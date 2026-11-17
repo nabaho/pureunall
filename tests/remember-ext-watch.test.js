@@ -43,6 +43,7 @@ test('★★ 제때 돌고 있으면 아무것도 안 한다', () => {
   const d = sync.decide({ at: T(14, 31) }, T(14, 50), {});
   assert.deepStrictEqual(d.act, []);
   assert.deepStrictEqual(sync.decide({ at: T(13, 59) }, T(14, 10), {}).act, [], '★ 예정 뒤 15분 여유 안에서는 기다린다');
+  assert.doesNotThrow(() => sync.decide(null, T(14, 50), {}), '★ 서버 status 가 비어 있으면 갱신기가 죽습니다');
 });
 
 test('★★★ 예정이 15분 넘게 늦으면 깨운다 — 25분 안에 또 깨우지는 않는다', () => {

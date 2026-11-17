@@ -98,7 +98,8 @@ function prevSlot(nowMs) {
 }
 function isLate(st, nowMs) {
   const p = prevSlot(nowMs - GRACE_MS);
-  return !!(p && !(Number.isFinite(Number(st && st.at)) && Number(st.at) >= p));
+  const at = Number(st && st.at);   // st 가 null 이어도 던지지 않는다
+  return !!(p && !(Number.isFinite(at) && at >= p));
 }
 const when = (ms) => { const d = new Date(Number(ms) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
 
