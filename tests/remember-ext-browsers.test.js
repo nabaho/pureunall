@@ -26,9 +26,10 @@ function fakePc(spec) {
   const put = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
   const egoUser = path.join(L, 'Citro Labs', 'ego lite', 'User Data');
   const chromeUser = path.join(L, 'Google', 'Chrome', 'User Data');
-  const prefs = (extPath, id) => JSON.stringify({ extensions: { settings: { [id]: { path: extPath } } } });
-  (spec.ego || []).forEach((e) => put(path.join(egoUser, e.profile, 'Secure Preferences'), prefs(e.path, e.id)));
-  (spec.chrome || []).forEach((e) => put(path.join(chromeUser, e.profile, 'Secure Preferences'), prefs(e.path, e.id)));
+  const prefs = (extPath, id, extra) => JSON.stringify({ extensions: { settings: { [id]: Object.assign({ path: extPath }, extra || {}) } } });
+  (spec.ego || []).forEach((e) => put(path.join(egoUser, e.profile, 'Secure Preferences'), prefs(e.path, e.id, e.extra)));
+  (spec.chrome || []).forEach((e) => put(path.join(chromeUser, e.profile, 'Secure Preferences'), prefs(e.path, e.id, e.extra)));
+  if (spec.egoNames) put(path.join(egoUser, 'Local State'), JSON.stringify({ profile: { info_cache: spec.egoNames } }));
   if (spec.egoExe !== false) put(path.join(P, 'Citro Labs', 'ego lite', 'Application', 'ego.exe'), 'x');
   if (spec.chromeExe !== false) put(path.join(P, 'Google', 'Chrome', 'Application', 'chrome.exe'), 'x');
   return { root, L, P, X, egoExe: path.join(P, 'Citro Labs', 'ego lite', 'Application', 'ego.exe'),
@@ -115,6 +116,29 @@ test('★★ 확장 경로가 빈 글자(내장 확장 등)면 «지금 작업 �
   let r;
   try { process.chdir(DIR); r = withPc(pc, () => sync.findExt()); } finally { process.chdir(before); }
   assert.strictEqual(r, null, '★★ 빈 경로의 확장이 우리 확장으로 보입니다 — 예약 작업에서 엉뚱한 확장 화면을 열게 됩니다');
+});
+
+/* 2026-11-17 — 에고라이트에서 확장이 꺼졌는데(disable_reasons) 갱신기가 30분마다 그 확장 화면을 열어 «…이(가) 차단됨» 창이 계속 떴다 */
+const OFF = { disable_reasons: [16777216] };   // 에고라이트 설정 파일에서 실제로 읽은 모양(새 판: 목록)
+
+test('★★★ 꺼진 확장은 «켜진 것»으로 보지 않는다 — 켜진 곳이 있으면 그쪽, 없으면 off 로 돌려준다', () => {
+  const both = fakePc({ ego: [{ profile: 'Profile 1', path: EXT, id: ID, extra: OFF }], chrome: [{ profile: 'Default', path: EXT, id: ID }],
+    egoNames: { 'Profile 1': { name: '가짜이름' } } });
+  const r = withPc(both, () => sync.findExt());
+  assert.strictEqual(r.browser, '크롬', '★★★ 꺼진 에고라이트를 깨우러 갑니다 — 켜진 크롬이 있는데도');
+  assert.ok(!r.off, '켜진 곳을 꺼졌다고 합니다');
+  assert.ok(r.offIn.length === 1 && r.offIn[0].browser === '에고라이트' && r.offIn[0].profileName === '가짜이름', '★ 꺼진 곳을 알려 주지 않습니다(알림에 쓴다)');
+
+  const onlyOff = fakePc({ ego: [{ profile: 'Profile 1', path: EXT, id: ID, extra: OFF }] });
+  const o = withPc(onlyOff, () => sync.findExt());
+  assert.ok(o && o.off === true && o.browser === '에고라이트', '★★★ 꺼진 곳밖에 없는데 off 로 돌려주지 않습니다');
+  const plan = sync.kickPlan(o);
+  assert.ok(!plan.exe && /꺼져/.test(plan.why), '★★★ 꺼진 확장인데 깨우기 계획을 세웁니다 — «차단됨» 창이 뜹니다: ' + JSON.stringify(plan));
+});
+
+test('★★ «꺼짐» 판정 — 옛 판(숫자)·새 판(목록)·state 0 은 꺼짐, 빈 목록·0 은 켜짐', () => {
+  [{ disable_reasons: 1 }, { disable_reasons: [1] }, { disable_reasons: [16777216] }, { state: 0 }].forEach((s) => assert.ok(sync.extIsOff(s), '꺼짐을 못 봅니다: ' + JSON.stringify(s)));
+  [{}, { disable_reasons: [] }, { disable_reasons: 0 }, { state: 1 }, null].forEach((s) => assert.ok(!sync.extIsOff(s), '켜진 것을 꺼졌다고 봅니다: ' + JSON.stringify(s)));
 });
 
 test('★★ 깨우기 계획 — 그 브라우저·그 프로필로, 확장 자기 화면(kick.html)을 연다', () => {

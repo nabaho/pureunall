@@ -79,6 +79,9 @@ function log(msg) {
    낮 09:00~18:00 은 30분마다, 그 밖에는 00:00 · 06:00. 예정 뒤 15분이 지나도 그 뒤 확인이 없으면 «늦음». */
 const DAY_FROM = 9 * 60, DAY_TO = 18 * 60, EVERY_MIN = 30, NIGHT = [0, 6 * 60];
 const GRACE_MS = 15 * 60000, KICK_GAP_MS = 25 * 60000, ALERT_AFTER_MS = 60 * 60000;
+/* 깨우기는 한 번 멈춤에 «두 번»까지 25분 간격, 그 뒤로는 3시간에 한 번만 (2026-11-17 대표 「계속 팝업나온다 … 근본적으로 해결」).
+   예전에는 멈춰 있는 내내 30분마다 브라우저를 앞으로 띄웠다 — 11/11~17 하루 7~39번. 사람에게는 이미 장애 알림이 가 있다. */
+const MAX_KICKS = 2, KICK_RETRY_MS = 3 * 60 * 60000;
 function slotsOfDay() {
   const s = NIGHT.slice();
   for (let m = DAY_FROM; m <= DAY_TO; m += EVERY_MIN) s.push(m);
@@ -95,35 +98,49 @@ function prevSlot(nowMs) {
 }
 function isLate(st, nowMs) {
   const p = prevSlot(nowMs - GRACE_MS);
-  return !!(p && !((Number(st && st.at) || 0) >= p));
+  return !!(p && !(Number.isFinite(Number(st && st.at)) && Number(st.at) >= p));
 }
 const when = (ms) => { const d = new Date(Number(ms) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
 
 /* 할 일을 정한다(순수 함수 — 검사가 그대로 돌린다).
-   st: 서버 status · state: 지난번 기억 {lateSince, lastKick, alerted} → {act: [...], state, why} */
-function decide(st, nowMs, state) {
-  const s = Object.assign({ lateSince: 0, lastKick: 0, alerted: '' }, state || {});
+   st: 서버 status · state: 지난번 기억 {lateSince, lastKick, kicks, alerted} · ext: findExt() 결과(없어도 된다)
+   → {act: [...], state, why} */
+function decide(st, nowMs, state, ext) {
+  const s = Object.assign({ lateSince: 0, lastKick: 0, kicks: 0, alerted: '' }, state || {});
   if (!isLate(st, nowMs)) {
     const act = s.alerted ? ['resolve'] : [];
-    return { act: act, state: { lateSince: 0, lastKick: 0, alerted: '' }, why: '제때 돌고 있음 (마지막 ' + when(st && st.at) + ')' };
+    return { act: act, state: { lateSince: 0, lastKick: 0, kicks: 0, alerted: '' }, why: '제때 돌고 있음 (마지막 ' + when(st && st.at) + ')' };
   }
   const act = [];
   if (!s.lateSince) s.lateSince = nowMs;
   const loginLost = st && st.err === 'login' && (Number(st.errAt) || 0) >= (Number(st.at) || 0);
-  if (!loginLost && nowMs - s.lastKick >= KICK_GAP_MS) { act.push('kick'); s.lastKick = nowMs; }
-  const reason = loginLost ? 'login' : 'stuck';
-  if (s.alerted !== reason && (loginLost || nowMs - s.lateSince >= ALERT_AFTER_MS)) { act.push('alert:' + reason); s.alerted = reason; }
-  return { act: act, state: s, why: '늦음 — 마지막 ' + when(st && st.at) + ', 예정 ' + when(prevSlot(nowMs - GRACE_MS)) + (loginLost ? ' · 리멤버 로그인 풀림' : '') };
+  /* 확장이 꺼져 있으면 깨워도 «…이(가) 차단됨» 화면만 뜬다 — 깨우지 말고 곧바로 «켜 주세요»를 알린다 */
+  const extOff = !!(ext && ext.off);
+  const gap = (Number(s.kicks) || 0) >= MAX_KICKS ? KICK_RETRY_MS : KICK_GAP_MS;
+  if (!loginLost && !extOff && nowMs - s.lastKick >= gap) { act.push('kick'); s.lastKick = nowMs; s.kicks = (Number(s.kicks) || 0) + 1; }
+  const reason = loginLost ? 'login' : extOff ? 'off' : 'stuck';
+  if (s.alerted !== reason && (loginLost || extOff || nowMs - s.lateSince >= ALERT_AFTER_MS)) { act.push('alert:' + reason); s.alerted = reason; }
+  return { act: act, state: s, why: '늦음 — 마지막 ' + when(st && st.at) + ', 예정 ' + when(prevSlot(nowMs - GRACE_MS)) +
+    (loginLost ? ' · 리멤버 로그인 풀림' : '') + (extOff ? ' · ' + extLabel(ext) + ' 에서 확장이 꺼져 있음' : '') };
 }
 
+/* «에고라이트 「…」 프로필» 처럼 사람이 알아보는 이름 — 프로필 이름은 설정 파일에서 읽은 것이다(박지 않는다) */
+function extLabel(e) { return e ? e.browser + ' 「' + (e.profileName || e.profile) + '」 프로필' : ''; }
+function extPage(e) { return e && e.browser === '크롬' ? 'chrome://extensions' : 'ego://extensions(크롬은 chrome://extensions)'; }
+
 /* 대표 「⚠ 장애 알림」에 올릴 말 — «무엇을 하면 되는지»가 먼저다 */
-function alertText(reason, st) {
+function alertText(reason, st, ext) {
   if (reason === 'login') {
     return '📇 리멤버 연결 — 리멤버 로그인이 풀렸습니다. 확장을 깐 브라우저(에고라이트·크롬)의 리멤버 탭(card.rememberapp.co.kr)에서 다시 로그인해 주세요. 로그인하면 30분 안에 저절로 이어집니다.';
   }
+  if (reason === 'off') {
+    return '📇 리멤버 연결이 ' + when(st && st.at) + ' 뒤로 멈췄습니다 — ' + (extLabel(ext) || '확장을 깐 브라우저(에고라이트·크롬)') + ' 에서 「푸른 리멤버 연결」 확장이 «꺼져» 있습니다. ' +
+      '① 주소창에 ' + extPage(ext) + ' ② 오른쪽 위 «개발자 모드» 켜기 ③ 「푸른 리멤버 연결」 스위치 켜기 — 켜면 30분 안에 저절로 이어집니다. 그래도 안 되면 클로드에게 「리멤버 점검」.';
+  }
+  const offIn = ext && Array.isArray(ext.offIn) && ext.offIn.length ? ' ※ ' + ext.offIn.map(extLabel).join('·') + ' 에서는 확장이 꺼져 있습니다(' + extPage(ext.offIn[0]) + ' 에서 켜기).' : '';
   return '📇 리멤버 연결이 ' + when(st && st.at) + ' 뒤로 멈췄습니다(PC 가 두 번 깨워 봄). ' +
     '① 확장을 깐 브라우저(에고라이트·크롬)가 켜져 있나 ② 「📇 리멤버 받기」 탭이 푸른에 로그인돼 있나 ③ 리멤버 탭이 로그인돼 있나 ' +
-    '④ 브라우저 오른쪽 위 「푸른 리멤버 연결」 아이콘 한 번 — 그래도 안 되면 클로드에게 「리멤버 점검」.';
+    '④ 브라우저 오른쪽 위 「푸른 리멤버 연결」 아이콘 한 번 — 그래도 안 되면 클로드에게 「리멤버 점검」.' + offIn;
 }
 
 /* firebase CLI — node 가 .cmd 를 직접 못 띄우므로 CLI 의 진짜 JS 를 부른다 */
@@ -161,28 +178,52 @@ function browsers() {
 function firstFile(list) {
   return list.find((p) => { try { return fs.statSync(p).isFile(); } catch (e) { return false; } }) || '';
 }
+/* 확장이 «꺼져» 있나 — 크롬 계열 설정 파일의 disable_reasons(옛 판은 숫자, 새 판은 목록)·state(0 = 꺼짐)로 본다.
+   꺼진 확장의 화면(kick.html)을 열면 브라우저가 «…이(가) 차단됨 · ERR_BLOCKED_BY_CLIENT» 화면만 띄운다
+   (2026-11-17: 에고라이트에서 개발자 모드가 꺼져 압축해제 확장이 꺼졌는데, 갱신기가 30분마다 그 화면을 열었다). */
+function extIsOff(set) {
+  const r = set && set.disable_reasons;
+  if (Array.isArray(r) ? r.some((x) => Number(x) > 0) : Number(r) > 0) return true;
+  return !!(set && set.state === 0);
+}
+function profileNames(root) {
+  try { const j = JSON.parse(fs.readFileSync(path.join(root, 'Local State'), 'utf8')); return (j && j.profile && j.profile.info_cache) || {}; } catch (e) { return {}; }
+}
 /* 확장이 깔린 브라우저·프로필과 확장 번호를 찾는다 — 못 찾으면 null.
-   돌려주는 것: { browser, exe, profile, id }  (exe 는 못 찾으면 '') */
+   «켜진» 곳을 먼저 돌려준다. 꺼진 곳밖에 없으면 그 첫 곳을 off: true 로 돌려준다(깨우지 말고 «켜 주세요»를 알리게).
+   돌려주는 것: { browser, exe, profile, profileName, id, off, offIn: [꺼진 곳들] }  (exe 는 못 찾으면 '') */
 function findExt() {
   const want = path.resolve(DIR).toLowerCase();
+  const offIn = [];
   for (const b of browsers()) {
     let dirs = [];
     try { dirs = fs.readdirSync(b.root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) { continue; }
-    for (const d of dirs) for (const pf of ['Secure Preferences', 'Preferences']) {
-      let j;
-      try { j = JSON.parse(fs.readFileSync(path.join(b.root, d, pf), 'utf8')); } catch (e) { continue; }
-      const set = (j && j.extensions && j.extensions.settings) || {};   // 설정 파일이 JSON null 이어도 던지지 않는다
-      for (const id of Object.keys(set)) {
-        /* 빈 경로(''·내장 확장)는 건너뛴다 — path.resolve('') 는 «지금 작업 폴더»라, 예약 작업(작업 폴더 = 이 폴더)에서는 엉뚱한 확장이 우리 것으로 보인다 */
-        if (set[id] && typeof set[id].path === 'string' && set[id].path !== '' && path.resolve(set[id].path).toLowerCase() === want) return { browser: b.name, exe: firstFile(b.exes), profile: d, id: id };
+    const names = profileNames(b.root);
+    for (const d of dirs) {
+      /* 한 프로필에서는 먼저 찾힌 파일(Secure Preferences)만 믿는다 — 다른 파일의 반쪽 항목이 «켜짐»으로 보이지 않게 */
+      let hit = null;
+      for (const pf of ['Secure Preferences', 'Preferences']) {
+        let j;
+        try { j = JSON.parse(fs.readFileSync(path.join(b.root, d, pf), 'utf8')); } catch (e) { continue; }
+        const set = (j && j.extensions && j.extensions.settings) || {};   // 설정 파일이 JSON null 이어도 던지지 않는다
+        for (const id of Object.keys(set)) {
+          /* 빈 경로(''·내장 확장)는 건너뛴다 — path.resolve('') 는 «지금 작업 폴더»라, 예약 작업(작업 폴더 = 이 폴더)에서는 엉뚱한 확장이 우리 것으로 보인다 */
+          if (set[id] && typeof set[id].path === 'string' && set[id].path !== '' && path.resolve(set[id].path).toLowerCase() === want) { hit = { id: id, off: extIsOff(set[id]) }; break; }
+        }
+        if (hit) break;
       }
+      if (!hit) continue;
+      const found = { browser: b.name, exe: firstFile(b.exes), profile: d, profileName: String((names[d] && names[d].name) || ''), id: hit.id };
+      if (!hit.off) return Object.assign(found, { offIn: offIn });
+      offIn.push(found);
     }
   }
-  return null;
+  return offIn.length ? Object.assign({}, offIn[0], { off: true, offIn: offIn }) : null;
 }
 /* 깨우기 계획(순수) — 어느 브라우저를 어느 프로필로 어떤 화면과 함께 켤지. 못 하면 { why } */
 function kickPlan(ext) {
   if (!ext) return { why: '확장이 깔린 프로필을 못 찾음(에고라이트·크롬)' };
+  if (ext.off) return { why: extLabel(ext) + ' 에서 확장이 꺼져 있음 — 열어도 «차단됨» 화면만 뜸' };
   if (!ext.exe) return { why: ext.browser + ' 실행 파일을 못 찾음' };
   return { exe: ext.exe, args: ['--profile-directory=' + ext.profile, 'chrome-extension://' + ext.id + '/kick.html'], browser: ext.browser };
 }
@@ -200,17 +241,18 @@ function watch(dry) {
   let st;
   try { st = readStatus(); } catch (e) { log('지켜보기 못 함 — 서버를 못 읽음: ' + String((e && e.stderr) || (e && e.message) || e).replace(/\s+/g, ' ').slice(0, 100)); return; }
   let prev = {};
-  try { prev = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (e) { /* 처음 */ }
-  const d = decide(st, Date.now(), prev);
+  try { prev = JSON.parse(fs.readFileSync(STATE, 'utf8')) || {}; } catch (e) { /* 처음 */ }
+  const ext = findExt();
+  const d = decide(st, Date.now(), prev, ext);
   if (dry) { console.log(JSON.stringify(d)); return; }
   if (d.act.length || prev.alerted) log('지켜보기 — ' + d.why + (d.act.length ? ' → ' + d.act.join(', ') : ''));
   for (const a of d.act) {
     try {
       if (a === 'kick') kick('늦음');
       /* 칸은 장애 알림판(js/pu-health.js)과 같게 — 판은 status 'new' 만 센다 */
-      else if (a.indexOf('alert:') === 0) writeAlert(st.by, { createdAt: Date.now(), kind: 'remember', status: 'new', page: '리멤버 연결', name: 'PC 자동 점검', message: alertText(a.slice(6), st) });
+      else if (a.indexOf('alert:') === 0) writeAlert(st.by, { createdAt: Date.now(), kind: 'remember', status: 'new', page: '리멤버 연결', name: 'PC 자동 점검', message: alertText(a.slice(6), st, ext) });
       else if (a === 'resolve') writeAlert(st.by, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'remember-watch', message: '📇 리멤버 연결 — 다시 돌고 있습니다 (' + when(st.at) + ')' });
-    } catch (e) { log(a + ' 실패 — ' + String((e && e.message) || e).slice(0, 100)); }
+    } catch (e) { if (a === 'resolve' || a.indexOf('alert:') === 0) d.state.alerted = prev.alerted || ''; log(a + ' 실패 — ' + String((e && e.message) || e).slice(0, 100)); }
   }
   try { fs.writeFileSync(STATE, JSON.stringify(d.state)); } catch (e) { /* 다음에 다시 센다 */ }
 }
@@ -247,5 +289,5 @@ function main() {
   watch(dry);
 }
 
-module.exports = { FILES, verOf, shape, judge, slotsOfDay, prevSlot, isLate, decide, alertText, browsers, findExt, kickPlan };
+module.exports = { FILES, verOf, shape, judge, slotsOfDay, prevSlot, isLate, decide, alertText, browsers, findExt, kickPlan, extIsOff, MAX_KICKS, KICK_RETRY_MS };
 if (require.main === module) main();
