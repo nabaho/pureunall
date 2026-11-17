@@ -118,7 +118,8 @@ function decide(st, nowMs, state, ext) {
   const extOff = !!(ext && ext.off);
   const gap = (Number(s.kicks) || 0) >= MAX_KICKS ? KICK_RETRY_MS : KICK_GAP_MS;
   if (!loginLost && !extOff && nowMs - s.lastKick >= gap) { act.push('kick'); s.lastKick = nowMs; s.kicks = (Number(s.kicks) || 0) + 1; }
-  const reason = loginLost ? 'login' : extOff ? 'off' : 'stuck';
+  /* 꺼짐이 로그인보다 먼저다 — 확장이 꺼져 있으면 리멤버에 다시 로그인해도 안 돈다 */
+  const reason = extOff ? 'off' : loginLost ? 'login' : 'stuck';
   if (s.alerted !== reason && (loginLost || extOff || nowMs - s.lateSince >= ALERT_AFTER_MS)) { act.push('alert:' + reason); s.alerted = reason; }
   return { act: act, state: s, why: '늦음 — 마지막 ' + when(st && st.at) + ', 예정 ' + when(prevSlot(nowMs - GRACE_MS)) +
     (loginLost ? ' · 리멤버 로그인 풀림' : '') + (extOff ? ' · ' + extLabel(ext) + ' 에서 확장이 꺼져 있음' : '') };
@@ -194,7 +195,7 @@ function profileNames(root) {
    돌려주는 것: { browser, exe, profile, profileName, id, off, offIn: [꺼진 곳들] }  (exe 는 못 찾으면 '') */
 function findExt() {
   const want = path.resolve(DIR).toLowerCase();
-  const offIn = [];
+  const offIn = [], onIn = [];   // 끝까지 다 본다 — 켜진 곳 «뒤»의 꺼진 프로필도 알림에 넣게
   for (const b of browsers()) {
     let dirs = [];
     try { dirs = fs.readdirSync(b.root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) { continue; }
@@ -214,10 +215,10 @@ function findExt() {
       }
       if (!hit) continue;
       const found = { browser: b.name, exe: firstFile(b.exes), profile: d, profileName: String((names[d] && names[d].name) || ''), id: hit.id };
-      if (!hit.off) return Object.assign(found, { offIn: offIn });
-      offIn.push(found);
+      (hit.off ? offIn : onIn).push(found);
     }
   }
+  if (onIn.length) return Object.assign({}, onIn[0], { offIn: offIn });
   return offIn.length ? Object.assign({}, offIn[0], { off: true, offIn: offIn }) : null;
 }
 /* 깨우기 계획(순수) — 어느 브라우저를 어느 프로필로 어떤 화면과 함께 켤지. 못 하면 { why } */

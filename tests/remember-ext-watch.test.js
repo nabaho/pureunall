@@ -89,6 +89,8 @@ test('★★★ 확장이 꺼져 있으면 깨우지 않고 곧바로 «켜 주�
   const m = sync.alertText('off', { at: T(13, 0) }, ext);
   ['에고라이트', '이름', 'extensions', '개발자 모드', '켜'].forEach((k) => assert.ok(m.indexOf(k) >= 0, '★★ 알림에 «' + k + '» 가 없습니다 — 무엇을 하면 되는지 모릅니다: ' + m));
   assert.deepStrictEqual(sync.decide({ at: T(14, 31) }, T(14, 50), d.state, ext).act, ['resolve'], '★★ 다시 돌아도 «켜 주세요» 알림이 안 닫힙니다');
+  const both = sync.decide({ at: T(13, 0), err: 'login', errAt: T(13, 30) }, T(14, 20), {}, ext).act;
+  assert.ok(both.includes('alert:off') && !both.includes('kick'), '★★ 꺼져 있고 로그인도 풀렸을 때 «다시 로그인»만 알립니다 — 확장이 꺼져 있으면 로그인해도 안 돕니다: ' + both.join(','));
 });
 
 test('★★ 다른 곳에서 켜져 있으면 그쪽을 깨우고, 꺼진 곳은 멈춤 알림에 덧붙인다', () => {

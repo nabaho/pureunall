@@ -129,6 +129,11 @@ test('★★★ 꺼진 확장은 «켜진 것»으로 보지 않는다 — 켜�
   assert.ok(!r.off, '켜진 곳을 꺼졌다고 합니다');
   assert.ok(r.offIn.length === 1 && r.offIn[0].browser === '에고라이트' && r.offIn[0].profileName === '가짜이름', '★ 꺼진 곳을 알려 주지 않습니다(알림에 쓴다)');
 
+  const after = fakePc({ ego: [{ profile: 'Profile 1', path: EXT, id: ID }, { profile: 'Profile 2', path: EXT, id: ID, extra: { disable_reasons: [1] } }] });
+  const a = withPc(after, () => sync.findExt());
+  assert.ok(a && !a.off && a.profile === 'Profile 1' && a.offIn.length === 1 && a.offIn[0].profile === 'Profile 2',
+    '★ 켜진 곳 «뒤»에 있는 꺼진 프로필을 빠뜨립니다 — 멈춤 알림에 안 나옵니다: ' + JSON.stringify(a && a.offIn));
+
   const onlyOff = fakePc({ ego: [{ profile: 'Profile 1', path: EXT, id: ID, extra: OFF }] });
   const o = withPc(onlyOff, () => sync.findExt());
   assert.ok(o && o.off === true && o.browser === '에고라이트', '★★★ 꺼진 곳밖에 없는데 off 로 돌려주지 않습니다');
