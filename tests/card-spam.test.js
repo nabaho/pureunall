@@ -160,7 +160,7 @@ function cardsSpam(items, lists, opt) {
   const state = { items, groups: { g1: { id: 'g1', name: '📬 메일에서 온 명함', kind: 'card' }, g2: { id: 'g2', name: '가나 폴더', kind: 'card' } },
     isAdmin: !!(opt && opt.admin) };
   const boxes = [];
-  const doc = { querySelector: () => (opt && opt.modalOpen) ? {} : null, createElement: () => { const b = {}; boxes.push(b); return b; },
+  const doc = { addEventListener() {}, querySelector: () => (opt && opt.modalOpen) ? {} : null, createElement: () => { const b = {}; boxes.push(b); return b; },
     body: { appendChild() {}, classList: { contains: (c) => c === 'pc' ? !(opt && opt.phone) : c === 'mailview' ? !!(opt && opt.mailView) : false } } };
   const deps = { state, Store, DB_ROOT: 'pucards', inHiddenLocked: (it) => !!it.locked, PuCardSpam: S,
     ErpMatch: { match: (it) => (it.erp ? {} : null) }, toast: (m) => toasts.push(m), render() {}, renderSoon() {}, myEmail: 'boss@gana.example',
@@ -248,6 +248,16 @@ test('★★★ ⑦ 창에서 정하기 — 주소로 남고, 보류 줄 «남�
   assert.ok(u2['pucards/mailcard/spam/' + S.key('abc9@gana.example')], '★★★ 스팸으로 정한 주소를 안 남겼다 — 또 들어온다');
   assert.deepEqual(c.deleted, ['q1'], '스팸으로 정한 명함은 휴지통으로');
   assert.equal(c.cspRows().length, 0);
+});
+
+test('★★ ⑦ 저장하는 동안 또 눌러도 한 번만 한다', async () => {
+  const c = cardsSpam({ q1: mailCard('q1', { name: '기업지원팀장', email: 'abc9@gana.example' }) }, {}, { admin: true });
+  await c.cardSpamRun();
+  await Promise.all([c.cspDecide(['c:q1'], 'spam'), c.cspDecide(['c:q1'], 'spam')]);
+  assert.equal(c.updates.length, 1, '★★ 빠르게 두 번 누르면 같은 저장을 두 번 한다');
+  assert.deepEqual(c.deleted, ['q1']);
+  await c.cspDecide(['c:q1'], 'spam');
+  assert.ok(c.toasts.some((m) => /고른 줄이 없습니다/.test(m)), '저장이 끝나면 다시 받는다');
 });
 
 test('★★ ⑦ 창이 먼저 열려 있어도 새로 찾은 의심을 그 창에 그린다', async () => {

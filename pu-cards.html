@@ -17843,8 +17843,13 @@ function cspClose(){ _cspOn = false; _cspSel = {}; cspMount(); renderSoon(); }
 function cspMount(){
   let box = $('cspBox');
   if(!box){ if(!_cspOn) return; box = document.createElement('div'); box.id = 'cspBox'; document.body.appendChild(box); }
+  /* ☐ 하나 누를 때마다 창을 다시 그린다 — 내려 둔 자리를 지켜야 긴 목록에서 맨 위로 튀지 않는다 */
+  const old = box.querySelector && box.querySelector('.body'), top = old ? old.scrollTop : 0;
   box.innerHTML = _cspOn ? cspHtml() : '';
+  const nb = top && box.querySelector && box.querySelector('.body'); if(nb) nb.scrollTop = top;
 }
+/* Esc 로 닫는다(「나중에」와 같다) — 창이 떠 있을 때만 */
+document.addEventListener('keydown', e => { if(_cspOn && e.key === 'Escape') cspClose(); });
 function cspPick(k){ if(_cspSel[k]) delete _cspSel[k]; else _cspSel[k] = 1; cspMount(); }
 function cspPickAll(on){ _cspSel = {}; if(on) cspRows().forEach(r => { _cspSel[r.k] = 1; }); cspMount(); }
 function cspKeyOf(el){ const t = el && el.closest && el.closest('[data-k]'); return t ? t.getAttribute('data-k') : ''; }
@@ -17852,7 +17857,13 @@ function cspKeyOf(el){ const t = el && el.closest && el.closest('[data-k]'); ret
    ⚠ 보류한 메일 줄을 «남기기»로 하면 줄을 read 로 돌린다 — 받는 탭이 같은 문(sendToCards)으로 넣는다.
      여기서 명함을 직접 만들지 않는다(겹침 검사·사람별 잠금을 비켜 가면 중복이 생긴다).
    ⚠ 이미 있는 명함을 «스팸»으로 하면 휴지통으로(30일 안에 되살린다). 여러 줄이면 건수를 묻는다. */
+let _cspSaving = false;    /* 저장하는 동안 또 누르면 같은 일을 두 번 한다 — 끝날 때까지 받지 않는다 */
 async function cspDecide(keys, verdict){
+  if(_cspSaving) return toast('앞서 누른 것을 저장하고 있습니다 — 잠시만요', 3000);
+  _cspSaving = true;
+  try{ return await cspDecideNow(keys, verdict); }finally{ _cspSaving = false; }
+}
+async function cspDecideNow(keys, verdict){
   const pick = {}; (keys||[]).forEach(k => { if(k) pick[k] = 1; });
   const rows = cspRows().filter(r => pick[r.k]);
   if(!rows.length) return toast('고른 줄이 없습니다');
@@ -17927,7 +17938,7 @@ function cspHtml(){
         + '<tr><th></th><th>#</th><th>갈래</th><th>이름</th><th>회사 · 직함</th><th>메일 주소</th><th>메일 제목</th><th>왜 의심하나</th><th></th></tr>'
         + rows.map((r, i) => {
           const co = [r.company, r.title].filter(Boolean).join(' · ');
-          return '<tr data-k="' + esc(r.k) + '"><td><input type="checkbox" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"></td>'
+          return '<tr data-k="' + esc(r.k) + '"><td><input type="checkbox" aria-label="' + esc((r.name || '이름 없음') + ' 고르기') + '" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"></td>'
             + '<td class="em" style="text-align:right">' + (i + 1) + '</td><td>' + tag(r) + '</td>'
             + '<td title="' + esc(r.name) + '"><b>' + esc(r.name || '(이름 없음)') + '</b></td>'
             + '<td title="' + esc(co) + '">' + esc(co) + '</td>'
@@ -17938,17 +17949,17 @@ function cspHtml(){
         }).join('') + '</table>';
     }else{
       body += rows.map((r, i) => '<div class="nck-m" data-k="' + esc(r.k) + '"><div class="l1">'
-        + '<input type="checkbox" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"> '
+        + '<input type="checkbox" aria-label="' + esc((r.name || '이름 없음') + ' 고르기') + '" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"> '
         + '<span class="em">' + (i + 1) + '</span> ' + tag(r) + ' <b>' + esc(r.name || '(이름 없음)') + '</b> '
         + '<span class="em">' + esc([r.company, r.email].filter(Boolean).join(' · ')) + '</span></div>'
         + '<div class="l1 em" title="' + esc(r.why) + '">' + esc(r.why) + (r.subject ? ' — ' + esc(r.subject) : '') + '</div>'
         + '<div class="l2 act">' + btns + '</div></div>').join('');
     }
   }
-  return '<div class="mck-dim csp-dim" onclick="if(event.target===this)cspClose()"><div class="mck nck-box csp-box">'
+  return '<div class="mck-dim csp-dim" onclick="if(event.target===this)cspClose()"><div class="mck nck-box csp-box" role="dialog" aria-modal="true" aria-label="스팸 의심 — 남길까요?">'
     + '<header><span>🤔</span><h2>스팸 의심 — 남길까요?</h2>'
     + (pc ? '<span class="em">확실한 스팸은 저절로 걸렀습니다. 아래는 사람이 보고 정할 것입니다 — 정한 주소는 다시 묻지 않습니다.</span>' : '')
-    + '<span class="x" onclick="cspClose()" title="나중에 — 옆줄 「🤔 스팸 의심」으로 다시 엽니다">✕</span></header>'
+    + '<span class="x" role="button" tabindex="0" aria-label="나중에 닫기" onclick="cspClose()" onkeydown="if(event.key===\'Enter\'||event.key===\' \')cspClose()" title="나중에(Esc) — 옆줄 「🤔 스팸 의심」으로 다시 엽니다">✕</span></header>'
     + '<div class="body">' + body + '</div></div></div>';
 }
 
