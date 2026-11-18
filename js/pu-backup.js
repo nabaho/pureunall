@@ -7,7 +7,13 @@
     'enter.html': { id: 'portal', paths: ['data/portal_prefs_uid', 'data/suggestions', 'data/sg_meta'] },
     'chwieop.html': { id: 'chwieop', paths: ['chwieop'] },
     'docs-esign.html': { id: 'esign', paths: ['esign'] },
-    'fund.html': { id: 'fund', paths: ['fund_erp'] },
+    /* ⚠ fund_erp 는 통째로 한 칸이 아니다 — 결산 파일 본문(closing_blobs)·재고 파일 본문(stock_blobs)이
+       들어 있어 2026-11-18 에 66MB 가 되었다. 한 칸이 약 800만 글자를 넘으면 이 백업은 그 칸을
+       «통째로» 건너뛰므로, 11-16 부터 기금 자료 전체가 백업에서 빠졌다(마지막 온전한 백업 11-11).
+       그래서 «본문 두 칸만 빼고» 나머지(약 2MB)를 담는다 — except 로 이름을 적은 칸은 읽지도 않는다
+       (범위 질의라 내려받기도 줄어든다). 빼는 칸은 백업 기록에도 skipped:'excluded' 로 남긴다.
+       빠진 본문 두 칸의 사본은 이 백업에 없다 — 창고로 옮기며 따로 챙겨야 한다. */
+    'fund.html': { id: 'fund', paths: ['fund_erp'], except: { 'fund_erp': ['closing_blobs', 'stock_blobs'] } },
     'gov-consulting.html': { id: 'gov-consulting', paths: ['scal_cos', 'scal_scheds', 'scal_roundlog', 'scal_staff'] },
     'kcareer.html': { id: 'kcareer', paths: [] },
     'payroll-os.html': { id: 'payroll', paths: ['payroll_os'] },
@@ -52,7 +58,7 @@
   function getConfig(user) {
     var base = configs[pageName()];
     if (!base) return null;
-    var config = { id: base.id, paths: base.paths.slice(), strip: base.strip || {} };
+    var config = { id: base.id, paths: base.paths.slice(), strip: base.strip || {}, except: base.except || {} };
     if (base.id === 'kcareer') config.paths = ['kcareer/' + user.uid];
     /* 규정관리의 실제 작업물(작성 중인 규정·작업 보관)은 사람마다 따로 있고
        규칙이 남의 칸 읽기를 막는다 — 그래서 백업하는 사람 본인 칸만 담는다
@@ -76,10 +82,54 @@
     return out;
   }
 
-  function readPaths(db, paths, strip) {
+  /* 실시간DB 의 키 순서: 32비트 정수로 읽히는 키가 먼저(수치 순), 나머지는 글자 순.
+     범위 질의의 경계를 이 순서로 정렬해야 이름에 숫자 모양 키가 섞여도 범위가 뒤집히지 않는다. */
+  function isIntKey(k) {
+    if (!/^(0|-?[1-9][0-9]*)$/.test(k)) return false;
+    var n = Number(k);
+    return n >= -2147483648 && n <= 2147483647;
+  }
+  function compareKeys(a, b) {
+    var ia = isIntKey(a), ib = isIntKey(b);
+    if (ia && ib) return Number(a) - Number(b);
+    if (ia) return -1;
+    if (ib) return 1;
+    return a < b ? -1 : (a > b ? 1 : 0);
+  }
+
+  /* 이름을 적은 아랫칸만 «빼고» 읽는다 — 키 순서 범위 질의 여러 번으로, 뺀 칸은 서버에서 받지도 않는다.
+     ⚠ 되돌릴 때 부모 칸을 통째로 쓰면 뺀 칸이 지워지므로, 읽은 아랫칸마다 «자기 경로»로 따로 담는다.
+        부모 칸 자체의 항목은 만들지 않는다(복원이 부모를 덮어쓰지 못하게). 뺀 칸은 skipped:'excluded' 로 표시. */
+  function readExcept(db, dbPath, names) {
+    var sorted = names.slice().sort(compareKeys);
+    var ranges = [];
+    var prev = null;
+    sorted.forEach(function (name) { ranges.push([prev, name]); prev = name; });
+    ranges.push([prev, null]);
+    return Promise.all(ranges.map(function (range) {
+      var query = db.ref(dbPath).orderByKey();
+      if (range[0] !== null) query = query.startAfter(range[0]);
+      if (range[1] !== null) query = query.endBefore(range[1]);
+      return query.once('value');
+    })).then(function (snapshots) {
+      var entries = [];
+      snapshots.forEach(function (snapshot) {
+        snapshot.forEach(function (child) {
+          entries.push({ path: dbPath + '/' + child.key, exists: true, value: child.val() });
+        });
+      });
+      sorted.forEach(function (name) { entries.push({ path: dbPath + '/' + name, skipped: 'excluded' }); });
+      return entries;
+    });
+  }
+
+  function readPaths(db, paths, strip, except) {
     var result = [];
     return paths.reduce(function (chain, dbPath) {
       return chain.then(function () {
+        if (except && except[dbPath] && except[dbPath].length) {
+          return readExcept(db, dbPath, except[dbPath]).then(function (entries) { entries.forEach(function (e) { result.push(e); }); });
+        }
         return db.ref(dbPath).once('value').then(function (snapshot) {
           var entry = { path: dbPath, exists: snapshot.exists() };
           if (entry.exists) entry.value = stripFields(snapshot.val(), strip && strip[dbPath]);
@@ -191,7 +241,7 @@
     var db = app.database();
     var user = app.auth().currentUser;
     if (!user || !config || !config.paths.length) return Promise.resolve(false);
-    return readPaths(db, config.paths, config.strip).then(function (data) {
+    return readPaths(db, config.paths, config.strip, config.except).then(function (data) {
       return sealEntries(db, data);     // ★ 크기를 «재기 전에» 잠근다
     }).then(function (data) {
       var trimmed = trimForWrite(data);
@@ -305,10 +355,22 @@
      옛 통째 백업을 복원할 때 낱칸들이 백업에 「없다」고 보여 «전부 지워질» 뻔했다.
      백업에 담긴 칸만 쓰면 옛 백업(통째)과 새 백업(낱칸)이 모두 안전하다.
      크기 때문에 건너뛴 칸(skipped)은 그대로 둔다 — 값이 없는데 지우면 안 된다. */
-  function restorePlan(backup) {
+  function restorePlan(backup, except) {
     var updates = {};
     (backup.paths || []).forEach(function (entry) {
       if (!entry || !entry.path || entry.skipped) return;
+      var keep = except && except[entry.path];
+      if (keep && keep.length) {
+        /* except 가 걸린 칸을 «옛 통째 백업»(부모 칸 한 항목)으로 되돌릴 때 — 부모를 통째로 쓰면
+           지금 DB 의 뺀 본문 칸이 지워지거나 옛 사본으로 바뀐다. 뺀 칸을 제외한 아랫칸만 쓴다.
+           (백업 당시 부모가 비어 있었다는 기록은 부모를 비우는 데 쓰지 않는다 — 뺀 칸이 같이 사라진다.) */
+        if (entry.exists === false || !entry.value || typeof entry.value !== 'object') return;
+        Object.keys(entry.value).forEach(function (k) {
+          if (keep.indexOf(k) >= 0) return;
+          updates[entry.path + '/' + k] = entry.value[k] === undefined ? null : entry.value[k];
+        });
+        return;
+      }
       updates[entry.path] = entry.exists === false ? null : (entry.value === undefined ? null : entry.value);
     });
     return updates;
@@ -326,7 +388,7 @@
       if (!backup || !Array.isArray(backup.paths)) throw new Error('백업 본문이 없습니다.');
       return unsealBackup(app.database(), backup);   // ★ 쓰기 전에 «반드시» 푼다
     }).then(function (backup) {
-      var updates = restorePlan(backup);
+      var updates = restorePlan(backup, config.except);
       if (!Object.keys(updates).length) throw new Error('이 백업에는 복원할 내용이 없습니다.');
       return app.database().ref().update(updates).then(function () {
         return app.database().ref('systemRestoreLog/' + safeKey(config.id)).push({
@@ -407,7 +469,7 @@
 
   window.PUBackup = { install: install, snapshot: function () { return current ? createSnapshot(current.app, current.config, 'manual') : Promise.resolve(false); }, _config: getConfig, _dayKey: dayKey,
     /* 검사용 — 순수 셈들 */
-    _trim: trimForWrite, _strip: stripFields, _restorePlan: restorePlan,
+    _trim: trimForWrite, _strip: stripFields, _restorePlan: restorePlan, _read: readPaths,
     _limits: { entry: MAX_ENTRY_CHARS, total: MAX_TOTAL_CHARS, cooldown: FAIL_COOLDOWN_MS } };
   install();
 })(typeof window !== 'undefined' ? window : null);
