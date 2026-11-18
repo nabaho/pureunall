@@ -115,6 +115,12 @@ function 글쪽만들기(본, 글) {
   h = h.replace(/(<meta[^>]+(?:name="description"|name="twitter:description"|property="og:description")[^>]*content=")[^"]*(")/gi,
     '$1' + 감싸기(글.요약 || 글.제목) + '$2');
 
+  /* 주간 브리핑 꾸밈 — 본(바로 앞 글 쪽)에 꾸밈 줄이 없으면 붙인다 (2026-11-18 「주간브리핑 깔끔하게」).
+     글 쪽은 notice/<번호>/ 라 두 칸 올라가야 assets 다. 본에 이미 있으면 두 번 넣지 않는다. */
+  if (/class="pu_brief"/.test(String(글.본문 || '')) && h.indexOf('assets/css/pu-brief.css') < 0) {
+    h = h.replace(/<\/head>/i, '<link rel="stylesheet" href="../../assets/css/pu-brief.css" />\n</head>');
+  }
+
   /* 날짜 */
   h = h.replace(/(<i class="xi-time"><\/i>날짜 : <\/span><span class="detail_content">)[^<]*(<\/span>)/i,
     '$1' + 감싸기(글.날짜) + '$2');
