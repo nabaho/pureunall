@@ -31,23 +31,37 @@ test('① 포털·온톨로지·앱바·챗봇에 업무 오케스트레이션(o
   const orchHtml = readUtf8('pu-orchestrator.html');
   const viewSrc = readUtf8('js/pu-orchestrator-view.js');
 
-  assert.match(enterHtml, /key:\s*'orch'[\s\S]{0,160}?url:\s*'pu-orchestrator\.html'/);
-  assert.match(enterHtml, /id="orchBar"[^>]*\bhidden\b/, '로그인 전에는 포털 오케스트레이션 바가 숨겨져 있어야 합니다');
+  assert.match(enterHtml, /key:\s*'orch'[\s\S]{0,180}?url:\s*'pu-orchestrator\.html'[\s\S]{0,60}?popup:\s*true/);
+  assert.doesNotMatch(enterHtml, /id="orchBar"/, '포털 첫 화면에 상단 고정 넓은 오케스트레이션 창(#orchBar)을 띄우지 않습니다');
+  assert.match(enterHtml, /id="orchFab"[^>]*\bhidden\b/, '로그인 전에는 오케스트레이션 알약 단추가 숨겨져 있어야 합니다');
+  assert.match(enterHtml, /id="orchModal"[^>]*\bhidden\b/, '클릭 전에는 오케스트레이션 컴팩트 팝업(#orchModal)이 숨겨져 있어야 합니다');
   assert.match(enterHtml, /<script src="js\/pu-orchestrator-core\.js\?v=\d+"><\/script>/);
-  assert.match(enterHtml, /window\.portalLaunchApp\('orch'/, '포털 바는 portalLaunchApp 을 통해 명명된 창을 재사용해야 합니다');
+  assert.match(enterHtml, /function portalOrchOpenPopup\(/, '클릭 시 현재 화면 위 작은 팝업(#orchModal)으로 열려야 합니다');
+  assert.match(enterHtml, /popup=yes,width=540,height=680/, '상세 보드 열기 시에도 작은 팝업 창 크기를 지정해야 합니다');
+  assert.match(enterHtml, /ev\.key\s*!==\s*'Tab'/, '모달 팝업(#orchModal) 내부에 Tab 포커스 가두기가 있어야 합니다');
+  assert.match(enterHtml, /data-orch-more/, '60건 초과 바통에 대해 더 보기 페이지네이션이 제공되어야 합니다');
+  assert.match(enterHtml, /data-orch-done/, '바통 확인·복원 및 전체 스캔 갱신 뒤에도 행 내부 포커스가 보존되어야 합니다');
 
-  // READ_ADAPTERS 에서 strategy:'in_app' 으로 선언된 모든 경로(하위 경로 포함)와 pu_sign/open 을 직접 열지 않는지 동적 검증
+  // READ_ADAPTERS 에서 strategy:'in_app' 으로 선언된 모든 경로(하위 경로 포함)와 pu_sign/open 을 직접 열지 않는지 동적 검증 (뷰 + 포털 팝업 공통)
   const inAppPaths = Object.values(O.READ_ADAPTERS || {})
     .filter((a) => a && a.strategy === 'in_app' && a.path)
     .map((a) => String(a.path));
   assert.ok(inAppPaths.length >= 8, 'READ_ADAPTERS 의 in_app 경로 목록이 비어 있으면 안 됩니다');
   const readPathsInView = Array.from(viewSrc.matchAll(/\[\s*'[A-Za-z0-9_]+'\s*,\s*'([^']+)'/g), (m) => m[1]);
+  const fullScanBlock = (enterHtml.match(/function portalOrchFullScan\([\s\S]*?\n  \}/) || [''])[0];
+  const readPathsInPortal = Array.from(fullScanBlock.matchAll(/\brd\(\s*'([^']+)'\s*\)/g), (m) => m[1]);
   assert.ok(readPathsInView.length >= 8, '뷰의 수집 경로 목록이 추출되어야 합니다');
+  assert.ok(readPathsInPortal.length >= 8, '포털 팝업의 온디맨드 수집 경로 목록이 추출되어야 합니다');
   for (const p of [...inAppPaths, 'pu_sign/open', 'data/finance_income']) {
     assert.equal(
       readPathsInView.some((rp) => rp === p || rp.startsWith(p + '/')),
       false,
       `in_app 민감 경로(${p})를 뷰에서 직접 읽으면 안 됩니다`
+    );
+    assert.equal(
+      readPathsInPortal.some((rp) => rp === p || rp.startsWith(p + '/')),
+      false,
+      `in_app 민감 경로(${p})를 포털 팝업에서 직접 읽으면 안 됩니다`
     );
     assert.equal(
       O.PROGRAMS.orch.sharedRoots.some((sr) => sr === p || sr.startsWith(p + '/')),
