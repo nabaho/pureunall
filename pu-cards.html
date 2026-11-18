@@ -17827,7 +17827,10 @@ function cspCount(){ return state.isAdmin ? cspRows().length : 0; }
 function cspMaybeAsk(){
   if(!state.isAdmin || _cspOn) return;
   if(!cspRows().some(r => !_cspAsked[r.k])) return;
-  if(document.querySelector('.modalbg.open, .mck-dim')){ setTimeout(cspMaybeAsk, 15000); return; }
+  /* 메일함 화면(같은 파일)에서는 메일을 쓰거나 읽는 중이다 — 가리지 않고 기업정보함으로 돌아오면 띄운다 */
+  if(document.querySelector('.modalbg.open, .mck-dim') || document.body.classList.contains('mailview')){
+    setTimeout(cspMaybeAsk, 15000); return;
+  }
   cspOpen();
 }
 function cspOpen(){

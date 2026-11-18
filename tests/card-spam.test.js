@@ -161,7 +161,7 @@ function cardsSpam(items, lists, opt) {
     isAdmin: !!(opt && opt.admin) };
   const boxes = [];
   const doc = { querySelector: () => (opt && opt.modalOpen) ? {} : null, createElement: () => { const b = {}; boxes.push(b); return b; },
-    body: { appendChild() {}, classList: { contains: () => !(opt && opt.phone) } } };
+    body: { appendChild() {}, classList: { contains: (c) => c === 'pc' ? !(opt && opt.phone) : c === 'mailview' ? !!(opt && opt.mailView) : false } } };
   const deps = { state, Store, DB_ROOT: 'pucards', inHiddenLocked: (it) => !!it.locked, PuCardSpam: S,
     ErpMatch: { match: (it) => (it.erp ? {} : null) }, toast: (m) => toasts.push(m), render() {}, renderSoon() {}, myEmail: 'boss@gana.example',
     $: () => null, document: doc, esc: (s) => String(s), confirm: () => true, setTimeout: () => 0,
@@ -225,6 +225,9 @@ test('★★★ ⑥ 기업정보함 — 모르면·너무 많으면 안 지운�
   const busy = cardsSpam({ q1: mailCard('q1', { name: '기업지원팀장', email: 'abc9@gana.example' }) }, {}, { admin: true, modalOpen: true });
   await busy.cardSpamRun();
   assert.equal(busy.isOn(), false, '다른 창 위에 겹쳐 띄웠다');
+  const mail = cardsSpam({ q1: mailCard('q1', { name: '기업지원팀장', email: 'abc9@gana.example' }) }, {}, { admin: true, mailView: true });
+  await mail.cardSpamRun();
+  assert.equal(mail.isOn(), false, '메일함 화면(메일 쓰는 중)을 가리고 띄웠다');
 });
 
 test('★★★ ⑦ 창에서 정하기 — 주소로 남고, 보류 줄 «남기기»는 받는 탭의 같은 문으로', async () => {
