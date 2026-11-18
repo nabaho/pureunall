@@ -33,6 +33,7 @@ jobs:
     # ⚠ 이름을 지을 때는 `gh secret list` 로 금고에 무엇이 있는지 «먼저» 본다.
     #   금고가 비어도 빌드는 조용히 성공하므로, 잘못 부른 것을 아무도 못 알아챈다.
     env:
+      JAVA_TOOL_OPTIONS: -XX:-UseBASE64Intrinsics
       HANA_KEYSTORE_B64: ${{ secrets.HANA_RELEASE_KEYSTORE_BASE64 }}
       HANA_KEYSTORE_PASSWORD: ${{ secrets.HANA_RELEASE_STORE_PASSWORD }}
       HANA_KEY_ALIAS: ${{ secrets.HANA_RELEASE_KEY_ALIAS }}
@@ -41,8 +42,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: zulu
           java-version: '17'
+      - name: Java 보안 패치 버전 확인 (17.0.21.1 이상)
+        run: |
+          VER=$(java -XshowSettings:properties -version 2>&1 | awk -F'= ' '/^[[:space:]]*java\.version =/{print $2; exit}')
+          echo "설치된 Java 버전: $VER"
+          VER="$VER" node -e 'const v=(process.env.VER||String()).split(/[^0-9]+/).filter(Boolean).map(Number); const min=[17,0,21,1]; if(!v.length)process.exit(1); for(let i=0;i<4;i++){const a=v[i]||0,b=min[i]||0; if(a>b)process.exit(0); if(a<b)process.exit(1);}'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
