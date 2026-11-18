@@ -215,6 +215,20 @@ const TOOLS = [
       required: ["query"],
       additionalProperties: false
     }
+  },
+  {
+    name: "moleg_auto_discover",
+    description: "무료 법률·심판 사이트의 홈페이지 개편·메뉴 변경·복합 질의로 일반 조회가 어려울 때, 약칭 확장·핵심어 분해·대체 공식 엔드포인트 우회·자율 DOM/JSON 파서 및 공공도메인(.go.kr) 정밀 탐색 경로를 총동원하여 실존 공식 원문을 자동 복구 탐색합니다.",
+    annotations: READ_ONLY_ANNOTATIONS,
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", maxLength: 50, description: "자동 복구 탐색할 쟁점어·문장 또는 사건·문서번호" },
+        limit: { type: "integer", minimum: 2, maximum: 25, description: "최대 반환 건수 (2~25, 기본값: 12)" }
+      },
+      required: ["query"],
+      additionalProperties: false
+    }
   }
 ];
 
@@ -317,6 +331,8 @@ async function executeToolCall(name, args, runtimeOpts) {
       return await core.getOfficialDocument(args, runtimeOpts);
     case "moleg_unified_search":
       return await core.unifiedSearch(args, runtimeOpts);
+    case "moleg_auto_discover":
+      return await core.autoDiscover(args, runtimeOpts);
     default:
       throw new Error("알 수 없는 도구입니다: " + String(name));
   }

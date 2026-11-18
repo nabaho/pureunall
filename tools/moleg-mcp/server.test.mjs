@@ -382,4 +382,33 @@ test("⑤ [회귀방지] deccInfoP URL 분류(M3) · unifiedSearch 4대법원 �
     params: { protocolVersion: "2099-01-01" }
   });
   assert.equal(futureVer.result.protocolVersion, "2025-06-18");
+
+  /* moleg_auto_discover: 홈페이지 개편(onclick 부재 -> href 직접링크 + <article> 본문) 상황에서도 원문을 자동 복구 탐색해야 함 */
+  const revampedMockFetch = async (url) => {
+    const s = String(url);
+    if (s.includes("Sc.do")) {
+      return {
+        ok: true,
+        status: 200,
+        url: s,
+        text: async () => `<div class="new-ui-list"><a href="/LSW/deccInfoP.do?deccSeq=301122">영업정지처분 취소청구 [국민권익위원회 2026-20555, 2026. 9. 12.]</a></div>`
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      url: s,
+      text: async () => `<main><article><h1>영업정지처분 취소청구</h1><p>사건번호 : 중앙행심 2026-20555</p><p>재결청 : 중앙행정심판위원회</p><p>재결일자 : 2026. 9. 12.</p><p>【주문】 피청구인이 청구인에게 한 영업정지처분을 취소한다.</p><p>【이유】 위반의 정도에 비하여 처분이 과중하므로 비례의 원칙에 위배된다.</p></article></main>`
+    };
+  };
+  const discCall = await mcpServer.dispatchRpcMessage({
+    jsonrpc: "2.0",
+    id: 510,
+    method: "tools/call",
+    params: { name: "moleg_auto_discover", arguments: { query: "행심법 영업정지 여부", limit: 5 } }
+  }, { env: {}, fetchFn: revampedMockFetch });
+  assert.equal(discCall.result.isError, false);
+  const discData = JSON.parse(discCall.result.content[0].text);
+  assert.ok(discData.docs.length >= 1, "개편된 DOM에서도 공식 원문이 자동 복구되어야 합니다");
+  assert.ok(discData.alternatePortalRoutes.length >= 4, "공공도메인(.go.kr) 우회 탐색 경로가 함께 제공되어야 합니다");
 });

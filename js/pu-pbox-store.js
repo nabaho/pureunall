@@ -85,6 +85,13 @@
     threads: [],
     recents: [],
     alerts: [],
+    serverSharedState: {
+      connected: false,
+      backend: '',
+      totalSharedActive: 0,
+      lastAutoSyncAt: '',
+      lastSyncAttemptAt: ''
+    },
     syncMeta: {
       lastSyncAt: '',
       lastTombstoneAt: '',
@@ -572,6 +579,9 @@
 
   function getStateSummary() {
     var idx = global.PuPBoxLawIndex;
+    var seedCnt = ((global.PuPBoxCorpus && Array.isArray(global.PuPBoxCorpus.SEED_DOCS)) ? global.PuPBoxCorpus.SEED_DOCS.length : 148);
+    var supaOk = hasSupabase();
+    var srvOk = !!(mem.serverSharedState && mem.serverSharedState.connected);
     return {
       uid: mem.uid,
       sessionGen: sessionGen,
@@ -579,13 +589,27 @@
       totalLawFamilies: idx ? idx.TOTAL_FAMILIES : 3060,
       cachedLawsCount: mem.laws.size,
       docsCount: mem.docs.length,
+      seedDocsCount: seedCnt,
+      syncedDocsCount: Math.max(0, mem.docs.length - seedCnt),
       projectsCount: mem.projects.length,
       threadsCount: mem.threads.length,
       recentsCount: mem.recents.length,
       alertsCount: mem.alerts.length,
-      supabaseConnected: hasSupabase(),
+      supabaseConnected: supaOk,
+      sharedServerConnected: supaOk || srvOk,
+      sharedBackend: supaOk ? 'supabase' : ((mem.serverSharedState && mem.serverSharedState.backend) || ''),
+      totalSharedActive: (mem.serverSharedState && mem.serverSharedState.totalSharedActive) || 0,
+      lastServerAutoSyncAt: (mem.serverSharedState && mem.serverSharedState.lastAutoSyncAt) || '',
+      lastServerSyncAttemptAt: (mem.serverSharedState && mem.serverSharedState.lastSyncAttemptAt) || '',
       lastSyncAt: mem.syncMeta.lastSyncAt || ''
     };
+  }
+
+  function isoToKstYmd(isoStr) {
+    if (!isoStr) return '';
+    var ms = Date.parse(String(isoStr));
+    if (!Number.isFinite(ms)) return '';
+    return new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
   }
 
   /* ── 실시간 법령 전문 가져오기 (무료·무인증 CDN + IndexedDB 영구 캐시 + 개정 감지) ── */
@@ -823,8 +847,11 @@
           })
           .catch(function (e) { errors.push('server: ' + String((e && e.message) || e)); })
       : (opts.pullSharedOnly
-          ? callServerSync(opts.auth, { pullOnly: true })
-              .then(function (r) { summary.serverPulled = (r && r.added) || 0; })
+          ? callServerSync(opts.auth, { pullOnly: true, autoBootstrapIfStale: opts.autoBootstrapIfStale === true })
+              .then(function (r) {
+                summary.serverPulled = (r && r.added) || 0;
+                summary.autoBootstrapped = !!(r && r.autoBootstrapped);
+              })
               .catch(function () {})
           : Promise.resolve());
 
@@ -1057,6 +1084,41 @@
     });
   }
 
+  function testSharedServerConnection(auth) {
+    var u = auth && auth.currentUser;
+    if (!u || typeof u.getIdToken !== 'function') {
+      return Promise.reject(new Error('포털 직원 로그인 상태에서 푸른 사무실 무료 공유 DB 연결을 시험할 수 있습니다.'));
+    }
+    return u.getIdToken().then(function (tok) {
+      return fetch(PBOX_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({ action: 'pull', limit: 5 })
+      });
+    }).then(function (r) {
+      if (!r || !r.ok) throw new Error('공유 서버 응답 오류 (HTTP ' + ((r && r.status) || 0) + ')');
+      return r.json();
+    }).then(function (j) {
+      j = j || {};
+      if (j.ok === false) throw new Error(j.error || '공유 서버 점검에 실패했습니다.');
+      if (j.configured) {
+        mem.serverSharedState.connected = true;
+        mem.serverSharedState.backend = j.sharedBackend || 'pureun_cloud_storage';
+        mem.serverSharedState.totalSharedActive = Number(j.totalSharedActive || (Array.isArray(j.docs) ? j.docs.length : 0));
+        if (j.lastAutoSyncAt) mem.serverSharedState.lastAutoSyncAt = String(j.lastAutoSyncAt);
+        if (j.lastSyncAttemptAt) mem.serverSharedState.lastSyncAttemptAt = String(j.lastSyncAttemptAt);
+      }
+      return {
+        ok: true,
+        configured: !!j.configured,
+        sharedBackend: j.sharedBackend || 'pureun_cloud_storage',
+        totalSharedActive: mem.serverSharedState.totalSharedActive,
+        lastAutoSyncAt: mem.serverSharedState.lastAutoSyncAt,
+        lastSyncAttemptAt: mem.serverSharedState.lastSyncAttemptAt
+      };
+    });
+  }
+
   function scrubFullDocClient(d) {
     var E = global.PuPBoxEngine;
     if (!E) return d;
@@ -1113,7 +1175,7 @@
       refCases: clean.refCases,
       sources: clean.sources,
       ingestedBy: row.ingested_by || row.ingestedBy || '',
-      verified: isOfficial && clean.body.length >= 20
+      verified: row.verified !== false && isOfficial && clean.body.length >= 20
     };
     if (clean.officialUrl) mappedOut.officialUrl = clean.officialUrl;
     return mappedOut;
@@ -1305,13 +1367,39 @@
     var u = auth && auth.currentUser;
     if (!u || !u.getIdToken) return Promise.resolve({ ok: true, added: 0, skipped: true });
     return u.getIdToken().then(function (tok) {
+      function pullExtraDocPages(nextOffset, pageIdx, accDocs) {
+        if (!nextOffset || pageIdx >= 2) return Promise.resolve(accDocs);
+        return fetch(PBOX_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+          body: JSON.stringify({
+            action: 'pull',
+            limit: 500,
+            offset: nextOffset,
+            sinceDeletedAt: '9999-12-31T23:59:59.000Z'
+          })
+        }).then(function (pr) {
+          if (!pr || !pr.ok) return accDocs;
+          return pr.json().then(function (pj) {
+            if (pj && Array.isArray(pj.docs) && pj.docs.length) {
+              accDocs = accDocs.concat(pj.docs);
+              if (pj.hasMoreDocs && pj.nextOffset > nextOffset) {
+                return pullExtraDocPages(pj.nextOffset, pageIdx + 1, accDocs);
+              }
+            }
+            return accDocs;
+          });
+        }).catch(function () { return accDocs; });
+      }
+
       function pullTombstoneRounds(curTs, curKey, roundIdx, accDocs, accErrs) {
         return fetch(PBOX_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
           body: JSON.stringify({
             action: 'pull',
-            limit: roundIdx === 0 ? 300 : 1,
+            limit: roundIdx === 0 ? 500 : 1,
+            offset: 0,
             sinceDeletedAt: curTs || '',
             afterDeletedKey: curKey || ''
           })
@@ -1321,19 +1409,37 @@
         }).then(function (pullJson) {
           pullJson = pullJson || {};
           if (pullJson.ok === false) accErrs.push('공유 DB 조회 실패');
+          if (roundIdx === 0 && pullJson.configured) {
+            mem.serverSharedState.connected = true;
+            mem.serverSharedState.backend = pullJson.sharedBackend || 'pureun_cloud_storage';
+            mem.serverSharedState.totalSharedActive = Number(pullJson.totalSharedActive || (Array.isArray(pullJson.docs) ? pullJson.docs.length : 0));
+            if (pullJson.lastAutoSyncAt) mem.serverSharedState.lastAutoSyncAt = String(pullJson.lastAutoSyncAt);
+            if (pullJson.lastSyncAttemptAt) mem.serverSharedState.lastSyncAttemptAt = String(pullJson.lastSyncAttemptAt);
+          }
           if ((Array.isArray(pullJson.deletedKeys) && pullJson.deletedKeys.length) || pullJson.latestDeletedAt) {
             applyServerDeletedKeys(pullJson.deletedKeys || [], pullJson.latestDeletedAt || '', pullJson.latestDeletedKey || '');
           }
           if (roundIdx === 0 && Array.isArray(pullJson.docs)) {
             accDocs = accDocs.concat(pullJson.docs);
           }
-          var nextTs = pullJson.latestDeletedAt || curTs;
-          var nextKey = pullJson.latestDeletedKey || '';
-          var progressed = nextTs !== curTs || nextKey !== curKey;
-          if (pullJson.hasMoreTombstones && progressed && roundIdx < 5) {
-            return pullTombstoneRounds(nextTs, nextKey, roundIdx + 1, accDocs, accErrs);
-          }
-          return { docs: accDocs, errors: accErrs };
+          var moreDocsPromise = (roundIdx === 0 && pullJson.hasMoreDocs && pullJson.nextOffset > 0)
+            ? pullExtraDocPages(pullJson.nextOffset, 0, accDocs)
+            : Promise.resolve(accDocs);
+          return moreDocsPromise.then(function (mergedDocs) {
+            var nextTs = pullJson.latestDeletedAt || curTs;
+            var nextKey = pullJson.latestDeletedKey || '';
+            var progressed = nextTs !== curTs || nextKey !== curKey;
+            if (pullJson.hasMoreTombstones && progressed && roundIdx < 5) {
+              return pullTombstoneRounds(nextTs, nextKey, roundIdx + 1, mergedDocs, accErrs);
+            }
+            return {
+              docs: mergedDocs,
+              errors: accErrs,
+              configured: !!pullJson.configured,
+              lastAutoSyncAt: pullJson.lastAutoSyncAt || mem.serverSharedState.lastAutoSyncAt || '',
+              lastSyncAttemptAt: pullJson.lastSyncAttemptAt || mem.serverSharedState.lastSyncAttemptAt || ''
+            };
+          });
         });
       }
 
@@ -1351,10 +1457,59 @@
       return Promise.all([
         syncReq,
         pullTombstoneRounds(mem.syncMeta.lastTombstoneAt || '', mem.syncMeta.lastTombstoneKey || '', 0, [], [])
-      ]);
-    }).then(function (pair) {
-      var syncJson = pair[0] || {};
-      var pullOut = pair[1] || { docs: [], errors: [] };
+      ]).then(function (pair) {
+        var syncJson = pair[0] || {};
+        var pullOut = pair[1] || { docs: [], errors: [] };
+        var todayYmd = (global.PuPBoxEngine && global.PuPBoxEngine.todayKstYmd)
+          ? global.PuPBoxEngine.todayKstYmd()
+          : isoToKstYmd(new Date().toISOString());
+        var lastSyncKstYmd = isoToKstYmd(pullOut.lastAutoSyncAt);
+        var attemptMs = pullOut.lastSyncAttemptAt ? Date.parse(String(pullOut.lastSyncAttemptAt)) : NaN;
+        var attemptedRecently = Number.isFinite(attemptMs) && (Date.now() - attemptMs < 30 * 60 * 1000);
+        var needsDailyBootstrap = sOpts.pullOnly === true &&
+          sOpts.autoBootstrapIfStale === true &&
+          pullOut.configured === true &&
+          !attemptedRecently &&
+          (!lastSyncKstYmd || lastSyncKstYmd < todayYmd);
+        if (!needsDailyBootstrap) {
+          return [syncJson, pullOut, false];
+        }
+        return fetch(PBOX_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+          body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '' })
+        }).then(function (sr) {
+          if (!sr || !sr.ok) return [syncJson, pullOut, false];
+          return sr.json().then(function (sj) {
+            if (sj && sj.syncedAt) {
+              mem.serverSharedState.lastSyncAttemptAt = String(sj.syncedAt);
+              if (sj.ok !== false || sj.partial === true) {
+                mem.serverSharedState.lastAutoSyncAt = String(sj.syncedAt);
+              }
+            }
+            if (sj && Array.isArray(sj.docs)) {
+              mem.serverSharedState.totalSharedActive = Math.max(mem.serverSharedState.totalSharedActive || 0, sj.docs.length);
+            }
+            return [sj || syncJson, pullOut, true];
+          });
+        }).catch(function () {
+          return [syncJson, pullOut, false];
+        });
+      });
+    }).then(function (triple) {
+      var syncJson = triple[0] || {};
+      var pullOut = triple[1] || { docs: [], errors: [] };
+      var autoBootstrapped = !!triple[2];
+      if (syncJson && syncJson.syncedAt && sOpts.pullOnly !== true) {
+        mem.serverSharedState.connected = true;
+        mem.serverSharedState.lastSyncAttemptAt = String(syncJson.syncedAt);
+        if (syncJson.ok !== false || syncJson.partial === true) {
+          mem.serverSharedState.lastAutoSyncAt = String(syncJson.syncedAt);
+        }
+        if (syncJson.sharedBackend && syncJson.sharedBackend !== 'none') {
+          mem.serverSharedState.backend = String(syncJson.sharedBackend);
+        }
+      }
       var errs = [];
       if (syncJson.ok === false) {
         errs = errs.concat(syncJson.errors && syncJson.errors.length ? syncJson.errors : ['서버 동기화 일부 실패']);
@@ -1372,7 +1527,14 @@
         added = st.added;
         merged = st.mergedStage1 + st.mergedStage2 + st.mergedStage3;
       }
-      return { ok: errs.length === 0, added: added, merged: merged, errors: errs };
+      if (autoBootstrapped && added > 0) {
+        addAlert({
+          kind: 'sync',
+          title: '푸른 사무실 무료 공유 DB 자동 동기화 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+          detail: '법제처·법원·행심위·노동위·유권해석 최신 공식 원문이 사무실 공유함에 자동 적재되었습니다.'
+        });
+      }
+      return { ok: errs.length === 0, added: added, merged: merged, autoBootstrapped: autoBootstrapped, errors: errs };
     });
   }
 
@@ -1730,6 +1892,137 @@
         var validRows = payload.docs.filter(function (row) {
           return row && typeof row === 'object' && !Array.isArray(row) && typeof row.body === 'string' && row.body.trim().length >= 20;
         });
+        function buildLiveZeroOrMappedResult() {
+          var mapped = validRows.map(mapExternalSharedRow).filter(function (d) { return !isDocTombstoned(d); });
+          var added = 0;
+          var merged = 0;
+          if (mapped.length) {
+            var st = addDocuments(mapped, {
+              scope: 'public',
+              shareConfirmed: false,
+              expectedGen: startGen,
+              expectedUid: startUid
+            });
+            added = st.added;
+            merged = st.mergedStage1 + st.mergedStage2 + st.mergedStage3;
+          }
+          saveConfig({ lastSyncAt: new Date().toISOString() });
+          addAlert({
+            kind: 'sync',
+            title: '「' + safeQuery + '」 전 기관 실시간 수집 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+            detail: ((payload.sourcesHit && payload.sourcesHit.length) ? payload.sourcesHit.join(' · ') : '수집 검색 완료')
+          });
+          return {
+            ok: payload.ok !== false,
+            partial: !!payload.partial,
+            query: safeQuery,
+            fetchedCount: payload.fetchedCount || mapped.length,
+            added: added,
+            merged: merged,
+            sourcesHit: Array.isArray(payload.sourcesHit) ? payload.sourcesHit : [],
+            recoveryNotes: Array.isArray(payload.recoveryNotes) ? payload.recoveryNotes : [],
+            errors: Array.isArray(payload.errors) ? payload.errors : []
+          };
+        }
+
+        /* 복합질의·약칭·사건번호 검색에서 기본 조회가 0건이거나 상위 장애가 있으면 4중 자가복구 탐색으로 인계하되, 쿨다운·예외 시 기존 결과를 보존 */
+        var canBenefitFromAutoDiscover = /\s/.test(safeQuery) ||
+          /(?:19|20)?\d{2}[가-힣-]\d{2,}/.test(safeQuery) ||
+          /(?:근기법|산재법|중처법|중대재해법|고보법|노조법|남녀고용법|고평법|기간제법|행심법|국공법|지공법|중노위|행심위|개보위|인권위|공정위)/.test(safeQuery) ||
+          (Array.isArray(payload.errors) && payload.errors.length > 0);
+        if (!validRows.length && opts.autoFallback !== false && opts.autoOnly !== true && canBenefitFromAutoDiscover) {
+          return autoDiscoverOfficial({
+            query: safeQuery,
+            targets: resolvedTargets,
+            lawOc: lawOc,
+            expectedGen: startGen,
+            expectedUid: startUid,
+            auth: auth
+          }).catch(function (fbErr) {
+            if (fbErr && fbErr.staleSession) throw fbErr;
+            return buildLiveZeroOrMappedResult();
+          });
+        }
+        return buildLiveZeroOrMappedResult();
+      });
+    });
+  }
+
+  function autoDiscoverOfficial(opts) {
+    opts = opts || {};
+    var startGen = opts.expectedGen !== undefined ? Number(opts.expectedGen) : sessionGen;
+    var startUid = opts.expectedUid !== undefined ? String(opts.expectedUid || '') : mem.uid;
+    if (startGen !== sessionGen || startUid !== mem.uid) {
+      return Promise.reject(makeStaleSessionError());
+    }
+
+    var discQCheck = validateClientOfficialSearchQuery(opts.query, 50, false, false);
+    if (!discQCheck.ok) {
+      return Promise.reject(new Error(discQCheck.error));
+    }
+
+    var auth = opts.auth;
+    var u = auth && auth.currentUser;
+    if (!u || typeof u.getIdToken !== 'function') {
+      return Promise.reject(new Error('자동 복구 원문 탐색은 포털 직원 로그인 상태에서 실행할 수 있습니다.'));
+    }
+
+    var cfg = getConfig();
+    var rawInputOc = opts.lawOc !== undefined ? String(opts.lawOc || '').trim() : '';
+    var lawOc = rawInputOc ? sanitizeLawOcClient(rawInputOc) : (cfg.lawOc || '');
+    if (rawInputOc && !lawOc) {
+      return Promise.reject(new Error('법제처 OC 아이디 형식이 올바르지 않습니다.'));
+    }
+
+    var safeQuery = discQCheck.query;
+    return u.getIdToken().then(function (tok) {
+      if (startGen !== sessionGen || startUid !== mem.uid) {
+        throw makeStaleSessionError();
+      }
+      var ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var reqTimer = ac ? setTimeout(function () { try { ac.abort(); } catch (_) {} }, 45000) : null;
+      var fetchInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          action: 'auto_discover',
+          lawOc: lawOc,
+          query: safeQuery,
+          targets: Array.isArray(opts.targets) ? opts.targets.slice(0, 25) : [],
+          includeComwel: opts.includeComwel !== false
+        })
+      };
+      if (ac) fetchInit.signal = ac.signal;
+      return fetch(PBOX_API_URL, fetchInit).then(
+        function (res) { if (reqTimer) clearTimeout(reqTimer); return res; },
+        function (err) {
+          if (reqTimer) clearTimeout(reqTimer);
+          if (err && err.name === 'AbortError') {
+            throw new Error('자동 복구 탐색 제한시간(45초)을 초과했습니다. 핵심 단어로 줄여 다시 시도해 주세요.');
+          }
+          throw err;
+        }
+      );
+    }).then(function (r) {
+      var jsonParseErr = false;
+      var parsePromise = (r && typeof r.json === 'function')
+        ? r.json().catch(function () { jsonParseErr = true; return null; })
+        : Promise.resolve(null);
+      return parsePromise.then(function (j) {
+        if (startGen !== sessionGen || startUid !== mem.uid) {
+          throw makeStaleSessionError();
+        }
+        var isPlainObj = !!(j && typeof j === 'object' && !Array.isArray(j));
+        var payload = isPlainObj ? j : {};
+        if (!r || jsonParseErr || !isPlainObj) {
+          throw new Error('자동 복구 탐색 서버 응답 형식이 올바르지 않습니다 (HTTP ' + ((r && r.status) || 0) + ')');
+        }
+        if (!r.ok || (payload.ok !== true && payload.partial !== true) || !Array.isArray(payload.docs)) {
+          throw new Error(payload.error || (Array.isArray(payload.errors) && payload.errors[0]) || ('자동 복구 탐색 응답 오류 (HTTP ' + (r.status || 0) + ')'));
+        }
+        var validRows = payload.docs.filter(function (row) {
+          return row && typeof row === 'object' && !Array.isArray(row) && typeof row.body === 'string' && row.body.trim().length >= 20;
+        });
         var mapped = validRows.map(mapExternalSharedRow).filter(function (d) { return !isDocTombstoned(d); });
         var added = 0;
         var merged = 0;
@@ -1746,17 +2039,21 @@
         saveConfig({ lastSyncAt: new Date().toISOString() });
         addAlert({
           kind: 'sync',
-          title: '「' + safeQuery + '」 전 기관 실시간 수집 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
-          detail: ((payload.sourcesHit && payload.sourcesHit.length) ? payload.sourcesHit.join(' · ') : '수집 검색 완료')
+          title: '🔎 「' + safeQuery + '」 사이트 개편·누락 대비 4중 자동탐색 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+          detail: ((payload.recoveryNotes && payload.recoveryNotes.length) ? payload.recoveryNotes.join(' · ') : ((payload.sourcesHit && payload.sourcesHit.length) ? payload.sourcesHit.join(' · ') : '공공도메인 대체 탐색 경로 생성 완료'))
         });
         return {
           ok: payload.ok !== false,
           partial: !!payload.partial,
+          autoRecovered: true,
           query: safeQuery,
+          expandedQueries: Array.isArray(payload.expandedQueries) ? payload.expandedQueries : [safeQuery],
           fetchedCount: payload.fetchedCount || mapped.length,
           added: added,
           merged: merged,
           sourcesHit: Array.isArray(payload.sourcesHit) ? payload.sourcesHit : [],
+          recoveryNotes: Array.isArray(payload.recoveryNotes) ? payload.recoveryNotes : [],
+          alternatePortalRoutes: Array.isArray(payload.alternatePortalRoutes) ? payload.alternatePortalRoutes : [],
           errors: Array.isArray(payload.errors) ? payload.errors : []
         };
       });
@@ -2310,6 +2607,7 @@
     mem.projects = [];
     mem.threads = [];
     mem.recents = [];
+    mem.serverSharedState = { connected: false, backend: '', totalSharedActive: 0, lastAutoSyncAt: '', lastSyncAttemptAt: '' };
     rebuildEffectiveDocs();
   }
 
@@ -2325,6 +2623,7 @@
     mem.projects = [];
     mem.threads = [];
     mem.recents = [];
+    mem.serverSharedState = { connected: false, backend: '', totalSharedActive: 0, lastAutoSyncAt: '', lastSyncAttemptAt: '' };
     rebuildEffectiveDocs();
 
     var targets = [WORKSPACE_DB];
@@ -2357,6 +2656,7 @@
     CORPUS_DB: CORPUS_DB,
     WORKSPACE_DB: WORKSPACE_DB,
     CORE_PACK_TARGETS: CORE_PACK_TARGETS,
+    isoToKstYmd: isoToKstYmd,
     workspaceDbNameFor: workspaceDbNameFor,
     getSessionGen: function () { return sessionGen; },
     getActiveUid: function () { return mem.uid; },
@@ -2380,10 +2680,12 @@
     addDocuments: addDocuments,
     deleteDocuments: deleteDocuments,
     testSupabaseConnection: testSupabaseConnection,
+    testSharedServerConnection: testSharedServerConnection,
     pullFromSupabase: pullFromSupabase,
     pullLowerCourtOfficial: pullLowerCourtOfficial,
     pullTribunalOfficial: pullTribunalOfficial,
     liveSearchAndCollect: liveSearchAndCollect,
+    autoDiscoverOfficial: autoDiscoverOfficial,
     pushDocsToSharedServer: pushDocsToSharedServer,
     deleteDocsFromSharedServer: deleteDocsFromSharedServer,
     recordRecent: recordRecent,

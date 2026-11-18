@@ -2237,11 +2237,774 @@ async function deleteFromSupabaseServer(canonicalKeys, env, fetchFn, staffUid) {
   };
 }
 
+/* ══════════════════════════════════════════════════════════════
+ * 6-B. 무설정 무료 클라우드 공유 저장소 (Firebase Cloud Storage JSON + GCS 낙관적 잠금)
+ *  - 별도 외부 Supabase 개설·URL·JWT 입력 없이도 푸른 직원 로그인만으로 전 직원 즉시 자동 공유(비용 ₩0)
+ *  - Cloud Storage 기본 차단 규칙 아래 서버 Admin SDK(pboxApi · pboxDailySync)만 접근하며,
+ *    GCS generation(ifGenerationMatch) 원자적 조건부 쓰기로 동시 업로드 유실·타인 덮어쓰기·삭제 부활을 원천 차단
+ * ══════════════════════════════════════════════════════════════ */
+const PBOX_SHARED_STORAGE_PATH = "pbox_shared/corpus_v1.json";
+const MAX_BUCKET_ACTIVE_DOCS = 4000;
+const MAX_SHARED_DOC_BODY_CHARS = 60000;
+const MAX_SHARED_DOC_BYTES = 180 * 1024;
+const MAX_STAFF_SHARED_DOCS_PER_UID = 200;
+const MAX_STAFF_SHARED_BYTES_PER_UID = 2 * 1024 * 1024;
+const MAX_TOTAL_STAFF_SHARED_BYTES = 6 * 1024 * 1024;
+const MAX_BUCKET_TOMBSTONES = 5000;
+const TOMBSTONE_RETENTION_MS = 180 * 86400000;
+const SOFT_BUCKET_JSON_BYTES = 14 * 1024 * 1024;
+const MAX_BUCKET_JSON_BYTES = 18 * 1024 * 1024;
+const MAX_PULL_RESPONSE_BYTES = 4 * 1024 * 1024;
+const _bucketStateMemCache = new WeakMap();
+
+function isPlainStringOrUndefined(v, maxChars) {
+  if (v === undefined || v === null) return true;
+  if (typeof v !== "string") return false;
+  return maxChars ? v.length <= maxChars : true;
+}
+
+function isBoundedStringArrayOrUndefined(v, maxItems, maxItemChars) {
+  if (v === undefined || v === null) return true;
+  if (!Array.isArray(v) || v.length > maxItems) return false;
+  for (let i = 0; i < v.length; i++) {
+    if (typeof v[i] !== "string" || v[i].length > maxItemChars) return false;
+  }
+  return true;
+}
+
+function validateUserSharedDocShape(rawDoc) {
+  if (!rawDoc || typeof rawDoc !== "object" || Array.isArray(rawDoc)) {
+    return "업로드할 공유 문서 객체 형식이 올바르지 않습니다.";
+  }
+  if (typeof rawDoc.body !== "string") {
+    return "공유 문서 본문(body)은 문자열 형식이어야 합니다.";
+  }
+  if (!isPlainStringOrUndefined(rawDoc.title, 400) ||
+      !isPlainStringOrUndefined(rawDoc.summary, 2000) ||
+      !isPlainStringOrUndefined(rawDoc.caseNo, 120) ||
+      !isPlainStringOrUndefined(rawDoc.case_no, 120) ||
+      !isPlainStringOrUndefined(rawDoc.court, 120) ||
+      !isPlainStringOrUndefined(rawDoc.agency, 120) ||
+      !isPlainStringOrUndefined(rawDoc.fileName, 200) ||
+      !isPlainStringOrUndefined(rawDoc.docType, 40) ||
+      !isPlainStringOrUndefined(rawDoc.decisionDate, 32)) {
+    return "공유 문서 메타데이터 필드 형식 또는 길이가 허용 범위를 벗어났습니다.";
+  }
+  if (!isBoundedStringArrayOrUndefined(rawDoc.tags, 30, 120) ||
+      !isBoundedStringArrayOrUndefined(rawDoc.refLaws, 50, 240) ||
+      !isBoundedStringArrayOrUndefined(rawDoc.ref_laws, 50, 240) ||
+      !isBoundedStringArrayOrUndefined(rawDoc.refCases, 50, 240) ||
+      !isBoundedStringArrayOrUndefined(rawDoc.ref_cases, 50, 240) ||
+      !isBoundedStringArrayOrUndefined(rawDoc.sources, 20, 200)) {
+    return "공유 문서 참조·태그 배열 형식 또는 개수가 허용 범위를 벗어났습니다.";
+  }
+  if (rawDoc.body.length > MAX_SHARED_DOC_BODY_CHARS) {
+    return "공유 문서 본문은 1건당 최대 " + MAX_SHARED_DOC_BODY_CHARS.toLocaleString() + "자까지 등록할 수 있습니다.";
+  }
+  if (Buffer.byteLength(rawDoc.body, "utf8") > MAX_SHARED_DOC_BYTES) {
+    return "공유 문서 본문 용량이 허용 상한(180KB)을 초과했습니다.";
+  }
+  return "";
+}
+
+function isStorageBucketLike(bucket) {
+  return Boolean(bucket && typeof bucket.file === "function");
+}
+
+function isBucketNotFoundError(err) {
+  if (!err) return false;
+  if (Number(err.code) === 404) return true;
+  const msg = String(err.message || err || "");
+  return /No such object|not found|ENOENT|404/i.test(msg);
+}
+
+function isBucketPreconditionError(err) {
+  if (!err) return false;
+  if (Number(err.code) === 412) return true;
+  const msg = String(err.message || err || "");
+  return /conditionNotMet|Precondition Failed|412/i.test(msg);
+}
+
+async function readBucketSharedState(bucket) {
+  const file = bucket.file(PBOX_SHARED_STORAGE_PATH);
+  let rawBuf = null;
+  let generation = 0;
+  try {
+    if (typeof file.getMetadata === "function") {
+      const metaRes = await file.getMetadata();
+      const metaObj = Array.isArray(metaRes) ? metaRes[0] : metaRes;
+      if (metaObj && metaObj.generation !== undefined) {
+        generation = String(metaObj.generation);
+      }
+    }
+    const cached = _bucketStateMemCache.get(bucket);
+    if (cached && generation && generation !== "0" && cached.generation === generation && typeof cached.rawText === "string") {
+      rawBuf = cached.rawText;
+    } else {
+      const dlRes = await file.download();
+      rawBuf = Array.isArray(dlRes) ? dlRes[0] : dlRes;
+    }
+  } catch (err) {
+    if (isBucketNotFoundError(err)) {
+      _bucketStateMemCache.delete(bucket);
+      return {
+        generation: 0,
+        state: { version: 1, updatedAt: "", lastAutoSyncAt: "", lastSyncAttemptAt: "", rows: {} }
+      };
+    }
+    throw err;
+  }
+  const text = Buffer.isBuffer(rawBuf) ? rawBuf.toString("utf8") : String(rawBuf || "");
+  if (!text.trim()) {
+    return {
+      generation: generation || 0,
+      state: { version: 1, updatedAt: "", lastAutoSyncAt: "", lastSyncAttemptAt: "", rows: {} }
+    };
+  }
+  if (generation && generation !== "0") {
+    _bucketStateMemCache.set(bucket, { generation: String(generation), rawText: text });
+  }
+  const parsed = JSON.parse(text);
+  const rows = (parsed && parsed.rows && typeof parsed.rows === "object" && !Array.isArray(parsed.rows))
+    ? parsed.rows
+    : {};
+  return {
+    generation: generation || 0,
+    state: {
+      version: 1,
+      updatedAt: String((parsed && parsed.updatedAt) || ""),
+      lastAutoSyncAt: String((parsed && parsed.lastAutoSyncAt) || ""),
+      lastSyncAttemptAt: String((parsed && parsed.lastSyncAttemptAt) || ""),
+      rows
+    }
+  };
+}
+
+async function writeBucketSharedStateAtomic(bucket, generation, nextState) {
+  const file = bucket.file(PBOX_SHARED_STORAGE_PATH);
+  const payload = Buffer.from(JSON.stringify(nextState), "utf8");
+  if (payload.byteLength > MAX_BUCKET_JSON_BYTES) {
+    const capErr = new Error("공유 저장소 전체 용량 상한(18MB)을 초과하여 저장이 차단되었습니다.");
+    capErr.status = 413;
+    throw capErr;
+  }
+  _bucketStateMemCache.delete(bucket);
+  const saveOpts = {
+    resumable: false,
+    contentType: "application/json; charset=utf-8",
+    preconditionOpts: {
+      ifGenerationMatch: generation === 0 || generation === "0" ? 0 : generation
+    }
+  };
+  await file.save(payload, saveOpts);
+}
+
+async function upsertToBucketStore(docs, bucket, ingestedByUid, opts) {
+  const o = opts || {};
+  const shouldTouchSyncMeta = o.markAutoSync === true || o.markSyncAttempt === true;
+  const docList = Array.isArray(docs) ? docs : [];
+  if (!isStorageBucketLike(bucket) || (!docList.length && !shouldTouchSyncMeta)) {
+    return { ok: true, pushed: 0, skipped: true, conflicts: [], tombstoned: [], sharedBackend: "pureun_cloud_storage" };
+  }
+  const owner = String(ingestedByUid || "system_sync").trim().slice(0, 128);
+  if (!owner) {
+    return { ok: false, status: 400, error: "유효한 작성자 식별자(ingested_by)가 필요합니다.", pushed: 0, conflicts: [], tombstoned: [], sharedBackend: "pureun_cloud_storage" };
+  }
+  const isUserAction = owner !== "system_sync";
+
+  const preparedMap = new Map();
+  for (const rawDoc of docList) {
+    if (!rawDoc || typeof rawDoc !== "object" || Array.isArray(rawDoc)) {
+      if (isUserAction) {
+        return { ok: false, status: 400, error: "업로드할 공유 문서 객체 형식이 올바르지 않습니다.", pushed: 0, conflicts: [], tombstoned: [], sharedBackend: "pureun_cloud_storage" };
+      }
+      continue;
+    }
+    if (isUserAction) {
+      const shapeErr = validateUserSharedDocShape(rawDoc);
+      if (shapeErr) {
+        return { ok: false, status: 400, error: shapeErr, pushed: 0, conflicts: [], tombstoned: [], sharedBackend: "pureun_cloud_storage" };
+      }
+    }
+    const clean = scrubDocumentObjectServer(rawDoc);
+    if (isUserAction && clean.body.length > MAX_SHARED_DOC_BODY_CHARS) {
+      return {
+        ok: false,
+        status: 400,
+        error: "공유 문서 본문은 1건당 최대 " + MAX_SHARED_DOC_BODY_CHARS.toLocaleString() + "자까지 등록할 수 있습니다.",
+        pushed: 0,
+        conflicts: [],
+        tombstoned: [],
+        sharedBackend: "pureun_cloud_storage"
+      };
+    }
+    if (!isUserAction && clean.body.length > MAX_SHARED_DOC_BODY_CHARS) {
+      clean.body = clean.body.slice(0, MAX_SHARED_DOC_BODY_CHARS);
+    }
+    if (clean.body.length < 20) continue;
+    const serverCk = canonicalKeyOf(clean, owner);
+    const safeUserDocType = clean.docType === "prec_lower" ? "prec_lower" : "internal_case";
+    const row = {
+      canonical_key: serverCk,
+      doc_type: isUserAction ? safeUserDocType : clean.docType,
+      court: clean.court,
+      agency: clean.agency,
+      case_no: clean.caseNo,
+      decision_date: clean.decisionDate,
+      title: clean.title,
+      summary: clean.summary,
+      body: clean.body,
+      tags: clean.tags,
+      ref_laws: clean.refLaws,
+      ref_cases: clean.refCases,
+      sources: isUserAction ? ["사무실 공유 (직원 비식별 등록)"] : clean.sources,
+      official_url: isUserAction ? null : (clean.officialUrl || null),
+      ingested_by: owner,
+      deleted_at: null
+    };
+    const rowByteLen = Buffer.byteLength(JSON.stringify(row), "utf8");
+    if (isUserAction && rowByteLen > MAX_SHARED_DOC_BYTES) {
+      return {
+        ok: false,
+        status: 400,
+        error: "공유 문서 1건당 전체 저장 크기 상한(180KB)을 초과했습니다.",
+        pushed: 0,
+        conflicts: [],
+        tombstoned: [],
+        sharedBackend: "pureun_cloud_storage"
+      };
+    }
+    if (hasResidualHardPii(row)) {
+      if (!isUserAction) continue;
+      return {
+        ok: false,
+        status: 400,
+        error: "비식별화되지 않은 민감 개인정보가 감지되어 저장을 거부했습니다.",
+        pushed: 0,
+        conflicts: [],
+        tombstoned: [],
+        sharedBackend: "pureun_cloud_storage"
+      };
+    }
+    preparedMap.set(serverCk, row);
+  }
+
+  const rows = Array.from(preparedMap.values());
+  if (!rows.length && !shouldTouchSyncMeta) {
+    return { ok: true, pushed: 0, skipped: true, conflicts: [], tombstoned: [], sharedBackend: "pureun_cloud_storage" };
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const snap = await readBucketSharedState(bucket);
+    const nextRows = Object.assign({}, snap.state.rows);
+    let pushed = 0;
+    let mutated = false;
+    const conflicts = [];
+    const tombstoned = [];
+    const canonicalKeys = [];
+
+    let ownerActiveCount = 0;
+    let ownerActiveBytes = 0;
+    let totalStaffBytes = 0;
+    if (isUserAction) {
+      for (const rk of Object.keys(nextRows)) {
+        const er = nextRows[rk];
+        if (!er || er.deleted_at || er.ingested_by === "system_sync") continue;
+        const eb = Buffer.byteLength(JSON.stringify(er), "utf8");
+        totalStaffBytes += eb;
+        if (er.ingested_by === owner) {
+          ownerActiveCount++;
+          ownerActiveBytes += eb;
+        }
+      }
+    }
+
+    for (const row of rows) {
+      const ex = nextRows[row.canonical_key];
+      const incomingBytes = isUserAction ? Buffer.byteLength(JSON.stringify(row), "utf8") : 0;
+      if (!ex) {
+        if (isUserAction && ownerActiveCount >= MAX_STAFF_SHARED_DOCS_PER_UID) {
+          return {
+            ok: false,
+            status: 429,
+            error: "직원 계정당 공유 문서는 최대 " + MAX_STAFF_SHARED_DOCS_PER_UID + "건까지 등록할 수 있습니다.",
+            pushed: 0,
+            conflicts: [],
+            tombstoned: [],
+            sharedBackend: "pureun_cloud_storage"
+          };
+        }
+        if (isUserAction && ownerActiveBytes + incomingBytes > MAX_STAFF_SHARED_BYTES_PER_UID) {
+          return {
+            ok: false,
+            status: 429,
+            error: "직원 계정당 공유 문서 누적 용량 상한(2MB)을 초과했습니다.",
+            pushed: 0,
+            conflicts: [],
+            tombstoned: [],
+            sharedBackend: "pureun_cloud_storage"
+          };
+        }
+        if (isUserAction && totalStaffBytes + incomingBytes > MAX_TOTAL_STAFF_SHARED_BYTES) {
+          return {
+            ok: false,
+            status: 429,
+            error: "사무실 직원 등록 공유 문서 전체 용량 상한(6MB)에 도달했습니다.",
+            pushed: 0,
+            conflicts: [],
+            tombstoned: [],
+            sharedBackend: "pureun_cloud_storage"
+          };
+        }
+        nextRows[row.canonical_key] = Object.assign({}, row);
+        pushed++;
+        if (isUserAction) {
+          ownerActiveCount++;
+          ownerActiveBytes += incomingBytes;
+          totalStaffBytes += incomingBytes;
+        }
+        mutated = true;
+        canonicalKeys.push(row.canonical_key);
+        continue;
+      }
+      /* 공식 공공기관 수집(system_sync)은 직원이 동일 사건번호로 선점·삭제해 둔 비검증 행보다 항상 우선 적용되어 공식 원문 오염을 원천 차단 */
+      if ((ex.ingested_by || "") !== owner) {
+        if (owner === "system_sync" && String(row.canonical_key).startsWith("case|")) {
+          nextRows[row.canonical_key] = Object.assign({}, row);
+          pushed++;
+          mutated = true;
+          canonicalKeys.push(row.canonical_key);
+          continue;
+        }
+        conflicts.push(row.canonical_key);
+        continue;
+      }
+      if (ex.deleted_at) {
+        tombstoned.push(row.canonical_key);
+        continue;
+      }
+      if (o.insertOnly === true) {
+        canonicalKeys.push(row.canonical_key);
+        continue;
+      }
+      if (isUserAction) {
+        const prevBytes = Buffer.byteLength(JSON.stringify(ex), "utf8");
+        if (ownerActiveBytes - prevBytes + incomingBytes > MAX_STAFF_SHARED_BYTES_PER_UID) {
+          return {
+            ok: false,
+            status: 429,
+            error: "직원 계정당 공유 문서 누적 용량 상한(2MB)을 초과했습니다.",
+            pushed: 0,
+            conflicts: [],
+            tombstoned: [],
+            sharedBackend: "pureun_cloud_storage"
+          };
+        }
+        if (totalStaffBytes - prevBytes + incomingBytes > MAX_TOTAL_STAFF_SHARED_BYTES) {
+          return {
+            ok: false,
+            status: 429,
+            error: "사무실 직원 등록 공유 문서 전체 용량 상한(6MB)에 도달했습니다.",
+            pushed: 0,
+            conflicts: [],
+            tombstoned: [],
+            sharedBackend: "pureun_cloud_storage"
+          };
+        }
+        ownerActiveBytes = ownerActiveBytes - prevBytes + incomingBytes;
+        totalStaffBytes = totalStaffBytes - prevBytes + incomingBytes;
+      }
+      const mergedRow = Object.assign({}, row);
+      if (owner === "system_sync") {
+        if (typeof ex.body === "string" && ex.body.length > String(mergedRow.body || "").length) {
+          mergedRow.body = ex.body.slice(0, MAX_SHARED_DOC_BODY_CHARS);
+        }
+        if (!mergedRow.official_url && ex.official_url) mergedRow.official_url = ex.official_url;
+        if (Array.isArray(ex.tags)) mergedRow.tags = Array.from(new Set([].concat(ex.tags, mergedRow.tags || []))).slice(0, 20);
+        if (Array.isArray(ex.ref_laws)) mergedRow.ref_laws = Array.from(new Set([].concat(ex.ref_laws, mergedRow.ref_laws || []))).slice(0, 30);
+        if (Array.isArray(ex.ref_cases)) mergedRow.ref_cases = Array.from(new Set([].concat(ex.ref_cases, mergedRow.ref_cases || []))).slice(0, 30);
+        if (Array.isArray(ex.sources)) mergedRow.sources = Array.from(new Set([].concat(ex.sources, mergedRow.sources || []))).slice(0, 12);
+      }
+      nextRows[row.canonical_key] = mergedRow;
+      pushed++;
+      mutated = true;
+      canonicalKeys.push(row.canonical_key);
+    }
+
+    /* 오래된 삭제 툼스톤(180일 경과 또는 5,000건 초과) 경량 정리 */
+    const nowMs = Date.now();
+    const tombKeys = [];
+    for (const tk of Object.keys(nextRows)) {
+      const tr = nextRows[tk];
+      if (!tr || !tr.deleted_at) continue;
+      const tMs = Date.parse(String(tr.deleted_at));
+      if (Number.isFinite(tMs) && nowMs - tMs > TOMBSTONE_RETENTION_MS) {
+        delete nextRows[tk];
+        mutated = true;
+      } else {
+        tombKeys.push(tk);
+      }
+    }
+    if (tombKeys.length > MAX_BUCKET_TOMBSTONES) {
+      tombKeys.sort((ka, kb) => String(nextRows[ka].deleted_at || "").localeCompare(String(nextRows[kb].deleted_at || "")));
+      const tombExcess = tombKeys.length - MAX_BUCKET_TOMBSTONES;
+      for (let ti = 0; ti < tombExcess; ti++) {
+        delete nextRows[tombKeys[ti]];
+        mutated = true;
+      }
+    }
+
+    /* 용량 상한(활성 4,000건 또는 직렬화 14MB) 초과 시 가장 오래된 system_sync 문서부터 바이트 인지형으로 축출 */
+    const evictableSysKeys = Object.keys(nextRows).filter((k) => {
+      const r = nextRows[k];
+      return r && !r.deleted_at && r.ingested_by === "system_sync" && !preparedMap.has(k);
+    });
+    evictableSysKeys.sort((ka, kb) => {
+      const da = String(nextRows[ka].decision_date || "") || "9999-99-99";
+      const db = String(nextRows[kb].decision_date || "") || "9999-99-99";
+      return da.localeCompare(db);
+    });
+    let evictIdx = 0;
+    const totalActive = Object.keys(nextRows).filter((k) => nextRows[k] && !nextRows[k].deleted_at).length;
+    if (totalActive > MAX_BUCKET_ACTIVE_DOCS && evictableSysKeys.length > 0) {
+      const excess = Math.min(totalActive - MAX_BUCKET_ACTIVE_DOCS, evictableSysKeys.length);
+      while (evictIdx < excess) {
+        delete nextRows[evictableSysKeys[evictIdx++]];
+        mutated = true;
+      }
+    }
+
+    const nowIso = new Date(nowMs).toISOString();
+    if (mutated || shouldTouchSyncMeta) {
+      const nextState = {
+        version: 1,
+        updatedAt: nowIso,
+        lastAutoSyncAt: o.markAutoSync === true ? nowIso : (snap.state.lastAutoSyncAt || ""),
+        lastSyncAttemptAt: shouldTouchSyncMeta ? nowIso : (snap.state.lastSyncAttemptAt || ""),
+        rows: nextRows
+      };
+      let approxBytes = Buffer.byteLength(JSON.stringify(nextState), "utf8");
+      while (approxBytes > SOFT_BUCKET_JSON_BYTES && evictIdx < evictableSysKeys.length) {
+        const victimKey = evictableSysKeys[evictIdx++];
+        const victimRow = nextRows[victimKey];
+        if (victimRow) {
+          approxBytes -= Buffer.byteLength(JSON.stringify(victimRow), "utf8");
+          delete nextRows[victimKey];
+        }
+      }
+      try {
+        await writeBucketSharedStateAtomic(bucket, snap.generation, nextState);
+      } catch (wErr) {
+        if (isBucketPreconditionError(wErr) && attempt < 4) continue;
+        if (wErr && wErr.status === 413) {
+          return { ok: false, status: 413, error: wErr.message, pushed: 0, conflicts, tombstoned, sharedBackend: "pureun_cloud_storage" };
+        }
+        throw wErr;
+      }
+    }
+
+    const hasUserRejection = isUserAction && (conflicts.length > 0 || tombstoned.length > 0);
+    const pureOwnershipForbidden = pushed === 0 && conflicts.length > 0 && tombstoned.length === 0;
+    let errMsg = "";
+    if (hasUserRejection) {
+      if (conflicts.length > 0 && tombstoned.length > 0) errMsg = "일부 문서가 소유권 충돌 또는 삭제 이력으로 적재 거부되었습니다.";
+      else if (conflicts.length > 0) errMsg = "타인이 등록했거나 공식 수집된 문서는 덮어쓸 수 없습니다.";
+      else errMsg = "이미 삭제 처리된 문서는 공유 서버에 재공유할 수 없습니다.";
+    }
+    return {
+      ok: !hasUserRejection,
+      status: hasUserRejection ? (pureOwnershipForbidden ? 403 : 409) : 200,
+      error: errMsg || undefined,
+      pushed,
+      canonicalKeys,
+      conflicts,
+      tombstoned,
+      sharedBackend: "pureun_cloud_storage"
+    };
+  }
+  throw new Error("공유 저장소 동시 쓰기 경합이 계속되어 잠시 후 다시 시도해 주세요.");
+}
+
+async function pullFromBucketStore(bucket, limit, sinceDeletedAt, afterCanonicalKey, offset) {
+  if (!isStorageBucketLike(bucket)) {
+    return {
+      ok: true,
+      docs: [],
+      deletedKeys: [],
+      latestDeletedAt: "",
+      latestDeletedKey: "",
+      hasMoreTombstones: false,
+      configured: false
+    };
+  }
+  const lim = Math.max(1, Math.min(Number(limit) || 300, 500));
+  const off = Math.max(0, Math.min(Math.trunc(Number(offset) || 0), 10000));
+  const snap = await readBucketSharedState(bucket);
+  const allRows = Object.values(snap.state.rows || {}).filter((r) => r && typeof r === "object" && typeof r.canonical_key === "string" && r.canonical_key.trim());
+
+  const activeRows = [];
+  const tombRows = [];
+  for (const row of allRows) {
+    if (row.deleted_at) {
+      tombRows.push(row);
+    } else if (typeof row.title === "string" && row.title.trim() && typeof row.body === "string" && row.body.trim()) {
+      activeRows.push(row);
+    }
+  }
+
+  activeRows.sort((a, b) => {
+    const da = String(a.decision_date || "");
+    const db = String(b.decision_date || "");
+    if (da !== db) {
+      if (!da) return 1;
+      if (!db) return -1;
+      return db.localeCompare(da);
+    }
+    return String(a.canonical_key).localeCompare(String(b.canonical_key));
+  });
+
+  tombRows.sort((a, b) => {
+    const tCmp = String(a.deleted_at).localeCompare(String(b.deleted_at));
+    if (tCmp !== 0) return tCmp;
+    return String(a.canonical_key).localeCompare(String(b.canonical_key));
+  });
+
+  const curTs = (sinceDeletedAt && /^\d{4}-\d{2}-\d{2}T/.test(String(sinceDeletedAt))) ? String(sinceDeletedAt) : "";
+  const curKey = curTs && afterCanonicalKey ? String(afterCanonicalKey) : "";
+  const filteredTombs = tombRows.filter((tr) => {
+    if (!curTs) return true;
+    if (curKey) {
+      return tr.deleted_at > curTs || (tr.deleted_at === curTs && tr.canonical_key > curKey);
+    }
+    return tr.deleted_at >= curTs;
+  });
+
+  const TOMB_CAP = 2000;
+  const slicedTombs = filteredTombs.slice(0, TOMB_CAP);
+  const lastTomb = slicedTombs.length ? slicedTombs[slicedTombs.length - 1] : null;
+  const docs = [];
+  let accPullBytes = 0;
+  const candidateSlice = activeRows.slice(off, off + lim);
+  for (const row of candidateSlice) {
+    const isOfficialRow = row.ingested_by === "system_sync";
+    const out = {
+      id: row.id || ("supa-" + row.canonical_key),
+      canonicalKey: row.canonical_key || "",
+      docType: isOfficialRow ? (row.doc_type || "prec_lower") : (row.doc_type === "prec_lower" ? "prec_lower" : "internal_case"),
+      court: row.court || "",
+      agency: row.agency || "",
+      caseNo: row.case_no || "",
+      decisionDate: row.decision_date || "",
+      title: row.title || "",
+      summary: row.summary || "",
+      body: row.body || "",
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      refLaws: Array.isArray(row.ref_laws) ? row.ref_laws : [],
+      refCases: Array.isArray(row.ref_cases) ? row.ref_cases : [],
+      sources: isOfficialRow
+        ? (Array.isArray(row.sources) && row.sources.length ? row.sources : ["푸른 사무실 무료 공유 DB"])
+        : ["사무실 공유 (직원 비식별 등록)"],
+      ingestedBy: row.ingested_by || "",
+      verified: isOfficialRow && String(row.body || "").trim().length >= 20
+    };
+    if (isOfficialRow) {
+      const cleanUrl = sanitizeOfficialLawUrl(row.official_url || row.officialUrl || "");
+      if (cleanUrl) out.officialUrl = cleanUrl;
+    }
+    const itemBytes = Buffer.byteLength(JSON.stringify(out), "utf8");
+    if (docs.length > 0 && accPullBytes + itemBytes > MAX_PULL_RESPONSE_BYTES) break;
+    accPullBytes += itemBytes;
+    docs.push(out);
+  }
+
+  return {
+    ok: true,
+    docs,
+    deletedKeys: slicedTombs.map((t) => t.canonical_key),
+    latestDeletedAt: lastTomb ? String(lastTomb.deleted_at) : curTs,
+    latestDeletedKey: lastTomb ? String(lastTomb.canonical_key) : curKey,
+    hasMoreTombstones: filteredTombs.length > TOMB_CAP,
+    hasMoreDocs: off + docs.length < activeRows.length,
+    nextOffset: off + docs.length,
+    configured: true,
+    sharedBackend: "pureun_cloud_storage",
+    totalSharedActive: activeRows.length,
+    lastAutoSyncAt: snap.state.lastAutoSyncAt || "",
+    lastSyncAttemptAt: snap.state.lastSyncAttemptAt || ""
+  };
+}
+
+async function deleteFromBucketStore(canonicalKeys, bucket, staffUid) {
+  if (!isStorageBucketLike(bucket) || !Array.isArray(canonicalKeys) || !canonicalKeys.length || !staffUid) {
+    return { ok: true, deleted: 0, unmatched: [], skipped: true };
+  }
+  const owner = String(staffUid).trim();
+  const targetKeys = canonicalKeys.slice(0, 50).map((k) => String(k || "").trim()).filter(Boolean);
+  if (!targetKeys.length) {
+    return { ok: true, deleted: 0, unmatched: [], skipped: true };
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const snap = await readBucketSharedState(bucket);
+    const nextRows = Object.assign({}, snap.state.rows);
+    const nowIso = new Date().toISOString();
+    let deleted = 0;
+    const unmatched = [];
+
+    for (const ck of targetKeys) {
+      const ex = nextRows[ck];
+      if (!ex || ex.deleted_at || (ex.ingested_by || "") !== owner) {
+        unmatched.push(ck);
+        continue;
+      }
+      nextRows[ck] = {
+        canonical_key: ck,
+        ingested_by: owner,
+        deleted_at: nowIso
+      };
+      deleted++;
+    }
+
+    if (deleted > 0) {
+      try {
+        await writeBucketSharedStateAtomic(bucket, snap.generation, {
+          version: 1,
+          updatedAt: nowIso,
+          lastAutoSyncAt: snap.state.lastAutoSyncAt || "",
+          lastSyncAttemptAt: snap.state.lastSyncAttemptAt || "",
+          rows: nextRows
+        });
+      } catch (wErr) {
+        if (isBucketPreconditionError(wErr) && attempt < 4) continue;
+        return { ok: false, status: 502, error: "공유 서버 삭제 요청 처리 중 오류가 발생했습니다.", deleted: 0, unmatched: targetKeys };
+      }
+    }
+
+    const hasUnmatched = unmatched.length > 0;
+    const delStatus = hasUnmatched ? (deleted === 0 ? 403 : 409) : 200;
+    const delError = hasUnmatched
+      ? (deleted === 0
+          ? "본인 소유 공유 문서가 아니거나 이미 삭제되었습니다."
+          : ("일부 문서는 본인 소유가 아니거나 존재하지 않아 삭제되지 않았습니다 (" + unmatched.length + "건 미삭제)."))
+      : "";
+    return {
+      ok: !hasUnmatched,
+      status: delStatus,
+      error: delError || undefined,
+      deleted,
+      unmatched,
+      tombstonedAt: nowIso,
+      sharedBackend: "pureun_cloud_storage"
+    };
+  }
+  return { ok: false, status: 502, error: "공유 저장소 동시 삭제 경합이 발생했습니다.", deleted: 0, unmatched: targetKeys };
+}
+
+function hasSharedStore(env, storageBucket) {
+  return Boolean(getSupabaseCreds(env) || isStorageBucketLike(storageBucket));
+}
+
+async function upsertSharedDocs(docs, env, fetchFn, ingestedByUid, opts) {
+  const o = opts || {};
+  if (getSupabaseCreds(env)) {
+    return upsertToSupabase(docs, env, fetchFn, ingestedByUid, o);
+  }
+  if (isStorageBucketLike(o.storageBucket)) {
+    return upsertToBucketStore(docs, o.storageBucket, ingestedByUid, o);
+  }
+  return { ok: true, pushed: 0, skipped: true, conflicts: [], tombstoned: [] };
+}
+
+async function pullSharedDocs(env, fetchFn, limit, sinceDeletedAt, afterCanonicalKey, storageBucket, offset) {
+  if (getSupabaseCreds(env)) {
+    const supaPulled = await pullFromSupabaseServer(env, fetchFn, limit, sinceDeletedAt, afterCanonicalKey);
+    return Object.assign({ sharedBackend: supaPulled.configured ? "supabase" : "none" }, supaPulled);
+  }
+  if (isStorageBucketLike(storageBucket)) {
+    return pullFromBucketStore(storageBucket, limit, sinceDeletedAt, afterCanonicalKey, offset);
+  }
+  return {
+    ok: true,
+    docs: [],
+    deletedKeys: [],
+    latestDeletedAt: "",
+    latestDeletedKey: "",
+    hasMoreTombstones: false,
+    configured: false,
+    sharedBackend: "none"
+  };
+}
+
+async function deleteSharedDocs(canonicalKeys, env, fetchFn, staffUid, storageBucket) {
+  if (getSupabaseCreds(env)) {
+    return deleteFromSupabaseServer(canonicalKeys, env, fetchFn, staffUid);
+  }
+  if (isStorageBucketLike(storageBucket)) {
+    return deleteFromBucketStore(canonicalKeys, storageBucket, staffUid);
+  }
+  return { ok: true, deleted: 0, unmatched: [], skipped: true };
+}
+
+const KEYLESS_DAILY_SYNC_QUERY_POOL = [
+  "통상임금", "부당해고", "업무상재해", "퇴직금", "영업정지",
+  "징계", "직장내괴롭힘", "구직급여", "요양불승인", "취업규칙"
+];
+
+const KEYLESS_DAILY_SYNC_TARGETS = [
+  { id: "prec_sc", target: "prec", org: "400201", docType: "prec_sc", label: "대법원 판례" },
+  { id: "prec_lower", target: "prec", org: "400202", docType: "prec_lower", label: "지방법원·고등법원 하급심" },
+  { id: "detc", target: "detc", docType: "prec_sc", label: "헌법재판소 결정례" },
+  { id: "decc_acrc", target: "decc", ssrMode: "decc", deccType: "N", decOrg: "국민권익위원회", docType: "dec_nlrc", label: "중앙행정심판위원회 재결례" },
+  { id: "nlrc", target: "nlrc", ssrMode: "decc", deccType: "S", decOrg: "360109", docType: "dec_nlrc", label: "중앙노동위원회·지방노동위원회 판정례" },
+  { id: "iaciac", target: "iaciac", ssrMode: "decc", deccType: "S", decOrg: "360108", docType: "dec_nlrc", label: "산업재해보상보험재심사위원회 재결례" },
+  { id: "adap", target: "adapSpecialDecc", ssrMode: "decc", deccType: "S", decOrg: "360106", docType: "dec_nlrc", label: "인사혁신처 소청심사위원회 재결례" },
+  { id: "cgmExpc", target: "cgmExpc", docType: "interp_moel", label: "고용노동부·중앙부처 유권해석" },
+  { id: "expc", target: "expc", docType: "interp_gov", label: "법제처 법령해석례" },
+  { id: "ordc", target: "ordc", docType: "interp_gov", label: "법제처 자치법규(조례) 의견제시", ssrOnly: true },
+  { id: "ordin", target: "ordin", docType: "ordinance", label: "지자체 조례·자치법규" },
+  { id: "admrul", target: "admrul", docType: "interp_moel", label: "행정규칙·훈령·예규·지침" }
+];
+
+async function pullKeylessOfficialRecent(fetchFn, opts) {
+  const f = fetchFn || fetch;
+  const o = opts || {};
+  const dayNum = Math.floor(Date.now() / 86400000);
+  const startIdx = (dayNum * 2) % KEYLESS_DAILY_SYNC_QUERY_POOL.length;
+  const defaultPair = [
+    KEYLESS_DAILY_SYNC_QUERY_POOL[startIdx],
+    KEYLESS_DAILY_SYNC_QUERY_POOL[(startIdx + 1) % KEYLESS_DAILY_SYNC_QUERY_POOL.length]
+  ];
+  const queries = Array.isArray(o.queries) && o.queries.length
+    ? o.queries.slice(0, 3)
+    : defaultPair;
+
+  const docs = [];
+  const errors = [];
+  let attempted = 0;
+  let succeeded = 0;
+  const perQueryDetail = Math.max(8, Math.min(Math.ceil((Number(o.detailLimit) || 24) / Math.max(1, queries.length)), 20));
+
+  for (const q of queries) {
+    const ssrRes = await searchLawGoKrPublicSsr(q, KEYLESS_DAILY_SYNC_TARGETS, f, {
+      maxPerTarget: 3,
+      detailLimit: perQueryDetail,
+      perRequestTimeoutMs: o.perRequestTimeoutMs,
+      overallTimeoutMs: o.overallTimeoutMs || 18000
+    });
+    attempted += ssrRes.attempted || 0;
+    succeeded += ssrRes.succeeded || 0;
+    if (Array.isArray(ssrRes.errors) && ssrRes.errors.length) errors.push(...ssrRes.errors);
+    if (Array.isArray(ssrRes.docs) && ssrRes.docs.length) docs.push(...ssrRes.docs);
+  }
+  return { docs, attempted, succeeded, errors };
+}
+
 async function runSync(opts) {
   const o = opts || {};
   const env = o.env || process.env || {};
   const fetchFn = o.fetchFn || fetch;
-  const lawOc = o.lawOc || env.LAW_OC || env.LAW_GO_KR_OC || "";
+  const rawLawOc = o.lawOc || env.LAW_OC || env.LAW_GO_KR_OC || "";
+  const cleanOc = sanitizeLawOc(rawLawOc);
   const dataKey = o.dataGoKrKey || env.DATA_GO_KR_KEY || "";
   const safeMaxPages = Math.max(1, Math.min(Number(o.maxPages) || 2, 5));
   const rawSince = sanitizeCompactYmd(o.sinceDate || "");
@@ -2249,10 +3012,17 @@ async function runSync(opts) {
     ? (rawSince.slice(0, 4) + "-" + rawSince.slice(4, 6) + "-" + rawSince.slice(6, 8))
     : "";
 
+  /* LAW_OC 미설정 환경에서도 매일 새벽 및 초기 부팅 시 무인증 공식 원문(12개 핵심 채널) 자동수집이 멈추지 않도록 구동 */
+  const lawSyncPromise = cleanOc
+    ? pullLawGoKrRecent(cleanOc, fetchFn, { maxPages: safeMaxPages, sinceDate: safeSinceDate, detailLimit: o.detailLimit, perRequestTimeoutMs: o.perRequestTimeoutMs })
+    : (o.enableKeylessAutoSync !== false
+        ? pullKeylessOfficialRecent(fetchFn, { queries: o.queries, detailLimit: o.detailLimit, perRequestTimeoutMs: o.perRequestTimeoutMs, overallTimeoutMs: o.overallTimeoutMs })
+        : Promise.resolve({ docs: [], attempted: 0, succeeded: 0, errors: [] }));
+
   const [treeCheck, lawRes, comwelRes] = await Promise.all([
-    checkLegalizeKrTree(fetchFn),
-    pullLawGoKrRecent(lawOc, fetchFn, { maxPages: safeMaxPages, sinceDate: safeSinceDate, detailLimit: o.detailLimit }),
-    pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: safeMaxPages })
+    checkLegalizeKrTree(fetchFn, { timeoutMs: o.perRequestTimeoutMs }),
+    lawSyncPromise,
+    pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: safeMaxPages, perRequestTimeoutMs: o.perRequestTimeoutMs })
   ]);
 
   const errors = [];
@@ -2265,16 +3035,21 @@ async function runSync(opts) {
   const corpusOk = corpusAttempted === 0 || corpusSucceeded > 0;
 
   const deduped = deduplicateBatch([].concat(lawRes.docs, comwelRes.docs), "system_sync");
-  const hasSupaCreds = !!getSupabaseCreds(env);
+  const sharedAvailable = hasSharedStore(env, o.storageBucket);
   let supaRes = { ok: true, pushed: 0, skipped: true };
 
-  if (hasSupaCreds && deduped.length > 0) {
-    supaRes = await upsertToSupabase(deduped, env, fetchFn, "system_sync").catch((e) => {
-      errors.push("supabase: " + String(e.message || e));
+  if (sharedAvailable && (deduped.length > 0 || isStorageBucketLike(o.storageBucket))) {
+    supaRes = await upsertSharedDocs(deduped, env, fetchFn, "system_sync", {
+      storageBucket: o.storageBucket,
+      markAutoSync: Boolean(treeCheck.ok && corpusOk),
+      markSyncAttempt: true
+    }).catch((e) => {
+      console.error("[pbox-sync shared_store]", e && (e.message || e));
+      errors.push("shared_store: 공유 저장소 반영 중 일시적 지연이 발생했습니다.");
       return { ok: false, pushed: 0 };
     });
-    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:"))) {
-      errors.push("supabase: upsert failed (HTTP " + (supaRes.status || 500) + ")");
+    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:") || x.startsWith("shared_store:"))) {
+      errors.push("shared_store: upsert failed (HTTP " + (supaRes.status || 500) + ")");
     }
   }
 
@@ -2289,6 +3064,7 @@ async function runSync(opts) {
     rawFetched: lawRes.docs.length + comwelRes.docs.length,
     dedupedCount: deduped.length,
     supabasePushed: supaRes.pushed || 0,
+    sharedBackend: supaRes.sharedBackend || (getSupabaseCreds(env) ? "supabase" : (isStorageBucketLike(o.storageBucket) ? "pureun_cloud_storage" : "none")),
     sourceStats: {
       treeOk: treeCheck.ok,
       lawAttempted: lawRes.attempted,
@@ -2304,19 +3080,71 @@ async function runSync(opts) {
 
 const LAW_PUBLIC_WEB_HTTPS = "https://www.law.go.kr";
 
+function extractJsonScriptLegalLines(rawHtml) {
+  const lines = [];
+  for (const m of String(rawHtml || "").matchAll(/<script[^>]+(?:id="__NEXT_DATA__"|type="application\/(?:ld\+)?json")[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const obj = JSON.parse(m[1].trim());
+      const stack = [obj];
+      while (stack.length > 0 && lines.length < 120) {
+        const cur = stack.pop();
+        if (!cur || typeof cur !== "object") continue;
+        if (Array.isArray(cur)) {
+          for (let i = cur.length - 1; i >= 0; i--) stack.push(cur[i]);
+          continue;
+        }
+        const ttl = cur.사건명 || cur.안건명 || cur.제목 || cur.title || cur.headline || "";
+        const cNo = cur.사건번호 || cur.안건번호 || cur.문서번호 || cur.caseNo || "";
+        const agency = cur.법원명 || cur.재결청 || cur.결정기관명 || cur.해석기관명 || cur.court || "";
+        const dt = cur.선고일자 || cur.의결일자 || cur.결정일자 || cur.재결일자 || cur.회시일자 || cur.datePublished || "";
+        if (ttl) lines.push(String(ttl).trim());
+        if (agency || cNo || dt) {
+          lines.push("[" + [agency, cNo, normLooseYmd(dt) || dt].filter(Boolean).join(", ") + "]");
+        }
+        for (const secKey of ["판시사항", "판결요지", "결정요지", "재결요지", "주문", "회답", "질의요지", "이유", "판결내용", "회시내용", "검토의견", "articleBody", "description", "body"]) {
+          if (typeof cur[secKey] === "string" && cur[secKey].trim().length >= 15) {
+            const korLabel = /^[가-힣]+$/.test(secKey) ? secKey : "이유";
+            lines.push("【" + korLabel + "】");
+            for (const subL of cur[secKey].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ").split(/\r?\n/)) {
+              if (subL.trim()) lines.push(subL.trim());
+            }
+          }
+        }
+        for (const v of Object.values(cur)) {
+          if (v && typeof v === "object") stack.push(v);
+        }
+      }
+    } catch (_) {}
+  }
+  return lines;
+}
+
 function cleanLawGoKrHtmlLines(rawHtml) {
   let s = String(rawHtml || "");
   const startMatch = /<div[^>]+id="(?:conTop|cont_top)"[^>]*>/i.exec(s) || /<div[^>]+id="conScroll(?:02)?"[^>]*>/i.exec(s);
-  if (startMatch) s = s.slice(startMatch.index + startMatch[0].length);
+  if (startMatch) {
+    s = s.slice(startMatch.index + startMatch[0].length);
+  } else {
+    /* 홈페이지 개편으로 #conTop / #conScroll ID가 바뀐 경우 <main> · <article> · 본문 컨테이너를 자율 탐색하고 상하단 메뉴 크롬을 제거 */
+    const semanticMatch = /<(main|article)\b[^>]*>([\s\S]*?)<\/\1>/i.exec(s) ||
+      /<div[^>]+(?:id|class)="[^"]*(?:view_cont|view-body|detail_body|detail-content|content_body|cont_body|law_body|doc_body)[^"]*"[^>]*>([\s\S]*)/i.exec(s);
+    if (semanticMatch) {
+      s = semanticMatch[2] || semanticMatch[1] || s;
+    } else {
+      s = s.replace(/<(?:header|nav|aside|footer)\b[\s\S]*?<\/(?:header|nav|aside|footer)>/gi, " ");
+    }
+  }
   const endIdx = s.search(/<div[^>]+id="(?:saveLayer|bylSaveLayer|viewSaveLayer|printLayer|popWrap)"/i);
   if (endIdx > 0) s = s.slice(0, endIdx);
+
+  const jsonFallbackLines = extractJsonScriptLegalLines(rawHtml);
 
   s = s.replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<(?:input|img)\b(?:"[^"]*"|'[^']*'|[^>"'])*>/gi, " ")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|h[1-6]|li|tr|dt|dd|section)>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6]|li|tr|dt|dd|section|article|main)>/gi, "\n")
     .replace(/<(?:"[^"]*"|'[^']*'|[^>"'])*>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
@@ -2331,6 +3159,9 @@ function cleanLawGoKrHtmlLines(rawHtml) {
     if (/^(?:※\s*이\s*(?:결정문|조례|규칙)|※\s*\d{4}년|\*\s*출처\s*:)/.test(line)) continue;
     if (/(?:민원안내|상담안내|대표전화|\b0\d{1,2}-\d{3,4}-\d{4}\b|\b1331\b|\b1670-0007\b|고충민원\s*신청\)\s*바로가기)/.test(line) && line.length < 95) continue;
     out.push(line);
+  }
+  if (out.length < 3 && jsonFallbackLines.length >= 3) {
+    return jsonFallbackLines;
   }
   return out;
 }
@@ -2553,6 +3384,19 @@ function parseLawGoKrSsrDetailHtml(kind, rawHtml, meta) {
       decisionDate = normLooseYmd(bm[2]) || decisionDate;
     }
     if (caseNo) title = rawTitle + " (" + caseNo + ")";
+  }
+
+  /* 홈페이지 개편으로 상단 [기관 사건번호, 일자] 대괄호 줄이 표(<dt>/<dd> 또는 라벨 줄)로 바뀐 경우 자동 추출 보완 */
+  if (!caseNo) {
+    const lblNo = /(?:사건번호|안건번호|의안번호|재결번호|결정번호|문서번호|회시번호|발령번호)\s*[:：]?\s*([가-힣A-Za-z0-9_.\-]{2,25}(?:[ \t]+[0-9A-Za-z_.\-]{2,25})?)/.exec(fullJoined);
+    if (lblNo) caseNo = lblNo[1].replace(/\s+/g, " ").trim();
+  }
+  if (!court || court === mOpts.defaultAgency) {
+    const lblCourt = /(?:법원명|선고법원|재결청|결정기관|해석기관|소관부처)\s*[:：]\s*([가-힣()·\s]{2,30})/.exec(fullJoined);
+    if (lblCourt) {
+      court = lblCourt[1].replace(/\s+/g, " ").trim();
+      if (kind === "prec" && court === "대법원") docType = "prec_sc";
+    }
   }
 
   const summarySrc =
@@ -2870,6 +3714,176 @@ function buildSsrListUrl(targetCfg, query, outmax, courtFilter) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+ * 7-B. 무료 법률사이트 홈페이지 개편·경로 변경 대비 4중 자가복구 탐색기 (Self-Healing Discovery)
+ *  1단계: 기본 메뉴 파라미터(menuId/subMenuId/decOrg/cmt) 변경·404 시 무파라미터 표준 .do 및 통합 심판/결정 경로로 자동 우회
+ *  2단계: onclick 핸들러명이 개편된 경우 <a href="*InfoP.do">, JSON 스크립트(__NEXT_DATA__), data-seq 속성에서 공식 원문 링크 자율 추출
+ *  3단계: 복합 자연어 질의 자동 분해·약칭 확장 재시도 + 공공기관(.go.kr) 개편 무관 도메인 정밀검색 경로 생성
+ * ══════════════════════════════════════════════════════════════ */
+function hasExplicitZeroResultNotice(rawHtml) {
+  const s = String(rawHtml || "");
+  if (!s) return false;
+  return /검색\s*결과가\s*없습니다|조회된\s*(?:목록|내역|데이터|결과)[이가]?\s*없습니다|검색된\s*(?:결과|법령|판례|재결)[이가]?\s*없습니다|"totalCnt"\s*:\s*"?0"?\b/i.test(s);
+}
+
+function classifyInfoEndpointKind(endpointName) {
+  const ep = String(endpointName || "");
+  if (/^precInfo/i.test(ep)) return "prec";
+  if (/^detcInfo/i.test(ep)) return "detc";
+  if (/^cgmExpcInfo/i.test(ep)) return "cgmExpc";
+  if (/^expcInfo/i.test(ep)) return "expc";
+  if (/^ordcInfo/i.test(ep)) return "ordc";
+  if (/^ordinInfo/i.test(ep)) return "ordin";
+  if (/^admRul/i.test(ep)) return "admrul";
+  if (/^nlrcInfo/i.test(ep)) return "nlrc";
+  if (/^specialDeccInfo/i.test(ep)) return "specialDecc";
+  if (/^deccInfo/i.test(ep)) return "decc";
+  if (/^baiPvcsInfo/i.test(ep)) return "baiPvcs";
+  if (/^(?:ftc|ppc|acr|kcc|fsc|oclt|eiac|iaciac|ecc|nhrck)Info/i.test(ep)) return "decsnDoc";
+  return "";
+}
+
+function extractAdaptiveListEntries(targetCfg, listHtml, maxCount) {
+  const h = String(listHtml || "");
+  if (!h) return [];
+  const cap = Math.max(1, Math.min(Number(maxCount) || 5, 10));
+  const strip = (x) => String(x || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+  const entries = [];
+  const seenUrl = new Set();
+
+  const pushEntry = (kind, seq, rawOfficialUrl, listText) => {
+    if (!kind || entries.length >= cap) return;
+    const cleanOfficial = sanitizeOfficialLawUrl(rawOfficialUrl);
+    if (!cleanOfficial) return;
+    if (targetCfg && targetCfg.org === "400201" && listText && listText.includes("[") && !listText.includes("대법원")) return;
+    if (targetCfg && targetCfg.org === "400202" && listText && listText.includes("[대법원")) return;
+    const fetchUrl = cleanOfficial.includes("/admRulLsInfoP.do")
+      ? cleanOfficial.replace("/admRulLsInfoP.do", "/admRulInfoR.do")
+      : (cleanOfficial.includes("/ordinInfoP.do") ? cleanOfficial.replace("/ordinInfoP.do", "/ordinInfoR.do") : cleanOfficial);
+    if (seenUrl.has(fetchUrl)) return;
+    seenUrl.add(fetchUrl);
+    entries.push({
+      kind,
+      seq: String(seq || "").replace(/[^0-9]/g, ""),
+      fetchUrl,
+      officialUrl: cleanOfficial,
+      listDate: normLooseYmd(listText || ""),
+      listText: listText || "",
+      recoveredBy: "adaptive_dom"
+    });
+  };
+
+  /* 2-A) 개편된 <a href="/LSW/...InfoP.do?..."> 또는 data-url 직접 링크 자율 감지 */
+  for (const m of h.matchAll(/<a\b[^>]*?(?:href|data-url|data-href)=["']([^"']*(?:InfoP|InfoR)\.do\?[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const rawHref = m[1].replace(/&amp;/g, "&").trim();
+    const txt = strip(m[2]);
+    let abs = rawHref;
+    if (rawHref.startsWith("/LSW/")) abs = LAW_PUBLIC_WEB_HTTPS + rawHref;
+    else if (rawHref.startsWith("/")) abs = LAW_PUBLIC_WEB_HTTPS + "/LSW" + rawHref;
+    else if (!/^https?:\/\//i.test(rawHref)) abs = LAW_PUBLIC_WEB_HTTPS + "/LSW/" + rawHref.replace(/^\.?\//, "");
+    const epM = /\/LSW\/([A-Za-z0-9_]+)\.do\?([^#]+)/.exec(abs);
+    if (!epM) continue;
+    const kind = classifyInfoEndpointKind(epM[1]);
+    const seqM = /(?:Seq|id)=(\d+)/i.exec(epM[2]);
+    pushEntry(kind, seqM ? seqM[1] : "", abs, txt);
+    if (entries.length >= cap) return entries;
+  }
+
+  /* 2-B) SPA / Next.js / 내장 JSON 스크립트 블록에서 일련번호 및 원문 주소 자율 복원 */
+  for (const sm of h.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)) {
+    const body = sm[1];
+    if (!/(?:일련번호|precSeq|deccSeq|specialDeccSeq|expcSeq|cgmExpcDatSeq|nlrcSeq|ordinSeq|admRulSeq|baiPvcsDatSeq)/.test(body)) continue;
+    for (const jm of body.matchAll(/\{[^{}]{10,1200}\}/g)) {
+      try {
+        const item = JSON.parse(jm[0]);
+        const serialId = extractDrfSerialId(item) ||
+          item.precSeq || item.detcSeq || item.deccSeq || item.specialDeccSeq ||
+          item.nlrcSeq || item.expcSeq || item.cgmExpcDatSeq || item.ordinSeq || item.admRulSeq || item.baiPvcsDatSeq || "";
+        if (!serialId) continue;
+        const drfT = (targetCfg && (targetCfg.drfTarget || targetCfg.target)) || "prec";
+        const u = buildOfficialUrlFromDrfItem(drfT, serialId, item);
+        const epM2 = /\/LSW\/([A-Za-z0-9_]+)\.do/.exec(u);
+        const kind2 = (epM2 && classifyInfoEndpointKind(epM2[1])) || "decc";
+        const txt2 = [item.사건명 || item.안건명 || item.제목 || item.title || "", item.법원명 || item.재결청 || "", item.선고일자 || item.의결일자 || ""].filter(Boolean).join(" ");
+        pushEntry(kind2, serialId, u, txt2);
+        if (entries.length >= cap) return entries;
+      } catch (_) {}
+    }
+  }
+
+  /* 2-C) data-seq 속성 또는 이름이 바뀐 일반 JS 상세보기 함수(fnView('12345') 등) 자율 매핑 */
+  if (targetCfg) {
+    const drfT = targetCfg.drfTarget || targetCfg.target || "";
+    for (const dm of h.matchAll(/(?:data-(?:[a-z]+-)?seq=["'](\d{3,12})["']|onclick=["'][A-Za-z0-9_]*(?:View|Detail|Info|Open|Pop)[A-Za-z0-9_]*\(\s*['"](\d{3,12})['"](?:\s*,\s*['"]([A-Za-z0-9_]+)['"])?[^"']*["'][^>]*>([\s\S]*?)<\/a>)/gi)) {
+      const seq = dm[1] || dm[2] || "";
+      const auxCode = dm[3] || "";
+      const txt3 = strip(dm[4] || "");
+      if (!seq) continue;
+      let u3 = buildOfficialUrlFromDrfItem(drfT, seq, null);
+      if (!u3 && targetCfg.id === "kipo_trb") u3 = LAW_PUBLIC_WEB_HTTPS + "/LSW/specialDeccInfoP.do?specialDeccSeq=" + seq + "&trbClsCd=360102";
+      if (!u3 && targetCfg.id === "hira_trb") u3 = LAW_PUBLIC_WEB_HTTPS + "/LSW/specialDeccInfoP.do?specialDeccSeq=" + seq + "&trbClsCd=360105";
+      if (!u3 && targetCfg.id === "decc_local") u3 = LAW_PUBLIC_WEB_HTTPS + "/LSW/deccInfoP.do?deccSeq=" + seq;
+      if (!u3 && targetCfg.id === "local_adap") u3 = LAW_PUBLIC_WEB_HTTPS + "/LSW/specialDeccInfoP.do?specialDeccSeq=" + seq + "&trbClsCd=" + (auxCode || "360105");
+      if (!u3 && targetCfg.target === "ordc") u3 = LAW_PUBLIC_WEB_HTTPS + "/LSW/ordcInfoP.do?ordcSeq=" + seq;
+      if (u3 && targetCfg.target === "cgmExpc" && auxCode && !u3.includes("ofiClsCd=")) u3 += "&ofiClsCd=" + auxCode;
+      const epM3 = /\/LSW\/([A-Za-z0-9_]+)\.do/.exec(u3);
+      const kind3 = (epM3 && classifyInfoEndpointKind(epM3[1])) || (targetCfg.ssrMode === "decsnDoc" ? "decsnDoc" : "decc");
+      pushEntry(kind3, seq, u3, txt3);
+      if (entries.length >= cap) return entries;
+    }
+  }
+
+  return entries;
+}
+
+function buildFallbackSsrListUrls(targetCfg, query, outmax) {
+  if (!targetCfg || !query) return [];
+  const qEnc = encodeURIComponent(query);
+  const om = Math.max(3, Math.min(Number(outmax) || 8, 20));
+  const mode = targetCfg.ssrMode || targetCfg.target;
+  const fallbacks = [];
+
+  /* 메뉴 개편으로 menuId·subMenuId·tabMenuId 또는 기관 세부코드(decOrg/cmt)가 변경되었을 때 작동하는 표준 무파라미터·통합 경로 */
+  switch (mode) {
+    case "prec":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/precSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "detc":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/detcSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "cgmExpc":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/cgmExpcSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "expc":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/expcSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "ordc":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/ordcSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "ordin":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/ordinSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "admrul":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/admRulSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "nlrc":
+    case "decc":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/deccSc.do?outmax=" + om + "&query=" + qEnc);
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/decsnDocSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "decsnDoc":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/decsnDocSc.do?outmax=" + om + "&query=" + qEnc);
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/deccSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    case "baiPvcs":
+      fallbacks.push(LAW_PUBLIC_WEB_HTTPS + "/LSW/baiPvcsSc.do?outmax=" + om + "&query=" + qEnc);
+      break;
+    default:
+      break;
+  }
+  return fallbacks;
+}
+
 const SSR_DEFAULT_PER_REQ_TIMEOUT_MS = 6500;
 const SSR_DEFAULT_OVERALL_TIMEOUT_MS = 18000;
 const SSR_DEFAULT_MAX_PAGE_BYTES = 1572864;
@@ -3001,6 +4015,7 @@ async function searchLawGoKrPublicSsr(cleanQuery, reqTargets, fetchFn, opts) {
   const docs = [];
   const errors = [];
   const sourcesHit = [];
+  const recoveryNotes = [];
   let attempted = 0;
   let succeeded = 0;
 
@@ -3010,7 +4025,30 @@ async function searchLawGoKrPublicSsr(cleanQuery, reqTargets, fetchFn, opts) {
     const mergedEntries = [];
     const seenSeq = new Set();
     let anyUrlOk = false;
+    let sawExplicitZeroNotice = false;
+    let usedAdaptiveDom = false;
+    let usedFallbackRoute = false;
     let lastStatus = 0;
+
+    const collectFromHtml = (html, perCap) => {
+      let found = extractSsrListEntries(t, html, perCap);
+      if (!found.length && !hasExplicitZeroResultNotice(html)) {
+        const adaptive = extractAdaptiveListEntries(t, html, perCap);
+        if (adaptive.length) {
+          found = adaptive;
+          usedAdaptiveDom = true;
+        }
+      } else if (!found.length) {
+        sawExplicitZeroNotice = true;
+      }
+      for (const ent of found) {
+        if (!seenSeq.has(ent.fetchUrl)) {
+          seenSeq.add(ent.fetchUrl);
+          mergedEntries.push(ent);
+        }
+      }
+    };
+
     for (const lu of listUrls) {
       attempted++;
       const r = await fetchSsrHtmlBounded(f, lu, budget);
@@ -3020,14 +4058,35 @@ async function searchLawGoKrPublicSsr(cleanQuery, reqTargets, fetchFn, opts) {
       }
       anyUrlOk = true;
       const perUrlCap = listUrls.length > 1 ? Math.max(1, Math.ceil(Math.min(maxPerTarget, 4) / listUrls.length)) : Math.min(maxPerTarget, 4);
-      for (const ent of extractSsrListEntries(t, r.html, perUrlCap)) {
-        if (!seenSeq.has(ent.fetchUrl)) {
-          seenSeq.add(ent.fetchUrl);
-          mergedEntries.push(ent);
+      collectFromHtml(r.html, perUrlCap);
+    }
+
+    /* 1단계 자가복구: 기본 목록 주소가 404/오류이거나 명시적 '0건' 안내 없이 항목이 0건이면 개편 대비 대체 공식 경로 자동 탐색 */
+    if (mergedEntries.length === 0 && !sawExplicitZeroNotice && o.enableAdaptiveFallback !== false) {
+      const altUrls = buildFallbackSsrListUrls(t, cleanQuery, maxPerTarget * 2)
+        .filter((u) => !listUrls.includes(u));
+      for (const au of altUrls) {
+        if (budget.deadlineAt - Date.now() <= 200) break;
+        attempted++;
+        const ar = await fetchSsrHtmlBounded(f, au, budget).catch(() => ({ ok: false, status: 0, html: "" }));
+        if (!ar.ok) {
+          if (!lastStatus) lastStatus = ar.status;
+          continue;
         }
+        anyUrlOk = true;
+        const beforeLen = mergedEntries.length;
+        collectFromHtml(ar.html, Math.min(maxPerTarget, 4));
+        if (mergedEntries.length > beforeLen) {
+          usedFallbackRoute = true;
+          break;
+        }
+        if (sawExplicitZeroNotice) break;
       }
     }
+
     if (!anyUrlOk) throw new Error(t.label + ": HTTP " + lastStatus);
+    if (usedAdaptiveDom) recoveryNotes.push(t.label + ": 홈페이지 DOM 개편 자율파서로 원문 복구");
+    if (usedFallbackRoute) recoveryNotes.push(t.label + ": 대체 공식 엔드포인트 자동우회 성공");
     return { targetCfg: t, entries: mergedEntries.slice(0, Math.min(maxPerTarget, 4)) };
   }));
 
@@ -3093,7 +4152,7 @@ async function searchLawGoKrPublicSsr(cleanQuery, reqTargets, fetchFn, opts) {
   for (const [lbl, cnt] of countByLabel.entries()) {
     if (cnt > 0) sourcesHit.push(lbl + " " + cnt + "건");
   }
-  return { docs, errors, sourcesHit, attempted, succeeded };
+  return { docs, errors, sourcesHit, recoveryNotes, attempted, succeeded };
 }
 
 async function pullLowerCourtPublicSsr(fetchFn, opts) {
@@ -3252,13 +4311,14 @@ async function pullLowerCourtBundle(opts) {
   const deduped = deduplicateBatch([].concat(filteredLower, filteredComwel), "system_sync");
 
   let supaRes = { ok: true, pushed: 0, skipped: true };
-  if (getSupabaseCreds(env) && deduped.length > 0 && o.skipSupabase !== true) {
-    supaRes = await upsertToSupabase(deduped, env, fetchFn, "system_sync").catch((e) => {
-      errors.push("supabase: " + String(e.message || e));
+  if (hasSharedStore(env, o.storageBucket) && deduped.length > 0 && o.skipSupabase !== true) {
+    supaRes = await upsertSharedDocs(deduped, env, fetchFn, "system_sync", { storageBucket: o.storageBucket }).catch((e) => {
+      console.error("[pbox-sync shared_store]", e && (e.message || e));
+      errors.push("shared_store: 공유 저장소 반영 중 일시적 지연이 발생했습니다.");
       return { ok: false, pushed: 0 };
     });
-    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:"))) {
-      errors.push("supabase: upsert failed (HTTP " + (supaRes.status || 500) + ")");
+    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:") || x.startsWith("shared_store:"))) {
+      errors.push("shared_store: upsert failed (HTTP " + (supaRes.status || 500) + ")");
     }
   }
 
@@ -3354,6 +4414,7 @@ async function liveSearchOfficialApis(opts) {
   const rawDocs = [];
   const errors = [];
   const sourcesHit = [];
+  const recoveryNotes = [];
   let attempted = 0;
   let succeeded = 0;
 
@@ -3370,6 +4431,7 @@ async function liveSearchOfficialApis(opts) {
     if (pubRes.errors.length) errors.push(...pubRes.errors);
     if (pubRes.docs.length) rawDocs.push(...pubRes.docs);
     if (pubRes.sourcesHit.length) sourcesHit.push(...pubRes.sourcesHit);
+    if (Array.isArray(pubRes.recoveryNotes) && pubRes.recoveryNotes.length) recoveryNotes.push(...pubRes.recoveryNotes);
   } else if (lawOc && reqTargets.length) {
     const seenDrfKey = new Set();
     const drfTargets = reqTargets.filter((t) => {
@@ -3516,13 +4578,17 @@ async function liveSearchOfficialApis(opts) {
 
   const deduped = deduplicateBatch(rawDocs, "system_sync");
   let supaRes = { ok: true, pushed: 0, skipped: true };
-  if (getSupabaseCreds(env) && deduped.length > 0 && o.skipSupabase !== true) {
-    supaRes = await upsertToSupabase(deduped, env, f, "system_sync", { insertOnly: true }).catch((e) => {
-      errors.push("supabase: " + String(e.message || e));
+  if (hasSharedStore(env, o.storageBucket) && deduped.length > 0 && o.skipSupabase !== true) {
+    supaRes = await upsertSharedDocs(deduped, env, f, "system_sync", {
+      insertOnly: true,
+      storageBucket: o.storageBucket
+    }).catch((e) => {
+      console.error("[pbox-sync shared_store]", e && (e.message || e));
+      errors.push("shared_store: 공유 저장소 반영 중 일시적 지연이 발생했습니다.");
       return { ok: false, pushed: 0 };
     });
-    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:"))) {
-      errors.push("supabase: upsert failed (HTTP " + (supaRes.status || 500) + ")");
+    if (supaRes.ok === false && !errors.some((x) => x.startsWith("supabase:") || x.startsWith("shared_store:"))) {
+      errors.push("shared_store: upsert failed (HTTP " + (supaRes.status || 500) + ")");
     }
   }
 
@@ -3541,6 +4607,7 @@ async function liveSearchOfficialApis(opts) {
     dedupedCount: deduped.length,
     supabasePushed: supaRes.pushed || 0,
     sourcesHit,
+    recoveryNotes,
     errors,
     docs: deduped
   };
@@ -3660,9 +4727,13 @@ async function pullTribunalBundle(opts) {
 
   const deduped = deduplicateBatch(allDocs, "system_sync");
   let supaRes = { ok: true, pushed: 0, skipped: true };
-  if (getSupabaseCreds(env) && deduped.length > 0 && o.skipSupabase !== true) {
-    supaRes = await upsertToSupabase(deduped, env, fetchFn, "system_sync", { insertOnly: true }).catch((e) => {
-      allErrors.push("supabase: " + String(e.message || e));
+  if (hasSharedStore(env, o.storageBucket) && deduped.length > 0 && o.skipSupabase !== true) {
+    supaRes = await upsertSharedDocs(deduped, env, fetchFn, "system_sync", {
+      insertOnly: true,
+      storageBucket: o.storageBucket
+    }).catch((e) => {
+      console.error("[pbox-sync shared_store]", e && (e.message || e));
+      allErrors.push("shared_store: 공유 저장소 반영 중 일시적 지연이 발생했습니다.");
       return { ok: false, pushed: 0 };
     });
   }
@@ -3687,23 +4758,274 @@ async function pullTribunalBundle(opts) {
   };
 }
 
+/* 8-C) 무료 사이트 홈페이지 개편·누락 자료 자동 재탐색 엔진(autoDiscoverOfficialMaterials)
+ *  - 약칭 확장·사건번호 추출·복합 질의 핵심어 분해 후 다중 공식 경로 및 자율 DOM 파서로 전 기관 교차 재탐색
+ *  - 개별 외부 공공사이트가 내부 메뉴/게시판 주소를 통째로 개편한 경우에도 즉시 원문에 도달하는 공공도메인(.go.kr) 정밀 탐색 경로 함께 반환
+ */
+const DISCOVERY_ABBREV_MAP = [
+  [/근기법/g, "근로기준법"],
+  [/산재법/g, "산업재해보상보험법"],
+  [/중처법|중대재해법/g, "중대재해처벌법"],
+  [/고보법/g, "고용보험법"],
+  [/노조법/g, "노동조합법"],
+  [/남녀고용법|고평법/g, "남녀고용평등법"],
+  [/기간제법/g, "기간제 및 단시간근로자 보호 등에 관한 법률"],
+  [/행심법/g, "행정심판"],
+  [/국공법/g, "국가공무원법"],
+  [/지공법/g, "지방공무원법"],
+  [/중노위/g, "중앙노동위원회"],
+  [/행심위/g, "행정심판위원회"],
+  [/개보위/g, "개인정보보호위원회"],
+  [/인권위/g, "국가인권위원회"],
+  [/공정위/g, "공정거래위원회"]
+];
+
+const DISCOVERY_STOPWORDS = new Set([
+  "관련", "대한", "관한", "여부", "기준", "경우", "판례", "사례", "해석", "검토", "문의", "질의", "인정", "가능", "방법", "절차"
+]);
+
+function buildDiscoveryQueries(cleanQuery) {
+  const base = String(cleanQuery || "").trim();
+  if (!base) return [];
+  const out = [base];
+  let expanded = base;
+  for (const [re, full] of DISCOVERY_ABBREV_MAP) {
+    expanded = expanded.replace(re, full);
+  }
+  if (expanded !== base && expanded.length <= 50) {
+    out.push(expanded);
+  }
+
+  /* 사건·문서번호가 포함된 경우 순수 사건번호 단독 질의 추가 */
+  const caseMatch = /((?:19|20)\d{2}[가-힣]{1,4}\d{1,8}|\b(?:19|20)?\d{2}-\d{3,6}\b|[가-힣]{2,10}과-\d{1,6})/.exec(base);
+  if (caseMatch && !out.includes(caseMatch[1])) {
+    out.push(caseMatch[1]);
+  }
+
+  /* 긴 문장형 질의인 경우 불용어를 걷어낸 핵심 쟁점어 조합 추가 */
+  const tokens = expanded
+    .replace(/[^\w가-힣\s-]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.replace(/(?:은|는|이|가|을|를|의|에|로|으로|와|과|도|만|에서|에게)$/, "").trim())
+    .filter((t) => t.length >= 2 && !DISCOVERY_STOPWORDS.has(t));
+  if (tokens.length >= 2) {
+    const compactKw = Array.from(new Set(tokens)).slice(0, 3).join(" ").slice(0, 40).trim();
+    if (compactKw && !out.includes(compactKw)) out.push(compactKw);
+    if (tokens[0] && tokens[0].length >= 2 && !out.includes(tokens[0])) out.push(tokens[0]);
+  }
+
+  return out.slice(0, 3);
+}
+
+function buildAlternateOfficialPortalRoutes(cleanQuery) {
+  const q = String(cleanQuery || "").trim();
+  if (!q) return [];
+  const qEnc = encodeURIComponent(q);
+  const mkGoogleGov = (siteDomain) => "https://www.google.com/search?q=" + encodeURIComponent("site:" + siteDomain + " " + q);
+  return [
+    {
+      id: "law_go_kr_unified",
+      label: "국가법령정보센터 통합검색",
+      domain: "law.go.kr",
+      officialUrl: "https://www.law.go.kr/lsSc.do?menuId=1&subMenuId=15&tabMenuId=81&query=" + qEnc,
+      resilientSearchUrl: mkGoogleGov("law.go.kr")
+    },
+    {
+      id: "scourt_glaw",
+      label: "대법원 종합법률정보",
+      domain: "scourt.go.kr",
+      officialUrl: "https://glaw.scourt.go.kr/wsjo/intesrch/sjo022.do?q=" + qEnc,
+      resilientSearchUrl: mkGoogleGov("scourt.go.kr")
+    },
+    {
+      id: "simpan_go_kr",
+      label: "온라인행정심판(중앙·시도 행심위)",
+      domain: "simpan.go.kr",
+      officialUrl: "https://www.simpan.go.kr/",
+      resilientSearchUrl: mkGoogleGov("simpan.go.kr")
+    },
+    {
+      id: "nlrc_go_kr",
+      label: "중앙노동위원회 판정사례",
+      domain: "nlrc.go.kr",
+      officialUrl: "https://www.nlrc.go.kr/",
+      resilientSearchUrl: mkGoogleGov("nlrc.go.kr")
+    },
+    {
+      id: "moel_go_kr",
+      label: "고용노동부 행정해석·지침",
+      domain: "moel.go.kr",
+      officialUrl: "https://www.moel.go.kr/",
+      resilientSearchUrl: mkGoogleGov("moel.go.kr")
+    },
+    {
+      id: "ccourt_pipc_ftc",
+      label: "헌법재판소 통합판례검색",
+      domain: "ccourt.go.kr / pipc.go.kr / ftc.go.kr",
+      officialUrl: "https://isearch.ccourt.go.kr/",
+      resilientSearchUrl: "https://www.google.com/search?q=" + encodeURIComponent("(site:ccourt.go.kr OR site:pipc.go.kr OR site:ftc.go.kr OR site:humanrights.go.kr) " + q)
+    }
+  ];
+}
+
+async function autoDiscoverOfficialMaterials(opts) {
+  const o = opts || {};
+  const env = o.env || process.env || {};
+  const f = o.fetchFn || fetch;
+
+  const qCheck = validateAndScrubOfficialQuery(o.query, { allowEmpty: false, maxLen: 50 });
+  if (!qCheck.ok) {
+    return {
+      ok: false,
+      partial: false,
+      status: 400,
+      error: qCheck.error,
+      docs: [],
+      expandedQueries: [],
+      recoveryNotes: [],
+      alternatePortalRoutes: [],
+      errors: [qCheck.error]
+    };
+  }
+  const cleanQuery = qCheck.query;
+  const candidateQueries = buildDiscoveryQueries(cleanQuery);
+  const alternatePortalRoutes = buildAlternateOfficialPortalRoutes(cleanQuery);
+  const hasExplicitOc = Boolean(sanitizeLawOc(o.lawOc || env.LAW_OC || env.LAW_GO_KR_OC || ""));
+
+  const DISCOVERY_TARGETS = [
+    "prec_sc", "prec_lower", "detc",
+    "decc_acrc", "decc_local", "nlrc", "iaciac", "eiac", "adap", "tt", "oclt", "ftc", "ppc", "acr", "nhrck",
+    "cgmExpc", "expc", "ordc", "ordin", "admrul", "baiPvcs"
+  ];
+  const reqTargets = Array.isArray(o.targets) && o.targets.length ? o.targets : DISCOVERY_TARGETS;
+
+  const collected = [];
+  const allErrors = [];
+  const hitMap = new Map();
+  const recoveryNotesSet = new Set();
+  const usedQueries = [];
+  let anySucceeded = false;
+  const deadlineAt = Date.now() + Math.max(500, Math.min(Number(o.overallTimeoutMs) || 28000, 45000));
+
+  function mergeDiscoveryStep(stepRes) {
+    if (stepRes.ok || stepRes.partial) anySucceeded = true;
+    if (Array.isArray(stepRes.docs) && stepRes.docs.length) collected.push(...stepRes.docs);
+    if (Array.isArray(stepRes.errors) && stepRes.errors.length) allErrors.push(...stepRes.errors);
+    for (const rn of (stepRes.recoveryNotes || [])) recoveryNotesSet.add(rn);
+    for (const sh of (stepRes.sourcesHit || [])) {
+      const m = /^(.+)\s+(\d+)건$/.exec(sh);
+      if (m) hitMap.set(m[1], (hitMap.get(m[1]) || 0) + Number(m[2]));
+    }
+  }
+
+  for (let qi = 0; qi < candidateQueries.length; qi++) {
+    const subQ = candidateQueries[qi];
+    const remMs = deadlineAt - Date.now();
+    if (remMs <= 250) break;
+    usedQueries.push(subQ);
+    if (qi > 0) {
+      recoveryNotesSet.add("질의 확장·핵심어 자동 분해 탐색 실행: \"" + subQ + "\"");
+    }
+
+    const stepRes = await liveSearchOfficialApis({
+      env,
+      fetchFn: f,
+      lawOc: o.lawOc,
+      query: subQ,
+      targets: reqTargets,
+      maxPerTarget: Math.min(Math.max(3, Number(o.maxPerTarget) || 5), 10),
+      detailLimit: Math.min(Math.max(8, Number(o.detailLimit) || 24), 36),
+      perRequestTimeoutMs: o.perRequestTimeoutMs,
+      overallTimeoutMs: Math.min(20000, remMs),
+      includeComwel: qi === 0 && o.includeComwel !== false,
+      skipSupabase: true,
+      usePublicWeb: o.usePublicWeb === true
+    });
+    mergeDiscoveryStep(stepRes);
+
+    /* OC 공공API가 설정된 환경에서 DRF 응답이 실패하거나 0건이면 즉시 무인증 4중 자가복구(자율 DOM·대체경로 SSR)로 교차 재탐색 */
+    const remAfterDrf = deadlineAt - Date.now();
+    if (hasExplicitOc && o.usePublicWeb !== true && !(Array.isArray(stepRes.docs) && stepRes.docs.length) && remAfterDrf > 350) {
+      recoveryNotesSet.add("공공API(OC) 무응답·0건 감지 → 무인증 자율 DOM·대체경로(SSR) 교차 복구 실행: \"" + subQ + "\"");
+      const ssrFallbackRes = await liveSearchOfficialApis({
+        env,
+        fetchFn: f,
+        lawOc: "",
+        query: subQ,
+        targets: reqTargets,
+        maxPerTarget: Math.min(Math.max(3, Number(o.maxPerTarget) || 5), 8),
+        detailLimit: Math.min(Math.max(8, Number(o.detailLimit) || 20), 30),
+        perRequestTimeoutMs: o.perRequestTimeoutMs,
+        overallTimeoutMs: Math.min(18000, remAfterDrf),
+        includeComwel: false,
+        skipSupabase: true,
+        usePublicWeb: true
+      });
+      mergeDiscoveryStep(ssrFallbackRes);
+    }
+
+    /* 정밀 질의에서 이미 충분한 원문(6건 이상)이 확보되면 불필요한 추가 상위 호출을 멈춤 */
+    if (collected.length >= 6) break;
+  }
+
+  const deduped = deduplicateBatch(collected, "system_sync");
+  let sharedRes = { ok: true, pushed: 0, skipped: true };
+  if (hasSharedStore(env, o.storageBucket) && deduped.length > 0 && o.skipSupabase !== true) {
+    sharedRes = await upsertSharedDocs(deduped, env, f, "system_sync", {
+      insertOnly: true,
+      storageBucket: o.storageBucket
+    }).catch((e) => {
+      console.error("[pbox-sync shared_store]", e && (e.message || e));
+      allErrors.push("shared_store: 공유 저장소 반영 중 일시적 지연이 발생했습니다.");
+      return { ok: false, pushed: 0 };
+    });
+  }
+
+  const sourcesHit = Array.from(hitMap.entries()).map(([k, v]) => k + " " + v + "건");
+  const fullOk = anySucceeded && sharedRes.ok !== false && allErrors.length === 0;
+  const partialOk = !fullOk && (anySucceeded || deduped.length > 0);
+
+  return {
+    ok: fullOk,
+    partial: partialOk,
+    status: (fullOk || partialOk) ? 200 : 502,
+    error: (!fullOk && !partialOk) ? (allErrors[0] || "자동 복구 탐색 응답을 받지 못했습니다.") : undefined,
+    query: cleanQuery,
+    expandedQueries: usedQueries,
+    syncedAt: new Date().toISOString(),
+    fetchedCount: collected.length,
+    dedupedCount: deduped.length,
+    supabasePushed: sharedRes.pushed || 0,
+    sourcesHit,
+    recoveryNotes: Array.from(recoveryNotesSet),
+    alternatePortalRoutes,
+    errors: allErrors,
+    docs: deduped
+  };
+}
+
 /* HTTP pboxApi 액션 처리기 — 어떠한 사전 절단(slice)도 없이 원문 전체·전체 배열 검증을 먼저 수행 */
 async function handleApiAction(opts) {
   const o = opts || {};
   const body = (o.body && typeof o.body === "object" && !Array.isArray(o.body)) ? o.body : {};
   const uid = String(o.uid || "").trim();
   const env = o.env || process.env || {};
+  const storageBucket = o.storageBucket || null;
   const f = o.fetchFn || fetch;
   const checkCool = typeof o.enforceCooldown === "function" ? o.enforceCooldown : (async () => "");
   const action = String(body.action || o.action || "sync");
 
   if (action === "pull") {
-    const pulled = await pullFromSupabaseServer(
+    const coolPull = await checkCool(uid, "pull", 0, 0);
+    if (coolPull) return { status: 429, payload: { ok: false, error: coolPull, docs: [], deletedKeys: [] } };
+    const pulled = await pullSharedDocs(
       env,
       f,
       body.limit,
       body.sinceDeletedAt || "",
-      body.afterDeletedKey || ""
+      body.afterDeletedKey || "",
+      storageBucket,
+      body.offset
     );
     return { status: pulled.ok === false ? 502 : 200, payload: pulled };
   }
@@ -3712,7 +5034,15 @@ async function handleApiAction(opts) {
       return { status: 400, payload: { ok: false, error: "공유 문서 업로드는 한 번에 최대 50건까지 가능합니다." } };
     }
     const docs = Array.isArray(body.docs) ? body.docs : [];
-    const pushed = await upsertToSupabase(docs, env, f, uid, {});
+    for (const d of docs) {
+      const shapeErr = validateUserSharedDocShape(d);
+      if (shapeErr) {
+        return { status: 400, payload: { ok: false, error: shapeErr } };
+      }
+    }
+    const coolPush = await checkCool(uid, "push", 3000, 800);
+    if (coolPush) return { status: 429, payload: { ok: false, error: coolPush } };
+    const pushed = await upsertSharedDocs(docs, env, f, uid, { storageBucket });
     const status = pushed.ok === false ? (pushed.status || 403) : 200;
     return { status, payload: Object.assign({ ok: pushed.ok !== false }, pushed) };
   }
@@ -3721,7 +5051,9 @@ async function handleApiAction(opts) {
       return { status: 400, payload: { ok: false, error: "공유 문서 삭제는 한 번에 최대 50건까지 가능합니다." } };
     }
     const keys = Array.isArray(body.canonicalKeys) ? body.canonicalKeys : [];
-    const del = await deleteFromSupabaseServer(keys, env, f, uid);
+    const coolDel = await checkCool(uid, "delete", 3000, 800);
+    if (coolDel) return { status: 429, payload: { ok: false, error: coolDel } };
+    const del = await deleteSharedDocs(keys, env, f, uid, storageBucket);
     const delStatus = del.ok === false ? (del.status || 502) : 200;
     return { status: delStatus, payload: Object.assign({ ok: del.ok !== false }, del) };
   }
@@ -3730,6 +5062,7 @@ async function handleApiAction(opts) {
     if (coolLower) return { status: 429, payload: { ok: false, error: coolLower, docs: [] } };
     const lowerOut = await pullLowerCourtBundle({
       env,
+      storageBucket,
       fetchFn: f,
       lawOc: body.lawOc,
       preset: body.preset || "all",
@@ -3754,6 +5087,7 @@ async function handleApiAction(opts) {
     if (coolTrb) return { status: 429, payload: { ok: false, error: coolTrb, docs: [] } };
     const trbOut = await pullTribunalBundle({
       env,
+      storageBucket,
       fetchFn: f,
       lawOc: body.lawOc,
       tribunal: body.tribunal || "all",
@@ -3769,6 +5103,28 @@ async function handleApiAction(opts) {
       payload: trbOut
     };
   }
+  if (action === "auto_discover") {
+    const coolDisc = await checkCool(uid, "auto_discover", 6000, 2000);
+    if (coolDisc) return { status: 429, payload: { ok: false, error: coolDisc, docs: [] } };
+    if (body.targets !== undefined && (!Array.isArray(body.targets) || body.targets.length > 25)) {
+      return { status: 400, payload: { ok: false, error: "자동 탐색 대상 기관은 최대 25개까지 지정할 수 있습니다.", docs: [] } };
+    }
+    const discOut = await autoDiscoverOfficialMaterials({
+      env,
+      storageBucket,
+      fetchFn: f,
+      lawOc: body.lawOc,
+      query: body.query,
+      targets: Array.isArray(body.targets) ? body.targets : [],
+      maxPerTarget: Math.min(Math.max(3, Number(body.maxPerTarget) || 5), 10),
+      detailLimit: Math.min(Math.max(6, Number(body.detailLimit ?? 24)), 36),
+      includeComwel: body.includeComwel !== false
+    });
+    return {
+      status: (discOut.ok || discOut.partial) ? 200 : (discOut.status || 502),
+      payload: discOut
+    };
+  }
   if (action === "live_search") {
     const coolLive = await checkCool(uid, "live_search", 4000, 1500);
     if (coolLive) return { status: 429, payload: { ok: false, error: coolLive, docs: [] } };
@@ -3777,6 +5133,7 @@ async function handleApiAction(opts) {
     }
     const liveOut = await liveSearchOfficialApis({
       env,
+      storageBucket,
       fetchFn: f,
       lawOc: body.lawOc,
       query: body.query,
@@ -3799,6 +5156,7 @@ async function handleApiAction(opts) {
   }
   const out = await runSync({
     env,
+    storageBucket,
     fetchFn: f,
     lawOc: body.lawOc,
     sinceDate: body.sinceDate,
@@ -3814,16 +5172,23 @@ module.exports = {
   TRIBUNAL_PRESETS,
   TRIBUNAL_GROUP_MAP,
   LOCAL_ADMIN_APPEAL_ORGS,
+  PBOX_SHARED_STORAGE_PATH,
   validateLocalOrgStrict,
   safeHttpsFetchJson,
   buildOfficialUrlFromDrfItem,
   resolveSsrListUrls,
+  buildFallbackSsrListUrls,
   sanitizeLawOc,
   sanitizeOfficialLawUrl,
   buildSsrListUrl,
+  hasExplicitZeroResultNotice,
   extractSsrListEntries,
+  extractAdaptiveListEntries,
   parseLawGoKrSsrDetailHtml,
   searchLawGoKrPublicSsr,
+  buildDiscoveryQueries,
+  buildAlternateOfficialPortalRoutes,
+  autoDiscoverOfficialMaterials,
   validateCourtFilterStrict,
   sanitizeCourtFilter,
   validateCompactYmdStrict,
@@ -3845,6 +5210,7 @@ module.exports = {
   checkLegalizeKrTree,
   fetchLawGoKrDetailRich,
   pullLawGoKrRecent,
+  pullKeylessOfficialRecent,
   pullLawGoKrLowerCourt,
   pullComwelSanjaeCases,
   pullLowerCourtBundle,
@@ -3853,6 +5219,12 @@ module.exports = {
   upsertToSupabase,
   pullFromSupabaseServer,
   deleteFromSupabaseServer,
+  upsertToBucketStore,
+  pullFromBucketStore,
+  deleteFromBucketStore,
+  upsertSharedDocs,
+  pullSharedDocs,
+  deleteSharedDocs,
   runSync,
   handleApiAction
 };

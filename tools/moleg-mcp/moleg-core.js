@@ -822,7 +822,42 @@ async function unifiedSearch(args, opts) {
     tribunals: docs.filter((d) => d.docType === "dec_nlrc").slice(0, limitPer * 2),
     interpretations: docs.filter((d) => d.docType === "interp_moel" || d.docType === "interp_gov").slice(0, limitPer * 2),
     sourcesHit: liveRes.sourcesHit || [],
+    recoveryNotes: liveRes.recoveryNotes || [],
     errors: liveRes.errors || []
+  };
+}
+
+async function autoDiscover(args, opts) {
+  const a = args || {};
+  const o = opts || {};
+  const env = o.env || process.env || {};
+  const fetchFn = o.fetchFn || fetch;
+  const limit = Math.max(2, Math.min(Number(a.limit) || 12, 25));
+
+  const res = await PBoxSync.autoDiscoverOfficialMaterials({
+    env,
+    fetchFn,
+    query: a.query,
+    maxPerTarget: 5,
+    detailLimit: Math.min(Math.max(limit + 8, 20), 36),
+    includeComwel: false,
+    skipSupabase: true
+  });
+  if (!res.ok && !res.partial) {
+    throw new Error(res.error || (res.errors && res.errors[0]) || "자가복구 다중탐색에 실패했습니다.");
+  }
+  const allDocs = res.docs || [];
+  const sliced = allDocs.slice(0, limit);
+  return {
+    query: res.query,
+    expandedQueries: res.expandedQueries || [],
+    count: sliced.length,
+    totalMatched: allDocs.length,
+    docs: sliced,
+    sourcesHit: res.sourcesHit || [],
+    recoveryNotes: res.recoveryNotes || [],
+    alternatePortalRoutes: res.alternatePortalRoutes || [],
+    errors: res.errors || []
   };
 }
 
@@ -836,5 +871,6 @@ module.exports = {
   searchInterpretations,
   searchOrdinanceAndAdmrul,
   getOfficialDocument,
-  unifiedSearch
+  unifiedSearch,
+  autoDiscover
 };
