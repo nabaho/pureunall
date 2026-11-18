@@ -13422,6 +13422,7 @@ function _deleteSetupFund(fid,goHome){
       var up={}; up['funds/'+fid]=null; up['sites/'+fid]=null; up['annual/'+fid]=null;
       up['subsidy_docs/'+fid]=null; up['doc_edits/'+fid]=null; up['welfare/'+fid]=null;
       up['events/'+fid]=null; up['txns/'+fid]=null; up['stocks/'+fid]=null; up['stock_blobs/'+fid]=null;
+      up['closing/'+fid]=null; up['closing_blobs/'+fid]=null;
       return fbDb.ref(NS).update(up);
     }).then(function(st){
       if(st==='abort') return 'abort';
@@ -16394,7 +16395,8 @@ function showBackup(){
 function exportAll(){
   toast('전체 자료를 모으는 중…');
   fbDb.ref(NS).once('value').then(function(sn){
-    var v=sn.val()||{};
+    var v=Object.assign({},sn.val()||{});
+    delete v.closing_blobs; delete v.stock_blobs;
     var blob=new Blob([JSON.stringify(v,null,1)],{type:'application/json'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -17670,13 +17672,29 @@ function importSites(dropped){
   _pickGo(inp,dropped);
 }
 
-// ── 연도 선택 (연간/지원금 공용) ──
+// ── 연도 선택 (연간/지원금/회계·결산 공용) — 기금에 실제 존재하는 과거 연도(2017~)를 빠짐없이 포함한다 ──
+function fundYearsOf(fid,clMap,includeNext){
+  var yNow=new Date().getFullYear(), maxY=includeNext?yNow+1:yNow, minY=yNow-5;
+  var f=(typeof funds!=='undefined'&&funds&&funds[fid])||{};
+  var rd=String(f.reg_date||f.inka_date||'').slice(0,4);
+  if(/^\d{4}$/.test(rd)&&+rd>=2017&&+rd<minY) minY=+rd;
+  var seen={};
+  for(var y=maxY;y>=minY;y--) seen[y]=1;
+  Object.keys((f&&f.years)||{}).forEach(function(k){ if(/^\d{4}$/.test(k)&&+k>=2017&&+k<=yNow+1) seen[+k]=1; });
+  var c=clMap||((typeof S!=='undefined'&&S&&S.cb&&S.cb[fid])||{});
+  Object.keys(c||{}).forEach(function(k){ if(/^\d{4}$/.test(k)&&+k>=2017&&+k<=yNow+1) seen[+k]=1; });
+  if(typeof S!=='undefined'&&S&&S.ysFor===fid&&S.ys&&S.ys.data){
+    Object.keys(S.ys.data).forEach(function(k){ if(/^\d{4}$/.test(k)&&+k>=2017&&+k<=yNow+1) seen[+k]=1; });
+  }
+  if(typeof S!=='undefined'&&S&&+S.year>=2017&&+S.year<=yNow+1) seen[+S.year]=1;
+  return Object.keys(seen).map(Number).sort(function(a,b){ return b-a; });
+}
 // 연도 전환 — 미저장 변경이 있으면 확인 후 이동(취소 시 원래 연도로 되돌림)
 function changeYear(v){ _leaveGuard().then(function(ok){ if(!ok){ renderFund(); return; }
   S.year=+v; S.annualFor=null; renderFund(); }); }
 function yearSel(){
-  var y=new Date().getFullYear(), opts='';
-  for(var i=y+1;i>=y-3;i--) opts+='<option'+(S.year===i?' selected':'')+'>'+i+'</option>';
+  var ys=fundYearsOf(S.fundId,null,true), opts='';
+  ys.forEach(function(i){ opts+='<option'+(S.year===i?' selected':'')+'>'+i+'</option>'; });
   return '<select onchange="changeYear(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px">'+opts+'</select>';
 }
 function fmtDeadline(dl){
@@ -23317,13 +23335,46 @@ function ieView(arr){
     +'<div style="overflow-x:auto;max-width:620px"><table><thead><tr><th>관 · 항 · 목</th><th style="text-align:right;width:150px">금액(원)</th></tr></thead><tbody>'
     +body+'</tbody></table></div></div>';
 }
+/* 스냅샷(closing/{fid}/{yr}/fin)만 있는 과거 백데이터 연도를 computeFin 반환 구조로 복원 — 순수 함수
+   스냅샷에 계정별 세부 내역이 없으므로 tb 는 비워 두어 없는 계정명을 지어내지 않는다(대분류 10단계만 표시). */
+function finFromSnap(snap,openingOpt){
+  var s=snap||{};
+  var cash=num(s.cash)||0, savings=num(s.savings)||0, loan=num(s.loan)||0, secu=num(s.secu)||0, otherAsset=num(s.otherAsset)||0;
+  var totalAssets=(s.assets!=null)?(num(s.assets)||0):(cash+savings+loan+secu+otherAsset);
+  var res1=num(s.res1)||0, res2=num(s.res2)||0;
+  var liab=(s.liab!=null)?(num(s.liab)||0):(res1+res2);
+  if(s.res1==null&&s.res2==null&&liab>0) res2=liab;
+  var basic=num(s.basic)||0, retained=num(s.retained)||0;
+  var equity=(s.equity!=null)?(num(s.equity)||0):(basic+retained);
+  var totalLiabEq=(s.liabEq!=null)?(num(s.liabEq)||0):(liab+equity);
+  var bizRev=num(s.revenue)||0, purpose=num(s.purpose)||0, admin=num(s.admin)||0, otherExp=num(s.otherExp)||0, tax=num(s.tax)||0;
+  var net=(s.net!=null)?(num(s.net)||0):(bizRev-purpose-admin-otherExp-tax);
+  var gross=bizRev-purpose, opInc=gross-admin;
+  var nonopExp=otherExp;
+  var hasNonop=(s.nonopRev!=null);
+  var nonopRev=hasNonop?(num(s.nonopRev)||0):Math.max(0,net+tax+nonopExp-opInc);
+  var preTax=opInc+nonopRev-nonopExp;
+  var op=openingOpt||{retained:retained-net};
+  return {tb:{},appr:num(s.txn_n)||0,tax:tax,gross:gross,opInc:opInc,nonopRev:nonopRev,
+    nonopExp:nonopExp,preTax:preTax,rev1:0,rev2:hasNonop?nonopRev:0,bizRev:bizRev,purpose:purpose,admin:admin,otherExp:otherExp,resvExp:hasNonop?otherExp:0,
+    cash:cash,savings:savings,loan:loan,secu:secu,otherAsset:otherAsset,basic:basic,liab:liab,res1:res1,res2:res2,
+    totalAssets:totalAssets,net:net,retained:retained,equity:equity,totalLiabEq:totalLiabEq,
+    balanced:Math.round(totalAssets)===Math.round(totalLiabEq),opening:op,_fromSnap:true};
+}
 function finCompareView(arr){
+  var f15Ok=f15Load();
   loadPrevTxns();
   var cur=computeFin(arr,S.fundId,S.year);
   var pa=prevArr(), py=_yr()-1;
-  if(pa===null) return '<div class="panel">'+loadingHTML()+'<div class="muted" style="font-size:12px">'+py+'년 자료를 불러오는 중…</div></div>';
+  if(pa===null||!f15Ok) return '<div class="panel">'+loadingHTML()+'<div class="muted" style="font-size:12px">'+py+'년 자료를 불러오는 중…</div></div>';
+  if(!cur.appr&&!Object.keys(cur.opening||{}).length&&S.f15Close&&S.f15Close.fin){
+    cur=finFromSnap(S.f15Close.fin,S.f15PrevFin?{retained:num(S.f15PrevFin.retained)||0}:undefined);
+  }
   var prv=computeFin(pa,S.fundId,py);
-  var hasPrev=prv.appr>0||Object.keys(prv.opening||{}).length>0;
+  if(!prv.appr&&!Object.keys(prv.opening||{}).length&&S.f15PrevFin){
+    prv=finFromSnap(S.f15PrevFin);
+  }
+  var hasPrev=prv.appr>0||Object.keys(prv.opening||{}).length>0||!!prv._fromSnap;
   var head='<thead><tr><th>과목</th><th style="text-align:right">'+S.year+'년 (당기)</th>'
     +'<th style="text-align:right">'+py+'년 (전기)</th><th style="text-align:right">증감</th><th class="mo" style="text-align:right">증감률</th></tr></thead>';
   /* 세 표 모두 stmtBS/IS/RE 한 곳에서 나온다 — 화면과 엑셀이 갈라지지 않는다.
@@ -23346,14 +23397,16 @@ function finCompareView(arr){
   /* 열 단계가 맞물리지 않으면 어딘가에서 분류가 새고 있다 — 조용히 두면 제출본이 틀어진다 */
   var _se=stmtChk(cur);
   var stepWarn=_se.length?'<span class="chip dg" style="font-size:10px">⚠ 손익 단계 어긋남: '+esc(_se.join(', '))+'</span>':'';
+  var snapChip=cur._fromSnap?'<span class="chip" style="font-size:10px" title="'+esc((S.f15Close&&S.f15Close.src_doc)||'과거 제출 결산서 백데이터')+'">📦 제출결산 백데이터</span>':'';
   var warn=cur.balanced?'<span class="chip ok" style="font-size:10px">✅ 대차일치</span>'
     :'<span class="chip dg" style="font-size:10px">⚠ 대차차이 '+won(cur.totalAssets-cur.totalLiabEq)+'</span>';
-  return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">재무제표 · 전기 대비</h2>'+hlp('close.fin')+warn+stepWarn
+  return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">재무제표 · 전기 대비</h2>'+hlp('close.fin')+warn+snapChip+stepWarn
     +(hasPrev?'':'<span class="chip warn" style="font-size:10px">'+py+'년 자료 없음 — 전기는 0으로 표시</span>')
-    +'<span style="flex:1"></span><button onclick="printLedger(\'fin\')">🖨 인쇄</button>'
+    +'<span style="flex:1"></span><button onclick="closeSub(\'years\')">📊 연도별 비교</button><button onclick="printLedger(\'fin\')">🖨 인쇄</button>'
     +'<button class="primary" onclick="closeSub(\'f15\')">📄 별지15호로 →</button></div>'
     +'<div class="row" style="align-items:flex-start;gap:22px;margin-top:12px;flex-wrap:wrap">'+bs+is+'</div>'
-    +'<div class="row" style="align-items:flex-start;gap:22px;margin-top:18px;flex-wrap:wrap">'+re+'</div></div>';
+    +'<div class="row" style="align-items:flex-start;gap:22px;margin-top:18px;flex-wrap:wrap">'+re+'</div></div>'
+    +(typeof archiveYearBarHTML==='function'?archiveYearBarHTML(S.fundId,S.year,S.f15Close):'');
 }
 /* ══════════ 별지 제15호 운영상황보고서 ══════════
    근로복지기본법 시행규칙 [별지 제15호서식] — 실제 제출본과 같은 2쪽 구성.
@@ -23772,9 +23825,71 @@ function f15SetBf(id,kind){
     _cbDirty(); renderFund(); toast('구분 변경됨');
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
+/* 스냅샷(closing/{fid}/{yr}/fin)만으로 과거 연도 별지 제15호 R 객체를 복원 — 순수 함수 */
+function f15FromSnap(snap,fid,yr,rep,sites){
+  var s=snap||{}, r=rep||{}, f=(typeof funds!=='undefined'&&funds&&funds[fid])||{};
+  var fin=finFromSnap(s);
+  var bf={employer:num(s.contrib_employer)||0,other:num(s.contrib_other)||0,income:num(s.bf_income)||0,
+    merge:num(s.bf_merge)||0,use:num(s.bf_use)||0,split:num(s.bf_split)||0};
+  var bfInc=bf.employer+bf.other+bf.income+bf.merge, bfDec=bf.use+bf.split;
+  var bfEnd=(s.bf_end!=null&&(num(s.bf_end)||s.has_f15))?(num(s.bf_end)||0):(num(s.basic)||0);
+  var bfOpen=(s.bf_open!=null&&num(s.bf_open))?(num(s.bf_open)||0):Math.max(0,bfEnd-bfInc+bfDec);
+  var run={trust:num(s.run_trust)||num(r.run_trust)||0,secu:num(s.run_secu)||num(r.run_secu)||fin.secu||0,
+    own:num(s.run_own)||num(r.run_own)||0,reit:num(s.run_reit)||num(r.run_reit)||0,etc:num(s.run_etc)||num(r.run_etc)||0,
+    loan:(s.run_loan!=null&&num(s.run_loan))?(num(s.run_loan)||0):fin.loan};
+  var inv=run.trust+run.secu+run.own+run.reit+run.etc;
+  run.deposit=(s.run_deposit!=null&&num(s.run_deposit))?(num(s.run_deposit)||0):Math.max(bfEnd-inv,0);
+  run.total=(s.run_total!=null&&num(s.run_total))?(num(s.run_total)||0):(run.deposit+inv+run.loan);
+  var src={
+    income:(s.f15_src_income!=null&&(num(s.f15_src_income)||s.has_f15))?(num(s.f15_src_income)||0):fin.bizRev,
+    contrib:num(s.f15_src_contrib)||0,
+    capExcess:num(s.f15_src_cap_excess)||num(r.src_cap_excess)||0,
+    basicRange:num(s.f15_src_basic_range)||num(r.src_basic_range)||0,
+    support:num(s.f15_src_support)||num(r.src_support)||0,
+    carry:num(s.f15_src_carry)||num(r.src_carry)||0
+  };
+  src.total=(num(s.f15_src_total)>0)?num(s.f15_src_total):(src.income+src.contrib+src.capExcess+src.basicRange+src.support+src.carry);
+  var rawItems=s.f15_items||{};
+  var items=F15_ROWS.map(function(row){
+    var it=rawItems[row[0]]||rawItems[String(row[0])]||{};
+    return {no:row[0],label:row[1],amt:num(it.amt)||0,cnt:num(it.cnt)||0};
+  });
+  var sumItAmt=items.reduce(function(a,x){return a+x.amt;},0);
+  var subAmt=(num(s.f15_sub_amt)>0)?num(s.f15_sub_amt):(sumItAmt||fin.purpose);
+  var subCnt=(num(s.benef)>0)?num(s.benef):items.reduce(function(a,x){return a+x.cnt;},0);
+  if(!sumItAmt&&subAmt>0&&items.length){ items[items.length-1].amt=subAmt; items[items.length-1].cnt=subCnt; }
+  var loanAmt=num(s.loan_amt)||0, loanBenef=num(s.loan_benef)||0;
+  var admin=(s.f15_admin!=null&&(num(s.f15_admin)||s.has_f15))?(num(s.f15_admin)||0):fin.admin;
+  var rest=(s.f15_rest!=null&&(num(s.f15_rest)||s.has_f15))?(num(s.f15_rest)||0):(src.total-subAmt-admin);
+  var total=(num(s.f15_total)>0)?num(s.f15_total):(subAmt+loanAmt+admin+rest);
+  var wk=num(s.workers)||0, pwk=num(s.partner)||num(r.partner_workers)||0;
+  if(!wk&&(sites||[]).length){ (sites||[]).forEach(function(st){ var n=num(st.company_size)||0; if(st.partner) pwk+=n; else wk+=n; }); }
+  var ratio=num(r.use_ratio)||50;
+  return {
+    f:f,yr:yr,fin:fin,_fromSnap:true,
+    head:{name:f.name||'',inka:f.inka_no||'',reg:f.reg_date||'',tel:f.phone||'',addr:f.address||'',
+      fy_s:(f.fy_start_md||'01-01'),fy_e:(f.fy_end_md||'12-31'),ceo:f.chairman||'',biz:r.biz_type||f.biz_type||'',
+      workers:wk,partner:pwk,capital:num(s.capital)||num(r.capital)||0,type:(f.fund_type==='사내')?'사내':'공동'},
+    bf:bf,bfOpen:bfOpen,bfInc:bfInc,bfDec:bfDec,bfEnd:bfEnd,bfList:[],
+    run:run,src:src,ratio:ratio,cashIn:bf.employer+bf.other,
+    items:items,subAmt:subAmt,subCnt:subCnt,
+    loanAmt:loanAmt,loanBenef:loanBenef,admin:admin,rest:rest,
+    benefLost:0,benefLostCats:[],loanBook:loanAmt,loanMismatch:false,
+    srcCap:src.total,srcOver:0,total:total,
+    sel:{amt:num(s.sel_amt)||num(r.sel_amt)||0,cnt:num(s.sel_cnt)||num(r.sel_cnt)||0},
+    estate:{name:r.estate_name||'해당없음',amt:num(s.estate_amt)||num(r.estate_amt)||0,date:r.estate_date||'해당없음'},
+    use20:{total:num(r.use20_total)||0,partner:num(r.use20_partner)||0,partnerCnt:num(r.use20_pcnt)||0},
+    use30:{total:num(r.use30_total)||0,partner:num(r.use30_partner)||0,partnerCnt:num(r.use30_pcnt)||0},
+    use80:{contrib:bf.employer+bf.other,pcnt:num(r.use80_pcnt)||0,pamt:num(r.use80_pamt)||0,wcnt:wk},
+    rep:r
+  };
+}
+function _useF15Snap(arr,fid,yr){
+  return !journalOf(arr||[]).length && !Object.keys(_openingOf(fid,yr)||{}).length && !!(S.f15Close&&S.f15Close.fin);
+}
 function f15View(arr){
   if(!f15Load()) return '<div class="panel">'+loadingHTML()+'</div>';
-  var R=buildF15(arr,S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
+  var R=_useF15Snap(arr,S.fundId,S.year)?f15FromSnap(S.f15Close.fin,S.fundId,S.year,S.f15Rep,S.f15Sites):buildF15(arr,S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
   function ip(k,lbl,ph){ return '<div class="fld"><label>'+lbl+'</label><input id="f15-'+k+'" value="'+esc((S.f15Rep||{})[k]||'')+'" placeholder="'+(ph||'0')+'"></div>'; }
   var bfRows=R.bfList.length?R.bfList.map(function(b,i){
     var sel='<select onchange="f15SetBf(\''+b.id+'\',this.value)" style="padding:2px 5px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">'
@@ -23790,15 +23905,17 @@ function f15View(arr){
   return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">운영상황보고서 (별지 제15호)</h2>'+hlp('close.f15')
     +'<span class="chip" style="font-size:10px">'+R.head.type+'근로복지기금법인</span>'
     +'<span class="muted" style="font-size:12px">'+S.year+'년도 · 단위 천원</span>'
+    +(R._fromSnap?'<span class="chip" style="font-size:10px" title="'+esc((S.f15Close&&S.f15Close.src_doc)||'과거 제출 보고서 백데이터')+'">📦 제출보고서 백데이터</span>':'')
     +(_isLocked()?'<span class="chip ok" style="font-size:10px">🔒 확정 '+esc(_lockInfo())+'</span>':'')
-    +'<span style="flex:1"></span><button onclick="makeClosingWb()" title="과거 제출본과 같은 시트 구성으로 결산서+사업계획서 워크북 생성">📗 결산서 워크북 받기</button>'
+    +'<span style="flex:1"></span><button onclick="S.ysMode=\'f15\';closeSub(\'years\')" title="연도별 운영상황보고서(별지15호) 비교표 열기">🏛 연도별 별지15호 비교</button>'
+    +'<button onclick="makeClosingWb()" title="과거 제출본과 같은 시트 구성으로 결산서+사업계획서 워크북 생성">📗 결산서 워크북 받기</button>'
     +'<button class="primary" onclick="previewF15()" title="고용노동부 제출용 A4 서식을 팝업으로 미리보기">👁 A4 미리보기</button>'
     +'<button onclick="printF15()" title="새 창에서 인쇄·PDF 저장">🖨 인쇄</button>'
     +(_isLocked()?'<button onclick="unlockClosing()">🔓 확정 해제</button>':'<button class="primary" onclick="lockClosing()" title="이 시점 수치를 스냅샷으로 보존 — 결산 대장·연도별 비교에 사용">🔒 결산 확정</button>')
     +hlp('close.lock')+'</div>'
     +'<div class="row" style="gap:18px;align-items:flex-start;margin-top:12px;flex-wrap:wrap">'
     +'<div style="min-width:300px;flex:1"><div style="font-weight:700;margin-bottom:6px">기본재산 현황 ⑫~⑳ (천원)</div><table>'
-      +(function(){ var ck=f15Checks(R,spresvOf(Object.keys(S.txns||{}).map(function(k){ return S.txns[k]; }))); if(!ck.length) return '';
+      +(function(){ if(R._fromSnap) return ''; var ck=f15Checks(R,spresvOf(Object.keys(S.txns||{}).map(function(k){ return S.txns[k]; }))); if(!ck.length) return '';
         return '<tr><td colspan="2" style="padding:0">'+ck.map(function(c){
           return '<div class="msg '+c.lv+'" style="margin:6px 0;font-size:11.5px;line-height:1.55"><b>⚠ '+esc(c.t)+'</b><br>'+esc(c.d)+'</div>'; }).join('')+'</td></tr>'; })()
       +'<tr><td>⑫ 직전 회계연도 말</td><td style="text-align:right">'+_n(_k1000(R.bfOpen))+'</td></tr>'
@@ -23826,6 +23943,7 @@ function f15View(arr){
       /* 출연금이 사업장 명부와 어긋나는가 — 별지15호(장부)와 지원신청서(사업장 명부)가
          같은 해에 대해 다른 숫자를 들고 나가는 것을 여기서 붙잡는다. */
       +(function(){
+        if(R._fromSnap) return '';
         var cc=contribCheck(R.bf.employer+R.bf.other,S.f15Sites,S.f15Sy);
         if(!cc.off&&!cc.nNone) return '';
         return '<tr><td colspan="2" style="padding:0"><div class="msg '+(cc.off?'err':'warn')+'" style="margin:6px 0;font-size:11.5px;line-height:1.55">'
@@ -23864,7 +23982,7 @@ function f15View(arr){
         +'</div></td></tr>':'')
       +'<tr style="font-weight:700;background:var(--bg)"><td>'+_f15n(70)+' 합계</td><td style="text-align:right">'+_n(_k1000(R.total))+'</td><td></td></tr>'
       /* 확정한 뒤에 산식이 고쳐지면 제출한 숫자와 화면이 달라진다 — 어느 칸인지 짚어 준다 */
-      +(function(){ var dr=f15Drift(R); if(!dr.length) return '';
+      +(function(){ if(R._fromSnap) return ''; var dr=f15Drift(R); if(!dr.length) return '';
         return '<tr><td colspan="3" style="padding:0"><div class="msg warn" style="margin:6px 0;font-size:11.5px;line-height:1.55">'
           +'<b>⚠ 확정한 때와 숫자가 달라졌습니다.</b> 확정 '+esc(_lockInfo())+' 이후 계산 방식이 바뀌었습니다.<br>'
           +dr.map(function(d){ return esc(d.name)+' '+_n(_k1000(d.was))+' → '+_n(_k1000(d.now)); }).join(' · ')
@@ -23901,7 +24019,7 @@ function f15View(arr){
       +ip('sel_amt','71 선택적 복지비(천원)')+ip('sel_cnt','72 선택적 복지비 수혜자(명)')
       +ip('estate_name','73 부동산 명칭','해당없음')+ip('estate_amt','74 부동산 금액(천원)')+ip('estate_date','75 취득일','해당없음')
       +'</div><button class="primary" style="margin-top:10px" onclick="f15Save()">💾 입력값 저장</button></details>'
-    +'</div>';
+    +'</div>'+(typeof archiveYearBarHTML==='function'?archiveYearBarHTML(S.fundId,S.year,S.f15Close):'');
 }
 /* ══════════ 별지 제15호 A4 서식 — 팝업 미리보기 · 인쇄 ══════════
    근로복지기본법 시행규칙 [별지 제15호서식] <개정 2025. 10. 1.> 관보 원문(4쪽 중 1~2쪽)의
@@ -24025,11 +24143,11 @@ function f15Pages(R){
       +'<th colspan="3">㉙ 해당 회계연도 기금운용 수익금</th><td class="n">'+N(K(R.src.income))+'</td></tr>'
     +'<tr><th colspan="3">㉚ 해당 회계연도 출연금액의 100분의 50, 100분의 80 또는 100분의 90 범위'
       +' <span style="font-weight:400">(적용 '+R.ratio+'%)</span></th><td class="n">'+N(K(R.src.contrib))+'</td></tr>'
-    +'<tr><th colspan="3">㉛ 기본재산 총액의 해당 사업(장) 자본금 100분의 50 초과액</th><td class="n">'+N(R.src.capExcess)+'</td></tr>'
-    +'<tr><th colspan="3">㉜ 직전 회계연도 기준 기본재산 총액의 100분의 20, 100분의 25 또는 100분의 30 범위</th><td class="n">'+N(R.src.basicRange)+'</td></tr>'
-    +'<tr><th colspan="3">㉝ 공동근로복지기금 지원액 및 그 지원액의 100분의 50 범위</th><td class="n">'+N(R.src.support)+'</td></tr>'
-    +'<tr><th colspan="3">㉞ 이월금 등</th><td class="n">'+N(R.src.carry)+'</td></tr>'
-    +'<tr class="b"><th colspan="3">'+n(35)+' 합계</th><td class="n">'+N(K(R.src.income)+K(R.src.contrib)+R.src.capExcess+R.src.basicRange+R.src.support+R.src.carry)+'</td></tr></table>'
+    +'<tr><th colspan="3">㉛ 기본재산 총액의 해당 사업(장) 자본금 100분의 50 초과액</th><td class="n">'+N(K(R.src.capExcess))+'</td></tr>'
+    +'<tr><th colspan="3">㉜ 직전 회계연도 기준 기본재산 총액의 100분의 20, 100분의 25 또는 100분의 30 범위</th><td class="n">'+N(K(R.src.basicRange))+'</td></tr>'
+    +'<tr><th colspan="3">㉝ 공동근로복지기금 지원액 및 그 지원액의 100분의 50 범위</th><td class="n">'+N(K(R.src.support))+'</td></tr>'
+    +'<tr><th colspan="3">㉞ 이월금 등</th><td class="n">'+N(K(R.src.carry))+'</td></tr>'
+    +'<tr class="b"><th colspan="3">'+n(35)+' 합계</th><td class="n">'+N(K(R.src.total))+'</td></tr></table>'
     +'</div><div class="a4f">210mm×297mm[백상지(80g/㎡) 또는 중질지(80g/㎡)]</div></div>';
 
   // ── 2쪽 ──
@@ -24151,7 +24269,11 @@ function _f15R(){
   var t=S.txns||{}, arr=Object.keys(t).map(function(k){ var o=Object.assign({},t[k]); o._id=k; return o; });
   /* 인쇄·미리보기도 화면과 «같은» 결산 조정(closeArr)을 얹는다 — 안 얹으면 확정 전 인쇄본만
      준비금2 설정·환입이 빠져 화면(별지15호 탭)과 다른 숫자가 나갔다(2026-10-07 발견) */
-  return buildF15(closeArr(arr,S.fundId,S.year),S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
+  var arrC=closeArr(arr,S.fundId,S.year);
+  if(typeof _useF15Snap==='function'&&_useF15Snap(arrC,S.fundId,S.year)){
+    return f15FromSnap(S.f15Close.fin,S.fundId,S.year,S.f15Rep,S.f15Sites);
+  }
+  return buildF15(arrC,S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
 }
 /* 팝업 미리보기 — 제출 전에 A4 두 장을 그대로 눈으로 확인한다(새 창 팝업 차단과 무관). */
 function previewF15(){
@@ -25094,7 +25216,7 @@ review:'<button onclick="flowMail(\'review\')" style="padding:2px 9px;font-size:
   return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="font-size:15px">'+yr+'년 결산 후 진행</h2>'+hlp('close.flow')+dchip
     +'<span style="flex:1"></span><button onclick="flowPackage()" title="결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글)를 한 zip 으로">📦 제출 묶음 받기(ZIP)</button></div>'
     +'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th style="width:24px"><input type="checkbox"></th><th class="no">#</th><th>단계</th><th>상태</th><th>날짜</th><th>할 일</th><th>메모</th></tr></thead><tbody>'
-    +rows+'</tbody></table></div></div>';
+    +rows+'</tbody></table></div></div>'+(typeof archiveYearBarHTML==='function'?archiveYearBarHTML(fid,yr,c):'');
 }
 /* 홈 「결산」 아래 — 기금마다 여덟 단계를 한 줄로(closing 을 이미 읽은 S.cb 를 그대로 쓴다) */
 function flowHomeHTML(list,cb,yr){
@@ -25739,6 +25861,8 @@ function goClosingFlow(fid,yr){ S.year=yr; S.closeSub='flow'; S.txnsFor=null; S.
    나중에 거래를 손대도 '제출한 그 숫자'가 보존된다. */
 function closeSnapshot(arr,fid,yr,rep,sites,welf){
   var fin=computeFin(arr,fid,yr), R=buildF15(arr,fid,yr,rep,sites,welf);
+  var f15Items={};
+  (R.items||[]).forEach(function(it){ f15Items[it.no]={amt:it.amt||0,cnt:it.cnt||0,loanAmt:0,loanCnt:0}; });
   return {
     cash:fin.cash, savings:fin.savings, loan:fin.loan, otherAsset:fin.otherAsset,
     /* 증권과 준비금 1·2 — 익년도 «추정재무상태표»가 이 셋을 봐야 셈이 된다.
@@ -25755,6 +25879,12 @@ function closeSnapshot(arr,fid,yr,rep,sites,welf){
     f15_src_income:R.src.income, f15_src_contrib:R.src.contrib, f15_src_carry:R.src.carry,
     f15_src_total:R.src.total, f15_sub_amt:R.subAmt, f15_admin:R.admin,
     f15_rest:R.rest, f15_total:R.total,
+    has_f15:true, capital:R.head.capital,
+    bf_open:R.bfOpen, bf_income:R.bf.income, bf_merge:R.bf.merge, bf_split:R.bf.split,
+    run_deposit:R.run.deposit, run_trust:R.run.trust, run_secu:R.run.secu,
+    run_own:R.run.own, run_reit:R.run.reit, run_etc:R.run.etc, run_loan:R.run.loan, run_total:R.run.total,
+    f15_src_cap_excess:R.src.capExcess, f15_src_basic_range:R.src.basicRange, f15_src_support:R.src.support,
+    f15_items:f15Items, sel_amt:R.sel.amt, sel_cnt:R.sel.cnt, estate_amt:R.estate.amt,
     txn_n:journalOf(arr).length
   };
 }
@@ -26309,15 +26439,26 @@ function unlockClosing(){
   });
 }
 /* ── 연도별 비교 (한 기금의 여러 연도) ── 확정 스냅샷을 우선 쓰고, 없는 연도는 거래를 읽어 계산 */
+function _safeArchiveKey(k){ return /^[A-Za-z0-9_-]{1,120}$/.test(String(k||'')); }
+function _activeArchiveDocs(docs){
+  var m=docs||{}, out={};
+  Object.keys(m).forEach(function(k){ if(_safeArchiveKey(k)&&m[k]&&!m[k]._deleted) out[k]=m[k]; });
+  return out;
+}
+function _safeArchiveMails(mails){
+  var m=mails||{}, out={};
+  Object.keys(m).forEach(function(k){ if(_safeArchiveKey(k)&&m[k]&&!m[k]._deleted) out[k]=m[k]; });
+  return out;
+}
 function loadYearSeries(){
   var fid=S.fundId, key=fid;
-  if(S.ysFor===key) return true;
+  if(S.ysFor===key) return !!S.ys;
   S.ysFor=key; S.ys=null;
-  var yNow=new Date().getFullYear(), years=[];
-  for(var y=yNow;y>=yNow-5;y--) years.push(y);
+  var fallbackYears=fundYearsOf(fid,null,false);
   fbDb.ref(NS+'/closing/'+fid).once('value').then(function(s){
     var cl=s.val()||{};
-    // 스냅샷이 없는 연도는 거래를 직접 읽어 계산(연 6회 이하)
+    var years=fundYearsOf(fid,cl,false);
+    // 스냅샷이 없는 연도는 거래를 직접 읽어 계산
     var need=years.filter(function(y){ return !(cl[y]&&cl[y].fin); });
     return Promise.all(need.map(function(y){
       return fbDb.ref(NS+'/txns/'+fid+'/'+y).once('value')
@@ -26327,49 +26468,680 @@ function loadYearSeries(){
         }).catch(function(){ return {y:y, fin:null}; });
     })).then(function(rs){
       var out={};
-      years.forEach(function(y){ out[y]={locked:!!(cl[y]&&cl[y].locked), fin:(cl[y]&&cl[y].fin)||null}; });
-      rs.forEach(function(r){ if(r.fin) out[r.y]={locked:false, fin:r.fin, live:true}; });
+      years.forEach(function(y){
+        var cy=cl[y]||{};
+        out[y]={locked:!!cy.locked, submitted:!!cy.submitted, src_doc:cy.src_doc||'',
+          report:cy.report||{}, archive_docs:_activeArchiveDocs(cy.archive_docs), archive_mails:_safeArchiveMails(cy.archive_mails),
+          fin:cy.fin||null};
+      });
+      rs.forEach(function(r){ if(r.fin&&out[r.y]) { out[r.y].fin=r.fin; out[r.y].live=true; } });
       if(S.ysFor!==key) return;
-      S.ys={years:years, data:out};
+      S.ys={years:years, data:out, cl:cl};
       if(S.tab==='closing'&&S.view==='fund') renderFund();
     });
-  }).catch(function(){ if(S.ysFor===key) S.ys={years:years,data:{}}; });
+  }).catch(function(){ if(S.ysFor===key){ S.ys={years:fallbackYears,data:{},cl:{}}; if(S.tab==='closing'&&S.view==='fund') renderFund(); } });
   return false;
 }
 var YS_ROWS=[
-  ['자산총계','assets'],['현금및현금성자산','cash'],['정기예금','savings'],['근로자대부금','loan'],
-  ['고유목적사업준비금','liab'],['기본재산','basic'],['이월잉여금','retained'],
-  ['사업수익','revenue'],['목적사업비','purpose'],['일반관리비','admin'],['당기순이익','net'],
-  ['사업주 출연','contrib_employer'],['사업주 외 출연','contrib_other'],['기본재산 사용','bf_use'],
-  ['수혜자수(명)','benef'],['근로자수(명)','workers'],['승인 분개(건)','txn_n']
+  ['자산총계','assets',1],['현금및현금성자산','cash'],['정기예금','savings'],['근로자대부금','loan'],['매도가능증권(주식 등)','secu'],
+  ['부채총계(준비금 등)','liab',1],['고유목적사업준비금1(이자)','res1'],['고유목적사업준비금2(출연이월)','res2'],
+  ['기본재산','basic',1],['이월잉여금(결손금)','retained'],['자본총계','equity',1],
+  ['사업수익(이자·배당 등)','revenue',1],['고유목적사업비(복지지출)','purpose',1],['일반관리비','admin'],['당기순이익','net',1],
+  ['사업주 출연','contrib_employer'],['사업주 외 출연','contrib_other'],['기본재산 사용(준비금설정)','bf_use'],
+  ['복지 수혜자수(명)','benef'],['근로자수(명)','workers'],['승인 분개(건)','txn_n']
 ];
+/* 별지 제15호 다개년 비교 행 산출 — 순수 함수 (Y: 오름차순 연도 배열, D: 연도별 {fin,report}, unit: 'k'|'won')
+   ⚠ 단위 규약(f15View·f15Pages·closeSnapshot과 동일):
+     · ⑪ 납입자본금(capital)·71 선택적복지비(sel_amt)·74 부동산(estate_amt)은 **천원 단위**로 저장됨 → scK 사용
+     · 나머지 금액 항목(bf_*, run_*, f15_src_*, f15_items, f15_sub_amt, f15_admin, f15_rest, f15_total)은 **원 단위**로 저장됨 → sc 사용 */
+function buildF15CompareRows(Y,D,unit){
+  var isK=(unit!=='won'), sc=function(v,isCnt){
+    if(v===null||v===undefined) return null;
+    return isCnt?Math.round(num(v)||0):(isK?_k1000(num(v)||0):Math.round(num(v)||0));
+  };
+  var scK=function(v){
+    if(v===null||v===undefined) return null;
+    var kv=num(v)||0;
+    return isK?Math.round(kv):Math.round(kv*1000);
+  };
+  var rows=[], sec=function(title){ rows.push({sec:true,lbl:title,vals:[]}); };
+  var add=function(lbl,fn,opts){
+    opts=opts||{};
+    var vals=Y.map(function(y,idx){
+      var dy=(D&&D[y])||{}, s=dy.fin;
+      if(!s) return null;
+      var raw=fn(s,dy.report||{},y,idx);
+      return opts.inK?scK(raw):sc(raw,!!opts.cnt);
+    });
+    if(opts.hideZero&&vals.every(function(v){return !v;})) return;
+    rows.push({sec:false,lbl:lbl,vals:vals,bold:!!opts.bold,cnt:!!opts.cnt});
+  };
+  sec('Ⅰ. 기금·사업체 개요 (⑨~⑪)');
+  add('⑨ 소속근로자 수 (명)',function(s){return s.workers||0;},{cnt:true});
+  add('⑩ 협력업체근로자 수 (명)',function(s,r){return s.partner||r.partner_workers||0;},{cnt:true,hideZero:true});
+  add('⑪ 납입자본금',function(s,r){ return num(s.capital)||num(r.capital)||0; },{inK:true,hideZero:true});
+
+  sec('Ⅱ. 기본재산 현황 (⑫~⑳)');
+  add('⑫ 직전 회계연도 말 기본재산',function(s,r,y,idx){
+    if(num(s.bf_open)) return s.bf_open;
+    var py=(idx>0&&Y[idx-1]===y-1)?Y[idx-1]:null, ps=py&&D[py]&&D[py].fin;
+    if(ps&&(num(ps.bf_end)||num(ps.basic))) return num(ps.bf_end)||num(ps.basic);
+    var inc=(num(s.contrib_employer)||0)+(num(s.contrib_other)||0)+(num(s.bf_income)||0)+(num(s.bf_merge)||0);
+    var dec=(num(s.bf_use)||0)+(num(s.bf_split)||0);
+    var end=num(s.bf_end)||num(s.basic)||0;
+    return Math.max(0,end-inc+dec);
+  });
+  add('⑬ 사업주 출연 (증가)',function(s){return s.contrib_employer||0;});
+  add('⑭ 수익금·이월금 전입 (증가)',function(s){return s.bf_income||0;},{hideZero:true});
+  add('⑮ 사업주 외의 자 출연 (증가)',function(s){return s.contrib_other||0;});
+  add('⑯ 기금법인 합병 (증가)',function(s){return s.bf_merge||0;},{hideZero:true});
+  add('⑰ 기본재산 사용·준비금설정 (감소)',function(s){return s.bf_use||0;});
+  add('⑱ 기금법인 분할 등 (감소)',function(s){return s.bf_split||0;},{hideZero:true});
+  add('⑲ 당해 회계연도 증감 소계',function(s){
+    return ((num(s.contrib_employer)||0)+(num(s.contrib_other)||0)+(num(s.bf_income)||0)+(num(s.bf_merge)||0))-((num(s.bf_use)||0)+(num(s.bf_split)||0));
+  },{bold:true});
+  add('⑳ 당해 회계연도 말 기본재산 총액',function(s){return num(s.bf_end)||num(s.basic)||0;},{bold:true});
+
+  sec('Ⅲ. 기금 운용 및 관리 방법 (㉑~㉘)');
+  add('㉑ 금융회사 예입·예탁',function(s){
+    if(num(s.run_deposit)) return s.run_deposit;
+    var end=num(s.bf_end)||num(s.basic)||0, secV=num(s.run_secu)||num(s.secu)||0;
+    return Math.max(0,end-secV-(num(s.run_trust)||0)-(num(s.run_own)||0)-(num(s.run_reit)||0)-(num(s.run_etc)||0));
+  });
+  add('㉒ 투자신탁 수익증권 매입',function(s){return s.run_trust||0;},{hideZero:true});
+  add('㉓ 유가증권 매입 (주식 등)',function(s){return num(s.run_secu)||num(s.secu)||0;},{hideZero:true});
+  add('㉔~㉖ 기타 운용 (유상증자·리츠·기타)',function(s){return (num(s.run_own)||0)+(num(s.run_reit)||0)+(num(s.run_etc)||0);},{hideZero:true});
+  add('㉗ 근로자 대부 잔액',function(s){return num(s.run_loan)||num(s.loan)||0;},{hideZero:true});
+  add('㉘ 기금 운용 합계',function(s){
+    if(num(s.run_total)) return s.run_total;
+    return (num(s.bf_end)||num(s.basic)||0)+(num(s.loan)||0);
+  },{bold:true});
+
+  sec('Ⅳ. 기금사업 재원 (㉙~㉟)');
+  add('㉙ 당해 기금운용 수익금',function(s){return (s.f15_src_income!=null&&(num(s.f15_src_income)||s.has_f15))?s.f15_src_income:(s.revenue||0);});
+  add('㉚ 당해 출연금 사용한도 범위',function(s){return s.f15_src_contrib||0;});
+  add('㉛ 자본금 50% 초과액',function(s,r){return num(s.f15_src_cap_excess)||num(r.src_cap_excess)||0;},{hideZero:true});
+  add('㉜ 직전 기본재산 20~30% 범위',function(s,r){return num(s.f15_src_basic_range)||num(r.src_basic_range)||0;},{hideZero:true});
+  add('㉝ 공동기금 지원액 등 범위',function(s,r){return num(s.f15_src_support)||num(r.src_support)||0;},{hideZero:true});
+  add('㉞ 이월금 등',function(s,r){return num(s.f15_src_carry)||num(r.src_carry)||0;});
+  add('㉟ 기금사업 재원 합계',function(s,r){
+    if(num(s.f15_src_total)) return s.f15_src_total;
+    return (num(s.f15_src_income)||num(s.revenue)||0)+(num(s.f15_src_contrib)||0)+(num(s.f15_src_cap_excess)||0)+(num(s.f15_src_basic_range)||0)+(num(s.f15_src_support)||0)+(num(s.f15_src_carry)||0);
+  },{bold:true});
+
+  sec('Ⅴ. 사업실적 — 복지사업비·대부·운영비·잔액 (57~70)');
+  F15_ROWS.forEach(function(fr){
+    var no=fr[0], lbl=fr[1];
+    add(no+'. '+lbl,function(s){
+      var it=(s.f15_items&&(s.f15_items[no]||s.f15_items[String(no)]))||{};
+      if(num(it.amt)) return it.amt;
+      if(no===66&&!s.f15_items&&(num(s.f15_sub_amt)||num(s.purpose))) return num(s.f15_sub_amt)||num(s.purpose);
+      return 0;
+    },{hideZero:no!==66});
+    add('   └ '+no+'. 수혜자수 (명)',function(s){
+      var it=(s.f15_items&&(s.f15_items[no]||s.f15_items[String(no)]))||{};
+      return num(it.cnt)||0;
+    },{cnt:true,hideZero:true});
+  });
+  add('67. 복지사업비 소계 (목적사업)',function(s){return num(s.f15_sub_amt)||num(s.purpose)||0;},{bold:true});
+  add('67. 복지사업 수혜자수 합계 (명)',function(s){return num(s.benef)||0;},{cnt:true,bold:true});
+  add('근로자 대부사업 실행액',function(s){return num(s.loan_amt)||0;},{hideZero:true});
+  add('근로자 대부 수혜자수 (명)',function(s){return num(s.loan_benef)||0;},{cnt:true,hideZero:true});
+  add('68. 기금 운영비 (관리비)',function(s){return (s.f15_admin!=null&&(num(s.f15_admin)||s.has_f15))?s.f15_admin:(s.admin||0);});
+  add('69. 잔액 (차기이월 등)',function(s){return s.f15_rest||0;});
+  add('70. 사업실적 합계',function(s){
+    if(num(s.f15_total)) return s.f15_total;
+    return (num(s.f15_sub_amt)||num(s.purpose)||0)+(num(s.loan_amt)||0)+((s.f15_admin!=null?num(s.f15_admin):num(s.admin))||0)+(num(s.f15_rest)||0);
+  },{bold:true});
+
+  sec('Ⅵ. 선택적 복지·부동산 현황 (71~74)');
+  add('71. 선택적 복지비',function(s,r){ return num(s.sel_amt)||num(r.sel_amt)||0; },{inK:true,hideZero:true});
+  add('72. 선택적 복지 수혜자수 (명)',function(s,r){return num(s.sel_cnt)||num(r.sel_cnt)||0;},{cnt:true,hideZero:true});
+  add('74. 부동산 현황 금액',function(s,r){ return num(s.estate_amt)||num(r.estate_amt)||0; },{inK:true,hideZero:true});
+  return rows;
+}
+/* 연도별 사업계획·예산 vs 결산실적 비교 행 산출 — 순수 함수 */
+function buildPlanCompareRows(fid,Y,D){
+  var f=(typeof funds!=='undefined'&&funds&&funds[fid])||{}, fy=f.years||{};
+  var getB=function(y){ return (fy[y]&&fy[y].budget)||null; };
+  var getF=function(y){ return (D&&D[y]&&D[y].fin)||null; };
+  var rows=[
+    {lbl:'[계획] 출연예정액 (사업계획서)',bold:true,vals:Y.map(function(y){var b=getB(y);return b?(num(b.rev_contrib)||0):null;})},
+    {lbl:'[실적] 실제 출연액 (사업주+제3자)',vals:Y.map(function(y){var s=getF(y);return s?((num(s.contrib_employer)||0)+(num(s.contrib_other)||0)):null;})},
+    {lbl:'[계획] 이자·운용수익 예산',vals:Y.map(function(y){var b=getB(y);return b?((num(b.rev_interest)||0)+(num(b.rev_loanint)||0)+(num(b.rev_etc)||0)):null;})},
+    {lbl:'[실적] 실제 사업수익',vals:Y.map(function(y){var s=getF(y);return s?(num(s.revenue)||0):null;})},
+    {lbl:'[계획] 고유목적사업비 예산',bold:true,vals:Y.map(function(y){var b=getB(y);return b?(num(b.exp_purpose)||0):null;})},
+    {lbl:'[실적] 고유목적사업비 집행실적',bold:true,vals:Y.map(function(y){var s=getF(y);return s?(num(s.purpose)||0):null;})},
+    {lbl:'목적사업 집행률 (%)',pct:true,vals:Y.map(function(y){
+      var b=getB(y), s=getF(y), bp=b?(num(b.exp_purpose)||0):0, sp=s?(num(s.purpose)||0):null;
+      return (bp>0&&sp!==null)?Math.round((sp/bp)*1000)/10:null;
+    })},
+    {lbl:'[계획] 일반관리비 예산',vals:Y.map(function(y){var b=getB(y);return b?(num(b.exp_admin)||0):null;})},
+    {lbl:'[실적] 일반관리비 집행실적',vals:Y.map(function(y){var s=getF(y);return s?(num(s.admin)||0):null;})},
+    {lbl:'[계획] 예비비·기타 예산',vals:Y.map(function(y){var b=getB(y);return b?(num(b.exp_etc)||0):null;})}
+  ];
+  return rows;
+}
+/* 직전 연도(y-1) 말 ⑳과 당해(y) 초 ⑫의 기본재산 연속성 점검 — 순수 함수 */
+function checkF15Chain(Y,D){
+  var issues=[], checked=0;
+  for(var i=1;i<Y.length;i++){
+    var py=Y[i-1], cy=Y[i];
+    if(cy!==py+1) continue; // 중간 빈 연도가 있으면 건너뛴다
+    var pf=D&&D[py]&&D[py].fin, cf=D&&D[cy]&&D[cy].fin;
+    if(!pf||!cf) continue;
+    var pRaw=num(pf.bf_end)||num(pf.basic)||0, cRaw=num(cf.bf_open)||0;
+    if(!(pRaw>0&&cRaw>0)) continue;
+    checked++;
+    var p20=_k1000(pRaw), c12=_k1000(cRaw);
+    if(Math.abs(p20-c12)>1) issues.push(py+'년 말 ⑳('+_n(p20)+'천원) ≠ '+cy+'년 초 ⑫('+_n(c12)+'천원)');
+  }
+  return {checked:checked, issues:issues};
+}
+function ysJumpYear(yr,sub){
+  _leaveGuard().then(function(ok){
+    if(!ok) return;
+    S.year=+yr; S.closeSub=sub||'fin'; S.txnsFor=null; S.f15For=null; S.annualFor=null;
+    renderFund();
+  });
+}
+function _ysYearTh(y,d,sub){
+  var badge=d.locked?' <span class="chip ok" style="font-size:10.5px">확정</span>'
+    :(d.submitted?' <span class="chip ok" style="font-size:10.5px">제출완료</span>'
+    :(d.fin?' <span class="chip warn" style="font-size:10.5px">작성중</span>':''));
+  var dc=Object.keys(_activeArchiveDocs(d.archive_docs)).length;
+  var docTag=dc?' <span class="muted" style="font-size:10.5px" title="백업 제출서류 '+dc+'건">📎'+dc+'</span>':'';
+  var targetSub=(sub==='f15'?'f15':'fin');
+  return '<th scope="col" style="text-align:right;white-space:nowrap">'
+    +'<button type="button" onclick="ysJumpYear('+(+y)+',\''+targetSub+'\')" title="'+(+y)+'년도 '+(targetSub==='f15'?'운영상황보고서':'재무제표')+' 화면으로 이동" style="background:transparent;border:none;padding:2px 4px;font:inherit;color:inherit;cursor:pointer">'
+    +(+y)+badge+docTag+'</button></th>';
+}
 function yearsView(){
   if(!loadYearSeries()) return '<div class="panel">'+loadingHTML()+'</div>';
-  var Y=S.ys.years.slice().reverse(), D=S.ys.data;
-  var have=Y.filter(function(y){ return D[y]&&D[y].fin; });
-  if(!have.length) return '<div class="panel"><div class="muted" style="padding:12px">비교할 연도 자료가 없습니다. 거래를 등록하거나 결산을 확정하세요.</div></div>';
-  var head='<tr><th>과목</th>'+Y.map(function(y){
+  var fid=S.fundId, f=funds[fid]||{}, fy=f.years||{}, safeFid=_safeArchiveKey(fid)?fid:'';
+  var Yall=(S.ys&&S.ys.years?S.ys.years:[]).slice().reverse(), D=(S.ys&&S.ys.data)||{};
+  var mode=S.ysMode||'fin', unit=S.ysUnit||'k';
+  var Y=Yall.filter(function(y){
     var d=D[y]||{};
-    return '<th style="text-align:right">'+y+(d.locked?' <span class="chip ok" style="font-size:9px">확정</span>':(d.fin?' <span class="chip warn" style="font-size:9px">작성중</span>':''))+'</th>';
-  }).join('')+'</tr>';
-  var rows=YS_ROWS.map(function(r){
-    var tds=Y.map(function(y,i){
-      var d=D[y]&&D[y].fin, v=d?(d[r[1]]||0):null;
-      var prevY=Y[i+1], pd=prevY&&D[prevY]&&D[prevY].fin, pv=pd?(pd[r[1]]||0):null;
-      var arrow='';
-      if(v!==null&&pv!==null&&pv!==v){
-        var up=v>pv;
-        arrow='<span style="font-size:9.5px;color:'+(up?'var(--ok)':'var(--danger)')+'"> '+(up?'▲':'▼')+'</span>';
-      }
-      return '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(v===null?'<span class="muted">—</span>':_n(v)+arrow)+'</td>';
+    return !!(d.fin || (fy[y]&&fy[y].budget) || Object.keys(_activeArchiveDocs(d.archive_docs)).length || Object.keys(_safeArchiveMails(d.archive_mails)).length);
+  });
+  if(!Y.length) Y=Yall.slice(-6);
+  var haveFin=Y.filter(function(y){ return D[y]&&D[y].fin; });
+  var totalDocs=0, totalMails=0;
+  Yall.forEach(function(y){ var d=D[y]||{}; totalDocs+=Object.keys(_activeArchiveDocs(d.archive_docs)).length; totalMails+=Object.keys(_safeArchiveMails(d.archive_mails)).length; });
+
+  var seg='<div class="segbar no-print">'
+    +'<button type="button" class="seg'+(mode==='fin'?' on':'')+'" onclick="S.ysMode=\'fin\';renderFund()">📊 재무제표 비교</button>'
+    +'<button type="button" class="seg'+(mode==='f15'?' on':'')+'" onclick="S.ysMode=\'f15\';renderFund()">🏛 운영상황보고서 비교(별지15호)</button>'
+    +'<button type="button" class="seg'+(mode==='plan'?' on':'')+'" onclick="S.ysMode=\'plan\';renderFund()">📑 사업계획·예산 &amp; 제출서류 백업'+(totalDocs?' ('+totalDocs+')':'')+'</button>'
+    +'</div>';
+
+  var unitBtn=(mode==='f15')?'<div class="segbar no-print">'
+    +'<button type="button" class="seg'+(unit==='k'?' on':'')+'" onclick="S.ysUnit=\'k\';renderFund()">단위: 천원(서식)</button>'
+    +'<button type="button" class="seg'+(unit==='won'?' on':'')+'" onclick="S.ysUnit=\'won\';renderFund()">단위: 원</button></div>':'';
+
+  var topBar='<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="font-size:15px">연도별 비교</h2>'+hlp('close.years')
+    +seg+unitBtn
+    +'<span class="stat">결산 '+haveFin.length+'개년</span>'
+    +(totalDocs?'<span class="stat">백업서류 '+totalDocs+'건</span>':'')
+    +'<span style="flex:1"></span>'
+    +'<button type="button" class="no-print" onclick="exportYearsWb()" title="재무제표·운영상황보고서(별지15호)·사업계획 비교표를 엑셀 한 파일로 받기">📗 비교 엑셀(.xlsx)</button>'
+    +'<button type="button" class="no-print" onclick="S.ysFor=null;renderFund()">↻ 새로고침</button>'
+    +'<button type="button" class="no-print" onclick="printLedger(\'years\')">🖨 인쇄</button></div>';
+
+  if(mode==='fin'){
+    if(!haveFin.length) return '<div class="panel">'+topBar+'<div class="muted" style="padding:12px">비교할 결산 자료가 없습니다. [사업계획·예산 &amp; 제출서류 백업] 탭을 확인하거나 결산을 등록하세요.</div></div>';
+    var head='<tr><th scope="col">과목 (단위: 원)</th>'+Y.map(function(y){ return _ysYearTh(y,D[y]||{},'fin'); }).join('')+'</tr>';
+    var rows=YS_ROWS.map(function(r){
+      var tds=Y.map(function(y,i){
+        var d=D[y]&&D[y].fin, v=d?(num(d[r[1]])||0):null;
+        var prevY=(i>0&&Y[i-1]===y-1)?Y[i-1]:null, pd=prevY&&D[prevY]&&D[prevY].fin, pv=pd?(num(pd[r[1]])||0):null;
+        var arrow='';
+        if(v!==null&&pv!==null&&pv!==v){
+          var up=v>pv;
+          arrow='<span style="font-size:10.5px;color:'+(up?'var(--ok)':'var(--danger)')+'"> '+(up?'▲':'▼')+'</span>';
+        }
+        return '<td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">'+(v===null?'<span class="muted">—</span>':_n(v)+arrow)+'</td>';
+      }).join('');
+      return '<tr'+(r[2]?' style="font-weight:700;background:var(--bg)"':'')+'><td style="font-weight:'+(r[2]?'700':'600')+';white-space:nowrap">'+esc(r[0])+'</td>'+tds+'</tr>';
     }).join('');
-    return '<tr><td style="font-weight:600">'+r[0]+'</td>'+tds+'</tr>';
+    return '<div class="panel">'+topBar
+      +'<div style="overflow-x:auto;margin-top:10px"><table><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div></div>';
+  }
+
+  if(mode==='f15'){
+    if(!haveFin.length) return '<div class="panel">'+topBar+'<div class="muted" style="padding:12px">비교할 운영상황보고서 자료가 없습니다.</div></div>';
+    var f15Rows=buildF15CompareRows(Y,D,unit);
+    var ch=checkF15Chain(Y,D);
+    var chainBanner=ch.issues.length
+      ?'<div class="msg warn" style="margin-top:8px;font-size:12px">⚠ 연도 간 기본재산 이월 차이 확인: '+esc(ch.issues.join(' · '))+'</div>'
+      :(ch.checked>0?'<div class="msg ok" style="margin-top:8px;font-size:12px">✅ 연도 간 기본재산 총액(전년 ⑳ → 당년 ⑫) 연속성 일치 확인됨 ('+ch.checked+'개 연속구간)</div>':'');
+    var head15='<tr><th scope="col">별지 제15호 항목 ('+(unit==='k'?'단위: 천원, 명':'단위: 원, 명')+')</th>'+Y.map(function(y){ return _ysYearTh(y,D[y]||{},'f15'); }).join('')+'</tr>';
+    var body15=f15Rows.map(function(r){
+      if(r.sec) return '<tr style="background:var(--bg)"><td colspan="'+(Y.length+1)+'" style="font-weight:700;color:var(--ink)">'+esc(r.lbl)+'</td></tr>';
+      var tds=r.vals.map(function(v,i){
+        var pv=(i>0&&Y[i-1]===Y[i]-1)?r.vals[i-1]:null, arrow='';
+        if(v!==null&&pv!==null&&pv!==v){
+          var up=v>pv;
+          arrow='<span style="font-size:10.5px;color:'+(up?'var(--ok)':'var(--danger)')+'"> '+(up?'▲':'▼')+'</span>';
+        }
+        return '<td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">'+(v===null?'<span class="muted">—</span>':_n(v)+arrow)+'</td>';
+      }).join('');
+      return '<tr'+(r.bold?' style="font-weight:700"':'')+'><td style="white-space:nowrap">'+esc(r.lbl)+'</td>'+tds+'</tr>';
+    }).join('');
+    return '<div class="panel">'+topBar+chainBanner
+      +'<div style="overflow-x:auto;margin-top:10px"><table><thead>'+head15+'</thead><tbody>'+body15+'</tbody></table></div></div>';
+  }
+
+  // mode === 'plan': 사업계획·예산 대 실적 비교 + 전 연도 노동부·공단 제출서류 백업 보관함
+  var planRows=buildPlanCompareRows(fid,Y,D);
+  var headP='<tr><th scope="col">사업계획·예산 대 결산실적 (단위: 원)</th>'+Y.map(function(y){ return _ysYearTh(y,D[y]||{},'fin'); }).join('')+'</tr>';
+  var bodyP=planRows.map(function(r){
+    var tds=r.vals.map(function(v){
+      if(v===null||v===undefined) return '<td style="text-align:right"><span class="muted">—</span></td>';
+      return '<td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">'+(r.pct?(v.toFixed(1)+'%'):_n(v))+'</td>';
+    }).join('');
+    return '<tr'+(r.bold?' style="font-weight:700;background:var(--bg)"':'')+'><td style="white-space:nowrap">'+esc(r.lbl)+'</td>'+tds+'</tr>';
   }).join('');
-  return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">연도별 비교</h2>'+hlp('close.years')
-    +'<span class="stat">'+have.length+'개 연도</span><span style="flex:1"></span>'
-    +'<button onclick="S.ysFor=null;renderFund()">↻ 다시 계산</button>'
-    +'<button onclick="printLedger(\'years\')">🖨 인쇄</button></div>'
-    +'<div style="overflow-x:auto;margin-top:8px"><table><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div></div>';
+
+  var docRows=[], mailRows=[], dNo=0, mNo=0;
+  Yall.slice().forEach(function(y){
+    var yrNum=+y; if(!yrNum) return;
+    var dy=D[y]||{}, docs=_activeArchiveDocs(dy.archive_docs), mails=_safeArchiveMails(dy.archive_mails);
+    var isYearSealed=!!(dy.locked||dy.submitted);
+    Object.keys(docs).sort(function(a,b){ return String((docs[a]||{}).kind||'').localeCompare(String((docs[b]||{}).kind||''))||String((docs[a]||{}).name||'').localeCompare(String((docs[b]||{}).name||'')); }).forEach(function(did){
+      var dc=docs[did]||{}; dNo++;
+      var kb=Math.max(1,Math.round((num(dc.size)||0)/1024));
+      var isPdf=String(dc.ext||'').toLowerCase()==='.pdf';
+      docRows.push('<tr>'+_ckTd()+'<td class="no">'+dNo+'</td>'
+        +'<td style="white-space:nowrap;font-weight:700">'+yrNum+'년</td>'
+        +'<td style="white-space:nowrap"><span class="chip">'+esc(dc.kind_label||dc.kind||'제출서류')+'</span></td>'
+        +'<td style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(dc.name||'')+'"><b>'+esc(dc.name||did)+'</b></td>'
+        +'<td class="mo muted" style="white-space:nowrap;text-align:right">'+_n(kb)+' KB</td>'
+        +'<td class="mo muted" style="white-space:nowrap">'+esc(dc.src==='mail_att'?'푸른메일 첨부':(dc.src==='upload'?'직접 백업':'과거자료 보관함'))+'</td>'
+        +'<td class="no-print" style="white-space:nowrap">'
+          +(safeFid&&isPdf?'<button type="button" class="primary" onclick="openArchiveDoc(\''+safeFid+'\','+yrNum+',\''+did+'\',false)" style="padding:4px 10px;font-size:12px">👁 열람</button> ':'')
+          +(safeFid?'<button type="button" onclick="openArchiveDoc(\''+safeFid+'\','+yrNum+',\''+did+'\',true)" style="padding:4px 10px;font-size:12px">⬇ 받기</button> ':'')
+          +(safeFid&&!isYearSealed?'<button type="button" onclick="deleteArchiveDoc(\''+safeFid+'\','+yrNum+',\''+did+'\')" title="백업 보관함에서 숨김(삭제 표식)" aria-label="백업 서류 삭제" style="padding:4px 9px;font-size:12px;color:var(--danger)">×</button>':'')
+        +'</td></tr>');
+    });
+    Object.keys(mails).sort(function(a,b){ return (num((mails[b]||{}).date_ms)||0)-(num((mails[a]||{}).date_ms)||0); }).forEach(function(mid){
+      var m=mails[mid]||{}; mNo++;
+      mailRows.push('<tr>'+_ckTd()+'<td class="no">'+mNo+'</td>'
+        +'<td style="white-space:nowrap;font-weight:700">'+yrNum+'년</td>'
+        +'<td style="white-space:nowrap">'+esc(m.date_str||'—')+'</td>'
+        +'<td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.subject||'')+'"><b>'+esc(m.subject||'(제목 없음)')+'</b></td>'
+        +'<td class="mo muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.from||'')+'">'+esc(m.from||'—')+'</td>'
+        +'<td style="white-space:nowrap">'+(m.att_names&&m.att_names.length?'<span class="chip ok">첨부 '+m.att_names.length+'건</span>':'—')+'</td>'
+        +'<td class="no-print" style="white-space:nowrap">'+(safeFid?'<button type="button" onclick="viewArchiveMailModal(\''+safeFid+'\','+yrNum+',\''+mid+'\')" style="padding:4px 10px;font-size:12px">📨 메일 보기</button>':'')+'</td></tr>');
+    });
+  });
+
+  return '<div class="panel">'+topBar
+    +'<div style="overflow-x:auto;margin-top:10px"><table><thead>'+headP+'</thead><tbody>'+bodyP+'</tbody></table></div></div>'
+    +'<div class="panel no-print" style="margin-top:12px">'
+      +'<div class="row" style="flex-wrap:wrap;gap:8px"><h3 style="margin:0;font-size:14px">📦 과거 고용노동부·공단 제출서류 백업 보관함 (결산서 · 운영상황보고서 · 사업계획서 · 회의록 · 감사보고서)</h3>'
+      +hlp('close.archive')
+      +'<span class="stat">'+docRows.length+'건 보관</span>'
+      +(mailRows.length?'<span class="stat">메일 '+mailRows.length+'통 연결</span>':'')
+      +'<span style="flex:1"></span>'
+      +(safeFid?'<button type="button" class="primary" onclick="uploadArchiveDocsModal(\''+safeFid+'\','+(+S.year||new Date().getFullYear())+')">⬆ 제출서류 추가 백업</button>':'')+'</div>'
+      +(docRows.length
+        ?'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>귀속연도</th><th>구분</th><th>파일명</th><th class="mo" style="text-align:right">크기</th><th class="mo">출처</th><th class="no-print">열람·내려받기</th></tr></thead><tbody>'+docRows.join('')+'</tbody></table></div>'
+        :'<div class="muted" style="padding:12px">보관된 제출서류 백업이 없습니다. 우측 상단 [⬆ 제출서류 추가 백업]으로 결산서·사업계획서·날인본 파일을 백업해 두세요.</div>')
+      +(mailRows.length
+        ?'<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">📨 결산·사업계획 관련 푸른메일 수발신 이력 ('+mailRows.length+'통)</summary>'
+          +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>연도</th><th>수발신일</th><th>제목</th><th class="mo">보낸사람</th><th>첨부</th><th class="no-print">보기</th></tr></thead><tbody>'+mailRows.join('')+'</tbody></table></div></details>'
+        :'')
+    +'</div>';
+}
+/* 단일 연도 화면(재무제표·운영상황보고서·결산후진행) 하단에 붙는 그 해 백업 제출서류 바 */
+function archiveYearBarHTML(fid,yr,closeNode){
+  var safeFid=_safeArchiveKey(fid)?fid:'', yrNum=+yr||0;
+  if(!safeFid||!yrNum) return '';
+  var c=closeNode||{}, docs=_activeArchiveDocs(c.archive_docs), mails=_safeArchiveMails(c.archive_mails);
+  var dKeys=Object.keys(docs), mKeys=Object.keys(mails);
+  if(!dKeys.length&&!mKeys.length&&!c.src_doc) return '';
+  var isYearSealed=!!(c.locked||c.submitted);
+  var rows=dKeys.sort(function(a,b){ return String((docs[a]||{}).name||'').localeCompare(String((docs[b]||{}).name||'')); }).map(function(did,i){
+    var dc=docs[did]||{}, isPdf=String(dc.ext||'').toLowerCase()==='.pdf';
+    return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip">'+esc(dc.kind_label||dc.kind||'서류')+'</span></td>'
+      +'<td style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(dc.name||'')+'"><b>'+esc(dc.name||did)+'</b></td>'
+      +'<td class="mo muted" style="white-space:nowrap;text-align:right">'+_n(Math.max(1,Math.round((num(dc.size)||0)/1024)))+' KB</td>'
+      +'<td class="no-print" style="white-space:nowrap">'
+        +(isPdf?'<button type="button" class="primary" onclick="openArchiveDoc(\''+safeFid+'\','+yrNum+',\''+did+'\',false)" style="padding:4px 10px;font-size:12px">👁 열람</button> ':'')
+        +'<button type="button" onclick="openArchiveDoc(\''+safeFid+'\','+yrNum+',\''+did+'\',true)" style="padding:4px 10px;font-size:12px">⬇ 받기</button> '
+        +(!isYearSealed?'<button type="button" onclick="deleteArchiveDoc(\''+safeFid+'\','+yrNum+',\''+did+'\')" style="padding:4px 9px;font-size:12px;color:var(--danger)" title="백업 삭제" aria-label="백업 서류 삭제">×</button>':'')
+      +'</td></tr>';
+  }).join('');
+  var mailChips=mKeys.map(function(mid){
+    var m=mails[mid]||{};
+    return '<button type="button" onclick="viewArchiveMailModal(\''+safeFid+'\','+yrNum+',\''+mid+'\')" style="padding:4px 10px;font-size:12px" title="'+esc(m.subject||'')+'">📨 '+esc(String(m.date_str||'').slice(0,10))+' · '+esc(String(m.subject||'메일').slice(0,28))+'</button>';
+  }).join(' ');
+  return '<div class="panel no-print" style="margin-top:12px">'
+    +'<div class="row" style="flex-wrap:wrap;gap:8px"><b>📦 '+yrNum+'년 백업 제출서류 · 사업계획서 보관함</b>'+hlp('close.archive')
+    +(dKeys.length?'<span class="chip ok">'+dKeys.length+'건 보관됨</span>':'')
+    +(mKeys.length?'<span class="chip">관련 메일 '+mKeys.length+'통</span>':'')
+    +'<span style="flex:1"></span>'
+    +'<button type="button" onclick="S.ysMode=\'plan\';closeSub(\'years\')">📑 전 연도 서류·예산 비교 →</button>'
+    +'<button type="button" class="primary" onclick="uploadArchiveDocsModal(\''+safeFid+'\','+yrNum+')">⬆ 서류 추가 백업</button></div>'
+    +(dKeys.length?'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr>'+_ckTh()+'<th class="no">#</th><th>구분</th><th>파일명</th><th class="mo" style="text-align:right">크기</th><th class="no-print">열람·받기</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'')
+    +(mKeys.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px"><span class="muted" style="font-size:12px">연결된 푸른메일:</span>'+mailChips+'</div>':'')
+    +'</div>';
+}
+var _archiveDocUrl=null;
+var _archiveUploadBusy=false;
+function openArchiveDoc(fid,yr,docId,downloadOnly){
+  if(!_safeArchiveKey(fid)||!_safeArchiveKey(docId)||!/^\d{4}$/.test(String(yr))){ toast('잘못된 문서 식별자입니다','err'); return; }
+  toast('백업 문서를 불러오는 중…');
+  fbDb.ref(NS+'/closing_blobs/'+fid+'/'+yr+'/'+docId).once('value').then(function(sn){
+    var b=sn.val();
+    if(!b||!b.data_b64){ toast('백업 문서 원본을 찾지 못했습니다','err'); return; }
+    var bytes=_b64ToBytes(b.data_b64);
+    var mime=b.mime||(/\.pdf$/i.test(b.name||'')?'application/pdf':'application/octet-stream');
+    var blob=new Blob([bytes],{type:mime});
+    if(downloadOnly||mime!=='application/pdf'){
+      _dlBlob(blob,b.name||(docId+(b.ext||'')));
+      return;
+    }
+    if(_archiveDocUrl){ try{URL.revokeObjectURL(_archiveDocUrl);}catch(e){} }
+    _archiveDocUrl=URL.createObjectURL(blob);
+    showModal('<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+      +'<h2 id="archDocTitle" tabindex="-1" style="margin:0;font-size:15px;outline:none">📄 '+esc(b.name||'제출서류')+'</h2>'
+      +'<span class="chip">'+(+yr)+'년 · '+esc(b.kind_label||b.kind||'')+'</span>'
+      +'<span style="flex:1"></span>'
+      +'<button type="button" class="primary" onclick="openArchiveDoc(\''+fid+'\','+(+yr)+',\''+docId+'\',true)">⬇ 파일 내려받기</button>'
+      +'<button type="button" onclick="closeM()">닫기</button></div>'
+      +'<iframe title="'+esc(b.name||'백업 제출서류 PDF 미리보기')+'" src="'+_archiveDocUrl+'" style="width:100%;height:74vh;border:1px solid var(--line);border-radius:8px;background:var(--bg)"></iframe>',
+      {width:980, after:function(){ var el=$('archDocTitle'); if(el) try{el.focus();}catch(e){} }});
+  }).catch(function(e){ toast('문서 열람 실패: '+((e&&e.message)||e),'err'); });
+}
+/* 백업 서류 업로드 시 확장자·파일명·문서 텍스트 개인정보(인감증명서·주민등록번호 등) 사전 차단 — 순수 함수 */
+var ARCHIVE_DOC_KINDS=[
+  ['closing_report','결산·운영상황보고서'],['business_plan','사업계획·예산서'],['audit_report','감사·검토보고서'],
+  ['council_minutes','협의회·총회 회의록'],['basic_asset_change','기본재산·정관·신고서'],['financial_stmt','재무제표·원장']
+];
+var ARCHIVE_EXT_RE=/\.(pdf|hwp|hwpx|xlsx|xls|docx|csv)$/i;
+function checkArchiveDocSafe(fileName,textSample){
+  var nm=String(fileName||'').trim();
+  if(!nm||!ARCHIVE_EXT_RE.test(nm)) return {ok:false,reason:'허용된 문서 형식(PDF·HWP·HWPX·XLSX·XLS·DOCX·CSV)만 백업할 수 있습니다'};
+  if(/인감증명|본인서명사실|주민등록|등초본|가족관계증명|신분증|운전면허|여권사본/.test(nm)) return {ok:false,reason:'개인 인감증명서·신분증·주민등록 서류는 보안상 백업할 수 없습니다'};
+  var hasRrn=(typeof hasStockRawRrn==='function')?hasStockRawRrn:function(s){
+    return /(?:^|[^\d])\d{6}\s*[-~–—.\s]?\s*[1-8]\d{6}(?!\d)/.test(String(s||''))&&/(?:^|[^\d])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s*[-~–—.\s]?\s*[1-8]\d{6}(?!\d)/.test(String(s||''));
+  };
+  if(hasRrn(nm)) return {ok:false,reason:'파일명에 주민등록번호·외국인등록번호 형식이 포함되어 업로드가 차단되었습니다'};
+  if(textSample){
+    var ts=String(textSample);
+    if(typeof isStockSensitivePage==='function'&&isStockSensitivePage(ts)) return {ok:false,reason:'문서 본문에 인감증명서·주민등록등초본 등 신분증명 서류가 감지되어 차단되었습니다'};
+    if(hasRrn(ts)) return {ok:false,reason:'문서 내 마스킹되지 않은 주민등록번호·운전면허번호 형식이 감지되어 차단되었습니다(비식별본을 올려 주세요)'};
+  }
+  return {ok:true,reason:''};
+}
+function guessArchiveDocKind(fileName){
+  var nm=String(fileName||'');
+  if(/사업계획|예산서|운영계획|추정재무|추정손익/.test(nm)) return ['business_plan','사업계획·예산서'];
+  if(/감사보고|외부감사|회계감사|검토보고/.test(nm)) return ['audit_report','감사·검토보고서'];
+  if(/회의록|의사록|의결서/.test(nm)) return ['council_minutes','협의회·총회 회의록'];
+  if(/기본재산|별지\s*제?10호|재산목록|정관|출연확인/.test(nm)) return ['basic_asset_change','기본재산·정관·신고서'];
+  if(/재무상태표|손익계산서|시산표|원장|분개장/.test(nm)&&!/운영상황|결산서/.test(nm)) return ['financial_stmt','재무제표·원장'];
+  return ['closing_report','결산·운영상황보고서'];
+}
+function _extractArchiveTextForCheck(nm,bytes){
+  var ext=(nm.slice(nm.lastIndexOf('.'))||'').toLowerCase();
+  if(ext==='.csv'){
+    try{ return Promise.resolve({status:'ok',text:new TextDecoder('utf-8').decode(bytes)}); }
+    catch(e){ return Promise.reject(new Error(nm+': CSV 텍스트 디코딩 실패')); }
+  }
+  if(ext==='.xls'){
+    if(typeof XLSX==='undefined'||!XLSX.read) return Promise.reject(new Error(nm+': 엑셀 판독 라이브러리 로드 실패 — 새로고침 후 다시 시도하세요'));
+    try{
+      var wbX=XLSX.read(bytes,{type:'array'});
+      var csvParts=(wbX.SheetNames||[]).map(function(sn){ return XLSX.utils.sheet_to_csv(wbX.Sheets[sn]); });
+      return Promise.resolve({status:'ok',text:csvParts.join('\n')});
+    }catch(e){ return Promise.reject(new Error(nm+': 엑셀 본문을 읽을 수 없어 보안상 업로드가 차단되었습니다')); }
+  }
+  if(ext==='.xlsx'||ext==='.hwpx'||ext==='.docx'){
+    var loadZip=(typeof JSZip!=='undefined')?Promise.resolve():(typeof _loadJsZip==='function'?_loadJsZip():Promise.reject(new Error('JSZip 미지원')));
+    return loadZip.then(function(){
+      if(typeof JSZip==='undefined') throw new Error('문서 압축 해제 모듈 로드 실패');
+      return JSZip.loadAsync(bytes);
+    }).then(function(zip){
+      var xmlNames=Object.keys(zip.files||{}).filter(function(p){ return /\.(xml|rels)$/i.test(p)&&!zip.files[p].dir; });
+      if(!xmlNames.length) throw new Error('문서 내부 XML 구조를 읽을 수 없습니다');
+      var usedBytes=0;
+      return Promise.all(xmlNames.map(function(p){
+        return zip.files[p].async('string').then(function(s){
+          usedBytes+=s.length;
+          if(usedBytes>12*1024*1024) throw new Error('문서 내부 텍스트 용량이 한도(12MB)를 초과합니다');
+          return s.replace(/<[^>]+>/g,' ');
+        });
+      })).then(function(arr){
+        var joined=arr.join('\n');
+        return {status:joined.replace(/\s+/g,'').length>0?'ok':'unreadable',text:joined};
+      });
+    }).catch(function(e){
+      return Promise.reject(new Error(nm+': 본문 개인정보 점검 실패('+((e&&e.message)||e)+') — 정상 파일인지 확인하거나 새로고침 후 다시 시도하세요'));
+    });
+  }
+  if(ext==='.pdf'){
+    if(typeof pdfjsLib==='undefined'||!pdfjsLib.getDocument){
+      return Promise.reject(new Error(nm+': PDF 판독 모듈이 준비되지 않았습니다 — 새로고침 후 다시 시도하세요'));
+    }
+    try{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+    return pdfjsLib.getDocument({isEvalSupported:false,data:bytes.slice(0)}).promise.then(function(doc){
+      var n=doc.numPages||0;
+      if(n<=0||n>200){ try{doc.destroy();}catch(e){} throw new Error('PDF 쪽수('+n+'쪽)가 허용 범위(1~200쪽)를 벗어납니다'); }
+      var ps=[];
+      for(var i=1;i<=n;i++){
+        ps.push(doc.getPage(i).then(function(pg){
+          return pg.getTextContent().then(function(tc){ return (tc.items||[]).map(function(x){return x.str||'';}).join(' '); });
+        }));
+      }
+      return Promise.all(ps).then(function(txts){
+        try{doc.destroy();}catch(e){}
+        var joined=txts.join('\n');
+        return {status:joined.replace(/\s+/g,'').length>=10?'ok':'unreadable',text:joined};
+      });
+    }).catch(function(e){
+      return Promise.reject(new Error(nm+': PDF 본문 점검 실패('+((e&&e.message)||e)+')'));
+    });
+  }
+  if(ext==='.hwp'){
+    return Promise.resolve({status:'unreadable',text:''});
+  }
+  return Promise.reject(new Error(nm+': 지원하지 않는 형식입니다'));
+}
+function uploadArchiveDocsModal(fid,yr){
+  if(!_safeArchiveKey(fid)) return;
+  var ys=fundYearsOf(fid,null,true);
+  showModal('<div class="row" style="margin-bottom:10px"><h2 id="archUpTitle" tabindex="-1" style="margin:0;font-size:16px;outline:none">⬆ 노동부·공단 제출서류 백업 올리기</h2>'+hlp('close.archive')+'<span style="flex:1"></span><button type="button" onclick="closeM()">닫기</button></div>'
+    +'<div class="grid" style="margin-bottom:10px">'
+      +'<div class="fld"><label for="arch-up-yr">귀속 회계연도</label><select id="arch-up-yr">'+ys.map(function(y){return '<option value="'+y+'"'+(+y===+yr?' selected':'')+'>'+y+'년</option>';}).join('')+'</select></div>'
+      +'<div class="fld"><label for="arch-up-kind">서류 분류 (자동추정 또는 직접선택)</label><select id="arch-up-kind"><option value="auto">파일명으로 자동 분류</option>'+ARCHIVE_DOC_KINDS.map(function(k){return '<option value="'+k[0]+'">'+k[1]+'</option>';}).join('')+'</select></div>'
+    +'</div>'
+    +'<div class="fld"><label for="arch-up-files">백업할 파일 선택 (PDF · HWP · HWPX · XLSX · DOCX · CSV, 파일당 5MB · 합계 7MB 이하)</label>'
+      +'<input type="file" id="arch-up-files" multiple accept=".pdf,.hwp,.hwpx,.xlsx,.xls,.docx,.csv"></div>'
+    +'<div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" onclick="closeM()">취소</button>'
+      +'<button type="button" id="arch-up-btn" class="primary" onclick="saveUploadedArchiveDocs(\''+fid+'\')">📦 백업 저장</button></div>',
+    {width:640, after:function(){ var el=$('archUpTitle'); if(el) try{el.focus();}catch(e){} }});
+}
+function saveUploadedArchiveDocs(fid){
+  if(_archiveUploadBusy||!_safeArchiveKey(fid)) return;
+  var yrEl=$('arch-up-yr'), kEl=$('arch-up-kind'), fEl=$('arch-up-files'), btn=$('arch-up-btn');
+  var yr=+(yrEl&&yrEl.value)||S.year, kSel=(kEl&&kEl.value)||'auto';
+  if(!/^\d{4}$/.test(String(yr))){ toast('귀속 회계연도를 확인하세요','warn'); return; }
+  var files=fEl&&fEl.files?Array.prototype.slice.call(fEl.files):[];
+  if(!files.length){ toast('백업할 파일을 선택하세요','warn'); return; }
+  var totBytes=0;
+  for(var i=0;i<files.length;i++){
+    if(files[i].size>5*1024*1024){ toast(files[i].name+': 파일당 5MB 이하만 백업할 수 있습니다','err'); return; }
+    totBytes+=files[i].size||0;
+    var ck0=checkArchiveDocSafe(files[i].name,'');
+    if(!ck0.ok){ toast(files[i].name+': '+ck0.reason,'err'); return; }
+  }
+  if(totBytes>7*1024*1024){ toast('한 번에 올리는 파일 합계는 7MB 이하여야 합니다 — 나누어 올려 주세요','err'); return; }
+  _archiveUploadBusy=true;
+  if(btn) btn.disabled=true;
+  toast(files.length+'개 파일 개인정보 점검 및 백업 저장 중…');
+  Promise.all(files.map(function(file){
+    return new Promise(function(resolve,reject){
+      var rd=new FileReader();
+      rd.onload=function(){ resolve({file:file,bytes:new Uint8Array(rd.result)}); };
+      rd.onerror=function(){ reject(new Error(file.name+' 읽기 실패')); };
+      rd.readAsArrayBuffer(file);
+    });
+  })).then(function(items){
+    return Promise.all(items.map(function(it){
+      return _extractArchiveTextForCheck(it.file.name||'',it.bytes).then(function(res){
+        var ck=checkArchiveDocSafe(it.file.name||'',(res&&res.text)||'');
+        if(!ck.ok) throw new Error((it.file.name||'문서')+': '+ck.reason);
+        it._unreadable=(!res||res.status==='unreadable');
+        return it;
+      });
+    }));
+  }).then(function(items){
+    var unread=items.filter(function(it){ return it._unreadable; }).map(function(it){ return it.file.name; });
+    if(!unread.length) return items;
+    return confirmM('다음 파일은 스캔 이미지 또는 구형 한글(.hwp) 바이너리 형식이라 본문 글자를 자동 판독할 수 없습니다:\n· '+unread.join('\n· ')+'\n\n인감증명서·주민등록등초본·주민등록번호가 포함되지 않았음을 직접 확인하셨나요?',{ok:'직접 확인함 · 저장',cancel:'취소'}).then(function(ok){
+      if(!ok) throw new Error('사용자가 스캔·바이너리 문서 업로드를 취소했습니다');
+      return items;
+    });
+  }).then(function(items){
+    var up={}, now=ymd(), stamp=Date.now().toString(36);
+    items.forEach(function(it,idx){
+      var nm=it.file.name||('문서'+(idx+1));
+      var dot=nm.lastIndexOf('.'), ext=dot>=0?nm.slice(dot).toLowerCase():'';
+      var gk=kSel==='auto'?guessArchiveDocKind(nm):(ARCHIVE_DOC_KINDS.filter(function(x){return x[0]===kSel;})[0]||['closing_report','결산·운영상황보고서']);
+      var docId='up_'+stamp+'_'+idx;
+      var mime=it.file.type||(ext==='.pdf'?'application/pdf':'application/octet-stream');
+      up['closing_blobs/'+fid+'/'+yr+'/'+docId]={name:nm,kind:gk[0],kind_label:gk[1],ext:ext,mime:mime,size:it.bytes.length,src:'upload',data_b64:_bytesToB64(it.bytes),uploaded_at:now,uploaded_by:S.user||''};
+      up['closing/'+fid+'/'+yr+'/archive_docs/'+docId]={name:nm,kind:gk[0],kind_label:gk[1],ext:ext,mime:mime,size:it.bytes.length,src:'upload',uploaded_at:now,uploaded_by:S.user||''};
+    });
+    return fbDb.ref(NS).update(up);
+  }).then(function(){
+    _archiveUploadBusy=false;
+    _audit(fid,'결산·사업계획 제출서류 백업',yr+'년 '+files.length+'건');
+    S.ysFor=null; S.f15For=null; _cbDirty(); closeM(); renderFund();
+    toast(yr+'년 제출서류 '+files.length+'건을 백업했습니다');
+  }).catch(function(e){
+    _archiveUploadBusy=false;
+    if(btn) btn.disabled=false;
+    toast('백업 실패: '+((e&&e.message)||e),'err');
+  });
+}
+/* 마감·제출 완료된 연도의 서류는 삭제를 막고, 작성중 연도 서류도 물리 제거 대신 무덤 표식(_deleted:true)으로 남긴다(규칙 ⑨) */
+function deleteArchiveDoc(fid,yr,docId){
+  if(!_safeArchiveKey(fid)||!_safeArchiveKey(docId)||!/^\d{4}$/.test(String(yr))) return;
+  var dy=(S.ys&&S.ys.data&&S.ys.data[yr])||(S.year===+yr?S.f15Close:null)||((S.cb&&S.cb[fid]&&S.cb[fid][yr])||{});
+  if(dy&&(dy.locked||dy.submitted)){
+    toast('확정·제출 완료된 연도의 백업 제출서류는 보존 원칙상 삭제할 수 없습니다','warn');
+    return;
+  }
+  confirmM('이 백업 서류를 목록에서 제외할까요?\n(오류 방지 규칙에 따라 무덤 표식으로 숨김 처리됩니다)',{ok:'제외',danger:true}).then(function(ok){
+    if(!ok) return;
+    var base='closing/'+fid+'/'+yr+'/archive_docs/'+docId+'/', up={};
+    up[base+'_deleted']=true; up[base+'deleted_at']=ymd(); up[base+'deleted_by']=S.user||'';
+    fbDb.ref(NS).update(up).then(function(){
+      _audit(fid,'결산 제출서류 백업 제외',yr+'년 '+docId);
+      S.ysFor=null; S.f15For=null; _cbDirty(); renderFund(); toast('백업 서류를 목록에서 제외했습니다');
+    }).catch(function(e){ toast('처리 실패: '+e.message,'err'); });
+  });
+}
+function viewArchiveMailModal(fid,yr,mailId){
+  if(!_safeArchiveKey(fid)||!_safeArchiveKey(mailId)||!/^\d{4}$/.test(String(yr))) return;
+  var m=((((S.ys&&S.ys.data&&S.ys.data[yr])||S.f15Close||{}).archive_mails)||{})[mailId];
+  if(!m&&S.f15Close&&S.f15Close.archive_mails) m=S.f15Close.archive_mails[mailId];
+  if(!m){ toast('메일 정보를 찾지 못했습니다','warn'); return; }
+  var canLive=(m.source==='old'&&m.old_key)||(m.source==='imap'&&m.slug&&m.uid);
+  var atts=m.att_names||[];
+  showModal('<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+    +'<h2 id="archMailTitle" tabindex="-1" style="margin:0;font-size:15px;outline:none">📨 '+esc(m.subject||'(제목 없음)')+'</h2>'
+    +'<span class="chip">'+(+yr)+'년 · '+esc(m.date_str||'')+'</span>'
+    +'<span style="flex:1"></span>'
+    +(canLive?'<button type="button" class="primary" onclick="fetchArchiveMailLive(\''+fid+'\','+(+yr)+',\''+mailId+'\')">🔄 메일 서버에서 전체 원문 불러오기</button>':'')
+    +'<button type="button" onclick="closeM()">닫기</button></div>'
+    +(m.from||m.email?'<div class="muted" style="font-size:12px;margin-bottom:6px">보낸사람: '+esc((m.from||'')+(m.email?' <'+m.email+'>':''))+'</div>':'')
+    +(atts.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:12px">첨부 목록:</span>'+atts.map(function(n){return '<span class="chip">'+esc(n)+'</span>';}).join('')+'</div>':'')
+    +'<div id="archMailBody" style="white-space:pre-wrap;font-size:12.5px;line-height:1.65;padding:12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;max-height:52vh;overflow:auto">'
+      +esc(scrubStockPii(m.summary||'저장된 요약이 없습니다. 우측 상단 버튼으로 서버 원문을 불러오세요.'))+'</div>',
+    {width:820, after:function(){ var el=$('archMailTitle'); if(el) try{el.focus();}catch(e){} }});
+}
+function fetchArchiveMailLive(fid,yr,mailId){
+  if(!_safeArchiveKey(fid)||!_safeArchiveKey(mailId)||!/^\d{4}$/.test(String(yr))) return;
+  var m=((((S.ys&&S.ys.data&&S.ys.data[yr])||S.f15Close||{}).archive_mails)||{})[mailId]||(S.f15Close&&S.f15Close.archive_mails&&S.f15Close.archive_mails[mailId]);
+  var box=$('archMailBody'); if(!m||!box) return;
+  box.innerHTML=loadingHTML('푸른메일 서버에서 원문을 읽는 중…');
+  var p=(m.source==='old'&&m.old_key)?_mfCall('readOldMail',{key:String(m.old_key),full:1}):_mfCall('readMailMessage',{slug:String(m.slug||''),uid:String(m.uid||''),peek:1});
+  p.then(function(j){
+    var txt=String(j.text||'').trim();
+    if(!txt&&j.html&&typeof stockMailHtmlToText==='function') txt=stockMailHtmlToText(j.html);
+    box.innerHTML='<div style="white-space:pre-wrap">'+esc(scrubStockPii(txt||m.summary||'(본문 없음)'))+'</div>';
+  }).catch(function(e){
+    box.innerHTML='<div class="msg warn">실시간 메일 조회 실패('+esc((e&&e.message)||e)+') — 보관 요약을 표시합니다.</div><div style="white-space:pre-wrap;margin-top:8px">'+esc(scrubStockPii(m.summary||''))+'</div>';
+  });
+}
+/* 연도별 비교 통합 엑셀(.xlsx) 내보내기 — 시트1: 재무제표 · 시트2: 별지15호 운영상황보고서 · 시트3: 사업계획예산·백업서류 */
+function exportYearsWb(){
+  if(typeof ExcelJS==='undefined'){ toast('ExcelJS 로드 실패 — 새로고침 후 다시 시도하세요','err'); return; }
+  if(!S.ys||!S.ys.years){ toast('연도별 자료를 먼저 불러오는 중입니다','warn'); return; }
+  var fid=S.fundId, f=funds[fid]||{}, D=S.ys.data||{};
+  var Y=S.ys.years.slice().reverse().filter(function(y){
+    var d=D[y]||{}, fy=(f.years||{})[y]||{};
+    return !!(d.fin||fy.budget||Object.keys(_activeArchiveDocs(d.archive_docs)).length||Object.keys(_safeArchiveMails(d.archive_mails)).length);
+  });
+  if(!Y.length){ toast('내보낼 연도 자료가 없습니다','warn'); return; }
+  var wb=new ExcelJS.Workbook(), bold={bold:true};
+
+  // 시트 1: 연도별 재무제표 비교
+  var ws1=wb.addWorksheet('연도별_재무제표비교');
+  ws1.columns=[{width:30}].concat(Y.map(function(){return {width:16};}));
+  ws1.addRow([(f.name||fid)+' — 연도별 재무제표·결산 비교 (단위: 원)']).font=bold;
+  ws1.addRow(['과목'].concat(Y.map(function(y){return y+'년';}))).font=bold;
+  YS_ROWS.forEach(function(r){
+    var row=ws1.addRow([r[0]].concat(Y.map(function(y){ var s=D[y]&&D[y].fin; return s?(num(s[r[1]])||0):null; })));
+    if(r[2]) row.font=bold;
+  });
+  for(var c1=2;c1<=Y.length+1;c1++) ws1.getColumn(c1).numFmt='#,##0';
+
+  // 시트 2: 연도별 운영상황보고서(별지15호) 비교
+  var ws2=wb.addWorksheet('연도별_별지15호비교');
+  var unit=S.ysUnit||'k';
+  ws2.columns=[{width:38}].concat(Y.map(function(){return {width:15};}));
+  ws2.addRow([(f.name||fid)+' — 고용노동부 운영상황보고서(별지 제15호) 연도별 비교 ('+(unit==='k'?'단위: 천원, 명':'단위: 원, 명')+')']).font=bold;
+  ws2.addRow(['별지 제15호 항목'].concat(Y.map(function(y){return y+'년';}))).font=bold;
+  buildF15CompareRows(Y,D,unit).forEach(function(r){
+    if(r.sec){ ws2.addRow([r.lbl]).font=bold; return; }
+    var row=ws2.addRow([r.lbl].concat(r.vals));
+    if(r.bold) row.font=bold;
+  });
+  for(var c2=2;c2<=Y.length+1;c2++) ws2.getColumn(c2).numFmt='#,##0';
+
+  // 시트 3: 연도별 사업계획·예산 및 백업 제출서류 목록
+  var ws3=wb.addWorksheet('사업계획예산_백업서류');
+  ws3.columns=[{width:34}].concat(Y.map(function(){return {width:16};}));
+  ws3.addRow([(f.name||fid)+' — 연도별 사업계획·예산 대 결산실적 비교 (단위: 원)']).font=bold;
+  ws3.addRow(['구분'].concat(Y.map(function(y){return y+'년';}))).font=bold;
+  buildPlanCompareRows(fid,Y,D).forEach(function(r){
+    var row=ws3.addRow([r.lbl].concat(r.vals.map(function(v){return v===null?null:(r.pct?(v+'%'):v);})));
+    if(r.bold) row.font=bold;
+  });
+  ws3.addRow([]);
+  ws3.addRow(['[백업 제출서류 목록]','귀속연도','서류구분','파일명','크기(KB)']).font=bold;
+  var seq=0;
+  S.ys.years.forEach(function(y){
+    var docs=_activeArchiveDocs((D[y]&&D[y].archive_docs)||{});
+    Object.keys(docs).forEach(function(did){
+      var dc=docs[did]||{}; seq++;
+      ws3.addRow([seq,y+'년',dc.kind_label||dc.kind||'',dc.name||did,Math.max(1,Math.round((num(dc.size)||0)/1024))]);
+    });
+  });
+  for(var c3=2;c3<=Y.length+1;c3++) ws3.getColumn(c3).numFmt='#,##0';
+
+  wb.xlsx.writeBuffer().then(function(buf){
+    _dlBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      '[연도별비교] '+String(f.short_name||f.name||fid).replace(/\s+/g,'')+'_'+Y[0]+'-'+Y[Y.length-1]+'.xlsx');
+  });
 }
 /* ══ 기한 매트릭스 (기금 × 일정) — 기금 현황의 '보기: 기한' ══
    대표 지시 2026-08-24: 「기한을 아무도 안 알려준다 — 42개를 하나씩 열어봐야 안다」.
@@ -26449,29 +27221,43 @@ function closeMatrixHTML(list0){
   }
   if(S.cbErr) return '<div class="panel"><div class="msg err">결산 자료를 읽지 못했습니다: '+esc(S.cbErr)
     +' <button onclick="S.cbErr=null;S.cbLoaded=0;renderHome()">다시 시도</button></div></div>';
-  var cb=S.cb||{}, yNow=new Date().getFullYear(), Y=[];
-  for(var y=yNow;y>=yNow-5;y--) Y.push(y);
+  var cb=S.cb||{}, yNow=new Date().getFullYear(), minY=yNow-5, Y=[];
+  if(S.cbAllYears){
+    minY=2018;
+    Object.keys(cb).forEach(function(fid){ Object.keys(cb[fid]||{}).forEach(function(yk){ if(/^\d{4}$/.test(yk)&&+yk>=2017&&+yk<minY) minY=+yk; }); });
+  }
+  for(var y=yNow;y>=minY;y--) Y.push(y);
   var list=(list0||[]).map(function(f){return f._id;});
-  var nLock=0,nDraft=0;
+  var nLock=0,nDraft=0,nDocs=0;
   var rows=list.map(function(fid,i){
     var f=funds[fid], c=cb[fid]||{};
     var tds=Y.map(function(y){
-      var d=c[y]||{};
+      var d=c[y]||{}, dc=Object.keys(_activeArchiveDocs(d.archive_docs)).length;
+      nDocs+=dc;
+      var docHint=dc?' · 백업서류 '+dc+'건':'';
       if(d.locked){ nLock++;
-        return '<td style="text-align:center;cursor:pointer" onclick="goClosing(\''+fid+'\','+y+')" title="확정 '+esc(d.locked_at||'')+' · 자산 '+_n((d.fin||{}).assets||0)+'원">'
-          +'<span class="chip ok" style="font-size:10px">확정</span></td>'; }
+        return '<td style="text-align:center;cursor:pointer;white-space:nowrap" onclick="goClosing(\''+fid+'\','+y+')" title="확정 '+esc(d.locked_at||'')+' · 자산 '+_n((d.fin||{}).assets||0)+'원'+docHint+'">'
+          +'<span class="chip ok" style="font-size:10px">확정'+(dc?' 📎':'')+'</span></td>'; }
+      if(d.submitted){ nLock++;
+        return '<td style="text-align:center;cursor:pointer;white-space:nowrap" onclick="goClosing(\''+fid+'\','+y+')" title="제출결산 백데이터 · 자산 '+_n((d.fin||{}).assets||0)+'원'+docHint+'">'
+          +'<span class="chip ok" style="font-size:10px">제출'+(dc?' 📎':'')+'</span></td>'; }
       if(d.fin||d.report){ nDraft++;
-        return '<td style="text-align:center;cursor:pointer" onclick="goClosing(\''+fid+'\','+y+')" title="작성 중"><span class="chip warn" style="font-size:10px">작성중</span></td>'; }
+        return '<td style="text-align:center;cursor:pointer;white-space:nowrap" onclick="goClosing(\''+fid+'\','+y+')" title="작성 중'+docHint+'"><span class="chip warn" style="font-size:10px">작성중'+(dc?' 📎':'')+'</span></td>'; }
+      if(dc){
+        return '<td style="text-align:center;cursor:pointer;white-space:nowrap" onclick="goClosing(\''+fid+'\','+y+')" title="백업 제출서류 '+dc+'건"><span class="chip" style="font-size:10px">📎'+dc+'</span></td>'; }
       return '<td style="text-align:center;cursor:pointer;color:var(--faint)" onclick="goClosing(\''+fid+'\','+y+')" title="자료 없음 — 눌러서 작성">·</td>';
     }).join('');
-    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer" onclick="go(\'fund\',\''+fid+'\')">'
+    return '<tr><td class="ckcol"><input type="checkbox" onchange="_ckRow(this)"></td><td class="no">'+(i+1)+'</td><td style="font-weight:700;cursor:pointer;white-space:nowrap" onclick="go(\'fund\',\''+fid+'\')">'
       +esc(f.short_name||f.name)+'<div class="muted mo" style="font-weight:400;font-size:11px">'+esc(f.name||'')+'</div></td>'+tds+'</tr>';
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">결산 현황</h2>'+hlp('board.close')
     +'<span class="stat">기금 '+list.length+'</span>'
-    +'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">확정 '+nLock+'</span>'
+    +'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">확정·제출 '+nLock+'</span>'
     +'<span class="stat" style="background:var(--warn-bg);color:var(--warn)">작성중 '+nDraft+'</span>'
-    +'<span style="flex:1"></span><button onclick="S.cbLoaded=0;renderHome()">↻ 새로고침</button></div>'
+    +(nDocs?'<span class="stat">백업서류 '+nDocs+'</span>':'')
+    +'<span style="flex:1"></span>'
+    +'<button onclick="S.cbAllYears=!S.cbAllYears;renderHome()">'+(S.cbAllYears?'최근 6개년만 보기':'과거 전체 연도 보기(2018~)')+'</button>'
+    +'<button onclick="S.cbLoaded=0;renderHome()">↻ 새로고침</button></div>'
     +(list.length
       ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th class="ckcol"><input type="checkbox" onclick="_ckAll(this)" title="모두 선택"></th><th class="no">번호</th><th>기금</th>'
         +Y.map(function(y){return '<th style="text-align:center">'+y+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
@@ -26483,18 +27269,19 @@ function goClosing(fid,yr){ S.year=yr; S.closeSub='fin'; S.txnsFor=null; S.f15Fo
 // 장부 인쇄 — 지금 보고 있는 표를 A4 가로로 그대로
 function printLedger(kind){
   var box=$('closeBody'); if(!box){ toast('인쇄할 표가 없습니다','warn'); return; }
-  var fd=funds[S.fundId]||{}, tbl=box.querySelectorAll('table');
+  var fd=funds[S.fundId]||{}, tbl=Array.prototype.filter.call(box.querySelectorAll('table'),function(t){ return !t.closest('.no-print'); });
   if(!tbl.length){ toast('인쇄할 표가 없습니다','warn'); return; }
-  var LBL={journal:'분개장',ledger:'계정별원장',monthly:'월계표',tb:'합계잔액시산표',fin:'재무제표(전기 대비)'};
+  var LBL={journal:'분개장',ledger:'계정별원장',monthly:'월계표',tb:'합계잔액시산표',fin:'재무제표(전기 대비)',years:'연도별 비교 (재무제표 · 운영상황보고서 · 사업계획)'};
   var w=window.open('','_blank'); if(!w){ toast('팝업이 차단되었습니다','err'); return; }
   var body=''; Array.prototype.forEach.call(tbl,function(t){ body+='<table>'+t.innerHTML+'</table>'; });
+  var periodLbl=(kind==='years'&&S.ys&&S.ys.years&&S.ys.years.length)?(S.ys.years[S.ys.years.length-1]+'~'+S.ys.years[0]+'년도 다개년 비교'):(S.year+'년도');
   w.document.write('<!doctype html><meta charset=utf-8><title>'+esc(LBL[kind]||'장부')+' — '+esc(fd.short_name||fd.name||'')+'</title>'
     +'<style>@page{size:A4 landscape;margin:12mm}body{font-family:Malgun Gothic,sans-serif;color:#1e293b}'
     +'h1{font-size:16px;margin:0 0 2px}p.sub{font-size:11px;color:#475569;margin:0 0 10px}'
     +'table{border-collapse:collapse;width:100%;margin-bottom:14px}th,td{border:1px solid #94a3b8;padding:3px 6px;font-size:10.5px}'
-    +'th{background:#e2e8f0}.mo{display:table-cell}.ckcol{display:none}@media print{button{display:none}}</style>'
+    +'th{background:#e2e8f0}th button{background:none;border:none;font:inherit;padding:0}.mo{display:table-cell}.ckcol{display:none}.no-print{display:none}@media print{button{display:none}th button{display:inline}}</style>'
     +'<h1>'+esc(LBL[kind]||'장부')+'</h1>'
-    +'<p class="sub">'+esc(fd.name||'')+' · '+S.year+'년도 · 출력 '+ymd()+'</p>'+body
+    +'<p class="sub">'+esc(fd.name||'')+' · '+esc(periodLbl)+' · 출력 '+ymd()+'</p>'+body
     +'<button onclick="print()" style="padding:8px 16px">인쇄 / PDF 저장</button>');
   w.document.close();
 }
@@ -28195,10 +28982,14 @@ var HELP={
  'close.fin':{t:'재무제표 · 전기 대비',h:'<p>재무상태표·손익계산서를 <b>당기와 전기를 나란히</b> 놓고 증감액·증감률까지 계산합니다.</p>'
    +'<p>전기 숫자는 <b>지난해 승인 분개 + 지난해 전기이월</b>로 그 자리에서 다시 계산한 것입니다 — 따로 입력하지 않습니다.</p>'
    +'<p>지난해 자료가 없으면 전기는 0으로 표시되고 안내 배지가 붙습니다.</p>'},
- 'close.years':{t:'연도별 비교',h:'<p>한 기금의 <b>여러 연도를 나란히</b> 놓고 자산·기본재산·목적사업비·순이익·수혜자수의 흐름을 봅니다.</p>'
-   +'<p><b>확정</b> 배지가 붙은 연도는 결산 확정 당시의 <b>스냅샷</b>을 그대로 보여줍니다 — 나중에 거래를 손대도 제출했던 숫자가 바뀌지 않습니다.</p>'
-   +'<p><b>작성중</b>은 지금 거래에서 계산한 값이라 바뀔 수 있습니다.</p>'
-   +'<p>▲▼는 <b>직전 연도 대비</b> 증감 방향입니다.</p>'},
+ 'close.years':{t:'연도별 비교 — 재무제표 · 별지15호 운영상황보고서 · 사업계획',h:'<p>한 기금의 <b>설립 이후 모든 연도를 시간순으로 나란히</b> 놓고 세 가지 관점으로 비교합니다.</p>'
+   +'<p><b>① 재무제표 비교</b> — 자산총계(예금·대부금·주식)·고유목적사업준비금1·2·기본재산·사업수익·목적사업비·일반관리비·당기순이익의 연도별 추이를 한눈에 봅니다.</p>'
+   +'<p><b>② 운영상황보고서 비교(별지 제15호)</b> — 고용노동부에 매년 제출한 <b>별지 제15호 전 항목</b>(⑫~⑳ 기본재산 변동, ㉑~㉘ 운용방법, ㉙~㉟ 기금사업 재원, 57~70 항목별 복지사업비·수혜자수·기금운영비·잔액)을 천원 또는 원 단위로 연도별 비교하고, 직전 연도 ⑳과 당해 ⑫의 연속성 일치 여부를 자동 점검합니다.</p>'
+   +'<p><b>③ 사업계획·예산 &amp; 제출서류 백업</b> — 연도별 사업계획서 예산과 실제 결산 집행액·집행률을 비교하고, 과거 노동부·공단에 제출했던 결산서·운영상황보고서·사업계획서·회의록·감사보고서 원본 백업과 푸른메일 이력을 바로 열람·내려받습니다.</p>'
+   +'<p><b>[📗 비교 엑셀(.xlsx)]</b>을 누르면 세 비교표를 한 워크북(3개 시트)으로 내려받습니다. 연도 머리글을 누르면 그 해 결산 화면으로 바로 이동합니다.</p>'},
+ 'close.archive':{t:'과거 노동부·공단 제출서류 및 사업계획서 백업 보관함',h:'<p>매년 고용노동부·근로복지공단에 제출한 <b>결산서 · 운영상황보고서(별지 제15호) · 익년도 사업계획서(추정재무상태표·손익계산서) · 협의회 회의록 · 감사보고서 · 기본재산 변경보고서</b>와 관련 푸른메일 이력을 귀속연도별로 모아 백업·열람합니다.</p>'
+   +'<p><b>업로드 점검 및 보관 범위</b> — 허용된 문서 확장자(PDF·HWP·HWPX·XLSX·DOCX·CSV, 파일당 5MB 이하)만 올릴 수 있으며, 파일명과 판독 가능한 본문(텍스트 PDF·XLSX·HWPX·DOCX·CSV)에서 인감증명서·주민등록등초본 키워드 및 주민등록번호 패턴을 점검해 차단합니다. 스캔 이미지나 구형 바이너리 HWP는 직접 마스킹 여부를 확인한 뒤 올려 주세요. 백업 파일은 로그인한 재직 담당자가 공유하는 기금 DB 영역에 보관되며, 확정·제출 완료된 연도의 서류는 보존 원칙상 삭제되지 않습니다.</p>'
+   +'<p>PDF 문서는 <b>[👁 열람]</b>으로 화면 안에서 바로 확인하고, 한글(HWP)·엑셀(XLSX) 원본은 <b>[⬇ 받기]</b>로 내려받아 다음 해 보고서·사업계획서 작성 시 참고할 수 있습니다.</p>'},
  'home.view':{t:'보기 전환',h:'<p>기금 목록은 <b>하나</b>입니다. 위 탭으로 <b>어느 기금</b>을 볼지 고르고, 보기 전환으로 <b>무엇을</b> 볼지 고릅니다.</p>'
    +'<p><b>기본정보</b> — 담당·대표자·정보 완비도·계약관계<br><b>서식 준비</b> — 기금별 서식 작성 상태<br><b>결산</b> — 연도별 결산 확정 상태</p>'
    +'<p>목록 화면을 여러 개 두지 않고 <b>열만 바꿉니다</b>. 그래서 지역·공동·사내 같은 분류와 검색이 세 보기 모두에 그대로 적용됩니다.</p>'},
