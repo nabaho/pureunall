@@ -1449,6 +1449,10 @@ table.mstab2 tr:last-child td{border-bottom:none}
      글자가 커진 만큼 빽빽해 보이라고 대표께서 그렇게 고르셨다. */
 .dm-row{display:flex;align-items:center;height:40px;border-bottom:1px solid #f8fafc;
   font-size:14px;color:#000000;cursor:pointer}
+/* 안 읽은 줄의 연파랑 바탕 — 아래 «읽음·안읽음을 한눈에(PC)» 참고.
+   ⚠ 반드시 :hover·.pick·.cur «앞»에 둔다 — 같은 무게라 뒤에 있는 것이 이긴다.
+     뒤에 두면 안 읽은 줄에서만 마우스 올림·고름·방향키 표시의 바탕이 사라진다. */
+.dm-row.unread{background:#eff6ff}
 .dm-row:hover{background:#f8fafc}
 .dm-row.pick{background:#f8fafc}
 /* 방향키로 짚어 둔 줄 — 왼쪽에 파란 선 한 줄. 고른 것(pick)과 헷갈리지 않게 다르게 둔다 */
@@ -1499,8 +1503,17 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-c-rest{gap:4px}
 .dm-row .at{flex:none;width:112px;text-align:right;color:#64748b;font-size:13.5px;
   padding-right:4px;white-space:nowrap}
-/* 안 읽은 것은 굵게 — 다음메일과 같다 */
+/* ══ 읽음·안읽음을 «한눈에» — PC 도 폰과 같은 차이로 (대표 지시 2026-11-18 「PC도 같은 차에 나게 해라」) ══
+   ★ 전에는 굵기 하나로만 갈렸다. 폰(.dmm-row — 아래 같은 이름의 절)과 같은 결로 맞춘다:
+     안 읽은 줄은 연파랑 바탕(위 .dm-row.unread) + 보낸이·제목 굵게 + 받은 시각 파랗게·굵게,
+     읽은 줄은 보낸이·제목을 회색으로 낮춘다.
+   ⚠ 폰과 달리 «왼쪽 띠»는 안 쓴다 — PC 에서 그 자리는 이미 «방향키로 짚은 줄(.cur)» 표시다.
+     둘 다 띠를 쓰면 짚은 줄과 안 읽은 줄이 헷갈린다. 그래서 PC 는 바탕으로 가른다.
+   ⚠ 읽은 줄은 :not(.unread) 가 아니라 .read 로 건다 — .dm-row 는 담당자 현황 같은 다른 표도
+     쓰는데, 그 줄들은 읽음 여부가 없어 :not(.unread) 로 걸면 통째로 회색이 된다. */
 .dm-row.unread .who,.dm-row.unread .sub{font-weight:700}
+.dm-row.unread .at{color:#2563eb;font-weight:700}
+.dm-row.read .who,.dm-row.read .sub{color:#475569}
 .dm-none{text-align:center;color:#94a3b8;font-size:13px;padding:52px 10px;line-height:1.8}
 /* ══════ 📎 첨부파일함 (대표 지시 2026-10-07 — 다음메일에 있고 우리에게만 없던 칸) ══════
    ⚠ 한 줄에 하나다. 자리가 넓다고 두 줄로 쌓지 않는다 — 7천 줄에서는 그것이 곧 두 배 길이다. */
@@ -28966,7 +28979,7 @@ function mbListHtml(){
        ⚠ 카드를 놓는 기준 줄(el)은 그대로 이 줄이다 — this.closest 로 찾는다. */
     const hov = `onmouseenter="mbHoverPeek('${v._slug}','${v.u}');mbCardEnter(this.closest('.dm-row'),event,'${v._slug}','${v.u}')" onmouseleave="mbHoverCancel();mbCardLeave()"`;
     return `
-    <div class="dm-row ${Number(v.r||0)?'':'unread'} ${pickOn(sel,v._key)?'pick':''} ${i===cur?'cur':''} ${why?'spam':''}"
+    <div class="dm-row ${Number(v.r||0)?'read':'unread'} ${pickOn(sel,v._key)?'pick':''} ${i===cur?'cur':''} ${why?'spam':''}"
       id="mbRow${i}"
       ${/* 마우스를 올려 두는 동안 본문을 미리 받아 둔다 — 누르면 그 자리에서 펼쳐진다. ⚠ 줄이 아니라 «제목·미리보기 글»(.sub .pre)에 건다(위 hov) */''}
       ${/* ⚠ 끌어다 왼쪽 칸에 놓으면 그 칸으로 간다. 「다음메일 원본」에서는 끌 수 없다 —
