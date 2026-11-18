@@ -184,6 +184,18 @@ test('번호 — 보이는 순서로 1부터 이어서, 거르면 다시 매긴�
   search.value = '나다'; fire(search, 'input');
   assert.deepStrictEqual(byClass(root, 'c-no').map((c) => c._text), ['1']);
 });
+test('★ 검색창 한글 입력 — 조합(IME) 중에는 다시 그리지 않아 글자가 깨지지 않고, 조합이 끝나면 한 번 거른다', async () => {
+  const { root } = await mountWith({ role: { fin: true } }, AMTS);
+  const find = () => byTag(root, 'input').filter((i) => i.attrs.type === 'search')[0];
+  const search = find();
+  fire(search, 'compositionstart');
+  search.value = '나'; fire(search, 'input');
+  assert.strictEqual(find(), search, '조합 중에는 입력칸을 새로 만들지 않는다(만들면 IME 가 끊긴다)');
+  assert.deepStrictEqual(byClass(root, 'c-no').map((c) => c._text), ['1', '2', '3', '4'], '조합 중에는 거르지 않는다');
+  search.value = '나다'; fire(search, 'compositionend');
+  assert.deepStrictEqual(byClass(root, 'c-no').map((c) => c._text), ['1'], '조합이 끝나면 거른다');
+  /* 조합이 없는 입력(영문·숫자)은 그대로 바로 거른다 — 위의 «번호» 시험과 같다 */
+});
 test('모든 줄 맨 왼쪽은 ☐ 다음은 번호', async () => {
   const { root } = await mountWith({ role: {} }, {});
   byClass(root, 'pqv-row').filter((r) => r.className.indexOf('pqv-head') < 0).forEach((row) => {

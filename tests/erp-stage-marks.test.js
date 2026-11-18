@@ -158,14 +158,18 @@ test('④ «＋ 단계 추가» — 이 유형에서 고를 수 있고 아직 �
 });
 
 /* ── 자동 길 두 곳을 진짜 소스째 돌려 본다 ── */
-const PLAN = ['function erpQuoteDay(', 'function erpQuoteNote(', 'function erpCoAddrKey(', 'function erpSameCompany(', 'function erpBlankContractForm(', 'function erpQuoteLanePlan('].map((d) => cutFn(SRC, d)).join('\n');
+const PLAN = ['function erpQuoteDay(', 'function erpQuoteScrub(', 'function erpQuoteNote(', 'function erpCardCoId(', 'function erpQuoteReqSrcKeys(', 'function erpCoAddrKey(', 'function erpSameCompany(', 'function erpBlankContractForm(', 'function erpQuoteLanePlan('].map((d) => cutFn(SRC, d)).join('\n');
+/* 견적 길은 «요청이 가리키는 업체(companyId)»로만 카드를 고른다(이름 모양으로 잇지 않는다 — 계획 3 검토) → 이 시험의 요청·카드도 업체를 «이은» 모양이다.
+   금액 가리기 한 벌(PuQuoteDetect)은 pu-erp.html 이 먼저 싣는다 */
+const PuQuoteDetect = require('../js/pu-quote-detect.js');
+const COS = [{ id: 'co-1', name: '가나다기업' }];
 function quotePlan(req, cts) {
-  const ctx = { window: { PuCaseStage }, h, Date, Object, Array, String, JSON, Number, todayYMD: () => '2026-11-15' };
+  const ctx = { window: { PuCaseStage, PuQuoteDetect }, h, Date, Object, Array, String, JSON, Number, todayYMD: () => '2026-11-15' };
   vm.createContext(ctx);
   vm.runInContext(HELPERS + '\n' + PLAN + '\nthis.fn=erpQuoteLanePlan;', ctx);
-  return ctx.fn(req, [], cts || [], [{ sid: 'S1', name: '담당A' }]);
+  return ctx.fn(req, COS, cts || [], [{ sid: 'S1', name: '담당A' }]);
 }
-const Q = (o) => Object.assign({ kind: 'quote', companyName: '가나다기업', deferLink: true, managerMain: 'S1', srcKey: 'k1', srcMails: ['k1'],
+const Q = (o) => Object.assign({ kind: 'quote', companyId: 'co-1', companyName: '가나다기업', managerMain: 'S1', srcKey: 'k1', srcMails: ['k1'],
   subject: '견적서 송부', atts: ['견적서.pdf'], at: Date.UTC(2026, 10, 15) }, o || {});
 
 test('① 견적 길 — 사건으로 읽힌 메일 제목·첨부에서 단계를 «확인 필요»로 달고, 상태·금액·번호는 그대로(상담접수)', () => {
@@ -278,12 +282,17 @@ const QL_SRC = SRC.slice(QL_START, QL_END);
 function quoteLaneRun(req, cts) {
   const saved = [], patched = [];
   const g = {
-    fbDb: { ref: () => ({ remove: async () => {}, update: async () => {} }) },
-    dbGet: (k) => (k === 'contracts' ? (cts || []) : []),
+    /* 요청 «맡았다» 표시(transaction)는 지금 요청을 그대로 돌려 준다 — 이 시험은 단계 표시가 패치에 담기는지만 본다 */
+    fbDb: { ref: () => ({ remove: async () => {}, update: async () => {},
+      transaction: async (fn) => { const r = fn(Object.assign({ state: 'pending' }, JSON.parse(JSON.stringify(req)))); return { committed: r !== undefined && r !== null, snapshot: { val: () => r } }; } }) },
+    CURRENT_USER: { sid: 'S1' }, setTimeout, clearTimeout, _recLastWrite: null, _erpQuoteUnlanded: {},
+    dbGet: (k) => (k === 'contracts' ? (cts || []) : k === 'companies' ? COS : []),
     getActiveUsers: () => [{ sid: 'S1', name: '담당A' }],
     erpQuoteLanePlan: vm.runInContext('(function(){' + HELPERS + '\n' + PLAN + '\nreturn erpQuoteLanePlan;})()',
-      vm.createContext({ window: { PuCaseStage }, h, Date, Object, Array, String, JSON, Number, todayYMD: () => '2026-11-15' })),
+      vm.createContext({ window: { PuCaseStage, PuQuoteDetect }, h, Date, Object, Array, String, JSON, Number, todayYMD: () => '2026-11-15' })),
     erpStageMarksMerge: H.erpStageMarksMerge, erpStagePartsFromQuote: H.erpStagePartsFromQuote,
+    erpQuoteReqSrcKeys: vm.runInContext('(' + cutFn(SRC, 'function erpQuoteReqSrcKeys(') + ')', vm.createContext({})),
+    erpQuoteScrub: vm.runInContext('(' + cutFn(SRC, 'function erpQuoteScrub(') + ')', vm.createContext({ window: { PuQuoteDetect } })),
     persistOne: (c) => { saved.push(c); return true; },
     patchOne: (id, patch) => { patched.push({ id, patch }); return true; },
     erpDeferCoLinkIfNew: () => null, isContractLocked: () => false, genContractNo: () => '계약-2026-901',
@@ -293,7 +302,7 @@ function quoteLaneRun(req, cts) {
   const fn = new Function(...names, 'return (' + QL_SRC.trim().replace(/^async function processQuoteLaneRequest/, 'async function') + ')');
   return fn(...names.map((k) => g[k]))('ctq-1', req).then((r) => ({ r, saved, patched }));
 }
-const OPEN = (o) => Object.assign({ id: 'ct-q', contractNo: '계약-2026-050', status: 'consult', kinds: ['case'], companyName: '가나다기업', company: { name: '가나다기업' } }, o || {});
+const OPEN = (o) => Object.assign({ id: 'ct-q', contractNo: '계약-2026-050', status: 'consult', kinds: ['case'], companyId: 'co-1', companyName: '가나다기업', company: { name: '가나다기업', companyId: 'co-1' } }, o || {});
 
 test('① 견적 길(기존 카드에 붙이기) — 새 단계만 auto 로 더하고 사람이 정한 상태·상태·금액은 그대로', async () => {
   const marks = PuCaseStage.setState([], 'lrc-local', 'checked', 'S1', 5);

@@ -182,6 +182,12 @@ test('runImport — 정상: 받기 → 🔒 저장 → 글자 → AI → 기록 
   assert.strictEqual(h.calls.log[0].o.target, 'q1');
   assert.match(h.calls.steps[0], /^1\/2 · 견적서 a/);
 });
+test('③ ★ runImport — 보관함에 두는 «파일 이름»의 금액 글자는 가려서 저장한다(글자 뽑기는 원래 이름 그대로)', async () => {
+  const h = host({ fetchAtt: (c) => Promise.resolve({ name: '견적서_400만원.pdf', type: 'application/pdf', bytes: new Uint8Array([1, 2, 3]) }) });
+  await I.runImport([C('a')], h);
+  assert.strictEqual(h.calls.store[0].name, '견적서_○○.pdf');
+  assert.deepStrictEqual(h.calls.text, ['견적서_400만원.pdf'], '확장자 판별용 원래 이름은 그대로 쓴다');
+});
 test('★ runImport — 이미 가져온 메일(같은 srcKey)은 건너뛴다: 받기·AI·저장을 안 한다', async () => {
   const h = host({ have: (k) => Promise.resolve(k === SLUG + '|a') });
   const r = await I.runImport([C('a'), C('b')], h);
@@ -314,4 +320,22 @@ test('readTextWithPrompt — 빈 글자·빈 사전은 AI 를 부르지 않는�
   assert.strictEqual((await r.D.readTextWithPrompt('사전', '   ')).ok, false);
   assert.strictEqual((await r.D.readTextWithPrompt('  ', '글')).ok, false);
   assert.strictEqual(r.sent.length, 0);
+});
+
+/* ── 검토 2026-11-09 (Codex) — 지난 견적·계약 «기록»은 직원 모두가 읽는다: AI 가 쓴 글의 금액을 공개 칸에 쓰기 전에 가린다 ── */
+test('★ 공개 칸(의뢰처·기간·과업내용)에는 금액 글자가 가려져 저장된다 — 금액은 잠긴 칸(amt)에만', () => {
+  const r = I.toRecord(CAND, { 금액: '4000000', 부가세: '별도', 의뢰처: '(주)가나상사', 업무종류: '직무분석',
+    기간: '3개월 (월 130만원씩)', 과업내용: '직무분석 컨설팅 총액 400만원, 선금 ₩2000000, 잔금 사백만원' }, 'f1', 1);
+  const j = JSON.stringify(out(r.rec));
+  assert.ok(!/400만|130만|2000000|사백만|4,000,000|4000000/.test(j), '공개 기록에 금액이 들어갔다: ' + j);
+  assert.match(r.rec.scope, /○○/); assert.match(r.rec.period, /○○/);
+  assert.strictEqual(out(r.amt).amount, 4000000, '금액은 잠긴 칸에 그대로');
+});
+test('공개 칸 가리기는 금액이 아닌 글을 건드리지 않는다 · 의뢰처가 비면 받는 이름·주소 도메인으로 채운다', () => {
+  const r = I.toRecord(CAND, { 금액: '', 의뢰처: '', 기간: '2026-11-01 ~ 2026-12-31', 과업내용: '신입 사원 직무분석 30인 대상 3개월' }, 'f1', 1);
+  assert.strictEqual(r.rec.period, '2026-11-01 ~ 2026-12-31'); assert.strictEqual(r.rec.scope, '신입 사원 직무분석 30인 대상 3개월');
+  assert.ok(r.rec.co);
+});
+test('QUOTE_PROMPT — 과업내용에는 금액을 쓰지 말라고 한다', () => {
+  assert.match(I.QUOTE_PROMPT, /금액·보수·비용 이야기는 쓰지 마세요/);
 });

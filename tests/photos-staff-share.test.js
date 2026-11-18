@@ -365,7 +365,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-16 — 뉴스레터 모으개 밑감 게시 완료(GitHub 「Firebase 배포」 실행 43733956060 · rules-deploy.js --deploy):
        새로 3 · 바뀜 0 · 사라짐 0 · 넓어짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
        살아 있는 콘솔을 다시 읽어 적용본과 뜻이 같음을 확인 — 새 기준 docs/firebase-rules-콘솔원문-2026-11-16.json. 목록을 비운다. */
-  const PENDING = [];
+  /* 2026-11-09 — 견적 자동 감지 스위치 규칙(pu_docs/config/quoteWatch, 총괄관리자만 쓰기)은 «아직 게시 전»(대표 승인 뒤 rules-deploy.js --deploy).
+       게시한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. 게시 전에도 동작은 안전하다 — 규칙이 없으면 단추의 쓰기가 거절돼 «켜지지 않는다». */
+  const PENDING = [
+    '/pu_docs/config',
+  ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

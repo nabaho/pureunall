@@ -216,7 +216,7 @@ test('⑥ 자동 계약 요청(erpQuoteLanePlan · processPhotoContractRequest) 
   ctx.window = ctx;
   vm.createContext(ctx);
   const fns = [
-    'function erpQuoteDay(', 'function erpQuoteNote(', 'function erpQuoteLanePlan(',
+    'function erpQuoteDay(', 'function erpQuoteScrub(', 'function erpQuoteNote(', 'function erpCardCoId(', 'function erpQuoteReqSrcKeys(', 'function erpQuoteLanePlan(',
     'function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpCoNameKey(',
     'async function processPhotoContractRequest(',
   ];
