@@ -12,7 +12,7 @@
 html,body{max-width:100%;overflow-x:hidden}
 body{margin:0;font:14px/1.5 'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:var(--line);font-variant-numeric:tabular-nums}
 button,input,select{font:inherit}
-.top{position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;padding:8px 14px;display:flex;gap:6px;align-items:center;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.top{position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;padding:8px 14px;height:41px;display:flex;gap:6px;align-items:center;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
 .top::-webkit-scrollbar{display:none}
 .top b{font-size:15px;margin-right:6px}
 .top button{background:var(--sub);color:#fff;border:0;border-radius:16px;padding:5px 12px;font-size:13px;cursor:pointer;flex:0 0 auto}
@@ -49,6 +49,7 @@ code{font-family:Consolas,monospace;font-size:12px;background:var(--bg);border-r
 .chip{border:1px solid var(--line2);background:#fff;border-radius:16px;padding:4px 11px;font-size:12.5px;cursor:pointer;color:var(--sub);display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
 .chip.on{border-color:var(--acc);background:var(--acc-soft);color:var(--acc2);font-weight:700}
 .chip.off{opacity:.45;text-decoration:line-through}
+.chip:disabled,.ask button:disabled{opacity:.5;cursor:not-allowed}
 .chip i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:0 0 auto}
 .rng{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--sub)}
 .rng input{width:220px;max-width:46vw}
@@ -82,7 +83,7 @@ table.t tr.sel td{background:var(--acc-soft)}
 .kpi .v{font-size:22px;font-weight:800;margin-top:2px;white-space:nowrap}
 .kpi .d{font-size:12px;white-space:nowrap}
 .up{color:var(--ok)}.dn{color:var(--dgi)}
-.main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;padding:12px 14px}
+.main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px;padding:12px 14px}
 .panel{background:#fff;border-radius:var(--r);border:1px solid var(--line);padding:10px 12px;min-width:0}
 .panel h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:8px}
 .panel h3 .sp{flex:1}
@@ -160,6 +161,43 @@ table.t tr.sel td{background:var(--acc-soft)}
 .pboard{padding:0 10px 10px;display:flex;flex-direction:column;gap:6px}
 .pboard .pg{padding:9px 10px 8px;border-radius:11px}
 .pboard .pg-k b{font-size:13px}
+/* 왼쪽 대시보드 — 맨 위 «이번 달 한눈에» + 부분마다 이름과 핵심 숫자 한 줄. 누르면 그 부분으로 간다 */
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);align-items:start}
+.sidebar{position:sticky;top:41px;height:calc(100vh - 41px);overflow-y:auto;background:#fff;border-right:1px solid var(--line2);padding:12px 10px 16px;z-index:20}
+.sdash{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.sdash h3{margin:0 0 6px;font-size:12.5px;color:var(--sub)}
+.sdash div{display:flex;gap:8px;font-size:12.5px;padding:2px 0;white-space:nowrap}
+.sdash div span{color:var(--mid);overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sdash div b{margin-left:auto;flex:0 0 auto}
+.side{display:flex;flex-direction:column;gap:2px}
+.side .grp{font-size:11.5px;color:var(--mid);font-weight:700;margin:10px 8px 3px}
+.side button{display:grid;grid-template-columns:30px minmax(0,1fr);column-gap:9px;align-items:center;text-align:left;border:0;background:transparent;border-radius:10px;padding:6px 8px;cursor:pointer;color:var(--ink);font:inherit}
+.side button:hover{background:var(--bg)}
+.side button .ic{grid-row:span 2;width:30px;height:30px;border-radius:8px;background:var(--acc-soft);color:var(--acc2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
+.side button .nm{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side button .mk{font-size:11.5px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side button.on{background:var(--acc-soft)}
+.side button.on .ic{background:var(--acc);color:#fff}
+.side button:focus-visible{outline:3px solid var(--acc-l);outline-offset:-3px}
+/* 연결 지도 — 옵시디언식 2D 그래프 */
+.gbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+.gbar input{flex:1 1 220px;min-width:0;border:1px solid var(--line2);border-radius:9px;padding:7px 10px;background:#fff}
+.gfound{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.gfound:empty{display:none}
+.gwrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
+.gwrap .stage canvas{height:540px;cursor:default}
+.gside{max-height:540px;overflow-y:auto}
+.gside h4{margin:2px 0 6px;font-size:14px;display:flex;gap:6px;align-items:center;min-width:0}
+.gside h4 span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gside .acts{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px}
+.gside .acts button{border:1px solid var(--line2);background:#fff;color:var(--acc2);border-radius:8px;padding:4px 10px;font-size:12.5px;cursor:pointer}
+.gside .gl{font-size:12px;color:var(--mid);font-weight:700;margin:8px 0 3px}
+.gside .nb{display:flex;gap:6px;align-items:center;width:100%;border:0;background:transparent;text-align:left;padding:4px 6px;border-radius:7px;cursor:pointer;font:inherit;font-size:12.5px;color:var(--ink);white-space:nowrap}
+.gside .nb:hover{background:var(--bg)}
+.gside .nb span:nth-child(2){overflow:hidden;text-overflow:ellipsis;min-width:0}
+.gside .nb em{margin-left:auto;font-style:normal;color:var(--mid);font-size:11.5px;flex:0 0 auto}
+.gside p{margin:4px 0;font-size:12.5px;color:var(--sub);word-break:keep-all;overflow-wrap:anywhere}
+.tdot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 /* 폰 틀 */
 .phonewrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
 .phone{width:390px;max-width:100%;border:10px solid var(--ink);border-radius:34px;background:var(--bg);overflow:hidden;flex:0 0 auto}
@@ -186,6 +224,14 @@ table.t tr.sel td{background:var(--acc-soft)}
   .lockgrid{grid-template-columns:1fr}
   .pc{grid-template-columns:1fr}
   .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+  /* 태블릿: 왼쪽 대시보드는 그림 단추만(이름·숫자는 title 풍선) */
+  .shell{grid-template-columns:64px minmax(0,1fr)}
+  .sidebar{padding:10px 6px}
+  .sdash,.side .grp,.side button .nm,.side button .mk{display:none}
+  .side button{grid-template-columns:1fr;justify-items:center;padding:6px 0}
+  .side button .ic{grid-row:auto}
+  .gwrap{grid-template-columns:1fr}
+  .gside{max-height:none}
 }
 @media (max-width:600px){
   .wrap{padding:10px}
@@ -199,6 +245,15 @@ table.t tr.sel td{background:var(--acc-soft)}
   .rng input{width:150px}
   .board{grid-template-columns:1fr;gap:8px}
   .pg{padding:9px 10px 8px}
+  /* 폰: 왼쪽 대시보드는 위쪽 «한 줄» 띠로 바뀐다(폰 규칙 — 탭은 한 줄) */
+  .shell{display:block}
+  .sidebar{position:sticky;top:41px;height:auto;border-right:0;border-bottom:1px solid var(--line2);padding:6px 8px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .sidebar::-webkit-scrollbar{display:none}
+  .side{flex-direction:row;gap:4px}
+  .side button{display:flex;gap:6px;padding:5px 9px;flex:0 0 auto;white-space:nowrap}
+  .side button .ic{width:24px;height:24px;font-size:12.5px}
+  .side button .nm{display:block;font-size:12.5px}
+  .gwrap .stage canvas{height:380px}
   .bstrip{margin:0 10px 10px}
   .only-ph{display:flex!important}
   .only-pc{display:none!important}
@@ -207,19 +262,31 @@ table.t tr.sel td{background:var(--acc-soft)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head>
 <body>
-<div class="top" role="tablist" aria-label="목업 고르기">
+<div class="top">
   <b>📊 데이터관리 3D 목업</b>
-  <button data-v="all" class="on" role="tab" aria-selected="true">★ 전체 배치</button>
-  <button data-v="board" role="tab" aria-selected="false">▦ 프로그램 현황판</button>
-  <button data-v="a" role="tab" aria-selected="false">A 입금 막대 숲</button>
-  <button data-v="b" role="tab" aria-selected="false">B 사람 구슬</button>
-  <button data-v="c" role="tab" aria-selected="false">C 업무량 산맥</button>
-  <button data-v="d" role="tab" aria-selected="false">D 한 해 입금 고리</button>
-  <button data-v="e" role="tab" aria-selected="false">E 업체 도시</button>
-  <button data-v="lock" role="tab" aria-selected="false">🔒 잠금·채팅</button>
-  <button data-v="phone" role="tab" aria-selected="false">📱 폰 화면</button>
   <span class="sp"></span><span class="fake">이름·업체·숫자 전부 지어낸 것</span>
 </div>
+
+<div class="shell">
+<!-- 왼쪽 대시보드 — 대표 추가 지시(2026-11-18) «각 부분에 왼쪽에 대시보드를 만들어서 볼 수 있게» -->
+<aside class="sidebar" aria-label="왼쪽 대시보드">
+  <div class="sdash" id="sDash"><h3>11월 한눈에</h3></div>
+  <div class="side" role="tablist" aria-label="데이터관리 화면 고르기" aria-orientation="vertical">
+    <div class="grp" role="presentation">대표 화면</div>
+    <button data-v="all" class="on" role="tab" aria-selected="true"><span class="ic">★</span><span class="nm">전체 배치</span><span class="mk" data-mk="all"></span></button>
+    <button data-v="board" role="tab" aria-selected="false"><span class="ic">▦</span><span class="nm">프로그램 현황판</span><span class="mk" data-mk="board"></span></button>
+    <button data-v="graph" role="tab" aria-selected="false"><span class="ic">🕸</span><span class="nm">연결 지도</span><span class="mk" data-mk="graph"></span></button>
+    <button data-v="lock" role="tab" aria-selected="false"><span class="ic">🔒</span><span class="nm">잠금·채팅</span><span class="mk" data-mk="lock"></span></button>
+    <div class="grp" role="presentation">3D 후보안 (하나 이상 고름)</div>
+    <button data-v="a" role="tab" aria-selected="false"><span class="ic">A</span><span class="nm">입금 막대 숲</span><span class="mk" data-mk="a"></span></button>
+    <button data-v="b" role="tab" aria-selected="false"><span class="ic">B</span><span class="nm">사람 구슬</span><span class="mk" data-mk="b"></span></button>
+    <button data-v="c" role="tab" aria-selected="false"><span class="ic">C</span><span class="nm">업무량 산맥</span><span class="mk" data-mk="c"></span></button>
+    <button data-v="d" role="tab" aria-selected="false"><span class="ic">D</span><span class="nm">한 해 입금 고리</span><span class="mk" data-mk="d"></span></button>
+    <button data-v="e" role="tab" aria-selected="false"><span class="ic">E</span><span class="nm">업체 도시</span><span class="mk" data-mk="e"></span></button>
+    <div class="grp" role="presentation">보기</div>
+    <button data-v="phone" role="tab" aria-selected="false"><span class="ic">📱</span><span class="nm">폰 화면</span><span class="mk" data-mk="phone"></span></button>
+  </div>
+</aside>
 
 <div class="wrap">
 
@@ -277,6 +344,32 @@ table.t tr.sel td{background:var(--acc-soft)}
   <details class="tbl"><summary>표로 보기 (카드 숫자 그대로 · 자료 출처 · 마지막 집계)</summary><div class="tw"><table class="t" id="boardTbl"></table></div></details>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>앱을 하나씩 열지 않고 «어디에 일이 쌓였나»를 한 장에서 봄</li><li>숫자는 서버가 «건수만» 모아 둔 것이라 가볍고, 원본(이름·금액·본문)은 데이터관리로 옮겨 오지 않음</li><li>앱이 늘면 카드만 하나 더 — 포털 앱 목록·온톨로지 등록과 같은 열쇠(key)로 묶음</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>숫자는 «마지막 집계 시각» 기준 — 앱 안의 지금 값과 몇 분 어긋날 수 있음</li><li>브라우저 안에만 저장하는 앱(한글 편집기·P박스)·자기 자료가 없는 앱(오케스트레이션)·준비 중인 앱은 회색 카드로 남음</li><li>뜻 있는 비율이 없는 앱은 막대를 그리지 않음 — 막대가 있는 카드와 없는 카드가 섞임</li><li>앱마다 «주의» 기준을 하나씩 정해야 함(계획서 3-5)</li></ul></div></div>
+</section>
+
+<!-- ═════════ 연결 지도 ═════════ -->
+<section class="view" id="v-graph">
+  <div class="vh"><div class="L">🕸</div><h2>연결 지도 — 업체·계약·사건·사람·입금이 어떻게 이어졌나</h2>
+    <p><span class="q">옵시디언 그래프처럼</span>점 하나가 한 건(업체·계약·사건·사업·업무·사람·입금·문서·일정), 선은 관계망(온톨로지)에 «확정»된 연결입니다. 점을 누르면 이웃만 진하게 보이고 오른쪽(폰에서는 아래)에 연결 목록이 나옵니다. «이 건 중심»은 그 건에서 1~2걸음 안만 보여 줍니다. «앱 지도»는 앱끼리 자료가 몇 건씩 이어졌는지 봅니다.</p></div>
+  <div class="chips" id="gMode"><span class="lb">보기</span></div>
+  <div class="chips" id="gTypes"><span class="lb">종류</span></div>
+  <div class="gbar">
+    <input type="search" id="gFind" placeholder="찾기 — 업체 번호(A-01)·사건(S-03)·사람 이름" aria-label="연결 지도에서 찾기">
+    <span class="chips" id="gDepth" style="margin:0"><span class="lb">걸음</span></span>
+    <button class="chip" type="button" id="gLabels" aria-pressed="false">이름 늘 보이기</button>
+  </div>
+  <div class="gfound" id="gFound" aria-label="찾은 것"></div>
+  <p class="bmsg" id="gMsg" role="status" aria-live="polite"></p>
+  <div class="gwrap">
+    <div class="stage">
+      <canvas id="cvG" tabindex="0" aria-label="연결 지도. 빈 곳을 끌면 옮기고, 점을 끌면 그 점을 옮깁니다. 점을 누르면 오른쪽에 연결 목록이 나옵니다. 방향키로 옮기고 + - 로 확대합니다."></canvas>
+      <span class="hint">빈 곳을 끌어 옮기기 · 점을 끌어 자리 바꾸기 · 누른 뒤 휠 확대 · 점을 누르면 연결 목록</span>
+      <div class="ctl" id="gCtl"></div>
+    </div>
+    <div class="panel gside" id="gSide"></div>
+  </div>
+  <details class="tbl"><summary>표로 보기 (지금 보이는 연결 — 화면읽기·인쇄용)</summary><div class="tw"><table class="t" id="gTbl"></table></div></details>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>한 업체에 계약·사건·입금·문서·일정이 «덩어리»로 모인 모습이 바로 보임 — 큰 고객·얽힌 사건이 눈에 띔</li><li>사람(담당자)을 누르면 그 사람이 맡은 건이 한꺼번에 보여 업무 쏠림을 짐작할 수 있음</li><li>«앱 지도»로 어느 앱끼리 자료를 주고받는지, 아무 데도 안 이어진 앱이 무엇인지 보임</li><li>새로 만드는 자료가 아니라 이미 있는 관계망(ontology/v1)을 읽기만 함</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>실제 자료는 점이 수천 개라 «전체»는 실타래가 됨 → 실제 앱은 «업체 하나 중심»을 기본으로 두고 종류를 거름</li><li>관계망은 이알피 «온톨로지 진단»에서 관리자가 «관계망 올리기»를 눌러야 새로워짐 — 판 시각을 늘 적음</li><li>이름으로 짐작한 연결은 일부러 뺐음 → «선이 없음 = 관계없음»이 아님</li></ul></div></div>
 </section>
 
 <!-- ═════════ A 막대 숲 ═════════ -->
@@ -415,6 +508,7 @@ table.t tr.sel td{background:var(--acc-soft)}
   </div>
 </section>
 
+</div>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
 
@@ -781,7 +875,7 @@ function buildRidges(s,mk){
     var y=sc(L.v);
     s.over.push({type:'line', a:[x0-0.6,y,ze+0.9], b:[xe+0.6,y,ze+0.9], c:L.c, dash:[6,4], lw:1.6, grow:true});
     s.over.push({type:'line', a:[x0-0.6,y,z0-0.9], b:[x0-0.6,y,ze+0.9], c:L.c, dash:[6,4], lw:1.2, grow:true});
-    s.labels.push({p:[xe+0.8,y,ze+0.9], t:L.t, c:L.c, wt:800, al:'left', grow:true, bg:'rgba(255,255,255,.85)'});
+    s.labels.push({p:[xe+0.8,y,ze+0.9], t:L.t, c:(L.c==='#d97706'?'#854d0e':(L.c==='#dc2626'?'#991b1b':L.c)), wt:800, al:'left', grow:true, bg:'rgba(255,255,255,.85)'});
   });
   s.labels.push({p:[x0,0,z0-1.7], t:'26주 전', c:'#64748b', sz:10.5});
   s.labels.push({p:[xe,0,z0-1.7], t:'이번 주', c:'#1e40af', wt:800, bg:'#eff6ff'});
@@ -840,7 +934,7 @@ var scD   = new Scene(document.getElementById('cvD'),   {dist:30, target:[0,1.8,
 var scE   = new Scene(document.getElementById('cvE'),   {dist:34, target:[0,0.8,0], pitch:0.82, yaw:-0.7});
 var scPh  = new Scene(document.getElementById('cvPh'),  {dist:25, target:[0,1.4,0], yaw:-0.5});
 document.querySelectorAll('.ctl').forEach(function(box){
-  var map={cvAll:scAll,cvA:scA,cvB:scB,cvC:scC,cvD:scD,cvE:scE,cvPh:scPh}; map[box.getAttribute('data-for')].controls(box); });
+  var map={cvAll:scAll,cvA:scA,cvB:scB,cvC:scC,cvD:scD,cvE:scE,cvPh:scPh}, sc=map[box.getAttribute('data-for')]; if(sc) sc.controls(box); });   /* 연결 지도(#gCtl)는 제 단추를 따로 단다 */
 
 /* 칩 — 하나 고르기(single)는 고른 것이 aria-pressed=true, 여럿 켜고 끄기(multi)는 «보이는 것»이 true */
 function chipRow(id, list, onSel, multi){
@@ -908,7 +1002,7 @@ var ordered=PEOPLE.slice().sort(function(a,b){ return b.m[cur].inc-a.m[cur].inc;
 /* 폰: 넓은 표 대신 두 줄 카드(☐·№ 는 왼쪽 끝 그대로) */
 function cardsHtml(live){
   return ordered.map(function(p,i){ var v=p.m[cur];
-    return '<div class="card"><input type="checkbox" '+(live?'data-id="'+esc(p.id)+'" '+(selected[p.id]?'checked ':''):'')+'aria-label="'+esc(p.name)+' 고르기"><span class="no">'+(i+1)+'</span><div><div class="l1"><span class="dot" style="background:'+esc(p.color)+'"></span><b>'+esc(p.name)+'</b><span style="color:#64748b;font-size:12px">'+esc(p.kind)+'</span><span style="margin-left:auto;font-weight:800;color:#166534">'+won(v.inc)+'</span></div>'+
+    return '<div class="card"><input type="checkbox" '+(live?'data-id="'+esc(p.id)+'" '+(selected[p.id]?'checked ':''):'')+'aria-label="'+esc(p.name)+' 고르기"><span class="no">'+(i+1)+'</span><div><div class="l1"><span class="dot" style="background:'+esc(p.color)+'"></span><b title="'+esc(p.name)+'">'+esc(p.name)+'</b><span style="color:#64748b;font-size:12px">'+esc(p.kind)+'</span><span style="margin-left:auto;font-weight:800;color:#166534">'+won(v.inc)+'</span></div>'+
            '<div class="l2"><span>업무 '+v.task+'건</span><span>입금 처리 '+v.proc+'건</span><span>1건당 '+(v.task?(Math.round(v.inc/v.task*10)/10)+'만':'—')+'</span></div></div></div>'; }).join('');
 }
 function renderTbl(){
@@ -1101,19 +1195,247 @@ document.getElementById('board').addEventListener('click',boardOpen);
 document.getElementById('pBoard').addEventListener('click',boardOpen);
 renderBoard();
 
+/* ══ 연결 지도 — 옵시디언식 2D 힘 배치(목업 전용 작은 엔진) ══
+   실제 앱: ontology/v1 의 지금 판(current → gen/{판})에서 «확정된 연결(confidence 1)»만 읽는다.
+   관계망에는 이름이 없다(종류·영구 id·번호만) — 이름은 대표 화면 안에서 원본을 읽어 붙이고, 어디에도 저장하지 않는다(계획서 3-6). */
+var GTYPE={Organization:{n:'업체',c:'#2563eb'},Contract:{n:'계약',c:'#0e7490'},Case:{n:'사건',c:'#a21caf'},Project:{n:'사업',c:'#c2410c'},
+  Task:{n:'업무',c:'#64748b'},Person:{n:'사람',c:'#5b21b6'},FinancialTransaction:{n:'입금',c:'#16a34a'},Document:{n:'문서',c:'#4d7c0f'},ScheduleEvent:{n:'일정',c:'#be185d'}};
+var GPRED={contractedWith:'계약 상대',concerns:'사건 업체',projectFor:'사업 업체',assignedTo:'주담당',assists:'보조',derivedFrom:'나온 곳',
+  paidFor:'입금 대상',attachedTo:'붙은 곳',scheduledFor:'일정 대상',appLink:'자료 연결'};
+var GROWC={client:'#2563eb',store:'#0e7490',sales:'#c2410c',inside:'#5b21b6'};
+function pad2(i){ return ('0'+(i+1)).slice(-2); }
+function gEntityData(){
+  var R2=rng(1118), N=[], E=[], ix={};
+  function node(id,type,label,prog){ ix[id]=N.length; N.push({id:id,type:type,label:label,prog:prog}); }
+  function edge(a,p,b){ if(ix[a]!=null&&ix[b]!=null) E.push({s:ix[a],t:ix[b],p:p}); }
+  function pick(a){ return a[Math.floor(R2()*a.length)]; }
+  var law=PEOPLE.filter(function(p){ return p.kind==='노무사'; }), staff=PEOPLE.filter(function(p){ return p.kind!=='노무사'; });
+  PEOPLE.forEach(function(p){ node('P:'+p.id,'Person',p.name,'hr'); });
+  COMP.forEach(function(c){ node('O:'+c.code,'Organization','업체 '+c.code,'erp'); });
+  var work=[];
+  COMP.forEach(function(c,i){ if(R2()<0.75){ var id='C:'+i; node(id,'Contract','계약 C-'+pad2(i),'erp'); edge(id,'contractedWith','O:'+c.code); edge(id,'assignedTo','P:'+c.owner.id);
+    if(R2()<0.4) edge(id,'assists','P:'+pick(staff).id); work.push(id); } });
+  for(var i=0;i<24;i++){ var c=pick(COMP), id='S:'+i; node(id,'Case','사건 S-'+pad2(i),'erp'); edge(id,'concerns','O:'+c.code); edge(id,'assignedTo','P:'+(R2()<0.6?c.owner.id:pick(law).id)); work.push(id); }
+  for(i=0;i<10;i++){ c=pick(COMP); id='J:'+i; node(id,'Project','사업 J-'+pad2(i),'consult'); edge(id,'projectFor','O:'+c.code); edge(id,'assignedTo','P:'+pick(law).id); work.push(id); }
+  for(i=0;i<34;i++){ id='T:'+i; node(id,'Task','업무 T-'+pad2(i),'work'); edge(id,'derivedFrom',pick(work)); edge(id,'assignedTo','P:'+pick(R2()<0.55?staff:law).id); }
+  for(i=0;i<44;i++){ id='F:'+i; node(id,'FinancialTransaction','입금 F-'+pad2(i),'fin'); edge(id,'paidFor',R2()<0.8?pick(work):'O:'+pick(COMP).code); }
+  for(i=0;i<22;i++){ id='D:'+i; node(id,'Document','문서 D-'+pad2(i),'docs'); edge(id,'attachedTo',R2()<0.5?'O:'+pick(COMP).code:pick(work)); }
+  for(i=0;i<16;i++){ id='E:'+i; node(id,'ScheduleEvent','일정 E-'+pad2(i),'cal'); edge(id,'scheduledFor',R2()<0.7?pick(work):'O:'+pick(COMP).code); }
+  return {nodes:N,edges:E,kind:'ent'};
+}
+/* 앱 지도 — 앱 사이 선의 숫자는 «지어낸 것». 실제는 관계망 연결을 출처 앱(sourceStore → 앱)끼리 묶어 센다 */
+var APP_LINKS=[['erp','fin',812,'입금 → 계약·사건'],['erp','work',236,'업무 → 계약·사건'],['erp','cal',74,'일정 → 사건·업체'],['erp','docs',96,'전자서명 → 계약'],
+  ['erp','photos',310,'사진 → 업체'],['erp','cards',288,'명함 → 업체'],['erp','hr',142,'담당자 → 사람'],['erp','consult',31,'사업장 → 업체'],['consult','govreport',418,'서류 → 사업'],
+  ['consult','work',24,'업무 → 사업'],['erp','fund',33,'기금 → 계약'],['fund','fin',41,'입금 → 기금'],['erp','rules',151,'규정 → 업체'],['erp','payroll',47,'급여 → 업체'],
+  ['erp','harass',3,'조사 → 업체'],['erp','govaid',37,'검토 → 업체'],['erp','ilteo',12,'사업 → 업체'],['erp','jobtrans',9,'사업 → 업체'],['consult','settle',21,'정산 → 사업'],
+  ['erp','career',342,'실적 → 사건·사업'],['hr','deungi',4,'사원 → 사람'],['mail','erp',1204,'메일 → 업체'],['hr','home',14,'구성원 → 사람']];
+function gAppData(){
+  var N=[], E=[], ix={};
+  BOARD.forEach(function(p){ ix[p.key]=N.length; N.push({id:'A:'+p.key,type:'App',label:p.name,prog:p.key,row:p.row}); });
+  APP_LINKS.forEach(function(l){ if(ix[l[0]]!=null&&ix[l[1]]!=null) E.push({s:ix[l[0]],t:ix[l[1]],p:'appLink',w:l[2],d:l[3]}); });
+  return {nodes:N,edges:E,kind:'app'};
+}
+var G={cv:document.getElementById('cvG'),w:0,h:0,N:[],E:[],adj:[],act:[],on:[],cam:{x:0,y:0,z:1},hot:-1,sel:-1,focus:-1,depth:1,alpha:0,
+  kind:'ent',hidden:{},labels:false,dirty:true,visible:false,drag:null};
+G.g=G.cv.getContext('2d');
+function gColor(n){ return n.type==='App' ? (GROWC[n.row]||'#64748b') : ((GTYPE[n.type]||{}).c||'#64748b'); }
+function gR(n){ return n.type==='App' ? Math.min(20,6+Math.sqrt(n.wsum||0)/3.2) : Math.min(13,3.2+Math.sqrt(n.deg)*1.7); }
+function gTypeName(n){ return n.type==='App' ? '앱' : ((GTYPE[n.type]||{}).n||n.type); }
+function gSet(data){
+  G.kind=data.kind; G.N=data.nodes; G.E=data.edges; G.hot=-1; G.sel=-1; G.focus=-1;
+  G.adj=G.N.map(function(){ return []; });
+  G.N.forEach(function(n,i){ n.deg=0; n.wsum=0; var a=i*2.399963, r=12*Math.sqrt(i+1); n.x=Math.cos(a)*r; n.y=Math.sin(a)*r; n.vx=0; n.vy=0; n.fx=false; });
+  G.E.forEach(function(e,k){ G.adj[e.s].push(k); G.adj[e.t].push(k); G.N[e.s].deg++; G.N[e.t].deg++; G.N[e.s].wsum+=(e.w||1); G.N[e.t].wsum+=(e.w||1); });
+  gActive(); G.alpha=1; gSim(320); gFit(); gAfter();
+}
+/* 보이는 점: 숨긴 종류는 빼고, «이 건 중심»이면 그 건에서 depth 걸음 안만 */
+function gActive(){
+  var ok=G.N.map(function(n){ return !G.hidden[n.type]; });
+  if(G.focus>=0){
+    var dist=G.N.map(function(){ return -1; }), q=[G.focus]; dist[G.focus]=0; ok[G.focus]=true;
+    while(q.length){ var i=q.shift(); if(dist[i]>=G.depth) continue;
+      G.adj[i].forEach(function(k){ var e=G.E[k], j=e.s===i?e.t:e.s; if(dist[j]<0 && ok[j]){ dist[j]=dist[i]+1; q.push(j); } }); }
+    ok=dist.map(function(d){ return d>=0; });
+  }
+  G.on=ok; G.act=[]; ok.forEach(function(v,i){ if(v) G.act.push(i); });
+  if(G.sel>=0 && !ok[G.sel]) G.sel=-1;
+}
+function gSim(ticks){
+  /* 이어진 곳이 많은 점(담당자·큰 업체)은 «전하»를 키워 서로 밀어낸다 — 가운데에 몰려 이름이 겹치지 않게 */
+  var A=G.act, L=G.kind==='app'?120:52, K=G.kind==='app'?2600:700;
+  for(var t=0;t<ticks && G.alpha>0.01;t++){
+    var al=G.alpha;
+    for(var a=0;a<A.length;a++){ var p=G.N[A[a]], cp=1+p.deg/5;
+      for(var b=a+1;b<A.length;b++){ var q=G.N[A[b]], dx=p.x-q.x, dy=p.y-q.y, d2=dx*dx+dy*dy+0.01;
+        if(d2>160000) continue; var f=K*cp*(1+q.deg/5)/d2*al, d=Math.sqrt(d2); f=Math.min(f,40); dx/=d; dy/=d; p.vx+=dx*f; p.vy+=dy*f; q.vx-=dx*f; q.vy-=dy*f; } }
+    G.E.forEach(function(e){ if(!G.on[e.s]||!G.on[e.t]) return; var p=G.N[e.s], q=G.N[e.t], dx=q.x-p.x, dy=q.y-p.y, d=Math.sqrt(dx*dx+dy*dy)+0.01, f=(d-L)*0.04*al;
+      dx/=d; dy/=d; p.vx+=dx*f; p.vy+=dy*f; q.vx-=dx*f; q.vy-=dy*f; });
+    A.forEach(function(i){ var n=G.N[i]; n.vx-=n.x*0.012*al; n.vy-=n.y*0.012*al;
+      if(n.fx){ n.vx=0; n.vy=0; return; } n.vx*=0.6; n.vy*=0.6; n.x+=clamp(n.vx,-30,30); n.y+=clamp(n.vy,-30,30); });
+    G.alpha*=0.985;
+  }
+}
+function gFit(){
+  if(!G.act.length||!G.w) return;
+  var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; G.act.forEach(function(i){ var n=G.N[i]; x0=Math.min(x0,n.x); y0=Math.min(y0,n.y); x1=Math.max(x1,n.x); y1=Math.max(y1,n.y); });
+  G.cam.x=(x0+x1)/2; G.cam.y=(y0+y1)/2; G.cam.z=clamp(Math.min((G.w-60)/Math.max(40,x1-x0),(G.h-60)/Math.max(40,y1-y0)),0.25,3); G.dirty=true;
+}
+function gFitCanvas(){
+  var r=G.cv.getBoundingClientRect(), dpr=Math.min(2,window.devicePixelRatio||1); if(r.width<2||r.height<2) return false;
+  var W=Math.round(r.width*dpr), H=Math.round(r.height*dpr); if(G.cv.width!==W||G.cv.height!==H){ G.cv.width=W; G.cv.height=H; }
+  var first=!G.w; G.w=r.width; G.h=r.height; G.g.setTransform(dpr,0,0,dpr,0,0); if(first) gFit(); G.dirty=true; return true;
+}
+function gS(n){ return [(n.x-G.cam.x)*G.cam.z+G.w/2, (n.y-G.cam.y)*G.cam.z+G.h/2]; }
+function gHL(){ var h=G.sel>=0?G.sel:G.hot; if(h<0) return null; var s={}; s[h]=1; G.adj[h].forEach(function(k){ var e=G.E[k]; if(G.on[e.s]&&G.on[e.t]){ s[e.s]=1; s[e.t]=1; } }); return {i:h,set:s}; }
+function gRender(){
+  var g=G.g, hl=gHL(), z=G.cam.z; g.clearRect(0,0,G.w,G.h);
+  G.E.forEach(function(e){ if(!G.on[e.s]||!G.on[e.t]) return; var a=gS(G.N[e.s]), b=gS(G.N[e.t]), adj=hl&&(e.s===hl.i||e.t===hl.i);
+    g.globalAlpha=hl?(adj?0.95:0.07):0.55; g.strokeStyle=adj?'#475569':'#94a3b8';
+    g.lineWidth=(G.kind==='app'?1+Math.log(1+(e.w||1))/Math.LN10*1.3:(adj?1.6:0.9));
+    g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.stroke();
+    if(G.kind==='app' && (adj || z>1.4)){ g.globalAlpha=hl&&!adj?0.15:1; g.font='11px Pretendard,"Malgun Gothic",sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+      var mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, t=n(e.w||0); g.lineWidth=3; g.strokeStyle='#fff'; g.strokeText(t,mx,my); g.fillStyle='#475569'; g.fillText(t,mx,my); } });
+  g.globalAlpha=1;
+  G.act.forEach(function(i){ var nd=G.N[i], s=gS(nd), r=Math.max(2,gR(nd)*Math.sqrt(z)), dim=hl&&!hl.set[i];
+    g.globalAlpha=dim?0.18:1; g.fillStyle=gColor(nd); g.beginPath(); g.arc(s[0],s[1],r,0,Math.PI*2); g.fill();
+    if(i===G.sel||i===G.focus){ g.lineWidth=3; g.strokeStyle=i===G.sel?'#1e293b':'#fbbf24'; g.stroke(); }
+    else if(i===G.hot){ g.lineWidth=2; g.strokeStyle='#1e293b'; g.stroke(); } });
+  /* 이름표 — 확대했거나, 이어진 곳이 많거나, 지금 고른 점과 그 이웃일 때만(옵시디언처럼 멀리서는 점만) */
+  g.font='12px Pretendard,"Malgun Gothic",sans-serif'; g.textAlign='center'; g.textBaseline='top';
+  G.act.forEach(function(i){ var nd=G.N[i], show=G.labels||G.kind==='app'||z>=1.6||(hl&&hl.set[i])||(nd.deg>=9&&z>=0.8);
+    if(!show || (hl&&!hl.set[i]&&!G.labels&&G.kind!=='app')) return;
+    var s=gS(nd), r=Math.max(2,gR(nd)*Math.sqrt(z)), t=nd.label.length>14?nd.label.slice(0,13)+'…':nd.label;
+    g.globalAlpha=hl&&!hl.set[i]?0.25:1; g.lineWidth=3.5; g.strokeStyle='#fff'; g.strokeText(t,s[0],s[1]+r+3); g.fillStyle='#1e293b'; g.fillText(t,s[0],s[1]+r+3); });
+  g.globalAlpha=1;
+}
+function gPick(x,y){ var best=-1, bd=1e9; G.act.forEach(function(i){ var s=gS(G.N[i]), r=Math.max(2,gR(G.N[i])*Math.sqrt(G.cam.z))+5, d=Math.hypot(s[0]-x,s[1]-y); if(d<=r&&d<bd){ bd=d; best=i; } }); return best; }
+function gPt(e){ var r=G.cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+function gCenter(i){ var nd=G.N[i]; if(!nd) return; G.cam.x=nd.x; G.cam.y=nd.y; if(G.cam.z<1.2) G.cam.z=1.4; G.dirty=true; }
+function gSelect(i,center){ G.sel=i; if(center&&i>=0) gCenter(i); G.dirty=true; gSideHtml(); }
+function gSetFocus(i){ G.focus=i; if(i>=0) G.sel=i; gActive(); G.alpha=0.9; gSim(160); gFit(); gAfter(); }
+function gAfter(){ gSideHtml(); gTable(); gDepthState(); gFindRender(); sideDash(); G.dirty=true; }
+/* 찾기 결과 — 보이는 점(G.act)에서만 찾고, 종류·중심이 바뀔 때마다 다시 그린다 */
+function gFindRender(){
+  var inp=document.getElementById('gFind'), box=document.getElementById('gFound'); if(!inp||!box) return;
+  var q=inp.value.trim().toLowerCase(); if(!q){ box.innerHTML=''; return; }
+  var hit=G.act.filter(function(i){ return G.N[i].label.toLowerCase().indexOf(q)>=0; }).slice(0,8);
+  box.innerHTML=hit.length?hit.map(function(i){ return gNbBtn(i,gTypeName(G.N[i])).replace('class="nb"','class="chip"'); }).join(''):'<span style="font-size:12.5px;color:#475569">찾은 것이 없습니다 — 숨긴 종류가 있으면 «종류»를 켜 보세요.</span>';
+}
+function gNeighborsByPred(i){
+  var groups={}; G.adj[i].forEach(function(k){ var e=G.E[k]; if(!G.on[e.s]||!G.on[e.t]) return; var j=e.s===i?e.t:e.s, out=e.s===i;
+    var key=G.kind==='app'?'이어진 앱':(GPRED[e.p]||e.p)+(out?' →':' ←'); (groups[key]=groups[key]||[]).push({j:j,e:e}); });
+  return groups;
+}
+function gSideHtml(){
+  var box=document.getElementById('gSide'), h='';
+  if(!G.act.length){
+    box.innerHTML='<h4><span>🕸</span><span>보이는 점이 없습니다</span></h4><p>«종류»를 모두 껐습니다 — 하나 이상 켜 주세요.</p>'; return;
+  }
+  if(G.sel<0){
+    var cnt={}, ne=0; G.act.forEach(function(i){ var t=gTypeName(G.N[i]); cnt[t]=(cnt[t]||0)+1; }); G.E.forEach(function(e){ if(G.on[e.s]&&G.on[e.t]) ne++; });
+    var wk=G.kind==='app'?'wsum':'deg', top=G.act.slice().sort(function(a,b){ return G.N[b][wk]-G.N[a][wk]; }).slice(0,6);
+    var lone=G.act.filter(function(i){ return !G.adj[i].some(function(k){ var e=G.E[k]; return G.on[e.s]&&G.on[e.t]; }); });
+    h+='<h4><span>🕸</span><span>'+(G.kind==='app'?'앱 지도':(G.focus>=0?'한 건 중심':'전체'))+'</span></h4>';
+    h+='<p>보이는 점 <b>'+n(G.act.length)+'</b> · 선 <b>'+n(ne)+'</b></p>';
+    h+='<div class="gl">종류별</div>'+Object.keys(cnt).map(function(t){ return '<p style="margin:1px 0">'+esc(t)+' '+n(cnt[t])+'</p>'; }).join('');
+    h+='<div class="gl">가장 많이 이어진 것</div>'+top.map(function(i){ return gNbBtn(i,G.kind==='app'?n(G.N[i].wsum)+'건':G.N[i].deg+'줄'); }).join('');
+    if(lone.length) h+='<div class="gl">아무 데도 안 이어진 것 '+lone.length+'</div>'+lone.slice(0,8).map(function(i){ return gNbBtn(i,''); }).join('')+(lone.length>8?'<p>외 '+(lone.length-8)+'개</p>':'');
+    h+='<div class="gl">관계망 판</div><p>ont-7c21a9e4 · 2026-11-18 09:12 (이알피 «온톨로지 진단»에서 올림) · 확정된 연결(confidence 1)만</p>';
+  } else {
+    var nd=G.N[G.sel], groups=gNeighborsByPred(G.sel), tot=0; Object.keys(groups).forEach(function(k){ tot+=groups[k].length; });
+    h+='<h4><span class="tdot" style="background:'+esc(gColor(nd))+'"></span><span title="'+esc(nd.label)+'">'+esc(nd.label)+'</span></h4>';
+    h+='<p>'+esc(gTypeName(nd))+' · 연결 '+tot+'줄'+(G.kind==='app'?' · 이어진 자료 '+n(nd.wsum)+'건':'')+'</p>';
+    h+='<div class="acts">'+(G.kind==='ent'?(G.focus===G.sel?'<button type="button" data-g="all">전체로 돌아가기</button>':'<button type="button" data-g="focus">이 건 중심으로 보기</button>'):'')+
+       '<button type="button" data-g="open">그 앱에서 열기 ↗</button><button type="button" data-g="clear">고르기 풀기</button></div>';
+    Object.keys(groups).sort().forEach(function(k){ h+='<div class="gl">'+esc(k)+' '+groups[k].length+'</div>'+groups[k].map(function(o){ return gNbBtn(o.j, G.kind==='app'?n(o.e.w)+'건 · '+o.e.d:''); }).join(''); });
+    if(!tot) h+='<p>이 건은 지금 보이는 범위에서 이어진 곳이 없습니다. 숨긴 종류가 있으면 «종류»를 켜 보세요.</p>';
+  }
+  box.innerHTML=h;
+}
+function gNbBtn(i,meta){ var nd=G.N[i]; return '<button type="button" class="nb" data-gi="'+i+'"><span class="tdot" style="background:'+esc(gColor(nd))+'"></span><span title="'+esc(nd.label)+'">'+esc(nd.label)+'</span>'+(meta?'<em>'+esc(meta)+'</em>':'')+'</button>'; }
+function gTable(){
+  var rows=[]; G.E.forEach(function(e){ if(!G.on[e.s]||!G.on[e.t]) return; var a=G.N[e.s], b=G.N[e.t];
+    rows.push([gTypeName(a)+' · '+a.label, G.kind==='app'?n(e.w)+'건 ('+e.d+')':(GPRED[e.p]||e.p), gTypeName(b)+' · '+b.label]); });
+  var more=rows.length>300; rows=rows.slice(0,300);
+  document.getElementById('gTbl').innerHTML=tblHtml(['시작','관계','도착'],rows,(more?'처음 300줄만 · ':'')+'지금 보이는 선 기준 · 숨긴 종류는 빠짐');
+}
+function gDepthState(){ document.querySelectorAll('#gDepth .chip').forEach(function(b){ b.disabled=(G.focus<0); b.title=G.focus<0?'점을 고르고 «이 건 중심으로 보기»를 누르면 쓸 수 있습니다':''; }); }
+/* 조작 — 빈 곳 끌기 = 옮기기, 점 끌기 = 그 점 옮기기, 누르기 = 고르기 */
+(function(){
+  var cv=G.cv;
+  cv.addEventListener('pointerdown',function(e){ var p=gPt(e); G.drag={i:gPick(p.x,p.y),x:p.x,y:p.y,cx:G.cam.x,cy:G.cam.y,moved:0}; try{ cv.setPointerCapture(e.pointerId); }catch(_){} });
+  cv.addEventListener('pointermove',function(e){ var p=gPt(e), d=G.drag;
+    if(d){ d.moved+=Math.abs(p.x-d.x)+Math.abs(p.y-d.y); if(d.moved>4){
+        if(d.i>=0){ var nd=G.N[d.i]; nd.fx=true; nd.x=G.cam.x+(p.x-G.w/2)/G.cam.z; nd.y=G.cam.y+(p.y-G.h/2)/G.cam.z; G.alpha=Math.max(G.alpha,0.25); }
+        else { G.cam.x=d.cx-(p.x-d.x)/G.cam.z; G.cam.y=d.cy-(p.y-d.y)/G.cam.z; }
+        G.dirty=true; } return; }
+    var h=gPick(p.x,p.y); if(h!==G.hot){ G.hot=h; cv.style.cursor=h>=0?'pointer':'default'; G.dirty=true; } });
+  function up(){ var d=G.drag; if(!d) return; if(d.i>=0) G.N[d.i].fx=false; if(d.moved<=4) gSelect(d.i,false); G.drag=null; }
+  cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',function(){ if(G.drag&&G.drag.i>=0) G.N[G.drag.i].fx=false; G.drag=null; });
+  cv.addEventListener('pointerleave',function(){ if(!G.drag&&G.hot>=0){ G.hot=-1; G.dirty=true; } });
+  cv.addEventListener('wheel',function(e){ if(!e.ctrlKey && document.activeElement!==cv) return; e.preventDefault();
+    var p=gPt(e), wx=G.cam.x+(p.x-G.w/2)/G.cam.z, wy=G.cam.y+(p.y-G.h/2)/G.cam.z; G.cam.z=clamp(G.cam.z*(e.deltaY>0?0.9:1.11),0.25,4);
+    G.cam.x=wx-(p.x-G.w/2)/G.cam.z; G.cam.y=wy-(p.y-G.h/2)/G.cam.z; G.dirty=true; },{passive:false});
+  cv.addEventListener('keydown',function(e){ var k=e.key, s=40/G.cam.z, used=true;
+    if(k==='ArrowLeft') G.cam.x-=s; else if(k==='ArrowRight') G.cam.x+=s; else if(k==='ArrowUp') G.cam.y-=s; else if(k==='ArrowDown') G.cam.y+=s;
+    else if(k==='+'||k==='=') G.cam.z=clamp(G.cam.z*1.15,0.25,4); else if(k==='-') G.cam.z=clamp(G.cam.z/1.15,0.25,4);
+    else if(k==='Escape') gSelect(-1); else used=false;
+    if(used){ e.preventDefault(); G.dirty=true; } });
+  [['＋','가까이',function(){ G.cam.z=clamp(G.cam.z*1.2,0.25,4); }],['－','멀리',function(){ G.cam.z=clamp(G.cam.z/1.2,0.25,4); }],
+   ['⟲','전체가 보이게',function(){ gFit(); }],['↻','다시 펼치기',function(){ G.alpha=1; gSim(200); gFit(); }]].forEach(function(b){
+    var el=document.createElement('button'); el.type='button'; el.textContent=b[0]; el.title=b[1]; el.setAttribute('aria-label',b[1]);
+    el.addEventListener('click',function(){ b[2](); G.dirty=true; }); document.getElementById('gCtl').appendChild(el); });
+  if('IntersectionObserver' in window) new IntersectionObserver(function(en){ G.visible=en[0].isIntersecting; if(G.visible){ gFitCanvas(); } }).observe(cv); else G.visible=true;
+  if('ResizeObserver' in window) new ResizeObserver(function(){ gFitCanvas(); }).observe(cv);
+  function tick(){ if(G.visible){ if(G.alpha>0.01 && !REDUCE){ gSim(2); G.dirty=true; } if(G.dirty){ G.dirty=false; gRender(); } } requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+  /* 오른쪽 목록 · 찾은 것 — 누르면 그 점을 고르고 가운데로 */
+  function onList(e){ var b=e.target.closest('[data-gi]'); if(b){ var gi=+b.getAttribute('data-gi'); if(G.on[gi]) gSelect(gi,true); else gFindRender(); return; }   /* 숨긴 점은 고르지 않는다 */
+    var a=e.target.closest('[data-g]'); if(!a) return; var act=a.getAttribute('data-g');
+    if(act==='focus') gSetFocus(G.sel); else if(act==='all') gSetFocus(-1); else if(act==='clear') gSelect(-1);
+    else if(act==='open' && G.sel>=0){ var nd=G.N[G.sel], app=BOARD.filter(function(p){ return p.key===nd.prog; })[0];
+      document.getElementById('gMsg').textContent='(목업) 실제 앱에서는 '+(app?'«'+app.name+'» 앱('+app.url+')':'원본 앱')+'에서 이 건을 엽니다 — 고치는 일은 그 앱에서 합니다.'; } }
+  document.getElementById('gSide').addEventListener('click',onList);
+  document.getElementById('gFound').addEventListener('click',onList);
+  document.getElementById('gFind').addEventListener('input',gFindRender);
+  document.getElementById('gLabels').addEventListener('click',function(e){ G.labels=!G.labels; setPressed(e.currentTarget,G.labels); G.dirty=true; });
+})();
+chipRow('gMode',[{k:'ent',name:'업체·사건 지도',on:true},{k:'app',name:'앱 지도'}],function(k){
+  document.getElementById('gTypes').style.display=k==='app'?'none':''; document.getElementById('gDepth').style.display=k==='app'?'none':'';
+  document.getElementById('gFind').value=''; document.getElementById('gFound').innerHTML=''; document.getElementById('gMsg').textContent='';
+  gSet(k==='app'?gAppData():gEntityData()); });
+chipRow('gTypes',Object.keys(GTYPE).map(function(t){ return {k:t,name:GTYPE[t].n,color:GTYPE[t].c}; }),function(k,on){
+  if(on) delete G.hidden[k]; else G.hidden[k]=1; gActive(); G.alpha=Math.max(G.alpha,0.5); gSim(80); gAfter(); },true);
+chipRow('gDepth',[{k:1,name:'1',on:true},{k:2,name:'2'}],function(k){ G.depth=k; if(G.focus>=0) gSetFocus(G.focus); });
+gSet(gEntityData());
+
+/* 왼쪽 대시보드 숫자 — 부분마다 한 줄 */
+function sideDash(){
+  var c=boardCount(), t=MTOT[cur], yr=MTOT.reduce(function(s,m){ return s+m.inc; },0), last=CM.cnt.lines[1].v;
+  var over=PEOPLE.filter(function(p){ var a=p[CM.cnt.key]; return a&&a[a.length-1]>=last; }).length, ne=0;
+  G.E.forEach(function(e){ if(G.on[e.s]&&G.on[e.t]) ne++; });
+  var MK={all:'이달 입금 '+won(t.inc), board:'주의 '+c.warn+' · 위험 '+c.bad+' · 못 모음 '+c.na, graph:(G.kind==='app'?'앱 ':'점 ')+n(G.act.length)+' · 선 '+n(ne),
+    lock:'이 컴퓨터 확인됨 · 15분 잠김', a:'12개월 '+won(yr), b:'사람 '+PEOPLE.length+'명 · 12개월 재생', c:'이번 주 넘침 '+over+'명',
+    d:'올해 입금 '+won(yr), e:'업체 '+COMP.length+'곳 · 미수 '+COMP.filter(function(x){ return x.misu; }).length+'곳', phone:'375px 한 화면'};
+  document.querySelectorAll('[data-mk]').forEach(function(el){ var k=el.getAttribute('data-mk'); el.textContent=MK[k]||''; var b=el.closest('button'); if(b) b.title=b.querySelector('.nm').textContent+' — '+(MK[k]||''); });
+  document.getElementById('sDash').innerHTML='<h3>11월 한눈에</h3>'+[['확정 입금',won(t.inc)],['수행업무',n(t.task)+'건'],['현황판 주의·위험',(c.warn+c.bad)+'곳'],['관계망 판','11-18 09:12']]
+    .map(function(r){ return '<div><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>'; }).join('');
+}
+sideDash();
+
 /* 폰 */
 buildBars(scPh,{metric:'inc'});
 document.getElementById('cardsPh').innerHTML = cardsHtml(false);
 
-/* 탭 — 탭·패널을 잇고(aria-controls·tabpanel), 왼쪽·오른쪽 화살표로 옮겨 간다 */
-var TABS=[].slice.call(document.querySelectorAll('.top button[data-v]'));
+/* 탭(왼쪽 대시보드) — 탭·패널을 잇고(aria-controls·tabpanel), 위·아래(폰에서는 왼쪽·오른쪽) 화살표로 옮겨 간다 */
+var TABS=[].slice.call(document.querySelectorAll('.side button[data-v]'));
 TABS.forEach(function(b){
   var v=b.getAttribute('data-v'), panel=document.getElementById('v-'+v);
   b.id='tab-'+v; b.setAttribute('aria-controls','v-'+v); b.tabIndex = b.classList.contains('on') ? 0 : -1;
   if(panel){ panel.setAttribute('role','tabpanel'); panel.setAttribute('aria-labelledby','tab-'+v); }
   b.addEventListener('keydown',function(e){
     var i=TABS.indexOf(b), j=null;
-    if(e.key==='ArrowRight') j=(i+1)%TABS.length; else if(e.key==='ArrowLeft') j=(i-1+TABS.length)%TABS.length;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') j=(i+1)%TABS.length; else if(e.key==='ArrowLeft'||e.key==='ArrowUp') j=(i-1+TABS.length)%TABS.length;
     else if(e.key==='Home') j=0; else if(e.key==='End') j=TABS.length-1;
     if(j!=null){ e.preventDefault(); TABS[j].focus(); TABS[j].click(); }
   });
@@ -1121,12 +1443,17 @@ TABS.forEach(function(b){
 TABS.forEach(function(b){
   b.addEventListener('click',function(){
     TABS.forEach(function(x){ x.tabIndex = (x===b) ? 0 : -1; });
-    document.querySelectorAll('.top button[data-v]').forEach(function(x){ x.classList.toggle('on',x===b); x.setAttribute('aria-selected', x===b?'true':'false'); });
+    TABS.forEach(function(x){ x.classList.toggle('on',x===b); x.setAttribute('aria-selected', x===b?'true':'false'); });
+    if(b.scrollIntoView && window.matchMedia && matchMedia('(max-width:600px)').matches) b.scrollIntoView({block:'nearest',inline:'nearest'});
     document.querySelectorAll('.view').forEach(function(v){ v.classList.toggle('on', v.id==='v-'+b.getAttribute('data-v')); });
     if(bTimer) document.getElementById('bPlay').click();   /* 다른 탭으로 가면 B안 재생을 멈춘다 */
     unpinAll(); window.scrollTo(0,0);
   });
 });
+/* 왼쪽 대시보드는 폰(600px 이하)에서 위쪽 가로 띠가 된다 — 화면읽기에도 방향을 알린다 */
+(function(){ var tl=document.querySelector('.side[role=tablist]'); if(!tl||!window.matchMedia) return;
+  var mq=matchMedia('(max-width:600px)'); function setO(){ tl.setAttribute('aria-orientation', mq.matches?'horizontal':'vertical'); }
+  setO(); if(mq.addEventListener) mq.addEventListener('change',setO); else if(mq.addListener) mq.addListener(setO); })();
 /* 전체 배치의 «현황판 보기» 단추 → 현황판 탭으로 */
 document.querySelectorAll('[data-goto]').forEach(function(b){ b.addEventListener('click',function(){
   var t=document.getElementById('tab-'+b.getAttribute('data-goto')); if(t){ t.click(); t.focus(); } }); });
