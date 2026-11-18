@@ -1353,6 +1353,8 @@
     + '.pcf-qbar-go{background:#1e40af;border:1px solid #1e40af;color:#fff;border-radius:7px;padding:6px 12px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
     + '.pcf-qbar-mk{background:#166534;border:1px solid #166534;color:#fff;border-radius:7px;padding:6px 12px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
     + '.pcf-qbar-in{flex:1 1 240px;min-width:180px;border:1px solid #cbd5e1;border-radius:7px;padding:6px 10px;font-family:inherit;font-size:12.5px;background:#fff;color:#1e293b}'
+    + '.pcf-qbar-mic{border:1px solid #fde68a;background:#fffbeb;color:#854d0e;border-radius:7px;padding:6px 10px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf-qbar-mic.rec{border-color:#fecaca;background:#fef2f2;color:#991b1b}'
     + '.pcf-qbar-run{border:1px solid #2563eb;background:#fff;color:#1e40af;border-radius:7px;padding:6px 10px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
     + '.pcf-sethits{display:flex;flex-wrap:wrap;gap:5px;padding:6px 8px;background:#eff6ff;border-bottom:1px solid #bfdbfe;align-items:center}'
     + '.pcf-sethit{border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:99px;padding:4px 10px;min-height:32px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
@@ -1499,7 +1501,7 @@
     + '.pcf-mf .pcf-b{padding:9px 8px;font-size:12.5px}.pcf-mf .pcf-go{order:-1;flex-basis:100%;padding:12px;font-size:15px;border-radius:8px}.pcf-mf .pcf-mclose{display:none}'
     + '.pcf-vrow{grid-template-columns:24px 18px 82px minmax(0,1fr) 54px}.pcf-vrow input[type=checkbox]{width:24px;height:24px;margin:0}'
     + '.pcf-qbar{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 8px 6px;margin-bottom:4px;background:none;border:0;border-radius:0}'
-    + '.pcf-qbar-in,.pcf-qbar-run{display:none}'
+    + '.pcf-qbar-in,.pcf-qbar-mic,.pcf-qbar-run{display:none}'
     + '.pcf-qbar-go,.pcf-qbar-mk{width:100%;padding:8px 6px;font-size:12.5px;text-align:center;overflow:hidden;text-overflow:ellipsis}'
     + '}';
 
@@ -4155,14 +4157,44 @@
       if (over > 0) box.style.height = Math.max(320, h - over) + 'px';
     }
     w.addEventListener('resize', fitHeight);
-    function openQuickMake(initText) {
+    function saveNewFormWithSet(fmObj, targetSetId) {
+      return change(function (list) { return list.concat([fmObj]); }, '✨ 새 양식을 등록했습니다 — ' + fmObj.name).then(function () {
+        if (!targetSetId) { S.setView = null; S.quote = false; S.kind = fmObj.kind; select(fmObj.id); return; }
+        return track(changeSets(db, function (doc) {
+          var found = false;
+          doc.v.forEach(function (s) {
+            if (s && s.id === targetSetId) {
+              found = true;
+              var curIds = listOf(s.formIds);
+              if (curIds.indexOf(fmObj.id) < 0) s.formIds = curIds.concat([fmObj.id]);
+            }
+          });
+          if (!found && isSeedSet(targetSetId) && doc.rm.indexOf(targetSetId) < 0) {
+            doc.v = setsOf(doc).map(function (s) { return JSON.parse(JSON.stringify(s)); });
+            doc.v.forEach(function (s) {
+              if (s.id === targetSetId && s.formIds.indexOf(fmObj.id) < 0) s.formIds.push(fmObj.id);
+            });
+          }
+          return doc;
+        })).then(function (newSets) {
+          S.sets = newSets;
+          applySet(targetSetId);
+          S.sel = fmObj.id;
+          drawMain();
+          toast('✨ 새 양식을 등록하고 하위 세트에도 함께 넣었습니다');
+        }, function () { select(fmObj.id); });
+      });
+    }
+    function openQuickMake(initText, extraOpts) {
       if (!w.PuContractEasy || !w.PuContractEasy.openQuickMakeModal) return;
       w.PuContractEasy.openQuickMakeModal({
         forms: S.forms,
         sets: S.sets,
         host: host,
         initialText: initText || '',
+        autoVoice: !!(extraOpts && extraOpts.autoVoice),
         toast: toast,
+        onSaveForm: saveNewFormWithSet,
         onPickSet: function (sid, ids) {
           if (sid && setById(sid)) { S.setView = sid; S.setId = sid; S.quote = false; }
           if (Array.isArray(ids) && ids.length) { S.checked = ids.slice(); S.sel = ids[0]; }
@@ -4173,62 +4205,91 @@
         }
       });
     }
-    function openEasyWizard() {
+    function openEasyWizard(initMode) {
       if (!w.PuContractEasy || !w.PuContractEasy.openEasyFormWizard) return;
       w.PuContractEasy.openEasyFormWizard({
         kinds: KINDS,
         caseTypes: caseTypeList(),
         sets: S.sets,
+        host: host,
         defaultKind: S.kind === '_closed' ? 'company' : S.kind,
+        initialMode: initMode || '',
         extractTemplateText: extractTemplateText,
         archiveFile: archiveFile,
         toast: toast,
-        onSaveForm: function (fmObj, targetSetId) {
-          return change(function (list) { return list.concat([fmObj]); }, '✨ 새 양식을 등록했습니다 — ' + fmObj.name).then(function () {
-            if (!targetSetId) { S.setView = null; S.quote = false; S.kind = fmObj.kind; select(fmObj.id); return; }
-            return track(changeSets(db, function (doc) {
-              var found = false;
-              doc.v.forEach(function (s) {
-                if (s && s.id === targetSetId) {
-                  found = true;
-                  var curIds = listOf(s.formIds);
-                  if (curIds.indexOf(fmObj.id) < 0) s.formIds = curIds.concat([fmObj.id]);
-                }
-              });
-              if (!found && isSeedSet(targetSetId) && doc.rm.indexOf(targetSetId) < 0) {
-                doc.v = setsOf(doc).map(function (s) { return JSON.parse(JSON.stringify(s)); });
-                doc.v.forEach(function (s) {
-                  if (s.id === targetSetId && s.formIds.indexOf(fmObj.id) < 0) s.formIds.push(fmObj.id);
-                });
-              }
-              return doc;
-            })).then(function (newSets) {
-              S.sets = newSets;
-              applySet(targetSetId);
-              S.sel = fmObj.id;
-              drawMain();
-              toast('✨ 새 양식을 등록하고 하위 세트에도 함께 넣었습니다');
-            }, function () { select(fmObj.id); });
-          });
-        }
+        onSaveForm: saveNewFormWithSet
       });
     }
+    var _barVoiceStop = null;
     function quickAutoBar() {
       if (!w.PuContractEasy) return null;
       var qIn = el('input', {
         type: 'search', 'class': 'pcf-qbar-in',
-        'aria-label': '회사·업무·금액·기간 한 줄 빠른 입력',
-        placeholder: '한 줄 빠른 작성 — 예: (주)가나상사 직장내괴롭힘 조사 35명 4주 440만원 부가세별도 (Enter)'
+        'aria-label': '회사·업무·금액·기간 한 줄 또는 구두 빠른 입력',
+        placeholder: '한 줄·구두 빠른 작성 — 예: (주)가나상사 괴롭힘 조사 35명 440만원 부가세별도 (Enter 또는 🎙 구두)'
       });
-      function goInline() { openQuickMake(qIn.value); qIn.value = ''; }
+      function goInline() {
+        if (_barVoiceStop) { var s0 = _barVoiceStop; _barVoiceStop = null; s0.stop(); }
+        openQuickMake(qIn.value);
+        qIn.value = '';
+      }
+      var micBtn = el('button', {
+        type: 'button', 'class': 'pcf-qbar-mic', 'aria-pressed': 'false',
+        title: '마이크로 구두(말) 입력 — 회사명·업무·금액·기간을 말씀하시면 바로 정리 창이 열립니다',
+        text: '🎙 구두 입력',
+        onclick: function () {
+          if (_barVoiceStop) {
+            var sp = _barVoiceStop;
+            _barVoiceStop = null;
+            sp.stop();
+            return;
+          }
+          if (!w.PuContractEasy.speechSupported || !w.PuContractEasy.speechSupported()) {
+            openQuickMake(qIn.value, { autoVoice: true });
+            qIn.value = '';
+            return;
+          }
+          var baseTxt = qIn.value.trim();
+          var handle = w.PuContractEasy.startVoiceInput({
+            onText: function (txt) {
+              qIn.value = baseTxt ? (baseTxt + ' ' + txt) : txt;
+            },
+            onError: function (msg) {
+              _barVoiceStop = null;
+              micBtn.className = 'pcf-qbar-mic';
+              micBtn.setAttribute('aria-pressed', 'false');
+              micBtn.textContent = '🎙 구두 입력';
+              if (msg) toast('💡 ' + msg);
+            },
+            onEnd: function () {
+              _barVoiceStop = null;
+              micBtn.className = 'pcf-qbar-mic';
+              micBtn.setAttribute('aria-pressed', 'false');
+              micBtn.textContent = '🎙 구두 입력';
+              if (qIn.value.trim()) {
+                var spoken = qIn.value;
+                qIn.value = '';
+                openQuickMake(spoken);
+              }
+            }
+          });
+          if (handle) {
+            _barVoiceStop = handle;
+            micBtn.className = 'pcf-qbar-mic rec';
+            micBtn.setAttribute('aria-pressed', 'true');
+            micBtn.textContent = '⏹ 듣는 중';
+          }
+        }
+      });
       qIn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') { e.preventDefault(); goInline(); } });
       return el('div', { 'class': 'pcf-qbar', role: 'region', 'aria-label': '빠른 서류·양식 만들기' }, [
-        el('button', { type: 'button', 'class': 'pcf-qbar-go', title: '양식 목록을 일일이 찾지 않고 업무·내용을 한 번에 적어 견적서·계약서·위임장을 자동 추천·채우기 합니다',
+        el('button', { type: 'button', 'class': 'pcf-qbar-go', title: '업무와 견적서·계약서만 간단히 체크해 한 번에 정리·채우기 합니다',
           text: '⚡ 한 번에 서류 만들기', onclick: function () { openQuickMake(qIn.value); qIn.value = ''; } }),
         qIn,
+        micBtn,
         el('button', { type: 'button', 'class': 'pcf-qbar-run', title: '적은 내용을 분석해 맞는 양식 묶음과 입력표를 바로 엽니다',
           text: '🪄 바로 정리', onclick: goInline }),
-        el('button', { type: 'button', 'class': 'pcf-qbar-mk', title: '기존 파일·문안의 날짜·금액·사업자번호를 {{변수}}로 자동 변환하거나 표준 조항 체크만으로 쉽게 새 양식을 만듭니다',
+        el('button', { type: 'button', 'class': 'pcf-qbar-mk', title: '기존 파일 자동 변환 · 10초 조항 조립 · 구두/AI 새 양식 창작',
           text: '✨ 쉽게 새 양식 만들기', onclick: function () { openEasyWizard(); } })
       ]);
     }

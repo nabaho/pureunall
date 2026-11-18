@@ -240,6 +240,13 @@ test('② recommendBundle & searchAll — 양식 이름 몰라도 동종 묶음 
   const E = box.PuContractEasy;
   const forms = out(CF.mergeSeeds([], []).list);
   const sets = out(CF.setsOf(null));
+  const setIds = new Set(sets.map((s) => s.id));
+
+  // 모든 WORK_PRESETS 의 setId 가 실제 SET_SEED 에 하나도 빠짐없이 존재하는지 검증
+  const missingPresets = E.WORK_PRESETS.filter((p) => !setIds.has(p.setId)).map((p) => p.id + '->' + p.setId);
+  assert.strictEqual(missingPresets.length, 0, '모든 업무 프리셋 setId 가 실제 SET_SEED 와 일치해야 한다: ' + missingPresets.join(', '));
+  assert.strictEqual(E.recommendBundle('change', forms, sets, 'all').set.id, 'fs-amend');
+  assert.strictEqual(E.recommendBundle('agency', forms, sets, 'all').set.id, 'fs-office');
 
   // 전체 / 견적서만 / 계약서만 범위 분기 검증
   const allBundle = E.recommendBundle('산업안전 중대재해 컨설팅', forms, sets, 'all');
@@ -462,3 +469,328 @@ test('④ PuContractForms 통합 — 상단 빠른 작성 막대 · 전 분류 �
   assert.doesNotMatch(archivedArg.metaArg.formName, /900101-1234567|9102021234567/);
   assert.doesNotMatch(savedFromFile.originals[0].name, /900101-1234567|9102021234567/);
 });
+
+test('⑤ 간결 화면 — 1~2줄 업무 칩 + 옆 [견적서·계약서·위임장] 체크 연동 및 체크 항목별 입력칸 자동 간소화', async () => {
+  const dom = makeDom();
+  const box = { console, Date, Math, JSON, Promise, Object, Array, String, Number, Error, document: dom.document, setTimeout: fastTimeout, clearTimeout };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(read('js/pu-contract-easy.js'), box);
+  vm.runInContext(read('js/pu-contract-forms.js'), box);
+
+  const CF = box.PuContractForms;
+  const E = box.PuContractEasy;
+  const forms = out(CF.mergeSeeds([], []).list);
+  const sets = out(CF.setsOf(null));
+  const setIds = new Set(sets.map((s) => s.id));
+
+  // 모든 WORK_PRESETS 의 setId 가 실제 SET_SEED 에 하나도 빠짐없이 존재하는지 검증
+  const missingPresets = E.WORK_PRESETS.filter((p) => !setIds.has(p.setId)).map((p) => p.id + '->' + p.setId);
+  assert.strictEqual(missingPresets.length, 0, '모든 업무 프리셋 setId 가 실제 SET_SEED 와 일치해야 한다: ' + missingPresets.join(', '));
+  assert.strictEqual(E.recommendBundle('change', forms, sets, 'all').set.id, 'fs-amend');
+  assert.strictEqual(E.recommendBundle('agency', forms, sets, 'all').set.id, 'fs-office');
+
+  E.openQuickMakeModal({ doc: dom.document, forms, sets, openFill: () => {} });
+  await settle(6);
+  const md = dom.body.querySelector('.pce-m');
+  assert.ok(md);
+
+  // 업무 칩이 간결하게 8개 핵심 + 기타 선택상자 + 새 계약서 창작으로 배치되고, 세부 서류 목록과 추가 입력칸은 기본 접힘
+  const wchips = md.querySelectorAll('.pce-wchip');
+  assert.ok(wchips.length >= 8 && wchips.length <= 10, '과밀한 12개 2줄 카드 대신 간결한 한 줄 칩 구성');
+  const ckQuote = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '견적서 포함');
+  const ckContract = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '계약서 포함');
+  const ckPower = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '위임장·부속 포함');
+  assert.ok(ckQuote && ckContract && ckPower, '업무 바로 옆에 견적서·계약서·위임장 체크박스 배치');
+
+  const scopeInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '과업내용');
+  assert.strictEqual(scopeInp.parentNode.parentNode.hidden, true, '세부 항목 격자는 기본 접힘 상태여서 첫 화면이 깔끔함');
+
+  const amtInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '계약 또는 견적 금액');
+  assert.strictEqual(amtInp.parentNode.parentNode.hidden, false, '견적·계약 체크 시에는 금액·부가세·기간 행이 열림');
+
+  // 견적서·계약서를 끄고 위임장·부속만 체크하면 금액·부가세·기간 줄이 자동으로 숨겨짐
+  ckQuote.checked = false;
+  dom.fire(ckQuote, 'change');
+  ckContract.checked = false;
+  dom.fire(ckContract, 'change');
+  assert.strictEqual(amtInp.parentNode.parentNode.hidden, true, '위임장만 체크하면 불필요한 금액·기간 줄을 숨겨 간소화');
+
+  // 견적서만 다시 켜면 금액 줄이 다시 열리고 견적서 양식만 선택됨
+  ckPower.checked = false;
+  dom.fire(ckPower, 'change');
+  ckQuote.checked = true;
+  dom.fire(ckQuote, 'change');
+  assert.strictEqual(amtInp.parentNode.parentNode.hidden, false);
+  assert.match(md.textContent, /견적서 내용 넣기/);
+  dom.document.dispatchKey('Escape');
+});
+
+test('⑥ 구두(음성) 입력 — 한 줄 메모·문의글 영역 & 계약 조건·특약 영역 모두 말로 입력·자동 정리·주민번호 가림', async () => {
+  const dom = makeDom();
+  let lastRec = null;
+  function FakeSpeechRec() {
+    this.lang = '';
+    lastRec = this;
+  }
+  FakeSpeechRec.prototype.start = function () {};
+  FakeSpeechRec.prototype.stop = function () { if (this.onend) this.onend(); };
+
+  const box = {
+    console, Date, Math, JSON, Promise, Object, Array, String, Number, Error,
+    document: dom.document, setTimeout: fastTimeout, clearTimeout,
+    confirm: () => true,
+    SpeechRecognition: FakeSpeechRec
+  };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(read('js/pu-contract-easy.js'), box);
+  vm.runInContext(read('js/pu-contract-forms.js'), box);
+
+  const CF = box.PuContractForms;
+  const E = box.PuContractEasy;
+  const forms = out(CF.mergeSeeds([], []).list);
+  const sets = out(CF.setsOf(null));
+  const setIds = new Set(sets.map((s) => s.id));
+
+  // 모든 WORK_PRESETS 의 setId 가 실제 SET_SEED 에 하나도 빠짐없이 존재하는지 검증
+  const missingPresets = E.WORK_PRESETS.filter((p) => !setIds.has(p.setId)).map((p) => p.id + '->' + p.setId);
+  assert.strictEqual(missingPresets.length, 0, '모든 업무 프리셋 setId 가 실제 SET_SEED 와 일치해야 한다: ' + missingPresets.join(', '));
+  assert.strictEqual(E.recommendBundle('change', forms, sets, 'all').set.id, 'fs-amend');
+  assert.strictEqual(E.recommendBundle('agency', forms, sets, 'all').set.id, 'fs-office');
+
+  E.openQuickMakeModal({ doc: dom.document, forms, sets, openFill: () => {} });
+  await settle(6);
+  const md = dom.body.querySelector('.pce-m');
+
+  // (1) 한 줄 메모·문의글 구두 입력 테스트
+  const briefMic = dom.allNodes(md).find((n) => n.tag === 'button' && /🎙 구두 입력/.test(n.textContent));
+  assert.ok(briefMic, '한 줄 메모 옆 🎙 구두 입력 단추 존재');
+  briefMic.click();
+  assert.ok(lastRec && lastRec.lang === 'ko-KR');
+  lastRec.onresult({
+    results: [[{ transcript: '(주)가나상사 직장내괴롭힘 조사 35명 440만원 부가세별도 900101-1234567' }], ]
+  });
+  lastRec.results_fin = true;
+  lastRec.onresult({
+    results: [Object.assign([{ transcript: '(주)가나상사 직장내괴롭힘 조사 35명 440만원 부가세별도 900101-1234567' }], { isFinal: true })]
+  });
+  lastRec.onend();
+  await settle(6);
+
+  const briefIn = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '한 줄 메모 또는 구두 문의글 입력');
+  assert.doesNotMatch(briefIn.value, /900101-1234567/, '구두 인식 중 들어온 주민번호도 즉시 마스킹');
+  const coInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '의뢰처 회사명');
+  const amtInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '계약 또는 견적 금액');
+  assert.strictEqual(coInp.value, '(주)가나상사', '구두 입력 종료 즉시 회사명 자동 추출');
+  assert.strictEqual(amtInp.value, '4,400,000', '구두 입력 종료 즉시 보수 금액 자동 추출');
+
+  // (2) 계약 조건·특약 구두 입력 영역 테스트
+  const verbalTab = dom.allNodes(md).find((n) => n.tag === 'button' && /구두로 조건·특약 넣기/.test(n.textContent));
+  verbalTab.click();
+  const verbalMic = dom.allNodes(md).find((n) => n.tag === 'button' && /마이크 켜고 말하기/.test(n.textContent));
+  assert.ok(verbalMic, '조건·특약 구두 입력 마이크 단추 존재');
+  verbalMic.click();
+  lastRec.onresult({
+    results: [Object.assign([{ transcript: '착수금 220만원 선지급하고 최종 보고서 제출 후 잔금 지급' }], { isFinal: true })]
+  });
+  lastRec.onend();
+  await settle(6);
+
+  const scopeInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '과업내용');
+  assert.match(scopeInp.value, /착수금 220만원 선지급/, '구두로 말한 세부 조건이 과업·특약 칸에 자동 반영됨');
+  dom.document.dispatchKey('Escape');
+});
+
+test('⑦ 지난 계약·견적 검토 장면 — 이전 계약 확인·원클릭 적용 및 주민번호 비노출 보안', async () => {
+  const dom = makeDom();
+  const box = {
+    console, Date, Math, JSON, Promise, Object, Array, String, Number, Error,
+    document: dom.document, setTimeout: fastTimeout, clearTimeout,
+    PuQuotes: {
+      list: () => Promise.resolve([
+        { id: 'q1', doc: 'quote', type: 'investigation', co: '(주)가나상사', date: '2026-09-10', scope: '직장 내 괴롭힘 사실조사', period: '4주', ownerGuess: '권형하' }
+      ]),
+      amounts: () => Promise.resolve({ q1: { amount: 4400000, vat: 'excl' } })
+    }
+  };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(read('js/pu-contract-easy.js'), box);
+  vm.runInContext(read('js/pu-contract-forms.js'), box);
+
+  const CF = box.PuContractForms;
+  const E = box.PuContractEasy;
+  const forms = out(CF.mergeSeeds([], []).list);
+  const sets = out(CF.setsOf(null));
+  const setIds = new Set(sets.map((s) => s.id));
+
+  // 모든 WORK_PRESETS 의 setId 가 실제 SET_SEED 에 하나도 빠짐없이 존재하는지 검증
+  const missingPresets = E.WORK_PRESETS.filter((p) => !setIds.has(p.setId)).map((p) => p.id + '->' + p.setId);
+  assert.strictEqual(missingPresets.length, 0, '모든 업무 프리셋 setId 가 실제 SET_SEED 와 일치해야 한다: ' + missingPresets.join(', '));
+  assert.strictEqual(E.recommendBundle('change', forms, sets, 'all').set.id, 'fs-amend');
+  assert.strictEqual(E.recommendBundle('agency', forms, sets, 'all').set.id, 'fs-office');
+
+  const host = {
+    contractList: () => Promise.resolve([
+      { id: 'ct1', contractNo: '2026-001', companyName: '(주)가나상사', bizNo: '123-45-67890', kinds: ['상시 노무자문'], signDate: '2026-05-01', status: '유지' }
+    ]),
+    contractLoad: () => Promise.resolve({
+      id: 'ct1',
+      contractNo: '2026-001',
+      kinds: ['상시 노무자문'],
+      vals: {
+        회사명: '(주)가나상사',
+        대표자: '홍길동',
+        사업자번호: '123-45-67890',
+        계약금액: '550,000',
+        부가세처리: '부가세 별도',
+        계약기간: '2026-05-01 ~ 2027-04-30',
+        주민번호: '900101-1234567'
+      }
+    })
+  };
+
+  E.openQuickMakeModal({ doc: dom.document, forms, sets, host, openFill: () => {} });
+  await settle(10);
+  const md = dom.body.querySelector('.pce-m');
+  const histTab = dom.allNodes(md).find((n) => n.tag === 'button' && /지난 계약·견적 검토/.test(n.textContent));
+  assert.match(histTab.textContent, /2건/, '이알피 확정 계약 1건 + 보낸 견적 1건 총 2건 감지');
+
+  histTab.click();
+  await settle(6);
+  const erpRow = md.querySelectorAll('.pce-hitem').find((n) => /확정계약/.test(n.textContent));
+  assert.ok(erpRow, '이알피 확정계약 이력 행 존재');
+  const reviewBtn = dom.allNodes(erpRow).find((n) => n.tag === 'button' && n.textContent === '내용 검토');
+  assert.ok(reviewBtn, '지난 계약 내용 검토 단추 존재');
+  reviewBtn.click();
+  await settle(6);
+  assert.match(erpRow.textContent, /550,000원/, '검토 펼침 시 지난 계약 금액·조건 확인 가능');
+  assert.doesNotMatch(md.textContent, /900101-1234567/, '지난 계약 상세에 주민번호가 있어도 화면에는 절대 노출되지 않음');
+
+  const applyBtn = dom.allNodes(erpRow).find((n) => n.tag === 'button' && n.textContent === '이 조건 적용');
+  applyBtn.click();
+  await settle(6);
+  const coInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '의뢰처 회사명');
+  const ceoInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '대표자');
+  const amtInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '계약 또는 견적 금액');
+  assert.strictEqual(coInp.value, '(주)가나상사');
+  assert.strictEqual(ceoInp.value, '홍길동');
+  assert.strictEqual(amtInp.value, '550,000');
+  dom.document.dispatchKey('Escape');
+});
+
+test('⑧ 창조적 새 계약서·견적서 생성 — 무과금 맞춤 합성 · AI 호출 전 비식별화 · 연 12% 정규화 · 즉시 채우기 연동', async () => {
+  const dom = makeDom();
+  const box = { console, Date, Math, JSON, Promise, Object, Array, String, Number, Error, document: dom.document, setTimeout: fastTimeout, clearTimeout };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(read('js/pu-contract-easy.js'), box);
+
+  const E = box.PuContractEasy;
+
+  // (1) 오프라인/무과금 즉시 창작 엔진 검증
+  const smart = E.composeCreativeBundle({
+    subject: '외국인 근로자 기숙사 및 근로시간 적법성 점검 용역',
+    verbalNotes: '착수금 50% 선지급 후 최종 점검보고서 제출 시 잔금 50% 지급, 통역 자료 협조 특약',
+    wantQuote: true,
+    wantContract: true,
+    wantPower: false
+  });
+  assert.strictEqual(smart.forms.length, 2, '체크한 견적서 + 계약서 2종이 맞춤 생성됨');
+  assert.match(smart.contractForm.name, /외국인 근로자 기숙사 및 근로시간 적법성 점검 용역/);
+  assert.match(smart.contractForm.body, /맞춤 특약사항/);
+  assert.match(smart.contractForm.body, /연 12%의 이자/);
+  assert.match(smart.quoteForm.body, /\{\{회사명\}\}/);
+
+  // (2) AI 고도화 호출 시 복수 상호·무호칭/전위직함 인명·+82/무하이픈 전화·2마디 계좌·시군구 주소 완벽 비식별화 검증
+  let sentPrompt = '';
+  const aiRes = await E.draftCreativeBundle({
+    subject: '(주)가나상사 생성형 AI 인사규정 설계 용역',
+    brief: '(주)가나상사 다나테크 라마정밀 대표 홍길동 부대표 이영희 홍길동과 이영희가 박팀장 123-45-67890 01011112222 0415551234 +82 10 1111 2222 110-123456789 국민은행 111-22-333333 천안시 서북구 두정로 10 900101 1234567 보수 880만원',
+    verbalNotes: '임직원 교육 2회 포함',
+    hints: { coName: '(주)가나상사', ceo: '홍길동', knownCompanies: ['가나정밀'], knownPeople: ['이대표'] }
+  }, {
+    confirmSend: () => true,
+    auth: { currentUser: { getIdToken: () => Promise.resolve('tok') } },
+    ai: {
+      ask: (parts) => {
+        sentPrompt = parts[0].text;
+        return Promise.resolve({
+          text: JSON.stringify({
+            contractTitle: '생성형 AI 인사규정 설계 위탁계약서',
+            contractBody: '{{회사명}}과 푸른노무법인은 {{과업내용}} 계약을 금 {{계약금액}}원에 체결하며 연체이율 연 20% 및 연 18%를 가산한다. 입금: 국민은행 999-88-777777 (900101 1234567)',
+            quoteTitle: '생성형 AI 인사규정 설계 견적서',
+            quoteBody: '수신: {{회사명}} / 금액: {{계약금액}}원 ({{부가세처리}})'
+          })
+        });
+      },
+      textOf: (r) => r.text
+    }
+  });
+  assert.strictEqual(aiRes.via, 'ai');
+  assert.doesNotMatch(sentPrompt, /가나상사|다나테크|라마정밀|홍길동|이영희|박팀장|123-45-67890|01011112222|0415551234|110-123456789|111-22-333333|두정로|900101|\+82/, '외부 AI 프롬프트에 다중 상호·무호칭/전위직함 인명·+82/무하이픈전화·2마디계좌·시군구주소·공백주민번호가 0글자여야 함');
+  assert.match(aiRes.contractForm.body, /연 12%/, 'AI가 다른 이율을 내놓아도 연 12%로 자동 교정');
+  assert.match(aiRes.contractForm.body, /하나은행 680-910005-45904/, 'AI가 임의 은행계좌를 넣어도 법인 공식 계좌로 교정');
+  assert.doesNotMatch(aiRes.contractForm.body, /연 20%|연 18%|999-88-777777|900101/);
+
+  // (3) 원스톱 모달 안에서 [✨ 새 계약서 창작] → 주제에 고객사·대표·전화가 섞여 있어도 공용 양식 저장 시 제목·본문 모두 비식별화 + 수동 편집 본문 보존 검증
+  let filledDocs = null;
+  const savedSharedForms = [];
+  E.openQuickMakeModal({
+    doc: dom.document,
+    forms: [],
+    sets: [],
+    onSaveForm: (fm) => { savedSharedForms.push(fm); return Promise.resolve(); },
+    openFill: (chosen, _h, _t, opts) => { filledDocs = { chosen, opts }; }
+  });
+  await settle(6);
+  const md = dom.body.querySelector('.pce-m');
+  const newChip = dom.allNodes(md).find((n) => n.tag === 'button' && /✨ 새 계약서 창작/.test(n.textContent));
+  newChip.click();
+  const subjIn = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '새로 만들 계약서 주제');
+  subjIn.value = '(주)가나상사 홍길동 대표 탄력적 근로시간제 도입 및 합의 지원 010-1111-2222';
+  const descIn = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '창작할 계약 조건 및 특약 설명');
+  descIn.value = '개별 사업장 일회성 세부 사정 메모';
+  const genBtn = dom.allNodes(md).find((n) => n.tag === 'button' && /맞춤 계약·견적 창조 생성/.test(n.textContent));
+  genBtn.click();
+  await settle(6);
+
+  // 본문을 수동 편집(고객 환급 계좌 등)한 뒤 오른쪽 [견적서] 체크박스를 껐다 켜도 수동 편집 본문이 변조·덮어써지지 않고 유지되는지 검증
+  const previewTa = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '생성된 맞춤 계약서 본문 편집');
+  previewTa.value += '\n[수동 추가 조항 및 환급계좌 우리은행 1002-000-000000 유지 확인]';
+  dom.fire(previewTa, 'input');
+  const ckQ = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '견적서 포함');
+  ckQ.checked = false;
+  dom.fire(ckQ, 'change');
+  ckQ.checked = true;
+  dom.fire(ckQ, 'change');
+
+  const coInp = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '의뢰처 회사명');
+  coInp.value = '(주)나다산업';
+  const saveCk = dom.allNodes(md).find((n) => n.attrs && n.attrs['aria-label'] === '창작한 양식을 공용 양식함에도 함께 저장');
+  saveCk.checked = true;
+
+  const goBtn = dom.allNodes(md).find((n) => n.tag === 'button' && /한 번에 채우기/.test(n.textContent));
+  goBtn.click();
+  await settle(10);
+
+  assert.ok(filledDocs && filledDocs.chosen.length >= 2, '새로 창작한 계약서·견적서 묶음이 바로 채우기로 전달됨');
+  const filledContract = filledDocs.chosen.find((f) => !/견적서/.test(f.name));
+  assert.match(filledContract.body, /우리은행 1002-000-000000 유지 확인/, '사람이 직접 수정한 본문의 계좌·조항은 임의 치환되지 않고 그대로 유지됨');
+  assert.strictEqual(filledDocs.opts.coName, '(주)나다산업');
+  assert.strictEqual(savedSharedForms.length, filledDocs.chosen.length, '공용 양식함 등록 체크 시 창작된 양식들이 함께 등록됨');
+  savedSharedForms.forEach((sf) => {
+    assert.doesNotMatch(sf.name, /가나상사|홍길동|010-1111-2222/, '공용 양식함 저장 제목에서도 고객사·대표·연락처가 완전 제거됨');
+    assert.doesNotMatch(sf.body, /가나상사|홍길동|010-1111-2222|개별 사업장 일회성 세부 사정 메모/, '공용 양식함 저장 본문에서도 고객사·연락처·일회성 특약 원문이 남지 않음');
+  });
+
+  // (4) 음성 인식 동의 확인 함수가 없거나 거절하면 SpeechRecognition.start() 미호출 검증
+  let recStarted = false;
+  function GuardedRec() {}
+  GuardedRec.prototype.start = function () { recStarted = true; };
+  assert.strictEqual(E.startVoiceInput({}, GuardedRec), null, 'confirm 창이 없는 환경에서는 자동 동의 처리하지 않고 시작 차단');
+  assert.strictEqual(E.startVoiceInput({ confirm: () => false }, GuardedRec), null, '음성 서버 안내 동의를 거절하면 마이크 인식을 시작하지 않음');
+  assert.strictEqual(recStarted, false);
+});
+
