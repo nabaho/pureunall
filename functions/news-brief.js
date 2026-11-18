@@ -223,22 +223,27 @@ function 글짓기(뉴스, 법령, 옷) {
   /* ★ 둘 다 비면 «만들지 않는다». 빈 브리핑을 올리면 그날 공지가 빈 껍데기가 된다. */
   if (!뉴스목록.length && !법령목록.length) return null;
 
+  /* ★ 모양은 홈페이지 공용 꾸밈(assets/css/pu-brief.css)이 «pu_brief 묶음 안»에서만 입힌다
+     (대표 지시 2026-11-18 「주간브리핑 깔끔하게 … 팝업으로」). 홈페이지 기본 꾸밈이 목록 점·제목 크기를
+     지워 버려 줄글처럼 보였다. 첫 화면 팝업(assets/js/pu-brief-pop.js)도 이 이름표(pb_law·pb_news)로 읽는다.
+     ⚠ <li> 에는 이름표를 달지 않는다 — 꾸밈은 바깥 <ul> 이름표로 건다(줄 세기 검사가 맨 <li> 를 센다). */
   const 줄 = [];
-  줄.push('<p>' + 옷.머리말 + '</p>');
+  줄.push('<div class="pu_brief">');
+  줄.push('<p class="pb_lead">' + 옷.머리말 + '</p>');
 
   if (법령목록.length) {
     줄.push('<h3>법령 소식</h3>');
-    줄.push('<ul>');
+    줄.push('<ul class="pb_law">');
     법령목록.forEach(function (x) {
-      줄.push('<li><strong>' + 감싸기(x.이름) + '</strong>'
-        + (x.구분 ? ' (' + 감싸기(x.구분) + ')' : '')
-        + (x.고친결 ? ' — ' + 감싸기(x.고친결) : '')
-        + '<br><span>공포 ' + 감싸기(날짜꼴(x.공포일))
+      const 딱지 = [x.구분, x.고친결].filter(Boolean).map(감싸기).join(' · ');
+      줄.push('<li><div class="pb_name"><strong>' + 감싸기(x.이름) + '</strong>'
+        + (딱지 ? ' <em>' + 딱지 + '</em>' : '') + '</div>'
+        + '<div class="pb_meta"><span class="pb_when">공포 ' + 감싸기(날짜꼴(x.공포일))
         + ' · 시행 ' + 감싸기(날짜꼴(x.시행일))
         + (x.부처 ? ' · ' + 감싸기(x.부처) : '') + '</span>'
         + (x.링크 ? ' <a href="https://www.law.go.kr' + 감싸기(x.링크)
             + '" target="_blank" rel="noopener">법제처에서 보기</a>' : '')
-        + '</li>');
+        + '</div></li>');
     });
     줄.push('</ul>');
   }
@@ -246,19 +251,20 @@ function 글짓기(뉴스, 법령, 옷) {
   if (뉴스목록.length) {
     줄.push('<h3>노동 뉴스</h3>');
     /* ★ 제목과 링크만 싣는다 — 기사 본문은 남의 글이다 */
-    줄.push('<ul>');
+    줄.push('<ul class="pb_news">');
     뉴스목록.forEach(function (x) {
       /* 2026-11-15 보안 — 링크는 http(s) 만. 모음 칸은 직원도 쓸 수 있어 javascript: 가 들어오면 공지에 그대로 실린다 */
       const 링크 = /^https?:\/\//i.test(String(x.링크 || '').trim()) ? String(x.링크).trim() : '#';
       줄.push('<li><a href="' + 감싸기(링크) + '" target="_blank" rel="noopener">'
         + 감싸기(x.제목) + '</a>'
-        + (x.언론사 ? ' <span>· ' + 감싸기(x.언론사) + '</span>' : '') + '</li>');
+        + (x.언론사 ? ' <span>' + 감싸기(x.언론사) + '</span>' : '') + '</li>');
     });
     줄.push('</ul>');
-    줄.push('<p><span>기사 제목과 링크만 싣습니다. 본문은 각 언론사 홈페이지에서 보실 수 있습니다.</span></p>');
+    줄.push('<p class="pb_note">기사 제목과 링크만 싣습니다. 본문은 각 언론사 홈페이지에서 보실 수 있습니다.</p>');
   }
 
-  줄.push('<p><span>' + 옷.꼬리말 + '</span></p>');
+  줄.push('<p class="pb_note">' + 옷.꼬리말 + '</p>');
+  줄.push('</div>');
 
   return {
     제목: 옷.제목,
