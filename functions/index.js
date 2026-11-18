@@ -7810,6 +7810,147 @@ exports.newsletterNoticeArchive = functions
     return null;
   });
 
+/* 📬 푸른메일함 전체(받은·내게쓴·보낸·보관·업무함) 정기 자동 검토 → 계약관리 큐 (대표 지시 2026-11-18)
+   매일 09시부터 18시까지 2시간 간격(09·11·13·15·17·18시)으로 푸른메일함을 동기화·전수 검토해
+   견적서와 계약서(위임약정서·자문계약서·용역계약서 등)를 `data/contract_requests`에 올린다. */
+const MailContractSweep = require("./mail-contract-sweep");
+async function runMailContractSweepOnce(trigger, opts) {
+  const MS = require("./mail-sync");
+  const manual = !!(opts && opts.manual);
+  return MailContractSweep.runSweep(
+    {
+      getDatabase,
+      getSelfEmail: mailUserAsync,
+      syncBefore: () => MS.runSync(MAIL_DEPS, { deadlineMs: 90000 }),
+      downloadContractAttachment: (slug, uid) =>
+        MS.withFolder(MAIL_DEPS, slug, async (client) => {
+          const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+          if (!head) return null;
+          const parts = MS.pickParts(head.bodyStructure, null, 0);
+          const picked = MailContractSweep.pickBestContractAttachment(parts.atts);
+          if (!picked || !picked.att || Number(picked.att.size || 0) > MailContractSweep.MAX_ATT_BYTES) return null;
+          const d = await client.download(String(uid), picked.att.part, { uid: true });
+          const buf = await MS.drain(d.content, MailContractSweep.MAX_ATT_BYTES);
+          return { name: picked.att.name, mime: picked.att.mime || "", buf };
+        }),
+      callContractAi: async (parts) => {
+        /* 방어 심층화: 비식별 텍스트 외 원본 바이너리(inline_data)는 절대 외부 AI로 보내지 않는다 */
+        const safeParts = (Array.isArray(parts) ? parts : []).filter((p) => p && typeof p.text === "string" && !p.inline_data && !p.inlineData);
+        if (!safeParts.length) return null;
+        const 몫 = await aiMonthSpend();
+        const 판정 = DR.budgetGate(몫, manual);
+        if (판정.block) return { overBudget: true };
+        const key = await readGeminiKey();
+        if (!key) return null;
+        const r = await DR.callGemini(fetch, key, safeParts, null, { temperature: 0, maxOutputTokens: 1600 });
+        await bumpReadTally("erp", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+        if (!r.ok) return null;
+        const candParts =
+          (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
+        return { text: candParts.map((p) => (p && p.text) || "").join("") };
+      },
+    },
+    Object.assign({ trigger }, opts || {})
+  );
+}
+
+async function acquireMailSweepLock(opts) {
+  const o = opts || {};
+  const now = Date.now();
+  const isManual = o.manual === true;
+  const isRescan = o.rescan === true;
+  const cooldownMs = isRescan ? 10 * 60 * 1000 : (isManual ? 60 * 1000 : 0);
+  const lockRef = getDatabase().ref("data/app_config/mailContractSweepLock");
+  let blockedWhy = "";
+  const tx = await lockRef.transaction((cur) => {
+    const c = (cur && typeof cur === "object") ? cur : {};
+    if (Number(c.runningUntil || 0) > now) {
+      blockedWhy = "메일 자동검토가 이미 실행 중입니다. 잠시 후 다시 시도해 주세요.";
+      return; /* abort */
+    }
+    if (isManual && cooldownMs > 0 && Number(c.lastManualAt || 0) > 0 && (now - Number(c.lastManualAt)) < cooldownMs) {
+      const waitSec = Math.ceil((cooldownMs - (now - Number(c.lastManualAt))) / 1000);
+      blockedWhy = "최근 수동 메일검토 직후입니다. " + waitSec + "초 뒤 다시 실행해 주세요.";
+      return; /* abort */
+    }
+    return {
+      runningUntil: now + 5 * 60 * 1000,
+      lastManualAt: isManual ? now : Number(c.lastManualAt || 0),
+      by: String(o.by || "schedule"),
+    };
+  });
+  if (!tx.committed) {
+    const err = new Error(blockedWhy || "메일 자동검토 잠금 획득에 실패했습니다.");
+    err.status = 429;
+    throw err;
+  }
+  return async () => {
+    try { await lockRef.update({ runningUntil: 0 }); } catch (_) {}
+  };
+}
+
+exports.mailContractSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD", "GEMINI_KEY", "TYPESAFE_API_KEY"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("0 9,11,13,15,17,18 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    let release = null;
+    try {
+      release = await acquireMailSweepLock({ manual: false, by: "schedule" });
+    } catch (e) {
+      console.log("mailContractSweep skipped(locked):", String(e && e.message || e));
+      return null;
+    }
+    try {
+      const r = await runMailContractSweepOnce("schedule", { days: 45 });
+      console.log("mailContractSweep", JSON.stringify(r));
+    } finally {
+      if (release) await release();
+    }
+    return null;
+  });
+
+exports.runMailContractSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD", "GEMINI_KEY", "TYPESAFE_API_KEY"], timeoutSeconds: 300, memory: "1GB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용합니다." }); return; }
+    let caller, staffRole;
+    try {
+      caller = await requireStaff(req);
+      staffRole = await STAFF_GATE.assertActive(caller.uid);
+    } catch (e) {
+      res.status(e.status || 401).json({ ok: false, error: String(e.message || e) });
+      return;
+    }
+    const b = (req.body && typeof req.body === "object") ? req.body : {};
+    const wantRescan = b.rescan === true;
+    if (wantRescan && !(staffRole && staffRole.isAdmin)) {
+      res.status(403).json({ ok: false, error: "전체 재검토(rescan)는 관리자만 실행할 수 있습니다." });
+      return;
+    }
+    let release = null;
+    try {
+      release = await acquireMailSweepLock({ manual: true, rescan: wantRescan, by: staffRole && staffRole.sid });
+    } catch (e) {
+      res.status(e.status || 429).json({ ok: false, error: String(e.message || e) });
+      return;
+    }
+    try {
+      const days = Math.min(365, Math.max(1, Number(b.days) || 60));
+      const r = await runMailContractSweepOnce("manual", { days, manual: true, rescan: wantRescan });
+      res.json(r);
+    } catch (e) {
+      console.error("runMailContractSweep", e && e.stack || e);
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+    } finally {
+      if (release) await release();
+    }
+  });
+
 /* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
    ⚠ 실제 코드는 mail-gone.js 에 있다 — index.js 를 더 키우지 않기 위해서다.
    ⚠ 여기 한 줄을 안 적으면 밖에서 안 보인다(배포가 안 된다). mail-sync 와 같은 까닭. */
