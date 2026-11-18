@@ -1279,7 +1279,7 @@
       '      <div id="pboxSideHistory" class="pbox-history-list"></div>',
       '    </div>',
       '    <div class="pbox-side-foot">',
-      '      <button type="button" class="pbox-foot-btn" data-act="open-cfg-modal">⚙ 실시간 수집 · 무료 DB 설정</button>',
+      '      <button type="button" class="pbox-foot-btn" data-act="open-cfg-modal">⚙ 자동동기화 · 무료 공유 DB 설정</button>',
       '      <div class="pbox-foot-row">',
       '        <a class="pbox-portal-link" href="enter.html">← 푸른포털</a>',
       '        <div class="pbox-btn-group">',
@@ -1399,9 +1399,11 @@
     if (topSyncBtn) topSyncBtn.disabled = !!state.syncBusy;
 
     if (elBadge) {
-      elBadge.textContent = sum.supabaseConnected
-        ? ('공유DB · 보관 ' + sum.cachedLawsCount + '편')
-        : '무료 무제한';
+      var isSharedVerified = !!sum.sharedServerConnected;
+      var isStaffLoggedIn = !!(state.authUser && state.authUser.uid);
+      elBadge.textContent = isSharedVerified
+        ? (sum.cachedLawsCount > 0 ? ('무료공유 · 법령 ' + sum.cachedLawsCount + '편') : '무료 공유DB 연결됨')
+        : (isStaffLoggedIn ? '무료 공유DB 연결중' : '무료 무제한');
     }
     if (elSync) {
       elSync.textContent = (state.syncBusy || state.liveCollectBusy)
@@ -2206,6 +2208,7 @@
       '      <input type="search" id="pboxCaseSearchInput" class="pbox-input" aria-label="판례·재결·행정해석·조례 검색" value="' + esc(state.caseQuery) + '" placeholder="사건·회시·조례번호(2020다247190, 근기 68207-694, 법제처 18-0687, 서울특별시조례 제8993호), 약칭조문(근기법 23), 쟁점어(생활임금 조례, 허리디스크 산재…)">',
       '      <button type="button" class="pbox-btn-primary" data-act="run-case-filter">🔍 통합 검색</button>',
       '      <button type="button" class="pbox-btn-live" data-act="live-collect-cases"' + liveBusyAttr + ' title="국가법령정보센터 공식 원문(대법원·하급심·헌재·중노위·노동부·법제처 법령해석·자치법규 조례·조례 의견제시·행심위)을 OC 키 없이도 즉시 실시간 수집합니다 (의뢰인 실명·업체명 등 고유명사는 입력하지 마세요)">' + (state.liveCollectBusy ? '⏳ 전 기관 수집 중…' : '⚡ 전 기관 실시간 수집·검색') + '</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="auto-discover-cases"' + liveBusyAttr + ' title="무료 사이트 홈페이지 개편·경로 변경·복합 질의로 자료가 잘 안 나올 때 4중 자가복구 파서와 공공도메인 정밀 우회 경로로 자동 재탐색합니다">🔎 개편·누락 자동탐색</button>',
       '      <button type="button" class="pbox-btn-sm" data-act="go-view" data-view="ingest">+ 파일·하급심 적재</button>',
       '    </div>',
       '    <div class="pbox-adv-row">',
@@ -2240,7 +2243,27 @@
         }).join('') + '</div>') : ''),
         '    </div>'
       ].join('\n') : ''),
-      (lbBanner ? ('    <div class="pbox-status-banner ' + esc(lbBanner.kind) + '" role="status"><strong>' + esc(lbBanner.title) + '</strong>' + (lbBanner.detail ? ('<div style="margin-top:3px">' + esc(lbBanner.detail) + '</div>') : '') + '</div>') : ''),
+      (lbBanner ? (
+        '    <div id="pboxCaseStatusBanner" class="pbox-status-banner ' + esc(lbBanner.kind) + '" role="' + (lbBanner.kind === 'err' ? 'alert' : 'status') + '">' +
+        '<strong>' + esc(lbBanner.title) + '</strong>' +
+        (lbBanner.detail ? ('<div style="margin-top:3px">' + esc(lbBanner.detail) + '</div>') : '') +
+        (Array.isArray(lbBanner.routes) && lbBanner.routes.length
+          ? ('<div class="pbox-chip-bar" style="margin-top:7px;margin-bottom:0">' + lbBanner.routes.map(function (rt) {
+              var safeOff = /^https:\/\//i.test(String(rt.officialUrl || '')) ? rt.officialUrl : '';
+              var safeGoogle = /^https:\/\//i.test(String(rt.resilientSearchUrl || '')) ? rt.resilientSearchUrl : '';
+              var chips = [];
+              if (safeOff) {
+                chips.push('<a class="pbox-ext-pill" href="' + esc(safeOff) + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(rt.label || rt.domain || '공식 사이트') + ' 새 창 열기" title="' + esc(rt.domain || '') + ' 공식 사이트로 바로 이동합니다">🏛️ ' + esc(rt.label) + '(새 창) ↗</a>');
+              }
+              if (safeGoogle) {
+                var shortDom = String(rt.domain || 'go.kr').split('/')[0].trim();
+                chips.push('<a class="pbox-ext-pill" href="' + esc(safeGoogle) + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(shortDom) + ' 구글 공공도메인 우회검색 새 창 열기" title="기관 홈페이지 메뉴 개편 시 구글 site:' + esc(shortDom) + ' 색인으로 원문을 찾습니다">🔎 ' + esc(shortDom) + ' 구글 우회탐색(새 창) ↗</a>');
+              }
+              return chips.join('');
+            }).join('') + '</div>')
+          : '') +
+        '</div>'
+      ) : ''),
       '  </div>',
       (smartJump ? [
         '  <div class="pbox-smart-jump">',
@@ -2362,6 +2385,7 @@
       '      <input type="search" id="pboxSiteSearchInput" class="pbox-input" aria-label="전국 법률사이트 통합 검색어" value="' + esc(curQ) + '" placeholder="전국 사이트 공통 검색어 입력 (예: 통상임금 재직조건, 2020다247190, 근로기준법 제23조, 직장 내 괴롭힘, 중대재해처벌법)">',
       '      <button type="button" class="pbox-btn-primary" data-act="run-site-search">검색어 적용</button>',
       '      <button type="button" class="pbox-btn-live" data-act="site-to-live-collect"' + (state.liveCollectBusy ? ' disabled' : '') + '>⚡ P박스 내부로도 실시간 수집</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="site-to-auto-discover"' + (state.liveCollectBusy ? ' disabled' : '') + ' title="무료 사이트가 홈페이지를 개편해 검색이 안 될 때 대체 공식 엔드포인트·자율 DOM 파서·공공도메인 정밀검색으로 자동 탐색합니다">🔎 개편 대비 자동탐색</button>',
       '    </div>',
       (bundles.length ? [
         '    <div class="pbox-bundle-row">',
@@ -2519,14 +2543,14 @@
     var cfg = global.PuPBoxStore.getConfig();
     var lb = state.lowerStatusBanner;
     var lowerBannerHtml = lb
-      ? ('    <div class="pbox-status-banner ' + esc(lb.kind) + '" role="' + (lb.kind === 'ok' ? 'status' : 'alert') + '">' +
+      ? ('    <div class="pbox-status-banner ' + esc(lb.kind) + '" role="' + (lb.kind === 'err' ? 'alert' : 'status') + '">' +
          '<strong>' + esc(lb.title) + '</strong>' +
          (lb.detail ? ('<div style="margin-top:3px">' + esc(lb.detail) + '</div>') : '') +
          '</div>')
       : '';
     var tb = state.tribunalStatusBanner;
     var trbBannerHtml = tb
-      ? ('    <div class="pbox-status-banner ' + esc(tb.kind) + '" role="' + (tb.kind === 'ok' ? 'status' : 'alert') + '">' +
+      ? ('    <div class="pbox-status-banner ' + esc(tb.kind) + '" role="' + (tb.kind === 'err' ? 'alert' : 'status') + '">' +
          '<strong>' + esc(tb.title) + '</strong>' +
          (tb.detail ? ('<div style="margin-top:3px">' + esc(tb.detail) + '</div>') : '') +
          '</div>')
@@ -2957,6 +2981,7 @@
   function closeModal() {
     var back = document.getElementById('pboxModalBackdrop');
     if (back) back.style.display = 'none';
+    state._cfgAutoProbedInCurrentOpen = false;
     if (state._modalPrevFocus && typeof state._modalPrevFocus.focus === 'function') {
       try { state._modalPrevFocus.focus(); } catch (e) {}
     }
@@ -3013,34 +3038,133 @@
     ].join('\n'));
   }
 
-  function showConfigModal() {
+  function formatKstDateTime(isoStr) {
+    if (!isoStr) return '';
+    var ms = Date.parse(String(isoStr));
+    if (!Number.isFinite(ms)) return String(isoStr).replace('T', ' ').slice(0, 16);
+    var kst = new Date(ms + 9 * 3600000).toISOString();
+    return kst.slice(0, 10) + ' ' + kst.slice(11, 16) + ' KST';
+  }
+
+  function showConfigModal(modalOpts) {
+    var mOpts = modalOpts || {};
     var cfg = global.PuPBoxStore.getConfig();
+    var draft = mOpts.draft || null;
+    var valAutoBoot = draft ? !!draft.autoSyncOnBoot : !!cfg.autoSyncOnBoot;
+    var valOfflineAi = draft ? !!draft.preferOfflineAi : !!cfg.preferOfflineAi;
+    var valLawOc = draft ? String(draft.lawOc || '') : String(cfg.lawOc || '');
+    var valSupaUrl = draft ? String(draft.supabaseUrl || '') : String(cfg.supabaseUrl || '');
+    var valSupaKey = draft ? String(draft.supabaseStaffJwt || '') : String(cfg.supabaseStaffJwt || '');
+    var sum = global.PuPBoxStore.getStateSummary();
+    var isStaffLoggedIn = !!(state.authUser && state.authUser.uid);
+    var isSharedVerified = !!sum.sharedServerConnected;
+    var lastAutoTxt = sum.lastServerAutoSyncAt
+      ? formatKstDateTime(sum.lastServerAutoSyncAt)
+      : (sum.lastSyncAt ? formatKstDateTime(sum.lastSyncAt) : '접속 즉시 자동 실행');
+    var hasCustomAdv = draft && draft.advOpen !== undefined
+      ? !!draft.advOpen
+      : Boolean(valLawOc.trim() || valSupaUrl.trim());
+    var syncModalBusy = state.syncBusy ? ' disabled aria-busy="true"' : '';
+    var bannerKind = isSharedVerified ? 'ok' : 'warn';
+    var bannerHeadline = isSharedVerified
+      ? '✓ 푸른노무법인 무료 공유 DB · 자동동기화 직결 완료 (비용 ₩0 · 별도 설정 불필요)'
+      : (isStaffLoggedIn
+          ? '⏳ 푸른노무법인 무료 공유 DB 연결 상태 확인 중… (잠시만 기다리거나 [🔌 공유 DB 연결 확인]을 누르세요)'
+          : 'ℹ 포털 직원 로그인 시 푸른 무료 공유 DB가 자동 연결됩니다 (현재 내 브라우저 모드)');
+    var backendDesc = sum.supabaseConnected
+      ? '외부 Supabase 연동 활성'
+      : (isSharedVerified
+          ? ('푸른 보안 클라우드 무료 공유함 연결 완료 (공유 원문 ' + (sum.totalSharedActive || sum.syncedDocsCount || 0) + '건 · 외부 익명 차단)')
+          : '푸른 보안 클라우드 무료 공유함 (전 직원 자동 공유 · 외부 익명 차단)');
+
     openModalHtml([
       '<div class="pbox-modal-hd"><strong id="pboxModalTitle">⚙ P박스 자동동기화 · 무료 공유 DB 설정</strong><button type="button" class="pbox-icon-btn" data-act="close-modal" aria-label="설정 닫기">✕</button></div>',
       '<div class="pbox-modal-bd">',
-      '  <div class="pbox-info-note">',
-      '    <b>현재 비용: ₩0 (완전 무료)</b> — 기본 상태에서도 5,773편 전 법령 미러와 UID 격리 IndexedDB로 모든 기능이 작동합니다.<br>',
-      '    사무실 공유 DB(Supabase Free Tier $0/월)는 보안을 위해 비로그인 익명 접근을 차단하고 <b>푸른 서버 인증 대리인(pboxApi)</b> 또는 <b>직원 인증 JWT</b>로만 읽기·쓰기를 허용합니다.',
+      '  <div class="pbox-status-banner ' + bannerKind + '" role="status" style="margin-top:0;margin-bottom:10px">',
+      '    <strong>' + bannerHeadline + '</strong>',
+      '    <div style="margin-top:4px">',
+      '      • <b>공유 저장소:</b> ' + backendDesc + '<br>',
+      '      • <b>현재 수록 자료:</b> 현행 국가법령 <b>' + sum.totalNationalLaws.toLocaleString() + '편</b> · 판례·심판재결·유권해석 <b>' + sum.docsCount + '건</b> (내장 검증원문 ' + sum.seedDocsCount + '건 + 자동동기화·공유 추가 ' + sum.syncedDocsCount + '건)<br>',
+      '      • <b>자동 동기화 주기:</b> 앱 열 때 자동 반영 + 매일 새벽 03:20(KST) 서버 자동 수집 (최근 점검: ' + esc(lastAutoTxt) + ')',
+      '    </div>',
+      '  </div>',
+      '  <div class="pbox-info-note" style="margin-bottom:10px">',
+      '    <b>🛡️ 무료 사이트 홈페이지 개편·장애 대비 4중 자가복구 탐색 엔진 탑재</b><br>',
+      '    무료 공공·법률 사이트의 메뉴·화면(HTML/DOM)이 바뀌어 일반 수집이 막히더라도 <b>① 공식 기본경로 → ② 표준 무파라미터·통합 경로 자동우회 → ③ 자율 DOM·내장 JSON 원문 추출기 → ④ 약칭·핵심어 자동 분해 및 공공도메인(<code>.go.kr</code>) 정밀 우회탐색</b>이 자동으로 작동합니다.',
       '  </div>',
       '  <div class="pbox-form-stack">',
-      '    <label class="pbox-field"><span class="pbox-label">법제처 국가법령정보 공동활용 OC 아이디 (선택 · 미입력 시에도 국가법령정보센터 공식 원문 직접 수집 즉시 작동)</span><input type="text" id="pboxCfgLawOc" class="pbox-input" value="' + esc(cfg.lawOc) + '" placeholder="open.law.go.kr 신청 이메일 앞자리 ID"></label>',
-      '    <label class="pbox-field"><span class="pbox-label">Supabase HTTPS Project URL (선택 · 직접 조회 시)</span><input type="url" id="pboxCfgSupaUrl" class="pbox-input" value="' + esc(cfg.supabaseUrl) + '" placeholder="https://xxxxxxxxxxxx.supabase.co"></label>',
-      '    <label class="pbox-field"><span class="pbox-label">Supabase 직원 인증 JWT (선택 · 현재 로그인 세션 메모리에만 보관되며 로그아웃 시 자동 파기)</span><input type="password" id="pboxCfgSupaKey" class="pbox-input" value="' + esc(cfg.supabaseStaffJwt) + '" placeholder="인증된 직원 세션 JWT (localStorage 영구 저장 안 함)"></label>',
-      '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgAutoBoot" aria-label="앱을 열 때 법령 개정 및 수집 변경분 자동 점검"' + (cfg.autoSyncOnBoot ? ' checked' : '') + '> 앱을 열 때 법령 개정·수집 변경분 자동 점검</label>',
-      '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgOfflineAi" aria-label="클라우드 AI 호출 없이 내장 무료 합성 모드만 사용"' + (cfg.preferOfflineAi ? ' checked' : '') + '> 클라우드 AI 호출 없이 100% 내장 무료 합성 모드만 사용</label>',
+      '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgAutoBoot" aria-label="앱을 열 때 법령 개정 및 수집 변경분 자동 점검"' + (valAutoBoot ? ' checked' : '') + '> 앱을 열 때 법령 개정 · 판례 · 심판재결 변경분 자동 동기화 (권장)</label>',
+      '    <label class="pbox-chk-line"><input type="checkbox" id="pboxCfgOfflineAi" aria-label="클라우드 AI 호출 없이 내장 무료 합성 모드만 사용"' + (valOfflineAi ? ' checked' : '') + '> 클라우드 AI 호출 없이 100% 내장 무료 합성 모드만 사용</label>',
       '  </div>',
       '  <div class="pbox-btn-group" style="margin-top:12px">',
-      '    <button type="button" class="pbox-btn-sm" data-act="test-supa-cfg">🔌 연결 시험</button>',
-      '    <button type="button" class="pbox-btn-sm" data-act="backup-export-json">💾 전체 자료 JSON 백업</button>',
+      '    <button type="button" id="pboxCfgSyncNowBtn" class="pbox-btn-primary" data-act="sync-now-modal"' + syncModalBusy + '>' + (state.syncBusy ? '⏳ 자동동기화 실행 중…' : '🔄 지금 즉시 전체 판례·재결 자동동기화') + '</button>',
+      '    <button type="button" id="pboxCfgAutoDiscBtn" class="pbox-btn-sm" data-act="jump-auto-discover">🔎 개편·누락 자료 자동탐색기</button>',
+      '    <button type="button" id="pboxCfgTestSupaBtn" class="pbox-btn-sm" data-act="test-supa-cfg">🔌 공유 DB 연결 확인</button>',
+      '    <button type="button" class="pbox-btn-sm" data-act="backup-export-json">💾 전체 JSON 백업</button>',
       '    <button type="button" id="pboxBackupImportBtn" class="pbox-btn-sm" data-act="backup-import-json"' + (state.backupBusy ? ' disabled aria-busy="true"' : '') + '>' + (state.backupBusy ? '⏳ 백업 복원 중…' : '📂 JSON 백업 복원') + '</button>',
       '    <input type="file" id="pboxBackupFileInput" accept=".json" style="display:none" aria-label="백업 JSON 파일 선택">',
       '  </div>',
+      '  <details id="pboxCfgAdvDetails" class="pbox-addenda" style="margin-top:12px"' + (hasCustomAdv ? ' open' : '') + '>',
+      '    <summary>고급 선택 설정 (개인 법제처 OC 아이디 · 외부 Supabase 수동 지정 — 기본 무료 공유 사용 시 비워 두세요)</summary>',
+      '    <div class="pbox-form-stack" style="margin-top:10px">',
+      '      <label class="pbox-field"><span class="pbox-label">법제처 국가법령정보 공동활용 OC 아이디 (선택 · 비워 두어도 공식 원문 자동 수집 작동)</span><input type="text" id="pboxCfgLawOc" class="pbox-input" value="' + esc(valLawOc) + '" placeholder="open.law.go.kr 신청 이메일 앞자리 ID (선택)"></label>',
+      '      <label class="pbox-field"><span class="pbox-label">외부 Supabase HTTPS Project URL (선택 · 기본 푸른 클라우드 공유함 대신 직접 연결할 때만 입력)</span><input type="url" id="pboxCfgSupaUrl" class="pbox-input" value="' + esc(valSupaUrl) + '" placeholder="https://xxxxxxxxxxxx.supabase.co (선택)"></label>',
+      '      <label class="pbox-field"><span class="pbox-label">외부 Supabase 직원 인증 JWT (선택 · 현재 세션 메모리에만 보관되며 로그아웃 시 파기)</span><input type="password" id="pboxCfgSupaKey" class="pbox-input" value="' + esc(valSupaKey) + '" placeholder="인증된 직원 세션 JWT (선택)"></label>',
+      '    </div>',
+      '  </details>',
       '  <div class="pbox-modal-ft">',
       '    <button type="button" class="pbox-btn-sm" data-act="close-modal">닫기</button>',
       '    <button type="button" class="pbox-btn-primary" data-act="save-cfg">설정 저장 및 동기화</button>',
       '  </div>',
       '</div>'
-    ].join('\n'));
+    ].join('\n'), !!mOpts.keepFocus);
+
+    if (isStaffLoggedIn && !isSharedVerified && !state._cfgAutoProbeInFlight && !state._cfgAutoProbedInCurrentOpen) {
+      state._cfgAutoProbedInCurrentOpen = true;
+      state._cfgAutoProbeInFlight = true;
+      global.PuPBoxStore.testSharedServerConnection(getAuthObj())
+        .then(function () {
+          state._cfgAutoProbeInFlight = false;
+          renderSidebarCounts();
+          refreshConfigModalInPlace();
+        })
+        .catch(function () {
+          state._cfgAutoProbeInFlight = false;
+        });
+    }
+  }
+
+  function refreshConfigModalInPlace() {
+    var back = document.getElementById('pboxModalBackdrop');
+    var autoChk = document.getElementById('pboxCfgAutoBoot');
+    if (!back || back.style.display !== 'flex' || !autoChk) return;
+    var activeEl = document.activeElement;
+    var focusId = (activeEl && activeEl.id) ? activeEl.id : '';
+    var selStart = (activeEl && typeof activeEl.selectionStart === 'number') ? activeEl.selectionStart : null;
+    var selEnd = (activeEl && typeof activeEl.selectionEnd === 'number') ? activeEl.selectionEnd : null;
+    var advEl = document.getElementById('pboxCfgAdvDetails');
+    showConfigModal({
+      keepFocus: true,
+      draft: {
+        autoSyncOnBoot: !!autoChk.checked,
+        preferOfflineAi: !!(document.getElementById('pboxCfgOfflineAi') || {}).checked,
+        lawOc: (document.getElementById('pboxCfgLawOc') || {}).value || '',
+        supabaseUrl: (document.getElementById('pboxCfgSupaUrl') || {}).value || '',
+        supabaseStaffJwt: (document.getElementById('pboxCfgSupaKey') || {}).value || '',
+        advOpen: advEl ? !!advEl.open : undefined
+      }
+    });
+    if (focusId) {
+      var nextFocusEl = document.getElementById(focusId);
+      if (nextFocusEl && !nextFocusEl.disabled && typeof nextFocusEl.focus === 'function') {
+        try {
+          nextFocusEl.focus();
+          if (selStart !== null && typeof nextFocusEl.setSelectionRange === 'function') {
+            nextFocusEl.setSelectionRange(selStart, selEnd !== null ? selEnd : selStart);
+          }
+        } catch (_) {}
+      }
+    }
   }
 
   function showPureunRoadmapModal() {
@@ -3766,6 +3890,12 @@
       if (ciLive) state.caseQuery = ciLive.value;
       if (subLive) state.caseSubQuery = subLive.value;
       triggerLiveCaseCollection(state.caseQuery);
+    } else if (act === 'auto-discover-cases') {
+      var ciDisc = document.getElementById('pboxCaseSearchInput');
+      var subDisc = document.getElementById('pboxCaseSubInput');
+      if (ciDisc) state.caseQuery = ciDisc.value;
+      if (subDisc) state.caseSubQuery = subDisc.value;
+      triggerAutoDiscoverCollection(state.caseQuery);
     } else if (act === 'set-site-cat') {
       var sInCat = document.getElementById('pboxSiteSearchInput');
       if (sInCat) {
@@ -3800,6 +3930,25 @@
       state.caseQuery = nextQ;
       switchView('cases');
       triggerLiveCaseCollection(nextQ);
+    } else if (act === 'site-to-auto-discover') {
+      var sIn3 = document.getElementById('pboxSiteSearchInput');
+      var rawDiscQ = sIn3 ? sIn3.value.trim() : getEffectiveSiteQuery();
+      var discCheck = sanitizeExternalSearchQuery(rawDiscQ);
+      if (!discCheck.ok) {
+        toast(discCheck.error, 'err');
+        return;
+      }
+      var targetQ = discCheck.query;
+      state.siteSearchQuery = targetQ;
+      if (targetQ) state.caseQuery = targetQ;
+      switchView('cases');
+      if (targetQ && targetQ.length >= 2) {
+        triggerAutoDiscoverCollection(targetQ);
+      } else {
+        var cInpSite = document.getElementById('pboxCaseSearchInput');
+        if (cInpSite && typeof cInpSite.focus === 'function') cInpSite.focus();
+        toast('자동탐색할 쟁점어·약칭 또는 사건번호를 2글자 이상 입력해 주세요.', 'err');
+      }
     } else if (act === 'toggle-biglaw-guide') {
       state.showBigLawGuide = !state.showBigLawGuide;
       renderMain();
@@ -4317,12 +4466,51 @@
       }
     } else if (act === 'open-cfg-modal') {
       showConfigModal();
+    } else if (act === 'sync-now-modal') {
+      if (state.syncBusy) return;
+      state.syncBusy = true;
+      state.syncProgressText = '판례·재결·해석 전체 자동동기화 중…';
+      refreshConfigModalInPlace();
+      renderSidebarCounts();
+      global.PuPBoxStore.runIncrementalSync({ callServer: true, auth: getAuthObj() }).then(function (r) {
+        state.syncBusy = false;
+        state.syncProgressText = '';
+        if (r && r.ok === false) {
+          toast('자동동기화 일부 지연: ' + ((r.errors && r.errors[0]) || '잠시 후 다시 시도해 주세요.'), 'err');
+        } else {
+          var pulledTotal = ((r && r.serverPulled) || 0) + ((r && r.supabasePulled) || 0);
+          toast('✓ 전체 자동동기화 완료! (신규 반영 ' + pulledTotal + '건 · 전 직원 무료 공유함 동기화됨)');
+        }
+        renderAll();
+        refreshConfigModalInPlace();
+      });
+    } else if (act === 'jump-auto-discover') {
+      var jumpQ = state.caseQuery.trim();
+      closeModal();
+      switchView('cases');
+      if (jumpQ.length >= 2) {
+        triggerAutoDiscoverCollection(jumpQ);
+      } else {
+        var jumpInp = document.getElementById('pboxCaseSearchInput');
+        if (jumpInp && typeof jumpInp.focus === 'function') jumpInp.focus();
+        toast('자동탐색할 쟁점어·약칭 또는 사건번호를 입력한 뒤 [🔎 개편·누락 자동탐색]을 눌러 주세요.');
+      }
     } else if (act === 'test-supa-cfg') {
-      var uVal = (document.getElementById('pboxCfgSupaUrl') || {}).value || '';
-      var kVal = (document.getElementById('pboxCfgSupaKey') || {}).value || '';
-      global.PuPBoxStore.testSupabaseConnection({ supabaseUrl: uVal.trim(), supabaseStaffJwt: kVal.trim() })
-        .then(function () { toast('✓ Supabase 직원 인증 연결 성공!'); })
-        .catch(function (e) { toast(e.message, 'err'); });
+      var uVal = ((document.getElementById('pboxCfgSupaUrl') || {}).value || '').trim();
+      var kVal = ((document.getElementById('pboxCfgSupaKey') || {}).value || '').trim();
+      if (uVal) {
+        global.PuPBoxStore.testSupabaseConnection({ supabaseUrl: uVal, supabaseStaffJwt: kVal })
+          .then(function () { toast('✓ 외부 Supabase 직원 인증 연결 성공!'); })
+          .catch(function (e) { toast(e.message, 'err'); });
+      } else {
+        global.PuPBoxStore.testSharedServerConnection(getAuthObj())
+          .then(function (info) {
+            renderSidebarCounts();
+            refreshConfigModalInPlace();
+            toast('✓ 푸른 사무실 무료 공유 DB 정상 연결 확인! (공유 수록 ' + (info.totalSharedActive || 0) + '건)');
+          })
+          .catch(function (e2) { toast(e2.message, 'err'); });
+      }
     } else if (act === 'save-cfg') {
       global.PuPBoxStore.saveConfig({
         supabaseUrl: (document.getElementById('pboxCfgSupaUrl') || {}).value || '',
@@ -4332,8 +4520,8 @@
         preferOfflineAi: !!(document.getElementById('pboxCfgOfflineAi') || {}).checked
       });
       closeModal();
-      toast('설정이 저장되었습니다.');
-      global.PuPBoxStore.runIncrementalSync({ callServer: false }).then(function () { renderAll(); });
+      toast('설정이 저장되었으며 무료 공유 DB와 동기화합니다.');
+      global.PuPBoxStore.runIncrementalSync({ callServer: false, pullSharedOnly: true, autoBootstrapIfStale: true, auth: getAuthObj() }).then(function () { renderAll(); });
     } else if (act === 'backup-export-json') {
       var dump = {
         exportedAt: new Date().toISOString(),
@@ -4404,12 +4592,17 @@
       state.syncProgressText = '';
       var warnCnt = Array.isArray(res.errors) ? res.errors.filter(Boolean).length : 0;
       var fetchedTotal = Number(res.fetchedCount !== undefined ? res.fetchedCount : (res.fetchedTotal || 0));
+      var recNotes = Array.isArray(res.recoveryNotes) ? res.recoveryNotes.filter(Boolean) : [];
       state.liveCollectBanner = {
         kind: (res.partial || warnCnt > 0 || fetchedTotal === 0) ? 'warn' : 'ok',
-        title: '⚡ "' + q + '" 전 기관 실시간 수집 완료: 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건 (총 수신 ' + fetchedTotal + '건)',
-        detail: warnCnt > 0
-          ? ('일부 기관 지연/경고(' + warnCnt + '건): ' + res.errors.slice(0, 2).join(' / '))
-          : '대법원·하급심·헌재·중노위·행심위·법제처·고용노동부·개보위·인권위·산재 공식 원문이 비식별·중복제거 후 P박스 DB에 즉시 반영되었습니다.'
+        title: (res.autoRecovered ? '🔎 "' + q + '" 4중 자가복구 탐색 완료: ' : '⚡ "' + q + '" 전 기관 실시간 수집 완료: ') +
+          '신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건 (총 수신 ' + fetchedTotal + '건)',
+        detail: recNotes.length
+          ? ('자동 복구 작동: ' + recNotes.slice(0, 3).join(' · '))
+          : (warnCnt > 0
+              ? ('일부 기관 지연/경고(' + warnCnt + '건): ' + res.errors.slice(0, 2).join(' / '))
+              : '대법원·하급심·헌재·중노위·행심위·법제처·고용노동부·개보위·인권위·산재 공식 원문이 비식별·중복제거 후 P박스 무료 공유 DB에 즉시 반영되었습니다.'),
+        routes: Array.isArray(res.alternatePortalRoutes) ? res.alternatePortalRoutes : []
       };
       toast('실시간 수집 완료! 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건');
       reverifyActiveThreadIfAny();
@@ -4431,6 +4624,81 @@
       toast('실시간 수집 안내: ' + msg, 'err');
       renderAll();
     });
+  }
+
+  function triggerAutoDiscoverCollection(rawQuery) {
+    if (state.liveCollectBusy) return;
+    var q = String(rawQuery == null ? state.caseQuery : rawQuery).trim();
+    if (q.length < 2) {
+      toast('자동 복구 탐색할 쟁점어 또는 사건번호를 2글자 이상 입력해 주세요.', 'err');
+      var inp = document.getElementById('pboxCaseSearchInput');
+      if (inp && typeof inp.focus === 'function') inp.focus();
+      return;
+    }
+    var startGen = global.PuPBoxStore.getSessionGen();
+    var startUid = global.PuPBoxStore.getActiveUid();
+    var startAuth = snapshotAuthForUid(startUid) || getAuthObj();
+    var cfg = global.PuPBoxStore.getConfig();
+
+    state.liveCollectBusy = true;
+    state.syncProgressText = '"' + q.slice(0, 14) + '" 4중 자가복구 탐색 중…';
+    state.liveCollectBanner = null;
+    renderAll();
+
+    global.PuPBoxStore.autoDiscoverOfficial({
+      query: q,
+      lawOc: cfg.lawOc || '',
+      expectedGen: startGen,
+      expectedUid: startUid,
+      auth: startAuth
+    }).then(function (res) {
+      if (!isSameSession(startGen, startUid)) return;
+      state.liveCollectBusy = false;
+      state.syncProgressText = '';
+      var fetchedTotal = Number(res.fetchedCount || 0);
+      var recNotes = Array.isArray(res.recoveryNotes) ? res.recoveryNotes.filter(Boolean) : [];
+      var expStr = (Array.isArray(res.expandedQueries) && res.expandedQueries.length > 1)
+        ? ('확장 질의 [' + res.expandedQueries.join(' → ') + '] · ')
+        : '';
+      state.liveCollectBanner = {
+        kind: fetchedTotal > 0 ? 'ok' : 'warn',
+        title: '🔎 "' + q + '" 홈페이지 개편·누락 대비 4중 자동탐색 완료: 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건',
+        detail: expStr + (recNotes.length
+          ? recNotes.slice(0, 3).join(' · ')
+          : (fetchedTotal > 0
+              ? '다중 공식 경로·자율 DOM 파서로 실존 공식 원문을 확보하여 무료 공유 DB에 반영했습니다. 외부 기관 사이트 직접 열람은 아래 도메인 우회 버튼을 누르세요.'
+              : '일치하는 원문이 없거나 외부 기관 홈페이지가 점검 중입니다. 아래 공공도메인(.go.kr) 개편 무관 우회 경로로 바로 찾을 수 있습니다.')),
+        routes: Array.isArray(res.alternatePortalRoutes) ? res.alternatePortalRoutes : []
+      };
+      toast('자동 복구 탐색 완료! 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건');
+      reverifyActiveThreadIfAny();
+      renderAll();
+      scrollCaseStatusBannerIntoView();
+    }).catch(function (err) {
+      if (!isSameSession(startGen, startUid)) return;
+      state.liveCollectBusy = false;
+      state.syncProgressText = '';
+      if (err && err.staleSession) {
+        renderMain();
+        return;
+      }
+      var msg = String((err && err.message) || err || '자동 복구 탐색에 실패했습니다.');
+      state.liveCollectBanner = {
+        kind: 'err',
+        title: '✕ 자동 복구 탐색 오류',
+        detail: msg
+      };
+      toast('자동 탐색 안내: ' + msg, 'err');
+      renderAll();
+      scrollCaseStatusBannerIntoView();
+    });
+  }
+
+  function scrollCaseStatusBannerIntoView() {
+    var bn = document.getElementById('pboxCaseStatusBanner');
+    if (bn && typeof bn.scrollIntoView === 'function') {
+      try { bn.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+    }
   }
 
   function bindDelegatedEvents() {
@@ -4898,11 +5166,12 @@
       global.PuPBoxStore.runIncrementalSync({
         callServer: false,
         pullSharedOnly: true,
+        autoBootstrapIfStale: true,
         auth: snapshotAuthForUid(expectedUid)
       }).then(function (r) {
         if (!state.authUser || state.authUser.uid !== expectedUid) return;
-        if (r && (r.treeChanged || r.supabasePulled > 0 || r.serverPulled > 0)) {
-          renderSidebarCounts();
+        renderSidebarCounts();
+        if (r && (r.treeChanged || r.supabasePulled > 0 || r.serverPulled > 0 || r.autoBootstrapped)) {
           if (state.view === 'cases' || state.view === 'alerts' || state.view === 'laws') {
             renderMain();
           }

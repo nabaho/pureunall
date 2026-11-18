@@ -8349,21 +8349,49 @@ exports.pboxDailySync = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const PBoxSync = require("./pbox-sync");
-    const r = await PBoxSync.runSync({ env: process.env });
+    const r = await PBoxSync.runSync({
+      env: process.env,
+      storageBucket: getStorage().bucket(PHOTO_BUCKET)
+    });
     console.log("[P박스 일일 동기화]", JSON.stringify({
       krTreeSha: r.krTreeSha,
       dedupedCount: r.dedupedCount,
-      supabasePushed: r.supabasePushed
+      supabasePushed: r.supabasePushed,
+      sharedBackend: r.sharedBackend || ""
     }));
     return null;
   });
 
 const _pboxRateState = {
   globalByAct: Object.create(null),
-  uidByAct: new Map()
+  uidByAct: new Map(),
+  pullBurstByUid: new Map()
 };
 
+function enforcePboxPullBurstGuard(uid) {
+  const now = Date.now();
+  if (_pboxRateState.pullBurstByUid.size > 500) {
+    for (const [k, win] of _pboxRateState.pullBurstByUid.entries()) {
+      if (!win || now - win.startMs > 60000) _pboxRateState.pullBurstByUid.delete(k);
+    }
+  }
+  const key = String(uid || "anon");
+  const cur = _pboxRateState.pullBurstByUid.get(key);
+  if (!cur || now - cur.startMs > 10000) {
+    _pboxRateState.pullBurstByUid.set(key, { startMs: now, count: 1 });
+    return "";
+  }
+  if (cur.count >= 15) {
+    return "공유 저장소 연속 조회 요청이 너무 빠릅니다. 잠시 후 다시 시도해 주세요.";
+  }
+  cur.count += 1;
+  return "";
+}
+
 async function enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs) {
+  if (action === "pull") {
+    return enforcePboxPullBurstGuard(uid);
+  }
   const now = Date.now();
   if (_pboxRateState.uidByAct.size > 500) {
     for (const [k, ts] of _pboxRateState.uidByAct.entries()) {
@@ -8399,7 +8427,7 @@ async function enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, global
 
 exports.pboxApi = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .runWith({ timeoutSeconds: 120, memory: "512MB" })
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
@@ -8414,12 +8442,14 @@ exports.pboxApi = functions
         body,
         uid: me.uid,
         env: process.env,
+        storageBucket: getStorage().bucket(PHOTO_BUCKET),
         fetchFn: fetch,
         enforceCooldown: (uid, action, uidMinMs, globalMinMs) =>
           enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs)
       });
       res.status(result.status).json(result.payload);
     } catch (e) {
-      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 240) });
+      console.error("[pboxApi]", e && (e.stack || e.message || e));
+      res.status(500).json({ ok: false, error: "서버 처리 중 일시적 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." });
     }
   });

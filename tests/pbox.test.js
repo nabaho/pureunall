@@ -4075,3 +4075,368 @@ test('㉙ 법제처 공식 MCP(moleg-law) 및 중앙행정심판·특별심판·
   const phoneAfterYear = PBoxSync.scrubServerPii('사건 경위: 2024 전 010-1234-5678 통화 내역');
   assert.ok(!phoneAfterYear.includes('1234-5678'), '단일 음절 뒤 휴대전화 번호가 사건번호로 오인되어 마스킹 누락되면 안 됩니다');
 });
+
+test('㉚ 무설정 무료 공유 저장소(Cloud Storage 낙관적 잠금) · 무인증 일일 자동동기화 · 홈페이지 개편 대비 4중 자가복구 탐색 검증', async () => {
+  const PBoxSync = require('../functions/pbox-sync');
+
+  /* 1) 메모리 모의 Cloud Storage 버킷(GCS generation 낙관적 잠금 + 412 경합 재시도 포함) */
+  function createMockGcsBucket() {
+    let storedBuf = null;
+    let curGen = 0;
+    let forceOneConflict = true;
+    return {
+      file(objPath) {
+        assert.equal(objPath, PBoxSync.PBOX_SHARED_STORAGE_PATH);
+        return {
+          async getMetadata() {
+            if (!storedBuf) {
+              const e = new Error('No such object');
+              e.code = 404;
+              throw e;
+            }
+            return [{ generation: String(curGen) }];
+          },
+          async download() {
+            if (!storedBuf) {
+              const e = new Error('No such object');
+              e.code = 404;
+              throw e;
+            }
+            return [storedBuf];
+          },
+          async save(buf, opts) {
+            const expectedGen = opts && opts.preconditionOpts ? opts.preconditionOpts.ifGenerationMatch : undefined;
+            if (forceOneConflict && curGen > 0) {
+              forceOneConflict = false;
+              const ce = new Error('Precondition Failed');
+              ce.code = 412;
+              throw ce;
+            }
+            if (expectedGen !== undefined && Number(expectedGen) !== curGen) {
+              const ce2 = new Error('conditionNotMet');
+              ce2.code = 412;
+              throw ce2;
+            }
+            storedBuf = Buffer.isBuffer(buf) ? buf : Buffer.from(String(buf), 'utf8');
+            curGen++;
+          }
+        };
+      }
+    };
+  }
+
+  const bucket = createMockGcsBucket();
+
+  /* 2) LAW_OC 없이도 runSync(일일 자동동기화)가 무인증 공식 원문을 수집하여 무료 공유 버킷에 자동 저장하는지 검증 */
+  const keylessSyncFetch = async (url) => {
+    const s = String(url);
+    if (s.includes('api.github.com')) {
+      return { ok: true, status: 200, url: s, json: async () => ({ tree: [{ path: 'kr', sha: 'tree-sha-2026' }] }) };
+    }
+    if (s.includes('Sc.do')) {
+      return {
+        ok: true,
+        status: 200,
+        url: s,
+        text: async () => '<a onclick="precView(\'600111\')">통상임금 청구 [대법원 2024. 12. 19. 선고 2020다247190 전원합의체 판결]</a>'
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      url: s,
+      text: async () => '<div id="conTop">통상임금<br>[대법원 2024. 12. 19. 선고 2020다247190 전원합의체 판결]<br>【판결요지】<br>재직조건이나 근무일수 조건이 부가되어 있다는 사정만으로 통상임금성을 부정할 수 없다.</div>'
+    };
+  };
+
+  const syncOut = await PBoxSync.runSync({
+    env: {},
+    storageBucket: bucket,
+    queries: ['통상임금'],
+    detailLimit: 4,
+    fetchFn: keylessSyncFetch
+  });
+  assert.equal(syncOut.ok, true, 'LAW_OC 및 Supabase 미설정 상태에서도 일일 자동동기화가 성공해야 합니다');
+  assert.equal(syncOut.sharedBackend, 'pureun_cloud_storage');
+  assert.ok(syncOut.supabasePushed >= 1, '무료 클라우드 공유 버킷에 수집된 판례가 적재되어야 합니다');
+
+  const pulled1 = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: { action: 'pull', limit: 20 },
+    env: {},
+    storageBucket: bucket,
+    fetchFn: keylessSyncFetch
+  });
+  assert.equal(pulled1.status, 200);
+  assert.equal(pulled1.payload.configured, true, '수동 설정 없이도 무료 공유 DB가 configured:true 상태여야 합니다');
+  assert.ok(pulled1.payload.lastAutoSyncAt, '일일 자동동기화 완료 시각이 기록되어야 합니다');
+  assert.ok(pulled1.payload.docs.some((d) => d.caseNo === '2020다247190'));
+
+  /* 3) 직원 공유 문서 업로드(412 낙관적 잠금 충돌 시 자동 재시도) · 타인 덮어쓰기 차단(403) · 본인 소프트 삭제 및 부활 차단(409) 검증 */
+  const pushA = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'push',
+      docs: [{
+        docType: 'internal_case',
+        court: '서울지방노동위원회',
+        caseNo: '2026부해99111',
+        decisionDate: '2026-10-01',
+        title: '수습근로자 본채용 거부 부당해고 구제신청',
+        body: '객관적이고 합리적인 본채용 거부 사유 없이 수습기간 만료만을 이유로 한 해고는 부당해고이다.'
+      }]
+    },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(pushA.status, 200, '412 경합 발생 시에도 낙관적 잠금 자동 재시도로 정상 저장되어야 합니다');
+  assert.equal(pushA.payload.pushed, 1);
+  const sharedCk = pushA.payload.canonicalKeys[0];
+
+  const hijackB = await PBoxSync.handleApiAction({
+    uid: 'staff_b',
+    body: {
+      action: 'push',
+      docs: [{
+        docType: 'internal_case',
+        court: '서울지방노동위원회',
+        caseNo: '2026부해99111',
+        title: '타인 덮어쓰기 시도',
+        body: '다른 직원이 이미 등록한 사건번호 문서를 덮어쓰려 시도한 충분히 긴 본문입니다.'
+      }]
+    },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(hijackB.status, 403, '타 직원이 등록한 공유 문서는 덮어쓸 수 없어야 합니다');
+
+  const delWrongOwner = await PBoxSync.handleApiAction({
+    uid: 'staff_b',
+    body: { action: 'delete', canonicalKeys: [sharedCk] },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(delWrongOwner.status, 403, '타 직원은 본인 소유가 아닌 공유 문서를 삭제할 수 없어야 합니다');
+
+  const delOwn = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: { action: 'delete', canonicalKeys: [sharedCk] },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(delOwn.status, 200);
+  assert.equal(delOwn.payload.deleted, 1);
+
+  const resurrectAttempt = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'push',
+      docs: [{
+        docType: 'internal_case',
+        court: '서울지방노동위원회',
+        caseNo: '2026부해99111',
+        title: '삭제 문서 재업로드 시도',
+        body: '이미 삭제 처리된 문서를 다시 올리려 시도한 본문입니다(부활 금지 규칙 검증).'
+      }]
+    },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(resurrectAttempt.status, 409, '삭제된 공유 문서는 자동 부활되지 않아야 합니다');
+
+  /* 4) 무료 사이트 홈페이지 개편 시나리오:
+   *    - 기본 menuId 경로가 HTTP 404를 반환하고,
+   *    - 대체 무파라미터 경로(/LSW/deccSc.do)는 onclick 대신 개편된 <a href="/LSW/deccInfoP.do?...">를 반환하며,
+   *    - 상세 페이지도 #conTop 없이 <main><article> 및 <script type="application/ld+json"> 구조로 바뀐 경우
+   *    4중 자가복구 탐색기(auto_discover)가 자동으로 원문과 사건번호를 복원해 공유 DB에 적재하는지 검증 */
+  let hitFallbackEndpoint = false;
+  const revampedSiteFetch = async (url) => {
+    const s = String(url);
+    if (s.includes('menuId=')) {
+      return { ok: false, status: 404, url: s, text: async () => 'Not Found (Menu Revamped)' };
+    }
+    if (s.includes('/LSW/deccSc.do')) {
+      hitFallbackEndpoint = true;
+      return {
+        ok: true,
+        status: 200,
+        url: s,
+        text: async () => '<section class="revamped-results"><a href="/LSW/deccInfoP.do?deccSeq=880123">고용유지지원금 환수처분 취소청구 (2026. 10. 15.)</a></section>'
+      };
+    }
+    if (s.includes('deccInfoP.do?deccSeq=880123')) {
+      return {
+        ok: true,
+        status: 200,
+        url: s,
+        text: async () => [
+          '<html><body><header>개편된 상단 메뉴</header><main><article>',
+          '<h1>고용유지지원금 환수처분 취소청구</h1>',
+          '<div>사건번호 : 중앙행심 2026-18801</div>',
+          '<div>재결청 : 중앙행정심판위원회</div>',
+          '<div>재결일자 : 2026. 10. 15.</div>',
+          '<div>【주문】 피청구인이 청구인에게 한 고용유지지원금 환수처분을 취소한다.</div>',
+          '<div>【이유】 출퇴근 기록 일부 누락만으로 부정수급 고의를 단정하여 전액 환수한 처분은 위법·부당하다.</div>',
+          '</article></main></body></html>'
+        ].join('\n')
+      };
+    }
+    return { ok: true, status: 200, url: s, text: async () => '<div>검색결과가 없습니다.</div>' };
+  };
+
+  const discRes = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'auto_discover',
+      query: '행심위 지원금 환수 여부',
+      targets: ['decc_acrc']
+    },
+    env: {},
+    storageBucket: bucket,
+    fetchFn: revampedSiteFetch
+  });
+  assert.equal(discRes.status, 200);
+  assert.equal(hitFallbackEndpoint, true, '기본 메뉴 주소 404 시 표준 대체 엔드포인트로 자동 우회해야 합니다');
+  assert.equal(discRes.payload.docs.length, 1, '개편된 href 목록과 <main><article> 상세 본문에서 원문을 자동 복구해야 합니다');
+  assert.equal(discRes.payload.docs[0].caseNo, '중앙행심 2026-18801');
+  assert.ok(discRes.payload.recoveryNotes.length >= 1, '자가복구 작동 내역이 기록되어야 합니다');
+  assert.ok(discRes.payload.alternatePortalRoutes.some((r) => r.domain === 'law.go.kr'));
+  assert.ok(discRes.payload.alternatePortalRoutes.some((r) => r.domain === 'simpan.go.kr' && r.officialUrl === 'https://www.simpan.go.kr/'));
+
+  /* 5) LAW_OC가 설정된 환경에서 DRF가 장애(HTTP 500)를 일으켜도 auto_discover가 무인증 SSR 자가복구로 자동 전환되는지 검증 */
+  const ocBrokenFetch = async (url) => {
+    const s = String(url);
+    if (s.includes('lawSearch.do')) {
+      return { ok: false, status: 500, url: s, text: async () => 'DRF Upstream Error', json: async () => ({}) };
+    }
+    return revampedSiteFetch(url);
+  };
+  const ocRecoveryRes = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'auto_discover',
+      lawOc: 'pureun_test_oc',
+      query: '기간제법 환수',
+      targets: ['decc_acrc']
+    },
+    env: {},
+    storageBucket: bucket,
+    fetchFn: ocBrokenFetch
+  });
+  assert.equal(ocRecoveryRes.status, 200);
+  assert.equal(ocRecoveryRes.payload.docs.length, 1, 'LAW_OC 환경에서 DRF가 실패해도 무인증 SSR 자가복구로 원문을 확보해야 합니다');
+  assert.ok(
+    ocRecoveryRes.payload.expandedQueries.some((q) => q.includes('기간제 및 단시간근로자 보호 등에 관한 법률')),
+    '기간제법 약칭이 정식 법령명으로 확장되어야 합니다'
+  );
+
+  /* 6) 본문 60,000자 초과 업로드 400 거부 & push 쿨다운 작동 & 0건 동기화 시 lastSyncAttemptAt 기록 검증 */
+  let pushCoolCalled = false;
+  const oversizePush = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'push',
+      docs: [{
+        docType: 'internal_case',
+        court: '서울지방노동위원회',
+        caseNo: '2026부해55555',
+        title: '과대 용량 문서',
+        body: '가'.repeat(60005)
+      }]
+    },
+    env: {},
+    storageBucket: bucket,
+    enforceCooldown: async (_u, act) => {
+      if (act === 'push') pushCoolCalled = true;
+      return '';
+    }
+  });
+  assert.equal(oversizePush.status, 400, '60,000자를 초과하는 공유 문서는 400으로 거부해야 합니다');
+  assert.equal(pushCoolCalled, false, '사전 입력 검증 실패 시 쿨다운을 소모하지 않아야 합니다');
+
+  const zeroNewBucket = createMockGcsBucket();
+  await PBoxSync.runSync({
+    env: {},
+    storageBucket: zeroNewBucket,
+    queries: ['무결과질의'],
+    fetchFn: async (url) => {
+      if (String(url).includes('api.github.com')) {
+        return { ok: true, status: 200, json: async () => ({ tree: [{ path: 'kr', sha: 'sha-zero-test' }] }) };
+      }
+      return { ok: false, status: 503, url: String(url), text: async () => 'Service Unavailable' };
+    }
+  });
+  const zeroPull = await PBoxSync.pullFromBucketStore(zeroNewBucket, 10, '', '');
+  assert.equal(zeroPull.lastAutoSyncAt, '', '상위 수집이 실패한 경우 lastAutoSyncAt를 거짓 성공으로 기록하면 안 됩니다');
+  assert.ok(zeroPull.lastSyncAttemptAt.length >= 20, '0건·상위 장애 시에도 재시도 폭주 방지를 위해 lastSyncAttemptAt는 기록되어야 합니다');
+
+  /* 7) 03:20 KST(전날 18:20 UTC) 타임스탬프가 KST 기준 당일로 정확히 판별되는지 검증 */
+  const storeCtx = { window: { PuPBoxEngine: Engine, PuPBoxCorpus: Corpus } };
+  storeCtx.globalThis = storeCtx.window;
+  vm.createContext(storeCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), storeCtx);
+  assert.equal(
+    storeCtx.window.PuPBoxStore.isoToKstYmd('2026-11-17T18:20:00.000Z'),
+    '2026-11-18',
+    '새벽 03:20 KST(전날 18:20 UTC)는 한국 날짜 2026-11-18로 인식되어야 중복 재수집이 일어나지 않습니다'
+  );
+
+  /* 8) 비문자열 body 우회 시도 400 차단 및 직원 사건번호 선점 시 공식 원문(system_sync) 권위 우선 보장 검증 */
+  const arrayBodyPush = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'push',
+      docs: [{
+        docType: 'internal_case',
+        court: '대법원',
+        caseNo: '2026다77777',
+        title: '배열 본문 우회 시도',
+        body: ['문자열이 아닌 배열을 넣은 공격 페이로드입니다.']
+      }]
+    },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(arrayBodyPush.status, 400, '문자열이 아닌 body는 타입 검증 단계에서 400으로 차단되어야 합니다');
+
+  const squatPush = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'push',
+      docs: [{
+        docType: 'prec_sc',
+        court: '대법원',
+        caseNo: '2026다77777',
+        officialUrl: 'https://www.law.go.kr/LSW/precInfoP.do?precSeq=999999',
+        title: '직원 선점 임의 요약본',
+        body: '직원이 공식 수집 전에 실존 대법원 사건번호를 먼저 등록한 비검증 메모입니다.'
+      }]
+    },
+    env: {},
+    storageBucket: bucket
+  });
+  assert.equal(squatPush.status, 200);
+  const pullBeforeOfficial = await PBoxSync.pullFromBucketStore(bucket, 50, '', '');
+  const squattedDoc = pullBeforeOfficial.docs.find((d) => d.caseNo === '2026다77777');
+  assert.ok(squattedDoc);
+  assert.equal(squattedDoc.verified, false, '직원 업로드 문서는 verified=true로 위장될 수 없어야 합니다');
+  assert.equal(squattedDoc.docType, 'internal_case', '직원 업로드 문서는 prec_sc로 위장될 수 없어야 합니다');
+  assert.equal(squattedDoc.officialUrl, undefined, '직원 업로드 문서의 임의 officialUrl은 제거되어야 합니다');
+
+  await PBoxSync.upsertToBucketStore([{
+    docType: 'prec_sc',
+    court: '대법원',
+    caseNo: '2026다77777',
+    decisionDate: '2026-11-01',
+    officialUrl: 'https://www.law.go.kr/LSW/precInfoP.do?precSeq=777777',
+    title: '대법원 2026다77777 정식 판결문',
+    body: '【판결요지】 공식 법제처 API를 통해 수집된 대법원 정식 판결 원문은 직원이 선점한 비검증 행을 대체한다.',
+    sources: ['법제처 대법원 판례 공식 원문']
+  }], bucket, 'system_sync', {});
+  const pullAfterOfficial = await PBoxSync.pullFromBucketStore(bucket, 50, '', '');
+  const officialDoc = pullAfterOfficial.docs.find((d) => d.caseNo === '2026다77777');
+  assert.ok(officialDoc);
+  assert.equal(officialDoc.verified, true, '공식 system_sync 수집본은 권위 원문으로 정상 적재되어야 합니다');
+  assert.equal(officialDoc.docType, 'prec_sc');
+  assert.ok(officialDoc.body.includes('공식 법제처 API를 통해 수집된 대법원 정식 판결 원문'));
+});
