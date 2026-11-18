@@ -2594,7 +2594,7 @@ test('★ 편집칸의 머리와 발이 고정돼 가운데만 구른다', () =>
     + fnSource('memberBandHtml') + '\n' + fnSource('riskReport') + '\n' + fnSource('srlConflict') + '\n'
     + fnSource('stamp') + '\n' + noConst(constLine('MEMBER_KINDS')) + '\n' + fnSource('memberKind') + '\n' + fnSource('memberEdit'));
   const h = ctx.memberEdit(ctx.App.draft);
-  const 가운데 = h.indexOf('class="esc"');
+  const 가운데 = h.search(/class="esc[ "]/);   // (2026-11-18) 두 칸 이름표(mem2)가 더 붙을 수 있다
   const 발 = h.lastIndexOf('class="eft"');
   assert.ok(가운데 >= 0, '구르는 가운데 칸이 없습니다 — 경력이 길면 단추가 화면 밖으로 밀립니다');
   assert.ok(발 > 가운데, '단추줄이 구르는 칸 안에 있습니다 — 굴려야 「저장」이 보입니다');

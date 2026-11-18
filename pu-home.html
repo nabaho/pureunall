@@ -616,6 +616,29 @@ table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
   max-height:56vh;overflow-y:auto}
 .stick.shadow{border-bottom:1px solid var(--line);box-shadow:0 6px 10px -8px rgba(15,23,42,.35);
   padding-bottom:9px;margin-bottom:11px}
+/* ══ 구성원 편집칸 — 넓은 화면은 두 칸 (대표 지시 2026-11-18 「상단을 깔끔하게 세로로 정리하고
+     경력을 한 줄로 길게 세로로 전체 화면에 내려오게」 → 목업 → 「추천대로 구성원도 모두」) ══
+   왼쪽 300px = 붙은칸(사진·구분·이름·직책·글 번호·직원·설명·담당 업무)을 세로로, 붙은 채.
+   오른쪽 = 경력 머리줄(붙음) + 경력 목록이 화면 높이 전체로.
+   ★ 화면 폭으로 가른다 — 편집칸이 900px 남짓 되는 1500px 이상에서만. 좁은 화면·폰은 지금 그대로(위아래).
+   ⚠ 담는 칸(container query)으로 가르지 않는다 — 그 칸이 «고정 위치 기준»이 되어 ⋯ 같은 떠 있는 칸이 어긋날 수 있다. */
+.m-carhd-out{display:none}
+@media (min-width:1500px){
+  .esc.mem2{display:grid;grid-template-columns:300px minmax(0,1fr);column-gap:20px;align-items:start}
+  .esc.mem2 > .stick{display:flex;flex-direction:column;box-shadow:none;border-bottom:0;margin-bottom:0;
+    border-right:1px solid var(--line);padding:12px 16px 12px 0;max-height:calc(100vh - 230px)}
+  .esc.mem2 > .stick .m-carhd-in{display:none}
+  .esc.mem2 > .stick .face-fld{order:-1}
+  .esc.mem2 > .stick .face-row{flex-direction:column-reverse;align-items:center;gap:8px}
+  .esc.mem2 > .stick .face-prev{width:132px;height:165px;border-radius:10px}
+  .esc.mem2 > .stick .two{flex-direction:column;gap:8px;margin-bottom:8px}
+  .esc.mem2 > .stick .two > .inl{flex:none !important;width:100%}
+  .esc.mem2 > .stick .sub{white-space:normal !important;flex-wrap:wrap}
+  .esc.mem2 > .stick .fldbar{flex-wrap:wrap}
+  .esc.mem2 > .m-car{min-width:0;padding-top:12px}
+  .esc.mem2 .m-carhd-out{display:block;position:sticky;top:0;z-index:4;background:#fff;
+    padding:8px 0;margin-bottom:6px;border-bottom:1px solid var(--line)}
+}
 .car{border:1px solid #cbd5e1;border-radius:9px;background:#fff;padding:4px}
 .car .l{display:flex;align-items:center;gap:5px;padding:3px 4px;border-bottom:1px solid var(--line-soft)}
 .car .l:last-child{border-bottom:0}
@@ -3368,8 +3391,13 @@ function careerEra(i, era) {
   if (bs[0]) bs[0].className = (새것 === 'now' ? 'on' : '');
   if (bs[1]) bs[1].className = 'past' + (새것 === 'past' ? ' on' : '');
   row.classList.toggle('needpick', !새것 && ERA_LIKELY.test(App.draft.careers[i]));
+  /* 경력 머리줄이 두 곳(좁은 화면·넓은 화면)이라 둘 다 고친다 (2026-11-18 memberEdit 경력머리) */
+  const 셈글 = eraInfoText(App.draft.careers);
   const info = document.getElementById('eraInfo');
-  if (info) info.textContent = eraInfoText(App.draft.careers);
+  if (info) info.textContent = 셈글;
+  if (typeof document.querySelectorAll === 'function') {
+    document.querySelectorAll('.eraInfo').forEach(el => { el.textContent = 셈글; });
+  }
   markDirty();
 }
 function careerAdd() {
@@ -8167,7 +8195,8 @@ function memberEdit(d) {
   /* 머리는 고정, 가운데(.esc)만 구르고, 발(.eft)의 단추는 늘 같은 자리에 있다 */
   let h = '<div class="edit">';
   h += '<div class="ehd">' + memberBandHtml(d, rec) + '</div>';
-  h += '<div class="esc">';
+  /* mem2 — 넓은 화면에서 «왼쪽 기본 정보 · 오른쪽 경력 전체 높이» 두 칸 (2026-11-18 .mem2 꾸밈 머리말) */
+  h += '<div class="esc mem2">';
   /* ══ 위 두 줄은 «붙여 둔다» (대표 지시 2026-09-03 「상단은 틀고정하는게 맞다」) ══
      경력 열여덟 줄을 고치다 보면 「누구 자료인지·올림인지」가 위로 사라졌다.
      ★ 붙이는 것은 여기까지다 — 아래(메인 설명·담당 업무·경력)는 구른다.
@@ -8289,17 +8318,23 @@ function memberEdit(d) {
   /* ★ 경력사항의 «이름줄»은 붙은 칸 안에, «목록»은 구르는 칸에 둔다 (2026-09-03).
      그래서 .fld 하나를 둘로 가른다 — 이름줄만 감싸고, 목록은 붙은 칸을 닫은 뒤 감싼다.
      ⚠ 한 .fld 안에서 .stick 을 닫으면 태그가 어긋난다(닫는 짝이 안 맞는다). */
-  붙은칸 += '<div class="fld"><div class="fldbar">'
+  /* ★ (2026-11-18) 경력 머리줄은 «두 곳»에 같은 것을 둔다 — 좁은 화면은 붙은칸 안(m-carhd-in, 지금처럼),
+       넓은 화면은 오른쪽 경력 칸 맨 위(m-carhd-out). 어느 쪽을 보일지는 꾸밈(.mem2)이 정한다.
+       ⚠ 번호표(id="eraInfo")는 붙은칸 쪽 하나만 — 둘 다 고치는 것은 이름표(class="eraInfo")로 한다(careerEra). */
+  const 경력머리 = (안쪽) => '<div class="fld ' + (안쪽 ? 'm-carhd-in' : 'm-carhd-out') + '"><div class="fldbar">'
     + '<label style="margin:0">경력사항 — ' + d.careers.length + '줄</label>'
     + '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="openPull()"'
     + ' title="경력관리에 담긴 위촉장·학력·자격증에서 골라 넣습니다">⤓ 경력관리에서 가져오기</button>'
     + '<span style="flex:1"></span>'
     /* 전현이 있을 만한 줄인데 안 고른 것이 몇인지 — 조용히 빠지는 것을 막는다 */
-    + '<span class="sub" id="eraInfo" style="font-size:11.5px">' + eraInfoText(d.careers) + '</span>'
+    + '<span class="sub eraInfo"' + (안쪽 ? ' id="eraInfo"' : '') + ' style="font-size:11.5px">' + eraInfoText(d.careers) + '</span>'
     + '</div></div>';
+  붙은칸 += 경력머리(true);
 
   /* ══ 여기까지가 붙는다. 경력 «목록»은 아래 — 구르는 칸이다 ══ */
   h += '<div class="stick shadow">' + 붙은칸 + '</div>';
+  /* 오른쪽(넓은 화면) — 경력 머리줄 + 목록 + 아래 알림까지 «한 덩이». 좁은 화면에서는 그냥 아래로 이어진다 */
+  h += '<div class="m-car">' + 경력머리(false);
   h += '<div class="fld">'
     + '<div class="car" id="careerBox">'
     /* ★ 칸에는 «속글»만 넣는다 — 앞한자는 딱지가 쥔다(대표 지시 2026-09-03).
@@ -8345,6 +8380,7 @@ function memberEdit(d) {
       + '이대로 붙여넣으면 그분 경력이 이 사람 것으로 덮입니다. '
       + '어느 쪽 글 번호가 잘못 적혔는지 고칠 때까지 붙여넣기를 막아 둡니다.</div>';
   }
+  h += '</div>';   // .m-car 끝
   h += '</div>';   // .esc 끝 — 여기까지가 구르는 칸이다
 
   /* 「홈페이지에 남기기」 예외가 있으면 «푸는» 단추를, 없으면 «남기는» 단추를 준다.
