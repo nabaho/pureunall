@@ -565,6 +565,11 @@ table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
 .fld input,.fld textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;
   font-size:14px;font-family:inherit;color:var(--ink);background:#fff}
 .fld textarea{resize:vertical;line-height:1.7;font-size:13.5px}
+/* 얼굴 사진 미리보기 — 사진 칸 오른쪽 (대표 지시 2026-11-18 「얼굴사진 업로드하면 오른쪽에 사진을 볼수 있게」) */
+.face-row{display:flex;gap:14px;align-items:flex-start}
+.face-txt{flex:1;min-width:0}
+.face-prev{flex:none;width:84px;height:105px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#e2e8f0}
+@media (max-width:560px){.face-prev{width:64px;height:80px}}
 .two{display:flex;gap:12px}
 .two>div{flex:1;min-width:0}
 /* ★ 좁은 자리에서는 «접힌다» (대표 지시 2026-09-03 「더 줄여줄수 없나」로 네 칸을
@@ -1104,7 +1109,7 @@ const GROUPS = [
      그래서 딱지는 늘 「대조 못 함 (그림)」이고, 올렸는지는 «사람이» 표시한다.
      못 하는 것을 「같음」으로 뭉개면 올리지도 않은 회사가 올라간 것처럼 보인다.
      목록은 푸른ERP 업체관리(data/companies)에서 읽고, 여기서 회사를 만들지 않는다. */
-  { key: 'partner',  label: '자문사현황', short: '자문사' }
+  { key: 'partner',  label: '고객사', short: '고객사' }
 ];
 
 /* 자문사 표시가 남는 자리. 업체 열쇠는 업체관리의 id(co-…)를 그대로 쓴다 —
@@ -1609,8 +1614,8 @@ function loadAll() {
     read('homepage/config/pages', '쪽 목록', null),
     /* 자문사현황 — 업체관리는 «읽기만» 한다. 표시(올림/안 올림)만 우리 자리에 쓴다. */
     read('data/companies', '푸른ERP 업체관리', null),
-    read(PARTNER_PATH, '자문사 표시', null),
-    read(PARTNER_LOGO_PATH, '자문사 로고 차례', null),
+    read(PARTNER_PATH, '고객사 표시', null),
+    read(PARTNER_LOGO_PATH, '고객사 로고 차례', null),
     /* 월간 자동 연결 기록 (2026-10-05) — 못 읽어도 화면은 뜬다. 못 읽은 것은 카드가 따로 말한다
        («아직 돈 적 없음»과 «못 읽음»을 가른다). 그래서 failed(전체 띠)에 넣지 않는다. */
     db.ref('homepage/auto/runs').once('value').then(s => ({ v: s.val() || {} }),
@@ -1649,7 +1654,7 @@ function loadAll() {
        객체로 와도 값만 뽑아 배열로 본다 — 저장 방식이 바뀌어도 목록이 빈 채 뜨지 않게. */
     App.companies = companiesFrom(companies);
     App.companiesErr = (failed.indexOf('푸른ERP 업체관리') !== -1)
-      ? '푸른ERP 업체관리(data/companies)를 읽지 못해 자문사 목록을 보여 드릴 수 없습니다 — '
+      ? '푸른ERP 업체관리(data/companies)를 읽지 못해 고객사 목록을 보여 드릴 수 없습니다 — '
         + '«업체가 없다»는 뜻이 아닙니다. 규칙이나 그물 문제일 수 있습니다.'
       : '';
     App.partners = partners || {};
@@ -1735,7 +1740,11 @@ function partnerRows() {
     /* ★ 「올림」으로 표시했는데 업체관리에서 거래가 끝난 곳 — 홈페이지에 그대로 걸려 있다.
        내릴지는 사람이 판단한다(끝난 뒤에도 실적으로 남겨 두는 곳이 있다). 알리기만 한다.
        표시를 안 한 회사는 홈페이지에 올라간 적이 없으니 알릴 것도 없다. */
-    const warn = (posted === 'yes' && closed)
+    /* ★ 과거 거래처 (대표 지시 2026-11-18 「자문사현황을 고객사로 바꾸고 과거 컨설팅등 거래했던 사업장도 넣을 수 있게」).
+         «계약이 끝나도 남기기»(keep — 사유가 있어야 한다)가 있으면 거래가 끝났어도 고객사로 남는다:
+         기본 목록·올린 회사 셈에 들고, 「자문 종료」 할 일도 안 띄우고, 올릴 때 로고도 저절로 안 숨는다(계약끝난로고). */
+    const 남김 = !!(mk.keep && typeof mk.keep === 'object' && String(mk.keep.why || '').trim());
+    const warn = (posted === 'yes' && closed && !남김)
       ? { kind: 'ended', label: '자문 종료', detail: c.closedDate || '' } : null;
     return {
       key: c.id, name: c.name, desc: bits.join(' · '),
@@ -1748,7 +1757,7 @@ function partnerRows() {
       subOffice: 사무대행, advFee: 자문료,
       pub: 공공, insured: 고용보험, big: 자문중 && (공공 || 고용보험 >= 100),
       website: String(c.website || '').trim(),
-      roster: warn, posted: posted, closed: closed
+      roster: warn, posted: posted, closed: closed, kept: 남김
     };
   });
   /* 올린 회사가 먼저, 그다음 이름 순 — 홈페이지에 올라간 것이 이 화면의 본론이다 */
@@ -1764,8 +1773,9 @@ function postedNames() {
   /* ★ 거래가 끝난 곳(2026-09-03)과 사무대행(2026-09-06)은 «자동으로» 빠진다.
      그래서 붙여넣을 회사명 목록에도, 「홈페이지에 N개사」 셈에도 안 들어간다.
      ⚠ 사무대행을 전에 「올림」으로 표시해 두었더라도 나가지 않는다 — 자문사가 아니다. */
+  /* (2026-11-18) 단 «남기기»가 있는 과거 거래처는 고객사로 남는다 — partnerRows 의 남김 머리말 */
   return partnerRows()
-    .filter(r => r.posted === 'yes' && !r.closed && !r.subOffice).map(r => r.name);
+    .filter(r => r.posted === 'yes' && (!r.closed || r.kept) && !r.subOffice).map(r => r.name);
 }
 
 /* 표시 저장. 한 업체 한 자리만 건드린다 — 통째로 set 하면 다른 사람이 방금 한 표시를 덮는다.
@@ -1785,8 +1795,8 @@ async function setPosted(id, value, why) {
     toast(value === true ? '「올림」으로 표시했습니다.'
       : (value === false ? '「안 올림」으로 표시했습니다.' : '표시를 지웠습니다.'));
   } catch (e) {
-    console.warn('[자문사 표시]', e && e.code);
-    App.saveErr = '자문사 표시를 저장하지 못했습니다' + (e && e.code ? '(' + e.code + ')' : '')
+    console.warn('[고객사 표시]', e && e.code);
+    App.saveErr = '고객사 표시를 저장하지 못했습니다' + (e && e.code ? '(' + e.code + ')' : '')
       + ' — 파이어베이스 규칙에 «' + PARTNER_PATH + '» 자리가 아직 없을 수 있습니다. '
       + '규칙을 넣기 전에는 표시가 남지 않습니다(화면에만 바뀌어 보이지 않도록 되돌렸습니다).';
     App.render();
@@ -1817,6 +1827,15 @@ const Pick = { open: false, sel: {}, q: '', type: '', saving: false, err: '' };
 function pickRows() {
   return partnerRows().filter(r => !r.closed && !r.subOffice);
 }
+/* ★ 과거 거래처 (대표 지시 2026-11-18 「과거 컨설팅등 거래했던 사업장도 넣을 수 있게」).
+     거래가 끝난 곳(사무대행 빼고)은 기본으로는 안 보이고, 「과거 거래처」 거르개로만 꺼내 고른다.
+     여기서 «새로» 체크하면 「계약이 끝나도 남기기」 사유를 함께 적는다(pickChanges) —
+     그래야 올릴 때 로고가 저절로 숨지 않는다(PuSitePartner.계약끝난로고는 남기기 사유를 본다). */
+function pickPastRows() {
+  return partnerRows().filter(r => r.closed && !r.subOffice);
+}
+/* 고르는 창이 다루는 «전부» — 지금 거래처 + 과거 거래처. 저장과 셈은 이것으로 한다 */
+function pickAllRows() { return pickRows().concat(pickPastRows()); }
 
 /* ══════ 거르개는 «종류»가 아니라 «자문료»로 (대표 지시 2026-09-06) ══════
    왜 — 2026-09-06 에 세어 보니 종류 딱지가 실제 거래를 안 따라간다:
@@ -1862,15 +1881,19 @@ function feeCounts(rows) {
 function pickVisible() {
   const q = String(Pick.q || '').trim().toLowerCase();
   const t = String(Pick.type || '');
-  return pickRows().filter(r => {
+  const 행 = t === 'past' ? pickPastRows() : pickRows();
+  return 행.filter(r => {
     if (q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
-    if (!feeMatch(r, t)) return false;
+    if (t !== 'past' && !feeMatch(r, t)) return false;
     return true;
   });
 }
 
 /* 고르는 창의 거르개 갈래 — 자문료로 가른다 */
-function pickTypes() { return feeCounts(pickRows()); }
+function pickTypes() {
+  const 지난 = pickPastRows().length;
+  return feeCounts(pickRows()).concat(지난 ? [{ k: 'past', label: '과거 거래처(거래 종료)', n: 지난 }] : []);
+}
 
 /* ★ 무엇을 «쓸지»를 정하는 곳. 여기만 맞으면 저장은 그대로 따라간다.
    규칙은 하나다 — «올림 여부가 바뀐 것만» 쓴다.
@@ -1888,13 +1911,15 @@ function pickTypes() { return feeCounts(pickRows()); }
 function pickChanges() {
   const out = {};
   const now = Date.now(), who = currentUserName(), day = todayString();
-  pickRows().forEach(r => {
+  pickAllRows().forEach(r => {
     const 지금올림 = postedOf(r.key) === 'yes';
     const 고름 = !!Pick.sel[r.key];
     if (지금올림 === 고름) return;                       // 바뀐 것만 쓴다
     const 옛 = partnerMark(r.key) || {};
     out[r.key] = { posted: 고름, why: String(옛.why || ''),
                    by: who, at: day, updatedAt: now };
+    /* 과거 거래처를 새로 올리면 «남기기» 사유를 함께 — 이미 사유가 있으면 그대로 둔다(남이 적은 사유를 덮지 않는다) */
+    if (고름 && r.closed && !r.kept) out[r.key].keep = { why: '과거 거래처 — 고객사로 올림', by: who, at: day };
   });
   return out;
 }
@@ -1903,7 +1928,7 @@ function openPartnerPick() {
   Pick.open = true; Pick.q = ''; Pick.type = ''; Pick.err = ''; Pick.saving = false;
   /* 지금 「올림」인 것을 체크된 채로 연다 — 그래야 «지금 무엇이 올라가 있나»가 보인다 */
   Pick.sel = {};
-  pickRows().forEach(r => { if (postedOf(r.key) === 'yes') Pick.sel[r.key] = true; });
+  pickAllRows().forEach(r => { if (postedOf(r.key) === 'yes') Pick.sel[r.key] = true; });
   renderPartnerPick();
 }
 window.openPartnerPick = openPartnerPick;
@@ -1996,6 +2021,10 @@ function pickNoteHtml() {
      「업체 종류로 자동으로 고르지 않습니다」라고 말하고 있다. 체크만 되고 저장은
      사람이 누르므로 그 말과 어긋나지 않는다 — 그 사실을 여기 적어 어긋남을 막는다. */
   if (!Pick.type) return '';
+  if (Pick.type === 'past') {
+    return '<div class="sub" style="margin-top:6px">거래가 끝난 곳입니다 — 체크해 저장하면 '
+      + '<b>「계약이 끝나도 남기기」(과거 거래처)</b>가 함께 적혀, 올릴 때 로고가 저절로 숨지 않습니다.</div>';
+  }
   /* 푸른이알피 유형이면 그 이름 그대로, 아니면 자문료 이름 */
   const 이름 = ERP_TYPES.indexOf(Pick.type) >= 0
     ? ('업체관리 ' + Pick.type)
@@ -2030,9 +2059,9 @@ function pickGridHtml() {
    ★ 「몇 곳 고름」과 「몇 곳 바뀜」을 갈라 적는다 — 24곳을 골랐어도 이미 다 올라가 있으면
      바뀌는 것은 0곳이다. 그때 「24곳 저장」이라 적으면 누른 뒤 아무 일도 안 난 것처럼 보인다. */
 function pickFootHtml() {
-  const 고른수 = pickRows().filter(r => Pick.sel[r.key]).length;
+  const 고른수 = pickAllRows().filter(r => Pick.sel[r.key]).length;
   const 바뀔것 = Object.keys(pickChanges()).length;
-  return '<span class="sub"><b>' + 고른수 + '곳</b> 고름 · 전체 ' + pickRows().length + '곳'
+  return '<span class="sub"><b>' + 고른수 + '곳</b> 고름 · 전체 ' + pickAllRows().length + '곳'
     + (바뀔것 ? ' · <b>' + 바뀔것 + '곳 바뀜</b>' : '') + '</span>'
     + '<button class="btn pri" onclick="pickSave()"' + (바뀔것 && !Pick.saving ? '' : ' disabled') + '>'
     + (Pick.saving ? '저장 중…' : (바뀔것 ? 바뀔것 + '곳 저장' : '바뀐 것 없음')) + '</button>'
@@ -2062,13 +2091,14 @@ function renderPartnerPick() {
        흐려진다(2026-09-06 「별도로 위에 두지 마라」와 같은 까닭이다). */
   let h = '<div class="pickhd">';
   h += '<div class="fldbar" style="margin:0">'
-    + '<h2>홈페이지에 올릴 자문사 고르기</h2>'
+    + '<h2>홈페이지에 올릴 고객사 고르기</h2>'
     + '<span style="flex:1"></span>'
     + '<span id="pickFoot" style="display:flex;gap:6px;align-items:center">'
     + pickFootHtml() + '</span>'
     + '</div>';
-  h += '<div class="sub" style="margin-top:2px">체크한 곳이 자문사현황에 오릅니다. '
-    + '<b>체크를 풀면 내려갑니다.</b> 거래가 끝난 곳과 사무대행은 여기 안 나옵니다.</div>';
+  h += '<div class="sub" style="margin-top:2px">체크한 곳이 고객사에 오릅니다. '
+    + '<b>체크를 풀면 내려갑니다.</b> 사무대행은 여기 안 나옵니다. '
+    + '과거 컨설팅 등 거래가 끝난 곳은 거르개 「과거 거래처」에서 골라 넣을 수 있습니다.</div>';
   if (Pick.err) h += '<div class="bar warn" style="margin-top:9px">' + esc(Pick.err) + '</div>';
 
   /* ⚠ 찾기칸은 이 안에 «한 번만» 그린다 — 고쳐 그리면 치는 도중 커서가 튄다 */
@@ -2119,7 +2149,7 @@ async function clearPosted() {
     App.render();
     toast('표시를 지웠습니다.');
   } catch (e) {
-    console.warn('[자문사 표시 지우기]', e && e.code);
+    console.warn('[고객사 표시 지우기]', e && e.code);
     App.saveErr = '표시를 지우지 못했습니다' + (e && e.code ? '(' + e.code + ')' : '') + '.';
     App.render();
   }
@@ -2203,7 +2233,7 @@ async function 홈로고목록() {
     if (접음) {
       /* (2026-11-16) 접은 뒤에는 새 사이트 자문사 쪽을 읽는다 — 옛 readHomepage 는 410(접음)이다 */
       쪽 = await 새사이트쪽읽기('partner');
-      if (쪽 == null) throw new Error('새 사이트 자문사 쪽을 읽지 못했습니다');
+      if (쪽 == null) throw new Error('새 사이트 고객사 쪽을 읽지 못했습니다');
     } else {
       const token = await firebase.auth().currentUser.getIdToken();
       const res = await fetch(READ_HOMEPAGE_URL, { method: 'POST',
@@ -2217,7 +2247,7 @@ async function 홈로고목록() {
     App.siteLogoList = list;
     return list;
   } catch (e) {
-    App.siteLogoErr = '자문사현황 로고를 읽지 못했습니다 — ' + ((e && e.message) || e);
+    App.siteLogoErr = '고객사 로고를 읽지 못했습니다 — ' + ((e && e.message) || e);
     return null;
   }
 }
@@ -2239,7 +2269,7 @@ function 로고의업체(srl) {
    ★ 로고 이름과 같은 업체를 «위로» 올려 주기만 한다. 미리 골라 두지 않는다. */
 async function 로고잇기창() {
   if (!App.isStaff) { await say('재직 직원만 할 수 있습니다', ''); return; }
-  openModal(modalHead('로고와 업체 잇기') + '<div class="sub">자문사현황 로고를 읽고 있습니다…</div>');
+  openModal(modalHead('로고와 업체 잇기') + '<div class="sub">고객사 로고를 읽고 있습니다…</div>');
   if (!App.siteLogoList) await 홈로고목록();
   로고잇기창그리기();
 }
@@ -2350,7 +2380,7 @@ async function 새로고넣기(companyId, file) {
     return false;
   }
   if (p.흰테두리 && !await askYes('흰 배경이 딸려 왔습니다',
-    '자문사현황의 로고 칸은 연한 회색이라 흰 네모가 보입니다. 회사 홈페이지의 로고에 '
+    '고객사의 로고 칸은 연한 회색이라 흰 네모가 보입니다. 회사 홈페이지의 로고에 '
     + '<b>우클릭 → 「이미지 복사」</b>로 다시 받으시면 투명하게 들어옵니다. 그래도 이대로 쓸까요?', '이대로 쓰기')) return false;
   const 지금 = { at: todayString(), by: currentUserName() };
   const 표시 = Object.assign({ bytes: p.바이트, w: p.w, h: p.h, 흰테두리: !!p.흰테두리 }, 지금);
@@ -2428,7 +2458,7 @@ function 새로올리기칸Html(d) {
   const 없음확인 = mk.notOnSite && mk.notOnSite.at ? mk.notOnSite : null;
   const 다 = !!(동의 && 로고 && 없음확인 && mk.posted === true);
   const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px">' + 안 + '</div>';
-  let h = '<div class="fld"><label>새로 올리기 — 로고와 공개 동의를 넣으면 다음 달 1일에 자문사현황에 올라갑니다</label>';
+  let h = '<div class="fld"><label>새로 올리기 — 로고와 공개 동의를 넣으면 다음 달 1일에 고객사에 올라갑니다</label>';
   h += 줄('<b>로고</b>' + (로고 ? '<span>있음 · ' + esc(로고.w) + '×' + esc(로고.h) + ' · '
         + Math.round(Number(로고.bytes) / 1024 * 10) / 10 + 'KB' + (로고.흰테두리 ? ' · 흰 배경' : '') + '</span>' : '<span>없음</span>')
     + '<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="max-width:230px" '
@@ -2445,7 +2475,7 @@ function 새로올리기칸Html(d) {
       : '<button class="btn sm" onclick="홈페이지에없음확인(\'' + esc(d.key) + '\', true)">지금 홈페이지에 없음 — 확인함</button>'
         + '<span>이미 있으면 위 「로고와 잇기」를 하십시오(두 장이 걸립니다)</span>'));
   /* ⚠ 서버가 올렸는데 글 번호를 못 받았으면 «다음 달»이 아니다 — 다시 안 올린다(두 장을 막으려고) */
-  h += 줄(mk.uploadedAt ? '<b>올렸지만 글 번호를 못 받았습니다</b><span>홈페이지 자문사현황에서 확인한 뒤 「로고와 잇기」를 하십시오</span>'
+  h += 줄(mk.uploadedAt ? '<b>올렸지만 글 번호를 못 받았습니다</b><span>홈페이지 고객사에서 확인한 뒤 「로고와 잇기」를 하십시오</span>'
     : 다 ? '<b>다음 달 1일에 저절로 올라갑니다</b>'
     : '<span>빠진 것: ' + [로고 ? '' : '로고', 동의 ? '' : '공개 동의', 없음확인 ? '' : '홈페이지 확인',
         mk.posted === true ? '' : '«올림» 표시'].filter(Boolean).join(' · ') + '</span>');
@@ -4613,6 +4643,8 @@ function 새사진넣기(key, file) {
         await db.ref('homepage/memberPhotos/' + key).set(Object.assign({ b64: 된것.바이트64, type: 된것.종류 }, 지금));
         await db.ref('homepage/members/' + key + '/photo').set(표시);
         (App.members[key] = App.members[key] || {}).photo = 표시;
+        /* 방금 넣은 그림을 미리보기에 바로 — 다시 읽으러 가지 않는다 (2026-11-18 사진미리주소 머리말) */
+        (App.사진미리 = App.사진미리 || {})[key] = { 판: 표시.ver, src: 된것.미리 || '' };
         App.render();
         toast('사진을 넣었습니다.');
         resolve(true);
@@ -4692,6 +4724,40 @@ function 사진새사이트에있나(photo) {
   return !!(p.site && typeof p.site === 'object' && p.site.path && String(p.site.ver || '') === 사진판(p));
 }
 
+/* ══════ 얼굴 사진 미리보기 (대표 지시 2026-11-18 「얼굴사진 업로드하면 오른쪽에 사진을 볼수 있게 해달라」) ══════
+   어디서 가져오나 — «지금 판(사진판)»의 그림만 보인다(옛 사진이 새 사진인 척 안 남게):
+     ① 방금 넣은 사진 — 넣을 때 만든 그림(새사진넣기가 App.사진미리 에 둔다)
+     ② 새 사이트에 이미 올라간 판 — 새 사이트 원본 주소(SITE_BASE)
+     ③ 담기만 한 사진 — homepage/memberPhotos 에서 «한 번» 읽어 그림 칸에만 넣는다(화면 전체를 다시 그리지 않는다 —
+        편집하던 칸의 커서가 튀지 않게).
+   ⚠ 그림 주소는 data:image/… 또는 https 원본만 — 글자로 짜 넣지 않는다. 함수 안에서 SITE_BASE·db 는 typeof 로(검사 상자). */
+function 사진미리주소(key, rec) {
+  const p = (rec || {}).photo;
+  if (!key || !(p && Number(p.bytes) > 0)) return '';
+  const 칸 = (App.사진미리 = App.사진미리 || {});
+  const 판 = 사진판(p);
+  const 있던 = 칸[key];
+  if (있던 && 있던.판 === 판 && 있던.src) return 있던.src;
+  if (사진새사이트에있나(p) && typeof SITE_BASE !== 'undefined') {
+    const 자리 = String(p.site.path || '').replace(/^site\//, '');
+    if (/^files\/people\/[A-Za-z0-9_-]+\.(jpg|png|webp)$/.test(자리)) {
+      return SITE_BASE + '/' + 자리 + '?v=' + encodeURIComponent(String(p.site.v || 판));
+    }
+  }
+  if (!(있던 && 있던.판 === 판) && typeof db !== 'undefined') {
+    칸[key] = { 판: 판, 읽는중: true };
+    db.ref('homepage/memberPhotos/' + key).once('value').then(function (snap) {
+      const v = snap && snap.val ? snap.val() : null;
+      const 종류 = /^image\/(jpeg|png|webp)$/.test(String((v && v.type) || '')) ? v.type : 'image/jpeg';
+      const b64 = v && /^[A-Za-z0-9+/=]+$/.test(String(v.b64 || '')) ? String(v.b64) : '';
+      칸[key] = { 판: 판, src: b64 ? 'data:' + 종류 + ';base64,' + b64 : '' };
+      const 그림 = document.getElementById('facePrev');
+      if (그림 && 그림.getAttribute('data-key') === String(key) && 칸[key].src) { 그림.src = 칸[key].src; 그림.hidden = false; }
+    }).catch(function () { 칸[key] = { 판: 판, src: '' }; });
+  }
+  return '';
+}
+
 /* 구성원 편집칸의 «새로 올리기» — 글 번호 없는 노무사에게만 */
 function 새노무사칸Html(d) {
   const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true;   // 상자 안에서도 안 죽게 typeof 로(jobsOf 와 같은 까닭)
@@ -4746,6 +4812,14 @@ function 새사이트사진칸Html(d) {
         : '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">새 사이트 올리기 허락</button>'));
     h += 줄(준비.준비 ? '<b>「새 사이트에 올리기」를 누르면 구성원 소개에 올라갑니다</b>'
       : '<span>' + (준비.낡은허락 ? '허락한 뒤 경력을 고쳤습니다 — 다시 허락해 주십시오' : '빠진 것: ' + esc(준비.빠진것.join(' · '))) + '</span>');
+  }
+  /* 오른쪽 미리보기 (2026-11-18) — 사진이 있을 때만. 읽는 중이면 빈 틀을 두고 읽히면 그림만 갈아 끼운다 */
+  if (사진있음) {
+    const 주소 = (typeof 사진미리주소 === 'function') ? 사진미리주소(d.key, rec) : '';
+    h = h.replace('<div class="fld"><label>', '<div class="fld face-fld"><label>')
+      .replace('</label>', '</label><div class="face-row"><div class="face-txt">');
+    h += '</div><img id="facePrev" class="face-prev" data-key="' + esc(d.key) + '" alt="얼굴 사진 미리보기"'
+      + ' title="새 사이트 구성원 소개에 보일 얼굴 사진"' + (주소 ? ' src="' + esc(주소) + '"' : ' hidden') + '></div>';
   }
   return h + '</div>';
 }
@@ -5670,7 +5744,7 @@ function renderChangeLog() {
     + '</div>';
   /* ⚠ 아직 기록이 «안 남는» 것을 숨기지 않는다 — 없는 것을 없다고 말해야
      「자문사를 고쳤는데 왜 기록에 없나」로 헤매지 않는다. */
-  h += '<div class="sub" style="margin-top:6px">자문사 표시·로고 차례·홈페이지에 올린 일은 '
+  h += '<div class="sub" style="margin-top:6px">고객사 표시·로고 차례·홈페이지에 올린 일은 '
     + '<b>아직 기록이 안 남습니다</b> — 그것까지 남기는 것은 다음 걸음입니다.</div>';
   h += '</div>';
   h += '<div class="pickbody"><div id="logRows">'
@@ -6450,7 +6524,7 @@ function 자동대상이름(x) {
   }
   if (r.companyId) {
     const c = (App.companies || []).filter(c => c && c.id === r.companyId)[0];
-    return (c ? c.name : '업체 ' + r.companyId) + ' · 자문사현황';
+    return (c ? c.name : '업체 ' + r.companyId) + ' · 고객사';
   }
   return '글 번호 ' + (r.srl || '?');
 }
@@ -6836,7 +6910,7 @@ function jobsOf() {
   if (App.dataErr) add({ cls: '', t: '통합시스템 자료를 못 읽었습니다', who: esc(App.dataErr),
     why: '목록이 비어 보이는 것이 「자료가 없다」는 뜻은 아닙니다. 파이어베이스 규칙일 수 있습니다.',
     go: '<button class="btn sm" onclick="location.reload()">다시 읽기</button>' });
-  if (App.companiesErr) add({ cls: '', t: '자문사 목록(업체관리)을 못 읽었습니다',
+  if (App.companiesErr) add({ cls: '', t: '고객사 목록(업체관리)을 못 읽었습니다',
     who: esc(App.companiesErr),
     go: '<button class="btn sm" onclick="location.reload()">다시 읽기</button>' });
   if (App.staffErr) add({ cls: 'warn', t: '푸른ERP 직원 명부를 온전히 못 봤습니다', who: esc(App.staffErr) });
@@ -7030,7 +7104,7 @@ function jobsOf() {
       who: esc(넣을곳.slice(0, 3).map(x => x.name).join(', ') + (넣을곳.length > 3 ? ' 외' : '')),
       go: 가는단추(넣을곳),
       why: '로고·공개 동의를 넣고 «지금 홈페이지에 없음»을 확인해 두시면 <b>다음 달 1일에 저절로</b> '
-         + '자문사현황에 올라갑니다. 이미 올라가 있는 회사는 「로고와 잇기」를 하십시오(두 장이 걸립니다). '
+         + '고객사에 올라갑니다. 이미 올라가 있는 회사는 「로고와 잇기」를 하십시오(두 장이 걸립니다). '
          + '싣지 않을 곳은 «안 올림»으로 두시면 다시 묻지 않습니다.' });
   }
   /* ★ 서버가 올렸는데 글 번호를 못 받은 곳 — 다시 안 올린다. 사람이 이어야 계약이 끝날 때 내려간다 */
@@ -7039,14 +7113,14 @@ function jobsOf() {
     add({ cls: 'warn', t: '올렸지만 글 번호를 못 받은 거래처', n: 번호못받음.length,
       who: esc(번호못받음.slice(0, 3).map(x => x.name).join(', ') + (번호못받음.length > 3 ? ' 외' : '')),
       go: 가는단추(번호못받음),
-      why: '홈페이지 자문사현황에 로고가 올라갔는지 보시고 「로고와 잇기」로 이어 주십시오. '
+      why: '홈페이지 고객사에 로고가 올라갔는지 보시고 「로고와 잇기」로 이어 주십시오. '
          + '안 이으면 계약이 끝나도 자동으로 안 내려갑니다.' });
   }
   /* ★ 월간 자동 연결(2026-10-05) — 업체관리를 읽었는데 로고와 이은 업체가 «하나도» 없으면
        계약이 끝나도 아무것도 안 내려간다. 그 사실을 할 일로 알린다. */
   const 이은로고 = Object.keys(App.partners || {}).filter(id => Number((App.partners[id] || {}).boardSrl) > 0);
   if (!접음 && (App.companies || []).length && !App.companiesErr && !이은로고.length) {
-    add({ cls: 'info', t: '자동 연결 — 자문사현황 로고를 업체와 아직 안 이었습니다',
+    add({ cls: 'info', t: '자동 연결 — 고객사 로고를 업체와 아직 안 이었습니다',
       go: '<button class="btn sm" onclick="로고잇기창()">로고와 잇기</button>',
       why: '이어 둔 로고만 계약이 끝났을 때 <b>다음 달 1일에 저절로</b> 휴지통으로 내려갑니다. '
          + '로고 이름이 같아도 저절로 잇지 않습니다 — 한 번만 골라 두시면 됩니다.' });
@@ -7290,7 +7364,8 @@ function visibleRows(group) {
        목록에서만 빠지고 조용해지면 손님 화면에서 영영 안 내려간다 —
        그래서 할 일(own:ended)에는 남기고, 그 딱지로는 볼 수 있게 열어 둔다. */
   if (group === 'partner' && App.filter !== 'closed' && App.filter !== 'own:ended') {
-    all = all.filter(r => !r.closed);
+    /* (2026-11-18) «남기기»가 있는 과거 거래처 가운데 올린 곳은 고객사로 남는다 — partnerRows 의 남김 머리말 */
+    all = all.filter(r => !r.closed || (r.kept && r.posted === 'yes'));
     /* ★ 사무대행은 자문사가 아니다 (대표 지시 2026-09-06). 66곳이 섞여 있었다.
        ⚠ 감추지 않는다 — 「사무대행」 딱지로 볼 수 있다. */
     if (App.filter !== 'suboffice') all = all.filter(r => !r.subOffice);
@@ -7361,7 +7436,7 @@ function chipsHtml() {
   }
   /* 살아있는 = 거래 중이고 «사무대행이 아닌» 곳 — 기본 목록이 세우는 것과 같다 */
   const 살아있는 = App.group === 'partner'
-    ? all.filter(r => !r.closed && !r.subOffice) : all;
+    ? all.filter(r => (!r.closed || (r.kept && r.posted === 'yes')) && !r.subOffice) : all;
   /* ★ 구성원도 기본에서 «내려간 사람»을 뺀다 (2026-09-14) — visibleRows 와 같은 규칙이라야
        「전체 9」라 적혀 있는데 눌러 보니 7줄인 일이 없다.
      ⚠ 이름도 바꾼다. 뺀 것이 있는데 「전체」라고 적으면 그것은 거짓말이다 —
@@ -7543,9 +7618,9 @@ function listHtml() {
     /* ★ 자문사에 대한 것은 «모두 여기»에 모은다 (대표 지시 2026-09-06) —
        고르기도 로고도 자문사 화면 안에서 끝난다. 머리띠에 두지 않는다. */
     + (App.group === 'partner'
-        ? '<button class="btn sm pri" onclick="openPartnerPick()">＋ 자문사 고르기</button>'
+        ? '<button class="btn sm pri" onclick="openPartnerPick()">＋ 고객사 고르기</button>'
           + '<button class="btn sm" onclick="openPartnerLogos()"'
-          + ' title="자문사 쪽에 보일 로고와 차례를 정합니다">로고 관리</button>' : '')
+          + ' title="고객사 쪽에 보일 로고와 차례를 정합니다">로고 관리</button>' : '')
     + '</div>';
   /* 찾기 칸 — 업체가 수백 개다. 찾을 길이 없으면 «회사별로 고르기»가 안 된다. */
   if (App.group === 'partner') {
@@ -7597,7 +7672,7 @@ function rowsHtml() {
       return '<div class="empty">아직 <b>아무 곳도 안 골랐습니다.</b><br>'
         + '<span class="sub">업체관리에 ' + 고를수있는 + '곳이 있습니다 — 홈페이지에 올릴 곳을 고르십시오.</span>'
         + '<div style="margin-top:9px">'
-        + '<button class="btn pri" onclick="openPartnerPick()">＋ 자문사 고르기</button></div></div>';
+        + '<button class="btn pri" onclick="openPartnerPick()">＋ 고객사 고르기</button></div></div>';
     }
     return '<div class="empty">' + (App.q ? '찾는 이름이 없습니다.' : '이 딱지에 해당하는 줄이 없습니다.')
       + '</div>';
@@ -7713,8 +7788,8 @@ function 미리보기문서(html, b) {
 function 미리보기HTML() {
   const g = App.group;
   if (g === 'partner') {
-    return { why: '자문사현황은 로고 «그림»이라 여기서 미리 볼 것이 없습니다.\n'
-      + '위 「자문사 로고 관리」에서, 붙인 로고를 실제 배경 위에 보여 드립니다.' };
+    return { why: '고객사는 로고 «그림»이라 여기서 미리 볼 것이 없습니다.\n'
+      + '위 「고객사 로고 관리」에서, 붙인 로고를 실제 배경 위에 보여 드립니다.' };
   }
   if (g === 'members') {
     if (!App.sitePeople) {
@@ -7893,7 +7968,7 @@ function partnerEdit(d) {
   h += '<div class="ehd">';
   /* 한 줄 + 접기 (5차 지시 ②) — 회사를 고를 때마다 같은 설명을 다시 읽지 않는다 */
   h += noteOneLine('<b>대조를 못 하는 갈래</b>입니다 — 올렸는지는 사람이 표시합니다.',
-    '홈페이지 자문사현황은 <b>로고 그림</b>입니다. 회사명이 글자로 없어 통합시스템이 '
+    '홈페이지 고객사는 <b>로고 그림</b>입니다. 회사명이 글자로 없어 통합시스템이 '
     + '대조를 할 수 없습니다. 못 하는 것을 「같음」으로 뭉개면 올리지도 않은 회사가 올라간 것처럼 '
     + '보입니다 — 그래서 「올림 / 안 올림」을 사람이 표시해 두고, 그 표시로 회사명 목록을 만들어 '
     + '드립니다. 로고 그림은 사람이 올립니다.', '왜 못 하나');
@@ -7937,7 +8012,7 @@ function partnerEdit(d) {
   h += '<div class="fld"><label>메모 (왜 올렸는지·왜 안 올렸는지) — 단추를 다시 누르면 함께 저장됩니다</label>'
     + '<textarea rows="2" oninput="fieldEdit(\'why\',this.value)">' + esc(d.why) + '</textarea></div>';
 
-  h += '<div class="guide"><b>자문사현황을 다루는 방식</b><ol>'
+  h += '<div class="guide"><b>고객사를 다루는 방식</b><ol>'
     + '<li>목록은 <b>푸른ERP 업체관리</b>에서 옵니다 — 여기서 회사를 새로 만들지 않습니다</li>'
     + '<li>어느 업체를 올릴지는 <b>회사별로 사람이</b> 고릅니다 (업체 종류로 자동으로 고르지 않습니다)</li>'
     + '<li>홈페이지는 로고 <b>그림</b>이라 대조를 못 합니다 — <b>올림/안 올림</b>만 표시해 둡니다</li>'
@@ -8650,10 +8725,10 @@ window.publishPage = publishPage;
 async function openPartnerLogos() {
   try {
     const res = await fetch(SITE_BASE + '/partner/index.html?t=' + Date.now());
-    if (!res.ok) throw new Error('자문사 쪽을 읽지 못했습니다 (' + res.status + ')');
+    if (!res.ok) throw new Error('고객사 쪽을 읽지 못했습니다 (' + res.status + ')');
     App.siteLogos = await res.text();
   } catch (e) {
-    await say('자문사 쪽을 읽지 못했습니다', (e && e.message) || String(e));
+    await say('고객사 쪽을 읽지 못했습니다', (e && e.message) || String(e));
     return;
   }
   drawPartnerLogos();
@@ -8663,7 +8738,7 @@ window.openPartnerLogos = openPartnerLogos;
 function drawPartnerLogos() {
   const 고른것 = PuSitePartner.올릴로고(App.siteLogos, App.partnerLogos);
   const 다 = 고른것.갈것.concat(고른것.숨긴것);
-  let h = modalHead('자문사 로고 — ' + 고른것.갈것.length + '장이 홈페이지에 보입니다');
+  let h = modalHead('고객사 로고 — ' + 고른것.갈것.length + '장이 홈페이지에 보입니다');
   /* ★ 여기 「새 로고 넣기는 아직 안 됩니다」가 적혀 있었다 — 아래에 «되는» 고르개를
        붙인 뒤에도 그 문장이 남아 있었다(2026-09-02 발견).
        그래서 이 화면을 열면 「안 된다」를 읽고 스무 줄 아래의 단추를 안 눌러 보게 됐다.
@@ -8981,7 +9056,7 @@ async function 로고담기(base64, 끝, 사연) {
   const 열쇠 = 로고열쇠();
   const 이름 = 열쇠 + '.' + 끝;
   const 자리 = 'site/files/logo/' + 이름;
-  const 답 = await 그림올리기(자리, base64, '자문사 로고 ' + (사연 || ''));
+  const 답 = await 그림올리기(자리, base64, '고객사 로고 ' + (사연 || ''));
   const 새것 = { srl: 열쇠, 그림: '../files/logo/' + 이름 };
   /* ★ 서버 목록에 «붙인다» — 다른 탭이 방금 담은 것이 있어도 함께 남는다.
        ⚠ 찬 자리(null)로 먼저 불려도 접지 않는다 — [새것] 을 내면 서버가 진짜 값으로 다시 부른다. */
@@ -9074,7 +9149,7 @@ async function publishPartner() {
   let 올림끄기 = null;
   try {
     const res = await fetch(SITE_BASE + '/partner/index.html?t=' + Date.now());
-    if (!res.ok) throw new Error('자문사 쪽을 읽지 못했습니다 (' + res.status + ')');
+    if (!res.ok) throw new Error('고객사 쪽을 읽지 못했습니다 (' + res.status + ')');
     const 지금쪽 = await res.text();
     /* ★ 계약 끝난 자문사 로고는 «저절로» 숨긴다 (2026-11-16 — 옛 홈페이지 자동 휴지통을 새 사이트로 옮김).
          업체관리를 못 읽었으면(App.companiesErr) 판정하지 않는다 — 비어 보이는 목록으로 아무 로고나 숨기지 않게.
@@ -9111,7 +9186,7 @@ async function publishPartner() {
     }
     /* ⚠ askYes 는 본문을 HTML 로 넣는다 — 회사 이름은 esc, 줄바꿈은 <br> */
     const ok = await askYes('홈페이지에 올릴까요?',
-      ('자문사 로고 ' + 고른것.갈것.length + '장을 이 차례로 보입니다.' +
+      ('고객사 로고 ' + 고른것.갈것.length + '장을 이 차례로 보입니다.' +
       (고른것.숨긴것.length ? '\n숨기는 로고 ' + 고른것.숨긴것.length + '장' : '') +
       (끝나숨김.length ? '\n\n[계약이 끝나 저절로 숨기는 로고] ' + 끝나숨김.length + '장\n'
         + 끝나숨김.map(x => '· ' + esc(회사이름((끝난.목록.filter(y => y.srl === String(x.srl))[0] || {}).companyId))).join('\n')
@@ -9125,7 +9200,7 @@ async function publishPartner() {
 
     let 올린쪽 = 0;
     if (새쪽 !== 지금쪽) {
-      await 올리기('site/partner/index.html', 새쪽, '자문사 로고 ' + 고른것.갈것.length + '장');
+      await 올리기('site/partner/index.html', 새쪽, '고객사 로고 ' + 고른것.갈것.length + '장');
       올린쪽++;
     }
     if (새메인) {
@@ -9144,7 +9219,7 @@ async function publishPartner() {
     }
     toast(올린쪽 + '쪽을 올렸습니다 — 1~2분 뒤 홈페이지에 뜹니다');
   } catch (e) {
-    console.warn('[자문사 올리기]', e);
+    console.warn('[고객사 올리기]', e);
     if (올림끄기) { 올림끄기(); 올림끄기 = null; }
     await say('올리지 못했습니다', (e && e.message) || String(e));
   } finally {

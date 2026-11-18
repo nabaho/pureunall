@@ -315,3 +315,38 @@ test('★★ 새 사이트 사본을 해석 부품이 읽는다 — 구성원은
     assert.ok(F.fixableRuns(P.pageBodyHtml(h)).length > 0, '★★ ' + mid + ' 고칠 줄이 0 — 「홈페이지에 올리기」가 안 나온다');
   });
 });
+
+/* ══════ 얼굴 사진 미리보기 (대표 지시 2026-11-18 「얼굴사진 업로드하면 오른쪽에 사진을 볼수 있게 해달라」) ══════ */
+test('★★ 얼굴 사진이 있으면 칸 오른쪽에 미리보기 그림을 그린다 — 지금 판의 그림만', () => {
+  const ctx = { OLD_SITE_OFF: true, App: { members: {} }, esc: (s) => String(s),
+                SITE_BASE: 'https://raw.example/site',
+                PuSitePeople: { 직원인가: (m) => String((m || {}).kind || '') === 'staff' },
+                새노무사준비: () => ({ 준비: false, 빠진것: [], 낡은허락: false }), 기록자이름: (x) => String(x || '') };
+  vm.createContext(ctx);
+  vm.runInContext(['새사이트사진칸Html', '사진판', '사진새사이트에있나', '사진미리주소'].map(화면함수).join('\n'), ctx);
+  /* ① 방금 넣은 사진 — 넣을 때 만든 그림 */
+  ctx.App.members.k = { name: '가', kind: 'labor', srl: '190', photo: { bytes: 4000, ver: 'v2' } };
+  ctx.App.사진미리 = { k: { 판: 'v2', src: 'data:image/jpeg;base64,QUJD' } };
+  const 방금 = ctx.새사이트사진칸Html({ key: 'k', srl: '190', mkind: 'labor' });
+  assert.match(방금, /<img id="facePrev"[^>]*src="data:image\/jpeg;base64,QUJD"/, '★★ 방금 넣은 사진이 오른쪽에 안 보인다');
+  assert.match(방금, /face-row/, '★ 사진 칸과 미리보기가 한 줄(오른쪽)로 놓이지 않는다');
+  /* 옛 판의 그림은 안 쓴다 — 사진을 바꿨는데 옛 그림이 남으면 안 된다 */
+  ctx.App.사진미리 = { k: { 판: 'v1', src: 'data:image/jpeg;base64,T0xE' } };
+  ctx.App.members.k.photo = { bytes: 4000, ver: 'v2', site: { path: 'site/files/people/k.jpg', v: '77', ver: 'v2' } };
+  const 사이트 = ctx.새사이트사진칸Html({ key: 'k', srl: '190', mkind: 'labor' });
+  assert.ok(사이트.indexOf('T0xE') < 0, '★★ 바뀌기 전 사진을 보인다');
+  assert.match(사이트, /src="https:\/\/raw\.example\/site\/files\/people\/k\.jpg\?v=\d+"/, '★★ 새 사이트에 올라간 사진을 안 보인다');
+  /* 사진이 없으면 그림 칸도 없다 */
+  ctx.App.members.n = { name: '나', kind: 'labor', srl: '' };
+  assert.ok(ctx.새사이트사진칸Html({ key: 'n', srl: '', mkind: 'labor' }).indexOf('facePrev') < 0, '★ 사진이 없는데 빈 그림 칸을 그린다');
+  /* 이상한 자리 글자는 주소로 안 쓴다 */
+  ctx.App.사진미리 = {};
+  ctx.App.members.k.photo.site.path = 'site/files/people/../../x.jpg';
+  assert.ok(ctx.새사이트사진칸Html({ key: 'k', srl: '190', mkind: 'labor' }).indexOf('raw.example') < 0, '★★ 모양이 틀린 사진 자리를 주소로 썼다');
+});
+
+test('★ 사진을 넣으면 그 그림을 미리보기에 바로 둔다 — 다시 읽으러 가지 않는다', () => {
+  const 몸 = 화면함수('새사진넣기');
+  assert.match(몸, /App\.사진미리[\s\S]{0,80}된것\.미리/, '★ 넣은 그림을 미리보기 칸에 안 둔다');
+  assert.match(html, /\.face-prev\{[^}]*object-fit:cover/, '★ 미리보기 그림 꾸밈이 없다');
+});
