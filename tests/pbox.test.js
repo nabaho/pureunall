@@ -2436,8 +2436,12 @@ test('⑪ 스마트 약칭·초성·불리언 판례검색 · 전국 35개 법�
     querySelectorAll: () => [],
     addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
   };
+  let lastMaxTimerCb = null;
   const ctx = {
-    setTimeout: () => 1,
+    setTimeout: (fn, ms) => {
+      if (ms >= 120000) lastMaxTimerCb = fn;
+      return 1;
+    },
     clearTimeout: () => {},
     setInterval: () => ({ unref() {} }),
     clearInterval: () => {},
@@ -2691,23 +2695,7 @@ test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · �
     };
   }
 
-  let mockLocalSpeechAvail = 'unavailable';
-  let mockInstallCalls = 0;
   class MockSpeechRecognition {
-    static async available(opts) {
-      if (!opts || opts.processLocally !== true || !Array.isArray(opts.langs) || !opts.langs.includes('ko-KR')) {
-        return 'unavailable';
-      }
-      return mockLocalSpeechAvail;
-    }
-    static async install(opts) {
-      if (!opts || opts.processLocally !== true || !Array.isArray(opts.langs) || !opts.langs.includes('ko-KR')) {
-        return false;
-      }
-      mockInstallCalls++;
-      mockLocalSpeechAvail = 'available';
-      return true;
-    }
     constructor() {
       this.lang = '';
       this.continuous = false;
@@ -2715,6 +2703,12 @@ test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · �
       this.processLocally = false;
       this.started = false;
       this.stopped = false;
+      this.onstart = null;
+      this.onaudiostart = null;
+      this.onsoundstart = null;
+      this.onspeechstart = null;
+      this.onspeechend = null;
+      this.onsoundend = null;
       this.onresult = null;
       this.onend = null;
       this.onerror = null;
@@ -2739,8 +2733,12 @@ test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · �
     addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
   };
 
+  let lastMaxTimerCb = null;
   const ctx = {
-    setTimeout: () => 1,
+    setTimeout: (fn, ms) => {
+      if (ms >= 120000) lastMaxTimerCb = fn;
+      return 1;
+    },
     clearTimeout: () => {},
     setInterval: () => ({ unref() {} }),
     clearInterval: () => {},
@@ -2874,37 +2872,80 @@ test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · �
   assert.equal(preventedPlainEnter, true, '홈 입력창에서 일반 Enter 입력 시 즉시 실행되어야 합니다');
   assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxCaseSearchInput') && elementsById.pboxMainArea.innerHTML.includes('pbox-unified-board'), '홈 검색 모드에서 Enter 입력 시 즉시 통합검색 화면과 4대 근거 보드가 열려야 합니다');
 
-  /* D) 온디바이스 로컬 음성인식(processLocally) 보안 강제 검증:
-   * - 로컬 한국어 모델이 unavailable 인 경우 외부 음성서버 폴백 없이 rec.start()를 완전 차단해야 함
-   * - downloadable 상태에서는 install({ langs: ['ko-KR'], processLocally: true }) 후 rec.processLocally === true 로만 시작해야 함 */
+  /* D) 실시간 음성인식(SpeechRecognition ko-KR) 고지·동의 게이트(fail-closed) · 동기 시작 · 상태 표시 · 음절 단위 즉시 화면 반영 · 분할 주민번호/연락처/재등장 실명 마스킹 · 무음/최대시간 자동종료 검증 */
   App.switchView('home');
   dispatchClick({ 'data-act': 'set-mode', 'data-mode': 'auto' });
-  mockLocalSpeechAvail = 'unavailable';
-  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
-  await new Promise((r) => setImmediate(r));
-  assert.equal(speechInstances.some((inst) => inst.started), false, '온디바이스 로컬 모델 미지원(unavailable) 시 외부 서버 전송 차단을 위해 rec.start()가 절대 호출되면 안 됩니다');
-
   speechInstances.length = 0;
-  mockLocalSpeechAvail = 'downloadable';
+
+  /* 0) window.confirm 이 없는 환경에서는 fail-closed 로 차단되어야 함 */
+  delete ctx.window.confirm;
   dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
-  await new Promise((r) => setImmediate(r));
-  await new Promise((r) => setImmediate(r));
-  assert.equal(mockInstallCalls, 1, '온디바이스 한국어 모델이 downloadable 상태면 install({ langs: [ko-KR], processLocally: true })이 호출되어야 합니다');
+  assert.equal(speechInstances.length, 0, 'window.confirm 미지원 환경에서는 동의 확인 없이 마이크가 시작되면 안 됩니다(fail-closed)');
+
+  /* 1) 1회 고지·동의 거부 시 SpeechRecognition.start()가 실행되면 안 됨 */
+  let confirmDecision = false;
+  ctx.window.confirm = () => confirmDecision;
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  assert.equal(speechInstances.length, 0, '브라우저 음성인식 고지·동의 확인을 거부하면 마이크가 시작되면 안 됩니다');
+
+  confirmDecision = true;
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
   const rec = speechInstances.find((inst) => inst.started);
-  assert.ok(rec, '온디바이스 한국어 모델 준비 완료 후 로컬 음성인식 인스턴스가 시작되어야 합니다');
+  assert.ok(rec, '동의 후 음성설명 클릭 즉시 동기 방식으로 SpeechRecognition 인스턴스가 시작되어야 합니다');
   assert.equal(rec.lang, 'ko-KR');
-  assert.equal(rec.processLocally, true, 'rec.processLocally === true 가 강제되어야 외부 음성 서버로 원음이 전송되지 않습니다');
+  assert.equal(rec.interimResults, true, '말하는 내용이 즉시 보이도록 interimResults: true 가 켜져야 합니다');
+  assert.equal(rec.continuous, true);
+  assert.equal(rec.processLocally, false, 'Windows Chrome 한국어 무음 장애를 유발하는 processLocally 강제가 제거되어야 합니다');
+  assert.ok(elementsById.pboxVoiceBannerSlot.innerHTML.includes('pbox-voice-live-card'), '음성 시작 즉시 실시간 음성 인식 모니터 카드가 표시되어야 합니다');
+
+  /* 마이크 준비 → 음성 감지 → 말하고 있는 중간(isFinal: false) 음절이 즉시 라이브 화면과 입력창에 모두 표시되는지 검증 */
+  if (rec.onstart) rec.onstart();
+  assert.ok(elementsById.pboxVoiceStatePill.textContent.includes('마이크 켜짐'), '마이크 연결 시 준비 완료 상태 배지가 표시되어야 합니다');
+
+  if (rec.onspeechstart) rec.onspeechstart();
+  assert.ok(elementsById.pboxVoiceStatePill.textContent.includes('음성 인식됨'), '발화 감지 즉시 음성 인식됨 상태 배지로 전환되어야 합니다');
+
+  /* 두 조각(확정 조각 + 실시간 중간 조각)에 걸친 분할 주민번호(6+7)·분할 휴대전화(10+1)·재등장 실명까지 결합 즉시 마스킹되는지 검증 */
+  const splitFront = '890214';
+  const splitBack = '1' + '234567';
+  const phoneHead10 = '010-' + '9876-543';
+  const phoneTail1 = '2';
+  rec.onresult({
+    results: [
+      Object.assign([{ transcript: '근로자 박민수가 입사했고 연락처 ' + phoneHead10 }], { isFinal: true }),
+      Object.assign([{ transcript: phoneTail1 + ' 이며 박민수가 카카오톡 해고됨' }], { isFinal: false })
+    ]
+  });
+  assert.ok(
+    !elementsById.pboxPromptInput.value.includes('010-****-*** 2') &&
+    elementsById.pboxPromptInput.value.includes('010-****-****') &&
+    !elementsById.pboxPromptInput.value.includes('박민수') &&
+    !elementsById.pboxVoiceLiveScreen.innerHTML.includes('박민수'),
+    '세그먼트·중간결과 경계에 걸친 10+1자리 휴대전화와 후속 재등장 당사자 실명이 모두 결합 즉시 비식별화되어야 합니다'
+  );
+
+  rec.onresult({
+    results: [
+      Object.assign([{ transcript: '근로자 주민번호 ' + splitFront }], { isFinal: true }),
+      Object.assign([{ transcript: splitBack + ' 카카오톡 해고' }], { isFinal: false })
+    ]
+  });
+  assert.ok(
+    !elementsById.pboxPromptInput.value.includes(splitBack) &&
+    !elementsById.pboxVoiceLiveScreen.innerHTML.includes(splitBack),
+    '세그먼트 경계에 걸쳐 나뉜 6+7자리 주민등록번호도 결합 즉시 비식별화되어야 합니다'
+  );
 
   rec.onresult({
     results: [
       Object.assign([{ transcript: `상시 12인 회사에서 재해자 박민수(${synthRrn})가 카카오톡으로 해고 통보를 받았습니다` }], { isFinal: true })
     ]
   });
-  assert.ok(!elementsById.pboxPromptInput.value.includes(synthRrn), '음성 인식 결과에 포함된 주민등록번호는 입력창 반영 즉시 마스킹되어야 합니다');
+  assert.ok(!elementsById.pboxPromptInput.value.includes(synthRrn) && !elementsById.pboxVoiceLiveScreen.innerHTML.includes(synthRrn), '음성 인식 결과에 포함된 주민등록번호는 라이브 모니터와 입력창 반영 즉시 마스킹되어야 합니다');
   assert.ok(elementsById.pboxLiveFactReview.innerHTML.includes('서면통지'), '음성 설명 중에도 실시간 법리 포섭 패널이 즉시 작동해야 합니다');
 
-  /* 음성 입력 종료(onend) 시 자동으로 내용검토(review) 워크스페이스가 열리고 2단 분할 4대 근거가 표시되어야 함 */
-  rec.onend();
+  /* [바로 검색·검토] 완료 시 사실관계 서술은 내용검토(review) 워크스페이스로 열리고 2단 분할 4대 근거가 표시되어야 함 */
+  dispatchClick({ 'data-act': 'finish-voice-review' });
   await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
 
@@ -2921,6 +2962,35 @@ test('⑫ 화면 전체 100% 레이아웃 · 홈 Enter 즉시 검색/검토 · �
   assert.equal(elementsById.pboxWsGrid.classList.contains('reader-open'), true, '우측 원문 리더가 열리면 워크스페이스 그리드가 reader-open 상태로 전환되어야 합니다');
   dispatchClick({ 'data-act': 'close-reader' });
   assert.equal(elementsById.pboxWsGrid.classList.contains('reader-open'), false, '원문 리더를 닫으면 워크스페이스 2단 분할 그리드가 복원되어야 합니다');
+
+  /* 연속 무음(no-speech · 주변 소음 onsoundstart 포함) 자동 종료, 취소 시 포커스 복원, Escape(closeTopLayerForBack), 2분 강제 종료 타이머 검증 */
+  App.switchView('home');
+  speechInstances.length = 0;
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  const idleRec = speechInstances[speechInstances.length - 1];
+  idleRec.onerror({ error: 'no-speech' });
+  if (idleRec.onsoundstart) idleRec.onsoundstart();
+  idleRec.onerror({ error: 'no-speech' });
+  idleRec.onerror({ error: 'no-speech' });
+  idleRec.onend();
+  assert.equal(elementsById.pboxVoiceBannerSlot.innerHTML, '', '주변 소음(onsoundstart)이 있더라도 실제 인식 결과 없이 무음(no-speech)이 3회 누적되면 마이크가 자동 종료되어야 합니다');
+
+  let inputFocused = false;
+  elementsById.pboxPromptInput.focus = () => { inputFocused = true; };
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  dispatchClick({ 'data-act': 'cancel-voice-input' });
+  assert.equal(inputFocused, true, '음성 입력 취소 시 입력창으로 키보드 포커스가 복원되어야 합니다');
+
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  assert.equal(App.closeTopLayerForBack(), true, '활성 음성인식 중 뒤로가기/Escape(closeTopLayerForBack)는 마이크를 닫아야 합니다');
+  assert.equal(elementsById.pboxVoiceBannerSlot.innerHTML, '', 'closeTopLayerForBack 실행 후 음성 모니터가 닫혀야 합니다');
+
+  lastMaxTimerCb = null;
+  dispatchClick({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  assert.equal(typeof lastMaxTimerCb, 'function', '연속 음성인식 시작 시 독립 2분 강제 종료 타이머가 설정되어야 합니다');
+  lastMaxTimerCb();
+  assert.equal(elementsById.pboxVoiceBannerSlot.innerHTML, '', 'onend가 오지 않더라도 2분 최대 제한 타이머 만료 시 마이크가 자동 종료되어야 합니다');
+  delete ctx.window.confirm;
 });
 
 /* ══════════════════════════════════════════════════════════════════
@@ -3736,8 +3806,12 @@ test('⑮ 공무원·군인·교원·선원 및 민사·상사·집행·회생 �
   elementsById.pboxLiveFactReview = makeUxEl('pboxLiveFactReview');
 
   const lsMap = {};
+  let lastMaxTimerCb = null;
   const ctx = {
-    setTimeout: () => 1,
+    setTimeout: (fn, ms) => {
+      if (ms >= 120000) lastMaxTimerCb = fn;
+      return 1;
+    },
     clearTimeout: () => {},
     setInterval: () => ({ unref() {} }),
     clearInterval: () => {},
@@ -4643,8 +4717,12 @@ test('㉜ 미니멀 검색 중심 UI 규칙 — 상단/사이드바 정적 건�
     addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
   };
 
+  let lastMaxTimerCb = null;
   const ctx = {
-    setTimeout: () => 1,
+    setTimeout: (fn, ms) => {
+      if (ms >= 120000) lastMaxTimerCb = fn;
+      return 1;
+    },
     clearTimeout: () => {},
     setInterval: () => ({ unref() {} }),
     clearInterval: () => {},

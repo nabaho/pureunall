@@ -158,11 +158,37 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-ws-grid.reader-open{grid-template-columns:minmax(0,1fr)}
 .pbox-ws-grid>*{min-width:0}
 
-/* 음성 마이크 설명 입력 · 실시간 사실관계 자동 법리검토 · 4대 근거(법령·판례·결정례·행정해석) 한번에 보기 보드 */
+/* 음성 마이크 설명 입력 · 실시간 음성 감지 상태 · 실시간 말한 내용 즉시 표시창 */
 .pbox-voice-btn{min-height:32px;min-width:32px;padding:6px 11px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e40af;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .pbox-voice-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
 .pbox-voice-btn.recording{background:#dc2626;color:#ffffff;border-color:#dc2626}
-.pbox-voice-banner{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;margin-bottom:8px;border-radius:10px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-size:12px;font-weight:700}
+.pbox-voice-live-card{background:#eff6ff;border:1px solid #60a5fa;border-radius:12px;padding:12px 14px;margin-bottom:10px;color:#1e293b}
+.pbox-voice-live-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.pbox-voice-status-wrap{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.pbox-voice-wave{display:inline-flex;align-items:center;gap:3px;height:16px;padding:0 2px}
+.pbox-vw-bar{width:3px;height:6px;border-radius:2px;background:#2563eb;animation:pboxVwIdle 1.2s ease-in-out infinite}
+.pbox-vw-bar:nth-child(2){animation-delay:.15s}
+.pbox-vw-bar:nth-child(3){animation-delay:.3s}
+.pbox-vw-bar:nth-child(4){animation-delay:.45s}
+.pbox-voice-wave.speaking .pbox-vw-bar{background:#16a34a;animation:pboxVwSpeak .42s ease-in-out infinite}
+.pbox-voice-wave.speaking .pbox-vw-bar:nth-child(2){animation-delay:.1s}
+.pbox-voice-wave.speaking .pbox-vw-bar:nth-child(3){animation-delay:.2s}
+.pbox-voice-wave.speaking .pbox-vw-bar:nth-child(4){animation-delay:.3s}
+@keyframes pboxVwIdle{0%,100%{height:5px;opacity:.55}50%{height:11px;opacity:1}}
+@keyframes pboxVwSpeak{0%,100%{height:4px}50%{height:16px}}
+@keyframes pboxCaretBlink{0%,100%{opacity:1}50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.pbox-vw-bar,.pbox-voice-wave.speaking .pbox-vw-bar,.pbox-voice-caret{animation:none}}
+.pbox-voice-state-pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.pbox-voice-state-pill.connecting{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+.pbox-voice-state-pill.ready{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.pbox-voice-state-pill.speaking{background:#2563eb;color:#ffffff;border:1px solid #1e40af}
+.pbox-voice-state-pill.recognized{background:#166534;color:#ffffff;border:1px solid #166534}
+.pbox-voice-live-screen{background:#ffffff;border:1px solid #bfdbfe;border-radius:9px;padding:10px 13px;min-height:48px;font-size:16px;line-height:1.62;color:#1e293b;word-break:keep-all;overflow-wrap:anywhere}
+.pbox-voice-placeholder{color:#64748b;font-size:14px}
+.pbox-voice-committed{color:#1e293b;font-weight:700}
+.pbox-voice-interim{background:#eff6ff;color:#1e40af;font-weight:800;padding:1px 5px;border-radius:4px;border-bottom:2px solid #2563eb}
+.pbox-voice-caret{color:#2563eb;font-weight:900;margin-left:2px;animation:pboxCaretBlink .9s step-end infinite}
+.pbox-voice-subnote{font-size:11px;color:#475569;margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 
 .pbox-live-review-box{background:#ffffff;border:1px solid #60a5fa;border-radius:12px;padding:13px 15px;margin:8px 0 14px}
 .pbox-live-review-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-bottom:9px;margin-bottom:10px;border-bottom:1px solid #e2e8f0}
@@ -480,11 +506,11 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
   .pbox-sidebar,.pbox-sidebar.collapsed{display:flex;position:fixed;top:0;left:0;bottom:0;transform:translateX(-105%);visibility:hidden;pointer-events:none;transition:transform .2s ease,visibility 0s linear .2s;z-index:1150}
   .pbox-sidebar.mobile-open{transform:translateX(0);visibility:visible;pointer-events:auto;transition:transform .2s ease,visibility 0s}
   .pbox-main-scroll{padding:10px 8px 56px;overflow-x:hidden}
-  .pbox-home-wrap,.pbox-home-stage,.pbox-page-wrap,.pbox-ws-wrap,.pbox-card,.pbox-composer-card,.pbox-site-card,.pbox-biglaw-card,.pbox-unified-board,.pbox-live-review-box,.pbox-calm-assist,.pbox-conn-law-bar,.pbox-unified-col{max-width:100%;min-width:0}
+  .pbox-home-wrap,.pbox-home-stage,.pbox-page-wrap,.pbox-ws-wrap,.pbox-card,.pbox-composer-card,.pbox-site-card,.pbox-biglaw-card,.pbox-unified-board,.pbox-live-review-box,.pbox-calm-assist,.pbox-conn-law-bar,.pbox-unified-col,.pbox-voice-live-card,.pbox-voice-live-screen{max-width:100%;min-width:0}
   .pbox-home-stage{margin:4px 0 0}
   .pbox-hero-bar{margin:2px 0 10px}
   .pbox-hero-greeting{font-size:18px;line-height:1.4;margin:0}
-  .pbox-card,.pbox-clause-card,.pbox-lbox-empty-proj,.pbox-site-card,.pbox-biglaw-card,.pbox-unified-board,.pbox-live-review-box,.pbox-calm-assist,.pbox-unified-col,.pbox-live-issue-card{padding:10px 8px}
+  .pbox-card,.pbox-clause-card,.pbox-lbox-empty-proj,.pbox-site-card,.pbox-biglaw-card,.pbox-unified-board,.pbox-live-review-box,.pbox-calm-assist,.pbox-unified-col,.pbox-live-issue-card,.pbox-voice-live-card{padding:10px 8px}
   .pbox-composer-card{padding:10px 8px}
   .pbox-proj-item{padding:8px 6px}
   .pbox-wf-card{padding:10px 4px}
@@ -527,7 +553,17 @@ html[data-theme="dark"],html[data-theme="dark"] body,html[data-theme="dark"] .pb
 html[data-theme="dark"] .pbox-profile-card,html[data-theme="dark"] .pbox-cite-bar,html[data-theme="dark"] .pbox-info-note,html[data-theme="dark"] .pbox-doc-meta-box,html[data-theme="dark"] .pbox-draft-box,html[data-theme="dark"] .pbox-reader-hd,html[data-theme="dark"] .pbox-modal-hd,html[data-theme="dark"] .pbox-md-quote,html[data-theme="dark"] .pbox-inline-code,html[data-theme="dark"] .pbox-mode-seg,html[data-theme="dark"] .pbox-clause-quote,html[data-theme="dark"] .pbox-op-hint,html[data-theme="dark"] .pbox-biglaw-card,html[data-theme="dark"] .pbox-unified-col{background:#000000;color:#cbd5e1;border-color:#475569}
 html[data-theme="dark"] .pbox-sidebar,html[data-theme="dark"] .pbox-side-foot,html[data-theme="dark"] .pbox-topbar,html[data-theme="dark"] .pbox-card,html[data-theme="dark"] .pbox-filter-card,html[data-theme="dark"] .pbox-composer-card,html[data-theme="dark"] .pbox-composer-card:focus-within,html[data-theme="dark"] .pbox-input,html[data-theme="dark"] .pbox-adv-subinput,html[data-theme="dark"] .pbox-select-sm,html[data-theme="dark"] .pbox-textarea,html[data-theme="dark"] .pbox-ws-title-input,html[data-theme="dark"] .pbox-recent-row,html[data-theme="dark"] .pbox-wf-card,html[data-theme="dark"] .pbox-proj-item,html[data-theme="dark"] .pbox-reader,html[data-theme="dark"] .pbox-reader-tabs,html[data-theme="dark"] .pbox-reader-tools,html[data-theme="dark"] .pbox-law-art,html[data-theme="dark"] .pbox-modal-box,html[data-theme="dark"] .pbox-preview-pre,html[data-theme="dark"] .pbox-btn-sm,html[data-theme="dark"] .pbox-icon-btn,html[data-theme="dark"] .pbox-plus-btn,html[data-theme="dark"] .pbox-voice-btn,html[data-theme="dark"] .pbox-side-newproj-btn,html[data-theme="dark"] .pbox-qa-pill,html[data-theme="dark"] .pbox-cat-chip,html[data-theme="dark"] .pbox-logout-btn,html[data-theme="dark"] .pbox-art-hit,html[data-theme="dark"] .pbox-clause-card,html[data-theme="dark"] .pbox-lbox-empty-proj,html[data-theme="dark"] .pbox-site-card,html[data-theme="dark"] .pbox-ext-pill,html[data-theme="dark"] .pbox-issue-tab,html[data-theme="dark"] .pbox-issue-chip,html[data-theme="dark"] .pbox-bundle-btn,html[data-theme="dark"] .pbox-biglaw-tools,html[data-theme="dark"] .pbox-unified-board,html[data-theme="dark"] .pbox-unified-item,html[data-theme="dark"] .pbox-live-review-box,html[data-theme="dark"] .pbox-home-dash-grid>.pbox-lbox-sec,html[data-theme="dark"] .pbox-table tbody tr{background:#1e293b;color:#f8fafc;border-color:#475569}
 html[data-theme="dark"] .pbox-voice-btn.recording{background:#dc2626;color:#ffffff;border-color:#f87171}
-html[data-theme="dark"] .pbox-voice-banner{background:#000000;color:#f87171;border-color:#dc2626}
+html[data-theme="dark"] .pbox-voice-live-card{background:#1e293b;color:#f8fafc;border-color:#60a5fa}
+html[data-theme="dark"] .pbox-voice-live-screen{background:#000000;color:#f8fafc;border-color:#475569}
+html[data-theme="dark"] .pbox-voice-committed{color:#f8fafc}
+html[data-theme="dark"] .pbox-voice-placeholder,html[data-theme="dark"] .pbox-voice-subnote{color:#cbd5e1}
+html[data-theme="dark"] .pbox-voice-interim{background:#1e40af;color:#ffffff;border-color:#60a5fa}
+html[data-theme="dark"] .pbox-voice-caret{color:#60a5fa}
+html[data-theme="dark"] .pbox-vw-bar{background:#60a5fa}
+html[data-theme="dark"] .pbox-voice-wave.speaking .pbox-vw-bar{background:#4ade80}
+html[data-theme="dark"] .pbox-voice-state-pill.connecting{background:#854d0e;color:#fffbeb;border-color:#d97706}
+html[data-theme="dark"] .pbox-voice-state-pill.ready,html[data-theme="dark"] .pbox-voice-state-pill.recognized{background:#166534;color:#ffffff;border-color:#4ade80}
+html[data-theme="dark"] .pbox-voice-state-pill.speaking{background:#2563eb;color:#ffffff;border-color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-card,html[data-theme="dark"] .pbox-unified-item:hover{background:#000000;color:#f8fafc;border-color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-title{color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-body,html[data-theme="dark"] .pbox-unified-title,html[data-theme="dark"] .pbox-unified-col-hd,html[data-theme="dark"] .pbox-unified-item-title{color:#f8fafc;border-color:#475569}
@@ -635,7 +671,7 @@ html[data-theme="dark"] .pbox-conn-grp{background:#1e40af;color:#ffffff}
 <script src="js/pu-pbox-corpus.js?v=10"></script>
 <script src="js/pu-pbox-engine.js?v=23"></script>
 <script src="js/pu-pbox-store.js?v=27"></script>
-<script src="js/pu-pbox-app.js?v=31"></script>
+<script src="js/pu-pbox-app.js?v=32"></script>
 <script>
 try {
   PuBack.guard(function () {
