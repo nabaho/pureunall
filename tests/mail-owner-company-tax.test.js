@@ -26,10 +26,10 @@ function normName(s) {
 
 function makeSandbox(opts = {}) {
   const companies = opts.companies || [
-    { id: 'co-101', name: '다라식당앤구이', bizNo: '101-81-00001', status: 'active', managerMain: '김영희', taxEmail: 'tax@chungsol.kr', taxOfficeName: '세무법인청솔' },
-    { id: 'co-102', name: '주식회사 마바유통', bizNo: '102-81-00002', status: 'active', managerMain: '이철수', taxEmail: 'tax@chungsol.kr', taxOfficeName: '세무법인청솔' },
-    { id: 'co-103', name: '가나상사', bizNo: '103-81-00003', status: 'active', managerMain: '김영희', email: 'ceo@gana.kr' },
-    { id: 'co-104', name: '사아테크', bizNo: '104-81-00004', status: 'active', managerMain: '김영희', taxEmail: '' },
+    { id: 'co-101', name: '다라식당앤구이', bizNo: '123-45-00001', status: 'active', managerMain: '김영희', taxEmail: 'tax@chungsol.kr', taxOfficeName: '세무법인청솔' },
+    { id: 'co-102', name: '주식회사 마바유통', bizNo: '123-45-00002', status: 'active', managerMain: '이철수', taxEmail: 'tax@chungsol.kr', taxOfficeName: '세무법인청솔' },
+    { id: 'co-103', name: '가나상사', bizNo: '123-45-00003', status: 'active', managerMain: '김영희', email: 'ceo@gana.kr' },
+    { id: 'co-104', name: '사아테크', bizNo: '123-45-00004', status: 'active', managerMain: '김영희', taxEmail: '' },
   ];
   const byId = {};
   const byName = {};
@@ -264,8 +264,8 @@ function makeSandbox(opts = {}) {
 test('★★★ 사업장 ID 우선 해석 + 받은메일함·보관메일함·지난메일(*old) 담당자 메일 유입 (담당모름 오염 없음)', () => {
   const { ctx } = makeSandbox({
     companies: [
-      { id: 'co-a', name: '가나상사', bizNo: '111-11-11111', status: 'active', managerMain: '이철수' },
-      { id: 'co-b', name: '가나상사(천안)', bizNo: '222-22-22222', status: 'active', managerMain: '김영희' },
+      { id: 'co-a', name: '가나상사', bizNo: '123-45-11111', status: 'active', managerMain: '이철수' },
+      { id: 'co-b', name: '가나상사(천안)', bizNo: '123-45-22222', status: 'active', managerMain: '김영희' },
     ],
     co: {
       'hr@gana-cheonan,kr': { n: '가나상사', id: 'co-b', at: 1 },
