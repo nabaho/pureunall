@@ -92,6 +92,31 @@ test('① 더 새 로그인의 표시를 옛 것이 덮지 않는다', () => {
   // 다른 사람이면 시각과 상관없이 새로 적는다
   assert.equal(g.PuActive.noteVia('u2', 'password', 1), true);
   assert.equal(JSON.parse(s.pu_login_via).uid, 'u2');
+  // 때를 모르는(0) 새 로그인은 옛 표시에 붙잡히지 않는다
+  assert.equal(g.PuActive.noteVia('u2', 'kakao', 0), true);
+  assert.equal(JSON.parse(s.pu_login_via).via, 'kakao');
+});
+
+test('① 로그인 때는 «서버 시각» 으로 적는다 — 기기 시계가 틀린 PC 에서도 같은 로그인끼리 맞는다', () => {
+  const { g } = 부품상자({}, {});
+  const u = 사람('u1');
+  assert.equal(g.PuActive.signInAt(u), Date.parse(u.metadata.lastSignInTime));
+  assert.equal(g.PuActive.signInAt({}), 0);
+  // 같은 로그인의 인증표(같은 서버 시각)는 포털이 적은 기록을 바로잡을 수 있다
+  const s = { pu_login_via: via('u1', 'kakao', Date.parse(u.metadata.lastSignInTime)) };
+  const b = 부품상자(s, {});
+  assert.equal(b.g.PuActive.noteVia('u1', 'password', Date.parse(u.metadata.lastSignInTime)), true);
+});
+
+test('① 인증표 읽기가 실패하면 매초 다시 부르지 않는다', async () => {
+  let 부름 = 0;
+  const u = 사람('u1', {}, { getIdTokenResult: () => { 부름++; return Promise.reject(new Error('오프라인')); } });
+  const { g } = 부품상자({}, { user: u });
+  g.PuActive.limitMs();
+  await new Promise((r) => setImmediate(r));
+  for (let i = 0; i < 5; i++) g.PuActive.limitMs();   // 시계가 매초 묻는다
+  await new Promise((r) => setImmediate(r));
+  assert.equal(부름, 1, '실패 뒤 곧바로 다시 불렀습니다 — 오프라인에서 매초 요청합니다');
 });
 
 test('① ★★ 인증표(서버 서명)의 kakao 표시로 바로잡는다', async () => {
@@ -162,8 +187,10 @@ test('④ ★ 포털은 로그인 직후 «어떻게 들어왔나» 를 적는�
   const s = stripJs(read('enter.html'));
   const pw = s.indexOf('signInWithEmailAndPassword(email, pw)');
   assert.ok(pw > 0, '비번 로그인 자리를 못 찾았습니다');
-  assert.match(s.slice(pw, pw + 800), /PuActive\.noteVia\([^)]*'password'/, '비번 로그인 뒤에 password 를 안 적습니다');
+  // 때는 서버 시각(signInAt)으로 — 기기 시계(Date.now)를 넘기면 시계가 앞선 PC 에서 순서가 어긋난다
+  const SERVER_AT = (v) => new RegExp("PuActive\\.noteVia\\([^;]*'" + v + "'\\s*,\\s*PuActive\\.signInAt\\(");
+  assert.match(s.slice(pw, pw + 800), SERVER_AT('password'), '비번 로그인 뒤에 password 를 (서버 시각으로) 안 적습니다');
   const kk = s.indexOf('signInWithCustomToken(');
   assert.ok(kk > 0, '카카오 로그인 자리를 못 찾았습니다');
-  assert.match(s.slice(kk, kk + 800), /PuActive\.noteVia\([^)]*'kakao'/, '★ 카카오 로그인 뒤에 kakao 를 안 적습니다');
+  assert.match(s.slice(kk, kk + 800), SERVER_AT('kakao'), '★ 카카오 로그인 뒤에 kakao 를 (서버 시각으로) 안 적습니다');
 });

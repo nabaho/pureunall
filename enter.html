@@ -2754,7 +2754,7 @@ body.portal-mode #moreFab{display:flex;}
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
         // 카카오 로그인 → 자동 로그아웃 3시간 (대표 지시 2026-11-18). 인증표의 kakao 표시로 다시 확인된다(js/pu-active.js).
-        try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', Date.now()); } catch(_v){}
+        try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', PuActive.signInAt(cred.user)); } catch(_v){}
         try {
           kkFirebaseHidden = kkFirebaseHidden || !!document.hidden;
           var resources = window.performance.getEntriesByType('resource');
@@ -3184,7 +3184,7 @@ body.portal-mode #moreFab{display:flex;}
     }).then(function(cred){
       _settled = true; clearTimeout(_watchdog);
       // 아이디·비번 로그인 → 자동 로그아웃은 포털 설정 시간(기본 1시간) (대표 지시 2026-11-18)
-      try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'password', Date.now()); } catch(_v){}
+      try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'password', PuActive.signInAt(cred.user)); } catch(_v){}
       // ⚠ 증표를 «기다리지 않는다» — 아래 아이디 저장도 enterPortal 도 이 약속과 무관하게
       //   그대로 진행된다. 증표를 못 얻으면 이번 성공은 그냥 기록하지 않는다(로그인이 먼저다).
       try {

@@ -49,6 +49,8 @@
   var KAKAO_LIMIT = 3 * 60 * 60 * 1000;         // 카카오 로그인 3시간 (대표 지시 2026-11-18)
   var lastMark = 0;
   var checkedKey = '';                          // 인증표를 이미 읽은 로그인 (uid|마지막 로그인 때)
+  var RETRY_MS = 60 * 1000;                     // 인증표 읽기가 실패하면 이만큼 쉬었다 다시(시계가 매초 묻는다)
+  var retryAt = 0;
 
   function lsGet(k) { try { return global.localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { global.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
@@ -79,12 +81,15 @@
   }
 
   /* 어떻게 로그인했나를 적는다 — via: 'kakao' | 'password' | 그 밖
-     at: 그 로그인이 일어난 때(ms). 같은 사람의 더 새 기록은 옛 기록으로 덮지 않는다. */
+     at: 그 로그인이 일어난 때(ms). 같은 사람의 더 새 기록은 옛 기록으로 덮지 않는다.
+     ⚠ at 은 «서버 시각» 으로 적는다(인증표 authTime · user.metadata.lastSignInTime) —
+       기기 시계(Date.now)와 섞으면 시계가 앞선 PC 에서 새 로그인 기록이 «더 옛 것» 으로 거절된다(검토 지적 2026-11-18). */
   function noteVia(uid, via, at) {
     if (!uid) return false;
     var t = Number(at) || 0;
     var old = readVia();
-    if (old && old.uid === String(uid) && Number(old.at) > t) return false;
+    // 때를 모르면(0) 막 일어난 로그인으로 보고 적는다 — 옛 표시가 새 로그인을 붙잡지 않게
+    if (old && old.uid === String(uid) && t > 0 && Number(old.at) > t) return false;
     return lsSet(VIA_KEY, JSON.stringify({ uid: String(uid), via: String(via || 'other'), at: t }));
   }
 
@@ -95,14 +100,21 @@
     if (!u || !u.uid || typeof u.getIdTokenResult !== 'function') return;
     var key = u.uid + '|' + ((u.metadata && u.metadata.lastSignInTime) || '');
     if (key === checkedKey) return;
+    if (Date.now() < retryAt) return;            // 방금 실패했다 — 매초 다시 부르지 않는다
     checkedKey = key;
+    var fail = function () { checkedKey = ''; retryAt = Date.now() + RETRY_MS; };
     try {
       u.getIdTokenResult().then(function (r) {
         var c = (r && r.claims) || {};
         var at = Date.parse((r && r.authTime) || '') || 0;
         noteVia(u.uid, c.kakao === true ? 'kakao' : ((r && r.signInProvider) || 'other'), at);
-      }, function () { checkedKey = ''; });
-    } catch (e) { checkedKey = ''; }
+      }, fail);
+    } catch (e) { fail(); }
+  }
+
+  /* 로그인 직후 그 사람의 «서버가 적은 로그인 때»(ms) — 없으면 0 */
+  function signInAt(user) {
+    try { return Date.parse((user && user.metadata && user.metadata.lastSignInTime) || '') || 0; } catch (e) { return 0; }
   }
 
   /* 카카오로 들어왔나 — 다른 사람이 남긴 표시는 믿지 않는다.
@@ -146,10 +158,11 @@
     mark: mark,
     limitMs: limitMs,       // 자동 로그아웃 시간 — 다섯 화면의 시계가 묻는다
     noteVia: noteVia,       // 로그인 직후 «어떻게 들어왔나» 를 적는다(포털)
+    signInAt: signInAt,     // noteVia 에 넘길 서버 시각
     isKakao: isKakao,
     // 검사용
     _mayMark: mayMark,
     _limitMs: limitMs,
-    _reset: function () { lastMark = 0; checkedKey = ''; }
+    _reset: function () { lastMark = 0; checkedKey = ''; retryAt = 0; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
