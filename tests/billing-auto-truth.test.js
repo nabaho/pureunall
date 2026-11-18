@@ -97,7 +97,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
   /* 2026-10-22 메일 서류 자동 처리(1시간마다, govReportAuto)가 늘어 스물여덟 — 서울 07~20시만 일하고 나머지는 읽기 0 으로 바로 끝나지만 «깨움»은 하루 24번이라 코드에서 읽은 주기로 센다(취업규칙 모으기와 같다) */
   /* 2026-10-31 새 사이트 열쇠 점검(아침 7:50, dailyHomepageKeyCheck)이 늘어 스물아홉 — 대표 지시 「앞으로 이런 문제 없게 자동으로」. 깃허브 저장소 두 곳을 읽기만 한다. 하루 셈 +1 */
   /* 2026-11-14 P박스 법령·판례 동기화(새벽 3:20, pboxDailySync)가 늘어 서른 — 국가법령 미러·판례·유권해석 증분 점검만 하며 실시간DB에는 쓰지 않는다. 하루 셈 +1 */
-  assert.strictEqual(all.length, 30,'스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
+  /* 2026-11-18 푸른메일함 계약·견적 전체 자동 검토(09·11·13·15·17·18시, mailContractSweep)가 늘어 서른하나 — 대표 지시 「매일 09시부터 2시간에 한번씩 18시까지 내게쓴메일함까지 전체 검토해 계약관리에 넣게」. 코드에서 읽은 시각 수(하루 6번)로 센다 */
+  assert.strictEqual(all.length, 31,'스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
@@ -144,6 +145,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '새 사이트 열쇠 점검 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.pboxDailySync') >= 0 && ENTER.indexOf('P박스 법령·판례 동기화 하루 한 번') >= 0,
     'P박스 법령·판례 동기화 일정이 화면 설명에 없습니다');
+  assert.ok(FIDX.indexOf('exports.mailContractSweep') >= 0 && ENTER.indexOf('메일 계약·견적 검토 하루 6번(09~18시, AI 정리)') >= 0,
+    '메일 계약·견적 자동 검토 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -205,10 +208,14 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const sync = scheduleOf(FSYNC, 'syncMailbox');
   const rules = scheduleOf(FIDX, 'collectRulesMail ');
   const gra = scheduleOf(FIDX, 'govReportAuto');
+  const mcsSeg = FIDX.slice(FIDX.indexOf('exports.mailContractSweep'), FIDX.indexOf('exports.mailContractSweep') + 500);
+  const mcsHours = ((mcsSeg.match(/\.pubsub\.schedule\(["']0 ([0-9,]+) \* \* \*["']\)/) || [])[1] || '').split(',').filter(Boolean).length;
+  assert.ok(mcsHours > 0, 'mailContractSweep 시각 목록을 못 읽음');
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
     + Math.round(60 / sync.every) * sync.hours
     + 15   // P박스 법령·판례 동기화(2026-11-14 +1) · 새 사이트 열쇠 점검(2026-10-31 +1) · 방문 사업장 안내 문자(2026-10-15 +1) · 정부지원금 공고 감시(2026-10-12 +1) · 공고 모으기(2026-10-12 +1) · 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·컨설턴트 모집 감시·회생광고 수집·공인노무사회 자료·뉴스레터 반송 확인·안내문 대장 정리·안내문 원문 보관 — 각 하루 한 번
+    + mcsHours   // 메일 계약·견적 전체 자동 검토 — 코드에서 읽은 하루 실행 횟수(09,11,13,15,17,18시)
     + Math.round(60 / rules.every) * rules.hours   // 취업규칙 모으기 — 30분마다 깨움(2026-10-05)
     + Math.round(60 / gra.every) * gra.hours   // 메일 서류 자동 처리 — 1시간마다 깨움(2026-10-22), 서울 07~20시 밖은 읽기 0 으로 바로 끝난다
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»

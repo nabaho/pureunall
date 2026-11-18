@@ -12001,7 +12001,7 @@ window.popConfirm = function(msg, onYes, opts){
   box.appendChild(msgEl);
   // 버튼들
   var btns = document.createElement('div');
-  Object.assign(btns.style, { display:'flex', gap:'6px', justifyContent:'flex-end' });
+  Object.assign(btns.style, { display:'flex', flexWrap:'wrap', gap:'6px', justifyContent:'flex-end' });
   var cancel = document.createElement('button');
   cancel.textContent = opts.cancelText || '취소';
   Object.assign(cancel.style, { padding:'4px 10px', fontSize:'11.5px', background:'#f8fafc', color:'#1e293b', border:'1px solid #cbd5e1', borderRadius:'4px', cursor:'pointer' });
@@ -12051,7 +12051,7 @@ window.popConfirm = function(msg, onYes, opts){
   if(left < 8) left = 8;
   box.style.top = top + 'px';
   box.style.left = left + 'px';
-  ok.focus();
+  (extra.length ? extra[0] : ok).focus();
   /* ── 끌어서 옮기기 ──
      손잡이(⠿)와 창 «자신의 여백»에서만 끌린다. 단추·입력칸 위에서는 안 끌린다.
      ⚠ 화면 밖으로는 못 나간다 — 나가면 취소·확인을 누를 수가 없다. */
@@ -12098,7 +12098,7 @@ window.popConfirm = function(msg, onYes, opts){
   var outside = function(e){ if(!box.contains(e.target)) close(false); };
   var onKey = function(e){
     if(e.key === 'Escape'){ e.preventDefault(); close(false); }
-    else if(e.key === 'Enter'){ e.preventDefault(); close(true); }
+    else if(e.key === 'Enter' && !extra.length){ e.preventDefault(); close(true); }
   };
   cancel.onclick = function(){ close(false); };
   if(third) third.onclick = function(){ close('third'); };
@@ -17308,7 +17308,7 @@ try {
   window.contractDupNeedsConfirm = contractDupNeedsConfirm;
 } catch(_){}
 
-// 계약번호 자동 생성: 계약-2026-001
+// 계약번호 자동 생성: 계약-2026-001 (동일 틱·비동기 연속 호출에서도 중복 번호 원천 차단)
 function genContractNo(){
   var year = (new Date()).getFullYear();
   var contracts = dbGet('contracts', []);
@@ -17317,7 +17317,16 @@ function genContractNo(){
     var m = (c.contractNo||'').match(new RegExp('^계약-' + year + '-(\\d+)$'));
     if(m){ var n = parseInt(m[1],10); if(n > maxN) maxN = n; }
   });
-  return '계약-' + year + '-' + ('00' + (maxN+1)).slice(-3);
+  var mem = genContractNo._seq;
+  if(mem && mem.year === year && mem.n > maxN) maxN = mem.n;
+  var nextN = maxN + 1;
+  genContractNo._seq = { year: year, n: nextN };
+  return '계약-' + year + '-' + ('00' + nextN).slice(-3);
+}
+
+// 계약 진행확인 필요 표시 여부 (담당자에게 진행·체결·종료 확인 요청)
+function erpHasCheckReq(c){
+  return !!(c && c.checkReq && !c.checkReq.resolvedAt && String(c.checkReq.note || '').trim());
 }
 
 var CONTRACT_DEMO_SEED = [];
@@ -21755,7 +21764,9 @@ function erpQuoteDay(ms){
 function erpQuoteNote(req){
   var r = req || {};
   var day = erpQuoteDay(r.at);
-  var lines = ['📧 푸른메일 보낸메일함에서 올림 — ' + (r.docKind === 'contract' ? '계약서' : '견적서') + ' 송부' + (day ? ' ' + day : '')];
+  var boxLabel = String(r.folderLabel || '보낸메일함').trim() || '보낸메일함';
+  var verb = boxLabel === '내게쓴메일함' ? '보관' : (boxLabel === '보낸메일함' ? '송부' : '수신');
+  var lines = ['📧 푸른메일 ' + boxLabel + '에서 올림 — ' + (r.docKind === 'contract' ? '계약서' : '견적서') + ' ' + verb + (day ? ' ' + day : '')];
   var subj = String(r.subject || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if(subj) lines.push('제목: ' + subj);
   var atts = (Array.isArray(r.atts) ? r.atts : []).map(function(x){ return String(x || '').slice(0, 40); }).filter(Boolean).slice(0, 3);
@@ -21772,15 +21783,44 @@ function erpQuoteLanePlan(req, cos, cts, users){
   var kind = r.kind;
   if(kind !== 'quote' && kind !== 'advance') return { action:'blocked', why:'알 수 없는 요청 종류입니다' };
   var all = (cts || []).filter(function(c){ return c && !c._deleted; });
+  var _canonMail = function(sk){
+    if(!sk) return '';
+    var raw = '';
+    if(typeof sk === 'object'){
+      var f0 = String(sk.folder || sk.slug || '').trim();
+      var u0 = String(sk.msgId || sk.uid || '').trim();
+      raw = (f0 && u0) ? (f0 + '|' + u0) : '';
+    } else {
+      raw = String(sk).trim();
+      var m0 = /^([^|:]+):(\d+)$/.exec(raw);
+      if(m0) raw = m0[1] + '|' + m0[2];
+    }
+    if(!raw) return '';
+    var idx = raw.lastIndexOf('|');
+    if(idx <= 0) return raw.toLowerCase();
+    var fb = raw.slice(0, idx).replace(/-[0-9a-f]{8}$/i, '').trim().toLowerCase();
+    var ub = raw.slice(idx + 1).trim();
+    if(!ub) return '';
+    if(/^(?:sent|sent messages|sent items|보낸메일함|보낸편지함)$/.test(fb)) fb = 'sent';
+    else if(/^(?:inbox|받은메일함|받은편지함)$/.test(fb)) fb = 'inbox';
+    else if(/^(?:tome|내게쓴메일함|내게쓴편지함)$/.test(fb)) fb = 'tome';
+    else if(/^(?:archive|보관메일함|보관함)$/.test(fb)) fb = 'archive';
+    return fb + '|' + ub;
+  };
+  var _hasMail = function(c, sk){
+    var ck = _canonMail(sk);
+    if(!ck) return false;
+    return (c.srcMails || []).some(function(x){ return _canonMail(x) === ck; });
+  };
   var srcKey = String(r.srcKey || '');
   var reqSrcMails = [];
   if(Array.isArray(r.srcMails)){
     r.srcMails.forEach(function(k){ var s = String(k || '').trim(); if(s && reqSrcMails.indexOf(s) < 0) reqSrcMails.push(s); });
   }
   if(srcKey && reqSrcMails.indexOf(srcKey) < 0) reqSrcMails.push(srcKey);
-  if(srcKey && all.some(function(c){ return (c.srcMails || []).indexOf(srcKey) >= 0; }))
+  if(srcKey && all.some(function(c){ return _hasMail(c, srcKey); }))
     return { action:'noop', why:'이미 반영한 메일입니다' };
-  if(reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return (c.srcMails || []).indexOf(sk) >= 0; }); }))
+  if(reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return _hasMail(c, sk); }); }))
     return { action:'noop', why:'이미 반영한 메일입니다' };
   /* 대상 업체 — 요청이 «가리키는» 업체만 믿는다 */
   var co = null;
@@ -21879,7 +21919,7 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   var scope = String(f.scope || '').trim();
   var text = [docName, scope].filter(Boolean).join(' ');
   if(/부당해고|부당징계|부당전보|구제신청|노동위원회|\d{4}\s*부해|임금\s*체불|퇴직금|체당금|대지급금|산재|요양\s*신청|장해\s*급여|유족\s*급여|직장\s*내\s*(괴롭힘|성희롱)|행정심판|진정\s*사건|사건\s*처리|위임\s*약정|약정서\s*및\s*위임장/.test(text)
-    || (/위임\s*(계약|약정)/.test(docName) && !/급여|자문|기금|컨설팅/.test(text))){
+    || (/위임\s*(계약|약정)/.test(docName) && !/급여|자문|기금|컨설팅|진단|취업규칙|규정|직무|의견서/.test(text))){
     var cList = caseTypes || [];
     var pickCase = function(rx, fallback){
       var hit = cList.find(function(t){ return t && (rx.test(t.name || '') || rx.test(t.short || '')); });
@@ -21910,7 +21950,7 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   }
   var ty = erpConsTypeByDocName(docName || scope, consTypes || []);
   if(ty && ty.code) return { kind:'consulting', typeCode:ty.code };
-  if(/컨설팅|용역|클리닉|일터혁신|기술보호/.test(text)){
+  if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(text)){
     var kList = consTypes || [];
     return { kind:'consulting', typeCode:(kList[0] && kList[0].code) || '' };
   }
@@ -25574,6 +25614,51 @@ function ContractModal(props){
   PANES.manager = h('div', null, PANES.manager, PANES.journal);
   PANES.journal = PANES.manager;   // 옛 탭 이름으로 들어와도 같은 화면
   tabBody = PANES[tab] || PANES.company;
+  var checkReqBanner = (props.cur || erpHasCheckReq(f)) ? (function(){
+    var activeChk = erpHasCheckReq(f);
+    if(!activeChk && tab !== 'manager') return null;
+    return h('div', { style:{ background: activeChk ? '#fffbeb' : '#f8fafc', border:'1px solid ' + (activeChk ? '#fbbf24' : '#e2e8f0'), borderRadius:'6px', padding:'8px 10px', marginBottom:'10px' } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' } },
+        h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'5px', fontSize:'11.5px', fontWeight:700, color: activeChk ? '#854d0e' : '#475569', cursor:'pointer' } },
+          h('input', { type:'checkbox', checked: activeChk,
+            onChange:function(e){
+              var on = e.target.checked;
+              setF(function(prev){
+                if(!on) return Object.assign({}, prev, { checkReq: null });
+                return Object.assign({}, prev, { checkReq: {
+                  at: (prev.checkReq && prev.checkReq.at) || (new Date()).toISOString(),
+                  by: (CURRENT_USER && CURRENT_USER.name) || '관리자',
+                  note: (prev.checkReq && prev.checkReq.note) || '메일·원장 대조 결과 진행 여부 확인이 필요합니다'
+                } });
+              });
+            } }),
+          '❓ 담당자 진행확인 요청'
+        ),
+        activeChk && h('span', { style:{ fontSize:'10.5px', color:'#854d0e' } }, '담당자가 진행·확정·종료 여부를 확인한 뒤 해제해 주세요'),
+        h('div', { style:{ flex:1 } }),
+        activeChk && h('button', { type:'button',
+          onClick:function(){
+            var stamp = '[' + todayYMD() + ' ' + ((CURRENT_USER && CURRENT_USER.name) || '담당자') + ' 진행확인 완료]';
+            setF(function(prev){
+              var nt = String(prev.note || '').trim();
+              return Object.assign({}, prev, { checkReq: null, note: nt ? (nt + '\n' + stamp) : stamp });
+            });
+            showToast('✓ 진행확인 표시를 해제했습니다 (저장 버튼을 누르면 반영됩니다)');
+          },
+          style:{ background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', borderRadius:'4px', padding:'3px 8px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '✓ 확인완료(해제)')
+      ),
+      activeChk && h('input', { type:'text', 'aria-label':'진행확인 사유',
+        value: (f.checkReq && f.checkReq.note) || '',
+        onChange:function(e){
+          var v = e.target.value;
+          setF(function(prev){
+            return Object.assign({}, prev, { checkReq: Object.assign({}, prev.checkReq || { at:(new Date()).toISOString(), by:(CURRENT_USER && CURRENT_USER.name)||'' }, { note: v }) });
+          });
+        },
+        placeholder:'담당자에게 확인할 사항 (예: 계약서 발송 후 회신 대기 — 실제 진행 여부 확인)',
+        style:{ width:'100%', marginTop:'6px', padding:'6px 8px', border:'1px solid #fde68a', borderRadius:'4px', fontSize:'11.5px', background:'#fff', color:'#1e293b' } })
+    );
+  })() : null;
 
   /* ⚠★ 되돌림 (대표 지시 2026-09-18 「3개의 화면을 기존처럼 한개씩 하고 저장해서
        넘어가게 해줘 다시」) — 넓은 화면에서 기둥 셋으로 펴던 것을 걷어냈다.
@@ -25787,9 +25872,7 @@ function ContractModal(props){
       // 탭 콘텐츠
       h('div', { className:'modal-b',
             ref:function(el){ modalBodyRef.current = el; },
-            style:{ maxHeight:'55vh', overflowY:'auto', padding:'16px' } },
-            tabBody
-          ),
+            style:{ maxHeight:'55vh', overflowY:'auto', padding:'16px' } }, checkReqBanner, tabBody),
       h('div', { className:'modal-f' },
         /* ⚠ 단추는 늘 «한 줄» (대표 갈무리 2026-10-22) — 폰에서 글자를 크게 쓰면 「취/소」가
              두 줄로 서고 「이전」·「다음」이 위아래로 갈라졌다. 글자는 안 꺾고(nowrap),
@@ -27360,6 +27443,7 @@ function ContractManagement(props){
   var mf = usePersistedState('contract_mgr_filter', 'all'); var mgrFilter = mf[0]; var setMgrFilter = mf[1];  // 'all' | 'mine' | sid
   var smf = usePersistedState('contract_submgr_filter', 'all'); var subMgrFilter = smf[0]; var setSubMgrFilter = smf[1];
   var moS = useState(false); var monthOnly = moS[0]; var setMonthOnly = moS[1];
+  var chkS = useState(false); var checkOnly = chkS[0]; var setCheckOnly = chkS[1];
   var hlpS = useState(false); var showHelp = hlpS[0]; var setShowHelp = hlpS[1];
   var fcS = useState('all'); var focusCol = fcS[0]; var setFocusCol = fcS[1];  // 'all' | 'consult' | 'review' | 'signed' — 단독 보기는 세션 한정, 열 때마다 전체(3컬럼)로 시작
   // 단계별 종류 필터 (각 단계 카드 안에서 독립적으로 필터링)
@@ -27779,20 +27863,68 @@ function ContractManagement(props){
     var cos = dbGet('companies', []) || [];
     var cts = dbGet('contracts', []) || [];
     var all = cts.filter(function(c){ return c && !c._deleted; });
+    var _normSrcMail = function(sk){
+      if(!sk) return '';
+      if(typeof sk === 'object'){
+        var _f = String(sk.folder || sk.slug || '').trim();
+        var _u = String(sk.msgId || sk.uid || '').trim();
+        return (_f && _u) ? (_f + '|' + _u) : '';
+      }
+      var _s = String(sk).trim();
+      var _m = /^([^|:]+):(\d+)$/.exec(_s);
+      return _m ? (_m[1] + '|' + _m[2]) : _s;
+    };
+    var _canonSrcMail = function(sk){
+      var n = _normSrcMail(sk);
+      if(!n) return '';
+      var idx = n.lastIndexOf('|');
+      if(idx <= 0) return n.toLowerCase();
+      var fb = n.slice(0, idx).replace(/-[0-9a-f]{8}$/i, '').trim().toLowerCase();
+      var ub = n.slice(idx + 1).trim();
+      if(!ub) return '';
+      if(/^(?:sent|sent messages|sent items|보낸메일함|보낸편지함)$/.test(fb)) fb = 'sent';
+      else if(/^(?:inbox|받은메일함|받은편지함)$/.test(fb)) fb = 'inbox';
+      else if(/^(?:tome|내게쓴메일함|내게쓴편지함)$/.test(fb)) fb = 'tome';
+      else if(/^(?:archive|보관메일함|보관함)$/.test(fb)) fb = 'archive';
+      return fb + '|' + ub;
+    };
+    var _sameMailKey = function(a, b){
+      var ca = _canonSrcMail(a), cb = _canonSrcMail(b);
+      if(!ca || !cb) return false;
+      return ca === cb;
+    };
+    var _isTermSubj = function(subj){
+      var s = String(subj || '');
+      return /자문\s*계약\s*(?:해지|종료)|계약\s*(?:해지|종료)\s*(?:통보|요청|안내|의\s*건)|해지\s*통보|거래\s*종료\s*(?:통보|요청)/.test(s);
+    };
+    if(_isTermSubj(req && req.subject) || _isTermSubj(req && req.mailMeta && req.mailMeta.subject)){
+      await drop();
+      return { lane:'photo_contract', noop:'계약 종료·해지 통보 메일입니다' };
+    }
     var srcPhoto = req && req.srcPhoto;
-    var srcKey = String((req && req.srcKey) || (req && req.mailMeta && req.mailMeta.srcKey) || '');
+    var srcKey = _normSrcMail((req && req.srcKey) || (req && req.mailMeta && req.mailMeta.srcKey) || '');
     var reqSrcMails = [];
     if(req && Array.isArray(req.srcMails)){
-      req.srcMails.forEach(function(k){ var s = String(k || '').trim(); if(s && reqSrcMails.indexOf(s) < 0) reqSrcMails.push(s); });
+      req.srcMails.forEach(function(k){ var s = _normSrcMail(k); if(s && reqSrcMails.indexOf(s) < 0) reqSrcMails.push(s); });
     }
     if(req && req.mailMeta && req.mailMeta.lifecycle && Array.isArray(req.mailMeta.lifecycle.srcMails)){
-      req.mailMeta.lifecycle.srcMails.forEach(function(k){ var s = String(k || '').trim(); if(s && reqSrcMails.indexOf(s) < 0) reqSrcMails.push(s); });
+      req.mailMeta.lifecycle.srcMails.forEach(function(k){ var s = _normSrcMail(k); if(s && reqSrcMails.indexOf(s) < 0) reqSrcMails.push(s); });
     }
     if(srcKey && reqSrcMails.indexOf(srcKey) < 0) reqSrcMails.push(srcKey);
     var synthNote = String((req && req.synthesizedNote) || (req && req.mailMeta && req.mailMeta.lifecycle && req.mailMeta.lifecycle.synthesizedNote) || '').trim();
-    var lcMeta = (req && req.mailMeta && req.mailMeta.lifecycle) || null; var isOutDir = !!(req && req.mailMeta && (req.mailMeta.dir === 'sent' || req.mailMeta.dir === 'out')); var hasMailMeta = !!(req && req.mailMeta && (req.mailMeta.dir || req.mailMeta.srcKey || req.mailMeta.subject || req.mailMeta.mpKey || req.mailMeta.companyId || req.mailMeta.lifecycle)); var mailRecvVerified = !hasMailMeta || isOutDir || (req && req.senderVerified === true && (!lcMeta || (lcMeta.senderVerified !== false && (!lcMeta.targetStage || lcMeta.targetStage === 'signed')))) || !!(lcMeta && lcMeta.senderVerified === true && lcMeta.targetStage === 'signed' && (!req || req.senderVerified !== false) && (!req.mailMeta || req.mailMeta.senderVerified !== false)); var reqUnverified = !!(req && ((!isOutDir && req.targetStatus === 'review') || !mailRecvVerified || req.senderVerified === false || (req.mailMeta && req.mailMeta.senderVerified === false) || (!isOutDir && lcMeta && (lcMeta.senderVerified === false || (lcMeta.targetStage && lcMeta.targetStage !== 'signed'))))); var targetStatus = (req && (req.targetStatus === 'review' || reqUnverified)) ? 'review' : 'signed';
+    var lcMeta = (req && req.mailMeta && req.mailMeta.lifecycle) || null;
+    var isTomeDir = !!(req && req.mailMeta && req.mailMeta.dir === 'tome');
+    var isOutDir = !!(req && req.mailMeta && (req.mailMeta.dir === 'sent' || req.mailMeta.dir === 'out'));
+    var isInternalDir = isOutDir || isTomeDir;
+    var hasMailMeta = !!(req && req.mailMeta && (req.mailMeta.dir || req.mailMeta.srcKey || req.mailMeta.subject || req.mailMeta.mpKey || req.mailMeta.companyId || req.mailMeta.lifecycle));
+    var mailRecvVerified = !hasMailMeta || isInternalDir || (req && req.senderVerified === true && (!lcMeta || (lcMeta.senderVerified !== false && (!lcMeta.targetStage || lcMeta.targetStage === 'signed')))) || !!(lcMeta && lcMeta.senderVerified === true && lcMeta.targetStage === 'signed' && (!req || req.senderVerified !== false) && (!req.mailMeta || req.mailMeta.senderVerified !== false));
+    var reqUnverified = !!(req && ((!isInternalDir && req.targetStatus === 'review') || !mailRecvVerified || req.senderVerified === false || (req.mailMeta && req.mailMeta.senderVerified === false) || (!isInternalDir && lcMeta && (lcMeta.senderVerified === false || (lcMeta.targetStage && lcMeta.targetStage !== 'signed')))));
+    var targetStatus = (req && (req.targetStatus === 'review' || reqUnverified)) ? 'review' : 'signed';
     var _isHandledCt = function(c){
       return !!(c && (c.status === 'signed' || c.status === 'transferred' || c.status === 'closed' || c.status === 'cancelled' || c.closedAt || c.closedDate || c.permanentArchived));
+    };
+    var _ctHasSrc = function(c, sk){
+      return Array.isArray(c && c.srcMails) && c.srcMails.some(function(x){ return _sameMailKey(x, sk); });
     };
     if(srcPhoto && srcPhoto.id){
       var already = all.find(function(c){
@@ -27801,8 +27933,8 @@ function ContractManagement(props){
       if(already){ await drop(); return { lane:'photo_contract', noop:'이미 반영한 계약서입니다' }; }
     }
     if((req && req.isDuplicateInErp)
-      || (srcKey && all.some(function(c){ return _isHandledCt(c) && (c.srcMails || []).indexOf(srcKey) >= 0; }))
-      || (reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return _isHandledCt(c) && (c.srcMails || []).indexOf(sk) >= 0; }); }))){
+      || (srcKey && all.some(function(c){ return (_isHandledCt(c) || c.status === targetStatus) && _ctHasSrc(c, srcKey); }))
+      || (reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return (_isHandledCt(c) || c.status === targetStatus) && _ctHasSrc(c, sk); }); }))){
       await drop();
       return { lane:'photo_contract', noop:'이미 반영한 중복 계약서입니다' };
     }
@@ -27840,7 +27972,7 @@ function ContractManagement(props){
     var reqBizDigits = (!reqUnverified && req && req.bizNoOk !== false && erpBizOk(rCo.bizNo)) ? String(rCo.bizNo || '').replace(/\D/g, '') : '';
     var reqMatchedCo = reqBizDigits.length === 10 ? cos.filter(function(x){ return x && !x._deleted && String(x.bizNo || '').replace(/\D/g, '') === reqBizDigits && erpCoNameKey(x.name) === erpCoNameKey(cname); })[0] : null;
     if(!reqMatchedCo && !reqUnverified && req && req.companyId && !rCo.bizNo && req.bizNoOk !== false) reqMatchedCo = cos.filter(function(x){ return x && !x._deleted && String(x.id) === String(req.companyId) && erpCoNameKey(x.name) === erpCoNameKey(cname) && erpBizOk(x.bizNo); })[0] || null;
-    if(hasMailMeta && !isOutDir && (!req.mailMeta.companyId || !reqMatchedCo || String(reqMatchedCo.id) !== String(req.mailMeta.companyId) || (req.mailMeta.companyName && erpCoNameKey(req.mailMeta.companyName) !== erpCoNameKey(cname)))){ reqUnverified = true; targetStatus = 'review'; reqBizDigits = ''; reqMatchedCo = null; } var isCoClosed = function(x){
+    if(hasMailMeta && !isInternalDir && (!req.mailMeta.companyId || !reqMatchedCo || String(reqMatchedCo.id) !== String(req.mailMeta.companyId) || (req.mailMeta.companyName && erpCoNameKey(req.mailMeta.companyName) !== erpCoNameKey(cname)))){ reqUnverified = true; targetStatus = 'review'; reqBizDigits = ''; reqMatchedCo = null; } var isCoClosed = function(x){
       if(!x || typeof x !== 'object') return false;
       var st = String(x.status || '').toLowerCase();
       if(st === 'closed' || st === 'cancelled' || st === 'done' || st === 'end' || st === '종료') return true;
@@ -27848,9 +27980,82 @@ function ContractManagement(props){
       if(String(x.lifecycle || '').indexOf('종료') >= 0 || String(x.lifecycle || '').indexOf('해지') >= 0) return true;
       return false;
     };
-    if((req && req.companyClosed) || isCoClosed(reqMatchedCo)){
+    var _coKey = erpCoNameKey(cname);
+    var _sameNameCos = _coKey.length >= 2 ? cos.filter(function(x){
+      if(!x || x._deleted || erpCoNameKey(x.name) !== _coKey) return false;
+      var xb = String(x.bizNo || '').replace(/\D/g, '');
+      if(reqBizDigits.length === 10 && xb.length === 10 && xb !== reqBizDigits) return false;
+      return true;
+    }) : [];
+    if((req && req.companyClosed) || isCoClosed(reqMatchedCo) || (_sameNameCos.length > 0 && _sameNameCos.every(isCoClosed))){
       await drop();
       return { lane:'photo_contract', noop:'종료된 사업장입니다' };
+    }
+    var _matchWorkCo = function(w){
+      if(!w || w._deleted) return false;
+      if(reqMatchedCo && w.companyId && String(w.companyId) === String(reqMatchedCo.id)) return true;
+      var wb = String(w.bizNo || '').replace(/\D/g, '');
+      if(reqBizDigits.length === 10 && wb.length === 10) return wb === reqBizDigits;
+      if(_coKey.length < 3) return false;
+      if(reqBizDigits.length === 10 && wb.length === 10 && wb !== reqBizDigits) return false;
+      return erpCoNameKey(w.companyName || w.name || '') === _coKey;
+    };
+    var _refMs = Date.parse(cf.signDate || cf.startDate || (req && req.mailMeta && req.mailMeta.dateYmd) || '') || Date.now();
+    // 1) 업체계약(자문·급여)인데 이미 업체관리에 활성 등록되어 운영·입금 중인 사업장이면 중복 생성 차단
+    if(kv === 'company'){
+      var _activeCos = reqMatchedCo ? [reqMatchedCo] : _sameNameCos.filter(function(x){ return !isCoClosed(x); });
+      if(_activeCos.length > 0){
+        var _liveIncs = (dbGet('finance_income', []) || []).filter(function(fi){ return fi && !fi._deleted && !fi.undoneDate; });
+        var _hasCoHistory = _activeCos.some(function(ac){
+          var aid = String(ac.id || '');
+          var abiz = String(ac.bizNo || '').replace(/\D/g, '');
+          if(/^(co-adv-|co-imp-|co-real-)/.test(aid) || Number(ac.monthlyFee || ac.fee || 0) > 0) return true;
+          if(_liveIncs.some(function(fi){
+            if(aid && fi.companyId === aid) return true;
+            if(abiz.length === 10 && String(fi.bizNo || '').replace(/\D/g, '') === abiz) return true;
+            return _coKey.length >= 3 && erpCoNameKey(fi.companyName || fi.depositor || '') === _coKey;
+          })) return true;
+          return all.some(function(c){
+            return (c.status === 'transferred' || c.status === 'closed') && (c.kinds || []).indexOf('company') >= 0 && erpCoNameKey(c.companyName || (c.company && c.company.name) || '') === _coKey;
+          });
+        });
+        if(_hasCoHistory){
+          await drop();
+          return { lane:'photo_contract', noop:'이미 업체관리에 등록되어 운영 중인 사업장입니다' };
+        }
+      }
+    }
+    // 2) 이미 이관되어 업무 원장(컨설팅·사건·기금·기타사업)에서 진행 중인 동일 건 중복 차단
+    var _storeCheckMap = {
+      consulting: ['consultings', 'other_projects'],
+      other: ['other_projects', 'consultings'],
+      'case': ['cases'],
+      fund: ['funds']
+    };
+    var _checkStores = _storeCheckMap[kv] || [];
+    var _caseCodeMatch = /(\d{4}\s*부해\s*\d+|\d{4}\s*가합\s*\d+|\d{4}\s*구합\s*\d+)/.exec(briefText + ' ' + String(cf.scope || ''));
+    var _reqCaseCode = _caseCodeMatch ? _caseCodeMatch[1].replace(/\s+/g, '') : '';
+    var _dupInWork = _checkStores.some(function(stKey){
+      var rows = dbGet(stKey, []) || [];
+      return rows.some(function(w){
+        if(!_matchWorkCo(w)) return false;
+        var wst = String(w.status || '').toLowerCase();
+        var isOpenW = wst !== 'closed' && wst !== 'cancelled' && !w.closedAt && !w.closedDate;
+        if(stKey === 'cases' && _reqCaseCode){
+          var wTxt = String((w.brief || '') + ' ' + (w.title || '') + ' ' + (w.note || '')).replace(/\s+/g, '');
+          if(wTxt.indexOf(_reqCaseCode) >= 0) return true;
+          if(/\d{4}부해\d+/.test(wTxt)) return false;
+        }
+        var wAmt = Number(w.contractFee || 0) + Number(w.balanceFee || 0) + Number(w.retainerFee || 0) + Number(w.fee || 0);
+        var amtSame = amt > 0 && wAmt > 0 && (Math.abs(wAmt - amt) <= 1000 || Math.abs(Math.round(wAmt * 1.1) - amt) <= 1000 || Math.abs(wAmt - Math.round(amt * 1.1)) <= 1000);
+        var wMs = Date.parse(w.startDate || w.receiveDate || w.arrivedAt || w.createdAt || '') || 0;
+        var nearWindow = !wMs || Math.abs(_refMs - wMs) <= 120 * 86400000;
+        return (isOpenW && nearWindow) || (amtSame && nearWindow);
+      });
+    });
+    if(_dupInWork){
+      await drop();
+      return { lane:'photo_contract', noop:'이미 이관되어 업무 원장에서 진행 중인 건입니다' };
     }
     var reqCoId = reqMatchedCo ? String(reqMatchedCo.id) : '';
     if(!reqBizDigits && reqMatchedCo && reqMatchedCo.bizNo) reqBizDigits = String(reqMatchedCo.bizNo).replace(/\D/g, '');
@@ -27965,7 +28170,9 @@ function ContractManagement(props){
     form.orderTs = Date.now();
     if(srcPhoto) form.srcPhoto = srcPhoto;
     if(reqSrcMails.length) form.srcMails = reqSrcMails;
-    form.note = '📄 사진첩·메일함에서 계약서 자동 정리 (' + (cf.docName || '계약서') + ')'
+    if(req && req.checkReq && req.checkReq.note) form.checkReq = req.checkReq;
+    var boxOrigin = isTomeDir ? '내게쓴메일함' : (hasMailMeta ? '푸른메일함' : '사진첩·메일함');
+    form.note = '📄 ' + boxOrigin + '에서 계약서 자동 정리 (' + (cf.docName || '계약서') + ')'
       + (briefText ? '\n업무: ' + briefText : '')
       + (req.by ? ' · 담당 ' + req.by : '')
       + (synthNote ? '\n' + synthNote : '');
@@ -28077,6 +28284,43 @@ function ContractManagement(props){
     });
     return function(){ try{ ref.off('value', cb); }catch(_){} };
   }, []);
+  var mswS = useState(null); var mailSweepInfo = mswS[0]; var setMailSweepInfo = mswS[1];
+  var msbS = useState(false); var mailSweepBusy = msbS[0]; var setMailSweepBusy = msbS[1];
+  useEffect(function(){
+    if(!fbDb) return;
+    var ref = fbDb.ref('data/app_config/mailContractSweep');
+    var cb = ref.on('value', function(snap){ setMailSweepInfo(snap.val() || null); }, function(){});
+    return function(){ try{ ref.off('value', cb); }catch(_){} };
+  }, []);
+  async function triggerMailSweepNow(){
+    if(mailSweepBusy){ showToast('⏳ 푸른메일함을 검토하는 중입니다 — 잠시만 기다려 주세요'); return; }
+    var u = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+    if(!u){ showToast('⚠ 로그인 상태를 확인해 주세요'); return; }
+    setMailSweepBusy(true);
+    showToast('📬 푸른메일함(받은·내게쓴·보낸·업무함) 전체 견적서·계약서를 검토합니다…', 8000);
+    try {
+      var tok = await u.getIdToken();
+      var res = await fetchT('https://asia-northeast3-pureun-erp.cloudfunctions.net/runMailContractSweep', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + tok },
+        body:JSON.stringify({ days:60 })
+      }, 180000);
+      var j = await res.json().catch(function(){ return {}; });
+      if(!res.ok || !j.ok){
+        showToast('❌ 메일함 검토 실패: ' + (j.error || ('상태 ' + res.status)), 9000);
+        return;
+      }
+      await runContractRequests();
+      var qN = Number(j.quoteQueued || 0), cN = Number(j.contractQueued || 0);
+      showToast((qN + cN) > 0
+        ? ('✅ 푸른메일함 검토 완료 — 견적 ' + qN + '건 · 계약서 ' + cN + '건을 계약관리에 반영했습니다')
+        : '✅ 푸른메일함(받은·내게쓴·보낸·업무함) 검토 완료 — 미반영 신규 견적·계약서가 없습니다', 9000);
+    } catch(e){
+      showToast('❌ 메일함 검토 호출 오류: ' + ((e && e.message) || e), 9000);
+    } finally {
+      setMailSweepBusy(false);
+    }
+  }
   async function retryBlockedRequest(key, req){
     if(_erpCtReqBusy){ showToast('⏳ 처리 중입니다 — 잠시 후 다시 눌러 주세요'); return; }
     var cos = dbGet('companies', null);
@@ -28740,8 +28984,69 @@ function ContractManagement(props){
     return ACTIVE_CONTRACT_STATUS.indexOf(c.status) >= 0;
   }
 
+  var checkReqList = contracts.filter(function(c){ return isActiveContract(c) && erpHasCheckReq(c); });
+  var myCheckReqList = checkReqList.filter(function(c){
+    return CURRENT_USER_SID && (c.managerMain === CURRENT_USER_SID || (c.managerSubs || []).indexOf(CURRENT_USER_SID) >= 0);
+  });
+
+  async function openCheckReq(c){
+    if(!c || !erpHasCheckReq(c)) return;
+    var reason = String((c.checkReq && c.checkReq.note) || '').trim();
+    var mgrLabel = [userName(c.managerMain)].concat((c.managerSubs || []).map(userName)).filter(Boolean).join(' / ') || '-';
+    var stLabel = contractStatusInfo(c.status).label;
+    var choices = [{ key:'keep', label:'✓ 계속 진행 중 (확인표시 해제)' }];
+    if(c.status !== 'signed') choices.push({ key:'signed', label:'✅ 계약확정으로 이동' });
+    choices.push({ key:'close', label:'🔒 계약 종료 (종료관리)' });
+    choices.push({ key:'cancel', label:'✕ 계약 취소' });
+    var boxNode = h('div', { style:{ fontSize:'12.5px', lineHeight:1.6, color:'#1e293b', textAlign:'left' } },
+      h('div', { style:{ fontWeight:700, fontSize:'13.5px', marginBottom:'6px' } },
+        '❓ 담당자 진행확인 — ' + (c.companyName || '-') + ' (' + (c.contractNo || '-') + ')'),
+      h('div', { style:{ fontSize:'11.5px', color:'#64748b', marginBottom:'8px' } },
+        '현재 단계: ' + stLabel + ' · 담당: ' + mgrLabel),
+      h('div', { style:{ background:'#fffbeb', border:'1px solid #fbbf24', borderRadius:'6px', padding:'9px 11px', color:'#854d0e', fontSize:'12px', marginBottom:'6px', whiteSpace:'pre-wrap' } },
+        reason),
+      h('div', { style:{ fontSize:'11px', color:'#64748b' } },
+        '메일함·세금계산서·입금 대조 후 확인이 필요한 항목입니다. 아래에서 현재 상태를 선택해 주세요.')
+    );
+    var act = await popConfirm('', { node: boxNode, cancelText:'나중에', choices: choices });
+    if(!act) return;
+    var who = (CURRENT_USER && CURRENT_USER.name) || '담당자';
+    var stampBase = '[' + todayYMD() + ' ' + who + ' 진행확인: ';
+    var curNote = String(c.note || '').trim();
+    if(act === 'keep'){
+      var n1 = curNote ? (curNote + '\n' + stampBase + '계속 진행 중]') : (stampBase + '계속 진행 중]');
+      if(patchOne(c.id, { checkReq: null, note: n1 })) showToast('✓ 진행확인을 완료하고 표시를 해제했습니다');
+      return;
+    }
+    if(act === 'signed'){
+      var n2 = curNote ? (curNote + '\n' + stampBase + '계약확정 이동]') : (stampBase + '계약확정 이동]');
+      if(patchOne(c.id, { status:'signed', orderTs: Date.now(), checkReq: null, note: n2 })){
+        showToast('✅ ' + (c.companyName || '') + ' → 계약확정으로 이동했습니다');
+      }
+      return;
+    }
+    if(act === 'close'){
+      if(!canCloseDirect(c)){ erpRequestClose(c, '계약 ' + (c.contractNo||'') + ' ' + (c.companyName||'')); return; }
+      erpClearCloseReq(c.id);
+      var n3 = curNote ? (curNote + '\n' + stampBase + '계약 종료]') : (stampBase + '계약 종료]');
+      patchOne(c.id, { checkReq: null, note: n3 });
+      archiveContract(c, '종료');
+      wsPingSync();
+      showToast('🔒 계약 종료 처리 완료 (종료관리에서 확인)');
+      return;
+    }
+    if(act === 'cancel'){
+      var n4 = curNote ? (curNote + '\n' + stampBase + '계약 취소]') : (stampBase + '계약 취소]');
+      patchOne(c.id, { checkReq: null, note: n4 });
+      archiveContract(c, '취소');
+      wsPingSync();
+      showToast('✕ 계약 취소 처리 완료 (종료관리에서 확인)');
+    }
+  }
+
   var filtered = contracts.filter(function(c){
     if(!isActiveContract(c)) return false;
+    if(checkOnly && !erpHasCheckReq(c)) return false;
     var kindsArr = c.kinds || (c.kind ? [c.kind] : []);
     if(kindFilter !== 'all' && kindsArr.indexOf(kindFilter) < 0) return false;
     if(monthOnly){
@@ -28925,6 +29230,10 @@ function ContractManagement(props){
           // 담당자 (주담당 / 부담당 풀 이름)
           h('span', { style:{ fontSize:'11px', color:'#64748b', whiteSpace:'nowrap', flexShrink:0 } },
             '👤 ' + [userName(c.managerMain)].concat((c.managerSubs||[]).map(userName)).filter(Boolean).join(' / ')),
+          erpHasCheckReq(c) && h('button', { type:'button',
+            onClick:function(e){ e.stopPropagation(); openCheckReq(c); },
+            title:'담당자 진행확인 요청: ' + c.checkReq.note + '\n(클릭하여 진행·확정·종료 선택)',
+            style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fbbf24', borderRadius:'10px', padding:'1px 7px', fontSize:'10px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } }, '❓ 진행확인'),
           // 메모
           c.note && h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 } }, '📝 ' + c.note),
           !c.note && h('span', { style:{ flex:1 } }),
@@ -28979,6 +29288,10 @@ function ContractManagement(props){
         // 2행: 담당 · 종류 · 메모(줄임) · 버튼들
         h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', marginTop:'2px', minWidth:0 } },
           h('span', { style:{ fontSize:'10px', color:'#64748b', whiteSpace:'nowrap', flexShrink:0 } }, '👤'+userName(c.managerMain)),
+          erpHasCheckReq(c) && h('button', { type:'button',
+            onClick:function(e){ e.stopPropagation(); openCheckReq(c); },
+            title:'담당자 진행확인: ' + c.checkReq.note,
+            style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fbbf24', borderRadius:'8px', padding:'1px 5px', fontSize:'9.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } }, '❓확인'),
           h('span', { style:{ flex:1, minWidth:0, fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
             [mSub, c.note].filter(Boolean).join(' · ') || c.contractNo),
           mBtns
@@ -28993,8 +29306,8 @@ function ContractManagement(props){
       onClick:function(){ openEdit(c); },
       style:{
         background: justMoved ? '#eff6ff' : '#fff', border: justMoved ? '1px solid #2563eb' : '1px solid #e2e8f0', borderRadius:'6px',
-        // 오늘 등록한 건은 왼쪽에 초록 띠 — 딱지를 못 봐도 목록에서 바로 갈린다
-        borderLeft: (!justMoved && regIsToday(c)) ? '3px solid #16a34a' : (justMoved ? '1px solid #2563eb' : '1px solid #e2e8f0'),
+        // 오늘 등록한 건은 초록 띠 · 진행확인 필요 건은 호박색 띠
+        borderLeft: (!justMoved && erpHasCheckReq(c)) ? '3px solid #d97706' : ((!justMoved && regIsToday(c)) ? '3px solid #16a34a' : (justMoved ? '1px solid #2563eb' : '1px solid #e2e8f0')),
         padding:'10px 12px', marginBottom:'6px', cursor:'grab',
         opacity: isDragging ? .4 : 1,
         transition: 'opacity .15s, background .3s, box-shadow .3s',
@@ -29061,6 +29374,10 @@ function ContractManagement(props){
           title:'카드로 낸 상담료 — 승인을 먼저 기록합니다(정산 입금이 들어오면 거래내역 «상담료»에서 잇습니다)',
           style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', padding:'1px 7px', borderRadius:'4px', fontSize:'10.5px', fontWeight:700, cursor:'pointer', flexShrink:0 } }, '💳'),
         c.note && h('span', { title:c.note, style:{ fontSize:'10.5px', color:'#94a3b8' } }, '📝'),
+        erpHasCheckReq(c) && h('button', { type:'button',
+          onClick:function(e){ e.stopPropagation(); openCheckReq(c); },
+          title:'담당자 진행확인 요청: ' + c.checkReq.note + '\n(클릭하여 진행·확정·종료 선택)',
+          style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fbbf24', borderRadius:'10px', padding:'1px 7px', fontSize:'10px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } }, '❓ 진행확인'),
         h('div', { style:{ flex:1, minWidth:'4px' } }),
         c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'10px', padding:'1px 6px', borderRadius:'5px', fontWeight:700, whiteSpace:'nowrap' } },
           '성공 ' + c.successFee + '%'),
@@ -29109,17 +29426,21 @@ function ContractManagement(props){
       extra: window.innerWidth <= 768
       ? /* 폰: 단추 넷(사용법·이번 달만·실적 띠·지난 중복 훑기)을 «⋯ 고르기 하나»로 (대표 지시 2026-11-15 「상단 간략하게」).
            고르면 바로 하고 도로 「⋯」로 돌아온다. 「걸린 요청」 배지는 알림이라 밖에 그대로 둔다. */
-        [ h('select', { key:'cmore', value:'', 'aria-label':'계약관리 더보기', title:'사용법 · 이번 달만 · 실적 · 지난 중복 훑기',
+        [ h('select', { key:'cmore', value:'', 'aria-label':'계약관리 더보기', title:'사용법 · 이번 달만 · 진행확인 · 실적 · 지난 중복 훑기',
             onChange:function(e){ var v = e.target.value; e.target.value = '';
               if(v === 'help') setShowHelp(true);
               else if(v === 'mo') setMonthOnly(!monthOnly);
+              else if(v === 'chk') setCheckOnly(!checkOnly);
               else if(v === 'unit') setUnitStrip(!unitStrip);
+              else if(v === 'mailsweep') triggerMailSweepNow();
               else if(v === 'dup') setDupSweep(dupSweepScan()); },
-            style:{ padding:'5px 4px', background: monthOnly ? '#1e40af' : '#eff6ff', color: monthOnly ? '#fff' : '#1e40af',
+            style:{ padding:'5px 4px', background: (monthOnly || checkOnly) ? '#1e40af' : '#eff6ff', color: (monthOnly || checkOnly) ? '#fff' : '#1e40af',
               border:'1px solid #bfdbfe', borderRadius:'5px', fontSize:'13px', fontWeight:700, cursor:'pointer', maxWidth:'92px' } },
-            h('option', { value:'' }, monthOnly ? '✓ 이번 달' : '⋯ 더보기'),
+            h('option', { value:'' }, checkOnly ? '❓ 확인중' : (monthOnly ? '✓ 이번 달' : '⋯ 더보기')),
             h('option', { value:'help' }, '❓ 사용법'),
             h('option', { value:'mo' }, monthOnly ? '✓ 이번 달만 끄기' : '📅 이번 달만'),
+            h('option', { value:'mailsweep' }, mailSweepBusy ? '⏳ 메일 검토중…' : '📬 메일함 지금 검토'),
+            checkReqList.length > 0 && h('option', { value:'chk' }, checkOnly ? '✓ 진행확인 필터 끄기' : ('❓ 진행확인 (' + checkReqList.length + '건)')),
             h('option', { value:'unit' }, (unitStrip ? '▾ 실적 띠 접기' : '▸ 클리닉·기술보호 실적')),
             h('option', { value:'dup' }, '🔎 지난 중복 훑기')) ].concat(
           blockedReqs.length > 0 ? [ h('button', { key:'blkreq', onClick:function(){ setShowBlockedReqs(true); },
@@ -29144,7 +29465,21 @@ function ContractManagement(props){
             background: unitStrip?'#1e40af':'#fff', color: unitStrip?'#fff':'#1e40af',
             border:'1px solid '+(unitStrip?'#1e40af':'#bfdbfe'), borderRadius:'5px', cursor:'pointer',
             fontSize: window.innerWidth<=768?'11px':'11.5px', fontWeight:600, whiteSpace:'nowrap' } },
-          (unitStrip ? '▾ ' : '▸ ') + '📊 클리닉·기술보호 실적') ].concat(
+          (unitStrip ? '▾ ' : '▸ ') + '📊 클리닉·기술보호 실적'),
+        h('button', { key:'msweep', onClick:triggerMailSweepNow, disabled:mailSweepBusy,
+          title:'매일 09·11·13·15·17·18시 푸른메일함(받은·내게쓴·보낸·업무함) 자동 검토'
+            + (mailSweepInfo && mailSweepInfo.lastRunAt ? (' · 최근 ' + (function(){ var d = new Date(mailSweepInfo.lastRunAt); return (d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); })()) : '')
+            + ' · 누르면 지금 즉시 전체 검토',
+          style:{ padding:'6px 12px', background: mailSweepBusy ? '#eff6ff' : '#fff', color:'#1e40af',
+            border:'1px solid #bfdbfe', borderRadius:'5px', cursor: mailSweepBusy ? 'wait' : 'pointer',
+            fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap', opacity: mailSweepBusy ? 0.7 : 1 } },
+          mailSweepBusy ? '⏳ 메일 검토중…' : '📬 메일검토') ].concat(
+        checkReqList.length > 0 ? [ h('button', { key:'chkreq', onClick:function(){ setCheckOnly(!checkOnly); },
+          title:'메일함·원장 대조 결과 담당자 진행확인이 필요한 계약만 모아 봅니다',
+          style:{ padding:'6px 12px', background: checkOnly ? '#d97706' : '#fffbeb', color: checkOnly ? '#fff' : '#854d0e',
+            border:'1px solid ' + (checkOnly ? '#d97706' : '#fbbf24'), borderRadius:'5px', cursor:'pointer',
+            fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' } },
+          (checkOnly ? '✓ ' : '❓ ') + '진행확인 ' + checkReqList.length + '건') ] : []).concat(
         /* ⚠ 걸린 것이 없으면 배지 자체를 안 그린다 — 「0건」을 늘 보여 주면
            «있다/없다»가 색으로 안 갈리고, 평소에 안 봐도 될 것이 하나 늘어난다. */
         blockedReqs.length > 0 ? [ h('button', { key:'blkreq', onClick:function(){ setShowBlockedReqs(true); },
@@ -29154,6 +29489,20 @@ function ContractManagement(props){
             fontSize: window.innerWidth<=768?'11px':'11.5px', fontWeight:700, whiteSpace:'nowrap' } },
           '⚠ 걸린 요청 ' + blockedReqs.length + '건') ] : [])
     }),
+    (myCheckReqList.length > 0 || checkOnly) && h('div', {
+      style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', background:'#fffbeb', border:'1px solid #fde68a',
+        borderRadius:'6px', padding:'6px 10px', marginBottom:'8px', fontSize:'11.5px', color:'#854d0e' } },
+      h('span', { style:{ fontWeight:700 } },
+        myCheckReqList.length > 0
+          ? ('🔔 내 담당 진행확인 필요 ' + myCheckReqList.length + '건 (전체 ' + checkReqList.length + '건)')
+          : ('❓ 담당자 진행확인 필터 켜짐 (' + checkReqList.length + '건)')),
+      h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'#475569' } },
+        '카드의 [❓ 진행확인] 배지를 눌러 계속 진행·계약확정·종료·취소를 선택해 주세요'),
+      !checkOnly && h('button', { type:'button', onClick:function(){ setCheckOnly(true); if(myCheckReqList.length > 0) setMgrFilter('mine'); },
+        style:{ background:'#fff', color:'#854d0e', border:'1px solid #fbbf24', borderRadius:'4px', padding:'2px 8px', fontSize:'11px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '확인건 보기'),
+      checkOnly && h('button', { type:'button', onClick:function(){ setCheckOnly(false); if(mgrFilter === 'mine') setMgrFilter('all'); },
+        style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'4px', padding:'2px 8px', fontSize:'11px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '필터 해제')
+    ),
     unitStrip && (function(){
       var cTypes = dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
       var cItems = dbGet('consultings', []) || [];

@@ -107,4 +107,20 @@ async function readScheduleText(buf, ext) {
   if (RAW_RE.test(safe) || SPACED_RRN_RE.test(safe)) return { ok: false, scanned: false, chars: 0 };
   return { ok: true, text: safe };
 }
-module.exports = { redactOne, recheck, readScheduleText, RAW_RE, SPACED_RRN_RE, load };
+/* 계약서·위임약정서 자동 검토(mail-contract-sweep)용 — 사업자번호·상호·보수는 유지하고 주민번호·계좌·신분증 번호만 가린 글만 돌려준다. */
+async function scrubContractText(rawText) {
+  const src = String(rawText || '').trim();
+  if (!src) return { ok: false, text: '' };
+  try {
+    const K = await load();
+    const p = K.redactText(src, { rules: T.rulesOf(['rrn', 'money', 'id']) });
+    const safe = String((p && p.text) || src)
+      .replace(RAW_RE_G, '$1-●●●●●●●')
+      .replace(SPACED_RRN_G, '●●●●●●-●●●●●●●');
+    if (RAW_RE.test(safe) || SPACED_RRN_RE.test(safe)) return { ok: false, residualPii: true, text: '' };
+    return { ok: true, text: safe };
+  } catch (_) {
+    return { ok: false, text: '' };
+  }
+}
+module.exports = { redactOne, recheck, readScheduleText, scrubContractText, RAW_RE, SPACED_RRN_RE, load };
