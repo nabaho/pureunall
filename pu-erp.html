@@ -13592,6 +13592,7 @@ if(fbDb){
       }
       _fbSynced = true;
       fbSetupListener();
+      try { if(typeof window._syncStaffMailCards === 'function') window._syncStaffMailCards(); } catch(_){}
       try { _flushPendingLocalNewer(); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
       // 급감 보류분 처리는 fbInitialSync 내부(.then trailing)에서 이미 수행됨 — 여기서 재호출 불필요.
       try { setTimeout(function(){ serverBackupDaily(false); startRecentBackupTimer(); }, 3000); } catch(e){}
@@ -13599,6 +13600,7 @@ if(fbDb){
       console.warn('[Firebase] 초기 동기화 실패:', e && e.message);
       _fbSynced = true;
       fbSetupListener();
+      try { if(typeof window._syncStaffMailCards === 'function') window._syncStaffMailCards(); } catch(_){}
     });
   };
   var _onAuthReady = function(){
@@ -94237,7 +94239,11 @@ function StaffRoster(){
      지워진다(2026-07-28 업체 데이터 사고와 같은 경로). 동기화가 끝나면 목록이 채워진다. */
   if(!existing){ existing = []; }
   var s = useState(existing); var users = s[0]; var setUsers = s[1];
-  function persist(arr){ setUsers(arr); dbSet('user_accounts', arr); }
+  function persist(arr){
+    setUsers(arr);
+    dbSet('user_accounts', arr);
+    try { if(typeof window._syncStaffMailCards === 'function') window._syncStaffMailCards(arr); } catch(_){}
+  }
 
   // 입사예정자 자동 active 전환
   var todayStr = todayYMD();
@@ -94448,7 +94454,9 @@ function StaffRoster(){
         ['companies','cases','consultings','funds','other_projects'].forEach(function(k){ console.log('[사번정리 백업] '+k, JSON.stringify(dbGet(k,[]))); });
       } catch(_){}
       // 1) user_accounts
-      dbSet('user_accounts', curUsers.map(function(u){ return sidMap[u.sid] ? Object.assign({}, u, { sid:sidMap[u.sid] }) : u; }));
+      var _nextCurUsers = curUsers.map(function(u){ return sidMap[u.sid] ? Object.assign({}, u, { sid:sidMap[u.sid] }) : u; });
+      dbSet('user_accounts', _nextCurUsers);
+      try { if(typeof window._syncStaffMailCards === 'function') window._syncStaffMailCards(_nextCurUsers); } catch(_){}
       // 2) finance_income (managerSid·perfShares·managerSidAtRecord·managerSidCurrent)
       dbSet('finance_income', fi.map(function(x){
         var n = Object.assign({}, x);
@@ -97372,6 +97380,7 @@ function App(){
     try { recordUidRole(sid); } catch(_){}  // Firebase 보안규칙용 uid→role 매핑 자동기록 (규칙 미적용 상태에선 무해)
     try { _purgeFinCacheIfNoPerm(sid); } catch(_){}  // 재무권한 없는 직원: 기기에 남은 재무 캐시 삭제
     try { _syncUserDir(); } catch(_){}  // 관리자 로그인 시 로그인용 공개 명부(user_dir) 갱신
+    try { if(typeof _syncStaffMailCards === 'function') _syncStaffMailCards(); } catch(_){}  // 근로자명부 연락처·직책을 메일함 명함(pucards/staffRoster)에 동기화
   }
 
   /* 한 번에 이만큼 넘게 사라지면 멈춘다. 퇴사는 status 로 남으므로 명부에서 «사라지는» 일은
@@ -97442,6 +97451,85 @@ function App(){
     });
   }
   window.erpSyncUserDir = _syncUserDir;  // 콘솔 수동 실행용
+
+  // ── 근로자명부(user_accounts) 현직 직원 이름·직책·연락처·지사 → HRW 전용 쓰기 data/company_info/v/staffCards 자동 동기화 ──
+  // · 일반 직원은 user_accounts 전체(주민번호·계좌 포함)를 직접 읽지 못하고 company_info 쓰기 권한도 없다(.read: LOGIN, .write: HRW).
+  //   따라서 HRW(관리자·위임관리인·재무) 기기에서만 현직(status === 'active') 직원의 명함 표시용 항목만
+  //   data/company_info/v/staffCards 전체 맵으로 교체해 퇴직·입사예정·삭제·T번호 전환 사번이 남지 않게 한다.
+  // · 새 기기 로그인 직후 슬림 명부(user_dir — phone 없음)가 로컬 캐시에 임시로 들어 있는 상태에서는
+  //   빈 연락처로 덮어쓰지 않고 data/user_accounts 원본을 먼저 읽어 동기화한다.
+  function _syncStaffMailCards(optArr){
+    if(typeof fbDb === 'undefined' || !fbDb) return;
+    if(!(CURRENT_USER && (CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin || CURRENT_USER.fin))) return;
+    var explicit = Array.isArray(optArr);
+    var hasPhoneData = function(list){
+      return Array.isArray(list) && list.some(function(u){
+        return u && u.status === 'active' && String(u.phone || u.mobile || '').trim().length > 0;
+      });
+    };
+    var applySync = function(accs){
+      if(!Array.isArray(accs) || !accs.length) return;
+      if(!explicit && !hasPhoneData(accs)) return;
+      var now = Date.now();
+      fbDb.ref('pucards/items').orderByKey().startAt('pu_staff_').endAt('pu_staff_\uf8ff').once('value')
+        .then(function(snap){
+          var existItems = (snap && snap.val()) || {};
+          var staffCards = {};
+          var patch = {};
+          accs.forEach(function(u){
+            if(!u || !u.sid) return;
+            var sid = String(u.sid).trim();
+            if(!sid || /[.#$/[\]]/.test(sid)) return;
+            if(u.status !== 'active') return;
+            var rawTitle = String(u.title || '').trim();
+            var cardTitle = rawTitle === '노무사' ? '공인노무사' : rawTitle;
+            var phone = String(u.phone || u.mobile || '').trim();
+            var branch = String(u.branch || '천안본사').trim();
+            var dept = String(u.jobDuty === '노무사' ? '' : (u.jobDuty || '')).trim();
+            staffCards[sid] = {
+              sid: sid,
+              name: String(u.name || '').trim(),
+              title: cardTitle,
+              phone: phone,
+              branch: branch,
+              dept: dept,
+              status: 'active',
+              updatedAt: now
+            };
+            var cid = 'pu_staff_' + sid;
+            if(existItems[cid]){
+              patch['pucards/items/' + cid + '/name'] = String(u.name || '').trim();
+              patch['pucards/items/' + cid + '/title'] = cardTitle;
+              patch['pucards/items/' + cid + '/mobile'] = phone;
+              patch['pucards/items/' + cid + '/branch'] = branch;
+              patch['pucards/items/' + cid + '/updatedAt'] = now;
+            }
+          });
+          if(!Object.keys(staffCards).length) return;
+          patch['data/company_info/v/staffCards'] = staffCards;
+          patch['data/company_info/u'] = now;
+          try {
+            var localCi = dbGet('company_info', null);
+            if(localCi && typeof localCi === 'object'){
+              localCi.staffCards = staffCards;
+              _dbCache['company_info'] = localCi;
+            }
+          } catch(_c){}
+          fbDb.ref().update(patch).catch(function(e){ console.warn('[명함동기화] 실패:', e && e.message); });
+        }).catch(function(e){ console.warn('[명함동기화] 조회 실패:', e && e.message); });
+    };
+    var localAccs = explicit ? optArr : (dbGet('user_accounts', USERS_SEED) || []);
+    if(explicit || hasPhoneData(localAccs)){
+      applySync(localAccs);
+      return;
+    }
+    fbDb.ref('data/user_accounts').once('value').then(function(snap){
+      var sv = snap && snap.val();
+      var fresh = sv && sv.v !== undefined ? (typeof normalizeFbValue === 'function' ? normalizeFbValue(sv.v) : sv.v) : null;
+      if(Array.isArray(fresh) && hasPhoneData(fresh)) applySync(fresh);
+    }).catch(function(){});
+  }
+  window._syncStaffMailCards = _syncStaffMailCards;
 
   // ── [보안규칙 대비] 재무권한(fin) 없는 직원 로그인 시 로컬에 남은 재무·급여 캐시 삭제 ──
   // 규칙이 꺼진 지금은 초기 동기화가 다시 받아와 무해. 규칙 적용 후엔 재다운로드가 거부되므로

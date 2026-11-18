@@ -140,8 +140,18 @@ function 우체국고르기(from) {
   return 우체국들[우체국들.length - 1];
 }
 
-/* 보내는 사람 표시 이름. 주소만 나가면 스팸으로 걸리기 쉽다. */
-function fromLine(u) { return u ? '푸른노무법인 <' + u + '>' : ''; }
+/* 보내는 사람 표시 이름. 주소만 나가면 스팸으로 걸리기 쉽다.
+   개인 발송 시 보낸 직원의 이름·직책(예: 푸른노무법인 권형하 대표노무사 <370-6@daum.net>)을 함께 표기한다.
+   ⚠ RFC5322 주소 구분자(, ; : < > " ( ) @ [ ] \)와 제어문자를 모두 걷어내 표시명이 복수 주소로 쪼개지거나 헤더가 오염되지 않게 한다. */
+function fromLine(u, senderLabel) {
+  if (!u) return '';
+  const clean = String(senderLabel || '')
+    .replace(/[\x00-\x1f\x7f"<>\\,;:()@[\]]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40);
+  return clean ? ('푸른노무법인 ' + clean + ' <' + u + '>') : ('푸른노무법인 <' + u + '>');
+}
 
 /* 접속 아이디 후보 — @ 앞부분 먼저, 그다음 주소 전체.
    다음메일 설정 화면이 「아이디: 370-6」이라고 알려 주지만, 주소 전체로도 되는
@@ -465,19 +475,39 @@ function isPureunCompany(co) {
   return /푸른\s*노무법인|pureun/i.test(String(co || ''));
 }
 
-async function resolveSenderStaffName(db, byEmail, uid) {
+async function resolveSenderStaffProfile(db, byEmail, uid) {
   let sid = '';
   if (uid && !/[.#$/[\]]/.test(String(uid))) {
     const role = (await db.ref('uid_roles/' + String(uid)).once('value')).val() || {};
-    if (role.status === 'retired' || role.status === 'resigned') return '';
+    if (role.status === 'retired' || role.status === 'resigned') return null;
     sid = String(role.sid || '').trim();
   }
   if (!sid) sid = sidFromByEmail(byEmail);
-  if (!sid) return '';
-  const dirRaw = (await db.ref('data/user_dir').once('value')).val();
+  if (!sid) return null;
+  const safeSid = !/[.#$/[\]]/.test(sid) ? sid : '';
+  /* ⚠ 이름·재직 상태는 관리자 전용 쓰기 경로(data/user_dir)만 신뢰하고,
+       보조 연락처·직책 미러도 인사·재무·관리자 전용 쓰기 경로(data/company_info/v/staffCards)만 읽는다. */
+  const [dirSnap, rosterSnap] = await Promise.all([
+    db.ref('data/user_dir').once('value'),
+    safeSid ? db.ref('data/company_info/v/staffCards/' + safeSid).once('value') : Promise.resolve({ val: () => null }),
+  ]);
+  const dirRaw = dirSnap ? dirSnap.val() : null;
+  const roster = (rosterSnap && rosterSnap.val()) || null;
   const users = Array.isArray(dirRaw) ? dirRaw : (dirRaw && dirRaw.v ? dirRaw.v : Object.values(dirRaw || {}));
-  const me = (users || []).find((u) => u && String(u.sid || '') === sid && u.status !== 'retired' && u.status !== 'resigned');
-  return (me && me.name) ? String(me.name).trim() : '';
+  const me = (users || []).find((u) => u && String(u.sid || '') === sid && u.status !== 'retired' && u.status !== 'resigned' && u.status !== 'scheduled');
+  if (!me) return null;
+  const name = String(me.name || '').trim();
+  if (!name) return null;
+  let title = String(me.title || (roster && roster.title) || '').trim();
+  if (title === '노무사') title = '공인노무사';
+  const phone = String((roster && roster.phone) || '').trim();
+  const branch = String(me.branch || (roster && roster.branch) || '천안본사').trim();
+  return { sid, name, title, phone, branch };
+}
+
+async function resolveSenderStaffName(db, byEmail, uid) {
+  const prof = await resolveSenderStaffProfile(db, byEmail, uid);
+  return prof ? prof.name : '';
 }
 
 async function resolveSenderCard(db, byEmail, uid) {
@@ -491,7 +521,8 @@ async function resolveSenderCard(db, byEmail, uid) {
       cardId = String(rec.cardId);
     }
   }
-  const senderName = await resolveSenderStaffName(db, byEmail, uid);
+  const senderProfile = await resolveSenderStaffProfile(db, byEmail, uid);
+  const senderName = senderProfile ? senderProfile.name : '';
 
   if (cardId) {
     const itemVal = (await db.ref(CARDS_ROOT + '/items/' + cardId).once('value')).val();
@@ -542,7 +573,7 @@ async function resolveSenderCard(db, byEmail, uid) {
     if (bestId) cardId = bestId;
   }
 
-  if (!cardId) return { cardId: '', thumb: '', name: senderName, rec: rec };
+  if (!cardId) return { cardId: '', thumb: '', name: senderName, authName: senderName, title: senderProfile ? senderProfile.title : '', rec: rec };
   const [rawThumbSnap, itemNameSnap] = await Promise.all([
     db.ref(CARDS_ROOT + '/thumbs/' + cardId).once('value'),
     senderName ? Promise.resolve(null) : db.ref(CARDS_ROOT + '/items/' + cardId + '/name').once('value'),
@@ -552,7 +583,7 @@ async function resolveSenderCard(db, byEmail, uid) {
   if (thumb && !thumb.startsWith('data:image/') && SG.allowedCardThumbUrl(thumb)) {
     thumb = await fetchAllowedThumbDataUrl(thumb);
   }
-  return { cardId: cardId, thumb: thumb, name: finalName, rec: rec };
+  return { cardId: cardId, thumb: thumb, name: finalName, authName: senderName, title: senderProfile ? senderProfile.title : '', rec: rec };
 }
 
 async function deliverOnce(opts) {
@@ -686,8 +717,21 @@ async function deliverOnce(opts) {
     console.warn('mailTrack', (e && e.message) || e);   /* 못 달아도 메일은 나간다 */
   }
 
+  let senderLabel = '';
+  if (!(body && body.bulk) && !(opts.copy && opts.copy.mode === 'rep')) {
+    try {
+      /* ⚠ From 표시명은 관리자 전용 명부(data/user_dir)에서 확인된 authName 만 신뢰한다 (items.name 대체 금지) */
+      const prof = cachedSenderCard
+        ? { name: cachedSenderCard.authName, title: cachedSenderCard.title }
+        : await resolveSenderStaffProfile(db, byEmail, uid);
+      if (prof && prof.name) {
+        senderLabel = [prof.name, prof.title].filter(Boolean).join(' ');
+      }
+    } catch (_) {}
+  }
+
   const baseMail = {
-    from: fromLine(from),
+    from: fromLine(from, senderLabel),
     // 답장은 보낸 직원에게 — 회사 대표주소로만 오면 누구 건인지 모른다
     replyTo: byEmail || undefined,
     cc: v.cc.length ? v.cc.join(', ') : undefined,
@@ -929,7 +973,7 @@ function slimPayload(body) {
 }
 
 module.exports = {
-  deliver, collectAttachments, resolveSenderCard, loginIds, errorHint, fromLine,
+  deliver, collectAttachments, resolveSenderCard, resolveSenderStaffProfile, loginIds, errorHint, fromLine,
   mailOutPathOk, sweepMailOut, CARDS_BUCKET, MAILOUT_MAX,
   errorsBefore, slimPayload, CARDS_ROOT,
   /* 검사가 밖에서 견줄 수 있게 내놓는다 — 안 내놓으면 「묵은 것만 치우는가」를

@@ -2448,7 +2448,9 @@ table.sbox td span.sn{display:inline-block;min-width:22px;color:#94a3b8;font-siz
   border-radius:4px;background:#f8fafc;overflow:hidden;display:flex;align-items:center;
   justify-content:center;font-size:12px;color:#64748b;font-weight:700}
 .msth img{width:100%;height:100%;object-fit:cover;display:block}
-.mspreview{margin:10px 0 0;padding:12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
+.mspreview{margin:10px 0 0;padding:12px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;overflow-x:auto}
+.mspreview .pu-mail-card{width:100% !important}
+@media (max-width:760px){.pu-mail-card{width:100% !important}}
 .mspreview .none{font-size:12px;color:#94a3b8}
 /* 본문 속 서명 그림이 너무 크게 벌어지지 않게 */
 .cpbody img{max-width:280px;height:auto}
@@ -5444,8 +5446,16 @@ const ErpMatch = {
     Promise.all([
       firebase.database().ref('data/user_dir').once('value'),
       firebase.database().ref('data/companies').once('value'),
-    ]).then(([du,dc])=>{
+      firebase.database().ref('data/company_info/v/staffCards').once('value').catch(()=>({ val:()=>null })),
+    ]).then(([du,dc,dr])=>{
       const dir = ErpMatch._arr(du.val()), cos = ErpMatch._arr(dc.val());
+      const rosterRaw = (dr && typeof dr.val === 'function') ? (dr.val() || {}) : {};
+      const rosterBySid = {};
+      Object.keys(rosterRaw || {}).forEach(k=>{
+        const r = rosterRaw[k];
+        if(r && typeof r === 'object' && r.sid) rosterBySid[String(r.sid)] = r;
+      });
+      ErpMatch.staffRosterBySid = rosterBySid;
       const nameBySid = {};
       dir.forEach(u=>{ if(u&&u.sid) nameBySid[u.sid]=u.name||''; });   /* ⚠ 이름을 모르면 빈 글자 — 사번을 이름 자리에 넣지 않는다(2026-10-25) */
       /* ⚠ 사번 → 이름 표를 «밖에도» 내놓는다 (대표 지시 2026-08-29 「사무관리 공동작업」).
@@ -5472,13 +5482,19 @@ const ErpMatch = {
       const staff = {};
       dir.forEach(u=>{
         if(!u || !u.name) return;
+        const sidStr = String(u.sid||'');
+        const r0 = (sidStr && rosterBySid[sidStr]) ? rosterBySid[sidStr] : {};
         staff[ErpMatch._norm(u.name)] = {
-          sid: String(u.sid||''), name: String(u.name),
+          sid: sidStr, name: String(u.name),
           ord: Number(u.sortOrder||0), role: String(u.role||''),
-          title: String(u.title||''), status: String(u.status||'')
+          title: String(u.title || r0.title || ''), status: String(u.status||''),
+          branch: String(u.branch || r0.branch || '천안본사'),
+          phone: String(r0.phone || u.phone || ''),
+          dept: String(r0.dept || '')
         };
       });
       ErpMatch.staff = staff;
+      try{ if(typeof refreshUntouchedComposeSign === 'function') refreshUntouchedComposeSign(); }catch(_){}
       const byBiz={}, byName={}, byId={};
       cos.forEach(co=>{
         if(!co) return;
@@ -7061,7 +7077,7 @@ function renderCompose(){
       <button class="sm-x" onclick="closeSendMat()" style="margin-left:auto">✕</button>
     </div>
     <div class="cprow"><span class="cpk">보내는사람</span>
-      <span class="cpfrom">푸른노무법인 &lt;${esc(from)}&gt;</span></div>
+      <span class="cpfrom">${esc(typeof mySenderDisplayPrefix === 'function' ? mySenderDisplayPrefix(!!c.bulk) : '푸른노무법인')} &lt;${esc(from)}&gt;</span></div>
     <div class="cprow"><span class="cpk">받는사람</span>
       <input id="cpTo" value="${esc(c.to)}" placeholder="hong@example.com"></div>
     <div class="cprow"><span class="cpk">참조</span>
@@ -9095,7 +9111,7 @@ function mailWriteHtml(){
       <button class="setback" onclick="mailBack()">← 목록으로</button>
     </div>
         <div class="cprow"><span class="cpk">보내는사람</span>
-          <span class="cpfrom">푸른노무법인 &lt;${esc(from)}&gt;</span>
+          <span class="cpfrom">${esc(typeof mySenderDisplayPrefix === 'function' ? mySenderDisplayPrefix(!!c.bulk) : '푸른노무법인')} &lt;${esc(from)}&gt;</span>
           ${/* 전 직원이 함께 쓰는 회사 주소다. 자료함 깊숙이 들어가야만 바꿀 수 있어
                아무도 못 찾았다 — 여기서 바로 바꾼다(대표만). */''}
           ${state.isAdmin ? `<button class="cpfrombtn" onclick="editMailFrom()"
@@ -9637,23 +9653,103 @@ function mySign(){
   return all[k] || null;
 }
 
-/* ══════ 글자로 짠 디지털 명함 (대표 지시 2026-08-24) ══════
-   「명함이 깔끔하게 정리되어 디지털 형태로 갔으면 좋겠다」
-
-   왜 사진보다 나은가
-     · 받는 쪽 메일 프로그램이 바깥 그림을 기본으로 막는 일이 잦다 — 글자는 무조건 보인다
-     · 주소·전화를 «긁어 붙일 수» 있다. 사진은 손으로 옮겨 적어야 한다
-     · 폰에서 사진은 작아 안 읽히고, 글자는 화면 폭에 맞춰 접힌다
-     · 편지마다 따라가는데 사진은 50~150KB, 글자는 1KB 안쪽이다
-     · 첨부 파일 목록에 명함 사진이 끼는 일이 없다
-   ⚠ 꾸밈은 functions/mail-send.js 의 STYLE_OK 에 있는 것만 쓴다 —
-     border·padding·display 는 목록에 없어 서버가 조용히 지운다.
-   ⚠ 빈 값은 «자리를 안 만든다». 「T : 」만 남으면 안 채운 칸이 드러난다. */
+/* ══════ 글자로 짠 디지털 명함 (대표 지시 2026-08-24 · 2026-11-18 확정 ① 품격 골드·네이비 카드형) ══════
+   · 푸른노무법인 명함(회사명 또는 pu_staff_ 사번 명함)은 확정 표준 ① 품격 골드·네이비형 표(table)로 짠다:
+     상단 네이비(68%)·골드(32%) 바 + 무궁화 휘장·법인명·웹주소 + 우측 직책·이름·담당분야·연락처(근로자명부 휴대폰 우선, 미기재 시 대표번호)·이메일 +
+     투톤 구분선 + 하단 천안본사·서산지사 2단 안내.
+   · 외부 단체 등 일반 명함은 빈 칸 이름표 없이 있는 값만 간결하게 보여 준다.
+   ⚠ functions/mail-send.js 의 HTML_OK · STYLE_OK · cleanHref 허용 범위 안의 속성만 쓴다.
+   ⚠ 단위 검사가 이 함수 하나만 떼어 실행하므로 외부 도우미에 의존하지 않는다. */
 function signCardHtml(it){
   const o = it || {};
   const g = k => String(o[k]==null?'':o[k]).trim();
   const nm = g('name');
   if(!nm) return '';                       /* 이름조차 없으면 명함이라 할 수 없다 */
+  const comp = g('company');
+  const idStr = g('id');
+  const isPu = /푸른\s*노무법인|pureun/i.test(comp) || idStr.indexOf('pu_staff_') === 0;
+  if(isPu){
+    let roleRaw = g('title');
+    if(roleRaw === '노무사') roleRaw = '공인노무사';
+    const deptRaw = g('dept');
+    const branchRaw = g('branch');
+    const mobileStr = g('mobile');
+    const showMob = (o.showMobile !== false) && Boolean(mobileStr);
+    const hqTel = g('companyTel') || '041-556-0035';
+    const hqFax = g('companyFax') || '041-556-3656';
+    const hqAddr = g('companyAddr') || '충남 천안시 서북구 원두정8길 6, 301호 (두정빌딩)';
+    const seosanAddr = '충남 서산시 쌍연남1로 37, 1층 (썬샤인빌딩)';
+    const seosanTel = '041-429-0123';
+    const seosanFax = '041-429-0222';
+    const primaryTel = branchRaw.indexOf('서산') >= 0 ? seosanTel : hqTel;
+    const em = g('email') || '370-6@hanmail.net';
+    const emHtml = /[\x22\x27<>\s]/.test(em)
+      ? `<span style="color:#1e293b;font-weight:600">${esc(em)}</span>`
+      : `<a href="mailto:${esc(em)}" style="color:#1e293b;text-decoration:none;font-weight:600">${esc(em)}</a>`;
+    const cleanDial = s => {
+      const d = String(s||'').replace(/\s+/g,'');
+      return (/^\+?[0-9-]+$/.test(d) && d.length >= 7 && d.length <= 20) ? d : '';
+    };
+    const mobHref = cleanDial(mobileStr);
+    const telHref = cleanDial(primaryTel);
+    const contactHtml = showMob
+      ? `<span style="color:#854d0e;font-weight:700">Mobile.</span> `
+        + (mobHref ? `<a href="tel:${esc(mobHref)}" style="color:#1e293b;text-decoration:none;font-weight:700;font-size:13.5px">${esc(mobileStr)}</a>`
+                   : `<strong style="color:#1e293b;font-size:13.5px">${esc(mobileStr)}</strong>`)
+        + ` &nbsp;<span style="color:#cbd5e1">|</span>&nbsp; <span style="color:#854d0e;font-weight:700">Email.</span> ${emHtml}`
+      : `<span style="color:#854d0e;font-weight:700">Tel.</span> `
+        + (telHref ? `<a href="tel:${esc(telHref)}" style="color:#1e293b;text-decoration:none;font-weight:700;font-size:13px">${esc(primaryTel)}</a>`
+                   : `<strong style="color:#1e293b;font-size:13px">${esc(primaryTel)}</strong>`)
+        + ` &nbsp;<span style="color:#cbd5e1">|</span>&nbsp; <span style="color:#854d0e;font-weight:700">Email.</span> ${emHtml}`;
+    return `<table class="pu-mail-card" cellpadding="0" cellspacing="0" border="0" style="width:650px;max-width:100%;border-collapse:collapse;font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#1e293b">`
+      + `<tr><td style="padding:0">`
+      + `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;border-collapse:collapse;overflow:hidden">`
+      + `<tr>`
+      + `<td style="width:68%;height:4px;background:#1e293b;font-size:0;line-height:0">&nbsp;</td>`
+      + `<td style="width:32%;height:4px;background:#d97706;font-size:0;line-height:0">&nbsp;</td>`
+      + `</tr>`
+      + `<tr><td colspan="2" style="padding:18px 22px 16px 22px">`
+      + `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse"><tr>`
+      + `<td style="vertical-align:middle;width:40%">`
+      + `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr>`
+      + `<td style="vertical-align:middle;padding:0 10px 0 0">`
+      + `<div style="width:40px;height:40px;line-height:38px;text-align:center;border:1.5px solid #d97706;border-radius:999px;background:#fffbeb;color:#d97706;font-size:20px;font-weight:700">&#10047;</div>`
+      + `</td>`
+      + `<td style="vertical-align:middle">`
+      + `<div style="font-size:16px;font-weight:700;color:#854d0e;letter-spacing:0.6px;line-height:1.2">푸른노무법인</div>`
+      + `<div style="font-size:9.5px;color:#64748b;letter-spacing:0.8px;margin:2px 0 0 0">PUREUN LABOR LAW FIRM</div>`
+      + `<div style="margin:3px 0 0 0"><a href="https://pureunlabor.co.kr" style="font-size:11px;color:#1e40af;text-decoration:none;font-weight:700">pureunlabor.co.kr</a></div>`
+      + `</td>`
+      + `</tr></table>`
+      + `</td>`
+      + `<td style="vertical-align:middle;text-align:right;width:60%;word-break:keep-all">`
+      + `<div style="line-height:1.25">`
+      + (roleRaw ? `<span style="font-size:12.5px;font-weight:700;color:#475569;margin:0 8px 0 0">${esc(roleRaw)}</span>` : '')
+      + `<span style="font-size:19px;font-weight:700;color:#1e293b;letter-spacing:3px">${esc(nm)}</span>`
+      + `</div>`
+      + (deptRaw ? `<div style="font-size:11.5px;color:#1e40af;font-weight:700;margin:4px 0 0 0">${esc(deptRaw)}</div>` : '')
+      + `<div style="font-size:12.5px;color:#1e293b;margin:6px 0 0 0">${contactHtml}</div>`
+      + `</td>`
+      + `</tr></table>`
+      + `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:13px 0 12px 0;border-collapse:collapse"><tr>`
+      + `<td style="width:66%;height:2px;background:#1e293b;font-size:0;line-height:0">&nbsp;</td>`
+      + `<td style="width:34%;height:2px;background:#d97706;font-size:0;line-height:0">&nbsp;</td>`
+      + `</tr></table>`
+      + `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse"><tr>`
+      + `<td style="width:50%;vertical-align:top;padding:0 14px 0 0;word-break:keep-all">`
+      + `<div style="font-size:12px;font-weight:700;color:#1e40af;margin:0 0 3px 0">천안본사</div>`
+      + `<div style="font-size:11.5px;color:#475569;line-height:1.55">${esc(hqAddr)}</div>`
+      + `<div style="font-size:11.5px;color:#1e293b;margin:2px 0 0 0"><span style="color:#854d0e;font-weight:700">Tel.</span> ${esc(hqTel)} &nbsp;&nbsp;<span style="color:#854d0e;font-weight:700">Fax.</span> ${esc(hqFax)}</div>`
+      + `</td>`
+      + `<td style="width:50%;vertical-align:top;padding:0 0 0 14px;border-left:1px solid #e2e8f0;word-break:keep-all">`
+      + `<div style="font-size:12px;font-weight:700;color:#1e40af;margin:0 0 3px 0">서산지사</div>`
+      + `<div style="font-size:11.5px;color:#475569;line-height:1.55">${esc(seosanAddr)}</div>`
+      + `<div style="font-size:11.5px;color:#1e293b;margin:2px 0 0 0"><span style="color:#854d0e;font-weight:700">Tel.</span> ${esc(seosanTel)} &nbsp;&nbsp;<span style="color:#854d0e;font-weight:700">Fax.</span> ${esc(seosanFax)}</div>`
+      + `</td>`
+      + `</tr></table>`
+      + `</td></tr></table>`
+      + `</td></tr></table>`;
+  }
   const L = [];
   /* 전화·팩스·휴대폰은 «있는 것만» 한 줄에 모은다 */
   const tel = [];
@@ -9664,14 +9760,14 @@ function signCardHtml(it){
   if(g('email')){
     /* 주소에 따옴표가 있으면 속성이 깨져 뒤가 다 망가진다 — 그때는 글자로만 둔다 */
     const em = g('email');
-    L.push(/["'<>\s]/.test(em) ? esc(em)
+    L.push(/[\x22\x27<>\s]/.test(em) ? esc(em)
       : `<a href="mailto:${esc(em)}" style="color:#1e40af">${esc(em)}</a>`);
   }
   if(g('companyAddr')) L.push(esc(g('companyAddr')));
   const role = [g('dept'), g('title')].filter(Boolean).join(' · ');
   return `<div style="font-size:15px;font-weight:700;color:#1e293b;margin:0">${esc(nm)}${
       role ? ` <span style="font-size:12px;font-weight:400;color:#64748b">${esc(role)}</span>` : ''}</div>`
-    + (g('company') ? `<div style="font-size:13px;font-weight:700;color:#1e40af">${esc(g('company'))}</div>` : '')
+    + (comp ? `<div style="font-size:13px;font-weight:700;color:#1e40af">${esc(comp)}</div>` : '')
     + (L.length ? `<div style="font-size:12px;color:#64748b;line-height:1.75">${L.join('<br>')}</div>` : '');
 }
 
@@ -9695,27 +9791,36 @@ function setSignMode(m){
     .catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||'')));
 }
 
-/* 서명 덩어리 — 고른 갈래에 따라 «글자 명함» 또는 «사진 표시» + 공용 글자 서명. */
+/* 서명 덩어리 — 고른 갈래에 따라 «글자 명함» 또는 «사진 표시» + 공용 글자 서명.
+   로그인한 푸른노무법인 직원의 디지털 명함(① 품격 골드·네이비 카드형)에는 천안본사·서산지사 정보가
+   카드 안에 이미 들어가 있으므로 기본 공용 글자 서명(SIGN_DEFAULT)을 중복 출력하지 않는다. */
 function signBlockHtml(){
   const rec = mySign();
   const mode = signMode();
   const txt = textToHtml(signText());
-  /* 보안문구는 «맨 끝». 작고 흐린 글씨로 본문과 구별한다.
-     ⚠ 꾸밈은 functions/mail-send.js 의 STYLE_OK 에 있는 것만 쓴다 —
-       border 는 목록에 없어 서버가 지운다. 줄은 <hr> 로 긋는다. */
+  /* 보안문구는 «맨 끝». 작고 흐린 글씨로 본문과 구별한다. */
   const sec = String(secText()||'').trim();
   const secHtml = sec
     ? '<hr><span style="font-size:12px;color:#94a3b8;line-height:1.6">'
       + textToHtml(sec) + '</span>'
     : '';
-  /* 고른 명함이 있으면 그것을 «글자»로 짜거나 «사진 표시»로 넣는다.
+  const effCard = (typeof myEffectiveSignCard === 'function')
+    ? myEffectiveSignCard(rec)
+    : ((rec && !rec.cleared && rec.cardId && state && state.items) ? state.items[rec.cardId] : null);
+  /* 고른 명함(또는 로그인 직원의 근로자명부 자동 매칭 명함)이 있으면 «글자» 또는 «사진 표시»로 넣는다.
      ⚠ 글자 갈래에 사진 표시를 함께 넣으면 안 된다 — 서버가 그림을 붙여 빈 자리가 뜬다. */
   let head = '';
-  if(rec && rec.cardId){
-    if(mode === 'photo') head = SIGN_IMG + '<br>';
-    else {
-      const card = signCardHtml(state.items[rec.cardId]);
-      head = card ? card + '<br>' : '';
+  if(effCard || (rec && !rec.cleared && rec.cardId)){
+    if(mode === 'photo' && rec && rec.cardId) head = SIGN_IMG + '<br>';
+    else if(effCard){
+      const card = signCardHtml(effCard);
+      if(card){
+        const customSign = (_matMail && _matMail.sign != null && String(_matMail.sign).trim() !== String(SIGN_DEFAULT).trim());
+        if(card.indexOf('pu-mail-card') >= 0 && !customSign){
+          return card + secHtml;
+        }
+        head = card + '<br>';
+      }
     }
   }
   return head + txt + secHtml;
@@ -9768,6 +9873,127 @@ function safeCardImgSrc(raw){
 function isPureunFirmName(co){
   return /푸른\s*노무법인|pureun/i.test(String(co || ''));
 }
+function mySidFromEmail(em){
+  const m = /^([pa])(\d+)@pureun\.kr$/i.exec(String(em || '').trim());
+  if(!m) return '';
+  const d = String(m[2] || '').padStart(3, '0').slice(-3);
+  return m[1].toUpperCase() + '-' + d;
+}
+/* 푸른노무법인 근로자 명부(HRW 전용 쓰기 data/company_info/v/staffCards + 관리자 전용 data/user_dir)에서
+   로그인 직원의 이름·직책·연락처·지사 조합. ⚠ 퇴사 판정은 mbRetired 단일 경로만 쓴다. */
+function myRosterCardProfile(){
+  const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
+  if(me && typeof mbRetired === 'function' && mbRetired(me)) return null;
+  const st = (me && typeof mbStaffOf === 'function') ? (mbStaffOf(me) || {}) : {};
+  const sid = String(st.sid || mySidFromEmail(typeof myEmail !== 'undefined' ? myEmail : '') || '').trim();
+  const rMap = (typeof ErpMatch !== 'undefined' && ErpMatch && ErpMatch.staffRosterBySid) ? ErpMatch.staffRosterBySid : {};
+  const r = (sid && rMap[sid]) ? rMap[sid] : {};
+  const nm = String(me || st.name || r.name || '').trim();
+  if(!nm) return null;
+  if(typeof mbRetired === 'function' && mbRetired(nm)) return null;
+  let title = String(st.title || r.title || '').trim();
+  if(title === '노무사') title = '공인노무사';
+  const mobile = String(r.phone || st.phone || '').trim();
+  const branch = String(st.branch || r.branch || '천안본사').trim();
+  const dept = String(r.dept || st.dept || '').trim();
+  return { sid, name: nm, title, mobile, branch, dept };
+}
+function enrichPureunCardWithRoster(it){
+  if(!it || typeof it !== 'object') return null;
+  const idStr = String(it.id || '');
+  if(!isPureunFirmName(it.company) && idStr.indexOf('pu_staff_') !== 0) return it;
+  const nm0 = String(it.name || '').trim();
+  const st = (nm0 && typeof mbStaffOf === 'function') ? (mbStaffOf(nm0) || {}) : {};
+  const sidFromId = idStr.indexOf('pu_staff_') === 0 ? idStr.slice(9) : '';
+  const sid = String(st.sid || sidFromId || '').trim();
+  const rMap = (typeof ErpMatch !== 'undefined' && ErpMatch && ErpMatch.staffRosterBySid) ? ErpMatch.staffRosterBySid : {};
+  const r = (sid && rMap[sid]) ? rMap[sid] : {};
+  const authName = String(st.name || r.name || nm0 || '').trim();
+  if(authName && typeof mbRetired === 'function' && mbRetired(authName)) return null;
+  /* ⚠ HRW·관리자 전용 쓰기 경로(user_dir · staffCards)가 있으면 일반 직원 쓰기(items)보다 우선한다 */
+  let title = String(st.title || r.title || it.title || '').trim();
+  if(title === '노무사') title = '공인노무사';
+  const rosterPhone = String(r.phone || st.phone || '').trim();
+  const mobile = rosterPhone ? rosterPhone : String(it.mobile || '').trim();
+  const branch = String(st.branch || r.branch || it.branch || '천안본사').trim();
+  const dept = String(r.dept || st.dept || it.dept || '').trim();
+  return Object.assign({}, it, {
+    name: authName,
+    title: title,
+    company: it.company || '푸른노무법인',
+    mobile: mobile,
+    branch: branch,
+    dept: dept,
+    email: it.email || '370-6@hanmail.net',
+    companyTel: it.companyTel || '041-556-0035',
+    companyFax: it.companyFax || '041-556-3656',
+    companyAddr: it.companyAddr || '충남 천안시 서북구 원두정8길 6, 301호 (두정빌딩)'
+  });
+}
+function myEffectiveSignCard(recOpt){
+  const rec = recOpt !== undefined ? recOpt : mySign();
+  if(rec && rec.cleared) return null;
+  const k = mySignKey();
+  if(!rec && k){
+    try{ if(localStorage.getItem(MYSIGN_OFF_LS + k) === '1') return null; }catch(_){}
+  }
+  if(rec && rec.cardId && state && state.items && state.items[rec.cardId]){
+    return enrichPureunCardWithRoster(state.items[rec.cardId]);
+  }
+  const found = findMyLatestPureunCard();
+  if(found) return enrichPureunCardWithRoster(found);
+  const prof = myRosterCardProfile();
+  if(!prof || !prof.name) return null;
+  return {
+    id: prof.sid ? ('pu_staff_' + prof.sid) : '',
+    kind: 'card',
+    name: prof.name,
+    title: prof.title,
+    dept: prof.dept,
+    branch: prof.branch,
+    company: '푸른노무법인',
+    mobile: prof.mobile,
+    email: '370-6@hanmail.net',
+    companyTel: '041-556-0035',
+    companyFax: '041-556-3656',
+    companyAddr: '충남 천안시 서북구 원두정8길 6, 301호 (두정빌딩)'
+  };
+}
+function mySenderDisplayPrefix(isBulk){
+  if(isBulk) return '푸른노무법인';
+  const prof = myRosterCardProfile();
+  const card = (!prof) ? mySignCardItem() : null;
+  const nm = String((prof && prof.name) || (card && card.name) || '').trim();
+  if(!nm) return '푸른노무법인';
+  let title = String((prof && prof.title) || (card && card.title) || '').trim();
+  if(title === '노무사') title = '공인노무사';
+  return ['푸른노무법인', nm, title].filter(Boolean).join(' ');
+}
+function refreshUntouchedComposeSign(){
+  if(typeof _compose === 'undefined' || !_compose) return;
+  /* ⚠ 먼저 화면 입력값을 _compose 에 반영(grabCompose)해야 사용자가 입력 중이던 글이 덮어써지지 않는다 */
+  if(typeof grabCompose === 'function') grabCompose();
+  try{
+    if(typeof document !== 'undefined'){
+      const from = (typeof matMailCfg === 'function' ? (matMailCfg().from || '(보내는 주소 없음)') : '');
+      if(from){
+        const lbl = mySenderDisplayPrefix(!!_compose.bulk) + ' <' + from + '>';
+        document.querySelectorAll('#pcMail .cpfrom, #mmBody .cpfrom, #sendMatSheet .cpfrom').forEach(el=>{ el.textContent = lbl; });
+      }
+    }
+  }catch(_){}
+  if(typeof composeTouched === 'function' && composeTouched(_compose)) return;
+  const curHtml = String(_compose.html || '');
+  if(curHtml.indexOf('──────────') >= 0) return;
+  const nextSign = signBlockHtml();
+  if(nextSign.indexOf('pu-mail-card') < 0) return;
+  const h0 = '<br><br>' + nextSign;
+  if(curHtml === h0) return;
+  _compose.html = h0;
+  _compose.body = htmlToTextC(h0);
+  _compose.base = { subject: String(_compose.subject || ''), body: _compose.body };
+  if(state && state.view === 'mail' && !state.mailSent && typeof renderMailPage === 'function') renderMailPage();
+}
 function findMyLatestPureunCard(){
   const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
   if(!me) return null;
@@ -9803,9 +10029,12 @@ function mySignCardItem(){
   if(rec && rec.cleared) return null;
   if(rec && rec.cardId && state && state.items && state.items[rec.cardId]){
     const it = state.items[rec.cardId];
-    if(isPureunFirmName(it.company) || String(rec.cardId).indexOf('pu_staff_') === 0) return it;
+    if(isPureunFirmName(it.company) || String(rec.cardId).indexOf('pu_staff_') === 0){
+      return (typeof enrichPureunCardWithRoster === 'function') ? enrichPureunCardWithRoster(it) : it;
+    }
   }
-  return findMyLatestPureunCard();
+  const found = findMyLatestPureunCard();
+  return (found && typeof enrichPureunCardWithRoster === 'function') ? enrichPureunCardWithRoster(found) : found;
 }
 function estimateDataUrlBytes(u){
   const s = String(u || '');
@@ -9880,125 +10109,149 @@ function setMyCardAutoAttach(on, silent){
     toast(on ? '📇 이제 메일을 보낼 때마다 내 명함 파일이 자동 첨부됩니다' : '자동 첨부를 껐습니다 — 서명 설정은 그대로 유지됩니다', 5000);
   }
 }
-/* 최근 푸른노무법인 공식 명함 양식(무궁화 휘장 · 투톤 구분선 · 천안본사/서산지사) 캔버스 생성 */
+/* 확정 표준 ① 품격 골드·네이비 카드형(1060×590, 90×50mm 비율) 캔버스 생성 */
 function renderPureunCardDataUrl(spec){
   const o = spec || {};
   const nm = String(o.name || '').trim();
   if(!nm || typeof document === 'undefined') return '';
   const cv = document.createElement('canvas');
-  cv.width = 900; cv.height = 500;
+  cv.width = 1060; cv.height = 590;
   const g = cv.getContext && cv.getContext('2d');
   if(!g) return '';
   g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, 900, 500);
+  g.fillRect(0, 0, 1060, 590);
   g.strokeStyle = '#e2e8f0';
   g.lineWidth = 2;
-  g.strokeRect(1, 1, 898, 498);
+  g.strokeRect(1, 1, 1058, 588);
 
-  /* 좌상단 공인노무사회 5꽃잎 휘장 + 푸른 노무법인 */
-  const cx = 118, cy = 78;
+  /* 상단 네이비(68%) · 골드(32%) 바 */
+  g.fillStyle = '#1e293b';
+  g.fillRect(0, 0, 721, 10);
+  g.fillStyle = '#d97706';
+  g.fillRect(721, 0, 339, 10);
+
+  /* 좌상단 공인노무사회 5꽃잎 휘장 + 푸른노무법인 */
+  const cx = 106, cy = 152;
   g.lineJoin = 'round';
   for(let i = 0; i < 5; i++){
     const ang = (-90 + i * 72) * Math.PI / 180;
-    const px = cx + 27 * Math.cos(ang), py = cy + 27 * Math.sin(ang);
+    const px = cx + 24 * Math.cos(ang), py = cy + 24 * Math.sin(ang);
     g.beginPath();
     for(let k = 0; k < 5; k++){
       const a2 = (-90 + i * 72 + k * 72) * Math.PI / 180;
-      const rr = k === 0 ? 26 : 21;
+      const rr = k === 0 ? 23 : 19;
       const x = px + rr * Math.cos(a2), y = py + rr * Math.sin(a2);
       if(k === 0) g.moveTo(x, y); else g.lineTo(x, y);
     }
     g.closePath();
     g.fillStyle = '#ffffff'; g.fill();
-    g.strokeStyle = '#d97706'; g.lineWidth = 3.4; g.stroke();
+    g.strokeStyle = '#d97706'; g.lineWidth = 3.2; g.stroke();
   }
-  g.beginPath(); g.arc(cx, cy, 23, 0, Math.PI * 2);
+  g.beginPath(); g.arc(cx, cy, 20, 0, Math.PI * 2);
   g.fillStyle = '#ffffff'; g.fill();
-  g.strokeStyle = '#d97706'; g.lineWidth = 3.4; g.stroke();
+  g.strokeStyle = '#d97706'; g.lineWidth = 3.2; g.stroke();
   for(let i = 0; i < 3; i++){
     const a = (-90 + i * 120) * Math.PI / 180;
     const aL = (-90 + i * 120 - 24) * Math.PI / 180;
     const aR = (-90 + i * 120 + 24) * Math.PI / 180;
     g.beginPath();
     g.moveTo(cx, cy);
-    g.lineTo(cx + 10 * Math.cos(aL), cy + 10 * Math.sin(aL));
-    g.lineTo(cx + 19 * Math.cos(a), cy + 19 * Math.sin(a));
-    g.lineTo(cx + 10 * Math.cos(aR), cy + 10 * Math.sin(aR));
+    g.lineTo(cx + 9 * Math.cos(aL), cy + 9 * Math.sin(aL));
+    g.lineTo(cx + 16 * Math.cos(a), cy + 16 * Math.sin(a));
+    g.lineTo(cx + 9 * Math.cos(aR), cy + 9 * Math.sin(aR));
     g.closePath();
     g.fillStyle = '#d97706'; g.fill();
   }
-  g.fillStyle = '#d97706';
-  g.font = 'bold 17px "Malgun Gothic", sans-serif';
-  g.textAlign = 'center';
-  g.fillText('푸른 노무법인', cx, 150);
+  g.textAlign = 'left';
+  g.fillStyle = '#854d0e';
+  g.font = 'bold 28px "Malgun Gothic", sans-serif';
+  g.fillText('푸른노무법인', 166, 145);
+  g.fillStyle = '#64748b';
+  g.font = 'bold 14px Calibri, "Malgun Gothic", sans-serif';
+  g.fillText('PUREUN LABOR LAW FIRM', 168, 170);
+  g.fillStyle = '#1e40af';
+  g.font = 'bold 16px Calibri, "Malgun Gothic", sans-serif';
+  g.fillText('pureunlabor.co.kr', 168, 195);
 
-  /* 우측 직함 · 성명 · Mobile */
+  /* 우측 직책 · 성명 · 담당분야 · 연락처(근로자명부 Mobile 우선) */
   const spaced = nm.split('').join(' ');
   const mobile = String(o.mobile || '').trim();
-  const title = String(o.title || '').trim();
-  const rightX = 852;
-  const nameY = mobile ? 236 : 258;
+  const showMob = (o.showMobile !== false) && Boolean(mobile);
+  let title = String(o.title || '').trim();
+  if(title === '노무사') title = '공인노무사';
+  const dept = String(o.dept || '').trim();
+  const branch = String(o.branch || '').trim();
+  const primaryTel = branch.indexOf('서산') >= 0 ? '041-429-0123' : '041-556-0035';
+  const rightX = 992;
   g.textAlign = 'right';
   g.fillStyle = '#1e293b';
-  g.font = 'bold 34px "Malgun Gothic", sans-serif';
-  g.fillText(spaced, rightX, nameY);
-  const nameW = g.measureText(spaced).width;
+  g.font = 'bold 42px "Malgun Gothic", sans-serif';
+  g.fillText(spaced, rightX, 152, 360);
+  const nameW = Math.min(360, g.measureText(spaced).width);
   if(title){
     g.fillStyle = '#475569';
-    g.font = 'bold 18.5px "Malgun Gothic", sans-serif';
-    g.fillText(title, rightX - nameW - 14, nameY - 2);
+    g.font = 'bold 23px "Malgun Gothic", sans-serif';
+    g.fillText(title, rightX - nameW - 16, 150, 210);
   }
-  if(mobile){
-    g.fillStyle = '#1e293b';
-    g.font = 'bold 20px Calibri, "Malgun Gothic", sans-serif';
-    g.fillText(mobile, rightX, 276);
-    const mobW = g.measureText(mobile).width;
-    g.fillStyle = '#d97706';
-    g.font = 'bold 18.5px Calibri, "Malgun Gothic", sans-serif';
-    g.fillText('Mobile.', rightX - mobW - 8, 276);
+  if(dept){
+    g.fillStyle = '#1e40af';
+    g.font = 'bold 19px "Malgun Gothic", sans-serif';
+    g.fillText(dept, rightX, 190, 560);
   }
+  const contactY = dept ? 232 : 210;
+  const contactLine = showMob
+    ? ('Mobile. ' + mobile + '   |   Email. 370-6@hanmail.net')
+    : ('Tel. ' + primaryTel + '   |   Email. 370-6@hanmail.net');
+  g.fillStyle = '#1e293b';
+  g.font = 'bold 20px Calibri, "Malgun Gothic", sans-serif';
+  g.fillText(contactLine, rightX, contactY);
 
-  /* 투톤 구분선 */
-  g.beginPath(); g.moveTo(38, 298); g.lineTo(608, 298);
-  g.strokeStyle = '#475569'; g.lineWidth = 2.4; g.stroke();
-  g.beginPath(); g.moveTo(608, 298); g.lineTo(854, 298);
-  g.strokeStyle = '#d97706'; g.lineWidth = 2.8; g.stroke();
+  /* 투톤 구분선 (66% 네이비 · 34% 골드) */
+  g.fillStyle = '#1e293b';
+  g.fillRect(68, 286, 610, 4);
+  g.fillStyle = '#d97706';
+  g.fillRect(678, 286, 314, 4);
 
-  /* 하단 천안본사 · 서산지사 */
+  /* 하단 천안본사 · 서산지사 2단 */
   g.textAlign = 'left';
+  g.fillStyle = '#e2e8f0';
+  g.fillRect(530, 326, 2, 190);
   const drawBranch = (x, head, addr, tel, fax) => {
-    g.fillStyle = '#1e40af'; g.font = 'bold 18px "Malgun Gothic", sans-serif';
-    g.fillText(head, x, 332);
-    g.fillStyle = '#1e293b'; g.font = '14.5px "Malgun Gothic", sans-serif';
-    g.fillText(addr, x, 376);
-    g.fillStyle = '#d97706'; g.font = 'bold 15px Calibri, sans-serif';
-    g.fillText('Tel.', x, 408);
-    g.fillText('Fax.', x + 202, 408);
-    g.fillText('Email.', x, 438);
-    g.fillStyle = '#1e293b'; g.font = '15.5px Calibri, sans-serif';
-    g.fillText(tel, x + 32, 408);
-    g.fillText(fax, x + 236, 408);
-    g.fillText('370-6@hanmail.net', x + 48, 438);
+    g.fillStyle = '#1e40af'; g.font = 'bold 22px "Malgun Gothic", sans-serif';
+    g.fillText(head, x, 352);
+    g.fillStyle = '#475569'; g.font = '18.5px "Malgun Gothic", sans-serif';
+    g.fillText(addr, x, 392);
+    g.fillStyle = '#854d0e'; g.font = 'bold 19px Calibri, "Malgun Gothic", sans-serif';
+    g.fillText('Tel.', x, 434);
+    g.fillText('Fax.', x + 216, 434);
+    g.fillStyle = '#1e293b'; g.font = 'bold 19px Calibri, "Malgun Gothic", sans-serif';
+    g.fillText(tel, x + 38, 434);
+    g.fillText(fax, x + 258, 434);
   };
-  drawBranch(38, '천안본사', '충남 천안시 서북구 원두정8길 6, 301호(두정빌딩)', '041-556-0035', '041-556-3656');
-  drawBranch(486, '서산지사', '충남 서산시 쌍연남1로 37, 1층(썬샤인빌딩)', '041-429-0123', '041-429-0222');
+  drawBranch(68, '천안본사', '충남 천안시 서북구 원두정8길 6, 301호 (두정빌딩)', '041-556-0035', '041-556-3656');
+  drawBranch(558, '서산지사', '충남 서산시 쌍연남1로 37, 1층 (썬샤인빌딩)', '041-429-0123', '041-429-0222');
   return cv.toDataURL('image/jpeg', 0.92);
 }
+let _genCardBusy = false;
 async function genMyPureunCardNow(){
+  if(_genCardBusy) return;
   const k = mySignKey();
   if(!k) return toast('로그인 정보를 확인 중입니다 — 잠시 뒤 다시 눌러 주세요', 5000);
+  const prof = (typeof myRosterCardProfile === 'function') ? myRosterCardProfile() : null;
   const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
   const cur = mySignCardItem();
   const st = (me && typeof mbStaffOf === 'function') ? (mbStaffOf(me) || {}) : {};
-  const nm = String((cur && cur.name) || me || '').trim();
+  const nm = String((prof && prof.name) || (cur && cur.name) || me || '').trim();
   if(!nm) return toast('내 직원 이름을 아직 불러오지 못했습니다', 6000);
-  let rawTitle = String((cur && isPureunFirmName(cur.company) && cur.title) || st.title || '').trim();
+  let rawTitle = String((prof && prof.title) || (cur && isPureunFirmName(cur.company) && cur.title) || st.title || '').trim();
   if(rawTitle === '노무사') rawTitle = '공인노무사';
-  const mobile = String((cur && cur.mobile) || '').trim();
-  const dataUrl = renderPureunCardDataUrl({ name: nm, title: rawTitle, mobile: mobile });
+  const mobile = String((prof && prof.mobile) || (cur && cur.mobile) || '').trim();
+  const branch = String((prof && prof.branch) || (cur && cur.branch) || st.branch || '천안본사').trim();
+  const dept = String((prof && prof.dept) || (cur && cur.dept) || '').trim();
+  const dataUrl = renderPureunCardDataUrl({ name: nm, title: rawTitle, mobile: mobile, branch: branch, dept: dept });
   if(!dataUrl) return toast('명함 이미지를 만들지 못했습니다', 6000);
   const now = Date.now();
-  const sidClean = String(st.sid || nm).replace(/[^A-Za-z0-9가-힣_-]/g, '_');
+  const sidClean = String((prof && prof.sid) || st.sid || nm).replace(/[^A-Za-z0-9가-힣_-]/g, '_');
   /* 기존 스캔 원본 명함(photos/<cur.id>)을 덮어쓰지 않도록 전용 공식 명함 ID(pu_staff_<sid>)에 저장한다 */
   const cardId = 'pu_staff_' + sidClean;
   const prevStaffCard = (state.items && state.items[cardId]) || {};
@@ -10009,17 +10262,21 @@ async function genMyPureunCardNow(){
     group: prevStaffCard.group || (cur && cur.group) || '',
     name: nm,
     title: rawTitle,
-    company: '푸른 노무법인',
+    dept: dept,
+    branch: branch,
+    company: '푸른노무법인',
     mobile: mobile,
     email: '370-6@hanmail.net',
     companyTel: '041-556-0035',
     companyFax: '041-556-3656',
-    companyAddr: '충남 천안시 서북구 원두정8길 6, 301호(두정빌딩)',
-    memo: '[서산지사] 충남 서산시 쌍연남1로 37, 1층(썬샤인빌딩) / Tel. 041-429-0123 / Fax. 041-429-0222',
+    companyAddr: '충남 천안시 서북구 원두정8길 6, 301호 (두정빌딩)',
+    memo: '[서산지사] 충남 서산시 쌍연남1로 37, 1층 (썬샤인빌딩) / Tel. 041-429-0123 / Fax. 041-429-0222',
     createdAt: Number(prevStaffCard.createdAt || now),
     updatedAt: now
   };
   if(!cardRec.group) delete cardRec.group;
+  if(!cardRec.dept) delete cardRec.dept;
+  _genCardBusy = true;
   try{
     if(typeof Store !== 'undefined' && Store.mode === 'firebase' && firebase.database){
       const db = firebase.database();
@@ -10028,7 +10285,7 @@ async function genMyPureunCardNow(){
         db.ref(`${DB_ROOT}/thumbs/${cardId}`).set(dataUrl),
         db.ref(`${DB_ROOT}/photos/${cardId}`).set(dataUrl),
         db.ref(`${DB_ROOT}/idx/${cardId}`).set(typeof idxRecord === 'function' ? idxRecord(cardRec) : cardRec),
-        db.ref(`${DB_ROOT}/config/matMail/perUser/${k}`).set({ cardId: cardId, cleared: false, mode: 'photo', autoAttach: true, at: now })
+        db.ref(`${DB_ROOT}/config/matMail/perUser/${k}`).set({ cardId: cardId, cleared: false, mode: 'card', autoAttach: true, at: now })
       ]);
     }
     state.items = state.items || {};
@@ -10036,14 +10293,17 @@ async function genMyPureunCardNow(){
     if(typeof Store !== 'undefined' && Store.thumbCache) Store.thumbCache[cardId] = dataUrl;
     try{ localStorage.removeItem(MYSIGN_OFF_LS + k); }catch(_){}
     _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
-    _matMail.perUser[k] = { cardId: cardId, cleared: false, mode: 'photo', autoAttach: true, at: now };
+    _matMail.perUser[k] = { cardId: cardId, cleared: false, mode: 'card', autoAttach: true, at: now };
     _signThumb = dataUrl;
     if(_compose) _compose.myCardOff = false;
+    try{ if(typeof refreshUntouchedComposeSign === 'function') refreshUntouchedComposeSign(); }catch(_){}
     try{ if(document.getElementById('msList')) showPanel(mySignHtml()); }catch(_){}
     renderMailPage();
-    toast(`✨ ${nm} ${rawTitle || ''} 최근 푸른노무법인 명함을 적용했습니다 — 메일 보낼 때 자동 첨부됩니다`, 7000);
+    toast(`✨ ${nm} ${rawTitle || ''} 확정 골드·네이비 명함을 적용했습니다 — 본문 디지털 명함 및 자동 첨부로 나갑니다`, 7000);
   }catch(e){
     toast('명함 저장 실패: ' + ((e && e.message) || e), 8000);
+  }finally{
+    _genCardBusy = false;
   }
 }
 let _ensuringMyCard = false;
@@ -10062,12 +10322,13 @@ function ensureMyPureunCard(then){
   const found = findMyLatestPureunCard();
   if(!found || !found.id){ if(then) then(); return; }
   _ensuringMyCard = true;
-  const next = { cardId: String(found.id), mode: 'photo', autoAttach: true, at: Date.now() };
+  const next = { cardId: String(found.id), mode: 'card', autoAttach: true, at: Date.now() };
   _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
   _matMail.perUser[k] = next;
   if(typeof Store !== 'undefined' && Store.mode === 'firebase' && firebase.database){
     firebase.database().ref(`${DB_ROOT}/config/matMail/perUser/${k}`).set(next).catch(()=>{});
   }
+  try{ if(typeof refreshUntouchedComposeSign === 'function') refreshUntouchedComposeSign(); }catch(_){}
   loadSignThumb(()=>{ _ensuringMyCard = false; if(then) then(); });
 }
 
@@ -10087,7 +10348,10 @@ function mySignHtml(){
   /* 사진(썸네일)이 있는 명함만 보여 준다 — 없는 것을 고르면 그림이 안 붙는다.
      ⚠ 개인 폴더 명함은 안 보여 준다. 서버는 공용 자리(pucards/thumbs)만 읽는다. */
   const pool = Object.values(state.items||{}).filter(it=>it && it.kind==='card' && it.id);
-  const cur = rec.cardId ? (state.items[rec.cardId]||{}) : null;
+  const rawCur = rec.cardId ? (state.items[rec.cardId]||null) : null;
+  const cur = rawCur
+    ? ((typeof enrichPureunCardWithRoster === 'function') ? enrichPureunCardWithRoster(rawCur) : rawCur)
+    : ((typeof myEffectiveSignCard === 'function') ? myEffectiveSignCard(rec) : null);
   const autoOn = (typeof myCardAutoAttachOn === 'function') ? myCardAutoAttachOn() : true;
   /* ⚠ 찾기 칸은 «다시 그리지 않는다». 한글은 자모 여러 번이 모여 한 글자가 되는데
      (조합), 글자마다 팝업을 다시 그리면 입력 칸이 새 것으로 바뀌어 조합이 끊긴다 —
@@ -10113,10 +10377,10 @@ function mySignHtml(){
     ${/* 글자냐 사진이냐 (대표 지시 2026-08-24 「깔끔하게 정리되어 디지털 형태로」).
          글자를 기본으로 둔다 — 받는 쪽이 그림을 막아도 보이고, 긁어 붙일 수 있다. */''}
     <div class="msmode">
-      <button class="${signMode()==='card'?'on':''}" onclick="setSignMode('card')"
+      <button class="${signMode()==='card'?'on':''}" aria-pressed="${signMode()==='card'?'true':'false'}" onclick="setSignMode('card')"
         title="이름·회사·전화·주소를 글자로 짜서 보냅니다 — 무조건 보이고, 긁어 붙일 수 있습니다">
         📝 본문은 글자로</button>
-      <button class="${signMode()==='photo'?'on':''}" onclick="setSignMode('photo')"
+      <button class="${signMode()==='photo'?'on':''}" aria-pressed="${signMode()==='photo'?'true':'false'}" onclick="setSignMode('photo')"
         title="본문 서명에도 명함 그림을 함께 넣습니다">
         🖼 본문에도 사진으로</button>
     </div>
@@ -10210,7 +10474,7 @@ function pickMySign(cardId){
   const next = {
     cardId: String(cardId),
     cleared: false,
-    mode: prev.mode || 'photo',
+    mode: prev.mode || 'card',
     autoAttach: prev.autoAttach !== false,
     at: Date.now()
   };
@@ -10356,7 +10620,7 @@ function previewMail(){
     .concat((c.files||[]).map(f=>f.name));
   showPanel(`<div class="mhead"><b>👁 미리보기</b>${_closeBtn()}</div>
     <div style="font-size:12.5px;line-height:1.9;color:#1e293b;border-bottom:1px solid #f8fafc;padding-bottom:9px;margin-bottom:9px">
-      <b>보내는사람</b> 푸른노무법인 &lt;${esc(from)}&gt;<br>
+      <b>보내는사람</b> ${esc(typeof mySenderDisplayPrefix === 'function' ? mySenderDisplayPrefix(!!c.bulk) : '푸른노무법인')} &lt;${esc(from)}&gt;<br>
       <b>받는사람</b> ${esc(c.to||'(비어 있음)')}<br>
       ${c.cc?`<b>참조</b> ${esc(c.cc)}<br>`:''}
       ${c.bcc||c.toMe?`<b>숨은참조</b> ${esc([c.bcc, c.toMe?from:''].filter(Boolean).join(', '))}<br>`:''}
