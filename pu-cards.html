@@ -1550,6 +1550,75 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-inq button{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:12px;
   padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 .dm-inq button:hover{background:#eff6ff}
+/* ── 담당자함 개인별 소분류 탭 · 자동정리 · 처리완료 (대표 지시 2026-11-18) ── */
+.dm-subbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 10px;
+  background:#f8fafc;border-top:1px solid #e2e8f0;border-bottom:1px solid #cbd5e1}
+.dm-subtab{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;min-height:28px;border-radius:999px;
+  border:1px solid #cbd5e1;background:#ffffff;color:#1e293b;font-family:inherit;font-size:12.5px;
+  font-weight:600;line-height:1.3;cursor:pointer;white-space:nowrap}
+.dm-subtab:hover{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.dm-subtab.dropmail{background:#eff6ff;border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}
+.dm-subtab .cnt{display:inline-flex;align-items:center;justify-content:center;min-width:18px;
+  padding:1px 6px;border-radius:999px;background:#f8fafc;color:#475569;font-size:11.5px;
+  font-weight:700;font-variant-numeric:tabular-nums;border:1px solid #e2e8f0}
+.dm-subtab .unr{display:inline-block;padding:0 5px;border-radius:999px;background:#eff6ff;
+  color:#1e40af;font-size:11px;font-weight:700;border:1px solid #bfdbfe}
+.dm-subtab.on{background:#2563eb;border-color:#2563eb;color:#ffffff}
+.dm-subtab.on .cnt{background:#ffffff;color:#1e40af;border-color:#ffffff}
+.dm-subtab.on .unr{background:#ffffff;color:#1e40af;border-color:#ffffff}
+.dm-subtab.done-tab.on{background:#166534;border-color:#166534;color:#ffffff}
+.dm-subtab.done-tab.on .cnt{background:#ffffff;color:#166534;border-color:#ffffff}
+.dm-subsep{width:1px;height:18px;background:#cbd5e1;margin:0 2px;flex:none}
+.dm-subsp{flex:1 1 auto}
+.dm-subact{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;min-height:28px;border-radius:7px;
+  border:1px solid #cbd5e1;background:#ffffff;color:#1e293b;font-family:inherit;font-size:12px;
+  font-weight:600;line-height:1.3;cursor:pointer;white-space:nowrap}
+.dm-subact:hover{background:#f8fafc;border-color:#94a3b8}
+.dm-subact.pri{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.dm-subact.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.dm-subpill{display:inline-flex;align-items:center;gap:2px;padding:2px 7px;min-height:24px;border-radius:6px;
+  font-family:inherit;font-size:11.5px;font-weight:600;line-height:1.2;border:1px solid #cbd5e1;
+  background:#f8fafc;color:#475569;cursor:pointer;white-space:nowrap}
+.dm-subpill.work{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.dm-subpill.acct{background:#fffbeb;border-color:#fde68a;color:#854d0e}
+.dm-subpill.ops{background:#f8fafc;border-color:#cbd5e1;color:#475569}
+.dm-subpill.done{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.dm-subchk{display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;min-width:26px;
+  min-height:24px;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;
+  font-family:inherit;font-size:11.5px;font-weight:700;line-height:1.2;cursor:pointer;white-space:nowrap}
+.dm-subchk:hover{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.dm-subchk.on{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.dmm-subbar{display:flex;align-items:center;gap:6px;padding:7px 10px;overflow-x:auto;
+  background:#f8fafc;border-bottom:1px solid #e2e8f0;-webkit-overflow-scrolling:touch}
+.dmm-subbar::-webkit-scrollbar{display:none}
+.dmm-subbar .dm-subtab{flex:none;padding:6px 12px;min-height:32px;font-size:12.5px}
+.mbsub-fmi{display:block;width:100%;text-align:left;border:none;background:#ffffff;color:#1e293b;
+  font-family:inherit;font-size:13px;cursor:pointer}
+.mbsub-fmi:hover{background:#eff6ff;color:#1e40af}
+.mbsub-sec{margin:10px 0 12px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc}
+.mbsub-sec h4{margin:0 0 8px;font-size:13px;color:#1e293b}
+.mbsub-trow{display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:5px;
+  border:1px solid #e2e8f0;border-radius:7px;background:#ffffff;font-size:13px;color:#1e293b}
+.mbsub-trow .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbsub-trow button,.mbsub-rrow button{padding:4px 10px;min-height:30px;min-width:32px;border:1px solid #cbd5e1;
+  border-radius:6px;background:#ffffff;color:#475569;font-family:inherit;font-size:12px;font-weight:600;
+  cursor:pointer;white-space:nowrap}
+.mbsub-trow button:disabled{opacity:.38;cursor:default}
+.mbsub-trow button.del,.mbsub-rrow button.del{border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.mbsub-note{margin:0 0 8px;font-size:12.5px;line-height:1.6;color:#475569}
+.mbsub-rrow{display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:5px;
+  border:1px solid #e2e8f0;border-radius:7px;background:#ffffff;font-size:12.5px;color:#1e293b}
+.mbsub-rrow .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbsub-add{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mbsub-add input,.mbsub-add select,.mbsub-defsel,.fmkwin{font-family:inherit;font-size:16px;padding:6px 9px;
+  border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#1e293b}
+.mbsub-add button{padding:6px 12px;min-height:36px;border:1px solid #2563eb;border-radius:7px;background:#2563eb;
+  color:#ffffff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.dm-none .sub-empty-note{font-size:12.5px;color:#475569}
+.dmm-none .sub-empty-note{font-size:12.5px;color:var(--sub)}
+.dm-none .sub-jump,.dmm-none .sub-jump{display:inline-flex;align-items:center;gap:5px;margin:8px 4px 0;
+  padding:6px 13px;min-height:34px;border-radius:999px;border:1px solid #bfdbfe;background:#eff6ff;
+  color:#1e40af;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
 /* 👁 메일 줄에 마우스를 올리면 뜨는 «내용 카드» (대표 승인 목업 2026-10-30) — 읽음 표시를 안 한다 */
 .dm-cardtog{border:1px solid #cbd5e1;background:#fff;color:#64748b;border-radius:12px;padding:1px 10px;
   font-family:inherit;font-size:12px;cursor:pointer}
@@ -20524,6 +20593,7 @@ function mbEnsureBins(cb){
     mbWkLoad();                 /* 업무관리에서 이은 것 — «따로» 읽는다(거절돼도 위 묶음은 멀쩡하게) */
     mbPushMasterLoad();         /* 📵 받은 메일 폰 알림 전체 스위치 — 이것도 «따로» (거절돼도 위 묶음은 멀쩡하게) */
     if(typeof mbCalInboxLoad === 'function') mbCalInboxLoad();
+    if(typeof mbSubLoad === 'function') mbSubLoad();
   });
 }
 
@@ -24284,75 +24354,59 @@ function mbAllRows(){
 
 /* 지금 화면에 보일 줄 — 거르개(안읽음·중요·첨부)·찾기를 거친 것 */
 /* 거르개·찾는 말까지 통과한 «모든» 줄 — 세는 데 쓴다(그리는 데는 안 쓴다). */
-function mbMatchedRows(){
-  /* ⚠ 셈의 «열쇠»에 칸·거르개·찾는 말을 넣는다. 안 넣으면 거르개를 바꿔도 옛 목록이
-       그대로 나온다 — 화면은 그릴 때마다 셈을 버리니 앱에서는 안 드러나지만,
-       그리기 없이 묻는 자리(검사·단축키)에서 조용히 틀린다. */
+function mbMatchedRows(skipSub){
   const m = mbMemoOf();
-  const tag = String(mbNow()) + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'')
+  const isP = (typeof mbIsPersonBox === 'function') && mbIsPersonBox(mbNow());
+  const rev = (typeof _mbSubRev !== 'undefined') ? _mbSubRev : 0;
+  const subKey = (!skipSub && isP && typeof mbSubActiveTab === 'function') ? (mbSubActiveTab(mbNow()) + ':' + rev) : 'base';
+  const baseTag = String(mbNow()) + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'')
     + '|' + (state.mbSpamShow?'s':'') + '|' + String(state.mbSentWho||'')
-    /* 👁 열어 본 것 — 켜고 끌 때, 그리고 열람 기록이 늦게 왔을 때 다시 센다 */
     + '|' + (mbOpenOnly() ? 'o' + (_mbOpen ? Object.keys(_mbOpen).length : '-') : '');
-  if(m.matched && m.matchedTag === tag) return m.matched;
-  m.matchedTag = tag;
-  let rows = mbAllRows();
-  /* ══ 🚫 스팸으로 보이는 것은 여기서 «한 번» 뺀다 (대표 지시 2026-09-08) ══
-     ★ 이 자리를 고른 까닭 — 목록·쪽수·「보이는 것 모두 고르기」·방향키가 모두
-       이 함수를 본다. 여기서 빼면 그 넷이 «함께» 맞는다. 딴 자리에서 빼면
-       목록에는 안 보이는데 「모두 고르기」에 들어가는 메일이 생긴다.
-     ⚠ 「보기」를 누르면(state.mbSpamShow) 그대로 둔다 — 감추는 것이지 없애는 것이
-       아니다. 그래서 셈의 열쇠에도 그 값을 넣었다(안 넣으면 눌러도 옛 목록이 나온다). */
-  if(!state.mbSpamShow && mbSpamOn()) rows = rows.filter(v=>!mbIsSpam(v));
-  /* ══ 📤 사람마다 갈라 보기 — 보낸 칸에서만 (대표 지시 2026-09-16) ══
-     ★ 스팸 거르개와 «같은 자리»다. 여기서 걸러야 목록·쪽수·「보이는 것 모두 고르기」·
-       방향키가 함께 맞는다. 딴 자리에서 걸면 칩에 적힌 수와 열었을 때 통수가 어긋난다 —
-       2026-09-18 에 「안읽음 8」을 눌러도 아무 일이 없던 것이 바로 그 어긋남이었다.
-     ⚠ 보낸 칸이 아니면 «아무 일도 안 한다» — 받은 칸에는 담당자 칸이 따로 있다. */
-  const sw = String(state.mbSentWho||'');
-  if(sw && mbSentBox()){
-    const idx = mbWhoIndex();
-    rows = (sw === MB_SENT_NA)
-      ? rows.filter(v=>!mbSentWho(v, idx).who)
-      : rows.filter(v=>mbSentWho(v, idx).who === sw);
+  const tag = baseTag + '|' + subKey;
+  if(!skipSub && m.matched && m.matchedTag === tag) return m.matched;
+  if(skipSub && m.matchedBase && m.matchedBaseTag === baseTag) return m.matchedBase;
+  if(!skipSub) m.matchedTag = tag;
+  let base = (m.matchedBase && m.matchedBaseTag === baseTag) ? m.matchedBase : null;
+  if(!base){
+    m.matchedBaseTag = baseTag;
+    let rows = mbAllRows();
+    /* ══ 🚫 스팸으로 보이는 것은 여기서 «한 번» 뺀다 (대표 지시 2026-09-08) ══ */
+    if(!state.mbSpamShow && mbSpamOn()) rows = rows.filter(v=>!mbIsSpam(v));
+    /* ══ 📤 사람마다 갈라 보기 — 보낸 칸에서만 (대표 지시 2026-09-16) ══ */
+    const sw = String(state.mbSentWho||'');
+    if(sw && mbSentBox()){
+      const idx = mbWhoIndex();
+      rows = (sw === MB_SENT_NA)
+        ? rows.filter(v=>!mbSentWho(v, idx).who)
+        : rows.filter(v=>mbSentWho(v, idx).who === sw);
+    }
+    /* 👁 열어 본 것만 — 보낸 칸에서만, 사람 칩과 함께 걸린다 (대표 승인 2026-10-05) */
+    if(mbOpenOnly() && mbSentBox()) rows = rows.filter(v=>!!mbOpenOf(v));
+    const f = state.mbFilter||'';
+    if(f==='unread') rows = rows.filter(v=>!Number(v.r||0));
+    else if(f==='flag') rows = rows.filter(v=>Number(v.g||0));
+    else if(f==='att')  rows = rows.filter(v=>Number(v.a||0));
+    else if(f==='doc')  rows = rows.filter(v=>mbIsDoc(v));
+    const q = String(state.mbQ||'').trim().toLowerCase().replace(/\s/g,'');
+    if(q) rows = rows.filter(v=>{
+      const hay = (String(v.f||'')+String(v.e||'')+String(v.t||'')+String(v.tn||'')
+                 +String(v.s||'')+String(v.p||''))
+        .toLowerCase().replace(/\s/g,'');
+      return hay.indexOf(q)>=0 || mbFindHit(v);
+    });
+    base = m.matchedBase = rows;
   }
-  /* 👁 열어 본 것만 — 보낸 칸에서만, 사람 칩과 함께 걸린다 (대표 승인 2026-10-05) */
-  if(mbOpenOnly() && mbSentBox()) rows = rows.filter(v=>!!mbOpenOf(v));
-  const f = state.mbFilter||'';
-  if(f==='unread') rows = rows.filter(v=>!Number(v.r||0));
-  else if(f==='flag') rows = rows.filter(v=>Number(v.g||0));
-  else if(f==='att')  rows = rows.filter(v=>Number(v.a||0));
-  /* 📄 서류 후보만 — 사업자등록증·등록확인서·명함·계약서로 «보이는» 첨부가 붙은 것
-     (대표 지시 2026-10-05 「2걸음」). 고르는 잣대는 js/pu-doc-pick.js 한 곳이다 —
-     여기서 따로 판단하면 띠에 적힌 수와 걸러진 수가 어긋난다. 판독은 아직 안 한다. */
-  else if(f==='doc')  rows = rows.filter(v=>mbIsDoc(v));
-  const q = String(state.mbQ||'').trim().toLowerCase().replace(/\s/g,'');
-  if(q) rows = rows.filter(v=>{
-    /* ⚠ 미리보기(v.p)도 «함께» 본다 — 서버가 이미 본문 앞 140자를 적어 두었는데
-         찾기가 그것을 안 봤다. 새로 받아 오는 것 없이 찾을 수 있는 자리가 는다. */
-    const hay = (String(v.f||'')+String(v.e||'')+String(v.t||'')+String(v.tn||'')
-               +String(v.s||'')+String(v.p||''))
-      .toLowerCase().replace(/\s/g,'');
-    /* 다음메일에게 물어 찾은 것도 함께 — 그것은 본문 «전체»를 뒤진 결과다 */
-    return hay.indexOf(q)>=0 || mbFindHit(v);
-  });
-  return (m.matched = rows);
+  if(skipSub) return base;
+  const out = (isP && typeof mbSubFilterRows === 'function') ? mbSubFilterRows(base, mbNow()) : base;
+  return (m.matched = out);
 }
 /* ══════════════════════════════════════════════════════════════════════════
    ★★ 화면에는 «한 쪽»만 그린다 (대표 보고 2026-08-29 「반응속도가 최악」)
-   ══════════════════════════════════════════════════════════════════════════
-   예전에는 받아 온 것을 «전부» 그렸다. 「전체메일」에서는 7,360줄이고, 줄 하나가
-   1.5KB 남짓이라 화면 하나가 11MB 짜리 글이 된다 — 브라우저가 그것을 만들고 붙이는
-   데만 11초다(실측 2026-08-29). 조각들을 아무리 빠르게 해도 이 값은 안 준다.
-   ★ 다음메일도 100통씩 그린다. 같은 수(mbPageSize)로 끊는다.
-   ⚠ 「보이는 것 모두 고르기」·방향키·고른 것 세기가 모두 이 함수를 본다 — 그래서
-     «보인다»는 말의 뜻이 한 곳에서만 정해진다. 여기서 끊으면 그 셋이 함께 맞는다.
-   ⚠ 더 보려면 「이전 메일 더 보기」다. 이미 받아 둔 것이 있으면 «그 자리에서» 늘고,
-     다 보였을 때만 서버에 더 달라고 한다(mbMore). */
+   ══════════════════════════════════════════════════════════════════════════ */
 function mbVisibleRows(){
-  /* ⚠ 칸·거르개·찾는 말이 바뀌면 «첫 쪽»으로 되돌린다 — 한 곳에서만 따진다.
-       여기저기서 state.mbPage=1 을 하면 언젠가 한 군데를 빠뜨리고, 그러면 딴 칸으로
-       옮겼는데 8쪽이 그려져 「왜 여기는 비어 있지」가 된다. */
-  const tag = String(mbNow()) + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'');
+  const isP = (typeof mbIsPersonBox === 'function') && mbIsPersonBox(mbNow());
+  const subPart = (isP && typeof mbSubActiveTab === 'function') ? mbSubActiveTab(mbNow()) : '';
+  const tag = String(mbNow()) + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'') + '|' + subPart;
   if(state.mbPageFor !== tag){ state.mbPageFor = tag; state.mbPage = 1; }
   const rows = mbMatchedRows();
   const n = mbPageSize();
@@ -24360,9 +24414,9 @@ function mbVisibleRows(){
   return rows.slice((p-1)*n, p*n);
 }
 /* ── 쪽수 ──
-   ⚠ 거르개(안읽음·중요·첨부)나 찾는 말이 걸려 있으면 «받아 둔 것» 안에서만 셀 수 있다.
-     서버가 대신 걸러 주지 않으므로, 칸 전체 통수로 쪽수를 매기면 눌러도 빈 쪽이 나온다. */
+   ⚠ 거르개(안읽음·중요·첨부)·찾는 말·담당함 소분류 탭이 걸려 있으면 «받아 둔 것» 안에서만 셀 수 있다. */
 function mbFiltering(){
+  if((typeof mbIsPersonBox === 'function') && mbIsPersonBox(mbNow()) && typeof mbSubActiveTab === 'function' && mbSubActiveTab(mbNow()) !== 'all') return true;
   return !!(state.mbFilter || String(state.mbQ||'').trim());
 }
 /* ══════════════════════════════════════════════════════════════════════════
@@ -26223,6 +26277,7 @@ function mbBackStep(){
 }
 function openMailBox(id){
   mbNavNote(id);
+  if(typeof mbSubEnterBox === 'function') mbSubEnterBox(id);
   state.view='mail'; state.mailSent='box'; state.mbBox=id; state.mbOpen=null;
   /* ✉ 다른 앱이 「이 말로 찾아 달라」고 보냈으면 찾기 칸에 담는다 (2026-10-07).
      ⚠ «한 번»만 쓴다 — 주소에서 지우지 않으면, 칸을 바꿀 때마다 찾는 말이 되살아나
@@ -26766,7 +26821,8 @@ function mbMobileHtml(){
       : (state.mbQ||state.mbFilter) ? '찾은 메일이 없습니다.'
       : mbNoMsgBox(mbNow()) ? '이 칸은 <b>다음메일에서 보십시오</b>.<br>지운 메일은 안 가져옵니다.'
       : mbLoadingBox() ? '읽고 있습니다…'
-      : '아직 동기화된 메일이 없습니다.<br>위 <b>↻</b> 를 눌러 가져오세요.'}</div>`;
+      : (mbIsPersonBox(mbNow()) && typeof mbSubEmptyHtml === 'function' ? mbSubEmptyHtml(mbNow())
+      : '아직 동기화된 메일이 없습니다.<br>위 <b>↻</b> 를 눌러 가져오세요.')}</div>`;
 
   return `<div class="dmm ${state.mbDrawerOpen?'open':''}">
     <div class="dmm-top">
@@ -26776,12 +26832,14 @@ function mbMobileHtml(){
       ${state.mbPickMode ? `
         <button class="dmm-ic" onclick="mbTrash()" title="휴지통으로">🗑</button>
         <button class="dmm-ic" onclick="mbMove(event)" title="폴더 옮기기">📁</button>
+        ${mbIsPersonBox(mbNow()) ? `<button class="dmm-ic" onclick="mbSubMoveMenu(event)" title="개인 소분류 이동">🗂</button>` : ''}
         <button class="dmm-ic on" onclick="mbPickMode()" title="고르기 끝">✕</button>`
       : `
         <button class="dmm-ic" ${_mbBusy?'disabled':''} onclick="mbPull()" title="새로 가져오기">${_mbBusy?'⏳':'↻'}</button>
         <button class="dmm-ic" onclick="mbPickMode()" title="골라서 옮기기">☑</button>
         <button class="dmm-ic ${state.mbFind?'on':''}" onclick="mbFindToggle()" title="찾기">🔍</button>`}
     </div>
+    ${mbIsPersonBox(mbNow()) && typeof mbSubMobileBarHtml === 'function' ? mbSubMobileBarHtml(mbNow()) : ''}
     ${state.mbFind ? `<div class="dmm-find">
       <input id="dmmQ" data-keep="dmmQ" placeholder="메일 검색" value="${esc(state.mbQ||'')}"
         oninput="state.mbQ=this.value;if(!event.isComposing)renderMailPage()"
@@ -27083,8 +27141,9 @@ function mbTagW(html){
     w += (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x3130 && c <= 0x318F) ? 10.5
        : c > 0x2000 ? 13 : 6.4;
   }
-  const spans = Math.max(1, (h.match(/<span class=.(dm-|mn-|box)/g) || []).length);   /* class=. — 따옴표를 안 쓴다(검사가 함수를 잘라 읽을 때 글자열로 잘못 본다) */
-  return Math.ceil(w + spans * 14 + (spans - 1) * 4);
+  const spans = Math.max(1, (h.match(/<(?:span|button)\b[^>]*class=.(dm-|mn-|box)/g) || []).length);   /* class=. — 따옴표를 안 쓴다(검사가 함수를 잘라 읽을 때 글자열로 잘못 본다) */
+  const btnExtra = (h.match(/<button\b/g) || []).length * 6;
+  return Math.ceil(w + spans * 16 + (spans - 1) * 4 + btnExtra);
 }
 /* ⚡ «제 열»을 지키는 것은 담당(who)과 칸 이름(box) 둘뿐이다 (대표 지시 2026-10-04 「그래도 너무 넓게 차지한다」)
    나머지(📁 건 · 급여자료/퇴사 · 📋 데이터함 · 🆕 문의 · 👁 열어봄 · 봤음 · 다음:)는 «한 무리»로 이어 붙인다.
@@ -27154,6 +27213,7 @@ function mbAiPutTag(key){
 function mbFromTag(v){
   const id = mbNow();
   if(id.charAt(0)===MB_RAW_P || id==='*all' || id==='*tome') return '';
+  if(typeof mbIsPersonBox === 'function' && mbIsPersonBox(id) && typeof mbSubRowTag === 'function') return mbSubRowTag(v, id);
   if(id.charAt(0)===MB_WHO_P) return '';        /* 담당자 칸은 mbWhoTag 가 적는다 */
   if(!mbPutOf(v._key)) return '';
   const f = mbFolderBy(v._slug);
@@ -27460,6 +27520,874 @@ function mbAttDays(n){
   state.mbAttShow = 0; renderMailPage();
 }
 function mbAttMore(){ state.mbAttShow = mbAttShown() + MB_ATT_PAGE; renderMailPage(); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🗂 담당자함 개인별 소분류 · 3단 자동정리 · 원클릭 규칙 학습 · 처리완료 체크
+      (대표 지시 2026-11-18 「김보람의 경우 인사노무업무 뿐 아니라 법인회계 및 잡무도 같이 메일로 받고 있다
+       개인이 나눠서 정리하는 기능 · 고객사 노무·급여 기본 첫 화면 + 자동 정리 + 규칙 학습 + 완료 체크」)
+   ★ 서버 격리: 개인 전용 창고(pucards_private/$uid/mailSub)에 저장되어 실시간DB 규칙(auth.uid === $uid)이
+     본인만 읽기·쓰기를 강제한다(타인이 내 탭·규칙·완료 상태를 읽거나 덮어쓸 수 없다).
+   ══════════════════════════════════════════════════════════════════════════ */
+let _mbSub = null, _mbSubBusy = false, _mbSubRev = 0, _mbSubSeq = 0, _mbSubLoadedUid = '';
+const MB_SUB_DEF_TABS = [
+  { id: 'work', name: '고객사 노무·급여', short: '노무·급여', icon: '⚡', tone: 'work' },
+  { id: 'acct', name: '법인회계·청구서', short: '회계·청구', icon: '🧾', tone: 'acct' },
+  { id: 'ops',  name: '법인총무·잡무',   short: '총무·잡무', icon: '🏢', tone: 'ops' }
+];
+function mbSubSafeId(raw){
+  const s = String(raw == null ? '' : raw).trim().replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 80);
+  return /^[A-Za-z0-9_-]+$/.test(s) ? s : '';
+}
+function mbSubSafeKey(raw){
+  const s = String(raw == null ? '' : raw).trim();
+  if(!s) return '';
+  return s.replace(/[\x00-\x1f\x7f.#$/[\]\s\x22\x27\\<>()`]+/g, '_').slice(0, 120);
+}
+function mbSubPrivRoot(){
+  try{
+    const uid = String((typeof myUid !== 'undefined' && myUid)
+      || (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid)
+      || '').trim();
+    const safeUid = mbSubSafeId(uid);
+    if(!safeUid) return '';
+    return 'pucards_private/' + safeUid + '/mailSub';
+  }catch(_){
+    return '';
+  }
+}
+function mbSubWhoOfBox(boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  return mbIsPersonBox(id) ? id.slice(1).trim() : '';
+}
+function mbSubKeyOfWho(whoName){
+  const nm = String(whoName || '').trim();
+  if(!nm) return '';
+  if(typeof mbStaffOf === 'function'){
+    const st = mbStaffOf(nm);
+    const sid = st && st.sid ? mbSubSafeId(st.sid) : '';
+    if(sid) return sid;
+  }
+  const nk = mbSubSafeKey(nm);
+  return nk ? ('nm_' + nk) : '';
+}
+function mbSubCanEdit(whoName){
+  const target = String(whoName || '').trim();
+  if(!target) return false;
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase') return true;
+  if(mbSubPrivRoot()){
+    if(state && state.isAdmin) return true;
+    const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
+    if(me) return me === target;
+    try{
+      const em = String((typeof myEmail !== 'undefined' && myEmail) || (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.email) || '').trim().toLowerCase();
+      const m = /^([pa])(\d+)@pureun\.kr$/i.exec(em);
+      if(m && typeof mbStaffOf === 'function'){
+        const st = mbStaffOf(target);
+        if(st && String(st.sid || '').toUpperCase() === (m[1].toUpperCase() + '-' + m[2])) return true;
+      }
+    }catch(_){}
+  }
+  return false;
+}
+function mbSubLoad(cb){
+  const root = mbSubPrivRoot();
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase' || !mbAuthOk() || !root){
+    if(_mbSubLoadedUid){ _mbSub = {}; _mbSubLoadedUid = ''; }
+    _mbSub = _mbSub || {};
+    if(cb) cb();
+    return;
+  }
+  if(_mbSub !== null && _mbSubLoadedUid === root && !_mbSubBusy){ if(cb) cb(); return; }
+  if(_mbSubLoadedUid && _mbSubLoadedUid !== root){ _mbSub = {}; _mbSubLoadedUid = ''; }
+  if(_mbSubBusy){ if(cb) setTimeout(()=>mbSubLoad(cb), 150); return; }
+  _mbSubBusy = true;
+  firebase.database().ref(root).once('value')
+    .then(s=>{ _mbSub = (s && s.val()) || {}; _mbSubLoadedUid = root; })
+    .catch(()=>{ _mbSub = {}; _mbSubLoadedUid = ''; })
+    .then(()=>{
+      _mbSubBusy = false;
+      _mbSubRev++;
+      mbMemoClear();
+      if(cb) cb();
+      if(state.view === 'mail'){
+        if(typeof mbDrawSoon === 'function') mbDrawSoon();
+        else if(typeof renderMailPage === 'function') renderMailPage();
+      }
+    });
+}
+function mbSubRec(whoName){
+  const k = mbSubKeyOfWho(whoName);
+  const nk = mbSubSafeKey(whoName);
+  const alt = nk ? ('nm_' + nk) : '';
+  const all = _mbSub || {};
+  const raw = (k && all[k]) || (alt && all[alt]) || {};
+  const safeAddr = {}, safeKw = {};
+  if(raw.addr && typeof raw.addr === 'object'){
+    Object.keys(raw.addr).forEach(ak=>{
+      const sk = mbSubSafeKey(ak);
+      if(sk && sk === ak) safeAddr[sk] = raw.addr[ak];
+    });
+  }
+  if(raw.kw && typeof raw.kw === 'object'){
+    Object.keys(raw.kw).forEach(kid=>{
+      const sid = mbSubSafeId(kid);
+      if(sid && sid === kid) safeKw[sid] = raw.kw[kid];
+    });
+  }
+  return {
+    key: k || alt,
+    defTab: mbSubSafeId(raw.defTab || ''),
+    tabs: Array.isArray(raw.tabs) ? raw.tabs : (raw.tabs && typeof raw.tabs === 'object' ? Object.values(raw.tabs) : null),
+    msg: (raw.msg && typeof raw.msg === 'object') ? raw.msg : {},
+    addr: safeAddr,
+    kw: safeKw,
+    done: (raw.done && typeof raw.done === 'object') ? raw.done : {}
+  };
+}
+function mbSubEnsureMem(whoName){
+  const r = mbSubRec(whoName);
+  _mbSub = _mbSub || {};
+  if(r.key && !_mbSub[r.key]) _mbSub[r.key] = {};
+  return { key: r.key, slot: r.key ? _mbSub[r.key] : {} };
+}
+function mbSubTabs(whoName){
+  const r = mbSubRec(whoName);
+  if(r.tabs && r.tabs.length){
+    const seen = {};
+    const list = [];
+    r.tabs.forEach(t=>{
+      if(!t || !t.id || !t.name) return;
+      const safeId = mbSubSafeId(t.id);
+      if(!safeId || safeId !== String(t.id) || seen[safeId]) return;
+      seen[safeId] = 1;
+      const def = MB_SUB_DEF_TABS.find(d=>d.id === safeId);
+      const safeTone = /^(work|acct|ops|done)$/.test(String(t.tone || '')) ? String(t.tone) : ((def && def.tone) || 'ops');
+      list.push({
+        id: safeId,
+        name: String(t.name).trim().slice(0, 24),
+        short: String(t.short || (def && def.short) || String(t.name).trim().slice(0, 6)).slice(0, 10),
+        icon: String(t.icon || (def && def.icon) || '📂').slice(0, 4),
+        tone: safeTone,
+        custom: !def
+      });
+    });
+    MB_SUB_DEF_TABS.forEach(d=>{
+      if(!seen[d.id]) list.push(Object.assign({}, d));
+    });
+    if(list.length) return list.slice(0, 8);
+  }
+  return MB_SUB_DEF_TABS.map(d=>Object.assign({}, d));
+}
+function mbSubTabMap(whoName){
+  const map = {};
+  mbSubTabs(whoName).forEach(t=>{ map[t.id] = t; });
+  return map;
+}
+function mbSubDefaultTab(whoName){
+  const r = mbSubRec(whoName);
+  const tmap = mbSubTabMap(whoName);
+  if(r.defTab === 'all' || (r.defTab && tmap[r.defTab])) return r.defTab;
+  return tmap.work ? 'work' : (mbSubTabs(whoName)[0].id || 'all');
+}
+function mbSubEnterBox(boxId){
+  if(!mbIsPersonBox(boxId)){
+    state.mbSubFor = '';
+    return;
+  }
+  const root = mbSubPrivRoot();
+  if(_mbSub === null || (root && _mbSubLoadedUid !== root)) mbSubLoad();
+  if(state.mbSubFor !== boxId){
+    state.mbSubFor = boxId;
+    state.mbSubTab = mbSubDefaultTab(mbSubWhoOfBox(boxId));
+  }
+}
+function mbSubActiveTab(boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  if(!mbIsPersonBox(id)) return 'all';
+  const who = mbSubWhoOfBox(id);
+  const cur = (state.mbSubFor === id && state.mbSubTab) ? String(state.mbSubTab) : mbSubDefaultTab(who);
+  if(cur === 'all' || cur === 'done') return cur;
+  const tmap = mbSubTabMap(who);
+  return tmap[cur] ? cur : mbSubDefaultTab(who);
+}
+function mbSubMsgKey(v){
+  if(!v) return '';
+  const slug = String(v._slug || '');
+  const u = String(v.u == null ? '' : v.u);
+  const raw = v._key ? String(v._key) : (slug && u ? (slug + ':' + u) : '');
+  return raw ? mbSubSafeKey(raw) : '';
+}
+function mbSubIsDone(v, whoName){
+  const mk = mbSubMsgKey(v);
+  if(!mk) return false;
+  const r = mbSubRec(whoName);
+  return !!(r.done && r.done[mk]);
+}
+function mbSubIsTaxFirmSender(v){
+  const f = String((v && v.f) || '') + ' ' + String((v && v.e) || '');
+  if(/세무|회계|기장|tax|cpa/i.test(f)) return true;
+  if(typeof ErpMatch !== 'undefined' && ErpMatch.byTaxEmail){
+    const em = String((v && v.e) || '').trim().toLowerCase();
+    if(em && ErpMatch.byTaxEmail[em]) return true;
+  }
+  return false;
+}
+/* 3단 자동 분류기: ① 개별 메일 지정 → ② 개인 학습 규칙(단어·발신자, since 시점 반영) → ③ 기본 직무·회계·총무 문맥 분류 */
+function mbSubTabOfRow(v, whoName){
+  const tmap = mbSubTabMap(whoName);
+  const fallback = tmap.work ? 'work' : (Object.keys(tmap)[0] || 'work');
+  if(!v) return fallback;
+  const r = mbSubRec(whoName);
+  const mk = mbSubMsgKey(v);
+  if(mk && r.msg && r.msg[mk]){
+    const mt = mbSubSafeId(r.msg[mk]);
+    if(mt && tmap[mt]) return mt;
+  }
+
+  const rowTs = Number(v.d || 0);
+  const em = String(v.e || '').trim().toLowerCase();
+  const ak = em ? mbSubSafeKey(em) : '';
+  const anStr = Array.isArray(v.an) ? v.an.join(' ') : '';
+  const subj = String(v.s || '');
+  const fromStr = String(v.f || '') + ' ' + em;
+  const hay = (subj + ' ' + fromStr + ' ' + anStr + ' ' + String(v.p || '')).toLowerCase();
+
+  /* ②-A 개인 키워드 학습 규칙 (최신순 우선 · 과거 미적용 규칙은 since 이후 메일만 대상) */
+  const kwIds = Object.keys(r.kw || {});
+  if(kwIds.length){
+    kwIds.sort((a, b)=>Number((r.kw[b] && r.kw[b].at) || 0) - Number((r.kw[a] && r.kw[a].at) || 0));
+    for(let i = 0; i < kwIds.length; i++){
+      const kr = r.kw[kwIds[i]];
+      const kTab = kr && kr.tab ? mbSubSafeId(kr.tab) : '';
+      if(!kr || !kr.kw || !kTab || !tmap[kTab]) continue;
+      if(Number(kr.since || 0) > 0 && rowTs <= Number(kr.since)) continue;
+      if(kr.addr && String(kr.addr).toLowerCase() !== em) continue;
+      if(hay.indexOf(String(kr.kw).toLowerCase()) >= 0) return kTab;
+    }
+  }
+  /* ②-B 개인 발신자 주소 학습 규칙 (과거 미적용 시 since 이후 메일만 · 세무회계법인은 forceAll 또는 단어 일치 시 적용) */
+  if(ak && r.addr && r.addr[ak]){
+    const ar = r.addr[ak];
+    const aTab = mbSubSafeId(typeof ar === 'string' ? ar : String((ar && ar.tab) || ''));
+    const aKw = (ar && typeof ar === 'object' && ar.kw) ? String(ar.kw).toLowerCase() : '';
+    const sinceTs = (ar && typeof ar === 'object') ? Number(ar.since || 0) : 0;
+    const forceAll = !!(ar && typeof ar === 'object' && ar.forceAll);
+    if(aTab && tmap[aTab] && !(sinceTs > 0 && rowTs <= sinceTs)){
+      if(aKw){
+        if(hay.indexOf(aKw) >= 0) return aTab;
+      } else if(forceAll || !mbSubIsTaxFirmSender(v)){
+        return aTab;
+      }
+    }
+  }
+
+  /* ③ 기본 문맥 자동 분류 (세화회계법인 등 복합 발신처의 고객사 원천징수 vs 푸른노무법인 세금계산서 정밀 분기) */
+  const b = (typeof mbBinOfRow === 'function') ? mbBinOfRow(v) : null;
+  const binName = String((b && b.name) || '');
+  const full = subj + ' ' + fromStr + ' ' + anStr;
+
+  const isPureunSelfBill = /->\s*푸른\s*노무법인|▶\s*푸른\s*노무법인|푸른\s*노무법인\s*님|푸른\s*노무법인\s*\(권형하\)|푸른\s*노무법인.*(?:청구서|명세서|세금계산서)/i.test(full);
+  if(isPureunSelfBill && tmap.acct) return 'acct';
+
+  const hasClientLaborWord = /원천징수|급여대장|급여내역|급여자료|임금명세|중도퇴사|퇴직금|퇴직소득|연말정산|보수총액|취득신고|상실신고|4대보험|피보험자|이직확인서|근로계약|취업규칙|인사위원회|노무자문|컨설팅|산재|체당금/.test(subj + ' ' + anStr);
+  const isBillVendor = /이카운트|ecount|한국전력|kepco|lg\s*u\+|lg유플러스|lguplus|kt\s*m모바일|ktmmobile|kt\s*email\s*명세서|bill\.kt\.com|신한카드|삼성카드|현대카드|국민카드|하나카드|롯데카드|비씨카드|우리카드|농협카드|스마일edi|smileedi|나이스정보통신|에스케이인텔릭스|코웨이|청호나이스|에스원|세콤|캡스|팝빌|popbill|빌365|bill36524|센드빌|sendbill|국세청|홈택스|hometax/i.test(full);
+  const isBillSubject = /전자세금계산서|세금계산서가?\s*도착|세금계산서.*발송|세금계산서.*발행|청구서가?\s*도착|청구서입니다|요금\s*청구서|명세서\s*입니다|명세서입니다|이용대금\s*명세서|자동이체\s*안내/i.test(subj);
+  const isBillBin = /세금계산서|청구서/.test(binName);
+  const isLaborBin = /자문사|급여|사무대행|컨설팅|사건|산업안전|공공기관|4대보험|지원금|체당금|취업규칙/.test(binName);
+  const isOpsBin = /사무실업무/.test(binName);
+
+  if(hasClientLaborWord && !isBillVendor && !isBillSubject) return fallback;
+  if((isBillBin || isBillVendor || (isBillSubject && !isLaborBin)) && tmap.acct) return 'acct';
+  if((isOpsBin || (!isLaborBin && /보안\s*경고|새로운\s*환경\s*로그인|인증번호\s*발송|비밀번호\s*변경|복합기|토너|정수기\s*점검|사무실\s*임대|건물\s*관리|두정빌딩|썬샤인빌딩|우편물|등기우편|소모품|비품/i.test(full))) && tmap.ops){
+    return 'ops';
+  }
+  return fallback;
+}
+function mbSubTally(boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  const m = mbMemoOf();
+  const tag = id + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'') + '|' + _mbSubRev;
+  if(m.subTally && m.subTallyTag === tag) return m.subTally;
+  m.subTallyTag = tag;
+  const who = mbSubWhoOfBox(id);
+  const tabs = mbSubTabs(who);
+  const byTab = {}, unread = {};
+  tabs.forEach(t=>{ byTab[t.id] = 0; unread[t.id] = 0; });
+  let done = 0, allUnread = 0;
+  const rows = mbMatchedRows(true);
+  rows.forEach(v=>{
+    const isUn = !Number(v.r || 0);
+    if(isUn) allUnread++;
+    if(mbSubIsDone(v, who)){ done++; return; }
+    const tid = mbSubTabOfRow(v, who);
+    byTab[tid] = (byTab[tid] || 0) + 1;
+    if(isUn) unread[tid] = (unread[tid] || 0) + 1;
+  });
+  return (m.subTally = { all: rows.length, allUnread: allUnread, done: done, byTab: byTab, unread: unread, tabs: tabs });
+}
+function mbSubFilterRows(rows, boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  if(!mbIsPersonBox(id)) return rows;
+  const who = mbSubWhoOfBox(id);
+  const tab = mbSubActiveTab(id);
+  if(tab === 'all') return rows;
+  if(tab === 'done') return rows.filter(v=>mbSubIsDone(v, who));
+  return rows.filter(v=>!mbSubIsDone(v, who) && mbSubTabOfRow(v, who) === tab);
+}
+function mbSubPickTab(tabId){
+  const clean = (tabId === 'all' || tabId === 'done') ? tabId : mbSubSafeId(tabId);
+  if(!clean) return;
+  const id = mbNow();
+  state.mbSubFor = id;
+  state.mbSubTab = clean;
+  state.mbPage = 1;
+  pickClear('mbox');
+  mbMemoClear();
+  renderMailPage();
+}
+function mbSubBarHtml(boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  if(!mbIsPersonBox(id)) return '';
+  const who = mbSubWhoOfBox(id);
+  const cur = mbSubActiveTab(id);
+  const tl = mbSubTally(id);
+  const canEdit = mbSubCanEdit(who);
+  const sel = pickOf('mbox');
+  const picked = pickList(sel, mbVisibleRows().map(v=>v._key)).length;
+  const tabBtn = (tid, labelHtml, plainLabel, cnt, unr, extraCls, dropOn)=>`<button type="button"
+    role="tab" aria-selected="${cur===tid?'true':'false'}"
+    data-tid="${esc(tid)}"
+    class="dm-subtab ${cur===tid?'on':''} ${extraCls||''}"
+    onclick="mbSubPickTab(this.dataset.tid)"
+    ${dropOn && canEdit ? `ondragover="mbDragOver(event,this)" ondragleave="mbDragLeave(this)" ondrop="mbSubTabDrop(event,this.dataset.tid,this)"` : ''}
+    title="${esc(plainLabel)} — 메일을 끌어다 놓아도 바로 분류됩니다">${labelHtml}<span class="cnt">${Number(cnt||0).toLocaleString()}</span>${
+      unr ? `<span class="unr" title="안 읽은 메일 ${unr}통">안읽음 ${unr}</span>` : ''}</button>`;
+
+  return `<div class="dm-subbar" role="tablist" aria-label="${esc(who)} 개인 메일 소분류">
+    ${tl.tabs.map(t=>tabBtn(t.id, `${esc(t.icon)} ${esc(t.name)}`, `${t.icon} ${t.name}`, tl.byTab[t.id]||0, tl.unread[t.id]||0, '', true)).join('')}
+    <span class="dm-subsep"></span>
+    ${tabBtn('all', '전체', '전체 메일 보기', tl.all, 0, '', false)}
+    ${tabBtn('done', '✅ 처리완료', '처리완료 메일 보기', tl.done, 0, 'done-tab', true)}
+    <span class="dm-subsp"></span>
+    ${canEdit ? `
+      <button type="button" class="dm-subact pri" onclick="mbSubMoveMenu(event)"
+        title="고른 메일의 소분류를 바꾸거나 앞으로 같은 발신자·단어 메일이 자동 정리되게 학습시킵니다">🗂 소분류·자동규칙${picked?` (${picked})`:''} ▾</button>
+      <button type="button" class="dm-subact ok" onclick="mbSubDonePicked(${cur==='done'?'false':'true'})"
+        title="${cur==='done' ? '고른 메일을 다시 진행중으로 되돌립니다' : '고른 메일을 처리완료 탭으로 넘겨 할 일 목록을 비웁니다'}">${
+        cur==='done' ? '↩ 완료 해제' : '✓ 완료 처리'}</button>
+      <button type="button" class="dm-subact" onclick="openMbSubMgr()"
+        title="내 소분류 탭 추가·이름 변경·기본 탭 및 자동정리 규칙을 관리합니다">⚙ 탭 관리</button>` : ''}
+  </div>`;
+}
+function mbSubMobileBarHtml(boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  if(!mbIsPersonBox(id)) return '';
+  const who = mbSubWhoOfBox(id);
+  const cur = mbSubActiveTab(id);
+  const tl = mbSubTally(id);
+  const pill = (tid, labelHtml, cnt, cls)=>`<button type="button" role="tab" aria-selected="${cur===tid?'true':'false'}"
+    data-tid="${esc(tid)}" class="dm-subtab ${cur===tid?'on':''} ${cls||''}"
+    onclick="mbSubPickTab(this.dataset.tid)">${labelHtml}<span class="cnt">${Number(cnt||0).toLocaleString()}</span></button>`;
+  return `<div class="dmm-subbar" role="tablist" aria-label="${esc(who)} 개인 메일 소분류">
+    ${tl.tabs.map(t=>pill(t.id, `${esc(t.icon)} ${esc(t.short||t.name)}`, tl.byTab[t.id]||0, '')).join('')}
+    ${pill('all', '전체', tl.all, '')}
+    ${pill('done', '✅ 완료', tl.done, 'done-tab')}
+  </div>`;
+}
+function mbSubEmptyHtml(boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  if(!mbIsPersonBox(id)) return '아직 동기화된 메일이 없습니다.<br><b>새로고침 ↻</b> 를 눌러 다음메일에서 가져오세요.';
+  const who = mbSubWhoOfBox(id);
+  const cur = mbSubActiveTab(id);
+  const tl = mbSubTally(id);
+  if(!tl.all){
+    return `아직 「${esc(who)}」 담당함에 동기화된 메일이 없습니다.<br>위 <b>📥 과거자료까지 가져오기</b> 또는 <b>새로고침 ↻</b> 를 눌러 주세요.`;
+  }
+  const tmap = mbSubTabMap(who);
+  const curLabel = cur === 'done' ? '✅ 처리완료' : (tmap[cur] ? `${tmap[cur].icon} ${tmap[cur].name}` : '이 탭');
+  const others = tl.tabs.filter(t=>t.id !== cur && (tl.byTab[t.id] || 0) > 0)
+    .map(t=>`<button type="button" class="sub-jump" data-tid="${esc(t.id)}" onclick="mbSubPickTab(this.dataset.tid)">${esc(t.icon)} ${esc(t.name)} ${(tl.byTab[t.id]||0).toLocaleString()}통 보기</button>`);
+  if(cur !== 'done' && tl.done > 0){
+    others.push(`<button type="button" class="sub-jump" data-tid="done" onclick="mbSubPickTab(this.dataset.tid)">✅ 처리완료 ${tl.done.toLocaleString()}통</button>`);
+  }
+  others.push(`<button type="button" class="sub-jump" data-tid="all" onclick="mbSubPickTab(this.dataset.tid)">전체 ${tl.all.toLocaleString()}통 보기</button>`);
+  return `<b>${esc(curLabel)}</b> 탭에 남은 메일이 없습니다. 🎉<br>`
+    + `<span class="sub-empty-note">다른 소분류에 메일이 정리되어 있습니다</span><br>`
+    + others.join('');
+}
+function mbSubRowTag(v, boxId){
+  const id = String(boxId == null ? mbNow() : boxId);
+  if(!mbIsPersonBox(id) || !v) return '';
+  const who = mbSubWhoOfBox(id);
+  const canEdit = mbSubCanEdit(who);
+  const done = mbSubIsDone(v, who);
+  const tid = mbSubTabOfRow(v, who);
+  const tmap = mbSubTabMap(who);
+  const t = tmap[tid] || MB_SUB_DEF_TABS[0];
+  const tone = done ? 'done' : (t.tone || (tid === 'acct' ? 'acct' : (tid === 'work' ? 'work' : 'ops')));
+  if(!canEdit){
+    return `<span class="dm-subpill ${esc(tone)}" title="소분류: ${esc(t.name)}">${esc(t.icon)}${esc(t.short || t.name)}</span>`;
+  }
+  return `<button type="button" class="dm-subpill ${esc(tone)}" data-key="${esc(v._key||'')}"
+      aria-label="소분류 ${esc(t.name)} 변경"
+      onclick="event.stopPropagation();mbSubMoveMenu(event,this.dataset.key)"
+      title="소분류: ${esc(t.name)} — 누르면 다른 탭으로 옮기거나 자동정리 규칙으로 저장합니다">${esc(t.icon)}${esc(t.short || t.name)} ▾</button>`
+    + `<button type="button" class="dm-subchk ${done?'on':''}" data-slug="${esc(v._slug||'')}" data-uid="${esc(v.u||'')}"
+      aria-label="${done ? '처리완료 해제' : '처리완료 체크'}"
+      onclick="event.stopPropagation();mbSubToggleDone(this.dataset.slug,this.dataset.uid)"
+      title="${done ? '처리완료 해제 (다시 할 일 탭으로 복귀)' : '처리완료 체크 (완료 탭으로 정리)'}">${done ? '✅' : '✓'}</button>`;
+}
+function mbSubFindRowByKey(rawKey){
+  const s = String(rawKey || '');
+  const i = s.indexOf(':');
+  if(i < 1) return null;
+  const slug = s.slice(0, i), uid = s.slice(i + 1);
+  const box = (_mbMsgs && _mbMsgs[slug]) || {};
+  const r = box[uid];
+  return r ? Object.assign({}, r, { u: (r.u || uid), _slug: slug, _key: s }) : null;
+}
+function mbSubTargetRows(){
+  if(state.mbSubOne){
+    const one = mbSubFindRowByKey(state.mbSubOne);
+    return one ? [one] : [];
+  }
+  const sel = pickOf('mbox');
+  const vis = mbVisibleRows();
+  const keys = pickList(sel, vis.map(v=>v._key));
+  return vis.filter(v=>keys.indexOf(v._key) >= 0);
+}
+function mbSubWriteDb(memKey, subPath, val, isUpdate){
+  const root = mbSubPrivRoot();
+  if(!root || !memKey || typeof Store === 'undefined' || Store.mode !== 'firebase' || !firebase.database) return;
+  const fullPath = subPath ? `${root}/${memKey}/${subPath}` : `${root}/${memKey}`;
+  const ref = firebase.database().ref(fullPath);
+  const op = isUpdate ? ref.update(val) : (val === null ? ref.remove() : ref.set(val));
+  op.catch(e=>toast('저장 실패: '+((e&&e.message)||'')));
+}
+function mbSubToggleDone(slug, uid){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return toast('본인 또는 관리자만 처리완료 상태를 바꿀 수 있습니다');
+  if(!slug || uid == null || String(uid) === '') return;
+  const rawKey = String(slug) + ':' + String(uid);
+  const mk = mbSubSafeKey(rawKey);
+  if(!mk) return;
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  mem.slot.done = mem.slot.done || {};
+  const nextDone = !mem.slot.done[mk];
+  if(nextDone) mem.slot.done[mk] = Date.now();
+  else delete mem.slot.done[mk];
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, 'done/' + mk, nextDone ? mem.slot.done[mk] : null, false);
+  renderMailPage();
+  toast(nextDone ? '✅ 처리완료 탭으로 정리했습니다' : '↩ 다시 진행중 목록으로 되돌렸습니다', 3500);
+}
+function mbSubDonePicked(doneVal){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return toast('본인 또는 관리자만 처리완료 상태를 바꿀 수 있습니다');
+  state.mbSubOne = null;
+  const picked = mbSubTargetRows();
+  if(!picked.length) return toast('먼저 왼쪽 체크박스로 메일을 골라 주세요 (또는 각 줄 오른쪽 ✓ 단추를 누르세요)');
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  mem.slot.done = mem.slot.done || {};
+  const now = Date.now();
+  const patch = {};
+  let cnt = 0;
+  picked.forEach(v=>{
+    const mk = mbSubMsgKey(v);
+    if(!mk) return;
+    cnt++;
+    if(doneVal){ mem.slot.done[mk] = now; patch[mk] = now; }
+    else { delete mem.slot.done[mk]; patch[mk] = null; }
+  });
+  if(!cnt) return;
+  pickClear('mbox');
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, 'done', patch, true);
+  renderMailPage();
+  toast(doneVal ? `✅ ${cnt}통을 처리완료로 정리했습니다` : `↩ ${cnt}통의 완료 표시를 풀었습니다`, 4000);
+}
+function mbSubMenuDoneAction(){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const picked = mbSubTargetRows();
+  const only = state.mbSubOne;
+  const m = $('folderMenu');
+  if(m) m.innerHTML = '';
+  closeFolderMenu();
+  if(!picked.length) return;
+  if(only && picked.length === 1) return mbSubToggleDone(picked[0]._slug, picked[0].u);
+  const allDone = picked.every(v=>mbSubIsDone(v, who));
+  mbSubDonePicked(!allDone);
+}
+function mbSubMoveMenu(ev, onlyKey){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return toast('본인 또는 관리자만 소분류를 설정할 수 있습니다');
+  state.mbSubOne = onlyKey || null;
+  const picked = mbSubTargetRows();
+  if(!picked.length) return toast('분류할 메일을 체크박스로 고르거나 메일 줄의 소분류 딱지(▾)를 눌러 주세요');
+  const m = $('folderMenu'); if(!m) return;
+  const tabs = mbSubTabs(who);
+  const addrs = [];
+  picked.forEach(v=>{
+    const e = String(v.e || '').trim().toLowerCase();
+    if(e && addrs.indexOf(e) < 0) addrs.push(e);
+  });
+  const singleAddr = addrs.length === 1 ? addrs[0] : '';
+  const isTaxSender = picked.some(mbSubIsTaxFirmSender);
+  const allDone = picked.every(v=>mbSubIsDone(v, who));
+  const curTab = picked.length === 1 ? mbSubTabOfRow(picked[0], who) : '';
+
+  m.innerHTML = `<div class="fmhead">🗂 개인 소분류 정리 <span>${picked.length}통 선택됨</span></div>
+    <div class="fmlist" role="menu">
+      ${tabs.map(t=>`<button type="button" role="menuitem" class="fmi mbsub-fmi" data-tid="${esc(t.id)}"
+        onclick="mbSubApplyMove(this.dataset.tid,true)">
+        ${curTab===t.id ? '✔ ' : ''}${esc(t.icon)} <b>${esc(t.name)}</b></button>`).join('')}
+      <button type="button" role="menuitem" class="fmi mbsub-fmi" style="border-top:1px solid #e2e8f0;color:#166534"
+        onclick="mbSubMenuDoneAction()">
+        ${allDone ? '↩ 진행중(미완료)으로 되돌리기' : '✅ 처리완료로 넘기기'}</button>
+    </div>
+    <div style="border-top:1px solid #e2e8f0;padding:8px 10px;background:#f8fafc;font-size:12px;color:#1e293b">
+      <div style="font-weight:700;margin-bottom:5px;color:#1e40af">🤖 다음부터 자동 정리 (선택)</div>
+      ${singleAddr ? `<label style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;cursor:pointer;line-height:1.45">
+        <input type="checkbox" id="mbSubLearnAddr" ${isTaxSender ? '' : 'checked'}>
+        <span>앞으로 <b>${esc(singleAddr)}</b> 메일은 늘 이 탭으로 자동 분류${
+          isTaxSender ? '<br><span style="color:#854d0e">※ 세무·회계법인은 아래 제목 단어로 걸어야 고객사 급여와 안 섞입니다</span>' : ''}</span>
+      </label>` : ''}
+      <div style="margin:4px 0 6px">
+        <input id="mbSubLearnKw" class="fmkwin" style="width:100%" aria-label="제목 또는 첨부 단어 자동규칙"
+          placeholder="제목·첨부 단어 자동규칙 (예: 세금계산서, 원천징수)">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="mbSubApplyPast" checked>
+        <span>이미 들어온 과거 메일도 같은 규칙으로 함께 정리</span>
+      </label>
+    </div>
+    <button type="button" class="fmi mbsub-fmi" style="border-top:1px solid #e2e8f0;color:#475569;font-size:12px"
+      onclick="closeFolderMenu();openMbSubMgr()">⚙ 내 소분류 탭 · 자동규칙 관리 ›</button>`;
+  mbPlaceMenu(m, ev);
+}
+function mbSubApplyMove(targetTab, fromMenu){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const safeTarget = mbSubSafeId(targetTab);
+  const tmap = mbSubTabMap(who);
+  const tab = safeTarget ? tmap[safeTarget] : null;
+  if(!tab) return;
+  const picked = mbSubTargetRows();
+  const menuEl = $('folderMenu');
+  if(!picked.length){
+    if(menuEl) menuEl.innerHTML = '';
+    closeFolderMenu();
+    return;
+  }
+  /* 드래그앤드롭(fromMenu !== true)일 때는 숨겨진 #folderMenu 입력값을 절대 읽지 않는다 */
+  const learnAddrEl = fromMenu ? $('mbSubLearnAddr') : null;
+  const learnKwEl = fromMenu ? $('mbSubLearnKw') : null;
+  const pastEl = fromMenu ? $('mbSubApplyPast') : null;
+  const wantAddr = !!(fromMenu && learnAddrEl && learnAddrEl.checked);
+  const kwRaw = fromMenu ? String((learnKwEl && learnKwEl.value) || '').trim().slice(0, 40) : '';
+  if(fromMenu && kwRaw.length === 1){
+    toast('단어 자동규칙은 2글자 이상 입력해 주세요');
+    return;
+  }
+  const kwText = kwRaw.length >= 2 ? kwRaw : '';
+  const wantPast = fromMenu ? (!pastEl || !!pastEl.checked) : false;
+  if(menuEl) menuEl.innerHTML = '';
+  closeFolderMenu();
+  state.mbSubOne = null;
+  pickClear('mbox');
+
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  mem.slot.msg = mem.slot.msg || {};
+  mem.slot.addr = mem.slot.addr || {};
+  mem.slot.kw = mem.slot.kw || {};
+  mem.slot.done = mem.slot.done || {};
+  const now = Date.now();
+  const dbPatch = {};
+  const pickedKeys = {};
+  let movedCnt = 0;
+
+  const allRows = mbAllRows();
+  const prevTabMap = {};
+  if(wantPast && (kwText || wantAddr)){
+    allRows.forEach(v=>{
+      const mk = mbSubMsgKey(v);
+      if(mk) prevTabMap[mk] = mbSubTabOfRow(v, who);
+    });
+  }
+
+  picked.forEach(v=>{
+    const mk = mbSubMsgKey(v);
+    if(!mk) return;
+    pickedKeys[mk] = 1;
+    movedCnt++;
+    mem.slot.msg[mk] = safeTarget;
+    dbPatch['msg/' + mk] = safeTarget;
+    if(mem.slot.done[mk]){
+      delete mem.slot.done[mk];
+      dbPatch['done/' + mk] = null;
+    }
+  });
+  if(!movedCnt) return;
+
+  const addrs = [];
+  picked.forEach(v=>{
+    const e = String(v.e || '').trim().toLowerCase();
+    if(e && addrs.indexOf(e) < 0) addrs.push(e);
+  });
+  const singleAddr = addrs.length === 1 ? addrs[0] : '';
+  let maxLoadedTs = now;
+  if(!wantPast && (kwText || (wantAddr && singleAddr))){
+    allRows.forEach(v=>{ const d = Number(v.d || 0); if(d > maxLoadedTs) maxLoadedTs = d; });
+  }
+  const ruleSince = wantPast ? 0 : maxLoadedTs;
+  let ruleSaved = '';
+
+  if(kwText){
+    const rid = 'kw_' + now.toString(36) + '_' + (++_mbSubSeq).toString(36);
+    const krec = { kw: kwText, tab: safeTarget, since: ruleSince, at: now };
+    if(wantAddr && singleAddr) krec.addr = singleAddr;
+    mem.slot.kw[rid] = krec;
+    dbPatch['kw/' + rid] = krec;
+    ruleSaved = `단어 「${kwText}」`;
+  } else if(wantAddr && singleAddr){
+    const ak = mbSubSafeKey(singleAddr);
+    if(ak){
+      const arec = { addr: singleAddr, tab: safeTarget, forceAll: true, since: ruleSince, at: now };
+      mem.slot.addr[ak] = arec;
+      dbPatch['addr/' + ak] = arec;
+      ruleSaved = singleAddr;
+    }
+  }
+
+  let extraPastMoved = 0;
+  if(wantPast && (kwText || (wantAddr && singleAddr))){
+    allRows.forEach(v=>{
+      const mk = mbSubMsgKey(v);
+      if(!mk || pickedKeys[mk]) return;
+      const em = String(v.e || '').trim().toLowerCase();
+      const anStr = Array.isArray(v.an) ? v.an.join(' ') : '';
+      const hay = (String(v.s||'') + ' ' + String(v.f||'') + ' ' + em + ' ' + anStr + ' ' + String(v.p||'')).toLowerCase();
+      const matchAddr = (!wantAddr || !singleAddr) ? true : (em === singleAddr);
+      const matchKw = !kwText ? true : (hay.indexOf(kwText.toLowerCase()) >= 0);
+      if(!matchAddr || !matchKw) return;
+      if(mem.slot.msg[mk] && mem.slot.msg[mk] !== safeTarget){
+        mem.slot.msg[mk] = safeTarget;
+        dbPatch['msg/' + mk] = safeTarget;
+      }
+      if(prevTabMap[mk] !== safeTarget) extraPastMoved++;
+    });
+  }
+
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, '', dbPatch, true);
+  renderMailPage();
+  toast(`${tab.icon} 「${tab.name}」 탭으로 ${movedCnt}통을 옮겼습니다`
+    + (ruleSaved
+      ? ` · 앞으로 ${ruleSaved} 메일도 자동 정리됩니다` + (extraPastMoved > 0 ? ` (과거 메일 ${extraPastMoved}통 함께 반영)` : '')
+      : ''), 5500);
+}
+function mbSubTabDrop(ev, tabId, el){
+  ev.preventDefault();
+  if(el){ el.classList.remove('dropover'); el.classList.remove('dropmail'); }
+  const d = state.mbDrag || {}; state.mbDrag = null;
+  if(d.kind !== 'mail') return;
+  if(tabId === 'done') return mbSubDonePicked(true);
+  state.mbSubOne = null;
+  mbSubApplyMove(tabId, false);
+}
+function openMbSubMgr(){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return toast('본인 또는 관리자만 소분류 탭을 관리할 수 있습니다');
+  showPanel(mbSubMgrHtml(who));
+}
+function mbSubMgrHtml(whoName){
+  const who = String(whoName || mbSubWhoOfBox(mbNow()) || '');
+  const rec = mbSubRec(who);
+  const tabs = mbSubTabs(who);
+  const defTab = mbSubDefaultTab(who);
+  const tmap = mbSubTabMap(who);
+  const addrKeys = Object.keys(rec.addr || {});
+  const kwKeys = Object.keys(rec.kw || {});
+
+  return `<div class="mhead"><b>⚙ ${esc(who)} 개인 메일 소분류 · 자동정리 관리</b>${_closeBtn()}</div>
+    <p class="mbsub-note">공용 폴더는 건드리지 않고 내 개인 보관함에 저장되어 <b>@${esc(who)}</b> 담당함 안에서만 내 업무 호흡에 맞춰 자동 분리합니다.</p>
+    <div class="mbsub-sec">
+      <h4>1. 담당함을 처음 열 때 기본 화면</h4>
+      <select class="mbsub-defsel" style="width:100%" aria-label="담당함 기본 화면 탭 선택" onchange="mbSubSetDefTab(this.value)">
+        ${tabs.map(t=>`<option value="${esc(t.id)}" ${defTab===t.id?'selected':''}>${esc(t.icon)} ${esc(t.name)}${t.id==='work'?' (추천 — 긴급 본업만 먼저 보기)':''}</option>`).join('')}
+        <option value="all" ${defTab==='all'?'selected':''}>전체 메일 한꺼번에 보기</option>
+      </select>
+    </div>
+    <div class="mbsub-sec">
+      <h4>2. 내 소분류 탭 구성 (추가 · 이름변경 · 순서조정)</h4>
+      ${tabs.map((t, idx)=>`<div class="mbsub-trow">
+        <span class="nm">${esc(t.icon)} ${esc(t.name)}</span>
+        <button type="button" data-tid="${esc(t.id)}" aria-label="${esc(t.name)} 위로 이동" onclick="mbSubOrderTab(this.dataset.tid,-1)" ${idx===0?'disabled':''} title="위로">↑</button>
+        <button type="button" data-tid="${esc(t.id)}" aria-label="${esc(t.name)} 아래로 이동" onclick="mbSubOrderTab(this.dataset.tid,1)" ${idx===tabs.length-1?'disabled':''} title="아래로">↓</button>
+        <button type="button" data-tid="${esc(t.id)}" aria-label="${esc(t.name)} 이름 변경" onclick="mbSubRenameTab(this.dataset.tid)">이름변경</button>
+        ${t.custom ? `<button type="button" class="del" data-tid="${esc(t.id)}" aria-label="${esc(t.name)} 탭 삭제" onclick="mbSubDeleteTab(this.dataset.tid)">삭제</button>` : ''}
+      </div>`).join('')}
+      <div class="mbsub-add">
+        <select id="mbSubNewIcon" aria-label="새 탭 아이콘">
+          ${['📂','💳','📑','⚖','📌','🏛','📊','🔔'].map(ic=>`<option value="${ic}">${ic}</option>`).join('')}
+        </select>
+        <input id="mbSubNewName" style="flex:1;min-width:150px" maxlength="24" aria-label="새 소분류 탭 이름" placeholder="새 탭 이름 (예: 카드·공과금, 세무협조)">
+        <button type="button" onclick="mbSubAddTab()">+ 탭 추가</button>
+      </div>
+    </div>
+    <div class="mbsub-sec">
+      <h4>3. 학습된 내 자동정리 규칙 (${addrKeys.length + kwKeys.length}개)</h4>
+      <p class="mbsub-note">기본 자동분류(세금계산서·한전·통신·카드·이카운트 → 법인회계 / 급여·원천징수·4대보험 → 노무·급여 / 사무실관리 → 총무) 외에 직접 추가한 규칙입니다.</p>
+      ${(!addrKeys.length && !kwKeys.length)
+        ? `<div style="font-size:12.5px;color:#475569;padding:6px 2px">아직 추가한 개인 규칙이 없습니다 — 메일 줄의 소분류 딱지(▾)에서 한 번 체크하면 자동 등록됩니다.</div>`
+        : ''}
+      ${kwKeys.map(kid=>{
+        const kr = rec.kw[kid] || {};
+        const tb = tmap[kr.tab] || { icon:'📂', name:kr.tab };
+        return `<div class="mbsub-rrow">
+          <span class="tx">단어 <b>「${esc(kr.kw||'')}」</b>${kr.addr?` (${esc(kr.addr)})`:''} → ${esc(tb.icon)} <b>${esc(tb.name)}</b></span>
+          <button type="button" class="del" data-kid="${esc(kid)}" aria-label="단어 규칙 삭제" onclick="mbSubDeleteKwRule(this.dataset.kid)">삭제</button>
+        </div>`;
+      }).join('')}
+      ${addrKeys.map(ak=>{
+        const ar = rec.addr[ak] || {};
+        const tid = typeof ar === 'string' ? ar : ar.tab;
+        const addrLabel = (ar && ar.addr) ? ar.addr : ak.replace(/_/g, '.');
+        const tb = tmap[tid] || { icon:'📂', name:tid };
+        return `<div class="mbsub-rrow">
+          <span class="tx">보낸이 <b>${esc(addrLabel)}</b> → ${esc(tb.icon)} <b>${esc(tb.name)}</b></span>
+          <button type="button" class="del" data-ak="${esc(ak)}" aria-label="보낸이 규칙 삭제" onclick="mbSubDeleteAddrRule(this.dataset.ak)">삭제</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+function mbSubSaveTabs(who, tabs){
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  const clean = tabs.slice(0, 8).map(t=>({
+    id: mbSubSafeId(t.id),
+    name: String(t.name).trim().slice(0, 24),
+    short: String(t.short || t.name.slice(0, 6)).slice(0, 10),
+    icon: String(t.icon || '📂').slice(0, 4),
+    tone: /^(work|acct|ops|done)$/.test(String(t.tone || '')) ? String(t.tone) : 'ops'
+  })).filter(t=>!!t.id && !!t.name);
+  mem.slot.tabs = clean;
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, 'tabs', clean, false);
+}
+function mbSubSetDefTab(tabId){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  const val = tabId === 'all' ? 'all' : (mbSubSafeId(tabId) || 'work');
+  mem.slot.defTab = val;
+  state.mbSubTab = val;
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, 'defTab', val, false);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+  toast('기본 첫 화면 탭을 저장했습니다', 3500);
+}
+function mbSubAddTab(){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const nmEl = $('mbSubNewName'), icEl = $('mbSubNewIcon');
+  const nm = String((nmEl && nmEl.value) || '').trim().slice(0, 24);
+  const ic = String((icEl && icEl.value) || '📂').trim().slice(0, 4);
+  if(!nm) return toast('새 소분류 탭 이름을 입력해 주세요');
+  const tabs = mbSubTabs(who);
+  if(tabs.length >= 8) return toast('개인 소분류 탭은 최대 8개까지 만들 수 있습니다');
+  const id = 'tab_' + Date.now().toString(36) + '_' + (++_mbSubSeq).toString(36);
+  tabs.push({ id: id, name: nm, short: nm.slice(0, 6), icon: ic, tone: 'ops', custom: true });
+  mbSubSaveTabs(who, tabs);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+  toast(`${ic} 「${nm}」 소분류 탭을 추가했습니다`, 4000);
+}
+function mbSubRenameTab(tabId){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const safeId = mbSubSafeId(tabId);
+  const tabs = mbSubTabs(who);
+  const t = tabs.find(x=>x.id === safeId);
+  if(!t) return;
+  const next = prompt('소분류 탭 이름을 입력해 주세요', t.name);
+  if(next === null) return;
+  const clean = String(next).trim().slice(0, 24);
+  if(!clean) return toast('탭 이름을 비울 수 없습니다');
+  t.name = clean;
+  t.short = clean.slice(0, 6);
+  mbSubSaveTabs(who, tabs);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+}
+function mbSubOrderTab(tabId, delta){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const safeId = mbSubSafeId(tabId);
+  const tabs = mbSubTabs(who);
+  const i = tabs.findIndex(x=>x.id === safeId);
+  const j = i + Number(delta || 0);
+  if(i < 0 || j < 0 || j >= tabs.length) return;
+  const tmp = tabs[i]; tabs[i] = tabs[j]; tabs[j] = tmp;
+  mbSubSaveTabs(who, tabs);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+}
+function mbSubDeleteTab(tabId){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const safeId = mbSubSafeId(tabId);
+  if(safeId === 'work' || safeId === 'acct' || safeId === 'ops') return toast('기본 3개 탭은 이름만 변경할 수 있습니다');
+  const tabs = mbSubTabs(who);
+  const t = tabs.find(x=>x.id === safeId);
+  if(!t || !confirm(`「${t.name}」 탭을 삭제할까요?\n(메일은 지워지지 않고 기본 자동분류 탭으로 돌아갑니다)`)) return;
+  const nextTabs = tabs.filter(x=>x.id !== safeId);
+  if(state.mbSubTab === safeId) state.mbSubTab = 'work';
+  mbSubSaveTabs(who, nextTabs);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+}
+function mbSubDeleteAddrRule(ak){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const safeAk = mbSubSafeKey(ak);
+  if(!safeAk) return;
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  if(mem.slot.addr) delete mem.slot.addr[safeAk];
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, 'addr/' + safeAk, null, false);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+  toast('발신자 자동정리 규칙을 삭제했습니다', 3500);
+}
+function mbSubDeleteKwRule(kid){
+  const who = mbSubWhoOfBox(mbNow());
+  if(!who || !mbSubCanEdit(who)) return;
+  const safeKid = mbSubSafeId(kid);
+  if(!safeKid) return;
+  const mem = mbSubEnsureMem(who);
+  if(!mem.key) return;
+  if(mem.slot.kw) delete mem.slot.kw[safeKid];
+  _mbSubRev++;
+  mbMemoClear();
+  mbSubWriteDb(mem.key, 'kw/' + safeKid, null, false);
+  showPanel(mbSubMgrHtml(who));
+  renderMailPage();
+  toast('단어 자동정리 규칙을 삭제했습니다', 3500);
+}
 function mbListHtml(){
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
@@ -27531,7 +28459,8 @@ function mbListHtml(){
         /* ⚠ «아직 안 받아 온 것»을 「없습니다」라고 하면 안 된다 — 새로고침을 눌러야만
              나오는 것처럼 보인다(대표 보고 2026-08-30). 받아 오는 중이면 그렇게 말한다. */
         : mbLoadingBox() ? '읽고 있습니다…'
-        : '아직 동기화된 메일이 없습니다.<br><b>새로고침 ↻</b> 를 눌러 다음메일에서 가져오세요.'}</div>`;
+        : (mbIsPersonBox(mbNow()) && typeof mbSubEmptyHtml === 'function' ? mbSubEmptyHtml(mbNow())
+        : '아직 동기화된 메일이 없습니다.<br><b>새로고침 ↻</b> 를 눌러 다음메일에서 가져오세요.')}</div>`;
 
   const meta = _mbMeta && _mbMeta.at
     ? `마지막 동기화 ${fmtDate(_mbMeta.at)} ${new Date(_mbMeta.at).toTimeString().slice(0,5)}`
@@ -27624,6 +28553,7 @@ function mbListHtml(){
         ${MB_SIZES.map(n=>`<option value="${n}" ${n===mbPageSize()?'selected':''}>${n}개씩</option>`).join('')}
       </select>
     </div>
+    ${mbIsPersonBox(mbNow()) && typeof mbSubBarHtml === 'function' ? mbSubBarHtml(mbNow()) : ''}
     ${/* 안내줄 — 오른쪽 글귀는 다음메일함과 같은 그 문장이다. 방향키·스페이스가 실제로
           되게 만들어 두었다(mbKeyNav) — 안 되는 채로 적어 두면 거짓말이 된다.
           왼쪽에는 몇 통인지와 언제 가져온 것인지를 둔다. 거울이니 «언제 것인가»가
@@ -30119,6 +31049,14 @@ function mbReadHtml(){
           title="이 메일을 «내가 처리했다»고 남깁니다 — 함께 맡은 사람이 두 번 일하지 않게"
           onclick="mbSeenDone('${o.slug}','${o.uid}')">${
             mbSeenMine(v)==='done' ? '✅ 내가 봤다' : '내가 봤다'}</button>` : ''}
+        ${typeof mbIsPersonBox === 'function' && mbIsPersonBox(mbNow()) && typeof mbSubCanEdit === 'function' && mbSubCanEdit(mbSubWhoOfBox(mbNow())) ? `
+          <button type="button" class="rbtn" data-key="${esc(v._key||'')}" onclick="mbSubMoveMenu(event,this.dataset.key)"
+            title="이 메일의 개인 소분류 탭을 바꾸거나 자동정리 규칙으로 등록합니다">🗂 소분류 ▾</button>
+          <button type="button" class="rbtn" ${mbSubIsDone(v, mbSubWhoOfBox(mbNow()))?'style="color:#166534;font-weight:700"':''}
+            data-slug="${esc(o.slug||'')}" data-uid="${esc(o.uid||'')}"
+            onclick="mbSubToggleDone(this.dataset.slug,this.dataset.uid)"
+            title="담당함에서 이 메일을 처리완료 탭으로 넘기거나 되돌립니다">${
+            mbSubIsDone(v, mbSubWhoOfBox(mbNow())) ? '✅ 완료됨' : '✓ 완료 처리'}</button>` : ''}
       </div>
       <div class="rgt">
         <button class="rbtn list" onclick="mbBack()"
