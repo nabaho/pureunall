@@ -159,3 +159,63 @@ test('④ erpHasCheckReq 및 계약관리 담당자 진행확인 UI 연동', () 
   assert.match(ERP_SRC, /async function openCheckReq\(/);
   assert.match(ERP_SRC, /담당자 진행확인 요청/);
 });
+
+test('⑤ 다중 PC·다중 탭 동시 수신 시 RTDB transaction 선점으로 중복 계약 생성을 원천 차단한다', async () => {
+  const fnBody = cutFn(ERP_SRC, 'async function runContractRequests(');
+  const store = {
+    req1: {
+      source: 'photo_contract',
+      state: 'pending',
+      managerMain: 'P-001',
+      company: { name: '가나수산' },
+      contractFields: { docName: '위임약정서', scope: '체불임금 진정 사건 대리' }
+    }
+  };
+  const madeByTabs = [];
+  function makeSharedDb() {
+    return {
+      ref(p) {
+        if (p === 'data/contract_requests') {
+          return { once: async () => ({ val: () => JSON.parse(JSON.stringify(store)) }) };
+        }
+        const key = p.replace(/^data\/contract_requests\//, '');
+        return {
+          transaction: async (updater) => {
+            const cur = store[key] ? JSON.parse(JSON.stringify(store[key])) : null;
+            const next = updater(cur);
+            if (next === undefined) return { committed: false, snapshot: { val: () => store[key] || null } };
+            store[key] = next;
+            return { committed: true, snapshot: { val: () => JSON.parse(JSON.stringify(store[key])) } };
+          },
+          remove: async () => { delete store[key]; },
+          update: async (u) => { if (store[key]) Object.assign(store[key], u); }
+        };
+      }
+    };
+  }
+  function makeTab(tabId) {
+    const ctx = {
+      console, Date, Object, Array, String, Number, Math, Promise,
+      _erpCtReqBusy: false,
+      _erpCtReqTabId: tabId,
+      fbDb: makeSharedDb(),
+      dbGet: () => [],
+      erpQuoteLaneReq: () => false,
+      showToast: () => {},
+      processOneContractRequest: async (k, r) => {
+        await new Promise((res) => setTimeout(res, 10));
+        delete store[k];
+        const m = { id: 'ct-' + tabId, companyName: r.company.name };
+        madeByTabs.push(m);
+        return { lane: 'photo_contract', made: m };
+      }
+    };
+    vm.createContext(ctx);
+    vm.runInContext(fnBody + '\nthis.run = runContractRequests;', ctx);
+    return ctx;
+  }
+  const tabA = makeTab('tab-PC-A');
+  const tabB = makeTab('tab-PC-B');
+  await Promise.all([tabA.run(), tabB.run()]);
+  assert.equal(madeByTabs.length, 1, '두 PC·탭이 동시에 수신해도 선점 잠금으로 정확히 1건만 생성된다');
+});

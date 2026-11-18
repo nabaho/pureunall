@@ -22053,8 +22053,10 @@ function erpContractDraftKey(cur){
 }
 
 /* 두 번 겹쳐 돌지 않게 — 화면이 다시 그려져도 처리는 한 번이다.
-   ⚠ 겹쳐 돌면 같은 요청으로 계약이 둘 생긴다(요청을 지우기 «전»에 둘째가 읽는다). */
+   ⚠ 겹쳐 돌면 같은 요청으로 계약이 둘 생긴다(요청을 지우기 «전»에 둘째가 읽는다).
+   ★ 여러 PC·여러 탭이 동시에 열려 있을 때도 한 탭만 선점하도록 _erpCtReqTabId + RTDB transaction 잠금을 함께 쓴다. */
 var _erpCtReqBusy = false;
+var _erpCtReqTabId = 'tab-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 
 function ContractModal(props){
   useEscClose(props.onClose);
@@ -28235,15 +28237,46 @@ function ContractManagement(props){
     try {
       var snap = await fbDb.ref('data/contract_requests').once('value');
       var all = snap.val() || {};
+      var nowClaim = Date.now();
       var keys = Object.keys(all).filter(function(k){
         var r = all[k];
-        if(!r || r.state !== 'pending') return false;
+        if(!r) return false;
+        var staleClaim = r.state === 'claiming' && (nowClaim - Number(r.claimedAt || 0)) > 90000;
+        if(r.state !== 'pending' && !staleClaim) return false;
         if(erpQuoteLaneReq(r)) return !!(r.companyId || r.contractId || r.companyName);   // 견적 길 — 업체·계약을 가리키는 요청만
         return !!(r.company && r.company.name);
       });
       for(var i = 0; i < keys.length; i++){
         var key = keys[i];
-        var r = await processOneContractRequest(key, all[key]);
+        var reqObj = all[key];
+        var reqRef = fbDb.ref('data/contract_requests/' + key);
+        if(reqRef && typeof reqRef.transaction === 'function'){
+          var claimAt = Date.now();
+          var tx = await reqRef.transaction(function(cur){
+            if(!cur) return cur;
+            var isStale = cur.state === 'claiming' && (claimAt - Number(cur.claimedAt || 0)) > 90000;
+            if(cur.state !== 'pending' && !isStale) return; /* 다른 PC·탭이 이미 선점했거나 처리 완료 */
+            return Object.assign({}, cur, { state:'claiming', claimedBy:_erpCtReqTabId, claimedAt:claimAt });
+          });
+          if(!tx || !tx.committed || !tx.snapshot) continue;
+          var claimed = tx.snapshot.val();
+          if(!claimed || claimed.claimedBy !== _erpCtReqTabId) continue;
+          reqObj = Object.assign({}, claimed, { state:'pending' });
+        }
+        var r;
+        try {
+          r = await processOneContractRequest(key, reqObj);
+        } catch(innerErr){
+          try{
+            if(reqRef && typeof reqRef.transaction === 'function'){
+              await reqRef.transaction(function(cur){
+                if(!cur || cur.state !== 'claiming' || cur.claimedBy !== _erpCtReqTabId) return;
+                return Object.assign({}, cur, { state:'pending', claimedBy:null, claimedAt:null });
+              });
+            }
+          }catch(_){}
+          throw innerErr;
+        }
         if(r.lane === 'quote'){
           if(r.made) madeQ++; else if(r.attached || r.advanced || r.noop) doneQ++; else blockedQ++;
         } else if(r.made) made.push(r.made); else if(!r.noop) blocked++;
@@ -28280,7 +28313,11 @@ function ContractManagement(props){
         .map(function(k){ return Object.assign({ _key:k }, all[k]); })
         .sort(function(a,b){ return (b.handledAt||0) - (a.handledAt||0); });
       setBlockedReqs(list);
-      if(Object.keys(all).some(function(k){ return all[k] && all[k].state === 'pending'; })) runContractRequests();
+      var nowListen = Date.now();
+      if(Object.keys(all).some(function(k){
+        var r = all[k];
+        return r && (r.state === 'pending' || (r.state === 'claiming' && (nowListen - Number(r.claimedAt || 0)) > 90000));
+      })) runContractRequests();
     });
     return function(){ try{ ref.off('value', cb); }catch(_){} };
   }, []);
