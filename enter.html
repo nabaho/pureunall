@@ -398,6 +398,36 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   background:#1e293b;color:#fff;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(15,23,42,.3);text-align:center;}
 .lay-toast.bad{background:#991b1b;}
 .lay-toast[hidden]{display:none;}
+/* 🔄 포털 실시간 업무 오케스트레이션 바 — 경량 접수·연계 대기 현황 및 원클릭 흐름판 연결 */
+#orchBar{display:flex;flex-direction:column;gap:7px;margin:0 4px 12px;padding:10px 12px;border-radius:14px;
+  background:#ffffff;border:1px solid #cbd5e1;box-shadow:0 4px 14px rgba(30,41,59,.06);color:#1e293b;}
+#orchBar[hidden]{display:none;}
+.orch-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.orch-hd{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:800;color:#1e40af;white-space:nowrap;cursor:pointer;background:none;border:none;padding:4px 4px;font-family:inherit;}
+.orch-hd:hover{text-decoration:underline;}
+.orch-pills{display:flex;align-items:center;gap:5px;flex:1;min-width:0;overflow-x:auto;padding:1px 0;}
+.orch-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;border:1px solid #e2e8f0;
+  background:#f8fafc;color:#475569;font-size:.72rem;font-weight:700;font-family:inherit;white-space:nowrap;cursor:pointer;flex:none;}
+.orch-pill:hover{border-color:#2563eb;background:#eff6ff;color:#1e40af;}
+.orch-pill.has-urg{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+.orch-pill.has-warn{background:#fffbeb;border-color:#fde68a;color:#854d0e;}
+.orch-pill b{font-variant-numeric:tabular-nums;font-weight:800;}
+.orch-open{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:999px;padding:4px 11px;
+  font-size:.72rem;font-weight:800;font-family:inherit;white-space:nowrap;cursor:pointer;margin-left:auto;}
+.orch-open:hover{background:#2563eb;border-color:#2563eb;color:#ffffff;}
+.orch-next{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:.74rem;color:#1e293b;}
+.orch-next[hidden]{display:none;}
+.orch-next-tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.orch-next-go{border:none;background:#1e40af;color:#ffffff;border-radius:999px;padding:4px 10px;font-size:.7rem;font-weight:700;font-family:inherit;white-space:nowrap;cursor:pointer;flex-shrink:0;}
+.orch-next-go:hover{background:#2563eb;}
+@media (max-width:640px){
+  #orchBar{margin:0 2px 10px;padding:8px 9px;}
+  .orch-hd{min-height:36px;}
+  .orch-open{min-height:36px;padding:5px 10px;font-size:.7rem;}
+  .orch-pills{order:3;flex:1 1 100%;width:100%;padding:2px 0;}
+  .orch-pill{min-height:36px;padding:5px 10px;}
+  .orch-next-go{min-height:36px;padding:5px 11px;}
+}
 body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline-offset:3px;border-radius:12px;min-height:40px;}
 /* ⚠ 앱마다 붙이던 📌(틀 고정 표시·단추)는 걷었다 — 대표 지시 2026-11-08 「각 앱에 고정표시는 없애고 오른쪽 끝에만 고정표시 있으면 된다」.
    고정 표시는 줄 머리 오른쪽 끝의 단추 하나뿐이다. 앱 하나만 고정하는 길은 «목록 창»(앱마다 📌)에만 남겨 두었다. */
@@ -1520,6 +1550,18 @@ body.portal-mode #moreFab{display:flex;}
       <button id="layoutResetBtn" type="button" title="모든 앱을 처음 자리로 되돌리고 틀 고정을 모두 풉니다">↩ 처음 자리로</button>
       <button id="layoutDoneBtn" type="button">끝내기</button>
     </div>
+    <!-- 🔄 포털 실시간 업무 오케스트레이션 바 — 로그인 확인 뒤에만 켜며(hidden), 28개 앱 간 다음 할 일 바통을 한눈에 이어 준다 -->
+    <div id="orchBar" role="region" aria-label="업무 오케스트레이션 실시간 흐름" hidden>
+      <div class="orch-top">
+        <button type="button" class="orch-hd" id="orchTitleBtn" title="업무 오케스트레이션 전체 지휘소 열기">🔄 업무 오케스트레이션</button>
+        <div class="orch-pills" id="orchStagePills" aria-label="생애주기 단계별 대기 건수"></div>
+        <button type="button" class="orch-open" id="orchOpenBtn">전체 흐름판 ›</button>
+      </div>
+      <div class="orch-next" id="orchNextRow" hidden>
+        <span class="orch-next-tx" id="orchNextText"></span>
+        <button type="button" class="orch-next-go" id="orchNextGoBtn">이어서 처리 ➔</button>
+      </div>
+    </div>
     <!-- 줄은 APP_ROWS 에서 «만들어» 넣는다 (대표 결정 2026-08-29, 안 ㉮).
          여태는 여기에 손으로 두 줄을 적어 두어, 줄을 늘리려면 화면·자바스크립트
          네 군데를 함께 고쳐야 했다. 이제 자료 한 곳만 고치면 된다. -->
@@ -2084,6 +2126,7 @@ body.portal-mode #moreFab{display:flex;}
     { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
     { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
     { key:'jobtrans', name:'산업일자리전환',  desc:'능률협회·충경진 메일·보고서·HWPX', icon:'⚡', url:'jobtrans.html',       roles:null, row:'client' },
+    { key:'orch',    name:'오케스트레이션',   desc:'메일·계약·ERP·정산 흐름연결', icon:'🔄', url:'pu-orchestrator.html', roles:null, row:'store' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
@@ -3868,6 +3911,202 @@ body.portal-mode #moreFab{display:flex;}
     document.addEventListener('visibilitychange', portalMrVis);
   }
 
+  // ── 🔄 포털 실시간 업무 오케스트레이션 바 & 타일 배지 (경량 접수·연계 대기 요약) ──
+  var portalOrchUid = '';
+  var portalOrchAt = 0;
+  var portalOrchBusy = false;
+  var portalOrchReport = null;
+  var portalOrchPinKey = '';
+  var portalOrchVis = null;
+
+  function portalOrchOpen(extraQuery){
+    if(typeof window.portalLaunchApp === 'function' && window.portalLaunchApp('orch', extraQuery || '')){
+      return;
+    }
+    var app = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === 'orch'){ app = APPS[i]; break; } }
+    var v = Math.floor(Date.now() / 600000);
+    var q = String(extraQuery || '').replace(/^[?&]+/, '');
+    var url = 'pu-orchestrator.html?sso=1&v=' + v + (q ? '&' + q : '');
+    if(isMobile() || !app) location.href = url;
+    else openPortalApp(app, url);
+  }
+
+  function portalOrchJumpBaton(b){
+    if(!b) return;
+    var C = window.PuOrchestratorCore;
+    var u = auth.currentUser;
+    if(C){
+      try{
+        var packed = C.packBaton(Object.assign({}, b, {
+          uid: (u && u.uid) || '',
+          returnUrl: 'pu-orchestrator.html'
+        }), Date.now());
+        var json = JSON.stringify(packed);
+        try{ localStorage.setItem(C.BATON_STORAGE_KEY, json); }catch(_){}
+        try{ sessionStorage.setItem(C.BATON_STORAGE_KEY, json); }catch(_){}
+      }catch(e){}
+    }
+    var safeUrl = C ? C.safeRelUrl(b.targetUrl, 'pu-orchestrator.html') : 'pu-orchestrator.html';
+    var hIdx = safeUrl.indexOf('#');
+    var hPart = hIdx >= 0 ? safeUrl.slice(hIdx) : '';
+    var basePart = hIdx >= 0 ? safeUrl.slice(0, hIdx) : safeUrl;
+    var _v = Math.floor(Date.now() / 600000);
+    var full = basePart + (basePart.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&orchBaton=1&v=' + _v + hPart;
+    if(isMobile()){ location.href = full; return; }
+    var targetApp = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === b.toApp){ targetApp = APPS[i]; break; } }
+    if(targetApp) openPortalApp(targetApp, full);
+    else location.href = full;
+  }
+
+  function portalOrchSyncPins(key){
+    if(key === portalOrchPinKey) return;
+    portalOrchPinKey = key;
+    try{ if(typeof paintPins === 'function') paintPins(); }catch(e){}
+  }
+
+  function portalOrchRemoveBadge(silent){
+    var b = $('portalOrchBadge');
+    if(b) b.remove();
+    if(!silent) portalOrchSyncPins('');
+  }
+
+  function portalOrchPaint(){
+    var bar = $('orchBar');
+    var pills = $('orchStagePills');
+    var nextRow = $('orchNextRow');
+    var nextTxt = $('orchNextText');
+    var nextGo = $('orchNextGoBtn');
+    portalOrchRemoveBadge(true);
+    if(!bar || !pills) return;
+    if(!portalOrchReport){
+      bar.hidden = true;
+      portalOrchSyncPins('');
+      return;
+    }
+    bar.hidden = false;
+    pills.innerHTML = '';
+    (portalOrchReport.stageSummary || []).forEach(function(st){
+      var p = document.createElement('button');
+      p.type = 'button';
+      p.className = 'orch-pill' + (st.urgent ? ' has-urg' : (st.warn ? ' has-warn' : ''));
+      var sLb = document.createElement('span');
+      sLb.textContent = String(st.short || '');
+      var bCnt = document.createElement('b');
+      bCnt.textContent = String(Number(st.total) || 0);
+      p.appendChild(sLb);
+      p.appendChild(bCnt);
+      p.title = st.title + ' — 포털 빠른 대기 ' + st.total + '건 (전체 원장 360° 점검은 오케스트레이션 지휘소에서 실행)';
+      p.onclick = function(){ portalOrchOpen('stage=' + encodeURIComponent(st.id)); };
+      pills.appendChild(p);
+    });
+
+    var active = (portalOrchReport.batons || []).filter(function(x){ return !x.checked && !x.snoozed; });
+    if(nextRow && nextTxt && nextGo){
+      if(active.length > 0){
+        var top = active[0];
+        nextRow.hidden = false;
+        nextTxt.textContent = (top.severity === 'urgent' ? '🚨 긴급 바통: ' : '⚡ 다음 바통: ')
+          + '[' + top.fromName + ' ➔ ' + top.toName + '] ' + top.companyLabel + ' — ' + top.title;
+        nextTxt.title = top.reason || top.title;
+        nextGo.textContent = (top.actionLabel || '이어서 처리') + ' ➔';
+        nextGo.onclick = function(){ portalOrchJumpBaton(top); };
+      } else {
+        nextRow.hidden = true;
+      }
+    }
+
+    if(active.length > 0){
+      var tile = document.querySelector('.tile[data-key="orch"]');
+      if(tile){
+        var tb = document.createElement('span');
+        tb.id = 'portalOrchBadge';
+        tb.className = 'tile-alert';
+        tb.textContent = '바통 ' + active.length;
+        tb.title = '🔄 빠른 접수·연계 대기 바통 ' + active.length + '건\n눌러서 오케스트레이션 전체 흐름판 열기';
+        tb.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); portalOrchOpen(''); };
+        tile.appendChild(tb);
+        portalOrchSyncPins(active.length + '|' + (active[0] ? active[0].id : ''));
+      }
+    } else {
+      portalOrchSyncPins('');
+    }
+  }
+
+  function portalOrchWireStatic(){
+    var tb = $('orchTitleBtn'), ob = $('orchOpenBtn');
+    if(tb && !tb._wired){ tb._wired = true; tb.addEventListener('click', function(){ portalOrchOpen(''); }); }
+    if(ob && !ob._wired){ ob._wired = true; ob.addEventListener('click', function(){ portalOrchOpen(''); }); }
+  }
+
+  /* ★ 포털 첫 화면에서는 무거운 전사 원장·민감 사건 트리를 통째로 읽지 않고,
+     가벼운 접수·연계 대기열 6개만 스캔한다(전체 28개 앱 정밀 진단은 전용 화면 진입 시 실행). */
+  function portalOrchScan(role, acct){
+    var C = window.PuOrchestratorCore;
+    var u = auth.currentUser;
+    if(!C || !u || portalOrchBusy || document.hidden) return;
+    portalOrchBusy = true;
+    var myUid = u.uid;
+    var mySid = acct ? String(acct.sid || '') : '';
+    var isAdm = role === 'admin' || (typeof sgIsAdmin === 'function' && sgIsAdmin());
+    var canFin = isAdm || (typeof portalAppPermOk === 'function' && portalAppPermOk('fin'));
+    function rd(p, ok){
+      if(!ok) return Promise.resolve(null);
+      return db.ref(p).once('value').then(function(s){ return s ? s.val() : null; }).catch(function(){ return null; });
+    }
+    var loc = {};
+    try{
+      var rawLoc = localStorage.getItem('pu_orch_local_' + myUid);
+      if(rawLoc) loc = JSON.parse(rawLoc) || {};
+    }catch(e){}
+
+    Promise.all([
+      rd('data/contract_requests', true),
+      rd('pu_quotes', true)
+    ]).then(function(res){
+      portalOrchBusy = false;
+      if(!auth.currentUser || auth.currentUser.uid !== myUid) return;
+      portalOrchAt = Date.now();
+      portalOrchReport = C.analyzeWorkspace({
+        contractRequests: res[0],
+        quotes: res[1],
+        hanaAlertCount: (portalHanaItems && portalHanaItems.length) || 0
+      }, {
+        now: Date.now(), uid: myUid, sid: mySid, role: role, isAdmin: isAdm,
+        perms: { fin: canFin }, localState: loc
+      });
+      portalOrchPaint();
+    }).catch(function(){ portalOrchBusy = false; });
+  }
+
+  function stopPortalOrchBar(){
+    portalOrchUid = ''; portalOrchAt = 0; portalOrchBusy = false; portalOrchReport = null;
+    if(portalOrchVis){ document.removeEventListener('visibilitychange', portalOrchVis); portalOrchVis = null; }
+    try{ localStorage.removeItem('pu_orch_baton_v1'); }catch(_){}
+    try{ sessionStorage.removeItem('pu_orch_baton_v1'); }catch(_){}
+    var bar = $('orchBar'); if(bar) bar.hidden = true;
+    portalOrchRemoveBadge();
+  }
+
+  function initPortalOrchBar(role, acct){
+    portalOrchWireStatic();
+    var u = auth.currentUser;
+    if(role === 'reviewer' || !u){ stopPortalOrchBar(); return; }
+    if(portalOrchUid === u.uid && portalOrchReport){
+      portalOrchPaint();
+      if(Date.now() - portalOrchAt > 180000) portalOrchScan(role, acct);
+      return;
+    }
+    stopPortalOrchBar();
+    portalOrchUid = u.uid;
+    setTimeout(function(){ portalOrchScan(role, acct); }, 60);
+    portalOrchVis = function(){
+      if(!document.hidden && Date.now() - portalOrchAt > 180000) portalOrchScan(role, acct);
+    };
+    document.addEventListener('visibilitychange', portalOrchVis);
+  }
+
   // 로그인 직후 바로 찍기 — 오른쪽 아래 동그란 단추(#camFab, 정적 마크업).
   // 타일 줄과 달리 다시 그릴 필요가 없어 배선은 한 번만 한다.
   function wireCamFab(){
@@ -4146,6 +4385,9 @@ body.portal-mode #moreFab{display:flex;}
          다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
       portalHanaPaintBadge();
       initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
+      initPortalOrchBar(role, acct);       // 🔄 업무 오케스트레이션 5단계 바통 바 & 타일 딱지
+    } else {
+      stopPortalOrchBar();
     }
     ['camFab', 'sgFab', 'chatFab', 'fabBar', 'moreDock'].forEach(function(id){
       var el = $(id);
@@ -5996,6 +6238,7 @@ body.portal-mode #moreFab{display:flex;}
     /* 같은 탭에서 다시 로그인하면 반드시 포털 선택 화면에 머문다. */
     stopPortalHanaAlerts();
     stopPortalMrAlerts();
+    stopPortalOrchBar();
     try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(e){}
     broadcastLogout();
     kkLogoutFlow();
@@ -7810,7 +8053,8 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=10"></script>
+<script src="js/pu-orchestrator-core.js?v=4"></script>
+<script src="js/pu-chatbot-kb.js?v=11"></script>
 <script src="js/pu-chatbot.js?v=6"></script>
 </body>
 </html>
