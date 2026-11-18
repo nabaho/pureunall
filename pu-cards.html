@@ -14728,7 +14728,7 @@ function addrNoteHtml(it, k){
   }
   return h;
 }
-const PC_POSTCODE_SRC = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+const PC_POSTCODE_SRC = 'https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 function pcLoadPostcode(){
   if (window.daum && daum.Postcode) return Promise.resolve();
   return new Promise((res, rej) => {

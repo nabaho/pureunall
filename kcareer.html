@@ -21848,7 +21848,7 @@ function firmTabSave(quiet){
      → 2026-10-17 부터 서버(zipLookup)가 그 열쇠로 찾아 준다 — 아래 piAutoZip·firmAutoZip 이 저절로 넣는다.
        이 「📮 찾기」는 한 곳으로 딱 떨어지지 않을 때 쓰라고 그대로 둔다.
    ⚠ 주소 칸은 «비어 있을 때만» 채운다 — 찾은 도로명 주소에는 건물명·호수가 없어 적어 둔 것이 줄어든다. */
-var KC_POSTCODE_SRC='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+var KC_POSTCODE_SRC='https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 function _kcLoadPostcode(){
   if(window.daum && daum.Postcode) return Promise.resolve();
   return new Promise(function(res,rej){
