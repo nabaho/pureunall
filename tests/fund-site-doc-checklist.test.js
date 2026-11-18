@@ -194,23 +194,24 @@ test('1. 공동기금·사내기금 단계별 필요서류 구성 및 간략 체
     includeOk: false
   });
 
-  assert.match(mail.subject, /보완·제출서류 체크리스트 요청/, '보완필요 항목이 있으면 제목에 보완 표시');
+  assert.match(mail.subject, /보완·필요서류 요청/, '보완필요 항목이 있으면 제목에 보완 표시');
   assert.match(mail.body, /최담당 과장님 안녕하세요\./);
-  assert.match(mail.body, /\[ \] 1\. 중소기업확인서 .* \[보완요청: 유효기간 만료 \(2026-03-31\)\]/, '보완 사유가 체크리스트 줄에 반영');
+  assert.match(mail.body, /\[ \] 1\. 중소기업확인서 \[보완요청: 유효기간 만료 \(2026-03-31\)\]/, '부연 설명 없이 제목과 보완 사유만 간결 반영');
   assert.ok(!mail.body.includes('[ ] 1. 사업자등록증 사본'), '기업정보함 보유 사업자등록증은 요청 목록에서 기본 제외');
-  assert.ok(!mail.body.includes('법인등기부등본(말소사항 포함) —'), '이미 확인완료된 등기부등본은 미제출 목록에서 제외');
-  assert.match(mail.body, /기제출·확인 완료 서류\(2종, 재제출 불필요\)/, '제외된 기확인 서류 안내 표시');
+  assert.ok(!mail.body.includes('법인등기부등본(말소사항 포함)'), '이미 확인완료된 등기부등본은 미제출 목록에서 제외');
+  assert.ok(!mail.body.includes(' — '), '각 항목 뒤에 장황한 설명을 붙이지 않음');
+  assert.match(mail.body, /확인 완료\(제출 불필요\): 사업자등록증, 법인등기부등본/, '제외된 기확인 서류 한 줄 안내');
   assert.match(mail.body, /요청 기한: 2026-11-28까지/);
 
-  /* 사내기금 문구 및 상호 중복 방지 확인 */
+  /* 사내기금 인가 단계 불필요 항목 제외 및 상호 중복 방지 확인 */
+  assert.ok(!intraInka.some((d) => d.id === 'inka_fin' || d.id === 'inka_ei'), '사내기금 인가 단계에는 재무제표·고용보험명부 제외');
   const intraDocs = ctx.sdcDocsFor('ops', '사내');
   const intraMail = ctx.sdcMailText(ctx.funds.F_INTRA, { sid: 'S_ONE', name: '(주)가상솔루션' }, {
     phase: 'ops',
-    docs: intraDocs,
-    style: 'brief'
+    docs: intraDocs
   });
   assert.ok(!intraMail.subject.includes('(주)가상솔루션 가상솔루션사내'), '사내기금 명칭에 회사명이 들어 있으면 중복 표기 생략');
-  assert.match(intraMail.body, /귀사\(설치사업장\)에서 제출해 주실 필요서류 체크리스트/);
+  assert.match(intraMail.body, /필요서류 요청드립니다\./);
 });
 
 test('2. 첨부파일명·메일제목 분류 및 공동·사내기금 사업장 자동 매칭', () => {

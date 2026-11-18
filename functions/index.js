@@ -8605,3 +8605,62 @@ exports.pboxApi = functions
       res.status(500).json({ ok: false, error: "서버 처리 중 일시적 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." });
     }
   });
+
+/* 📬 푸른메일함 기금 서류 상시 자동 수집 → 관리기금 자동 적재 (대표 지시 2026-11-18)
+   새 수신 메일이 /mailbox/msgs/{slug}/{uid} 에 들어오는 즉시 관리기금과 매칭해
+   회계·결산 백업 보관함 · 변경 이벤트 · 사업장 제출서류 체크리스트 · 기금 자동보관함에 적재한다. */
+exports.collectFundMailOnNew = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 180, memory: "512MB" })
+  .database.ref("/mailbox/msgs/{slug}/{uid}")
+  .onCreate(async (snap, ctx) => {
+    const msg = (snap && snap.val && snap.val()) || null;
+    if (!msg || !(Number(msg.a) > 0)) return null;
+    const slug = String((ctx && ctx.params && ctx.params.slug) || "");
+    const uid = String((ctx && ctx.params && ctx.params.uid) || "");
+    const FMC = require("./fund-mail-collect");
+    if (!FMC.isFundCollectableFolder(slug)) return null;
+    const MS = require("./mail-sync");
+    try {
+      return await FMC.collectSingleMail(
+        {
+          db: getDatabase(),
+          getSelfEmail: mailUserAsync,
+          fetchAttachments: (folderSlug, mailUid) =>
+            MS.withFolder(MAIL_DEPS, folderSlug, async (client) => {
+              const head = await client.fetchOne(
+                String(mailUid),
+                { uid: true, bodyStructure: true, headers: ["authentication-results"] },
+                { uid: true }
+              );
+              if (!head) return { atts: [], authResults: "" };
+              const authResults = head.headers ? head.headers.toString("utf8") : "";
+              const parts = MS.pickParts(head.bodyStructure, null, 0);
+              const out = [];
+              let totalBytes = 0;
+              for (const att of (parts.atts || []).slice(0, FMC.MAX_ATT_COUNT)) {
+                const sz = Number(att && att.size) || 0;
+                if (!att || !att.part || sz > FMC.MAX_RAW_ATT_BYTES) continue;
+                if (totalBytes + sz > FMC.MAX_TOTAL_ATT_BYTES) break;
+                try {
+                  const d = await client.download(String(mailUid), att.part, { uid: true });
+                  const buf = await MS.drain(d.content, Math.min(FMC.MAX_RAW_ATT_BYTES, FMC.MAX_TOTAL_ATT_BYTES - totalBytes));
+                  totalBytes += buf.length;
+                  out.push({ name: att.name || "", part: att.part, mime: att.mime || "", buf });
+                } catch (_) {
+                  continue;
+                }
+                if (totalBytes >= FMC.MAX_TOTAL_ATT_BYTES) break;
+              }
+              return { atts: out, authResults };
+            })
+        },
+        slug,
+        uid,
+        msg
+      );
+    } catch (e) {
+      console.error("[collectFundMailOnNew]", slug, uid, e && (e.stack || e.message || e));
+      return null;
+    }
+  });
