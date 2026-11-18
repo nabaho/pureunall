@@ -502,3 +502,43 @@ test('넣다 만·효력 없는 변경 — 등기 없음으로 보지 않고 계
   const ck = C.checklist(a).map((i) => i.key);
   assert.ok(ck.includes('repRes:m3') && !ck.some((k) => /^addrRes:/.test(k)));
 });
+
+test('★ 지사장 — 분사무소마다 사원 줄을 가리킨다(이름 따로 적지 않음) · 짝이 없으면 미정', () => {
+  const b = 법인(); b.branches[0].head = 'm2'; b.branches[1].head = 'm9';   // m9 는 없는 사원
+  const n = C.normBase(b);
+  assert.equal(n.branches[0].head, 'm2');
+  assert.equal(C.branchHead(n, n.branches[0]).name, '점검노무', '지사장은 가리키는 사원이어야 한다');
+  assert.equal(C.branchHead(n, n.branches[1]), null, '없는 사원을 가리키면 미정이다');
+  assert.deepEqual(C.memberDuties(n, 'm2'), ['가지지사장']);
+  assert.deepEqual(C.memberDuties(n, 'm1'), []);
+  assert.deepEqual(C.headProblems(n), ['나무지사 — 지사장(상근 사원)이 정해지지 않았습니다.']);
+  const r = C.officeRoster(n);
+  assert.equal(r[0].kind, 'hq'); assert.equal(r[0].head, '점검대표·점검노무', '본점은 대표사원');
+  assert.equal(r[1].head, '점검노무'); assert.equal(r[1].headOk, true);
+  assert.equal(r[2].head, ''); assert.equal(r[2].headOk, false);
+  assert.equal(C.normBase(법인()).branches[0].head, '', '지사장을 안 넣은 옛 자료는 빈칸으로 읽힌다');
+});
+
+test('★ 지사장이 퇴사하면 알리고, 등기 현황에 반영하면 지사장은 미정이 된다 · 남는 사원은 번호가 이어진다', () => {
+  const b = 법인(); b.branches[0].head = 'm3'; b.branches[1].head = 'm1';
+  const a = C.applyChanges(b, 건([
+    { id: 'j', type: 'join', name: '새노무', birth: '950101', addr: '점검시 라로 4', invest: { labor: true } },
+    { id: 'l', type: 'leave', member: 'm3', share: { mode: 'none' } },
+  ]));
+  assert.deepEqual(a.errors, []);
+  assert.ok(a.warnings.some((w) => /점검사원/.test(w) && /가지지사장/.test(w) && /후임 지사장/.test(w)), '지사장 퇴사 경고가 없다');
+  const nb = C.normBase(C.nextBase(a, { today: '2026-12-01' }));
+  assert.equal(nb.branches.find((x) => x.id === 'b1').head, '', '퇴사한 지사장 자리는 비어야 한다');
+  assert.equal(nb.branches.find((x) => x.id === 'b3').head, 'm1', '남는 지사장은 이어져야 한다');
+  const a2 = C.applyChanges(b, 건([{ id: 'j', type: 'join', name: '새노무', birth: '950101', addr: '점검시 라로 4', invest: { labor: true } }]));
+  assert.ok(!a2.warnings.some((w) => /후임 지사장/.test(w)), '퇴사가 없으면 지사장 경고도 없다');
+});
+
+test('★ 한 사람이 두 곳 이상의 지사장으로 정해지면 알린다(상근은 한 곳) · 한 곳씩이면 알리지 않는다', () => {
+  const b = 법인(); b.branches[0].head = 'm2'; b.branches[1].head = 'm2';
+  assert.deepEqual(C.headDups(b), ['점검노무']);
+  b.branches[1].head = 'm3';
+  assert.deepEqual(C.headDups(b), []);
+  b.branches[1].head = 'm9';   // 없는 사원 — 중복도 미정도 아니라 «미정» 쪽
+  assert.deepEqual(C.headDups(b), []);
+});

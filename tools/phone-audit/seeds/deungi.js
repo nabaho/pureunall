@@ -15,7 +15,8 @@ const base = Object.assign(meta('base', 'DeungiBase'), {
     { id: 'm4', name: '점검사무장', birth: '850101', addr: '점검도 점검시 자차로 4', invest: { cash: 10000000, labor: false, inKind: '차종 : 점검차 / 연식 : 2000 / 차대번호 : TEST0000' }, rep: false, joinDate: '2025-01-01' },
   ],
   branches: [
-    { id: 'b1', name: '가지분사무소', alias: '가지지사', addr: '점검광역시 서구 점검서로 79, 2층(점검동, 점검빌딩)', no: 1, since: '2002-03-11' },
+    { id: 'b1', name: '가지분사무소', alias: '가지지사', addr: '점검광역시 서구 점검서로 79, 2층(점검동, 점검빌딩)', no: 1, since: '2002-03-11', head: 'm2' },
+    { id: 'b2', name: '다래분사무소', alias: '다래지사', addr: '점검특별자치시 점검로 312, 502호(점검동, 점검타운)', no: 2, since: '2025-01-01', head: 'm4' },
     { id: 'b3', name: '나무분사무소', alias: '나무지사', addr: '점검도 점검시 점검남1로 37, 2층(점검동, 점검인빌딩)', no: 3, since: '2019-07-24' },
   ],
   charter: '', history: [],
@@ -57,16 +58,72 @@ module.exports = {
     { name: 'easy3', run: async (p) => { await p.click('#wizSteps [data-s="3"]'); } },
     { name: 'easy4', run: async (p) => { await p.click('#wizSteps [data-s="4"]'); } },
     { name: 'docs', run: async (p) => { await p.click('[data-act=mode][data-m=full]'); await p.click('#edDocs input[data-doc]'); } },
-    { name: 'base', run: async (p) => { await p.click('#tabs button[data-tab=base]'); } },
-    { name: 'hist', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); } },
+    { name: 'base', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); window.DOC_NO_AUTO = window.CUR; }); await p.click('#tabs button[data-tab=base]'); await p.waitForTimeout(300); } },
+    /* 지난 기록 — 접힌 모습(기본) · 모두 편 모습 */
+    { name: 'hist', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); window.FOLD = {}; }); await p.click('#tabs button[data-tab=hist]'); } },
+    { name: 'histopen', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); const b = await p.$('[data-act=foldAll][data-v="1"]'); if (b) await b.click(); await p.waitForTimeout(300); } },
+    /* 등기 현황 — 지사장 짝: 처음엔 한 곳 미정 → 사원을 고르면 띠·직책이 바뀜 → 사원 이름을 고치면 따라옴 → 미정으로 되돌림. 어긋나면 throw → 결과 json 의 navErr */
+    { name: 'basehead', run: async (p) => {
+      const must = (ok, why) => { if (!ok) throw new Error('basehead: ' + why); };
+      await p.evaluate(() => { window.sideClose && window.sideClose(); window.DOC_NO_AUTO = window.CUR; window.BASE_DRAFT = null; });
+      await p.click('#tabs button[data-tab=base]'); await p.waitForTimeout(300);
+      const info = () => p.evaluate(() => ({ oc: [...document.querySelectorAll('#ofc .oc')].map((e) => e.className + '|' + e.querySelector('.op').textContent.trim()), sum: document.getElementById('baseSum').textContent, duty: [...document.querySelectorAll('#baseBox td.duty')].map((e) => e.textContent.trim()) }));
+      const a0 = await info();
+      must(a0.oc.length === 4 && /no/.test(a0.oc[3]) && /미정/.test(a0.oc[3]) && /지사장 미정 1곳/.test(a0.sum), '처음엔 마지막 지사가 미정 ' + JSON.stringify(a0));
+      await p.selectOption('#baseBox select[data-bb="2"][data-k="head"]', 'm3'); await p.waitForTimeout(200);
+      const a1 = await info();
+      must(/ok/.test(a1.oc[3]) && /점검사원/.test(a1.oc[3]) && /지사장 모두 정함/.test(a1.sum) && /나무지사장/.test(a1.duty[2]), '고르면 띠·요약·직책이 바뀌어야 함 ' + JSON.stringify(a1));
+      await p.fill('#baseBox input[data-bm="2"][data-k="name"]', '바뀐이름'); await p.waitForTimeout(200);
+      const a2 = await info();
+      must(/바뀐이름/.test(a2.oc[3]), '사원 이름을 고치면 띠가 따라와야 함 ' + JSON.stringify(a2));
+      must(await p.evaluate(() => [...document.querySelectorAll('#baseBox select[data-k="head"] option')].some((o) => o.textContent.indexOf('바뀐이름') >= 0)), '지사장 고르기 칸의 글자도 따라와야 함');
+      must(await p.evaluate(() => document.activeElement && document.activeElement.dataset && document.activeElement.dataset.bm === '2'), '글을 치는 동안 초점이 빠지면 안 됨');
+      await p.selectOption('#baseBox select[data-bb="2"][data-k="head"]', ''); await p.waitForTimeout(200);
+      must(/지사장 미정 1곳/.test((await info()).sum), '미정으로 되돌릴 수 있어야 함');
+      /* 지사장인 사원 줄을 지우면 지사장도 비고, 새 사원 줄이 지운 번호를 다시 써도 옛 지사장 자리를 잇지 않는다(외부 검토 2026-11-18) */
+      await p.selectOption('#baseBox select[data-bb="2"][data-k="head"]', 'm3'); await p.waitForTimeout(150);
+      await p.evaluate(() => { window.confirm = () => true; });
+      await p.check('#baseBox input[data-sel="mem"][data-id="m3"]'); await p.waitForTimeout(200);
+      await p.click('[data-act=memDel]'); await p.waitForTimeout(250);
+      const a4 = await info();
+      must(/no/.test(a4.oc[3]) && /지사장 미정 1곳/.test(a4.sum), '지사장인 사원을 지우면 지사장도 비어야 함 ' + JSON.stringify(a4));
+      await p.click('[data-act=memAdd]'); await p.waitForTimeout(250);
+      const a5 = await info();
+      must(/no/.test(a5.oc[3]) && /지사장 미정 1곳/.test(a5.sum), '새 사원 줄이 옛 지사장 자리를 차지하면 안 됨 ' + JSON.stringify(a5));
+      await p.evaluate(() => { window.BASE_DRAFT = null; window.drawBase(); });
+    } },
+    /* 지난 기록 접고 펴기 — 처음엔 접힘 → 누르면 펴지고 초점이 단추에 남음 → 다시 그려도 폄 → 접음 → 칸으로 접힌 묶음의 파일을 열면 그 묶음이 펴지고 줄이 칠해짐 → 모두 펴기/접기 */
+    { name: 'histfold', run: async (p) => {
+      const must = (ok, why) => { if (!ok) throw new Error('histfold: ' + why); };
+      const w = (ms) => p.waitForTimeout(ms);
+      await p.evaluate(() => { window.sideClose && window.sideClose(); window.FOLD = {}; });
+      await p.click('#tabs button[data-tab=hist]'); await w(300);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .arcg.open').length === 0 && document.querySelectorAll('#histBox tr[data-arcf]').length === 0), '처음엔 모두 접혀 있어야 함');
+      await p.click('#histBox .arcg[data-arc="ARtest2019a"] .tg'); await w(300);
+      const st = await p.evaluate(() => ({ open: document.querySelector('#histBox .arcg[data-arc="ARtest2019a"]').classList.contains('open'), rows: document.querySelectorAll('#histBox tr[data-arcf]').length, exp: document.querySelector('#histBox .arcg[data-arc="ARtest2019a"] .tg').getAttribute('aria-expanded'), foc: document.activeElement && document.activeElement.className }));
+      must(st.open && st.rows === 4 && st.exp === 'true' && /tg/.test(st.foc), '누르면 펴지고 초점이 단추에 남아야 함 ' + JSON.stringify(st));
+      await p.evaluate(() => window.drawHist());
+      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4), '다시 그려도 펴져 있어야 함');
+      await p.click('#histBox .arcg[data-arc="ARtest2019a"] .tg'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 0), '다시 누르면 접혀야 함');
+      await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); window.arcView('ARtest2019a', 'fake_file_id_0004'); });
+      await w(700);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4 && !!document.querySelector('#histBox tr.cur')), '칸으로 접힌 묶음의 파일을 열면 그 묶음이 펴지고 줄이 칠해져야 함');
+      await p.evaluate(() => window.sideClose()); await w(300);
+      await p.click('[data-act=foldAll][data-v="1"]'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .arcg.open').length === 2), '모두 펴기');
+      await p.click('[data-act=foldAll][data-v="0"]'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .arcg.open').length === 0), '모두 접기');
+      await p.evaluate(() => { window.FOLD = {}; window.drawHist(); });
+    } },
     /* 오른쪽 보기 칸(폰에서는 전체를 덮는 창) — 파일 받기는 가짜(작은 그림)로 */
-    { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } },
+    { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); const fa = await p.$('[data-act=foldAll][data-v="1"]'); if (fa) await fa.click(); await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } },
     /* 새 서류 보기 칸 — ② 에서 저절로 열림 · 이전/다음 · 줄 누르기 · 새 서류↔지난 원본 · ①에서 고치면 다시 그림 · Esc 뒤엔 저절로 다시 열지 않음 · 건을 닫으면 칸도 닫힘.
        어긋나면 throw → 결과 json 의 navErr 에 나온다 */
     { name: 'docflow', wait: 800, run: async (p) => {
       if (p.viewportSize().width < 1080) return;   /* 좁은 화면은 저절로 열리지 않는다 — docside 로 본다 */
       await toEasy(p);
-      await p.evaluate(() => { const c = window.CASES[window.CUR]; if (c) { c.docsOff = {}; window.drawEasy(); } });   /* 앞의 «docs» 화면이 끈 서류를 다시 켠다 */
+      await p.evaluate(() => { window.DOC_NO_AUTO = ''; const c = window.CASES[window.CUR]; if (c) { c.docsOff = {}; window.drawEasy(); } });   /* 앞의 «docs» 화면이 끈 서류를 다시 켜고, «base» 화면이 막아 둔 저절로 열림도 푼다 */
       const w = (ms) => p.waitForTimeout(ms);
       const must = (ok, why) => { if (!ok) throw new Error('docflow: ' + why); };
       const snap = () => p.evaluate(() => ({ k: window.SIDE && window.SIDE.kind, key: window.SIDE && window.SIDE.key, pos: (document.getElementById('sdPos') || {}).textContent, cv: document.querySelectorAll('#spv canvas').length, cur: (document.querySelector('#editor tr.cur') || {}).dataset ? document.querySelector('#editor tr.cur').dataset.dockey : '', h: window.PV_BYTES ? window.PV_BYTES.u8.reduce((a, b) => (a * 31 + b) | 0, 0) : 0 }));
