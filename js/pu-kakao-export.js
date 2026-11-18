@@ -36,6 +36,52 @@
       .map(function (p) { return p.m; });
   }
 
+  /* ── 서버에 모인 글 → fromLines 입력 (2026-11-18) ──────────────────────────
+     대표 지시 2026-11-17 「업무용 카톡 자료 자동 수집 후 … 업무관리에 자동으로 정리하고 싶다」.
+     폰 알림으로 저절로 들어온 글(그리고 전에 «넣기»한 저장본 글)은 서버 kakaoWork/notes 에 30일 모여 있다.
+     .txt 를 다시 읽지 않아도 그 글로 진행 기록을 묶을 수 있게 모양만 바꾼다(가림은 서버가 이미 했다).
+     notes = kakaoList 의 items [{room,sender,text,sentAt,src}], files = kakaoFiles 의 items [{room,sender,name,sentAt}].
+     · 방은 하나만 — 진행 기록 열쇠(logId)가 방 이름을 쓴다. 방이 여럿이면 글이 많은 방부터(serverRooms).
+     · 「사진을 보냈습니다」류는 글이 아니다 — isMedia 로 걸러 «세기만» 한다(저장본 읽기도 사진 줄을 글로 넣지 않는다).
+       판별은 js/pu-kakao-work.js 의 classify 한 곳 — 부르는 쪽이 넘긴다(여기서 다시 짓지 않는다).
+     · since 보다 옛 글·파일은 뺀다(서버 보관 30일과 같은 창). */
+  function serverRooms(notes) {
+    var n = {};
+    (notes || []).forEach(function (x) {
+      var r = String((x && x.room) || '').trim();
+      if (r) n[r] = (n[r] || 0) + 1;
+    });
+    return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || (a < b ? -1 : a > b ? 1 : 0); })
+      .map(function (r) { return { room: r, n: n[r] }; });
+  }
+  function fromServer(notes, files, opts) {
+    var o = opts || {};
+    var room = String(o.room || '').trim();
+    var since = Number(o.since) || 0;
+    var isMedia = typeof o.isMedia === 'function' ? o.isMedia : function () { return false; };
+    var out = { room: room, lines: [], files: [], media: 0, notify: 0, exported: 0 };
+    if (!room) return out;
+    (notes || []).forEach(function (x) {
+      if (!x || String(x.room || '').trim() !== room) return;
+      var at = Number(x.sentAt);
+      if (!isFinite(at) || at < since) return;
+      var text = String(x.text || '').trim();
+      if (!text) return;
+      if (isMedia(text)) { out.media++; return; }
+      out.lines.push({ sender: String(x.sender || ''), sentAt: at, text: text });
+      if (x.src === 'export') out.exported++; else out.notify++;
+    });
+    (files || []).forEach(function (f) {
+      if (!f || String(f.room || '').trim() !== room || !f.name) return;
+      var at = Number(f.sentAt);
+      if (!isFinite(at) || at < since) return;
+      out.files.push({ sender: String(f.sender || ''), sentAt: at, name: String(f.name) });
+    });
+    out.lines.sort(function (a, b) { return a.sentAt - b.sentAt; });
+    out.files.sort(function (a, b) { return a.sentAt - b.sentAt; });
+    return out;
+  }
+
 
   /* ── 사건번호 ──────────────────────────────────────────────────────────────
      「경기2026부해3347」 = 지역 + 연도 4자리 + 사건부호 + 번호. 공백·하이픈을 지워 견준다.
@@ -245,7 +291,7 @@
 
   return {
     CASE_CODES: CASE_CODES, GAP_MIN: GAP_MIN, LINE_MAX: LINE_MAX,
-    fromLines: fromLines, normCaseNo: normCaseNo, extractCaseNos: extractCaseNos, findCompanyKeys: findCompanyKeys,
+    fromLines: fromLines, serverRooms: serverRooms, fromServer: fromServer, normCaseNo: normCaseNo, extractCaseNos: extractCaseNos, findCompanyKeys: findCompanyKeys,
     groupMessages: groupMessages, digest: digest, hash: hash, recordKey: recordKey, logId: logId,
     matchGroups: matchGroups
   };
