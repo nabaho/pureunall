@@ -129,3 +129,10 @@ hana-mod.patch
 tools/phone-audit/out/
 # 폰 미러 갈무리·잰 값 — 실제 고객 화면이 찍힌다. 저장소에 올리지 않는다 (2026-10-24)
 tools/phone-mirror/out/
+
+# 이 컴퓨터의 도구가 worktree 마다 만든 Codex 용 사본 (2026-11-09 생김 · 2026-11-18 무시 추가)
+#  .agents/skills/hwpx/ 는 .claude/skills/hwpx/ 의 사본(한 줄만 다름) — 올리면 같은 스킬이 두 벌이 되어 서로 어긋난다.
+#  .codex/ 는 .mcp.json 을 옮긴 Codex MCP 설정 — 배포 게이트가 .codex 를 안 지워서 올리면 공개 사이트에 실린다.
+#  ⚠ .agents/skills/ 전체를 막지 말 것 — Codex 저장소 스킬을 일부러 둘 자리다(.agents/rules/ 는 추적 중).
+.agents/skills/hwpx/
+.codex/
