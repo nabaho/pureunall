@@ -1476,6 +1476,115 @@
     });
   }
 
+  function pullTribunalOfficial(opts) {
+    opts = opts || {};
+    var startGen = opts.expectedGen !== undefined ? Number(opts.expectedGen) : sessionGen;
+    var startUid = opts.expectedUid !== undefined ? String(opts.expectedUid || '') : mem.uid;
+    if (startGen !== sessionGen || startUid !== mem.uid) {
+      return Promise.reject(makeStaleSessionError());
+    }
+
+    var auth = opts.auth;
+    var u = auth && auth.currentUser;
+    if (!u || typeof u.getIdToken !== 'function') {
+      return Promise.reject(new Error('중앙행정심판위원회·특별심판 공식 API 수집은 포털 직원 로그인 상태에서 실행할 수 있습니다.'));
+    }
+
+    var cfg = getConfig();
+    var rawInputOc = opts.lawOc !== undefined ? String(opts.lawOc || '').trim() : '';
+    var lawOc = rawInputOc ? sanitizeLawOcClient(rawInputOc) : (cfg.lawOc || '');
+    if (rawInputOc && !lawOc) {
+      return Promise.reject(new Error('법제처 OC 아이디 형식이 올바르지 않습니다 (신청 이메일의 @ 앞자리 영문·숫자만 입력해 주세요).'));
+    }
+    if (lawOc && lawOc !== cfg.lawOc) {
+      saveConfig({ lawOc: lawOc });
+    }
+
+    var trbQCheck = validateClientOfficialSearchQuery(opts.query, 50, true);
+    if (!trbQCheck.ok) {
+      return Promise.reject(new Error(trbQCheck.error));
+    }
+
+    return u.getIdToken().then(function (tok) {
+      if (startGen !== sessionGen || startUid !== mem.uid) {
+        throw makeStaleSessionError();
+      }
+      var ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var reqTimer = ac ? setTimeout(function () { try { ac.abort(); } catch (_) {} }, 45000) : null;
+      var fetchInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          action: 'pull_tribunals',
+          lawOc: lawOc,
+          tribunal: String(opts.tribunal || 'all'),
+          preset: String(opts.preset || 'all'),
+          localOrg: opts.localOrg ? String(opts.localOrg).trim() : '',
+          query: trbQCheck.query
+        })
+      };
+      if (ac) fetchInit.signal = ac.signal;
+      return fetch(PBOX_API_URL, fetchInit).then(
+        function (res) { if (reqTimer) clearTimeout(reqTimer); return res; },
+        function (err) {
+          if (reqTimer) clearTimeout(reqTimer);
+          if (err && err.name === 'AbortError') {
+            throw new Error('심판·재결 공식 API 요청 제한시간(45초)을 초과했습니다. 검색어를 지정하거나 단일 기관을 선택해 다시 시도해 주세요.');
+          }
+          throw err;
+        }
+      );
+    }).then(function (r) {
+      var jsonParseErr = false;
+      var parsePromise = (r && typeof r.json === 'function')
+        ? r.json().catch(function () { jsonParseErr = true; return null; })
+        : Promise.resolve(null);
+      return parsePromise.then(function (j) {
+        if (startGen !== sessionGen || startUid !== mem.uid) {
+          throw makeStaleSessionError();
+        }
+        var isPlainObj = !!(j && typeof j === 'object' && !Array.isArray(j));
+        var payload = isPlainObj ? j : {};
+        if (!r || jsonParseErr || !isPlainObj) {
+          throw new Error('심판·재결 공식 API 서버 응답(JSON) 형식이 올바르지 않습니다 (HTTP ' + ((r && r.status) || 0) + ')');
+        }
+        if (!r.ok || (payload.ok !== true && payload.partial !== true) || !Array.isArray(payload.docs)) {
+          throw new Error(payload.error || (Array.isArray(payload.errors) && payload.errors[0]) || ('심판·재결 공식 API 응답 오류 (HTTP ' + (r.status || 0) + ')'));
+        }
+        var validRows = payload.docs.filter(function (row) {
+          return row && typeof row === 'object' && !Array.isArray(row) && typeof row.body === 'string' && row.body.trim().length >= 20;
+        });
+        var mapped = validRows.map(mapExternalSharedRow).filter(function (d) { return !isDocTombstoned(d); });
+        var added = 0;
+        var merged = 0;
+        if (mapped.length) {
+          var st = addDocuments(mapped, {
+            scope: 'public',
+            shareConfirmed: false,
+            expectedGen: startGen,
+            expectedUid: startUid
+          });
+          added = st.added;
+          merged = st.mergedStage1 + st.mergedStage2 + st.mergedStage3;
+        }
+        addAlert({
+          kind: 'sync',
+          title: '중앙행정심판·특별행정심판·위원회 공식 수집 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+          detail: ((payload.sourcesHit && payload.sourcesHit.length) ? payload.sourcesHit.join(' · ') : ('심판·재결 사건 ' + (payload.fetchedCount || mapped.length) + '건 대조 완료'))
+        });
+        return {
+          ok: payload.ok !== false,
+          partial: !!payload.partial,
+          fetchedCount: payload.fetchedCount || mapped.length,
+          added: added,
+          merged: merged,
+          sourcesHit: Array.isArray(payload.sourcesHit) ? payload.sourcesHit : [],
+          errors: Array.isArray(payload.errors) ? payload.errors : []
+        };
+      });
+    });
+  }
+
   function validateClientOfficialSearchQuery(rawVal, maxLen, allowEmpty, autoOnly) {
     if (rawVal != null && typeof rawVal !== 'string') {
       return { ok: false, query: '', error: '검색어 형식이 올바르지 않습니다.' };
@@ -1575,13 +1684,13 @@
     var docTypeTargetMap = {
       prec_sc: ['prec_sc', 'detc'],
       prec_lower: ['prec_lower'],
-      dec_nlrc: ['nlrc', 'decc'],
+      dec_nlrc: ['decc', 'decc_acrc', 'decc_acr_spc', 'decc_local', 'nlrc', 'iaciac', 'eiac', 'adap', 'local_adap', 'tt', 'kipo_trb', 'kmst', 'oclt', 'hira_trb', 'nhrck', 'ftc', 'ppc', 'acr', 'kcc', 'fsc', 'sfc', 'ecc', 'baiPvcs'],
       interp_moel: ['cgmExpc', 'admrul'],
-      interp_gov: ['expc', 'ordc'],
+      interp_gov: ['expc', 'ordc', 'baiPvcs'],
       ordinance: ['ordin', 'ordc', 'expc']
     };
     var resolvedTargets = (Array.isArray(opts.targets) && opts.targets.length)
-      ? opts.targets.slice(0, 12)
+      ? opts.targets.slice(0, 25)
       : (docTypeTargetMap[String(opts.docType || '')] || []);
 
     var safeQuery = liveQCheck.query;
@@ -2273,6 +2382,7 @@
     testSupabaseConnection: testSupabaseConnection,
     pullFromSupabase: pullFromSupabase,
     pullLowerCourtOfficial: pullLowerCourtOfficial,
+    pullTribunalOfficial: pullTribunalOfficial,
     liveSearchAndCollect: liveSearchAndCollect,
     pushDocsToSharedServer: pushDocsToSharedServer,
     deleteDocsFromSharedServer: deleteDocsFromSharedServer,

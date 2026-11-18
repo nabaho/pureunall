@@ -1,5 +1,15 @@
 {
   "mcpServers": {
+    "moleg-law": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "tools/moleg-mcp/server.js"
+      ],
+      "env": {
+        "LAW_OC": "${LAW_OC:-}"
+      }
+    },
     "hrmcp": {
       "type": "http",
       "url": "https://ncs-mcp-bridge-mini2.vercel.app/api/mcp"

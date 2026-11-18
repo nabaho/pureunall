@@ -3479,8 +3479,8 @@ test('⑭ 판례·행정해석·조례·조례유권해석·결정례 100% 법�
     } else if (u.includes('/LSW/ordinInfoR.do')) {
       html = '<div id="conScroll"><h2>경기도 생활임금 조례</h2><div>[경기도조례 제8123호, 2025. 1. 10., 일부개정]</div>' +
              '<p>제1조(목적) 이 조례는 근로자의 생활안정과 교육·문화·주거 등 실질적인 삶의 질 향상을 위하여 생활임금 지급에 필요한 사항을 규정함을 목적으로 한다.</p></div>';
-    } else if (u.includes('/nlrcSc.do')) {
-      html = '<a href="#" onclick="nlrcView(\'44001\', \'460110\')">중앙노동위원회 판정</a>';
+    } else if (u.includes('/nlrcSc.do') || u.includes('decOrg=360109')) {
+      html = '<a href="#" onclick="decsnDocView(\'44001\', \'460110\', \'Y\')">중앙노동위원회 판정 [2025부해101, 2025. 4. 1., 노동위원회]</a>';
     } else if (u.includes('/LSW/nlrcInfoP.do')) {
       html = '<div id="conTop"><h2>부당해고 구제 재심신청</h2><div>[2025부해101, 2025. 4. 1., 노동위원회]</div>' +
              '<p>담당부서 : 중앙노동위원회</p>' +
@@ -3856,4 +3856,222 @@ test('⑮ 공무원·군인·교원·선원 및 민사·상사·집행·회생 �
   clickAct({ 'data-act': 'open-law', 'data-dir': '군인사법', 'data-file': '법률.md' });
   await new Promise((r) => setImmediate(r));
   assert.ok(elementsById.pboxReader.innerHTML.includes('pbox-conn-law-bar') && elementsById.pboxReader.innerHTML.includes('근로기준법'), '군인사법 원문 리더 상단에 연결·유사직역 비교 법령 막대가 표시되어야 합니다');
+});
+
+test('㉙ 법제처 공식 MCP(moleg-law) 및 중앙행정심판·특별심판·위원회 전 심판채널 API·코퍼스 통합 검증', async () => {
+  /* 1) 전 심판·재결 채널 레지스트리 무누락(all == 전체 채널) 및 전국 시도·교육청 동적 라우팅 검증 */
+  assert.ok(PBoxSync.TRIBUNAL_TARGETS.length >= 20, '행정심판·특별심판·위원회 채널들이 등록되어야 합니다');
+  assert.deepEqual(
+    PBoxSync.TRIBUNAL_TARGETS.map((t) => t.id),
+    PBoxSync.TRIBUNAL_GROUP_MAP.all,
+    'TRIBUNAL_GROUP_MAP.all 은 TRIBUNAL_TARGETS 전체와 차집합 없이 일치해야 합니다'
+  );
+  assert.deepEqual(
+    Corpus.TRIBUNAL_ORGS[0].targets,
+    PBoxSync.TRIBUNAL_TARGETS.map((t) => t.id),
+    '프론트엔드 전체 심판 필터(TRIBUNAL_ORGS[0].targets)도 전 채널을 빠짐없이 포함해야 합니다'
+  );
+
+  const nlrcUrl = PBoxSync.buildSsrListUrl({ target: 'nlrc', ssrMode: 'nlrc' }, '부당해고', 5);
+  assert.ok(nlrcUrl.includes('deccSc.do') && nlrcUrl.includes('decOrg=360109'), '노동위원회 SSR URL이 통합 deccSc.do(decOrg=360109)를 가리켜야 합니다');
+
+  const deccLocalTarget = PBoxSync.TRIBUNAL_TARGETS.find((t) => t.id === 'decc_local');
+  const busanUrls = PBoxSync.resolveSsrListUrls(deccLocalTarget, '부산 영업정지', 5, '', '');
+  assert.ok(busanUrls.some((u) => u.includes(encodeURIComponent('부산광역시행정심판위원회'))), '지역명 검색 시 해당 시·도 행정심판위원회로 동적 라우팅되어야 합니다');
+  const multiLocalUrls = PBoxSync.resolveSsrListUrls(deccLocalTarget, '처분취소', 5, '', '');
+  assert.ok(multiLocalUrls.length >= 3, '지역 미지정 시 서울 단독이 아니라 다수 시·도/교육청 행정심판위원회를 함께 조회해야 합니다');
+
+  /* 2) DRF Open API(LAW_OC) 조회 시에도 officialUrl 자동 생성 검증 */
+  const drfDeccRes = await PBoxSync.liveSearchOfficialApis({
+    lawOc: 'dummy_oc',
+    query: '영업정지',
+    targets: ['decc_acrc'],
+    detailLimit: 0,
+    includeComwel: false,
+    skipSupabase: true,
+    fetchFn: async (url) => ({
+      ok: true,
+      status: 200,
+      url: String(url),
+      json: async () => ({
+        Decc: {
+          totalCnt: '1',
+          decc: [{
+            행정심판재결례일련번호: '273779',
+            사건명: '영업정지처분 취소청구',
+            사건번호: '2026-10301',
+            의결일자: '20260818',
+            재결청: '국민권익위원회',
+            주문: '피청구인이 청구인에게 한 영업정지처분을 취소한다.',
+            재결요지: '재량권을 일탈·남용한 위법한 처분이다.'
+          }]
+        }
+      })
+    })
+  });
+  assert.equal(drfDeccRes.ok, true);
+  assert.equal(drfDeccRes.docs[0].officialUrl, 'https://www.law.go.kr/LSW/deccInfoP.do?deccSeq=273779', 'DRF Open API 결과에도 공식 LSW 원문 URL이 채워져야 합니다');
+
+  /* 3) 특별행정심판·위원회·감사원 상세 HTML 파서 및 사건번호 보존 검증 */
+  const mockSpecialHtml = '<div id="conTop">감봉1월 처분 취소 청구<br>[인사혁신처 소청심사위원회 2024-12345]<br>【결정요지】<br>징계양정이 과중하여 감경한다.</div>';
+  const parsedAdap = PBoxSync.parseLawGoKrSsrDetailHtml('specialDecc', mockSpecialHtml, {
+    officialUrl: 'https://www.law.go.kr/LSW/specialDeccInfoP.do?specialDeccSeq=2071809&trbClsCd=360106'
+  });
+  const scrubbedAdap = PBoxSync.scrubDocumentObjectServer(parsedAdap);
+  assert.equal(scrubbedAdap.court, '인사혁신처 소청심사위원회');
+  assert.equal(scrubbedAdap.caseNo, '소청 2024-12345', '소청 사건번호 2024-12345가 계좌번호로 오인 마스킹되지 않아야 합니다');
+  assert.equal(PBoxSync.hasResidualHardPii(scrubbedAdap), false);
+
+  /* 4) pboxApi pull_tribunals 액션 모의 호출 검증 */
+  const mockFetch = async (url) => {
+    const s = String(url);
+    if (s.includes('deccSc.do')) {
+      return {
+        ok: true,
+        status: 200,
+        url: s,
+        text: async () => '<a onclick="deccView(\'273779\',\'Y\')">폐기물수집 영업정지처분 취소청구 [국민권익위원회 2026-10301, 2026. 8. 18., 인용]</a>'
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      url: s,
+      text: async () => '<div id="conTop">폐기물수집 영업정지처분 취소청구<br>[국민권익위원회 2026-10301, 2026. 8. 18., 인용]<br>【주문】<br>피청구인이 청구인에게 한 영업정지처분을 취소한다.<br>【이유】<br>처분사유에 비하여 달성하려는 공익보다 청구인이 입게 될 불이익이 현저히 크므로 재량권을 일탈·남용하였다.</div>'
+    };
+  };
+
+  const apiRes = await PBoxSync.handleApiAction({
+    uid: 'staff_1',
+    body: { action: 'pull_tribunals', tribunal: 'decc_acrc', query: '영업정지' },
+    fetchFn: mockFetch,
+    env: {}
+  });
+  assert.equal(apiRes.status, 200);
+  assert.equal(apiRes.payload.docs.length, 1);
+  assert.equal(apiRes.payload.docs[0].caseNo, '중앙행심 2026-10301');
+
+  /* 5) 내장 코퍼스 전수 실존 공식 URL 및 무결성 검증 */
+  assert.ok(Corpus.SEED_DOCS.length >= 140, '전 심판기관 재결례가 포함된 검증 코퍼스가 충분히 수록되어야 합니다');
+  assert.ok(Array.isArray(Corpus.TRIBUNAL_ORGS) && Corpus.TRIBUNAL_ORGS.length >= 8);
+  for (const d of Corpus.SEED_DOCS) {
+    assert.ok(PBoxSync.sanitizeOfficialLawUrl(d.officialUrl), '유효한 법제처 공식 원문 URL 누락: ' + d.id);
+    assert.equal(PBoxSync.hasResidualHardPii(d), false, '코퍼스 문서 내 잔존 개인정보 감지: ' + d.id);
+  }
+
+  /* 6) 법제처 공식 MCP 서버(tools/moleg-mcp/server.js) 통합 도구 호출 검증 */
+  const molegMcp = require(path.join(ROOT, 'tools', 'moleg-mcp', 'server.js'));
+  const callRes = await molegMcp.dispatchRpcMessage({
+    jsonrpc: '2.0',
+    id: 77,
+    method: 'tools/call',
+    params: { name: 'moleg_search_tribunal', arguments: { tribunal: 'decc_acrc', query: '영업정지', limit: 3 } }
+  }, { fetchFn: mockFetch, env: {} });
+  assert.equal(callRes.result.isError, false);
+  const mcpData = JSON.parse(callRes.result.content[0].text);
+  assert.equal(mcpData.count, 1);
+  assert.equal(mcpData.docs[0].caseNo, '중앙행심 2026-10301');
+
+  const issueLawRes = await molegMcp.dispatchRpcMessage({
+    jsonrpc: '2.0',
+    id: 78,
+    method: 'tools/call',
+    params: { name: 'moleg_search_law', arguments: { query: '부당해고', limit: 5 } }
+  });
+  const issueLaws = JSON.parse(issueLawRes.result.content[0].text);
+  assert.ok(issueLaws.laws.some((l) => l.title === '근로기준법'), '쟁점어(부당해고)로 법령 검색 시 연결 기본법령(근로기준법)이 반환되어야 합니다');
+
+  /* 7) [Round 2 회귀방지] H1 DRF 타임아웃 · M1 23개 채널 라운드로빈 · M5 DATA_GO_KR_KEY 단독 환경 SSR 동작 · M6 지방행심 검증 · L3/L6 URL·PII 보호 */
+  let drfAborted = false;
+  const hangingDrfRes = await PBoxSync.liveSearchOfficialApis({
+    lawOc: 'hang_oc',
+    query: '영업정지',
+    targets: ['decc_acrc'],
+    perRequestTimeoutMs: 80,
+    overallTimeoutMs: 250,
+    includeComwel: false,
+    skipSupabase: true,
+    fetchFn: (_url, init) => new Promise((_resolve, reject) => {
+      if (init && init.signal) {
+        init.signal.addEventListener('abort', () => {
+          drfAborted = true;
+          reject(new Error('Aborted'));
+        });
+      }
+    })
+  });
+  assert.equal(hangingDrfRes.ok, false, '응답 없는 DRF 호출은 제한시간 내 안전하게 실패 처리되어야 합니다');
+  assert.equal(drfAborted, true, 'DRF 호출 타임아웃 시 AbortSignal이 즉시 발화해야 합니다');
+
+  /* M1: 23개 심판 채널 각각이 복수(3건씩) 결과를 반환하더라도 라운드로빈 배분으로 23개 전 채널에서 최소 1건씩 수집되어야 함 */
+  const all23MockFetch = async (url) => {
+    const s = String(url);
+    if (s.includes('Sc.do')) {
+      const tag = encodeURIComponent(s).slice(-18).replace(/[^0-9A-Za-z]/g, '').slice(0, 6) || '1';
+      if (s.includes('baiPvcsSc.do')) {
+        return { ok: true, status: 200, url: s, text: async () => [1, 2, 3].map((k) => `<a onclick="baiPvcsView('90${k}')">사전컨설팅 [감사원 2025-0${k}, 2025. 6. 1.]</a>`).join('') };
+      }
+      if (s.includes('decsnDocSc.do')) {
+        const cmtM = /cmt=([0-9_]+)/.exec(s);
+        const cmt = (cmtM ? cmtM[1] : '460101').replace(/_\d+$/, '');
+        return { ok: true, status: 200, url: s, text: async () => [1, 2, 3].map((k) => `<a onclick="decsnDocView('8${cmt.slice(-2)}${k}','${cmt}')">시정명령 [제2025-0${k}호, 2025. 6. 1., 위원회]</a>`).join('') };
+      }
+      return { ok: true, status: 200, url: s, text: async () => [1, 2, 3].map((k) => `<a onclick="deccView('7${ k }${tag.length}','Y')">처분 취소 [국민권익위원회 2025-10${k}, 2025. 6. 1., 인용]</a>`).join('') };
+    }
+    return {
+      ok: true,
+      status: 200,
+      url: s,
+      text: async () => '<div id="conTop">처분 취소 청구<br>[국민권익위원회 2025-101, 2025. 6. 1., 인용]<br>【주문】<br>피청구인의 처분을 취소한다. 재량권을 일탈·남용한 위법한 처분이다.</div>'
+    };
+  };
+  const rrRes = await PBoxSync.pullTribunalBundle({
+    tribunal: 'all',
+    query: '처분',
+    detailLimit: 26,
+    env: {},
+    fetchFn: all23MockFetch,
+    skipSupabase: true
+  });
+  assert.equal(rrRes.ok, true);
+  assert.equal(rrRes.sourcesHit.length, PBoxSync.TRIBUNAL_TARGETS.length, '23개 전 심판 채널이 상세 예산 기아 없이 모두 수집되어야 합니다');
+
+  /* M5: DATA_GO_KR_KEY만 설정되고 LAW_OC가 없는 환경에서 includeComwel:false 호출 시에도 공식 SSR이 건너뛰어지지 않아야 함 */
+  const dataKeyOnlyRes = await PBoxSync.liveSearchOfficialApis({
+    env: { DATA_GO_KR_KEY: 'only_comwel_key' },
+    query: '영업정지',
+    targets: ['decc_acrc'],
+    includeComwel: false,
+    skipSupabase: true,
+    fetchFn: mockFetch
+  });
+  assert.equal(dataKeyOnlyRes.ok, true, 'LAW_OC 미설정 + DATA_GO_KR_KEY 설정 시에도 법제처 공개원문 SSR 조회가 정상 동작해야 합니다');
+  assert.equal(dataKeyOnlyRes.docs.length, 1);
+
+  /* M6: 미지원 시·도 행심위 코드 지정 시 400 차단 및 경기도교육청 질의 시 단일 교육청 정확 라우팅 */
+  const badLocalRes = await PBoxSync.pullTribunalBundle({
+    tribunal: 'decc_local',
+    localOrg: '전라남도행정심판위원회',
+    query: '영업정지',
+    env: {},
+    fetchFn: mockFetch,
+    skipSupabase: true
+  });
+  assert.equal(badLocalRes.ok, false);
+  assert.equal(badLocalRes.status, 400);
+  const ggEduUrls = PBoxSync.resolveSsrListUrls(
+    PBoxSync.TRIBUNAL_TARGETS.find((t) => t.id === 'decc_local'),
+    '경기도교육청 징계',
+    8,
+    '',
+    ''
+  );
+  assert.equal(ggEduUrls.length, 1, '경기도교육청 질의는 7개 전체 교육청이 아니라 경기도교육청행심위 1곳으로만 라우팅되어야 합니다');
+  assert.ok(decodeURIComponent(ggEduUrls[0]).includes('경기도교육청행정심판위원회'));
+
+  /* L3 + L6: open.law.go.kr/LSW/ 차단 및 단일 음절('전') 뒤 연락처 정상 비식별화 */
+  assert.equal(PBoxSync.sanitizeOfficialLawUrl('https://open.law.go.kr/LSW/deccInfoP.do?deccSeq=1'), '');
+  assert.equal(PBoxSync.sanitizeOfficialLawUrl('https://www.law.go.kr/LSW/deccInfoP.do?deccSeq=1'), 'https://www.law.go.kr/LSW/deccInfoP.do?deccSeq=1');
+  const phoneAfterYear = PBoxSync.scrubServerPii('사건 경위: 2024 전 010-1234-5678 통화 내역');
+  assert.ok(!phoneAfterYear.includes('1234-5678'), '단일 음절 뒤 휴대전화 번호가 사건번호로 오인되어 마스킹 누락되면 안 됩니다');
 });
