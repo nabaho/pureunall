@@ -151,6 +151,39 @@ test('★ 요금 눈금은 관리자가 정할 수 있다 — 전에는 아무�
   assert.equal(ev(rules.billing['.read'], { auth: 직원 }), false);
 });
 
+test('★ 급여아웃소싱(payroll_os) — 재직 직원 전원 접근, 이름표·열쇠 덮어쓰기·열람기록 변조는 차단 (대표 지시 2026-11-18)', () => {
+  const p = rules.payroll_os;
+  const 카카오직원 = { uid: 'st', token: { firebase: { sign_in_provider: 'custom' }, kakao: true, email: 'st@pureun.kr' } };
+  const 퇴사자 = auth('ret'), 외부인 = auth('bad');
+  for (const u of [관리자, 재무, 직원, 지문직원, 카카오직원]) {
+    assert.equal(ev(p['.read'], { auth: u }), true, '재직 직원이 payroll_os 를 못 읽습니다');
+    assert.equal(ev(p.$k['.write'], { auth: u, newData: { a: 1 } }), true, '재직 직원이 payroll_os/$k 에 못 씁니다');
+    assert.equal(ev(p.$k.$k2['.write'], { auth: u, newData: { a: 1 } }), true, '재직 직원이 payroll_os/$k/$k2 에 못 씁니다');
+  }
+  for (const u of [null, 퇴사자, 외부인]) {
+    assert.equal(ev(p['.read'], { auth: u }), false, '비재직·미등록 계정이 payroll_os 를 읽습니다');
+    assert.equal(ev(p.$k['.write'], { auth: u, newData: { a: 1 } }), false, '비재직·미등록 계정이 payroll_os 에 씁니다');
+  }
+  /* 상위 묶음($k) 통째 삭제는 관리자만 */
+  assert.equal(ev(p.$k['.write'], { auth: 직원, newData: undefined }), false, '일반 직원이 payroll_os 상위 칸을 통째 지웁니다');
+  assert.equal(ev(p.$k['.write'], { auth: 관리자, newData: undefined }), true);
+  /* 사업장↔업체 이름표(site_co_link)는 관리자만 확정 */
+  assert.equal(ev(p.site_co_link['.write'], { auth: 관리자 }), true);
+  assert.equal(ev(p.site_co_link['.write'], { auth: 직원 }), false, '일반 직원이 이름표(site_co_link)를 덮어쓸 수 있습니다');
+  /* 주민번호 암호화 열쇠(rrn_key/$v) — 처음 한 번만 만들고 누구도 덮어쓰지 못한다 */
+  const k = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+  assert.equal(ev(p.rrn_key.$v['.write'], { auth: 직원, data: undefined }), true, '처음 열쇠 만들기는 재직 직원도 돼야 합니다');
+  assert.equal(ev(p.rrn_key.$v['.write'], { auth: 직원, data: k }), false, '일반 직원이 기존 주민번호 열쇠를 덮어씁니다');
+  assert.equal(ev(p.rrn_key.$v['.validate'], { auth: 관리자, data: undefined, newData: k }), true);
+  assert.equal(ev(p.rrn_key.$v['.validate'], { auth: 관리자, data: k, newData: k }), false, '관리자라도 기존 주민번호 열쇠를 덮어쓰면 옛 암호문이 영영 안 풀립니다');
+  /* 열람·확정 기록(rrn_log · lock_log)은 덧붙이기만 */
+  assert.equal(ev(p.rrn_log.$id['.write'], { auth: 직원, data: undefined, newData: { a: 1 } }), true);
+  assert.equal(ev(p.rrn_log.$id['.write'], { auth: 직원, data: { a: 1 }, newData: { a: 2 } }), false, '주민번호 열람 기록을 고칠 수 있습니다');
+  assert.equal(ev(p.rrn_log.$id['.write'], { auth: 직원, data: { a: 1 }, newData: undefined }), false, '주민번호 열람 기록을 지울 수 있습니다');
+  assert.equal(ev(p.lock_log.$site.$id['.write'], { auth: 직원, data: undefined, newData: { a: 1 } }), true);
+  assert.equal(ev(p.lock_log.$site.$id['.write'], { auth: 직원, data: { a: 1 }, newData: undefined }), false, '확정 기록을 지울 수 있습니다');
+});
+
 test('★ 로그인하지 않으면 «업무 자료» 는 아무것도 못 읽는다', () => {
   const 열린곳 = [];
   (function walk(node, at) {

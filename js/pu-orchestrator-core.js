@@ -79,7 +79,7 @@
     fund:      { key: 'fund',      name: '기금관리',           icon: '🪙', row: 'client', stage: 'consulting_fund', url: 'fund.html',                role: '사내·공동근로복지기금 설립·결산·출연회사 연동' },
     rules:     { key: 'rules',     name: '기업규정집',         icon: '📜', row: 'client', stage: 'case_rules',      url: 'rules-v2.html',            role: '취업규칙 메일 자동수집·회차별 개정·신고 관리' },
     hangul:    { key: 'hangul',    name: '한글 편집기',        icon: '📝', row: 'client', stage: 'case_rules',      url: 'hangul.html',              role: '서버 무전송 브라우저 로컬 HWP/HWPX 열람·편집' },
-    payroll:   { key: 'payroll',   name: '급여아웃소싱',       icon: '💰', row: 'client', stage: 'work_payroll',    url: 'payroll-os.html',          role: '고객사 임금대장·명세서·연차 정산 대행', soon: true },
+    payroll:   { key: 'payroll',   name: '급여아웃소싱',       icon: '💰', row: 'client', stage: 'work_payroll',    url: 'payroll-os.html',          role: '고객사 임금대장·명세서·연차 정산 대행' },
     orch:      { key: 'orch',      name: '오케스트레이션',     icon: '🔄', row: 'store',  stage: 'work_payroll',    url: 'pu-orchestrator.html',     role: '전 프로그램 업무 바통 감지·360° 생애주기 지휘' },
     work:      { key: 'work',      name: '업무관리',           icon: '📋', row: 'store',  stage: 'work_payroll',    url: 'work.html',                role: '사업장별 주간 할 일·오간 메일·방문 통합 실행' },
     mail:      { key: 'mail',      name: '푸른 메일',          icon: '📧', row: 'store',  stage: 'intake',          url: 'pu-cards.html?view=mail',  role: '다음메일 동기화·사업장 스레드·서류 후보 공급' },
