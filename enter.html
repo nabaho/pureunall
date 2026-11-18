@@ -899,8 +899,23 @@ body.portal-mode #camFab{display:flex;}
 .sgp-by{font-size:.72rem;color:#94a3b8;flex-shrink:0;}
 .sgp-more{text-align:center;color:#94a3b8;font-size:.74rem;padding:8px;}
 .sgd-item{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin-bottom:8px;}
-.sgd-t{font-size:.86rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
-.sgd-r{font-size:.8rem;color:#1e293b;line-height:1.6;margin-top:7px;padding-top:7px;border-top:1px dashed #bbf7d0;white-space:pre-wrap;}
+.sgd-t{font-size:.86rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:7px;flex-wrap:wrap;overflow-wrap:anywhere;}
+.sgd-r{font-size:.8rem;color:#1e293b;line-height:1.6;margin-top:7px;padding-top:7px;border-top:1px dashed #bbf7d0;white-space:pre-wrap;overflow-wrap:anywhere;}
+/* ⚠ 해결 확인 경고 (대표 지시 2026-11-18 「건의한 본인은 로그인하면 해결됐는지 반드시 확인해달라 — 경고 표시」)
+   «완료» 는 고쳤다는 뜻일 뿐 «끝» 이 아니다 — 건의한 본인이 ☑ 해결됐어요 를 눌러야 최종 확정이다. 빨강 = 위험·확인(팔레트). */
+#sgDoneModal .hd.warn{background:#fef2f2;color:#991b1b;border-bottom:1px solid #fecaca;}
+.sgd-warn{background:#fef2f2;border:1.5px solid #dc2626;color:#991b1b;border-radius:10px;padding:10px 12px;font-size:.8rem;line-height:1.6;font-weight:700;}
+.sgd-warn .sub{display:block;font-weight:500;margin-top:4px;color:#1e293b;}
+#sgDoneModal .sgd-warn{margin:12px 18px 0;}
+.sgd-warn-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.sgd-warn-bar span{flex:1 1 180px;min-width:0;}
+.sgd-warn-bar .sg-btn{width:auto;min-height:36px;margin:0;padding:8px 14px;font-size:.76rem;background:#991b1b;flex:none;}
+@media(max-width:520px){#sgDoneModal .sgd-warn{margin:10px 14px 0;padding:8px 10px;font-size:.74rem;line-height:1.5;}#sgDoneModal .sgd-warn .sub{display:none;}}
+.sg-fabwarn{display:none;}
+#sgFab.sg-need .sg-fabwarn{display:inline;}
+#sgFab.sg-need{background:#991b1b;animation:sgNeedPulse 1.8s ease-in-out infinite;}
+@keyframes sgNeedPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55);}50%{box-shadow:0 0 0 8px rgba(220,38,38,0);}}
+@media (prefers-reduced-motion:reduce){#sgFab.sg-need{animation:none;}}
 /* ── 시스템 설정 (관리자 전용) — 화면 왼쪽 아래 구석에 조용히 ── */
 #cfgFab{display:none;position:fixed;left:16px;bottom:16px;z-index:60;align-items:center;gap:5px;
   background:rgba(255,255,255,.75);border:1px solid rgba(10,20,60,.14);color:var(--sub);
@@ -1535,7 +1550,7 @@ body.portal-mode #moreFab{display:flex;}
         <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
         <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
       </a>
-      <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
+      <button id="sgFab" type="button"><span class="sg-fabwarn" id="sgFabWarn" aria-hidden="true">⚠ </span>💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
       <div class="me-menu" id="meMenu" role="menu" aria-label="내 메뉴" hidden>
@@ -1942,7 +1957,8 @@ body.portal-mode #moreFab{display:flex;}
 <!-- ── 건의 해결 알림 팝업 (로그인 직후 자동) ── -->
 <div id="sgDoneModal" role="dialog" aria-modal="true" aria-labelledby="sgDoneTitle">
   <div class="box">
-    <div class="hd" id="sgDoneTitle">🎉 건의가 해결되었습니다</div>
+    <div class="hd warn" id="sgDoneTitle">⚠ 건의 해결 여부를 확인해 주세요</div>
+    <div class="sgd-warn" id="sgDoneWarn" role="alert"></div>
     <div class="bd" id="sgDoneBody"></div>
     <div class="ft"><button class="sg-btn" id="sgDoneOk" type="button" style="margin-top:12px">확인</button></div>
   </div>
@@ -7072,10 +7088,12 @@ body.portal-mode #moreFab{display:flex;}
     chatImpStartWatch();  // 길잡이 채팅방 내 개선요청 실시간 상태·결과 답변·승인 동기화
     sgShowTip();          // 무엇을 건의하는 곳인지 5초간 말풍선 안내
     sgUpdateBadge();      // 버튼 숫자 배지 (admin=미처리, 일반=내 미확인 해결)
-    sgCheckResolved();    // 내 건의가 해결됐으면 로그인 직후 자동 팝업
+    /* ★ 해결 확인이 «가장 먼저» (대표 지시 2026-11-18) — 내 건의가 해결로 처리됐으면 로그인 직후 경고 팝업을 먼저 띄운다.
+       관리자 «처리할 건의» 팝업은 이 확인 창이 닫힌 뒤에 띄운다 — 두 창이 겹쳐 확인 창이 묻히지 않게. */
     // 폰 알림을 눌러 들어온 경우(?sg=1)엔 건의함을 바로 연다 — 미처리 팝업까지 겹쳐 뜨지 않게 한 쪽만.
-    if(/[?&]sg=1/.test(location.search)) sgOpen();
-    else sgCheckPending();   // (관리자) 미처리 건의가 있으면 로그인 직후 자동 팝업
+    var viaPush = /[?&]sg=1/.test(location.search);
+    sgCheckResolved(function(){ if(!viaPush) sgCheckPending(); });   // (관리자) 미처리 건의 팝업은 확인 창 뒤에
+    if(viaPush) sgOpen();
     pushListenForeground();  // 폰 알림을 켜둔 기기면, 포털을 열어둔 채로 와도 알림·배지 갱신
     cfgShowFab();         // (관리자) 화면 왼쪽 아래 ⚙ 설정 버튼 노출
   };
@@ -7322,11 +7340,41 @@ body.portal-mode #moreFab{display:flex;}
     b.style.display = n > 0 ? 'inline-flex' : 'none';
     b.textContent = n > 99 ? '99+' : String(n);
   }
+  /* ⚠ 해결 확인 대기 표시 — «건의하기» 단추를 붉게 깜빡이고 ⚠ 를 붙인다 (대표 지시 2026-11-18).
+     n = 내가 건의한 건 중 «완료» 로 처리됐는데 아직 내가 확인(☑ 해결됐어요 / 🙅 아직 안 됐어요)하지 않은 수.
+     0 이면 표시를 거둔다. 관리자도 건의자일 수 있어 역할과 무관하게 쓴다(관리자 단추의 숫자 배지는 «미처리» 그대로). */
+  function sgSetNeed(n){
+    n = Math.max(0, +n || 0);
+    SG.needConfirm = n;
+    var f = $('sgFab'); if(!f) return;
+    if(n > 0){
+      f.classList.add('sg-need');
+      f.title = '⚠ 내가 건의한 ' + n + '건이 해결 처리되었습니다 — 해결됐는지 확인해 주세요';
+    } else {
+      f.classList.remove('sg-need');
+      f.removeAttribute('title');
+    }
+  }
+  // 건의함 위쪽에 붙이는 «아직 확인 안 한 건» 경고 띠 — 팝업을 「나중에 확인」으로 넘겼어도 여기서 다시 확인하러 간다
+  function sgNeedBannerHtml(){
+    var n = SG.needConfirm || 0; if(!n) return '';
+    return '<div class="sgd-warn sgd-warn-bar" role="alert"><span>⚠ 내 건의 <b>' + n + '건</b>이 해결 처리되었습니다. <b>해결됐는지 확인</b>해 주세요.</span>'
+      + '<button type="button" class="sg-btn" data-sg-need-open="1">지금 확인하기</button></div>';
+  }
+  function sgBindNeedBanner(root){
+    var b = root && root.querySelector('[data-sg-need-open]');
+    if(b) b.addEventListener('click', function(){ sgCloseModal(); sgCheckResolved(); });
+  }
   function sgUpdateBadge(){
     if(sgIsAdmin()){
       sgEnsurePrivateMigration().then(function(){ return db.ref(SG_META_PRIVATE_PATH).once('value'); }).then(function(snap){
         var n = 0; snap.forEach(function(ch){ var v = ch.val(); if(v && v.status !== 'done') n++; });
         sgSetBadge(n);
+      }).catch(function(){});
+      /* 관리자도 건의자일 수 있다 — «내 건의 확인 대기» 수로 단추의 ⚠ 도 같이 맞춘다(숫자 배지는 미처리 수 그대로) */
+      sgLoadOwnResolved().then(function(records){
+        var k = 0; Object.keys(records).forEach(function(id){ var v = records[id]||{}; if(!v.seen && (v.status||'done')==='done') k++; });
+        sgSetNeed(k);
       }).catch(function(){});
     } else if(SG.email || SG.uid){
       sgLoadOwnResolved().then(function(records){
@@ -7336,6 +7384,7 @@ body.portal-mode #moreFab{display:flex;}
           if(!v.seen && (v.status||'done')==='done') n++;
         });
         sgSetBadge(n);
+        sgSetNeed(n);   // 같은 수로 «⚠ 확인 필요» 표시도 맞춘다
       }).catch(function(){});
     }
   }
@@ -7546,17 +7595,27 @@ body.portal-mode #moreFab{display:flex;}
        🙅 아직 안 됐어요 → 어디가 안 되는지 적게 하고, 그 내용을 «재요청 건의» 로 새로 접수한다
                           (원본과 relatedId 로 이어진다 — 기존 알림·배지가 그대로 관리자에게 간다)
      status 가 없던 옛 기록은 완료 팝업만 쓰던 시절 것이므로 완료로 본다. */
-  function sgCheckResolved(){
-    if(!SG.uid) return;
+  function sgCheckResolved(after){
+    /* after: 이 확인 창이 «닫히거나 뜰 일이 없을 때» 한 번 불린다 — 관리자 «처리할 건의» 팝업이 확인 창 뒤에 뜨게 하는 데 쓴다 */
+    var _once = false;
+    function _after(){ if(_once) return; _once = true; try{ if(after) after(); }catch(e){} }
+    if(!SG.uid){ _after(); return; }
     sgLoadOwnResolved().then(function(records){
       var items = [];
       Object.keys(records).forEach(function(id){
         var v=records[id]||{};
         if(!v.seen && (v.status||'done')==='done'){ v._id=id; items.push(v); }
       });
-      if(!items.length) return;
+      if(!items.length){ sgSetNeed(0); _after(); return; }
+      sgSetNeed(items.length);   // 「나중에 확인」으로 넘겨도 «건의하기» 단추에 ⚠ 가 남는다
       items.sort(function(a,b){ return (a.at||0) - (b.at||0); });
       var path = sgResolvedUidPath(SG.uid);
+      function _warnText(n){
+        return '내가 건의한 <b>' + n + '건</b>이 «해결(완료)» 로 처리되었습니다.<br>'
+          + '실제로 고쳐졌는지 <b>반드시 확인</b>해 주세요 — 직접 확인하셔야 최종 종료됩니다.'
+          + '<span class="sub">고쳐졌으면 ☑ 해결됐어요 → 완료, 아직이면 🙅 아직 안 됐어요를 눌러 주세요. 지금 못 하면 「나중에 확인」 — 확인하기 전까지 「건의하기」 단추에 ⚠ 표시가 남습니다.</span>';
+      }
+      $('sgDoneWarn').innerHTML = _warnText(items.length);
       $('sgDoneBody').innerHTML = items.map(function(it, i){
         return '<div class="sgd-item" data-sgd="'+i+'">'
           + '<div class="sgd-t"><span class="sg-badge sg-b-'+sgCatClass(it.cat)+'">'+sgEsc(sgCatName(it.cat))+'</span>'+sgEsc(it.title||'')+'</div>'
@@ -7585,6 +7644,20 @@ body.portal-mode #moreFab{display:flex;}
         db.ref(path+'/'+it._id).update(upd).catch(function(){});
       }
       function _row(i){ return $('sgDoneBody').querySelector('[data-sgd="'+i+'"]'); }
+      // 한 건을 확인했을 때 — 줄을 걷고 남은 수로 경고를 맞추고, 다 했으면 창을 닫는다
+      function _rowDone(row){
+        row.style.display='none';
+        var left = items.filter(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }).length;
+        sgSetNeed(left);
+        sgUpdateBadge();
+        if(left){
+          $('sgDoneWarn').innerHTML = _warnText(left);
+          for(var j=0;j<items.length;j++){   // 남은 첫 건의 ☑ 칸으로 포커스를 옮긴다
+            var rj=_row(j);
+            if(rj && rj.style.display!=='none'){ var cj=rj.querySelector('[data-sgd-chk="'+j+'"]'); if(cj && cj.focus) cj.focus(); break; }
+          }
+        } else { $('sgDoneModal').style.display='none'; _after(); }
+      }
       items.forEach(function(it, i){
         var row=_row(i); if(!row) return;
         var okBtn=row.querySelector('[data-sgd-ok="'+i+'"]'), chk=row.querySelector('[data-sgd-chk="'+i+'"]');
@@ -7592,9 +7665,7 @@ body.portal-mode #moreFab{display:flex;}
         okBtn.addEventListener('click', function(){
           if(!chk.checked) return;
           _markSeen(it, { resolvedOk:true, resolvedAt:Date.now() });
-          row.style.display='none'; sgUpdateBadge();
-          if(!items.some(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }))
-            $('sgDoneModal').style.display='none';
+          _rowDone(row);
         });
         /* 📎 재요청에 붙이는 캡처 — 새 건의(sgAddImgs)와 같은 줄여 담기(sgCompress)·3장 한도를 쓴다 */
         it._imgs = [];
@@ -7647,10 +7718,8 @@ body.portal-mode #moreFab{display:flex;}
               authorUid:rec.authorUid, status:'new', cat:rec.cat, title:rec.title, createdAt:rec.createdAt }).catch(function(){});
             db.ref(path+'/'+ref.key).set({ title:rec.title, cat:rec.cat, status:'new', at:rec.createdAt, seen:true }).catch(function(){});
             _markSeen(it, { resolvedOk:false, feedback:txt.slice(0,2000), feedbackAt:Date.now() });
-            row.style.display='none'; sgUpdateBadge();
+            _rowDone(row);
             alert('재요청이 접수되었습니다. 관리자에게 알림이 갑니다.');
-            if(!items.some(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }))
-              $('sgDoneModal').style.display='none';
           }).catch(function(err){
             btn.disabled=false; btn.textContent='↩ 재요청 보내기';
             alert('접수 실패: '+(err&&err.message||'알 수 없는 오류'));
@@ -7658,14 +7727,16 @@ body.portal-mode #moreFab{display:flex;}
         });
       });
       $('sgDoneModal').style.display = 'flex';
-      setTimeout(function(){ $('sgDoneOk').focus(); }, 0);
+      /* 첫 칸은 «☑ 해결됐어요» — 예전엔 「나중에 확인」에 맞춰져 Enter 한 번에 그냥 넘어갔다 */
+      setTimeout(function(){ var c = $('sgDoneBody').querySelector('[data-sgd-chk]'); (c || $('sgDoneOk')).focus(); }, 0);
       // [나중에 확인] — 답을 안 정한 건은 그대로 두어 다음 로그인에 다시 묻는다
       $('sgDoneOk').textContent = '나중에 확인';
       $('sgDoneOk').onclick = function(){
         $('sgDoneModal').style.display = 'none';
         sgUpdateBadge();
+        _after();
       };
-    }).catch(function(){});
+    }).catch(function(){ _after(); });
   }
   function sgCatName(k){ var c = SG_CATS.find(function(x){return x.key===k;}); return c ? c.name : '기타'; }
   function sgEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
@@ -7745,12 +7816,13 @@ body.portal-mode #moreFab{display:flex;}
   function sgViewMemberHome(){
     $('sgTitle').textContent = '💬 건의하기';
     var bd = $('sgBody');
-    bd.innerHTML = '<div style="text-align:center;padding:18px 8px 8px">'
+    bd.innerHTML = sgNeedBannerHtml() + '<div style="text-align:center;padding:18px 8px 8px">'
       + '<div style="font-size:2rem;margin-bottom:8px">📝</div><b style="font-size:1rem;color:#1e293b">불편한 점을 남겨주세요</b>'
       + '<p style="font-size:.78rem;color:#64748b;line-height:1.6;margin:8px 0 16px">건의의 제목·내용·첨부파일은 관리자만 확인합니다.<br>처리가 끝나면 본인에게 결과를 알려드립니다.</p>'
       + '<button class="sg-btn" id="sgMemberNew" style="margin:0">＋ 새 건의 작성</button></div>'
       + '<div id="sgMyList"></div>';
     $('sgMemberNew').addEventListener('click', sgViewCreate);
+    sgBindNeedBanner(bd);
     if(!SG.uid) return;
     sgLoadOwnResolved().then(function(records){
       var items = [];
@@ -7769,6 +7841,7 @@ body.portal-mode #moreFab{display:flex;}
               + '<span class="sg-st '+st.c+'">'+st.t+'</span>'
               + (it.resolvedOk===true?'<span style="font-size:.62rem;color:#166534;font-weight:700">본인확인 ✓</span>':'')
               + (it.resolvedOk===false?'<span style="font-size:.62rem;color:#991b1b;font-weight:700">재요청함</span>':'')
+              + ((!it.seen && (it.status||'done')==='done')?'<span style="font-size:.62rem;color:#991b1b;font-weight:700">⚠ 확인 필요</span>':'')
               + '<span style="font-size:.66rem;color:#94a3b8;margin-left:auto">'+sgFmt(it.at)+'</span></div>'
               + '<div style="font-size:.78rem;color:#1e293b;font-weight:600;margin-top:4px">'+sgEsc(it.title||'')+'</div>'
               + (hasReply
@@ -7896,7 +7969,8 @@ body.portal-mode #moreFab{display:flex;}
         + '⚠ 옛 자리에 남은 건의를 옮기지 못했습니다 — <b>아래 목록에 예전 건의가 빠져 있을 수 있습니다.</b>'
         + '<br>새 건의 등록·답변은 그대로 됩니다. 개발자 도구 콘솔에 원인이 찍혀 있습니다.</div>'
       : '';
-    wrap.innerHTML = warnHtml + topHtml + chips + searchBox + listHtml + moreBtn;
+    wrap.innerHTML = warnHtml + sgNeedBannerHtml() + topHtml + chips + searchBox + listHtml + moreBtn;
+    sgBindNeedBanner(wrap);
     $('sgNewBtn').addEventListener('click', sgViewCreate);
     Array.prototype.forEach.call(wrap.querySelectorAll('.sg-flt'), function(el){
       el.addEventListener('click', function(){ SG.listStatus = el.dataset.f; SG.listShown = PAGE; sgRenderList(); });
