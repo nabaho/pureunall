@@ -3250,10 +3250,14 @@ function kkLoad(){
 /* 📋 진행 기록이 쓸 «서버에 모인 글» 30일치 (2026-11-18) — 폰 알림으로 저절로 온 글 + 전에 「넣기」한 저장본 글.
    대표 지시 2026-11-17 「업무용 카톡 자료 자동 수집 후 … 업무관리에 자동으로 정리」.
    대화 탭의 KK.items(기본 1일)와 따로 받는다 — 대화 탭의 날짜 고르기를 흔들지 않는다.
-   ⚠ 읽기만 한다(kakaoList·kakaoFiles). 원문 보관은 「넣기」(kakaoImport) 한 곳이고, 진행 기록 정리 구간은 이것만 부른다. */
-function kkSrvNotes(){
+   ⚠ 글을 쓰지 않는다(kakaoList·kakaoFiles 목록만). 원문 보관은 「넣기」(kakaoImport) 한 곳이고, 진행 기록 정리 구간은 이것만 부른다.
+     (kakaoFiles 는 서버가 45일 지난 파일 줄을 치우는 «기존» 동작이 딸려 있다 — 📎 받을 파일 탭이 부를 때와 같다.)
+   fresh — 「↻ 다시 읽기」: 받을 파일 목록도 새로 받아 📎 탭과 같은 것을 본다. */
+function kkSrvNotes(fresh){
   var K=window.PuKakaoWork, keep=(K&&K.KEEP_DAYS)||30;
-  return Promise.all([kkCall('kakaoList',{days:keep+1}),KK.files?Promise.resolve({items:KK.files}):kkCall('kakaoFiles')])
+  var files=(KK.files&&!fresh)?Promise.resolve({items:KK.files})
+    :kkCall('kakaoFiles').then(function(j){ KK.files=j.items||[]; if(j.meta) KK.meta=j.meta; return j; });
+  return Promise.all([kkCall('kakaoList',{days:keep+1}),files])
     .then(function(r){ return {notes:r[0].items||[],truncated:!!r[0].truncated,files:r[1].items||[],since:Date.now()-keep*864e5}; });
 }
 function kkTime(ms){ var d=new Date(ms); return (d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
@@ -4069,7 +4073,8 @@ function kxSrvUse(room){
   var X=window.PuKakaoExport, K=window.PuKakaoWork, s=KX.srv;
   if(!s) return;
   if(!X||!X.fromServer||!K||!K.classify){ KX.srvErr='묶기 도구(js/pu-kakao-export.js)가 옛 판이거나 없습니다 — 새로고침해 주세요'; return; }
-  var rooms=X.serverRooms(s.notes);
+  /* 방 고르기 칸의 (n) 이 칩의 줄 수와 어긋나지 않게 — 30일 창 밖·사진 알림은 세지 않는다 */
+  var rooms=X.serverRooms((s.notes||[]).filter(function(x){ return x&&Number(x.sentAt)>=s.since&&K.classify(x.text).kind!=='media'; }));
   var ok=function(r){ return rooms.some(function(x){ return x.room===r; }); };
   var pick=ok(room)?room:ok(KX.srvRoom)?KX.srvRoom:((rooms[0]&&rooms[0].room)||'');
   KX.srvRoom=pick; KX.rows=null; KX.err=''; KX.logs={}; KX.off={};
@@ -4077,15 +4082,15 @@ function kxSrvUse(room){
   var f=X.fromServer(s.notes,s.files,{room:pick,since:s.since,isMedia:function(t){ return K.classify(t).kind==='media'; }});
   KX.src={room:pick,lines:f.lines,files:f.files,fileName:'',from:'server',notify:f.notify,exported:f.exported,media:f.media,truncated:s.truncated,rooms:rooms};
 }
-function kxSrvLoad(){
+function kxSrvLoad(fresh){
   if(KX.srvBusy) return;
   KX.srvBusy=true; KX.srvErr='';
-  kkSrvNotes().then(function(s){ KX.srv=s; if(!KX.src||KX.src.from==='server') kxSrvUse(KX.srvRoom); })
+  kkSrvNotes(!!fresh).then(function(s){ KX.srv=s; if(!KX.src||KX.src.from==='server') kxSrvUse(KX.srvRoom); })
     .catch(function(e){ KX.srvErr=(e&&e.message)||String(e); })
     .then(function(){ KX.srvBusy=false; if(S.view==='kakao'&&KK.tab==='log') renderKakao(); });
 }
 /* ↻ 다시 읽기 · 저장본 대신 서버에 모인 글로 — 읽어 둔 저장본 줄은 이 탭에서 놓는다(대화 탭에서 다시 읽으면 된다) */
-function kxSrvAgain(){ if(KX.busy) return; KX.srv=null; KX.src=null; KX.rows=null; KX.err=''; KX.srvErr=''; kxSrvLoad(); renderKakao(); }
+function kxSrvAgain(){ if(KX.busy) return; KX.srv=null; KX.src=null; KX.rows=null; KX.err=''; KX.srvErr=''; kxSrvLoad(true); renderKakao(); }
 function kxSrvRoom(r){ if(KX.busy) return; kxSrvUse(r); renderKakao(); }
 /* 업무 하나가 가진 «심급 사건번호» — 푸른이알피 사건 레코드의 stages[].caseNo (읽기만) */
 function kxStageNos(it){
@@ -4151,7 +4156,14 @@ function kxBuild(){
   });
   var ids={}; KX.rows.forEach(function(r){ if(r.itemId) ids[r.itemId]=1; });
   return Promise.all(Object.keys(ids).map(kxLogsOf)).then(function(){
-    KX.rows.forEach(function(r){ if(!kxElig(r)) r.on=false; });
+    /* 서버에 모인 글로 묶을 때는 더 조심한다(2026-11-18, 독립 검토 지적):
+       · «보강»은 기본 해제 — 같은 글이 알림·저장본으로 글자가 조금 달라 둘 다 남으면 그날 묶음이 «늘어난» 것처럼 보여 근사 중복 줄이 생긴다.
+       · 글이 많아 잘렸으면(truncated) 가장 옛 날 묶음은 그날 글이 일부만 왔다 — 기본 해제. 사람이 보고 고르면 된다. */
+    var srv=src.from==='server', oldest=srv&&src.truncated?KX.rows.reduce(function(a,r){ return !a||r.g.day<a?r.g.day:a; },''):'';
+    KX.rows.forEach(function(r){
+      if(!kxElig(r)) r.on=false;
+      else if(srv&&(kxStatus(r)==='more'||(oldest&&r.g.day===oldest))) r.on=false;
+    });
   }).catch(function(e){ KX.err='기록을 읽지 못했습니다: '+((e&&e.message)||e); KX.rows=null; })
     .then(function(){ KX.busy=false; renderKakao(); });
 }
@@ -4177,6 +4189,7 @@ function kxRowHTML(i,r){
     :st==='same'?'<span class="kkc">이미 있음</span>'
     :st==='gone'?'<span class="kkc" title="이 줄은 사람이 지웠습니다 — 같은 내용은 다시 올리지 않습니다. 그날 글이 늘어 내용이 달라지면 새 줄로 다시 나옵니다">지운 줄 · 다시 안 올림</span>':'<span class="muted">—</span>';
   var full=r.g.msgs.map(function(x){ return x.sender+': '+x.text; }).join('\n');
+  var M=window.PuRrnMask; if(M&&M.maskRrnInText) full=M.maskRrnInText(full).text;   /* 마우스를 올리면 보이는 원문에도 지우개 한 겹 더(요약 줄과 같게) */
   return '<tr'+(ok&&r.on?'':' class="kxoff"')+'><td class="kkfit"><input type="checkbox"'+(r.on?' checked':'')+(ok?'':' disabled')+' onclick="kxPick('+i+',this.checked)"></td>'
     +'<td class="kkfit muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
     +'<td class="kkfit">'+esc(md(r.g.day))+'</td>'
@@ -4213,7 +4226,7 @@ function kxHTML(){
   /* 폰에서는 칩 글을 짧게(.kxhead .kxshort) — 폰의 .row 는 «한 줄 + 옆으로 밀기»라 길면 단추가 화면 밖으로 밀린다 */
   var two=function(long,short){ return '<span class="kxlong">'+long+'</span><span class="kxshort">'+short+'</span>'; };
   var rooms=srv&&src.rooms&&src.rooms.length>1
-    ?'<select class="kxroom" title="받는 방 — 진행 기록은 방마다 따로 묶습니다" onchange="kxSrvRoom(this.value)">'
+    ?'<select class="kxroom" aria-label="받는 방 고르기" title="받는 방 — 진행 기록은 방마다 따로 묶습니다" onchange="kxSrvRoom(this.value)">'
       +src.rooms.map(function(x){ return '<option value="'+esc(x.room)+'"'+(x.room===src.room?' selected':'')+'>'+esc(x.room)+' ('+x.n+')</option>'; }).join('')+'</select>'
     :'<span class="kkc g">✓ '+esc(src.room)+'</span>';
   h+='<div class="row kxhead" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">'+rooms
@@ -4224,7 +4237,7 @@ function kxHTML(){
       :'<span class="kkc">'+esc(src.fileName)+'</span><span class="kkc">글 '+src.lines.length+'줄</span>')
     +(src.files.length?'<span class="kkc" title="파일 '+src.files.length+'개">'+two('파일 '+src.files.length+'개','📎'+src.files.length)+'</span>':'')
     +(nSame?'<span class="kkc" title="이미 반영한 묶음 '+nSame+'개는 건너뜀">'+two('이미 반영한 묶음 '+nSame+'개는 건너뜀','반영됨 '+nSame)+'</span>':'')
-    +'<button class="kksm" onclick="kxSrvAgain()" title="폰 알림으로 저절로 온 글과 넣은 저장본 글(최근 30일)로 다시 묶습니다">'
+    +'<button class="kksm" onclick="kxSrvAgain()" aria-label="'+(srv?'서버에 모인 글 다시 읽기':'서버에 모인 글로 묶기')+'" title="폰 알림으로 저절로 온 글과 넣은 저장본 글(최근 30일)로 다시 묶습니다">'
       +(srv?two('↻ 다시 읽기','↻'):two('🔔 서버에 모인 글로 묶기','🔔 서버 글'))+'</button></div>';
   if(!rows.length) return h+'<div class="panel muted">묶을 글이 없습니다 — '+(srv?'서버에 모인 글이 사진 알림뿐이거나 30일이 지났습니다.':'저장본에 글이 없습니다.')+'</div>';
   h+='<div class="row" style="gap:8px;margin-bottom:6px;min-height:30px;flex-wrap:wrap">'

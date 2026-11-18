@@ -86,7 +86,7 @@ test('저장본을 안 읽었으면 탭을 열 때 서버에 모인 글을 저�
   const h = fn('kxHTML');
   const noSrc = h.indexOf('if(!src)');
   assert.ok(noSrc > 0 && h.indexOf('kxSrvLoad', noSrc) > noSrc, '저장본이 없을 때 서버 글을 읽지 않는다');
-  assert.match(fn('kxSrvLoad'), /kkSrvNotes\(\)/);
+  assert.match(fn('kxSrvLoad'), /kkSrvNotes\(/);
   assert.match(fn('kxSrvUse'), /fromServer\(/);
   assert.match(fn('kxSrvUse'), /classify\(/, '사진 판별을 PuKakaoWork.classify 한 곳에서 하지 않는다');
   assert.match(fn('kxSrvUse'), /from:'server'/);
@@ -107,6 +107,28 @@ test('묶기는 저절로, 더하기는 사람이 — 서버 글을 읽는 길�
   const a = fn('kxApply');
   assert.ok(a.indexOf('confirmM(') > 0 && a.indexOf('confirmM(') < a.indexOf('kxWriteLogs('), '건수를 묻기 전에 쓴다');
   assert.match(fn('kxBuild'), /on:m\.basis==='sure'/, '«확실» 말고도 기본으로 고른다');
+});
+
+test('서버 글로 묶을 때는 «보강»과 잘린 가장 옛 날 묶음을 기본으로 고르지 않는다 — 근사 중복 줄 방지', () => {
+  const b = fn('kxBuild');
+  const at = b.indexOf("src.from==='server'");
+  assert.ok(at > 0, '서버 글일 때 따로 보는 곳이 없다');
+  const tail = b.slice(at);
+  assert.match(tail, /'more'/, '서버 글의 «보강»을 기본 해제하지 않는다');
+  assert.match(tail, /truncated/, '잘린 목록의 가장 옛 날 묶음을 기본 해제하지 않는다');
+  assert.match(tail, /r\.on=false/);
+});
+
+test('줄 전체 미리보기(title)에도 주민번호 지우개를 한 겹 더 건다', () => {
+  const r = fn('kxRowHTML');
+  const full = r.indexOf('var full=');
+  assert.ok(full > 0 && r.indexOf('maskRrnInText(full)', full) > full, '원문 미리보기에 지우개가 없다');
+});
+
+test('「↻ 다시 읽기」는 받을 파일 목록도 새로 받는다 — 📎 탭과 같은 것을 본다', () => {
+  assert.match(fn('kxSrvAgain'), /kxSrvLoad\(true\)/);
+  assert.match(fn('kxSrvLoad'), /kkSrvNotes\(!!fresh\)/);
+  assert.match(body(W, 'kkSrvNotes'), /fresh/);
 });
 
 test('화면을 떠나면 서버에서 읽은 글도 버린다 — 초기값에 서버 자리가 있고 kxReset 이 통째로 비운다', () => {
