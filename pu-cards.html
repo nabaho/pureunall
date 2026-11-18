@@ -1889,11 +1889,16 @@ table.mstab2 tr:last-child td{border-bottom:none}
      밝게 바뀐다 — 앱도 그렇게 한다. */
 .dmm{--bg:#000000;--panel:#1e293b;--line:#1e293b;--ink:#e2e8f0;--sub:#cbd5e1;
   --dim:#94a3b8;--blue:#2563eb;
+  /* 읽음·안읽음 색 — 아래 «읽음·안읽음을 한눈에» 참고. un- 은 안 읽은 줄, rd 는 읽은 줄 */
+  --un-bg:rgba(148,163,184,.13);--un-bar:#60a5fa;--un-ink:#ffffff;--un-at:#60a5fa;
+  --rd:#94a3b8;--rd2:#64748b;
   position:fixed;inset:0;z-index:40;background:var(--bg);color:var(--ink);
   display:flex;flex-direction:column;overflow:hidden;
   font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif}
 @media(prefers-color-scheme:light){
-  .dmm{--bg:#fff;--panel:#fff;--line:#e2e8f0;--ink:#000000;--sub:#1e293b;--dim:#64748b}
+  .dmm{--bg:#fff;--panel:#fff;--line:#e2e8f0;--ink:#000000;--sub:#1e293b;--dim:#64748b;
+    --un-bg:#f8fafc;--un-bar:#2563eb;--un-ink:#000000;--un-at:#2563eb;
+    --rd:#475569;--rd2:#64748b}
 }
 /* ══ 폰 메일 «읽기» — 목록(.dmm)과 «같은 전체 화면 틀» (대표 지적 2026-10-19) ══
    「메일함에서 메일을 눌렀는데 왜 기업정보함으로 들어가서 화면이 바뀌냐」
@@ -2050,8 +2055,22 @@ html.maildoor #appbar .logo::after{content:'푸른 메일';font-size:23px}
 .dmm-seg button.on{background:#475569;border-color:#475569;color:#fff;font-weight:700}
 .dmm-f .meTag{margin-left:5px;font-size:10.5px;font-weight:700;color:#fff;
   background:#2563eb;border-radius:4px;padding:1px 5px}
-/* 안 읽은 줄은 굵게 — 앱과 같다 */
-.dmm-row.unread .dmm-l1 .who,.dmm-row.unread .dmm-l2{font-weight:700;color:var(--ink)}
+/* ══ 읽음·안읽음을 «한눈에» (대표 지적 2026-11-18 「읽은 것과 안 읽은 것이 색깔로는 잘 구분이 안 된다」) ══
+   ★ 왜 — 어두운 차림에서 --ink(보낸이)와 --sub(제목)가 거의 같은 밝기라, 안 읽은 줄과
+     읽은 줄이 «글자 굵기 한 단계»만 달랐다. 폰의 작은 글씨로는 그 차이가 안 보였다.
+   ★ 고친 결 — 앱들이 쓰는 표시를 겹친다.
+     · 안 읽은 줄: 왼쪽 파란 띠 + 바탕 한 단계 밝게 + 보낸이·제목 굵고 밝게 + 시각 파랗게
+     · 읽은 줄: 보낸이·제목을 회색으로 낮추고 굵기를 뺀다(미리보기는 한 단계 더 낮다)
+   ⚠ 색은 위 .dmm 의 변수(--un-*·--rd*)로만 — 밝은 차림은 그 media 에서 따로 정한다.
+   ⚠ 고른 줄(.pick)의 파란 바탕이 안 읽은 바탕에 덮이지 않게 .unread.pick 을 따로 둔다.
+   ⚠ 띠는 inset 그림자다 — border 로 두면 줄마다 글자가 2~3px 씩 옆으로 밀려 열이 흔들린다. */
+.dmm-row.unread{background:var(--un-bg);box-shadow:inset 3px 0 0 var(--un-bar)}
+.dmm-row.unread.pick{background:rgba(58,123,253,.22)}
+.dmm-row.unread .dmm-l1 .who,.dmm-row.unread .dmm-l2{font-weight:700;color:var(--un-ink)}
+.dmm-row.unread .dmm-l1 .at{font-weight:700;color:var(--un-at)}
+.dmm-row:not(.unread) .dmm-l1 .who{font-weight:400;color:var(--rd)}
+.dmm-row:not(.unread) .dmm-l2{color:var(--rd)}
+.dmm-row:not(.unread) .dmm-l3{color:var(--rd2)}
 .dmm-st{position:absolute;right:8px;bottom:12px;color:#475569;font-size:17px;
   padding:2px 4px}
 /* 봉투 — 폰 목록에서도 그 자리에서 뒤집는다(대표 지시 2026-08-29).
