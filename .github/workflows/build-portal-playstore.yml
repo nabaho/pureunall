@@ -65,10 +65,6 @@ jobs:
         working-directory: android/portal-twa
     env:
       JAVA_TOOL_OPTIONS: -XX:-UseBASE64Intrinsics
-      PORTAL_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PORTAL_UPLOAD_KEYSTORE_BASE64 }}
-      PORTAL_UPLOAD_STORE_PASSWORD: ${{ secrets.PORTAL_UPLOAD_STORE_PASSWORD }}
-      PORTAL_UPLOAD_KEY_ALIAS: ${{ secrets.PORTAL_UPLOAD_KEY_ALIAS }}
-      PORTAL_UPLOAD_KEY_PASSWORD: ${{ secrets.PORTAL_UPLOAD_KEY_PASSWORD }}
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v4
@@ -97,11 +93,17 @@ jobs:
           fi
 
       - name: 업로드 서명키 4종 시크릿 검증 및 준비
+        env:
+          PORTAL_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PORTAL_UPLOAD_KEYSTORE_BASE64 }}
+          PORTAL_UPLOAD_STORE_PASSWORD: ${{ secrets.PORTAL_UPLOAD_STORE_PASSWORD }}
+          PORTAL_UPLOAD_KEY_ALIAS: ${{ secrets.PORTAL_UPLOAD_KEY_ALIAS }}
+          PORTAL_UPLOAD_KEY_PASSWORD: ${{ secrets.PORTAL_UPLOAD_KEY_PASSWORD }}
         run: |
           if [ -n "$PORTAL_UPLOAD_KEYSTORE_BASE64" ] && \
              [ -n "$PORTAL_UPLOAD_STORE_PASSWORD" ] && \
              [ -n "$PORTAL_UPLOAD_KEY_ALIAS" ] && \
              [ -n "$PORTAL_UPLOAD_KEY_PASSWORD" ]; then
+            umask 077
             printf '%s' "$PORTAL_UPLOAD_KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/portal-upload.jks"
             echo "PORTAL_UPLOAD_KEYSTORE_FILE=$RUNNER_TEMP/portal-upload.jks" >> "$GITHUB_ENV"
             echo "PORTAL_UPLOAD_SIGNING_READY=1" >> "$GITHUB_ENV"
@@ -112,9 +114,16 @@ jobs:
           fi
 
       - name: Play 스토어용 AAB 및 점검용 APK 빌드
+        env:
+          PORTAL_UPLOAD_STORE_PASSWORD: ${{ secrets.PORTAL_UPLOAD_STORE_PASSWORD }}
+          PORTAL_UPLOAD_KEY_ALIAS: ${{ secrets.PORTAL_UPLOAD_KEY_ALIAS }}
+          PORTAL_UPLOAD_KEY_PASSWORD: ${{ secrets.PORTAL_UPLOAD_KEY_PASSWORD }}
         run: gradle :app:bundleRelease :app:assembleRelease --no-daemon
 
       - name: 서명 지문 및 제출 안내 요약 출력
+        env:
+          PORTAL_UPLOAD_STORE_PASSWORD: ${{ secrets.PORTAL_UPLOAD_STORE_PASSWORD }}
+          PORTAL_UPLOAD_KEY_ALIAS: ${{ secrets.PORTAL_UPLOAD_KEY_ALIAS }}
         run: |
           {
             echo "## 푸른포털 Google Play 스토어 빌드 결과"
@@ -130,6 +139,10 @@ jobs:
               echo "- 서명 상태: **검증용 임시 서명 (Play Console 업로드 전 \`node scripts/play-store-setup.js --init-keystore\` 실행 필요)**"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 임시 서명키 파일 삭제
+        if: always()
+        run: rm -f "$RUNNER_TEMP/portal-upload.jks"
 
       - name: Play Console 제출용 AAB 업로드
         uses: actions/upload-artifact@v4
