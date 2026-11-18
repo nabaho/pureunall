@@ -18,10 +18,16 @@ const NON_PERSON_SUFFIX_RE = /(?:법원|위원회|공단|조합|회사|법인|�
 const KOREAN_SURNAME_RE = /^[김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구라민진지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편가]([가-힣]{1,2})$/;
 
 function sanitizeOfficialLawUrl(rawUrl) {
-  const s = String(rawUrl || "").trim().replace(/^https:\/\/law\.go\.kr\/LSW\//, "https://www.law.go.kr/LSW/");
+  const s = String(rawUrl || "").trim()
+    .replace(/^https:\/\/law\.go\.kr\/LSW\//, "https://www.law.go.kr/LSW/")
+    .replace(/^https:\/\/www\.ilabor\.co\.kr\/main\//, "https://ilabor.co.kr/main/")
+    .replace(/^https:\/\/kcplaa\.or\.kr\/bbs\//, "https://www.kcplaa.or.kr/bbs/");
   if (!s) return "";
-  if (!/^https:\/\/www\.law\.go\.kr\/LSW\/[A-Za-z0-9_.?&=+-]+$/.test(s)) return "";
-  return s;
+  if (s.includes("..") || s.indexOf("//", 8) >= 0 || /%(?:2e|2f|5c|00|0d|0a)/i.test(s)) return "";
+  if (/^https:\/\/www\.law\.go\.kr\/LSW\/[A-Za-z0-9_.?&=+-]+$/.test(s)) return s;
+  if (/^https:\/\/ilabor\.co\.kr\/main\/(?:index|search|site_map|sub0[1-9]_0[1-9](?:s|_01)?)\.php(?:\?[A-Za-z0-9_=&-]+)?$/.test(s)) return s;
+  if (/^https:\/\/www\.kcplaa\.or\.kr\/bbs\/(?:notice|news|labor_news|law|policy|rule|edu_info|edu_notice|work_notice)\/(?:list|view\/[0-9]{1,8})(?:\?[A-Za-z0-9_=&-]+)?$/.test(s)) return s;
+  return "";
 }
 
 function assertHttpsUrl(urlStr) {
@@ -34,7 +40,8 @@ function assertHttpsUrl(urlStr) {
 
 async function safeHttpsFetch(fetchFn, urlStr, init) {
   const safeUrl = assertHttpsUrl(urlStr);
-  const opts = Object.assign({ redirect: "error" }, init || {});
+  const safeRedirect = (init && init.redirect === "manual") ? "manual" : "error";
+  const opts = Object.assign({}, init || {}, { redirect: safeRedirect });
   const res = await fetchFn(safeUrl, opts);
   if (res && res.url && !String(res.url).startsWith("https://")) {
     throw new Error("비보안 리다이렉트 응답이 차단되었습니다.");
@@ -1685,6 +1692,7 @@ function deduplicateBatch(docs, ownerUid) {
       map.set(ck, Object.assign({}, d, { canonicalKey: ck }));
     } else {
       const cur = map.get(ck);
+      if (d.memberOnly) cur.memberOnly = true;
       cur.sources = Array.from(new Set([].concat(cur.sources || [], d.sources || [])));
       if (!cur.officialUrl && d.officialUrl) {
         cur.officialUrl = sanitizeOfficialLawUrl(d.officialUrl);
@@ -2275,6 +2283,9 @@ function isBoundedStringArrayOrUndefined(v, maxItems, maxItemChars) {
 function validateUserSharedDocShape(rawDoc) {
   if (!rawDoc || typeof rawDoc !== "object" || Array.isArray(rawDoc)) {
     return "업로드할 공유 문서 객체 형식이 올바르지 않습니다.";
+  }
+  if (rawDoc.memberOnly === true || [].concat(rawDoc.sources || [], rawDoc.tags || []).some((s) => /회원전용|로컬전용|kcplaa_member/i.test(String(s || "")))) {
+    return "회원 전용 로그인 세션으로 수집된 원문(memberOnly)은 전 직원 공유 DB에 업로드할 수 없습니다.";
   }
   if (typeof rawDoc.body !== "string") {
     return "공유 문서 본문(body)은 문자열 형식이어야 합니다.";
@@ -3019,10 +3030,22 @@ async function runSync(opts) {
         ? pullKeylessOfficialRecent(fetchFn, { queries: o.queries, detailLimit: o.detailLimit, perRequestTimeoutMs: o.perRequestTimeoutMs, overallTimeoutMs: o.overallTimeoutMs })
         : Promise.resolve({ docs: [], attempted: 0, succeeded: 0, errors: [] }));
 
-  const [treeCheck, lawRes, comwelRes] = await Promise.all([
+  const [treeCheck, lawRes, comwelRes, kcplaaRes] = await Promise.all([
     checkLegalizeKrTree(fetchFn, { timeoutMs: o.perRequestTimeoutMs }),
     lawSyncPromise,
-    pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: safeMaxPages, perRequestTimeoutMs: o.perRequestTimeoutMs })
+    pullComwelSanjaeCases(dataKey, fetchFn, { maxPages: safeMaxPages, perRequestTimeoutMs: o.perRequestTimeoutMs }),
+    o.includeKcplaa === true
+      ? pullKcplaaIlaborBundle({
+          env,
+          fetchFn,
+          channel: "daily_digest",
+          maxPerChannel: 6,
+          detailLimit: 4,
+          skipSupabase: true,
+          perRequestTimeoutMs: o.perRequestTimeoutMs,
+          overallTimeoutMs: 9000
+        }).catch(() => ({ ok: false, docs: [], attempted: 0, succeeded: 0, errors: [] }))
+      : Promise.resolve({ docs: [], attempted: 0, succeeded: 0, errors: [] })
   ]);
 
   const errors = [];
@@ -3034,7 +3057,7 @@ async function runSync(opts) {
   const corpusSucceeded = lawRes.succeeded + comwelRes.succeeded;
   const corpusOk = corpusAttempted === 0 || corpusSucceeded > 0;
 
-  const deduped = deduplicateBatch([].concat(lawRes.docs, comwelRes.docs), "system_sync");
+  const deduped = deduplicateBatch([].concat(lawRes.docs, comwelRes.docs, kcplaaRes.docs || []), "system_sync");
   const sharedAvailable = hasSharedStore(env, o.storageBucket);
   let supaRes = { ok: true, pushed: 0, skipped: true };
 
@@ -3061,7 +3084,7 @@ async function runSync(opts) {
     partial: partialOk,
     syncedAt: new Date().toISOString(),
     krTreeSha: treeCheck.krTreeSha || "",
-    rawFetched: lawRes.docs.length + comwelRes.docs.length,
+    rawFetched: lawRes.docs.length + comwelRes.docs.length + (kcplaaRes.docs ? kcplaaRes.docs.length : 0),
     dedupedCount: deduped.length,
     supabasePushed: supaRes.pushed || 0,
     sharedBackend: supaRes.sharedBackend || (getSupabaseCreds(env) ? "supabase" : (isStorageBucketLike(o.storageBucket) ? "pureun_cloud_storage" : "none")),
@@ -3913,7 +3936,12 @@ async function fetchSsrHtmlBounded(fetchFn, urlStr, budget) {
   let timer = null;
   try {
     const workPromise = (async () => {
-      const init = { headers: { "User-Agent": UA } };
+      const reqHeaders = { "User-Agent": UA };
+      if (budget.hostHeaders && typeof budget.hostHeaders === "function") {
+        const extra = budget.hostHeaders(urlStr);
+        if (extra && typeof extra === "object") Object.assign(reqHeaders, extra);
+      }
+      const init = { headers: reqHeaders };
       if (ac) init.signal = ac.signal;
       const r = await safeHttpsFetch(fetchFn, urlStr, init);
       if (!r || !r.ok) {
@@ -4576,6 +4604,27 @@ async function liveSearchOfficialApis(opts) {
     }
   }
 
+  if (o.includeKcplaa === true) {
+    const kc = await pullKcplaaIlaborBundle({
+      env,
+      fetchFn: f,
+      channel: "search_fast",
+      query: cleanQuery,
+      maxPerChannel: Math.min(maxPerTarget, 6),
+      detailLimit: 3,
+      skipSupabase: true,
+      perRequestTimeoutMs: o.perRequestTimeoutMs,
+      overallTimeoutMs: 7500
+    }).catch(() => ({ ok: false, docs: [], sourcesHit: [] }));
+    if (Array.isArray(kc.docs) && kc.docs.length) {
+      rawDocs.push(...kc.docs);
+      if (Array.isArray(kc.sourcesHit) && kc.sourcesHit.length) sourcesHit.push(...kc.sourcesHit);
+      else sourcesHit.push("한국공인노무사회(ilabor·본회) " + kc.docs.length + "건");
+      attempted++;
+      succeeded++;
+    }
+  }
+
   const deduped = deduplicateBatch(rawDocs, "system_sync");
   let supaRes = { ok: true, pushed: 0, skipped: true };
   if (hasSharedStore(env, o.storageBucket) && deduped.length > 0 && o.skipSupabase !== true) {
@@ -4864,6 +4913,13 @@ function buildAlternateOfficialPortalRoutes(cleanQuery) {
       domain: "ccourt.go.kr / pipc.go.kr / ftc.go.kr",
       officialUrl: "https://isearch.ccourt.go.kr/",
       resilientSearchUrl: "https://www.google.com/search?q=" + encodeURIComponent("(site:ccourt.go.kr OR site:pipc.go.kr OR site:ftc.go.kr OR site:humanrights.go.kr) " + q)
+    },
+    {
+      id: "kcplaa_ilabor",
+      label: "한국공인노무사회 ilabor 전용자료실",
+      domain: "ilabor.co.kr / kcplaa.or.kr",
+      officialUrl: "https://ilabor.co.kr/main/search.php?search=" + qEnc,
+      resilientSearchUrl: "https://www.google.com/search?q=" + encodeURIComponent("(site:ilabor.co.kr OR site:kcplaa.or.kr) " + q)
     }
   ];
 }
@@ -4938,6 +4994,7 @@ async function autoDiscoverOfficialMaterials(opts) {
       perRequestTimeoutMs: o.perRequestTimeoutMs,
       overallTimeoutMs: Math.min(20000, remMs),
       includeComwel: qi === 0 && o.includeComwel !== false,
+      includeKcplaa: qi === 0 && o.includeKcplaa === true,
       skipSupabase: true,
       usePublicWeb: o.usePublicWeb === true
     });
@@ -5000,6 +5057,861 @@ async function autoDiscoverOfficialMaterials(opts) {
     recoveryNotes: Array.from(recoveryNotesSet),
     alternatePortalRoutes,
     errors: allErrors,
+    docs: deduped
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * 8-D. 한국공인노무사회(ilabor.co.kr 전용자료실 + kcplaa.or.kr 본회 포털) 통합 수집·검색 엔진
+ *  - ilabor 13개 영역: 오늘의자료·고용노동부·근로복지공단·노동위원회·기관보도자료·판례(5대법원)·재결례·행정해석·지침·노사정뉴스·월간포커스·법정서식/예규/훈령/고시·통합검색
+ *  - kcplaa 본회: 일반 공지사항·주간 소식지 「알리다」·제도안내 (+ CLI 로컬 회원 세션 제공 시 회원공지·법령건의·ADR·회칙규정·상세원문 확장)
+ *  - 100% 실존 게시물·공식 원문만 수집하며, 제3자 OC 파라미터 제거 및 엄격한 도메인·경로 화이트리스트 적용
+ * ══════════════════════════════════════════════════════════════ */
+const ILABOR_BASE_HTTPS = "https://ilabor.co.kr/main";
+const KCPLAA_BASE_HTTPS = "https://www.kcplaa.or.kr";
+
+const KCPLAA_ILABOR_CHANNELS = [
+  { id: "today", site: "ilabor", label: "ilabor 오늘의 자료 · 전월 자료", docType: "interp_moel" },
+  { id: "moel", site: "ilabor", cate1: "100", label: "ilabor 고용노동부 자료실(24개 분과)", docType: "interp_moel", defaultAgency: "고용노동부" },
+  { id: "comwel", site: "ilabor", cate1: "200", label: "ilabor 근로복지공단 산재·고용·체당금", docType: "interp_moel", defaultAgency: "근로복지공단" },
+  { id: "nlrc", site: "ilabor", cate1: "300", label: "ilabor 노동위원회 심판·조정·차별시정", docType: "dec_nlrc", defaultAgency: "중앙노동위원회" },
+  { id: "press", site: "ilabor", cate1: "400", label: "ilabor 노동·유관기관 보도·설명자료", docType: "interp_moel", defaultAgency: "고용노동부" },
+  { id: "prec", site: "ilabor", label: "ilabor 노동판례(대법원·헌재·고등·지방·행정)", docType: "prec_sc" },
+  { id: "decc", site: "ilabor", label: "ilabor 행정자료 — 재결례", docType: "dec_nlrc" },
+  { id: "interp", site: "ilabor", label: "ilabor 행정자료 — 행정해석(질의회시)", docType: "interp_moel" },
+  { id: "guide", site: "ilabor", label: "ilabor 행정자료 — 지침·시달문", docType: "interp_moel" },
+  { id: "news", site: "ilabor", label: "ilabor 노사정 뉴스", docType: "interp_gov" },
+  { id: "focus", site: "ilabor", label: "ilabor 월간 노사 FOCUS", docType: "interp_gov" },
+  { id: "forms_rules", site: "ilabor", label: "ilabor 법정서식 · 예규 · 훈령 · 고시", docType: "interp_moel" },
+  { id: "unified", site: "ilabor", label: "ilabor 전 영역 통합검색", docType: "interp_moel" },
+  { id: "kcplaa_notice", site: "kcplaa", board: "notice", label: "한국공인노무사회 공지 · 소식지 알리다", docType: "interp_gov" },
+  { id: "kcplaa_member", site: "kcplaa", cliOnly: true, label: "한국공인노무사회 회원전용(법령건의·ADR·회칙·회원공지)", docType: "interp_gov" }
+];
+
+const KCPLAA_CHANNEL_GROUPS = {
+  all: ["today", "moel", "comwel", "nlrc", "interp", "guide", "decc", "news", "focus", "forms_rules", "kcplaa_notice"],
+  daily_digest: ["today", "guide", "news", "kcplaa_notice"],
+  search_fast: ["unified", "moel", "comwel", "nlrc", "interp", "guide", "news", "kcplaa_notice"],
+  ilabor_all: ["today", "moel", "comwel", "nlrc", "press", "prec", "decc", "interp", "guide", "news", "focus", "forms_rules"],
+  kcplaa_all: ["kcplaa_notice", "kcplaa_member"]
+};
+
+function decodeHtmlEntitiesLoose(raw) {
+  return String(raw || "")
+    .replace(/\u200b/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#0?39;/g, "'")
+    .replace(/&#x([0-9a-f]{1,4});/gi, (_, hex) => {
+      const n = parseInt(hex, 16);
+      return Number.isFinite(n) && n >= 32 && n <= 55295 ? String.fromCharCode(n) : " ";
+    })
+    .replace(/&#(\d{2,5});/g, (_, code) => {
+      const n = Number(code);
+      return Number.isFinite(n) && n >= 32 && n <= 55295 ? String.fromCharCode(n) : " ";
+    })
+    .replace(/&amp;/gi, "&");
+}
+
+function scrubDecodedAngleBrackets(str) {
+  return String(str || "")
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, " ")
+    .replace(/<[A-Za-z/!?][^>]{0,400}>/g, " ")
+    .replace(/[<>]/g, " ");
+}
+
+function stripTagsClean(rawHtml) {
+  return scrubDecodedAngleBrackets(
+    decodeHtmlEntitiesLoose(String(rawHtml || "").replace(/<[^>]+>/g, " "))
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeCliCookieHeader(rawCookie) {
+  const s = String(rawCookie || "").replace(/[\r\n\0]/g, "").trim();
+  if (!s) return "";
+  if (s.length > 1024 || !/^[A-Za-z0-9_=.%; -]{4,1024}$/.test(s)) return "";
+  return s;
+}
+
+function canonicalizeIlaborHref(rawHref) {
+  const h = decodeHtmlEntitiesLoose(String(rawHref || "")).trim();
+  if (!h) return "";
+  /* 외부 행정규칙 DRF 링크에 포함된 제3자 OC 파라미터는 즉시 폐기하고 무인증 공식 법제처 주소로 변환 */
+  const admM = /law\.go\.kr\/DRF\/lawService\.do\?[^"']*target=admrul[^"']*ID=(\d{5,16})/i.exec(h);
+  if (admM) {
+    return LAW_PUBLIC_WEB_HTTPS + "/LSW/admRulInfoP.do?admRulSeq=" + admM[1];
+  }
+  const cleanRel = h.replace(/^https?:\/\/(?:www\.)?ilabor\.co\.kr\/main\//i, "").replace(/^\.\//, "");
+  const pageM = /^(sub0[1-9]_0[1-9](?:s|_01)?|index|search|site_map)\.php(?:\?(.*))?$/i.exec(cleanRel);
+  if (!pageM) return "";
+  const page = pageM[1].toLowerCase() + ".php";
+  const qs = pageM[2] || "";
+  const sidM = /(?:^|&)sid=(\d{1,9})(?:&|$)/.exec(qs);
+  const tblM = /(?:^|&)table=(supreme|constitution|highcourt|districtcourt|admincourt)(?:&|$)/.exec(qs);
+  const cate1M = /(?:^|&)cate1=(100|200|300|400)(?:&|$)/.exec(qs);
+  const qParts = [];
+  if (tblM) qParts.push("table=" + tblM[1]);
+  if (cate1M && !sidM) qParts.push("cate1=" + cate1M[1]);
+  if (sidM) qParts.push("sid=" + sidM[1]);
+  return sanitizeOfficialLawUrl(ILABOR_BASE_HTTPS + "/" + page + (qParts.length ? ("?" + qParts.join("&")) : ""));
+}
+
+function canonicalizeKcplaaHref(rawHref, fallbackBoard) {
+  const h = decodeHtmlEntitiesLoose(String(rawHref || "")).trim();
+  const m = /\/bbs\/(notice|news|labor_news|law|policy|rule|edu_info|edu_notice|work_notice)\/view\/(\d{1,8})/.exec(h);
+  if (m) {
+    return sanitizeOfficialLawUrl(KCPLAA_BASE_HTTPS + "/bbs/" + m[1] + "/view/" + m[2]);
+  }
+  if (fallbackBoard && /^(?:notice|news|labor_news|law|policy|rule)$/.test(fallbackBoard)) {
+    return sanitizeOfficialLawUrl(KCPLAA_BASE_HTTPS + "/bbs/" + fallbackBoard + "/list");
+  }
+  return "";
+}
+
+function sanitizeIlaborCaseNo(raw) {
+  const s = stripTagsClean(raw);
+  if (!s || s === "-" || /^array$/i.test(s) || /^null$/i.test(s) || /^undefined$/i.test(s)) return "";
+  return s.slice(0, 60);
+}
+
+function buildBibliographicBody(item) {
+  const lines = [
+    "[한국공인노무사회(" + (item.originLabel || "ilabor") + ") 수록 실존 자료]",
+    "• 제목: " + item.title
+  ];
+  if (item.agency) lines.push("• 소관·출처기관: " + item.agency);
+  if (item.caseNo) lines.push("• 문서·사건·고유번호: " + item.caseNo);
+  if (item.decisionDate) lines.push("• 발간·선고·회시일자: " + item.decisionDate);
+  if (item.excerpt && item.excerpt !== item.title) lines.push("• 주요 내용 발췌: " + item.excerpt);
+  if (Array.isArray(item.attachments) && item.attachments.length) {
+    lines.push("• 첨부 원문 파일: " + item.attachments.join(", "));
+  }
+  if (item.officialUrl) lines.push("• 공식 열람 경로: " + item.officialUrl);
+  return lines.join("\n");
+}
+
+function parseIlaborIndexHtml(html) {
+  const h = String(html || "");
+  const out = [];
+  /* 1) 오늘의 자료 (<table class="type09"> ... <tbody>) */
+  const todayBlockM = /<table[^>]*class=["']type09["'][^>]*>([\s\S]*?)<\/table>/i.exec(h);
+  if (todayBlockM) {
+    for (const rm of todayBlockM[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const tds = Array.from(rm[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((m) => m[1]);
+      if (tds.length < 5) continue;
+      const agency = stripTagsClean(tds[0]) || "한국공인노무사회 ilabor";
+      const hrefM = /href=["']([^"']*sub09_01_01\.php\?[^"']+)["']/i.exec(tds[1] + " " + tds[2]);
+      const title = stripTagsClean(tds[1]);
+      const desc = stripTagsClean(tds[2]);
+      const dt = normLooseYmd(stripTagsClean(tds[3]));
+      const serialNo = stripTagsClean(tds[4]).replace(/[^0-9]/g, "");
+      if (!title) continue;
+      const officialUrl = hrefM ? canonicalizeIlaborHref(hrefM[1]) : (ILABOR_BASE_HTTPS + "/index.php");
+      out.push({
+        docType: "interp_moel",
+        agency,
+        court: agency,
+        caseNo: serialNo ? ("ilabor-" + serialNo) : "",
+        decisionDate: dt,
+        title,
+        excerpt: desc && desc !== title ? desc : "",
+        officialUrl,
+        originLabel: "ilabor 오늘의 자료",
+        sourceTag: "한국공인노무사회 ilabor (오늘의 자료)"
+      });
+    }
+  }
+  /* 2) 메인 노사정 뉴스 & 전일/전월 자료 링크 */
+  for (const am of h.matchAll(/<a[^>]+href=["']([^"']*sub05_01_01\.php\?sid=(\d+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const title = stripTagsClean(am[3]);
+    if (!title || title.length < 4) continue;
+    out.push({
+      docType: "interp_gov",
+      agency: "한국공인노무사회 노사정뉴스",
+      court: "한국공인노무사회",
+      caseNo: "ilabor-news-" + am[2],
+      decisionDate: "",
+      title,
+      excerpt: "",
+      officialUrl: canonicalizeIlaborHref(am[1]),
+      detailFetchUrl: canonicalizeIlaborHref(am[1]),
+      originLabel: "ilabor 노사정 뉴스",
+      sourceTag: "한국공인노무사회 ilabor (노사정 뉴스)"
+    });
+  }
+  return out;
+}
+
+function parseIlaborSub09Html(html, defaultAgency, sourceLabel) {
+  const h = String(html || "");
+  const out = [];
+  const seenSid = new Set();
+  for (const trm of h.matchAll(/<tr[^>]*>((?:(?!<tr[\s>])[\s\S])*?sub09_01_01\.php\?[^"']*sid=(\d+)(?:(?!<tr[\s>])[\s\S])*?)<\/tr>/gi)) {
+    const rowHtml = trm[1];
+    const sid = trm[2];
+    if (seenSid.has(sid)) continue;
+    const tds = Array.from(rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((m) => m[1]);
+    if (tds.length < 3) continue;
+    const linkIdx = tds.findIndex((c) => /sub09_01_01\.php/i.test(c));
+    if (linkIdx < 0) continue;
+    const hrefM = /href=["']([^"']*sub09_01_01\.php\?[^"']+)["']/i.exec(tds[linkIdx]);
+    const title = stripTagsClean(tds[linkIdx]);
+    if (!title || title.length < 3) continue;
+    seenSid.add(sid);
+    const numTxt = linkIdx > 0 ? stripTagsClean(tds[linkIdx - 1]).replace(/[^0-9]/g, "") : "";
+    const agency = (tds[linkIdx + 1] ? stripTagsClean(tds[linkIdx + 1]) : "") || defaultAgency || "고용노동부";
+    const dt = tds[linkIdx + 2] ? normLooseYmd(stripTagsClean(tds[linkIdx + 2])) : "";
+    let docType = defaultAgency === "중앙노동위원회" ? "dec_nlrc" : "interp_moel";
+    if (/대법원|헌법재판소/.test(agency)) docType = "prec_sc";
+    else if (/고등법원|지방법원|행정법원/.test(agency)) docType = "prec_lower";
+    else if (/노동위원회|심판원/.test(agency)) docType = "dec_nlrc";
+    out.push({
+      docType,
+      agency,
+      court: agency,
+      caseNo: numTxt ? ("ilabor-" + numTxt) : ("ilabor-sid-" + sid),
+      decisionDate: dt,
+      title,
+      excerpt: "",
+      officialUrl: hrefM ? canonicalizeIlaborHref(hrefM[1]) : canonicalizeIlaborHref("sub09_01_01.php?sid=" + sid),
+      originLabel: sourceLabel || "ilabor 행정자료실",
+      sourceTag: "한국공인노무사회 " + (sourceLabel || "ilabor 자료실")
+    });
+  }
+  return out;
+}
+
+function parseIlaborCaseAdminListHtml(html, modeCfg) {
+  const h = String(html || "");
+  const cfg = modeCfg || {};
+  const out = [];
+  const seenKey = new Set();
+  for (const trm of h.matchAll(/<tr[^>]*>((?:(?!<tr[\s>])[\s\S])*?sub0[3457]_0[123]_01\.php\?[^"']*sid=(\d+)(?:(?!<tr[\s>])[\s\S])*?)<\/tr>/gi)) {
+    const rowHtml = trm[1];
+    const sid = trm[2];
+    const tds = Array.from(rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((m) => m[1]);
+    if (tds.length < 3 || tds.length > 6) continue;
+    const linkIdx = tds.findIndex((c) => /sub0[3457]_0[123]_01\.php/i.test(c));
+    if (linkIdx < 0) continue;
+    const hrefM = /href=["']([^"']*sub0[3457]_0[123]_01\.php\?[^"']+)["']/i.exec(tds[linkIdx]);
+    const title = stripTagsClean(tds[linkIdx]);
+    if (!title || title.length < 3) continue;
+    const officialUrl = hrefM ? canonicalizeIlaborHref(hrefM[1]) : "";
+    const dedupKey = (officialUrl || sid) + "|" + title;
+    if (seenKey.has(dedupKey)) continue;
+    seenKey.add(dedupKey);
+
+    const trailing = tds.slice(linkIdx + 1).map(stripTagsClean);
+    let dt = "";
+    let midCol = "";
+    for (const col of trailing) {
+      const maybeDt = normLooseYmd(col) || (/^\d{4}-\d{1,2}$/.test(col) ? (col.replace(/-(\d)$/, "-0$1") + "-01") : "");
+      if (maybeDt && !dt) dt = maybeDt;
+      else if (!midCol && col) midCol = col;
+    }
+
+    const isNews = /sub05_01_01\.php/i.test(officialUrl);
+    const isFocus = /sub07_01_01\.php/i.test(officialUrl);
+    let agency = cfg.defaultAgency || "고용노동부";
+    let caseNo = "";
+    if (isNews) {
+      agency = midCol || "노사정뉴스";
+      caseNo = "ilabor-news-" + sid;
+    } else if (isFocus) {
+      agency = "한국공인노무사회";
+      caseNo = "ilabor-focus-" + sid;
+    } else {
+      const cleanedNo = sanitizeIlaborCaseNo(midCol.replace(/^(?:대법원|헌법재판소|행정해석|재결례|지침)\s+/, ""));
+      caseNo = cleanedNo || ("ilabor-" + sid);
+      if (/대법원/.test(midCol) || /table=supreme/.test(officialUrl)) agency = "대법원";
+      else if (/헌법재판소/.test(midCol) || /table=constitution/.test(officialUrl)) agency = "헌법재판소";
+      else if (/table=highcourt/.test(officialUrl)) agency = "고등법원";
+      else if (/table=districtcourt/.test(officialUrl)) agency = "지방법원";
+      else if (/table=admincourt/.test(officialUrl)) agency = "행정법원";
+      else if (/법제처/.test(caseNo)) agency = "법제처";
+      else if (/중앙|지노위|부해|부노/.test(caseNo)) agency = "중앙노동위원회";
+    }
+
+    let docType = cfg.docType || "interp_moel";
+    if (agency === "대법원" || agency === "헌법재판소") docType = "prec_sc";
+    else if (agency === "고등법원" || agency === "지방법원" || agency === "행정법원") docType = "prec_lower";
+
+    out.push({
+      docType,
+      agency,
+      court: agency,
+      caseNo,
+      decisionDate: dt,
+      title,
+      excerpt: "",
+      officialUrl,
+      detailFetchUrl: isNews ? officialUrl : "",
+      originLabel: cfg.label || "ilabor 전문자료",
+      sourceTag: "한국공인노무사회 " + (cfg.label || "ilabor")
+    });
+  }
+  return out;
+}
+
+function parseIlaborSearchPhpHtml(html, maxPerSection) {
+  const h = String(html || "");
+  if (!h || h.includes("There are no results")) return [];
+  const cap = Math.max(2, Math.min(Number(maxPerSection) || 5, 15));
+  const parts = h.split(/<td style="font-weight:\s*bold;\s*font-size:\s*15px;">/i);
+  const out = [];
+  for (let i = 1; i < parts.length; i++) {
+    const endIdx = parts[i].indexOf("</td>");
+    if (endIdx < 0) continue;
+    const secHeader = stripTagsClean(parts[i].slice(0, endIdx));
+    const secBody = parts[i].slice(endIdx);
+    let docType = "interp_moel";
+    let defaultAgency = "한국공인노무사회 ilabor";
+    if (/대법원|헌법재판소/.test(secHeader)) {
+      docType = "prec_sc";
+      defaultAgency = /헌법재판소/.test(secHeader) ? "헌법재판소" : "대법원";
+    } else if (/고등법원|지방법원|행정법원/.test(secHeader)) {
+      docType = "prec_lower";
+      defaultAgency = /행정법원/.test(secHeader) ? "행정법원" : (/고등법원/.test(secHeader) ? "고등법원" : "지방법원");
+    } else if (/재결|노동위원회/.test(secHeader)) {
+      docType = "dec_nlrc";
+      defaultAgency = "중앙노동위원회";
+    } else if (/행정해석|지침/.test(secHeader)) {
+      docType = "interp_moel";
+      defaultAgency = "고용노동부";
+    } else if (/뉴스|포커스|정책자료/.test(secHeader)) {
+      docType = "interp_gov";
+      defaultAgency = "한국공인노무사회";
+    }
+
+    let secCount = 0;
+    for (const cm of secBody.matchAll(/<td[^>]*class=["']txt01["'][^>]*>\s*<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>([\s\S]*?)<\/td>/gi)) {
+      if (secCount >= cap) break;
+      const officialUrl = canonicalizeIlaborHref(cm[1]);
+      const title = stripTagsClean(cm[2]);
+      if (!title || title.length < 3 || !officialUrl) continue;
+      const tailRaw = stripTagsClean(cm[3]);
+      const bracketM = /\[([^\]]{2,50})\]/.exec(tailRaw);
+      const dateM = /\((\d{4}[-.]\d{1,2}[-.]\d{1,2})\)/.exec(tailRaw);
+      const dt = dateM ? normLooseYmd(dateM[1]) : normLooseYmd(tailRaw);
+      const excerpt = tailRaw
+        .replace(/\[[^\]]{2,50}\]\s*\(\d{4}[-.]\d{1,2}[-.]\d{1,2}\)\s*$/, "")
+        .trim();
+      const sidM = /sid=(\d+)/.exec(officialUrl);
+      const caseNo = sanitizeIlaborCaseNo(bracketM ? bracketM[1] : "") || (sidM ? ("ilabor-" + sidM[1]) : "");
+      out.push({
+        docType,
+        agency: defaultAgency,
+        court: defaultAgency,
+        caseNo,
+        decisionDate: dt,
+        title,
+        excerpt,
+        officialUrl,
+        detailFetchUrl: /sub05_01_01\.php/.test(officialUrl) ? officialUrl : "",
+        originLabel: "ilabor 통합검색 (" + secHeader.replace(/\s*\(.*$/, "") + ")",
+        sourceTag: "한국공인노무사회 ilabor 통합검색"
+      });
+      secCount++;
+    }
+  }
+  return out;
+}
+
+function parseIlaborFormsAndRulesHtml(html, kindLabel, queryFilter) {
+  const h = String(html || "");
+  const qNorm = String(queryFilter || "").trim().toLowerCase();
+  const out = [];
+  const seen = new Set();
+  for (const am of h.matchAll(/<td[^>]*>([\s\S]{0,180}?)<a[^>]+href=["']([^"']*law\.go\.kr\/DRF\/lawService\.do\?[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const prefixLaw = stripTagsClean(am[1]);
+    const rawHref = am[2];
+    const name = stripTagsClean(am[3]);
+    if (!name) continue;
+    const fullTitle = prefixLaw && !name.includes(prefixLaw) ? (prefixLaw + " " + name) : name;
+    if (qNorm && !fullTitle.toLowerCase().includes(qNorm) && !fullTitle.replace(/\s+/g, "").toLowerCase().includes(qNorm.replace(/\s+/g, ""))) {
+      continue;
+    }
+    const idM = /ID=(\d{4,16})/i.exec(rawHref);
+    const isForm = /target=licbyl/i.test(rawHref);
+    const officialUrl = !isForm && idM
+      ? sanitizeOfficialLawUrl(LAW_PUBLIC_WEB_HTTPS + "/LSW/admRulInfoP.do?admRulSeq=" + idM[1])
+      : sanitizeOfficialLawUrl(ILABOR_BASE_HTTPS + "/sub01_04.php");
+    const dedupK = fullTitle + "|" + (idM ? idM[1] : "");
+    if (seen.has(dedupK)) continue;
+    seen.add(dedupK);
+    out.push({
+      docType: "interp_moel",
+      agency: "고용노동부",
+      court: "고용노동부",
+      caseNo: idM ? ((isForm ? "법정서식-" : "노동행정규칙-") + idM[1]) : "",
+      decisionDate: "",
+      title: fullTitle,
+      excerpt: "한국공인노무사회 ilabor 노동관계법령(" + (kindLabel || "법정서식·행정규칙") + ") 수록 공식 서식·규칙",
+      officialUrl,
+      originLabel: "ilabor " + (kindLabel || "노동관계법령"),
+      sourceTag: "한국공인노무사회 ilabor (" + (kindLabel || "법정서식·행정규칙") + ")"
+    });
+  }
+  return out;
+}
+
+function parseIlaborDetailHtml(html) {
+  const h = String(html || "");
+  if (!h) return { gated: false, body: "", attachments: [] };
+  if (h.length < 3600 && /로그인\s*후\s*이용가능/.test(h)) {
+    return { gated: true, body: "", attachments: [] };
+  }
+  const attachments = [];
+  for (const fm of h.matchAll(/<a[^>]+href=["'][^"']*(?:download|down\.php|flDownload)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const fn = stripTagsClean(fm[1]);
+    if (fn && fn.length >= 3 && fn.length <= 120 && !attachments.includes(fn)) attachments.push(fn);
+  }
+  const scopedHtml = (() => {
+    const f5Idx = h.search(/bgcolor=["']?#?f5f5f5["']?/i);
+    if (f5Idx >= 0) {
+      const trStart = h.lastIndexOf("<tr", f5Idx);
+      return h.slice(trStart >= 0 ? trStart : f5Idx);
+    }
+    return h;
+  })();
+  const withoutScripts = scopedHtml
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<title[\s\S]*?<\/title>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<div[^>]*id=["'](?:lnb|topMenu)["'][\s\S]*?<\/div>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|tr|li|h[1-6])>/gi, "\n");
+  const plain = scrubDecodedAngleBrackets(decodeHtmlEntitiesLoose(withoutScripts.replace(/<[^>]+>/g, " ")));
+  const homeIdx = plain.indexOf("홈 >");
+  const startIdx = homeIdx >= 0 ? homeIdx : 0;
+  const endIdx = plain.lastIndexOf("이용약관");
+  const sliced = plain.slice(startIdx, endIdx > startIdx ? endIdx : plain.length);
+  const lines = sliced
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter((l) => l.length >= 2 && !/^(?:홈\s*>|스크랩|인쇄하기|목록보기|목록|이전글|다음글|http로변경)/.test(l));
+  return {
+    gated: false,
+    body: lines.join("\n").slice(0, 24000).trim(),
+    attachments: attachments.slice(0, 10)
+  };
+}
+
+function parseKcplaaBoardListHtml(html, boardSlug, boardLabel) {
+  const h = String(html || "");
+  if (!h || (h.length < 400 && /location\.href=['"]\/login/.test(h))) return [];
+  const slug = boardSlug || "notice";
+  const tbodyIdx = h.indexOf("<tbody");
+  const scopeHtml = tbodyIdx >= 0 ? h.slice(tbodyIdx) : h;
+  const out = [];
+  const seenId = new Set();
+  const re = new RegExp("<tr[^>]*>((?:(?!<tr[\\s>])[\\s\\S])*?\\/bbs\\/" + slug + "\\/view\\/(\\d{1,8})(?:(?!<tr[\\s>])[\\s\\S])*?)<\\/tr>", "gi");
+  for (const trm of scopeHtml.matchAll(re)) {
+    const rowHtml = trm[1];
+    const viewId = trm[2];
+    if (seenId.has(viewId)) continue;
+    seenId.add(viewId);
+    const aM = new RegExp("<a[^>]+href=[\"']([^\"']*\\/bbs\\/" + slug + "\\/view\\/" + viewId + "[^\"']*)[\"'][^>]*>([\\s\\S]*?)<\\/a>", "i").exec(rowHtml);
+    const title = aM ? stripTagsClean(aM[2]) : "";
+    if (!title || title.length < 2) continue;
+    const dt = normLooseYmd(stripTagsClean(rowHtml));
+    const officialUrl = canonicalizeKcplaaHref("/bbs/" + slug + "/view/" + viewId, slug);
+    out.push({
+      docType: "interp_gov",
+      agency: "한국공인노무사회",
+      court: "한국공인노무사회",
+      caseNo: "kcplaa-" + slug + "-" + viewId,
+      decisionDate: dt,
+      title,
+      excerpt: "",
+      officialUrl,
+      detailFetchUrl: officialUrl,
+      originLabel: boardLabel || "한국공인노무사회 공지사항",
+      sourceTag: "한국공인노무사회 본회 (" + (boardLabel || "공지·알리다") + ")"
+    });
+  }
+  return out;
+}
+
+function parseKcplaaBoardDetailHtml(html) {
+  const h = String(html || "");
+  if (!h || (h.length < 400 && /location\.href=['"]\/login/.test(h))) {
+    return { gated: true, body: "", attachments: [] };
+  }
+  const attachments = [];
+  for (const fm of h.matchAll(/onclick=["']goFileDownLoad\(['"]\d+['"]\);?["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const fn = stripTagsClean(fm[1]);
+    if (fn && !attachments.includes(fn)) attachments.push(fn);
+  }
+  const edM = /<div[^>]*id=["']editor["'][^>]*>([\s\S]*?)<\/div>/i.exec(h);
+  const bodyRaw = edM ? edM[1] : "";
+  const bodyTxt = scrubDecodedAngleBrackets(
+    decodeHtmlEntitiesLoose(
+      bodyRaw
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(?:p|div|li|tr)>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+    )
+  )
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 20000)
+    .trim();
+  return {
+    gated: false,
+    body: bodyTxt,
+    attachments: attachments.slice(0, 10)
+  };
+}
+
+/* 로컬 CLI 전용 한국공인노무사회 ilabor 회원 세션 로그인 (자격증명은 메모리 일회용으로만 사용하며 로그·파일에 남기지 않음) */
+async function loginIlaborMemberCli(opts) {
+  const o = opts || {};
+  const f = o.fetchFn || fetch;
+  const memberId = String(o.memberId || "").trim();
+  const memberPw = String(o.memberPw || "");
+  if (!/^[A-Za-z0-9._-]{3,40}$/.test(memberId) || !memberPw || memberPw.length > 64) {
+    return { ok: false, cookie: "", error: "한국공인노무사회(ilabor) 아이디 또는 비밀번호 형식이 올바르지 않습니다." };
+  }
+  const ac = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = setTimeout(() => { if (ac) ac.abort(); }, 8500);
+  if (timer && typeof timer.unref === "function") timer.unref();
+  try {
+    const pageRes = await safeHttpsFetch(f, ILABOR_BASE_HTTPS + "/login01.php", {
+      headers: { "User-Agent": UA },
+      ...(ac ? { signal: ac.signal } : {})
+    });
+    const getCookies = (res) => {
+      if (!res || !res.headers) return [];
+      if (typeof res.headers.getSetCookie === "function") return res.headers.getSetCookie();
+      const single = typeof res.headers.get === "function" ? res.headers.get("set-cookie") : "";
+      return single ? [single] : [];
+    };
+    const jar = new Map();
+    for (const c of getCookies(pageRes)) {
+      const pair = String(c).split(";")[0].trim();
+      const eq = pair.indexOf("=");
+      if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+    const initCookie = Array.from(jar.entries()).map(([k, v]) => k + "=" + v).join("; ");
+    const formBody = "id=" + encodeURIComponent(memberId) + "&pw=" + encodeURIComponent(memberPw);
+    const procRes = await safeHttpsFetch(f, ILABOR_BASE_HTTPS + "/include/login_proc.php", {
+      method: "POST",
+      redirect: "manual",
+      headers: Object.assign(
+        {
+          "User-Agent": UA,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Referer": ILABOR_BASE_HTTPS + "/login01.php"
+        },
+        initCookie ? { Cookie: initCookie } : {}
+      ),
+      body: formBody,
+      ...(ac ? { signal: ac.signal } : {})
+    });
+    for (const c of getCookies(procRes)) {
+      const pair = String(c).split(";")[0].trim();
+      const eq = pair.indexOf("=");
+      if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+    const procTxt = procRes && typeof procRes.text === "function" ? await procRes.text() : "";
+    if (/alert\s*\(/i.test(procTxt) && !/index\.php/i.test(procTxt)) {
+      return { ok: false, cookie: "", error: "한국공인노무사회(ilabor) 회원 인증에 실패했습니다. 아이디·비밀번호(성실회원 여부)를 확인해 주세요." };
+    }
+    const finalCookie = sanitizeCliCookieHeader(Array.from(jar.entries()).map(([k, v]) => k + "=" + v).join("; "));
+    if (!finalCookie) {
+      return { ok: false, cookie: "", error: "ilabor 로그인 세션 쿠키를 발급받지 못했습니다." };
+    }
+    return { ok: true, cookie: finalCookie };
+  } catch (e) {
+    return { ok: false, cookie: "", error: "ilabor 로그인 통신 중 오류가 발생했습니다." };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function pullKcplaaIlaborBundle(opts) {
+  const o = opts || {};
+  const env = o.env || process.env || {};
+  const f = o.fetchFn || fetch;
+
+  let cleanQuery = "";
+  if (o.query !== undefined && o.query !== null && String(o.query).trim() !== "") {
+    const qc = validateAndScrubOfficialQuery(o.query, { allowEmpty: false, maxLen: 50 });
+    if (!qc.ok) {
+      return {
+        ok: false,
+        partial: false,
+        status: 400,
+        error: qc.error,
+        docs: [],
+        sourcesHit: [],
+        errors: [qc.error]
+      };
+    }
+    cleanQuery = qc.query;
+  }
+
+  const rawChannel = String(o.channel || (cleanQuery ? "search_fast" : "all")).trim();
+  const validSingleIds = new Set(KCPLAA_ILABOR_CHANNELS.map((c) => c.id));
+  let channelIds = [];
+  if (KCPLAA_CHANNEL_GROUPS[rawChannel]) {
+    channelIds = KCPLAA_CHANNEL_GROUPS[rawChannel].slice();
+  } else if (validSingleIds.has(rawChannel)) {
+    channelIds = [rawChannel];
+  } else {
+    const badChErr = "유효하지 않은 한국공인노무사회 수집 채널입니다: " + rawChannel.slice(0, 30);
+    return { ok: false, partial: false, status: 400, error: badChErr, docs: [], sourcesHit: [], errors: [badChErr] };
+  }
+
+  const allowCliSession = o.allowCliSession === true;
+  const safeIlaborCookie = allowCliSession ? sanitizeCliCookieHeader(o.ilaborCookie) : "";
+  const safeKcplaaCookie = allowCliSession ? sanitizeCliCookieHeader(o.kcplaaCookie) : "";
+  if (!safeKcplaaCookie) {
+    if (rawChannel === "kcplaa_member" && !allowCliSession) {
+      const cliOnlyErr = "한국공인노무사회 회원전용 채널(kcplaa_member)은 로컬 CLI(kcplaa-pbox)에서만 열람할 수 있습니다.";
+      return { ok: false, partial: false, status: 400, error: cliOnlyErr, docs: [], sourcesHit: [], errors: [cliOnlyErr] };
+    }
+    channelIds = channelIds.filter((id) => id !== "kcplaa_member" || rawChannel === "kcplaa_member");
+  }
+
+  const maxPerChannel = Math.max(2, Math.min(Number(o.maxPerChannel) || 8, 25));
+  let detailBudget = Math.max(0, Math.min(Number(o.detailLimit ?? 6), 20));
+  const perReqTimeoutMs = Math.max(200, Math.min(Number(o.perRequestTimeoutMs) || 6500, 15000));
+  const overallTimeoutMs = Math.max(500, Math.min(Number(o.overallTimeoutMs) || 18000, 35000));
+  const budget = {
+    perReqTimeoutMs,
+    deadlineAt: Date.now() + overallTimeoutMs,
+    maxPageBytes: 1572864,
+    maxTotalBytes: 8 * 1024 * 1024,
+    totalBytes: 0,
+    abortedByTotal: false,
+    activeControllers: new Set(),
+    hostHeaders(targetUrl) {
+      if (!allowCliSession) return null;
+      try {
+        const host = new URL(targetUrl).hostname.toLowerCase();
+        if (host === "ilabor.co.kr" && safeIlaborCookie) return { Cookie: safeIlaborCookie };
+        if (host === "www.kcplaa.or.kr" && safeKcplaaCookie) return { Cookie: safeKcplaaCookie };
+      } catch (_) {}
+      return null;
+    }
+  };
+
+  const qEnc = encodeURIComponent(cleanQuery);
+  const tasks = [];
+  for (const chId of channelIds) {
+    if (chId === "today") {
+      tasks.push({ chId, label: "ilabor 오늘의 자료", url: ILABOR_BASE_HTTPS + "/index.php", kind: "index" });
+    } else if (chId === "moel" || chId === "comwel" || chId === "nlrc" || chId === "press") {
+      const chMeta = KCPLAA_ILABOR_CHANNELS.find((x) => x.id === chId);
+      const u = ILABOR_BASE_HTTPS + "/sub09_01.php?condition=form_title&cate1=" + chMeta.cate1 + (cleanQuery ? ("&words=" + qEnc) : "");
+      tasks.push({ chId, label: chMeta.label, url: u, kind: "sub09", defaultAgency: chMeta.defaultAgency });
+    } else if (chId === "prec") {
+      const u = cleanQuery
+        ? (ILABOR_BASE_HTTPS + "/sub03_01s.php?table=supreme&parent=A001&sort=DATE&date1=&date2=&words=" + qEnc)
+        : (ILABOR_BASE_HTTPS + "/sub03_01.php?table=supreme&parent=A001");
+      tasks.push({ chId, label: "ilabor 노동판례", url: u, kind: "case_admin", docType: "prec_sc", defaultAgency: "대법원" });
+    } else if (chId === "decc") {
+      const u = cleanQuery
+        ? (ILABOR_BASE_HTTPS + "/sub04_01s.php?sort=DATE&date1=&date2=&words=" + qEnc)
+        : (ILABOR_BASE_HTTPS + "/sub04_01.php");
+      tasks.push({ chId, label: "ilabor 재결례", url: u, kind: "case_admin", docType: "dec_nlrc", defaultAgency: "중앙노동위원회" });
+    } else if (chId === "interp") {
+      const u = cleanQuery
+        ? (ILABOR_BASE_HTTPS + "/sub04_02s.php?sort=DATE&date1=&date2=&words=" + qEnc)
+        : (ILABOR_BASE_HTTPS + "/sub04_02.php");
+      tasks.push({ chId, label: "ilabor 행정해석", url: u, kind: "case_admin", docType: "interp_moel", defaultAgency: "고용노동부" });
+    } else if (chId === "guide") {
+      const u = cleanQuery
+        ? (ILABOR_BASE_HTTPS + "/sub04_03s.php?sort=DATE&date1=&date2=&words=" + qEnc)
+        : (ILABOR_BASE_HTTPS + "/sub04_03.php");
+      tasks.push({ chId, label: "ilabor 지침·시달문", url: u, kind: "case_admin", docType: "interp_moel", defaultAgency: "고용노동부" });
+    } else if (chId === "news") {
+      const u = cleanQuery
+        ? (ILABOR_BASE_HTTPS + "/sub05_01s.php?sort=DATE&date1=&date2=&words=" + qEnc)
+        : (ILABOR_BASE_HTTPS + "/sub05_01.php");
+      tasks.push({ chId, label: "ilabor 노사정 뉴스", url: u, kind: "case_admin", docType: "interp_gov", defaultAgency: "노사정뉴스" });
+    } else if (chId === "focus") {
+      const u = ILABOR_BASE_HTTPS + "/sub07_01.php" + (cleanQuery ? ("?words=" + qEnc) : "");
+      tasks.push({ chId, label: "ilabor 월간 노사 FOCUS", url: u, kind: "case_admin", docType: "interp_gov", defaultAgency: "한국공인노무사회" });
+    } else if (chId === "forms_rules") {
+      tasks.push({ chId, label: "ilabor 법정서식", url: ILABOR_BASE_HTTPS + "/sub01_04.php" + (cleanQuery ? ("?search=1&query=" + qEnc) : ""), kind: "forms_rules", subLabel: "법정서식" });
+      tasks.push({ chId, label: "ilabor 고용노동부 예규·고시", url: ILABOR_BASE_HTTPS + "/sub02_01.php" + (cleanQuery ? ("?search=1&query=" + qEnc) : ""), kind: "forms_rules", subLabel: "예규·훈령·고시" });
+    } else if (chId === "unified" && cleanQuery) {
+      tasks.push({ chId, label: "ilabor 통합검색", url: ILABOR_BASE_HTTPS + "/search.php?search=" + qEnc, kind: "unified" });
+    } else if (chId === "kcplaa_notice") {
+      const u = KCPLAA_BASE_HTTPS + "/bbs/notice/list" + (cleanQuery ? ("?skey=all&stxt=" + qEnc) : "");
+      tasks.push({ chId, label: "한국공인노무사회 공지·알리다", url: u, kind: "kcplaa_board", board: "notice" });
+    } else if (chId === "kcplaa_member") {
+      for (const mb of [
+        { board: "news", label: "한국공인노무사회 회원공지" },
+        { board: "law", label: "한국공인노무사회 법령건의" },
+        { board: "policy", label: "한국공인노무사회 ADR·노동연구소" },
+        { board: "rule", label: "한국공인노무사회 회칙·규정" }
+      ]) {
+        const u = KCPLAA_BASE_HTTPS + "/bbs/" + mb.board + "/list" + (cleanQuery ? ("?skey=all&stxt=" + qEnc) : "");
+        tasks.push({ chId, label: mb.label, url: u, kind: "kcplaa_board", board: mb.board });
+      }
+    }
+  }
+
+  let attempted = 0;
+  let succeeded = 0;
+  const errors = [];
+  const rawItems = [];
+  const hitCountByLabel = new Map();
+
+  const listSettled = await Promise.allSettled(tasks.map(async (tk) => {
+    attempted++;
+    const res = await fetchSsrHtmlBounded(f, tk.url, budget);
+    if (!res.ok) throw new Error(tk.label + ": HTTP " + res.status);
+    let parsed = [];
+    if (tk.kind === "index") {
+      parsed = parseIlaborIndexHtml(res.html);
+      if (cleanQuery) {
+        const ql = cleanQuery.toLowerCase();
+        parsed = parsed.filter((x) => (x.title + " " + x.excerpt + " " + x.agency).toLowerCase().includes(ql));
+      }
+    } else if (tk.kind === "sub09") {
+      parsed = parseIlaborSub09Html(res.html, tk.defaultAgency, tk.label);
+    } else if (tk.kind === "case_admin") {
+      parsed = parseIlaborCaseAdminListHtml(res.html, tk);
+      if (cleanQuery && tk.chId === "focus") {
+        const ql = cleanQuery.toLowerCase();
+        parsed = parsed.filter((x) => x.title.toLowerCase().includes(ql));
+      }
+    } else if (tk.kind === "unified") {
+      parsed = parseIlaborSearchPhpHtml(res.html, Math.min(maxPerChannel, 5));
+    } else if (tk.kind === "forms_rules") {
+      parsed = parseIlaborFormsAndRulesHtml(res.html, tk.subLabel, cleanQuery);
+    } else if (tk.kind === "kcplaa_board") {
+      parsed = parseKcplaaBoardListHtml(res.html, tk.board, tk.label);
+    }
+    return { tk, items: parsed.slice(0, maxPerChannel) };
+  }));
+
+  for (const st of listSettled) {
+    if (st.status === "rejected") {
+      errors.push(String((st.reason && st.reason.message) || st.reason));
+      continue;
+    }
+    succeeded++;
+    const { tk, items } = st.value;
+    if (items.length > 0) {
+      hitCountByLabel.set(tk.label, (hitCountByLabel.get(tk.label) || 0) + items.length);
+      for (const it of items) {
+        if (tk.chId === "kcplaa_member") {
+          it.memberOnly = true;
+        }
+        if (allowCliSession && safeIlaborCookie && !it.detailFetchUrl && it.officialUrl && it.officialUrl.startsWith(ILABOR_BASE_HTTPS + "/sub0")) {
+          it.detailFetchUrl = it.officialUrl;
+          it._cliMemberDetail = true;
+        }
+        rawItems.push(it);
+      }
+    }
+  }
+
+  /* 공개 상세(노사정뉴스·본회 공지) 및 CLI 로그인 세션 상세 본문 보강 */
+  const detailTargets = [];
+  const seenDetUrl = new Set();
+  for (const it of rawItems) {
+    if (detailTargets.length >= detailBudget) break;
+    if (!it.detailFetchUrl || seenDetUrl.has(it.detailFetchUrl)) continue;
+    seenDetUrl.add(it.detailFetchUrl);
+    detailTargets.push(it);
+  }
+  if (detailTargets.length > 0 && Date.now() < budget.deadlineAt - 300) {
+    await Promise.allSettled(detailTargets.map(async (it) => {
+      const detRes = await fetchSsrHtmlBounded(f, it.detailFetchUrl, budget);
+      if (!detRes.ok || !detRes.html) return;
+      const parsedDet = it.detailFetchUrl.startsWith(KCPLAA_BASE_HTTPS)
+        ? parseKcplaaBoardDetailHtml(detRes.html)
+        : parseIlaborDetailHtml(detRes.html);
+      if (!parsedDet.gated) {
+        if (parsedDet.body && parsedDet.body.length >= 20) {
+          it.fullBody = parsedDet.body;
+          if (it._cliMemberDetail) it.memberOnly = true;
+        }
+        if (parsedDet.attachments && parsedDet.attachments.length) {
+          it.attachments = parsedDet.attachments;
+          if (it._cliMemberDetail) it.memberOnly = true;
+        }
+      }
+    }));
+  }
+
+  const hasMemberCookie = Boolean(allowCliSession && (safeIlaborCookie || safeKcplaaCookie));
+  const scrubbedDocs = [];
+  for (const it of rawItems) {
+    const isMemberRestricted = Boolean(hasMemberCookie || it.memberOnly);
+    const bodyText = (it.fullBody && it.fullBody.length >= 25)
+      ? it.fullBody
+      : buildBibliographicBody(it);
+    const summaryText = it.excerpt || (it.fullBody ? it.fullBody.slice(0, 320) : (it.agency + " · " + it.title));
+    const clean = scrubDocumentObjectServer({
+      docType: it.docType || "interp_moel",
+      court: it.court || it.agency || "한국공인노무사회",
+      agency: it.agency || "한국공인노무사회",
+      caseNo: it.caseNo || "",
+      decisionDate: it.decisionDate || "",
+      title: it.title,
+      summary: summaryText.slice(0, 400),
+      body: bodyText,
+      tags: ["한국공인노무사회", it.originLabel || "ilabor"].concat(isMemberRestricted ? ["회원전용(로컬전용)"] : []),
+      refLaws: [],
+      refCases: [],
+      officialUrl: it.officialUrl || "",
+      sources: [it.sourceTag || "한국공인노무사회 ilabor"].concat(isMemberRestricted ? ["한국공인노무사회 회원전용(로컬전용)"] : [])
+    });
+    if (hasResidualHardPii(clean) || clean.body.length < 20) continue;
+    if (/<[A-Za-z/!?]/.test(clean.title + "\n" + clean.summary + "\n" + clean.body)) continue;
+    clean.verified = true;
+    if (isMemberRestricted) clean.memberOnly = true;
+    clean.canonicalKey = canonicalKeyOf(clean, "system_sync");
+    scrubbedDocs.push(clean);
+  }
+
+  const deduped = deduplicateBatch(scrubbedDocs, "system_sync");
+  const sharedSafeDocs = deduped.filter((d) => !d.memberOnly);
+  let sharedRes = { ok: true, pushed: 0, skipped: true };
+  if (hasSharedStore(env, o.storageBucket) && sharedSafeDocs.length > 0 && o.skipSupabase !== true) {
+    sharedRes = await upsertSharedDocs(sharedSafeDocs, env, f, "system_sync", {
+      insertOnly: true,
+      storageBucket: o.storageBucket
+    }).catch((e) => {
+      console.error("[pbox-sync shared_store]", e && (e.message || e));
+      errors.push("shared_store: 공유 저장소 반영 중 일시적 지연이 발생했습니다.");
+      return { ok: false, pushed: 0 };
+    });
+  }
+
+  const sourcesHit = Array.from(hitCountByLabel.entries()).map(([k, v]) => k + " " + v + "건");
+  const fullOk = attempted > 0 && succeeded > 0 && sharedRes.ok !== false && errors.length === 0;
+  const partialOk = !fullOk && (succeeded > 0 || deduped.length > 0);
+
+  return {
+    ok: fullOk,
+    partial: partialOk,
+    status: (fullOk || partialOk) ? 200 : 502,
+    error: (!fullOk && !partialOk) ? (errors[0] || "한국공인노무사회 자료 응답을 받지 못했습니다.") : undefined,
+    channel: rawChannel,
+    query: cleanQuery,
+    authenticatedMember: Boolean(safeIlaborCookie || safeKcplaaCookie),
+    syncedAt: new Date().toISOString(),
+    fetchedCount: scrubbedDocs.length,
+    dedupedCount: deduped.length,
+    supabasePushed: sharedRes.pushed || 0,
+    sourcesHit,
+    errors,
     docs: deduped
   };
 }
@@ -5103,6 +6015,23 @@ async function handleApiAction(opts) {
       payload: trbOut
     };
   }
+  if (action === "pull_kcplaa") {
+    const coolKc = await checkCool(uid, "pull_kcplaa", 8000, 2500);
+    if (coolKc) return { status: 429, payload: { ok: false, error: coolKc, docs: [] } };
+    const kcOut = await pullKcplaaIlaborBundle({
+      env,
+      storageBucket,
+      fetchFn: f,
+      channel: body.channel || "all",
+      query: body.query,
+      maxPerChannel: Math.min(Math.max(3, Number(body.maxPerChannel) || 8), 20),
+      detailLimit: Math.min(Math.max(0, Number(body.detailLimit ?? 6)), 15)
+    });
+    return {
+      status: (kcOut.ok || kcOut.partial) ? 200 : (kcOut.status || 502),
+      payload: kcOut
+    };
+  }
   if (action === "auto_discover") {
     const coolDisc = await checkCool(uid, "auto_discover", 6000, 2000);
     if (coolDisc) return { status: 429, payload: { ok: false, error: coolDisc, docs: [] } };
@@ -5118,7 +6047,8 @@ async function handleApiAction(opts) {
       targets: Array.isArray(body.targets) ? body.targets : [],
       maxPerTarget: Math.min(Math.max(3, Number(body.maxPerTarget) || 5), 10),
       detailLimit: Math.min(Math.max(6, Number(body.detailLimit ?? 24)), 36),
-      includeComwel: body.includeComwel !== false
+      includeComwel: body.includeComwel !== false,
+      includeKcplaa: body.includeKcplaa === true
     });
     return {
       status: (discOut.ok || discOut.partial) ? 200 : (discOut.status || 502),
@@ -5141,7 +6071,8 @@ async function handleApiAction(opts) {
       targets: Array.isArray(body.targets) ? body.targets : [],
       maxPerTarget: Math.min(Math.max(3, Number(body.maxPerTarget) || 10), 20),
       detailLimit: Math.min(Math.max(0, Number(body.detailLimit ?? 12)), 24),
-      includeComwel: body.includeComwel !== false
+      includeComwel: body.includeComwel !== false,
+      includeKcplaa: body.includeKcplaa === true
     });
     return {
       status: (liveOut.ok || liveOut.partial) ? 200 : (liveOut.status || 502),
@@ -5160,6 +6091,7 @@ async function handleApiAction(opts) {
     fetchFn: f,
     lawOc: body.lawOc,
     sinceDate: body.sinceDate,
+    includeKcplaa: body.includeKcplaa === true,
     maxPages: Math.min(Math.max(1, Number(body.maxPages) || 2), 4)
   });
   return { status: 200, payload: out };
@@ -5172,6 +6104,8 @@ module.exports = {
   TRIBUNAL_PRESETS,
   TRIBUNAL_GROUP_MAP,
   LOCAL_ADMIN_APPEAL_ORGS,
+  KCPLAA_ILABOR_CHANNELS,
+  KCPLAA_CHANNEL_GROUPS,
   PBOX_SHARED_STORAGE_PATH,
   validateLocalOrgStrict,
   safeHttpsFetchJson,
@@ -5180,6 +6114,18 @@ module.exports = {
   buildFallbackSsrListUrls,
   sanitizeLawOc,
   sanitizeOfficialLawUrl,
+  canonicalizeIlaborHref,
+  canonicalizeKcplaaHref,
+  parseIlaborIndexHtml,
+  parseIlaborSub09Html,
+  parseIlaborCaseAdminListHtml,
+  parseIlaborSearchPhpHtml,
+  parseIlaborFormsAndRulesHtml,
+  parseIlaborDetailHtml,
+  parseKcplaaBoardListHtml,
+  parseKcplaaBoardDetailHtml,
+  loginIlaborMemberCli,
+  pullKcplaaIlaborBundle,
   buildSsrListUrl,
   hasExplicitZeroResultNotice,
   extractSsrListEntries,

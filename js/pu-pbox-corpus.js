@@ -247,6 +247,15 @@
     "cycle": "파일 끌어놓기 즉시 비식별화 + 3단계 중복검증 후 DB 적재",
     "scope": "미간행 1·2심 행정·민사 판결문, 지노위·중노위 판정서, 산재 심사·재심사 결정서",
     "readyByDefault": true
+  },
+  {
+    "id": "kcplaa_ilabor_sync",
+    "name": "한국공인노무사회 ilabor 전용자료실 & 본회 포털 통합 CLI · API 연동",
+    "agency": "한국공인노무사회 (ilabor.co.kr · kcplaa.or.kr)",
+    "tier": "무료 직결 + CLI(kcplaa-pbox) 로컬·회원세션 동기화",
+    "cycle": "실시간 통합검색·수집 + 매일 새벽 03:20 오늘의 자료·지침·공지 자동수집 + CLI 당겨오기",
+    "scope": "오늘의자료, 고용노동부(24개 분과), 근로복지공단, 노동위원회, 보도자료, 노동판례, 재결례, 행정해석, 지침, 노사정뉴스, 월간 FOCUS, 법정서식·예규·훈령·고시, 본회 공지·소식지 알리다",
+    "readyByDefault": true
   }
 ];
 
@@ -6570,10 +6579,58 @@
     "homeUrl": "https://www.law.go.kr/deccSc.do?menuId=7&subMenuId=53&tabMenuId=249&deccType=S&decOrg=360110",
     "searchUrl": "https://www.law.go.kr/deccSc.do?menuId=7&subMenuId=53&tabMenuId=249&deccType=S&decOrg=360110&query={q}",
     "desc": "공익사업 토지수용·영업손실·휴업보상 이의재결례 및 공사장·사업장 소음·진동·분진 환경분쟁 재정례."
+  },
+  {
+    "id": "ilabor_portal",
+    "cat": "labor_sanjae",
+    "bigLawPick": true,
+    "shortLabel": "노무사회 ilabor",
+    "name": "한국공인노무사회 ilabor (공인노무사 전용 자료사이트)",
+    "org": "한국공인노무사회",
+    "tier": "공인노무사 필수 DB",
+    "domain": "ilabor.co.kr",
+    "homeUrl": "https://ilabor.co.kr/main/index.php",
+    "searchUrl": "https://ilabor.co.kr/main/search.php?search={q}",
+    "desc": "오늘의 자료, 고용노동부·근로복지공단·노동위원회 자료실, 노동판례, 행정해석·지침·재결례, 노사정뉴스, 월간 노사 FOCUS, 법정서식·예규·훈령·고시 통합 수록."
+  },
+  {
+    "id": "ilabor_moel_archive",
+    "cat": "labor_sanjae",
+    "shortLabel": "ilabor 행정자료",
+    "name": "ilabor 고용노동부·근로복지공단·노동위 실무자료실",
+    "org": "한국공인노무사회 ilabor",
+    "tier": "실무편람·지침·서식",
+    "domain": "ilabor.co.kr",
+    "homeUrl": "https://ilabor.co.kr/main/sub09_01.php?cate1=100",
+    "searchUrl": "https://ilabor.co.kr/main/sub09_01.php?condition=form_title&cate1=100&words={q}",
+    "desc": "포괄임금 지도지침, 최저임금 심의편람, 산재보험료율·부과업무 편람, 노동위 판정사례 등 노무사 실무 핵심 발간물."
+  },
+  {
+    "id": "kcplaa_main",
+    "cat": "labor_sanjae",
+    "shortLabel": "한국공인노무사회",
+    "name": "한국공인노무사회 본회 공식 포털 (공지·알리다·제도개선)",
+    "org": "한국공인노무사회",
+    "tier": "본회 공식 포털",
+    "domain": "kcplaa.or.kr",
+    "homeUrl": "https://www.kcplaa.or.kr/",
+    "searchUrl": "https://www.kcplaa.or.kr/bbs/notice/list?skey=all&stxt={q}",
+    "desc": "한국공인노무사회 공지사항, 주간 소식지 「알리다」, 공인노무사 직무·제도개선·법령건의·ADR 노동연구소 안내."
   }
 ];
 
   var SITE_BUNDLE_PRESETS = [
+  {
+    "id": "bundle_kcplaa_pro",
+    "label": "🎖️ 공인노무사 핵심 4종 동시검색",
+    "desc": "노무사회 ilabor · 이레이버 · 고용노동부 · 중앙노동위원회",
+    "siteIds": [
+      "ilabor_portal",
+      "elabor",
+      "moel",
+      "nlrc"
+    ]
+  },
   {
     "id": "bundle_biglaw_cases",
     "label": "⚡ 대형로펌 판례 4종 동시검색",

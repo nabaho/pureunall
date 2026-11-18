@@ -4440,3 +4440,140 @@ test('㉚ 무설정 무료 공유 저장소(Cloud Storage 낙관적 잠금) · �
   assert.equal(officialDoc.docType, 'prec_sc');
   assert.ok(officialDoc.body.includes('공식 법제처 API를 통해 수집된 대법원 정식 판결 원문'));
 });
+
+test('㉛ 한국공인노무사회(ilabor.co.kr 전용자료실 · kcplaa.or.kr 본회 포털) 통합 수집·검색 · URL 화이트리스트 · 호스트 쿠키 격리 검증', async () => {
+  const Corpus = require('../js/pu-pbox-corpus');
+  const Engine = require('../js/pu-pbox-engine');
+  const PBoxSync = require('../functions/pbox-sync');
+
+  /* 1) 코퍼스 전국 법률사이트 허브에 한국공인노무사회 ilabor 및 본회 사이트가 등록되어야 함 */
+  const siteIds = Corpus.KOREA_LEGAL_SITES.map((s) => s.id);
+  assert.ok(siteIds.includes('ilabor_portal'), 'ilabor 전용자료실이 전국 사이트 허브에 등록되어야 합니다');
+  assert.ok(siteIds.includes('kcplaa_main'), '한국공인노무사회 본회 포털이 등록되어야 합니다');
+
+  /* 2) 공식 URL 화이트리스트: ilabor.co.kr/main/*.php 및 www.kcplaa.or.kr/bbs/* 만 허용, 경로이탈·비허용 도메인 차단 */
+  assert.equal(
+    PBoxSync.sanitizeOfficialLawUrl('https://ilabor.co.kr/main/sub09_01_01.php?sid=4172'),
+    'https://ilabor.co.kr/main/sub09_01_01.php?sid=4172'
+  );
+  assert.equal(
+    Engine.sanitizeOfficialLawUrlClient('https://www.kcplaa.or.kr/bbs/notice/view/547'),
+    'https://www.kcplaa.or.kr/bbs/notice/view/547'
+  );
+  assert.equal(PBoxSync.sanitizeOfficialLawUrl('https://ilabor.co.kr/main/../../etc/passwd'), '');
+  assert.equal(PBoxSync.sanitizeOfficialLawUrl('https://evil.ilabor.co.kr/main/index.php'), '');
+
+  /* 3) pboxApi action=pull_kcplaa 수집 및 CLI 세션 쿠키 호스트 격리 검증 */
+  const seenCookieByHost = new Map();
+  const kcMockFetch = async (url, init) => {
+    const u = new URL(String(url));
+    const ckHdr = (init && init.headers && init.headers.Cookie) || '';
+    seenCookieByHost.set(u.hostname, ckHdr);
+    if (u.hostname === 'ilabor.co.kr' && u.pathname.includes('search.php')) {
+      return {
+        ok: true,
+        status: 200,
+        url: String(url),
+        text: async () => [
+          '<table><tr><td style="font-weight: bold;font-size: 15px;">행정해석 ( 검색 수 : 12 )</td></tr>',
+          '<tr><td class="txt01"><a href="sub04_02_01.php?sid=19202">단시간근로자가 아닌 주 40시간 미만 근로자의 연차유급휴가 산정방법</a><br/>',
+          '... 주 40시간 미만 약정 소정근로시간 비례 산정 기준 안내 ... [임금근로시간과-2754] (2021-12-03)</td></tr></table>'
+        ].join('\n')
+      };
+    }
+    if (u.hostname === 'ilabor.co.kr' && u.pathname.includes('sub09_01.php')) {
+      return {
+        ok: true,
+        status: 200,
+        url: String(url),
+        text: async () => [
+          '<table><tr><td>3371</td>',
+          '<td><a href="sub09_01_01.php?sid=4101&words=포괄임금">공짜노동 근절 위한 포괄임금 오남용 방지 지도지침</a></td>',
+          '<td>고용노동부</td><td>2026-04-08</td></tr></table>'
+        ].join('\n')
+      };
+    }
+    if (u.hostname === 'www.kcplaa.or.kr') {
+      return {
+        ok: true,
+        status: 200,
+        url: String(url),
+        text: async () => '<tbody><tr><td>273</td><td><a href="/bbs/notice/view/547">알리다 33호</a></td><td>2026-11-12</td></tr></tbody>'
+      };
+    }
+    return { ok: true, status: 200, url: String(url), text: async () => '' };
+  };
+
+  /* CLI 로컬 세션 실행 시 ilabor 쿠키가 kcplaa나 타 도메인으로 절대 전송되지 않는지 확인 */
+  const cliBundle = await PBoxSync.pullKcplaaIlaborBundle({
+    fetchFn: kcMockFetch,
+    channel: 'search_fast',
+    query: '포괄임금',
+    allowCliSession: true,
+    ilaborCookie: 'PHPSESSID=testsession123',
+    skipSupabase: true
+  });
+  assert.equal(cliBundle.ok, true);
+  assert.equal(seenCookieByHost.get('ilabor.co.kr'), 'PHPSESSID=testsession123');
+  assert.equal(seenCookieByHost.get('www.kcplaa.or.kr'), '', 'ilabor 세션 쿠키가 타 호스트로 유출되면 안 됩니다');
+  assert.ok(cliBundle.docs.some((d) => d.caseNo === '임금근로시간과-2754'));
+  assert.ok(cliBundle.docs.some((d) => d.title.includes('포괄임금 오남용 방지 지도지침')));
+
+  /* 서버 HTTP handleApiAction(pull_kcplaa)에서는 클라이언트가 임의 쿠키를 보내도 무시되어야 함 */
+  seenCookieByHost.clear();
+  const apiRes = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: {
+      action: 'pull_kcplaa',
+      channel: 'moel',
+      query: '포괄임금',
+      ilaborCookie: 'PHPSESSID=injected_by_client'
+    },
+    env: {},
+    fetchFn: kcMockFetch
+  });
+  assert.equal(apiRes.status, 200);
+  assert.equal(seenCookieByHost.get('ilabor.co.kr'), '', 'HTTP pboxApi는 클라이언트가 전달한 쿠키를 외부 요청에 주입하면 안 됩니다');
+  assert.equal(apiRes.payload.docs.length, 1);
+  assert.equal(Boolean(apiRes.payload.docs[0].memberOnly), false, '비로그인 공개 수집 문서는 memberOnly가 아니어야 합니다');
+
+  /* 회원 전용 세션 문서(memberOnly)는 CLI·웹앱 Store·서버 API 전 경계에서 공유 DB 업로드가 차단되어야 함 */
+  assert.ok(cliBundle.docs.every((d) => d.memberOnly === true), '회원 세션 쿠키로 수집한 모든 문서는 memberOnly=true로 표시되어야 합니다');
+  const stCtx = {
+    window: {
+      PuPBoxEngine: Engine,
+      PuPBoxCorpus: Corpus,
+      PuPBoxLawIndex: loadLawIndex(),
+      addEventListener: () => {}
+    },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    fetch: async () => ({ ok: false })
+  };
+  stCtx.globalThis = stCtx.window;
+  vm.createContext(stCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), stCtx);
+  const LocalStore = stCtx.window.PuPBoxStore;
+  await LocalStore.init('staff_a');
+  assert.throws(
+    () => LocalStore.importBackupData({ version: 1, source: 'kcplaa-pbox-member-vault', memberVault: true, memberDocs: cliBundle.docs }),
+    /회원 전용 로컬 보관함/,
+    'CLI 회원 전용 보관함 파일은 웹앱 백업 복원에서 차단되어야 합니다'
+  );
+  let blockedPushErr = null;
+  const addMemStats = LocalStore.addDocuments([cliBundle.docs[0]], {
+    shareConfirmed: true,
+    auth: { currentUser: { uid: 'staff_a', getIdToken: async () => 'tok' } },
+    onSyncError: (err) => { blockedPushErr = err; }
+  });
+  const syncBlockOut = await addMemStats.syncPromise;
+  assert.equal(syncBlockOut.ok, false);
+  assert.ok(blockedPushErr && /memberOnly/.test(blockedPushErr.message), '웹앱 Store에서도 memberOnly 문서 공유 업로드가 차단되어야 합니다');
+
+  const srvRejectPush = await PBoxSync.handleApiAction({
+    uid: 'staff_a',
+    body: { action: 'push', docs: [Object.assign({}, cliBundle.docs[0], { memberOnly: false })] },
+    env: {},
+    fetchFn: kcMockFetch
+  });
+  assert.equal(srvRejectPush.status, 400, 'memberOnly 불리언이 제거되더라도 sources/tags의 회원전용 표식으로 서버 push가 거부되어야 합니다');
+});

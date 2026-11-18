@@ -229,6 +229,24 @@ const TOOLS = [
       required: ["query"],
       additionalProperties: false
     }
+  },
+  {
+    name: "moleg_search_kcplaa",
+    description: "한국공인노무사회 전용자료실(ilabor.co.kr: 오늘의자료·고용노동부·근로복지공단·노동위원회·보도자료·노동판례·재결례·행정해석·지침·노사정뉴스·월간포커스·법정서식/행정규칙) 및 한국공인노무사회 본회 포털(kcplaa.or.kr: 공지·소식지 알리다) 실존 자료를 직접 검색·수집합니다.",
+    annotations: READ_ONLY_ANNOTATIONS,
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", maxLength: 50, description: "검색할 노무·산재·인사 쟁점어 (생략 시 최신 오늘의 자료·공지 조회)" },
+        channel: {
+          type: "string",
+          enum: ["all", "daily_digest", "search_fast", "ilabor_all", "today", "moel", "comwel", "nlrc", "press", "prec", "decc", "interp", "guide", "news", "focus", "forms_rules", "unified", "kcplaa_notice"],
+          description: "조회할 한국공인노무사회 세부 채널 (기본값: 검색어 있을 때 search_fast, 없을 때 all)"
+        },
+        limit: { type: "integer", minimum: 2, maximum: 25, description: "최대 반환 건수 (2~25, 기본값: 12)" }
+      },
+      additionalProperties: false
+    }
   }
 ];
 
@@ -333,6 +351,8 @@ async function executeToolCall(name, args, runtimeOpts) {
       return await core.unifiedSearch(args, runtimeOpts);
     case "moleg_auto_discover":
       return await core.autoDiscover(args, runtimeOpts);
+    case "moleg_search_kcplaa":
+      return await core.searchKcplaaIlabor(args, runtimeOpts);
     default:
       throw new Error("알 수 없는 도구입니다: " + String(name));
   }

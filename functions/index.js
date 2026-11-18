@@ -8495,14 +8495,15 @@ exports.visitSmsSend = functions
    파이어베이스 실시간DB에는 아무것도 쓰지 않아 RTDB 저장·대역폭 비용이 0원이다. */
 exports.pboxDailySync = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 180, memory: "256MB" })
+  .runWith({ timeoutSeconds: 180, memory: "512MB" })
   .pubsub.schedule("every day 03:20")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const PBoxSync = require("./pbox-sync");
     const r = await PBoxSync.runSync({
       env: process.env,
-      storageBucket: getStorage().bucket(PHOTO_BUCKET)
+      storageBucket: getStorage().bucket(PHOTO_BUCKET),
+      includeKcplaa: true
     });
     console.log("[P박스 일일 동기화]", JSON.stringify({
       krTreeSha: r.krTreeSha,

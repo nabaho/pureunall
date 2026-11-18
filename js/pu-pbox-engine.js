@@ -244,10 +244,16 @@
   }
 
   function sanitizeOfficialLawUrlClient(rawUrl) {
-    var s = String(rawUrl || '').trim().replace(/^https:\/\/law\.go\.kr\/LSW\//, 'https://www.law.go.kr/LSW/');
+    var s = String(rawUrl || '').trim()
+      .replace(/^https:\/\/law\.go\.kr\/LSW\//, 'https://www.law.go.kr/LSW/')
+      .replace(/^https:\/\/www\.ilabor\.co\.kr\/main\//, 'https://ilabor.co.kr/main/')
+      .replace(/^https:\/\/kcplaa\.or\.kr\/bbs\//, 'https://www.kcplaa.or.kr/bbs/');
     if (!s) return '';
-    if (!/^https:\/\/www\.law\.go\.kr\/LSW\/[A-Za-z0-9_.?&=+-]+$/.test(s)) return '';
-    return s;
+    if (s.indexOf('..') >= 0 || s.indexOf('//', 8) >= 0 || /%(?:2e|2f|5c|00|0d|0a)/i.test(s)) return '';
+    if (/^https:\/\/www\.law\.go\.kr\/LSW\/[A-Za-z0-9_.?&=+-]+$/.test(s)) return s;
+    if (/^https:\/\/ilabor\.co\.kr\/main\/(?:index|search|site_map|sub0[1-9]_0[1-9](?:s|_01)?)\.php(?:\?[A-Za-z0-9_=&-]+)?$/.test(s)) return s;
+    if (/^https:\/\/www\.kcplaa\.or\.kr\/bbs\/(?:notice|news|labor_news|law|policy|rule|edu_info|edu_notice|work_notice)\/(?:list|view\/[0-9]{1,8})(?:\?[A-Za-z0-9_=&-]+)?$/.test(s)) return s;
+    return '';
   }
 
   var DEPRECATED_SYNTHETIC_DOC_IDS = new Set([
@@ -374,8 +380,21 @@
     return union > 0 ? inter / union : 0;
   }
 
+  function isMemberRestrictedDoc(d) {
+    if (!d || typeof d !== 'object') return false;
+    if (d.memberOnly === true) return true;
+    var metaArr = [].concat(d.sources || [], d.tags || []);
+    for (var i = 0; i < metaArr.length; i++) {
+      if (/회원전용|로컬전용|kcplaa_member/i.test(String(metaArr[i] || ''))) return true;
+    }
+    return false;
+  }
+
   function mergeTwoDocs(target, incoming, stageLabel) {
     var out = Object.assign({}, target);
+    if (isMemberRestrictedDoc(target) || isMemberRestrictedDoc(incoming)) {
+      out.memberOnly = true;
+    }
     var srcSet = new Set([].concat(target.sources || [], incoming.sources || []).filter(Boolean));
     out.sources = Array.from(srcSet);
 
@@ -3694,6 +3713,7 @@
     normalizeCourt: normalizeCourt,
     normalizeCaseNo: normalizeCaseNo,
     sanitizeOfficialLawUrlClient: sanitizeOfficialLawUrlClient,
+    isMemberRestrictedDoc: isMemberRestrictedDoc,
     isDeprecatedSyntheticDoc: isDeprecatedSyntheticDoc,
     deterministicDocHash16: deterministicDocHash16,
     canonicalKeyOf: canonicalKeyOf,
