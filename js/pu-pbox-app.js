@@ -46,6 +46,14 @@
     lowerCustomQuery: '',
     lowerStatusBanner: null,
 
+    /* 중앙행정심판·특별행정심판·위원회 심판·재결 전체 공식 API 수집 조건 */
+    tribunalPullBusy: false,
+    tribunalFilter: 'all',
+    tribunalLocalOrg: '',
+    tribunalPreset: 'all',
+    tribunalCustomQuery: '',
+    tribunalStatusBanner: null,
+
     /* 국가법령 전수함 필터·선택 */
     lawCat: 'priority',
     lawQuery: '',
@@ -54,6 +62,7 @@
 
     /* 판례·심결·유권해석 스마트 필터·선택 */
     caseDocType: 'all',
+    caseTribunalOrg: 'all',
     caseQuery: '',
     caseSubQuery: '',
     caseDateRange: 'all',    // all | 1y | 3y | 5y
@@ -1250,7 +1259,7 @@
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="laws"><span aria-hidden="true">📖</span><span>주석·법령전수함</span><span id="pboxLawCnt" class="pbox-nav-cnt">5,773</span></button>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="cases"><span aria-hidden="true">⚖️</span><span>판례·결정·유권해석</span><span id="pboxCaseCnt" class="pbox-nav-cnt">0</span></button>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="sites"><span aria-hidden="true">🌐</span><span>전국 사이트 직접검색</span><span id="pboxSiteCnt" class="pbox-nav-cnt">' + totalSitesCnt + '</span></button>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="ingest"><span aria-hidden="true">📥</span><span>하급심·판결 수집</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="ingest"><span aria-hidden="true">📥</span><span>하급심·심판 수집</span></button>',
       '      <div class="pbox-nav-divider" role="separator"></div>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="recents"><span aria-hidden="true">🕘</span><span>최근 본 자료</span></button>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="workflows"><span aria-hidden="true">▷</span><span>워크플로</span></button>',
@@ -1338,9 +1347,9 @@
       workspace: '✦ 내용 검토 · 문서 작성 워크스페이스 (우측 원문 대조)',
       alerts: '법령·판례 개정 및 전 기관 실시간 자동수집 현황',
       laws: '주석 · 대한민국 국가법령 전수함 (법률·시행령·시행규칙 5,773편)',
-      cases: '판례 · 위원회 결정례 · 부처 유권해석 스마트 검색 & 실시간 수집',
+      cases: '판례 · 중앙행심 · 특별심판 · 부처 유권해석 스마트 검색 & 실시간 수집',
       sites: '🌐 대한민국 전 법률·공공사이트 직접검색 허브 & 대형로펌 리서치 체계',
-      ingest: '지방법원·행정법원 하급심 판례 및 결정서 비식별 수집함',
+      ingest: '하급심 판례 및 중앙행정심판·특별행정심판·전 위원회 재결례 공식 수집함',
       recents: '최근 본 법령 · 판례 · 결정례 · 유권해석 관리',
       workflows: '공인노무사 워크플로 라이브러리',
       projects: '의뢰인 · 사건별 프로젝트 보관함',
@@ -2131,14 +2140,26 @@
       limit: 200,
       ragLimit: 8
     };
-    if (state.caseDocType === 'all' && E && typeof E.searchUnifiedAllInOne === 'function') {
-      return E.searchUnifiedAllInOne(state.caseQuery, searchOpts);
+    var outRes = (state.caseDocType === 'all' && E && typeof E.searchUnifiedAllInOne === 'function')
+      ? E.searchUnifiedAllInOne(state.caseQuery, searchOpts)
+      : E.searchCorpus(state.caseQuery, searchOpts);
+    if (state.caseDocType === 'dec_nlrc' && state.caseTribunalOrg && state.caseTribunalOrg !== 'all') {
+      var trbOrgs = (global.PuPBoxCorpus && global.PuPBoxCorpus.TRIBUNAL_ORGS) || [];
+      var curTrb = trbOrgs.find(function (o) { return o.id === state.caseTribunalOrg; });
+      if (curTrb && curTrb.matchRe) {
+        var trbRe = new RegExp(curTrb.matchRe);
+        var fDocs = (outRes.docs || []).filter(function (d) {
+          return trbRe.test((d.court || '') + ' ' + (d.agency || '') + ' ' + (d.caseNo || ''));
+        });
+        outRes = Object.assign({}, outRes, { docs: fDocs, totalMatchedDocs: fDocs.length });
+      }
     }
-    return E.searchCorpus(state.caseQuery, searchOpts);
+    return outRes;
   }
 
   function buildCasesHtml() {
     var dtypes = global.PuPBoxCorpus.DOC_TYPES || [];
+    var trbOrgs = global.PuPBoxCorpus.TRIBUNAL_ORGS || [];
     var issueTree = global.PuPBoxCorpus.ISSUE_FINDER_TREE || [];
     var allSites = global.PuPBoxCorpus.KOREA_LEGAL_SITES || [];
     var E = global.PuPBoxEngine;
@@ -2173,6 +2194,14 @@
         return '<button type="button" class="pbox-cat-chip' + (isAct ? ' active' : '') + '" aria-pressed="' + (isAct ? 'true' : 'false') + '" data-act="set-case-type" data-dtype="' + dt.id + '">' + esc(dt.label) + '</button>';
       }).join(''),
       '    </div>',
+      (state.caseDocType === 'dec_nlrc' && trbOrgs.length ? [
+        '    <div class="pbox-chip-bar" style="margin-top:-2px;margin-bottom:8px" role="group" aria-label="심판·재결 기관별 필터">',
+        trbOrgs.map(function (org) {
+          var isTrbAct = state.caseTribunalOrg === org.id;
+          return '<button type="button" class="pbox-cat-chip' + (isTrbAct ? ' active' : '') + '" aria-pressed="' + (isTrbAct ? 'true' : 'false') + '" data-act="set-tribunal-org" data-org="' + esc(org.id) + '">' + esc(org.label) + '</button>';
+        }).join(''),
+        '    </div>'
+      ].join('\n') : ''),
       '    <div class="pbox-search-bar">',
       '      <input type="search" id="pboxCaseSearchInput" class="pbox-input" aria-label="판례·재결·행정해석·조례 검색" value="' + esc(state.caseQuery) + '" placeholder="사건·회시·조례번호(2020다247190, 근기 68207-694, 법제처 18-0687, 서울특별시조례 제8993호), 약칭조문(근기법 23), 쟁점어(생활임금 조례, 허리디스크 산재…)">',
       '      <button type="button" class="pbox-btn-primary" data-act="run-case-filter">🔍 통합 검색</button>',
@@ -2421,10 +2450,72 @@
     { value: 'status', label: '근로자성·직장내괴롭힘·노조' }
   ];
 
+  var TRIBUNAL_OPTIONS = [
+    { value: 'all', label: '전체 심판·재결·결정 통합 (23개 공식 채널)' },
+    { value: 'decc_acrc', label: '중앙행정심판위원회 (국민권익위 일반행정심판)' },
+    { value: 'decc_acr_spc', label: '국민권익위원회 특별행정심판' },
+    { value: 'decc_local', label: '전국 시·도 및 교육청 행정심판위원회' },
+    { value: 'nlrc', label: '중앙노동위원회 · 지방노동위원회 (판정·재심판정)' },
+    { value: 'iaciac', label: '산업재해보상보험재심사위원회 (산재 재결례)' },
+    { value: 'eiac', label: '고용보험심사위원회 (구직급여·육아휴직급여 재결례)' },
+    { value: 'adap', label: '인사혁신처 소청심사위원회 (국가공무원 소청)' },
+    { value: 'local_adap', label: '지방소청심사위원회 (지방공무원 소청)' },
+    { value: 'tt', label: '조세심판원 (국세·지방세 특별행정심판)' },
+    { value: 'kipo_trb', label: '특허심판원 (직무발명·특허·상표 심결례)' },
+    { value: 'kmst', label: '해양안전심판원 (선박사고·해기사 특별행정심판)' },
+    { value: 'oclt', label: '중앙토지수용위원회 (토지수용·이의재결례)' },
+    { value: 'hira_trb', label: '건강보험분쟁조정위원회 (요양급여 결정례)' },
+    { value: 'ftc', label: '공정거래위원회 (하도급·위수탁·부당특약 심결례)' },
+    { value: 'ppc', label: '개인정보보호위원회 (인사·CCTV·과징금 심결례)' },
+    { value: 'acr', label: '국민권익위원회 (고충민원·부패방지 의결례)' },
+    { value: 'nhrck', label: '국가인권위원회 (고용·채용·병역 차별 결정례)' },
+    { value: 'fsc', label: '금융위원회 (금융제재·의결례)' },
+    { value: 'sfc', label: '증권선물위원회 (자본시장 제재 의결례)' },
+    { value: 'kcc', label: '방송미디어통신위원회 (방통위 심결례)' },
+    { value: 'ecc', label: '중앙환경분쟁조정위원회 (소음·진동·분진 재정례)' },
+    { value: 'baiPvcs', label: '감사원 사전컨설팅 의견서' }
+  ];
+
+  var LOCAL_APPEAL_ORG_OPTIONS = [
+    { value: '', label: '전국 주요 시·도/교육청 행심위 자동 선택' },
+    { value: '서울특별시행정심판위원회', label: '서울특별시행정심판위원회' },
+    { value: '경기도행정심판위원회', label: '경기도행정심판위원회' },
+    { value: '부산광역시행정심판위원회', label: '부산광역시행정심판위원회' },
+    { value: '인천광역시행정심판위원회', label: '인천광역시행정심판위원회' },
+    { value: '대구광역시행정심판위원회', label: '대구광역시행정심판위원회' },
+    { value: '광주광역시행정심판위원회', label: '광주광역시행정심판위원회' },
+    { value: '대전광역시행정심판위원회', label: '대전광역시행정심판위원회' },
+    { value: '울산광역시행정심판위원회', label: '울산광역시행정심판위원회' },
+    { value: '세종특별자치시행정심판위원회', label: '세종특별자치시행정심판위원회' },
+    { value: '강원특별자치도행정심판위원회', label: '강원특별자치도행정심판위원회' },
+    { value: '충청남도행정심판위원회', label: '충청남도행정심판위원회' },
+    { value: '경상북도행정심판위원회', label: '경상북도행정심판위원회' },
+    { value: '경상남도행정심판위원회', label: '경상남도행정심판위원회' },
+    { value: '제주특별자치도행정심판위원회', label: '제주특별자치도행정심판위원회' },
+    { value: '경기도교육청행정심판위원회', label: '경기도교육청행정심판위원회' },
+    { value: '강원특별자치도교육청행정심판위원회', label: '강원특별자치도교육청행정심판위원회' },
+    { value: '경상남도교육청행정심판위원회', label: '경상남도교육청행정심판위원회' },
+    { value: '경상북도교육청행정심판위원회', label: '경상북도교육청행정심판위원회' },
+    { value: '광주광역시교육청행정심판위원회', label: '광주광역시교육청행정심판위원회' },
+    { value: '대구광역시교육청행정심판위원회', label: '대구광역시교육청행정심판위원회' },
+    { value: '충청북도교육청행정심판위원회', label: '충청북도교육청행정심판위원회' },
+    { value: '서울지방교정청행정심판위원회', label: '서울지방교정청행정심판위원회' }
+  ];
+
+  var TRIBUNAL_PRESET_OPTIONS = [
+    { value: 'all', label: '공통 핵심쟁점 (전체 채널 선택 시 대표어 「처분」 · 개별 기관 선택 시 3종 순차 수집)' },
+    { value: 'admin_disp', label: '일반행정심판 (영업정지 · 과징금 · 환수처분)' },
+    { value: 'labor_sanjae', label: '노동·산재·고용보험 (부당해고 · 부당노동행위 · 요양불승인)' },
+    { value: 'civil_public', label: '공무원·교원 소청 (감봉 · 정직 · 해임)' },
+    { value: 'tax_land_marine', label: '특별심판 (취득세 · 법인세 · 퇴직소득 · 수용보상금)' },
+    { value: 'fair_rights', label: '독립위원회 (하도급 · 개인정보 · 고용차별)' }
+  ];
+
   function buildIngestHtml() {
     var pv = state.ingestPreview;
     var busyAttr = state.ingestBusy ? ' disabled aria-busy="true"' : '';
     var lowerBusyAttr = state.lowerPullBusy ? ' disabled aria-busy="true"' : '';
+    var trbBusyAttr = state.tribunalPullBusy ? ' disabled aria-busy="true"' : '';
     var cfg = global.PuPBoxStore.getConfig();
     var lb = state.lowerStatusBanner;
     var lowerBannerHtml = lb
@@ -2433,13 +2524,19 @@
          (lb.detail ? ('<div style="margin-top:3px">' + esc(lb.detail) + '</div>') : '') +
          '</div>')
       : '';
+    var tb = state.tribunalStatusBanner;
+    var trbBannerHtml = tb
+      ? ('    <div class="pbox-status-banner ' + esc(tb.kind) + '" role="' + (tb.kind === 'ok' ? 'status' : 'alert') + '">' +
+         '<strong>' + esc(tb.title) + '</strong>' +
+         (tb.detail ? ('<div style="margin-top:3px">' + esc(tb.detail) + '</div>') : '') +
+         '</div>')
+      : '';
     return [
       '<div class="pbox-page-wrap">',
       '  <div class="pbox-card pbox-flat-m" style="margin-bottom:14px">',
       '    <div class="pbox-sec-hd"><span>🏛️ 지방법원 · 행정법원 · 고등법원 하급심 공식 API 자동 수집 (org=400202)</span></div>',
       '    <div class="pbox-info-note">',
-      '      <b>OC 아이디 미입력 상태에서도</b> 국가법령정보센터(<code>law.go.kr</code>) 공식 공개 원문에서 <b>지방법원·행정법원·고등법원 하급심 판례(<code>org=400202</code>)</b>를 즉시 당겨와 비식별·중복 제거 후 적재합니다 (법제처 무료 <b>OC 아이디</b> 등록 시 고속 DRF API 및 근로복지공단 산재 판례 병행 수집).<br>',
-      '      수천 건 초기 대량 적재가 필요할 때는 터미널에서 <code class="pbox-inline-code">node scripts/backfill-pbox-lowercourt.js --oc=아이디</code> 를 실행해 생성된 JSON 파일을 아래 수집함에 끌어다 놓으세요.',
+      '      <b>OC 아이디 미입력 상태에서도</b> 국가법령정보센터(<code>law.go.kr</code>) 공식 원문에서 <b>지방법원·행정법원·고등법원 하급심 판례(<code>org=400202</code>)</b>를 즉시 비식별·중복제거 수집합니다 (무료 OC 아이디 입력 시 고속 DRF API 및 근로복지공단 산재판례 병행 수집).',
       '    </div>',
       '    <div class="pbox-matched-grid" style="margin-bottom:10px">',
       '      <label class="pbox-field"><span class="pbox-label">대상 하급심 법원</span>' +
@@ -2465,6 +2562,45 @@
       '      <button type="button" class="pbox-btn-primary" data-act="pull-lower-court"' + lowerBusyAttr + '>' + (state.lowerPullBusy ? '⏳ 하급심 판례 수집 중…' : '📥 지방법원·하급심 판례 당겨오기') + '</button>',
       '    </div>',
       lowerBannerHtml,
+      '  </div>',
+      '  <div class="pbox-card pbox-flat-m" style="margin-bottom:14px">',
+      '    <div class="pbox-sec-hd"><span>⚖️ 중앙행정심판위원회 · 특별행정심판원 · 전 위원회 심판·재결 사건 공식 API 수집</span></div>',
+      '    <div class="pbox-info-note">',
+      '      <b>OC 아이디 미입력 상태에서도</b> 국가법령정보센터(<code>law.go.kr</code>) 공식 원문에서 <b>중앙행정심판위원회, 시·도 행심위, 중앙·지방노동위원회, 산재재심사위, 고용보험심사위, 인사혁신처·지방 소청심사위, 조세심판원, 특허심판원, 해양안전심판원, 중앙토지수용위, 공정위, 개인정보위, 권익위, 인권위, 금융위, 방통위, 환경분쟁조정위, 감사원</b> 사건 전체를 실시간 비식별 수집합니다.',
+      '    </div>',
+      '    <div class="pbox-matched-grid" style="margin-bottom:10px">',
+      '      <label class="pbox-field"><span class="pbox-label">대상 심판·재결 기관</span>' +
+               '<select id="pboxTribunalSel" class="pbox-input">' +
+               TRIBUNAL_OPTIONS.map(function (opt) {
+                 var selT = state.tribunalFilter === opt.value ? ' selected' : '';
+                 return '<option value="' + esc(opt.value) + '"' + selT + '>' + esc(opt.label) + '</option>';
+               }).join('') +
+               '</select></label>',
+      (state.tribunalFilter === 'decc_local'
+        ? ('      <label class="pbox-field"><span class="pbox-label">대상 시·도 · 교육청 행정심판위원회</span>' +
+             '<select id="pboxTribunalLocalOrgSel" class="pbox-input">' +
+             LOCAL_APPEAL_ORG_OPTIONS.map(function (opt) {
+               var selL = state.tribunalLocalOrg === opt.value ? ' selected' : '';
+               return '<option value="' + esc(opt.value) + '"' + selL + '>' + esc(opt.label) + '</option>';
+             }).join('') +
+             '</select></label>')
+        : ''),
+      '      <label class="pbox-field"><span class="pbox-label">심판 쟁점 묶음</span>' +
+               '<select id="pboxTribunalPresetSel" class="pbox-input">' +
+               TRIBUNAL_PRESET_OPTIONS.map(function (opt) {
+                 var selP = state.tribunalPreset === opt.value ? ' selected' : '';
+                 return '<option value="' + esc(opt.value) + '"' + selP + '>' + esc(opt.label) + '</option>';
+               }).join('') +
+               '</select></label>',
+      '      <label class="pbox-field"><span class="pbox-label">지정 검색어 (선택 · 사건번호·처분명 집중 수집)</span>' +
+               '<input type="text" id="pboxTribunalQueryInput" class="pbox-input" value="' + esc(state.tribunalCustomQuery) + '" placeholder="예: 영업정지, 환수처분, 감봉, 요양불승인, 하도급"></label>',
+      '      <label class="pbox-field"><span class="pbox-label">법제처 무료 OC 아이디 (선택 · 미입력 시 공식 원문 직접 수집)</span>' +
+               '<input type="text" id="pboxTribunalLawOcInput" class="pbox-input" value="' + esc(cfg.lawOc || '') + '" placeholder="open.law.go.kr 신청 이메일 앞자리"></label>',
+      '    </div>',
+      '    <div class="pbox-btn-group">',
+      '      <button type="button" class="pbox-btn-primary" data-act="pull-tribunal-cases"' + trbBusyAttr + '>' + (state.tribunalPullBusy ? '⏳ 심판·재결 사건 수집 중…' : '📥 심판·재결 사건 당겨오기') + '</button>',
+      '    </div>',
+      trbBannerHtml,
       '  </div>',
       '  <div class="pbox-card pbox-flat-m" style="margin-bottom:14px">',
       '    <div class="pbox-sec-hd"><span>📥 사법정보공개포털 PDF · AI-Hub/백필 JSON · 수행 사건 결정문 적재함</span></div>',
@@ -3590,7 +3726,19 @@
         renderAll();
       });
     } else if (act === 'set-case-type') {
+      var ciType = document.getElementById('pboxCaseSearchInput');
+      var subTypeIn = document.getElementById('pboxCaseSubInput');
+      if (ciType) state.caseQuery = ciType.value;
+      if (subTypeIn) state.caseSubQuery = subTypeIn.value;
       state.caseDocType = btn.getAttribute('data-dtype') || 'all';
+      if (state.caseDocType !== 'dec_nlrc') state.caseTribunalOrg = 'all';
+      renderMain();
+    } else if (act === 'set-tribunal-org') {
+      var ciOrg = document.getElementById('pboxCaseSearchInput');
+      var subOrgIn = document.getElementById('pboxCaseSubInput');
+      if (ciOrg) state.caseQuery = ciOrg.value;
+      if (subOrgIn) state.caseSubQuery = subOrgIn.value;
+      state.caseTribunalOrg = btn.getAttribute('data-org') || 'all';
       renderMain();
     } else if (act === 'run-case-filter') {
       var ci = document.getElementById('pboxCaseSearchInput');
@@ -3809,6 +3957,73 @@
         };
         renderMain();
         toast('하급심 수집 실패: ' + errMsg, 'err');
+      });
+    } else if (act === 'pull-tribunal-cases') {
+      if (state.tribunalPullBusy) return;
+      var trbSel = document.getElementById('pboxTribunalSel');
+      var trbPresetSel = document.getElementById('pboxTribunalPresetSel');
+      var trbLocalSel = document.getElementById('pboxTribunalLocalOrgSel');
+      var trbQInp = document.getElementById('pboxTribunalQueryInput');
+      var trbOcInp = document.getElementById('pboxTribunalLawOcInput');
+      if (trbSel) state.tribunalFilter = trbSel.value || 'all';
+      if (trbLocalSel) state.tribunalLocalOrg = trbLocalSel.value || '';
+      if (trbPresetSel) state.tribunalPreset = trbPresetSel.value || 'all';
+      if (trbQInp) state.tribunalCustomQuery = trbQInp.value.trim();
+      var trbOcVal = trbOcInp ? trbOcInp.value.trim() : '';
+
+      var trbStartGen = global.PuPBoxStore.getSessionGen();
+      var trbStartUid = global.PuPBoxStore.getActiveUid();
+      state.tribunalPullBusy = true;
+      state.tribunalStatusBanner = null;
+      renderMain();
+
+      global.PuPBoxStore.pullTribunalOfficial({
+        expectedGen: trbStartGen,
+        expectedUid: trbStartUid,
+        auth: snapshotAuthForUid(trbStartUid),
+        lawOc: trbOcVal,
+        tribunal: state.tribunalFilter,
+        localOrg: state.tribunalFilter === 'decc_local' ? state.tribunalLocalOrg : '',
+        preset: state.tribunalPreset,
+        query: state.tribunalCustomQuery
+      }).then(function (res) {
+        if (!isSameSession(trbStartGen, trbStartUid)) return;
+        state.tribunalPullBusy = false;
+        var trbWarns = Array.isArray(res.errors) ? res.errors.filter(Boolean) : [];
+        var hitDetail = (Array.isArray(res.sourcesHit) && res.sourcesHit.length)
+          ? res.sourcesHit.join(' · ')
+          : '판례·결정·유권해석 메뉴와 AI 질의창에서 즉시 활용할 수 있습니다.';
+        if (res.partial || trbWarns.length) {
+          state.tribunalStatusBanner = {
+            kind: 'warn',
+            title: '⚠ 심판·재결 일부 수집 완료: 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건',
+            detail: hitDetail + (trbWarns.length ? (' / 경고: ' + trbWarns.slice(0, 2).join(' / ')) : '')
+          };
+          toast('심판·재결 수집 완료: 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건');
+        } else {
+          state.tribunalStatusBanner = {
+            kind: 'ok',
+            title: '✓ 심판·재결 공식 수집 완료: 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건',
+            detail: hitDetail
+          };
+          toast('심판·재결 사건 수집 완료! 신규 ' + res.added + '건 · 중복병합 ' + res.merged + '건');
+        }
+        renderAll();
+      }).catch(function (errT) {
+        if (!isSameSession(trbStartGen, trbStartUid)) return;
+        state.tribunalPullBusy = false;
+        if (errT && errT.staleSession) {
+          renderMain();
+          return;
+        }
+        var errMsgT = String((errT && errT.message) || errT || '심판·재결 수집 요청에 실패했습니다.');
+        state.tribunalStatusBanner = {
+          kind: 'err',
+          title: '✕ 심판·재결 공식 API 수집 실패',
+          detail: errMsgT
+        };
+        renderMain();
+        toast('심판·재결 수집 실패: ' + errMsgT, 'err');
       });
     } else if (act === 'preview-ingest') {
       var ita = document.getElementById('pboxIngestTa');
@@ -4168,9 +4383,17 @@
       return;
     }
 
+    var customTargets = [];
+    if (state.caseDocType === 'dec_nlrc' && state.caseTribunalOrg && state.caseTribunalOrg !== 'all') {
+      var orgList = (global.PuPBoxCorpus && global.PuPBoxCorpus.TRIBUNAL_ORGS) || [];
+      var selOrgObj = orgList.find(function (o) { return o.id === state.caseTribunalOrg; });
+      if (selOrgObj && Array.isArray(selOrgObj.targets)) customTargets = selOrgObj.targets.slice();
+    }
+
     global.PuPBoxStore.liveSearchAndCollect({
       query: q,
       docType: state.caseDocType,
+      targets: customTargets,
       lawOc: cfg.lawOc || '',
       expectedGen: startGen,
       expectedUid: startUid,
@@ -4415,6 +4638,15 @@
         ev.target.value = '';
       } else if (ev.target.id === 'pboxShareConfirmChk') {
         state.ingestShareConfirmed = !!ev.target.checked;
+      } else if (ev.target.id === 'pboxTribunalSel') {
+        var curTrbQ = document.getElementById('pboxTribunalQueryInput');
+        var curTrbPreset = document.getElementById('pboxTribunalPresetSel');
+        if (curTrbQ) state.tribunalCustomQuery = curTrbQ.value;
+        if (curTrbPreset) state.tribunalPreset = curTrbPreset.value || 'all';
+        state.tribunalFilter = ev.target.value || 'all';
+        renderMain();
+      } else if (ev.target.id === 'pboxTribunalLocalOrgSel') {
+        state.tribunalLocalOrg = ev.target.value || '';
       } else if (ev.target.id === 'pboxBackupFileInput' && ev.target.files && ev.target.files[0]) {
         if (state.backupBusy) {
           ev.target.value = '';

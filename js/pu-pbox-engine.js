@@ -244,9 +244,9 @@
   }
 
   function sanitizeOfficialLawUrlClient(rawUrl) {
-    var s = String(rawUrl || '').trim();
+    var s = String(rawUrl || '').trim().replace(/^https:\/\/law\.go\.kr\/LSW\//, 'https://www.law.go.kr/LSW/');
     if (!s) return '';
-    if (!/^https:\/\/(?:www\.|open\.)?law\.go\.kr\/LSW\/[A-Za-z0-9_.?&=+-]+$/.test(s)) return '';
+    if (!/^https:\/\/www\.law\.go\.kr\/LSW\/[A-Za-z0-9_.?&=+-]+$/.test(s)) return '';
     return s;
   }
 
@@ -758,7 +758,7 @@
           hStr += vis[hk].ch;
           hk++;
         }
-        if (hk > endVis + 1 && hk < vis.length && vis[hk].d >= 0 && /^(?:다|두|도|마|모|바|부|스|으|추|초|카|쿠|크|트|프|허|후|히|가합|가단|가소|나|노|누|구합|구단|고합|고단|고정|고약|즈단|즈기|카합|카단|카기|타채|하합|하단|회합|회단|간|재다|재두|재도|헌마|헌바|헌가|헌나|헌라|헌사|헌아|행심|부해|부노|차별)$/.test(hStr)) {
+        if (hk > endVis + 1 && hk < vis.length && vis[hk].d >= 0 && /^(?:다|두|도|마|모|바|부|스|으|추|초|카|쿠|크|트|프|허|후|히|가합|가단|가소|나|노|누|구합|구단|고합|고단|고정|고약|즈단|즈기|카합|카단|카기|타채|하합|하단|회합|회단|간|재다|재두|재도|헌마|헌바|헌가|헌나|헌라|헌사|헌아|행심|부해|부노|차별|조심|해심|특심|진정|기조|심결|환조|재결|소청)$/.test(hStr)) {
           isCaseYearPrefix = true;
         }
       }
@@ -881,7 +881,7 @@
         (ri + 2 >= runs.length || classifySep(runs[ri + 1], runs[ri + 2], false) === null)
       ) {
         var spAdm = classifySep(runs[ri], runs[ri + 1], false);
-        if (spAdm && spAdm.hasDash && /(?:행심|심판|위원회|권익위|재결|재심사위|사건번호|안건번호)\s*[:：]?\s*$/.test(s.slice(Math.max(0, runs[ri].pos - 18), runs[ri].pos))) {
+        if (spAdm && spAdm.hasDash && /(?:행심|심판|위원회|권익위|재결|재심사위|소청|조심|해심|특심|중토|공정위|개보위|인권위|방통위|금융위|증선위|환조|고보|사건번호|안건번호)\s*[:：]?\s*$/.test(s.slice(Math.max(0, runs[ri].pos - 18), runs[ri].pos))) {
           ri += 2;
           continue;
         }
@@ -901,7 +901,7 @@
       if (
         runs[ri].len >= 8 && runs[ri].len <= 15 &&
         (ri + 1 >= runs.length || classifySep(runs[ri], runs[ri + 1], false) === null) &&
-        /(?:admRulSeq|ordcSeq|ordinSeq|precSeq|detcSeq|expcSeq|cgmExpcDatSeq|nlrcSeq|deccSeq|ppcSeq|acrSeq|nhrckSeq|decsnDocDatSeq|flSeq|lsiSeq|efYd)=$/.test(s.slice(Math.max(0, runs[ri].pos - 18), runs[ri].pos))
+        /(?:admRulSeq|ordcSeq|ordinSeq|precSeq|detcSeq|expcSeq|cgmExpcDatSeq|nlrcSeq|deccSeq|specialDeccSeq|ftcSeq|ppcSeq|acrSeq|nhrckSeq|decsnDocDatSeq|baiPvcsDatSeq|flSeq|lsiSeq|efYd)=$/.test(s.slice(Math.max(0, runs[ri].pos - 22), runs[ri].pos))
       ) {
         ri++;
         continue;
@@ -3557,8 +3557,8 @@
       });
     }
 
-    /* ② 행정해석·법제처 해석/의견제시·조례·고시/예규/훈령·위원회 결정례 문서번호 검출 */
-    var interpRe = /(법제처\s*(?:의견)?\d{2}-\d{4}|[가-힣]{2,16}조례\s*제\d{1,6}호|[가-힣]{2,14}(?:고시|예규|훈령)\s*제[0-9-]{1,14}호|(?:산재재심사위|중앙행심|개인정보위)\s*제?[0-9]{4}-[0-9-]{2,12}호?|인권위\s*\d{2}진정\d{5,8}|20\d{2}[가-힣]{1,4}(?:OOO|○○○)\(중노위#\d{3,8}\)|[가-힣]{1,18}(?:\s*판정기준|과|팀|부|실|담당관|위원회|위|고시|재심사|시행령|시행규칙)-[0-9가-힣]{1,18}|(?:근기|임금|노조|산재|산안|고평|고보|근정|근지|노정|퇴직|징수|산보)\s*\d{3,6}-\d{1,6})/g;
+    /* ② 행정해석·법제처 해석/의견제시·조례·고시/예규/훈령·중앙행심/특별심판/위원회 결정례 문서번호 검출 */
+    var interpRe = /(법제처\s*(?:의견)?\d{2}-\d{4}|감사원\s*\d{2}-\d{2,5}|[가-힣]{2,16}조례\s*제\d{1,6}호|[가-힣]{2,14}(?:고시|예규|훈령)\s*제[0-9-]{1,14}호|(?:산재재심사위|[가-힣]{2,12}행심|개인정보위|[가-힣]*해심)\s*제?[0-9]{4}-[0-9-]{2,12}호?|제(?:19|20)\d{2}-\d{2,4}-\d{2,5}호|소청\s*제?(?:19|20)\d{2}-\d{1,6}호?|20\d{2}재결\s*제\d{1,6}호|의결\s*제\s*(?:19|20)\d{2}\s*-\s*\d{1,5}\s*호|제?(?:19|20)\d{2}-\d{1,2}소위\d{1,3}-[가-힣0-9]{2,6}호?|(?:중앙|지방|[가-힣]{2})환조\s*\d{2}-\d{1,2}-\d{1,5}|(?:19|20)\d{2}-\d{3,6}호|(?:인권위\s*)?\d{2}진정\d{5,8}|20\d{2}[가-힣]{1,4}(?:OOO|○○○)\(중노위#\d{3,8}\)|[가-힣]{2,14}위#\d{3,8}|[가-힣]{1,18}(?:\s*판정기준|과|팀|부|실|담당관|위원회|위|고시|재심사|시행령|시행규칙)-[0-9가-힣]{1,18}|(?:근기|임금|노조|산재|산안|고평|고보|근정|근지|노정|퇴직|징수|산보)\s*\d{3,6}-\d{1,6})/g;
     var im;
     while ((im = interpRe.exec(text))) {
       var rawDocNo = im[1].trim();
