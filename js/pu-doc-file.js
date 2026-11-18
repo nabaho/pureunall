@@ -339,6 +339,68 @@
     return row;
   }
 
+  /* ── 같은 사람을 «동시에» 두 곳이 처리하지 않게 — 사람별 잠금 (대표 지시 2026-11-18) ──
+     「리멤버에서 가지고 오더라도 중복 명함은 안 된다 … 기업정보함도 중복으로 정리되면 안 된다. 프로그램으로 무조건 거르게」
+     중복이 생기던 틈: 「이미 있나?」 읽기 → 없으면 «새로 만들기» 사이에, 다른 곳(리멤버 받는 탭·메일 서명 줄·사진첩)이 같은 사람으로
+     똑같이 «없다»를 읽고 둘 다 새로 만들었다. 읽기와 쓰기가 한 덩어리가 아니라서다.
+     → 같은 사람(이름 열쇠)은 한 번에 «한 곳만» 이 대목(찾기→만들기·채우기)을 지난다. 잠금은 실시간DB 트랜잭션이라 탭·브라우저가 달라도 지킨다.
+     ⚠ 열쇠는 이름 «전체»를 쓴다(휴대폰이 있든 없든) — 번호가 있는 쪽과 없는 쪽이 같은 사람일 수 있어서다.
+        해시가 부딪혀도 «잠깐 기다릴 뿐» 해가 없다(잠금은 결정이 아니라 순서 세우기다).
+     ⚠ 잡은 채 죽은 곳이 있어도 TTL(40초)이 풀어 준다. 70초를 기다려도 못 잡으면 «만들지 않고» 오류로 돌려보낸다 — 잠금 없이 만들면 중복이다.
+     ⚠ transaction 을 못 쓰는 환경(옛 시험용 가짜 DB)은 잠그지 않고 그대로 간다 — 운영 DB 는 늘 쓴다. */
+  var LOCK_ROOT = 'sendLock';                                   /* pucards/sendLock/{열쇠} */
+  var LOCK_TTL_MS = 40000, LOCK_STEP_MS = 250, LOCK_MAX_WAIT_MS = 70000;
+
+  function shortHash(text) {
+    var s = String(text == null ? '' : text), a = 5381, b = 52711;
+    for (var i = 0; i < s.length; i++) { var c = s.charCodeAt(i); a = ((a * 33) ^ c) >>> 0; b = ((b * 33) ^ c) >>> 0; }
+    return a.toString(36) + b.toString(36);
+  }
+  function lockKeyOf(kind, fields) {
+    var f = fields || {};
+    if (TO_CARD_KIND[kind] === 'biz') { var bz = bizKey(f.bizno); return bz ? 'b' + bz : ''; }
+    var nk = nameKey(f.name);
+    if (nk) return 'n' + shortHash(nk);
+    var m = digits(f.mobile);
+    if (m) return 'm' + m;
+    var ck = coKey(f.company);
+    return ck ? 'c' + shortHash(ck) : '';
+  }
+  /* path 를 잡고 fn 을 돌린 뒤 놓는다. fn 이 던져도 놓는다. opts: { ttl, step, maxWait } (시험용) */
+  function withLock(path, fn, opts) {
+    var o = opts || {};
+    var db = deps.db;
+    if (!path || !db) return Promise.resolve().then(fn);
+    var ref = db.ref(path);
+    if (typeof ref.transaction !== 'function') return Promise.resolve().then(fn);
+    var ttl = o.ttl || LOCK_TTL_MS, step = o.step || LOCK_STEP_MS, maxWait = o.maxWait || LOCK_MAX_WAIT_MS;
+    var token = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    var started = Date.now();
+    function sleep(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+    function acquire() {
+      return ref.transaction(function (cur) {
+        var now = Date.now();
+        if (cur && typeof cur === 'object' && cur.t && now - Number(cur.at || 0) < ttl) return undefined;   /* 누가 잡고 있다 */
+        return { t: token, at: now };
+      }).then(function (r) {
+        var v = r && r.snapshot && r.snapshot.val && r.snapshot.val();
+        if (r && r.committed && v && v.t === token) return true;
+        if (Date.now() - started > maxWait) return false;
+        return sleep(step).then(acquire);
+      });
+    }
+    function release() {
+      return ref.transaction(function (cur) { return (cur && cur.t === token) ? null : undefined; })
+        .catch(function () { /* 못 놓아도 TTL 이 푼다 */ });
+    }
+    return acquire().then(function (got) {
+      if (!got) throw new Error('같은 사람을 다른 곳에서 처리하는 중입니다 — 새로 만들지 않았습니다(곧 다시 시도됩니다)');
+      return Promise.resolve().then(fn).then(
+        function (v) { return release().then(function () { return v; }); },
+        function (e) { return release().then(function () { throw e; }); });
+    });
+  }
+
   /* ── 기업정보함에 보내기 ──
      자동으로 부를 수도 있고(검증 통과분), 사람이 버튼으로 부를 수도 있다.
      돌려주는 것: { id, created, filled[], message } */
@@ -384,6 +446,7 @@
       : Promise.resolve();
 
     /* 개인 폴더 확인이 **먼저다.** 뒤에 두면 이미 만들고 난 뒤가 된다. */
+    var core = function () {
     return pre.then(function () {
     return inPrivateVault(kind, o.fields).then(function (hidden) {
       if (hidden) {
@@ -408,6 +471,10 @@
       }
       return res;
     });
+    };
+    /* ★ 같은 사람은 «한 곳씩만» 찾기→만들기·채우기를 지난다 — 위 «사람별 잠금» 머리말 참고(대표 지시 2026-11-18) */
+    var lk = lockKeyOf(kind, o.fields);
+    return lk ? withLock(CARDS_ROOT + '/' + LOCK_ROOT + '/' + lk, core) : core();
   }
 
   /* ── 이미 있는 명함 = 중복 ──
@@ -2838,6 +2905,9 @@
     idxOf: idxOf,
     whenText: whenText,
     sendToCards: sendToCards,
+    withLock: withLock,
+    lockKeyOf: lockKeyOf,
+    shortHash: shortHash,
     findCompanyByBizNo: findCompanyByBizNo,
     coNameKey: coNameKey,
     findCompanyByName: findCompanyByName,
