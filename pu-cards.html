@@ -85,6 +85,7 @@
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-cal-map.js?v=2"></script>   <!-- 명함 주소 → 지도 팝업 (캘린더와 같은 셈, 2026-10-27) -->
 <script src="js/pu-doc-file.js?v=44"></script>
+<script src="js/pu-card-spam.js?v=1"></script>   <!-- 🚫 메일에서 온 스팸 명함 잣대 (2026-11-18) — 받는 탭과 같은 파일 -->
 <!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
 <script src="js/pu-office-store.js?v=11"></script>
 <script src="js/pu-co-roster.js?v=4"></script>
@@ -1314,6 +1315,16 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck.gn-box{width:min(1240px,100%)}
 .mck.gn-box>header .em{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mck.gn-box>header h2{flex:none}
+/* 🤔 스팸 의심 — 남길까요? (2026-11-18) — 한 칸은 한 줄, 넘치면 … (없어진 듯한 곳과 같은 벌) */
+.mck.csp-box>header .em{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mck.csp-box>header h2{flex:none}
+.mck .csp-src{display:inline-block;border-radius:10px;padding:0 7px;font-size:11px;font-weight:600;white-space:nowrap}
+.mck .csp-src.q{background:#eff6ff;color:#1e40af}
+.mck .csp-src.c{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.mck .nck-bulk button.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
+.mck .nck-bulk button.no{color:#991b1b}
+/* 폰에서는 창 바깥 여백을 줄인다(폰 규칙 「양옆 8~14px」) — PC 는 그대로 */
+@media (max-width:760px){ .mck-dim.csp-dim{padding:10px} }
 /* ⚠ flex:none — overflow-x:auto 칸은 최소 높이가 0 이라, 목록이 길면 세로로 접혀 갈래 칸이 «빈 막대»가 됐다(2026-10-11 대표 화면) */
 .mck .gn-cards{display:flex;gap:8px;padding:12px 18px;overflow-x:auto;flex:none}
 .mck .gn-cd{flex:1;min-width:120px;overflow:hidden;border:1px solid #e2e8f0;border-radius:8px;padding:7px 11px;cursor:pointer;white-space:nowrap}
@@ -4993,6 +5004,8 @@ const Store = {
             if(!Store._byKeyDone){ Store._byKeyDone=true; setTimeout(ensureByKeyMap, 4000); }
             /* 🧹 똑같은 명함 저절로 합치기 — 「중복 아님」 서버 목록을 먼저 읽고, 켜는 길이 한가해진 뒤 */
             if(!Store._dupAutoDone){ Store._dupAutoDone = true; dupIgnoreLoad(); setTimeout(dupAutoRun, 30000); }
+            /* 🚫 메일에서 온 스팸 명함 정리 · 🤔 의심 창 (대표 지시 2026-11-18) — 켜는 길이 한가해진 뒤, 합치기보다 먼저 */
+            if(!Store._spamDone){ Store._spamDone = true; setTimeout(cardSpamRun, 20000); }
           }
           /* 씨앗 갈무리 — 다음 로그인은 이것을 먼저 그린다(cardCacheGet).
              자주 쓰면 그때마다 2.5MB 를 베끼므로 5분에 한 번만. */
@@ -16578,6 +16591,9 @@ function openMenu(){
       <span class="msub">중복·유사·빈·깨짐·휴지통</span></button>
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');goneOpen()">🏚 없어진 듯한 곳
       <span class="msub">국세청 폐업·도메인 없어짐·반송 메일</span></button>
+    ${/* 🤔 스팸 의심 (2026-11-18) — 폰에서 창을 「나중에」로 닫았을 때 다시 여는 길. 대표만 */''}
+    ${state.isAdmin && typeof cspOpen === 'function' ? `<button class="sheetbtn" onclick="menuBg.classList.remove('open');cspOpen()">🤔 스팸 의심
+      <span class="msub">메일에서 온 명함 — 남길지 정하기${cspCount() ? ' · ' + cspCount() + '건' : ''}</span></button>` : ''}
 
     ${hd('📥 데이터')}
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');importInput.click()">📥 파일 가져오기
@@ -17690,6 +17706,247 @@ async function dupAutoRun(){
    ⚠ 공용 목록에 개인 명함이 옆에 나오면 숨긴 사실 자체가 드러난다. */
 /* ⚠ 남의 잠긴 폴더 명함은 합치기·치우기 대상에서 뺀다(2026-10-07 점검 ①) */
 function dupPool(){ return Object.values(state.items).filter(it=>it&&it.kind===state.tab&&!inHiddenLocked(it)); }
+
+/* ══════ 🚫 스팸 명함 정리 · 🤔 스팸 의심 창 (대표 지시 2026-11-18) ══════
+   「메일에서 가지고 오는 정보들 중에 처음부터 스팸이거나 추후에 스팸이 되거나 광고 등으로 들어오는
+    내용들이 많다 — 수집이 필요 없다. 완전 스팸은 자동으로 걸러 반드시 제거하고, 기업정보함으로
+    들어왔더라도 스팸으로 바로 정리하라.」
+   「스팸으로 의심되는 것은 별도로 모아서, 들어올 경우 팝업창으로 남길지 판단을 요청하게 하라.」
+   ★ 잣대는 js/pu-card-spam.js 하나다. 들어오는 길(받는 탭 remember-intake.html)도 같은 잣대로 거른다 —
+     여기는 «이미 들어온 것»과 «받는 탭이 보류한 것»을 맡는다.
+   ★ 확실한 스팸 → 휴지통(Store.del — 30일 안에 되살린다). 무엇을 했는지 config/cardSpamLast 에 남기고 알린다
+     (dupAutoRun 과 같은 무늬 — 조용히 지우면 「명함이 사라졌다」가 된다).
+   ★ 의심 → 「🤔 스팸 의심」 창(대표만): 받는 탭이 보류한 메일 줄(mailcard/q st:'hold') + 이미 있는 메일 명함.
+     새로 걸린 것이 있으면 저절로 뜬다. 「나중에」로 닫으면 옆줄 「🤔 스팸 의심 N」으로 다시 연다.
+   ★ 사람이 정한 것은 주소로 남는다 — mailcard/ok(남기기) · mailcard/spam(스팸). 다음부터 받는 탭도 그대로 따른다.
+     메일함에서 「🚫 스팸신고」한 보낸 사람도 mailcard/spam 에 적힌다(mbSpamReport) — «추후에 스팸이 된» 곳.
+   ⚠ 보는 명함: 메일에서 온 명함(capturedBy '메일') 가운데 사람이 다른 폴더로 옮기지 않은 것.
+     사람이 폴더를 정해 둔 명함·메일 말고 다른 길로 온 명함은 «스팸으로 정한 주소»일 때만, 그것도 묻기만 한다.
+   ⚠ 업체관리에 이어진 명함·휴대폰이 적힌 명함은 저절로 안 지운다(잣대가 «의심»으로 낮춘다).
+   ⚠ 사람이 정한 목록을 못 읽었으면 아무것도 지우지 않는다. 한 번에 CARD_SPAM_AUTO_MAX 장을 넘게 걸리면
+     잣대가 틀렸을 수 있으니 저절로 지우지 않고 창으로 묻는다.
+   ⚠ 남의 잠긴 폴더 명함은 안 본다(dupPool 과 같은 거르개). 개인 폴더 명함은 state.items 에 없다. */
+const CARD_SPAM_AUTO_MAX = 30;
+const CARD_SPAM_FOLDER = '📬 메일에서 온 명함';      /* 받는 탭 MAIL_FOLDER 와 같은 이름 */
+let _cspLists = null;      /* {spam, ok, notSpam} — 못 읽었으면 null(모르면 안 지운다) */
+let _cspHold = {};         /* 받는 탭이 보류한 줄 {줄번호: q} */
+let _cspHoldOn = false;
+let _cspSuspect = [];      /* 의심 명함 [{id, why}] */
+let _cspBusy = false;
+let _cspAsked = {};        /* 이번에 창으로 이미 보인 줄 — 「나중에」를 눌렀으면 같은 줄로 또 안 띄운다 */
+let _cspSel = {};
+let _cspOn = false;
+function cspMailFolderId(){
+  const g = Object.values(state.groups||{}).find(g=>g && g.name===CARD_SPAM_FOLDER && (g.kind||'card')==='card');
+  return g ? g.id : '';
+}
+/* 메일에서 와서 아직 사람이 손대지(다른 폴더로 옮기지) 않은 명함 */
+function cspMailCard(it, mf){
+  if(!it || it.kind!=='card' || String(it.capturedBy||'')!=='메일') return false;
+  const g = String(it.group||'');
+  return !g || g===mf;
+}
+function cspProtect(it){ try{ return !!(typeof ErpMatch!=='undefined' && ErpMatch.match(it)); }catch(_){ return false; } }
+function cspJudgeCard(it, mf){
+  if(!it || it.kind!=='card' || inHiddenLocked(it)) return null;
+  const L = _cspLists || {};
+  const mine = cspMailCard(it, mf);
+  /* 메일 명함이 아니면 사람이 «스팸»으로 정한 주소일 때만 본다 */
+  if(!mine && !(it.email && L.spam && L.spam[PuCardSpam.key(it.email)])) return null;
+  return PuCardSpam.judge(it, { fromMail: mine, spam: L.spam, ok: L.ok, notSpam: L.notSpam, protect: cspProtect(it) });
+}
+function cspLoad(){
+  const R = DB_ROOT + '/mailcard';
+  return Promise.all([Store.db.ref(R+'/spam').once('value'), Store.db.ref(R+'/ok').once('value'),
+                      Store.db.ref(DB_ROOT+'/config/mailNotSpam').once('value')])
+    .then(r => (_cspLists = { spam: r[0].val()||{}, ok: r[1].val()||{}, notSpam: r[2].val()||{} }))
+    .catch(e => { console.warn('[스팸] 사람이 정한 목록을 못 읽었습니다 — 아무것도 지우지 않습니다', e); return null; });
+}
+/* 받는 탭이 보류한 줄 — 대표에게만. 새 줄이 오면 창을 띄운다 */
+function cspHoldWatch(){
+  if(_cspHoldOn || !Store.db || !state.isAdmin) return;
+  _cspHoldOn = true;
+  Store.db.ref(DB_ROOT+'/mailcard/q').orderByChild('st').equalTo('hold').on('value', s => {
+    _cspHold = s.val() || {};
+    if(_cspOn){ cspRows().forEach(r => { _cspAsked[r.k] = 1; }); cspMount(); }
+    renderSoon(); cspMaybeAsk();
+  }, () => { _cspHoldOn = false; });
+}
+async function cardSpamRun(){
+  if(_cspBusy || typeof PuCardSpam==='undefined' || typeof Store==='undefined' || Store.mode!=='firebase'
+     || !Store.db || !Store._itemsReady) return;
+  _cspBusy = true;
+  let done = 0;
+  try{
+    cspHoldWatch();
+    if(!(await cspLoad())) return;
+    const mf = cspMailFolderId(), spam = [], ask = [];
+    Object.values(state.items).forEach(it => {
+      const j = cspJudgeCard(it, mf); if(!j || !j.level) return;
+      (j.level==='spam' ? spam : ask).push({ id: it.id, why: j.why });
+    });
+    if(spam.length > CARD_SPAM_AUTO_MAX){
+      spam.forEach(x => ask.push({ id: x.id, why: x.why.concat(['한꺼번에 너무 많이 걸려 저절로 지우지 않았습니다']) }));
+      spam.length = 0;
+    }
+    _cspSuspect = ask;
+    for(const x of spam){
+      if(!state.items[x.id]) continue;
+      try{ await Store.del(x.id); done++; }
+      catch(e){ console.warn('[스팸] 휴지통으로 못 옮겼습니다', x.id, e); }
+    }
+    if(done){
+      Store.db.ref(DB_ROOT+'/config/cardSpamLast').set({ at:Date.now(), n:done, by:String(myEmail||'') }).catch(function(){});
+      toast('🚫 스팸 명함 ' + done + '장을 휴지통으로 옮겼습니다 — 30일 안에 환경설정 → 🗑 휴지통에서 되살릴 수 있습니다', 10000);
+    }
+  }finally{ _cspBusy = false; }
+  if(done) render(); else renderSoon();
+  /* ⚠ 보류 메일 감시가 먼저 창을 열었을 수 있다 — 열려 있으면 새로 찾은 의심 명함을 그 창에 다시 그린다
+     (안 그리면 창에는 메일 줄만 있고 옆줄 숫자만 늘어 있었다 — 2026-11-18 미리보기에서 실측) */
+  if(_cspOn){ cspRows().forEach(r => { _cspAsked[r.k] = 1; }); cspMount(); }
+  else cspMaybeAsk();
+}
+/* 창에 놓을 줄 — 보류한 메일 줄과 의심 명함을 한 목록으로 */
+function cspRows(){
+  const rows = [];
+  Object.keys(_cspHold||{}).forEach(id => {
+    const q = _cspHold[id]; if(!q || q.st!=='hold') return;
+    const f = q.f || {};
+    rows.push({ k:'q:'+id, src:'q', id, name: f.name||q.n||'', company: f.company||'', title: f.title||'',
+      email: f.email||q.e||'', subject: q.s||'', why: String(q.why||''), at: Number(q.heldAt||q.at)||0 });
+  });
+  (_cspSuspect||[]).forEach(x => {
+    const it = state.items[x.id]; if(!it) return;
+    rows.push({ k:'c:'+it.id, src:'c', id: it.id, name: it.name||'', company: it.company||'', title: it.title||'',
+      email: it.email||'', subject: '', why: x.why.join(' · '), at: Number(it.createdAt)||0 });
+  });
+  return rows.sort((a,b) => (b.at||0) - (a.at||0));
+}
+function cspCount(){ return state.isAdmin ? cspRows().length : 0; }
+/* 새로 걸린 것이 있으면 띄운다 — 다른 창이 떠 있으면 그 창을 덮지 않고 조금 뒤에 */
+function cspMaybeAsk(){
+  if(!state.isAdmin || _cspOn) return;
+  if(!cspRows().some(r => !_cspAsked[r.k])) return;
+  if(document.querySelector('.modalbg.open, .mck-dim')){ setTimeout(cspMaybeAsk, 15000); return; }
+  cspOpen();
+}
+function cspOpen(){
+  _cspOn = true; _cspSel = {};
+  cspRows().forEach(r => { _cspAsked[r.k] = 1; });
+  cspMount();
+}
+function cspClose(){ _cspOn = false; _cspSel = {}; cspMount(); renderSoon(); }
+function cspMount(){
+  let box = $('cspBox');
+  if(!box){ if(!_cspOn) return; box = document.createElement('div'); box.id = 'cspBox'; document.body.appendChild(box); }
+  box.innerHTML = _cspOn ? cspHtml() : '';
+}
+function cspPick(k){ if(_cspSel[k]) delete _cspSel[k]; else _cspSel[k] = 1; cspMount(); }
+function cspPickAll(on){ _cspSel = {}; if(on) cspRows().forEach(r => { _cspSel[r.k] = 1; }); cspMount(); }
+function cspKeyOf(el){ const t = el && el.closest && el.closest('[data-k]'); return t ? t.getAttribute('data-k') : ''; }
+/* 정하기 — keep(남기기) · spam(스팸). 주소로 남겨 다음부터 받는 탭도 그대로 따른다.
+   ⚠ 보류한 메일 줄을 «남기기»로 하면 줄을 read 로 돌린다 — 받는 탭이 같은 문(sendToCards)으로 넣는다.
+     여기서 명함을 직접 만들지 않는다(겹침 검사·사람별 잠금을 비켜 가면 중복이 생긴다).
+   ⚠ 이미 있는 명함을 «스팸»으로 하면 휴지통으로(30일 안에 되살린다). 여러 줄이면 건수를 묻는다. */
+async function cspDecide(keys, verdict){
+  const pick = {}; (keys||[]).forEach(k => { if(k) pick[k] = 1; });
+  const rows = cspRows().filter(r => pick[r.k]);
+  if(!rows.length) return toast('고른 줄이 없습니다');
+  const nCard = rows.filter(r => r.src==='c').length;
+  if(rows.length > 1 && !confirm(verdict==='keep'
+      ? rows.length + '건을 «남기기»로 정합니다. 같은 주소는 다시 묻지 않습니다.\n\n진행할까요?'
+      : rows.length + '건을 «스팸»으로 정합니다.' + (nCard ? '\n· 이미 들어온 명함 ' + nCard + '장은 휴지통으로 갑니다(30일 안에 되살릴 수 있습니다).' : '')
+        + '\n· 같은 주소에서 오는 메일은 다음부터 명함으로 넣지 않습니다.\n\n진행할까요?')) return;
+  const R = DB_ROOT + '/mailcard', now = Date.now(), by = String(myEmail||'');
+  const up = {}, del = [];
+  rows.forEach(r => {
+    const ek = r.email ? PuCardSpam.key(r.email) : '';
+    if(verdict === 'keep'){
+      if(ek){ up[R+'/ok/'+ek] = { at:now, by:by }; up[R+'/spam/'+ek] = null; }
+      if(r.src === 'q'){ up[R+'/q/'+r.id+'/st'] = 'read'; up[R+'/q/'+r.id+'/keep'] = 1; }
+    } else {
+      if(ek){ up[R+'/spam/'+ek] = { at:now, by:by, why:'사람이 스팸으로 정함' }; up[R+'/ok/'+ek] = null; }
+      if(r.src === 'q'){ up[R+'/q/'+r.id+'/st'] = 'spam'; up[R+'/q/'+r.id+'/doneAt'] = now; up[R+'/q/'+r.id+'/why'] = '사람이 스팸으로 정함'; }
+      else del.push(r.id);
+    }
+  });
+  try{
+    await Store.db.ref().update(up);
+  }catch(e){ return toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+  if(_cspLists) rows.forEach(r => {
+    const ek = r.email ? PuCardSpam.key(r.email) : ''; if(!ek) return;
+    if(verdict === 'keep'){ _cspLists.ok[ek] = { at:now }; delete _cspLists.spam[ek]; }
+    else { _cspLists.spam[ek] = { at:now }; delete _cspLists.ok[ek]; }
+  });
+  const gone = {}; rows.forEach(r => { gone[r.k] = 1; delete _cspSel[r.k]; if(r.src==='q') delete _cspHold[r.id]; });
+  _cspSuspect = _cspSuspect.filter(x => !gone['c:'+x.id]);
+  let msg;
+  if(verdict === 'keep'){
+    const nq = rows.length - nCard;
+    msg = '✓ ' + rows.length + '건을 남겼습니다' + (nq ? ' — 메일 명함 ' + nq + '건은 📇 리멤버 받기 탭이 「' + CARD_SPAM_FOLDER + '」에 넣습니다' : '');
+  } else {
+    const r = del.length ? await delMany(del) : { ok:0, fail:0, why:'' };
+    msg = '🚫 ' + rows.length + '건을 스팸으로 정했습니다' + (r.ok ? ' — 명함 ' + r.ok + '장은 휴지통으로(30일 안에 환경설정 → 🗑 휴지통에서 되살릴 수 있습니다)' : '')
+      + (r.fail ? ' · ' + r.fail + '장은 못 옮겼습니다(' + r.why + ')' : '');
+  }
+  if(!cspRows().length) _cspOn = false;
+  cspMount(); render();
+  toast(msg, 8000);
+}
+/* 메일함 「🚫 스팸신고」 — 신고한 보낸 사람은 기업정보함에서도 스팸이다(«추후에 스팸이 된» 곳).
+   메일에서 온 명함은 다음 정리에서 휴지통으로 가고, 다른 길로 온 명함은 창으로 묻는다. */
+function cspMarkSpamAddrs(emails, why){
+  if(typeof PuCardSpam==='undefined' || !Store.db) return;
+  const up = {}, now = Date.now(), by = String(myEmail||'');
+  (emails||[]).forEach(e => { const k = PuCardSpam.key(e); if(k && k.indexOf('@') > 0) up[DB_ROOT+'/mailcard/spam/'+k] = { at:now, by:by, why:String(why||'').slice(0,40) }; });
+  if(!Object.keys(up).length) return;
+  Store.db.ref().update(up).then(() => { if(Store._itemsReady) cardSpamRun(); })
+    .catch(e => console.warn('[스팸] 신고한 주소를 기업정보함 스팸 목록에 못 적었습니다', e));
+}
+function cspHtml(){
+  const pc = document.body.classList.contains('pc');
+  const rows = cspRows(), nSel = rows.filter(r => _cspSel[r.k]).length;
+  const tag = r => r.src==='q' ? '<span class="csp-src q" title="새로 온 메일 — 아직 명함으로 안 넣었습니다">새 메일</span>'
+                               : '<span class="csp-src c" title="이미 기업정보함에 있는 명함입니다">명함</span>';
+  const btns = '<button class="ok" onclick="cspDecide([cspKeyOf(this)],\'keep\')">남기기</button>'
+             + '<button class="no" onclick="cspDecide([cspKeyOf(this)],\'spam\')">🚫 스팸</button>';
+  let body;
+  if(!rows.length) body = '<p class="em">✓ 스팸으로 의심되는 것이 없습니다</p>';
+  else{
+    body = '<div class="nck-bulk"><label><input type="checkbox" ' + (nSel && nSel===rows.length ? 'checked' : '')
+      + ' onclick="cspPickAll(this.checked)"> 전체</label> · <b>' + nSel + '건</b> 고름'
+      + '<button class="ok" onclick="cspDecide(Object.keys(_cspSel),\'keep\')">고른 것 남기기</button>'
+      + '<button class="no" onclick="cspDecide(Object.keys(_cspSel),\'spam\')">🚫 고른 것 스팸</button></div>';
+    if(pc){
+      body += '<table class="nck csp"><colgroup><col style="width:30px"><col style="width:40px"><col style="width:62px">'
+        + '<col style="width:12%"><col style="width:14%"><col style="width:17%"><col><col style="width:22%"><col style="width:150px"></colgroup>'
+        + '<tr><th></th><th>#</th><th>갈래</th><th>이름</th><th>회사 · 직함</th><th>메일 주소</th><th>메일 제목</th><th>왜 의심하나</th><th></th></tr>'
+        + rows.map((r, i) => {
+          const co = [r.company, r.title].filter(Boolean).join(' · ');
+          return '<tr data-k="' + esc(r.k) + '"><td><input type="checkbox" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"></td>'
+            + '<td class="em" style="text-align:right">' + (i + 1) + '</td><td>' + tag(r) + '</td>'
+            + '<td title="' + esc(r.name) + '"><b>' + esc(r.name || '(이름 없음)') + '</b></td>'
+            + '<td title="' + esc(co) + '">' + esc(co) + '</td>'
+            + '<td title="' + esc(r.email) + '">' + esc(r.email) + '</td>'
+            + '<td class="em" title="' + esc(r.subject) + '">' + esc(r.subject || '—') + '</td>'
+            + '<td title="' + esc(r.why) + '"><span class="nck-why">' + esc(r.why || '—') + '</span></td>'
+            + '<td class="act">' + btns + '</td></tr>';
+        }).join('') + '</table>';
+    }else{
+      body += rows.map((r, i) => '<div class="nck-m" data-k="' + esc(r.k) + '"><div class="l1">'
+        + '<input type="checkbox" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"> '
+        + '<span class="em">' + (i + 1) + '</span> ' + tag(r) + ' <b>' + esc(r.name || '(이름 없음)') + '</b> '
+        + '<span class="em">' + esc([r.company, r.email].filter(Boolean).join(' · ')) + '</span></div>'
+        + '<div class="l1 em" title="' + esc(r.why) + '">' + esc(r.why) + (r.subject ? ' — ' + esc(r.subject) : '') + '</div>'
+        + '<div class="l2 act">' + btns + '</div></div>').join('');
+    }
+  }
+  return '<div class="mck-dim csp-dim" onclick="if(event.target===this)cspClose()"><div class="mck nck-box csp-box">'
+    + '<header><span>🤔</span><h2>스팸 의심 — 남길까요?</h2>'
+    + (pc ? '<span class="em">확실한 스팸은 저절로 걸렀습니다. 아래는 사람이 보고 정할 것입니다 — 정한 주소는 다시 묻지 않습니다.</span>' : '')
+    + '<span class="x" onclick="cspClose()" title="나중에 — 옆줄 「🤔 스팸 의심」으로 다시 엽니다">✕</span></header>'
+    + '<div class="body">' + body + '</div></div></div>';
+}
 
 let _dupFixIds = [];      /* 지금 팝업이 다루는 명함들 */
 let _dupFixKeep = '';     /* 남길 것 */
@@ -19253,6 +19510,8 @@ function renderPCSide(){
     <button class="${state.view==='cnt'?'on':''}" onclick="openCntPage()" title="메일에서 처음 온 상대를 업체 담당자 · 명함으로 정리합니다 — 이 창에서 열립니다">📥<em>연락처 정리</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
     ${/* 🏚 없어진 듯한 곳 (대표 승인 목업 2026-10-09) — 창으로 연다. 수는 «정리할 것» 회사 수 */''}
     <button onclick="goneOpen()" title="국세청 폐업 · 메일 도메인 없어짐 · 반송 메일로 «없어진 듯한 회사»를 모아 봅니다">🏚<em>없어진 듯한 곳</em><span>${(n => n ? n.toLocaleString() : '')(typeof goneCount === 'function' ? goneCount() : 0)}</span></button>
+    ${/* 🤔 스팸 의심 (대표 지시 2026-11-18) — 대표에게만, 물을 것이 있을 때만. 창을 「나중에」로 닫았을 때 다시 여는 길 */''}
+    ${(n => n ? `<button onclick="cspOpen()" title="메일에서 온 명함 가운데 스팸으로 의심되는 것 — 남길지 정합니다">🤔<em>스팸 의심</em><span>${n.toLocaleString()}</span></button>` : '')(typeof cspCount === 'function' ? cspCount() : 0)}
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
      이미 갈라져 나갔으므로 여기서는 갈래 줄이 늘 그려진다 — 따로 닫을 일이 없다. */
@@ -33753,6 +34012,8 @@ function mbSpamReport(rows){
     if(bad) throw new Error((bad&&bad.error)||'신고하지 못했습니다');
     /* 화면에서 먼저 걷어낸다 — 스팸함은 애초에 안 가져오므로 다시 동기화해도 안 돌아온다 */
     picked.forEach(v=>{ if(_mbMsgs[v._slug]) delete _mbMsgs[v._slug][String(v.u)]; });
+    /* 🚫 신고한 보낸 사람은 기업정보함에서도 스팸이다 (대표 지시 2026-11-18 「추후에 스팸이 되거나」) */
+    if(typeof cspMarkSpamAddrs === 'function') cspMarkSpamAddrs(picked.map(v=>v.e), '메일 스팸신고');
     pickClear('mbox'); state.mbOpen=null;
     renderPCSide(); renderMailPage();
     toast(`🚫 ${picked.length}통을 스팸으로 신고했습니다`, 6000);

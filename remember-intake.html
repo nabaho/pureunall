@@ -20,6 +20,7 @@
 <script src="js/pu-remember.js?v=2"></script>
 <script src="js/pu-handoff.js?v=2"></script>
 <script src="js/pu-doc-pick.js?v=2"></script>
+<script src="js/pu-card-spam.js?v=1"></script>
 <script src="js/pu-version.js?v=12"></script>
 <!--
   ══ 📇 리멤버 → 푸른사진첩·기업정보함 «받는 화면» (대표 「반드시 자동으로」 2026-10-24, 목업 승인) ══
@@ -64,7 +65,8 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
   <div class="card"><div id="state" class="band wait">준비 중…</div>
     <p class="muted" style="margin-top:8px">이 탭은 «푸른 리멤버 연결» 확장이 쓰는 받는 창입니다 — 닫지 말고 고정해 두세요.
       리멤버에서 새로 받거나 고친 명함이 낮(09~18시)에는 30분마다, 밤에는 00시·06시에 사진첩과 기업정보함에 저절로 들어옵니다.
-      푸른메일에 처음 보는 사람이 메일을 보내면 서명을 읽어 기업정보함 「📬 메일에서 온 명함」에도 넣습니다.</p></div>
+      푸른메일에 처음 보는 사람이 메일을 보내면 서명을 읽어 기업정보함 「📬 메일에서 온 명함」에도 넣습니다.
+      스팸은 넣지 않고, 스팸으로 의심되는 것은 기업정보함에서 남길지 여쭙니다.</p></div>
   <div class="card"><b>최근에 받은 명함</b><table id="recent"><colgroup><col style="width:110px"><col style="width:90px"><col><col style="width:150px"></colgroup>
     <tr><th>받은 때</th><th>이름</th><th>회사</th><th>결과</th></tr></table></div>
 </div>
@@ -246,11 +248,48 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
         });
       });
   }
+  /* ── 🚫 스팸·광고는 명함으로 넣지 않는다 (대표 지시 2026-11-18) ──
+     「처음부터 스팸이거나 광고 등으로 들어오는 것은 수집할 필요 없다 · 완전 스팸은 자동으로 걸러라 ·
+      의심되는 것은 따로 모아 팝업으로 남길지 물어라」
+     잣대는 js/pu-card-spam.js 하나 — 기업정보함(pu-cards.html)도 같은 잣대로 이미 들어온 명함을 정리한다.
+       확실한 스팸 → 줄을 st:'spam' 으로 닫는다(명함을 안 만든다 · 이미 있는 명함 빈 칸도 안 채운다)
+       스팸 의심   → 줄을 st:'hold' 로 둔다 → 기업정보함 「🤔 스팸 의심」 창이 대표께 묻는다
+                     (남기기 → st:'read'·keep:1 로 돌아와 이 탭이 넣는다 / 스팸 → st:'spam')
+     ⚠ 잣대 파일을 못 실었으면 «넣지 않고» 그 줄을 그대로 둔다 — 다음에 탭을 열면 다시 본다.
+     ⚠ 사람이 정한 목록(스팸·남기기·메일함 「스팸 아님」)을 못 읽었으면 «버리지 않고» 보류한다 — 모르면 안 버린다. */
+  var CARD_SPAM = 'pucards/mailcard/spam', CARD_OK = 'pucards/mailcard/ok', MAIL_NOTSPAM = 'pucards/config/mailNotSpam';
+  var spamMemo = null, spamAt = 0;
+  function spamLists() {
+    if (spamMemo && Date.now() - spamAt < 60000) return Promise.resolve(spamMemo);
+    return Promise.all([db.ref(CARD_SPAM).once('value'), db.ref(CARD_OK).once('value'), db.ref(MAIL_NOTSPAM).once('value')]).then(function (r) {
+      spamMemo = { spam: r[0].val() || {}, ok: r[1].val() || {}, notSpam: r[2].val() || {} }; spamAt = Date.now();
+      return spamMemo;
+    }, function () { return null; });
+  }
+  function mailShut(id, q, u, what) {
+    var f = q.f || {};
+    return db.ref(MAIL_Q + '/' + id).update(u).then(function () {
+      return note({ name: f.name || q.n || '', company: f.company || '', what: what, at: Date.now() });
+    });
+  }
+  function mailGate(id, q) {
+    if (q.keep) return mailOne(id, q);                  /* 대표가 「남기기」로 정한 줄 — 다시 묻지 않는다 */
+    if (typeof PuCardSpam === 'undefined') return Promise.resolve();
+    return spamLists().then(function (L) {
+      var j = PuCardSpam.judge(Object.assign({ email: q.e }, q.f || {}),
+        { subject: q.s, fromMail: true, spam: L && L.spam, ok: L && L.ok, notSpam: L && L.notSpam });
+      if (j.level === 'spam' && !L) j = { level: 'suspect', why: j.why.concat(['스팸 목록을 못 읽어 버리지 않고 보류합니다']) };
+      var why = j.why.join(' · ').slice(0, 200), now = Date.now();
+      if (j.level === 'spam') return mailShut(id, q, { st: 'spam', why: why, doneAt: now }, '🚫 스팸 — 명함으로 넣지 않음');
+      if (j.level === 'suspect') return mailShut(id, q, { st: 'hold', why: why, heldAt: now }, '🤔 스팸 의심 — 기업정보함에서 남길지 여쭙니다');
+      return mailOne(id, q);
+    });
+  }
   function mailPump() {
     if (mailBusy || !mailWait.length || !S.ready) return;
     mailBusy = true;
     var x = mailWait.shift();
-    mailOne(x.id, x.q).catch(function () {}).then(function () { mailBusy = false; mailPump(); });
+    mailGate(x.id, x.q).catch(function () {}).then(function () { mailBusy = false; mailPump(); });
   }
   var mailOn = false;
   function mailWatch() {
