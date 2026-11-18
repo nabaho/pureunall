@@ -125,10 +125,21 @@
   /* 명함 한 장 가져오기. d = { db, ROOT, withLock(path, fn), sha(dataUrl)→Promise<hex>, addPhoto(dataUrl)→Promise<{photo, pic}>,
                               sendToCards(o)→Promise }  — 화면(remember-intake.html)이 부품을 끼워 넣는다.
      돌려주는 것: { name, company, what, at, isNew, err } */
+  /* 잠금 열쇠 — 기업정보함 보내기의 열쇠(PuDocFile.lockKeyOf)와 «같은 차례»: 이름 → 휴대폰 → 회사 → 묶음 번호.
+     (이름이 비었다고 곧바로 묶음 번호로 가면, 번호·회사만 있는 같은 명함이 두 묶음으로 동시에 올 때 서로를 못 막는다 — 2026-11-18 검토 지적) */
+  function lockKeyFor(c) {
+    var nk = nameKey(c && c.name); if (nk) return 'n' + hash(nk);
+    var m = digits(c && c.mobile); if (m) return 'm' + m;
+    var ck = coKey(c && c.company); if (ck) return 'c' + hash(ck);
+    return 'r' + hash(c && c.rid);
+  }
+  /* 바깥 잠금(이 계산) 안에서 안쪽 잠금(기업정보함 보내기, 최대 70초 기다림)과 사진 올리기를 한다 — 바깥 TTL 이 그보다 «길어야»
+     안쪽을 기다리는 동안 바깥이 먼저 풀려 다른 곳이 끼어들지 않는다(기본 TTL 40초로는 모자란다 — 2026-11-18 검토 지적) */
+  var LOCK_TTL_MS = 150000;
+
   function importOne(d, c, img, now) {
     var db = d.db, ROOT = d.ROOT;
-    var nk = nameKey(c.name);
-    var lockKey = nk ? 'n' + hash(nk) : 'r' + hash(c.rid);          /* 같은 이름은 «한 번에 한 곳만»(묶음 번호가 달라도) */
+    var lockKey = lockKeyFor(c);                                    /* 같은 사람은 «한 번에 한 곳만»(묶음 번호가 달라도) */
     return d.withLock(ROOT + '/lock/' + lockKey, function () {
       var seenRef = db.ref(ROOT + '/seen/' + c.rid);
       return seenRef.once('value').then(function (snap) {
@@ -198,7 +209,7 @@
           return seenRef.set(rec).then(function () { return { name: c.name, company: c.company, what: res.what, at: now, isNew: !seen, err: !!res.err }; });
         });
       });
-    });
+    }, { ttl: LOCK_TTL_MS });
   }
 
   var api = { phone: phone, fromApi: fromApi, toFields: toFields, readOf: readOf, plan: plan, needPhoto: needPhoto, okImageUrl: okImageUrl,

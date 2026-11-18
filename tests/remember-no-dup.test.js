@@ -169,6 +169,26 @@ test('★★ 사람 열쇠 — 휴대폰이 있으면 휴대폰이 첫째, 이�
     '(주) 표시가 달라도 같은 회사로 본다');
 });
 
+test('★★★ 이름이 비고 휴대폰만 있는 같은 명함이 두 묶음으로 «동시에» 와도 사진은 한 장 — 잠금 열쇠가 기업정보함 보내기와 같은 차례(이름→휴대폰→회사)', async () => {
+  const L = layer(); const d = deps(L, null, true);
+  const nameless = (rid, tag) => card(rid, { name: '', mobile: '010-1234-5678', email: '' });
+  await Promise.all([L.R.importOne(d, nameless(1), IMG('a'), NOW), L.R.importOne(d, nameless(2), IMG('b'), NOW)]);
+  assert.strictEqual(d.photos.length, 1, '★★★ 이름이 비었다고 묶음 번호로 잠가, 같은 휴대폰 명함이 두 묶음으로 동시에 오면 사진이 ' + d.photos.length + '장 올랐습니다');
+});
+
+test('★★ 바깥 잠금 열쇠는 이름 → 휴대폰 → 회사 → 묶음 번호 차례이고, 바깥 TTL 은 안쪽 잠금 최대 기다림(70초)보다 길다', async () => {
+  const L = layer();
+  const got = [];
+  const d = deps(L, { withLock: (p, fn, opts) => { got.push({ p, opts }); return L.F.withLock(p, fn, Object.assign({ step: 2, maxWait: 4000 }, opts)); } });
+  await L.R.importOne(d, card(1), IMG('a'), NOW);
+  await L.R.importOne(d, card(2, { name: '', mobile: '010-7777-8888' }), IMG('b'), NOW);
+  await L.R.importOne(d, card(3, { name: '', mobile: '', company: '다라상사' }), IMG('c'), NOW);
+  await L.R.importOne(d, card(4, { name: '', mobile: '', company: '' }), IMG('d'), NOW);
+  const heads = got.map((g) => g.p.replace(ROOT + '/lock/', '')[0]).join('');
+  assert.strictEqual(heads, 'nmcr', '★★ 잠금 열쇠 차례가 이름→휴대폰→회사→묶음 번호가 아닙니다: ' + got.map((g) => g.p).join(' | '));
+  got.forEach((g) => assert.ok(g.opts && g.opts.ttl > 70000, '★★ 바깥 잠금 TTL 이 안쪽 최대 기다림(70초)보다 길지 않습니다 — 안쪽을 기다리는 동안 바깥이 먼저 풀립니다: ' + JSON.stringify(g.opts)));
+});
+
 test('★ 화면은 가져오기를 «이 계산»에 맡기고, 같은 이름은 한 곳씩만(잠금)·그림 지문을 만든다', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'remember-intake.html'), 'utf8');
   const one = html.slice(html.indexOf('function one('), html.indexOf('function addPhotoOf('));
