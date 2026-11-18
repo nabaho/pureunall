@@ -562,3 +562,34 @@ test('★★ 자문사 화면에 «고르기» 단추가 있다 — 없으면 �
   assert.match(앞, /App\.group === 'partner'/,
     '★ 자문사 화면이 아닐 때도 「자문사 고르기」가 보인다');
 });
+
+/* ══════ 공공기관 · 100인 이상 거르개 (대표 지시 2026-11-18) ══════
+   「현재 자문하고 있는 사업장 중에서 공공기관 모두 찾아서 … 100인 이상 사업장 자문사도 확인해서 넣어달라」
+   ★ 업체관리에 사람이 적은 칸(규모 · 고용보험 가입자 수)으로만 가른다 — 이름으로 짐작하지 않는다. */
+test('★★ 「공공기관·100인 이상」은 자문 중인 곳 가운데 규모 공공기관 또는 고용보험 100명 이상만 고른다', () => {
+  const 판 = [
+    { id: 'p1', name: '가온공사', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 500000, companySize: '공공기관' },
+    { id: 'p2', name: '대형제조', typeCode: '급여', status: 'active', monthlyAdvisoryFee: 300000, employmentInsuredCount: 152 },
+    { id: 'p3', name: '작은상회', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 100000, employmentInsuredCount: 12 },
+    { id: 'p4', name: '어느공단', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 100000 },          // 이름만 공단
+    { id: 'p5', name: '끝난공사', typeCode: '자문', status: 'closed', monthlyAdvisoryFee: 500000, companySize: '공공기관' },
+    { id: 'p6', name: '자문없는큰곳', typeCode: '노조', status: 'active', employmentInsuredCount: 300 }  // 자문 중이 아니다
+  ];
+  const ctx = 상자(판, {});
+  ctx.Pick.type = 'big';
+  const 이름들 = ctx.pickVisible().map(r => r.name);
+  assert.ok(이름들.indexOf('가온공사') >= 0, '★★ 규모 「공공기관」인 자문사를 못 찾았다');
+  assert.ok(이름들.indexOf('대형제조') >= 0, '★★ 고용보험 100명 이상 자문사를 못 찾았다');
+  assert.ok(이름들.indexOf('작은상회') < 0, '★ 100명이 안 되는 곳이 끼었다');
+  assert.ok(이름들.indexOf('어느공단') < 0, '★★ 이름만 보고 공공기관으로 짐작했다 — 업체관리 규모 칸으로만 가른다');
+  assert.ok(이름들.indexOf('끝난공사') < 0, '★★ 거래가 끝난 곳이 끼었다');
+  assert.ok(이름들.indexOf('자문없는큰곳') < 0, '★ 자문 중이 아닌 곳이 끼었다');
+  assert.ok(ctx.pickTypes().some(t => t.k === 'big' && t.n >= 2), '★ 고르는 창의 거르개 목록에 「공공기관·100인 이상」이 없다');
+});
+
+test('★ 「목록 복사」는 번호·연락처·금액 없이 회사 · 구분 · 고용보험 · 홈페이지 · 지금 표시만 옮긴다', () => {
+  const 몸 = 함수('pickCopyList');
+  assert.match(몸, /pickVisible\(\)/, '★ 지금 보이는 것만 옮겨야 한다 — 거르개와 어긋난다');
+  assert.ok(!/monthlyAdvisoryFee|advFee|phone|email|ceo/.test(몸), '★★ 금액·연락처를 옮긴다 — 넘길 곳에 필요한 만큼만');
+  assert.match(H, /onclick="pickCopyList\(\)"/, '★ 목록 복사 단추가 없다');
+});

@@ -1716,8 +1716,18 @@ function partnerRows() {
        그래서 거르는 기준을 «딱지»가 아니라 «실제 자문료»로 둔다. */
     const 자문료 = (Number(String(c.monthlyAdvisoryFee == null ? '' : c.monthlyAdvisoryFee)
                     .replace(/[^\d.-]/g, '')) || 0) > 0;
+    /* ★ 공공기관 · 100인 이상 (대표 지시 2026-11-18 「현재 자문하고 있는 사업장 중에서 공공기관 모두 찾아서 …
+         100인 이상 사업장 자문사도 확인해서 넣어달라」). 업체관리에 «사람이 적은» 칸으로만 가른다 —
+         규모(companySize)가 「공공기관」이거나 고용보험 가입자(employmentInsuredCount)가 100명 이상.
+         ⚠ 이름으로 «공공기관 같다»고 짐작하지 않는다(온톨로지 규칙: 이름 추정 관계 금지). 칸이 비면 후보가 아니다. */
+    const 공공 = String(c.companySize || '').trim() === '공공기관';
+    const 고용보험 = Number(String(c.employmentInsuredCount == null ? '' : c.employmentInsuredCount)
+                    .replace(/[^\d]/g, '')) || 0;
+    const 자문중 = 자문료 || String(c.typeCode || '') === '자문';
     /* 첫 마디는 «믿을 수 있는 것»부터 — 자문료가 있으면 그것을, 없으면 종류를 적는다 */
     const bits = [자문료 ? '자문료' : (c.typeCode || '(종류 없음)')];
+    if (공공) bits.push('공공기관');
+    if (고용보험 >= 100) bits.push('고용보험 ' + 고용보험 + '명');
     if (사무대행) bits.push('사무대행');
     if (closed) bits.push('업체관리 거래 종료' + (c.closedDate ? ' ' + c.closedDate : ''));
     bits.push(POSTED_TEXT[posted]);
@@ -1736,6 +1746,8 @@ function partnerRows() {
          desc 에서 다시 뜯어 읽으면 「자문 · 표시 안 함」 같은 줄에서 잘못 걸린다. */
       typeCode: c.typeCode || '',
       subOffice: 사무대행, advFee: 자문료,
+      pub: 공공, insured: 고용보험, big: 자문중 && (공공 || 고용보험 >= 100),
+      website: String(c.website || '').trim(),
       roster: warn, posted: posted, closed: closed
     };
   });
@@ -1811,7 +1823,9 @@ function pickRows() {
      거래 중 206곳 중 자문료를 받는 곳 182 / 「자문」 딱지 84 /
      「급여」 딱지인데 자문료만 받는 곳 41.
    종류로 고르면 자문사 100곳쯤을 놓친다. */
-const FEE_FILTERS = [{ k: 'fee', label: '자문료 받는 곳' }, { k: 'nofee', label: '자문료 없는 곳' }];
+/* 'big' — 2026-11-18 대표 지시: 자문 중인 공공기관·100인 이상(partnerRows 의 big 머리말).
+   ⚠ 한 줄로 둔다 — 화면 검사가 이 상수를 «한 줄»로 떼어 싣는다(constLine). */
+const FEE_FILTERS = [{ k: 'fee', label: '자문료 받는 곳' }, { k: 'nofee', label: '자문료 없는 곳' }, { k: 'big', label: '공공기관·100인 이상' }];
 
 /* ★ 푸른이알피가 «이미 가른 것»으로도 거른다 (대표 지시 2026-09-14
      「푸른이알피 구분한 것으로 연결해서 구분해라」).
@@ -1831,6 +1845,7 @@ function feeMatch(r, k) {
   if (!k) return true;
   /* 푸른이알피 유형이면 그것으로, 아니면 자문료로 — 거르개 하나가 두 기준을 다 받는다 */
   if (ERP_TYPES.indexOf(k) >= 0) return typeMatch(r, k);
+  if (k === 'big') return !!r.big;
   return k === 'fee' ? !!r.advFee : !r.advFee;
 }
 /* 갈래마다 몇인지 — 0건짜리는 안 낸다(눌러 봐야 빈 화면이다).
@@ -1961,8 +1976,20 @@ function pickBtnsHtml() {
   return '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="pickAllVisible(1)">'
     + (걸렀나 ? '보이는 ' + 보임.length + '곳 전부 고르기' : '전부 고르기 (' + 보임.length + ')') + '</button>'
     + '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="pickAllVisible(0)"'
-    + (보임.some(r => Pick.sel[r.key]) ? '' : ' disabled') + '>고른 것 풀기</button>';
+    + (보임.some(r => Pick.sel[r.key]) ? '' : ' disabled') + '>고른 것 풀기</button>'
+    /* 2026-11-18 — 보이는 업체를 표로 복사(홈페이지·로고 찾기에 넘길 목록) */
+    + '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="pickCopyList()"'
+    + (보임.length ? '' : ' disabled') + ' title="회사 · 구분 · 고용보험 · 홈페이지 · 지금 표시를 표로 복사">목록 복사</button>';
 }
+/* 지금 보이는 업체를 표(탭 구분)로 복사한다 (대표 지시 2026-11-18 「공공기관 모두 찾아서 홈페이지 확인후 로고 넣어달라」).
+   ★ 번호는 넣지 않는다 — 목록 번호는 화면에서 세는 용도다(자료·붙여넣을 글자에 안 넣는 규칙).
+   ★ 업체관리에 적힌 칸만 옮긴다 — 담당자·연락처·금액은 넣지 않는다(넘길 곳에 필요한 만큼만). */
+function pickCopyList() {
+  const 줄 = pickVisible().map(r => [r.name, r.pub ? '공공기관' : '', r.insured ? r.insured + '명' : '',
+    r.website || '', POSTED_TEXT[r.posted] || ''].map(x => String(x).replace(/[\t\n]/g, ' ')).join('\t'));
+  copyText(['회사\t구분\t고용보험\t홈페이지\t지금'].concat(줄).join('\n'));
+}
+window.pickCopyList = pickCopyList;
 function pickNoteHtml() {
   /* ⚠ 「전부 고르기」를 종류로 걸러 놓고 누르는 것을 «막지 않는다» — 대신 무엇을 하는지
      적어 둔다. 업체 종류 「자문」이 홈페이지에 올릴 자문사와 «같지 않아서», 화면이
@@ -1994,6 +2021,8 @@ function pickGridHtml() {
     + '<span class="ty">'
     + (r.typeCode ? '<b>' + esc(r.typeCode) + '</b>' : '')
     + (r.advFee ? (r.typeCode ? ' ' : '') + '자문료' : '')
+    /* 2026-11-18 — 공공기관·100인 이상 거르개로 볼 때 왜 걸렸는지가 보이게 */
+    + (r.pub ? ' 공공' : '') + (r.insured >= 100 ? ' ' + r.insured + '명' : '')
     + '</span>'
     + '</label>').join('') + '</div>';
 }
