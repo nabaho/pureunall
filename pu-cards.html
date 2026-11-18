@@ -1891,7 +1891,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
   --dim:#94a3b8;--blue:#2563eb;
   /* 읽음·안읽음 색 — 아래 «읽음·안읽음을 한눈에» 참고. un- 은 안 읽은 줄, rd 는 읽은 줄 */
   --un-bg:rgba(148,163,184,.13);--un-bar:#60a5fa;--un-ink:#ffffff;--un-at:#60a5fa;
-  --rd:#94a3b8;--rd2:#64748b;
+  --rd:#94a3b8;--rd2:#94a3b8;   /* 검정 바탕 위 #64748b 는 4.4:1 이라 작은 글씨 기준(4.5:1)에 못 미친다 */
   position:fixed;inset:0;z-index:40;background:var(--bg);color:var(--ink);
   display:flex;flex-direction:column;overflow:hidden;
   font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif}
@@ -2065,7 +2065,7 @@ html.maildoor #appbar .logo::after{content:'푸른 메일';font-size:23px}
    ⚠ 고른 줄(.pick)의 파란 바탕이 안 읽은 바탕에 덮이지 않게 .unread.pick 을 따로 둔다.
    ⚠ 띠는 inset 그림자다 — border 로 두면 줄마다 글자가 2~3px 씩 옆으로 밀려 열이 흔들린다. */
 .dmm-row.unread{background:var(--un-bg);box-shadow:inset 3px 0 0 var(--un-bar)}
-.dmm-row.unread.pick{background:rgba(58,123,253,.22)}
+.dmm-row.unread.pick{background:rgba(58,123,253,.14)}   /* .pick 과 같은 농도 — 더 짙게 하면 밝은 차림에서 시각·미리보기 글자 대비가 떨어진다(외부 검토 2026-11-18) */
 .dmm-row.unread .dmm-l1 .who,.dmm-row.unread .dmm-l2{font-weight:700;color:var(--un-ink)}
 .dmm-row.unread .dmm-l1 .at{font-weight:700;color:var(--un-at)}
 .dmm-row:not(.unread) .dmm-l1 .who{font-weight:400;color:var(--rd)}
