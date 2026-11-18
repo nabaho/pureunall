@@ -158,7 +158,7 @@ test('④ «＋ 단계 추가» — 이 유형에서 고를 수 있고 아직 �
 });
 
 /* ── 자동 길 두 곳을 진짜 소스째 돌려 본다 ── */
-const PLAN = ['function erpQuoteDay(', 'function erpQuoteNote(', 'function erpCoAddrKey(', 'function erpSameCompany(', 'function erpBlankContractForm(', 'function erpQuoteLanePlan('].map((d) => cutFn(SRC, d)).join('\n');
+const PLAN = ['function erpQuoteDay(', 'function erpQuoteNote(', 'function erpCoAddrKey(', 'function erpSameCompany(', 'function erpBlankContractForm(', 'function erpDeletedSrcMap(', 'function erpQuoteLanePlan('].map((d) => cutFn(SRC, d)).join('\n');
 function quotePlan(req, cts) {
   const ctx = { window: { PuCaseStage }, h, Date, Object, Array, String, JSON, Number, todayYMD: () => '2026-11-15' };
   vm.createContext(ctx);
@@ -208,6 +208,7 @@ function laneRun(req, opt) {
     erpSameCompany: (a, c) => String(a.company.name) === String(c.companyName),
     erpDeferCoLinkIfNew: () => null,
     erpBiznoClash: () => null,
+    erpDeletedSrcMap: vm.runInContext('(' + cutFn(SRC, 'function erpDeletedSrcMap(') + ')', vm.createContext({})),
     isContractLocked: () => false,
     genContractNo: () => '계약-2026-900',
     persistOne: (c) => { saved.push(c); return true; },

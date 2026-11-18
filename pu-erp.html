@@ -21512,7 +21512,7 @@ function erpQuoteDay(ms){
 function erpQuoteNote(req){
   var r = req || {};
   var day = erpQuoteDay(r.at);
-  var lines = ['📧 푸른메일 보낸메일함에서 올림 — ' + (r.docKind === 'contract' ? '계약서' : '견적서') + ' 송부' + (day ? ' ' + day : '')];
+  var lines = ['📧 푸른메일 ' + (r.folderKind === 'tome' ? '내게쓴편지함' : '보낸메일함') + '에서 올림 — ' + (r.docKind === 'contract' ? '계약서' : '견적서') + ' 송부' + (day ? ' ' + day : '')];
   var subj = String(r.subject || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if(subj) lines.push('제목: ' + subj);
   var atts = (Array.isArray(r.atts) ? r.atts : []).map(function(x){ return String(x || '').slice(0, 40); }).filter(Boolean).slice(0, 3);
@@ -21523,6 +21523,14 @@ function erpQuoteNote(req){
   }
   lines.push('금액은 이 칸에 적지 않았음(계약서등관리 「지난 견적·계약」).');
   return lines.join('\n');
+}
+/* 휴지통(_deleted)에 보낸 계약이 들고 있던 메일 열쇠 — «사람이 처리해 치운 메일»이라 자동 길이 새 카드로 되살리지 않는다.
+   (js/pu-doc-file.js dismissedMailKeys 와 같은 규칙 — 이알피 화면은 그 파일을 싣지 않아 한 벌 따로 둔다.
+    2026-11-17: 휴지통에 보낸 계약 둘이 그날 같은 메일로 되살아났다) */
+function erpDeletedSrcMap(cts){
+  var out = {};
+  (cts || []).forEach(function(c){ if(c && c._deleted && Array.isArray(c.srcMails)) c.srcMails.forEach(function(sk){ if(sk) out[sk] = true; }); });
+  return out;
 }
 function erpQuoteLanePlan(req, cos, cts, users){
   var r = req || {};
@@ -21539,6 +21547,10 @@ function erpQuoteLanePlan(req, cos, cts, users){
     return { action:'noop', why:'이미 반영한 메일입니다' };
   if(reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return (c.srcMails || []).indexOf(sk) >= 0; }); }))
     return { action:'noop', why:'이미 반영한 메일입니다' };
+  /* 지운 카드의 메일이 섞여 있고, 나머지는 살아 있는 카드가 이미 가진 메일이면 새로 만들 것이 없다 */
+  var deadSrc = erpDeletedSrcMap(cts);
+  if(reqSrcMails.some(function(sk){ return deadSrc[sk]; }) && reqSrcMails.every(function(sk){ return deadSrc[sk] || all.some(function(c){ return (c.srcMails || []).indexOf(sk) >= 0; }); }))
+    return { action:'noop', why:'지운 계약의 메일입니다' };
   /* 대상 업체 — 요청이 «가리키는» 업체만 믿는다 */
   var co = null;
   if(r.companyId){
@@ -27479,6 +27491,13 @@ function ContractManagement(props){
       || (reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return _isHandledCt(c) && (c.srcMails || []).indexOf(sk) >= 0; }); }))){
       await drop();
       return { lane:'photo_contract', noop:'이미 반영한 중복 계약서입니다' };
+    }
+    /* 휴지통에 보낸 계약의 메일·서류는 «사람이 처리해 치운 것» — 같은 메일·사진으로 카드를 다시 만들지 않는다(2026-11-17) */
+    var deadSrcP = erpDeletedSrcMap(cts);
+    var deadPhotoP = !!(srcPhoto && srcPhoto.id && cts.some(function(c){ return c && c._deleted && c.srcPhoto && c.srcPhoto.id === srcPhoto.id; }));
+    if(deadPhotoP || (reqSrcMails.some(function(sk){ return deadSrcP[sk]; }) && reqSrcMails.every(function(sk){ return deadSrcP[sk] || all.some(function(c){ return _isHandledCt(c) && (c.srcMails || []).indexOf(sk) >= 0; }); }))){
+      await drop();
+      return { lane:'photo_contract', noop:'지운 계약의 메일·서류입니다' };
     }
     var rCo = (req && req.company) || {};
     var cname = String(rCo.name || (req && req.companyName) || '').trim();

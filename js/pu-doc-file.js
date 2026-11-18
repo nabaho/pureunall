@@ -1832,6 +1832,34 @@
     return 'consult';
   }
 
+  /* 휴지통(_deleted)에 보낸 계약이 들고 있던 메일 열쇠 모음 — «사람이 처리해 치운 메일»이다.
+     ⚠ 이것을 «이미 처리함»으로 세지 않으면, 지운 카드의 메일로 자동 길이 같은 카드를 다시 만든다.
+       2026-11-17 실제: 휴지통에 보낸 계약 둘이 그날 같은 메일로 새 번호를 받아 되살아났다.
+     메일 열쇠(폴더|번호)는 어느 업체와도 겹치지 않아 업체와 상관없이 전체에 건다.
+     카드를 되살리면(_deleted 가 지워지면) 저절로 빠진다. */
+  function dismissedMailKeys(rawCts) {
+    var out = {};
+    var add = function (c) {
+      if (c && typeof c === 'object' && c._deleted && Array.isArray(c.srcMails)) {
+        c.srcMails.forEach(function (sk) { if (sk) out[sk] = true; });
+      }
+    };
+    if (Array.isArray(rawCts)) rawCts.forEach(add);
+    else if (rawCts && typeof rawCts === 'object') Object.keys(rawCts).forEach(function (k) { add(rawCts[k]); });
+    return out;
+  }
+
+  /* ── 내게쓴편지함(kind 'tome') — 사무실이 «자기에게 보낸» 계약서·견적서(스캔본 전달 등)도 자동 길이 훑는다 (대표 지시 2026-11-18) ──
+     ⚠ «앞으로»만 — 지금 들어 있는 옛 메일은 건드리지 않는다(대표: 「현재 메일함 바로 작업하지 말고 앞으로 진행」).
+       한국시각 2026-11-18 0시 이전에 온 메일은 이 폴더에서 무시한다. 다른 폴더(받은·보낸·사용자 폴더)의 범위는 그대로다.
+     ⚠ 발신은 우리 자신이라 «보낸 메일»처럼 다룬다 — 견적서는 상담접수, 계약서는 계약협의(review)까지만.
+       계약확정은 사람이 한다(메일 종합 분석은 보낸 메일을 체결본으로 승격하지 않는다).
+     ⚠ 임시보관함·예약편지함·휴지통·보관함은 훑지 않는다(보내지 않은 것·치운 것). */
+  var TOME_KIND = 'tome';
+  var TOME_FROM_MS = Date.parse('2026-11-18T00:00:00+09:00');
+  function isOutFolderKind(k) { return k === 'sent' || k === TOME_KIND; }
+  function tomeTooOld(kind, dMs) { return kind === TOME_KIND && dMs < TOME_FROM_MS; }
+
   /* ══════ 메일 생애주기(①보낸 견적서 → ②보낸 계약서 양식 → ③체결 계약서) 종합 자동 분석 (2026-11-11) ══════ */
   function synthesizeMailLifecycle(folderData, ctx) {
     ctx = ctx || {};
@@ -1853,6 +1881,7 @@
         if (c && typeof c === 'object' && !c._deleted) ctList.push(c);
       });
     }
+    var dismissedMap = dismissedMailKeys(rawCts);   /* 지운 카드의 메일 — 아래 finalizedSrcMap 에 함께 넣는다 */
 
     function findCo(subj, attNames, peerName, peerEmail, isSent) {
       var parsed = parseOneEmailAddr(peerEmail);
@@ -1920,12 +1949,13 @@
       if (!fd || !fd.msgs) return;
       var slug = String(fd.slug || '');
       var fKind = String(fd.kind || 'custom');
-      var isSent = (fKind === 'sent');
+      var isSent = isOutFolderKind(fKind);
       var msgs = fd.msgs || {};
       Object.keys(msgs).forEach(function (uidKey) {
         var m = msgs[uidKey] || {};
         var dMs = Number(m.d) || 0;
         if (sinceMs && dMs < sinceMs) return;
+        if (tomeTooOld(fKind, dMs)) return;   /* 내게쓴편지함은 «앞으로»만 */
         var uid = String(m.u || uidKey);
         var srcKey = slug + '|' + uid;
         var subj = String(m.s || '');
@@ -2079,6 +2109,8 @@
           }
         }
       });
+      /* 지운 카드의 메일도 «이미 처리한 메일»이다 — 그 메일로 새 카드를 만들지 않는다 */
+      Object.keys(dismissedMap).forEach(function (sk) { finalizedSrcMap[sk] = true; });
       var allCtsClosed = sameCts.length > 0 && sameCts.every(function (c) {
         return c.status === 'closed' || c.status === 'cancelled';
       }) && (maxActiveMs === 0 || maxClosedCtMs === 0 || maxActiveMs <= maxClosedCtMs + 86400000);
@@ -2451,7 +2483,7 @@
 
       var scanSlugs = Object.keys(folders).filter(function (slug) {
         var k = (folders[slug] && folders[slug].kind) || '';
-        return k === 'inbox' || k === 'sent' || k === 'custom';
+        return k === 'inbox' || k === 'sent' || k === 'custom' || k === TOME_KIND;
       });
 
       return Promise.all(scanSlugs.map(function (slug) {
@@ -2472,7 +2504,9 @@
           QD: QD,
           DP: DP
         });
-        var existingContractSrcSet = {};
+        /* ⚠ 휴지통(_deleted)에 보낸 카드의 메일도 «이미 카드가 있는 메일»이다 — 사람이 처리해 치운 메일을
+           자동 길이 다시 집지 않는다(dismissedMailKeys 머리글). 살아 있는 카드의 메일과 같은 «한 모음»이다. */
+        var existingContractSrcSet = dismissedMailKeys(rawCts);
         if (Array.isArray(rawCts)) {
           rawCts.forEach(function (c) {
             if (c && !c._deleted && Array.isArray(c.srcMails)) {
@@ -2494,6 +2528,7 @@
             var m = msgs[uidKey] || {};
             var dMs = Number(m.d) || 0;
             if (dMs < sinceMs) return;
+            if (tomeTooOld(fKind, dMs)) return;   /* 내게쓴편지함은 «앞으로»만 */
             var uid = String(m.u || uidKey);
             var safeKey = (slug + '_' + uid).replace(/[.#$/[\]]/g, '_');
             var srcKey = slug + '|' + uid;
@@ -2502,7 +2537,7 @@
             var bodyTxt = String(m.b || m.p || '');
             if (isTerminatedMailText(subj, bodyTxt)) return;
             var an = QD ? QD.namesOf(m.an) : (Array.isArray(m.an) ? m.an : []);
-            var isSent = (fKind === 'sent');
+            var isSent = isOutFolderKind(fKind);
             var peerName = isSent ? String(m.tn || '') : String(m.f || '');
             var peerEmail = isSent ? String(m.t || '') : String(m.e || '');
             var matchedCo = matchCoFromMail(subj, peerName, peerEmail, isSent);
@@ -2527,6 +2562,7 @@
                 quoteWrites[CT_REQ + '/' + mqKey] = {
                   id: mqKey,
                   source: 'mail_quote_watch',
+                  folderKind: fKind,
                   kind: docKind === 'contract' ? 'advance' : 'quote',
                   allowCreateReview: docKind === 'contract',
                   companyName: coName,
@@ -2582,6 +2618,7 @@
                 subject: subj,
                 mailMeta: {
                   dir: isSent ? 'sent' : 'recv',
+                  folderKind: fKind,
                   senderVerified: recvVerified,
                   slug: slug,
                   uid: uid,
