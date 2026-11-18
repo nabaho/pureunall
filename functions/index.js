@@ -85,22 +85,27 @@ const SECRET_ACCESS = require("./doc-secret-access");
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
 
 /* ══════════════════════════════════════════════════════════════════════════
-   급여명세서가 «어디서» 나가고 «어디로» 답장이 오나 — 2026-09-05 대표 지시로 손봄
+   급여명세서·인사 메일이 «어디서» 나가고 «어디로» 답장이 오나 — 2026-11-18 새 법인 도메인 전환
    ══════════════════════════════════════════════════════════════════════════
-   ⚠ 여기는 원래 「PoC 설정 — 도메인 인증 전까지는」이라 적힌 임시 자리였다.
-     그 임시가 굳어서, 근로자 메일함에는 푸른이 아닌 fairrunlabor.com 이 뜬다.
-
-   ★ 보내는 주소를 푸른 것으로 바꾸려면 «먼저» Resend 에서 그 도메인 인증을
-     마쳐야 한다(DNS 에 몇 줄 넣는 일). 인증 안 된 도메인을 넣으면 Resend 가
-     메일을 통째로 거절한다 — 그래서 여기서 혼자 바꿀 수가 없다.
-     인증이 끝나면 아래 한 줄만 고치고 sendPayslip 을 다시 올리면 된다.
-
-   ★ 회신 주소(Reply-To)가 아예 없었다. 본문에는 「문의사항은 사무실로 연락
-     주세요」라 써 놓고, 근로자가 회신 단추를 누르면 아무도 안 보는 곳으로 갔다.
-     이것은 도메인 인증과 상관없이 지금 고칠 수 있다 — 자료 발송이 쓰는
-     공용함(370-6@daum.net)으로 오게 한다. */
-const FROM = process.env.PAYSLIP_FROM || "푸른노무법인 <payroll@fairrunlabor.com>";
+   ① 발신(FROM): 2026-11-18 가비아 DNS(resend._domainkey · rsend · send · _dmarc)와
+      Resend(도쿄 ap-northeast-1)에 새 법인 공식 도메인 pureunlabor.co.kr 을 등록·연결해
+      「푸른노무법인 <payroll@pureunlabor.co.kr>」로 내보낸다.
+      만약 DNS 전파 과도기에 Resend 가 도메인 미인증 오류를 돌려줄 때만 기존 인증 도메인
+      (payroll@fairrunlabor.com)으로 한 번 비켜 보내 발송 중단을 막는다.
+   ② 회신(REPLY_TO): pureunlabor.co.kr 은 아직 수신 사서함(MX)을 연동하지 않았으므로,
+      근로자가 회신을 눌렀을 때 반송되지 않도록 실제 확인하는 공용함(370-6@daum.net)을 유지한다. */
+const FROM = process.env.PAYSLIP_FROM || "푸른노무법인 <payroll@pureunlabor.co.kr>";
+const FALLBACK_FROM = "푸른노무법인 <payroll@fairrunlabor.com>";
 const REPLY_TO = process.env.PAYSLIP_REPLY_TO || "370-6@daum.net";
+
+function isResendDomainUnverifiedError(err) {
+  if (!err || typeof err !== "object") return false;
+  const name = String(err.name || "").toLowerCase();
+  const code = Number(err.statusCode || 0);
+  if (name && name !== "validation_error" && code !== 403) return false;
+  const msg = String(err.message || err.error || "");
+  return /pureunlabor\.co\.kr[\s\S]*not\s+verified|domain\s+is\s+not\s+verified/i.test(msg);
+}
 
 // 발송 창구는 우리 포털에서만 연다. 예전에는 "*" 라서 주소만 알면
 // 전 세계 누구나 푸른노무법인 이름으로 메일을 보낼 수 있었다.
@@ -209,12 +214,17 @@ exports.sendPayslip = functions
     const atts = Array.isArray(b.attachments)
       ? b.attachments.map(function (a) { return { filename: a.filename, content: Buffer.from(a.content, "base64") }; })
       : undefined;
-    const payload = { from: FROM, to: to, subject: subject, html: html };
+    let usedFrom = FROM;
+    const payload = { from: usedFrom, to: to, subject: subject, html: html };
     /* 근로자가 «회신»을 누르면 우리 공용함으로 오게 한다 — 본문에 「연락 주세요」라고
        써 놓고 답장 갈 곳이 없으면 그 말이 거짓말이 된다. */
     if (REPLY_TO) payload.reply_to = REPLY_TO;
     if (atts && atts.length) payload.attachments = atts;
-    const r = await resend.emails.send(payload);
+    let r = await resend.emails.send(payload);
+    if (r && r.error && !process.env.PAYSLIP_FROM && usedFrom !== FALLBACK_FROM && isResendDomainUnverifiedError(r.error)) {
+      usedFrom = FALLBACK_FROM;
+      r = await resend.emails.send(Object.assign({}, payload, { from: usedFrom }));
+    }
     if (r && r.error) {
       res.status(500).json({ ok: false, error: r.error });
       return;
@@ -224,7 +234,7 @@ exports.sendPayslip = functions
        나중에 「안 받았다」는 말에 내놓을 것이 없다. */
     res.status(200).json({ ok: true, id: (r && r.data && r.data.id) || null, to: to,
                            by: (sender && sender.email) || "",
-                           from: FROM, replyTo: REPLY_TO });
+                           from: usedFrom, replyTo: REPLY_TO });
   } catch (e) {
     res.status(500).json({ ok: false, error: String((e && e.message) || e) });
   }
