@@ -112,7 +112,7 @@ function load(o) {
     /* 주민번호 칸(2026-10-07) — 서버 없이: 받기는 건너뛰고 「불러오는 중」으로 그린다 */
     'var fbDb = null, ready = false, rrnBox = {}, rrnBusy = {}, lockLogBox = {}, lockLogBusy = {};',
     cutVar('TABS'), cutVar('TOOLS'), cutVar('TAB_FN'), cutVar('FILINGS'), cutVar('FILING_WHO'),
-    cut('filingOf'), cut('filingUnset'), cut('setFiling'), cut('filingHtml'),
+    cut('filingOf'), cut('filingUnset'), cut('setFiling'), cut('filingHtml'), cut('mailDigestOf'), cut('mailDigestPanelHtml'),
     ['ymNow', 'ymParts', 'ymText', 'inboxYm', 'coArrivals', 'coState', 'sitesHaveSever', 'byKoName', 'shellModel', 'curView',
       'viewbarHtml', 'toolRow', 'colistHtml', 'horizonNote', 'dataHorizon', 'defaultYm', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'monthRecsFor', 'coMoney', 'manwon', 'empsMonth', 'insOf', 'coVariance', 'varianceHtml', 'fbk', 'rrnValid', 'rrnMask', 'birthOfMask', 'ensureRrn', 'rrnRec', 'rrnPanelHtml', 'ensureLockLog', 'lockLogHtml', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
     'globalThis.M = function(){ return shellModel(); };',
@@ -470,7 +470,32 @@ test('★★ 모든 사업장·모든 사람 줄에 순번(1, 2, 3…) + ☐/☑
   const bar = s.coBarHtml(m);
   assert.match(bar, /toggleRowMark\('co:c1','chk',event\)/, '머리줄 회사 칸에 체크 단추가 없습니다');
   assert.match(bar, /toggleRowMark\('co:c1','star',event\)/, '머리줄 회사 칸에 별표 단추가 없습니다');
-  if ( !true ) {
-    /* keep closing brace balanced */
+});
+
+test('★★ 한눈에 상단 틀고정 및 기업내용·주민번호·수신발신 세로 1줄 나열·칸 위치 고정 (2026-11-18 대표 지시)', () => {
+  const style = (HTML.match(/<style[^>]*>([\s\S]*?)<\/style>/) || [])[1] || '';
+  const pc = (style.match(/@media\s*\(min-width\s*:\s*761px\)\s*\{([\s\S]*?)\r?\n\}/) || [])[1] || '';
+  assert.match(pc, /main>\.tabs\s*\{[^}]*position\s*:\s*sticky/, '탭 줄이 상단 틀고정(sticky)이 아닙니다');
+  assert.match(pc, /main>\.uimode-bar\s*\{[^}]*position\s*:\s*sticky/, '화면 형태 줄이 상단 틀고정(sticky)이 아닙니다');
+  assert.match(style, /\.ov-stack\s*\{[^}]*flex-direction\s*:\s*column/, '한눈에 칸들이 세로 1열(.ov-stack)로 쌓이지 않습니다');
+  ['ov-sum', 'ov-filing', 'ov-rrn', 'ov-mail', 'ov-var', 'ov-lock'].forEach(cls => {
+    assert.match(pc, new RegExp('\\.ov-box\\.' + cls + '\\s*\\{[^}]*height\\s*:'), cls + ' 칸 높이가 고정되어 있지 않아 회사마다 위치가 흔들립니다');
+  });
+
+  const s = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-08' }, emps: EMPS });
+  const h = s.shellMainHtml(s.M());
+  assert.match(h, /<select[^>]*aria-label="화면 형태 선택"/, '상단 화면 형태가 드롭다운으로 정리되지 않았습니다');
+  const boxOrder = ['ov-sum', 'ov-filing', 'ov-rrn', 'ov-mail', 'ov-var', 'ov-lock'].map(cls => h.indexOf(cls));
+  for (let i = 0; i < boxOrder.length; i++) {
+    assert.ok(boxOrder[i] > 0, i + '번째 세로 고정 상자가 누락되었습니다');
+    if (i > 0) assert.ok(boxOrder[i] > boxOrder[i - 1], '세로 고정 상자 순서가 어긋났습니다');
   }
+  assert.ok((h.match(/class="ov-row"/g) || []).length >= 10, '당월업무·신고담당·수신발신 항목이 한 줄씩(.ov-row) 세로로 나열되어야 합니다');
+
+  /* 자료가 전혀 없는 회사(c3)를 열어도 여섯 상자가 모두 같은 순서·같은 틀로 남아 아래 칸이 위로 튀지 않는다 */
+  const emptyCo = load({ App: { coId: 'c3', tab: 'sum', ym: '2026-08' } });
+  const he = emptyCo.shellMainHtml(emptyCo.M());
+  ['ov-sum', 'ov-filing', 'ov-rrn', 'ov-mail', 'ov-var', 'ov-lock'].forEach(cls => {
+    assert.ok(he.indexOf(cls) > 0, '자료 없는 회사에서 ' + cls + ' 상자가 사라져 다른 상자 위치가 움직였습니다');
+  });
 });
