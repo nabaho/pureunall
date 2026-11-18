@@ -405,6 +405,156 @@ async function deliver(opts) {
   }
 }
 
+/* ── 보낸 직원의 본인 명함 찾기 (대표 지시 2026-11-18 「담당자가 본인이 메일을 보내는경우 본인의 명함이 자동으로 첨부」) ──
+   ① perUser/<signKey> 에 저장된 내 명함 번호를 먼저 본다.
+   ② 아직 안 골랐더라도 로그인한 직원의 재직 명부(uid_roles → data/user_dir) 이름으로
+      기업정보함 색인(pucards/idx)에서 가장 최근 푸른노무법인 명함을 스스로 찾는다.
+   ③ 썸네일이 우리 파이어베이스 창고 주소(https://firebasestorage...)로 적혀 있으면 내려받아 dataURL 로 바꾼다. */
+function fetchAllowedThumbDataUrl(rawUrl) {
+  const safeUrl = SG.allowedCardThumbUrl(rawUrl);
+  if (!safeUrl) return Promise.resolve('');
+  return new Promise((resolve) => {
+    const https = require('node:https');
+    let settled = false;
+    let req = null;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(wallTimer);
+      resolve(val);
+    };
+    const wallTimer = setTimeout(() => {
+      try { if (req) req.destroy(); } catch (_) {}
+      finish('');
+    }, 8000);
+    req = https.get(safeUrl, { timeout: 6000 }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); finish(''); return; }
+      const ct = String((res.headers && res.headers['content-type']) || '').toLowerCase();
+      const chunks = [];
+      let size = 0;
+      res.on('data', (d) => {
+        if (settled) return;
+        size += d.length;
+        if (size > SG.SIGN_MAX_BYTES) { req.destroy(); finish(''); return; }
+        chunks.push(d);
+      });
+      res.on('end', () => {
+        if (settled || !size) { finish(''); return; }
+        const buf = Buffer.concat(chunks);
+        let mime = 'image/jpeg';
+        if (ct.indexOf('png') >= 0 || (buf[0] === 0x89 && buf[1] === 0x50)) mime = 'image/png';
+        else if (ct.indexOf('webp') >= 0) mime = 'image/webp';
+        else if (ct.indexOf('gif') >= 0) mime = 'image/gif';
+        else if (ct.indexOf('jpeg') < 0 && ct.indexOf('jpg') < 0 && !(buf[0] === 0xff && buf[1] === 0xd8)) {
+          finish(''); return;
+        }
+        finish('data:' + mime + ';base64,' + buf.toString('base64'));
+      });
+    });
+    req.on('timeout', () => { req.destroy(); finish(''); });
+    req.on('error', () => finish(''));
+  });
+}
+
+function sidFromByEmail(byEmail) {
+  const m = /^([pa])(\d{3})@pureun\.kr$/i.exec(String(byEmail || '').trim());
+  return m ? (m[1].toUpperCase() + '-' + m[2]) : '';
+}
+
+function isPureunCompany(co) {
+  return /푸른\s*노무법인|pureun/i.test(String(co || ''));
+}
+
+async function resolveSenderStaffName(db, byEmail, uid) {
+  let sid = '';
+  if (uid && !/[.#$/[\]]/.test(String(uid))) {
+    const role = (await db.ref('uid_roles/' + String(uid)).once('value')).val() || {};
+    if (role.status === 'retired' || role.status === 'resigned') return '';
+    sid = String(role.sid || '').trim();
+  }
+  if (!sid) sid = sidFromByEmail(byEmail);
+  if (!sid) return '';
+  const dirRaw = (await db.ref('data/user_dir').once('value')).val();
+  const users = Array.isArray(dirRaw) ? dirRaw : (dirRaw && dirRaw.v ? dirRaw.v : Object.values(dirRaw || {}));
+  const me = (users || []).find((u) => u && String(u.sid || '') === sid && u.status !== 'retired' && u.status !== 'resigned');
+  return (me && me.name) ? String(me.name).trim() : '';
+}
+
+async function resolveSenderCard(db, byEmail, uid) {
+  const key = SG.signKey(byEmail);
+  let cardId = '';
+  let rec = null;
+  if (key) {
+    rec = (await db.ref(CARDS_ROOT + '/config/matMail/perUser/' + key).once('value')).val() || null;
+    if (rec && rec.cleared) return { cardId: '', thumb: '', name: '', rec: rec };
+    if (rec && rec.cardId && !/[.#$/[\]]/.test(String(rec.cardId))) {
+      cardId = String(rec.cardId);
+    }
+  }
+  const senderName = await resolveSenderStaffName(db, byEmail, uid);
+
+  if (cardId) {
+    const itemVal = (await db.ref(CARDS_ROOT + '/items/' + cardId).once('value')).val();
+    if (itemVal && typeof itemVal === 'object') {
+      const itemName = String(itemVal.name || '').trim();
+      const itemPureun = isPureunCompany(itemVal.company) || cardId.indexOf('pu_staff_') === 0;
+      if (!itemPureun || (senderName && itemName && itemName !== senderName)) {
+        cardId = '';
+      }
+    } else if (senderName) {
+      const idxVal = (await db.ref(CARDS_ROOT + '/idx/' + cardId).once('value')).val();
+      if (idxVal && typeof idxVal === 'object') {
+        const idxName = String(idxVal.n || idxVal.name || '').trim();
+        const idxPureun = isPureunCompany(idxVal.c || idxVal.company) || cardId.indexOf('pu_staff_') === 0;
+        if (!idxPureun || (idxName && idxName !== senderName)) cardId = '';
+      }
+    }
+  }
+
+  if (!cardId && senderName) {
+    const idxRef = db.ref(CARDS_ROOT + '/idx');
+    let idxAll = null;
+    if (typeof idxRef.orderByChild === 'function') {
+      try {
+        idxAll = (await idxRef.orderByChild('n').equalTo(senderName).once('value')).val();
+      } catch (_) { idxAll = null; }
+    }
+    if (!idxAll) idxAll = (await idxRef.once('value')).val() || {};
+    let bestId = '', bestRank = -1, bestAt = -1;
+    Object.keys(idxAll).forEach((id) => {
+      if (/[.#$/[\]]/.test(id)) return;
+      const it = idxAll[id];
+      if (!it) return;
+      const kind = String(it.k || it.kind || '');
+      if (kind && kind !== 'card') return;
+      const nm = String(it.n || it.name || '').trim();
+      if (nm !== senderName) return;
+      const comp = String(it.c || it.company || '');
+      const isPu = isPureunCompany(comp);
+      const isOfficial = id.indexOf('pu_staff_') === 0;
+      if (!isPu && !isOfficial) return;
+      const rank = (isPu ? 2 : 0) + (isOfficial ? 1 : 0);
+      const at = Number(it.updatedAt || it.createdAt || 0);
+      if (rank > bestRank || (rank === bestRank && (at > bestAt || (at === bestAt && id > bestId)))) {
+        bestRank = rank; bestAt = at; bestId = id;
+      }
+    });
+    if (bestId) cardId = bestId;
+  }
+
+  if (!cardId) return { cardId: '', thumb: '', name: senderName, rec: rec };
+  const [rawThumbSnap, itemNameSnap] = await Promise.all([
+    db.ref(CARDS_ROOT + '/thumbs/' + cardId).once('value'),
+    senderName ? Promise.resolve(null) : db.ref(CARDS_ROOT + '/items/' + cardId + '/name').once('value'),
+  ]);
+  const finalName = senderName || (itemNameSnap ? String(itemNameSnap.val() || '').trim() : '');
+  let thumb = String(rawThumbSnap.val() || '');
+  if (thumb && !thumb.startsWith('data:image/') && SG.allowedCardThumbUrl(thumb)) {
+    thumb = await fetchAllowedThumbDataUrl(thumb);
+  }
+  return { cardId: cardId, thumb: thumb, name: finalName, rec: rec };
+}
+
 async function deliverOnce(opts) {
   /* ⚠ deps·uid 는 «창고 첨부»에만 쓴다(2026-08-31). 안 넘어오면 창고 길은 조용히
      건너뛰고 예전 길(dataUrl)만 붙는다 — 부르는 곳을 하나 빠뜨려도 메일은 나간다. */
@@ -430,6 +580,31 @@ async function deliverOnce(opts) {
   /* 창고에서 꺼내다 한도를 넘었다 — 다 끌어오기 «전»에 멈춘 것이다.
      ⚠ 조용히 빼고 보내지 않는다. 첨부가 빠진 채 나가면 받는 쪽은 그걸 모른다. */
   if (got.tooBig) return { ok: false, status: 400, error: MS.sizeError(got.tooBig) };
+
+  /* ── 보낸 직원의 본인 명함 파일 자동 첨부 (body.attachMyCard) ──
+     ⚠ 명함 조회가 실패해도 메일 발송 자체는 멈추지 않는다(try/catch). */
+  let cachedSenderCard = null;
+  const getSenderCard = async () => {
+    if (!cachedSenderCard) cachedSenderCard = await resolveSenderCard(db, byEmail, uid);
+    return cachedSenderCard;
+  };
+  if (body && body.attachMyCard) {
+    try {
+      const sc = await getSenderCard();
+      const autoAllowed = !(sc && sc.rec && (sc.rec.cleared || sc.rec.autoAttach === false));
+      const fileAtt = (autoAllowed && sc && sc.thumb) ? SG.cardFileAttachment(sc.thumb, sc.name) : null;
+      if (fileAtt && (got.bytes + fileAtt.bytes) <= MS.MAX_TOTAL_BYTES) {
+        const dup = got.attachments.some((a) => a && a.filename === fileAtt.filename);
+        if (!dup) {
+          got.attachments.push(fileAtt);
+          got.names.push(fileAtt.filename);
+          got.bytes += fileAtt.bytes;
+        }
+      }
+    } catch (e) {
+      console.warn('attachMyCard', (e && e.message) || e);
+    }
+  }
 
   const v = MS.validateSend({
     to: body.to, cc: body.cc, bcc: body.bcc,
@@ -464,17 +639,8 @@ async function deliverOnce(opts) {
   const signAtt = [];
   try {
     if (signHtml && SG.hasSignMark(signHtml)) {
-      const key = SG.signKey(byEmail);
-      let thumb = '';
-      if (key) {
-        const rec = (await db.ref(CARDS_ROOT + '/config/matMail/perUser/' + key).once('value')).val() || {};
-        const cardId = String(rec.cardId || '');
-        /* 열쇠에 못 쓰는 글자가 든 번호는 아예 읽지 않는다 — 경로가 어긋난다 */
-        if (cardId && !/[.#$/[\]]/.test(cardId)) {
-          thumb = (await db.ref(CARDS_ROOT + '/thumbs/' + cardId).once('value')).val() || '';
-        }
-      }
-      const att = SG.signAttachment(thumb);
+      const sc = await getSenderCard();
+      const att = sc && sc.thumb ? SG.signAttachment(sc.thumb) : null;
       if (att) signAtt.push(att);
       else signHtml = SG.stripSignMark(signHtml);   // 못 찾았다 — 표시를 지운다
     }
@@ -756,13 +922,14 @@ function slimPayload(body) {
     matIds: (Array.isArray(p.matIds) ? p.matIds : []).filter((x) => typeof x === 'string').slice(0, 10),
     set: String(p.set || ''),
     toName: String(p.toName || ''),
+    attachMyCard: !!p.attachMyCard,
     droppedFiles: (Array.isArray(p.files) ? p.files : [])
       .map((f) => String((f && f.name) || '')).filter(Boolean),
   };
 }
 
 module.exports = {
-  deliver, collectAttachments, loginIds, errorHint, fromLine,
+  deliver, collectAttachments, resolveSenderCard, loginIds, errorHint, fromLine,
   mailOutPathOk, sweepMailOut, CARDS_BUCKET, MAILOUT_MAX,
   errorsBefore, slimPayload, CARDS_ROOT,
   /* 검사가 밖에서 견줄 수 있게 내놓는다 — 안 내놓으면 「묵은 것만 치우는가」를

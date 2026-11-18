@@ -2263,6 +2263,22 @@ table.sbox td span.sn{display:inline-block;min-width:22px;color:#94a3b8;font-siz
 .cpchip{display:inline-flex;align-items:center;gap:5px;background:#f8fafc;border-radius:14px;
   padding:4px 10px;font-size:12px;color:#1e293b}
 .cpchip.local{background:#f8fafc;color:#166534}
+.cpchip.mycard{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-weight:700}
+.cpchip.mycard .sz{color:#475569;font-weight:400}
+.cpchip.mycard .nm{cursor:pointer}
+.cpchip.mycard .nm:hover{text-decoration:underline}
+.cpcardadd{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:7px;padding:4px 9px;
+  font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.cpcardadd:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+.cpcardadd:focus-visible,.ms-gen-btn:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.ms-auto-bar{display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 10px;border-radius:8px;
+  background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:12px;line-height:1.45;cursor:pointer;word-break:keep-all}
+.ms-auto-bar input{width:16px;height:16px;margin:0;flex:none;accent-color:#166534;cursor:pointer}
+.ms-gen-btn{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:7px;padding:5px 10px;
+  font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.ms-gen-btn:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+.ms-mine-tag{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:5px;background:#eff6ff;
+  border:1px solid #bfdbfe;color:#1e40af;font-size:10.5px;font-weight:700;vertical-align:middle}
 .cpchip b{color:#94a3b8;cursor:pointer;font-weight:700}
 .cpchip b:hover{color:#dc2626}
 .cpnone{font-size:12px;color:#94a3b8}
@@ -7449,8 +7465,9 @@ async function sendCompose(){
   grabCompose();
   const c = _compose; if(!c) return;
   if(c.bulk) return bulkSendAll();      /* 여러 곳에 한 통씩 — 다른 길로 간다 */
+  const myCardNow = (typeof myCardAttachActive === 'function' && myCardAttachActive(c)) ? myCardAttachInfo() : null;
   const chk = composeCheck({ to:c.to, subject:c.subject, body:c.body,
-                             bytes:attachTotal(c.ids,_matMeta,c.files) });
+                             bytes:attachTotal(c.ids,_matMeta,c.files) + (myCardNow ? myCardNow.size : 0) });
   if(!chk.ok) return toast(chk.error, 7000);
   /* ── 잘린 것으로 보이는 주소 (대표 화면 2026-08-24) ──
      「cust03@hanmail.ne」처럼 끝 글자가 빠진 주소는 형식 검사를 통과하고 나가서
@@ -7504,6 +7521,8 @@ async function sendCompose(){
       matIds: c.ids, set: _sendMatSetName || '',
       /* 보낸 메일함에 '누구에게'를 사람 이름으로 보이게 — 주소만 남으면 알아보기 어렵다 */
       toName: (state.items[c.cardId]||{}).name || (state.items[c.cardId]||{}).company || '',
+      /* 보낸 담당자 본인의 최근 명함 파일 자동 첨부 (대표 지시 2026-11-18) */
+      attachMyCard: !!myCardNow,
       /* ⚠ path 든 것은 «창고에 있다»는 뜻이라 dataUrl 이 없다 — 둘 다 실어 보내고
            서버가 있는 쪽을 쓴다(위 addLocalFiles 머리글). 지우면 큰 첨부가 조용히 빠진다. */
       files: (c.files||[]).map(f=>({ name:f.name, dataUrl:f.dataUrl, path:f.path }))
@@ -7589,7 +7608,8 @@ async function doSendMaterials(){
     const cardId = _sendMatId, setName = _sendMatSetName;
     toast('회사 메일로 보내는 중…', 30000);
     try{
-      const r = await postAutoMail({ cardId, to: email, subject, body, matIds: ids, set: setName });
+      const r = await postAutoMail({ cardId, to: email, subject, body, matIds: ids, set: setName,
+        attachMyCard: (typeof myCardShouldAttachNow === 'function' ? myCardShouldAttachNow() : false) });
       closeSendMat();
       toast(`✉️ 보냈습니다 — ${esc(r.from||'회사 메일')}에서 ${email} 로`
         + (r.files?` (첨부 ${r.files}개)`:'')
@@ -8648,8 +8668,9 @@ function mailPageBuild(pre){
       _compose.html = h2; _compose.body = htmlToTextC(h2); _compose.base.body = _compose.body;
     }
   }
-  /* 고른 명함의 사진을 받아 둔다 — 없으면 본문에 빈 자리가 보인다 */
+  /* 고른 명함의 사진을 받아 둔다 — 아직 안 골랐으면 본인 최근 푸른노무법인 명함을 저절로 이어 둔다 */
   if(mySign() && !_signThumb) loadSignThumb(()=>{ if(state.view==='mail') renderMailPage(); });
+  else if(!mySign() && typeof ensureMyPureunCard === 'function') ensureMyPureunCard(()=>{ if(state.view==='mail') renderMailPage(); });
   render();
   try{ $('pcMain').scrollTop=0; }catch(_){}
   if(!_matLoaded && Store.mode==='firebase') loadMaterials(()=>{ if(state.view==='mail') renderMailPage(); });
@@ -8949,12 +8970,25 @@ function puAsk(o){
 function mailWriteHtml(){
   const c = _compose || {}; c.files = c.files || []; c.ids = c.ids || [];
   const from = matMailCfg().from || '(보내는 주소 없음)';
-  const bytes = attachTotal(c.ids, _matMeta, c.files);
+  const myCard = (!c.bulk && typeof myCardAttachActive === 'function' && myCardAttachActive(c)) ? myCardAttachInfo() : null;
+  const canReaddCard = !c.bulk && !myCard && (typeof myCardAttachInfo === 'function' && !!myCardAttachInfo());
+  const bytes = attachTotal(c.ids, _matMeta, c.files) + (myCard ? myCard.size : 0);
   const over = bytes > MAIL_MAX_BYTES;
+  const attCount = c.ids.length + c.files.length + (myCard ? 1 : 0);
+  const chipMyCard = myCard
+    ? `<span class="cpchip mycard" title="메일 발송 시 본인 명함 이미지 파일이 함께 첨부됩니다 (누르면 명함 확인·변경)">
+        <span class="nm" role="button" tabindex="0" onclick="openMySign()"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMySign()}">📇 ${esc(myCard.name)}</span>
+        <span class="sz">내 명함 자동첨부${myCard.size ? ' · ' + fmtMB(myCard.size) : ''}</span>
+        <b role="button" tabindex="0" aria-label="이번 메일에서 내 명함 첨부 빼기"
+          onclick="toggleComposeMyCard(false)"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleComposeMyCard(false)}"
+          title="이번 메일에서만 내 명함 첨부 빼기">✕</b></span>`
+    : '';
   const chipsMat = c.ids.map(id=>{ const m=_matMeta[id]||{};
     return `<span class="cpchip">${matIcon(m.fileName)} ${esc(m.name||'자료')}
       <span class="sz">${m.size?fmtMB(m.size):''}</span>
-      <b onclick="dropAttach('${id}')" title="빼기">✕</b></span>`; }).join('');
+      <b data-id="${esc(id)}" onclick="dropAttach(this.dataset.id)" title="빼기">✕</b></span>`; }).join('');
   const chipsLocal = c.files.map((f,i)=>
     `<span class="cpchip local">💻 ${esc(f.name||'파일')}
       <span class="sz">${fmtMB(f.size)}</span>
@@ -9046,12 +9080,14 @@ function mailWriteHtml(){
             <div class="cpattbar">
               <label class="cpfilebtn" title="한글에서 고친 계약서처럼 이번 편지에만 붙일 파일 (8MB 이하)">파일 첨부하기
                 <input type="file" multiple style="display:none" onchange="addLocalFiles(this)"></label>
+              ${canReaddCard ? `<button type="button" class="cpcardadd" onclick="toggleComposeMyCard(true)"
+                title="내 명함 이미지 파일을 이번 메일 첨부에 다시 넣습니다">+ 📇 내 명함 첨부</button>` : ''}
               <span class="cpsize ${over?'over':''}">일반 : ${fmtMB(bytes)} / ${fmtMB(MAIL_MAX_BYTES)}${over?' — 넘었습니다' : ''}</span>
-              ${state.attFold && (c.ids.length+c.files.length)
-                ? `<span class="cpattn" onclick="toggleAtt()">붙은 것 ${c.ids.length+c.files.length}개 — 눌러서 보기</span>` : ''}
+              ${state.attFold && attCount
+                ? `<span class="cpattn" onclick="toggleAtt()">붙은 것 ${attCount}개 — 눌러서 보기</span>` : ''}
             </div>
             ${state.attFold ? '' : `<div class="cpattbox ${over?'over':''}" id="cpDrop">
-              ${(chipsMat+chipsLocal) || '<div class="cpdrophint">여러개의 파일을 마우스로 끌어놓으세요.</div>'}
+              ${(chipMyCard+chipsMat+chipsLocal) || '<div class="cpdrophint">여러개의 파일을 마우스로 끌어놓으세요.</div>'}
             </div>`}
           </div></div>
         ${/* ⚠ 서식 도구줄까지 «붙박이 덩이 안»이다 (대표 지시 2026-08-30 「캡쳐2도
@@ -9643,9 +9679,327 @@ function signRestoreHtml(html){
 /* 고른 명함의 썸네일을 미리 받아 둔다 — 그려야 할 때 없으면 빈 자리가 된다 */
 function loadSignThumb(then){
   const rec = mySign();
-  if(!rec || !rec.cardId){ _signThumb=''; if(then) then(); return; }
-  Store.getThumb(rec.cardId).then(t=>{ _signThumb = t||''; if(then) then(); })
-    .catch(()=>{ _signThumb=''; if(then) then(); });
+  if(!rec || rec.cleared || !rec.cardId){ _signThumb=''; if(then) then(); return; }
+  Store.getThumb(rec.cardId).then(t=>{
+    _signThumb = (typeof safeCardImgSrc === 'function') ? safeCardImgSrc(t||'') : (t||'');
+    if(then) then();
+  }).catch(()=>{ _signThumb=''; if(then) then(); });
+}
+
+/* ══ 담당자 본인 최근 푸른노무법인 명함 자동 매칭 · 이미지 생성 · 자동 첨부 (대표 지시 2026-11-18) ══
+   「담당자가 본인이 메일을 보내는경우 본인의 명함이 자동으로 첨부되어 보낼수 있게 되었으면 좋겠다.
+     푸른노무법인 최근 명함 확인하고 메일을 보낼때 명함도 첨부하게 해라」 */
+const MYSIGN_OFF_LS = 'pucards_mysign_off_';
+function safeCardImgSrc(raw){
+  const s = String(raw == null ? '' : raw).trim();
+  if(/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(s)) return s;
+  if(/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/pureun-erp(?:\.firebasestorage\.app|\.appspot\.com)\/o\/[^\x22\x27<>\\\s]+$/i.test(s)) return s;
+  return '';
+}
+function isPureunFirmName(co){
+  return /푸른\s*노무법인|pureun/i.test(String(co || ''));
+}
+function findMyLatestPureunCard(){
+  const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
+  if(!me) return null;
+  const all = Object.values((state && state.items) || {}).filter(it =>
+    it && it.kind === 'card' && it.id
+    && String(it.name || '').trim() === me
+    && (isPureunFirmName(it.company) || String(it.id).indexOf('pu_staff_') === 0)
+  );
+  if(!all.length) return null;
+  all.sort((a, b) => {
+    const ar = (isPureunFirmName(a.company) ? 2 : 0) + (String(a.id).indexOf('pu_staff_') === 0 ? 1 : 0);
+    const br = (isPureunFirmName(b.company) ? 2 : 0) + (String(b.id).indexOf('pu_staff_') === 0 ? 1 : 0);
+    if(ar !== br) return br - ar;
+    const at = Number(a.updatedAt || a.createdAt || 0);
+    const bt = Number(b.updatedAt || b.createdAt || 0);
+    if(at !== bt) return bt - at;
+    return String(b.id).localeCompare(String(a.id));
+  });
+  return all[0] || null;
+}
+function myCardAutoAttachOn(){
+  const rec = mySign();
+  if(rec && rec.cleared) return false;
+  if(rec && rec.autoAttach !== undefined) return rec.autoAttach !== false;
+  const k = mySignKey();
+  if(k){
+    try{ if(localStorage.getItem(MYSIGN_OFF_LS + k) === '1') return false; }catch(_){}
+  }
+  return true;
+}
+function mySignCardItem(){
+  const rec = mySign();
+  if(rec && rec.cleared) return null;
+  if(rec && rec.cardId && state && state.items && state.items[rec.cardId]){
+    const it = state.items[rec.cardId];
+    if(isPureunFirmName(it.company) || String(rec.cardId).indexOf('pu_staff_') === 0) return it;
+  }
+  return findMyLatestPureunCard();
+}
+function estimateDataUrlBytes(u){
+  const s = String(u || '');
+  if(!s.startsWith('data:')) return 0;
+  const i = s.indexOf(',');
+  if(i < 0) return 0;
+  return Math.max(0, Math.floor((s.length - i - 1) * 3 / 4));
+}
+function myCardAttachInfo(){
+  const rec = mySign();
+  if(rec && rec.cleared) return null;
+  const k = mySignKey();
+  if(!rec && k){
+    try{ if(localStorage.getItem(MYSIGN_OFF_LS + k) === '1') return null; }catch(_){}
+  }
+  const it = mySignCardItem();
+  if(!it) return null;
+  const me = (it && it.name) || ((typeof mbMyName === 'function') ? mbMyName() : '');
+  const clean = String(me || '').replace(/[\\/:*?\x22<>|\r\n\s]+/g, '').slice(0, 30);
+  if(!clean) return null;
+  const bytes = estimateDataUrlBytes(_signThumb) || 48 * 1024;
+  return {
+    cardId: String((it && it.id) || (rec && rec.cardId) || ''),
+    personName: clean,
+    name: '푸른노무법인_' + (clean ? clean + '_' : '') + '명함.jpg',
+    size: bytes
+  };
+}
+function myCardAttachActive(c){
+  const o = c || _compose || {};
+  if(o.bulk || o.myCardOff) return false;
+  if(!myCardAutoAttachOn()) return false;
+  return !!myCardAttachInfo();
+}
+function myCardShouldAttachNow(){
+  if(!myCardAutoAttachOn()) return false;
+  return !!myCardAttachInfo();
+}
+function toggleComposeMyCard(on){
+  grabCompose();
+  if(!_compose) return;
+  _compose.myCardOff = !on;
+  if(on && !myCardAutoAttachOn()) setMyCardAutoAttach(true, true);
+  renderMailPage();
+  toast(on ? '📇 이번 메일에 내 명함을 다시 첨부했습니다' : '이번 메일에서만 내 명함 첨부를 뺐습니다 (늘 빼려면 [📇 내 명함]에서 설정)', 5000);
+}
+function setMyCardAutoAttach(on, silent){
+  const k = mySignKey(); if(!k) return;
+  const rec = mySign() || {};
+  const fallback = (!rec.cardId) ? findMyLatestPureunCard() : null;
+  const cid = String(rec.cardId || (fallback && fallback.id) || '');
+  const now = Date.now();
+  const next = Object.assign({}, rec, {
+    cleared: false,
+    autoAttach: !!on,
+    at: now
+  });
+  if(cid) next.cardId = cid; else delete next.cardId;
+  try{ if(on) localStorage.removeItem(MYSIGN_OFF_LS + k); }catch(_){}
+  _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
+  _matMail.perUser[k] = next;
+  if(_compose) _compose.myCardOff = !on;
+  if(typeof Store !== 'undefined' && Store.mode === 'firebase' && firebase.database){
+    const dbPatch = { cleared: false, autoAttach: !!on, at: now };
+    if(cid) dbPatch.cardId = cid;
+    firebase.database().ref(`${DB_ROOT}/config/matMail/perUser/${k}`).update(dbPatch)
+      .catch(e=>toast('설정 저장 실패: '+((e&&e.message)||'')));
+  }
+  if(!silent){
+    try{ if(document.getElementById('msList')) showPanel(mySignHtml()); }catch(_){}
+    renderMailPage();
+    toast(on ? '📇 이제 메일을 보낼 때마다 내 명함 파일이 자동 첨부됩니다' : '자동 첨부를 껐습니다 — 서명 설정은 그대로 유지됩니다', 5000);
+  }
+}
+/* 최근 푸른노무법인 공식 명함 양식(무궁화 휘장 · 투톤 구분선 · 천안본사/서산지사) 캔버스 생성 */
+function renderPureunCardDataUrl(spec){
+  const o = spec || {};
+  const nm = String(o.name || '').trim();
+  if(!nm || typeof document === 'undefined') return '';
+  const cv = document.createElement('canvas');
+  cv.width = 900; cv.height = 500;
+  const g = cv.getContext && cv.getContext('2d');
+  if(!g) return '';
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 900, 500);
+  g.strokeStyle = '#e2e8f0';
+  g.lineWidth = 2;
+  g.strokeRect(1, 1, 898, 498);
+
+  /* 좌상단 공인노무사회 5꽃잎 휘장 + 푸른 노무법인 */
+  const cx = 118, cy = 78;
+  g.lineJoin = 'round';
+  for(let i = 0; i < 5; i++){
+    const ang = (-90 + i * 72) * Math.PI / 180;
+    const px = cx + 27 * Math.cos(ang), py = cy + 27 * Math.sin(ang);
+    g.beginPath();
+    for(let k = 0; k < 5; k++){
+      const a2 = (-90 + i * 72 + k * 72) * Math.PI / 180;
+      const rr = k === 0 ? 26 : 21;
+      const x = px + rr * Math.cos(a2), y = py + rr * Math.sin(a2);
+      if(k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.closePath();
+    g.fillStyle = '#ffffff'; g.fill();
+    g.strokeStyle = '#d97706'; g.lineWidth = 3.4; g.stroke();
+  }
+  g.beginPath(); g.arc(cx, cy, 23, 0, Math.PI * 2);
+  g.fillStyle = '#ffffff'; g.fill();
+  g.strokeStyle = '#d97706'; g.lineWidth = 3.4; g.stroke();
+  for(let i = 0; i < 3; i++){
+    const a = (-90 + i * 120) * Math.PI / 180;
+    const aL = (-90 + i * 120 - 24) * Math.PI / 180;
+    const aR = (-90 + i * 120 + 24) * Math.PI / 180;
+    g.beginPath();
+    g.moveTo(cx, cy);
+    g.lineTo(cx + 10 * Math.cos(aL), cy + 10 * Math.sin(aL));
+    g.lineTo(cx + 19 * Math.cos(a), cy + 19 * Math.sin(a));
+    g.lineTo(cx + 10 * Math.cos(aR), cy + 10 * Math.sin(aR));
+    g.closePath();
+    g.fillStyle = '#d97706'; g.fill();
+  }
+  g.fillStyle = '#d97706';
+  g.font = 'bold 17px "Malgun Gothic", sans-serif';
+  g.textAlign = 'center';
+  g.fillText('푸른 노무법인', cx, 150);
+
+  /* 우측 직함 · 성명 · Mobile */
+  const spaced = nm.split('').join(' ');
+  const mobile = String(o.mobile || '').trim();
+  const title = String(o.title || '').trim();
+  const rightX = 852;
+  const nameY = mobile ? 236 : 258;
+  g.textAlign = 'right';
+  g.fillStyle = '#1e293b';
+  g.font = 'bold 34px "Malgun Gothic", sans-serif';
+  g.fillText(spaced, rightX, nameY);
+  const nameW = g.measureText(spaced).width;
+  if(title){
+    g.fillStyle = '#475569';
+    g.font = 'bold 18.5px "Malgun Gothic", sans-serif';
+    g.fillText(title, rightX - nameW - 14, nameY - 2);
+  }
+  if(mobile){
+    g.fillStyle = '#1e293b';
+    g.font = 'bold 20px Calibri, "Malgun Gothic", sans-serif';
+    g.fillText(mobile, rightX, 276);
+    const mobW = g.measureText(mobile).width;
+    g.fillStyle = '#d97706';
+    g.font = 'bold 18.5px Calibri, "Malgun Gothic", sans-serif';
+    g.fillText('Mobile.', rightX - mobW - 8, 276);
+  }
+
+  /* 투톤 구분선 */
+  g.beginPath(); g.moveTo(38, 298); g.lineTo(608, 298);
+  g.strokeStyle = '#475569'; g.lineWidth = 2.4; g.stroke();
+  g.beginPath(); g.moveTo(608, 298); g.lineTo(854, 298);
+  g.strokeStyle = '#d97706'; g.lineWidth = 2.8; g.stroke();
+
+  /* 하단 천안본사 · 서산지사 */
+  g.textAlign = 'left';
+  const drawBranch = (x, head, addr, tel, fax) => {
+    g.fillStyle = '#1e40af'; g.font = 'bold 18px "Malgun Gothic", sans-serif';
+    g.fillText(head, x, 332);
+    g.fillStyle = '#1e293b'; g.font = '14.5px "Malgun Gothic", sans-serif';
+    g.fillText(addr, x, 376);
+    g.fillStyle = '#d97706'; g.font = 'bold 15px Calibri, sans-serif';
+    g.fillText('Tel.', x, 408);
+    g.fillText('Fax.', x + 202, 408);
+    g.fillText('Email.', x, 438);
+    g.fillStyle = '#1e293b'; g.font = '15.5px Calibri, sans-serif';
+    g.fillText(tel, x + 32, 408);
+    g.fillText(fax, x + 236, 408);
+    g.fillText('370-6@hanmail.net', x + 48, 438);
+  };
+  drawBranch(38, '천안본사', '충남 천안시 서북구 원두정8길 6, 301호(두정빌딩)', '041-556-0035', '041-556-3656');
+  drawBranch(486, '서산지사', '충남 서산시 쌍연남1로 37, 1층(썬샤인빌딩)', '041-429-0123', '041-429-0222');
+  return cv.toDataURL('image/jpeg', 0.92);
+}
+async function genMyPureunCardNow(){
+  const k = mySignKey();
+  if(!k) return toast('로그인 정보를 확인 중입니다 — 잠시 뒤 다시 눌러 주세요', 5000);
+  const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
+  const cur = mySignCardItem();
+  const st = (me && typeof mbStaffOf === 'function') ? (mbStaffOf(me) || {}) : {};
+  const nm = String((cur && cur.name) || me || '').trim();
+  if(!nm) return toast('내 직원 이름을 아직 불러오지 못했습니다', 6000);
+  let rawTitle = String((cur && isPureunFirmName(cur.company) && cur.title) || st.title || '').trim();
+  if(rawTitle === '노무사') rawTitle = '공인노무사';
+  const mobile = String((cur && cur.mobile) || '').trim();
+  const dataUrl = renderPureunCardDataUrl({ name: nm, title: rawTitle, mobile: mobile });
+  if(!dataUrl) return toast('명함 이미지를 만들지 못했습니다', 6000);
+  const now = Date.now();
+  const sidClean = String(st.sid || nm).replace(/[^A-Za-z0-9가-힣_-]/g, '_');
+  /* 기존 스캔 원본 명함(photos/<cur.id>)을 덮어쓰지 않도록 전용 공식 명함 ID(pu_staff_<sid>)에 저장한다 */
+  const cardId = 'pu_staff_' + sidClean;
+  const prevStaffCard = (state.items && state.items[cardId]) || {};
+  const cardRec = {
+    id: cardId,
+    kind: 'card',
+    scope: 'shared',
+    group: prevStaffCard.group || (cur && cur.group) || '',
+    name: nm,
+    title: rawTitle,
+    company: '푸른 노무법인',
+    mobile: mobile,
+    email: '370-6@hanmail.net',
+    companyTel: '041-556-0035',
+    companyFax: '041-556-3656',
+    companyAddr: '충남 천안시 서북구 원두정8길 6, 301호(두정빌딩)',
+    memo: '[서산지사] 충남 서산시 쌍연남1로 37, 1층(썬샤인빌딩) / Tel. 041-429-0123 / Fax. 041-429-0222',
+    createdAt: Number(prevStaffCard.createdAt || now),
+    updatedAt: now
+  };
+  if(!cardRec.group) delete cardRec.group;
+  try{
+    if(typeof Store !== 'undefined' && Store.mode === 'firebase' && firebase.database){
+      const db = firebase.database();
+      await Promise.all([
+        db.ref(`${DB_ROOT}/items/${cardId}`).update(cardRec),
+        db.ref(`${DB_ROOT}/thumbs/${cardId}`).set(dataUrl),
+        db.ref(`${DB_ROOT}/photos/${cardId}`).set(dataUrl),
+        db.ref(`${DB_ROOT}/idx/${cardId}`).set(typeof idxRecord === 'function' ? idxRecord(cardRec) : cardRec),
+        db.ref(`${DB_ROOT}/config/matMail/perUser/${k}`).set({ cardId: cardId, cleared: false, mode: 'photo', autoAttach: true, at: now })
+      ]);
+    }
+    state.items = state.items || {};
+    state.items[cardId] = Object.assign({}, prevStaffCard, cardRec, { thumb: dataUrl });
+    if(typeof Store !== 'undefined' && Store.thumbCache) Store.thumbCache[cardId] = dataUrl;
+    try{ localStorage.removeItem(MYSIGN_OFF_LS + k); }catch(_){}
+    _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
+    _matMail.perUser[k] = { cardId: cardId, cleared: false, mode: 'photo', autoAttach: true, at: now };
+    _signThumb = dataUrl;
+    if(_compose) _compose.myCardOff = false;
+    try{ if(document.getElementById('msList')) showPanel(mySignHtml()); }catch(_){}
+    renderMailPage();
+    toast(`✨ ${nm} ${rawTitle || ''} 최근 푸른노무법인 명함을 적용했습니다 — 메일 보낼 때 자동 첨부됩니다`, 7000);
+  }catch(e){
+    toast('명함 저장 실패: ' + ((e && e.message) || e), 8000);
+  }
+}
+let _ensuringMyCard = false;
+function ensureMyPureunCard(then){
+  const k = mySignKey();
+  if(!k){ if(then) then(); return; }
+  const cur = mySign();
+  if(cur && cur.cleared){ if(then) then(); return; }
+  if(cur && cur.cardId){
+    if(!_signThumb) loadSignThumb(then);
+    else if(then) then();
+    return;
+  }
+  try{ if(localStorage.getItem(MYSIGN_OFF_LS + k) === '1'){ if(then) then(); return; } }catch(_){}
+  if(_ensuringMyCard){ if(then) then(); return; }
+  const found = findMyLatestPureunCard();
+  if(!found || !found.id){ if(then) then(); return; }
+  _ensuringMyCard = true;
+  const next = { cardId: String(found.id), mode: 'photo', autoAttach: true, at: Date.now() };
+  _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
+  _matMail.perUser[k] = next;
+  if(typeof Store !== 'undefined' && Store.mode === 'firebase' && firebase.database){
+    firebase.database().ref(`${DB_ROOT}/config/matMail/perUser/${k}`).set(next).catch(()=>{});
+  }
+  loadSignThumb(()=>{ _ensuringMyCard = false; if(then) then(); });
 }
 
 /* ── 고르는 창 ── */
@@ -9653,6 +10007,7 @@ let _msQ = '';
 function openMySign(){
   if(!mySignKey()) return toast('로그인 정보를 아직 못 읽었습니다 — 잠시 뒤 다시 눌러 주세요', 6000);
   _msQ = '';
+  if(!mySign() && typeof ensureMyPureunCard === 'function') ensureMyPureunCard(()=>{ try{ if(document.getElementById('msList')){ showPanel(mySignHtml()); msFillThumbs(); } }catch(_){} });
   showPanel(mySignHtml());
   msFillThumbs();
   try{ const el=$('msQ'); if(el) el.focus(); }catch(_){}
@@ -9664,32 +10019,42 @@ function mySignHtml(){
      ⚠ 개인 폴더 명함은 안 보여 준다. 서버는 공용 자리(pucards/thumbs)만 읽는다. */
   const pool = Object.values(state.items||{}).filter(it=>it && it.kind==='card' && it.id);
   const cur = rec.cardId ? (state.items[rec.cardId]||{}) : null;
+  const autoOn = (typeof myCardAutoAttachOn === 'function') ? myCardAutoAttachOn() : true;
   /* ⚠ 찾기 칸은 «다시 그리지 않는다». 한글은 자모 여러 번이 모여 한 글자가 되는데
      (조합), 글자마다 팝업을 다시 그리면 입력 칸이 새 것으로 바뀌어 조합이 끊긴다 —
      대표 화면 2026-08-24 에 「권」을 치니 «ㄱㅜㅓㄴ» 이 남았다.
      그래서 결과 목록(#msList)만 바꾼다(msType). */
-  return `<div class="mhead"><b>✍ 내 서명 명함</b>${_closeBtn()}</div>
-    <p class="setnote" style="margin:0 0 8px">한 번 고르면 <b>내가 보내는 모든 메일</b> 끝에 따라붙습니다 ·
+  return `<div class="mhead"><b>✍ 내 서명 · 자동 첨부 명함</b>${_closeBtn()}</div>
+    <p class="setnote" style="margin:0 0 8px">본인 명함이 <b>메일 보낼 때 자동 첨부</b>되며 본문 서명에도 함께 따라갑니다 ·
       사람마다 따로 저장됩니다</p>
+    <label class="ms-auto-bar">
+      <input type="checkbox" ${autoOn?'checked':''} onchange="setMyCardAutoAttach(this.checked)">
+      <span><b>📎 메일 보낼 때 내 명함 이미지 파일 자동 첨부하기</b> (받는 분이 파일로 바로 저장 가능)</span>
+    </label>
+    <div style="display:flex;justify-content:flex-end;margin:0 0 8px">
+      <button type="button" class="ms-gen-btn" onclick="genMyPureunCardNow()"
+        title="푸른노무법인 최근 공식 명함 양식(천안본사·서산지사)으로 내 명함 이미지를 즉시 생성·적용합니다">✨ 최근 푸른노무법인 양식으로 내 명함 이미지 적용</button>
+    </div>
     ${cur ? `<div class="msnow">
-      ${_signThumb?`<img src="${_signThumb}" alt="">`:'<span class="none">사진을 읽는 중…</span>'}
+      ${(typeof safeCardImgSrc === 'function' ? safeCardImgSrc(_signThumb) : _signThumb)?`<img src="${esc(typeof safeCardImgSrc === 'function' ? safeCardImgSrc(_signThumb) : _signThumb)}" alt="내 서명 명함 미리보기">`:'<span class="none">사진을 읽는 중…</span>'}
       <div class="t"><b>${esc(cur.name||'(이름 없음)')}</b>
         <span>${esc(cur.company||'')}</span></div>
-      <button class="msoff" onclick="clearMySign()" title="서명에서 명함 사진을 뺍니다">✕ 빼기</button>
+      <button class="msoff" onclick="clearMySign()" title="서명 및 자동첨부에서 명함을 뺍니다">✕ 빼기</button>
     </div>
     ${/* 글자냐 사진이냐 (대표 지시 2026-08-24 「깔끔하게 정리되어 디지털 형태로」).
          글자를 기본으로 둔다 — 받는 쪽이 그림을 막아도 보이고, 긁어 붙일 수 있다. */''}
     <div class="msmode">
       <button class="${signMode()==='card'?'on':''}" onclick="setSignMode('card')"
         title="이름·회사·전화·주소를 글자로 짜서 보냅니다 — 무조건 보이고, 긁어 붙일 수 있습니다">
-        📝 글자로 <i>권장</i></button>
+        📝 본문은 글자로</button>
       <button class="${signMode()==='photo'?'on':''}" onclick="setSignMode('photo')"
-        title="명함 사진을 그림으로 보냅니다 — 받는 쪽이 그림을 막으면 안 보일 수 있습니다">
-        🖼 사진으로</button>
+        title="본문 서명에도 명함 그림을 함께 넣습니다">
+        🖼 본문에도 사진으로</button>
     </div>
     ${signMode()==='card' ? `<div class="mspreview">${signCardHtml(cur) || '<span class="none">이 명함에 적힌 값이 없습니다 — 명함을 열어 채워 주세요</span>'}</div>` : ''}`
-    : `<p class="cpnone" style="padding:10px 2px">아직 고른 명함이 없습니다</p>`}
+    : `<p class="cpnone" style="padding:10px 2px">아직 고른 명함이 없습니다 — 아래에서 고르거나 위 [최근 푸른노무법인 양식 적용]을 눌러 주세요</p>`}
     <div class="mdsearch" style="margin:10px 0 8px"><input id="msQ" value="${esc(_msQ||'')}"
+      aria-label="내 서명 명함 이름 또는 회사 검색"
       placeholder="🔍 내 이름·회사로 찾기" oninput="msType(this.value)"></div>
     <div class="ablist" id="msList">${mySignListHtml()}</div>
     <p class="setnote" style="margin:8px 0 0">사진이 없는 명함을 고르면 글자 서명만 나갑니다.
@@ -9709,12 +10074,23 @@ function msIsOurs(it){
 function mySignListHtml(){
   const rec = mySign() || {};
   const q = String(_msQ||'').trim();
+  const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
   /* ⚠ 거르기를 «먼저» 하고 40장을 센다 — 뒤에 거르면 바깥 명함이 자리를 다 차지해
        정작 우리 사람은 한 명도 안 나온다. */
   const pool = Object.values(state.items||{})
     .filter(it=>it && it.kind==='card' && it.id && msIsOurs(it));
-  const hits = (q ? findPeople(state.items, q, 0).filter(msIsOurs) : pool).slice(0, 40)
+  const rawHits = (q ? findPeople(state.items, q, 0).filter(msIsOurs) : pool)
     .filter(it=>it && it.kind==='card');
+  rawHits.sort((a, b) => {
+    const am = (me && String(a.name||'').trim() === me) ? 1 : 0;
+    const bm = (me && String(b.name||'').trim() === me) ? 1 : 0;
+    if(am !== bm) return bm - am;
+    const ap = /푸른\s*노무법인|pureun/i.test(String(a.company||'')) ? 1 : 0;
+    const bp = /푸른\s*노무법인|pureun/i.test(String(b.company||'')) ? 1 : 0;
+    if(ap !== bp) return bp - ap;
+    return Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0);
+  });
+  const hits = rawHits.slice(0, 40);
   if(!hits.length) return `<div class="cpnone" style="padding:16px 2px">${
     q ? '찾은 명함이 없습니다'
       : (mbStaffReady() ? '푸른노무법인 사람의 명함이 아직 기업정보함에 없습니다 — 내 명함을 먼저 담아 주세요'
@@ -9725,15 +10101,22 @@ function mySignListHtml(){
      ⚠ 그림은 «보일 때» 받아 온다(thumbFill) — 목록에 나온 40장을 한꺼번에 받으면
        창이 열릴 때마다 몇 MB 다. 이미 있는 길을 그대로 쓴다.
      ⚠ 사진이 없는 명함은 첫 글자를 그대로 둔다 — thumbFill 이 그렇게 한다. */
-  return hits.map(it=>`
-    <div class="abrow msrow ${rec.cardId===it.id?'on':''}" onclick="pickMySign('${it.id}')">
+  return hits.map(it=>{
+    const isMine = !!(me && String(it.name||'').trim() === me && /푸른\s*노무법인|pureun/i.test(String(it.company||'')));
+    return `
+    <div class="abrow msrow ${rec.cardId===it.id?'on':''}" role="button" tabindex="0"
+      data-cid="${esc(it.id)}" onclick="pickMySign(this.dataset.cid)"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">
       <span class="ck">${rec.cardId===it.id?'☑':'☐'}</span>
       <span class="msth thumb" data-th="${esc(it.id)}">${
-        it.thumb ? `<img src="${it.thumb}" loading="lazy">`
+        it.thumb ? ((typeof safeCardImgSrc !== 'function' || safeCardImgSrc(it.thumb))
+          ? `<img src="${esc(typeof safeCardImgSrc === 'function' ? safeCardImgSrc(it.thumb) : it.thumb)}" loading="lazy" alt="">`
+          : esc(String(it.name||'?').slice(0,1)))
                  : esc(String(it.name||'?').slice(0,1))}</span>
-      <span class="n"><b>${esc(it.name||'(이름 없음)')}</b>
+      <span class="n"><b>${esc(it.name||'(이름 없음)')}</b>${isMine ? '<span class="ms-mine-tag">내 최근 명함</span>' : ''}
         <span class="c">${esc(it.company||'')}</span></span>
-      <span class="e">${esc(it.title||'')}</span></div>`).join('');
+      <span class="e">${esc(it.title||'')}</span></div>`;
+  }).join('');
 }
 /* 글자를 칠 때 — 목록만 바꾼다. 초점도 손대지 않는다(안 건드렸으니 그럴 일이 없다). */
 /* 목록에 나온 명함 그림을 채운다 — 창을 열 때와 글자를 칠 때 둘 다 부른다.
@@ -9754,25 +10137,38 @@ function msType(v){
 function pickMySign(cardId){
   const k = mySignKey(); if(!k) return;
   const it = state.items[cardId]; if(!it) return;
+  const prev = mySign() || {};
+  const next = {
+    cardId: String(cardId),
+    cleared: false,
+    mode: prev.mode || 'photo',
+    autoAttach: prev.autoAttach !== false,
+    at: Date.now()
+  };
+  try{ localStorage.removeItem(MYSIGN_OFF_LS + k); }catch(_){}
   firebase.database().ref(`${DB_ROOT}/config/matMail/perUser/${k}`)
-    .set({ cardId: String(cardId), at: Date.now() })
+    .set(next)
     .then(()=>{
       _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
-      _matMail.perUser[k] = { cardId:String(cardId), at:Date.now() };
+      _matMail.perUser[k] = next;
+      if(_compose) _compose.myCardOff = false;
       loadSignThumb(()=>{ showPanel(mySignHtml()); renderMailPage(); });
-      toast(`${it.name||'이 명함'} 사진을 서명에 넣었습니다 — 이제 보낼 때마다 따라갑니다`, 7000);
+      toast(`${it.name||'이 명함'} 명함을 적용했습니다 — 이제 메일 보낼 때마다 자동 첨부·서명으로 따라갑니다`, 7000);
     })
     .catch(e=>toast('저장하지 못했습니다: '+((e&&e.message)||'')
       + '\n(서버 규칙에서 config/matMail 쓰기가 막혀 있을 수 있습니다)', 9000));
 }
 function clearMySign(){
   const k = mySignKey(); if(!k) return;
-  firebase.database().ref(`${DB_ROOT}/config/matMail/perUser/${k}`).remove()
+  const clearedRec = { cleared: true, autoAttach: false, at: Date.now() };
+  try{ localStorage.setItem(MYSIGN_OFF_LS + k, '1'); }catch(_){}
+  firebase.database().ref(`${DB_ROOT}/config/matMail/perUser/${k}`).set(clearedRec)
     .then(()=>{
-      if(_matMail && _matMail.perUser) delete _matMail.perUser[k];
+      _matMail = _matMail || {}; _matMail.perUser = _matMail.perUser || {};
+      _matMail.perUser[k] = clearedRec;
       _signThumb='';
       showPanel(mySignHtml()); renderMailPage();
-      toast('서명에서 명함 사진을 뺐습니다');
+      toast('서명 및 자동 첨부에서 명함을 뺐습니다');
     })
     .catch(e=>toast('지우지 못했습니다: '+((e&&e.message)||'')));
 }
@@ -9885,7 +10281,9 @@ function previewMail(){
   grabCompose();
   const c=_compose; if(!c) return;
   const from = matMailCfg().from || '';
-  const names = (c.ids||[]).map(id=>(_matMeta[id]||{}).name||'자료')
+  const myCard = (!c.bulk && typeof myCardAttachActive === 'function' && myCardAttachActive(c)) ? myCardAttachInfo() : null;
+  const names = (myCard ? ['📇 ' + myCard.name + ' (내 명함)'] : [])
+    .concat((c.ids||[]).map(id=>(_matMeta[id]||{}).name||'자료'))
     .concat((c.files||[]).map(f=>f.name));
   showPanel(`<div class="mhead"><b>👁 미리보기</b>${_closeBtn()}</div>
     <div style="font-size:12.5px;line-height:1.9;color:#1e293b;border-bottom:1px solid #f8fafc;padding-bottom:9px;margin-bottom:9px">
@@ -31945,7 +32343,8 @@ async function mbQrSend(){
   if(btn){ btn.textContent = '보내는 중…'; btn.disabled = true; }
   try{
     const r = await postAutoMail({ cardId:'', to:to, cc:'', bcc:'', toMe:false, oneByOne:false, scheduleAt:0,
-      subject:subj, body:htmlToTextC(html), html:html, matIds:[], set:'', toName:(mbNameOf(v.e, v.f) || ''), files:[] });
+      subject:subj, body:htmlToTextC(html), html:html, matIds:[], set:'', toName:(mbNameOf(v.e, v.f) || ''),
+      attachMyCard: (typeof myCardShouldAttachNow === 'function' ? myCardShouldAttachNow() : false), files:[] });
     toast('✉️ 보냈습니다 — ' + esc(r.from||'회사 메일') + ' 에서 ' + esc(to) + ' 로', 7000);
     mbAnswered(slug, uid);    /* ⚠ 보낸 «뒤에만» 답장 표 */
     mbQrClose();
