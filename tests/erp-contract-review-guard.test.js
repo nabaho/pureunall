@@ -219,3 +219,43 @@ test('⑤ 다중 PC·다중 탭 동시 수신 시 RTDB transaction 선점으로 
   await Promise.all([tabA.run(), tabB.run()]);
   assert.equal(madeByTabs.length, 1, '두 PC·탭이 동시에 수신해도 선점 잠금으로 정확히 1건만 생성된다');
 });
+
+test('⑥ 상담접수 및 견적서 송부 라벨 적용 + 견적서 송부 내용 자동정리 기록(quoteLogs·journals) 보존', () => {
+  assert.match(ERP_SRC, /v:'consult',\s*label:'상담접수 및 견적서 송부'/); // 검사고정-허용: 대표 지시 단계 명칭 검증
+  const STAGE_FNS = ['function erpStageMarksMerge(', 'function erpStagePartsFromContract(', 'function erpStagePartsFromQuote('];
+  const PURE = ['function erpQuoteLaneReq(', 'function erpQuoteDay(', 'function erpQuoteNote(', 'function erpQuoteLanePlan(',
+    'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(']
+    .concat(STAGE_FNS).map((d) => cutFn(ERP_SRC, d)).join('\n');
+  const ctx = { console, Date, Object, Array, String, Number, JSON, Math, todayYMD: () => '2026-11-18', window: {} };
+  vm.createContext(ctx);
+  vm.runInContext(PURE + '\nthis.plan = erpQuoteLanePlan;', ctx);
+
+  const users = [{ sid: 'P-001', name: '김대표' }];
+  const plan = ctx.plan({
+    kind: 'quote',
+    state: 'pending',
+    deferLink: true,
+    companyName: '가나테크',
+    folderLabel: '보낸메일함',
+    subject: '[푸른노무법인] 가나테크 사내근로복지기금 설립 컨설팅 견적서 송부의 건',
+    quoteScope: '사내근로복지기금 설립 컨설팅',
+    quoteSummary: '과업: 사내근로복지기금 설립 컨설팅 | 견적내용: 정관 작성 및 인가 대행 | 발송금액 5,500,000원 제외 확인',
+    atts: ['견적서_사내근로복지기금_가나테크.pdf'],
+    to: ['info@ganatech.example'],
+    at: Date.parse('2026-11-18T14:30:00+09:00'),
+    srcKey: 'Sent Messages|901',
+    inferredKind: 'fund',
+    useInferredKind: true,
+    managerMain: 'P-001'
+  }, [], [], users);
+
+  assert.equal(plan.action, 'create');
+  assert.equal(plan.form.status, 'consult');
+  assert.equal(plan.form.briefs.fund, '사내근로복지기금 설립 컨설팅');
+  assert.equal(plan.form.quoteLogs.length, 1, '견적 송부 기록(quoteLogs) 1건 생성');
+  assert.equal(plan.form.quoteLogs[0].scope, '사내근로복지기금 설립 컨설팅');
+  assert.ok(plan.form.quoteLogs[0].summary.includes('정관 작성 및 인가 대행'));
+  assert.ok(!/5,500,000|5500000/.test(JSON.stringify(plan.form)), '요약에 금액이 섞여 들어와도 카드 기록에서 제거된다');
+  assert.equal(plan.form.journals.length, 1, '활동 일지(journals)에도 견적 송부 자동정리 기록이 함께 남는다');
+  assert.match(plan.form.journals[0].content, /견적서 송부 자동정리/);
+});

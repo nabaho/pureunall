@@ -7832,6 +7832,17 @@ async function runMailContractSweepOnce(trigger, opts) {
       getDatabase,
       getSelfEmail: mailUserAsync,
       syncBefore: () => MS.runSync(MAIL_DEPS, { deadlineMs: 90000 }),
+      downloadQuoteAttachment: (slug, uid) =>
+        MS.withFolder(MAIL_DEPS, slug, async (client) => {
+          const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+          if (!head) return null;
+          const parts = MS.pickParts(head.bodyStructure, null, 0);
+          const picked = MailContractSweep.pickBestQuoteAttachment(parts.atts);
+          if (!picked || !picked.att || Number(picked.att.size || 0) > MailContractSweep.MAX_ATT_BYTES) return null;
+          const d = await client.download(String(uid), picked.att.part, { uid: true });
+          const buf = await MS.drain(d.content, MailContractSweep.MAX_ATT_BYTES);
+          return { name: picked.att.name, mime: picked.att.mime || "", buf };
+        }),
       downloadContractAttachment: (slug, uid) =>
         MS.withFolder(MAIL_DEPS, slug, async (client) => {
           const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
@@ -7902,7 +7913,7 @@ async function acquireMailSweepLock(opts) {
 exports.mailContractSweep = functions
   .region(MAIL_REGION)
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD", "GEMINI_KEY", "TYPESAFE_API_KEY"], timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("0 9,11,13,15,17,18 * * *")
+  .pubsub.schedule("0 0,9,11,13,15,17,18 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     let release = null;
