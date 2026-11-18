@@ -4577,3 +4577,189 @@ test('㉛ 한국공인노무사회(ilabor.co.kr 전용자료실 · kcplaa.or.kr 
   });
   assert.equal(srvRejectPush.status, 400, 'memberOnly 불리언이 제거되더라도 sources/tags의 회원전용 표식으로 서버 push가 거부되어야 합니다');
 });
+
+test('㉜ 미니멀 검색 중심 UI 규칙 — 상단/사이드바 정적 건수·불필요 안내문 배제 · 홈 영역탭 직행 · 상단 빠른검색 검증', async () => {
+  const Corpus = require('../js/pu-pbox-corpus');
+  const Engine = require('../js/pu-pbox-engine');
+
+  const elementsById = {};
+  const docListeners = {};
+  function makeEl(id) {
+    const cls = new Set();
+    return {
+      id: id || '',
+      tagName: id === 'pboxPromptInput' ? 'TEXTAREA' : 'DIV',
+      style: {},
+      value: '',
+      checked: false,
+      textContent: '',
+      _html: '',
+      _ownedIds: new Set(),
+      get innerHTML() { return this._html; },
+      set innerHTML(v) {
+        for (const oldId of this._ownedIds) delete elementsById[oldId];
+        this._ownedIds.clear();
+        this._html = String(v || '');
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
+        let m;
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const idMatch = /\bid="([^"]+)"/i.exec(m[2] || '');
+          if (!idMatch) continue;
+          const child = makeEl(idMatch[1]);
+          child.tagName = (m[1] || 'DIV').toUpperCase();
+          const dispMatch = /\bstyle="display:none"/i.exec(m[2] || '');
+          if (dispMatch) child.style.display = 'none';
+          elementsById[idMatch[1]] = child;
+          this._ownedIds.add(idMatch[1]);
+        }
+      },
+      classList: {
+        add: (c) => cls.add(c),
+        remove: (c) => cls.delete(c),
+        contains: (c) => cls.has(c)
+      },
+      setAttribute(k, v) { this[k] = v; },
+      removeAttribute(k) { delete this[k]; },
+      getAttribute(k) { return this[k] !== undefined ? this[k] : null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      closest() { return null; },
+      focus() {}
+    };
+  }
+
+  const rootContainer = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootContainer;
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => elementsById[id] || (elementsById[id] = makeEl(id)),
+    createElement: (t) => makeEl(t),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
+  };
+
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, docs: [] }), text: async () => '' }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1440,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    open: () => ({ opener: null }),
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  await Store.init('user-clean-ui');
+  App.mount(rootContainer);
+
+  function clickAct(attrs) {
+    const btn = {
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    };
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* 1) 최상단 및 사이드바에 법령·판례 정적 건수 배지나 장문 [안내] 문구가 노출되지 않아야 함 */
+  const shellHtml = rootContainer.innerHTML;
+  assert.ok(!shellHtml.includes('[안내] 새로워진'), '최상단 장문 홍보 배너가 제거되어야 합니다');
+  assert.ok(!shellHtml.includes('전 법령') && !shellHtml.includes('pboxLawCnt') && !shellHtml.includes('pboxDocCnt'), '최상단 및 사이드바에 정적 법령·판례 건수 배지를 표시하지 않아야 합니다');
+  assert.equal(elementsById.pboxSyncPill.style.display, 'none', '유휴 상태에서는 상단 동기화 알약 배지가 숨겨져야 합니다');
+
+  /* 2) 홈 화면 불필요 설명 제거 및 빠른 검색 영역 탭 라우팅 검증 */
+  const homeHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(!homeHtml.includes('pbox-composer-subbar') && !homeHtml.includes('Shift+Enter 줄바꿈'), '홈 화면의 중복 조작 설명 줄이 제거되어야 합니다');
+  assert.ok(homeHtml.includes('data-act="home-scope-jump"'), '홈 상단 검색 영역 전환 탭이 제공되어야 합니다');
+
+  elementsById.pboxPromptInput.value = '통상임금';
+  clickAct({ 'data-act': 'home-scope-jump', 'data-scope': 'laws' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxLawSearchInput'), '법령·조문 탭 클릭 시 법령 조회 화면으로 즉시 전환되어야 합니다');
+  assert.equal(elementsById.pboxTopSearchBox.style.display, '', '하위 화면에서는 상단 우측 빠른 통합검색창이 표시되어야 합니다');
+
+  /* 3) 상단 빠른 통합검색창 Enter 실행 및 빈 입력 시 기존 검색어 보호 검증 */
+  elementsById.pboxTopQuickInput.value = '포괄임금';
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    isComposing: false,
+    target: elementsById.pboxTopQuickInput,
+    preventDefault: () => {}
+  }));
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxCaseSearchInput'), '상단 빠른검색창에서 Enter 입력 시 통합 검색 화면으로 즉시 연결되어야 합니다');
+  assert.equal(elementsById.pboxTopSearchBox.style.display, 'none', '통합 검색 화면에서는 중복 방지를 위해 상단 빠른검색창이 숨겨져야 합니다');
+
+  App.switchView('laws');
+  elementsById.pboxTopQuickInput.value = '   ';
+  (docListeners.keydown || []).forEach((fn) => fn({
+    key: 'Enter',
+    isComposing: false,
+    target: elementsById.pboxTopQuickInput,
+    preventDefault: () => {}
+  }));
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxLawSearchInput'), '상단 빠른검색창이 비어 있을 때 Enter를 누르면 기존 검색어를 덮어쓰지 않고 현재 화면을 유지해야 합니다');
+
+  /* 4) 홈 영역 탭 복합 범위(판례 전체·행정유권해석·심판재결·노무사회 자료) 일치 검증 */
+  App.switchView('home');
+  elementsById.pboxPromptInput.value = '';
+  clickAct({ 'data-act': 'home-scope-jump', 'data-scope': 'prec_group' });
+  const precHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(precHtml.includes('2020다247190') && precHtml.includes('2009구단4596'), '판례 전체 탭은 대법원·헌재와 하급심 판결을 모두 포함해야 합니다');
+
+  App.switchView('home');
+  elementsById.pboxPromptInput.value = '';
+  clickAct({ 'data-act': 'home-scope-jump', 'data-scope': 'interp_group' });
+  const interpHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(interpHtml.includes('근로기준정책과-') && interpHtml.includes('법제처 '), '행정·유권해석 탭은 고용노동부 해석과 법제처 해석을 모두 포함해야 합니다');
+
+  App.switchView('home');
+  Store.addDocuments([{
+    id: 'kcplaa-test-doc-1',
+    docType: 'interp_gov',
+    agency: '한국공인노무사회',
+    caseNo: '알리다-33',
+    decisionDate: '2010-01-01',
+    title: '한국공인노무사회 주간 노동동향 브리핑',
+    body: '한국공인노무사회 공개 게시판 테스트 원문입니다. '.repeat(4),
+    sources: ['한국공인노무사회']
+  }].concat(Array.from({ length: 520 }, (_, k) => ({
+    id: 'bulk-recent-prec-' + k,
+    docType: 'prec_sc',
+    court: '대법원',
+    caseNo: '2026다' + String(90000 + k),
+    decisionDate: '2026-10-01',
+    title: '대량 최신 판례 더미 ' + k,
+    body: '전체 저장소 문서가 오백 건을 넘을 때도 묶음 필터가 누락되지 않는지 확인하는 테스트 본문입니다. '.repeat(2),
+    sources: ['법제처']
+  }))));
+  elementsById.pboxPromptInput.value = '';
+  clickAct({ 'data-act': 'home-scope-jump', 'data-scope': 'kcplaa' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('알리다-33'), '전체 문서가 500건을 넘더라도 선행 스코프 필터링으로 노무사회 수록 자료가 누락 없이 조회되어야 합니다');
+
+  /* 5) 홈 영역 탭에서 외부 사이트 이동 시 민감 개인정보(주민번호) 자동 차단 확인 */
+  App.switchView('home');
+  const fakeRrn = '900101' + '-' + '1' + '234567';
+  elementsById.pboxPromptInput.value = '김길동 ' + fakeRrn;
+  clickAct({ 'data-act': 'home-scope-jump', 'data-scope': 'sites' });
+  assert.ok(!elementsById.pboxMainArea.innerHTML.includes(fakeRrn), '외부 사이트 이동 시 주민번호 등 개인정보가 검색창에 전달되면 안 됩니다');
+});
