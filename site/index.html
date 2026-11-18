@@ -109,6 +109,7 @@
 <!-- 푸른노무법인 홈페이지 — 2026-08-31 굳힌 사본 (실제 운영용).
      scripts/freeze-homepage.js 로 다시 만든다. 손으로 고치지 말 것: 다시 굳히면 사라진다. -->
 <link rel="stylesheet" href="assets/css/pu-brief.css" />
+<link rel="stylesheet" href="assets/css/pu-site.css" />
 </head>
 
 <!-- BODY START -->
@@ -1073,105 +1074,46 @@ $(document).ready(function(){
 						<div class="xe-widget-wrapper " style=""><div style="padding:0px 0px 0px 0px !important;">
 <div class="bh bh_page_widget_wrap">
 	<div class="bh bh_page_widget_inner">
-	<div class="business_wrap">
-    <div class="bh_row">
-        <div class="lg:col col-12">
-            <div class="fixed_title animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <div class="en_title">Our business</div>
-                <div class="common_title ta-l lg:mb-0 mb-45">푸른 노무법인은 함께 일하고,<br>함께 성장하는 사회를 위하여</div>
-            </div>
-        </div>
-        <div class="lg:col-auto col-12">
-            <div class="business_content animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <img src="assets/images/main/business_img1.jpg" alt="img">
-                <div class="business_text1">자문서비스</div>
-                <div class="business_text2">노동법 자문부터 급여·4대보험 관리까지, 매달 곁에서 챙깁니다.</div>
-            </div>
-            <div class="business_content animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <img src="assets/images/main/business_img2.jpg" alt="img">
-                <div class="business_text1">인사노무컨설팅</div>
-                <div class="business_text2">취업규칙·임금체계·평가보상을 회사 규모에 맞게 설계합니다.</div>
-            </div>
-            <div class="business_content animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <img src="assets/images/main/business_img3.jpg" alt="img">
-                <div class="business_text1">노동사건대리</div>
-                <div class="business_text2">부당해고·임금체불·직장 내 괴롭힘 사건을 끝까지 대리합니다.</div>
-            </div>
-            <div class="business_content animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <img src="assets/images/main/business_img4.jpg" alt="img">
-                <div class="business_text1">산재보상</div>
-                <div class="business_text2">업무관련성 입증부터 급여 청구까지 산재 절차를 함께합니다.</div>
-            </div>
-            <div class="business_content animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <img src="assets/images/main/business_img5.jpg" alt="img">
-                <div class="business_text1">사내 · 공동근로복지기금</div>
-                <div class="business_text2">기금 설립 인가부터 운영·변경등기까지 전 과정을 지원합니다.</div>
-            </div>
-            <div class="business_content animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
-                <img src="assets/images/main/business_img6.jpg" alt="img">
-                <div class="business_text1">AI 인사노무 시스템</div>
-                <div class="business_text2">AI로 직접 만든 업무 시스템 경험으로, 회사에 맞는 인사노무 시스템을 구축합니다.</div>
-            </div>
-        </div>
+	<div class="business_wrap pu_biz">
+    <div class="animate-in" data-anim-delay="0" data-anim-type="fade-in-up">
+        <div class="en_title">Our business</div>
+        <div class="common_title ta-l pu_biz_title">푸른 노무법인은 함께 일하고, 함께 성장하는 사회를 위하여</div>
+    </div>
+    <div class="pu_biz_grid">
+        <a class="pu_biz_card" href="work1/"><span class="pu_biz_img"><img src="assets/images/main/business_img1.jpg" alt="자문서비스" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">자문서비스</span><span class="pu_biz_d">노동법 자문부터 급여·4대보험 관리까지, 매달 곁에서 챙깁니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work1/#payroll"><span class="pu_biz_img"><img src="assets/images/sub/work1_img3.jpg" alt="급여 아웃소싱" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">급여 아웃소싱</span><span class="pu_biz_d">급여 계산부터 명세서 발송·연차 관리까지 맡깁니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work2/"><span class="pu_biz_img"><img src="assets/images/main/business_img2.jpg" alt="인사노무컨설팅" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">인사노무컨설팅</span><span class="pu_biz_d">임금체계·근로시간·평가보상을 회사 규모에 맞게 설계합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work2/#rules"><span class="pu_biz_img"><img src="assets/images/sub/work2_img2.jpg" alt="취업규칙·단체협약" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">취업규칙·단체협약</span><span class="pu_biz_d">법령 개정에 맞춘 제·개정과 신고, 노사협의회 운영까지 돕습니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work2/#gov"><span class="pu_biz_img"><img src="assets/images/sub/work1_img2.jpg" alt="정부지원 컨설팅" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">정부지원 컨설팅</span><span class="pu_biz_d">일터혁신 상생컨설팅·산업일자리전환 등 진단부터 보고서까지 함께합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work2/#public"><span class="pu_biz_img"><img src="assets/images/sub/work4_img4.jpg" alt="공공부문 노사관계" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">공공부문 노사관계</span><span class="pu_biz_d">공무직 인사관리와 임금·단체협약 교섭을 자문합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work3/"><span class="pu_biz_img"><img src="assets/images/main/business_img3.jpg" alt="노동사건대리" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">노동사건대리</span><span class="pu_biz_d">부당해고·임금체불 사건을 노동위원회부터 끝까지 대리합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work3/#harass"><span class="pu_biz_img"><img src="assets/images/sub/work3_img3.jpg" alt="괴롭힘·성희롱 조사" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">괴롭힘·성희롱 조사</span><span class="pu_biz_d">외부 조사인으로 조사하고 조사보고서를 작성합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work4/"><span class="pu_biz_img"><img src="assets/images/main/business_img4.jpg" alt="산재보상" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">산재보상</span><span class="pu_biz_d">업무관련성 입증부터 급여 청구까지 산재 절차를 함께합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work5a/"><span class="pu_biz_img"><img src="assets/images/main/business_img5.jpg" alt="근로복지기금" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">근로복지기금</span><span class="pu_biz_d">기금 설립 인가부터 운영·변경등기까지 전 과정을 지원합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="work6/"><span class="pu_biz_img"><img src="assets/images/main/business_img6.jpg" alt="AI 인사노무 시스템" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">AI 인사노무 시스템</span><span class="pu_biz_d">AI로 직접 만든 업무 시스템 경험으로, 회사에 맞게 구축합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
+        <a class="pu_biz_card" href="notice/"><span class="pu_biz_img"><img src="assets/images/sub/work1_img4.jpg" alt="주간 노동 브리핑" loading="lazy"></span><span class="pu_biz_txt"><span class="pu_biz_t">주간 노동 브리핑</span><span class="pu_biz_d">매주 노동 법령 개정과 노동 뉴스를 정리해 공지합니다.</span><span class="pu_biz_go">자세히 →</span></span></a>
     </div>
 </div>
-<script>
-$(window).on("scroll resize", function () {
-
-    const $section = $(".business_wrap");
-    const $title = $(".fixed_title");
-
-    // PC 이하에서는 고정 안 함
-    if ($(window).width() < 992) {
-        $title.css({
-            position: "static",
-            top: "auto",
-            left: "auto",
-            width: "auto"
-        });
-        return;
-    }
-
-    // section & title 값 계산
-    const sectionTop = $section.offset().top;
-    const sectionHeight = $section.outerHeight();
-    const scrollTop = $(window).scrollTop();
-
-    const stickTop = 136;
-    const maxScroll = sectionTop + sectionHeight - $title.outerHeight() - stickTop;
-
-    // 고정되기 전 원래 left값을 계산 (부모 기준)
-    const originalLeft = $section.offset().left;
-
-    if (scrollTop >= sectionTop - stickTop && scrollTop < maxScroll) {
-        // 고정 영역
-        $title.css({
-            position: "fixed",
-            top: stickTop + "px",
-            left: originalLeft + "px", // 부모의 left 기준으로 고정
-            width: $section.width() + "px" // 원래 width 맞춰줌
-        });
-    }
-    else if (scrollTop >= maxScroll) {
-        // section의 맨 아래 고정
-        $title.css({
-            position: "absolute",
-            top: (sectionHeight - $title.outerHeight()) + "px",
-            left: "15px",
-            width: "100%"
-        });
-    }
-    else {
-        // 처음 위치로 돌아갈 때
-        $title.css({
-            position: "unset",
-            top: "auto",
-            left: "auto",
-            width: "auto"
-        });
-    }
-});
-</script>
+<style>
+/* 첫 화면 업무 격자 (대표 지시 2026-11-18 「추천대로」 — PC 에서 업무를 한 화면에 더 많이) */
+.pu_biz .pu_biz_title{margin-bottom:40px}
+.pu_biz_grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:34px 24px}
+.pu_biz_card{display:flex;flex-direction:column;color:#222;text-decoration:none}
+.pu_biz_img{display:block;aspect-ratio:16/10;overflow:hidden;border-radius:10px;background:#eef2f7}
+.pu_biz_img img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .35s}
+.pu_biz_card:hover .pu_biz_img img{transform:scale(1.04)}
+.pu_biz_txt{display:flex;flex-direction:column;min-width:0}
+.pu_biz_t{margin-top:16px;color:#111;font-size:21px;font-weight:700;line-height:1.35}
+.pu_biz_d{margin-top:6px;color:#4d4b4c;font-size:15px;line-height:1.55;letter-spacing:-0.2px}
+.pu_biz_go{margin-top:10px;color:#1d3e8b;font-size:14px;font-weight:600}
+.pu_biz_card:hover .pu_biz_t{color:#1d3e8b}
+@media (max-width:1199px){.pu_biz_grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:991px){.pu_biz .pu_biz_title{margin-bottom:24px}.pu_biz_grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 14px}.pu_biz_t{font-size:18px}.pu_biz_d{font-size:14px}}
+@media (max-width:640px){.pu_biz_grid{grid-template-columns:1fr;gap:0}
+  .pu_biz_card{flex-direction:row;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e5e7eb}
+  .pu_biz_img{flex:none;width:104px;border-radius:8px}
+  .pu_biz_t{margin-top:0;font-size:16px}.pu_biz_d{margin-top:2px;font-size:13px;line-height:1.45}.pu_biz_go{display:none}}
+</style>
 		</div>
 </div>
 </div></div>
