@@ -8,8 +8,9 @@
       계약서등을 모두 계약관리에 넣을 수 있게 해달라"
 
    ■ 실행 주기
-     · 자동 스케줄: 매일 09:00, 11:00, 13:00, 15:00, 17:00, 18:00 (Asia/Seoul, `0 9,11,13,15,17,18 * * *`)
-     · 수동 즉시 실행: 계약관리 상단 [📬 메일검토] 버튼 (`runMailContractSweep` HTTP POST)
+     · 자동 스케줄: 평일 09:00, 11:00, 13:00, 15:00, 17:00, 18:00 + 매일 24:00(=00:00)
+       (Asia/Seoul, `0 0,9,11,13,15,17,18 * * *` — 주말·법정공휴일·대체공휴일에는 낮 시간대를 건너뛰고 24시에만 자동 수집)
+     · 수동 즉시 실행: 계약관리 상단 [📬 메일검토] 버튼 (`runMailContractSweep` HTTP POST, 휴일 무관 즉시 실행)
 
    ■ 지키는 원칙
      1. 메일함은 읽기 전용(readOnly)으로만 연다 — 읽음 표시·삭제·이동을 절대 건드리지 않는다.
@@ -34,6 +35,7 @@ const CLOSED_CO_FOLDER_ID = "imt7309g57mtle";
 const DEFAULT_LOOKBACK_DAYS = 45;
 const MAX_CONTRACT_READS_PER_RUN = 12;
 const MAX_QUOTE_REQS_PER_RUN = 40;
+const MAX_QUOTE_ATT_READS_PER_RUN = 8;
 const MAX_ATT_BYTES = 15 * 1024 * 1024;
 const MAX_HWPX_SECTIONS = 25;
 const MAX_HWPX_ENTRY_OUT = 4 * 1024 * 1024;
@@ -393,6 +395,217 @@ function pickBestContractAttachment(atts) {
   return fallback;
 }
 
+function pickBestQuoteAttachment(atts) {
+  const list = Array.isArray(atts) ? atts : [];
+  let fallback = null;
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    const nm = String((a && a.name) || "").trim();
+    if (!nm || !TEXT_EXTRACTABLE_EXT_RE.test(nm)) continue;
+    if (/사업자등록증|고유번호증|통장사본|등기부|명함/.test(nm)) continue;
+    if (/(?:견적|제안|산출|안내|내역)/.test(nm)) return { att: a, index: i };
+    if (!fallback) fallback = { att: a, index: i };
+  }
+  return fallback;
+}
+
+function getKstClock(ms) {
+  const t = (Number(ms) || Date.now()) + 9 * 3600 * 1000;
+  const d = new Date(t);
+  const iso = d.toISOString();
+  return {
+    year: d.getUTCFullYear(),
+    ymd: iso.slice(0, 10),
+    mmdd: iso.slice(5, 10),
+    hm: iso.slice(11, 16),
+    dow: d.getUTCDay(), /* 0: 일요일, 6: 토요일 */
+    hour: d.getUTCHours(),
+  };
+}
+
+const FIXED_KR_HOLIDAY_MMDD = {
+  "01-01": "신정",
+  "03-01": "삼일절",
+  "05-01": "노동절",
+  "05-05": "어린이날",
+  "06-06": "현충일",
+  "07-17": "제헌절",
+  "08-15": "광복절",
+  "10-03": "개천절",
+  "10-09": "한글날",
+  "12-25": "기독탄신일",
+};
+
+/* 한국천문연구원(pubdata/common/holidays) 캐시가 일시적으로 비어 있을 때를 대비한 음력·대체공휴일 안전망 */
+const FALLBACK_KR_HOLIDAY_YMD = {
+  "2025-01-27": "임시공휴일", "2025-01-28": "설날", "2025-01-29": "설날", "2025-01-30": "설날",
+  "2025-03-03": "대체공휴일", "2025-05-06": "대체공휴일", "2025-06-03": "대통령선거일",
+  "2025-10-05": "추석", "2025-10-06": "추석", "2025-10-07": "추석", "2025-10-08": "대체공휴일",
+  "2026-02-16": "설날", "2026-02-17": "설날", "2026-02-18": "설날",
+  "2026-03-02": "대체공휴일(삼일절)", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일(부처님오신날)",
+  "2026-06-03": "전국동시지방선거", "2026-08-17": "대체공휴일(광복절)",
+  "2026-09-24": "추석", "2026-09-25": "추석", "2026-09-26": "추석", "2026-10-05": "대체공휴일(개천절)",
+  "2027-02-06": "설날", "2027-02-07": "설날", "2027-02-08": "설날", "2027-02-09": "대체공휴일(설날)",
+  "2027-03-01": "삼일절", "2027-05-13": "부처님오신날", "2027-08-16": "대체공휴일(광복절)",
+  "2027-09-14": "추석", "2027-09-15": "추석", "2027-09-16": "추석", "2027-10-04": "대체공휴일(개천절)", "2027-10-11": "대체공휴일(한글날)",
+  "2028-01-26": "설날", "2028-01-27": "설날", "2028-01-28": "설날", "2028-05-02": "부처님오신날",
+  "2028-10-02": "추석", "2028-10-03": "추석", "2028-10-04": "추석", "2028-10-05": "대체공휴일(추석)",
+};
+
+async function loadKoreanHolidayMap(db, year) {
+  const map = Object.assign({}, FALLBACK_KR_HOLIDAY_YMD);
+  const y = String(year || new Date().getFullYear());
+  Object.keys(FIXED_KR_HOLIDAY_MMDD).forEach((mmdd) => {
+    map[y + "-" + mmdd] = FIXED_KR_HOLIDAY_MMDD[mmdd];
+  });
+  if (!db) return map;
+  try {
+    const pubSnap = await db.ref("pubdata/common/holidays/" + y).once("value");
+    const pubVal = pubSnap && pubSnap.val();
+    const pubList = Array.isArray(pubVal) ? pubVal : (pubVal && Array.isArray(pubVal.list) ? pubVal.list : []);
+    pubList.forEach((h) => {
+      if (h && h.date) map[String(h.date)] = String(h.name || "공휴일");
+    });
+  } catch (_) {}
+  return map;
+}
+
+/* 평일: 09·11·13·15·17·18시 + 24시(=00:00) 수집
+   주말(토·일) 및 법정공휴일·대체공휴일: 24시(=00:00)에만 수집하고 낮 시간대는 건너뛴다 */
+function shouldSkipScheduledDaytime(nowMs, holidayMap) {
+  const clk = getKstClock(nowMs);
+  if (clk.hour === 0) return { skip: false, reason: "", clock: clk };
+  if (clk.dow === 0 || clk.dow === 6) {
+    return { skip: true, reason: clk.dow === 0 ? "일요일(24시만 자동수집)" : "토요일(24시만 자동수집)", clock: clk };
+  }
+  const holName = holidayMap && holidayMap[clk.ymd];
+  if (holName) {
+    return { skip: true, reason: "공휴일:" + holName + "(24시만 자동수집)", clock: clk };
+  }
+  return { skip: false, reason: "", clock: clk };
+}
+
+function maskEmailForLog(addr) {
+  const s = String(addr || "").trim();
+  const at = s.indexOf("@");
+  if (at <= 0) return s;
+  const loc = s.slice(0, at);
+  const dom = s.slice(at + 1);
+  return (loc.length <= 2 ? loc[0] + "*" : loc.slice(0, 2) + "***") + "@" + dom;
+}
+
+/* 견적 금액 비공개 원칙(erp-quote-lane 규칙 ⑤) 준수: 계약관리 카드·일지 요약에는 숫자·한글수사 금액·요율을 남기지 않고 날짜·과업 내용만 남긴다 */
+function stripQuoteMoneyForLog(raw) {
+  let s = String(raw == null ? "" : raw).slice(0, 8000);
+  if (!s) return "";
+  const savedDates = [];
+  s = s.replace(/\b20\d{2}[-./]\s*\d{1,2}[-./]\s*\d{1,2}\b|\b20\d{2}\s*(?:년|년도|학년도)(?:\s*\d{1,2}\s*월(?:\s*\d{1,2}\s*일)?)?/g, (m) => {
+    const idx = savedDates.push(m) - 1;
+    return "__DT" + idx + "__";
+  });
+  s = s
+    .replace(/(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/g, "●●●●●●-●●●●●●●")
+    .replace(/\b01[016-9][-.\s]?\d{3,4}[-.\s]?\d{4}\b/g, "")
+    .replace(/[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g, (_, dom) => "***@" + dom)
+    .replace(/(?:일금|금\s*액|공급가액|합계\s*금액|견적\s*금액|총\s*액|착수금|성공\s*보수|자문료|수임료|용역비|보수\s*총액)\s*[:：]?\s*[^\n,;)]{0,45}(?:원정?|만원|별도|포함|%)/g, "")
+    .replace(/금\s*[일이삼사오육칠팔구십백천만억0-9,\s]{1,24}원정?/g, "")
+    .replace(/[일이삼사오육칠팔구십백천만억]{2,20}\s*원정?/g, "")
+    .replace(/(?:KRW|USD)\s*[\d,.]+/gi, "")
+    .replace(/[₩￦\\]\s*\d[\d,.]*/g, "")
+    .replace(/\d+(?:,\d{3})+(?:\.\d+)?\s*(?:만\s*)?원?/g, "")
+    .replace(/\d+(?:\.\d+)?\s*(?:억|천만|백만|십만|만)\s*원?/g, "")
+    .replace(/\d+\s*원/g, "")
+    .replace(/\d+(?:\.\d+)?\s*%/g, "")
+    .replace(/\b\d{3,}\b/g, "");
+  s = s.replace(/__DT(\d+)__/g, (_, i) => savedDates[Number(i)] || "");
+  return s.replace(/\s{2,}/g, " ").trim();
+}
+
+function extractQuoteScope(subj, attNames, coName) {
+  const cleanCo = String(coName || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const candidates = [String(subj || "")].concat(Array.isArray(attNames) ? attNames : []);
+  for (const raw of candidates) {
+    let t = String(raw || "")
+      .replace(/\.[a-z0-9]{2,5}$/i, "")
+      .replace(/^\s*(?:(?:RE|FW|FWD)\s*[:：]\s*)+/i, "")
+      .replace(/\[푸른노무법인\]|\(푸른노무법인\)|푸른노무법인/g, " ")
+      .replace(/(?:20)?\d{6}\b/g, " ")
+      .replace(/[_]+/g, " ");
+    if (cleanCo && cleanCo.length >= 2) {
+      t = t.replace(new RegExp("\\[\\s*" + cleanCo + "\\s*\\]|\\(\\s*" + cleanCo + "\\s*\\)|" + cleanCo, "g"), " ");
+    }
+    t = t
+      .replace(/(?:수정\s*)?(?:비교\s*)?견적서(?:\s*등)?(?:\s*(?:송부|전달|제출|안내|회신)(?:의\s*건|건|드립니다)?)?/g, " ")
+      .replace(/(?:수임료|비용|보수)\s*안내(?:의\s*건|건)?/g, " ")
+      .replace(/(?:송부|전달|제출|회신)(?:의\s*건|건|드립니다)/g, " ")
+      .replace(/^[\s\-·:()\[\]]+|[\s\-·:()\[\]]+$/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    t = stripQuoteMoneyForLog(t);
+    if (t.length >= 3 && !/^(?:견적|안내|회신|수정|첨부|별첨)$/.test(t)) {
+      return t.slice(0, 50);
+    }
+  }
+  return "";
+}
+
+function cleanMailBodyForQuoteLog(bodyRaw) {
+  const raw = String(bodyRaw || "")
+    .replace(/\r\n/g, "\n")
+    .split(/(?:푸른노무법인\s*\[천안본사\])|(?:충남\s*천안시\s*서북구\s*원두정)|(?:From\s*:)|(?:-----Original Message-----)/i)[0] || "";
+  const lines = raw
+    .split(/\n+/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter((l) => l && !/^(?:안녕하십니까|안녕하세요|수고하십니다|감사합니다|고맙습니다|좋은\s*하루|평안하시기|노무법인\s*푸른|푸른노무법인입니다|첨부와\s*같이\s*송부|붙임과\s*같이)[.!~\s]*$/.test(l))
+    .filter((l) => !/(?:T\s*:\s*041|F\s*:\s*041|370-6@)/.test(l));
+  return stripQuoteMoneyForLog(lines.join(" / ")).slice(0, 160);
+}
+
+function summarizeQuoteAttachmentText(attText, coName) {
+  const src = stripQuoteMoneyForLog(attText);
+  if (!src || src.length < 15) return "";
+  const cleanCo = String(coName || "").trim();
+  const picked = [];
+  const keyPatterns = [
+    /(?:건\s*명|과\s*업\s*명|용\s*역\s*명|사\s*업\s*명|제\s*목)\s*[:：]\s*([^\n]{3,70})/,
+    /(?:과업\s*범위|수행\s*범위|업무\s*범위|주요\s*내용|세부\s*내용|컨설팅\s*내용|제안\s*내용)\s*[:：]?\s*([^\n]{4,90})/,
+    /(?:수행\s*기간|과업\s*기간|계약\s*기간|일\s*정|납\s*기)\s*[:：]\s*([^\n]{3,60})/,
+    /(?:유효\s*기간|비\s*고|특기\s*사항|포함\s*사항)\s*[:：]\s*([^\n]{3,70})/,
+  ];
+  for (const re of keyPatterns) {
+    const m = re.exec(src);
+    if (m && m[1]) {
+      const seg = m[1].replace(/\s+/g, " ").trim();
+      if (seg && (!cleanCo || seg !== cleanCo) && !picked.includes(seg)) picked.push(seg);
+    }
+  }
+  if (!picked.length) {
+    const compact = src
+      .replace(/푸른노무법인|견\s*적\s*서|공급자|사업자등록번호|대표자|소재지|업태|종목|귀하|귀중/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (compact.length >= 10) picked.push(compact.slice(0, 120));
+  }
+  return picked.join(" · ").slice(0, 180);
+}
+
+function buildAutoQuoteSummary(opts) {
+  const o = opts || {};
+  const scope = extractQuoteScope(o.subj, o.attNames, o.coName);
+  const bodyNote = cleanMailBodyForQuoteLog(o.bodyPreview);
+  const attNote = summarizeQuoteAttachmentText(o.attText, o.coName);
+  const parts = [];
+  if (scope) parts.push("과업: " + scope);
+  if (attNote) parts.push("견적내용: " + attNote);
+  if (bodyNote && (!attNote || !attNote.includes(bodyNote.slice(0, 20)))) parts.push("발송안내: " + bodyNote);
+  const maskedTos = (Array.isArray(o.toAddrs) ? o.toAddrs : []).slice(0, 2).map(maskEmailForLog).filter(Boolean);
+  if (maskedTos.length) parts.push("수신: " + maskedTos.join(", "));
+  return {
+    scope: scope.slice(0, 50),
+    summary: stripQuoteMoneyForLog(parts.join(" | ")).slice(0, 300),
+  };
+}
+
 function resolveStaffForMail(opts) {
   const { slugUid, matchedCo, subj, attNames, aiMgrName, staffList } = opts;
   const mailWhoMsg = opts.mailWhoMsg || {};
@@ -461,6 +674,19 @@ async function runSweep(deps, opts) {
     skippedNonTarget: 0,
     errors: 0,
   };
+
+  /* 0) 스케줄 실행이고 낮 시간대(09~18시)인데 주말(토·일) 또는 법정공휴일·대체공휴일이면 바로 종료 (24시=00:00 에만 자동수집) */
+  if (trigger === "schedule" && o.manual !== true && o.ignoreHolidayWindow !== true) {
+    const kClk = getKstClock(now);
+    if (kClk.hour !== 0) {
+      const holidayMap = o.holidayMap || await loadKoreanHolidayMap(db, kClk.year);
+      const chk = shouldSkipScheduledDaytime(now, holidayMap);
+      if (chk.skip) {
+        out.skippedScheduleWindow = chk.reason;
+        return out;
+      }
+    }
+  }
 
   /* 1) 실행 직전 최신 메일 동기화(주입된 경우) — 실패해도 기존 거울(mailbox/msgs)로 계속 진행 */
   if (typeof deps.syncBefore === "function" && o.skipSync !== true) {
@@ -705,7 +931,8 @@ async function runSweep(deps, opts) {
 
   const reqUpdates = {};
 
-  /* ── A. 견적서 후보 처리 (보낸메일함·내게쓴메일함·관련 스레드) ── */
+  /* ── A. 견적서 후보 처리 (보낸메일함·내게쓴메일함·관련 스레드 + 견적 송부 내용 자동 정리) ── */
+  let quoteAttReads = 0;
   for (const qc of quoteCandidates.slice(0, MAX_QUOTE_REQS_PER_RUN)) {
     const peerAddrs = qc.isSent
       ? DETECT.addrsOf(qc.m.t || "").filter((a) => !selfSet[a])
@@ -767,6 +994,50 @@ async function runSweep(deps, opts) {
       out.skippedDup++;
       continue;
     }
+
+    let quoteAttText = "";
+    /* 보안 원칙: 외부 발신(받은메일함 등) 첨부는 임의 파싱하지 않고, 신뢰된 내부 발송·보관(보낸메일함·내게쓴메일함) 첨부만 읽는다 */
+    if (qc.isInternal && quoteAttReads < MAX_QUOTE_ATT_READS_PER_RUN && typeof deps.downloadQuoteAttachment === "function" && qc.an.some((nm) => TEXT_EXTRACTABLE_EXT_RE.test(nm))) {
+      quoteAttReads++;
+      try {
+        const qDl = await deps.downloadQuoteAttachment(qc.slug, qc.uid);
+        if (qDl && qDl.buf) {
+          const qFn = String(qDl.name || "");
+          let rawTxt = "";
+          if (/\.hwpx$/i.test(qFn)) {
+            rawTxt = extractHwpxText(qDl.buf);
+          } else if (/\.pdf$/i.test(qFn)) {
+            if (typeof deps.extractPdfText === "function") rawTxt = await deps.extractPdfText(qDl.buf);
+            else {
+              const pr = await PDF_READ.pdfText(qDl.buf);
+              rawTxt = (pr && pr.text) ? String(pr.text).slice(0, 12000) : "";
+            }
+          } else if (/\.(hwp|docx)$/i.test(qFn)) {
+            const sc = await REDACT.readScheduleText(qDl.buf, /\.docx$/i.test(qFn) ? "docx" : "hwp");
+            rawTxt = (sc && sc.ok && sc.text) ? String(sc.text).slice(0, 12000) : "";
+          }
+          if (rawTxt && rawTxt.trim().length >= 10) {
+            const scr = await scrubContractTextForAi(rawTxt);
+            quoteAttText = (scr && scr.ok && scr.text) ? scr.text : "";
+          }
+        }
+      } catch (_) {
+        quoteAttText = "";
+      }
+    }
+
+    const qAuto = buildAutoQuoteSummary({
+      subj: qc.subj,
+      attNames: qc.an,
+      bodyPreview: qc.bodyPreview,
+      attText: quoteAttText,
+      coName,
+      folderLabel,
+      toAddrs: peerAddrs,
+      dMs: qc.dMs,
+      staffName: staff.name || "",
+    });
+
     reqUpdates[REQ_ROOT + "/" + reqKey] = {
       source: "mail_contract_sweep",
       kind: "quote",
@@ -777,8 +1048,11 @@ async function runSweep(deps, opts) {
       docKind: "quote",
       folderLabel,
       subject: qc.subj.slice(0, 60),
+      quoteScope: qAuto.scope,
+      quoteSummary: qAuto.summary,
+      senderName: String(staff.name || "").slice(0, 20),
       atts: qc.an.slice(0, 3).map((x) => String(x || "").slice(0, 60)),
-      to: peerAddrs.slice(0, 3),
+      to: peerAddrs.slice(0, 3).map(maskEmailForLog),
       at: qc.dMs,
       srcKey: qc.srcKey,
       srcMails: [qc.srcKey],
@@ -1182,7 +1456,7 @@ async function runSweep(deps, opts) {
   const allWrites = Object.assign({}, seenUpdates, reqUpdates);
   allWrites[STATUS_PATH] = {
     lastRunAt: now,
-    schedule: "0 9,11,13,15,17,18 * * * (Asia/Seoul)",
+    schedule: "0 0,9,11,13,15,17,18 * * * (Asia/Seoul · 주말·공휴일 24시 전용)",
     trigger,
     foldersScanned: out.foldersScanned,
     msgsScanned: out.msgsScanned,
@@ -1214,6 +1488,13 @@ module.exports = {
   isSelfMailRow,
   isContractCandidateMail,
   pickBestContractAttachment,
+  pickBestQuoteAttachment,
+  getKstClock,
+  loadKoreanHolidayMap,
+  shouldSkipScheduledDaytime,
+  stripQuoteMoneyForLog,
+  extractQuoteScope,
+  buildAutoQuoteSummary,
   MAX_ATT_BYTES,
   REQ_ROOT,
   SEEN_ROOT,

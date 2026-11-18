@@ -145,7 +145,7 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '새 사이트 열쇠 점검 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.pboxDailySync') >= 0 && ENTER.indexOf('P박스 법령·판례 동기화 하루 한 번') >= 0,
     'P박스 법령·판례 동기화 일정이 화면 설명에 없습니다');
-  assert.ok(FIDX.indexOf('exports.mailContractSweep') >= 0 && ENTER.indexOf('메일 계약·견적 검토 하루 6번(09~18시, AI 정리)') >= 0,
+  assert.ok(FIDX.indexOf('exports.mailContractSweep') >= 0 && ENTER.indexOf('메일 계약·견적 검토 하루 7번(평일 09~18·24시, 주말·공휴일은 24시만 일하고 낮엔 바로 끝냄, AI 정리)') >= 0,
     '메일 계약·견적 자동 검토 일정이 화면 설명에 없습니다');
 });
 

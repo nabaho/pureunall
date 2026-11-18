@@ -58,7 +58,7 @@ test("① 스케줄 및 서버 함수 배선 — 매일 09·11·13·15·17·18�
   const idx = fs.readFileSync(path.join(__dirname, "index.js"), "utf8");
   assert.match(idx, /exports\.mailContractSweep\s*=/);
   assert.match(idx, /exports\.runMailContractSweep\s*=/);
-  assert.match(idx, /\.pubsub\.schedule\(["']0 9,11,13,15,17,18 \* \* \*["']\)/); // 검사고정-허용: 대표 지시 09시~18시 2시간 간격 스케줄 규칙 검증
+  assert.match(idx, /\.pubsub\.schedule\(["']0 0,9,11,13,15,17,18 \* \* \*["']\)/); // 검사고정-허용: 대표 지시 평일 09~18시+24시(00시) 및 주말·공휴일 24시 전용 스케줄 규칙 검증
   assert.match(idx, /\.timeZone\(["']Asia\/Seoul["']\)/);
 });
 
@@ -324,6 +324,8 @@ test("④ 내게쓴메일함·받은메일함·보낸메일함 전체 검토 —
   assert.equal(reqSentQuote.companyName, "사아테크");
   assert.equal(reqSentQuote.deferLink, true);
   assert.equal(reqSentQuote.inferredKind, "fund");
+  assert.ok(reqSentQuote.quoteScope && reqSentQuote.quoteScope.includes("사내근로복지기금"), "견적 과업명이 자동 추출된다");
+  assert.ok(reqSentQuote.quoteSummary && reqSentQuote.quoteSummary.includes("사내근로복지기금"), "견적 송부 내용이 자동 정리된다");
 
   const reqRecvSigned = reqs["mcsc-INBOX-4a1e411c_701"];
   assert.ok(reqRecvSigned, "검증된 거래처 수신 날인 계약서 요청 생성");
@@ -350,4 +352,53 @@ test("④ 내게쓴메일함·받은메일함·보낸메일함 전체 검토 —
   assert.equal(res2.quoteQueued, 0);
   assert.equal(res2.contractQueued, 0);
   assert.equal(res2.aiReads, 0);
+});
+
+test("⑤ 평일 09~18·24시 및 주말·공휴일 24시 전용 스케줄 가드 + 견적 첨부 요약 금액 비공개 검증", async () => {
+  const holMap = { "2026-10-05": "대체공휴일(개천절)" };
+  // 1) 토요일 낮 11시 → 건너뜀
+  const satNoon = Date.parse("2026-11-21T11:00:00+09:00");
+  assert.equal(MCS.shouldSkipScheduledDaytime(satNoon, holMap).skip, true);
+  // 2) 일요일 낮 15시 → 건너뜀
+  const sunAfternoon = Date.parse("2026-11-22T15:00:00+09:00");
+  assert.equal(MCS.shouldSkipScheduledDaytime(sunAfternoon, holMap).skip, true);
+  // 3) 월요일이지만 대체공휴일 낮 09시 → 건너뜀
+  const holMorning = Date.parse("2026-10-05T09:00:00+09:00");
+  assert.equal(MCS.shouldSkipScheduledDaytime(holMorning, holMap).skip, true);
+  // 4) 주말·공휴일 24시(=00:00 KST) → 실행 허용
+  const sunMidnight = Date.parse("2026-11-22T00:00:00+09:00");
+  const holMidnight = Date.parse("2026-10-05T00:00:00+09:00");
+  assert.equal(MCS.shouldSkipScheduledDaytime(sunMidnight, holMap).skip, false);
+  assert.equal(MCS.shouldSkipScheduledDaytime(holMidnight, holMap).skip, false);
+  // 5) 평일 낮 13시 → 실행 허용
+  const wedAfternoon = Date.parse("2026-11-18T13:00:00+09:00");
+  assert.equal(MCS.shouldSkipScheduledDaytime(wedAfternoon, holMap).skip, false);
+
+  // runSweep 이 공휴일 낮 자동 스케줄에서는 동기화·스캔 없이 즉시 반환하지만 수동 실행은 허용
+  const { rawDb } = makeFakeDb({ pubdata: { common: { holidays: { "2026": { list: [{ date: "2026-10-05", name: "대체공휴일" }] } } } } });
+  let syncCalled = 0;
+  const skippedRes = await MCS.runSweep(
+    {
+      getDatabase: () => rawDb,
+      syncBefore: async () => { syncCalled++; },
+    },
+    { now: holMorning, trigger: "schedule" }
+  );
+  assert.ok(skippedRes.skippedScheduleWindow, "공휴일 낮 스케줄은 즉시 건너뛴다");
+  assert.equal(syncCalled, 0, "건너뛸 때 IMAP 동기화를 부르지 않는다");
+
+  // 견적 첨부 요약 시 금액·요율 숫자는 제거되고 과업·일정 내용은 유지된다
+  const qSummary = MCS.buildAutoQuoteSummary({
+    subj: "[푸른노무법인] 가나기관 취업규칙 정비 컨설팅 견적서 송부의 건",
+    attNames: ["견적서_취업규칙정비_가나기관.pdf"],
+    bodyPreview: "안녕하세요.\n요청하신 취업규칙 개정 및 노사협의회 규정 정비 견적 2000만원 안내를 송부드립니다. 공급가액 3,300,000원(부가세 포함)입니다.",
+    attText: "건명: 2026년 취업규칙 및 인사규정 정비 컨설팅\n과업범위: 현행 규정 적법성 검토 및 개정안 작성\n수행기간: 2026-11-20 ~ 2026-12-31\n합계금액: 금 3,300,000원 (성공보수 15%)",
+    coName: "가나기관",
+    toAddrs: ["hr@gana.example"],
+  });
+  assert.ok(qSummary.scope.includes("취업규칙 정비 컨설팅"));
+  assert.ok(qSummary.summary.includes("현행 규정 적법성 검토"));
+  assert.ok(qSummary.summary.includes("2026년"));
+  assert.ok(qSummary.summary.includes("2026-11-20"));
+  assert.ok(!/3,300,000|3300000|2000만원|2000|15%|hr@gana\.example/.test(qSummary.summary), "견적 금액(2000만원 포함)·요율·원문 이메일은 요약 기록으로 새지 않는다");
 });

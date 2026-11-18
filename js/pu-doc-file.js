@@ -2596,6 +2596,43 @@
               var mqKey = 'mq-' + safeKey;
               var skipContractMqIfPullable = (docKind === 'contract') && ((DP && DP.계약서인가 && DP.계약서인가(m)) || Number(m.a) > 0);
               if ((docKind === 'quote' || (docKind === 'contract' && !skipContractMqIfPullable)) && !reqs[mqKey] && coName && staff.sid) {
+                var stripQMoney = function (s0) {
+                  var dts = [];
+                  var tx = String(s0 || '').slice(0, 3000).replace(/\b20\d{2}[-./]\s*\d{1,2}[-./]\s*\d{1,2}\b|\b20\d{2}\s*(?:년|년도|학년도)(?:\s*\d{1,2}\s*월(?:\s*\d{1,2}\s*일)?)?/g, function (m0) {
+                    dts.push(m0); return '__QDT' + (dts.length - 1) + '__';
+                  });
+                  tx = tx
+                    .replace(/\b\d{6}\s*-\s*[1-8]\d{6}\b|\b01[016-9][-.\s]?\d{3,4}[-.\s]?\d{4}\b/g, '')
+                    .replace(/[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g, '***@$1')
+                    .replace(/금\s*[일이삼사오육칠팔구십백천만억0-9,\s]{1,24}원정?|[일이삼사오육칠팔구십백천만억]{2,20}\s*원정?|(?:KRW|USD)\s*[\d,.]+/gi, '')
+                    .replace(/\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?\s*(?:억|천만|백만|십만|만)\s*원?|\d+\s*원|\d+(?:\.\d+)?\s*%|\b\d{3,}\b/g, '');
+                  return tx.replace(/__QDT(\d+)__/g, function (_, idx0) { return dts[Number(idx0)] || ''; }).replace(/\s{2,}/g, ' ').trim();
+                };
+                var qScopeRaw = stripQMoney(String(subj || '')
+                  .replace(/^\s*(?:(?:RE|FW|FWD)\s*[:：]\s*)+/i, '')
+                  .replace(/\[푸른노무법인\]|\(푸른노무법인\)|푸른노무법인/g, ' ')
+                  .replace(coName, ' ')
+                  .replace(/(?:수정\s*)?(?:비교\s*)?견적서(?:\s*등)?(?:\s*(?:송부|전달|제출|안내|회신)(?:의\s*건|건|드립니다)?)?/g, ' ')
+                  .replace(/(?:수임료|비용|보수)\s*안내(?:의\s*건|건)?/g, ' ')
+                  .replace(/^[\s\-·:()\[\]_]+|[\s\-·:()\[\]_]+$/g, ''))
+                  .slice(0, 50);
+                var qBodyRaw = String(bodyTxt || '')
+                  .replace(/\r\n/g, '\n')
+                  .split(/(?:푸른노무법인\s*\[천안본사\])|(?:충남\s*천안시\s*서북구)|(?:From\s*:)|(?:-----Original Message-----)/i)[0] || '';
+                var qBodyLines = qBodyRaw.split(/\n+/).map(function (ln) { return ln.replace(/\s+/g, ' ').trim(); }).filter(function (ln) {
+                  return ln && !/^(?:안녕하십니까|안녕하세요|수고하십니다|감사합니다|고맙습니다|좋은\s*하루|노무법인\s*푸른|푸른노무법인입니다)[.!~\s]*$/.test(ln) && !/(?:T\s*:\s*041|F\s*:\s*041|370-6@)/.test(ln);
+                });
+                var qBodyClean = stripQMoney(qBodyLines.join(' / ')).slice(0, 160);
+                var qSumParts = [];
+                if (qScopeRaw) qSumParts.push('과업: ' + qScopeRaw);
+                if (qBodyClean) qSumParts.push('발송안내: ' + qBodyClean);
+                var maskedTo = isTome ? [] : String(m.t || '').split(/[,;]+/).map(function (em) {
+                  var pEm = parseOneEmailAddr(em);
+                  if (!pEm) return '';
+                  var atI = pEm.addr.indexOf('@');
+                  var lc = pEm.addr.slice(0, atI);
+                  return (lc.length <= 2 ? lc[0] + '*' : lc.slice(0, 2) + '***') + pEm.addr.slice(atI);
+                }).filter(Boolean).slice(0, 2);
                 quoteWrites[CT_REQ + '/' + mqKey] = {
                   id: mqKey,
                   source: 'mail_quote_watch',
@@ -2604,11 +2641,15 @@
                   deferLink: !verifiedCoId,
                   companyName: coName,
                   docKind: docKind,
+                  folderLabel: isTome ? '내게쓴메일함' : (isSent ? '보낸메일함' : '받은메일함'),
                   subject: subj.slice(0, 60),
+                  quoteScope: docKind === 'quote' ? qScopeRaw : '',
+                  quoteSummary: docKind === 'quote' ? qSumParts.join(' | ').slice(0, 260) : '',
+                  senderName: String(staff.name || '').slice(0, 20),
                   atts: an.slice(0, 3),
-                  to: [String(m.t || '')].filter(Boolean),
+                  to: maskedTo,
                   state: 'pending',
-                  at: Date.now(),
+                  at: dMs || Date.now(),
                   srcKey: srcKey,
                   srcMails: (lcGroup && Array.isArray(lcGroup.srcMails) && lcGroup.srcMails.length) ? lcGroup.srcMails : [srcKey],
                   synthesizedNote: (lcGroup && lcGroup.synthesizedNote) || '',
