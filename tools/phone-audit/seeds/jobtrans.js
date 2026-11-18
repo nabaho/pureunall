@@ -255,5 +255,6 @@ module.exports = {
         await p.selectOption('#p-final select[data-proj-sel="1"]', 'jt_co_syn_2_cepa_2026');
       },
     },
+    { name: 'forms',  run: async (p) => { await p.click('#tabs button[data-tab="forms"]'); } },
   ],
 };
