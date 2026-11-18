@@ -60,6 +60,8 @@
   #nav-setup{margin:0 10px 10px;border:1.5px solid #fbbf24;background:var(--warn-bg);color:var(--warn);font-weight:700}
   #nav-setup .ncnt{color:var(--warn);font-weight:800;font-size:12px}#nav-setup.on{background:#fde68a;color:var(--warn)}
   @media(max-width:900px){.sdflow{grid-template-columns:1fr 1fr!important}}
+  .sdc-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;align-items:start}
+  @media(max-width:860px){.sdc-split{grid-template-columns:1fr}}
   /* 하위 묶음 — 왼쪽 실선으로 «기금 현황에 딸린 것»임을 보인다 */
   #navsub{margin:2px 0 2px 12px;border-left:1px solid var(--line);padding-left:6px}
   #navsub.hid{display:none}
@@ -7347,7 +7349,8 @@ function reqDocsBoxHTML(phase,cur,fundMode){
     +'<span id="reqCnt_'+phase+'" class="chip '+(allOn?'ok':(doneN?'warn':''))+'" style="font-size:10.5px">확인 '+doneN+'/'+list.length+'</span>'
     +hlp('forms.reqdocs')+'</div>'
     +'<span style="flex:1"></span>'
-    +'<button class="'+(isSel?'':'primary')+'" onclick="selectForm(\''+rKind+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap;margin-left:auto" title="기업에 발송하거나 인쇄할 수 있는 준비·첨부서류 안내문 및 사업장별 체크리스트(A4)를 오른쪽에 표시합니다">'
+    +(fundMode?'<button onclick="openSiteDocCenter(S.formFund,\''+({inka:'inka',reg:'inka',tax:'inka',subsidy:'subsidy',ops:'ops',dis:'chg'}[phase]||'inka')+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="참여·설립사업장별 필요서류를 간결한 체크리스트 메일로 요청하고 푸른메일함 수신 서류를 자동 감지·내용검토합니다">✉ 사업장 체크리스트 메일·수신검토</button>':'')
+    +'<button class="'+(isSel?'':'primary')+'" onclick="selectForm(\''+rKind+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="기업에 발송하거나 인쇄할 수 있는 준비·첨부서류 안내문 및 사업장별 체크리스트(A4)를 오른쪽에 표시합니다">'
     +(isSel?'▶ 오른쪽에 안내문 표시 중':'📋 기업 안내문 미리보기·인쇄')+'</button>'
     +'</div>'
     +'<div style="overflow-x:auto"><table><thead><tr>'
@@ -12608,7 +12611,8 @@ function _sdBoard(f,st){
     +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
     +(fc&&fc.nForm?'<span class="chip dg" style="font-size:10.5px">🔴 서식 '+fc.nForm+'</span>':'')+ciChip(fid)
     +(_pmSentN(f,SD.sites[fid])?'<span class="chip ok" style="font-size:10.5px" title="기업에 설립시 준비서류 요청 메일을 «보냈음»으로 표시한 곳">✉ 준비서류 '+_pmSentN(f,SD.sites[fid])+'곳 보냄</span>':'')
-    +'<span style="flex:1"></span><button data-fid="'+esc(fid)+'" onclick="pmOpen(this.dataset.fid)" title="설립에 필요한 서류와 함께 정할 사항을 정리해 기업에 보내는 메일을 만듭니다 — 기업 정보·받는 사람은 기업정보함에서">✉ 기업에 설립시 준비서류</button>'
+    +'<span style="flex:1"></span><button data-fid="'+esc(fid)+'" onclick="openSiteDocCenter(this.dataset.fid,\'inka\')" title="참여·설립사업장에 간략 체크리스트로 서류를 요청하고 메일함 수신 서류를 자동 체크·내용검토합니다">📋 체크리스트·수신검토</button>'
+    +'<button data-fid="'+esc(fid)+'" onclick="pmOpen(this.dataset.fid)" title="설립에 필요한 서류와 함께 정할 사항을 정리해 기업에 보내는 메일을 만듭니다 — 기업 정보·받는 사람은 기업정보함에서">✉ 기업에 설립시 준비서류</button>'
     +'<button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
     +'<button onclick="closeM();trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>'
     +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin:10px 0">'
@@ -16514,6 +16518,1258 @@ function _siteFilter(arr){
 }
 function setSiteQ(v){ _siteQ=v; renderFund(); setTimeout(function(){ var el=$('siteQ'); if(el){ el.focus(); el.selectionStart=el.selectionEnd=el.value.length; } },0); }
 function setSiteOnly(v){ _siteOnly=(_siteOnly===v)?'':v; renderFund(); }
+/* ══ 📋 사업장 제출서류 체크리스트 · 메일 요청 · 수신 자동체크 · 내용검토 (공동기금·사내기금 공용) ══
+   · 공동기금(참여사업장별) 및 사내기금(설립·설치사업장)에 필요한 제출서류를 간결한 체크리스트(□) 메일로 요청하고,
+     푸른메일함에 회신·수신된 첨부(ZIP 묶음 포함)를 자동 감지해 입수 체크(recv)한 뒤,
+     본문 내용을 판독·대조해 자동 확인(ok.mode='auto') 또는 담당자 수동 확인(ok.mode='manual')으로 관리한다.
+   · 메일 발송은 기존 _pmOpenMail 규칙 그대로 푸른메일함 쓰기 창에 채워 열기만 하며 자동 발송하지 않는다.
+   · RTDB(site_doc_chk/{fid}/{sid}/{docId})에는 원본 파일·전체 텍스트·주민등록번호를 저장하지 않는다. */
+var SDC=null;
+var SDC_UI={help:'site.doccenter'};
+var SDC_PHASES=[
+  ['inka','① 설립·인가·등기','노동부 설립인가 및 법인 설립등기 단계'],
+  ['subsidy','② 지원금 신청','근로복지공단 지원사업 신청 단계'],
+  ['ops','③ 결산·운영상황보고','연간 결산 및 고용노동부 운영상황보고 단계'],
+  ['chg','④ 추가출연·변경·탈퇴','기본재산 추가출연(현금·주식)·변경등기·탈퇴 단계']
+];
+var SDC_DOC_DEFS={
+  inka:[
+    {id:'inka_bizreg',kind:'bizreg',title:'사업자등록증 사본',short:'사업자등록증',req:'최신 발급본 1부 (상호·사업자번호·대표자·소재지 확인)'},
+    {id:'inka_corpreg',kind:'corpreg',title:'법인등기부등본(말소사항 포함)',short:'법인등기부등본',req:'발급 3개월 이내 제출용 1부 (개인사업자 제외)',req3m:true},
+    {id:'inka_wrep',kind:'wrep',title:'설립준비위원 재직증명서',short:'재직증명서',req:'노·사 준비위원 각 1부 (성명·생년월일·직책 기재)'},
+    {id:'inka_fin',kind:'fin',title:'직전년도 재무제표',short:'재무제표',req:'재무상태표·손익계산서 (납입자본금·세전순이익 확인용)'},
+    {id:'inka_ei',kind:'ei',title:'고용보험 가입자명부',short:'고용보험명부',req:'사업장 소속 상시근로자 수 확인용 1부'},
+    {id:'inka_contrib',kind:'contrib',title:'기금출연확인서(법인직인 날인)',short:'출연확인서',req:'출연금액 기재 및 직인 날인 (주식·현물 출연 시 평가서류 첨부)'},
+    {id:'reg_inseal',kind:'inseal',title:'이사 개인인감증명서·주민등록초본',short:'인감·초본(이사)',req:'등기이사 전원 각 1부 (발급 3개월 이내)',sensitive:true},
+    {id:'inka_match',kind:'match',ftype:'공동',title:'공동기금 참여신청서(노·사 서명)',short:'참여신청서',req:'사용자·근로자대표 서명 또는 날인본 1부'}
+  ],
+  subsidy:[
+    {id:'sub_bizreg',kind:'bizreg',subKey:'bizno',title:'사업자등록증 사본',short:'사업자등록증',req:'참여기업 각 1부'},
+    {id:'sub_corpreg',kind:'corpreg',subKey:'reg',title:'법인등기부등본(말소사항 포함)',short:'법인등기부등본',req:'지원금 신청일 기준 3개월 이내 발급본 (임원사항 포함)',req3m:true},
+    {id:'sub_smecert',kind:'smecert',subKey:'sme',title:'중소기업확인서',short:'중소기업확인서',req:'중소벤처기업부 발급 · 신청일 기준 유효기간 내'},
+    {id:'sub_contrib',kind:'contrib',title:'기금출연확인서 및 송금영수증',short:'출연·송금증',req:'대표자 직인 날인본 + 기금계좌 이체확인증'},
+    {id:'sub_fin',kind:'fin_ei',title:'직전년도 표준재무제표증명 및 고용보험명부',short:'재무·고용명부',req:'매출액·자본금 및 소속 근로자 수 산정용'},
+    {id:'sub_rel',kind:'rel',title:'주주명부(특수관계 확인서류)',short:'주주명부',req:'참여기업 간 출자·임원겸직 등 자율점검 확인용'}
+  ],
+  ops:[
+    {id:'ops_stat',kind:'site_stat',title:'결산일(12.31.) 근로자 수·납입자본금 확인자료',short:'근로자·자본금',req:'결산 기준일 소속·협력업체 근로자 수 및 납입자본금'},
+    {id:'ops_fin',kind:'fin',title:'직전 사업연도 재무제표',short:'재무제표',req:'재무상태표·손익계산서 (출연금 한도 및 기본재산 대조용)'},
+    {id:'ops_bank',kind:'bank_tx',title:'기금 전 계좌 연간 거래내역서(엑셀)·잔액증명서',short:'통장·잔액증명',req:'1.1.~12.31. 입출금 엑셀 + 12.31. 기준 예금잔액증명서'},
+    {id:'ops_wht',kind:'tax_wh',title:'이자소득 원천징수영수증',short:'원천징수영수증',req:'회계연도 이자수익 발생 계좌 전체분'},
+    {id:'ops_ev',kind:'welfare_ev',title:'목적사업 지급 증빙·수혜자명부·대부명세',short:'복지·대부증빙',req:'이체확인증·영수증·수혜자명단 및 개인별 대부잔액 명세'}
+  ],
+  chg:[
+    {id:'chg_contrib',kind:'contrib',title:'기금출연확인서 및 입금확인증(주식출연 평가명세)',short:'추가출연증빙',req:'별지 제10호 기본재산 총액 변경보고 및 변경등기 첨부용'},
+    {id:'chg_bizreg',kind:'bizreg',title:'변경 사업자등록증·법인등기부등본',short:'변경등록·등기',req:'상호·대표자·소재지 변경 내역 대조용'},
+    {id:'chg_officer',kind:'inseal',title:'신임·중임 이사 인감증명서·주민등록초본·취임승낙서',short:'임원변경서류',req:'발급 3개월 이내 · 관할 등기소 변경등기용',sensitive:true},
+    {id:'chg_leave',kind:'leave_ev',ftype:'공동',title:'중간탈퇴 사유 증명서류',short:'탈퇴증명서류',req:'별지 제14호의2 법정 탈퇴사유 입증자료'}
+  ]
+};
+var SDC_FILE_RE=/\.(pdf|png|jpe?g|gif|bmp|tiff?|webp|hwp|hwpx|xlsx?|docx|csv)$/i;
+var SDC_PREVIEW_MIMES={'application/pdf':1,'image/png':1,'image/jpeg':1,'image/webp':1,'image/gif':1,'image/bmp':1};
+var SDC_KIND_RULES=[
+  ['bizreg',/사업자\s*등록/],
+  ['smecert',/중소기업\s*확인|중견기업\s*확인|소상공인\s*확인|기업\s*확인서/],
+  ['corpreg',/등기사항|등기부|법인\s*등기/],
+  ['wrep',/재직\s*증명|근로\s*계약|경력\s*증명|신분\s*증명/],
+  ['contrib',/출연\s*확인|출연\s*약정|출연\s*증서|송금\s*영수|이체\s*확인|입금\s*확인/],
+  ['rel',/주주\s*명부|출자\s*명세|특수\s*관계/],
+  ['fin_ei',/표준\s*재무.*고용|재무.*가입자/],
+  ['fin',/재무\s*제표|재무\s*상태표|대차\s*대조표|손익\s*계산서|표준\s*재무/],
+  ['ei',/고용\s*보험|가입자\s*명부|4대\s*보험|피보험자/],
+  ['inseal',/인감\s*증명|주민\s*등록|초본|취임\s*승낙/],
+  ['tax_wh',/원천\s*징수/],
+  ['bank_tx',/잔액\s*증명|잔고\s*증명|거래\s*내역|통장\s*사본|계좌\s*내역/],
+  ['welfare_ev',/수혜자|지급\s*명단|목적\s*사업\s*증빙|대부\s*명세|차용증/],
+  ['site_stat',/근로자\s*수.*자본금|결산\s*기초|사업장\s*현황/],
+  ['match',/참여\s*신청|출연\s*협약/],
+  ['leave_ev',/탈퇴\s*사유|폐업\s*사실|도급.*종료|탈퇴\s*신청/]
+];
+var SDC_DOC_KW={
+  wrep:{lbl:'재직증명서',must:/재\s*직\s*증\s*명|근\s*로\s*계\s*약|경\s*력\s*증\s*명/,sub:/성\s*명|직\s*위|직\s*책|입\s*사|재\s*직/,needCo:true},
+  fin:{lbl:'재무제표',must:/재\s*무\s*상\s*태\s*표|손\s*익\s*계\s*산\s*서|대\s*차\s*대\s*조\s*표|표\s*준\s*재\s*무\s*제\s*표/,sub:/자\s*산|자\s*본\s*금|매\s*출|당\s*기\s*순\s*이\s*익/,needCo:true},
+  ei:{lbl:'고용보험 가입자명부',must:/고\s*용\s*보\s*험|피\s*보\s*험\s*자|사\s*업\s*장\s*가\s*입\s*자|4\s*대\s*보\s*험/,sub:/취\s*득\s*일|성\s*명|사\s*업\s*장/,needCo:true},
+  fin_ei:{lbl:'재무제표·고용보험명부',must:/재\s*무\s*상\s*태\s*표|손\s*익\s*계\s*산\s*서|표\s*준\s*재\s*무|고\s*용\s*보\s*험|가입자\s*명부/,sub:/매\s*출|자\s*본|피\s*보\s*험\s*자|사\s*업\s*장/,needCo:true},
+  contrib:{lbl:'기금출연확인서·송금증',must:/출\s*연\s*확\s*인|출\s*연\s*약\s*정|기\s*금\s*출\s*연|이\s*체\s*확\s*인|송\s*금|입\s*금\s*확\s*인/,sub:/원\s*정|일\s*금|금\s*액|출\s*연|주\s*식/,needCo:true,allowFund:true},
+  rel:{lbl:'주주명부·특수관계확인',must:/주\s*주\s*명\s*부|특\s*수\s*관\s*계|출\s*자\s*현\s*황|주식\s*수|지\s*분\s*율/,sub:/주\s*주|발\s*행\s*주\s*식|액\s*면/,needCo:true},
+  site_stat:{lbl:'근로자수·납입자본금 확인',must:/근\s*로\s*자|자\s*본\s*금|인\s*원|재\s*무\s*상\s*태/,sub:/명|원/,needCo:true,allowFund:true},
+  bank_tx:{lbl:'계좌 거래내역·잔액증명',must:/거\s*래\s*내\s*역|잔\s*액\s*증\s*명|잔\s*고\s*증\s*명|입\s*출\s*금|보\s*통\s*예\s*금/,sub:/잔\s*액|입\s*금|출\s*금|계\s*좌/,needCo:true,allowFund:true},
+  tax_wh:{lbl:'이자소득 원천징수영수증',must:/원\s*천\s*징\s*수|이\s*자\s*소\s*득|법\s*인\s*세/,sub:/세\s*액|지\s*급\s*액|이\s*자/,needCo:true,allowFund:true},
+  welfare_ev:{lbl:'목적사업·대부 증빙',must:/목\s*적\s*사\s*업|복\s*지|수\s*혜|지\s*급|대\s*부|영\s*수\s*증|이\s*체/,sub:/금\s*액|성\s*명|일\s*자/,needCo:true,allowFund:true},
+  match:{lbl:'공동기금 참여신청서',must:/참\s*여\s*신\s*청|공\s*동\s*근\s*로\s*복\s*지|출\s*연\s*협\s*약/,sub:/대\s*표|근\s*로\s*자/,needCo:true},
+  leave_ev:{lbl:'중간탈퇴 사유 증빙',must:/탈\s*퇴|폐\s*업\s*사\s*실|도\s*급|계\s*약\s*종\s*료/,sub:/사\s*유|일\s*자/,needCo:true}
+};
+function _sdcSafeKey(k){
+  return (typeof _safeArchiveKey==='function')?_safeArchiveKey(k):/^[A-Za-z0-9_-]{1,80}$/.test(String(k||''));
+}
+function _sdcMaskRrn(s){
+  return String(s==null?'':s).replace(/(^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))[\s\-]*([1-8])\d{6}(?!\d)/g,'$1$2-$3******');
+}
+function sdcDocsFor(phase,ftype){
+  var t=(ftype==='사내')?'사내':'공동';
+  return (SDC_DOC_DEFS[phase]||SDC_DOC_DEFS.inka).filter(function(d){ return !d.ftype||d.ftype===t; }).map(function(d){
+    if(t!=='사내') return Object.assign({},d);
+    return Object.assign({},d,{
+      title:d.title.replace(/참여기업/g,'설립기업').replace(/참여사업장/g,'설립사업장'),
+      req:d.req.replace(/참여기업/g,'설립기업').replace(/참여사업장/g,'설립사업장')
+    });
+  });
+}
+function sdcDefaultPhase(f){
+  if(typeof isSetupFund==='function'&&isSetupFund(f)) return 'inka';
+  if(S.tab==='subsidy'||((f&&f.fund_type!=='사내')&&S.subTab==='docs')) return 'subsidy';
+  if(S.tab==='closing') return 'ops';
+  if(S.tab==='events') return 'chg';
+  return (f&&f.fund_type!=='사내')?'subsidy':'ops';
+}
+/* 셀 한 칸의 상태 — 'ok'(확인완료) | 'hold'(보완필요) | 'recv'(입수·검토대기) | 'none'(미수신) */
+function sdcCellState(cell,subLegacy){
+  cell=cell||{};
+  if(cell.hold) return {k:'hold',mode:'',label:'⚠ 보완필요',sub:String(cell.hold)};
+  if(cell.ok) return {k:'ok',mode:cell.ok.mode||'manual',label:cell.ok.mode==='auto'?'✅ 자동확인':'✅ 수동확인',sub:(cell.review&&cell.review.summary)||cell.ok.at||''};
+  if(cell.recv||subLegacy){
+    var rs=cell.review&&cell.review.st;
+    if(rs==='diff') return {k:'hold',mode:'auto',label:'⚠ 불일치',sub:(cell.review&&cell.review.summary)||'내용 대조 필요'};
+    if(rs==='match') return {k:'recv',mode:'match',label:'📩 일치·대기',sub:(cell.review&&cell.review.summary)||'확인 가능'};
+    return {k:'recv',mode:'',label:cell.recv_via==='mail'?'📩 메일입수':'📥 입수됨',sub:(cell.review&&cell.review.summary)||(cell.mail&&cell.mail.attName)||'내용 검토 대기'};
+  }
+  return {k:'none',mode:'',label:'⬜ 미수신',sub:''};
+}
+/* 기업별 필요서류 체크리스트 메일 제목·본문 생성 — 순수 함수(검사 대상)
+   opts={phase,docs,siteCells,subSiteChk,style:'brief'|'detail',deadline,note,mgr,toName,toPos,includeOk,skipCardBiz} */
+function sdcMailText(f,row,opts){
+  f=f||{}; row=row||{}; opts=opts||{};
+  var isIntra=(f.fund_type==='사내');
+  var fn=String(f.name||f.short_name||'근로복지기금').trim()+(f.name_temp?'(가칭)':'');
+  var cn=String(row.name||'').trim();
+  var who=opts.toName?(String(opts.toName).trim()+(opts.toPos?' '+String(opts.toPos).trim():'')+'님'):(cn?cn+' 담당자님':'담당자님');
+  var phObj=SDC_PHASES.filter(function(p){ return p[0]===opts.phase; })[0]||SDC_PHASES[0];
+  var phTitle=({inka:'설립·등기',subsidy:'공단 지원금 신청',ops:'결산·운영상황보고',chg:'변경신고·출연'})[phObj[0]]||'진행';
+  var cells=opts.siteCells||{}, subChk=opts.subSiteChk||{};
+  var todo=[], done=[];
+  (opts.docs||[]).forEach(function(d){
+    if(opts.sel&&!opts.sel[d.id]) return;
+    if(d.kind==='bizreg'&&row.biz&&opts.skipCardBiz){ done.push({d:d,why:'기업정보함 보유'}); return; }
+    var st=sdcCellState(cells[d.id],d.subKey?subChk[d.subKey]:0);
+    if(st.k==='ok'&&!opts.includeOk){ done.push({d:d,why:'확인완료'}); return; }
+    todo.push({d:d,st:st});
+  });
+  var brief=(opts.style!=='detail');
+  var L=[who+' 안녕하세요.', opts.mgr?('푸른노무법인 '+opts.mgr+'입니다.'):'푸른노무법인입니다.',''];
+  L.push(fn+' '+phTitle+' 업무 진행을 위해 '+(isIntra?'귀사(설치사업장)에서':'참여사업장인 귀사에서')+' 제출해 주실 필요서류 체크리스트를 보내드립니다.');
+  if(!brief&&row.info&&row.info.length){
+    L.push('','■ 등록된 기업 정보 확인 (변경사항이 있으면 함께 알려 주세요)');
+    row.info.forEach(function(x){ L.push('- '+x[0]+': '+x[1]); });
+  }
+  L.push('','■ 제출 필요서류 체크리스트 ('+todo.length+'종)');
+  if(!todo.length){
+    L.push('- 현재 추가로 제출하실 미비 서류가 없습니다.');
+  }else{
+    todo.forEach(function(x,i){
+      var warn=(x.st.k==='hold'&&x.st.sub)?' [보완요청: '+x.st.sub+']':'';
+      if(brief){
+        L.push('[ ] '+(i+1)+'. '+x.d.title+' — '+x.d.req+warn);
+      }else{
+        L.push('[ ] '+(i+1)+'. '+x.d.title+warn);
+        L.push('    · 안내: '+x.d.req);
+      }
+    });
+  }
+  if(done.length){
+    L.push('','※ 기제출·확인 완료 서류('+done.length+'종, 재제출 불필요): '+done.map(function(x){ return x.d.short||x.d.title; }).join(', '));
+  }
+  if(opts.note&&String(opts.note).trim()){
+    L.push('','■ 추가 안내','- '+String(opts.note).trim());
+  }
+  L.push('','■ 회신 방법','- 준비된 서류(PDF·이미지·한글·엑셀 또는 압축파일)를 이 메일에 첨부하여 회신 부탁드립니다.');
+  if(opts.deadline&&String(opts.deadline).trim()) L.push('- 요청 기한: '+String(opts.deadline).trim()+'까지');
+  L.push('','궁금하신 점은 편하게 연락 주십시오. 감사합니다.','','푸른노무법인 드림');
+  var cp=cn.replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s/g,''), dup=!!cp&&fn.replace(/\s/g,'').indexOf(cp)>=0;
+  var hasHold=todo.some(function(x){ return x.st.k==='hold'; });
+  var subj='[푸른노무법인] '+((cn&&!dup)?cn+' ':'')+fn+' '+phTitle+' '+(hasHold?'보완·':'')+'제출서류 체크리스트 요청';
+  return {subject:subj, body:L.join('\n'), nDoc:todo.length, todoDocs:todo, doneDocs:done};
+}
+/* 첨부파일명·메일제목으로 서류 종류(kind)와 현재 단계(또는 전체 단계) docId 매칭 — 순수 함수 */
+function sdcClassifyKind(fileName,mailSubject){
+  var fn=String(fileName||'').replace(/\s+/g,''), sb=String(mailSubject||'').replace(/\s+/g,'');
+  for(var i=0;i<SDC_KIND_RULES.length;i++){
+    if(SDC_KIND_RULES[i][1].test(fileName||'')||SDC_KIND_RULES[i][1].test(fn)) return SDC_KIND_RULES[i][0];
+  }
+  for(var j=0;j<SDC_KIND_RULES.length;j++){
+    if(SDC_KIND_RULES[j][1].test(mailSubject||'')||SDC_KIND_RULES[j][1].test(sb)) return SDC_KIND_RULES[j][0];
+  }
+  return '';
+}
+function sdcMapKindToDocId(kind,phase,ftype){
+  if(!kind) return '';
+  var cur=sdcDocsFor(phase,ftype);
+  for(var i=0;i<cur.length;i++){
+    if(cur[i].kind===kind) return cur[i].id;
+    if((kind==='fin'||kind==='ei')&&cur[i].kind==='fin_ei') return cur[i].id;
+  }
+  /* 현재 단계에 없으면 다른 단계에 정확히 대응되는 서류가 있는지 찾는다 */
+  for(var p=0;p<SDC_PHASES.length;p++){
+    var ph=SDC_PHASES[p][0]; if(ph===phase) continue;
+    var ds=sdcDocsFor(ph,ftype);
+    for(var k=0;k<ds.length;k++){
+      if(ds[k].kind===kind) return ds[k].id;
+    }
+  }
+  return '';
+}
+function sdcDocDefById(docId,ftype){
+  for(var p=0;p<SDC_PHASES.length;p++){
+    var ds=sdcDocsFor(SDC_PHASES[p][0],ftype);
+    for(var i=0;i<ds.length;i++) if(ds[i].id===docId) return Object.assign({phase:SDC_PHASES[p][0]},ds[i]);
+  }
+  return null;
+}
+/* 메일·첨부가 어느 참여(설립)사업장 것인지 판별 — 순수 함수
+   1순위: 보낸이 이메일이 특정 사업장 1곳과 일치
+   2순위: 파일명·제목에 사업자등록번호 10자리가 일치
+   3순위: 파일명·제목·발신자명에 사업장 상호가 유일하게 일치
+   4순위: 활성 사업장이 1곳뿐인 기금(사내기금 등)이고 기금 관련 메일(fundMatched)일 때 그 1곳 */
+function sdcGuessSite(fileName,mailSubject,fromEmail,fromName,sites,fundMatched){
+  var list=(sites||[]).filter(function(s){ return s&&s._id&&(s.status||'active')!=='closed'; });
+  if(!list.length) return '';
+  var em=String(fromEmail||'').trim().toLowerCase();
+  if(em){
+    var emHits=list.filter(function(s){ return !!(_mfKeys({},[s]).mails[em]); });
+    if(emHits.length===1) return emHits[0]._id;
+  }
+  var raw=String(fileName||'')+' '+String(mailSubject||'')+' '+String(fromName||'');
+  var digits=raw.replace(/\D+/g,' ');
+  var bzHits=list.filter(function(s){
+    var bz=String(s.biz_no||'').replace(/\D/g,'');
+    return bz.length===10&&raw.replace(/\D/g,'').indexOf(bz)>=0;
+  });
+  if(bzHits.length===1) return bzHits[0]._id;
+  var normHay=_cardFundKey(raw);
+  var nmHits=list.map(function(s){
+    var nk=_cardFundKey(s.name||'');
+    return (nk.length>=2&&normHay.indexOf(nk)>=0)?{sid:s._id,len:nk.length}:null;
+  }).filter(Boolean).sort(function(a,b){ return b.len-a.len; });
+  if(nmHits.length===1) return nmHits[0].sid;
+  if(nmHits.length>1&&nmHits[0].len>nmHits[1].len) return nmHits[0].sid;
+  if(list.length===1&&fundMatched) return list[0]._id;
+  return '';
+}
+function _sdcDaysBetween(d1,d2){
+  var m1=String(d1||'').match(/^(\d{4})-(\d{2})-(\d{2})$/), m2=String(d2||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m1||!m2) return null;
+  var t1=Date.UTC(+m1[1],+m1[2]-1,+m1[3]), t2=Date.UTC(+m2[1],+m2[2]-1,+m2[3]);
+  return Math.round((t2-t1)/86400000);
+}
+/* 추출된 텍스트로 서류 내용 대조·검증 — 순수 함수(검사 대상)
+   → {st:'match'|'diff'|'unk', summary, items:[{k,label,read,have,res}], read} */
+function sdcVerifyText(kind,rawText,site,opts){
+  opts=opts||{}; site=site||{};
+  var txt=_sdcMaskRrn(String(rawText||''));
+  var refDate=opts.refDate||opts.today||'';
+  if(kind==='inseal'){
+    var hasIn=/인\s*감\s*증\s*명|주\s*민\s*등\s*록|취\s*임\s*승\s*낙/.test(txt);
+    return {
+      st:'unk',
+      summary:hasIn?'신분·인감서류 양식 감지 — 원본 직접 대조 후 수동 확인':'민감 신분서류 — 원본 확인 후 수동 체크',
+      items:[{k:'doc_type',label:'서류 구분',read:hasIn?'인감·주민등록·취임승낙 관련 문구 확인':'판독 보류',have:'원본 육안 대조 필수',res:hasIn?'info':'unk'}],
+      read:null
+    };
+  }
+  if(txt.replace(/\s+/g,'').length<8){
+    return {st:'unk',summary:'텍스트 추출 부족 — 열람 창에서 원본 확인 또는 OCR 재시도',items:[],read:null};
+  }
+  if(kind==='bizreg'){
+    var rb=parseBizReg(txt), cb=docCompare('bizno',rb,site,refDate,opts.today||'');
+    var badB=cb.items.filter(function(x){ return x.res==='diff'; });
+    var sumB=cb.st==='match'?'사업자번호·상호 일치':cb.st==='diff'?(badB[0]?badB[0].label+' 불일치':'등록 정보와 다름'):'일부 항목 미인식 — 육안 확인';
+    return {st:cb.st,summary:_sdcMaskRrn(sumB),items:cb.items,read:rvPickRead('bizno',rb)};
+  }
+  if(kind==='smecert'){
+    var rs=parseSmeCert(txt), cs=docCompare('sme',rs,site,refDate,opts.today||'');
+    var badS=cs.items.filter(function(x){ return x.res==='diff'; });
+    var sumS=cs.st==='match'?('유효기간 정상'+(rs.sme_to?' (~'+rs.sme_to+')':''))
+      :cs.st==='diff'?(badS[0]&&badS[0].k==='period'?'유효기간 만료 ('+(rs.sme_to||'확인')+')':(badS[0]?badS[0].label+' 확인 필요':'요건 불일치'))
+      :'유효기간·기업규모 미인식 — 육안 확인';
+    return {st:cs.st,summary:_sdcMaskRrn(sumS),items:cs.items,read:rvPickRead('sme',rs)};
+  }
+  if(kind==='corpreg'){
+    var rr=parseSiteReg(txt), cr=docCompare('reg',rr,site,refDate,opts.today||'');
+    var itemsR=(cr.items||[]).slice();
+    var stR=cr.st;
+    if(opts.req3m!==false&&rr.issued&&refDate){
+      var age=_sdcDaysBetween(rr.issued,refDate);
+      if(age!==null){
+        var ok3m=(age>=-7&&age<=92);
+        itemsR.push({k:'issued_3m',label:'발급 3개월 요건',read:rr.issued+' ('+(age>=0?age+'일 경과':'기준일 이후')+')',have:'기준일 '+refDate+' 기준 92일 이내',res:ok3m?'ok':'diff'});
+        if(!ok3m) stR='diff';
+      }
+    }
+    var badR=itemsR.filter(function(x){ return x.res==='diff'; });
+    var sumR=stR==='match'?('등기 상호 일치'+(rr.issued?' · 발급 '+rr.issued:''))
+      :stR==='diff'?(badR[0]&&badR[0].k==='issued_3m'?'발급 3개월 경과 ('+rr.issued+')':(badR[0]?badR[0].label+' 불일치':'등록 정보와 다름'))
+      :'상호·등기번호 미인식 — 육안 확인';
+    return {st:stR,summary:_sdcMaskRrn(sumR),items:itemsR,read:rvPickRead('reg',rr)};
+  }
+  var rule=SDC_DOC_KW[kind];
+  if(!rule) return {st:'unk',summary:'자동검토 규칙 없음 — 수동 확인',items:[],read:null};
+  var flat=txt.replace(/\s+/g,' ');
+  var kwOk=rule.must.test(flat), subOk=!rule.sub||rule.sub.test(flat);
+  var itemsG=[];
+  itemsG.push({k:'doc_kw',label:'문서 양식 키워드',read:kwOk?(rule.lbl+' 핵심 문구 확인'):'해당 서류 문구 미발견',have:rule.lbl,res:kwOk?'ok':'diff'});
+  if(!kwOk){
+    /* 혹시 다른 서류가 잘못 첨부되었는지 추정 */
+    var other=sdcClassifyKind('',flat.slice(0,500));
+    return {st:'diff',summary:'문서 종류 불일치 의심'+(other?' ('+other+' 계열 문구 감지)':''),items:itemsG,read:null};
+  }
+  var coMatch='na', coRead='';
+  var siteNk=_cardFundKey(site.name||''), siteBz=String(site.biz_no||'').replace(/\D/g,''), fundNk=_cardFundKey(opts.fundName||'');
+  var flatNk=_cardFundKey(flat), flatDigits=flat.replace(/\D/g,'');
+  if(siteBz.length===10&&flatDigits.indexOf(siteBz)>=0){ coMatch='ok'; coRead=site.biz_no; }
+  else if(siteNk.length>=2&&flatNk.indexOf(siteNk)>=0){ coMatch='ok'; coRead=site.name; }
+  else if(rule.allowFund&&fundNk.length>=2&&flatNk.indexOf(fundNk)>=0){ coMatch='ok'; coRead=opts.fundName; }
+  else if(rule.needCo&&(siteNk.length>=2||siteBz.length===10||fundNk.length>=2)){
+    /* 문서 안에 다른 사업자번호만 적혀 있으면 diff, 아예 못 읽었으면 unk */
+    var anyBz=flat.match(/\b(\d{3})\s*-\s*(\d{2})\s*-\s*(\d{5})\b/);
+    if(anyBz&&siteBz.length===10&&(anyBz[1]+anyBz[2]+anyBz[3])!==siteBz){
+      coMatch='diff'; coRead=anyBz[1]+'-'+anyBz[2]+'-'+anyBz[3];
+    }else{
+      coMatch='unk';
+    }
+  }
+  if(rule.needCo||coMatch==='ok'){
+    itemsG.push({k:'co_match',label:'사업장·기금 일치',read:coRead||(coMatch==='unk'?'본문 내 상호·기금명 미확인':'—'),have:(site.name||opts.fundName||'')+(site.biz_no?' ('+site.biz_no+')':''),res:coMatch});
+  }
+  var amtM=flat.match(/(?:금\s*액|출\s*연\s*금|합\s*계|자\s*본\s*금|일\s*금)[^0-9]{0,12}([0-9]{1,3}(?:,[0-9]{3})+)\s*원?/);
+  if(amtM) itemsG.push({k:'amount_ref',label:'기재 금액(참고)',read:amtM[1]+'원',have:'',res:'info'});
+  var dtM=flat.match(/(20\d{2})\s*[.년\-/]\s*(0?[1-9]|1[0-2])\s*[.월\-/]\s*(0?[1-9]|[12]\d|3[01])/);
+  if(dtM) itemsG.push({k:'date_ref',label:'문서 일자(참고)',read:dtM[1]+'-'+('0'+dtM[2]).slice(-2)+'-'+('0'+dtM[3]).slice(-2),have:'',res:'info'});
+  if(coMatch==='diff') return {st:'diff',summary:'타 사업장 번호('+coRead+') 감지 — 확인 필요',items:itemsG,read:null};
+  if(kwOk&&subOk&&(!rule.needCo||coMatch==='ok')){
+    return {st:'match',summary:rule.lbl+' 양식'+(coMatch==='ok'?'·상호':'')+' 확인됨',items:itemsG,read:null};
+  }
+  return {st:'unk',summary:rule.lbl+' 문구 확인됨 — 사업장명 육안 대조 요망',items:itemsG,read:null};
+}
+function _sdcSiteWithCands(r){
+  var base=Object.assign({},(r&&r.site)||{}, {_id:(r&&r.sid)||((r&&r.site)||{})._id||'', name:(r&&r.name)||((r&&r.site)||{}).name||''});
+  var extra=((r&&r.cands)||[]).map(function(c){ return {email:c&&c.email}; }).filter(function(c){ return !!c.email; });
+  base._sdcCands=extra;
+  return base;
+}
+function _sdcIsTrustedSender(r,fromEmail){
+  var em=String(fromEmail||'').trim().toLowerCase();
+  if(!em||!r) return false;
+  var siteObj=_sdcSiteWithCands(r);
+  return !!(_mfKeys({},[siteObj]).mails[em]);
+}
+function _sdcZipUncompSize(zf){
+  if(!zf) return 0;
+  var d=zf._data||{};
+  return Number(d.uncompressedSize||zf.uncompressedSize||0)||0;
+}
+/* 스트리밍 바이트 상한 해제 — 조작된 ZIP 헤더(압축폭탄)가 실제 해제 시 한도를 넘는 순간 즉시 중단 */
+function _sdcReadZipEntryBounded(zf,maxBytes){
+  if(!zf) return Promise.reject(new Error('파일 없음'));
+  if(_sdcZipUncompSize(zf)>maxBytes) return Promise.reject(new Error('압축 해제 전 파일 크기가 상한을 초과합니다'));
+  if(typeof zf.internalStream==='function'){
+    return new Promise(function(resolve,reject){
+      var chunks=[], total=0, done=false, st=zf.internalStream('uint8array');
+      st.on('data',function(ch){
+        if(done) return;
+        total+=ch.length;
+        if(total>maxBytes){
+          done=true;
+          try{ if(typeof st.pause==='function') st.pause(); }catch(e){}
+          reject(new Error('압축 해제 중 용량 상한 초과'));
+          return;
+        }
+        chunks.push(ch);
+      }).on('error',function(err){
+        if(!done){ done=true; reject(err); }
+      }).on('end',function(){
+        if(done) return;
+        done=true;
+        var out=new Uint8Array(total), off=0;
+        for(var i=0;i<chunks.length;i++){ out.set(chunks[i],off); off+=chunks[i].length; }
+        resolve(out);
+      });
+      if(typeof st.resume==='function') st.resume();
+    });
+  }
+  return zf.async('uint8array').then(function(b){
+    if(b.length>maxBytes) throw new Error('압축 해제 중 용량 상한 초과');
+    return b;
+  });
+}
+function _sdcRevokeBlob(){
+  if(SDC&&SDC._blobUrl){ try{ URL.revokeObjectURL(SDC._blobUrl); }catch(e){} SDC._blobUrl=''; }
+}
+function openSiteDocCenter(fidOpt,phaseOpt){
+  var fid=fidOpt||S.fundId;
+  if(!fid||!funds[fid]){ toast('기금을 먼저 선택하세요','warn'); return; }
+  if(!_sdcSafeKey(fid)){ toast('기금 식별자가 올바르지 않습니다','err'); return; }
+  _sdcRevokeBlob();
+  var f=Object.assign({},funds[fid],{_id:fid});
+  var ph=phaseOpt||sdcDefaultPhase(f);
+  var docs=sdcDocsFor(ph,f.fund_type), sel={};
+  docs.forEach(function(d){ sel[d.id]=true; });
+  var C=SDC={
+    fid:fid, f:f, phase:ph, docs:docs, sel:sel, rows:null, chk:{}, subChk:{},
+    cur:'', style:'brief', autoOk:true, skipCardBiz:true, includeOk:false,
+    refDate:ymd(), deadline:'', note:'', loading:true, shown:false,
+    scanning:false, reviewing:false, scanMsg:'', unmatched:[], detail:null, _localFiles:{}, _mailHdr:{}, _blobUrl:''
+  };
+  sdcRender();
+  var idxP=loadCardIdx().then(function(x){ return x||[]; },function(){ return []; });
+  var chkP=fbDb.ref(NS+'/site_doc_chk/'+fid).once('value').then(function(sn){ return sn.val()||{}; },function(){ return {}; });
+  var subP=(f.fund_type!=='사내')?fbDb.ref(NS+'/subsidy_chk/'+fid+'/'+(S.year||new Date().getFullYear())).once('value').then(function(sn){ return sn.val()||{}; },function(){ return {}; }):Promise.resolve({});
+  return Promise.all([_loadSites(fid),idxP,chkP,subP]).then(function(res){
+    if(SDC!==C) return;
+    var sites=res[0]||[], idx=res[1]||[];
+    C.chk=res[2]||{}; C.subChk=res[3]||{};
+    if(!sites.length&&f.fund_type==='사내'){
+      var coNm=String(f.name||f.short_name||'').replace(/\s*(사내|공동)?\s*근로복지기금.*$/,'').replace(/㈜|\(주\)|주식회사/g,'').trim();
+      if(coNm) sites=[{_id:'_fund',name:coNm}];
+    }
+    return Promise.all(sites.map(function(s){
+      var biz=idx.length?_siteCardMatch(s,idx):null;
+      return loadCardCo(biz||{c:s.name,bz:s.biz_no}).catch(function(){ return {}; }).then(function(co){
+        var r=_pmRow(s,idx,co,f);
+        var reqMeta=((C.chk[r.sid]||{})['_req'])||null;
+        r.reqSent=reqMeta;
+        r.on=!reqMeta||reqMeta.phase!==C.phase;
+        return r;
+      });
+    }));
+  }).then(function(rows){
+    if(!rows||SDC!==C) return;
+    rows.forEach(function(r,i){ r.key='r'+i; });
+    C.rows=rows; C.loading=false;
+    var first=rows.filter(function(r){ return r.on; })[0]||rows[0];
+    C.cur=first?first.sid:'';
+    sdcRender();
+  }).catch(function(e){
+    if(SDC===C){ C.loading=false; C.rows=[]; toast('사업장 서류 현황 로드 실패: '+((e&&e.message)||e),'err'); sdcRender(); }
+  });
+}
+function _sdcRowOf(C,k){
+  var a=(C&&C.rows)||[];
+  for(var i=0;i<a.length;i++) if(a[i].key===k||a[i].sid===k) return a[i];
+  return null;
+}
+function _sdcCellOf(C,sid,docId){
+  return ((C.chk||{})[sid]||{})[docId]||null;
+}
+function _sdcSubLegacyOf(C,sid,docDef){
+  if(!docDef||!docDef.subKey) return 0;
+  return ((((C.subChk||{}).site)||{})[sid]||{})[docDef.subKey]?1:0;
+}
+/* subsidy_chk 연동 — «확인완료(ok)»일 때만 세우며, 해제할 때도 이 창(sdc_src)이 세운 값일 때만 지워 기존 수동 체크를 보호한다 */
+function _sdcSyncSubsidyChk(C,sid,docId,isOk){
+  if(!C||C.f.fund_type==='사내'||!_sdcSafeKey(sid)||sid==='_fund') return Promise.resolve();
+  var def=sdcDocDefById(docId,C.f.fund_type);
+  if(!def||!def.subKey) return Promise.resolve();
+  var yr=S.year||new Date().getFullYear(), sk=def.subKey;
+  C.subChk=C.subChk||{}; C.subChk.site=C.subChk.site||{}; C.subChk.site[sid]=C.subChk.site[sid]||{};
+  C.subChk.sdc_src=C.subChk.sdc_src||{}; C.subChk.sdc_src[sid]=C.subChk.sdc_src[sid]||{};
+  if(isOk){
+    C.subChk.site[sid][sk]=1; C.subChk.sdc_src[sid][sk]=1;
+    if(S.fundId===C.fid&&S.year===yr&&S.subChk){
+      S.subChk.site=S.subChk.site||{}; S.subChk.site[sid]=S.subChk.site[sid]||{}; S.subChk.site[sid][sk]=1;
+    }
+    var upSet={}; upSet['site/'+sid+'/'+sk]=1; upSet['sdc_src/'+sid+'/'+sk]=1;
+    return fbDb.ref(NS+'/subsidy_chk/'+C.fid+'/'+yr).update(upSet).catch(function(){});
+  }
+  /* 이 창에서 세운 기록이 있을 때만 해제한다 */
+  if(!C.subChk.sdc_src[sid][sk]) return Promise.resolve();
+  delete C.subChk.site[sid][sk]; delete C.subChk.sdc_src[sid][sk];
+  if(S.fundId===C.fid&&S.year===yr&&S.subChk&&S.subChk.site&&S.subChk.site[sid]) delete S.subChk.site[sid][sk];
+  var upClr={}; upClr['site/'+sid+'/'+sk]=null; upClr['sdc_src/'+sid+'/'+sk]=null;
+  return fbDb.ref(NS+'/subsidy_chk/'+C.fid+'/'+yr).update(upClr).catch(function(){});
+}
+function _sdcSaveCell(C,sid,docId,valOrFn,opts){
+  if(!_sdcSafeKey(C.fid)||!_sdcSafeKey(sid)||!_sdcSafeKey(docId)) return Promise.reject(new Error('잘못된 식별자'));
+  opts=opts||{};
+  var ref=fbDb.ref(NS+'/site_doc_chk/'+C.fid+'/'+sid+'/'+docId);
+  var applyFn=(typeof valOrFn==='function')?valOrFn:function(cur){
+    if(opts.preserveManualOk&&cur&&cur.ok&&cur.ok.mode==='manual') return cur;
+    return valOrFn||null;
+  };
+  var saveP=(typeof ref.transaction==='function')
+    ?ref.transaction(function(cur){ return applyFn(cur); }).then(function(res){
+      return (res&&res.snapshot&&typeof res.snapshot.val==='function')?res.snapshot.val():applyFn(_sdcCellOf(C,sid,docId));
+    })
+    :Promise.resolve().then(function(){
+      var nx=applyFn(_sdcCellOf(C,sid,docId));
+      return ref.set(nx).then(function(){ return nx; });
+    });
+  return saveP.then(function(saved){
+    C.chk[sid]=C.chk[sid]||{};
+    if(saved) C.chk[sid][docId]=saved; else delete C.chk[sid][docId];
+    return _sdcSyncSubsidyChk(C,sid,docId,!!(saved&&saved.ok));
+  });
+}
+function sdcHelp(){
+  var C=SDC; if(!C) return;
+  C.help=!C.help;
+  var e=$('sdcHelpBox'), b=$('sdcHelpBtn');
+  if(e) e.style.display=C.help?'block':'none';
+  if(b&&b.setAttribute) b.setAttribute('aria-expanded',C.help?'true':'false');
+}
+function sdcSetPhase(ph){
+  var C=SDC; if(!C) return;
+  _sdcRevokeBlob(); C.detail=null; C.phase=ph;
+  C.docs=sdcDocsFor(ph,C.f.fund_type); C.sel={};
+  C.docs.forEach(function(d){ C.sel[d.id]=true; });
+  (C.rows||[]).forEach(function(r){
+    var req=((C.chk[r.sid]||{})['_req'])||null;
+    r.reqSent=(req&&req.phase===ph)?req:null;
+    r.on=!r.reqSent;
+  });
+  sdcRender();
+}
+function _sdcStats(C){
+  var rows=C.rows||[], docs=C.docs||[], tot=rows.length*docs.length, recv=0, ok=0, hold=0;
+  rows.forEach(function(r){
+    docs.forEach(function(d){
+      var st=sdcCellState(_sdcCellOf(C,r.sid,d.id),_sdcSubLegacyOf(C,r.sid,d));
+      if(st.k==='ok'){ ok++; recv++; }
+      else if(st.k==='hold'){ hold++; recv++; }
+      else if(st.k==='recv'){ recv++; }
+    });
+  });
+  return {tot:tot,recv:recv,ok:ok,hold:hold};
+}
+function _sdcAllPhaseDocOpts(ftype,selectedDocId){
+  return '<option value="">— 서류 선택 —</option>'+SDC_PHASES.map(function(p){
+    var ds=sdcDocsFor(p[0],ftype);
+    return '<optgroup label="'+esc(p[1])+'">'+ds.map(function(d){
+      return '<option value="'+esc(d.id)+'"'+(selectedDocId===d.id?' selected':'')+'>'+esc(d.short||d.title)+'</option>';
+    }).join('')+'</optgroup>';
+  }).join('');
+}
+function _sdcHTML(C){
+  var f=C.f, isIntra=(f.fund_type==='사내');
+  var head='<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">📋 사업장 제출서류 요청 · 수신 · 내용검토 — '+esc(f.short_name||f.name||C.fid)+'</h2>'
+    +'<span class="chip" style="font-size:10.5px">'+esc(isIntra?'사내기금 (설립·설치사업장)':'공동기금 (참여사업장별)')+'</span>'
+    +'<button type="button" class="hbtn" id="sdcHelpBtn" aria-expanded="'+(C.help?'true':'false')+'" onclick="sdcHelp()" title="체크리스트 요청·메일 자동수신·내용검토 도움말">ⓘ</button>'
+    +'<span style="flex:1"></span>'
+    +(C.detail?'<button type="button" onclick="sdcCloseDetail()">← 체크리스트 현황표</button>':'')
+    +'<button type="button" onclick="closeM()">✕ 닫기</button></div>'
+    +'<div id="sdcHelpBox" class="helpbody" style="display:'+(C.help?'block':'none')+';background:var(--acc-soft);border-radius:9px;padding:8px 12px;margin:8px 0">'+((typeof HELP!=='undefined'&&HELP[SDC_UI.help])?HELP[SDC_UI.help].h:'')+'</div>';
+  if(C.loading||!C.rows) return head+'<div class="muted" style="padding:18px 2px">참여사업장·기업정보함·서류 체크 현황을 불러오는 중…</div>';
+  if(C.detail) return head+_sdcDetailHTML(C);
+
+  var st=_sdcStats(C);
+  var pTabs='<div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">'
+    +'<div class="segbar">'+SDC_PHASES.map(function(p){
+      return '<button type="button" class="seg'+(C.phase===p[0]?' on':'')+'" onclick="sdcSetPhase(\''+p[0]+'\')" title="'+esc(p[2])+'">'+esc(p[1])+'</button>';
+    }).join('')+'</div>'
+    +'<span class="chip" style="font-size:11px">입수 '+st.recv+'/'+st.tot+'</span>'
+    +'<span class="chip ok" style="font-size:11px">확인완료 '+st.ok+'/'+st.tot+'</span>'
+    +(st.hold?'<span class="chip warn" style="font-size:11px">보완필요 '+st.hold+'</span>':'')
+    +'</div>';
+
+  var actBar='<div class="row" style="gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--ok-bg);border:1px solid var(--line);border-radius:9px;margin-bottom:10px">'
+    +'<button type="button" class="primary" onclick="sdcScanMail()"'+(C.scanning||C.reviewing?' disabled':'')+' title="푸른메일함에서 참여사업장 수신 메일·첨부(ZIP 포함)를 찾아 입수 체크하고 내용을 자동 검토합니다">🔄 '+(C.scanning?'메일함 스캔 중…':'메일함 수신서류 자동체크·검토')+'</button>'
+    +'<button type="button" onclick="sdcReviewAll()"'+(C.scanning||C.reviewing?' disabled':'')+' title="이미 입수된 서류 중 미검토 항목의 본문을 판독·대조합니다">🔍 '+(C.reviewing?'내용 검토 중…':'입수서류 일괄 내용검토')+'</button>'
+    +'<button type="button" onclick="sdcConfirmMatched()" title="내용 검토 결과 «일치» 판정된 항목을 한꺼번에 확인완료 처리합니다">✅ 일치항목 일괄 확인</button>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap" title="켜 두면 등록된 사업장 연락처에서 온 메일의 서류 내용이 일치할 때 자동으로 확인완료 체크합니다">'
+      +'<input type="checkbox"'+(C.autoOk?' checked':'')+' onchange="SDC.autoOk=this.checked">일치 시 자동 확인체크</label>'
+    +'<span style="flex:1"></span>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap" title="중소기업확인서 유효기간 및 등기부등본 3개월 이내 발급 기준일">기준일 '
+      +'<input type="date" value="'+esc(C.refDate||'')+'" onchange="SDC.refDate=this.value;sdcRender()" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:16px;width:138px"></label>'
+    +'</div>'
+    +(C.scanMsg?'<div class="msg ok" role="status" aria-live="polite" style="font-size:12px;margin:0 0 8px">'+esc(C.scanMsg)+'</div>':'');
+
+  var unBox='';
+  if(C.unmatched&&C.unmatched.length){
+    unBox='<div style="border:1px solid var(--acc);background:var(--acc-soft);border-radius:9px;padding:8px 10px;margin-bottom:10px">'
+      +'<div class="row" style="margin-bottom:6px"><b style="font-size:12.5px">📨 메일에서 찾았으나 사업장·서류 종류 지정이 필요한 첨부 ('+C.unmatched.length+'건)</b>'
+      +'<span style="flex:1"></span><button type="button" onclick="SDC.unmatched=[];sdcRender()" style="padding:3px 8px;font-size:11px">목록 닫기</button></div>'
+      +'<div style="overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px"><table style="font-size:12px"><thead><tr>'
+      +'<th class="ckcol"><input type="checkbox" disabled></th><th class="no">#</th><th>수신일</th><th>보낸이</th><th>첨부파일</th><th>사업장 · 서류 지정</th><th></th></tr></thead><tbody>'
+      +C.unmatched.map(function(u,idx){
+        var sOpts='<option value="">— 사업장 선택 —</option>'+(C.rows||[]).map(function(r){ return '<option value="'+esc(r.key)+'"'+(u.sid===r.sid?' selected':'')+'>'+esc(r.name)+'</option>'; }).join('');
+        var dOpts=_sdcAllPhaseDocOpts(C.f.fund_type,u.docId);
+        return '<tr><td class="ckcol"><input type="checkbox" checked disabled></td><td class="no">'+(idx+1)+'</td>'
+          +'<td style="white-space:nowrap">'+esc(u.date||'')+'</td>'
+          +'<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(u.from||'')+'">'+esc(u.from||'')+'</td>'
+          +'<td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(u.attName+' · '+u.subject)+'">'+(u.zipEntry?'📦 ':'📎 ')+esc(u.attName||'')+'</td>'
+          +'<td style="white-space:nowrap"><select id="sdc-us-'+idx+'" aria-label="사업장 선택" style="padding:3px 4px;font-size:12px;max-width:140px">'+sOpts+'</select> '
+          +'<select id="sdc-ud-'+idx+'" aria-label="서류 선택" style="padding:3px 4px;font-size:12px;max-width:165px">'+dOpts+'</select></td>'
+          +'<td style="white-space:nowrap"><button type="button" class="primary" onclick="sdcAssignUnmatched('+idx+')" style="padding:4px 9px;min-height:26px;font-size:11.5px">입수·검토 반영</button></td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+  }
+
+  var rows=C.rows, docs=C.docs, nOn=rows.filter(function(r){ return r.on; }).length;
+  var recvSel=function(r){
+    var k=r.key;
+    var opts=r.cands.map(function(c,i){ return '<option value="'+i+'"'+(r.pick===i?' selected':'')+'>'+esc((c.name?c.name+' · ':'')+c.email)+'</option>'; }).join('')
+      +'<option value="-1"'+(r.pick<0?' selected':'')+'>직접 입력…</option>';
+    return '<span style="display:inline-flex;gap:4px;align-items:center;white-space:nowrap"><select aria-label="'+esc(r.name+' 받는 사람')+'" onchange="sdcPickMail(\''+k+'\',this.value)" style="width:'+(r.pick<0?'88':'185')+'px;font-size:12px;padding:3px 4px" title="'+esc(_pmTo(r).email||'')+'">'+opts+'</select>'
+      +(r.pick<0?'<input type="text" value="'+esc(r.manual)+'" aria-label="'+esc(r.name+' 이메일 직접 입력')+'" oninput="sdcManualMail(\''+k+'\',this.value)" onchange="sdcManualMail(\''+k+'\',this.value)" placeholder="이메일" style="width:125px;font-size:16px;padding:2px 5px">':'')+'</span>';
+  };
+  var thDocs=docs.map(function(d){
+    var cnt=rows.filter(function(r){ return sdcCellState(_sdcCellOf(C,r.sid,d.id),_sdcSubLegacyOf(C,r.sid,d)).k==='ok'; }).length;
+    return '<th style="text-align:center;white-space:nowrap;padding:4px 6px">'
+      +'<button type="button" onclick="sdcToggleColOk(\''+esc(d.id)+'\')" title="'+esc(d.title+' — '+d.req+' (클릭 시 열 전체 수동확인 토글)')+'" style="border:0;background:none;padding:2px 4px;font-size:11px;font-weight:700;color:var(--sub);cursor:pointer;line-height:1.25">'
+      +esc(d.short||d.title)+'<br><span class="muted" style="font-weight:400">'+cnt+'/'+rows.length+'</span></button></th>';
+  }).join('');
+  var tbRows=rows.map(function(r,i){
+    var k=r.key, cur=(r.sid===C.cur);
+    var m=sdcMailText(f,r,{phase:C.phase,docs:docs,sel:C.sel,siteCells:C.chk[r.sid]||{},subSiteChk:((C.subChk||{}).site||{})[r.sid]||{},style:C.style,deadline:C.deadline,note:C.note,mgr:(f.mgr_main&&f.mgr_main.name)||f.manager||'',toName:_pmTo(r).name,toPos:_pmTo(r).pos,includeOk:C.includeOk,skipCardBiz:C.skipCardBiz});
+    var docCells=docs.map(function(d){
+      var cell=_sdcCellOf(C,r.sid,d.id), leg=_sdcSubLegacyOf(C,r.sid,d), stCell=sdcCellState(cell,leg);
+      var cls=stCell.k==='ok'?'ok':stCell.k==='hold'?'warn':'';
+      var tip=d.title+' — '+stCell.label+(stCell.sub?' ('+stCell.sub+')':'')+'\n클릭: 상세 검토·원본 열람·파일 첨부\n체크박스: 수동 확인완료 바로 토글';
+      return '<td style="text-align:center;white-space:nowrap;padding:5px 6px">'
+        +'<span style="display:inline-flex;align-items:center;gap:3px">'
+        +'<input type="checkbox"'+(stCell.k==='ok'?' checked':'')+' onchange="sdcManualOk(\''+k+'\',\''+esc(d.id)+'\',this.checked)" title="수동 확인완료 체크/해제" aria-label="'+esc(r.name+' '+d.short+' 확인완료')+'">'
+        +'<button type="button" class="chip'+(cls?' '+cls:'')+'" style="font-size:10.5px;cursor:pointer;border:1px solid var(--line);min-height:24px;padding:2px 7px" onclick="sdcOpenDetail(\''+k+'\',\''+esc(d.id)+'\')" title="'+esc(tip)+'">'+esc(stCell.label.replace(/^[^ ]+ /,''))+'</button>'
+        +'</span></td>';
+    }).join('');
+    var reqChip=r.reqSent?'<span class="chip ok" style="font-size:10px" title="'+esc((r.reqSent.by||'')+' '+(r.reqSent.at||''))+'">✉ '+esc(String(r.reqSent.at||'').slice(5).replace('-','/'))+'</span>':'<span class="muted">—</span>';
+    return '<tr id="sdcR_'+k+'"'+(cur?' style="background:var(--acc-soft)"':'')+'>'
+      +'<td class="ckcol"><input type="checkbox"'+(r.on?' checked':'')+' onchange="sdcTickRow(\''+k+'\',this.checked)" aria-label="'+esc(r.name+' 선택')+'"></td>'
+      +'<td class="no">'+(i+1)+'</td>'
+      +'<td style="font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis"><button type="button" onclick="sdcFocusRow(\''+k+'\')" title="'+esc(r.name+' — 클릭 시 아래 메일 미리보기 전환')+'" style="border:0;background:none;padding:2px 0;font-weight:700;font-size:12.5px;cursor:pointer;max-width:136px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'(이름 없음)')+'</button></td>'
+      +'<td>'+recvSel(r)+'</td>'
+      +docCells
+      +'<td style="text-align:center;white-space:nowrap">'+reqChip+'</td>'
+      +'<td style="white-space:nowrap"><button type="button" class="primary" onclick="sdcCompose(\''+k+'\')" style="padding:4px 8px;min-height:26px;font-size:11.5px" title="미확인·보완 서류 체크리스트 메일을 푸른메일함 쓰기 창에 채워 엽니다">✉ 요청('+(m.nDoc)+')</button> '
+      +'<button type="button" onclick="sdcMarkReqSent(\''+k+'\','+(r.reqSent?'false':'true')+')" style="padding:4px 7px;min-height:26px;font-size:11.5px">'+(r.reqSent?'↩':'✔보냄')+'</button></td></tr>';
+  }).join('');
+
+  var matrix='<div class="row" style="gap:8px;margin:0 0 5px;flex-wrap:wrap"><b style="font-size:13px">① 사업장별 필요서류 입수 · 내용검토 · 확인 현황</b>'
+    +'<span class="muted" style="font-size:11.5px">칸의 ☑는 수동 확인완료 토글, 배지 단추는 원본 열람·내용 대조·보완 지정입니다.</span>'
+    +'<span style="flex:1"></span>'
+    +'<button type="button" class="primary" onclick="sdcComposeNext()" style="padding:4px 10px;font-size:12px" title="선택된 사업장 중 아직 보냄 표시가 없는 다음 사업장의 요청 메일 쓰기 창을 엽니다">▶ 다음 사업장 요청메일 쓰기</button></div>'
+    +'<div id="sdcMat" style="overflow:auto;max-height:320px;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'
+    +'<th class="ckcol"><input type="checkbox"'+(nOn&&nOn===rows.length?' checked':'')+' onclick="sdcTickAll(this.checked)" aria-label="사업장 전체 선택" title="전체 선택"></th>'
+    +'<th class="no">#</th><th>사업장</th><th>받는 사람</th>'+thDocs+'<th style="text-align:center">요청</th><th>메일</th></tr></thead><tbody>'
+    +(tbRows||'<tr><td colspan="'+(6+docs.length)+'" class="center muted" style="padding:16px">등록된 사업장이 없습니다 — 참여사업장 탭에서 먼저 사업장을 등록하세요.</td></tr>')
+    +'</tbody></table></div>';
+
+  var cr=_sdcRowOf(C,C.cur)||rows[0];
+  var cm=cr?sdcMailText(f,cr,{phase:C.phase,docs:docs,sel:C.sel,siteCells:C.chk[cr.sid]||{},subSiteChk:((C.subChk||{}).site||{})[cr.sid]||{},style:C.style,deadline:C.deadline,note:C.note,mgr:(f.mgr_main&&f.mgr_main.name)||f.manager||'',toName:_pmTo(cr).name,toPos:_pmTo(cr).pos,includeOk:C.includeOk,skipCardBiz:C.skipCardBiz}):null;
+  var docPicks=docs.map(function(d){
+    return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;padding:2px 7px;border:1px solid var(--line);border-radius:999px;background:var(--panel);cursor:pointer;white-space:nowrap">'
+      +'<input type="checkbox"'+(C.sel[d.id]?' checked':'')+' onchange="sdcToggleDocSel(\''+esc(d.id)+'\',this.checked)">'+esc(d.short||d.title)+'</label>';
+  }).join(' ');
+
+  var composer='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">'
+    +'<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:6px"><b style="font-size:13px">② 필요서류 체크리스트 요청 메일 미리보기</b>'
+    +'<div class="segbar"><button type="button" class="seg'+(C.style==='brief'?' on':'')+'" onclick="SDC.style=\'brief\';sdcRender()">간략 체크리스트</button>'
+      +'<button type="button" class="seg'+(C.style==='detail'?' on':'')+'" onclick="SDC.style=\'detail\';sdcRender()">상세 안내문</button></div>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;cursor:pointer;white-space:nowrap"><input type="checkbox"'+(C.skipCardBiz?' checked':'')+' onchange="SDC.skipCardBiz=this.checked;sdcRender()">기업정보함 보유 등록증 제외</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;cursor:pointer;white-space:nowrap"><input type="checkbox"'+(C.includeOk?' checked':'')+' onchange="SDC.includeOk=this.checked;sdcRender()">확인완료 서류도 포함</label>'
+    +'<span style="flex:1"></span>'
+    +'<button type="button" onclick="sdcCopyMail()" style="padding:4px 9px;font-size:12px">📋 제목·본문 복사</button></div>'
+    +'<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:6px">'+docPicks+'</div>'
+    +'<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap">제출 기한(선택) <input type="date" value="'+esc(C.deadline||'')+'" onchange="SDC.deadline=this.value;sdcUpdatePreview()" style="padding:2px 6px;border:1px solid var(--line);border-radius:6px;font-size:16px;width:138px"></label>'
+      +'<input type="text" value="'+esc(C.note||'')+'" aria-label="추가 안내 메모" oninput="SDC.note=this.value;sdcUpdatePreview()" placeholder="추가 안내 메모 (선택 — 메일 본문에 한 줄 추가됩니다)" style="flex:1;min-width:200px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:16px">'
+    +'</div>'
+    +'<div class="muted" id="sdcMailWho" style="font-size:11.5px;margin-bottom:4px">'+(cr&&cm?(esc(cr.name)+' · 받는이 '+( _pmTo(cr).email?esc(_pmTo(cr).email):'미입력')+' · 요청 대상 '+cm.nDoc+'종'):'')+'</div>'
+    +'<input id="sdcSubj" readonly value="'+esc(cm?cm.subject:'')+'" aria-label="요청 메일 제목" style="width:100%;margin-bottom:4px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:16px">'
+    +'<textarea id="sdcBody" readonly rows="8" aria-label="요청 메일 본문" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;font-family:inherit;word-break:keep-all">'+esc(cm?cm.body:'')+'</textarea>'
+    +'</div>';
+
+  return head+pTabs+actBar+unBox+matrix+composer;
+}
+function _sdcDetailHTML(C){
+  var D=C.detail, r=_sdcRowOf(C,D.rKey), def=sdcDocDefById(D.docId,C.f.fund_type);
+  if(!r||!def) return '<div class="msg err">대상을 찾을 수 없습니다.</div>';
+  var cell=_sdcCellOf(C,r.sid,def.id)||{}, leg=_sdcSubLegacyOf(C,r.sid,def), st=sdcCellState(cell,leg);
+  var rv=cell.review||null, items=(rv&&rv.items)||[];
+  var cmpTbl=items.length?'<div style="overflow-x:auto;margin-top:8px"><table style="font-size:12px"><thead><tr><th class="ckcol"><input type="checkbox" disabled></th><th class="no">#</th><th>검토 항목</th><th>서류에서 읽은 값</th><th>등록된 사업장 정보·기준</th><th>판정</th></tr></thead><tbody>'
+    +items.map(function(x,idx){
+      var b=({ok:'<span class="chip ok">일치</span>',diff:'<span class="chip warn">불일치</span>',unk:'<span class="chip">미인식</span>',na:'<span class="chip">비교값 없음</span>',info:'<span class="chip">참고</span>'})[x.res]||'<span class="chip">—</span>';
+      return '<tr'+(x.res==='diff'?' style="background:var(--warn-bg)"':'')+'><td class="ckcol"><input type="checkbox"'+(x.res==='ok'?' checked':'')+' disabled></td><td class="no">'+(idx+1)+'</td>'
+        +'<td class="muted">'+esc(x.label||'')+'</td><td>'+esc(x.read||'—')+'</td><td>'+esc(x.have||'—')+'</td><td>'+b+'</td></tr>';
+    }).join('')+'</tbody></table></div>'
+    :'<div class="muted" style="padding:10px 2px;font-size:12px">'+(cell.recv?'아직 자동 내용검토 결과가 없습니다 — [🔍 내용 자동검토 실행]을 누르거나 원본을 보고 수동 확인하세요.':'아직 수신된 파일이 없습니다 — 메일함 자동스캔을 실행하거나 아래에서 받은 파일을 직접 선택하세요.')+'</div>';
+  var hdr=cell.mail?(C._mailHdr[cell.mail.slug+'|'+cell.mail.uid]||{}):{};
+  var mailMeta=cell.mail?('<div style="font-size:12px;padding:6px 9px;background:var(--ok-bg);border:1px solid var(--line);border-radius:7px;margin-bottom:8px">'
+    +'<b>📩 연결된 수신 메일 첨부:</b> '+esc(cell.mail.attName||'')+(cell.mail.zipEntry?' (묶음 내 '+esc(cell.mail.zipEntry)+')':'')
+    +'<div class="muted" style="font-size:11.5px;margin-top:2px">'+(hdr.subject?'제목: '+esc(hdr.subject)+' · ':'')+(hdr.from?'보낸이: '+esc(hdr.from)+' · ':'')+'수신일: '+esc(cell.mail.date||'')+'</div></div>'):'';
+  var pvHtml='<div id="sdcPvBox" style="min-height:280px;border:1px solid var(--line);border-radius:8px;background:var(--ok-bg);padding:10px;text-align:center;overflow:auto">'
+    +(D.pvHtml||'<div class="muted" style="padding:40px 8px;font-size:12.5px">'+(cell.mail?'[👁 첨부 원본 불러오기]를 누르면 화면에서 바로 미리 봅니다.':'연결된 메일 첨부가 없습니다.<br>아래에서 PC 파일을 골라 바로 검토할 수 있습니다.')+'</div>')+'</div>';
+
+  return '<div style="margin-top:8px">'
+    +'<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px">'
+      +'<b style="font-size:14.5px">'+esc(r.name)+' — '+esc(def.title)+'</b>'
+      +'<span class="chip'+(st.k==='ok'?' ok':st.k==='hold'?' warn':'')+'">'+esc(st.label)+'</span>'
+      +(rv&&rv.summary?'<span class="muted" style="font-size:12px">'+esc(rv.summary)+'</span>':'')
+    +'</div>'
+    +'<div class="sdc-split">'
+      +'<div>'
+        +mailMeta
+        +'<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px;position:relative">'
+          +(cell.mail?'<button type="button" class="primary" onclick="sdcPreviewMailAtt()" style="padding:5px 10px;font-size:12px">👁 첨부 원본 불러오기</button>'
+            +'<button type="button" onclick="sdcDownloadMailAtt()" style="padding:5px 10px;font-size:12px">⬇ 파일 내려받기</button>':'')
+          +'<button type="button" onclick="var el=$(\'sdcLocalInp\');if(el)el.click()" style="padding:5px 10px;font-size:12px">📎 PC 파일로 입수·검토</button>'
+          +'<input id="sdcLocalInp" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.hwp,.hwpx,.xlsx,.xls,.docx,.csv" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" onchange="sdcLocalFilePicked(this)">'
+        +'</div>'
+        +pvHtml
+      +'</div>'
+      +'<div>'
+        +'<b style="font-size:13px">🔍 서류 내용 판독 · 등록정보 대조</b>'
+        +cmpTbl
+        +'<div class="fld" style="margin-top:12px"><label for="sdcHoldInput" style="font-size:12px">보완 요청 사유 / 검토 메모 (보완필요 지정 시 재요청 메일 체크리스트에 자동 기재)</label>'
+          +'<input id="sdcHoldInput" type="text" value="'+esc(cell.hold||'')+'" placeholder="예: 유효기간 만료(재발급 필요), 대표자 직인 누락, 말소사항 미포함 등" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:16px"></div>'
+        +'<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">'
+          +(st.k==='ok'
+            ?'<button type="button" onclick="sdcManualOk(\''+r.key+'\',\''+esc(def.id)+'\',false)">↩ 확인완료 취소</button>'
+            :'<button type="button" class="primary" onclick="sdcManualOk(\''+r.key+'\',\''+esc(def.id)+'\',true)">✅ 확인완료 체크 (수동)</button>')
+          +'<button type="button" onclick="sdcSetHold(\''+r.key+'\',\''+esc(def.id)+'\')" style="border-color:var(--warn);color:var(--warn)">⚠ 보완필요 표시</button>'
+          +(cell.hold?'<button type="button" onclick="sdcClearHold(\''+r.key+'\',\''+esc(def.id)+'\')">보완 해제</button>':'')
+          +(cell.mail||C._localFiles[r.sid+'|'+def.id]?'<button type="button" onclick="sdcReviewSingle(\''+r.key+'\',\''+esc(def.id)+'\')">🔍 내용 자동검토 실행</button>':'')
+          +(!cell.recv&&!cell.ok?'<button type="button" onclick="sdcMarkManualRecv(\''+r.key+'\',\''+esc(def.id)+'\',true)">📥 서류 입수만 체크</button>'
+            :(cell.recv||cell.ok?'<button type="button" onclick="sdcMarkManualRecv(\''+r.key+'\',\''+esc(def.id)+'\',false)" style="color:var(--danger)">🗑 입수·확인 초기화</button>':''))
+        +'</div>'
+      +'</div>'
+    +'</div></div>';
+}
+function sdcRender(){
+  var C=SDC; if(!C) return;
+  var html=_sdcHTML(C), box=$('modalbox');
+  if(C.shown&&box){
+    var top=box.scrollTop, mt=$('sdcMat')?$('sdcMat').scrollTop:0;
+    box.innerHTML=html; box.scrollTop=top;
+    if($('sdcMat')) $('sdcMat').scrollTop=mt;
+    return;
+  }
+  closeM();
+  showModal(html,{width:1120,onclose:function(){ _sdcRevokeBlob(); if(SDC===C) SDC=null; }});
+  C.shown=true;
+}
+function sdcUpdatePreview(){
+  var C=SDC; if(!C||!C.rows||C.detail) return;
+  var cr=_sdcRowOf(C,C.cur)||C.rows[0]; if(!cr) return;
+  var cm=sdcMailText(C.f,cr,{phase:C.phase,docs:C.docs,sel:C.sel,siteCells:C.chk[cr.sid]||{},subSiteChk:((C.subChk||{}).site||{})[cr.sid]||{},style:C.style,deadline:C.deadline,note:C.note,mgr:(C.f.mgr_main&&C.f.mgr_main.name)||C.f.manager||'',toName:_pmTo(cr).name,toPos:_pmTo(cr).pos,includeOk:C.includeOk,skipCardBiz:C.skipCardBiz});
+  if($('sdcSubj')) $('sdcSubj').value=cm.subject;
+  if($('sdcBody')) $('sdcBody').value=cm.body;
+  if($('sdcMailWho')) $('sdcMailWho').textContent=cr.name+' · 받는이 '+(_pmTo(cr).email||'미입력')+' · 요청 대상 '+cm.nDoc+'종';
+}
+function sdcTickRow(rKey,on){ var r=_sdcRowOf(SDC,rKey); if(r){ r.on=!!on; sdcRender(); } }
+function sdcTickAll(on){ if(SDC&&SDC.rows){ SDC.rows.forEach(function(r){ r.on=!!on; }); sdcRender(); } }
+function sdcFocusRow(rKey){ var r=_sdcRowOf(SDC,rKey); if(r){ SDC.cur=r.sid; sdcRender(); } }
+function sdcPickMail(rKey,v){ var r=_sdcRowOf(SDC,rKey); if(!r) return; var i=parseInt(v,10); r.pick=(i>=0&&i<r.cands.length)?i:-1; SDC.cur=r.sid; sdcRender(); }
+function sdcManualMail(rKey,v){ var r=_sdcRowOf(SDC,rKey); if(!r) return; r.manual=String(v||'').trim(); r.pick=-1; SDC.cur=r.sid; sdcUpdatePreview(); }
+function sdcToggleDocSel(docId,on){ if(!SDC) return; SDC.sel[docId]=!!on; sdcRender(); }
+function sdcCopyMail(){
+  var C=SDC; if(!C||!C.rows) return;
+  var cr=_sdcRowOf(C,C.cur)||C.rows[0]; if(!cr) return;
+  var cm=sdcMailText(C.f,cr,{phase:C.phase,docs:C.docs,sel:C.sel,siteCells:C.chk[cr.sid]||{},subSiteChk:((C.subChk||{}).site||{})[cr.sid]||{},style:C.style,deadline:C.deadline,note:C.note,mgr:(C.f.mgr_main&&C.f.mgr_main.name)||C.f.manager||'',toName:_pmTo(cr).name,toPos:_pmTo(cr).pos,includeOk:C.includeOk,skipCardBiz:C.skipCardBiz});
+  _pmCopy((_pmTo(cr).email?'받는 사람: '+_pmTo(cr).email+'\n':'')+'제목: '+cm.subject+'\n\n'+cm.body)
+    .then(function(ok){ toast(ok?'체크리스트 메일 제목·본문을 복사했습니다':'복사에 실패했습니다 — 직접 복사해 주세요',ok?undefined:'warn'); });
+}
+function sdcCompose(rKey){
+  var C=SDC, r=_sdcRowOf(C,rKey); if(!r) return;
+  var to=_pmTo(r);
+  if(!PM_MAIL_RE.test(to.email)){ toast('«'+r.name+'» 받는 사람 이메일을 선택하거나 입력해 주세요','warn'); return; }
+  var cm=sdcMailText(C.f,r,{phase:C.phase,docs:C.docs,sel:C.sel,siteCells:C.chk[r.sid]||{},subSiteChk:((C.subChk||{}).site||{})[r.sid]||{},style:C.style,deadline:C.deadline,note:C.note,mgr:(C.f.mgr_main&&C.f.mgr_main.name)||C.f.manager||'',toName:to.name,toPos:to.pos,includeOk:C.includeOk,skipCardBiz:C.skipCardBiz});
+  if(!cm.nDoc){ toast('«'+r.name+'»에 요청할 미제출 서류가 없습니다 (확인완료 포함 옵션을 켜면 다시 보낼 수 있습니다)','warn'); return; }
+  C.cur=r.sid; r.opened=true;
+  _pmOpenMail({to:to.email,name:r.name,subject:cm.subject,body:cm.body});
+  sdcRender();
+}
+function sdcComposeNext(){
+  var C=SDC; if(!C||!C.rows||!C.rows.length){ toast('대상 사업장이 없습니다','warn'); return; }
+  var todo=C.rows.filter(function(r){ return r.on&&!r.reqSent; });
+  if(!todo.length){ toast('선택된 사업장은 모두 보냄 표시가 되어 있습니다','warn'); return; }
+  var nx=todo.filter(function(r){ return !r.opened; })[0];
+  if(!nx){ toast('선택된 사업장의 쓰기 창을 모두 열었습니다 — 발송 후 [✔보냄]을 눌러 주세요','warn'); return; }
+  sdcCompose(nx.key);
+}
+function sdcMarkReqSent(rKey,on){
+  var C=SDC, r=_sdcRowOf(C,rKey); if(!r||!_sdcSafeKey(r.sid)) return;
+  var v=on?{at:ymd(),by:(S.user||''),phase:C.phase,style:C.style}:null;
+  fbDb.ref(NS+'/site_doc_chk/'+C.fid+'/'+r.sid+'/_req').set(v).then(function(){
+    if(SDC!==C) return;
+    C.chk[r.sid]=C.chk[r.sid]||{};
+    if(v) C.chk[r.sid]._req=v; else delete C.chk[r.sid]._req;
+    r.reqSent=v; if(v) r.on=false;
+    _audit(C.fid,'사업장 제출서류 요청메일',r.name+' ('+C.phase+') '+(v?'보냈음 표시':'취소'));
+    sdcRender();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function sdcManualOk(rKey,docId,on){
+  var C=SDC, r=_sdcRowOf(C,rKey); if(!r||!_sdcSafeKey(r.sid)||!_sdcSafeKey(docId)) return;
+  var prev=Object.assign({},_sdcCellOf(C,r.sid,docId)||{});
+  if(on){
+    prev.recv=true; prev.recv_at=prev.recv_at||ymd(); prev.recv_via=prev.recv_via||'manual';
+    prev.ok={mode:'manual',at:ymd(),by:(S.user||'')};
+    delete prev.hold; delete prev.hold_auto;
+  }else{
+    delete prev.ok;
+  }
+  var nextVal=Object.keys(prev).length?prev:null;
+  _sdcSaveCell(C,r.sid,docId,nextVal).then(function(){
+    if(SDC!==C) return;
+    _audit(C.fid,'사업장 제출서류 확인',r.name+' '+docId+(on?' 수동 확인완료':' 확인 해제'));
+    sdcRender();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function sdcToggleColOk(docId){
+  var C=SDC; if(!C||!C.rows||!C.rows.length||!_sdcSafeKey(docId)) return;
+  var def=sdcDocDefById(docId,C.f.fund_type);
+  var allOk=C.rows.every(function(r){ return sdcCellState(_sdcCellOf(C,r.sid,docId),_sdcSubLegacyOf(C,r.sid,def)).k==='ok'; });
+  var ask=(typeof confirmM==='function')?confirmM(C.rows.length+'개 사업장의 «'+((def&&def.short)||docId)+'» 항목을 일괄 '+(allOk?'확인 해제':'수동 확인완료')+'하시겠습니까?'):Promise.resolve(true);
+  ask.then(function(yes){
+    if(!yes||SDC!==C) return;
+    var ps=C.rows.map(function(r){
+      var prev=Object.assign({},_sdcCellOf(C,r.sid,docId)||{});
+      if(!allOk){
+        prev.recv=true; prev.recv_at=prev.recv_at||ymd(); prev.recv_via=prev.recv_via||'manual';
+        prev.ok={mode:'manual',at:ymd(),by:(S.user||'')}; delete prev.hold; delete prev.hold_auto;
+      }else{
+        delete prev.ok;
+      }
+      return _sdcSaveCell(C,r.sid,docId,Object.keys(prev).length?prev:null);
+    });
+    return Promise.all(ps).then(function(){
+      if(SDC!==C) return;
+      _audit(C.fid,'사업장 제출서류 열 일괄확인',((def&&def.short)||docId)+' '+C.rows.length+'곳 '+(allOk?'해제':'수동 확인완료'));
+      sdcRender(); toast(allOk?'열 전체 확인 해제':'열 전체 수동 확인완료');
+    });
+  });
+}
+function sdcMarkManualRecv(rKey,docId,on){
+  var C=SDC, r=_sdcRowOf(C,rKey); if(!r||!_sdcSafeKey(r.sid)||!_sdcSafeKey(docId)) return;
+  var nextVal=on?{recv:true,recv_at:ymd(),recv_via:'manual'}:null;
+  if(!on) delete C._localFiles[r.sid+'|'+docId];
+  _sdcSaveCell(C,r.sid,docId,nextVal).then(function(){
+    if(SDC===C){
+      _audit(C.fid,'사업장 제출서류 입수상태',r.name+' '+docId+(on?' 수동 입수':' 초기화'));
+      _sdcRevokeBlob(); if(C.detail) C.detail.pvHtml=''; sdcRender();
+    }
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function sdcSetHold(rKey,docId){
+  var C=SDC, r=_sdcRowOf(C,rKey); if(!r||!_sdcSafeKey(r.sid)||!_sdcSafeKey(docId)) return;
+  var inp=$('sdcHoldInput'), txt=_sdcMaskRrn(String((inp&&inp.value)||'내용 확인·보완 필요').trim()).slice(0,120);
+  var prev=Object.assign({},_sdcCellOf(C,r.sid,docId)||{});
+  prev.recv=true; prev.recv_at=prev.recv_at||ymd(); prev.hold=txt||'보완 필요';
+  delete prev.hold_auto; delete prev.ok;
+  _sdcSaveCell(C,r.sid,docId,prev).then(function(){
+    if(SDC===C){
+      _audit(C.fid,'사업장 제출서류 보완지정',r.name+' '+docId+' ('+prev.hold+')');
+      toast('보완필요로 표시했습니다 — 요청메일 체크리스트에 사유가 반영됩니다'); sdcRender();
+    }
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function sdcClearHold(rKey,docId){
+  var C=SDC, r=_sdcRowOf(C,rKey); if(!r||!_sdcSafeKey(r.sid)||!_sdcSafeKey(docId)) return;
+  var prev=Object.assign({},_sdcCellOf(C,r.sid,docId)||{});
+  delete prev.hold; delete prev.hold_auto;
+  _sdcSaveCell(C,r.sid,docId,Object.keys(prev).length?prev:null).then(function(){
+    if(SDC===C){ _audit(C.fid,'사업장 제출서류 보완해제',r.name+' '+docId); sdcRender(); }
+  });
+}
+function sdcOpenDetail(rKey,docId){
+  var C=SDC; if(!C) return;
+  _sdcRevokeBlob();
+  C.detail={rKey:rKey,docId:docId,pvHtml:''};
+  sdcRender();
+}
+function sdcCloseDetail(){
+  var C=SDC; if(!C) return;
+  _sdcRevokeBlob();
+  C.detail=null;
+  sdcRender();
+}
+/* 메일 첨부 바이트 가져오기 (일반 첨부 + ZIP 내부 파일 모두 지원, 스트리밍 상한 보호) */
+function _sdcFetchMailBytes(mailRef){
+  if(!mailRef||!mailRef.slug||!mailRef.uid) return Promise.reject(new Error('연결된 메일 첨부 정보가 없습니다'));
+  return _mfCall('readMailAttachment',{slug:mailRef.slug,uid:String(mailRef.uid),index:Number(mailRef.index)||0,part:String(mailRef.part||'')}).then(function(j){
+    var b64=String(j.b64||'');
+    if(b64.length>22*1024*1024) throw new Error('첨부 용량이 너무 큽니다(15MB 이하만 지원)');
+    var bin=atob(b64), buf=new Uint8Array(bin.length);
+    for(var k=0;k<bin.length;k++) buf[k]=bin.charCodeAt(k);
+    if(!mailRef.zipEntry&&mailRef.zipIdx==null) return {name:_sdcMaskRrn(j.name||mailRef.attName||'첨부'),mime:j.mime||'application/octet-stream',bytes:buf};
+    return _loadJsZip().then(function(JSZip){ return JSZip.loadAsync(buf,{decodeFileName:_mfZipName}); }).then(function(z){
+      var allKeys=Object.keys(z.files).sort();
+      var entryName=(mailRef.zipIdx!=null&&allKeys[mailRef.zipIdx])?allKeys[mailRef.zipIdx]:mailRef.zipEntry;
+      var zf=entryName?z.file(entryName):null;
+      if(!zf) throw new Error('묶음(ZIP) 안에서 파일을 찾지 못했습니다');
+      return _sdcReadZipEntryBounded(zf,15*1024*1024).then(function(ibuf){
+        var bnm=_sdcMaskRrn(String(entryName||'').split('/').pop());
+        var mime=/\.pdf$/i.test(bnm)?'application/pdf':/\.(png|jpe?g|webp|gif|bmp)$/i.test(bnm)?('image/'+bnm.split('.').pop().toLowerCase().replace('jpg','jpeg')):'application/octet-stream';
+        return {name:bnm,mime:mime,bytes:ibuf};
+      });
+    });
+  });
+}
+/* 파일 바이트 → 텍스트 추출 (PDF/XLSX/HWPX/DOCX/CSV + kordoc HWP + 스캔 이미지/스캔 PDF OCR) */
+function _sdcExtractFileText(name,bytes,mime){
+  var ext=(String(name||'').slice(String(name||'').lastIndexOf('.'))||'').toLowerCase();
+  if(/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(ext)){
+    var fImg=new File([bytes],name||'scan.jpg',{type:mime||'image/jpeg'});
+    return imgCanvas(fImg,true).then(function(cv){ return ocrCanvases([cv],function(){}); });
+  }
+  if(ext==='.hwp'&&typeof PuKordocText!=='undefined'&&PuKordocText.read){
+    return PuKordocText.read(bytes).then(function(o){ return (o&&o.text)||''; }).catch(function(){ return ''; });
+  }
+  if(ext==='.pdf'){
+    return _extractArchiveTextForCheck(name,bytes).then(function(r){
+      if(r&&r.status==='ok'&&String(r.text||'').replace(/\s+/g,'').length>=20) return r.text;
+      /* 스캔 이미지 PDF 인 경우 1쪽 렌더링 후 OCR 시도 */
+      var fPdf=new File([bytes],name||'scan.pdf',{type:'application/pdf'});
+      return pdfCanvases(fPdf,2,true).then(function(cvs){ return ocrCanvases(cvs,function(){}); }).catch(function(){ return (r&&r.text)||''; });
+    });
+  }
+  if(/\.(xlsx?|hwpx|docx|csv)$/i.test(ext)){
+    return _extractArchiveTextForCheck(name,bytes).then(function(r){ return (r&&r.text)||''; }).catch(function(){ return ''; });
+  }
+  return Promise.resolve('');
+}
+function sdcPreviewMailAtt(){
+  var C=SDC; if(!C||!C.detail) return;
+  var r=_sdcRowOf(C,C.detail.rKey), cell=r&&_sdcCellOf(C,r.sid,C.detail.docId);
+  if(!r||!cell||!cell.mail) return;
+  var box=$('sdcPvBox'); if(box) box.innerHTML=loadingHTML('메일함에서 첨부 원본을 받아오는 중…');
+  _sdcFetchMailBytes(cell.mail).then(function(got){
+    if(SDC!==C||!C.detail) return;
+    _sdcRenderBytesPreview(C,got.name,got.mime,got.bytes);
+  }).catch(function(e){
+    var b=$('sdcPvBox'); if(b) b.innerHTML='<div class="msg err">'+esc((e&&e.message)||e)+'</div>';
+  });
+}
+function _sdcRenderBytesPreview(C,name,mime,bytes){
+  _sdcRevokeBlob();
+  var safeMime=SDC_PREVIEW_MIMES[mime]?mime:(/\.pdf$/i.test(name)?'application/pdf':/\.(png|jpe?g|webp|gif|bmp)$/i.test(name)?('image/'+name.split('.').pop().toLowerCase().replace('jpg','jpeg')):'');
+  if(safeMime==='application/pdf'){
+    var uPdf=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+    C._blobUrl=uPdf;
+    C.detail.pvHtml='<iframe src="'+esc(uPdf)+'" style="width:100%;height:420px;border:0;border-radius:6px" title="첨부 PDF 미리보기"></iframe>';
+    sdcRender();
+    return;
+  }
+  if(safeMime.indexOf('image/')===0){
+    var uImg=URL.createObjectURL(new Blob([bytes],{type:safeMime}));
+    C._blobUrl=uImg;
+    C.detail.pvHtml='<img src="'+esc(uImg)+'" alt="'+esc(name)+'" style="max-width:100%;max-height:420px;border-radius:6px">';
+    sdcRender();
+    return;
+  }
+  _sdcExtractFileText(name,bytes,mime).then(function(txt){
+    if(SDC!==C||!C.detail) return;
+    var clean=_sdcMaskRrn(txt||'').trim();
+    C.detail.pvHtml=clean?'<div style="text-align:left;font-size:12px;white-space:pre-wrap;max-height:380px;overflow:auto;padding:6px">'+esc(clean.slice(0,3000))+'</div>'
+      :'<div class="muted" style="padding:24px">문서 미리보기를 지원하지 않는 형식입니다 — [⬇ 파일 내려받기]로 열람해 주세요.</div>';
+    sdcRender();
+  });
+}
+function sdcDownloadMailAtt(){
+  var C=SDC; if(!C||!C.detail) return;
+  var r=_sdcRowOf(C,C.detail.rKey), cell=r&&_sdcCellOf(C,r.sid,C.detail.docId);
+  if(!r||!cell||!cell.mail) return;
+  toast('첨부파일을 내려받는 중…');
+  _sdcFetchMailBytes(cell.mail).then(function(got){
+    _dlBlob(new Blob([got.bytes],{type:'application/octet-stream'}),got.name||'첨부파일');
+  }).catch(function(e){ toast('내려받기 실패: '+((e&&e.message)||e),'err'); });
+}
+function sdcLocalFilePicked(inp){
+  var C=SDC; if(!C||!C.detail||!inp||!inp.files||!inp.files[0]) return;
+  var file=inp.files[0];
+  if(file.size>15*1024*1024){ toast('15MB 이하 파일만 판독할 수 있습니다','warn'); return; }
+  var r=_sdcRowOf(C,C.detail.rKey), def=sdcDocDefById(C.detail.docId,C.f.fund_type);
+  if(!r||!def) return;
+  file.arrayBuffer().then(function(ab){
+    if(SDC!==C||!C.detail) return;
+    var bytes=new Uint8Array(ab);
+    C._localFiles[r.sid+'|'+def.id]={name:file.name,mime:file.type||'application/octet-stream',bytes:bytes};
+    _sdcRenderBytesPreview(C,file.name,file.type||'',bytes);
+    return _sdcRunVerifyOne(C,r,def,{name:file.name,mime:file.type||'',bytes:bytes},'local',true);
+  }).then(function(){
+    if(SDC===C) sdcRender();
+  }).catch(function(e){ toast('파일 처리 실패: '+((e&&e.message)||e),'err'); });
+}
+function _sdcRunVerifyOne(C,r,def,loadedFile,via,trustedSender){
+  if(def&&def.sensitive){
+    var sensVr={st:'unk',summary:'민감 신분·인감서류 — 원본 열람 후 수동 확인',items:[{k:'doc_type',label:'서류 구분',read:'신분·인감서류(자동판독 생략)',have:'원본 육안 대조 필수',res:'info'}]};
+    return _sdcSaveCell(C,r.sid,def.id,function(cur){
+      if(cur&&cur.ok&&cur.ok.mode==='manual') return cur;
+      var nx=Object.assign({},cur||_sdcCellOf(C,r.sid,def.id)||{});
+      nx.recv=true; nx.recv_at=nx.recv_at||ymd();
+      if(via==='local') nx.recv_via='manual';
+      nx.review={st:'unk',summary:sensVr.summary,items:sensVr.items,at:ymd(),by:(S.user||'')};
+      if(nx.ok&&nx.ok.mode==='auto') delete nx.ok;
+      return nx;
+    },{preserveManualOk:true}).then(function(){ return sensVr; });
+  }
+  var pBytes=loadedFile?Promise.resolve(loadedFile):_sdcFetchMailBytes((_sdcCellOf(C,r.sid,def.id)||{}).mail);
+  return pBytes.then(function(got){
+    return _sdcExtractFileText(got.name,got.bytes,got.mime).then(function(txt){
+      var vr=sdcVerifyText(def.kind,txt,r.site||{},{refDate:C.refDate||ymd(),today:ymd(),req3m:!!def.req3m,fundName:C.f.name||C.f.short_name||''});
+      var canAuto=!!(C.autoOk&&trustedSender!==false&&!def.sensitive);
+      return _sdcSaveCell(C,r.sid,def.id,function(cur){
+        if(cur&&cur.ok&&cur.ok.mode==='manual') return cur;
+        var prev=Object.assign({},cur||_sdcCellOf(C,r.sid,def.id)||{});
+        prev.recv=true; prev.recv_at=prev.recv_at||ymd();
+        if(via==='local') prev.recv_via='manual';
+        prev.review={st:vr.st,summary:vr.summary,items:(vr.items||[]).map(function(x){
+          return {k:x.k,label:x.label,read:_sdcMaskRrn(x.read||'').slice(0,100),have:_sdcMaskRrn(x.have||'').slice(0,100),res:x.res};
+        }),at:ymd(),by:(S.user||'')};
+        if(vr.st==='match'){
+          delete prev.hold; delete prev.hold_auto;
+          if(canAuto){
+            prev.ok={mode:'auto',at:ymd(),by:(S.user||'')};
+          }else if(prev.ok&&prev.ok.mode==='auto'){
+            delete prev.ok;
+          }
+        }else if(vr.st==='diff'){
+          if(!prev.ok||prev.ok.mode==='auto'){ delete prev.ok; prev.hold=vr.summary; prev.hold_auto=1; }
+        }else{
+          /* unk: 이전 파일의 자동확인·자동보완은 걷어내고 사람 수동확인/수동보완은 유지 */
+          if(prev.ok&&prev.ok.mode==='auto') delete prev.ok;
+          if(prev.hold_auto){ delete prev.hold; delete prev.hold_auto; }
+        }
+        return prev;
+      },{preserveManualOk:true}).then(function(){ return vr; });
+    });
+  });
+}
+function sdcReviewSingle(rKey,docId){
+  var C=SDC, r=_sdcRowOf(C,rKey), def=sdcDocDefById(docId,C&&C.f.fund_type);
+  if(!C||!r||!def) return;
+  var loc=C._localFiles[r.sid+'|'+def.id]||null;
+  var cell=_sdcCellOf(C,r.sid,def.id)||{};
+  var trusted=loc?true:!!(cell.mail&&cell.mail.trusted);
+  toast('서류 내용을 판독·대조하는 중…');
+  _sdcRunVerifyOne(C,r,def,loc,loc?'local':'mail',trusted).then(function(vr){
+    if(SDC!==C) return;
+    sdcRender();
+    toast(r.name+' '+def.short+': '+vr.summary,vr.st==='diff'?'warn':undefined);
+  }).catch(function(e){ toast('내용 검토 실패: '+((e&&e.message)||e),'err'); });
+}
+/* 푸른메일함 수신 메일·첨부(ZIP 내부 포함) 일괄 스캔 → 사업장×서류 자동 입수체크 및 내용검토 */
+function sdcScanMail(){
+  var C=SDC; if(!C||C.scanning) return;
+  C.scanning=true; C.scanMsg=''; C.unmatched=[]; sdcRender();
+  var richSites=(C.rows||[]).map(_sdcSiteWithCands);
+  var K=_mfKeys(C.f,richSites);
+  fbDb.ref('mailbox/folders').once('value').then(function(sn){
+    var v=sn.val()||{};
+    return Object.keys(v).filter(function(k){
+      var o=v[k]||{};
+      return o.kind==='inbox'||/^INBOX/i.test(String(o.path||k))||/근로복지기금|기금/.test(String(o.name||''));
+    });
+  }).then(function(slugs){
+    return Promise.all(slugs.map(function(slug){
+      return fbDb.ref('mailbox/msgs/'+slug).once('value').then(function(sn){
+        var v=sn.val()||{};
+        return Object.keys(v).map(function(uid){ return Object.assign({slug:slug,uid:uid},v[uid]); });
+      }).catch(function(){ return []; });
+    }));
+  }).then(function(lists){
+    if(SDC!==C) return null;
+    var all=[].concat.apply([],lists), seen={};
+    var hits=all.map(function(m){ return {m:m,sc:_mfScore(m,K)}; }).filter(function(x){ return x.sc>0; })
+      .sort(function(a,b){ return (+b.m.d||0)-(+a.m.d||0)||b.sc-a.sc; })
+      .filter(function(x){ var fp=String(x.m.s||'')+'|'+String(x.m.d||'')+'|'+String(x.m.e||''); if(seen[fp]) return false; seen[fp]=1; return true; })
+      .slice(0,20);
+    hits.forEach(function(x){
+      C._mailHdr[x.m.slug+'|'+x.m.uid]={subject:String(x.m.s||'').slice(0,120),from:String(x.m.f||x.m.e||'').slice(0,80)};
+    });
+    return Promise.all(hits.map(function(x){
+      return _mfCall('readMailMessage',{slug:x.m.slug,uid:String(x.m.uid),peek:1})
+        .then(function(j){ return {m:x.m,sc:x.sc,atts:j.atts||[]}; },function(){ return {m:x.m,sc:x.sc,atts:[]}; });
+    }));
+  }).then(function(msgs){
+    if(!msgs||SDC!==C) return null;
+    /* 일반 첨부와 ZIP 첨부를 순차 확장(메모리·압축폭탄 방어: ZIP 최대 5개 · 항목 12MB · 합계 40MB 상한) */
+    var out=[], zipCnt=0, totalUncomp=0, zipChain=Promise.resolve();
+    msgs.forEach(function(g){
+      var d=+g.m.d?new Date(+g.m.d):null;
+      var ds=d?(d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)):ymd();
+      (g.atts||[]).forEach(function(a,idx){
+        var nm=String(a.name||'');
+        if(/\.zip$/i.test(nm)&&Number(a.size||0)<=15*1024*1024&&zipCnt<5){
+          zipCnt++;
+          zipChain=zipChain.then(function(){
+            if(SDC!==C||totalUncomp>40*1024*1024) return;
+            return _mfCall('readMailAttachment',{slug:g.m.slug,uid:String(g.m.uid),index:idx,part:String(a.part||'')}).then(function(j){
+              var b64=String(j.b64||'');
+              if(b64.length>22*1024*1024) return;
+              var bin=atob(b64), buf=new Uint8Array(bin.length);
+              for(var k=0;k<bin.length;k++) buf[k]=bin.charCodeAt(k);
+              return _loadJsZip().then(function(JSZip){ return JSZip.loadAsync(buf,{decodeFileName:_mfZipName}); }).then(function(z){
+                var allSorted=Object.keys(z.files).sort();
+                var names=allSorted.filter(function(n){ return !z.files[n].dir&&!/__MACOSX\//.test(n)&&SDC_FILE_RE.test(n); }).slice(0,40);
+                var innerSeq=Promise.resolve();
+                names.forEach(function(entry){
+                  innerSeq=innerSeq.then(function(){
+                    var zf=z.files[entry], hint=_sdcZipUncompSize(zf);
+                    if(hint>12*1024*1024||(totalUncomp+hint)>40*1024*1024) return;
+                    return _sdcReadZipEntryBounded(zf,12*1024*1024).then(function(ebuf){
+                      if((totalUncomp+ebuf.length)>40*1024*1024) return;
+                      totalUncomp+=ebuf.length;
+                      out.push({m:g.m,ds:ds,index:idx,part:String(a.part||''),attName:entry.split('/').pop(),zipEntry:_sdcMaskRrn(entry),zipRaw:entry,zipIdx:allSorted.indexOf(entry),bytes:ebuf,sc:g.sc});
+                    }).catch(function(){});
+                  });
+                });
+                return innerSeq;
+              });
+            }).catch(function(){});
+          });
+        }else if(SDC_FILE_RE.test(nm)){
+          out.push({m:g.m,ds:ds,index:idx,part:String(a.part||''),attName:nm,zipEntry:'',zipRaw:'',zipIdx:null,bytes:null,sc:g.sc});
+        }
+      });
+    });
+    return zipChain.then(function(){ return out; });
+  }).then(function(cands){
+    if(!cands||SDC!==C) return;
+    var sites=(C.rows||[]).map(_sdcSiteWithCands);
+    var matched=[], unmatched=[], seenCell={};
+    cands.forEach(function(it){
+      var kind=sdcClassifyKind(it.attName,it.m.s||'');
+      var docId=sdcMapKindToDocId(kind,C.phase,C.f.fund_type);
+      var sid=sdcGuessSite((it.zipRaw||it.attName),it.m.s||'',it.m.e||'',it.m.f||'',sites,it.sc>0);
+      var rRow=sid?_sdcRowOf(C,sid):null;
+      var isTrusted=rRow?_sdcIsTrustedSender(rRow,String(it.m.e||'')):false;
+      /* 최소 수집 및 개인정보 가림: RTDB 저장용 mailRef 에는 발신자명·제목을 넣지 않고 파일명 주민번호를 가린다 */
+      var safeAtt=_sdcMaskRrn(it.attName);
+      var mailRef={slug:it.m.slug,uid:String(it.m.uid),index:it.index,part:it.part,zipEntry:it.zipEntry||'',attName:safeAtt,date:it.ds,trusted:!!isTrusted};
+      if(it.zipIdx!=null&&it.zipIdx>=0) mailRef.zipIdx=it.zipIdx;
+      if(sid&&docId){
+        var ck=sid+'|'+docId;
+        if(seenCell[ck]){ it.bytes=null; return; }
+        seenCell[ck]=1;
+        matched.push({sid:sid,docId:docId,mailRef:mailRef,trusted:isTrusted,bytes:it.bytes});
+      }else{
+        it.bytes=null;
+        unmatched.push({sid:sid,docId:docId,date:it.ds,from:String(it.m.f||it.m.e||''),subject:String(it.m.s||''),attName:safeAtt,zipEntry:it.zipEntry||'',mailRef:mailRef});
+      }
+    });
+    C.unmatched=unmatched.slice(0,25);
+    var newRecv=0, autoVerified=0;
+    var seq=Promise.resolve();
+    matched.forEach(function(x){
+      seq=seq.then(function(){
+        if(SDC!==C){ x.bytes=null; return; }
+        var prev=_sdcCellOf(C,x.sid,x.docId)||{};
+        /* 이미 확인완료(수동·자동)된 칸은 재스캔으로 덮어쓰지 않는다 */
+        if(prev.ok){ x.bytes=null; return; }
+        var sameSrc=!!(prev.mail&&prev.mail.slug===x.mailRef.slug&&String(prev.mail.uid)===String(x.mailRef.uid)&&prev.mail.attName===x.mailRef.attName&&String(prev.mail.zipEntry||'')===String(x.mailRef.zipEntry||''));
+        var wasRecv=!!prev.recv;
+        if(!wasRecv||!sameSrc) newRecv++;
+        return _sdcSaveCell(C,x.sid,x.docId,function(cur){
+          if(cur&&cur.ok) return cur;
+          var nx=Object.assign({},cur||prev);
+          nx.recv=true; nx.recv_at=x.mailRef.date||ymd(); nx.recv_via='mail'; nx.mail=x.mailRef;
+          return nx;
+        },{preserveManualOk:true}).then(function(){
+          var latest=_sdcCellOf(C,x.sid,x.docId)||{};
+          if(latest.ok||(sameSrc&&latest.review)){ x.bytes=null; return; }
+          var r=_sdcRowOf(C,x.sid), def=sdcDocDefById(x.docId,C.f.fund_type);
+          if(!r||!def){ x.bytes=null; return; }
+          var loaded=x.bytes?{name:x.mailRef.attName,mime:'',bytes:x.bytes}:null;
+          x.bytes=null;
+          return _sdcRunVerifyOne(C,r,def,loaded,'mail',x.trusted).then(function(vr){
+            if(vr&&vr.st==='match'&&C.autoOk&&x.trusted&&!def.sensitive) autoVerified++;
+          }).catch(function(){});
+        });
+      });
+    });
+    return seq.then(function(){
+      if(SDC!==C) return;
+      C.scanning=false;
+      C.scanMsg='메일함 스캔 완료: 신규 입수 '+newRecv+'건'+(autoVerified?' · 자동 내용확인 '+autoVerified+'건':'')+(C.unmatched.length?' · 미지정 첨부 '+C.unmatched.length+'건':'');
+      if(newRecv||autoVerified) _audit(C.fid,'메일 수신서류 자동체크','신규 입수 '+newRecv+'건 · 자동확인 '+autoVerified+'건');
+      sdcRender();
+    });
+  }).catch(function(e){
+    if(SDC===C){ C.scanning=false; toast('메일함 스캔 실패: '+((e&&e.message)||e),'err'); sdcRender(); }
+  });
+}
+function sdcAssignUnmatched(idx){
+  var C=SDC; if(!C||!C.unmatched||!C.unmatched[idx]) return;
+  var u=C.unmatched[idx];
+  var sEl=$('sdc-us-'+idx), dEl=$('sdc-ud-'+idx);
+  var rKey=sEl?sEl.value:'', docId=dEl?dEl.value:'';
+  var r=_sdcRowOf(C,rKey), def=sdcDocDefById(docId,C.f.fund_type);
+  if(!r||!def){ toast('적용할 사업장과 서류 종류를 모두 선택해 주세요','warn'); return; }
+  var assignedMail=Object.assign({},u.mailRef,{trusted:true});
+  C.unmatched.splice(idx,1);
+  _sdcSaveCell(C,r.sid,def.id,function(cur){
+    if(cur&&cur.ok&&cur.ok.mode==='manual') return cur;
+    var nx=Object.assign({},cur||_sdcCellOf(C,r.sid,def.id)||{});
+    nx.recv=true; nx.recv_at=u.date||ymd(); nx.recv_via='mail'; nx.mail=assignedMail;
+    return nx;
+  },{preserveManualOk:true}).then(function(){
+    /* 사람이 직접 사업장·서류를 지정한 것이므로 trusted=true 로 판독·검토 실행 */
+    return _sdcRunVerifyOne(C,r,def,null,'mail',true).catch(function(){});
+  }).then(function(){
+    if(SDC!==C) return;
+    if(def.phase&&def.phase!==C.phase) C.phase=def.phase;
+    C.docs=sdcDocsFor(C.phase,C.f.fund_type);
+    _audit(C.fid,'미지정 수신첨부 반영',r.name+' '+def.id);
+    toast(r.name+' — '+def.short+' 입수 및 내용검토를 반영했습니다');
+    sdcRender();
+  }).catch(function(e){ toast('반영 실패: '+((e&&e.message)||e),'err'); });
+}
+function sdcReviewAll(){
+  var C=SDC; if(!C||C.reviewing||!C.rows) return;
+  var queue=[];
+  C.rows.forEach(function(r){
+    C.docs.forEach(function(d){
+      var cell=_sdcCellOf(C,r.sid,d.id);
+      if(!cell||(!cell.mail&&!C._localFiles[r.sid+'|'+d.id])) return;
+      if(cell.ok&&cell.ok.mode==='manual') return;
+      queue.push({r:r,def:d,cell:cell});
+    });
+  });
+  if(!queue.length){ toast('내용 검토할 메일·파일 첨부 입수 건이 없습니다 — 먼저 [🔄 메일함 수신서류 자동체크·검토]를 실행하세요','warn'); return; }
+  C.reviewing=true; sdcRender();
+  var okN=0, diffN=0, seq=Promise.resolve();
+  queue.forEach(function(q){
+    seq=seq.then(function(){
+      if(SDC!==C) return;
+      var loc=C._localFiles[q.r.sid+'|'+q.def.id]||null;
+      var trusted=loc?true:!!(q.cell.mail&&q.cell.mail.trusted);
+      return _sdcRunVerifyOne(C,q.r,q.def,loc,loc?'local':'mail',trusted).then(function(vr){
+        if(vr&&vr.st==='match') okN++; else if(vr&&vr.st==='diff') diffN++;
+      }).catch(function(){});
+    });
+  });
+  seq.then(function(){
+    if(SDC!==C) return;
+    C.reviewing=false;
+    C.scanMsg='일괄 내용검토 완료 ('+queue.length+'건): 일치 '+okN+'건'+(diffN?' · 불일치/보완 '+diffN+'건':'');
+    sdcRender();
+  });
+}
+function sdcConfirmMatched(){
+  var C=SDC; if(!C||!C.rows) return;
+  var jobs=[], n=0;
+  C.rows.forEach(function(r){
+    C.docs.forEach(function(d){
+      if(d.sensitive) return;
+      var cell=_sdcCellOf(C,r.sid,d.id);
+      if(!cell||cell.ok||!(cell.review&&cell.review.st==='match')) return;
+      /* 담당자가 직접 지정한 보완필요(hold && !hold_auto) 칸은 일괄 확인에서 제외한다 */
+      if(cell.hold&&!cell.hold_auto) return;
+      n++;
+      jobs.push(_sdcSaveCell(C,r.sid,d.id,function(cur){
+        if(!cur||cur.ok||(cur.hold&&!cur.hold_auto)) return cur;
+        var nx=Object.assign({},cur,{ok:{mode:'auto',at:ymd(),by:(S.user||'')}});
+        delete nx.hold; delete nx.hold_auto;
+        return nx;
+      },{preserveManualOk:true}));
+    });
+  });
+  if(!n){ toast('새로 확인 처리할 «일치» 대기 항목이 없습니다','warn'); return; }
+  Promise.all(jobs).then(function(){
+    if(SDC!==C) return;
+    _audit(C.fid,'사업장 제출서류 일괄확인','검토 일치 '+n+'건 확인완료');
+    toast(n+'건을 확인완료로 체크했습니다');
+    sdcRender();
+  });
+}
 function sitesTab(){
   if(S.sitesFor!==S.fundId){
     var _fid=S.fundId; S.sitesFor=_fid; S.sites=null;
@@ -16660,6 +17916,7 @@ function sitesTab(){
       :(있음?'<span class="stat" style="color:var(--faint)" title="명부에서 상호 앞의 ☆ 를 눌러 지정하면 서식의 「대표회사·사무국」이 채워집니다">대표사업장 미지정</span>':''))
     +sub
     +'<span style="flex:1"></span>'
+    +(있음?'<button onclick="openSiteDocCenter()" title="참여·설립사업장별 필요서류를 체크리스트 메일로 요청하고, 메일함 수신 서류를 자동 체크·내용검토합니다">📋 제출서류 요청·검토</button>':'')
     +'<button class="primary" onclick="editSite(\'\')">+ 사업장 추가</button>'
     +siteToolsMenu()+'</div>';
   var 고르는줄=(!있음||isYr)?''
@@ -19373,6 +20630,7 @@ function subsidyDocsPanel(f){
 
     +'<div class="panel"><div class="row"><h2 style="font-size:15px">🏢 참여사별 제출서류</h2>'
     +'<span class="muted" style="font-size:11px">중소기업확인서·등기부등본·사업자등록증은 참여사마다 각 1부</span><span style="flex:1"></span>'
+    +'<button onclick="openSiteDocCenter(S.fundId,\'subsidy\')" style="padding:3px 9px;font-size:12px" title="참여사업장에 지원금 필요서류 체크리스트 메일을 보내고 푸른메일함 수신 서류를 자동 체크·검토합니다">✉ 체크리스트 요청·자동수신</button>'
     +'<span class="stat'+(totalDone===totalNeed&&totalNeed?' ok':'')+'">'+totalDone+'/'+totalNeed+'장</span></div>'
     +(act.length
       ? '<div class="row" style="margin:8px 0;gap:6px;flex-wrap:wrap">'
@@ -28807,6 +30065,10 @@ var HELP={
    +'<p>다만 준비처가 기금법인이어도 <b>도장 제작·위원 날인·등록면허세 납부·인감카드 준비</b>처럼 기업 협조가 꼭 필요한 줄(«협조» 표시)은 기본으로 넣고, 메일에서는 «도장·날인·납부 등 협조해 주실 사항» 단락으로 따로 적습니다.</p>'
    +'<p>받는 사람과 기업 정보(상호·대표자·사업자등록번호·소재지)는 <b>기업정보함</b>에서 가져옵니다 — 참여사업장 담당자 · 같은 회사 명함 · 회사 메일 가운데 고릅니다. 기업정보함에 사업자등록증이 이미 있는 회사에는 «사업자등록증 사본»을 달라고 하지 않습니다.</p>'
    +'<p>문안은 초안입니다 — 메일함 쓰기 창에서 읽고 고쳐 보내세요. 메일을 보낸 뒤 [✔ 보냈음]을 누르면 날짜와 누른 사람만 기록합니다(받는 주소는 남기지 않습니다).</p>'},
+ 'site.doccenter':{t:'사업장 제출서류 체크리스트 요청 · 메일 자동수신 · 내용검토',h:'<p><b>공동기금(참여사업장별)</b>과 <b>사내기금(설립·설치사업장)</b> 모두에서 단계별(①설립·등기 ②지원금 신청 ③결산·운영상황보고 ④추가출연·변경·탈퇴) 기업 제출서류를 한 화면에서 요청·수신·검토합니다.</p>'
+   +'<p><b>① 간결한 체크리스트 메일 요청</b> — 이미 확인완료된 서류와 기업정보함 보유 사업자등록증은 기본 제외하고, 미제출 서류와 <b>보완필요 사유</b>만 <code>[ ] 1. 서류명</code> 형태로 정리해 푸른메일함 쓰기 창에 채워 엽니다(발송은 메일함에서 직접 클릭).</p>'
+   +'<p><b>② 메일함 수신서류 자동 체크</b> — [🔄 메일함 수신서류 자동체크·검토]를 누르면 푸른메일함(받은메일함·기금 폴더)의 첨부파일과 압축파일(ZIP) 내부 문서를 스캔해 사업장·서류 종류별로 매칭하고 <b>입수됨(📩)</b>으로 자동 체크합니다.</p>'
+   +'<p><b>③ 내용 판독·대조 및 자동/수동 확인</b> — 사업자등록증(사업자번호·상호·대표자·소재지), 중소기업확인서(기업규모·유효기간 만료 여부), 법인등기부등본(상호·3개월 이내 발급 여부), 재직증명서·재무제표·고용보험명부·출연확인서 등 본문을 판독해 이상이 없으면 <b>자동확인(✅)</b>으로 체크하고, 불일치·유효기간 경과 시 <b>보완필요(⚠)</b>로 표시합니다. 칸의 체크박스(☑)나 상세 열람 창에서 언제든 <b>담당자 수동 확인</b>으로도 전환할 수 있습니다(신분·인감 등 민감 서류는 늘 원본 대조 후 수동 확인).</p>'},
  'setup.gaps':{t:'빈 자료',h:'<p>설립 서식이 읽는 자료 가운데 아직 안 적은 것입니다. <b>여기를 채우면 서식 빈칸이 따라 채워집니다.</b></p>'
    +'<p>🧮 추정은 비어 있지는 않지만 사람수 × 단가로 계산한 출연금이라 실제 약정액과 맞는지 봐야 합니다.</p>'},
  'home.trash':{t:'삭제 보관함',h:'<p>목록·집계에서 빠졌지만 <b>데이터는 그대로 있습니다</b> — 참여사업장·서식·연간일정까지 모두 보존됩니다.</p>'
