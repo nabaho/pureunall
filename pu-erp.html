@@ -190,7 +190,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=51"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <script>
@@ -98058,6 +98058,8 @@ document.addEventListener('keydown', function(e){
   }
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
+  /* 카카오로 들어왔으면 3시간 — 판정은 공용 부품 한 곳(js/pu-active.js PuActive.limitMs) (대표 지시 2026-11-18) */
+  function idleLimit(){ try{ if(window.PuActive && PuActive.limitMs) return PuActive.limitMs(LIMIT); }catch(e){} return LIMIT; }
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
   function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   var WARN  = 2*60*1000;      // 종료 2분 전 경고
@@ -98162,7 +98164,7 @@ document.addEventListener('keydown', function(e){
     if(!loggedIn()){ if(badge) badge.style.display='none'; hideWarn(); return; }
     if(shouldPauseIdle()) return;
     ensureBadge();
-    var rem = LIMIT - (now()-getLast());
+    var rem = idleLimit() - (now()-getLast());
     if(badge){
       /* 글자가 바뀌었을 때만 적는다 — 같은 글자를 매초 다시 적으면 그것도 다시 그림이다 */
       var txt=(window.IS_MOBILE?'⏱':'⏱ ')+fmt(rem);
