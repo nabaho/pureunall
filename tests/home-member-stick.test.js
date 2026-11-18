@@ -133,7 +133,8 @@ test('★★ 붙는 것은 «구르는 칸 안»이다 — 경고 띠 자리로 
   /* .ehd 는 퇴사·남김 경고 띠 자리다. 여기에 입력칸까지 넣으면
      폰에서 머리가 화면 절반을 먹는다. */
   const 머리 = s.indexOf('class="ehd"');
-  const 구르는칸 = s.indexOf('class="esc"');
+  /* (2026-11-18) 구르는 칸에 두 칸 이름표(mem2)가 더 붙을 수 있다 — «esc» 가 있는지만 본다 */
+  const 구르는칸 = s.search(/class="esc[ "]/);
   const 붙임 = s.indexOf('class="stick');
   assert.ok(머리 >= 0 && 구르는칸 > 머리, '★ 편집칸 뼈대(.ehd → .esc)가 바뀌었다');
   assert.ok(붙임 > 구르는칸,
@@ -233,4 +234,33 @@ test('★★ 좁은 자리에서 네 칸이 «접힌다» — 안 접히면 이�
   }
   assert.ok(찾음,
     '★★ 좁은 자리에서 .two 가 접히지 않는다 — 네 칸을 한 줄에 두었으니 반드시 접혀야 한다');
+});
+
+/* ══════ 넓은 화면 두 칸 (대표 지시 2026-11-18 「상단을 깔끔하게 세로로 정리하고 경력을 한 줄로 길게
+   세로로 전체 화면에 내려오게」 → 목업 → 「추천대로 구성원도 모두」) ══════
+   왼쪽 = 붙은칸(기본 정보) 세로, 오른쪽 = 경력 머리줄 + 목록. 넓은 화면에서만 — 좁은 화면·폰은 위아래 그대로. */
+test('★★ 넓은 화면에서만 «왼쪽 기본 정보 · 오른쪽 경력» 두 칸이 된다 — 좁으면 지금 그대로', () => {
+  const s = 함수('memberEdit');
+  assert.match(s, /class="esc mem2"/, '★ 구르는 칸에 두 칸 이름표가 없다');
+  assert.match(s, /class="m-car">/, '★ 경력 덩이(오른쪽)가 없다');
+  assert.ok(s.indexOf('class="m-car">') > s.indexOf('class="stick'), '★ 경력 덩이가 붙은칸보다 앞에 있다');
+  assert.ok(s.indexOf('m-car') < s.indexOf('careerBox'), '★ 경력 목록이 오른쪽 덩이 밖에 있다');
+  /* 경력 머리줄은 좁은 화면(붙은칸 안)·넓은 화면(오른쪽 위) 두 곳 — 번호표는 하나 */
+  assert.match(s, /m-carhd-in/, '★ 좁은 화면의 경력 머리줄이 없다');
+  assert.match(s, /m-carhd-out/, '★ 넓은 화면 오른쪽 위 경력 머리줄이 없다');
+  const css = RAW;
+  assert.match(css, /\.m-carhd-out\{display:none\}/, '★★ 좁은 화면에서 경력 머리줄이 두 번 보인다');
+  const 넓음 = /@media \(min-width:(\d+)px\)\{\s*\.esc\.mem2\{([^}]*)\}([\s\S]*?)\n\}/.exec(css);
+  assert.ok(넓음, '★★ 넓은 화면 두 칸 꾸밈이 없다');
+  assert.ok(Number(넓음[1]) >= 1200, '★★ 두 칸이 너무 좁은 화면에서도 켜진다 — 경력 줄이 잘린다');
+  assert.match(넓음[2], /display:grid/, '★ 두 칸이 격자가 아니다');
+  assert.match(넓음[3], /\.m-carhd-in\{display:none\}/, '★ 넓은 화면에서 경력 머리줄이 두 번 보인다');
+  assert.match(넓음[3], /\.m-carhd-out\{display:block;position:sticky/, '★★ 넓은 화면에서 경력 머리줄이 안 붙는다');
+  assert.match(넓음[3], /\.two\{flex-direction:column/, '★ 이름·직책이 세로로 안 선다');
+});
+
+test('★ 전현 셈은 경력 머리줄 «두 곳 다» 고친다', () => {
+  const s = 함수('careerEra');
+  assert.match(s, /getElementById\('eraInfo'\)/, '★ 좁은 화면 셈을 안 고친다');
+  assert.match(s, /\.eraInfo/, '★★ 넓은 화면 셈이 낡은 채 남는다');
 });
