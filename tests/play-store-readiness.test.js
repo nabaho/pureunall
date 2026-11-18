@@ -85,7 +85,7 @@ test('Play 심사관 전용 계정(playreviewer@pureun.kr)은 사내 실데이�
   const loopMatch = /APPS\.forEach\(function\(app\)\{[\s\S]*?\n    \}\);/.exec(enter);
   assert.ok(appsMatch && loopMatch, 'APPS 정의와 타일 렌더링 루프를 찾을 수 있어야 합니다');
 
-  function renderTilesForRole(role, mobile) {
+  function renderTilesForRole(role, mobile, extraApps) {
     const tiles = [];
     const headShown = [];
     const ctx = {
@@ -118,19 +118,23 @@ test('Play 심사관 전용 계정(playreviewer@pureun.kr)은 사내 실데이�
       tileCont: () => ({ appendChild: (el) => tiles.push(el) }),
     };
     vm.createContext(ctx);
+    const inject = Array.isArray(extraApps) && extraApps.length
+      ? 'APPS = APPS.concat(' + JSON.stringify(extraApps) + ');\n'
+      : '';
     vm.runInContext(
-      appsMatch[0] + '\n' + 함수몸(enter, 'appIsSoon') + '\n' + loopMatch[0],
+      appsMatch[0] + '\n' + inject + 함수몸(enter, 'appIsSoon') + '\n' + loopMatch[0],
       ctx
     );
     return { tiles, headShown };
   }
 
-  const reviewerMobile = renderTilesForRole('reviewer', true);
+  const soonProbe = [{ key: '_soon_probe', name: '출시전앱', desc: '', icon: '🧪', url: 'probe.html', roles: null, soon: true, row: 'client' }];
+  const reviewerMobile = renderTilesForRole('reviewer', true, soonProbe);
   const reviewerKeys = reviewerMobile.tiles.map((t) => t.dataset.key).sort();
   assert.deepEqual(
     reviewerKeys,
     ['aliounion', 'hangul'],
-    '심사관 계정에는 로컬·공공데이터 실작동 프로그램(한글 편집기·공공임단협)만 노출되어야 합니다'
+    '심사관 계정에는 로컬·공공데이터 실작동 프로그램(한글 편집기·공공임단협)만 노출되고 준비중 앱은 숨겨져야 합니다'
   );
   assert.equal(reviewerMobile.headShown.length, 0, '심사관 계정에는 사내 캘린더 머리줄 단추를 켜지 않습니다');
   for (const tile of reviewerMobile.tiles) {
@@ -138,11 +142,15 @@ test('Play 심사관 전용 계정(playreviewer@pureun.kr)은 사내 실데이�
     assert.doesNotMatch(tile.innerHTML, /준비중|PC 전용/, '심사관 화면에 준비중·PC 전용 딱지가 없어야 합니다');
   }
 
-  // 일반 직원과 관리자 화면은 기존대로 유지되는지 함께 확인
-  const memberMobile = renderTilesForRole('member', true);
+  // 일반 직원과 관리자 화면은 기존대로 유지되는지 함께 확인 (급여아웃소싱 등 공개 앱은 즉시 실행, 준비중 지정 앱이 있을 때는 준비중 표시 유지)
+  const memberMobile = renderTilesForRole('member', true, soonProbe);
   assert.ok(
     memberMobile.tiles.some((t) => t.dataset.key === 'erp'),
     '일반 직원 화면에는 기존 푸른이알피 등 사내 타일이 그대로 나와야 합니다'
+  );
+  assert.ok(
+    memberMobile.tiles.some((t) => t.dataset.key === 'payroll' && t.href !== '#' && !t.dataset.soonApp),
+    '일반 직원 화면에서 급여아웃소싱은 준비중 없이 즉시 실행 가능해야 합니다'
   );
   assert.ok(
     memberMobile.tiles.some((t) => t.dataset.soonApp === '1'),
