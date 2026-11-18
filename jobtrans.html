@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>푸른노무법인 산업일자리전환 자동화</title>
+<!-- ⚠ pu-version.js 는 싣지 않는다 — 보고서 원고·인터뷰·모달 작성 중 30초 유휴 자동 새로고침이 돌면 미저장 초안이 증발한다 (ilteo·viewer 와 동일) -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <!-- ══════════════════════════════════════════════════════════════════════
      푸른노무법인 산업·일자리전환 컨설팅 자동화 (jobtrans.html) — 2026-11-15
@@ -41,7 +42,8 @@
   }
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
+html,body{width:100%;max-width:none;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
 button:hover{border-color:var(--mute)}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
@@ -55,14 +57,14 @@ input,select,textarea{font:inherit;font-size:16px;padding:5px 8px;border:1px sol
 textarea{width:100%;resize:vertical;font-family:inherit;line-height:1.55;word-break:keep-all;overflow-wrap:break-word}
 a{color:var(--blue-d);text-decoration:none}
 a.act-link{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--blue-line);border-radius:7px;background:var(--blue-bg);color:var(--blue-d);font-size:12px;font-weight:600;white-space:nowrap}
-#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
-.top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
+#head{position:sticky;top:0;z-index:20;width:100%;max-width:none;background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:8px 12px;width:100%;max-width:none;flex-wrap:wrap}
 .top h1{font-size:17px;margin:0}
 .top .sub{font-size:12px;color:var(--mute)}
 .sp{flex:1}
 #who{font-size:13px;color:var(--mute)}
 #who b{color:var(--ink)!important}
-.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap;align-items:center}
+.tabs{display:flex;gap:4px;padding:0 12px;width:100%;max-width:none;flex-wrap:wrap;align-items:center}
 .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
 .tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
 .chip{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--ink2)}
@@ -70,37 +72,39 @@ a.act-link{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border
 .c-green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
 .c-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
 .c-red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
-main{padding:12px 20px 56px;width:100%;max-width:none;margin:0}
+main{display:block;padding:10px 26px 56px 12px;width:100%;max-width:none;margin:0}
+.pane,.card,.agency-scope-bar,.kpis,#projectsBox,#intakeBox,#midBox,#finalBox,#formsBox,.agency-split-grid,.agency-col-card,.report-workbench,.form-compare-grid,.scroll{width:100%;max-width:none}
 .pane{display:none}
 .pane.on{display:block}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
 .bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 12px}
 .sec{padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .card>.sec:first-child{border-top:0;border-radius:10px 10px 0 0}
 .note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px}
 .warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
 .ok-banner{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
-.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
-.agency-scope-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px;margin-bottom:12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.agency-scope-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;background:var(--card);border:1px solid var(--line);border-radius:10px}
 .agency-scope-lbl{font-weight:700;font-size:12.5px;color:var(--ink2);white-space:nowrap}
-.agency-scope-btn{padding:6px 12px;min-height:34px;border-radius:8px;font-weight:600;font-size:12.5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
+.agency-scope-btn{padding:6px 11px;min-height:34px;border-radius:8px;font-weight:600;font-size:12.5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
 .agency-scope-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
 .agency-scope-btn.cepa.on{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff}
-.agency-split-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
-@media (min-width:1440px){.agency-split-grid.dual{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.agency-col-card{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;margin-bottom:12px}
+.agency-split-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+@media (min-width:1820px){.agency-split-grid.dual{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.agency-col-card{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;margin-bottom:10px}
 .agency-col-card.kmac{border-top:3px solid var(--pri-bg)}
 .agency-col-card.cepa{border-top:3px solid var(--ok-bg)}
-.agency-col-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--blue-bg);color:var(--blue-d);font-weight:700;font-size:13.5px}
+.agency-col-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--blue-bg);color:var(--blue-d);font-weight:700;font-size:13.5px}
 .agency-col-card.cepa .agency-col-hd{background:var(--green-bg);color:var(--green)}
-.agency-col-sub{padding:8px 14px;font-size:12px;color:var(--ink2);border-bottom:1px solid var(--line);background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.report-workbench{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
-@media (min-width:1260px){
-  .report-workbench{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr)}
-  .report-side-sticky{position:sticky;top:96px;max-height:calc(100vh - 112px);overflow:auto}
+.agency-col-sub{padding:7px 12px;font-size:12px;color:var(--ink2);border-bottom:1px solid var(--line);background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.report-workbench{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+@media (min-width:1560px){
+  .report-workbench{grid-template-columns:minmax(0,1.18fr) minmax(0,0.82fr)}
+  .report-side-sticky{position:sticky;top:92px;max-height:calc(100vh - 108px);overflow:auto}
+  .report-side-sticky table.t td.ti{max-width:170px}
 }
-.form-compare-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-bottom:12px}
-@media (min-width:1180px){.form-compare-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.form-compare-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;margin-bottom:10px}
+@media (min-width:1480px){.form-compare-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .form-step-list{margin:0;padding:10px 14px 10px 28px;font-size:12.5px;line-height:1.65;color:var(--ink)}
 .form-step-list li{margin-bottom:3px}
 .kpi{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;flex-direction:column;gap:3px;min-width:0}
@@ -127,16 +131,27 @@ main{padding:12px 20px 56px;width:100%;max-width:none;margin:0}
 .bulk{display:none;gap:6px;align-items:center;padding:6px 12px;background:var(--blue-bg);border-bottom:1px solid var(--blue-line);font-size:12.5px;flex-wrap:wrap}
 .bulk.on{display:flex}
 .scroll{overflow:auto}
-table.t{width:100%;border-collapse:collapse}
+table.t{width:100%;max-width:none;border-collapse:collapse}
 table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
 table.t td{overflow:hidden;text-overflow:ellipsis;max-width:480px}
-table.t td.ti{font-weight:600;max-width:360px}
-table.t td.wide{max-width:680px}
-table.t th.c,table.t td.c{width:40px;text-align:center}
+table.t td.ti{font-weight:600;max-width:340px}
+table.t td.wide{max-width:760px}
+table.t th.c,table.t td.c{width:38px;text-align:center}
 input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
-table.t th.n,table.t td.n{width:42px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+table.t th.n,table.t td.n{width:38px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+@media (min-width:769px){
+  table.t td.wide{width:100%;max-width:0}
+  table.t td[data-k="act"]{width:1%;white-space:nowrap;max-width:none}
+  table.t td[data-k="act"] button.sm{margin-left:3px}
+  table.t td[data-k="act"] button.sm:first-child{margin-left:0}
+}
+@media (min-width:1820px){
+  .agency-split-grid.dual table.t th,.agency-split-grid.dual table.t td{padding:7px 6px}
+  .agency-split-grid.dual table.t td.ti{max-width:205px}
+  .agency-split-grid.dual table.t button.sm{padding:4px 7px;min-height:32px}
+}
 table.t tr[data-row]{cursor:pointer}
 table.t tr[data-row]:hover>td{background:var(--bg)}
 table.t tr.cur>td{background:var(--blue-bg)}
@@ -306,9 +321,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <div class="kpis" id="kpiBox"></div>
     <div class="card">
       <div class="bar">
-        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·계약번호·전환목표·업종 찾기" style="flex:1;min-width:180px;max-width:360px">
+        <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·계약번호·전환목표·업종 찾기" style="flex:1;min-width:220px">
         <select id="projAgency" aria-label="운영기관 필터">
-          <option value="">운영기관 좌우 분리 (전체)</option>
+          <option value="">⚖️ 운영기관 좌우 분리 (전체)</option>
+          <option value="stack">▤ 운영기관 전체폭 상하 분리 (전체)</option>
           <option value="kmac">🔵 한국능률협회컨설팅 (KMAC) 전용</option>
           <option value="cepa">🟢 충남경제진흥원 (CEPA) 전용</option>
         </select>
@@ -411,7 +427,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/pu-jobtrans-intake.js?v=3"></script>
 <script src="js/pu-jobtrans-report.js?v=2"></script>
 <script src="js/pu-jobtrans-hwpx.js?v=1"></script>
-<script src="js/pu-jobtrans-view.js?v=3"></script>
+<script src="js/pu-jobtrans-view.js?v=4"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){

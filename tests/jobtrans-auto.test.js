@@ -595,18 +595,18 @@ test('10. 컨설팅업체 폴더 산업일자리 전용 선별 · 메일함 타�
     { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2025 구조혁신 지원사업/2025 구조혁신컨설팅/1. (주)가상모듈테크/인식수준_설문조사.xlsx' },
     { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2025 구조혁신 지원사업/2025 경제진흥원 구조혁신/1. 가상충남플렌트(당진)/진단보고서.hwpx' },
     { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2025 구조혁신 지원사업/2025 경제진흥원 구조혁신/2. 가상충남플랜트(태안)/완료계.pdf' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환(능률협회)/2026 (주)가상농산(산업일자리전환)_101-81-00099/기초진단표.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환(능률협회)/2. 주식회사 가상농산_1018100099/최종보고서.hwpx' }
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환(능률협회)/2026 (주)가상농산(산업일자리전환)_123-81-20026/기초진단표.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환(능률협회)/2. 주식회사 가상농산_1238120026/최종보고서.hwpx' }
   ];
 
   const grouped = Intake.groupJobtransFolderEntries(mockFolderFiles, {
     rootDirName: '컨설팅업체',
     companies: [
-      { id: 'co-mod-1', name: '주식회사 가상모듈테크', bizNo: '101-81-00011' },
-      { id: 'co-agr-1', name: '주식회사 가상농산', bizNo: '101-81-00099' }
+      { id: 'co-mod-1', name: '주식회사 가상모듈테크', bizNo: '123-81-20012' },
+      { id: 'co-agr-1', name: '주식회사 가상농산', bizNo: '123-81-20026' }
     ],
     projects: [
-      { id: 'jt-cepa-other', companyId: 'co-other-plant', companyName: '(주)가상전환정밀', bizNo: '202-81-00077', agency: 'cepa', year: 2024 }
+      { id: 'jt-cepa-other', companyId: 'co-other-plant', companyName: '(주)가상전환정밀', bizNo: '123-81-20031', agency: 'cepa', year: 2024 }
     ],
     discoverCandidates: []
   });
@@ -638,11 +638,11 @@ test('10. 컨설팅업체 폴더 산업일자리 전용 선별 · 메일함 타�
 
   /* 검증된 10자리 사업자번호(하이픈형·연속형)가 일치하고 연도·기관이 같을 때만 기존 companyId로 병합·자동 귀속 */
   const agrGrp = grouped.groups.find(g => g.companyId === 'co-agr-1');
-  assert.ok(agrGrp && agrGrp.fileCount === 2, '동일 10자리 사업자번호(101-81-00099 / 1018100099)가 확인된 두 폴더는 co-agr-1로 병합되어야 한다');
+  assert.ok(agrGrp && agrGrp.fileCount === 2, '동일 10자리 사업자번호(123-81-20026 / 1238120026)가 확인된 두 폴더는 co-agr-1로 병합되어야 한다');
   assert.equal(agrGrp.year, 2026);
-  assert.equal(agrGrp.bizNo, '101-81-00099');
-  assert.equal(Intake.cleanWorkplaceSegmentName('2026 (주)가상농산(산업일자리전환)_101-81-00099'), '(주)가상농산');
-  assert.equal(Intake.cleanWorkplaceSegmentName('2. 주식회사 가상농산_1018100099'), '주식회사 가상농산');
+  assert.equal(agrGrp.bizNo, '123-81-20026');
+  assert.equal(Intake.cleanWorkplaceSegmentName('2026 (주)가상농산(산업일자리전환)_123-81-20026'), '(주)가상농산');
+  assert.equal(Intake.cleanWorkplaceSegmentName('2. 주식회사 가상농산_1238120026'), '주식회사 가상농산');
 
   /* 상위 비컨테이너 경로('가상노무법인/컨설팅업체/4. 산업일자리전환컨설팅/...')에서도 상위 폴더명으로 사업장이 뭉개지면 안 됨 */
   const preFilteredEntries = [
@@ -725,7 +725,7 @@ test('10. 컨설팅업체 폴더 산업일자리 전용 선별 · 메일함 타�
   /* ③ 운영 RTDB 스키마 호환: bt.code · cs.typeCode · 빈 companyId(biz:10자리) · scal_cos types 배열 · 삭제/타사업 제외 */
   const cands = Intake.discoverJobtransCandidates({
     companies: [
-      { id: 'co-erp-1', name: '(주)가상알파기공', bizNo: '701-87-00001', email: 'info@alpha-syn.example' }
+      { id: 'co-erp-1', name: '(주)가상알파기공', bizNo: '123-81-20045', email: 'info@alpha-syn.example' }
     ],
     bizTypes: [
       { code: 'consulting-jt-cn', name: '산업일자리전환컨설팅충남' },
@@ -733,9 +733,9 @@ test('10. 컨설팅업체 폴더 산업일자리 전용 선별 · 메일함 타�
       { code: 'consulting-work-inn', name: '일터혁신컨설팅' }
     ],
     consultings: [
-      { id: 'cs-1', typeCode: 'consulting-jt-kmac', consultingType: '산업일자리전환컨설팅능률', no: '산일능률-2026-001', companyId: '', companyName: '주식회사 가상감마테크', bizNo: '801-86-00002', startDate: '2026-05-01', status: '진행' },
-      { id: 'cs-2', typeCode: 'consulting-work-inn', consultingType: '일터혁신컨설팅', no: '일터-2026-001', companyId: '', companyName: '(주)가상일터제조', bizNo: '801-86-00009', startDate: '2026-05-01', status: '진행' },
-      { id: 'cs-3', typeCode: 'consulting-jt-cn', consultingType: '산업일자리전환컨설팅충남', companyId: '', companyName: '(주)취소된사업장', bizNo: '801-86-00008', status: '취소' }
+      { id: 'cs-1', typeCode: 'consulting-jt-kmac', consultingType: '산업일자리전환컨설팅능률', no: '산일능률-2026-001', companyId: '', companyName: '주식회사 가상감마테크', bizNo: '123-81-20050', startDate: '2026-05-01', status: '진행' },
+      { id: 'cs-2', typeCode: 'consulting-work-inn', consultingType: '일터혁신컨설팅', no: '일터-2026-001', companyId: '', companyName: '(주)가상일터제조', bizNo: '123-81-20064', startDate: '2026-05-01', status: '진행' },
+      { id: 'cs-3', typeCode: 'consulting-jt-cn', consultingType: '산업일자리전환컨설팅충남', companyId: '', companyName: '(주)취소된사업장', bizNo: '123-81-20079', status: '취소' }
     ],
     scalTypes: {
       t1: { id: 't1', name: '일터혁신' },
@@ -746,7 +746,7 @@ test('10. 컨설팅업체 폴더 산업일자리 전용 선별 · 메일함 타�
     scalCos: {
       '2': { id: '2', name: '(주)가상알파기공', co_id: 'co-erp-1', types: ['t4', 't2'] },
       '99': { id: '99', name: '(주)삭제된기업', co_id: 'co-erp-1', types: ['t2'], deleted: true },
-      '100': { id: '100', name: '(주)타사업기업', bizNo: '901-81-00003', types: ['t1', 't4'] }
+      '100': { id: '100', name: '(주)타사업기업', bizNo: '123-81-20083', types: ['t1', 't4'] }
     },
     scalScheds: {},
     registeredProjects: []
@@ -755,7 +755,7 @@ test('10. 컨설팅업체 폴더 산업일자리 전용 선별 · 메일함 타�
   assert.equal(cands.length, 2, '일터혁신·기술보호 단독·취소·삭제 건을 제외하고 산업일자리 확정 2개사만 발견되어야 한다');
   const kmacCand = cands.find(c => c.companyName.includes('가상감마테크'));
   const cepaCand = cands.find(c => c.companyId === 'co-erp-1');
-  assert.ok(kmacCand && kmacCand.companyId === 'biz:8018600002' && kmacCand.agency === 'kmac');
+  assert.ok(kmacCand && kmacCand.companyId === 'biz:1238120050' && kmacCand.agency === 'kmac');
   assert.ok(cepaCand && cepaCand.agency === 'cepa' && cepaCand.scalTypeId === 't2');
   assert.equal(gw.prepare({ id: 'jt_cand_1', entityType: 'Project', companyId: kmacCand.companyId, companyName: kmacCand.companyName }, { entityType: 'Project' }).ok, true);
 });
@@ -765,19 +765,19 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
 
   /* ① 동일·유사 발음 상호라도 서로 다른 사업자번호·무번호·번호충돌 폴더는 절대 합쳐지거나 첫 거래처로 오귀속되지 않아야 함 */
   const homonymFiles = [
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/1. 가상플랜트_101-81-00011/기초자료A.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/2. 가상플렌트_202-81-00022/기초자료B.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/1. 가상플랜트_123-81-20012/기초자료A.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/2. 가상플렌트_123-81-20098/기초자료B.xlsx' },
     { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/3. 가상플랜트/기초자료_무번호.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/4. 가상충돌테크/문서1_101-81-00011.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/4. 가상충돌테크/문서2_202-81-00022.xlsx' }
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/4. 가상충돌테크/문서1_123-81-20012.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/4. 가상충돌테크/문서2_123-81-20098.xlsx' }
   ];
 
   const homonymGrouped = Intake.groupJobtransFolderEntries(homonymFiles, {
     rootDirName: '컨설팅업체',
     companies: [
-      { id: 'co-a', name: '(주)가상플랜트', bizNo: '101-81-00011' },
-      { id: 'co-b', name: '주식회사 가상플렌트', bizNo: '202-81-00022' },
-      { id: 'co-cf', name: '(주)가상충돌테크', bizNo: '101-81-00011' }
+      { id: 'co-a', name: '(주)가상플랜트', bizNo: '123-81-20012' },
+      { id: 'co-b', name: '주식회사 가상플렌트', bizNo: '123-81-20098' },
+      { id: 'co-cf', name: '(주)가상충돌테크', bizNo: '123-81-20012' }
     ],
     projects: [],
     discoverCandidates: []
@@ -789,8 +789,8 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
   const grpUnnum = homonymGrouped.groups.find(g => !g.bizNo && !g.bizNoConflict);
   const grpConflict = homonymGrouped.groups.find(g => g.bizNoConflict === true);
 
-  assert.ok(grpA && grpA.fileCount === 1 && grpA.bizNo === '101-81-00011', 'co-a에는 101-81-00011 폴더 파일 1건만 귀속되어야 한다');
-  assert.ok(grpB && grpB.fileCount === 1 && grpB.bizNo === '202-81-00022', 'co-b에는 202-81-00022 폴더 파일 1건만 귀속되어야 한다');
+  assert.ok(grpA && grpA.fileCount === 1 && grpA.bizNo === '123-81-20012', 'co-a에는 123-81-20012 폴더 파일 1건만 귀속되어야 한다');
+  assert.ok(grpB && grpB.fileCount === 1 && grpB.bizNo === '123-81-20098', 'co-b에는 123-81-20098 폴더 파일 1건만 귀속되어야 한다');
   assert.ok(grpUnnum && grpUnnum.fileCount === 1 && /^jtdir:2026_kmac_/.test(grpUnnum.companyId), '무번호 동명 폴더는 번호 있는 그룹에 합쳐지지 않고 격리 열쇠를 가져야 한다');
   assert.equal(grpUnnum.matchedProjectId, '');
   assert.ok(grpConflict && grpConflict.fileCount === 2 && grpConflict.bizNo === '' && /^jtdir:2026_kmac_/.test(grpConflict.companyId), '내부 파일 간 사업자번호가 충돌하는 폴더는 자동·후보 귀속이 모두 차단되어야 한다');
@@ -799,24 +799,24 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
 
   /* 파일명에만 서로 다른 사업자번호(하이픈형·연속 10자리형)가 적힌 두 동명 폴더와 무번호 동명 폴더 2개 모두 경계별로 분리되어야 함 */
   const innerBizFiles = [
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/1. 가상플랜트/재무_1018100011.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/2. 가상플렌트/재무_2028100022.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/1. 가상플랜트/재무_1238120012.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/2. 가상플렌트/재무_1238120098.xlsx' },
     { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/3. 가상알파테크/기초자료_a.xlsx' },
     { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/4. 가상알파테크/기초자료_b.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/5. 가상연속충돌/문서_1018100011.xlsx' },
-    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/5. 가상연속충돌/문서_2028100022.xlsx' }
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/5. 가상연속충돌/문서_1238120012.xlsx' },
+    { relPath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/5. 가상연속충돌/문서_1238120098.xlsx' }
   ];
   const innerGrouped = Intake.groupJobtransFolderEntries(innerBizFiles, {
     rootDirName: '컨설팅업체',
     companies: [
-      { id: 'co-a', name: '(주)가상플랜트', bizNo: '101-81-00011' },
-      { id: 'co-b', name: '주식회사 가상플렌트', bizNo: '202-81-00022' },
-      { id: 'co-alpha', name: '(주)가상알파테크', bizNo: '303-81-00033' }
+      { id: 'co-a', name: '(주)가상플랜트', bizNo: '123-81-20012' },
+      { id: 'co-b', name: '주식회사 가상플렌트', bizNo: '123-81-20098' },
+      { id: 'co-alpha', name: '(주)가상알파테크', bizNo: '123-81-20104' }
     ]
   });
   assert.equal(innerGrouped.groups.length, 5, '연속10자리 2개 + 무번호 동명 2개 + 연속10자리 충돌 1개가 모두 별도 그룹이어야 한다');
-  assert.ok(innerGrouped.groups.some(g => g.companyId === 'co-a' && g.fileCount === 1 && g.bizNo === '101-81-00011'));
-  assert.ok(innerGrouped.groups.some(g => g.companyId === 'co-b' && g.fileCount === 1 && g.bizNo === '202-81-00022'));
+  assert.ok(innerGrouped.groups.some(g => g.companyId === 'co-a' && g.fileCount === 1 && g.bizNo === '123-81-20012'));
+  assert.ok(innerGrouped.groups.some(g => g.companyId === 'co-b' && g.fileCount === 1 && g.bizNo === '123-81-20098'));
   const unnumAlphaGrps = innerGrouped.groups.filter(g => g.companyName === '가상알파테크');
   assert.equal(unnumAlphaGrps.length, 2, '사업자번호 없는 동명 2개 폴더(3. 가상알파테크, 4. 가상알파테크)는 자동 병합되면 안 된다');
   assert.notEqual(unnumAlphaGrps[0].companyId, unnumAlphaGrps[1].companyId, '무번호 동명 두 폴더는 서로 다른 영구 열쇠(jtdir:)를 가져야 한다');
@@ -912,9 +912,9 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
                       jt_a_1: {
                         id: 'jt_a_1',
                         entityType: 'Project',
-                        companyId: 'biz:1018100011',
+                        companyId: 'biz:1238120012',
                         companyName: '(주)가상A전용기업',
-                        bizNo: '101-81-00011',
+                        bizNo: '123-81-20012',
                         agency: 'kmac',
                         track: 'kmac_std',
                         year: 2026
@@ -1002,7 +1002,7 @@ test('11. 보안 회귀 검증: 사업장 경계별 사업자번호 분리·충�
   let resolveSlowBuffer = null;
   const slowFile = {
     name: '취업규칙_개정안.txt',
-    webkitRelativePath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/1. (주)가상A전용기업_101-81-00011/취업규칙_개정안.txt',
+    webkitRelativePath: '컨설팅업체/4. 산업일자리전환컨설팅/2026 산업일자리전환/1. (주)가상A전용기업_123-81-20012/취업규칙_개정안.txt',
     size: 64,
     lastModified: 1761000000000,
     arrayBuffer: () => new Promise(res => { resolveSlowBuffer = res; })
@@ -1190,10 +1190,10 @@ test('12. 소속기관(KMAC vs CEPA) 분리 · 일터상생/석유화학노동�
   /* ① ERP 계약 발견 시 산일능률(KMAC)과 산일충남(CEPA)만 정확히 분리하고, 일터상생 및 석유화학 노동전환지원센터는 원천 배제한다 */
   const cands = Intake.discoverJobtransCandidates({
     companies: [
-      { id: 'co-syn-kmac', name: '(주)가상능률제조', bizNo: '101-81-00011', addr: '충청남도 천안시', email: 'kmac@syn1.example' },
-      { id: 'co-syn-cepa', name: '(주)가상충남설비', bizNo: '102-81-00022', addr: '충청남도 당진시', email: 'cepa@syn2.example' },
-      { id: 'co-syn-ilteo', name: '(주)가상상생기업', bizNo: '103-81-00033', email: 'ilteo@syn3.example' },
-      { id: 'co-syn-petro', name: '(주)가상석유화학', bizNo: '104-81-00044', email: 'petro@syn4.example' }
+      { id: 'co-syn-kmac', name: '(주)가상능률제조', bizNo: '123-81-20012', addr: '충청남도 천안시', email: 'kmac@syn1.example' },
+      { id: 'co-syn-cepa', name: '(주)가상충남설비', bizNo: '123-81-20119', addr: '충청남도 당진시', email: 'cepa@syn2.example' },
+      { id: 'co-syn-ilteo', name: '(주)가상상생기업', bizNo: '123-81-20123', email: 'ilteo@syn3.example' },
+      { id: 'co-syn-petro', name: '(주)가상석유화학', bizNo: '123-81-20138', email: 'petro@syn4.example' }
     ],
     bizTypes: [
       { code: 'bt-kmac', name: '산업일자리전환컨설팅능률', agency: '한국능률협회', short: '산일능률' },
@@ -1287,9 +1287,13 @@ test('12. 소속기관(KMAC vs CEPA) 분리 · 일터상생/석유화학노동�
   const pollutedRev = Report.evaluateReportFormReview(cepaProj, 'final', pollutedFin, {}, []);
   assert.equal(pollutedRev.hasCrossContamination, true, '일터상생 문구가 섞이면 타 양식 혼입 경고가 켜져야 한다');
 
-  /* ⑤ 와이드 전체폭(max-width:none) 및 기관별 분리 UI 구조 검증 */
+  /* ⑤ 와이드 전체폭(max-width:none) · 원고 증발 방지(pu-version 미탑재) · 기관별 분리 UI 구조 검증 */
   const html = fs.readFileSync(path.join(__dirname, '..', 'jobtrans.html'), 'utf8');
-  assert.match(html, /main\{[^}]*max-width:none/, 'PC 화면에서 좌우 전체 폭을 사용해야 한다');
+  assert.doesNotMatch(html, /<script[^>]+pu-version\.js/, '보고서 작성 중 30초 유휴 강제 새로고침으로 미저장 원고가 증발하지 않도록 pu-version.js를 탑재하지 않아야 한다');
+  assert.match(html, /html,body\{width:100%;max-width:none/, 'html·body 전체 가로폭 제약이 없어야 한다');
+  assert.match(html, /main\{[^}]*width:100%;max-width:none/, 'PC 화면에서 좌우 전체 폭을 사용해야 한다');
+  assert.match(html, /table\.t td\.wide\{width:100%;max-width:0\}/, '데스크톱 표의 가변 열이 남은 가로폭을 100% 채우고 오른쪽 열 잘림을 막아야 한다');
   assert.match(html, /id="agencyScopeBar"/, '소속기관 구분 스코프 바가 존재해야 한다');
+  assert.match(html, /value="stack"/, '전체폭 상하 분리 옵션이 존재해야 한다');
   assert.match(html, /id="p-forms"/, '기관별 양식 분리검토 전용 패널이 존재해야 한다');
 });

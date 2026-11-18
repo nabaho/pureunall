@@ -1005,10 +1005,12 @@
       '<span class="agency-scope-lbl">🏛️ 소속기관 구분 보기:</span>' +
       '<button type="button" class="agency-scope-btn' + (AGENCY_SCOPE === '' ? ' on' : '') + '" data-set-agency-scope="" aria-pressed="' + (AGENCY_SCOPE === '' ? 'true' : 'false') + '">' +
       '⚖️ 기관별 좌우 분리 (' + projs.length + ')</button>' +
+      '<button type="button" class="agency-scope-btn wide-only' + (AGENCY_SCOPE === 'stack' ? ' on' : '') + '" data-set-agency-scope="stack" aria-pressed="' + (AGENCY_SCOPE === 'stack' ? 'true' : 'false') + '">' +
+      '▤ 전체폭 상하 분리 (' + projs.length + ')</button>' +
       '<button type="button" class="agency-scope-btn' + (AGENCY_SCOPE === 'kmac' ? ' on' : '') + '" data-set-agency-scope="kmac" aria-pressed="' + (AGENCY_SCOPE === 'kmac' ? 'true' : 'false') + '">' +
-      '🔵 한국능률협회컨설팅(KMAC · 산일능률) 전용 (' + kmacCnt + ')</button>' +
+      '🔵 능률협회(KMAC · 산일능률) (' + kmacCnt + ')</button>' +
       '<button type="button" class="agency-scope-btn cepa' + (AGENCY_SCOPE === 'cepa' ? ' on' : '') + '" data-set-agency-scope="cepa" aria-pressed="' + (AGENCY_SCOPE === 'cepa' ? 'true' : 'false') + '">' +
-      '🟢 충남경제진흥원(CEPA · 산일충남) 전용 (' + cepaCnt + ')</button>' +
+      '🟢 충남경제진흥원(CEPA · 산일충남) (' + cepaCnt + ')</button>' +
       '<span class="sp"></span>' +
       '<span class="chip c-amber wide-only" title="일터혁신 상생컨설팅(일터상생) 및 석유화학 노동전환지원센터 사업은 본 워크스페이스·메일 감지에서 자동 분리·배제됩니다">🚫 일터상생 · 석유화학노동전환 자동분리</span>' +
       '<button type="button" class="sm" data-goto-tab="forms" title="능률협회(KMAC)와 충남경제진흥원(CEPA)의 서로 다른 보고서 양식·목차·검수기준을 나란히 검토합니다">⚖️ 양식·검토기준 분리보기</button>';
@@ -1137,31 +1139,31 @@
     var rev = Report().evaluateReportFormReview(p, p.midConfirmedAt ? 'final' : 'mid', p.midConfirmedAt ? finObj : midObj, D.intake[p.id] || {}, schedRds);
 
     var mailBadges = [];
-    if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber">📩 기초 미확인 ' + sc.unseenPreCount + '</span>');
-    if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green">📬 후속 미확인 ' + sc.unseenPostCount + '</span>');
-    if (!mailBadges.length) mailBadges.push('<span class="chip">수신 ' + (sc.totalInCount || 0) + '건 확인됨</span>');
+    if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber" title="기초자료 미확인 메일 ' + sc.unseenPreCount + '건">📩' + sc.unseenPreCount + '</span>');
+    if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green" title="후속 미확인 메일 ' + sc.unseenPostCount + '건">📬' + sc.unseenPostCount + '</span>');
+    if (!mailBadges.length && sc.totalInCount > 0) mailBadges.push('<span class="chip" title="수신 확인된 메일 ' + sc.totalInCount + '건">✓' + sc.totalInCount + '</span>');
 
     var contractChip = pMeta.contractNo
       ? ' <span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(pMeta.contractNo) + '</span>'
       : '';
     var ilteoChip = pMeta.hasIlteoSangsaeng
-      ? ' <span class="chip c-amber" title="일터혁신 상생컨설팅(' + esc(pMeta.ilteoLabels.join(', ')) + ') 별도 계약은 본 워크스페이스에서 자동 분리됨">일터상생 별도</span>'
+      ? ' <span class="chip c-amber" title="일터혁신 상생컨설팅(' + esc(pMeta.ilteoLabels.join(', ')) + ') 별도 계약은 본 워크스페이스에서 자동 분리됨">일터별도</span>'
       : '';
     var revChipCls = rev.allPassed ? 'c-green' : 'c-amber';
+    var compactTrackLabel = str(tr.short).replace(/^(?:KMAC|CEPA)\s+/i, '');
 
     return {
       id: p.id,
       cells: [
-        { cls: 'ti', title: p.companyName + (pMeta.contractNo ? ' (' + pMeta.contractNo + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span>' + contractChip + ilteoChip },
-        { k: 'badge', html: '<span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(tr.short) + '</span> ' + stageDotsHtml(p) },
+        { cls: 'ti', title: p.companyName + (pMeta.contractNo ? ' (' + pMeta.contractNo + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc(String(p.year || 2026).slice(-2) + '년') + '</span>' + contractChip + ilteoChip },
+        { k: 'badge', title: tr.name, html: '<span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(compactTrackLabel) + '</span> ' + stageDotsHtml(p) },
         { cls: 'wide', title: str(p.transGoal) || taskNames, html: esc(str(p.transGoal) || taskNames || '과제 선택 필요') },
-        { html: '기초 <b>' + chkPre.pct + '%</b> · <span class="chip ' + revChipCls + '">양식검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' },
-        { html: mailBadges.join(' ') },
+        { html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
         {
           k: 'act',
-          html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초</button>' +
-            '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간검토</button>' +
-            '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ ' + (p.agency === 'cepa' ? '결과·완료계' : '최종·정책매니저') + '</button>'
+          html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">①기초</button>' +
+            '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">②중간</button>' +
+            '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final" title="' + esc(p.agency === 'cepa' ? '충남경제진흥원 결과보고서·완료계 검토' : '능률협회 최종보고서·정책매니저 검토') + '">③' + (p.agency === 'cepa' ? '완료계' : '최종') + '</button>'
         }
       ]
     };
@@ -1179,7 +1181,8 @@
     }
 
     var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var agFilter = AGENCY_SCOPE || str($('projAgency') && $('projAgency').value);
+    var rawScope = AGENCY_SCOPE || str($('projAgency') && $('projAgency').value);
+    var agFilter = (rawScope === 'kmac' || rawScope === 'cepa') ? rawScope : '';
     var yr = str($('projYear') && $('projYear').value);
     var stFilter = str($('projStage') && $('projStage').value);
 
@@ -1219,7 +1222,7 @@
       '<span><b>전용 양식:</b> 착수PPT(1MD) → 중간 7장 → 2026년형 결과보고서 8장(KPI 4+·지원사업 2+) → 완료보고서·정책매니저</span>' +
       '</div>' +
       renderTable('projectsKmac',
-        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 양식검수', '메일 감지', '분리 검토·작업'],
+        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 검수 · 메일', '분리 검토·보고서'],
         kmacRows, CUR_PID) +
       '</div>';
 
@@ -1237,7 +1240,7 @@
       '<span><b>전용 양식:</b> 지원신청서 → [진단 3회 / 전문 6회·월별실적] → 결과보고서 8장 → 완료계(갑지 대표자 날인) · 충남장려금</span>' +
       '</div>' +
       renderTable('projectsCepa',
-        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 양식검수', '메일 감지', '분리 검토·작업'],
+        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 검수 · 메일', '분리 검토·보고서'],
         cepaRows, CUR_PID) +
       '</div>';
 
@@ -1246,6 +1249,8 @@
         $('projectsBox').innerHTML = '<div class="agency-split-grid">' + kmacCardHtml + '</div>';
       } else if (agFilter === 'cepa') {
         $('projectsBox').innerHTML = '<div class="agency-split-grid">' + cepaCardHtml + '</div>';
+      } else if (rawScope === 'stack') {
+        $('projectsBox').innerHTML = '<div class="agency-split-grid">' + kmacCardHtml + cepaCardHtml + '</div>';
       } else {
         $('projectsBox').innerHTML = '<div class="agency-split-grid dual">' + kmacCardHtml + cepaCardHtml + '</div>';
       }
@@ -1308,7 +1313,7 @@
           cells: [
             { cls: 'ti', title: c.companyName, html: esc(c.companyName) + ' <span class="chip">' + esc(c.year + '년') + '</span>' },
             { k: 'badge', html: agencyChipHtml(c.agency) + ' <span class="chip">' + esc(tr.short) + '</span>' },
-            { html: esc(c.source + (c.bizLabel ? ' · ' + c.bizLabel : '')) },
+            { cls: 'wide', title: c.source + (c.bizLabel ? ' · ' + c.bizLabel : ''), html: esc(c.source + (c.bizLabel ? ' · ' + c.bizLabel : '')) },
             { html: esc(c.contactEmail || '이메일 미등록') },
             { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
           ]
@@ -1521,7 +1526,7 @@
       return {
         id: String(r.roundNo),
         cells: [
-          { cls: 'ti', title: r.topic, html: r.roundNo + '회차 · ' + esc(r.topic) },
+          { cls: 'ti wide', title: r.topic, html: r.roundNo + '회차 · ' + esc(r.topic) },
           { k: 'badge', html: modeChip + ' ' + proofChip + ruleWarn },
           { html: esc(r.date) + ' · ' + r.mins + '분 · 기업 ' + r.companyPeople + '명' },
           {
@@ -1917,7 +1922,7 @@
       return {
         id: p.id,
         cells: [
-          { cls: 'ti', title: p.companyName, html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span>' + cChip },
+          { cls: 'ti wide', title: p.companyName, html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span>' + cChip },
           { k: 'badge', html: '<span class="chip ' + (isCepa ? 'c-green' : 'c-blue') + '">' + esc(tr.short) + '</span>' },
           { html: '<span class="chip ' + (midRev.allPassed ? 'c-green' : 'c-amber') + '">중간 ' + midRev.passCount + '/' + midRev.totalCount + '</span> <span class="chip ' + (finRev.allPassed ? 'c-green' : 'c-amber') + '">최종 ' + finRev.passCount + '/' + finRev.totalCount + '</span>' },
           {
@@ -2760,7 +2765,7 @@
       '<div class="fr"><label for="npCo">대상 거래처*</label><div class="fv"><select id="npCo">' + coOpts + '</select></div></div>' +
       '<div class="fr" id="npDirectRow" style="display:none"><label for="npDirectName">상호 / 사업자번호*</label><div class="fv">' +
       '<input type="text" id="npDirectName" placeholder="컨설팅 사업장 정식 상호 (필수)">' +
-      '<input type="text" id="npDirectBiz" placeholder="사업자등록번호 10자리 (예: 101-81-00000)">' +
+      '<input type="text" id="npDirectBiz" placeholder="사업자등록번호 10자리 (예: 123-81-20007)">' +
       '</div></div>' +
       '<div class="fr"><label for="npAgency">운영기관 / 트랙*</label><div class="fv">' +
       '<select id="npAgency">' + agOpts + '</select>' +
@@ -3513,10 +3518,10 @@
   }
 
   function applyAgencyScope(nextScope) {
-    var norm = nextScope === 'kmac' ? 'kmac' : (nextScope === 'cepa' ? 'cepa' : '');
+    var norm = nextScope === 'kmac' ? 'kmac' : (nextScope === 'cepa' ? 'cepa' : (nextScope === 'stack' ? 'stack' : ''));
     AGENCY_SCOPE = norm;
     if ($('projAgency')) $('projAgency').value = norm;
-    if (norm) {
+    if (norm === 'kmac' || norm === 'cepa') {
       var cur = projectById(CUR_PID);
       var curAg = cur && cur.agency === 'cepa' ? 'cepa' : (cur ? 'kmac' : '');
       if (!cur || curAg !== norm) {
