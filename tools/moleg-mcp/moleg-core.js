@@ -861,6 +861,39 @@ async function autoDiscover(args, opts) {
   };
 }
 
+async function searchKcplaaIlabor(args, opts) {
+  const a = args || {};
+  const o = opts || {};
+  const env = o.env || process.env || {};
+  const fetchFn = o.fetchFn || fetch;
+  const limit = Math.max(2, Math.min(Number(a.limit) || 12, 25));
+  const channel = String(a.channel || (a.query ? "search_fast" : "all")).trim();
+
+  const res = await PBoxSync.pullKcplaaIlaborBundle({
+    env,
+    fetchFn,
+    channel,
+    query: a.query || "",
+    maxPerChannel: Math.min(Math.max(4, Math.ceil(limit / 2)), 15),
+    detailLimit: Math.min(Math.max(4, Math.ceil(limit / 2)), 10),
+    skipSupabase: true
+  });
+  if (!res.ok && !res.partial) {
+    throw new Error(res.error || (res.errors && res.errors[0]) || "한국공인노무사회(ilabor·본회) 자료 조회에 실패했습니다.");
+  }
+  const allDocs = res.docs || [];
+  const sliced = allDocs.slice(0, limit);
+  return {
+    channel: res.channel,
+    query: res.query || "",
+    count: sliced.length,
+    totalMatched: allDocs.length,
+    docs: sliced,
+    sourcesHit: res.sourcesHit || [],
+    errors: res.errors || []
+  };
+}
+
 module.exports = {
   fetchTextBounded,
   listTribunals,
@@ -872,5 +905,6 @@ module.exports = {
   searchOrdinanceAndAdmrul,
   getOfficialDocument,
   unifiedSearch,
-  autoDiscover
+  autoDiscover,
+  searchKcplaaIlabor
 };

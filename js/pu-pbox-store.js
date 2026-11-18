@@ -883,6 +883,7 @@
     var cleanIncoming = (Array.isArray(incomingList) ? incomingList : []).filter(function (d) {
       if (!d || typeof d !== 'object') return false;
       if (String(d.body || '').trim().length < 20) return false;
+      if (isPublicScope && isMemberOnlyClientDoc(d)) return false;
       if (isPublicScope && E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) return false;
       if (opts.overrideDeleted) {
         if (d.id) mem.deletedDocKeys.delete(String(d.id));
@@ -913,12 +914,15 @@
       var markedPrivate = cleanIncoming.map(function (d) {
         var scrubbedForKey = scrubFullDocClient(d);
         var serverCk = (E && E.serverCanonicalKeyOf) ? E.serverCanonicalKeyOf(scrubbedForKey, activeOwner) : '';
-        return Object.assign({}, d, {
+        var restricted = isMemberOnlyClientDoc(d);
+        var nextDoc = Object.assign({}, d, {
           userIngested: true,
           ownerUid: mem.uid,
-          sharedToOffice: opts.shareConfirmed === true,
+          sharedToOffice: !restricted && opts.shareConfirmed === true,
           serverCanonicalKey: d.serverCanonicalKey || serverCk
         });
+        if (restricted) nextDoc.memberOnly = true;
+        return nextDoc;
       });
       res = E.deduplicateDocs(mem.privateDocs, markedPrivate);
       mem.privateDocs = res.docs;
@@ -937,16 +941,23 @@
     }
     rebuildEffectiveDocs();
 
-    /* 사용자 수집 문서는 비식별 결과를 확인하고 shareConfirmed === true 를 명시했을 때만 공유 서버로 전송하며, 오류를 삼키지 않고 결과/콜백 전달 */
+    /* 사용자 수집 문서는 비식별 결과를 확인하고 shareConfirmed === true 를 명시했을 때만 공유 서버로 전송하며, 회원전용(memberOnly) 문서는 원천 차단 */
     if (opts.shareConfirmed === true && cleanIncoming.length) {
+      var shareableIncoming = cleanIncoming.filter(function (d) { return !isMemberOnlyClientDoc(d); });
+      if (!shareableIncoming.length) {
+        var memRestrictErr = new Error('회원 전용 로그인 세션으로 수집된 원문(memberOnly)은 전 직원 공유 DB에 업로드할 수 없습니다.');
+        res.stats.syncPromise = Promise.resolve({ ok: false, error: memRestrictErr.message });
+        if (typeof opts.onSyncError === 'function') opts.onSyncError(memRestrictErr);
+        return res.stats;
+      }
       var pushGen = sessionGen;
       var pushUid = mem.uid;
       var incomingByPredictedKey = new Map();
-      cleanIncoming.forEach(function (d) {
+      shareableIncoming.forEach(function (d) {
         var pred = (E && E.serverCanonicalKeyOf) ? E.serverCanonicalKeyOf(scrubFullDocClient(d), activeOwner) : '';
         if (pred) incomingByPredictedKey.set(pred, d.id);
       });
-      res.stats.syncPromise = pushDocsToSharedServer(cleanIncoming, opts.auth, {})
+      res.stats.syncPromise = pushDocsToSharedServer(shareableIncoming, opts.auth, {})
         .then(function (srvRes) {
           if (pushGen === sessionGen && pushUid === mem.uid) {
             var wsDb2 = getWorkspaceDb();
@@ -1119,6 +1130,20 @@
     });
   }
 
+  function isMemberOnlyClientDoc(d) {
+    if (!d || typeof d !== 'object') return false;
+    if (d.memberOnly === true) return true;
+    var E = global.PuPBoxEngine;
+    if (E && typeof E.isMemberRestrictedDoc === 'function') {
+      return E.isMemberRestrictedDoc(d);
+    }
+    var arr = [].concat(d.sources || [], d.tags || []);
+    for (var i = 0; i < arr.length; i++) {
+      if (/회원전용|로컬전용|kcplaa_member/i.test(String(arr[i] || ''))) return true;
+    }
+    return false;
+  }
+
   function scrubFullDocClient(d) {
     var E = global.PuPBoxEngine;
     if (!E) return d;
@@ -1150,13 +1175,14 @@
       sources: rawSources.map(sc)
     };
     if (cleanOfficialUrl) scrubbedOut.officialUrl = cleanOfficialUrl;
+    if (isMemberOnlyClientDoc(d)) scrubbedOut.memberOnly = true;
     return scrubbedOut;
   }
 
   function mapExternalSharedRow(row) {
     var clean = scrubFullDocClient(row);
     var isOfficial = Boolean(clean.officialUrl) || (Array.isArray(clean.sources) && clean.sources.some(function (s) {
-      return /국가법령정보|근로복지공단|대법원|중앙노동위원회|고용노동부|법제처|조례|자치법규/.test(String(s));
+      return /국가법령정보|근로복지공단|대법원|중앙노동위원회|고용노동부|법제처|조례|자치법규|한국공인노무사회|ilabor/i.test(String(s));
     }));
     var mappedOut = {
       id: clean.id || ('supa-' + clean.canonicalKey),
@@ -1288,11 +1314,14 @@
     if (!Array.isArray(docs) || !docs.length) {
       return Promise.resolve({ ok: true, pushed: 0, skipped: true });
     }
+    if (docs.some(isMemberOnlyClientDoc)) {
+      return Promise.reject(new Error('회원 전용 로그인 세션으로 수집된 원문(memberOnly)은 전 직원 공유 DB에 업로드할 수 없습니다.'));
+    }
     var o = opts || {};
     /* 서버가 canonicalKey를 직접 재계산하고 소유권을 검증하므로 클라이언트는 모든 필드를 전면 비식별화하여 전달 */
     var sanitizedDocs = docs.map(function (d) {
       var clean = scrubFullDocClient(d);
-      return {
+      var payloadRow = {
         docType: clean.docType || 'internal_case',
         court: clean.court,
         agency: clean.agency,
@@ -1306,6 +1335,8 @@
         refCases: clean.refCases,
         sources: clean.sources.length ? clean.sources : ['사무실 공유 (비식별 확인)']
       };
+      if (clean.memberOnly === true) payloadRow.memberOnly = true;
+      return payloadRow;
     });
     return u.getIdToken().then(function (tok) {
       return fetch(PBOX_API_URL, {
@@ -1448,7 +1479,7 @@
         : fetch(PBOX_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-            body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '' })
+            body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '', includeKcplaa: true })
           }).then(function (r) {
             if (!r.ok) throw new Error('서버 자동수집 응답 오류 (HTTP ' + r.status + ')');
             return r.json();
@@ -1477,7 +1508,7 @@
         return fetch(PBOX_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-          body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '' })
+          body: JSON.stringify({ action: 'sync', lawOc: cfg.lawOc || '', includeKcplaa: true })
         }).then(function (sr) {
           if (!sr || !sr.ok) return [syncJson, pullOut, false];
           return sr.json().then(function (sj) {
@@ -1747,6 +1778,105 @@
     });
   }
 
+  /* ── 한국공인노무사회(ilabor.co.kr 전용자료실 + kcplaa.or.kr 본회 포털) 실시간 당겨오기 ── */
+  function pullKcplaaOfficial(opts) {
+    opts = opts || {};
+    var startGen = opts.expectedGen !== undefined ? Number(opts.expectedGen) : sessionGen;
+    var startUid = opts.expectedUid !== undefined ? String(opts.expectedUid || '') : mem.uid;
+    if (startGen !== sessionGen || startUid !== mem.uid) {
+      return Promise.reject(makeStaleSessionError());
+    }
+
+    var auth = opts.auth;
+    var u = auth && auth.currentUser;
+    if (!u || typeof u.getIdToken !== 'function') {
+      return Promise.reject(new Error('한국공인노무사회 서버 당겨오기는 포털 직원 로그인 상태에서 실행할 수 있습니다. (터미널에서는 `kcplaa-pbox pull` CLI로 즉시 수집·내보내기가 가능합니다)'));
+    }
+
+    var kcQCheck = validateClientOfficialSearchQuery(opts.query, 50, true, false);
+    if (!kcQCheck.ok) {
+      return Promise.reject(new Error(kcQCheck.error));
+    }
+
+    return u.getIdToken().then(function (tok) {
+      if (startGen !== sessionGen || startUid !== mem.uid) {
+        throw makeStaleSessionError();
+      }
+      var ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var reqTimer = ac ? setTimeout(function () { try { ac.abort(); } catch (_) {} }, 35000) : null;
+      var fetchInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({
+          action: 'pull_kcplaa',
+          channel: String(opts.channel || 'all'),
+          query: kcQCheck.query,
+          maxPerChannel: Math.min(Math.max(4, Number(opts.maxPerChannel) || 10), 20),
+          detailLimit: 8
+        })
+      };
+      if (ac) fetchInit.signal = ac.signal;
+      return fetch(PBOX_API_URL, fetchInit).then(
+        function (res) { if (reqTimer) clearTimeout(reqTimer); return res; },
+        function (err) {
+          if (reqTimer) clearTimeout(reqTimer);
+          if (err && err.name === 'AbortError') {
+            throw new Error('한국공인노무사회 자료 요청 제한시간(35초)을 초과했습니다. 세부 채널을 선택해 다시 시도해 주세요.');
+          }
+          throw err;
+        }
+      );
+    }).then(function (r) {
+      var jsonParseErr = false;
+      var parsePromise = (r && typeof r.json === 'function')
+        ? r.json().catch(function () { jsonParseErr = true; return null; })
+        : Promise.resolve(null);
+      return parsePromise.then(function (j) {
+        if (startGen !== sessionGen || startUid !== mem.uid) {
+          throw makeStaleSessionError();
+        }
+        var isPlainObj = !!(j && typeof j === 'object' && !Array.isArray(j));
+        var payload = isPlainObj ? j : {};
+        if (!r || jsonParseErr || !isPlainObj) {
+          throw new Error('한국공인노무사회 수집 서버 응답 형식이 올바르지 않습니다 (HTTP ' + ((r && r.status) || 0) + ')');
+        }
+        if (!r.ok || (payload.ok !== true && payload.partial !== true) || !Array.isArray(payload.docs)) {
+          throw new Error(payload.error || (Array.isArray(payload.errors) && payload.errors[0]) || ('한국공인노무사회 수집 응답 오류 (HTTP ' + (r.status || 0) + ')'));
+        }
+        var validRows = payload.docs.filter(function (row) {
+          return row && typeof row === 'object' && !Array.isArray(row) && typeof row.body === 'string' && row.body.trim().length >= 20;
+        });
+        var mapped = validRows.map(mapExternalSharedRow).filter(function (d) { return !isDocTombstoned(d); });
+        var added = 0;
+        var merged = 0;
+        if (mapped.length) {
+          var st = addDocuments(mapped, {
+            scope: 'public',
+            shareConfirmed: false,
+            expectedGen: startGen,
+            expectedUid: startUid
+          });
+          added = st.added;
+          merged = st.mergedStage1 + st.mergedStage2 + st.mergedStage3;
+        }
+        addAlert({
+          kind: 'sync',
+          title: '한국공인노무사회(ilabor·본회) 자료 당겨오기 완료 (신규 ' + added + '건 · 중복병합 ' + merged + '건)',
+          detail: ((payload.sourcesHit && payload.sourcesHit.length) ? payload.sourcesHit.join(' · ') : ('노무사회 자료 ' + (payload.fetchedCount || mapped.length) + '건 반영'))
+        });
+        return {
+          ok: payload.ok !== false,
+          partial: !!payload.partial,
+          fetchedCount: payload.fetchedCount || mapped.length,
+          added: added,
+          merged: merged,
+          sourcesHit: Array.isArray(payload.sourcesHit) ? payload.sourcesHit : [],
+          errors: Array.isArray(payload.errors) ? payload.errors : []
+        };
+      });
+    });
+  }
+
   function validateClientOfficialSearchQuery(rawVal, maxLen, allowEmpty, autoOnly) {
     if (rawVal != null && typeof rawVal !== 'string') {
       return { ok: false, query: '', error: '검색어 형식이 올바르지 않습니다.' };
@@ -1869,7 +1999,8 @@
           query: safeQuery,
           targets: resolvedTargets,
           maxPerTarget: Math.min(Math.max(3, Number(opts.maxPerTarget) || 10), 20),
-          includeComwel: opts.includeComwel !== false
+          includeComwel: opts.includeComwel !== false,
+          includeKcplaa: opts.includeKcplaa !== false
         })
       });
     }).then(function (r) {
@@ -1989,7 +2120,8 @@
           lawOc: lawOc,
           query: safeQuery,
           targets: Array.isArray(opts.targets) ? opts.targets.slice(0, 25) : [],
-          includeComwel: opts.includeComwel !== false
+          includeComwel: opts.includeComwel !== false,
+          includeKcplaa: opts.includeKcplaa !== false
         })
       };
       if (ac) fetchInit.signal = ac.signal;
@@ -2293,6 +2425,9 @@
     }
     if (!dump || typeof dump !== 'object' || Array.isArray(dump)) {
       throw new Error('올바른 P박스 백업 JSON 객체 형식이 아닙니다.');
+    }
+    if (dump.memberVault === true || dump.source === 'kcplaa-pbox-member-vault') {
+      throw new Error('한국공인노무사회 회원 전용 로컬 보관함 파일은 웹 백업으로 복원할 수 없습니다(kcplaa-pbox search 로컬 검색 전용).');
     }
     var hasDocsKey = Object.prototype.hasOwnProperty.call(dump, 'docs');
     var hasProjectsKey = Object.prototype.hasOwnProperty.call(dump, 'projects');
@@ -2684,6 +2819,7 @@
     pullFromSupabase: pullFromSupabase,
     pullLowerCourtOfficial: pullLowerCourtOfficial,
     pullTribunalOfficial: pullTribunalOfficial,
+    pullKcplaaOfficial: pullKcplaaOfficial,
     liveSearchAndCollect: liveSearchAndCollect,
     autoDiscoverOfficial: autoDiscoverOfficial,
     pushDocsToSharedServer: pushDocsToSharedServer,

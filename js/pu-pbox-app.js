@@ -54,6 +54,12 @@
     tribunalCustomQuery: '',
     tribunalStatusBanner: null,
 
+    /* 한국공인노무사회(ilabor 전용자료실 · 본회 포털) 통합 수집 조건 */
+    kcplaaPullBusy: false,
+    kcplaaChannel: 'all',
+    kcplaaCustomQuery: '',
+    kcplaaStatusBanner: null,
+
     /* 국가법령 전수함 필터·선택 */
     lawCat: 'priority',
     lawQuery: '',
@@ -1259,7 +1265,7 @@
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="laws"><span aria-hidden="true">📖</span><span>주석·법령전수함</span><span id="pboxLawCnt" class="pbox-nav-cnt">5,773</span></button>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="cases"><span aria-hidden="true">⚖️</span><span>판례·결정·유권해석</span><span id="pboxCaseCnt" class="pbox-nav-cnt">0</span></button>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="sites"><span aria-hidden="true">🌐</span><span>전국 사이트 직접검색</span><span id="pboxSiteCnt" class="pbox-nav-cnt">' + totalSitesCnt + '</span></button>',
-      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="ingest"><span aria-hidden="true">📥</span><span>하급심·심판 수집</span></button>',
+      '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="ingest"><span aria-hidden="true">📥</span><span>하급심·심판·노무사회 수집</span></button>',
       '      <div class="pbox-nav-divider" role="separator"></div>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="recents"><span aria-hidden="true">🕘</span><span>최근 본 자료</span></button>',
       '      <button type="button" class="pbox-nav-btn" data-act="go-view" data-view="workflows"><span aria-hidden="true">▷</span><span>워크플로</span></button>',
@@ -1349,7 +1355,7 @@
       laws: '주석 · 대한민국 국가법령 전수함 (법률·시행령·시행규칙 5,773편)',
       cases: '판례 · 중앙행심 · 특별심판 · 부처 유권해석 스마트 검색 & 실시간 수집',
       sites: '🌐 대한민국 전 법률·공공사이트 직접검색 허브 & 대형로펌 리서치 체계',
-      ingest: '하급심 판례 및 중앙행정심판·특별행정심판·전 위원회 재결례 공식 수집함',
+      ingest: '한국공인노무사회(ilabor·본회) 자료실 · 하급심 판례 · 전 심판재결 공식 수집함',
       recents: '최근 본 법령 · 판례 · 결정례 · 유권해석 관리',
       workflows: '공인노무사 워크플로 라이브러리',
       projects: '의뢰인 · 사건별 프로젝트 보관함',
@@ -2025,7 +2031,7 @@
       ? E.extractHighlightTerms(state.lawQuery.trim(), '')
       : [];
 
-    var lawQuickExtIds = ['law_go_kr', 'lawnb', 'assembly_bill', 'lawmaking', 'gwanbo'];
+    var lawQuickExtIds = ['ilabor_portal', 'law_go_kr', 'lawnb', 'assembly_bill', 'lawmaking', 'gwanbo'];
     var allSites = global.PuPBoxCorpus.KOREA_LEGAL_SITES || [];
     var lawExtBtns = lawQuickExtIds.map(function (sid) {
       var st = allSites.find(function (s) { return s.id === sid; });
@@ -2176,7 +2182,7 @@
       : [];
 
     var curIssueGroup = issueTree.find(function (g) { return g.id === state.activeIssueCat; }) || issueTree[0] || null;
-    var quickExtIds = ['lbox', 'bigcase', 'casenote', 'lawnb', 'scourt_glaw', 'law_go_prec', 'moel', 'nlrc'];
+    var quickExtIds = ['ilabor_portal', 'lbox', 'bigcase', 'casenote', 'lawnb', 'scourt_glaw', 'law_go_prec', 'moel', 'nlrc'];
     var extQuickBtns = quickExtIds.map(function (sid) {
       var st = allSites.find(function (s) { return s.id === sid; });
       if (!st) return '';
@@ -2535,12 +2541,36 @@
     { value: 'fair_rights', label: '독립위원회 (하도급 · 개인정보 · 고용차별)' }
   ];
 
+  var KCPLAA_CHANNEL_OPTIONS = [
+    { value: 'all', label: '전체 통합 (오늘의자료·노동부·근복·노동위·해석·지침·재결·뉴스·포커스·서식·본회공지)' },
+    { value: 'today', label: 'ilabor 오늘의 자료 · 전월 자료 · 노사정 뉴스' },
+    { value: 'moel', label: 'ilabor 고용노동부 자료실 (24개 분과 전체)' },
+    { value: 'comwel', label: 'ilabor 근로복지공단 (산재·체당금·퇴직연금·고용보험)' },
+    { value: 'nlrc', label: 'ilabor 노동위원회 (심판·조정·차별시정·복수노조)' },
+    { value: 'interp', label: 'ilabor 행정자료 — 행정해석(질의회시)' },
+    { value: 'guide', label: 'ilabor 행정자료 — 고용노동부 지침·시달문' },
+    { value: 'decc', label: 'ilabor 행정자료 — 재결례' },
+    { value: 'prec', label: 'ilabor 노동판례 (대법원·헌재·고등·지방·행정법원)' },
+    { value: 'forms_rules', label: 'ilabor 노동관계 법정서식 · 예규 · 훈령 · 고시' },
+    { value: 'focus', label: 'ilabor 월간 노사 FOCUS (정기간행물)' },
+    { value: 'news', label: 'ilabor 노사정 뉴스 (전문 본문)' },
+    { value: 'kcplaa_notice', label: '한국공인노무사회 본회 공지사항 · 주간 「알리다」' }
+  ];
+
   function buildIngestHtml() {
     var pv = state.ingestPreview;
     var busyAttr = state.ingestBusy ? ' disabled aria-busy="true"' : '';
     var lowerBusyAttr = state.lowerPullBusy ? ' disabled aria-busy="true"' : '';
     var trbBusyAttr = state.tribunalPullBusy ? ' disabled aria-busy="true"' : '';
+    var kcBusyAttr = state.kcplaaPullBusy ? ' disabled aria-busy="true"' : '';
     var cfg = global.PuPBoxStore.getConfig();
+    var kb = state.kcplaaStatusBanner;
+    var kcBannerHtml = kb
+      ? ('    <div class="pbox-status-banner ' + esc(kb.kind) + '" role="' + (kb.kind === 'err' ? 'alert' : 'status') + '">' +
+         '<strong>' + esc(kb.title) + '</strong>' +
+         (kb.detail ? ('<div style="margin-top:3px">' + esc(kb.detail) + '</div>') : '') +
+         '</div>')
+      : '';
     var lb = state.lowerStatusBanner;
     var lowerBannerHtml = lb
       ? ('    <div class="pbox-status-banner ' + esc(lb.kind) + '" role="' + (lb.kind === 'err' ? 'alert' : 'status') + '">' +
@@ -2557,6 +2587,31 @@
       : '';
     return [
       '<div class="pbox-page-wrap">',
+      '  <div class="pbox-card pbox-flat-m" style="margin-bottom:14px">',
+      '    <div class="pbox-sec-hd"><span>🎖️ 한국공인노무사회(ilabor 전용자료실 · 본회 포털) 전 영역 당겨오기 & CLI 직접검색 연동</span></div>',
+      '    <div class="pbox-info-note">',
+      '      한국공인노무사회 전용자료실(<code>ilabor.co.kr</code>: <b>오늘의 자료, 고용노동부 24개 분과, 근로복지공단, 노동위원회, 노동판례, 재결례, 행정해석, 지침, 노사정뉴스, 월간 FOCUS, 법정서식·예규·훈령·고시</b>)과 본회 포털(<code>kcplaa.or.kr</code>: <b>공지사항·소식지 알리다</b>)을 P박스 무료 공유 DB로 즉시 당겨와 직접 통합검색합니다.<br>' +
+      '      • <b>터미널 CLI 직접 연동:</b> <code>kcplaa-pbox search "통상임금"</code> · <code>kcplaa-pbox pull --channel all</code> (회원 로그인 상세원문 일괄수집: <code>kcplaa-pbox pull --login --export kcplaa.json</code>)',
+      '    </div>',
+      '    <div class="pbox-matched-grid" style="margin-bottom:10px">',
+      '      <label class="pbox-field"><span class="pbox-label">한국공인노무사회 수집 채널</span>' +
+               '<select id="pboxKcplaaChannelSel" class="pbox-input">' +
+               KCPLAA_CHANNEL_OPTIONS.map(function (opt) {
+                 var selK = state.kcplaaChannel === opt.value ? ' selected' : '';
+                 return '<option value="' + esc(opt.value) + '"' + selK + '>' + esc(opt.label) + '</option>';
+               }).join('') +
+               '</select></label>',
+      '      <label class="pbox-field"><span class="pbox-label">검색어 지정 당겨오기 (선택 · 비우면 최신 등록순 수집)</span>' +
+               '<input type="text" id="pboxKcplaaQueryInput" class="pbox-input" value="' + esc(state.kcplaaCustomQuery) + '" placeholder="예: 포괄임금, 최저임금, 산재보험료율, 임금근로시간과, 알리다"></label>',
+      '    </div>',
+      '    <div class="pbox-btn-group">',
+      '      <button type="button" class="pbox-btn-primary" data-act="pull-kcplaa-docs"' + kcBusyAttr + '>' + (state.kcplaaPullBusy ? '⏳ 한국공인노무사회 자료 수집 중…' : '📥 한국공인노무사회 자료 당겨오기') + '</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="jump-kcplaa-cases">🔎 수집된 노무사회 자료 직접 검색</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="copy-kcplaa-cli">💻 CLI 명령어 복사</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="open-ext-site" data-site-id="ilabor_portal">🌐 ilabor 원문사이트 열기 ↗</button>',
+      '    </div>',
+      kcBannerHtml,
+      '  </div>',
       '  <div class="pbox-card pbox-flat-m" style="margin-bottom:14px">',
       '    <div class="pbox-sec-hd"><span>🏛️ 지방법원 · 행정법원 · 고등법원 하급심 공식 API 자동 수집 (org=400202)</span></div>',
       '    <div class="pbox-info-note">',
@@ -4174,6 +4229,72 @@
         renderMain();
         toast('심판·재결 수집 실패: ' + errMsgT, 'err');
       });
+    } else if (act === 'pull-kcplaa-docs') {
+      if (state.kcplaaPullBusy) return;
+      var kcChSel = document.getElementById('pboxKcplaaChannelSel');
+      var kcQInp = document.getElementById('pboxKcplaaQueryInput');
+      if (kcChSel) state.kcplaaChannel = kcChSel.value || 'all';
+      if (kcQInp) state.kcplaaCustomQuery = kcQInp.value.trim();
+
+      var kcStartGen = global.PuPBoxStore.getSessionGen();
+      var kcStartUid = global.PuPBoxStore.getActiveUid();
+      state.kcplaaPullBusy = true;
+      state.kcplaaStatusBanner = null;
+      renderMain();
+
+      global.PuPBoxStore.pullKcplaaOfficial({
+        expectedGen: kcStartGen,
+        expectedUid: kcStartUid,
+        auth: snapshotAuthForUid(kcStartUid),
+        channel: state.kcplaaChannel,
+        query: state.kcplaaCustomQuery
+      }).then(function (resK) {
+        if (!isSameSession(kcStartGen, kcStartUid)) return;
+        state.kcplaaPullBusy = false;
+        var kcWarns = Array.isArray(resK.errors) ? resK.errors.filter(Boolean) : [];
+        var kcHitDetail = (Array.isArray(resK.sourcesHit) && resK.sourcesHit.length)
+          ? resK.sourcesHit.join(' · ')
+          : '판례·결정·유권해석 통합검색 메뉴와 홈 검색창에서 즉시 직접 검색할 수 있습니다.';
+        state.kcplaaStatusBanner = {
+          kind: (resK.partial || kcWarns.length) ? 'warn' : 'ok',
+          title: (resK.partial || kcWarns.length ? '⚠ 한국공인노무사회 일부 수집 완료: ' : '✓ 한국공인노무사회(ilabor·본회) 자료 당겨오기 완료: ') +
+            '신규 ' + resK.added + '건 · 중복병합 ' + resK.merged + '건',
+          detail: kcHitDetail + (kcWarns.length ? (' / 안내: ' + kcWarns.slice(0, 2).join(' / ')) : '')
+        };
+        toast('한국공인노무사회 자료 당겨오기 완료! 신규 ' + resK.added + '건 · 중복병합 ' + resK.merged + '건');
+        renderAll();
+      }).catch(function (errK) {
+        if (!isSameSession(kcStartGen, kcStartUid)) return;
+        state.kcplaaPullBusy = false;
+        if (errK && errK.staleSession) {
+          renderMain();
+          return;
+        }
+        var errMsgK = String((errK && errK.message) || errK || '한국공인노무사회 수집 요청에 실패했습니다.');
+        state.kcplaaStatusBanner = {
+          kind: 'err',
+          title: '✕ 한국공인노무사회 자료 당겨오기 실패',
+          detail: errMsgK
+        };
+        renderMain();
+        toast('노무사회 수집 실패: ' + errMsgK, 'err');
+      });
+    } else if (act === 'jump-kcplaa-cases') {
+      var jumpKcQ = (document.getElementById('pboxKcplaaQueryInput') || {}).value || state.kcplaaCustomQuery || '한국공인노무사회';
+      state.caseDocType = 'all';
+      state.caseQuery = String(jumpKcQ).trim();
+      switchView('cases');
+    } else if (act === 'copy-kcplaa-cli') {
+      var cliQ = ((document.getElementById('pboxKcplaaQueryInput') || {}).value || state.kcplaaCustomQuery || '통상임금').trim();
+      var safeCliQ = cliQ.replace(/[^가-힣A-Za-z0-9 .,_()·-]/g, '').replace(/^-+/, '').trim().slice(0, 50);
+      var cliCmd = 'kcplaa-pbox search "' + (safeCliQ || '통상임금') + '"';
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(cliCmd).then(function () {
+          toast('✓ CLI 명령어가 복사되었습니다: ' + cliCmd);
+        });
+      } else {
+        toast('CLI 명령어: ' + cliCmd);
+      }
     } else if (act === 'preview-ingest') {
       var ita = document.getElementById('pboxIngestTa');
       var schk = document.getElementById('pboxShareConfirmChk');
@@ -5121,6 +5242,8 @@
     state.reviewFileBusy = false;
     state.ingestBusy = false;
     state.lowerPullBusy = false;
+    state.tribunalPullBusy = false;
+    state.kcplaaPullBusy = false;
     state.liveCollectBusy = false;
     state.backupBusy = false;
     state.workspaceTab = 'report';
@@ -5133,6 +5256,14 @@
     state.lowerPreset = 'all';
     state.lowerCustomQuery = '';
     state.lowerStatusBanner = null;
+    state.tribunalFilter = 'all';
+    state.tribunalLocalOrg = '';
+    state.tribunalPreset = 'all';
+    state.tribunalCustomQuery = '';
+    state.tribunalStatusBanner = null;
+    state.kcplaaChannel = 'all';
+    state.kcplaaCustomQuery = '';
+    state.kcplaaStatusBanner = null;
     state.caseQuery = '';
     state.caseSubQuery = '';
     state.caseDateRange = 'all';

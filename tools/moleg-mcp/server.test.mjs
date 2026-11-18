@@ -36,7 +36,9 @@ test("① moleg-law MCP initialize · 필수 도구 · 전 심판채널 무누�
     "moleg_search_interpretation",
     "moleg_search_ordinance_admrul",
     "moleg_get_document",
-    "moleg_unified_search"
+    "moleg_unified_search",
+    "moleg_auto_discover",
+    "moleg_search_kcplaa"
   ]) {
     assert.ok(names.includes(reqTool), "필수 MCP 도구 누락: " + reqTool);
   }
