@@ -147,8 +147,10 @@ test('★★ 포털 로그아웃이 «같은 열쇠»에 시각을 적고 이알
 });
 
 test('★ 유휴 자동 로그아웃도 «전체»다', () => {
-  const i = PORTAL.indexOf('Date.now() - last >= LIMIT');
-  assert.ok(i > 0);
+  // 시간 이름은 박지 않는다 — 2026-11-18 카카오 3시간(lim = idleLimit())으로 바뀌었다. «쉰 시간 ≥ 한도» 판정을 찾는다.
+  const m = /Date\.now\(\)\s*-\s*last\s*>=\s*[A-Za-z_$][\w$]*/.exec(PORTAL);
+  const i = m ? m.index : -1;
+  assert.ok(i > 0, '포털의 유휴 자동 로그아웃 판정(쉰 시간 ≥ 한도)을 못 찾았습니다');
   assert.match(PORTAL.slice(i, i + 120), /broadcastLogout\(\)/, '★ 60분 유휴로 나갈 때는 신호를 안 냅니다 — 다른 탭은 그대로 로그인돼 있습니다');
 });
 

@@ -4077,7 +4077,7 @@ body.pc #pcDetail{display:flex}
   <script src="js/pu-handoff.js?v=2"></script>
   <script src="js/pu-doc-pick.js?v=2"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -45855,6 +45855,8 @@ document.addEventListener('keydown', e=>{
   }
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
+  /* 카카오로 들어왔으면 3시간 — 판정은 공용 부품 한 곳(js/pu-active.js PuActive.limitMs) (대표 지시 2026-11-18) */
+  function idleLimit(){ try{ if(window.PuActive && PuActive.limitMs) return PuActive.limitMs(LIMIT); }catch(e){} return LIMIT; }
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
   function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   var warnBox=null, tick=null;
@@ -45902,7 +45904,7 @@ document.addEventListener('keydown', e=>{
     var badges=document.querySelectorAll('.logoutTimer');
     if(!loggedIn()){ badges.forEach(function(b){ b.style.display='none'; }); hideWarn(); return; }
     if(shouldPauseIdle()) return;
-    var rem=LIMIT-(now()-getLast());
+    var rem = idleLimit() - (now()-getLast());
     badges.forEach(function(b){ b.style.display='inline-flex'; b.textContent='⏱ '+fmt(rem); });
     if(rem<=0){ clearInterval(tick); doAutoLogout(); return; }
     if(rem<=WARN){ showWarn(rem); } else { hideWarn(); }

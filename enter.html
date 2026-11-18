@@ -138,6 +138,8 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
 <script src="js/pu-logout-why.js?v=1"></script>
+<!-- 자동 로그아웃 시간 — 아이디·비번 1시간 / 카카오 3시간 판정을 여기서 묻는다 (대표 지시 2026-11-18) -->
+<script src="js/pu-active.js?v=2"></script>
 <!-- 2단계 인증 모듈은 필요한 순간에만 불러온다. 카카오 복귀 시 두 번째 Auth 인스턴스를 만들지 않는다. -->
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"></script>
@@ -1770,7 +1772,8 @@ body.portal-mode #moreFab{display:flex;}
       <input type="number" id="cfgIdle" min="10" max="480" step="10" placeholder="60" autocomplete="off" style="width:120px">
       <p class="cfg-help">아무 조작이 없을 때 자동으로 로그아웃되는 시간. 포털 · 푸른이알피 · 기업정보함 ·
         규정관리 · 정부사업일정에 함께 적용됩니다. <b>비워두면 60분</b>이고,
-        안전을 위해 10분~480분(8시간) 범위만 적용됩니다.</p>
+        안전을 위해 10분~480분(8시간) 범위만 적용됩니다.
+        <b>카카오 로그인은 3시간</b>입니다(이 값이 3시간보다 길면 이 값을 따릅니다).</p>
 
       <!-- 「줄 사이 이동」 허용·막음 칸(cfgTileCross)은 걷었다 — 2026-11-08 앱 배치는 «관리자만 한 벌로» 바꾸고
            영역 이동은 앱마다 📌 틀 고정으로 가른다. 이 칸이 남아 있으면 눌러도 아무 일이 없는 «죽은 스위치»가 된다. -->
@@ -2750,6 +2753,8 @@ body.portal-mode #moreFab{display:flex;}
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
+        // 카카오 로그인 → 자동 로그아웃 3시간 (대표 지시 2026-11-18). 인증표의 kakao 표시로 다시 확인된다(js/pu-active.js).
+        try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', Date.now()); } catch(_v){}
         try {
           kkFirebaseHidden = kkFirebaseHidden || !!document.hidden;
           var resources = window.performance.getEntriesByType('resource');
@@ -3178,6 +3183,8 @@ body.portal-mode #moreFab{display:flex;}
       return auth.signInWithEmailAndPassword(email, pw);
     }).then(function(cred){
       _settled = true; clearTimeout(_watchdog);
+      // 아이디·비번 로그인 → 자동 로그아웃은 포털 설정 시간(기본 1시간) (대표 지시 2026-11-18)
+      try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'password', Date.now()); } catch(_v){}
       // ⚠ 증표를 «기다리지 않는다» — 아래 아이디 저장도 enterPortal 도 이 약속과 무관하게
       //   그대로 진행된다. 증표를 못 얻으면 이번 성공은 그냥 기록하지 않는다(로그인이 먼저다).
       try {
@@ -6293,6 +6300,8 @@ body.portal-mode #moreFab{display:flex;}
   }
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
+  /* 카카오로 들어왔으면 3시간 — 판정은 공용 부품 한 곳(js/pu-active.js PuActive.limitMs) (대표 지시 2026-11-18) */
+  function idleLimit(){ try{ if(window.PuActive && PuActive.limitMs) return PuActive.limitMs(LIMIT); }catch(e){} return LIMIT; }
     // 활동 기록: mousemove는 초당 수백 번 발생 → 매번 동기 localStorage.setItem 하면
     // (ERP와 공유하는 대용량 localStorage에서) 메인스레드가 멈춘다. 10초에 한 번만 기록(유휴 판정은 60분 단위라 충분).
     var _lastMark = 0;
@@ -6311,7 +6320,8 @@ body.portal-mode #moreFab{display:flex;}
       var last = 0;
       try{ last = parseInt(localStorage.getItem(AKEY)||'0', 10); }catch(e){}
       if(!last){ mark(); return; }
-      if(Date.now() - last >= LIMIT){ broadcastLogout(); try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃('+Math.round(LIMIT/60000)+'분)'); }catch(_w){} auth.signOut(); }   // 유휴 로그아웃도 «전체»다
+      var lim = idleLimit();
+      if(Date.now() - last >= lim){ broadcastLogout(); try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃('+Math.round(lim/60000)+'분)'); }catch(_w){} auth.signOut(); }   // 유휴 로그아웃도 «전체»다
     }, 30000);
   })();
 

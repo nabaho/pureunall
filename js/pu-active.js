@@ -20,9 +20,22 @@
      예외: 「이 기기에서 로그인 유지」 를 켠 기기(pu_portal_auto=1)는 원래 떠나 있는 동안
      시계가 멈추므로 적는다(포털·이알피의 resumeAutoSession 과 같은 뜻).
 
+   ── 로그인 방식마다 시간이 다르다 (대표 지시 2026-11-18) ──────────
+   「아이디·비번으로 로그인하면 1시간 제한, 계속 작업하면 연장. 카카오톡 로그인은 3시간으로,
+    계속 작업 중이면 안 끊기게」
+     · 아이디·비번(그 밖 모든 방식) → 포털 설정 시간(비우면 60분)
+     · 카카오                        → 3시간. 포털 설정이 그보다 길면 설정을 따른다(더 짧게 하지 않는다)
+     · 둘 다 «마지막으로 움직인 때»부터 잰다 — 움직이면 다시 처음부터(지금과 같다).
+   카카오인지는 서버가 서명한 인증표의 kakao:true 표시로 가린다(functions/kakao.js 가 넣는다).
+   그 결과를 pu_login_via 에 {uid, via, at} 로 적어 두고 모든 앱이 같은 값을 읽는다.
+   ★ 자동 로그아웃을 거는 다섯 화면(포털·이알피·정부사업일정·기업정보함·규정관리)은
+     제 시계의 시간을 PuActive.limitMs(제 기본값) 로 물어 쓴다 — 판정은 이 파일 한 곳뿐이다.
+   ⚠ 다른 사람이 남긴 표시(uid 가 다름)는 믿지 않는다. 더 새 로그인의 표시를 옛 것이 덮지 않는다.
+
    ── 쓰는 법 ─────────────────────────────────────────────────
-     <script src="js/pu-active.js?v=1"></script>   (로그인이 필요한 앱에 한 줄)
-   ⚠ 로그인 화면·공개 화면에는 넣지 않는다 — 거기엔 지킬 로그인이 없다.
+     <script src="js/pu-active.js?v=2"></script>   (로그인이 필요한 앱에 한 줄)
+   ⚠ 공개 화면에는 넣지 않는다 — 거기엔 지킬 로그인이 없다.
+     (포털 enter.html 은 로그인 화면이자 자동 로그아웃을 거는 곳이라 싣는다 — 시간을 여기서 묻는다.)
    ══════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
@@ -30,20 +43,83 @@
 
   var AKEY = 'pu_last_active';
   var AUTO_KEY = 'pu_portal_auto';
+  var VIA_KEY = 'pu_login_via';
   var EVERY_MS = 5000;                          // 이보다 자주 적지 않는다
   var DEFAULT_LIMIT = 60 * 60 * 1000;
+  var KAKAO_LIMIT = 3 * 60 * 60 * 1000;         // 카카오 로그인 3시간 (대표 지시 2026-11-18)
   var lastMark = 0;
+  var checkedKey = '';                          // 인증표를 이미 읽은 로그인 (uid|마지막 로그인 때)
 
   function lsGet(k) { try { return global.localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { global.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 
   /* 포털 공용 설정의 자동 로그아웃 시간 — 포털·이알피와 같은 잣대(10~480분만 인정) */
-  function limitMs() {
+  function baseMs() {
     try {
       var m = parseInt(global.PU_CFG && global.PU_CFG.idleMinutes, 10);
       if (m >= 10 && m <= 480) return m * 60 * 1000;
     } catch (e) { }
     return DEFAULT_LIMIT;
+  }
+
+  /* 지금 로그인한 사람 — 파이어베이스가 아직 없거나 앱을 안 열었으면 null */
+  function authUser() {
+    try {
+      var fb = global.firebase;
+      if (!fb || !fb.apps || !fb.apps.length || typeof fb.auth !== 'function') return null;
+      return fb.auth().currentUser || null;
+    } catch (e) { return null; }
+  }
+
+  function readVia() {
+    try {
+      var r = JSON.parse(lsGet(VIA_KEY) || 'null');
+      return (r && typeof r === 'object' && r.uid) ? r : null;
+    } catch (e) { return null; }
+  }
+
+  /* 어떻게 로그인했나를 적는다 — via: 'kakao' | 'password' | 그 밖
+     at: 그 로그인이 일어난 때(ms). 같은 사람의 더 새 기록은 옛 기록으로 덮지 않는다. */
+  function noteVia(uid, via, at) {
+    if (!uid) return false;
+    var t = Number(at) || 0;
+    var old = readVia();
+    if (old && old.uid === String(uid) && Number(old.at) > t) return false;
+    return lsSet(VIA_KEY, JSON.stringify({ uid: String(uid), via: String(via || 'other'), at: t }));
+  }
+
+  /* 인증표를 한 번 읽어 «카카오인지» 를 바로잡는다 — 로그인이 바뀌면 다시 읽는다.
+     ⚠ 인증표의 kakao 표시는 서버가 서명한 것이라 브라우저 값보다 믿을 만하다. */
+  function checkVia() {
+    var u = authUser();
+    if (!u || !u.uid || typeof u.getIdTokenResult !== 'function') return;
+    var key = u.uid + '|' + ((u.metadata && u.metadata.lastSignInTime) || '');
+    if (key === checkedKey) return;
+    checkedKey = key;
+    try {
+      u.getIdTokenResult().then(function (r) {
+        var c = (r && r.claims) || {};
+        var at = Date.parse((r && r.authTime) || '') || 0;
+        noteVia(u.uid, c.kakao === true ? 'kakao' : ((r && r.signInProvider) || 'other'), at);
+      }, function () { checkedKey = ''; });
+    } catch (e) { checkedKey = ''; }
+  }
+
+  /* 카카오로 들어왔나 — 다른 사람이 남긴 표시는 믿지 않는다.
+     파이어베이스가 아직 사람을 못 띄웠으면(새로 연 화면의 첫 1~2초) 적힌 표시를 따른다. */
+  function isKakao() {
+    var r = readVia();
+    if (!r || r.via !== 'kakao') return false;
+    var u = authUser();
+    if (u && u.uid && r.uid !== String(u.uid)) return false;
+    return true;
+  }
+
+  /* 자동 로그아웃 시간 — base 를 주면 그 화면의 기본값(포털 설정 반영)을 쓴다 */
+  function limitMs(base) {
+    var b = (typeof base === 'number' && base > 0) ? base : baseMs();
+    checkVia();
+    return isKakao() ? Math.max(b, KAKAO_LIMIT) : b;
   }
 
   /* 적어도 되나 — 이미 시간이 다 된 시계는 되살리지 않는다 */
@@ -68,9 +144,12 @@
 
   global.PuActive = {
     mark: mark,
+    limitMs: limitMs,       // 자동 로그아웃 시간 — 다섯 화면의 시계가 묻는다
+    noteVia: noteVia,       // 로그인 직후 «어떻게 들어왔나» 를 적는다(포털)
+    isKakao: isKakao,
     // 검사용
     _mayMark: mayMark,
     _limitMs: limitMs,
-    _reset: function () { lastMark = 0; }
+    _reset: function () { lastMark = 0; checkedKey = ''; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
