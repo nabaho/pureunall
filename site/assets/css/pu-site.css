@@ -1,0 +1,10 @@
+/* 홈페이지 공용 꾸밈 — 모든 쪽이 싣는다 (2026-11-18)
+   ★ 머리띠 고정 (대표 지시 「상단은 고정이 필요하다 그래야 다른 내용 찾는다」)
+     테마 스크립트가 스크롤하면 .header_wrap(PC)·.mobile_header_wrap(폰)에 .fixed 를 붙인다.
+     그 모양이 비어 있어 PC 머리띠는 위로 사라지고, 폰 머리띠는 투명하게 글 위에 겹쳤다. */
+.bh .header_wrap.fixed,.header_wrap.fixed{position:fixed;top:0;left:0;right:0;width:100%;z-index:1000;background-color:rgba(16,25,43,.96);box-shadow:0 2px 14px rgba(0,0,0,.22);animation:puHeadIn .25s ease-out}
+.bh .header_wrap.fixed .logo,.header_wrap.fixed .logo{margin:17px 0}
+.bh .header_wrap.fixed .main_menu>ul>li>a,.header_wrap.fixed .main_menu>ul>li>a{padding-top:19px;padding-bottom:19px}
+.bh .mobile_header_wrap.fixed,.mobile_header_wrap.fixed{background-color:rgba(16,25,43,.96);box-shadow:0 2px 10px rgba(0,0,0,.22)}
+@keyframes puHeadIn{from{transform:translateY(-100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.header_wrap.fixed{animation:none}}
