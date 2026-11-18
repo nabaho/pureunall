@@ -519,14 +519,30 @@ rules.invoice_arc = {
 };
 
 /* ══ 다른 앱들 ═════════════════════════════════════════════════════════ */
-rules.payroll_os = {
-  '.read': `auth != null && (${FIN} || ${ADMIN})`,
-  '.write': ADMIN,
-  $k: {
-    '.write': `(auth != null && (${FIN} || ${ADMIN})) && (newData.exists() || ${ADMIN})`,
-    $k2: { '.write': `auth != null && (${FIN} || ${ADMIN})` }
+/* 급여아웃소싱 — 대표 지시 2026-11-18 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」
+   재직 직원(LOGIN) 모두가 읽고 처리할 수 있는 업무 칸(workspace)으로 연다.
+   ⚠ 전 직원으로 넓히는 만큼 지워지거나 바뀌면 안 되는 네 자리는 이름으로 못 박는다:
+     · site_co_link — 사업장↔업체 이름표 확정은 대표(관리자)만 쓴다(화면 안내와 짝)
+     · rrn_key      — 주민번호 암호화 열쇠는 처음 한 번만 만들고 덮어쓰지 못한다(덮으면 옛 암호문이 영영 안 풀린다)
+     · rrn_log      — 주민번호 열람·입력 기록은 덧붙이기만 된다(고치거나 지우면 기록이 아니다)
+     · lock_log     — 급여 확정·되돌리기 기록도 덧붙이기만 된다 */
+rules.payroll_os = workspace({
+  site_co_link: { '.write': `auth != null && ${ADMIN}` },
+  rrn_key: {
+    $v: {
+      '.write': `(${LOGIN}) && !data.exists()`,
+      '.validate': '!data.exists() && newData.isString() && newData.val().length >= 32 && newData.val().length <= 200'
+    }
+  },
+  rrn_log: {
+    $id: { '.write': `(${LOGIN}) && !data.exists() && newData.exists()` }
+  },
+  lock_log: {
+    $site: {
+      $id: { '.write': `(${LOGIN}) && !data.exists() && newData.exists()` }
+    }
   }
-};
+});
 rules.fund_erp = workspace();
 rules.work_erp = workspace();
 rules.chwieop  = workspace();

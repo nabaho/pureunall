@@ -19,8 +19,8 @@
 
 ## 2. Firebase
 - 프로젝트 `pureun-erp`, RTDB `https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app`, SDK **10.13.2 compat** + App Check reCAPTCHA v3(키 `6Ldu1hEt...`).
-- 인증: **이메일/비번**(pu-erp 공유). 로그인 후 `uid_roles/{uid}`(isAdmin/fin) 권한 판별.
-- **규칙에 `payroll_os` 블록 게시됨**(`auth!=null && (fin || isAdmin)`). 그 외 pu-erp 규칙 불변.
+- 인증: **이메일/비번 · 패스키 · 카카오**(pu-erp 공유). 로그인 후 `uid_roles/{uid}`(재직 `status === 'active'`, `isAdmin`/`fin`/`sid`) 확인.
+- **규칙에 `payroll_os` 블록 게시됨**(2026-11-18 대표 지시로 재직 직원 전원 `LOGIN` 접근 가능, 이름표 `site_co_link` 관리자 전용 · `rrn_key` 덮어쓰기 차단 · `rrn_log`/`lock_log` 덧붙이기 전용). 그 외 pu-erp 규칙 불변.
 - 데이터 키: `payroll_os/site_cards`(설정카드 배열)·`/payroll`(급여, 사업장→시트/월→직원)·`/payroll_locked`(확정잠금맵 `사업장|월`).
 - 앱의 "가져오기" 버튼으로 `_harness_out`의 JSON을 payroll_os에 업로드.
 - ⚠️ 처음 열면 서버가 비어 "0곳"으로 보임 → 아래 4-데이터 재업로드로 복구(정상).
@@ -144,6 +144,7 @@ git rebase origin/main && git push origin <작업브랜치>:main   # main 은 pu
 - OCR도 마찬가지: `js/pu-doc-read.js`(데이터함 판독기)가 이미 한다. **주민번호·급여 금액을 애초에 읽지 않고**, 불확실한 줄은 노랗게 표시해 사람이 원본과 대조한다. ✅**하네스 OCR은 폐기 완료(2026-09-05)** — `engine/ocr_pipeline.py`·`ocr_triage.py`·`OCR_PLAN.md` 451줄 삭제. 하네스 방식은 「읽고 나서 마스킹」이라 「애초에 안 읽는」 판독기보다 위험했다. **급여관리에 OCR을 다시 만들지 말 것** — 필요하면 데이터함 판독기를 쓴다. (되살릴 일이 생기면 git 이력에 있다)
 
 ## 9. 변경 로그 (최신순 — 끝낼 때 추가)
+- 2026-11-18: **준비중 해제 · 재직 직원 전원 접근 개방**(대표 지시 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」) — 포털 `enter.html` 타일 `soon:true` 제거 + `payroll-os.html` 안쪽 `PuGate.soonUnlessAdmin('급여아웃소싱')` 제거(짝) + 실시간DB 규칙 `payroll_os` 를 재직 직원(`LOGIN`) 업무 칸으로 게시 완료(`docs/firebase-rules-콘솔원문-2026-11-18.json`, 이름표 `site_co_link` 관리자 전용 · `rrn_key` 덮어쓰기 차단 · `rrn_log`/`lock_log` 덧붙이기 전용) + 카카오·패스키 로그인 직원의 사번(`uid_roles.sid`) 기반 `내 담당` 매칭 보강. `status/2026-11-18-payroll-open-all-staff.md`.
 - 2026-11-12: **서버의 가짜 급여 줄 1,116개 정리** — 백업(저장소 밖) 후 월 줄·직원 표·자동수집 짝 119개 삭제, 남긴 줄은 정리 전과 동일(사업장 104곳·월 줄 2,262). `status/2026-11-12-payroll-server-cleanup.md`.
 - 2026-11-08: **가짜 급여 채우기 끔** — `autoSync2026FromMail` 은 이제 메일 요약(`mail_digest_2026`)만 모으고, 로그인 때 저절로 돌지 않는다.
   이미 들어간 가짜 줄은 `payRecs` 가 거르고, 뒷막이로 `effSig` 가 빨강. 검사 `tests/payroll-no-fake-autofill.test.js`(vm 에서 돌림, 옛 코드는 5/5 실패).

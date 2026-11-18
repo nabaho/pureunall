@@ -75,7 +75,8 @@ function load(o) {
     STAFF,
     'var PuSiteStaff = globalThis.PuSiteStaff;',
     'var App = ' + JSON.stringify(Object.assign({ screen: 'shell', site: null, month: null, emp: null, day: null, view: null, coId: null, loose: null, tab: 'sum', ym: '2026-08', q: '' }, o.App || {})) + ';',
-    'var me = ' + JSON.stringify({ email: o.email || 'p001@pureun.kr' }) + ';',
+    'var me = ' + JSON.stringify({ email: o.email === undefined ? 'p001@pureun.kr' : o.email }) + ';',
+    'var mySid = ' + JSON.stringify(o.mySid || '') + ';',
     'var isAdminUser = ' + JSON.stringify(o.isAdmin !== false) + ';',
     'var coData = { companies: PuSiteStaff.list(' + JSON.stringify(COS) + '), dir: ' + JSON.stringify(DIR) + ' };',
     'var coErr = "";',
@@ -142,6 +143,13 @@ test('★ 부담당도 「내 담당」이다 — 데이터함과 같은 규칙'
   assert.deepEqual(Array.from(m.view.list, c => c.id).sort(), ['c1', 'c2'], '부담당으로 맡은 회사가 내 담당에서 빠졌습니다');
   const vb = s.viewbarHtml(m);
   assert.equal(vb.indexOf('전체 사업장'), -1, '관리자가 아닌데 「전체」가 보입니다');
+});
+
+test('★ 카카오·패스키 로그인처럼 이메일이 비어 있어도 사번(uid_roles.sid)으로 「내 담당」을 찾는다', () => {
+  const s = load({ email: '', mySid: 'A-004', isAdmin: false });
+  const m = s.M();
+  assert.equal(m.view.key, 'mine');
+  assert.deepEqual(Array.from(m.view.list, c => c.id).sort(), ['c1', 'c2'], '이메일 없는 로그인 직원의 내 담당이 비어 버렸습니다');
 });
 
 test('담당자 줄은 사번 순 · 확정/전체를 센다', () => {
