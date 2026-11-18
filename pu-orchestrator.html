@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 오케스트레이션</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔄</text></svg>">
+<!-- ══════════════════════════════════════════════════════════════════════
+     푸른노무법인 업무 오케스트레이션 (pu-orchestrator.html) — 2026-11-17
+     포털(enter.html) 전체 프로그램 간 업무 흐름(메일·사진첩·계약서 ➔ 푸른이알피 원장 ➔
+     사건·조사·규정·컨설팅·기금·지원금 ➔ 업무관리·급여 ➔ 입금·컨설팅정산·환류)을
+     읽기 전용 온톨로지 규칙으로 실시간 조립하고 원클릭 바통(Baton)으로 이어 주는 통합 지휘소.
+     ★ 원본 무변경(sourceMutation:'never'): 파이어베이스에 쓰지 않으며, 상세 수정·확정은
+       각 정본 소유 프로그램으로 바통을 건네 처리한다.
+     ══════════════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-m:#dc2626; --red-bg:#fef2f2; --red-line:#fecaca;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Noto Sans KR',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:anywhere}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--blue);color:var(--blue-d)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.pri{background:var(--blue-d);border-color:var(--blue-d);color:#ffffff;font-weight:700}
+button.pri:hover{background:var(--blue);border-color:var(--blue);color:#ffffff}
+button.sm{padding:4px 9px;font-size:12px}
+button[aria-pressed="true"]{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-d);font-weight:700}
+input[type="search"],input[type="text"],select{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);min-width:0}
+input[type="checkbox"]{width:18px;height:18px;margin:0;vertical-align:middle;accent-color:var(--blue);cursor:pointer}
+.ck-hit{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;cursor:pointer}
+a{color:var(--blue-d);text-decoration:none}
+
+/* 상단 고정 헤더 & 탭 */
+#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:10px 18px;flex-wrap:wrap}
+.top-brand{display:flex;align-items:center;gap:8px}
+.top-mark{width:30px;height:30px;border-radius:9px;background:var(--blue-d);color:#ffffff;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:800}
+.top h1{font-size:16.5px;margin:0;color:var(--ink)}
+.top .sub{font-size:12px;color:var(--ink2)}
+.sp{flex:1}
+#who{font-size:13px;color:var(--ink2);font-weight:600}
+.portal-lnk{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--ink);font-size:12px;font-weight:700}
+.portal-lnk:hover{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
+
+.tabs{display:flex;gap:4px;padding:0 18px;overflow-x:auto;border-top:1px solid var(--bg)}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--ink2);padding:9px 12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.tabs button.on{color:var(--blue-d);font-weight:800;border-bottom-color:var(--blue)}
+
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip.c-blue{background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
+.chip.c-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.chip.c-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line)}
+.chip.c-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.chip.c-gray{background:var(--bg);color:var(--ink2);border:1px solid var(--line2)}
+
+/* 본문 레이아웃 */
+main{padding:14px 18px 56px;max-width:1520px;margin:0 auto;transition:margin-right .15s}
+body.with-drawer main{margin-right:390px}
+.pane{display:none}
+.pane.on{display:block}
+
+/* 5대 생애주기 파이프라인 상단 바 */
+.pipe-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.pipe-step{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:10px 12px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-align:left;white-space:normal}
+.pipe-step:hover{border-color:var(--blue);background:var(--bg)}
+.pipe-step.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-d)}
+.ps-top{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.ps-no{font-size:12px;font-weight:800;color:var(--ink2)}
+.pipe-step.on .ps-no{color:var(--blue-d)}
+.ps-cnt{font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
+.ps-cnt span{font-size:12px;font-weight:600;color:var(--ink2);margin-left:2px}
+.ps-lb{font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 필터 바 & 선택 일괄 작업 바 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:12px}
+.card-hd{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.bulk-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--blue-bg);border-bottom:1px solid var(--blue-line);color:var(--blue-d);flex-wrap:wrap}
+.bulk-bar[hidden]{display:none}
+.hint{font-size:12px;color:var(--ink2)}
+.notice-bar{padding:10px 14px;border-radius:10px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);font-size:12.5px;margin-bottom:10px}
+.notice-bar[hidden]{display:none}
+.mob-sel-head{display:none}
+.more-box{padding:10px 12px;text-align:center;border-top:1px solid var(--line);background:var(--bg)}
+
+/* 한 줄 원칙 표 (맨 왼쪽 ☐ 28px + № 36px 고정) */
+.tbl-wrap{overflow-x:auto}
+.orch-tbl{width:100%;border-collapse:collapse}
+.orch-tbl th,.orch-tbl td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+.orch-tbl th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:700}
+.orch-tbl .col-ck{width:28px;min-width:28px;text-align:center;padding-left:6px;padding-right:4px}
+.orch-tbl .col-no{width:36px;min-width:36px;text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums;padding-right:8px}
+.orch-tbl .col-sev{width:64px}
+.orch-tbl .col-flow{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.orch-tbl .col-co{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.orch-tbl .col-tt{max-width:360px;overflow:hidden;text-overflow:ellipsis}
+.orch-tbl .col-own{width:96px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.orch-tbl .col-due{width:96px;font-variant-numeric:tabular-nums}
+.orch-tbl .col-stg{width:84px;text-align:center}
+.orch-tbl .col-go{width:126px;text-align:right}
+.orch-row:hover td{background:var(--bg)}
+.orch-row.is-sel td{background:var(--blue-bg)}
+.orch-row.is-cur td{background:var(--blue-bg)}
+
+.cell-flex{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;overflow:hidden;vertical-align:middle}
+.cell-flex>b,.cell-flex>span:not(.chip):not(.tag-key):not(.tag-guess){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow-inline{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.f-arr{color:var(--blue);font-weight:800}
+.lnk-btn{display:inline-flex;align-items:center;min-height:28px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:none;background:transparent;padding:2px 0;color:var(--ink);text-align:left}
+.lnk-btn:hover{border:none;color:var(--blue-d);text-decoration:underline}
+.tag-key{display:inline-block;padding:1px 6px;border-radius:6px;background:var(--bg);border:1px solid var(--line2);color:var(--ink2);font-size:11px;font-variant-numeric:tabular-nums;flex-shrink:0}
+.tag-guess{display:inline-block;padding:1px 6px;border-radius:6px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);font-size:11px;font-weight:700;flex-shrink:0}
+.due-tx{font-size:12px;font-weight:700;color:var(--ink)}
+.due-tx.urg{color:var(--red)}
+.mute-tx{font-size:12px;color:var(--ink2)}
+
+/* 사업장 5단계 신호등 알약 */
+.stg-pill{display:inline-block;min-width:44px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:700;text-align:center}
+.stg-pill.st-urg{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.stg-pill.st-warn{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line)}
+.stg-pill.st-act{background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
+.stg-pill.st-done{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.stg-pill.st-idle{background:var(--bg);color:var(--mute);border:1px solid var(--line)}
+
+/* 표준 런북 & 전체 앱 연결 매트릭스 */
+.rb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-bottom:18px}
+.rb-card{padding:14px;margin-bottom:0}
+.rb-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.rb-desc{margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.5}
+.rb-chain{display:flex;flex-direction:column;gap:6px}
+.rb-step{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--bg)}
+.rb-step.done{background:var(--green-bg);border-color:var(--green-line)}
+.rb-no{width:20px;height:20px;border-radius:999px;background:var(--card);border:1px solid var(--line2);color:var(--ink2);font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.rb-tx{flex:1;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden}
+.rb-tx b{font-size:12.5px;white-space:nowrap}
+.rb-tx small{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sec-h{font-size:15px;margin:18px 2px 10px;color:var(--ink)}
+.app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;padding:12px}
+.app-node{padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;gap:4px}
+.an-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.an-role{font-size:11.5px;color:var(--ink2);line-height:1.4}
+
+/* 우측 상세 서랍 */
+#detailDrawer{display:none;position:fixed;top:var(--head-h,94px);right:0;bottom:0;width:380px;max-width:100vw;z-index:25;background:var(--card);border-left:1px solid var(--line2);box-shadow:-6px 0 20px rgba(30,41,59,.10);flex-direction:column}
+#detailDrawer.on{display:flex}
+.dr-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg)}
+#detailBody{flex:1;overflow-y:auto;padding:14px}
+.dr-sec{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.dr-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.dr-title{margin:0 0 6px;font-size:15px;color:var(--ink);line-height:1.4}
+.dr-reason{margin:0;font-size:12.5px;color:var(--ink2);line-height:1.55}
+.dr-kv{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;padding:10px 12px;border-radius:9px;background:var(--bg);border:1px solid var(--line)}
+.dr-kv>div{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
+.dr-kv span{color:var(--ink2)}
+.dr-memo-box{margin-bottom:14px}
+.dr-memo-box label{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:5px}
+.dr-memo-row{display:flex;gap:6px}
+.dr-memo-row input{flex:1}
+.dr-actions{display:flex;flex-direction:column;gap:7px}
+.dr-bitem{margin-top:8px;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;gap:5px}
+.dr-btop{display:flex;align-items:center;gap:6px;font-size:12px}
+.dr-btt{font-size:12.5px;color:var(--ink);font-weight:600}
+.dr-qgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+
+.empty{padding:36px 16px;text-align:center;color:var(--ink2)}
+.empty b{display:block;font-size:14px;color:var(--ink);margin-bottom:6px}
+.empty p{margin:0;font-size:12.5px}
+#lock{display:none;max-width:480px;margin:64px auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;padding:9px 16px;border-radius:9px;font-size:13px;font-weight:600;display:none;z-index:60;max-width:92vw}
+
+/* 태블릿·폰 화면 대응 (입력칸 16px 이상 · 넓은 표를 2줄 카드로 · ☐·№ 왼쪽 끝 유지) */
+@media (max-width:1200px){
+  body.with-drawer main{margin-right:0}
+  #detailDrawer{box-shadow:-10px 0 28px rgba(30,41,59,.18)}
+}
+@media (max-width:1024px){
+  .pipe-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:768px){
+  input[type="search"],input[type="text"],input,select,textarea{font-size:16px;min-height:38px}
+  button,button.sm,.portal-lnk{min-height:36px;padding:6px 10px}
+  button.lnk-btn{min-height:36px;padding:4px 0}
+  .top{padding:8px 10px;gap:6px}
+  .top .sub{display:none}
+  .tabs{padding:0 8px}
+  .tabs button{padding:8px 10px;font-size:12.5px;min-height:38px}
+  main{padding:10px 10px 64px}
+  .card{border:none;background:transparent;border-radius:0;margin-bottom:10px}
+  .bar{padding:6px 2px;border-bottom:1px solid var(--line)}
+  .pipe-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .pipe-step{padding:8px 10px}
+  .ps-cnt{font-size:17px}
+  .rb-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .rb-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .rb-step{flex-wrap:wrap;gap:6px}
+  .rb-tx{flex:1 1 160px;flex-direction:column;align-items:flex-start;gap:2px}
+  .app-grid{padding:6px 0}
+  .app-node{background:var(--card)}
+  #detailDrawer{top:0;left:0;right:0;width:100vw;z-index:45}
+  .mob-sel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;margin:6px 0;background:var(--card);border:1px solid var(--line);border-radius:9px;font-size:12.5px;font-weight:700;color:var(--ink2)}
+  .more-box{border:none;background:transparent;padding:8px 0}
+
+  /* 넓은 표 → 줄마다 깔끔한 모바일 카드 (☐·№ 왼쪽 끝 유지 · 짓눌림 0건) */
+  .orch-tbl thead{display:none}
+  .orch-tbl,.orch-tbl tbody{display:block;width:100%}
+  .orch-tbl tr.orch-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:8px 8px;margin-bottom:6px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+  .orch-tbl td{border:none;padding:1px 0;max-width:100%}
+  .orch-tbl .col-ck{width:28px;min-width:28px;padding:0}
+  .orch-tbl .col-no{width:26px;min-width:26px;text-align:left;padding:0;font-weight:700}
+  .orch-tbl .col-sev{width:auto}
+  .orch-tbl .col-flow{flex:1 1 130px;min-width:120px}
+  .orch-tbl .col-co{width:100%;padding-left:30px}
+  .orch-tbl .col-tt{width:100%;padding-left:30px}
+  .orch-tbl .col-stg{width:auto;padding-left:4px}
+  .orch-tbl .col-own,.orch-tbl .col-due{width:auto;padding-left:30px}
+  .orch-tbl .col-go{margin-left:auto;width:auto}
+}
+</style>
+</head>
+<body>
+
+<header id="head">
+  <div class="top">
+    <div class="top-brand">
+      <span class="top-mark" aria-hidden="true">🔄</span>
+      <div>
+        <h1>업무 오케스트레이션</h1>
+        <div class="sub">메일 · 계약 · 푸른이알피 · 사건/컨설팅 · 업무관리 · 정산 실시간 연결 지휘소</div>
+      </div>
+    </div>
+    <span class="sp"></span>
+    <span id="who"></span>
+    <button type="button" class="sm" id="refreshBtn" data-act="refresh" title="모든 프로그램의 최신 바통 상태를 다시 읽어옵니다">🔄 새로고침</button>
+    <a class="portal-lnk" href="enter.html">🏠 포털</a>
+    <button type="button" class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </div>
+  <div class="tabs" id="tabs" role="tablist" aria-label="오케스트레이션 보기 탭">
+    <button type="button" id="tab-batons" role="tab" aria-selected="true" aria-controls="p-batons" tabindex="0" data-tab="batons" class="on">
+      ⚡ 실행 바통 대기열 <span class="chip c-blue" id="nBatons">0</span>
+    </button>
+    <button type="button" id="tab-companies" role="tab" aria-selected="false" aria-controls="p-companies" tabindex="-1" data-tab="companies">
+      🏢 사업장 360° 흐름판 <span class="chip c-green" id="nCompanies">0</span>
+    </button>
+    <button type="button" id="tab-runbooks" role="tab" aria-selected="false" aria-controls="p-runbooks" tabindex="-1" data-tab="runbooks">
+      🗺️ 연결망 · 표준 런북
+    </button>
+    <button type="button" id="tab-diag" role="tab" aria-selected="false" aria-controls="p-diag" tabindex="-1" data-tab="diag">
+      🔗 연결 무결성 진단 <span class="chip c-amber" id="nDiag">0</span>
+    </button>
+  </div>
+</header>
+
+<div id="lock">
+  <h2>🔄 업무 오케스트레이션</h2>
+  <p id="lockWhy">재직 중인 직원 계정으로 열 수 있습니다.</p>
+  <p style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+    <a class="portal-lnk" href="enter.html">🏠 통합 포털로 이동</a>
+    <button type="button" class="sm" id="lockOutBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </p>
+</div>
+
+<main id="app" style="display:none">
+  <div id="loadNote" class="notice-bar" role="status" aria-live="polite" hidden></div>
+  <!-- 상단 5대 생애주기 단계 파이프라인 -->
+  <div class="pipe-grid" id="stagePipeline" role="group" aria-label="5대 업무 생애주기 단계 필터"></div>
+
+  <!-- 탭 1: 실행 바통 대기열 -->
+  <section class="pane on" id="p-batons" role="tabpanel" aria-labelledby="tab-batons">
+    <div class="card">
+      <div class="bar">
+        <input id="fltQ" type="search" aria-label="바통 검색" placeholder="사업장·고유번호·업무명·앱 이름 검색" style="flex:1;min-width:190px;max-width:320px">
+        <select id="fltSev" aria-label="긴급도 필터">
+          <option value="">긴급도 전체</option>
+          <option value="urgent">긴급만</option>
+          <option value="warn">주의만</option>
+          <option value="normal">일반 연계만</option>
+        </select>
+        <select id="fltApp" aria-label="관련 프로그램 필터">
+          <option value="">프로그램 전체</option>
+        </select>
+        <button type="button" class="sm" id="fltMineBtn" data-act="toggle-mine" aria-pressed="false">👤 내 담당만</button>
+        <button type="button" class="sm" id="fltDoneBtn" data-act="toggle-done" aria-pressed="false">✓ 확인·보류 포함</button>
+        <span class="sp"></span>
+        <span class="hint">행을 누르면 상세 맥락이 열리고, [실행 ➔]을 누르면 바통을 들고 해당 앱으로 건너갑니다</span>
+      </div>
+      <div class="bulk-bar" id="batonBulkBar" hidden></div>
+      <div id="batonTableBox"><div class="empty">흐름 데이터를 불러오는 중입니다…</div></div>
+    </div>
+  </section>
+
+  <!-- 탭 2: 사업장 360° 흐름판 -->
+  <section class="pane" id="p-companies" role="tabpanel" aria-labelledby="tab-companies">
+    <div class="card">
+      <div class="bar">
+        <input id="fltCoQ" type="search" aria-label="사업장 검색" placeholder="사업장명 · 고유번호(10001) · 담당자 검색" style="flex:1;min-width:200px;max-width:340px">
+        <select id="fltCoStage" aria-label="진행 단계 필터">
+          <option value="">생애주기 전체</option>
+          <option value="intake">① 유입·계약 활성</option>
+          <option value="case_rules">② 사건·규정 활성</option>
+          <option value="consulting_fund">③ 컨설팅·기금 활성</option>
+          <option value="work_payroll">④ 업무·급여 활성</option>
+          <option value="finance_settle">⑤ 입금·정산 활성</option>
+        </select>
+        <button type="button" class="sm" id="coPendingBtn" data-act="toggle-co-pending" aria-pressed="false">⚡ 대기 바통 있는 곳만</button>
+        <button type="button" class="sm" id="coMineBtn" data-act="toggle-co-mine" aria-pressed="false">👤 내 담당 사업장만</button>
+      </div>
+      <div class="bulk-bar" id="coBulkBar" hidden></div>
+      <div id="companyTableBox"></div>
+    </div>
+  </section>
+
+  <!-- 탭 3: 연결망 · 표준 런북 -->
+  <section class="pane" id="p-runbooks" role="tabpanel" aria-labelledby="tab-runbooks">
+    <div id="runbooksBox"></div>
+  </section>
+
+  <!-- 탭 4: 연결 무결성 진단 -->
+  <section class="pane" id="p-diag" role="tabpanel" aria-labelledby="tab-diag">
+    <div id="diagBox"></div>
+  </section>
+</main>
+
+<!-- 우측 상세 맥락 서랍 -->
+<aside id="detailDrawer" role="dialog" aria-modal="false" aria-labelledby="drHeadTitle">
+  <div class="dr-head">
+    <b id="drHeadTitle">🔎 연결 상세 맥락</b>
+    <button type="button" class="sm" id="drCloseBtn" data-act="close-drawer">닫기 ✕</button>
+  </div>
+  <div id="detailBody"></div>
+</aside>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 표시는 관문 탑재 검사용이며, orch 는 localOnly + 비유예 앱이므로 강제(enforce) 모드로 쓰기가 원천 차단됩니다 -->
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-appbar.js?v=51"></script>
+<script src="js/pu-active.js?v=1"></script>
+<script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-back.js?v=5"></script>
+<script>
+try{
+  PuBack.guard(function(){
+    var dr = document.getElementById('detailDrawer');
+    if(dr && dr.classList.contains('on')){
+      if(window.PuOrchestratorView && window.PuOrchestratorView.closeDrawer) window.PuOrchestratorView.closeDrawer();
+      else { dr.classList.remove('on'); document.body.classList.remove('with-drawer'); }
+      return true;
+    }
+    return false;
+  });
+}catch(e){}
+</script>
+<script src="js/pu-orchestrator-core.js?v=4"></script>
+<script src="js/pu-orchestrator-view.js?v=4"></script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+if(location.protocol==='file:'){
+  document.getElementById('lock').style.display='block';
+  document.getElementById('lockWhy').textContent='file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요';
+} else if(typeof firebase==='undefined'){
+  document.getElementById('lock').style.display='block';
+  document.getElementById('lockWhy').textContent='인터넷 연결이 필요합니다';
+} else {
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  if(window.PuOrchestratorView) PuOrchestratorView.boot(firebase);
+  else if(window.PuGate) PuGate.show();
+}
+</script>
+</body>
+</html>

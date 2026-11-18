@@ -156,11 +156,12 @@
     },
     {
       id: 'store',
-      title: '② 자료함 (7개 앱 · 캘린더는 머리줄 단추)',
-      badge: '서류 · 명함 · 메일 · 일정 · 업무 · 법령 허브',
-      summary: '현장 사진·서류·명함·메일·계약서·주간 할 일·일정·법령·판례를 모아 다듬고 [의뢰인 업무] 앱들로 공급하는 허브 줄입니다.',
+      title: '② 자료함 (8개 앱 · 캘린더는 머리줄 단추)',
+      badge: '서류 · 명함 · 메일 · 오케스트레이션 · 업무 · 법령 허브',
+      summary: '현장 사진·서류·명함·메일·계약서·주간 할 일·일정·법령·판례를 모아 다듬고 전 프로그램 업무 흐름(오케스트레이션)을 이어 주는 허브 줄입니다.',
       apps: [
         { key: 'cal',       icon: '📅', name: '푸른 캘린더',   when: '법인 전체 방문·재판·상담 일정 공유, 구성원 근태(휴가·외근), 이음센터 확인', from: '푸른이알피 일정·근태 칸 공유, 기업정보함(미팅 시 명함 색인 참조)', to: '푸른이알피·인사관리 근태 기록과 실시간 한 몸으로 반영', ask: '푸른 캘린더에 일정을 넣으면 인사관리·이알피와 어떻게 연동되나요?' },
+        { key: 'orch',      icon: '🔄', name: '오케스트레이션', when: '전 프로그램 간 멈춰 있는 업무 바통(계약요청·견적·조사동기화·컨설팅·지원금·입금·정산) 실시간 감지 및 사업장 360° 생애주기 지휘', from: '푸른이알피·계약서등관리·업무관리·컨설팅·지원금·재무·정산 등 전 앱 경량 원장(읽기 전용)', to: '각 정본 소유 앱 해당 화면으로 세션 바통(맥락)을 실어 원클릭 점프 및 복귀', ask: '오케스트레이션 앱은 28개 프로그램 업무 흐름을 어떻게 자동으로 이어 주나요?' },
         { key: 'photos',    icon: '🖼️', name: '사진첩',         when: '사업자등록증·명함·통장·근로계약서·현장사진 촬영(우측하단 📷) 및 주민번호 가림 후 AI 판독', from: '포털 📷 푸른카메라, 휴대폰·PC 사진·PDF·HWP 업로드', to: '기업정보함(사업자·명함), 푸른이알피(업체 채움·계약요청·근로자 통장), 푸른 메일(직접 발송)', ask: '사진첩에서 찍은 서류가 기업정보함·이알피·메일로 나가는 전체 연결도를 알려줘' },
         { key: 'cards',     icon: '📇', name: '기업정보함',     when: '거래처 사업자등록증·담당자 명함 통합 검색, 기업 상세 카드 및 연도별 전체 업무 이력 조회', from: '사진첩(판독 명함·사업자), 푸른이알피(업체·사건·계약), 기업규정집(개정 이력)', to: '푸른이알피·기금관리·푸른 캘린더에 사업자·담당자 정보 공급, 푸른 메일 발송 연동', ask: '기업정보함에서는 어떤 정보를 볼 수 있고 어느 앱들과 연결되나요?' },
         { key: 'docs',      icon: '📤', name: '계약서등관리',   when: '견적서·자문계약서·사건 위임장 양식 작성 및 의뢰인 휴대폰 전자서명 링크 발송·보관', from: '푸른이알피 계약서 양식 공유, 의뢰인 전자서명 수신', to: '기업별 계약서 원본 보관 및 사건·계약 진행 증빙', ask: '계약서등관리에서 전자서명 위임장·계약서는 어떻게 보내고 관리하나요?' },
@@ -295,8 +296,8 @@
         'P박스로 법령·판례 검색과 계약서·서면 내용 검토는 어떻게 하나요?',
         '계약서등관리와 사진첩의 계약서 등록은 무엇이 달라?'
       ],
-      tags: ['자료함', '두번째줄', '2번째줄', '자료함사용법', '자료함연결도', '서류연결', '메일연결', '허브', '드래그', '드래그앤드롭', '첨부', '다운받', 'P박스', '피박스'],
-      apps: ['photos', 'cards', 'mail', 'work', 'docs', 'cal', 'aliounion', 'pbox']
+      tags: ['자료함', '두번째줄', '2번째줄', '자료함사용법', '자료함연결도', '서류연결', '메일연결', '허브', '드래그', '드래그앤드롭', '첨부', '다운받', 'P박스', '피박스', '오케스트레이션'],
+      apps: ['photos', 'cards', 'mail', 'work', 'docs', 'cal', 'aliounion', 'pbox', 'orch']
     },
     {
       id: 'SYS-row-sales',
@@ -380,6 +381,26 @@
       ],
       tags: ['P박스', '피박스', 'pbox', '법령전수함', '국가법령', '판례검색', '하급심', '행정해석', '유권해석', '내용검토', '문서작성', '위험진단', '인용검증'],
       apps: ['pbox']
+    },
+    {
+      id: 'SYS-orch-01',
+      cat: 'system',
+      flowId: 'flow-core',
+      source: '푸른포털 앱 사용법',
+      docNo: '오케스트레이션 지휘소 사용법',
+      law: '① 유입·계약 ➔ ② 사건·조사·규정 ➔ ③ 컨설팅·기금·지원금 ➔ ④ 주간실행·급여 ➔ ⑤ 입금·정산 5대 생애주기 바통 지휘',
+      title: '[오케스트레이션] 28개 앱 간 멈춘 바통 감지 및 사업장 360° 흐름판 사용법',
+      q: '오케스트레이션 앱은 28개 프로그램 업무 흐름을 어떻게 이어 주나요?',
+      a: '[오케스트레이션]은 포털 상단 실시간 흐름 바와 [오케스트레이션] 타일에서 여는 전사 바통 지휘소입니다.\n① [⚡ 실행 바통 대기열]: 사진첩 계약요청 대기, 견적 발송 미전환, 괴롭힘 조사↔이알피 미동기화, 일터상생·산업일자리 방 개설 대기, 지원금 신청대행 할 일, 기한 임박 사건, 미매칭 입금·미확정 컨설팅정산 등 여러 앱 사이에 걸려 있는 바통을 한곳에 모아 보여줍니다.\n② [원클릭 바통 점프 & 복귀]: 행의 `[실행 ➔]` 단추를 누르면 정본 앱의 해당 탭으로 이동하며 화면 하단에 바통 안내 띠와 `[흐름판 복귀]` 단추가 따라갑니다.\n③ [🏢 사업장 360° 흐름판 & 표준 런북]: 거래처별 5대 생애주기 신호등, 8대 실무 표준 런북 체크리스트, 온톨로지 무결성 진단을 원본 무변경(`sourceMutation: never`) 원칙으로 수행합니다.',
+      points: [
+        '오케스트레이션은 파이어베이스 원본을 고치거나 덮어쓰지 않고 읽기만 하며, 확정은 정본 앱에서 처리합니다',
+        '체크박스(☐)로 여러 바통을 골라 확인 완료·오늘 하루 보류로 정리하거나 진행 요약을 클립보드에 복사할 수 있습니다'
+      ],
+      followUps: [
+        '푸른통합시스템에서 앱끼리 연결도가 어떻게 되어 있나요?'
+      ],
+      tags: ['오케스트레이션', '업무오케스트레이션', '바통', '바통대기열', '흐름판', '생애주기', '런북', '360도흐름판', 'orchestration', 'orch'],
+      apps: ['orch']
     },
     {
       id: 'SYS-harass-01',
@@ -1138,7 +1159,7 @@
   /* ── Ⅳ. 신규 프로그램 무보수 자동 감지 · 온톨로지 연결도 · 화면 HTML 파서 엔진 ── */
   var STATIC_COVERED_APPS = {
     erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1,
-    hangul: 1, rules: 1, payroll: 1, cal: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
+    hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
     aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1,
     hr: 1, fin: 1, settle: 1, deungi: 1, career: 1
   };
@@ -1147,6 +1168,7 @@
     fund: 'SYS-fund-01',
     deungi: 'SYS-deungi-01',
     pbox: 'SYS-pbox-01',
+    orch: 'SYS-orch-01',
     harass: 'SYS-harass-01',
     ilteo: 'SYS-ilteo-01',
     jobtrans: 'SYS-jobtrans-01'
@@ -1853,6 +1875,7 @@
     if (/급여아웃소싱/.test(q) && it.id === 'SYS-row-client') score += 28;
     if (/공공임단협|알리오|타임오프/.test(q) && it.id === 'SYS-work-cal-01') score += 34;
     if (/p박스|피박스|\bpbox\b/i.test(q) && it.id === 'SYS-pbox-01') score += 45;
+    if (/오케스트레이션|바통\s*대기열|흐름판|\borch\b/i.test(q) && it.id === 'SYS-orch-01') score += 48;
     if ((/괴롭힘[·\s]*성희롱\s*조사|\bharass\b/i.test(q) || (/괴롭힘/.test(q) && /앱|프로그램|화면|타일|사용법|어디서|연결도|공문\s*메일|8단계|진술확인서/.test(q))) && it.id === 'SYS-harass-01') score += 48;
     if (/일터상생혁신|\bilteo\b/i.test(q) && it.id === 'SYS-ilteo-01') score += 48;
     if (/산업일자리전환|\bjobtrans\b/i.test(q) && !/무료.*컨설팅.*종류/.test(q) && it.id === 'SYS-jobtrans-01') score += 48;
@@ -2012,7 +2035,7 @@
     payroll: 'payroll', paydata: 'payroll',
     cards: 'cards', photos: 'cards',
     docs: 'docs', hangul: 'docs',
-    news: 'portal', home: 'portal', rehabad: 'portal', signboard: 'portal', aliounion: 'portal', pbox: 'portal', portal: 'portal'
+    news: 'portal', home: 'portal', rehabad: 'portal', signboard: 'portal', aliounion: 'portal', pbox: 'portal', orch: 'portal', portal: 'portal'
   };
 
   function matchExplicitImproveCat(text) {
@@ -2025,7 +2048,7 @@
     if (/기업규정집|취업규칙/.test(hay)) return 'rules';
     if (/급여아웃소싱|급여데이터함|\bpaydata\b/i.test(hay)) return 'payroll';
     if (/푸른이알피|이알피|재무관리|인사관리|경력관리|푸른등기|변경등기|기업정부지원금|괴롭힘[·\s]*성희롱\s*조사|\bharass\b|자문계약|사건관리|업체관리|계약\s*저장/i.test(hay)) return 'erp';
-    if (/포털|챗봇|길잡이|뉴스레터|홈페이지|회생광고|전광판|공공임단협|P박스|p박스|피박스|\bpbox\b/i.test(hay)) return 'portal';
+    if (/포털|챗봇|길잡이|뉴스레터|홈페이지|회생광고|전광판|공공임단협|오케스트레이션|P박스|p박스|피박스|\bpbox\b|\borch\b/i.test(hay)) return 'portal';
     var dynApps = detectMentionedApps(hay);
     for (var i = 0; i < dynApps.length; i++) {
       var mapped = APP_TO_SG_CAT[dynApps[i]];
@@ -2172,7 +2195,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];
