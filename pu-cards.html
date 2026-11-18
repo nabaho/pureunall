@@ -2740,6 +2740,32 @@ table.sbox td span.sn{display:inline-block;min-width:22px;color:#94a3b8;font-siz
   padding:7px 9px;font-size:13px;font-family:inherit}
 #folderMenu .fmform button{flex:none;border:none;background:#2563eb;color:#fff;
   border-radius:7px;padding:0 12px;font-size:13px;font-family:inherit;cursor:pointer}
+/* 👤 담당자 창 — 사람 이름 오른쪽 빠른 버튼(사업장 지정 · 과거까지 · 사건) 및 인라인 사업장 고르개 (2026-11-18) */
+#folderMenu .fmi.fmrow{display:flex;flex-wrap:wrap;align-items:center;gap:5px 6px;padding:7px 10px 7px 14px}
+#folderMenu .fmi.fmrow .fm-nm{flex:1;min-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#folderMenu .fm-acts{display:inline-flex;align-items:center;gap:4px;margin-left:auto;flex:none}
+#folderMenu .fm-qbtn{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:6px;
+  padding:4px 8px;min-height:28px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.3;white-space:nowrap}
+#folderMenu .fm-qbtn:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+#folderMenu .fm-qbtn:focus-visible,#folderMenu .fmi:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}
+#folderMenu .fm-qbtn.past{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+#folderMenu .fm-qbtn.past:hover{background:#166534;border-color:#166534;color:#fff}
+#folderMenu .fm-qbtn.wk{border-color:#e2e8f0;background:#fff;color:#475569}
+#folderMenu .fm-qbtn.wk:hover{border-color:#cbd5e1;background:#f8fafc;color:#1e293b}
+#folderMenu .fmhead.fm-wide{max-width:340px;white-space:normal;line-height:1.45;color:#475569;word-break:keep-all}
+#folderMenu .fmhead.fm-wide span{display:block;font-size:11.5px;color:#64748b;margin-top:2px;font-weight:400}
+#folderMenu .fm-panel-sec{padding:7px 12px;border-bottom:1px solid #e2e8f0;font-size:11.5px;color:#1e293b;max-width:340px;box-sizing:border-box;word-break:keep-all;line-height:1.45}
+#folderMenu .fm-panel-sec.tax-on{background:#f0fdf4}
+#folderMenu .fm-panel-sec.tax-off{background:#f8fafc}
+#folderMenu .fm-panel-sec.past-bar{padding:6px 12px;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e40af}
+#folderMenu .fm-search{padding:7px 10px;border-bottom:1px solid #e2e8f0;max-width:340px;box-sizing:border-box}
+#folderMenu .fm-search input{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;font-family:inherit;color:#1e293b;background:#fff}
+#folderMenu .fm-co-warn{display:inline-flex;align-items:center;flex:none;margin:0;padding:2px 6px;border-radius:5px;font-size:11px;font-weight:700;
+  line-height:1.3;white-space:nowrap;background:#fffbeb;border:1px solid #fde68a;color:#854d0e}
+#folderMenu .fm-co-ok{display:inline-flex;align-items:center;flex:none;margin:0;padding:2px 6px;border-radius:5px;font-size:11px;font-weight:700;
+  line-height:1.3;white-space:nowrap;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+#folderMenu .fmi.fmco{display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:8px 12px;max-width:340px;box-sizing:border-box;white-space:normal}
+#folderMenu .fmi.fmco .fmco-main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 열 깔때기 팝업에서 지금 고른 값을 짚어 준다 — 어느 값으로 걸러 놨는지 모르고
    또 눌러 헷갈리면 안 된다 */
 #folderMenu .fmi.on{background:#f8fafc;color:#1e40af;font-weight:700}
@@ -3607,14 +3633,28 @@ body.pc #pcDetail{display:flex}
 .tax-card{background:#fff;border-radius:14px;padding:18px 20px;width:100%;max-width:380px;
   box-shadow:0 16px 50px rgba(10,20,50,.28);box-sizing:border-box}
 .tax-card .tax-t{font-size:14.5px;font-weight:800;color:#1e293b}
-.tax-card .tax-sub{font-size:12px;color:#94a3b8;margin:2px 0 14px}
-.tax-card label{display:block;font-size:11.5px;color:#64748b;margin:9px 0 4px}
+.tax-card .tax-sub{font-size:12px;color:#64748b;margin:2px 0 14px;word-break:keep-all}
+.tax-card label{display:block;font-size:11.5px;color:#475569;margin:9px 0 4px}
 .tax-card input{width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;
-  font-size:12.5px;font-family:inherit;box-sizing:border-box}
+  font-size:13px;font-family:inherit;box-sizing:border-box}
 .tax-card input:disabled{background:#f8fafc;color:#64748b}
 .tax-card .tax-note{margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e293b;
-  border-radius:8px;padding:8px 10px;font-size:11.5px;line-height:1.6}
+  border-radius:8px;padding:8px 10px;font-size:11.5px;line-height:1.6;word-break:keep-all}
 .tax-card .tax-row{display:flex;gap:7px;justify-content:flex-end;margin-top:14px}
+.tax-card.wide{max-width:460px;max-height:88vh;overflow-y:auto}
+.tax-card input.tax-chk{width:16px;height:16px;padding:0;margin:2px 0 0;flex:none;accent-color:#1e40af;cursor:pointer}
+.tax-chkbox{margin:8px 0 10px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;padding:8px 10px}
+.tax-card label.tax-co-row{display:flex;align-items:flex-start;gap:8px;margin:0;padding:6px 4px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#1e293b;line-height:1.5;cursor:pointer}
+.tax-card label.tax-co-row:last-of-type{border-bottom:none}
+.tax-badge{display:inline-block;border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;white-space:nowrap}
+.tax-badge.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.tax-badge.warn{background:#fffbeb;border:1px solid #fde68a;color:#854d0e}
+.tax-badge.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.tax-card label.tax-confirm{display:flex;align-items:flex-start;gap:8px;margin:10px 0 0;padding:8px 10px;border-radius:8px;
+  background:#fffbeb;border:1px solid #fde68a;color:#854d0e;font-size:12px;line-height:1.55;cursor:pointer;word-break:keep-all}
+.tax-card label.tax-past{display:flex;align-items:center;gap:8px;margin:8px 0 0;padding:7px 10px;border-radius:8px;
+  background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:12px;line-height:1.45;cursor:pointer}
+@media(max-width:760px){#folderMenu .fm-search input,.tax-card input:not(.tax-chk){font-size:16px}}
 #cardsLogin{position:fixed;inset:0;z-index:9999;background:#f8fafc;display:none;align-items:center;justify-content:center;padding:20px}
 #cardsLogin .cl-card{width:100%;max-width:360px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px 24px;box-shadow:0 10px 40px rgba(20,30,50,.08)}
 #cardsLogin .cl-brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
@@ -20927,7 +20967,7 @@ function mbWhoIndex(){
          곧바로 co 를 쓴 것과 «다른» 담당자를 주는 업체 0곳, 주소 248개 그대로.
          잃는 것이 없으므로 «한 자리에서만 판정한다»는 쪽을 골랐다. */
     const rec = (typeof ErpMatch!=='undefined' && ErpMatch.match)
-      ? ErpMatch.match({ bizno: co.bizNo, company: co.name }) : null;
+      ? ErpMatch.match({ erpCoId: co.id, bizno: co.bizNo, company: co.name }) : null;
     if(!rec || (!rec.main && !rec.left)) return;
     if(okMail(co.email)) put(co.email, rec);
     if(okMail(co.primaryContactEmail)) put(co.primaryContactEmail, rec);
@@ -20959,7 +20999,7 @@ function mbWhoIndex(){
       const em = String(co[f]||'').trim().toLowerCase();
       if(!okMail(em) || (extraCos[em]||[]).length !== 1) return;
       const rec = (typeof ErpMatch!=='undefined' && ErpMatch.match)
-        ? ErpMatch.match({ bizno: co.bizNo, company: co.name }) : null;
+        ? ErpMatch.match({ erpCoId: co.id, bizno: co.bizNo, company: co.name }) : null;
       if(!rec || (!rec.main && !rec.left)) return;
       put(em, rec, true);
     });
@@ -22159,11 +22199,59 @@ function mbHqRec(rec){
   return r || rec;
 }
 function mbCoRecOfAddr(em){
+  /* ★ 열쇠(id)가 함께 적힌 새 꼴({n,id})이면 id 로 먼저 찾는다 — 이름이 같거나 바뀐 사업장이
+     다른 담당자에게 섞이는 일을 막는다 (서버 functions/mail-owner.js coRecOf 와 같은 차례). */
+  if(typeof _mbCo !== 'undefined' && _mbCo && typeof ErpMatch !== 'undefined' && ErpMatch.byId){
+    const d0 = typeof mbDomOf === 'function' ? mbDomOf(em) : '';
+    const raw = _mbCo[mbWhoKey(em)] || (d0 ? _mbCo[mbWhoKey('@' + d0)] : null);
+    if(raw && typeof raw === 'object' && raw.id && ErpMatch.byId[String(raw.id)]){
+      return mbHqRec(ErpMatch.byId[String(raw.id)]);
+    }
+  }
   const r = mbCoRec(mbCoOf(em));
   if(r) return mbHqRec(r);
   const id = (_mbWkAddr||{})[em];
   const w = (id && typeof ErpMatch !== 'undefined' && ErpMatch.byId) ? (ErpMatch.byId[String(id)] || null) : null;
   return w ? mbHqRec(w) : null;
+}
+/* 🧾 한 세무사무실 이메일(byTaxEmail)이 여러 사업장을 함께 맡을 때:
+   ① 맡은 활성 사업장들의 주담당이 모두 같은 한 사람이면 그 사업장 기록을 돌려준다.
+   ② 담당자가 다르면 이 메일의 제목(v.s)·첨부 파일명(v.an)·미리보기(v.p)에 적힌 사업장을 짚어 그 담당자에게 보낸다. */
+function mbTaxRecOfRow(v){
+  if(!v || typeof ErpMatch === 'undefined' || !ErpMatch.byTaxEmail) return null;
+  const em = String(v.e || '').trim().toLowerCase();
+  if(!em) return null;
+  const list = ErpMatch.byTaxEmail[em];
+  if(!list || !list.length) return null;
+  const live = [];
+  list.forEach(c=>{
+    const r = (c && c.id && ErpMatch.byId && ErpMatch.byId[String(c.id)]) || mbCoRec(c && (c.coName || c.company));
+    const eff = r ? mbHqRec(r) : null;
+    const owner = eff && !eff.left ? mbWhoLive(eff.main) : '';
+    if(eff && owner){
+      const nm = ErpMatch._norm((c && (c.coName || c.company)) || eff.company || '');
+      live.push({ raw: c, rec: eff, owner: owner, nm: nm });
+    }
+  });
+  if(!live.length) return null;
+  const owners = [];
+  live.forEach(x=>{ if(owners.indexOf(x.owner) < 0) owners.push(x.owner); });
+  const src = v._src || v;
+  const an = Array.isArray(src.an) ? src.an.join(' ') : (Array.isArray(v.an) ? v.an.join(' ') : '');
+  const hay = ErpMatch._norm(String(v.s || src.s || '') + ' ' + an + ' ' + String(v.p || src.p || ''));
+  if(hay.length >= 2){
+    const full = live.filter(x => x.nm.length >= 2 && hay.indexOf(x.nm) >= 0);
+    if(full.length === 1) return full[0].rec;
+    if(full.length > 1){
+      const fw = [];
+      full.forEach(x=>{ if(fw.indexOf(x.owner) < 0) fw.push(x.owner); });
+      if(fw.length === 1) return full[0].rec;
+    }
+    const pref = live.filter(x => x.nm.length >= 4 && hay.indexOf(x.nm.slice(0, 4)) >= 0);
+    if(pref.length === 1) return pref[0].rec;
+  }
+  if(owners.length === 1) return live[0].rec;
+  return null;
 }
 /* ── 이 메일의 담당자 ── 받은 메일은 «보낸이» 주소로 본다 */
 function mbWhoOfRow(v, idx0){
@@ -22183,6 +22271,12 @@ function mbWhoOfRow(v, idx0){
   if(byWk) return byWk;
   const w = mbWhoWhy(em, idx0).who;
   if(w) return w;
+  /* ⑤-2 다수 사업장 공용 세무사무실(byTaxEmail) — 이 메일이 가리키는 사업장의 주담당 */
+  const taxRec = (typeof mbTaxRecOfRow === 'function') ? mbTaxRecOfRow(v) : null;
+  if(taxRec){
+    const tw = mbWhoLive(taxRec.main);
+    if(tw) return tw;
+  }
   /* ⑥ 이 칸을 보는 사람 — «맨 뒤»다 (대표 승인 목업 2026-10-06).
      ⚠ 주소 판정(mbWhoWhy)이 아니라 «여기»에 둔다. 칸은 줄마다 다르고, 주소 판정은
        주소 하나에 한 번만 셈해 담아 둔다 — 거기 넣으면 같은 주소의 메일이 어느 칸에
@@ -22797,6 +22891,7 @@ function mbSubsOfRow(v, idx0){
     const co = (idx.coAddr||{})[em];
     rec = co ? mbHqRec(mbCoRec(co)) : null;
   }
+  if(!rec && typeof mbTaxRecOfRow === 'function') rec = mbTaxRecOfRow(v);
   const out = [];
   const main = (rec && rec.main) || '';
   if(rec && !rec.left && Array.isArray(rec.subs)){
@@ -23372,9 +23467,26 @@ function mbWasRetired(v, idx0){
 /* ── 담당자 칸에 담기는 메일의 «울타리» ──
    업무 칸(우리 칸)에 든 것만 본다. 받은메일함·보낸메일함·휴지통까지 넣으면 「담당 모름」이
    광고·뉴스레터로 가득 차 일할 자리가 못 된다. 숨긴 칸도 뺀다. */
-function mbWhoScope(v){
+function mbIsPersonBox(id){
+  const s = String(id || '');
+  return s.charAt(0) === MB_WHO_P && s !== MB_WHO_NA && s !== MB_WHO_OTH && s !== MB_WHO_END && s !== MB_WHO_OFF;
+}
+function mbWhoScope(v, idx0){
   const b = mbBinOfRow(v);
-  return !!(b && !mbHidden(b.id));
+  if(b) return !mbHidden(b.id);
+  /* ★ 받은메일함(inbox)·보관메일함(archive)·📦 지난 메일(*old)이라도 담당 사업장·담당자가 확인된 메일은
+     그 사람 칸으로 바로 가져온다 (대표 지시 2026-11-18 「자기 사업장을 지정하는데 제대로 안가지고 온다 · 과거자료까지」).
+     ⚠ 담당 모름(@?)·그 밖(@#)·자문종료(@!)에는 안 넣는다 — 넣으면 광고·지난 메일 수만 통이 담당 모름으로 쏟아진다. */
+  const slug = String((v && v._slug) || '');
+  const isOld = (typeof MB_OLD_ID !== 'undefined' && slug === MB_OLD_ID);
+  if(!isOld){
+    const f = typeof mbFolderBy === 'function' ? mbFolderBy(slug) : null;
+    if(!f || (f.kind !== 'inbox' && f.kind !== 'archive')) return false;
+  }
+  if(typeof mbWhoOfRow !== 'function') return false;
+  const idx = idx0 || (typeof mbWhoIndex === 'function' ? mbWhoIndex() : null);
+  if(typeof mbEndedOfRow === 'function' && mbEndedOfRow(v, idx)) return false;
+  return !!mbWhoOfRow(v, idx);
 }
 
 /* ── 담당자 목록 ── 자문사를 맡은 사람만. 빈 칸이 늘어서면 왼쪽만 길어진다. */
@@ -23398,13 +23510,14 @@ function mbWhoTally(){
   const idx = mbWhoIndex();                       /* 표는 «여기서 한 번»만 찾는다 */
   /* ⚠ _reuse — 내용만 바꿔 «돌려 쓰는» 한 개라, 객체를 열쇠로 기억하는 셈(mbBinIdOfRow·mbIsSpam)이
      첫 메일 답을 모든 메일에 주지 않게 표시한다(2026-10-03). */
-  const v = { e:'', r:0, _slug:'', _key:'', _reuse:1 };      /* 돌려 쓰는 한 개 */
+  const v = { e:'', s:'', p:'', an:null, r:0, _slug:'', _key:'', _reuse:1 };      /* 돌려 쓰는 한 개 */
   Object.keys(_mbMsgs||{}).forEach(slug=>{
     const box = _mbMsgs[slug]||{};
     Object.keys(box).forEach(uid=>{
       const row = box[uid]; if(!row) return;
       v.e = row.e; v.r = row.r; v._slug = slug; v._key = slug + ':' + uid; v._src = row;   /* 원본을 가리켜 판정 기억을 함께 쓴다 */
-      if(!mbWhoScope(v)) return;
+      v.s = row.s || ''; v.p = row.p || ''; v.an = row.an || null;
+      if(!mbWhoScope(v, idx)) return;
       const unread = !Number(row.r||0);
       if(mbEndedOfRow(v, idx)){ ended.n++; if(unread) ended.un++; return; }
       /* ⚠ 자문종료 «다음», 담당자 판정 «앞»이다. 칸이 「사람 안 붙임」이면 담당자 칸에도
@@ -23477,10 +23590,10 @@ function mbRowFits(v, id, idx0){
   if(String(id).charAt(0)===MB_RAW_P) return true;         /* 원본 — 쪽지를 안 본다 */
   /* 담당자 칸 — 자리를 옮기는 것이 아니라 «거르는» 것이다(대표 지시 2026-08-26) */
   if(String(id).charAt(0)===MB_WHO_P){
-    if(!mbWhoScope(v)) return false;
+    const idx = idx0 || mbWhoIndex();
+    if(!mbWhoScope(v, idx)) return false;
     /* ⚠ 자문이 끝난 업체는 «종료 칸에만» 넣는다. 담당자 칸에도 「담당 모름」에도 넣지
          않는다 — 한 통이 두 곳에 겹치면 몇 통인지 알 수 없다. */
-    const idx = idx0 || mbWhoIndex();
     const ended = mbEndedOfRow(v, idx);
     if(id === MB_WHO_END) return ended;
     if(ended) return false;
@@ -23550,6 +23663,12 @@ function mbNeedSlugs(id){
   if(s.charAt(0)===MB_WHO_P){
     const need = {};
     mbBins().forEach(b=>{ if(b.link && !mbHidden(b.id)) need[b.link] = 1; });
+    /* ★ 특정 담당자 칸(@이름)을 열 때는 받은메일함·보관메일함도 함께 읽는다 —
+       방금 들어와 아직 업무 칸으로 안 옮겨진 내 사업장 메일이 빠지지 않게 한다 (2026-11-18). */
+    if(typeof mbIsPersonBox === 'function' && mbIsPersonBox(s) && typeof mbFolderOf === 'function'){
+      mbFolderOf('inbox').forEach(f=>{ if(f && f.slug) need[f.slug] = 1; });
+      mbFolderOf('archive').forEach(f=>{ if(f && f.slug) need[f.slug] = 1; });
+    }
     const put = _mbPut||{};
     Object.keys(put).forEach(k=>{
       const at = k.lastIndexOf(':'); if(at>0) need[k.slice(0,at)] = 1;
@@ -25762,13 +25881,135 @@ function openMailBox(id){
   if(_mbBins===null || _mbPut===null || _mbOwner===null || _mbSucc===null){ mbEnsureBins(()=>openMailBox(id)); return; }
   /* 전체메일·우리 칸은 여러 폴더를 합친다 — 아직 안 읽은 폴더를 채워 넣는다 */
   const need = mbNeedSlugs(id).filter(s=>s && !_mbMsgs[s]);
-  if(!need.length){ renderPCSide(); renderMailPage(); return; }
+  if(!need.length){
+    renderPCSide(); renderMailPage();
+    if(mbIsPersonBox(id) && !_mbAutoPastDone && typeof indexedDB !== 'undefined') mbAutoPullPersonPast();
+    return;
+  }
   let left = need.length;
   need.forEach(s=>loadMailBox(s, mbPageSize(), ()=>{
     if(--left) return;
     if(state.view==='mail' && state.mailSent==='box') mbDrawSoon();
     mbSeedSaveSoon();          /* 📬 다음에 창을 열 때 이것으로 먼저 그린다 */
+    if(mbIsPersonBox(id) && !_mbAutoPastDone && typeof indexedDB !== 'undefined') mbAutoPullPersonPast();
   }));
+}
+/* 📥 담당자별 과거 메일·지난 메일(POP3) 즉시 전체 불러오기 (대표 지시 2026-11-18 「과거자료까지 바로 가지고 올 수 있게」)
+   ★ 공용 폴더에서 최신 100통만 읽으면 담당자 10명이 나눠 쓰는 폴더는 최근 하루이틀(2~3통)만 보여 과거 사업장 메일이 안 잡힌다.
+     담당자 칸을 열거나 사업장·담당자를 지정할 때 RTDB 에 쌓인 폴더 전체 목록과 지난 메일(*old)을 바로 끌어와 합친다. */
+let _mbFullSlugs = {};
+let _mbPastPulling = false;
+let _mbPastWaiters = [];
+let _mbAutoPastDone = false;
+function mbHasUnloadedPast(){
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase') return false;
+  const got = mbFolders().filter(mbGotFolder);
+  for(let i = 0; i < got.length; i++){
+    const f = got[i];
+    if(_mbFullSlugs[f.slug]) continue;
+    const have = Object.keys((_mbMsgs && _mbMsgs[f.slug]) || {}).length;
+    if(Number(f.total || 0) > have) return true;
+  }
+  if(!_mbOldLoaded && typeof mbOldCount === 'function' && mbOldCount() > 0) return true;
+  return false;
+}
+function mbRowMentionsCo(row, coRec){
+  if(!row || !coRec || typeof ErpMatch === 'undefined') return false;
+  const nm = ErpMatch._norm(coRec.coName || coRec.company || coRec.name || '');
+  if(nm.length < 2) return false;
+  const an = Array.isArray(row.an) ? row.an.join(' ') : '';
+  const hay = ErpMatch._norm(String(row.s || '') + ' ' + an + ' ' + String(row.p || ''));
+  if(hay.indexOf(nm) >= 0) return true;
+  return nm.length >= 4 && hay.indexOf(nm.slice(0, 4)) >= 0;
+}
+function mbTagPastSenderInLoaded(spec){
+  if(!spec || !spec.em || !spec.who) return 0;
+  const em = String(spec.em).trim().toLowerCase();
+  const nm = String(spec.who).trim();
+  const onlyCo = spec.onlyCoRec || null;
+  const upd = {};
+  let added = 0;
+  _mbWhoMsg = _mbWhoMsg || {};
+  Object.keys(_mbMsgs || {}).forEach(slug=>{
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid=>{
+      const r = box[uid]; if(!r) return;
+      if(String(r.e || '').trim().toLowerCase() !== em) return;
+      if(onlyCo && !mbRowMentionsCo(r, onlyCo)) return;
+      const k = mbWhoKey(slug + ':' + uid);
+      if(_mbWhoMsg[k] === nm) return;
+      _mbWhoMsg[k] = nm;
+      upd['config/mailWhoMsg/' + k] = nm;
+      added++;
+    });
+  });
+  if(added && typeof Store !== 'undefined' && Store.mode === 'firebase'){
+    firebase.database().ref(DB_ROOT).update(upd).catch(e=>console.warn('[과거메일 담당지정]', (e&&e.message)||e));
+  }
+  return added;
+}
+function mbPullPastAll(opts){
+  const o = opts || {};
+  if(_mbPastPulling){
+    if(o.tagSender || o.done) _mbPastWaiters.push({ tagSender: o.tagSender || null, done: o.done || null });
+    return;
+  }
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase'){
+    if(o.tagSender) mbTagPastSenderInLoaded(o.tagSender);
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    if(o.done) o.done(0);
+    return;
+  }
+  const slugs = mbFolders().filter(mbGotFolder).filter(f=>{
+    if(_mbFullSlugs[f.slug]) return false;
+    const have = Object.keys((_mbMsgs && _mbMsgs[f.slug]) || {}).length;
+    return Number(f.total || 0) > have || !_mbMsgs[f.slug];
+  }).map(f=>f.slug);
+  const needOld = !_mbOldLoaded;
+  let left = slugs.length + (needOld ? 1 : 0);
+  if(!left){
+    _mbAutoPastDone = true;
+    const tagged = o.tagSender ? mbTagPastSenderInLoaded(o.tagSender) : 0;
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    if(o.done) o.done(tagged);
+    return;
+  }
+  _mbPastPulling = true;
+  if(!o.silent && state.view === 'mail') renderMailPage();
+  const finishOne = ()=>{
+    if(--left > 0) return;
+    _mbPastPulling = false;
+    _mbAutoPastDone = true;
+    let tagged = o.tagSender ? mbTagPastSenderInLoaded(o.tagSender) : 0;
+    const waiters = _mbPastWaiters.splice(0);
+    waiters.forEach(w=>{ if(w.tagSender) tagged += mbTagPastSenderInLoaded(w.tagSender); });
+    mbWhoBust();
+    if(state.view === 'mail'){ renderPCSide(); renderMailPage(); }
+    if(o.done) o.done(tagged);
+    waiters.forEach(w=>{ if(w.done) w.done(tagged); });
+  };
+  slugs.forEach(sl=>{
+    loadMailBox(sl, 0, ()=>{ _mbFullSlugs[sl] = 1; finishOne(); });
+  });
+  if(needOld) mbOldLoad(()=>finishOne());
+}
+function mbAutoPullPersonPast(){
+  if(_mbPastPulling || _mbAutoPastDone) return;
+  if(!mbHasUnloadedPast()){ _mbAutoPastDone = true; return; }
+  mbPullPastAll({ silent: true });
+}
+function mbPullPastNow(){
+  if(_mbPastPulling) return;
+  const boxId = mbNow();
+  const whoName = mbIsPersonBox(boxId) ? boxId.slice(1) : '';
+  mbPullPastAll({
+    done: ()=>{
+      const total = mbAllRows().length;
+      toast(whoName
+        ? `📥 「${whoName}」 담당 사업장의 과거 메일·지난 메일까지 모두 불러왔습니다 (총 ${total.toLocaleString()}통)`
+        : `📥 과거 메일·지난 메일까지 모두 불러왔습니다`, 6000);
+    }
+  });
 }
 /* 지금 보는 칸에 «모두» 몇 통 있나 — 서버가 폴더마다 적어 둔 값이다.
    화면에 보이는 수(가져온 것)와 다르다. 둘을 같이 보여 줘야 「더 있나」를 안다. */
@@ -26975,6 +27216,9 @@ function mbListHtml(){
       ${mbNow() === MB_WHO_NA ? `<button class="mck-chip" onclick="mbGuessOpen()"
         title="메일 속(제목·본문 첫 줄)을 읽어 «이 주소는 어느 업체인가»를 모아 짚어 드립니다"
         >📄 한 번에 나누기</button>` : ''}
+      ${mbIsPersonBox(mbNow()) ? `<button type="button" class="mck-chip" ${_mbPastPulling?'disabled':''} onclick="mbPullPastNow()"
+        title="모든 업무 폴더의 과거 메일과 지난 메일(POP3)까지 바로 가져와 이 담당자 사업장 메일을 빠짐없이 보여 줍니다">${
+        _mbPastPulling ? '⏳ 과거자료 불러오는 중…' : (mbHasUnloadedPast() ? '📥 과거자료까지 가져오기' : '✔ 과거자료 포함됨')}</button>` : ''}
       ${/* 몇 통씩 볼까 (대표 지시 2026-08-25) — 다음메일도 이 값을 고르게 해 둔다.
            ⚠ 「보이는 수」와 「받아 오는 수」가 같은 값이다. 따로 두면 화면에는 50통인데
              받아 오기는 500통이라, 눈에 안 보이는 곳에서 요금이 나간다. */''}
@@ -28920,58 +29164,230 @@ function taxHintFor(email, name, subject, body){
     taxPhone:hit.taxPhone||'', taxEmail:hit.taxEmail||'' } };
 }
 
+/* 세무사무실 ↔ 사업장 · 본인(담당자) 일치 점검 도우미 (대표 지시 2026-11-18 「세무사무실도 본인과 정확하게 맞는것이고 사업장과 제대로 연계되었는지 한번더 체크」) */
+function taxCoInfoOf(rawOrCo){
+  if(rawOrCo === undefined || rawOrCo === null || rawOrCo === '') return null;
+  const raw = (typeof rawOrCo === 'object') ? rawOrCo : { id: String(rawOrCo) };
+  const id = String(raw.id || '').trim();
+  const base = (id && typeof ErpMatch !== 'undefined' && ErpMatch.byId && ErpMatch.byId[id])
+    || (typeof mbCoRec === 'function' ? mbCoRec(raw.coName || raw.company || raw.name) : null)
+    || raw;
+  const eff = (typeof mbHqRec === 'function' && base) ? mbHqRec(base) : base;
+  const owner = (eff && !eff.left && typeof mbWhoLive === 'function') ? mbWhoLive(eff.main) : String((eff && eff.main) || '');
+  const subs = [];
+  if(eff && !eff.left && Array.isArray(eff.subs)){
+    eff.subs.forEach(s=>{
+      const n = typeof mbPerson === 'function' ? mbPerson(s) : String(s||'');
+      if(n && (typeof mbRetired !== 'function' || !mbRetired(n)) && n !== owner && subs.indexOf(n) < 0) subs.push(n);
+    });
+  }
+  const coNm = String(raw.coName || raw.company || raw.name || (base && (base.coName || base.company || base.name)) || '');
+  const txOff = String(raw.taxOfficeName || raw.taxOffice || (base && (base.taxOfficeName || base.taxOffice)) || '');
+  const isLeft = !!(eff && eff.left);
+  return {
+    id: id || String((base && base.id) || ''),
+    coName: coNm,
+    name: coNm,
+    bizNo: String(raw.bizNo || (base && (base.bizNo || base.bizno)) || ''),
+    taxOfficeName: txOff,
+    taxOffice: txOff,
+    taxContact: String(raw.taxContact || (base && base.taxContact) || ''),
+    taxPhone: String(raw.taxPhone || (base && base.taxPhone) || ''),
+    taxEmail: String(raw.taxEmail || (base && base.taxEmail) || ''),
+    owner: owner,
+    subs: subs,
+    left: isLeft,
+    ended: isLeft
+  };
+}
+function taxCheckOf(v, bodyText){
+  const e = String((v && v.e) || '').trim().toLowerCase();
+  const an = Array.isArray(v && v.an) ? v.an.join(' ') : '';
+  const richBody = [String(bodyText || ''), String((v && v.p) || ''), an].filter(Boolean).join(' ');
+  const hint = taxHintFor(e, v && v.f, v && v.s, richBody);
+  if(!hint) return null;
+  const me = (typeof mbMyName === 'function') ? mbMyName() : '';
+  const rowLike = { s: v && v.s, p: richBody, an: v && v.an };
+  if(hint.kind === 'known'){
+    const cos = (hint.cos || []).map(taxCoInfoOf).filter(Boolean);
+    const matched = (typeof mbRowMentionsCo === 'function') ? cos.filter(c => mbRowMentionsCo(rowLike, c)) : [];
+    const focus = matched.length ? matched : cos;
+    const myMatch = !!me && focus.some(c => c.owner === me || (c.subs || []).indexOf(me) >= 0);
+    const mismatchOwners = [];
+    const blankOwners = [];
+    focus.forEach(c=>{
+      if(!c.owner){ blankOwners.push(c.coName); return; }
+      if(me && c.owner !== me && (c.subs || []).indexOf(me) < 0 && mismatchOwners.indexOf(c.owner) < 0){
+        mismatchOwners.push(c.owner);
+      }
+    });
+    /* 이미 아는 세무사무실이라도 본문·첨부에 아직 taxEmail 이 안 적힌 새 사업장이 보이면 함께 짚어 준다 */
+    let extraCo = null;
+    const allCos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+    const hay = String((v && v.s) || '') + ' ' + richBody;
+    for(let i = 0; i < allCos.length; i++){
+      const co = allCos[i];
+      const nm = String((co && co.name) || '').trim();
+      if(nm.length < 4 || String((co && co.taxEmail) || '').trim()) continue;
+      if(cos.some(c => c.id && String(co.id) === c.id)) continue;
+      if(hay.indexOf(nm) >= 0){ extraCo = taxCoInfoOf(co); break; }
+    }
+    return { kind:'known', cos:cos, matched:matched, me:me, myMatch:myMatch,
+      mismatchOwners:mismatchOwners, blankOwners:blankOwners, extraCo:extraCo };
+  }
+  const askCo = taxCoInfoOf(hint.co);
+  const askMatch = !!me && askCo && (askCo.owner === me || (askCo.subs || []).indexOf(me) >= 0);
+  return { kind:'ask', co:askCo, me:me, myMatch:askMatch };
+}
+
 /* 메일 아래 붙는 띠 */
 function taxStripHtml(v){
   const o = state.mbOpen || {};
-  const hint = taxHintFor(v.e, v.f, v.s, o.text || '');
-  if(!hint) return '';
+  const ck = taxCheckOf(v, o.text || '');
+  if(!ck) return '';
   const em = esc(String(v.e||''));
   const nm = esc(String(v.f||''));
-  if(hint.kind === 'known'){
-    const names = hint.cos.map(c=>c.coName).filter(Boolean);
-    const office = (hint.cos[0] && hint.cos[0].taxOfficeName) || '';
+  if(ck.kind === 'known'){
+    const labels = ck.cos.slice(0, 3).map(c => esc(c.coName) + (c.owner ? ' <small>(' + esc(c.owner) + ')</small>' : ' <small>(담당미지정)</small>'));
+    const office = (ck.cos[0] && ck.cos[0].taxOfficeName) || '';
+    const matchTag = ck.matched.length === 1
+      ? ` <span class="tax-badge info">이번 메일: ${esc(ck.matched[0].coName)}</span>` : '';
+    const verifyTag = (ck.me && ck.myMatch && !ck.mismatchOwners.length && !ck.blankOwners.length)
+      ? ` <span class="tax-badge ok">✔ 본인(${esc(ck.me)}) 담당 · 사업장 연계 확인</span>`
+      : ck.mismatchOwners.length
+      ? ` <span class="tax-badge warn">⚠ 본인(${esc(ck.me)}) 담당 아님 — ERP 담당: ${esc(ck.mismatchOwners.join('·'))}</span>`
+      : ck.blankOwners.length
+      ? ` <span class="tax-badge warn">⚠ 사업장 ERP 담당 미지정 — 연계 확인 필요</span>`
+      : (ck.cos.length > 1 && !ck.matched.length)
+      ? ` <span class="tax-badge warn">⚠ 다수 사업장 공용 세무사무실 — 대상 사업장 확인</span>` : '';
+    const extraBtn = ck.extraCo
+      ? `<button type="button" class="tax-b a" data-em="${em}" data-nm="${nm}" data-coid="${esc(ck.extraCo.id)}"
+          onclick="taxSaveOpen(this.dataset.em,this.dataset.nm,this.dataset.coid)"
+          title="메일에 보이는 ${esc(ck.extraCo.coName)} 사업장도 이 세무사무실과 연계합니다">+ ${esc(ck.extraCo.coName)} 추가 연계</button>` : '';
     return `<div class="tax-strip known">
-      <span>🧾 <b>${esc(names.slice(0,3).join(' · '))}</b>${names.length>3?(' 외 '+(names.length-3)+'곳'):''} 의 세무사무실입니다${office?(' <i>'+esc(office)+'</i>'):''}</span>
+      <span>🧾 <b>${labels.join(' · ')}</b>${ck.cos.length>3?(' 외 '+(ck.cos.length-3)+'곳'):''} 의 세무사무실입니다${office?(' <i>'+esc(office)+'</i>'):''}${matchTag}${verifyTag}</span>
       <span style="flex:1"></span>
-      <button class="tax-b g" onclick="taxSaveOpen('${em}','${nm}')">담당자 저장</button>
+      ${extraBtn}
+      <button type="button" class="tax-b g" data-em="${em}" data-nm="${nm}" onclick="taxSaveOpen(this.dataset.em,this.dataset.nm)">연계·담당 확인</button>
     </div>`;
   }
+  const ownerTxt = ck.co.owner
+    ? (ck.me ? (ck.myMatch ? ` · <span class="tax-badge ok">✔ 본인(${esc(ck.me)}) 담당 사업장</span>`
+                           : ` · <span class="tax-badge warn">⚠ ERP 담당: ${esc(ck.co.owner)} (본인 아님)</span>`)
+             : ` (담당: ${esc(ck.co.owner)})`)
+    : ` · <span class="tax-badge warn">⚠ ERP 담당 미지정</span>`;
   return `<div class="tax-strip ask">
-    <span>❓ 본문에 <b>${esc(hint.co.coName)}</b> 이(가) 보입니다 — 이 주소를 그 업체의 세무사무실로 등록할까요?</span>
+    <span>❓ 메일에 <b>${esc(ck.co.coName)}</b> 이(가) 보입니다${ownerTxt} — 이 주소를 세무사무실로 연계할까요?</span>
     <span style="flex:1"></span>
-    <button class="tax-b a" onclick="taxSaveOpen('${em}','${nm}','${esc(hint.co.id)}')">등록</button>
-    <button class="tax-b n" onclick="taxHintNo('${em}')">아니오</button>
+    <button type="button" class="tax-b a" data-em="${em}" data-nm="${nm}" data-coid="${esc(ck.co.id)}" onclick="taxSaveOpen(this.dataset.em,this.dataset.nm,this.dataset.coid)">연계 확인·등록</button>
+    <button type="button" class="tax-b n" data-em="${em}" onclick="taxHintNo(this.dataset.em)">아니오</button>
   </div>`;
 }
 function taxHintNo(email){ taxSkipAdd(email); toast('이 주소는 다시 묻지 않습니다'); renderMailPage(); }
 
-/* 저장 창 — 빈 칸만 채운다 */
-function taxSaveOpen(email, sender, coId){
-  const e = String(email||'').toLowerCase();
-  let targets = [];
+/* 저장 · 연계 확인 창 — 본인 담당 여부와 사업장 연계를 한 번 더 체크한 뒤 빈 칸만 채운다 */
+function taxSaveOpen(email, sender, coId, forWho){
+  const e = String(email||'').trim().toLowerCase();
+  const known = ((ErpMatch.byTaxEmail||{})[e] || []).map(taxCoInfoOf).filter(Boolean);
+  const list = [];
+  const seen = {};
+  known.forEach(c=>{
+    if(!c.id || seen[c.id]) return;
+    seen[c.id] = 1;
+    list.push(Object.assign({}, c, { picked: true, already: true }));
+  });
   if(coId){
-    const co = (ErpMatch.companies||[]).find(c=>c && c.id===coId);
-    if(co) targets = [{ id:co.id, coName:co.name, taxOfficeName:co.taxOfficeName||'',
-      taxContact:co.taxContact||'', taxPhone:co.taxPhone||'', taxEmail:co.taxEmail||'' }];
-  } else {
-    targets = ((ErpMatch.byTaxEmail||{})[e] || []).slice();
+    const co = (ErpMatch.companies||[]).find(c=>c && String(c.id)===String(coId));
+    const inf = taxCoInfoOf(co);
+    if(inf && inf.id && !seen[inf.id]){
+      seen[inf.id] = 1;
+      list.unshift(Object.assign({}, inf, { picked: true, already: String(inf.taxEmail||'').trim().toLowerCase() === e }));
+    }
   }
-  if(!targets.length) return toast('업체를 찾지 못했습니다');
-  state.taxSave = { email:e, sender:String(sender||''), targets:targets,
-                    contact:String(sender||''), phone:'', office: targets[0].taxOfficeName || '' };
+  if(!list.length) return toast('업체를 찾지 못했습니다');
+  const checkWho = String(forWho || ((typeof mbMyName === 'function') ? mbMyName() : '') || '');
+  state.taxSave = {
+    email: e,
+    sender: String(sender||''),
+    targets: list,
+    checkWho: checkWho,
+    contact: String(sender||''),
+    phone: '',
+    office: (list.find(x=>x.taxOfficeName) || list[0] || {}).taxOfficeName || '',
+    pullPast: true,
+    verified: false,
+    addQ: ''
+  };
   renderMailPage();
 }
 function taxSaveClose(){ state.taxSave = null; renderMailPage(); }
 function taxSaveField(k, val){ if(state.taxSave){ state.taxSave[k] = val; } }
+function taxSaveToggleCo(idx, on){
+  const t = state.taxSave; if(!t || !t.targets || !t.targets[idx]) return;
+  t.targets[idx].picked = !!on;
+  renderMailPage();
+}
+function taxSaveAddCo(coId){
+  const t = state.taxSave; if(!t) return;
+  const co = ((ErpMatch && ErpMatch.companies) || []).find(c => c && String(c.id) === String(coId));
+  const inf = taxCoInfoOf(co);
+  if(!inf || !inf.id) return;
+  if(!t.targets.some(x => x.id === inf.id)){
+    t.targets.push(Object.assign({}, inf, {
+      picked: true,
+      already: String(inf.taxEmail||'').trim().toLowerCase() === t.email
+    }));
+  }
+  t.addQ = '';
+  t.verified = false;
+  renderMailPage();
+}
+function taxSaveNeedsVerify(t){
+  if(!t) return false;
+  const picked = (t.targets || []).filter(x => x.picked !== false);
+  if(picked.length > 1) return true;
+  return picked.some(x => !x.already || !x.owner || (t.checkWho && x.owner !== t.checkWho && (x.subs||[]).indexOf(t.checkWho) < 0));
+}
+
+let _taxSaveBusy = false;
+function taxSaveAddHitsHtml(){
+  const t = state.taxSave;
+  if(!t) return '';
+  const q = String(t.addQ || '').trim();
+  const qNorm = (q.length >= 2 && typeof ErpMatch !== 'undefined') ? ErpMatch._norm(q) : '';
+  if(!qNorm) return '';
+  const addHits = ((ErpMatch.companies || []).filter(c=>{
+    if(!c || !c.id || !c.name) return false;
+    if((t.targets || []).some(x => x.id === String(c.id))) return false;
+    return ErpMatch._norm(c.name).indexOf(qNorm) >= 0 || String(c.bizNo||'').indexOf(q) >= 0;
+  }).slice(0, 6).map(taxCoInfoOf).filter(Boolean));
+  if(!addHits.length) return '';
+  return addHits.map(c =>
+    `<button type="button" class="tax-b g" data-coid="${esc(String(c.id))}" onclick="taxSaveAddCo(this.dataset.coid)">+ ${esc(c.coName)}${c.owner?' ('+esc(c.owner)+')':''}</button>`
+  ).join('');
+}
+function taxSaveAddQ(val){
+  if(!state.taxSave) return;
+  state.taxSave.addQ = String(val || '');
+  const box = $('taxSaveAddHits');
+  if(box) box.innerHTML = taxSaveAddHitsHtml();
+}
 
 async function taxSaveDo(){
+  if(_taxSaveBusy) return;
   const t = state.taxSave;
   if(!t) return;
+  const picked = (t.targets || []).filter(tg => tg && tg.picked !== false);
+  if(!picked.length) return toast('연계할 사업장을 하나 이상 선택해 주세요', 6000);
+  if(taxSaveNeedsVerify(t) && !t.verified){
+    return toast('⚠ 본인 담당 여부와 사업장·세무사무실 연계 확인란에 먼저 체크해 주세요', 7000);
+  }
   const u = firebase.auth().currentUser;
   if(!u) return toast('로그인이 필요합니다');
+  _taxSaveBusy = true;
   try{
     /* ★ 업체 «한 건씩» 서버의 지금 판 위에서 셈한다(erpCoPatchMany) — 2026-10-07 점검 ① */
-    const r = await erpCoPatchMany((t.targets||[]).map(tg => ({ id: tg.id, plan: function(cur){
+    const r = await erpCoPatchMany(picked.map(tg => ({ id: tg.id, plan: function(cur){
       /* ★ 이미 있는 값은 «안 덮는다» — 사람이 업체관리에서 고쳐 둔 것을
          메일 한 통이 조용히 지우면 안 된다. 빈 칸만 채운다. */
       const blank = v => v===undefined || v===null || String(v).trim()==='';
@@ -28984,43 +29400,101 @@ async function taxSaveDo(){
     } })));
     const n = r.done;
     const kept = Object.keys(r.infos).reduce((s,k) => s + ((r.infos[k]||{}).kept || 0), 0);
+    /* 메모리 색인(byTaxEmail)에도 즉시 반영해 새로고침 전에도 과거 메일이 바로 잡히게 한다 */
+    if(typeof ErpMatch !== 'undefined' && ErpMatch.byTaxEmail){
+      const arr = ErpMatch.byTaxEmail[t.email] = ErpMatch.byTaxEmail[t.email] || [];
+      picked.forEach(tg=>{
+        if(!arr.some(x => x && String(x.id) === String(tg.id))){
+          arr.push({ id: tg.id, coName: tg.coName, taxOfficeName: t.office || tg.taxOfficeName || '', taxEmail: t.email });
+        }
+      });
+    }
+    const wantPast = t.pullPast !== false;
+    mbWhoBust();
     if(!n){
-      toast(r.failed.length ? ('저장 실패 — ' + r.failed[0].why) : '채울 빈 칸이 없습니다 — 이미 다 들어 있습니다', 7000);
-      if(!r.failed.length){ state.taxSave=null; return renderMailPage(); }
+      toast(r.failed.length ? ('저장 실패 — ' + r.failed[0].why)
+        : (wantPast ? '✔ 이미 연계되어 있습니다 — 과거 메일까지 바로 확인합니다' : '채울 빈 칸이 없습니다 — 이미 다 들어 있습니다'), 7000);
+      if(!r.failed.length){
+        state.taxSave = null;
+        if(wantPast && typeof mbPullPastAll === 'function') mbPullPastAll({});
+        else renderMailPage();
+      }
       return;
     }
-    toast('✅ 업체관리에 저장했습니다 ('+n+'곳'+(kept?(' · 이미 있던 값 '+kept+'개는 그대로'):'')
-      + (r.failed.length ? (' · 못 한 곳 '+r.failed.length+' — '+r.failed[0].why) : '')+')', r.failed.length ? 9000 : undefined);
+    toast('✅ 세무사무실·사업장 연계 저장 완료 ('+n+'곳'+(kept?(' · 기존 값 '+kept+'개 유지'):'')
+      + (wantPast ? ' · 과거 메일까지 가져옵니다' : '')
+      + (r.failed.length ? (' · 못 한 곳 '+r.failed.length+' — '+r.failed[0].why) : '')+')', 8000);
     state.taxSave = null;
     ErpMatch.load();                   /* 색인을 다시 만들어 띠가 바로 바뀌게 */
-    renderMailPage();
+    if(wantPast && typeof mbPullPastAll === 'function') mbPullPastAll({});
+    else { renderPCSide(); renderMailPage(); }
   }catch(e){
     console.error(e);
     toast('저장 실패 — 권한 또는 연결을 확인하세요');
+  }finally{
+    _taxSaveBusy = false;
   }
 }
 
-/* 저장 창 그리기 */
+/* 저장 · 연계 점검 창 그리기 */
 function taxSaveHtml(){
   const t = state.taxSave;
   if(!t) return '';
-  const names = t.targets.map(x=>x.coName).filter(Boolean).join(' · ');
+  const me = t.checkWho || ((typeof mbMyName === 'function') ? mbMyName() : '');
+  const needChk = taxSaveNeedsVerify(t);
+  const rowsHtml = (t.targets || []).map((tg, i)=>{
+    const isMine = !!me && (tg.owner === me || (tg.subs||[]).indexOf(me) >= 0);
+    const badge = tg.owner
+      ? (me ? (isMine ? `<span class="tax-badge ok">✔ 본인(${esc(me)}) 담당</span>`
+                      : `<span class="tax-badge warn">⚠ ERP 담당: ${esc(tg.owner)} (본인 아님)</span>`)
+            : `<span class="tax-badge info">담당: ${esc(tg.owner)}</span>`)
+      : `<span class="tax-badge warn">⚠ ERP 담당 미지정</span>`;
+    const linkSt = tg.already
+      ? `<span class="tax-badge info">기존 연계됨</span>`
+      : (tg.taxEmail ? `<span class="tax-badge warn">기존 세무메일: ${esc(tg.taxEmail)} (유지됨)</span>`
+                     : `<span class="tax-badge ok">+ 신규 연계</span>`);
+    return `<label class="tax-co-row">
+      <input type="checkbox" class="tax-chk" ${tg.picked!==false?'checked':''} onchange="taxSaveToggleCo(${i},this.checked)">
+      <span style="flex:1;min-width:0">
+        <b>${esc(tg.coName)}</b>${tg.bizNo ? ` <small style="color:#64748b">(${esc(tg.bizNo)})</small>` : ''}<br>
+        ${badge} ${linkSt}
+      </span>
+    </label>`;
+  }).join('');
   return `<div class="tax-modal" onclick="if(event.target===this)taxSaveClose()">
-    <div class="tax-card">
-      <div class="tax-t">🧾 세무사무실 담당자 저장</div>
-      <div class="tax-sub">${esc(names)}</div>
-      <label>세무사무실</label>
-      <input value="${esc(t.office)}" oninput="taxSaveField('office',this.value)" placeholder="○○세무회계">
-      <label>담당자</label>
-      <input value="${esc(t.contact)}" oninput="taxSaveField('contact',this.value)" placeholder="보낸 사람 이름이 들어 있습니다 — 고치셔도 됩니다">
-      <label>이메일</label>
-      <input value="${esc(t.email)}" disabled>
-      <label>연락처</label>
-      <input value="${esc(t.phone)}" oninput="taxSaveField('phone',this.value)" placeholder="비어 있음 — 적으면 채워집니다">
-      <div class="tax-note">★ 이미 들어 있는 값은 <b>안 덮습니다</b> — 빈 칸만 채웁니다.</div>
+    <div class="tax-card wide" role="dialog" aria-modal="true" aria-label="세무사무실 사업장 연계 및 담당 확인">
+      <div class="tax-t">🧾 세무사무실 · 사업장 연계 및 본인 확인</div>
+      <div class="tax-sub">세무사무실이 본인 담당 사업장과 정확히 맞는지 한 번 더 확인해 주세요</div>
+      <div class="tax-chkbox">
+        <div style="font-size:11.5px;font-weight:700;color:#475569;margin-bottom:4px">연계 사업장 점검 (${(t.targets||[]).filter(x=>x.picked!==false).length}곳 선택)</div>
+        ${rowsHtml}
+        <div style="margin-top:6px">
+          <input value="${esc(t.addQ||'')}" oninput="taxSaveAddQ(this.value)"
+            aria-label="다른 내 사업장 추가 연계 검색"
+            placeholder="+ 다른 내 사업장 추가 연계 (상호 2글자 이상 검색)…">
+          <div id="taxSaveAddHits" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${taxSaveAddHitsHtml()}</div>
+        </div>
+      </div>
+      <label for="taxInpOffice">세무사무실 상호</label>
+      <input id="taxInpOffice" value="${esc(t.office)}" oninput="taxSaveField('office',this.value)" placeholder="○○세무회계 / 세무법인 ○○">
+      <label for="taxInpContact">세무사무실 담당자</label>
+      <input id="taxInpContact" value="${esc(t.contact)}" oninput="taxSaveField('contact',this.value)" placeholder="보낸 사람 이름이 들어 있습니다 — 고치셔도 됩니다">
+      <label for="taxInpEmail">세무사무실 이메일</label>
+      <input id="taxInpEmail" value="${esc(t.email)}" disabled>
+      <label for="taxInpPhone">세무사무실 연락처</label>
+      <input id="taxInpPhone" value="${esc(t.phone)}" oninput="taxSaveField('phone',this.value)" placeholder="비어 있음 — 적으면 채워집니다">
+      <label class="tax-past">
+        <input type="checkbox" class="tax-chk" ${t.pullPast!==false?'checked':''} onchange="taxSaveField('pullPast',this.checked)">
+        <span><b>저장 후 과거 메일·지난 메일까지 바로 가져오기</b></span>
+      </label>
+      ${needChk ? `<label class="tax-confirm">
+        <input type="checkbox" class="tax-chk" ${t.verified?'checked':''} onchange="taxSaveField('verified',this.checked);renderMailPage()">
+        <span><b>[한 번 더 확인]</b> 위 세무사무실이 선택한 사업장 및 담당자(${esc(me||'본인')})와 정확히 맞고, 다른 사업장 메일과 섞이지 않음을 확인했습니다.</span>
+      </label>` : ''}
+      <div class="tax-note">★ 이미 들어 있는 값은 <b>안 덮습니다</b> — 빈 칸만 채우며, 다수 사업장을 대행하는 세무사무실도 메일의 사업장명·첨부명으로 각 담당자에게 자동 배분됩니다.</div>
       <div class="tax-row">
-        <button class="tax-b n" onclick="taxSaveClose()">그만두기</button>
-        <button class="tax-b p" onclick="taxSaveDo()">업체관리에 저장</button>
+        <button type="button" class="tax-b n" onclick="taxSaveClose()">그만두기</button>
+        <button type="button" class="tax-b p" ${_taxSaveBusy?'disabled':''} onclick="taxSaveDo()">확인 후 업체관리에 저장</button>
       </div>
     </div>
   </div>`;
@@ -31745,15 +32219,18 @@ function mbOwnerMove(ev, only){
   const gNew = g0 && !picked.every(v=>mbWhoOfRow(v) === g0.who) ? g0 : null;
   const gHtml = !gNew ? '' : `
     <div class="fmsec">📄 이 메일이 말하는 업체 — 눌러서 확인해 주세요</div>
-    <div class="fmi fmg" onclick="mbOwnerPut('${esc(gNew.who)}')"
+    <div class="fmi fmg" role="button" tabindex="0" data-who="${esc(gNew.who)}"
+      onclick="mbOwnerPut(this.dataset.who)"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"
       title="이 메일의 담당자를 ${esc(gNew.who)} 으로 정합니다">
       <span>🏢</span>
       <span><b>${esc(gNew.co)}</b> · 담당 <b class="gw">${esc(gNew.who)}</b>
         <small>${esc(gNew.from)} 「${esc(gNew.txt.slice(0,44))}${gNew.txt.length>44?'…':''}」</small></span>
       <span class="gbtn">${esc(gNew.who)}에게</span>
     </div>
-    ${(one && !mbCoOf(one)) ? `<div class="fmi fmg2"
-      onclick="mbGuessLink('${esc(one)}')"
+    ${(one && !mbCoOf(one)) ? `<div class="fmi fmg2" role="button" tabindex="0"
+      data-em="${esc(one)}" onclick="mbGuessLink(this.dataset.em)"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"
       title="이 주소를 자문사에 잇습니다 — 담당자는 그 회사에서 따라옵니다">
       <span>🔗</span><span>이 주소를 「${esc(gNew.co)}」 에 잇기
         <small>지난 메일도 앞으로 올 메일도 함께 따라옵니다</small></span></div>` : ''}`;
@@ -31761,12 +32238,24 @@ function mbOwnerMove(ev, only){
       <span>우리 앱에서만 — 메일은 «움직이지 않습니다»(담당자 칸은 거르개입니다)</span></div>
     ${gHtml}
     ${gHtml ? '<div class="fmsec">직원</div>' : ''}
-    <div class="fmlist">${who.map(w=>`
-      <div class="fmi ${w.me?'me':''}" onclick="mbOwnerPut('${esc(w.name)}')">
-        <span style="color:#94a3b8">●</span> ${esc(w.name)}${w.me?' <b class="meTag">나</b>':''}
-        ${w.un?`<span style="margin-left:auto;color:#2563eb;font-weight:700">${w.un}</span>`:''}</div>`).join('')}
+    <div class="fmlist">${who.map((w, wi)=>`
+      <div class="fmi fmrow ${w.me?'me':''}" role="button" tabindex="0"
+        data-who="${esc(w.name)}" onclick="mbOwnerPut(this.dataset.who)"
+        onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.click()}">
+        <span style="color:#94a3b8">●</span>
+        <span class="fm-nm">${esc(w.name)}${w.me?' <b class="meTag">나</b>':''}</span>
+        ${one ? `<span class="fm-acts" onclick="event.stopPropagation()">
+          <button type="button" class="fm-qbtn" onclick="mbOwnCoByIdx(${wi},event)"
+            title="${esc(w.name)} 담당 사업장을 바로 지정하고 과거 메일까지 가져옵니다">🏢 사업장</button>
+          <button type="button" class="fm-qbtn past" onclick="mbOwnAllByIdx(${wi},event)"
+            title="이 보낸이를 ${esc(w.name)}에게 지정하고 과거자료까지 바로 가져옵니다">📥 과거까지</button>
+          <button type="button" class="fm-qbtn wk" onclick="mbOwnWkByIdx(${wi},event)"
+            title="${esc(w.name)}의 사건·컨설팅에 바로 잇습니다">📁 건</button>
+        </span>` : ''}
+        ${w.un?`<span style="margin-left:${one?'2px':'auto'};color:#2563eb;font-weight:700">${w.un}</span>`:''}</div>`).join('')}
     </div>
-    <div class="fmi" style="color:#64748b" onclick="mbOwnerPut('')">
+    <div class="fmi" style="color:#64748b" role="button" tabindex="0" onclick="mbOwnerPut('')"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">
       ❓ 담당 모름으로 되돌리기</div>
     ${one ? `<div class="fmi" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px"
       onclick="closeFolderMenu();openWhoPage()">🔗 자문사로 잇기 ›
@@ -31776,7 +32265,7 @@ function mbOwnerMove(ev, only){
            어느 것이 왜 이어졌는지 알 길이 없다(자문사 잇기와 같은 잣대).
          ★ 자문사 잇기 «바로 아래»에 둔다. 둘은 같은 일(「이 주소는 어디 것인가」)의
            두 갈래라, 떨어뜨려 두면 하나만 찾고 다른 하나는 없는 줄 안다. */''}
-    ${one ? `<div class="fmi" onclick="mbWorkLinkOpen('${esc(one)}', event)" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px">📁 사건·컨설팅에 잇기 ›
+    ${one ? `<div class="fmi" data-em="${esc(one)}" onclick="mbWorkLinkOpen(this.dataset.em, event)" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px">📁 사건·컨설팅에 잇기 ›
       <small>이 주소가 그 건의 것이면 담당이 «건에서» 따라옵니다${
         mbWorkHandOf(one) ? ' — 지금 이어져 있습니다' : ''}</small></div>` : ''}
     ${/* ── ㉯ 로 가는 문 (대표 승인 목업 2026-09-05) ──
@@ -31843,10 +32332,476 @@ function mbOwnerPut(name){
   const msg = nm
     ? `${rows.length.toLocaleString()}통을 「${nm}」 담당으로 보냈습니다${ruleMsg}`
     : `${rows.length.toLocaleString()}통을 「담당 모름」으로 되돌렸습니다${ruleMsg}`;
+  if(nm && em && (keep || past) && typeof indexedDB !== 'undefined' && typeof mbPullPastAll === 'function'){
+    mbPullPastAll({ tagSender: past ? { em: em, who: nm } : null, silent: true });
+  }
   if(typeof Store==='undefined' || Store.mode!=='firebase') return toast(msg, 7000);
   firebase.database().ref(DB_ROOT).update(upd)
     .then(()=>toast(msg, 7000))
     .catch(e=>toast('저장하지 못했습니다 — '+((e&&e.message)||e), 9000));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚡ 담당자 이름 오른쪽 빠른 지정 — 🏢 사업장 · 📥 과거까지 · 📁 건 + 세무사무실 연계 점검
+   ══════════════════════════════════════════════════════════════════════════
+   - 사람 이름 오른쪽 버튼에서 스크롤 없이 즉시 본인 사업장을 고르고 과거 메일·📦 지난 메일까지
+     한 번에 끌어온다.
+   - 보낸이가 세무사무실(byTaxEmail 또는 세무·회계 단서)이거나 사업장 ERP 주담당이 선택한 사람·본인과
+     다르면 반드시 한 번 더 확인(confirm)하여 다른 담당자 사업장 메일이 섞이는 일을 막는다. */
+let _mbOwnCoShown = [];
+function mbTaxSenderInfo(em, pickedRows){
+  const addr = String(em || '').trim().toLowerCase();
+  const taxList = (addr && typeof ErpMatch !== 'undefined' && ErpMatch.byTaxEmail && ErpMatch.byTaxEmail[addr])
+    ? ErpMatch.byTaxEmail[addr] : [];
+  const rows = Array.isArray(pickedRows) ? pickedRows : [];
+  const r0 = rows[0] || {};
+  const anText = rows.map(r => Array.isArray(r && r.an) ? r.an.join(' ') : String((r && r.an) || '')).join(' ');
+  const sample = rows.map(r => [r && (r.f || r.n), r && r.s, r && r.p].join(' ')).join(' ') + ' ' + anText + ' ' + addr;
+  const hint = (addr && typeof taxHintFor === 'function')
+    ? taxHintFor(addr, String(r0.f || r0.n || ''), String(r0.s || ''), String(r0.p || '') + ' ' + anText)
+    : null;
+  const isTaxLikely = taxList.length > 0 || !!hint || /세무|회계법인|세무법인|세무사|회계사/.test(sample);
+  const office = String((taxList[0] && (taxList[0].taxOfficeName || taxList[0].taxOffice))
+    || (hint && hint.co && (hint.co.taxOfficeName || hint.co.taxOffice)) || '').trim();
+  return { taxList: taxList, hint: hint, isTaxLikely: isTaxLikely, office: office };
+}
+function mbOwnCoByIdx(wi, ev){
+  if(ev) ev.stopPropagation();
+  const who = mbWhoList();
+  const w = who[Number(wi)];
+  if(!w) return;
+  mbOwnCoOpen(w.name, ev);
+}
+function mbOwnWkByIdx(wi, ev){
+  if(ev) ev.stopPropagation();
+  const who = mbWhoList();
+  const w = who[Number(wi)];
+  if(!w) return;
+  const picked = mbOwnRows();
+  const em = String((picked[0] || {}).e || '').trim().toLowerCase();
+  if(!em) return;
+  mbWorkLinkOpen(em, ev);
+  const all = (_mbWork && _mbWork.all) || [];
+  if(all.some(x => x && x.mgr === w.name)){
+    state.mbWkQ = w.name;
+    const inp = document.querySelector('#folderMenu input');
+    if(inp) inp.value = w.name;
+    mbWorkLinkFill();
+  }
+}
+function mbOwnAllByIdx(wi, ev){
+  if(ev) ev.stopPropagation();
+  const who = mbWhoList();
+  const w = who[Number(wi)];
+  if(!w) return;
+  const picked = mbOwnRows();
+  if(!picked.length){ closeFolderMenu(); return toast('고른 것이 없습니다'); }
+  const em = String((picked[0] || {}).e || '').trim().toLowerCase();
+  if(!em) return;
+  const me = typeof mbMyName === 'function' ? mbMyName() : '';
+  const tx = mbTaxSenderInfo(em, picked);
+  /* ① 다수 사업장 세무사무실 방어: 주소 전체를 못 박으면 다른 담당자 사업장 메일까지 딸려 온다 */
+  if(tx.taxList.length > 1){
+    const infos = tx.taxList.map(c => typeof taxCoInfoOf === 'function' ? taxCoInfoOf(c) : { id: c.id, name: c.coName || c.company || '', owner: '' }).filter(Boolean);
+    const myCos = infos.filter(x => x.owner === w.name);
+    const desc = infos.map(x => `· ${x.name} (담당: ${x.owner || '미지정'})`).join('\n');
+    if(!myCos.length){
+      if(confirm(`⚠ 세무사무실 연계 확인이 필요합니다!\n\n보낸이 ${em}${tx.office ? ' ('+tx.office+')' : ''} 은 여러 사업장을 대행하는 세무사무실입니다:\n${desc}\n\n현재 「${w.name}」 담당으로 연계된 사업장이 없습니다.\n바로 「${w.name}」 사업장 지정 창을 열어 세무사무실·사업장 연계를 확인할까요?`)){
+        mbOwnCoOpen(w.name, ev);
+      }
+      return;
+    }
+    if(!confirm(`🧾 세무사무실 · 담당 사업장 한 번 더 확인\n\n보낸이: ${em}${tx.office ? ' ('+tx.office+')' : ''}\n전체 연계 사업장:\n${desc}\n\n주소 전체를 고정하면 다른 담당자 사업장 메일이 섞이므로,\n「${myCos.map(x=>x.name).join(', ')}」(${w.name} 담당) 관련 과거 메일만 골라 가져옵니다.\n진행할까요?`)) return;
+    closeFolderMenu();
+    _mbWhoMsg = _mbWhoMsg || {};
+    const upd = {};
+    picked.forEach(v => {
+      const k = mbWhoKey(v._key);
+      _mbWhoMsg[k] = w.name;
+      upd['config/mailWhoMsg/' + k] = w.name;
+    });
+    if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
+      firebase.database().ref(DB_ROOT).update(upd).catch(()=>{});
+    }
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    if(typeof mbPullPastAll === 'function'){
+      mbPullPastAll({
+        tagSender: myCos.length === 1 ? { em: em, who: w.name, onlyCoRec: myCos[0] } : null,
+        done: () => {
+          const cnt = ((mbWhoTally().cnt || {})[w.name] || 0);
+          toast(`📥 「${w.name}」 담당 과거 메일까지 확인 완료 (현재 ${cnt.toLocaleString()}통)`, 7000);
+        }
+      });
+    }
+    return;
+  }
+  /* ② 이미 다른 담당자의 사업장에 연결된 주소인지 한 번 더 체크 */
+  const linkedRec = mbCoRecOfAddr(em);
+  const linkedOwner = (linkedRec && !linkedRec.left) ? mbWhoLive(linkedRec.main) : '';
+  if(linkedRec && linkedOwner && linkedOwner !== w.name){
+    if(!confirm(`⚠ 사업장 담당자 일치 여부를 한 번 더 확인해 주세요!\n\n이 주소(${em})는 현재 「${linkedRec.company || ''}」(ERP 담당: ${linkedOwner}) 사업장에 연결되어 있습니다.\n선택하신 담당자: ${w.name}${me ? ' (로그인 본인: '+me+')' : ''}\n\n그래도 「${w.name}」에게 지정하고 과거 메일까지 모두 가져올까요?`)) return;
+  } else if(tx.isTaxLikely && !tx.taxList.length){
+    if(confirm(`🧾 세무사무실 메일로 보입니다 (${tx.office || em}).\n\n주소만 고정하는 대신 「${w.name}」의 어느 사업장 세무사무실인지 정확히 확인해 연계할까요?\n([확인] 사업장 선택 · [취소] 바로 ${w.name}에게 과거까지 가져오기)`)){
+      mbOwnCoOpen(w.name, ev);
+      return;
+    }
+  }
+  state.mbOwnKeep = true;
+  state.mbOwnPast = true;
+  mbOwnerPut(w.name);
+}
+function mbOwnCoOpen(whoName, ev){
+  const picked = mbOwnRows();
+  if(!picked.length) return toast('고른 것이 없습니다');
+  const em = String((picked[0] || {}).e || '').trim().toLowerCase();
+  if(!em) return toast('한 보낸이 메일에서만 사업장을 지정할 수 있습니다');
+  const tx = mbTaxSenderInfo(em, picked);
+  state.mbOwnCo = {
+    who: String(whoName || '').trim(),
+    em: em,
+    fromName: String((picked[0] || {}).f || (picked[0] || {}).n || '').trim(),
+    q: '',
+    pullPast: state.mbOwnPullPast !== false,
+    isTax: tx.isTaxLikely,
+    taxLikely: tx.isTaxLikely,
+    taxOffice: tx.office,
+    taxCos: tx.taxList.map(c => typeof taxCoInfoOf === 'function' ? taxCoInfoOf(c) : { id: String(c.id), name: c.coName || c.company || '', owner: '' }).filter(Boolean)
+  };
+  mbOwnCoDraw(ev);
+}
+function mbOwnCoQ(q){
+  if(!state.mbOwnCo) return;
+  state.mbOwnCo.q = String(q || '');
+  const box = $('mbOwnCoList');
+  if(box) box.innerHTML = mbOwnCoListHtml();
+}
+function mbOwnCoTogglePast(on){
+  state.mbOwnPullPast = !!on;
+  if(state.mbOwnCo) state.mbOwnCo.pullPast = !!on;
+}
+function mbOwnCoToggleTax(on){
+  if(!state.mbOwnCo) return;
+  state.mbOwnCo.isTax = !!on;
+  const box = $('mbOwnCoList');
+  if(box) box.innerHTML = mbOwnCoListHtml();
+}
+function mbOwnCoDetectedIds(){
+  const out = {};
+  const picked = mbOwnRows();
+  picked.forEach(v => {
+    const g = typeof mbGuessOf === 'function' ? mbGuessOf(v) : null;
+    if(g && g.id) out[String(g.id)] = '메일 본문·제목';
+    if(typeof taxCheckOf === 'function'){
+      const tc = taxCheckOf(v);
+      if(tc){
+        (tc.matched || []).forEach(x => { if(x && x.id) out[String(x.id)] = '세무 메일 언급'; });
+        if(tc.extraCo && tc.extraCo.id) out[String(tc.extraCo.id)] = '첨부·제목 일치';
+        if(tc.co && tc.co.id) out[String(tc.co.id)] = '세무 메일 감지';
+      }
+    }
+    const src = v._src || v;
+    const an = Array.isArray(src.an) ? src.an.join(' ') : (Array.isArray(v.an) ? v.an.join(' ') : '');
+    const hay = (typeof ErpMatch !== 'undefined' && ErpMatch._norm)
+      ? ErpMatch._norm([v.s, src.s, an, v.p, src.p].join(' ')) : '';
+    if(hay.length >= 2 && typeof ErpMatch !== 'undefined' && Array.isArray(ErpMatch.companies)){
+      ErpMatch.companies.forEach(c => {
+        if(!c || !c.id) return;
+        const nm = ErpMatch._norm(c.name || '');
+        if((nm.length >= 2 && hay.indexOf(nm) >= 0) || (nm.length >= 4 && hay.indexOf(nm.slice(0, 4)) >= 0)){
+          if(!out[String(c.id)]) out[String(c.id)] = '제목·첨부파일 감지';
+        }
+      });
+    }
+  });
+  return out;
+}
+function mbOwnCoListHtml(){
+  const st = state.mbOwnCo;
+  if(!st) return '';
+  const cos = (typeof ErpMatch !== 'undefined' && Array.isArray(ErpMatch.companies)) ? ErpMatch.companies : [];
+  if(!cos.length){
+    return '<div class="fmi" style="color:#64748b">푸른이알피 사업장 목록을 불러오는 중입니다…</div>';
+  }
+  const me = typeof mbMyName === 'function' ? mbMyName() : '';
+  const qNorm = (typeof ErpMatch !== 'undefined' && ErpMatch._norm) ? ErpMatch._norm(st.q) : String(st.q || '').trim().toLowerCase();
+  const qRaw = String(st.q || '').trim().toLowerCase();
+  const det = mbOwnCoDetectedIds();
+  const linkedCur = mbCoRecOfAddr(st.em);
+  const linkedCurId = linkedCur && linkedCur.id ? String(linkedCur.id) : '';
+  const taxLinkedMap = {};
+  (st.taxCos || []).forEach(x => { if(x && x.id) taxLinkedMap[String(x.id)] = 1; });
+
+  const items = [];
+  cos.forEach(c => {
+    if(!c || !c.id || !c.name) return;
+    if(String(c.status || '') === 'suboffice') return;
+    const info = typeof taxCoInfoOf === 'function'
+      ? taxCoInfoOf(c)
+      : { id: String(c.id), name: c.name, owner: '', subs: [], ended: false, taxEmail: c.taxEmail || '', taxOffice: c.taxOfficeName || '' };
+    if(!info) return;
+    if(info.ended && !qRaw && !det[String(c.id)]) return;
+    const isMine = (info.owner === st.who) || (info.subs || []).indexOf(st.who) >= 0;
+    const isDet = !!det[String(c.id)];
+    const isAlready = (String(c.id) === linkedCurId) || !!taxLinkedMap[String(c.id)];
+    if(qRaw){
+      const nm = ErpMatch._norm ? ErpMatch._norm(c.name) : c.name.toLowerCase();
+      const hay = (c.name + ' ' + (c.bizNo || '') + ' ' + (info.owner || '') + ' ' + (c.ceo || '')).toLowerCase();
+      if((!qNorm || nm.indexOf(qNorm) < 0) && hay.indexOf(qRaw) < 0) return;
+    } else if(!isMine && !isDet && !isAlready){
+      return;
+    }
+    items.push({
+      id: String(c.id),
+      name: c.name,
+      bizNo: String(c.bizNo || ''),
+      owner: info.owner,
+      subs: info.subs || [],
+      isMine: isMine,
+      isMeOwner: !!(me && info.owner === me),
+      detWhy: det[String(c.id)] || '',
+      isAlready: isAlready,
+      taxEmail: info.taxEmail || '',
+      taxOffice: info.taxOffice || ''
+    });
+  });
+
+  items.sort((a, b) => {
+    if(!!a.detWhy !== !!b.detWhy) return a.detWhy ? -1 : 1;
+    if(a.isMine !== b.isMine) return a.isMine ? -1 : 1;
+    if(a.isAlready !== b.isAlready) return a.isAlready ? -1 : 1;
+    return String(a.name).localeCompare(String(b.name), 'ko');
+  });
+
+  _mbOwnCoShown = items.slice(0, 180);
+  if(!_mbOwnCoShown.length){
+    return `<div class="fmi" style="color:#64748b;display:block">
+      <div>「${esc(st.who)}」 담당으로 등록된 사업장이${qRaw ? ' 검색어와 맞지' : ' 아직'} 없습니다.</div>
+      <small style="color:#64748b">위 검색창에 사업장 이름을 두 글자 이상 치면 전체 자문사에서 찾아 보여 드립니다.</small>
+    </div>`;
+  }
+
+  let html = '';
+  let lastGroup = '';
+  _mbOwnCoShown.forEach((it, ci) => {
+    const grp = it.detWhy ? 'det' : (it.isMine ? 'mine' : 'other');
+    if(grp !== lastGroup){
+      lastGroup = grp;
+      const label = grp === 'det'
+        ? '📄 이 메일 제목·첨부파일에서 감지된 사업장'
+        : (grp === 'mine' ? `👤 ${esc(st.who)} 담당 사업장` : '🔎 다른 담당자 · 미지정 사업장 (한 번 더 확인)');
+      html += `<div class="fmsec">${label}</div>`;
+    }
+    const badge = it.isMine
+      ? `<span class="fm-co-ok">✔ ${esc(st.who)}${it.isMeOwner ? '(본인)' : ''} 담당</span>`
+      : `<span class="fm-co-warn">⚠ ERP 담당: ${esc(it.owner || '미지정')}</span>`;
+    const subParts = [];
+    if(it.detWhy) subParts.push(it.detWhy);
+    if(it.bizNo) subParts.push(it.bizNo);
+    if(it.isAlready) subParts.push('이미 연결됨');
+    else if(st.isTax && it.taxEmail && it.taxEmail !== st.em) subParts.push('기존 세무: ' + it.taxEmail);
+    html += `<div class="fmi fmco" role="button" tabindex="0" onclick="mbOwnCoPickIdx(${ci})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">
+      <div style="display:flex;align-items:center;gap:6px;width:100%">
+        <b class="fmco-main">${esc(it.name)}</b>
+        ${badge}
+      </div>
+      ${subParts.length ? `<small>${esc(subParts.join(' · '))}</small>` : ''}
+    </div>`;
+  });
+  if(items.length > 180){
+    html += `<div class="fmi" style="color:#64748b">… ${(items.length - 180).toLocaleString()}곳 더 있습니다 — 사업장 이름을 검색해 주세요</div>`;
+  }
+  return html;
+}
+function mbOwnCoDraw(ev){
+  const st = state.mbOwnCo;
+  const m = $('folderMenu');
+  if(!st || !m) return;
+  const me = typeof mbMyName === 'function' ? mbMyName() : '';
+  const taxCosDesc = (st.taxCos || []).map(x => `${x.name}(${x.owner || '미지정'})`).join(' · ');
+  m.innerHTML = `
+    <div class="fmi" role="button" tabindex="0" style="color:#2563eb;font-size:12px;border-bottom:1px solid #e2e8f0"
+      onclick="mbOwnerKeep(event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">‹ 담당자 목록으로 돌아가기</div>
+    <div class="fmhead fm-wide">🏢 「${esc(st.who)}」 사업장 빠르게 지정
+      <span>${esc(st.em)} — 사업장을 클릭하면 바로 연결되고 과거자료까지 가져옵니다</span></div>
+    <div class="fm-panel-sec ${st.isTax ? 'tax-on' : 'tax-off'}">
+      <label style="display:flex;align-items:flex-start;gap:7px;cursor:pointer">
+        <input type="checkbox" ${st.isTax ? 'checked' : ''} onclick="mbOwnCoToggleTax(this.checked)" style="margin-top:2px">
+        <span><b>🧾 세무사무실 이메일로 사업장에 연계·점검</b>${st.taxOffice ? ' (' + esc(st.taxOffice) + ')' : ''}
+          <small style="display:block;color:#475569;margin-top:2px">${taxCosDesc
+            ? '현재 연계 사업장: ' + esc(taxCosDesc) + ' — 제목·첨부파일로 각 사업장 담당자에게 정확히 분리됩니다'
+            : '세무사무실이 여러 사업장을 대행해도 섞이지 않게 세무 이메일(taxEmail)과 본인 담당 여부를 한 번 더 체크합니다'}</small></span>
+      </label>
+    </div>
+    <div class="fm-panel-sec past-bar">
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+        <input type="checkbox" ${st.pullPast ? 'checked' : ''} onclick="mbOwnCoTogglePast(this.checked)">
+        <span><b>📥 클릭 후 과거 메일 · 📦 지난 메일(전체)까지 바로 가져오기</b></span>
+      </label>
+    </div>
+    <div class="fm-search">
+      <input type="text" value="${esc(st.q)}" oninput="mbOwnCoQ(this.value)"
+        aria-label="${esc(st.who)} 담당 사업장 검색"
+        placeholder="${esc(st.who)}${me && st.who === me ? '(본인)' : ''} 사업장 검색 (전체 사업장도 이름 치면 표시)">
+    </div>
+    <div id="mbOwnCoList" class="fmlist" style="max-height:280px">${mbOwnCoListHtml()}</div>`;
+  mbPlaceMenu(m, ev);
+}
+let _mbOwnCoBusy = false;
+async function mbOwnCoPickIdx(ci){
+  const st = state.mbOwnCo;
+  const it = _mbOwnCoShown[Number(ci)];
+  if(!st || !it) return;
+  return mbOwnCoPick(it.id);
+}
+async function mbOwnCoPick(coId){
+  if(_mbOwnCoBusy) return;
+  const st = state.mbOwnCo;
+  if(!st || !coId) return;
+  const rec = (typeof ErpMatch !== 'undefined' && ErpMatch.byId) ? ErpMatch.byId[String(coId)] : null;
+  if(!rec) return toast('푸른이알피 사업장 정보를 찾지 못했습니다', 7000);
+  const info = typeof taxCoInfoOf === 'function'
+    ? taxCoInfoOf(coId)
+    : { id: String(coId), coName: rec.company || '', name: rec.company || '', owner: mbWhoLive(rec.main), subs: rec.subs || [], taxEmail: '', taxOffice: '' };
+  const me = typeof mbMyName === 'function' ? mbMyName() : '';
+  const effOwner = info.owner || st.who;
+
+  /* ── 1단계: 선택한 사람(본인) ↔ 사업장 ERP 담당자 일치 여부 한 번 더 체크 ── */
+  const ownerMatchesPick = (info.owner === st.who) || (info.subs || []).indexOf(st.who) >= 0;
+  if(info.owner && !ownerMatchesPick){
+    if(!confirm(`⚠ 본인·담당자 사업장 일치 여부를 한 번 더 확인해 주세요!\n\n`
+      + `· 선택한 담당자: ${st.who}${me ? ' (로그인 본인: ' + me + ')' : ''}\n`
+      + `· 선택한 사업장: ${info.name}\n`
+      + `· 푸른이알피 등록 담당자: ${info.owner}\n\n`
+      + `이 사업장의 ERP 담당자는 「${info.owner}」입니다.\n`
+      + `연결하면 메일은 사업장 담당자인 「${info.owner}」 함으로 들어갑니다. 계속할까요?`)) return;
+  } else if(!info.owner){
+    if(!confirm(`⚠ 「${info.name}」 사업장에 푸른이알피 주담당자가 아직 비어 있습니다.\n\n`
+      + `사업장 연결과 함께 메일이 「${st.who}」 함으로 들어오도록 지정할까요?`)) return;
+  } else if(me && st.who !== me && info.owner !== me && (info.subs || []).indexOf(me) < 0){
+    if(st.isTax && !confirm(`🧾 본인(${me}) 담당이 아닌 「${st.who}」 담당 사업장 「${info.name}」에 세무사무실(${st.em})을 연계합니다.\n맞는지 한 번 더 확인해 주세요. 진행할까요?`)) return;
+  }
+
+  _mbOwnCoBusy = true;
+  try{
+    /* ── 2단계: 세무사무실 연계 모드일 때 세무사무실 ↔ 사업장 ↔ 담당자 최종 체크 ── */
+    if(st.isTax){
+      const otherCos = (st.taxCos || []).filter(x => String(x.id) !== String(coId)).map(x => `${x.name}(${x.owner || '미지정'})`);
+      const selfLine = me
+        ? (info.owner === me ? `✔ 로그인 본인(${me}) 담당 사업장과 정확히 일치합니다.` : `로그인 본인: ${me} / 사업장 담당: ${info.owner || st.who}`)
+        : `사업장 담당: ${info.owner || st.who}`;
+      const existTaxWarn = (info.taxEmail && info.taxEmail !== st.em)
+        ? `\n⚠ 이 사업장에는 이미 다른 세무 이메일(${info.taxEmail})이 적혀 있어 기존 값은 덮어쓰지 않고 현재 주소 연계만 추가합니다.`
+        : '';
+      if(!confirm(`🧾 세무사무실 · 사업장 연계 한 번 더 확인\n\n`
+        + `· 세무사무실 이메일: ${st.em}${st.taxOffice ? ' (' + st.taxOffice + ')' : ''}\n`
+        + `· 연계할 사업장: ${info.name}\n`
+        + `· ${selfLine}`
+        + (otherCos.length ? `\n· 같은 세무사무실의 다른 사업장: ${otherCos.join(', ')} (제목·첨부파일로 자동 구분)` : '')
+        + existTaxWarn
+        + `\n\n정확히 맞으면 [확인]을 눌러 연계하고 ${st.pullPast ? '과거자료까지 바로 가져옵니다.' : '저장합니다.'}`)) return;
+
+      closeFolderMenu();
+      if(!info.taxEmail && typeof erpCoPatchMany === 'function'){
+        try{
+          await erpCoPatchMany([{
+            id: String(coId),
+            plan: (cur) => {
+              const blank = v => v === undefined || v === null || String(v).trim() === '';
+              const p = {};
+              if(blank(cur.taxEmail)) p.taxEmail = st.em;
+              if(st.taxOffice && blank(cur.taxOfficeName)) p.taxOfficeName = st.taxOffice;
+              return Object.keys(p).length ? { fields: p, info: {} } : { none: true, info: {} };
+            }
+          }]);
+        }catch(e){
+          return toast('세무사무실 연계 저장 실패 — ' + ((e && e.message) || e), 9000);
+        }
+      }
+      if(typeof ErpMatch !== 'undefined'){
+        ErpMatch.byTaxEmail = ErpMatch.byTaxEmail || {};
+        const arr = ErpMatch.byTaxEmail[st.em] = ErpMatch.byTaxEmail[st.em] || [];
+        if(!arr.some(x => String(x.id) === String(coId))){
+          arr.push({ id: String(coId), coName: info.name, company: info.name, taxOfficeName: st.taxOffice || info.taxOffice || '', taxEmail: st.em, bizno: rec.bizno || '' });
+        }
+        const rawCo = (ErpMatch.companies || []).find(x => x && String(x.id) === String(coId));
+        if(rawCo && !rawCo.taxEmail) rawCo.taxEmail = st.em;
+      }
+      const taxArrNow = (typeof ErpMatch !== 'undefined' && ErpMatch.byTaxEmail && ErpMatch.byTaxEmail[st.em]) || [];
+      const mKey = mbWhoKey(st.em);
+      if(taxArrNow.length > 1 && _mbCo && _mbCo[mKey]){
+        delete _mbCo[mKey];
+        if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
+          firebase.database().ref(DB_ROOT + '/config/mailCo/' + mKey).set(null).catch(()=>{});
+        }
+      }
+      const picked = mbOwnRows();
+      _mbWhoMsg = _mbWhoMsg || {};
+      const msgUpd = {};
+      picked.forEach(v => {
+        if(!v || !v._key) return;
+        const k = mbWhoKey(v._key);
+        _mbWhoMsg[k] = effOwner;
+        msgUpd['config/mailWhoMsg/' + k] = effOwner;
+      });
+      if(Object.keys(msgUpd).length && typeof Store !== 'undefined' && Store.mode === 'firebase'){
+        firebase.database().ref(DB_ROOT).update(msgUpd).catch(()=>{});
+      }
+      mbWhoBust(); renderPCSide(); renderMailPage();
+      if(st.pullPast && typeof mbPullPastAll === 'function'){
+        await new Promise(resolve => mbPullPastAll({
+          done: () => {
+            const cnt = ((mbWhoTally().cnt || {})[effOwner] || 0);
+            toast(`🧾 「${info.name}」 세무사무실 연계 · 과거자료 확인 완료 (담당 ${effOwner} · ${cnt.toLocaleString()}통)`, 7000);
+            resolve();
+          }
+        }));
+      } else {
+        toast(`🧾 「${info.name}」 세무사무실(${st.em}) 연계 완료 — 담당 ${effOwner}`, 7000);
+      }
+      return;
+    }
+
+    /* ── 3단계: 일반 거래처·사업장 이메일 연결 + 과거자료 즉시 가져오기 ── */
+    closeFolderMenu();
+    const key = mbWhoKey(st.em);
+    _mbCo = _mbCo || {};
+    const val = { n: info.name, id: String(coId), at: Date.now() };
+    _mbCo[key] = val;
+    const upd = {};
+    upd['config/mailCo/' + key] = val;
+    if(!info.owner && st.who){
+      _mbOwner = _mbOwner || {};
+      _mbOwner[key] = st.who;
+      upd['config/mailWho/' + key] = st.who;
+    }
+    if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
+      firebase.database().ref(DB_ROOT).update(upd).catch(e => {
+        toast('사업장 연결 저장 실패 — ' + ((e && e.message) || e), 9000);
+      });
+    }
+    if(mbErpFillOn() && typeof erpFillContact === 'function'){
+      erpFillContact({ coId: String(coId), email: st.em, name: st.fromName || '', from: 'mail-own-co' })
+        .then(r => { if(r && r.ok && r.added){ renderPCSide(); renderMailPage(); } })
+        .catch(()=>{});
+    }
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    if(st.pullPast && typeof mbPullPastAll === 'function'){
+      await new Promise(resolve => mbPullPastAll({
+        tagSender: (!info.owner && st.who) ? { em: st.em, who: st.who } : null,
+        done: () => {
+          const cnt = ((mbWhoTally().cnt || {})[effOwner] || 0);
+          toast(`🏢 ${st.em} → 「${info.name}」 연결 · 과거자료 가져오기 완료 (담당 ${effOwner} · ${cnt.toLocaleString()}통)`, 7000);
+          resolve();
+        }
+      }));
+    } else {
+      const cnt = ((mbWhoTally().cnt || {})[effOwner] || 0);
+      toast(`🏢 ${st.em} → 「${info.name}」(담당 ${effOwner} · 현재 ${cnt.toLocaleString()}통) 연결 완료`, 7000);
+    }
+  }finally{
+    _mbOwnCoBusy = false;
+  }
 }
 
 /* ⚠ 2026-08-26 로 이 창이 «우리 칸» 창이 되었다. 고르면 다음메일이 아니라 쪽지가 바뀐다.
@@ -43272,6 +44227,7 @@ document.addEventListener('keydown', e=>{
        함께 비운다(다른 상세 패널을 닫을 땐 coPick 이 이미 비어 있어 해가 없다). */
   if(e.key==='Escape'){
     if(state.mbPv){ e.preventDefault(); mbPvClose(); return; }
+    if(state.taxSave){ e.preventDefault(); taxSaveClose(); return; }
     /* ⚙️ 환경설정에서 Esc = 한 단계 뒤로 (대표 지시 2026-09-30 「환경설정에서 esc 누르면 뒤로가기」)
        하위 화면 → 환경설정 목록 → 원래 목록. ⚠ 열린 창·패널이 있으면 그것부터 닫는다(아래 그대로).
        ⚠ 입력칸에 글자를 쓰는 중이면 안 간다 — 붙여 넣던 명단이 날아간다. */
