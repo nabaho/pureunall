@@ -27,3 +27,5 @@
 
 ## 확인
 - `node --test 'tests/*.test.js'` 30,715건 실패 0.
+- 자동 검토(Orca) — 검증·보안 모두 Antigravity(Gemini, Codex 사용률 91% 로 자동 전환). 보안 **발견 사항 없음**, 검증 **통과**(낮음 3건 → 고침: 길잡이 추천 질문의 옛 이름, ＋ 넣기에서 강의 폴더 밖 파일도 guessPath, 줄마다 ☐·입력칸 aria-label). 캐시 pu-edulib-app v3 · pu-chatbot-kb v15.
+- `node tools/phone-audit/run.mjs edulib --widths=375,1280` — 375px 7화면 옆넘침·화면밖·세로깨짐·작은입력 0.
