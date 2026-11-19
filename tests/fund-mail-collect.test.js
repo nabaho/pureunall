@@ -252,9 +252,10 @@ test('3. collectSingleMail — 신뢰 발신 적재 · 미등록 외부인 무�
   assert.equal(res.trustedSender, true);
   assert.equal(downloadCalls, 1);
 
-  /* 텍스트 안전 검증을 통과한 1건만 closing_blobs 에 저장 */
+  /* 텍스트 안전 검증을 통과한 1건만 closing_blobs 에 저장하며, 주민등록초본(jumin)은 바이너리 미보관 상태에서 chg_officer 입수(recv)만 표시 */
   assert.equal(Object.keys(db.getAt('fund_erp/closing_blobs/FUND-T1/2026')).length, 1);
   assert.equal(db.getAt('fund_erp/site_doc_chk/FUND-T1/S_1/chg_contrib').mail.trusted, true);
+  assert.equal(db.getAt('fund_erp/site_doc_chk/FUND-T1/S_1/chg_officer').recv, true);
 
   /* ★ 일반 INBOX 로 들어온 미등록 외부인 메일은 fetchAttachments 조차 부르지 않고 격리되며,
      기존 trusted 체크리스트 셀이나 trusted_quota 를 전혀 건드리지 않음 */
