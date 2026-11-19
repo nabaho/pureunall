@@ -4841,3 +4841,185 @@ test('㉜ 미니멀 검색 중심 UI 규칙 — 상단/사이드바 정적 건�
   clickAct({ 'data-act': 'home-scope-jump', 'data-scope': 'sites' });
   assert.ok(!elementsById.pboxMainArea.innerHTML.includes(fakeRrn), '외부 사이트 이동 시 주민번호 등 개인정보가 검색창에 전달되면 안 됩니다');
 });
+
+test('원문 100% 보존형 동적 앵커 발췌(No-Stitching Verbatim RAG) — 후반부 판결요지·단서조항·장문 첨부 위법조항을 무합성 원문 그대로 보존한다', async () => {
+  /* 1) 동적 문맥 유지율(r*) 및 점수 비례 글자수 예산 검증 */
+  assert.equal(Engine.computeDynamicRetentionRatio(1.0, 0.25), 1, '최고 관련도(R=1.0) 문서는 100% 유지율(1.0)을 배정받아야 합니다');
+  assert.equal(Engine.computeDynamicRetentionRatio(0, 0.25), 0, '무관 문서(R=0)는 최소 예산으로 수렴해야 합니다');
+  assert.equal(Engine.computeDynamicRetentionRatio(NaN, -5), 0, '비정상 입력값(NaN·음수 beta)에서도 안전하게 0을 반환해야 합니다');
+  const topBudget = Engine.computeDynamicCharBudget(1.0, 850, 2600, 0.25);
+  const midBudget = Engine.computeDynamicCharBudget(0.5, 850, 2600, 0.25);
+  const lowBudget = Engine.computeDynamicCharBudget(0.1, 850, 2600, 0.25);
+  assert.equal(topBudget, 2600);
+  assert.ok(topBudget > midBudget && midBudget > lowBudget && lowBudget >= 850, '관련도 점수에 비례해 동적 예산이 단조 증가해야 합니다');
+
+  /* 2) 장문 판결문(3,200자+) 후반부 【판결요지】 및 `다만` 단서 동반 보존 + 임의 문장 합성 0% 검증 */
+  const longHistoryFiller = Array.from({ length: 34 }, (_, idx) => (
+    `제${idx + 1}항 기초 경위로서 피고 회사는 일반 인사관리 규정과 급여 지급 절차를 운영하여 왔으며 당사자 사이의 종전 단체협약 교섭 경과는 별지 기재와 같다.`
+  )).join(' ');
+  const holdingMain = '정기상여금에 지급일 현재 재직 중일 것을 요건으로 하는 재직조건이 부가되어 있더라도 소정근로의 대가로 정기적·일률적으로 지급되는 이상 통상임금에 해당한다.';
+  const holdingProviso = '다만, 법적 안정성과 신뢰보호를 위하여 새로운 법리는 이 판결 선고일 이후 산정하는 통상임금부터 적용한다.';
+  const longRulingBody = [
+    '【소송대리인】 법무법인 푸른 담당변호사 김변호',
+    '【원심판결】 서울고등법원 2023. 11. 10. 선고 2022나12345 판결',
+    '【이 유】',
+    longHistoryFiller,
+    '【판결요지】',
+    holdingMain + ' ' + holdingProviso
+  ].join('\n');
+  assert.ok(longRulingBody.indexOf('【판결요지】') > 1800, '테스트 판결문의 【판결요지】는 기존 1,400자 절단선 뒤에 위치해야 합니다');
+
+  const ragPrompt = Engine.buildRagPrompt({
+    query: '재직조건이 붙은 정기상여금도 통상임금에 포함되나요?',
+    mode: 'review',
+    retrievedDocs: [
+      {
+        id: 'long-prec-1',
+        docType: 'prec_sc',
+        court: '대법원 전원합의체',
+        caseNo: '2020다247190',
+        decisionDate: '2024-12-19',
+        title: '통상임금 재직조건 전원합의체 판결',
+        summary: '',
+        body: longRulingBody
+      },
+      {
+        id: 'peripheral-prec-2',
+        docType: 'prec_lower',
+        court: '서울중앙지방법원',
+        caseNo: '2023가합55555',
+        decisionDate: '2024-02-01',
+        title: '일반 정산금 청구 사건',
+        summary: '',
+        body: longHistoryFiller
+      }
+    ]
+  });
+
+  assert.ok(ragPrompt.includes(holdingMain), '기존 1,400자 앞부분 절단에서 누락되던 후반부 【판결요지】 본문이 프롬프트에 보존되어야 합니다');
+  assert.ok(ragPrompt.includes(holdingProviso), '본문 뒤에 이어지는 `다만` 단서 문장까지 분리·누락 없이 동반 보존되어야 합니다');
+
+  const directExcerpt = Engine.extractLegalEvidenceExcerpt(longRulingBody, {
+    query: '재직조건 정기상여금 통상임금',
+    maxChars: 950,
+    docKind: 'ruling',
+    multiline: true
+  });
+  assert.ok(directExcerpt.length <= 950, '발췌 결과는 지정된 최대 글자수 예산을 초과하면 안 됩니다');
+  assert.ok(directExcerpt.includes('[…]'), '중간 생략 구간은 생성문 대신 명시적 `[…]` 기호로 표기되어야 합니다');
+  const verbatimPieces = directExcerpt
+    .split(/\s*\[…\]\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  assert.ok(verbatimPieces.length >= 2, '생략 기호 전후로 복수의 원문 구간이 추출되어야 합니다');
+  for (const piece of verbatimPieces) {
+    for (const line of piece.split('\n').map((x) => x.trim()).filter(Boolean)) {
+      assert.ok(longRulingBody.includes(line), `발췌된 모든 문장은 원문의 100% 부분문자열이어야 합니다(임의 합성 금지): ${line}`);
+    }
+  }
+
+  /* 3) 장문 법령 조문(240자 초과) 후반부 `다만` 적용제외 단서 검색 스니펫 및 RAG·오프라인 합성 보존 검증 */
+  const longLawMd = [
+    '---',
+    '제목: 근로기준법',
+    '법령ID: "001872"',
+    '시행일자: 2026-10-02',
+    '---',
+    '# 근로기준법',
+    '##### 제11조 (적용 범위)',
+    '① 이 법은 상시 5명 이상의 근로자를 사용하는 모든 사업 또는 사업장에 적용한다. 이 경우 사업이 여러 차례의 도급에 따라 행하여지는 경우의 사용자 판단 기준과 상시 사용 근로자 수 산정 방법은 산정사유 발생일 전 1개월 동안 사용한 근로자의 연인원을 같은 기간 중의 가동 일수로 나누어 산정하는 절차와 객관적 산식에 따르며 동거하는 친족만을 사용하는 사업과 가사 사용인에 대하여는 일체의 규정을 적용하지 아니한다.',
+    '② 상시 4명 이하의 근로자를 사용하는 사업 또는 사업장에 대하여는 대통령령으로 정하는 바에 따라 이 법의 일부 규정을 적용할 수 있으며 구체적 적용 조항은 별표에서 정한다. 다만, 해고의 제한 규정은 상시 4명 이하 사업장에는 적용하지 아니한다.'
+  ].join('\n');
+  const parsedLaw = Engine.parseLawMarkdown(longLawMd, { dir: '근로기준법', fileName: '법률(법률).md' }, '2026-11-19');
+  assert.ok(parsedLaw.articles[0].text.indexOf('다만, 해고의 제한 규정은') > 260, '단서 문장이 기존 240자 한계 뒤에 있어야 합니다');
+
+  const corpusRes = Engine.searchCorpus('상시 4명 이하 해고 제한 적용', {
+    docs: [],
+    loadedLaws: [parsedLaw],
+    lawIndex: []
+  });
+  assert.equal(corpusRes.articles.length, 1);
+  assert.ok(corpusRes.articles[0].fullText.includes('다만, 해고의 제한 규정은'), '조문 검색 결과에 fullText 전문이 유지되어야 합니다');
+  assert.ok(corpusRes.articles[0].snippet.includes('다만, 해고의 제한 규정은'), '조문 카드 스니펫(280자)에서도 매칭된 후반부 단서가 잘리지 않고 표시되어야 합니다');
+
+  const lawRagPrompt = Engine.buildRagPrompt({
+    query: '상시 4명 이하 사업장 해고 제한 적용 여부',
+    retrievedArticles: corpusRes.articles
+  });
+  assert.ok(lawRagPrompt.includes('다만, 해고의 제한 규정은 상시 4명 이하 사업장에는 적용하지 아니한다.'), 'RAG 프롬프트의 법령 조문에 후반부 단서 전문이 포함되어야 합니다');
+
+  const offlineOut = Engine.synthesizeOfflineAnswer({
+    query: '상시 4명 이하 사업장 해고 제한 적용 여부',
+    retrievedArticles: corpusRes.articles
+  });
+  assert.ok(offlineOut.includes('다만, 해고의 제한 규정은'), '무료 오프라인 합성 답변에서도 법령 조문 말미의 단서가 누락되지 않아야 합니다');
+
+  /* 4) 장문 @첨부 취업규칙(7,500자+) 말미 강행규정 위반 조항 포착 및 절단 전 개인정보 마스킹 검증 */
+  const contractBenignChapters = Array.from({ length: 110 }, (_, i) => (
+    `제${i + 1}조(일반 복무 및 시설 관리) 직원은 사내 보안 지침과 출입증 패용 규정을 준수하며 비품 점검표를 매월 작성하여 총무부서에 제출한다.`
+  )).join('\n\n');
+  const splitBoundaryPhone = '010' + '-' + '9988' + '-' + '7766';
+  const tailIllegalClause = `제115조(퇴사 시 위약금 및 급여 공제) 원고 김철수(${splitBoundaryPhone})가 계약기간 만료 전 퇴사 시 교육비 및 위약금 3,000만 원을 마지막 달 급여에서 일방 공제한다.`;
+  const hugeContract = contractBenignChapters + '\n\n' + tailIllegalClause;
+  assert.ok(hugeContract.indexOf('제115조') > 5500, '위법 조항은 기존 Store 5,000자 및 Engine 2,200자 절단선 뒤에 위치해야 합니다');
+
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    localStorage: { getItem: () => null, setItem: () => {} },
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, docs: [] }), text: async () => '' }),
+    window: null
+  };
+  let capturedCloudPrompt = '';
+  ctx.window = {
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    PuAiCall: {
+      ask: async (parts) => {
+        capturedCloudPrompt = Array.isArray(parts) && parts[0] ? parts[0].text : String(parts || '');
+        return { text: '근로기준법 제20조 및 근로기준법 제43조에 따라 위약 예정 및 급여 일방 공제 약정은 무효입니다.' };
+      },
+      textOf: (r) => (r && r.text) || ''
+    },
+    localStorage: ctx.localStorage
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  const Store = ctx.window.PuPBoxStore;
+  await Store.init('user-anchor-rag');
+  await Store.askLegalAi({
+    query: '이 취업규칙에서 근로기준법 위반 소지가 있는 조항을 검토해 주세요.',
+    mode: 'review',
+    sourceText: hugeContract,
+    sourceFileName: '취업규칙_전문.txt',
+    auth: { currentUser: { uid: 'user-anchor-rag' } }
+  });
+
+  assert.ok(capturedCloudPrompt.includes('제115조') && capturedCloudPrompt.includes('위약금 3,000만 원'), '5,000자 이후 말미에 위치한 제115조 위약금·급여공제 위험 조항이 RAG 프롬프트에 정확히 발췌되어야 합니다');
+  assert.ok(!capturedCloudPrompt.includes(splitBoundaryPhone) && !capturedCloudPrompt.includes('김철수'), '발췌 전 원문 전체 비식별화가 선행되어 말미 조항의 전화번호·실명도 100% 가려져야 합니다');
+
+  /* 5) 마침표 없는 초장문 단일 문장(2,500자)에서도 maxChars 상한 준수 및 말미 키워드 윈도우 포착 검증 */
+  const runOnPrefix = '일반적인 사업장 운영 현황과 인사기록 관리 절차를 설명하는 배경 서술이 이어지며 '.repeat(55);
+  const runOnTarget = '재직조건이 부가된 정기상여금 역시 소정근로의 대가로서 통상임금에 산입된다고 보아야 할 것이다';
+  const runOnSingleSentence = runOnPrefix + runOnTarget;
+  const runOnExcerpt = Engine.extractLegalEvidenceExcerpt(runOnSingleSentence, {
+    query: '재직조건 정기상여금 통상임금',
+    maxChars: 360,
+    docKind: 'ruling',
+    multiline: false
+  });
+  assert.ok(runOnExcerpt.length <= 360, '단일 초장문 문장 윈도우 발췌도 maxChars 상한을 엄격히 지켜야 합니다');
+  assert.ok(runOnExcerpt.includes('재직조건이 부가된 정기상여금'), '마침표 없는 초장문 문장 말미의 핵심 앵커 구절도 정확히 포착해야 합니다');
+
+  /* 6) 59,000자 연속 공백 비정상 입력에 대한 선형 시간(ReDoS 차단) 방어 검증 */
+  const t0 = Date.now();
+  const pathologicalWs = '가다.' + ' '.repeat(59000) + '---';
+  const wsOut = Engine.extractLegalEvidenceExcerpt(pathologicalWs, { query: '통상임금', maxChars: 300 });
+  const elapsedMs = Date.now() - t0;
+  assert.ok(wsOut.length <= 300, '비정상 공백 입력에서도 maxChars 상한을 준수해야 합니다');
+  assert.ok(elapsedMs < 200, `59,000자 연속 공백 입력도 되추적 없이 즉시 처리되어야 합니다(실측 ${elapsedMs}ms)`);
+});

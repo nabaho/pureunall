@@ -2593,11 +2593,14 @@
         kind: 'doc',
         title: safeSourceFileName || '검토 대상 문서 원문',
         caseNo: '검토원문',
-        body: safeSourceText.slice(0, 5000)
+        body: safeSourceText.slice(0, 40000)
       });
     }
 
-    var searchSeed = safeSourceText ? (query + ' ' + safeSourceText.slice(0, 600)) : query;
+    var searchSeedExcerpt = (safeSourceText && E && typeof E.extractLegalEvidenceExcerpt === 'function')
+      ? E.extractLegalEvidenceExcerpt(safeSourceText, { query: query, maxChars: 800, docKind: 'attachment', multiline: false })
+      : safeSourceText.slice(0, 600);
+    var searchSeed = safeSourceText ? (query + ' ' + searchSeedExcerpt) : query;
     var searchFn = (E && typeof E.searchUnifiedAllInOne === 'function') ? E.searchUnifiedAllInOne : E.searchCorpus;
     var searchRes = searchFn(searchSeed, {
       docs: snapshotDocs,
