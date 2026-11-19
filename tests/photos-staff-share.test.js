@@ -369,7 +369,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      (대표 「추천대로」 — 자체 방문 집계). 새로 생김 1 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — 읽기는 homepage 그대로(재직 직원),
      화면에서 그 자리에 쓰는 곳은 없다(서버 siteHit 만 쓴다).
      게시(GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. */
-  const PENDING = ['/homepage/stats'];
+  /* ★ 2026-11-19 — 방문 통계 게시 완료(GitHub 「Firebase 배포」 실행 44432043739 · rules-deploy.js --deploy):
+       새로 1 · 바뀜 0 · 사라짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
+       새 기준 docs/firebase-rules-콘솔원문-2026-11-19.json(만들개 출력과 같다). 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
