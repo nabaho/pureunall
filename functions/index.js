@@ -1241,6 +1241,7 @@ exports.recruitWatch = functions
       if (!key) throw new Error("AI 키가 없습니다");
       const r = await DR.callGemini(fetch, key, parts, [2000], {});
       await bumpReadTally("gov", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+      await bumpSpend("gov", r);
       if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
       const ps = (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
       return ps.map((p) => (p && p.text) || "").join("");
@@ -1834,6 +1835,7 @@ async function 뉴스레터AI(글, cfg) {
   if (!key) throw new Error("AI 키가 없습니다");
   const r = await DR.callGemini(fetch, key, [{ text: 글 }], null, cfg || {});
   await bumpReadTally("news", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+  await bumpSpend("news", r);
   if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
   const parts = (r.json && r.json.candidates && r.json.candidates[0]
     && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
@@ -3866,6 +3868,7 @@ exports.readDoc = functions
     const r = await DR.callGemini(fetch, key, parts, null, v.cfg);
     // ⑤ 한 번 불렀다 — 세어 둔다(대표 물음 2026-09-08). 숫자만 담는다.
     await bumpReadTally(v.app, r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+    await bumpSpend(v.app, r);
     if (!r.ok) {
       /* ⚠ 상태를 **그대로** 돌려준다. 브라우저의 재시도·모델 갈아타기 판단이
          이 숫자를 보고 움직인다(429 면 잠시 뒤, 403 이면 곧바로 포기). */
@@ -3897,11 +3900,12 @@ async function aiMonthSpend() {
   try {
     const db = getDatabase();
     const [셈, 설정] = await Promise.all([
-      db.ref(DR.aiMonthPath()).once("value"),
+      /* 달 «_all» 통째 — n(부른 수)·won(실제 토큰 원화)·wn(원화로 센 수)를 함께 읽는다(2026-11-19) */
+      db.ref(DR.aiMonthAllPath()).once("value"),
       db.ref(DR.AI_BUDGET_PATH).once("value")
     ]);
     const b = DR.aiBudgetOf(설정.val());
-    const spent = DR.aiSpentWon(셈.val(), b.wonPerRead);
+    const spent = DR.aiSpentWonOf(셈.val(), b.wonPerRead);
     return { spent: spent, limit: b.limit, warn: b.warn,
              over: b.limit > 0 && spent >= b.limit, known: true };
   } catch (e) {
@@ -3919,6 +3923,28 @@ async function visionMonthLeft() {
   } catch (e) {
     console.warn("Vision 달 셈 못 읽음(그래서 안 부른다):", String((e && e.message) || e));
     return { left: 0, used: 0, known: false };
+  }
+}
+
+/* 실제 토큰으로 센 원화를 쌓는다(2026-11-19 비용 점검) — won 은 원화 합, wn 은 «원화로 센 판독 수».
+   달 금액은 DR.aiSpentWonOf 가 (n − wn) × 단가 + won 으로 낸다. 셈을 못 내면(usageMetadata 없음) 안 쌓는다 —
+   그 판독은 예전처럼 n × 단가로 잡힌다. ⚠ 판독 성공(r.ok) 뒤 bumpReadTally(…"n") 바로 다음에 부른다. */
+async function bumpSpend(app, r) {
+  if (!r || !r.ok) return;
+  const won = DR.wonOfUsage(r.json, r.model);
+  if (won === null) return;
+  try {
+    const db = getDatabase();
+    await Promise.all([].concat(
+      DR.tallyPaths(app, null, "won").map(function (p) {
+        return db.ref(p).transaction(function (cur) { return Math.round(((Number(cur) || 0) + won) * 100) / 100; });
+      }),
+      DR.tallyPaths(app, null, "wn").map(function (p) {
+        return db.ref(p).transaction(function (cur) { return (Number(cur) || 0) + 1; });
+      })
+    ));
+  } catch (e) {
+    console.warn("원화 셈 적기 실패(판독은 계속):", String((e && e.message) || e));
   }
 }
 
@@ -3988,6 +4014,7 @@ async function buildSuggestionAssist(id, record) {
   const r = await DR.callGemini(fetch, key, 보낼것.parts, null,
     { temperature: 0.2, maxOutputTokens: 900 });
   await bumpReadTally(SG_ASSIST_APP, r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+  await bumpSpend(SG_ASSIST_APP, r);
   if (!r.ok) {
     await writeAssist(id, { ok: false, why: "ai", note: "AI가 응답하지 않았습니다.",
       maskedKinds: 보낼것.maskedKinds });
@@ -7795,6 +7822,7 @@ exports.mailCardRead = functions
       if (q.sig) {
         const r = await DR.callGemini(fetch, key, [{ text: MAILCARD.prompt(q.sig, q) }], [2000], {});
         await bumpReadTally("cards", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+        await bumpSpend("cards", r);
         if (!r.ok) return done({ st: "skip", why: String(r.why || "AI 오류").slice(0, 80) });
         const parts = (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
         f = MAILCARD.fieldsFrom(MAILCARD.parseAi(parts.map((p) => (p && p.text) || "").join("")), q);
@@ -7902,6 +7930,7 @@ async function runMailContractSweepOnce(trigger, opts) {
         if (!key) return null;
         const r = await DR.callGemini(fetch, key, safeParts, null, { temperature: 0, maxOutputTokens: 1600 });
         await bumpReadTally("erp", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+        await bumpSpend("erp", r);
         if (!r.ok) return null;
         const candParts =
           (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
