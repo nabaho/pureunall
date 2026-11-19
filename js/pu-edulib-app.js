@@ -145,7 +145,7 @@
         n++; RENDERED.push(it.id);
         var on = !!PICK[it.id];
         h += '<tr data-id="' + esc(it.id) + '" data-g="' + esc(g.key) + '"' + (on ? ' class="picked"' : '') + '>' +
-          '<td class="ck"><input type="checkbox" data-pick="' + esc(it.id) + '"' + (on ? ' checked' : '') + '></td>' +
+          '<td class="ck"><input type="checkbox" aria-label="' + esc(it.title || it.fileName) + ' 고르기" data-pick="' + esc(it.id) + '"' + (on ? ' checked' : '') + '></td>' +
           '<td class="no">' + n + '</td>' +
           '<td class="dt">' + dateCell(it) + '</td>' +
           '<td class="ct"><span class="one"><span title="' + esc(catLabel(it.cat)) + '">' + esc(catLabel(it.cat)) + '</span>' + (C.catByKey(it.cat).legal ? '<span class="tag legal">법정</span>' : '') + '</span></td>' +
@@ -582,10 +582,11 @@
       var rel = f.webkitRelativePath || f._rel || f.name;          /* _rel — 끌어놓은 폴더에서 경로를 못 붙였을 때의 대신 자리(readDrop) */
       if (/^~\$/.test(f.name) || /^\./.test(f.name)) { skipped++; return; }
       var r = C.classifyPath(rel);
-      var cat = r.tier ? r.cat : C.catOfText(rel);
-      var date = r.tier ? r.date : C.dateFromText(f.name.replace(/\.[^.]+$/, ''));
+      var g = r.tier ? r : C.guessPath(rel);                       /* 강의 폴더 밖이라도 같은 규칙(깊은 폴더 → 이름)으로 종류·강의일 짐작 */
+      var cat = r.tier ? r.cat : g.cat;
+      var date = r.tier ? r.date : g.date;
       var row = { key: 'f' + Math.random().toString(36).slice(2), src: 'file', file: f, fileName: f.name, size: f.size, rel: rel,
-        title: f.name.replace(/\.[^.]+$/, ''), cat: cat, lectureDate: date || '', dateFrom: date ? (r.dateFrom || 'name') : '',
+        title: f.name.replace(/\.[^.]+$/, ''), cat: cat, lectureDate: date || '', dateFrom: date ? (g.dateFrom || 'name') : '',
         venue: '', pii: r.pii, tier: r.tier, why: r.tier ? '' : r.why, pick: true, note: '', state: '' };
       if (fromFolder && !r.tier) row.pick = false;
       if (r.pii) row.pick = false;
@@ -642,12 +643,12 @@
       '<th class="tt">파일</th><th class="ct">종류</th><th class="dt">강의일</th><th class="vn">강의처</th><th class="fm">크기</th><th class="st">알림</th></tr></thead><tbody>';
     show.forEach(function (r, i) {
       h += '<tr data-sk="' + esc(r.key) + '"' + (r.pick ? ' class="picked"' : '') + '>' +
-        '<td class="ck"><input type="checkbox" data-spick="' + esc(r.key) + '"' + (r.pick ? ' checked' : '') + (r.state === 'done' ? ' disabled' : '') + '></td>' +
+        '<td class="ck"><input type="checkbox" aria-label="' + esc(r.fileName) + ' 고르기" data-spick="' + esc(r.key) + '"' + (r.pick ? ' checked' : '') + (r.state === 'done' ? ' disabled' : '') + '></td>' +
         '<td class="no">' + (i + 1) + '</td>' +
         '<td class="tt" title="' + esc(r.rel) + '"><span class="one"><span>' + esc(r.fileName) + '</span>' + (r.tier ? '<span class="tag est" title="A: 강의 폴더 안 · B: 이름만 강의">' + esc(r.tier) + '</span>' : '') + '</span></td>' +
-        '<td class="ct"><select data-scat="' + esc(r.key) + '">' + catOpts(r.cat) + '</select></td>' +
-        '<td class="dt"><input type="text" data-sdate="' + esc(r.key) + '" value="' + esc(r.lectureDate) + '" placeholder="모름"></td>' +
-        '<td class="vn"><input type="text" data-svenue="' + esc(r.key) + '" value="' + esc(r.venue) + '" placeholder="강의처"></td>' +
+        '<td class="ct"><select aria-label="' + esc(r.fileName) + ' 종류" data-scat="' + esc(r.key) + '">' + catOpts(r.cat) + '</select></td>' +
+        '<td class="dt"><input type="text" aria-label="' + esc(r.fileName) + ' 강의일" data-sdate="' + esc(r.key) + '" value="' + esc(r.lectureDate) + '" placeholder="모름"></td>' +
+        '<td class="vn"><input type="text" aria-label="' + esc(r.fileName) + ' 강의처" data-svenue="' + esc(r.key) + '" value="' + esc(r.venue) + '" placeholder="강의처"></td>' +
         '<td class="fm">' + esc(K.fmtBytes(r.size)) + '</td>' +
         '<td class="st" title="' + esc([r.note, r.why, r.err].filter(Boolean).join(' · ')) + '"><span class="one">' +
           (r.state === 'done' ? '<span class="tag ok">저장함</span>' : r.state === 'err' ? '<span class="tag pii">못 함</span>' : '') +
@@ -780,7 +781,7 @@
       '<th class="dt">메일 날짜</th><th class="tt">제목</th><th class="att">첨부</th><th class="ct">추정 종류</th><th class="who">보낸이·받는이</th><th class="st">알림</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
       var on = !!MPICK[r.id];
-      h += '<tr' + (on ? ' class="picked"' : '') + '><td class="ck"><input type="checkbox" data-mpick="' + esc(r.id) + '"' + (on ? ' checked' : '') + (r.have ? ' disabled' : '') + '></td>' +
+      h += '<tr' + (on ? ' class="picked"' : '') + '><td class="ck"><input type="checkbox" aria-label="' + esc(r.att || r.s) + ' 고르기" data-mpick="' + esc(r.id) + '"' + (on ? ' checked' : '') + (r.have ? ' disabled' : '') + '></td>' +
         '<td class="no">' + (i + 1) + '</td><td class="dt">' + esc(ymd(r.d)) + '</td>' +
         '<td class="tt" title="' + esc(r.s) + '">' + esc(r.s) + '</td>' +
         '<td class="att" title="' + esc(r.att || '첨부 이름 모름 — 가져올 때 확인') + '">' + esc(r.att || '(가져올 때 확인)') + '</td>' +
