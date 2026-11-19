@@ -13,7 +13,8 @@
      ④ 숨기거나 옮기지 않는다 — display·visibility·order·position 을 쓰지 않는다(앱 안 디자인 덩어리도 같다)
      ⑤ 입력칸 글자 크기는 건드리지 않는다 — 폰 16px 규칙은 앱이 지킨다
      ⑥ 켠 앱은 파일을 자기 <style> «뒤»에 싣고 <body> 에 pu-design 을 단다 — 둘은 함께 다닌다
-     ⑦ 글자 대비 — 파랑 위 흰 글자, 바탕 위 회색 글자, 옅은 파랑 위 짙은 파랑이 4.5:1 이상
+     ⑥-2 기기 «어두운 모드»를 따르는 앱은 pu-dark-auto 도 단다(안 달면 어두운 카드 위에 밝은 판 값이 얹힌다) — 거꾸로도
+     ⑦ 글자 대비 — 파랑 위 흰 글자, 바탕 위 회색 글자, 옅은 파랑 위 짙은 파랑이 4.5:1 이상 (어두운 판도 같다 ⑦-2)
      ⑧ 켜기 전·뒤 대조 도구(tools/phone-audit/design-diff.js)가 «줄어든 것»과 «새로 화면 밖»을 잡는다
    실행: node --test tests/pu-design.test.js */
 'use strict';
@@ -27,7 +28,15 @@ const ROOT = path.join(__dirname, '..');
 const R = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n');
 const CSS_FILE = 'css/pu-design.css';
 const noComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
-const ALLOWED = new Set([].concat(...Object.values(PALETTE), '#ffffff'));
+/* 검정은 어두운 판 바탕(앱의 어두운 모드 바탕과 같은 색)으로만 쓴다 — 저장소 색 검사(color-palette-apps)도 검정을 받는다 */
+const ALLOWED = new Set([].concat(...Object.values(PALETTE), '#ffffff', '#000000'));
+/* 어두운 판 덩어리(@media (prefers-color-scheme:dark) 안의 body.pu-design.pu-dark-auto 값) */
+function darkBlock(css) {
+  const m = noComments(css).match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:where\(body\.pu-design\.pu-dark-auto\)\s*\{([^{}]*)\}/);
+  return m ? m[1] : '';
+}
+/* 기기 어두운 모드를 «자기 스타일»에서 따르는 앱인가 — 공용 파일을 실은 줄은 빼고 본다 */
+const followsDark = (h) => /prefers-color-scheme:\s*dark/.test(h.slice(0, Math.max(0, h.indexOf('</head>'))));
 
 /* 앞머리 묶음을 «괄호 밖 쉼표»로만 나눈다 — :where(button,a[href]) 안의 쉼표는 나누지 않는다 */
 function splitTop(sel) {
@@ -138,12 +147,36 @@ test('⑥ 켠 앱 — 자기 <style> 뒤에 싣고 <body> 에 pu-design 을 단�
   });
 });
 
+test('⑥-2 기기 어두운 모드를 따르는 켠 앱은 pu-dark-auto 를 단다 — 어두운 모드가 없는 앱은 안 단다', () => {
+  assert.ok(darkBlock(R(CSS_FILE)), '공용 파일에 어두운 판 덩어리가 없다');
+  appsUsing().forEach(f => {
+    const h = R(f), body = bodyTag(h);
+    const dark = /\bpu-dark-auto\b/.test(body);
+    if (followsDark(h)) assert.ok(dark, f + ': 기기 어두운 모드를 따르는데 pu-dark-auto 가 없다 — 어두운 카드 위에 흰 숫자 카드·흐린 글자가 얹힌다');
+    else assert.ok(!dark, f + ': 어두운 모드가 없는데 pu-dark-auto 를 달았다 — 밝은 화면에 어두운 값만 얹힌다');
+  });
+});
+
 test('⑦ 글자 대비 4.5:1 이상 — 파랑 위 흰 글자 · 바탕 위 회색 · 옅은 파랑 위 짙은 파랑', () => {
   const css = noComments(R(CSS_FILE));
   const v = (name) => { const m = css.match(new RegExp(name + '\\s*:\\s*(#[0-9a-fA-F]{3,6})\\b')); assert.ok(m, name + ' 없음'); return m[1]; };
-  [['#ffffff', v('--pu-acc')], [v('--pu-sub'), v('--pu-bg')], [v('--pu-acc2'), v('--pu-acc-soft')],
+  [['#ffffff', v('--pu-acc')], ['#ffffff', v('--pu-acc2')], [v('--pu-sub'), v('--pu-bg')], [v('--pu-acc-ink'), v('--pu-acc-soft')],
    [v('--pu-ink'), v('--pu-card')], [v('--pu-warn'), v('--pu-warn-bg')], [v('--pu-dgi'), v('--pu-dg-bg')], [v('--pu-ok'), v('--pu-ok-bg')]]
     .forEach(([fg, bg]) => assert.ok(contrast(fg, bg) >= 4.5, fg + ' / ' + bg + ' 대비 ' + contrast(fg, bg).toFixed(2)));
+});
+
+test('⑦-2 어두운 판도 글자 대비 4.5:1 이상 — 바뀐 값은 어두운 판 값으로, 안 바뀐 값은 밝은 판 값으로 본다', () => {
+  const css = noComments(R(CSS_FILE));
+  const dark = darkBlock(R(CSS_FILE));
+  assert.ok(dark, '어두운 판 덩어리를 못 읽었다');
+  const pick = (src, name) => { const m = src.match(new RegExp(name + '\\s*:\\s*(#[0-9a-fA-F]{3,6})\\b')); return m && m[1]; };
+  const v = (name) => { const c = pick(dark, name) || pick(css, name); assert.ok(c, name + ' 없음'); return c; };
+  /* 어두운 판에서 «글자»가 되는 값은 모두 바뀌어 있어야 한다 — 밝은 판 짙은 글자가 검정 위에 남으면 안 보인다 */
+  ['--pu-ink', '--pu-sub', '--pu-acc-ink', '--pu-card', '--pu-bg', '--pu-line'].forEach(n => assert.ok(pick(dark, n), '어두운 판에 ' + n + ' 가 없다'));
+  [['#ffffff', v('--pu-acc')], ['#ffffff', v('--pu-acc2')], [v('--pu-sub'), v('--pu-bg')], [v('--pu-sub'), v('--pu-card')],
+   [v('--pu-acc-ink'), v('--pu-acc-soft')], [v('--pu-ink'), v('--pu-card')], [v('--pu-ink'), v('--pu-bg')],
+   [v('--pu-warn'), v('--pu-warn-bg')], [v('--pu-dgi'), v('--pu-dg-bg')], [v('--pu-ok'), v('--pu-ok-bg')]]
+    .forEach(([fg, bg]) => assert.ok(contrast(fg, bg) >= 4.5, '어두운 판 ' + fg + ' / ' + bg + ' 대비 ' + contrast(fg, bg).toFixed(2)));
 });
 
 test('⑧ 켜기 전·뒤 대조 — 줄어든 것과 새로 화면 밖으로 나간 것만 잡는다', () => {
