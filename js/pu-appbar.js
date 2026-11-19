@@ -73,8 +73,8 @@
        2026-10-24 off 로 감췄다가 2026-10-30 대표 「다시 살려」로 off 를 걷었다 — 포털 타일과 함께. */
     { key: 'rules',   row: 'client', name: '기업규정집',    icon: '📋', url: 'rules-v2.html',       desc: '취업규칙·노사협의회·단체협약' },
     { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
-    /* 법정교육자료함(2026-11-19) — 강의자료 종류·강의일별 · 재직 직원 모두 — 포털 타일과 짝 */
-    { key: 'edulib',  row: 'store', name: '법정교육자료함', icon: '🎓', url: 'pu-edulib.html',      desc: '강의자료 종류·날짜별' },
+    /* 강의자료(2026-11-19 · 11-20 «법정교육자료함»에서 이름 바꿈) — 강의자료 종류·강의일별 · 재직 직원 모두 — 포털 타일과 짝 */
+    { key: 'edulib',  row: 'store', name: '강의자료', icon: '🎓', url: 'pu-edulib.html',      desc: '종류·강의일별 · 나란히 비교' },
     { key: 'aliounion', row: 'store', name: '공공임단협', icon: '🤝', url: 'pu-alio-union.html', desc: '알리오 노조·임금·단체협약 API 통합비교' },
     { key: 'hangul',  row: 'client', name: '한글 편집기',  icon: '📝', url: 'hangul.html',   desc: '한글 문서 열기·고치기' },
     { key: 'pbox',    row: 'store',  name: 'P박스',        icon: '📚', url: 'pu-pbox.html',  desc: '전 법령·판례·행정해석·AI 서면' },

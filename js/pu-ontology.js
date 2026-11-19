@@ -281,7 +281,7 @@
        ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모). 원본 파일은 창고 edulib/{id}/ 에 받은 그대로.
        ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 관리자 화면에서만, 머리글·첨부 이름만)
        ⚠ 재직 직원 모두 읽고 쓴다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만. */
-    edulib:{ name:'법정교육자료함', file:'pu-edulib.html', primaryRoots:['edulib'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
+    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
       writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
                       {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'}],
       entityTypes:['EduMaterial','EduReviewNote'] },

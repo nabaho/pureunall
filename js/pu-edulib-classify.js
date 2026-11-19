@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   법정교육자료함 — 강의 종류·날짜 «추정» 규칙 (대표 지시 2026-11-19)
+   강의자료 — 강의 종류·날짜 «추정» 규칙 (대표 지시 2026-11-19)
 
    「내컴퓨터 및 푸른메일함 전체 찾아서 강의 종류별로 대시보드 만들고
      강의종류 및 날짜별로 정리해줘 … 가급적 원본을 유지해라」
@@ -69,7 +69,8 @@
   var EXCLUDE_DIR_RX = /회의자료|회의록|신청서|위원\s?신청|컨설턴트|자문사관리|이수증|수료증|증명서|입금|지원금|환급|계약서|급여|임금대장|명세서|정산|견적/;
   /* 파일 이름만으로도 강의자료인 것 */
   var LECTURE_NAME_RX = /강의|강좌|교안|특강|교육자료|예방교육|인식개선교육|보호교육|보건교육|강의안|강연|ox\s?quiz|퀴즈/i;
-  var EXCLUDE_NAME_RX = /이수증|수료증|증명서|신청서|견적|계약서|세금계산서|영수증|입금|정산|강사료|강사\s?확인/;
+  /* «계약서»는 용역·위탁 계약 같은 «우리 계약 서류»만 뺀다 — «근로계약서와 노동법 강의»·청소년 근로계약서 실습지는 강의자료다(2026-11-20) */
+  var EXCLUDE_NAME_RX = /이수증|수료증|증명서|신청서|견적|(?<!근로|주급)계약서|세금계산서|영수증|입금|정산|강사료|강사\s?확인/;
   /* 사람 이름·서명·연락처가 들어 있을 수 있는 것 — 목록엔 넣되 «원본 올리기»는 기본으로 고르지 않는다 */
   var PII_NAME_RX = /명단|서명|참석자|출석|교육일지|이수자|수강생|연락처|주민|신상|교육\s?확인서|참석\s?확인/;
 
@@ -153,17 +154,27 @@
     else if (nameLecture) out.tier = 'B';
     else { out.why = '강의 근거 없음'; return out; }
 
-    /* 종류: 가장 깊은 폴더부터 올라가며 처음 잡히는 것 → 없으면 파일 이름 */
+    var g = guessPath(fullPath);
+    out.cat = g.cat; out.catFrom = g.catFrom; out.date = g.date; out.dateFrom = g.dateFrom;
+    return out;
+  }
+
+  /* 종류·강의일만 짐작한다(강의자료인지는 묻지 않는다) — 사람이 «강의자료»로 고른 파일에 쓴다.
+     종류: 가장 깊은 폴더부터 올라가며 처음 잡히는 것 → 없으면 파일 이름 → 없으면 «기타»
+     날짜: 파일 이름 → 가장 깊은 폴더부터 (못 찾으면 null — 파일 수정일로 지어내지 않는다) */
+  function guessPath(fullPath) {
+    var segs = splitPath(fullPath);
+    var name = segs.length ? segs[segs.length - 1] : '';
+    var dirs = segs.slice(0, -1);
+    var out = { cat: 'etc', catFrom: null, date: null, dateFrom: null };
     var c = null;
+    var cn = catOfText(name);
     for (var j = dirs.length - 1; j >= 0; j--) {
       var cj = catOfText(dirs[j]);
       if (cj.key !== 'etc') { c = cj; out.catFrom = 'folder'; break; }
     }
-    var cn = catOfText(name);
     if (!c && cn.key !== 'etc') { c = cn; out.catFrom = 'name'; }
     out.cat = (c || BY_KEY.etc).key;
-
-    /* 날짜: 파일 이름 → 가장 깊은 폴더부터 */
     var d = dateFromText(name.replace(/\.[^.]+$/, ''));
     if (d) { out.date = d; out.dateFrom = 'name'; }
     else {
@@ -193,6 +204,7 @@
     catOfText: function (s) { return catOfText(s).key; },
     dateFromText: dateFromText,
     classifyPath: classifyPath,
+    guessPath: guessPath,
     classifyMail: classifyMail,
     extOf: extOf,
     kindOf: kindOf

@@ -59,7 +59,7 @@ const DONE = [
   ['ilteo.html', '일터상생혁신'],
   ['jobtrans.html', '산업일자리전환'],
   ['pu-orchestrator.html', '업무오케스트레이션'],
-  ['pu-edulib.html', '법정교육자료함'],
+  ['pu-edulib.html', '강의자료'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */

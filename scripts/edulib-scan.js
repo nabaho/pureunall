@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ═══════════════════════════════════════════════════════════════════════
-   법정교육자료함 — 내 PC 의 강의자료를 훑어 «가져오기 목록(JSON)»을 만든다 (2026-11-19)
+   강의자료 — 내 PC 의 강의자료를 훑어 «가져오기 목록(JSON)»을 만든다 (2026-11-19)
 
    쓰는 법:
      node scripts/edulib-scan.js                       # C·D·E·F·H 드라이브 전부
@@ -19,7 +19,7 @@ const os = require('os');
 const C = require('../js/pu-edulib-classify.js');
 
 const args = process.argv.slice(2);
-let out = path.join(os.homedir(), 'Desktop', '법정교육자료함_PC목록_' + new Date().toISOString().slice(0, 10) + '.json');
+let out = path.join(os.homedir(), 'Desktop', '강의자료_PC목록_' + new Date().toISOString().slice(0, 10) + '.json');
 const roots = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--out') {
