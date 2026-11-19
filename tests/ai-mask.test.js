@@ -96,6 +96,52 @@ test('마지막 문지기 — 실려 있으면 PuRrnMask 로 남은 주민번호
   }
 });
 
+/* ── 2026-11-19 독립 검토(ow review)가 잡은 것 — 다시 생기지 않게 ── */
+test('★ 계좌 뒤에 띄어 쓴 전화·날짜를 반쪽만 삼키지 않는다 (뒷자리가 그대로 나갔다)', () => {
+  const a = M.createMasker({}).mask('통장 110-123-456789 010-1234-5678');
+  assert.ok(a.indexOf('1234-5678') < 0, '전화 뒷자리가 남았다: ' + a);
+  assert.match(a, /\[계좌1\] \[전화1\]/);
+  const b = M.createMasker({}).mask('계좌 110-123-456789 2026-11-19 입금');
+  assert.ok(b.indexOf('2026-11-19') >= 0, '날짜가 깨졌다: ' + b);
+});
+
+test('★ 이름 조각이 앞서 만든 꼬리표 글자를 다시 바꾸지 않는다 ([업체1] → [[의뢰인2]1] 였다)', () => {
+  const mk = M.createMasker({ known: [{ value: '푸른샘', label: '업체' }, { value: '신규 업체 김철수', label: '의뢰인' }, { value: '김철수 담당', label: '담당자' }] });
+  const src = '푸른샘에서 김철수 님이 문의함';
+  const out = mk.mask(src);
+  assert.ok(!/\[\[|\]\d*\]/.test(out), '꼬리표가 겹쳤다: ' + out);
+  assert.equal(mk.unmask(out), src);
+});
+
+test('★ JSON 답을 되돌려도 JSON 이 안 깨진다 (이름에 따옴표·역슬래시·줄바꿈)', () => {
+  const name = '주식회사 "푸른"\\샘\n2지점';
+  const mk = M.createMasker({ known: [{ value: name, label: '업체', parts: false }] });
+  mk.mask(name + ' 문의');
+  const back = mk.unmaskReply('설명 앞말 {"sit":"[업체1] 문의","todo":"[업체1]에 연락"} 뒷말');
+  const a = back.indexOf('{'), b = back.lastIndexOf('}');
+  const d = JSON.parse(back.slice(a, b + 1));
+  assert.equal(d.sit, name + ' 문의');
+  assert.equal(d.todo, name + '에 연락');
+  // JSON 이 아닌 답은 그대로 되돌린다
+  assert.equal(mk.unmaskReply('[업체1] 문의'), name + ' 문의');
+});
+
+test('번호 꼴 구분 — 사업장관리번호는 통째로, 연·월로 시작하는 문서번호는 그대로, 안심·수신자부담 번호는 전화', () => {
+  const mk = M.createMasker({});
+  const out = mk.mask('관리번호 2026-01-1234, 사업장관리번호 123-45-67890-0, 안심 0505-123-4567, 080-123-4567');
+  assert.ok(out.indexOf('2026-01-1234') >= 0, out);
+  assert.match(out, /사업장관리번호 \[사업장관리번호1\],/);
+  assert.ok(out.indexOf('0505-123-4567') < 0 && out.indexOf('080-123-4567') < 0, out);
+  assert.equal(mk.kinds()['전화'], 2);
+});
+
+test('붙여 쓴 법인 꼴은 떼고, 괄호 속 노무 낱말은 이름으로 치지 않는다', () => {
+  assert.deepEqual(M.partsOf('주식회사푸른샘'), ['푸른샘']);
+  assert.deepEqual(M.partsOf('㈜푸른샘'), ['푸른샘']);
+  assert.deepEqual(M.partsOf('김철수(근로자)'), ['김철수']);
+  assert.deepEqual(M.partsOf('김철수 (해고) 문의'), ['김철수']);
+});
+
 test('★ 옛 아이폰 사파리에서 터지는 뒤돌아보기(lookbehind)를 쓰지 않는다', () => {
   assert.ok(!/\(\?<[=!]/.test(MODSRC), 'js/pu-ai-mask.js 에 (?<= 나 (?<! 가 있다');
 });
@@ -124,7 +170,7 @@ APPS.forEach(({ file, fn }) => {
     const body = grab(src, fn);
     assert.match(body, /PuAiMask/, '가리개를 부르지 않는다');
     assert.match(body, /\.mask\(/, '보내기 전에 가리지 않는다');
-    assert.match(body, /\.unmask\(/, '답을 되돌리지 않는다');
+    assert.match(body, /\.unmask(?:Reply)?\(/, '답을 되돌리지 않는다');
     // 가리개가 없으면 보내지 않는다 — 「없으면 그냥 원문」이면 조용히 새어 나간다
     assert.match(body, /if\(\s*!_?MK\s*\|\|\s*!_?MK\.createMasker\s*\)/, '가리개가 없을 때 멈추지 않는다');
     // 원문을 그대로 싣는 자리가 남지 않았다
@@ -132,11 +178,46 @@ APPS.forEach(({ file, fn }) => {
   });
 });
 
-test('★ 업무관리 — 업무 정보를 보내는 부름은 모두 «아는 이름»을 넘긴다', () => {
+/* aiCall( … ) 부름마다 «맨 바깥» 인자 수를 센다 — 셋째(아는 이름)가 있는지 */
+function aiCallArgCounts(src) {
+  const out = [];
+  const re = /aiCall\(/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (/function\s+$/.test(src.slice(Math.max(0, m.index - 12), m.index))) continue;   // 정의는 건너뛴다
+    let d = 0, n = 1, j = m.index + 'aiCall('.length - 1, q = null;
+    for (; j < src.length; j++) {
+      const ch = src[j];
+      if (q) { if (ch === '\\') { j++; continue; } if (ch === q) q = null; continue; }
+      if (ch === "'" || ch === '"') { q = ch; continue; }
+      if (ch === '(') d++;
+      else if (ch === ')') { d--; if (!d) break; }
+      else if (ch === ',' && d === 1) n++;
+    }
+    out.push({ at: src.slice(m.index, Math.min(j + 1, m.index + 90)), args: n });
+  }
+  return out;
+}
+
+test('★ 업무관리 — AI 부름은 모두 «아는 이름»을 넘긴다 (지식 묻기도 — 노트 속 실명이 나갔다)', () => {
   const work = read('work.html');
-  const calls = work.match(/aiCall\(AI_SYS_(?:DRAFT|ASK|HARVEST),[^\n]*?\)\s*;?\s*\}\)/g) || [];
-  assert.ok(calls.length >= 1, '업무 정보를 보내는 AI 부름을 찾지 못했다');
-  calls.forEach((c) => assert.match(c, /aiKnown\(id\)/, '아는 이름을 넘기지 않는다: ' + c));
+  const calls = aiCallArgCounts(work);
+  assert.ok(calls.length >= 4, '업무관리의 AI 부름을 다 찾지 못했다: ' + calls.length);
+  calls.forEach((c) => assert.ok(c.args >= 3, '아는 이름을 넘기지 않는다: ' + c.at));
   const k = grab(work, 'aiKnown');
   ['company', 'client', 'officer', 'mgr_main'].forEach((f) => assert.ok(k.indexOf('it.' + f) >= 0, 'aiKnown 이 ' + f + ' 를 안 넣는다'));
+  assert.match(k, /itemContacts\(it\)/, 'aiKnown 이 이 건 담당자(연락처)를 안 넣는다');
+  assert.match(grab(work, 'kbAskCtx'), /known\.push/, '지식 묻기 글이 실은 이름을 모으지 않는다');
+});
+
+test('★ 기금관리 — 서식 본문을 보내는 부름은 기금의 아는 이름을 넘기고, 주민번호 문지기를 싣는다', () => {
+  const fund = read('fund.html');
+  const doc = aiCallArgCounts(fund).filter((c) => /문서 내용/.test(c.at));
+  assert.ok(doc.length >= 1, '서식 고치기 AI 부름을 찾지 못했다');
+  doc.forEach((c) => assert.ok(c.args >= 3, '아는 이름을 넘기지 않는다: ' + c.at));
+  const k = grab(fund, '_aiFundKnown');
+  assert.match(k, /_officersOf\(f\)/);
+  assert.match(k, /_fundSites\(/);
+  assert.match(fund, /<script src="js\/pu-rrn-mask\.js\?v=\d+"><\/script>\s*<script src="js\/pu-ai-mask\.js\?v=\d+"><\/script>/,
+    '주민번호 문지기(pu-rrn-mask.js)를 가리개보다 먼저 싣지 않는다');
 });

@@ -4437,8 +4437,11 @@ function _qToks(q){
   });
   return out;
 }
-function kbAskCtx(q){
+/* known — 넘기면 여기 실리는 이름(지식 카드의 대상·작성자, 관련 업무의 업체·의뢰인·담당자)을 모아 준다.
+   지식 묻기도 이 글을 바깥 AI 로 보내므로 aiCall 이 꼬리표로 가린다(2026-11-19 독립 검토 지적). */
+function kbAskCtx(q,known){
   var toks=_qToks(q);
+  function kn(v,label){ if(known&&v!=null&&String(v).trim()) known.push({value:String(v),label:label}); }
   function score(s){ s=String(s||'').toLowerCase(); return toks.filter(function(t){return s.indexOf(t)>=0;}).length; }
   var cards=kbAll().map(function(c){
       return {c:c,s:score(c.t)*2+score(c.x)+score(c.kl)*2};
@@ -4449,6 +4452,8 @@ function kbAskCtx(q){
   var L=['[지식 카드 '+pick.length+'장]'];
   pick.forEach(function(x){
     var c=x.c;
+    if(c._kind==='person'||c._kind==='company') kn(c.kl,c._kind==='person'?'인물':'업체');
+    kn(c.byName,'담당자');
     L.push('- ('+(KB_KLBL[c._kind]||c._kind)+' · '+(c.kl||c._key)+') '+c.t
       +(c.x?' — '+c.x:'')+' [작성 '+String(c.at||'').slice(0,10)+' '+(c.byName||'')+']'
       +(kbBad(c)?' ※ 정정 요청됨':'')+(kbStale(c)?' ※ 2년 경과':''));
@@ -4461,6 +4466,9 @@ function kbAskCtx(q){
   if(its.length){
     L.push('','[관련 업무의 노트·회고 '+its.length+'건]');
     its.forEach(function(x){
+      kn(x.it.company,'업체'); kn(x.it.client,'의뢰인'); kn(x.it.officer,'상대담당');
+      kn(x.it.mgr_main&&x.it.mgr_main.name,'담당자');
+      (x.it.mgr_subs||[]).forEach(function(m){ kn(m&&m.name,'담당자'); });
       L.push('· '+(x.it.company||'')+' '+(x.it.title||'')+(x.it.state==='done'?' (종료)':''));
       HO_FIELDS.forEach(function(f){ if(String(x.n[f[0]]||'').trim()) L.push('   '+f[1]+': '+x.n[f[0]]); });
       RETRO_FIELDS.forEach(function(f){ if(String(x.r[f[0]]||'').trim()) L.push('   회고·'+f[1]+': '+x.r[f[0]]); });
@@ -4474,7 +4482,8 @@ function kbAsk(){
   if(!kbAll().length){ toast('아직 저장된 지식이 없습니다','warn'); return; }
   aiConsent().then(function(ok){ if(!ok)return;
     var b=$('kbask-btn'); if(b){ b.disabled=true; b.textContent='찾는 중…'; }
-    aiCall(AI_SYS_QA,'[질문]\n'+q+'\n\n'+kbAskCtx(q))
+    var K=[], ctx=kbAskCtx(q,K);
+    aiCall(AI_SYS_QA,'[질문]\n'+q+'\n\n'+ctx,K)
     .then(function(txt){
       var d=aiJson(txt);
       showModal('<h2 style="margin:0 0 6px">🤔 '+esc(q)+'</h2>'
@@ -9708,7 +9717,7 @@ function aiCall(system,userText,known){
         // 새 모델은 안전 기준에 걸리면 HTTP 200 에 stop_reason:'refusal' 로 빈 답을 준다 — 까닭을 밝히고 다음 모델로 넘긴다
         if(!t&&d&&d.stop_reason==='refusal') throw new Error('AI가 이 요청을 거절했습니다(안전 기준) — 내용을 줄이거나 바꿔 다시 해 주세요');
         if(!t) throw new Error('AI 응답이 비어 있습니다');
-        return mk.unmask(t);
+        return mk.unmaskReply(t);   // 답이 JSON 이면 JSON 에 맞는 꼴로 되돌린다(이름에 따옴표가 있어도 aiJson 이 안 깨진다)
       })
       .catch(function(e){
         // ⚠ 끊긴 것은 «모델 탓»이 아니다. 다음 모델로 다시 걸면 1분을 또 기다린다.
@@ -9733,6 +9742,9 @@ function aiKnown(id){
   add(it.mgr_main&&it.mgr_main.name,'담당자');
   (it.mgr_subs||[]).forEach(function(m){ add(m&&m.name,'담당자'); });
   Object.keys(logs).forEach(function(k){ add(logs[k]&&logs[k].byName,'담당자'); });
+  /* 이 건·업체의 담당자(연락처) — 노트·기록에 이름과 전화가 그대로 적힌다 */
+  var cs=[]; try{ cs=cs.concat(itemContacts(it)); }catch(e){} try{ cs=cs.concat(coContacts(it)); }catch(e){}
+  cs.forEach(function(c){ if(!c) return; add(c.name,'업체담당'); add(c.phone,'전화'); add(c.email,'전자우편'); });
   return K;
 }
 function aiContext(id){
