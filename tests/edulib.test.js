@@ -1,0 +1,137 @@
+'use strict';
+/* 법정교육자료함 — 분류·셈·글자 미리보기 규칙 (2026-11-19)
+ *
+ * ■ 왜 이 검사가 있나
+ *   대표 지시 「강의종류 및 날짜별로 정리 … 가급적 원본을 유지해라」.
+ *   ① 날짜는 «찾은 만큼만» — 못 찾으면 비워 둔다(파일 수정일로 지어내지 않는다)
+ *   ② 회의자료·증명서·신청서는 강의자료로 넣지 않는다
+ *   ③ 원본 파일 정보(이름·크기·지문·창고 경로)는 «고치기»로 바뀌지 않는다
+ *   ④ 번호(№)는 저장하지 않는다 — 기록에 순번 칸이 없다
+ *   ⑤ 거르기·묶기·대시보드 숫자가 지운 것(_deleted)을 세지 않는다
+ *
+ * ■ 못 박는 것은 값이 아니라 규칙이다(종류 이름·개수 같은 «지금 값»은 안 본다)
+ * node --test tests/edulib.test.js */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+
+const ROOT = path.join(__dirname, '..');
+const C = require(path.join(ROOT, 'js/pu-edulib-classify.js'));
+const Core = require(path.join(ROOT, 'js/pu-edulib-core.js'));
+const P = require(path.join(ROOT, 'js/pu-edulib-preview.js'));
+
+test('날짜 — 이름에 있는 만큼만 읽고, 없으면 null', () => {
+  assert.equal(C.dateFromText('성희롱예방교육_2024.11.05_본사'), '2024-11-05');
+  assert.equal(C.dateFromText('강의안_20190628'), '2019-06-28');
+  assert.equal(C.dateFromText('노벗 평택 강의 170622'), '2017-06-22');
+  assert.equal(C.dateFromText('2026년 3월 노동법 강의'), '2026-03');
+  assert.equal(C.dateFromText('2018'), '2018');
+  assert.equal(C.dateFromText('직장내성희롱예방교육자료'), null);
+  assert.equal(C.dateFromText('2024.13.40'), '2024', '없는 달·날은 날짜로 만들지 않는다');
+  assert.notEqual(C.dateFromText('2026.02.31 강의'), '2026-02-31', '그 달에 없는 날(2월 31일)은 날짜로 만들지 않는다');
+  const next = new Date().getFullYear() + 1;
+  assert.equal(C.dateFromText(next + '년 강의 준비'), String(next), '다음 해 준비 자료의 연도도 읽는다(상한을 숫자로 박지 않는다)');
+});
+
+test('강의일 모양 검사 — 그 달의 날수를 넘으면 받지 않는다', () => {
+  assert.equal(Core.okDate('2026-02-28'), true);
+  assert.equal(Core.okDate('2026-02-31'), false);
+  assert.equal(Core.okDate('2024-02-29'), true, '윤년');
+  assert.equal(Core.okDate(''), true, '빈 값은 «모름»');
+});
+
+test('경로 판정 — 강의 폴더는 A, 이름만 강의면 B, 회의자료·증명서는 뺀다', () => {
+  /* 경로는 드라이브 글자 없이 쓴다(tests/tests-no-local-path — 검사 파일에 PC 절대 경로를 넣지 않는다). 나누는 규칙은 같다 */
+  const a = C.classifyPath('바탕화면\\9. 강의 회의\\1. 강의자료\\성희롱예방교육\\2018\\점검상사.pptx');
+  assert.equal(a.tier, 'A');
+  assert.equal(a.cat, 'sexual');
+  assert.equal(a.date, '2018');
+  assert.equal(a.dateFrom, 'folder');
+
+  const b = C.classifyPath('자료/노조법 강의안.pdf');
+  assert.equal(b.tier, 'B');
+
+  assert.equal(C.classifyPath('x\\9. 강의 회의\\2. 회의자료\\2022\\회의.pptx').tier, null);
+  assert.equal(C.classifyPath('x\\1. 강의자료\\강사 경력증명서.pdf').tier, null);
+  assert.equal(C.classifyPath('x\\1. 강의자료\\~$임시.pptx').tier, null);
+  assert.equal(C.classifyPath('x\\업무\\견적.xlsx').tier, null, '강의 근거가 없으면 넣지 않는다');
+});
+
+test('경로 판정 — 종류는 가장 깊은 폴더가 먼저, 사람 명단은 개인정보 표시', () => {
+  const r = C.classifyPath('a\\강의자료\\노동법(소규모사업장)\\중대재해법자료\\자료.pdf');
+  assert.equal(r.cat, 'safety', '더 깊은 폴더(중대재해)가 이긴다');
+  const p = C.classifyPath('a\\강의자료\\차별시정교육\\참석자 서명지.zip');
+  assert.equal(p.pii, true);
+});
+
+test('메일 판정 — 강의 말이 없으면 null, 첨부 이름이 종류를 정한다', () => {
+  assert.equal(C.classifyMail('회의 일정 안내', '일정.hwp', '2026-01-02'), null);
+  const m = C.classifyMail('[덕양] 교육자료 발송의 건', '직장내 괴롭힘 예방교육.pptx', '2026-11-16');
+  assert.equal(m.cat, 'bullying');
+});
+
+test('법정 의무교육 종류에는 근거 법령 안내가 붙는다', () => {
+  const legal = C.CATS.filter(c => c.legal);
+  assert.ok(legal.length >= 2);
+  for (const c of legal) assert.ok(c.law, c.label + ' 에 근거가 없다');
+  assert.ok(C.CATS.some(c => c.key === 'etc'), '어디에도 안 맞는 것을 받을 «기타»가 있어야 한다');
+});
+
+test('새 기록 — 온톨로지 칸(id·entityType·createdAt·updatedAt)을 갖고 순번 칸은 없다', () => {
+  const it = Core.makeItem({ fileName: '강의.pptx', size: 10, cat: 'sexual', lectureDate: '2024-05' }, { uid: 'u1', name: '갑' }, 1000);
+  assert.match(it.id, /^edu_/);
+  assert.equal(it.entityType, Core.ENTITY);
+  assert.equal(it.createdAt, 1000);
+  assert.equal(it.updatedAt, 1000);
+  assert.equal(it.revision, 1);
+  assert.equal(it.status, 'review', '처음에는 «검토 대기»');
+  for (const k of Object.keys(it)) assert.ok(!/^(no|num|seq|order|rowNo)$/i.test(k), '보는 번호를 저장하지 않는다: ' + k);
+  assert.equal(Core.makeItem({ fileName: 'a.pdf', lectureDate: '24년쯤' }).lectureDate, '', '모양이 틀린 날짜는 받지 않는다');
+});
+
+test('고치기 — 원본 파일 정보는 못 바꾸고, 바뀌면 revision 이 오른다', () => {
+  const cur = Core.makeItem({ fileName: 'a.pdf', size: 5, sha256: 'x', storagePath: 'edulib/1/a.pdf' });
+  const p = Core.patchOf(cur, { fileName: 'b.pdf', size: 9, sha256: 'y', storagePath: 'z', title: '새 제목' }, 2000);
+  assert.deepEqual(Object.keys(p).sort(), ['revision', 'title', 'updatedAt']);
+  assert.equal(p.revision, cur.revision + 1);
+  assert.equal(Core.patchOf(cur, { title: cur.title }), null, '바뀐 것이 없으면 저장하지 않는다');
+});
+
+test('거르기·묶기·대시보드 — 지운 것은 세지 않는다', () => {
+  const items = [
+    Core.makeItem({ fileName: 'a.pptx', cat: 'sexual', lectureDate: '2024-01-02' }),
+    Core.makeItem({ fileName: 'b.pptx', cat: 'sexual', lectureDate: '2025' }),
+    Core.makeItem({ fileName: 'c.pdf', cat: 'safety' }),
+    Object.assign(Core.makeItem({ fileName: 'd.pdf', cat: 'sexual', lectureDate: '2025' }), { _deleted: true })
+  ];
+  assert.equal(Core.filter(items, { cat: 'sexual' }).length, 2);
+  assert.equal(Core.filter(items, { year: 'none' }).length, 1);
+  const sorted = Core.sortByDate(Core.filter(items, {}));
+  assert.equal(sorted[sorted.length - 1].fileName, 'c.pdf', '날짜 없는 것은 맨 뒤');
+  const g = Core.group(Core.filter(items, {}), 'year');
+  assert.equal(g[g.length - 1].key, 'none');
+  const d = Core.dashboard(items);
+  assert.equal(d.total, 3);
+  assert.equal(d.cats.find(c => c.key === 'sexual').n, 2);
+});
+
+test('같은 파일 찾기 — 지문이 먼저, 없으면 이름+크기', () => {
+  const items = [Core.makeItem({ fileName: 'a.pptx', size: 3, sha256: 'h1' })];
+  assert.equal(Core.findSame(items, { sha256: 'h1', fileName: 'z', size: 1 }).how, 'sha256');
+  assert.equal(Core.findSame(items, { fileName: 'A.pptx', size: 3 }).how, 'name+size');
+  assert.equal(Core.findSame(items, { fileName: 'a.pptx', size: 4 }), null);
+});
+
+test('창고 경로 — 기록 id 아래, 경로를 깨는 글자만 바꾼다', () => {
+  const s = Core.storagePathOf('edu_1', '강의/자료#1?.pptx');
+  assert.ok(s.startsWith('edulib/edu_1/'));
+  assert.ok(!/[#?]/.test(s.slice('edulib/edu_1/'.length)));
+  assert.equal(s.split('/').length, 3);
+});
+
+test('글자 미리보기 — 문단마다 글자를 모으고 XML 엔티티를 푼다(코드로 넣지 않는다)', () => {
+  const xml = '<p:sld><a:p><a:r><a:t>직장 내 &lt;성희롱&gt;</a:t></a:r><a:r><a:t> 예방</a:t></a:r></a:p><a:p><a:r><a:t>&amp;#60;script&amp;#62;</a:t></a:r></a:p></p:sld>';
+  const lines = P._paragraphs(xml, 'a:p', 'a:t');
+  assert.equal(lines[0], '직장 내 <성희롱> 예방');
+  assert.equal(lines.length, 2);
+});

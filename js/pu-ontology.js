@@ -26,6 +26,8 @@
       SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
+      /* 법정교육자료함(2026-11-19) — 강의자료 파일 한 건(원본은 창고에 받은 그대로) · 그 자료를 본 노무사의 검토 메모 */
+      EduMaterial:'강의자료', EduReviewNote:'강의자료 검토 메모',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
@@ -275,6 +277,14 @@
                       {path:'signboard/control',entityType:'SignboardControl'},
                       {path:'signboard/log/{id}',entityType:'SignboardLog'}],
       entityTypes:['SignboardAd','SignboardPublish','SignboardControl','SignboardLog'] },
+    /* 법정교육자료함 — 강의자료를 종류·강의일로 모아 보고·나란히 비교하고·검토해 더한다(대표 지시 2026-11-19).
+       ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모). 원본 파일은 창고 edulib/{id}/ 에 받은 그대로.
+       ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 관리자 화면에서만, 머리글·첨부 이름만)
+       ⚠ 재직 직원 모두 읽고 쓴다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만. */
+    edulib:{ name:'법정교육자료함', file:'pu-edulib.html', primaryRoots:['edulib'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
+      writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
+                      {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'}],
+      entityTypes:['EduMaterial','EduReviewNote'] },
     /* 컨설팅정산 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 사이 차액을 정산한다(대표 지시 2026-10-31).
        설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md.
        ★ 쓰는 것: rules(SettleRule) · links(SettleLink — 사람이 확정한 연결만) · notices(SettleNotice) · runs(SettleRun) · adjusts(SettleAdjust).
@@ -660,6 +670,9 @@
     /* 전광판 — 광고 문구·올린 판이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     signboard_core:{program:'signboard',strategy:'in_app',path:'signboard',parser:'coverage',
       gives:'전광판 광고·올린 판·올린 기록·심부름꾼 상태 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 법정교육자료함 — 강의처(고객사 이름)·검토 메모가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
+    edulib_core:{program:'edulib',strategy:'in_app',path:'edulib',parser:'coverage',
+      gives:'강의자료 목록·종류·강의일·검토 메모 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     /* 컨설팅정산 — 사람별 금액·요율·송금이 든 재무 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     settle_core:{program:'settle',strategy:'in_app',path:'settle',parser:'coverage',
       gives:'컨설팅정산 규칙·연결·안내 파일·정산표·이월 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
