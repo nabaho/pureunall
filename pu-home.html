@@ -681,6 +681,29 @@ table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
      그 틈으로 회사 줄이 비쳐 지나간다(편집칸에서 13px·2px 로 두 번 겪은 자리다).
      여백은 머리와 몸통이 «저마다 안에서» 갖는다. */
 .modalCard.wide{max-width:1000px;padding:0}
+/* 📈 방문 통계 창 (2026-11-19) — 한 갈래 한 색(#2563eb), 폰/PC 두 색 + 이름표 */
+.st-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.st-tile{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.st-tile .k{color:var(--sub);font-size:12.5px;font-weight:600}
+.st-tile .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+.st-tile .v small{font-size:13px;color:var(--sub);margin-left:2px}
+.st-tile .d{font-size:12px;color:var(--sub)}
+.st-up{color:#166534}.st-down{color:#991b1b}
+.st-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+.st-card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.st-card h3{margin:0 0 2px;font-size:14px}
+.st-bars{margin-top:6px}
+.st-r{display:grid;grid-template-columns:120px minmax(0,1fr) 62px;align-items:center;gap:8px;padding:4px 0}
+.st-r .n{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-r .b{height:11px;background:#e2e8f0;border-radius:4px;position:relative}
+.st-r .b i{position:absolute;left:0;top:0;bottom:0;background:#2563eb;border-radius:0 4px 4px 0}
+.st-r .val{text-align:right;font-size:12.5px;color:var(--sub);font-variant-numeric:tabular-nums}
+.st-split{display:flex;gap:2px;height:12px;border-radius:4px;overflow:hidden;margin:8px 0 6px}
+.st-legend{display:flex;gap:12px;font-size:12.5px;color:var(--sub);flex-wrap:wrap}
+.st-legend span{display:inline-flex;align-items:center;gap:5px}
+.st-legend span::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--c)}
+@media (max-width:760px){.st-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.st-grid{grid-template-columns:1fr}
+  .st-r{grid-template-columns:96px minmax(0,1fr) 56px}.st-tile .v{font-size:22px}}
 /* 고르는 창의 머리 — 굴려도 붙어 있다 (대표 지시 2026-09-06 「상단 틀고정과
    저장 기능과 닫기 기능도 상단에」). 206줄을 굴려 내려가도 저장을 누를 수 있어야 한다. */
 .pickhd{position:sticky;top:0;z-index:3;background:#fff;
@@ -5677,6 +5700,152 @@ async function 기록읽기() {
   return rows;
 }
 
+/* ══════ 📈 방문 통계 (대표 지시 2026-11-18 「외부트래픽이나 홈페이지 방문자 등 검색자 숫자 확인 시스템 … 우선 목업」
+         → 목업 → 2026-11-19 「추천대로」) ══════
+   ★ 숫자는 서버(siteHit)가 날짜 칸(homepage/stats/day/<날짜>)에 «숫자만» 올린 것이다 — 여기서는 읽기만 한다.
+     칸 모양: { pv: 쪽 보기, v: 방문, tel: 상담 전화 누름, p:{쪽: 보기}, r:{유입: 방문}, d:{m|pc: 방문} } (functions/site-stats.js).
+   ★ 누가 왔는지는 없다 — 사람마다의 기록을 남기지 않는다(개인정보처리방침 8번).
+   ★ 검색어(노출·클릭·순위)는 구글 서치콘솔 연결 뒤 — 지금은 자리만 두고 «연결 전»이라 밝힌다.
+   ⚠ 그래프 꾸밈: 한 갈래(방문)는 한 색, 유입·쪽은 한 색 막대 + 숫자 글자, 폰/PC 는 두 색 + 이름표(색만으로 가르지 않는다). */
+const STATS_PATH = 'homepage/stats/day';
+const 통계 = { 기간: 30, 날들: null, 탈: '', 읽는중: false };
+const 통계유입이름 = {
+  naver: '네이버 검색', naverx: '네이버 블로그·카페', google: '구글 검색', daum: '다음 검색', bing: '빙 검색',
+  kakao: '카카오톡·카카오', sns: 'SNS(페이스북·인스타·유튜브 등)', erp: '메일·푸른 ERP', direct: '직접 입력·즐겨찾기', other: '다른 사이트'
+};
+const 통계검색 = ['naver', 'google', 'daum', 'bing'];
+const 통계쪽이름 = {
+  home: '첫 화면', greeting: '인사말', people: '구성원 소개', partner: '고객사', inquiry: '오시는길',
+  notice: '공지사항·주간 브리핑', privacy: '개인정보처리방침', other: '기타'
+};
+/* 오늘부터 거꾸로 n 날의 「YYYY-MM-DD」(서울 시간) — 오래된 것이 앞 */
+function 통계날짜들(n, 기준ms) {
+  const 끝 = Number(기준ms) || Date.now();
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(끝 - i * 86400000 + 9 * 3600000);
+    out.push(d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'));
+  }
+  return out;
+}
+/* 날짜 칸들 → 합. 모양이 틀린 칸·값은 0 으로 본다(지어내지 않는다 — 없는 날은 «0»이 아니라 «안 모임»일 수 있어 매일 줄에 표시) */
+function 통계합(날들, 날짜들) {
+  const 수 = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; };
+  const 합 = { pv: 0, v: 0, tel: 0, p: {}, r: {}, d: {}, 매일: [] };
+  (날짜들 || []).forEach(날 => {
+    const c = (날들 && 날들[날]) || null;
+    합.매일.push({ 날: 날, v: c ? 수(c.v) : 0, pv: c ? 수(c.pv) : 0, 있음: !!c });
+    if (!c) return;
+    합.pv += 수(c.pv); 합.v += 수(c.v); 합.tel += 수(c.tel);
+    ['p', 'r', 'd'].forEach(k => {
+      const 칸 = (c[k] && typeof c[k] === 'object') ? c[k] : {};
+      Object.keys(칸).forEach(이름 => {
+        if (!/^[a-z0-9_]{1,30}$/.test(이름)) return;     // 서버가 거른 모양 — 그래도 한 번 더
+        합[k][이름] = (합[k][이름] || 0) + 수(칸[이름]);
+      });
+    });
+  });
+  return 합;
+}
+function 통계쪽표(k) { return 통계쪽이름[k] || (typeof PAGE_LABEL !== 'undefined' && PAGE_LABEL[k]) || k; }
+/* 지난 같은 기간과 견준다 — ⚠ 지난 기간이 «다 모였을 때만»(셈을 켜기 전 날이 섞이면 ▲100% 처럼 부풀려 보인다) */
+function 통계변화(지금, 전, 다모임) {
+  if (!다모임) return '<span class="sub">지난 기간 숫자가 아직 다 안 모임</span>';
+  if (!전) return 지금 ? '<span class="sub">지난 기간 숫자 없음</span>' : '';
+  const 퍼 = Math.round((지금 - 전) / 전 * 100);
+  return '지난 같은 기간보다 <b class="' + (퍼 >= 0 ? 'st-up' : 'st-down') + '">' + (퍼 >= 0 ? '▲ ' : '▼ ') + Math.abs(퍼) + '%</b>';
+}
+function 통계막대(줄들, 단위) {
+  const 큰 = Math.max.apply(null, 줄들.map(x => x[1]).concat([1]));
+  return '<div class="st-bars">' + 줄들.map(x =>
+    '<div class="st-r" title="' + esc(x[0]) + ' · ' + x[1].toLocaleString() + 단위 + '"><span class="n">' + esc(x[0]) + '</span>'
+    + '<span class="b"><i style="width:' + (x[1] / 큰 * 100).toFixed(1) + '%"></i></span>'
+    + '<span class="val"><b>' + x[1].toLocaleString() + '</b>' + 단위 + '</span></div>').join('') + '</div>';
+}
+function 통계선(매일) {
+  const W = 640, H = 200, L = 32, R = 20, T = 12, B = 24, n = 매일.length;
+  if (n < 2) return '';
+  const 큰 = Math.max(10, Math.ceil(Math.max.apply(null, 매일.map(x => x.v)) / 10) * 10);
+  const x = i => L + i * (W - L - R) / (n - 1), y = v => T + (H - T - B) * (1 - v / 큰);
+  let s = '';
+  [0, 0.5, 1].forEach(f => {
+    const g = Math.round(큰 * f);
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#e2e8f0"/>'
+      + '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" font-size="11" fill="#94a3b8" text-anchor="end">' + g + '</text>';
+  });
+  const 칸 = Math.max(1, Math.round(n / 5));
+  매일.forEach((p, i) => {
+    if (i % 칸 === 0 && i < n - 칸 / 2 || i === n - 1) {
+      s += '<text x="' + x(i) + '" y="' + (H - 6) + '" font-size="11" fill="#94a3b8" text-anchor="middle">' + Number(p.날.slice(5, 7)) + '/' + Number(p.날.slice(8)) + '</text>';
+    }
+  });
+  const 길 = 매일.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  s += '<path d="' + 길 + ' L' + x(n - 1) + ' ' + y(0) + ' L' + x(0) + ' ' + y(0) + ' Z" fill="#2563eb" opacity=".08"/>'
+    + '<path d="' + 길 + '" fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round"/>';
+  /* 점마다 손을 올리면 그날 숫자(title) — 점은 작게, 누르는 자리는 넓게 */
+  매일.forEach((p, i) => {
+    s += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="9" fill="transparent"><title>'
+      + esc(p.날) + ' · 방문 ' + p.v + '명 · 쪽 보기 ' + p.pv + '회' + (p.있음 ? '' : ' (모인 숫자 없음)') + '</title></circle>';
+  });
+  const 끝 = 매일[n - 1];
+  s += '<circle cx="' + x(n - 1) + '" cy="' + y(끝.v) + '" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="날마다 방문자">' + s + '</svg>';
+}
+function 통계Html() {
+  let h = '<div class="pickhd"><div class="fldbar" style="margin:0"><h2>📈 홈페이지 방문 통계</h2>'
+    + '<span class="sub">pureunlabor.co.kr · 숫자만 셉니다(누가 왔는지는 남기지 않음)</span>'
+    + '<span style="flex:1"></span>'
+    + [7, 30].map(n => '<button class="chip' + (통계.기간 === n ? ' on' : '') + '" onclick="통계기간(' + n + ')">' + n + '일</button>').join('')
+    + '<button class="btn" onclick="closeModal()">닫기</button></div></div><div class="pickbody">';
+  if (통계.읽는중) return h + '<div class="sub">숫자를 읽고 있습니다…</div></div>';
+  if (통계.탈) return h + '<div class="bar warn">' + esc(통계.탈) + '</div></div>';
+  const 지금날 = 통계날짜들(통계.기간);
+  const 전날 = 통계날짜들(통계.기간 * 2).slice(0, 통계.기간);
+  const 합 = 통계합(통계.날들 || {}, 지금날), 전 = 통계합(통계.날들 || {}, 전날);
+  const 오늘 = 합.매일[합.매일.length - 1] || { v: 0 };
+  const 전다모임 = 전.매일.length > 0 && 전.매일.every(x => x.있음);
+  if (!합.매일.some(x => x.있음)) {
+    return h + '<div class="empty">아직 모인 숫자가 없습니다 — 홈페이지 셈을 켠 날부터 쌓입니다.<br>'
+      + '<span class="sub">홈페이지를 한 번 열어 보시고 1~2분 뒤 다시 열어 보십시오.</span></div></div>';
+  }
+  const 검색 = 통계검색.reduce((a, k) => a + (합.r[k] || 0), 0);
+  const 폰 = 합.d.m || 0, 피씨 = 합.d.pc || 0, 기기합 = 폰 + 피씨;
+  h += '<div class="st-tiles">'
+    + '<div class="st-tile"><div class="k">방문</div><div class="v">' + 합.v.toLocaleString() + '<small>명</small></div><div class="d">오늘 ' + 오늘.v + '명 · ' + 통계변화(합.v, 전.v, 전다모임) + '</div></div>'
+    + '<div class="st-tile"><div class="k">쪽 보기</div><div class="v">' + 합.pv.toLocaleString() + '<small>회</small></div><div class="d">한 방문에 ' + (합.v ? (합.pv / 합.v).toFixed(1) : '0') + '쪽</div></div>'
+    + '<div class="st-tile"><div class="k">검색으로 들어옴</div><div class="v">' + (합.v ? Math.round(검색 / 합.v * 100) : 0) + '<small>%</small></div><div class="d">'
+      + 통계검색.filter(k => 합.r[k]).map(k => esc(통계유입이름[k].replace(' 검색', '')) + ' ' + Math.round(합.r[k] / 합.v * 100) + '%').join(' · ') + '</div></div>'
+    + '<div class="st-tile"><div class="k">상담 전화 누름</div><div class="v">' + 합.tel.toLocaleString() + '<small>회</small></div><div class="d">' + 통계변화(합.tel, 전.tel, 전다모임) + '</div></div>'
+    + '</div>';
+  h += '<div class="st-grid"><div class="st-card"><h3>날마다 방문</h3><div class="sub">점에 손을 올리면 그날 숫자</div>' + 통계선(합.매일) + '</div>'
+    + '<div class="st-card"><h3>어디서 들어왔나</h3><div class="sub">방문 ' + 합.v.toLocaleString() + '명</div>'
+    + 통계막대(Object.keys(합.r).filter(k => k !== 'self').sort((a, b) => 합.r[b] - 합.r[a]).map(k => [통계유입이름[k] || k, 합.r[k]]), '명') + '</div></div>';
+  h += '<div class="st-grid"><div class="st-card"><h3>무엇을 검색하고 들어왔나</h3>'
+    + '<div class="sub">구글 서치콘솔 · 네이버 서치어드바이저 — <b>연결 전</b>입니다. 구글은 홈페이지 소유 계정에서 읽기 권한을 받으면 하루 한 번 가져옵니다.</div></div>'
+    + '<div class="st-card"><h3>많이 본 쪽</h3>'
+    + 통계막대(Object.keys(합.p).sort((a, b) => 합.p[b] - 합.p[a]).slice(0, 8).map(k => [통계쪽표(k), 합.p[k]]), '회')
+    + (기기합 ? '<h3 style="margin-top:12px">어떤 기기로</h3><div class="st-split"><i style="flex:' + 폰 + ';background:#2563eb"></i><i style="flex:' + 피씨 + ';background:#d97706"></i></div>'
+      + '<div class="st-legend"><span style="--c:#2563eb">폰 ' + Math.round(폰 / 기기합 * 100) + '% · ' + 폰.toLocaleString() + '명</span>'
+      + '<span style="--c:#d97706">PC ' + Math.round(피씨 / 기기합 * 100) + '% · ' + 피씨.toLocaleString() + '명</span></div>' : '')
+    + '</div></div>';
+  return h + '</div>';
+}
+async function openStats() {
+  통계.읽는중 = true; 통계.탈 = '';
+  openModal(통계Html(), true);
+  try {
+    const 처음 = 통계날짜들(61)[0];
+    const snap = await db.ref(STATS_PATH).orderByKey().startAt(처음).once('value');
+    통계.날들 = snap.val() || {};
+  } catch (e) {
+    통계.탈 = '방문 숫자를 읽지 못했습니다 — ' + ((e && e.code) || (e && e.message) || e);
+  }
+  통계.읽는중 = false;
+  if ($('modal').classList.contains('on')) openModal(통계Html(), true);
+}
+function 통계기간(n) { 통계.기간 = n === 7 ? 7 : 30; openModal(통계Html(), true); }
+window.openStats = openStats; window.통계기간 = 통계기간;
+
 async function openChangeLog() {
   Log.open = true; Log.rows = null; Log.err = ''; Log.kind = ''; Log.q = ''; Log.더 = 0;
   renderChangeLog();
@@ -6797,6 +6966,8 @@ function appbarHtml() {
        실제로 2026-09-06 에 「자문사 고르기」가 위아래 두 곳에 생겼다.
        ★ 둘 다 목록 머리(listHtml)에 모여 있다. 여기로 되돌리지 말 것. */
     /* 접은 뒤에는 손님이 보는 홈페이지가 새 사이트다 */
+    /* 📈 방문 통계 (2026-11-19) — 화면 전체(홈페이지)에 대한 것이라 머리띠에. 폰에서는 그림만(+title) */
+    + '<button class="btn" onclick="openStats()" title="홈페이지 방문·유입 경로·상담 전화 누름 숫자를 봅니다">📈<span class="pc-only"> 방문 통계</span></button>'
     + '<a class="btn" style="text-decoration:none" href="' + esc(접음 ? SITE_VIEW : PuHomeExport.ORIGIN)
     + '" target="_blank" rel="noopener" title="손님이 보는 홈페이지를 새 탭에 엽니다">사이트 <span class="pc-only">열기 </span>↗</a>'
     /* ★ 「★ 푸른ERP 채우기」 단추를 넣는 문 (대표 지시 2026-09-13 「2번 하고 사용하게 해달라」).

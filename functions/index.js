@@ -6504,6 +6504,43 @@ exports.weeklyNewsBrief = functions
     return null;
   });
 
+/* ══════════ 홈페이지 방문 통계 — 숫자만 센다 (대표 지시 2026-11-19 「추천대로」, 목업 2026-11-18) ══════════
+   홈페이지 쪽마다 site/assets/js/pu-count.js 가 «쪽 이름·유입 갈래·폰/PC·행동»만 보낸다 → 날짜 칸 하나를 «거래»로 올린다.
+   ★ 셈·모양 검사는 functions/site-stats.js(순수 부품) — 여기는 «바깥을 두드리는» 일만.
+   ★ 우리 홈페이지 출처만 받는다 · 로봇은 안 센다 · 너무 잦으면 버린다(IP 는 메모리에만, 적지 않는다).
+   ★ 무슨 일이 있어도 204 로 조용히 끝낸다 — 홈페이지 쪽이 이 함수 때문에 느려지거나 오류를 보이면 안 된다.
+   ⚠ ServerValue.increment 를 쓰지 않는다(이 파일에 admin 변수가 없다 — bumpReadTally 머리말). «거래»로 올린다.
+   자리: homepage/stats/day/<서울 날짜> — 쓰기는 서버만(scripts/make-firebase-rules.js), 읽기는 재직 직원(홈페이지 관리). */
+const SiteStats = require("./site-stats");
+exports.siteHit = functions
+  .runWith({ timeoutSeconds: 10, memory: "128MB" })
+  .https.onRequest(async (req, res) => {
+    const 출처 = String(req.headers.origin || "");
+    const 우리 = SiteStats.받는출처.indexOf(출처) >= 0;
+    if (우리) { res.set("Access-Control-Allow-Origin", 출처); res.set("Vary", "Origin"); }
+    res.set("Cache-Control", "no-store");
+    if (req.method === "OPTIONS") {
+      res.set("Access-Control-Allow-Methods", "POST");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "POST" || !우리 || SiteStats.봇인가(req.headers["user-agent"])) { res.status(204).send(""); return; }
+    const 곳 = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim();
+    if (!SiteStats.숨돌리기(곳, Date.now())) { res.status(204).send(""); return; }
+    const 몸 = (typeof req.body === "string" || Buffer.isBuffer(req.body)) ? req.body
+      : ((req.body && typeof req.body === "object" && Object.keys(req.body).length) ? req.body : req.rawBody);
+    const 받은 = SiteStats.받기(몸);
+    if (!받은.ok) { res.status(204).send(""); return; }
+    try {
+      await getDatabase().ref("homepage/stats/day/" + SiteStats.서울날(Date.now()))
+        .transaction((cur) => SiteStats.셈더하기(cur, 받은));
+    } catch (e) {
+      console.warn("[방문 셈] 못 적었습니다", String((e && e.message) || e));
+    }
+    res.status(204).send("");
+  });
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // 한국공인노무사회 자료 가져오기 (대표 지시 2026-09-03)

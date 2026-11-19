@@ -47,6 +47,18 @@ for (let i = 0; i < 40; i++) {
     employmentInsuredCount: i % 7 === 2 ? 150 + i : 12,
   });
 }
+/* 방문 통계 점검(2026-11-19) — 지어낸 숫자. 오늘부터 거꾸로 45일 */
+const 통계날 = {};
+for (let i = 0; i < 45; i++) {
+  const d = new Date(Date.now() - i * 86400000 + 9 * 3600000);
+  const 날 = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  const 주말 = [0, 6].indexOf(d.getUTCDay()) >= 0;
+  const v = (주말 ? 26 : 44) + ((i * 7) % 19);
+  통계날[날] = { v, pv: Math.round(v * 2.8), tel: (i % 3) + (주말 ? 0 : 1),
+    p: { home: Math.round(v * 0.95), people: Math.round(v * 0.4), notice: Math.round(v * 0.35), inquiry: Math.round(v * 0.25), work3: Math.round(v * 0.2), work5a: Math.round(v * 0.15), work6: Math.round(v * 0.12) },
+    r: { naver: Math.round(v * 0.38), direct: Math.round(v * 0.21), google: Math.round(v * 0.17), kakao: Math.round(v * 0.1), daum: Math.round(v * 0.06), other: Math.round(v * 0.05), erp: Math.round(v * 0.03) },
+    d: { m: Math.round(v * 0.68), pc: v - Math.round(v * 0.68) } };
+}
 const partners = {};
 업체.forEach((c, i) => { if (i % 2 === 0 || i < 30) partners[c.id] = { posted: i % 5 !== 1 }; });
 
@@ -59,6 +71,7 @@ module.exports = {
       },
       partners,
       memberPhotos: { m00: { b64: 점검사진, type: 'image/jpeg' } },
+      stats: { day: 통계날 },
       config: { lineFormat: 'plain' },
     },
     data: { companies: 업체 },
@@ -97,6 +110,8 @@ module.exports = {
         await page.waitForTimeout(600);
         await page.evaluate(() => { const e = document.querySelector('.face-fld') || document.querySelector('.edit'); if (e) e.scrollIntoView(); window.scrollBy(0, -80); });
       } },
+    /* 📈 방문 통계 창(2026-11-19) */
+    { name: 'stats', run: async (page) => { await page.evaluate(() => openStats()); await page.waitForTimeout(800); } },
     /* 직원 편집칸(2026-11-19 — 넓은 화면 두 칸) */
     { name: 'staff', run: async (page) => {
         await page.evaluate(async () => { await App.go('members'); App.filter = 'staff'; App.pick = 'm02'; if (typeof loadDraft === 'function') loadDraft(); App.render(); });
