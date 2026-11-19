@@ -97,11 +97,12 @@ test('★ 서류 목록은 새로 짓지 않는다 — 서식 탭의 «기업 �
   const ids = secs.flatMap((s) => s.docs.map((d) => d.id));
   assert.equal(new Set(ids).size, ids.length, '서류 번호가 겹친다');
   assert.ok(ids.length >= 8, '설립 필수서류 개수 확인');
-  /* 사내기금 인가 단계에서 불필요한 재무제표·고용보험명부·개인도장·기금직인이 완전히 빠졌는지 검증 */
+  /* 사내기금 인가 단계에서 불필요한 재무제표·고용보험명부·개인도장·기금직인 및 기업 준비 불필요 기금출연확인서가 완전히 빠졌는지 검증 */
   const saneInkaIds = w.api._pmDocs('사내', null)[0].docs.map((d) => d.id);
-  ['inka_fin', 'inka_ei', 'inka_pseal', 'inka_fseal'].forEach((bad) => {
+  ['inka_fin', 'inka_ei', 'inka_pseal', 'inka_fseal', 'inka_cseal'].forEach((bad) => {
     assert.ok(!saneInkaIds.includes(bad), '사내기금 인가 단계에 불필요한 서류가 남아 있음: ' + bad);
   });
+  assert.ok(!ids.includes('inka_cseal'), '기금출연확인서는 기업 준비 요청 목록에서 제외되어야 한다');
 });
 
 test('★ 기본으로 고르는 것 — 기업이 준비하는 줄만 고르고, 기금법인 준비분과 서식 탭에서 이미 확인한 서류는 뺀다', () => {
@@ -127,8 +128,12 @@ test('★ 메일 본문은 불필요한 단락(고유번호증·은행, 도장·
   assert.ok(!/함께 정해 주실 사항/.test(m.body), '함께 정해 주실 사항 단락이 남아 있다');
   assert.ok(!/기업 정보 확인/.test(m.body), '기업 정보 확인 단락이 남아 있다');
   assert.ok(!/준비:\s/.test(m.body) && !/\n {3}- /.test(m.body), '서류 아래 부연 설명줄이나 (준비: ...) 꼬리표가 남아 있다');
-  ['설립인가증 원본', '인가받은 정관 사본'].forEach((t) => assert.ok(!m.body.includes(t), t + ' — 기금법인 준비 줄이 들어갔다'));
-  assert.match(m.body, /\[ \] 1\. 설립준비위원 재직증명서/);
+  ['설립인가증 원본', '인가받은 정관 사본', '기금출연확인서'].forEach((t) => assert.ok(!m.body.includes(t), t + ' — 기업 준비 대상이 아닌 줄이 들어갔다'));
+  assert.match(m.body, /\[ \] 1\. \[근로자측·사용자측 위원\] 설립준비위원 재직증명서 \(노 1부, 사 1부\)/);
+  assert.match(m.body, /\[참여기업\(회사\)\] 법인등기부등본 1부/);
+  assert.match(m.body, /\[근로자측·사용자측 이사\] 개인인감증명서 \(노 1부, 사 1부 · 발급 3개월 이내\)/);
+  assert.match(m.body, /\[근로자측·사용자측 이사\] 주민등록등본 또는 초본 \(노 1부, 사 1부 · 발급 3개월 이내\)/);
+  assert.match(m.body, /\[근로자측·사용자측 이사\] 신분증 사본 및 개인인감도장 \(노 1부, 사 1부\)/);
 });
 
 test('화면 — 기금법인 줄은 «우리 진행»으로 남고 기본 해제된다', async () => {
@@ -142,7 +147,8 @@ test('사내기금은 «참여기업» 말을 «설립기업»으로 · 공동 �
   const w = world();
   const a = w.api._pmDocs('사내', null).flatMap((s) => s.docs), b = w.api._pmDocs('공동', null).flatMap((s) => s.docs);
   assert.ok(!a.some((d) => d.id === 'inka_match') && b.some((d) => d.id === 'inka_match'), '공동 전용 서류가 사내에 섞였다');
-  assert.ok(!a.some((d) => /참여기업별/.test(d.who)), '사내기금에 «참여기업별»이 남았다');
+  assert.ok(!a.some((d) => /참여기업/.test(d.who)) && !a.some((d) => /참여기업/.test(d.title)), '사내기금에 «참여기업»이 남았다');
+  assert.ok(a.some((d) => /\[설립기업\(회사\)\] 사업자등록증 사본 1부/.test(d.title)), '사내기금 제목이 «[설립기업(회사)]»로 바뀌어야 한다');
 });
 
 test('★ 받는 사람 후보 — 참여사업장 대표 담당자가 맨 앞 → 기업정보함 명함 → 회사 메일 · 이메일 꼴 아니면 버리고 같은 주소는 한 번만', () => {
