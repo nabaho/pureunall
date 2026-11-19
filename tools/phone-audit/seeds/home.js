@@ -97,6 +97,11 @@ module.exports = {
         await page.waitForTimeout(600);
         await page.evaluate(() => { const e = document.querySelector('.face-fld') || document.querySelector('.edit'); if (e) e.scrollIntoView(); window.scrollBy(0, -80); });
       } },
+    /* 직원 편집칸(2026-11-19 — 넓은 화면 두 칸) */
+    { name: 'staff', run: async (page) => {
+        await page.evaluate(async () => { await App.go('members'); App.filter = 'staff'; App.pick = 'm02'; if (typeof loadDraft === 'function') loadDraft(); App.render(); });
+        await page.waitForTimeout(500);
+      } },
     /* 고객사 고르기 — 공공기관·100인 이상 · 과거 거래처(2026-11-18) */
     { name: 'pick-big', run: async (page) => { await page.evaluate(() => { App.go('partner'); openPartnerPick(); pickType('big'); }); } },
     { name: 'pick-past', run: async (page) => { await page.evaluate(() => { App.go('partner'); openPartnerPick(); pickType('past'); }); } },

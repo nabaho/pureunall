@@ -625,17 +625,19 @@ table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
 .m-carhd-out{display:none}
 @media (min-width:1500px){
   .esc.mem2{display:grid;grid-template-columns:300px minmax(0,1fr);column-gap:20px;align-items:start}
-  .esc.mem2 > .stick{display:flex;flex-direction:column;box-shadow:none;border-bottom:0;margin-bottom:0;
+  .esc.mem2 > :is(.stick,.m-left){display:flex;flex-direction:column;box-shadow:none;border-bottom:0;margin-bottom:0;
     border-right:1px solid var(--line);padding:12px 16px 12px 0;max-height:calc(100vh - 230px)}
-  .esc.mem2 > .stick .m-carhd-in{display:none}
-  .esc.mem2 > .stick .face-fld{order:-1}
-  .esc.mem2 > .stick .face-row{flex-direction:column-reverse;align-items:center;gap:8px}
-  .esc.mem2 > .stick .face-prev{width:132px;height:165px;border-radius:10px}
-  .esc.mem2 > .stick .two{flex-direction:column;gap:8px;margin-bottom:8px}
-  .esc.mem2 > .stick .two > .inl{flex:none !important;width:100%}
-  .esc.mem2 > .stick .sub{white-space:normal !important;flex-wrap:wrap}
-  .esc.mem2 > .stick .fldbar{flex-wrap:wrap}
+  .esc.mem2 > :is(.stick,.m-left) .m-carhd-in{display:none}
+  .esc.mem2 > :is(.stick,.m-left) .face-fld{order:-1}
+  .esc.mem2 > :is(.stick,.m-left) .face-row{flex-direction:column-reverse;align-items:center;gap:8px}
+  .esc.mem2 > :is(.stick,.m-left) .face-prev{width:132px;height:165px;border-radius:10px}
+  .esc.mem2 > :is(.stick,.m-left) .two{flex-direction:column;gap:8px;margin-bottom:8px}
+  .esc.mem2 > :is(.stick,.m-left) .two > .inl{flex:none !important;width:100%}
+  .esc.mem2 > :is(.stick,.m-left) .sub{white-space:normal !important;flex-wrap:wrap}
+  .esc.mem2 > :is(.stick,.m-left) .fldbar{flex-wrap:wrap}
   .esc.mem2 > .m-car{min-width:0;padding-top:12px}
+  .esc.mem2 > .m-left{position:sticky;top:0;align-self:start;overflow-y:auto}
+  .esc.mem2 .m-carfld > .fldbar{position:sticky;top:0;z-index:4;background:#fff;padding:8px 0}
   .esc.mem2 .m-carhd-out{display:block;position:sticky;top:0;z-index:4;background:#fff;
     padding:8px 0;margin-bottom:6px;border-bottom:1px solid var(--line)}
 }
@@ -2962,7 +2964,10 @@ window.직원경력가져오기 = 직원경력가져오기;
 function 직원편집(d) {
   const rec = App.members[d.key] || {};
   const kept = keptOf(rec);
-  let h = '<div class="edit"><div class="esc">';
+  /* (2026-11-18) 노무사 편집칸과 같은 두 칸 — 넓은 화면은 왼쪽 기본 정보(m-left) · 오른쪽 경력(m-car).
+     대표 지시 「직원도 모두 노무사와 같이 캡쳐2처럼 할 수 있게 해달라」. 좁은 화면은 위아래로 이어진다.
+     ⚠ 왼쪽은 .stick 이 아니다 — 좁은 화면에서 직원 칸은 원래 안 붙었다(그대로 둔다). */
+  let h = '<div class="edit"><div class="esc mem2"><div class="m-left">';
   h += '<div class="fldbar"><b style="font-size:16px">' + esc(d.name || '(이름 없음)') + '</b>'
     + '<label style="margin:0 0 0 10px">구분</label>'
     + MEMBER_KINDS.map(mk =>
@@ -2986,6 +2991,11 @@ function 직원편집(d) {
   if (kept) {
     h += '<div class="sub" style="margin-top:6px">퇴사해도 남김 — ' + esc(String(kept.why || '')) + '</div>';
   }
+  /* 새 사이트의 직원 칸은 이름·직급 «상자»라 얼굴 사진 자리가 없다 — 사진은 사이트 모양을 바꿀 때 함께 */
+  h += '<div class="guide" style="margin-top:12px;color:var(--faint)">얼굴 사진: 나중 단계입니다.</div>';
+  h += '<div class="sub" style="margin-top:10px">「저장」은 <b>우리 목록에만</b> 들어갑니다. 손님이 보는 새 사이트에는 '
+    + '「새 사이트에 올리기」를 누르거나, <b>매달 1일 아침에 저절로</b> 올라갑니다.</div>';
+  h += '</div><div class="m-car">';   // .m-left 끝 · 오른쪽(경력) 시작
   /* ── 직원이 「내 정보」에서 보낸 경력 제안 (대표 결정 2026-11-01 「대표 확인 뒤」) ──
        받기를 누르기 전에는 우리 목록도 새 사이트도 안 바뀐다. */
   const 제안 = 경력제안(rec);
@@ -2999,7 +3009,7 @@ function 직원편집(d) {
   }
   /* ── 경력 (대표 승인 2026-11-01 직원 소개 2단계, 사진 제외) ──
      노무사 경력 칸과 같은 손잡이(現/前 딱지·▲▼·✕·경력관리에서 가져오기)를 쓴다. */
-  h += '<div class="fld" style="margin-top:12px"><div class="fldbar">'
+  h += '<div class="fld m-carfld" style="margin-top:12px"><div class="fldbar">'
     + '<label style="margin:0">경력 — ' + d.careers.length + '줄 <span class="sub">(맨 위가 최근 · 새 사이트엔 ' + PuSitePeople.경력한도 + '줄까지)</span></label>'
     + '<button class="btn" style="padding:3px 9px;font-size:11.5px" onclick="직원경력가져오기()"'
     + ' title="경력관리에 담긴 위촉장·학력·자격증에서 골라 넣습니다">⤓ 경력관리에서 가져오기</button></div>'
@@ -3026,9 +3036,7 @@ function 직원편집(d) {
           + '</select></div>'
         : '<div class="sub" style="margin-top:4px">체크가 없으면 경력은 <b>우리 목록에만</b> 남고, 새 사이트에는 이름·직급만 나갑니다.</div>')
     + '</div>';
-  h += '<div class="guide" style="margin-top:12px;color:var(--faint)">얼굴 사진: 나중 단계입니다.</div>';
-  h += '<div class="sub" style="margin-top:10px">「저장」은 <b>우리 목록에만</b> 들어갑니다. 손님이 보는 새 사이트에는 '
-    + '「새 사이트에 올리기」를 누르거나, <b>매달 1일 아침에 저절로</b> 올라갑니다.</div>';
+  h += '</div>';   // .m-car 끝
   h += '</div>';   // .esc 끝
   h += '<div class="eft">'
     + '<button class="btn pri" onclick="saveDraft()">저장</button>'
