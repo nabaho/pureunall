@@ -140,6 +140,12 @@ test('⑤ 서버 — Gemini 판독을 센 자리마다 원화도 세고, 달 한
   const fn = cutFn(IDX, 'async function aiMonthSpend(');
   assert.match(fn, /DR\.aiMonthAllPath\(\)/, '★ 달 «_all» 통째를 안 읽으면 원화 칸(won·wn)을 못 봅니다');
   assert.match(fn, /DR\.aiSpentWonOf\(/, '★ 서버가 화면과 다른 식으로 셉니다');
+  /* 캘린더 메일함은 제 손으로 한도를 본다 — 같은 식이어야 한다(2026-11-19 독립 검토 «낮음» 지적) */
+  const CAL = stripJs(fs.readFileSync(path.join(R, 'functions', 'cal-inbox.js'), 'utf8'));
+  const mo = cutFn(CAL, 'async function monthOver(');
+  assert.match(mo, /DR\.aiMonthAllPath\(\)/, '★ 캘린더 메일함이 원화 칸을 안 봅니다');
+  assert.match(mo, /DR\.aiSpentWonOf\(/, '★ 캘린더 메일함이 서버·화면과 다른 식으로 셉니다');
+  assert.match(CAL, /await bumpTally\(db, today\);\s*await bumpSpend\(db, today, r\);/, '★ 캘린더 메일함 판독이 원화를 안 셉니다');
   const bs = cutFn(IDX, 'async function bumpSpend(');
   assert.match(bs, /if \(!r \|\| !r\.ok\) return;/, '실패한 판독은 원화로 세지 않는다');
   assert.match(bs, /if \(won === null\) return;/, '셈을 못 냈으면 쌓지 않는다(그 판독은 횟수×단가로)');

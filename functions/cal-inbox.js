@@ -91,9 +91,10 @@ async function loadGate(db) {
 /* 이번 달 AI 요금 한도 — index.js 의 aiMonthSpend 와 «같은 셈» */
 async function monthOver(db) {
   try {
-    const [n, b] = await Promise.all([db.ref(DR.aiMonthPath()).once("value"), db.ref(DR.AI_BUDGET_PATH).once("value")]);
+    /* 달 «_all» 통째(n·won·wn)와 aiSpentWonOf — index.js aiMonthSpend·화면과 같은 식(2026-11-19 실제 토큰 원화) */
+    const [n, b] = await Promise.all([db.ref(DR.aiMonthAllPath()).once("value"), db.ref(DR.AI_BUDGET_PATH).once("value")]);
     const budget = DR.aiBudgetOf(b.val());
-    const spent = DR.aiSpentWon(n.val(), budget.wonPerRead);
+    const spent = DR.aiSpentWonOf(n.val(), budget.wonPerRead);
     return budget.limit > 0 && spent >= budget.limit;
   } catch (e) {
     console.warn("cal-inbox 달 요금을 못 읽었습니다(막지 않습니다):", String((e && e.message) || e));
@@ -110,6 +111,19 @@ async function bumpTally(db, ymd) {
   try {
     await Promise.all(DR.tallyPaths(APP, ymd || null, "n").map((p) => db.ref(p).transaction((cur) => (Number(cur) || 0) + 1)));
   } catch (e) { console.warn("cal-inbox 판독 셈 적기 실패(후보는 계속):", String((e && e.message) || e)); }
+}
+
+/* 실제 토큰으로 센 원화를 쌓는다(2026-11-19) — index.js bumpSpend 와 같은 일. 셈을 못 내면 안 쌓는다(그 판독은 횟수×단가). */
+async function bumpSpend(db, ymd, r) {
+  if (!r || !r.ok) return;
+  const won = DR.wonOfUsage(r.json, r.model);
+  if (won === null) return;
+  try {
+    await Promise.all([].concat(
+      DR.tallyPaths(APP, ymd || null, "won").map((p) => db.ref(p).transaction((cur) => Math.round(((Number(cur) || 0) + won) * 100) / 100)),
+      DR.tallyPaths(APP, ymd || null, "wn").map((p) => db.ref(p).transaction((cur) => (Number(cur) || 0) + 1))
+    ));
+  } catch (e) { console.warn("cal-inbox 원화 셈 적기 실패(후보는 계속):", String((e && e.message) || e)); }
 }
 
 function replyText(json) {
@@ -1140,6 +1154,7 @@ async function extractFromNewMail(deps, o) {
       try { r = await DR.callGemini(fetchFn, key, parts, [1500], { temperature: 0, maxOutputTokens: 1500 }); }
       catch (e) { console.warn("cal-inbox 판독 실패:", String((e && e.message) || e).slice(0, 200)); continue; }
       await bumpTally(db, today);
+      await bumpSpend(db, today, r);
       if (!r || !r.ok) { console.warn("cal-inbox AI 가 답하지 않았습니다:", r && r.status, String((r && r.why) || "").slice(0, 120)); continue; }
 
       const norm = CAP.normalize(replyText(r.json), today);
