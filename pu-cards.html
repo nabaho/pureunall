@@ -713,8 +713,20 @@ table.sbox tr.bad td{background:#f8fafc}
      덮는 것은 곧 못 누르는 것이다. 손가락이 알약을 먼저 만난다.
    ⚠ 없애는 것이 아니라 «비켜 두는 것»이다 — 같은 일을 하는 글자 줄을 옆줄 맨 아래에
      넣어 두었다(pcSideBottomHtml 🗄 백업·복구). 그 줄을 지우려면 이 규칙도 함께 지울 것.
-   ⚠ 메일 창에서만이다. 기업정보함·포털에서는 알약이 그대로 뜬다. */
+   ⚠ 메일 창에서만이다. 기업정보함·포털에서는 알약이 그대로 뜬다.
+     → 2026-11-19 바뀜: 기업정보함 PC 옆줄도 아래 규칙으로 비킨다.
+     ⚠ body.mailview 는 폰 차림 render(renderMobile)에서만 붙는다 — PC 메일 창에서는 false 다(2026-11-19 실측).
+       그래서 이 줄은 PC 메일 창의 알약을 못 감추고 있었다. PC 는 아래 규칙이 메일·자료함까지 함께 감춘다.
+       이 줄은 폰 차림 메일 몫으로 그대로 둔다. */
 body.mailview #pu-backup-admin-button{display:none!important}
+/* ── 기업정보함 PC 옆줄에서도 알약을 «비켜 둔다» (대표 화면 2026-11-18, 1903px 크롬 · 2026-11-19 고침) ──
+   남색 옆줄 맨 아래 「🔒 개인 폴더 열기」를 같은 알약(left:12px·bottom:58px)이 덮고 있었다.
+   메일 창과 같은 길이다 — 옆줄 맨 아래에 「🗄 백업·복구」 줄(.pcside-backup, pcSideBottomHtml)을 넣고
+   그 줄이 «보일 때만» 알약을 감춘다.
+   ⚠ 조건을 «줄이 있을 때»로 건 것이 요점이다. 직원(줄 없음)·옆줄을 접었을 때(.sidehidden)·
+     폰 차림(#pcRoot[hidden])에는 알약이 그대로 뜬다 — 감추기만 하면 백업·복구로 갈 길이 끊긴다.
+   ⚠ 폰(640px 이하)은 공용 앱바(js/pu-appbar.js phoneRows)가 따로 정리한다 — 여기는 PC 만 본다. */
+body.pc:has(#pcRoot:not([hidden]):not(.sidehidden) .pcside-backup) #pu-backup-admin-button{display:none!important}
 
 /* ── 맨 위 로고 ── (대표 지시 2026-10-04 「높낮이 좀더 좁게 · 위로 · 글자·아이콘 조금 작게」 — 맨 위 넷을 함께 줄였다) */
 .dm-top{display:flex;align-items:center;gap:7px;padding:6px 2px 4px}
@@ -19390,9 +19402,13 @@ function pcSideBottomHtml(){
            길을 없애는 것이 아니다 — 없애면 메일 창에서 백업·복구로 갈 길이 끊긴다.
          ⚠ 새로 짓지 않는다. 알약을 그대로 누른다(mbBackupOpen) — 여는 창이 두 벌이
            되면 언젠가 한쪽만 고친다.
-         ⚠ 알약이 없는 사람(대표가 아닌 직원)에게는 이 줄도 안 그린다. */''}
-    ${onMailNow && state.isAdmin
-      ? `<button class="pcside-settings" onclick="mbBackupOpen()"
+         ⚠ 알약이 없는 사람(대표가 아닌 직원)에게는 이 줄도 안 그린다.
+         ★ 기업정보함(명함·사업자·기업 상세·근로자)에서도 그린다 (대표 화면 2026-11-18, 1903px 크롬).
+           남색 옆줄 맨 아래 「🔒 개인 폴더 열기」를 같은 알약이 덮고 있었다 — 메일 창과 똑같은 일이라
+           같은 길로 푼다. 알약은 옆줄이 «보일 때만» 비킨다(아래 CSS .pcside-backup).
+           ⚠ class 의 pcside-backup 을 지우면 알약이 다시 떠서 이 줄과 겹친다 — 그 CSS 가 이 이름으로 찾는다. */''}
+    ${state.isAdmin
+      ? `<button class="pcside-settings pcside-backup" onclick="mbBackupOpen()"
           title="백업·복구 — 떠 있던 단추와 같은 창입니다">🗄 백업·복구</button>` : ''}
   </div>`;
 }
