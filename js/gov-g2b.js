@@ -307,6 +307,38 @@
     return matched({ nm: clean(s(row.tags).replace(/,/g, ' ')) }, strong);
   }
 
+  /* ── 🤖 AI 사업 갈래 (대표 지시 2026-11-19 「ai 관련 사업 별도로 탭만들어달라」) ──
+     찾는 말(노무·임금…)과 «따로» 본다 — 찾는 말에 안 걸려도 여기 걸리면 버리지 않고 ai 표시를 붙여 담는다.
+     화면은 그런 줄(«AI 로만 걸린 공고»)을 공고 모아보기·📍 지역 탭·🎯 추천에 넣지 않고 🤖 AI 사업 탭에만 보인다.
+     갈래 = 대표가 붙여 준 사업 넷 + 넓은 AI 도입 지원:
+       hr 고용부 HR플랫폼(영세사업장 인사노무관리체계) · smart 중기부 스마트서비스 · voucher 과기정통부 AI·클라우드(·데이터) 바우처 ·
+       factory 중기부 스마트공장 · ai AI·AX·DX 도입·전환 지원.
+     ⚠ 실측 전 «짐작»이다 — 걸리는 것을 보고 늘리고 줄인다(찾는 말 규칙과 같은 약속).
+     ⚠ 「AI」 낱말 하나로는 안 건다 — 나라장터에 「AI 기반 ○○ 시스템 구축」 같은 IT 용역이 하루 수십 건이다.
+       넓은 갈래(ai)는 «지원사업·공급기업·수요기업·도입 지원·바우처…» 같은 «지원사업» 말이 함께 있어야 건다.
+       「컨설팅」은 넣지 않는다 — 「KDB AI 거버넌스 수립 컨설팅」 같은 일반 AI 용역까지 쓸어 온다(tests/gov-g2b.test.js 잡음 목록). */
+  var AI_PROGRAMS = [
+    { k: 'hr', name: 'HR플랫폼', re: /인사\s*노무\s*관리\s*체계|HR\s*플랫폼|인사\s*노무\s*(플랫폼|솔루션)/i },
+    { k: 'smart', name: '스마트서비스', re: /스마트\s*서비스/ },
+    { k: 'voucher', name: 'AI·클라우드 바우처', re: /(AI|인공지능|클라우드|데이터)\s*(서비스\s*)?(바우처|보급|확산|이용\s*지원)/i },
+    { k: 'factory', name: '스마트공장', re: /스마트\s*공장|스마트\s*제조|자율\s*제조|제조\s*(AI|데이터|디지털)/i },
+    { k: 'ai', name: 'AI 도입·전환', re: /(^|[^A-Za-z])(AI|AX|DX)(?![A-Za-z])|인공지능|디지털\s*전환/i,
+      need: /지원\s*사업|공급\s*기업|수요\s*기업|도입\s*지원|활용\s*지원|전환\s*지원|바우처|참여\s*기업/ }
+  ];
+  /* 공고 하나 → 걸린 갈래 열쇠 목록(없으면 []) */
+  function judgeAi(row) {
+    row = row || {};
+    var t = s(row.nm);
+    if (!t) return [];
+    if (row.src === '알리오' && ALIO_NOT.test(t)) return [];   /* 알리오는 직원 채용 창구 — 「AI 연구원 채용」은 사업이 아니다 */
+    if (row.src === '기업마당') t += ' ' + s(row.tags).replace(/,/g, ' ');   /* 지원사업은 해시태그에 「인공지능」·「클라우드」가 적힌다 */
+    var out = [];
+    AI_PROGRAMS.forEach(function (p) { if (p.re.test(t) && (!p.need || p.need.test(t))) out.push(p.k); });
+    /* 좁은 갈래가 걸리면 넓은 갈래(ai)는 겹쳐 붙이지 않는다 — 「AI 바우처」가 「AI 도입·전환」에도 세어지면 칩 수가 부푼다 */
+    if (out.length > 1 && out.indexOf('ai') >= 0) out.splice(out.indexOf('ai'), 1);
+    return out;
+  }
+
   /* 공고 하나를 거를지 정한다 — merge 가 이것만 쓴다. 걸리면 걸린 낱말 목록, 아니면 []. */
   function judge(row, kws) {
     row = row || {};
@@ -331,8 +363,9 @@
     var adds = [], skipped = 0, unmatched = 0;
     (incoming || []).forEach(function (r) {
       if (!r || !r.no) return;
-      var hit = judge(r, kws);
-      if (!hit.length) { unmatched++; return; }
+      var hit = judge(r, kws), ai = judgeAi(r);
+      /* 찾는 말에도, 🤖 AI 사업 갈래에도 안 걸리면 버린다 — AI 로만 걸린 줄은 kw 가 비고 ai 가 붙는다 */
+      if (!hit.length && !ai.length) { unmatched++; return; }
       if (have[r.no]) { skipped++; return; }
       have[r.no] = 1;
       /* ⚠★ 출처(src)를 «반드시» 데려간다 — 빠뜨려 2026-10-03 첫 실사용 32건이 전부
@@ -347,6 +380,7 @@
         type: '새 공고'                       /* 상태 — 목록 툴바의 「유형」으로 거른다 */
       });
       var last = adds[adds.length - 1];
+      if (ai.length) last.ai = ai.join(',');
       ['indY', 'jnt', 'rgn', 'ind'].forEach(function (k) { if (r[k]) last[k] = r[k]; });
       if (r.lk === LK) last.lk = LK;
       if ((last.src === '기업마당') && !last.rgn) { var br = bizRegion(r.tags, r.nm); if (br) last.rgn = br; }
@@ -356,7 +390,7 @@
 
   var api = { BASE: BASE, KEYWORDS_DEFAULT: KEYWORDS_DEFAULT, encKey: encKey,
               buildUrl: buildUrl, parse: parse, matched: matched, dday: dday, merge: merge,
-              guessSrc: guessSrc, judge: judge,
+              guessSrc: guessSrc, judge: judge, judgeAi: judgeAi, AI_PROGRAMS: AI_PROGRAMS,
               detailUrl: detailUrl, parseDetail: parseDetail, enrich: enrich, bizRegion: bizRegion, LK: LK,
               toggleKw: toggleKw };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -34,6 +34,8 @@
       });
       /* 지역·업종 제한 — 있을 때만(서버가 나라장터 상세에서 읽은 것). 아래 칸 이름은 gov-g2b.js 와 같다 */
       ['rgn', 'ind', 'indY', 'jnt'].forEach(function (k) { if (s(r[k])) adds[adds.length - 1][k] = s(r[k]); });
+      /* 🤖 AI 사업 갈래(gov-g2b.js judgeAi) — 서버가 적어 왔으면 데려간다. 안 적혀 왔으면 화면(inboxPull)이 다시 판정한다 */
+      if (s(r.ai)) adds[adds.length - 1].ai = s(r.ai);
       if (s(r.lk) === '2') adds[adds.length - 1].lk = '2';   /* «제대로 본» 표시만(1 은 차수 빠진 옛 헛 조회) */
     });
     return { adds: adds, skipped: skipped, dropped: dropped };
