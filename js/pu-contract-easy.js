@@ -1265,15 +1265,19 @@
   /* ── 공통 DOM 유틸 & 간결 스타일 (27색 팔레트 엄수) ── */
   var _easyCssDone = false;
   var EASY_CSS = ''
+    + '.pce-m [hidden],.pce-mbg [hidden]{display:none!important}'
     + '.pce-mbg{position:fixed;inset:0;background:rgba(30,41,59,.55);z-index:10002;display:flex;align-items:center;justify-content:center;padding:12px}'
     + '.pce-m{background:#fff;border-radius:12px;width:860px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;border:1px solid #cbd5e1;overflow:hidden}'
+    + '.pce-m.wiz{width:1040px}'
     + '.pce-mh{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0}'
     + '.pce-mh b{flex:1;font-size:14.5px;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pce-x{background:#fff;border:1px solid #cbd5e1;border-radius:7px;min-width:36px;min-height:36px;padding:0 8px;font-size:16px;color:#475569;cursor:pointer;flex:none}'
     + '.pce-mb{padding:12px 14px;overflow-y:auto;overflow-x:hidden;flex:1;display:flex;flex-direction:column;gap:9px}'
     + '.pce-mf{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:10px 14px;background:#f8fafc;border-top:1px solid #e2e8f0}'
     + '.pce-sec{border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;background:#f8fafc;box-sizing:border-box;max-width:100%;min-width:0}'
-    + '.pce-sh{font-size:12.5px;font-weight:700;color:#1e293b;margin-bottom:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}'
+    + '.pce-sh{font-size:12.5px;font-weight:700;color:#1e293b;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}'
+    + '.pce-stepno{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:99px;background:#1e40af;color:#fff;font-size:12px;font-weight:700;flex:none}'
+    + '.pce-stepno.grn{background:#166534;color:#fff}'
     + '.pce-sub{font-size:12px;color:#475569;font-weight:400;min-width:0;overflow-wrap:anywhere}'
     + '.pce-in,.pce-ta,.pce-sel{width:100%;max-width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:7px;padding:6px 9px;font-family:inherit;font-size:13px;color:#1e293b;background:#fff}'
     + '.pce-ta{resize:vertical;line-height:1.5}'
@@ -1281,7 +1285,7 @@
     + '.pce-btn:hover{background:#f8fafc}'
     + '.pce-btn.pri{background:#1e40af;border-color:#1e40af;color:#fff;font-weight:700}'
     + '.pce-btn.grn{background:#166534;border-color:#166534;color:#fff;font-weight:700}'
-    + '.pce-btn.soft{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}'
+    + '.pce-btn.soft{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;font-weight:700}'
     + '.pce-btn.mic{background:#fffbeb;border-color:#fde68a;color:#854d0e;font-weight:700}'
     + '.pce-btn.mic.rec{background:#fef2f2;border-color:#fecaca;color:#991b1b;font-weight:700}'
     + '.pce-btn:disabled{opacity:.5;cursor:default}'
@@ -1321,18 +1325,48 @@
     + '.pce-hmain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:#1e293b}'
     + '.pce-hmain .hsum{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pce-hdet{font-size:11.5px;color:#475569;background:#f8fafc;border-top:1px solid #e2e8f0;padding:6px;border-radius:5px;white-space:pre-wrap;overflow-wrap:anywhere}'
-    + '.pce-tabs{display:flex;gap:6px;flex-wrap:wrap}'
-    + '.pce-tab{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:7px;padding:6px 12px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer}'
-    + '.pce-tab.on{background:#1e40af;border-color:#1e40af;color:#fff}'
+    /* 새 양식 만들기 — 2단 단계형 스튜디오 (왼쪽 ①·②·③ + 오른쪽 실시간 종이 미리보기) */
+    + '.pce-wizgrid{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,0.94fr);gap:12px;align-items:start}'
+    + '.pce-wizleft{display:flex;flex-direction:column;gap:10px;min-width:0}'
+    + '.pce-wizright{display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;padding:10px}'
+    + '.pce-stepcard{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;background:#fff;box-sizing:border-box;min-width:0}'
+    + '.pce-stepcard.hi{border-color:#bfdbfe;background:#f8fafc}'
+    + '.pce-mcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:4px}'
+    + '.pce-mcard{border:1.5px solid #cbd5e1;background:#fff;color:#1e293b;border-radius:9px;padding:9px 8px;min-height:60px;font-family:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}'
+    + '.pce-mcard:hover{border-color:#60a5fa;background:#eff6ff}'
+    + '.pce-mcard b{font-size:13px;font-weight:700;color:#1e293b;line-height:1.3}'
+    + '.pce-mcard small{font-size:11.5px;color:#475569;line-height:1.35;font-weight:500}'
+    + '.pce-mcard.on{border:2px solid #1e40af;background:#eff6ff}'
+    + '.pce-mcard.on b{color:#1e40af}'
+    + '.pce-mcard.grn.on{border:2px solid #16a34a;background:#f0fdf4}'
+    + '.pce-mcard.grn.on b{color:#166534}'
+    + '.pce-drop{border:2px dashed #60a5fa;background:#eff6ff;border-radius:9px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}'
+    + '.pce-drop.drag{border-color:#1e40af;background:#bfdbfe}'
+    + '.pce-dtgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-bottom:8px}'
+    + '.pce-dtbtn{border:1px solid #cbd5e1;background:#fff;color:#1e293b;border-radius:8px;padding:7px 9px;min-height:36px;font-family:inherit;font-size:12.5px;font-weight:700;text-align:left;cursor:pointer}'
+    + '.pce-dtbtn.on{border:2px solid #1e40af;background:#eff6ff;color:#1e40af}'
+    + '.pce-metasum{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px;padding:6px 8px;border-radius:7px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;color:#475569}'
+    + '.pce-metasum b{color:#1e293b}'
+    + '.pce-pvhead{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}'
+    + '.pce-pvhead b{font-size:13px;color:#1e293b}'
+    + '.pce-pvtabs{display:inline-flex;border:1px solid #cbd5e1;border-radius:7px;overflow:hidden;background:#fff}'
+    + '.pce-pvtab{border:0;background:#fff;color:#475569;padding:5px 10px;min-height:32px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}'
+    + '.pce-pvtab+.pce-pvtab{border-left:1px solid #e2e8f0}'
+    + '.pce-pvtab.on{background:#1e40af;color:#fff}'
+    + '.pce-paperwrap{background:#e2e8f0;border-radius:8px;padding:12px;max-height:54vh;overflow-y:auto}'
+    + '.pce-paper{background:#fff;border:1px solid #cbd5e1;border-radius:4px;padding:22px 24px;min-height:300px;font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:12.5px;line-height:1.8;color:#1e293b;white-space:pre-wrap;overflow-wrap:anywhere}'
+    + '.pce-paper-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:260px;color:#475569;font-size:12.5px;line-height:1.6;white-space:normal}'
+    + '.pce-blank{display:inline-block;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:4px;padding:0 5px;margin:0 1px;font-size:12px;font-weight:700;line-height:1.45}'
     + '.pce-vchips{display:flex;flex-wrap:wrap;gap:5px}'
-    + '.pce-vchip{border:1px solid #cbd5e1;background:#fff;color:#1e293b;border-radius:6px;padding:4px 8px;min-height:32px;font-family:monospace;font-size:12px;cursor:pointer}'
-    + '.pce-vchip:hover{background:#eff6ff;border-color:#2563eb;color:#1e40af}'
-    + '.pce-cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}'
+    + '.pce-vchip{border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:99px;padding:4px 9px;min-height:30px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer}'
+    + '.pce-vchip:hover{background:#1e40af;border-color:#1e40af;color:#fff}'
+    + '.pce-cgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}'
     + '.pce-cklbl{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #cbd5e1;border-radius:7px;padding:6px 9px;font-size:12.5px;color:#1e293b;cursor:pointer;margin:0;font-weight:600;min-width:0}'
-    + '.pce-cklbl input[type=checkbox]{width:24px;height:24px;margin:0;flex:none}'
+    + '.pce-cklbl input[type=checkbox]{width:22px;height:22px;margin:0;flex:none;cursor:pointer}'
+    + '@media(max-width:860px){.pce-wizgrid{grid-template-columns:minmax(0,1fr)}.pce-paperwrap{max-height:38vh}}'
     + '@media(max-width:760px){'
     + '.pce-mbg{padding:8px}.pce-mb{padding:10px}.pce-qrow{flex-wrap:wrap}.pce-qrow .pce-ta{flex:1 1 100%}'
-    + '.pce-fgrid{grid-template-columns:minmax(0,1fr)}.pce-cgrid{grid-template-columns:minmax(0,1fr)}'
+    + '.pce-fgrid,.pce-cgrid,.pce-mcards,.pce-dtgrid{grid-template-columns:minmax(0,1fr)}'
     + '.pce-rchecks{width:100%;box-sizing:border-box}.pce-wsel{max-width:100%;flex:1 1 160px}'
     + '.pce-btn{white-space:normal;height:auto;min-height:36px;line-height:1.35;text-align:center}'
     + '.pce-x{min-width:40px;min-height:36px}'
@@ -1723,7 +1757,7 @@
     var fAddr = mkField('사업장 주소(선택)', '업체 선택 시 자동 입력', '사업장 주소');
     var fSucc = mkField('성공보수·분할지급 조건(선택)', '예: 수령금의 15% / 착수 50%·잔금 50%', '성공보수');
 
-    var inputHeadTitle = domEl(doc, 'span', { text: '③ 내용 넣기 — 체크한 서류에 공통 반영 (비운 칸은 서식 밑줄 유지)' });
+    var inputHeadTitle = domEl(doc, 'span', { text: '내용 넣기 — 체크한 서류에 공통 반영 (비운 칸은 서식 밑줄 유지)' });
     var btnMoreFields = domEl(doc, 'button', {
       type: 'button', 'class': 'pce-btn', style: 'margin-left:auto;padding:3px 9px;min-height:30px;font-size:11.5px',
       'aria-expanded': 'false',
@@ -1770,17 +1804,17 @@
       moneyPeriodRow.hidden = !anyChecked || !needMoneyOrPeriod;
 
       if (st.wantQuote && !st.wantContract) {
-        inputHeadTitle.textContent = '③ 견적서 내용 넣기 (비운 칸은 서식 밑줄 유지)';
+        inputHeadTitle.textContent = '견적서 내용 넣기 (비운 칸은 서식 밑줄 유지)';
         fAmt.lbl.textContent = '견적 금액(원, 선택)';
         fPeriod.lbl.textContent = '예상 수행기간(선택)';
       } else if (!st.wantQuote && st.wantContract) {
-        inputHeadTitle.textContent = '③ 계약서 내용 넣기 (비운 칸은 서식 밑줄 유지)';
+        inputHeadTitle.textContent = '계약서 내용 넣기 (비운 칸은 서식 밑줄 유지)';
         fAmt.lbl.textContent = caseMode ? '착수·계약 보수(원, 선택)' : '계약 보수(원, 선택)';
         fPeriod.lbl.textContent = '계약기간(선택)';
       } else if (!needMoneyOrPeriod && st.wantPower) {
-        inputHeadTitle.textContent = '③ 위임장 기본 정보 넣기';
+        inputHeadTitle.textContent = '위임장 기본 정보 넣기';
       } else {
-        inputHeadTitle.textContent = '③ 내용 넣기 — 견적서·계약서 공통 반영 (비운 칸은 밑줄 유지)';
+        inputHeadTitle.textContent = '내용 넣기 — 견적서·계약서 공통 반영 (비운 칸은 밑줄 유지)';
         fAmt.lbl.textContent = '계약·견적 금액(원, 선택)';
         fPeriod.lbl.textContent = '계약·수행 기간(선택)';
       }
@@ -2418,12 +2452,17 @@
 
     var md = domEl(doc, 'div', { 'class': 'pce-m', role: 'dialog', 'aria-modal': 'true', 'aria-label': '한 번에 계약·견적 정리 및 만들기' }, [
       domEl(doc, 'div', { 'class': 'pce-mh' }, [
-        domEl(doc, 'b', { text: '⚡ 계약·견적 간편 만들기 — 업무·서류만 체크하면 한 번에 완성' }),
+        domEl(doc, 'b', { text: '⚡ 쉽게 서류 작성하기 — ① 빠른 입력 · ② 업무 체크 · ③ 핵심 내용 확인' }),
         domEl(doc, 'button', { type: 'button', 'class': 'pce-x', 'aria-label': '닫기', text: '×', onclick: function () { close(); } })
       ]),
       domEl(doc, 'div', { 'class': 'pce-mb' }, [
         /* ① 한 줄 메모·문의글 + 구두 입력 */
         domEl(doc, 'div', { 'class': 'pce-sec' }, [
+          domEl(doc, 'div', { 'class': 'pce-sh' }, [
+            domEl(doc, 'span', { 'class': 'pce-stepno', text: '1' }),
+            domEl(doc, 'span', { text: '한 줄 메모·구두로 자동 채우기 (선택)' }),
+            domEl(doc, 'span', { 'class': 'pce-sub', text: '— 건너뛰고 아래 ②번에서 바로 업무를 골라도 됩니다' })
+          ]),
           domEl(doc, 'div', { 'class': 'pce-qrow' }, [
             briefIn,
             btnBriefMic,
@@ -2433,6 +2472,11 @@
         ]),
         /* ② 업무 1~2줄 간략 선택 + 바로 옆 견적서·계약서·위임장 체크 */
         domEl(doc, 'div', { 'class': 'pce-sec' }, [
+          domEl(doc, 'div', { 'class': 'pce-sh' }, [
+            domEl(doc, 'span', { 'class': 'pce-stepno', text: '2' }),
+            domEl(doc, 'span', { text: '무슨 업무의 어떤 서류를 만드시나요?' }),
+            domEl(doc, 'span', { 'class': 'pce-sub', text: '— 왼쪽에서 업무를 고르고 오른쪽에서 견적서·계약서를 체크하세요' })
+          ]),
           domEl(doc, 'div', { 'class': 'pce-workbar' }, [
             coreChipWrap,
             domEl(doc, 'div', { 'class': 'pce-rchecks', role: 'group', 'aria-label': '만들 서류 종류 체크' }, [
@@ -2461,6 +2505,7 @@
         /* ③ 체크한 서류 맞춤 핵심 입력칸 */
         domEl(doc, 'div', { 'class': 'pce-sec' }, [
           domEl(doc, 'div', { 'class': 'pce-sh' }, [
+            domEl(doc, 'span', { 'class': 'pce-stepno', text: '3' }),
             inputHeadTitle,
             btnMoreFields
           ]),
@@ -2490,7 +2535,7 @@
     return { close: close };
   }
 
-  /* ══ 모달 2: ✨ 쉽게 새 양식 만들기 마법사 (파일·문안 자동 변환 + 10초 표준 조립 + 구두·AI 창조 양식 생성) ══ */
+  /* ══ 모달 2: ✨ 쉽게 새 양식 만들기 — 체계적인 ①·②·③ 단계 안내 + 실시간 종이 모양 미리보기 스튜디오 ══ */
   function openEasyFormWizard(ctx) {
     ctx = ctx || {};
     var doc = ctx.doc || (w && w.document);
@@ -2513,9 +2558,13 @@
     var notify = ctx.toast || function () {};
 
     var mode = 'convert'; // 'convert' | 'assemble' | 'creative'
+    var rightView = 'paper'; // 'paper' | 'edit'
     var stagedFile = null;
     var pendingFiles = 0;
     var busy = false;
+    var assembledAuto = false;
+    var oldNamesOpen = false;
+    var metaOpen = false;
     var wizVoiceStop = null;
     var wizCoRows = [];
     if (ctx.host && ctx.host.cards && typeof ctx.host.cards.rows === 'function') {
@@ -2544,11 +2593,37 @@
     }
     bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
 
-    var tabConvert = domEl(doc, 'button', { type: 'button', 'class': 'pce-tab on', 'aria-pressed': 'true', text: '📎 기존 파일·문안 → 자동 {{변수}} 변환', onclick: function () { setMode('convert'); } });
-    var tabAssemble = domEl(doc, 'button', { type: 'button', 'class': 'pce-tab', 'aria-pressed': 'false', text: '🧩 조항 체크로 10초 표준 양식 조립', onclick: function () { setMode('assemble'); } });
-    var tabCreative = domEl(doc, 'button', { type: 'button', 'class': 'pce-tab', 'aria-pressed': 'false', text: '✨ 구두·AI로 새로운 양식 창작', onclick: function () { setMode('creative'); } });
+    /* ── 단계 ①: 만드는 방법 3가지 큰 시각 카드 (전문용어 {{변수}} 완전 배제) ── */
+    var tabConvert = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-mcard on', 'aria-pressed': 'true',
+      onclick: function () { setMode('convert'); }
+    }, [
+      domEl(doc, 'b', { text: '📄 쓰던 파일 올리기' }),
+      domEl(doc, 'small', { text: '한글·워드·PDF 자동 빈칸 변환' })
+    ]);
+    var tabAssemble = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-mcard', 'aria-pressed': 'false',
+      onclick: function () { setMode('assemble'); }
+    }, [
+      domEl(doc, 'b', { text: '✅ 10초 표준 양식 조립' }),
+      domEl(doc, 'small', { text: '조항만 체크하면 즉시 완성' })
+    ]);
+    var tabCreative = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-mcard grn', 'aria-pressed': 'false',
+      onclick: function () { setMode('creative'); }
+    }, [
+      domEl(doc, 'b', { text: '🎙 말·글로 새로 창작' }),
+      domEl(doc, 'small', { text: '없는 양식을 맞춤 자동 작성' })
+    ]);
 
-    var nameIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '예: 외국인 근로자 노무관리 용역계약서 (푸른 표준)', 'aria-label': '새 양식 이름' });
+    var step2Title = domEl(doc, 'span', { text: '쓰던 문서 파일을 고르세요 (날짜·금액·사업자번호가 자동 빈칸이 됩니다)' });
+
+    /* ── 단계 ③: 새 양식 이름 + 자동 분류 1줄 요약 (복잡한 선택상자 3개는 기본 접힘) ── */
+    var nameIn = domEl(doc, 'input', {
+      type: 'text', 'class': 'pce-in',
+      placeholder: '예: 외국인 근로자 노무관리 용역계약서 (푸른 표준)',
+      'aria-label': '새 양식 이름'
+    });
     var kindSel = domEl(doc, 'select', { 'class': 'pce-sel', 'aria-label': '계약 분류' }, kinds.map(function (k) {
       return domEl(doc, 'option', { value: k.v, text: (k.icon || '') + ' ' + k.label, selected: k.v === (ctx.defaultKind || 'company') });
     }));
@@ -2561,7 +2636,7 @@
     function rebuildSetOptions(selectedId) {
       var curVal = selectedId !== undefined ? selectedId : setSel.value;
       setSel.innerHTML = '';
-      setSel.appendChild(domEl(doc, 'option', { value: '', text: '(선택 안 함 — 양식 목록에만 등록)' }));
+      setSel.appendChild(domEl(doc, 'option', { value: '', text: '(세트 선택 안 함 — 양식 목록에만 등록)' }));
       sets.forEach(function (s) {
         setSel.appendChild(domEl(doc, 'option', { value: s.id, text: '📦 ' + s.name, selected: s.id === curVal }));
       });
@@ -2569,49 +2644,143 @@
     }
     rebuildSetOptions('');
 
-    /* 모드 A: 파일 올리기 + 기존 값 → {{변수}} 원클릭 변환 */
-    var fileStatus = domEl(doc, 'span', { 'class': 'pce-sub', role: 'status', 'aria-live': 'polite', text: '한글(.hwpx/.hwp)·워드·PDF 파일을 고르면 브라우저 안에서 본문만 뽑아 자동으로 {{변수}}로 변환합니다.' });
+    var metaSumText = domEl(doc, 'span', { style: 'flex:1;min-width:0' });
+    var btnToggleMeta = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-btn', style: 'padding:3px 9px;min-height:30px;font-size:11.5px',
+      'aria-expanded': 'false',
+      text: '분류·세트 바꾸기 ▾',
+      onclick: function () {
+        metaOpen = !metaOpen;
+        metaDetailBox.hidden = !metaOpen;
+        btnToggleMeta.setAttribute('aria-expanded', metaOpen ? 'true' : 'false');
+        btnToggleMeta.textContent = metaOpen ? '분류·세트 접기 ▴' : '분류·세트 바꾸기 ▾';
+      }
+    });
+    var metaDetailBox = domEl(doc, 'div', { style: 'margin-top:8px', hidden: true }, [
+      domEl(doc, 'div', { 'class': 'pce-fgrid' }, [
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '상위 분류' }), kindSel]),
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '문서 역할' }), roleSel]),
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '함께 묶을 동종 하위 세트' }), setSel])
+      ])
+    ]);
+
+    function syncMetaSummary() {
+      var kObj = kinds.filter(function (k) { return k.v === kindSel.value; })[0] || kinds[0];
+      var kTxt = kObj ? ((kObj.icon || '') + ' ' + kObj.label).trim() : '업체계약';
+      var rTxt = roleSel.value === PROPOSAL_GROUP ? '🧾 견적서·제안서' : '📑 계약서·약정서';
+      var sObj = sets.filter(function (s) { return s && s.id === setSel.value; })[0];
+      var sTxt = sObj ? ('📦 ' + sObj.name + ' 함께 편입') : '양식 목록에 등록';
+      metaSumText.textContent = kTxt + ' ▸ ' + rTxt + ' ▸ ' + sTxt;
+    }
+    kindSel.addEventListener('change', syncMetaSummary);
+    roleSel.addEventListener('change', syncMetaSummary);
+    setSel.addEventListener('change', syncMetaSummary);
+
+    /* ── 단계 ②-A: 쓰던 파일 올리기 (깔끔한 드롭존 + 선택형 보조 도구 접기) ── */
+    var fileStatus = domEl(doc, 'span', {
+      'class': 'pce-sub', role: 'status', 'aria-live': 'polite',
+      text: '한글(.hwpx/.hwp)·워드(.docx)·PDF 파일을 고르면 본문만 깔끔하게 뽑아 오른쪽 종이에 바로 보여줍니다.'
+    });
     var fileIn = domEl(doc, 'input', {
       type: 'file', accept: '.hwpx,.hwp,.docx,.doc,.pdf,.xlsx,.xls', hidden: true, style: 'display:none',
       onchange: function (e) { handleFiles(e.target.files); e.target.value = ''; }
     });
     var filePickBtn = domEl(doc, 'button', {
-      type: 'button', 'class': 'pce-btn soft',
+      type: 'button', 'class': 'pce-btn pri',
       text: '📎 기존 파일에서 본문 뽑기 (.hwpx/.hwp/.docx/.pdf)',
       onclick: function () { if (typeof fileIn.click === 'function') fileIn.click(); }
     });
+    var dropBox = domEl(doc, 'div', {
+      'class': 'pce-drop',
+      ondragover: function (e) { e.preventDefault(); dropBox.className = 'pce-drop drag'; },
+      ondragleave: function () { dropBox.className = 'pce-drop'; },
+      ondrop: function (e) {
+        e.preventDefault();
+        dropBox.className = 'pce-drop';
+        if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+      }
+    }, [filePickBtn, fileIn, fileStatus]);
+
     var attachRawCk = domEl(doc, 'input', { type: 'checkbox', 'aria-label': '빈 공용 서식 원본 파일도 함께 첨부' });
     var attachRawRow = domEl(doc, 'label', { 'class': 'pce-cklbl', style: 'margin-top:8px', hidden: true }, [
       attachRawCk,
-      domEl(doc, 'span', { text: '빈 공용 서식 원본 파일임 확인 — 원본 파일도 양식·보관함에 함께 첨부 (개인·거래처 정보가 든 파일은 체크하지 마세요)' })
+      domEl(doc, 'span', { text: '빈 공용 서식 원본 파일임 확인 — 원본 파일도 함께 보관 (과거 거래처·개인정보가 든 파일은 체크하지 마세요)' })
     ]);
-    var oldCoIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '문서에 적혀 있던 예전 회사명 (예: 가나상사 → {{회사명}})', 'aria-label': '치환할 예전 회사명' });
-    var oldCeoIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '예전 대표자명 (→ {{대표자}})', 'aria-label': '치환할 예전 대표자명' });
-    var oldWorkerIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '예전 근로자명 (→ {{근로자명}})', 'aria-label': '치환할 예전 근로자명' });
+
+    var oldCoIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '예: 가나상사 (적으면 [회사명] 칸으로 바뀜)', 'aria-label': '치환할 예전 회사명' });
+    var oldCeoIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '예: 홍길동 (→ [대표자] 칸)', 'aria-label': '치환할 예전 대표자명' });
+    var oldWorkerIn = domEl(doc, 'input', { type: 'text', 'class': 'pce-in', placeholder: '예: 김철수 (→ [근로자명] 칸)', 'aria-label': '치환할 예전 근로자명' });
     var convertNote = domEl(doc, 'div', { 'class': 'pce-sub', role: 'status', 'aria-live': 'polite', style: 'margin-top:6px' });
 
-    var convertPane = domEl(doc, 'div', { 'class': 'pce-sec' }, [
-      domEl(doc, 'div', { 'class': 'pce-sh' }, [filePickBtn, fileIn, fileStatus]),
-      attachRawRow,
-      domEl(doc, 'div', { 'class': 'pce-fgrid', style: 'margin-top:8px' }, [
-        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '문서 속 예전 회사명 (선택)' }), oldCoIn]),
-        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '문서 속 예전 대표자명 (선택)' }), oldCeoIn]),
-        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '문서 속 예전 근로자명 (선택)' }), oldWorkerIn])
+    var btnToggleOldNames = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-btn', style: 'padding:4px 9px;min-height:32px;font-size:12px',
+      'aria-expanded': 'false',
+      text: '🔧 문서 속 예전 회사·대표 이름 지우기 ▾',
+      onclick: function () {
+        oldNamesOpen = !oldNamesOpen;
+        oldNamesWrap.hidden = !oldNamesOpen;
+        btnToggleOldNames.setAttribute('aria-expanded', oldNamesOpen ? 'true' : 'false');
+        btnToggleOldNames.textContent = oldNamesOpen ? '▲ 예전 이름 지우기 접기' : '🔧 문서 속 예전 회사·대표 이름 지우기 ▾';
+      }
+    });
+    var btnPasteMode = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-btn soft', style: 'padding:4px 9px;min-height:32px;font-size:12px',
+      text: '📋 복사해 둔 글 직접 붙여넣기',
+      onclick: function () {
+        setRightView('edit');
+        try { bodyIn.focus(); } catch (_) {}
+      }
+    });
+    var oldNamesWrap = domEl(doc, 'div', { 'class': 'pce-sec', style: 'margin-top:8px;background:#f8fafc', hidden: true }, [
+      domEl(doc, 'div', { 'class': 'pce-sub', style: 'margin-bottom:6px', text: '예전 계약서에 적혀 있던 거래처 이름·대표자명을 적고 아래 단추를 누르면 깨끗한 공용 빈칸으로 바뀝니다.' }),
+      domEl(doc, 'div', { 'class': 'pce-fgrid' }, [
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '예전 회사명 (선택)' }), oldCoIn]),
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '예전 대표자명 (선택)' }), oldCeoIn]),
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '예전 근로자명 (선택)' }), oldWorkerIn])
       ]),
-      domEl(doc, 'div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px' }, [
-        domEl(doc, 'button', { type: 'button', 'class': 'pce-btn pri', text: '🪄 본문 속 날짜·금액·사업자번호·이름 → {{변수}} 한 번에 변환', onclick: runAutoTemplatize }),
-        convertNote
+      domEl(doc, 'div', { style: 'margin-top:8px' }, [
+        domEl(doc, 'button', { type: 'button', 'class': 'pce-btn pri', text: '🪄 본문 속 날짜·금액·사업자번호·이름 → 자동 빈칸 한 번에 변환', onclick: runAutoTemplatize })
       ])
     ]);
 
-    /* 모드 B: 10초 표준 조항 조립기 */
-    var docTypeSel = domEl(doc, 'select', { 'class': 'pce-sel', 'aria-label': '조립할 문서 기본 틀' }, [
-      domEl(doc, 'option', { value: 'contract', text: '📑 위탁·자문·용역 계약서 표준 틀', selected: true }),
-      domEl(doc, 'option', { value: 'quote', text: '🧾 견적서·제안서 표준 틀' }),
-      domEl(doc, 'option', { value: 'case', text: '⚖ 사건 대리 위임약정서 표준 틀' }),
-      domEl(doc, 'option', { value: 'agree', text: '🔄 계약 변경·연장 합의서 표준 틀' })
+    var convertPane = domEl(doc, 'div', null, [
+      dropBox,
+      attachRawRow,
+      domEl(doc, 'div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center' }, [
+        btnPasteMode,
+        btnToggleOldNames
+      ]),
+      oldNamesWrap,
+      convertNote
     ]);
+
+    /* ── 단계 ②-B: 10초 표준 양식 조립 (문서 종류 카드 + 조항 체크 즉시 오른쪽 종이 반영) ── */
+    var docTypeItems = [
+      { v: 'contract', label: '📑 위탁·자문·용역 계약서' },
+      { v: 'quote', label: '🧾 견적서·제안서' },
+      { v: 'case', label: '⚖ 사건 대리 위임약정서' },
+      { v: 'agree', label: '🔄 계약 변경·연장 합의서' }
+    ];
+    var docTypeSel = domEl(doc, 'select', { 'class': 'pce-sel', 'aria-label': '조립할 문서 기본 틀', hidden: true }, docTypeItems.map(function (it, idx) {
+      return domEl(doc, 'option', { value: it.v, text: it.label + ' 표준 틀', selected: idx === 0 });
+    }));
     docTypeSel.value = 'contract';
+
+    var dtBtns = {};
+    var docTypeGrid = domEl(doc, 'div', { 'class': 'pce-dtgrid', role: 'group', 'aria-label': '문서 기본 종류 선택' }, docTypeItems.map(function (it, idx) {
+      var b = domEl(doc, 'button', {
+        type: 'button', 'class': 'pce-dtbtn' + (idx === 0 ? ' on' : ''),
+        'aria-pressed': idx === 0 ? 'true' : 'false',
+        text: it.label,
+        onclick: function () {
+          docTypeSel.value = it.v;
+          onDocTypeChange();
+        }
+      });
+      dtBtns[it.v] = b;
+      return b;
+    }));
+
     var clauseDefs = [
       { k: 'scope', label: '과업 범위·대상인원', on: true },
       { k: 'period', label: '계약·수행 기간', on: true },
@@ -2626,36 +2795,56 @@
     ];
     var clauseChecks = {};
     var clauseGrid = domEl(doc, 'div', { 'class': 'pce-cgrid' }, clauseDefs.map(function (cd) {
-      var ck = domEl(doc, 'input', { type: 'checkbox', checked: cd.on });
+      var ck = domEl(doc, 'input', {
+        type: 'checkbox', checked: cd.on,
+        onchange: function () {
+          if (mode === 'assemble') runAssemble(true);
+        }
+      });
       clauseChecks[cd.k] = ck;
       return domEl(doc, 'label', { 'class': 'pce-cklbl' }, [ck, domEl(doc, 'span', { text: cd.label })]);
     }));
-    docTypeSel.addEventListener('change', function () {
+
+    function syncDocTypeButtons() {
+      var curDt = docTypeSel.value;
+      Object.keys(dtBtns).forEach(function (k) {
+        var on = k === curDt;
+        dtBtns[k].className = 'pce-dtbtn' + (on ? ' on' : '');
+        dtBtns[k].setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    function onDocTypeChange() {
       var dt = docTypeSel.value;
+      syncDocTypeButtons();
       clauseChecks.successFee.checked = dt === 'case';
       clauseChecks.lateInterest.checked = dt === 'case';
       clauseChecks.lawyers.checked = dt === 'case';
       clauseChecks.autoRenew.checked = dt === 'contract';
       roleSel.value = dt === 'quote' ? PROPOSAL_GROUP : '계약서';
-    });
+      syncMetaSummary();
+      if (mode === 'assemble') runAssemble(true);
+    }
+    docTypeSel.addEventListener('change', onDocTypeChange);
 
-    var assemblePane = domEl(doc, 'div', { 'class': 'pce-sec', hidden: true }, [
-      domEl(doc, 'div', { 'class': 'pce-sh' }, [
-        domEl(doc, 'span', { text: '문서 틀과 넣을 조항만 체크하고 [🧩 표준 본문 한 번에 조립]을 누르면 즉시 만들어집니다.' })
-      ]),
-      domEl(doc, 'div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px' }, [
-        domEl(doc, 'div', { style: 'min-width:240px' }, [docTypeSel]),
-        domEl(doc, 'button', { type: 'button', 'class': 'pce-btn pri', text: '🧩 체크한 조항으로 표준 본문 한 번에 조립', onclick: runAssemble })
-      ]),
-      clauseGrid
+    var assemblePane = domEl(doc, 'div', { hidden: true }, [
+      docTypeSel,
+      docTypeGrid,
+      domEl(doc, 'div', { 'class': 'pce-sub', style: 'margin-bottom:6px', text: '넣고 싶은 조항만 체크하세요 — 체크할 때마다 오른쪽 종이 미리보기가 즉시 바뀝니다.' }),
+      clauseGrid,
+      domEl(doc, 'div', { style: 'margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [
+        domEl(doc, 'button', { type: 'button', 'class': 'pce-btn pri', text: '🧩 체크한 조항으로 표준 본문 한 번에 조립', onclick: function () { runAssemble(false); } })
+      ])
     ]);
 
-    /* 모드 C: ✨ 구두·AI로 새로운 맞춤형 양식 창작 */
+    /* ── 단계 ②-C: 🎙 말·글로 새로운 맞춤형 양식 창작 ── */
     var wizPromptIn = domEl(doc, 'textarea', {
-      'class': 'pce-ta', rows: '2', 'aria-label': '창작할 양식 설명',
-      placeholder: '어떤 새로운 양식을 만들지 글이나 말로 설명해 주세요 — 예: "사내 하도급 적법성 정기점검 및 개선 자문 계약서, 분기별 보고서 제출, 착수금·잔금 50%씩 지급"'
+      'class': 'pce-ta', rows: '3', 'aria-label': '창작할 양식 설명',
+      placeholder: '예: "사내 하도급 적법성 정기점검 및 개선 자문 계약서, 분기별 보고서 제출, 착수금·잔금 50%씩 지급"'
     });
-    var wizCreativeNote = domEl(doc, 'span', { 'class': 'pce-sub', role: 'status', 'aria-live': 'polite', text: '구두 또는 글로 설명하면 표준 {{변수}}가 갖춰진 새 양식 본문을 창조 생성합니다.' });
+    var wizCreativeNote = domEl(doc, 'div', {
+      'class': 'pce-sub', role: 'status', 'aria-live': 'polite', style: 'margin-top:6px',
+      text: '말이나 글로 설명하고 [✨ 맞춤 양식 본문 창조 생성]을 누르면 오른쪽 종이에 바로 만들어집니다.'
+    });
     var btnWizMic = domEl(doc, 'button', {
       type: 'button', 'class': 'pce-btn mic', 'aria-pressed': 'false',
       text: '🎙 구두로 설명 말하기',
@@ -2706,63 +2895,187 @@
         }, { ai: ctx.ai, auth: ctx.auth, fetch: ctx.fetch }).then(function (bundle) {
           btnWizDraft.disabled = false;
           var pickedFm = wantQ ? bundle.quoteForm : bundle.contractForm;
+          assembledAuto = false;
           bodyIn.value = pickedFm.body;
           if (!nameIn.value.trim()) nameIn.value = pickedFm.name;
           autoDetectMeta();
-          wizCreativeNote.textContent = '✔ 「' + pickedFm.name + '」 본문을 생성했습니다 — 아래에서 확인 후 저장하세요.';
+          renderPaperPreview();
+          setRightView('paper');
+          wizCreativeNote.textContent = '✔ 「' + pickedFm.name + '」 본문을 생성했습니다 — 오른쪽 종이 모양을 확인 후 저장하세요.';
         });
       }
     });
-    var creativeWizPane = domEl(doc, 'div', { 'class': 'pce-sec', style: 'background:#f0fdf4;border-color:#bbf7d0', hidden: true }, [
-      domEl(doc, 'div', { 'class': 'pce-sh' }, [btnWizMic, btnWizDraft, wizCreativeNote]),
-      wizPromptIn
+    var creativeWizPane = domEl(doc, 'div', { hidden: true }, [
+      wizPromptIn,
+      domEl(doc, 'div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center' }, [
+        btnWizMic,
+        btnWizDraft
+      ]),
+      wizCreativeNote
     ]);
 
-    /* 본문 편집기 + 자주 쓰는 변수 원클릭 칩 */
+    /* ── 오른쪽: 실시간 종이 모양 미리보기 + 쉬운 한글 빈칸 넣기 편집판 ── */
     var bodyIn = domEl(doc, 'textarea', {
-      'class': 'pce-ta', rows: '10', 'aria-label': '양식 본문',
-      placeholder: '기존 문안을 붙여넣고 [🪄 {{변수}} 한 번에 변환]을 누르거나, 위 탭에서 [조항 조립] · [새로운 양식 창작]을 이용하세요.'
+      'class': 'pce-ta', rows: '14', 'aria-label': '양식 본문',
+      placeholder: '여기에 기존 계약서 문안을 붙여넣고 위 [🪄 자동 빈칸 변환]을 누르거나, 직접 글자를 다듬을 수 있습니다.'
     });
-    var quickVars = ['{{회사명}}', '{{사업자번호}}', '{{대표자}}', '{{주소}}', '{{담당자}}', '{{계약금액}}', '{{계약금액한글}}', '{{부가세처리}}', '{{계약기간}}', '{{계약시작일}}', '{{계약종료일}}', '{{과업내용}}', '{{대상인원}}', '{{성공보수}}', '{{근로자명}}', '{{주담당}}', '{{공인노무사명단}}', '{{계약일}}'];
-    var varChipBar = domEl(doc, 'div', { 'class': 'pce-vchips' }, quickVars.map(function (code) {
+    var quickBlankItems = [
+      ['+ 회사명 칸', '{{회사명}}'],
+      ['+ 대표자 칸', '{{대표자}}'],
+      ['+ 사업자번호 칸', '{{사업자번호}}'],
+      ['+ 주소 칸', '{{주소}}'],
+      ['+ 담당자 칸', '{{담당자}}'],
+      ['+ 계약금액 칸', '{{계약금액}}'],
+      ['+ 한글금액 칸', '{{계약금액한글}}'],
+      ['+ 부가세 칸', '{{부가세처리}}'],
+      ['+ 계약기간 칸', '{{계약기간}}'],
+      ['+ 시작일 칸', '{{계약시작일}}'],
+      ['+ 종료일 칸', '{{계약종료일}}'],
+      ['+ 과업내용 칸', '{{과업내용}}'],
+      ['+ 대상인원 칸', '{{대상인원}}'],
+      ['+ 성공보수 칸', '{{성공보수}}'],
+      ['+ 근로자명 칸', '{{근로자명}}'],
+      ['+ 주담당 칸', '{{주담당}}'],
+      ['+ 노무사명단 칸', '{{공인노무사명단}}'],
+      ['+ 계약일 칸', '{{계약일}}']
+    ];
+    var varChipBar = domEl(doc, 'div', { 'class': 'pce-vchips' }, quickBlankItems.map(function (pair) {
+      var label = pair[0], code = pair[1];
       return domEl(doc, 'button', {
-        type: 'button', 'class': 'pce-vchip', title: '커서 자리에 ' + code + ' 넣기', text: code,
+        type: 'button', 'class': 'pce-vchip', title: '커서 위치에 자동 채움 칸 ' + code + ' 넣기', text: label,
         onclick: function () {
-          var s = bodyIn.selectionStart || bodyIn.value.length, e = bodyIn.selectionEnd || s;
+          var s = bodyIn.selectionStart != null ? bodyIn.selectionStart : bodyIn.value.length;
+          var e = bodyIn.selectionEnd != null ? bodyIn.selectionEnd : s;
+          assembledAuto = false;
           bodyIn.value = bodyIn.value.slice(0, s) + code + bodyIn.value.slice(e);
+          renderPaperPreview();
           bodyIn.focus();
           try { bodyIn.selectionStart = bodyIn.selectionEnd = s + code.length; } catch (_) {}
         }
       });
     }));
 
+    var blankCountBadge = domEl(doc, 'span', { 'class': 'pce-tag q', hidden: true, text: '자동 빈칸 0개' });
+    var btnViewPaper = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-pvtab on', 'aria-pressed': 'true',
+      text: '📄 종이 모양 보기',
+      onclick: function () { setRightView('paper'); }
+    });
+    var btnViewEdit = domEl(doc, 'button', {
+      type: 'button', 'class': 'pce-pvtab', 'aria-pressed': 'false',
+      text: '✏ 글자 직접 수정',
+      onclick: function () { setRightView('edit'); try { bodyIn.focus(); } catch (_) {} }
+    });
+
+    var paperSheet = domEl(doc, 'div', { 'class': 'pce-paper', 'aria-label': '완성될 양식 종이 미리보기' });
+    var paperPane = domEl(doc, 'div', null, [
+      domEl(doc, 'div', { 'class': 'pce-sub', style: 'margin-bottom:6px', text: '파란 [빈칸]은 나중에 서류 작성 때 회사명·금액·기간이 자동으로 들어가는 자리입니다.' }),
+      domEl(doc, 'div', { 'class': 'pce-paperwrap' }, [paperSheet])
+    ]);
+    var editPane = domEl(doc, 'div', { hidden: true }, [
+      domEl(doc, 'div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:6px' }, [
+        domEl(doc, 'span', { 'class': 'pce-sub', text: '커서를 두고 아래 파란 단추를 누르면 해당 빈칸이 들어갑니다.' }),
+        domEl(doc, 'button', { type: 'button', 'class': 'pce-btn soft', style: 'padding:3px 9px;min-height:30px;font-size:11.5px', text: '🪄 날짜·금액·사업자번호 자동 빈칸 변환', onclick: runAutoTemplatize })
+      ]),
+      varChipBar,
+      domEl(doc, 'div', { style: 'margin-top:6px' }, [bodyIn])
+    ]);
+
+    function setRightView(v) {
+      rightView = v === 'edit' ? 'edit' : 'paper';
+      var isP = rightView === 'paper';
+      btnViewPaper.className = 'pce-pvtab' + (isP ? ' on' : '');
+      btnViewPaper.setAttribute('aria-pressed', isP ? 'true' : 'false');
+      btnViewEdit.className = 'pce-pvtab' + (!isP ? ' on' : '');
+      btnViewEdit.setAttribute('aria-pressed', !isP ? 'true' : 'false');
+      paperPane.hidden = !isP;
+      editPane.hidden = isP;
+      if (isP) renderPaperPreview();
+    }
+
+    function renderPaperPreview() {
+      paperSheet.innerHTML = '';
+      var raw = maskRrnSafe(String(bodyIn.value || ''));
+      if (!raw.trim()) {
+        blankCountBadge.hidden = true;
+        paperSheet.appendChild(domEl(doc, 'div', { 'class': 'pce-paper-empty' }, [
+          domEl(doc, 'b', { style: 'font-size:14px;color:#1e293b', text: '이곳에 완성될 양식이 종이 모양으로 바로 나타납니다' }),
+          domEl(doc, 'span', { text: '왼쪽 ①번에서 방법을 고른 뒤 파일을 올리거나 [10초 표준 양식 조립]을 눌러 보세요.' }),
+          domEl(doc, 'div', { style: 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px' }, [
+            domEl(doc, 'button', { type: 'button', 'class': 'pce-btn soft', text: '📎 파일 고르기', onclick: function () { setMode('convert'); if (typeof fileIn.click === 'function') fileIn.click(); } }),
+            domEl(doc, 'button', { type: 'button', 'class': 'pce-btn pri', text: '✅ 10초 표준 조립 바로 보기', onclick: function () { setMode('assemble'); } })
+          ])
+        ]));
+        return;
+      }
+      var re = /\{\{([^{}\r\n]{1,40})\}\}/g;
+      var last = 0, m, count = 0, seenVars = {};
+      while ((m = re.exec(raw))) {
+        if (m.index > last) {
+          paperSheet.appendChild(doc.createTextNode(raw.slice(last, m.index)));
+        }
+        var vName = m[1].trim();
+        seenVars[vName] = true;
+        count++;
+        paperSheet.appendChild(domEl(doc, 'span', { 'class': 'pce-blank', title: '자동 채움 빈칸: ' + vName, text: '[' + vName + ']' }));
+        last = m.index + m[0].length;
+      }
+      if (last < raw.length) {
+        paperSheet.appendChild(doc.createTextNode(raw.slice(last)));
+      }
+      var uniq = Object.keys(seenVars).length;
+      blankCountBadge.hidden = count === 0;
+      blankCountBadge.textContent = '자동 빈칸 ' + uniq + '종 연결됨';
+    }
+
+    bodyIn.addEventListener('input', function () {
+      assembledAuto = false;
+      renderPaperPreview();
+    });
+
     function autoDetectMeta() {
       var meta = guessFormMeta(nameIn.value, bodyIn.value, sets);
       if (kinds.some(function (k) { return k.v === meta.kind; })) kindSel.value = meta.kind;
       roleSel.value = meta.isQuote ? PROPOSAL_GROUP : '계약서';
       if (meta.setId) rebuildSetOptions(meta.setId);
+      syncMetaSummary();
     }
-    nameIn.addEventListener('change', autoDetectMeta);
+    nameIn.addEventListener('change', function () {
+      if (mode === 'assemble' && assembledAuto) runAssemble(true);
+      autoDetectMeta();
+    });
+    nameIn.addEventListener('input', function () {
+      if (mode === 'assemble' && assembledAuto) runAssemble(true);
+    });
 
     function setMode(m) {
-      mode = m;
+      mode = (m === 'assemble' || m === 'creative') ? m : 'convert';
       [
-        [tabConvert, 'convert'],
-        [tabAssemble, 'assemble'],
-        [tabCreative, 'creative']
-      ].forEach(function (pair) {
-        var on = pair[1] === m;
-        pair[0].className = 'pce-tab' + (on ? ' on' : '');
-        pair[0].setAttribute('aria-pressed', on ? 'true' : 'false');
+        [tabConvert, 'convert', 'pce-mcard'],
+        [tabAssemble, 'assemble', 'pce-mcard'],
+        [tabCreative, 'creative', 'pce-mcard grn']
+      ].forEach(function (item) {
+        var on = item[1] === mode;
+        item[0].className = item[2] + (on ? ' on' : '');
+        item[0].setAttribute('aria-pressed', on ? 'true' : 'false');
       });
-      convertPane.hidden = m !== 'convert';
-      assemblePane.hidden = m !== 'assemble';
-      creativeWizPane.hidden = m !== 'creative';
+      convertPane.hidden = mode !== 'convert';
+      assemblePane.hidden = mode !== 'assemble';
+      creativeWizPane.hidden = mode !== 'creative';
+      if (mode === 'convert') {
+        step2Title.textContent = '쓰던 문서 파일을 고르세요 (날짜·금액·사업자번호가 자동 빈칸이 됩니다)';
+      } else if (mode === 'assemble') {
+        step2Title.textContent = '문서 종류와 조항만 체크하세요 (오른쪽 종이에 즉시 만들어집니다)';
+        if (!bodyIn.value.trim() || assembledAuto) runAssemble(true);
+      } else {
+        step2Title.textContent = '어떤 양식이 필요한지 말이나 글로 간단히 적으세요';
+      }
     }
 
     function runAutoTemplatize() {
       if (!bodyIn.value.trim()) {
-        notify('먼저 본문 칸에 기존 문안을 붙여넣거나 파일을 불러와 주세요');
+        notify('먼저 파일을 불러오거나 [글자 직접 수정] 칸에 기존 문안을 붙여넣어 주세요');
+        setRightView('edit');
         bodyIn.focus();
         return;
       }
@@ -2771,12 +3084,22 @@
         oldCeo: oldCeoIn.value,
         oldWorker: oldWorkerIn.value
       });
+      assembledAuto = false;
       bodyIn.value = res.text;
       autoDetectMeta();
-      convertNote.textContent = '✔ ' + res.replacedCount + '곳을 {{변수}}로 자동 변환했습니다 · 현재 포함된 변수: ' + (res.vars.length ? res.vars.join(', ') : '없음');
+      renderPaperPreview();
+      var niceVars = res.vars.map(function (v) { return '[' + v.replace(/^\{\{|\}\}$/g, '') + ']'; });
+      convertNote.textContent = '✔ ' + res.replacedCount + '곳을 자동 빈칸으로 바꿨습니다' + (niceVars.length ? (' · 연결된 빈칸: ' + niceVars.join(', ')) : '');
     }
 
-    function runAssemble() {
+    function defaultAssembleTitle(dt) {
+      if (dt === 'quote') return '신규 업무 표준 견적서';
+      if (dt === 'case') return '신규 사건 위임약정서 (푸른 표준)';
+      if (dt === 'agree') return '계약 변경·연장 합의서 (푸른 표준)';
+      return '신규 업무 위탁계약서 (푸른 표준)';
+    }
+
+    function runAssemble(silent) {
       var cls = {};
       Object.keys(clauseChecks).forEach(function (k) { cls[k] = !!clauseChecks[k].checked; });
       bodyIn.value = buildStandardTemplate({
@@ -2784,11 +3107,16 @@
         title: nameIn.value.trim(),
         clauses: cls
       });
-      if (!nameIn.value.trim()) {
-        nameIn.value = docTypeSel.value === 'quote' ? '신규 업무 표준 견적서' : docTypeSel.value === 'case' ? '신규 사건 위임약정서 (푸른 표준)' : '신규 업무 위탁계약서 (푸른 표준)';
+      assembledAuto = true;
+      if (!silent && !nameIn.value.trim()) {
+        nameIn.value = defaultAssembleTitle(docTypeSel.value);
       }
       autoDetectMeta();
-      notify('표준 양식 본문을 한 번에 조립했습니다');
+      renderPaperPreview();
+      if (!silent) {
+        setRightView('paper');
+        notify('표준 양식 본문을 한 번에 조립했습니다');
+      }
     }
 
     function handleFiles(fileList) {
@@ -2801,7 +3129,7 @@
       attachRawRow.hidden = false;
       if (!nameIn.value.trim()) nameIn.value = safeFileName.replace(/\.[^.]+$/, '');
       pendingFiles++;
-      fileStatus.textContent = '⏳ 브라우저 안에서 본문 뽑는 중… (' + safeFileName + ')';
+      fileStatus.textContent = '⏳ 파일에서 글자를 뽑아 자동 빈칸으로 정리하는 중… (' + safeFileName + ')';
 
       var textP = new Promise(function (res) {
         if (typeof ctx.extractTemplateText !== 'function') { res(''); return; }
@@ -2810,22 +3138,25 @@
 
       textP.then(function (txt) {
         pendingFiles--;
+        assembledAuto = false;
         if (txt) {
           var conv = templatizeText(txt, { oldCompany: oldCoIn.value, oldCeo: oldCeoIn.value, oldWorker: oldWorkerIn.value });
           bodyIn.value = conv.text;
-          convertNote.textContent = '✔ 파일 본문 추출 및 ' + conv.replacedCount + '곳 자동 {{변수}} 변환 완료 (개인정보 보호를 위해 원본 파일은 기본 미첨부)';
+          convertNote.textContent = '✔ 파일 본문 추출 및 ' + conv.replacedCount + '곳 자동 빈칸 변환 완료 — 오른쪽 종이 모양을 확인하세요.';
         } else if (!bodyIn.value.trim()) {
           bodyIn.value = '수신: {{회사명}} (대표 {{대표자}})\n과업: {{과업내용}}\n금액: 금 {{계약금액}}원 ({{부가세처리}})\n기간: {{계약기간}}\n작성일: {{계약일}}\n';
         }
         autoDetectMeta();
-        fileStatus.textContent = '✔ 본문 추출 완료: ' + safeFileName;
+        renderPaperPreview();
+        setRightView('paper');
+        fileStatus.textContent = '✔ 본문 추출 완료: ' + safeFileName + ' (다른 파일로 바꾸려면 다시 누르세요)';
       }, function () {
         pendingFiles--;
-        fileStatus.textContent = '⚠ 파일 글자를 읽지 못했습니다 — 본문을 직접 붙여넣거나 조항 조립을 이용해 주세요.';
+        fileStatus.textContent = '⚠ 파일 글자를 읽지 못했습니다 — [복사해 둔 글 직접 붙여넣기]나 [10초 표준 양식 조립]을 이용해 주세요.';
       });
     }
 
-    var btnSave = domEl(doc, 'button', { type: 'button', 'class': 'pce-btn grn', text: '💾 양식 저장 (+ 하위 세트 자동 반영)', onclick: onSave });
+    var btnSave = domEl(doc, 'button', { type: 'button', 'class': 'pce-btn grn', text: '💾 이 양식 저장하기 (+ 하위 세트 자동 반영)', onclick: onSave });
     function onSave() {
       if (busy) return;
       if (pendingFiles > 0) { notify('파일을 읽는 중입니다 — 잠시 후 저장해 주세요'); return; }
@@ -2837,6 +3168,9 @@
         knownCompanies: wizCoRows.map(function (r) { return r && r.c; }).filter(Boolean),
         knownPeople: wizCoRows.map(function (r) { return r && r.ceo; }).filter(Boolean)
       };
+      if (!nameIn.value.trim() && mode === 'assemble' && bodyIn.value.trim()) {
+        nameIn.value = defaultAssembleTitle(docTypeSel.value);
+      }
       var nm = maskRrnSafe(nameIn.value).trim();
       var bd = maskRrnSafe(bodyIn.value);
       if (mode === 'creative') {
@@ -2844,8 +3178,8 @@
         nm = cleanWiz.name;
         bd = cleanWiz.body;
       }
-      if (!nm) { notify('새 양식 이름을 넣어 주세요'); nameIn.focus(); return; }
-      if (!bd.trim()) { notify('양식 본문을 넣어 주세요 ([표준 본문 조립] 또는 [새로운 양식 창작]을 누르면 자동 생성됩니다)'); bodyIn.focus(); return; }
+      if (!nm) { notify('③번 칸에 새 양식 이름을 넣어 주세요'); nameIn.focus(); return; }
+      if (!bd.trim()) { notify('먼저 ②번에서 파일을 올리거나 [10초 표준 양식 조립] · [맞춤 양식 창조 생성]을 눌러 본문을 만들어 주세요'); return; }
 
       var meta = guessFormMeta(nm, bd, sets);
       var kVal = kindSel.value || meta.kind || 'company';
@@ -2914,36 +3248,70 @@
       });
     }
 
-    var md = domEl(doc, 'div', { 'class': 'pce-m', role: 'dialog', 'aria-modal': 'true', 'aria-label': '쉽게 새 양식 만들기' }, [
-      domEl(doc, 'div', { 'class': 'pce-mh' }, [
-        domEl(doc, 'b', { text: '✨ 쉽게 새 양식 만들기 — 자동 {{변수}} 변환 · 조항 조립 · 구두/AI 창작' }),
-        domEl(doc, 'button', { type: 'button', 'class': 'pce-x', 'aria-label': '닫기', text: '×', onclick: function () { close(); } })
+    var leftCol = domEl(doc, 'div', { 'class': 'pce-wizleft' }, [
+      /* 카드 ①: 방법 고르기 */
+      domEl(doc, 'div', { 'class': 'pce-stepcard' }, [
+        domEl(doc, 'div', { 'class': 'pce-sh' }, [
+          domEl(doc, 'span', { 'class': 'pce-stepno grn', text: '1' }),
+          domEl(doc, 'span', { text: '어떻게 양식을 만드시겠습니까? (하나만 고르세요)' })
+        ]),
+        domEl(doc, 'div', { 'class': 'pce-mcards', role: 'group', 'aria-label': '새 양식 만드는 방법 선택' }, [
+          tabConvert, tabAssemble, tabCreative
+        ])
       ]),
-      domEl(doc, 'div', { 'class': 'pce-mb' }, [
-        domEl(doc, 'div', { 'class': 'pce-tabs' }, [tabConvert, tabAssemble, tabCreative]),
-        domEl(doc, 'div', { 'class': 'pce-sec' }, [
-          domEl(doc, 'div', { 'class': 'pce-fgrid' }, [
-            domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '새 양식 이름 *' }), nameIn]),
-            domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '상위 분류 (자동 추천됨)' }), kindSel]),
-            domEl(doc, 'div', { 'class': 'pce-fg' }, [domEl(doc, 'label', { text: '문서 역할' }), roleSel])
-          ]),
-          domEl(doc, 'div', { 'class': 'pce-fg', style: 'margin-top:8px' }, [
-            domEl(doc, 'label', { text: '함께 묶어 둘 동종 하위 세트 (선택 시 견적서·계약서 세트에 자동 편입)' }),
-            setSel
-          ])
+      /* 카드 ②: 내용 만들기 */
+      domEl(doc, 'div', { 'class': 'pce-stepcard hi' }, [
+        domEl(doc, 'div', { 'class': 'pce-sh' }, [
+          domEl(doc, 'span', { 'class': 'pce-stepno grn', text: '2' }),
+          step2Title
         ]),
         convertPane,
         assemblePane,
-        creativeWizPane,
-        domEl(doc, 'div', { 'class': 'pce-sec' }, [
-          domEl(doc, 'div', { 'class': 'pce-sh' }, [
-            domEl(doc, 'span', { text: '양식 본문 ({{변수}} 칩을 누르면 커서 위치에 바로 들어갑니다 · 주민번호 자동 가림)' })
-          ]),
-          varChipBar,
-          domEl(doc, 'div', { style: 'margin-top:6px' }, [bodyIn])
+        creativeWizPane
+      ]),
+      /* 카드 ③: 이름 확인 및 저장 위치 */
+      domEl(doc, 'div', { 'class': 'pce-stepcard' }, [
+        domEl(doc, 'div', { 'class': 'pce-sh' }, [
+          domEl(doc, 'span', { 'class': 'pce-stepno grn', text: '3' }),
+          domEl(doc, 'span', { text: '양식 이름만 확인하고 아래 [저장하기]를 누르세요' })
+        ]),
+        domEl(doc, 'div', { 'class': 'pce-fg' }, [
+          domEl(doc, 'label', { text: '새 양식 이름 * (파일이나 조립 내용에 맞춰 자동으로 채워집니다)' }),
+          nameIn
+        ]),
+        domEl(doc, 'div', { 'class': 'pce-metasum' }, [
+          domEl(doc, 'b', { text: '📁 자동 저장 위치:' }),
+          metaSumText,
+          btnToggleMeta
+        ]),
+        metaDetailBox
+      ])
+    ]);
+
+    var rightCol = domEl(doc, 'div', { 'class': 'pce-wizright' }, [
+      domEl(doc, 'div', { 'class': 'pce-pvhead' }, [
+        domEl(doc, 'div', { style: 'display:flex;align-items:center;gap:6px;flex-wrap:wrap' }, [
+          domEl(doc, 'b', { text: '📄 완성될 양식 미리보기' }),
+          blankCountBadge
+        ]),
+        domEl(doc, 'div', { 'class': 'pce-pvtabs', role: 'group', 'aria-label': '미리보기 및 직접 수정 전환' }, [
+          btnViewPaper, btnViewEdit
         ])
       ]),
+      paperPane,
+      editPane
+    ]);
+
+    var md = domEl(doc, 'div', { 'class': 'pce-m wiz', role: 'dialog', 'aria-modal': 'true', 'aria-label': '쉽게 새 양식 만들기' }, [
+      domEl(doc, 'div', { 'class': 'pce-mh' }, [
+        domEl(doc, 'b', { text: '✨ 쉽게 새 양식 만들기 — ① 방법 선택 → ② 내용 생성 → ③ 종이 확인 후 저장' }),
+        domEl(doc, 'button', { type: 'button', 'class': 'pce-x', 'aria-label': '닫기', text: '×', onclick: function () { close(); } })
+      ]),
+      domEl(doc, 'div', { 'class': 'pce-mb' }, [
+        domEl(doc, 'div', { 'class': 'pce-wizgrid' }, [leftCol, rightCol])
+      ]),
       domEl(doc, 'div', { 'class': 'pce-mf' }, [
+        domEl(doc, 'span', { 'class': 'pce-sub', style: 'margin-right:auto', text: '① → ② → ③ 순서대로 진행하면 공용 양식함과 하위 세트에 한 번에 등록됩니다.' }),
         domEl(doc, 'button', { type: 'button', 'class': 'pce-btn', text: '취소', onclick: function () { close(); } }),
         btnSave
       ])
@@ -2952,8 +3320,18 @@
     bg.appendChild(md);
     doc.body.appendChild(bg);
     unbindKeys = bindModalKeys(doc, md, function () { close(); });
-    if (ctx.initialMode === 'creative') setMode('creative');
-    try { nameIn.focus(); } catch (_) {}
+    syncMetaSummary();
+    renderPaperPreview();
+    if (ctx.initialMode === 'assemble' || ctx.initialMode === 'creative' || ctx.initialMode === 'convert') {
+      setMode(ctx.initialMode);
+    } else {
+      setMode('convert');
+    }
+    try {
+      if (mode === 'creative') wizPromptIn.focus();
+      else if (mode === 'assemble') nameIn.focus();
+      else filePickBtn.focus();
+    } catch (_) {}
     return { close: close };
   }
 
