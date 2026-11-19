@@ -71,7 +71,8 @@
 :where(body.pu-design.pu-frame-a) button:hover:where(:not(:disabled)){border-color:var(--pu-acc-m)}
 :where(body.pu-design.pu-frame-a) button.pri{box-shadow:var(--pu-sh-acc)}
 :where(body.pu-design.pu-frame-a) button.pri:hover:not(:disabled){background:var(--pu-acc2);border-color:var(--pu-acc2);color:#ffffff}
-:where(body.pu-design.pu-frame-a) :where(input,select,textarea){border-radius:10px;border-color:var(--pu-line2)}
+/* ⚠ input 을 :where 로 또 감싸면 세기가 0 이 되어 앱의 input{border-radius:7px} 에 진다(자동 검토 2026-11-19) — 하나씩 적는다 */
+:where(body.pu-design.pu-frame-a) input,:where(body.pu-design.pu-frame-a) select,:where(body.pu-design.pu-frame-a) textarea{border-radius:10px;border-color:var(--pu-line2)}
 :where(body.pu-design.pu-frame-a) :where(input,select,textarea):focus{border-color:var(--pu-acc);outline:2px solid var(--pu-acc-l);outline-offset:0}
 
 /* 상자 — 둥근 카드 + 옅은 그림자 */
@@ -98,6 +99,8 @@
 /* 달 고르개 — 목업 월 알약(.mpill): 고른 달은 파랑으로 채운다 */
 :where(body.pu-design.pu-frame-a) .mo{border-radius:var(--pu-r-pill)}
 :where(body.pu-design.pu-frame-a) .mo.on{background:var(--pu-acc);border:1px solid var(--pu-acc);color:#ffffff;padding:5px 2px;box-shadow:var(--pu-sh-acc)}
+/* 파랑 위 상태 점(할 일 노랑·끝 초록)은 대비가 1.6 이라 흰 테두리를 두른다 */
+:where(body.pu-design.pu-frame-a) .mo.on .dot{box-shadow:0 0 0 2px #ffffff}
 :where(body.pu-design.pu-frame-a) .subtabs button.on{background:var(--pu-acc-soft);border-color:var(--pu-acc);color:var(--pu-acc2);font-weight:800}
 
 /* 알림·창 */

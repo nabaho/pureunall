@@ -107,12 +107,15 @@ test('④-2 앱 안 디자인 덩어리도 body.pu-design 아래에서만 먹는
   });
 });
 
-test('⑤ 입력칸 글자 크기는 건드리지 않는다', () => {
-  const css = noComments(R(CSS_FILE));
-  const bad = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(m => /\b(input|select|textarea)\b/.test(m[1]) && /font-size\s*:/.test(m[2]))
-    .map(m => m[1].trim());
-  assert.deepEqual(bad, []);
+test('⑤ 입력칸 글자 크기는 건드리지 않는다 — 공용 파일과 앱 안 디자인 덩어리 모두', () => {
+  const blocks = [[CSS_FILE, R(CSS_FILE)]];
+  appsUsing().forEach(f => { const b = appBlock(R(f)); if (b) blocks.push([f + ' 디자인 덩어리', b]); });
+  blocks.forEach(([name, src]) => {
+    const bad = [...noComments(src).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(m => /\b(input|select|textarea)\b/.test(m[1]) && /font-size\s*:/.test(m[2]))
+      .map(m => m[1].trim());
+    assert.deepEqual(bad, [], name);
+  });
 });
 
 test('⑥ 켠 앱 — 자기 <style> 뒤에 싣고 <body> 에 pu-design 을 단다 (둘은 함께)', () => {
@@ -121,8 +124,9 @@ test('⑥ 켠 앱 — 자기 <style> 뒤에 싣고 <body> 에 pu-design 을 단�
   using.forEach(f => {
     const h = R(f);
     const link = h.search(/<link[^>]+href="css\/pu-design\.css/);
-    const firstStyleEnd = h.indexOf('</style>');
-    assert.ok(firstStyleEnd > 0 && link > firstStyleEnd, f + ': 자기 <style> 뒤에 실어야 같은 세기에서 이긴다');
+    /* <head> 안의 «마지막» <style> 뒤 — 앱 <style> 이 여럿이어도 모두 뒤에 와야 같은 세기에서 이긴다 */
+    const lastStyleEnd = h.slice(0, h.indexOf('</head>')).lastIndexOf('</style>');
+    assert.ok(lastStyleEnd > 0 && link > lastStyleEnd, f + ': 자기 <style> 뒤에 실어야 같은 세기에서 이긴다');
     assert.ok(link < h.indexOf('</head>'), f + ': <head> 안에 싣는다');
     const body = bodyTag(h);
     assert.match(body, /class="[^"]*\bpu-design\b/, f + ': <body> 에 pu-design 이 없다 — 실어도 안 먹는다');
