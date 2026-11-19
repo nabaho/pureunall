@@ -22,7 +22,10 @@ const args = process.argv.slice(2);
 let out = path.join(os.homedir(), 'Desktop', '법정교육자료함_PC목록_' + new Date().toISOString().slice(0, 10) + '.json');
 const roots = [];
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--out') { out = args[++i]; continue; }
+  if (args[i] === '--out') {
+    if (!args[i + 1] || args[i + 1].startsWith('--')) { console.error('--out 뒤에 저장할 파일 이름을 적어 주세요'); process.exit(2); }
+    out = args[++i]; continue;
+  }
   roots.push(args[i]);
 }
 if (!roots.length) for (const d of ['C', 'D', 'E', 'F', 'H']) if (fs.existsSync(d + ':\\')) roots.push(d + ':\\');
@@ -74,10 +77,9 @@ for (const f of found) {
   if (first) (first.copies || (first.copies = [])).push(f.path);
   else byKey.set(k, f);
 }
-const list = [...byKey.values()].map(f => Object.assign(f, {
-  /* 화면에 보일 경로 — 내 PC 사용자 폴더는 «~» 로 줄인다 */
-  path: f.path.toLowerCase().startsWith(HOME) ? '~' + f.path.slice(HOME.length) : f.path
-}));
+/* 화면에 보일 경로 — 내 PC 사용자 폴더는 «~» 로 줄인다(대표 자리·같은 파일의 다른 자리 모두) */
+const short = p => p.toLowerCase().startsWith(HOME) ? '~' + p.slice(HOME.length) : p;
+const list = [...byKey.values()].map(f => Object.assign(f, { path: short(f.path) }, f.copies ? { copies: f.copies.map(short) } : {}));
 fs.writeFileSync(out, JSON.stringify({ kind: 'edulib-pc-list', version: 1, made: new Date().toISOString(),
   count: list.length, items: list }, null, 1));
 

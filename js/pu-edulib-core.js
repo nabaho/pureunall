@@ -22,7 +22,9 @@
   /* 개체 이름은 온톨로지 사전(PuOntology.TERMS.entityTypes)에 먼저 올라 있어야 한다 — 없으면 관문이 저장을 거절한다 */
   var ENTITY = 'EduMaterial';
   var NOTE_ENTITY = 'EduReviewNote';
-  var SCHEMA = 1;
+  /* 자료 구조 판 — 온톨로지 사전의 판(PuOntology.VERSION)을 따른다. 저장할 때는 공용 관문(prepareRecord)이
+     schemaVersion·contractVersion·revision·시각을 «다시» 찍으므로, 여기 값은 관문을 거치기 전 모양을 맞추는 것뿐이다. */
+  var SCHEMA = (typeof self !== 'undefined' && self.PuOntology && +self.PuOntology.VERSION) || 1;
   var STATUS = { review: '검토 대기', ok: '참고 가능', old: '옛 자료' };
   var STORE = { cloud: '자료함', pc: 'PC에만', mail: '메일함' };
   var KIND_LABEL = { doc: '문서', video: '영상', audio: '소리', image: '그림', archive: '압축', other: '기타' };
@@ -37,7 +39,8 @@
     var m = d.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/);
     if (!m) return false;
     var y = +m[1], mo = m[2] ? +m[2] : 1, da = m[3] ? +m[3] : 1;
-    return y >= 1990 && y <= 2100 && mo >= 1 && mo <= 12 && da >= 1 && da <= 31;
+    var dim = new Date(Date.UTC(y, mo, 0)).getUTCDate();          /* 그 달의 날수 — 2026-02-31 은 받지 않는다 */
+    return y >= 1990 && y <= 2100 && mo >= 1 && mo <= 12 && da >= 1 && da <= dim;
   }
 
   function newId(now) {

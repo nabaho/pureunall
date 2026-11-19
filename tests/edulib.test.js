@@ -28,6 +28,16 @@ test('날짜 — 이름에 있는 만큼만 읽고, 없으면 null', () => {
   assert.equal(C.dateFromText('2018'), '2018');
   assert.equal(C.dateFromText('직장내성희롱예방교육자료'), null);
   assert.equal(C.dateFromText('2024.13.40'), '2024', '없는 달·날은 날짜로 만들지 않는다');
+  assert.notEqual(C.dateFromText('2026.02.31 강의'), '2026-02-31', '그 달에 없는 날(2월 31일)은 날짜로 만들지 않는다');
+  const next = new Date().getFullYear() + 1;
+  assert.equal(C.dateFromText(next + '년 강의 준비'), String(next), '다음 해 준비 자료의 연도도 읽는다(상한을 숫자로 박지 않는다)');
+});
+
+test('강의일 모양 검사 — 그 달의 날수를 넘으면 받지 않는다', () => {
+  assert.equal(Core.okDate('2026-02-28'), true);
+  assert.equal(Core.okDate('2026-02-31'), false);
+  assert.equal(Core.okDate('2024-02-29'), true, '윤년');
+  assert.equal(Core.okDate(''), true, '빈 값은 «모름»');
 });
 
 test('경로 판정 — 강의 폴더는 A, 이름만 강의면 B, 회의자료·증명서는 뺀다', () => {

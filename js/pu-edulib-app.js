@@ -12,7 +12,7 @@
   var FB_CONFIG = { apiKey: 'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA', authDomain: 'pureun-erp.firebaseapp.com', databaseURL: 'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app', projectId: 'pureun-erp', appId: '1:936817166182:web:9bd31f70d0afdf5fca2aa7', messagingSenderId: '936817166182' };
   var BUCKET = 'gs://pureun-erp-hrphotos';
   var MB_FN = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/';
-  var MAX_UPLOAD = 1024 * 1024 * 1024;          /* 창고 규칙과 같은 한도(1GB) — 넘으면 «목록만, 원본은 PC» */
+  var MAX_UPLOAD = 1024 * 1024 * 1024;          /* 창고 규칙과 같은 한도 — 규칙이 «1GB 미만»이므로 여기서도 «< MAX_UPLOAD» 만 올린다. 아니면 «목록만, 원본은 PC» */
   var MAX_HASH = 200 * 1024 * 1024;             /* 지문(sha256)은 200MB 까지만 잰다 — 큰 파일은 이름+크기로 같은지 본다 */
   var MAX_CMP = 4;                              /* 나란히 보기 한 화면 최대 칸 */
   var MAX_WIN = 6;                              /* 새 창으로 한 번에 여는 최대 수 */
@@ -102,13 +102,16 @@
       h += '<tr><th>' + esc(y === 'none' ? '모름' : y) + '</th>';
       cols.forEach(function (c) {
         var n = row[c.key] || 0; sum += n;
-        h += n ? '<td class="c" data-y="' + esc(y) + '" data-cat="' + esc(c.key) + '">' + n + '</td>' : '<td class="z">·</td>';
+        h += n ? '<td class="c" role="button" tabindex="0" aria-label="' + esc((y === 'none' ? '강의일 모름' : y + '년') + ' ' + c.label + ' ' + n + '건') + '" data-y="' + esc(y) + '" data-cat="' + esc(c.key) + '">' + n + '</td>' : '<td class="z">·</td>';
       });
       h += '<td><b>' + sum + '</b></td></tr>';
     });
     $('mx').innerHTML = h + '</tbody></table>';
   }
-  function kpi(n, label, store) { return '<div class="kpi"' + (store ? ' data-store="' + esc(store) + '" style="cursor:pointer"' : '') + '><b>' + n + '</b><span>' + esc(label) + '</span></div>'; }
+  function kpi(n, label, store) {
+    return store ? '<button type="button" class="kpi" data-store="' + esc(store) + '" title="이것만 목록으로"><b>' + n + '</b><span>' + esc(label) + '</span></button>'
+      : '<div class="kpi"><b>' + n + '</b><span>' + esc(label) + '</span></div>';
+  }
 
   /* ───────── 자료 목록 ───────── */
   function fillFilters() {
@@ -146,9 +149,9 @@
           '<td class="no">' + n + '</td>' +
           '<td class="dt">' + dateCell(it) + '</td>' +
           '<td class="ct"><span class="one"><span title="' + esc(catLabel(it.cat)) + '">' + esc(catLabel(it.cat)) + '</span>' + (C.catByKey(it.cat).legal ? '<span class="tag legal">법정</span>' : '') + '</span></td>' +
-          '<td class="tt"><span class="one"><span class="ttl" data-open="' + esc(it.id) + '" title="' + esc(it.title + ' — ' + it.fileName) + '">' + esc(it.title) + '</span></span></td>' +
+          '<td class="tt"><span class="one"><button type="button" class="ttl" data-open="' + esc(it.id) + '" title="' + esc(it.title + ' — ' + it.fileName) + '">' + esc(it.title) + '</button></span></td>' +
           '<td class="vn" title="' + esc(it.venue) + '">' + esc(it.venue) + '</td>' +
-          '<td class="fm">' + esc((it.ext || '').toUpperCase() + ' · ' + K.fmtBytes(it.size)) + '</td>' +
+          '<td class="fm" title="' + esc(it.fileName + ' · ' + K.fmtBytes(it.size)) + '">' + esc((it.ext || '').toUpperCase() + ' · ' + K.fmtBytes(it.size)) + '</td>' +
           '<td class="st"><span class="one">' + statusTags(it) + '</span></td>' +
           '<td class="ac">' + (it._wasDeleted ? '<span class="hint">' + esc(ymd(it.deletedAt)) + ' 지움</span>' :
             '<button class="sm" data-open="' + esc(it.id) + '" title="자세히·검토">👁</button> <button class="sm" data-win="' + esc(it.id) + '" title="새 창으로 열기">🪟</button>') + '</td>' +
@@ -158,6 +161,8 @@
       h += '</tbody></table>';
     });
     if (rows.length > SHOWN) h += '<button class="more" id="moreBtn">더 보기 (' + (rows.length - SHOWN) + '건 남음)</button>';
+    /* 폰에서는 표 머리줄(☐)이 숨으므로 «보이는 줄 모두 고르기»를 따로 둔다 */
+    if (RENDERED.length) h = '<label class="phone-only hint" style="margin:2px 0 6px"><input type="checkbox" data-allv> 보이는 ' + RENDERED.length + '줄 모두 고르기</label>' + h;
     $('list').innerHTML = h;
     drawSel();
   }
@@ -168,6 +173,13 @@
     $('selN').textContent = ids.length + '건 선택';
     $('sRestore').style.display = F.trash ? '' : 'none';
     ['sCmp', 'sWin', 'sCat', 'sOk', 'sDel'].forEach(function (b) { $(b).style.display = F.trash ? 'none' : ''; });
+    /* 머리줄 ☐ 는 «그 묶음에서 보이는 줄이 다 골라졌을 때만» 켜진다 — 한 줄을 풀면 함께 풀린다 */
+    [].forEach.call(document.querySelectorAll('#list [data-allg]'), function (c) {
+      var rs = document.querySelectorAll('#list tr[data-g="' + CSS.escape(c.getAttribute('data-allg')) + '"]');
+      c.checked = rs.length > 0 && [].every.call(rs, function (tr) { return !!PICK[tr.getAttribute('data-id')]; });
+    });
+    var av = document.querySelector('#list [data-allv]');
+    if (av) av.checked = RENDERED.length > 0 && RENDERED.every(function (id) { return !!PICK[id]; });
   }
 
   /* ───────── 저장(관문) ───────── */
@@ -280,6 +292,10 @@
       post(f, { t: 'close' }); return false;
     });
   }
+  /* PC 파일을 «올리지 않고 보기»로 연 주소 — 칸을 닫을 때 풀어 준다(메모리에 남지 않게) */
+  var OBJURLS = [];
+  function objUrl(file) { var u = URL.createObjectURL(file); OBJURLS.push(u); return u; }
+  function freeObjUrls() { OBJURLS.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); OBJURLS = []; }
   var _zipP = null;
   function loadZip() {
     if (window.JSZip) return Promise.resolve(window.JSZip);
@@ -331,7 +347,7 @@
       return;
     }
     if (kind === 'video' || kind === 'audio' || kind === 'image') {
-      var urlP = localFile ? Promise.resolve(URL.createObjectURL(localFile)) : urlOf(it);
+      var urlP = localFile ? Promise.resolve(objUrl(localFile)) : urlOf(it);
       urlP.then(function (u) {
         body.innerHTML = '';
         var el = document.createElement(kind === 'image' ? 'img' : kind);
@@ -413,7 +429,7 @@
   }
   function closeCompare() {
     if (!$('cmp').classList.contains('on')) return;
-    closeFrames($('cmpGrid')); $('cmpGrid').innerHTML = ''; $('cmp').classList.remove('on');
+    closeFrames($('cmpGrid')); $('cmpGrid').innerHTML = ''; $('cmp').classList.remove('on'); freeObjUrls();
     if (VIEW_ID) { VIEW_ID = ''; try { history.replaceState(null, '', location.pathname); } catch (e) {} }
   }
   function openWin(id) {
@@ -455,9 +471,12 @@
       '<div class="bar" style="margin-top:4px"><span class="sp"></span><button class="sm" id="dNoteAdd">메모 남기기</button></div></div>' +
       '</div></div>' +
       '<div class="mfoot">' +
-      (it.store !== 'cloud' ? '<button id="dUp" title="이 PC 의 원본 파일을 골라 자료함에 올립니다(바꾸지 않고 그대로)">📤 원본 올리기</button>' : '<button id="dDl">⬇ 원본 내려받기</button>') +
-      '<button id="dWin">🪟 새 창으로</button><button class="dng" id="dDel">🗑 휴지통으로</button><span class="sp"></span>' +
-      '<button id="dCancel">닫기</button><button class="pri" id="dSave">저장</button></div>';
+      /* 휴지통에 있는 자료 — 고치기·휴지통 대신 «되살리기»만(원본 내려받기는 그대로) */
+      (it._deleted ? '<span class="tag old">' + esc(ymd(it.deletedAt)) + ' ' + esc(nameOf(it.deletedBy)) + ' 지움</span>' +
+        (it.store === 'cloud' ? '<button id="dDl">⬇ 원본 내려받기</button>' : '') + '<span class="sp"></span><button id="dCancel">닫기</button><button class="pri" id="dRestore">↩ 되살리기</button></div>'
+      : (it.store !== 'cloud' ? '<button id="dUp" title="이 PC 의 원본 파일을 골라 자료함에 올립니다(바꾸지 않고 그대로)">📤 원본 올리기</button>' : '<button id="dDl">⬇ 원본 내려받기</button>') +
+        '<button id="dWin">🪟 새 창으로</button><button class="dng" id="dDel">🗑 휴지통으로</button><span class="sp"></span>' +
+        '<button id="dCancel">닫기</button><button class="pri" id="dSave">저장</button></div>');
     $('modal').style.display = 'flex';
     makePane($('dView'), it, { inDetail: true });
     loadNotes(id);
@@ -466,6 +485,7 @@
   function closeDetail() {
     if ($('modal').style.display === 'none') return;
     closeFrames($('mbox')); $('modal').style.display = 'none'; $('mbox').innerHTML = ''; DETAIL = '';
+    if (!$('cmp').classList.contains('on')) freeObjUrls();
   }
   function saveDetail() {
     var it = ITEMS[DETAIL]; if (!it) return;
@@ -525,9 +545,10 @@
   /* PC 에만 있던 기록에 원본을 붙인다 — 같은 파일인지(이름·크기) 먼저 본다 */
   function attachOriginal(id, file, onPct) {
     var it = ITEMS[id]; if (!it) return Promise.reject(new Error('자료를 찾지 못했습니다'));
-    if (file.size > MAX_UPLOAD) return Promise.reject(new Error('1GB 가 넘어 올리지 않습니다'));
+    if (file.size >= MAX_UPLOAD) return Promise.reject(new Error('1GB 가 넘어 올리지 않습니다'));
     return sha256(file).then(function (h) {
-      if (h) { var same = K.findSame(list().filter(function (x) { return x.store === 'cloud'; }), { sha256: h }); if (same) throw new Error('같은 파일이 이미 자료함에 있습니다: ' + same.items[0].title); }
+      /* 같은 파일 찾기는 넣기·메일과 «같은 범위»(지운 것 뺀 전체)에서 한다 — 자기 자신은 뺀다 */
+      if (h) { var same = K.findSame(list().filter(function (x) { return x.id !== id; }), { sha256: h }); if (same && same.how === 'sha256') throw new Error('같은 파일이 이미 자료함에 있습니다: ' + same.items[0].title); }
       return uploadBlob(id, file, it.fileName || file.name, onPct).then(function (path) {
         return saveRaw(id, function (prev) {
           if (!prev) return prev;
@@ -558,7 +579,7 @@
     var arr = [].slice.call(files || []);
     var added = 0, skipped = 0;
     arr.forEach(function (f) {
-      var rel = f.webkitRelativePath || f.name;
+      var rel = f.webkitRelativePath || f._rel || f.name;          /* _rel — 끌어놓은 폴더에서 경로를 못 붙였을 때의 대신 자리(readDrop) */
       if (/^~\$/.test(f.name) || /^\./.test(f.name)) { skipped++; return; }
       var r = C.classifyPath(rel);
       var cat = r.tier ? r.cat : C.catOfText(rel);
@@ -582,7 +603,7 @@
       if (pc && row.src === 'file') { row.match = pc.id; row.note = 'PC 목록에 있음 → 원본만 붙임'; }
       else { row.dup = true; row.pick = false; row.note = '이미 있음: ' + same.items[0].title; }
     }
-    if (row.src === 'file' && row.size > MAX_UPLOAD) { row.note = (row.note ? row.note + ' · ' : '') + '1GB 넘음 — 목록만(원본 PC)'; }
+    if (row.src === 'file' && row.size >= MAX_UPLOAD) { row.note = (row.note ? row.note + ' · ' : '') + '1GB 넘음 — 목록만(원본 PC)'; }
   }
   function stagePcList(json) {
     var items = json && json.kind === 'edulib-pc-list' && Array.isArray(json.items) ? json.items : null;
@@ -613,7 +634,11 @@
     $('stSave').textContent = '고른 ' + nPick + '건 저장';
     var catOpts = function (v) { return C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '"' + (c.key === v ? ' selected' : '') + '>' + esc(c.label) + '</option>'; }).join(''); };
     var show = STAGE.slice(0, 600);
-    var h = '<table class="lst"><thead><tr><th class="ck"><input type="checkbox" id="stAll" title="보이는 줄 모두 고르기"></th><th class="no">№</th>' +
+    /* 머리줄 ☐ 는 «보이는(아직 저장 안 한) 줄이 다 골라졌을 때만» 켜진다 — 다시 그려도 상태를 잃지 않고, 한 줄을 풀면 함께 풀린다 */
+    var open = show.filter(function (r) { return !r.state; });
+    var allOn = open.length > 0 && open.every(function (r) { return r.pick; }) ? ' checked' : '';
+    var h = '<label class="phone-only hint" style="margin:2px 0 6px"><input type="checkbox" id="stAllP"' + allOn + '> 보이는 줄 모두 고르기</label>' +
+      '<table class="lst stg"><thead><tr><th class="ck"><input type="checkbox" id="stAll"' + allOn + ' title="보이는 줄 모두 고르기" aria-label="보이는 줄 모두 고르기"></th><th class="no">№</th>' +
       '<th class="tt">파일</th><th class="ct">종류</th><th class="dt">강의일</th><th class="vn">강의처</th><th class="fm">크기</th><th class="st">알림</th></tr></thead><tbody>';
     show.forEach(function (r, i) {
       h += '<tr data-sk="' + esc(r.key) + '"' + (r.pick ? ' class="picked"' : '') + '>' +
@@ -641,7 +666,7 @@
     if (!rows.length) { toast('고른 줄이 없습니다'); return; }
     var bad = rows.filter(function (r) { return !K.okDate(r.lectureDate); });
     if (bad.length) { toast('강의일 모양이 틀린 줄이 ' + bad.length + '건 있습니다(2026-11-19 · 2026-11 · 2026)', 7000); return; }
-    var up = rows.filter(function (r) { return r.src === 'file' && r.size <= MAX_UPLOAD; }).length;
+    var up = rows.filter(function (r) { return r.src === 'file' && r.size < MAX_UPLOAD; }).length;
     if (!window.confirm(rows.length + '건을 저장할까요?\n· 원본 올리기 ' + up + '건(바꾸지 않고 그대로)\n· 목록만 ' + (rows.length - up) + '건(원본은 PC 에)')) return;
     var done = 0, fail = 0, total = rows.length;
     var bar = $('stProg'); bar.style.display = ''; var fill = bar.firstElementChild;
@@ -652,8 +677,8 @@
         function (e) { r.state = 'err'; r.err = errMsg(e); fail++; step(r); });
     }
     /* 목록만 저장하는 줄은 8건씩 함께(한 건마다 관문 트랜잭션), 원본을 올리는 줄은 하나씩 차례로 — 큰 파일이 겹치지 않게 */
-    var meta = rows.filter(function (r) { return !(r.src === 'file' && r.size <= MAX_UPLOAD); });
-    var ups = rows.filter(function (r) { return r.src === 'file' && r.size <= MAX_UPLOAD; });
+    var meta = rows.filter(function (r) { return !(r.src === 'file' && r.size < MAX_UPLOAD); });
+    var ups = rows.filter(function (r) { return r.src === 'file' && r.size < MAX_UPLOAD; });
     function pool(list, n) {
       var i = 0;
       function worker() { if (i >= list.length) return Promise.resolve(); var r = list[i++]; return one(r).then(worker); }
@@ -669,11 +694,13 @@
   }
   function saveStageRow(r, onPct) {
     if (r.match && r.src === 'file') return attachOriginal(r.match, r.file, onPct);
-    var it = K.makeItem({ fileName: r.fileName, size: r.size, cat: r.cat, lectureDate: r.lectureDate,
+    /* 기록 id 는 줄마다 «한 번만» 정한다 — 원본은 올라가고 기록 저장만 실패해 다시 누르면 같은 창고 자리를 이어 쓴다(새 사본을 또 올리지 않는다) */
+    if (!r.itemId) r.itemId = K.newId();
+    var it = K.makeItem({ id: r.itemId, fileName: r.fileName, size: r.size, cat: r.cat, lectureDate: r.lectureDate,
       dateFrom: r.lectureDate ? (r.dateFrom || 'name') : '', venue: r.venue, title: r.title, pii: r.pii, status: 'review', store: 'pc',
       source: { kind: r.src === 'pclist' ? 'pc' : 'upload', path: r.rel, mtime: r.mtime || (r.file && r.file.lastModified ? ymd(r.file.lastModified) : '') } },
       { uid: ME.sid });
-    if (r.src !== 'file' || r.size > MAX_UPLOAD) return saveNew(it);
+    if (r.src !== 'file' || r.size >= MAX_UPLOAD) return saveNew(it);
     return sha256(r.file).then(function (h) {
       if (h) {
         var same = K.findSame(list(), { sha256: h, fileName: r.fileName, size: r.size });
@@ -743,16 +770,22 @@
     var nPick = Object.keys(MPICK).filter(function (k) { return MPICK[k]; }).length;
     $('mN').textContent = '찾은 첨부 ' + MAIL.length + '건 · ' + nPick + '건 고름';
     $('mImp').textContent = '고른 ' + nPick + '건 가져오기';
-    var h = '<table class="lst"><thead><tr><th class="ck"><input type="checkbox" id="mAll" title="보이는 줄 모두 고르기"></th><th class="no">№</th>' +
-      '<th class="dt">메일 날짜</th><th class="tt">제목</th><th class="vn">첨부</th><th class="ct">추정 종류</th><th class="vn">보낸이·받는이</th><th class="st">알림</th></tr></thead><tbody>';
+    var shown = mailShown();
+    /* 머리줄 ☐ — 고를 수 있는 줄(이미 가져온 것·개인정보? 뺀 것)이 다 골라졌을 때만 켜진다 */
+    var can = rows.filter(function (r) { return !r.have && !r.pii; });
+    var mOn = can.length > 0 && can.every(function (r) { return !!MPICK[r.id]; }) ? ' checked' : '';
+    var h = (shown.length > rows.length ? '<div class="hint" style="margin-bottom:6px">앞 ' + rows.length + '건만 보입니다(모두 ' + shown.length + '건) — 위 «찾기»로 좁혀 주세요.</div>' : '') +
+      '<label class="phone-only hint" style="margin:2px 0 6px"><input type="checkbox" id="mAllP"' + mOn + '> 보이는 줄 모두 고르기(개인정보? 빼고)</label>' +
+      '<table class="lst ml"><thead><tr><th class="ck"><input type="checkbox" id="mAll"' + mOn + ' title="보이는 줄 모두 고르기(개인정보? 빼고)" aria-label="보이는 줄 모두 고르기"></th><th class="no">№</th>' +
+      '<th class="dt">메일 날짜</th><th class="tt">제목</th><th class="att">첨부</th><th class="ct">추정 종류</th><th class="who">보낸이·받는이</th><th class="st">알림</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
       var on = !!MPICK[r.id];
       h += '<tr' + (on ? ' class="picked"' : '') + '><td class="ck"><input type="checkbox" data-mpick="' + esc(r.id) + '"' + (on ? ' checked' : '') + (r.have ? ' disabled' : '') + '></td>' +
         '<td class="no">' + (i + 1) + '</td><td class="dt">' + esc(ymd(r.d)) + '</td>' +
         '<td class="tt" title="' + esc(r.s) + '">' + esc(r.s) + '</td>' +
-        '<td class="vn" title="' + esc(r.att || '첨부 이름 모름 — 가져올 때 확인') + '">' + esc(r.att || '(가져올 때 확인)') + '</td>' +
+        '<td class="att" title="' + esc(r.att || '첨부 이름 모름 — 가져올 때 확인') + '">' + esc(r.att || '(가져올 때 확인)') + '</td>' +
         '<td class="ct">' + esc(catLabel(r.cat)) + '</td>' +
-        '<td class="vn" title="' + esc(r.who) + '">' + esc(r.who) + '</td>' +
+        '<td class="who" title="' + esc(r.who) + '">' + esc(r.who) + '</td>' +
         '<td class="st"><span class="one">' + (r.have ? '<span class="tag ok">이미 가져옴</span>' : '') + (r.pii ? '<span class="tag pii">개인정보?</span>' : '') +
           (r.state === 'done' ? '<span class="tag ok">가져옴</span>' : r.state === 'err' ? '<span class="tag pii" title="' + esc(r.err) + '">못 함</span>' : '') +
           '<span>' + esc(r.folder) + '</span></span></td>' +
@@ -795,7 +828,9 @@
             var name = String(got.name || a.name || '첨부');
             var blob = new Blob([b64ToBytes(got.b64)], { type: got.mime || 'application/octet-stream' });
             var date = C.dateFromText(name.replace(/\.[^.]+$/, '')) || C.dateFromText(r.s);
-            var it = K.makeItem({ fileName: name, size: blob.size, cat: C.catOfText(name) !== 'etc' ? C.catOfText(name) : r.cat,
+            r.ids = r.ids || {};
+            if (!r.ids[a.i]) r.ids[a.i] = K.newId();                /* 다시 가져와도 같은 id·같은 창고 자리 — 중복 사본을 만들지 않는다 */
+            var it = K.makeItem({ id: r.ids[a.i], fileName: name, size: blob.size, cat: C.catOfText(name) !== 'etc' ? C.catOfText(name) : r.cat,
               lectureDate: date || ymd(r.d), dateFrom: date ? 'name' : (r.d ? 'mail' : ''), title: name.replace(/\.[^.]+$/, ''),
               pii: C.classifyMail(r.s, name, '') ? C.classifyMail(r.s, name, '').pii : false, status: 'review', store: 'cloud',
               source: { kind: 'mail', mailId: r.mailId, mailSubject: r.s.slice(0, 300), mailDate: ymd(r.d) } }, { uid: ME.sid });
@@ -845,6 +880,7 @@
     $('list').addEventListener('change', function (e) {
       var c = e.target;
       if (c.hasAttribute('data-pick')) { PICK[c.getAttribute('data-pick')] = c.checked; c.closest('tr').classList.toggle('picked', c.checked); drawSel(); }
+      else if (c.hasAttribute('data-allv')) { RENDERED.forEach(function (id) { PICK[id] = c.checked; }); drawList(); }
       else if (c.hasAttribute('data-allg')) {
         var g = c.getAttribute('data-allg');
         [].forEach.call(document.querySelectorAll('#list tr[data-g="' + CSS.escape(g) + '"]'), function (tr) {
@@ -888,10 +924,25 @@
       else if (id === 'dDl') downloadOriginal(ITEMS[DETAIL]);
       else if (id === 'dWin') openWin(DETAIL);
       else if (id === 'dUp') detailUpload();
+      else if (id === 'dRestore') { var rd = DETAIL; restoreItem(rd).then(function () { toast('되살렸습니다'); closeDetail(); }, function (er) { toast('되살리지 못했습니다 — ' + errMsg(er), 7000); }); }
       else if (id === 'dDel') { var d = DETAIL; if (window.confirm('휴지통으로 옮길까요? (원본은 지우지 않습니다 · 휴지통에서 되살릴 수 있습니다)')) trashItem(d).then(function () { toast('휴지통으로 옮겼습니다'); closeDetail(); }, function (er) { toast('옮기지 못했습니다 — ' + errMsg(er), 7000); }); }
     });
     $('cmpX').addEventListener('click', closeCompare);
     $('cmpCols').addEventListener('click', function () { CMP_ONE_ROW = !CMP_ONE_ROW; layoutCompare(); });
+    /* 키보드 — Esc 로 위의 창을 닫고, 단추 노릇을 하는 칸(role=button)은 Enter·Space 로 누른다 */
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if ($('modal').style.display !== 'none') { closeDetail(); e.preventDefault(); }
+        else if ($('cmp').classList.contains('on')) { closeCompare(); e.preventDefault(); }
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.getAttribute && e.target.getAttribute('role') === 'button' && e.target.tagName !== 'BUTTON') {
+        e.preventDefault(); e.target.click();
+      }
+    });
+    /* 선택 줄이 머리 바로 아래에 붙도록 머리 높이를 잰다(폰에서 머리가 두 줄이 되면 76px 로는 가려졌다) */
+    function headH() { try { document.documentElement.style.setProperty('--headH', $('head').offsetHeight + 'px'); } catch (e) {} }
+    headH(); window.addEventListener('resize', headH); setTimeout(headH, 800);
     /* 뒤로 가기는 공용 PuBack 이 «닫기» 단추를 눌러 준다(pu-edulib.html 의 PuBack.guard) — 여기서 따로 history 를 만지지 않는다 */
 
     /* 넣기 */
@@ -913,7 +964,7 @@
     });
     $('stage').addEventListener('change', function (e) {
       var t = e.target, r;
-      if (t.id === 'stAll') { [].forEach.call(document.querySelectorAll('#stage [data-spick]'), function (cb) { var x = stageRow(cb.getAttribute('data-spick')); if (x && !x.state) { x.pick = t.checked; } }); drawStage(); return; }
+      if (t.id === 'stAll' || t.id === 'stAllP') { [].forEach.call(document.querySelectorAll('#stage [data-spick]'), function (cb) { var x = stageRow(cb.getAttribute('data-spick')); if (x && !x.state) { x.pick = t.checked; } }); drawStage(); return; }
       if (t.hasAttribute('data-spick') && (r = stageRow(t.getAttribute('data-spick')))) { r.pick = t.checked; drawStage(); }
       else if (t.hasAttribute('data-scat') && (r = stageRow(t.getAttribute('data-scat')))) r.cat = t.value;
       else if (t.hasAttribute('data-sdate') && (r = stageRow(t.getAttribute('data-sdate')))) { r.lectureDate = t.value.trim(); r.dateFrom = r.lectureDate ? 'manual' : ''; if (!K.okDate(r.lectureDate)) toast('강의일은 2026-11-19 · 2026-11 · 2026 꼴로'); }
@@ -930,7 +981,8 @@
     $('mQ').addEventListener('input', function () { clearTimeout(mq); mq = setTimeout(function () { MQ = $('mQ').value; MPICK = {}; drawMail(); }, 200); });
     $('mList').addEventListener('change', function (e) {
       var t = e.target;
-      if (t.id === 'mAll') { mailShown().slice(0, 800).forEach(function (r) { if (!r.have) MPICK[r.id] = t.checked; }); drawMail(); return; }
+      /* 머리줄 ☐ 는 «개인정보?»(명단·서명지) 첨부는 고르지 않는다 — 그런 줄은 하나씩 보고 고른다 */
+      if (t.id === 'mAll' || t.id === 'mAllP') { mailShown().slice(0, 800).forEach(function (r) { if (!r.have && !r.pii) MPICK[r.id] = t.checked; }); drawMail(); return; }
       if (t.hasAttribute('data-mpick')) { MPICK[t.getAttribute('data-mpick')] = t.checked; drawMail(); }
     });
   }
@@ -943,7 +995,8 @@
     if (!entries.length) return Promise.resolve([].slice.call((dt && dt.files) || []));
     var out = [];
     function walk(entry, prefix) {
-      if (entry.isFile) return new Promise(function (res) { entry.file(function (f) { try { Object.defineProperty(f, 'webkitRelativePath', { value: prefix + f.name }); } catch (e) { f._rel = prefix + f.name; } out.push(f); res(); }, function () { res(); }); });
+      /* 폴더 안의 파일에만 경로를 붙인다 — 파일 하나를 끌어놓은 것은 «폴더 넣기»가 아니다(파일 고르기와 같게 다룬다) */
+      if (entry.isFile) return new Promise(function (res) { entry.file(function (f) { if (prefix) { try { Object.defineProperty(f, 'webkitRelativePath', { value: prefix + f.name }); } catch (e) { f._rel = prefix + f.name; } } out.push(f); res(); }, function () { res(); }); });
       if (!entry.isDirectory) return Promise.resolve();
       var rd = entry.createReader();
       return new Promise(function (res) {

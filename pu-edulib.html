@@ -30,10 +30,9 @@
   --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
   --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
   --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca;
-  --legal:#7c3aed; --legal-bg:#f5f3ff; --legal-line:#ddd6fe;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
+body{word-break:keep-all;overflow-wrap:anywhere;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
 button:hover{border-color:var(--mute)}
 button:disabled{opacity:.45;cursor:default}
@@ -42,7 +41,7 @@ button.sm{padding:3px 9px;font-size:12px}
 button.dng{color:var(--red);border-color:var(--red-line)}
 input,select,textarea{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
 textarea{width:100%;resize:vertical}
-input[type=checkbox]{width:16px;height:16px;margin:0;vertical-align:middle;cursor:pointer}
+input[type=checkbox]{width:18px;height:18px;margin:0;vertical-align:middle;cursor:pointer}
 a{color:var(--blue-d);text-decoration:none}
 .sp{flex:1 1 auto}
 .hint{color:var(--mute);font-size:12px}
@@ -65,62 +64,65 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 
 /* ── 한눈에(대시보드) ── */
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;white-space:normal;color:var(--ink)}
 .kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
 .kpi span{color:var(--mute);font-size:12px;white-space:nowrap}
 .cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .cat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;white-space:normal}
 .cat:hover{border-color:var(--blue-line);background:var(--blue-bg)}
-.cat.legal{border-left:4px solid var(--legal)}
+.cat.legal{border-left:4px solid var(--blue)}
 .cat .nm{display:flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap;min-width:0}
 .cat .nm>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .cat .nm .tag{flex:0 0 auto}
 .cat .nm .n{margin-left:auto;flex:0 0 auto;font-size:18px;font-variant-numeric:tabular-nums}
 .cat .ln{display:flex;gap:10px;color:var(--mute);font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cat.zero{opacity:.65}
+.cat.zero .nm .n{color:var(--mute)}
 .tag{display:inline-block;padding:0 6px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;line-height:18px}
-.tag.legal{background:var(--legal-bg);color:var(--legal);border:1px solid var(--legal-line)}
+.tag.legal{background:var(--blue);color:#ffffff;border:1px solid var(--blue)}
 .tag.review{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line)}
 .tag.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
 .tag.old{background:var(--line);color:var(--ink2)}
-.tag.pc{background:#f1f5f9;color:var(--ink2);border:1px solid var(--line2)}
+.tag.pc{background:var(--bg);color:var(--ink2);border:1px solid var(--line2)}
 .tag.cloud{background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
-.tag.mail{background:#fdf4ff;color:#86198f;border:1px solid #f5d0fe}
+.tag.mail{background:var(--card);color:var(--ink2);border:1px dashed var(--mute)}
 .tag.pii{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
 .tag.est{background:none;color:var(--mute);border:1px dashed var(--line2)}
 .mx{overflow-x:auto}
 .mx table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
 .mx th,.mx td{border:1px solid var(--line);padding:4px 8px;white-space:nowrap;text-align:center}
-.mx th{background:#f1f5f9;color:var(--ink2);font-weight:600}
+.mx th{background:var(--bg);color:var(--ink2);font-weight:600}
 .mx td.c{cursor:pointer}
 .mx td.c:hover{background:var(--blue-bg)}
-.mx td.z{color:var(--line2)}
+.mx td.z{color:var(--mute)}
 
 /* ── 자료 목록 — 한 칸은 한 줄(넘치면 … + title 에 전문) ── */
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .filters input[type=search]{min-width:220px;flex:1 1 220px}
-.selbar{display:none;position:sticky;top:84px;z-index:15;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px}
+.selbar{display:none;position:sticky;top:var(--headH,84px);z-index:15;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px}
 .selbar.on{display:flex}
 .selbar b{white-space:nowrap}
 .grp{margin:14px 0 6px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:8px}
 .grp .chip{font-weight:400}
 table.lst{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;table-layout:fixed}
 table.lst th,table.lst td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;vertical-align:middle}
-table.lst th{background:#f1f5f9;color:var(--ink2);font-size:12px;font-weight:600}
-table.lst tr:hover td{background:#f8fbff}
+table.lst th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
+table.lst tr:hover td{background:var(--bg)}
 table.lst tr.picked td{background:var(--blue-bg)}
 table.lst .ck{width:28px;text-align:center;padding:6px 4px}
 table.lst .no{width:36px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
 table.lst .dt{width:134px;font-variant-numeric:tabular-nums}
 table.lst .ct{width:196px}
 table.lst .vn{width:150px}
-table.lst .fm{width:110px;color:var(--mute);font-variant-numeric:tabular-nums}
+table.lst .fm{width:124px;color:var(--mute);font-variant-numeric:tabular-nums}
 table.lst .st{width:210px}
 table.lst .ac{width:112px;text-align:right}
+table.lst .att{width:220px}
+table.lst .who{width:140px}
 table.lst td .one{display:flex;align-items:center;gap:6px;min-width:0}
 table.lst td .one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 table.lst td .one>.tag{flex:0 0 auto}
-.ttl{cursor:pointer;color:var(--ink);font-weight:600}
+.ttl{cursor:pointer;color:var(--ink);font-weight:600;background:none;border:0;padding:0;font:inherit;font-weight:600;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[role=button]:focus-visible,button:focus-visible,.ttl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .ttl:hover{color:var(--blue-d);text-decoration:underline}
 .empty{padding:28px;text-align:center;color:var(--mute)}
 .more{display:block;margin:10px auto}
@@ -134,24 +136,24 @@ table.lst td .one>.tag{flex:0 0 auto}
 table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6px;font-size:12px}
 
 /* ── 나란히 보기 / 자세히 ── */
-#cmp{display:none;position:fixed;inset:0;z-index:60;background:#0f172a;flex-direction:column}
+#cmp{display:none;position:fixed;inset:0;z-index:60;background:var(--ink2);flex-direction:column}
 #cmp.on{display:flex}
-#cmp .ch{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#111827;color:#e5e7eb}
+#cmp .ch{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ink);color:var(--line)}
 #cmp .ch b{white-space:nowrap}
-#cmp .ch button{background:#1f2937;color:#e5e7eb;border-color:#374151}
+#cmp .ch button{background:var(--ink2);color:var(--line);border-color:var(--mute)}
 /* 오른쪽 26px 은 공용 앱바의 «즐겨찾기» 손잡이 자리 — 오른쪽 칸의 단추를 덮지 않게(손잡이는 숨기지 않는다) */
 #cmpGrid{flex:1 1 auto;display:grid;gap:6px;padding:6px 26px 6px 6px;min-height:0}
 .pn{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--card);border-radius:8px;overflow:hidden}
 .pn .ph{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);min-width:0}
 .pn .ph .t{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pn .ph .m{color:var(--mute);font-size:12px;white-space:nowrap}
-.pn .pb{flex:1 1 auto;min-height:0;overflow:auto;background:#e8edf3;position:relative}
-.pn .pb iframe{width:100%;height:100%;border:0;display:block;background:#e8edf3}
+.pn .pb{flex:1 1 auto;min-height:0;overflow:auto;background:var(--line);position:relative}
+.pn .pb iframe{width:100%;height:100%;border:0;display:block;background:var(--line)}
 .pn .pb video,.pn .pb img{max-width:100%;max-height:100%;display:block;margin:0 auto;background:#000}
 .pn .pb .msg{padding:18px;color:var(--ink2);font-size:13px;line-height:1.6}
-.pn .pb .msg code{word-break:break-all;background:#fff;padding:1px 4px;border-radius:4px}
+.pn .pb .msg code{word-break:break-all;background:var(--card);padding:1px 4px;border-radius:4px}
 .slides{padding:8px}
-.slide{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.slide{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px}
 .slide .sn{color:var(--mute);font-size:11px}
 .slide .st1{font-weight:700;margin:2px 0 4px}
 .slide p{margin:2px 0;font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:keep-all}
@@ -174,7 +176,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 .note .w{color:var(--mute);font-size:11px}
 .note p{margin:2px 0 0;white-space:pre-wrap;word-break:keep-all}
 .mfoot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:9px 16px;border-radius:9px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:90;max-width:92vw}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;padding:9px 16px;border-radius:9px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:90;max-width:92vw}
 #toast.on{opacity:1}
 .phone-only{display:none}
 
@@ -186,8 +188,9 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   #head .top{padding:6px 10px;gap:8px}
   #head .sub{display:none}
   .tabs{padding:0 6px}
-  main{padding:8px 10px 80px}
-  .card{padding:10px}
+  main{padding:8px 6px 80px}
+  .card{padding:8px 7px}
+  table.lst tr{padding:6px 6px}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .kpi{padding:8px 10px}
   .kpi b{font-size:20px}
@@ -195,26 +198,38 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .cat{padding:8px 9px}
   .cat .ln+.ln{display:none}
-  .cat .nm .tag{display:none}   /* 폰에서는 보라색 띠가 «법정»을 말한다(안내줄에 적어 둠) — 이름 자리를 남긴다 */
+  .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
+  .cat .nm .tag{display:none}   /* 폰에서는 왼쪽 파란 띠가 «법정»을 말한다(안내줄에 적어 둠) — 이름 자리를 남긴다 */
   .cat .nm .n{font-size:16px}
   .filters input[type=search]{min-width:0;flex:1 1 100%}
   /* 거르개 — 자주 안 쓰는 것은 «⋯ 더» 안으로 */
   .filters .fx{display:none}
   .filters.open .fx{display:inline-block}
   .filters select{flex:1 1 40%;min-width:0}
-  .selbar{top:76px}
   /* 넓은 표 → 줄마다 두 줄 카드(☐·№ 는 왼쪽 끝 그대로) */
   table.lst,table.lst tbody{display:block;border:0;background:none}
   table.lst thead{display:none}
   table.lst tr{display:grid;grid-template-columns:30px 30px minmax(0,1fr) auto;grid-template-areas:"ck no ttl ac" "ck no meta meta";align-items:center;column-gap:4px;row-gap:2px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:6px;padding:6px 6px}
   table.lst td{border:0;padding:0;display:block}
   table.lst td.ck{grid-area:ck;width:auto;padding:0}
-  table.lst td.ck input{width:22px;height:22px}
+  table.lst td.ck input{width:24px;height:24px}
   table.lst td.no{grid-area:no;width:auto}
   table.lst td.tt{grid-area:ttl}
   table.lst td.ac{grid-area:ac;width:auto}
-  table.lst td.dt,table.lst td.ct,table.lst td.vn,table.lst td.fm,table.lst td.st{display:none}
   table.lst td.meta{grid-area:meta;display:block;color:var(--mute);font-size:12px}
+  #list table.lst td.dt,#list table.lst td.ct,#list table.lst td.vn,#list table.lst td.fm,#list table.lst td.st{display:none}
+  table.lst tr.picked{background:var(--blue-bg)}
+  table.lst tr.picked td,table.lst tr:hover td{background:none}
+  /* 넣기 — 종류·강의일·강의처를 폰에서도 고친다 */
+  table.stg tr{grid-template-columns:30px 30px minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ck no ttl ttl" "ck no ct dt" "ck no vn fm" "ck no st st"}
+  table.stg td.ct{grid-area:ct;width:auto} table.stg td.dt{grid-area:dt;width:auto} table.stg td.vn{grid-area:vn;width:auto}
+  table.stg td.fm{grid-area:fm;width:auto;align-self:center} table.stg td.st{grid-area:st;width:auto} table.stg td.meta{display:none}
+  table.stg select,table.stg input[type=text]{font-size:16px;padding:5px 6px}
+  /* 메일 — 첨부·추정 종류·알림(이미 가져옴·개인정보?·못 한 까닭)을 폰에서도 보인다 */
+  table.ml tr{grid-template-columns:30px 30px minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ck no ttl ttl" "ck no att ct" "ck no dt st"}
+  table.ml td.att{grid-area:att;width:auto} table.ml td.ct{grid-area:ct;width:auto} table.ml td.dt{grid-area:dt;width:auto}
+  table.ml td.st{grid-area:st;width:auto} table.ml td.who,table.ml td.meta{display:none}
+  .card.flat{padding:0;border:0;background:none}
   .mbody{grid-template-columns:minmax(0,1fr)}
   .mview{height:48vh}
   .modal{padding:0}
@@ -222,6 +237,13 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   #cmpGrid{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:none!important;grid-auto-rows:minmax(60vh,1fr);overflow:auto;padding:6px 14px 6px 6px}
 }
 @media (min-width:769px){ table.lst td.meta{display:none} }
+@media (min-width:769px) and (max-width:1180px){
+  #list table.lst .vn,table.lst .fm{display:none}
+  table.lst .ct{width:150px} table.lst .st{width:210px} table.lst .ac{width:92px}
+  table.ml .who{display:none} table.stg .st{width:120px} table.stg .vn{width:130px}
+}
+/* 769~960px — 종류 칸도 접는다(종류는 묶음 머리줄·«법정» 딱지로 보인다). 강의일·상태 딱지가 잘리지 않게 */
+@media (min-width:769px) and (max-width:960px){ #list table.lst .ct{display:none} }
 </style>
 </head>
 <body>
@@ -245,22 +267,22 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <main id="app" style="display:none">
   <section class="pane" id="pane-dash">
     <div class="kpis" id="kpis"></div>
-    <div class="card"><div class="bar"><div class="sec" style="margin:0">강의 종류별</div><span class="hint">보라색 띠 = 법정 의무교육 · 누르면 그 종류만 목록으로</span></div><div class="cats" id="cats" style="margin-top:8px"></div></div>
+    <div class="card"><div class="bar"><div class="sec" style="margin:0">강의 종류별</div><span class="hint">왼쪽 파란 띠 = 법정 의무교육 · 누르면 그 종류만 목록으로</span></div><div class="cats" id="cats" style="margin-top:8px"></div></div>
     <div class="card"><div class="bar"><div class="sec" style="margin:0">연도 × 종류</div><span class="hint">칸을 누르면 그 연도·종류만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
   </section>
 
   <section class="pane" id="pane-list">
     <div class="card">
       <div class="filters">
-        <input type="search" id="fQ" placeholder="찾기 — 제목·파일 이름·강의처·메모·경로">
-        <select id="fCat"></select>
-        <select id="fYear"></select>
+        <input type="search" id="fQ" placeholder="찾기 — 제목·파일 이름·강의처·메모·경로" aria-label="자료 찾기">
+        <select id="fCat" aria-label="강의 종류"></select>
+        <select id="fYear" aria-label="강의 연도"></select>
         <button class="sm phone-only fmore-btn" id="fMore" title="거르개 더 보기">⋯ 더</button>
-        <select id="fKind" class="fx"><option value="">형식 전체</option><option value="doc">문서</option><option value="video">영상</option><option value="archive">압축</option><option value="image">그림</option><option value="audio">소리</option></select>
-        <select id="fStatus" class="fx"><option value="">상태 전체</option><option value="review">검토 대기</option><option value="ok">참고 가능</option><option value="old">옛 자료</option></select>
-        <select id="fStore" class="fx"><option value="">원본 위치 전체</option><option value="cloud">자료함에 있음</option><option value="pc">PC에만</option><option value="mail">메일함</option></select>
+        <select id="fKind" class="fx" aria-label="형식"><option value="">형식 전체</option><option value="doc">문서</option><option value="video">영상</option><option value="archive">압축</option><option value="image">그림</option><option value="audio">소리</option></select>
+        <select id="fStatus" class="fx" aria-label="상태"><option value="">상태 전체</option><option value="review">검토 대기</option><option value="ok">참고 가능</option><option value="old">옛 자료</option></select>
+        <select id="fStore" class="fx" aria-label="원본 위치"><option value="">원본 위치 전체</option><option value="cloud">자료함에 있음</option><option value="pc">PC에만</option><option value="mail">메일함</option></select>
         <label class="hint fx" style="white-space:nowrap"><input type="checkbox" id="fLegal"> 법정 의무교육만</label>
-        <select id="fGroup" title="묶어 보기"><option value="cat">종류별로 묶기</option><option value="year">연도별로 묶기</option><option value="">묶지 않기</option></select>
+        <select id="fGroup" title="묶어 보기" aria-label="묶어 보기"><option value="cat">종류별로 묶기</option><option value="year">연도별로 묶기</option><option value="">묶지 않기</option></select>
         <label class="hint fx" style="white-space:nowrap"><input type="checkbox" id="fTrash"> 휴지통</label>
         <button class="sm fx" id="fClr">거르개 비우기</button>
       </div>
@@ -282,7 +304,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   <section class="pane" id="pane-add">
     <div class="card">
       <div class="sec">새 자료 넣기 — 파일을 끌어다 놓거나 고르세요</div>
-      <div class="drop" id="drop">
+      <div class="drop" id="drop" role="region" aria-label="파일을 끌어다 놓는 자리">
         <div>여기에 파일·폴더를 끌어다 놓으면 이름과 폴더를 보고 <b>강의 종류·강의일</b>을 미리 채웁니다. 확인한 뒤 저장하세요.</div>
         <div class="hint" style="margin-top:4px">원본은 받은 그대로 올립니다(바꾸거나 줄이지 않습니다) · 같은 파일이 이미 있으면 알려 드립니다 · 한 파일 1GB 까지</div>
         <div class="bar"><button class="pri" id="pickF">📄 파일 고르기</button><button id="pickD">📁 폴더 통째로</button><button id="pickJ" title="scripts/edulib-scan.js 가 만든 PC 목록(JSON)">📥 PC 목록 가져오기</button></div>
@@ -291,7 +313,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
         <input type="file" id="inJ" accept=".json,application/json" style="display:none">
       </div>
     </div>
-    <div class="card" id="stageCard" style="display:none">
+    <div class="card flat" id="stageCard" style="display:none">
       <div class="bar"><div class="sec" style="margin:0" id="stageTitle">넣을 자료</div><span class="hint" id="stageHint"></span><span class="sp"></span>
         <button class="sm" id="stAllA" title="강의 폴더 안(A)에 있고 개인정보 표시가 없는 것만">추천만 고르기</button>
         <button class="sm" id="stClr">비우기</button>
@@ -307,18 +329,18 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
       <p class="hint" style="margin:6px 0 0">제목·첨부 이름에 강의·교육자료·교안 같은 말이 있는 메일을 찾습니다. 메일은 «읽음» 표시를 바꾸지 않고, 고른 첨부만 원본 그대로 자료함에 복사합니다(메일은 그대로 둡니다).
         지난 메일(옛 보관함)은 첨부 이름이 없어 제목으로만 찾습니다 — 가져올 때 첨부를 확인합니다. 관리자만 보이는 칸입니다.</p>
     </div>
-    <div class="card" id="mCard" style="display:none">
-      <div class="bar"><b id="mN"></b><span class="sp"></span><input type="search" id="mQ" placeholder="찾기" style="min-width:160px"><button class="pri" id="mImp">고른 첨부 가져오기</button></div>
+    <div class="card flat" id="mCard" style="display:none">
+      <div class="bar"><b id="mN"></b><span class="sp"></span><input type="search" id="mQ" placeholder="찾기" aria-label="찾은 메일 거르기" style="min-width:160px"><button class="pri" id="mImp">고른 첨부 가져오기</button></div>
       <div class="prog" id="mProg" style="display:none"><i></i></div>
       <div id="mList" style="margin-top:8px"></div>
     </div>
   </section>
 </main>
 
-<div id="cmp"><div class="ch"><b id="cmpT">나란히 보기</b><span class="hint" style="color:#9ca3af" id="cmpH"></span><span class="sp"></span>
+<div id="cmp" role="dialog" aria-modal="true" aria-labelledby="cmpT"><div class="ch"><b id="cmpT">나란히 보기</b><span class="hint" style="color:var(--line2)" id="cmpH"></span><span class="sp"></span>
   <button class="sm" id="cmpCols" title="한 줄에 몇 칸">칸 나누기</button><button class="sm" id="cmpX">닫기</button></div><div id="cmpGrid"></div></div>
-<div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox"></div></div>
-<div id="toast"></div>
+<div class="modal" id="modal" style="display:none" role="dialog" aria-modal="true" aria-label="자세히·검토"><div class="mbox" id="mbox"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>

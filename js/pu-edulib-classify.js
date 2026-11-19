@@ -93,8 +93,12 @@
   }
 
   function pad(n) { n = String(n); return n.length < 2 ? '0' + n : n; }
+  /* 연도 상한은 «올해 + 1»(다음 해 강의 준비 자료까지) — 숫자를 박아 두면 해가 바뀔 때 새 자료를 못 읽는다.
+     날은 그 달의 날수까지만(2026-02-31 같은 날은 날짜로 보지 않는다). */
+  var MAX_YEAR = new Date().getFullYear() + 1;
+  function daysIn(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
   function okYmd(y, m, d) {
-    return y >= 1995 && y <= 2027 && m >= 1 && m <= 12 && (!d || (d >= 1 && d <= 31));
+    return y >= 1995 && y <= MAX_YEAR && m >= 1 && m <= 12 && (!d || (d >= 1 && d <= daysIn(y, m)));
   }
 
   /* 글자에서 날짜 찾기 — 찾은 만큼만(YYYY-MM-DD / YYYY-MM / YYYY). 못 찾으면 null */
@@ -113,8 +117,10 @@
     if (m && okYmd(+m[1], +m[2])) return m[1] + '-' + pad(m[2]);
     m = s.match(/(?:^|[^\d])(20\d{2}|19\d{2})(?!\d)/);
     if (m && okYmd(+m[1], 1)) return m[1];
-    m = s.match(/(?:^|[^\d])(1\d|2[0-7])\s*년/);
-    if (m) return String(2000 + +m[1]);
+    /* ⚠ 6자리(YYMMDD)는 위에서 «달·날이 맞는 것»만 날짜로 본다 — 일련번호가 우연히 맞으면 날짜로 읽힐 수 있어
+       화면은 늘 «추정» 딱지를 붙이고, 사람이 고치면 «확정»이 된다. */
+    m = s.match(/(?:^|[^\d])(\d{2})\s*년/);
+    if (m && okYmd(2000 + +m[1], 1)) return String(2000 + +m[1]);
     return null;
   }
 
