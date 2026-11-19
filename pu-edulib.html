@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>법정교육자료함</title>
+<title>강의자료</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🎓</text></svg>">
 <!-- ═══════════════════════════════════════════════════════
-     법정교육자료함 (pu-edulib.html) — 2026-11-19
+     강의자료 (pu-edulib.html) — 2026-11-19 · 11-20 «법정교육자료함»에서 이름 바꿈(대표 「법정교육 제목을 강의자료로」)
      대표 지시 「내컴퓨터 및 푸른메일함 전체 찾아서 강의 종류별로 대시보드 만들고 강의종류 및 날짜별로 정리해줘.
        강의자료 및 종류 등 처리된것 보고 다른노무사가 참고할 수 있게 한번에 여러종류 보고 창을보고 비교하고 검토해서
        추가할수 있게 가급적 원본을 유지해라. 새앱으로 만들고 자료함으로 만들어라」
@@ -249,7 +249,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <body>
 <div id="head">
   <div class="top">
-    <h1>🎓 법정교육자료함</h1>
+    <h1>🎓 강의자료</h1>
     <span class="sub">강의자료를 종류·강의일로 모아 보고, 나란히 비교하고, 검토해 더합니다 — 원본은 그대로 둡니다</span>
     <span id="who"></span>
     <span class="sp"></span>
@@ -263,7 +263,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
     <button data-tab="mail" id="mailTab" style="display:none">✉ 메일에서 찾기</button>
   </div>
 </div>
-<div id="lock"><h2>🎓 법정교육자료함</h2><div id="lockWhy"></div><p>재직 직원만 열 수 있습니다.</p></div>
+<div id="lock"><h2>🎓 강의자료</h2><div id="lockWhy"></div><p>재직 직원만 열 수 있습니다.</p></div>
 <main id="app" style="display:none">
   <section class="pane" id="pane-dash">
     <div class="kpis" id="kpis"></div>
@@ -347,13 +347,13 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=105"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=52"></script>
+<script src="js/pu-appbar.js?v=53"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -368,9 +368,9 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ PuGate.hide(); } };
 </script>
 <script src="js/pu-viewer-kind.js?v=1"></script>
-<script src="js/pu-edulib-classify.js?v=1"></script>
-<script src="js/pu-edulib-core.js?v=1"></script>
-<script src="js/pu-edulib-preview.js?v=1"></script>
-<script src="js/pu-edulib-app.js?v=1"></script>
+<script src="js/pu-edulib-classify.js?v=2"></script>
+<script src="js/pu-edulib-core.js?v=2"></script>
+<script src="js/pu-edulib-preview.js?v=2"></script>
+<script src="js/pu-edulib-app.js?v=2"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* 법정교육자료함(pu-edulib.html) 폰 점검 자료 — 모두 지어낸 것이다(실제 고객·직원 이름·연락처 없음). */
+/* 강의자료(pu-edulib.html) 폰 점검 자료 — 모두 지어낸 것이다(실제 고객·직원 이름·연락처 없음). */
 'use strict';
 const T0 = Date.UTC(2026, 9, 1, 0, 0, 0);
 const CATS = ['sexual', 'disability', 'privacy', 'safety', 'pension', 'bullying', 'youth', 'equality', 'labor_law', 'hours', 'ai', 'etc'];

@@ -1,5 +1,5 @@
 'use strict';
-/* 법정교육자료함 — 분류·셈·글자 미리보기 규칙 (2026-11-19)
+/* 강의자료(옛 이름 법정교육자료함) — 분류·셈·글자 미리보기 규칙 (2026-11-19)
  *
  * ■ 왜 이 검사가 있나
  *   대표 지시 「강의종류 및 날짜별로 정리 … 가급적 원본을 유지해라」.
@@ -55,6 +55,16 @@ test('경로 판정 — 강의 폴더는 A, 이름만 강의면 B, 회의자료�
   assert.equal(C.classifyPath('x\\1. 강의자료\\강사 경력증명서.pdf').tier, null);
   assert.equal(C.classifyPath('x\\1. 강의자료\\~$임시.pptx').tier, null);
   assert.equal(C.classifyPath('x\\업무\\견적.xlsx').tier, null, '강의 근거가 없으면 넣지 않는다');
+  assert.equal(C.classifyPath('x\\1. 강의자료\\노동법\\근로계약서와 노동법 강의.pptx').tier, 'A', '«근로계약서» 강의는 계약 서류가 아니다');
+  assert.equal(C.classifyPath('x\\1. 강의자료\\강의 용역 제공 계약서.hwp').tier, null, '우리 용역 계약서는 강의자료가 아니다');
+});
+
+test('종류·강의일 짐작(guessPath) — 강의 폴더 밖이라도 사람이 고른 파일의 종류·날짜는 같은 규칙으로', () => {
+  const g = C.guessPath('a\\컨설턴트,위원신청등\\2019퇴직연금강의(공인노무사회)\\교재 및 강의안.pptx');
+  assert.equal(g.cat, 'pension', '폴더 이름으로 종류를 잡는다');
+  assert.equal(g.date, '2019');
+  assert.equal(g.dateFrom, 'folder');
+  assert.equal(C.guessPath('a\\b\\자료.pdf').date, null, '못 찾으면 비운다');
 });
 
 test('경로 판정 — 종류는 가장 깊은 폴더가 먼저, 사람 명단은 개인정보 표시', () => {
