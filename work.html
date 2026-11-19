@@ -4469,6 +4469,8 @@ function kbAskCtx(q,known){
       kn(x.it.company,'업체'); kn(x.it.client,'의뢰인'); kn(x.it.officer,'상대담당');
       kn(x.it.mgr_main&&x.it.mgr_main.name,'담당자');
       (x.it.mgr_subs||[]).forEach(function(m){ kn(m&&m.name,'담당자'); });
+      var cs=[]; try{ cs=cs.concat(itemContacts(x.it)); }catch(e){} try{ cs=cs.concat(coContacts(x.it)); }catch(e){}
+      cs.forEach(function(c){ if(c){ kn(c.name,'업체담당'); kn(c.phone,'전화'); kn(c.email,'전자우편'); } });
       L.push('· '+(x.it.company||'')+' '+(x.it.title||'')+(x.it.state==='done'?' (종료)':''));
       HO_FIELDS.forEach(function(f){ if(String(x.n[f[0]]||'').trim()) L.push('   '+f[1]+': '+x.n[f[0]]); });
       RETRO_FIELDS.forEach(function(f){ if(String(x.r[f[0]]||'').trim()) L.push('   회고·'+f[1]+': '+x.r[f[0]]); });

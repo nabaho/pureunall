@@ -5786,7 +5786,7 @@ function _aiClassifyEdits(doc,edits){
 function _aiFundKnown(){
   var f=curForm()||{}, K=[];
   function add(v,label,whole){ if(v!=null&&String(v).trim()) K.push({value:String(v),label:label,parts:!whole}); }
-  if(!f._sample){ add(f.name,'기금',true); add(f.short_name,'기금',true); }
+  if(!f._sample){ add(f.name,'기금',true); add(f.short_name,'기금',true); add(f.chairman,'대표자'); }   // 임원 명부를 안 적은 기금도 대표자 칸은 있다
   _officersOf(f).forEach(function(o){ add(o.name,'임원'); add(o.email,'전자우편',true); });
   (Array.isArray(f.prep_committee)?f.prep_committee:[]).forEach(function(o){ if(!o) return; add(o.name,'위원'); add(o.company,'업체'); });
   var sites=(S.formsCtx==='fund'&&S.formFund)?(_fundSites(S.formFund)||[]):[];
