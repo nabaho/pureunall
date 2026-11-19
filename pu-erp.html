@@ -115,6 +115,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-ai-mask.js?v=1"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-contract-easy.js?v=3"></script>
 <script src="js/pu-contract-forms.js?v=74"></script>
@@ -15146,24 +15147,33 @@ function ConsultLogModal(props){
       showToast('AI 프록시 주소가 없습니다 — 시작 화면(포털) 왼쪽 아래 [⚙ 설정] → 「AI 프록시 주소」에 등록해 주세요');
       return;
     }
+    /* 상담자·연락처와 주민번호·전화·계좌 같은 번호는 꼬리표로 가려 보내고, 요약이 오면 이 화면에서 되돌린다
+       (js/pu-ai-mask.js). 가리개가 안 실렸으면 보내지 않는다 — 상담 원문이 그대로 바깥으로 나간다. */
+    var _MK = window.PuAiMask;
+    if(!_MK || !_MK.createMasker){ showToast('개인정보 가림 도구(js/pu-ai-mask.js)가 실리지 않아 AI 요약을 보내지 않았습니다 — 새로고침해 주세요'); return; }
+    var _mk = _MK.createMasker({ known:[{ value:f.callerName, label:'상담자' }, { value:f.callerPhone, label:'전화' }] });
+    var _sendText = _mk.mask('상담 내용:\n'+allText);
     setAiLoading(true);
     fetchT(_proxy,{                                        // AI 는 좀 느릴 수 있어 45초
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:800,
-        system:'당신은 노무법인의 상담내용 정리 전문가입니다. 아래 상담 내용을 다음 형식으로 간결하게 정리해주세요:\n\n1. 핵심 쟁점\n2. 의뢰인 요구사항\n3. 추천 업무 유형 (자문/사건/컨설팅 등)\n4. 다음 단계\n\n100자 내외로 각 항목을 작성하세요.',
-        messages:[{role:'user', content:'상담 내용:\n'+allText}]
+        model:'claude-sonnet-5-5',   // 2026-11-19: claude-sonnet-4-20250514 는 2026-06-15 은퇴(이 단추가 늘 실패했다)
+        max_tokens:2000,             // 새 모델은 생각(thinking)도 이 안에서 쓴다 — 800 이면 요약이 잘릴 수 있다
+        system:_mk.withNote('당신은 노무법인의 상담내용 정리 전문가입니다. 아래 상담 내용을 다음 형식으로 간결하게 정리해주세요:\n\n1. 핵심 쟁점\n2. 의뢰인 요구사항\n3. 추천 업무 유형 (자문/사건/컨설팅 등)\n4. 다음 단계\n\n100자 내외로 각 항목을 작성하세요.'),
+        messages:[{role:'user', content:_sendText}]
       })
     }, 45000)
     .then(function(r){ return r.json(); })
     .then(function(d){
       // 프록시가 돌려주는 모양은 서버마다 다르다 — AI 도우미와 같은 순서로 읽는다
+      if(d && d.error){ showToast('AI 요약 실패: '+(d.error.message||'AI 오류')); return; }
       var text = d.reply || d.text
         || (d.content||[]).filter(function(x){return x.type==='text';}).map(function(x){return x.text;}).join('');
+      // 새 모델은 안전 기준에 걸리면 HTTP 200 에 stop_reason:'refusal' 로 빈 답을 준다
+      if(!text && d && d.stop_reason==='refusal'){ showToast('AI가 이 상담 요약을 거절했습니다(안전 기준) — 내용을 줄여 다시 눌러 주세요'); return; }
       if(!text){ showToast('AI 요약이 비어서 왔습니다 — 잠시 후 다시 눌러 주세요'); return; }
-      upd('summary', text);
+      upd('summary', _mk.unmask(text));
       showToast('✅ AI 요약 완료');
     })
     .catch(function(e){
