@@ -264,3 +264,13 @@ test('★ 전현 셈은 경력 머리줄 «두 곳 다» 고친다', () => {
   assert.match(s, /getElementById\('eraInfo'\)/, '★ 좁은 화면 셈을 안 고친다');
   assert.match(s, /\.eraInfo/, '★★ 넓은 화면 셈이 낡은 채 남는다');
 });
+
+test('★★ 직원 편집칸도 같은 두 칸이다 — 왼쪽 기본 정보 · 오른쪽 경력 (대표 지시 2026-11-19 「직원도 모두 노무사와 같이」)', () => {
+  const s = 함수('직원편집');
+  assert.match(s, /class="esc mem2"/, '★★ 직원 편집칸에 두 칸 이름표가 없다');
+  const 왼 = s.indexOf('class="m-left"'), 오 = s.indexOf('class="m-car"'), 경력 = s.indexOf('careerBox');
+  assert.ok(왼 >= 0 && 오 > 왼, '★ 왼쪽(기본 정보) 다음에 오른쪽(경력)이 와야 한다');
+  assert.ok(경력 > 오, '★★ 경력 목록이 오른쪽 칸 밖에 있다');
+  assert.ok(s.indexOf('경력동의') > 오, '★ 경력 공개 동의가 경력과 떨어져 왼쪽으로 갔다');
+  assert.match(RAW, /\.esc\.mem2 > :is\(\.stick,\.m-left\)/, '★★ 넓은 화면 왼쪽 칸 꾸밈이 직원(m-left)에게 안 걸린다');
+});
