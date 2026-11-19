@@ -1327,12 +1327,34 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck.gn-box{width:min(1240px,100%)}
 .mck.gn-box>header .em{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mck.gn-box>header h2{flex:none}
-/* 🤔 스팸 의심 — 남길까요? (2026-11-18) — 한 칸은 한 줄, 넘치면 … (없어진 듯한 곳과 같은 벌) */
+/* 🤔 스팸 의심 — 남길까요? (2026-11-18 · 내용 확인·삭제 표시 보강 2026-11-19) — 한 칸은 한 줄, 넘치면 … */
+.mck.csp-box{width:min(1260px,100%)}
 .mck.csp-box>header .em{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mck.csp-box>header h2{flex:none}
 .mck .csp-src{display:inline-block;border-radius:10px;padding:0 7px;font-size:11px;font-weight:600;white-space:nowrap}
 .mck .csp-src.q{background:#eff6ff;color:#1e40af}
 .mck .csp-src.c{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.mck .csp-st{display:inline-block;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;white-space:nowrap;margin-right:5px;vertical-align:1px}
+.mck .csp-st.del{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.mck .csp-st.trash{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+.mck .csp-st.live{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.mck .csp-st.chk{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;font-weight:500}
+.mck .csp-subj{cursor:pointer}
+.mck .csp-subj:hover{color:#1e40af}
+.mck .act button.vw{border-color:#bfdbfe;background:#eff6ff;color:#1e40af;font-weight:600}
+.mck .act button.vw.on{background:#2563eb;border-color:#2563eb;color:#ffffff}
+.mck tr.csp-open td,.mck div.csp-open{background:#f8fafc;white-space:normal;font-size:12.5px;color:#1e293b}
+.mck tr.csp-open td{padding:10px 14px 12px;border-bottom:1px solid #e2e8f0}
+.mck .csp-dp{display:flex;flex-direction:column;gap:7px}
+.mck .csp-dh{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;border-radius:7px;font-size:12.5px;line-height:1.5}
+.mck .csp-dh.del{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.mck .csp-dh.trash{background:#fffbeb;border:1px solid #fde68a;color:#854d0e}
+.mck .csp-dh.live{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.mck .csp-dh.info{background:#ffffff;border:1px solid #e2e8f0;color:#475569}
+.mck .csp-dm{font-size:12px;color:#475569;line-height:1.6}
+.mck .csp-dm b{color:#1e293b}
+.mck .csp-db{background:#ffffff;border:1px solid #e2e8f0;border-radius:7px;padding:9px 12px;max-height:190px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.65;color:#1e293b;overscroll-behavior:contain}
+.mck .csp-db.empty{color:#64748b}
 .mck .nck-bulk button.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
 .mck .nck-bulk button.no{color:#991b1b}
 /* 폰에서는 창 바깥 여백을 줄인다(폰 규칙 「양옆 8~14px」) — PC 는 그대로.
@@ -1660,9 +1682,9 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-cardtog{border:1px solid #cbd5e1;background:#fff;color:#64748b;border-radius:12px;padding:1px 10px;
   font-family:inherit;font-size:12px;cursor:pointer}
 .dm-cardtog.on{border-color:#bfdbfe;background:#eff6ff;color:#1e40af}
-#mbCard{position:fixed;z-index:60;width:560px;max-width:calc(100vw - 16px);max-height:380px;display:none;
+#mbCard{position:fixed;z-index:60;width:560px;max-width:calc(100vw - 16px);max-height:min(520px,calc(100vh - 24px));display:none;
   flex-direction:column;background:#fff;border:1px solid #cbd5e1;border-radius:10px;
-  box-shadow:0 10px 28px rgba(15,23,42,.18);overflow:hidden;font-size:13px;color:#1e293b}
+  box-shadow:0 10px 28px rgba(15,23,42,.18);overflow:hidden;overscroll-behavior:contain;font-size:13px;color:#1e293b}
 #mbCard.on{display:flex}
 #mbCard .hd{flex:none;padding:10px 14px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc}
 #mbCard .sj{font-weight:800;font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;
@@ -1670,7 +1692,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
 #mbCard .mt{margin-top:3px;color:#64748b;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #mbCard .at{flex:none;padding:6px 14px;border-bottom:1px solid #e2e8f0;font-size:12.5px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
-#mbCard .bd{flex:1;min-height:60px;padding:10px 14px;line-height:1.7;overflow:auto;white-space:pre-wrap;word-break:break-word}
+#mbCard .bd{flex:1;min-height:60px;padding:10px 14px;line-height:1.7;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;word-break:break-word}
 #mbCard .bd.wait{color:#64748b}
 #mbCard .ft{flex:none;padding:6px 14px;border-top:1px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:12px}
 #mbCard .ft b{color:#166534}
@@ -17781,6 +17803,320 @@ let _cspBusy = false;
 let _cspAsked = {};        /* 이번에 창으로 이미 보인 줄 — 「나중에」를 눌렀으면 같은 줄로 또 안 띄운다 */
 let _cspSel = {};
 let _cspOn = false;
+let _cspQAll = null;       /* mailcard/q 기록 {줄번호: q} — 이미 들어온 메일 명함의 제목·서명·원본 위치를 되살린다 */
+let _cspQBusy = false;
+let _cspOpenRow = {};      /* 상세 펼침 {열쇠: 1(펼침) | 0(접음)} */
+let _cspProbe = {};        /* 원본 메일 생존·삭제 점검 {열쇠: {st, slug, uid, box, s, p, body, d, atts, note, bodyTried}} */
+let _cspBoxCache = {};     /* 점검 중 읽은 폴더 줄 캐시 */
+function cspCleanText(s){
+  return String(s == null ? '' : s).replace(/&(nbsp|\x230*160|\x23x0*a0);/gi, ' ').replace(/\r/g, '')
+    .replace(/[ \t\u00a0]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n\n\n+/g, '\n\n').trim();
+}
+function cspFmtTime(ts){
+  const n = Number(ts) || 0;
+  if(!(n > 0)) return '';
+  try{
+    const d = new Date(n);
+    const p = v => (v < 10 ? '0' : '') + v;
+    return d.getFullYear() + '.' + p(d.getMonth() + 1) + '.' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }catch(_){ return ''; }
+}
+function cspSplitQId(qid){
+  const s = String(qid || '');
+  const i = s.lastIndexOf('_');
+  if(i <= 0) return null;
+  const slug = s.slice(0, i), uid = s.slice(i + 1);
+  return (slug && /^\d+$/.test(uid)) ? { slug, uid } : null;
+}
+function cspFolderLabel(slug, folders){
+  if(!slug) return '';
+  try{
+    if(typeof mbBoxName === 'function'){
+      const nm = mbBoxName(slug);
+      if(nm && nm !== slug) return nm;
+    }
+  }catch(_){ }
+  const f = (folders || (typeof _mbFolders !== 'undefined' && _mbFolders) || {})[slug] || {};
+  if(f.kind === 'inbox') return '받은메일함';
+  if(f.kind === 'trash') return '휴지통';
+  if(f.kind === 'spam') return '스팸편지함';
+  if(f.kind === 'archive') return '보관메일함';
+  return String(f.name || f.path || slug);
+}
+function cspMatchQ(it){
+  if(!it) return null;
+  const pools = [_cspQAll || {}, _cspHold || {}];
+  if(it.mailQ){
+    for(let i = 0; i < pools.length; i++){
+      if(pools[i][it.mailQ]) return { qid: String(it.mailQ), q: pools[i][it.mailQ] };
+    }
+  }
+  let best = null, bestAt = -1;
+  const ek = (it.email && typeof PuCardSpam !== 'undefined') ? PuCardSpam.key(it.email) : '';
+  for(let i = 0; i < pools.length; i++){
+    const map = pools[i];
+    const keys = Object.keys(map);
+    for(let j = 0; j < keys.length; j++){
+      const qid = keys[j], q = map[qid];
+      if(!q || typeof q !== 'object') continue;
+      if(q.card && q.card === it.id) return { qid, q };
+      if(ek && q.e && PuCardSpam.key(q.e) === ek){
+        const t = Number(q.d || q.at || 0);
+        if(t >= bestAt){ best = { qid, q }; bestAt = t; }
+      }
+    }
+  }
+  return best;
+}
+function cspLocalMail(slug, uid, email, folders){
+  const msgs = (typeof _mbMsgs !== 'undefined' && _mbMsgs) ? _mbMsgs : null;
+  if(!msgs) return null;
+  const fds = folders || ((typeof _mbFolders !== 'undefined' && _mbFolders) ? _mbFolders : {});
+  const pack = (sl, u, v) => {
+    const kind = String((fds[sl] && fds[sl].kind) || '');
+    const st = kind === 'trash' ? 'trash' : kind === 'spam' ? 'spambox' : 'alive';
+    return { st, slug: sl, uid: String(u), box: cspFolderLabel(sl, fds), s: String(v.s || ''),
+      p: cspCleanText(v.p || ''), d: Number(v.d) || 0, a: Number(v.a) || 0, an: Array.isArray(v.an) ? v.an : [] };
+  };
+  if(slug && uid && msgs[slug] && msgs[slug][String(uid)]){
+    return pack(slug, uid, msgs[slug][String(uid)]);
+  }
+  const em = String(email || '').trim().toLowerCase();
+  if(!em) return null;
+  let liveHit = null, trashHit = null;
+  Object.keys(msgs).forEach(sl => {
+    if(sl === '*old') return;
+    const box = msgs[sl] || {};
+    const kind = String((fds[sl] && fds[sl].kind) || '');
+    if(kind === 'sent' || kind === 'drafts' || kind === 'tome' || kind === 'sched') return;
+    Object.keys(box).forEach(u => {
+      const v = box[u];
+      if(!v || String(v.e || '').trim().toLowerCase() !== em) return;
+      const cand = pack(sl, u, v);
+      if(cand.st === 'alive'){
+        if(!liveHit || cand.d >= liveHit.d) liveHit = cand;
+      } else if(!trashHit || cand.d >= trashHit.d){
+        trashHit = cand;
+      }
+    });
+  });
+  return liveHit || trashHit;
+}
+function cspMailDb(){
+  if(typeof Store !== 'undefined' && Store && Store.mailDb) return Store.mailDb;
+  try{
+    if(typeof firebase !== 'undefined' && firebase && typeof firebase.auth === 'function'
+       && firebase.auth().currentUser && typeof firebase.database === 'function'){
+      return firebase.database();
+    }
+  }catch(_){ }
+  return null;
+}
+function cspEnsureQ(){
+  if(_cspQAll !== null || _cspQBusy || typeof Store === 'undefined' || !Store || !Store.db) return;
+  _cspQBusy = true;
+  let ref = Store.db.ref(DB_ROOT + '/mailcard/q');
+  if(ref && typeof ref.limitToLast === 'function') ref = ref.limitToLast(600);
+  if(!ref || typeof ref.once !== 'function'){ _cspQAll = {}; _cspQBusy = false; return; }
+  ref.once('value').then(s => {
+    _cspQAll = (s && typeof s.val === 'function' && s.val()) || {};
+    _cspQBusy = false;
+    if(_cspOn){ cspAutoOpenFew(); cspMount(); cspProbeRows(); }
+  }).catch(() => { _cspQAll = _cspQAll || {}; _cspQBusy = false; });
+}
+async function cspReadBoxMap(mdb, slug){
+  if(!mdb || !slug) return {};
+  if(_cspBoxCache[slug]) return _cspBoxCache[slug];
+  if(typeof _mbMsgs !== 'undefined' && _mbMsgs && _mbMsgs[slug] && Object.keys(_mbMsgs[slug]).length){
+    return (_cspBoxCache[slug] = _mbMsgs[slug]);
+  }
+  try{
+    let ref = mdb.ref('mailbox/msgs/' + slug);
+    if(ref && typeof ref.orderByKey === 'function') ref = ref.orderByKey();
+    if(ref && typeof ref.limitToLast === 'function') ref = ref.limitToLast(250);
+    const snap = await ref.once('value');
+    return (_cspBoxCache[slug] = (snap && typeof snap.val === 'function' && snap.val()) || {});
+  }catch(_){ return (_cspBoxCache[slug] = {}); }
+}
+async function cspFindByEmailInBox(mdb, slug, email, aroundTs){
+  const em = String(email || '').trim().toLowerCase();
+  if(!mdb || !slug || !em) return null;
+  if(aroundTs > 0){
+    try{
+      const r0 = mdb.ref('mailbox/msgs/' + slug);
+      if(r0 && typeof r0.orderByChild === 'function'){
+        const q = r0.orderByChild('d').startAt(aroundTs - 14 * 86400000).endAt(aroundTs + 2 * 86400000);
+        const s = await q.once('value');
+        const map = (s && typeof s.val === 'function' && s.val()) || {};
+        let bestU = '', bestV = null;
+        Object.keys(map).forEach(u => {
+          const v = map[u];
+          if(v && String(v.e || '').trim().toLowerCase() === em && (!bestV || Number(v.d||0) >= Number(bestV.d||0))){
+            bestU = u; bestV = v;
+          }
+        });
+        if(bestV) return { uid: bestU, v: bestV };
+      }
+    }catch(_){ }
+  }
+  const recent = await cspReadBoxMap(mdb, slug);
+  let hitU = '', hitV = null;
+  Object.keys(recent).forEach(u => {
+    const v = recent[u];
+    if(v && String(v.e || '').trim().toLowerCase() === em && (!hitV || Number(v.d||0) >= Number(hitV.d||0))){
+      hitU = u; hitV = v;
+    }
+  });
+  return hitV ? { uid: hitU, v: hitV } : null;
+}
+function cspFetchPeekBody(k, p){
+  if(!p || !p.slug || !p.uid || p.slug === '*old' || p.bodyTried) return;
+  if(p.st !== 'alive' && p.st !== 'trash' && p.st !== 'spambox') return;
+  if(typeof mbBodyGet === 'function'){
+    const cached = mbBodyGet(p.slug, p.uid);
+    if(cached){
+      p.bodyTried = true;
+      p.body = (typeof mbCardText === 'function') ? mbCardText(cached) : cspCleanText(cached.text || '');
+      if(Array.isArray(cached.atts) && cached.atts.length) p.atts = cached.atts.map(a => String((a && a.name) || '첨부'));
+      return;
+    }
+  }
+  if(typeof mbFetchBody !== 'function') return;
+  p.bodyTried = true;
+  mbFetchBody(p.slug, p.uid, true).then(o => {
+    if(!o) return;
+    p.body = (typeof mbCardText === 'function') ? mbCardText(o) : cspCleanText(o.text || '');
+    if(Array.isArray(o.atts) && o.atts.length) p.atts = o.atts.map(a => String((a && a.name) || '첨부'));
+    if(_cspOn) cspMount();
+  }).catch(err => {
+    const msg = String((err && err.message) || err || '');
+    if(/지웠거나|없습니다|gone|not found/i.test(msg)){
+      p.st = 'deleted';
+      p.note = '다음메일에서 삭제되어 원본 메일이 남아 있지 않습니다.';
+      if(_cspOn) cspMount();
+    }
+  });
+}
+let _cspProbeBusy = false;
+let _cspProbeAgain = false;
+async function cspProbeRows(){
+  if(!_cspOn) return;
+  if(_cspProbeBusy){ _cspProbeAgain = true; return; }
+  const rows = cspRows();
+  if(!rows.length) return;
+  const mdb = cspMailDb();
+  /* 로컬 메모리(_mbMsgs)만으로 먼저 채우고, 펼쳐진 줄의 peek 본문도 곧장 요청 */
+  rows.forEach(r => {
+    if(r.src === 'c' && !state.items[r.id]){
+      _cspProbe[r.k] = { st: 'cardDeleted', note: '이미 삭제(휴지통 이동)된 명함입니다.' };
+      return;
+    }
+    const loc = cspLocalMail(r.slug, r.uid, r.email);
+    if(loc && !_cspProbe[r.k]){
+      _cspProbe[r.k] = { st: loc.st, slug: loc.slug, uid: loc.uid, box: loc.box, s: loc.s, p: loc.p, d: loc.d, atts: loc.an || [] };
+    }
+    if(_cspOpenRow[r.k] && _cspProbe[r.k]) cspFetchPeekBody(r.k, _cspProbe[r.k]);
+  });
+  if(!mdb) return;
+  _cspProbeBusy = true;
+  let changed = false;
+  try{
+    let folders = (typeof _mbFolders !== 'undefined' && _mbFolders && Object.keys(_mbFolders).length) ? _mbFolders : null;
+    if(!folders){
+      try{
+        const fs = await mdb.ref('mailbox/folders').once('value');
+        folders = (fs && typeof fs.val === 'function' && fs.val()) || {};
+      }catch(_){ folders = {}; }
+    }
+    const fKeys = Object.keys(folders);
+    const inboxSlug = fKeys.find(k => folders[k] && folders[k].kind === 'inbox') || '';
+    const trashSlug = fKeys.find(k => folders[k] && folders[k].kind === 'trash') || '';
+    const spamSlug  = fKeys.find(k => folders[k] && folders[k].kind === 'spam')  || '';
+    const latestRows = cspRows();
+    for(let i = 0; i < latestRows.length; i++){
+      const r = latestRows[i];
+      const cur = _cspProbe[r.k];
+      if(cur && cur.checkedDb && (cur.hadUid || !(r.slug && r.uid))){
+        if(_cspOpenRow[r.k]) cspFetchPeekBody(r.k, cur);
+        continue;
+      }
+      if(r.src === 'c' && !state.items[r.id]){
+        _cspProbe[r.k] = { st: 'cardDeleted', checkedDb: true, note: '이미 삭제(휴지통 이동)된 명함입니다.' };
+        changed = true; continue;
+      }
+      let next = null;
+      if(r.slug && r.uid){
+        let v = null;
+        try{
+          const snap = await mdb.ref('mailbox/msgs/' + r.slug + '/' + r.uid).once('value');
+          v = snap && typeof snap.val === 'function' ? snap.val() : null;
+        }catch(_){ v = null; }
+        if(v){
+          const kind = String((folders[r.slug] && folders[r.slug].kind) || '');
+          const st = kind === 'trash' ? 'trash' : kind === 'spam' ? 'spambox' : 'alive';
+          next = { st, checkedDb: true, slug: r.slug, uid: String(r.uid), box: cspFolderLabel(r.slug, folders),
+            s: String(v.s || ''), p: cspCleanText(v.p || ''), d: Number(v.d) || 0, atts: Array.isArray(v.an) ? v.an : [] };
+        } else {
+          const inTrash = trashSlug ? await cspFindByEmailInBox(mdb, trashSlug, r.email, r.mailAt || r.at) : null;
+          const inSpam  = (!inTrash && spamSlug) ? await cspFindByEmailInBox(mdb, spamSlug, r.email, r.mailAt || r.at) : null;
+          const loc     = (!inTrash && !inSpam) ? cspLocalMail('', '', r.email, folders) : null;
+          if(inTrash){
+            next = { st: 'trash', checkedDb: true, slug: trashSlug, uid: String(inTrash.uid), box: cspFolderLabel(trashSlug, folders),
+              s: String(inTrash.v.s || ''), p: cspCleanText(inTrash.v.p || ''), d: Number(inTrash.v.d) || 0, atts: Array.isArray(inTrash.v.an) ? inTrash.v.an : [] };
+          } else if(inSpam){
+            next = { st: 'spambox', checkedDb: true, slug: spamSlug, uid: String(inSpam.uid), box: cspFolderLabel(spamSlug, folders),
+              s: String(inSpam.v.s || ''), p: cspCleanText(inSpam.v.p || ''), d: Number(inSpam.v.d) || 0, atts: Array.isArray(inSpam.v.an) ? inSpam.v.an : [] };
+          } else if(loc){
+            next = Object.assign({ checkedDb: true }, loc, { atts: loc.an || [] });
+          } else {
+            next = { st: 'deleted', checkedDb: true, note: '원본 메일이 삭제되어 메일함(받은메일함·휴지통)에 남아 있지 않습니다.' };
+          }
+        }
+      } else {
+        const loc = cspLocalMail('', '', r.email, folders);
+        if(loc){
+          next = Object.assign({ checkedDb: true }, loc, { atts: loc.an || [] });
+        } else {
+          const inInbox = inboxSlug ? await cspFindByEmailInBox(mdb, inboxSlug, r.email, r.at) : null;
+          const inTrash = (!inInbox && trashSlug) ? await cspFindByEmailInBox(mdb, trashSlug, r.email, r.at) : null;
+          const inSpam  = (!inInbox && !inTrash && spamSlug) ? await cspFindByEmailInBox(mdb, spamSlug, r.email, r.at) : null;
+          if(inInbox){
+            next = { st: 'alive', checkedDb: true, slug: inboxSlug, uid: String(inInbox.uid), box: cspFolderLabel(inboxSlug, folders),
+              s: String(inInbox.v.s || ''), p: cspCleanText(inInbox.v.p || ''), d: Number(inInbox.v.d) || 0, atts: Array.isArray(inInbox.v.an) ? inInbox.v.an : [] };
+          } else if(inTrash){
+            next = { st: 'trash', checkedDb: true, slug: trashSlug, uid: String(inTrash.uid), box: cspFolderLabel(trashSlug, folders),
+              s: String(inTrash.v.s || ''), p: cspCleanText(inTrash.v.p || ''), d: Number(inTrash.v.d) || 0, atts: Array.isArray(inTrash.v.an) ? inTrash.v.an : [] };
+          } else if(inSpam){
+            next = { st: 'spambox', checkedDb: true, slug: spamSlug, uid: String(inSpam.uid), box: cspFolderLabel(spamSlug, folders),
+              s: String(inSpam.v.s || ''), p: cspCleanText(inSpam.v.p || ''), d: Number(inSpam.v.d) || 0, atts: Array.isArray(inSpam.v.an) ? inSpam.v.an : [] };
+          } else if(inboxSlug || trashSlug){
+            next = { st: 'deleted', checkedDb: true, note: '원본 메일이 삭제되어 받은메일함·휴지통에 남아 있지 않습니다.' };
+          }
+        }
+      }
+      if(next){
+        next.hadUid = !!(r.slug && r.uid);
+        _cspProbe[r.k] = next;
+        if(_cspOpenRow[r.k]) cspFetchPeekBody(r.k, next);
+        changed = true;
+      }
+    }
+  }finally{ _cspProbeBusy = false; }
+  if(changed && _cspOn) cspMount();
+  if(_cspProbeAgain && _cspOn){ _cspProbeAgain = false; cspProbeRows(); }
+}
+function cspAutoOpenFew(){
+  const rows = cspRows();
+  if(rows.length >= 1 && rows.length <= 3){
+    rows.forEach(r => { if(!(r.k in _cspOpenRow)) _cspOpenRow[r.k] = 1; });
+  }
+}
+function cspToggle(k){
+  if(!k) return;
+  _cspOpenRow[k] = _cspOpenRow[k] ? 0 : 1;
+  cspMount();
+  if(_cspOpenRow[k]) cspProbeRows();
+}
 function cspMailFolderId(){
   const g = Object.values(state.groups||{}).find(g=>g && g.name===CARD_SPAM_FOLDER && (g.kind||'card')==='card');
   return g ? g.id : '';
@@ -17813,7 +18149,7 @@ function cspHoldWatch(){
   _cspHoldOn = true;
   Store.db.ref(DB_ROOT+'/mailcard/q').orderByChild('st').equalTo('hold').on('value', s => {
     _cspHold = s.val() || {};
-    if(_cspOn){ cspRows().forEach(r => { _cspAsked[r.k] = 1; }); cspMount(); }
+    if(_cspOn){ cspRows().forEach(r => { _cspAsked[r.k] = 1; }); cspAutoOpenFew(); cspMount(); cspProbeRows(); }
     renderSoon(); cspMaybeAsk();
   }, () => { _cspHoldOn = false; });
 }
@@ -17835,6 +18171,7 @@ async function cardSpamRun(){
       spam.length = 0;
     }
     _cspSuspect = ask;
+    if(ask.length) cspEnsureQ();
     for(const x of spam){
       if(!state.items[x.id]) continue;
       try{ await Store.del(x.id); done++; }
@@ -17848,7 +18185,7 @@ async function cardSpamRun(){
   if(done) render(); else renderSoon();
   /* ⚠ 보류 메일 감시가 먼저 창을 열었을 수 있다 — 열려 있으면 새로 찾은 의심 명함을 그 창에 다시 그린다
      (안 그리면 창에는 메일 줄만 있고 옆줄 숫자만 늘어 있었다 — 2026-11-18 미리보기에서 실측) */
-  if(_cspOn){ cspRows().forEach(r => { _cspAsked[r.k] = 1; }); cspMount(); }
+  if(_cspOn){ cspRows().forEach(r => { _cspAsked[r.k] = 1; }); cspAutoOpenFew(); cspMount(); cspProbeRows(); }
   else cspMaybeAsk();
 }
 /* 창에 놓을 줄 — 보류한 메일 줄과 의심 명함을 한 목록으로 */
@@ -17857,13 +18194,29 @@ function cspRows(){
   Object.keys(_cspHold||{}).forEach(id => {
     const q = _cspHold[id]; if(!q || q.st!=='hold') return;
     const f = q.f || {};
-    rows.push({ k:'q:'+id, src:'q', id, name: f.name||q.n||'', company: f.company||'', title: f.title||'',
-      email: f.email||q.e||'', subject: q.s||'', why: String(q.why||''), at: Number(q.heldAt||q.at)||0 });
+    const sp = cspSplitQId(id);
+    const pr = _cspProbe['q:'+id];
+    const loc = !pr ? cspLocalMail(sp && sp.slug, sp && sp.uid, f.email || q.e) : null;
+    rows.push({ k:'q:'+id, src:'q', id, slug: (sp && sp.slug)||'', uid: (sp && sp.uid)||'',
+      name: f.name||q.n||'', company: f.company||'', dept: f.dept||'', title: f.title||'',
+      tel: f.tel||'', mobile: f.mobile||'', fax: f.fax||'', address: f.address||'', website: f.website||'', memo: '',
+      email: f.email||q.e||'', subject: q.s||(pr && pr.s)||(loc && loc.s)||'', sig: cspCleanText(q.sig||''),
+      mailAt: Number(q.d)||0, why: String(q.why||''), at: Number(q.heldAt||q.at)||0 });
   });
   (_cspSuspect||[]).forEach(x => {
     const it = state.items[x.id]; if(!it) return;
-    rows.push({ k:'c:'+it.id, src:'c', id: it.id, name: it.name||'', company: it.company||'', title: it.title||'',
-      email: it.email||'', subject: '', why: x.why.join(' · '), at: Number(it.createdAt)||0 });
+    const mq = cspMatchQ(it);
+    const q = mq ? mq.q : null;
+    const sp = cspSplitQId(it.mailQ || (mq && mq.qid));
+    const pr = _cspProbe['c:'+it.id];
+    const loc = !pr ? cspLocalMail(sp && sp.slug, sp && sp.uid, it.email) : null;
+    rows.push({ k:'c:'+it.id, src:'c', id: it.id, slug: (sp && sp.slug)||'', uid: (sp && sp.uid)||'',
+      name: it.name||'', company: it.company||'', dept: it.dept||'', title: it.title||'',
+      tel: it.tel||'', mobile: it.mobile||'', fax: it.fax||'', address: it.address||it.companyAddr||'',
+      website: it.website||'', memo: cspCleanText(it.memo||it.note||''),
+      email: it.email||'', subject: String(it.mailSubj||(q && q.s)||(pr && pr.s)||(loc && loc.s)||''),
+      sig: cspCleanText((q && q.sig)||''), mailAt: Number((q && q.d)||0),
+      why: x.why.join(' · '), at: Number(it.createdAt)||0 });
   });
   return rows.sort((a,b) => (b.at||0) - (a.at||0));
 }
@@ -17879,9 +18232,12 @@ function cspMaybeAsk(){
   cspOpen();
 }
 function cspOpen(){
-  _cspOn = true; _cspSel = {};
+  _cspOn = true; _cspSel = {}; _cspBoxCache = {};
+  cspEnsureQ();
   cspRows().forEach(r => { _cspAsked[r.k] = 1; });
+  cspAutoOpenFew();
   cspMount();
+  cspProbeRows();
 }
 function cspClose(){ _cspOn = false; _cspSel = {}; cspMount(); renderSoon(); }
 function cspMount(){
@@ -17937,7 +18293,7 @@ async function cspDecideNow(keys, verdict){
     if(verdict === 'keep'){ _cspLists.ok[ek] = { at:now }; delete _cspLists.spam[ek]; }
     else { _cspLists.spam[ek] = { at:now }; delete _cspLists.ok[ek]; }
   });
-  const gone = {}; rows.forEach(r => { gone[r.k] = 1; delete _cspSel[r.k]; if(r.src==='q') delete _cspHold[r.id]; });
+  const gone = {}; rows.forEach(r => { gone[r.k] = 1; delete _cspSel[r.k]; delete _cspOpenRow[r.k]; if(r.src==='q') delete _cspHold[r.id]; });
   _cspSuspect = _cspSuspect.filter(x => !gone['c:'+x.id]);
   let msg;
   if(verdict === 'keep'){
@@ -17962,13 +18318,94 @@ function cspMarkSpamAddrs(emails, why){
   Store.db.ref().update(up).then(() => { if(Store._itemsReady) cardSpamRun(); })
     .catch(e => console.warn('[스팸] 신고한 주소를 기업정보함 스팸 목록에 못 적었습니다', e));
 }
+function cspStatusBadge(r){
+  const pr = _cspProbe[r.k] || cspLocalMail(r.slug, r.uid, r.email);
+  if(!pr) return '';
+  if(pr.st === 'deleted') return '<span class="csp-st del" title="원본 메일이 삭제되어 메일함에 남아 있지 않습니다">🗑 삭제됨</span>';
+  if(pr.st === 'cardDeleted') return '<span class="csp-st del" title="이미 휴지통으로 삭제된 명함입니다">🗑 명함 삭제됨</span>';
+  if(pr.st === 'trash') return '<span class="csp-st trash" title="원본 메일이 휴지통으로 삭제되어 있습니다">🗑 휴지통</span>';
+  if(pr.st === 'spambox') return '<span class="csp-st trash" title="스팸편지함에 있는 메일입니다">🚫 스팸함</span>';
+  if(pr.st === 'alive') return '<span class="csp-st live" title="메일함에 보관 중입니다">📩 ' + esc(pr.box || '메일함') + '</span>';
+  return '';
+}
+function cspSubjCellHtml(r){
+  const pr = _cspProbe[r.k] || cspLocalMail(r.slug, r.uid, r.email);
+  const badge = cspStatusBadge(r);
+  const sj = String(r.subject || (pr && pr.s) || '').trim();
+  if(sj) return badge + esc(sj);
+  if(pr && pr.st === 'deleted') return badge + '<span class="em">원본 메일이 삭제되었습니다</span>';
+  if(pr && pr.st === 'cardDeleted') return badge + '<span class="em">명함이 삭제되었습니다</span>';
+  if(pr && (pr.st === 'trash' || pr.st === 'spambox')) return badge + '<span class="em">(제목 없음)</span>';
+  const snip = cspCleanText(r.sig || r.memo || (pr && (pr.body || pr.p)) || '');
+  if(snip) return badge + '<span class="em">' + esc(snip.split('\n')[0].slice(0, 60)) + '</span>';
+  if(_cspQBusy || _cspProbeBusy) return '<span class="csp-st chk">확인 중…</span>';
+  return badge + '<span class="em">— (내용 보기 클릭)</span>';
+}
+function cspDetailHtml(r){
+  const pr = _cspProbe[r.k] || cspLocalMail(r.slug, r.uid, r.email);
+  const sj = String(r.subject || (pr && pr.s) || '').trim();
+  const bodyTxt = cspCleanText((pr && pr.body) || (pr && pr.p) || r.sig || r.memo || '');
+  const when = cspFmtTime((pr && pr.d) || r.mailAt || r.at);
+  let headCls = 'info', headMsg = '';
+  if(pr && pr.st === 'deleted'){
+    headCls = 'del';
+    headMsg = '🗑 <b>원본 메일이 삭제되었습니다</b> — ' + esc(pr.note || '메일함(받은메일함·휴지통)에 원본 메일이 남아 있지 않습니다.')
+      + (bodyTxt ? ' (수집 당시 남겨 둔 서명·본문 기록을 아래에 표시합니다)' : '');
+  } else if(pr && pr.st === 'cardDeleted'){
+    headCls = 'del';
+    headMsg = '🗑 <b>이미 삭제된 명함입니다</b> — ' + esc(pr.note || '기업정보함 휴지통으로 옮겨진 항목입니다.');
+  } else if(pr && pr.st === 'trash'){
+    headCls = 'trash';
+    headMsg = '🗑 <b>휴지통으로 삭제된 메일입니다</b> — 원본 메일이 <b>' + esc(pr.box || '휴지통') + '</b>에 들어가 있습니다.'
+      + (when ? ' · 받은 때: ' + esc(when) : '');
+  } else if(pr && pr.st === 'spambox'){
+    headCls = 'trash';
+    headMsg = '🚫 <b>스팸편지함에 있는 메일입니다</b>' + (when ? ' · 받은 때: ' + esc(when) : '');
+  } else if(pr && pr.st === 'alive'){
+    headCls = 'live';
+    headMsg = '📩 <b>메일함에 보관 중인 메일입니다</b> · 폴더: <b>' + esc(pr.box || '메일함') + '</b>'
+      + (when ? ' · 받은 때: ' + esc(when) : '') + ' · 읽음 표시는 바뀌지 않습니다';
+  } else {
+    headMsg = '📬 <b>메일 수집 정보</b>' + (when ? ' · 기록 시각: ' + esc(when) : '')
+      + ((_cspQBusy || _cspProbeBusy) ? ' · 메일함 삭제 여부를 확인하고 있습니다…' : '');
+  }
+  const extra = [];
+  if(r.company) extra.push('회사: <b>' + esc(r.company) + '</b>');
+  if(r.dept || r.title) extra.push('부서·직함: <b>' + esc([r.dept, r.title].filter(Boolean).join(' / ')) + '</b>');
+  if(r.mobile) extra.push('휴대폰: <b>' + esc(r.mobile) + '</b>');
+  if(r.tel) extra.push('전화: <b>' + esc(r.tel) + '</b>');
+  if(r.fax) extra.push('팩스: <b>' + esc(r.fax) + '</b>');
+  if(r.address) extra.push('주소: <b>' + esc(r.address) + '</b>');
+  if(r.website) extra.push('홈페이지: <b>' + esc(r.website) + '</b>');
+  if(pr && Array.isArray(pr.atts) && pr.atts.length) extra.push('첨부: <b>📎 ' + esc(pr.atts.slice(0, 4).join(', ')) + '</b>');
+  const metaHtml = '<div class="csp-dm">보낸이: <b>' + esc(r.name || '(이름 없음)') + '</b>'
+    + (r.email ? ' &lt;' + esc(r.email) + '&gt;' : '')
+    + ' · 제목: <b>' + esc(sj || '(제목 기록 없음)') + '</b><br>'
+    + (extra.length ? extra.join(' · ')
+      : '저장된 상세 정보: <b>없음</b> (이름·메일 주소 외에 회사·직함·전화번호·주소가 전혀 적혀 있지 않습니다)')
+    + '</div>';
+  let bodyBox;
+  if(bodyTxt){
+    const label = (pr && pr.body) ? '[메일 본문]' : (pr && pr.p) ? '[메일 본문 미리보기]' : r.sig ? '[수집 당시 메일 서명·본문 끝부분]' : '[메모]';
+    bodyBox = '<div class="csp-db">' + esc(label + '\n' + bodyTxt) + '</div>';
+  } else if(pr && pr.st === 'deleted'){
+    bodyBox = '<div class="csp-db empty">🗑 원본 메일 내용이 삭제되어 메일함·휴지통 어디에도 본문이 남아 있지 않습니다.</div>';
+  } else if(_cspQBusy || _cspProbeBusy){
+    bodyBox = '<div class="csp-db empty">메일함에서 원본 메일 내용과 삭제 여부를 확인하고 있습니다…</div>';
+  } else {
+    bodyBox = '<div class="csp-db empty">남아 있는 메일 본문·서명 글자가 없습니다. (이름·메일 주소만으로 들어온 항목입니다)</div>';
+  }
+  return '<div class="csp-dp"><div class="csp-dh ' + headCls + '">' + headMsg + '</div>' + metaHtml + bodyBox + '</div>';
+}
 function cspHtml(){
   const pc = document.body.classList.contains('pc');
   const rows = cspRows(), nSel = rows.filter(r => _cspSel[r.k]).length;
   const tag = r => r.src==='q' ? '<span class="csp-src q" title="새로 온 메일 — 아직 명함으로 안 넣었습니다">새 메일</span>'
                                : '<span class="csp-src c" title="이미 기업정보함에 있는 명함입니다">명함</span>';
-  const btns = '<button class="ok" onclick="cspDecide([cspKeyOf(this)],\'keep\')">남기기</button>'
-             + '<button class="no" onclick="cspDecide([cspKeyOf(this)],\'spam\')">🚫 스팸</button>';
+  const rowBtns = r => '<button type="button" class="vw' + (_cspOpenRow[r.k] ? ' on' : '') + '" aria-expanded="' + (!!_cspOpenRow[r.k]) + '" onclick="cspToggle(cspKeyOf(this))">'
+    + (_cspOpenRow[r.k] ? '내용 접기' : '내용 보기') + '</button>'
+    + '<button class="ok" onclick="cspDecide([cspKeyOf(this)],\'keep\')">남기기</button>'
+    + '<button class="no" onclick="cspDecide([cspKeyOf(this)],\'spam\')">🚫 스팸</button>';
   let body;
   if(!rows.length) body = '<p class="em">✓ 스팸으로 의심되는 것이 없습니다</p>';
   else{
@@ -17977,27 +18414,31 @@ function cspHtml(){
       + '<button class="ok" onclick="cspDecide(Object.keys(_cspSel),\'keep\')">고른 것 남기기</button>'
       + '<button class="no" onclick="cspDecide(Object.keys(_cspSel),\'spam\')">🚫 고른 것 스팸</button></div>';
     if(pc){
-      body += '<table class="nck csp"><colgroup><col style="width:30px"><col style="width:40px"><col style="width:62px">'
-        + '<col style="width:12%"><col style="width:14%"><col style="width:17%"><col><col style="width:22%"><col style="width:150px"></colgroup>'
-        + '<tr><th></th><th>#</th><th>갈래</th><th>이름</th><th>회사 · 직함</th><th>메일 주소</th><th>메일 제목</th><th>왜 의심하나</th><th></th></tr>'
+      body += '<table class="nck csp"><colgroup><col style="width:30px"><col style="width:36px"><col style="width:60px">'
+        + '<col style="width:11%"><col style="width:12%"><col style="width:16%"><col><col style="width:20%"><col style="width:224px"></colgroup>'
+        + '<tr><th></th><th>#</th><th>갈래</th><th>이름</th><th>회사 · 직함</th><th>메일 주소</th><th>메일 제목 · 상태</th><th>왜 의심하나</th><th></th></tr>'
         + rows.map((r, i) => {
           const co = [r.company, r.title].filter(Boolean).join(' · ');
+          const open = !!_cspOpenRow[r.k];
           return '<tr data-k="' + esc(r.k) + '"><td><input type="checkbox" aria-label="' + esc((r.name || '이름 없음') + ' 고르기') + '" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"></td>'
             + '<td class="em" style="text-align:right">' + (i + 1) + '</td><td>' + tag(r) + '</td>'
             + '<td title="' + esc(r.name) + '"><b>' + esc(r.name || '(이름 없음)') + '</b></td>'
             + '<td title="' + esc(co) + '">' + esc(co) + '</td>'
             + '<td title="' + esc(r.email) + '">' + esc(r.email) + '</td>'
-            + '<td class="em" title="' + esc(r.subject) + '">' + esc(r.subject || '—') + '</td>'
+            + '<td class="csp-subj" title="눌러서 내용·삭제 여부 보기" onclick="cspToggle(cspKeyOf(this))">' + cspSubjCellHtml(r) + '</td>'
             + '<td title="' + esc(r.why) + '"><span class="nck-why">' + esc(r.why || '—') + '</span></td>'
-            + '<td class="act">' + btns + '</td></tr>';
+            + '<td class="act">' + rowBtns(r) + '</td></tr>'
+            + (open ? '<tr class="gn-open csp-open"><td></td><td colspan="8">' + cspDetailHtml(r) + '</td></tr>' : '');
         }).join('') + '</table>';
     }else{
       body += rows.map((r, i) => '<div class="nck-m" data-k="' + esc(r.k) + '"><div class="l1">'
         + '<input type="checkbox" aria-label="' + esc((r.name || '이름 없음') + ' 고르기') + '" ' + (_cspSel[r.k] ? 'checked' : '') + ' onclick="cspPick(cspKeyOf(this))"> '
         + '<span class="em">' + (i + 1) + '</span> ' + tag(r) + ' <b>' + esc(r.name || '(이름 없음)') + '</b> '
         + '<span class="em">' + esc([r.company, r.email].filter(Boolean).join(' · ')) + '</span></div>'
-        + '<div class="l1 em" title="' + esc(r.why) + '">' + esc(r.why) + (r.subject ? ' — ' + esc(r.subject) : '') + '</div>'
-        + '<div class="l2 act">' + btns + '</div></div>').join('');
+        + '<div class="l1 csp-subj" onclick="cspToggle(cspKeyOf(this))">' + cspSubjCellHtml(r) + '</div>'
+        + '<div class="l1 em" title="' + esc(r.why) + '">' + esc(r.why) + '</div>'
+        + '<div class="l2 act">' + rowBtns(r) + '</div>'
+        + (_cspOpenRow[r.k] ? '<div class="gn-open csp-open">' + cspDetailHtml(r) + '</div>' : '') + '</div>').join('');
     }
   }
   return '<div class="mck-dim csp-dim" onclick="if(event.target===this)cspClose()"><div class="mck nck-box csp-box" role="dialog" aria-modal="true" aria-label="스팸 의심 — 남길까요?">'
@@ -29439,7 +29880,7 @@ const MB_CARD_LS = 'pucards_mb_hovercard';
 const MB_CARD_MS = 400;
 const MB_CARD_SWITCH_MS = 120;
 const MB_CARD_GRACE = 250;
-const MB_CARD_TEXT_MAX = 2400;
+const MB_CARD_TEXT_MAX = 4800;
 let _mbCardT = 0, _mbCardHideT = 0, _mbCardKey = '';
 function mbCardOn(){
   if(state.mbCardOn === undefined){
@@ -29464,8 +29905,29 @@ function mbCardEl(){
   if(c) return c;
   c = document.createElement('div');
   c.id = 'mbCard';
-  c.addEventListener('mouseenter', ()=>{ clearTimeout(_mbCardHideT); });
-  c.addEventListener('mouseleave', ()=>{ mbCardLeave(); });
+  c.addEventListener('mouseenter', ()=>{ c._inside = true; clearTimeout(_mbCardHideT); _mbCardHideT = 0; clearTimeout(_mbCardT); _mbCardT = 0; });
+  c.addEventListener('mouseleave', ()=>{ c._inside = false; mbCardLeave(); });
+  c.addEventListener('wheel', (ev)=>{
+    let bd = null;
+    if(typeof c.querySelector === 'function') bd = c.querySelector('.bd');
+    else if(Array.isArray(c.children)) bd = c.children.find(x=>x && (' '+String(x.className||'')+' ').indexOf(' bd ')>=0) || null;
+    if(bd && ev && typeof ev.deltaY === 'number'){
+      const t = ev.target;
+      const inBd = !!(t && (t === bd || (typeof bd.contains === 'function' && bd.contains(t))));
+      if(!inBd){
+        const px = ev.deltaMode === 1 ? ev.deltaY * 22 : ev.deltaMode === 2 ? ev.deltaY * 240 : ev.deltaY;
+        bd.scrollTop = Math.max(0, (bd.scrollTop || 0) + px);
+        if(typeof ev.preventDefault === 'function') ev.preventDefault();
+      } else {
+        const top = bd.scrollTop || 0;
+        const max = Math.max(0, (bd.scrollHeight || 0) - (bd.clientHeight || 0));
+        if((ev.deltaY < 0 && top <= 0) || (ev.deltaY > 0 && top >= max - 1)){
+          if(typeof ev.preventDefault === 'function') ev.preventDefault();
+        }
+      }
+    }
+    if(ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+  }, { passive: false });
   document.body.appendChild(c);
   return c;
 }
@@ -29479,7 +29941,7 @@ function mbCardText(o){
     try{ t = new DOMParser().parseFromString(h, 'text/html').body.textContent || ''; }
     catch(_){ t = h.replace(/<[^>]+>/g, ' '); }
   }
-  t = t.replace(/\r/g, '').replace(/[ \t\u00a0]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  t = t.replace(/&(nbsp|\x230*160|\x23x0*a0);/gi, ' ').replace(/\r/g, '').replace(/[ \t\u00a0]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   const cut = t.search(/\n[-─=_ ]{3,}\s*(원본 메시지|원본메시지|Original Message|Forwarded message)/i);
   if(cut > 40) t = t.slice(0, cut).trim();
   return t.length > MB_CARD_TEXT_MAX ? t.slice(0, MB_CARD_TEXT_MAX) + '…' : t;
@@ -29513,7 +29975,7 @@ function mbCardFill(c, slug, uid){
   const att = mbCardAttLine(v, o);
   if(att) add('at', att);
   const full = o ? mbCardText(o) : '';
-  const txt = full || String(v.p || '').trim();
+  const txt = full || String(v.p || '').replace(/&(nbsp|\x230*160|\x23x0*a0);/gi, ' ').trim();
   const bd = add('bd' + (full ? '' : ' wait'), txt || (o ? '(본문이 없습니다)' : '본문을 가져오고 있습니다…'));
   if(!full && txt && slug !== MB_OLD_ID) bd.textContent = txt + ' …';
   const ft = document.createElement('div'); ft.className = 'ft';
@@ -29547,13 +30009,21 @@ function mbCardShow(el, x, slug, uid){
   if(!mbBodyGet(slug, uid) && slug !== MB_OLD_ID){
     mbFetchBody(slug, uid, true).then(()=>{
       if(_mbCardKey !== key || !mbCardVisible()) return;
-      if(mbCardFill(c, slug, uid)) mbCardPlace(c, el, x);
+      const oldBd = typeof c.querySelector === 'function' ? c.querySelector('.bd') : null;
+      const prevTop = oldBd ? oldBd.scrollTop : 0;
+      if(mbCardFill(c, slug, uid)){
+        const newBd = prevTop && typeof c.querySelector === 'function' ? c.querySelector('.bd') : null;
+        if(newBd) newBd.scrollTop = prevTop;
+        if(!c._inside) mbCardPlace(c, el, x);
+      }
     }).catch(()=>{ /* 못 받아도 미리보기 글은 이미 보이고 있다 */ });
   }
 }
 function mbCardEnter(el, ev, slug, uid){
   clearTimeout(_mbCardHideT);
   if(!mbCardOn() || !mbCardCanHover() || state.mbOpen || state.mbPickMode) return;
+  const cur = document.getElementById('mbCard');
+  if(cur && cur._inside && mbCardVisible()) return;
   clearTimeout(_mbCardT);
   const x = (ev && ev.clientX) || 0;
   const key = slug + '|' + uid;
@@ -29566,11 +30036,42 @@ function mbCardLeave(){
   clearTimeout(_mbCardHideT);
   _mbCardHideT = setTimeout(mbCardHide, MB_CARD_GRACE);
 }
-function mbCardHide(){
+function mbCardHide(ev){
+  try{
+    const c = document.getElementById('mbCard');
+    if(ev && typeof ev === 'object' && ev.type && c && c.classList && c.classList.contains('on')){
+      const t = ev.target;
+      const inTarget = !!(t && (t === c || (typeof c.contains === 'function' && c.contains(t))));
+      if(ev.type === 'scroll' && inTarget) return;
+      if(ev.type === 'click' && inTarget) return;
+      if(ev.type === 'keydown' && ev.key !== 'Escape'){
+        const tn = t && t.tagName ? String(t.tagName).toUpperCase() : '';
+        if(tn === 'INPUT' || tn === 'TEXTAREA' || tn === 'SELECT' || (t && t.isContentEditable)){
+          /* 입력칸 타이핑·커서 이동은 가로채지 않고 기존처럼 카드만 닫는다 */
+        } else {
+          const inside = !!(c._inside || inTarget);
+          let bd = null;
+          if(inside){
+            if(typeof c.querySelector === 'function') bd = c.querySelector('.bd');
+            else if(Array.isArray(c.children)) bd = c.children.find(x=>x && (' '+String(x.className||'')+' ').indexOf(' bd ')>=0) || null;
+          }
+          if(bd && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'PageDown' || ev.key === 'PageUp' || ev.key === 'Home' || ev.key === 'End' || ev.key === ' ')){
+            const page = Math.max(120, (bd.clientHeight || 240) - 40);
+            if(ev.key === 'Home') bd.scrollTop = 0;
+            else if(ev.key === 'End') bd.scrollTop = bd.scrollHeight || 99999;
+            else bd.scrollTop = Math.max(0, (bd.scrollTop || 0) + (ev.key === 'PageDown' || ev.key === ' ' ? page : ev.key === 'PageUp' ? -page : ev.key === 'ArrowDown' ? 48 : -48));
+            if(typeof ev.preventDefault === 'function') ev.preventDefault();
+            return;
+          }
+          if(inside) return;
+        }
+      }
+    }
+  }catch(_){ }
   clearTimeout(_mbCardT); _mbCardT = 0;
   clearTimeout(_mbCardHideT); _mbCardHideT = 0;
   _mbCardKey = '';
-  try{ const c = document.getElementById('mbCard'); if(c) c.classList.remove('on'); }catch(_){ }
+  try{ const c = document.getElementById('mbCard'); if(c){ c._inside = false; c.classList.remove('on'); } }catch(_){ }
 }
 /* 클릭·키·스크롤·창 벗어남이면 닫는다 — 줄을 눌러 열 때 카드가 따라오지 않게 */
 try{
