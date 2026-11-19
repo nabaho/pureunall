@@ -1838,7 +1838,7 @@
      메일 열쇠(폴더|번호)는 어느 업체와도 겹치지 않아 업체와 상관없이 전체에 건다.
      카드를 되살리면(_deleted 가 지워지면) 저절로 빠진다. */
   function dismissedMailKeys(rawCts) {
-    var out = {};
+    var out = Object.create(null);   /* __proto__·constructor 같은 글자가 열쇠로 와도 상속 속성에 걸리지 않게 */
     var add = function (c) {
       if (c && typeof c === 'object' && c._deleted && Array.isArray(c.srcMails)) {
         c.srcMails.forEach(function (sk) { if (sk) out[sk] = true; });
@@ -1961,8 +1961,9 @@
         var subj = String(m.s || '');
         var bodyTxt = String(m.b || m.p || '');
         var an = QD && typeof QD.namesOf === 'function' ? QD.namesOf(m.an) : (Array.isArray(m.an) ? m.an : []);
-        var peerName = isSent ? String(m.tn || '') : String(m.f || '');
-        var peerEmail = isSent ? String(m.t || '') : String(m.e || '');
+        /* 내게쓴편지함은 받는 사람이 «우리 자신»이다 — 그 주소·이름으로 업체를 맞추지 않는다(제목·첨부 이름만 쓴다) */
+        var peerName = fKind === TOME_KIND ? '' : (isSent ? String(m.tn || '') : String(m.f || ''));
+        var peerEmail = fKind === TOME_KIND ? '' : (isSent ? String(m.t || '') : String(m.e || ''));
         var matchWrap = findCo(subj, an, peerName, peerEmail, isSent);
         var origMatchedCo = matchWrap ? matchWrap.co : null;
         var verifiedByEmail = !!(matchWrap && matchWrap.verifiedByEmail);
@@ -2538,8 +2539,9 @@
             if (isTerminatedMailText(subj, bodyTxt)) return;
             var an = QD ? QD.namesOf(m.an) : (Array.isArray(m.an) ? m.an : []);
             var isSent = isOutFolderKind(fKind);
-            var peerName = isSent ? String(m.tn || '') : String(m.f || '');
-            var peerEmail = isSent ? String(m.t || '') : String(m.e || '');
+            /* 내게쓴편지함은 받는 사람이 «우리 자신»이다 — 그 주소·이름으로 업체를 맞추지 않는다(제목·첨부 이름만 쓴다) */
+            var peerName = fKind === TOME_KIND ? '' : (isSent ? String(m.tn || '') : String(m.f || ''));
+            var peerEmail = fKind === TOME_KIND ? '' : (isSent ? String(m.t || '') : String(m.e || ''));
             var matchedCo = matchCoFromMail(subj, peerName, peerEmail, isSent);
             var coName = (matchedCo && matchedCo.rec && matchedCo.rec.name) ||
                          extractCoFromSubj(subj, an, peerName) ||

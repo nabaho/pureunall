@@ -64,7 +64,7 @@ test('② 기준일 이전 메일은 어떤 후보도 만들지 않는다 — �
 });
 
 /* ─── pullMailContracts — 어느 폴더를 훑는가 ─── */
-async function pull(folders, msgsBySlug) {
+async function pull(folders, msgsBySlug, companies) {
   const { ctx, writes, P } = lib();
   const reads = [];   // 메일을 «읽으러 간» 폴더 — 어느 폴더를 훑었는지의 증거
   ctx.firebase = { auth: () => ({ currentUser: { uid: 'u1', getIdToken: () => Promise.resolve('tok-1') } }) };
@@ -80,7 +80,8 @@ async function pull(folders, msgsBySlug) {
           val: () => {
             if (p === 'mailbox/folders') return folders;
             if (p.indexOf('user_dir') >= 0) return { v: USERS };
-            if (p.indexOf('companies') >= 0 || p.indexOf('contracts') >= 0) return { v: {} };
+            if (p.indexOf('companies') >= 0) return { v: companies || {} };
+            if (p.indexOf('contracts') >= 0) return { v: {} };
             return {};
           }
         }),
@@ -132,4 +133,16 @@ test('④ 요청 메모는 어느 폴더에서 왔는지 밝힌다 — 내게쓴
   assert.match(ctx.note(Object.assign({ folderKind: 'tome' }, base)), /내게쓴편지함에서 올림/);
   assert.match(ctx.note(base), /보낸메일함에서 올림/, '폴더 정보가 없으면 예전 문구 그대로');
   assert.match(ctx.note(Object.assign({ folderKind: 'sent' }, base)), /보낸메일함에서 올림/);
+});
+
+test('⑤ 내게쓴편지함은 «받는 주소(우리 자신)»로 업체를 맞추지 않는다 — 제목·첨부 이름만 쓴다 · 보낸메일함은 주소로 맞춘다(대조)', async () => {
+  const COS = { coRev: { id: 'coRev', name: '부활기업', status: 'active', email: 'hr@revive.example', managerMain: 'P-005' } };
+  const mail = (u) => ({ u, d: Date.now(), t: 'hr@revive.example', s: '[푸른노무법인] 하늘수산 컨설팅 위임계약서 송부', a: 1, an: ['위임계약서_하늘수산.pdf'] });
+  const tome = await pull({ TOME1: { kind: 'tome' } }, { TOME1: { '601': mail('601') } }, COS);
+  const wt = tome.writes[MQ('TOME1', '601')];
+  assert.ok(wt, '요청은 만들어진다');
+  assert.equal(wt.companyId, '', '받는 주소가 우연히 어느 업체 이메일과 같아도 그 업체로 잇지 않는다');
+  assert.equal(wt.companyName, '하늘수산', '업체 이름은 제목에서 읽는다');
+  const sent = await pull({ SENT1: { kind: 'sent' } }, { SENT1: { '602': mail('602') } }, COS);
+  assert.equal(sent.writes[MQ('SENT1', '602')].companyId, 'coRev', '대조 — 보낸메일함은 받는 주소로 업체를 맞춘다(예전 그대로)');
 });

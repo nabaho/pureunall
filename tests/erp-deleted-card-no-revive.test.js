@@ -206,3 +206,9 @@ test('① 종합 분석이 «계약 이벤트»로 안 보는 메일도(계약�
   const dead = await pull({ ct1: card({ _deleted: true, srcMails: ['Sent|303'] }) }, odd);
   assert.deepEqual(out(dead.res.pulled), [], '지운 카드가 가진 메일이면 당겨 오지 않는다');
 });
+
+test('⑤ 메일 열쇠 자리에 __proto__·constructor 같은 글자가 와도 상속 속성에 걸려 요청이 막히지 않는다', () => {
+  const evil = QREQ({ srcKey: '__proto__', srcMails: ['__proto__', 'constructor', 'toString'] });
+  assert.notEqual(plan(evil, [COREC], [], USERS).action, 'noop', '지운 카드가 없으면 막지 않는다');
+  assert.notEqual(plan(evil, [COREC], [card({ _deleted: true })], USERS).action, 'noop', '지운 카드의 메일(Sent|301)과 무관하면 막지 않는다');
+});
