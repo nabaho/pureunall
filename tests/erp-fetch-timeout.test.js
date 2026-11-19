@@ -158,7 +158,8 @@ test('끊을 수 없는 옛 브라우저는 그냥 지나간다', async () => {
 test('AI 는 시간이 지났을 때와 실패했을 때를 갈라 말한다', () => {
   assert.match(app, /⏱ AI 요약이 45초 안에 오지 않았습니다 — 다시 눌러 주세요/);
   /* AI 도우미 대화(「질문을 짧게 줄여…」·「연결 오류…」)는 2026-09-27 대표 지시로 걷어냈다 */
-  const ai = app.slice(app.indexOf('function aiSummarize(){'), app.indexOf('function aiSummarize(){') + 2600);
+  /* 함수 앞 몇천 자만 자르면 함수가 길어질 때(2026-11-19 개인정보 가림을 넣음) 뒷부분을 못 본다 — 함수째 집는다 */
+  const ai = grab('aiSummarize');
   assert.match(ai, /e && e\.timeout/, '★ 끊긴 것과 실패한 것을 갈라 말하지 않습니다');
 });
 
@@ -189,7 +190,7 @@ test('★ 급여 메일은 «다시 걸지» 않는다 — 다시 걸면 30초�
 
 test('화면이 갇히지 않는다 — 끝나면 반드시 푼다', () => {
   // 시간 제한이 있어도 로딩 표시를 안 풀면 화면은 그대로 갇힌다
-  const ai = app.slice(app.indexOf('function aiSummarize(){'), app.indexOf('function aiSummarize(){') + 2200);
+  const ai = grab('aiSummarize');   // 함수째 — 앞 몇천 자만 자르면 함수가 길어질 때 뒷부분을 못 본다
   assert.match(ai, /\.finally\(function\(\)\{ setAiLoading\(false\); \}\)/);
   /* AI 도우미 대화의 풀기 검사는 그 화면째 걷어내며 뺐다(2026-09-27) */
 });

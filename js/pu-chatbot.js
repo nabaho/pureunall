@@ -1339,8 +1339,8 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1100,
+          model: 'claude-sonnet-5-5',   // 2026-11-19: claude-sonnet-4-20250514 는 2026-06-15 은퇴
+          max_tokens: 2000,             // 새 모델은 생각(thinking)도 이 안에서 쓴다
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }]
         }),
@@ -1354,6 +1354,7 @@
       }).then(function (d) {
         if (d && d.error) throw new Error(d.error.message || 'AI 응답 오류');
         var t = (d && (d.reply || d.text)) || (((d && d.content) || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join(''));
+        if (!t && d && d.stop_reason === 'refusal') throw new Error('AI가 이 질문을 거절했습니다(안전 기준)');
         if (!t) throw new Error('AI 응답이 비어 있습니다');
         return t;
       });

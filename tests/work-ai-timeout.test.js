@@ -123,7 +123,8 @@ test('★ 끊긴 것은 다음 모델로 다시 걸지 않는다', () => {
 
 test('모델 바꿔 걸기 자체는 그대로', () => {
   assert.match(grab('aiCall'), /if\(i<AI_MODELS\.length-1\)\{ i\+\+; return attempt\(\); \}/);
-  assert.match(src, /var AI_MODELS=\['claude-opus-5','claude-sonnet-4-20250514'\];/);
+  /* 모델 이름은 박지 않는다(2026-11-19 은퇴 모델 교체가 여기서 막혔다) — 바꿔 걸려면 «둘 이상» 있어야 한다는 규칙만 본다 */
+  assert.match(src, /var AI_MODELS=\['[^']+'(?:,'[^']+')+\];/, '다음 모델로 바꿔 걸려면 모델이 둘 이상 있어야 한다');
 });
 
 /* ── 부른 쪽이 스스로 되돌아온다 ── */

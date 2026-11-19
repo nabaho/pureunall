@@ -94,7 +94,10 @@ test('★ 설정이 없으면 부르기 전에 말해 준다', () => {
 
 test('빈 답이 와도 「완료」라고 하지 않는다', () => {
   assert.match(SUM, /if\(!text\)\{ showToast\('AI 요약이 비어서 왔습니다/);
-  assert.ok(SUM.indexOf("if(!text){") < SUM.indexOf("upd('summary', text)"), '비었으면 덮어쓰지 않는다');
+  /* 저장하는 자리는 «upd('summary',» 로 찾는다 — 2026-11-19 부터 가린 꼬리표를 되돌린 값(_mk.unmask(text))을 저장한다 */
+  const write = SUM.indexOf("upd('summary',");
+  assert.ok(write > 0, '요약을 저장하는 자리를 찾지 못했다');
+  assert.ok(SUM.indexOf("if(!text){") < write, '비었으면 덮어쓰지 않는다');
 });
 
 test('답 읽는 순서 — reply → text → content', () => {
