@@ -1256,6 +1256,10 @@ rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
    → 이름 붙은 갈래로 두어 $part 를 안 타게 한다: 쓰기는 총괄관리자만 · 서버는 규칙을 안 지나 그대로 쓴다.
      읽기는 그대로(LOGIN — 위 homepage '.read'). 보는 사람은 넓어지지 않고 쓰는 사람만 좁아진다. */
 ['newsBrief', 'newsDocs', 'newsPrec'].forEach((k) => { rules.homepage[k] = { '.write': ADMIN }; });
+/* ★ 홈페이지 방문 통계(homepage/stats)도 «서버만» 쓴다 (2026-11-19 대표 「추천대로」 — 방문 통계 자체 집계).
+     서버 함수 siteHit 이 날짜 칸에 숫자만 올린다(functions/site-stats.js). 화면(홈페이지 관리 「📈 방문 통계」)은 읽기만.
+     $part 규칙을 타면 재직 직원이 숫자를 고칠 수 있어 이름 붙은 갈래로 둔다 — 읽기는 그대로(LOGIN), 쓰기만 좁아진다. */
+rules.homepage.stats = { '.write': ADMIN };
 /* ★ 직원 경력 제안함 (대표 지시 2026-11-01 「필요시 개인이 추가할 수 있게」 · 결정 「대표 확인 뒤」)
      직원이 포털 「내 정보」에서 새 사이트에 실릴 «내 경력»을 보낸다 — 대표가 홈페이지 관리에서 「받기」.
    ⚠ 이름이 붙은 갈래(careerInbox)는 $part 대신 이 규칙을 탄다 — 그래서 남의 칸에는 못 쓴다.
