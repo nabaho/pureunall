@@ -373,10 +373,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
        새로 1 · 바뀜 0 · 사라짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
        새 기준 docs/firebase-rules-콘솔원문-2026-11-19.json(만들개 출력과 같다). 목록을 비운다. */
   /* ★ 2026-11-19 — 법정교육자료함(/edulib) 게시 완료(rules-deploy.js --deploy): 새로 1 · 바뀜 0 · 사라짐 0, 읽기·쓰기 재직 직원(LOGIN)·지우기 금지 — 다시 읽어 «콘솔이 올린 것과 같음» 확인, 새 기준 docs/firebase-rules-콘솔원문-2026-11-19.json(같은 날 판을 갈아 끼움). 목록을 비운다. */
-  /* 2026-11-19 게시 전 — AI 판독 셈(ai_read_tally/$ymd/$app)에 «실제 토큰 원화» 칸 won·wn 을 적었다(AI 비용 정리 ⑤, 대표 「지금」).
-     새로 생김 2 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — 쓰기는 그대로 false(서버만 쓰고, 서버 admin 은 규칙을 안 거친다), 읽기는 ai_read_tally 그대로(LOGIN).
-     게시 전에도 동작은 같다. 게시(rules-deploy.js --deploy 또는 GitHub «Firebase 배포» rules=true)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 두 칸을 뺄 것. */
-  const PENDING = ['/ai_read_tally/$ymd/$app/won', '/ai_read_tally/$ymd/$app/wn'];
+  /* 2026-11-19 게시 전 — AI 판독 셈(ai_read_tally/$ymd/$app)에 «실제 토큰 원화» 칸 won·wn 을 적었다(AI 비용 정리 ⑤, 대표 「지금」). */
+  /* ★ 2026-11-20 — won·wn 게시 완료(GitHub 「Firebase 배포」 실행 44634743342 · rules-deploy.js --deploy, 대표 「지금해」):
+       새로 2 · 바뀜 0 · 사라짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
+       새 기준 docs/firebase-rules-콘솔원문-2026-11-20.json(만들개 출력과 같다) — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
