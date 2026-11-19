@@ -380,9 +380,20 @@ body.slim .t.mt,body.slim .t.bt{min-width:0}
 body.slim .t.fx{table-layout:auto}
 body.slim .t.fx th,body.slim .t.fx td{overflow:visible}
 @media (min-width:1080px){ body.slim .t tbody td.c,body.slim .t tbody td.tk{padding:3px 8px} }
+/* ══ pu-design 시작 — 푸른등기는 탭이 머리줄(.top) 한 줄 안에 있다. 공용 A 틀의 탭 여백(옆 16px·아래 9px)이 머리줄을
+   위아래로 어긋나게 하니(자동 검토 2026-11-20) 자기 탭 여백·간격·단추 안쪽 여백을 그대로 둔다. 이름표가 둘이라 공용 파일보다 세다 ══ */
+:where(body.pu-design) .top .tabs{padding:0;gap:4px}
+:where(body.pu-design) .top .tabs button{padding:5px 13px}
+@media (max-width:768px){
+  :where(body.pu-design) .top .tabs{gap:2px}
+  :where(body.pu-design) .top .tabs button{padding:5px 9px;font-size:13px}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a">
 <div id="head">
   <div class="top">
     <h1>🖋 푸른등기</h1>
