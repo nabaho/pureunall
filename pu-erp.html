@@ -22071,8 +22071,17 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   var ty = erpConsTypeByDocName(docName || scope, consTypes || []);
   if(ty && ty.code) return { kind:'consulting', typeCode:ty.code };
   if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(text)){
+    /* ⚠ 유형을 못 골랐으면 «안 고른다» — 목록 첫 번째를 그냥 찍으면 «인사노무 컨설팅» 위임계약서도
+       현장클리닉이 된다(2026-11-16 점검: 계약 6건이 그렇게 잘못 찍혀 있었다). 사업 이름이 글에 나오고
+       그 이름을 가진 유형이 «딱 하나»일 때만 고른다. 둘 이상이거나 없으면 비워 두어 사람이 고른다
+       (아래 호출부는 typeCode 가 있을 때만 담는다). */
     var kList = consTypes || [];
-    return { kind:'consulting', typeCode:(kList[0] && kList[0].code) || '' };
+    var kwHit = ['클리닉', '일터혁신', '기술보호'].filter(function(kw){ return text.indexOf(kw) >= 0; });
+    if(kwHit.length === 1){
+      var byKw = kList.filter(function(t){ return t && t.code && String(t.name || '').replace(/\s/g, '').indexOf(kwHit[0]) >= 0; });
+      if(byKw.length === 1) return { kind:'consulting', typeCode:byKw[0].code };
+    }
+    return { kind:'consulting', typeCode:'' };
   }
   if(/위임|약정/.test(text)){
     var cList2 = caseTypes || [];

@@ -1898,6 +1898,17 @@
 
   var SKIP_CUSTOM_SLUG_RE = /^(?:기타광고|뉴스레터 발송분|쇼핑|소셜|프로모션|카페편지함|이력서|13_ 경조사)/;
 
+  /* 사진첩 길 전용 — 제목·서류 이름이 «종료·해지 통보»인가.
+     isTerminatedMailText 는 «자문계약 종료» 만으로도 걸려 「자문계약 종료 후 신규 계약서 송부」 같은
+     갱신 계약서 메일까지 막는다. 여기서는 통보 낱말(통보·요청·통지·안내·의 건·합의·확인)이 붙었거나
+     계약서 낱말(계약서·약정서·위임장·서명본·날인본)이 없을 때만 통보로 본다(2026-11-16 검토 지적). */
+  function isTerminationNoticeTitle(t) {
+    var s = String(t == null ? '' : t);
+    if (!isTerminatedMailText(s, '')) return false;
+    if (/(?:해지|종료)\s*(?:통보|요청|통지|안내|의\s*건|합의|확인)/.test(s)) return true;
+    return !/계약서|약정서|위임장|서명본|날인본/.test(s);
+  }
+
   function isDraftOrReviewRequest(subj, attNames, bodyTxt) {
     var head = String(subj || '') + ' ' + (Array.isArray(attNames) ? attNames.join(' ') : '');
     if (!/계약서|약정서|합의서|협약서|규정/.test(head)) return false;
@@ -2350,7 +2361,10 @@
     o = o || {};
     var f = o.fields || {};
     var mm = o.mailMeta || {};
-    if (mm && isTerminatedMailText(mm.subject || '', mm.body || '')) {
+    /* 종료·해지 «통보»(메일 제목·본문·서류 이름)는 새 계약이 아니다 — 요청을 안 만든다(아무것도 지우지 않는다).
+       제목은 «통보»일 때만 건다(isTerminationNoticeTitle) — 「자문계약 종료 후 신규 계약서 송부」 같은 갱신 계약서는 통과.
+       본문은 isTerminatedMailText 의 본문 갈래 그대로, 서류 이름(날인본 파일명 따위)도 본다(2026-11-16 점검). */
+    if ((mm && (isTerminationNoticeTitle(mm.subject) || isTerminatedMailText('', mm.body || ''))) || isTerminationNoticeTitle(f.docName)) {
       return Promise.resolve({ ok: false, reason: 'terminated_mail' });
     }
     var compName = String(f.company || '').trim();
