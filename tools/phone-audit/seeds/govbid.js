@@ -29,6 +29,20 @@ const 지역줄 = [
     openDt: addDays(-7) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: 23000000 + i * 4567891, mthd: '일반경쟁', kw: '노무', rgn: rgn || undefined,
     url: 'https://example.com/rg' + i, savedAt: addDays(-(i % 4)) + 'T09:00:00', hidden: false });
 });
+/* 🤖 AI 사업 탭(2026-11-19)이 그리는 줄 — 찾는 말에는 안 걸리고 AI 갈래로만 걸린 줄(kw 빔 · ai 표시) + 노무 말에도 걸린 AI 줄.
+   「AI 기반 … 감시 구축」은 AI 갈래가 아니라 원래 안 담기는 줄이라 넣지 않는다(모두 지어낸 이름) */
+const AI줄 = [
+  ['기업마당', '점검정보산업진흥원', '', '2027년 AI바우처 지원사업 공급기업 등록 안내(가나다라마바사아자차카타파하)', 6, 'voucher'],
+  ['기업마당', '중소벤처점검부', '', '2027년 중소기업 스마트서비스 지원사업 공고', 15, 'smart'],
+  ['나라장터', '점검테크노파크', '', '2027년 스마트공장 구축 및 고도화 지원사업 운영 용역', 10, 'factory'],
+  ['기업마당', '점검노동부', '노무,인사', '영세사업장 인사노무관리체계 구축 지원사업 공급기업 모집', 21, 'hr'],
+  ['나라장터', '점검진흥원', '', '소상공인 AX 전환 지원사업 운영 용역', -3, 'ai']
+];
+AI줄.forEach(([src, org, kw, nm, d, ai], i) => {
+  feed.push({ id: 'G' + String(41 + i).padStart(4, '0'), no: 'R26AI' + String(3000000 + i * 43) + '-000', src, type: d < 0 ? '지나감' : '새 공고', nm, org, ntce: org,
+    openDt: addDays(-5) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: 0, mthd: '', kw, ai,
+    url: 'https://example.com/ai' + i, savedAt: addDays(-(i % 3)) + 'T09:00:00', hidden: false });
+});
 const plan = [];
 for (let i = 0; i < 26; i++) {
   const ym = addDays((i % 8) * 30 - 60).slice(0, 7);
@@ -43,6 +57,11 @@ for (let i = 0; i < 28; i++) hits['h' + i] = { key: 'h' + i, title: (i % 2 ? '[�
  ['cri', '충북연구원 공지사항', '외부 자문위원 위촉 공고', -2],
  ['nosa', '노사발전재단 사업공고/모집', '2027 충북 지역 일터혁신 컨설턴트 모집', 14]].forEach(([board, boardName, title, d], i) => {
   hits['rg' + i] = { key: 'rg' + i, title, date: addDays(-i), board, boardName, href: 'https://example.com/rg-h' + i, per: { to: addDays(d) } };
+});
+/* 🤖 AI 사업 쪽 모집 글 — 데이터바우처 게시판(서버 번호 voucher) · 공단 AI훈련코치(기관 hrdkai) */
+[['voucher', '', '데이터산업진흥원 알림', '2027 데이터 공급기업 풀 평가위원 모집', 8],
+ ['hrdk', 'hrdkai', 'HRD 전문가 인력풀 신청공고', '중소기업 AI훈련확산센터 AI훈련코치 모집', 11]].forEach(([board, org, boardName, title, d], i) => {
+  hits['ai' + i] = { key: 'ai' + i, title, date: addDays(-i), board, org, boardName, href: 'https://example.com/ai-h' + i, per: { to: addDays(d) } };
 });
 module.exports = {
   localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
@@ -63,5 +82,7 @@ module.exports = {
     { name: 'rechist', run: async (p) => { await p.evaluate(() => recSub('hist')); } },
     { name: 'rgn', run: async (p) => { await p.click('#tbRgn'); } },
     { name: 'rgnsel', run: async (p) => { for (const k of [1, 2]) await p.click('#rgnTb tr:nth-child(' + k + ') input.row-chk'); } },
+    { name: 'ai', run: async (p) => { await p.click('#tbAi'); } },
+    { name: 'aisel', run: async (p) => { for (const k of [1, 2]) await p.click('#aiTb tr:nth-child(' + k + ') input.row-chk'); } },
   ],
 };

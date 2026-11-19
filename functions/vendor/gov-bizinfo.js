@@ -24,6 +24,9 @@
   var FIELDS = { '01': '금융', '02': '기술', '03': '인력', '04': '수출',
                  '05': '내수', '06': '창업', '07': '경영', '09': '기타' };
   var FIELDS_DEFAULT = ['03', '07'];              /* 인력 · 경영 */
+  /* 🤖 AI 사업 탭 몫(대표 지시 2026-11-19) — AI·클라우드 바우처·스마트공장 지원사업은 «기술» 분야에 실린다.
+     전국 길로만 한 번 더 받는다(하루 1,000회 제한 안). 찾는 말·AI 갈래(GovG2b.judgeAi)로 똑같이 거른다. */
+  var FIELDS_AI = ['02'];                          /* 기술 */
 
   /* 해시태그로 지역을 좁힌다 — 실측상 대표 지원처가 충남·세종·대전·충북에 몰려 있다.
      ⚠ 비워 두면 전국이 온다. 그것도 쓸모가 있으므로 «끌 수 있게» 둔다. */
@@ -102,7 +105,7 @@
      ⚠ 상한은 «실호출로 확인하지 못했다» — 거절되면 둘째 길만 조용히 건너뛴다(gov.html). */
   var NATION_COUNT = 500;
 
-  var api = { BASE: BASE, FIELDS: FIELDS, FIELDS_DEFAULT: FIELDS_DEFAULT, NATION_COUNT: NATION_COUNT,
+  var api = { BASE: BASE, FIELDS: FIELDS, FIELDS_DEFAULT: FIELDS_DEFAULT, FIELDS_AI: FIELDS_AI, NATION_COUNT: NATION_COUNT,
               REGIONS_DEFAULT: REGIONS_DEFAULT,
               buildUrl: buildUrl, parse: parse, period: period };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
