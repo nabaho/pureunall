@@ -2072,6 +2072,7 @@
             }
           }
           if ((artDirect || artMaxTier >= tokenMeta.requiredMinTier) && asc > 0) {
+            var artFullText = String(art.text || '');
             articleHits.push({
               lawDir: law.dir,
               lawTitle: law.title,
@@ -2079,7 +2080,17 @@
               effectiveDate: law.effectiveDate,
               articleNo: art.no,
               heading: art.heading,
-              snippet: String(art.text || '').slice(0, 240),
+              fullText: artFullText,
+              snippet: extractLegalEvidenceExcerpt(artFullText, {
+                query: rawUserQ || qStr,
+                expandedQuery: ops.expandedQuery,
+                phrases: ops.phrases,
+                tokens: tokens,
+                tokenMeta: tokenMeta,
+                maxChars: 280,
+                docKind: 'article',
+                multiline: false
+              }),
               score: Math.round(asc * 10) / 10
             });
           }
@@ -3023,7 +3034,394 @@
     };
   }
 
-  /* AI 질의용 근거 프롬프트 조립 (환각 차단용 원문 강제 주입 + 외부 AI 전달 전 전체 민감정보 비식별 관문 통과) */
+  /* ══════════════════════════════════════════════════════════════
+   * 원문 100% 보존형 동적 앵커 문장 발췌기 (No-Stitching Verbatim RAG Context)
+   * - 생성형 문장 합성(Diffusion/AR Stitching) 없이 원문 부분문자열만 순서대로 보존
+   * - 생략 구간은 명시적 `[…]` 기호로만 표기하여 법률 조문·판결문 왜곡 및 환각 원천 차단
+   * - 【판결요지】·【결정요지】·주문·회시 및 `다만` 단서 조항 인접 동반 보존(Proviso Coupling)
+   * ══════════════════════════════════════════════════════════════ */
+  var LEGAL_HOLDING_HEADER_RE = /^(?:【\s*(?:판결요지|결정요지|판시사항|주\s*문|회\s*시|결\s*론|판\s*단|요\s*지)\s*】|\[\s*(?:판결요지|결정요지|판시사항|주\s*문|회\s*시|결\s*론|요\s*지)\s*\]|(?:주\s*문|판결요지|결정요지|판시사항|회\s*시)\s*$)/;
+  var LEGAL_REASON_HEADER_RE = /^(?:【\s*이\s*유\s*】|\[\s*이\s*유\s*\]|이\s*유\s*$)/;
+  var LEGAL_BOILERPLATE_HEADER_RE = /^(?:【\s*(?:당사자|원심판결|피고\s*,\s*상고인|원고\s*,\s*피상고인|소송대리인|변론종결|참조조문|참조판례)\s*】|\[\s*(?:참조조문|참조판례|원심판결)\s*\]|(?:소송대리인|변론종결|원심법원|재판장\s*판사)\s*[:：])/;
+  var LEGAL_PROVISO_START_RE = /^(?:[①-⑳]|\d+\.|[가-하]\.)?\s*(?:다만|단\s*,|그러나\s+위와\s+같은|예외적으로)/;
+  var LEGAL_PROVISO_ANY_RE = /(?:(?:^|[\s,.;])다만[\s,]|단서|그러하지\s*아니하|예외로\s*한다|적용하지\s*아니한다|제외한다|한한다)/;
+  var LEGAL_HOLDING_PREDICATE_RE = /(?:타당하다|위법하다|부당하다|무효이다|무효로\s*본다|해석함이\s*상당|보아야\s*한다|볼\s*수\s*없다|인정된다|인정하기\s*어렵다|해당한다|해당하지\s*아니한다|정당한\s*이유가\s*없다|정당한\s*이유가\s*있다|산입된다|포함된다)/;
+
+  /* 효용 극대화 닫힌해 기반 동적 문맥 유지 비율 r* = min(0.5 * (sqrt(1 + 2R / beta) - 1), 1) */
+  function computeDynamicRetentionRatio(normRelevance, beta) {
+    var relNum = Number(normRelevance);
+    var r = Number.isFinite(relNum) ? Math.max(0, Math.min(1, relNum)) : 0;
+    var betaNum = Number(beta);
+    var b = (Number.isFinite(betaNum) && betaNum > 0) ? Math.max(0.05, betaNum) : 0.25;
+    var ratio = 0.5 * (Math.sqrt(1 + (2 * r) / b) - 1);
+    return Math.max(0, Math.min(1, Math.round(ratio * 1000) / 1000));
+  }
+
+  function computeDynamicCharBudget(normRelevance, minChars, maxChars, beta) {
+    var minNum = Number(minChars);
+    var maxNum = Number(maxChars);
+    var lo = Number.isFinite(minNum) ? Math.max(80, Math.round(minNum)) : 400;
+    var hi = Number.isFinite(maxNum) ? Math.max(lo, Math.round(maxNum)) : 2000;
+    var rStar = computeDynamicRetentionRatio(normRelevance, beta);
+    return Math.round(lo + (hi - lo) * rStar);
+  }
+
+  /* 날짜(2024. 12. 19.)·목차기호(1., 가., 다.)는 보존하고 한국어 법률 문장·항(①~⑳) 경계만 선형 분할 */
+  function splitLegalUnits(rawText) {
+    var src = String(rawText || '').replace(/\r\n?/g, '\n').slice(0, 60000).trim();
+    if (!src) return [];
+    var paras = src.split(/\n+/);
+    var units = [];
+    var sentRe = /([가-힣0-9)\]」』"”'](?:[가-힣][.)\]」』"”']?\.|[가-힣]\)\.|[가-힣][?!]))((?:\s*<[^>]{1,60}>|\s*\[(?:개정|신설|전문개정|본조신설|제목개정)[^\]]{0,60}\])*)(\s+)/g;
+    var nextStartRe = /[가-힣0-9\[【(「『①-⑳]/;
+
+    for (var pIdx = 0; pIdx < paras.length; pIdx++) {
+      var pLine = paras[pIdx].trim();
+      if (!pLine) continue;
+      var subBlocks = pLine.split(/\s(?=[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/);
+      for (var sb = 0; sb < subBlocks.length; sb++) {
+        var blk = subBlocks[sb].trim();
+        if (!blk) continue;
+        sentRe.lastIndex = 0;
+        var lastIdx = 0;
+        var sm;
+        while ((sm = sentRe.exec(blk))) {
+          var cutEnd = sm.index + sm[1].length + sm[2].length;
+          var afterWs = cutEnd + sm[3].length;
+          if (afterWs >= blk.length || !nextStartRe.test(blk.charAt(afterWs))) continue;
+          var piece = blk.slice(lastIdx, cutEnd).trim();
+          if (piece) {
+            units.push({ idx: units.length, paraIdx: pIdx, text: piece });
+          }
+          lastIdx = afterWs;
+        }
+        var rest = blk.slice(lastIdx).trim();
+        if (rest) {
+          units.push({ idx: units.length, paraIdx: pIdx, text: rest });
+        }
+      }
+    }
+    return units;
+  }
+
+  function extractDocSalientTerms(units, excludeSet) {
+    var freq = new Map();
+    var wordRe = /[가-힣]{2,12}|제\d{1,4}조(?:의\d{1,2})?/g;
+    for (var i = 0; i < units.length; i++) {
+      if (units[i].isBoilerplate) continue;
+      var seenInUnit = new Set();
+      var wm;
+      wordRe.lastIndex = 0;
+      while ((wm = wordRe.exec(units[i].low))) {
+        var w = wm[0].replace(/(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만|란|이란)$/, '');
+        if (w.length < 2) continue;
+        if (LOW_INFO_QUERY_TOKENS.has(w) || (excludeSet && excludeSet.has(w))) continue;
+        if (seenInUnit.has(w)) continue;
+        seenInUnit.add(w);
+        freq.set(w, (freq.get(w) || 0) + 1);
+      }
+    }
+    var nUnits = Math.max(units.length, 1);
+    var scored = [];
+    freq.forEach(function (df, term) {
+      if (nUnits >= 6 && df > Math.ceil(nUnits * 0.7)) return;
+      var idf = 1 + Math.log((nUnits + 1) / (df + 1));
+      var bonus = /^제\d+조/.test(term) ? 1.4 : (term.length >= 3 ? 1.15 : 0.9);
+      scored.push({ term: term, score: df * idf * bonus });
+    });
+    scored.sort(function (a, b) { return b.score - a.score; });
+    return scored.slice(0, 8).map(function (x) { return x.term; });
+  }
+
+  function sliceVerbatimWindowAroundAnchor(unitText, anchorTerms, maxChars, hasSkippedBefore, hasSkippedAfter) {
+    var src = String(unitText || '').trim();
+    if (!src) return '';
+    if (src.length <= maxChars && !hasSkippedBefore && !hasSkippedAfter) return src;
+    var low = src.toLowerCase();
+    var hitPos = -1;
+    for (var i = 0; i < anchorTerms.length; i++) {
+      var t = anchorTerms[i];
+      if (!t) continue;
+      var idx = low.indexOf(t.toLowerCase());
+      if (idx >= 0) { hitPos = idx; break; }
+    }
+    if (hitPos < 0) {
+      var pm = LEGAL_PROVISO_ANY_RE.exec(src) || LEGAL_HOLDING_PREDICATE_RE.exec(src);
+      if (pm) hitPos = pm.index;
+    }
+
+    var reservePre = (hasSkippedBefore || hitPos > 40) ? 4 : 0;
+    var reservePost = 4;
+    var avail = Math.max(24, maxChars - reservePre - reservePost);
+    if (avail >= src.length) {
+      var fullOut = (hasSkippedBefore ? '[…] ' : '') + src + (hasSkippedAfter ? ' […]' : '');
+      if (fullOut.length <= maxChars) return fullOut;
+    }
+
+    var rawStart = hitPos > 0 ? Math.max(0, hitPos - Math.floor(avail * 0.32)) : 0;
+    rawStart = Math.min(rawStart, Math.max(0, src.length - avail));
+    if (rawStart > 0) {
+      var spAfter = src.indexOf(' ', rawStart);
+      if (spAfter > rawStart && spAfter - rawStart <= 16) rawStart = spAfter + 1;
+    }
+    var needPrefix = hasSkippedBefore || rawStart > 0;
+    var prefix = needPrefix ? '[…] ' : '';
+    var maxBody = Math.max(16, maxChars - prefix.length);
+    var rawEnd = Math.min(src.length, rawStart + maxBody);
+    var needSuffix = hasSkippedAfter || rawEnd < src.length;
+    if (needSuffix) {
+      rawEnd = Math.min(src.length, rawStart + Math.max(12, maxChars - prefix.length - 4));
+      if (rawEnd < src.length) {
+        var spBefore = src.lastIndexOf(' ', rawEnd);
+        if (spBefore > rawStart + 24 && rawEnd - spBefore <= 16) rawEnd = spBefore;
+      }
+    }
+    var suffix = (hasSkippedAfter || rawEnd < src.length) ? ' […]' : '';
+    var bodySlice = src.slice(rawStart, rawEnd).trim();
+    return prefix + bodySlice + suffix;
+  }
+
+  function assembleSelectedLegalUnits(units, pickedSet, multiline) {
+    var idxs = Array.from(pickedSet).sort(function (a, b) { return a - b; });
+    if (!idxs.length) return '';
+    var parts = [];
+    if (idxs[0] > 0) {
+      parts.push('[…] ');
+    }
+    parts.push(units[idxs[0]].text);
+    for (var m = 1; m < idxs.length; m++) {
+      var prev = idxs[m - 1];
+      var cur = idxs[m];
+      if (cur === prev + 1) {
+        parts.push((multiline && units[cur].paraIdx !== units[prev].paraIdx) ? '\n' : ' ');
+      } else {
+        parts.push(multiline ? '\n[…]\n' : ' […] ');
+      }
+      parts.push(units[cur].text);
+    }
+    if (idxs[idxs.length - 1] < units.length - 1) {
+      parts.push(' […]');
+    }
+    return parts.join('');
+  }
+
+  function extractLegalEvidenceExcerpt(rawText, opts) {
+    opts = opts || {};
+    var multiline = opts.multiline !== false;
+    var src = String(rawText || '').replace(/\r\n?/g, '\n').slice(0, 60000).trim();
+    if (!src) return '';
+    var formattedWhole = multiline ? src : src.replace(/\s+/g, ' ');
+    var maxNum = Number(opts.maxChars);
+    var maxChars = Number.isFinite(maxNum) ? Math.max(80, Math.round(maxNum)) : 1400;
+    if (formattedWhole.length <= maxChars) return formattedWhole;
+
+    var units = splitLegalUnits(src);
+    if (!units.length) return formattedWhole.slice(0, Math.max(16, maxChars - 4)).trim() + ' […]';
+
+    var rawQuery = String(opts.query || '').trim();
+    var ops = rawQuery ? parseSmartQueryOperators(rawQuery) : { baseQuery: '', expandedQuery: '', phrases: [] };
+    var phrases = Array.isArray(opts.phrases) ? opts.phrases : ops.phrases;
+    var tokens = Array.isArray(opts.tokens)
+      ? opts.tokens
+      : tokenizeQuery(String(opts.expandedQuery || ops.expandedQuery || rawQuery));
+    var tokenMeta = opts.tokenMeta || null;
+    var qNorm = ops.baseQuery.toLowerCase().replace(/\s+/g, '');
+    var docKind = String(opts.docKind || 'ruling');
+
+    var inHoldingSection = false;
+    var inBoilerplateSection = false;
+    var activeHeaderIdx = -1;
+    for (var i = 0; i < units.length; i++) {
+      var u = units[i];
+      u.low = u.text.toLowerCase();
+      u.noSpace = u.low.replace(/\s+/g, '');
+      u.isHoldingHeader = LEGAL_HOLDING_HEADER_RE.test(u.text);
+      u.isReasonHeader = LEGAL_REASON_HEADER_RE.test(u.text);
+      u.isBoilerplateHeader = LEGAL_BOILERPLATE_HEADER_RE.test(u.text);
+      if (u.isHoldingHeader) {
+        inHoldingSection = true;
+        inBoilerplateSection = false;
+        activeHeaderIdx = i;
+      } else if (u.isReasonHeader || /^【[^】]{1,20}】/.test(u.text)) {
+        inHoldingSection = false;
+        inBoilerplateSection = u.isBoilerplateHeader;
+        activeHeaderIdx = -1;
+      } else if (u.isBoilerplateHeader) {
+        inBoilerplateSection = true;
+      }
+      u.inHolding = inHoldingSection && !u.isHoldingHeader;
+      u.headerIdx = u.inHolding ? activeHeaderIdx : -1;
+      u.isBoilerplate = u.isBoilerplateHeader || (inBoilerplateSection && u.text.length < 180);
+      u.startsWithProviso = LEGAL_PROVISO_START_RE.test(u.text);
+      u.hasProviso = u.startsWithProviso || LEGAL_PROVISO_ANY_RE.test(u.text);
+      u.hasHoldingPred = LEGAL_HOLDING_PREDICATE_RE.test(u.text);
+    }
+
+    var tokenSet = new Set(tokens);
+    var salientTerms = extractDocSalientTerms(units, tokenSet);
+    var tier2WindowTerms = [];
+    var tier1WindowTerms = [];
+    for (var tkIdx = 0; tkIdx < tokens.length; tkIdx++) {
+      var tkItem = tokens[tkIdx];
+      var tkTier = tokenMeta ? tokenMeta.tiers[tkIdx] : tokenSpecificityTier(tkItem);
+      if (tkTier >= 2) tier2WindowTerms.push(tkItem);
+      else if (tkTier === 1) tier1WindowTerms.push(tkItem);
+    }
+    var priorityWindowTerms = phrases.concat(tier2WindowTerms, tier1WindowTerms, salientTerms);
+
+    for (var j = 0; j < units.length; j++) {
+      var unit = units[j];
+      var sc = 0;
+      var queryHits = 0;
+      var tier2Hits = 0;
+
+      if (qNorm && qNorm.length >= 2 && unit.noSpace.indexOf(qNorm) >= 0) {
+        sc += 28;
+        queryHits++;
+      }
+      for (var ph = 0; ph < phrases.length; ph++) {
+        var phNorm = String(phrases[ph] || '').toLowerCase().replace(/\s+/g, '');
+        if (phNorm && (unit.low.indexOf(phrases[ph].toLowerCase()) >= 0 || unit.noSpace.indexOf(phNorm) >= 0)) {
+          sc += 30;
+          queryHits++;
+          tier2Hits++;
+        }
+      }
+      for (var t = 0; t < tokens.length; t++) {
+        var tok = tokens[t];
+        var tokNoSpace = tok.replace(/\s+/g, '');
+        if (unit.low.indexOf(tok) >= 0 || (tokNoSpace.length >= 3 && unit.noSpace.indexOf(tokNoSpace) >= 0)) {
+          var tier = tokenMeta ? tokenMeta.tiers[t] : tokenSpecificityTier(tok);
+          var w = tokenMeta ? tokenMeta.weights[t] : (tier === 0 ? 0.2 : (tier === 1 ? 0.6 : 1.2));
+          sc += (tier >= 2 ? 18 : (tier === 1 ? 7 : 1.2)) * w;
+          queryHits++;
+          if (tier >= 2) tier2Hits++;
+        }
+      }
+      if (tier2Hits >= 2) {
+        sc += 14 * (tier2Hits - 1);
+      }
+      for (var st = 0; st < salientTerms.length; st++) {
+        if (unit.low.indexOf(salientTerms[st]) >= 0) {
+          sc += 3.5;
+        }
+      }
+      if (docKind === 'attachment' && Array.isArray(CLAUSE_RISK_RULES)) {
+        for (var cr = 0; cr < CLAUSE_RISK_RULES.length; cr++) {
+          if (CLAUSE_RISK_RULES[cr].pattern.test(unit.text)) {
+            sc += CLAUSE_RISK_RULES[cr].severity === 'high' ? 48 : 32;
+            queryHits++;
+          }
+        }
+      }
+      if (unit.inHolding) {
+        sc += 28;
+      }
+      if (unit.hasHoldingPred) {
+        var inTailConclusion = j >= Math.floor(units.length * 0.65);
+        sc += (queryHits > 0 || inTailConclusion) ? 14 : 6;
+      }
+      if (unit.hasProviso) {
+        sc += (docKind === 'article' || queryHits > 0 || unit.inHolding) ? 20 : 11;
+      }
+      if (unit.isHoldingHeader) {
+        sc -= 10;
+      }
+      if (unit.isBoilerplate && queryHits === 0) {
+        sc -= 30;
+      }
+      unit.score = sc;
+      unit.queryHits = queryHits;
+    }
+
+    if (units.length === 1) {
+      return sliceVerbatimWindowAroundAnchor(units[0].text, priorityWindowTerms, maxChars, false, false);
+    }
+
+    var picked = new Set();
+    function tryAddIndices(idxArr) {
+      var addedAny = false;
+      var nextSet = new Set(picked);
+      for (var k = 0; k < idxArr.length; k++) {
+        var cIdx = idxArr[k];
+        if (cIdx < 0 || cIdx >= units.length || nextSet.has(cIdx)) continue;
+        nextSet.add(cIdx);
+        addedAny = true;
+      }
+      if (!addedAny) return true;
+      var assembled = assembleSelectedLegalUnits(units, nextSet, multiline);
+      if (assembled.length <= maxChars) {
+        picked = nextSet;
+        return true;
+      }
+      return false;
+    }
+
+    /* 넉넉한 RAG 예산일 때는 문서 서두(제1항 또는 사건 도입 1문장)를 먼저 확보해 문맥 정합성 유지 */
+    var leadIdx = -1;
+    for (var li = 0; li < Math.min(units.length, 3); li++) {
+      if (!units[li].isBoilerplate && !units[li].isHoldingHeader && !units[li].isReasonHeader) {
+        leadIdx = li;
+        break;
+      }
+    }
+    if (leadIdx >= 0 && maxChars >= 420 && units[leadIdx].text.length <= Math.floor(maxChars * 0.34)) {
+      tryAddIndices([leadIdx]);
+    }
+
+    var ranked = units.slice().sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.idx - b.idx;
+    });
+
+    for (var rIdx = 0; rIdx < ranked.length; rIdx++) {
+      var cand = ranked[rIdx];
+      if (cand.isHoldingHeader || cand.isReasonHeader) continue;
+      if (cand.score <= 0 && picked.size > 0) break;
+
+      /* 본문-단서(`다만`) 및 【판결요지】 헤더 인접 동반 보존 */
+      var bundle = [];
+      if (cand.headerIdx >= 0 && units[cand.headerIdx].text.length <= 24) {
+        bundle.push(cand.headerIdx);
+      }
+      if (cand.startsWithProviso && cand.idx > 0 && !units[cand.idx - 1].isHoldingHeader && !units[cand.idx - 1].isReasonHeader) {
+        bundle.push(cand.idx - 1);
+      }
+      bundle.push(cand.idx);
+      if (cand.idx + 1 < units.length && units[cand.idx + 1].startsWithProviso) {
+        bundle.push(cand.idx + 1);
+      }
+
+      if (!tryAddIndices(bundle)) {
+        tryAddIndices([cand.idx]);
+        if (cand.idx + 1 < units.length && units[cand.idx + 1].startsWithProviso) {
+          tryAddIndices([cand.idx + 1]);
+        }
+      }
+    }
+
+    /* 남는 예산에 서두·순차 문장을 채워 정보 밀도 확보 */
+    for (var fi = 0; fi < units.length; fi++) {
+      if (units[fi].isBoilerplate || units[fi].isHoldingHeader || units[fi].isReasonHeader) continue;
+      if (picked.has(fi)) continue;
+      tryAddIndices([fi]);
+    }
+
+    if (picked.size === 0) {
+      var bestUnit = ranked[0] || units[0];
+      return sliceVerbatimWindowAroundAnchor(
+        bestUnit.text,
+        priorityWindowTerms,
+        maxChars,
+        bestUnit.idx > 0,
+        bestUnit.idx < units.length - 1
+      );
+    }
+
+    return assembleSelectedLegalUnits(units, picked, multiline);
+  }
+
+  /* AI 질의용 근거 프롬프트 조립 (환각 차단용 원문 강제 주입 + 동적 예산·핵심 앵커 원문 발췌 + 민감정보 비식별 관문 통과) */
   function buildRagPrompt(params) {
     params = params || {};
     var rawQuery = String(params.query || '').trim();
@@ -3040,6 +3438,17 @@
     var scrub = function (s) { return anonymizeLegalText(String(s || ''), promptNames).text; };
     var query = scrub(rawQuery);
     var matchedIssues = detectFactIssues(query);
+
+    var ops = parseSmartQueryOperators(query);
+    var issueBoost = matchedIssues.map(function (m) {
+      return (m.boostQuery || '') + ' ' + (m.coreLaws || []).join(' ');
+    }).join(' ');
+    var expandedAnchorQuery = (ops.expandedQuery + ' ' + issueBoost).trim();
+    var qNorm = ops.baseQuery.toLowerCase().replace(/\s+/g, '');
+    var ragDocsSlice = retrievedDocs.slice(0, 8);
+    var ragArtsSlice = retrievedArticles.slice(0, 6);
+    var tokens = tokenizeQuery(expandedAnchorQuery);
+    var tokenMeta = buildTokenScoringMeta(tokens, ragDocsSlice);
 
     var ctxLines = [];
     ctxLines.push('당신은 푸른노무법인의 법률·노무 AI 리서치 시스템 「P박스」입니다.');
@@ -3063,16 +3472,82 @@
     ctxLines.push('\n═══ [제공된 검증 원문 자료] ═══');
     for (var a = 0; a < attached.length; a++) {
       var att = attached[a];
-      ctxLines.push('[사용자 @첨부 ' + (a + 1) + '] ' + scrub(att.title || '') + (att.caseNo ? ' (' + scrub(att.caseNo) + ')' : '') + '\n' + scrub(String(att.body || att.plainText || att.summary || '').slice(0, 2200)));
+      var safeAttFull = scrub(String(att.body || att.plainText || att.summary || ''));
+      var attRel = a === 0 ? 1 : (1 / (1 + 0.45 * a));
+      var attBudget = computeDynamicCharBudget(attRel, 1800, 3200, 0.25);
+      var attExcerpt = extractLegalEvidenceExcerpt(safeAttFull, {
+        query: query,
+        expandedQuery: expandedAnchorQuery,
+        phrases: ops.phrases,
+        tokens: tokens,
+        tokenMeta: tokenMeta,
+        maxChars: attBudget,
+        docKind: 'attachment',
+        multiline: true
+      });
+      ctxLines.push('[사용자 @첨부 ' + (a + 1) + '] ' + scrub(att.title || '') + (att.caseNo ? ' (' + scrub(att.caseNo) + ')' : '') + '\n' + attExcerpt);
     }
-    for (var r = 0; r < Math.min(retrievedArticles.length, 6); r++) {
-      var art = retrievedArticles[r];
-      ctxLines.push('[법령 조문 ' + (r + 1) + '] ' + art.lawTitle + ' ' + art.articleNo + (art.heading ? '(' + art.heading + ')' : '') + ' [시행 ' + (art.effectiveDate || '현행') + ']\n' + art.snippet);
+
+    var maxArtScore = 1;
+    for (var arIdx = 0; arIdx < ragArtsSlice.length; arIdx++) {
+      var arSc = Number(ragArtsSlice[arIdx] && ragArtsSlice[arIdx].score);
+      if (Number.isFinite(arSc) && arSc > maxArtScore) maxArtScore = arSc;
     }
-    for (var d = 0; d < Math.min(retrievedDocs.length, 8); d++) {
-      var doc = retrievedDocs[d];
+    for (var r = 0; r < ragArtsSlice.length; r++) {
+      var art = ragArtsSlice[r];
+      var artRankPrior = 1 / (1 + 0.3 * r);
+      var artScoreVal = Number(art.score);
+      var artNormRel = (Number.isFinite(artScoreVal) && artScoreVal > 0)
+        ? (0.7 * (artScoreVal / maxArtScore) + 0.3 * artRankPrior)
+        : artRankPrior;
+      var artBudget = computeDynamicCharBudget(artNormRel, 420, 1200, 0.25);
+      var safeArtFull = scrub(String(art.fullText || art.text || art.snippet || ''));
+      var artBodyOut = art.isAttachment
+        ? scrub(String(art.snippet || ''))
+        : extractLegalEvidenceExcerpt(safeArtFull, {
+            query: query,
+            expandedQuery: expandedAnchorQuery,
+            phrases: ops.phrases,
+            tokens: tokens,
+            tokenMeta: tokenMeta,
+            maxChars: artBudget,
+            docKind: 'article',
+            multiline: true
+          });
+      ctxLines.push('[법령 조문 ' + (r + 1) + '] ' + scrub(art.lawTitle || '') + ' ' + scrub(art.articleNo || '') + (art.heading ? '(' + scrub(art.heading) + ')' : '') + ' [시행 ' + scrub(art.effectiveDate || '현행') + ']\n' + artBodyOut);
+    }
+
+    var docRawScores = [];
+    var maxDocScore = 1;
+    for (var ds = 0; ds < ragDocsSlice.length; ds++) {
+      var scVal = scoreDocument(ragDocsSlice[ds], tokens, qNorm, tokenMeta, ops.phrases.length > 0);
+      docRawScores.push(scVal);
+      if (scVal > maxDocScore) maxDocScore = scVal;
+    }
+    for (var d = 0; d < ragDocsSlice.length; d++) {
+      var doc = ragDocsSlice[d];
       var kindTag = isInterpDoc(doc) ? '행정해석·유권해석' : (isDecisionDoc(doc) ? '위원회 결정·재결례' : '법원·헌재 판례');
-      ctxLines.push('[' + kindTag + ' ' + (d + 1) + '] ' + scrub(doc.court || doc.agency || '') + ' ' + (doc.decisionDate || '') + ' ' + scrub(doc.caseNo || '') + ' — ' + scrub(doc.title || '') + '\n' + scrub(String(doc.body || doc.summary || '').slice(0, 1400)));
+      var docRankPrior = 1 / (1 + 0.28 * d);
+      var docNormRel = docRawScores[d] > 0
+        ? (0.75 * (docRawScores[d] / maxDocScore) + 0.25 * docRankPrior)
+        : (0.4 * docRankPrior);
+      var docBudget = computeDynamicCharBudget(docNormRel, 850, 2600, 0.25);
+      var safeDocBody = scrub(String(doc.body || ''));
+      var safeDocSum = scrub(String(doc.summary || ''));
+      var safeDocSource = safeDocBody
+        ? ((safeDocSum && safeDocBody.indexOf(safeDocSum.slice(0, 36)) < 0) ? (safeDocSum + '\n' + safeDocBody) : safeDocBody)
+        : safeDocSum;
+      var docExcerpt = extractLegalEvidenceExcerpt(safeDocSource, {
+        query: query,
+        expandedQuery: expandedAnchorQuery,
+        phrases: ops.phrases,
+        tokens: tokens,
+        tokenMeta: tokenMeta,
+        maxChars: docBudget,
+        docKind: 'ruling',
+        multiline: true
+      });
+      ctxLines.push('[' + kindTag + ' ' + (d + 1) + '] ' + scrub(doc.court || doc.agency || '') + ' ' + (doc.decisionDate || '') + ' ' + scrub(doc.caseNo || '') + ' — ' + scrub(doc.title || '') + '\n' + docExcerpt);
     }
     ctxLines.push('═══════════════════════════════\n');
     ctxLines.push('[사용자 질의 / 사실관계]:\n' + query);
@@ -3278,12 +3753,16 @@
     }
     var rawQuery = String(params.query || '').trim();
     var mode = params.mode || 'auto';
-    var query = anonymizeLegalText(rawQuery, extractPartyNames(rawQuery, '')).text;
     var workflow = params.workflow || null;
     var attached = Array.isArray(params.attached) ? params.attached : [];
     var docs = Array.isArray(params.retrievedDocs) ? params.retrievedDocs.slice(0, 8) : [];
     var arts = Array.isArray(params.retrievedArticles) ? params.retrievedArticles.slice(0, 5) : [];
     var fams = Array.isArray(params.retrievedLawFamilies) ? params.retrievedLawFamilies.slice(0, 4) : [];
+    var synthNames = extractPartyNames([rawQuery].concat(attached.map(function (a) {
+      return (a.title || '') + '\n' + (a.body || a.plainText || a.summary || '');
+    })).join('\n'), '');
+    var scrubSynth = function (s) { return anonymizeLegalText(String(s || ''), synthNames).text; };
+    var query = scrubSynth(rawQuery);
 
     var combinedReviewSource = [query].concat(attached.map(function (a) {
       return String(a.body || a.plainText || a.summary || '');
@@ -3336,8 +3815,17 @@
     if (arts.length) {
       for (var i = 0; i < arts.length; i++) {
         var ar = arts[i];
-        lines.push('- **' + ar.lawTitle + ' ' + ar.articleNo + (ar.heading ? '(' + ar.heading + ')' : '') + '** *(시행 ' + (ar.effectiveDate || '현행') + ')*');
-        lines.push('  > ' + ar.snippet.replace(/\n+/g, ' '));
+        var arRawText = scrubSynth(ar.fullText || ar.text || ar.snippet || '');
+        var arExcerpt = ar.isAttachment
+          ? scrubSynth(ar.snippet || '')
+          : extractLegalEvidenceExcerpt(arRawText, {
+              query: query,
+              maxChars: 380,
+              docKind: 'article',
+              multiline: false
+            });
+        lines.push('- **' + scrubSynth(ar.lawTitle || '') + ' ' + scrubSynth(ar.articleNo || '') + (ar.heading ? '(' + scrubSynth(ar.heading) + ')' : '') + '** *(시행 ' + scrubSynth(ar.effectiveDate || '현행') + ')*');
+        lines.push('  > ' + arExcerpt.replace(/\n+/g, ' '));
       }
     } else if (matchedIssues.length && matchedIssues[0].coreLaws && matchedIssues[0].coreLaws.length) {
       for (var cl = 0; cl < matchedIssues[0].coreLaws.length; cl++) {
@@ -3355,14 +3843,29 @@
       lines.push('- 근로기준법, 산업재해보상보험법 등 개별 노동관계법령의 강행규정 및 시행령 별표 기준을 우선 확인합니다.');
     }
 
+    function formatOfflineDocPoint(dItem) {
+      var sBody = scrubSynth(dItem.body || '');
+      var sSum = scrubSynth(dItem.summary || '');
+      var isHeadAutoSum = !sSum || /^\[주문\]/.test(sSum) || (sBody && sBody.replace(/\s+/g, ' ').indexOf(sSum.slice(0, 36)) === 0);
+      if (isHeadAutoSum && sBody.length > 120) {
+        return extractLegalEvidenceExcerpt(sBody, {
+          query: query,
+          maxChars: 420,
+          docKind: 'ruling',
+          multiline: false
+        });
+      }
+      return sSum || extractLegalEvidenceExcerpt(sBody, { query: query, maxChars: 420, docKind: 'ruling', multiline: false });
+    }
+
     lines.push('');
     lines.push('#### ' + (secNo++) + '. 대법원·헌법재판소·하급심 판례 법리');
     if (precDocs.length) {
       for (var p = 0; p < precDocs.length; p++) {
         var pd = precDocs[p];
-        var pHead = [pd.court || pd.agency, pd.decisionDate, pd.caseNo].filter(Boolean).join(' ');
-        lines.push('- **[' + pHead + '] ' + pd.title + '**');
-        lines.push('  - ' + pd.summary);
+        var pHead = [scrubSynth(pd.court || pd.agency || ''), pd.decisionDate, scrubSynth(pd.caseNo || '')].filter(Boolean).join(' ');
+        lines.push('- **[' + pHead + '] ' + scrubSynth(pd.title || '') + '**');
+        lines.push('  - ' + formatOfflineDocPoint(pd));
       }
     } else {
       lines.push('- 오른쪽 「통합 법령·판례·결정례·행정해석 한번에 보기」 패널의 실시간 수집 버튼으로 최신 판례를 추가 조회할 수 있습니다.');
@@ -3373,9 +3876,9 @@
     if (interpAndDecDocs.length) {
       for (var idIdx = 0; idIdx < interpAndDecDocs.length; idIdx++) {
         var idDoc = interpAndDecDocs[idIdx];
-        var iHead = [idDoc.court || idDoc.agency, idDoc.decisionDate, idDoc.caseNo].filter(Boolean).join(' ');
-        lines.push('- **[' + iHead + '] ' + idDoc.title + '**');
-        lines.push('  - ' + idDoc.summary);
+        var iHead = [scrubSynth(idDoc.court || idDoc.agency || ''), idDoc.decisionDate, scrubSynth(idDoc.caseNo || '')].filter(Boolean).join(' ');
+        lines.push('- **[' + iHead + '] ' + scrubSynth(idDoc.title || '') + '**');
+        lines.push('  - ' + formatOfflineDocPoint(idDoc));
       }
     } else {
       lines.push('- 오른쪽 통합 근거창에서 고용노동부 행정해석·법제처 법령해석·중앙노동위원회 재결례 실시간 수집을 눌러 최신 유권해석을 즉시 보강할 수 있습니다.');
@@ -3744,6 +4247,9 @@
     searchUnifiedAllInOne: searchUnifiedAllInOne,
     analyzeFactPatternInstant: analyzeFactPatternInstant,
     analyzeDocumentClauses: analyzeDocumentClauses,
+    computeDynamicRetentionRatio: computeDynamicRetentionRatio,
+    computeDynamicCharBudget: computeDynamicCharBudget,
+    extractLegalEvidenceExcerpt: extractLegalEvidenceExcerpt,
     buildRagPrompt: buildRagPrompt,
     synthesizeOfflineAnswer: synthesizeOfflineAnswer,
     extractLawCitationsFromText: extractLawCitationsFromText,
