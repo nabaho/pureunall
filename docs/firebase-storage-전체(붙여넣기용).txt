@@ -358,6 +358,20 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    // ── 법정교육자료함 강의자료 원본 (2026-11-19 추가) · 창고 pureun-erp-hrphotos ──
+    //    포털 «법정교육자료함» 앱이 강의자료 파일을 «받은 그대로» 올립니다(바꾸거나 줄이지 않습니다).
+    //    ★★ «새로 쓰기만» — 이미 있는 파일을 덮거나 지우지 못합니다(원본 보존). 버릴 때는 실시간DB 기록에 _deleted 표식만 남깁니다.
+    //    ⚠ 한 파일 1GB 까지(강의 녹화 영상) — 앱(js/pu-edulib-app.js 의 MAX_UPLOAD)과 같은 값입니다.
+    //    ⚠ 종류 검사를 걸지 않습니다 — 한글·옛 파워포인트는 브라우저가 종류를 안 알려 줍니다(서고·계약서와 같은 까닭).
+    //    ⚠ 읽기·쓰기 모두 isStaff()(재직 직원 표시 + @pureun.kr) — 실시간DB edulib 규칙(LOGIN)과 같은 사람입니다.
+    match /edulib/{id}/{file} {
+      allow read:   if isStaff();
+      allow create: if isStaff()
+                    && request.resource != null
+                    && request.resource.size < 1024 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
     // 위에 없는 자리는 전부 막는다
     match /{allPaths=**} {
       allow read, write: if false;

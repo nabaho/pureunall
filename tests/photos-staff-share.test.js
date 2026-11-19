@@ -372,7 +372,7 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-19 — 방문 통계 게시 완료(GitHub 「Firebase 배포」 실행 44432043739 · rules-deploy.js --deploy):
        새로 1 · 바뀜 0 · 사라짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
        새 기준 docs/firebase-rules-콘솔원문-2026-11-19.json(만들개 출력과 같다). 목록을 비운다. */
-  const PENDING = [];
+  /* ★ 2026-11-19 — 법정교육자료함(/edulib) 게시 완료(rules-deploy.js --deploy): 새로 1 · 바뀜 0 · 사라짐 0, 읽기·쓰기 재직 직원(LOGIN)·지우기 금지 — 다시 읽어 «콘솔이 올린 것과 같음» 확인, 새 기준 docs/firebase-rules-콘솔원문-2026-11-19.json(같은 날 판을 갈아 끼움). 목록을 비운다. */ const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
