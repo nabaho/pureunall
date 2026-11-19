@@ -117,7 +117,8 @@
       var due = dueOf(deps.feedDue, r);
       var closeYmd = /^\d{4}-\d{2}-\d{2}/.test(s(r.closeDt)) ? s(r.closeDt).slice(0, 10) : '';
       items.push({ kind: 'feed', ref: r.id, sel: 'f:' + r.id, title: s(r.nm), org: s(r.org), src: s(r.src) || '공고',
-        date: s(r.savedAt).slice(0, 10), to: due.to || closeYmd, days: due.days, dueK: due.k, dueText: due.text,
+        /* 날짜 칸 = 공고일(openDt) — 지난 공고를 해마다 견주려면 «받은 날»이 아니라 «공고한 날»이어야 한다(2026-11-19). 없으면 받은 날 */
+        date: (/^\d{4}-?\d{2}-?\d{2}/.test(s(r.openDt)) ? s(r.openDt).replace(/^(\d{4})-?(\d{2})-?(\d{2}).*/, '$1-$2-$3') : s(r.savedAt).slice(0, 10)), to: due.to || closeYmd, days: due.days, dueK: due.k, dueText: due.text,
         past: due.k === 'past', isNew: s(r.type) === '새 공고', type: s(r.type), hidden: !!r.hidden,
         url: /^https?:\/\//.test(s(r.url)) ? s(r.url) : '', groups: g.groups, why: g.why });
     });

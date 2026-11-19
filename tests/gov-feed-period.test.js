@@ -106,7 +106,7 @@ test('★★ 「새로 받기」가 받은 때·범위를 남긴다 — 그래�
   await r.api.fetchAll();
   assert.ok(r.store.gov3_last_at, 'last_at 을 남기지 않았다');
   assert.equal(new Date(r.store.gov3_last_at).getTime(), new Date('2026-10-04T15:20:00').getTime());
-  assert.equal(r.store.gov3_last_win, '2026-09-27~2026-10-04', '나라장터에 물은 범위(지난 7일)');
+  assert.equal(r.store.gov3_last_win, '2026-09-28~2026-10-04', '나라장터에 물은 범위 — «오늘 포함 7일»(2026-11-10 부터 한 번에 7일까지, 8일치는 거절)');
   r.api.healthPop();
   assert.match(r.el('popBody').innerHTML, /마지막으로 받은 때 <b>2026-10-04 15:20<\/b>/);
   assert.match(r.el('popBody').innerHTML, /지난번 받은 결과[\s\S]*받은 공고 0건 중 <b>0건<\/b>이 새로 걸렸습니다/, '받은 결과의 자세한 셈은 팝업에 남는다');

@@ -43,6 +43,14 @@ AI줄.forEach(([src, org, kw, nm, d, ai], i) => {
     openDt: addDays(-5) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: 0, mthd: '', kw, ai,
     url: 'https://example.com/ai' + i, savedAt: addDays(-(i % 3)) + 'T09:00:00', hidden: false });
 });
+/* 📁 지난 공고 하위 탭(2026-11-19) — 몰아 받은 지난해 AI 공고(r.back) · 공고일이 해마다 다르게(연도별 건수 확인용) */
+[['기업마당', '점검정보산업진흥원', '2025년 AI바우처 지원사업 공급기업 등록 안내', -360, -330, 'voucher'],
+ ['나라장터', '점검테크노파크', '2025년 스마트공장 구축 지원사업 운영 용역', -300, -280, 'factory'],
+ ['기업마당', '중소벤처점검부', '2024년 중소기업 스마트서비스 지원사업 공고', -700, -680, 'smart']].forEach(([src, org, nm, open, close, ai], i) => {
+  feed.push({ id: 'G' + String(51 + i).padStart(4, '0'), no: 'R26PS' + String(4000000 + i * 47) + '-000', src, type: '지나감', nm, org, ntce: org,
+    openDt: addDays(open) + ' 10:00', closeDt: addDays(close) + ' 18:00', prc: 0, mthd: '', kw: '', ai, back: 1,
+    url: 'https://example.com/ps' + i, savedAt: addDays(-1) + 'T09:00:00', hidden: false });
+});
 const plan = [];
 for (let i = 0; i < 26; i++) {
   const ym = addDays((i % 8) * 30 - 60).slice(0, 7);
@@ -84,5 +92,6 @@ module.exports = {
     { name: 'rgnsel', run: async (p) => { for (const k of [1, 2]) await p.click('#rgnTb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'ai', run: async (p) => { await p.click('#tbAi'); } },
     { name: 'aisel', run: async (p) => { for (const k of [1, 2]) await p.click('#aiTb tr:nth-child(' + k + ') input.row-chk'); } },
+    { name: 'aipast', run: async (p) => { await p.evaluate(() => lensSub('ai', 'past')); } },
   ],
 };

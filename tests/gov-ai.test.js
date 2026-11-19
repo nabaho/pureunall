@@ -92,7 +92,8 @@ function runApp(seed, opt) {
   const ctx = {
     console, setTimeout, clearTimeout, Math, JSON, String, Number, Object, Array, RegExp, Promise,
     Date: FixedDate('2026-11-19T10:00:00'),
-    localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+    localStorage: { getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => { if (opt.lsFail && opt.lsFail.test(k)) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; } store[k] = String(v); } },
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }), addEventListener(){} },
     location: { protocol: 'https:' }, navigator: {},
     GovG2b: G, GovPlan: require('../js/gov-plan.js'), GovCareer: require('../js/gov-career.js'),
@@ -110,7 +111,8 @@ function runApp(seed, opt) {
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
-  vm.runInNewContext(code + '\n;globalThis.__api={setTab,draw,lensDraw,lensDo,lensTog,lensBulk,lensGrp,get,recObj,rejudge,feedMainRows,pickRank,starAllItems,inboxPull,fetchAll,'
+  vm.runInNewContext(code + '\n;globalThis.__api={setTab,draw,lensDraw,lensDo,lensTog,lensBulk,lensGrp,lensSub,aiBackfill,aiBackStop,starGo,get,recObj,rejudge,feedMainRows,pickRank,starAllItems,inboxPull,fetchAll,'
+    + 'setBackMonths:function(m){ _aiBack.months=m; },'
     + 'getSel:function(id){ return _lens[id].sel; },setWatch:function(w){ _recWatch=w; },setFb:function(db,uid){ fbDb=db; fbUid=uid; },'
     + 'setPull:function(f){ pull=f; },toast:function(f){ toast=f; }};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
@@ -218,6 +220,120 @@ test('★★ 새로 받기 — 기업마당 «기술» 분야를 전국 길로 �
   r.api.setPull(async (u) => { urls.push(u); return { jsonArray: [] }; });
   await r.api.fetchAll();
   assert.ok(urls.some((u) => /searchLclasId=02/.test(u) && !/hashtags=/.test(u)), '기술 분야(02) 전국 길: ' + urls.join('\n'));
+});
+
+/* ═════════ 📁 지난 공고 (대표 지시 2026-11-19 「AI 관련 이미 지난것도 올려달라 그래야 비교 분석 가능하다 지난것 별도 하위 탭으로」) ═════════ */
+test('★★★ 나라장터 오류 묶음(ResponseError)은 «오류»다 «0건»이 아니다 — 03(데이터 없음)만 빈 결과', () => {
+  const e07 = G.parse({ 'nkoneps.com.response.ResponseError': { header: { resultCode: '07', resultMsg: '입력범위값 초과 에러' } } });
+  assert.equal(e07.ok, false); assert.match(e07.err, /입력범위값 초과/); assert.match(e07.err, /07/);
+  const e03 = G.parse({ 'nkoneps.com.response.ResponseError': { header: { resultCode: '03', resultMsg: '데이터 없음' } } });
+  assert.equal(e03.ok, true); assert.deepEqual(e03.rows, []);
+});
+test('★★★ 한 번에 «오늘 포함 7일»만 묻는다(2026-11-10 부터 7일 제한) · 몰아 받을 때도 7일 창으로 자른다', () => {
+  const to = new Date('2026-11-19T10:00:00+09:00');
+  const u = G.buildUrl({ key: 'K', from: G.recentFrom(to), to, page: 1 });
+  assert.match(u, /inqryBgnDt=202611130000/); assert.match(u, /inqryEndDt=202611192359/);
+  const from = new Date('2026-08-19T10:00:00+09:00'), ws = G.weekWindows(from, to);
+  const ymd = (d) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10);
+  const span = (w) => Math.round((Date.parse(ymd(w[1])) - Date.parse(ymd(w[0]))) / 864e5) + 1;
+  assert.ok(ws.length >= 13);
+  ws.forEach((w) => assert.ok(span(w) <= 7, '창이 7일을 넘는다: ' + ymd(w[0]) + '~' + ymd(w[1])));
+  assert.equal(ymd(ws[0][1]), '2026-11-19', '최근 창부터'); assert.equal(ymd(ws[ws.length - 1][0]), '2026-08-19', '고른 첫날까지 덮는다');
+  for (let i = 1; i < ws.length; i++) assert.equal(Math.round((Date.parse(ymd(ws[i - 1][0])) - Date.parse(ymd(ws[i][1]))) / 864e5), 1, '창 사이에 빈 날·겹친 날이 없다');
+});
+test('★★ 기업마당 쪽 넘기기 주소 — 전체(searchCnt 없음) + pageUnit·pageIndex', () => {
+  const u = B.buildUrl({ key: 'K', count: 0, pageUnit: 500, pageIndex: 2 });
+  assert.doesNotMatch(u, /searchCnt=/); assert.match(u, /pageUnit=500/); assert.match(u, /pageIndex=2/);
+});
+
+const PAST_FEED = [
+  { id: 'G0101', src: '나라장터', type: '지나감', nm: '2026년 AI바우처 지원사업 운영 용역', org: '정보통신산업진흥원', openDt: '2026-03-02 10:00:00', closeDt: '2026-03-20 18:00', kw: '', ai: 'voucher' },
+  { id: 'G0102', src: '기업마당', type: '새 공고', nm: '2025 스마트공장 구축 지원사업 공고', org: '중소벤처기업부', openDt: '2025-05-01', closeDt: '', kw: '', ai: 'factory' },
+  { id: 'G0103', src: '기업마당', type: '새 공고', nm: '중소기업 스마트서비스 지원사업(상시)', org: '중소벤처기업부', openDt: '2026-11-10', closeDt: '', kw: '', ai: 'smart' },
+  { id: 'G0104', src: '나라장터', type: '새 공고', nm: '2027년 AI바우처 지원사업 운영 용역', org: '정보통신산업진흥원', openDt: '2026-11-15 10:00:00', closeDt: '2026-11-30 18:00', kw: '', ai: 'voucher' }
+];
+test('★★★ 하위 탭 — 🟢 진행 중 / 📁 지난 공고로 가르고, 지난 공고에는 공고일 기준 «해마다 몇 건»', () => {
+  const r = runApp({ feed: PAST_FEED });
+  r.api.setTab('ai');
+  assert.match(r.el('aiSubs').innerHTML, /🟢 진행 중 <span class="n">2<\/span>/); assert.match(r.el('aiSubs').innerHTML, /📁 지난 공고 <span class="n">2<\/span>/);
+  let h = r.el('aiTb').innerHTML;
+  assert.match(h, /2027년 AI바우처/); assert.match(h, /스마트서비스 지원사업\(상시\)/, '마감 모름이라도 공고한 지 90일 안이면 진행 중');
+  assert.doesNotMatch(h, /2026년 AI바우처|2025 스마트공장/);
+  assert.equal(r.el('aiPast').innerHTML, '', '진행 중에는 지난 공고 칸이 없다');
+  r.api.lensSub('ai', 'past');
+  h = r.el('aiTb').innerHTML;
+  assert.match(h, /2026년 AI바우처/); assert.match(h, /2025 스마트공장/, '마감 모름 + 공고한 지 90일 넘음 → 지난 공고');
+  assert.match(h, /마감 모름 · 공고 \d+일 지남/, '마감일을 지어내지 않고 밝힌다');
+  assert.doesNotMatch(h, /2027년 AI바우처/);
+  assert.match(h, /<td class="rdt sml">2026-03-02<\/td>/, '날짜 칸은 공고일');
+  assert.match(r.el('aView').innerHTML, /value="past"/); assert.doesNotMatch(r.el('aView').innerHTML, /value="live"/, '지난 공고에는 «마감 안 지난 것» 보기가 없다');
+  const past = r.el('aiPast').innerHTML;
+  assert.match(past, /공고일 기준.*2026년 <b>1<\/b>건 · 2025년 <b>1<\/b>건/);
+  assert.match(past, /📥 불러오기/);
+  assert.equal(r.store.gov3_ai_sub, 'past', '고른 하위 탭은 이 기기에서 기억한다');
+  r.api.lensSub('ai', 'live');
+  assert.match(r.el('aView').innerHTML, /value="live"/);
+});
+
+/* 가짜 나라장터·기업마당 — 창(inqryBgnDt)마다 AI 공고 1 + 무관 공고 1 */
+const g2bOf = (u) => { const d = (u.match(/inqryBgnDt=(\d{8})/) || [])[1];
+  return { response: { header: { resultCode: '00' }, body: { totalCount: 2, items: [
+    { bidNtceNo: 'AI' + d, bidNtceOrd: '000', bidNtceNm: d.slice(0, 4) + '년 AI바우처 지원사업 운영 용역', ntceInsttNm: '정보통신산업진흥원', bidNtceDt: d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6) + ' 10:00:00', bidClseDt: '2026-10-01 10:00' },
+    { bidNtceNo: 'CL' + d, bidNtceOrd: '000', bidNtceNm: '청사 청소 용역', ntceInsttNm: '가', bidNtceDt: '2026-10-01 10:00:00', bidClseDt: '2026-10-05 10:00' }] } } }; };
+const BIZ = { jsonArray: [
+  { pblancId: 'PBLN_9001', pblancNm: '2025 스마트공장 구축 지원사업 공고', jrsdInsttNm: '중소벤처기업부', creatPnttm: '2025-05-01 09:00:00', reqstBeginEndDe: '2025-05-01 ~ 2025-05-31' },
+  { pblancId: 'PBLN_9002', pblancNm: '소상공인 경영 교육 수강생 모집', jrsdInsttNm: '가', creatPnttm: '2025-06-01 09:00:00' }] };
+
+test('★★★ 📥 지난 공고 불러오기 — 7일 창마다 받아 AI 갈래만 담고(r.back), 노무 쪽 목록에는 안 섞는다 · 받은 주는 다음에 건너뛴다', async () => {
+  const r = runApp({ feed: [], key_data: 'K', key_biz: 'B' });
+  const urls = [];
+  r.api.setPull(async (u) => { urls.push(u); return /bizinfo/.test(u) ? BIZ : g2bOf(u); });
+  r.api.setBackMonths(1);
+  await r.api.aiBackfill();
+  const g2b = urls.filter((u) => /BidPublicInfoService/.test(u));
+  assert.ok(g2b.length >= 4 && g2b.length <= 6, '한 달 = 7일 창 다섯 안팎: ' + g2b.length);
+  assert.ok(urls.some((u) => /bizinfo/.test(u) && /pageIndex=1/.test(u) && !/searchCnt=/.test(u)), '기업마당은 전체를 쪽으로');
+  const f = r.api.get('feed');
+  assert.ok(f.length === g2b.length + 1, 'AI 공고만(창마다 1 + 기업마당 1): ' + f.length);
+  assert.ok(f.every((x) => x.back === 1 && x.ai), '몰아 받은 줄 표시(back)와 AI 갈래');
+  assert.ok(!f.some((x) => /청소|경영 교육/.test(x.nm)), 'AI 와 무관한 공고는 안 담는다');
+  assert.deepEqual(r.api.feedMainRows(), [], '공고 모아보기·📍·🎯 에는 안 섞는다');
+  const info = JSON.parse(r.store.gov3_ai_back);
+  assert.equal(Object.keys(info.weeks).length, g2b.length); assert.equal(info.adds, f.length);
+  assert.ok(r.toasts.some((t) => /지난 AI 공고 \d+건을 담았습니다/.test(t)));
+  /* 다시 누르면 — 받은 주는 건너뛰고(나라장터 0회), 이미 있는 공고는 두 번 안 담는다 */
+  urls.length = 0;
+  await r.api.aiBackfill();
+  assert.equal(urls.filter((u) => /BidPublicInfoService/.test(u)).length, 0);
+  assert.equal(r.api.get('feed').length, f.length);
+  r.api.setTab('ai'); r.api.lensSub('ai', 'past');
+  assert.match(r.el('aiTb').innerHTML, /2025 스마트공장/);
+});
+
+test('★★ 불러오다 오류(열쇠·한도·기간)면 멈추고 «받은 주»로 적지 않는다 — 다음에 다시 받는다', async () => {
+  const r = runApp({ feed: [], key_data: 'K' });
+  let n = 0;
+  r.api.setPull(async () => { n++; return { 'nkoneps.com.response.ResponseError': { header: { resultCode: '22', resultMsg: '서비스 요청제한횟수 초과에러' } } }; });
+  r.api.setBackMonths(3);
+  await r.api.aiBackfill();
+  assert.equal(n, 1, '첫 창에서 멈춘다');
+  assert.deepEqual(JSON.parse(r.store.gov3_ai_back).weeks, {});
+  assert.ok(r.toasts.some((t) => /요청제한횟수/.test(t)));
+});
+
+test('★★ 저장 공간이 모자라 못 담았으면 «받은 주»도 안 적는다 — 다음에 그 주를 다시 받는다(2026-11-19 검토 낮음)', async () => {
+  const r = runApp({ feed: [], key_data: 'K' }, { lsFail: /^gov3_feed$/ });
+  r.api.setPull(async (u) => g2bOf(u));
+  r.api.setBackMonths(1);
+  await r.api.aiBackfill();
+  assert.deepEqual(JSON.parse(r.store.gov3_ai_back).weeks, {});
+  assert.ok(r.toasts.some((t) => /저장 공간이 모자라/.test(t)));
+});
+test('★ 🤖 탭을 한 번도 안 열었어도 별표 모음 → 「이 탭에서 별표만 보기」가 별표 보기로 연다(2026-11-19 검토 낮음)', () => {
+  const r = runApp({ feed: FEED });
+  r.api.starGo('ai');
+  assert.equal(r.el('aView').value, 'star');
+  assert.equal(r.el('pgAi').style.display, '');
 });
 
 /* ───────── 맞물림 ───────── */

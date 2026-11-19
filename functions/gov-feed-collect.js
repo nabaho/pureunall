@@ -52,7 +52,8 @@ async function pullAll(name, urlOf, parse, max, getJson, secrets) {
 async function collect(o) {
   const secrets = [o.keyData, o.keyBiz];
   const got = [], errors = [], counts = { g2b: 0, alio: 0, biz: 0 };
-  const to = o.now || new Date(), from = new Date(to.getTime() - 7 * 86400000);
+  /* ⚠ 나라장터는 2026-11-10 부터 한 번에 7일까지만 — 「오늘 포함 7일」(G2B.recentFrom). 7일 전으로 잡으면 8일치라 거절됐다(그동안 날마다 0건) */
+  const to = o.now || new Date(), from = G2B.recentFrom(to);
   if (s(o.keyData)) {
     const g = await pullAll('나라장터', (p) => G2B.buildUrl({ key: o.keyData, from, to, page: p, rows: 999 }), G2B.parse, PAGE_MAX.g2b, o.getJson, secrets);
     counts.g2b = g.rows.length; g.rows.forEach((r) => got.push(r)); g.errs.forEach((e) => errors.push(e));
