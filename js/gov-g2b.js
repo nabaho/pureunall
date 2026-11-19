@@ -66,6 +66,24 @@
            (endOfDay ? '2359' : '0000');
   }
 
+  /* ── 한 번에 물을 수 있는 기간 ──
+     ⚠★ 2026-11-10 부터 «7일»(공공데이터포털 15129394 공지 — 전체 오퍼레이션, 이전 1개월).
+       stamp 가 시작은 00:00, 끝은 23:59 로 채우므로 «오늘 포함 7일» = 시작 날을 끝 날의 6일 전으로 잡는다.
+       ⚠ 7일 전으로 잡으면 8일치가 되어 거절된다(그동안 그랬다). 지난 공고를 몰아 받을 때도 이 창으로 자른다(weekWindows). */
+  var WINDOW_DAYS = 7;
+  function recentFrom(to) { var t = (to instanceof Date) ? to : new Date(); return new Date(t.getTime() - (WINDOW_DAYS - 1) * 86400000); }
+  /* from ~ to 를 «7일 창»으로 자른다 — 최근 창부터(가까운 것을 먼저 받는다). [[from,to], …] */
+  function weekWindows(from, to) {
+    var out = [], end = new Date(to.getTime());
+    while (end.getTime() >= from.getTime()) {
+      var st = new Date(end.getTime() - (WINDOW_DAYS - 1) * 86400000);
+      if (st.getTime() < from.getTime()) st = new Date(from.getTime());
+      out.push([st, end]);
+      end = new Date(st.getTime() - 86400000);
+    }
+    return out;
+  }
+
   function buildUrl(o) {
     o = o || {};
     var q = [
@@ -86,6 +104,16 @@
      ⚠ items 는 «배열일 때도, 객체 하나일 때도, 아예 없을 때도» 있다. 셋 다 받아야 한다. */
   function parse(json) {
     if (!json) return { ok: false, err: '빈 응답', rows: [], total: 0 };
+    /* ⚠★ 나라장터 오류는 «HTTP 200 + {"nkoneps.com.response.ResponseError":{header:{resultCode,resultMsg}}}» 로도 온다
+         (상세 조회 parseDetail 에서 2026-10-24 실측). 목록 풀기가 이 모양을 몰라 «0건 받음(정상)»으로 넘겼다 —
+         2026-11-10 조회기간이 1개월 → 7일로 줄었는데(공공데이터포털 공지) 8일치를 묻던 화면·서버가 날마다 «나라장터 0건»이었다(11-16 갈무리).
+         03(데이터 없음)만 «빈 결과»이고 나머지는 오류다. */
+    var ek = Object.keys(json).filter(function (k) { return /ResponseError$/.test(k); })[0];
+    if (ek) {
+      var eh = (json[ek] && json[ek].header) || {}, ec = String(eh.resultCode || '');
+      if (ec === '03') return { ok: true, err: '', rows: [], total: 0 };
+      return { ok: false, rows: [], total: 0, err: String(eh.resultMsg || ('오류 코드 ' + ec)) + (ec ? ' (' + ec + ')' : '') };
+    }
     var bad = json.OpenAPI_ServiceResponse && json.OpenAPI_ServiceResponse.cmmMsgHeader;
     if (bad) {
       return { ok: false, rows: [], total: 0,
@@ -391,6 +419,7 @@
   var api = { BASE: BASE, KEYWORDS_DEFAULT: KEYWORDS_DEFAULT, encKey: encKey,
               buildUrl: buildUrl, parse: parse, matched: matched, dday: dday, merge: merge,
               guessSrc: guessSrc, judge: judge, judgeAi: judgeAi, AI_PROGRAMS: AI_PROGRAMS,
+              WINDOW_DAYS: WINDOW_DAYS, recentFrom: recentFrom, weekWindows: weekWindows,
               detailUrl: detailUrl, parseDetail: parseDetail, enrich: enrich, bizRegion: bizRegion, LK: LK,
               toggleKw: toggleKw };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -43,6 +43,10 @@
     if (o.field) q.push('searchLclasId=' + encodeURIComponent(s(o.field)));
     var tags = o.regions;
     if (tags && tags.length) q.push('hashtags=' + encodeURIComponent(tags.join(',')));
+    /* 쪽 넘기기(명세 2025-10-22: pageUnit 한 쪽 건수 · pageIndex 쪽 번호) — 🤖 지난 공고 불러오기가 쓴다(2026-11-19).
+       ⚠ count 0 = 명세상 «전체 데이터». 실호출로는 아직 확인 못 했다 — 쪽을 넘겨도 새 공고가 안 나오면 부르는 쪽이 멈춘다 */
+    if (o.pageUnit) q.push('pageUnit=' + encodeURIComponent(String(o.pageUnit)));
+    if (o.pageIndex) q.push('pageIndex=' + encodeURIComponent(String(o.pageIndex)));
     return BASE + '?' + q.join('&');
   }
 
