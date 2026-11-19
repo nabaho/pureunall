@@ -1896,6 +1896,27 @@
     return f + '|' + u;
   }
 
+  /* 휴지통(_deleted)에 보낸 계약이 들고 있던 메일 열쇠 모음 — «사람이 처리해 치운 메일»이다.
+     ⚠ 이것을 «이미 처리함»으로 세지 않으면, 지운 카드의 메일로 자동 길이 같은 카드를 다시 만든다.
+       2026-11-17 실제: 휴지통에 보낸 계약 둘이 그날 같은 메일로 새 번호를 받아 되살아났다.
+       (서버 mail-contract-sweep.js 는 휴지통 카드까지 knownMailKeys 로 세므로 이 길만 맞추면 된다.)
+     열쇠는 normSrcMailKey·canonSrcMailKey «두 꼴 모두» 담는다(콜론 꼴·객체 꼴·폴더 별칭도 걸리게).
+     카드를 되살리면(_deleted 가 지워지면) 저절로 빠진다. */
+  function dismissedMailKeys(rawCts) {
+    var out = Object.create(null);   /* __proto__·constructor 같은 글자가 열쇠로 와도 상속 속성에 걸리지 않게 */
+    var add = function (c) {
+      if (c && typeof c === 'object' && c._deleted && Array.isArray(c.srcMails)) {
+        c.srcMails.forEach(function (sk) {
+          var nk = normSrcMailKey(sk); if (nk) out[nk] = true;
+          var ck = canonSrcMailKey(sk); if (ck) out[ck] = true;
+        });
+      }
+    };
+    if (Array.isArray(rawCts)) rawCts.forEach(add);
+    else if (rawCts && typeof rawCts === 'object') Object.keys(rawCts).forEach(function (k) { add(rawCts[k]); });
+    return out;
+  }
+
   var SKIP_CUSTOM_SLUG_RE = /^(?:기타광고|뉴스레터 발송분|쇼핑|소셜|프로모션|카페편지함|이력서|13_ 경조사)/;
 
   /* 사진첩 길 전용 — 제목·서류 이름이 «종료·해지 통보»인가.
@@ -1985,6 +2006,7 @@
         if (c && typeof c === 'object' && !c._deleted) ctList.push(c);
       });
     }
+    var dismissedMap = dismissedMailKeys(rawCts);   /* 지운 카드의 메일 — 아래 finalizedSrcMap 에 함께 넣는다 */
 
     function findCo(subj, attNames, peerName, peerEmail, isSent) {
       var parsed = parseOneEmailAddr(peerEmail);
@@ -2220,6 +2242,8 @@
           }
         }
       });
+      /* 지운 카드의 메일도 «이미 처리한 메일»이다 — 그 메일로 새 카드를 만들지 않는다 */
+      Object.keys(dismissedMap).forEach(function (sk) { finalizedSrcMap[sk] = true; });
       var allCtsClosed = sameCts.length > 0 && sameCts.every(function (c) {
         return c.status === 'closed' || c.status === 'cancelled';
       }) && (maxActiveMs === 0 || maxClosedCtMs === 0 || maxActiveMs <= maxClosedCtMs + 86400000);
@@ -2626,6 +2650,9 @@
           var nk = normSrcMailKey(sk); if (nk) existingContractSrcSet[nk] = true;
           var ck2 = canonSrcMailKey(sk); if (ck2) existingContractSrcSet[ck2] = true;
         };
+        /* ⚠ 휴지통에 보낸 카드의 메일도 «이미 카드가 있는 메일»이다 — 사람이 처리해 치운 메일을 자동 길이 다시 집지 않는다 */
+        var dismissedExist = dismissedMailKeys(rawCts);
+        Object.keys(dismissedExist).forEach(function (k) { existingContractSrcSet[k] = true; });
         if (Array.isArray(rawCts)) {
           rawCts.forEach(function (c) {
             if (c && !c._deleted && Array.isArray(c.srcMails)) c.srcMails.forEach(addExistKey);
