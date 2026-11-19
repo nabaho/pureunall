@@ -21,7 +21,9 @@
     hideHomeEmptyProjects: false,
     hideHomeAssist: false,
     _assistDismissedDraft: '',
-    workspaceTab: 'report',  // report | clauses | editor
+    workspaceTab: 'report',  // report | clauses | timeline | editor
+    reviewStance: 'neutral', // neutral | worker | employer
+    deadlineBaseDate: '',
     promptMode: 'auto',      // auto | search | draft | review
     homePromptDraft: '',
     voiceActive: false,
@@ -77,6 +79,7 @@
     caseSubQuery: '',
     caseDateRange: 'all',    // all | 1y | 3y | 5y
     caseSortBy: 'relevance', // relevance | date_desc | court_tier
+    caseOutcomeFilter: 'all',// all | en_banc | favorable | partial | unfavorable | caution
     activeIssueCat: 'dismissal',
     liveCollectBanner: null,
     selectedDocIds: new Set(),
@@ -310,6 +313,21 @@
     box._timer = setTimeout(function () {
       box.className = 'pbox-toast';
     }, 3400);
+  }
+
+  function copyTextSafe(txt, okMsg) {
+    var payload = String(txt == null ? '' : txt);
+    if (!payload.trim()) {
+      toast('복사할 내용이 없습니다.', 'err');
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(payload)
+        .then(function () { toast(okMsg || '클립보드에 복사되었습니다.'); })
+        .catch(function () { toast('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.', 'err'); });
+    } else {
+      toast('클립보드 복사를 지원하지 않는 환경입니다.', 'err');
+    }
   }
 
   /* ── PDF 로컬 텍스트 추출기 (필요할 때만 vendor/pdf.min.js 지연 적재) ── */
@@ -1880,8 +1898,20 @@
     }
 
     var E = global.PuPBoxEngine;
+    var curStance = (th && th.stance) || state.reviewStance || 'neutral';
     var modeInfo = threadModeBadge(th.mode);
+    var combinedWsText = String((th.sourceText || '') + '\n' + (th.query || '')).trim();
     var diag = E.analyzeDocumentClauses(th.sourceText || th.query || '');
+    var redlineInfo = (E && typeof E.buildClauseRedlineTable === 'function')
+      ? E.buildClauseRedlineTable(diag)
+      : { rows: [], markdown: '' };
+    var timelineInfo = (E && typeof E.extractFactTimeline === 'function')
+      ? E.extractFactTimeline(combinedWsText)
+      : { events: [], suggestedBaseDate: '', suggestedBaseLabel: '', markdown: '' };
+    var effBaseDate = state.deadlineBaseDate || timelineInfo.suggestedBaseDate || E.todayKstYmd();
+    var dlInfo = (E && typeof E.calculateLaborDeadlines === 'function')
+      ? E.calculateLaborDeadlines(effBaseDate, E.todayKstYmd())
+      : { valid: false, items: [], markdown: '' };
     var vf = th.verification || { items: [], verifiedCount: 0, unverifiedCount: 0 };
     var vfBadges = (vf.items || []).filter(function (it) { return it && typeof it === 'object'; }).map(function (it) {
       if (it.verified) {
@@ -1912,27 +1942,52 @@
     var tabBodyHtml = '';
 
     if (state.workspaceTab === 'clauses') {
+      var redlineRowsHtml = redlineInfo.rows.map(function (r) {
+        var bCls = r.severity === 'high' ? 'pbox-badge-red' : 'pbox-badge-amber';
+        return '<tr>' +
+          '<td data-label="조항"><span class="' + bCls + '">' + esc(r.badge) + '</span><br><strong>' + esc(r.clauseLabel) + '</strong></td>' +
+          '<td data-label="현행 원문">' + esc(r.currentExcerpt) + '</td>' +
+          '<td data-label="위반 위험·근거">' + esc(r.riskAndBasis) + '</td>' +
+          '<td data-label="적법 수정안">' + esc(r.revisedSuggestion) + '</td>' +
+        '</tr>';
+      }).join('');
+
       tabBodyHtml = [
         '<div class="pbox-sec-hd">',
         '  <span>⚖️ 조항별 강행법규 위반 · 위험 진단 (고위험 <b>' + diag.highCount + '</b>건 · 주의 <b>' + diag.warnCount + '</b>건 / 분석 단위 ' + diag.clauseCount + '개)</span>',
-        '  <button type="button" class="pbox-btn-sm" data-act="set-ws-tab" data-tab="editor">✎ 원문 수정하러 가기</button>',
+        '  <div class="pbox-btn-group">',
+        (diag.findings.length ? '    <button type="button" class="pbox-btn-sm" data-act="copy-redline-md">📋 신·구 대비표 복사</button>' : ''),
+        (diag.findings.length ? '    <button type="button" class="pbox-btn-sm" data-act="apply-all-clause-fixes">✨ 전체 수정안 일괄 반영</button>' : ''),
+        '    <button type="button" class="pbox-btn-sm" data-act="set-ws-tab" data-tab="editor">✎ 원문 편집</button>',
+        '  </div>',
         '</div>',
-        (diag.findings.length ? '<div class="pbox-clause-list">' + diag.findings.map(function (f, idx) {
-          var sevCls = f.severity === 'high' ? 'high' : 'warn';
-          var badgeCls = f.severity === 'high' ? 'pbox-badge-red' : 'pbox-badge-amber';
-          return '<div class="pbox-clause-card ' + sevCls + '">' +
-            '<div class="pbox-clause-top">' +
-              '<div><span class="' + badgeCls + '">' + esc(f.badge) + '</span> <strong>[' + esc(f.clauseLabel) + '] ' + esc(f.title) + '</strong></div>' +
-              '<span class="pbox-muted">' + esc(f.basis) + '</span>' +
-            '</div>' +
-            '<div class="pbox-clause-quote">원문 발췌: ' + esc(f.excerpt) + '</div>' +
-            '<div class="pbox-md-p"><strong>위험 요지:</strong> ' + esc(f.issue) + '</div>' +
-            '<div class="pbox-clause-suggest">' +
-              '<div><strong>권고 수정문안:</strong> ' + esc(f.suggestion) + '</div>' +
-              '<div style="margin-top:8px"><button type="button" class="pbox-btn-sm" data-act="apply-clause-fix" data-idx="' + idx + '">✎ 권고 수정문안을 문서 원문에 반영</button></div>' +
-            '</div>' +
-          '</div>';
-        }).join('') + '</div>' : [
+        (diag.findings.length ? [
+          '<details class="pbox-slim-drawer" open style="margin-bottom:12px">',
+          '  <summary>신·구 조항 대비표 (Redline 자문표 · ' + redlineInfo.rows.length + '건)</summary>',
+          '  <div class="pbox-matrix-wrap" style="margin-top:8px">',
+          '    <table class="pbox-matrix-table" aria-label="신·구 조항 대비표">',
+          '      <thead><tr><th style="width:130px">조항 · 등급</th><th>현행 원문 발췌</th><th>법적 위험 · 근거</th><th>적법 수정 권고안 (Redline)</th></tr></thead>',
+          '      <tbody>' + redlineRowsHtml + '</tbody>',
+          '    </table>',
+          '  </div>',
+          '</details>',
+          '<div class="pbox-clause-list">' + diag.findings.map(function (f, idx) {
+            var sevCls = f.severity === 'high' ? 'high' : 'warn';
+            var badgeCls = f.severity === 'high' ? 'pbox-badge-red' : 'pbox-badge-amber';
+            return '<div class="pbox-clause-card ' + sevCls + '">' +
+              '<div class="pbox-clause-top">' +
+                '<div><span class="' + badgeCls + '">' + esc(f.badge) + '</span> <strong>[' + esc(f.clauseLabel) + '] ' + esc(f.title) + '</strong></div>' +
+                '<span class="pbox-muted">' + esc(f.basis) + '</span>' +
+              '</div>' +
+              '<div class="pbox-clause-quote">원문 발췌: ' + esc(f.excerpt) + '</div>' +
+              '<div class="pbox-md-p"><strong>위험 요지:</strong> ' + esc(f.issue) + '</div>' +
+              '<div class="pbox-clause-suggest">' +
+                '<div><strong>권고 수정문안:</strong> ' + esc(f.suggestion) + '</div>' +
+                '<div style="margin-top:8px"><button type="button" class="pbox-btn-sm" data-act="apply-clause-fix" data-idx="' + idx + '">✎ 권고 수정문안을 문서 원문에 반영</button></div>' +
+              '</div>' +
+            '</div>';
+          }).join('') + '</div>'
+        ].join('\n') : [
           '<div class="pbox-card pbox-empty-box">',
           '  현재 입력된 문서에서 자동 탐지된 강행규정 위반 조항이 없거나 아직 검토할 계약서·취업규칙 본문이 입력되지 않았습니다.<br>',
           '  <div class="pbox-btn-group" style="justify-content:center;margin-top:10px">',
@@ -1942,6 +1997,71 @@
           '  </div>',
           '</div>'
         ].join('\n'))
+      ].join('\n');
+    } else if (state.workspaceTab === 'timeline') {
+      var dlRowsHtml = (dlInfo.items || []).map(function (it) {
+        var stBadge = it.status === 'expired'
+          ? '<span class="pbox-badge-red">' + esc(it.dDayLabel) + '</span>'
+          : (it.status === 'urgent'
+              ? '<span class="pbox-badge-amber">' + esc(it.dDayLabel) + '</span>'
+              : '<span class="pbox-badge-green">' + esc(it.dDayLabel) + '</span>');
+        return '<tr>' +
+          '<td data-label="절차·항목"><strong>' + esc(it.title) + '</strong></td>' +
+          '<td data-label="법정 기준">' + esc(it.ruleLabel) + '</td>' +
+          '<td data-label="만료 예정일"><span class="pbox-mono"><strong>' + esc(it.dueDate) + '</strong></span>' +
+            (it.weekendExtended ? ' <span class="pbox-badge-blue" title="' + esc(it.weekendNote) + '">주말연장</span>' : '') + '</td>' +
+          '<td data-label="기한 상태">' + stBadge + '</td>' +
+          '<td data-label="근거 법령"><span class="pbox-muted">' + esc(it.basis) + '</span></td>' +
+        '</tr>';
+      }).join('');
+
+      var tlRowsHtml = (timelineInfo.events || []).map(function (evItem) {
+        return '<tr>' +
+          '<td data-label="일자"><span class="pbox-mono"><strong>' + esc(evItem.date) + '</strong></span></td>' +
+          '<td data-label="구분"><span class="pbox-badge-blue">' + esc(evItem.category) + '</span></td>' +
+          '<td data-label="사실관계 내용">' + esc(evItem.summary) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      tabBodyHtml = [
+        '<div class="pbox-card pbox-flat-m" style="margin-bottom:12px">',
+        '  <div class="pbox-sec-hd">',
+        '    <span>⏱️ 노동사건 제척기간 · 불복기한 · 소멸시효 자동 계산 (민법 제157조 초일불산입 · 제161조 주말연장 반영)</span>',
+        '    <button type="button" class="pbox-btn-sm" data-act="copy-deadlines-md">📋 기한산정표 복사</button>',
+        '  </div>',
+        '  <div class="pbox-adv-row" style="margin-top:0;padding-top:0;margin-bottom:10px;border-top:none">',
+        '    <label class="pbox-label" for="pboxDeadlineBaseInput">처분·해고·퇴직·판정서 송달일</label>',
+        '    <input type="date" id="pboxDeadlineBaseInput" class="pbox-select-sm" aria-label="제척기간 산정 기준일" value="' + esc(effBaseDate) + '">',
+        (timelineInfo.suggestedBaseLabel
+          ? '    <button type="button" class="pbox-btn-sm" data-act="use-detected-base-date" data-date="' + esc(timelineInfo.suggestedBaseDate) + '">문서 포착일 적용: ' + esc(timelineInfo.suggestedBaseLabel) + '</button>'
+          : ''),
+        (dlInfo.valid ? '    <span class="pbox-muted">초일불산입 기산일: <b>' + esc(dlInfo.startCountDate) + '</b></span>' : ''),
+        '  </div>',
+        '  <div class="pbox-matrix-wrap">',
+        '    <table class="pbox-matrix-table" aria-label="법정 제척기간 및 소멸시효 산정표">',
+        '      <thead><tr><th>절차 · 권리구제 항목</th><th>법정 산정 기준</th><th style="width:140px">만료 예정일</th><th style="width:110px">기한 상태</th><th>근거 법령</th></tr></thead>',
+        '      <tbody>' + dlRowsHtml + '</tbody>',
+        '    </table>',
+        '  </div>',
+        '  <div class="pbox-muted" style="margin-top:8px">※ 만료일이 법정공휴일·대체공휴일·근로자의 날인 경우 민법 제161조에 따라 그 익일(다음 평일)로 만료됩니다.</div>',
+        '</div>',
+        '<div class="pbox-card pbox-flat-m">',
+        '  <div class="pbox-sec-hd">',
+        '    <span>📅 사실관계 일자별 연표 자동 추출 (' + timelineInfo.events.length + '건)</span>',
+        '    <div class="pbox-btn-group">',
+        (timelineInfo.events.length ? '      <button type="button" class="pbox-btn-sm" data-act="copy-timeline-md">📋 연표 복사</button>' : ''),
+        (timelineInfo.events.length ? '      <button type="button" class="pbox-btn-sm" data-act="insert-timeline-editor">✎ 서면 편집창에 추가</button>' : ''),
+        '    </div>',
+        '  </div>',
+        (timelineInfo.events.length ? [
+          '  <div class="pbox-matrix-wrap">',
+          '    <table class="pbox-matrix-table" aria-label="사실관계 일자별 연표">',
+          '      <thead><tr><th style="width:115px">일자</th><th style="width:120px">구분</th><th>사실관계 내용 (원문 기반 시간순 정렬)</th></tr></thead>',
+          '      <tbody>' + tlRowsHtml + '</tbody>',
+          '    </table>',
+          '  </div>'
+        ].join('\n') : '  <div class="pbox-empty-mini">원문 또는 질의에 날짜(예: 2026. 3. 15., 2026년 5월 1일)가 포함되면 시간순 기초사실 연표가 이곳에 자동 생성됩니다.</div>'),
+        '</div>'
       ].join('\n');
     } else if (state.workspaceTab === 'editor') {
       tabBodyHtml = [
@@ -1962,6 +2082,13 @@
         '</div>'
       ].join('\n');
     } else {
+      var followChips = (E && typeof E.buildFollowUpQuestions === 'function')
+        ? E.buildFollowUpQuestions({ query: th.query || '', sourceText: th.sourceText || '', stance: curStance })
+        : [];
+      var followBtnsHtml = followChips.map(function (fc) {
+        return '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="' + esc(fc.query) + '"' + busyAttr + '>' + esc(fc.label) + '</button>';
+      }).join('\n');
+
       tabBodyHtml = [
         (state.aiBusy ? '<div class="pbox-info-note" role="status" aria-live="polite">⏳ 요청하신 내용 검토·수정 사항을 법령·판례·결정례·행정해석 원문과 대조하여 반영하고 있습니다…</div>' : ''),
         (th.answer ? [
@@ -1982,10 +2109,7 @@
           '</div>'
         ].join('\n')),
         '<div class="pbox-btn-group" style="margin-top:12px">',
-        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="강행법규 위반 및 근로감독 지적 위험조항을 빠짐없이 다시 점검해 줘"' + busyAttr + '>⚖️ 강행규정·위험조항 점검</button>',
-        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="관련 대법원 전원합의체·하급심 판례와 고용노동부 행정해석·위원회 결정례를 모두 보강해 줘"' + busyAttr + '>🏛️ 판례·행정해석 보강</button>',
-        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="문제가 된 조항들을 적법한 표준 대체 조항 문안으로 다시 작성해 줘"' + busyAttr + '>✏️ 적법 수정조항 작성</button>',
-        '  <button type="button" class="pbox-btn-sm" data-act="run-ws-quick-review" data-q="의뢰인(사업주 또는 근로자)에게 바로 보낼 수 있도록 핵심 결론 중심으로 요약해 줘"' + busyAttr + '>📋 의뢰인 보고용 요약</button>',
+        followBtnsHtml,
         '</div>',
         '<div class="pbox-ws-follow-bar">',
         '  <input type="text" id="pboxWsFollowInput" class="pbox-input" aria-label="후속 검토 지시 또는 서면 수정 요청" placeholder="추가 사실관계·보완 지시 입력 (Enter 즉시 반영 · 🎤 음성설명 · @ 자료첨부)">',
@@ -1994,6 +2118,18 @@
         '</div>'
       ].join('\n');
     }
+
+    var stanceItems = [
+      { id: 'neutral', label: '중립' },
+      { id: 'worker', label: '근로자측' },
+      { id: 'employer', label: '사용자측' }
+    ];
+    var stanceSegHtml = '<div class="pbox-mode-seg" role="group" aria-label="대리 및 검토 관점 선택">' +
+      stanceItems.map(function (st) {
+        var isActSt = curStance === st.id;
+        return '<button type="button" class="pbox-mode-btn' + (isActSt ? ' active' : '') + '" aria-pressed="' + (isActSt ? 'true' : 'false') + '" data-act="set-ws-stance" data-stance="' + esc(st.id) + '">' + esc(st.label) + '</button>';
+      }).join('') +
+    '</div>';
 
     var wsRightHtml = '<aside class="pbox-ws-side" aria-label="관련 법령 판례 결정례 행정해석 통합 대조">' +
       buildUnifiedAuthoritiesHtml(wsSearchRes, wsSeed, {
@@ -2026,11 +2162,12 @@
       '    <div>',
       '      <div class="pbox-ws-tabs-bar">',
       '        <div class="pbox-ws-tabs" role="tablist" aria-label="내용 검토 워크스페이스 탭">',
-      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'report' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'report' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="report">✦ 검토 의견서 · 초안</button>',
-      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'clauses' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'clauses' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="clauses">⚖️ 조항별 위험 진단 (' + diag.findings.length + ')</button>',
-      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'editor' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'editor' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="editor">✎ 검토 대상 원문 · 편집</button>',
+      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'report' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'report' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="report">✦ 검토 의견서</button>',
+      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'clauses' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'clauses' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="clauses">⚖️ 위험 진단 (' + diag.findings.length + ')</button>',
+      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'timeline' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'timeline' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="timeline">📅 연표 · 기한 (' + timelineInfo.events.length + ')</button>',
+      '          <button type="button" role="tab" aria-selected="' + (state.workspaceTab === 'editor' ? 'true' : 'false') + '" class="pbox-ws-tab' + (state.workspaceTab === 'editor' ? ' active' : '') + '" data-act="set-ws-tab" data-tab="editor">✎ 원문 편집</button>',
       '        </div>',
-      '        <button type="button" class="pbox-btn-sm" data-act="open-attach-modal">@ 참고 법령·판례 첨부 (' + state.attached.length + '건)</button>',
+      '        <div class="pbox-btn-group">' + stanceSegHtml + '<button type="button" class="pbox-btn-sm" data-act="open-attach-modal">@ 첨부 (' + state.attached.length + ')</button></div>',
       '      </div>',
       tabBodyHtml,
       '    </div>',
@@ -2414,6 +2551,17 @@
     var outRes = (state.caseDocType === 'all' && E && typeof E.searchUnifiedAllInOne === 'function')
       ? E.searchUnifiedAllInOne(state.caseQuery, searchOpts)
       : E.searchCorpus(state.caseQuery, searchOpts);
+    var preOutcomeDocs = Array.isArray(outRes.docs) ? outRes.docs : [];
+    outRes.trendSummary = (E && typeof E.summarizeOutcomeDistribution === 'function')
+      ? E.summarizeOutcomeDistribution(preOutcomeDocs)
+      : null;
+    if (state.caseOutcomeFilter && state.caseOutcomeFilter !== 'all' && E && typeof E.classifyLegalOutcomeSignal === 'function') {
+      outRes.docs = preOutcomeDocs.filter(function (d) {
+        var sig = E.classifyLegalOutcomeSignal(d);
+        if (state.caseOutcomeFilter === 'caution') return Boolean(sig.caution);
+        return sig.code === state.caseOutcomeFilter;
+      });
+    }
     return outRes;
   }
 
@@ -2451,7 +2599,22 @@
     var liveBusyAttr = state.liveCollectBusy ? ' disabled aria-busy="true"' : '';
     var lbBanner = state.liveCollectBanner;
 
-    var hasAdvActive = Boolean(state.caseSubQuery || state.caseDateRange !== 'all' || state.caseSortBy !== 'relevance');
+    var hasAdvActive = Boolean(
+      state.caseSubQuery ||
+      state.caseDateRange !== 'all' ||
+      state.caseSortBy !== 'relevance' ||
+      state.caseOutcomeFilter !== 'all'
+    );
+    var trend = res.trendSummary || null;
+    var trendStripHtml = (trend && trend.total > 0) ? [
+      '<span class="pbox-trend-strip">',
+      (trend.enBanc > 0 ? '<span class="pbox-badge-red">전원합의체 ' + trend.enBanc + '</span>' : ''),
+      (trend.favorable > 0 ? '<span class="pbox-badge-green">인용·인정 ' + trend.favorable + '</span>' : ''),
+      (trend.partial > 0 ? '<span class="pbox-badge-amber">일부인용 ' + trend.partial + '</span>' : ''),
+      (trend.unfavorable > 0 ? '<span class="pbox-badge-gray">기각·불인정 ' + trend.unfavorable + '</span>' : ''),
+      (trend.cautionCount > 0 ? '<span class="pbox-badge-amber">⚠ 판례변경주의 ' + trend.cautionCount + '</span>' : ''),
+      '</span>'
+    ].filter(Boolean).join(' ') : '';
 
     return [
       '<div class="pbox-page-wrap">',
@@ -2493,6 +2656,14 @@
       '          <option value="relevance"' + (state.caseSortBy === 'relevance' ? ' selected' : '') + '>정확도순</option>',
       '          <option value="date_desc"' + (state.caseSortBy === 'date_desc' ? ' selected' : '') + '>최신일자순</option>',
       '          <option value="court_tier"' + (state.caseSortBy === 'court_tier' ? ' selected' : '') + '>상급심우선</option>',
+      '        </select>',
+      '        <select id="pboxCaseOutcomeSel" class="pbox-select-sm" aria-label="결론 및 효력 신호 필터">',
+      '          <option value="all"' + (state.caseOutcomeFilter === 'all' ? ' selected' : '') + '>전체 결론</option>',
+      '          <option value="en_banc"' + (state.caseOutcomeFilter === 'en_banc' ? ' selected' : '') + '>전원합의체·위헌</option>',
+      '          <option value="favorable"' + (state.caseOutcomeFilter === 'favorable' ? ' selected' : '') + '>인용·취소·인정</option>',
+      '          <option value="partial"' + (state.caseOutcomeFilter === 'partial' ? ' selected' : '') + '>일부인용</option>',
+      '          <option value="unfavorable"' + (state.caseOutcomeFilter === 'unfavorable' ? ' selected' : '') + '>기각·불인정</option>',
+      '          <option value="caution"' + (state.caseOutcomeFilter === 'caution' ? ' selected' : '') + '>⚠ 판례변경 주의</option>',
       '        </select>',
       '      </div>',
       (issueTree.length ? [
@@ -2547,6 +2718,7 @@
         '  <div class="pbox-bulk-bar">',
         '    <span>선택 <b>' + selCnt + '</b>건</span>',
         '    <div class="pbox-btn-group">',
+        '      <button type="button" class="pbox-btn-primary" data-act="open-compare-modal">📊 선택 비교표</button>',
         '      <button type="button" class="pbox-btn-sm" data-act="bulk-attach-docs">@ 첨부</button>',
         '      <button type="button" class="pbox-btn-sm" data-act="bulk-proj-docs">프로젝트 담기</button>',
         '      <button type="button" class="pbox-btn-sm" data-act="bulk-export-docs">내보내기</button>',
@@ -2556,7 +2728,7 @@
         '  </div>'
       ].join('\n') : ''),
       '  <div class="pbox-card pbox-list-card">',
-      '    <div class="pbox-sec-hd"><span>검색 결과 <b>' + docs.length + '</b>건' + (res.totalMatchedDocs > docs.length ? ' (전체 ' + res.totalMatchedDocs + '건)' : '') + '</span></div>',
+      '    <div class="pbox-sec-hd"><span>검색 결과 <b>' + docs.length + '</b>건' + (res.totalMatchedDocs > docs.length ? ' (전체 ' + res.totalMatchedDocs + '건)' : '') + '</span>' + trendStripHtml + '</div>',
       '    <div class="pbox-table-wrap">',
       '      <table class="pbox-table" aria-label="판례 및 유권해석 목록">',
       '        <thead><tr>',
@@ -2565,14 +2737,23 @@
       '          <th style="width:112px">분류</th>',
       '          <th style="width:125px">선고·회시기관</th>',
       '          <th style="width:145px">사건·문서번호</th>',
-      '          <th>제목 및 핵심 요지</th>',
+      '          <th>제목 · 결론신호 · 핵심 요지</th>',
       '          <th style="width:96px">일자</th>',
-      '          <th style="width:148px">출처·동작</th>',
+      '          <th style="width:176px">동작</th>',
       '        </tr></thead>',
       '        <tbody>',
       (docs.length ? docs.map(function (d, idx) {
         var checked = state.selectedDocIds.has(d.id) ? ' checked' : '';
         var srcCnt = (d.sources || []).length;
+        var sig = (E && typeof E.classifyLegalOutcomeSignal === 'function')
+          ? E.classifyLegalOutcomeSignal(d)
+          : { label: '', badgeCls: 'pbox-badge-gray', caution: '' };
+        var sigBadgeHtml = sig.label
+          ? ('<span class="' + sig.badgeCls + '">' + esc(sig.label) + '</span> ')
+          : '';
+        var cautionBadgeHtml = sig.caution
+          ? ('<span class="pbox-badge-amber" title="' + esc(sig.caution) + '">⚠ 변경주의</span> ')
+          : '';
         return '<tr>' +
           '<td class="col-chk"><label class="pbox-chk-tap"><input type="checkbox" data-act="toggle-doc-chk" data-id="' + esc(d.id) + '" aria-label="' + esc(d.title) + ' 선택"' + checked + '></label></td>' +
           '<td class="col-num">' + (idx + 1) + '</td>' +
@@ -2580,13 +2761,14 @@
           '<td class="pbox-cell-hide-m" title="' + esc(d.court || d.agency) + '">' + esc(d.court || d.agency) + '</td>' +
           '<td class="pbox-mono pbox-cell-meta" title="' + esc((d.court || d.agency) + ' ' + (d.caseNo || '')) + '">' + highlightHtml(d.caseNo || d.court || d.agency || '-', hlTerms) + '</td>' +
           '<td class="pbox-row-click pbox-cell-main" role="button" tabindex="0" data-act="open-doc" data-id="' + esc(d.id) + '" title="' + esc(d.title + ' — ' + d.summary) + '">' +
-            '<strong>' + highlightHtml(d.title, hlTerms) + '</strong> <span class="pbox-muted pbox-cell-sum">— ' + highlightHtml(d.summary, hlTerms) + '</span>' +
+            sigBadgeHtml + cautionBadgeHtml + '<strong>' + highlightHtml(d.title, hlTerms) + '</strong> <span class="pbox-muted pbox-cell-sum">— ' + highlightHtml(d.summary, hlTerms) + '</span>' +
           '</td>' +
           '<td class="col-num pbox-cell-hide-m">' + esc(d.decisionDate || '') + '</td>' +
           '<td class="pbox-cell-actions" title="' + esc((d.sources || []).join(', ')) + '">' +
             '<button type="button" class="pbox-mini-act" data-act="open-doc" data-id="' + esc(d.id) + '">원문</button> ' +
+            '<button type="button" class="pbox-mini-act pbox-pc-only" data-act="copy-doc-citation" data-id="' + esc(d.id) + '" title="서면 표준 인용문구 복사">인용</button> ' +
             '<button type="button" class="pbox-mini-act" data-act="attach-doc" data-id="' + esc(d.id) + '">@첨부</button>' +
-            (srcCnt > 1 ? ' <span class="pbox-badge-green" title="중복 병합 출처 ' + srcCnt + '곳">+' + srcCnt + '</span>' : '') +
+            (srcCnt > 1 ? ' <span class="pbox-badge-green pbox-pc-only" title="중복 병합 출처 ' + srcCnt + '곳">+' + srcCnt + '</span>' : '') +
           '</td>' +
         '</tr>';
       }).join('') : '<tr class="pbox-empty-row"><td colspan="8" class="pbox-empty-cell">일치하는 자료가 없습니다. 상단 <b>[실시간 수집]</b>을 눌러 공식 원문을 즉시 조회해 보세요.</td></tr>'),
@@ -3165,6 +3347,9 @@
         label: '🔗 연결·유사직역 비교 법령',
         openInReader: true
       });
+      var artAuthMap = (E && typeof E.indexAuthoritiesByLaw === 'function')
+        ? E.indexAuthoritiesByLaw(law.title, global.PuPBoxStore.getDocs())
+        : new Map();
 
       rEl.innerHTML = [
         '<div class="pbox-reader-hd">',
@@ -3187,6 +3372,17 @@
         (arts.length ? arts.map(function (a) {
           var domId = 'pboxArt_' + a.no.replace(/[^0-9가-힣]/g, '');
           var hi = state.readerHighlightArt === a.no ? ' highlight' : '';
+          var linkedDocs = artAuthMap.get(String(a.no || '').replace(/\s+/g, '')) || [];
+          var linkedHtml = linkedDocs.length ? (
+            '<div class="pbox-art-linked">' +
+              '<span>⚖️ 연결 판례·해석 ' + linkedDocs.length + '건:</span>' +
+              linkedDocs.slice(0, 5).map(function (ld) {
+                var shortOrg = String(ld.court || ld.agency || '').replace(/\s*전원합의체\s*/, ' 전합');
+                var pillTxt = (shortOrg ? shortOrg + ' ' : '') + (ld.caseNo || ld.title.slice(0, 18));
+                return '<button type="button" class="pbox-subfile-btn" data-act="open-doc" data-id="' + esc(ld.id) + '" title="' + esc(ld.title) + '">' + esc(pillTxt) + '</button>';
+              }).join(' ') +
+            '</div>'
+          ) : '';
           return '<article id="' + domId + '" class="pbox-law-art' + hi + '">' +
             (a.chapter ? '<div class="pbox-art-chap">' + esc(a.chapter) + '</div>' : '') +
             '<div class="pbox-art-hd">' +
@@ -3194,6 +3390,7 @@
               '<button type="button" class="pbox-mini-act" data-act="copy-art" data-law="' + esc(law.title) + '" data-no="' + esc(a.no + (a.heading ? '(' + a.heading + ')' : '')) + '">조문복사</button>' +
             '</div>' +
             '<div class="pbox-art-txt">' + esc(a.text).replace(/\n/g, '<br>') + '</div>' +
+            linkedHtml +
           '</article>';
         }).join('') : (qArt && filteredAnnexes.length ? '<div class="pbox-empty-mini">해당 검색어와 일치하는 본문 조문은 없으며, 아래 별표·서식 목록에서 일치 항목을 찾았습니다.</div>' : '<div class="pbox-plain-law">' + esc(law.plainText).replace(/\n/g, '<br>') + '</div>')),
         annexHtml,
@@ -3209,20 +3406,29 @@
       var safeOfficialUrl = (E && typeof E.sanitizeOfficialLawUrlClient === 'function')
         ? E.sanitizeOfficialLawUrlClient(d.officialUrl)
         : '';
+      var readerSig = (E && typeof E.classifyLegalOutcomeSignal === 'function')
+        ? E.classifyLegalOutcomeSignal(d)
+        : { label: '', badgeCls: 'pbox-badge-gray', caution: '' };
       rEl.innerHTML = [
         '<div class="pbox-reader-hd">',
         '  <div class="pbox-reader-titlewrap">',
-        '    <div class="pbox-reader-kicker"><span class="' + docTypeBadgeClass(d.docType) + '">' + esc(docTypeBadgeLabel(d.docType)) + '</span> <span class="pbox-mono">' + esc(d.caseNo || '') + '</span> · ' + esc(d.decisionDate || '') + '</div>',
+        '    <div class="pbox-reader-kicker">' +
+          '<span class="' + docTypeBadgeClass(d.docType) + '">' + esc(docTypeBadgeLabel(d.docType)) + '</span> ' +
+          (readerSig.label ? '<span class="' + readerSig.badgeCls + '">' + esc(readerSig.label) + '</span> ' : '') +
+          '<span class="pbox-mono">' + esc(d.caseNo || '') + '</span> · ' + esc(d.decisionDate || '') +
+        '</div>',
         '    <strong class="pbox-reader-title">' + esc(d.title) + '</strong>',
         '  </div>',
         '  <div class="pbox-btn-group">',
         (safeOfficialUrl ? '    <a class="pbox-btn-sm" href="' + esc(safeOfficialUrl) + '" target="_blank" rel="noopener noreferrer">🏛️ 법제처 공식원문 ↗</a>' : ''),
+        '    <button type="button" class="pbox-btn-sm" data-act="copy-doc-citation" data-id="' + esc(d.id) + '">📌 인용문 복사</button>',
         '    <button type="button" class="pbox-btn-sm" data-act="attach-doc" data-id="' + esc(d.id) + '">@ AI 첨부</button>',
         '    <button type="button" class="pbox-btn-sm" data-act="copy-doc-body" data-id="' + esc(d.id) + '">📋 전문복사</button>',
         '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
         '  </div>',
         '</div>',
         '<div class="pbox-reader-bd">',
+        (readerSig.caution ? '  <div class="pbox-status-banner warn" role="status" style="margin-top:0;margin-bottom:10px"><strong>⚠ 판례 · 법리 변경 주의</strong><div style="margin-top:3px">' + esc(readerSig.caution) + '</div></div>' : ''),
         '  <div class="pbox-doc-meta-box">',
         '    <div><b>기관/법원:</b> ' + esc(d.court || d.agency) + '</div>',
         '    <div><b>출처 채널:</b> ' + esc((d.sources || []).join(' · ')) + '</div>',
@@ -3253,12 +3459,16 @@
     });
   }
 
-  function openModalHtml(html, keepCurrentFocus) {
+  function openModalHtml(html, keepCurrentFocus, wideMode) {
     var back = document.getElementById('pboxModalBackdrop');
     var body = document.getElementById('pboxModalBox');
     if (!back || !body) return;
     if (back.style.display !== 'flex') {
       state._modalPrevFocus = document.activeElement || null;
+    }
+    if (body.classList) {
+      if (wideMode) body.classList.add('wide');
+      else body.classList.remove('wide');
     }
     body.innerHTML = html;
     back.style.display = 'flex';
@@ -3272,12 +3482,51 @@
 
   function closeModal() {
     var back = document.getElementById('pboxModalBackdrop');
+    var body = document.getElementById('pboxModalBox');
     if (back) back.style.display = 'none';
+    if (body && body.classList) body.classList.remove('wide');
     state._cfgAutoProbedInCurrentOpen = false;
     if (state._modalPrevFocus && typeof state._modalPrevFocus.focus === 'function') {
       try { state._modalPrevFocus.focus(); } catch (e) {}
     }
     state._modalPrevFocus = null;
+  }
+
+  function showCompareDocsModal() {
+    var ids = Array.from(state.selectedDocIds);
+    var selectedDocs = ids.map(function (id) { return global.PuPBoxStore.getDocById(id); }).filter(Boolean);
+    if (!selectedDocs.length) {
+      toast('비교할 판례·재결·행정해석을 1건 이상 선택해 주세요.', 'err');
+      return;
+    }
+    var E = global.PuPBoxEngine;
+    var mat = E.buildAuthorityComparisonMatrix(selectedDocs, { query: state.caseQuery });
+    var rowsHtml = mat.rows.map(function (r) {
+      return '<tr>' +
+        '<td data-label="기관·일자"><strong>' + esc(r.orgAndDate) + '</strong></td>' +
+        '<td data-label="사건·문서번호"><span class="pbox-mono">' + esc(r.caseNo) + '</span><br><button type="button" class="pbox-link-btn" data-act="open-doc-from-modal" data-id="' + esc(r.id) + '">' + esc(r.title) + '</button></td>' +
+        '<td data-label="결론·효력"><span class="' + r.signal.badgeCls + '">' + esc(r.signal.label) + '</span>' +
+          (r.caution ? '<br><span class="pbox-badge-amber" title="' + esc(r.caution) + '">⚠ 변경주의</span>' : '') + '</td>' +
+        '<td data-label="핵심 법리 발췌">' + esc(r.keyExcerpt) + '</td>' +
+        '<td data-label="참조조문"><span class="pbox-muted">' + esc(r.refLawsText) + '</span></td>' +
+      '</tr>';
+    }).join('');
+
+    openModalHtml([
+      '<div class="pbox-modal-hd"><strong id="pboxModalTitle">📊 선택 판례 · 결정례 · 행정해석 한눈에 비교표 (' + mat.rows.length + '건)</strong><button type="button" class="pbox-icon-btn" data-act="close-modal" aria-label="비교표 닫기">✕</button></div>',
+      '<div class="pbox-modal-bd">',
+      '  <div class="pbox-matrix-wrap">',
+      '    <table class="pbox-matrix-table" aria-label="선택 자료 비교 매트릭스">',
+      '      <thead><tr><th style="width:135px">기관 · 일자</th><th style="width:190px">사건번호 · 제목</th><th style="width:110px">결론신호</th><th>핵심 법리 · 판단 요지 (원문 발췌)</th><th style="width:150px">참조조문</th></tr></thead>',
+      '      <tbody>' + rowsHtml + '</tbody>',
+      '    </table>',
+      '  </div>',
+      '  <div class="pbox-modal-ft">',
+      '    <button type="button" class="pbox-btn-sm" data-act="copy-compare-md">📋 비교표 마크다운 복사</button>',
+      '    <button type="button" class="pbox-btn-primary" data-act="compare-to-ai-review">✦ 이 자료들로 AI 종합 비교검토 시작</button>',
+      '  </div>',
+      '</div>'
+    ].join('\n'), false, true);
   }
 
   function showAttachModal(filterQ, keepFocus) {
@@ -3776,9 +4025,11 @@
       maybeAutoOfficialCollect(intentInfo.safeOfficialQuery);
     }
 
+    var reqStance = opts.stance || (opts.inWorkspace && state.activeThread && state.activeThread.stance) || state.reviewStance || 'neutral';
     global.PuPBoxStore.askLegalAi({
       query: q,
       mode: effMode,
+      stance: reqStance,
       workflow: workflowObj || null,
       attached: state.attached,
       sourceText: srcTxt,
@@ -3829,10 +4080,12 @@
         query: '',
         answer: '',
         mode: 'review',
+        stance: state.reviewStance || 'neutral',
         sourceText: '',
         workflowStyle: 'lbox'
       });
       state.activeThread = blankTh;
+      state.deadlineBaseDate = '';
       state.workspaceTab = 'editor';
       switchView('workspace');
     } else if (act === 'open-review-file') {
@@ -3841,6 +4094,61 @@
     } else if (act === 'set-ws-tab') {
       syncWorkspaceEditorDraftIfPresent();
       state.workspaceTab = btn.getAttribute('data-tab') || 'report';
+      renderMain();
+    } else if (act === 'set-ws-stance') {
+      syncWorkspaceEditorDraftIfPresent();
+      var nextStance = btn.getAttribute('data-stance') || 'neutral';
+      state.reviewStance = nextStance;
+      if (state.activeThread) {
+        state.activeThread.stance = nextStance;
+        state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+      }
+      var stanceNm = nextStance === 'worker' ? '근로자·신청인측' : (nextStance === 'employer' ? '사용자·회사측' : '객관·중립');
+      toast('검토·기안 관점이 [' + stanceNm + '] 기준으로 설정되었습니다.');
+      renderMain();
+    } else if (act === 'copy-redline-md') {
+      if (!state.activeThread) return;
+      var rlRes = global.PuPBoxEngine.buildClauseRedlineTable(state.activeThread.sourceText || state.activeThread.query || '');
+      copyTextSafe(rlRes.markdown, '신·구 조항 대비표(Redline)가 클립보드에 복사되었습니다.');
+    } else if (act === 'apply-all-clause-fixes') {
+      if (!state.activeThread) return;
+      var allDiag = global.PuPBoxEngine.analyzeDocumentClauses(state.activeThread.sourceText || state.activeThread.query || '');
+      if (!allDiag.findings.length) return;
+      var curSrc = state.activeThread.sourceText || state.activeThread.query || '';
+      var appendedFixes = allDiag.findings.map(function (f) {
+        return '[' + f.clauseLabel + ' 적법 수정안 — ' + f.title + ']\n' + f.suggestion;
+      }).join('\n\n');
+      state.activeThread.sourceText = (curSrc ? (curSrc + '\n\n') : '') + '═══ [적법 수정 권고문안 일괄 반영] ═══\n\n' + appendedFixes;
+      state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+      state.workspaceTab = 'editor';
+      toast('탐지된 ' + allDiag.findings.length + '개 위험조항의 권고 수정문안을 일괄 반영했습니다.');
+      renderMain();
+    } else if (act === 'use-detected-base-date') {
+      var detDate = btn.getAttribute('data-date') || '';
+      if (detDate) {
+        state.deadlineBaseDate = detDate;
+        renderMain();
+        toast('기산 기준일을 ' + detDate + '(으)로 적용했습니다.');
+      }
+    } else if (act === 'copy-deadlines-md') {
+      var thDl = state.activeThread;
+      var tlForDl = global.PuPBoxEngine.extractFactTimeline(thDl ? ((thDl.sourceText || '') + '\n' + (thDl.query || '')) : '');
+      var baseForDl = state.deadlineBaseDate || tlForDl.suggestedBaseDate || global.PuPBoxEngine.todayKstYmd();
+      var dlRes = global.PuPBoxEngine.calculateLaborDeadlines(baseForDl, global.PuPBoxEngine.todayKstYmd());
+      copyTextSafe(dlRes.markdown, '노동사건 법정 기한 산정표가 클립보드에 복사되었습니다.');
+    } else if (act === 'copy-timeline-md') {
+      if (!state.activeThread) return;
+      var tlRes = global.PuPBoxEngine.extractFactTimeline((state.activeThread.sourceText || '') + '\n' + (state.activeThread.query || ''));
+      copyTextSafe(tlRes.markdown, '사실관계 일자별 연표가 클립보드에 복사되었습니다.');
+    } else if (act === 'insert-timeline-editor') {
+      if (!state.activeThread) return;
+      var tlIns = global.PuPBoxEngine.extractFactTimeline((state.activeThread.sourceText || '') + '\n' + (state.activeThread.query || ''));
+      if (!tlIns.markdown) return;
+      var origSrc = state.activeThread.sourceText || '';
+      state.activeThread.sourceText = (origSrc ? (origSrc + '\n\n') : '') + '[기초사실 일자별 연표]\n' + tlIns.markdown;
+      state.activeThread = global.PuPBoxStore.saveThread(state.activeThread);
+      state.workspaceTab = 'editor';
+      toast('사실관계 일자별 연표를 원문 편집창에 추가했습니다.');
       renderMain();
     } else if (act === 'load-ws-sample') {
       var sKey = btn.getAttribute('data-sample') || 'freelancer';
@@ -4189,8 +4497,34 @@
       state.caseSubQuery = '';
       state.caseDateRange = 'all';
       state.caseSortBy = 'relevance';
+      state.caseOutcomeFilter = 'all';
       state.liveCollectBanner = null;
       renderMain();
+    } else if (act === 'open-compare-modal') {
+      showCompareDocsModal();
+    } else if (act === 'open-doc-from-modal') {
+      closeModal();
+      openDocInReader(btn.getAttribute('data-id'));
+    } else if (act === 'copy-compare-md') {
+      var cmpDocs = Array.from(state.selectedDocIds).map(function (id) { return global.PuPBoxStore.getDocById(id); }).filter(Boolean);
+      var cmpMat = global.PuPBoxEngine.buildAuthorityComparisonMatrix(cmpDocs, { query: state.caseQuery });
+      copyTextSafe(cmpMat.markdown, '선택 자료 비교표(마크다운)가 클립보드에 복사되었습니다.');
+    } else if (act === 'compare-to-ai-review') {
+      var cmpDocsForAi = Array.from(state.selectedDocIds).slice(0, 6).map(function (id) { return global.PuPBoxStore.getDocById(id); }).filter(Boolean);
+      if (!cmpDocsForAi.length) return;
+      closeModal();
+      cmpDocsForAi.forEach(function (doc) {
+        attachItem({ id: 'doc:' + doc.id, kind: 'doc', title: doc.title, caseNo: doc.caseNo, body: doc.body });
+      });
+      var cmpQuery = (state.caseQuery ? ('"' + state.caseQuery + '" 쟁점과 관련하여 ') : '') +
+        '첨부된 ' + cmpDocsForAi.length + '건의 판례·재결·행정해석 결론과 핵심 판단기준 차이점을 비교 분석해 주세요.';
+      runPromptSubmit(cmpQuery, null, { mode: 'review' });
+    } else if (act === 'copy-doc-citation') {
+      var citeDoc = global.PuPBoxStore.getDocById(btn.getAttribute('data-id'));
+      if (citeDoc && global.PuPBoxEngine && typeof global.PuPBoxEngine.formatStandardLegalCitation === 'function') {
+        var stdCite = global.PuPBoxEngine.formatStandardLegalCitation(citeDoc, { withSummary: false });
+        copyTextSafe(stdCite, '표준 인용문구 복사 완료: ' + stdCite);
+      }
     } else if (act === 'set-issue-cat') {
       state.activeIssueCat = btn.getAttribute('data-cat') || 'dismissal';
       renderMain();
@@ -4618,6 +4952,8 @@
           switchView('cases');
         } else {
           state.activeThread = found;
+          state.reviewStance = found.stance || 'neutral';
+          state.deadlineBaseDate = '';
           state.workspaceTab = found.answer ? 'report' : 'editor';
           switchView('workspace');
         }
@@ -5338,6 +5674,16 @@
         if (subS) state.caseSubQuery = subS.value;
         state.caseSortBy = ev.target.value || 'relevance';
         renderMain();
+      } else if (ev.target.id === 'pboxCaseOutcomeSel') {
+        var ciO = document.getElementById('pboxCaseSearchInput');
+        var subO = document.getElementById('pboxCaseSubInput');
+        if (ciO) state.caseQuery = ciO.value;
+        if (subO) state.caseSubQuery = subO.value;
+        state.caseOutcomeFilter = ev.target.value || 'all';
+        renderMain();
+      } else if (ev.target.id === 'pboxDeadlineBaseInput') {
+        state.deadlineBaseDate = String(ev.target.value || '').trim();
+        renderMain();
       } else if (ev.target.id === 'pboxReviewFileInput') {
         handleReviewFileOpen(ev.target.files);
         ev.target.value = '';
@@ -5572,6 +5918,8 @@
     state.liveCollectBusy = false;
     state.backupBusy = false;
     state.workspaceTab = 'report';
+    state.reviewStance = 'neutral';
+    state.deadlineBaseDate = '';
     state.hideHomeEmptyProjects = false;
     state.activeThread = null;
     state.activeSearchRes = null;
@@ -5593,6 +5941,7 @@
     state.caseSubQuery = '';
     state.caseDateRange = 'all';
     state.caseSortBy = 'relevance';
+    state.caseOutcomeFilter = 'all';
     state.liveCollectBanner = null;
     state.siteSearchQuery = '';
     state.lawQuery = '';
