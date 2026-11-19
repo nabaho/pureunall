@@ -14117,7 +14117,8 @@ async function ocrDrop(files,page){ files=[...files]; if(!files.length) return;
       continue;
     }
     if(!parsed && aiReady()){ const gj=await _geminiOCR(prompt,sendB64,mt,pay.pages); if(gj){ if(gj.parsed) parsed=gj.parsed; else if(gj.err) apiErr=gj.err; } }
-    if(gvKey&&!isPDF){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
+    /* ⚠ Vision·Claude 는 Gemini 가 «못 읽었을 때만» 부른다(2026-11-19 비용 점검) — 예전에는 Gemini 가 읽은 뒤에도 열쇠만 있으면 둘 다 또 불러 요금이 두세 번 나갔다 */
+    if(gvKey&&!isPDF&&!_ocrGot(parsed)){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
       if(r.ok){ const d=await r.json(); const text=d.responses?.[0]?.fullTextAnnotation?.text||d.responses?.[0]?.textAnnotations?.[0]?.description||'';
         if(text&&apiKey){ const resp=await kcFetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content:`다음 OCR 텍스트를 분석하세요:\n${text.slice(0,2000)}\n\n${prompt}`}]})});
           if(resp.ok){ const rd=await resp.json(); const raw=rd.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim(); const m=raw.match(/\{[\s\S]*\}/); if(m) parsed=JSON.parse(m[0]); }

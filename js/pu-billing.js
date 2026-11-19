@@ -523,6 +523,19 @@
 
   /* 이번 달 판독이 얼마나 됐나. 셈을 못 읽었으면 has:false — **아무것도 안 그린다**.
      ⚠ 「못 읽었다」를 ₩0 으로 적지 말 것. 다 쓴 것을 「아직 안 썼다」로 읽는다. */
+  /* 달 금액 — 서버 functions/doc-read.js 의 aiSpentWonOf 와 «같은 식»이다(2026-11-19 비용 점검).
+     (n − wn) × 단가 + won — won 은 실제 토큰으로 센 원화 합, wn 은 그렇게 센 판독 수.
+     원화로 못 센 판독(옛 기록·사진 지우개 등)은 예전처럼 횟수 × 단가다. 단가 0 은 «무료로 쓰는 중» — 금액 0. */
+  function aiSpentWonOf(all, wonPerRead) {
+    var a = (all && typeof all === 'object') ? all : {};
+    var w = Math.max(0, Number(wonPerRead) || 0);
+    if (w === 0) return 0;
+    var n = Math.max(0, Number(a.n) || 0);
+    var wn = Math.min(n, Math.max(0, Number(a.wn) || 0));
+    var won = Math.max(0, Number(a.won) || 0);
+    return Math.round((n - wn) * w + won);
+  }
+
   function aiSummarize(budgetRaw, monthTally) {
     var b = aiBudgetOf(budgetRaw);
     var reads = (monthTally && monthTally._all) ? num(monthTally._all.n) : null;
@@ -530,7 +543,7 @@
       return { has: false, reads: null, spent: null, limit: b.limit, warn: b.warn,
         wonPerRead: b.wonPerRead, free: b.wonPerRead === 0, over: false, near: false, tone: 'none' };
     }
-    var spent = Math.round(reads * b.wonPerRead);
+    var spent = aiSpentWonOf(monthTally._all, b.wonPerRead);
     var over = b.limit > 0 && spent >= b.limit;
     var near = b.warn > 0 && spent >= b.warn;
     /* ★ 단가가 0 이면 «무료로 쓰는 중»이다 — 그때는 금액을 그리지 않는다
@@ -594,6 +607,7 @@
     aiYm: aiYm,
     aiBudgetOf: aiBudgetOf,
     aiSummarize: aiSummarize,
+    aiSpentWonOf: aiSpentWonOf,
     watchAi: watchAi,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1738,7 +1738,7 @@ function askFundBotAi(idx){
   turn.aiLoading=true;
   _refreshKbChatViews(false);
   var pr=PuFundAsk.makePrompt(turn.picked||[],turn.q);
-  aiCall(pr.system,pr.user).then(function(reply){
+  aiCall(pr.system,pr.user,null,{models:AI_MODELS_QUICK}).then(function(reply){
     var parsed=PuFundAsk.parseReply(reply,turn.picked||[]);
     turn.aiLoading=false;
     if(parsed&&parsed.answer) turn.aiText=parsed.answer;
@@ -5677,6 +5677,9 @@ function _hwpClearStudioStores(){
      새 열쇠·새 비용 설정 없음). 문서 내용이 나간다는 동의창을 한 번 띄운다(work.html 과 같은 방식). */
 // 2026-11-19: claude-sonnet-4-20250514 는 2026-06-15 은퇴 → Opus 5.5·Sonnet 5.5 (업무관리와 같은 프록시·같은 목록)
 var AI_MODELS=['claude-opus-5-5','claude-sonnet-5-5'];
+/* 지식 챗봇용 — 질문마다 «자동»으로 부르는 길이라 가장 비싼 Opus 대신 Haiku 5.5(입력·출력 단가 Opus 의 1/40)부터(2026-11-19 비용 점검).
+   서식 고치기(문서를 정확히 고쳐야 하는 일)는 그대로 AI_MODELS 를 쓴다. */
+var AI_MODELS_QUICK=['claude-haiku-5-5','claude-sonnet-5-5'];
 function aiProxyUrl(){
   try{
     var raw=localStorage.getItem('pureun_v6_setting_ai_proxy_url')||localStorage.getItem('pureun_v6_ai_proxy_url')
@@ -5710,7 +5713,8 @@ function aiFetch(url,opts){
       throw e;
     });
 }
-function aiCall(system,userText,known){
+/* opts.models — 이 부름만 다른 모델 목록을 쓸 때(기금 지식 챗봇은 AI_MODELS_QUICK). 안 주면 AI_MODELS. */
+function aiCall(system,userText,known,opts){
   var url=aiProxyUrl();
   if(!url) return Promise.reject(new Error('AI 프록시 주소가 없습니다 — 시작 화면(포털) 왼쪽 아래 [⚙ 설정] → 「AI 프록시 주소」에 등록하세요 (대표만 보입니다)'));
   /* 개인정보(주민번호·전화·계좌·전자우편 등)는 꼬리표로 가려 보내고 답은 이 브라우저 안에서 되돌린다(js/pu-ai-mask.js).
@@ -5718,11 +5722,12 @@ function aiCall(system,userText,known){
   var MK=window.PuAiMask;
   if(!MK||!MK.createMasker) return Promise.reject(new Error('개인정보 가림 도구(js/pu-ai-mask.js)가 이 화면에 실려 있지 않습니다 — 그대로 보내면 문서 속 개인정보가 바깥으로 나갑니다'));
   var mk=MK.createMasker({known:known||[]}), sendText=mk.mask(userText), sendSys=mk.withNote(system);
+  var models=(opts&&Array.isArray(opts.models)&&opts.models.length)?opts.models:AI_MODELS;
   var i=0;
   function attempt(){
     return aiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
       /* 새 모델은 생각(thinking)도 max_tokens 안에서 쓴다 — 2000 이면 답이 잘릴 수 있어 넉넉히 */
-      body:JSON.stringify({model:AI_MODELS[i],max_tokens:4000,system:sendSys,
+      body:JSON.stringify({model:models[i],max_tokens:4000,system:sendSys,
         messages:[{role:'user',content:sendText}]})})
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -5735,7 +5740,7 @@ function aiCall(system,userText,known){
       })
       .catch(function(e){
         if(e&&e.timeout) throw e;
-        if(i<AI_MODELS.length-1){ i++; return attempt(); }
+        if(i<models.length-1){ i++; return attempt(); }
         throw e;
       });
   }

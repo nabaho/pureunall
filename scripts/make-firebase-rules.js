@@ -1826,6 +1826,9 @@ rules.ai_read_tally = {
        ⚠ n 에 합치지 말 것 — Gemini 는 «하루» 몫이고 Vision 은 «달마다» 1,000장이다.
          합치면 어느 쪽이 남았는지 알 수가 없다. */
     vision: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    /* won = 실제 토큰으로 센 원화 합 · wn = 그렇게 센 판독 수 (2026-11-19) — 달 금액 = (n − wn) × 단가 + won */
+    won:    { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    wn:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
     $other: { '.validate': false }
   } }
 };

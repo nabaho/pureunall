@@ -313,7 +313,8 @@ function ymdKST(now) {
      같아 보인다.
    ⚠ vision 을 n 에 합치면 «몫이 다른 곳»이 한 숫자에 섞인다 — Gemini 는 하루 몫이고
      Vision 은 «달마다» 1,000장이다. 합치면 어느 쪽이 남았는지 알 수가 없다. */
-const TALLY_KINDS = ["n", "quota", "vision"];
+/* won = 실제 토큰으로 센 원화 합 · wn = 그렇게 센 판독 수 (2026-11-19) — aiSpentWonOf 머리 참고 */
+const TALLY_KINDS = ["n", "quota", "vision", "won", "wn"];
 
 /* ── Vision 의 무료 몫은 «달마다» 1,000장이다 (2026-09-08) ────────────────────
    ⚠⚠ Gemini 의 «하루» 몫과 **다른 셈**이다. 날짜로만 세면 「이달에 얼마 썼나」에
@@ -365,6 +366,60 @@ function aiBudgetOf(raw) {
   };
 }
 function aiMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/n"; }
+/* 달 «_all» 자리 통째 — n·won·wn 을 함께 읽어 aiSpentWonOf 에 넘긴다 */
+function aiMonthAllPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all"; }
+
+/* ── 실제 토큰으로 원화를 센다 (2026-11-19 비용 점검) ─────────────────────────────
+   여태 달 금액은 «부른 횟수 × ₩4» 였다 — 2만 자 계약서·30분 녹음도 한 번(₩4)으로 잡혀 적게 셌다.
+   구글이 답마다 주는 usageMetadata(입력·출력·생각 토큰)로 그 자리에서 원화를 셈해 따로 쌓는다.
+     won = 그렇게 센 원화 합 · wn = 그렇게 센 판독 수
+   달 금액 = (n − wn) × 단가 + won — 원화로 못 센 판독(옛 기록·사진 지우개 등)은 예전처럼 횟수×단가.
+   ⚠ 이 식은 화면(js/pu-billing.js aiSpentWonOf)과 «글자 그대로 같아야» 한다 — tests/ai-spend-cap 이 견준다.
+   ⚠ 단가 0 은 «무료로 쓰는 중»(화면은 횟수만) — 그때는 금액을 0 으로 둔다(예전과 같다).
+   단가: AI Studio 유료 등급 표준, USD/100만 토큰(2026-11-19 원문 확인). 바뀌면 이 표와 환율만 고친다. */
+const KRW_PER_USD = 1400;
+const GEMINI_PRICE_USD = {
+  "gemini-2.5-flash-lite": { in: 0.10, out: 0.40, audio: 0.30 },
+  "gemini-2.5-flash": { in: 0.30, out: 2.50, audio: 1.00 },
+  "gemini-2.5-pro": { in: 1.25, out: 10.00, audio: 1.25 },
+  "gemini-3.1-flash-lite": { in: 0.25, out: 1.50, audio: 0.50 },
+  /* 2026-12-01 부터 2.5 Flash 가 넘어가는 곳(같은 값) · 2.5 Pro 가 넘어가는 곳(2027-01-01 값으로 넉넉히) */
+  "gemini-3.5-flash-lite": { in: 0.30, out: 2.50, audio: 0.30 },
+  "gemini-3.8-flash": { in: 1.50, out: 7.50, audio: 1.50 }
+};
+/* 모델 이름 → 단가. 가장 길게 맞는 이름을 고른다(2.5-flash-lite 가 2.5-flash 로 잘못 잡히지 않게).
+   모르는 모델이면 2.5 Flash 값 — 가장 많이 쓰는 모델이고, lite 보다 비싸게 잡혀 덜 세는 일이 없다. */
+function priceOf(model) {
+  const m = String(model || "").replace(/^models\//, "");
+  let best = "";
+  Object.keys(GEMINI_PRICE_USD).forEach(function (k) { if (m.indexOf(k) === 0 && k.length > best.length) best = k; });
+  return GEMINI_PRICE_USD[best || "gemini-2.5-flash"];
+}
+/* 답 하나의 원화(소수 둘째 자리). usageMetadata 가 없으면 null — 부르는 쪽은 안 쌓는다(그 판독은 횟수×단가로 잡힌다). */
+function wonOfUsage(json, model) {
+  const u = json && json.usageMetadata;
+  if (!u || typeof u !== "object") return null;
+  const p = priceOf((json && json.modelVersion) || model);
+  const prompt = Math.max(0, Number(u.promptTokenCount) || 0);
+  let audio = 0;
+  (Array.isArray(u.promptTokensDetails) ? u.promptTokensDetails : []).forEach(function (d) {
+    if (d && String(d.modality || "").toUpperCase() === "AUDIO") audio += Math.max(0, Number(d.tokenCount) || 0);
+  });
+  audio = Math.min(audio, prompt);
+  const out = Math.max(0, Number(u.candidatesTokenCount) || 0) + Math.max(0, Number(u.thoughtsTokenCount) || 0);
+  const usd = ((prompt - audio) * p.in + audio * p.audio + out * p.out) / 1e6;
+  return Math.round(usd * KRW_PER_USD * 100) / 100;
+}
+/* 달 금액 — 달 «_all» 자리(n·won·wn)와 판독 단가로. 화면 js/pu-billing.js 의 aiSpentWonOf 와 같은 식이다. */
+function aiSpentWonOf(all, wonPerRead) {
+  const a = (all && typeof all === "object") ? all : {};
+  const w = Math.max(0, Number(wonPerRead) || 0);
+  if (w === 0) return 0;
+  const n = Math.max(0, Number(a.n) || 0);
+  const wn = Math.min(n, Math.max(0, Number(a.wn) || 0));
+  const won = Math.max(0, Number(a.won) || 0);
+  return Math.round((n - wn) * w + won);
+}
 
 /* ── 한도 판정 한 곳 (대표 지시 2026-11-05 「유료 API 통제 — 추천대로」) ─────────────
    여태 «사람이 누른 판독(manual)»은 한도를 넘어도 끝없이 통과했다 — 화면 하나가
@@ -404,7 +459,8 @@ function tallyPaths(app, ymd, kind) {
        섞지 않는다. 하루 몫과 달 몫, 무료와 유료가 뒤엉키면 둘 다 못 읽는다.
      ⚠ quota(막힌 수)는 달 자리에 안 올린다 — 그것은 «못 쓴 것»이라 요금이 아니다.
      ⚠ 이미 달 자리를 받았으면 더하지 않는다 — 같은 자리를 한 번에 두 번 올린다. */
-  if ((k === "vision" || k === "n") && String(d).length > 7) {
+  /* won·wn — 실제 토큰 원화 셈도 달 금액에 쓰이므로 달 자리에 올린다(2026-11-19) */
+  if ((k === "vision" || k === "n" || k === "won" || k === "wn") && String(d).length > 7) {
     out.push("ai_read_tally/" + String(d).slice(0, 7) + "/_all/" + k);
   }
   return out;
@@ -427,6 +483,10 @@ function geminiBody(parts, cfg) {
   }
   const mot = Number(c.maxOutputTokens);
   if (Number.isFinite(mot) && mot > 0) g.maxOutputTokens = Math.min(Math.round(mot), MAX_OUTPUT_TOKENS);
+  /* 부르는 쪽이 안 정하면 «기본 상한»을 건다(2026-11-19 비용 점검). 여태는 안 정하면 상한이 없어
+     모델 최대(6만+ 토큰)까지 나올 수 있었다 — 생각(thinking) 토큰도 출력 요금이다.
+     값은 부르는 쪽이 정할 수 있는 최대와 같다(사진첩은 10장 묶음이라 이 안에 든다). */
+  else g.maxOutputTokens = MAX_OUTPUT_TOKENS;
   return { contents: [{ parts: parts }], generationConfig: g };
 }
 
@@ -473,7 +533,8 @@ async function callGemini(fetchFn, key, parts, waits, cfg) {
         last = { status: 0, why: String((e && e.message) || e) };
         break;   // 그물이 끊겼다 — 다음 모델로
       }
-      if (r && r.ok) return { ok: true, json: await r.json() };
+      /* model — 실제로 답한 모델(원화 셈 wonOfUsage 가 단가를 고른다) */
+      if (r && r.ok) return { ok: true, json: await r.json(), model: model };
 
       const status = (r && r.status) || 0;
       let why = "";
@@ -574,6 +635,8 @@ module.exports = {
   APPS, appOf, ymdKST, tallyPaths, TALLY_KINDS,
   /* AI 판독 이번 달 요금 한도 (대표 결정 2026-09-10) — 까닭은 AI_BUDGET_PATH 머리에 */
   AI_BUDGET_PATH, AI_BUDGET_DEFAULT, aiBudgetOf, aiSpentWon, aiMonthPath,
+  /* 실제 토큰으로 원화 셈 (2026-11-19) — 까닭은 KRW_PER_USD 머리에 */
+  KRW_PER_USD, GEMINI_PRICE_USD, priceOf, wonOfUsage, aiSpentWonOf, aiMonthAllPath,
   /* 한도 판정 한 곳 (2026-11-05) — 까닭은 MANUAL_CEIL 머리에 */
   MANUAL_CEIL, budgetGate,
   /* 달 몫 문턱 — 까닭은 ymKST 머리에 */
