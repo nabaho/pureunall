@@ -48,6 +48,14 @@
     --pu-ok:#4ade80; --pu-ok-bg:#1e293b; --pu-warn:#fde68a; --pu-warn-bg:#1e293b; --pu-dgi:#fecaca; --pu-dg-bg:#1e293b;
   }
 }
+/* 기기 설정 말고 화면에서 html 에 data-theme="dark" 를 다는 길도 같은 값 — 일터상생은 이 규칙을 갖고 있다(지금 켜는 단추는 없다).
+   ⚠ 위 덩어리와 값이 같아야 한다(tests/pu-design.test.js ⑦-2) */
+:where(html[data-theme="dark"] body.pu-design.pu-dark-auto){
+  --pu-acc-soft:#1e293b; --pu-acc-ink:#bfdbfe;
+  --pu-ink:#f8fafc; --pu-sub:#cbd5e1; --pu-faint:#94a3b8;
+  --pu-line:#475569; --pu-line2:#64748b; --pu-bg:#000000; --pu-card:#1e293b;
+  --pu-ok:#4ade80; --pu-ok-bg:#1e293b; --pu-warn:#fde68a; --pu-warn-bg:#1e293b; --pu-dgi:#fecaca; --pu-dg-bg:#1e293b;
+}
 
 /* ── 2. 모든 켠 앱 공통 ── */
 /* 키보드로 다닐 때 지금 자리가 보인다(목업 :focus-visible) */
@@ -124,11 +132,15 @@
 :where(body.pu-design.pu-frame-a) #toast{border-radius:12px;box-shadow:0 8px 24px rgba(30,41,59,.28)}
 :where(body.pu-design.pu-frame-a) .modal{background:rgba(30,41,59,.4)}
 
+/* A 틀 폰·태블릿 상자 — 앱 대부분(일터상생·일자리전환·괴롭힘 조사·오케스트레이션·푸른등기)이 768px 부터 상자를 양옆 테두리 없이 편다.
+   그 폭에서 둥근 모서리·그림자가 남으면 선 끝이 휘고 «상자 두 겹»이 된다(자동 검토 2026-11-20) → 상자는 768px 부터 편다 */
+@media (max-width:768px){
+  :where(body.pu-design.pu-frame-a) .card{border-radius:0;box-shadow:none}
+}
 /* A 틀 폰 — 앱의 폰 구간이 바꾸던 칸 가운데 위에서 덮은 것을 다시 맞춘다(상자는 한 겹, 양옆 테두리 없음) */
 @media (max-width:640px){
   :where(body.pu-design.pu-frame-a) .tabs{padding:2px 8px 8px;gap:2px}
   :where(body.pu-design.pu-frame-a) .tabs button{padding:6px 10px;font-size:13px}
-  :where(body.pu-design.pu-frame-a) .card{border-radius:0;box-shadow:none}
   :where(body.pu-design.pu-frame-a) .site{border-radius:0}
   :where(body.pu-design.pu-frame-a) .kpi b{font-size:16px}
 }

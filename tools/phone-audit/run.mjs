@@ -60,7 +60,9 @@ const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter(a => a.startsWith('--')).map(a => { const [k, v] = a.slice(2).split('='); return [k, v ?? true]; }));
 const only = args.filter(a => !a.startsWith('--'));
 const widths = String(opt.widths || '360,411').split(',').map(Number);
-const outDir = path.resolve(opt.out || path.join(here, 'out'));
+/* --dark · --dark=1 만 켠다(--dark=false·0 은 끔). 결과 자리를 안 주면 밝은 판 갈무리를 덮지 않게 out/dark 에 둔다 */
+const dark = opt.dark === true || /^(1|true|yes|on)$/i.test(String(opt.dark || ''));
+const outDir = path.resolve(opt.out || path.join(here, 'out', dark ? 'dark' : ''));
 const waitMs = Number(opt.wait || 6000);
 const onlyView = opt.view || '';
 
@@ -160,7 +162,7 @@ async function auditOne(browser, base, app, width) {
     viewport: { width, height: 800 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true,
     userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
     locale: 'ko-KR', timezoneId: 'Asia/Seoul',
-    colorScheme: opt.dark ? 'dark' : 'light',
+    colorScheme: dark ? 'dark' : 'light',
   });
   const extra = seed.apps[app.key] || {};
   const data = deepMerge(seed.base, extra.data || {});

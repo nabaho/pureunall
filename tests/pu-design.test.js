@@ -74,7 +74,8 @@ const appsUsing = () => fs.readdirSync(ROOT).filter(f => f.endsWith('.html'))
 test('① 모든 규칙은 body.pu-design 아래에서만 먹는다', () => {
   const sels = selectorsOf(R(CSS_FILE));
   assert.ok(sels.length >= 10, '규칙을 못 읽었다');
-  const bad = sels.filter(s => !s.startsWith(':where(body.pu-design'));
+  /* 화면에서 html 에 data-theme="dark" 를 다는 어두운 판도 body.pu-design 아래다 */
+  const bad = sels.filter(s => !s.startsWith(':where(body.pu-design') && !s.startsWith(':where(html[data-theme="dark"] body.pu-design'));
   assert.deepEqual(bad, [], 'body.pu-design 밖에서 먹는 규칙: ' + bad.join(' | '));
 });
 
@@ -169,6 +170,11 @@ test('⑦-2 어두운 판도 글자 대비 4.5:1 이상 — 바뀐 값은 어두
   const css = noComments(R(CSS_FILE));
   const dark = darkBlock(R(CSS_FILE));
   assert.ok(dark, '어두운 판 덩어리를 못 읽었다');
+  /* 화면에서 다는 data-theme="dark" 길도 기기 설정 길과 값이 같아야 한다 — 한쪽만 고치면 두 어두운 판이 달라진다 */
+  const byAttr = (css.match(/:where\(html\[data-theme="dark"\] body\.pu-design\.pu-dark-auto\)\s*\{([^{}]*)\}/) || [])[1];
+  const vars = (s) => [...String(s).matchAll(/(--pu-[a-z0-9-]+)\s*:\s*([^;]+);/g)].map(m => m[1] + ':' + m[2].trim()).sort();
+  assert.ok(byAttr, 'data-theme="dark" 어두운 판 덩어리가 없다');
+  assert.deepEqual(vars(byAttr), vars(dark), '두 어두운 판 값이 다르다');
   const pick = (src, name) => { const m = src.match(new RegExp(name + '\\s*:\\s*(#[0-9a-fA-F]{3,6})\\b')); return m && m[1]; };
   const v = (name) => { const c = pick(dark, name) || pick(css, name); assert.ok(c, name + ' 없음'); return c; };
   /* 어두운 판에서 «글자»가 되는 값은 모두 바뀌어 있어야 한다 — 밝은 판 짙은 글자가 검정 위에 남으면 안 보인다 */
