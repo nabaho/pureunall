@@ -5023,3 +5023,262 @@ test('원문 100% 보존형 동적 앵커 발췌(No-Stitching Verbatim RAG) — 
   assert.ok(wsOut.length <= 300, '비정상 공백 입력에서도 maxChars 상한을 준수해야 합니다');
   assert.ok(elapsedMs < 200, `59,000자 연속 공백 입력도 되추적 없이 즉시 처리되어야 합니다(실측 ${elapsedMs}ms)`);
 });
+
+test('유료 리걸테크 6대 핵심 기능(결론신호·표준인용·다중비교표·조문역색인·신구대비표/대리입장·연표/제척기간) 통합 검증', async () => {
+  /* 1) 결론·효력 신호(KeyCite/Shepard형) 및 전합 변경 주의 경고 검증 */
+  const enBancDoc = Corpus.SEED_DOCS.find((d) => d.caseNo === '2020다247190');
+  assert.ok(enBancDoc);
+  const sigEnBanc = Engine.classifyLegalOutcomeSignal(enBancDoc);
+  assert.equal(sigEnBanc.code, 'en_banc');
+  assert.equal(sigEnBanc.label, '전원합의체');
+  assert.equal(sigEnBanc.caution, '', '2024.12.19. 이후 전원합의체 자체에는 구법리 주의가 붙지 않아야 합니다');
+
+  const oldOrdinaryWageDoc = {
+    id: 'old-ord-1',
+    docType: 'interp_moel',
+    agency: '고용노동부',
+    caseNo: '임금근로시간과-111',
+    decisionDate: '2018-05-10',
+    title: '재직조건부 상여금 통상임금 고정성 질의',
+    summary: '지급일 현재 재직자에 한하여 지급하는 상여금은 고정성이 결여되어 통상임금에 해당하지 아니한다.',
+    body: '고정성 요건이 인정되지 아니하므로 통상임금에서 제외된다.'
+  };
+  const sigOld = Engine.classifyLegalOutcomeSignal(oldOrdinaryWageDoc);
+  assert.equal(sigOld.code, 'unfavorable');
+  assert.ok(sigOld.caution.includes('2020다247190'), '2024 전합 이전 고정성 설시 자료에는 판례변경 주의 경고가 표시되어야 합니다');
+
+  const dist = Engine.summarizeOutcomeDistribution([
+    enBancDoc,
+    oldOrdinaryWageDoc,
+    { docType: 'prec_lower', court: '서울행정법원', summary: '피고의 요양불승인처분을 취소한다.' },
+    { docType: 'dec_nlrc', court: '중앙노동위원회', summary: '근로자의 구제신청을 일부 인용한다.' }
+  ]);
+  assert.equal(dist.enBanc, 1);
+  assert.equal(dist.favorable, 1);
+  assert.equal(dist.partial, 1);
+  assert.equal(dist.unfavorable, 1);
+  assert.equal(dist.cautionCount, 1);
+
+  /* 2) 법원·노동위·부처 표준 인용문구 생성기 검증 */
+  assert.equal(
+    Engine.formatStandardLegalCitation(enBancDoc),
+    '대법원 2024. 12. 19. 선고 2020다247190 전원합의체 판결'
+  );
+  assert.equal(
+    Engine.formatStandardLegalCitation({
+      docType: 'dec_nlrc',
+      court: '중앙노동위원회',
+      decisionDate: '2025-03-04',
+      caseNo: '2025부해101'
+    }),
+    '중앙노동위원회 2025. 3. 4. 판정 2025부해101'
+  );
+  assert.equal(
+    Engine.formatStandardLegalCitation({
+      docType: 'interp_moel',
+      agency: '고용노동부',
+      decisionDate: '2025-02-06',
+      caseNo: '임금근로시간과-647'
+    }),
+    '고용노동부 2025. 2. 6. 회시 임금근로시간과-647'
+  );
+  assert.equal(
+    Engine.formatStandardLegalCitation({ lawTitle: '근로기준법', articleNo: '제23조', heading: '해고 등의 제한' }),
+    '근로기준법 제23조(해고 등의 제한)'
+  );
+
+  /* 3) 다중 판례·해석 한눈에 비교 매트릭스 표 생성 검증 */
+  const cmp = Engine.buildAuthorityComparisonMatrix([enBancDoc, oldOrdinaryWageDoc], { query: '재직조건 통상임금' });
+  assert.equal(cmp.rows.length, 2);
+  assert.ok(cmp.markdown.includes('| 1 |') && cmp.markdown.includes('2020다247190') && cmp.markdown.includes('변경주의'), '마크다운 비교표에 사건번호와 변경주의 표시가 포함되어야 합니다');
+
+  /* 4) 법령 조문별 인용 판례·해석 역색인(온주/케이스노트형) 검증 */
+  const linked2 = Engine.findAuthoritiesForArticle('근로기준법', '제2조', Corpus.SEED_DOCS, 5);
+  assert.ok(linked2.some((d) => d.caseNo === '2020다247190'), '근로기준법 제2조 역색인에 2020다247190 전원합의체 판결이 자동 연결되어야 합니다');
+
+  /* 5) 대리 입장(근로자측/사용자측) 맞춤 검토 및 3단 신·구 조항 대비표(Redline) 검증 */
+  const workerPrompt = Engine.buildRagPrompt({
+    query: '해고 통보를 카톡으로 받았습니다.',
+    mode: 'review',
+    stance: 'worker',
+    retrievedDocs: [enBancDoc]
+  });
+  const employerPrompt = Engine.buildRagPrompt({
+    query: '취업규칙 개정 절차를 점검하고 싶습니다.',
+    mode: 'review',
+    stance: 'employer',
+    retrievedDocs: [enBancDoc]
+  });
+  assert.ok(workerPrompt.includes('근로자·재해자·신청인측'), '근로자측 대리 입장 지시가 프롬프트에 반영되어야 합니다');
+  assert.ok(employerPrompt.includes('사용자·회사·피신청인측'), '사용자측 대리 입장 지시가 프롬프트에 반영되어야 합니다');
+
+  const redline = Engine.buildClauseRedlineTable(
+    '제10조 퇴사 시 위약금 2,000만 원을 급여에서 차감한다.\n\n제12조 회사는 예고 없이 즉시 해고할 수 있다.'
+  );
+  assert.equal(redline.rows.length, 2);
+  assert.ok(redline.markdown.includes('적법 수정 권고안 (Redline)') && redline.markdown.includes('제10조'));
+
+  /* 6) 사실관계 일자별 연표 자동 추출 및 노동법 제척기간(민법 초일불산입·월말·주말연장) 계산기 검증 */
+  const fakePhone = '010' + '-' + '2233' + '-' + '4455';
+  const timelineRes = Engine.extractFactTimeline(
+    `원고 박민수(${fakePhone})는 2025. 12. 10. 회사로부터 카카오톡 해고 통보를 받았다. 이전에 2024년 3월 2일 근로계약을 체결하였고 2025-11-01 정기 인사평가를 받았다.`
+  );
+  assert.equal(timelineRes.events.length, 3, '본문 내 3개의 일자가 모두 추출되어야 합니다');
+  assert.equal(timelineRes.events[0].date, '2024-03-02', '연표가 시간순 오름차순으로 정렬되어야 합니다');
+  assert.equal(timelineRes.events[2].date, '2025-12-10');
+  assert.equal(timelineRes.suggestedBaseDate, '2025-12-10', '징계·해고·통지 일자가 기본 기산 기준일로 우선 제안되어야 합니다');
+  assert.ok(!timelineRes.markdown.includes(fakePhone) && !timelineRes.markdown.includes('박민수'), '연표 추출 결과에서도 전화번호·실명이 마스킹되어야 합니다');
+
+  /* 민법 제157조·제160조·제161조 기한 산정 정밀 검증 */
+  const dlNormal = Engine.calculateLaborDeadlines('2026-03-16', '2026-04-01');
+  assert.equal(dlNormal.valid, true);
+  assert.equal(dlNormal.startCountDate, '2026-03-17');
+  const reliefNormal = dlNormal.items.find((x) => x.id === 'nlrc_relief_3m');
+  assert.equal(reliefNormal.dueDate, '2026-06-16', '2026-03-16 해고 시 초일불산입(3/17 기산) 3개월 만료일은 2026-06-16(화)이어야 합니다');
+
+  const dlMonthEnd1 = Engine.calculateLaborDeadlines('2025-11-30', '2026-01-01');
+  assert.equal(
+    dlMonthEnd1.items.find((x) => x.id === 'nlrc_relief_3m').rawDueDate,
+    '2026-02-28',
+    '2025-11-30 처분 시 기산일 12/1부터 3개월 만료 원일은 2026-02-28(토)이어야 합니다'
+  );
+  assert.equal(
+    dlMonthEnd1.items.find((x) => x.id === 'nlrc_relief_3m').dueDate,
+    '2026-03-02',
+    '2026-02-28이 토요일이므로 민법 제161조에 따라 월요일인 2026-03-02로 연장되어야 합니다'
+  );
+
+  const dlMonthEnd2 = Engine.calculateLaborDeadlines('2025-11-29', '2026-01-01');
+  assert.equal(
+    dlMonthEnd2.items.find((x) => x.id === 'nlrc_relief_3m').rawDueDate,
+    '2026-02-28',
+    '2025-11-29 처분 시 기산일 11/30의 3개월 후 응당일이 2월에 없으므로 말일(2026-02-28)이 만료 원일이어야 합니다'
+  );
+  assert.equal(Engine.calculateLaborDeadlines('2026-02-31', '2026-03-01').valid, false, '존재하지 않는 날짜는 안전하게 거부해야 합니다');
+
+  /* 7) UI 통합 검증: 비교표 모달 · 법령 리더 연결판례 · 연표/기한 탭 · 로그아웃 초기화 */
+  const elementsById = {};
+  const docListeners = {};
+  function makeEl(id) {
+    const classSet = new Set();
+    return {
+      id: id || '',
+      tagName: 'DIV',
+      style: {},
+      value: '',
+      checked: false,
+      innerHTML: '',
+      textContent: '',
+      className: '',
+      classList: {
+        add: (...c) => c.forEach((x) => classSet.add(x)),
+        remove: (...c) => c.forEach((x) => classSet.delete(x)),
+        contains: (x) => classSet.has(x)
+      },
+      setAttribute() {},
+      removeAttribute() {},
+      getAttribute() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      closest() { return null; },
+      focus() {}
+    };
+  }
+  const rootContainer = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootContainer;
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => elementsById[id] || (elementsById[id] = makeEl(id)),
+    createElement: (t) => makeEl(t),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] || (docListeners[ev] = [])).push(fn); }
+  };
+  const sampleLsaMd = '---\n제목: 근로기준법\n시행일자: 2026-10-02\n---\n##### 제2조 (정의)\n① 통상임금 등 정의 조문이다.\n##### 제23조 (해고 등의 제한)\n① 사용자는 정당한 이유 없이 해고하지 못한다.';
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => ({ unref() {} }),
+    clearInterval: () => {},
+    navigator: { clipboard: { writeText: async () => {} } },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, docs: [] }), text: async () => sampleLsaMd }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1440,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    navigator: ctx.navigator,
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    open: () => ({ opener: null }),
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  App.mount(rootContainer);
+  App.setAuthUser({ uid: 'user-legaltech-parity', displayName: '권형하' });
+  await new Promise((r) => setImmediate(r));
+
+  function clickAct(attrs, extraProps) {
+    const btn = Object.assign({
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    }, extraProps || {});
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* 통합검색 체크 후 [선택 비교표] 모달 열기 확인 */
+  App.switchView('cases');
+  clickAct({ 'data-act': 'toggle-doc-chk', 'data-id': enBancDoc.id }, { checked: true });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('data-act="open-compare-modal"'), '일괄 작업 막대에 [선택 비교표] 버튼이 표시되어야 합니다');
+  clickAct({ 'data-act': 'open-compare-modal' });
+  assert.equal(elementsById.pboxModalBackdrop.style.display, 'flex');
+  assert.ok(elementsById.pboxModalBox.classList.contains('wide'), '비교표 모달은 넓은 매트릭스 레이아웃(.wide)으로 열려야 합니다');
+  assert.ok(elementsById.pboxModalBox.innerHTML.includes('2020다247190'), '비교표 모달에 선택 판례 정보가 표시되어야 합니다');
+  clickAct({ 'data-act': 'close-modal' });
+
+  /* 법령 원문 리더 열람 시 조문 하단 연결 판례 자동 표시 확인 */
+  clickAct({ 'data-act': 'open-law', 'data-dir': '근로기준법', 'data-file': '법률(법률).md' });
+  await new Promise((r) => setImmediate(r));
+  assert.ok(elementsById.pboxReader.innerHTML.includes('pbox-art-linked') && elementsById.pboxReader.innerHTML.includes('2020다247190'), '법령 원문 리더의 조문 하단에 연결 판례 버튼이 자동 표시되어야 합니다');
+
+  /* 워크스페이스 대리 입장 선택·영속화(saveThread + 스레드 전환 복원) 및 연표·기한계산 탭 확인 */
+  clickAct({ 'data-act': 'start-new-doc' });
+  clickAct({ 'data-act': 'set-ws-stance', 'data-stance': 'worker' });
+  const workerThreadId = Store.getThreads()[0].id;
+  assert.equal(Store.getThreads()[0].stance, 'worker', 'saveThread 시 대리 입장(stance)이 스레드 객체에 영구 저장되어야 합니다');
+
+  const employerThread = Store.saveThread({
+    title: '회사측 취업규칙 검토',
+    mode: 'review',
+    stance: 'employer',
+    sourceText: '제5조 근무규정'
+  });
+  assert.equal(employerThread.stance, 'employer');
+  clickAct({ 'data-act': 'open-thread', 'data-id': employerThread.id });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('aria-pressed="true" data-act="set-ws-stance" data-stance="employer"'), '스레드 열기 시 해당 스레드의 대리 입장(employer)이 복원되어야 합니다');
+  clickAct({ 'data-act': 'open-thread', 'data-id': workerThreadId });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('aria-pressed="true" data-act="set-ws-stance" data-stance="worker"'), '이전 근로자측 스레드로 돌아오면 worker 입장이 그대로 유지되어야 합니다');
+
+  clickAct({ 'data-act': 'set-ws-tab', 'data-tab': 'timeline' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('pboxDeadlineBaseInput') && elementsById.pboxMainArea.innerHTML.includes('부당해고·징계·부당노동행위 구제신청'), '연표·기한 탭에 노동사건 법정 제척기간 계산기가 렌더링되어야 합니다');
+
+  /* 로그아웃 시 대리 입장·기산일·필터 등 민감 UI 상태 초기화 확인 */
+  App.setAuthUser(null);
+  clickAct({ 'data-act': 'start-new-doc' });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('aria-pressed="true" data-act="set-ws-stance" data-stance="neutral"'), '로그아웃 후 대리 입장이 기본 중립 상태로 초기화되어야 합니다');
+});

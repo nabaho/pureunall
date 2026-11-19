@@ -2363,11 +2363,14 @@
       });
     var rawStyle = String(clean.workflowStyle || (prev && prev.workflowStyle) || 'lbox');
     var safeStyle = (rawStyle === 'pureun' || rawStyle === 'lbox') ? rawStyle : 'lbox';
+    var rawStance = String(clean.stance !== undefined ? clean.stance : ((prev && prev.stance) || 'neutral'));
+    var safeStance = (rawStance === 'worker' || rawStance === 'employer') ? rawStance : 'neutral';
     var th = {
       id: String(clean.id || ('th-' + now + '-' + Math.random().toString(36).slice(2, 7))),
       ownerUid: mem.uid,
       title: scrubThreadField(rawTitleForNames || '법률 리서치 작업') || '법률 리서치 작업',
       mode: String(clean.mode || (prev && prev.mode) || 'auto'),
+      stance: safeStance,
       query: scrubThreadField(rawQueryForNames),
       answer: scrubThreadField(clean.answer !== undefined ? clean.answer : ((prev && prev.answer) || '')),
       sourceText: scrubThreadField(rawSrcForNames),
@@ -2613,9 +2616,11 @@
       ? searchRes.balancedDocs
       : searchRes.docs;
 
+    var reqStance = String(params.stance || 'neutral');
     var prompt = scrubText(E.buildRagPrompt({
       query: query,
       mode: params.mode || 'auto',
+      stance: reqStance,
       workflow: wfObj,
       attached: attached,
       retrievedDocs: ragDocs,
@@ -2670,6 +2675,7 @@
           ownerUid: reqUid,
           title: computedTitle,
           mode: params.mode || 'auto',
+          stance: reqStance,
           query: query,
           answer: safeAnswer,
           engineLabel: engineLabel,
@@ -2696,6 +2702,7 @@
       var offlineAns = E.synthesizeOfflineAnswer({
         query: query,
         mode: params.mode || 'auto',
+        stance: reqStance,
         workflow: wfObj,
         attached: attached,
         retrievedDocs: ragDocs,
@@ -2721,6 +2728,7 @@
       var fallbackAns = E.synthesizeOfflineAnswer({
         query: query,
         mode: params.mode || 'auto',
+        stance: reqStance,
         workflow: wfObj,
         attached: attached,
         retrievedDocs: ragDocs,
