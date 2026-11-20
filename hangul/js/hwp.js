@@ -1355,7 +1355,8 @@
     return out;
   };
   const encodeWstr = s => {
-    s = String(s || '');
+    // 글자 수는 16비트에 적는다 — 65,535 자를 넘으면 잘라야 뒤 자료가 어긋나지 않는다
+    s = String(s || '').slice(0, 0xffff);
     const out = new Uint8Array(2 + s.length * 2), v = new DataView(out.buffer);
     v.setUint16(0, s.length, true);
     for (let i = 0; i < s.length; i++) v.setUint16(2 + i * 2, s.charCodeAt(i), true);
@@ -1649,7 +1650,7 @@
       const head = shapeHead(node, code, top, w, h), { ow, oh } = orgOf(node, w, h);
       const inst = av(node, 'instid') || st.nextId();
       if (code === '$con') {
-        const kids = ((node && node.kids) || []).filter(canWrite);
+        const kids = ((node && node.kids) || []).filter(canWrite).slice(0, 0xffff); // 자식 수는 16비트
         const tail = new Uint8Array(2 + kids.length * 4 + 4), tv = new DataView(tail.buffer);
         tv.setUint16(0, kids.length, true);
         kids.forEach((k, i) => tv.setUint32(2 + i * 4, ctrlId(SHP_CODE[lname(k)]), true));

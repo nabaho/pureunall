@@ -242,7 +242,7 @@
       const what = loss.broken ? '저장한 .hwp 를 이 편집기가 다시 읽지 못했습니다'
         : [loss.chars ? `글자 ${loss.chars.toLocaleString()}자` : '', loss.images ? `그림 ${loss.images}개` : '', loss.shapes ? `도형·개체 ${loss.shapes}개` : ''].filter(Boolean).join(' · ') + '가 빠집니다';
       UI.dialog({ title: '.hwp 로 저장하면 빠지는 내용이 있습니다', width: 470,
-        body: h('div', {}, h('p', {}, `이 편집기의 .hwp 저장은 아직 일부 개체(묶음 개체 안의 글상자·그림, 바탕쪽 등)를 쓰지 못해 ${what}.`),
+        body: h('div', {}, h('p', {}, `이 편집기의 .hwp 저장은 아직 일부 개체(글맵시·OLE 개체·연결선 등)를 쓰지 못해 ${what}.`),
           h('p', { class: 'tp-note' }, '.hwpx 로 저장하면 모두 남습니다. 한글 2014 이후 판은 .hwpx 를 그대로 엽니다.')),
         buttons: [{ label: '.hwpx 로 저장', primary: true, act: () => { pick = 'hwpx'; } }, { label: '그래도 .hwp 로 저장', act: () => { pick = 'hwp'; } }, { label: '취소', cancel: true }],
         onClose: () => res(pick) });
