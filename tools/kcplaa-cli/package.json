@@ -1,0 +1,17 @@
+{
+  "name": "pureun-kcplaa-cli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "한국공인노무사회(ilabor.co.kr 전용자료실 · kcplaa.or.kr 본회 포털) 전 영역 자료 CLI 당겨오기 · 로컬 색인 · 직접 검색 · P박스 연동 도구",
+  "main": "kcplaa-cli.js",
+  "bin": {
+    "kcplaa-pbox": "./kcplaa-cli.js"
+  },
+  "scripts": {
+    "start": "node kcplaa-cli.js",
+    "test": "node --test kcplaa-cli.test.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

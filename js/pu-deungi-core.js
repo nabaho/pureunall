@@ -253,7 +253,46 @@
     var name = str(b.name);
     return { id: str(b.id) || ('b' + (i + 1)), name: name, alias: str(b.alias) || name.replace(/분사무소$/, '지사'),
       addr: str(b.addr), charterAddr: str(b.charterAddr), since: isDate(b.since) ? b.since : '',
-      no: Math.max(1, num(b.no) || (i + 1)) };
+      no: Math.max(1, num(b.no) || (i + 1)),
+      /* 지사장 — 그 분사무소를 맡는(상근하는) «사원의 번호». 사람 이름·번호를 따로 적지 않고 사원 줄을 가리켜 이름·등록번호가 어긋나지 않게 한다 */
+      head: str(b.head).slice(0, 40) };
+  }
+  /* 지사장·사무소 짝 맞추기 (대표 2026-11-18 «각 지사의 지사장 등의 정보가 정확하게 매칭이 안 된다»)
+     · 지사장은 사원 중에서 고른다(공인노무사법 제7조의7③ — 분사무소마다 공인노무사인 사원 1명 이상 상근)
+     · 가리키는 사원이 없어졌으면(퇴사) «미정» 으로 본다 */
+  function memberById(b, id) { var r = null; b.members.forEach(function (m) { if (id && m.id === id) r = m; }); return r; }
+  function branchHead(base, br) { var b = normBase(base); return memberById(b, br && br.head); }
+  /* «대전지사» → «대전지사장» */
+  function headTitle(br) { return String((br && (br.alias || br.name)) || '').replace(/(지사|분사무소)$/, '') + '지사장'; }
+  function memberDuties(base, memberId) {
+    var b = normBase(base), out = [];
+    b.branches.forEach(function (x) { if (x.head && x.head === memberId) out.push(headTitle(x)); });
+    return out;
+  }
+  /* 사무소 한눈에 — 본점 + 분사무소마다 지사장 */
+  function officeRoster(base) {
+    var b = normBase(base);
+    var reps = b.members.filter(function (m) { return m.rep; }).map(function (m) { return m.name; });
+    var rows = [{ kind: 'hq', id: 'hq', label: '본점', addr: b.firm.hq, head: reps.join('·'), headOk: reps.length > 0, since: '' }];
+    b.branches.forEach(function (x) {
+      var h = memberById(b, x.head);
+      rows.push({ kind: 'br', id: x.id, label: x.alias || x.name, name: x.name, addr: x.addr, since: x.since, no: x.no, head: h ? h.name : '', headId: h ? h.id : '', headOk: !!h, licenseNo: h ? h.licenseNo : '' });
+    });
+    return rows;
+  }
+  /* 한 사람이 둘 이상의 분사무소 지사장으로 정해진 경우 — 이름 목록(상근은 한 곳이다) */
+  function headDups(base) {
+    var b = normBase(base), cnt = {}, out = [];
+    b.branches.forEach(function (x) { var m = memberById(b, x.head); if (m) cnt[m.id] = (cnt[m.id] || 0) + 1; });
+    b.members.forEach(function (m) { if (cnt[m.id] > 1) out.push(m.name || '(이름 없음)'); });
+    return out;
+  }
+  function headProblems(base) {
+    var b = normBase(base), out = [];
+    b.branches.forEach(function (x) {
+      if (!memberById(b, x.head)) out.push((x.alias || x.name || '분사무소') + ' — 지사장(상근 사원)이 정해지지 않았습니다.');
+    });
+    return out;
   }
   function normBase(raw) {
     var e = emptyBase(), b = raw || {}, bf = b.firm || {};
@@ -485,6 +524,13 @@
     if (cur.length < 2) warnings.push('변경 뒤 사원이 ' + cur.length + '명입니다 — ' + LAW.members + '.');
     var offices = 1 + branches.filter(function (x) { return !x.gone; }).length;
     if (cur.length && cur.length < offices) warnings.push('변경 뒤 사원 ' + cur.length + '명, 사무소 ' + offices + '곳(주사무소 포함)입니다 — ' + LAW.office + '.');
+    /* 지사장이 퇴사하면 그 지사의 상근 사원이 비는지 알린다 — 지사장 칸은 «등기 현황»에서 후임으로 바꾼다 */
+    members.forEach(function (m) {
+      if (!m.gone) return;
+      branches.forEach(function (x) {
+        if (!x.gone && x.head && x.head === m.id) warnings.push('사원 퇴사(' + m.name + ') — ' + headTitle(x) + '입니다. 후임 지사장(상근 공인노무사 사원)을 등기 현황에서 정하십시오 — ' + LAW.office + '.');
+      });
+    });
     /* 출자금이 바뀐 기존 사원 — 지분 양수 */
     cur.forEach(function (m) {
       if (!m.isNew && m.acq.length) { events.push({ type: 'share', member: m.id, date: m.acq[0].date }); arts[6] = true; }
@@ -886,12 +932,16 @@
     var used = {};
     b.members.forEach(function (m) { used[m.id] = 1; }); b.branches.forEach(function (x) { used[x.id] = 1; });
     function fresh(prefix) { var i = 1; while (used[prefix + i]) i++; used[prefix + i] = 1; return prefix + i; }
+    var idMap = {};
     var members = after.members.map(function (m) {
-      return { id: m.isNew ? fresh('m') : m.id, name: m.name, birth: m.birth, addr: m.addr, invest: normInvest(m.invest), rep: !!m.rep,
+      var nid = m.isNew ? fresh('m') : m.id; idMap[m.id] = nid;
+      return { id: nid, name: m.name, birth: m.birth, addr: m.addr, invest: normInvest(m.invest), rep: !!m.rep,
         joinDate: m.joinDate || '', repDate: m.repDate || '', licenseNo: m.licenseNo || '', note: m.note || '' };
     });
+    /* 지사장 — 남는 사원이면 그대로 잇고, 퇴사했으면 «미정»으로 비운다(후임은 등기 현황에서) */
     var branches = after.branches.map(function (x) {
-      return { id: x.isNew ? fresh('b') : x.id, name: x.name, alias: x.alias, addr: x.addr, charterAddr: x.charterAddr || '', since: x.since || '', no: x.no };
+      return { id: x.isNew ? fresh('b') : x.id, name: x.name, alias: x.alias, addr: x.addr, charterAddr: x.charterAddr || '', since: x.since || '', no: x.no,
+        head: (x.head && idMap[x.head]) || '' };
     });
     var done = c.dates.done || (!needsReg(after) ? (c.dates.approvalGet || c.dates.approval) : '') || opts.today || todayIso();
     var hist = (b.history || []).concat([{ at: done, caseId: c.id, title: c.title, summary: summary(after) }]).slice(-30);
@@ -1069,6 +1119,7 @@
     str: str, num: num, won: won, isDate: isDate, addDays: addDays, addMonths: addMonths, diffDays: diffDays, todayIso: todayIso,
     koDate: koDate, dotDate: dotDate, regDate: regDate, timeKo: timeKo, birthOk: birthOk, backOk: backOk, rrn: rrn, newId: newId, particle: particle,
     normInvest: normInvest, investText: investText, inKindLines: inKindLines, particleRo: particleRo, emptyBase: emptyBase, normBase: normBase, baseProblems: baseProblems,
+    branchHead: branchHead, headTitle: headTitle, memberDuties: memberDuties, officeRoster: officeRoster, headProblems: headProblems, headDups: headDups,
     normChange: normChange, normCase: normCase, meetingDate: meetingDate, changeDate: changeDate, changeDateSrc: changeDateSrc,
     applyChanges: applyChanges, describe: describe, purpose: purpose, summary: summary, reason: reason, regItems: regItems,
     articles: articles, compareRows: compareRows, charterFull: charterFull,

@@ -69,7 +69,41 @@ function signAttachment(dataUrl) {
   };
 }
 
+/* 파일 첨부용 명함 이름 — 「푸른노무법인_권형하_명함.jpg」 꼴 */
+function cardFileName(staffName, ext) {
+  const clean = String(staffName == null ? '' : staffName)
+    .replace(/[\\/:*?"<>|\r\n\s]+/g, '')
+    .slice(0, 30);
+  const kind = String(ext || 'jpg').toLowerCase() === 'jpeg' ? 'jpg' : String(ext || 'jpg').toLowerCase();
+  return '푸른노무법인_' + (clean ? clean + '_' : '') + '명함.' + kind;
+}
+
+/* 썸네일(dataURL) 을 «일반 첨부 파일» 한 개로 (대표 지시 2026-11-18 「본인이 메일을 보내는 경우 본인의 명함이 자동으로 첨부」).
+   인라인 서명(cid:pusign)과 달리 cid·inline 표시를 두지 않아 받는 분의 첨부파일 목록에 정식 파일로 뜬다. */
+function cardFileAttachment(dataUrl, staffName) {
+  const inl = signAttachment(dataUrl);
+  if (!inl) return null;
+  const dot = inl.filename.lastIndexOf('.');
+  const ext = dot >= 0 ? inl.filename.slice(dot + 1) : 'jpg';
+  return {
+    filename: cardFileName(staffName, ext),
+    content: inl.content,
+    encoding: 'base64',
+    bytes: inl.bytes
+  };
+}
+
+/* 썸네일 칸에 dataURL 대신 우리 파이어베이스 명함 창고 주소가 적힌 옛 명함 호환 — 외부 임의 주소(SSRF) 및 인사사진 버킷은 허용하지 않는다 */
+function allowedCardThumbUrl(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/pureun-erp(?:\.firebasestorage\.app|\.appspot\.com)\/o\//i.test(s)) {
+    return '';
+  }
+  return s;
+}
+
 module.exports = {
   SIGN_CID, SIGN_MAX_BYTES,
-  signKey, hasSignMark, stripSignMark, signAttachment
+  signKey, hasSignMark, stripSignMark, signAttachment,
+  cardFileName, cardFileAttachment, allowedCardThumbUrl
 };

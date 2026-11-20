@@ -549,12 +549,33 @@
       }
     },
     "payroll_os": {
-      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('fin').val() == true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       "$k": {
-        ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('fin').val() == true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
-          ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('fin').val() == true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)"
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+        }
+      },
+      "site_co_link": {
+        ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
+      "rrn_key": {
+        "$v": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists()",
+          ".validate": "!data.exists() && newData.isString() && newData.val().length >= 32 && newData.val().length <= 200"
+        }
+      },
+      "rrn_log": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists() && newData.exists()"
+        }
+      },
+      "lock_log": {
+        "$site": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists() && newData.exists()"
+          }
         }
       }
     },
@@ -1734,6 +1755,9 @@
       "newsPrec": {
         ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
       },
+      "stats": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      },
       "careerInbox": {
         ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
         "$sid": {
@@ -1867,6 +1891,23 @@
       },
       "state": {
         ".write": false
+      }
+    },
+    "edulib": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "items": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduMaterial'"
+        }
+      },
+      "notes": {
+        "$item": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+            ".validate": "newData.child('id').val() === $id && newData.child('sourceId').val() === $item && newData.child('entityType').val() === 'EduReviewNote'"
+          }
+        }
       }
     },
     "settle": {
@@ -2472,6 +2513,12 @@
             ".validate": "newData.isNumber() && newData.val() >= 0"
           },
           "vision": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "won": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "wn": {
             ".validate": "newData.isNumber() && newData.val() >= 0"
           },
           "$other": {

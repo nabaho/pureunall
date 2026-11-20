@@ -12,7 +12,7 @@
 | 공개 홈페이지(저장소 nabaho/pureun-site) | `https://pureunlabor.co.kr` |
 | 옛 ERP 주소 | `https://nabaho.github.io/pureunall/*` → GitHub 이 **301** 로 새 주소에 넘김(경로 앞머리 `/pureunall` 만 떼고 `?…`·`#…` 유지) |
 | 옛 기기 자료 구출 쪽 | `https://nabaho.github.io/pureunall-rescue/` (옛 출처 저장소를 파일로 내려받기) |
-| 메일 도메인(그대로) | `fairrunlabor.com` — 회사 메일·뉴스레터(news.fairrunlabor.com)·급여명세서 발신 |
+| 메일 도메인 | 인사·급여명세서 발신(Resend): `pureunlabor.co.kr` (`payroll@pureunlabor.co.kr`, 회신 `370-6@daum.net`) · 구글 워크스페이스·뉴스레터(`news.fairrunlabor.com`): `fairrunlabor.com` |
 
 ## 지킬 것
 

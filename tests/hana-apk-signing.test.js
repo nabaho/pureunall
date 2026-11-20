@@ -137,3 +137,31 @@ test('★★ 워크플로가 «금고에 있는» 서명키 이름을 부른다'
     assert.ok(called.indexOf(n) >= 0, '★ 금고에 있는 「' + n + '」 을 안 부릅니다');
   });
 });
+
+test('★★ PR 검증 잡에는 서명키 시크릿을 주입하지 않고 main 에서만 단계 범위로 서명·파기한다', () => {
+  const wf = fs.readFileSync(
+    path.join(__dirname, '..', '.github', 'workflows', 'build-hana-sms-bridge.yml'), 'utf8');
+  const buildIdx = wf.indexOf('  build:');
+  const prIdx = wf.indexOf('  verify-pr:');
+  assert.ok(buildIdx >= 0 && prIdx > buildIdx, 'build 잡과 verify-pr 잡이 분리되어 있어야 합니다');
+  const buildJob = wf.slice(buildIdx, prIdx);
+  const prJob = wf.slice(prIdx);
+  const buildHeader = buildJob.slice(0, buildJob.indexOf('    steps:'));
+  assert.ok(!prJob.includes('secrets.'), 'PR 검증 잡에는 서명 시크릿을 넣지 않아야 합니다');
+  assert.ok(!buildHeader.includes('secrets.'), '서명 시크릿은 잡 전체가 아니라 필요한 단계에만 넣어야 합니다');
+  assert.match(
+    buildJob,
+    /if:\s*github\.event_name\s*!=\s*'pull_request'\s*&&\s*github\.ref\s*==\s*'refs\/heads\/main'/,
+    '서명 시크릿을 쓰는 build 잡은 refs/heads/main 에서만 돌아야 합니다'
+  );
+  assert.match(buildJob, /umask\s+077/, '서명키 파일은 umask 077 로 만들어야 합니다');
+  assert.match(buildJob, /if:\s*always\(\)[\s\S]{0,80}rm\s+-f\s+"\$RUNNER_TEMP\/hana\.jks"/, '임시 서명키 파일을 always() 에서 지워야 합니다');
+
+  const portalWf = fs.readFileSync(
+    path.join(__dirname, '..', '.github', 'workflows', 'build-portal-playstore.yml'), 'utf8');
+  const relJob = portalWf.slice(portalWf.indexOf('  build-release:'));
+  const relHeader = relJob.slice(0, relJob.indexOf('    steps:'));
+  assert.ok(!relHeader.includes('secrets.'), '포털 서명 시크릿도 잡 전체가 아니라 필요한 단계에만 넣어야 합니다');
+  assert.match(relJob, /umask\s+077/, '포털 서명키 파일도 umask 077 로 만들어야 합니다');
+  assert.match(relJob, /if:\s*always\(\)[\s\S]{0,80}rm\s+-f\s+"\$RUNNER_TEMP\/portal-upload\.jks"/, '포털 임시 서명키 파일도 always() 에서 지워야 합니다');
+});

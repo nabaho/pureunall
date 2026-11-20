@@ -138,6 +138,8 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
 <script src="js/pu-logout-why.js?v=1"></script>
+<!-- 자동 로그아웃 시간 — 아이디·비번 1시간 / 카카오 3시간 판정을 여기서 묻는다 (대표 지시 2026-11-18) -->
+<script src="js/pu-active.js?v=2"></script>
 <!-- 2단계 인증 모듈은 필요한 순간에만 불러온다. 카카오 복귀 시 두 번째 Auth 인스턴스를 만들지 않는다. -->
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"></script>
@@ -155,11 +157,11 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-pw-policy.js?v=1"></script>
-<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-backup.js?v=3"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-kakao.js?v=8"></script>
-<script src="js/pu-billing.js?v=12"></script>
-<script src="js/kcareer-mailreq.js?v=3"></script>
+<script src="js/pu-billing.js?v=13"></script>
+<script src="js/kcareer-mailreq.js?v=4"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -398,6 +400,94 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   background:#1e293b;color:#fff;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(15,23,42,.3);text-align:center;}
 .lay-toast.bad{background:#991b1b;}
 .lay-toast[hidden]{display:none;}
+/* 🔄 포털 업무 오케스트레이션 — 상단 넓은 고정 창 없이 작은 알약 단추(#orchFab) + 클릭 시 열리는 컴팩트 팝업(#orchModal) */
+#orchFab{margin-left:auto;display:inline-flex;align-items:center;gap:5px;min-height:26px;border:1px solid #bfdbfe;background:#eff6ff;
+  color:#1e40af;border-radius:999px;padding:4px 12px;font-size:.7rem;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;transition:.12s;}
+#orchFab:hover{background:#2563eb;border-color:#2563eb;color:#ffffff;}
+#orchFab[data-tone="urgent"]{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+#orchFab[data-tone="urgent"]:hover{background:#dc2626;border-color:#dc2626;color:#ffffff;}
+#orchFab[data-tone="warn"]{background:#fffbeb;border-color:#fde68a;color:#854d0e;}
+#orchFab[data-tone="warn"]:hover{background:#fde68a;border-color:#d97706;color:#854d0e;}
+#orchFab[hidden],#orchFabBadge[hidden]{display:none;}
+#orchFabBadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;
+  background:#1e40af;color:#ffffff;font-size:.66rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
+#orchFab[data-tone="urgent"] #orchFabBadge{background:#dc2626;color:#ffffff;}
+#orchFab[data-tone="warn"] #orchFabBadge{background:#fde68a;color:#854d0e;border:1px solid #d97706;}
+#orchModal{display:flex;position:fixed;inset:0;z-index:82;background:rgba(15,23,42,.42);align-items:center;justify-content:center;padding:12px;}
+#orchModal[hidden]{display:none;}
+#orchModal .box{background:#ffffff;border:1px solid #cbd5e1;border-radius:18px;width:472px;max-width:calc(100vw - 24px);
+  max-height:min(76vh,580px);max-height:min(76dvh,580px);display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 22px 54px rgba(15,23,42,.32);color:#1e293b;}
+#orchModal .hd{display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;}
+#orchModal .orchm-ic{width:30px;height:30px;border-radius:9px;background:#1e40af;color:#ffffff;display:inline-flex;align-items:center;justify-content:center;font-size:.92rem;flex:none;}
+#orchModal .orchm-ti{min-width:0;flex:1;}
+#orchModal .orchm-ti b{display:block;font-size:.92rem;font-weight:800;color:#1e293b;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all;}
+#orchModal .orchm-sub{display:block;font-size:.69rem;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#orchModal .orchm-cnt{display:inline-block;padding:2px 8px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:.7rem;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;}
+#orchModal .orchm-ico,#orchModal .orchm-x{border:1px solid #cbd5e1;background:#ffffff;color:#475569;border-radius:999px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:.86rem;font-weight:800;cursor:pointer;font-family:inherit;flex:none;}
+#orchModal .orchm-ico:hover,#orchModal .orchm-x:hover{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
+#orchModal .orchm-stages{display:flex;align-items:center;gap:5px;padding:8px 12px;border-bottom:1px solid #e2e8f0;overflow-x:auto;flex-shrink:0;}
+#orchModal .orchm-stg{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:.71rem;font-weight:700;font-family:inherit;white-space:nowrap;cursor:pointer;flex:none;}
+#orchModal .orchm-stg b{font-variant-numeric:tabular-nums;font-weight:800;}
+#orchModal .orchm-stg.on{background:#1e40af;border-color:#1e40af;color:#ffffff;}
+#orchModal .orchm-stg:not(.on).has-urg{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+#orchModal .orchm-stg:not(.on).has-warn{background:#fffbeb;border-color:#fde68a;color:#854d0e;}
+#orchModal .orchm-bar{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid #e2e8f0;background:#ffffff;flex-shrink:0;flex-wrap:wrap;}
+#orchModal .orchm-ck-all{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;color:#475569;cursor:pointer;white-space:nowrap;padding:2px 4px;}
+#orchModal .orchm-ck-all input{width:16px;height:16px;margin:0;accent-color:#1e40af;cursor:pointer;}
+#orchModal #orchModalQ{flex:1 1 130px;min-width:0;padding:6px 10px;border:1px solid #cbd5e1;border-radius:9px;font-size:16px;font-family:inherit;background:#f8fafc;color:#1e293b;}
+#orchModal #orchModalQ:focus{background:#ffffff;border-color:#2563eb;outline:2px solid #bfdbfe;outline-offset:1px;}
+#orchModal button:focus-visible,#orchModal input[type="checkbox"]:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
+#orchModal .orchm-chip{border:1px solid #cbd5e1;background:#ffffff;color:#475569;border-radius:999px;padding:4px 9px;font-size:.7rem;font-weight:700;font-family:inherit;white-space:nowrap;cursor:pointer;}
+#orchModal .orchm-chip[aria-pressed="true"]{background:#eff6ff;border-color:#2563eb;color:#1e40af;}
+#orchModal .orchm-bulk{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:.73rem;font-weight:700;color:#1e40af;flex-shrink:0;}
+#orchModal .orchm-bulk[hidden]{display:none;}
+#orchModal .orchm-bulk span{margin-right:auto;}
+#orchModal .bd{flex:1;min-height:0;overflow-y:auto;padding:8px 10px;background:#f8fafc;}
+#orchModal .orchm-row{display:flex;align-items:flex-start;gap:7px;padding:8px 9px;margin-bottom:6px;border-radius:11px;background:#ffffff;border:1px solid #e2e8f0;}
+#orchModal .orchm-row:last-child{margin-bottom:0;}
+#orchModal .orchm-row.is-urg{border-left:3px solid #dc2626;}
+#orchModal .orchm-row.is-warn{border-left:3px solid #d97706;}
+#orchModal .orchm-row.is-done{background:#f8fafc;border-color:#cbd5e1;}
+#orchModal .orchm-ck{display:inline-flex;align-items:center;justify-content:center;width:24px;min-height:24px;flex:none;cursor:pointer;margin-top:1px;}
+#orchModal .orchm-ck input{width:16px;height:16px;margin:0;accent-color:#1e40af;cursor:pointer;}
+#orchModal .orchm-no{min-width:22px;font-size:.72rem;font-weight:800;color:#64748b;font-variant-numeric:tabular-nums;padding-top:3px;flex:none;}
+#orchModal .orchm-main{flex:1;min-width:0;}
+#orchModal .orchm-r1{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px;}
+#orchModal .orchm-sev{display:inline-block;padding:1px 6px;border-radius:999px;font-size:.65rem;font-weight:800;white-space:nowrap;}
+#orchModal .orchm-sev.s-urg{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}
+#orchModal .orchm-sev.s-warn{background:#fffbeb;color:#854d0e;border:1px solid #fde68a;}
+#orchModal .orchm-sev.s-norm{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;}
+#orchModal .orchm-sev.s-done{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;}
+#orchModal .orchm-more{padding:6px 0 2px;text-align:center;}
+#orchModal .orchm-flow{font-size:.71rem;font-weight:700;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+#orchModal .orchm-own{font-size:.67rem;color:#64748b;margin-left:auto;white-space:nowrap;}
+#orchModal .orchm-co{font-size:.8rem;font-weight:800;color:#1e293b;line-height:1.3;word-break:keep-all;overflow-wrap:anywhere;}
+#orchModal .orchm-tt{font-size:.73rem;color:#475569;line-height:1.38;margin-top:2px;word-break:keep-all;overflow-wrap:anywhere;}
+#orchModal .orchm-acts{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:6px;}
+#orchModal .orchm-sm{border:1px solid #cbd5e1;background:#ffffff;color:#475569;border-radius:8px;padding:4px 9px;font-size:.7rem;font-weight:700;font-family:inherit;white-space:nowrap;cursor:pointer;}
+#orchModal .orchm-sm:hover{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
+#orchModal .orchm-sm.pri{background:#1e40af;border-color:#1e40af;color:#ffffff;}
+#orchModal .orchm-sm.pri:hover{background:#2563eb;border-color:#2563eb;color:#ffffff;}
+#orchModal .orchm-empty{padding:26px 12px;text-align:center;color:#64748b;font-size:.78rem;line-height:1.55;}
+#orchModal .orchm-empty b{display:block;color:#1e293b;font-size:.84rem;margin-bottom:4px;}
+#orchModal .ft{display:flex;align-items:center;gap:6px;padding:9px 12px;border-top:1px solid #e2e8f0;background:#ffffff;flex-shrink:0;}
+#orchModal .orchm-note{flex:1;min-width:0;font-size:.68rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#orchModal .orchm-btn{border:1px solid #cbd5e1;background:#ffffff;color:#475569;border-radius:9px;padding:6px 11px;font-size:.74rem;font-weight:700;font-family:inherit;white-space:nowrap;cursor:pointer;}
+#orchModal .orchm-btn:hover{border-color:#2563eb;color:#1e40af;background:#eff6ff;}
+#orchModal .orchm-btn.pri{background:#1e40af;border-color:#1e40af;color:#ffffff;}
+#orchModal .orchm-btn.pri:hover{background:#2563eb;border-color:#2563eb;color:#ffffff;}
+@media (max-width:640px){
+  #orchModal{padding:8px;}
+  #orchModal .box{width:100%;max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);border-radius:16px;}
+  #orchModal #orchModalQ{font-size:16px;min-height:38px;flex:1 1 100%;}
+  #orchModal .orchm-ico,#orchModal .orchm-x{width:36px;height:36px;}
+  #orchModal .orchm-stg,#orchModal .orchm-chip,#orchModal .orchm-sm,#orchModal .orchm-btn,#orchModal .orchm-ck-all{min-height:36px;padding:6px 10px;}
+  #orchModal .orchm-ck{width:28px;min-height:28px;}
+  #orchModal .orchm-ck input,#orchModal .orchm-ck-all input{width:18px;height:18px;}
+  #orchModal .orchm-note{display:none;}
+  #orchModal .ft{justify-content:flex-end;}
+}
 body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline-offset:3px;border-radius:12px;min-height:40px;}
 /* ⚠ 앱마다 붙이던 📌(틀 고정 표시·단추)는 걷었다 — 대표 지시 2026-11-08 「각 앱에 고정표시는 없애고 오른쪽 끝에만 고정표시 있으면 된다」.
    고정 표시는 줄 머리 오른쪽 끝의 단추 하나뿐이다. 앱 하나만 고정하는 길은 «목록 창»(앱마다 📌)에만 남겨 두었다. */
@@ -809,8 +899,23 @@ body.portal-mode #camFab{display:flex;}
 .sgp-by{font-size:.72rem;color:#94a3b8;flex-shrink:0;}
 .sgp-more{text-align:center;color:#94a3b8;font-size:.74rem;padding:8px;}
 .sgd-item{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin-bottom:8px;}
-.sgd-t{font-size:.86rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
-.sgd-r{font-size:.8rem;color:#1e293b;line-height:1.6;margin-top:7px;padding-top:7px;border-top:1px dashed #bbf7d0;white-space:pre-wrap;}
+.sgd-t{font-size:.86rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:7px;flex-wrap:wrap;overflow-wrap:anywhere;}
+.sgd-r{font-size:.8rem;color:#1e293b;line-height:1.6;margin-top:7px;padding-top:7px;border-top:1px dashed #bbf7d0;white-space:pre-wrap;overflow-wrap:anywhere;}
+/* ⚠ 해결 확인 경고 (대표 지시 2026-11-18 「건의한 본인은 로그인하면 해결됐는지 반드시 확인해달라 — 경고 표시」)
+   «완료» 는 고쳤다는 뜻일 뿐 «끝» 이 아니다 — 건의한 본인이 ☑ 해결됐어요 를 눌러야 최종 확정이다. 빨강 = 위험·확인(팔레트). */
+#sgDoneModal .hd.warn{background:#fef2f2;color:#991b1b;border-bottom:1px solid #fecaca;}
+.sgd-warn{background:#fef2f2;border:1.5px solid #dc2626;color:#991b1b;border-radius:10px;padding:10px 12px;font-size:.8rem;line-height:1.6;font-weight:700;}
+.sgd-warn .sub{display:block;font-weight:500;margin-top:4px;color:#1e293b;}
+#sgDoneModal .sgd-warn{margin:12px 18px 0;}
+.sgd-warn-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.sgd-warn-bar span{flex:1 1 180px;min-width:0;}
+.sgd-warn-bar .sg-btn{width:auto;min-height:36px;margin:0;padding:8px 14px;font-size:.76rem;background:#991b1b;flex:none;}
+@media(max-width:520px){#sgDoneModal .sgd-warn{margin:10px 14px 0;padding:8px 10px;font-size:.74rem;line-height:1.5;}#sgDoneModal .sgd-warn .sub{display:none;}}
+.sg-fabwarn{display:none;}
+#sgFab.sg-need .sg-fabwarn{display:inline;}
+#sgFab.sg-need{background:#991b1b;animation:sgNeedPulse 1.8s ease-in-out infinite;}
+@keyframes sgNeedPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55);}50%{box-shadow:0 0 0 8px rgba(220,38,38,0);}}
+@media (prefers-reduced-motion:reduce){#sgFab.sg-need{animation:none;}}
 /* ── 시스템 설정 (관리자 전용) — 화면 왼쪽 아래 구석에 조용히 ── */
 #cfgFab{display:none;position:fixed;left:16px;bottom:16px;z-index:60;align-items:center;gap:5px;
   background:rgba(255,255,255,.75);border:1px solid rgba(10,20,60,.14);color:var(--sub);
@@ -1445,7 +1550,7 @@ body.portal-mode #moreFab{display:flex;}
         <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
         <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
       </a>
-      <button id="sgFab" type="button">💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
+      <button id="sgFab" type="button"><span class="sg-fabwarn" id="sgFabWarn" aria-hidden="true">⚠ </span>💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
       <div class="me-menu" id="meMenu" role="menu" aria-label="내 메뉴" hidden>
@@ -1510,6 +1615,8 @@ body.portal-mode #moreFab{display:flex;}
            긴 안내는 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
       <button id="layoutEditBtn" type="button" aria-describedby="tileHint" hidden></button>
       <span id="tileHint" hidden>관리자는 앱을 마우스로 바로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다(같은 영역 안). 다른 영역으로도 끌어 옮길 수 있고, 줄 오른쪽 끝의 «📌 이 줄 고정»을 누르면 그 줄 앱이 줄 밖으로 못 나갑니다. 틀 고정한 앱은 자기 영역 안에서만 움직입니다. 바꾼 배치는 모든 직원 화면에 같이 반영됩니다.</span>
+      <!-- 🔄 오케스트레이션 — 넓은 상단 고정 창 대신 작은 알약 단추만 두고, 클릭하면 컴팩트 팝업(#orchModal)을 띄운다 -->
+      <button id="orchFab" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="orchModal" title="업무 오케스트레이션 팝업 열기" hidden>🔄 오케스트레이션<span id="orchFabBadge" hidden>0</span></button>
     </div>
     <!-- 편집 중 안내 줄(관리자·PC) — 목록으로 편집(폰과 같은 창) · 처음 자리로 · 끝내기 -->
     <div id="layoutBar" role="group" aria-label="앱 배치 편집" hidden>
@@ -1556,6 +1663,39 @@ body.portal-mode #moreFab{display:flex;}
           title="설정 · 버전 확인" aria-label="더보기">⋯</button>
 </div>
 <div id="moreDock" role="group" aria-label="더보기 메뉴"></div>
+<!-- 🔄 업무 오케스트레이션 컴팩트 팝업 — 클릭했을 때만 작은 창으로 열리며(기본 hidden), 바통을 바로 확인·실행한다 -->
+<div id="orchModal" role="dialog" aria-modal="true" aria-labelledby="orchModalTitle" hidden>
+  <div class="box">
+    <div class="hd">
+      <span class="orchm-ic" aria-hidden="true">🔄</span>
+      <div class="orchm-ti">
+        <b id="orchModalTitle">업무 오케스트레이션</b>
+        <span class="orchm-sub" id="orchModalSub">프로그램 간 실시간 연결 바통</span>
+      </div>
+      <span class="orchm-cnt" id="orchModalCnt" role="status" aria-live="polite">0건</span>
+      <button type="button" class="orchm-ico" id="orchModalRefresh" title="최신 흐름 다시 읽기" aria-label="오케스트레이션 새로고침">↻</button>
+      <button type="button" class="orchm-x" id="orchModalClose" title="닫기 (Esc)" aria-label="오케스트레이션 닫기">✕</button>
+    </div>
+    <div class="orchm-stages" id="orchModalStages" role="group" aria-label="생애주기 단계 필터"></div>
+    <div class="orchm-bar">
+      <input type="search" id="orchModalQ" placeholder="사업장·업무 검색" aria-label="오케스트레이션 검색">
+      <label class="orchm-ck-all" title="현재 화면에 보이는 바통 모두 선택"><input type="checkbox" id="orchModalSelAll" aria-label="현재 보이는 바통 전체 선택"><span>전체선택</span></label>
+      <button type="button" class="orchm-chip" id="orchModalMine" aria-pressed="false">👤 내 담당</button>
+      <button type="button" class="orchm-chip" id="orchModalShowDone" aria-pressed="false">✓ 확인포함</button>
+    </div>
+    <div class="orchm-bulk" id="orchModalBulk" hidden>
+      <span id="orchModalBulkCnt">0건 선택</span>
+      <button type="button" class="orchm-sm pri" id="orchModalBulkCheck">✓ 선택 확인</button>
+      <button type="button" class="orchm-sm" id="orchModalBulkClear">해제</button>
+    </div>
+    <div class="bd" id="orchModalList"></div>
+    <div class="ft">
+      <span class="orchm-note">원본 무변경 · 실행 시 해당 앱으로 연결</span>
+      <button type="button" class="orchm-btn" id="orchModalFullBtn" title="360° 사업장 흐름판·런북 작은 창 열기">상세 보드 ↗</button>
+      <button type="button" class="orchm-btn pri" id="orchModalDoneBtn">닫기</button>
+    </div>
+  </div>
+</div>
 <div id="billModal" role="dialog" aria-modal="true" aria-labelledby="billTitle">
   <div class="box">
     <div class="hd">
@@ -1630,8 +1770,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
-        — 하루 <b>539번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 메일 계약·견적 검토 하루 7번(평일 09~18·24시, 주말·공휴일은 24시만 일하고 낮엔 바로 끝냄, AI 정리) · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
+        — 하루 <b>546번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -1728,7 +1868,8 @@ body.portal-mode #moreFab{display:flex;}
       <input type="number" id="cfgIdle" min="10" max="480" step="10" placeholder="60" autocomplete="off" style="width:120px">
       <p class="cfg-help">아무 조작이 없을 때 자동으로 로그아웃되는 시간. 포털 · 푸른이알피 · 기업정보함 ·
         규정관리 · 정부사업일정에 함께 적용됩니다. <b>비워두면 60분</b>이고,
-        안전을 위해 10분~480분(8시간) 범위만 적용됩니다.</p>
+        안전을 위해 10분~480분(8시간) 범위만 적용됩니다.
+        <b>카카오 로그인은 3시간</b>입니다(이 값이 3시간보다 길면 이 값을 따릅니다).</p>
 
       <!-- 「줄 사이 이동」 허용·막음 칸(cfgTileCross)은 걷었다 — 2026-11-08 앱 배치는 «관리자만 한 벌로» 바꾸고
            영역 이동은 앱마다 📌 틀 고정으로 가른다. 이 칸이 남아 있으면 눌러도 아무 일이 없는 «죽은 스위치»가 된다. -->
@@ -1816,7 +1957,8 @@ body.portal-mode #moreFab{display:flex;}
 <!-- ── 건의 해결 알림 팝업 (로그인 직후 자동) ── -->
 <div id="sgDoneModal" role="dialog" aria-modal="true" aria-labelledby="sgDoneTitle">
   <div class="box">
-    <div class="hd" id="sgDoneTitle">🎉 건의가 해결되었습니다</div>
+    <div class="hd warn" id="sgDoneTitle">⚠ 건의 해결 여부를 확인해 주세요</div>
+    <div class="sgd-warn" id="sgDoneWarn" role="alert"></div>
     <div class="bd" id="sgDoneBody"></div>
     <div class="ft"><button class="sg-btn" id="sgDoneOk" type="button" style="margin-top:12px">확인</button></div>
   </div>
@@ -2084,6 +2226,7 @@ body.portal-mode #moreFab{display:flex;}
     { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
     { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
     { key:'jobtrans', name:'산업일자리전환',  desc:'능률협회·충경진 메일·보고서·HWPX', icon:'⚡', url:'jobtrans.html',       roles:null, row:'client' },
+    { key:'orch',    name:'오케스트레이션',   desc:'메일·계약·ERP·정산 흐름연결', icon:'🔄', url:'pu-orchestrator.html', roles:null, row:'store', popup:true },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
@@ -2139,13 +2282,16 @@ body.portal-mode #moreFab{display:flex;}
        PuGate.soonUnlessAdmin)을 «짝으로 함께» 걷었다 — 직원도 연다(푸른 메일·문서관리와 같다. tests/app-soon-gate.test.js ⑩). */
     { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
+    { key:'edulib',  name:'강의자료', desc:'종류·강의일별 · 나란히 비교', icon:'🎓', url:'pu-edulib.html',      roles:null, row:'store' },  /* 2026-11-19 대표 «새앱으로 만들고 자료함으로» — 재직 직원 모두 */
     { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
     /* P박스 — 대한민국 전 법령·판례·행정해석·AI 서면(대표 지시 2026-11-15 「다 만들면 자료함에 연결시켜 달라」). */
     { key:'pbox',    name:'P박스',        desc:'전 법령·판례·행정해석·AI 서면', icon:'📚', url:'pu-pbox.html', roles:null, row:'store' },
-    { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, soon:true, row:'client' },  /* 2026-10-20 대표 「급여관리도 준비중으로」 · 2026-10-24 off 로 감췄다가 2026-11-02 대표 「여기에 급여아웃소싱(준비중) 앱만들어 달라」로 off 걷고 이름 변경 — 안쪽 문과 짝 */
+    /* 급여아웃소싱 — 2026-10-20 준비중으로 닫았다가 2026-11-02 off 걷고 이름 변경, 2026-11-18 대표 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」로
+       포털 준비중 딱지(soon)와 안쪽 문(payroll-os.html 의 PuGate.soonUnlessAdmin)·실시간DB 규칙(payroll_os → 재직 직원 LOGIN)을 함께 열었다(tests/app-soon-gate.test.js ⑨). */
+    { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, row:'client' },
     /* 대표 지시(2026-08-13): 급여데이터함은 급여 아웃소싱과 바로 이어지는 직접업무다 —
        사진첩(업무지원)과 달리 이 줄에 둔다. */
     { key:'paydata', name:'급여데이터함',  desc:'급여자료 사업장별', icon:'💼', url:'pu-paydata.html',     roles:null, soon:true, off:true, row:'store' },
@@ -2705,6 +2851,8 @@ body.portal-mode #moreFab{display:flex;}
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
+        // 카카오 로그인 → 자동 로그아웃 3시간 (대표 지시 2026-11-18). 인증표의 kakao 표시로 다시 확인된다(js/pu-active.js).
+        try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', PuActive.signInAt(cred.user)); } catch(_v){}
         try {
           kkFirebaseHidden = kkFirebaseHidden || !!document.hidden;
           var resources = window.performance.getEntriesByType('resource');
@@ -3133,6 +3281,8 @@ body.portal-mode #moreFab{display:flex;}
       return auth.signInWithEmailAndPassword(email, pw);
     }).then(function(cred){
       _settled = true; clearTimeout(_watchdog);
+      // 아이디·비번 로그인 → 자동 로그아웃은 포털 설정 시간(기본 1시간) (대표 지시 2026-11-18)
+      try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'password', PuActive.signInAt(cred.user)); } catch(_v){}
       // ⚠ 증표를 «기다리지 않는다» — 아래 아이디 저장도 enterPortal 도 이 약속과 무관하게
       //   그대로 진행된다. 증표를 못 얻으면 이번 성공은 그냥 기록하지 않는다(로그인이 먼저다).
       try {
@@ -3591,6 +3741,7 @@ body.portal-mode #moreFab{display:flex;}
     var canHead = !!(headEl && !headEl.hidden && headEl.style.display !== 'none' && headEl.getAttribute('aria-disabled') !== 'true');
     if(!canTile && !canHead) return false;
     if(typeof app.act === 'function'){ app.act(); return true; }
+    if(app.popup && typeof portalOrchOpenPopup === 'function'){ portalOrchOpenPopup(extraQuery || ''); return true; }
     var v = Math.floor(Date.now() / 600000);
     var q = String(extraQuery || '').replace(/^[?&]+/, '');
     var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&v=' + v + (q ? '&' + q : '');
@@ -3892,7 +4043,811 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  // ── 🔄 포털 업무 오케스트레이션 — 작은 알약 단추(#orchFab)·타일 클릭 시 컴팩트 팝업(#orchModal)으로 표시 ──
+  var portalOrchUid = '';
+  var portalOrchSid = '';
+  var portalOrchRole = 'member';
+  var portalOrchEpoch = 0;
+  var portalOrchAt = 0;
+  var portalOrchFullAt = 0;
+  var portalOrchBusy = false;
+  var portalOrchFullBusy = false;
+  var portalOrchErr = '';
+  var portalOrchRaw = null;
+  var portalOrchReport = null;
+  var portalOrchPinKey = '';
+  var portalOrchVis = null;
+  var portalOrchLastTrigger = null;
+  var portalOrchSel = Object.create(null);
+  var portalOrchShownIds = [];
+  var portalOrchLimit = 60;
+  var portalOrchFlt = { stage: '', q: '', mineOnly: false, showDone: false };
+  var _orchDrag = null;
 
+  function portalOrchReadLocal(uid){
+    if(!uid) return { checked: {}, snoozedUntil: {} };
+    try{
+      var raw = localStorage.getItem('pu_orch_local_' + uid);
+      var p = raw ? JSON.parse(raw) : {};
+      if(!p || typeof p !== 'object') p = {};
+      return {
+        checked: (p.checked && typeof p.checked === 'object') ? p.checked : {},
+        snoozedUntil: (p.snoozedUntil && typeof p.snoozedUntil === 'object') ? p.snoozedUntil : {},
+        notes: (p.notes && typeof p.notes === 'object') ? p.notes : {},
+        runbooks: (p.runbooks && typeof p.runbooks === 'object') ? p.runbooks : {}
+      };
+    }catch(e){ return { checked: {}, snoozedUntil: {} }; }
+  }
+
+  function portalOrchWriteLocal(uid, st){
+    if(!uid) return;
+    try{ localStorage.setItem('pu_orch_local_' + uid, JSON.stringify(st || {})); }catch(e){}
+  }
+
+  function portalOrchRecompute(){
+    var C = window.PuOrchestratorCore;
+    var u = auth.currentUser;
+    if(!C || !u || !portalOrchRaw) return;
+    var isAdm = portalOrchRole === 'admin' || (typeof sgIsAdmin === 'function' && sgIsAdmin());
+    var isSubAdm = portalOrchRole === 'admin-delegate' || !!(_portalAppPerm && _portalAppPerm.isSubAdmin === true);
+    var canFin = isAdm || isSubAdm || (typeof portalAppPermOk === 'function' && portalAppPermOk('fin'));
+    var canHr = isAdm || isSubAdm || (typeof portalAppPermOk === 'function' && portalAppPermOk('hr'));
+    var canDeungi = isAdm || isSubAdm || (typeof portalAppPermOk === 'function' && portalAppPermOk('deungi'));
+    portalOrchReport = C.analyzeWorkspace(Object.assign({}, portalOrchRaw, {
+      hanaAlertCount: (portalHanaItems && portalHanaItems.length) || 0
+    }), {
+      now: Date.now(),
+      uid: u.uid,
+      sid: portalOrchSid,
+      role: portalOrchRole,
+      isAdmin: isAdm,
+      isSubAdmin: isSubAdm,
+      perms: { fin: canFin, hr: canHr, deungi: canDeungi },
+      localState: portalOrchReadLocal(u.uid)
+    });
+  }
+
+  function portalOrchOpenFullWindow(extraQuery){
+    var app = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === 'orch'){ app = APPS[i]; break; } }
+    var v = Math.floor(Date.now() / 600000);
+    var q = String(extraQuery || '').replace(/^[?&]+/, '');
+    if(!q && portalOrchFlt.stage) q = 'stage=' + encodeURIComponent(portalOrchFlt.stage);
+    var url = 'pu-orchestrator.html?sso=1&v=' + v + (q ? '&' + q : '');
+    portalOrchClosePopup(true);
+    if(isMobile() || !app){ location.href = url; return; }
+    var winName = portalAppWindowName('orch');
+    var ref = portalAppWindows.orch;
+    try{
+      if(ref && !ref.closed){
+        if(!portalAppUrlMatches(ref, url)) navigatePortalApp(ref, url);
+        ref.focus();
+        return;
+      }
+    }catch(e){}
+    try{
+      ref = window.open(url, winName, 'popup=yes,width=540,height=680,resizable=yes,scrollbars=yes');
+    }catch(e){ ref = null; }
+    if(ref){
+      portalAppWindows.orch = ref;
+      try{ ref.focus(); }catch(e){}
+      return;
+    }
+    openPortalApp(app, url);
+  }
+
+  function portalOrchOpenPopup(extraQuery, triggerEl){
+    var u = auth.currentUser;
+    var modal = $('orchModal');
+    if(!u || portalOrchRole === 'reviewer' || !modal) return;
+    portalOrchWireStatic();
+    var qStr = String(extraQuery || '').replace(/^[?&]+/, '');
+    portalOrchFlt.stage = '';
+    if(qStr){
+      try{
+        var sp = new URLSearchParams(qStr);
+        var stg = sp.get('stage') || '';
+        if(/^(intake|case_rules|consulting_fund|work_payroll|finance_settle)$/.test(stg)){
+          portalOrchFlt.stage = stg;
+        }
+        if(sp.get('mine') === '1') portalOrchFlt.mineOnly = true;
+      }catch(e){}
+    }
+    portalOrchLimit = 60;
+    portalOrchSel = Object.create(null);
+    if(triggerEl && triggerEl.id === 'portalOrchBadge'){
+      portalOrchLastTrigger = document.querySelector('#appRows .tile[data-key="orch"]') || $('orchFab');
+    } else {
+      portalOrchLastTrigger = triggerEl || document.activeElement || $('orchFab');
+    }
+    if(_orchDrag) _orchDrag.reset();
+    modal.hidden = false;
+    var fab = $('orchFab');
+    if(fab) fab.setAttribute('aria-expanded', 'true');
+    portalOrchPaintModal();
+    if(!window.PuOrchestratorCore){
+      portalOrchErr = '흐름 분석 모듈을 불러오지 못했습니다.';
+      portalOrchPaintModal();
+    } else if(Date.now() - portalOrchFullAt > 60000){
+      portalOrchFullScan(false);
+    }
+    setTimeout(function(){
+      if(modal.hidden || auth.currentUser !== u) return;
+      var closeBtn = $('orchModalClose');
+      if(closeBtn && !isMobile()){
+        var qInp = $('orchModalQ');
+        try{ (qInp || closeBtn).focus(); }catch(e){}
+      } else if(closeBtn){
+        try{ closeBtn.focus(); }catch(e){}
+      }
+    }, 20);
+  }
+
+  function portalOrchClosePopup(skipFocus){
+    var modal = $('orchModal');
+    if(!modal || modal.hidden) return;
+    modal.hidden = true;
+    portalOrchSel = Object.create(null);
+    var fab = $('orchFab');
+    if(fab) fab.setAttribute('aria-expanded', 'false');
+    if(!skipFocus){
+      var target = (portalOrchLastTrigger && document.contains(portalOrchLastTrigger))
+        ? portalOrchLastTrigger
+        : (document.querySelector('#appRows .tile[data-key="orch"]') || fab);
+      if(target && typeof target.focus === 'function'){
+        try{ target.focus(); }catch(e){}
+      }
+    }
+    portalOrchLastTrigger = null;
+  }
+
+  function portalOrchJumpBaton(b){
+    if(!b) return;
+    var C = window.PuOrchestratorCore;
+    var u = auth.currentUser;
+    if(C){
+      try{
+        var packed = C.packBaton(Object.assign({}, b, {
+          uid: (u && u.uid) || '',
+          returnUrl: 'pu-orchestrator.html'
+        }), Date.now());
+        var json = JSON.stringify(packed);
+        try{ localStorage.setItem(C.BATON_STORAGE_KEY, json); }catch(_){}
+        try{ sessionStorage.setItem(C.BATON_STORAGE_KEY, json); }catch(_){}
+      }catch(e){}
+    }
+    portalOrchClosePopup(true);
+    var safeUrl = C ? C.safeRelUrl(b.targetUrl, 'pu-orchestrator.html') : 'pu-orchestrator.html';
+    var hIdx = safeUrl.indexOf('#');
+    var hPart = hIdx >= 0 ? safeUrl.slice(hIdx) : '';
+    var basePart = hIdx >= 0 ? safeUrl.slice(0, hIdx) : safeUrl;
+    var _v = Math.floor(Date.now() / 600000);
+    var full = basePart + (basePart.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&orchBaton=1&v=' + _v + hPart;
+    if(isMobile()){ location.href = full; return; }
+    var targetApp = null;
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i].key === b.toApp){ targetApp = APPS[i]; break; } }
+    if(targetApp) openPortalApp(targetApp, full);
+    else location.href = full;
+  }
+
+  function portalOrchToggleCheck(batonId){
+    var u = auth.currentUser;
+    if(!u || !batonId || batonId === '__proto__' || batonId === 'constructor' || batonId === 'prototype') return;
+    var st = portalOrchReadLocal(u.uid);
+    if(st.checked[batonId]) delete st.checked[batonId];
+    else st.checked[batonId] = Date.now();
+    portalOrchWriteLocal(u.uid, st);
+    delete portalOrchSel[batonId];
+    portalOrchRecompute();
+    portalOrchPaint();
+  }
+
+  function portalOrchBulkCheck(){
+    var u = auth.currentUser;
+    var ids = portalOrchShownIds.filter(function(id){ return !!portalOrchSel[id]; });
+    if(!u || !ids.length) return;
+    var st = portalOrchReadLocal(u.uid);
+    var now = Date.now();
+    ids.forEach(function(id){
+      if(id && id !== '__proto__' && id !== 'constructor' && id !== 'prototype'){
+        st.checked[id] = now;
+      }
+    });
+    portalOrchWriteLocal(u.uid, st);
+    portalOrchSel = Object.create(null);
+    portalOrchRecompute();
+    portalOrchPaint();
+    var modal = $('orchModal');
+    var nextFocus = (modal && modal.querySelector('input[data-orch-row-ck]')) || $('orchModalQ') || $('orchModalClose');
+    if(nextFocus){ try{ nextFocus.focus(); }catch(e){} }
+  }
+
+  function portalOrchSyncPins(key){
+    if(key === portalOrchPinKey) return;
+    portalOrchPinKey = key;
+    try{ if(typeof paintPins === 'function') paintPins(); }catch(e){}
+  }
+
+  function portalOrchRemoveBadge(silent){
+    var b = $('portalOrchBadge');
+    if(b) b.remove();
+    if(!silent) portalOrchSyncPins('');
+  }
+
+  function portalOrchSyncSelectionUI(){
+    var bulkBox = $('orchModalBulk');
+    var bulkCnt = $('orchModalBulkCnt');
+    var selAll = $('orchModalSelAll');
+    var selKeys = portalOrchShownIds.filter(function(id){ return !!portalOrchSel[id]; });
+    if(bulkBox && bulkCnt){
+      if(selKeys.length > 0){
+        bulkBox.hidden = false;
+        bulkCnt.textContent = selKeys.length + '건 선택됨';
+      } else {
+        bulkBox.hidden = true;
+      }
+    }
+    if(selAll){
+      selAll.disabled = portalOrchShownIds.length === 0;
+      selAll.checked = portalOrchShownIds.length > 0 && selKeys.length === portalOrchShownIds.length;
+      selAll.indeterminate = selKeys.length > 0 && selKeys.length < portalOrchShownIds.length;
+    }
+  }
+
+  function portalOrchPaintModal(){
+    var modal = $('orchModal');
+    if(!modal || modal.hidden) return;
+    var C = window.PuOrchestratorCore;
+    var stBox = $('orchModalStages');
+    var listBox = $('orchModalList');
+    var cntEl = $('orchModalCnt');
+    var subEl = $('orchModalSub');
+    var mineBtn = $('orchModalMine');
+    var doneBtn = $('orchModalShowDone');
+    if(!stBox || !listBox) return;
+
+    var activeEl = document.activeElement;
+    var keepStg = (activeEl && modal.contains(activeEl) && activeEl.hasAttribute('data-orch-stg'))
+      ? activeEl.getAttribute('data-orch-stg')
+      : null;
+    var keepListFocus = null;
+    if(activeEl && listBox.contains(activeEl)){
+      if(activeEl.hasAttribute('data-orch-row-ck')){
+        keepListFocus = { kind: 'ck', id: activeEl.getAttribute('data-orch-row-ck'), idx: Number(activeEl.getAttribute('data-orch-idx') || 0) };
+      } else if(activeEl.hasAttribute('data-orch-done')){
+        keepListFocus = { kind: 'done', id: activeEl.getAttribute('data-orch-done'), idx: Number(activeEl.getAttribute('data-orch-idx') || 0) };
+      } else if(activeEl.hasAttribute('data-orch-go')){
+        keepListFocus = { kind: 'go', id: activeEl.getAttribute('data-orch-go'), idx: Number(activeEl.getAttribute('data-orch-idx') || 0) };
+      } else if(activeEl.hasAttribute('data-orch-more')){
+        keepListFocus = { kind: 'more', fromIdx: Number(activeEl.getAttribute('data-orch-more') || 0) };
+      }
+    }
+
+    if(mineBtn) mineBtn.setAttribute('aria-pressed', portalOrchFlt.mineOnly ? 'true' : 'false');
+    if(doneBtn) doneBtn.setAttribute('aria-pressed', portalOrchFlt.showDone ? 'true' : 'false');
+
+    var allBatons = (portalOrchReport && portalOrchReport.batons) || [];
+    var activeAll = allBatons.filter(function(x){ return !x.checked && !x.snoozed; });
+    if(cntEl) cntEl.textContent = '대기 ' + activeAll.length + '건';
+    if(subEl){
+      subEl.textContent = portalOrchFullBusy
+        ? '전체 프로그램 흐름 동기화 중…'
+        : (portalOrchErr ? portalOrchErr : (portalOrchFullAt ? '5단계 실시간 바통 · 클릭 시 바로 연결' : '빠른 대기열 표시 중 · 전체 흐름 불러오는 중'));
+    }
+
+    stBox.innerHTML = '';
+    var mkStageBtn = function(id, label, count, cls){
+      var isOn = portalOrchFlt.stage === id;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'orchm-stg' + (isOn ? ' on' : '') + (cls ? ' ' + cls : '');
+      b.setAttribute('data-orch-stg', id);
+      b.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+      var sp = document.createElement('span');
+      sp.textContent = label;
+      var num = document.createElement('b');
+      num.textContent = String(count);
+      b.appendChild(sp);
+      b.appendChild(num);
+      b.onclick = function(){
+        portalOrchFlt.stage = (portalOrchFlt.stage === id) ? '' : id;
+        portalOrchLimit = 60;
+        portalOrchSel = Object.create(null);
+        portalOrchPaintModal();
+      };
+      return b;
+    };
+    stBox.appendChild(mkStageBtn('', '전체', activeAll.length, ''));
+    ((portalOrchReport && portalOrchReport.stageSummary) || []).forEach(function(st){
+      var toneCls = st.urgent ? 'has-urg' : (st.warn ? 'has-warn' : '');
+      stBox.appendChild(mkStageBtn(st.id, String(st.short || ''), Number(st.total) || 0, toneCls));
+    });
+    if(keepStg !== null){
+      var stBtnRestore = stBox.querySelector('button[data-orch-stg="' + keepStg.replace(/[^a-z_]/gi, '') + '"]');
+      if(stBtnRestore){ try{ stBtnRestore.focus(); }catch(e){} }
+    }
+
+    var filtered = C ? C.filterBatons(allBatons, {
+      stage: portalOrchFlt.stage,
+      q: portalOrchFlt.q,
+      mineOnly: portalOrchFlt.mineOnly,
+      showDone: portalOrchFlt.showDone
+    }) : [];
+
+    var shown = filtered.slice(0, portalOrchLimit);
+    portalOrchShownIds = shown.map(function(x){ return x.id; });
+    portalOrchSyncSelectionUI();
+
+    listBox.innerHTML = '';
+    if(!portalOrchReport && (portalOrchBusy || portalOrchFullBusy)){
+      var ld = document.createElement('div');
+      ld.className = 'orchm-empty';
+      var ldb = document.createElement('b');
+      ldb.textContent = '🔄 프로그램 간 바통을 불러오고 있습니다…';
+      ld.appendChild(ldb);
+      listBox.appendChild(ld);
+      return;
+    }
+    if(!portalOrchReport && portalOrchErr){
+      var er = document.createElement('div');
+      er.className = 'orchm-empty';
+      var erb = document.createElement('b');
+      erb.textContent = '⚠️ 흐름 데이터를 불러오지 못했습니다';
+      var erp = document.createElement('span');
+      erp.textContent = '우측 상단 ↻ 새로고침 단추를 눌러 다시 시도해 주세요.';
+      er.appendChild(erb);
+      er.appendChild(erp);
+      listBox.appendChild(er);
+      return;
+    }
+    if(!filtered.length){
+      var emp = document.createElement('div');
+      emp.className = 'orchm-empty';
+      var empB = document.createElement('b');
+      empB.textContent = activeAll.length ? '조건에 맞는 바통이 없습니다' : '현재 대기 중인 바통이 없습니다';
+      var empP = document.createElement('span');
+      empP.textContent = activeAll.length
+        ? '단계 필터나 검색어를 해제하면 다른 대기 항목을 볼 수 있습니다.'
+        : '새 계약 요청·견적·사건·컨설팅·정산 연계 건이 생기면 여기에 표시됩니다.';
+      emp.appendChild(empB);
+      emp.appendChild(empP);
+      listBox.appendChild(emp);
+      if(keepListFocus){
+        var fbEmpty = $('orchModalQ') || $('orchModalClose');
+        if(fbEmpty){ try{ fbEmpty.focus(); }catch(e){} }
+      }
+      return;
+    }
+
+    var rowFocusNodes = [];
+    shown.forEach(function(b, idx){
+      var row = document.createElement('div');
+      row.className = 'orchm-row'
+        + (b.severity === 'urgent' ? ' is-urg' : (b.severity === 'warn' ? ' is-warn' : ''))
+        + (b.checked ? ' is-done' : '');
+
+      var ckLbl = document.createElement('label');
+      ckLbl.className = 'orchm-ck';
+      var ck = document.createElement('input');
+      ck.type = 'checkbox';
+      ck.checked = !!portalOrchSel[b.id];
+      ck.setAttribute('data-orch-row-ck', b.id);
+      ck.setAttribute('data-orch-idx', String(idx));
+      ck.setAttribute('aria-label', (idx + 1) + '번 바통 선택 · ' + (b.companyLabel || '미지정 사업장'));
+      ck.onchange = function(){
+        if(ck.checked) portalOrchSel[b.id] = 1;
+        else delete portalOrchSel[b.id];
+        portalOrchSyncSelectionUI();
+      };
+      ckLbl.appendChild(ck);
+
+      var noEl = document.createElement('span');
+      noEl.className = 'orchm-no';
+      noEl.textContent = String(idx + 1);
+
+      var main = document.createElement('div');
+      main.className = 'orchm-main';
+
+      var r1 = document.createElement('div');
+      r1.className = 'orchm-r1';
+      var sev = document.createElement('span');
+      if(b.checked){
+        sev.className = 'orchm-sev s-done';
+        sev.textContent = '확인됨';
+      } else {
+        sev.className = 'orchm-sev ' + (b.severity === 'urgent' ? 's-urg' : (b.severity === 'warn' ? 's-warn' : 's-norm'));
+        sev.textContent = b.severity === 'urgent' ? '긴급' : (b.severity === 'warn' ? '주의' : '일반');
+      }
+      var flow = document.createElement('span');
+      flow.className = 'orchm-flow';
+      flow.textContent = (b.fromName || '') + ' ➔ ' + (b.toName || '');
+      r1.appendChild(sev);
+      r1.appendChild(flow);
+      if(b.ownerName){
+        var own = document.createElement('span');
+        own.className = 'orchm-own';
+        own.textContent = b.ownerName;
+        r1.appendChild(own);
+      }
+
+      var co = document.createElement('div');
+      co.className = 'orchm-co';
+      co.textContent = b.companyLabel || '미지정 사업장';
+
+      var tt = document.createElement('div');
+      tt.className = 'orchm-tt';
+      tt.textContent = b.title || '';
+      if(b.reason) tt.title = b.reason;
+
+      var acts = document.createElement('div');
+      acts.className = 'orchm-acts';
+      var doneToggle = document.createElement('button');
+      doneToggle.type = 'button';
+      doneToggle.className = 'orchm-sm';
+      doneToggle.setAttribute('data-orch-done', b.id);
+      doneToggle.setAttribute('data-orch-idx', String(idx));
+      doneToggle.textContent = b.checked ? '↩ 복원' : '✓ 확인';
+      doneToggle.onclick = function(){ portalOrchToggleCheck(b.id); };
+
+      var goBtn = document.createElement('button');
+      goBtn.type = 'button';
+      goBtn.className = 'orchm-sm pri';
+      goBtn.setAttribute('data-orch-go', b.id);
+      goBtn.setAttribute('data-orch-idx', String(idx));
+      goBtn.textContent = (b.actionLabel || '실행') + ' ➔';
+      goBtn.onclick = function(){ portalOrchJumpBaton(b); };
+
+      acts.appendChild(doneToggle);
+      acts.appendChild(goBtn);
+
+      main.appendChild(r1);
+      main.appendChild(co);
+      main.appendChild(tt);
+      main.appendChild(acts);
+
+      row.appendChild(ckLbl);
+      row.appendChild(noEl);
+      row.appendChild(main);
+      listBox.appendChild(row);
+      rowFocusNodes.push({ id: b.id, ck: ck, done: doneToggle, go: goBtn });
+    });
+
+    var moreBtnRef = null;
+    if(filtered.length > shown.length){
+      var moreWrap = document.createElement('div');
+      moreWrap.className = 'orchm-more';
+      var moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'orchm-btn';
+      moreBtn.setAttribute('data-orch-more', String(shown.length));
+      moreBtn.textContent = '더 보기 (+' + (filtered.length - shown.length) + '건)';
+      moreBtn.onclick = function(){
+        portalOrchLimit += 60;
+        portalOrchPaintModal();
+      };
+      moreWrap.appendChild(moreBtn);
+      listBox.appendChild(moreWrap);
+      moreBtnRef = moreBtn;
+    }
+
+    if(keepListFocus && rowFocusNodes.length){
+      var targetNode = null;
+      if(keepListFocus.kind === 'more'){
+        var jumpRow = rowFocusNodes[Math.min(keepListFocus.fromIdx, rowFocusNodes.length - 1)];
+        targetNode = (jumpRow && jumpRow.ck) || moreBtnRef;
+      } else {
+        for(var fi = 0; fi < rowFocusNodes.length; fi++){
+          if(rowFocusNodes[fi].id === keepListFocus.id){
+            targetNode = rowFocusNodes[fi][keepListFocus.kind];
+            break;
+          }
+        }
+        if(!targetNode){
+          var nearRow = rowFocusNodes[Math.min(keepListFocus.idx, rowFocusNodes.length - 1)];
+          targetNode = nearRow ? (nearRow[keepListFocus.kind] || nearRow.ck) : null;
+        }
+      }
+      if(targetNode){ try{ targetNode.focus(); }catch(e){} }
+    }
+  }
+
+  function portalOrchPaint(){
+    var fab = $('orchFab');
+    var fabBadge = $('orchFabBadge');
+    portalOrchRemoveBadge(true);
+    if(fab){
+      fab.hidden = !(portalOrchUid && portalOrchRole !== 'reviewer');
+    }
+    if(!portalOrchReport){
+      if(fab) fab.removeAttribute('data-tone');
+      if(fabBadge) fabBadge.hidden = true;
+      portalOrchSyncPins('');
+      portalOrchPaintModal();
+      return;
+    }
+    var active = (portalOrchReport.batons || []).filter(function(x){ return !x.checked && !x.snoozed; });
+    var hasUrg = active.some(function(x){ return x.severity === 'urgent'; });
+    var hasWarn = active.some(function(x){ return x.severity === 'warn'; });
+    if(fab){
+      if(hasUrg) fab.setAttribute('data-tone', 'urgent');
+      else if(hasWarn) fab.setAttribute('data-tone', 'warn');
+      else fab.removeAttribute('data-tone');
+      fab.title = active.length > 0
+        ? ('업무 오케스트레이션 — 대기 바통 ' + active.length + '건 (클릭 시 팝업 열기)')
+        : '업무 오케스트레이션 팝업 열기';
+    }
+    if(fabBadge){
+      if(active.length > 0){
+        fabBadge.hidden = false;
+        fabBadge.textContent = String(active.length);
+      } else {
+        fabBadge.hidden = true;
+      }
+    }
+
+    if(active.length > 0){
+      var tile = document.querySelector('.tile[data-key="orch"]');
+      if(tile){
+        var tb = document.createElement('span');
+        tb.id = 'portalOrchBadge';
+        tb.className = 'tile-alert';
+        tb.textContent = '바통 ' + active.length;
+        tb.title = '🔄 대기 바통 ' + active.length + '건 — 눌러서 작은 팝업으로 바로 확인';
+        tb.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); portalOrchOpenPopup('', tb); };
+        tile.appendChild(tb);
+        portalOrchSyncPins(active.length + '|' + (active[0] ? active[0].id : ''));
+      }
+    } else {
+      portalOrchSyncPins('');
+    }
+    portalOrchPaintModal();
+  }
+
+  function portalOrchWireStatic(){
+    var fab = $('orchFab');
+    if(fab && !fab._wired){
+      fab._wired = true;
+      fab.addEventListener('click', function(){ portalOrchOpenPopup('', fab); });
+    }
+    var modal = $('orchModal');
+    if(modal && !modal._wired){
+      modal._wired = true;
+      modal.addEventListener('click', function(ev){
+        if(ev.target === modal) portalOrchClosePopup();
+      });
+      document.addEventListener('keydown', function(ev){
+        if(!modal || modal.hidden || ev.key !== 'Tab') return;
+        var nodes = Array.prototype.filter.call(
+          modal.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+          function(el){ return !el.hidden && el.offsetParent !== null; }
+        );
+        if(!nodes.length) return;
+        var first = nodes[0], last = nodes[nodes.length - 1];
+        if(ev.shiftKey){
+          if(document.activeElement === first || !modal.contains(document.activeElement)){
+            ev.preventDefault();
+            last.focus();
+          }
+        } else {
+          if(document.activeElement === last || !modal.contains(document.activeElement)){
+            ev.preventDefault();
+            first.focus();
+          }
+        }
+      });
+    }
+    var selAll = $('orchModalSelAll');
+    if(selAll && !selAll._wired){
+      selAll._wired = true;
+      selAll.addEventListener('change', function(){
+        portalOrchShownIds.forEach(function(id){
+          if(!id || id === '__proto__' || id === 'constructor' || id === 'prototype') return;
+          if(selAll.checked) portalOrchSel[id] = 1;
+          else delete portalOrchSel[id];
+        });
+        if(modal){
+          Array.prototype.forEach.call(modal.querySelectorAll('input[data-orch-row-ck]'), function(ck){
+            ck.checked = !!selAll.checked;
+          });
+        }
+        portalOrchSyncSelectionUI();
+      });
+    }
+    var xBtn = $('orchModalClose'), dBtn = $('orchModalDoneBtn');
+    if(xBtn && !xBtn._wired){ xBtn._wired = true; xBtn.addEventListener('click', function(){ portalOrchClosePopup(); }); }
+    if(dBtn && !dBtn._wired){ dBtn._wired = true; dBtn.addEventListener('click', function(){ portalOrchClosePopup(); }); }
+    var rBtn = $('orchModalRefresh');
+    if(rBtn && !rBtn._wired){ rBtn._wired = true; rBtn.addEventListener('click', function(){ portalOrchFullScan(true); }); }
+    var fBtn = $('orchModalFullBtn');
+    if(fBtn && !fBtn._wired){ fBtn._wired = true; fBtn.addEventListener('click', function(){ portalOrchOpenFullWindow(''); }); }
+    var qInp = $('orchModalQ');
+    if(qInp && !qInp._wired){
+      qInp._wired = true;
+      qInp.addEventListener('input', function(){
+        portalOrchFlt.q = String(qInp.value || '').trim();
+        portalOrchLimit = 60;
+        portalOrchSel = Object.create(null);
+        portalOrchPaintModal();
+      });
+    }
+    var mBtn = $('orchModalMine');
+    if(mBtn && !mBtn._wired){
+      mBtn._wired = true;
+      mBtn.addEventListener('click', function(){
+        portalOrchFlt.mineOnly = !portalOrchFlt.mineOnly;
+        portalOrchLimit = 60;
+        portalOrchSel = Object.create(null);
+        portalOrchPaintModal();
+      });
+    }
+    var sBtn = $('orchModalShowDone');
+    if(sBtn && !sBtn._wired){
+      sBtn._wired = true;
+      sBtn.addEventListener('click', function(){
+        portalOrchFlt.showDone = !portalOrchFlt.showDone;
+        portalOrchLimit = 60;
+        portalOrchSel = Object.create(null);
+        portalOrchPaintModal();
+      });
+    }
+    var bcBtn = $('orchModalBulkCheck'), bxBtn = $('orchModalBulkClear');
+    if(bcBtn && !bcBtn._wired){ bcBtn._wired = true; bcBtn.addEventListener('click', portalOrchBulkCheck); }
+    if(bxBtn && !bxBtn._wired){
+      bxBtn._wired = true;
+      bxBtn.addEventListener('click', function(){
+        portalOrchSel = Object.create(null);
+        if(modal){
+          Array.prototype.forEach.call(modal.querySelectorAll('input[data-orch-row-ck]'), function(ck){
+            ck.checked = false;
+          });
+        }
+        portalOrchSyncSelectionUI();
+        var nextEl = (modal && modal.querySelector('input[data-orch-row-ck]')) || $('orchModalQ') || $('orchModalClose');
+        if(nextEl){ try{ nextEl.focus(); }catch(e){} }
+      });
+    }
+  }
+
+  /* ★ 포털 첫 화면 진입 시에는 가벼운 접수·견적 대기열 2개만 스캔하여 배지 숫자를 표시하고,
+     사용자가 팝업(#orchModal)을 클릭해 열 때 5단계 허용 공유 원장(in_app 제외)을 일괄 동기화한다. */
+  function portalOrchScan(role, acct){
+    var C = window.PuOrchestratorCore;
+    var u = auth.currentUser;
+    if(!C || !u || portalOrchBusy || document.hidden) return;
+    portalOrchBusy = true;
+    var ep = portalOrchEpoch;
+    var myUid = u.uid;
+    portalOrchRole = role || portalOrchRole || 'member';
+    if(acct && acct.sid) portalOrchSid = String(acct.sid);
+    var failCnt = 0;
+    function rd(p){
+      return db.ref(p).once('value').then(function(s){ return s ? s.val() : null; }).catch(function(){ failCnt++; return null; });
+    }
+    Promise.all([
+      rd('data/contract_requests'),
+      rd('pu_quotes')
+    ]).then(function(res){
+      if(ep !== portalOrchEpoch || !auth.currentUser || auth.currentUser.uid !== myUid) return;
+      portalOrchBusy = false;
+      if(failCnt >= 2 && !portalOrchReport){
+        portalOrchErr = '일시적으로 대기열을 읽지 못했습니다.';
+        portalOrchPaint();
+        return;
+      }
+      portalOrchErr = '';
+      portalOrchAt = Date.now();
+      portalOrchRaw = Object.assign({}, portalOrchRaw || {}, {
+        contractRequests: res[0],
+        quotes: res[1]
+      });
+      portalOrchRecompute();
+      portalOrchPaint();
+    }).catch(function(){
+      if(ep !== portalOrchEpoch || !auth.currentUser || auth.currentUser.uid !== myUid) return;
+      portalOrchBusy = false;
+    });
+  }
+
+  function portalOrchFullScan(force){
+    var C = window.PuOrchestratorCore;
+    var u = auth.currentUser;
+    if(!C || !u || portalOrchFullBusy) return;
+    if(!force && portalOrchFullAt && (Date.now() - portalOrchFullAt < 30000)) return;
+    portalOrchFullBusy = true;
+    portalOrchErr = '';
+    portalOrchPaintModal();
+    var ep = portalOrchEpoch;
+    var myUid = u.uid;
+    var failCnt = 0;
+    function rd(p){
+      return db.ref(p).once('value').then(function(s){ return s ? s.val() : null; }).catch(function(){ failCnt++; return null; });
+    }
+    /* READ_ADAPTERS 의 in_app 민감 경로(harass_invest·scal_*·rules_mgmt·govaid·settle·rehab_ad·pu_sign/open·data/finance_income)는 절대 읽지 않는다 */
+    Promise.all([
+      rd('data/companies/v'),
+      rd('data/user_dir/v'),
+      rd('data/contracts/v'),
+      rd('data/contract_requests'),
+      rd('data/cases/v'),
+      rd('data/consultings/v'),
+      rd('work_erp/items'),
+      rd('pu_quotes'),
+      rd('pucards/ontIdx')
+    ]).then(function(res){
+      if(ep !== portalOrchEpoch || !auth.currentUser || auth.currentUser.uid !== myUid) return;
+      portalOrchFullBusy = false;
+      if(failCnt >= 9){
+        portalOrchErr = '데이터 읽기 오류 · ↻ 새로고침으로 다시 시도해 주세요';
+        portalOrchPaintModal();
+        return;
+      }
+      portalOrchErr = failCnt > 0 ? ('일부 원장 응답 지연(' + failCnt + '곳) · 표시 가능한 바통만 집계됨') : '';
+      portalOrchAt = Date.now();
+      portalOrchFullAt = Date.now();
+      portalOrchRaw = {
+        companies: res[0],
+        userDir: res[1],
+        contracts: res[2],
+        contractRequests: res[3],
+        cases: res[4],
+        consultings: res[5],
+        workItems: res[6],
+        quotes: res[7],
+        cardsOntIdx: res[8]
+      };
+      portalOrchRecompute();
+      portalOrchPaint();
+    }).catch(function(){
+      if(ep !== portalOrchEpoch || !auth.currentUser || auth.currentUser.uid !== myUid) return;
+      portalOrchFullBusy = false;
+      portalOrchErr = '데이터 읽기 오류 · ↻ 새로고침으로 다시 시도해 주세요';
+      portalOrchPaintModal();
+    });
+  }
+
+  function stopPortalOrchBar(){
+    portalOrchEpoch++;
+    portalOrchClosePopup(true);
+    portalOrchUid = ''; portalOrchSid = ''; portalOrchRole = 'member';
+    portalOrchAt = 0; portalOrchFullAt = 0; portalOrchBusy = false; portalOrchFullBusy = false;
+    portalOrchErr = ''; portalOrchRaw = null; portalOrchReport = null;
+    portalOrchSel = Object.create(null);
+    portalOrchShownIds = [];
+    portalOrchLimit = 60;
+    portalOrchFlt = { stage: '', q: '', mineOnly: false, showDone: false };
+    if(portalOrchVis){ document.removeEventListener('visibilitychange', portalOrchVis); portalOrchVis = null; }
+    try{ localStorage.removeItem('pu_orch_baton_v1'); }catch(_){}
+    try{ sessionStorage.removeItem('pu_orch_baton_v1'); }catch(_){}
+    var fab = $('orchFab'); if(fab){ fab.hidden = true; fab.removeAttribute('data-tone'); }
+    var fabBadge = $('orchFabBadge'); if(fabBadge) fabBadge.hidden = true;
+    var qInp = $('orchModalQ'); if(qInp) qInp.value = '';
+    var stBox = $('orchModalStages'); if(stBox) stBox.innerHTML = '';
+    var lsBox = $('orchModalList'); if(lsBox) lsBox.innerHTML = '';
+    portalOrchRemoveBadge();
+  }
+
+  function initPortalOrchBar(role, acct){
+    portalOrchWireStatic();
+    var u = auth.currentUser;
+    if(role === 'reviewer' || !u){ stopPortalOrchBar(); return; }
+    portalOrchRole = role || 'member';
+    portalOrchSid = acct ? String(acct.sid || '') : '';
+    if(portalOrchUid === u.uid && portalOrchReport){
+      portalOrchPaint();
+      if(Date.now() - portalOrchAt > 180000) portalOrchScan(role, acct);
+      return;
+    }
+    stopPortalOrchBar();
+    portalOrchUid = u.uid;
+    portalOrchRole = role || 'member';
+    portalOrchSid = acct ? String(acct.sid || '') : '';
+    portalOrchPaint();
+    setTimeout(function(){ portalOrchScan(role, acct); }, 60);
+    portalOrchVis = function(){
+      if(!document.hidden && Date.now() - portalOrchAt > 180000) portalOrchScan(portalOrchRole, acct);
+    };
+    document.addEventListener('visibilitychange', portalOrchVis);
+  }
 
   /* 로그인 신원 안내 띠 — 헤더 바로 아래에 하나만 그린다(다시 그리면 갈아 끼움) */
   function puIdentityBand(html, tone){
@@ -4099,6 +5054,17 @@ body.portal-mode #moreFab{display:flex;}
         tileCont(appRowOf(app)).appendChild(a);
         return;
       }
+      if(app.popup && !준비중){
+        a.removeAttribute('target');
+        a.addEventListener('click', function(ev){
+          if(typeof portalOrchOpenPopup === 'function'){
+            ev.preventDefault();
+            portalOrchOpenPopup('', a);
+          }
+        });
+        tileCont(appRowOf(app)).appendChild(a);
+        return;
+      }
       /* ⚠★★ 준비중이면 «여는 처리를 아예 안 붙인다» (2026-09-23).
          ── 처음엔 위에서 stopPropagation() 으로 막으려 했다. **안 막힌다.**
             그것은 «부모로 올라가는 것»을 막을 뿐, 같은 칸에 붙은 다른 처리는 그대로 돈다.
@@ -4146,6 +5112,9 @@ body.portal-mode #moreFab{display:flex;}
          다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
       portalHanaPaintBadge();
       initPortalMrAlerts(role, acct);      // 📬 경력관리 «요청 메일» 딱지 — 대표 본인만(이미 돌고 있으면 딱지만 다시 붙인다)
+      initPortalOrchBar(role, acct);       // 🔄 업무 오케스트레이션 5단계 바통 바 & 타일 딱지
+    } else {
+      stopPortalOrchBar();
     }
     ['camFab', 'sgFab', 'chatFab', 'fabBar', 'moreDock'].forEach(function(id){
       var el = $(id);
@@ -5996,6 +6965,7 @@ body.portal-mode #moreFab{display:flex;}
     /* 같은 탭에서 다시 로그인하면 반드시 포털 선택 화면에 머문다. */
     stopPortalHanaAlerts();
     stopPortalMrAlerts();
+    stopPortalOrchBar();
     try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(e){}
     broadcastLogout();
     kkLogoutFlow();
@@ -6048,6 +7018,8 @@ body.portal-mode #moreFab{display:flex;}
   }
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
+  /* 카카오로 들어왔으면 3시간 — 판정은 공용 부품 한 곳(js/pu-active.js PuActive.limitMs) (대표 지시 2026-11-18) */
+  function idleLimit(){ try{ if(window.PuActive && PuActive.limitMs) return PuActive.limitMs(LIMIT); }catch(e){} return LIMIT; }
     // 활동 기록: mousemove는 초당 수백 번 발생 → 매번 동기 localStorage.setItem 하면
     // (ERP와 공유하는 대용량 localStorage에서) 메인스레드가 멈춘다. 10초에 한 번만 기록(유휴 판정은 60분 단위라 충분).
     var _lastMark = 0;
@@ -6066,7 +7038,8 @@ body.portal-mode #moreFab{display:flex;}
       var last = 0;
       try{ last = parseInt(localStorage.getItem(AKEY)||'0', 10); }catch(e){}
       if(!last){ mark(); return; }
-      if(Date.now() - last >= LIMIT){ broadcastLogout(); try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃('+Math.round(LIMIT/60000)+'분)'); }catch(_w){} auth.signOut(); }   // 유휴 로그아웃도 «전체»다
+      var lim = idleLimit();
+      if(Date.now() - last >= lim){ broadcastLogout(); try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃('+Math.round(lim/60000)+'분)'); }catch(_w){} auth.signOut(); }   // 유휴 로그아웃도 «전체»다
     }, 30000);
   })();
 
@@ -6116,10 +7089,12 @@ body.portal-mode #moreFab{display:flex;}
     chatImpStartWatch();  // 길잡이 채팅방 내 개선요청 실시간 상태·결과 답변·승인 동기화
     sgShowTip();          // 무엇을 건의하는 곳인지 5초간 말풍선 안내
     sgUpdateBadge();      // 버튼 숫자 배지 (admin=미처리, 일반=내 미확인 해결)
-    sgCheckResolved();    // 내 건의가 해결됐으면 로그인 직후 자동 팝업
+    /* ★ 해결 확인이 «가장 먼저» (대표 지시 2026-11-18) — 내 건의가 해결로 처리됐으면 로그인 직후 경고 팝업을 먼저 띄운다.
+       관리자 «처리할 건의» 팝업은 이 확인 창이 닫힌 뒤에 띄운다 — 두 창이 겹쳐 확인 창이 묻히지 않게. */
     // 폰 알림을 눌러 들어온 경우(?sg=1)엔 건의함을 바로 연다 — 미처리 팝업까지 겹쳐 뜨지 않게 한 쪽만.
-    if(/[?&]sg=1/.test(location.search)) sgOpen();
-    else sgCheckPending();   // (관리자) 미처리 건의가 있으면 로그인 직후 자동 팝업
+    var viaPush = /[?&]sg=1/.test(location.search);
+    sgCheckResolved(function(){ if(!viaPush) sgCheckPending(); });   // (관리자) 미처리 건의 팝업은 확인 창 뒤에
+    if(viaPush) sgOpen();
     pushListenForeground();  // 폰 알림을 켜둔 기기면, 포털을 열어둔 채로 와도 알림·배지 갱신
     cfgShowFab();         // (관리자) 화면 왼쪽 아래 ⚙ 설정 버튼 노출
   };
@@ -6366,11 +7341,41 @@ body.portal-mode #moreFab{display:flex;}
     b.style.display = n > 0 ? 'inline-flex' : 'none';
     b.textContent = n > 99 ? '99+' : String(n);
   }
+  /* ⚠ 해결 확인 대기 표시 — «건의하기» 단추를 붉게 깜빡이고 ⚠ 를 붙인다 (대표 지시 2026-11-18).
+     n = 내가 건의한 건 중 «완료» 로 처리됐는데 아직 내가 확인(☑ 해결됐어요 / 🙅 아직 안 됐어요)하지 않은 수.
+     0 이면 표시를 거둔다. 관리자도 건의자일 수 있어 역할과 무관하게 쓴다(관리자 단추의 숫자 배지는 «미처리» 그대로). */
+  function sgSetNeed(n){
+    n = Math.max(0, +n || 0);
+    SG.needConfirm = n;
+    var f = $('sgFab'); if(!f) return;
+    if(n > 0){
+      f.classList.add('sg-need');
+      f.title = '⚠ 내가 건의한 ' + n + '건이 해결 처리되었습니다 — 해결됐는지 확인해 주세요';
+    } else {
+      f.classList.remove('sg-need');
+      f.removeAttribute('title');
+    }
+  }
+  // 건의함 위쪽에 붙이는 «아직 확인 안 한 건» 경고 띠 — 팝업을 「나중에 확인」으로 넘겼어도 여기서 다시 확인하러 간다
+  function sgNeedBannerHtml(){
+    var n = SG.needConfirm || 0; if(!n) return '';
+    return '<div class="sgd-warn sgd-warn-bar" role="alert"><span>⚠ 내 건의 <b>' + n + '건</b>이 해결 처리되었습니다. <b>해결됐는지 확인</b>해 주세요.</span>'
+      + '<button type="button" class="sg-btn" data-sg-need-open="1">지금 확인하기</button></div>';
+  }
+  function sgBindNeedBanner(root){
+    var b = root && root.querySelector('[data-sg-need-open]');
+    if(b) b.addEventListener('click', function(){ sgCloseModal(); sgCheckResolved(); });
+  }
   function sgUpdateBadge(){
     if(sgIsAdmin()){
       sgEnsurePrivateMigration().then(function(){ return db.ref(SG_META_PRIVATE_PATH).once('value'); }).then(function(snap){
         var n = 0; snap.forEach(function(ch){ var v = ch.val(); if(v && v.status !== 'done') n++; });
         sgSetBadge(n);
+      }).catch(function(){});
+      /* 관리자도 건의자일 수 있다 — «내 건의 확인 대기» 수로 단추의 ⚠ 도 같이 맞춘다(숫자 배지는 미처리 수 그대로) */
+      sgLoadOwnResolved().then(function(records){
+        var k = 0; Object.keys(records).forEach(function(id){ var v = records[id]||{}; if(!v.seen && (v.status||'done')==='done') k++; });
+        sgSetNeed(k);
       }).catch(function(){});
     } else if(SG.email || SG.uid){
       sgLoadOwnResolved().then(function(records){
@@ -6380,6 +7385,7 @@ body.portal-mode #moreFab{display:flex;}
           if(!v.seen && (v.status||'done')==='done') n++;
         });
         sgSetBadge(n);
+        sgSetNeed(n);   // 같은 수로 «⚠ 확인 필요» 표시도 맞춘다
       }).catch(function(){});
     }
   }
@@ -6590,17 +7596,27 @@ body.portal-mode #moreFab{display:flex;}
        🙅 아직 안 됐어요 → 어디가 안 되는지 적게 하고, 그 내용을 «재요청 건의» 로 새로 접수한다
                           (원본과 relatedId 로 이어진다 — 기존 알림·배지가 그대로 관리자에게 간다)
      status 가 없던 옛 기록은 완료 팝업만 쓰던 시절 것이므로 완료로 본다. */
-  function sgCheckResolved(){
-    if(!SG.uid) return;
+  function sgCheckResolved(after){
+    /* after: 이 확인 창이 «닫히거나 뜰 일이 없을 때» 한 번 불린다 — 관리자 «처리할 건의» 팝업이 확인 창 뒤에 뜨게 하는 데 쓴다 */
+    var _once = false;
+    function _after(){ if(_once) return; _once = true; try{ if(after) after(); }catch(e){} }
+    if(!SG.uid){ _after(); return; }
     sgLoadOwnResolved().then(function(records){
       var items = [];
       Object.keys(records).forEach(function(id){
         var v=records[id]||{};
         if(!v.seen && (v.status||'done')==='done'){ v._id=id; items.push(v); }
       });
-      if(!items.length) return;
+      if(!items.length){ sgSetNeed(0); _after(); return; }
+      sgSetNeed(items.length);   // 「나중에 확인」으로 넘겨도 «건의하기» 단추에 ⚠ 가 남는다
       items.sort(function(a,b){ return (a.at||0) - (b.at||0); });
       var path = sgResolvedUidPath(SG.uid);
+      function _warnText(n){
+        return '내가 건의한 <b>' + n + '건</b>이 «해결(완료)» 로 처리되었습니다.<br>'
+          + '실제로 고쳐졌는지 <b>반드시 확인</b>해 주세요 — 직접 확인하셔야 최종 종료됩니다.'
+          + '<span class="sub">고쳐졌으면 ☑ 해결됐어요 → 완료, 아직이면 🙅 아직 안 됐어요를 눌러 주세요. 지금 못 하면 「나중에 확인」 — 확인하기 전까지 「건의하기」 단추에 ⚠ 표시가 남습니다.</span>';
+      }
+      $('sgDoneWarn').innerHTML = _warnText(items.length);
       $('sgDoneBody').innerHTML = items.map(function(it, i){
         return '<div class="sgd-item" data-sgd="'+i+'">'
           + '<div class="sgd-t"><span class="sg-badge sg-b-'+sgCatClass(it.cat)+'">'+sgEsc(sgCatName(it.cat))+'</span>'+sgEsc(it.title||'')+'</div>'
@@ -6629,6 +7645,20 @@ body.portal-mode #moreFab{display:flex;}
         db.ref(path+'/'+it._id).update(upd).catch(function(){});
       }
       function _row(i){ return $('sgDoneBody').querySelector('[data-sgd="'+i+'"]'); }
+      // 한 건을 확인했을 때 — 줄을 걷고 남은 수로 경고를 맞추고, 다 했으면 창을 닫는다
+      function _rowDone(row){
+        row.style.display='none';
+        var left = items.filter(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }).length;
+        sgSetNeed(left);
+        sgUpdateBadge();
+        if(left){
+          $('sgDoneWarn').innerHTML = _warnText(left);
+          for(var j=0;j<items.length;j++){   // 남은 첫 건의 ☑ 칸으로 포커스를 옮긴다
+            var rj=_row(j);
+            if(rj && rj.style.display!=='none'){ var cj=rj.querySelector('[data-sgd-chk="'+j+'"]'); if(cj && cj.focus) cj.focus(); break; }
+          }
+        } else { $('sgDoneModal').style.display='none'; _after(); }
+      }
       items.forEach(function(it, i){
         var row=_row(i); if(!row) return;
         var okBtn=row.querySelector('[data-sgd-ok="'+i+'"]'), chk=row.querySelector('[data-sgd-chk="'+i+'"]');
@@ -6636,9 +7666,7 @@ body.portal-mode #moreFab{display:flex;}
         okBtn.addEventListener('click', function(){
           if(!chk.checked) return;
           _markSeen(it, { resolvedOk:true, resolvedAt:Date.now() });
-          row.style.display='none'; sgUpdateBadge();
-          if(!items.some(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }))
-            $('sgDoneModal').style.display='none';
+          _rowDone(row);
         });
         /* 📎 재요청에 붙이는 캡처 — 새 건의(sgAddImgs)와 같은 줄여 담기(sgCompress)·3장 한도를 쓴다 */
         it._imgs = [];
@@ -6691,10 +7719,8 @@ body.portal-mode #moreFab{display:flex;}
               authorUid:rec.authorUid, status:'new', cat:rec.cat, title:rec.title, createdAt:rec.createdAt }).catch(function(){});
             db.ref(path+'/'+ref.key).set({ title:rec.title, cat:rec.cat, status:'new', at:rec.createdAt, seen:true }).catch(function(){});
             _markSeen(it, { resolvedOk:false, feedback:txt.slice(0,2000), feedbackAt:Date.now() });
-            row.style.display='none'; sgUpdateBadge();
+            _rowDone(row);
             alert('재요청이 접수되었습니다. 관리자에게 알림이 갑니다.');
-            if(!items.some(function(x,j){ var r=_row(j); return r && r.style.display!=='none'; }))
-              $('sgDoneModal').style.display='none';
           }).catch(function(err){
             btn.disabled=false; btn.textContent='↩ 재요청 보내기';
             alert('접수 실패: '+(err&&err.message||'알 수 없는 오류'));
@@ -6702,14 +7728,16 @@ body.portal-mode #moreFab{display:flex;}
         });
       });
       $('sgDoneModal').style.display = 'flex';
-      setTimeout(function(){ $('sgDoneOk').focus(); }, 0);
+      /* 첫 칸은 «☑ 해결됐어요» — 예전엔 「나중에 확인」에 맞춰져 Enter 한 번에 그냥 넘어갔다 */
+      setTimeout(function(){ var c = $('sgDoneBody').querySelector('[data-sgd-chk]'); (c || $('sgDoneOk')).focus(); }, 0);
       // [나중에 확인] — 답을 안 정한 건은 그대로 두어 다음 로그인에 다시 묻는다
       $('sgDoneOk').textContent = '나중에 확인';
       $('sgDoneOk').onclick = function(){
         $('sgDoneModal').style.display = 'none';
         sgUpdateBadge();
+        _after();
       };
-    }).catch(function(){});
+    }).catch(function(){ _after(); });
   }
   function sgCatName(k){ var c = SG_CATS.find(function(x){return x.key===k;}); return c ? c.name : '기타'; }
   function sgEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
@@ -6789,12 +7817,13 @@ body.portal-mode #moreFab{display:flex;}
   function sgViewMemberHome(){
     $('sgTitle').textContent = '💬 건의하기';
     var bd = $('sgBody');
-    bd.innerHTML = '<div style="text-align:center;padding:18px 8px 8px">'
+    bd.innerHTML = sgNeedBannerHtml() + '<div style="text-align:center;padding:18px 8px 8px">'
       + '<div style="font-size:2rem;margin-bottom:8px">📝</div><b style="font-size:1rem;color:#1e293b">불편한 점을 남겨주세요</b>'
       + '<p style="font-size:.78rem;color:#64748b;line-height:1.6;margin:8px 0 16px">건의의 제목·내용·첨부파일은 관리자만 확인합니다.<br>처리가 끝나면 본인에게 결과를 알려드립니다.</p>'
       + '<button class="sg-btn" id="sgMemberNew" style="margin:0">＋ 새 건의 작성</button></div>'
       + '<div id="sgMyList"></div>';
     $('sgMemberNew').addEventListener('click', sgViewCreate);
+    sgBindNeedBanner(bd);
     if(!SG.uid) return;
     sgLoadOwnResolved().then(function(records){
       var items = [];
@@ -6813,6 +7842,7 @@ body.portal-mode #moreFab{display:flex;}
               + '<span class="sg-st '+st.c+'">'+st.t+'</span>'
               + (it.resolvedOk===true?'<span style="font-size:.62rem;color:#166534;font-weight:700">본인확인 ✓</span>':'')
               + (it.resolvedOk===false?'<span style="font-size:.62rem;color:#991b1b;font-weight:700">재요청함</span>':'')
+              + ((!it.seen && (it.status||'done')==='done')?'<span style="font-size:.62rem;color:#991b1b;font-weight:700">⚠ 확인 필요</span>':'')
               + '<span style="font-size:.66rem;color:#94a3b8;margin-left:auto">'+sgFmt(it.at)+'</span></div>'
               + '<div style="font-size:.78rem;color:#1e293b;font-weight:600;margin-top:4px">'+sgEsc(it.title||'')+'</div>'
               + (hasReply
@@ -6940,7 +7970,8 @@ body.portal-mode #moreFab{display:flex;}
         + '⚠ 옛 자리에 남은 건의를 옮기지 못했습니다 — <b>아래 목록에 예전 건의가 빠져 있을 수 있습니다.</b>'
         + '<br>새 건의 등록·답변은 그대로 됩니다. 개발자 도구 콘솔에 원인이 찍혀 있습니다.</div>'
       : '';
-    wrap.innerHTML = warnHtml + topHtml + chips + searchBox + listHtml + moreBtn;
+    wrap.innerHTML = warnHtml + sgNeedBannerHtml() + topHtml + chips + searchBox + listHtml + moreBtn;
+    sgBindNeedBanner(wrap);
     $('sgNewBtn').addEventListener('click', sgViewCreate);
     Array.prototype.forEach.call(wrap.querySelectorAll('.sg-flt'), function(el){
       el.addEventListener('click', function(){ SG.listStatus = el.dataset.f; SG.listShown = PAGE; sgRenderList(); });
@@ -7752,6 +8783,8 @@ body.portal-mode #moreFab{display:flex;}
       $('sgFab').focus();
     } else if($('nlWarnModal').style.display === 'flex'){
       뉴스레터경고닫기(true);
+    } else if($('orchModal') && !$('orchModal').hidden){
+      portalOrchClosePopup();
     }
   });
 
@@ -7786,6 +8819,7 @@ body.portal-mode #moreFab{display:flex;}
   }
   var _sgDrag = makeDraggable('sgModal');      // 건의함
   var _cfgDrag = makeDraggable('cfgModal');    // 시스템 설정
+  _orchDrag = makeDraggable('orchModal');      // 업무 오케스트레이션 컴팩트 팝업
   makeDraggable('sgPendModal');                // 관리자 미처리 알림
   makeDraggable('sgDoneModal');                // 해결 알림
 
@@ -7810,7 +8844,8 @@ window.PU_TYPESAFE_MOUNT = function(){
 </script>
 <script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=10"></script>
-<script src="js/pu-chatbot.js?v=6"></script>
+<script src="js/pu-orchestrator-core.js?v=5"></script>
+<script src="js/pu-chatbot-kb.js?v=15"></script>
+<script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>

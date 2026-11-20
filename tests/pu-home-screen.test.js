@@ -151,7 +151,7 @@ function rowDeps() {
        ⚠⚠ 이 모래통은 «새 함수를 안 넣어» 네 번 깨졌다 — memberKind·pillShort·offSiteOf,
          그리고 이번 pickTypes. 화면 함수를 새로 만들면 여기부터 볼 것.
          (keepBox() 에도 같은 목록이 있다 — «둘 다» 넣어야 한다.) */
-    fnSource('pickRows'), fnSource('pickTypes'),
+    fnSource('pickRows'), fnSource('pickPastRows'), fnSource('pickAllRows'), fnSource('pickTypes'),
     /* 거르개가 «종류(자문·급여)»에서 «자문료»로 바뀌었다 (2026-09-06) —
        업체관리 딱지가 실제 거래를 안 따라가서다(자문료 182 / 「자문」 딱지 84).
        ⚠ 2026-09-14 부터 푸른이알피 유형(자문·급여·노조·기금)도 «함께» 거른다 —
@@ -2008,7 +2008,8 @@ test('★ 갈래는 대시보드 카드로 고른다 — 카드가 우리 자료
   ['구성원 소개', '주요업무', '오시는길', '인사말'].forEach(label =>
     assert.ok(h.indexOf(label) >= 0, '갈래 「' + label + '」 을 고를 수 없습니다'));
   assert.match(h, /App\.go\(/, '카드를 눌러도 옮겨갈 수 없습니다');
-  assert.ok(h.indexOf('자문사현황') >= 0, '자문사현황 자리가 없습니다');
+  /* 2026-11-18 홈페이지 이름 「자문사현황」 → 「고객사」(대표 지시) */
+  assert.ok(h.indexOf('고객사') >= 0, '고객사(옛 자문사현황) 자리가 없습니다');
 
   /* ★ 확인을 안 눌렀고 손댈 것도 없으면 «대조 안 함»이라고 적어야 한다.
      이것을 「이상 없음」으로 적으면 안 본 것이 깨끗한 것으로 읽힌다. */
@@ -2335,7 +2336,7 @@ function partnerBox() {
 test('★ 자문사현황은 «대조 못 함»이라고 말한다 — 「같음」으로 뭉개지 않는다', () => {
   const ctx = partnerBox();
   const card = ctx.dashHtml();
-  assert.ok(card.indexOf('자문사현황') >= 0, '자문사현황 카드가 없습니다');
+  assert.ok(card.indexOf('고객사') >= 0, '고객사(옛 자문사현황) 카드가 없습니다');
   /* 목록 줄에 「확인 전」이 붙으면 언젠가 대조가 될 것처럼 들린다 — 그 갈래는 못 한다 */
   assert.ok(ctx.rowsHtml().indexOf('확인 전') < 0, '자문사 줄에 「확인 전」이 붙었습니다');
   /* ★ 카드는 «상태 한 마디»만 적는다(5차 지시). 할 일이 있으면 그것이 먼저다 —
@@ -2593,7 +2594,7 @@ test('★ 편집칸의 머리와 발이 고정돼 가운데만 구른다', () =>
     + fnSource('memberBandHtml') + '\n' + fnSource('riskReport') + '\n' + fnSource('srlConflict') + '\n'
     + fnSource('stamp') + '\n' + noConst(constLine('MEMBER_KINDS')) + '\n' + fnSource('memberKind') + '\n' + fnSource('memberEdit'));
   const h = ctx.memberEdit(ctx.App.draft);
-  const 가운데 = h.indexOf('class="esc"');
+  const 가운데 = h.search(/class="esc[ "]/);   // (2026-11-18) 두 칸 이름표(mem2)가 더 붙을 수 있다
   const 발 = h.lastIndexOf('class="eft"');
   assert.ok(가운데 >= 0, '구르는 가운데 칸이 없습니다 — 경력이 길면 단추가 화면 밖으로 밀립니다');
   assert.ok(발 > 가운데, '단추줄이 구르는 칸 안에 있습니다 — 굴려야 「저장」이 보입니다');

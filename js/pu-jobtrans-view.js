@@ -48,7 +48,21 @@
 
   var SCAN_CACHE = {};
   var DISCOVER_LIST = [];
+  var FOLDER_STATE = {
+    rootName: '',
+    rawRootName: '',
+    handle: null,
+    needsPerm: false,
+    rawEntries: [],
+    groups: [],
+    formFileCount: 0,
+    totalAcceptedFiles: 0,
+    walkedSkippedDirs: 0,
+    skippedNonJobtrans: 0,
+    skippedPersonal: 0
+  };
   var TAB = 'projects';
+  var AGENCY_SCOPE = '';
   var CUR_PID = '';
   var SEL = {};
   var DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
@@ -63,7 +77,19 @@
     });
   }
   function safeKey(v) {
-    return str(v).replace(/[.#$/\[\]\s]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 72) || ('id_' + Date.now());
+    var raw = str(v);
+    if (!raw) return 'id_' + Date.now();
+    if (!/[.#$/\[\]\s]/.test(raw) && raw.length <= 120) return raw;
+    var cleaned = raw.replace(/[.#$/\[\]\s]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    var dig = (Intake() && typeof Intake().sha256Hex === 'function') ? Intake().sha256Hex(raw) : Date.now().toString(36);
+    return (cleaned ? cleaned + '_' : 'id_') + dig;
+  }
+  function hashKey(prefix, raw) {
+    var s = str(raw);
+    if (Intake() && typeof Intake().sha256Hex === 'function') {
+      return (prefix || 'id_') + Intake().sha256Hex(s);
+    }
+    return (prefix || 'id_') + safeKey(s);
   }
   function stripUndef(v) {
     if (Array.isArray(v)) return v.filter(function (x) { return x !== undefined; }).map(stripUndef);
@@ -116,11 +142,16 @@
     gate = null;
     ME = { uid: '', sid: '', name: '', email: '', isAdmin: false, isSubAdmin: false };
     TAB = 'projects';
+    AGENCY_SCOPE = '';
     CUR_PID = '';
     SEL = {};
     DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
     SCAN_CACHE = {};
     DISCOVER_LIST = [];
+    FOLDER_STATE = {
+      rootName: '', rawRootName: '', handle: null, needsPerm: false, rawEntries: [], groups: [],
+      formFileCount: 0, totalAcceptedFiles: 0, walkedSkippedDirs: 0, skippedNonJobtrans: 0, skippedPersonal: 0
+    };
     D = {
       projects: {}, intake: {}, mid: {}, final: {}, snapshots: {},
       companies: [], consultings: [], bizTypes: [],
@@ -128,10 +159,13 @@
       mailFolders: {}, mailMsgs: {}, flatMails: []
     };
     closeModal();
-    ['kpiBox', 'projectsBox', 'discoverBox', 'intakeBox', 'midBox', 'finalBox'].forEach(function (id) {
+    ['agencyScopeBar', 'kpiBox', 'projectsBox', 'folderSyncBox', 'discoverBox', 'intakeBox', 'midBox', 'finalBox', 'formsBox'].forEach(function (id) {
       var el = $(id);
       if (el) el.innerHTML = '';
     });
+    if ($('folderSyncMeta')) $('folderSyncMeta').textContent = '';
+    if ($('nFolderGroups')) $('nFolderGroups').textContent = '0';
+    if ($('folderSyncCard')) $('folderSyncCard').style.display = 'none';
     if ($('app')) $('app').style.display = 'none';
   }
 
@@ -184,6 +218,7 @@
     rebuildScanAndDiscover();
     applyHashTarget();
     draw();
+    await tryRestoreSavedFolderHandle(reqEpoch, reqUid);
   }
 
   function activeProjects() {
@@ -200,11 +235,18 @@
   function schedRoundsForProject(proj) {
     if (!proj) return [];
     var all = rowsOf(D.scalScheds);
+    var typeMap = {};
+    rowsOf(D.scalTypes).forEach(function (t) {
+      if (t && t.id) typeMap[str(t.id)] = str(t.name || t.title);
+    });
     var hits = all.filter(function (s) {
-      if (!s || s.phase === 'pre' || s.phase === 'post') return false;
-      var sameCo = (proj.scalCoId && s.coId === proj.scalCoId) || (proj.companyId && s.coId === proj.companyId);
+      if (!s || s._deleted || s.deleted || s.phase === 'pre' || s.phase === 'post') return false;
+      var sCo = str(s.coId || s.co_id);
+      var sTid = str(s.typeId || s.type);
+      var sameCo = (proj.scalCoId && sCo === str(proj.scalCoId)) || (proj.companyId && sCo === str(proj.companyId));
       if (!sameCo) return false;
-      if (proj.scalTypeId && s.typeId && s.typeId !== proj.scalTypeId) return false;
+      if (proj.scalTypeId && sTid && sTid !== str(proj.scalTypeId)) return false;
+      if (sTid && typeMap[sTid] && !JOBTRANS_BIZ_RE.test(typeMap[sTid])) return false;
       return /^\d{4}-\d{2}-\d{2}$/.test(str(s.date));
     }).sort(function (a, b) { return str(a.date) < str(b.date) ? -1 : 1; });
 
@@ -230,10 +272,7 @@
   function rebuildScanAndDiscover() {
     SCAN_CACHE = {};
     var projs = activeProjects();
-    var registeredCoIds = {};
     projs.forEach(function (p) {
-      if (p.companyId) registeredCoIds[p.companyId] = p.id;
-      if (p.scalCoId) registeredCoIds['scal:' + p.scalCoId] = p.id;
       SCAN_CACHE[p.id] = Intake().scanProjectMails(
         p, D.flatMails, null, D.companies, D.consultings, D.intake[p.id] || {}
       );
@@ -242,72 +281,497 @@
     if (!CUR_PID && projs.length) CUR_PID = projs[0].id;
     if (CUR_PID && !projectById(CUR_PID)) CUR_PID = projs[0] ? projs[0].id : '';
 
-    var cands = [], seenCo = {};
-    var typeMap = {};
-    rowsOf(D.scalTypes).forEach(function (t) {
-      if (t && t.id) typeMap[t.id] = str(t.name || t.title);
-    });
-    var bizTypeMap = {};
-    D.bizTypes.forEach(function (bt) {
-      if (bt && bt.id) bizTypeMap[bt.id] = str(bt.name || bt.title);
-    });
-
-    D.consultings.forEach(function (cs) {
-      var bName = str(cs.bizName || cs.typeName || bizTypeMap[cs.bizTypeId] || cs.memo || '');
-      if (!JOBTRANS_BIZ_RE.test(bName)) return;
-      var coObj = (cs.company && typeof cs.company === 'object') ? cs.company : {};
-      var coId = str(cs.companyId || coObj.id);
-      if (!coId || registeredCoIds[coId] || seenCo[coId]) return;
-      seenCo[coId] = 1;
-      var coRec = findCompanyById(coId) || coObj;
-      var inferred = Cat().inferAgencyAndTrack(bName + ' ' + str(coRec.addr || coRec.address || ''));
-      cands.push({
-        candKey: 'erp_' + safeKey(coId),
-        source: '푸른이알피 계약확정',
-        bizLabel: bName,
-        agency: inferred.agency,
-        track: inferred.track,
-        companyId: coId,
-        companyName: str(coRec.name || cs.companyName || '사업장'),
-        bizNo: str(coRec.bizNo || cs.bizNo),
-        industry: str(coRec.bizType || coRec.bizCategory),
-        contactEmail: firstEmailOf(coRec) || firstEmailOf(cs),
-        year: Number(String(cs.year || cs.contractDate || '2026').slice(0, 4)) || 2026,
-        scalCoId: '',
-        scalTypeId: ''
-      });
+    DISCOVER_LIST = Intake().discoverJobtransCandidates({
+      companies: D.companies,
+      consultings: D.consultings,
+      bizTypes: D.bizTypes,
+      scalCos: D.scalCos,
+      scalTypes: D.scalTypes,
+      scalScheds: D.scalScheds,
+      registeredProjects: projs
     });
 
-    rowsOf(D.scalCos).forEach(function (sc) {
-      if (!sc || !sc.id) return;
-      var tName = typeMap[sc.typeId] || str(sc.bizName || '');
-      var hasJtSched = rowsOf(D.scalScheds).some(function (s) {
-        return s && s.coId === sc.id && JOBTRANS_BIZ_RE.test(typeMap[s.typeId] || '');
-      });
-      if (!JOBTRANS_BIZ_RE.test(tName) && !hasJtSched) return;
-      var matchedErpCo = matchErpCompanyStrict(sc);
-      if (!matchedErpCo) return;
-      if (registeredCoIds[matchedErpCo.id] || seenCo[matchedErpCo.id]) return;
-      seenCo[matchedErpCo.id] = 1;
-      var inferred = Cat().inferAgencyAndTrack(tName + ' ' + str(sc.memo || ''));
-      cands.push({
-        candKey: 'scal_' + safeKey(matchedErpCo.id),
-        source: '정부사업일정',
-        bizLabel: tName || '산업·일자리전환',
-        agency: inferred.agency,
-        track: inferred.track,
-        companyId: matchedErpCo.id,
-        companyName: str(matchedErpCo.name || sc.name),
-        bizNo: str(matchedErpCo.bizNo || sc.bizNo),
-        industry: str(matchedErpCo.bizType || matchedErpCo.bizCategory),
-        contactEmail: firstEmailOf(matchedErpCo),
-        year: Number(sc.year) || 2026,
-        scalCoId: str(sc.id),
-        scalTypeId: str(sc.typeId)
-      });
+    refreshFolderGroups();
+  }
+
+  /* ── 로컬 컨설팅업체 폴더(산업·일자리전환 전용 하위폴더 선별) 연결 · IndexedDB UID 격리 핸들 보관 · 일괄 반영 ── */
+  var IDB_FS_NAME = 'pu_jobtrans_fs';
+  var IDB_FS_STORE = 'handles';
+  var IDB_FS_KEY_PREFIX = 'consulting_dir:';
+
+  function openFsIdb() {
+    return new Promise(function (resolve) {
+      if (typeof indexedDB === 'undefined') { resolve(null); return; }
+      try {
+        var req = indexedDB.open(IDB_FS_NAME, 1);
+        req.onupgradeneeded = function () {
+          var db = req.result;
+          if (!db.objectStoreNames.contains(IDB_FS_STORE)) db.createObjectStore(IDB_FS_STORE);
+        };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { resolve(null); };
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  async function saveDirHandleToIdb(handle, uid) {
+    var u = str(uid);
+    if (!u || !handle) return;
+    var db = await openFsIdb();
+    if (!db) return;
+    return new Promise(function (resolve) {
+      try {
+        var tx = db.transaction(IDB_FS_STORE, 'readwrite');
+        tx.objectStore(IDB_FS_STORE).put(handle, IDB_FS_KEY_PREFIX + u);
+        tx.oncomplete = function () { db.close(); resolve(); };
+        tx.onerror = function () { db.close(); resolve(); };
+      } catch (e) { try { db.close(); } catch (err) {} resolve(); }
+    });
+  }
+
+  async function loadDirHandleFromIdb(uid) {
+    var u = str(uid);
+    if (!u) return null;
+    var db = await openFsIdb();
+    if (!db) return null;
+    return new Promise(function (resolve) {
+      try {
+        var tx = db.transaction(IDB_FS_STORE, 'readonly');
+        var g = tx.objectStore(IDB_FS_STORE).get(IDB_FS_KEY_PREFIX + u);
+        g.onsuccess = function () { var res = g.result || null; db.close(); resolve(res); };
+        g.onerror = function () { db.close(); resolve(null); };
+      } catch (e) { try { db.close(); } catch (err) {} resolve(null); }
+    });
+  }
+
+  async function clearDirHandlesFromIdb() {
+    var db = await openFsIdb();
+    if (!db) return;
+    return new Promise(function (resolve) {
+      try {
+        var tx = db.transaction(IDB_FS_STORE, 'readwrite');
+        tx.objectStore(IDB_FS_STORE).clear();
+        tx.oncomplete = function () { db.close(); resolve(); };
+        tx.onerror = function () { db.close(); resolve(); };
+      } catch (e) { try { db.close(); } catch (err) {} resolve(); }
+    });
+  }
+
+  function safeFolderDisplayLabel(rawLabel, fallback) {
+    var fbTxt = str(fallback) || '선택폴더';
+    var raw = str(rawLabel);
+    if (!raw || !Intake()) return fbTxt;
+    var masked = Intake().maskPiiStrict(raw, []).text.split(Intake().GARIM).join('')
+      .replace(/[\s_\-]{2,}/g, ' ')
+      .replace(/^[\s_\-,·]+|[\s_\-,·]+$/g, '')
+      .trim();
+    if (!masked || Intake().hasResidualPii(masked)) return fbTxt;
+    return masked;
+  }
+
+  function refreshFolderGroups() {
+    if (!FOLDER_STATE.rawEntries || !FOLDER_STATE.rawEntries.length) {
+      FOLDER_STATE.groups = [];
+      FOLDER_STATE.formFileCount = 0;
+      FOLDER_STATE.totalAcceptedFiles = 0;
+      FOLDER_STATE.skippedNonJobtrans = FOLDER_STATE.walkedSkippedDirs || 0;
+      FOLDER_STATE.skippedPersonal = 0;
+      return;
+    }
+    var grouped = Intake().groupJobtransFolderEntries(FOLDER_STATE.rawEntries, {
+      rootDirName: FOLDER_STATE.rawRootName || FOLDER_STATE.rootName,
+      companies: D.companies,
+      projects: activeProjects(),
+      discoverCandidates: DISCOVER_LIST
+    });
+    FOLDER_STATE.groups = grouped.groups;
+    FOLDER_STATE.formFileCount = grouped.formFileCount;
+    FOLDER_STATE.totalAcceptedFiles = grouped.totalAcceptedFiles;
+    FOLDER_STATE.skippedNonJobtrans = grouped.skippedNonJobtrans + (FOLDER_STATE.walkedSkippedDirs || 0);
+    FOLDER_STATE.skippedPersonal = grouped.skippedPersonal;
+  }
+
+  async function walkJobtransDirectoryHandle(rootHandle) {
+    var rawEntries = [];
+    var skippedDirs = 0;
+    var startStep = Intake().inspectConsultingSubdir(rootHandle.name, false);
+    var startInside = !!startStep.nextInside;
+
+    async function walk(dirHandle, relPrefix, insideJobtrans) {
+      if (!dirHandle || typeof dirHandle.values !== 'function') return;
+      for await (var entry of dirHandle.values()) {
+        if (!entry) continue;
+        var nextPath = relPrefix ? (relPrefix + '/' + entry.name) : entry.name;
+        if (entry.kind === 'directory') {
+          var step = Intake().inspectConsultingSubdir(entry.name, insideJobtrans);
+          if (!step.enter) {
+            skippedDirs++;
+            continue;
+          }
+          await walk(entry, nextPath, step.nextInside);
+        } else if (entry.kind === 'file') {
+          if (!insideJobtrans) {
+            skippedDirs++;
+            continue;
+          }
+          rawEntries.push({
+            relPath: rootHandle.name + '/' + nextPath,
+            name: entry.name,
+            handle: entry
+          });
+        }
+      }
+    }
+
+    await walk(rootHandle, '', startInside);
+    return { rawEntries: rawEntries, skippedDirs: skippedDirs };
+  }
+
+  async function scanConnectedHandle(handle, silent, optEpoch, optUid) {
+    var reqEpoch = optEpoch || SESSION_EPOCH;
+    var reqUid = optUid || (ME && ME.uid ? String(ME.uid) : '');
+    if (!handle || !isSessionCurrent(reqEpoch, reqUid)) return;
+    var walked = await walkJobtransDirectoryHandle(handle);
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    FOLDER_STATE.handle = handle;
+    FOLDER_STATE.rawRootName = str(handle.name);
+    FOLDER_STATE.rootName = safeFolderDisplayLabel(handle.name, '선택폴더');
+    FOLDER_STATE.needsPerm = false;
+    FOLDER_STATE.rawEntries = walked.rawEntries;
+    FOLDER_STATE.walkedSkippedDirs = walked.skippedDirs || 0;
+    refreshFolderGroups();
+    clearSel('folderSync');
+    draw();
+    if (!silent) {
+      if (!FOLDER_STATE.groups.length && !FOLDER_STATE.formFileCount) {
+        toast('선택한 폴더 안에 산업·일자리전환 하위 폴더(예: 4. 산업일자리전환컨설팅)가 없습니다. 타 컨설팅 폴더는 가져오지 않습니다.');
+      } else {
+        toast('컨설팅폴더 연결 완료: 산업일자리 사업장 ' + FOLDER_STATE.groups.length + '곳 (' + FOLDER_STATE.totalAcceptedFiles + '개 파일 선별 · 타 컨설팅 자동 제외)');
+      }
+    }
+  }
+
+  async function tryRestoreSavedFolderHandle(reqEpoch, reqUid) {
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    if (FOLDER_STATE.rawEntries.length || FOLDER_STATE.handle) return;
+    var saved = await loadDirHandleFromIdb(reqUid);
+    if (!saved || !isSessionCurrent(reqEpoch, reqUid)) return;
+    try {
+      var perm = typeof saved.queryPermission === 'function' ? await saved.queryPermission({ mode: 'read' }) : 'prompt';
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+      if (perm === 'granted') {
+        await scanConnectedHandle(saved, true, reqEpoch, reqUid);
+      } else {
+        FOLDER_STATE.handle = saved;
+        FOLDER_STATE.rawRootName = str(saved.name);
+        FOLDER_STATE.rootName = safeFolderDisplayLabel(saved.name, '선택폴더');
+        FOLDER_STATE.needsPerm = true;
+        draw();
+      }
+    } catch (e) {}
+  }
+
+  async function connectConsultingFolder() {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    if (typeof global.showDirectoryPicker === 'function') {
+      try {
+        var dirHandle = await global.showDirectoryPicker({ mode: 'read' });
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
+        await saveDirHandleToIdb(dirHandle, reqUid);
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
+        await scanConnectedHandle(dirHandle, false, reqEpoch, reqUid);
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        toast('폴더 열기 실패: ' + (e.message || e));
+      }
+      return;
+    }
+    if ($('folderFallbackInput')) {
+      $('folderFallbackInput').value = '';
+      $('folderFallbackInput').click();
+    }
+  }
+
+  async function reconnectSavedFolder() {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    if (!FOLDER_STATE.handle) {
+      await connectConsultingFolder();
+      return;
+    }
+    try {
+      var perm = typeof FOLDER_STATE.handle.requestPermission === 'function'
+        ? await FOLDER_STATE.handle.requestPermission({ mode: 'read' })
+        : 'granted';
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+      if (perm === 'granted') {
+        await scanConnectedHandle(FOLDER_STATE.handle, false, reqEpoch, reqUid);
+      } else {
+        toast('폴더 읽기 권한이 허용되지 않았습니다.');
+      }
+    } catch (e) {
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+      await connectConsultingFolder();
+    }
+  }
+
+  function handleFallbackFolderFiles(fileList) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return;
+    var firstRel = str(files[0].webkitRelativePath || files[0].name).replace(/\\/g, '/');
+    var rootName = firstRel.indexOf('/') > 0 ? firstRel.split('/')[0] : '';
+    FOLDER_STATE.handle = null;
+    FOLDER_STATE.needsPerm = false;
+    FOLDER_STATE.rawRootName = rootName || '선택폴더';
+    FOLDER_STATE.rootName = safeFolderDisplayLabel(rootName, '선택폴더');
+    FOLDER_STATE.walkedSkippedDirs = 0;
+    FOLDER_STATE.rawEntries = files.map(function (f) {
+      return {
+        relPath: str(f.webkitRelativePath || f.name),
+        name: f.name,
+        size: f.size,
+        lastModified: f.lastModified,
+        file: f
+      };
+    });
+    refreshFolderGroups();
+    clearSel('folderSync');
+    draw();
+    if (!FOLDER_STATE.groups.length && !FOLDER_STATE.formFileCount) {
+      toast('선택한 폴더에 산업·일자리전환 하위 폴더가 없습니다. 타 컨설팅 자료는 가져오지 않습니다.');
+    } else {
+      toast('컨설팅폴더 연결 완료: 산업일자리 사업장 ' + FOLDER_STATE.groups.length + '곳 (' + FOLDER_STATE.totalAcceptedFiles + '개 파일 선별 · 타 컨설팅 자동 제외)');
+    }
+  }
+
+  async function importFolderWorkplaceGroup(groupKey, silent, optEpoch, optUid, optBoundaryHash) {
+    var reqEpoch = optEpoch != null ? optEpoch : SESSION_EPOCH;
+    var reqUid = optUid != null ? String(optUid) : (ME && ME.uid ? String(ME.uid) : '');
+    if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+
+    var grp = FOLDER_STATE.groups.find(function (g) {
+      if (g.groupKey !== groupKey) return false;
+      if (optBoundaryHash && g.boundaryHash && g.boundaryHash !== optBoundaryHash) return false;
+      return true;
+    });
+    if (!grp) return null;
+
+    /* ★ 사업자번호로 검증된 프로젝트만 자동 연결하고, 상호만 유사한 후보는 단건 실행 시에만 명시적 확인 후 연결한다 */
+    var proj = grp.matchedProjectId ? projectById(grp.matchedProjectId) : null;
+    if (!proj && !silent && !grp.bizNoConflict && grp.suggestedProjectId) {
+      var sugProj = projectById(grp.suggestedProjectId);
+      if (sugProj && askConfirm(
+        '폴더 사업장 [' + grp.companyName + ']에는 사업자번호 표기가 없습니다.\n' +
+        '동일 연도·동일 운영기관의 기존 워크스페이스 [' + sugProj.companyName + ']에 귀속하시겠습니까?\n' +
+        '(취소 시 별도 격리 워크스페이스로 안전하게 개설됩니다)'
+      )) {
+        proj = sugProj;
+      }
+      if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+    }
+
+    if (!proj) {
+      var targetCompanyId = grp.companyId;
+      if (!silent && !grp.bizNo && !grp.bizNoConflict && grp.suggestedCompanyId) {
+        var sugCo = findCompanyById(grp.suggestedCompanyId);
+        if (sugCo && askConfirm(
+          '폴더 사업장 [' + grp.companyName + ']에는 사업자번호 표기가 없습니다.\n' +
+          '기업정보함의 동일 상호 거래처 [' + str(sugCo.name) + (sugCo.bizNo ? ' · ' + sugCo.bizNo : '') + ']와 연결하시겠습니까?\n' +
+          '(취소 시 격리 열쇠로 별도 개설됩니다)'
+        )) {
+          targetCompanyId = str(sugCo.id);
+        }
+        if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+      }
+      var co = findCompanyById(targetCompanyId);
+      var agCode = grp.agency === 'cepa' ? 'cepa' : 'kmac';
+      var trCode = Cat().getTrack(grp.track, agCode).code;
+      var targetProjId = 'jt_' + safeKey(targetCompanyId) + '_' + agCode + '_' + (grp.year || 2026);
+      var boundFolderHash = (targetCompanyId === grp.companyId && grp.boundaryHash) ? str(grp.boundaryHash) : '';
+      var existingAtTarget = D.projects[targetProjId];
+      if (boundFolderHash && existingAtTarget && !existingAtTarget._deleted && existingAtTarget.folderBoundaryHash && existingAtTarget.folderBoundaryHash !== boundFolderHash) {
+        throw new Error('폴더 경계 지문 불일치 감지: 서로 다른 폴더 경계를 동일 프로젝트에 병합할 수 없습니다.');
+      }
+      var safeGrpCoName = co ? str(co.name) : sanitizeMetaLabel(grp.companyName, { companyName: '' });
+      if (!safeGrpCoName || Intake().hasResidualPii(safeGrpCoName)) safeGrpCoName = '산업일자리전환_참여사업장';
+      proj = await saveProjectRecord({
+        id: targetProjId,
+        companyId: targetCompanyId,
+        companyName: safeGrpCoName,
+        bizNo: grp.bizNo || (co ? str(co.bizNo) : ''),
+        folderBoundaryHash: boundFolderHash || undefined,
+        ceoName: co ? str(co.ceo || co.ceoName) : '',
+        contactName: contactNameOfCompany(co),
+        agency: agCode,
+        track: trCode,
+        year: grp.year || 2026,
+        industry: co ? str(co.bizType || co.bizCategory) : '',
+        contactEmails: co && firstEmailOf(co) ? [firstEmailOf(co)] : [],
+        scalCoId: grp.scalCoId || '',
+        scalTypeId: grp.scalTypeId || '',
+        selectedTasks: agCode === 'cepa'
+          ? ['jt_impact', 'jt_job_redesign', 'jt_reskill', 'jt_gov_match']
+          : ['jt_impact', 'jt_job_redesign', 'jt_reskill', 'jt_emp_stab'],
+        consultantName: ME.name ? ME.name + ' 공인노무사' : '푸른노무법인 전담 공인노무사'
+      }, reqEpoch, reqUid);
+    }
+    if (!proj || !isSessionCurrent(reqEpoch, reqUid)) return null;
+
+    var photoFiles = [];
+    var docFiles = [];
+    var metaOnlyFiles = [];
+    (grp.files || []).forEach(function (f) {
+      var low = str(f.fileName).toLowerCase();
+      if (/\.(jpg|jpeg|png|webp)$/.test(low)) photoFiles.push(f);
+      else if (/\.(xlsx|xls|csv|hwpx|hwp|docx|pdf|txt)$/.test(low)) docFiles.push(f);
+      else metaOnlyFiles.push(f);
     });
 
-    DISCOVER_LIST = cands;
+    var mc = Object.assign({}, proj.manualChecks || {});
+    function markCheck(phase, dkCode) {
+      var ph = phase === 'post_mid' ? 'post_mid' : 'pre_mid';
+      var sub = Object.assign({}, mc[ph] || {});
+      sub[dkCode] = true;
+      mc[ph] = sub;
+    }
+
+    var savedCount = 0;
+    var docSlice = docFiles.slice(0, 24);
+    if (docFiles.length > 24) {
+      metaOnlyFiles = metaOnlyFiles.concat(docFiles.slice(24));
+    }
+    for (var i = 0; i < docSlice.length; i++) {
+      if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+      var df = docSlice[i];
+      var safeTitle = sanitizeMetaLabel(df.fileName, proj);
+      if (Intake().hasResidualPii(safeTitle)) safeTitle = (df.docKindName || '수집문서') + '_자료';
+      var cardId = hashKey('fdir_', df.relPath);
+      try {
+        var fileObj = df.file || (df.handle && typeof df.handle.getFile === 'function' ? await df.handle.getFile() : null);
+        if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+        if (fileObj && fileObj.size > 0 && fileObj.size <= 20 * 1024 * 1024) {
+          var bytes = new Uint8Array(await fileObj.arrayBuffer());
+          if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+          var analyzed = await analyzeAttachmentBytes(df.fileName, bytes, proj, '', df.phase);
+          if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+          if (analyzed) {
+            var savedDocCard = await saveIntakeCard(proj, Object.assign({
+              id: cardId,
+              source: 'folder',
+              title: safeTitle,
+              attNames: [safeTitle],
+              phase: df.phase,
+              checkedAt: Date.now(),
+              analyzedAt: Date.now()
+            }, analyzed), reqEpoch, reqUid);
+            if (!savedDocCard || !isSessionCurrent(reqEpoch, reqUid)) return null;
+            markCheck(df.phase, analyzed.docKind || df.docKind);
+            savedCount++;
+            continue;
+          }
+        }
+      } catch (err) {
+        /* 민감 열 불완전 시트나 비정형 바이너리는 원문 노출 없이 비식별 수령 메타 카드로만 기록 */
+      }
+      if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+      var savedMetaCard = await saveIntakeCard(proj, {
+        id: cardId,
+        source: 'folder',
+        title: safeTitle,
+        attNames: [safeTitle],
+        phase: df.phase,
+        docKind: df.docKind,
+        track: 'meta',
+        piiStripped: true,
+        maskedExcerpt: '',
+        stats: null,
+        policyIssues: [],
+        postDiff: null,
+        summaryLines: ['컨설팅업체 폴더 원본 연결 확인 (' + (df.docKindName || df.docKind) + ') — 개인정보 비저장 보호 적용'],
+        checkedAt: Date.now(),
+        analyzedAt: Date.now()
+      }, reqEpoch, reqUid);
+      if (!savedMetaCard || !isSessionCurrent(reqEpoch, reqUid)) return null;
+      markCheck(df.phase, df.docKind);
+      savedCount++;
+    }
+
+    if (photoFiles.length) {
+      if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+      var savedPhotoCard = await saveIntakeCard(proj, {
+        id: 'fdir_photos_' + safeKey(grp.groupKey),
+        source: 'folder',
+        title: '현장 수행사진 모음 (' + photoFiles.length + '매)',
+        attNames: ['현장사진_' + photoFiles.length + '매'],
+        phase: 'post_mid',
+        docKind: 'round_log',
+        track: 'meta',
+        piiStripped: true,
+        maskedExcerpt: '',
+        stats: null,
+        policyIssues: [],
+        postDiff: { hasPhoto: true, hasSign: false, requests: [] },
+        summaryLines: ['컨설팅업체 폴더 내 현장 수행사진 증빙 ' + photoFiles.length + '매 연결 확인'],
+        checkedAt: Date.now(),
+        analyzedAt: Date.now()
+      }, reqEpoch, reqUid);
+      if (!savedPhotoCard || !isSessionCurrent(reqEpoch, reqUid)) return null;
+      markCheck('post_mid', 'round_log');
+      savedCount++;
+    }
+
+    if (metaOnlyFiles.length) {
+      var byKind = {};
+      metaOnlyFiles.forEach(function (mf) {
+        if (!byKind[mf.docKind]) byKind[mf.docKind] = { count: 0, phase: mf.phase, short: mf.docKindName };
+        byKind[mf.docKind].count++;
+        markCheck(mf.phase, mf.docKind);
+      });
+      var mkKeys = Object.keys(byKind);
+      for (var k = 0; k < mkKeys.length; k++) {
+        if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+        var dkc = mkKeys[k];
+        var info = byKind[dkc];
+        var savedArchCard = await saveIntakeCard(proj, {
+          id: 'fdir_arch_' + safeKey(grp.groupKey + '_' + dkc),
+          source: 'folder',
+          title: (info.short || dkc) + ' 관련 참고·압축자료 (' + info.count + '건)',
+          attNames: [(info.short || dkc) + '_' + info.count + '건'],
+          phase: info.phase,
+          docKind: dkc,
+          track: 'meta',
+          piiStripped: true,
+          maskedExcerpt: '',
+          stats: null,
+          policyIssues: [],
+          postDiff: null,
+          summaryLines: ['컨설팅업체 폴더 관련 자료 ' + info.count + '건 수령 확인 (' + (info.short || dkc) + ')'],
+          checkedAt: Date.now(),
+          analyzedAt: Date.now()
+        }, reqEpoch, reqUid);
+        if (!savedArchCard || !isSessionCurrent(reqEpoch, reqUid)) return null;
+        savedCount++;
+      }
+    }
+
+    if (!isSessionCurrent(reqEpoch, reqUid)) return null;
+    var updatedProj = await saveProjectRecord(Object.assign({}, proj, { manualChecks: mc }), reqEpoch, reqUid);
+    if (!updatedProj || !isSessionCurrent(reqEpoch, reqUid)) return null;
+    if (!silent) {
+      CUR_PID = updatedProj.id;
+      TAB = 'intake';
+      clearSel();
+      rebuildScanAndDiscover();
+      draw();
+      toast(updatedProj.companyName + ' 폴더 자료 ' + savedCount + '건 비식별 반영 완료');
+    }
+    return updatedProj;
   }
 
   function findCompanyById(coId) {
@@ -473,8 +937,14 @@
       el.className = 'bulk' + (n ? ' on' : '');
       if (!n) { el.innerHTML = ''; return; }
       var btns = '';
-      if (nm === 'projects') {
-        btns = '<button class="sm danger" data-bulkact="projects:del">선택 숨김(삭제)</button>';
+      if (nm === 'projects' || nm === 'projectsKmac' || nm === 'projectsCepa') {
+        btns = '<button class="sm danger" data-bulkact="' + nm + ':del">선택 숨김(삭제)</button>';
+      } else if (nm === 'formReviewKmac' || nm === 'formReviewCepa') {
+        btns = '<button class="sm ok" data-bulkact="' + nm + ':hwpx">📥 선택 사업장 최종 .hwpx 다운로드</button>';
+      } else if (nm === 'midReview' || nm === 'finalReview') {
+        btns = '<button class="sm pri" data-bulkact="' + nm + ':copy">📋 선택 검수기준 복사</button>';
+      } else if (nm === 'folderSync') {
+        btns = '<button class="sm pri" data-bulkact="folderSync:import">📥 선택 사업장 자료 반영</button>';
       } else if (nm === 'discover') {
         btns = '<button class="sm pri" data-bulkact="discover:activate">⚡ 선택 활성화</button>';
       } else if (nm === 'preChk' || nm === 'postChk') {
@@ -518,6 +988,34 @@
     return '<span class="chip ' + cls + '">' + esc(ag.short) + '</span>';
   }
 
+  function projectParallelMeta(proj) {
+    if (!Intake() || typeof Intake().detectParallelConsultings !== 'function') {
+      return { contractNo: str(proj && proj.contractNo), hasIlteoSangsaeng: false, ilteoLabels: [], otherLabels: [] };
+    }
+    return Intake().detectParallelConsultings(proj, D.consultings, D.bizTypes);
+  }
+
+  function drawAgencyScopeBar(projs, kmacCnt, cepaCnt) {
+    var bar = $('agencyScopeBar');
+    if (!bar) return;
+    if ($('projAgency') && $('projAgency').value !== AGENCY_SCOPE) {
+      $('projAgency').value = AGENCY_SCOPE;
+    }
+    bar.innerHTML =
+      '<span class="agency-scope-lbl">🏛️ 소속기관 구분 보기:</span>' +
+      '<button type="button" class="agency-scope-btn' + (AGENCY_SCOPE === '' ? ' on' : '') + '" data-set-agency-scope="" aria-pressed="' + (AGENCY_SCOPE === '' ? 'true' : 'false') + '">' +
+      '⚖️ 기관별 좌우 분리 (' + projs.length + ')</button>' +
+      '<button type="button" class="agency-scope-btn wide-only' + (AGENCY_SCOPE === 'stack' ? ' on' : '') + '" data-set-agency-scope="stack" aria-pressed="' + (AGENCY_SCOPE === 'stack' ? 'true' : 'false') + '">' +
+      '▤ 전체폭 상하 분리 (' + projs.length + ')</button>' +
+      '<button type="button" class="agency-scope-btn' + (AGENCY_SCOPE === 'kmac' ? ' on' : '') + '" data-set-agency-scope="kmac" aria-pressed="' + (AGENCY_SCOPE === 'kmac' ? 'true' : 'false') + '">' +
+      '🔵 능률협회(KMAC · 산일능률) (' + kmacCnt + ')</button>' +
+      '<button type="button" class="agency-scope-btn cepa' + (AGENCY_SCOPE === 'cepa' ? ' on' : '') + '" data-set-agency-scope="cepa" aria-pressed="' + (AGENCY_SCOPE === 'cepa' ? 'true' : 'false') + '">' +
+      '🟢 충남경제진흥원(CEPA · 산일충남) (' + cepaCnt + ')</button>' +
+      '<span class="sp"></span>' +
+      '<span class="chip c-amber wide-only" title="일터혁신 상생컨설팅(일터상생) 및 석유화학 노동전환지원센터 사업은 본 워크스페이스·메일 감지에서 자동 분리·배제됩니다">🚫 일터상생 · 석유화학노동전환 자동분리</span>' +
+      '<button type="button" class="sm" data-goto-tab="forms" title="능률협회(KMAC)와 충남경제진흥원(CEPA)의 서로 다른 보고서 양식·목차·검수기준을 나란히 검토합니다">⚖️ 양식·검토기준 분리보기</button>';
+  }
+
   /* ══ 3. 화면 전체 그리기 ════════════════════════════════════════════════ */
   function draw() {
     var projs = activeProjects();
@@ -542,15 +1040,17 @@
       b.setAttribute('aria-selected', isOn ? 'true' : 'false');
       b.setAttribute('tabindex', isOn ? '0' : '-1');
     });
-    ['projects', 'intake', 'mid', 'final'].forEach(function (t) {
+    ['projects', 'intake', 'mid', 'final', 'forms'].forEach(function (t) {
       var pane = $('p-' + t);
       if (pane) pane.classList.toggle('on', t === TAB);
     });
 
+    drawAgencyScopeBar(projs, kmacCnt, cepaCnt);
     drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen, kmacCnt, cepaCnt);
     drawIntakePane();
     drawMidPane();
     drawFinalPane();
+    drawFormsPane(projs);
     drawBulks();
   }
 
@@ -571,21 +1071,46 @@
     var projs = activeProjects();
     var ag = Cat().getAgency(proj.agency);
     var tr = Cat().getTrack(proj.track, ag.code);
+    var spec = Cat().getAgencyFormSpec ? Cat().getAgencyFormSpec(ag.code) : null;
+    var pMeta = projectParallelMeta(proj);
     var tasks = (proj.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : c; });
     var curOrder = proj.finalConfirmedAt ? 6 : (proj.midConfirmedAt ? 4 : (activeIntakeCount(proj.id) ? 2 : 1));
 
-    var opts = projs.map(function (p) {
-      var pAg = Cat().getAgency(p.agency);
-      return '<option value="' + esc(p.id) + '"' + (p.id === proj.id ? ' selected' : '') + '>' +
-        esc('[' + (pAg.code === 'cepa' ? '충경진' : '능률협회') + '] ' + p.companyName + ' (' + (p.year || 2026) + ')') + '</option>';
-    }).join('');
+    var kmacProjs = projs.filter(function (p) { return p.agency !== 'cepa'; });
+    var cepaProjs = projs.filter(function (p) { return p.agency === 'cepa'; });
+    function buildOptItems(list, prefix) {
+      return list.map(function (p) {
+        var pm = projectParallelMeta(p);
+        var ctag = pm.contractNo ? (' · ' + pm.contractNo) : '';
+        return '<option value="' + esc(p.id) + '"' + (p.id === proj.id ? ' selected' : '') + '>' +
+          esc('[' + prefix + '] ' + p.companyName + ' (' + (p.year || 2026) + ctag + ')') + '</option>';
+      }).join('');
+    }
+    var opts = '';
+    if (AGENCY_SCOPE === 'kmac' && proj.agency !== 'cepa') {
+      opts = '<optgroup label="🔵 한국능률협회컨설팅 (KMAC · 산일능률)">' + buildOptItems(kmacProjs, '능률협회') + '</optgroup>';
+    } else if (AGENCY_SCOPE === 'cepa' && proj.agency === 'cepa') {
+      opts = '<optgroup label="🟢 충남경제진흥원 (CEPA · 산일충남)">' + buildOptItems(cepaProjs, '충경진') + '</optgroup>';
+    } else {
+      if (kmacProjs.length) opts += '<optgroup label="🔵 한국능률협회컨설팅 (KMAC · 산일능률)">' + buildOptItems(kmacProjs, '능률협회') + '</optgroup>';
+      if (cepaProjs.length) opts += '<optgroup label="🟢 충남경제진흥원 (CEPA · 산일충남)">' + buildOptItems(cepaProjs, '충경진') + '</optgroup>';
+    }
+
+    var contractChip = pMeta.contractNo
+      ? ' <span class="chip ' + (ag.code === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(pMeta.contractNo) + '</span>'
+      : ' <span class="chip">' + esc(ag.code === 'cepa' ? '산일충남' : '산일능률') + '</span>';
+    var ilteoGuardChip = pMeta.hasIlteoSangsaeng
+      ? ' <span class="chip c-amber" title="동일 사업장의 일터혁신 상생컨설팅(' + esc(pMeta.ilteoLabels.join(', ')) + ') 계약·서류·메일은 본 화면에서 자동 분리·배제됩니다">일터상생 별도수행(자동분리)</span>'
+      : '';
+    var formChipLabel = spec ? (TAB === 'mid' ? spec.midFormTitle : spec.finalFormTitle) : (ag.short + ' 전용 양식');
 
     return '<div class="card">' +
       '<div class="prof">' +
-      '<span><b>대상 사업장</b><select data-proj-sel="1" aria-label="작업 사업장 전환">' + opts + '</select></span>' +
-      '<span><b>운영기관</b>' + agencyChipHtml(ag.code) + ' <span class="chip">' + esc(tr.short) + '</span></span>' +
+      '<span><b>소속기관·사업장</b><select data-proj-sel="1" aria-label="작업 사업장 전환">' + opts + '</select></span>' +
+      '<span><b>기관 구분</b>' + agencyChipHtml(ag.code) + contractChip + ' <span class="chip">' + esc(tr.short) + '</span>' + ilteoGuardChip + '</span>' +
+      '<span title="' + esc(formChipLabel) + '"><b>적용 양식</b><span class="chip ' + (ag.code === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(formChipLabel) + '</span></span>' +
       '<span title="' + esc(tasks.join(', ')) + '"><b>중점과제</b>' + esc(tasks.join(' · ') || '미선택') + '</span>' +
-      '<span><b>기준선</b>' + (proj.midConfirmedAt ? '<span class="chip c-green">중간보고 확정 (' + esc(fmtDateTime(proj.midConfirmedAt).slice(0, 10)) + ')</span>' : '<span class="chip c-amber">기초진단 진행중</span>') + '</span>' +
+      '<span><b>기준선</b>' + (proj.midConfirmedAt ? '<span class="chip c-green">중간확정 (' + esc(fmtDateTime(proj.midConfirmedAt).slice(0, 10)) + ')</span>' : '<span class="chip c-amber">기초진단중</span>') + '</span>' +
       '<span class="sp"></span>' +
       '<button class="sm" data-act="open-task-modal">🎯 기관·트랙·과제 설정</button>' +
       '</div>' +
@@ -601,18 +1126,63 @@
       '</div></div>';
   }
 
-  /* ── 탭 1: 사업장 현황 · 메일 감지 ── */
+  function buildProjectRowForAgencyTable(p) {
+    var sc = SCAN_CACHE[p.id] || { matched: [], unseenPreCount: 0, unseenPostCount: 0, totalInCount: 0 };
+    var chkPre = Intake().summarizeChecklistProgress('pre_mid', p.agency, p.track, p.selectedTasks, D.intake[p.id] || {}, sc.matched, manualChecksOf(p, 'pre_mid'));
+    var tr = Cat().getTrack(p.track, p.agency);
+    var pMeta = projectParallelMeta(p);
+    var taskNames = (p.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : c; }).join(' · ');
+
+    var schedRds = schedRoundsForProject(p);
+    var midObj = Report().buildMidReport(p, D.intake[p.id] || {}, schedRds, D.mid[p.id] || null);
+    var finObj = Report().buildFinalReport(p, midObj, D.intake[p.id] || {}, schedRds, D.final[p.id] || null);
+    var rev = Report().evaluateReportFormReview(p, p.midConfirmedAt ? 'final' : 'mid', p.midConfirmedAt ? finObj : midObj, D.intake[p.id] || {}, schedRds);
+
+    var mailBadges = [];
+    if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber" title="기초자료 미확인 메일 ' + sc.unseenPreCount + '건">📩' + sc.unseenPreCount + '</span>');
+    if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green" title="후속 미확인 메일 ' + sc.unseenPostCount + '건">📬' + sc.unseenPostCount + '</span>');
+    if (!mailBadges.length && sc.totalInCount > 0) mailBadges.push('<span class="chip" title="수신 확인된 메일 ' + sc.totalInCount + '건">✓' + sc.totalInCount + '</span>');
+
+    var contractChip = pMeta.contractNo
+      ? ' <span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(pMeta.contractNo) + '</span>'
+      : '';
+    var ilteoChip = pMeta.hasIlteoSangsaeng
+      ? ' <span class="chip c-amber" title="일터혁신 상생컨설팅(' + esc(pMeta.ilteoLabels.join(', ')) + ') 별도 계약은 본 워크스페이스에서 자동 분리됨">일터별도</span>'
+      : '';
+    var revChipCls = rev.allPassed ? 'c-green' : 'c-amber';
+    var compactTrackLabel = str(tr.short).replace(/^(?:KMAC|CEPA)\s+/i, '');
+
+    return {
+      id: p.id,
+      cells: [
+        { cls: 'ti', title: p.companyName + (pMeta.contractNo ? ' (' + pMeta.contractNo + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc(String(p.year || 2026).slice(-2) + '년') + '</span>' + contractChip + ilteoChip },
+        { k: 'badge', title: tr.name, html: '<span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(compactTrackLabel) + '</span> ' + stageDotsHtml(p) },
+        { cls: 'wide', title: str(p.transGoal) || taskNames, html: esc(str(p.transGoal) || taskNames || '과제 선택 필요') },
+        { html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
+        {
+          k: 'act',
+          html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">①기초</button>' +
+            '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">②중간</button>' +
+            '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final" title="' + esc(p.agency === 'cepa' ? '충남경제진흥원 결과보고서·완료계 검토' : '능률협회 최종보고서·정책매니저 검토') + '">③' + (p.agency === 'cepa' ? '완료계' : '최종') + '</button>'
+        }
+      ]
+    };
+  }
+
+  /* ── 탭 1: 사업장 현황 · 소속기관별(KMAC vs CEPA) 완전 분리 보기 ── */
   function drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen, kmacCnt, cepaCnt) {
     if ($('kpiBox')) {
       $('kpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>계약 사업장 (능률 ' + kmacCnt + ' · 충경진 ' + cepaCnt + ')</span><b>' + projs.length + '개사</b></div>' +
-        '<div class="kpi k-amber"><span>📩 기초자료 메일 미확인</span><b>' + totalPreUnseen + '건</b></div>' +
-        '<div class="kpi k-green"><span>📌 중간보고 확정 완료</span><b>' + midDoneCnt + '개사</b></div>' +
-        '<div class="kpi k-blue"><span>📬 후속·완료 메일 미확인</span><b>' + totalPostUnseen + '건</b></div>';
+        '<div class="kpi k-blue"><span>전체 산업·일자리전환 (중복제거)</span><b>' + projs.length + '개사</b></div>' +
+        '<div class="kpi k-blue"><span>🔵 한국능률협회컨설팅 (산일능률)</span><b>' + kmacCnt + '개사</b></div>' +
+        '<div class="kpi k-green"><span>🟢 충남경제진흥원 (산일충남)</span><b>' + cepaCnt + '개사</b></div>' +
+        '<div class="kpi k-amber"><span>📩 미확인 메일 (기초 ' + totalPreUnseen + ' · 후속 ' + totalPostUnseen + ')</span><b>' + (totalPreUnseen + totalPostUnseen) + '건</b></div>' +
+        '<div class="kpi k-green"><span>📌 중간보고 기준선 확정</span><b>' + midDoneCnt + '개사</b></div>';
     }
 
     var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var agFilter = str($('projAgency') && $('projAgency').value);
+    var rawScope = AGENCY_SCOPE || str($('projAgency') && $('projAgency').value);
+    var agFilter = (rawScope === 'kmac' || rawScope === 'cepa') ? rawScope : '';
     var yr = str($('projYear') && $('projYear').value);
     var stFilter = str($('projStage') && $('projStage').value);
 
@@ -628,45 +1198,108 @@
         var taskStr = (p.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : ''; }).join(' ');
         var agObj = Cat().getAgency(pAg);
         var trObj = Cat().getTrack(p.track, pAg);
-        var hay = (str(p.companyName) + ' ' + str(p.industry) + ' ' + str(p.transGoal) + ' ' + str(p.consultantName) + ' ' + agObj.name + ' ' + trObj.name + ' ' + taskStr).toLowerCase();
+        var pm = projectParallelMeta(p);
+        var hay = (str(p.companyName) + ' ' + str(pm.contractNo) + ' ' + str(p.industry) + ' ' + str(p.transGoal) + ' ' + str(p.consultantName) + ' ' + agObj.name + ' ' + trObj.name + ' ' + taskStr).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
     });
 
-    var rows = filtered.map(function (p) {
-      var sc = SCAN_CACHE[p.id] || { matched: [], unseenPreCount: 0, unseenPostCount: 0, totalInCount: 0 };
-      var chkPre = Intake().summarizeChecklistProgress('pre_mid', p.agency, p.track, p.selectedTasks, D.intake[p.id] || {}, sc.matched, manualChecksOf(p, 'pre_mid'));
-      var tr = Cat().getTrack(p.track, p.agency);
-      var taskNames = (p.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : c; }).join(' · ');
+    var kmacRows = filtered.filter(function (p) { return p.agency !== 'cepa'; }).map(buildProjectRowForAgencyTable);
+    var cepaRows = filtered.filter(function (p) { return p.agency === 'cepa'; }).map(buildProjectRowForAgencyTable);
 
-      var mailBadges = [];
-      if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber">📩 기초 미확인 ' + sc.unseenPreCount + '</span>');
-      if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green">📬 후속 미확인 ' + sc.unseenPostCount + '</span>');
-      if (!mailBadges.length) mailBadges.push('<span class="chip">수신 ' + (sc.totalInCount || 0) + '건 확인됨</span>');
+    var kmacCardHtml =
+      '<div class="agency-col-card kmac">' +
+      '<div class="agency-col-hd">' +
+      '<span>🔵 한국능률협회컨설팅(KMAC) — 구조혁신(산업·일자리전환)</span>' +
+      '<span class="chip c-blue">' + kmacRows.length + '개사</span>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm" data-goto-tab="forms" data-set-agency-scope="kmac">📋 KMAC 양식·검수기준</button>' +
+      '</div>' +
+      '<div class="agency-col-sub">' +
+      '<span><b>ERP 계약구분:</b> 산일능률</span>' +
+      '<span>·</span>' +
+      '<span><b>전용 양식:</b> 착수PPT(1MD) → 중간 7장 → 2026년형 결과보고서 8장(KPI 4+·지원사업 2+) → 완료보고서·정책매니저</span>' +
+      '</div>' +
+      renderTable('projectsKmac',
+        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 검수 · 메일', '분리 검토·보고서'],
+        kmacRows, CUR_PID) +
+      '</div>';
 
-      return {
-        id: p.id,
-        cells: [
-          { cls: 'ti', title: p.companyName, html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span>' },
-          { k: 'badge', html: agencyChipHtml(p.agency) + ' <span class="chip">' + esc(tr.short) + '</span> ' + stageDotsHtml(p) },
-          { cls: 'wide', title: taskNames, html: esc(str(p.transGoal) || taskNames || '과제 선택 필요') },
-          { html: '기초자료 <b>' + chkPre.pct + '%</b> (' + chkPre.requiredDone + '/' + chkPre.requiredTotal + ')' },
-          { html: mailBadges.join(' ') },
-          {
-            k: 'act',
-            html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초체크</button>' +
-              '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간보고</button>' +
-              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 최종·HWPX</button>'
-          }
-        ]
-      };
-    });
+    var cepaCardHtml =
+      '<div class="agency-col-card cepa">' +
+      '<div class="agency-col-hd">' +
+      '<span>🟢 충남경제진흥원(CEPA) — 충남 산업일자리전환지원센터</span>' +
+      '<span class="chip c-green">' + cepaRows.length + '개사</span>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm" data-goto-tab="forms" data-set-agency-scope="cepa">📋 CEPA 양식·검수기준</button>' +
+      '</div>' +
+      '<div class="agency-col-sub">' +
+      '<span><b>ERP 계약구분:</b> 산일충남</span>' +
+      '<span>·</span>' +
+      '<span><b>전용 양식:</b> 지원신청서 → [진단 3회 / 전문 6회·월별실적] → 결과보고서 8장 → 완료계(갑지 대표자 날인) · 충남장려금</span>' +
+      '</div>' +
+      renderTable('projectsCepa',
+        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 검수 · 메일', '분리 검토·보고서'],
+        cepaRows, CUR_PID) +
+      '</div>';
 
     if ($('projectsBox')) {
-      $('projectsBox').innerHTML = renderTable('projects',
-        ['사업장명', '운영기관 · 트랙 · 단계', '전환목표 · 중점과제', '기초자료 충족', '푸른메일함 감지', '작업 열기'],
-        rows, CUR_PID);
+      if (agFilter === 'kmac') {
+        $('projectsBox').innerHTML = '<div class="agency-split-grid">' + kmacCardHtml + '</div>';
+      } else if (agFilter === 'cepa') {
+        $('projectsBox').innerHTML = '<div class="agency-split-grid">' + cepaCardHtml + '</div>';
+      } else if (rawScope === 'stack') {
+        $('projectsBox').innerHTML = '<div class="agency-split-grid">' + kmacCardHtml + cepaCardHtml + '</div>';
+      } else {
+        $('projectsBox').innerHTML = '<div class="agency-split-grid dual">' + kmacCardHtml + cepaCardHtml + '</div>';
+      }
+    }
+
+    if ($('folderSyncCard')) {
+      var showFolderCard = !!(FOLDER_STATE.needsPerm || FOLDER_STATE.groups.length || FOLDER_STATE.rootName);
+      $('folderSyncCard').style.display = showFolderCard ? '' : 'none';
+      if ($('nFolderGroups')) $('nFolderGroups').textContent = String(FOLDER_STATE.groups.length);
+      if ($('reconnectFolderBtn')) $('reconnectFolderBtn').style.display = FOLDER_STATE.needsPerm ? '' : 'none';
+      if ($('folderSyncMeta')) {
+        var dispRoot = safeFolderDisplayLabel(FOLDER_STATE.rootName, '선택폴더');
+        if (FOLDER_STATE.needsPerm) {
+          $('folderSyncMeta').textContent = '이전 연결 폴더(' + dispRoot + ') — [🔓 폴더 권한 재연결]을 누르면 산업일자리 자료만 다시 불러옵니다';
+        } else if (FOLDER_STATE.rootName) {
+          $('folderSyncMeta').textContent = '[' + dispRoot + '] 산업일자리 파일 ' + FOLDER_STATE.totalAcceptedFiles + '개 선별 (공통양식 ' + FOLDER_STATE.formFileCount + ' · 타 컨설팅/정산 제외 ' + (FOLDER_STATE.skippedNonJobtrans + FOLDER_STATE.skippedPersonal) + ')';
+        }
+      }
+      if ($('folderSyncBox')) {
+        if (FOLDER_STATE.needsPerm) {
+          $('folderSyncBox').innerHTML = '<div class="empty">브라우저 보안 정책상 새로고침 후 폴더 읽기 권한 재승인이 필요합니다. 상단의 [🔓 폴더 권한 재연결]을 눌러 주세요.</div>';
+        } else {
+          var fRows = FOLDER_STATE.groups.map(function (g) {
+            var tr = Cat().getTrack(g.track, g.agency);
+            var safeDispCo = safeFolderDisplayLabel(g.companyName, '산업일자리전환 사업장');
+            var kindTags = Object.keys(g.docKindCounts || {}).slice(0, 4).map(function (dkCode) {
+              var dk = Cat().getDocKind(dkCode);
+              return (dk ? dk.short : dkCode) + ' ' + g.docKindCounts[dkCode];
+            }).join(' · ');
+            var linkedBadge = g.bizNoConflict
+              ? '<span class="chip c-red">사업자번호 충돌·격리개설</span>'
+              : (g.matchedProjectId
+                ? '<span class="chip c-green">사업자번호 검증 연결됨</span>'
+                : ((g.suggestedProjectId || g.suggestedCompanyId)
+                  ? '<span class="chip c-amber">동일상호 후보 확인필요</span>'
+                  : '<span class="chip c-blue">격리 워크스페이스 개설</span>'));
+            return {
+              id: g.groupKey,
+              cells: [
+                { cls: 'ti', title: safeDispCo, html: esc(safeDispCo) + ' <span class="chip">' + esc(g.year + '년') + '</span>' },
+                { k: 'badge', html: agencyChipHtml(g.agency) + ' <span class="chip">' + esc(tr.short) + '</span> ' + linkedBadge },
+                { cls: 'wide', title: kindTags, html: '파일 <b>' + g.fileCount + '건</b>' + (kindTags ? ' (' + esc(kindTags) + ')' : '') },
+                { k: 'act', html: '<button class="sm pri" data-import-fgrp="' + esc(g.groupKey) + '" data-boundary-hash="' + esc(g.boundaryHash || '') + '">📥 자료 반영</button>' }
+              ]
+            };
+          });
+          $('folderSyncBox').innerHTML = renderTable('folderSync', ['폴더 사업장명', '기관 · 트랙 · 상태', '선별된 산업일자리 자료', '반영'], fRows, '');
+        }
+      }
     }
 
     if ($('discoverCard')) {
@@ -680,7 +1313,7 @@
           cells: [
             { cls: 'ti', title: c.companyName, html: esc(c.companyName) + ' <span class="chip">' + esc(c.year + '년') + '</span>' },
             { k: 'badge', html: agencyChipHtml(c.agency) + ' <span class="chip">' + esc(tr.short) + '</span>' },
-            { html: esc(c.source + (c.bizLabel ? ' · ' + c.bizLabel : '')) },
+            { cls: 'wide', title: c.source + (c.bizLabel ? ' · ' + c.bizLabel : ''), html: esc(c.source + (c.bizLabel ? ' · ' + c.bizLabel : '')) },
             { html: esc(c.contactEmail || '이메일 미등록') },
             { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
           ]
@@ -730,11 +1363,14 @@
     var candCardHtml = '';
     if (sc.nameCandidates && sc.nameCandidates.length) {
       var candRows = sc.nameCandidates.map(function (cm) {
+        var candChip = cm.matchKind === 'addr_ambiguous'
+          ? '<span class="chip c-amber">발신일치·내용확인필요</span>'
+          : '<span class="chip c-amber">상호 후보</span>';
         return {
           id: cm.key,
           cells: [
             { cls: 'ti', title: cm.subject, html: esc(cm.subject || '(제목 없음)') },
-            { k: 'badge', html: '<span class="chip c-amber">상호 후보</span>' },
+            { k: 'badge', html: candChip },
             { html: esc(cm.fromLabel || cm.from || '-') },
             { html: esc(cm.date || '-') },
             { k: 'act', html: '<button class="sm pri" data-mail-inspect="' + esc(cm.key) + '" data-phase="pre_mid">🔍 확인·연결</button>' }
@@ -890,7 +1526,7 @@
       return {
         id: String(r.roundNo),
         cells: [
-          { cls: 'ti', title: r.topic, html: r.roundNo + '회차 · ' + esc(r.topic) },
+          { cls: 'ti wide', title: r.topic, html: r.roundNo + '회차 · ' + esc(r.topic) },
           { k: 'badge', html: modeChip + ' ' + proofChip + ruleWarn },
           { html: esc(r.date) + ' · ' + r.mins + '분 · 기업 ' + r.companyPeople + '명' },
           {
@@ -939,18 +1575,69 @@
       '<div class="eos-bars">' + svHtml + '</div>' +
       '</div>' +
 
-      '<div class="card">' +
+      '<div class="report-workbench">' +
+      '<div class="card" style="margin-bottom:0">' +
       '<div class="bar">' +
       '<button class="sm pri" data-act="regen-mid">⚡ 초안 자동정리</button>' +
-      '<button class="sm" data-act="preview-mid">👁️ 웹 A4 미리보기</button>' +
+      '<button class="sm" data-act="preview-mid">👁️ 큰창 미리보기</button>' +
       '<button class="sm ok" data-act="dl-mid-hwpx">📥 중간 .hwpx 다운로드</button>' +
       '<button class="sm pri" data-act="open-mid-hangul">📝 푸른한글에서 열기</button>' +
       '<button class="sm" data-act="print-mid">🖨 PDF 인쇄</button>' +
       '<span class="sp"></span>' +
       '<button class="sm ok" data-act="confirm-mid-baseline" title="중간보고 기준선 스냅샷 확정 및 후속메일 감시 시작">📌 중간보고 확정</button>' +
       '</div>' +
-      renderSectionList('midSecs', ag.short + ' 중간보고서 7개 장 원고 (좌측 체크로 일괄 저장·고정 가능)', midSchema, secs, locks, 'mid', badgeCls) +
+      renderSectionList('midSecs', ag.short + ' 전용 중간보고서 7개 장 원고 (우측에서 ' + ag.short + ' 공식 양식·검수표 실시간 대조)', midSchema, secs, locks, 'mid', badgeCls) +
+      '</div>' +
+      '<div class="report-side-sticky" id="midSideWorkbench">' +
+      renderReportSideWorkbenchHtml(proj, 'mid', Object.assign({}, computedMid, { sections: secs }), Object.assign({}, computedMid, { sections: secs }), null, schedRds) +
+      '</div>' +
       '</div>';
+  }
+
+  function renderReportSideWorkbenchHtml(proj, kind, targetReport, midForPv, finForPv, schedRds) {
+    var ag = Cat().getAgency(proj.agency);
+    var isCepa = ag.code === 'cepa';
+    var rev = Report().evaluateReportFormReview(proj, kind, targetReport, D.intake[proj.id] || {}, schedRds);
+    var tblName = kind === 'final' ? 'finalReview' : 'midReview';
+    var revRows = rev.checks.map(function (c) {
+      return {
+        id: c.code,
+        cells: [
+          { cls: 'ti', title: c.label, html: esc(c.label) },
+          { k: 'badge', html: '<span class="chip ' + (c.ok ? 'c-green' : 'c-amber') + '">' + esc(c.statusLabel) + '</span>' },
+          { cls: 'wide', title: c.detail, html: esc(c.detail) }
+        ]
+      };
+    });
+    var pvHtml = '';
+    if (Hwpx() && typeof Hwpx().buildPreviewHtml === 'function') {
+      var safeMid = midForPv || Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, D.mid[proj.id] || null);
+      var safeFin = finForPv || Report().buildFinalReport(proj, safeMid, D.intake[proj.id] || {}, schedRds, D.final[proj.id] || null);
+      pvHtml = Hwpx().buildPreviewHtml(kind, proj, safeMid, safeFin);
+    }
+
+    return '<div class="agency-col-card ' + (isCepa ? 'cepa' : 'kmac') + '">' +
+      '<div class="agency-col-hd">' +
+      '<span>🛡️ ' + esc(ag.short) + ' 전용 양식 적합성 검수표</span>' +
+      '<span class="chip ' + (rev.allPassed ? 'c-green' : 'c-amber') + '">' + rev.passCount + '/' + rev.totalCount + ' 통과 (' + rev.passPct + '%)</span>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm" data-goto-tab="forms">⚖️ 타기관 양식비교</button>' +
+      '</div>' +
+      '<div class="agency-col-sub">' +
+      '<span><b>검토 양식:</b> ' + esc(rev.formTitle) + '</span>' +
+      '</div>' +
+      renderTable(tblName, ['기관 전용 검수항목', '판정', '세부 기준 · 현재 상태'], revRows, '') +
+      '</div>' +
+      (pvHtml ? (
+        '<div class="agency-col-card ' + (isCepa ? 'cepa' : 'kmac') + '">' +
+        '<div class="agency-col-hd">' +
+        '<span>📄 ' + esc(ag.short) + ' 공식 양식 실시간 대조 미리보기</span>' +
+        '<span class="sp"></span>' +
+        '<button type="button" class="sm" data-act="preview-' + (kind === 'final' ? 'final' : 'mid') + '">🔍 전체창 확대</button>' +
+        '</div>' +
+        '<div style="padding:10px">' + pvHtml + '</div>' +
+        '</div>'
+      ) : '');
   }
 
   /* ── 탭 4: ③ 후속메일 · 최종결과보고서 · 완료계/완료보고서 · HWPX/푸른한글/PDF ── */
@@ -1182,10 +1869,11 @@
       renderTable('deliverables', ['산출물 파일명', '형식', '기관 맞춤 수록 내용', '미리보기 · 푸른한글 · 다운로드'], delivRows, '') +
       '</div>' +
 
-      '<div class="card">' +
+      '<div class="report-workbench" style="margin-bottom:12px">' +
+      '<div class="card" style="margin-bottom:0">' +
       '<div class="bar">' +
       '<button class="sm pri" data-act="regen-final" title="중간보고 기준선 + 후속 메일 Diff → 기관 맞춤 최종결과보고서 자동 조립">⚡ 결과보고 조립</button>' +
-      '<button class="sm" data-act="preview-final">👁️ 웹 A4 미리보기</button>' +
+      '<button class="sm" data-act="preview-final">👁️ 큰창 미리보기</button>' +
       '<button class="sm ok" data-act="dl-final-hwpx">📥 결과 .hwpx 다운로드</button>' +
       '<button class="sm pri" data-act="open-final-hangul">📝 푸른한글에서 열기</button>' +
       '<button class="sm" data-act="print-final">🖨 PDF 인쇄</button>' +
@@ -1193,7 +1881,11 @@
       '<span class="sp"></span>' +
       '<button class="sm ok" data-act="confirm-final-snapshot">📌 최종 확정</button>' +
       '</div>' +
-      renderSectionList('finalSecs', ag.short + ' (' + tr.short + ') 최종결과보고서 8개 장 원고 (좌측 체크로 일괄 저장·고정 가능)', finSchema, secs, locks, 'final', 'c-green') +
+      renderSectionList('finalSecs', ag.short + ' (' + tr.short + ') 전용 8개 장 원고 (우측에서 ' + ag.short + ' 공식 양식·검수표 실시간 대조)', finSchema, secs, locks, 'final', ag.code === 'cepa' ? 'c-green' : 'c-blue') +
+      '</div>' +
+      '<div class="report-side-sticky" id="finalSideWorkbench">' +
+      renderReportSideWorkbenchHtml(proj, 'final', Object.assign({}, computedFinal, { sections: secs }), computedMid, Object.assign({}, computedFinal, { sections: secs }), schedRds) +
+      '</div>' +
       '</div>' +
 
       '<div class="card">' +
@@ -1208,6 +1900,100 @@
       '</div>';
 
     wireDropZone('postDropZone', 'postFileInput', 'postUploadKind', 'post_mid');
+  }
+
+  /* ── 탭 5: ⚖️ 소속기관별(KMAC vs CEPA) 보고서 양식 분리 검토 & 일터상생 구분 대조 ── */
+  function buildAgencyFormSpecCardHtml(agencyCode, agencyProjs) {
+    var isCepa = agencyCode === 'cepa';
+    var spec = Cat().getAgencyFormSpec ? Cat().getAgencyFormSpec(agencyCode) : null;
+    if (!spec) return '';
+    var midToc = Cat().getMidSections(agencyCode).map(function (s) { return s.part + ' ' + s.title; }).join(' / ');
+    var finToc = Cat().getFinalSections(agencyCode, isCepa ? 'cepa_coal' : 'kmac_std').map(function (s) { return s.part; }).join(' · ');
+
+    var projRows = agencyProjs.map(function (p) {
+      var tr = Cat().getTrack(p.track, p.agency);
+      var pm = projectParallelMeta(p);
+      var schedRds = schedRoundsForProject(p);
+      var midObj = Report().buildMidReport(p, D.intake[p.id] || {}, schedRds, D.mid[p.id] || null);
+      var finObj = Report().buildFinalReport(p, midObj, D.intake[p.id] || {}, schedRds, D.final[p.id] || null);
+      var midRev = Report().evaluateReportFormReview(p, 'mid', midObj, D.intake[p.id] || {}, schedRds);
+      var finRev = Report().evaluateReportFormReview(p, 'final', finObj, D.intake[p.id] || {}, schedRds);
+      var cChip = pm.contractNo ? (' <span class="chip ' + (isCepa ? 'c-green' : 'c-blue') + '">' + esc(pm.contractNo) + '</span>') : '';
+      return {
+        id: p.id,
+        cells: [
+          { cls: 'ti wide', title: p.companyName, html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span>' + cChip },
+          { k: 'badge', html: '<span class="chip ' + (isCepa ? 'c-green' : 'c-blue') + '">' + esc(tr.short) + '</span>' },
+          { html: '<span class="chip ' + (midRev.allPassed ? 'c-green' : 'c-amber') + '">중간 ' + midRev.passCount + '/' + midRev.totalCount + '</span> <span class="chip ' + (finRev.allPassed ? 'c-green' : 'c-amber') + '">최종 ' + finRev.passCount + '/' + finRev.totalCount + '</span>' },
+          {
+            k: 'act',
+            html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간양식 검토</button>' +
+              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ ' + (isCepa ? '결과·완료계 검토' : '최종·정책매니저 검토') + '</button>'
+          }
+        ]
+      };
+    });
+
+    return '<div class="agency-col-card ' + (isCepa ? 'cepa' : 'kmac') + '">' +
+      '<div class="agency-col-hd">' +
+      '<span>' + (isCepa ? '🟢 ' : '🔵 ') + esc(spec.agencyName) + ' — ' + esc(spec.programTitle) + '</span>' +
+      '<span class="chip ' + (isCepa ? 'c-green' : 'c-blue') + '">' + esc(spec.erpTypeCode) + ' · ' + agencyProjs.length + '개사</span>' +
+      '</div>' +
+      '<div class="agency-col-sub">' +
+      '<span><b>주관·운영:</b> ' + esc(spec.supervisingBody) + '</span>' +
+      '<span>|</span>' +
+      '<span><b>제출 경로:</b> ' + esc(spec.platformName) + '</span>' +
+      '</div>' +
+      '<div class="sec"><span>📑 ' + esc(spec.agencyName) + ' 전용 제출 서식 체계 (타 기관 양식과 혼용 불가)</span></div>' +
+      '<ol class="form-step-list">' +
+      spec.deliverableSteps.map(function (st) { return '<li>' + esc(st) + '</li>'; }).join('') +
+      '</ol>' +
+      '<div class="sec"><span>📐 전용 목차 구조</span><span class="hint" title="' + esc(midToc) + '">최종 8장: ' + esc(finToc) + '</span></div>' +
+      '<div class="sec"><span>✅ ' + esc(spec.agencyName) + ' 소속 사업장별 양식 검수 현황 (' + agencyProjs.length + '개사)</span></div>' +
+      renderTable(isCepa ? 'formReviewCepa' : 'formReviewKmac',
+        ['사업장명 · 계약코드', '세부트랙', '중간·최종 검수', '분리 양식 검토 열기'],
+        projRows, CUR_PID) +
+      '</div>';
+  }
+
+  function drawFormsPane(projs) {
+    var box = $('formsBox');
+    if (!box) return;
+    var list = Array.isArray(projs) ? projs : activeProjects();
+    var kmacList = list.filter(function (p) { return p.agency !== 'cepa'; });
+    var cepaList = list.filter(function (p) { return p.agency === 'cepa'; });
+
+    var gridHtml = '';
+    if (AGENCY_SCOPE === 'kmac') {
+      gridHtml = '<div class="form-compare-grid" style="grid-template-columns:minmax(0,1fr)">' + buildAgencyFormSpecCardHtml('kmac', kmacList) + '</div>';
+    } else if (AGENCY_SCOPE === 'cepa') {
+      gridHtml = '<div class="form-compare-grid" style="grid-template-columns:minmax(0,1fr)">' + buildAgencyFormSpecCardHtml('cepa', cepaList) + '</div>';
+    } else {
+      gridHtml = '<div class="form-compare-grid">' +
+        buildAgencyFormSpecCardHtml('kmac', kmacList) +
+        buildAgencyFormSpecCardHtml('cepa', cepaList) +
+        '</div>';
+    }
+
+    var sepTableHtml =
+      '<div class="card">' +
+      '<div class="sec"><span>🚫 산업·일자리전환(KMAC vs CEPA) 및 타 컨설팅(일터혁신 상생컨설팅) 엄격 구분 기준표</span></div>' +
+      '<div class="scroll" style="padding:10px 12px">' +
+      '<table class="pv-tbl">' +
+      '<thead><tr><th>구분 기준</th><th>🔵 한국능률협회컨설팅 (KMAC)</th><th>🟢 충남경제진흥원 (CEPA)</th><th>🚫 일터혁신 상생컨설팅 (원천 제외)</th></tr></thead>' +
+      '<tbody>' +
+      '<tr><td><b>공식 사업명</b></td><td>구조혁신지원사업 (산업·일자리전환 컨설팅)</td><td>충남 산업일자리전환지원센터 진단·전문컨설팅</td><td>일터혁신 상생컨설팅 (일터상생혁신)</td></tr>' +
+      '<tr><td><b>주관 · 운영기관</b></td><td>중진공 · 한국능률협회컨설팅(KMAC)</td><td>충청남도 · 고용노동부 · 충남경제진흥원</td><td>노사발전재단 · 에프엠어소시에이션</td></tr>' +
+      '<tr><td><b>ERP 계약코드</b></td><td><b>산일능률-YYYY-NNN</b></td><td><b>산일충남-YYYY-NNN</b></td><td>일터상생-YYYY-NNN (본 화면 배제)</td></tr>' +
+      '<tr><td><b>핵심 보고서 양식</b></td><td>착수PPT(1MD) → 중간 7장 → 2026년형 결과보고서 8장</td><td>지원신청서 → 월별실적 → 중간 7장 → 지원센터 결과보고서 8장</td><td>참여안내서 → 디자인팀 회의 → 통합진단보고서 PPT</td></tr>' +
+      '<tr><td><b>완료 · 사후관리 서식</b></td><td>완료보고서(요약) · 수행실적증명서 · <b>정책매니저 보고서</b></td><td><b>산업일자리 전환 완료계(갑지 대표자 날인)</b> · 사후관리 결과보고서</td><td>이행관리 등록 · 이행결과표</td></tr>' +
+      '<tr><td><b>필수 인정·검수 기준</b></td><td>KPI 4개+(필수2·선택2) · 지원사업 2개+(전환지원금 필수) · 대면 75%+</td><td>석탄화력 폐지/미래차 공급망 진단 · 대면 80%+ · 충남 장려금 연계</td><td>본 화면 수집·메일·양식에서 100% 자동 차단</td></tr>' +
+      '</tbody></table></div></div>';
+
+    box.innerHTML =
+      '<div class="note"><b>소속기관별 양식 완전 분리 원칙:</b> 한국능률협회컨설팅(KMAC · 구조혁신 산일능률)과 충남경제진흥원(CEPA · 충남산일지원센터 산일충남)은 보고서 목차·검수기준·완료서식(정책매니저 vs 완료계)이 완전히 다르므로 별도 양식으로 분리 검토하며, 일터혁신 상생컨설팅(일터상생) 및 석유화학 노동전환 자료는 중복되지 않도록 원천 배제합니다.</div>' +
+      gridHtml +
+      sepTableHtml;
   }
 
   /* ══ 4. 로컬 파일(XLSX/CSV/HWPX/HWP/DOCX/PDF/TXT) 및 메일 실시간 열람·분석 ═ */
@@ -1264,6 +2050,9 @@
   }
 
   async function handleLocalFiles(fileList, forcedDocKind, phase) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
     var proj = projectById(CUR_PID);
     if (!proj) return;
     var files = Array.prototype.slice.call(fileList || []);
@@ -1271,6 +2060,7 @@
     toast('파일 ' + files.length + '건 로컬 비식별 분석 중…');
 
     for (var i = 0; i < files.length; i++) {
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
       var f = files[i];
       var safeTitle = sanitizeMetaLabel(f.name, proj);
       try {
@@ -1278,23 +2068,28 @@
           throw new Error('파일명에 해제되지 않은 민감 식별정보 패턴이 포함되어 차단했습니다.');
         }
         var buf = await f.arrayBuffer();
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
         var bytes = new Uint8Array(buf);
         var analyzed = await analyzeAttachmentBytes(f.name, bytes, proj, forcedDocKind, phase);
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
         if (analyzed) {
-          await saveIntakeCard(proj, Object.assign({
+          var savedUp = await saveIntakeCard(proj, Object.assign({
             source: 'upload',
             title: safeTitle,
             attNames: [safeTitle],
             phase: phase,
             checkedAt: Date.now(),
             analyzedAt: Date.now()
-          }, analyzed));
-          okCnt++;
+          }, analyzed), reqEpoch, reqUid);
+          if (!isSessionCurrent(reqEpoch, reqUid)) return;
+          if (savedUp) okCnt++;
         }
       } catch (e) {
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
         toast('파일 분석 오류 (' + safeTitle + '): ' + (e.message || e));
       }
     }
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
     rebuildScanAndDiscover();
     draw();
     if (okCnt > 0) toast(okCnt + '건 비식별 분석 및 카드 반영 완료');
@@ -1453,16 +2248,19 @@
   }
 
   /* ── 메일 서버 peek 열람 및 첨부 자동 분석 ── */
-  async function callMailFn(fnName, payload) {
+  async function callMailFn(fnName, payload, optEpoch, optUid) {
+    if (optEpoch != null && !isSessionCurrent(optEpoch, optUid)) throw new Error('SESSION_CHANGED');
     var u = fb && fb.auth && fb.auth().currentUser;
-    if (!u) throw new Error('로그인이 필요합니다.');
+    if (!u || (optUid && String(u.uid) !== String(optUid))) throw new Error('로그인이 필요합니다.');
     var tok = await u.getIdToken();
+    if (optEpoch != null && !isSessionCurrent(optEpoch, optUid)) throw new Error('SESSION_CHANGED');
     var res = await fetch(MAIL_FN_BASE + fnName, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
       body: JSON.stringify(payload || {})
     });
     var j = await res.json().catch(function () { return null; });
+    if (optEpoch != null && !isSessionCurrent(optEpoch, optUid)) throw new Error('SESSION_CHANGED');
     if (!res.ok || !j || j.ok !== true) {
       throw new Error((j && j.error) || ('메일 서버 응답 오류 (' + res.status + ')'));
     }
@@ -1492,7 +2290,10 @@
     return D.flatMails.find(function (m) { return m.key === mailKey; }) || null;
   }
 
-  async function inspectAndAnalyzeMail(mailKey, phase, silent) {
+  async function inspectAndAnalyzeMail(mailKey, phase, silent, optEpoch, optUid) {
+    var reqEpoch = optEpoch != null ? optEpoch : SESSION_EPOCH;
+    var reqUid = optUid != null ? String(optUid) : (ME && ME.uid ? String(ME.uid) : '');
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
     var proj = projectById(CUR_PID);
     if (!proj) return;
     var m = findMailRowByKey(proj.id, mailKey);
@@ -1506,11 +2307,13 @@
     var attLeakBlocked = false;
 
     try {
-      var msg = await callMailFn('readMailMessage', { slug: m.slug, uid: m.uid, peek: 1 });
+      var msg = await callMailFn('readMailMessage', { slug: m.slug, uid: m.uid, peek: 1 }, reqEpoch, reqUid);
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
       bodyPlain = str(msg.text) || htmlToPlainText(msg.html);
       var atts = Array.isArray(msg.atts) ? msg.atts : [];
 
       for (var i = 0; i < Math.min(atts.length, 6); i++) {
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
         var a = atts[i];
         var aName = str(a && a.name);
         if (!aName || Number(a.size || 0) > 15 * 1024 * 1024) continue;
@@ -1520,10 +2323,12 @@
             uid: m.uid,
             index: a.i == null ? i : a.i,
             part: a.part || ''
-          });
+          }, reqEpoch, reqUid);
+          if (!isSessionCurrent(reqEpoch, reqUid)) return;
           if (got && got.b64 && global.PuRulesMailOrig) {
             var bytes = global.PuRulesMailOrig.b64ToBytes(got.b64);
             var attRes = await analyzeAttachmentBytes(aName, bytes, proj, '', phase);
+            if (!isSessionCurrent(reqEpoch, reqUid)) return;
             if (attRes) {
               finalDocKind = attRes.docKind || finalDocKind;
               if (attRes.stats) mergedStats = attRes.stats;
@@ -1533,15 +2338,18 @@
             }
           }
         } catch (attErr) {
+          if (!isSessionCurrent(reqEpoch, reqUid)) return;
           var errMsg = String((attErr && attErr.message) || attErr || '');
           if (/잔존 패턴/.test(errMsg)) attLeakBlocked = true;
           attErrors.push(sanitizeMetaLabel(aName, proj) + ': ' + errMsg);
         }
       }
     } catch (mailErr) {
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
       bodyPlain = m.subject + '\n' + (m.attNames || []).join('\n');
     }
 
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
     var safeSubjTitle = sanitizeMetaLabel(m.subject || m.docKindName, proj);
     var safeAttList = (m.attNames || []).map(function (n) { return sanitizeMetaLabel(n, proj); });
 
@@ -1596,11 +2404,14 @@
       var nextEmails = Array.isArray(proj.contactEmails) ? proj.contactEmails.slice() : [];
       if (nextEmails.indexOf(m.from) < 0) {
         nextEmails.push(m.from);
-        await saveProjectRecord(Object.assign({}, proj, { contactEmails: nextEmails }));
+        var updatedMailProj = await saveProjectRecord(Object.assign({}, proj, { contactEmails: nextEmails }), reqEpoch, reqUid);
+        if (!updatedMailProj || !isSessionCurrent(reqEpoch, reqUid)) return;
       }
     }
 
-    var savedCard = await saveIntakeCard(proj, cardPayload);
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    var savedCard = await saveIntakeCard(proj, cardPayload, reqEpoch, reqUid);
+    if (!savedCard || !isSessionCurrent(reqEpoch, reqUid)) return;
     rebuildScanAndDiscover();
     draw();
     if (!silent && savedCard) openCardDetailModal(savedCard);
@@ -1639,78 +2450,126 @@
     };
   }
 
-  async function markMailCheckedOnly(mailKey, phase) {
+  async function markMailCheckedOnly(mailKey, phase, optEpoch, optUid) {
+    var reqEpoch = optEpoch != null ? optEpoch : SESSION_EPOCH;
+    var reqUid = optUid != null ? String(optUid) : (ME && ME.uid ? String(ME.uid) : '');
+    if (!isSessionCurrent(reqEpoch, reqUid)) return null;
     var proj = projectById(CUR_PID);
-    if (!proj) return;
+    if (!proj) return null;
     var built = buildCheckedMailCardPayload(proj, mailKey, phase);
     if (!built) {
       toast('⚠ 메일 제목·첨부명에 민감 식별정보 패턴이 남아 있어 저장을 차단했습니다.');
-      return;
+      return null;
     }
-    await saveIntakeCard(proj, built.record);
+    var saved = await saveIntakeCard(proj, built.record, reqEpoch, reqUid);
+    if (!saved || !isSessionCurrent(reqEpoch, reqUid)) return null;
     rebuildScanAndDiscover();
     draw();
+    return saved;
   }
 
-  /* ══ 5. 온톨로지 강제 관문(gate) 및 다건 원자적 저장 함수들 (scal_jobtrans) ═══ */
-  async function atomicMultiRecordUpdate(entries) {
-    if (!gate || !fbDb || !entries || !entries.length) return;
+  /* ══ 5. 온톨로지 강제 관문(gate) 및 세션 바인딩 원자적 저장 함수들 (scal_jobtrans) ═══ */
+  function captureCurrentSession() {
+    var ep = SESSION_EPOCH;
+    var uid = ME && ME.uid ? String(ME.uid) : '';
+    var sid = ME && ME.sid ? String(ME.sid) : '';
+    if (!ep || !uid || !sid || !isSessionCurrent(ep, uid)) return null;
+    return { epoch: ep, uid: uid, sid: sid };
+  }
+
+  function resolveWriteSession(reqEpoch, reqUid) {
+    if (!reqEpoch || !reqUid) return null;
+    var ep = reqEpoch;
+    var uid = String(reqUid);
+    var g = gate;
+    var sid = ME && ME.sid ? String(ME.sid) : '';
+    if (!g || !fbDb || !sid || !isSessionCurrent(ep, uid)) return null;
+    return { epoch: ep, uid: uid, gate: g, sid: sid };
+  }
+
+  async function atomicMultiRecordUpdate(entries, optEpoch, optUid) {
+    if (!entries || !entries.length) return null;
+    var ws = resolveWriteSession(optEpoch, optUid);
+    if (!ws) return null;
     var rootRef = fbDb.ref();
     if (rootRef && typeof rootRef.update === 'function' && global.PuOntologyWrite) {
       var batch = {};
       for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
         var prepared = e.tombstone
-          ? global.PuOntologyWrite.tombstone(e.previous, { actor: ME.sid, entityType: e.entityType })
-          : gate.prepare(e.record, { previous: e.previous || null, entityType: e.entityType });
+          ? global.PuOntologyWrite.tombstone(e.previous, { actor: ws.sid, entityType: e.entityType })
+          : ws.gate.prepare(e.record, { previous: e.previous || null, entityType: e.entityType });
         if (!prepared || !prepared.ok) {
           throw new Error((prepared && prepared.issues && prepared.issues[0] && prepared.issues[0].message) || '온톨로지 검증 실패');
         }
         batch[e.path] = stripUndef(prepared.value);
       }
+      if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
       await rootRef.update(batch);
+      if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
       return batch;
     }
     var fallbackOut = {};
     for (var j = 0; j < entries.length; j++) {
+      if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
       var it = entries[j];
       if (it.tombstone) {
-        var rmRes = await gate.remove(fbDb.ref(it.path), it.previous, { entityType: it.entityType });
+        var rmRes = await ws.gate.remove(fbDb.ref(it.path), it.previous, { entityType: it.entityType });
+        if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
         fallbackOut[it.path] = rmRes && rmRes.snapshot ? rmRes.snapshot.val() : null;
       } else {
-        var svRes = await gate.save(fbDb.ref(it.path), it.record, { entityType: it.entityType });
+        var svRes = await ws.gate.save(fbDb.ref(it.path), it.record, { entityType: it.entityType });
+        if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
         fallbackOut[it.path] = svRes && svRes.snapshot ? svRes.snapshot.val() : null;
       }
     }
     return fallbackOut;
   }
 
-  async function saveProjectRecord(projInput) {
-    if (!gate || !fbDb) throw new Error('저장 관문이 준비되지 않았습니다.');
+  async function saveProjectRecord(projInput, optEpoch, optUid) {
+    var ws = resolveWriteSession(optEpoch, optUid);
+    if (!ws) return null;
     var id = str(projInput.id) || ('jt_' + Date.now().toString(36));
     if (!str(projInput.companyId)) {
       throw new Error('거래처(companyId)를 선택해야 등록할 수 있습니다(상호 텍스트 단독 저장 불가).');
     }
+    var piiCheckFields = [
+      projInput.companyName,
+      projInput.industry,
+      projInput.mainProduct,
+      projInput.transGoal,
+      projInput.consultantName,
+      projInput.folderBoundaryHash,
+      projInput.interviews ? JSON.stringify(projInput.interviews) : ''
+    ];
+    if (piiCheckFields.some(function (f) { return f && Intake().hasResidualPii(String(f)); })) {
+      throw new Error('프로젝트 메타데이터에 해제되지 않은 민감 식별정보 패턴이 감지되어 저장을 차단했습니다.');
+    }
     var ag = Cat().getAgency(projInput.agency);
     var tr = Cat().getTrack(projInput.track, ag.code);
     var ref = fbDb.ref('scal_jobtrans/projects/' + id);
-    var res = await gate.save(ref, function (prev) {
-      return stripUndef(Object.assign({}, prev || {}, projInput, {
+    var res = await ws.gate.save(ref, function (prev) {
+      var merged = Object.assign({}, prev || {}, projInput, {
         id: id,
         entityType: 'Project',
         agency: ag.code,
         track: tr.code,
         companyId: str(projInput.companyId),
         companyName: str(projInput.companyName)
-      }));
+      });
+      delete merged.folderBoundaryId;
+      return stripUndef(merged);
     }, { entityType: 'Project' });
+    if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
     var val = res && res.snapshot ? res.snapshot.val() : null;
     if (val) D.projects[id] = val;
     return val;
   }
 
-  async function saveIntakeCard(proj, cardInput) {
-    if (!gate || !fbDb || !proj) return null;
+  async function saveIntakeCard(proj, cardInput, optEpoch, optUid) {
+    if (!proj) return null;
+    var ws = resolveWriteSession(optEpoch, optUid);
+    if (!ws) return null;
     var checkBlob = JSON.stringify({
       title: cardInput && cardInput.title,
       maskedExcerpt: cardInput && cardInput.maskedExcerpt,
@@ -1724,7 +2583,7 @@
     }
     var cid = str(cardInput.id) || ('in_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6));
     var ref = fbDb.ref('scal_jobtrans/intake/' + proj.id + '/' + cid);
-    var res = await gate.save(ref, function (prev) {
+    var res = await ws.gate.save(ref, function (prev) {
       return stripUndef(Object.assign({}, prev || {}, cardInput, {
         id: cid,
         projectId: proj.id,
@@ -1733,15 +2592,18 @@
         companyName: str(proj.companyName)
       }));
     }, { entityType: 'Document' });
+    if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
     var val = res && res.snapshot ? res.snapshot.val() : null;
     if (!D.intake[proj.id]) D.intake[proj.id] = {};
     if (val) D.intake[proj.id][cid] = val;
     return val;
   }
 
-  async function saveMidDoc(proj, sections, locks) {
+  async function saveMidDoc(proj, sections, locks, optEpoch, optUid) {
+    var ws = resolveWriteSession(optEpoch, optUid);
+    if (!ws) return null;
     var ref = fbDb.ref('scal_jobtrans/mid/' + proj.id);
-    var res = await gate.save(ref, function (prev) {
+    var res = await ws.gate.save(ref, function (prev) {
       return stripUndef(Object.assign({}, prev || {}, {
         id: proj.id,
         projectId: proj.id,
@@ -1754,14 +2616,17 @@
         locks: locks || {}
       }));
     }, { entityType: 'Document' });
+    if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
     var val = res && res.snapshot ? res.snapshot.val() : null;
     if (val) D.mid[proj.id] = val;
     return val;
   }
 
-  async function saveFinalDoc(proj, sections, locks) {
+  async function saveFinalDoc(proj, sections, locks, optEpoch, optUid) {
+    var ws = resolveWriteSession(optEpoch, optUid);
+    if (!ws) return null;
     var ref = fbDb.ref('scal_jobtrans/final/' + proj.id);
-    var res = await gate.save(ref, function (prev) {
+    var res = await ws.gate.save(ref, function (prev) {
       return stripUndef(Object.assign({}, prev || {}, {
         id: proj.id,
         projectId: proj.id,
@@ -1774,23 +2639,29 @@
         locks: locks || {}
       }));
     }, { entityType: 'Document' });
+    if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
     var val = res && res.snapshot ? res.snapshot.val() : null;
     if (val) D.final[proj.id] = val;
     return val;
   }
 
-  async function saveImmutableSnapshot(proj, snapObj) {
+  async function saveImmutableSnapshot(proj, snapObj, optEpoch, optUid) {
+    var ws = resolveWriteSession(optEpoch, optUid);
+    if (!ws) return null;
     var sid = str(snapObj.id) || ('snap_' + Date.now());
     var ref = fbDb.ref('scal_jobtrans/snapshots/' + proj.id + '/' + sid);
-    var res = await gate.save(ref, stripUndef(Object.assign({}, snapObj, {
+    var res = await ws.gate.save(ref, stripUndef(Object.assign({}, snapObj, {
       id: sid,
       projectId: proj.id,
       entityType: 'Document',
       companyId: str(proj.companyId),
       companyName: str(proj.companyName)
     })), { entityType: 'Document' });
+    if (!isSessionCurrent(ws.epoch, ws.uid)) return null;
+    var val = res && res.snapshot ? res.snapshot.val() : null;
     if (!D.snapshots[proj.id]) D.snapshots[proj.id] = {};
-    if (res && res.snapshot) D.snapshots[proj.id][sid] = res.snapshot.val();
+    if (val) D.snapshots[proj.id][sid] = val;
+    return val;
   }
 
   /* ══ 6. 모달 창 (사업장 등록 · 기관/트랙/과제 설정 · 회차 편집 · Diff 편집 · 웹 A4 미리보기 · 제출문안 · AI 윤문) ═ */
@@ -1878,7 +2749,8 @@
   }
 
   function openNewProjectModal() {
-    var coOpts = '<option value="">-- 기업정보함(data/companies) 거래처 선택 (필수) --</option>' +
+    var coOpts = '<option value="">-- 기업정보함(data/companies) 거래처 선택 --</option>' +
+      '<option value="__biz__">➕ 기업정보함 미등록 컨설팅 전용 사업장 (사업자등록번호 10자리 기준)</option>' +
       D.companies.slice().sort(function (a, b) { return str(a.name).localeCompare(str(b.name), 'ko'); })
         .map(function (c) {
           return '<option value="' + esc(c.id) + '">' + esc(str(c.name) + (c.bizNo ? ' (' + c.bizNo + ')' : '')) + '</option>';
@@ -1891,6 +2763,10 @@
 
     var body =
       '<div class="fr"><label for="npCo">대상 거래처*</label><div class="fv"><select id="npCo">' + coOpts + '</select></div></div>' +
+      '<div class="fr" id="npDirectRow" style="display:none"><label for="npDirectName">상호 / 사업자번호*</label><div class="fv">' +
+      '<input type="text" id="npDirectName" placeholder="컨설팅 사업장 정식 상호 (필수)">' +
+      '<input type="text" id="npDirectBiz" placeholder="사업자등록번호 10자리 (예: 123-81-20007)">' +
+      '</div></div>' +
       '<div class="fr"><label for="npAgency">운영기관 / 트랙*</label><div class="fv">' +
       '<select id="npAgency">' + agOpts + '</select>' +
       '<select id="npTrack">' + buildTrackOptionsHtml('kmac', 'kmac_std') + '</select>' +
@@ -1918,42 +2794,70 @@
     }
     if ($('npCo')) {
       $('npCo').onchange = function () {
-        var co = findCompanyById($('npCo').value);
+        var v = $('npCo').value;
+        if ($('npDirectRow')) $('npDirectRow').style.display = v === '__biz__' ? '' : 'none';
+        var co = findCompanyById(v);
         if (!co) return;
         if ($('npIndustry') && !str($('npIndustry').value)) $('npIndustry').value = str(co.bizType || co.bizCategory);
         if ($('npEmail') && !str($('npEmail').value)) $('npEmail').value = firstEmailOf(co);
       };
     }
+    var modalSess = captureCurrentSession();
     if ($('npSaveBtn')) {
       $('npSaveBtn').onclick = function () {
         return withBusy($('npSaveBtn'), async function () {
-          var coId = str($('npCo') && $('npCo').value);
-          var co = findCompanyById(coId);
-          if (!co) { toast('반드시 기업정보함 거래처를 선택해 주세요.'); return; }
+          if (!modalSess || !isSessionCurrent(modalSess.epoch, modalSess.uid)) return;
+          var selVal = str($('npCo') && $('npCo').value);
+          var co = null, resolvedCoId = '', resolvedName = '', resolvedBiz = '';
+          if (selVal === '__biz__') {
+            resolvedName = str($('npDirectName') && $('npDirectName').value);
+            var bizDigits = str($('npDirectBiz') && $('npDirectBiz').value).replace(/\D/g, '');
+            if (!resolvedName || bizDigits.length !== 10) {
+              toast('컨설팅 전용 사업장은 상호와 10자리 사업자등록번호를 모두 입력해야 합니다.');
+              return;
+            }
+            var dupByBiz = D.companies.find(function (c) { return str(c.bizNo).replace(/\D/g, '') === bizDigits; });
+            if (dupByBiz) {
+              co = dupByBiz;
+              resolvedCoId = str(dupByBiz.id);
+              resolvedName = str(dupByBiz.name);
+              resolvedBiz = str(dupByBiz.bizNo);
+            } else {
+              resolvedCoId = 'biz:' + bizDigits;
+              resolvedBiz = bizDigits.slice(0, 3) + '-' + bizDigits.slice(3, 5) + '-' + bizDigits.slice(5);
+            }
+          } else {
+            co = findCompanyById(selVal);
+            if (!co) { toast('대상 거래처를 선택하거나 컨설팅 전용 사업장(사업자번호 10자리)을 선택해 주세요.'); return; }
+            resolvedCoId = str(co.id);
+            resolvedName = str(co.name);
+            resolvedBiz = str(co.bizNo);
+          }
           try {
             var agCode = str($('npAgency').value) || 'kmac';
             var trCode = str($('npTrack').value) || (agCode === 'cepa' ? 'cepa_coal' : 'kmac_std');
             var emails = str($('npEmail').value).split(/[,;\s]+/).map(str).filter(Boolean);
             var created = await saveProjectRecord({
-              id: 'jt_' + safeKey(co.id) + '_' + agCode + '_' + str($('npYear').value || '2026'),
-              companyId: co.id,
-              companyName: str(co.name),
-              bizNo: str(co.bizNo),
-              ceoName: str(co.ceo || co.ceoName),
+              id: 'jt_' + safeKey(resolvedCoId) + '_' + agCode + '_' + str($('npYear').value || '2026'),
+              companyId: resolvedCoId,
+              companyName: resolvedName,
+              bizNo: resolvedBiz,
+              ceoName: co ? str(co.ceo || co.ceoName) : '',
               contactName: contactNameOfCompany(co),
               agency: agCode,
               track: trCode,
               year: Number($('npYear').value) || 2026,
-              industry: sanitizeMetaLabel(str($('npIndustry').value) || str(co.bizType), { companyName: co.name }),
-              mainProduct: sanitizeMetaLabel(str($('npMainProd').value), { companyName: co.name }),
-              transGoal: sanitizeMetaLabel(str($('npTransGoal').value), { companyName: co.name }),
+              industry: sanitizeMetaLabel(str($('npIndustry').value) || (co ? str(co.bizType) : ''), { companyName: resolvedName }),
+              mainProduct: sanitizeMetaLabel(str($('npMainProd').value), { companyName: resolvedName }),
+              transGoal: sanitizeMetaLabel(str($('npTransGoal').value), { companyName: resolvedName }),
               workerCount: Number($('npWorkers').value) || 0,
               contactEmails: emails,
               consultantName: str($('npCons').value),
               selectedTasks: agCode === 'cepa'
                 ? ['jt_impact', 'jt_job_redesign', 'jt_reskill', 'jt_gov_match']
                 : ['jt_impact', 'jt_job_redesign', 'jt_reskill', 'jt_emp_stab']
-            });
+            }, modalSess.epoch, modalSess.uid);
+            if (!created || !isSessionCurrent(modalSess.epoch, modalSess.uid)) return;
             closeModal(true);
             CUR_PID = created.id;
             TAB = 'intake';
@@ -1961,8 +2865,9 @@
             rebuildScanAndDiscover();
             draw();
             restoreModalFocus();
-            toast(co.name + ' (' + Cat().getAgency(agCode).short + ') 워크스페이스가 개설되었습니다.');
+            toast(resolvedName + ' (' + Cat().getAgency(agCode).short + ') 워크스페이스가 개설되었습니다.');
           } catch (e) {
+            if (!isSessionCurrent(modalSess.epoch, modalSess.uid)) return;
             toast('등록 실패: ' + (e.message || e));
           }
         });
@@ -2048,9 +2953,11 @@
       };
     });
 
+    var cfgSess = captureCurrentSession();
     if ($('cfgSaveBtn')) {
       $('cfgSaveBtn').onclick = function () {
         return withBusy($('cfgSaveBtn'), async function () {
+          if (!cfgSess || !isSessionCurrent(cfgSess.epoch, cfgSess.uid)) return;
           var selected = Array.prototype.slice.call(document.querySelectorAll('#mbox input[name="cfgTask"]:checked')).map(function (el) { return el.value; });
           if (!selected.length) { toast('최소 1개 이상의 중점 과제를 선택해 주세요.'); return; }
           try {
@@ -2058,7 +2965,7 @@
             var co = findCompanyById(proj.companyId);
             var nextAg = str($('cfgAgency').value) || 'kmac';
             var nextTr = str($('cfgTrack').value) || (nextAg === 'cepa' ? 'cepa_coal' : 'kmac_std');
-            await saveProjectRecord(Object.assign({}, proj, {
+            var savedCfg = await saveProjectRecord(Object.assign({}, proj, {
               ceoName: str(proj.ceoName || (co && (co.ceo || co.ceoName))),
               contactName: str(proj.contactName || contactNameOfCompany(co)),
               agency: nextAg,
@@ -2070,13 +2977,15 @@
               contactEmails: emails,
               consultantName: sanitizeMetaLabel(str($('cfgCons').value), proj) || proj.consultantName,
               selectedTasks: selected
-            }));
+            }), cfgSess.epoch, cfgSess.uid);
+            if (!savedCfg || !isSessionCurrent(cfgSess.epoch, cfgSess.uid)) return;
             closeModal(true);
             rebuildScanAndDiscover();
             draw();
             restoreModalFocus();
             toast('운영기관(' + Cat().getAgency(nextAg).short + ') 및 보고서 양식 설정이 갱신되었습니다.');
           } catch (e) {
+            if (!isSessionCurrent(cfgSess.epoch, cfgSess.uid)) return;
             toast('설정 저장 실패: ' + (e.message || e));
           }
         });
@@ -2138,9 +3047,11 @@
     openModal((existing ? '✏️ ' + targetNo + '회차 수행·증빙 편집' : '➕ 신규 컨설팅 회차 추가'), body,
       '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="rdSaveBtn">회차 저장</button>', 'wide');
 
+    var rdSess = captureCurrentSession();
     if ($('rdSaveBtn')) {
       $('rdSaveBtn').onclick = function () {
         return withBusy($('rdSaveBtn'), async function () {
+          if (!rdSess || !isSessionCurrent(rdSess.epoch, rdSess.uid)) return;
           var topic = sanitizeMetaLabel(str($('rdTopic').value), proj);
           if (!topic) { toast('자문 수행 주제를 입력해 주세요.'); return; }
           if (Intake().hasResidualPii(topic)) { toast('수행 주제에 민감 식별정보 패턴이 포함되어 저장할 수 없습니다.'); return; }
@@ -2160,7 +3071,8 @@
           else nextRounds.push(entry);
           nextRounds = nextRounds.map(function (r, i) { return Object.assign({}, r, { roundNo: i + 1 }); });
 
-          await saveProjectRecord(Object.assign({}, proj, { rounds: nextRounds }));
+          var savedRd = await saveProjectRecord(Object.assign({}, proj, { rounds: nextRounds }), rdSess.epoch, rdSess.uid);
+          if (!savedRd || !isSessionCurrent(rdSess.epoch, rdSess.uid)) return;
           closeModal(true);
           draw();
           restoreModalFocus();
@@ -2196,9 +3108,11 @@
     openModal((existing ? '✏️ 후속 협의 Diff 항목 편집' : '➕ 후속 협의 합의사항 추가'), body,
       '<button class="sm" data-close-modal="1">취소</button><button class="sm pri" id="dfSaveBtn">합의사항 저장</button>', 'wide');
 
+    var dfSess = captureCurrentSession();
     if ($('dfSaveBtn')) {
       $('dfSaveBtn').onclick = function () {
         return withBusy($('dfSaveBtn'), async function () {
+          if (!dfSess || !isSessionCurrent(dfSess.epoch, dfSess.uid)) return;
           var item = sanitizeMetaLabel(str($('dfItem').value), proj);
           var midVal = sanitizeMetaLabel(str($('dfMid').value), proj);
           var finVal = sanitizeMetaLabel(str($('dfFin').value), proj);
@@ -2227,11 +3141,12 @@
             nextStatusMap[existing.id] = status;
           }
 
-          await saveProjectRecord(Object.assign({}, proj, {
+          var savedDf = await saveProjectRecord(Object.assign({}, proj, {
             diffStatusMap: nextStatusMap,
             diffOverrides: nextOverrides,
             customDiffRows: nextCustom
-          }));
+          }), dfSess.epoch, dfSess.uid);
+          if (!savedDf || !isSessionCurrent(dfSess.epoch, dfSess.uid)) return;
           closeModal(true);
           draw();
           restoreModalFocus();
@@ -2381,16 +3296,20 @@
   }
 
   async function runAiPolishForSection(kindAndKey) {
+    var aiSess = captureCurrentSession();
+    if (!aiSess) return;
     var proj = projectById(CUR_PID);
     if (!proj || !global.PuAiCall) return;
+    var reqPid = proj.id;
     var parts = kindAndKey.split(':');
     var mode = parts[0], secKey = parts[1];
     var ta = $((mode === 'mid' ? 'midSec_' : 'finalSec_') + secKey);
     if (!ta || !str(ta.value)) { toast('다듬을 초안 본문이 비어 있습니다.'); return; }
+    var origDraft = ta.value;
 
     var schema = mode === 'mid' ? Cat().getMidSections(proj.agency) : Cat().getFinalSections(proj.agency, proj.track);
     var secMeta = schema.find(function (s) { return s.key === secKey; });
-    var req = Report().buildAiPolishPrompt(secMeta ? secMeta.title : secKey, ta.value, proj.agency, projectNamesList(proj));
+    var req = Report().buildAiPolishPrompt(secMeta ? secMeta.title : secKey, origDraft, proj.agency, projectNamesList(proj));
     if (!req.ok) { toast(req.error); return; }
 
     toast('개인정보 2중 가림 확인 완료 → AI 문안 윤문 요청 중…');
@@ -2400,9 +3319,10 @@
         app: 'jobtrans',
         manual: true
       });
+      if (!isSessionCurrent(aiSess.epoch, aiSess.uid) || CUR_PID !== reqPid) return;
       var rawOut = global.PuAiCall.textOf(reply);
       var unmasked = Intake().unmaskNames(rawOut, req.back);
-      var numCheck = Report().checkHallucinatedNumbers(ta.value, unmasked);
+      var numCheck = Report().checkHallucinatedNumbers(origDraft, unmasked);
 
       var warnBanner = numCheck.clean
         ? '<div class="ok-banner">✓ 원본 수치 일치 검증 통과 (임의 추가된 숫자 없음)</div>'
@@ -2413,7 +3333,9 @@
 
       if ($('applyAiPolishBtn')) {
         $('applyAiPolishBtn').onclick = function () {
-          ta.value = $('aiPolishedTxt').value;
+          if (!isSessionCurrent(aiSess.epoch, aiSess.uid) || CUR_PID !== reqPid) return;
+          var curTa = $((mode === 'mid' ? 'midSec_' : 'finalSec_') + secKey);
+          if (curTa) curTa.value = $('aiPolishedTxt').value;
           var lockCb = document.querySelector('input[data-' + mode + '-lock="' + secKey + '"]');
           if (lockCb) lockCb.checked = true;
           closeModal();
@@ -2421,6 +3343,7 @@
         };
       }
     } catch (e) {
+      if (!isSessionCurrent(aiSess.epoch, aiSess.uid)) return;
       toast('AI 윤문 호출 실패: ' + (e.message || e));
     }
   }
@@ -2507,8 +3430,8 @@
     return new Uint8Array(out);
   }
 
-  async function downloadDeliverablesZip(proj, selectedIds) {
-    if (!Hwpx() || !global.JSZip) { toast('패키지 생성 엔진이 로드되지 않았습니다.'); return; }
+  async function downloadDeliverablesZip(proj, selectedIds, optEpoch, optUid) {
+    if (!Hwpx() || !global.JSZip) { toast('패키지 생성 엔진이 로드되지 않았습니다.'); return false; }
     var live = buildLiveReportsForExport(proj);
     var safeCo = Hwpx().safeFilePart(proj.companyName);
     var agTag = proj.agency === 'cepa' ? '충남경제진흥원' : 'KMAC구조혁신';
@@ -2533,7 +3456,9 @@
       zip.file('05_' + safeCo + '_' + agTag + '_수행계획_완료계_일지문안.txt', buildCombinedSubmissionTextFile(proj, sub));
     }
     var zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+    if (optEpoch != null && !isSessionCurrent(optEpoch, optUid)) return false;
     downloadRawBytes(zipBytes, safeCo + '_' + agTag + '_산출물_' + selectedIds.length + '종패키지.zip', 'application/zip');
+    return true;
   }
 
   /* ══ 8. 이벤트 바인딩 (끌어고르기 포함) 및 일괄 실행 ═════════════════════ */
@@ -2574,6 +3499,7 @@
       companyId: c.companyId,
       companyName: c.companyName,
       bizNo: c.bizNo,
+      contractNo: str(c.contractNo || ''),
       ceoName: co ? str(co.ceo || co.ceoName) : '',
       contactName: contactNameOfCompany(co),
       agency: agCode,
@@ -2581,6 +3507,7 @@
       industry: c.industry,
       year: c.year || 2026,
       contactEmails: c.contactEmail ? [c.contactEmail] : [],
+      consultingId: c.consultingId || '',
       scalCoId: c.scalCoId || '',
       scalTypeId: c.scalTypeId || '',
       selectedTasks: agCode === 'cepa'
@@ -2590,10 +3517,53 @@
     };
   }
 
-  async function activateDiscoverCandidate(candKey) {
+  function applyAgencyScope(nextScope) {
+    var norm = nextScope === 'kmac' ? 'kmac' : (nextScope === 'cepa' ? 'cepa' : (nextScope === 'stack' ? 'stack' : ''));
+    AGENCY_SCOPE = norm;
+    if ($('projAgency')) $('projAgency').value = norm;
+    if (norm === 'kmac' || norm === 'cepa') {
+      var cur = projectById(CUR_PID);
+      var curAg = cur && cur.agency === 'cepa' ? 'cepa' : (cur ? 'kmac' : '');
+      if (!cur || curAg !== norm) {
+        var matchProj = activeProjects().find(function (p) {
+          return (p.agency === 'cepa' ? 'cepa' : 'kmac') === norm;
+        });
+        if (matchProj) CUR_PID = matchProj.id;
+      }
+    }
+    clearSel('projects');
+    clearSel('projectsKmac');
+    clearSel('projectsCepa');
+  }
+
+  var _wbTimer = null;
+  function scheduleSideWorkbenchRefresh(mode) {
+    clearTimeout(_wbTimer);
+    _wbTimer = setTimeout(function () {
+      var proj = projectById(CUR_PID);
+      if (!proj) return;
+      var schedRds = schedRoundsForProject(proj);
+      if (mode === 'mid' && $('midSideWorkbench')) {
+        var domM = readCurrentMidSectionsFromDom(proj);
+        var midObj = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, D.mid[proj.id] || null);
+        midObj.sections = Object.assign({}, midObj.sections, domM.sections);
+        $('midSideWorkbench').innerHTML = renderReportSideWorkbenchHtml(proj, 'mid', midObj, midObj, null, schedRds);
+        drawBulks();
+      } else if (mode === 'final' && $('finalSideWorkbench')) {
+        var domF = readCurrentFinalSectionsFromDom(proj);
+        var midBase = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRds, D.mid[proj.id] || null);
+        var finObj = Report().buildFinalReport(proj, midBase, D.intake[proj.id] || {}, schedRds, D.final[proj.id] || null);
+        finObj.sections = Object.assign({}, finObj.sections, domF.sections);
+        $('finalSideWorkbench').innerHTML = renderReportSideWorkbenchHtml(proj, 'final', finObj, midBase, finObj, schedRds);
+        drawBulks();
+      }
+    }, 220);
+  }
+
+  async function activateDiscoverCandidate(candKey, reqEpoch, reqUid) {
     var c = DISCOVER_LIST.find(function (x) { return x.candKey === candKey; });
     if (!c) return null;
-    return saveProjectRecord(buildDiscoverProjectPayload(c));
+    return saveProjectRecord(buildDiscoverProjectPayload(c), reqEpoch, reqUid);
   }
 
   function bindDragSel() {
@@ -2688,6 +3658,26 @@
         return withBusy($('reloadBtn'), function () { return reload(); });
       };
     }
+    if ($('linkFolderBtn')) {
+      $('linkFolderBtn').onclick = function () {
+        return withBusy($('linkFolderBtn'), function () { return connectConsultingFolder(); });
+      };
+    }
+    if ($('changeFolderBtn')) {
+      $('changeFolderBtn').onclick = function () {
+        return withBusy($('changeFolderBtn'), function () { return connectConsultingFolder(); });
+      };
+    }
+    if ($('reconnectFolderBtn')) {
+      $('reconnectFolderBtn').onclick = function () {
+        return withBusy($('reconnectFolderBtn'), function () { return reconnectSavedFolder(); });
+      };
+    }
+    if ($('folderFallbackInput')) {
+      $('folderFallbackInput').addEventListener('change', function () {
+        handleFallbackFolderFiles($('folderFallbackInput').files);
+      });
+    }
     if ($('scanAllBtn')) {
       $('scanAllBtn').onclick = function () {
         rebuildScanAndDiscover();
@@ -2700,9 +3690,18 @@
       var el = $(id);
       if (!el) return;
       el.addEventListener(id === 'projQ' ? 'input' : 'change', function () {
+        if (id === 'projAgency') applyAgencyScope(el.value);
         clearSel('projects');
+        clearSel('projectsKmac');
+        clearSel('projectsCepa');
         draw();
       });
+    });
+
+    document.addEventListener('input', function (e) {
+      var tid = (e.target && e.target.id) ? String(e.target.id) : '';
+      if (tid.indexOf('midSec_') === 0) scheduleSideWorkbenchRefresh('mid');
+      else if (tid.indexOf('finalSec_') === 0) scheduleSideWorkbenchRefresh('final');
     });
 
     if ($('modal')) {
@@ -2770,6 +3769,16 @@
     });
 
     document.addEventListener('click', async function (e) {
+      var scopeBtn = e.target.closest('[data-set-agency-scope]');
+      if (scopeBtn) {
+        applyAgencyScope(scopeBtn.getAttribute('data-set-agency-scope') || '');
+        var nextTabAttr = scopeBtn.getAttribute('data-goto-tab');
+        if (nextTabAttr) TAB = nextTabAttr;
+        clearSel();
+        draw();
+        return;
+      }
+
       var gotoBtn = e.target.closest('[data-goto-tab]');
       if (gotoBtn) {
         TAB = gotoBtn.getAttribute('data-goto-tab');
@@ -2787,11 +3796,29 @@
         return;
       }
 
+      var importFgrpBtn = e.target.closest('[data-import-fgrp]');
+      if (importFgrpBtn) {
+        var fgrpSess = captureCurrentSession();
+        if (!fgrpSess) return;
+        await withBusy(importFgrpBtn, async function () {
+          await importFolderWorkplaceGroup(
+            importFgrpBtn.getAttribute('data-import-fgrp'),
+            false,
+            fgrpSess.epoch,
+            fgrpSess.uid,
+            importFgrpBtn.getAttribute('data-boundary-hash') || ''
+          );
+        });
+        return;
+      }
+
       var actCand = e.target.closest('[data-activate-cand]');
       if (actCand) {
+        var candSess = captureCurrentSession();
+        if (!candSess) return;
         await withBusy(actCand, async function () {
-          var created = await activateDiscoverCandidate(actCand.getAttribute('data-activate-cand'));
-          if (created) {
+          var created = await activateDiscoverCandidate(actCand.getAttribute('data-activate-cand'), candSess.epoch, candSess.uid);
+          if (created && isSessionCurrent(candSess.epoch, candSess.uid)) {
             CUR_PID = created.id;
             TAB = 'intake';
             clearSel();
@@ -2805,6 +3832,8 @@
 
       var toggleChkBtn = e.target.closest('[data-toggle-chk]');
       if (toggleChkBtn && CUR_PID) {
+        var chkSess = captureCurrentSession();
+        if (!chkSess) return;
         await withBusy(toggleChkBtn, async function () {
           var projC = projectById(CUR_PID);
           if (!projC) return;
@@ -2814,7 +3843,8 @@
           var sub = Object.assign({}, mc[ph] || {});
           sub[dkCode] = !sub[dkCode];
           mc[ph] = sub;
-          await saveProjectRecord(Object.assign({}, projC, { manualChecks: mc }));
+          var savedC = await saveProjectRecord(Object.assign({}, projC, { manualChecks: mc }), chkSess.epoch, chkSess.uid);
+          if (!savedC || !isSessionCurrent(chkSess.epoch, chkSess.uid)) return;
           draw();
           toast(sub[dkCode] ? '오프라인·직접 수령 확인 표시됨' : '수기 수령 확인 해제됨');
         });
@@ -2830,6 +3860,8 @@
 
       var toggleRdProofBtn = e.target.closest('[data-toggle-round-proof]');
       if (toggleRdProofBtn && CUR_PID) {
+        var rpSess = captureCurrentSession();
+        if (!rpSess) return;
         await withBusy(toggleRdProofBtn, async function () {
           var projRP = projectById(CUR_PID);
           if (!projRP) return;
@@ -2839,7 +3871,8 @@
             var nextOk = !(r.hasPhoto && r.hasSign);
             return Object.assign({}, r, { hasPhoto: nextOk, hasSign: nextOk });
           });
-          await saveProjectRecord(Object.assign({}, projRP, { rounds: rds }));
+          var savedRP = await saveProjectRecord(Object.assign({}, projRP, { rounds: rds }), rpSess.epoch, rpSess.uid);
+          if (!savedRP || !isSessionCurrent(rpSess.epoch, rpSess.uid)) return;
           draw();
           toast(rno + '회차 사진·수행일지 증빙 상태가 변경되었습니다.');
         });
@@ -2855,13 +3888,16 @@
 
       var toggleFuBtn = e.target.closest('[data-toggle-followup]');
       if (toggleFuBtn && CUR_PID) {
+        var fuSess = captureCurrentSession();
+        if (!fuSess) return;
         await withBusy(toggleFuBtn, async function () {
           var projFu = projectById(CUR_PID);
           if (!projFu) return;
           var fuCode = toggleFuBtn.getAttribute('data-toggle-followup');
           var nextFu = Object.assign({}, projFu.followupChecks || {});
           nextFu[fuCode] = !nextFu[fuCode];
-          await saveProjectRecord(Object.assign({}, projFu, { followupChecks: nextFu }));
+          var savedFu = await saveProjectRecord(Object.assign({}, projFu, { followupChecks: nextFu }), fuSess.epoch, fuSess.uid);
+          if (!savedFu || !isSessionCurrent(fuSess.epoch, fuSess.uid)) return;
           draw();
           toast(nextFu[fuCode] ? '이행완료로 체크되었습니다.' : '점검예정 상태로 변경되었습니다.');
         });
@@ -2870,16 +3906,21 @@
 
       var mailIns = e.target.closest('[data-mail-inspect]');
       if (mailIns) {
+        var miSess = captureCurrentSession();
+        if (!miSess) return;
         await withBusy(mailIns, function () {
-          return inspectAndAnalyzeMail(mailIns.getAttribute('data-mail-inspect'), mailIns.getAttribute('data-phase') || 'pre_mid', false);
+          return inspectAndAnalyzeMail(mailIns.getAttribute('data-mail-inspect'), mailIns.getAttribute('data-phase') || 'pre_mid', false, miSess.epoch, miSess.uid);
         });
         return;
       }
 
       var mailChk = e.target.closest('[data-mail-check]');
       if (mailChk) {
+        var mcSess = captureCurrentSession();
+        if (!mcSess) return;
         await withBusy(mailChk, async function () {
-          await markMailCheckedOnly(mailChk.getAttribute('data-mail-check'), mailChk.getAttribute('data-phase') || 'pre_mid');
+          var checkedCard = await markMailCheckedOnly(mailChk.getAttribute('data-mail-check'), mailChk.getAttribute('data-phase') || 'pre_mid', mcSess.epoch, mcSess.uid);
+          if (!checkedCard || !isSessionCurrent(mcSess.epoch, mcSess.uid)) return;
           toast('메일 확인완료 표시됨');
         });
         return;
@@ -2895,11 +3936,14 @@
 
       var saveMidSec = e.target.closest('[data-save-mid-sec]');
       if (saveMidSec && CUR_PID) {
+        var msSess = captureCurrentSession();
+        if (!msSess) return;
         await withBusy(saveMidSec, async function () {
           var projM = projectById(CUR_PID);
           if (!projM) return;
           var domMid = readCurrentMidSectionsFromDom(projM);
-          await saveMidDoc(projM, domMid.sections, domMid.locks);
+          var savedM = await saveMidDoc(projM, domMid.sections, domMid.locks, msSess.epoch, msSess.uid);
+          if (!savedM || !isSessionCurrent(msSess.epoch, msSess.uid)) return;
           toast('중간보고서 섹션이 저장되었습니다.');
         });
         return;
@@ -2907,11 +3951,14 @@
 
       var saveFinSec = e.target.closest('[data-save-final-sec]');
       if (saveFinSec && CUR_PID) {
+        var fsSess = captureCurrentSession();
+        if (!fsSess) return;
         await withBusy(saveFinSec, async function () {
           var projF = projectById(CUR_PID);
           if (!projF) return;
           var domFin = readCurrentFinalSectionsFromDom(projF);
-          await saveFinalDoc(projF, domFin.sections, domFin.locks);
+          var savedF = await saveFinalDoc(projF, domFin.sections, domFin.locks, fsSess.epoch, fsSess.uid);
+          if (!savedF || !isSessionCurrent(fsSess.epoch, fsSess.uid)) return;
           toast('최종 결과보고서 섹션이 저장되었습니다.');
         });
         return;
@@ -2942,7 +3989,7 @@
       }
 
       if (!e.target.closest('input,button,select,a,label,textarea')) {
-        var tr = e.target.closest('tr[data-row][data-tname="projects"]');
+        var tr = e.target.closest('tr[data-row][data-tname="projects"], tr[data-row][data-tname="projectsKmac"], tr[data-row][data-tname="projectsCepa"]');
         if (tr) {
           CUR_PID = tr.getAttribute('data-row');
           TAB = 'intake';
@@ -2954,6 +4001,9 @@
   }
 
   async function handleBulkAction(spec) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
     var parts = spec.split(':');
     var nm = parts[0], op = parts[1];
     if (op === 'clear') { clearSel(nm); drawBulks(); return; }
@@ -2961,7 +4011,21 @@
     if (!ids.length) return;
     var proj = projectById(CUR_PID);
 
-    if (nm === 'discover' && op === 'activate') {
+    if (nm === 'folderSync' && op === 'import') {
+      if (!askConfirm('선택한 폴더 사업장 ' + ids.length + '곳의 산업·일자리전환 자료를 일괄 비식별 반영하시겠습니까?')) return;
+      var lastImported = null;
+      for (var fg = 0; fg < ids.length; fg++) {
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
+        var imp = await importFolderWorkplaceGroup(ids[fg], true, reqEpoch, reqUid);
+        if (imp) lastImported = imp;
+      }
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+      if (lastImported && !CUR_PID) CUR_PID = lastImported.id;
+      clearSel(nm);
+      rebuildScanAndDiscover();
+      draw();
+      toast('컨설팅폴더 사업장 ' + ids.length + '곳 자료 일괄 반영 완료');
+    } else if (nm === 'discover' && op === 'activate') {
       if (!askConfirm('선택한 자동 발견 후보 ' + ids.length + '건을 일괄 워크스페이스 활성화하시겠습니까?')) return;
       var actEntries = [];
       ids.forEach(function (ck) {
@@ -2975,18 +4039,17 @@
           entityType: 'Project'
         });
       });
-      var savedAct = await atomicMultiRecordUpdate(actEntries);
-      if (savedAct) {
-        Object.keys(savedAct).forEach(function (pathKey) {
-          var val = savedAct[pathKey];
-          if (val && val.id) D.projects[val.id] = val;
-        });
-      }
+      var savedAct = await atomicMultiRecordUpdate(actEntries, reqEpoch, reqUid);
+      if (!savedAct || !isSessionCurrent(reqEpoch, reqUid)) return;
+      Object.keys(savedAct).forEach(function (pathKey) {
+        var val = savedAct[pathKey];
+        if (val && val.id) D.projects[val.id] = val;
+      });
       clearSel(nm);
       rebuildScanAndDiscover();
       draw();
       toast(actEntries.length + '개 사업장 워크스페이스 활성화 완료');
-    } else if (nm === 'projects' && op === 'del') {
+    } else if ((nm === 'projects' || nm === 'projectsKmac' || nm === 'projectsCepa') && op === 'del') {
       if (typeof global.confirm === 'function' && !global.confirm('선택한 사업장 ' + ids.length + '건을 목록에서 숨김(소프트 삭제) 처리하시겠습니까?')) return;
       var delProjEntries = [];
       ids.forEach(function (pid) {
@@ -3000,12 +4063,42 @@
           });
         }
       });
-      await atomicMultiRecordUpdate(delProjEntries);
+      var delRes = await atomicMultiRecordUpdate(delProjEntries, reqEpoch, reqUid);
+      if (!delRes || !isSessionCurrent(reqEpoch, reqUid)) return;
       ids.forEach(function (pid) { if (D.projects[pid]) D.projects[pid]._deleted = true; });
       clearSel(nm);
       rebuildScanAndDiscover();
       draw();
       toast('선택 사업장 ' + delProjEntries.length + '건을 목록에서 숨겼습니다(소프트 삭제).');
+    } else if ((nm === 'formReviewKmac' || nm === 'formReviewCepa') && op === 'hwpx') {
+      if (!Hwpx()) { toast('한글(.hwpx) 생성 엔진이 준비되지 않았습니다.'); return; }
+      if (!askConfirm('선택한 사업장 ' + ids.length + '곳의 소속기관 맞춤 최종결과보고서(.hwpx)를 일괄 생성·다운로드하시겠습니까?')) return;
+      ids.forEach(function (pid) {
+        var pItem = projectById(pid);
+        if (!pItem) return;
+        var sRds = schedRoundsForProject(pItem);
+        var mItem = Report().buildMidReport(pItem, D.intake[pItem.id] || {}, sRds, D.mid[pItem.id] || null);
+        var fItem = Report().buildFinalReport(pItem, mItem, D.intake[pItem.id] || {}, sRds, D.final[pItem.id] || null);
+        var fnOut = Hwpx().suggestedFileName('final', pItem);
+        Hwpx().downloadHwpxBytes(Hwpx().generateHwpxBytes('final', pItem, mItem, fItem), fnOut);
+      });
+      clearSel(nm);
+      drawBulks();
+      toast(ids.length + '곳 소속기관 맞춤 최종결과보고서(.hwpx) 생성 완료');
+    } else if ((nm === 'midReview' || nm === 'finalReview') && op === 'copy' && proj) {
+      var sRdsRev = schedRoundsForProject(proj);
+      var mRev = Report().buildMidReport(proj, D.intake[proj.id] || {}, sRdsRev, D.mid[proj.id] || null);
+      var fRev = Report().buildFinalReport(proj, mRev, D.intake[proj.id] || {}, sRdsRev, D.final[proj.id] || null);
+      var revEval = Report().evaluateReportFormReview(proj, nm === 'finalReview' ? 'final' : 'mid', nm === 'finalReview' ? fRev : mRev, D.intake[proj.id] || {}, sRdsRev);
+      var idMapRev = {};
+      ids.forEach(function (c) { idMapRev[c] = 1; });
+      var linesRev = revEval.checks.filter(function (c) { return !!idMapRev[c.code]; }).map(function (c) {
+        return '[' + c.statusLabel + '] ' + c.label + ' — ' + c.detail;
+      });
+      copyTextToClipboard(linesRev.join('\n'));
+      clearSel(nm);
+      drawBulks();
+      toast('선택 검수항목 ' + linesRev.length + '건을 복사했습니다.');
     } else if ((nm === 'preChk' || nm === 'postChk') && proj) {
       var phChk = nm === 'postChk' ? 'post_mid' : 'pre_mid';
       if (op === 'reqmail') {
@@ -3018,7 +4111,8 @@
       var subChk = Object.assign({}, mcAll[phChk] || {});
       ids.forEach(function (code) { subChk[code] = markVal; });
       mcAll[phChk] = subChk;
-      await saveProjectRecord(Object.assign({}, proj, { manualChecks: mcAll }));
+      var savedChkProj = await saveProjectRecord(Object.assign({}, proj, { manualChecks: mcAll }), reqEpoch, reqUid);
+      if (!savedChkProj || !isSessionCurrent(reqEpoch, reqUid)) return;
       clearSel(nm);
       draw();
       toast(ids.length + '건 체크리스트 상태가 한 번에 저장되었습니다.');
@@ -3038,18 +4132,19 @@
             });
           }
         });
-        var savedMails = await atomicMultiRecordUpdate(mailEntries);
+        var savedMails = await atomicMultiRecordUpdate(mailEntries, reqEpoch, reqUid);
+        if (!savedMails || !isSessionCurrent(reqEpoch, reqUid)) return;
         if (!D.intake[proj.id]) D.intake[proj.id] = {};
-        if (savedMails) {
-          Object.keys(savedMails).forEach(function (pk) {
-            var v = savedMails[pk];
-            if (v && v.id) D.intake[proj.id][v.id] = v;
-          });
-        }
+        Object.keys(savedMails).forEach(function (pk) {
+          var v = savedMails[pk];
+          if (v && v.id) D.intake[proj.id][v.id] = v;
+        });
       } else {
         for (var m = 0; m < ids.length; m++) {
-          await inspectAndAnalyzeMail(ids[m], phMail, true);
+          if (!isSessionCurrent(reqEpoch, reqUid)) return;
+          await inspectAndAnalyzeMail(ids[m], phMail, true, reqEpoch, reqUid);
         }
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
       }
       clearSel(nm);
       rebuildScanAndDiscover();
@@ -3057,20 +4152,22 @@
       toast(ids.length + '건 메일 일괄 처리 완료');
     } else if ((nm === 'preCards' || nm === 'postCards') && op === 'del' && CUR_PID) {
       if (typeof global.confirm === 'function' && !global.confirm('선택한 분석카드 ' + ids.length + '건을 삭제하시겠습니까?')) return;
+      var cardDelPid = CUR_PID;
       var cardDelEntries = [];
       ids.forEach(function (cid) {
-        var prevC = D.intake[CUR_PID] && D.intake[CUR_PID][cid];
+        var prevC = D.intake[cardDelPid] && D.intake[cardDelPid][cid];
         if (prevC) {
           cardDelEntries.push({
-            path: 'scal_jobtrans/intake/' + CUR_PID + '/' + prevC.id,
+            path: 'scal_jobtrans/intake/' + cardDelPid + '/' + prevC.id,
             previous: prevC,
             tombstone: true,
             entityType: 'Document'
           });
         }
       });
-      await atomicMultiRecordUpdate(cardDelEntries);
-      ids.forEach(function (cid) { if (D.intake[CUR_PID] && D.intake[CUR_PID][cid]) D.intake[CUR_PID][cid]._deleted = true; });
+      var cardDelRes = await atomicMultiRecordUpdate(cardDelEntries, reqEpoch, reqUid);
+      if (!cardDelRes || !isSessionCurrent(reqEpoch, reqUid)) return;
+      ids.forEach(function (cid) { if (D.intake[cardDelPid] && D.intake[cardDelPid][cid]) D.intake[cardDelPid][cid]._deleted = true; });
       clearSel(nm);
       rebuildScanAndDiscover();
       draw();
@@ -3094,7 +4191,8 @@
           return r;
         });
       }
-      await saveProjectRecord(Object.assign({}, proj, { rounds: nextRds }));
+      var savedRds = await saveProjectRecord(Object.assign({}, proj, { rounds: nextRds }), reqEpoch, reqUid);
+      if (!savedRds || !isSessionCurrent(reqEpoch, reqUid)) return;
       clearSel(nm);
       draw();
       toast('선택 회차 ' + ids.length + '건 일괄 반영 완료');
@@ -3110,8 +4208,10 @@
         if (op === 'lock') nextLocks[secKey] = true;
         else if (op === 'unlock') nextLocks[secKey] = false;
       });
-      if (isMid) await saveMidDoc(proj, nextSecs, nextLocks);
-      else await saveFinalDoc(proj, nextSecs, nextLocks);
+      var savedSecs = isMid
+        ? await saveMidDoc(proj, nextSecs, nextLocks, reqEpoch, reqUid)
+        : await saveFinalDoc(proj, nextSecs, nextLocks, reqEpoch, reqUid);
+      if (!savedSecs || !isSessionCurrent(reqEpoch, reqUid)) return;
       clearSel(nm);
       draw();
       toast('선택 섹션 ' + ids.length + '건이 한 번에 저장되었습니다.');
@@ -3129,12 +4229,14 @@
         var label = op === 'confirm' ? '합의 확정 ✓' : '추가 협의중';
         ids.forEach(function (id) { nextStMap[id] = label; });
       }
-      await saveProjectRecord(Object.assign({}, proj, { diffStatusMap: nextStMap, customDiffRows: nextCust }));
+      var savedDiffBulk = await saveProjectRecord(Object.assign({}, proj, { diffStatusMap: nextStMap, customDiffRows: nextCust }), reqEpoch, reqUid);
+      if (!savedDiffBulk || !isSessionCurrent(reqEpoch, reqUid)) return;
       clearSel(nm);
       draw();
       toast('선택 Diff 항목 ' + ids.length + '건이 반영되었습니다.');
     } else if (nm === 'deliverables' && op === 'zip' && proj) {
-      await downloadDeliverablesZip(proj, ids);
+      var zipDone = await downloadDeliverablesZip(proj, ids, reqEpoch, reqUid);
+      if (!zipDone || !isSessionCurrent(reqEpoch, reqUid)) return;
       clearSel(nm);
       drawBulks();
       toast('선택 산출물 ' + ids.length + '종 통합 ZIP 파일을 생성했습니다.');
@@ -3143,7 +4245,8 @@
       if (!askConfirm('선택한 사후 이행점검 ' + ids.length + '건을 일괄 ' + (doneFlag ? '이행완료' : '점검예정') + ' 처리하시겠습니까?')) return;
       var nextFuMap = Object.assign({}, proj.followupChecks || {});
       ids.forEach(function (code) { nextFuMap[code] = doneFlag; });
-      await saveProjectRecord(Object.assign({}, proj, { followupChecks: nextFuMap }));
+      var savedFuBulk = await saveProjectRecord(Object.assign({}, proj, { followupChecks: nextFuMap }), reqEpoch, reqUid);
+      if (!savedFuBulk || !isSessionCurrent(reqEpoch, reqUid)) return;
       clearSel(nm);
       draw();
       toast('사후 이행관리 ' + ids.length + '건 상태가 한 번에 저장되었습니다.');
@@ -3151,6 +4254,8 @@
   }
 
   async function handleNamedAction(act) {
+    var s = captureCurrentSession();
+    if (!s) return;
     var proj = projectById(CUR_PID);
     if (!proj) return;
 
@@ -3223,7 +4328,8 @@
         safeCoT + '_' + agTagT + '_수행계획_완료계_일지문안.txt', 'text/plain;charset=utf-8');
       toast('제출용 수행계획·완료계·수행일지 문안(.txt)을 다운로드했습니다.');
     } else if (act === 'dl-full-zip') {
-      await downloadDeliverablesZip(proj, ['mid_hwpx', 'final_hwpx', 'comp_hwpx', 'data_xlsx', 'sub_txt']);
+      var fullZipOk = await downloadDeliverablesZip(proj, ['mid_hwpx', 'final_hwpx', 'comp_hwpx', 'data_xlsx', 'sub_txt'], s.epoch, s.uid);
+      if (!fullZipOk || !isSessionCurrent(s.epoch, s.uid)) return;
       toast('제출 산출물 5종 통합 ZIP 패키지를 다운로드했습니다.');
     } else if (act === 'open-sub-modal') {
       openSubmissionTextsModal(proj);
@@ -3237,7 +4343,8 @@
         toast('인터뷰 메모에 민감 고유식별정보 패턴이 감지되어 차단했습니다.');
         return;
       }
-      await saveProjectRecord(Object.assign({}, proj, { interviews: iv }));
+      var savedIv = await saveProjectRecord(Object.assign({}, proj, { interviews: iv }), s.epoch, s.uid);
+      if (!savedIv || !isSessionCurrent(s.epoch, s.uid)) return;
       toast('계층별 인터뷰 메모가 저장되었습니다.');
       draw();
     } else if (act === 'regen-mid') {
@@ -3246,19 +4353,23 @@
         sections: curMid.sections,
         locks: curMid.locks
       });
-      await saveMidDoc(proj, builtM.sections, builtM.locks);
+      var savedRegenM = await saveMidDoc(proj, builtM.sections, builtM.locks, s.epoch, s.uid);
+      if (!savedRegenM || !isSessionCurrent(s.epoch, s.uid)) return;
       draw();
       toast('수집된 기초자료와 운영기관 양식에 맞춰 중간보고서가 자동 정리되었습니다(수기 고정 섹션 보존).');
     } else if (act === 'confirm-mid-baseline') {
       var domM2 = readCurrentMidSectionsFromDom(proj);
-      await saveMidDoc(proj, domM2.sections, domM2.locks);
+      var savedMidBase = await saveMidDoc(proj, domM2.sections, domM2.locks, s.epoch, s.uid);
+      if (!savedMidBase || !isSessionCurrent(s.epoch, s.uid)) return;
       var midObj = Report().buildMidReport(proj, D.intake[proj.id] || {}, schedRoundsForProject(proj), {
         sections: domM2.sections, locks: domM2.locks
       });
       var now = Date.now();
-      var snap = Report().buildMidSnapshot(proj, midObj, ME.sid, now);
-      await saveImmutableSnapshot(proj, snap);
-      await saveProjectRecord(Object.assign({}, proj, { midConfirmedAt: now, stage: 'design' }));
+      var snap = Report().buildMidSnapshot(proj, midObj, s.sid, now);
+      var savedMidSnap = await saveImmutableSnapshot(proj, snap, s.epoch, s.uid);
+      if (!savedMidSnap || !isSessionCurrent(s.epoch, s.uid)) return;
+      var savedMidProj = await saveProjectRecord(Object.assign({}, proj, { midConfirmedAt: now, stage: 'design' }), s.epoch, s.uid);
+      if (!savedMidProj || !isSessionCurrent(s.epoch, s.uid)) return;
       clearSel();
       rebuildScanAndDiscover();
       TAB = 'final';
@@ -3272,24 +4383,28 @@
         sections: curFin.sections,
         locks: curFin.locks
       });
-      await saveFinalDoc(proj, builtF.sections, builtF.locks);
+      var savedRegenF = await saveFinalDoc(proj, builtF.sections, builtF.locks, s.epoch, s.uid);
+      if (!savedRegenF || !isSessionCurrent(s.epoch, s.uid)) return;
       draw();
       toast('중간보고 기준선과 후속 메일 Diff를 반영해 ' + Cat().getAgency(proj.agency).short + ' 최종결과보고서를 조립했습니다.');
     } else if (act === 'confirm-final-snapshot') {
       var domF2 = readCurrentFinalSectionsFromDom(proj);
-      await saveFinalDoc(proj, domF2.sections, domF2.locks);
+      var savedFinBase = await saveFinalDoc(proj, domF2.sections, domF2.locks, s.epoch, s.uid);
+      if (!savedFinBase || !isSessionCurrent(s.epoch, s.uid)) return;
       var nowF = Date.now();
-      await saveImmutableSnapshot(proj, {
+      var savedFinSnap = await saveImmutableSnapshot(proj, {
         id: 'snap_final_' + nowF,
         kind: 'final_report',
         agency: proj.agency || 'kmac',
         track: proj.track || 'kmac_std',
         title: proj.companyName + ' (' + Cat().getAgency(proj.agency).short + ') 최종결과보고 확정 스냅샷',
         sections: domF2.sections,
-        confirmedBy: ME.sid,
+        confirmedBy: s.sid,
         confirmedAt: nowF
-      });
-      await saveProjectRecord(Object.assign({}, proj, { finalConfirmedAt: nowF, stage: 'followup' }));
+      }, s.epoch, s.uid);
+      if (!savedFinSnap || !isSessionCurrent(s.epoch, s.uid)) return;
+      var savedFinProj = await saveProjectRecord(Object.assign({}, proj, { finalConfirmedAt: nowF, stage: 'followup' }), s.epoch, s.uid);
+      if (!savedFinProj || !isSessionCurrent(s.epoch, s.uid)) return;
       draw();
       toast('최종 결과보고 스냅샷이 불변 저장되었습니다.');
     }
@@ -3310,12 +4425,16 @@
       var authUid = (u && u.uid) ? String(u.uid) : '';
       if ($('outBtn')) $('outBtn').style.display = authUid ? '' : 'none';
       if (!authUid) {
+        clearDirHandlesFromIdb();
         purgeSessionState();
         if ($('lock')) $('lock').style.display = 'none';
         if (global.PuGate) global.PuGate.show();
         return;
       }
-      if (ME && ME.uid && ME.uid !== authUid) purgeSessionState();
+      if (ME && ME.uid && ME.uid !== authUid) {
+        clearDirHandlesFromIdb();
+        purgeSessionState();
+      }
       var authEpoch = ++SESSION_EPOCH;
       if (global.PuGate) global.PuGate.hide();
 
@@ -3323,6 +4442,7 @@
       try { roleVal = (await fbDb.ref('uid_roles/' + authUid).once('value')).val() || {}; } catch (e) {}
       if (authEpoch !== SESSION_EPOCH || currentAuthUid() !== authUid) return;
       if (roleVal.status !== 'active' || !roleVal.sid) {
+        clearDirHandlesFromIdb();
         purgeSessionState();
         lockScreen('재직 중인 직원 계정이 아닙니다.');
         return;

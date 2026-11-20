@@ -60,7 +60,10 @@ test('늦음 띠는 있고, 안내문은 옛 «1시간마다»를 말하지 않�
 });
 
 test('리멤버 줄에도 출처 표시(📇)가 붙는다', () => {
-  assert.match(html, /'📇 새로 넣음'/);
-  assert.match(html, /'📇 빈 칸 채움'/);
-  assert.match(html, /'📇 이미 있음'/);
+  /* 결과 말은 «가져오는 계산»(js/pu-remember.js importOne)이 정한다 — 화면은 그것을 그대로 표에 그린다 */
+  const logic = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-remember.js'), 'utf8');
+  assert.match(logic, /'📇 새로 넣음'/);
+  assert.match(logic, /'📇 빈 칸 채움'/);
+  assert.match(logic, /'📇 이미 있음'/);
+  assert.match(html, /PuRemember\.importOne/, '화면이 가져오는 계산을 부르지 않습니다');
 });

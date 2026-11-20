@@ -74,9 +74,14 @@ function fakeDoc(text) {
   return d;
 }
 
-test('AI_MODELS — work.html·pu-erp.html 과 같은 프록시를 쓰니 모델 이름도 같다', () => {
-  assert.ok(API.MODELS.includes('claude-opus-5'));
-  assert.ok(API.MODELS.includes('claude-sonnet-4-20250514'));
+/* 2026-11-19 모델 이름을 박던 것을 «업무관리와 같은 목록» 규칙으로 바꿨다 — 은퇴 모델을 박고 있어 교체가 막혔다 */
+test('AI_MODELS — work.html 과 같은 프록시를 쓰니 모델 목록도 같다', () => {
+  const work = fs.readFileSync(path.join(ROOT, 'work.html'), 'utf8');
+  const list = (work.match(/var AI_MODELS=\[([^\]]*)\]/) || [])[1];
+  assert.ok(list, 'work.html 의 AI_MODELS 를 찾지 못했다');
+  const want = (list.match(/'[^']+'/g) || []).map((s) => s.slice(1, -1));
+  assert.ok(want.length >= 1);
+  assert.deepEqual(Array.from(API.MODELS), want, '기금관리와 업무관리가 서로 다른 모델을 고른다');
 });
 
 test('systemPrompt — «찾아 바꾸기만» 시키고, JSON 하나만 요구한다', () => {

@@ -32,6 +32,9 @@
        ② 서류 확인·도장은 «서류 목록 + 도장 ☑» 한 줄씩만 왼쪽에 두고, 서류를 누르면 오른쪽 칸에 한글 쪽 그대로 나온다(◀ 이전·다음 ▶).
        칸 위쪽 «새 서류 | 지난 원본» 단추로 같은 자리에서 맞바꿔 본다. ①에서 값을 고치면 칸의 서류도 저절로 다시 그려진다.
        지난 기록 목록도 한 줄(이름·종류·날짜)로 줄였다 — 종류 바꾸기는 칸 위쪽에서.
+     ★ 화면 개편(2026-11-18 대표 「UI 모두 깔끔하게 — 너무 단순하고 무미건조하고 빈 공백이 많다 · 한 화면에서 가급적 모두 확인 · 각 지사 지사장 정보가 안 맞는다 · 지난 기록은 접어서 펴기」):
+       머리줄 한 줄(탭 알약·개수) · 본문은 화면 너비를 쓴다 · 등기 현황은 «사무소·지사장 띠» + 왼쪽 법인 정보 / 오른쪽 사원·분사무소(넓은 화면 한 화면) ·
+       분사무소마다 «지사장»(사원 줄을 가리킨다 — core branch.head)·사원 줄 «직책» 칸 · 지난 기록 묶음·끝난 건·바뀐 기록은 접고 펴기(FOLD — 이 브라우저에 기억).
      ⚠ 법령 근거(2026-11-14 현행 원문 확인)·기한은 js/pu-deungi-core.js 머리글. 서식·기한·비용은 담당 법무사가 최종 확인한다.
      ═══════════════════════════════════════════════════════ -->
 <style>
@@ -105,7 +108,6 @@ button.lnk:disabled{opacity:1;color:var(--ink);cursor:default;text-decoration:no
 .chg{border:1px solid var(--line);border-radius:9px;margin:10px 12px;background:var(--card)}
 .chg>.hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-bottom:1px solid var(--line);border-radius:9px 9px 0 0}
 .chg>.hd b{font-size:13px}
-.arcg{border-top:1px solid var(--line)}
 /* 쉬운 진행 — 단계 막대 · 큰 단추 · 한글 쪽 화면 */
 .wiz{display:flex;gap:6px;padding:10px 12px;flex-wrap:wrap}
 .wiz button{flex:1 1 150px;display:flex;align-items:center;gap:8px;text-align:left;padding:8px 10px;border-radius:10px;white-space:normal}
@@ -136,8 +138,6 @@ button.lnk:disabled{opacity:1;color:var(--ink);cursor:default;text-decoration:no
   #spv .pvi{padding:0 !important;background:#ffffff !important;overflow:visible !important}
   #spv canvas{box-shadow:none !important;margin:0 auto !important;break-after:page;page-break-after:always;max-width:100% !important}
 }
-.arcg>.hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 12px;background:var(--bg)}
-.arcg>.hd b{white-space:nowrap;font-size:13px}
 .chg>.bd{padding:9px 10px}
 .tos{margin-top:8px;border-top:1px dashed var(--line2);padding-top:8px}
 .tor{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
@@ -262,22 +262,151 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
   .arct tbody td.kd,.arct tbody td.dt{order:3}
   .arct tbody td.kd{margin-left:54px}
 }
+/* ═══ 화면 개편(2026-11-18 대표 «UI 모두 깔끔하게 — 너무 단순하고 무미건조하고 빈 공백이 많다 · 한 화면에서 가급적 모두 확인 · 지난 기록은 접어서 펴기») ═══
+   · 머리줄 한 줄(이름·탭·사람) · 본문은 화면 너비를 쓴다 · 카드·표를 촘촘하게(표 안 글칸은 가리키면 테두리)
+   · 등기 현황: 사무소·지사장 띠 + 왼쪽 법인 정보 / 오른쪽 사원·분사무소 (넓은 화면에서 한 화면)
+   · 지난 기록: 묶음·끝난 건·바뀐 기록을 접고 펴기 */
+:root{--shadow:0 1px 2px rgba(15,23,42,.07),0 1px 1px rgba(15,23,42,.04)}
+body{background:linear-gradient(180deg,#f8fafc,#e2e8f0) fixed}
+.card{box-shadow:var(--shadow);border-radius:12px}
+.card>h3{padding:8px 12px;background:linear-gradient(#ffffff,#f8fafc);border-radius:12px 12px 0 0;font-size:13.5px}
+.cb{padding:8px 12px}
+.bar{padding:6px 10px}
+.t th,.t td{padding:4px 8px}
+.t th{font-weight:600;letter-spacing:-.1px}
+@media (min-width:769px){ :where(body:not(.slim)) .t tbody tr:where(:nth-child(even))>td{background:#f8fafc} }
+.t td.inp{padding:2px 3px}
+.t td.inp input,.t td.inp select{border-color:transparent;background:transparent;padding:3px 6px;font-size:12.5px;text-overflow:ellipsis}
+.t td.inp input:hover,.t td.inp select:hover{border-color:var(--line2);background:var(--card)}
+.t td.inp input:focus,.t td.inp select:focus{border-color:var(--blue);background:var(--card);outline:none;box-shadow:0 0 0 2px var(--blue-line)}
+.t.fx{table-layout:fixed}
+.t.fx th,.t.fx td{overflow:hidden;text-overflow:ellipsis}
+.t.mt{min-width:940px}
+.t.bt{min-width:900px}
+.t td.duty{white-space:normal;line-height:1.7}
+.mute{color:var(--mute)}
+.tiles{gap:6px;padding:8px 12px}
+.tile{padding:8px 10px;font-size:13px;border-radius:9px}
+.tile small{font-size:11.5px}
+.msgs{padding:0 12px 2px}
+.msg{padding:5px 10px;margin:5px 0}
+.empty{padding:16px 12px}
+/* 머리줄 — 이름 · 탭 · 사람이 한 줄 */
+#head{background:linear-gradient(90deg,#2563eb,#60a5fa) top/100% 3px no-repeat,var(--card);box-shadow:0 1px 3px rgba(15,23,42,.08)}
+.top{padding:6px 16px;gap:10px}
+.top h1{font-size:16px;white-space:nowrap}
+.tabs{padding:0;margin-left:6px;gap:4px;flex-wrap:nowrap}
+.tabs button{border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 13px;font-weight:600;white-space:nowrap}
+.tabs button:hover{background:var(--blue-bg);border-color:var(--blue-line)}
+.tabs button.on{background:var(--blue);border-color:var(--blue);color:#ffffff}
+.tabs .tn{display:inline-block;margin-left:5px;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;font-weight:700;background:var(--blue-bg);color:var(--blue-d)}
+.tabs button.on .tn{background:#ffffff;color:var(--blue-d)}
+.tabs .tn:empty{display:none}
+main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
+/* 등기 현황 — 사무소·지사장 띠 · 왼쪽 법인 정보 / 오른쪽 사원·분사무소 */
+#pane-base,#pane-hist,#pane-case{container-type:inline-size}
+.sums{display:inline-flex;gap:5px;flex-wrap:wrap;align-items:center;font-weight:400}
+.ofc{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:8px;padding:10px 12px}
+.oc{border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:9px;padding:6px 10px;background:var(--card);display:flex;flex-direction:column;gap:1px;min-width:0}
+.oc.hq{border-left-color:var(--blue);background:linear-gradient(90deg,var(--blue-bg),#ffffff 70%)}
+.oc.ok{border-left-color:var(--green-m);background:linear-gradient(90deg,var(--green-bg),#ffffff 70%)}
+.oc.no{border-left-color:var(--amber-m);background:linear-gradient(90deg,var(--amber-bg),#ffffff 70%)}
+.oc .oh{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.oc .oh b{font-size:13px;white-space:nowrap}
+.oc .op{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc .ot{font-size:11px;font-weight:600;color:var(--mute);margin-right:3px}
+.oc .miss{font-size:12.5px;font-weight:600;color:var(--amber)}
+.oc .lic{font-size:11px;font-weight:400;color:var(--mute)}
+.oc .oa,.oc .om{font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcols,.dright{display:block;min-width:0}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.fgrid .fl{font-size:11.5px}
+.fgrid .fl input{padding:4px 7px;font-size:12.5px}
+/* 중간 너비(2단이 못 되는 데스크톱) — 법인 정보를 4칸으로 펼쳐 세로를 줄인다 */
+@container (min-width:720px) and (max-width:1299px){
+  .fgrid{grid-template-columns:repeat(4,1fr)}
+  .fgrid .fl.wide{grid-column:span 2}
+}
+@container (min-width:1300px){
+  .dcols{display:grid;grid-template-columns:330px minmax(0,1fr);gap:12px;align-items:start}
+}
+@container (min-width:1000px){
+  .hcols{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+}
+/* 접고 펴기 — 카드 머리가 단추 */
+.car{display:inline-block;flex:0 0 14px;width:14px;color:var(--mute);font-size:12px;transition:transform .15s}
+.card.fc>.fh{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;border-radius:12px;background:linear-gradient(#ffffff,#f8fafc);padding:8px 12px;white-space:normal;font-weight:400}
+.card.fc>.fh:hover{background:var(--blue-bg)}
+.card.fc>.fh b{font-size:13.5px}
+.card.fc>.fh .hint{flex:1;min-width:0}
+.card.fc.open>.fh{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
+.card.fc.open>.fh .car,.arcg.open .car{transform:rotate(90deg)}
+.arcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(480px,100%),1fr));gap:8px;padding:10px 12px;align-items:start}
+.arcg{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;min-width:0;box-shadow:var(--shadow)}
+.arcg.open{grid-column:1/-1;border-color:var(--blue-line);box-shadow:0 0 0 1px var(--blue-line)}
+.arcg>.hd{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px 10px;background:none}
+.arcg .tg{flex:1;min-width:0;display:flex;align-items:flex-start;gap:6px;text-align:left;border:none;background:none;padding:2px 0;border-radius:6px;white-space:normal;font-weight:400}
+.arcg .tg:hover{border:none;background:none}
+.arcg .tg:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.arcg .tg .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.arcg .l1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.arcg .l1 .dt{flex:0 0 auto;font-size:12px;color:var(--blue-d);font-weight:700;font-variant-numeric:tabular-nums}
+.arcg .l1 .ttl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.arcg .l2{display:flex;align-items:center;gap:6px;min-width:0}
+.arcg .l2 .ks{font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arcg .l3{font-size:12px;color:var(--ink2);line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.arcg.open .l3{-webkit-line-clamp:unset;line-clamp:unset;display:block}
+.arcg .acts{display:flex;gap:5px;flex:0 0 auto}
+.arcg>.bd{border-top:1px solid var(--line)}
+@media (max-width:768px){
+  .top{padding:6px 10px;gap:6px 8px}
+  .tabs{order:5;flex:1 1 100%;margin-left:0;overflow-x:auto;gap:2px}
+  .tabs button{padding:5px 9px;font-size:13px}
+  .t td.inp input,.t td.inp select{border-color:var(--line2);background:var(--card)}
+  .t.mt,.t.bt{min-width:0}
+  .t.fx{table-layout:auto}
+  .t.fx th,.t.fx td{overflow:visible}
+  .t td.inp input,.t td.inp select,.fgrid .fl input{font-size:16px}   /* 폰 16px — 위의 표 안 글칸·법인 정보 칸 규칙이 이기지 않게(외부 검토 2026-11-18) */
+  .fgrid{grid-template-columns:1fr}
+  .arcg .acts{flex-direction:column}
+}
+body.slim .t td.inp input,body.slim .t td.inp select{border-color:var(--line2);background:var(--card)}
+/* 등기 건 — 넓으면 단추 4칸 · 바뀌는 것 카드 여러 칸 · 옆 칸이 열려 본문이 좁아도(데스크톱) 단계 4칸을 한 줄로 */
+#edChanges{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));column-gap:4px;align-items:start}
+#edChanges>.adds,#edChanges>.empty{grid-column:1/-1}
+@container (min-width:600px){ .tiles{grid-template-columns:repeat(4,1fr)} .wiz button{flex:1 1 0} }
+@media (min-width:1080px){ body.slim .tiles{grid-template-columns:repeat(4,1fr)} body.slim .wiz button{flex:1 1 0;padding:7px 8px} body.slim .wiz button .tx small{display:none} body.slim .wiz button.on .tx small{display:block} }
+body.slim .t.mt,body.slim .t.bt{min-width:0}
+body.slim .t.fx{table-layout:auto}
+body.slim .t.fx th,body.slim .t.fx td{overflow:visible}
+@media (min-width:1080px){ body.slim .t tbody td.c,body.slim .t tbody td.tk{padding:3px 8px} }
+/* ══ pu-design 시작 — 푸른등기는 탭이 머리줄(.top) 한 줄 안에 있다. 공용 A 틀의 탭 여백(옆 16px·아래 9px)이 머리줄을
+   위아래로 어긋나게 하니(자동 검토 2026-11-20) 자기 탭 여백·간격·단추 안쪽 여백을 그대로 둔다. 이름표가 둘이라 공용 파일보다 세다 ══ */
+:where(body.pu-design) .top .tabs{padding:0;gap:4px}
+:where(body.pu-design) .top .tabs button{padding:5px 13px}
+@media (max-width:768px){
+  :where(body.pu-design) .top .tabs{gap:2px}
+  :where(body.pu-design) .top .tabs button{padding:5px 9px;font-size:13px}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a">
 <div id="head">
   <div class="top">
     <h1>🖋 푸른등기</h1>
+    <div class="tabs" id="tabs" role="tablist" aria-label="푸른등기 화면">
+      <button role="tab" data-tab="case">📝 등기 건<span class="tn" data-n="case"></span></button>
+      <button role="tab" data-tab="base">🏛 등기 현황<span class="tn" data-n="base"></span></button>
+      <button role="tab" data-tab="hist">📚 지난 기록<span class="tn" data-n="hist"></span></button>
+    </div>
     <span class="sub wide-only">노무법인 변경등기 — 바뀌는 사람만 넣으면 서류가 한글로</span>
-    <span id="who"></span>
     <span class="sp"></span>
+    <span id="who"></span>
     <button class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
-  </div>
-  <div class="tabs" id="tabs" role="tablist" aria-label="푸른등기 화면">
-    <button role="tab" data-tab="case">📝 등기 건</button>
-    <button role="tab" data-tab="base">🏛 등기 현황</button>
-    <button role="tab" data-tab="hist">📚 지난 기록</button>
   </div>
 </div>
 <div id="lock"><h2>🖋 푸른등기</h2><div id="lockWhy"></div><p>대표·위임관리인만 열 수 있습니다.</p></div>
@@ -309,14 +438,14 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=101"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=47"></script>
-<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-appbar.js?v=53"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
@@ -328,7 +457,7 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-office-store.js?v=11"></script>
-<script src="js/pu-deungi-core.js?v=5"></script>
+<script src="js/pu-deungi-core.js?v=6"></script>
 <script src="js/pu-deungi-docs.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -419,7 +548,17 @@ function draw(){
   if(TAB==='case'){ drawBaseWarn(); drawCaseList(); drawEditor(); }
   else if(TAB==='base') drawBase();
   else drawHist();
-  sideHead(); sideDocRefresh();
+  drawTabBadges(); sideHead(); sideDocRefresh();
+}
+/* 탭 꼬리표 — 진행 중인 건 수 · 지난 기록 묶음 수 */
+function drawTabBadges(){
+  var m={ case:caseRows().filter(function(c){ return c.status!=='cancelled' && !(c.status==='done' && c.applied); }).length||'', base:'', hist:arcRows().length||'' };
+  /* 꼬리표 숫자의 뜻을 말로도(스크린리더·가리키면) — «등기 건 1» 만 읽히지 않게 */
+  var say={ case:function(n){ return '등기 건 — 진행 중 '+n+'건'; }, hist:function(n){ return '지난 기록 — 원본 서류 묶음 '+n+'개'; } };
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs .tn'), function(e){
+    var n=m[e.dataset.n]||''; e.textContent=n;
+    if(e.parentNode) e.parentNode.title=(n&&say[e.dataset.n])?say[e.dataset.n](n):'';
+  });
 }
 function drawBaseWarn(){
   var p=C.baseProblems(BASE);
@@ -772,59 +911,116 @@ function drawEasyDerived(){
   if(ab){ var canA=canApplyCase(a, c); ab.disabled=!canA; ab.title=canA?'':applyWhy(a); }
   drawSaveState(); sideDocRefresh();
 }
+/* 접고 펴기 — 지난 기록 묶음·끝난 건·바뀐 기록·정관 본문(2026-11-18 대표 «지난 기록은 접어서 펴서 보고 내용을 확인»). 펴 둔 것은 이 브라우저에 기억 */
+var FOLD={}; try{ FOLD=JSON.parse(lsGet('fold')||'{}')||{}; }catch(e){ FOLD={}; }
+function isOpen(k, dflt){ return FOLD[k]===undefined ? !!dflt : !!FOLD[k]; }
+function setFold(k, v){ FOLD[k]=!!v; var o={}; Object.keys(FOLD).slice(-300).forEach(function(x){ o[x]=FOLD[x]; }); FOLD=o; lsSet('fold', JSON.stringify(o)); }
+function foldKeyDraw(k){ if(k==='charter') drawBase(); else drawHist(); }
+function foldFocus(k){ Array.prototype.some.call(document.querySelectorAll('[data-act="fold"]'), function(b){ if(b.dataset.k===k){ try{ b.focus(); }catch(e){} return true; } return false; }); }
+
 /* ═══ 등기 현황 ═══ */
 function bd(){ return BASE_DRAFT || BASE; }
+/* 사무소·지사장 한눈에 (대표 2026-11-18 «각 지사의 지사장 등의 정보가 정확하게 매칭이 안 된다»)
+   — 분사무소 표의 «지사장»(사원을 고른다)에서 정한 대로 본점·지사마다 맡은 사람을 보인다. 사람 이름은 사원 줄에서 가져오므로 어긋나지 않는다 */
+function ofcHtml(b){
+  return C.officeRoster(b).map(function(r){
+    if(r.kind==='hq') return '<div class="oc hq"><div class="oh"><b>🏛 본점</b><span class="chip">주사무소</span></div>'+
+      '<div class="op"><span class="ot">대표사원</span> '+(r.head?esc(r.head):'<span class="miss">없음</span>')+'</div>'+
+      '<div class="oa" title="'+esc(r.addr)+'">'+esc(r.addr||'소재지 없음')+'</div>'+
+      '<div class="om">'+(b.firm&&b.firm.court?'관할 '+esc(b.firm.court):'관할 등기소 없음')+'</div></div>';
+    return '<div class="oc '+(r.headOk?'ok':'no')+'"><div class="oh"><b>🏢 '+esc(r.label||'분사무소')+'</b><span class="chip m" title="정관 제3조② 번호">'+esc(r.no)+'호</span></div>'+
+      '<div class="op"><span class="ot">지사장</span> '+(r.headOk?esc(r.head):'<span class="miss">미정 — 아래 표에서 고르기</span>')+(r.licenseNo?' <span class="lic">노무사 '+esc(r.licenseNo)+'</span>':'')+'</div>'+
+      '<div class="oa" title="'+esc(r.addr)+'">'+esc(r.addr||'소재지 없음')+'</div>'+
+      '<div class="om">'+(r.since?'설치 '+esc(r.since):'설치일 없음')+'</div></div>';
+  }).join('');
+}
+function sumHtml(b){
+  var n=C.normBase(b), reps=n.members.filter(function(m){ return m.rep; }).length, hp=C.headProblems(n), dup=C.headDups(n);
+  return '<span class="chip">사원 '+n.members.length+'명</span><span class="chip">대표사원 '+reps+'명</span><span class="chip">분사무소 '+n.branches.length+'곳</span>'+
+    (hp.length?'<span class="chip a" title="'+esc(hp.join('\n'))+'">지사장 미정 '+hp.length+'곳</span>':n.branches.length&&!dup.length?'<span class="chip g">지사장 모두 정함</span>':'')+
+    (dup.length?'<span class="chip a" title="한 사람은 한 곳에 상근합니다 — 공인노무사법 제7조의7③">'+esc(dup.join('·'))+' 지사장 두 곳 이상</span>':'')+
+    (n.asOf?'<span class="chip m">기준일 '+esc(n.asOf)+'</span>':'');
+}
+function dutyHtml(b, m){
+  var d=C.memberDuties(b, m.id), h='';
+  d.forEach(function(t){ h+='<span class="chip g">'+esc(t)+'</span> '; });
+  return h||'<span class="mute">—</span>';
+}
+function headSel(b, x, i){
+  var h=C.branchHead(b, x), v=h?h.id:'', n=C.normBase(b);
+  return '<select data-bb="'+i+'" data-k="head" aria-label="'+esc((x.alias||x.name||'분사무소')+' 지사장')+'"><option value=""'+(v?'':' selected')+'>— 미정 —</option>'+
+    n.members.map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===v?' selected':'')+'>'+esc((m.name||'(이름 없음)')+(m.rep?' · 대표':''))+'</option>'; }).join('')+'</select>';
+}
+/* 글을 치는 동안 — 띠·요약·직책·지사장 고르기 글자만 고친다(표를 다시 그리면 커서가 빠진다) */
+function baseLive(){
+  var e=$('ofc'); if(!e) return;
+  var b=bd(), n=C.normBase(b);
+  e.innerHTML=ofcHtml(b);
+  var s=$('baseSum'); if(s) s.innerHTML=sumHtml(b);
+  Array.prototype.forEach.call(document.querySelectorAll('#baseBox td.duty'), function(td){ var m=b.members[Number(td.dataset.i)]; if(m) td.innerHTML=dutyHtml(b, m); });
+  Array.prototype.forEach.call(document.querySelectorAll('#baseBox select[data-k="head"] option'), function(o){
+    if(!o.value) return; var m=n.members.filter(function(x){ return x.id===o.value; })[0]; if(m) o.textContent=(m.name||'(이름 없음)')+(m.rep?' · 대표':'');
+  });
+}
 function drawBase(){
   var b=bd(), f=b.firm, p=C.baseProblems(b);
   var nm=Object.keys(SEL.mem).filter(function(k){ return SEL.mem[k]; }).length, nb=Object.keys(SEL.br).filter(function(k){ return SEL.br[k]; }).length;
   function bf(label, key, val, opt){ return fld(label, key, val, opt).replace('data-k=', 'data-b='); }
-  var h='<div class="card"><h3>🏛 등기 현황 — 지금 등기부 <span class="hint">등기사항전부증명서를 보고 맞추십시오. 등기 건을 «등기 현황에 반영»하면 저절로 바뀝니다</span><span class="sp"></span>'+
-    '<span id="baseHead">'+baseHeadHtml()+'</span></h3>'+
-    '<div class="bar"><button class="sm" data-act="jsonIn">📂 파일에서 불러오기(JSON)</button><button class="sm" data-act="jsonOut">💾 파일로 내보내기(JSON)</button><span class="hint">내보낸 파일에는 사원 주소·생년월일이 들어 있습니다 — 보관에 주의하십시오</span></div>'+
+  /* ① 맨 위 띠 — 사무소·지사장 한눈에 + 저장 */
+  var h='<div class="dash"><div class="card"><h3>🏢 사무소·지사장 <span class="sums" id="baseSum">'+sumHtml(b)+'</span><span class="sp"></span>'+
+    '<span id="baseHead">'+baseHeadHtml()+'</span>'+
+    '<button class="sm" data-act="jsonIn" title="파일에서 불러오기(JSON)">📂 불러오기</button><button class="sm" data-act="jsonOut" title="파일로 내보내기(JSON) — 사원 주소·생년월일이 들어 있습니다. 보관에 주의하십시오">💾 내보내기</button></h3>'+
     (p.length?'<div class="msgs">'+p.map(function(x){ return '<div class="msg w">⚠ '+esc(x)+'</div>'; }).join('')+'</div>':'')+
-    '<div class="cb"><div class="grid">'+
-      bf('명칭', 'firm.name', f.name)+bf('등기번호', 'firm.regNo', f.regNo)+bf('등록번호(법인)', 'firm.corpNo', f.corpNo)+
-      bf('주사무소(등기부)', 'firm.hq', f.hq, { wide:true })+bf('정관 제3조의 주사무소(예: 충청남도 천안시)', 'firm.hqCharter', f.hqCharter)+
-      bf('관할 등기소', 'firm.court', f.court, { ph:'예: ○○지방법원 ○○지원 등기과' })+bf('정관변경 인가 관청(수신)', 'firm.authority', f.authority, { ph:'예: ○○지방고용노동청 ○○지청장' })+
-      bf('노무법인 인가 번호', 'firm.approvalNo', f.approvalNo)+bf('대표 전화', 'firm.phone', f.phone)+
-      bf('기준일(등기부 발급일)', 'asOf', b.asOf, { type:'date' })+bf('근거', 'source', b.source, { ph:'예: 등기사항전부증명서(현재 유효사항)' })+
-    '</div></div></div>';
-  /* 사원 */
+    '<div class="ofc" id="ofc">'+ofcHtml(b)+'</div></div>';
+  /* ② 왼쪽 법인 정보 */
+  h+='<div class="dcols"><div class="card"><h3>🏛 법인 정보 <span class="hint">등기사항전부증명서에 맞춥니다</span></h3><div class="cb"><div class="fgrid">'+
+      bf('명칭', 'firm.name', f.name)+bf('등기번호', 'firm.regNo', f.regNo)+bf('등록번호(법인)', 'firm.corpNo', f.corpNo)+bf('노무법인 인가 번호', 'firm.approvalNo', f.approvalNo)+
+      bf('주사무소(등기부)', 'firm.hq', f.hq, { wide:true })+bf('정관 제3조의 주사무소', 'firm.hqCharter', f.hqCharter, { ph:'예: 충청남도 천안시' })+bf('대표 전화', 'firm.phone', f.phone)+
+      bf('관할 등기소', 'firm.court', f.court, { wide:true, ph:'예: ○○지방법원 ○○지원 등기과' })+bf('정관변경 인가 관청(수신)', 'firm.authority', f.authority, { wide:true, ph:'예: ○○지방고용노동청 ○○지청장' })+
+      bf('기준일(등기부 발급일)', 'asOf', b.asOf, { type:'date' })+bf('근거', 'source', b.source, { ph:'예: 등기사항전부증명서' })+
+    '</div></div></div><div class="dright">';
+  /* ③ 오른쪽 사원 */
   var allM=b.members.length && b.members.every(function(m){ return SEL.mem[m.id]; });
-  h+='<div class="card"><h3>사원 '+b.members.length+'명 <span class="hint">주민번호는 앞 6자리(생년월일)만 — 뒷자리는 저장하지 않습니다</span><span class="sp"></span>'+(nm?'<b>'+nm+'명 선택</b><button class="sm warn" data-act="memDel">고른 사원 빼기</button>':'')+'<button class="sm" data-act="memAdd">＋ 사원 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="사원 모두 고르기" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금·현물 출자(원)</th><th>현물 재산</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
+  h+='<div class="card"><h3>👥 사원 '+b.members.length+'명 <span class="hint wide-only">주민번호는 앞 6자리만 — 뒷자리는 저장하지 않습니다</span><span class="sp"></span>'+(nm?'<b>'+nm+'명 선택</b><button class="sm warn" data-act="memDel">고른 사원 빼기</button>':'')+'<button class="sm" data-act="memAdd">＋ 사원 줄</button></h3>'+
+    '<div class="scroll"><table class="t fx mt"><colgroup><col style="width:26px"><col style="width:34px"><col style="width:84px"><col style="width:76px"><col><col style="width:90px"><col style="width:116px"><col style="width:40px"><col style="width:40px"><col style="width:110px"><col style="width:84px"><col style="width:112px"></colgroup>'+
+    '<thead><tr><th class="c"><input type="checkbox" aria-label="사원 모두 고르기" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>출자(원)</th><th>현물 재산</th><th class="c" title="노무출자">노무</th><th class="c" title="대표사원">대표</th><th>입사일</th><th>등록번호</th><th title="지사장은 아래 분사무소 표에서 고릅니다">직책</th></tr></thead><tbody>';
   b.members.forEach(function(m, i){
     var iv=C.normInvest(m.invest);
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(m.name||'사원')+' 고르기" data-sel="mem" data-id="'+esc(m.id)+'"'+(SEL.mem[m.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="inp" data-l="이름"><input data-bm="'+i+'" data-k="name" value="'+esc(m.name)+'" placeholder="이름"></td>'+
-      '<td class="inp" data-l="생년월일"><input data-bm="'+i+'" data-k="birth" value="'+esc(m.birth)+'" inputmode="numeric" maxlength="6" placeholder="생년월일 6자리"></td>'+
-      '<td class="inp" data-l="주소" style="min-width:260px"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소"></td>'+
-      '<td class="inp" data-l="현금·현물 출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="출자 금액"></td>'+
-      '<td class="inp" data-l="현물 재산" style="min-width:180px"><input data-bm="'+i+'" data-k="invest.inKind" value="'+esc(iv.inKind||'')+'" placeholder="현물이면 — 차종 : ○○ / 연식 : ○○"></td>'+
+      '<td class="inp" data-l="생년월일"><input data-bm="'+i+'" data-k="birth" value="'+esc(m.birth)+'" inputmode="numeric" maxlength="6" placeholder="6자리"></td>'+
+      '<td class="inp" data-l="주소"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소" title="'+esc(m.addr)+'"></td>'+
+      '<td class="inp" data-l="출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="금액"></td>'+
+      '<td class="inp" data-l="현물 재산"><input data-bm="'+i+'" data-k="invest.inKind" value="'+esc(iv.inKind||'')+'" placeholder="현물이면 — 차종 : ○○ / …" title="'+esc(iv.inKind||'')+'"></td>'+
       '<td class="tk" data-l="노무출자"><input type="checkbox" aria-label="'+esc((m.name||'사원')+' 노무출자')+'" data-bm="'+i+'" data-k="invest.labor"'+(iv.labor?' checked':'')+'></td>'+
       '<td class="tk" data-l="대표사원"><input type="checkbox" aria-label="'+esc((m.name||'사원')+' 대표사원')+'" data-bm="'+i+'" data-k="rep"'+(m.rep?' checked':'')+'></td>'+
       '<td class="inp" data-l="입사일"><input type="date" data-bm="'+i+'" data-k="joinDate" value="'+esc(m.joinDate)+'"></td>'+
-      '<td class="inp" data-l="노무사 등록번호"><input data-bm="'+i+'" data-k="licenseNo" value="'+esc(m.licenseNo||'')+'" placeholder="등록번호"></td></tr>';
+      '<td class="inp" data-l="등록번호"><input data-bm="'+i+'" data-k="licenseNo" value="'+esc(m.licenseNo||'')+'" placeholder="번호" title="공인노무사 등록번호"></td>'+
+      '<td class="duty" data-l="직책" data-i="'+i+'">'+dutyHtml(b, m)+'</td></tr>';
   });
-  if(!b.members.length) h+='<tr><td colspan="11" class="empty">사원이 없습니다 — «＋ 사원 줄»로 넣거나 파일에서 불러오십시오.</td></tr>';
+  if(!b.members.length) h+='<tr><td colspan="12" class="empty">사원이 없습니다 — «＋ 사원 줄»로 넣거나 파일에서 불러오십시오.</td></tr>';
   h+='</tbody></table></div></div>';
-  /* 분사무소 */
+  /* ④ 오른쪽 분사무소 — 지사장은 사원 중에서 고른다 */
   var allB=b.branches.length && b.branches.every(function(x){ return SEL.br[x.id]; });
-  h+='<div class="card"><h3>분사무소 '+b.branches.length+'곳 <span class="hint">«정관 호»는 정관 제3조②의 번호 — 폐지된 번호는 «삭제»로 남습니다</span><span class="sp"></span>'+(nb?'<b>'+nb+'곳 선택</b><button class="sm warn" data-act="brDel">고른 분사무소 빼기</button>':'')+'<button class="sm" data-act="brAdd">＋ 분사무소 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="분사무소 모두 고르기" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th>정관 호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
+  h+='<div class="card"><h3>🏢 분사무소 '+b.branches.length+'곳 <span class="hint wide-only">«호»는 정관 제3조②의 번호 — 폐지된 번호는 «삭제»로 남습니다 · 지사장은 사원 중에서 고릅니다</span><span class="sp"></span>'+(nb?'<b>'+nb+'곳 선택</b><button class="sm warn" data-act="brDel">고른 분사무소 빼기</button>':'')+'<button class="sm" data-act="brAdd">＋ 분사무소 줄</button></h3>'+
+    '<div class="scroll"><table class="t fx bt"><colgroup><col style="width:26px"><col style="width:34px"><col style="width:44px"><col style="width:112px"><col style="width:90px"><col style="width:140px"><col><col style="width:210px"><col style="width:110px"></colgroup>'+
+    '<thead><tr><th class="c"><input type="checkbox" aria-label="분사무소 모두 고르기" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th title="정관 제3조②의 호">호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>지사장</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
   b.branches.forEach(function(x, i){
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(x.name||'분사무소')+' 고르기" data-sel="br" data-id="'+esc(x.id)+'"'+(SEL.br[x.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
-      '<td class="inp" data-l="정관 호" style="width:70px"><input data-bb="'+i+'" data-k="no" value="'+esc(x.no)+'" inputmode="numeric"></td>'+
+      '<td class="inp" data-l="호"><input data-bb="'+i+'" data-k="no" value="'+esc(x.no)+'" inputmode="numeric"></td>'+
       '<td class="inp" data-l="명칭(등기부)"><input data-bb="'+i+'" data-k="name" value="'+esc(x.name)+'" placeholder="예: 대전분사무소"></td>'+
       '<td class="inp" data-l="정관 명칭"><input data-bb="'+i+'" data-k="alias" value="'+esc(x.alias)+'" placeholder="예: 대전지사"></td>'+
-      '<td class="inp" data-l="소재지(등기부)" style="min-width:260px"><input data-bb="'+i+'" data-k="addr" value="'+esc(x.addr)+'"></td>'+
-      '<td class="inp" data-l="정관 소재지" style="min-width:200px"><input data-bb="'+i+'" data-k="charterAddr" value="'+esc(x.charterAddr)+'"></td>'+
+      '<td class="inp" data-l="지사장">'+headSel(b, x, i)+'</td>'+
+      '<td class="inp" data-l="소재지(등기부)"><input data-bb="'+i+'" data-k="addr" value="'+esc(x.addr)+'" title="'+esc(x.addr)+'"></td>'+
+      '<td class="inp" data-l="정관 소재지"><input data-bb="'+i+'" data-k="charterAddr" value="'+esc(x.charterAddr)+'" title="'+esc(x.charterAddr)+'"></td>'+
       '<td class="inp" data-l="설치일"><input type="date" data-bb="'+i+'" data-k="since" value="'+esc(x.since)+'"></td></tr>';
   });
-  if(!b.branches.length) h+='<tr><td colspan="8" class="empty">분사무소가 없습니다.</td></tr>';
-  h+='</tbody></table></div></div>';
-  h+='<div class="card"><h3>정관 본문(선택) <span class="hint">넣어 두면 «변경 정관»이 제3·5·6조(대표사원이 바뀌면 제13조도)를 갈아 끼운 전문으로 나옵니다. 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸으로 바뀝니다</span></h3>'+
-    '<div class="cb"><textarea data-b="charter" rows="10" placeholder="정 관&#10;(2001. 10. 30. 제정)&#10;…&#10;제3조【사무소의 소재지】&#10;…">'+esc(b.charter||'')+'</textarea></div></div>';
+  if(!b.branches.length) h+='<tr><td colspan="9" class="empty">분사무소가 없습니다.</td></tr>';
+  h+='</tbody></table></div></div></div></div>';
+  /* ⑤ 정관 본문 — 접어 둔다 */
+  var co=isOpen('charter', false);
+  h+='<div class="card fc'+(co?' open':'')+'"><button class="fh" data-act="fold" data-k="charter" aria-expanded="'+(co?'true':'false')+'"><span class="car" aria-hidden="true">▸</span><b>📜 정관 본문</b><span class="hint">(선택) 넣어 두면 «변경 정관»이 제3·5·6조(대표사원이 바뀌면 제13조도)를 갈아 끼운 전문으로 나옵니다 · 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸이 됩니다</span></button>'+
+    (co?'<div class="cb"><textarea data-b="charter" rows="10" placeholder="정 관&#10;(2001. 10. 30. 제정)&#10;…&#10;제3조【사무소의 소재지】&#10;…">'+esc(b.charter||'')+'</textarea></div>':'')+'</div>';
   $('baseBox').innerHTML=h;
   /* 표 안 입력칸 이름표(스크린리더) — 폰 카드 이름표(data-l)와 같은 말 */
   Array.prototype.forEach.call($('baseBox').querySelectorAll('td[data-l] input:not([aria-label])'), function(i){ i.setAttribute('aria-label', i.closest('td').getAttribute('data-l')); });
@@ -852,32 +1048,50 @@ function arcRows(){ return C.archiveList(ARCH); }
 function arcById(id){ return arcRows().filter(function(a){ return a.id===id; })[0]||null; }
 function extOf(nm){ var m=/\.([A-Za-z0-9]+)$/.exec(String(nm||'')); return m?m[1].toLowerCase():''; }
 function arcLockAttr(){ return ME.isAdmin?'':' disabled title="🔒 총괄관리자만 엽니다"'; }
+/* 묶음 머리에 «정관 2 · 의사록 3 · 증명서» 처럼 어떤 서류가 들었는지 — 펴지 않고도 내용을 가늠한다 */
+function arcKindSummary(a){
+  var cnt={}, order=[];
+  C.arcFiles(a).forEach(function(x){ var k=C.arcKindLabel(x.kind); if(!cnt[k]){ cnt[k]=0; order.push(k); } cnt[k]++; });
+  return order.map(function(k){ return k+(cnt[k]>1?' '+cnt[k]:''); }).join(' · ');
+}
 function drawArchive(){
   var rows=arcRows(), nsel=Object.keys(SEL.arc).filter(function(k){ return SEL.arc[k]; }).length;
-  var h='<div class="card" id="arcCard"><h3>📁 지난 등기 원본 서류 <span class="chip m">'+rows.length+'묶음</span><span class="hint wide-only">🔒 보기·받기는 총괄관리자만</span><span class="sp"></span><button class="sm pri" data-act="arcNew">＋ 묶음 만들기</button></h3>';
+  var openN=rows.filter(function(a){ return isOpen('a:'+a.id, false); }).length, allOpen=rows.length>0 && openN===rows.length;
+  var h='<div class="card" id="arcCard"><h3>📁 지난 등기 원본 서류 <span class="chip m">'+rows.length+'묶음</span><span class="hint wide-only">🔒 보기·받기는 총괄관리자만 · 묶음을 누르면 펴집니다</span><span class="sp"></span>'+
+    (rows.length?'<button class="sm" data-act="foldAll" data-v="'+(allOpen?'0':'1')+'">'+(allOpen?'모두 접기':'모두 펴기')+'</button>':'')+
+    '<button class="sm pri" data-act="arcNew">＋ 묶음 만들기</button></h3>';
   if(nsel) h+='<div class="bar"><b>'+nsel+'개 선택</b><button class="sm" data-act="arcSelDl"'+arcLockAttr()+'>⬇ 받기</button><button class="sm warn" data-act="arcSelOut">묶음에서 빼기</button><button class="sm" data-act="arcSelClear">고르기 풀기</button><span class="hint">빼도 파일은 보관함에 남습니다</span></div>';
   if(ARC_BUSY) h+='<div class="msgs"><div class="msg i">파일을 올리는 중입니다 — 창을 닫지 마십시오.</div></div>';
   if(!rows.length) h+='<div class="empty">아직 없습니다. «＋ 묶음 만들기»로 지난 등기(예: 2019-07 서산분사무소 설치)를 만들고 원본 파일을 올리십시오.</div>';
+  h+='<div class="arcgrid">';
   rows.forEach(function(a){
-    var fl=C.arcFiles(a), all=fl.length && fl.every(function(x){ return SEL.arc[a.id+'|'+x.fileId]; });
-    h+='<div class="arcg" data-arc="'+esc(a.id)+'"><div class="hd"><b>'+esc(a.at||'날짜 없음')+'</b> '+esc(a.title||'(이름 없음)')+' <span class="chip m">'+fl.length+'개</span><span class="sp"></span><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp"'+(ARC_BUSY?' disabled':'')+'>＋ 파일 올리기</button></div>';
-    if(a.summary) h+='<div class="cb hint">'+esc(a.summary)+'</div>';
-    if(!fl.length) h+='<div class="empty">파일이 없습니다.</div>';
-    else {
-      h+='<div class="scroll"><table class="t arct"><thead><tr><th class="c"><input type="checkbox" aria-label="이 묶음 모두 고르기" data-selall="arc:'+esc(a.id)+'"'+(all?' checked':'')+'></th><th class="n">№</th><th>파일</th><th>종류</th><th>날짜</th><th></th></tr></thead><tbody>';
-      fl.forEach(function(x, i){
-        var k=a.id+'|'+x.fileId;
-        h+='<tr class="click" data-arcf="'+esc(x.fileId)+'"><td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
-          '<td class="ti" title="'+esc(x.name)+'"><button class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+arcLockAttr()+'>'+esc(x.name)+'</button></td>'+
-          '<td class="kd">'+esc(C.arcKindLabel(x.kind))+'</td><td class="dt">'+esc(x.date||'')+'</td>'+
-          '<td class="ac"><button class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기" title="받기"'+arcLockAttr()+'>⬇</button></td></tr>';
-      });
-      h+='</tbody></table></div>';
+    var fl=C.arcFiles(a), op=isOpen('a:'+a.id, false), all=fl.length && fl.every(function(x){ return SEL.arc[a.id+'|'+x.fileId]; }), ks=arcKindSummary(a);
+    h+='<div class="arcg'+(op?' open':'')+'" data-arc="'+esc(a.id)+'"><div class="hd"><button class="tg" data-act="fold" data-k="a:'+esc(a.id)+'" aria-expanded="'+(op?'true':'false')+'"'+(op?' aria-controls="arcb-'+esc(a.id)+'"':'')+'>'+
+      '<span class="car" aria-hidden="true">▸</span><span class="tx"><span class="l1"><span class="dt">'+esc(a.at||'날짜 없음')+'</span><b class="ttl" title="'+esc(a.title||'')+'">'+esc(a.title||'(이름 없음)')+'</b></span>'+
+      '<span class="l2"><span class="chip m">'+fl.length+'개</span>'+(ks?'<span class="ks">'+esc(ks)+'</span>':'')+'</span>'+
+      (a.summary?'<span class="l3">'+esc(a.summary)+'</span>':'')+'</span></button>'+
+      '<span class="acts"><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp" aria-label="파일 올리기"'+(ARC_BUSY?' disabled':'')+'>＋ 파일</button></span></div>';
+    if(op){
+      h+='<div class="bd" id="arcb-'+esc(a.id)+'">';
+      if(!fl.length) h+='<div class="empty">파일이 없습니다. «＋ 파일»로 올리십시오.</div>';
+      else {
+        h+='<div class="scroll"><table class="t arct"><thead><tr><th class="c"><input type="checkbox" aria-label="이 묶음 모두 고르기" data-selall="arc:'+esc(a.id)+'"'+(all?' checked':'')+'></th><th class="n">№</th><th>파일</th><th>종류</th><th>날짜</th><th></th></tr></thead><tbody>';
+        fl.forEach(function(x, i){
+          var k=a.id+'|'+x.fileId;
+          h+='<tr class="click" data-arcf="'+esc(x.fileId)+'"><td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+            '<td class="ti" title="'+esc(x.name)+'"><button class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+arcLockAttr()+'>'+esc(x.name)+'</button></td>'+
+            '<td class="kd">'+esc(C.arcKindLabel(x.kind))+'</td><td class="dt">'+esc(x.date||'')+'</td>'+
+            '<td class="ac"><button class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기" title="받기"'+arcLockAttr()+'>⬇</button></td></tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+      h+='</div>';
     }
     h+='</div>';
   });
-  return h+'<div style="height:4px"></div></div>';
+  return h+'</div></div>';
 }
+
 /* 묶음 하나 고치기 — 관문으로. 찬 자리에서 previous 가 null 로 먼저 오면 화면 기억(ARCH)으로 만든다 */
 function arcWrite(id, fn){
   var g=GEN;
@@ -1074,6 +1288,7 @@ function arcView(evId, fid){
   if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
   var a=arcById(evId), f=a&&a.files[fid]; if(!f) return;
   var ext=extOf(f.name);
+  if(!isOpen('a:'+evId, false)){ setFold('a:'+evId, true); if(TAB==='hist') drawHist(); }   /* 접힌 묶음의 파일을 보면 그 묶음을 펴 둔다 */
   sideShow({ kind:'arc', ev:evId, fid:fid }, function(box, live){
     PuOfficeStore.secretBlob(f.fileId||fid).then(function(blob){
       if(!live()) return;
@@ -1203,22 +1418,24 @@ function fetchSecret(fileId){
     return r.json().catch(function(){ return {}; }).then(function(j){ throw new Error(j.error||('열지 못했습니다 ('+r.status+')')); });
   });
 }
+function foldCard(k, dflt, title, count, body){
+  var op=isOpen(k, dflt);
+  return '<div class="card fc'+(op?' open':'')+'"><button class="fh" data-act="fold" data-k="'+k+'" aria-expanded="'+(op?'true':'false')+'"><span class="car" aria-hidden="true">▸</span><b>'+title+'</b><span class="chip m">'+count+'</span></button>'+(op?body:'')+'</div>';
+}
 function drawHist(){
-  var done=caseRows().filter(function(c){ return c.status==='cancelled' || (c.status==='done' && c.applied); });
-  var h='<div class="card"><h3>끝난·취소한 등기 건 '+done.length+'</h3>';
-  if(!done.length) h+='<div class="empty">아직 없습니다.</div>';
+  var done=caseRows().filter(function(c){ return c.status==='cancelled' || (c.status==='done' && c.applied); }), dh='';
+  if(!done.length) dh='<div class="empty">아직 없습니다.</div>';
   else {
-    h+='<div class="scroll"><table class="t"><thead><tr><th class="c"></th><th class="n">№</th><th>건 이름</th><th>총회일</th><th>단계</th><th>등기 완료</th><th>바뀐 것</th></tr></thead><tbody>';
+    dh='<div class="scroll"><table class="t"><thead><tr><th class="c"></th><th class="n">№</th><th>건 이름</th><th>총회일</th><th>단계</th><th>등기 완료</th><th>바뀐 것</th></tr></thead><tbody>';
     done.forEach(function(c, i){
       var a=C.applyChanges(baseOf(c), c);
-      h+='<tr class="click" data-open="'+esc(c.id)+'" tabindex="0" aria-label="'+esc(c.title)+' 열기"><td class="c">📄</td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td><td data-l="완료">'+esc((c.dates&&c.dates.done)||'—')+'</td><td class="nw" title="'+esc(C.summary(a))+'">'+esc(C.summary(a)||'—')+'</td></tr>';
+      dh+='<tr class="click" data-open="'+esc(c.id)+'" tabindex="0" aria-label="'+esc(c.title)+' 열기"><td class="c">📄</td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td><td data-l="완료">'+esc((c.dates&&c.dates.done)||'—')+'</td><td class="nw" title="'+esc(C.summary(a))+'">'+esc(C.summary(a)||'—')+'</td></tr>';
     });
-    h+='</tbody></table></div>';
+    dh+='</tbody></table></div>';
   }
-  h+='</div>';
   var hi=(BASE.history||[]).slice().reverse();
-  h+='<div class="card"><h3>등기 현황 바뀐 기록 '+hi.length+'</h3>'+(hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>')+'</div>';
-  $('histBox').innerHTML=drawArchive()+h;
+  var hh=hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>';
+  $('histBox').innerHTML=drawArchive()+'<div class="hcols">'+foldCard('done', true, '끝난·취소한 등기 건', done.length, dh)+foldCard('hist', true, '등기 현황 바뀐 기록', hi.length, hh)+'</div>';
   sideMark(); sideHead();
 }
 
@@ -1339,7 +1556,7 @@ function applyToBase(){
   var nb=C.nextBase(a, { today:today() });
   /* 반영 전 현황을 건에 남긴다 — 나중에 이 건을 열어도 같은 서류가 나오게(정관 본문·기록은 빼고) */
   var snap=C.normBase(BASE); snap.charter=''; snap.history=[];
-  var msg='등기 현황을 이 건이 끝난 모습으로 바꿉니다.\n\n· '+C.summary(a)+'\n· 사원 '+BASE.members.length+'명 → '+nb.members.length+'명, 분사무소 '+BASE.branches.length+'곳 → '+nb.branches.length+'곳'+
+  var msg='등기 현황을 이 건이 끝난 모습으로 바꿉니다.\n\n· '+C.summary(a)+'\n· 사원 '+BASE.members.length+'명 → '+nb.members.length+'명, 분사무소 '+BASE.branches.length+'곳 → '+nb.branches.length+'곳'+(C.headProblems(nb).length>C.headProblems(BASE).length?'\n· 지사장이 비는 분사무소가 생깁니다 — 반영한 뒤 «등기 현황»에서 지사장을 정하십시오':'')+
     (BASE.charter?'\n· 정관 본문의 제3·5·6조'+(a.arts.indexOf(13)>=0?'·제13조':'')+'도 바꿉니다':'')+'\n\n바꾼 뒤에는 이 건을 «지난 기록»으로 옮깁니다. 진행할까요?';
   if(!confirm(msg)) return;
   var g=GEN;
@@ -1417,9 +1634,9 @@ document.addEventListener('click', function(ev){
     else if(act==='clearSel'){ SEL.cases={}; drawCaseList(); }
     else if(act==='baseSave') saveBase();
     else if(act==='baseUndo'){ if(confirm('저장 안 한 고침을 버릴까요?')){ BASE_DRAFT=null; drawBase(); } }
-    else if(act==='memAdd'){ var b=touchBase(); var used={}; b.members.forEach(function(m){ used[m.id]=1; }); var k=1; while(used['m'+k]) k++; b.members.push({ id:'m'+k, name:'', birth:'', addr:'', invest:{ cash:0, labor:false }, rep:false, joinDate:'' }); drawBase(); }
+    else if(act==='memAdd'){ var b=touchBase(); var used={}; b.members.forEach(function(m){ used[m.id]=1; }); b.branches.forEach(function(x){ if(x.head) used[x.head]=1; }); var k=1; while(used['m'+k]) k++; b.members.push({ id:'m'+k, name:'', birth:'', addr:'', invest:{ cash:0, labor:false }, rep:false, joinDate:'' }); drawBase(); }
     else if(act==='brAdd'){ var b2=touchBase(); var u2={}, mx=0; b2.branches.forEach(function(x){ u2[x.id]=1; mx=Math.max(mx, Number(x.no)||0); }); var k2=1; while(u2['b'+k2]) k2++; b2.branches.push({ id:'b'+k2, name:'', alias:'', addr:'', charterAddr:'', since:'', no:mx+1 }); drawBase(); }
-    else if(act==='memDel'){ var ids=Object.keys(SEL.mem).filter(function(k){ return SEL.mem[k]; }); if(ids.length&&confirm(ids.length+'명을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b3=touchBase(); b3.members=b3.members.filter(function(m){ return !SEL.mem[m.id]; }); SEL.mem={}; drawBase(); } }
+    else if(act==='memDel'){ var ids=Object.keys(SEL.mem).filter(function(k){ return SEL.mem[k]; }); if(ids.length&&confirm(ids.length+'명을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b3=touchBase(); b3.branches.forEach(function(x){ if(x.head && SEL.mem[x.head]) x.head=''; }); b3.members=b3.members.filter(function(m){ return !SEL.mem[m.id]; }); SEL.mem={}; drawBase(); } }
     else if(act==='brDel'){ var ids2=Object.keys(SEL.br).filter(function(k){ return SEL.br[k]; }); if(ids2.length&&confirm(ids2.length+'곳을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b4=touchBase(); b4.branches=b4.branches.filter(function(x){ return !SEL.br[x.id]; }); SEL.br={}; drawBase(); } }
     else if(act==='jsonOut') jsonOut();
     else if(act==='jsonIn') $('jsonFile').click();
@@ -1436,6 +1653,8 @@ document.addEventListener('click', function(ev){
     else if(act==='arcSelDl') arcDownload(arcSelected());
     else if(act==='arcSelOut') arcSelOut();
     else if(act==='arcSelClear'){ SEL.arc={}; drawHist(); }
+    else if(act==='fold'){ var fk=el.dataset.k, fo=el.getAttribute('aria-expanded')==='true'; setFold(fk, !fo); foldKeyDraw(fk); foldFocus(fk); }
+    else if(act==='foldAll'){ var fv=el.dataset.v==='1'; arcRows().forEach(function(a){ setFold('a:'+a.id, fv); }); drawHist(); var fb=document.querySelector('#histBox [data-act="foldAll"]'); if(fb){ try{ fb.focus(); }catch(e){} } }
     return;
   }
   /* ☐ 칸 둘레를 누르면 «고르기»다 — 건이 열리면 안 된다(폰에서 체크칸이 작다 · 기능 검증 2026-11-14) */
@@ -1477,7 +1696,7 @@ function onField(ev){
     else if(el.dataset.bb!=null){ var x=b.branches[Number(el.dataset.bb)]; if(!x) return; x[el.dataset.k]=el.dataset.k==='no'?C.num(v):v; }
     else if(el.dataset.b){ setPath(b, el.dataset.b, v); }
     /* 글자 칸은 다시 그리지 않는다(치는 중 커서가 빠진다) — 고르기·날짜만 다시 그린다 */
-    if(ev.type==='change' && (el.type==='checkbox'||el.type==='date')) drawBase();
+    if(ev.type==='change' && (el.type==='checkbox'||el.type==='date')) drawBase(); else baseLive();
     return;
   }
   var c=cur(); if(!c) return;

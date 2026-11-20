@@ -216,7 +216,7 @@ test('줄 수 한도 — 오래 쓰면 완료 탭이 길어져도 한도까지�
   assert.equal(Object.keys(w.ctx._mr.sel).length, rows, '고른 것은 «보이는 줄»만(안 보이는 건을 골라 일괄로 바꾸면 안 된다)');
 });
 test('★ 메일 제목·보낸이를 이스케이프한다(제목에 태그가 있어도 화면에 안 심긴다)', async () => {
-  const w = world({ onPage: true, msgs: { '101': mailRow({ s: '동의서 제출 <img src=x onerror=alert(1)>', f: '<b>가</b>' }) } });
+  const w = world({ onPage: true, msgs: { '101': mailRow({ s: '위원 위촉 동의서 제출 <img src=x onerror=alert(1)>', f: '<b>가</b>' }) } });   // 위촉 — 범위 안이라 진행 중 탭에 나온다
   w.ctx.mrStart(); await settle(); await settle(); await settle(); w.ctx.mrRender();
   const h = w.els.mrBody.innerHTML;
   assert.ok(!/<img src=x/.test(h) && !/<b>가<\/b>/.test(h), '태그가 그대로 들어가면 안 된다');

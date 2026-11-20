@@ -90,8 +90,8 @@ tr.fr.starred{background:rgba(217,119,6,.07)}
   .tab-stick{position:sticky;top:var(--headH,94px);z-index:13}
   #pgFeed .scroll,#pgPlan .scroll{overflow:visible}
   #pgFeed thead th,#pgPlan thead th{position:sticky;z-index:12;background:var(--card);top:calc(var(--headH,94px) + var(--tstickH,60px))}
-  #pgRgn .scroll{overflow:visible}
-  #pgRgn thead th{position:sticky;z-index:12;background:var(--card);top:calc(var(--headH,94px) + var(--tstickH,60px))}
+  .lens .scroll{overflow:visible}
+  .lens thead th{position:sticky;z-index:12;background:var(--card);top:calc(var(--headH,94px) + var(--tstickH,60px))}
 }
 /* 공고 모아보기 머리 — «딱 두 줄»(대표 지시 2026-10-11 「셀 너무 많다 정렬해달라 2줄로」).
    첫 줄 = 검색·거르개 셋·건수·표시·단추 / 둘째 줄 = 찾는 말 알약(넘치면 옆으로 민다 — 줄을 늘리지 않는다).
@@ -257,20 +257,21 @@ td.act{white-space:nowrap}
 tr.fr,tr.mr{cursor:pointer}
 tr.fr:hover td,tr.mr:hover td{background:var(--bg)}
 tr.gone td{opacity:.62}
-/* 📍 대전·충남·충북 (대표 지시 2026-11-16) — 칸은 «한 줄»: 긴 것은 … + title(전문). 표 짜임은 컨설턴트 모집 표(.rec-hits)를 그대로 써서 폰 카드도 같다 */
-#pgRgn .rec-fixed td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* 태블릿(641~1099px) — 고정 칸 합(약 760px)이 화면보다 넓으면 제목 칸이 0px 로 접힌다(2026-11-16 검증 실측 768px).
+/* 모아보기 탭(.lens) — 📍 대전·세종·충남·충북(2026-11-16) · 🤖 AI 사업(2026-11-19)이 «한 벌»로 쓴다.
+   칸은 «한 줄»: 긴 것은 … + title(전문). 표 짜임은 컨설턴트 모집 표(.rec-hits)를 그대로 써서 폰 카드도 같다 */
+.lens .rec-fixed td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 태블릿(641~1099px) — 고정 칸 합(약 780px)이 화면보다 넓으면 제목 칸이 0px 로 접힌다(2026-11-16 검증 실측 768px).
    표에 최소 폭을 주고 .scroll 이 옆으로 밀게 한다. 폰(640 이하)은 카드라 안 건드리고, 1100 이상은 화면이 넉넉해 밀 일이 없다 */
-@media (min-width:641px){ #pgRgn .rec-fixed{min-width:960px} }
-#pgRgn .rec-fixed td.act{overflow:visible}
-#pgRgn .rec-fixed td.tt{font-weight:600}
-#pgRgn tr.rr{cursor:pointer}
-#pgRgn tr.rr:hover td{background:var(--bg)}
-#pgRgn .rgt{display:inline-block;padding:0 6px;margin-right:3px;border-radius:5px;font-size:11px;line-height:18px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe}
-#pgRgn .rgt.wide{background:var(--bg);color:var(--text-mute);border-color:var(--border)}
-#rgnChips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
-#rgnChips .mchip{flex:none;padding:4px 10px}
-#rgnNote:empty{display:none}
+@media (min-width:641px){ .lens .rec-fixed{min-width:960px} }
+.lens .rec-fixed td.act{overflow:visible}
+.lens .rec-fixed td.tt{font-weight:600}
+.lens tr.rr{cursor:pointer}
+.lens tr.rr:hover td{background:var(--bg)}
+.lens .rgt{display:inline-block;padding:0 6px;margin-right:3px;border-radius:5px;font-size:11px;line-height:18px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe}
+.lens .rgt.wide{background:var(--bg);color:var(--text-mute);border-color:var(--border)}
+.lens-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.lens-chips .mchip{flex:none;padding:4px 10px}
+.lens-note:empty{display:none}
 /* 팝업 */
 .pop{position:fixed;inset:0;z-index:9000;display:none;align-items:flex-start;justify-content:center;
   padding:40px 16px;overflow:auto;background:rgba(15,23,42,.45)}
@@ -357,9 +358,9 @@ table.cmp td{white-space:nowrap}
   /* 떠 있는 「즐겨찾기」 손잡이가 목록 오른쪽 끝(남은 날)을 덮는다 → 폰에서는 숨기고 머리의 ⭐ 가 같은 목록을 연다 */
   [data-pu-appbar-tab]{display:none!important}
   #mFavBtn.m-only{display:inline-block}
-  #perBox label,#pPerBox label,#rPerBox label{font-size:0}
+  #perBox label,#pPerBox label,#rPerBox label,#aPerBox label{font-size:0}
   #tabs .m-only{display:inline}   /* 📍 탭의 폰 이름 「충청권」 — PC 이름(대전·세종·충남·충북)은 .mx 로 숨는다 */
-  #pgRgn .rec-hits td.rdt{display:none}   /* 폰 둘째 줄 — 받은 날은 빼고 지역·갈래·기관·마감·할 일 */
+  .lens .rec-hits td.rdt{display:none}   /* 폰 둘째 줄 — 받은 날은 빼고 지역(갈래)·출처·기관·마감·할 일 */
   #kwBox{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding-bottom:3px;scrollbar-width:none}
   #kwBox>*{flex:none}
   #period{font-size:11.5px;margin:0 0 6px}
@@ -439,11 +440,14 @@ table.cmp td{white-space:nowrap}
      경력관리 자료는 «지난 이력과 견주기»에만 읽는다(careerPull) — 되살리지 말 것. -->
 <div id="tabs">
   <!-- 폰에서는 탭 이름을 줄인다(.mx 가 폰에서 숨는다) — 탭이 넷이 되어 한 줄(360px)에 다 들어오게 (2026-11-16) -->
-  <button class="tb on" id="tbFeed" onclick="setTab('feed')">📋 공고<span class="mx"> 모아보기</span></button>
-  <button class="tb" id="tbPlan" onclick="setTab('plan')">📅 발주<span class="mx"> 예정</span></button>
-  <button class="tb" id="tbRec" onclick="setTab('rec')">🧑‍💼 <span class="mx">컨설턴트 </span>모집</button>
+  <!-- 탭이 다섯이 되어(🤖 AI 사업, 2026-11-19) 폰에서는 그림도 숨긴다(.mx) — 「공고 · 발주 · 모집 · 충청권 · AI」 글만 한 줄 -->
+  <button class="tb on" id="tbFeed" onclick="setTab('feed')"><span class="mx">📋 </span>공고<span class="mx"> 모아보기</span></button>
+  <button class="tb" id="tbPlan" onclick="setTab('plan')"><span class="mx">📅 </span>발주<span class="mx"> 예정</span></button>
+  <button class="tb" id="tbRec" onclick="setTab('rec')"><span class="mx">🧑‍💼 컨설턴트 </span>모집</button>
   <!-- 세종도 넣었다(대표 지시 2026-11-17) — 이름이 길어져 폰에서는 「충청권」(넷을 함께 부르는 말)으로 줄인다 -->
-  <button class="tb" id="tbRgn" onclick="setTab('rgn')" title="대전·세종·충남·충북 공공기관의 입찰·공고와 컨설턴트·위원 모집 글만 모아 관리합니다">📍 <span class="mx">대전·세종·충남·충북</span><span class="m-only">충청권</span></button>
+  <button class="tb" id="tbRgn" onclick="setTab('rgn')" title="대전·세종·충남·충북 공공기관의 입찰·공고와 컨설턴트·위원 모집 글만 모아 관리합니다"><span class="mx">📍 대전·세종·충남·충북</span><span class="m-only">충청권</span></button>
+  <!-- 🤖 AI 사업 (대표 지시 2026-11-19 「ai 관련 사업 별도로 탭만들어달라」) — HR플랫폼·스마트서비스·AI/클라우드 바우처·스마트공장·AI 도입 지원 -->
+  <button class="tb" id="tbAi" onclick="setTab('ai')" title="AI 관련 정부사업 — HR플랫폼·스마트서비스·AI·클라우드 바우처·스마트공장·AI 도입·전환 지원 공고와 모집 글"><span class="mx">🤖 </span>AI<span class="mx"> 사업</span></button>
 </div>
 </div>
 
@@ -544,31 +548,64 @@ table.cmp td{white-space:nowrap}
   </div>
 </div>
 
-<!-- 📍 대전·충남·충북 (대표 지시 2026-11-16 「대전충남충북 공공기관의 입찰 컨설턴트모집은 별도로 탭만들어 관리하게 해달라」)
-     공고 모아보기 줄(나라장터·알리오·기업마당)과 서버가 매일 읽는 기관 게시판 모집 글에서 «그 지역 것»만 한 목록으로(js/gov-region.js).
-     ⚠ 따로 받거나 따로 담지 않는다 — ★·숨김·봤음·마감일은 원래 자리(공고 목록·모집 글 표시)에 그대로 적혀 다른 탭과 함께 바뀐다. -->
-<div class="wrap" id="pgRgn" style="display:none">
+<!-- 모아보기 탭 둘(.lens) — 화면·고르기·일괄 처리는 «한 벌»(lens* 함수)을 함께 쓰고, 칸 이름(id)만 앞글자로 가른다.
+     ⚠ 따로 받거나 따로 담지 않는다 — ★·숨김·봤음·마감일은 원래 자리(공고 목록·모집 글 표시)에 그대로 적혀 다른 탭과 함께 바뀐다.
+     📍 대전·세종·충남·충북 (대표 지시 2026-11-16 「대전충남충북 공공기관의 입찰 컨설턴트모집은 별도로 탭만들어 관리하게 해달라」 · 11-17 세종)
+        공고 모아보기 줄(나라장터·알리오·기업마당)과 서버가 매일 읽는 기관 게시판 모집 글에서 «그 지역 것»만(js/gov-region.js). -->
+<div class="wrap lens" id="pgRgn" style="display:none">
   <div class="card">
     <div class="tab-stick">
     <div class="bar">
-      <input id="rq" placeholder="제목·기관 검색" aria-label="제목·기관 검색" style="min-width:190px" oninput="_rgnPage=0;rgnDraw()">
-      <select id="rKind" aria-label="갈래" onchange="_rgnPage=0;rgnDraw()"><option value="">전체 갈래</option><option value="feed">📋 입찰·공고</option><option value="hit">🧑‍💼 모집 글</option></select>
-      <select id="rView" aria-label="보기" onchange="_rgnPage=0;rgnDraw()"><option value="live">마감 안 지난 것</option><option value="fresh">🆕 새 것만</option><option value="star">★ 별표만</option>
+      <input id="rq" placeholder="제목·기관 검색" aria-label="제목·기관 검색" style="min-width:190px" oninput="_lens.rgn.page=0;lensDraw('rgn')">
+      <select id="rKind" aria-label="갈래" onchange="_lens.rgn.page=0;lensDraw('rgn')"><option value="">전체 갈래</option><option value="feed">📋 입찰·공고</option><option value="hit">🧑‍💼 모집 글</option></select>
+      <select id="rView" aria-label="보기" onchange="_lens.rgn.page=0;lensDraw('rgn')"><option value="live">마감 안 지난 것</option><option value="fresh">🆕 새 것만</option><option value="star">★ 별표만</option>
         <option value="all">마감 지난 것까지</option><option value="hidden">🙈 숨긴 공고</option></select>
       <div class="sp"></div>
       <span id="rCnt" class="sub"></span>
       <span id="rPerBox"></span>
-      <button class="btn" onclick="rgnRefresh()" title="새로 받기 — 공고를 받고 서버 모집 글을 다시 읽습니다">🔄<span class="mx"> 새로 받기</span></button>
+      <button class="btn" onclick="lensRefresh('rgn')" title="새로 받기 — 공고를 받고 서버 모집 글을 다시 읽습니다">🔄<span class="mx"> 새로 받기</span></button>
     </div>
-    <div class="bar" id="rgnChips"></div>
+    <div class="bar lens-chips" id="rgnChips"></div>
     </div>
-    <div class="sml" id="rgnNote" style="margin:0 0 6px"></div>
+    <div class="sml lens-note" id="rgnNote" style="margin:0 0 6px"></div>
     <div id="rgnSel"></div>
     <div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:34px"><col style="width:32px"><col style="width:40px"><col style="width:100px"><col style="width:82px"><col><col style="width:170px"><col style="width:84px"><col style="width:118px"><col style="width:112px"></colgroup>
-      <thead><tr><th class="stc" title="별표(★)">★</th><th class="chk"><input type="checkbox" id="rSelAll" title="보이는 것 모두" onchange="rgnSelAll(this.checked)"></th><th class="rn">№</th><th>지역</th><th>갈래</th><th>제목</th><th>기관</th><th>받은 날</th><th>마감</th><th style="text-align:right">할 일</th></tr></thead>
+      <thead><tr><th class="stc" title="별표(★)">★</th><th class="chk"><input type="checkbox" id="rSelAll" title="보이는 것 모두" onchange="lensSelAll('rgn',this.checked)"></th><th class="rn">№</th><th>지역</th><th>갈래</th><th>제목</th><th>기관</th><th>공고일</th><th>마감</th><th style="text-align:right">할 일</th></tr></thead>
       <tbody id="rgnTb"></tbody>
     </table></div>
     <div id="rgnPager"></div>
+  </div>
+</div>
+
+<!-- 🤖 AI 사업 (대표 지시 2026-11-19 「ai 관련 사업 별도로 탭만들어달라」) — HR플랫폼(고용부)·스마트서비스(중기부)·AI·클라우드 바우처(과기정통부)·
+     스마트공장(중기부)·AI 도입·전환 지원. 갈래는 공고를 받을 때와 같은 규칙(GovG2b.judgeAi)으로 고른다(js/gov-ai.js).
+     ⚠ «AI 로만 걸린 공고»(찾는 말에는 안 걸림)는 이 탭에만 보인다 — 공고 모아보기·📍 지역 탭·🎯 추천에는 안 섞는다. -->
+<div class="wrap lens" id="pgAi" style="display:none">
+  <div class="card">
+    <!-- 하위 탭 — 🟢 진행 중 · 📁 지난 공고 (대표 지시 2026-11-19 「AI 관련 이미 지난것도 올려달라 그래야 비교 분석 가능하다 지난것 별도 하위 탭으로」) -->
+    <div class="rsubs" id="aiSubs"></div>
+    <div class="tab-stick">
+    <div class="bar">
+      <input id="aq" placeholder="제목·기관 검색" aria-label="제목·기관 검색" style="min-width:190px" oninput="_lens.ai.page=0;lensDraw('ai')">
+      <select id="aKind" aria-label="출처" onchange="_lens.ai.page=0;lensDraw('ai')"><option value="">전체 출처</option><option value="feed">📋 공고</option><option value="hit">🧑‍💼 모집 글</option></select>
+      <!-- 보기 고르개의 줄은 하위 탭마다 다르다(lensViewOpts) — 마감 지난 것은 「📁 지난 공고」 하위 탭이 맡는다 -->
+      <select id="aView" aria-label="보기" onchange="_lens.ai.page=0;lensDraw('ai')"><option value="live">마감 안 지난 것</option><option value="fresh">🆕 새 것만</option><option value="star">★ 별표만</option>
+        <option value="hidden">🙈 숨긴 공고</option></select>
+      <div class="sp"></div>
+      <span id="aCnt" class="sub"></span>
+      <span id="aPerBox"></span>
+      <button class="btn" onclick="lensRefresh('ai')" title="새로 받기 — 공고를 받고 서버 모집 글을 다시 읽습니다">🔄<span class="mx"> 새로 받기</span></button>
+    </div>
+    <div class="bar lens-chips" id="aiChips"></div>
+    </div>
+    <div class="sml lens-note" id="aiNote" style="margin:0 0 6px"></div>
+    <div id="aiPast"></div>
+    <div id="aiSel"></div>
+    <div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:34px"><col style="width:32px"><col style="width:40px"><col style="width:120px"><col style="width:82px"><col><col style="width:170px"><col style="width:84px"><col style="width:118px"><col style="width:112px"></colgroup>
+      <thead><tr><th class="stc" title="별표(★)">★</th><th class="chk"><input type="checkbox" id="aSelAll" title="보이는 것 모두" onchange="lensSelAll('ai',this.checked)"></th><th class="rn">№</th><th>사업 갈래</th><th>출처</th><th>제목</th><th>기관</th><th>공고일</th><th>마감</th><th style="text-align:right">할 일</th></tr></thead>
+      <tbody id="aiTb"></tbody>
+    </table></div>
+    <div id="aiPager"></div>
   </div>
 </div>
 
@@ -588,7 +625,7 @@ table.cmp td{white-space:nowrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=101"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -596,9 +633,9 @@ table.cmp td{white-space:nowrap}
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=47"></script>
+<script src="js/pu-appbar.js?v=53"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
-<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -608,17 +645,18 @@ table.cmp td{white-space:nowrap}
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=3"></script>
-<script src="js/gov-g2b.js?v=10"></script>
+<script src="js/gov-g2b.js?v=12"></script>
 <script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
-<script src="js/gov-bizinfo.js?v=3"></script>
+<script src="js/gov-bizinfo.js?v=5"></script>
 <script src="js/gov-recruit.js?v=7"></script>
 <script src="js/gov-submit.js?v=4"></script>
 <script src="js/gov-sync.js?v=10"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
-<script src="js/gov-inbox.js?v=4"></script>
-<script src="js/gov-region.js?v=2"></script>
+<script src="js/gov-inbox.js?v=5"></script>
+<script src="js/gov-region.js?v=4"></script>
+<script src="js/gov-ai.js?v=1"></script>
 <script src="js/gov-pick.js?v=2"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
@@ -688,7 +726,7 @@ function kwReset(){
 function kwChanged(list){
   lsSet('kw',JSON.stringify(list)); drawKw();
   rejudge(); draw();
-  if(!rejudge.last.n && !rejudge.last.back) toast('찾는 말이 바뀌었습니다 — 이미 받은 공고는 그대로이고, 🔄 새로 받기부터 새 기준으로 걸립니다');
+  if(!rejudge.last.n && !rejudge.last.back && !rejudge.last.ai) toast('찾는 말이 바뀌었습니다 — 이미 받은 공고는 그대로이고, 🔄 새로 받기부터 새 기준으로 걸립니다');
 }
 function kwTog(k){ var r=GovG2b.toggleKw(kws(),k);
   if(!r.ok){ toast(r.err); return; }
@@ -745,7 +783,8 @@ async function pullAll(name, urlOf, parse, max){
 async function restrictFill(buf, kd, adds){
   var open=buf.filter(function(r){ if(!r||r.lk===GovG2b.LK||r.src!=='나라장터'||adds.indexOf(r)>=0) return false; var d=GovG2b.dday(r.closeDt); return d==null||d>=0; }).slice(0,20);
   var copies=open.map(function(r){ return {no:r.no, src:'나라장터'}; });   // 옛 줄은 복사본에만 붙인다 — 부른 뒤 번호로 찾아 합친다
-  var todo=adds.filter(function(r){ return r.src==='나라장터'; }).concat(copies);
+  /* 찾는 말로 걸린 공고 먼저 — 🤖 AI 로만 걸린 공고가 한도(60건)를 먼저 먹지 않게(2026-11-19) */
+  var todo=adds.filter(function(r){ return r.src==='나라장터' && r.kw; }).concat(adds.filter(function(r){ return r.src==='나라장터' && !r.kw; }), copies);
   var sum=await GovG2b.enrich(todo, pull, {key:kd, max:60});
   return {sum:sum, patches:copies.filter(function(c){ return c.lk||c.rgn||c.ind; })};
 }
@@ -761,7 +800,8 @@ async function _fetchAll(){
   note('⏳ 받는 중…'); _planSum=null;
   var today=new Date().toISOString().slice(0,10);
   var got=[], errs=[], bizRows=[], hs=healthStat(), hNow=new Date().toISOString();
-  var to=new Date(), from=new Date(Date.now()-7*86400000);
+  /* ⚠ 나라장터는 2026-11-10 부터 한 번에 7일까지만 — 「오늘 포함 7일」(GovG2b.recentFrom). 7일 전으로 잡으면 8일치라 거절된다 */
+  var to=new Date(), from=GovG2b.recentFrom(to);
   if(kd){
     var g=await pullAll('나라장터', function(p){ return GovG2b.buildUrl({key:kd,from:from,to:to,page:p,rows:999}); },
                         GovG2b.parse, PAGE_MAX.g2b);
@@ -785,6 +825,13 @@ async function _fetchAll(){
     for(var j=0;j<GovBizinfo.FIELDS_DEFAULT.length;j++){
       try{ var nb=GovBizinfo.parse(await pull(GovBizinfo.buildUrl({key:kb, field:GovBizinfo.FIELDS_DEFAULT[j], count:GovBizinfo.NATION_COUNT})));
         if(nb.ok){ got=got.concat(nb.rows); bizRows=bizRows.concat(nb.rows); } }
+      catch(e){}
+    }
+    /* 🤖 AI 사업 탭 몫 — «기술» 분야(AI·클라우드 바우처·스마트공장)를 전국 길로 한 번 더(2026-11-19). 둘째 길처럼 «덤»이라 실패해도 조용히 */
+    var fa=GovBizinfo.FIELDS_AI||[];
+    for(var fi=0;fi<fa.length;fi++){
+      try{ var ab=GovBizinfo.parse(await pull(GovBizinfo.buildUrl({key:kb, field:fa[fi], count:GovBizinfo.NATION_COUNT})));
+        if(ab.ok){ got=got.concat(ab.rows); bizRows=bizRows.concat(ab.rows); } }
       catch(e){}
     }
   }
@@ -951,7 +998,7 @@ function planDraw(){
   var vc=planViewSel(o.every, today, o.view);
   planStarBtn(vc, o.view);
   var soon=o.every.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;
-  if($('tbPlan')) $('tbPlan').innerHTML='📅 발주<span class="mx"> 예정</span>'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
+  if($('tbPlan')) $('tbPlan').innerHTML='<span class="mx">📅 </span>발주<span class="mx"> 예정</span>'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
   var vis={}; o.rows.forEach(function(r){ vis[r.no]=1; });
   Object.keys(_planSel).forEach(function(k){ if(!vis[k]) delete _planSel[k]; });
   var sn=Object.keys(_planSel).length, hid=o.every.filter(function(r){ return r.hidden; }).length;
@@ -1121,8 +1168,9 @@ async function inboxPull(){
     var v=(await fbDb.ref('gov_feed').once('value')).val()||{};
     _feedSrv={ last:v.last||null };
     var buf=get('feed'), kw=kws(), today=new Date().toISOString().slice(0,10);
-    var m=GovInbox.merge(buf, v.rows||{}, { today:today, dday:GovG2b.dday, keep:function(r){ return GovG2b.judge(r, kw).length>0; } });
-    m.adds.forEach(function(r){ r.id=nextId(buf); buf.unshift(r); });
+    /* 찾는 말이나 🤖 AI 사업 갈래 둘 중 하나에 걸리면 합친다(2026-11-19) — AI 표시가 서버에서 안 붙어 왔으면 여기서 붙인다 */
+    var m=GovInbox.merge(buf, v.rows||{}, { today:today, dday:GovG2b.dday, keep:function(r){ return GovG2b.judge(r, kw).length>0 || GovG2b.judgeAi(r).length>0; } });
+    m.adds.forEach(function(r){ if(!r.ai){ var ai=GovG2b.judgeAi(r); if(ai.length) r.ai=ai.join(','); } r.id=nextId(buf); buf.unshift(r); });
     /* 이미 내 목록에 있는 공고에는 서버가 새로 알아낸 지역·업종 제한만 «빈 칸에» 옮긴다(숨김·별표 같은 내 표시는 안 건드린다) */
     var carried=0, byNo={}; buf.forEach(function(r){ if(r&&r.no!=null) byNo[String(r.no)]=r; });
     Object.keys(v.rows||{}).forEach(function(k){ var sv=v.rows[k], l=sv&&byNo[String(sv.no)];
@@ -1212,10 +1260,16 @@ function restrictTags(r){
   return h;
 }
 function feedMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('pMthd')) $('pMthd').value=lsGet('feed_mthd'); _feedPage=0; draw(); }
+/* 🤖 «AI 로만 걸린 공고» — 받을 때 AI 갈래 표시(r.ai)가 붙었고, «지금» 찾는 말에는 안 걸리는 줄 (대표 지시 2026-11-19).
+   이런 줄은 🤖 AI 사업 탭에만 보인다 — 공고 모아보기·📍 지역 탭·🎯 추천·CSV 는 노무 쪽 일감이라 섞지 않는다.
+   ⚠ r.ai 가 없는 줄(옛 줄 · 찾는 말로 걸린 줄)은 절대 빼지 않는다 — 표시 없는 것을 짐작으로 숨기면 공고가 사라진다. */
+/* «📥 지난 공고 불러오기»로 담은 줄(r.back)도 🤖 탭 몫이다 — 비교하려고 몰아 받은 옛 공고라 노무 쪽 목록에 섞지 않는다(2026-11-19) */
+function aiOnly(r, kw){ return !!r && (!!r.back || (!!r.ai && !GovG2b.judge(r, kw||kws()).length)); }
+function feedMainRows(){ var kw=kws(); return get('feed').filter(function(r){ return !!r && !aiOnly(r, kw); }); }
 function feedVisible(){
   var q=($('q').value||'').toLowerCase(), fs=$('fSrc').value, ft=$('fSt').value;
   var fm=($('fMthd')&&$('fMthd').value)||'', soleOut=0;
-  var every=get('feed').filter(function(r){ return !!r; });
+  var every=feedMainRows();
   var base=every.filter(function(r){
     if(ft==='__hidden') return !!r.hidden;
     if(ft==='__all') return true;
@@ -1253,7 +1307,7 @@ function pickDeps(){
     orgName:matchOrgName, monthsAhead:GovRecruit.monthsAhead, appliedThisYear:GovRecruit.appliedThisYear };
 }
 function pickRank(){
-  return GovPick.rank({ today:recYmd(recToday()), hits:recWatchHits(), feed:get('feed'), orgs:recGroups().orgs,
+  return GovPick.rank({ today:recYmd(recToday()), hits:recWatchHits(), feed:feedMainRows(), orgs:recGroups().orgs,
     off:recObj('pick_off'), seen:recObj('recruit_seen'), deps:pickDeps() });
 }
 function pickBadge(res){
@@ -1449,7 +1503,7 @@ function draw(){
                    : '<button class="btn sm" onclick="hide(\''+id+'\')">🚫</button>')+'</td></tr>';
   }).join('') : '<tr><td colspan="13" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
   var pg=$('feedPager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, 'feedPageTo');
-  rgnRedraw();   /* 📍 탭은 공고 목록을 «빌려» 그린다 — ★·숨김이 바뀌면 함께 */
+  lensRedraw();   /* 📍·🤖 탭은 공고 목록을 «빌려» 그린다 — ★·숨김이 바뀌면 함께 */
 }
 function feedTog(id,on){ if(on) _feedSel[id]=1; else delete _feedSel[id]; draw(); }
 /* 머리 ㅁ — «이 쪽에 보이는 것»만 고른다(다른 쪽은 그대로) */
@@ -1590,22 +1644,34 @@ function srcBackfill(){
 /* 새 걸러내기 규칙(2026-10-03 대표 결정)을 «이미 받은» 줄에도 댄다.
    ⚠ 사람이 손댄 줄(관심·지원함)과 이미 숨긴 줄은 건드리지 않는다 — 기계가 정한 「새 공고」·「지나감」만.
    ⚠ 지우지 않고 숨긴다(🚫 와 같은 표시 + ruleOut). 멱등. */
-rejudge.last={ n:0, back:0 };
+/* 🤖 AI 사업 갈래(2026-11-19) — 찾는 말에 안 맞아도 AI 갈래에 걸리면 숨기지 않고 ai 표시만 붙인다(→ 🤖 탭에만 보인다).
+   기계가 숨겼던 줄(ruleOut)이 AI 갈래에 걸리면 되살려 🤖 탭으로 보낸다. ⚠ 사람이 숨긴 줄은 그대로. */
+rejudge.last={ n:0, back:0, ai:0 };
 function rejudge(){
-  var a=get('feed'), n=0, back=0, kw=kws();
+  var a=get('feed'), n=0, back=0, toAi=0, kw=kws();
+  var tagAi=function(r){ var ai=GovG2b.judgeAi(r); if(!ai.length) return false; if(!r.ai){ r.ai=ai.join(','); } return true; };
   a.forEach(function(r){
     if(!r) return;
     /* ⚠ 기계가 숨긴 것(ruleOut)만 되살린다 — 사람이 숨긴 것은 건드리지 않는다 */
-    if(r.hidden && r.ruleOut){ if(GovG2b.judge(r,kw).length){ r.hidden=false; r.ruleOut=false; back++; } return; }
+    if(r.hidden && r.ruleOut){
+      if(GovG2b.judge(r,kw).length){ r.hidden=false; r.ruleOut=false; back++; }
+      else if(tagAi(r)){ r.hidden=false; r.ruleOut=false; toAi++; }
+      return; }
     if(r.hidden||r.keep||r.type==='관심'||r.type==='지원함') return;   /* 「지나감」도 기계가 정한 것이다 */
-    if(!GovG2b.judge(r,kw).length){ r.hidden=true; r.ruleOut=true; n++; } });
-  rejudge.last={ n:n, back:back };
-  if(n||back){ set('feed',a); toast((n?'새 걸러내기 규칙에 맞지 않는 '+n+'건을 숨겼습니다':'')+(n&&back?' · ':'')+(back?'다시 맞는 '+back+'건을 되살렸습니다':'')); }
+    if(!GovG2b.judge(r,kw).length){
+      if(r.ai) return;                           /* 이미 🤖 탭 몫 — 숨기지 않는다(알림도 처음 한 번만) */
+      if(tagAi(r)){ toAi++; return; }            /* 처음 AI 표시를 붙인 줄만 센다 */
+      r.hidden=true; r.ruleOut=true; n++; } });
+  rejudge.last={ n:n, back:back, ai:toAi };
+  if(n||back||toAi){ set('feed',a);
+    var say=[]; if(n) say.push('새 걸러내기 규칙에 맞지 않는 '+n+'건을 숨겼습니다'); if(back) say.push('다시 맞는 '+back+'건을 되살렸습니다');
+    if(toAi) say.push('AI 사업 갈래 '+toAi+'건은 🤖 AI 사업 탭에서 봅니다');
+    toast(say.join(' · ')); }
   return n;
 }
 function open2(id){ var h=find(id); if(h&&h.a[h.i].url) window.open(h.a[h.i].url,'_blank','noopener'); }
 function expCsv(only){
-  var rows=get('feed').filter(function(r){ return r&&(only?_feedSel[r.id]:!r.hidden); });
+  var rows=feedMainRows().filter(function(r){ return only?_feedSel[r.id]:!r.hidden; });   /* 🤖 AI 로만 걸린 줄은 공고 모아보기 몫이 아니다 */
   if(!rows.length){ toast('내보낼 것이 없습니다'); return; }
   var keys=['src','type','no','nm','org','openDt','closeDt','prc','mthd','kw','url'];
   var csv=[keys.join(',')].concat(rows.map(function(r){
@@ -1748,14 +1814,18 @@ async function cloudPull(){ return cloudSync(); }
 var _mat=null, _matDocs=null, _matAi=null;   /* _matAi — AI·DX 수행·강의 이력(서류 준비 창, 읽기만) */
 
 function setTab(t){
-  if(t!=='rec' && t!=='plan' && t!=='rgn') t='feed';   /* 예전에 「신청 재료」('mat')를 보던 기기도 공고로 연다 */
-  if(t!=='rgn') _rgnSel={};               /* 화면을 떠나면 고른 것을 비운다(자료 목록 규칙) */
+  if(t!=='rec' && t!=='plan' && !LENS[t]) t='feed';   /* 예전에 「신청 재료」('mat')를 보던 기기도 공고로 연다 */
   _curTab=t;
   $('pgFeed').style.display = (t==='feed'?'':'none');
-  if($('pgRgn')) $('pgRgn').style.display = (t==='rgn'?'':'none');
-  if($('tbRgn')) $('tbRgn').className='tb'+(t==='rgn'?' on':'');
-  /* 모집 글(gov_watch)은 컨설턴트 모집 탭이 «열 때» 받는다 — 이 탭도 열 때 받는다(못 받으면 공고만 보이고 까닭을 말한다) */
-  if(t==='rgn'){ rgnDraw(); Promise.resolve(recWatchLoad()).then(function(){ rgnRedraw(); }); }
+  /* 모아보기 탭(📍·🤖) — 떠난 탭은 고른 것을 비운다(자료 목록 규칙) */
+  Object.keys(LENS).forEach(function(id){
+    if(t!==id) _lens[id].sel={};
+    var pg=$(LENS[id].el.pg), tb=$(LENS[id].el.tab);
+    if(pg) pg.style.display=(t===id?'':'none');
+    if(tb) tb.className='tb'+(t===id?' on':'');
+  });
+  /* 모집 글(gov_watch)은 컨설턴트 모집 탭이 «열 때» 받는다 — 모아보기 탭도 열 때 받는다(못 받으면 공고만 보이고 까닭을 말한다) */
+  if(LENS[t]){ lensDraw(t); Promise.resolve(recWatchLoad()).then(function(){ lensRedraw(); }); }
   if($('pgPlan')) $('pgPlan').style.display = (t==='plan'?'':'none');
   if($('tbPlan')) $('tbPlan').className='tb'+(t==='plan'?' on':'');
   /* ⚠ 「한 번이라도 다 받았나」(plan_since)로 본다 — 받은 «때»(plan_at)로 보면 승인 전에 한 번 실패한 뒤로는
@@ -1884,7 +1954,7 @@ function recDraw(){
   recStickySync();   /* 한 줄 높이가 바뀌었을 수 있다(갈래 수·선택 줄) */
   if($('recStarBtnH')) $('recStarBtnH').innerHTML=recStarBtn();
   starAllBadge();
-  rgnRedraw();   /* 📍 탭은 모집 글을 «빌려» 그린다 — ★·봤음·마감일이 바뀌면 함께 */
+  lensRedraw();   /* 📍·🤖 탭은 모집 글을 «빌려» 그린다 — ★·봤음·마감일이 바뀌면 함께 */
   recSubDraw();
   matchEnsure();
   var mnr=$('matchNoteR'); if(mnr) mnr.innerHTML=matchNoteHtml();
@@ -2402,116 +2472,207 @@ function recWatchCal(key){
   window.open(u, '_blank', 'noopener');
 }
 
-/* ═══ 📍 대전·세종·충남·충북 (대표 지시 2026-11-16 「대전충남충북 공공기관의 입찰 컨설턴트모집은 별도로 탭만들어 관리하게 해달라」 · 2026-11-17 「세종도 넣어달라」) ═══
-   공고 모아보기 줄 + 서버 모집 글에서 «그 지역 것»(js/gov-region.js 가 고른다 — 까닭과 함께)을 한 목록으로 본다.
+/* ═══ 모아보기 탭 둘 — 📍 대전·세종·충남·충북 · 🤖 AI 사업 ═══
+   (대표 지시 2026-11-16 「대전충남충북 공공기관의 입찰 컨설턴트모집은 별도로 탭만들어 관리하게 해달라」 · 11-17 「세종도 넣어달라」 ·
+    11-19 「ai 관련 사업 별도로 탭만들어달라」)
+   공고 모아보기 줄 + 서버 모집 글에서 «그 갈래 것»을 한 목록으로 본다 — 갈래는 모듈이 규칙으로 고르고 까닭을 함께 준다
+   (📍 js/gov-region.js · 🤖 js/gov-ai.js). 화면·고르기·일괄 처리는 «한 벌»(lens*)을 두 탭이 함께 쓴다 — 두 벌이면 한쪽만 고쳐진다.
    ⚠ 자료를 «빌려» 그린다 — 따로 받거나 담지 않는다. 손대는 것은 원래 자리 그대로:
       공고 ★ = 상태 「관심」(star) · 공고 🚫 = 숨김(hide — 지우지 않는다) · 모집 글 ★ = recruit_star('h|열쇠') · ✓ = recruit_seen · 📅 = recruit_due.
       그래서 공고 모아보기·컨설턴트 모집·별표 모음에도 «같이» 바뀐다(두 곳이 어긋나지 않는다).
-   ⚠ 고르기(☐)는 이 탭만의 것(_rgnSel — 'f:공고번호'·'h:글 열쇠'). 탭을 떠나면 비운다.
+   ⚠ 고르기(☐)는 탭마다 따로(_lens[탭].sel — 'f:공고번호'·'h:글 열쇠'). 탭을 떠나면 비운다.
    ⚠ 줄의 번호·열쇠는 onclick 글자에 넣지 않고 data-sel 로 넘긴다(따옴표가 든 열쇠가 와도 깨지지 않게). */
-var _rgnSel={}, _rgnPage=0, _rgnReg='', _curTab='feed';
-function rgnToday(){ return recYmd(recToday()); }
-function rgnBuild(){
-  var today=rgnToday();
-  return GovRegion.build({ feed:get('feed'), hits:recWatchHits(), today:today, seen:recObj('recruit_seen'),
+var _curTab='feed';
+var LENS={
+  rgn:{ mod:function(){ return typeof GovRegion!=='undefined'?GovRegion:null; },
+    keys:function(M){ return M.REGIONS.concat([M.WIDE]); }, wide:function(M,k){ return k===M.WIDE; },
+    feed:function(){ return feedMainRows(); },   /* «AI 로만 걸린 공고»는 빼고 — 지역 탭은 노무 쪽 일감이다 */
+    el:{ pg:'pgRgn', tab:'tbRgn', q:'rq', kind:'rKind', view:'rView', chips:'rgnChips', note:'rgnNote', sel:'rgnSel', body:'rgnTb', pager:'rgnPager', cnt:'rCnt', per:'rPerBox', all:'rSelAll' },
+    per:'rgn_per', tabHtml:'<span class="mx">📍 대전·세종·충남·충북</span><span class="m-only">충청권</span>',
+    empty:'대전·세종·충남·충북 공고·모집 글이 아직 없습니다' },
+  ai:{ mod:function(){ return typeof GovAi!=='undefined'?GovAi:null; },
+    keys:function(M){ return M.KEYS; }, wide:function(){ return false; },
+    feed:function(){ return get('feed'); },      /* 찾는 말에 걸린 공고도 AI 갈래면 여기에 함께 */
+    el:{ pg:'pgAi', tab:'tbAi', q:'aq', kind:'aKind', view:'aView', chips:'aiChips', note:'aiNote', sel:'aiSel', body:'aiTb', pager:'aiPager', cnt:'aCnt', per:'aPerBox', all:'aSelAll', subs:'aiSubs', past:'aiPast' },
+    per:'ai_per', tabHtml:'<span class="mx">🤖 </span>AI<span class="mx"> 사업</span>',
+    empty:'AI 관련 사업 공고·모집 글이 아직 없습니다',
+    /* 하위 탭 (대표 지시 2026-11-19 「AI 관련 이미 지난것도 올려달라 그래야 비교 분석 가능하다 지난것 별도 하위 탭으로」) */
+    subs:[ { k:'live', nm:'🟢 진행 중' }, { k:'past', nm:'📁 지난 공고' } ] }
+};
+/* 하위 탭마다 보기 고르개의 줄 — 「지난 공고」는 마감 지난 것만 보므로 «마감 안 지난 것·새 것만»이 없다 */
+var LENS_VIEW={ live:[['live','마감 안 지난 것'],['fresh','🆕 새 것만'],['star','★ 별표만'],['hidden','🙈 숨긴 공고']],
+  past:[['past','지난 공고 전체'],['star','★ 별표만'],['hidden','🙈 숨긴 공고']] };
+var _lens={ rgn:{ sel:{}, page:0, grp:'' },
+  ai:{ sel:{}, page:0, grp:'', sub:(function(){ try{ return lsGet('ai_sub')==='past'?'past':'live'; }catch(e){ return 'live'; } })() } };
+function lensEl(id, k){ return $(LENS[id].el[k]); }
+function lensToday(){ return recYmd(recToday()); }
+function lensBuild(id){
+  var L=LENS[id], M=L.mod(), today=lensToday();
+  return M.build({ feed:L.feed(), hits:recWatchHits(), today:today, seen:recObj('recruit_seen'),
     deps:{
       /* 공고도 모집 글과 «같은 잣대»(dueState)로 — 날짜만 보고 센다(받은 날 적어 둔 r.dday 는 낡는다) */
-      feedDue:function(r){ var c=closeYmd(r.closeDt); if(!c) return null;   /* 공고 목록 「남음」 칸과 같은 마감일 읽기 */
+      feedDue:function(r){ var c=closeYmd(r.closeDt);   /* 공고 목록 「남음」 칸과 같은 마감일 읽기 */
+        if(!c){
+          /* 마감일이 없는 공고(상시 접수·기업마당 일부)는 공고한 지 90일이 넘었으면 «지난 공고»로 본다(2026-11-19) —
+             몰아 받은 몇 해 전 공고가 「진행 중」에 섞이면 안 된다. ⚠ 마감일을 지어내지 않는다 — 글로 «마감 모름»이라 밝힌다 */
+          var o=closeYmd(r.openDt), age=o ? Math.round((new Date(today+'T00:00:00Z').getTime()-new Date(o+'T00:00:00Z').getTime())/864e5) : null;
+          return (age!=null && age>90) ? { k:'past', text:'마감 모름 · 공고 '+age+'일 지남', days:null } : null; }
         var st=GovRecruit.dueState({to:c}, today); st.to=c; return st; },
       hitDue:function(h){ var pp=recPer(h.key, h.per, h.title, h.date), st=GovRecruit.dueState(pp, today); st.to=(pp&&pp.to)||''; return st; } } });
 }
-function rgnStarOn(x){ return x.kind==='feed' ? x.type==='관심' : recStarOn('h', x.ref); }
-/* 보기 — live 마감 안 지난 것(기본) · fresh 새 것만 · star ★ · all 마감 지난 것까지 · hidden 숨긴 공고(되살리는 자리) */
-function rgnInView(x, v){
+function lensStarOn(x){ return x.kind==='feed' ? x.type==='관심' : recStarOn('h', x.ref); }
+/* 보기 — live 마감 안 지난 것(기본) · fresh 새 것만 · star ★ · all 마감 지난 것까지 · hidden 숨긴 공고(되살리는 자리)
+   하위 탭이 있는 탭(🤖)은 하위 탭이 먼저 가른다 — 🟢 진행 중 = 마감 안 지난 것 · 📁 지난 공고 = 마감 지난 것 */
+function lensInView(x, v, sub){
+  if(sub==='live' || sub==='past'){
+    if(!!x.past !== (sub==='past')) return false;
+    if(v==='hidden') return x.kind==='feed' && x.hidden;
+    if(x.hidden) return false;
+    if(v==='star') return lensStarOn(x);
+    if(v==='fresh') return x.isNew;
+    return true;
+  }
   if(v==='hidden') return x.kind==='feed' && x.hidden;
   if(x.hidden) return false;
   if(v==='all') return true;
-  if(v==='star') return rgnStarOn(x);
+  if(v==='star') return lensStarOn(x);
   if(v==='fresh') return x.isNew && !x.past;
   return !x.past;
 }
-function rgnVisible(){
-  var b=rgnBuild(), v=($('rView')&&$('rView').value)||'live', k=($('rKind')&&$('rKind').value)||'', q=(($('rq')&&$('rq').value)||'').toLowerCase();
-  var base=b.items.filter(function(x){ return rgnInView(x, v) && (!k || x.kind===k) && (!q || (x.title+' '+x.org).toLowerCase().indexOf(q)>=0); });
-  var chip={'':base.length}; base.forEach(function(x){ x.regions.forEach(function(r){ chip[r]=(chip[r]||0)+1; }); });
-  if(_rgnReg && !chip[_rgnReg]) _rgnReg='';
-  return { b:b, base:base, rows:_rgnReg ? base.filter(function(x){ return x.regions.indexOf(_rgnReg)>=0; }) : base, chip:chip, v:v };
+function lensVisible(id){
+  var st=_lens[id], b=lensBuild(id), vw=lensEl(id,'view'), kd=lensEl(id,'kind'), qq=lensEl(id,'q');
+  lensViewOpts(id);
+  var v=(vw&&vw.value)||(st.sub==='past'?'past':'live'), k=(kd&&kd.value)||'', q=((qq&&qq.value)||'').toLowerCase();
+  var base=b.items.filter(function(x){ return lensInView(x, v, st.sub) && (!k || x.kind===k) && (!q || (x.title+' '+x.org).toLowerCase().indexOf(q)>=0); });
+  var chip={'':base.length}; base.forEach(function(x){ x.groups.forEach(function(g){ chip[g]=(chip[g]||0)+1; }); });
+  if(st.grp && !chip[st.grp]) st.grp='';
+  return { b:b, base:base, rows:st.grp ? base.filter(function(x){ return x.groups.indexOf(st.grp)>=0; }) : base, chip:chip, v:v };
 }
-function rgnBadge(b){
-  var el=$('tbRgn'); if(!el) return;
-  var n=0; try{ n=(b||rgnBuild()).counts.fresh; }catch(e){}
-  el.innerHTML='📍 <span class="mx">대전·세종·충남·충북</span><span class="m-only">충청권</span>'+(n?' <span class="tag red" title="마감 안 지난 새 공고 · 안 본 모집 글">'+n+'</span>':'');
+/* 하위 탭에 맞게 보기 고르개의 줄을 바꾼다 — 바뀔 때만(고른 값을 날마다 되돌리지 않게) */
+function lensViewOpts(id){
+  var st=_lens[id], vw=lensEl(id,'view'); if(!LENS[id].subs || !vw) return;
+  if(st._optFor===st.sub) return;
+  var opts=LENS_VIEW[st.sub]||LENS_VIEW.live;
+  vw.innerHTML=opts.map(function(o){ return '<option value="'+o[0]+'">'+esc(o[1])+'</option>'; }).join('');
+  vw.value=opts[0][0]; st._optFor=st.sub;
 }
-/* 공고 목록·모집 글이 바뀔 때마다 부른다(draw·recDraw 끝) — 이 탭이 열려 있으면 다시 그리고, 아니면 탭의 숫자만 */
-function rgnRedraw(){
-  if(typeof GovRegion==='undefined') return;
-  try{ if(_curTab==='rgn') rgnDraw(); else rgnBadge(); }catch(e){}
+function lensSub(id, k){
+  var st=_lens[id]; if(!LENS[id].subs) return;
+  st.sub=(k==='past')?'past':'live'; st.page=0; st.sel={}; st.grp='';
+  lsSet(id+'_sub', st.sub);   /* 이 기기에서만 기억(클라우드 칸 아님) */
+  lensDraw(id);
 }
-function rgnDraw(){
-  if(typeof GovRegion==='undefined' || !$('rgnTb')) return;
-  var o=rgnVisible(), rows=o.rows;
-  rgnBadge(o.b);
+/* 하위 탭 줄 — 탭마다 건수(숨긴 것 빼고) */
+function lensSubsHtml(id, b){
+  var L=LENS[id], st=_lens[id], n={ live:0, past:0 };
+  b.items.forEach(function(x){ if(!x.hidden) n[x.past?'past':'live']++; });
+  return L.subs.map(function(t){
+    return '<button class="rsub'+(st.sub===t.k?' on':'')+'" onclick="lensSub(\''+id+'\',\''+t.k+'\')">'+t.nm+' <span class="n">'+n[t.k]+'</span></button>'; }).join('');
+}
+/* 📁 지난 공고 칸 — 공고일 기준 «해마다 몇 건»(비교) + 📥 지난 공고 불러오기 */
+function lensPastHtml(id, rows){
+  if(id!=='ai') return '';
+  var yr={}; rows.forEach(function(x){ var y=String(x.date||'').slice(0,4); if(/^\d{4}$/.test(y)) yr[y]=(yr[y]||0)+1; });
+  var ys=Object.keys(yr).sort().reverse();
+  var info=aiBackInfo(), mo=_aiBack.months;
+  var sum='<div class="sml" style="margin:2px 0 6px">📊 <b>공고일 기준</b> '
+    +(ys.length ? ys.map(function(y){ return y+'년 <b>'+yr[y]+'</b>건'; }).join(' · ') : '아직 없음')
+    +' <span class="sml">— 갈래 칩·검색으로 좁혀 해마다 견주세요</span></div>';
+  var ctl='<div class="bar" style="margin-bottom:6px"><span class="sml"><b>📥 지난 공고 불러오기</b> — 나라장터</span>'
+    +'<select id="aBackMonths" aria-label="불러올 기간" onchange="_aiBack.months=Number(this.value)||6"'+(_aiBack.run?' disabled':'')+'>'
+    +[3,6,12].map(function(m){ return '<option value="'+m+'"'+(m===mo?' selected':'')+'>지난 '+m+'개월</option>'; }).join('')+'</select>'
+    +'<span class="sml">+ 기업마당(받을 수 있는 만큼)</span>'
+    +(_aiBack.run ? '<button class="btn" onclick="aiBackStop()">■ 멈추기</button>'
+                  : '<button class="btn primary" onclick="aiBackfill()" title="AI 갈래에 걸리는 지난 공고만 이 칸에 담습니다(하루 호출 한도 안)">📥 불러오기</button>')
+    +'<span class="sml" id="aBackInfo">'+esc(_aiBack.msg || (info.at ? '지난번 '+String(info.at).slice(0,10)+' · 나라장터 '+(info.months||'?')+'개월 · 담은 것 모두 '+(info.adds||0)+'건' : '아직 안 불러왔습니다'))+'</span></div>';
+  return sum+ctl;
+}
+function lensBadge(id, b){
+  var L=LENS[id], el=$(L.el.tab); if(!el || !L.mod()) return;
+  var n=0; try{ n=(b||lensBuild(id)).counts.fresh; }catch(e){}
+  el.innerHTML=L.tabHtml+(n?' <span class="tag red" title="마감 안 지난 새 공고 · 안 본 모집 글">'+n+'</span>':'');
+}
+/* 공고 목록·모집 글이 바뀔 때마다 부른다(draw·recDraw 끝) — 열려 있는 탭은 다시 그리고, 나머지는 탭의 숫자만 */
+function lensRedraw(){
+  Object.keys(LENS).forEach(function(id){
+    if(!LENS[id].mod()) return;
+    try{ if(_curTab===id) lensDraw(id); else lensBadge(id); }catch(e){}
+  });
+}
+function lensDraw(id){
+  var L=LENS[id], M=L&&L.mod(), st=_lens[id];
+  if(!M || !lensEl(id,'body')) return;
+  var o=lensVisible(id), rows=o.rows;
+  lensBadge(id, o.b);
+  if(L.subs){
+    if(lensEl(id,'subs')) lensEl(id,'subs').innerHTML=lensSubsHtml(id, o.b);
+    if(lensEl(id,'past')) lensEl(id,'past').innerHTML = st.sub==='past' ? lensPastHtml(id, rows) : '';
+  }
   var vis={}; rows.forEach(function(x){ vis[x.sel]=1; });
-  Object.keys(_rgnSel).forEach(function(k){ if(!vis[k]) delete _rgnSel[k]; });   /* 안 보이게 된 줄은 고른 것에서 뺀다 */
-  $('rgnChips').innerHTML=[''].concat(GovRegion.REGIONS, [GovRegion.WIDE]).filter(function(k){ return !k || o.chip[k] || _rgnReg===k; }).map(function(k){
-    /* 📍 그림은 폰에서 뺀다(.mx) — 세종이 더해져 칩이 다섯이 되며 360px 한 줄을 넘었다(2026-11-17) */
-    return '<button class="mchip'+(_rgnReg===k?' on':'')+'" data-reg="'+esc(k)+'" onclick="rgnReg(this.dataset.reg)">'+(k?'<span class="mx">📍 </span>'+esc(GovRegion.label(k)):'전체')+' <span class="n">'+(o.chip[k]||0)+'</span></button>'; }).join('');
-  var nf=rows.filter(function(x){ return x.kind==='feed'; }).length;
-  $('rCnt').textContent='지금 '+rows.length+'건 · 공고 '+nf+' · 모집 글 '+(rows.length-nf);
-  $('rCnt').title=$('rCnt').textContent;
-  if($('rPerBox')) $('rPerBox').innerHTML=perSel('rgn_per','rgnPer');
+  Object.keys(st.sel).forEach(function(k){ if(!vis[k]) delete st.sel[k]; });   /* 안 보이게 된 줄은 고른 것에서 뺀다 */
+  /* 칩의 그림은 폰에서 뺀다(.mx) — 칩이 다섯이면 360px 한 줄을 넘는다(2026-11-17) */
+  lensEl(id,'chips').innerHTML=[''].concat(L.keys(M)).filter(function(k){ return !k || o.chip[k] || st.grp===k; }).map(function(k){
+    return '<button class="mchip'+(st.grp===k?' on':'')+'" data-grp="'+esc(k)+'" onclick="lensGrp(\''+id+'\',this.dataset.grp)">'
+      +(k?'<span class="mx">'+M.icon(k)+' </span>'+esc(M.label(k)):'전체')+' <span class="n">'+(o.chip[k]||0)+'</span></button>'; }).join('');
+  var nf=rows.filter(function(x){ return x.kind==='feed'; }).length, cnt=lensEl(id,'cnt');
+  cnt.textContent='지금 '+rows.length+'건 · 공고 '+nf+' · 모집 글 '+(rows.length-nf);
+  cnt.title=cnt.textContent;
+  if(lensEl(id,'per')) lensEl(id,'per').innerHTML=perSel(L.per, "lensPer.bind(null,'"+id+"')");
   /* 모집 글을 못 읽었으면 «없다»가 아니라 «못 읽었다»고 말한다 */
-  var nt=$('rgnNote'); if(nt) nt.innerHTML = _recWatchErr ? '⚠ 모집 글을 '+esc(_recWatchErr)+' — 지금은 공고만 보입니다'
+  var nt=lensEl(id,'note'); if(nt) nt.innerHTML = _recWatchErr ? '⚠ 모집 글을 '+esc(_recWatchErr)+' — 지금은 공고만 보입니다'
     : (!_recWatch && fbDb && fbUid ? '모집 글을 불러오는 중입니다…' : '');
-  var per=perOf('rgn_per'), n=rows.length, pages=per?Math.max(1,Math.ceil(n/per)):1, p=Math.min(_rgnPage,pages-1); _rgnPage=p;
+  var per=perOf(L.per), n=rows.length, pages=per?Math.max(1,Math.ceil(n/per)):1, p=Math.min(st.page,pages-1); st.page=p;
   var from=per?p*per:0, page=per?rows.slice(from,from+per):rows;
-  var ks=Object.keys(_rgnSel), sf=ks.filter(function(k){ return /^f:/.test(k); }).length, sh=ks.length-sf;
-  $('rgnSel').innerHTML = ks.length ? '<div class="sel-bar">✔ <b>'+ks.length+'건</b> 선택'
-      +' <button class="btn sm" onclick="rgnBulk(\'star\')">★ 별표</button>'
-      +(sf ? (o.v==='hidden' ? ' <button class="btn sm" onclick="rgnBulk(\'unhide\')">↩ 공고 되살리기 '+sf+'</button>'
-                             : ' <button class="btn sm" onclick="rgnBulk(\'hide\')">🚫 공고 숨기기 '+sf+'</button>') : '')
-      +(sh ? ' <button class="btn sm" onclick="rgnBulk(\'seen\')">✓ 모집 글 봤음 '+sh+'</button>' : '')
-      +' <button class="btn sm" onclick="rgnSelAll(false)">선택 해제</button></div>' : '';
-  var sa=$('rSelAll'); if(sa) sa.checked = page.length>0 && page.every(function(x){ return _rgnSel[x.sel]; });
-  var b=function(sel, what, ttl, ic){ return '<button class="btn sm" title="'+esc(ttl)+'" data-sel="'+sel+'" onclick="rgnDo(this.dataset.sel,\''+what+'\')">'+ic+'</button>'; };
-  $('rgnTb').innerHTML = page.length ? page.map(function(x, i){
-    var on=!!_rgnSel[x.sel], st=rgnStarOn(x), sel=esc(x.sel);
-    var rg=x.regions.map(function(k){ return '<span class="rgt'+(k===GovRegion.WIDE?' wide':'')+'">'+esc(GovRegion.label(k))+'</span>'; }).join('');
+  var ks=Object.keys(st.sel), sf=ks.filter(function(k){ return /^f:/.test(k); }).length, sh=ks.length-sf;
+  var bulk=function(what, txt){ return ' <button class="btn sm" onclick="lensBulk(\''+id+'\',\''+what+'\')">'+txt+'</button>'; };
+  lensEl(id,'sel').innerHTML = ks.length ? '<div class="sel-bar">✔ <b>'+ks.length+'건</b> 선택'
+      +bulk('star','★ 별표')
+      +(sf ? (o.v==='hidden' ? bulk('unhide','↩ 공고 되살리기 '+sf) : bulk('hide','🚫 공고 숨기기 '+sf)) : '')
+      +(sh ? bulk('seen','✓ 모집 글 봤음 '+sh) : '')
+      +' <button class="btn sm" onclick="lensSelAll(\''+id+'\',false)">선택 해제</button></div>' : '';
+  var sa=lensEl(id,'all'); if(sa) sa.checked = page.length>0 && page.every(function(x){ return st.sel[x.sel]; });
+  var b=function(sel, what, ttl, ic){ return '<button class="btn sm" title="'+esc(ttl)+'" data-sel="'+sel+'" onclick="lensDo(this.dataset.sel,\''+what+'\')">'+ic+'</button>'; };
+  lensEl(id,'body').innerHTML = page.length ? page.map(function(x, i){
+    var on=!!st.sel[x.sel], star=lensStarOn(x), sel=esc(x.sel);
+    var grp=x.groups.map(function(k){ return '<span class="rgt'+(L.wide(M,k)?' wide':'')+'">'+esc(M.label(k))+'</span>'; }).join('');
     var tag = x.kind==='feed'
       ? (x.hidden ? '<span class="tag red">숨김</span> ' : (x.isNew ? '<span class="tag teal">새 공고</span> '
-          : (x.type && x.type!=='관심' ? '<span class="tag">'+esc(x.type)+'</span> ' : '')))
+          : (x.type && x.type!=='관심' && !(st.sub==='past' && x.type==='지나감') ? '<span class="tag">'+esc(x.type)+'</span> ' : '')))   /* 📁 지난 공고에서는 다 지난 것이라 「지나감」을 안 붙인다 */
       : (x.isNew ? '<span class="tag red">새 글</span> ' : '');
-    /* 팝업이 막히면(rgnOpen 이 true) 링크가 «새 탭»으로 연다 — target 이 없으면 이 ERP 창이 바깥 누리집으로 넘어간다 */
+    /* 팝업이 막히면(lensOpen 이 true) 링크가 «새 탭»으로 연다 — target 이 없으면 이 ERP 창이 바깥 누리집으로 넘어간다 */
     /* 공고 제목은 상세 팝업을 여는 링크 — 줄 누르기(마우스)와 같은 일을 키보드(Tab·Enter)로도 */
-    var ttl = x.kind==='hit' && x.url ? '<a class="tlink" href="'+esc(x.url)+'" target="_blank" rel="noopener" data-sel="'+sel+'" onclick="return rgnOpen(this.dataset.sel)">'+esc(x.title)+'</a>'
-      : (x.kind==='feed' ? '<a class="tlink" href="#" role="button" data-sel="'+sel+'" onclick="rgnPop(this.dataset.sel);return false">'+esc(x.title)+'</a>' : esc(x.title));
+    var ttl = x.kind==='hit' && x.url ? '<a class="tlink" href="'+esc(x.url)+'" target="_blank" rel="noopener" data-sel="'+sel+'" onclick="return lensOpen(this.dataset.sel)">'+esc(x.title)+'</a>'
+      : (x.kind==='feed' ? '<a class="tlink" href="#" role="button" data-sel="'+sel+'" onclick="lensPop(this.dataset.sel);return false">'+esc(x.title)+'</a>' : esc(x.title));
     var acts = x.kind==='feed'
       ? (x.url ? b(sel,'open','원문 공고 열기','🔗') : '') + b(sel,'apply','지원 준비 — 경력관리에서 서류를 함께 준비합니다','📝')
         + (x.hidden ? b(sel,'unhide','되살리기','↩') : b(sel,'hide','숨기기 — 지우지 않습니다(보기 「🙈 숨긴 공고」에서 되살립니다)','🚫'))
       : b(sel,'apply','지원 준비 — 경력관리에서 서류를 함께 준비합니다','📝') + b(sel,'due','마감일 넣기 · 구글 캘린더','📅')
         + (x.isNew ? b(sel,'seen','봤음','✓') : '');
-    return '<tr class="rr'+(on?' sel-on':'')+(x.isNew&&!x.past&&!x.hidden?' rec-now':'')+(x.past||x.hidden?' rec-past':'')+'" data-sel="'+sel+'" onclick="rgnRowClick(event,this.dataset.sel)">'
-      +'<td class="stc"><button class="starbtn'+(st?' on':'')+'" title="'+(st?'별표 끄기':'별표 치기')+'" data-sel="'+sel+'" onclick="event.stopPropagation();rgnDo(this.dataset.sel,\'star\')">'+(st?'★':'☆')+'</button></td>'
-      +'<td class="chk"><input type="checkbox" class="row-chk" aria-label="'+(from+i+1)+'번 고르기"'+(on?' checked':'')+' data-sel="'+sel+'" onchange="rgnTog(this.dataset.sel,this.checked)"></td>'
+    return '<tr class="rr'+(on?' sel-on':'')+(x.isNew&&!x.past&&!x.hidden?' rec-now':'')+(x.past||x.hidden?' rec-past':'')+'" data-sel="'+sel+'" onclick="lensRowClick(event,this.dataset.sel)">'
+      +'<td class="stc"><button class="starbtn'+(star?' on':'')+'" title="'+(star?'별표 끄기':'별표 치기')+'" data-sel="'+sel+'" onclick="event.stopPropagation();lensDo(this.dataset.sel,\'star\')">'+(star?'★':'☆')+'</button></td>'
+      +'<td class="chk"><input type="checkbox" class="row-chk" aria-label="'+(from+i+1)+'번 고르기"'+(on?' checked':'')+' data-sel="'+sel+'" onchange="lensTog(\''+id+'\',this.dataset.sel,this.checked)"></td>'
       +'<td class="rn">'+(from+i+1)+'</td>'
-      +'<td class="rrg" title="'+esc(x.why.join(' / '))+'">'+rg+'</td>'
+      +'<td class="rrg" title="'+esc(x.why.join(' / '))+'">'+grp+'</td>'
       +'<td class="rsrc"><span class="sml">'+esc(x.kind==='feed'?x.src:'모집 글')+'</span></td>'
       +'<td class="tt" title="'+esc(x.title)+'">'+tag+ttl+'</td>'
       +'<td class="src" title="'+esc(x.org)+'">'+esc(x.org||'-')+'</td>'
       +'<td class="rdt sml">'+esc(x.date||'-')+'</td>'
       +'<td title="'+esc(x.to?'마감 '+x.to:'')+'"><span class="due '+esc(x.dueK||'unknown')+'">'+esc(x.dueText||'마감 모름')+'</span></td>'
       +'<td class="act">'+acts+'</td></tr>';
-  }).join('') : '<tr><td colspan="10" class="empty">'+(!o.b.items.length
-      ? '대전·세종·충남·충북 공고·모집 글이 아직 없습니다 — 🔄 새로 받기를 누르거나, 서버가 매일 아침 모은 것을 기다려 주세요'
+  }).join('') : '<tr><td colspan="10" class="empty">'+(st.sub==='past' && o.v==='past' && !o.base.length
+      ? '지난 공고가 아직 없습니다 — 위 「📥 불러오기」로 나라장터·기업마당의 지난 AI 공고를 받아 오세요'
+      : !o.b.items.length
+      ? L.empty+' — 🔄 새로 받기를 누르거나, 서버가 매일 아침 모은 것을 기다려 주세요'
       : (o.v==='star' ? '별표 친 것이 없습니다 — 줄 맨 왼쪽의 ☆ 를 눌러 보세요'
-        : (o.v==='hidden' ? '숨긴 공고가 없습니다' : '조건에 맞는 것이 없습니다 — 보기를 「마감 지난 것까지」로 넓혀 보세요')))+'</td></tr>';
-  var pg=$('rgnPager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, 'rgnPageTo');
+        : (o.v==='hidden' ? '숨긴 공고가 없습니다'
+          : (L.subs ? '조건에 맞는 것이 없습니다 — 검색·출처·갈래를 넓혀 보세요' : '조건에 맞는 것이 없습니다 — 보기를 「마감 지난 것까지」로 넓혀 보세요'))))+'</td></tr>';
+  var pg=lensEl(id,'pager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, "lensPageTo.bind(null,'"+id+"')");
   recStickySync();
 }
-function rgnFind(sel){ var k=String(sel||''); return { kind:k.charAt(0)==='f'?'feed':'hit', ref:k.slice(2) }; }
+function lensFind(sel){ var k=String(sel||''); return { kind:k.charAt(0)==='f'?'feed':'hit', ref:k.slice(2) }; }
 /* 줄 하나에 할 일 — 모두 «원래 자리»의 함수를 그대로 부른다(그 함수들이 공고 목록·모집 글을 다시 그리면 이 탭도 따라 그려진다) */
-function rgnDo(sel, what){
-  var t=rgnFind(sel);
+function lensDo(sel, what){
+  var t=lensFind(sel);
   if(t.kind==='feed'){
     if(what==='star') star(t.ref);
     else if(what==='open') open2(t.ref);
@@ -2525,35 +2686,36 @@ function rgnDo(sel, what){
   else if(what==='due') recWatchCal(t.ref);
   else if(what==='seen') recSeen(t.ref);
 }
-function rgnPop(sel){ var t=rgnFind(sel); if(t.kind==='feed') feedPop(t.ref); }
+function lensPop(sel){ var t=lensFind(sel); if(t.kind==='feed') feedPop(t.ref); }
 /* 모집 글 제목 — 컨설턴트 모집과 같은 팝업 창(연 글은 봤음). 막히면 a 의 href 로 새 탭 */
-function rgnOpen(sel){ var t=rgnFind(sel); return t.kind==='hit' ? recOpenPost(t.ref) : true; }
+function lensOpen(sel){ var t=lensFind(sel); return t.kind==='hit' ? recOpenPost(t.ref) : true; }
 /* 줄을 누르면 — 공고는 상세 팝업(비교 포함), 모집 글은 원문. ☐·단추·링크를 누른 것은 빼고 */
-function rgnRowClick(e, sel){
+function lensRowClick(e, sel){
   var tg=e&&e.target; if(tg && tg.closest && tg.closest('input,button,a,select,label')) return;
-  var t=rgnFind(sel);
+  var t=lensFind(sel);
   if(t.kind==='feed'){ feedPop(t.ref); return; }
   var x=recWatchHits().filter(function(h){ return h.key===t.ref; })[0];
   if(x && /^https:\/\//.test(x.href||'') && recOpenPost(t.ref)) window.open(x.href, '_blank', 'noopener');
 }
-function rgnTog(sel, on){ if(on) _rgnSel[sel]=1; else delete _rgnSel[sel]; rgnDraw(); }
+function lensTog(id, sel, on){ var s=_lens[id].sel; if(on) s[sel]=1; else delete s[sel]; lensDraw(id); }
 /* 머리 ☐ — «이 쪽에 보이는 것»만 고른다 */
-function rgnSelAll(on){
-  if(!on){ _rgnSel={}; rgnDraw(); return; }
-  var rows=rgnVisible().rows, per=perOf('rgn_per'), from=per?_rgnPage*per:0;
-  (per?rows.slice(from,from+per):rows).forEach(function(x){ _rgnSel[x.sel]=1; });
-  rgnDraw();
+function lensSelAll(id, on){
+  var st=_lens[id];
+  if(!on){ st.sel={}; lensDraw(id); return; }
+  var rows=lensVisible(id).rows, per=perOf(LENS[id].per), from=per?st.page*per:0;
+  (per?rows.slice(from,from+per):rows).forEach(function(x){ st.sel[x.sel]=1; });
+  lensDraw(id);
 }
-function rgnReg(k){ _rgnReg=k||''; _rgnPage=0; rgnDraw(); }
-function rgnPer(v){ lsSet('rgn_per', String(v)); _rgnPage=0; rgnDraw(); }
-function rgnPageTo(p){ _rgnPage=p; rgnDraw(); }
+function lensGrp(id, k){ _lens[id].grp=k||''; _lens[id].page=0; lensDraw(id); }
+function lensPer(id, v){ lsSet(LENS[id].per, String(v)); _lens[id].page=0; lensDraw(id); }
+function lensPageTo(id, p){ _lens[id].page=p; lensDraw(id); }
 /* 🔄 — 공고를 받고(fetchAll: 하루 1,000회 제한 안의 같은 길) 서버 모집 글을 다시 읽는다 */
-function rgnRefresh(){
-  Promise.resolve(fetchAll()).then(function(){ return recWatchLoad(); }).then(function(){ rgnRedraw(); }, function(){ rgnRedraw(); });
+function lensRefresh(id){
+  Promise.resolve(fetchAll()).then(function(){ return recWatchLoad(); }).then(function(){ lensRedraw(); }, function(){ lensRedraw(); });
 }
 /* 고른 것 한꺼번에 — 공고는 목록을 «한 번» 읽고 «한 번» 저장, 모집 글 표시도 한 번. 숨기기는 건수를 묻는다(지우지 않는다) */
-function rgnBulk(what){
-  var ks=Object.keys(_rgnSel); if(!ks.length) return;
+function lensBulk(id, what){
+  var st=_lens[id], ks=Object.keys(st.sel); if(!ks.length) return;
   var fs={}, nf=0, hs=[];
   ks.forEach(function(k){ if(/^f:/.test(k)){ fs[k.slice(2)]=1; nf++; } else hs.push(k.slice(2)); });
   if(what==='hide' && nf && !confirm('고른 공고 '+nf+'건을 숨길까요?\n지우지 않습니다 — 보기 「🙈 숨긴 공고」에서 언제든 되살립니다.')) return;
@@ -2576,13 +2738,84 @@ function rgnBulk(what){
     hs.forEach(function(k){ if(!sn[k]){ sn[k]=now2; c3++; } });
     if(c3) recObjSet('recruit_seen', sn); n+=c3;
   }
-  _rgnSel={};
-  draw(); recDraw(); starAllBadge(); rgnRedraw();
+  st.sel={};
+  draw(); recDraw(); starAllBadge(); lensRedraw();
   toast(!n ? '바뀐 것이 없습니다'
     : what==='star' ? n+'건에 별표를 쳤습니다'
     : what==='hide' ? n+'건을 숨겼습니다 — 보기 「🙈 숨긴 공고」에서 되살립니다'
     : what==='unhide' ? n+'건을 되살렸습니다 — 규칙이 다시 숨기지 않습니다'
     : n+'건을 봤음으로 적었습니다');
+}
+
+/* ═══ 📥 지난 AI 공고 불러오기 (대표 지시 2026-11-19 「AI 관련 이미 지난것도 올려달라 그래야 비교 분석 가능하다」) ═══
+   🤖 탭은 오늘부터 받은 것만 있어 «지난 공고»가 비어 있다 — 손으로 한 번 몰아 받는다(📁 지난 공고 하위 탭의 단추).
+   · 나라장터: 고른 기간(3·6·12개월)을 «7일 창»(GovG2b.weekWindows — 2026-11-10 부터 한 번에 7일까지)으로 잘라 받는다.
+     받은 창은 기억해(ai_back.weeks) 다시 눌러도 건너뛴다. 창마다 쪽 뚜껑 PAGE_MAX.g2b.
+   · 기업마당: 분야·지역 없이 쪽을 넘기며 받는다(명세상 searchCnt 0 = 전체). ⚠ 실호출로 확인 못 함 — 새 공고가 안 나오면 멈춘다.
+   · AI 갈래(GovG2b.judgeAi)에 걸리는 것만 담는다 — 많게는 AI_BACK_MAX 건(공고일 최근 것부터). 담은 줄은 r.back=1 → 🤖 탭에만(aiOnly).
+   ⚠ 하루 호출 한도(공공데이터포털 1,000회) — 묻기 전에 대략 몇 번인지 밝힌다. 멈추기(■)를 누르면 그때까지 받은 것만 담는다.
+   ⚠ «새로 받기»와 같은 문(_fetching)을 쓴다 — 둘이 겹쳐 돌면 같은 줄을 두 번 합친다.
+   ⚠ lsSet 은 자리가 모자라면 조용히 실패한다 — 담은 뒤 다시 읽어 줄 수를 견준다. */
+var _aiBack={ run:false, stop:false, msg:'', months:6 };
+var AI_BACK_MAX=300, AI_BACK_BIZ_PAGES=6, AI_BACK_BIZ_UNIT=500;
+function aiBackInfo(){ try{ var v=JSON.parse(lsGet('ai_back')||'null'); return (v&&typeof v==='object')?v:{}; }catch(e){ return {}; } }
+function aiBackMsg(m){ _aiBack.msg=m; var el=$('aBackInfo'); if(el) el.textContent=m; }
+function aiBackStop(){ if(_aiBack.run){ _aiBack.stop=true; aiBackMsg('멈추는 중… 지금 받는 창까지 마치고 담습니다'); } }
+async function aiBackfill(){
+  if(_aiBack.run) return;
+  if(_fetching){ toast('받고 있습니다 — 잠시만 기다려 주세요'); return; }
+  var kd=keyData(), kb=keyBiz();
+  if(!kd && !kb){ toast('인증키를 먼저 넣어 주세요'); return; }
+  var months=_aiBack.months||6, now=new Date(), from=new Date(now.getTime()-Math.round(months*30.44)*86400000);
+  var info=aiBackInfo(), done=(info.weeks&&typeof info.weeks==='object')?info.weeks:{}, doneBefore=Object.assign({}, done);
+  var wins=kd ? GovG2b.weekWindows(from, now).filter(function(w){ return !done[ymdOf(w[0])]; }) : [];
+  if(!wins.length && !kb){ toast('지난 '+months+'개월치는 이미 다 불러왔습니다'); return; }
+  if(!confirm('지난 AI 공고를 불러옵니다.\n'
+    +(kd ? '· 나라장터: 지난 '+months+'개월을 7일씩 '+wins.length+'번 (호출 약 '+(wins.length*4)+'회, 많게는 '+(wins.length*PAGE_MAX.g2b)+'회 — 하루 한도 1,000회 안)\n' : '')
+    +(kb ? '· 기업마당: 받을 수 있는 만큼(많게는 '+AI_BACK_BIZ_PAGES+'회)\n' : '')
+    +'AI 갈래에 걸리는 공고만 「📁 지난 공고」에 담습니다(많게는 '+AI_BACK_MAX+'건). 몇 분 걸릴 수 있고, ■ 멈추기로 중간에 멈출 수 있습니다.\n진행할까요?')) return;
+  _aiBack.run=true; _aiBack.stop=false; _fetching=true; lensRedraw();
+  var got=[], errs=[], seen={}, bizSeen={}, weeksDone=0;
+  var keep=function(r){ if(r && r.no && !seen[r.no] && GovG2b.judgeAi(r).length){ seen[r.no]=1; got.push(r); } };
+  try{
+    if(kb){
+      for(var pi=1; pi<=AI_BACK_BIZ_PAGES && !_aiBack.stop; pi++){
+        aiBackMsg('⏳ 기업마당 '+pi+'쪽 받는 중…');
+        var b; try{ b=GovBizinfo.parse(await pull(GovBizinfo.buildUrl({ key:kb, count:0, pageUnit:AI_BACK_BIZ_UNIT, pageIndex:pi }))); }
+        catch(e){ errs.push('기업마당: 받지 못했습니다'); break; }
+        if(!b.ok){ errs.push('기업마당: '+b.err); break; }
+        var newN=0; b.rows.forEach(function(r){ if(!bizSeen[r.no]){ bizSeen[r.no]=1; newN++; } keep(r); });
+        if(!newN || b.rows.length<AI_BACK_BIZ_UNIT) break;   /* 새 공고가 안 나오면(쪽 넘기기를 안 받는 판) 멈춘다 */
+      }
+    }
+    for(var i=0; i<wins.length && !_aiBack.stop; i++){
+      var w=wins[i];
+      aiBackMsg('⏳ 나라장터 '+ymdOf(w[0])+'~'+ymdOf(w[1])+' ('+(i+1)+'/'+wins.length+') · 찾은 AI 공고 '+got.length+'건');
+      var g=await pullAll('나라장터', function(p){ return GovG2b.buildUrl({ key:kd, from:w[0], to:w[1], page:p, rows:999 }); }, GovG2b.parse, PAGE_MAX.g2b);
+      g.rows.forEach(keep);
+      var hard=g.errs.filter(function(e){ return !/쪽 뚜껑/.test(e); });
+      errs=errs.concat(g.errs);
+      if(hard.length) break;          /* 열쇠·한도 오류 — 더 불러도 같다. 이 창은 «받은 것»으로 적지 않는다 */
+      done[ymdOf(w[0])]=1; weeksDone++;
+    }
+    got.sort(function(a,b){ return String(b.openDt||'').localeCompare(String(a.openDt||'')); });
+    var cut=Math.max(0, got.length-AI_BACK_MAX); got=got.slice(0, AI_BACK_MAX);
+    var buf=get('feed'), at=new Date().toISOString();
+    var m=GovG2b.merge(buf, got, kws(), at.slice(0,10));
+    m.adds.forEach(function(r){ r.back=1; r.id=nextId(buf); r.savedAt=at; buf.unshift(r); });
+    var added=m.adds.length;
+    if(added){ set('feed', buf);
+      /* 못 담았으면 «받은 주»도 적지 않는다 — 적으면 다음에 그 주를 건너뛰어 영영 못 받는다(2026-11-19 검토 낮음) */
+      if(get('feed').length!==buf.length){ errs.push('저장 공간이 모자라 담지 못했습니다'); added=0; done=doneBefore; } }
+    ageOut();
+    lsSet('ai_back', JSON.stringify({ at:at, months:Math.max(months, info.months||0), weeks:done, adds:(info.adds||0)+added, last:added, cut:cut, errs:errs.slice(0,3) }));
+    draw();
+    toast((_aiBack.stop?'멈췄습니다 — ':'')+'지난 AI 공고 '+added+'건을 담았습니다'
+      +(cut?' (많아서 최근 '+AI_BACK_MAX+'건만)':'')+(m.skipped?' · 이미 있던 '+m.skipped+'건 건너뜀':'')
+      +(errs.length?' — ⚠ '+errs[0]:''));
+  } finally {
+    _aiBack.run=false; _aiBack.stop=false; _aiBack.msg=''; _fetching=false; lensRedraw();
+  }
 }
 
 /* ═══ ★ 별표 + 📚 과거 지원 표시 (대표 지시 2026-10-30 「중요한 부분은 별표 표시하고 별표만 따로 보게 — 공고·발주·컨설턴트 모집 모든 영역」
@@ -2698,13 +2931,15 @@ function appSetSt(orgId, y, v){
 
 /* ★ 별표 모음 — 공고·발주·모집을 한 창에 (머리 단추) */
 function starAllItems(){
-  var feed=get('feed').filter(function(r){ return r && r.type==='관심'; });
+  /* 🤖 AI 로만 걸린 공고는 따로 — 「공고 모아보기에서 별표만 보기」로 가면 거기엔 안 보이므로 🤖 탭으로 보낸다(2026-11-19) */
+  var kw=kws(), starred=get('feed').filter(function(r){ return r && r.type==='관심'; });
+  var feed=starred.filter(function(r){ return !aiOnly(r, kw); }), aiFeed=starred.filter(function(r){ return aiOnly(r, kw); });
   var plan=get('plan').filter(function(r){ return r && r.star; });
   var sm=recStarMap(), hits=recWatchHits().filter(function(x){ return sm[recStarKey('h', x.key)]; });
   var orgs=appOrgs().filter(function(o){ return sm[recStarKey('o', o.id)]; });
   var mails=(get('recruit_mailitems')||[]).filter(function(x){ return x && sm[recStarKey('m', x.key)]; });
-  return { feed:feed, plan:plan, hits:hits, orgs:orgs, mails:mails,
-    n: feed.length+plan.length+hits.length+orgs.length+mails.length };
+  return { feed:feed, ai:aiFeed, plan:plan, hits:hits, orgs:orgs, mails:mails,
+    n: feed.length+aiFeed.length+plan.length+hits.length+orgs.length+mails.length };
 }
 function starAllBadge(){
   var el=$('starAllN'); if(!el) return;
@@ -2715,6 +2950,8 @@ function starGo(where){
   popClose();
   if(where==='feed'){ setTab('feed'); var s=$('fSt'); if(s && s.value!=='관심') feedStarOnly(); }
   else if(where==='plan'){ setTab('plan'); var p=$('pView'); if(p && p.value!=='star') planStarOnly(); }
+  /* ⚠ 보기 줄을 먼저 맞춘 뒤 별표로 — 탭을 한 번도 안 열었으면 lensViewOpts 가 줄을 새로 그리며 고른 값을 덮는다(2026-11-19 검토 낮음) */
+  else if(LENS[where]){ lensViewOpts(where); var vw=$(LENS[where].el.view); if(vw) vw.value='star'; _lens[where].page=0; setTab(where); }
   else { setTab('rec'); if(!_recStarOnly) recStarOnlyTog(); }
 }
 function starAllOpen(){
@@ -2727,6 +2964,7 @@ function starAllOpen(){
   var tr=function(a,b,c){ return '<tr><td style="white-space:normal"><b>'+esc(a)+'</b></td><td class="sml">'+esc(b||'')+'</td><td class="sml">'+(c||'')+'</td></tr>'; };
   var body=''
     +sec('📅 공고 모아보기', 'feed', S.feed.map(function(r){ return tr(r.nm||'-', r.org||'', esc(String(r.closeDt||'').slice(0,10))+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))); }), S.feed.length)
+    +sec('🤖 AI 사업', 'ai', S.ai.map(function(r){ return tr(r.nm||'-', r.org||'', esc(String(r.closeDt||'').slice(0,10))); }), S.ai.length)
     +sec('📅 발주 예정', 'plan', S.plan.map(function(r){ return tr(r.nm||'-', r.org||'', esc(r.ym||'')+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))); }), S.plan.length)
     +sec('🧑‍💼 컨설턴트 모집 — 모집 글', 'rec', S.hits.map(function(x){ return tr(x.title, (x.boardName||'')+' '+(x.date||''), appTag(x.org&&x.org!=='kcplaa'?x.org:appOrgOf(x.title))); }), S.hits.length)
     +sec('🧑‍💼 컨설턴트 모집 — 기관', 'rec', S.orgs.map(function(o){ return tr(o.name, o.what||'', appTag(o.id)); }), S.orgs.length)

@@ -180,7 +180,7 @@
       agencies: ['kmac', 'cepa'],
       summary: '신규 라인 가동·다품종 공정에 맞춘 교대·유연근무 개편, 전환기 임금보전 원칙 및 직무·다기능 숙련수당 체계 설계',
       lawPoints: ['근로기준법 제50조~제53조(근로시간·유연근무) · 제43조·제48조(임금지급 및 임금명세서)', '통상임금 산입범위 적법화'],
-      govAid: ['워라밸일자리·유연근무 장려금', '일터혁신 상생컨설팅 연계 지원']
+      govAid: ['워라밸일자리·유연근무 장려금', '고용노동부 노동전환 지원금(직무·근무체계 전환)']
     },
     {
       code: 'jt_smart_safe',
@@ -522,16 +522,111 @@
     return { subject: subj, body: body };
   }
 
-  /* 사업명·유형 텍스트로 운영기관(kmac / cepa) 및 세부 트랙 자동 추론 */
+  /* ══ 소속기관별 공식 보고서 양식 · 제출물 · 검수기준 완전 분리 명세 ══════ */
+  var AGENCY_FORM_SPECS = {
+    kmac: {
+      agencyCode: 'kmac',
+      agencyName: '한국능률협회컨설팅(KMAC)',
+      erpTypeCode: '산일능률',
+      erpTypeName: '산업일자리전환컨설팅능률',
+      supervisingBody: '중소벤처기업부 · 중소벤처기업진흥공단 · 한국능률협회컨설팅(KMAC)',
+      programTitle: '구조혁신지원사업 (산업·일자리전환 컨설팅)',
+      platformName: '중진공 구조혁신지원사업 종합 플랫폼',
+      midFormTitle: 'KMAC 구조혁신(산업·일자리전환) 표준 중간보고서 (7장)',
+      finalFormTitle: '신규양식_기업명_컨설턴트명_산업·일자리전환_2_결과 보고서 (8장 · 2026년형)',
+      completionFormTitle: '컨설팅 완료보고서(요약) · 수행실적 증명서 · 정책매니저(사후관리) 보고서',
+      deliverableSteps: [
+        '① 사전 구조혁신진단 보고서 연계 확인',
+        '② 착수보고서 표준 PPT 제출 (업로드 시 1MD 인정)',
+        '③ 수행계획서 승인 · 중복수혜 방지 서약서(양식1) · 인식수준 조사지(양식3)',
+        '④ MD별 수행일지 등록 (대면 75%+, 회당 120분+, 시작·종료 타임스탬프 사진)',
+        '⑤ KMAC 양식 중간보고서(7장) 진단 기준선 확정',
+        '⑥ KMAC 신규양식 최종결과보고서(8장) 제출 — KPI 4개+(필수2·선택2) · 지원사업 2개+(산업일자리전환지원금 필수)',
+        '⑦ 완료보고서(요약) · 연계지원사업 플랫폼 등록 및 정책매니저 사후관리 보고서(날인본)'
+      ],
+      reviewRules: [
+        { code: 'kmac_toc', label: 'KMAC 구조혁신 전용 목차 적용', detail: '중간 7장 / 최종 8장(신규양식_산업·일자리전환_2_결과보고서) 체제 일치' },
+        { code: 'kmac_kpi4', label: '성과지표(KPI) 4개 이상 설정', detail: 'KPI POOL 기준 필수지표 2개 + 선택지표 2개 이상 구체 수치 포함' },
+        { code: 'kmac_gov2', label: '정부지원사업 2개 이상 매칭', detail: '고용노동부 산업·일자리전환지원금 필수 포함 2개 이상 및 적합·부적합 사유 기재' },
+        { code: 'kmac_md', label: 'MD·대면 수행인정 기준 충족', detail: '권장 회차(본컨설팅 8회/정책매니저 4회), 회당 120분+, 대면 비율 75% 이상' },
+        { code: 'kmac_data', label: '최신 3개년 현황 · 인식설문 반영', detail: '최근 3개년 재무·인력 추이 및 노동전환 인식수준(5대 영역) 진단 반영' },
+        { code: 'kmac_isolation', label: '타 사업·타 기관 서식 무혼입', detail: '일터상생(디자인팀·통합진단보고서·이행결과표) 및 충남경제진흥원(완료계) 문구 혼입 0건' }
+      ],
+      forbiddenTermsRe: /디자인\s*팀\s*회의|통합\s*진단\s*보고서\s*양식|이행\s*결과표|노사\s*발전\s*재단|에프엠\s*어소시에이션|충남\s*경제\s*진흥원\s*완료계/i
+    },
+    cepa: {
+      agencyCode: 'cepa',
+      agencyName: '충남경제진흥원(CEPA)',
+      erpTypeCode: '산일충남',
+      erpTypeName: '산업일자리전환컨설팅충남',
+      supervisingBody: '충청남도 · 고용노동부 · 충남경제진흥원(충남 산업일자리전환지원센터)',
+      programTitle: '충남 산업일자리전환지원센터 진단·전문컨설팅',
+      platformName: '충남경제진흥원 산업일자리전환지원센터 공문·전자제출 체계',
+      midFormTitle: '충남 산업일자리전환지원센터 표준 중간보고서 (7장)',
+      finalFormTitle: '충남 산업일자리전환지원센터 진단/전문컨설팅 결과보고서 (8장)',
+      completionFormTitle: '산업일자리 전환 완료계(갑지 대표자 날인) · 사후관리 결과보고서 · 장려금 신청계획',
+      deliverableSteps: [
+        '① 산업·일자리전환 지원컨설팅 사업 신청서 (기업용 · 컨설턴트용)',
+        '② [진단 트랙] 진단컨설팅 수행계획서 및 결과보고서 (3회차 기준)',
+        '③ [전문 트랙] 컨설팅 수행일지 · 월별 수행실적보고서(추진현황 보고서)',
+        '④ 충남지원센터 양식 전문컨설팅 중간보고서(7장) 확정',
+        '⑤ 충남지원센터 양식 전문컨설팅 결과보고서(8장 — 석탄화력 폐지 / 미래차 전환 특화)',
+        '⑥ 산업일자리 전환 완료계 (갑지 참여기업 대표자 서명·직인 날인 필수)',
+        '⑦ 사후관리 결과보고서 및 충남 산업일자리전환 장려금·에너지전환 훈련 신청계획'
+      ],
+      reviewRules: [
+        { code: 'cepa_toc', label: '충남경제진흥원 트랙별 목차 적용', detail: '진단컨설팅 / 전문컨설팅(석탄화력·자동차주력) 전용 7장·8장 목차 일치' },
+        { code: 'cepa_sector', label: '충남 전환산업 공급망 영향 진단', detail: '석탄화력 단계적 폐지 또는 내연기관→미래차 전환에 따른 매출·직무 영향 명시' },
+        { code: 'cepa_reskill', label: '전환직무 인원 · 지역훈련 연계', detail: '전환 대상 직무·인원 산정 및 충남지역혁신프로젝트·에너지전환·S-OJT 훈련 연계' },
+        { code: 'cepa_face80', label: '대면 80%+ · 회차 증빙 충족', detail: '권장 회차(진단 3회/전문 6회), 회당 120분+, 대면 비율 80% 이상 및 사진·일지 확보' },
+        { code: 'cepa_completion', label: '컨설팅 완료계(날인) · 충남 장려금', detail: '갑지 서명·날인용 산업일자리 전환 완료계 및 충남 산업일자리전환 장려금 매칭 구비' },
+        { code: 'cepa_isolation', label: '타 사업·타 기관 서식 무혼입', detail: '일터상생(디자인팀·통합진단보고서·이행결과표) 및 KMAC(중진공 플랫폼·정책매니저) 혼입 0건' }
+      ],
+      forbiddenTermsRe: /디자인\s*팀\s*회의|통합\s*진단\s*보고서\s*양식|이행\s*결과표|노사\s*발전\s*재단|에프엠\s*어소시에이션|중진공\s*구조혁신\s*플랫폼|정책\s*매니저\s*보고서/i
+    }
+  };
+
+  /* ══ 혼동·중복 원천 배제 대상 타 컨설팅 구분 사전 ═════════════════════════ */
+  var EXCLUDED_PROGRAMS = [
+    {
+      code: 'workplace_sangsaeng',
+      name: '일터혁신 상생컨설팅 (일터상생)',
+      erpCode: '일터상생-YYYY-NNN',
+      organizer: '고용노동부 · 노사발전재단 · 에프엠어소시에이션',
+      distinctiveDocs: '참여 안내서(서명) · 디자인팀 회의록 · 통합진단보고서(PPT, 일반형 v4/v5) · 이행결과표',
+      separationRule: '산업·일자리전환(KMAC/CEPA)과 별개 사업이므로 본 화면의 사업장 감지·폴더 수집·메일 스캔·보고서 양식에서 100% 원천 제외합니다 (일터혁신 전용 화면 소관).'
+    },
+    {
+      code: 'petrochem_labortrans',
+      name: '석유화학 노동전환컨설팅',
+      erpCode: '노동전환-YYYY-NNN',
+      organizer: '충남노동전환지원센터 (석유화학 협력사 트랙)',
+      distinctiveDocs: '노동전환 컨설팅 사업장 신청서(간단형/기본형) · 인터뷰수당확인서',
+      separationRule: '충남경제진흥원(산일충남) 산업일자리전환지원센터 사업과 주관기관·양식이 다른 별도 사업이므로 CEPA 목록에 섞이지 않도록 자동 분리합니다.'
+    }
+  ];
+
+  function getAgencyFormSpec(agencyCode) {
+    var ag = getAgency(agencyCode);
+    return AGENCY_FORM_SPECS[ag.code] || AGENCY_FORM_SPECS.kmac;
+  }
+
+  /* 사업명·유형 텍스트로 운영기관(kmac / cepa) 및 세부 트랙 자동 추론
+   * - 주의: 충남노동전환지원센터(석유화학 노동전환)나 일터혁신 상생컨설팅은 여기서 CEPA/KMAC으로 오인하지 않도록 호출부에서 먼저 걸러낸다. */
   function inferAgencyAndTrack(text) {
     var s = String(text || '').toLowerCase();
-    if (/충남|충경진|cepa|경제진흥원|석탄화력|정의로운/.test(s)) {
+    if (/산일\s*능률|한국\s*능률\s*협회|능률\s*협회|kmac|중진공|구조\s*혁신\s*(?:지원|컨설팅|진단)|정책\s*매니저/.test(s)) {
+      if (/정책\s*매니저|사후\s*관리/.test(s)) return { agency: 'kmac', track: 'kmac_pm' };
+      return { agency: 'kmac', track: 'kmac_std' };
+    }
+    if (/산일\s*충남|충경진|cepa|충남\s*경제\s*진흥원|경제\s*진흥원|산업\s*[·ㆍ.]?\s*일자리\s*\(\s*충남\s*\)|충남\s*산업\s*[·ㆍ.]?\s*일자리|석탄\s*화력|정의로운/.test(s)) {
       if (/진단\s*컨설팅|기초\s*진단/.test(s)) return { agency: 'cepa', track: 'cepa_diag' };
       if (/자동차|미래차|모빌리티|전동화|부품/.test(s)) return { agency: 'cepa', track: 'cepa_auto' };
       return { agency: 'cepa', track: 'cepa_coal' };
     }
-    if (/정책\s*매니저|사후\s*관리/.test(s)) {
-      return { agency: 'kmac', track: 'kmac_pm' };
+    if (/완료계/.test(s) && !/능률|kmac|중진공|정책\s*매니저/.test(s)) {
+      if (/진단\s*컨설팅/.test(s)) return { agency: 'cepa', track: 'cepa_diag' };
+      return { agency: 'cepa', track: 'cepa_coal' };
     }
     return { agency: 'kmac', track: 'kmac_std' };
   }
@@ -549,6 +644,8 @@
     KMAC_FINAL_SECTIONS: KMAC_FINAL_SECTIONS,
     CEPA_DIAG_FINAL_SECTIONS: CEPA_DIAG_FINAL_SECTIONS,
     CEPA_PRO_FINAL_SECTIONS: CEPA_PRO_FINAL_SECTIONS,
+    AGENCY_FORM_SPECS: AGENCY_FORM_SPECS,
+    EXCLUDED_PROGRAMS: EXCLUDED_PROGRAMS,
     getAgency: getAgency,
     getTrack: getTrack,
     tracksForAgency: tracksForAgency,
@@ -557,6 +654,7 @@
     getMidSections: getMidSections,
     getFinalSections: getFinalSections,
     getFollowupItems: getFollowupItems,
+    getAgencyFormSpec: getAgencyFormSpec,
     checklistFor: checklistFor,
     buildDocRequestMail: buildDocRequestMail,
     inferAgencyAndTrack: inferAgencyAndTrack

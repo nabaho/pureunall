@@ -131,12 +131,12 @@ function imgSrcOk(v) {
      이 다섯은 «자기 칸 안»에서만 힘을 쓴다. 받는 화면을 덮는 것들과 다르다. */
 const STYLE_OK = ['color','background-color','background','font-family','font-size',
                   'font-weight','font-style','text-decoration','text-align',
-                  'line-height','margin','margin-left','padding-left','text-indent',
+                  'line-height','margin','margin-top','margin-right','margin-bottom','margin-left','padding-left','text-indent',
                   'padding','padding-top','padding-right','padding-bottom',
                   'border','border-top','border-bottom','border-left','border-right',
                   'border-radius','border-collapse','border-spacing',
                   'width','max-width','height','min-height','vertical-align',
-                  'letter-spacing','display'];
+                  'letter-spacing','display','overflow','word-break'];
 
 /* 태그마다 남길 속성. 여기 없는 속성은 다 버린다(on* 손잡이가 여기서 걸러진다). */
 /* ★ class 는 2026-09-26 에 더했다 — 화면 크기별 규칙(@media)이 붙잡을 손잡이다.
@@ -187,6 +187,7 @@ function cleanStyle(v) {
 /* 누를 수 있는 주소인가 — http·https·mailto 만. javascript: 는 받는 쪽에서 돈다. */
 function cleanHref(v) {
   const s = String(v == null ? '' : v).trim().replace(/[ -\s]/g, '');
+  if (/^tel:\+?[0-9-]{7,20}$/i.test(s)) return s;
   return /^(https?:\/\/|mailto:)/i.test(s) ? s.replace(/"/g, '&quot;') : '';
 }
 

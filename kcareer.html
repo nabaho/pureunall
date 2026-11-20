@@ -778,6 +778,8 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
 .mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
+.mr-pill.quiet:not(.on){background:transparent;border-style:dashed;color:var(--text-mute)}   /* 걸러낸 메일 — 목록이 아니라 «되돌리러 가는 곳»이라 조용히 (2026-11-19) */
+#mrBody .dt.mr-act1 thead th:last-child{width:auto;min-width:96px}   /* 단추 하나(↩ 되돌림)뿐인 탭 — 공용 200px 가 표를 가로로 밀지 않게 */
 .mr-st{font-size:11.5px;color:var(--text-mute);margin:0 0 8px;word-break:keep-all}
 .mr-note{font-size:11.5px;color:var(--text-mute);line-height:1.6;margin-top:10px;word-break:keep-all}
 .mr-open{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
@@ -1680,7 +1682,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=101"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -1688,7 +1690,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
-<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-backup.js?v=3"></script>
 <script src="js/kcareer-scan.js?v=3"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
@@ -1721,7 +1723,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=3"></script>
+<script src="js/kcareer-mailreq.js?v=4"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -1750,9 +1752,9 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=47"></script>
+  <script src="js/pu-appbar.js?v=53"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
-  <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=6"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -14115,7 +14117,8 @@ async function ocrDrop(files,page){ files=[...files]; if(!files.length) return;
       continue;
     }
     if(!parsed && aiReady()){ const gj=await _geminiOCR(prompt,sendB64,mt,pay.pages); if(gj){ if(gj.parsed) parsed=gj.parsed; else if(gj.err) apiErr=gj.err; } }
-    if(gvKey&&!isPDF){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
+    /* ⚠ Vision·Claude 는 Gemini 가 «못 읽었을 때만» 부른다(2026-11-19 비용 점검) — 예전에는 Gemini 가 읽은 뒤에도 열쇠만 있으면 둘 다 또 불러 요금이 두세 번 나갔다 */
+    if(gvKey&&!isPDF&&!_ocrGot(parsed)){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
       if(r.ok){ const d=await r.json(); const text=d.responses?.[0]?.fullTextAnnotation?.text||d.responses?.[0]?.textAnnotations?.[0]?.description||'';
         if(text&&apiKey){ const resp=await kcFetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content:`다음 OCR 텍스트를 분석하세요:\n${text.slice(0,2000)}\n\n${prompt}`}]})});
           if(resp.ok){ const rd=await resp.json(); const raw=rd.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim(); const m=raw.match(/\{[\s\S]*\}/); if(m) parsed=JSON.parse(m[0]); }
@@ -15971,7 +15974,7 @@ function renderFeeSettle(){
    ⚠ 보내거나 채우지 않는다. 메일을 «읽기만»(peek) 한다. 상태(확인함·처리 완료·요청 아님)는 사람이 누른다.
    ⚠ 저장 자리는 kcareer/{uid}/mailreq — 자료 통(ls)과 «따로»다. at 을 안 건드려 다른 기기에 «새 저장» 띠가 안 뜬다. 보안규칙은 그대로.
    ⚠ 기기마다 다른 설정(알림 켬·띠 닫음)은 localStorage 에 직접 둔다 — LS(cm3_*)에 두면 자료 통에 실려 클라우드로 간다. */
-var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0, detId:'', detFrom:null };
+var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0, detId:'', detFrom:null, layaMsg:'' };
 function mrBase(){ return 'kcareer/'+fbUid+'/mailreq'; }
 function mrLocal(k, v){ try{ if(v===undefined) return localStorage.getItem('kc_mr_'+k); if(v===null) localStorage.removeItem('kc_mr_'+k); else localStorage.setItem('kc_mr_'+k, v); }catch(e){} return null; }
 function mrNavCount(){ return _mr.ready ? KcareerMailReq.summary(_mr.items, Date.now()).open : null; }
@@ -16014,7 +16017,7 @@ function mrOnData(v){
   if(_mr.detId && !v[_mr.detId]) mrDetClose();      /* 보던 건이 사라졌다(다른 곳에서 지움) — 팝업을 닫는다 */
   /* 처음 받은 판은 «조용히» — 열 때마다 알림이 쏟아지면 안 된다. 그 몫은 띠가 말한다 */
   /* 건이 하나씩 들어와도(건마다 저장) 알림은 «한 번에 모아» — 처음 훑을 때 알림이 건수만큼 깜박이지 않게 */
-  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ.map(function(x){ return (_mr.items&&_mr.items[x.id])||x; }).filter(function(x){ return x.st==='new'; }); _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }   /* 알리는 «그 순간»의 상태를 다시 본다 — 그 사이 Jev·규칙이 업무로 치운 건은 알리지 않는다 */
+  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ.map(function(x){ return (_mr.items&&_mr.items[x.id])||x; }).filter(function(x){ return x.st==='new'; }); _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }   /* 알리는 «그 순간»의 상태를 다시 본다 — 그 사이 규칙이 걸러 둔 건은 알리지 않는다 */
   _mr.seen=ids;
   mrPaint(); mrRender();
 }
@@ -16043,41 +16046,48 @@ async function mrScan(quiet){
     var r=await KcareerMailReq.scan({ db:fbDb, uid:fbUid, readBody:KcareerMailReq.makeReadBody(_bizMbCall) });
     _mr.last=Date.now(); _mr.lastRes={ folders:r.folders, scanned:r.scanned, found:r.found, errors:r.errors.length, autoIgnored:(r.autoIgnored||0) };
     if(r.errors.length) console.warn('[요청 메일] 훑기', r.errors);
-    await mrJevRun();     /* 규칙이 못 가른 «애매한 건»만 Jev 에게 — 실패해도 훑기는 끝난 것이다(안에서 삼킨다) */
     /* 찾았으면 «새 요청» 알림(mrAnnounce)이 이미 말했다 — 같은 자리 알림이라 덮어쓰지 않는다 */
     if(!quiet && (r.errors.length || !r.created.length)) toast(r.errors.length ? ('⚠ 일부 폴더를 읽지 못했습니다 ('+r.errors.length+'곳)') : '새 요청 메일이 없습니다', 5000);
   }catch(e){ console.warn('[요청 메일] 훑기 실패', e); _mr.err='메일함을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,60); if(!quiet) toast('⚠ '+_mr.err, 6000); }
   finally{ _mr.busy=false; mrRender(); }
+  /* 🧠 이 PC 의 Laya 에게 «의견»만 — 훑기가 «끝난 뒤» 따로 돈다(한 건 1~3초라 기다리게 하면 «지금 확인» 단추가 묶인다). 켠 기기에서만, 실패는 안에서 삼킨다 */
+  mrLayaRun().then(function(r){ if(r && r.asked) mrRender(); });
 }
 function mrScanNow(){ mrScan(false); }
-/* ── 🤖 Jev 범위 분류 — «이력서·경력·회의·비용»만 남기고 «업무»는 뺀다 (대표 지시 2026-11-15) ──
-   1차는 모듈의 말 목록(scopeOf — 밖으로 안 나간다). 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 서버 함수 mailReqScope 가
-   이름을 가려 Jev 에게 묻는다(본문·보낸이는 안 보낸다 · 관리자만 · 하루 한도). 켜짐이 기본 — 이 기기에서 끌 수 있다(mrLocal 'jev').
-   ⚠ 못 물으면(열쇠·한도·서버 함수 미배포·업체 오류) 던지지 않는다 — 30분 쉬고 «규칙 결과 그대로»다. 자동 제외는 «새 요청»만(모듈 scopeAsk). */
-function mrJevOn(){ return mrLocal('jev')!=='0'; }
-function mrJevPaused(){ var t=Number(mrLocal('jevPause'))||0; return t>Date.now() ? t : 0; }
-async function mrJevCall(items){
-  var u=firebase.auth().currentUser; if(!u) throw new Error('로그인이 필요합니다');
-  var tok=await u.getIdToken(), r;
-  try{ r=await kcFetch(BIZ_MB_FN+'mailReqScope', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:JSON.stringify({ items:items }) }, 60000); }
-  catch(e){ throw new Error('Jev 분류 서버에 닿지 못했습니다 — 서버 함수가 아직 배포 전일 수 있습니다'); }
+/* ── 🧠 Laya 의견 — 이 PC 에 깐 무료 판단 모델(tools/laya-judge · http://127.0.0.1:LAYA_PORT)에게 «이력·회의·비용인가 업무인가»를 묻는다 (대표 지시 2026-11-19
+      「laya 라는 프로그램 사용해서 설치하고 판단하는 기능 넣어서 만들어 달라」) ──
+   ★ 보내는 것은 제목·첨부 이름뿐이고(모듈 layaPayload), 받는 곳은 이 PC 안(127.0.0.1)이다 — 밖으로 안 나간다.
+   ★ «의견»만 적는다(모듈 layaAsk → laya 칸). 상태를 바꾸지 않는다 — 실제 64건에서 Laya 의견대로 치웠다면 진짜 요청 6건 중 3건이 사라졌다.
+     대표 판단과 맞는 비율(layaAgree)을 상태줄에 센다.
+   ★ 이 기기에서 «켤 때만» 부른다(꺼짐이 기본, mrLocal 'laya') — 판단기가 없는 폰·다른 PC 에서 브라우저가 «이 기기의 다른 앱 접근» 허락을 묻지 않게.
+   ⚠ 못 닿으면(판단기 꺼짐·응답 없음) 던지지 않고 10분 쉰다. (2026-11-15 의 Jev 단계는 부르지 않는다 — 애매한 건은 처음부터 걸러진다) */
+function mrLayaUrl(){ return 'http://127.0.0.1:'+((typeof KcareerMailReq!=='undefined' && KcareerMailReq.LAYA_PORT)||18765); }
+function mrLayaOn(){ return mrLocal('laya')==='1'; }
+function mrLayaPaused(){ var t=Number(mrLocal('layaPause'))||0; return t>Date.now() ? t : 0; }
+async function mrLayaCall(list){
+  var r;
+  try{ r=await kcFetch(mrLayaUrl()+'/judge', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ items:list }) }, 90000); }
+  catch(e){ throw new Error('이 PC 의 Laya 판단기에 닿지 못했습니다 — 판단기가 켜져 있는지 보세요'); }
   var j=await r.json().catch(function(){ return {}; });
-  if(!j.ok) throw new Error(j.error||('Jev 분류를 받지 못했습니다 ('+r.status+')'));
+  if(!j.ok) throw new Error(j.error||('Laya 의견을 받지 못했습니다 ('+r.status+')'));
   return j;
 }
-async function mrJevRun(){
-  if(!mrJevOn() || mrJevPaused() || !fbDb || !fbUid) return null;
+async function mrLayaRun(){
+  if(_mr.layaBusy || !mrLayaOn() || mrLayaPaused() || !fbDb || !fbUid) return null;   /* 겹쳐 돌지 않는다(켜기 단추·5분 훑기가 겹쳐도 한 번만) */
+  _mr.layaBusy=true;
   try{
-    var r=await KcareerMailReq.scopeAsk({ db:fbDb, uid:fbUid, ask:mrJevCall });
-    if(r.errors.length){ mrLocal('jevPause', String(Date.now()+30*60*1000)); _mr.jevMsg=r.errors[0]; console.warn('[요청 메일] Jev 분류', r.errors); }
-    else{ _mr.jevMsg=''; if(r.work) toast('🤖 Jev 가 업무 관련 메일 '+r.work+'건을 «요청 아님»으로 치웠습니다 — «요청 아님» 탭에서 되돌릴 수 있습니다', 7000); }
+    var r=await KcareerMailReq.layaAsk({ db:fbDb, uid:fbUid, ask:mrLayaCall });
+    if(r.errors.length){ mrLocal('layaPause', String(Date.now()+10*60*1000)); _mr.layaMsg=r.errors[0]; console.warn('[요청 메일] Laya 의견', r.errors); }
+    else _mr.layaMsg='';
     return r;
-  }catch(e){ mrLocal('jevPause', String(Date.now()+30*60*1000)); _mr.jevMsg=String((e&&e.message)||e).slice(0,80); return null; }
+  }catch(e){ mrLocal('layaPause', String(Date.now()+10*60*1000)); _mr.layaMsg=String((e&&e.message)||e).slice(0,80); return null; }
+  finally{ _mr.layaBusy=false; }
 }
-function mrJevToggle(){
-  var on=!mrJevOn(); mrLocal('jev', on?'1':'0'); if(on) mrLocal('jevPause', null);
-  toast(on?'🤖 Jev 분류를 켰습니다 — 규칙이 못 가른 메일의 제목·첨부 이름만(이름 가림) 물어봅니다':'🤖 Jev 분류를 껐습니다 — 규칙으로만 가릅니다', 5000);
+function mrLayaToggle(){
+  var on=!mrLayaOn(); mrLocal('laya', on?'1':null); mrLocal('layaPause', null); _mr.layaMsg='';
+  toast(on?'🧠 이 PC 의 Laya 판단기에게 제목·첨부 이름만 물어 «의견»을 적습니다 — 의견일 뿐 메일을 옮기지 않습니다':'🧠 Laya 의견을 껐습니다 — 규칙으로만 가립니다', 6000);
   mrRender();
+  if(on) mrLayaRun().then(function(){ mrRender(); });
 }
 /* 푸른메일함 열기 — 앱끼리 여는 공용 길(같은 창을 다시 쓴다). «이름 없는 새 탭»은 누를 때마다 탭이 쌓인다(tests/one-window-per-app) */
 function mrOpenMail(){ var u='pu-cards.html?sso=1&view=mail'; if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(u); else window.open(u,'pu_pu_cards'); }
@@ -16127,16 +16137,16 @@ function mrStatusLine(){
   if(!_mr.ready) return '불러오는 중…';
   var r=_mr.lastRes, 때=_mr.last?mrWhen(_mr.last):'';
   return (때?'마지막 확인 '+때:'아직 메일함을 확인하지 않았습니다')+(r?(' · 폴더 '+r.folders+'곳'+(r.scanned?' · 새로 읽은 메일 '+r.scanned+'통':'')+(r.errors?' · <span style="color:var(--red)">못 읽은 폴더 '+r.errors+'곳</span>':'')):'')
-    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다'+mrJevLine();
+    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다'+mrLayaLine();
 }
-/* 상태줄 끝 — 자동으로 치운 건수 · Jev 분류가 켜져 있는지/쉬는지(쉬는 까닭은 마우스를 올리면) */
-function mrJevLine(){
-  var n=KcareerMailReq.toList(_mr.items).filter(function(x){ return x.autoIgnored && x.st==='ignored'; }).length;   /* 지금도 «기계가 치운 채»인 건만 — 되돌린 건은 안 센다 */
-  var 말=(n?' · 🤖 업무 관련 '+n+'건 자동 제외(«요청 아님» 탭)':'');
-  if(!mrJevOn()) return 말+' · Jev 분류 꺼짐(규칙으로만 가름)';
-  var p=mrJevPaused();
-  /* 쉬는 까닭은 «글자»로 보인다 — 마우스를 올려야만 보이면 폰·키보드에서는 못 본다 */
-  return 말+(p?' · <span title="'+escapeHtml(_mr.jevMsg||'')+'">Jev 분류 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로'+(_mr.jevMsg?' · <span style="color:var(--text-mute)">'+escapeHtml(String(_mr.jevMsg).slice(0,60))+'</span>':'')+'</span>':' · Jev 분류 켜짐');
+/* 상태줄 끝 — 자동으로 걸러 둔 건수 · 🧠 Laya 의견이 켜져 있는지/쉬는지 · 대표 판단과 맞는 비율(쉬는 까닭은 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게) */
+function mrLayaLine(){
+  var Q=KcareerMailReq, n=Q.toList(_mr.items).filter(function(x){ return x.autoIgnored && x.st==='ignored'; }).length;   /* 지금도 «기계가 거른 채»인 건만 — 되돌린 건은 안 센다 */
+  var 말=(n?' · 🤖 이력·회의·비용이 아닌 메일 '+n+'건은 걸러 둠(«🚫 걸러낸 메일»)':'');
+  if(!mrLayaOn()) return 말+' · 🧠 Laya 의견 꺼짐(규칙으로만 가름)';
+  var p=mrLayaPaused(), a=Q.layaAgree(_mr.items);
+  var 셈=a.n?(' · 대표 판단과 같음 '+a.same+'/'+a.n+'건 — 진짜 요청 '+a.keepSame+'/'+a.keepN+'건'):' · 아직 견줄 대표 판단 없음';
+  return 말+(p?' · <span title="'+escapeHtml(_mr.layaMsg||'')+'">🧠 Laya 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로'+(_mr.layaMsg?' · <span style="color:var(--text-mute)">'+escapeHtml(String(_mr.layaMsg).slice(0,60))+'</span>':'')+'</span>':(' · 🧠 Laya 의견 켜짐(의견만)'+셈));
 }
 function mrRowHtml(x, i, now){
   var Q=KcareerMailReq, u=Q.urgency(x, now), dd=Q.ddayOf(x.deadline, now), 종류=(x.kinds||[]).map(Q.kindMeta).filter(Boolean), st=Q.STATES[x.st]?x.st:'new';   /* 아는 상태만 — 클래스에 DB 값이 그대로 들어가지 않게 */
@@ -16147,7 +16157,7 @@ function mrRowHtml(x, i, now){
     +(dd.label&&(x.st==='new'||x.st==='doing')?'<span class="mr-chip '+(u==='overdue'?'red':(u==='soon'?'new':'ignored'))+'">'+dd.label+'</span>':'');
   else 기한='<span style="color:var(--text-mute)" title="'+(x.bodyAt?'본문에서 기한 말과 가까운 날짜를 찾지 못했습니다 — 메일을 열어 확인해 주세요':((Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'본문을 열지 못했습니다 — 메일을 열어 확인해 주세요':'본문을 읽는 중입니다'))+'">'+(x.bodyAt||(Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'기한 모름':'읽는 중…')+'</span>';
   var id=_jsAttr(x.id);
-  var 단추=function(st, 그림, 글, 설명){ return '<button class="btn sm" type="button" title="'+설명+'" onclick="mrOne(\''+id+'\',\''+st+'\')">'+그림+'<span class="mr-btx"> '+글+'</span></button>'; };
+  var 단추=function(st, 그림, 글, 설명){ return '<button class="btn sm" type="button" title="'+설명+'" aria-label="'+글+'" onclick="mrOne(\''+id+'\',\''+st+'\')">'+그림+'<span class="mr-btx"> '+글+'</span></button>'; };   /* 폰에서 글자가 숨어도 이름이 남게(aria-label) */
   var 관리=(st==='new'?단추('doing','👀','확인','확인함으로 표시 — 아직 처리 전입니다')+' ':'')
     +(st==='new'||st==='doing'?단추('done','✔','완료','처리 완료로 표시')+' '+단추('ignored','🚫','아님','요청이 아닌 메일입니다 — 목록에서 치웁니다'):단추('doing','↩','되돌림','진행 중으로 되돌립니다'));
   return '<tr class="'+(u==='overdue'?'mr-over':(u==='soon'?'mr-soon':''))+'">'
@@ -16157,8 +16167,11 @@ function mrRowHtml(x, i, now){
     +'<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(보낸전체)+'">'+escapeHtml(보낸)+'</td>'
     +'<td style="white-space:nowrap">'+mrWhen(x.d)+'</td>'
     +'<td style="white-space:nowrap">'+기한+'</td>'
-    +'<td style="white-space:nowrap"><span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span>'
-      +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? ' <span class="mr-chip ignored" title="'+escapeHtml(sm.title)+'">'+escapeHtml(sm.text)+'</span>' : ''; })()+'</td>'
+    /* 상태 칸 — 자동으로 거른 줄은 «요청 아님»과 «🤖 자동으로 걸러냄»이 겹치므로 🤖 딱지 하나로(칸이 넘쳐 표가 가로로 밀리지 않게, 2026-11-19) */
+    +'<td style="white-space:nowrap">'+(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? '<span class="mr-chip ignored" title="'+escapeHtml(sm.title)+'">'+escapeHtml(sm.text)+'</span>' : '<span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span>'; })()
+      /* 🧠 Laya 의견 — 지금 자리와 «다를 때만» 짧게(진행 중인데 업무로 봄 · 걸렀는데 이력으로 봄 — 대표가 볼 만한 것만). 같은 의견은 팝업에만 */
+      +(function(){ var lm=Q.layaMark(x); if(!lm) return ''; var 다름=(x.st==='ignored') ? x.laya.v==='personal' : x.laya.v==='work';
+        return 다름 ? ' <span class="mr-chip" title="'+escapeHtml(lm.title+' — 지금 자리와 의견이 다릅니다')+'">'+escapeHtml(lm.short)+'?</span>' : ''; })()+'</td>'
     +'<td onclick="event.stopPropagation()" style="white-space:nowrap"><span style="display:inline-flex;gap:4px;flex-wrap:nowrap">'+관리+'</span></td></tr>';
 }
 /* 지금 탭에서 «보이는» 줄 — 그리기와 「전체 선택」이 같은 목록을 본다. 줄이 한없이 쌓이지 않게 한도를 둔다(오래 쓰면 완료 탭이 길어진다) */
@@ -16170,12 +16183,13 @@ function mrRender(){
   var ml=mrList(now), list=ml.rows;
   var vis={}; list.forEach(function(x){ vis[x.id]=1; }); Object.keys(_mr.sel).forEach(function(k){ if(!vis[k]) delete _mr.sel[k]; });   /* 안 보이게 된 건은 선택에서 뺀다 */
   var cnt={ open:sm.open, done:sm.done, ignored:sm.ignored, all:sm.total };
-  var h='<div class="toolbar mr-top">'+Q.TABS.map(function(t){ return '<button type="button" class="mr-pill'+(_mr.tab===t.key?' on':'')+'" aria-pressed="'+(_mr.tab===t.key)+'" onclick="mrTab(\''+t.key+'\')">'+t.label+' '+cnt[t.key]+'</button>'; }).join('')
+  /* 걸러낸 메일(quiet)은 «조용한» 단추 — 숫자를 키워 보이지 않게(대표 지시 2026-11-19 «아예 안 들임») */
+  var h='<div class="toolbar mr-top">'+Q.TABS.map(function(t){ return '<button type="button" class="mr-pill'+(t.quiet?' quiet':'')+(_mr.tab===t.key?' on':'')+'" aria-pressed="'+(_mr.tab===t.key)+'" onclick="mrTab(\''+t.key+'\')"'+(t.quiet?' title="이력·회의·비용이 아니라서 자동으로 걸러 둔 메일과 🚫 로 치운 메일 — 잘못 걸렀으면 ↩ 로 되돌립니다"':'')+'>'+t.label+' '+cnt[t.key]+'</button>'; }).join('')
     +'<div class="tb-spacer"></div>'
-    +'<button class="btn" type="button" onclick="mrScanNow()"'+(_mr.busy||!_mr.started?' disabled':'')+' title="법인 메일함에 새로 온 메일을 지금 확인합니다">'+(_mr.busy?'⏳<span class="mr-btx"> 확인 중…</span>':'🔄<span class="mr-btx"> 지금 확인</span>')+'</button>'
-    +'<button class="btn" type="button" onclick="mrJevToggle()" aria-pressed="'+mrJevOn()+'" title="규칙이 못 가른 애매한 메일의 제목·첨부 이름만(이름 가림, 본문·보낸이는 안 보냄) Jev 에게 물어 업무 관련인지 가립니다 — 끄면 규칙으로만 가릅니다">'+(mrJevOn()?'🤖<span class="mr-btx"> Jev 분류 켜짐</span>':'🤖<span class="mr-btx"> Jev 분류 꺼짐</span>')+'</button>'
-    +(typeof Notification!=='undefined'?'<button class="btn" type="button" onclick="mrNotifyToggle()" title="다른 탭을 보고 있을 때도 새 요청이 오면 브라우저 알림으로 알립니다(이 경력관리 탭을 열어 둔 동안)">'+(mrNotifyOn()?'🔔<span class="mr-btx"> 브라우저 알림 켜짐</span>':'🔕<span class="mr-btx"> 브라우저 알림 켜기</span>')+'</button>':'')
-    +'<button class="btn" type="button" onclick="mrOpenMail()" title="푸른메일함을 엽니다 — 답장·첨부 받기는 거기서 합니다">📬<span class="mr-btx"> 메일함 열기</span></button></div>'
+    +'<button class="btn" type="button" onclick="mrScanNow()" aria-label="메일함 지금 확인"'+(_mr.busy||!_mr.started?' disabled':'')+' title="법인 메일함에 새로 온 메일을 지금 확인합니다">'+(_mr.busy?'⏳<span class="mr-btx"> 확인 중…</span>':'🔄<span class="mr-btx"> 지금 확인</span>')+'</button>'
+    +'<button class="btn" type="button" onclick="mrLayaToggle()" aria-label="Laya 의견" aria-pressed="'+mrLayaOn()+'" title="이 PC 에 깐 Laya 판단기에게 제목·첨부 이름만 물어(밖으로 안 나감) «이력·회의·비용인가 업무인가» 의견을 적습니다 — 의견일 뿐 메일을 옮기지 않습니다. 판단기를 깐 PC 에서만 켜 주세요">'+(mrLayaOn()?'🧠<span class="mr-btx"> Laya 의견 켜짐</span>':'🧠<span class="mr-btx"> Laya 의견 켜기</span>')+'</button>'
+    +(typeof Notification!=='undefined'?'<button class="btn" type="button" onclick="mrNotifyToggle()" aria-label="브라우저 알림" aria-pressed="'+mrNotifyOn()+'" title="다른 탭을 보고 있을 때도 새 요청이 오면 브라우저 알림으로 알립니다(이 경력관리 탭을 열어 둔 동안)">'+(mrNotifyOn()?'🔔<span class="mr-btx"> 브라우저 알림 켜짐</span>':'🔕<span class="mr-btx"> 브라우저 알림 켜기</span>')+'</button>':'')
+    +'<button class="btn" type="button" onclick="mrOpenMail()" aria-label="메일함 열기" title="푸른메일함을 엽니다 — 답장·첨부 받기는 거기서 합니다">📬<span class="mr-btx"> 메일함 열기</span></button></div>'
     +'<div class="mr-st">'+mrStatusLine()+'</div>';
   var n=Object.keys(_mr.sel).length;
   h+='<div class="sel-bar" id="mrSel"'+(n?'':' style="display:none"')+'><b><span id="mrSelCnt">'+n+'</span>건 선택</b>'
@@ -16188,12 +16202,13 @@ function mrRender(){
       +(all.length?'이 탭에는 건이 없습니다.':'아직 알아본 요청 메일이 없습니다.<br>법인 메일함에 «동의서·경력 확인·이력서 제출» 같은 요청 메일이 오면 몇 분 안에 여기 올라오고, 위에 알림 띠가 뜹니다. 처음에는 최근 '+KcareerMailReq.WINDOW_DAYS+'일 안의 메일을 훑습니다.')
       +'</div></div>';
   }else{
-    h+='<div class="dt" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="mrAll" onclick="mrPickAll(this.checked)" title="지금 보이는 줄 전체 선택"> №</th>'
+    /* 단추가 하나(↩ 되돌림)뿐인 탭은 «관리» 칸을 좁힌다 — 공용 규칙(.dt 마지막 칸 200px)이 걸러낸 메일 탭에서 표를 가로로 밀었다(1280px, 2026-11-19 검토) */
+    h+='<div class="dt'+(_mr.tab==='open'?'':' mr-act1')+'" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="mrAll" onclick="mrPickAll(this.checked)" title="지금 보이는 줄 전체 선택"> №</th>'
       +'<th>종류</th><th>제목</th><th>보낸이</th><th>받은 날</th><th>기한</th><th>상태</th><th>관리</th></tr></thead><tbody>'
       +list.map(function(x,i){ return mrRowHtml(x, i, now); }).join('')+'</tbody></table></div>'
       +(ml.all>list.length?'<div class="mr-st">앞의 '+list.length+'건만 보입니다 — 전체 '+ml.all+'건</div>':'');
   }
-  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.<br>이 화면은 <b>이력서·경력·회의·비용</b> 서류만 다룹니다 — 고객 업무(노동청 사건·컨설팅 수행·급여·근로계약서 등)로 보이는 메일은 자동으로 «🚫 요청 아님»으로 치우고(🤖 표시), 애매한 것만 Jev 에게 제목·첨부 이름(이름 가림)을 물어봅니다. 잘못 치웠으면 «요청 아님» 탭에서 ↩ 되돌려 주세요.</div>';
+  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.<br>이 화면은 <b>이력서·경력·회의·비용</b> 메일만 들입니다 — 제목·첨부 이름에 이력·위원·회의·수당 같은 말이 없거나 고객 업무(노동청 사건·컨설팅 수행·급여·근로계약서 등)로 보이는 메일은 목록에 올리지 않고 걸러 둡니다(🤖 표시). 잘못 걸렀으면 «🚫 걸러낸 메일»에서 ↩ 되돌려 주세요. 🧠 Laya 의견은 이 PC 안에서만 매기는 참고 의견이고 메일을 옮기지 않습니다.</div>';
   box.innerHTML=h;
   try{ stampCellLabels(box); }catch(e){}
   mrSelSync();
@@ -16225,7 +16240,7 @@ function mrBatch(btn, st){
   if(!건.length){ toast('ℹ 고른 건이 이미 그 상태입니다'); return; }
   kcAskDelete(btn, { title:'📬 요청 메일 '+건.length+'건을 «'+이름+'»'+으로+' 바꿉니다',
       detail:건.slice(0,4).map(function(x){ return escapeHtml(String(x.s).slice(0,34)); }).join('<br>')+(건.length>4?'<br>… 외 '+(건.length-4)+'건':'')
-        +(st==='ignored'?'<br>목록의 «요청 아님» 탭에서 되돌릴 수 있습니다.':'')+(st==='done'?'<br>«처리 완료» 탭에서 되돌릴 수 있습니다.':''),
+        +(st==='ignored'?'<br>«🚫 걸러낸 메일»에서 되돌릴 수 있습니다.':'')+(st==='done'?'<br>«처리 완료» 탭에서 되돌릴 수 있습니다.':''),
       yes:'«'+이름+'»'+으로+' 바꾸기' },
     function(){ mrSet(건.map(function(x){ return x.id; }), st).then(function(){ _mr.sel={}; mrRender(); }); });
 }
@@ -16288,9 +16303,10 @@ function mrDetRender(x){
     +(x.an&&x.an.length?행('첨부', x.an.map(function(n){ return '📎 '+escapeHtml(n); }).join('<br>')):'')
     +(x.replyTo?행('회신 주소', escapeHtml(x.replyTo)):'')
     +(x.why&&x.why.length?행('알아본 까닭', x.why.map(escapeHtml).join(' · ')):'')
-    +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? 행('자동 제외', escapeHtml(sm.title)) : ''; })()     /* 딱지의 까닭을 팝업에도 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게 */
+    +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? 행('자동 걸러냄', escapeHtml(sm.title)) : ''; })()     /* 딱지의 까닭을 팝업에도 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게 */
+    +(function(){ var lm=Q.layaMark(x); return lm ? 행('Laya 의견', escapeHtml(lm.text)+'<div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">'+escapeHtml(lm.title)+'</div>') : ''; })()
     +행('메모', '<textarea id="mrDetMemo" maxlength="'+Q.MEMO_MAX+'" placeholder="예) 담당자에게 전화함 · 서류는 11월 둘째 주에 보냄" aria-label="메모">'+escapeHtml(x.memo||'')+'</textarea>')
-    +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><b style="font-size:13px">메일 내용</b>'
+    +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">메일 내용</b>'   /* 폰(375)에서 «메일 / 내용» 두 줄로 접히지 않게(2026-11-19 검토) */
     +'<button class="btn sm" type="button" onclick="mrDetLoadBody(_mr.items[_mr.detId], true)" title="메일 내용을 다시 읽습니다">↻ 다시 읽기</button>'
     +'<span style="font-size:11.5px;color:var(--text-mute)">읽기만 합니다 — 읽음 표시·저장은 안 합니다</span></div>'
     +'<div class="mr-det-mail" id="mrDetMail" tabindex="0" aria-label="메일 내용"></div></div>';
@@ -21848,7 +21864,7 @@ function firmTabSave(quiet){
      → 2026-10-17 부터 서버(zipLookup)가 그 열쇠로 찾아 준다 — 아래 piAutoZip·firmAutoZip 이 저절로 넣는다.
        이 「📮 찾기」는 한 곳으로 딱 떨어지지 않을 때 쓰라고 그대로 둔다.
    ⚠ 주소 칸은 «비어 있을 때만» 채운다 — 찾은 도로명 주소에는 건물명·호수가 없어 적어 둔 것이 줄어든다. */
-var KC_POSTCODE_SRC='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+var KC_POSTCODE_SRC='https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 function _kcLoadPostcode(){
   if(window.daum && daum.Postcode) return Promise.resolve();
   return new Promise(function(res,rej){

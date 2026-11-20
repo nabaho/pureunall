@@ -157,7 +157,16 @@ test('★ 모르는 갈래는 «부른 수»로 떨어진다 — 아무 이름�
   assert.deepEqual(DR.tallyPaths('erp', '2026-09-08', '아무거나'),
     DR.tallyPaths('erp', '2026-09-08', 'n'),
     '★ 모르는 갈래가 새 칸을 만듭니다 — 서버 규칙이 그것을 물립니다');
-  assert.deepEqual(DR.TALLY_KINDS, ['n', 'quota', 'vision']);
+  /* 갈래 목록을 글자 그대로 박지 않는다(2026-11-19 실제 토큰 원화 셈 won·wn 을 더하며 깨졌다).
+     지키는 것: 기본 셋(n·quota·vision)이 있고, 갈래마다 서버 규칙(ai_read_tally)에 «아는 칸»이 있다. */
+  ['n', 'quota', 'vision'].forEach(function (k) {
+    assert.ok(DR.TALLY_KINDS.indexOf(k) >= 0, '★ 기본 갈래 ' + k + ' 가 사라졌습니다');
+  });
+  const 규칙 = fs.readFileSync(path.join(ROOT, 'scripts', 'make-firebase-rules.js'), 'utf8');
+  const 셈규칙 = 규칙.slice(규칙.indexOf('rules.ai_read_tally'), 규칙.indexOf('rules.ai_read_tally') + 1500);
+  DR.TALLY_KINDS.forEach(function (k) {
+    assert.match(셈규칙, new RegExp('\\b' + k + ':\\s*\\{'), '★ 갈래 ' + k + ' 의 칸이 서버 규칙에 없습니다');
+  });
 });
 
 test('★★ Vision 을 부른 뒤 «반드시» 센다 — 안 세면 달 몫이 얼마 남았는지 알 수 없다', () => {

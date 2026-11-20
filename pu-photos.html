@@ -17,7 +17,7 @@
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=101"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
@@ -46,11 +46,11 @@
 <script src="js/pu-photo-look.js?v=1"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
-<script src="js/pu-quote-detect.js?v=4"></script>
+<script src="js/pu-quote-detect.js?v=5"></script>
 <script src="js/pu-doc-pick.js?v=2"></script>
-<script src="js/pu-doc-file.js?v=41"></script>
+<script src="js/pu-doc-file.js?v=44"></script>
 <script src="js/pu-drag.js?v=2"></script>
-<script src="js/pu-billing.js?v=12"></script>
+<script src="js/pu-billing.js?v=13"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check-compat.js"></script>
 <style>
@@ -1995,10 +1995,10 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=47"></script>
+  <script src="js/pu-appbar.js?v=53"></script>
   <script src="js/pu-handoff.js?v=2"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
-  <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=6"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -9123,7 +9123,9 @@ function imgChunkMakers(imgs, opts) {
        칸의 자리가 뜻인 서류면 스스로 사진으로 되돌린다(PuDocRead.tableLike).
        글자 뽑기는 무료라 그렇게 되돌려도 값이 더 들지 않는다.
      ⚠ 글자가 모자라도(흐린 사진·손글씨) 판독 층이 사진으로 되돌린다. */
-  const o = Object.assign({}, opts || {}, { freeFirst: true });
+  /* ⚠ 부르는 쪽이 freeFirst:false 를 주면 그대로 따른다(2026-11-19 비용 점검) — 이 사진을 «무료 판독»으로
+       이미 Vision 에 한 번 읽혔으면 서버가 같은 사진을 또 Vision 에 보내 달 무료 몫(1,000장)이 절반으로 줄었다. */
+  const o = Object.assign({ freeFirst: true }, opts || {});
   return chunkOf(imgs, READ_CHUNK_IMG).map(function (g, ci) {
     /* ⚠ 덩이 «첫 쪽»을 결과에 붙여 둔다 — 판독기는 덩이 안에서 1부터 세므로,
        합칠 때(mergeReads) 이만큼 밀어 주지 않으면 11쪽이 1쪽으로 겹친다. */
@@ -9191,6 +9193,14 @@ function freeReadTry(text, imgs, opt) {
   if (text) return freeReadAsk({ text: text });
   if ((imgs || []).length !== 1) return Promise.resolve(null);
   return freeReadAsk({ imgs: imgs, app: 'photos' });
+}
+/* freeReadTry 가 «사진을 Vision 에 실제로 보냈나» — 같은 조건을 한 곳에 둔다.
+   보냈으면 그 뒤 AI 판독은 서버의 «무료 글자 먼저»(또 Vision)를 끈다(freeFirst:false). */
+function freeOcrRan(text, imgs, opt) {
+  if (opt && opt.noFree) return false;
+  if (!freeOcrPref()) return false;
+  if (!window.PuDocRead || !PuDocRead.freeRead) return false;
+  return !text && (imgs || []).length === 1;
 }
 function freeReadAsk(o) {
   /* 🔒 사진이면 가린 사본을 Vision 으로 보낸다. 글자만 왔으면(o.text) 아무 데도 안 간다.
@@ -9315,7 +9325,7 @@ function readDocChunked(sibs, job) {
         return PuDocRead.read(m[0], { freeFirst: true });
       }, rrnFail);
     }
-    return runReadChunks(imgChunkMakers(imgs));
+    return runReadChunks(imgChunkMakers(imgs, freeOcrRan(text, imgs) ? { freeFirst: false } : null));
   });
 }
 
@@ -18441,7 +18451,9 @@ function readPhoto(id, masked, opt) {
       const imgs = fulls.filter(function (f) { return safeSrc(f); });
       if (!imgs.length) throw new Error('사진 본문을 불러오지 못했습니다');
       return freeReadTry('', imgs, opt).then(function (free) {
-        return free || runReadChunks(imgChunkMakers(imgs, 사람이));
+        if (free) return free;
+        const 덤 = freeOcrRan('', imgs, opt) ? { freeFirst: false } : {};
+        return runReadChunks(imgChunkMakers(imgs, Object.assign({}, 사람이, 덤)));
       });
     });
   }).then(function (r) {

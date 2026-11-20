@@ -1544,7 +1544,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=101"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-staff-label.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -1555,7 +1555,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
-<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-backup.js?v=3"></script>
 <!-- 푸른사진첩에서 사진을 끌어다 놓을 수 있게 하는 공용 조각 -->
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-photo-store.js?v=36"></script>
@@ -1566,11 +1566,11 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
      ⚠ ?v= 는 사진첩(pu-photos.html)의 것과 **같이** 올린다 — 한쪽만 올리면 이 앱만
        옛 판 판독기로 읽어, 같은 캡처가 앱마다 다른 결과를 낸다. -->
 <script src="js/pu-doc-read.js?v=53"></script>
-<script src="js/pu-doc-file.js?v=41"></script>
+<script src="js/pu-doc-file.js?v=44"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=47"></script>
+  <script src="js/pu-appbar.js?v=53"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
@@ -15393,6 +15393,8 @@ init();
   }
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
+  /* 카카오로 들어왔으면 3시간 — 판정은 공용 부품 한 곳(js/pu-active.js PuActive.limitMs) (대표 지시 2026-11-18) */
+  function idleLimit(){ try{ if(window.PuActive && PuActive.limitMs) return PuActive.limitMs(LIMIT); }catch(e){} return LIMIT; }
   var badge=null, warnBox=null, tick=null;
   function loggedIn(){ try{ return !!(sessionStorage.getItem('p_session')||localStorage.getItem('p_autoSession')); }catch(e){ return false; } }
   function now(){ return Date.now(); }
@@ -15449,7 +15451,7 @@ init();
     if(!loggedIn()){ if(badge) badge.style.display='none'; hideWarn(); return; }
     if(shouldPauseIdle()) return;
     ensureBadge();
-    var rem=LIMIT-(now()-getLast());
+    var rem = idleLimit() - (now()-getLast());
     if(badge){ badge.style.display='inline-flex'; badge.textContent='⏱ '+fmt(rem); }
     if(rem<=0){ clearInterval(tick); doAutoLogout(); return; }
     if(rem<=WARN){ showWarn(rem); } else { hideWarn(); }

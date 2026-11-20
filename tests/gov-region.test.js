@@ -145,8 +145,8 @@ function runApp(seed, opt) {
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
-  vm.runInNewContext(code + '\n;globalThis.__api={setTab,draw,recDraw,rgnDraw,rgnDo,rgnTog,rgnSelAll,rgnBulk,rgnReg,get,recObj,recOpenPost,'
-    + 'getSel:function(){ return _rgnSel; },setWatch:function(w){ _recWatch=w; },'
+  vm.runInNewContext(code + '\n;globalThis.__api={setTab,draw,recDraw,lensDraw,lensDo,lensTog,lensSelAll,lensBulk,lensGrp,get,recObj,recOpenPost,'
+    + 'getSel:function(){ return _lens.rgn.sel; },setWatch:function(w){ _recWatch=w; },'
     + 'toast:function(f){ toast=f; }};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, toasts };
@@ -165,12 +165,12 @@ const WATCH = { hits: {
 }, last: { at: Date.now() } };
 const rowsOf = (h) => (h.match(/<tr class="rr/g) || []).length;
 /* 줄 하나(그 줄의 <tr …> ~ </tr>) — 다른 줄의 글자에 속지 않게 */
-const rowFor = (h, sel) => h.split('</tr>').find((t) => t.includes('data-sel="' + sel + '" onclick="rgnRowClick')) || '';
+const rowFor = (h, sel) => h.split('</tr>').find((t) => t.includes('data-sel="' + sel + '" onclick="lensRowClick')) || '';
 
 test('★★★ 탭이 있고, 열면 이 화면만 보인다 · 다른 탭으로 가면 숨는다', () => {
   const tb = (src.match(/<button class="tb" id="tbRgn" onclick="setTab\('rgn'\)"[^>]*>([\s\S]*?)<\/button>/) || [])[1];
   assert.ok(tb, '📍 탭 단추가 없다');
-  assert.match(tb, /<span class="mx">대전·세종·충남·충북<\/span>/, 'PC 이름 — 세종 포함(2026-11-17)');
+  assert.match(tb, /<span class="mx">📍 대전·세종·충남·충북<\/span>/, 'PC 이름 — 세종 포함(2026-11-17)');
   assert.match(tb, /<span class="m-only">충청권<\/span>/, '폰 이름(탭 넷이 360px 한 줄에 들어가게)');
   assert.match(src, /<script src="js\/gov-region\.js\?v=\d+"><\/script>/, '화면이 모듈을 싣는다');
   const r = runApp({ feed: FEED });
@@ -203,24 +203,24 @@ test('★★★ 그 지역 공고·모집 글만 한 목록에 — ☐ + 번호�
 test('★★ 보기를 넓히면 마감 지난 것이 돌아오고, 지역 칩으로 좁힌다(켜는 길·푸는 길)', () => {
   const r = runApp({ feed: FEED });
   r.api.setWatch(WATCH); r.api.setTab('rgn');
-  r.el('rView').value = 'all'; r.api.rgnDraw();
+  r.el('rView').value = 'all'; r.api.lensDraw('rgn');
   assert.match(r.el('rgnTb').innerHTML, /경영평가위원 위촉/);
   assert.match(r.el('rgnChips').innerHTML.replace(/<span class="mx">([^<]*)<\/span>/g, '$1'), /📍 충북 <span class="n">2<\/span>/);
-  r.api.rgnReg('충북');
+  r.api.lensGrp('rgn', '충북');
   const h = r.el('rgnTb').innerHTML;
   assert.equal(rowsOf(h), 2); assert.match(h, /경영평가위원 위촉/); assert.match(h, /2027 충북/);
-  r.api.rgnReg('');
+  r.api.lensGrp('rgn', '');
   assert.equal(rowsOf(r.el('rgnTb').innerHTML), 5);
 });
 
 test('★★★ ★ 는 «원래 자리»에 — 공고는 상태 「관심」, 모집 글은 recruit_star · 공고 모아보기에도 같이 보인다', () => {
   const r = runApp({ feed: FEED });
   r.api.setWatch(WATCH); r.api.setTab('rgn');
-  r.api.rgnDo('f:G0001', 'star');
+  r.api.lensDo('f:G0001', 'star');
   assert.equal(r.api.get('feed').find((x) => x.id === 'G0001').type, '관심');
   assert.match(r.el('tb').innerHTML, /<tr class="fr[^"]*\bstarred\b[^"]*" onclick="feedRowClick\(event,'G0001'\)"/, '공고 모아보기 목록도 같은 별');
   assert.match(rowFor(r.el('rgnTb').innerHTML, 'f:G0001'), /class="starbtn on"/);
-  r.api.rgnDo('h:h1', 'star');
+  r.api.lensDo('h:h1', 'star');
   assert.ok(Object.keys(r.api.recObj('recruit_star')).some((k) => /h1/.test(k)), '모집 글 별은 recruit_star 에');
   assert.match(rowFor(r.el('rgnTb').innerHTML, 'h:h1'), /class="starbtn on"/);
 });
@@ -228,23 +228,23 @@ test('★★★ ★ 는 «원래 자리»에 — 공고는 상태 「관심」, 
 test('★★★ 고르기 — 고르면 「N건 선택」과 할 일, 일괄 숨기기는 건수를 묻고 한 번에(지우지 않는다), 「숨긴 공고」에서 되살린다', () => {
   const r = runApp({ feed: FEED });
   r.api.setWatch(WATCH); r.api.setTab('rgn');
-  r.api.rgnTog('f:G0001', true); r.api.rgnTog('h:h1', true);
+  r.api.lensTog('rgn', 'f:G0001', true); r.api.lensTog('rgn', 'h:h1', true);
   const bar = r.el('rgnSel').innerHTML;
   assert.match(bar, /<b>2건<\/b> 선택/); assert.match(bar, /🚫 공고 숨기기 1/); assert.match(bar, /✓ 모집 글 봤음 1/);
-  r.api.rgnBulk('hide');
+  r.api.lensBulk('rgn', 'hide');
   const f = r.api.get('feed');
   assert.equal(f.length, FEED.length, '지우지 않는다'); assert.equal(f.find((x) => x.id === 'G0001').hidden, true);
   assert.doesNotMatch(r.el('rgnTb').innerHTML, /천안시 노무관리/, '숨긴 것은 기본 보기에서 빠진다');
   assert.equal(Object.keys(r.api.getSel()).length, 0, '한 번 처리하면 고른 것을 비운다');
-  r.el('rView').value = 'hidden'; r.api.rgnDraw();
+  r.el('rView').value = 'hidden'; r.api.lensDraw('rgn');
   assert.match(r.el('rgnTb').innerHTML, /천안시 노무관리/);
-  r.api.rgnTog('f:G0001', true); r.api.rgnBulk('unhide');
+  r.api.lensTog('rgn', 'f:G0001', true); r.api.lensBulk('rgn', 'unhide');
   assert.equal(r.api.get('feed').find((x) => x.id === 'G0001').hidden, false);
 });
 
 test('★★ 일괄 숨기기에서 «아니오»면 아무것도 안 바뀐다', () => {
   const r = runApp({ feed: FEED }, { confirm: false });
-  r.api.setTab('rgn'); r.api.rgnTog('f:G0001', true); r.api.rgnBulk('hide');
+  r.api.setTab('rgn'); r.api.lensTog('rgn', 'f:G0001', true); r.api.lensBulk('rgn', 'hide');
   assert.equal(r.api.get('feed').find((x) => x.id === 'G0001').hidden, undefined);
 });
 
@@ -254,9 +254,9 @@ test('★★ 모집 글 «봤음»은 recruit_seen 에 — 새 글 딱지가 사
   r.api.setWatch(w); r.api.setTab('rgn');
   const h = r.el('rgnTb').innerHTML;
   assert.match(h, /data-sel="h:h&#39;2"/, '열쇠는 onclick 글자가 아니라 data-sel 로');
-  assert.doesNotMatch(h, /rgnDo\('h:h'2'/);
+  assert.doesNotMatch(h, /lensDo\('h:h'2'/);
   assert.match(rowFor(h, 'h:h1'), /새 글/);
-  r.api.rgnDo('h:h1', 'seen');
+  r.api.lensDo('h:h1', 'seen');
   assert.ok(r.api.recObj('recruit_seen').h1, '봤음 표시');
   const after = rowFor(r.el('rgnTb').innerHTML, 'h:h1');
   assert.ok(after, '봤음으로 적어도 목록에서 빠지지 않는다');
@@ -265,11 +265,11 @@ test('★★ 모집 글 «봤음»은 recruit_seen 에 — 새 글 딱지가 사
 
 test('★★ 화면을 떠나면 고른 것을 비운다 · 탭을 안 보고 있어도 숫자(새 것)는 탭에 뜬다', () => {
   const r = runApp({ feed: FEED });
-  r.api.setWatch(WATCH); r.api.setTab('rgn'); r.api.rgnTog('f:G0001', true);
+  r.api.setWatch(WATCH); r.api.setTab('rgn'); r.api.lensTog('rgn', 'f:G0001', true);
   r.api.setTab('feed');
   assert.equal(Object.keys(r.api.getSel()).length, 0);
   r.api.draw();
-  assert.match(r.el('tbRgn').innerHTML, /📍 <span class="mx">대전·세종·충남·충북<\/span><span class="m-only">충청권<\/span> <span class="tag red"[^>]*>3<\/span>/, '새 공고 1(G0001) + 안 본 모집 글 2(h1·h3) — 관심(G0005)은 새 것이 아니다');
+  assert.match(r.el('tbRgn').innerHTML, /<span class="mx">📍 대전·세종·충남·충북<\/span><span class="m-only">충청권<\/span> <span class="tag red"[^>]*>3<\/span>/, '새 공고 1(G0001) + 안 본 모집 글 2(h1·h3) — 관심(G0005)은 새 것이 아니다');
 });
 
 test('★★★ 모집 글 팝업은 열자마자 opener 를 끊는다 — 바깥 누리집이 ERP 창을 다른 주소로 못 바꾼다(2026-11-16 보안 검토)', () => {
@@ -284,11 +284,11 @@ test('★★★ 모집 글 팝업은 열자마자 opener 를 끊는다 — 바�
 });
 
 test('★★ 태블릿(641px~)에서 제목 칸이 0 으로 접히지 않는다 — 표 최소 폭 ≥ 고정 칸 합 + 제목 자리(2026-11-16 검증 실측 768px)', () => {
-  const page = src.slice(src.indexOf('<div class="wrap" id="pgRgn"'), src.indexOf('id="rgnTb"'));
+  const page = src.slice(src.indexOf('<div class="wrap lens" id="pgRgn"'), src.indexOf('id="rgnTb"'));
   const fixed = [...page.matchAll(/<col style="width:(\d+)px">/g)].map((m) => Number(m[1]));
   assert.ok(fixed.length >= 8, '고정 칸을 못 찾았다 — 이 검사의 찾는 법을 고쳐야 한다');
   const css = src.slice(0, src.indexOf('</style>'));
-  const m = css.match(/@media \(min-width:(\d+)px\)\{\s*#pgRgn \.rec-fixed\{min-width:(\d+)px\}\s*\}/);
+  const m = css.match(/@media \(min-width:(\d+)px\)\{\s*\.lens \.rec-fixed\{min-width:(\d+)px\}\s*\}/);
   assert.ok(m, '태블릿 구간에 표 최소 폭 규칙이 없다');
   assert.ok(Number(m[1]) > 640, '폰(640 이하)은 카드라 최소 폭을 주면 옆으로 넘친다');
   const sum = fixed.reduce((a, b) => a + b, 0), TITLE_MIN = 150;
@@ -299,7 +299,7 @@ test('★ 키보드로도 — 공고 제목은 상세를 여는 링크(role=butt
   const r = runApp({ feed: FEED });
   r.api.setTab('rgn');
   const row = rowFor(r.el('rgnTb').innerHTML, 'f:G0001');
-  assert.match(row, /<a class="tlink" href="#" role="button" data-sel="f:G0001" onclick="rgnPop\(this\.dataset\.sel\);return false">천안시 노무관리/);
+  assert.match(row, /<a class="tlink" href="#" role="button" data-sel="f:G0001" onclick="lensPop\(this\.dataset\.sel\);return false">천안시 노무관리/);
   assert.match(row, /<input type="checkbox" class="row-chk" aria-label="\d+번 고르기"/);
   assert.match(src, /<input id="rq"[^>]*aria-label="[^"]+"/);
   assert.match(src, /<select id="rKind"[^>]*aria-label="[^"]+"/); assert.match(src, /<select id="rView"[^>]*aria-label="[^"]+"/);

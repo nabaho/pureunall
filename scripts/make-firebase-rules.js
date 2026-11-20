@@ -519,14 +519,30 @@ rules.invoice_arc = {
 };
 
 /* ══ 다른 앱들 ═════════════════════════════════════════════════════════ */
-rules.payroll_os = {
-  '.read': `auth != null && (${FIN} || ${ADMIN})`,
-  '.write': ADMIN,
-  $k: {
-    '.write': `(auth != null && (${FIN} || ${ADMIN})) && (newData.exists() || ${ADMIN})`,
-    $k2: { '.write': `auth != null && (${FIN} || ${ADMIN})` }
+/* 급여아웃소싱 — 대표 지시 2026-11-18 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」
+   재직 직원(LOGIN) 모두가 읽고 처리할 수 있는 업무 칸(workspace)으로 연다.
+   ⚠ 전 직원으로 넓히는 만큼 지워지거나 바뀌면 안 되는 네 자리는 이름으로 못 박는다:
+     · site_co_link — 사업장↔업체 이름표 확정은 대표(관리자)만 쓴다(화면 안내와 짝)
+     · rrn_key      — 주민번호 암호화 열쇠는 처음 한 번만 만들고 덮어쓰지 못한다(덮으면 옛 암호문이 영영 안 풀린다)
+     · rrn_log      — 주민번호 열람·입력 기록은 덧붙이기만 된다(고치거나 지우면 기록이 아니다)
+     · lock_log     — 급여 확정·되돌리기 기록도 덧붙이기만 된다 */
+rules.payroll_os = workspace({
+  site_co_link: { '.write': `auth != null && ${ADMIN}` },
+  rrn_key: {
+    $v: {
+      '.write': `(${LOGIN}) && !data.exists()`,
+      '.validate': '!data.exists() && newData.isString() && newData.val().length >= 32 && newData.val().length <= 200'
+    }
+  },
+  rrn_log: {
+    $id: { '.write': `(${LOGIN}) && !data.exists() && newData.exists()` }
+  },
+  lock_log: {
+    $site: {
+      $id: { '.write': `(${LOGIN}) && !data.exists() && newData.exists()` }
+    }
   }
-};
+});
 rules.fund_erp = workspace();
 rules.work_erp = workspace();
 rules.chwieop  = workspace();
@@ -1240,6 +1256,10 @@ rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
    → 이름 붙은 갈래로 두어 $part 를 안 타게 한다: 쓰기는 총괄관리자만 · 서버는 규칙을 안 지나 그대로 쓴다.
      읽기는 그대로(LOGIN — 위 homepage '.read'). 보는 사람은 넓어지지 않고 쓰는 사람만 좁아진다. */
 ['newsBrief', 'newsDocs', 'newsPrec'].forEach((k) => { rules.homepage[k] = { '.write': ADMIN }; });
+/* ★ 홈페이지 방문 통계(homepage/stats)도 «서버만» 쓴다 (2026-11-19 대표 「추천대로」 — 방문 통계 자체 집계).
+     서버 함수 siteHit 이 날짜 칸에 숫자만 올린다(functions/site-stats.js). 화면(홈페이지 관리 「📈 방문 통계」)은 읽기만.
+     $part 규칙을 타면 재직 직원이 숫자를 고칠 수 있어 이름 붙은 갈래로 둔다 — 읽기는 그대로(LOGIN), 쓰기만 좁아진다. */
+rules.homepage.stats = { '.write': ADMIN };
 /* ★ 직원 경력 제안함 (대표 지시 2026-11-01 「필요시 개인이 추가할 수 있게」 · 결정 「대표 확인 뒤」)
      직원이 포털 「내 정보」에서 새 사이트에 실릴 «내 경력»을 보낸다 — 대표가 홈페이지 관리에서 「받기」.
    ⚠ 이름이 붙은 갈래(careerInbox)는 $part 대신 이 규칙을 탄다 — 그래서 남의 칸에는 못 쓴다.
@@ -1374,6 +1394,16 @@ rules.signboard = { '.read': LOGIN,
   control:   { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === 'control'" },
   log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
   state:     { '.write': false } };
+
+/* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
+   대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
+   ★ 읽기·쓰기 = 재직 직원(LOGIN). 담기는 것: 강의자료 목록(파일 이름·종류·강의일·강의처·원본 창고 경로) · 검토 메모.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식으로만. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ⚠ 메모는 «그 자료의 메모»여야 한다(sourceId = 자료 열쇠). 원본 파일은 창고 규칙(edulib/{id}/…)이 따로 지킨다. */
+const EDULIB_W = `(${LOGIN}) && newData.exists()`;
+rules.edulib = { '.read': LOGIN,
+  items: { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduMaterial'" } },
+  notes: { $item: { $id: { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('sourceId').val() === $item && newData.child('entityType').val() === 'EduReviewNote'" } } } };
 
 /* ══ 🧾 컨설팅정산(pu-settle.html) — 개인입금 사업의 주관·담당 정산 (2026-10-31) ══
    설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md §6 · 대표 선택 2026-10-31 「대표·재무권한자만」.
@@ -1796,6 +1826,9 @@ rules.ai_read_tally = {
        ⚠ n 에 합치지 말 것 — Gemini 는 «하루» 몫이고 Vision 은 «달마다» 1,000장이다.
          합치면 어느 쪽이 남았는지 알 수가 없다. */
     vision: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    /* won = 실제 토큰으로 센 원화 합 · wn = 그렇게 센 판독 수 (2026-11-19) — 달 금액 = (n − wn) × 단가 + won */
+    won:    { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    wn:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
     $other: { '.validate': false }
   } }
 };

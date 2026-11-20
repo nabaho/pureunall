@@ -13,7 +13,7 @@
 <!-- ⑤ 서고 원본 파일 — 기존 창고(pureun-erp-hrphotos)에 담는다. 설계서 §3-⑤ -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=101"></script>
+<script src="js/pu-ontology.js?v=106"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -22,7 +22,7 @@
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
-<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-backup.js?v=3"></script>
 <script src="js/pu-rules-history.js?v=4"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/pu-rules-lawlink.js?v=2"></script>
@@ -928,9 +928,9 @@ table.daejo td.dj2{padding:0}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=47"></script>
+  <script src="js/pu-appbar.js?v=53"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
 <!-- 「준비중」 문(PuGate.soonUnlessAdmin)은 2026-11-15 대표 「기업규정집 준비중 열어라」로 걷었다 — 포털 타일의 준비중 딱지와 «짝»이라 함께 뺐다
@@ -9929,6 +9929,8 @@ try{
   }
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
+  /* 카카오로 들어왔으면 3시간 — 판정은 공용 부품 한 곳(js/pu-active.js PuActive.limitMs) (대표 지시 2026-11-18) */
+  function idleLimit(){ try{ if(window.PuActive && PuActive.limitMs) return PuActive.limitMs(LIMIT); }catch(e){} return LIMIT; }
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
   function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   var warnBox=null, tick=null;
@@ -9985,7 +9987,7 @@ try{
     var badges=document.querySelectorAll('.logoutTimer');
     if(!loggedIn()){ badges.forEach(function(b){ b.style.display='none'; }); hideWarn(); return; }
     if(shouldPauseIdle()) return;
-    var rem=LIMIT-(now()-getLast());
+    var rem = idleLimit() - (now()-getLast());
     badges.forEach(function(b){ b.style.display='inline-flex'; b.textContent='⏱ '+fmt(rem); });
     if(rem<=0){ clearInterval(tick); doAutoLogout(); return; }
     if(rem<=WARN){ showWarn(rem); } else { hideWarn(); }

@@ -121,10 +121,23 @@ test('★ 서버가 씻은 뒤에도 모양이 남는다', () => {
 });
 
 test('허용 목록에 없는 꾸밈을 쓰지 않았다 — 쓰면 서버가 조용히 지운다', () => {
+  /* 2026-09-02 에 표 기반 서식을 위해 border·padding·width·display 등이 MS.STYLE_OK 에 추가됐고,
+     2026-11-18 대표 지시(메일명함.html ① 품격 골드·네이비 카드형 확정)로 푸른노무법인 명함도 표로 짠다.
+     특정 옛 목록을 박아 두는 대신 실제 MS.STYLE_OK 허용 목록과 직접 대조한다. */
   const raw = load().signCardHtml(FULL);
-  for (const bad of ['border', 'padding:', 'display:', 'width:', 'float']) {
+  const allowed = new Set(MS.STYLE_OK);
+  for (const m of raw.matchAll(/style="([^"]*)"/g)) {
+    for (const part of m[1].split(';')) {
+      const i = part.indexOf(':');
+      if (i < 0) continue;
+      const prop = part.slice(0, i).trim().toLowerCase();
+      assert.ok(allowed.has(prop),
+        '★ 「' + prop + '」은 허용 목록(MS.STYLE_OK)에 없어 서버가 지운다');
+    }
+  }
+  for (const bad of ['float', 'position', 'z-index']) {
     assert.equal(raw.indexOf(bad), -1,
-      '★ 「' + bad + '」은 허용 목록(STYLE_OK)에 없어 서버가 지운다');
+      '★ 「' + bad + '」은 받는 화면을 덮을 수 있어 쓰지 않는다');
   }
 });
 

@@ -8,6 +8,9 @@
  *   node tools/phone-audit/run.mjs --full          # 페이지 전체 갈무리도 남긴다
  *   node tools/phone-audit/run.mjs gov --view=feed # 그 앱의 views 가운데 하나만
  *   node tools/phone-audit/run.mjs erp --font=1.4  # 폰 «글자 크게» 흉내 (글자만 1.4배)
+ *   node tools/phone-audit/run.mjs settle --design # 공용 디자인(css/pu-design.css) 켜기 전·뒤 «보이는 누를 것» 대조
+ *                                                  # (줄거나 새로 화면 밖으로 나간 것이 있으면 끝 코드 1 — design-diff.js)
+ *   node tools/phone-audit/run.mjs harass --dark   # 기기 «어두운 모드»로 그린다(prefers-color-scheme: dark 를 따르는 앱)
  *
  * 앱마다 자료·화면 열기: tools/phone-audit/seeds/<key>.js — { data, views:[{name, run(page)}], url?, localStorage? }
  *
@@ -57,13 +60,17 @@ const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter(a => a.startsWith('--')).map(a => { const [k, v] = a.slice(2).split('='); return [k, v ?? true]; }));
 const only = args.filter(a => !a.startsWith('--'));
 const widths = String(opt.widths || '360,411').split(',').map(Number);
-const outDir = path.resolve(opt.out || path.join(here, 'out'));
+/* --dark · --dark=1 만 켠다(--dark=false·0 은 끔). 결과 자리를 안 주면 밝은 판 갈무리를 덮지 않게 out/dark 에 둔다 */
+const dark = opt.dark === true || /^(1|true|yes|on)$/i.test(String(opt.dark || ''));
+const outDir = path.resolve(opt.out || path.join(here, 'out', dark ? 'dark' : ''));
 const waitMs = Number(opt.wait || 6000);
 const onlyView = opt.view || '';
 
 const seed = require('./seed.js');
 const fakeSrc = fs.readFileSync(path.join(here, 'fake-firebase.js'), 'utf8');
 const measureSrc = fs.readFileSync(path.join(here, 'measure.js'), 'utf8');
+const designSrc = opt.design ? fs.readFileSync(path.join(here, 'design-diff.js'), 'utf8') : '';
+let designBad = 0;
 
 function deepMerge(a, b) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) return b;
@@ -138,6 +145,14 @@ async function snapOne(page, key, view, width) {
   const shot = path.join(outDir, name + '.png');
   try { await page.screenshot({ path: shot, fullPage: false }); } catch (e) {}
   if (opt.full) { try { await page.screenshot({ path: path.join(outDir, name + '-full.png'), fullPage: true }); } catch (e) {} }
+  /* --design — 공용 디자인을 잠깐 떼어 «켜기 전»과 견준다(design-diff.js). 갈무리를 «먼저» 찍고 잰다 — 화면은 바로 되돌린다 */
+  if (designSrc && m) {
+    try {
+      await page.addScriptTag({ content: designSrc });
+      m.design = await page.evaluate((w) => __paDesignDiff({ width: w }), width);
+      if (m.design && !m.design.skipped && (m.design.lostN || m.design.newOffN)) designBad++;
+    } catch (e) { err = err || String(e.message).slice(0, 200); }
+  }
   return { m, err, shot: path.relative(root, shot) };
 }
 
@@ -147,6 +162,7 @@ async function auditOne(browser, base, app, width) {
     viewport: { width, height: 800 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true,
     userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
     locale: 'ko-KR', timezoneId: 'Asia/Seoul',
+    colorScheme: dark ? 'dark' : 'light',
   });
   const extra = seed.apps[app.key] || {};
   const data = deepMerge(seed.base, extra.data || {});
@@ -207,7 +223,10 @@ async function auditOne(browser, base, app, width) {
 function line(r) {
   const m = r.m || {};
   const n = (v, w) => String(v ?? '?').padStart(w);
-  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${m.gate ? ' · ⚠잠금화면' : ''}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
+  const d = m.design;
+  const dz = !d ? '' : d.skipped ? ' · 디자인 안 켬' : ` · 디자인 ${d.offN}→${d.onN} 잃음 ${d.lostN} 밖 ${d.newOffN}` +
+    (d.lostN || d.newOffN ? ' ⚠ ' + [...d.lost, ...d.newOff].slice(0, 4).map(x => x.key).join(' | ') : '');
+  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${m.gate ? ' · ⚠잠금화면' : ''}${dz}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
 }
 
 async function main() {
@@ -239,6 +258,7 @@ async function main() {
   const file = path.join(outDir, only.length ? `result-${only.join('-')}.json` : 'result.json');
   fs.writeFileSync(file, JSON.stringify(results, null, 1));
   await browser.close(); srv.close();
+  if (designBad) { console.log(`⚠ 디자인을 켜자 줄거나 화면 밖으로 나간 것이 있는 화면 ${designBad}개 — 값만 바꿔야 한다(design-diff.js)`); process.exitCode = 1; }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e); process.exit(1); });

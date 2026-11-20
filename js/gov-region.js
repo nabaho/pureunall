@@ -99,29 +99,37 @@
                (gov.html 은 둘 다 GovRecruit.dueState 로 만든다 — 공고와 모집 글이 «같은 잣대»로 마감을 말한다)
      ⚠ 숨긴 공고(hidden)도 담는다(hidden:true) — 거르는 것은 부르는 쪽(보기 고르개)이다. */
   function dueOf(fn, x) { var d = fn ? (fn(x) || {}) : {}; return { k: s(d.k) || 'unknown', text: s(d.text), days: typeof d.days === 'number' && !isNaN(d.days) ? d.days : null, to: s(d.to) }; }
+  /* 목록 짜기는 «한 벌» — 🤖 AI 사업 탭(js/gov-ai.js)도 갈래 고르는 법(cls)만 바꿔 이것을 쓴다(2026-11-19).
+     cls = { feed(r) → {groups, why} · hit(h) → {groups, why} · keys[] (칩 갈래, 셈 차례) } — 줄마다 groups(갈래 열쇠)를 단다 */
   function build(o) {
+    return buildWith(o, { keys: REGIONS.concat([WIDE]),
+      feed: function (r) { var g = ofFeed(r); return { groups: g.regions, why: g.why }; },
+      hit: function (h) { var g = ofHit(h); return { groups: g.regions, why: g.why }; } });
+  }
+  function buildWith(o, cls) {
     o = o || {};
     var deps = o.deps || {}, seen = o.seen || {}, items = [];
     var counts = { feed: 0, hit: 0, live: 0, fresh: 0 };
-    REGIONS.concat([WIDE]).forEach(function (k) { counts[k] = 0; });
+    (cls.keys || []).forEach(function (k) { counts[k] = 0; });
     (o.feed || []).forEach(function (r) {
       if (!r || !r.id) return;
-      var g = ofFeed(r); if (!g.regions.length) return;
+      var g = cls.feed(r); if (!g.groups.length) return;
       var due = dueOf(deps.feedDue, r);
       var closeYmd = /^\d{4}-\d{2}-\d{2}/.test(s(r.closeDt)) ? s(r.closeDt).slice(0, 10) : '';
       items.push({ kind: 'feed', ref: r.id, sel: 'f:' + r.id, title: s(r.nm), org: s(r.org), src: s(r.src) || '공고',
-        date: s(r.savedAt).slice(0, 10), to: due.to || closeYmd, days: due.days, dueK: due.k, dueText: due.text,
+        /* 날짜 칸 = 공고일(openDt) — 지난 공고를 해마다 견주려면 «받은 날»이 아니라 «공고한 날»이어야 한다(2026-11-19). 없으면 받은 날 */
+        date: (/^\d{4}-?\d{2}-?\d{2}/.test(s(r.openDt)) ? s(r.openDt).replace(/^(\d{4})-?(\d{2})-?(\d{2}).*/, '$1-$2-$3') : s(r.savedAt).slice(0, 10)), to: due.to || closeYmd, days: due.days, dueK: due.k, dueText: due.text,
         past: due.k === 'past', isNew: s(r.type) === '새 공고', type: s(r.type), hidden: !!r.hidden,
-        url: /^https?:\/\//.test(s(r.url)) ? s(r.url) : '', regions: g.regions, why: g.why });
+        url: /^https?:\/\//.test(s(r.url)) ? s(r.url) : '', groups: g.groups, why: g.why });
     });
     (o.hits || []).forEach(function (h) {
       if (!h || !h.key || !s(h.title)) return;
-      var g = ofHit(h); if (!g.regions.length) return;
+      var g = cls.hit(h); if (!g.groups.length) return;
       var due = dueOf(deps.hitDue, h);
       items.push({ kind: 'hit', ref: h.key, sel: 'h:' + h.key, title: s(h.title), org: s(h.boardName || h.org), src: '모집 글',
         date: s(h.date).slice(0, 10), to: due.to, days: due.days, dueK: due.k, dueText: due.text,
         past: due.k === 'past', isNew: !seen[h.key], type: '', hidden: false,
-        url: /^https:\/\//.test(s(h.href)) ? s(h.href) : '', regions: g.regions, why: g.why });
+        url: /^https:\/\//.test(s(h.href)) ? s(h.href) : '', groups: g.groups, why: g.why });
     });
     /* 차례: 마감 안 지난 것(마감 가까운 것부터 → 마감 모름은 최근 것부터) → 마감 지난 것(최근 마감부터) */
     items.sort(function (a, b) {
@@ -137,14 +145,14 @@
     items.forEach(function (x) {
       if (x.hidden) return;
       counts[x.kind]++;
-      x.regions.forEach(function (k) { counts[k]++; });
+      x.groups.forEach(function (k) { counts[k] = (counts[k] || 0) + 1; });
       if (!x.past) { counts.live++; if (x.isNew) counts.fresh++; }
     });
     return { items: items, counts: counts };
   }
 
   var api = { REGIONS: REGIONS, WIDE: WIDE, BOARD_REGION: BOARD_REGION, regionsIn: regionsIn, label: label,
-    ofFeed: ofFeed, ofHit: ofHit, build: build };
+    ofFeed: ofFeed, ofHit: ofHit, build: build, buildWith: buildWith, icon: function () { return '📍'; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovRegion = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
