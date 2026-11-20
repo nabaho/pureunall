@@ -9,7 +9,11 @@
   function readCfb(buffer) {
     const b = new Uint8Array(buffer), v = new DataView(b.buffer, b.byteOffset, b.byteLength);
     const SIG = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
-    if (!SIG.every((x, i) => b[i] === x)) throw new Error('HWP 문서 형식이 아닙니다.');
+    if (!SIG.every((x, i) => b[i] === x)) {
+      // 한글 97 이전(HWP 3.x) 문서는 머리가 "HWP Document File" — 이유를 알려 준다
+      if (String.fromCharCode(...b.subarray(0, 17)) === 'HWP Document File') throw new Error('한글 97 이전 형식(HWP 3.0) 문서는 열 수 없습니다 — 한글에서 열어 .hwpx 로 다시 저장해 주세요.');
+      throw new Error('HWP 문서 형식이 아닙니다.');
+    }
     const secSize = 1 << v.getUint16(30, true), miniSize = 1 << v.getUint16(32, true);
     const numFat = v.getUint32(44, true), dirStart = v.getUint32(48, true), miniCutoff = v.getUint32(56, true);
     const miniFatStart = v.getUint32(60, true), difatStart = v.getUint32(68, true);
@@ -586,16 +590,24 @@
       return cand.find(f => f && /wingdings|webdings|symbol|marlett|dingbat/i.test(f)) || null;
     };
 
+    // 같은 그림을 여러 곳에서 가리켜도 한 번만 푼다 — 가리킬 때마다 풀면 메모리를 겹으로 잡고, 풀린 크기 상한에서도 거듭 빠져
+    //  정상 문서가 «너무 큽니다» 로 거절될 수 있다 (2026-11-20 점검). 풀린 자료는 함께 쓴다(고치지 않음)
+    const binCache = new Map();
     async function image(binId, w, h) {
       const bin = info.bins[binId - 1];
       if (!bin || bin.type === 0) return null;
       const ext = bin.ext || 'png';
       const mime = MIME[ext] || 'image/' + ext;
-      const name = ('BIN' + binId.toString(16).toUpperCase().padStart(4, '0') + '.' + ext).toUpperCase();
-      let data = binFiles[name];
-      if (!data) return null;
-      if (bin.comp === 1 || (bin.comp === 0 && compressed)) { try { data = await inflateDoc(data); } catch (e) { if (e && e.tooBig) throw e; /* 압축 안 된 그림 */ } }
-      return { mime, data: new Uint8Array(data), w: mm(w), h: mm(h) };
+      let data = binCache.get(binId);
+      if (!data) {
+        const name = ('BIN' + binId.toString(16).toUpperCase().padStart(4, '0') + '.' + ext).toUpperCase();
+        data = binFiles[name];
+        if (!data) return null;
+        if (bin.comp === 1 || (bin.comp === 0 && compressed)) { try { data = await inflateDoc(data); } catch (e) { if (e && e.tooBig) throw e; /* 압축 안 된 그림 */ } }
+        data = new Uint8Array(data);
+        binCache.set(binId, data);
+      }
+      return { mime, data, w: mm(w), h: mm(h) };
     }
 
     // 문단 묶음(리스트) 해석
@@ -1365,14 +1377,16 @@
     st.styleOf = b => (b && doc.styles && b.styleId > 0 && b.styleId < doc.styles.length ? b.styleId : 0);
     const pg = doc.page || H.defaultPage();
     const hu = v => Math.round(v * MM);
-    const pageW = (pg.hu && pg.hu.width) || hu(pg.landscape ? pg.height : pg.width);
-    const pageH = (pg.hu && pg.hu.height) || hu(pg.landscape ? pg.width : pg.height);
-    const mgL = (pg.hu && pg.hu.left) || hu(pg.margin.left);
-    const mgR = (pg.hu && pg.hu.right) || hu(pg.margin.right);
-    const mgT = (pg.hu && pg.hu.top) || hu(pg.margin.top);
-    const mgB = (pg.hu && pg.hu.bottom) || hu(pg.margin.bottom);
-    const mgH = (pg.hu && pg.hu.header) || hu(pg.margin.header);
-    const mgF = (pg.hu && pg.hu.footer) || hu(pg.margin.footer);
+    // 읽을 때 둔 원래 값(pg.hu)은 mm 값을 바꾸지 않았을 때만 쓴다 (HWPX 쓰기의 pageHu 와 같은 규칙) — 여백·용지를 바꾸면 바꾼 값을 쓴다
+    const phu = k => {
+      const v = k === 'width' || k === 'height' ? pg[k] : (pg.margin || {})[k], raw = pg.hu && pg.hu[k];
+      return raw !== undefined && Math.abs(raw / MM - v) < 0.051 ? raw : hu(v || 0);
+    };
+    // 용지는 한글처럼 늘 «세로로 둔» 크기(pg.width·height)로 적고 가로면 방향 비트를 켠다. pageW 는 눕힌 뒤의 실제 폭
+    //  (예전에는 원래 값이 있을 때 한 번 더 맞바꿔 가로 문서가 저장할 때마다 세로·가로로 뒤집혔다, 2026-11-20 점검)
+    const paperW = phu('width'), paperH = phu('height');
+    const pageW = pg.landscape ? paperH : paperW;
+    const mgL = phu('left'), mgR = phu('right'), mgT = phu('top'), mgB = phu('bottom'), mgH = phu('header'), mgF = phu('footer');
     const bodyWidth = Math.max(2834, pageW - mgL - mgR);
 
     const makeCtrlHead = (name, extraBytes) => {
@@ -1391,8 +1405,11 @@
       const hrel = Math.max(0, HREL.indexOf(pl.horzRelTo || 'COLUMN'));
       const halign = Math.max(0, HALIGN.indexOf(pl.horzAlign || 'LEFT'));
       const wrap = Math.max(0, WRAP.indexOf(pl.wrap || 'TOP_AND_BOTTOM'));
+      // 너비·높이 기준(15~17·18~19 비트): 비워 두면 0 = «종이 대비 %» 로 읽혀 그림·도형이 몇 배로 커진다 — 한글처럼 기본은 절대값
+      const wrelI = ['PAPER', 'PAGE', 'COLUMN', 'PARA', 'ABSOLUTE'].indexOf(pl.widthRelTo || 'ABSOLUTE');
+      const hrelI = ['PAPER', 'PAGE', 'ABSOLUTE'].indexOf(pl.heightRelTo || 'ABSOLUTE');
       const at = (inline ? 1 : 0) | (pl.affect ? 4 : 0) | (vrel << 3) | (valign << 5) | (hrel << 8) | (halign << 10)
-        | (pl.flow ? 0x2000 : 0) | (pl.overlap ? 0x4000 : 0) | (wrap << 21);
+        | (pl.flow ? 0x2000 : 0) | (pl.overlap ? 0x4000 : 0) | ((wrelI < 0 ? 4 : wrelI) << 15) | ((hrelI < 0 ? 2 : hrelI) << 18) | (wrap << 21);
       v.setUint32(4, at >>> 0, true);
       v.setInt32(8, pl.vertOffset || 0, true);
       v.setInt32(12, pl.horzOffset || 0, true);
@@ -1492,20 +1509,33 @@
       return recs;
     };
 
-    const writePicCtrl = img => {
-      const idStr = st.imageId(img);
-      const binId = parseInt(idStr.replace(/\D+/g, ''), 10) || 1;
-      const w = Math.max(100, hu(img.w || 30)), h = Math.max(100, hu(img.h || 20));
-      const headData = makeObjCommon('gso ', { inline: true }, w, h, st.nextId());
-      const sc = new Uint8Array(94), sv = new DataView(sc.buffer);
-      sv.setUint32(0, ctrlId('$pic'), true);
-      sv.setUint32(4, ctrlId('$pic'), true);
+    // 개체 요소(SHAPE_COMPONENT) 앞부분 — 읽기(readShapeComp)·한글과 같은 자리:
+    //  컨트롤 ID 두 번 · 위치 @8 · 묶음 수준 @16 · 판 @18 · 원래 크기 @20 · 지금 크기 @28 · 뒤집기 @36 · 회전각 @40 · 회전 중심 @42
+    //  · 행렬 쌍 개수 @50 · 이동 행렬 @52 · 확대·회전 행렬 @100·@148(모두 단위 행렬) → 다음 자료는 @196
+    //  (예전에는 행렬을 @46·@70 에 써 자리가 6바이트 어긋나, 다시 열면 선·채우기가 엉뚱하게 읽히고 도형이 안 보였다, 2026-11-20 점검)
+    const SC_HEAD = 196;
+    const shapeCompHead = (code, w, h, tail) => {
+      const sc = new Uint8Array(SC_HEAD + (tail || 0)), sv = new DataView(sc.buffer);
+      sv.setUint32(0, ctrlId(code), true);
+      sv.setUint32(4, ctrlId(code), true);
+      sv.setUint16(18, 1, true);
       sv.setUint32(20, w, true);
       sv.setUint32(24, h, true);
       sv.setUint32(28, w, true);
       sv.setUint32(32, h, true);
-      sv.setFloat64(46, 1, true);
-      sv.setFloat64(70, 1, true);
+      sv.setUint32(42, Math.round(w / 2), true);
+      sv.setUint32(46, Math.round(h / 2), true);
+      sv.setUint16(50, 1, true);
+      for (const m of [52, 100, 148]) { sv.setFloat64(m, 1, true); sv.setFloat64(m + 32, 1, true); }
+      return { sc, sv };
+    };
+
+    const writePicCtrl = (img, pl) => {
+      const idStr = st.imageId(img);
+      const binId = parseInt(idStr.replace(/\D+/g, ''), 10) || 1;
+      const w = Math.max(100, hu(img.w || 30)), h = Math.max(100, hu(img.h || 20));
+      const headData = makeObjCommon('gso ', pl || { inline: true }, w, h, st.nextId());
+      const { sc } = shapeCompHead('$pic', w, h, 0);
       const sp = new Uint8Array(78), pv = new DataView(sp.buffer);
       pv.setUint32(0, 0xffffffff, true);
       pv.setInt32(20, w, true);
@@ -1523,6 +1553,12 @@
       const w = +(sz && sz.attrs && sz.attrs.width) || 5000;
       const h = +(sz && sz.attrs && sz.attrs.height) || 3000;
       const inline = !pos || pos.attrs.treatAsChar === '1';
+      // 배치(기준·정렬·오프셋·글 감싸기·여백)도 그대로 쓴다 — { inline } 만 넘기면 떠 있는 그림·도형이 글자처럼 취급됐다 (2026-11-20 점검)
+      const pa = (pos && pos.attrs) || {}, na = node.attrs || {}, om = kid('outMargin'), oma = (om && om.attrs) || {};
+      const pl = { inline, affect: pa.affectLSpacing === '1', vertRelTo: pa.vertRelTo, horzRelTo: pa.horzRelTo, vertAlign: pa.vertAlign, horzAlign: pa.horzAlign,
+        vertOffset: (+pa.vertOffset || 0) | 0, horzOffset: (+pa.horzOffset || 0) | 0, flow: pa.flowWithText === '1', overlap: pa.allowOverlap === '1',
+        wrap: inline ? 'TOP_AND_BOTTOM' : na.textWrap, zOrder: +na.zOrder || 0, out: { l: +oma.left || 0, r: +oma.right || 0, t: +oma.top || 0, b: +oma.bottom || 0 },
+        widthRelTo: sz && sz.attrs && sz.attrs.widthRelTo, heightRelTo: sz && sz.attrs && sz.attrs.heightRelTo };
       const FORM_REV = { edit: '+edt', btn: '+pbt', radioBtn: '+rbt', checkBtn: '+cbt', comboBox: '+cob', listBox: '+lsb', scrollBar: '+scr' };
       if (FORM_REV[local]) {
         const fCode = FORM_REV[local], at = node.attrs || {};
@@ -1554,7 +1590,7 @@
         fv.setUint32(0, ctrlId(fCode), true);
         fv.setUint32(4, ctrlId(fCode), true);
         fd.set(propW, 12);
-        return [makeRec(T.CTRL_HEADER, 0, makeObjCommon('form', { inline }, w, h, st.nextId())), makeRec(91, 1, fd)];
+        return [makeRec(T.CTRL_HEADER, 0, makeObjCommon('form', pl, w, h, st.nextId())), makeRec(91, 1, fd)];
       }
       if (local === 'equation') {
         const scEl = kid('script'), sc = encodeWstr((scEl && scEl.txt) || '');
@@ -1569,26 +1605,19 @@
         ev.setInt16(o + 8, +(node.attrs && node.attrs.baseLine) || 85, true);
         eq.set(ver, o + 12);
         eq.set(fnt, o + 12 + ver.length);
-        return [makeRec(T.CTRL_HEADER, 0, makeObjCommon('eqed', { inline }, w, h, st.nextId())), makeRec(88, 1, eq)];
+        return [makeRec(T.CTRL_HEADER, 0, makeObjCommon('eqed', pl, w, h, st.nextId())), makeRec(88, 1, eq)];
       }
       const tagMap = { rect: '$rec', ellipse: '$ell', line: '$lin', arc: '$arc', polygon: '$pol', curve: '$cur', pic: '$pic' };
       const code = tagMap[local] || '$rec';
       if (code === '$pic') {
         const im = (node.kids || []).find(k => (k.tag || '').endsWith('img'));
-        if (im && im.image) return writePicCtrl({ mime: im.image.mime, data: im.image.data, w: w / MM, h: h / MM });
+        if (im && im.image) return writePicCtrl({ mime: im.image.mime, data: im.image.data, w: w / MM, h: h / MM }, pl);
       }
-      const headData = makeObjCommon('gso ', { inline }, w, h, st.nextId());
+      const headData = makeObjCommon('gso ', pl, w, h, st.nextId());
       const ls = kid('lineShape'), fb = kid('fillBrush'), wb = fb && (fb.kids || []).find(k => (k.tag || '').endsWith('winBrush'));
-      const sc = new Uint8Array(143), sv = new DataView(sc.buffer);
-      sv.setUint32(0, ctrlId(code), true);
-      sv.setUint32(4, ctrlId(code), true);
-      sv.setUint32(20, w, true);
-      sv.setUint32(24, h, true);
-      sv.setUint32(28, w, true);
-      sv.setUint32(32, h, true);
-      sv.setFloat64(46, 1, true);
-      sv.setFloat64(70, 1, true);
-      let o = 94;
+      // 선(13) · 채우기(4 + 단색 12) · 추가 속성 길이(4) · 투명도(1) · 그림자(16) · instid(4)
+      const { sc, sv } = shapeCompHead(code, w, h, 60);
+      let o = SC_HEAD;
       sv.setUint32(o, parseHexColor((ls && ls.attrs && ls.attrs.color) || '#000000'), true);
       sv.setInt32(o + 4, +(ls && ls.attrs && ls.attrs.width) || 33, true);
       sv.setUint32(o + 8, lineTypeIdx(ls && ls.attrs && ls.attrs.style), true);
@@ -1621,6 +1650,30 @@
         gv.setInt32(12, w, true); gv.setInt32(16, h >> 1, true);
         gv.setInt32(20, w >> 1, true); gv.setInt32(24, 0, true);
         recs.push(makeRec(80, 2, g));
+      } else if (code === '$pol' || code === '$cur' || code === '$arc') {
+        // 다각형·곡선·호는 제 기하 레코드로 (예전에는 사각형 것으로 써 다시 열면 점이 0개 — 도형이 사라졌다, 2026-11-20 점검)
+        //  읽기(readShapeComp)와 같은 짜임: 다각형 = 점 개수 + 점들 · 곡선 = 점 개수 + 점들 + 구간 종류 · 호 = 종류 1바이트 + 중심·축1·축2
+        const num = v => (+v || 0) | 0;
+        const xy = k => [num(k && k.attrs && k.attrs.x), num(k && k.attrs && k.attrs.y)];
+        let g;
+        if (code === '$arc') {
+          g = new Uint8Array(25);
+          const gv = new DataView(g.buffer);
+          g[0] = Math.max(0, ['NORMAL', 'PIE', 'CHORD'].indexOf((node.attrs && node.attrs.type) || 'NORMAL'));
+          ['center', 'ax1', 'ax2'].forEach((nm, k) => { const [x, y] = xy(kid(nm)); gv.setInt32(1 + k * 8, x, true); gv.setInt32(5 + k * 8, y, true); });
+          recs.push(makeRec(81, 2, g));
+        } else {
+          const segs = code === '$cur' ? (node.kids || []).filter(k => (k.tag || '').split(':').pop() === 'seg') : [];
+          // 곡선의 점: 첫 구간의 시작점 + 구간마다 끝점
+          const pts = code === '$pol' ? (node.kids || []).filter(k => (k.tag || '').split(':').pop() === 'pt').map(xy)
+            : segs.length ? [[num(segs[0].attrs.x1), num(segs[0].attrs.y1)], ...segs.map(s => [num(s.attrs.x2), num(s.attrs.y2)])] : [];
+          g = new Uint8Array(4 + pts.length * 8 + (code === '$cur' ? Math.max(0, pts.length - 1) : 0));
+          const gv = new DataView(g.buffer);
+          gv.setInt32(0, pts.length, true);
+          pts.forEach(([x, y], k) => { gv.setInt32(4 + k * 8, x, true); gv.setInt32(8 + k * 8, y, true); });
+          segs.forEach((s, k) => { g[4 + pts.length * 8 + k] = s.attrs && s.attrs.type === 'CURVE' ? 1 : 0; });
+          recs.push(makeRec(code === '$pol' ? 82 : 83, 2, g));
+        }
       } else {
         const g = new Uint8Array(33), gv = new DataView(g.buffer);
         g[0] = +(node.attrs && node.attrs.ratio) || 0;
@@ -1673,8 +1726,8 @@
         cv.setUint16(45, +(ln.startNumber || 1), true);
       }
       const pd = new Uint8Array(40), pv = new DataView(pd.buffer);
-      pv.setUint32(0, pg.landscape ? pageH : pageW, true);
-      pv.setUint32(4, pg.landscape ? pageW : pageH, true);
+      pv.setUint32(0, paperW, true);
+      pv.setUint32(4, paperH, true);
       pv.setUint32(8, mgL, true);
       pv.setUint32(12, mgR, true);
       pv.setUint32(16, mgT, true);
@@ -1782,7 +1835,8 @@
               if (wantLink) {
                 openLink = wantLink;
                 pushShape(st.charId(r));
-                pushCtrlChar(3, writeFieldCtrl('%hlk', wantLink.replace(/:/g, '\\:') + ';1;0;0', 0));
+                // 명령 문자열은 «\» 가 다음 글자를 살리고 «;» 가 끝이다 — 주소 속 \ · : · ; 를 모두 살린다 (\\server\share 의 \ 와 ;jsessionid 뒤가 사라지던 것)
+                pushCtrlChar(3, writeFieldCtrl('%hlk', wantLink.replace(/[\\:;]/g, m => '\\' + m) + ';1;0;0', 0));
               }
             }
             if (r.table) { pushShape(st.charId(r.style || {})); pushCtrlChar(11, writeTableCtrl(r.table, width)); continue; }
@@ -1815,13 +1869,16 @@
             }
             if (!r.text) continue;
             pushShape(st.charId(r));
-            const s = r.text.replace(/\u00a0\ufeff/g, '\u00a0');
+            // 글자 그대로의 NBSP(뒤에 FEFF 가 붙은 NBSP_LIT)는 0xA0 로, 맨 NBSP 는 묶음 빈칸(30)으로 쓴다
+            //  (예전에는 FEFF 를 먼저 지워 둘을 가리지 못했다) · 탭·줄바꿈 밖의 제어 문자(0~31)는 문단을 끊으므로 쓰지 않는다
+            const s = r.text;
             for (let k = 0; k < s.length; k++) {
               const code = s.charCodeAt(k);
               if (code === 9) pushCtrlChar(9, null);
               else if (code === 10) wchars.push(10);
-              else if (code === 0xa0 && s.charCodeAt(k + 1) !== 0xfeff) wchars.push(30);
+              else if (code === 0xa0) { if (s.charCodeAt(k + 1) === 0xfeff) { wchars.push(0xa0); k++; } else wchars.push(30); }
               else if (code === 0x2007) wchars.push(31);
+              else if (code < 32) continue;
               else wchars.push(code);
             }
           }
@@ -1888,7 +1945,7 @@
     st.images.forEach((im, idx) => {
       const ext = encodeWstr(im.ext || 'png');
       const bd = new Uint8Array(4 + ext.length), bdv = new DataView(bd.buffer);
-      bdv.setUint16(0, 1 | (1 << 4), true); // EMBEDDING + 비압축
+      bdv.setUint16(0, 1 | (2 << 4), true); // EMBEDDING + «무조건 비압축»(4~5비트 = 2). 1 은 «무조건 압축» 이라 날 자료를 풀려다 그림이 깨진다
       bdv.setUint16(2, idx + 1, true);
       bd.set(ext, 4);
       docRecs.push(makeRec(T.BIN_DATA, 0, bd));

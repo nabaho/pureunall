@@ -43,7 +43,8 @@ function fakeDom({ withBox = true } = {}) {
 }
 function runBar(dom, ctx) {
   const code = cutFn(CODE, 'function _renderFundBridgeBar(');
-  return new Function('$', 'h', 'saveToFund', 'fundCtx', code + '\nreturn _renderFundBridgeBar;')(dom.$, dom.h, () => {}, ctx)();
+  // 2026-11-20: 연결 정보는 «지금 탭» 의 것(cur.fundCtx)
+  return new Function('$', 'h', 'saveToFund', 'cur', code + '\nreturn _renderFundBridgeBar;')(dom.$, dom.h, () => {}, { fundCtx: ctx })();
 }
 
 test('★★★ 연동 띠가 메뉴 줄에 들어간다 — 찾기 상자 «앞»에, 오류 없이', () => {
@@ -64,7 +65,7 @@ test('★★ 가짜 DOM 이 진짜처럼 옛 코드(#quickFind 를 직계 자식
   const dom = fakeDom();
   const old = cutFn(CODE, 'function _renderFundBridgeBar(').replace(/const ref = [^\n]*\n/, '').replace('mb.insertBefore(wrap, ref || null)', 'mb.insertBefore(wrap, qf || null)');
   assert.match(old, /insertBefore\(wrap, qf \|\| null\)/, '옛 코드로 되돌리지 못했습니다 — 이 검사의 바꿔치기를 고쳐야 합니다');
-  assert.throws(() => new Function('$', 'h', 'saveToFund', 'fundCtx', old + '\nreturn _renderFundBridgeBar;')(dom.$, dom.h, () => {}, { fundName: 'x' })(), /NotFoundError/);
+  assert.throws(() => new Function('$', 'h', 'saveToFund', 'cur', old + '\nreturn _renderFundBridgeBar;')(dom.$, dom.h, () => {}, { fundCtx: { fundName: 'x' } })(), /NotFoundError/);
 });
 
 test('★★★ «열기» 메시지는 같은 사이트가 보낸 것만 듣는다 (다른 출처는 무시)', () => {
@@ -86,6 +87,56 @@ test('★★★ «열기» 메시지는 같은 사이트가 보낸 것만 듣는
   open('https://nabaho.github.io');
   assert.strictEqual(calls.length, 1, '같은 사이트의 «열기» 는 받아야 합니다');
   assert.doesNotThrow(() => handler(null));
+});
+
+// ---------- 2026-11-20 점검: 연결은 «연 문서» 에만 · 같은 쪽지는 한 번만 · 못 열면 함께 온 HTML 로 ----------
+// loadFromFundPayload 를 떠서 가짜 openBlob·addDoc 로 돌린다
+function runLoad({ openOk = true } = {}) {
+  const keyLine = /const _bridgeKey = [^\n]*\n/.exec(CODE);
+  assert.ok(keyLine, '_bridgeKey 를 못 찾았습니다');
+  const code = keyLine[0] + cutFn(CODE, 'async function loadFromFundPayload(');
+  const log = { opened: [], added: [], bars: 0, toasts: [] };
+  const fn = new Function('_seenBridgeIds', 'window', 'location', 'BroadcastChannel', 'openBlob', 'addDoc', '_renderFundBridgeBar', 'Hx', 'toast', '_b64ToBytes', 'File', 'console',
+    code + '\nreturn loadFromFundPayload;')(
+    new Set(), {}, { origin: 'https://erp.example' }, undefined,
+    async file => { const d = { name: file.name }; log.opened.push(d); return openOk ? d : null; },
+    o => { const d = Object.assign({}, o); log.added.push(d); return d; },
+    () => { log.bars++; }, { defaultPage: () => ({ margin: {} }) }, m => log.toasts.push(m), () => new Uint8Array([1]),
+    function (parts, name) { this.name = name; }, { warn() {} });
+  return { load: fn, log };
+}
+
+test('★★★ 기금관리가 같은 쪽지를 여러 번 보내도(bridgeId 없이 저장소·메시지·채널) 한 번만 연다', async () => {
+  const { load, log } = runLoad();
+  const p = { sentAt: 1795161000000, fundId: 'F1', fundName: '시험기금', kind: 'rule', label: '규약', name: '시험기금_규약', format: 'hwpx', b64: 'AA==' };
+  for (let i = 0; i < 5; i++) await load(Object.assign({}, p));
+  assert.strictEqual(log.opened.length, 1, '같은 쪽지로 탭이 여러 개 열렸습니다 (' + log.opened.length + ')');
+  await load(Object.assign({}, p, { sentAt: p.sentAt + 5000 })); // 다시 눌러 새로 보낸 것은 연다
+  assert.strictEqual(log.opened.length, 2);
+});
+
+test('★★★ 기금 연결은 «실제로 연 그 문서» 에만 붙는다 — 다른 탭에는 없다', async () => {
+  const { load, log } = runLoad();
+  await load({ sentAt: 1, fundId: 'F1', kind: 'rule', label: '규약', format: 'hwpx', b64: 'AA==' });
+  assert.deepStrictEqual(log.opened[0].fundCtx && log.opened[0].fundCtx.fundId, 'F1');
+  assert.ok(log.bars >= 1, '연결 띠를 다시 그려야 합니다');
+  // 소스에도: 전역 하나(let fundCtx)로 두지 않고, 띠·반영은 지금 탭(cur.fundCtx)을 본다
+  assert.doesNotMatch(CODE, /let fundCtx\b/, '기금 연결을 창 하나에 하나(전역)로 두면 다른 탭이 그 서식으로 저장됩니다');
+  assert.match(cutFn(CODE, 'function saveToFund('), /cur && cur\.fundCtx/);
+  assert.match(cutFn(CODE, 'function _renderFundBridgeBar('), /cur && cur\.fundCtx/);
+  assert.match(cutFn(CODE, 'function activate('), /_renderFundBridgeBar\(\)/, '탭을 바꾸면 띠도 그 탭의 것으로 바뀌어야 합니다');
+});
+
+test('★★ 서식 파일(b64)을 못 열면 함께 온 HTML 로 대신 열고, 연결은 그 문서에 — 둘 다 못 열면 아무 데도 안 붙는다', async () => {
+  const r1 = runLoad({ openOk: false });
+  await r1.load({ sentAt: 2, fundId: 'F2', kind: 'rule', label: '규약', format: 'hwpx', b64: 'AA==', html: '<p>x</p>' });
+  assert.strictEqual(r1.log.added.length, 1, '못 연 b64 대신 HTML 로 열어야 합니다');
+  assert.strictEqual(r1.log.added[0].fundCtx.fundId, 'F2');
+  assert.strictEqual(r1.log.opened[0].fundCtx, undefined);
+  const r2 = runLoad({ openOk: false });
+  await r2.load({ sentAt: 3, fundId: 'F3', format: 'hwpx', b64: 'AA==' });
+  assert.strictEqual(r2.log.added.length, 0);
+  assert.strictEqual(r2.log.opened[0].fundCtx, undefined, '못 연 문서에 연결이 붙었습니다');
 });
 
 test('★★ «저장» 메시지(문서 전문)를 보낼 때 받는 쪽을 같은 사이트로 좁힌다 — 맨 \'*\' 만 쓰지 않는다', () => {

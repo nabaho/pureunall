@@ -28,6 +28,7 @@
     wrapFields();
     renderFields();
     renderTabs();
+    _renderFundBridgeBar(); // 기금 연결 띠는 지금 탭의 것만
     updatePrintPage();
     desk.scrollTop = d.scroll || 0;
     document.title = d.name + (d.readOnly ? ' [읽기 전용]' : '') + ' - 푸른 한글편집기';
@@ -155,20 +156,27 @@
     for (const x of ok) await openBlob(x.file, x.handle);
   });
 
+  // 열면 그 문서(탭)를 돌려준다 — 못 열면 null (부르는 쪽이 대신 열기 등을 고를 수 있게)
   async function openBlob(file, handle) {
     // 서식 파일(.hwt)은 한글처럼 그 서식으로 새 문서를 만듦 (같은 이름으로 덮어쓰지 않고, '만든 날짜'는 오늘)
-    const isTpl = /\.hwt$/i.test(file.name), isHwp = isTpl || /\.hwp$/i.test(file.name);
+    const isTpl = /\.hwt$/i.test(file.name);
+    let isHwp = isTpl || /\.hwp$/i.test(file.name);
     try {
+      const buf = await file.arrayBuffer();
+      // 확장자와 속 형식이 다른 파일(이름만 .hwp 인 HWPX 등)은 속 형식대로 연다
+      const sig = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
+      if (sig[0] === 0x50 && sig[1] === 0x4b) isHwp = false; // PK = zip(HWPX)
+      else if (sig[0] === 0xd0 && sig[1] === 0xcf && sig[2] === 0x11 && sig[3] === 0xe0) isHwp = true; // 복합 파일(HWP)
       let model;
       if (isHwp) {
         if (!window.PureunHwp) throw new Error('HWP 읽기 기능을 불러오지 못했습니다.');
-        model = await PureunHwp.readHwp(await file.arrayBuffer(), isTpl ? { docDate: new Date().toISOString() } : {});
+        model = await PureunHwp.readHwp(buf, isTpl ? { docDate: new Date().toISOString() } : {});
       } else {
-        model = await Hx.readHwpx(await file.arrayBuffer());
+        model = await Hx.readHwpx(buf);
       }
       Dm.setCompat(model.compat); // 워드 호환 문서는 줄 높이 계산이 다름 (HTML 을 만들기 전에)
       Dm.setFontInfo(model.fontInfo); // 한글 전용(HFT) 글꼴의 대체 글꼴
-      addDoc({
+      const d = addDoc({
         name: file.name.replace(/\.(hwpx|hwp|hwt)$/i, ''), html: Dm.blocksToHtml(model.blocks), page: Hx.normalizeDoc(model).page,
         header: model.header, footer: model.footer, pageNum: model.pageNum, numberings: model.numberings, bullets: model.bullets, outlineId: model.outlineId, columns: model.columns, pageBorders: model.pageBorders, masterPages: model.masterPages, compat: model.compat, sec: model.sec, styles: model.styles, fontInfo: model.fontInfo,
         handle: isTpl ? null : handle, format: isHwp && !isTpl ? 'hwp' : 'hwpx', pristine: false, readOnly: !!model.distributed,
@@ -177,8 +185,10 @@
       if (model.distributed) notes.push('배포용 문서라 읽기 전용으로 열었습니다 (고치기·저장·복사·인쇄 불가)');
       if (model.skipped) notes.push(`지원하지 않는 개체 ${model.skipped}개는 표시되지 않으며 저장 시 빠집니다`);
       toast(notes.length ? `열었습니다. ${notes.join(' / ')}.` : `'${file.name}'을(를) 열었습니다.`);
+      return d;
     } catch (err) {
       toast('열지 못했습니다: ' + err.message, true);
+      return null;
     }
   }
 
@@ -188,6 +198,60 @@
       ? PureunHwp.buildHwp(E.getModel())
       : Hx.buildHwpx(E.getModel());
   }
+  // ---------- .hwp 저장 확인 ----------
+  // 이 편집기의 .hwp 쓰기는 아직 일부 개체(묶음 개체 속 글상자·그림, 바탕쪽 등)를 못 쓴다 (2026-11-20 점검: 편람 그림 24 → 3).
+  //  쓴 바이트를 곧바로 다시 읽어 글자·그림·도형 수가 줄었으면 조용히 저장하지 않고 묻는다 (.hwpx 는 모두 남는다).
+  function contentCount(m) {
+    const n = { chars: 0, images: 0, shapes: {} }, seen = new Set();
+    const walk = x => {
+      if (!x || typeof x !== 'object' || seen.has(x) || ArrayBuffer.isView(x) || x instanceof ArrayBuffer) return;
+      seen.add(x);
+      if (Array.isArray(x)) { x.forEach(walk); return; }
+      if (typeof x.text === 'string') n.chars += x.text.replace(/\s/g, '').length;
+      for (const k of ['image', 'img']) { const v = x[k]; if (v && typeof v === 'object' && (v.data || v.src)) n.images++; }
+      const tag = typeof x.tag === 'string' ? x.tag.split(':').pop() : '';
+      if (/^(rect|ellipse|line|arc|polygon|curve|pic|container|ole|equation|textart)$/.test(tag)) n.shapes[tag] = (n.shapes[tag] || 0) + 1;
+      for (const k in x) walk(x[k]);
+    };
+    for (const k of ['blocks', 'header', 'footer', 'masterPages']) walk(m && m[k]);
+    return n;
+  }
+  function countLoss(a, b) {
+    let shapes = 0;
+    for (const k of new Set([...Object.keys(a.shapes), ...Object.keys(b.shapes)])) shapes += Math.max(0, (a.shapes[k] || 0) - (b.shapes[k] || 0));
+    return { chars: Math.max(0, a.chars - b.chars), images: Math.max(0, a.images - b.images), shapes };
+  }
+  // 저장할 바이트를 만든다. .hwp 면 다시 읽어 빠진 것(loss)도 센다 — 다시 읽지도 못하면 broken
+  async function buildChecked(fmt) {
+    commit();
+    const model = E.getModel();
+    if (fmt !== 'hwp' || !(window.PureunHwp && PureunHwp.buildHwp)) return { bytes: Hx.buildHwpx(model), loss: null };
+    const before = contentCount(model);
+    const bytes = PureunHwp.buildHwp(model);
+    let loss;
+    try {
+      const back = await PureunHwp.readHwp(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      loss = countLoss(before, contentCount(back));
+    } catch (e) { loss = { broken: true, chars: 0, images: 0, shapes: 0 }; }
+    return { bytes, loss: loss.broken || loss.chars || loss.images || loss.shapes ? loss : null };
+  }
+  // 빠지는 것이 있을 때 묻기: 'hwpx'(권함) · 'hwp'(그래도) · null(취소)
+  function askHwpLoss(loss) {
+    return new Promise(res => {
+      let pick = null;
+      const what = loss.broken ? '저장한 .hwp 를 이 편집기가 다시 읽지 못했습니다'
+        : [loss.chars ? `글자 ${loss.chars.toLocaleString()}자` : '', loss.images ? `그림 ${loss.images}개` : '', loss.shapes ? `도형·개체 ${loss.shapes}개` : ''].filter(Boolean).join(' · ') + '가 빠집니다';
+      UI.dialog({ title: '.hwp 로 저장하면 빠지는 내용이 있습니다', width: 470,
+        body: h('div', {}, h('p', {}, `이 편집기의 .hwp 저장은 아직 일부 개체(묶음 개체 안의 글상자·그림, 바탕쪽 등)를 쓰지 못해 ${what}.`),
+          h('p', { class: 'tp-note' }, '.hwpx 로 저장하면 모두 남습니다. 한글 2014 이후 판은 .hwpx 를 그대로 엽니다.')),
+        buttons: [{ label: '.hwpx 로 저장', primary: true, act: () => { pick = 'hwpx'; } }, { label: '그래도 .hwp 로 저장', act: () => { pick = 'hwp'; } }, { label: '취소', cancel: true }],
+        onClose: () => res(pick) });
+    });
+  }
+  // 저장 창이 방금 만든 빈 파일만 치운다 (내용이 있는 파일은 건드리지 않음)
+  async function dropEmptyPick(handle) {
+    try { const f = await handle.getFile(); if (f.size === 0 && handle.remove) await handle.remove(); } catch (e) {}
+  }
   // 배포용 문서(읽기 전용)에서 막는 일
   const guardRO = what => { if (cur && cur.readOnly) { toast(`배포용 문서는 ${what}할 수 없습니다. (작성자가 정한 보호)`, true); return true; } return false; };
   docEl.addEventListener('copy', e => { if (cur && cur.readOnly) { e.preventDefault(); guardRO('복사'); } });
@@ -195,12 +259,17 @@
   async function save(as, forceFmt) {
     if (guardRO('저장')) return;
     if (!cur) return;
-    let fmt = forceFmt || (cur.format === 'hwp' ? 'hwp' : 'hwpx');
-    const done = name => { cur.dirty = false; cur.pristine = false; renderTabs(); document.title = cur.name + ' - 푸른 한글편집기'; toast(`'${name}'에 저장했습니다.`); };
+    // 저장 창·권한 창이 떠 있는 사이 기금 쪽지 등으로 다른 탭이 앞에 와도 «저장을 누른 문서»를 저장한다 (2026-11-20 점검)
+    const doc = cur;
+    const back = () => { if (cur !== doc && docs.includes(doc)) activate(doc); return cur === doc; };
+    // 열어 온 .hwp(저장 창에서 직접 고른 파일이 아님)는 «다른 이름으로 저장» 도 .hwpx 를 먼저 제안 — 원본 이름 그대로 Enter 한 번에 덮어쓰지 않게
+    const openedHwp = doc.format === 'hwp' && !doc.handleFromSave;
+    let fmt = forceFmt || (doc.format === 'hwp' && !openedHwp ? 'hwp' : 'hwpx');
+    const done = name => { doc.dirty = false; doc.pristine = false; renderTabs(); if (cur === doc) document.title = doc.name + ' - 푸른 한글편집기'; toast(`'${name}'에 저장했습니다.`); };
     try {
-      if (!as && !forceFmt && cur.handle) {
-        const hFmt = /\.hwp$/i.test(cur.handle.name) ? 'hwp' : 'hwpx';
-        if (hFmt === 'hwp' && !cur.handleFromSave) {
+      if (!as && !forceFmt && doc.handle) {
+        const hFmt = /\.hwp$/i.test(doc.handle.name) ? 'hwp' : 'hwpx';
+        if (hFmt === 'hwp' && !doc.handleFromSave) {
           // 열어 온 .hwp 원본은 «저장하기» 로 조용히 덮어쓰지 않는다 (2026-11-08 대표 «막고 진행»).
           //  이 편집기가 읽은 내용이 원본보다 적을 수 있고(큰 문서는 일부만 읽힘), 저장하면 일부 그림이 빠질 수 있어
           //  덮어쓰면 되돌릴 수 없다. 새 이름(제안: .hwpx)으로 저장하게 한다 — «다른 이름으로 저장» 은 그대로.
@@ -208,37 +277,56 @@
           toast('열어 온 .hwp 원본은 덮어쓰지 않습니다 — 새 이름으로 저장해 주세요.');
           fmt = 'hwpx';
         } else {
-          const bytes = buildBytes(hFmt);
-          const w = await cur.handle.createWritable();
-          await w.write(bytes); await w.close();
-          cur.format = hFmt;
-          return done(cur.handle.name);
+          if (!back()) return;
+          const built = await buildChecked(hFmt);
+          if (built.loss) {
+            const pick = await askHwpLoss(built.loss);
+            if (pick === 'hwpx') return save(true, 'hwpx');
+            if (pick !== 'hwp') return;
+          }
+          const w = await doc.handle.createWritable();
+          await w.write(built.bytes); await w.close();
+          doc.format = hFmt;
+          return done(doc.handle.name);
         }
       }
       if (window.showSaveFilePicker) {
         const handle = await showSaveFilePicker({
-          suggestedName: safeName(cur.name) + '.' + fmt,
+          suggestedName: safeName(doc.name) + '.' + fmt,
           types: fmt === 'hwp' ? [HWP_TYPE, HWPX_TYPE] : [HWPX_TYPE, HWP_TYPE],
         });
         fmt = /\.hwp$/i.test(handle.name) ? 'hwp' : 'hwpx';
-        const bytes = buildBytes(fmt);
+        if (!back()) return;
+        const built = await buildChecked(fmt);
+        if (built.loss) {
+          const pick = await askHwpLoss(built.loss);
+          if (pick !== 'hwp') { await dropEmptyPick(handle); return pick === 'hwpx' ? save(true, 'hwpx') : undefined; }
+        }
         const w = await handle.createWritable();
-        await w.write(bytes); await w.close();
-        cur.handle = handle;
-        cur.handleFromSave = true;
-        cur.format = fmt;
-        cur.name = handle.name.replace(/\.(hwpx|hwp)$/i, '');
+        await w.write(built.bytes); await w.close();
+        doc.handle = handle;
+        doc.handleFromSave = true;
+        doc.format = fmt;
+        doc.name = handle.name.replace(/\.(hwpx|hwp)$/i, '');
         return done(handle.name);
       }
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.warn('파일 직접 저장 실패, 내려받기로 저장', err);
     }
-    let bytes;
-    try { bytes = buildBytes(fmt); } catch (err) { return toast('저장하지 못했습니다: ' + err.message, true); }
-    cur.format = fmt;
-    download(bytes, safeName(cur.name) + '.' + fmt, fmt);
-    done(safeName(cur.name) + '.' + fmt + ' (내려받기 폴더)');
+    if (!back()) return;
+    let built;
+    try {
+      built = await buildChecked(fmt);
+      if (built.loss) {
+        const pick = await askHwpLoss(built.loss);
+        if (pick === 'hwpx') { fmt = 'hwpx'; if (!back()) return; built = await buildChecked(fmt); }
+        else if (pick !== 'hwp') return;
+      }
+    } catch (err) { return toast('저장하지 못했습니다: ' + err.message, true); }
+    doc.format = fmt;
+    download(built.bytes, safeName(doc.name) + '.' + fmt, fmt);
+    done(safeName(doc.name) + '.' + fmt + ' (내려받기 폴더)');
   }
   const safeName = n => (n || '문서').trim().replace(/[\\/:*?"<>|]/g, '_');
   function download(bytes, name, fmt) {
@@ -2457,7 +2545,8 @@
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
   // =============== 기금관리(fund.html) 직접 연결 브리지 ===============
-  let fundCtx = null;
+  // 기금 연결 정보는 «그 서식을 연 문서(탭)» 에 붙인다 (doc.fundCtx) — 창 하나에 하나만 두면 다른 탭·빈 문서가
+  //  «기금관리에 반영» 으로 그 기금 서식을 덮어쓴다 (2026-11-20 점검). 띠도 지금 탭의 연결만 보여 준다.
   function _b64ToBytes(b64) {
     const bin = atob(String(b64 || ''));
     const out = new Uint8Array(bin.length);
@@ -2472,6 +2561,7 @@
   }
   function _renderFundBridgeBar() {
     let wrap = $('fundBridgeBar');
+    const fundCtx = cur && cur.fundCtx;
     if (!fundCtx) { if (wrap) wrap.remove(); return; }
     if (!wrap) {
       wrap = h('div', { id: 'fundBridgeBar', style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginRight: '8px', padding: '2px 8px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '6px', fontSize: '12px' } });
@@ -2492,7 +2582,8 @@
     );
   }
   function saveToFund() {
-    if (!cur || !fundCtx) return toast('연결된 기금 서식 정보가 없습니다.', true);
+    const fundCtx = cur && cur.fundCtx;
+    if (!fundCtx) return toast('연결된 기금 서식 정보가 없습니다.', true);
     commit();
     let hwpxB64 = '';
     try { hwpxB64 = _bytesToB64(buildBytes()); } catch (e) { console.warn('HWPX 빌드 경고', e); }
@@ -2506,7 +2597,12 @@
       hwpxB64,
       savedAt: Date.now()
     };
-    try { localStorage.setItem('pureun_hangul_save', JSON.stringify(msg)); } catch (e) {}
+    // 저장소 쪽지는 기금관리 창의 storage 사건으로만 받는다 — 문서 전문이 남지 않게 잠시 뒤 치운다(내가 쓴 그대로일 때만)
+    try {
+      const json = JSON.stringify(msg);
+      localStorage.setItem('pureun_hangul_save', json);
+      setTimeout(() => { try { if (localStorage.getItem('pureun_hangul_save') === json) localStorage.removeItem('pureun_hangul_save'); } catch (e) {} }, 5000);
+    } catch (e) {}
     // 문서 전문이 담긴 메시지 — 같은 사이트(기금관리를 연 창)에게만 보낸다. file:// 처럼 출처가 «null» 이면 주소로 못 지정하므로 '*' 로 둔다.
     try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, location.origin && location.origin !== 'null' ? location.origin : '*'); } catch (e) {}
     try { if (typeof BroadcastChannel !== 'undefined') new BroadcastChannel('pureun_hangul_channel').postMessage(msg); } catch (e) {}
@@ -2514,11 +2610,17 @@
     toast(`'${fundCtx.label || cur.name}' 편집 내용을 기금관리에 반영했습니다.`);
   }
   const _seenBridgeIds = new Set();
+  // 같은 쪽지를 두 번 열지 않는다 — 기금관리는 같은 서식을 저장소 1번 + 메시지·채널 2번씩 보낸다(bridgeId 없이).
+  //  bridgeId 가 없으면 보낸 때(sentAt)·기금·서식으로 같은 쪽지인지 본다 (한 번 눌렀는데 탭 5개가 열리던 것, 2026-11-20 점검)
+  const _bridgeKey = p => p.bridgeId ? 'b:' + p.bridgeId : p.sentAt ? ['s', p.sentAt, p.fundId || '', p.kind || '', p.label || p.name || ''].join(':') : '';
   async function loadFromFundPayload(p) {
     if (!p || typeof p !== 'object') return;
+    const key = _bridgeKey(p);
+    if (key) {
+      if (_seenBridgeIds.has(key)) return;
+      _seenBridgeIds.add(key);
+    }
     if (p.bridgeId) {
-      if (_seenBridgeIds.has(p.bridgeId)) return;
-      _seenBridgeIds.add(p.bridgeId);
       const isHarassBridge = String(p.bridgeId).indexOf('harass_') === 0;
       try {
         if (window.opener && !window.opener.closed) {
@@ -2535,27 +2637,29 @@
         } catch (e) {}
       }
     }
-    fundCtx = p.fundId ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
-    _renderFundBridgeBar();
+    const ctx = p.fundId ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
     const srcLabel = p.sourceLabel || '기금관리';
     const docName = (p.name || p.label || '서식문서').replace(/\.(hwpx|hwp|hwt)$/i, '');
+    let opened = null;
     if (p.b64) {
       try {
         const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
         const bytes = _b64ToBytes(p.b64);
         const file = new File([bytes], docName + '.' + ext, { type: ext === 'hwp' ? 'application/x-hwp' : 'application/hwp+zip' });
-        await openBlob(file, null);
-        return;
+        opened = await openBlob(file, null); // 못 열면 null — 함께 온 HTML 로 대신 연다
       } catch (e) {
         console.warn('HWP/HWPX 열기 폴백(HTML):', e);
       }
     }
-    if (p.html) {
+    if (!opened && p.html) {
       const pg = Hx.defaultPage();
       if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
-      addDoc({ name: docName, html: p.html, page: pg, pristine: false });
+      opened = addDoc({ name: docName, html: p.html, page: pg, pristine: false });
       toast(`${srcLabel}에서 '${docName}' 서식을 불러왔습니다.`);
     }
+    // 연결은 «실제로 열린 그 문서» 에만 — 못 열었으면 아무 탭에도 붙이지 않는다
+    if (opened && ctx) opened.fundCtx = ctx;
+    _renderFundBridgeBar();
   }
   const _initSp = new URLSearchParams(location.search);
   const fromParam = _initSp.get('from') || '';

@@ -135,7 +135,17 @@
   };
 
   const changed = () => { cachedChars = -1; E.onChange && E.onChange(); };
-  function onInput() { lastEdit = Date.now(); normalizeRoot(); queueLayout(); changed(); }
+  function onInput(e) { lastEdit = Date.now(); if (e && e.inputType === 'insertParagraph') dropCopiedBreaks(); normalizeRoot(); queueLayout(); changed(); }
+  // Enter 로 문단을 나누면 브라우저가 속성까지 복제한다 — 쪽·단 나누기(data-pb·data-cb)는 «앞» 문단에만 남긴다
+  //  (그대로 두면 Enter 칠 때마다 새 쪽·새 단이 생겼다, 2026-11-20 점검)
+  function dropCopiedBreaks() {
+    const b = E.currentBlock();
+    if (!b) return;
+    let p = b.previousElementSibling;
+    while (p && p.classList.contains('pg-gap')) p = p.previousElementSibling;
+    if (!p || !p.dataset) return;
+    for (const k of ['pb', 'cb']) if (b.dataset[k] && p.dataset[k]) delete b.dataset[k];
+  }
 
   // ---------- 선택 영역 ----------
   E.focus = () => doc.focus();
