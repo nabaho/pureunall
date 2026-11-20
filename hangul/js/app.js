@@ -210,7 +210,7 @@
       if (typeof x.text === 'string') n.chars += x.text.replace(/\s/g, '').length;
       for (const k of ['image', 'img']) { const v = x[k]; if (v && typeof v === 'object' && (v.data || v.src)) n.images++; }
       const tag = typeof x.tag === 'string' ? x.tag.split(':').pop() : '';
-      if (/^(rect|ellipse|line|arc|polygon|curve|pic|container|ole|equation|textart)$/.test(tag)) n.shapes[tag] = (n.shapes[tag] || 0) + 1;
+      if (/^(rect|ellipse|line|arc|polygon|curve|pic|container|ole|equation|textart|connectLine)$/.test(tag)) n.shapes[tag] = (n.shapes[tag] || 0) + 1;
       for (const k in x) walk(x[k]);
     };
     for (const k of ['blocks', 'header', 'footer', 'masterPages']) walk(m && m[k]);
