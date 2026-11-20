@@ -281,7 +281,8 @@
           const built = await buildChecked(hFmt);
           if (built.loss) {
             const pick = await askHwpLoss(built.loss);
-            if (pick === 'hwpx') return save(true, 'hwpx');
+            // 묻는 창이 떠 있던 사이 탭이 바뀌었어도 이 문서로 돌아와 새 저장 창을 연다
+            if (pick === 'hwpx') return back() ? save(true, 'hwpx') : undefined;
             if (pick !== 'hwp') return;
           }
           const w = await doc.handle.createWritable();
@@ -300,7 +301,7 @@
         const built = await buildChecked(fmt);
         if (built.loss) {
           const pick = await askHwpLoss(built.loss);
-          if (pick !== 'hwp') { await dropEmptyPick(handle); return pick === 'hwpx' ? save(true, 'hwpx') : undefined; }
+          if (pick !== 'hwp') { await dropEmptyPick(handle); return pick === 'hwpx' && back() ? save(true, 'hwpx') : undefined; }
         }
         const w = await handle.createWritable();
         await w.write(built.bytes); await w.close();

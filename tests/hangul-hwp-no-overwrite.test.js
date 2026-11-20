@@ -29,7 +29,7 @@ function mkHandle(name) {
 // 2026-11-20: save 는 «누른 문서(doc)» 를 붙잡고, 저장할 바이트를 buildChecked(fmt) 로 만든다(.hwp 면 다시 읽어 빠진 것 loss 도 셈).
 //  loss 가 있으면 askHwpLoss 로 묻는다 — 'hwpx'(새 저장 창) · 'hwp'(그래도) · null(취소).
 //  가짜 환경: cur 는 save 와 같은 자리의 let 이라 activate 가 바꿀 수 있다(탭 바뀜 흉내).
-function harness({ cur, picker, pickerOk = true, loss = null, answer = null, onPick = null }) {
+function harness({ cur, picker, pickerOk = true, loss = null, answer = null, onPick = null, onAsk = null }) {
   const log = { picked: [], toasts: [], downloads: [], built: [], asked: [], dropped: [], activated: [] };
   const win = {};
   const env = {};
@@ -42,7 +42,7 @@ function harness({ cur, picker, pickerOk = true, loss = null, answer = null, onP
     Object.assign(env, { first: cur }), () => false, docs, () => {}, { title: '' }, (m, bad) => log.toasts.push({ m, bad }), win, showSaveFilePicker,
     { id: 'hwp' }, { id: 'hwpx' }, n => n, (bytes, name, fmt) => log.downloads.push({ name, fmt, bytes: Array.from(bytes) }),
     async fmt => { log.built.push({ fmt, doc: env.api.getCur() }); return { bytes: new Uint8Array([fmt === 'hwp' ? 1 : 2]), loss: fmt === 'hwp' ? loss : null }; },
-    async l => { log.asked.push(l); return answer; }, async h => { log.dropped.push(h); }, log);
+    async l => { log.asked.push(l); if (onAsk) onAsk(env); return answer; }, async h => { log.dropped.push(h); }, log);
   env.api = made;
   env.docs = docs;
   return { save: made.save, log, env };
@@ -160,6 +160,20 @@ test('★★ 저장 창을 못 쓰는 브라우저에서도 빠지면 묻고, «
   assert.strictEqual(log.downloads.length, 1);
   assert.match(log.downloads[0].name, /\.hwpx$/);
   assert.deepStrictEqual(log.downloads[0].bytes, [2]);
+});
+
+test('★★ «빠집니다» 묻는 창이 떠 있는 사이 탭이 바뀌어도 «.hwpx 로 저장» 은 처음 문서를 저장한다', async () => {
+  const A = { name: '문서A', format: 'hwpx', handle: null, dirty: true };
+  const B = { name: '문서B', format: 'hwpx', handle: null, dirty: true };
+  const hwpA = mkHandle('문서A.hwp'), xA = mkHandle('문서A.hwpx');
+  const { save, log } = harness({ cur: A, loss: LOSS, answer: 'hwpx', picker: (o, n) => (n === 1 ? hwpA : xA), onAsk: e => { e.docs.push(B); e.api.setCur(B); } });
+  await save(true, 'hwp');
+  assert.strictEqual(log.picked.length, 2);
+  assert.match(log.picked[1].suggestedName, /^문서A\.hwpx$/, '두 번째 저장 창이 바뀐 탭(문서B) 이름을 제안했습니다');
+  assert.deepStrictEqual(log.built.map(b => b.doc.name), ['문서A', '문서A'], '바뀐 탭의 내용을 저장했습니다');
+  assert.strictEqual(A.handle, xA);
+  assert.strictEqual(B.handle, null);
+  assert.strictEqual(B.dirty, true);
 });
 
 test('★★★ 저장 창이 떠 있는 사이 다른 탭이 앞에 와도 «저장을 누른 문서» 를 저장한다', async () => {
