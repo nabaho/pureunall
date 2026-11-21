@@ -48,7 +48,7 @@
 <!-- ?v= 는 등록 층을 고칠 때 올린다 — 캐시에 묵으면 고친 안내가 안 보인다. -->
 <script src="js/pu-quote-detect.js?v=5"></script>
 <script src="js/pu-doc-pick.js?v=2"></script>
-<script src="js/pu-doc-file.js?v=44"></script>
+<script src="js/pu-doc-file.js?v=45"></script>
 <script src="js/pu-drag.js?v=2"></script>
 <script src="js/pu-billing.js?v=13"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -17038,6 +17038,7 @@ function autoSendContractToErp(id, yearHint, job) {
   const read = (it && it.meta && it.meta.read) || (job && job._read);
   if (!read || read.error || read.kind !== 'contract') return Promise.resolve();
   if (read.filedCtReq && read.filedCtReq.at) return Promise.resolve();
+  if (read.skippedCtReq && read.skippedCtReq.at) return Promise.resolve();   /* 종료·해지 통보로 걸러진 서류 — 다시 안 본다 */
   const f = readFields(read);
   const mailMeta = (it && it.meta && it.meta.mail) || (job && job.meta && job.meta.mail) || null;
   const year = yearHint || (it && it.meta && it.meta.__year) || gridYear;
@@ -17051,6 +17052,14 @@ function autoSendContractToErp(id, yearHint, job) {
     bizNoOk: read.bizNoOk,
     mailMeta: mailMeta
   }).then(function (res) {
+    if (res && !res.ok && res.reason === 'terminated_mail') {
+      /* 종료·해지 «통보» 서류 — 계약 요청을 안 만들었다. 도장을 찍어 두어야 아래 따라잡기(mailContractSweep 의 앞 5건)가
+         영영 «아직 안 보낸 것»으로 이것을 집어 정상 계약서가 뒤로 밀리지 않는다. 사진·판독값은 그대로 둔다. */
+      const skipped = Object.assign({}, read, { skippedCtReq: { at: Date.now(), reason: 'terminated_mail' } });
+      if (it && it.meta) it.meta = Object.assign({}, it.meta, { read: skipped });
+      if (job) job._read = skipped;
+      return PuPhotoStore.saveRead(year, id, skipped, owner);
+    }
     if (!res || !res.ok) return;
     const stamped = Object.assign({}, read, {
       filedCtReq: { at: Date.now(), id: res.id, targetStatus: res.targetStatus || 'signed' }
@@ -17088,7 +17097,7 @@ function mailContractSweep() {
       const d = it && it.meta && it.meta.doc;
       if (d && d.page && d.page > 1) return false;
       const r = it && it.meta && it.meta.read;
-      return !!(r && !r.error && r.kind === 'contract' && (!r.filedCtReq || !r.filedCtReq.at) && (it.meta.via === 'mail' || it.meta.mail));
+      return !!(r && !r.error && r.kind === 'contract' && (!r.filedCtReq || !r.filedCtReq.at) && (!r.skippedCtReq || !r.skippedCtReq.at) && (it.meta.via === 'mail' || it.meta.mail));
     }).slice(0, 5);
     return unfiled.reduce(function (ch, it) {
       return ch.then(function () { return autoSendContractToErp(it.id, photoYearOf(it.id), null); });
