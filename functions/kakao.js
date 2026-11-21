@@ -136,30 +136,42 @@ function originIdxOfNonce(nonce) {
   const n = String(nonce || "");
   return (n.length === 34 && /^o\d/.test(n)) ? Number(n.charAt(1)) : 0;
 }
-/* state 발급 때는 DB 에 쓰지 않는다 — 공개 로그인 단추를 자동 호출해 빈 표를 무한히
-   쌓는 공격을 막는다. 서버 비밀값으로 서명하고, 실제 code 교환 때만 「사용함」 한 줄을
-   transaction 으로 만든다. 같은 state 를 두 요청이 동시에 보내도 첫 요청만 성공한다.
-   돌려주는 값: 실패면 false, 성공이면 { originIdx } (돌아올 주소를 다시 만드는 데 쓴다).
-   ★ 출처 번호가 없는 옛 꼴(이 배포 전에 발급돼 10분 안에 돌아오는 것)도 받는다 → 옛 출처(0). */
-async function takeState(state, mode, secret) {
+/* state 형식·HMAC 서명·만료·출처 번호를 동기 검증한다(DB 호출 없음).
+   실패하면 null, 성공하면 { raw, originIdx } 를 돌려준다. */
+function verifyStateFormatAndSig(state, mode, secret) {
   const raw = String(state || "");
   const parts = raw.split(".");
   if (parts.length !== 4 || parts[0] !== mode || !/^\d{13}$/.test(parts[1])
-      || !/^[A-Za-z0-9_-]{30,40}$/.test(parts[2]) || !/^[A-Za-z0-9_-]{40,50}$/.test(parts[3]) || !secret) return false;
+      || !/^[A-Za-z0-9_-]{30,40}$/.test(parts[2]) || !/^[A-Za-z0-9_-]{40,50}$/.test(parts[3]) || !secret) return null;
   const payload = parts.slice(0, 3).join(".");
   /* ★ 서명은 «글자 그대로» 견준다 (2026-11-15 보안 검토 중간 1).
      풀어 낸 바이트로 견주면 마지막 글자의 쓰지 않는 비트만 바꾼 «다른 글자»도 통과하는데,
      「한 번 씀」 기록은 원문 글자로 매기므로 같은 서명을 한 번 더 쓸 수 있었다. 정규 인코딩 하나만 받는다. */
   const expected = Buffer.from(crypto.createHmac("sha256", secret).update(payload).digest("base64url"));
   const got = Buffer.from(String(parts[3]));
-  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return false;
+  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return null;
   const age = Date.now() - Number(parts[1]);
-  if (age < 0 || age > STATE_TTL_MS) return false;
+  if (age < 0 || age > STATE_TTL_MS) return null;
   const originIdx = originIdxOfNonce(parts[2]);
-  if (!ERP_ORIGINS_LIB.ERP_ORIGINS[originIdx]) return false;
+  if (!ERP_ORIGINS_LIB.ERP_ORIGINS[originIdx]) return null;
+  return { raw, originIdx };
+}
+/* 서명 검증을 통과한 state 를 DB 에 1회 사용으로 기록한다 — 동시 요청도 첫 요청만 성공. */
+async function consumeState(raw) {
   const ref = getRawDatabase().ref(DB_STATE + "/" + stateKey(raw));
   const result = await ref.transaction((cur) => cur ? undefined : { at: Date.now() }, undefined, false);
-  return (result && result.committed === true) ? { originIdx } : false;
+  return !!(result && result.committed === true);
+}
+/* state 발급 때는 DB 에 쓰지 않는다 — 공개 로그인 단추를 자동 호출해 빈 표를 무한히
+   쌓는 공격을 막는다. 서버 비밀값으로 서명하고, 실제 code 교환 때만 「사용함」 한 줄을
+   transaction 으로 만든다. 같은 state 를 두 요청이 동시에 보내도 첫 요청만 성공한다.
+   돌려주는 값: 실패면 false, 성공이면 { originIdx } (돌아올 주소를 다시 만드는 데 쓴다).
+   ★ 출처 번호가 없는 옛 꼴(이 배포 전에 발급돼 10분 안에 돌아오는 것)도 받는다 → 옛 출처(0). */
+async function takeState(state, mode, secret) {
+  const parsed = verifyStateFormatAndSig(state, mode, secret);
+  if (!parsed) return false;
+  const ok = await consumeState(parsed.raw);
+  return ok ? { originIdx: parsed.originIdx } : false;
 }
 
 async function acquireLinkLock(uid) {
@@ -280,7 +292,7 @@ async function kakaoIdFromCode(code, restKey, clientSecret, redirectUri) {
      화면을 다시 배포하지 않고 서버 비밀값만 바꾸면 되게. */
 exports.kakaoAuthUrl = functions
   .region(REGION)
-  .runWith({ secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
+  .runWith({ memory: "512MB", secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
@@ -426,7 +438,7 @@ exports.kakaoUnlink = functions.region(REGION).https.onRequest(async (req, res) 
 /* ── ④ 카카오로 로그인 — 통과하면 「그 사람 계정」으로 들어갈 표를 준다 ──────── */
 exports.kakaoLoginFinish = functions
   .region(REGION)
-  .runWith({ secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
+  .runWith({ memory: "512MB", secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
   .https.onRequest(async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
@@ -446,15 +458,19 @@ exports.kakaoLoginFinish = functions
     if (!code) return bad(res, 400, "카카오 인가코드가 없습니다");
     const rk = restKeyOf(), cs = clientSecretOf();
     if (!rk || !cs) return bad(res, 500, KEY_BAD);
-    const took = await takeState(state, "login", cs);
-    if (!took) return bad(res, 400, "카카오 로그인 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
+    /* ① 형식·서명·만료는 동기 검증(0ms) — 잘못된 요청은 DB·카카오 모두 안 부른다. */
+    const parsed = verifyStateFormatAndSig(state, "login", cs);
+    if (!parsed) return bad(res, 400, "카카오 로그인 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
 
-    /* DB 연결을 카카오에 묻는 «동안» 맺는다 — 예전에는 카카오 답을 다 받은 뒤에야 시작했다 */
+    /* ② DB 연결을 먼저 열고 1회성 state 를 트랜잭션으로 확정 소비한 «뒤» 카카오 인가코드를
+       교환한다 — 중복 요청이 동시에 도달해도 패배 요청이 1회용 code 를 먼저 소모하지 못한다. */
     const t0 = Date.now();
     getRawDatabase().ref("uid_roles/_warm").once("value").catch(() => null);
+    const consumed = await consumeState(parsed.raw);
+    if (!consumed) return bad(res, 400, "카카오 로그인 요청이 만료됐거나 이미 사용됐습니다 — 다시 눌러 주세요");
     let kakaoId;
     try {
-      kakaoId = await kakaoIdFromCode(code, rk, cs, redirectUriAt(took.originIdx));
+      kakaoId = await kakaoIdFromCode(code, rk, cs, redirectUriAt(parsed.originIdx));
     } catch (e) {
       return bad(res, 400, String((e && e.message) || e));
     }
