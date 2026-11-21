@@ -27,7 +27,6 @@ const 허용 = {
   'tools/remember-ext/bg.js': [1, '이미 옛 주소로 열어 둔 받는 화면 탭도 찾는 목록(INTAKE_ANY) — 2027-02-15 무렵 옛 출처와 함께 뺀다'],
   'tools/remember-ext/manifest.json': [2, '옛 주소로 열린 받는 화면 탭에도 붙는 권한·내용 스크립트 — 2027-02-15 무렵 뺀다'],
   'tools/phone-mirror.js': [1, '폰 크롬에서 푸른 탭을 못 찾을 때의 안내 글 — 두 주소 모두 받는다고 알려 준다'],
-  'pu-news.html': [3, '소식지 그림 주소 안내·예시 — 옛 주소 그림도 지난 회차 때문에 계속 받는다'],
   'js/pu-news-show.js': [1, '소식지 웹보기 그림 허용 목록 — 지난 회차 옛 주소 그림'],
   'js/pu-news-tpl.js': [1, '소식지 틀 그림 허용 목록 — 지난 회차 옛 주소 그림'],
   'functions/news-lib/pu-news-show.js': [1, 'js/pu-news-show.js 의 사본(sync-news-lib)'],

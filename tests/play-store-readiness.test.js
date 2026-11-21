@@ -285,3 +285,77 @@ test('스토어 그래픽 생성기와 설정 도우미가 정상 동작하고 �
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('Google Play 앱(TWA·WebView) 내부에서는 외부 APK 다운로드 링크를 숨기고 배포 게이트가 정책·미인증 파일을 통제한다', () => {
+  const vm = require('node:vm');
+  const erp = readUtf8('pu-erp.html');
+  const enter = readUtf8('enter.html');
+  const deployYml = readUtf8('.github/workflows/deploy-pages.yml');
+
+  // 1. enter.html 에서 TWA 진입 세션을 sessionStorage('pu_play_twa')에 기록한다
+  assert.match(enter, /android-app:\/\/kr\.pureun\.portal/, 'enter.html 에 Play TWA referrer 감지가 있어야 합니다');
+  assert.match(enter, /sessionStorage\.setItem\(['"]pu_play_twa['"]/, 'enter.html 에 pu_play_twa 세션 저장이 있어야 합니다');
+
+  // 2. pu-erp.html hanaApkBlock() 이 Play 앱 환경(TWA referrer·세션·Android WebView)에서 .apk 링크를 노출하지 않는다
+  function cutBlock(src, header) {
+    const i = src.indexOf(header);
+    assert.ok(i >= 0, '못 찾음: ' + header);
+    let d = 0;
+    for (let k = src.indexOf('{', i); k < src.length; k++) {
+      if (src[k] === '{') d++;
+      else if (src[k] === '}') { d--; if (d === 0) return src.slice(i, k + 1); }
+    }
+    throw new Error('닫는 괄호 없음: ' + header);
+  }
+  function hasApkLink(node) {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some(hasApkLink);
+    if (typeof node !== 'object') return false;
+    if (node.tag === 'a' && node.props && /hana-bridge\.apk/.test(String(node.props.href || ''))) return true;
+    return hasApkLink(node.kids);
+  }
+  function evalHanaBlock(env) {
+    const ctx = Object.assign({
+      HANA_APK_VER: '9.9.9',
+      location: { protocol: 'https:', origin: 'https://erp.pureunlabor.co.kr', pathname: '/pu-erp.html' },
+      h: (tag, props, ...kids) => ({ tag, props: props || {}, kids }),
+    }, env || {});
+    vm.createContext(ctx);
+    vm.runInContext(cutBlock(erp, 'function hanaApkUrl(){'), ctx);
+    vm.runInContext(cutBlock(erp, '  function hanaApkBlock(){'), ctx);
+    return ctx.hanaApkBlock();
+  }
+
+  assert.equal(
+    hasApkLink(evalHanaBlock({ document: { referrer: 'android-app://kr.pureun.portal/' } })),
+    false,
+    'TWA referrer 환경에서는 외부 APK 다운로드 링크를 숨겨야 합니다'
+  );
+  assert.equal(
+    hasApkLink(evalHanaBlock({ sessionStorage: { getItem: (k) => (k === 'pu_play_twa' ? '1' : null) } })),
+    false,
+    'TWA 세션(pu_play_twa=1)에서는 외부 APK 다운로드 링크를 숨겨야 합니다'
+  );
+  assert.equal(
+    hasApkLink(evalHanaBlock({ navigator: { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP1A; wv) AppleWebKit/537.36' } })),
+    false,
+    'Android WebView 폴백 환경에서는 외부 APK 다운로드 링크를 숨겨야 합니다'
+  );
+  assert.equal(
+    hasApkLink(evalHanaBlock({ navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0' } })),
+    true,
+    '일반 PC 브라우저에서는 기존 하나문자 APK 다운로드 링크가 유지되어야 합니다'
+  );
+
+  // 3. 배포 게이트가 Play 필수 정책 문서 3종을 유지하고 미인증 프로토타입(pu-payroll-mail-sync.html)을 제외한다
+  for (const keepPolicy of ['policy/privacy.html', 'policy/terms.html', 'policy/account-deletion.html']) {
+    assert.ok(deployYml.includes(keepPolicy), 'deploy-pages.yml keep 목록에 누락됨: ' + keepPolicy);
+  }
+  assert.match(deployYml, /test -f "\$pdoc" && test -s "\$pdoc"/, '정책 문서 3종은 비어 있지 않은 일반 파일인지 검증해야 합니다');
+  assert.match(deployYml, /rm -f --[^\n]*pu-payroll-mail-sync\.html/, '미인증 시안 파일이 배포 제외 목록에 있어야 합니다');
+  assert.match(deployYml, /for gone in[\s\S]*?pu-payroll-mail-sync\.html/, '미인증 시안 파일이 gone 검증 목록에 있어야 합니다');
+
+  // 4. 네이티브 TWA 딥링크(PortalLauncherActivity.java)에서 .apk 직접 경로를 차단한다
+  const launcherJava = readUtf8('android/portal-twa/app/src/main/java/kr/pureun/portal/PortalLauncherActivity.java');
+  assert.match(launcherJava, /endsWith\("\.apk"\)/, '네이티브 딥링크에서 .apk 경로를 차단해야 합니다');
+});
