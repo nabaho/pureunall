@@ -16,7 +16,12 @@
      ★ 원본은 바꾸지 않는다 — 올린 파일은 받은 바이트 그대로 창고(Storage edulib/{id}/{원래 이름})에 둔다.
        변환·압축·이름 바꾸기를 하지 않는다. 창고 규칙도 «새로 쓰기만», 지우기 금지다.
      ★ 원본이 어디 있나(store): cloud = 자료함 창고 · pc = 아직 PC 에만(목록만 먼저) · mail = 메일함 첨부(관리자만)
-     ★ 쓰는 자리(관문 강제 모드, PROGRAMS.edulib.writeContracts): edulib/items/{id} · edulib/notes/{itemId}/{id}
+     ★ 쓰는 자리(관문 강제 모드, PROGRAMS.edulib.writeContracts): edulib/items/{id} · edulib/notes/{itemId}/{id} · edulib/cats/{id}(사람이 더한 강의 종류)
+     ★ 2026-11-21 대표 「대시보드로 넣어달라. 이부분도 데시보드로 해달라. 그리고 새로운 강의가 생길수 있으니 + 추가기능도 만들어달라.
+       또한 메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」 → 대표 선택 «한 화면 대시보드»:
+       · 한눈에 — 종류 × 연도 표(종류를 줄로, 연도를 칸으로 · 옛날 해는 한 칸)라 옆으로 넘치지 않는다 · 끝에 «＋ 새 강의 종류» 카드
+       · 자료 — 종류별 카드 대시보드가 기본(«☰ 표»로 지금 표 그대로) · 줄마다 ☐ + 번호
+       · 메일에서 찾기 — 서버가 매일 보낸 메일의 강의자료를 넣은 상태(edulib/sweep, 서버만 쓴다)와 «지금 정리»
      ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 대표·관리자 화면에서만)
      ⚠ 재직 직원 모두 연다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만.
      ⚠ 메일 찾기는 관리자만 — 메일함(?view=mail)이 2026-09-23 부터 관리자 전용이라 그 뜻을 따른다.
@@ -87,13 +92,31 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .tag.mail{background:var(--card);color:var(--ink2);border:1px dashed var(--mute)}
 .tag.pii{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
 .tag.est{background:none;color:var(--mute);border:1px dashed var(--line2)}
+/* 종류 카드 — 단추 노릇 칸(role=button). 사람이 더한 종류는 점선 테두리 + ✎ · «＋ 새 강의 종류»는 점선 빈 카드 */
+.cat:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.cat.mine{border-style:dashed}
+.cat .ced{flex:0 0 auto;padding:0 6px;font-size:12px;line-height:18px;border-radius:6px}
+.cat.add{border:2px dashed var(--line2);background:var(--bg);color:var(--blue-d);font-weight:700;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.cat.add .ln{font-weight:400}
+.cat.add:hover{border-color:var(--blue);background:var(--blue-bg)}
+/* 종류 × 연도 — 칸 너비를 표 안에서 나눠 옆으로 넘치지 않는다(폰에서만 옆으로 민다) · 진할수록 많다 */
 .mx{overflow-x:auto}
-.mx table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
-.mx th,.mx td{border:1px solid var(--line);padding:4px 8px;white-space:nowrap;text-align:center}
+.mx table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%;table-layout:fixed}
+.mx col.mk{width:190px}
+.mx col.ms{width:56px}
+.mx th,.mx td{border:1px solid var(--line);padding:4px 4px;white-space:nowrap;text-align:center;overflow:hidden;text-overflow:ellipsis}
 .mx th{background:var(--bg);color:var(--ink2);font-weight:600}
+.mx th.mk{text-align:left;padding:4px 8px}
+.mx th.mk .one{display:flex;align-items:center;gap:6px;min-width:0}
+.mx th.mk .one>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .mx td.c{cursor:pointer}
-.mx td.c:hover{background:var(--blue-bg)}
+.mx td.h1{background:var(--blue-bg)}
+.mx td.h2{background:var(--blue-line)}
+.mx td.h3{background:var(--blue);color:#ffffff;font-weight:700}
+.mx td.c:hover{outline:2px solid var(--blue-d);outline-offset:-2px}
 .mx td.z{color:var(--mute)}
+.mx td.ms{font-weight:600}
+.mx tr.mt th,.mx tr.mt td{background:var(--bg);font-weight:600}
 
 /* ── 자료 목록 — 한 칸은 한 줄(넘치면 … + title 에 전문) ── */
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -125,6 +148,41 @@ table.lst td .one>.tag{flex:0 0 auto}
 [role=button]:focus-visible,button:focus-visible,.ttl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .ttl:hover{color:var(--blue-d);text-decoration:underline}
 .empty{padding:28px;text-align:center;color:var(--mute)}
+/* 보기 바꾸기 — ▦ 카드(기본) · ☰ 표 */
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;flex:0 0 auto}
+.seg button{border:0;border-radius:0;padding:4px 10px;background:var(--card);color:var(--ink2)}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:var(--blue);color:#ffffff}
+.idchip{display:inline-flex;align-items:center;gap:6px;padding:2px 4px 2px 10px;border-radius:14px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);font-size:12px;white-space:nowrap}
+/* ── 자료 카드 대시보드 — 묶음마다 카드 한 장, 줄은 한 줄(☐ · № · 강의일 · 제목 · 형식 · 상태 점) ── */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px;align-items:start}
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.gcard.legal{border-left:4px solid var(--blue)}
+.gcard.open{grid-column:1/-1}
+.gcard.add{border:2px dashed var(--line2);background:var(--bg);color:var(--blue-d);font-weight:700;min-height:64px;align-self:stretch}
+.gcard.add:hover{border-color:var(--blue);background:var(--blue-bg)}
+.gh{display:flex;align-items:center;gap:6px;min-width:0;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.gh .gn{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gh .tag,.gh .chip{flex:0 0 auto}
+.gh .gm{margin-left:auto;color:var(--mute);font-size:12px;white-space:nowrap;flex:0 0 auto}
+.gl{display:block}
+.gcard.open .gl{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));column-gap:18px}
+.gr{display:grid;grid-template-columns:22px 26px 80px minmax(0,1fr) 40px 10px;align-items:center;column-gap:6px;padding:3px 2px;border-radius:6px;min-width:0}
+.gr:hover{background:var(--bg)}
+.gr.picked{background:var(--blue-bg)}
+.gr .no{text-align:right;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+.gr .gd{font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gr .gd.est{color:var(--mute);font-style:italic;padding-right:2px}   /* 기운 글자 끝이 잘리지 않게 */
+.gr .ttl{font-weight:500}
+.gr .ge{color:var(--mute);font-size:11px;text-align:right;white-space:nowrap;overflow:hidden}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line2)}
+.dot.review{background:var(--amber-m)}
+.dot.ok{background:var(--green-m)}
+.dot.old{background:var(--mute)}
+.gmore{display:block;margin:6px auto 0}
+.chipb{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.sumx{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.sumx p{margin:2px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink2);white-space:pre-wrap;word-break:keep-all;max-height:160px;overflow:auto}
 .more{display:block;margin:10px auto}
 
 /* ── 넣기 ── */
@@ -201,6 +259,19 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
   .cat .nm .tag{display:none}   /* 폰에서는 왼쪽 파란 띠가 «법정»을 말한다(안내줄에 적어 둠) — 이름 자리를 남긴다 */
   .cat .nm .n{font-size:16px}
+  .cat.add .ln{display:none}
+  .mx col.mk{width:112px} .mx col.ms{width:40px}
+  .mx table{min-width:560px}
+  .cgrid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .gcard{padding:7px 8px}
+  .gcard.open .gl{display:block}
+  /* 폰 줄 — ☐ · № · 제목 · 강의일 · 상태 점(형식은 숨긴다). 칸 자리를 못 박는다(마크업 순서는 PC 와 같다) */
+  .gr{grid-template-columns:28px 24px minmax(0,1fr) auto 10px;padding:5px 2px}
+  .gr>*{grid-row:1}
+  .gr>input{grid-column:1} .gr .no{grid-column:2} .gr .ttl{grid-column:3} .gr .gd{grid-column:4} .gr .dot{grid-column:5}
+  .gr input[type=checkbox],.gh input[type=checkbox]{width:24px;height:24px}
+  .gr .ge{display:none}
+  .gh .gm{display:none}
   .filters input[type=search]{min-width:0;flex:1 1 100%}
   /* 거르개 — 자주 안 쓰는 것은 «⋯ 더» 안으로 */
   .filters .fx{display:none}
@@ -296,8 +367,8 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <main id="app" style="display:none">
   <section class="pane" id="pane-dash">
     <div class="kpis" id="kpis"></div>
-    <div class="card"><div class="bar"><div class="sec" style="margin:0">강의 종류별</div><span class="hint">왼쪽 파란 띠 = 법정 의무교육 · 누르면 그 종류만 목록으로</span></div><div class="cats" id="cats" style="margin-top:8px"></div></div>
-    <div class="card"><div class="bar"><div class="sec" style="margin:0">연도 × 종류</div><span class="hint">칸을 누르면 그 연도·종류만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
+    <div class="card"><div class="bar"><div class="sec" style="margin:0">강의 종류별</div><span class="hint">왼쪽 파란 띠 = 법정 의무교육 · 점선 = 직접 더한 종류 · 누르면 그 종류만 · 새 강의는 «＋ 새 강의 종류»</span></div><div class="cats" id="cats" style="margin-top:8px"></div></div>
+    <div class="card"><div class="bar"><div class="sec" style="margin:0">종류 × 연도</div><span class="hint">진할수록 많음 · 칸을 누르면 그 종류·연도만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
   </section>
 
   <section class="pane" id="pane-list">
@@ -314,6 +385,8 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
         <select id="fGroup" title="묶어 보기" aria-label="묶어 보기"><option value="cat">종류별로 묶기</option><option value="year">연도별로 묶기</option><option value="">묶지 않기</option></select>
         <label class="hint fx" style="white-space:nowrap"><input type="checkbox" id="fTrash"> 휴지통</label>
         <button class="sm fx" id="fClr">거르개 비우기</button>
+        <span class="idchip" id="fIds" style="display:none"></span>
+        <span class="seg" id="vSeg" role="group" aria-label="보기 바꾸기"><button type="button" data-view="card" title="종류별 카드로 보기" aria-pressed="true">▦<span class="wide-only"> 카드</span></button><button type="button" data-view="table" title="표로 보기" aria-pressed="false">☰<span class="wide-only"> 표</span></button></span>
       </div>
     </div>
     <div class="selbar" id="selbar">
@@ -358,6 +431,15 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
       <p class="hint" style="margin:6px 0 0">제목·첨부 이름에 강의·교육자료·교안 같은 말이 있는 메일을 찾습니다. 메일은 «읽음» 표시를 바꾸지 않고, 고른 첨부만 원본 그대로 자료함에 복사합니다(메일은 그대로 둡니다).
         지난 메일(옛 보관함)은 첨부 이름이 없어 제목으로만 찾습니다 — 가져올 때 첨부를 확인합니다. 관리자만 보이는 칸입니다.</p>
     </div>
+    <div class="card" id="mAutoCard">
+      <div class="bar"><div class="sec" style="margin:0">🤖 보낸 메일 자동 정리</div><span class="hint" id="mAutoSt">불러오는 중…</span><span class="sp"></span>
+        <select id="mAutoDays" aria-label="얼마나 지난 메일까지 정리할지"><option value="14">최근 14일</option><option value="30" selected>최근 30일</option><option value="90">최근 90일</option><option value="365">최근 1년</option></select>
+        <button id="mAutoRun" title="서버가 지금 바로 한 번 정리합니다(몇 분 걸릴 수 있습니다)">지금 정리</button></div>
+      <p class="hint" style="margin:6px 0 0">매일 19:30 에 서버가 보낸편지함·내게쓴편지함(그리고 우리가 보낸 것으로 확인되는 폴더의 메일)에서 강의자료 첨부를 찾아 원본 그대로 자료함에 넣고,
+        종류·강의일을 짐작하고, 문서의 목차·첫 글을 «자동 정리 내용»으로 적습니다. 모두 «검토 대기»로 들어갑니다 —
+        받은 메일, 명단·서명지 같은 이름, 주민번호 꼴이 보이는 문서, 이미 있는 같은 파일은 넣지 않습니다. 메일은 읽기만 합니다.</p>
+      <div id="mAutoList"></div>
+    </div>
     <div class="card flat" id="mCard" style="display:none">
       <div class="bar"><b id="mN"></b><span class="sp"></span><input type="search" id="mQ" placeholder="찾기" aria-label="찾은 메일 거르기" style="min-width:160px"><button class="pri" id="mImp">고른 첨부 가져오기</button></div>
       <div class="prog" id="mProg" style="display:none"><i></i></div>
@@ -376,7 +458,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=106"></script>
+<script src="js/pu-ontology.js?v=107"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 gate(createGateway enforce)로만 한다. -->
@@ -397,9 +479,9 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ PuGate.hide(); } };
 </script>
 <script src="js/pu-viewer-kind.js?v=1"></script>
-<script src="js/pu-edulib-classify.js?v=2"></script>
-<script src="js/pu-edulib-core.js?v=2"></script>
+<script src="js/pu-edulib-classify.js?v=3"></script>
+<script src="js/pu-edulib-core.js?v=3"></script>
 <script src="js/pu-edulib-preview.js?v=2"></script>
-<script src="js/pu-edulib-app.js?v=3"></script>
+<script src="js/pu-edulib-app.js?v=4"></script>
 </body>
 </html>

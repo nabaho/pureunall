@@ -8038,6 +8038,107 @@ exports.runMailContractSweep = functions
     }
   });
 
+/* 🎓 보낸 메일의 강의자료 → 강의자료 앱 자동 정리 (대표 지시 2026-11-21
+     「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
+   실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
+   매일 19:30 한 번(최근 14일) · 관리자는 강의자료 앱 «메일에서 찾기»의 [지금 정리](runEdulibMailSweep, 최대 400일).
+   ⚠ 메일함은 읽기만(withFolder readOnly) · 받은 메일은 안 넣는다 · 새 기록만(빈 자리일 때만) · AI 안 씀.
+   ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다) */
+const EdulibMailSweep = require("./edulib-mail-sweep");
+async function edulibSaveFile(path, buf, meta) {
+  const file = getStorage().bucket(PHOTO_BUCKET).file(path);
+  const token = crypto.randomUUID();
+  const name = String((meta && meta.name) || path.split("/").pop());
+  try {
+    /* 새로 쓰기만(ifGenerationMatch 0) — 창고 규칙(edulib/{id}/… «새로 쓰기만»)과 같은 뜻. 내려받기 토큰을 붙여 화면의 getDownloadURL 이 된다 */
+    await file.save(buf, { resumable: false, preconditionOpts: { ifGenerationMatch: 0 },
+      metadata: { contentType: (meta && meta.contentType) || "application/octet-stream",
+        contentDisposition: "attachment; filename*=UTF-8''" + encodeURIComponent(name),
+        metadata: { firebaseStorageDownloadTokens: token, originalName: name.slice(0, 500) } } });
+    return { existed: false };
+  } catch (e) {
+    if (Number(e && (e.code || e.status)) !== 412) throw e;
+    /* 같은 자리에 이미 있다 — 지난번에 원본만 올라가고 기록을 못 쓴 경우다. 크기가 같을 때만 이어 쓴다(덮어쓰지 않는다) */
+    const [m] = await file.getMetadata();
+    if (Number(m.size) !== buf.length) throw new Error("창고 같은 자리에 다른 파일이 있습니다");
+    if (!(m.metadata && m.metadata.firebaseStorageDownloadTokens)) await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    return { existed: true };
+  }
+}
+async function runEdulibMailSweepOnce(trigger, opts) {
+  const MS = require("./mail-sync");
+  return EdulibMailSweep.runSweep({
+    db: getDatabase(),
+    getSelfEmail: mailUserAsync,
+    download: (slug, uid, name, max) => MS.withFolder(MAIL_DEPS, slug, async (client) => {
+      const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+      if (!head) return { gone: true };
+      const parts = MS.pickParts(head.bodyStructure, null, 0);
+      /* 이름으로만 집는다 — 색인의 첨부 순서와 IMAP 조각 순서가 다를 수 있다(화면 «가져오기»와 같은 잣대) */
+      const a = parts.atts.find((x) => x.name === name) || parts.atts.find((x) => String(x.name || "").slice(0, 60) === String(name).slice(0, 60));
+      if (!a) return { gone: true };
+      if (Number(a.size || 0) > max) return { big: true };
+      const d = await client.download(String(uid), a.part, { uid: true });
+      const buf = await MS.drain(d.content, max);
+      return { name: a.name, mime: a.mime || "", buf };
+    }),
+    saveFile: edulibSaveFile,
+    pdfText: (buf) => require("./rules-collect-pdf").pdfText(buf),
+    log: (...a) => console.log(...a),
+  }, Object.assign({ trigger }, opts || {}));
+}
+async function acquireEdulibSweepLock(by) {
+  const now = Date.now();
+  const lockRef = getDatabase().ref("edulib/sweep/lock");
+  const tx = await lockRef.transaction((cur) => {
+    const c = (cur && typeof cur === "object") ? cur : {};
+    if (Number(c.runningUntil || 0) > now) return; /* 이미 도는 중 — 그만둔다 */
+    return { runningUntil: now + 9 * 60 * 1000, by: String(by || "schedule"), at: now };
+  });
+  if (!tx.committed) { const err = new Error("강의자료 메일 정리가 이미 돌고 있습니다. 잠시 뒤 다시 해 주세요."); err.status = 429; throw err; }
+  return async () => { try { await lockRef.update({ runningUntil: 0 }); } catch (_) { /* 다음 잠금이 시간으로 풀린다 */ } };
+}
+exports.edulibMailSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("30 19 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    let release = null;
+    try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); return null; }
+    try {
+      const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
+      console.log("edulibMailSweep", JSON.stringify({ added: r.added, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
+    } finally { if (release) await release(); }
+    return null;
+  });
+exports.runEdulibMailSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 받습니다." }); return; }
+    let staffRole;
+    try {
+      const caller = await requireStaff(req);
+      staffRole = await STAFF_GATE.assertActive(caller.uid);
+    } catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    /* 메일함은 관리자 전용(2026-09-23) — 강의자료 앱의 «메일에서 찾기» 칸도 관리자만 보인다 */
+    if (!(staffRole && staffRole.isAdmin)) { res.status(403).json({ ok: false, error: "관리자만 돌릴 수 있습니다." }); return; }
+    const b = (req.body && typeof req.body === "object") ? req.body : {};
+    let release = null;
+    try { release = await acquireEdulibSweepLock(staffRole.sid); } catch (e) { res.status(e.status || 429).json({ ok: false, error: String(e.message || e) }); return; }
+    try {
+      const days = Math.min(EdulibMailSweep.MAX_DAYS, Math.max(1, Number(b.days) || 30));
+      const r = await runEdulibMailSweepOnce("manual", { days, by: staffRole.sid, budgetMs: 7.5 * 60 * 1000 });
+      res.json({ ok: true, result: { added: r.added, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
+    } catch (e) {
+      console.error("runEdulibMailSweep", e && e.stack || e);
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+    } finally { if (release) await release(); }
+  });
+
 /* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
    ⚠ 실제 코드는 mail-gone.js 에 있다 — index.js 를 더 키우지 않기 위해서다.
    ⚠ 여기 한 줄을 안 적으면 밖에서 안 보인다(배포가 안 된다). mail-sync 와 같은 까닭. */
