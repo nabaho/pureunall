@@ -57,13 +57,19 @@ if ($AutoStart) {
 }
 
 if (-not $NoStart) {
-  # 이미 켜져 있으면 끄고 다시 켠다 — 옛 판단기가 옛 자리(2026-11-21 전 18765)를 계속 쥐고 있지 않게. 끄는 것은 laya_judge.py 를 돌리는 파이썬만.
-  $running = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like '*laya_judge.py*' }
-  if ($running) {
+  # 이미 켜져 있으면 끄고 다시 켠다 — 옛 판단기가 옛 자리(2026-11-21 전 18765)를 계속 쥐고 있지 않게.
+  # 끄는 것은 명령줄이 «이 폴더의 파이썬 칸 + 이 폴더의 laya_judge.py» 인 것만(다른 곳의 같은 이름 파일·다른 파이썬은 안 건드린다).
+  # 실행 파일 경로로 거르지 않는다 — 파이썬 칸의 pythonw 는 바탕 파이썬을 자식으로 띄우고, 자리를 쥔 것은 그 자식이다(명령줄은 같다).
+  $running = @(Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object {
+    $_.CommandLine -and $_.CommandLine.IndexOf($Venv, [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+    $_.CommandLine.IndexOf($Script, [StringComparison]::OrdinalIgnoreCase) -ge 0 })
+  if ($running.Count) {
     Write-Host '⑤ 켜져 있던 판단기를 끄고 새로 켜기'
     $running | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Seconds 1
   } else { Write-Host '⑤ 켜기' }
-  Start-Process -FilePath $Pyw -ArgumentList ('"' + $Script + '"') -WorkingDirectory $Dir -WindowStyle Hidden
+  $p = Start-Process -FilePath $Pyw -ArgumentList ('"' + $Script + '"') -WorkingDirectory $Dir -WindowStyle Hidden -PassThru
+  Start-Sleep -Seconds 3
+  if ($p.HasExited) { Write-Warning ('판단기가 켜지자마자 끝났습니다 — 기록을 보세요: ' + (Join-Path $Dir 'laya-judge.log')) }
 }
 Write-Host '끝 — 경력관리 «요청 메일» 화면에서 «🧠 Laya 의견 켜기»를 누르면 이 PC 의 판단기에게 묻습니다.'
