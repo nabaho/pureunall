@@ -148,10 +148,50 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="js/pu-health.js?v=7"></script>
 <script>
 /* 카카오 복귀 문서는 이미 인증 중이다. 버전 확인보다 먼저 표시하여 콜백 중 자동 새로고침을 막는다.
-   이 문서에서 인증을 마친 직후에도 자동 교체하지 않는다 — 포털→진행 화면→포털 왕복 방지. */
+   이 문서에서 인증을 마친 직후에도 자동 교체하지 않는다 — 포털→진행 화면→포털 왕복 방지.
+   ★ 또한 나머지 스크립트(16개)와 8,800줄 HTML을 파싱하기 전에 kakaoLoginFinish 서버 요청을
+     즉시 선제 발사해 파싱 시간과 서버 왕복 시간을 완전히 겹친다. */
 if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
   window.__kkReturning = true;
   window.__puKakaoReturnPage = true;
+  (function () {
+    try {
+      var sp = new URLSearchParams(location.search);
+      var code = sp.get('code') || '', st = sp.get('state') || '';
+      if (!code || sp.get('error') || !/^login\./.test(st) || typeof fetch !== 'function') return;
+      var matched = false;
+      try {
+        var r1 = sessionStorage.getItem('pu_kakao_state');
+        var o1 = r1 ? JSON.parse(r1) : null;
+        if (o1 && o1.mode === 'login' && o1.nonce === st) matched = true;
+      } catch (_) {}
+      if (!matched) {
+        try {
+          var r2 = localStorage.getItem('pu_kakao_state_bak');
+          var o2 = r2 ? JSON.parse(r2) : null;
+          if (o2 && o2.mode === 'login' && o2.nonce === st && (Date.now() - Number(o2.at || 0)) <= 600000) matched = true;
+        } catch (_) {}
+      }
+      if (!matched) return;
+      var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function () { ctl.abort(); }, 15000) : 0;
+      var promise = fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoLoginFinish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code, state: st }),
+        signal: ctl ? ctl.signal : undefined
+      }).catch(function (e) {
+        throw new Error(e && e.name === 'AbortError'
+          ? '카카오 서버 응답이 늦습니다 — 다시 시도해 주세요'
+          : ('서버에 닿지 못했습니다 [kakaoLoginFinish 연결실패' + (e && e.message ? ' · ' + e.message : '') + ']'));
+      }).then(function (r) {
+        return r.text().then(function (t) { return { status: r.status, text: t }; });
+      }).finally(function () { if (timer) clearTimeout(timer); });
+      /* 소비 전 실패해도 unhandledrejection 이 나지 않게 조용히 붙잡아 둔다(실제 에러는 loginFinish 에서 받는다). */
+      promise.catch(function () {});
+      window.__puKakaoEarlyLogin = { code: code, state: st, promise: promise };
+    } catch (_) {}
+  })();
 }
 </script>
 <script src="js/pu-version.js?v=12"></script>
@@ -159,9 +199,9 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
 <script src="js/pu-pw-policy.js?v=1"></script>
 <script src="js/pu-backup.js?v=3"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
-<script src="js/pu-kakao.js?v=8"></script>
+<script src="js/pu-kakao.js?v=9"></script>
 <script src="js/pu-billing.js?v=13"></script>
-<script src="js/kcareer-mailreq.js?v=4"></script>
+<script src="js/kcareer-mailreq.js?v=5"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -1396,7 +1436,7 @@ body.portal-mode #moreFab{display:flex;}
         kb.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
         kb.onclick=function(){ location.replace(location.pathname + '?v=' + Date.now()); };
         ks.appendChild(kb);
-      }, 25000);
+      }, 10000);
       return;
     }
     if(typeof firebase === 'undefined' || !firebase.auth){ s2.remove(); return; }
@@ -1410,7 +1450,7 @@ body.portal-mode #moreFab{display:flex;}
     /* 자동 제한시간으로 걷지 않는다. 인증이 40초 넘게 걸리는 폰에서 노란 로그인 화면이
        잠깐 보였다가 같은 계정으로 다시 들어가는 문제가 바로 이 제한시간 때문에 생겼다.
        실제 미로그인은 onAuthStateChanged가 즉시 걷고, SDK가 멎으면 위 단추로 직접 열 수 있다. */
-  }, kk ? 20000 : 8000);
+  }, kk ? 10000 : 8000);
 })();
 </script>
 <div class="mesh"></div>
@@ -1523,7 +1563,7 @@ body.portal-mode #moreFab{display:flex;}
         b.setAttribute('aria-expanded', 'false');
       })();
       </script>
-      <div class="err" id="errMsg"></div>
+      <div class="err" id="errMsg" role="alert" aria-live="assertive"></div>
       </form>
     </div>
     <!-- 지난번에 왜 풀렸나 — 다시 생기면 이 줄을 찍어 보내 주시면 원인을 바로 짚는다 -->
@@ -2680,6 +2720,8 @@ body.portal-mode #moreFab{display:flex;}
         if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
         else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); if(window._fastRestored){ window._fastRestored = false; enterPortal(user); } }
       } else if(_handled){
+        // 방금 signInWithCustomToken 등으로 로그인 완료된 직후 비동기 null 이 뒤늦게 도착한 경우 무시한다.
+        if(auth.currentUser && auth.currentUser.uid === _portalUid){ if(_portalReady) _rmBootSplash(); return; }
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
         // 실제 로그아웃 신호가 있으면 기다리지 않는다.
@@ -2711,6 +2753,8 @@ body.portal-mode #moreFab{display:flex;}
         try { var _lw=$('logoutWhy'), _lt=window.PuLogoutWhy?PuLogoutWhy.text():''; if(_lw&&_lt){ _lw.textContent=_lt; _lw.style.display=''; } } catch(_w){}
         // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
         try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
+        // 모바일 또는 카카오 사용 기기는 인가 주소도 미리 받아 두어 단추 클릭 시 0ms 로 즉시 이동한다.
+        try { if(!window.__kkReturning && window.PuKakao && PuKakao.prefetchLogin && (isMobile() || localStorage.getItem('pu_kakao_used') === '1')) PuKakao.prefetchLogin({ ask: !isMobile() }); } catch(_p){}
       }
   });
 
@@ -2757,11 +2801,21 @@ body.portal-mode #moreFab{display:flex;}
     clearTimeout(t._kkT);
     t._kkT = setTimeout(function(){ t.style.display = 'none'; }, ms || 4000);
   }
+  function kkResetBtn(){
+    _kkLoginStarting = false;
+    var btn = $('kkLoginBtn');
+    if(btn){ btn.disabled = false; btn.textContent = '💬 카카오로 로그인'; }
+  }
+  /* 모바일 브라우저에서 카카오 화면으로 갔다가 뒤로가기(bfcache)로 돌아오면
+     버튼이 비활성·이동 중 상태로 굳어 먹통이 되는 것을 막는다. */
+  window.addEventListener('pageshow', function(e){
+    if(e && e.persisted && !window.__kkReturning) kkResetBtn();
+  });
   function kkLogin(){
     if(_kkLoginStarting) return;   // 한 번 누른 요청이 끝나기 전 중복 이동을 만들지 않는다
     _kkLoginStarting = true;
     var btn = $('kkLoginBtn');
-    if(btn) btn.disabled = true;
+    if(btn){ btn.disabled = true; btn.textContent = '💬 카카오로 이동 중…'; }
     showErr('');
     /* 「이 기기에서 로그인 유지」 를 카카오도 따른다 (2026-09-29) — 전에는 무조건 유지(LOCAL)였다.
        ⚠ 여기서 고른 값을 «기록만» 해 둔다: 화면이 카카오로 떠났다 돌아오면 새 페이지라, 여기서 정한
@@ -2790,7 +2844,7 @@ body.portal-mode #moreFab{display:flex;}
       var restored = auth.currentUser;
       if(restored && restored.email && !_handled){ _handled = true; enterPortal(restored); return; }
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
-      if(btn) btn.disabled = false;
+      if(btn){ btn.disabled = false; btn.textContent = '💬 카카오로 로그인'; }
     });
   }
   /* 카카오가 돌려보낸 뒤 — 로그인 화면이든 포털이든, 뜨자마자 한 번 확인한다.
@@ -2851,6 +2905,7 @@ body.portal-mode #moreFab{display:flex;}
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
+        window._puAuthAt = Date.now();
         // 카카오 로그인 → 자동 로그아웃 3시간 (대표 지시 2026-11-18). 인증표의 kakao 표시로 다시 확인된다(js/pu-active.js).
         try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', PuActive.signInAt(cred.user)); } catch(_v){}
         try {
@@ -3475,6 +3530,15 @@ body.portal-mode #moreFab{display:flex;}
     var dir = location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1);
     if(to.origin !== location.origin || to.pathname.indexOf(dir) !== 0
        || !/\.html$/i.test(to.pathname) || /\/enter\.html$/i.test(to.pathname)) return false;
+    /* ★ 포털 ↔ 앱 무한 창 반복(핑퐁 루프) 차단 — 20초 안에 같은 앱으로 2번 이상 튕겨 돌아오면
+       앱으로 다시 보내지 않고 포털에 안전하게 멈춘다. */
+    try {
+      var loopKey = 'pu_return_loop', now = Date.now();
+      var prev = JSON.parse(sessionStorage.getItem(loopKey) || 'null');
+      var cnt = (prev && prev.to === to.pathname && (now - Number(prev.at || 0)) < 20000) ? (Number(prev.n || 0) + 1) : 1;
+      sessionStorage.setItem(loopKey, JSON.stringify({ to: to.pathname, n: cnt, at: now }));
+      if(cnt >= 2) return false;
+    } catch(_lp){}
     function go(){
       try { if(/^(pureun-|pu_)[\w-]+$/.test(String(t.name || ''))) window.name = t.name; } catch(e){}
       try { _loginGuard.cover(); } catch(e){}      // 떠나는 동안 로그인 화면이 비치지 않게

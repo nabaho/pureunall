@@ -3,7 +3,7 @@
 「laya 라는 프로그램 사용해서 설치하고 판단하는 기능 넣어서 만들어 달라」)
 
 무엇을 하나
-  경력관리 화면(kcareer.html)이 제목·첨부 이름을 http://127.0.0.1:18765/judge 로 보내면,
+  경력관리 화면(kcareer.html)이 제목·첨부 이름을 http://127.0.0.1:18766/judge 로 보내면,
   Laya(ConvAI Innovations 의 무료 판단 모델, Apache-2.0) 다국어 판으로 «이력·회의·비용인가 / 고객 업무인가»를 고르고
   {"v": "personal"|"work", "p": 업무일 확률} 만 돌려준다. 화면은 이것을 «의견»으로만 적는다(메일을 옮기지 않는다).
 
@@ -27,6 +27,7 @@
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
@@ -42,7 +43,9 @@ os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 HOST = "127.0.0.1"
-PORT = int(os.environ.get("PUREUN_LAYA_PORT", "18765"))          # js/kcareer-mailreq.js 의 LAYA_PORT 와 같다
+PORT = int(os.environ.get("PUREUN_LAYA_PORT", "18766"))          # js/kcareer-mailreq.js 의 LAYA_PORT 와 같다
+# ⚠ 18765 는 이 PC 의 «푸른 한글편집기» 실행 도우미 자리다(2026-11-08부터 · 편집기 자동 저장이 그 주소에 묶여 옮길 수 없다).
+#   2026-11-19 에 판단기를 같은 자리에 깔아 편집기가 켜지지 않았다 → 2026-11-21 판단기를 옮겼다.
 LAYA_VERSION = "0.4.37"                                            # install.ps1 이 까는 판
 MODEL_REVISION = "e333cb7c823cd1787276228260f56d02fbf5180b"        # 2026-11-19 에 실제 64건으로 재 본 모델 판(convaiinnovations/laya · multilingual)
 ERP_ORIGINS = ("https://nabaho.github.io", "https://erp.pureunlabor.co.kr")   # functions/erp-origins.js ERP_ORIGINS 와 같다
@@ -243,12 +246,29 @@ def download():
     print("모델을 받아 두었습니다 — 시험 판단: %s" % a.get("choice"))
 
 
+def make_server():
+    """자리를 «혼자» 쥔다. 기본 HTTP 서버는 SO_REUSEADDR 를 켜는데, 윈도우에서는 그러면 이미 다른 프로그램이 듣는 자리에도
+    소리 없이 묶여 버려 어느 쪽이 받을지 모르게 된다(2026-11-21 한글편집기와 겹친 까닭). 그래서 끄고, 윈도우에서는 독점으로 묶는다
+    — 자리가 이미 쓰이면 여기서 OSError 가 나 «켜지 못했습니다»로 알린다."""
+    httpd = ThreadingHTTPServer((HOST, PORT), Handler, bind_and_activate=False)
+    httpd.allow_reuse_address = False
+    if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+        httpd.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+    try:
+        httpd.server_bind()
+        httpd.server_activate()
+    except BaseException:
+        httpd.server_close()
+        raise
+    return httpd
+
+
 def main():
     if "--download" in sys.argv:
         download()
         return
     try:
-        httpd = ThreadingHTTPServer((HOST, PORT), Handler)
+        httpd = make_server()
     except OSError as e:
         log("켜지 못했습니다(이미 켜져 있을 수 있습니다) — %s" % e)
         print("이미 켜져 있거나 %d 번 자리를 다른 프로그램이 씁니다: %s" % (PORT, e), file=sys.stderr)

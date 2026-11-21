@@ -2379,6 +2379,7 @@
       workflowStyle: safeStyle,
       engineLabel: String(clean.engineLabel || (prev && prev.engineLabel) || 'P박스 하이브리드 엔진'),
       verification: safeVf,
+      hallucinationBlockedCount: Number(clean.hallucinationBlockedCount !== undefined ? clean.hallucinationBlockedCount : ((prev && prev.hallucinationBlockedCount) || 0)) || 0,
       attachedTitles: safeAttached,
       retrievedDocIds: safeRetrievedIds,
       history: safeHistory,
@@ -2616,7 +2617,8 @@
       ? searchRes.balancedDocs
       : searchRes.docs;
 
-    var reqStance = String(params.stance || 'neutral');
+    var rawReqStance = String(params.stance || 'neutral');
+    var reqStance = (rawReqStance === 'worker' || rawReqStance === 'employer') ? rawReqStance : 'neutral';
     var prompt = scrubText(E.buildRagPrompt({
       query: query,
       mode: params.mode || 'auto',
@@ -2642,16 +2644,33 @@
       }
     }
 
-    function finalizeWithVerification(answerText, engineLabel) {
+    function finalizeWithVerification(answerText, engineLabel, isCloudAi) {
       assertSameSession();
       var safeAnswer = scrubText(answerText);
       return preloadCitedLawsIfNeeded(safeAnswer, idxList, params.forceOffline === true).then(function () {
         assertSameSession();
-        var verification = E.verifyCitations(safeAnswer, {
-          docs: snapshotDocs,
-          loadedLaws: Array.from(mem.laws.values()),
-          lawIndex: idxList
-        });
+        var loadedNow = Array.from(mem.laws.values());
+        var verification;
+        var hallucinationBlockedCount = 0;
+        if (isCloudAi) {
+          if (!E || typeof E.enforceZeroHallucinationGuard !== 'function') {
+            throw new Error('할루시네이션 차단 관문 모듈이 로드되지 않아 클라우드 AI 응답을 안전하게 검증할 수 없습니다.');
+          }
+          var guard = E.enforceZeroHallucinationGuard(safeAnswer, {
+            docs: snapshotDocs,
+            loadedLaws: loadedNow,
+            lawIndex: idxList
+          });
+          safeAnswer = guard.text;
+          verification = guard.verification;
+          hallucinationBlockedCount = guard.blockedCount || 0;
+        } else {
+          verification = E.verifyCitations(safeAnswer, {
+            docs: snapshotDocs,
+            loadedLaws: loadedNow,
+            lawIndex: idxList
+          });
+        }
         var existingTh = params.threadId
           ? mem.threads.find(function (x) { return x.id === String(params.threadId); })
           : null;
@@ -2680,6 +2699,7 @@
           answer: safeAnswer,
           engineLabel: engineLabel,
           verification: verification,
+          hallucinationBlockedCount: hallucinationBlockedCount,
           attachedTitles: attached.map(function (a) { return a.title || a.caseNo; }),
           retrievedDocIds: ragDocs.slice(0, 8).map(function (d) { return d.id; }),
           history: prevHistory
@@ -2693,7 +2713,8 @@
         return {
           thread: saved,
           searchRes: searchRes,
-          verification: verification
+          verification: verification,
+          hallucinationBlockedCount: hallucinationBlockedCount
         };
       });
     }
@@ -2709,7 +2730,7 @@
         retrievedArticles: searchRes.articles,
         retrievedLawFamilies: searchRes.lawFamilies
       });
-      return finalizeWithVerification(offlineAns, '무료 내장 법률합성 엔진 (₩0 · 원문 기반)');
+      return finalizeWithVerification(offlineAns, '무료 내장 법률합성 엔진 (₩0 · 원문 기반)', false);
     }
 
     return global.PuAiCall.ask([{ text: prompt }], {
@@ -2721,7 +2742,7 @@
       assertSameSession();
       var txt = global.PuAiCall.textOf(reply);
       if (!txt) throw new Error('빈 응답');
-      return finalizeWithVerification(txt, '푸른 AI 대리인 + P박스 인용검증 (원문 RAG)');
+      return finalizeWithVerification(txt, '푸른 AI 대리인 + P박스 할루시네이션 차단관문 (원문 RAG)', true);
     }).catch(function (err) {
       if (err && err.staleSession) throw err;
       assertSameSession();
@@ -2738,7 +2759,7 @@
       var label = err && err.overBudget
         ? '무료 내장 법률합성 엔진 (월 AI 한도 보호 모드 · ₩0)'
         : '무료 내장 법률합성 엔진 (오프라인 자동전환 · ₩0)';
-      return finalizeWithVerification(fallbackAns, label);
+      return finalizeWithVerification(fallbackAns, label, false);
     });
   }
 

@@ -18,6 +18,13 @@ const R = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(R, 'hangul/js/app.js'), 'utf8').replace(/\r\n/g, '\n');
 const strip = s => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\n\s*\/\/[^\n]*/g, '\n');
 const CODE = strip(SRC);
+// 기밀 문서(괴롭힘 조사·P박스) 가림 도우미 — 떠서 돌리는 조각 앞에 함께 붙인다 (main 2026-11-21 «pbox» 연결)
+function privHelpers() {
+  const a = /const _isPrivateBridgeId = [\s\S]*?\n {2}\};\n/.exec(CODE);
+  const b = /const _isPrivateFrom = [^\n]*\n/.exec(CODE);
+  assert.ok(a && b, '기밀 문서 가림 도우미(_isPrivateBridgeId·_isPrivateFrom)를 못 찾았습니다');
+  return a[0] + b[0];
+}
 
 /* 진짜 DOM 처럼 «기준 노드가 내 자식이 아니면 던지는» 아주 작은 가짜 — 이 가짜가 옛 코드를 잡는지도 아래에서 확인한다 */
 function fakeDom({ withBox = true } = {}) {
@@ -75,7 +82,7 @@ test('★★★ «열기» 메시지는 같은 사이트가 보낸 것만 듣는
   let handler = null;
   const calls = [];
   // main 의 조사 문서 전용 팝업 확인(_initFrom·_initBid)이 같은 블록 안에서 쓰이므로 «일반 기금 창» 값으로 넣는다
-  new Function('window', 'location', 'loadFromFundPayload', '_initFrom', '_initBid', block)(
+  new Function('window', 'location', 'loadFromFundPayload', '_initFrom', '_initBid', privHelpers() + block)(
     { addEventListener: (t, f) => { if (t === 'message') handler = f; } },
     { origin: 'https://nabaho.github.io' },
     p => calls.push(p), '', '');
@@ -91,10 +98,10 @@ test('★★★ «열기» 메시지는 같은 사이트가 보낸 것만 듣는
 
 // ---------- 2026-11-20 점검: 연결은 «연 문서» 에만 · 같은 쪽지는 한 번만 · 못 열면 함께 온 HTML 로 ----------
 // loadFromFundPayload 를 떠서 가짜 openBlob·addDoc 로 돌린다
-function runLoad({ openOk = true } = {}) {
+function runLoad({ openOk = true, initFrom = '' } = {}) {
   const keyLine = /const _bridgeKey = [^\n]*\n/.exec(CODE);
   assert.ok(keyLine, '_bridgeKey 를 못 찾았습니다');
-  const code = keyLine[0] + cutFn(CODE, 'async function loadFromFundPayload(');
+  const code = keyLine[0] + privHelpers() + 'const _initFrom = ' + JSON.stringify(initFrom) + ';\n' + cutFn(CODE, 'async function loadFromFundPayload(');
   const log = { opened: [], added: [], bars: 0, toasts: [] };
   const fn = new Function('_seenBridgeIds', 'window', 'location', 'BroadcastChannel', 'openBlob', 'addDoc', '_renderFundBridgeBar', 'Hx', 'toast', '_b64ToBytes', 'File', 'console',
     code + '\nreturn loadFromFundPayload;')(
@@ -137,6 +144,26 @@ test('★★ 서식 파일(b64)을 못 열면 함께 온 HTML 로 대신 열고,
   await r2.load({ sentAt: 3, fundId: 'F3', format: 'hwpx', b64: 'AA==' });
   assert.strictEqual(r2.log.added.length, 0);
   assert.strictEqual(r2.log.opened[0].fundCtx, undefined, '못 연 문서에 연결이 붙었습니다');
+});
+
+test('★★★ 기밀 서면(P박스·괴롭힘 조사)은 못 열어도 HTML 로 대신 열지 않고, 열면 자동 저장 사본을 남기지 않는다', async () => {
+  // 서식 파일을 못 열었다 — 일반 서식이면 HTML 로 대신 열지만, 기밀 서면은 열지 않는다
+  for (const [bridgeId, initFrom] of [['pbox_1', 'pbox'], ['harass_1', 'harass'], ['x1', 'pbox']]) {
+    const r = runLoad({ openOk: false, initFrom });
+    await r.load({ bridgeId, format: 'hwpx', b64: 'AA==', html: '<p>x</p>' });
+    assert.strictEqual(r.log.added.length, 0, bridgeId + ': 기밀 서면을 HTML 로 대신 열었습니다');
+    assert.ok(r.log.toasts.length >= 1, bridgeId + ': 못 열었다고 알려야 합니다');
+  }
+  const ok = runLoad({ openOk: true, initFrom: 'pbox' });
+  await ok.load({ bridgeId: 'pbox_2', format: 'hwpx', b64: 'AA==' });
+  assert.strictEqual(ok.log.opened[0].noAutosave, true, '기밀 서면에 자동 저장 막음 표시가 없습니다');
+  // 일반 서식은 그대로 자동 저장 대상
+  const plain = runLoad({ openOk: true });
+  await plain.load({ sentAt: 9, format: 'hwpx', b64: 'AA==' });
+  assert.ok(!plain.log.opened[0].noAutosave, '일반 서식까지 자동 저장을 막았습니다');
+  // 자동 저장은 그 표시를 본다
+  const AS = strip(fs.readFileSync(path.join(R, 'hangul/js/autosave.js'), 'utf8').replace(/\r\n/g, '\n'));
+  assert.match(cutFn(AS, 'async function saveCurrent('), /d\.noAutosave/, '자동 저장이 기밀 서면 표시(noAutosave)를 보지 않습니다');
 });
 
 test('★★ «저장» 메시지(문서 전문)를 보낼 때 받는 쪽을 같은 사이트로 좁힌다 — 맨 \'*\' 만 쓰지 않는다', () => {

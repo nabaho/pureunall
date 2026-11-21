@@ -2614,6 +2614,11 @@
   // 같은 쪽지를 두 번 열지 않는다 — 기금관리는 같은 서식을 저장소 1번 + 메시지·채널 2번씩 보낸다(bridgeId 없이).
   //  bridgeId 가 없으면 보낸 때(sentAt)·기금·서식으로 같은 쪽지인지 본다 (한 번 눌렀는데 탭 5개가 열리던 것, 2026-11-20 점검)
   const _bridgeKey = p => p.bridgeId ? 'b:' + p.bridgeId : p.sentAt ? ['s', p.sentAt, p.fundId || '', p.kind || '', p.label || p.name || ''].join(':') : '';
+  const _isPrivateBridgeId = id => {
+    const s = String(id || '');
+    return s.indexOf('harass_') === 0 || s.indexOf('pbox_') === 0;
+  };
+  const _isPrivateFrom = f => (f === 'harass' || f === 'pbox');
   async function loadFromFundPayload(p) {
     if (!p || typeof p !== 'object') return;
     const key = _bridgeKey(p);
@@ -2622,13 +2627,13 @@
       _seenBridgeIds.add(key);
     }
     if (p.bridgeId) {
-      const isHarassBridge = String(p.bridgeId).indexOf('harass_') === 0;
+      const isPrivateBridge = _isPrivateBridgeId(p.bridgeId);
       try {
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage({ type: 'pureun_hangul_ack', bridgeId: p.bridgeId }, location.origin);
         }
       } catch (e) {}
-      if (!isHarassBridge) {
+      if (!isPrivateBridge) {
         try {
           if (typeof BroadcastChannel !== 'undefined') {
             const ackBc = new BroadcastChannel('pureun_hangul_channel');
@@ -2639,20 +2644,34 @@
       }
     }
     const ctx = p.fundId ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
+    const isPrivateDoc = _isPrivateBridgeId(p.bridgeId) || _isPrivateFrom(_initFrom);
     const srcLabel = p.sourceLabel || '기금관리';
     const docName = (p.name || p.label || '서식문서').replace(/\.(hwpx|hwp|hwt)$/i, '');
     let opened = null;
     if (p.b64) {
+      /* 기밀 브리지(harass/pbox)는 최대 15MB(base64 ~20M자) 및 HWPX/HWP 바이너리만 허용 */
+      if (isPrivateDoc && (typeof p.b64 !== 'string' || p.b64.length > 20 * 1024 * 1024)) {
+        toast('기밀 서면 크기 제한을 초과하여 열 수 없습니다.', true);
+        return;
+      }
       try {
         const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
         const bytes = _b64ToBytes(p.b64);
         const file = new File([bytes], docName + '.' + ext, { type: ext === 'hwp' ? 'application/x-hwp' : 'application/hwp+zip' });
-        opened = await openBlob(file, null); // 못 열면 null — 함께 온 HTML 로 대신 연다
+        opened = await openBlob(file, null); // 못 열면 null — 함께 온 HTML 로 대신 연다(기밀 서면은 대신 열지 않는다)
+        if (isPrivateDoc) {
+          if (!opened) { toast('기밀 서면(.hwpx)을 안전하게 열지 못했습니다.', true); return; }
+          opened.noAutosave = true; // 기밀 서면은 이 브라우저에 복구용 사본을 남기지 않는다
+        }
       } catch (e) {
+        if (isPrivateDoc) {
+          toast('기밀 서면(.hwpx)을 안전하게 열지 못했습니다.', true);
+          return;
+        }
         console.warn('HWP/HWPX 열기 폴백(HTML):', e);
       }
     }
-    if (!opened && p.html) {
+    if (!opened && p.html && !isPrivateDoc) {
       const pg = Hx.defaultPage();
       if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
       opened = addDoc({ name: docName, html: p.html, page: pg, pristine: false });
@@ -2670,10 +2689,10 @@
     const raw = localStorage.getItem('pureun_hangul_bridge');
     if (raw) {
       localStorage.removeItem('pureun_hangul_bridge');
-      /* 전용 조사 팝업(from=harass)은 opener postMessage + bid 검증 경로만 허용하고 공용 localStorage 잔류분은 무시 */
-      if (fromParam !== 'harass') {
+      /* 전용 기밀 팝업(from=harass, from=pbox)은 opener postMessage + bid 검증 경로만 허용하고 공용 localStorage 잔류분은 무시 */
+      if (!_isPrivateFrom(fromParam)) {
         const p = JSON.parse(raw);
-        if (p && String(p.bridgeId || '').indexOf('harass_') !== 0) {
+        if (p && !_isPrivateBridgeId(p.bridgeId)) {
           const freshMs = fromParam === 'jobtrans' ? 300000 : 60000;
           if (fromParam === 'fund' || Date.now() - (p.sentAt || 0) < freshMs) {
             setTimeout(() => loadFromFundPayload(p), 60);
@@ -2687,20 +2706,21 @@
     const d = e && e.data;
     if (!d || d.type !== 'pureun_hangul_open' || !d.payload) return;
     const pBid = String(d.payload.bridgeId || '');
-    if (pBid.indexOf('harass_') === 0 || _initFrom === 'harass') {
-      /* 기밀 조사문서는 반드시 해당 bid로 열린 전용 팝업만 opener로부터 수신(다른 탭 유출 원천 차단) */
-      if (_initFrom !== 'harass' || !_initBid || pBid !== _initBid) return;
+    if (_isPrivateBridgeId(pBid) || _isPrivateFrom(_initFrom)) {
+      /* 기밀 조사문서·P박스 의견서는 반드시 해당 bid로 열린 전용 팝업만 opener로부터 수신(다른 탭 유출 원천 차단) */
+      const expectedPrefix = _initFrom === 'pbox' ? 'pbox_' : 'harass_';
+      if (!_isPrivateFrom(_initFrom) || !_initBid || pBid !== _initBid || pBid.indexOf(expectedPrefix) !== 0) return;
       if (!window.opener || e.source !== window.opener) return;
     }
     loadFromFundPayload(d.payload);
   });
   try {
-    if (typeof BroadcastChannel !== 'undefined' && _initFrom !== 'harass') {
+    if (typeof BroadcastChannel !== 'undefined' && !_isPrivateFrom(_initFrom)) {
       const bc = new BroadcastChannel('pureun_hangul_channel');
       bc.onmessage = e => {
         const d = e && e.data;
         if (!d || d.type !== 'pureun_hangul_open' || !d.payload) return;
-        if (String(d.payload.bridgeId || '').indexOf('harass_') === 0) return;
+        if (_isPrivateBridgeId(d.payload.bridgeId)) return;
         loadFromFundPayload(d.payload);
       };
       if (_initFrom === 'jobtrans' || _initFrom === 'fund') {
@@ -2709,7 +2729,7 @@
     }
   } catch (e) {}
   try {
-    if ((_initFrom === 'jobtrans' || _initFrom === 'fund' || _initFrom === 'harass') && window.opener && !window.opener.closed) {
+    if ((_initFrom === 'jobtrans' || _initFrom === 'fund' || _isPrivateFrom(_initFrom)) && window.opener && !window.opener.closed) {
       window.opener.postMessage({ type: 'pureun_hangul_ready', from: _initFrom, bid: _initBid }, location.origin);
     }
   } catch (e) {}

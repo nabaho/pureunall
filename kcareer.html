@@ -1723,7 +1723,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=4"></script>
+<script src="js/kcareer-mailreq.js?v=5"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -1756,7 +1756,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script>
+  <script src="js/pu-authsync.js?v=7"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <script>
@@ -16061,7 +16061,7 @@ function mrScanNow(){ mrScan(false); }
      대표 판단과 맞는 비율(layaAgree)을 상태줄에 센다.
    ★ 이 기기에서 «켤 때만» 부른다(꺼짐이 기본, mrLocal 'laya') — 판단기가 없는 폰·다른 PC 에서 브라우저가 «이 기기의 다른 앱 접근» 허락을 묻지 않게.
    ⚠ 못 닿으면(판단기 꺼짐·응답 없음) 던지지 않고 10분 쉰다. (2026-11-15 의 Jev 단계는 부르지 않는다 — 애매한 건은 처음부터 걸러진다) */
-function mrLayaUrl(){ return 'http://127.0.0.1:'+((typeof KcareerMailReq!=='undefined' && KcareerMailReq.LAYA_PORT)||18765); }
+function mrLayaUrl(){ return 'http://127.0.0.1:'+((typeof KcareerMailReq!=='undefined' && KcareerMailReq.LAYA_PORT)||18766); }   /* 18765 는 이 PC 의 한글편집기 자리 — 판단기는 18766(2026-11-21) */
 function mrLayaOn(){ return mrLocal('laya')==='1'; }
 function mrLayaPaused(){ var t=Number(mrLocal('layaPause'))||0; return t>Date.now() ? t : 0; }
 async function mrLayaCall(list){

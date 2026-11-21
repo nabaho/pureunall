@@ -3454,7 +3454,7 @@
     var ctxLines = [];
     ctxLines.push('당신은 푸른노무법인의 법률·노무 AI 리서치 시스템 「P박스」입니다.');
     ctxLines.push('반드시 아래 [제공된 검증 원문 자료]에 있는 법령 조문·판례 사건번호·행정해석 문서번호만 인용하여 한국어로 답변하십시오.');
-    ctxLines.push('원문 자료에 없는 사건번호나 문서번호를 절대 임의로 지어내지 마십시오(환각 금지). 근로기준법상 용어는 반드시 「근로자」와 「임금」을 정확히 사용하십시오.');
+    ctxLines.push('원문 자료에 없는 사건번호·회시번호·조례번호·법령 조문은 시스템이 자동으로 차단(할루시네이션 관문)하므로 절대 임의로 지어내거나 추측하여 기재하지 마십시오. 근로기준법상 용어는 반드시 「근로자」와 「임금」을 정확히 사용하십시오.');
     ctxLines.push('판례(대법원·헌법재판소·하급심)뿐만 아니라 제공된 자료 내 행정해석·유권해석(고용노동부·법제처) 및 위원회 결정·재결례(노동위원회·산재재심사위)도 빠짐없이 함께 구분하여 제시하십시오.');
     if (workflow) {
       ctxLines.push('\n[선택된 전문 워크플로]: ' + scrub(workflow.title) + ' — ' + scrub(workflow.desc));
@@ -3913,6 +3913,69 @@
 
   var LEADING_CITE_STOP_RE = /^(?:또한|그리고|그러나|하지만|따라서|그러므로|한편|다만|즉|특히|아울러|나아가|반면|결국|우선|먼저|예컨대|가령|혹은|또는|및|내지|현행|구|개정|신|관련|위|해당|따라|따른|의한|의하여|비추어|위반한|적용되는|규정한|대법원|판결|결정|해석|참조)$/;
 
+  /* 국가법령 공식 약칭 → 색인 정식 폴더명 매핑 (실존 법령 약칭 인용 시 오탐 차단 · 미등록 가공 법령은 여전히 100% 적발) */
+  var STATUTE_CITATION_ALIASES = {
+    '헌법': '대한민국헌법',
+    '근기법': '근로기준법',
+    '노조법': '노동조합및노동관계조정법',
+    '노동관계조정법': '노동조합및노동관계조정법',
+    '산재법': '산업재해보상보험법',
+    '산재보험법': '산업재해보상보험법',
+    '산안법': '산업안전보건법',
+    '퇴직급여법': '근로자퇴직급여보장법',
+    '근퇴법': '근로자퇴직급여보장법',
+    '남녀고용평등법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '고평법': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '가정양립지원에관한법률': '남녀고용평등과일ㆍ가정양립지원에관한법률',
+    '기간제법': '기간제및단시간근로자보호등에관한법률',
+    '파견법': '파견근로자보호등에관한법률',
+    '고보법': '고용보험법',
+    '최임법': '최저임금법',
+    '채무자회생법': '채무자회생및파산에관한법률',
+    '채용절차법': '채용절차의공정화에관한법률',
+    '고령자고용법': '고용상연령차별금지및고령자고용촉진에관한법률',
+    '공공기관운영법': '공공기관의운영에관한법률',
+    '교원지위법': '교원의지위향상및교육활동보호를위한특별법',
+    '건설근로자법': '건설근로자의고용개선등에관한법률',
+    '환경범죄단속법': '환경범죄등의단속및가중처벌에관한법률',
+    '중대재해법': '중대재해처벌등에관한법률',
+    '중대재해처벌법': '중대재해처벌등에관한법률',
+    '노동조합법': '노동조합및노동관계조정법',
+    '노조법': '노동조합및노동관계조정법',
+    '국공법': '국가공무원법',
+    '지공법': '지방공무원법'
+  };
+
+  var DEMONSTRATIVE_LAW_RE = /^(?:같은\s*법|동법|이\s*법|위\s*법|해당\s*법|관련\s*법|구\s*법|현행\s*법|본법|법|법률|시행령|시행규칙)(?:\s*(?:시행령|시행규칙))?$/;
+
+  function buildLawDirLookupMap(lawIndex) {
+    var idxArr = Array.isArray(lawIndex) ? lawIndex : [];
+    var lawDirSet = new Map();
+    for (var k = 0; k < idxArr.length; k++) {
+      var item = idxArr[k];
+      if (!item || !item.dir) continue;
+      lawDirSet.set(item.dir, item);
+      if (item.title) lawDirSet.set(item.title.replace(/\s+/g, ''), item);
+    }
+    var abbrev = getAbbrevMap();
+    var aliasKeys = Object.keys(STATUTE_CITATION_ALIASES);
+    for (var a = 0; a < aliasKeys.length; a++) {
+      var ak = aliasKeys[a];
+      var targetDir = STATUTE_CITATION_ALIASES[ak];
+      var hit = lawDirSet.get(targetDir);
+      if (hit && !lawDirSet.has(ak)) lawDirSet.set(ak, hit);
+    }
+    var abKeys = Object.keys(abbrev);
+    for (var b = 0; b < abKeys.length; b++) {
+      var bk = abKeys[b];
+      if (bk.length < 2) continue;
+      var mappedDir = String(abbrev[bk] || '').replace(/\s+/g, '');
+      var hitAb = lawDirSet.get(mappedDir);
+      if (hitAb && !lawDirSet.has(bk)) lawDirSet.set(bk, hitAb);
+    }
+    return lawDirSet;
+  }
+
   function resolveTargetLawFile(indexed, isDecree, isRule) {
     var files = (indexed && Array.isArray(indexed.files)) ? indexed.files : [];
     if (isDecree) {
@@ -3941,11 +4004,13 @@
 
       var candPhrase = tailMatch[1].trim().replace(/\s+/g, ' ');
       if (!/(?:법률|법|시행령|시행규칙|헌법)$/.test(candPhrase)) continue;
+      /* 문장 말미가 '같은 법', '동법', '이 법', 단독 '법 시행령' 등 지시대명사인 경우 독립 법령명 오탐 방지 */
+      if (/(?:^|\s)(?:같은\s*법|동법|이\s*법|위\s*법|해당\s*법|관련\s*법|구\s*법|현행\s*법|본법|법)(?:\s*(?:시행령|시행규칙))?$/.test(candPhrase)) continue;
 
       var tokens = candPhrase.split(' ').filter(Boolean);
       if (!tokens.length) continue;
 
-      /* 1순위: 국가법령 색인에 등록된 실제 법령명(공백 포함 최장 일치) 우선 매칭 */
+      /* 1순위: 국가법령 색인에 등록된 실제 법령명 및 공식 약칭(공백 포함 최장 일치) 우선 매칭 */
       var matchedRaw = '';
       if (lawDirSet && lawDirSet.size > 0) {
         for (var sIdx = 0; sIdx < tokens.length; sIdx++) {
@@ -3973,7 +4038,7 @@
         }
         while (cutIdx < tokens.length - 1) {
           var w = tokens[cutIdx];
-          if (LEADING_CITE_STOP_RE.test(w) || /^(?:조|항|호|목)$/.test(w) || /(?:은|는|이|가|을|를|도|만|와|과|에서|에게|으로|로써|로서|부터|까지|처럼|보다|라고|라며|상)$/.test(w)) {
+          if (LEADING_CITE_STOP_RE.test(w) || /^(?:조|항|호|목|등|역시|인한|대한)$/.test(w) || /(?:은|는|이|가|을|를|도|만|와|과|에서|에게|으로|로써|로서|부터|까지|처럼|보다|라고|라며|상|다면|하면|하고|하여|하며)$/.test(w)) {
             cutIdx++;
           } else {
             break;
@@ -3983,8 +4048,7 @@
       }
 
       if (matchedRaw.replace(/\s+/g, '').length < 2) continue;
-      /* 단독 '시행령 제3조'처럼 본법 없이 시행령만 적힌 일반 지칭은 제외 */
-      if (/^(?:법|법률|시행령|시행규칙)$/.test(matchedRaw.replace(/\s+/g, ''))) continue;
+      if (DEMONSTRATIVE_LAW_RE.test(matchedRaw)) continue;
 
       out.push({
         rawLawName: matchedRaw,
@@ -3996,12 +4060,7 @@
 
   /* 답변 문자열에서 인용된 현행 국가법령 목록 추출 (검증 전 조문 자동 로드용) */
   function extractCitedLawTargets(answerText, lawIndex) {
-    var idxArr = Array.isArray(lawIndex) ? lawIndex : [];
-    var lawDirSet = new Map();
-    for (var k = 0; k < idxArr.length; k++) {
-      lawDirSet.set(idxArr[k].dir, idxArr[k]);
-      lawDirSet.set(idxArr[k].title.replace(/\s+/g, ''), idxArr[k]);
-    }
+    var lawDirSet = buildLawDirLookupMap(lawIndex);
     var cites = extractLawCitationsFromText(answerText, lawDirSet);
     var out = [];
     var seen = new Set();
@@ -4034,8 +4093,32 @@
     var refOnlyMap = new Map();
     for (var i = 0; i < docs.length; i++) {
       var hasBody = String(docs[i].body || '').trim().length >= 20;
-      var cno = normalizeCaseNo(docs[i].caseNo);
-      if (cno && hasBody) docMap.set(cno, docs[i]);
+      var rawCnoStr = String(docs[i].caseNo || '');
+      var cno = normalizeCaseNo(rawCnoStr);
+      if (cno && hasBody) {
+        docMap.set(cno, docs[i]);
+        /* 실존 위원회 재결·심결 문서의 축약 표기(예: '개인정보위 제2023-005-040호' -> '제2023-005-040호', '산재재심사위 2022-2302호' -> '2022-2302호'·'2022재결 제2302호') 동시 색인 */
+        var mSub1 = /(제(?:19|20)\d{2}-\d{2,4}-\d{2,5}호?)/.exec(rawCnoStr);
+        if (mSub1) {
+          var subKey1 = normalizeCaseNo(mSub1[1]);
+          if (subKey1 && !docMap.has(subKey1)) docMap.set(subKey1, docs[i]);
+        }
+        var mSub2 = /((?:19|20)\d{2})-(\d{2,6})호?/.exec(rawCnoStr);
+        if (mSub2) {
+          var subKey2 = normalizeCaseNo(mSub2[1] + '-' + mSub2[2] + '호');
+          if (subKey2 && !docMap.has(subKey2)) docMap.set(subKey2, docs[i]);
+          var subKey3 = normalizeCaseNo(mSub2[1] + '재결 제' + mSub2[2] + '호');
+          if (subKey3 && !docMap.has(subKey3)) docMap.set(subKey3, docs[i]);
+        }
+        if (docs[i].docType === 'dec_nlrc') {
+          var headBody = String(docs[i].body || '').slice(0, 140);
+          var mHeadNo = /(20\d{2}재결\s*제\d{1,6}호|(?:19|20)\d{2}-\d{2,6}호)/.exec(headBody);
+          if (mHeadNo) {
+            var hk = normalizeCaseNo(mHeadNo[1]);
+            if (hk && !docMap.has(hk)) docMap.set(hk, docs[i]);
+          }
+        }
+      }
       var refs = docs[i].refCases || [];
       for (var r = 0; r < refs.length; r++) {
         var rc = normalizeCaseNo(refs[r]);
@@ -4057,11 +4140,7 @@
       }
     }
 
-    var lawDirSet = new Map();
-    for (var k = 0; k < lawIndex.length; k++) {
-      lawDirSet.set(lawIndex[k].dir, lawIndex[k]);
-      lawDirSet.set(lawIndex[k].title.replace(/\s+/g, ''), lawIndex[k]);
-    }
+    var lawDirSet = buildLawDirLookupMap(lawIndex);
 
     var items = [];
     var seen = new Set();
@@ -4808,6 +4887,635 @@
     return anonymizeLegalText(src, names);
   }
 
+  /* ══════════════════════════════════════════════════════════════
+   * 절대 할루시네이션 차단 관문 (Active Zero-Hallucination Guard)
+   * — verifyCitations 결과 중 원문 코퍼스·국가법령에 미존재하는 인용
+   *   (missing / missing_law / missing_article)을 본문에서 자동 격리하여
+   *   허구 판례·조문·행정해석이 답변이나 의견서·한글 문서로 유출되는 것을 원천 차단
+   * ══════════════════════════════════════════════════════════════ */
+  var QUARANTINE_PREFIX = '[⚠ 미검증 인용 자동 차단: ';
+  var QUARANTINE_SUFFIX = ' — 원문 미확인]';
+  var QUARANTINE_BANNER_MARK = '🛡️ **P박스 절대 할루시네이션 차단 관문 작동**';
+
+  function buildFlexibleWhitespaceNeedleRegex(needle) {
+    var trimmed = String(needle || '').trim();
+    if (!trimmed) return null;
+    /* 공백 정규화 전후 표기(예: '2099 다 999999' vs '2099다999999')를 모두 포착하되 안전한 선형 패턴만 생성 */
+    var parts = trimmed.replace(/\s+/g, '').split('');
+    var escaped = parts.map(function (ch) {
+      return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    });
+    return new RegExp(escaped.join('[ \\t]*'), 'g');
+  }
+
+  function replaceOutsideQuarantineSpans(text, needle, replacement) {
+    if (!text || !needle) return text;
+    var flexRe = buildFlexibleWhitespaceNeedleRegex(needle);
+    var lines = text.split('\n');
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      if (line.indexOf(QUARANTINE_BANNER_MARK) !== -1) continue;
+      if (line.indexOf(needle) === -1 && (!flexRe || !flexRe.test(line))) continue;
+      if (flexRe) flexRe.lastIndex = 0;
+
+      /* 기존 격리 구간([⚠ 미검증 인용 자동 차단: ... — 원문 미확인])을 보존하며 바깥 구간만 치환 */
+      var segs = [];
+      var pos = 0;
+      var pLen = QUARANTINE_PREFIX.length;
+      while (pos < line.length) {
+        var qIdx = line.indexOf(QUARANTINE_PREFIX, pos);
+        if (qIdx === -1) {
+          segs.push({ locked: false, text: line.slice(pos) });
+          break;
+        }
+        if (qIdx > pos) segs.push({ locked: false, text: line.slice(pos, qIdx) });
+        var qEnd = line.indexOf(QUARANTINE_SUFFIX, qIdx + pLen);
+        if (qEnd === -1) {
+          segs.push({ locked: true, text: line.slice(qIdx) });
+          break;
+        }
+        segs.push({ locked: true, text: line.slice(qIdx, qEnd + QUARANTINE_SUFFIX.length) });
+        pos = qEnd + QUARANTINE_SUFFIX.length;
+      }
+
+      var rebuilt = '';
+      for (var si = 0; si < segs.length; si++) {
+        if (segs[si].locked) {
+          rebuilt += segs[si].text;
+        } else if (flexRe) {
+          flexRe.lastIndex = 0;
+          rebuilt += segs[si].text.replace(flexRe, replacement);
+        } else if (segs[si].text.indexOf(needle) !== -1) {
+          rebuilt += segs[si].text.split(needle).join(replacement);
+        } else {
+          rebuilt += segs[si].text;
+        }
+      }
+      lines[li] = rebuilt;
+    }
+    return lines.join('\n');
+  }
+
+  function enforceZeroHallucinationGuard(rawText, opts) {
+    opts = opts || {};
+    var text = String(rawText || '');
+    var verification = verifyCitations(text, opts);
+    var items = Array.isArray(verification.items) ? verification.items : [];
+    var blockedItems = [];
+    var refOnlyCount = 0;
+    var unfetchedLawCount = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it || it.verified) continue;
+      if (it.status === 'ref_only') {
+        refOnlyCount++;
+      } else if (it.status === 'unfetched_law') {
+        unfetchedLawCount++;
+      } else if (it.status === 'missing' || it.status === 'missing_law' || it.status === 'missing_article') {
+        blockedItems.push(it);
+      }
+    }
+
+    var guardedText = text;
+    if (blockedItems.length > 0) {
+      var sorted = blockedItems.slice().sort(function (a, b) {
+        return String(b.raw || '').length - String(a.raw || '').length;
+      });
+      for (var j = 0; j < sorted.length; j++) {
+        var raw = String(sorted[j].raw || '').trim();
+        if (!raw) continue;
+        guardedText = replaceOutsideQuarantineSpans(
+          guardedText,
+          raw,
+          QUARANTINE_PREFIX + raw + QUARANTINE_SUFFIX
+        );
+      }
+      var bannerMark = '🛡️ **P박스 절대 할루시네이션 차단 관문 작동**';
+      if (guardedText.indexOf(bannerMark) === -1) {
+        var blockedPreview = blockedItems.slice(0, 6).map(function (b) { return b.raw; }).join(', ');
+        if (blockedItems.length > 6) blockedPreview += ' 외 ' + (blockedItems.length - 6) + '건';
+        guardedText =
+          '> ' + bannerMark + ': 원문 코퍼스·국가법령에서 실재가 확인되지 않은 인용 ' +
+          blockedItems.length + '건(' + blockedPreview + ')을 본문에서 자동 격리했습니다. 원문을 직접 확인하기 전에는 서면에 인용하지 마십시오.\n\n' +
+          guardedText;
+      }
+    }
+
+    return {
+      text: guardedText,
+      blockedCount: blockedItems.length,
+      blockedItems: blockedItems,
+      refOnlyCount: refOnlyCount,
+      unfetchedLawCount: unfetchedLawCount,
+      verifiedCount: verification.verifiedCount,
+      verification: verification,
+      clean: blockedItems.length === 0
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 무복사(Zero Copy-Paste) 공식 노무 서면 자동 조립 + KS X 6101 HWPX 변환기
+   * — 검토 완료된 보고서·연표·신구대비표·제척기간표·검증완료 근거를
+   *   복사/붙여넣기 없이 4종 공식 서면 구조로 변환하고 한글(.hwpx)·편집기로 직행
+   * ══════════════════════════════════════════════════════════════ */
+  var FORMAL_DOC_TEMPLATES = {
+    opinion: {
+      id: 'opinion',
+      label: '법률·노무 자문의견서',
+      bannerTitle: '노 무 법 률 자 문 의 견 서',
+      defaultRecipient: '의뢰인 귀하',
+      closingLine: '위와 같이 관련 현행 법령 및 검증된 판례·행정해석에 근거하여 자문 의견을 제출합니다.',
+      sections: ['Ⅰ. 사안의 개요 및 질의 요지', 'Ⅱ. 관련 법령·판례 검토 및 자문 의견', 'Ⅲ. 사실관계 일자별 연표', 'Ⅳ. 계약서·규정 신·구 조항 대비표', 'Ⅴ. 주요 노동법 제척기간·소멸시효 점검', 'Ⅵ. 검증 완료 법령·판례 근거 목록']
+    },
+    nlrc_brief: {
+      id: 'nlrc_brief',
+      label: '노동위원회 이유서·답변서',
+      bannerTitle: '이 유 서 (답 변 서) 초 안',
+      defaultRecipient: '관할 지방노동위원회 귀중',
+      closingLine: '이상의 사실관계 및 검증된 법령·판례에 비추어 공정한 판정을 구합니다.',
+      sections: ['Ⅰ. 사건 개요 및 당사자 주장 요지', 'Ⅱ. 처분의 정당성(또는 부당성)에 관한 법리 및 판례 검토', 'Ⅲ. 사건 경위 일자별 연표', 'Ⅳ. 관련 취업규칙·계약 조항 대비 검토', 'Ⅴ. 구제신청 제척기간 및 법정 기한 확인', 'Ⅵ. 입증·인용 근거 (검증 완료 법령·판례)']
+    },
+    notice: {
+      id: 'notice',
+      label: '내용증명·시정요구서',
+      bannerTitle: '통 지 서 (시 정 요 구 서)',
+      defaultRecipient: '수신인(상대방) 귀하',
+      closingLine: '본 통지서 수령일로부터 7일 이내에 성실한 시정 및 회신을 요청드리며, 미이행 시 관계 법령에 따른 절차를 진행할 수 있음을 정중히 통지합니다.',
+      sections: ['Ⅰ. 통지 취지 및 사안의 경위', 'Ⅱ. 법적 근거 및 시정 요구 사항', 'Ⅲ. 주요 경위 일자별 정리', 'Ⅳ. 위반·쟁점 조항 수정 요구 대비표', 'Ⅴ. 법정 기한 및 시효 안내', 'Ⅵ. 관련 검증 법령·판례 근거']
+    },
+    redline_memo: {
+      id: 'redline_memo',
+      label: '취업규칙·계약서 신·구 대비 의견서',
+      bannerTitle: '규 정 · 계 약 서  검 토  및  개 정 의 견 서',
+      defaultRecipient: '대표이사 / 인사노무 담당자 귀하',
+      closingLine: '위 강행법규 위반 및 분쟁 위험 조항을 적법한 개정안으로 정비하시기를 권고합니다.',
+      sections: ['Ⅰ. 검토 대상 문서 및 총평', 'Ⅱ. 강행법규·판례 기준 세부 검토 의견', 'Ⅲ. 주요 일정 및 시행 경위', 'Ⅳ. 현행 조항 vs 적법 수정안 3단 대비표', 'Ⅴ. 개정 절차 및 법정 기한 점검', 'Ⅵ. 검증 완료 법령·판례 근거']
+    }
+  };
+
+  function stripMdInline(s) {
+    return String(s == null ? '' : s)
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .trim();
+  }
+
+  function hwpP(text, opts) {
+    opts = opts || {};
+    var sz = opts.size || opts.sizePt || 10.5;
+    return {
+      type: 'p',
+      align: opts.align || 'left',
+      runs: [{
+        text: String(text == null ? '' : text),
+        bold: !!opts.bold,
+        size: sz,
+        color: opts.color || '#111827'
+      }]
+    };
+  }
+
+  function hwpCell(text, opts) {
+    opts = opts || {};
+    var sz = opts.size || opts.sizePt || 9.5;
+    return {
+      blocks: [{
+        type: 'p',
+        align: opts.align || 'left',
+        runs: [{
+          text: String(text == null ? '' : text),
+          bold: !!opts.bold,
+          size: sz,
+          color: opts.color || '#111827'
+        }]
+      }],
+      bg: opts.bg || '',
+      valign: opts.valign || 'middle'
+    };
+  }
+
+  function parseMdTableBlock(lines, startIdx) {
+    var rows = [];
+    var idx = startIdx;
+    while (idx < lines.length && /^\s*\|/.test(lines[idx])) {
+      var raw = lines[idx].trim();
+      if (/^\|[\s:|-]+\|?$/.test(raw)) {
+        idx++;
+        continue;
+      }
+      var inner = raw.replace(/^\|/, '').replace(/\|$/, '');
+      var cells = inner.split(/\|/).map(function (c) { return stripMdInline(c); });
+      if (cells.length) rows.push(cells);
+      idx++;
+    }
+    return { rows: rows, nextIdx: idx };
+  }
+
+  function appendMarkdownBodyToHwpxBlocks(blocks, mdText) {
+    var lines = String(mdText || '').split(/\r?\n/);
+    var i = 0;
+    while (i < lines.length) {
+      var line = lines[i];
+      var trimmed = line.trim();
+      if (!trimmed) {
+        i++;
+        continue;
+      }
+      if (/^\|/.test(trimmed)) {
+        var parsed = parseMdTableBlock(lines, i);
+        i = parsed.nextIdx;
+        if (parsed.rows.length > 0) {
+          var colCount = Math.max(1, parsed.rows[0].length);
+          var totalMm = 166;
+          var colWidths = [];
+          for (var c = 0; c < colCount; c++) {
+            colWidths.push(Math.max(18, Math.floor(totalMm / colCount)));
+          }
+          var hwpxRows = parsed.rows.map(function (r, rIdx) {
+            var normalized = [];
+            for (var ci = 0; ci < colCount; ci++) {
+              normalized.push(hwpCell(r[ci] || '', {
+                bold: rIdx === 0,
+                bg: rIdx === 0 ? '#EFF6FF' : (rIdx % 2 === 0 ? '#F9FAFB' : ''),
+                align: rIdx === 0 ? 'center' : 'left',
+                sizePt: 9
+              }));
+            }
+            return normalized;
+          });
+          blocks.push({ type: 'table', colWidths: colWidths, rows: hwpxRows });
+          blocks.push(hwpP('', { sizePt: 6 }));
+        }
+        continue;
+      }
+      if (/^#{1,3}\s+/.test(trimmed)) {
+        var hText = stripMdInline(trimmed.replace(/^#{1,3}\s+/, ''));
+        blocks.push(hwpP(hText, { bold: true, sizePt: 11.5, color: '#1E3A8A' }));
+        i++;
+        continue;
+      }
+      if (/^>\s*/.test(trimmed)) {
+        var qText = stripMdInline(trimmed.replace(/^>\s*/, ''));
+        blocks.push(hwpP('※ ' + qText, { bold: false, sizePt: 9.5, color: '#374151' }));
+        i++;
+        continue;
+      }
+      if (/^[-*•]\s+/.test(trimmed)) {
+        var bText = stripMdInline(trimmed.replace(/^[-*•]\s+/, ''));
+        blocks.push(hwpP('  · ' + bText, { sizePt: 10 }));
+        i++;
+        continue;
+      }
+      blocks.push(hwpP(stripMdInline(trimmed), { sizePt: 10 }));
+      i++;
+    }
+  }
+
+  function escHtmlForDoc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function buildFormalLegalDocument(params) {
+    params = params || {};
+    var tpl = FORMAL_DOC_TEMPLATES[params.docType] || FORMAL_DOC_TEMPLATES.opinion;
+    var stance = (params.stance === 'worker' || params.stance === 'employer') ? params.stance : 'neutral';
+    var stanceLabel = stance === 'worker' ? '근로자·신청인측' : (stance === 'employer' ? '사용자·회사측' : '객관·중립 검토');
+    var dateYmd = String(params.dateYmd || todayKstYmd());
+    var dateKorean = formatKoreanLegalDotDate(dateYmd);
+
+    /* 전체 필드 공통 당사자 실명 사전을 구축해 제목·수신·질의·원문·답변 간 교차 유출 차단 */
+    var combinedForNames = [
+      String(params.title || ''),
+      String(params.recipient || ''),
+      String(params.query || ''),
+      String(params.sourceText || ''),
+      String(params.answer || '')
+    ].join('\n');
+    var sharedPartyNames = extractPartyNames(combinedForNames, '');
+    var anonymizeStr = function (s) {
+      var str = String(s == null ? '' : s).trim();
+      if (!str) return '';
+      var res = anonymizeLegalText(str, sharedPartyNames);
+      var out = (res && typeof res === 'object' && typeof res.text === 'string') ? res.text : String(res || '');
+      if (global && global.PuRrnScrub && typeof global.PuRrnScrub.scrub === 'function') {
+        out = global.PuRrnScrub.scrub(out);
+      }
+      return out;
+    };
+    var safeTitle = anonymizeStr(params.title) || tpl.label;
+    var safeRecipient = anonymizeStr(params.recipient) || tpl.defaultRecipient;
+    var safeSender = anonymizeStr(params.sender) || '푸른노무법인 담당 공인노무사';
+    var safeQuery = anonymizeStr(params.query);
+    var safeSourceText = anonymizeStr(params.sourceText);
+    var rawAnswer = anonymizeStr(params.answer);
+
+    /* 1. 절대 할루시네이션 차단 관문 필수 통과 */
+    var guardRes = enforceZeroHallucinationGuard(rawAnswer, {
+      docs: Array.isArray(params.docs) ? params.docs : [],
+      loadedLaws: Array.isArray(params.loadedLaws) ? params.loadedLaws : [],
+      lawIndex: Array.isArray(params.lawIndex) ? params.lawIndex : []
+    });
+    var safeAnswer = guardRes.text;
+
+    /* 2. 구조화 부록(연표 · 신구대비표 · 제척기간표 · 검증 완료 인용목록) 자동 생성 */
+    var factSeed = [safeSourceText, safeQuery].filter(Boolean).join('\n');
+    var timelineAll = factSeed ? extractFactTimeline(factSeed) : { events: [], suggestedBaseDate: '', markdown: '' };
+    var timeline = (params.includeTimeline !== false)
+      ? timelineAll
+      : { events: [], suggestedBaseDate: timelineAll.suggestedBaseDate || '', markdown: '' };
+    var redline = (params.includeRedline !== false && factSeed)
+      ? buildClauseRedlineTable(factSeed)
+      : { rows: [], markdown: '' };
+    var deadlineBase = String(params.deadlineBaseDate || '').trim();
+    if (!deadlineBase && timelineAll.suggestedBaseDate) {
+      deadlineBase = timelineAll.suggestedBaseDate;
+    }
+    if (!deadlineBase && timelineAll.events && timelineAll.events.length) {
+      deadlineBase = timelineAll.events[timelineAll.events.length - 1].date;
+    }
+    var deadlines = (params.includeDeadlines !== false && deadlineBase)
+      ? calculateLaborDeadlines(deadlineBase, dateYmd)
+      : { valid: false, items: [], markdown: '' };
+
+    var docById = new Map();
+    var allDocs = Array.isArray(params.docs) ? params.docs : [];
+    for (var di = 0; di < allDocs.length; di++) {
+      if (allDocs[di] && allDocs[di].id) docById.set(allDocs[di].id, allDocs[di]);
+    }
+    var verifiedCitations = [];
+    var seenCite = new Set();
+    var vItems = (guardRes.verification && Array.isArray(guardRes.verification.items)) ? guardRes.verification.items : [];
+    for (var vi = 0; vi < vItems.length; vi++) {
+      var vit = vItems[vi];
+      if (!vit || !vit.verified) continue;
+      var line = '';
+      if (vit.targetId && docById.has(vit.targetId)) {
+        line = formatStandardLegalCitation(docById.get(vit.targetId), { includeTitle: true });
+      } else {
+        line = vit.matchedTitle || vit.raw;
+      }
+      if (!line || seenCite.has(line)) continue;
+      seenCite.add(line);
+      verifiedCitations.push(line);
+    }
+
+    /* 3. KS X 6101 HWPX 블록 조립 */
+    var blocks = [];
+    blocks.push(hwpP(tpl.bannerTitle, { align: 'center', bold: true, sizePt: 18, color: '#1E3A8A' }));
+    blocks.push(hwpP('', { sizePt: 8 }));
+
+    blocks.push({
+      type: 'table',
+      colWidths: [34, 132],
+      rows: [
+        [hwpCell('문서 제목', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(safeTitle, { bold: true })],
+        [hwpCell('수 신', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(safeRecipient)],
+        [hwpCell('발 신', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(safeSender)],
+        [hwpCell('작성 일자', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(dateKorean + '  (검토 관점: ' + stanceLabel + ')')],
+        [
+          hwpCell('할루시네이션 검증', { bold: true, bg: '#EFF6FF', align: 'center' }),
+          hwpCell(
+            guardRes.clean
+              ? ('통과 — 검증 완료 인용 ' + guardRes.verifiedCount + '건 / 미검증 차단 0건 (P박스 원문 대조 완료)')
+              : ('주의 — 미검증 인용 ' + guardRes.blockedCount + '건 자동 격리됨 (격리 항목은 원문 확인 후 사용)')
+          )
+        ]
+      ]
+    });
+    blocks.push(hwpP('', { sizePt: 10 }));
+
+    var secIdx = 0;
+    /* 섹션 1: 사안 개요 */
+    blocks.push(hwpP(tpl.sections[secIdx++], { bold: true, sizePt: 12.5, color: '#1E3A8A' }));
+    if (safeQuery) {
+      blocks.push(hwpP('1. 검토 요청 요지: ' + safeQuery, { sizePt: 10 }));
+    }
+    if (safeSourceText) {
+      blocks.push(hwpP('2. 검토 대상 원문·사실관계 발췌(개인정보 비식별 처리):', { bold: true, sizePt: 10 }));
+      var srcLines = safeSourceText.slice(0, 2400).split(/\r?\n/).filter(Boolean);
+      for (var sl = 0; sl < srcLines.length; sl++) {
+        blocks.push(hwpP('  ' + srcLines[sl].trim(), { sizePt: 9.5, color: '#374151' }));
+      }
+    }
+    blocks.push(hwpP('', { sizePt: 8 }));
+
+    /* 섹션 2: 핵심 법률·판례 검토 본문 */
+    blocks.push(hwpP(tpl.sections[secIdx++], { bold: true, sizePt: 12.5, color: '#1E3A8A' }));
+    appendMarkdownBodyToHwpxBlocks(blocks, safeAnswer || '(검토 본문 없음)');
+    blocks.push(hwpP('', { sizePt: 8 }));
+
+    /* 섹션 3: 사실관계 연표 (있을 때만) */
+    if (timeline.events && timeline.events.length) {
+      blocks.push(hwpP(tpl.sections[secIdx++], { bold: true, sizePt: 12.5, color: '#1E3A8A' }));
+      var tlRows = [[
+        hwpCell('일자', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 }),
+        hwpCell('사실관계·경위', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 }),
+        hwpCell('쟁점 구분', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 })
+      ]];
+      for (var ti = 0; ti < timeline.events.length; ti++) {
+        var ev = timeline.events[ti];
+        tlRows.push([
+          hwpCell(ev.date, { align: 'center', size: 9 }),
+          hwpCell(ev.summary, { size: 9 }),
+          hwpCell(ev.category || '경위', { align: 'center', size: 9 })
+        ]);
+      }
+      blocks.push({ type: 'table', colWidths: [28, 112, 26], rows: tlRows });
+      blocks.push(hwpP('', { size: 8 }));
+    } else {
+      secIdx++;
+    }
+
+    /* 섹션 4: 3단 신·구 조항 대비표 (있을 때만) */
+    if (redline.rows && redline.rows.length) {
+      blocks.push(hwpP(tpl.sections[secIdx++], { bold: true, size: 12.5, color: '#1E3A8A' }));
+      var rlRows = [[
+        hwpCell('위험도·항목', { bold: true, bg: '#EFF6FF', align: 'center', size: 9 }),
+        hwpCell('현행 조항(원문 발췌)', { bold: true, bg: '#EFF6FF', align: 'center', size: 9 }),
+        hwpCell('적법 수정 권고안', { bold: true, bg: '#EFF6FF', align: 'center', size: 9 }),
+        hwpCell('근거 법령·사유', { bold: true, bg: '#EFF6FF', align: 'center', size: 9 })
+      ]];
+      for (var ri = 0; ri < redline.rows.length; ri++) {
+        var rr = redline.rows[ri];
+        var itemHead = (rr.badge ? (rr.badge + ' ') : '') + (rr.clauseLabel ? ('[' + rr.clauseLabel + '] ') : '') + (rr.title || '조항 검토');
+        rlRows.push([
+          hwpCell(itemHead, { bold: true, size: 8.8 }),
+          hwpCell(rr.currentExcerpt || '', { size: 8.8 }),
+          hwpCell(rr.revisedSuggestion || '', { size: 8.8, color: '#1E3A8A' }),
+          hwpCell(rr.riskAndBasis || '', { size: 8.5 })
+        ]);
+      }
+      blocks.push({ type: 'table', colWidths: [28, 46, 52, 40], rows: rlRows });
+      blocks.push(hwpP('', { sizePt: 8 }));
+    } else {
+      secIdx++;
+    }
+
+    /* 섹션 5: 제척기간·소멸시효 점검 (있을 때만) */
+    if (deadlines.valid && deadlines.items && deadlines.items.length) {
+      blocks.push(hwpP(tpl.sections[secIdx++] + ' (기산 기준일: ' + deadlines.baseDate + ')', { bold: true, sizePt: 12.5, color: '#1E3A8A' }));
+      var dlRows = [[
+        hwpCell('법정 절차·권리', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 }),
+        hwpCell('법정 기한', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 }),
+        hwpCell('만료일', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 }),
+        hwpCell('잔여', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 }),
+        hwpCell('근거 조문', { bold: true, bg: '#EFF6FF', align: 'center', sizePt: 9 })
+      ]];
+      for (var dli = 0; dli < deadlines.items.length; dli++) {
+        var dliItem = deadlines.items[dli];
+        dlRows.push([
+          hwpCell(dliItem.title, { sizePt: 8.8 }),
+          hwpCell(dliItem.ruleLabel, { align: 'center', sizePt: 8.8 }),
+          hwpCell(dliItem.dueDate + (dliItem.weekendExtended ? ' (주말연장)' : ''), { align: 'center', sizePt: 8.8 }),
+          hwpCell(dliItem.dDayLabel, { align: 'center', bold: true, sizePt: 8.8 }),
+          hwpCell(dliItem.basis, { sizePt: 8.5 })
+        ]);
+      }
+      blocks.push({ type: 'table', colWidths: [48, 24, 34, 22, 38], rows: dlRows });
+      blocks.push(hwpP('※ 민법 제157조(초일불산입) 및 제161조(토·일요일 익일 연장) 반영. 법정공휴일 해당 시 다음 평일로 연장됩니다.', { sizePt: 8.5, color: '#4B5563' }));
+      blocks.push(hwpP('', { sizePt: 8 }));
+    } else {
+      secIdx++;
+    }
+
+    /* 섹션 6: 검증 완료 인용 근거 목록 (100% verified만 등재) */
+    if (params.includeCitations !== false && verifiedCitations.length > 0) {
+      blocks.push(hwpP(tpl.sections[secIdx], { bold: true, sizePt: 12.5, color: '#1E3A8A' }));
+      for (var ci2 = 0; ci2 < verifiedCitations.length; ci2++) {
+        blocks.push(hwpP('  ' + (ci2 + 1) + '. ' + verifiedCitations[ci2], { sizePt: 9.5 }));
+      }
+      blocks.push(hwpP('', { sizePt: 8 }));
+    }
+
+    /* 맺음말 + 작성일 + 서명 */
+    blocks.push(hwpP(tpl.closingLine, { sizePt: 10 }));
+    blocks.push(hwpP('', { sizePt: 12 }));
+    blocks.push(hwpP(dateKorean, { align: 'center', bold: true, sizePt: 11 }));
+    blocks.push(hwpP(safeSender + '  (인)', { align: 'right', bold: true, sizePt: 11.5 }));
+
+    /* 4. Markdown 및 Word(.doc) 호환 HTML 동시 생성 */
+    var mdParts = [
+      '# ' + tpl.bannerTitle,
+      '',
+      '- **제목**: ' + safeTitle,
+      '- **수신**: ' + safeRecipient,
+      '- **발신**: ' + safeSender,
+      '- **작성일자**: ' + dateKorean + ' (' + stanceLabel + ')',
+      '- **할루시네이션 검증**: ' + (guardRes.clean
+        ? ('통과 (검증 완료 인용 ' + guardRes.verifiedCount + '건 / 미검증 차단 0건)')
+        : ('주의 (미검증 인용 ' + guardRes.blockedCount + '건 자동 격리됨)')),
+      '',
+      '## ' + tpl.sections[0],
+      safeQuery ? ('- **검토 요청**: ' + safeQuery) : '',
+      safeSourceText ? ('\n' + safeSourceText.slice(0, 2400)) : '',
+      '',
+      '## ' + tpl.sections[1],
+      safeAnswer
+    ];
+    if (timeline.events && timeline.events.length) {
+      mdParts.push('', '## ' + tpl.sections[2], timeline.markdown);
+    }
+    if (redline.rows && redline.rows.length) {
+      mdParts.push('', '## ' + tpl.sections[3], redline.markdown);
+    }
+    if (deadlines.valid && deadlines.items && deadlines.items.length) {
+      mdParts.push('', '## ' + tpl.sections[4] + ' (기산 기준일: ' + deadlines.baseDate + ')', deadlines.markdown);
+    }
+    if (params.includeCitations !== false && verifiedCitations.length > 0) {
+      mdParts.push('', '## ' + tpl.sections[5]);
+      verifiedCitations.forEach(function (vc, idx) { mdParts.push((idx + 1) + '. ' + vc); });
+    }
+    mdParts.push('', tpl.closingLine, '', dateKorean, '', safeSender + ' (인)');
+    var markdown = mdParts.filter(function (x) { return x !== undefined && x !== null; }).join('\n');
+
+    var htmlBlocks = [];
+    for (var bi = 0; bi < blocks.length; bi++) {
+      var blk = blocks[bi];
+      if (blk.type === 'p') {
+        var r0 = (blk.runs && blk.runs[0]) || { text: '' };
+        var styleStr = 'text-align:' + (blk.align || 'left') + ';font-size:' + (r0.size || 10.5) + 'pt;' +
+          (r0.bold ? 'font-weight:700;' : '') + 'color:' + (r0.color || '#111827') + ';margin:4px 0;';
+        htmlBlocks.push('<p style="' + styleStr + '">' + (escHtmlForDoc(r0.text) || '&nbsp;') + '</p>');
+      } else if (blk.type === 'table') {
+        var trHtml = blk.rows.map(function (row) {
+          return '<tr>' + row.map(function (cell) {
+            var cp = (cell.blocks && cell.blocks[0]) || { align: 'left', runs: [] };
+            var cr = (cp.runs && cp.runs[0]) || { text: '' };
+            var tdStyle = 'border:1px solid #cbd5e1;padding:6px 8px;text-align:' + (cp.align || 'left') +
+              ';font-size:' + (cr.size || 9.5) + 'pt;' +
+              (cr.bold ? 'font-weight:700;' : '') +
+              (cell.bg ? ('background:' + cell.bg + ';') : '') +
+              'color:' + (cr.color || '#111827') + ';';
+            return '<td style="' + tdStyle + '">' + escHtmlForDoc(cr.text) + '</td>';
+          }).join('') + '</tr>';
+        }).join('');
+        htmlBlocks.push('<table style="width:100%;border-collapse:collapse;margin:8px 0;">' + trHtml + '</table>');
+      }
+    }
+    var html = '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + escHtmlForDoc(safeTitle) + '</title>' +
+      '<style>body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;line-height:1.65;color:#111827;max-width:780px;margin:24px auto;padding:0 16px;}</style>' +
+      '</head><body>' + htmlBlocks.join('\n') + '</body></html>';
+
+    var safeFileBase = (tpl.label + '_' + safeTitle + '_' + dateYmd)
+      .replace(/[\\/:*?"<>|\s]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 60) || ('P박스_' + tpl.id + '_' + dateYmd);
+
+    return {
+      docType: tpl.id,
+      docTypeLabel: tpl.label,
+      title: safeTitle,
+      recipient: safeRecipient,
+      sender: safeSender,
+      dateYmd: dateYmd,
+      fileNameBase: safeFileBase,
+      blocks: blocks,
+      markdown: markdown,
+      html: html,
+      blockedCount: guardRes.blockedCount,
+      blockedItems: guardRes.blockedItems,
+      verifiedCount: guardRes.verifiedCount,
+      verifiedCitations: verifiedCitations,
+      verification: guardRes.verification,
+      clean: guardRes.clean
+    };
+  }
+
+  function buildFormalHwpxBytes(formalDoc, hwpxMod) {
+    var api = hwpxMod || (typeof global !== 'undefined' && global.PureunHwpx) || null;
+    if (!api || typeof api.buildHwpx !== 'function') {
+      throw new Error('PureunHwpx 모듈이 로드되지 않았습니다.');
+    }
+    if (!formalDoc || !Array.isArray(formalDoc.blocks) || !formalDoc.blocks.length) {
+      throw new Error('HWPX로 변환할 공식 문서 블록이 비어 있습니다.');
+    }
+    return api.buildHwpx({
+      page: {
+        paper: 'A4',
+        width: 210,
+        height: 297,
+        landscape: false,
+        margin: {
+          top: 20,
+          bottom: 20,
+          left: 22,
+          right: 22,
+          header: 10,
+          footer: 10
+        }
+      },
+      blocks: formalDoc.blocks
+    });
+  }
+
   global.PuPBoxEngine = {
     todayKstYmd: todayKstYmd,
     parseYamlFrontmatter: parseYamlFrontmatter,
@@ -4864,7 +5572,11 @@
     synthesizeOfflineAnswer: synthesizeOfflineAnswer,
     extractLawCitationsFromText: extractLawCitationsFromText,
     extractCitedLawTargets: extractCitedLawTargets,
-    verifyCitations: verifyCitations
+    verifyCitations: verifyCitations,
+    enforceZeroHallucinationGuard: enforceZeroHallucinationGuard,
+    FORMAL_DOC_TEMPLATES: FORMAL_DOC_TEMPLATES,
+    buildFormalLegalDocument: buildFormalLegalDocument,
+    buildFormalHwpxBytes: buildFormalHwpxBytes
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -900,9 +900,11 @@ table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
   .autocard:not(.open) .arow,.autocard:not(.open) .ago{display:none}
   /* 할 일 — 한 건 = 한 줄(제목·건수·단추). 설명(누가·어떻게 하면 되나)은 PC 에서 본다 */
   .todo .th .sub{display:none}
-  .todo .job{display:flex;align-items:center;gap:6px}
-  .todo .job .h{flex:1;min-width:0;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .todo .job .go{margin:0;flex:none}
+  /* ★ 제목이 «중간에서 뚝» 잘리던 것을 고친다(2026-11-21 대표 「폰에서도 깔끔하게」) — .h 는 flex 라서 말줄임(…)이 안 먹어
+       글자가 반쯤 끊겼고, 단추 셋이 붙은 줄은 제목이 거의 안 남았다. 한 줄에 다 들어가면 한 줄, 아니면 «제목 줄 + 단추 줄» 두 줄 카드로 접는다. */
+  .todo .job{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+  .todo .job .h{flex:1 1 200px;min-width:0;margin:0;white-space:normal;word-break:keep-all;overflow-wrap:break-word}
+  .todo .job .go{margin:0 0 0 auto;flex:0 1 auto;justify-content:flex-end}
   .todo .job .who,.todo .job details{display:none}
   /* 목록 — 줄마다 붙던 「확인 전」은 뺀다(위 시각이 같은 말을 한다). 뜻 있는 딱지(남김·퇴사…)만 */
   #rowsBox .pill.none{display:none}
@@ -933,7 +935,8 @@ table.imp th{font-size:12px;color:var(--sub);font-weight:600;background:#f8fafc}
   .job .go .btn{padding:4px 9px;font-size:11.5px}
   .job details p{line-height:1.5;margin-top:3px}
   .chips{padding:4px 10px 5px;gap:4px}
-  .list .lh{padding:5px 10px;font-size:12px}
+  /* 목록 머리 — 글이 길면 단추가 오른쪽 끝에 끼어 잘렸다: 안 들어가면 단추를 아랫줄로 내린다(들어가면 그대로 한 줄) */
+  .list .lh{padding:5px 10px;font-size:12px;flex-wrap:wrap;row-gap:4px}
   .list .r{min-height:50px;padding:6px 10px;gap:7px}
   .list .nm{font-size:13.5px}
   .list .po{font-size:11.5px}

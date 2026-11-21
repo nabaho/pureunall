@@ -1461,7 +1461,7 @@
     });
   }
 
-  /* ── 파일 내보내기 유틸리티 (.md / .doc) ── */
+  /* ── 파일 내보내기 유틸리티 (.md / .doc / .hwpx) ── */
   function downloadBlob(filename, content, mime) {
     var BlobCtor = (global && global.Blob) || Blob;
     var urlApi = (global && global.URL) || URL;
@@ -1476,6 +1476,233 @@
       document.body.removeChild(a);
       urlApi.revokeObjectURL(url);
     }, 300);
+  }
+
+  /* ── 무복사(Zero Copy-Paste) 공식 서면 조립 + 푸른 한글 편집기(hangul.html) 메모리 전용 브리지 ── */
+  var _activeHangulBridges = new Set();
+  function clearAllHangulBridges() {
+    var list = Array.from(_activeHangulBridges);
+    for (var i = 0; i < list.length; i++) {
+      try { list[i](); } catch (_) {}
+    }
+    _activeHangulBridges.clear();
+  }
+  try {
+    if (global && typeof global.addEventListener === 'function') {
+      global.addEventListener('pagehide', clearAllHangulBridges);
+    }
+  } catch (_) {}
+
+  function bytesToBase64Chunked(bytes) {
+    var b64 = '';
+    var chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) {
+      b64 += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+    }
+    return (global.btoa || btoa)(b64);
+  }
+
+  function buildFormalDocFromThread(th, opts) {
+    opts = opts || {};
+    var E = global.PuPBoxEngine;
+    if (!E || typeof E.buildFormalLegalDocument !== 'function') {
+      throw new Error('공식 서면 생성 엔진이 로드되지 않았습니다.');
+    }
+    var store = global.PuPBoxStore;
+    var docs = (store && typeof store.getDocs === 'function') ? store.getDocs() : [];
+    var loadedLaws = (store && typeof store.getLoadedLaws === 'function') ? store.getLoadedLaws() : [];
+    var lawIndex = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
+      ? global.PuPBoxLawIndex.list()
+      : [];
+    return E.buildFormalLegalDocument({
+      docType: opts.docType || 'opinion',
+      title: opts.title !== undefined ? opts.title : (th && th.title ? th.title : '법률·노무 검토 의견서'),
+      recipient: opts.recipient || '',
+      sender: opts.sender || ((state.userName ? (state.userName + ' 공인노무사') : '푸른노무법인 담당 공인노무사')),
+      stance: (th && th.stance) || state.reviewStance || 'neutral',
+      query: (th && th.query) || '',
+      sourceText: (th && th.sourceText) || '',
+      answer: (th && th.answer) || (th && th.sourceText) || '',
+      deadlineBaseDate: opts.deadlineBaseDate !== undefined ? opts.deadlineBaseDate : (state.deadlineBaseDate || ''),
+      includeTimeline: opts.includeTimeline !== false,
+      includeRedline: opts.includeRedline !== false,
+      includeDeadlines: opts.includeDeadlines !== false,
+      includeCitations: opts.includeCitations !== false,
+      docs: docs,
+      loadedLaws: loadedLaws,
+      lawIndex: lawIndex
+    });
+  }
+
+  function downloadFormalHwpx(formalDoc) {
+    var E = global.PuPBoxEngine;
+    var bytes = E.buildFormalHwpxBytes(formalDoc, global.PureunHwpx);
+    downloadBlob(formalDoc.fileNameBase + '.hwpx', bytes, 'application/hwp+zip');
+    return bytes;
+  }
+
+  function openFormalDocInHangulEditor(formalDoc) {
+    var E = global.PuPBoxEngine;
+    var bytes = E.buildFormalHwpxBytes(formalDoc, global.PureunHwpx);
+    var b64 = bytesToBase64Chunked(bytes);
+    var bridgeId = 'pbox_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    var payload = {
+      bridgeId: bridgeId,
+      format: 'hwpx',
+      name: formalDoc.fileNameBase + '.hwpx',
+      label: formalDoc.title,
+      sourceLabel: 'P박스 ' + formalDoc.docTypeLabel,
+      b64: b64,
+      sentAt: Date.now()
+    };
+    var url = 'hangul.html?from=pbox&bid=' + encodeURIComponent(bridgeId);
+    var w = (typeof global.open === 'function') ? global.open(url, '_blank') : null;
+    if (!w) {
+      payload.b64 = '';
+      payload.html = '';
+      toast('팝업이 차단되어 푸른 한글 편집기를 열지 못했습니다. 브라우저 팝업을 허용한 뒤 다시 누르거나 [📥 한글(.hwpx)] 버튼으로 직접 저장해 주세요.', 'err');
+      return { opened: false, popupBlocked: true, bridgeId: bridgeId };
+    }
+
+    var origin = (global.location && /^https?:\/\//i.test(String(global.location.origin || '')))
+      ? String(global.location.origin)
+      : '';
+    if (!origin) {
+      payload.b64 = '';
+      try { if (w && typeof w.close === 'function') w.close(); } catch (_) {}
+      toast('보안 출처(https/http) 환경에서만 푸른 한글 편집기 직접 전송이 가능합니다. [📥 한글(.hwpx)] 저장을 이용해 주세요.', 'err');
+      return { opened: false, invalidOrigin: true, bridgeId: bridgeId };
+    }
+    var cleaned = false;
+    var timers = [];
+    function pushToChild() {
+      if (cleaned || !payload.b64) return;
+      try {
+        if (w && !w.closed) {
+          w.postMessage({ type: 'pureun_hangul_open', payload: payload }, origin);
+        }
+      } catch (_) {}
+    }
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      for (var t = 0; t < timers.length; t++) clearTimeout(timers[t]);
+      timers = [];
+      try {
+        if (global && typeof global.removeEventListener === 'function') {
+          global.removeEventListener('message', onMsg);
+        }
+      } catch (_) {}
+      payload.b64 = '';
+      _activeHangulBridges.delete(cleanup);
+    }
+    function onMsg(e) {
+      if (cleaned || !e) return;
+      if (e.origin !== origin) return;
+      if (e.source !== w) return;
+      var d = e.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'pureun_hangul_ready' && d.bid === bridgeId) {
+        pushToChild();
+      } else if (d.type === 'pureun_hangul_ack' && d.bridgeId === bridgeId) {
+        cleanup();
+      }
+    }
+    if (global && typeof global.addEventListener === 'function') {
+      global.addEventListener('message', onMsg);
+    }
+    _activeHangulBridges.add(cleanup);
+    timers.push(setTimeout(cleanup, 25000));
+    toast('푸른 한글 편집기로 \'' + formalDoc.docTypeLabel + '\'을 복사 없이 바로 전송했습니다.');
+    return { opened: true, fallbackDownload: false, bridgeId: bridgeId };
+  }
+
+  function showDocumentHandoffModal() {
+    if (!state.activeThread) {
+      toast('먼저 내용 검토를 실행하거나 작업을 열어 주세요.', 'err');
+      return;
+    }
+    var th = state.activeThread;
+    var previewDoc = null;
+    try {
+      previewDoc = buildFormalDocFromThread(th, { docType: 'opinion' });
+    } catch (e) {
+      toast('서면 준비 오류: ' + e.message, 'err');
+      return;
+    }
+    var guardHtml = previewDoc.clean
+      ? '<span class="pbox-badge-green">🛡️ 할루시네이션 차단 관문 통과 · 검증 완료 인용 ' + previewDoc.verifiedCount + '건 / 미검증 차단 0건</span>'
+      : '<span class="pbox-badge-red">⚠️ 미검증 인용 ' + previewDoc.blockedCount + '건 자동 격리됨 — 서면 내 격리 표시를 원문 확인 후 정리하세요</span>';
+
+    var html = [
+      '<div class="pbox-modal-hd">',
+      '  <strong id="pboxModalTitle">📝 무복사 공식 서면 연결 작성 · 한글 직행</strong>',
+      '  <button type="button" class="pbox-icon-btn" data-act="close-modal" aria-label="창 닫기">✕</button>',
+      '</div>',
+      '<div class="pbox-modal-bd">',
+      '  <div class="pbox-muted" style="margin-bottom:10px">Ctrl+C / Ctrl+V 없이 현재 검토 보고서·연표·신구대비표·제척기간·검증 완료 판례를 공식 노무 서면으로 조립해 푸른 한글 편집기 또는 .hwpx 파일로 바로 넘깁니다.</div>',
+      '  <div style="margin-bottom:12px">' + guardHtml + '</div>',
+      '  <div class="pbox-form-stack">',
+      '    <label class="pbox-field">',
+      '      <span class="pbox-label">서면 양식 선택</span>',
+      '      <select id="pboxHandoffType" class="pbox-input" style="width:100%;max-width:100%;box-sizing:border-box">',
+      '        <option value="opinion">법률·노무 자문의견서 (의뢰인 발송용)</option>',
+      '        <option value="nlrc_brief">노동위원회 이유서·답변서 초안</option>',
+      '        <option value="notice">내용증명·시정요구서 (통지서)</option>',
+      '        <option value="redline_memo">취업규칙·근로계약서 신·구 조항 대비 의견서</option>',
+      '      </select>',
+      '    </label>',
+      '    <label class="pbox-field">',
+      '      <span class="pbox-label">문서 제목</span>',
+      '      <input id="pboxHandoffTitle" type="text" class="pbox-input" value="' + esc(previewDoc.title) + '">',
+      '    </label>',
+      '    <label class="pbox-field">',
+      '      <span class="pbox-label">수신 (예: 의뢰인 귀하 / 관할 지방노동위원회 귀중)</span>',
+      '      <input id="pboxHandoffRecipient" type="text" class="pbox-input" value="' + esc(previewDoc.recipient) + '">',
+      '    </label>',
+      '    <label class="pbox-field">',
+      '      <span class="pbox-label">발신·작성자</span>',
+      '      <input id="pboxHandoffSender" type="text" class="pbox-input" value="' + esc(previewDoc.sender) + '">',
+      '    </label>',
+      '    <div class="pbox-field">',
+      '      <span class="pbox-label">자동 연계 포함 항목 (개인정보 자동 비식별 + 미검증 인용 차단 적용)</span>',
+      '      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncTimeline" checked> 사실관계 일자별 연표</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncRedline" checked> 3단 신·구 조항 대비표</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncDeadlines" checked> 노동법 제척기간·시효표</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncCitations" checked> 검증 완료 근거 (' + previewDoc.verifiedCount + '건)</label>',
+      '      </div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="pbox-modal-ft" style="flex-wrap:wrap">',
+      '    <button type="button" class="pbox-btn-sm" data-act="handoff-download-doc">📄 Word(.doc) 저장</button>',
+      '    <button type="button" class="pbox-btn-sm" data-act="handoff-download-hwpx">📥 한글(.hwpx) 저장</button>',
+      '    <button type="button" class="pbox-btn-primary" data-act="handoff-open-hangul">🖋️ 푸른 한글 편집기로 바로 넘기기</button>',
+      '  </div>',
+      '</div>'
+    ].join('\n');
+    openModalHtml(html, false, false);
+  }
+
+  function readHandoffModalOptions() {
+    var typeEl = document.getElementById('pboxHandoffType');
+    var titleEl = document.getElementById('pboxHandoffTitle');
+    var recEl = document.getElementById('pboxHandoffRecipient');
+    var sndEl = document.getElementById('pboxHandoffSender');
+    var tlEl = document.getElementById('pboxHandoffIncTimeline');
+    var rlEl = document.getElementById('pboxHandoffIncRedline');
+    var dlEl = document.getElementById('pboxHandoffIncDeadlines');
+    var ctEl = document.getElementById('pboxHandoffIncCitations');
+    return {
+      docType: typeEl ? typeEl.value : 'opinion',
+      title: titleEl ? titleEl.value.trim() : '',
+      recipient: recEl ? recEl.value.trim() : '',
+      sender: sndEl ? sndEl.value.trim() : '',
+      includeTimeline: tlEl ? !!tlEl.checked : true,
+      includeRedline: rlEl ? !!rlEl.checked : true,
+      includeDeadlines: dlEl ? !!dlEl.checked : true,
+      includeCitations: ctEl ? !!ctEl.checked : true
+    };
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -2151,10 +2378,11 @@
       '    <div class="pbox-btn-group">',
       '      <button type="button" class="pbox-btn-sm" data-act="open-review-file"' + busyAttr + '>📂 문서 열기</button>',
       '      <input type="file" id="pboxReviewFileInput" accept=".pdf,.txt,.md,.json" style="display:none" aria-label="내용 검토할 문서 파일 선택">',
-      '      <button type="button" class="pbox-btn-sm" data-act="copy-thread">📋 복사</button>',
-      '      <button type="button" class="pbox-btn-sm" data-act="export-thread-md">📝 MD 저장</button>',
+      '      <button type="button" class="pbox-btn-primary" data-act="open-handoff-modal">📝 의견서·서면 연결 작성</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="quick-open-hangul">🖋️ 한글 바로 열기</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="export-thread-hwpx">📥 한글(.hwpx)</button>',
       '      <button type="button" class="pbox-btn-sm" data-act="export-thread-doc">📄 Word(.doc)</button>',
-      '      <button type="button" class="pbox-btn-primary" data-act="save-thread-proj">📁 프로젝트 담기</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="save-thread-proj">📁 프로젝트 담기</button>',
       '    </div>',
       '  </div>',
       '  <div id="pboxVoiceBannerSlot"></div>',
@@ -5082,9 +5310,66 @@
       }
     } else if (act === 'export-thread-doc') {
       if (state.activeThread) {
-        var docSrc = state.activeThread.answer || state.activeThread.sourceText || '';
-        var wordHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(state.activeThread.title) + '</title></head><body style="font-family:Malgun Gothic,sans-serif;line-height:1.7">' + formatSimpleMd(docSrc) + '</body></html>';
-        downloadBlob('pbox-opinion.doc', wordHtml, 'application/msword;charset=utf-8');
+        try {
+          var formalForDoc = buildFormalDocFromThread(state.activeThread, { docType: 'opinion' });
+          downloadBlob(formalForDoc.fileNameBase + '.doc', formalForDoc.html, 'application/msword;charset=utf-8');
+          toast('할루시네이션 차단 검증을 거친 Word(.doc) 의견서를 저장했습니다.');
+        } catch (errDoc) {
+          toast('Word(.doc) 생성 오류: ' + errDoc.message, 'err');
+        }
+      }
+    } else if (act === 'open-handoff-modal') {
+      showDocumentHandoffModal();
+    } else if (act === 'quick-open-hangul') {
+      if (state.activeThread) {
+        try {
+          var quickFormal = buildFormalDocFromThread(state.activeThread, { docType: 'opinion' });
+          openFormalDocInHangulEditor(quickFormal);
+        } catch (errQuick) {
+          toast('한글 편집기 연결 오류: ' + errQuick.message, 'err');
+        }
+      }
+    } else if (act === 'export-thread-hwpx') {
+      if (state.activeThread) {
+        try {
+          var quickHwpxDoc = buildFormalDocFromThread(state.activeThread, { docType: 'opinion' });
+          downloadFormalHwpx(quickHwpxDoc);
+          toast('표준 한글(.hwpx) 공식 의견서를 저장했습니다.');
+        } catch (errHwpx) {
+          toast('한글(.hwpx) 생성 오류: ' + errHwpx.message, 'err');
+        }
+      }
+    } else if (act === 'handoff-open-hangul') {
+      if (state.activeThread) {
+        try {
+          var hDoc = buildFormalDocFromThread(state.activeThread, readHandoffModalOptions());
+          closeModal();
+          openFormalDocInHangulEditor(hDoc);
+        } catch (errH1) {
+          toast('한글 편집기 연결 오류: ' + errH1.message, 'err');
+        }
+      }
+    } else if (act === 'handoff-download-hwpx') {
+      if (state.activeThread) {
+        try {
+          var hDoc2 = buildFormalDocFromThread(state.activeThread, readHandoffModalOptions());
+          downloadFormalHwpx(hDoc2);
+          closeModal();
+          toast(hDoc2.docTypeLabel + ' 한글(.hwpx) 파일을 저장했습니다.');
+        } catch (errH2) {
+          toast('한글(.hwpx) 생성 오류: ' + errH2.message, 'err');
+        }
+      }
+    } else if (act === 'handoff-download-doc') {
+      if (state.activeThread) {
+        try {
+          var hDoc3 = buildFormalDocFromThread(state.activeThread, readHandoffModalOptions());
+          downloadBlob(hDoc3.fileNameBase + '.doc', hDoc3.html, 'application/msword;charset=utf-8');
+          closeModal();
+          toast(hDoc3.docTypeLabel + ' Word(.doc) 파일을 저장했습니다.');
+        } catch (errH3) {
+          toast('Word(.doc) 생성 오류: ' + errH3.message, 'err');
+        }
       }
     } else if (act === 'save-thread-proj') {
       if (!state.activeThread) return;
@@ -6000,6 +6285,7 @@
 
     if (prevUid !== nextUid) {
       stopBackgroundAutoSync();
+      clearAllHangulBridges();
       resetSensitiveUiState();
       closeReader();
     }
@@ -6019,6 +6305,7 @@
       });
     } else {
       stopBackgroundAutoSync();
+      clearAllHangulBridges();
       state.userName = '노무사';
       global.PuPBoxStore.clearMemoryOnSignOut();
       renderAll();

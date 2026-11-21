@@ -514,7 +514,7 @@
        대표 판단과 맞는 비율(layaAgree)을 화면에 세어 두고, 충분히 맞으면 그때 «움직이게» 할지 대표가 정한다.
      ⚠ 한 번 의견을 받은 건은 다시 안 묻는다 · 못 받은 건은 LAYA_TRY 번까지만 · 한 번에 LAYA_MAX 건(이 PC CPU 로 한 건 1~3초 — 화면은 훑기 뒤에 따로 기다린다).
      ⚠ 못 물으면(판단기가 꺼짐·응답 없음) 던지지 않고 errors 에 적는다 — 화면이 한동안 쉰다. 모르는 답·범위 밖 확률은 쓰지 않는다. */
-  var LAYA_PORT = 18765, LAYA_MAX = 10, LAYA_TRY = 2;
+  var LAYA_PORT = 18766, LAYA_MAX = 10, LAYA_TRY = 2;   // ⚠ 18765 는 이 PC 의 한글편집기 실행 도우미 자리 — 겹쳐 편집기가 안 켜졌다(2026-11-21 옮김)
   var LAYA_VS = ['work', 'personal'];
   function layaPayload(x) {
     return { id: str(x && x.id), s: cut(x && x.s, 120), an: (Array.isArray(x && x.an) ? x.an : []).map(function (n) { return cut(n, 50); }).filter(Boolean).slice(0, 3) };

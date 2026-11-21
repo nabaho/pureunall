@@ -38,7 +38,7 @@
   // 지금 편집기에 올라 있는 문서를 저장 (수정된 문서만 저장하여 대용량 문서를 열자마자 멈추는 현상 방지)
   async function saveCurrent() {
     const app = A(), d = app && app.current();
-    if (!d || d.readOnly || !d.dirty || d._savedRev === rev) return;
+    if (!d || d.readOnly || d.noAutosave || !d.dirty || d._savedRev === rev) return;
     if (saving) { again = true; return; }
     saving = true;
     const curRev = rev;
