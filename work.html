@@ -15227,6 +15227,7 @@ function mvCandidates(){
           main:main, subs:subs };
         var mine=mvMine(main,subs,me);
         if(!all&&!mine) return;
+        if(!mvKey(c)) return;              // 열쇠를 못 만드는 원본(id 가 너무 김)은 옮기지 않는다 — 이알피에 그대로 보인다
         c.mine=mine;
         out.push(c);
       });
@@ -15287,12 +15288,14 @@ function erpMoveModal(){
   });
 }
 /* 옮긴 업무의 열쇠 — 원본에서 «정해진 이름»(같은 원본이면 늘 같은 자리).
-   ★ 두 창(두 사람)이 같은 것을 동시에 옮겨도 «같은 자리»에 쓰여 한 줄만 남는다(2회차 보안 검토 «중간» — 무작위 열쇠면 둘이 생겼다).
-   ⚠ 원본 id 에 열쇠로 못 쓰는 글자가 있으면 바꿔 쓰지 않는다(다른 원본과 겹칠 수 있다) — 그때만 무작위 열쇠로 물러선다. */
+   ★ 두 창(두 사람)이 같은 것을 동시에 옮겨도 «같은 자리»라 한 줄만 남는다(2회차 보안 검토 «중간» — 무작위 열쇠면 둘이 생겼다).
+   ★ 원본 id 를 encodeURIComponent 로 옮겨 적는다 — 열쇠 금지 글자(# $ [ ] /)는 %xx 로, 점(.)은 %2E 로.
+     서로 다른 id 가 같은 열쇠가 되지 않는다(되돌릴 수 있는 바꿈). 무작위 열쇠로 물러서지 않는다(3회차 «낮음»).
+   ⚠ 열쇠가 너무 길면(200자 넘음) 만들지 않는다 — 그 원본은 옮기기 목록에서 뺀다(mvCandidates). */
 function mvKey(c){
-  var s=String(c&&c.id||'');
-  if(!s||/[.#$\[\]\/]/.test(s)||s.length>80) return '';
-  return 'MV-'+(c.store==='biz_cases'?'B':'W')+'-'+s;
+  var s=String(c&&c.id!=null?c.id:''); if(!s) return '';
+  var k='MV-'+(c.store==='biz_cases'?'B':'W')+'-'+encodeURIComponent(s).replace(/\./g,'%2E');
+  return k.length<=200?k:'';
 }
 /* 옮길 한 줄 → 업무관리 업무. «＋ 새 업무»(saveItem)와 같은 칸에 출처(mv)·온톨로지 칸을 더한다 */
 function mvRecord(c,no,nowIso,id){
@@ -15320,25 +15323,37 @@ function erpMoveRun(){
   var pick=[].slice.call(document.querySelectorAll('.mvchk')).filter(function(c){ return c.checked; })
     .map(function(c){ return list[+c.value]; }).filter(Boolean);
   if(!pick.length){ if(msg) msg.textContent='고른 것이 없습니다.'; return; }
-  /* 그 사이 다른 창에서 옮겼을 수 있다 — 지금 목록으로 한 번 더 거른다 */
+  /* 그 사이 다른 창에서 옮겼을 수 있다 — 지금 목록으로 한 번 더 거른다(진짜 막이는 아래 «처음 한 번만») */
   var done=mvDoneMap();
-  pick=pick.filter(function(c){ var k=mvKey(c); return !done[c.store+'|'+c.id] && !(k&&items[k]); });
+  pick=pick.filter(function(c){ var k=mvKey(c); return k && !done[c.store+'|'+c.id] && !items[k]; });
   if(!pick.length){ if(msg) msg.textContent='이미 옮겨진 것들입니다.'; return; }
   if(btn) btn.disabled=true;
-  var up={}, nowIso=new Date().toISOString(), base=genNo('기타'), m=/^(.*-)(\d+)$/.exec(base), n0=m?+m[2]:1, recs={};
+  var nowIso=new Date().toISOString(), base=genNo('기타'), m=/^(.*-)(\d+)$/.exec(base), n0=m?+m[2]:1, recs={};
   pick.forEach(function(c,i){
     /* 세 자리로 채우되 1000번을 넘으면 자르지 않는다(slice(-3) 은 1000 → 000 으로 겹친다) */
     var n=String(n0+i); while(n.length<3) n='0'+n;
-    var id=mvKey(c)||rid('W'), no=m?(m[1]+n):base;
+    var id=mvKey(c), no=m?(m[1]+n):base;
     recs[id]=mvRecord(c,no,nowIso,id);
-    up[NS+'/items/'+id]=recs[id];
   });
-  fbDb.ref().update(up).then(function(){
-    Object.keys(recs).forEach(function(id){ items[id]=recs[id]; });
-    closeM(); toast('✅ '+pick.length+'건을 업무관리로 옮겼습니다'); route();
-  }).catch(function(e){
+  /* ★ 건마다 «처음 한 번만» 만든다(서버 트랜잭션 — 3회차 보안 검토 «중간»).
+       같은 자리에 이미 업무가 있으면(다른 창이 먼저 옮겼고 그 뒤 고치거나 끝냈을 수 있다) 덮지 않고 그만둔다.
+     ⚠ 그래서 «한꺼번에 다 아니면 하나도»는 아니다 — 몇 건이 실패하면 그 건만 안 옮겨지고, 다시 누르면 남은 것만 옮긴다(열쇠가 같아 겹치지 않는다). */
+  var ids=Object.keys(recs);
+  Promise.all(ids.map(function(id){
+    return fbDb.ref(NS+'/items/'+id).transaction(function(cur){ return cur ? undefined : recs[id]; })
+      .then(function(r){ return (r&&r.committed)?'ok':'had'; },function(){ return 'fail'; });
+  })).then(function(rs){
+    var ok=0, had=0, fail=0;
+    rs.forEach(function(r,i){ if(r==='ok'){ ok++; items[ids[i]]=recs[ids[i]]; } else if(r==='had') had++; else fail++; });
+    if(!fail){
+      closeM();
+      toast('✅ '+ok+'건을 업무관리로 옮겼습니다'+(had?' (이미 옮겨진 '+had+'건은 그대로 두었습니다)':''));
+      route(); return;
+    }
     if(btn) btn.disabled=false;
-    if(msg) msg.textContent='옮기지 못했습니다: '+(e&&e.message||e)+' — 아무것도 바뀌지 않았습니다.';
+    if(msg) msg.textContent='옮긴 것 '+ok+'건 · 못 옮긴 것 '+fail+'건'+(had?' · 이미 있던 것 '+had+'건':'')
+      +' — 다시 누르면 못 옮긴 것만 옮깁니다.';
+    if(ok) route();
   });
 }
 // 푸른이알피 해당 메뉴로 이동 (pu-erp는 #menu= 딥링크를 지원)

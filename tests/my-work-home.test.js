@@ -195,8 +195,11 @@ test('② 「내 업무」를 그릴 때 적는다 — 머리 숫자를 셈한 �
 });
 
 /* ═════ ③ 일반업무·업무케이스 옮기기 ═════ */
+/* 서버 흉내 — 트랜잭션은 «지금 서버 값»을 보고 정한다. 여러 창이 한 서버를 나눠 쓸 수 있다(o.서버). */
+let 가짜번호 = 0;
 function 옮기기놀이터(o) {
-  const 원본 = o.원본, 보냄 = [], 읽음 = [], 메시지 = { textContent: '' };
+  const 원본 = o.원본, 보냄 = [], 통째 = [], 읽음 = [], 메시지 = { textContent: '' };
+  const 서버 = o.서버 || {};
   const ctx = {
     S: { me: o.me || { sid: 'P-001', name: '나', title: '' }, year: 2026 },
     NS: 'work_erp', items: {}, MV_STORES: null, MV_TYPE: null,
@@ -207,10 +210,19 @@ function 옮기기놀이터(o) {
     fbDb: {
       ref: (p) => ({
         once: () => { 읽음.push(p); const k = p.replace(/^data\//, '').replace(/\/v$/, ''); return o.읽기실패 && o.읽기실패[k] ? Promise.reject(new Error('막힘')) : Promise.resolve({ val: () => 원본[k] }); },
-        update: (up) => { 보냄.push(up); return o.쓰기실패 ? Promise.reject(new Error('규칙')) : Promise.resolve(); },
+        update: (up) => { 통째.push(up); return Promise.resolve(); },
+        set: (v) => { 통째.push({ [p]: v }); return Promise.resolve(); },
+        transaction: (fn) => {
+          if (o.쓰기실패) return Promise.reject(new Error('규칙'));
+          const v = fn(Object.prototype.hasOwnProperty.call(서버, p) ? 서버[p] : null);
+          if (v === undefined) return Promise.resolve({ committed: false });
+          서버[p] = v; 보냄.push({ p, v });
+          return Promise.resolve({ committed: true });
+        },
       }),
     },
-    todayStr: () => '2026-11-21', genNo: () => '2026-기타-007', rid: (() => { let n = 0; return () => 'Wnew' + (++n); })(),
+    /* rid 는 놀이터끼리도 겹치지 않게(진짜처럼 무작위) — 창마다 같은 번호를 내면 «무작위 열쇠»가 우연히 같은 자리가 된다 */
+    todayStr: () => '2026-11-21', genNo: () => '2026-기타-007', rid: () => 'Wnew' + (++가짜번호),
     $: (id) => (id === 'mv-msg' ? 메시지 : null), document: { querySelectorAll: () => (o.고름 || []) },
     closeM() {}, toast() {}, route() {}, Promise,
   };
@@ -218,7 +230,7 @@ function 옮기기놀이터(o) {
   ['isOf', '_peArr', 'briefTrim', 'mvClosed', 'mvWho', 'mvMine', 'mvDoneMap', 'mvCandidates', 'mvKey', 'mvRecord', 'erpMoveRun']
     .forEach((n) => vm.runInContext(함수(WORK, n), ctx));
   vm.runInContext(줄(WORK, 'var BRIEF_MAX=') + '\n' + 줄(WORK, 'var MV_STORES=') + '\n' + 몸(WORK, 'var MV_TYPE=') + ';', ctx);
-  return { ctx, 보냄, 읽음, 메시지 };
+  return { ctx, 보냄, 통째, 읽음, 메시지, 서버 };
 }
 const 원본보기 = () => ({
   my_work_items: [
@@ -273,7 +285,7 @@ test('③★ 원본을 못 읽은 곳은 «없다»로 치지 않고 알린다',
   assert.ok(r.list.every((c) => c.store !== 'biz_cases'));
 });
 
-test('③★ 옮기기 — 한 번의 update · work_erp/items 아래만 · 원본(data/…)은 안 건드린다 · 종료 동기화 표식을 안 붙인다', async () => {
+test('③★ 옮기기 — 건마다 «처음 한 번만»(트랜잭션) · work_erp/items 아래만 · 원본(data/…)은 안 건드린다 · 종료 동기화 표식을 안 붙인다', async () => {
   const g = 옮기기놀이터({ 원본: 원본보기(), 관리자: true });
   const r = await g.ctx.mvCandidates();
   g.ctx.S._mvList = r.list;
@@ -281,11 +293,11 @@ test('③★ 옮기기 — 한 번의 update · work_erp/items 아래만 · 원�
   g.ctx.document.querySelectorAll = () => pick;
   g.ctx.erpMoveRun();
   await 흘려보내기();
-  assert.equal(g.보냄.length, 1, '★ 여러 번 나눠 쓴다 — 중간에 실패하면 반쯤 옮겨진다');
-  const keys = Object.keys(g.보냄[0]);
-  assert.equal(keys.length, 2);
+  assert.equal(g.통째.length, 0, '★ 통째 쓰기(update·set)를 쓴다 — 먼저 만들어진 업무를 덮을 수 있다');
+  assert.equal(g.보냄.length, 2);
+  const keys = g.보냄.map((x) => x.p);
   keys.forEach((k) => assert.match(k, /^work_erp\/items\/[^/]+$/, '★ 업무관리 업무 자리 밖에 쓴다: ' + k));
-  const recs = keys.map((k) => g.보냄[0][k]);
+  const recs = g.보냄.map((x) => x.v);
   recs.forEach((v) => {
     assert.ok(v.mv && v.mv.store && v.mv.id, '★ 어디서 옮겼는지(mv)가 없다 — 두 번 옮겨지고 이알피가 «옮겼다»를 모른다');
     assert.equal(v.src, undefined, '★ src 를 붙였다 — 이알피 종료 동기화가 원본을 건드린다');
@@ -304,26 +316,36 @@ test('③★ 옮기기 — 한 번의 update · work_erp/items 아래만 · 원�
   assert.ok(g.읽음.every((p) => /^data\/(my_work_items|biz_cases)\/v$/.test(p)), '원본 두 곳 말고 다른 데를 읽는다');
 });
 
-test('③★ 두 창에서 같은 것을 동시에 옮겨도 «같은 자리» — 업무가 둘로 생기지 않는다', async () => {
+test('③★ 두 창에서 같은 것을 옮겨도 «같은 자리» · 늦게 온 창은 먼저 만들어진(그 뒤 고친) 업무를 덮지 않는다', async () => {
+  const 서버 = {};
   async function 한창() {
-    const g = 옮기기놀이터({ 원본: 원본보기(), 관리자: true });
+    const g = 옮기기놀이터({ 원본: 원본보기(), 관리자: true, 서버 });   // 두 창이 한 서버를 나눠 쓴다(각자 화면 목록은 아직 모른다)
     const r = await g.ctx.mvCandidates();
     g.ctx.S._mvList = r.list;
     g.ctx.document.querySelectorAll = () => r.list.map((c, i) => ({ checked: true, value: String(i) }));
     g.ctx.erpMoveRun();
     await 흘려보내기();
-    return Object.keys(g.보냄[0] || {}).sort().join(',');
+    return g;
   }
-  const a = await 한창(), b = await 한창();
-  assert.ok(a.length > 0);
-  assert.equal(a, b, '★ 같은 원본을 옮겼는데 창마다 다른 자리에 쓴다 — 동시에 누르면 업무가 둘이 된다');
-  /* 열쇠로 못 쓰는 글자가 든 원본 id 는 바꿔 쓰지 않는다(다른 원본과 겹칠 수 있다) */
-  const g = 옮기기놀이터({ 원본: 원본보기() });
-  assert.equal(g.ctx.mvKey({ store: 'my_work_items', id: 'a.b' }), '', '★ 못 쓰는 글자를 바꿔 열쇠를 만든다 — 다른 원본과 겹칠 수 있다');
-  assert.notEqual(g.ctx.mvKey({ store: 'my_work_items', id: 'x1' }), g.ctx.mvKey({ store: 'biz_cases', id: 'x1' }), '두 원본 자리의 같은 id 가 한 자리로 겹친다');
+  const a = await 한창();
+  const 자리 = Object.keys(서버).sort();
+  assert.ok(자리.length > 0);
+  /* 먼저 옮긴 것을 사람이 고쳤다(끝냄) — 늦게 온 창이 이것을 덮으면 안 된다 */
+  서버[자리[0]] = Object.assign({}, 서버[자리[0]], { state: 'done', title: '사람이 고친 업무명' });
+  const b = await 한창();
+  assert.equal(Object.keys(서버).sort().join(','), 자리.join(','), '★ 같은 원본인데 창마다 다른 자리에 쓴다 — 업무가 둘이 된다');
+  assert.equal(b.보냄.length, 0, '★ 늦게 온 창이 이미 있는 업무를 다시 썼다');
+  assert.equal(서버[자리[0]].title, '사람이 고친 업무명', '★ 먼저 만들어지고 고쳐진 업무를 늦게 온 옮기기가 덮었다');
+  /* 열쇠: 금지 글자도 «되돌릴 수 있게» 옮겨 적는다 — 다른 id 와 겹치지 않고, 무작위로 물러서지 않는다 */
+  const k = (store, id) => a.ctx.mvKey({ store, id });
+  assert.ok(k('my_work_items', 'a.b') && !/[.#$\[\]\/]/.test(k('my_work_items', 'a.b').slice(5)), '★ 금지 글자 id 의 열쇠를 못 만들거나 금지 글자가 남는다');
+  assert.notEqual(k('my_work_items', 'a.b'), k('my_work_items', 'a_b'), '★ 다른 id 가 같은 열쇠가 된다(겹침)');
+  assert.notEqual(k('my_work_items', 'a/b'), k('my_work_items', 'a%2Fb'), '★ 다른 id 가 같은 열쇠가 된다(겹침)');
+  assert.equal(k('my_work_items', 'x1'), k('my_work_items', 'x1'), '같은 원본은 늘 같은 열쇠');
+  assert.notEqual(k('my_work_items', 'x1'), k('biz_cases', 'x1'), '두 원본 자리의 같은 id 가 한 자리로 겹친다');
 });
 
-test('③ 쓰기에 실패하면 아무것도 안 바뀐 것으로 둔다 · 그 사이 옮겨진 것은 다시 안 옮긴다', async () => {
+test('③ 쓰기에 실패하면 옮겨진 것처럼 안 보인다 · 그 사이 옮겨진 것은 다시 안 옮긴다', async () => {
   const g = 옮기기놀이터({ 원본: 원본보기(), 쓰기실패: true });
   const r = await g.ctx.mvCandidates();
   g.ctx.S._mvList = r.list;
