@@ -203,7 +203,8 @@ const 기금후보 = {
 const 오늘ms = Date.now();
 const 날짜 = (n) => { const d = new Date(오늘ms + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const data = {
-  work_erp: { mysum: { P001: { v: 1, n: 12, dd: [날짜(-1), 날짜(3)], nx: [날짜(0)], nl: 4, ws: 날짜(-30), we: 날짜(30), at: 오늘ms - 3600000 } } },
+  /* 열쇠 = 가짜 로그인 UID(seed.js 의 UID — require 하면 서로 부르기가 되어 undefined 라 글자로 적는다) */
+  work_erp: { mysum: { 'pa-uid-1': { v: 1, n: 12, dd: [날짜(-1), 날짜(3)], nx: [날짜(0)], nl: 4, ws: 날짜(-30), we: 날짜(30), at: 오늘ms - 3600000 } } },
   fund_erp: { contract_inbox: 기금후보 },
   data: {
     user_accounts: { u: U, v: 사람 },

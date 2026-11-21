@@ -2,7 +2,9 @@
    (대표 지시 2026-11-21 「로그인한 사람이 자기 업무를 한 번에 보고 클릭해서 확인」 → 추천대로).
 
    ★ 누가 쓰나: 업무관리(work.html)가 «내 업무» 화면을 그릴 때 그 사람 몫 한 줄만 적는다.
-       work_erp/mysum/{사번} = { v, n, dd[], nx[], nl, ws, we, at }
+       work_erp/mysum/{로그인 UID} = { v, n, dd[], nx[], nl, ws, we, at }
+       ⚠ 열쇠는 사번이 아니라 «로그인 UID»다 — 보안규칙이 «auth.uid === 열쇠»일 때만 쓰게 막는다(남이 내 숫자를 못 덮는다,
+         2026-11-21 보안 검토 지적). 세 화면은 같은 사이트라 로그인(UID)이 같다.
          n  = 진행 건수 — 업무관리 「내 업무」 머리의 «진행» 과 같은 셈(이관한 계약·자문·급여 뺌, 펼침 단추와 상관없이)
          dd = 기한(다음 할 일·업무 기한·사건 단계 기한 중 이른 것) 날짜들 — «임박»은 읽는 쪽이 «오늘» 기준으로 다시 센다
          nx = 다음 할 일 날짜들 — «오늘까지 할 일»도 읽는 쪽이 다시 센다
@@ -20,9 +22,10 @@
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function ymdOf(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
   function isYmd(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); }
-  /* 사번을 서버 열쇠로 — 열쇠에 못 쓰는 글자만 바꾼다(P-001 은 그대로) */
-  function key(sid) { return String(sid || '').trim().replace(/[.#$\[\]\/]/g, '_'); }
-  function pathOf(sid) { var k = key(sid); return k ? PATH + '/' + k : ''; }
+  /* 로그인 UID 를 서버 열쇠로. UID 는 글자·숫자뿐이지만, 열쇠에 못 쓰는 글자가 오면 «자리를 안 만든다»
+     (바꿔 쓰면 다른 사람 자리와 겹칠 수 있다 — 겹침보다 «숫자 없음»이 낫다) */
+  function key(uid) { var s = String(uid || '').trim(); return /[.#$\[\]\/]/.test(s) ? '' : s; }
+  function pathOf(uid) { var k = key(uid); return k ? PATH + '/' + k : ''; }
   /* 업무관리 dday 와 같은 셈 — 오늘 0 · 지났으면 음수 */
   function dday(dateStr, todayYmd) {
     if (!isYmd(dateStr) || !isYmd(todayYmd)) return null;

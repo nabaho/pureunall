@@ -71220,7 +71220,9 @@ function MyDeskV2(props){
         });
         setWsLogs(map);
       }).catch(function(){ setWsLogs({ __fail:true }); });
-      var _mp = (window.PuMyWork && sid) ? window.PuMyWork.pathOf(sid) : '';
+      /* 자리 열쇠는 로그인 UID(규칙이 본인 자리만 쓰게 막는다) — 포털·업무관리와 같은 사이트라 같은 로그인이다 */
+      var _fu = null; try{ _fu = (window.firebase && firebase.auth) ? firebase.auth().currentUser : null; }catch(e){}
+      var _mp = (window.PuMyWork && _fu) ? window.PuMyWork.pathOf(_fu.uid) : '';
       if(_mp) fbDb.ref(_mp).once('value').then(function(s){ setWsSum(s.val() || null); }).catch(function(){ setWsSum(null); });
       else setWsSum(null);
     }catch(e){}
@@ -71766,7 +71768,7 @@ function MyDeskV2(props){
             return h('button', { key:k, onClick:function(){ _goWork(hash); }, title:tip,
                 style:{ display:'inline-flex', alignItems:'baseline', gap:'4px', padding: IS_MOBILE?'3px 8px':'4px 10px', border:'1px solid #e2e8f0',
                   borderRadius:'8px', background:'#fff', cursor:'pointer', fontSize:'11.5px', color:'#475569', whiteSpace:'nowrap' } },
-              label, h('b', { style:{ fontSize: IS_MOBILE?'13px':'14px', color: n ? color : '#94a3b8', fontVariantNumeric:'tabular-nums' } }, String(n)));
+              label, h('b', { style:{ fontSize: IS_MOBILE?'13px':'14px', color: n ? color : '#64748b', fontVariantNumeric:'tabular-nums' } }, String(n)));
           }
           // 남은 것 몇 건을 한 줄 딱지로 — 누르면 원본(이알피 메뉴) 또는 옮기기 창. 다 못 보이면 「외 N건」
           function _chipList(list, onClickItem){
@@ -71774,7 +71776,9 @@ function MyDeskV2(props){
             return h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px 6px', marginTop:'6px' } },
               show.map(function(it){
                 var dL = it.dDay===null ? '' : it.dDay<0 ? ('D+'+Math.abs(it.dDay)) : it.dDay===0 ? 'D-Day' : ('D-'+it.dDay);
-                return h('span', { key:it.type+'-'+it.id, onClick:function(){ onClickItem(it); },
+                // 키보드로도 누른다(Tab 으로 와서 Enter·Space) — span 이라 role·tabIndex 를 붙인다
+                return h('span', { key:it.type+'-'+it.id, role:'button', tabIndex:0, onClick:function(){ onClickItem(it); },
+                    onKeyDown:function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onClickItem(it); } },
                     // 무슨 기한인지 — 단계 기한과 사람이 넣은 마감일을 구분해야 한다
                     title: (it.name || '') + (it.no ? ' · ' + it.no : '') + (it.dDayDate ? ' · ' + (it.dDayDate + (it.dDayWhy ? ' · ' + it.dDayWhy : '')) : ''),
                     style:{ display:'inline-flex', alignItems:'center', gap:'4px', maxWidth: IS_MOBILE?'100%':'280px', padding:'2px 8px',
@@ -71782,10 +71786,10 @@ function MyDeskV2(props){
                       cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', boxSizing:'border-box' } },
                   h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, padding:'0 5px', borderRadius:'8px', background:TYPE_BG[it.type], color:TYPE_COLOR[it.type] } }, TYPE_LABEL[it.type]),
                   h('span', { style:{ overflow:'hidden', textOverflow:'ellipsis' } }, (it.company && it.company !== '-') ? it.company : (it.name || '—')),
-                  dL && h('span', { style:{ flexShrink:0, fontFamily:'monospace', fontWeight:700, color: it.dDay<=3 ? '#dc2626' : '#94a3b8' } }, dL)
+                  dL && h('span', { style:{ flexShrink:0, fontFamily:'monospace', fontWeight:700, color: it.dDay<=3 ? '#dc2626' : '#64748b' } }, dL)
                 );
               }),
-              list.length > show.length && h('span', { style:{ fontSize:'11px', color:'#94a3b8', alignSelf:'center' } }, '외 ' + (list.length - show.length) + '건')
+              list.length > show.length && h('span', { style:{ fontSize:'11px', color:'#64748b', alignSelf:'center' } }, '외 ' + (list.length - show.length) + '건')
             );
           }
           var _btn = function(bg){ return { padding: IS_MOBILE?'3px 8px':'4px 10px', fontSize: IS_MOBILE?'10.5px':'11px', fontWeight:700, cursor:'pointer',
@@ -71797,15 +71801,15 @@ function MyDeskV2(props){
               _cnt ? [
                   _num('o', '진행', _cnt.open, '#1e40af', '', '업무관리 「내 업무」의 진행 건수'),
                   _num('d', '🔥 임박', _cnt.due, '#dc2626', '#f=due', '기한이 7일 안이거나 지난 업무 — 누르면 그 건만'),
-                  _num('n', '📌 할 일', _cnt.next, '#d97706', '#f=next', '다음 할 일 날짜가 오늘이거나 지난 업무 — 누르면 그 건만'),
+                  _num('n', '📌 할 일', _cnt.next, '#854d0e', '#f=next', '다음 할 일 날짜가 오늘이거나 지난 업무 — 누르면 그 건만'),
                   _cnt.nolog !== null && _num('l', '✍ 미기록', _cnt.nolog, '#854d0e', '#f=nolog', '이번 주에 사람이 쓴 기록이 없는 업무 — 누르면 그 건만')
                 ]
-                : h('span', { style:{ fontSize:'11.5px', color:'#94a3b8' } }, wsSum === undefined ? '숫자 불러오는 중…' : '숫자는 업무관리를 한 번 열면 나옵니다'),
+                : h('span', { style:{ fontSize:'11.5px', color:'#64748b' } }, wsSum === undefined ? '숫자 불러오는 중…' : '숫자는 업무관리를 한 번 열면 나옵니다'),
               h('span', { style:{ flex:1 } }),
               h('button', { onClick:function(){ _goWork('#new'); }, title:'업무관리 「＋ 새 업무」 창을 엽니다 — 새 업무는 업무관리 한 곳에서 만듭니다', style:_btn('#166534') }, '＋ 새 업무'),
               h('button', { onClick:function(){ _goWork(''); }, title:'업무관리 「내 업무」를 엽니다', style:_btn('#1e40af') }, '업무관리에서 열기 →')
             ),
-            _cnt && h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'4px' } },
+            _cnt && h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'4px', wordBreak:'keep-all' } },
               '업무관리 ' + window.PuMyWork.stamp(_cnt.at) + ' 기준 · 포털 머리줄 «📋 내 업무» 단추와 같은 숫자입니다'),
             !_wsOk && wsLogs && wsLogs.__fail && h('div', { style:{ marginTop:'8px', fontSize:'11px', color:'#854d0e' } },
               '⚠ 업무관리 목록을 읽지 못해 «업무관리에 아직 없는 업무»를 세지 못했습니다. 새로고침해 주세요.'),
@@ -71815,7 +71819,7 @@ function MyDeskV2(props){
                 h('span', { title:'이알피 사무관리에서 내가 주담당·부담당인데 업무관리에 아직 연결되지 않은 업무입니다',
                   style:{ fontSize:'12px', fontWeight:700, color:'#854d0e' } }, '🔗 업무관리에 아직 없는 내 업무 ' + _unl.length + '건'),
                 h('span', { style:{ flex:1 } }),
-                h('button', { onClick:function(){ _goWork('#peimport'); }, title:'업무관리 「주담당 업무 연결」 창을 엽니다', style:_btn('#d97706') }, '업무관리로 가져오기 →')
+                h('button', { onClick:function(){ _goWork('#peimport'); }, title:'업무관리 「주담당 업무 연결」 창을 엽니다', style:_btn('#854d0e') }, '업무관리로 가져오기 →')
               ),
               _chipList(_unl, function(it){ navigate('biz/' + it.type); })
             ),
@@ -71870,7 +71874,7 @@ function MyDeskV2(props){
             ),
 
             // 안내
-            h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
+            h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#64748b', lineHeight:'1.6', wordBreak:'keep-all' } },
               '💡 업무 목록·진행 기록·새 업무는 ',h('strong',null,'업무관리'),' 한 곳에서 봅니다. ',
               '사무관리에서 주담당/부담당으로 지정되면 업무관리 「내 업무」에 저절로 들어갑니다.'
             )

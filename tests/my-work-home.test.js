@@ -46,12 +46,23 @@ const 함수 = (src, name) => 몸(src, 'function ' + name + '(');
 const 줄 = (src, head) => { const a = src.indexOf(head); assert.ok(a >= 0, head + ' 줄이 없다'); return src.slice(a, src.indexOf('\n', a)); };
 
 /* ═════ ① 숫자 한 줄 ═════ */
-test('① 자리 — 사번 하나에 한 줄 · 열쇠에 못 쓰는 글자는 바꾼다 · 사번이 없으면 자리도 없다', () => {
-  assert.equal(M.pathOf('P-001'), M.PATH + '/P-001');
+test('① 자리 — 로그인 UID 하나에 한 줄 · 열쇠에 못 쓰는 글자가 오면 자리를 안 만든다 · 누구인지 모르면 자리도 없다', () => {
+  assert.equal(M.pathOf('aBc123'), M.PATH + '/aBc123');
   assert.ok(M.PATH.indexOf('work_erp/') === 0, '★ 업무관리 자리(work_erp) 밖에 적는다 — 규칙이 다른 자리다');
-  assert.ok(!/[.#$\[\]]/.test(M.pathOf('a.b#c$d[e]').slice(M.PATH.length + 1)), '열쇠에 못 쓰는 글자가 남는다');
+  /* 바꿔 써서 만들면 다른 사람 자리와 겹칠 수 있다(a.b → a_b 와 a_b) — 겹침보다 «숫자 없음»이 낫다 */
+  assert.equal(M.pathOf('a.b'), '', '★ 열쇠에 못 쓰는 글자를 바꿔 자리를 만든다 — 남의 자리와 겹칠 수 있다');
+  assert.equal(M.pathOf('a/b'), '');
   assert.equal(M.pathOf(''), '');
   assert.equal(M.pathOf(null), '');
+});
+
+test('①★ 보안규칙 — 숫자 한 줄은 «본인 UID 자리만» 쓴다(남이 덮지 못한다) · 모양을 본다', () => {
+  const R = JSON.parse(read('docs/firebase-rules-전체-적용본.json')).rules;
+  const 자리 = R.work_erp && R.work_erp.mysum && R.work_erp.mysum.$uid;
+  assert.ok(자리, '★ work_erp/mysum 에 이름 붙은 규칙이 없다 — 로그인 직원 누구나 쓰는 $k 로 떨어진다');
+  assert.match(자리['.write'] || '', /auth\.uid === \$uid/, '★ 본인 UID 자리만 쓰게 막지 않는다');
+  assert.match(자리['.validate'] || '', /hasChildren/, '모양(통짜 값 등)을 안 본다');
+  assert.equal(R.work_erp.mysum['.write'], undefined, '★ 자리 통째에 쓰기를 열었다 — 남의 줄까지 한 번에 덮을 수 있다');
 });
 
 test('①★ 임박·할 일은 «날짜»로 남기고 읽는 날의 «오늘»로 다시 센다 — 업무관리를 어제 열었어도 맞다', () => {
@@ -109,6 +120,7 @@ function 적기놀이터(o) {
   const 적음 = [];
   const ctx = {
     window: { PuMyWork: M }, S: { me: o.me === undefined ? { sid: 'P-001', name: '나' } : o.me },
+    firebase: { auth: () => ({ currentUser: o.uid === null ? null : { uid: o.uid || 'U-ME' } }) },
     fbDb: { ref: (p) => ({ set: (v) => { 적음.push({ p, v }); return Promise.resolve(); } }) },
     isCurWeek: () => o.cur !== false,
     openItems: () => o.items,
@@ -136,7 +148,7 @@ test('②★ «내 몫» 한 줄만 · 진행은 이관 계약·자문을 빼고
   g.ctx.mysumWrite({ nolog: [1, 2] });
   await 흘려보내기();
   assert.equal(g.적음.length, 1);
-  assert.equal(g.적음[0].p, M.pathOf('P-001'), '★ 내 자리가 아닌 곳에 적는다');
+  assert.equal(g.적음[0].p, M.pathOf('U-ME'), '★ 내 로그인 UID 자리가 아닌 곳에 적는다(규칙이 막아 못 적는다)');
   const v = g.적음[0].v;
   assert.equal(v.n, 3, '★ 진행 셈이 업무관리 머리 숫자와 다르다(이관 계약·자문 빼기, 부담당 넣기)');
   assert.ok(v.dd.indexOf('2026-11-22') < 0, '★ 남의 업무 기한이 내 숫자에 섞인다');
@@ -163,6 +175,10 @@ test('② 바뀐 것이 없으면 다시 안 적는다 · 지난주를 보는 �
   const nobody = 적기놀이터({ items, me: { sid: '', name: '' } });
   nobody.ctx.mysumWrite({ nolog: [] }); await 흘려보내기();
   assert.equal(nobody.적음.length, 0, '★ 누구인지 모르는데 적는다');
+
+  const nologin = 적기놀이터({ items, uid: null });
+  nologin.ctx.mysumWrite({ nolog: [] }); await 흘려보내기();
+  assert.equal(nologin.적음.length, 0, '★ 로그인(UID)을 모르는데 적는다');
 });
 
 test('② 「내 업무」를 그릴 때 적는다 — 머리 숫자를 셈한 «바로 그 자리»에서', () => {
@@ -193,7 +209,7 @@ function 옮기기놀이터(o) {
     closeM() {}, toast() {}, route() {}, Promise,
   };
   vm.createContext(ctx);
-  ['isOf', '_peArr', 'briefTrim', 'mvClosed', 'mvWho', 'mvDoneMap', 'mvCandidates', 'mvRecord', 'erpMoveRun']
+  ['isOf', '_peArr', 'briefTrim', 'mvClosed', 'mvWho', 'mvMine', 'mvDoneMap', 'mvCandidates', 'mvRecord', 'erpMoveRun']
     .forEach((n) => vm.runInContext(함수(WORK, n), ctx));
   vm.runInContext(줄(WORK, 'var BRIEF_MAX=') + '\n' + 줄(WORK, 'var MV_STORES=') + '\n' + 몸(WORK, 'var MV_TYPE=') + ';', ctx);
   return { ctx, 보냄, 읽음, 메시지 };
@@ -225,6 +241,16 @@ test('③★ 후보 — 끝난 것·보관함·휴지통·이미 옮긴 것은 �
   ['w1', 'w5', 'b1', 'b2', 'b3'].forEach((id) => assert.ok(aids.indexOf(id) >= 0, '관리자 후보에 ' + id + ' 가 없다'));
   ['w2', 'w3', 'w4', 'w6', 'b4'].forEach((id) => assert.ok(aids.indexOf(id) < 0, '★ 옮기면 안 될 ' + id + ' 가 후보에 있다'));
   assert.equal(adm.list[0].mine, true, '내 것이 위로 와야 한다');
+});
+
+test('③★ 동명이인 — 사번이 다르면 이름이 같아도 «내 것»이 아니다(남의 일반업무가 섞이지 않는다)', async () => {
+  const 원본 = { my_work_items: [
+    { id: 'x1', sid: 'P-009', title: '같은 이름 다른 사람', status: 'open' },
+    { id: 'x2', sid: 'P-001', title: '진짜 내 것', status: 'open' },
+  ], biz_cases: [] };
+  const 명부 = [{ sid: 'P-001', name: '나' }, { sid: 'P-009', name: '나' }];
+  const r = await 옮기기놀이터({ 원본, 명부 }).ctx.mvCandidates();
+  assert.equal(r.list.map((c) => c.id).join(','), 'x2', '★ 이름만 같은 남의 업무가 내 후보에 섞인다');
 });
 
 test('③★ 담당 이름만 있는 옛 자료 — «하나로 정해질 때만» 사번을 붙인다(지어내지 않는다)', async () => {
@@ -340,7 +366,7 @@ test('⑤★ 업무관리는 자료함 타일이 아니라 머리줄 단추 — 
 test('⑤★ 포털은 «그 사람 몫 한 줄»만 읽는다 — 업무 목록 통째(work_erp/items)를 안 읽는다', () => {
   const 코드 = stripJs(숫자구역);
   assert.ok(!/work_erp\/items/.test(코드), '★ 포털이 업무 목록 전체를 읽는다 — 모든 직원이 포털을 열 때마다 내려받는다');
-  assert.match(코드, /PuMyWork\.pathOf\(sid\)|M\.pathOf\(sid\)/, '읽는 자리를 공용 모듈에서 정하지 않는다(쓰는 쪽과 어긋날 수 있다)');
+  assert.match(코드, /\.pathOf\(\w+\)/, '읽는 자리를 공용 모듈에서 정하지 않는다(쓰는 쪽과 어긋날 수 있다)');
   assert.equal((코드.match(/\.ref\(/g) || []).length, 1, '읽는 곳이 한 곳이 아니다');
 });
 
@@ -352,8 +378,11 @@ function 포털놀이터(o) {
     portalYmdOf: (d) => M.ymdOf(d),
   };
   vm.createContext(ctx);
-  vm.runInContext(숫자구역.replace(/var _curSid = '';/, 'var _curSid = ' + JSON.stringify(o.sid || '') + ';'), ctx);
-  return { ctx, 읽음 };
+  /* 누구 몫인지(로그인 UID)를 담는 첫 줄 — 이름은 바뀔 수 있으니 «var _cur…= '';» 꼴로 찾아 갈아 끼운다 */
+  const m = /var (_cur\w+) = '';/.exec(숫자구역);
+  assert.ok(m, '«누구 몫» 변수 줄을 못 찾았다');
+  vm.runInContext(숫자구역.replace(m[0], 'var ' + m[1] + ' = ' + JSON.stringify(o.sid || '') + ';'), ctx);
+  return { ctx, 읽음, 누구: m[1] };
 }
 
 test('⑤★ 읽으면 숫자 · 못 읽으면 null(캐시에 안 담아 다음에 다시) · 사번이 없으면 읽지도 않는다', async () => {
@@ -380,13 +409,20 @@ test('⑤★ 읽으면 숫자 · 못 읽으면 null(캐시에 안 담아 다음�
 test('⑤★ 사람이 바뀌면 앞사람 숫자를 버린다', async () => {
   const g = 포털놀이터({ sid: 'P-001', 값: { [M.pathOf('P-001')]: M.build({ n: 7, now: Date.now() }), [M.pathOf('P-002')]: M.build({ n: 2, now: Date.now() }) } });
   assert.equal((await g.ctx.portalMyWorkCount()).open, 7);
-  vm.runInContext("_curSid = 'P-002';", g.ctx);
+  vm.runInContext(g.누구 + " = 'P-002';", g.ctx);
   assert.equal((await g.ctx.portalMyWorkCount()).open, 2, '★ 다른 사람으로 바뀌었는데 앞사람 숫자를 보인다');
-  assert.deepEqual(g.읽음, [M.pathOf('P-001'), M.pathOf('P-002')]);
-  /* 누구 몫으로 읽을지는 포털을 그리는 첫머리에서 정한다(단추를 그리기 전에) */
+  assert.equal(g.읽음.join(','), [M.pathOf('P-001'), M.pathOf('P-002')].join(','));
+  /* 누구 몫으로 읽을지는 포털을 그리는 첫머리에서 «로그인 UID»로 정한다(단추를 그리기 전에) */
   const rp = 함수(ENTER, 'renderPortal');
-  const s = rp.indexOf('_curSid = mySid'), loop = rp.indexOf('APPS.forEach(function(app){');
-  assert.ok(s > 0 && loop > s, '★ 단추를 그리기 전에 «누구 몫»을 안 정한다 — 앞사람 숫자를 읽는다');
+  const s = rp.indexOf(g.누구 + ' = (auth.currentUser'), loop = rp.indexOf('APPS.forEach(function(app){');
+  assert.ok(s > 0 && loop > s, '★ 단추를 그리기 전에 «누구 몫(로그인 UID)»을 안 정한다 — 앞사람 숫자를 읽는다');
+});
+
+test('⑤★ 태블릿·폰 머리줄은 한 줄 — «내 업무» 단추가 들어온 만큼 ≤900px 에서 챗봇 글자를 접는다', () => {
+  const css = ENTER.slice(0, ENTER.indexOf('</style>'));
+  assert.match(css, /@media\(max-width:900px\)\{ \.pbar #chatFab \.chat-lb\{display:none;\} \}/,
+    '★ 768px 태블릿에서 로그아웃이 화면 밖으로 밀린다(머리줄은 한 줄 — 단추 글자를 접어야 들어간다)');
+  assert.match(ENTER, /id="chatFab"[^>]*aria-label="[^"]+"/, '글자를 접으면 접근성 이름이 있어야 한다');
 });
 
 test('⑤ 단추에 숫자 — PC 는 한 줄, 폰 딱지는 급한 것(임박+할 일)만 · 말풍선은 언제 기준인지 밝힌다', () => {
@@ -432,8 +468,15 @@ test('⑥★ 업무관리 목록을 못 읽었으면 «업무관리에 없음»�
   assert.match(MYDESK, /setWsLogs\(\{ __fail:true \}\)/, '못 읽었을 때를 가르지 않는다');
   assert.match(MYDESK, /var _unl = _wsOk \?/, '★ 못 읽었는데도 «업무관리에 없는 업무»를 센다 — 다 없음으로 보인다');
   assert.match(MYDESK, /var _left = _wsOk \?/, '★ 못 읽었는데도 «옮길 것»을 센다');
-  assert.match(MYDESK, /PuMyWork\.pathOf\(sid\)/, '숫자를 공용 모듈 자리에서 안 읽는다');
+  assert.match(MYDESK, /PuMyWork\.pathOf\(\w+\.uid\)/, '숫자를 공용 모듈 자리(로그인 UID)에서 안 읽는다');
   assert.match(MYDESK, /PuMyWork\.counts\(wsSum, todayStr/, '숫자를 공용 모듈 셈으로 안 센다 — 포털과 숫자가 갈린다');
+});
+
+test('⑥ 남은 업무 딱지는 키보드로도 누른다(Tab·Enter·Space)', () => {
+  const chip = 몸(MYDESK, 'function _chipList(');
+  assert.match(chip, /role:'button'/, '딱지가 단추라고 스크린리더에 안 알린다');
+  assert.match(chip, /tabIndex:0/, '★ Tab 으로 딱지에 못 온다');
+  assert.match(chip, /onKeyDown:function\(e\)\{ if\(e\.key==='Enter'\|\|e\.key===' '\)/, '★ Enter·Space 로 못 누른다');
 });
 
 test('⑥ 세 화면이 같은 모듈을 싣는다', () => {

@@ -11,7 +11,9 @@ module.exports = {
   data: {
     work_erp: {
       mysum: {
-        P001: { v: 1, n: 12, dd: [날(-1), 날(3), 날(20)], nx: [날(0)], at: Date.now() - 3600000 }
+        /* 열쇠는 로그인 UID(규칙이 본인 자리만 쓰게 막는다) — 가짜 로그인의 UID(seed.js 의 UID).
+           ⚠ seed.js 를 require 하면 «서로 부르기»가 되어 UID 가 undefined 로 온다 — 다른 씨앗처럼 글자로 적는다 */
+        'pa-uid-1': { v: 1, n: 12, dd: [날(-1), 날(3), 날(20)], nx: [날(0)], at: Date.now() - 3600000 }
       }
     },
     data: {

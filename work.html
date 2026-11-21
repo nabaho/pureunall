@@ -1176,6 +1176,9 @@
   .mvtbl th,.mvtbl td{padding:5px 4px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
   .mvtbl thead th{border-top:0;background:var(--bg)}
   .mvtbl .mv-sub{display:none}
+  /* ☐ 는 label 로 감싸 칸 전체를 누르는 자리로 — 손가락이 13px 네모를 맞추지 않아도 된다(24px 넘게) */
+  .mvtbl .mvck{display:flex;align-items:center;justify-content:center;min-width:24px;min-height:26px;cursor:pointer}
+  .mvtbl .mvck input{width:16px;height:16px;margin:0;cursor:pointer}
   @media (max-width:560px){
     .mvtbl .mv-pc{display:none}
     .mvtbl .mv-sub{display:block;font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis}
@@ -7487,7 +7490,7 @@ function focusCounts(){
   return {due:due,nolog:nolog,next:next,done:done};
 }
 /* 📋 내 업무 숫자 한 줄 — 포털 머리줄 «내 업무» 단추와 이알피 「나의 업무」가 읽는다 (대표 지시 2026-11-21 「추천대로」).
-   work_erp/mysum/{사번} — 모양·읽는 법은 js/pu-mywork.js 머리글.
+   work_erp/mysum/{로그인 UID} — 모양·읽는 법은 js/pu-mywork.js 머리글. 규칙이 «본인 UID 자리만» 쓰게 막는다.
    ★ «내 몫» 한 줄만 적는다 — 남의 숫자를 대신 적지 않는다(그 사람 화면의 셈은 그 사람 화면이 한다).
    ★ 이번 주를 볼 때만 적는다 — 「미기록」은 «이번 주» 숫자여야 한다. 지난주를 보는 동안은 안 적는다.
    ★ 진행(n)은 머리 숫자와 같은 셈 — 이관한 계약·자문·급여를 뺀다. «펴 보기» 단추를 눌렀는지와 상관없이 같다.
@@ -7510,7 +7513,8 @@ function mysumWrite(fc){
     var rec=M.build({ n:open.filter(function(it){ return !xferOf(it)&&!wsAdv(it); }).length,
       dues:dues, nexts:nexts, nolog:fc.nolog.length, ws:ymd(mon), we:ymd(addDays(mon,6)), now:Date.now() });
     if(_mysumLast&&M.same(_mysumLast,rec)) return;
-    var p=M.pathOf(me.sid); if(!p) return;
+    var fu=null; try{ fu=firebase.auth().currentUser; }catch(e){}
+    var p=M.pathOf(fu&&fu.uid); if(!p) return;
     _mysumBusy=true;
     fbDb.ref(p).set(rec).then(function(){ _mysumLast=rec; },function(){}).then(function(){
       _mysumBusy=false;
@@ -15184,6 +15188,13 @@ function mvWho(v,staff){
   if(byName.length===1) return {sid:byName[0].sid,name:byName[0].name};
   return {sid:'',name:s};
 }
+/* «내 것»인가 — 사번으로만 본다. isOf 는 이름이 같아도 «내 것»으로 치므로(동명이인이면 남의 일이 섞인다,
+   2026-11-21 보안 검토 지적) 여기서는 쓰지 않는다. 사번 없는 옛 자료(이름만, 명부에서 하나로 안 정해짐)는
+   «내 것»으로 치지 않는다 — 관리자 화면(전 직원)에서는 그대로 보이니 그때 옮긴다. */
+function mvMine(main,subs,me){
+  var ms=me&&me.sid; if(!ms) return false;
+  return [main].concat(subs||[]).some(function(w){ return !!(w&&w.sid&&w.sid===ms); });
+}
 /* 이미 옮긴 것 — store|id */
 function mvDoneMap(){
   var m={};
@@ -15214,7 +15225,7 @@ function mvCandidates(){
           due:String(x.dueDate||'').slice(0,10), start:String(x.startDate||'').slice(0,10),
           brief:[x.detail||x.description||'', x.result?('결과: '+x.result):''].filter(Boolean).join(' / '),
           main:main, subs:subs };
-        var mine=(main&&isOf({mgr_main:main,mgr_subs:subs},me));
+        var mine=mvMine(main,subs,me);
         if(!all&&!mine) return;
         c.mine=mine;
         out.push(c);
@@ -15248,15 +15259,15 @@ function erpMoveModal(){
       +'<table class="mvtbl"><colgroup><col style="width:28px"><col style="width:36px"><col>'
       +'<col class="mv-pc" style="width:26%"><col class="mv-pc" style="width:15%"><col class="mv-pc" style="width:88px"></colgroup>'
       +'<thead><tr>'
-      +'<th style="text-align:center"><input type="checkbox" checked onclick="mvAll(this.checked)" title="보이는 줄 모두 고르기"></th>'
-      +'<th style="text-align:right">#</th>'
-      +'<th>업무</th><th class="mv-pc">업체</th><th class="mv-pc">담당</th><th class="mv-pc">기한</th></tr></thead><tbody>'
+      +'<th scope="col" style="text-align:center"><label class="mvck"><input type="checkbox" checked onclick="mvAll(this.checked)" title="보이는 줄 모두 고르기" aria-label="보이는 줄 모두 고르기"></label></th>'
+      +'<th scope="col" style="text-align:right">#</th>'
+      +'<th scope="col">업무</th><th scope="col" class="mv-pc">업체</th><th scope="col" class="mv-pc">담당</th><th scope="col" class="mv-pc">기한</th></tr></thead><tbody>'
       +r.list.map(function(c,i){
         var nm=(c.type?'['+c.type+'] ':'')+(c.title||'(제목 없음)');
         var who=c.main?(c.main.name||c.main.sid):'';
         var whoH=who?esc(who):'<span style="color:var(--warn)">담당 모름</span>';
-        return '<tr><td style="text-align:center">'
-          +'<input type="checkbox" class="mvchk" value="'+i+'" checked onchange="mvCount()"></td>'
+        return '<tr><td style="text-align:center"><label class="mvck">'
+          +'<input type="checkbox" class="mvchk" value="'+i+'" checked onchange="mvCount()" aria-label="'+esc('옮기기 고르기: '+c.kind+' '+nm)+'"></label></td>'
           +'<td class="muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
           +'<td class="mv-w" title="'+esc(c.kind+' · '+nm+(c.company?' · '+c.company:''))+'">'
           +'<span class="mv-n"><span class="muted">'+esc(c.kind)+'</span> '+esc(nm)+'</span>'
@@ -15266,7 +15277,7 @@ function erpMoveModal(){
           +'<td class="mv-pc">'+whoH+'</td>'
           +'<td class="mv-pc" style="font-variant-numeric:tabular-nums">'+esc(c.due||'—')+'</td></tr>';
       }).join('')+'</tbody></table></div>'
-      +'<div id="mv-msg" class="muted" style="font-size:12px;min-height:18px;margin-top:8px"></div>'
+      +'<div id="mv-msg" class="muted" role="status" aria-live="polite" style="font-size:12px;min-height:18px;margin-top:8px"></div>'
       +'<div class="row" style="justify-content:flex-end;margin-top:6px"><button onclick="closeM()">취소</button>'
       +'<button class="primary" id="mv-go" onclick="erpMoveRun()">'+r.list.length+'건 옮기기</button></div>';
     showModal(h);
@@ -15308,7 +15319,9 @@ function erpMoveRun(){
   if(btn) btn.disabled=true;
   var up={}, nowIso=new Date().toISOString(), base=genNo('기타'), m=/^(.*-)(\d+)$/.exec(base), n0=m?+m[2]:1, recs={};
   pick.forEach(function(c,i){
-    var id=rid('W'), no=m?(m[1]+('00'+(n0+i)).slice(-3)):base;
+    /* 세 자리로 채우되 1000번을 넘으면 자르지 않는다(slice(-3) 은 1000 → 000 으로 겹친다) */
+    var n=String(n0+i); while(n.length<3) n='0'+n;
+    var id=rid('W'), no=m?(m[1]+n):base;
     recs[id]=mvRecord(c,no,nowIso,id);
     up[NS+'/items/'+id]=recs[id];
   });
