@@ -408,7 +408,16 @@
                       {path:'scal_jobtrans/mid/{id}',entityType:'Document'},
                       {path:'scal_jobtrans/final/{id}',entityType:'Document'},
                       {path:'scal_jobtrans/snapshots/{pid}/{id}',entityType:'Document'}],
-      entityTypes:['Organization','Person','Project','Document','Task','Message'] }
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 데이터관리(2026-11-21) — 대표 전용. 원본(입금·명부·업체·업무·관계망)은 «읽기만» 하고 화면 안에서 센다.
+       제 자리는 보기 설정(datahub/{uid}/settings)뿐 — 기기·일회용 문제·현황판 숫자는 서버 함수만 쓴다(INFRA_ROOTS).
+       ⚠ 사람 이름·업체명을 관계 열쇠로 쓰지 않는다(sid·companyId). 채팅으로는 가명 숫자만 나간다. */
+    datahub:{ name:'데이터관리', file:'pu-datahub.html', primaryRoots:['datahub/{uid}'],
+      sharedRoots:['uid_roles','app_owner','data/finance_income','data/user_dir','data/companies','work_erp/items','work_erp/logs',
+        'ontology/v1','datahub_device/{uid}','datahub_board'],
+      entityTypes:['ViewState'], sourceMutation:'never',
+      writeContracts:[{path:'datahub/{uid}/settings',entityType:'ViewState'}],
+      note:'대표 전용 3D·현황판·연결 지도·다년 대조 — 원본은 읽기만, 자기 자리는 보기 설정뿐' }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -598,7 +607,17 @@
     login_countries:'계정별 알려진 접속 국가', login_fail_burst:'짧은 시간 비밀번호 반복실패 셈',
     /* 2026-09-27 카카오 로그인 — 「연결됨」 표시만. 카카오 회원번호(누구 것인지 찾는 표)는
        서버 전용 자리(kakao_links)에 있어 화면이 아예 안 읽는다. */
-    uid_kakao:'계정별 카카오 로그인 연결 표시'
+    uid_kakao:'계정별 카카오 로그인 연결 표시',
+    /* 데이터관리(2026-11-21) — 업무 자료가 아니라 «문·기기·살림 숫자»다. 사람이 화면에서 쓰지 않는다(규칙 .write:false — 서버 함수·터미널만). */
+    app_owner:'대표 표지 — 대표 uid 하나(화면에서 아무도 못 씀, 터미널 scripts/datahub-owner.js)',
+    datahub_device:'데이터관리 채팅 기기 — 승인된 공개 열쇠·지문(서버·터미널만 씀)',
+    datahub_device_req:'데이터관리 채팅 기기 등록 요청 — 승인되면 지움(서버만)',
+    datahub_nonce:'데이터관리 채팅 일회용 문제 — 쓰면 지움(서버만)',
+    datahub_activity:'데이터관리 채팅 마지막 질문 시각 — 15분 재인증용(서버만)',
+    datahub_board:'데이터관리 현황판 — 앱별 건수·비율만(서버가 한 시간마다 씀, 대표만 읽음)',
+    /* 관계망 판(ontology/v1) — 원본이 아니라 원본에서 «파생»한 관계층이다. 이알피 «온톨로지 진단»의 관계망 올리기가 쓰고(관리자),
+       데이터관리 연결 지도가 읽기만 한다. 쓰는 쪽은 변수(ONT_ROOT)로 불러 검사의 눈에 안 띄었고, 2026-11-21 데이터관리가 글자로 읽으면서 여기 밝힌다 */
+    ontology:'온톨로지 관계망 판 — 확정 관계만, 이름·본문 없음(이알피 온톨로지 진단이 올림, 데이터관리는 읽기만)'
   };
 
   /* ── 사전에만 있고 아직 만들지 않는 관계어 ──
@@ -729,7 +748,9 @@
     fin_private:{program:'fin',strategy:'in_app',parser:'finMetadata'},
     rules_documents:{program:'rules',strategy:'in_app',parser:'ruleMetadata'},
     esign_cases:{program:'docs',strategy:'in_app',parser:'esignMetadata'},
-    newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'}
+    newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'},
+    /* 데이터관리 — 돈·사람별 실적이라 통합 화면에서 따로 열지 않는다. 앱 안에서만(대표 전용) */
+    datahub_view:{program:'datahub',strategy:'in_app',path:'datahub/{uid}',parser:'coverage',gives:'대표 보기 설정만 — 집계는 화면 안에서 하고 저장하지 않는다'}
   };
 
   function arr(v){

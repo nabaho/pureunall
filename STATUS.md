@@ -231,6 +231,14 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
+### 📊 데이터관리(대표 전용) — 대표 표지 넣기 · 서버 함수 배포 · 대표 PC 기기 승인 (2026-11-21 대표 「한번에 모든 것 다해고 내부관리에 넣어달라」)
+
+`status/2026-11-21-datahub-app.md` · 가지 `claude/datahub-app`. 앱·보안규칙은 들어갔고, 아래 셋은 «운영 일»이라 대표 승인 뒤에 한다.
+- [ ] (대표 승인) 대표 표지: `node scripts/datahub-owner.js --uid <대표 uid> --apply` — 없으면 앱이 대표에게도 «대표 표지가 아직 없습니다»로 닫힌다(모르면 닫는 문).
+- [ ] (대표 승인) 서버 함수 넷 배포: GitHub «Firebase 배포» functions=`datahubDeviceRequest,datahubChallenge,datahubAsk,datahubBoardTally` — 전에는 현황판 «서버 집계 전»(회색)·채팅 «채팅 서버 준비 전». 현황판 집계는 1시간마다 돈다.
+- [ ] (대표 PC) 채팅 기기: 데이터관리 «잠금·채팅»에서 등록 요청 → 화면의 지문으로 `node scripts/datahub-device.js --approve <지문> --apply`.
+- [ ] (대표 눈) 표지를 넣은 뒤 대표 화면의 이번 달 입금·사람별 몫이 이알피 성과관리·손익과 같은 달·같은 거르개로 맞는지, 기준값(⚙ 기준 정하기)을 정할지.
+
 ### 🎓 강의자료(옛 이름 법정교육자료함) — 메일에만 있는 강의 첨부 20건 가져오기 (2026-11-20 대표 「니가해라 … 똑같은자료는 빼라 … 나머지 강의했던것도 찾아넣어라」)
 
 `status/2026-11-20-feat-edulib-lectures.md`. **PC 강의자료 729건(16.6GB)은 AI 가 넣었다** — 창고 `edulib/{id}/` 에 원본 그대로, `/edulib/items` 에 기록(만든이 `AI-PC가져오기`, 상태 «검토 대기»).

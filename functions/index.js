@@ -8741,3 +8741,39 @@ exports.collectFundMailOnNew = functions
       return null;
     }
   });
+
+/* 📊 데이터관리(대표 전용, pu-datahub.html) — 서버 쪽은 functions/datahub.js 한 곳 (2026-11-21, 계획서 4·5·3-5절)
+   문지기: requireReader(토큰 철회 확인 + 재직 로그인 — 규칙 LOGIN 과 같은 뜻) → app_owner/uid 와 같은 uid. 모르면 닫는다.
+   ⚠ 범용 readDoc 을 쓰지 않는다 — 화면이 app 이름을 바꿔 서명 검사를 건너뛸 수 있다. 묻기는 datahubAsk 하나뿐.
+   ⚠ 열쇠(GEMINI_KEY)는 datahubAsk 만 건다 — 나머지 셋은 AI 를 부르지 않는다. */
+const Datahub = require("./datahub");
+function datahubDeps() {
+  return { getDatabase: getDatabase, requireReader: requireReader, setCors: setCors };
+}
+exports.datahubDeviceRequest = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(Datahub.handlers(datahubDeps()).deviceRequest);
+exports.datahubChallenge = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(Datahub.handlers(datahubDeps()).challenge);
+exports.datahubAsk = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB", secrets: ["GEMINI_KEY"] })
+  .https.onRequest(Datahub.handlers(Object.assign(datahubDeps(), {
+    readGeminiKey: readGeminiKey, aiMonthSpend: aiMonthSpend, budgetGate: DR.budgetGate,
+    callGemini: DR.callGemini, dailyQuotaGone: DR.dailyQuotaGone, fetch: fetch,
+    bumpReadTally: bumpReadTally, bumpSpend: bumpSpend
+  })).ask);
+/* 현황판 — 한 시간마다 앱별 «건수·비율만» datahub_board/{앱 key} 에. 원본은 읽기만 한다. */
+exports.datahubBoardTally = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "1GB" })
+  .pubsub.schedule("every 60 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const r = await Datahub.boardTally({ getDatabase: getDatabase, log: (m, o) => console.log(m, o || "") });
+    console.log("[데이터관리 현황판]", r);
+    return null;
+  });

@@ -244,9 +244,38 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 }
 /* 769~960px — 종류 칸도 접는다(종류는 묶음 머리줄·«법정» 딱지로 보인다). 강의일·상태 딱지가 잘리지 않게 */
 @media (min-width:769px) and (max-width:960px){ #list table.lst .ct{display:none} }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ 이 앱은 작은 새 앱들의 «A 틀»(#head .top .tabs · main .pane · .card · .kpis/.kpi · .chip · #toast · .modal)을 그대로 쓴다
+     → <body class="pu-design pu-frame-a"> 로 공용 A 틀 모양을 받고, 여기에는 이 앱에만 있는 이름표(목록 표·종류 카드·딱지·창)만 잇는다.
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 탭·거르개·☐·№·칸·줄은 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다). */
+/* 목록 표 — 머리줄 굵게·읽히는 회색(목업 table.t th), 표 상자는 작은 카드 둥글기 */
+:where(body.pu-design) table.lst{border-radius:var(--pu-r-sm)}
+:where(body.pu-design) table.lst th{color:var(--pu-sub);font-weight:800}
+:where(body.pu-design) .mx th{color:var(--pu-sub);font-weight:800}
+/* 숫자 카드 — 공용 A 틀은 숫자를 19px(폰 16px)로 줄이지만, 이 앱 숫자는 원래 22px(폰 20px) — 목업 «큰 숫자 22px» 와 같다.
+   앱 값을 지킨다. 공용 파일이 이 파일 «뒤»에 실려 같은 세기면 지므로 .kpis 를 붙여 한 단계 세게 */
+:where(body.pu-design) .kpis .kpi b{font-size:22px}
+/* 종류 카드 — 작은 카드 둥글기 + 옅은 그림자(왼쪽 파란 «법정» 띠는 그대로) */
+:where(body.pu-design) .cat{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+/* 상태·원본 딱지 — 알약(색 짝은 그대로) */
+:where(body.pu-design) .tag{border-radius:var(--pu-r-pill)}
+/* 고른 것 띠·자세히 창 */
+:where(body.pu-design) .selbar{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .mbox{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .pn,:where(body.pu-design) .mview{border-radius:var(--pu-r-sm)}
+/* 폰 — 앱 폰 구간 값을 다시 맞춘다: 자세히 창은 화면 가득(둥근 모서리 없음) */
+@media (max-width:768px){
+  :where(body.pu-design) .mbox{border-radius:0}
+  :where(body.pu-design) .kpis .kpi b{font-size:20px}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a">
 <div id="head">
   <div class="top">
     <h1>🎓 강의자료</h1>

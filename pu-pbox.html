@@ -656,9 +656,35 @@ html[data-theme="dark"] .pbox-art-linked{color:#cbd5e1;border-color:#475569}
 html[data-theme="dark"] .pbox-matrix-table th{background:#1e293b;color:#cbd5e1;border-color:#475569}
 html[data-theme="dark"] .pbox-matrix-table td,html[data-theme="dark"] .pbox-matrix-table tbody tr{background:#1e293b;color:#f8fafc;border-color:#475569}
 html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 모서리·그림자·굵기. 색은 건드리지 않는다 — 자기 어두운 판(html[data-theme="dark"])이 바탕·글자·테두리 색을
+     정하고, 그 규칙이 이 덩어리보다 세다(이름표 둘 + html). 그래서 어두운 판에서도 여기 값은 모양만 바꾼다.
+   ★ 이 앱은 기기 어두운 모드를 따르지 않는다(화면 안 단추로 고른다) — pu-dark-auto 는 달지 않는다(tests/pu-design.test.js ⑥-2). */
+/* 상자 — 큰 카드 16px · 작은 카드 11px + 옅은 그림자(목업 .card) */
+:where(body.pu-design) .pbox-card,:where(body.pu-design) .pbox-filter-card{border-radius:var(--pu-r);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .pbox-composer-card{box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .pbox-site-card,:where(body.pu-design) .pbox-wf-card,:where(body.pu-design) .pbox-clause-card{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .pbox-modal-box{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .pbox-topbar{box-shadow:var(--pu-sh-sm)}
+/* 왼쪽 메뉴·단추 — 둥글기(목업 .side button) */
+:where(body.pu-design) .pbox-nav-btn{border-radius:10px}
+:where(body.pu-design) .pbox-btn-sm,:where(body.pu-design) .pbox-foot-btn,:where(body.pu-design) .pbox-plus-btn,:where(body.pu-design) .pbox-icon-pill{border-radius:10px}
+:where(body.pu-design) .pbox-scope-tab.active{box-shadow:var(--pu-sh-sm)}
+/* 표 머리 — 굵게(색은 이미 읽히는 회색) */
+:where(body.pu-design) .pbox-table th{font-weight:800}
+/* 폰(768px 이하) — 앱이 거르개·목록 상자(.pbox-filter-card·.pbox-list-card·.pbox-flat-m)를 «없는 셈»으로 편다(테두리·둥글기·그림자 0).
+   위에서 덮은 것을 다시 걷고, 남는 카드 그림자도 뺀다(상자는 한 겹) */
+@media (max-width:768px){
+  :where(body.pu-design) .pbox-filter-card,:where(body.pu-design) .pbox-list-card,:where(body.pu-design) .pbox-flat-m{border-radius:0;box-shadow:none}
+  :where(body.pu-design) .pbox-card,:where(body.pu-design) .pbox-site-card,:where(body.pu-design) .pbox-wf-card,:where(body.pu-design) .pbox-clause-card{box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 <div id="pboxRoot"></div>
 <div id="pboxSideBackdrop" class="pbox-side-backdrop" onclick="if(window.PuPBoxApp)PuPBoxApp.closeTopLayerForBack()"></div>
 <div id="pboxModalBackdrop" class="pbox-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pboxModalTitle">

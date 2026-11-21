@@ -124,7 +124,8 @@ test('★ 받은 때를 클라우드에도 싣는다 — 다른 기기에서도 
 });
 
 test('★★ 틀고정 — 머리줄과 탭이 «한 덩어리»(#head)로 붙는다', () => {
-  const body = src.slice(src.indexOf('<body>'));
+  /* body 에 class(예: 제미나이 판 모양 pu-design)가 붙어도 찾게 — 글자 그대로 '<body>' 를 찾으면 못 찾는다(2026-11-21) */
+  const body = src.slice(src.search(/<body\b[^>]*>/));
   const head = body.indexOf('<div id="head">'), top = body.indexOf('<div id="top">'), tabs = body.indexOf('<div id="tabs">');
   const feed = body.indexOf('<div class="wrap" id="pgFeed">');
   assert.ok(head >= 0 && head < top && top < tabs && tabs < feed, '머리줄·탭이 #head 안에 차례로 있어야 한다');

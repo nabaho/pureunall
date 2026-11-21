@@ -122,7 +122,38 @@
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 왼쪽 메뉴·칸·표·단추는 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 왼쪽 메뉴 고른 칸은 «테두리 대신 안쪽 그림자»로 — 테두리를 더하면 단추가 2px 커져 폰 한 줄 메뉴가 넘친다.
+   ⚠ 양식 모듈(js/pu-contract-forms.js·pu-office-docs.js)이 그리는 칸은 모듈 자기 모양 그대로다 — 여기서는 이 앱 이름표만 맞춘다. */
+/* 머리줄 제목 */
+:where(body.pu-design) .top h1{font-weight:800;letter-spacing:-.02em}
+/* 상자 — 둥근 카드 + 옅은 그림자(목업 .card) */
+:where(body.pu-design) .card{border-radius:var(--pu-r);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .hwp-local-note,:where(body.pu-design) .hwp-file-card,:where(body.pu-design) .hwp-preview{border-radius:var(--pu-r-sm)}
+/* 단추·입력칸 — 둥글기와 파란 단추 그림자(글자 크기는 앱 그대로) */
+:where(body.pu-design) .btn{border-radius:10px}
+:where(body.pu-design) .btn-pri{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) input,:where(body.pu-design) select{border-radius:10px}
+/* 표 머리 — 굵게(색은 이미 읽히는 회색) */
+:where(body.pu-design) th{font-weight:800}
+/* 왼쪽 메뉴 — 고른 칸은 옅은 파랑 + 파랑 테두리 선 + 옅은 그림자(목업 .side button.on) */
+:where(body.pu-design) .nav{border-radius:10px}
+:where(body.pu-design) .nav.on{background:var(--pu-acc-soft);color:var(--pu-acc-ink);font-weight:800;box-shadow:inset 0 0 0 1px var(--pu-acc-l),var(--pu-sh-sm)}
+:where(body.pu-design) .nav.soon i{border-radius:var(--pu-r-pill)}
+/* 창 */
+:where(body.pu-design) .modal{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .modal-bg{background:rgba(30,41,59,.5)}
+/* 폰 — 앱 폰 구간이 카드를 화면 폭 그대로(둥근 모서리·그림자 없이) 편다. 위에서 덮은 것을 다시 맞춘다(상자는 한 겹) */
+@media (max-width:700px){
+  :where(body.pu-design) .card{border-radius:0;box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 <!-- 프로그램 사이 이동 (공용 앱바) — 이 한 줄이 빠져 있어서
      문서관리에만 오른쪽 「즐겨찾기」 손잡이가 없었다(대표 보고 2026-08-13) -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
@@ -151,7 +182,7 @@
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=2"></script>
 </head>
-<body>
+<body class="pu-design">
 <div class="top">
   <h1>📄 계약서등관리</h1>
   <span id="whoami" style="font-size:12.5px;color:#94a3b8"></span>

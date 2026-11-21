@@ -4147,7 +4147,27 @@ body.pc #pcDetail{display:flex}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+     (⚠ 이 주석에 꺾쇠 붙은 body 태그 글자를 쓰지 않는다 — 검사들이 파일에서 처음 나오는 그 글자를 진짜 body 로 읽는다)
+   ★ 기업정보함·푸른 메일은 검정 바탕(폰)·남색 옆줄(PC)이 기본이다 — 바탕·글자·테두리 «색»은 하나도 안 바꾸고 모서리·그림자만(계획서 결정 Ⓔ).
+     그래서 이 덩어리는 공용 색 변수(--pu-acc·--pu-card 등)를 쓰지 않는다. 그림자도 짙은 남색(#1e293b) 반투명뿐이다.
+     공용 파일도 이 앱에는 «A 틀»(pu-frame-a)을 달지 않으니 단추·입력칸·카드 색 규칙이 안 먹는다(먹는 것: 키보드 자리 테두리·누름 움직임·숫자 자리 맞춤).
+   ★ 메일 화면(다음메일 차림, 대표 지시 2026-08-10 «눈이 이미 익어 있다»)과 폰 검정 화면은 모양을 안 건드린다.
+   ★ pu-dark-auto: 폰 메일 목록(.dmm)이 기기 밝음·어두움을 따른다(tests/pu-design.test.js ⑥-2). 이 덩어리는 색을 안 쓰니 어두운 판에서도 모양만 바뀐다. */
+/* PC 옆줄 — 갈래·폴더·아래 단추를 12px 로(목업 .side button) */
+:where(body.pu-design) .sidetab button,:where(body.pu-design) .pcitem,:where(body.pu-design) .pcside-settings{border-radius:12px}
+/* PC 본문 — 목록 표·정보등록 단추에 옅은 그림자 */
+:where(body.pu-design) #pcTable{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .pcbtn-primary{box-shadow:var(--pu-sh-sm)}
+/* PC 창 — 둥근 모서리 16px + 목업 그림자. 폰 창은 아래에서 올라오는 시트(위 모서리만 둥근)라 앱 값 그대로 둔다 */
+:where(body.pu-design.pc) .modal{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+/* 알림 — 그림자 */
+:where(body.pu-design) #toast{box-shadow:0 8px 24px rgba(30,41,59,.28)}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -4169,7 +4189,7 @@ body.pc #pcDetail{display:flex}
    `tests/app-soon-gate.test.js` ⑧ 이 「열려 있음」을 지킨다. */
 </script>
 </head>
-<body>
+<body class="pu-design pu-dark-auto">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>

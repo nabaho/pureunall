@@ -55,6 +55,8 @@
     { key: 'orch',    row: 'store',  name: '오케스트레이션',   icon: '🔄', url: 'pu-orchestrator.html', desc: '메일·계약·ERP·정산 흐름연결' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
+    /* 데이터관리(2026-11-21) — 대표 전용. 포털 타일과 짝(adminOnly) */
+    { key: 'datahub', row: 'inside', name: '데이터관리',   icon: '📊', url: 'pu-datahub.html',     desc: '입금·업무량 3D·현황판', adminOnly: true },
     /* 영업관리 다섯(정부사업신청·회생광고·전광판·홈페이지·뉴스레터) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
        adminOnly·perm 을 뺐다 — 포털 타일과 짝. */
     { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기' },
