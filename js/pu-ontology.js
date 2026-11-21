@@ -282,11 +282,11 @@
     /* 법정교육자료함 — 강의자료를 종류·강의일로 모아 보고·나란히 비교하고·검토해 더한다(대표 지시 2026-11-19).
        ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모) · cats(EduCategory — 사람이 더한 강의 종류, 2026-11-21).
          원본 파일은 창고 edulib/{id}/ 에 받은 그대로.
-       ★ 서버 자동 정리(functions/edulib-mail-sweep.js, 2026-11-21)가 보낸 메일의 강의자료를 items 에 «새 기록만» 더하고
-         edulib/sweep(실행 상태·본 첨부 표시 — 레코드 아님)을 쓴다. 관리자 SDK 라 서버 관문(ontology-write-server reviewRecord)을 거친다.
+       ★ 서버 자동 정리(functions/edulib-mail-sweep.js, 2026-11-21)는 보낸 메일의 강의자료를 «정리»만 해 관리자 전용 자동 정리함
+         edulib_inbox(레코드 아닌 대기열·상태 — 서버만 쓴다)에 쌓는다. 자료함 기록(items)은 관리자가 골라 «넣기»할 때 화면 관문이 만든다.
        ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 관리자 화면에서만, 머리글·첨부 이름만)
        ⚠ 재직 직원 모두 읽고 쓴다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만. */
-    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
+    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib'], sharedRoots:['uid_roles','data/user_dir','mailbox','edulib_inbox'],
       writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
                       {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'},
                       {path:'edulib/cats/{id}',entityType:'EduCategory'}],

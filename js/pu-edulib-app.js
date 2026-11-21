@@ -34,7 +34,9 @@
   var EXPAND = {};                              /* «더 보기»로 펼친 카드(묶음 열쇠) */
   var CATSDB = {};                              /* 사람이 더한 강의 종류(/edulib/cats) */
   var ADD_CAT = '';                             /* 새 종류를 막 더하고 «넣기»로 왔을 때 — 짐작 못 한 파일을 그 종류로 */
-  var SWEEP = null;                             /* 보낸 메일 자동 정리 상태(/edulib/sweep/state — 서버만 쓴다) */
+  var SWEEP = null;                             /* 보낸 메일 자동 정리 상태(/edulib_inbox/state — 서버만 쓰고 관리자만 읽는다) */
+  var INBOX = {}, IPICK = {};                   /* 자동 정리함(/edulib_inbox/q) — 서버가 정리해 둔 강의자료 첨부, 관리자가 골라 «넣기» */
+  var INBOX_DAYS = 90;                          /* 자동 정리함에 보이는 기간 — 오래된 줄은 접는다(지우지 않는다) */
 
   /* ───────── 작은 도구 ───────── */
   function $(id) { return document.getElementById(id); }
@@ -75,7 +77,7 @@
   /* ───────── 탭 ───────── */
   function setTab(t) {
     if (t === 'mail' && !ME.admin) t = 'dash';
-    if (TAB !== t) { PICK = {}; MPICK = {}; if (TAB === 'add') ADD_CAT = ''; }   /* 화면을 떠나면 고른 것을 비운다 */
+    if (TAB !== t) { PICK = {}; MPICK = {}; IPICK = {}; if (TAB === 'add') ADD_CAT = ''; }   /* 화면을 떠나면 고른 것을 비운다 */
     TAB = t; lsSet('tab', t);
     [].forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
     [].forEach.call(document.querySelectorAll('.pane'), function (p) { p.classList.toggle('on', p.id === 'pane-' + t); });
@@ -896,21 +898,25 @@
   }
   function importMail() {
     var rows = MAIL.filter(function (r) { return MPICK[r.id] && !r.have && r.state !== 'done'; });
+    importRows(rows, $('mImp'), $('mProg'), MPICK, drawMail);
+  }
+  /* 고른 줄을 자료함으로 — 메일 찾기(MAIL 줄)와 자동 정리함(INBOX 줄)이 같은 길(importMailRow)을 탄다. 건수를 묻고 끝까지 한 번에 */
+  function importRows(rows, btn, bar, pick, redraw) {
     if (!rows.length) { toast('고른 첨부가 없습니다'); return; }
     if (!window.confirm(rows.length + '건을 자료함으로 가져올까요?\n· 메일은 그대로 두고(읽음 표시도 그대로) 첨부만 원본 그대로 복사합니다.\n· 가져온 자료는 재직 직원 모두가 봅니다.')) return;
-    var bar = $('mProg'); bar.style.display = ''; var fill = bar.firstElementChild;
+    bar.style.display = ''; var fill = bar.firstElementChild;
     var done = 0, fail = 0;
-    $('mImp').disabled = true;
+    btn.disabled = true;
     return rows.reduce(function (p, r) {
       return p.then(function () {
-        return importMailRow(r).then(function (n) { r.state = 'done'; r.have = true; MPICK[r.id] = false; done += n || 1; },
+        return importMailRow(r).then(function (n) { r.state = 'done'; r.have = true; pick[r.id] = false; done += n || 1; },
           function (e) { r.state = 'err'; r.err = errMsg(e); fail++; })
           .then(function () { fill.style.width = Math.round(((rows.indexOf(r) + 1) / rows.length) * 100) + '%'; });
       });
     }, Promise.resolve()).then(function () {
-      bar.style.display = 'none'; $('mImp').disabled = false;
+      bar.style.display = 'none'; btn.disabled = false;
       toast('가져온 첨부 ' + done + '건' + (fail ? ' · 못 한 것 ' + fail + '건(줄의 «알림»에 까닭)' : ''), 8000);
-      drawMail();
+      redraw();
     });
   }
   /* 메일 한 통에서 첨부 받기 — 먼저 첨부 목록을 «엿보고»(peek: 읽음 표시 안 바꿈) 이름으로 집는다 */
@@ -932,7 +938,7 @@
             r.ids = r.ids || {};
             if (!r.ids[a.i]) r.ids[a.i] = K.newId();                /* 다시 가져와도 같은 id·같은 창고 자리 — 중복 사본을 만들지 않는다 */
             var it = K.makeItem({ id: r.ids[a.i], fileName: name, size: blob.size, cat: C.catOfText(name) !== 'etc' ? C.catOfText(name) : r.cat,
-              lectureDate: date || ymd(r.d), dateFrom: date ? 'name' : (r.d ? 'mail' : ''), title: name.replace(/\.[^.]+$/, ''),
+              lectureDate: date || ymd(r.d), dateFrom: date ? 'name' : (r.d ? 'mail' : ''), title: name.replace(/\.[^.]+$/, ''), summary: r.summary || '',
               pii: C.classifyMail(r.s, name, '') ? C.classifyMail(r.s, name, '').pii : false, status: 'review', store: 'cloud',
               source: { kind: 'mail', mailId: r.mailId, mailSubject: r.s.slice(0, 300), mailDate: ymd(r.d) } }, { uid: ME.sid });
             var file = new File([blob], name, { type: blob.type });
@@ -1035,30 +1041,72 @@
 
   /* ───────── 보낸 메일 자동 정리 (대표 지시 2026-11-21 「메일로 보낸 강의 자료 … 자동으로 정리해서 내용 넣을 수 있게」) ─────────
      서버(functions/edulib-mail-sweep.js)가 매일 19:30 에 한다. 여기서는 그 상태를 보여 주고, 관리자가 «지금 정리»로 바로 돌린다. */
+  /* 자동 정리함 줄 — 이미 자료함에 있는 것(같은 메일·같은 첨부, 같은 지문 — 휴지통 포함)과 오래된 줄은 안 보인다 */
+  var INB_ROWS = [];
+  function inboxRows() {
+    var have = {}, sha = {};
+    list().forEach(function (it) {
+      var src = it.source || {};
+      if (src.mailId && it.fileName) have[src.mailId + '|' + it.fileName] = 1;
+      if (it.sha256) sha[it.sha256] = 1;
+    });
+    var since = Date.now() - INBOX_DAYS * 864e5;
+    return Object.keys(INBOX).map(function (k) { return INBOX[k]; })
+      .filter(function (q) { return q && q.key && q.att && (+q.d || 0) >= since && !have[q.mailId + '|' + q.att] && !(q.sha256 && sha[q.sha256]); })
+      .sort(function (a, b) { return (+b.d || 0) - (+a.d || 0); }).slice(0, 300)
+      .map(function (q) {
+        return { id: 'q#' + q.key, slug: String(q.slug || ''), uid: String(q.uid || ''), key: String(q.mailKey || ''), mailId: String(q.mailId || ''),
+          s: String(q.subject || ''), d: +q.d || 0, att: String(q.att), cat: q.cat, lectureDate: q.lectureDate || '', summary: String(q.summary || ''),
+          old: false, have: false, state: '' };
+      });
+  }
+  function drawInbox() {
+    INB_ROWS = inboxRows();
+    if (!INB_ROWS.length) { $('mAutoList').innerHTML = '<p class="hint" style="margin:6px 0 0">자동 정리함이 비었습니다 — 새로 정리된 강의자료가 생기면 여기에 쌓입니다.</p>'; return; }
+    var nPick = INB_ROWS.filter(function (r) { return IPICK[r.id]; }).length;
+    var allOn = INB_ROWS.every(function (r) { return !!IPICK[r.id]; }) ? ' checked' : '';
+    var h = '<div class="bar" style="margin-top:8px"><b>🗂 자동 정리함 ' + INB_ROWS.length + '건</b><span class="hint">넣을 것을 고르세요 — 넣은 것만 재직 직원 모두가 봅니다</span><span class="sp"></span>' +
+      '<button class="pri" id="mInbImp"' + (nPick ? '' : ' disabled') + '>고른 ' + nPick + '건 자료함에 넣기</button></div>' +
+      '<div class="prog" id="mInbProg" style="display:none"><i></i></div>' +
+      '<label class="phone-only hint" style="margin:6px 0"><input type="checkbox" id="mInbAllP"' + allOn + '> 보이는 줄 모두 고르기</label>' +
+      '<table class="lst ml" style="margin-top:6px"><thead><tr><th class="ck"><input type="checkbox" id="mInbAll"' + allOn + ' title="보이는 줄 모두 고르기" aria-label="자동 정리함 보이는 줄 모두 고르기"></th><th class="no">№</th>' +
+      '<th class="dt">메일 날짜</th><th class="tt">자동 정리 내용</th><th class="att">첨부</th><th class="ct">추정 종류</th><th class="st">강의일(추정)</th></tr></thead><tbody>';
+    INB_ROWS.forEach(function (r, i) {
+      var on = !!IPICK[r.id];
+      h += '<tr' + (on ? ' class="picked"' : '') + '><td class="ck"><input type="checkbox" aria-label="' + esc(r.att) + ' 고르기" data-ipick="' + esc(r.id) + '"' + (on ? ' checked' : '') + '></td>' +
+        '<td class="no">' + (i + 1) + '</td><td class="dt">' + esc(ymd(r.d)) + '</td>' +
+        '<td class="tt" title="' + esc(r.summary || '(내용 없음)') + '">' + esc(r.summary || '—') + '</td>' +
+        '<td class="att" title="' + esc(r.att + (r.s ? ' — 메일: ' + r.s : '')) + '">' + esc(r.att) + '</td>' +
+        '<td class="ct">' + esc(catLabel(r.cat)) + '</td>' +
+        '<td class="st"><span class="one">' + (r.state === 'err' ? '<span class="tag pii" title="' + esc(r.err) + '">못 함</span>' : '') + '<span>' + esc(r.lectureDate || '—') + '</span></span></td></tr>';
+    });
+    $('mAutoList').innerHTML = h + '</tbody></table>';
+  }
+  function importInbox() {
+    var rows = INB_ROWS.filter(function (r) { return IPICK[r.id]; });
+    importRows(rows, $('mInbImp'), $('mInbProg'), IPICK, drawSweep);
+  }
   function drawSweep() {
     var s = SWEEP || {};
-    if (!s.lastRunAt) { $('mAutoSt').textContent = '아직 한 번도 돌지 않았습니다'; $('mAutoList').innerHTML = ''; return; }
+    drawInbox();
+    if (!s.lastRunAt) { $('mAutoSt').textContent = '아직 한 번도 돌지 않았습니다'; return; }
     var k = s.skipped || {};
-    var bits = ['마지막 ' + fmtTime(s.lastRunAt) + (s.trigger === 'manual' ? '(손으로)' : ''), '새로 넣음 ' + (+s.added || 0) + '건'];
+    var bits = ['마지막 ' + fmtTime(s.lastRunAt) + (s.trigger === 'manual' ? '(손으로)' : ''), '새로 정리 ' + (+s.queued || 0) + '건'];
     if (k.same) bits.push('이미 있음 ' + k.same);
     if (k.pii) bits.push('개인정보로 뺌 ' + k.pii);
     if (k.big) bits.push('너무 큼 ' + k.big);
-    if (k.human) bits.push('사람 확인 필요 ' + k.human + '(옛 형식·압축·글자 없는 PDF — 아래 «메일함 전체 훑기»로 골라 가져오기)');
+    if (k.human) bits.push('사람 확인 필요 ' + k.human);
     if (k.err) bits.push('못 함 ' + k.err);
     $('mAutoSt').textContent = bits.join(' · ');
-    var rec = Array.isArray(s.recent) ? s.recent.filter(function (r) { return r && ITEMS[r.id]; }) : [];
-    $('mAutoList').innerHTML = rec.length ? '<div class="bar" style="margin-top:6px"><span class="hint">최근 넣은 것</span>' + rec.slice(0, 12).map(function (r) {
-      var it = ITEMS[r.id];
-      return '<button type="button" class="sm chipb" data-open="' + esc(r.id) + '" title="' + esc(it.title + ' — ' + catLabel(it.cat)) + '">' + esc(it.title) + '</button>';
-    }).join('') + '</div>' : '';
+    $('mAutoSt').title = '사람 확인 필요 = 옛 형식(ppt·hwp)·압축·글자 없는 PDF — 아래 «메일함 전체 훑기»로 골라 가져오세요';
   }
   function runSweep() {
     var days = +$('mAutoDays').value || 30;
-    if (!window.confirm('최근 ' + days + '일 보낸 메일의 강의자료를 지금 정리할까요?\n· 메일은 읽기만 합니다 · 새로 넣는 것은 모두 «검토 대기» · 몇 분 걸릴 수 있습니다')) return;
+    if (!window.confirm('최근 ' + days + '일 보낸 메일의 강의자료를 지금 정리할까요?\n· 메일은 읽기만 합니다 · 정리한 것은 «자동 정리함»에 쌓이고, 자료함에는 고른 것만 넣습니다 · 몇 분 걸릴 수 있습니다')) return;
     $('mAutoRun').disabled = true; $('mAutoRun').textContent = '정리 중…';
     callFn('runEdulibMailSweep', { days: days }).then(function (j) {
       var r = j.result || {};
-      toast('메일 자동 정리 — 새로 넣음 ' + (+r.added || 0) + '건' + (r.more ? ' · 남은 것은 다음에 이어서' : ''), 8000);
+      toast('메일 자동 정리 — 새로 정리 ' + (+r.queued || 0) + '건(자동 정리함)' + (r.more ? ' · 남은 것은 다음에 이어서' : ''), 8000);
     }).catch(function (e) { toast('정리하지 못했습니다 — ' + errMsg(e), 8000); })
       .then(function () { $('mAutoRun').disabled = false; $('mAutoRun').textContent = '지금 정리'; });
   }
@@ -1202,7 +1250,12 @@
     /* 메일 */
     $('mScan').addEventListener('click', scanMail);
     $('mAutoRun').addEventListener('click', runSweep);
-    $('mAutoList').addEventListener('click', function (e) { var o = e.target.closest('[data-open]'); if (o) openDetail(o.getAttribute('data-open')); });
+    $('mAutoList').addEventListener('click', function (e) { if (e.target.id === 'mInbImp') importInbox(); });
+    $('mAutoList').addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.id === 'mInbAll' || t.id === 'mInbAllP') { INB_ROWS.forEach(function (r) { IPICK[r.id] = t.checked; }); drawInbox(); return; }
+      if (t.hasAttribute('data-ipick')) { IPICK[t.getAttribute('data-ipick')] = t.checked; drawInbox(); }
+    });
     $('mImp').addEventListener('click', importMail);
     var mq = null;
     $('mQ').addEventListener('input', function () { clearTimeout(mq); mq = setTimeout(function () { MQ = $('mQ').value; MPICK = {}; drawMail(); }, 200); });
@@ -1256,7 +1309,10 @@
       applyCats();
       clearTimeout(drawC); drawC = setTimeout(function () { if (TAB !== 'add' && LOADED) draw(); }, 60);
     }, function () {});
-    if (ME.admin) fbDb.ref('edulib/sweep/state').on('value', function (s) { SWEEP = s.val(); drawSweep(); }, function () {});
+    if (ME.admin) {
+      fbDb.ref('edulib_inbox/state').on('value', function (s) { SWEEP = s.val(); if (TAB === 'mail') drawSweep(); }, function () {});
+      fbDb.ref('edulib_inbox/q').on('value', function (s) { INBOX = s.val() || {}; if (TAB === 'mail') drawSweep(); }, function () {});
+    }
   }
   function loadNames() {
     return fbDb.ref('data/user_dir').once('value').then(function (snap) {

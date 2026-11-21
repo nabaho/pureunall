@@ -8042,30 +8042,11 @@ exports.runMailContractSweep = functions
      「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
    실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
    매일 19:30 한 번(최근 14일) · 관리자는 강의자료 앱 «메일에서 찾기»의 [지금 정리](runEdulibMailSweep, 최대 400일).
-   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 새 기록만(빈 자리일 때만) · AI 안 씀.
+   ★ «정리»까지만 자동이다 — 결과(종류·강의일·내용 요약)를 관리자만 읽는 자동 정리함(edulib_inbox)에 쌓고, 원본은 복사하지 않는다.
+     자료함(재직 직원 모두)에 넣는 것은 관리자가 자동 정리함에서 골라 «넣기»를 누를 때다(화면의 «가져오기» 길).
+   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 빈 자리일 때만 · 창고·자료함에는 안 씀 · AI 안 씀.
    ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다) */
 const EdulibMailSweep = require("./edulib-mail-sweep");
-async function edulibSaveFile(path, buf, meta) {
-  const file = getStorage().bucket(PHOTO_BUCKET).file(path);
-  const token = crypto.randomUUID();
-  const name = String((meta && meta.name) || path.split("/").pop());
-  try {
-    /* 새로 쓰기만(ifGenerationMatch 0) — 창고 규칙(edulib/{id}/… «새로 쓰기만»)과 같은 뜻. 내려받기 토큰을 붙여 화면의 getDownloadURL 이 된다 */
-    await file.save(buf, { resumable: false, preconditionOpts: { ifGenerationMatch: 0 },
-      metadata: { contentType: (meta && meta.contentType) || "application/octet-stream",
-        contentDisposition: "attachment; filename*=UTF-8''" + encodeURIComponent(name),
-        metadata: { firebaseStorageDownloadTokens: token, originalName: name.slice(0, 500) } } });
-    return { existed: false };
-  } catch (e) {
-    if (Number(e && (e.code || e.status)) !== 412) throw e;
-    /* 같은 자리에 이미 있다 — 지난번에 원본만 올라가고 기록을 못 쓴 경우다. «바이트까지 같을 때만»(크기 + md5) 이어 쓴다(덮어쓰지 않는다) */
-    const [m] = await file.getMetadata();
-    const md5 = crypto.createHash("md5").update(buf).digest("base64");
-    if (Number(m.size) !== buf.length || String(m.md5Hash || "") !== md5) throw new Error("창고 같은 자리에 다른 파일이 있습니다");
-    if (!(m.metadata && m.metadata.firebaseStorageDownloadTokens)) await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
-    return { existed: true };
-  }
-}
 async function runEdulibMailSweepOnce(trigger, opts) {
   const MS = require("./mail-sync");
   return EdulibMailSweep.runSweep({
@@ -8082,14 +8063,13 @@ async function runEdulibMailSweepOnce(trigger, opts) {
       const buf = await MS.drain(d.content, max);
       return { name: a.name, mime: a.mime || "", buf };
     }),
-    saveFile: edulibSaveFile,
     pdfText: (buf) => require("./rules-collect-pdf").pdfText(buf),
     log: (...a) => console.log(...a),
   }, Object.assign({ trigger }, opts || {}));
 }
 async function acquireEdulibSweepLock(by) {
   const now = Date.now();
-  const lockRef = getDatabase().ref("edulib/sweep/lock");
+  const lockRef = getDatabase().ref("edulib_inbox/lock");
   const tx = await lockRef.transaction((cur) => {
     const c = (cur && typeof cur === "object") ? cur : {};
     if (Number(c.runningUntil || 0) > now) return; /* 이미 도는 중 — 그만둔다 */
@@ -8108,7 +8088,7 @@ exports.edulibMailSweep = functions
     try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); return null; }
     try {
       const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
-      console.log("edulibMailSweep", JSON.stringify({ added: r.added, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
+      console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
     } finally { if (release) await release(); }
     return null;
   });
@@ -8132,7 +8112,7 @@ exports.runEdulibMailSweep = functions
     try {
       const days = Math.min(EdulibMailSweep.MAX_DAYS, Math.max(1, Number(b.days) || 30));
       const r = await runEdulibMailSweepOnce("manual", { days, by: staffRole.sid, budgetMs: 7.5 * 60 * 1000 });
-      res.json({ ok: true, result: { added: r.added, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
+      res.json({ ok: true, result: { queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
     } catch (e) {
       console.error("runEdulibMailSweep", e && e.stack || e);
       res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });

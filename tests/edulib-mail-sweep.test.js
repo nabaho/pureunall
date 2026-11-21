@@ -8,8 +8,9 @@
  *   ③ 사람이 보지 않고 넣는 것은 «내용을 읽어 확인한 문서»뿐 — 옛 형식·압축·스캔 pdf 는 «사람 확인 필요»로만 센다.
  *      명단·서명·급여 같은 이름, 이름에 전화·메일·주민번호 꼴, 문서 안 주민번호 꼴은 안 넣는다
  *   ③-1 직원이 더한 찾을 낱말은 «종류 나누기»에만 — 가져올지를 정하는 문을 넓히지 못한다
- *   ④ 같은 파일·이미 넣은 첨부·휴지통에 간 자료는 다시 넣지 않는다(되살리지 않는다) — 두 번 돌아도 그대로
- *   ⑤ 서버가 찍는 기록이 화면 관문(PuOntologyWrite)과 «같은 모양»이고, 서버 관문(reviewRecord)을 통과한다
+ *   ④ 같은 파일·이미 넣은 첨부·휴지통에 간 자료는 다시 올리지 않는다(되살리지 않는다) — 두 번 돌아도 그대로
+ *   ⑤ «정리»까지만 자동 — 서버는 관리자만 읽는 자동 정리함(edulib_inbox)에만 쓰고, 자료함(edulib)·창고에는 쓰지 않는다.
+ *      원본 바이트는 어디에도 담지 않는다. 넣기는 관리자가 화면에서 고른다(화면 «가져오기» 길)
  *   ⑥ 내용 정리 — 발표자료는 장마다 첫 줄(목차), 메일 주소·전화번호는 가린다
  *   ⑦ 서버 함수가 매일 한 번·관리자만·잠금·새로 쓰기만으로 이어져 있다
  * ⚠ 예시는 지어낸 것이다(가나상사·example 주소). 실제 메일·고객 자료를 쓰지 않는다. */
@@ -21,7 +22,6 @@ const crypto = require('node:crypto');
 
 const ROOT = path.join(__dirname, '..');
 const S = require('../functions/edulib-mail-sweep.js');
-const Gate = require('../functions/ontology-write-server.js');
 const { 옮길것 } = require('../scripts/sync-edulib-core.js');
 const read = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 
@@ -156,7 +156,6 @@ function deps(db, over) {
       if (buf.length > max) return { big: true };
       return { name, mime: 'application/octet-stream', buf };
     },
-    saveFile: async (p, buf) => { if (saved[p]) { const e = new Error('exists'); e.code = 412; throw e; } saved[p] = buf; return { existed: false }; },
     pdfText: async (buf) => ({ text: PDF_TEXT[buf.toString('utf8')] || '' }),
   }, over || {});
 }
@@ -199,56 +198,75 @@ test('★★★ 직원이 더한 찾을 낱말은 «종류 나누기»에만 —
   } finally { C.setCustom([]); }
 });
 
-test('★★★ 한 번 돌면 넣을 것만 넣고, 두 번 돌아도 그대로다', async () => {
+test('★★★ 한 번 돌면 올릴 것만 자동 정리함에 올리고, 두 번 돌아도 그대로다', async () => {
   const db = fakeDb(mailTree());
   const d = deps(db);
   const r1 = await S.runSweep(d, { days: 14, trigger: 'schedule' });
-  const items = db.tree.edulib.items;
-  const got = Object.keys(items).map((k) => items[k].fileName).sort();
+  const q = db.tree.edulib_inbox.q;
+  const got = Object.keys(q).map((k) => q[k].att).sort();
   assert.deepEqual(got, ['2026 괴롭힘 예방교육.pptx', '중처법 대응 강의.pdf'].sort());
-  assert.equal(r1.added, 2);
+  assert.equal(r1.queued, 2);
   assert.ok(r1.skipped.pii >= 4, '명단·급여·전화 꼴 이름과 주민번호 꼴 문서는 뺀다');
   assert.ok(r1.skipped.human >= 3, '옛 형식·압축·스캔 pdf 는 사람 확인 필요로만 센다');
   assert.ok(!d.downloads.some((x) => /\.(ppt|zip)$/.test(x)), '내용을 확인 못 할 형식은 받지도 않는다');
-  /* 창고에는 기록 id 아래 원본 그대로 */
-  Object.keys(items).forEach((k) => {
-    const it = items[k];
-    assert.equal(it.storagePath, 'edulib/' + it.id + '/' + it.fileName);
-    assert.ok(d.saved[it.storagePath].equals(FILES[it.fileName]), '받은 바이트 그대로');
-    assert.equal(it.sha256, crypto.createHash('sha256').update(FILES[it.fileName]).digest('hex'));
-    assert.equal(it.status, 'review'); assert.equal(it.store, 'cloud'); assert.equal(it.source.kind, 'mail');
-    assert.ok(/^edu_m[0-9a-f]{16}$/.test(it.id), '메일·첨부에서 정해진 id');
+  /* 자동 정리함 줄 — 화면 «가져오기»가 쓸 메일 자리·첨부 이름·종류·내용, 원본 바이트는 없다 */
+  Object.keys(q).forEach((k) => {
+    const e = q[k];
+    assert.equal(e.key, k);
+    assert.ok(e.slug && e.uid && e.mailKey && e.mailId && e.att);
+    assert.equal(e.sha256, crypto.createHash('sha256').update(FILES[e.att]).digest('hex'));
+    assert.equal(e.size, FILES[e.att].length);
+    assert.ok(!('buf' in e) && !('id' in e) && !('entityType' in e), '원본을 담지 않고, 자료함 기록인 척하지 않는다');
+    assert.ok(e.summary.length > 0);
   });
-  /* 사람이 더한 종류(/edulib/cats)로 짐작한다 */
-  const pdf = Object.values(items).find((it) => it.fileName === '중처법 대응 강의.pdf');
-  assert.equal(pdf.cat, 'cat_abc');
-  /* 상태 — 서버만 쓰는 자리 */
-  assert.equal(db.tree.edulib.sweep.state.added, 2);
-  assert.ok(db.tree.edulib.sweep.state.recent.length === 2);
+  /* 사람이 더한 종류(/edulib/cats)로 나눈다 */
+  assert.equal(Object.values(q).find((e) => e.att === '중처법 대응 강의.pdf').cat, 'cat_abc');
+  /* 자료함·창고에는 아무것도 안 쓴다 — 쓴 곳은 모두 관리자 전용 자리 */
+  assert.deepEqual(db.tree.edulib.items, {});
+  assert.ok(db.writes.length > 0 && db.writes.every((w) => /^edulib_inbox\//.test(w[1])), JSON.stringify(db.writes));
+  assert.equal(db.tree.edulib_inbox.state.queued, 2);
 
-  const before = JSON.stringify(db.tree.edulib.items);
+  const before = JSON.stringify(db.tree.edulib_inbox.q);
   const r2 = await S.runSweep(deps(db), { days: 14 });
-  assert.equal(r2.added, 0);
-  assert.equal(JSON.stringify(db.tree.edulib.items), before, '두 번째에는 아무것도 안 바뀐다');
+  assert.equal(r2.queued, 0);
+  assert.equal(JSON.stringify(db.tree.edulib_inbox.q), before, '두 번째에는 아무것도 안 바뀐다');
 });
 
-test('★★★ 휴지통에 간 자료·같은 파일은 다시 넣지 않는다(되살리지 않는다)', async () => {
+test('★★ 자료함에 이미 들어간 첨부(관리자가 넣은 뒤)는 다시 올리지 않는다', async () => {
+  const tree = mailTree();
+  tree.edulib.items.edu_a = { id: 'edu_a', entityType: 'EduMaterial', fileName: '2026 괴롭힘 예방교육.pptx', size: 1,
+    source: { kind: 'mail', mailId: 'Sent-1/101' }, revision: 1 };
+  const db = fakeDb(tree);
+  await S.runSweep(deps(db), { days: 14 });
+  assert.ok(!Object.values(db.tree.edulib_inbox.q).some((e) => e.att === '2026 괴롭힘 예방교육.pptx'));
+});
+
+test('★★ 실제로 받은 첨부 이름으로 한 번 더 판정한다(색인 이름과 다를 때)', async () => {
+  const db = fakeDb(mailTree());
+  const d = deps(db, { download: async (slug, uid, name) => {
+    if (name === '2026 괴롭힘 예방교육.pptx') return { name: '2026 괴롭힘 예방교육 참석자 명단.pptx', mime: '', buf: PPTX };
+    return { gone: true };
+  } });
+  const r = await S.runSweep(d, { days: 14 });
+  assert.equal(r.queued, 0);
+  assert.ok(!db.tree.edulib_inbox.q, '명단 이름으로 드러난 첨부는 올리지 않는다');
+});
+
+test('★★★ 휴지통에 간 자료와 같은 파일은 다시 올리지 않는다(되살리지 않는다) · 정리함 자리는 덮지 않는다', async () => {
   const tree = mailTree();
   const sha = crypto.createHash('sha256').update(PPTX).digest('hex');
   tree.edulib.items.edu_old = { id: 'edu_old', entityType: 'EduMaterial', fileName: '다른이름.pptx', size: PPTX.length, sha256: sha, _deleted: true, revision: 2 };
   const db = fakeDb(tree);
   await S.runSweep(deps(db), { days: 14 });
-  assert.ok(!Object.values(db.tree.edulib.items).some((it) => it.fileName === '2026 괴롭힘 예방교육.pptx'), '사람이 지운 같은 파일');
+  assert.ok(!Object.values(db.tree.edulib_inbox.q).some((e) => e.att === '2026 괴롭힘 예방교육.pptx'), '사람이 지운 같은 파일');
   assert.equal(db.tree.edulib.items.edu_old._deleted, true, '지운 기록은 그대로');
-  /* 같은 id 자리에 이미 기록이 있으면(휴지통이라도) 덮지 않는다 */
+  /* 같은 열쇠 자리에 이미 줄이 있으면 덮지 않는다(transaction) */
   const t2 = mailTree();
   const c = S.pickCandidates(t2.mailbox.folders, t2.mailbox.msgs, { cutoff: 0 }).list.find((x) => x.name === '중처법 대응 강의.pdf');
-  const id = S.itemIdOf(c.seenKey);
-  t2.edulib.items[id] = { id, entityType: 'EduMaterial', fileName: '중처법 대응 강의.pdf', _deleted: true, revision: 3 };
+  t2.edulib_inbox = { q: { [c.seenKey]: { key: c.seenKey, att: '중처법 대응 강의.pdf', mark: '먼저 있던 줄' } } };
   const db2 = fakeDb(t2);
   await S.runSweep(deps(db2), { days: 14 });
-  assert.equal(db2.tree.edulib.items[id].revision, 3);
-  assert.equal(db2.tree.edulib.items[id]._deleted, true);
+  assert.equal(db2.tree.edulib_inbox.q[c.seenKey].mark, '먼저 있던 줄');
 });
 
 test('★★ 다시 하면 될 실패(연결 끊김)는 «본 것»으로 적지 않는다 · 없어진 메일·너무 큰 첨부는 적는다', async () => {
@@ -259,31 +277,17 @@ test('★★ 다시 하면 될 실패(연결 끊김)는 «본 것»으로 적지
     return { gone: true };
   } });
   const r = await S.runSweep(d, { days: 14 });
-  assert.equal(r.added, 0);
+  assert.equal(r.queued, 0);
   assert.ok(r.skipped.err >= 1 && r.skipped.big >= 1);
-  const seen = db.tree.edulib.sweep.seen;
+  const seen = db.tree.edulib_inbox.seen;
   const why = Object.keys(seen).map((k) => seen[k].why);
   assert.ok(why.indexOf('big') >= 0 && why.indexOf('gone') >= 0);
-  assert.equal(Object.keys(db.tree.edulib.items).length, 0);
+  assert.ok(!db.tree.edulib_inbox.q);
   /* 다음 번엔 끊겼던 것만 다시 받는다 */
   const d2 = deps(db);
   await S.runSweep(d2, { days: 14 });
   assert.ok(d2.downloads.some((x) => /괴롭힘 예방교육\.pptx$/.test(x)));
   assert.ok(!d2.downloads.some((x) => /중처법 대응 강의\.pdf$/.test(x)), '너무 컸던 것은 다시 안 받는다');
-});
-
-test('★★ 서버 기록이 화면 관문과 같은 모양이고 서버 관문을 통과한다', async () => {
-  const db = fakeDb(mailTree());
-  await S.runSweep(deps(db), { days: 14 });
-  const W = require('../js/pu-ontology-write.js');
-  Object.values(db.tree.edulib.items).forEach((rec) => {
-    assert.ok(Gate.reviewRecord(rec).ok, JSON.stringify(Gate.reviewRecord(rec).issues));
-    const base = Object.assign({}, rec);
-    ['schemaVersion', 'contractVersion', 'revision', 'createdBy', 'updatedBy', 'updatedAt'].forEach((k) => delete base[k]);
-    const r = W.prepareRecord(base, { entityType: 'EduMaterial', actor: S.ACTOR, expectedRevision: -1, now: rec.updatedAt });
-    assert.ok(r.ok, JSON.stringify(r.issues));
-    ['schemaVersion', 'contractVersion', 'revision', 'createdBy', 'updatedBy', 'entityType'].forEach((k) => assert.equal(rec[k], r.value[k], k + ' 가 화면 관문과 다르다'));
-  });
 });
 
 test('★★ 내용 정리 — 발표자료는 장 순서대로 첫 줄(목차), 메일 주소·전화번호는 가린다', async () => {
@@ -294,14 +298,15 @@ test('★★ 내용 정리 — 발표자료는 장 순서대로 첫 줄(목차),
   assert.ok(s.indexOf('kim@example.com') < 0 && s.indexOf('010-1234-5678') < 0, '가린다');
   assert.ok(s.indexOf('[메일]') >= 0 && s.indexOf('[전화]') >= 0);
   assert.ok(S.summarize({ lines: ['가'.repeat(3000)] }).length <= 1200);
-  const rec = S.buildRecord({ seenKey: 'k1', name: 'a.pptx', subject: '담당 kim@example.com 010-1234-5678 강의자료', d: NOW, cat: 'etc', mailId: 'Sent-1/1' },
+  const e = S.queueEntry({ seenKey: 'k1', slug: 'Sent-1', uid: '1', key: '1', name: 'a.pptx', subject: '담당 kim@example.com 010-1234-5678 900101-1234567 강의자료', d: NOW, cat: 'etc', mailId: 'Sent-1/1' },
     { name: 'a.pptx', buf: PPTX }, 'x', '', NOW);
-  assert.ok(rec.source.mailSubject.indexOf('example.com') < 0 && rec.source.mailSubject.indexOf('1234-5678') < 0, '메일 제목도 가린다');
+  assert.ok(e.subject.indexOf('example.com') < 0 && e.subject.indexOf('1234-5678') < 0 && e.subject.indexOf('1234567') < 0, '메일 제목도 가린다(주민번호까지)');
+  assert.ok(S.scrub('주민 900101-1234567').indexOf('[주민번호]') >= 0);
   const x = S.xmlLines('<w:p><w:r><w:t>&amp;#60;b&amp;#62;</w:t></w:r></w:p>', 'w:p', 'w:t');
   assert.deepEqual(x, ['&#60;b&#62;'], '엔티티는 한 번만 푼다(글자가 코드가 되지 않게)');
 });
 
-test('★★ 서버 함수 — 매일 한 번 · 관리자만 · 잠금 · 창고는 새로 쓰기만 · 이름 찍어 배포', () => {
+test('★★ 서버 함수 — 매일 한 번 · 관리자만 · 잠금 · 창고·자료함에는 안 쓴다 · AI 안 씀', () => {
   const idx = read(path.join(ROOT, 'functions', 'index.js'));
   const i = idx.indexOf('exports.edulibMailSweep');
   assert.ok(i > 0 && idx.indexOf('exports.runEdulibMailSweep') > i);
@@ -311,9 +316,13 @@ test('★★ 서버 함수 — 매일 한 번 · 관리자만 · 잠금 · 창�
   const run = idx.slice(idx.indexOf('exports.runEdulibMailSweep'), idx.indexOf('exports.runEdulibMailSweep') + 2000);
   assert.match(run, /requireStaff\(req\)/);
   assert.match(run, /staffRole\.isAdmin/);
-  const save = idx.slice(idx.indexOf('async function edulibSaveFile'), idx.indexOf('async function runEdulibMailSweepOnce'));
-  assert.match(save, /ifGenerationMatch: 0/);
-  assert.match(save, /md5Hash/, '이어 쓸 때는 바이트까지 같은지(md5) 본다');
-  assert.match(save, /firebaseStorageDownloadTokens/);
-  assert.ok(!/callGemini|GEMINI_KEY/.test(idx.slice(idx.indexOf('const EdulibMailSweep'), idx.indexOf('exports.runEdulibMailSweep'))), 'AI 를 쓰지 않는다');
+  const block = idx.slice(idx.indexOf('const EdulibMailSweep'), idx.indexOf('exports.runEdulibMailSweep') + 2000);
+  assert.ok(!/\.save\(|getStorage\(|edulib\/items/.test(block), '서버는 창고·자료함에 쓰지 않는다(자동 정리함만)');
+  assert.ok(!/callGemini|GEMINI_KEY/.test(block), 'AI 를 쓰지 않는다');
+  const sweep = read(path.join(ROOT, 'functions', 'edulib-mail-sweep.js'));
+  assert.ok(!/\bITEMS_ROOT\s*\+|ref\(ITEMS_ROOT\s*\+/.test(sweep), '자료함 기록 자리에 쓰는 줄이 없다');
+  /* 규칙 — 자동 정리함은 관리자만 읽고 화면은 못 쓴다 */
+  const rules = require('../docs/rules-paste.json').rules.edulib_inbox;
+  assert.equal(rules['.write'], false);
+  assert.match(rules['.read'], /isAdmin/);
 });
