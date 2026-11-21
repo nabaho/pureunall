@@ -32,6 +32,15 @@ test('127.0.0.1 에만 묶는다 — 같은 공유기의 다른 기기·인터�
   assert.match(code, /ThreadingHTTPServer\(\(HOST, PORT\)/);
   assert.equal(Number(/PUREUN_LAYA_PORT", "(\d+)"/.exec(py)[1]), Q.LAYA_PORT, '화면이 부르는 자리와 같다');
 });
+test('한글편집기 자리와 겹치지 않는다 · 자리를 «혼자» 쥔다 — 2026-11-21 같은 자리(18765)에 깔아 편집기가 안 켜졌다', () => {
+  // 검사고정-허용: 18765 는 이 PC «푸른 한글편집기» 실행 도우미의 자리다. 편집기 자동 저장(브라우저 저장소)이 그 주소에 묶여 편집기 쪽은 옮길 수 없다.
+  const HANGUL_LAUNCHER_PORT = 18765;
+  assert.notEqual(Q.LAYA_PORT, HANGUL_LAUNCHER_PORT, '판단기가 한글편집기 자리를 쓰면 편집기 서버가 켜지지 않는다');
+  assert.match(code, /allow_reuse_address = False/, '윈도우의 SO_REUSEADDR 는 이미 쓰이는 자리에도 소리 없이 묶인다 — 끈다');
+  assert.match(code, /SO_EXCLUSIVEADDRUSE/, '윈도우에서는 독점으로 묶는다');
+  assert.match(ps, /\$lnk\.Description = '[^']*127\.0\.0\.1:(\d+)\)'/);
+  assert.equal(Number(/127\.0\.0\.1:(\d+)\)'/.exec(ps)[1]), Q.LAYA_PORT, '바로가기 설명의 자리도 같다');
+});
 test('받는 주소(Origin)는 ERP 주소 목록과 같다 — 목록이 바뀌면 함께 바뀌어야 한다 · 아무 곳(*)이나 받지 않는다', () => {
   const tuple = /^ERP_ORIGINS = \(([^)]*)\)/m.exec(code)[1];
   const got = [...tuple.matchAll(/"([^"]+)"/g)].map((m) => m[1]).sort();
@@ -131,4 +140,15 @@ test('★ 켜서 보기 — 화면 모듈(layaAsk)이 판단기와 그대로 주
   const logf = path.join(tmp, 'PureunLaya', 'laya-judge.log');
   const log = fs.existsSync(logf) ? fs.readFileSync(logf, 'utf8') : '';
   assert.ok(log.length > 0, '켜진 기록은 남는다'); assert.ok(!/비밀제목|위촉|업무 협조/.test(log), '받은 제목이 기록에 남으면 안 된다');
+});
+test('켜서 보기 — 같은 자리에 하나 더 켜면 «켜지 못했습니다»로 끝나고, 먼저 켠 판단기는 그대로 답한다', { skip: !PY && '파이썬 없음' }, async () => {
+  const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'laya-judge-2-'));
+  const second = spawn(PY, [path.join(DIR, 'laya_judge.py')], { env: Object.assign({}, process.env, { PUREUN_LAYA_FAKE: '1', PUREUN_LAYA_PORT: String(port), LOCALAPPDATA: tmp2, HOME: tmp2, PYTHONUTF8: '1' }), stdio: 'ignore' });
+  const code2 = await new Promise((res) => { const t = setTimeout(() => { second.kill(); res('살아 있음'); }, 15000); second.on('exit', (c) => { clearTimeout(t); res(c); }); });
+  assert.equal(code2, 1, '둘째는 자리를 못 쥐고 끝나야 한다(윈도우에서 함께 묶이면 어느 쪽이 받을지 모른다)');
+  const ok = await req(port, { headers: { Origin: ERP } });
+  assert.equal(ok.status, 200); assert.equal(ok.json.fake, true);
+  const log2 = fs.readFileSync(path.join(tmp2, 'PureunLaya', 'laya-judge.log'), 'utf8');
+  assert.match(log2, /켜지 못했습니다/);
+  fs.rmSync(tmp2, { recursive: true, force: true });
 });

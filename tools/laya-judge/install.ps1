@@ -52,16 +52,18 @@ if ($AutoStart) {
   $lnk.TargetPath = $Pyw
   $lnk.Arguments = '"' + $Script + '"'
   $lnk.WorkingDirectory = $Dir
-  $lnk.Description = '푸른 경력관리 요청 메일 — Laya 판단기(이 PC 안에서만, 127.0.0.1:18765)'
+  $lnk.Description = '푸른 경력관리 요청 메일 — Laya 판단기(이 PC 안에서만, 127.0.0.1:18766)'
   $lnk.Save()
 }
 
 if (-not $NoStart) {
+  # 이미 켜져 있으면 끄고 다시 켠다 — 옛 판단기가 옛 자리(2026-11-21 전 18765)를 계속 쥐고 있지 않게. 끄는 것은 laya_judge.py 를 돌리는 파이썬만.
   $running = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like '*laya_judge.py*' }
-  if ($running) { Write-Host '⑤ 이미 켜져 있습니다' }
-  else {
-    Write-Host '⑤ 켜기'
-    Start-Process -FilePath $Pyw -ArgumentList ('"' + $Script + '"') -WorkingDirectory $Dir -WindowStyle Hidden
-  }
+  if ($running) {
+    Write-Host '⑤ 켜져 있던 판단기를 끄고 새로 켜기'
+    $running | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Seconds 1
+  } else { Write-Host '⑤ 켜기' }
+  Start-Process -FilePath $Pyw -ArgumentList ('"' + $Script + '"') -WorkingDirectory $Dir -WindowStyle Hidden
 }
 Write-Host '끝 — 경력관리 «요청 메일» 화면에서 «🧠 Laya 의견 켜기»를 누르면 이 PC 의 판단기에게 묻습니다.'
