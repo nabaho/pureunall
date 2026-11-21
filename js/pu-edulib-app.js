@@ -924,9 +924,11 @@
     var listP = r.old ? callFn('readOldMail', { key: r.key }) : callFn('readMailMessage', { slug: r.slug, uid: r.uid, peek: true });
     return listP.then(function (j) {
       var atts = (j.atts || []).map(function (a, i) { return { i: i, part: String(a.part || ''), name: String(a.name || ''), size: +a.size || 0 }; });
-      var want = r.att ? atts.filter(function (a) { return a.name === r.att || a.name.slice(0, 60) === r.att; })
+      /* 자동 정리함 줄(qsha 있음)은 «정리한 바로 그 첨부» 한 건만 — 이름이 정확히 같아야 하고, 받은 뒤 지문(sha256)도 같아야 올린다 */
+      var want = r.att ? atts.filter(function (a) { return a.name === r.att || (!r.qsha && a.name.slice(0, 60) === r.att); })
         : atts.filter(function (a) { var k = C.kindOf(C.extOf(a.name)); return (k === 'doc' || k === 'video' || k === 'archive') && C.classifyMail(r.s, a.name, ''); });
-      if (!want.length) throw new Error('강의자료로 보이는 첨부를 못 찾았습니다');
+      if (r.qsha) want = want.slice(0, 1);
+      if (!want.length) throw new Error(r.qsha ? '정리할 때의 첨부를 찾지 못했습니다(이름이 다릅니다)' : '강의자료로 보이는 첨부를 못 찾았습니다');
       return want.reduce(function (p, a) {
         return p.then(function (n) {
           if (a.size > 20 * 1024 * 1024) throw new Error(a.name + ' — 20MB 가 넘어 메일 서버에서 직접 내려받아 «＋ 넣기»로 올려 주세요');
@@ -943,6 +945,7 @@
               source: { kind: 'mail', mailId: r.mailId, mailSubject: r.s.slice(0, 300), mailDate: ymd(r.d) } }, { uid: ME.sid });
             var file = new File([blob], name, { type: blob.type });
             return sha256(file).then(function (h) {
+              if (r.qsha && h !== r.qsha) throw new Error('정리할 때와 다른 파일입니다 — 올리지 않았습니다(메일에서 직접 확인해 주세요)');
               if (h) {
                 var same = K.findSame(list(), { sha256: h, fileName: name, size: blob.size });
                 if (same && same.how === 'sha256') return n;          /* 같은 파일이 이미 있다 — 또 올리지 않는다 */
@@ -1055,7 +1058,7 @@
       .filter(function (q) { return q && q.key && q.att && (+q.d || 0) >= since && !have[q.mailId + '|' + q.att] && !(q.sha256 && sha[q.sha256]); })
       .sort(function (a, b) { return (+b.d || 0) - (+a.d || 0); }).slice(0, 300)
       .map(function (q) {
-        return { id: 'q#' + q.key, slug: String(q.slug || ''), uid: String(q.uid || ''), key: String(q.mailKey || ''), mailId: String(q.mailId || ''),
+        return { id: 'q#' + q.key, qsha: String(q.sha256 || '') || 'none', slug: String(q.slug || ''), uid: String(q.uid || ''), key: String(q.mailKey || ''), mailId: String(q.mailId || ''),
           s: String(q.subject || ''), d: +q.d || 0, att: String(q.att), cat: q.cat, lectureDate: q.lectureDate || '', summary: String(q.summary || ''),
           old: false, have: false, state: '' };
       });

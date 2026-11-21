@@ -58,7 +58,13 @@ const DOC_HUMAN = { ppt: 1, pps: 1, hwp: 1, doc: 1, show: 1, odp: 1, key: 1, zip
 const MIN_TEXT = 40;                            /* 이만큼도 글자가 안 나오면(스캔 pdf 등) 내용을 확인 못 한 것으로 본다 */
 /* 강의 말이 있어도 «서류»일 수 있는 이름 — 사람이 고르기 전에 걸러 두는 길이라 화면 «가져오기»보다 넓게 뺀다 */
 const SERVER_EXCLUDE_RX = /급여|임금\s?대장|명세서|원천\s?징수|통장|계좌|이력서|주민\s?등록|등본|초본|신분증|가족\s?관계|진단서|건강\s?검진|연봉|인사\s?기록|평가표|성적|합격|채점/;
-const RRN_RX = /(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/;
+/* 주민번호(외국인등록번호) 꼴 — 앞 6자리가 «날짜 꼴»이고 뒤 7자리가 1~8로 시작. 사이는 없음·빈칸·여러 대시(‐‑‒–—―−﹣－)·점 모두.
+   글자는 먼저 NFKC 로 다듬는다(전각 숫자·전각 대시 → 보통 글자). 막기(test)와 가리기(scrub)가 «같은 꼴»을 쓴다. */
+const RRN_SRC = "(?<!\\d)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\s*[-\\u2010-\\u2015\\u2212\\uFE58\\uFE63\\uFF0D.]?\\s*[1-8]\\d{6}(?!\\d)";
+const RRN_RX = new RegExp(RRN_SRC);
+const RRN_G = new RegExp(RRN_SRC, "g");
+function norm(s) { s = s == null ? "" : String(s); try { return s.normalize("NFKC"); } catch (_) { return s; } }
+function hasRrn(s) { return RRN_RX.test(norm(s)); }
 const MAIL_RX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const PHONE_RX = /(?<!\d)0\d{1,2}[-.\s)]?\d{3,4}[-.\s]?\d{4}(?!\d)/g;
 const PHONE_TEST = /(?<!\d)0\d{1,2}[-.\s)]?\d{3,4}[-.\s]?\d{4}(?!\d)/;
@@ -87,7 +93,7 @@ function judgeAttachment(subject, name, sentDate) {
   if (!C.lectureSignal(subject, name)) return { ok: false, why: "type" };    /* 직원이 더한 낱말로는 문을 넓히지 않는다 */
   const c = C.classifyMail(subject, name, sentDate);
   if (!c) return { ok: false, why: "type" };
-  if (c.pii || SERVER_EXCLUDE_RX.test(name) || RRN_RX.test(name) || PHONE_TEST.test(name) || MAIL_TEST.test(name)) return { ok: false, why: "pii" };
+  if (c.pii || SERVER_EXCLUDE_RX.test(name) || hasRrn(name) || PHONE_TEST.test(norm(name)) || MAIL_TEST.test(name)) return { ok: false, why: "pii" };
   const ext = C.extOf(name);
   if (DOC_HUMAN[ext]) return { ok: false, why: "human" };
   if (!DOC_AUTO[ext]) return { ok: false, why: "type" };
@@ -217,8 +223,7 @@ async function extractContent(name, buf, deps) {
   } catch (_) { /* 못 읽으면 글자 없음 — «사람 확인 필요»로 센다 */ }
   return { text: "" };
 }
-const RRN_G = /(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/g;
-function scrub(s) { return str(s).replace(RRN_G, "[주민번호]").replace(MAIL_RX, "[메일]").replace(PHONE_RX, "[전화]"); }
+function scrub(s) { return norm(s).replace(RRN_G, "[주민번호]").replace(MAIL_RX, "[메일]").replace(PHONE_RX, "[전화]"); }
 /* 자동 정리 내용 — 발표자료는 «목차(장마다 첫 줄)», 그 밖은 첫 글. 메일 주소·전화는 가린다. 상한은 화면과 같은 K.SUMMARY_MAX */
 function summarize(ex) {
   const max = K.SUMMARY_MAX || 1200;
@@ -336,7 +341,7 @@ async function runSweep(deps, opts) {
       if (sameId) { skipped.same++; await markSeen(c, "same", sameId); continue; }
       const ex = await extractContent(name, buf, deps);
       /* 주민번호 꼴이 보이면 먼저 뺀다(글자가 적어도) · 내용을 읽어 확인하지 못했으면(깨짐·스캔·한도 넘음) 넣지 않는다 — 사람이 «메일에서 찾기»로 고른다 */
-      if (RRN_RX.test(str(ex.text))) { skipped.pii++; await markSeen(c, "pii-text"); continue; }
+      if (hasRrn(ex.text)) { skipped.pii++; await markSeen(c, "pii-text"); continue; }
       if (str(ex.text).replace(/\s+/g, "").length < MIN_TEXT) { skipped.human++; await markSeen(c, "human"); continue; }
       const q = queueEntry(c, got, sha256, summarize(ex), clock());
       const tx = await db.ref(Q_ROOT + "/" + c.seenKey).transaction((cur) => (cur ? undefined : q));
@@ -359,6 +364,6 @@ async function runSweep(deps, opts) {
 
 module.exports = {
   runSweep, pickCandidates, judgeAttachment, folderMode, extractContent, summarize, zipEntries, xmlLines,
-  queueEntry, indexItems, seenKeyOf, ymdSeoul, scrub,
+  queueEntry, indexItems, seenKeyOf, ymdSeoul, scrub, hasRrn,
   INBOX_ROOT, Q_ROOT, STATE_PATH, SEEN_ROOT, ITEMS_ROOT, DEFAULT_DAYS, MAX_DAYS, MAX_FILES_PER_RUN, MAX_ATT_BYTES, MIN_TEXT, DOC_AUTO, DOC_HUMAN
 };

@@ -286,7 +286,7 @@
          edulib_inbox(레코드 아닌 대기열·상태 — 서버만 쓴다)에 쌓는다. 자료함 기록(items)은 관리자가 골라 «넣기»할 때 화면 관문이 만든다.
        ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 관리자 화면에서만, 머리글·첨부 이름만)
        ⚠ 재직 직원 모두 읽고 쓴다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만. */
-    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib'], sharedRoots:['uid_roles','data/user_dir','mailbox','edulib_inbox'],
+    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib','edulib_inbox'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
       writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
                       {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'},
                       {path:'edulib/cats/{id}',entityType:'EduCategory'}],

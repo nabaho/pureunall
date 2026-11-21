@@ -306,6 +306,26 @@ test('★★ 내용 정리 — 발표자료는 장 순서대로 첫 줄(목차),
   assert.deepEqual(x, ['&#60;b&#62;'], '엔티티는 한 번만 푼다(글자가 코드가 되지 않게)');
 });
 
+test('★★ 주민번호 꼴 — 빈칸·여러 대시·전각·붙여 쓴 13자리도 막고 가린다(앞 6자리가 날짜 꼴일 때)', () => {
+  ['900101-1234567', '900101 1234567', '900101–1234567', '900101−1234567', '9001011234567', '９００１０１－１２３４５６７']
+    .forEach((s) => {
+      assert.ok(S.hasRrn('참석 ' + s), s);
+      assert.ok(S.scrub('참석 ' + s).indexOf('[주민번호]') >= 0 && !/\d{7}/.test(S.scrub('참석 ' + s)), s);
+    });
+  ['1234567890123', '2026-11-21 1234567', '010-1234-5678'].forEach((s) => assert.equal(S.hasRrn(s), false, '날짜 꼴이 아니면 주민번호로 안 본다: ' + s));
+  assert.equal(S.judgeAttachment('강의 자료', '강의안 9001011234567.pdf', '').why, 'pii', '이름에 붙여 쓴 주민번호');
+});
+
+test('★★ 자동 정리함에서 넣을 때는 «정리한 바로 그 첨부»만 — 이름이 정확히 같고 지문도 같아야 올린다', () => {
+  const app = read(path.join(ROOT, 'js', 'pu-edulib-app.js'));
+  const row = app.slice(app.indexOf('function importMailRow'), app.indexOf('/* ───────── 사람이 더한 강의 종류'));
+  assert.match(row, /!r\.qsha && a\.name\.slice\(0, 60\)/, '정리함 줄은 앞 60자 맞추기를 쓰지 않는다');
+  assert.match(row, /if \(r\.qsha\) want = want\.slice\(0, 1\)/, '한 건만');
+  assert.match(row, /r\.qsha && h !== r\.qsha/, '받은 뒤 지문이 정리할 때와 같아야');
+  const inbox = app.slice(app.indexOf('function inboxRows'), app.indexOf('function drawInbox'));
+  assert.match(inbox, /qsha: String\(q\.sha256 \|\| ''\) \|\| 'none'/, '지문이 없는 줄은 올리지 못한다(none)');
+});
+
 test('★★ 서버 함수 — 매일 한 번 · 관리자만 · 잠금 · 창고·자료함에는 안 쓴다 · AI 안 씀', () => {
   const idx = read(path.join(ROOT, 'functions', 'index.js'));
   const i = idx.indexOf('exports.edulibMailSweep');
