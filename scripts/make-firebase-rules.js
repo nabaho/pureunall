@@ -548,11 +548,26 @@ rules.fund_erp = workspace();
    «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
    이름 붙은 자리가 $k 보다 먼저 잡힌다. 읽기는 work_erp 전체와 같다(로그인 직원) — 날짜·건수뿐이라 더 넓어지지 않는다.
    ⚠ 관리자 쓰기는 위(work_erp .write)에서 그대로 내려온다. */
+/* ★ 모양도 좁힌다(2회차 보안 검토 «중간» — n·at 만 보면 본인 자리에 아무 큰 자료나 쌓을 수 있었다):
+     아는 칸만(v·n·at·dd·nx·nl·ws·we, 나머지 $other 거부) · 건수는 0~10만 · 날짜 목록은 «0~999 번째»까지 «YYYY-MM-DD» 글자만
+     (js/pu-mywork.js MAX_DATES 400 보다 넉넉히) · 통짜 값(글자 하나)은 $uid·dd·nx 의 hasChildren 로 막는다(자식 규칙이 안 도는 함정). */
+const 날짜칸 = "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)";
+const 날짜목록 = { '.validate': 'newData.hasChildren()', $i: { '.validate': `$i.matches(/^[0-9]{1,3}$/) && ${날짜칸}` } };
+const 건수 = (hi) => `newData.isNumber() && newData.val() >= 0 && newData.val() <= ${hi}`;
 rules.work_erp = workspace({
   mysum: {
     $uid: {
       '.write': `(${LOGIN}) && auth.uid === $uid`,
-      '.validate': "newData.hasChildren(['n','at']) && newData.child('n').isNumber() && newData.child('at').isNumber()"
+      '.validate': "newData.hasChildren(['n','at'])",
+      v: { '.validate': 'newData.isNumber()' },
+      n: { '.validate': 건수(100000) },
+      at: { '.validate': 'newData.isNumber()' },
+      nl: { '.validate': 건수(100000) },
+      ws: { '.validate': 날짜칸 },
+      we: { '.validate': 날짜칸 },
+      dd: 날짜목록,
+      nx: 날짜목록,
+      $other: { '.validate': false }
     }
   }
 });

@@ -62,6 +62,12 @@ test('①★ 보안규칙 — 숫자 한 줄은 «본인 UID 자리만» 쓴다(
   assert.ok(자리, '★ work_erp/mysum 에 이름 붙은 규칙이 없다 — 로그인 직원 누구나 쓰는 $k 로 떨어진다');
   assert.match(자리['.write'] || '', /auth\.uid === \$uid/, '★ 본인 UID 자리만 쓰게 막지 않는다');
   assert.match(자리['.validate'] || '', /hasChildren/, '모양(통짜 값 등)을 안 본다');
+  assert.equal(자리.$other && 자리.$other['.validate'], false, '★ 모르는 칸을 받는다 — 본인 자리에 아무 큰 자료나 쌓인다');
+  ['dd', 'nx'].forEach((k) => {
+    assert.ok(자리[k] && 자리[k].$i, k + ' 목록의 한 칸 규칙이 없다');
+    assert.match(자리[k].$i['.validate'], /\$i\.matches/, '★ ' + k + ' 목록 길이에 한도가 없다');
+  });
+  assert.match((자리.n || {})['.validate'] || '', /<=/, '건수에 위 한도가 없다');
   assert.equal(R.work_erp.mysum['.write'], undefined, '★ 자리 통째에 쓰기를 열었다 — 남의 줄까지 한 번에 덮을 수 있다');
 });
 
@@ -209,7 +215,7 @@ function 옮기기놀이터(o) {
     closeM() {}, toast() {}, route() {}, Promise,
   };
   vm.createContext(ctx);
-  ['isOf', '_peArr', 'briefTrim', 'mvClosed', 'mvWho', 'mvMine', 'mvDoneMap', 'mvCandidates', 'mvRecord', 'erpMoveRun']
+  ['isOf', '_peArr', 'briefTrim', 'mvClosed', 'mvWho', 'mvMine', 'mvDoneMap', 'mvCandidates', 'mvKey', 'mvRecord', 'erpMoveRun']
     .forEach((n) => vm.runInContext(함수(WORK, n), ctx));
   vm.runInContext(줄(WORK, 'var BRIEF_MAX=') + '\n' + 줄(WORK, 'var MV_STORES=') + '\n' + 몸(WORK, 'var MV_TYPE=') + ';', ctx);
   return { ctx, 보냄, 읽음, 메시지 };
@@ -296,6 +302,25 @@ test('③★ 옮기기 — 한 번의 update · work_erp/items 아래만 · 원�
   const note = w1.pe_notes && Object.keys(w1.pe_notes).map((k) => w1.pe_notes[k])[0];
   assert.ok(note && note.t.indexOf('안내함') >= 0 && note.t.length > w1.brief.length, '★ 원본 내용·결과 전문이 사라진다');
   assert.ok(g.읽음.every((p) => /^data\/(my_work_items|biz_cases)\/v$/.test(p)), '원본 두 곳 말고 다른 데를 읽는다');
+});
+
+test('③★ 두 창에서 같은 것을 동시에 옮겨도 «같은 자리» — 업무가 둘로 생기지 않는다', async () => {
+  async function 한창() {
+    const g = 옮기기놀이터({ 원본: 원본보기(), 관리자: true });
+    const r = await g.ctx.mvCandidates();
+    g.ctx.S._mvList = r.list;
+    g.ctx.document.querySelectorAll = () => r.list.map((c, i) => ({ checked: true, value: String(i) }));
+    g.ctx.erpMoveRun();
+    await 흘려보내기();
+    return Object.keys(g.보냄[0] || {}).sort().join(',');
+  }
+  const a = await 한창(), b = await 한창();
+  assert.ok(a.length > 0);
+  assert.equal(a, b, '★ 같은 원본을 옮겼는데 창마다 다른 자리에 쓴다 — 동시에 누르면 업무가 둘이 된다');
+  /* 열쇠로 못 쓰는 글자가 든 원본 id 는 바꿔 쓰지 않는다(다른 원본과 겹칠 수 있다) */
+  const g = 옮기기놀이터({ 원본: 원본보기() });
+  assert.equal(g.ctx.mvKey({ store: 'my_work_items', id: 'a.b' }), '', '★ 못 쓰는 글자를 바꿔 열쇠를 만든다 — 다른 원본과 겹칠 수 있다');
+  assert.notEqual(g.ctx.mvKey({ store: 'my_work_items', id: 'x1' }), g.ctx.mvKey({ store: 'biz_cases', id: 'x1' }), '두 원본 자리의 같은 id 가 한 자리로 겹친다');
 });
 
 test('③ 쓰기에 실패하면 아무것도 안 바뀐 것으로 둔다 · 그 사이 옮겨진 것은 다시 안 옮긴다', async () => {

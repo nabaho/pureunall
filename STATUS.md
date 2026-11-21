@@ -231,6 +231,11 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
+### 🔒 규칙 게시 대기 — `work_erp/mysum/$uid`(«📋 내 업무» 숫자 한 줄 본인만 쓰기) (2026-11-21, `feat/my-work-home`)
+
+`status/2026-11-21-feat-my-work-home.md`. `rules-deploy.js` 가 콘솔에만 있는 `/edulib/cats`(열린 PR #3227)로 멈춰 아직 못 올렸다(우회 안 함).
+- [ ] #3227 과 이 PR 이 합쳐진 뒤 `node scripts/rules-deploy.js --deploy`(누가 올리든 만들개 전체가 나간다) → 콘솔 원문 새 판 → `tests/photos-staff-share.test.js` PENDING 비우기
+
 ### 📊 데이터관리(대표 전용) — 대표 표지 넣기 · 서버 함수 배포 · 대표 PC 기기 승인 (2026-11-21 대표 「한번에 모든 것 다해고 내부관리에 넣어달라」)
 
 `status/2026-11-21-datahub-app.md` · PR #3225(합쳐짐). 앱·보안규칙·대표 표지·서버 함수 넷은 끝났고(2026-11-21 대표 「둘 다 해라」), 남은 것은 대표 PC 기기 승인과 대표 눈 확인뿐이다.

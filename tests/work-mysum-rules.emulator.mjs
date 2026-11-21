@@ -38,10 +38,12 @@ async function call(method, path, auth, body) {
   return r.status;
 }
 const ok = (s) => s >= 200 && s < 300;
+/* «거부»는 규칙이 막은 것(401·403)만 센다 — 잘못된 주소·서버 오류(400·404·5xx)를 «거부 성공»으로 착각하지 않게(2회차 보안 검토 «낮음») */
+const denied = (s) => s === 401 || s === 403;
 let pass = 0, fail = 0;
 async function expect(label, method, path, auth, body, want) {
   const s = await call(method, path, auth, body);
-  const got = ok(s) ? '허용' : '거부';
+  const got = ok(s) ? '허용' : denied(s) ? '거부' : '오류';
   const good = got === want;
   good ? pass++ : fail++;
   console.log(`  ${good ? '✓' : '✗'} ${label.padEnd(44)} 기대=${want} 실제=${got} (${s})`);
@@ -49,10 +51,14 @@ async function expect(label, method, path, auth, body, want) {
 const 한줄 = (n) => ({ v: 1, n, dd: ['2026-11-25'], nx: ['2026-11-21'], at: Date.now() });
 
 async function seed() {
-  await call('PUT', 'uid_roles/U_ADMIN', OWNER, { isAdmin: true, sid: 'P-001', status: 'active' });
-  await call('PUT', 'uid_roles/U_STAFF', OWNER, { isAdmin: false, sid: 'P-002', status: 'active' });
-  await call('PUT', 'uid_roles/U_OTHER', OWNER, { isAdmin: false, sid: 'P-003', status: 'active' });
-  await call('PUT', 'work_erp', OWNER, { items: { W1: { t: 'x' } }, mysum: { U_OTHER: 한줄(3) } });
+  const st = [
+    await call('PUT', 'uid_roles/U_ADMIN', OWNER, { isAdmin: true, sid: 'P-001', status: 'active' }),
+    await call('PUT', 'uid_roles/U_STAFF', OWNER, { isAdmin: false, sid: 'P-002', status: 'active' }),
+    await call('PUT', 'uid_roles/U_OTHER', OWNER, { isAdmin: false, sid: 'P-003', status: 'active' }),
+    await call('PUT', 'work_erp', OWNER, { items: { W1: { t: 'x' } }, mysum: { U_OTHER: 한줄(3) } }),
+  ];
+  /* 자료를 못 심었으면 뒤의 «허용·거부»가 다 엉터리다 — 바로 멈춘다 */
+  if (!st.every(ok)) { console.error('\n  자료 심기 실패: ' + st.join(',') + '\n'); process.exit(2); }
 }
 
 const guard = await fetch(`${BASE}/work_erp.json?ns=${NS}`).then((r) => r.status);
@@ -66,6 +72,13 @@ await expect('내 숫자 지우기  mysum/U_STAFF', 'DELETE', 'work_erp/mysum/U_
 await expect('★ 통짜 값  mysum/U_STAFF = "글자"', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, '글자', '거부');
 await expect('★ 건수(n) 없는 값', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, { v: 1, at: Date.now() }, '거부');
 await expect('★ 건수가 글자', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, { n: '5', at: Date.now() }, '거부');
+await expect('★ 건수가 음수', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, { n: -1, at: Date.now() }, '거부');
+await expect('★ 모르는 칸(큰 자료 쌓기)', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, Object.assign(한줄(1), { blob: 'x'.repeat(5000) }), '거부');
+await expect('★ 날짜 목록이 통짜 글자', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, Object.assign(한줄(1), { dd: '2026-11-25' }), '거부');
+await expect('★ 날짜 목록에 날짜 아닌 글자', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, Object.assign(한줄(1), { dd: ['엉터리'] }), '거부');
+await expect('★ 날짜 목록 1000번째 칸', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, Object.assign(한줄(1), { dd: { 1000: '2026-11-25' } }), '거부');
+await expect('빈 날짜 목록(업무관리가 실제로 적는 꼴)', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, { v: 1, n: 0, dd: [], nx: [], at: Date.now() }, '허용');
+await expect('이번 주 미기록·주 시작·끝도 받는다', 'PUT', 'work_erp/mysum/U_STAFF', STAFF, Object.assign(한줄(1), { nl: 2, ws: '2026-11-16', we: '2026-11-22' }), '허용');
 
 console.log('\n── 직원 — 남의 자리 ──');
 await seed();

@@ -15286,6 +15286,14 @@ function erpMoveModal(){
       +esc(e&&e.message||e)+'</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>');
   });
 }
+/* 옮긴 업무의 열쇠 — 원본에서 «정해진 이름»(같은 원본이면 늘 같은 자리).
+   ★ 두 창(두 사람)이 같은 것을 동시에 옮겨도 «같은 자리»에 쓰여 한 줄만 남는다(2회차 보안 검토 «중간» — 무작위 열쇠면 둘이 생겼다).
+   ⚠ 원본 id 에 열쇠로 못 쓰는 글자가 있으면 바꿔 쓰지 않는다(다른 원본과 겹칠 수 있다) — 그때만 무작위 열쇠로 물러선다. */
+function mvKey(c){
+  var s=String(c&&c.id||'');
+  if(!s||/[.#$\[\]\/]/.test(s)||s.length>80) return '';
+  return 'MV-'+(c.store==='biz_cases'?'B':'W')+'-'+s;
+}
 /* 옮길 한 줄 → 업무관리 업무. «＋ 새 업무»(saveItem)와 같은 칸에 출처(mv)·온톨로지 칸을 더한다 */
 function mvRecord(c,no,nowIso,id){
   var rec={ cat:'기타', company:c.company, client:'', officer:'',
@@ -15314,14 +15322,14 @@ function erpMoveRun(){
   if(!pick.length){ if(msg) msg.textContent='고른 것이 없습니다.'; return; }
   /* 그 사이 다른 창에서 옮겼을 수 있다 — 지금 목록으로 한 번 더 거른다 */
   var done=mvDoneMap();
-  pick=pick.filter(function(c){ return !done[c.store+'|'+c.id]; });
+  pick=pick.filter(function(c){ var k=mvKey(c); return !done[c.store+'|'+c.id] && !(k&&items[k]); });
   if(!pick.length){ if(msg) msg.textContent='이미 옮겨진 것들입니다.'; return; }
   if(btn) btn.disabled=true;
   var up={}, nowIso=new Date().toISOString(), base=genNo('기타'), m=/^(.*-)(\d+)$/.exec(base), n0=m?+m[2]:1, recs={};
   pick.forEach(function(c,i){
     /* 세 자리로 채우되 1000번을 넘으면 자르지 않는다(slice(-3) 은 1000 → 000 으로 겹친다) */
     var n=String(n0+i); while(n.length<3) n='0'+n;
-    var id=rid('W'), no=m?(m[1]+n):base;
+    var id=mvKey(c)||rid('W'), no=m?(m[1]+n):base;
     recs[id]=mvRecord(c,no,nowIso,id);
     up[NS+'/items/'+id]=recs[id];
   });
