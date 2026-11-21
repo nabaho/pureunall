@@ -51,7 +51,14 @@
   - 남긴 것(낮음): 파이어베이스 SDK 에 SRI 를 안 붙였다 — 저장소의 다른 앱과 같은 gstatic 방식이라 따로 정할 거리. 터미널 도구의 «조회↔쓰기» 사이 경쟁은 firebase CLI 에 조건부 쓰기가 없어 «쓰기 직전 다시 읽어 같을 때만»으로 둔다(대표만 터미널에서 돌리는 도구, 서버 전용 자리).
 
 ## 안 한 것 · 사람 손이 필요한 것
-- **대표 승인이 필요한 운영 일 셋**(아직 안 함): ① 대표 표지 넣기 `node scripts/datahub-owner.js --uid <대표 uid> --apply` — 이것이 없으면 앱이 대표에게도 «대표 표지가 아직 없습니다»로 닫힌다 ② 서버 함수 넷 배포(GitHub «Firebase 배포», 이름 찍어서) — 전에는 현황판이 «서버 집계 전»(회색), 채팅이 «채팅 서버 준비 전» ③ 대표 PC 기기 승인(화면에서 등록 요청 → 터미널 `datahub-device.js --approve <fp> --apply`).
+- **운영 일 — 2026-11-21 대표 「둘 다 해라」로 ①②는 끝냈다**(아래 «끝낸 운영 일»). ③만 대표 PC 에서 남았다. 처음 적은 목록: ① 대표 표지 넣기 `node scripts/datahub-owner.js --uid <대표 uid> --apply` — 이것이 없으면 앱이 대표에게도 «대표 표지가 아직 없습니다»로 닫힌다 ② 서버 함수 넷 배포(GitHub «Firebase 배포», 이름 찍어서) — 전에는 현황판이 «서버 집계 전»(회색), 채팅이 «채팅 서버 준비 전» ③ 대표 PC 기기 승인(화면에서 등록 요청 → 터미널 `datahub-device.js --approve <fp> --apply`).
 - 실데이터로는 숫자를 견주지 않았다 — 표지를 넣은 뒤 대표 화면에서 이알피 성과관리·손익과 같은 달·같은 거르개로 맞는지 본다(계획서 8절 1단계 끝 기준). `node scripts/erp-integrity-audit.js` 도 그때.
 - 현황판 일부 칸(정부지원금 승인 비율·규정집 신고 비율·계약서 esign·메일 이번 달)은 코드에서 찾은 칸 이름으로 센 추정이 남아 있다.
 - 노무·개인정보(계획서 7절, 담당 노무사 최종 검토): 개인별 실적·업무량을 «성과 평가·성과급»에 쓰기 시작하면 개인정보 보호법 제15조·제18조 목적 범위와 근로자참여법 제20조 협의 사항을 먼저 확인한다.
+
+## 끝낸 운영 일 (2026-11-21 대표 「둘 다 해라」)
+- **대표 표지**: 서버 권한표(`uid_roles`)에서 `role==="admin"` 계정이 «하나뿐이고 재직»임을 확인(다른 계정은 읽어도 화면에 찍지 않음) → `node scripts/datahub-owner.js --uid <uid>`(보기: 지금 표지 «없음») → `--apply`. 백업 `서버백업\datahub\app-owner-*.json`(저장소 밖) → 다시 읽어 «끝» 확인 → 읽기만으로 한 번 더 확인(가린 표시 `Uovt…f1`).
+  - 알아 둘 것: 이 PC 의 firebase CLI `database:get` 은 `--order-by-child` 를 모른다 — 권한표 전체를 읽어 코드에서 거른다.
+- **서버 함수 넷**: 먼저 #3225 가 main 에 합쳐짐을 확인(배포 워크플로는 main 에서만 돈다) → `node scripts/firebase-deploy-check.js "<이름들>"`(인자로 받는다 — 환경 변수가 아니다)이 «functions:이름» 넷을 돌려줌 → `gh workflow run firebase-deploy.yml --ref main -f rules=false -f functions=datahubDeviceRequest,datahubChallenge,datahubAsk,datahubBoardTally` → 실행 44891655882 성공(네 함수·예약 작업 생성). 보안규칙은 PR 올릴 때 이미 게시했다.
+- 확인: 로그인 없이 `datahubDeviceRequest`·`datahubChallenge`·`datahubAsk` 를 부르면 401(올라가 있고 문지기가 막음). 현황판 집계 숫자·채팅 질문은 대표 로그인과 기기 승인이 있어야 볼 수 있어 이 방에서는 보지 못했다.
+- **남은 것**: ③ 대표 PC 기기 승인(데이터관리 «잠금·채팅» → 등록 요청 → 화면의 지문으로 `node scripts/datahub-device.js --approve <지문> --apply`) · 대표 눈으로 숫자가 이알피 성과관리·손익과 맞는지 보기 · 기준값(⚙ 기준 정하기).

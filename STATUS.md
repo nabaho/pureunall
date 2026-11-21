@@ -233,9 +233,9 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ### 📊 데이터관리(대표 전용) — 대표 표지 넣기 · 서버 함수 배포 · 대표 PC 기기 승인 (2026-11-21 대표 「한번에 모든 것 다해고 내부관리에 넣어달라」)
 
-`status/2026-11-21-datahub-app.md` · 가지 `claude/datahub-app`. 앱·보안규칙은 들어갔고, 아래 셋은 «운영 일»이라 대표 승인 뒤에 한다.
-- [ ] (대표 승인) 대표 표지: `node scripts/datahub-owner.js --uid <대표 uid> --apply` — 없으면 앱이 대표에게도 «대표 표지가 아직 없습니다»로 닫힌다(모르면 닫는 문).
-- [ ] (대표 승인) 서버 함수 넷 배포: GitHub «Firebase 배포» functions=`datahubDeviceRequest,datahubChallenge,datahubAsk,datahubBoardTally` — 전에는 현황판 «서버 집계 전»(회색)·채팅 «채팅 서버 준비 전». 현황판 집계는 1시간마다 돈다.
+`status/2026-11-21-datahub-app.md` · PR #3225(합쳐짐). 앱·보안규칙·대표 표지·서버 함수 넷은 끝났고(2026-11-21 대표 「둘 다 해라」), 남은 것은 대표 PC 기기 승인과 대표 눈 확인뿐이다.
+- [x] 대표 표지 `app_owner/uid` 넣음(2026-11-21 · 백업 `C:\Users\user\서버백업\datahub\`, 다시 읽어 확인) — 앱이 대표 계정에게만 열린다.
+- [x] 서버 함수 넷 배포함(2026-11-21 GitHub «Firebase 배포» 실행 44891655882, 모두 «Successful create operation») — 로그인 없이 부르면 세 함수가 401. 현황판 집계(`datahubBoardTally`)는 한 시간마다 돌아 처음 숫자는 늦어도 한 시간 안에 채워진다(그 전엔 회색 «서버 집계 전»).
 - [ ] (대표 PC) 채팅 기기: 데이터관리 «잠금·채팅»에서 등록 요청 → 화면의 지문으로 `node scripts/datahub-device.js --approve <지문> --apply`.
 - [ ] (대표 눈) 표지를 넣은 뒤 대표 화면의 이번 달 입금·사람별 몫이 이알피 성과관리·손익과 같은 달·같은 거르개로 맞는지, 기준값(⚙ 기준 정하기)을 정할지.
 
