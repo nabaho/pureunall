@@ -359,3 +359,40 @@ test('Google Play 앱(TWA·WebView) 내부에서는 외부 APK 다운로드 링�
   const launcherJava = readUtf8('android/portal-twa/app/src/main/java/kr/pureun/portal/PortalLauncherActivity.java');
   assert.match(launcherJava, /endsWith\("\.apk"\)/, '네이티브 딥링크에서 .apk 경로를 차단해야 합니다');
 });
+
+test('안드로이드 홈 화면 위젯과 Digital Asset Links SHA-256 지문이 안전하게 구성되어 있다', () => {
+  const manifest = readUtf8('android/portal-twa/app/src/main/AndroidManifest.xml');
+  const widgetJava = readUtf8('android/portal-twa/app/src/main/java/kr/pureun/portal/PortalWidgetProvider.java');
+  const widgetInfo = readUtf8('android/portal-twa/app/src/main/res/xml/portal_widget_info.xml');
+  const widgetLayout = readUtf8('android/portal-twa/app/src/main/res/layout/widget_portal_quick.xml');
+  const strings = readUtf8('android/portal-twa/app/src/main/res/values/strings.xml');
+  const assetlinks = JSON.parse(readUtf8('.well-known/assetlinks.json'));
+
+  // 1. Digital Asset Links 업로드 키 SHA-256 지문이 최소 1개 이상 유효한 형식으로 등록되어 있어야 한다
+  const fps = assetlinks[0] && assetlinks[0].target && assetlinks[0].target.sha256_cert_fingerprints;
+  assert.ok(Array.isArray(fps) && fps.length >= 1, 'assetlinks.json 에 최소 1개의 SHA-256 인증서 지문이 등록되어 있어야 합니다');
+  for (const fp of fps) {
+    assert.match(fp, /^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/, '잘못된 SHA-256 지문 형식: ' + fp);
+  }
+
+  // 2. 홈 화면 위젯 리시버·메타데이터·레이아웃·FLAG_IMMUTABLE 보안 검증
+  assert.match(manifest, /android:name="\.PortalWidgetProvider"/);
+  assert.match(manifest, /android\.appwidget\.action\.APPWIDGET_UPDATE/);
+  assert.match(manifest, /@xml\/portal_widget_info/);
+  assert.match(widgetInfo, /@layout\/widget_portal_quick/);
+  assert.match(widgetJava, /PendingIntent\.FLAG_IMMUTABLE/, 'Android 12+ 보안 정책상 PendingIntent.FLAG_IMMUTABLE 이 필수입니다');
+  assert.match(widgetJava, /PortalLauncherActivity\.class/, '위젯은 명시적으로 PortalLauncherActivity 를 통해 검증된 주소만 열어야 합니다');
+
+  // 3. 위젯의 6개 핵심 앱 바로가기 버튼과 URL 이 모두 ERP 정식 출처를 가리킨다
+  const { ERP_LINK_BASE } = require('../functions/erp-origins.js');
+  for (const id of ['widget_header', 'widget_btn_erp', 'widget_btn_cal', 'widget_btn_cards', 'widget_btn_mail', 'widget_btn_photos', 'widget_btn_work']) {
+    assert.ok(widgetLayout.includes('@+id/' + id), '위젯 레이아웃에 버튼이 누락됨: ' + id);
+    assert.ok(widgetJava.includes('R.id.' + id), '위젯 Provider에 클릭 핸들러가 누락됨: ' + id);
+  }
+  for (const key of ['widget_url_portal', 'widget_url_erp', 'widget_url_cal', 'widget_url_cards', 'widget_url_mail', 'widget_url_photos', 'widget_url_work']) {
+    assert.ok(
+      strings.includes('name="' + key + '" translatable="false">' + ERP_LINK_BASE + '/'),
+      '위젯 URL이 ERP 정식 출처(' + ERP_LINK_BASE + ')와 다릅니다: ' + key
+    );
+  }
+});
