@@ -23,7 +23,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/widget_title"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/widget_header_text"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -31,7 +31,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/widget_open_portal"
-            android:textColor="#BFDBFE"
+            android:textColor="@color/widget_header_sub"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -60,7 +60,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:text="@string/widget_btn_erp"
-            android:textColor="#1E3A8A"
+            android:textColor="@color/portal_primary_dark"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -77,7 +77,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:text="@string/widget_btn_cal"
-            android:textColor="#1E3A8A"
+            android:textColor="@color/portal_primary_dark"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -93,7 +93,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:text="@string/widget_btn_cards"
-            android:textColor="#1E3A8A"
+            android:textColor="@color/portal_primary_dark"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -122,7 +122,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:text="@string/widget_btn_mail"
-            android:textColor="#1E3A8A"
+            android:textColor="@color/portal_primary_dark"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -139,7 +139,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:text="@string/widget_btn_photos"
-            android:textColor="#1E3A8A"
+            android:textColor="@color/portal_primary_dark"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -155,7 +155,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:text="@string/widget_btn_work"
-            android:textColor="#1E3A8A"
+            android:textColor="@color/portal_primary_dark"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>

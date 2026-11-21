@@ -83,10 +83,8 @@ public class PortalLauncherActivity extends Activity {
         /* 2026-11-15 ERP 이사 — 호스트(erp.pureunlabor.co.kr)가 ERP 전용 출처라 경로 앞머리(/pureunall)가 없다.
            호스트·https 검사는 위에서 끝났으니 그 호스트의 뿌리 아래면 받는다. «//» 로 시작하는 꼴과
            Google Play 외부 설치 파일(.apk) 직접 탐색 딥링크는 차단한다. */
-        if (path == null || !path.startsWith("/") || path.startsWith("//")) return false;
-        String lowerPath = path.toLowerCase(java.util.Locale.ROOT);
-        if (lowerPath.endsWith(".apk")) return false;
-        return true;
+        return path != null && path.startsWith("/") && !path.startsWith("//")
+            && !path.toLowerCase(java.util.Locale.ROOT).endsWith(".apk");
     }
 
     private void openTwaAndFinish() {
