@@ -193,6 +193,13 @@ if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
     } catch (_) {}
   })();
 }
+/* Google Play TWA(kr.pureun.portal)로 진입한 세션을 기억한다 — 하위 앱(pu-erp.html 등)으로
+   이동해 document.referrer 가 바뀐 뒤에도 Play 앱 정책 가드(외부 APK 다운로드 링크 숨김 등)를 유지한다. */
+try {
+  if (document.referrer && document.referrer.indexOf('android-app://kr.pureun.portal') === 0) {
+    sessionStorage.setItem('pu_play_twa', '1');
+  }
+} catch (_twaErr) {}
 </script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
