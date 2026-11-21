@@ -33,8 +33,9 @@
   const DEFAULT_SIDE = { type: 'SOLID', width: 0.12, color: '#000000' };
   const sideKey = s => `${(s && s.type) || 'SOLID'},${s ? s.width : 0.12},${((s && s.color) || '#000000').toUpperCase()}`;
   const isDefaultSide = s => !s || sideKey(s) === sideKey(DEFAULT_SIDE);
-  // 네 변 모두 기본(0.12mm 검정 실선)이면 null 로 단순화
-  const compactBorders = b => (!b || ['l', 'r', 't', 'b'].every(k => isDefaultSide(b[k])) ? null : b);
+  const hasDiag = d => !!(d && d.type && d.type !== 'NONE');
+  // 네 변 모두 기본(0.12mm 검정 실선)이고 대각선이 없으면 null 로 단순화
+  const compactBorders = b => (!b || (['l', 'r', 't', 'b'].every(k => isDefaultSide(b[k])) && !hasDiag(b.slash) && !hasDiag(b.backSlash)) ? null : b);
   // 셀 안쪽 여백 (mm). 한글 기본 = 좌우 1.8, 위아래 0.5
   const DEFAULT_MARGIN = { l: 1.8, r: 1.8, t: 0.5, b: 0.5 };
   const compactMargin = m => (!m || ['l', 'r', 't', 'b'].every(k => Math.abs((m[k] || 0) - DEFAULT_MARGIN[k]) < 0.05) ? null : m);
@@ -262,9 +263,11 @@
       const bg = cell && cell.bg ? cell.bg.toUpperCase() : null, bs = cell && compactBorders(cell.borders);
       if (!bg && !bs) return 2;
       const sides = ['l', 'r', 't', 'b'].map(k => (bs && bs[k]) || DEFAULT_SIDE);
-      const k = bg + '|' + sides.map(sideKey).join('|');
+      const slash = bs && hasDiag(bs.slash) ? bs.slash : null;
+      const backSlash = bs && hasDiag(bs.backSlash) ? bs.backSlash : null;
+      const k = bg + '|' + sides.map(sideKey).join('|') + (slash ? '|S:' + sideKey(slash) : '') + (backSlash ? '|B:' + sideKey(backSlash) : '');
       let i = fillKeys.indexOf(k);
-      if (i < 0) { i = fillKeys.push(k) - 1; fills.push({ bg, sides }); }
+      if (i < 0) { i = fillKeys.push(k) - 1; fills.push({ bg, sides, slash, backSlash }); }
       return i + 3;
     }
     // 쪽 테두리/배경: 테두리 4면 + 배경색 또는 그림
@@ -317,15 +320,20 @@
         + `<hh:typeInfo familyType="${esc(ti.familyType)}"${TYPE_INFO_KEYS.map(k => ` ${k}="${esc(ti[k])}"`).join('')}/></hh:font>`;
     };
     const fontfaces = LANGS.map(l => `<hh:fontface lang="${l}" fontCnt="${st.fonts.length}">${st.fonts.map((f, i) => fontXml(l, f, i)).join('')}</hh:fontface>`).join('');
-    const borderFill = (id, sides, bg, img) =>
-      `<hh:borderFill id="${id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>`
-      + ['left', 'right', 'top', 'bottom'].map((s, i) => `<hh:${s}Border type="${sides[i].type}" width="${widthStr(sides[i].width)}" color="${sides[i].color.toUpperCase()}"/>`).join('')
-      + (img ? `<hc:fillBrush><hc:imgBrush mode="${img.mode}"><hc:img binaryItemIDRef="${img.ref}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/></hc:imgBrush></hc:fillBrush>`
-        : bg ? `<hc:fillBrush><hc:winBrush faceColor="${bg}" hatchColor="#000000" alpha="0"/></hc:fillBrush>` : '')
-      + '</hh:borderFill>';
+    const borderFill = (id, sides, bg, img, slash, backSlash) => {
+      const diag = slash || backSlash;
+      return `<hh:borderFill id="${id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">`
+        + `<hh:slash type="${slash ? 'CENTER' : 'NONE'}" Crooked="0" isCounter="0"/>`
+        + `<hh:backSlash type="${backSlash ? 'CENTER' : 'NONE'}" Crooked="0" isCounter="0"/>`
+        + ['left', 'right', 'top', 'bottom'].map((s, i) => `<hh:${s}Border type="${sides[i].type}" width="${widthStr(sides[i].width)}" color="${sides[i].color.toUpperCase()}"/>`).join('')
+        + (diag ? `<hh:diagonal type="${diag.type || 'SOLID'}" width="${widthStr(diag.width || 0.12)}" color="${(diag.color || '#000000').toUpperCase()}"/>` : '')
+        + (img ? `<hc:fillBrush><hc:imgBrush mode="${img.mode}"><hc:img binaryItemIDRef="${img.ref}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/></hc:imgBrush></hc:fillBrush>`
+          : bg ? `<hc:fillBrush><hc:winBrush faceColor="${bg}" hatchColor="#000000" alpha="0"/></hc:fillBrush>` : '')
+        + '</hh:borderFill>';
+    };
     const none = { type: 'NONE', width: 0.1, color: '#000000' };
     const fills = [borderFill(1, [none, none, none, none]), borderFill(2, [DEFAULT_SIDE, DEFAULT_SIDE, DEFAULT_SIDE, DEFAULT_SIDE])]
-      .concat(st.fills.map((f, i) => borderFill(i + 3, f.sides, f.bg, f.img)));
+      .concat(st.fills.map((f, i) => borderFill(i + 3, f.sides, f.bg, f.img, f.slash, f.backSlash)));
     const chars = st.chars.map((c, i) => {
       const fx = parseFx(c.fx), u = fx.u ? fx.u.split('/') : null, s = fx.s ? fx.s.split('/') : null, sh = fx.sh ? fx.sh.split('/') : null;
       return `<hh:charPr id="${i}" height="${c.height}" textColor="${c.color}" shadeColor="${c.shade}" useFontSpace="${fx.fs ? 1 : 0}" useKerning="${fx.k ? 1 : 0}" symMark="${esc(fx.sym || 'NONE')}" borderFillIDRef="1">`
@@ -572,7 +580,7 @@
         else runs.push(...x.runs);
       }
       const lastP = pieces[pieces.length - 1];
-      out.push(Object.assign({ type: 'p' }, props, { runs }, pieces[0].pageBreak ? { pageBreak: true } : null, lastP.type === 'p' && lastP.endMark ? { endMark: lastP.endMark } : null));
+      out.push(Object.assign({ type: 'p' }, props, { runs }, pieces[0].pageBreak ? { pageBreak: true } : null, pieces[0].columnBreak ? { columnBreak: true } : null, lastP.type === 'p' && lastP.endMark ? { endMark: lastP.endMark } : null));
       i = j - 1;
     }
     return out;
@@ -582,7 +590,7 @@
   // first: 첫 문단이면 구역 정의(secPr) 문자열
   function paraXml(b, st, width, first) {
     let runs = first ? `<hp:run charPrIDRef="0">${first}</hp:run>` : '';
-    const pb = b.pageBreak ? ' pageBreak="1"' : '';
+    const pb = (b.pageBreak ? ' pageBreak="1"' : '') + (b.columnBreak ? ' columnBreak="1"' : '');
     if (b.type === 'table') {
       // 표와 같은 문단에 있던 떠 있는 개체(선·도형)는 원래 자리대로 표 앞·뒤에 함께 둠
       const anch = after => (b.anchors || []).filter(r => r.shape && !!r.shape.afterTable === after).map(r => shapeXml(r.shape, st)).join('');
@@ -863,9 +871,14 @@
       const id = bf.getAttribute('id');
       if (c && c !== 'none' && !/^#FF[0-9A-F]{6}$/i.test(c)) fillColor[id] = c; // 흰색 채우기도 그대로 (#FFrrggbb = 투명)
       const side = tag => { const e = kid(bf, tag); return e ? { type: e.getAttribute('type') || 'SOLID', width: parseFloat(e.getAttribute('width')) || 0.12, color: e.getAttribute('color') || '#000000' } : DEFAULT_SIDE; };
-      fillBorders[id] = compactBorders({ l: side('leftBorder'), r: side('rightBorder'), t: side('topBorder'), b: side('bottomBorder') });
+      const slEl = kid(bf, 'slash'), bslEl = kid(bf, 'backSlash'), dgEl = kid(bf, 'diagonal');
+      const diagSpec = dgEl ? { type: dgEl.getAttribute('type') || 'SOLID', width: parseFloat(dgEl.getAttribute('width')) || 0.12, color: dgEl.getAttribute('color') || '#000000' } : DEFAULT_SIDE;
+      const bObj = { l: side('leftBorder'), r: side('rightBorder'), t: side('topBorder'), b: side('bottomBorder') };
+      if (slEl && slEl.getAttribute('type') && slEl.getAttribute('type') !== 'NONE') bObj.slash = Object.assign({}, diagSpec);
+      if (bslEl && bslEl.getAttribute('type') && bslEl.getAttribute('type') !== 'NONE') bObj.backSlash = Object.assign({}, diagSpec);
+      fillBorders[id] = compactBorders(bObj);
       const ib = all(bf, 'imgBrush')[0], im = ib && all(ib, 'img')[0];
-      fillDefs[id] = { sides: { l: side('leftBorder'), r: side('rightBorder'), t: side('topBorder'), b: side('bottomBorder') }, bg: fillColor[id] || null,
+      fillDefs[id] = { sides: bObj, bg: fillColor[id] || null,
         // rawBg: 흰색도 그대로 (문단 배경용). #FFrrggbb = 투명
         rawBg: c && c !== 'none' && !/^#FF[0-9A-F]{6}$/i.test(c) ? c.toUpperCase() : null, imgRef: im ? im.getAttribute('binaryItemIDRef') : null, imgMode: ib ? ib.getAttribute('mode') || 'TOTAL' : null };
     }
@@ -1062,6 +1075,7 @@
       let cur = fresh(), field = null, link = null, gfd = null;
       const textLen = () => cur.runs.reduce((n, r) => n + (r.text ? r.text.length : 1), 0);
       if (p.getAttribute('pageBreak') === '1') cur.pageBreak = true;
+      if (p.getAttribute('columnBreak') === '1') cur.columnBreak = true;
       for (const run of kids(p, 'run')) {
         const cs = chars[run.getAttribute('charPrIDRef')] || {};
         for (const el of Array.from(run.children)) {
@@ -1320,5 +1334,5 @@
     walk(doc.footer, body);
   }
 
-  g.PureunHwpx = { buildHwpx, readHwpx, plainText, normalizeDoc, defaultPage, fixTableWidths, settleTables, compactBorders, compactMargin, solveWidths, puaChar, mapPuaText, unescapeCmd, clickDirection, splitSymbols, numText, headCounter, headDef, numTypeOf, makeLangs, parseLangs, makeFx, parseFx, typeInfoOf, NBSP_LIT, makePP, parsePP, WORD_COMPAT_FLAGS, NUM_TYPES, DEFAULT_OUTLINE, PAPERS, DEFAULT_FONT, MM, DEFAULT_SIDE };
+  g.PureunHwpx = { buildHwpx, readHwpx, plainText, normalizeDoc, defaultPage, fixTableWidths, settleTables, compactBorders, compactMargin, solveWidths, puaChar, mapPuaText, unescapeCmd, clickDirection, splitSymbols, numText, headCounter, headDef, numTypeOf, makeLangs, parseLangs, makeFx, parseFx, typeInfoOf, NBSP_LIT, makePP, parsePP, WORD_COMPAT_FLAGS, NUM_TYPES, DEFAULT_OUTLINE, PAPERS, DEFAULT_FONT, MM, DEFAULT_SIDE, makeRegistry, mergeGroups, fieldDate };
 })(typeof window !== 'undefined' ? window : globalThis);
