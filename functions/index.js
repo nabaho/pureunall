@@ -8042,7 +8042,7 @@ exports.runMailContractSweep = functions
      「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
    실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
    매일 19:30 한 번(최근 14일) · 관리자는 강의자료 앱 «메일에서 찾기»의 [지금 정리](runEdulibMailSweep, 최대 400일).
-   ⚠ 메일함은 읽기만(withFolder readOnly) · 받은 메일은 안 넣는다 · 새 기록만(빈 자리일 때만) · AI 안 씀.
+   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 새 기록만(빈 자리일 때만) · AI 안 씀.
    ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다) */
 const EdulibMailSweep = require("./edulib-mail-sweep");
 async function edulibSaveFile(path, buf, meta) {
@@ -8058,9 +8058,10 @@ async function edulibSaveFile(path, buf, meta) {
     return { existed: false };
   } catch (e) {
     if (Number(e && (e.code || e.status)) !== 412) throw e;
-    /* 같은 자리에 이미 있다 — 지난번에 원본만 올라가고 기록을 못 쓴 경우다. 크기가 같을 때만 이어 쓴다(덮어쓰지 않는다) */
+    /* 같은 자리에 이미 있다 — 지난번에 원본만 올라가고 기록을 못 쓴 경우다. «바이트까지 같을 때만»(크기 + md5) 이어 쓴다(덮어쓰지 않는다) */
     const [m] = await file.getMetadata();
-    if (Number(m.size) !== buf.length) throw new Error("창고 같은 자리에 다른 파일이 있습니다");
+    const md5 = crypto.createHash("md5").update(buf).digest("base64");
+    if (Number(m.size) !== buf.length || String(m.md5Hash || "") !== md5) throw new Error("창고 같은 자리에 다른 파일이 있습니다");
     if (!(m.metadata && m.metadata.firebaseStorageDownloadTokens)) await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
     return { existed: true };
   }
@@ -8069,7 +8070,6 @@ async function runEdulibMailSweepOnce(trigger, opts) {
   const MS = require("./mail-sync");
   return EdulibMailSweep.runSweep({
     db: getDatabase(),
-    getSelfEmail: mailUserAsync,
     download: (slug, uid, name, max) => MS.withFolder(MAIL_DEPS, slug, async (client) => {
       const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
       if (!head) return { gone: true };

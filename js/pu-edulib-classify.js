@@ -245,11 +245,18 @@
     return out;
   }
 
+  /* 강의라는 «기본 근거»만 — 사람이 더한 낱말은 보지 않는다.
+     ⚠ 서버 자동 정리(functions/edulib-mail-sweep.js)는 이것으로만 «가져올지»를 정한다 — 직원 누구나 더하는 낱말이
+       자동 반입의 문을 넓히지 못하게(낱말은 종류 나누기에만 쓴다). 화면의 «메일에서 찾기»는 사람이 고르므로 classifyMail 을 쓴다. */
+  function lectureSignal(subject, attachName) {
+    var s = String(subject || ''), a = String(attachName || '');
+    return LECTURE_NAME_RX.test(s) || LECTURE_NAME_RX.test(a) || /교육/.test(s);
+  }
   /* 메일 한 통(제목·첨부 이름)을 판정 — 첨부가 강의자료로 보이면 종류·날짜를 짐작 */
   function classifyMail(subject, attachName, sentDate) {
     var s = String(subject || '');
     var a = String(attachName || '');
-    var lect = LECTURE_NAME_RX.test(s) || LECTURE_NAME_RX.test(a) || /교육/.test(s) || (a !== '' && customHit(a));
+    var lect = lectureSignal(s, a) || (a !== '' && customHit(a));
     if (!lect) return null;
     if (EXCLUDE_NAME_RX.test(a) || (a && kindOf(extOf(a)) === 'other')) return null;
     var c = catOfText(a); if (c.key === 'etc') c = catOfText(s);
@@ -269,6 +276,7 @@
     classifyPath: classifyPath,
     guessPath: guessPath,
     classifyMail: classifyMail,
+    lectureSignal: lectureSignal,
     extOf: extOf,
     kindOf: kindOf
   };

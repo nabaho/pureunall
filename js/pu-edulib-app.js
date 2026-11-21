@@ -96,14 +96,17 @@
     $('kpis').innerHTML =
       kpi(d.total, '모은 강의자료', '') + kpi(d.cloud, '자료함에 원본 있음', 'cloud') +
       kpi(pcOnly, '원본은 아직 PC에만', 'pc') + kpi(d.review, '검토 대기', 'review');
-    /* 종류 카드 — 카드는 «단추 노릇 칸»(role=button)이다: 사람이 더한 종류의 ✎(고치기)를 진짜 단추로 안에 둘 수 있게 */
+    /* 종류 카드 — 카드는 «단추 노릇 칸»(role=button). 사람이 더한 종류의 ✎(고치기)는 카드 «밖»의 형제 단추로 둔다
+       (단추 안에 단추를 넣으면 화면 읽기 도구가 안쪽 단추를 못 읽는다) — .catw 로 감싸 카드 오른쪽 아래에 얹는다 */
     $('cats').innerHTML = d.cats.map(function (c) {
       var words = c.custom ? (C.catByKey(c.key).words || []).join(', ') : '';
-      return '<div class="cat' + (c.legal ? ' legal' : '') + (c.n ? '' : ' zero') + (c.custom ? ' mine' : '') + '" role="button" tabindex="0" data-cat="' + esc(c.key) + '" aria-label="' + esc(c.label + ' ' + c.n + '건 — 이 종류만 보기') + '">' +
+      return (c.custom ? '<div class="catw">' : '') +
+        '<div class="cat' + (c.legal ? ' legal' : '') + (c.n ? '' : ' zero') + (c.custom ? ' mine' : '') + '" role="button" tabindex="0" data-cat="' + esc(c.key) + '" aria-label="' + esc(c.label + ' ' + c.n + '건 — 이 종류만 보기') + '">' +
         '<div class="nm"><span title="' + esc(c.label) + '">' + esc(c.label) + '</span>' + (c.legal ? '<span class="tag legal" title="' + esc(c.law) + '">법정</span>' : '') +
-          (c.custom ? '<button type="button" class="ced" data-catedit="' + esc(c.key) + '" title="이 종류 고치기" aria-label="' + esc(c.label) + ' 종류 고치기">✎</button>' : '') + '<span class="n">' + c.n + '</span></div>' +
+          '<span class="n">' + c.n + '</span></div>' +
         '<div class="ln"><span>최근 ' + esc(c.latest || '—') + '</span><span>원본 ' + c.cloud + '</span><span>검토 ' + c.review + '</span><span>' + esc(K.fmtBytes(c.bytes)) + '</span></div>' +
-        (c.legal && c.law ? '<div class="ln"><span>' + esc(c.law) + '</span></div>' : (c.custom ? '<div class="ln"><span title="' + esc(words) + '">찾을 낱말 ' + esc(words || c.label) + '</span></div>' : '')) + '</div>';
+        (c.legal && c.law ? '<div class="ln"><span>' + esc(c.law) + '</span></div>' : (c.custom ? '<div class="ln"><span title="' + esc(words) + '">찾을 낱말 ' + esc(words || c.label) + '</span></div>' : '')) + '</div>' +
+        (c.custom ? '<button type="button" class="ced" data-catedit="' + esc(c.key) + '" title="이 종류 고치기" aria-label="' + esc(c.label) + ' 종류 고치기">✎</button></div>' : '');
     }).join('') + '<button type="button" class="cat add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부">＋ 새 강의 종류<span class="ln"><span>새 강의가 생기면 여기서 종류로 더합니다</span></span></button>';
     drawMatrix(d);
   }
@@ -567,9 +570,15 @@
       : (it.store !== 'cloud' ? '<button id="dUp" title="이 PC 의 원본 파일을 골라 자료함에 올립니다(바꾸지 않고 그대로)">📤 원본 올리기</button>' : '<button id="dDl">⬇ 원본 내려받기</button>') +
         '<button id="dWin">🪟 새 창으로</button><button class="dng" id="dDel">🗑 휴지통으로</button><span class="sp"></span>' +
         '<button id="dCancel">닫기</button><button class="pri" id="dSave">저장</button></div>');
-    $('modal').style.display = 'flex';
+    openModal('자세히·검토 — ' + it.title, it._deleted ? 'dX' : 'dTitle');
     makePane($('dView'), it, { inDetail: true });
     loadNotes(id);
+  }
+  /* 같은 창(#modal)을 여러 일에 쓴다 — 열 때마다 대화상자 이름을 그 일로 바꾸고 첫 칸에 초점을 준다 */
+  function openModal(label, focusId) {
+    $('modal').setAttribute('aria-label', label);
+    $('modal').style.display = 'flex';
+    setTimeout(function () { var el = focusId && $(focusId); try { if (el) el.focus(); } catch (e) {} }, 30);
   }
   function kv(k, v) { return '<div class="kv"><span>' + esc(k) + '</span><b title="' + esc(v) + '">' + esc(v) + '</b></div>'; }
   function closeDetail() {
@@ -967,8 +976,7 @@
       '이미 넣은 자료의 종류는 저절로 바꾸지 않습니다 — 낱말이 맞는 자료를 골라 드리면 «종류 바꾸기»로 바꾸세요.</p></div>' +
       '<div class="mfoot">' + (cur ? (nUsed ? '<span class="hint">이 종류 자료 ' + nUsed + '건</span>' : '<button class="dng" id="cHide">🗑 이 종류 지우기</button>') : '') +
       '<span class="sp"></span><button id="dCancel">취소</button><button class="pri" id="cSave">저장</button></div>';
-    $('modal').style.display = 'flex';
-    setTimeout(function () { try { $('cName').focus(); } catch (e) {} }, 30);
+    openModal(cur ? '강의 종류 고치기' : '새 강의 종류', 'cName');
   }
   function saveCat() {
     var key = $('mbox').getAttribute('data-catkey') || '';
@@ -1035,6 +1043,7 @@
     if (k.same) bits.push('이미 있음 ' + k.same);
     if (k.pii) bits.push('개인정보로 뺌 ' + k.pii);
     if (k.big) bits.push('너무 큼 ' + k.big);
+    if (k.human) bits.push('사람 확인 필요 ' + k.human + '(옛 형식·압축·글자 없는 PDF — 아래 «메일함 전체 훑기»로 골라 가져오기)');
     if (k.err) bits.push('못 함 ' + k.err);
     $('mAutoSt').textContent = bits.join(' · ');
     var rec = Array.isArray(s.recent) ? s.recent.filter(function (r) { return r && ITEMS[r.id]; }) : [];
@@ -1126,7 +1135,7 @@
       $('mbox').innerHTML = '<div class="mhead"><h3>종류 바꾸기 — ' + ids.length + '건</h3><span class="sp"></span><button class="sm" id="dX">닫기</button></div>' +
         '<div style="padding:14px"><select id="bCat" style="width:100%">' + C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '">' + esc(c.label) + '</option>'; }).join('') + '</select></div>' +
         '<div class="mfoot"><span class="sp"></span><button id="dCancel">취소</button><button class="pri" id="bCatGo">바꾸기</button></div>';
-      $('modal').style.display = 'flex';
+      openModal('종류 바꾸기 — ' + ids.length + '건', 'bCat');
       $('bCatGo').onclick = function () { var v = $('bCat').value; closeDetail(); bulk(ids, '«' + catLabel(v) + '»(으)로 종류 바꾸기', function (id) { return savePatch(id, { cat: v }); }); };
     });
     $('modal').addEventListener('click', function (e) {

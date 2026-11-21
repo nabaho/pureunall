@@ -5,7 +5,7 @@
    「또한 메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」
 
    ■ 하는 일
-     보낸편지함·내게쓴편지함(그리고 «우리가 보낸» 것으로 확인되는 다른 폴더의 메일)에 붙은 강의자료 첨부를
+     보낸편지함·내게쓴편지함에 붙은 강의자료 첨부 가운데 «글자를 읽어 확인할 수 있는 문서»(pptx·ppsx·docx·hwpx·글자 있는 pdf)를
        ① 원본 그대로 창고(pureun-erp-hrphotos · edulib/{id}/{원래 이름})에 복사하고
        ② 종류·강의일을 화면과 «같은 규칙»(edulib-core/pu-edulib-classify.js — js/ 사본)으로 짐작하고
        ③ 문서의 목차·첫 글을 잘라 «자동 정리 내용»(summary)으로 적어
@@ -14,9 +14,14 @@
 
    ■ 지키는 것
      1. 메일함은 읽기만 — 읽음 표시·이동·삭제 없음(mail-sync withFolder 는 readOnly).
-     2. 받은 메일(남이 보낸 외부 교육자료)은 넣지 않는다 — 우리가 보낸 것만(보낸·내게쓴 폴더, 다른 폴더는 보낸이가 우리 주소일 때만).
-     3. 재직 직원 모두 보는 자료함이다 — 이름에 명단·서명·연락처 같은 말이 있거나(PII_NAME_RX), 문서 안에 주민번호 꼴이 보이거나,
-        압축 안 파일 이름에 그런 말이 있으면 넣지 않는다. 내용 요약에서 메일 주소·전화번호는 가린다.
+     2. 받은 메일(남이 보낸 외부 교육자료)은 넣지 않는다 — 우리가 보낸 것만. 보는 폴더는 «보낸편지함·내게쓴편지함» 둘뿐이다
+        (다른 폴더는 색인의 보낸이 글자만으로는 우리 것인지 믿을 수 없어 사람이 «메일에서 찾기»로 고른다).
+     3. 재직 직원 모두 보는 자료함이다 — 사람이 보지 않고 넣는 것은 «내용을 읽어 확인한 문서»뿐이다.
+        · 옛 형식(ppt·hwp·doc 등)·압축·글자 없는(스캔) pdf 는 내용을 확인할 수 없어 넣지 않고 «사람 확인 필요»로만 센다.
+        · 이름에 명단·서명·연락처·급여·통장 같은 말, 이름·제목에 주민번호·전화·메일 꼴이 있으면 넣지 않는다.
+        · 문서 안에 주민번호 꼴이 보이면 넣지 않는다. 내용 요약·메일 제목의 메일 주소·전화번호는 가린다.
+     3-1. «가져올지»는 기본 강의 근거(강의·교안·교육자료… — C.lectureSignal)로만 정한다. 직원이 더한 찾을 낱말은 «종류 나누기»에만 쓴다
+        — 누구나 더하는 낱말이 관리자 메일함에서 가져오는 문을 넓히지 못하게.
      4. 같은 파일은 다시 넣지 않는다 — 지문(sha256)·이름+크기·같은 메일의 같은 첨부. 휴지통에 간 기록도 «있는 것»으로 본다
         (사람이 지운 자료를 되살리지 않는다 — CLAUDE.md 「종료·삭제·되돌림 불변」).
      5. 기록 id 는 «메일·첨부»에서 정해진다(edu_m + 해시) — 다시 돌아도 같은 id·같은 창고 자리. 기록은 빈 자리일 때만 쓴다(transaction).
@@ -44,11 +49,18 @@ const MAX_ZIP_ENTRY_OUT = 4 * 1024 * 1024;
 const MAX_ZIP_TOTAL_OUT = 16 * 1024 * 1024;
 const MAX_ZIP_ENTRIES = 600;
 const SLIDE_TITLES_MAX = 15;
-/* 자동으로 넣는 문서 형식 — 표계산(xls·cell)·글(txt)·그림·소리·영상은 넣지 않는다(강의 «발표·교안» 자료만) */
-const DOC_OK = { ppt: 1, pptx: 1, pps: 1, ppsx: 1, pdf: 1, hwp: 1, hwpx: 1, doc: 1, docx: 1, show: 1, odp: 1 };
+/* 사람이 보지 않고 넣는 형식 — 글자를 읽어 내용을 확인할 수 있는 것만 */
+const DOC_AUTO = { pptx: 1, ppsx: 1, pdf: 1, docx: 1, hwpx: 1 };
+/* 강의자료일 수 있지만 내용을 확인할 수 없는 형식 — 넣지 않고 «사람 확인 필요»로 센다(관리자가 «메일에서 찾기»로 골라 가져온다) */
+const DOC_HUMAN = { ppt: 1, pps: 1, hwp: 1, doc: 1, show: 1, odp: 1, key: 1, zip: 1, '7z': 1, alz: 1, egg: 1, rar: 1 };
+const MIN_TEXT = 40;                            /* 이만큼도 글자가 안 나오면(스캔 pdf 등) 내용을 확인 못 한 것으로 본다 */
+/* 강의 말이 있어도 «서류»일 수 있는 이름 — 사람 손 없이 넣는 길이라 화면 «가져오기»보다 넓게 뺀다 */
+const SERVER_EXCLUDE_RX = /급여|임금\s?대장|명세서|원천\s?징수|통장|계좌|이력서|주민\s?등록|등본|초본|신분증|가족\s?관계|진단서|건강\s?검진|연봉|인사\s?기록|평가표|성적|합격|채점/;
 const RRN_RX = /(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/;
 const MAIL_RX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const PHONE_RX = /(?<!\d)0\d{1,2}[-.\s)]?\d{3,4}[-.\s]?\d{4}(?!\d)/g;
+const PHONE_TEST = /(?<!\d)0\d{1,2}[-.\s)]?\d{3,4}[-.\s]?\d{4}(?!\d)/;
+const MAIL_TEST = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 
 function str(v) { return v == null ? "" : String(v); }
 function sha1(s) { return crypto.createHash("sha1").update(String(s)).digest("hex"); }
@@ -60,24 +72,23 @@ function ymdSeoul(ms) {
   if (!isFinite(d.getTime())) return "";
   return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
 }
-function addrsOf(s) { return (str(s).toLowerCase().match(MAIL_RX) || []).map((a) => a.toLowerCase()); }
 
-/* 폴더마다 «어디까지 넣나» — all: 그 폴더 전부(보낸·내게쓴) · self: 보낸이가 우리 주소인 메일만 · no: 안 본다 */
+/* 폴더마다 «보나 안 보나» — 보낸편지함·내게쓴편지함만(all). 나머지(받은·스팸·휴지통·임시·사용자 폴더)는 안 본다(no).
+   ⚠ 사용자 폴더의 «우리가 보낸 메일»은 색인의 보낸이 글자로만 가릴 수 있어 믿지 않는다 — 사람이 «메일에서 찾기»로 고른다. */
 function folderMode(meta) {
-  const k = str(meta && meta.kind) || "custom";
-  if (k === "sent" || k === "tome") return "all";
-  /* 받은편지함은 «남이 보낸 것»의 자리다 — 통째로 읽지 않는다(크고, 우리가 보낸 것은 보낸·내게쓴 폴더에 이미 있다) */
-  if (k === "inbox" || k === "spam" || k === "trash" || k === "drafts" || k === "sched") return "no";
-  return "self";
+  const k = str(meta && meta.kind);
+  return (k === "sent" || k === "tome") ? "all" : "no";
 }
 
 /* 첨부 하나를 자동으로 넣을 «후보»인가 — 사람 손을 거치지 않으니 화면 «가져오기»보다 좁게 본다 */
 function judgeAttachment(subject, name, sentDate) {
+  if (!C.lectureSignal(subject, name)) return { ok: false, why: "type" };    /* 직원이 더한 낱말로는 문을 넓히지 않는다 */
   const c = C.classifyMail(subject, name, sentDate);
   if (!c) return { ok: false, why: "type" };
-  if (c.pii) return { ok: false, why: "pii" };
+  if (c.pii || SERVER_EXCLUDE_RX.test(name) || RRN_RX.test(name) || PHONE_TEST.test(name) || MAIL_TEST.test(name)) return { ok: false, why: "pii" };
   const ext = C.extOf(name);
-  if (!DOC_OK[ext] && ext !== "zip") return { ok: false, why: "type" };
+  if (DOC_HUMAN[ext]) return { ok: false, why: "human" };
+  if (!DOC_AUTO[ext]) return { ok: false, why: "type" };
   return { ok: true, cat: c.cat, date: c.date };
 }
 
@@ -86,8 +97,6 @@ function itemIdOf(seenKey) { return "edu_m" + sha1("edulib|" + seenKey).slice(0,
 
 /* 메일 색인(mailbox/folders · mailbox/msgs/{slug})에서 후보 첨부를 고른다 — 순수 셈(시험이 직접 부른다) */
 function pickCandidates(folders, msgsBySlug, o) {
-  const self = {};
-  (o.self || []).forEach((a) => { if (a) self[String(a).toLowerCase()] = 1; });
   const cutoff = Number(o.cutoff || 0);
   const out = [];
   let mails = 0;
@@ -103,10 +112,6 @@ function pickCandidates(folders, msgsBySlug, o) {
       if (!d || d < cutoff) return;
       const uid = str(m.u || key);
       if (!/^\d+$/.test(uid)) return;
-      if (mode === "self") {
-        const froms = addrsOf(m.e);
-        if (!froms.length || !froms.every((a) => self[a])) return;
-      }
       const names = Array.isArray(m.an) ? m.an : [];
       if (!names.length) return;
       mails++;
@@ -151,7 +156,6 @@ function zipEntries(buf, want) {
     if (!want(name)) continue;
     const entry = { name, data: null };
     out.push(entry);
-    if (want.namesOnly) continue;
     if (lho + 30 > buf.length || buf.readUInt32LE(lho) !== 0x04034b50) continue;
     const start = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28);
     if (start + comp > buf.length || comp > MAX_ZIP_TOTAL_OUT) continue;
@@ -209,10 +213,6 @@ async function extractContent(name, buf, deps) {
       const text = str(r && r.text);
       return { lines: text.split(/\n+/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean), text };
     }
-    if (ext === "zip") {
-      const names = zipEntries(buf, Object.assign((n) => !/\/$/.test(n) && !/__MACOSX\//.test(n), { namesOnly: true })).map((e) => e.name);
-      return { entries: names, text: "" };
-    }
   } catch (_) { /* 못 읽으면 글자 없이 넣는다 — 원본은 그대로 있다 */ }
   return { text: "" };
 }
@@ -230,8 +230,6 @@ function summarize(ex) {
     out = "목차(" + ex.slides.length + "장): " + titles.join(" · ");
     const body = ex.slides.slice(0, 3).map((l) => l.slice(1).join(" ")).join(" ").replace(/\s+/g, " ").trim();
     if (body) out += " — " + body;
-  } else if (ex && Array.isArray(ex.entries) && ex.entries.length) {
-    out = "압축 안 파일(" + ex.entries.length + "개): " + ex.entries.slice(0, 20).map((n) => n.split("/").pop()).join(" · ");
   } else if (ex && Array.isArray(ex.lines) && ex.lines.length) {
     out = ex.lines.join(" ");
   }
@@ -263,14 +261,14 @@ function buildRecord(c, got, sha256, summary, now) {
     id, fileName: name, size: got.buf.length, sha256, cat: catByName !== "etc" ? catByName : c.cat,
     lectureDate: date || ymdSeoul(c.d), dateFrom: date ? "name" : "mail", title: name.replace(/\.[^.]+$/, ""),
     pii: false, status: "review", store: "cloud", storagePath: K.storagePathOf(id, name), summary,
-    source: { kind: "mail", mailId: c.mailId, mailSubject: c.subject.slice(0, 300), mailDate: ymdSeoul(c.d) }
+    source: { kind: "mail", mailId: c.mailId, mailSubject: scrub(c.subject).slice(0, 300), mailDate: ymdSeoul(c.d) }
   }, { uid: ACTOR }, now);
   return Object.assign(it, { schemaVersion: SCHEMA_VERSION, contractVersion: OntologyServerWrite.CONTRACT_VERSION,
     createdBy: ACTOR, updatedBy: ACTOR, revision: 1 });
 }
 
 /* ═══ 한 번 돌기 ═══
-   deps: { db, getSelfEmail(), download(slug, uid, name) → {buf,name,mime}|{gone}|{big}, saveFile(path, buf, meta) → {existed},
+   deps: { db, download(slug, uid, name, max) → {buf,name,mime}|{gone}|{big}, saveFile(path, buf, meta) → {existed},
            pdfText(buf), now(), log() }
    opts: { days, trigger('schedule'|'manual'), by, maxFiles, budgetMs } */
 async function runSweep(deps, opts) {
@@ -282,7 +280,7 @@ async function runSweep(deps, opts) {
   const clock = typeof deps.now === "function" ? deps.now : Date.now;
   const log = typeof deps.log === "function" ? deps.log : () => {};
   const db = deps.db;
-  const skipped = { seen: 0, same: 0, pii: 0, big: 0, gone: 0, type: 0, err: 0 };
+  const skipped = { seen: 0, same: 0, pii: 0, big: 0, gone: 0, type: 0, human: 0, err: 0 };
   const recent = [];
   let added = 0, tried = 0, more = false;
 
@@ -297,7 +295,6 @@ async function runSweep(deps, opts) {
     .map((x) => ({ key: x.id, label: x.label, legal: x.legal, law: x.law, words: x.words })));
   const idx = indexItems(isnap.val() || {});
   const seen = ssnap.val() || {};
-  const self = addrsOf(await deps.getSelfEmail());
   const cutoff = now - days * 86400000;
 
   const msgsBySlug = {};
@@ -306,7 +303,7 @@ async function runSweep(deps, opts) {
     const ms = await db.ref("mailbox/msgs/" + slug).once("value");
     msgsBySlug[slug] = ms.val() || {};
   }
-  const pick = pickCandidates(folders, msgsBySlug, { self, cutoff });
+  const pick = pickCandidates(folders, msgsBySlug, { cutoff });
   const cand = pick.list;
 
   async function markSeen(c, why, id) {
@@ -317,7 +314,7 @@ async function runSweep(deps, opts) {
   }
 
   for (const c of cand) {
-    if (!c.ok) { skipped[c.why === "pii" ? "pii" : "type"]++; continue; }
+    if (!c.ok) { skipped[c.why === "pii" ? "pii" : c.why === "human" ? "human" : "type"]++; continue; }
     if (seen[c.seenKey]) { skipped.seen++; continue; }
     if (idx.mailFile[c.mailId + "|" + c.name] || idx.ids[itemIdOf(c.seenKey)]) { skipped.same++; await markSeen(c, "have"); continue; }
     if (tried >= maxFiles || clock() > deadline) { more = true; break; }
@@ -330,10 +327,12 @@ async function runSweep(deps, opts) {
       if (!Buffer.isBuffer(buf) || !buf.length) { skipped.gone++; await markSeen(c, "empty"); continue; }
       const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
       const name = str(got.name || c.name);
-      if (idx.sha[sha256] || idx.nameSize[name.toLowerCase() + "|" + buf.length]) { skipped.same++; await markSeen(c, "same", idx.sha[sha256] || ""); continue; }
+      const sameId = idx.sha[sha256] || idx.nameSize[name.toLowerCase() + "|" + buf.length];
+      if (sameId) { skipped.same++; await markSeen(c, "same", sameId); continue; }
       const ex = await extractContent(name, buf, deps);
+      /* 주민번호 꼴이 보이면 먼저 뺀다(글자가 적어도) · 내용을 읽어 확인하지 못했으면(깨짐·스캔·한도 넘음) 넣지 않는다 — 사람이 «메일에서 찾기»로 고른다 */
       if (RRN_RX.test(str(ex.text))) { skipped.pii++; await markSeen(c, "pii-text"); continue; }
-      if (Array.isArray(ex.entries) && ex.entries.some((n) => C.PII_NAME_RX.test(n) || RRN_RX.test(n))) { skipped.pii++; await markSeen(c, "pii-zip"); continue; }
+      if (str(ex.text).replace(/\s+/g, "").length < MIN_TEXT) { skipped.human++; await markSeen(c, "human"); continue; }
       const rec = buildRecord(c, got, sha256, summarize(ex), clock());
       const review = OntologyServerWrite.reviewRecord(rec);
       if (!review.ok) { skipped.err++; log("edulibMailSweep 기록 모양", JSON.stringify(review.issues)); continue; }
@@ -364,5 +363,5 @@ async function runSweep(deps, opts) {
 module.exports = {
   runSweep, pickCandidates, judgeAttachment, folderMode, extractContent, summarize, zipEntries, xmlLines,
   buildRecord, indexItems, seenKeyOf, itemIdOf, ymdSeoul,
-  ACTOR, SCHEMA_VERSION, STATE_PATH, SEEN_ROOT, ITEMS_ROOT, DEFAULT_DAYS, MAX_DAYS, MAX_FILES_PER_RUN, MAX_ATT_BYTES
+  ACTOR, SCHEMA_VERSION, STATE_PATH, SEEN_ROOT, ITEMS_ROOT, DEFAULT_DAYS, MAX_DAYS, MAX_FILES_PER_RUN, MAX_ATT_BYTES, MIN_TEXT, DOC_AUTO, DOC_HUMAN
 };
