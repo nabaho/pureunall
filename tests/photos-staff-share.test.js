@@ -383,6 +383,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 일곱 줄을 뺄 것. */
   /* ★ 2026-11-21 — 데이터관리 일곱 자리 게시 완료(rules-deploy.js --deploy, 이 PC): 새로 7 · 바뀜 0 · 사라짐 0,
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-21.json — 목록을 비운다. */
+  /* ★ 2026-11-21 — 강의자료 «사람이 더한 강의 종류»(/edulib/cats, 대표 「새로운 강의가 생길수 있으니 + 추가기능」) 게시 완료(rules-deploy.js --deploy, 이 PC):
+       새로 1 · 바뀜 0 · 사라짐 0 — 읽기·쓰기 재직 직원(LOGIN, edulib 와 같은 사람)·지우기 금지·id/entityType/이름 1~40자 검증. 더 넓게 보이게 된 칸 없음.
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-21.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
   const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +

@@ -50,17 +50,76 @@
       rx: /노동법|근로기준|인사노무|노무관리|노무실무|취업규칙|근로계약|해고|징계|인사관리|노무/i },
     { key: 'etc',        label: '기타 강의',              legal: false, law: '', rx: null }
   ];
+  var BASE = CATS.slice();
+  var BASE_KEY = {};
+  BASE.forEach(function (c) { BASE_KEY[c.key] = c; });
   var BY_KEY = {};
   CATS.forEach(function (c) { BY_KEY[c.key] = c; });
+
+  /* ── 사람이 더한 강의 종류 (대표 지시 2026-11-21 「새로운 강의가 생길수 있으니 + 추가기능도 만들어달라」) ──
+     /edulib/cats 에 적힌 것을 setCustom 으로 넣는다(화면·서버 자동 정리가 같은 규칙을 쓴다).
+     ★ 찾을 낱말은 기본 종류보다 «먼저» 잡힌다 — 새 종류는 대개 기본 종류보다 좁은 이름이다(예: 중대재해처벌법 ⊂ 산업안전보건).
+     ★ 목록 순서는 «기타 강의» 바로 앞. 내보내는 CATS 는 «같은 배열»을 고쳐 쓴다 — 이미 들고 있는 쪽(core 의 묶기·대시보드)도 새 종류를 본다.
+     ⚠ 한 글자 낱말은 받지 않는다 — 거의 모든 이름에 걸려 종류가 엉킨다. 기본 종류의 열쇠(sexual 등)와 겹치는 열쇠도 받지 않는다. */
+  var CUSTOM = [];
+  var PUB = [];
+  function pubOf(c) { return { key: c.key, label: c.label, legal: c.legal, law: c.law, custom: !!c.custom, words: c.words ? c.words.slice() : [] }; }
+  function refreshPub() {
+    var next = CATS.map(pubOf);
+    PUB.length = 0;
+    next.forEach(function (c) { PUB.push(c); });
+  }
+  function escRx(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function cleanWords(words, label) {
+    var raw = Array.isArray(words) ? words : String(words || '').split(/[,，、;\n]/);
+    var out = [];
+    raw.forEach(function (w) {
+      w = String(w == null ? '' : w).replace(/\s+/g, ' ').trim().slice(0, 30);
+      if (w.length >= 2 && out.indexOf(w) < 0 && out.length < 12) out.push(w);
+    });
+    if (!out.length && String(label || '').trim().length >= 2) out.push(String(label).replace(/\s+/g, ' ').trim().slice(0, 30));
+    return out;
+  }
+  function setCustom(list) {
+    CUSTOM = [];
+    var seenLabel = {};
+    BASE.forEach(function (c) { seenLabel[c.label.replace(/\s+/g, '')] = 1; });
+    (Array.isArray(list) ? list : []).forEach(function (o) {
+      if (!o || typeof o !== 'object' || o._deleted) return;
+      var key = String(o.key || o.id || '');
+      var label = String(o.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (!/^[A-Za-z0-9_-]{3,60}$/.test(key) || BASE_KEY[key] || !label) return;
+      if (seenLabel[label.replace(/\s+/g, '')]) return;
+      if (CUSTOM.some(function (c) { return c.key === key; })) return;
+      seenLabel[label.replace(/\s+/g, '')] = 1;
+      var words = cleanWords(o.words, label);
+      CUSTOM.push({ key: key, label: label, legal: !!o.legal, law: String(o.law || '').trim().slice(0, 60),
+        rx: words.length ? new RegExp(words.map(escRx).join('|'), 'i') : null, custom: true, words: words });
+    });
+    CATS = BASE.slice(0, -1).concat(CUSTOM, BASE.slice(-1));
+    BY_KEY = {};
+    CATS.forEach(function (c) { BY_KEY[c.key] = c; });
+    refreshPub();
+    return PUB;
+  }
+  refreshPub();
 
   function catByKey(k) { return BY_KEY[k] || BY_KEY.etc; }
 
   function catOfText(s) {
     s = String(s || '');
-    for (var i = 0; i < CATS.length; i++) {
-      if (CATS[i].rx && CATS[i].rx.test(s)) return CATS[i];
+    for (var j = 0; j < CUSTOM.length; j++) {
+      if (CUSTOM[j].rx && CUSTOM[j].rx.test(s)) return CUSTOM[j];
+    }
+    for (var i = 0; i < BASE.length; i++) {
+      if (BASE[i].rx && BASE[i].rx.test(s)) return BASE[i];
     }
     return BY_KEY.etc;
+  }
+  /* 첨부 이름에 사람이 더한 종류의 낱말이 있는가 — 그런 첨부는 «강의» 같은 말이 없어도 강의자료로 본다 */
+  function customHit(s) {
+    s = String(s || '');
+    return CUSTOM.some(function (c) { return c.rx && c.rx.test(s); });
   }
 
   /* 경로 조각 하나가 «강의 폴더»인가 — 강의자료 묶음으로 볼 근거 */
@@ -190,7 +249,7 @@
   function classifyMail(subject, attachName, sentDate) {
     var s = String(subject || '');
     var a = String(attachName || '');
-    var lect = LECTURE_NAME_RX.test(s) || LECTURE_NAME_RX.test(a) || /교육/.test(s);
+    var lect = LECTURE_NAME_RX.test(s) || LECTURE_NAME_RX.test(a) || /교육/.test(s) || (a !== '' && customHit(a));
     if (!lect) return null;
     if (EXCLUDE_NAME_RX.test(a) || (a && kindOf(extOf(a)) === 'other')) return null;
     var c = catOfText(a); if (c.key === 'etc') c = catOfText(s);
@@ -199,9 +258,13 @@
   }
 
   return {
-    CATS: CATS.map(function (c) { return { key: c.key, label: c.label, legal: c.legal, law: c.law }; }),
-    catByKey: function (k) { var c = catByKey(k); return { key: c.key, label: c.label, legal: c.legal, law: c.law }; },
+    CATS: PUB,
+    BASE_KEYS: BASE.map(function (c) { return c.key; }),
+    setCustom: setCustom,
+    cleanWords: cleanWords,
+    catByKey: function (k) { return pubOf(catByKey(k)); },
     catOfText: function (s) { return catOfText(s).key; },
+    PII_NAME_RX: PII_NAME_RX,
     dateFromText: dateFromText,
     classifyPath: classifyPath,
     guessPath: guessPath,

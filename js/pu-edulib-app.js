@@ -28,6 +28,13 @@
   var STAGE = [];                               /* 넣기 — 저장 전 줄들 */
   var MAIL = [], MPICK = {}, MQ = '';
   var VIEW_ID = '';                             /* ?view=<id> 로 연 «한 건 보기» 창 */
+  /* 2026-11-21 대표 「이부분도 대시보드로 해달라 … + 추가기능 … 메일로 보낸 강의 자료 … 자동으로 정리」 */
+  var VIEW = 'card';                            /* 자료 보기 — card(종류별 카드 대시보드, 기본) · table(표) */
+  var CARD_TOP = 6;                             /* 카드 한 장에 먼저 보이는 줄 — 나머지는 «더 보기» */
+  var EXPAND = {};                              /* «더 보기»로 펼친 카드(묶음 열쇠) */
+  var CATSDB = {};                              /* 사람이 더한 강의 종류(/edulib/cats) */
+  var ADD_CAT = '';                             /* 새 종류를 막 더하고 «넣기»로 왔을 때 — 짐작 못 한 파일을 그 종류로 */
+  var SWEEP = null;                             /* 보낸 메일 자동 정리 상태(/edulib/sweep/state — 서버만 쓴다) */
 
   /* ───────── 작은 도구 ───────── */
   function $(id) { return document.getElementById(id); }
@@ -40,7 +47,8 @@
   function lsSet(k, v) { try { localStorage.setItem('pu_edulib_' + k, v); } catch (e) {} }
   function toast(m, ms) { var t = $('toast'); t.textContent = m; t.className = 'on'; clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = ''; }, ms || 4200); }
   function errMsg(e) { return String((e && e.message) || e || '알 수 없는 오류'); }
-  function nameOf(sid) { return NAMES[sid] || (sid ? '직원' : ''); }
+  /* 사람은 사번→이름, 자동으로 넣은 것(AI-…)은 «자동»으로 — 사번이 아닌 것을 «직원»이라 부르지 않는다 */
+  function nameOf(sid) { if (/^AI-/.test(String(sid || ''))) return '자동(' + String(sid).slice(3) + ')'; return NAMES[sid] || (sid ? '직원' : ''); }
   function fmtTime(ms) {
     if (!ms) return '';
     var d = new Date(+ms); if (!isFinite(d.getTime())) return '';
@@ -67,7 +75,7 @@
   /* ───────── 탭 ───────── */
   function setTab(t) {
     if (t === 'mail' && !ME.admin) t = 'dash';
-    if (TAB !== t) { PICK = {}; MPICK = {}; }                 /* 화면을 떠나면 고른 것을 비운다 */
+    if (TAB !== t) { PICK = {}; MPICK = {}; if (TAB === 'add') ADD_CAT = ''; }   /* 화면을 떠나면 고른 것을 비운다 */
     TAB = t; lsSet('tab', t);
     [].forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
     [].forEach.call(document.querySelectorAll('.pane'), function (p) { p.classList.toggle('on', p.id === 'pane-' + t); });
@@ -78,7 +86,7 @@
     if (TAB === 'dash') drawDash();
     else if (TAB === 'list') drawList();
     else if (TAB === 'add') drawStage();
-    else if (TAB === 'mail') drawMail();
+    else if (TAB === 'mail') { drawMail(); drawSweep(); }
   }
 
   /* ───────── 한눈에 ───────── */
@@ -88,24 +96,48 @@
     $('kpis').innerHTML =
       kpi(d.total, '모은 강의자료', '') + kpi(d.cloud, '자료함에 원본 있음', 'cloud') +
       kpi(pcOnly, '원본은 아직 PC에만', 'pc') + kpi(d.review, '검토 대기', 'review');
+    /* 종류 카드 — 카드는 «단추 노릇 칸»(role=button)이다: 사람이 더한 종류의 ✎(고치기)를 진짜 단추로 안에 둘 수 있게 */
     $('cats').innerHTML = d.cats.map(function (c) {
-      return '<button class="cat' + (c.legal ? ' legal' : '') + (c.n ? '' : ' zero') + '" data-cat="' + esc(c.key) + '">' +
-        '<div class="nm"><span>' + esc(c.label) + '</span>' + (c.legal ? '<span class="tag legal" title="' + esc(c.law) + '">법정</span>' : '') + '<span class="n">' + c.n + '</span></div>' +
+      var words = c.custom ? (C.catByKey(c.key).words || []).join(', ') : '';
+      return '<div class="cat' + (c.legal ? ' legal' : '') + (c.n ? '' : ' zero') + (c.custom ? ' mine' : '') + '" role="button" tabindex="0" data-cat="' + esc(c.key) + '" aria-label="' + esc(c.label + ' ' + c.n + '건 — 이 종류만 보기') + '">' +
+        '<div class="nm"><span title="' + esc(c.label) + '">' + esc(c.label) + '</span>' + (c.legal ? '<span class="tag legal" title="' + esc(c.law) + '">법정</span>' : '') +
+          (c.custom ? '<button type="button" class="ced" data-catedit="' + esc(c.key) + '" title="이 종류 고치기" aria-label="' + esc(c.label) + ' 종류 고치기">✎</button>' : '') + '<span class="n">' + c.n + '</span></div>' +
         '<div class="ln"><span>최근 ' + esc(c.latest || '—') + '</span><span>원본 ' + c.cloud + '</span><span>검토 ' + c.review + '</span><span>' + esc(K.fmtBytes(c.bytes)) + '</span></div>' +
-        (c.legal ? '<div class="ln"><span>' + esc(c.law) + '</span></div>' : '') + '</button>';
-    }).join('') || '<div class="empty">아직 자료가 없습니다 — «＋ 넣기»에서 더하세요.</div>';
-    var cols = d.cats.filter(function (c) { return c.n > 0; });
+        (c.legal && c.law ? '<div class="ln"><span>' + esc(c.law) + '</span></div>' : (c.custom ? '<div class="ln"><span title="' + esc(words) + '">찾을 낱말 ' + esc(words || c.label) + '</span></div>' : '')) + '</div>';
+    }).join('') + '<button type="button" class="cat add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부">＋ 새 강의 종류<span class="ln"><span>새 강의가 생기면 여기서 종류로 더합니다</span></span></button>';
+    drawMatrix(d);
+  }
+  /* 종류 × 연도 — 종류를 줄로, 연도를 칸으로(연도 칸은 좁아 옆으로 넘치지 않는다). 최근 12해만 따로, 그 이전은 «~YYYY» 한 칸.
+     칸 색이 진할수록 많다(가장 많은 칸 대비). 칸을 누르면 그 종류·연도만 목록으로. */
+  function drawMatrix(d) {
     if (!d.total) { $('mx').innerHTML = '<div class="empty">자료가 생기면 연도별로 셉니다.</div>'; return; }
-    var h = '<table><thead><tr><th>연도</th>' + cols.map(function (c) { return '<th title="' + esc(c.label) + '">' + esc(c.label) + '</th>'; }).join('') + '<th>합계</th></tr></thead><tbody>';
-    d.years.forEach(function (y) {
-      var row = d.matrix[y] || {}, sum = 0;
-      h += '<tr><th>' + esc(y === 'none' ? '모름' : y) + '</th>';
-      cols.forEach(function (c) {
-        var n = row[c.key] || 0; sum += n;
-        h += n ? '<td class="c" role="button" tabindex="0" aria-label="' + esc((y === 'none' ? '강의일 모름' : y + '년') + ' ' + c.label + ' ' + n + '건') + '" data-y="' + esc(y) + '" data-cat="' + esc(c.key) + '">' + n + '</td>' : '<td class="z">·</td>';
+    var narrow = window.matchMedia && window.matchMedia('(max-width:768px)').matches;
+    var yc = K.yearCols(d.years, narrow ? 5 : 12);
+    var cols = yc.cols.concat(yc.none ? ['none'] : []);
+    var rowsC = d.cats.filter(function (c) { return c.n > 0; });
+    function cnt(catKey, y) {
+      if (y === yc.olderKey) return yc.older.reduce(function (s, yy) { return s + (((d.matrix[yy] || {})[catKey]) || 0); }, 0);
+      return ((d.matrix[y] || {})[catKey]) || 0;
+    }
+    function yName(y) { return y === 'none' ? '강의일 모름' : y === yc.olderKey ? y.slice(1) + '년까지' : y + '년'; }
+    function yHead(y) { return y === 'none' ? '모름' : y; }
+    var max = 0;
+    rowsC.forEach(function (c) { cols.forEach(function (y) { var n = cnt(c.key, y); if (n > max) max = n; }); });
+    function heat(n) { var r = max ? n / max : 0; return r > 0.66 ? ' h3' : r > 0.33 ? ' h2' : ' h1'; }
+    var colSum = {}, all = 0;
+    var h = '<table><colgroup><col class="mk">' + cols.map(function () { return '<col>'; }).join('') + '<col class="ms"></colgroup>' +
+      '<thead><tr><th class="mk">종류</th>' + cols.map(function (y) { return '<th title="' + esc(yName(y)) + '">' + esc(yHead(y)) + '</th>'; }).join('') + '<th>합계</th></tr></thead><tbody>';
+    rowsC.forEach(function (c) {
+      var sum = 0;
+      h += '<tr><th class="mk" title="' + esc(c.label) + '"><span class="one"><span>' + esc(c.label) + '</span>' + (c.legal ? '<span class="tag legal">법정</span>' : '') + '</span></th>';
+      cols.forEach(function (y) {
+        var n = cnt(c.key, y); sum += n; colSum[y] = (colSum[y] || 0) + n;
+        h += n ? '<td class="c' + heat(n) + '" role="button" tabindex="0" aria-label="' + esc(yName(y) + ' ' + c.label + ' ' + n + '건') + '" title="' + esc(yName(y) + ' · ' + c.label + ' ' + n + '건') + '" data-y="' + esc(y) + '" data-cat="' + esc(c.key) + '">' + n + '</td>' : '<td class="z">·</td>';
       });
-      h += '<td><b>' + sum + '</b></td></tr>';
+      all += sum;
+      h += '<td class="ms"><b>' + sum + '</b></td></tr>';
     });
+    h += '<tr class="mt"><th class="mk">합계</th>' + cols.map(function (y) { return '<td>' + (colSum[y] || 0) + '</td>'; }).join('') + '<td class="ms"><b>' + all + '</b></td></tr>';
     $('mx').innerHTML = h + '</tbody></table>';
   }
   function kpi(n, label, store) {
@@ -117,7 +149,12 @@
   function fillFilters() {
     $('fCat').innerHTML = '<option value="">종류 전체</option>' + C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '">' + esc(c.label) + (c.legal ? ' (법정)' : '') + '</option>'; }).join('');
     var ys = {}; K.live(list()).forEach(function (it) { var y = K.yearOf(it.lectureDate); if (y) ys[y] = 1; });
-    $('fYear').innerHTML = '<option value="">연도 전체</option>' + Object.keys(ys).sort().reverse().map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '년</option>'; }).join('') + '<option value="none">강의일 모름</option>';
+    $('fYear').innerHTML = '<option value="">연도 전체</option>' + Object.keys(ys).sort().reverse().map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '년</option>'; }).join('') + '<option value="none">강의일 모름</option>' +
+      (/^~\d{4}$/.test(F.year) ? '<option value="' + esc(F.year) + '">' + esc(F.year.slice(1)) + '년까지</option>' : '');
+    /* 새 종류를 더한 뒤 «맞는 자료»만 골라 보여 주는 중 — 무엇을 보고 있는지 말하고, 한 번에 풀 수 있게 */
+    var nIds = F.ids ? Object.keys(F.ids).length : 0;
+    $('fIds').style.display = nIds ? '' : 'none';
+    $('fIds').innerHTML = nIds ? '<span>추천 ' + nIds + '건만 보는 중</span><button type="button" class="sm" id="fIdsX" title="모든 자료 보기">✕</button>' : '';
     $('fQ').value = F.q; $('fCat').value = F.cat; $('fYear').value = F.year; $('fKind').value = F.kind;
     $('fStatus').value = F.status; $('fStore').value = F.store; $('fLegal').checked = F.legal; $('fGroup').value = GROUP; $('fTrash').checked = F.trash;
     /* 폰에서 «⋯ 더» 안에 접힌 거르개가 걸려 있으면 펼쳐 둔다 — 걸린 거르개가 안 보이면 «왜 적게 나오나»를 모른다 */
@@ -125,13 +162,16 @@
   }
   function visible() {
     var src = F.trash ? list().filter(function (it) { return it && it._deleted; }).map(function (it) { return Object.assign({}, it, { _deleted: false, _wasDeleted: true }); }) : list();
+    if (F.ids) src = src.filter(function (it) { return !!F.ids[it.id]; });
     return K.sortByDate(K.filter(src, F));
   }
   var RENDERED = [];
   function drawList() {
     fillFilters();
+    [].forEach.call(document.querySelectorAll('#vSeg [data-view]'), function (b) { var on = b.getAttribute('data-view') === VIEW; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     var rows = visible();
     var groups = K.group(rows, GROUP);
+    if (VIEW === 'card') { drawCards(rows, groups); return; }
     var n = 0, h = '';
     RENDERED = [];
     if (!rows.length) h = '<div class="empty">' + (LOADED ? '거르개에 맞는 자료가 없습니다.' : '불러오는 중…') + '</div>';
@@ -166,6 +206,54 @@
     $('list').innerHTML = h;
     drawSel();
   }
+  /* 카드 대시보드 — 묶음(종류·연도)마다 카드 한 장: 건수·최근 강의일·검토 대기 + 늦은 강의일 먼저 CARD_TOP 줄.
+     ★ 줄마다 맨 왼쪽 ☐ + 번호(카드 안에서 보이는 순서) — 고르면 표 보기와 같은 «N건 선택» 줄이 뜬다(나란히·새 창·종류 바꾸기).
+     ★ 한 줄은 한 줄 — 강의일·제목·형식, 넘치는 제목은 … + title. 표 보기는 «☰ 표»로 그대로 남는다. */
+  function drawCards(rows, groups) {
+    RENDERED = [];
+    var h = '';
+    if (!rows.length) h = '<div class="empty">' + (LOADED ? '거르개에 맞는 자료가 없습니다.' : '불러오는 중…') + '</div>';
+    else {
+      var gs = GROUP ? groups : [{ key: 'all', label: '모든 자료', items: rows }];
+      h += '<div class="cgrid">';
+      /* 한 묶음만 보일 때(종류 카드·표 칸을 눌러 왔을 때)와 추천만 보는 중엔 처음부터 다 펼친다 — 고른 줄·찾던 줄이 숨지 않게 */
+      var forced = !!F.ids || gs.length === 1;
+      gs.forEach(function (g) {
+        var open = forced || !!EXPAND[g.key];
+        var shown = open ? g.items : g.items.slice(0, CARD_TOP);
+        var c = GROUP === 'cat' ? C.catByKey(g.key) : null;
+        var rev = 0, latest = '';
+        g.items.forEach(function (it) { if (it.status === 'review') rev++; if (String(it.lectureDate || '') > latest) latest = String(it.lectureDate); });
+        var allOn = shown.length > 0 && shown.every(function (it) { return !!PICK[it.id]; });
+        h += '<section class="gcard' + (open ? ' open' : '') + (c && c.legal ? ' legal' : '') + '" aria-label="' + esc(g.label + ' ' + g.items.length + '건') + '">' +
+          '<div class="gh"><input type="checkbox" data-allg="' + esc(g.key) + '" aria-label="' + esc(g.label) + ' — 이 카드에 보이는 줄 모두 고르기" title="이 카드에 보이는 줄 모두 고르기"' + (allOn ? ' checked' : '') + '>' +
+          '<span class="gn" title="' + esc(g.label) + '">' + esc(g.label) + '</span>' + (c && c.legal ? '<span class="tag legal" title="' + esc(c.law) + '">법정</span>' : '') +
+          '<span class="chip">' + g.items.length + '</span><span class="gm">최근 ' + esc(latest || '—') + (rev ? ' · 검토 ' + rev : '') + '</span></div><div class="gl">';
+        shown.forEach(function (it, i) {
+          RENDERED.push(it.id);
+          var on = !!PICK[it.id];
+          var est = !!(it.lectureDate && it.dateFrom && it.dateFrom !== 'manual');
+          var tip = it.title + ' — ' + it.fileName + (it.summary ? ' · ' + it.summary.slice(0, 160) : '');
+          h += '<div class="gr' + (on ? ' picked' : '') + '" data-id="' + esc(it.id) + '" data-g="' + esc(g.key) + '">' +
+            '<input type="checkbox" aria-label="' + esc(it.title || it.fileName) + ' 고르기" data-pick="' + esc(it.id) + '"' + (on ? ' checked' : '') + '>' +
+            '<span class="no">' + (i + 1) + '</span>' +
+            '<span class="gd' + (est ? ' est' : '') + '" title="' + esc(it.lectureDate ? (est ? estWhy(it.dateFrom) : '강의일(확정)') : '강의일 모름') + '">' + esc(it.lectureDate || '—') + '</span>' +
+            '<button type="button" class="ttl" data-open="' + esc(it.id) + '" title="' + esc(tip) + '">' + esc(it.title) + '</button>' +
+            '<span class="ge" title="' + esc(it.fileName + ' · ' + K.fmtBytes(it.size)) + '">' + esc((it.ext || '').toUpperCase()) + '</span>' +
+            (it._wasDeleted ? '<span class="hint">지움</span>' : '<span class="dot ' + esc(it.status) + '" title="' + esc((K.STATUS[it.status] || '') + (it.store !== 'cloud' ? ' · ' + (K.STORE[it.store] || '') : '')) + '"></span>') +
+            '</div>';
+        });
+        h += '</div>';
+        if (g.items.length > CARD_TOP && !forced) h += '<button type="button" class="sm gmore" data-gx="' + esc(g.key) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' + (open ? '접기 ▴' : '더 보기 (' + (g.items.length - CARD_TOP) + '건) ▾') + '</button>';
+        h += '</section>';
+      });
+      if (GROUP === 'cat' && !F.trash && !F.ids) h += '<button type="button" class="gcard add" data-catnew title="새로 생긴 강의를 종류로 더합니다">＋ 새 강의 종류</button>';
+      h += '</div>';
+    }
+    if (RENDERED.length) h = '<label class="phone-only hint" style="margin:2px 0 6px"><input type="checkbox" data-allv> 보이는 ' + RENDERED.length + '줄 모두 고르기</label>' + h;
+    $('list').innerHTML = h;
+    drawSel();
+  }
   function picked() { return Object.keys(PICK).filter(function (id) { return PICK[id] && ITEMS[id]; }); }
   function drawSel() {
     var ids = picked();
@@ -175,7 +263,7 @@
     ['sCmp', 'sWin', 'sCat', 'sOk', 'sDel'].forEach(function (b) { $(b).style.display = F.trash ? 'none' : ''; });
     /* 머리줄 ☐ 는 «그 묶음에서 보이는 줄이 다 골라졌을 때만» 켜진다 — 한 줄을 풀면 함께 풀린다 */
     [].forEach.call(document.querySelectorAll('#list [data-allg]'), function (c) {
-      var rs = document.querySelectorAll('#list tr[data-g="' + CSS.escape(c.getAttribute('data-allg')) + '"]');
+      var rs = document.querySelectorAll('#list [data-id][data-g="' + CSS.escape(c.getAttribute('data-allg')) + '"]');
       c.checked = rs.length > 0 && [].every.call(rs, function (tr) { return !!PICK[tr.getAttribute('data-id')]; });
     });
     var av = document.querySelector('#list [data-allv]');
@@ -443,7 +531,8 @@
   function openDetail(id) {
     var it = ITEMS[id]; if (!it) return;
     DETAIL = id;
-    var catOpts = C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '"' + (c.key === it.cat ? ' selected' : '') + '>' + esc(c.label) + (c.legal ? ' (법정)' : '') + '</option>'; }).join('');
+    var catOpts = C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '"' + (c.key === it.cat ? ' selected' : '') + '>' + esc(c.label) + (c.legal ? ' (법정)' : '') + '</option>'; }).join('') +
+      (C.CATS.some(function (c) { return c.key === it.cat; }) ? '' : '<option value="' + esc(it.cat) + '" selected>' + esc(it.cat) + ' (종류 목록에 없음)</option>');
     var stOpts = Object.keys(K.STATUS).map(function (k) { return '<option value="' + esc(k) + '"' + (k === it.status ? ' selected' : '') + '>' + esc(K.STATUS[k]) + '</option>'; }).join('');
     var src = it.source || {};
     $('mbox').innerHTML = '<div class="mhead"><h3 title="' + esc(it.title) + '">' + esc(it.title) + '</h3>' + statusTags(it) + '<span class="sp"></span><button class="sm" id="dX">닫기</button></div>' +
@@ -466,6 +555,7 @@
       kv('넣은 사람', nameOf(it.createdBy) + ' · ' + fmtTime(it.createdAt)) + kv('고친 때', fmtTime(it.updatedAt)) +
       (it.sha256 ? kv('지문', it.sha256.slice(0, 16) + '…') : '') +
       '</div>' +
+      (it.summary ? '<div class="sumx"><div class="sec" style="font-size:13px">자동 정리 내용 <span class="hint">문서의 목차·첫 글을 그대로 옮긴 것</span></div><p>' + esc(it.summary) + '</p></div>' : '') +
       '<div class="notes"><div class="sec" style="font-size:13px">검토 메모</div><div id="dNotes" class="hint">불러오는 중…</div>' +
       '<textarea id="dNoteNew" rows="2" placeholder="이 자료를 본 의견 — 예) 2026 개정 반영 필요 · 3쪽 사례 좋음"></textarea>' +
       '<div class="bar" style="margin-top:4px"><span class="sp"></span><button class="sm" id="dNoteAdd">메모 남기기</button></div></div>' +
@@ -584,6 +674,7 @@
       var r = C.classifyPath(rel);
       var g = r.tier ? r : C.guessPath(rel);                       /* 강의 폴더 밖이라도 같은 규칙(깊은 폴더 → 이름)으로 종류·강의일 짐작 */
       var cat = r.tier ? r.cat : g.cat;
+      if (ADD_CAT && cat === 'etc' && C.catByKey(ADD_CAT).key === ADD_CAT) cat = ADD_CAT;
       var date = r.tier ? r.date : g.date;
       var row = { key: 'f' + Math.random().toString(36).slice(2), src: 'file', file: f, fileName: f.name, size: f.size, rel: rel,
         title: f.name.replace(/\.[^.]+$/, ''), cat: cat, lectureDate: date || '', dateFrom: date ? (g.dateFrom || 'name') : '',
@@ -850,14 +941,134 @@
     });
   }
 
+  /* ───────── 사람이 더한 강의 종류 (대표 지시 2026-11-21 「새로운 강의가 생길수 있으니 + 추가기능」) ─────────
+     ★ /edulib/cats/{id} 에 EduCategory 기록 — 저장은 관문(gate)으로. 지우기는 _deleted 표식만, 그 종류 자료가 0건일 때만.
+     ★ 이미 넣은 자료의 종류는 저절로 바꾸지 않는다 — 낱말이 맞는 자료를 «골라 보여 줄» 뿐, 바꾸는 것은 사람(«종류 바꾸기»). */
+  function catRef(id) { return fbDb.ref('edulib/cats/' + id); }
+  function applyCats() {
+    var arr = Object.keys(CATSDB).map(function (k) { return CATSDB[k]; })
+      .filter(function (c) { return c && !c._deleted; })
+      .sort(function (a, b) { return (+a.createdAt || 0) - (+b.createdAt || 0); })
+      .map(function (c) { return { key: c.id, label: c.label, legal: c.legal, law: c.law, words: c.words }; });
+    C.setCustom(arr);
+  }
+  function openCatEditor(key) {
+    var cur = key ? CATSDB[key] : null;
+    if (key && !cur) return;
+    var nUsed = key ? K.live(list()).filter(function (it) { return it.cat === key; }).length : 0;
+    $('mbox').setAttribute('data-catkey', key || '');
+    $('mbox').innerHTML = '<div class="mhead"><h3>' + (cur ? '✎ 강의 종류 고치기' : '＋ 새 강의 종류') + '</h3><span class="sp"></span><button class="sm" id="dX">닫기</button></div>' +
+      '<div style="padding:14px"><div class="form">' +
+      '<label for="cName">이름</label><input type="text" id="cName" maxlength="40" value="' + esc(cur ? cur.label : '') + '" placeholder="예) 중대재해처벌법 · ESG 경영">' +
+      '<label for="cWords">찾을 낱말</label><input type="text" id="cWords" maxlength="200" value="' + esc(cur ? (cur.words || []).join(', ') : '') + '" placeholder="쉼표로 — 예) 중대재해, 중처법 (비우면 이름으로 찾음)">' +
+      '<label for="cLegal">법정 교육</label><label class="hint" style="white-space:normal"><input type="checkbox" id="cLegal"' + (cur && cur.legal ? ' checked' : '') + '> 법정 의무교육이다</label>' +
+      '<label for="cLaw">근거</label><input type="text" id="cLaw" maxlength="60" value="' + esc(cur ? cur.law || '' : '') + '" placeholder="예) ○○법 제○조 (선택 — 현행 원문을 확인한 뒤)">' +
+      '</div><p class="hint" style="margin:10px 0 0;white-space:normal">파일 이름·메일 첨부 이름에 이 낱말이 있으면 이 종류로 짐작합니다(기본 종류보다 먼저 봅니다). 두 글자 이상 낱말만 씁니다. ' +
+      '이미 넣은 자료의 종류는 저절로 바꾸지 않습니다 — 낱말이 맞는 자료를 골라 드리면 «종류 바꾸기»로 바꾸세요.</p></div>' +
+      '<div class="mfoot">' + (cur ? (nUsed ? '<span class="hint">이 종류 자료 ' + nUsed + '건</span>' : '<button class="dng" id="cHide">🗑 이 종류 지우기</button>') : '') +
+      '<span class="sp"></span><button id="dCancel">취소</button><button class="pri" id="cSave">저장</button></div>';
+    $('modal').style.display = 'flex';
+    setTimeout(function () { try { $('cName').focus(); } catch (e) {} }, 30);
+  }
+  function saveCat() {
+    var key = $('mbox').getAttribute('data-catkey') || '';
+    var label = $('cName').value.replace(/\s+/g, ' ').trim();
+    if (!label) { toast('이름을 적어 주세요'); return; }
+    var norm = label.replace(/\s+/g, '');
+    if (C.CATS.some(function (c) { return c.key !== key && c.label.replace(/\s+/g, '') === norm; })) { toast('같은 이름의 종류가 이미 있습니다'); return; }
+    var o = { label: label, words: $('cWords').value, legal: $('cLegal').checked, law: $('cLaw').value };
+    var p;
+    if (!key) {
+      var rec = K.makeCat(o, { uid: ME.sid });
+      p = gate.save(catRef(rec.id), rec, { entityType: K.CAT_ENTITY, expectedRevision: -1 }).then(function () { return rec; });
+    } else {
+      var cur = CATSDB[key];
+      var nx = K.makeCat(Object.assign({ id: key }, o), { uid: cur.createdBy });
+      p = gate.save(catRef(key), function (prev) {
+        var base = Object.assign({}, prev || cur);
+        base.label = nx.label; base.words = nx.words; base.legal = nx.legal; base.law = nx.law;
+        return base;
+      }, { entityType: K.CAT_ENTITY }).then(function () { return nx; });
+    }
+    $('cSave').disabled = true;
+    p.then(function (rec) {
+      closeDetail();
+      CATSDB[rec.id] = Object.assign({}, CATSDB[rec.id] || {}, rec); applyCats(); draw();
+      toast(key ? '«' + rec.label + '» 종류를 고쳤습니다' : '«' + rec.label + '» 종류를 더했습니다', 6000);
+      suggestCatMatches(rec, !key);
+    }).catch(function (e) { if ($('cSave')) $('cSave').disabled = false; toast('저장하지 못했습니다 — ' + errMsg(e), 7000); });
+  }
+  /* 낱말이 맞는 «이미 넣은 자료»를 골라 보여 준다(바꾸지 않는다). 없으면 새 종류로 자료를 넣으러 갈지 묻는다 */
+  function suggestCatMatches(rec, isNew) {
+    var c = C.catByKey(rec.id);
+    var words = (c.words || []).map(function (w) { return w.toLowerCase(); });
+    var hits = words.length ? K.live(list()).filter(function (it) {
+      if (it.cat === rec.id) return false;
+      var hay = [it.title, it.fileName].join(' ').toLowerCase();
+      return words.some(function (w) { return hay.indexOf(w) >= 0; });
+    }) : [];
+    if (hits.length) {
+      if (!window.confirm('이미 넣은 자료 중 ' + hits.length + '건이 «' + rec.label + '» 낱말과 맞습니다.\n그 자료만 골라 «자료»에 보여 드릴까요? (종류는 «종류 바꾸기»를 눌러야 바뀝니다)')) return;
+      resetFilters(); setTab('list');
+      F.ids = {}; hits.forEach(function (it) { F.ids[it.id] = 1; PICK[it.id] = true; });
+      drawList();
+      return;
+    }
+    if (isNew && window.confirm('«' + rec.label + '» 자료를 지금 넣을까요? (＋ 넣기로 갑니다 — 종류를 짐작 못 한 파일은 «' + rec.label + '»로 채웁니다)')) { setTab('add'); ADD_CAT = rec.id; }
+  }
+  function hideCat() {
+    var key = $('mbox').getAttribute('data-catkey') || '';
+    var cur = CATSDB[key]; if (!cur) return;
+    if (K.live(list()).some(function (it) { return it.cat === key; })) { toast('이 종류 자료가 있어 지울 수 없습니다 — 먼저 자료의 종류를 바꾸세요', 7000); return; }
+    if (!window.confirm('«' + cur.label + '» 종류를 지울까요? (지운 표시만 남깁니다 — 자료는 건드리지 않습니다)')) return;
+    gate.remove(catRef(key), cur, { entityType: K.CAT_ENTITY }).then(function () { closeDetail(); toast('지웠습니다'); },
+      function (e) { toast('지우지 못했습니다 — ' + errMsg(e), 7000); });
+  }
+
+  /* ───────── 보낸 메일 자동 정리 (대표 지시 2026-11-21 「메일로 보낸 강의 자료 … 자동으로 정리해서 내용 넣을 수 있게」) ─────────
+     서버(functions/edulib-mail-sweep.js)가 매일 19:30 에 한다. 여기서는 그 상태를 보여 주고, 관리자가 «지금 정리»로 바로 돌린다. */
+  function drawSweep() {
+    var s = SWEEP || {};
+    if (!s.lastRunAt) { $('mAutoSt').textContent = '아직 한 번도 돌지 않았습니다'; $('mAutoList').innerHTML = ''; return; }
+    var k = s.skipped || {};
+    var bits = ['마지막 ' + fmtTime(s.lastRunAt) + (s.trigger === 'manual' ? '(손으로)' : ''), '새로 넣음 ' + (+s.added || 0) + '건'];
+    if (k.same) bits.push('이미 있음 ' + k.same);
+    if (k.pii) bits.push('개인정보로 뺌 ' + k.pii);
+    if (k.big) bits.push('너무 큼 ' + k.big);
+    if (k.err) bits.push('못 함 ' + k.err);
+    $('mAutoSt').textContent = bits.join(' · ');
+    var rec = Array.isArray(s.recent) ? s.recent.filter(function (r) { return r && ITEMS[r.id]; }) : [];
+    $('mAutoList').innerHTML = rec.length ? '<div class="bar" style="margin-top:6px"><span class="hint">최근 넣은 것</span>' + rec.slice(0, 12).map(function (r) {
+      var it = ITEMS[r.id];
+      return '<button type="button" class="sm chipb" data-open="' + esc(r.id) + '" title="' + esc(it.title + ' — ' + catLabel(it.cat)) + '">' + esc(it.title) + '</button>';
+    }).join('') + '</div>' : '';
+  }
+  function runSweep() {
+    var days = +$('mAutoDays').value || 30;
+    if (!window.confirm('최근 ' + days + '일 보낸 메일의 강의자료를 지금 정리할까요?\n· 메일은 읽기만 합니다 · 새로 넣는 것은 모두 «검토 대기» · 몇 분 걸릴 수 있습니다')) return;
+    $('mAutoRun').disabled = true; $('mAutoRun').textContent = '정리 중…';
+    callFn('runEdulibMailSweep', { days: days }).then(function (j) {
+      var r = j.result || {};
+      toast('메일 자동 정리 — 새로 넣음 ' + (+r.added || 0) + '건' + (r.more ? ' · 남은 것은 다음에 이어서' : ''), 8000);
+    }).catch(function (e) { toast('정리하지 못했습니다 — ' + errMsg(e), 8000); })
+      .then(function () { $('mAutoRun').disabled = false; $('mAutoRun').textContent = '지금 정리'; });
+  }
+
   /* ───────── 사건 연결 ───────── */
   function wire() {
     $('tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) setTab(b.getAttribute('data-tab')); });
     $('reBtn').addEventListener('click', function () { draw(); toast('최신 자료입니다(바뀌면 저절로 다시 그립니다)'); });
     $('cats').addEventListener('click', function (e) {
+      var ed = e.target.closest('[data-catedit]'); if (ed) { e.stopPropagation(); openCatEditor(ed.getAttribute('data-catedit')); return; }
+      if (e.target.closest('[data-catnew]')) { openCatEditor(''); return; }
       var b = e.target.closest('[data-cat]'); if (!b) return;
       resetFilters(); F.cat = b.getAttribute('data-cat'); setTab('list');
     });
+    $('vSeg').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-view]'); if (!b) return;
+      VIEW = b.getAttribute('data-view') === 'table' ? 'table' : 'card'; lsSet('view', VIEW); drawList();
+    });
+    $('fIds').addEventListener('click', function (e) { if (e.target.id === 'fIdsX') { F.ids = null; PICK = {}; drawList(); } });
     $('mx').addEventListener('click', function (e) {
       var td = e.target.closest('td.c'); if (!td) return;
       resetFilters(); F.cat = td.getAttribute('data-cat'); F.year = td.getAttribute('data-y'); setTab('list');
@@ -880,11 +1091,11 @@
     $('fMore').addEventListener('click', function () { var f = $('fMore').parentNode; f.classList.toggle('open'); $('fMore').textContent = f.classList.contains('open') ? '접기' : '⋯ 더'; });
     $('list').addEventListener('change', function (e) {
       var c = e.target;
-      if (c.hasAttribute('data-pick')) { PICK[c.getAttribute('data-pick')] = c.checked; c.closest('tr').classList.toggle('picked', c.checked); drawSel(); }
+      if (c.hasAttribute('data-pick')) { PICK[c.getAttribute('data-pick')] = c.checked; var rw = c.closest('[data-id]'); if (rw) rw.classList.toggle('picked', c.checked); drawSel(); }
       else if (c.hasAttribute('data-allv')) { RENDERED.forEach(function (id) { PICK[id] = c.checked; }); drawList(); }
       else if (c.hasAttribute('data-allg')) {
         var g = c.getAttribute('data-allg');
-        [].forEach.call(document.querySelectorAll('#list tr[data-g="' + CSS.escape(g) + '"]'), function (tr) {
+        [].forEach.call(document.querySelectorAll('#list [data-id][data-g="' + CSS.escape(g) + '"]'), function (tr) {
           PICK[tr.getAttribute('data-id')] = c.checked; tr.classList.toggle('picked', c.checked);
           var cb = tr.querySelector('[data-pick]'); if (cb) cb.checked = c.checked;
         });
@@ -894,7 +1105,9 @@
     $('list').addEventListener('click', function (e) {
       var o = e.target.closest('[data-open]'); if (o) { openDetail(o.getAttribute('data-open')); return; }
       var w = e.target.closest('[data-win]'); if (w) { if (!openWin(w.getAttribute('data-win'))) toast('새 창이 막혔습니다 — 브라우저의 팝업 허용을 켜 주세요', 7000); return; }
-      if (e.target.id === 'moreBtn') { SHOWN += PAGE; drawList(); }
+      if (e.target.id === 'moreBtn') { SHOWN += PAGE; drawList(); return; }
+      var gx = e.target.closest('[data-gx]'); if (gx) { var gk = gx.getAttribute('data-gx'); EXPAND[gk] = !EXPAND[gk]; drawList(); return; }
+      if (e.target.closest('[data-catnew]')) openCatEditor('');
     });
     $('sClr').addEventListener('click', function () { PICK = {}; drawList(); });
     $('sCmp').addEventListener('click', function () { openCompare(picked()); });
@@ -921,6 +1134,8 @@
       var id = e.target.id;
       if (id === 'dX' || id === 'dCancel') closeDetail();
       else if (id === 'dSave') saveDetail();
+      else if (id === 'cSave') saveCat();
+      else if (id === 'cHide') hideCat();
       else if (id === 'dNoteAdd') addNote();
       else if (id === 'dDl') downloadOriginal(ITEMS[DETAIL]);
       else if (id === 'dWin') openWin(DETAIL);
@@ -977,6 +1192,8 @@
 
     /* 메일 */
     $('mScan').addEventListener('click', scanMail);
+    $('mAutoRun').addEventListener('click', runSweep);
+    $('mAutoList').addEventListener('click', function (e) { var o = e.target.closest('[data-open]'); if (o) openDetail(o.getAttribute('data-open')); });
     $('mImp').addEventListener('click', importMail);
     var mq = null;
     $('mQ').addEventListener('input', function () { clearTimeout(mq); mq = setTimeout(function () { MQ = $('mQ').value; MPICK = {}; drawMail(); }, 200); });
@@ -987,7 +1204,7 @@
       if (t.hasAttribute('data-mpick')) { MPICK[t.getAttribute('data-mpick')] = t.checked; drawMail(); }
     });
   }
-  function resetFilters() { F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: false, trash: false }; SHOWN = PAGE; PICK = {}; }
+  function resetFilters() { F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: false, trash: false, ids: null }; SHOWN = PAGE; PICK = {}; EXPAND = {}; }
 
   /* 끌어다 놓은 폴더 — 안의 파일을 모두 모은다(경로는 _rel 로 붙여 분류에 쓴다) */
   function readDrop(dt) {
@@ -1021,6 +1238,16 @@
         if (VIEW_ID && ITEMS[VIEW_ID] && !$('cmp').classList.contains('on')) openCompare([VIEW_ID], ITEMS[VIEW_ID].title);
       }, 60);
     }, function (e) { lock('자료를 읽지 못했습니다 — ' + errMsg(e)); });
+    /* 사람이 더한 강의 종류 — 바뀌면 분류 규칙(C.setCustom)을 갈아 끼우고 다시 그린다(넣기 화면은 쓰던 칸을 지우지 않게 그대로) */
+    var drawC = null;
+    fbDb.ref('edulib/cats').on('value', function (s) {
+      var v = s.val() || {};
+      CATSDB = {};
+      Object.keys(v).forEach(function (k) { var c = v[k]; if (c && typeof c === 'object' && c.id === k) CATSDB[k] = c; });
+      applyCats();
+      clearTimeout(drawC); drawC = setTimeout(function () { if (TAB !== 'add' && LOADED) draw(); }, 60);
+    }, function () {});
+    if (ME.admin) fbDb.ref('edulib/sweep/state').on('value', function (s) { SWEEP = s.val(); drawSweep(); }, function () {});
   }
   function loadNames() {
     return fbDb.ref('data/user_dir').once('value').then(function (snap) {
@@ -1046,6 +1273,7 @@
     VIEW_ID = m ? decodeURIComponent(m[1]) : '';
     var t = lsGet('tab'); if (['dash', 'list', 'add', 'mail'].indexOf(t) >= 0) TAB = t;
     var g = lsGet('group'); if (g === 'cat' || g === 'year' || g === '') GROUP = g;
+    var vw = lsGet('view'); if (vw === 'card' || vw === 'table') VIEW = vw;
     if (location.protocol === 'file:') { lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
     if (typeof firebase === 'undefined') { lock('인터넷이 필요합니다'); return; }
     if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FB_CONFIG);

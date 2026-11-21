@@ -145,3 +145,93 @@ test('글자 미리보기 — 문단마다 글자를 모으고 XML 엔티티를 
   assert.equal(lines[0], '직장 내 <성희롱> 예방');
   assert.equal(lines.length, 2);
 });
+
+/* ── 2026-11-21 대표 「이부분도 데시보드로 … 새로운 강의가 생길수 있으니 + 추가기능 … 메일로 보낸 강의 자료 … 자동으로 정리」 ── */
+test('사람이 더한 강의 종류 — 낱말이 기본 종류보다 먼저 잡히고, 목록엔 «기타» 바로 앞에 선다', () => {
+  try {
+    C.setCustom([{ id: 'cat_test1', label: '중대재해처벌법', words: '중대재해, 중처법', legal: true, law: '시험용' }]);
+    assert.equal(C.catOfText('2026 중대재해 대응 강의.pptx'), 'cat_test1', '기본 «산업안전보건»보다 먼저');
+    const keys = C.CATS.map((c) => c.key);
+    assert.equal(keys[keys.length - 1], 'etc', '«기타»는 늘 끝');
+    assert.equal(keys[keys.length - 2], 'cat_test1');
+    assert.ok(C.catByKey('cat_test1').custom && C.catByKey('cat_test1').legal);
+    assert.ok(C.classifyMail('자료 보내드립니다', '중처법 실무.pdf', ''), '첨부 이름에 새 종류 낱말이 있으면 «강의» 말이 없어도 후보');
+    assert.equal(C.classifyMail('자료 보내드립니다', '', ''), null, '제목만으로는 아니다(첨부 이름이 있어야)');
+    /* 받지 않는 것 — 기본 종류 열쇠와 겹침 · 같은 이름 · 이상한 열쇠 · 지운 것 */
+    C.setCustom([{ id: 'sexual', label: '가짜' }, { id: 'cat_x2', label: '직장 내 성희롱 예방' }, { id: 'a/b', label: '나쁜열쇠' },
+      { id: 'cat_x3', label: '지운종류', _deleted: true }, { id: 'cat_x4', label: '한글자', words: '가, 나' }]);
+    assert.deepEqual(C.CATS.filter((c) => c.custom).map((c) => c.key), ['cat_x4']);
+    assert.deepEqual(C.catByKey('cat_x4').words, ['한글자'], '한 글자 낱말만 있으면 이름으로 찾는다');
+  } finally { C.setCustom([]); }
+  assert.ok(!C.CATS.some((c) => c.custom), '비우면 기본 종류만 남는다');
+});
+
+test('새 강의 종류 기록 — 온톨로지 칸을 갖고, 대시보드에 0건이어도 보인다', () => {
+  try {
+    const rec = Core.makeCat({ label: '  ESG   경영 ', words: 'ESG, 지속가능' }, { uid: 'S1' });
+    assert.equal(rec.entityType, Core.CAT_ENTITY);
+    assert.ok(rec.id && rec.createdAt && rec.updatedAt && rec.revision >= 1);
+    assert.equal(rec.label, 'ESG 경영');
+    assert.deepEqual(rec.words, ['ESG', '지속가능']);
+    C.setCustom([{ key: rec.id, label: rec.label, words: rec.words }]);
+    const d = Core.dashboard([]);
+    assert.ok(d.cats.some((c) => c.key === rec.id && c.custom && c.n === 0), '더하자마자 «어디 갔나»가 되지 않게');
+    /* 종류 목록을 아직 못 읽은 순간에도 지금 종류는 그대로 — «기타»로 바뀌지 않는다 */
+    C.setCustom([]);
+    const it = Core.makeItem({ fileName: 'a.pptx', cat: 'etc' });
+    it.cat = rec.id;
+    assert.equal(Core.patchOf(it, { cat: rec.id, title: '바꿈' }).cat, undefined, '같은 종류면 고칠 것에 안 든다');
+    assert.equal(Core.patchOf(it, { cat: 'nope' }).cat, 'etc', '모르는 열쇠로 «바꾸는» 것은 기타로');
+  } finally { C.setCustom([]); }
+});
+
+test('종류 × 연도 — 최근 해만 칸으로, 옛날은 «~YYYY» 한 칸 · 거르개가 그 칸을 안다', () => {
+  const yc = Core.yearCols(['2026', '2025', '2024', '2012', '2010', 'none'], 3);
+  assert.deepEqual(yc.cols, ['~2012', '2024', '2025', '2026'], '옛날 → 최근 순서');
+  assert.deepEqual(yc.older, ['2012', '2010']);
+  assert.ok(yc.none);
+  assert.equal(Core.yearCols(['2026'], 12).olderKey, '', '모을 옛날이 없으면 칸도 없다');
+  const L = [Core.makeItem({ fileName: 'a', lectureDate: '2010-03' }), Core.makeItem({ fileName: 'b', lectureDate: '2012' }),
+    Core.makeItem({ fileName: 'c', lectureDate: '2024' }), Core.makeItem({ fileName: 'd' })];
+  assert.equal(Core.filter(L, { year: '~2012' }).length, 2, '그 해까지 — 강의일 모름은 안 든다');
+});
+
+test('자동 정리 내용(summary) — 상한이 있고, 찾기에 걸린다 · 사람 «고치기»로는 안 바뀐다', () => {
+  const it = Core.makeItem({ fileName: 'x.pptx', summary: '목차(3장):  근로시간  ·  휴게 ' + '가'.repeat(5000) });
+  assert.ok(it.summary.length <= Core.SUMMARY_MAX);
+  assert.ok(!/\s{2}/.test(it.summary), '빈칸은 하나로');
+  assert.equal(Core.filter([it], { q: '휴게' }).length, 1);
+  assert.equal(Core.patchOf(it, { summary: '바꿈' }), null, '원본에서 읽은 글 — 고치기 칸이 아니다');
+});
+
+test('화면 — 카드 대시보드·표 보기·＋ 새 강의 종류·메일 자동 정리 칸이 이어져 있다', () => {
+  const fs = require('node:fs');
+  const html = fs.readFileSync(path.join(ROOT, 'pu-edulib.html'), 'utf8');
+  const app = fs.readFileSync(path.join(ROOT, 'js/pu-edulib-app.js'), 'utf8');
+  ['id="vSeg"', 'data-view="card"', 'data-view="table"', 'id="fIds"', 'id="mAutoRun"', 'id="mAutoSt"', 'id="mAutoList"'].forEach((s) => assert.ok(html.indexOf(s) >= 0, s));
+  /* 저장은 관문으로만 — 새 종류도 같은 관문·같은 개체 이름 */
+  assert.match(app, /gate\.save\(catRef\([^)]*\)[^;]*K\.CAT_ENTITY/);
+  assert.match(app, /gate\.remove\(catRef\(key\)[^;]*K\.CAT_ENTITY/);
+  assert.match(app, /callFn\('runEdulibMailSweep'/);
+  /* 카드 줄도 맨 왼쪽 ☐ + 번호(대표 지시 2026-10-05) */
+  const card = app.slice(app.indexOf('function drawCards'), app.indexOf('function picked'));
+  assert.ok(card.indexOf('data-pick=') >= 0 && card.indexOf('class="no"') > card.indexOf('data-pick='), '☐ 다음에 번호');
+  assert.ok(card.indexOf('data-allg=') >= 0, '카드 머리 ☐ — 보이는 줄 모두 고르기');
+  /* 이미 넣은 자료의 종류를 «저절로» 바꾸지 않는다 — 골라 보여 줄 뿐 */
+  const sug = app.slice(app.indexOf('function suggestCatMatches'), app.indexOf('function hideCat'));
+  assert.ok(sug.length > 0 && !/savePatch|gate\.save/.test(sug), '추천은 고르기만');
+});
+
+test('온톨로지·DB 규칙 — 새 강의 종류(EduCategory)가 등록되고 재직 직원만 쓴다', () => {
+  const fs = require('node:fs');
+  const onto = require(path.join(ROOT, 'js/pu-ontology.js'));
+  assert.ok(onto.TERMS.entityTypes.EduCategory);
+  const p = onto.PROGRAMS.edulib;
+  assert.ok(p.writeContracts.some((w) => w.path === 'edulib/cats/{id}' && w.entityType === 'EduCategory'));
+  assert.ok(p.entityTypes.indexOf('EduCategory') >= 0);
+  const rules = fs.readFileSync(path.join(ROOT, 'scripts/make-firebase-rules.js'), 'utf8');
+  const seg = rules.slice(rules.indexOf('rules.edulib'), rules.indexOf('rules.edulib') + 1200);
+  assert.match(seg, /cats:\s*\{\s*\$id:\s*\{\s*'\.write':\s*EDULIB_W/);
+  assert.match(seg, /entityType'\)\.val\(\) === 'EduCategory'/);
+  assert.ok(!/sweep\s*:/.test(seg), '자동 정리 상태(sweep)에는 화면 쓰기 자리를 열지 않는다(서버만 쓴다)');
+});
