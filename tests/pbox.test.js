@@ -5282,3 +5282,295 @@ test('유료 리걸테크 6대 핵심 기능(결론신호·표준인용·다중�
   clickAct({ 'data-act': 'start-new-doc' });
   assert.ok(elementsById.pboxMainArea.innerHTML.includes('aria-pressed="true" data-act="set-ws-stance" data-stance="neutral"'), '로그아웃 후 대리 입장이 기본 중립 상태로 초기화되어야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * ㉖ 절대 할루시네이션 차단 관문 · 무복사 공식 서면 조립 · 표준 HWPX(.hwpx) · 푸른 한글 편집기 직행 브리지 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('㉖ 절대 할루시네이션 차단 관문 · 인용 오탐 해소 · 4종 공식 서면 + KS X 6101 HWPX + 메모리 전용 한글 브리지', async () => {
+  const lawIndex = loadLawIndex().list();
+  const docs = Corpus.SEED_DOCS;
+
+  /* 1) verifyCitations 오탐 해소 (약칭 법령명·지시대명사·축약 재결번호) + 허구 인용 100% 탐지 유지 */
+  const cleanRealText = [
+    '헌법 제32조 및 남녀고용평등법 제19조, 퇴직급여법 제8조, 노동조합법 제2조에 따라 판단하며,',
+    '같은 법 제23조 및 동법 시행령 제12조, 이 법 제27조를 함께 검토한다.',
+    '실존 판례 2020다247190 및 산재재심사위 2022-2302호, 개인정보위 제2023-005-040호를 참조한다.'
+  ].join('\n');
+  const cleanVf = Engine.verifyCitations(cleanRealText, { docs, loadedLaws: [], lawIndex });
+  const falseMissing = cleanVf.items.filter((x) => x.status === 'missing' || x.status === 'missing_law' || x.status === 'missing_article');
+  assert.equal(falseMissing.length, 0, '공식 법령 약칭·지시대명사(같은 법/동법)·축약 재결번호는 미검증 오탐으로 잡히면 안 됩니다: ' + JSON.stringify(falseMissing));
+
+  /* 2) enforceZeroHallucinationGuard — 허구 판례(공백 삽입 변형 포함)·허구 법령·허구 조문 자동 격리 + 멱등성 */
+  const hallucinatedText = [
+    '대법원 2020다247190 전원합의체 판결에 따르면 통상임금 고정성 요건은 폐기되었습니다.',
+    '또한 대법원 2099 다 999999 판결 및 가짜근로보호법 제1조, 근로기준과-999999 회시도 동일합니다.'
+  ].join('\n');
+  const guard1 = Engine.enforceZeroHallucinationGuard(hallucinatedText, { docs, loadedLaws: [], lawIndex });
+  assert.equal(guard1.clean, false);
+  assert.equal(guard1.blockedCount, 3, '허구 판례(공백 삽입 포함)·허구 법령·허구 행정해석 3건이 모두 차단되어야 합니다');
+  assert.ok(guard1.text.includes('P박스 절대 할루시네이션 차단 관문 작동'), '차단 배너가 최상단에 부착되어야 합니다');
+  assert.ok(guard1.text.includes('[⚠ 미검증 인용 자동 차단: 2099다999999 — 원문 미확인]'), '공백이 섞인 허구 사건번호(2099 다 999999)도 본문에서 완전히 격리되어야 합니다');
+  assert.ok(!guard1.text.includes('2099 다 999999'), '공백이 섞인 허구 사건번호 원문이 격리 없이 남아서는 안 됩니다');
+  assert.ok(guard1.text.includes('[⚠ 미검증 인용 자동 차단: 가짜근로보호법 제1조 — 원문 미확인]'));
+  assert.ok(guard1.text.includes('[⚠ 미검증 인용 자동 차단: 근로기준과-999999 — 원문 미확인]'));
+  assert.ok(!guard1.text.includes('[⚠ 미검증 인용 자동 차단: 2020다247190'), '실존 검증 판례 2020다247190은 절대 격리되면 안 됩니다');
+
+  const guard2 = Engine.enforceZeroHallucinationGuard(guard1.text, { docs, loadedLaws: [], lawIndex });
+  assert.equal((guard2.text.match(/\[⚠ 미검증 인용 자동 차단: 2099다999999/g) || []).length, 1, '가드를 2회 적용해도 이미 격리된 구간은 이중 래핑되지 않아야 합니다');
+
+  /* 3) 4종 공식 서면 조립 + KS X 6101 HWPX ZIP 라운드트립 검증 (PureunZip + PureunHwpx) */
+  const hwpxCtx = { console, Uint8Array, ArrayBuffer, DataView, TextEncoder, TextDecoder };
+  hwpxCtx.window = hwpxCtx;
+  hwpxCtx.globalThis = hwpxCtx;
+  vm.createContext(hwpxCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'hangul', 'js', 'zip.js'), 'utf8'), hwpxCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'hangul', 'js', 'hwpx.js'), 'utf8'), hwpxCtx);
+  assert.ok(hwpxCtx.PureunZip && hwpxCtx.PureunHwpx, 'hangul/js/zip.js 및 hwpx.js가 정상 로드되어야 합니다');
+
+  const samplePiiRrn = '900101' + '-' + '1' + '234567';
+  const sampleSource = [
+    '2025. 3. 1. 근로자 김철수(' + samplePiiRrn + ', 010-1234-5678) 입사.',
+    '2025. 11. 10. 카카오톡으로 즉시 해고 통보.',
+    '제8조(위약예정) 중도 퇴사 시 교육비 300만원을 위약금으로 배상한다.'
+  ].join('\n');
+
+  for (const docType of ['opinion', 'nlrc_brief', 'notice', 'redline_memo']) {
+    const formalDoc = Engine.buildFormalLegalDocument({
+      docType,
+      title: '부당해고 및 위약예정 검토',
+      recipient: '의뢰인 귀하',
+      sender: '권형하 공인노무사',
+      stance: 'worker',
+      query: '카톡 해고 및 위약예정 효력 검토',
+      sourceText: sampleSource,
+      answer: hallucinatedText,
+      docs,
+      loadedLaws: [],
+      lawIndex
+    });
+    assert.equal(formalDoc.docType, docType);
+    assert.equal(formalDoc.blockedCount, 3, docType + ' 서면에서도 미검증 인용 3건이 자동 격리되어야 합니다');
+    assert.ok(formalDoc.verifiedCitations.some((c) => c.includes('2020다247190')), '검증 완료 근거 목록에 실존 판례가 포함되어야 합니다');
+    assert.ok(!formalDoc.verifiedCitations.some((c) => c.includes('2099다999999')), '허구 판례는 검증 완료 근거 목록에 절대 들어가면 안 됩니다');
+    assert.ok(!formalDoc.markdown.includes(samplePiiRrn) && !formalDoc.html.includes('010-1234-5678'), '공식 서면 출력에 원시 주민번호·연락처가 절대 남아서는 안 됩니다');
+
+    const bytes = Engine.buildFormalHwpxBytes(formalDoc, hwpxCtx.PureunHwpx);
+    assert.ok(bytes instanceof Uint8Array && bytes.length > 500, docType + ' HWPX 바이너리가 정상 생성되어야 합니다');
+    assert.equal(bytes[0], 0x50);
+    assert.equal(bytes[1], 0x4b);
+    const entries = await hwpxCtx.PureunZip.readZip(bytes);
+    const hasEntry = (name) => (entries instanceof Map ? entries.has(name) : !!entries[name]);
+    const getEntry = (name) => (entries instanceof Map ? entries.get(name) : entries[name]);
+    assert.ok(hasEntry('mimetype') && hasEntry('Contents/section0.xml'), '표준 KS X 6101 HWPX 필수 엔트리(mimetype, Contents/section0.xml)가 포함되어야 합니다');
+    const secXml = new TextDecoder().decode(getEntry('Contents/section0.xml'));
+    assert.ok(secXml.includes('2020다247190'), 'HWPX 본문에 검증 완료 판례가 포함되어야 합니다');
+    assert.ok(secXml.includes('문서 제목') && secXml.includes('할루시네이션 검증') && secXml.includes('위약예정'), 'HWPX 표 셀(blocks 구조)에 실제 텍스트가 누락 없이 기록되어야 합니다');
+    assert.ok(!secXml.includes('undefined') && !formalDoc.html.includes('undefined'), 'HWPX 및 HTML 신·구 대비표/연표에 undefined 문자열이 절대 출력되면 안 됩니다');
+    assert.ok(secXml.includes('미검증 인용 자동 차단'), 'HWPX 본문에도 미검증 인용 격리 표시가 유지되어야 합니다');
+    assert.ok(!secXml.includes(samplePiiRrn) && !secXml.includes('010-1234-5678') && !secXml.includes('김철수'), 'HWPX XML 내부에도 원시 개인정보·당사자 실명이 절대 포함되면 안 됩니다');
+  }
+
+  /* 3-b) 연표 체크 해제(includeTimeline: false) 시에도 제척기간표(includeDeadlines: true)는 suggestedBaseDate로 정상 생성되어야 함 */
+  const noTlDoc = Engine.buildFormalLegalDocument({
+    docType: 'opinion',
+    title: '연표 제외 제척기간 확인',
+    sourceText: sampleSource,
+    answer: '근로기준법 제23조 및 2020다247190 판결 검토',
+    includeTimeline: false,
+    includeDeadlines: true,
+    docs,
+    loadedLaws: [],
+    lawIndex
+  });
+  assert.ok(noTlDoc.markdown.includes('부당해고·징계·부당노동행위 구제신청') && noTlDoc.markdown.includes('2025-11-10'), '연표를 꺼도 제척기간표는 해고일(2025-11-10) 기준으로 정상 생성되어야 합니다');
+
+  /* 4) Cloud AI 경로 자동 격리 + UI 무복사 서면 연결 모달 + 메모리 전용 한글 브리지 핸드셰이크 검증 */
+  const docListeners = {};
+  const winListeners = {};
+  const elementsById = {};
+  function makeEl(id) {
+    const el = {
+      id,
+      value: '',
+      checked: true,
+      style: {},
+      _innerHTML: '',
+      textContent: '',
+      classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+      },
+      setAttribute() {},
+      getAttribute() { return ''; },
+      querySelectorAll() { return []; },
+      querySelector() { return null; },
+      focus() {},
+      click() {},
+      appendChild() {},
+      removeChild() {}
+    };
+    Object.defineProperty(el, 'innerHTML', {
+      get() { return this._innerHTML; },
+      set(v) { this._innerHTML = String(v); }
+    });
+    if (id) elementsById[id] = el;
+    return el;
+  }
+  ['pboxRoot', 'pboxMainArea', 'pboxSidebar', 'pboxReader', 'pboxModalBackdrop', 'pboxModalBox', 'pboxToast',
+    'pboxHandoffType', 'pboxHandoffTitle', 'pboxHandoffRecipient', 'pboxHandoffSender',
+    'pboxHandoffIncTimeline', 'pboxHandoffIncRedline', 'pboxHandoffIncDeadlines', 'pboxHandoffIncCitations'
+  ].forEach(makeEl);
+  elementsById.pboxHandoffType.value = 'nlrc_brief';
+  elementsById.pboxHandoffTitle.value = '부당해고 구제신청 이유서';
+  elementsById.pboxHandoffRecipient.value = '서울지방노동위원회 귀중';
+  elementsById.pboxHandoffSender.value = '권형하 공인노무사';
+
+  const domDoc = {
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => elementsById[id] || null,
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); }
+  };
+
+  const lsStore = new Map();
+  const openedPopups = [];
+  const downloads = [];
+  let allowPopup = true;
+
+  const uiCtx = {
+    console, URL, URLSearchParams, Blob, Uint8Array, ArrayBuffer, DataView, TextEncoder, TextDecoder,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    setTimeout, clearTimeout, setInterval, clearInterval,
+    location: { protocol: 'https:', origin: 'https://erp.pureunlabor.co.kr', href: 'https://erp.pureunlabor.co.kr/pu-pbox.html' },
+    localStorage: {
+      getItem: (k) => (lsStore.has(k) ? lsStore.get(k) : null),
+      setItem: (k, v) => lsStore.set(k, String(v)),
+      removeItem: (k) => lsStore.delete(k)
+    },
+    navigator: { clipboard: { writeText: async () => {} } },
+    document: domDoc,
+    fetch: async () => ({ ok: false, status: 404, text: async () => '' }),
+    PureunZip: hwpxCtx.PureunZip,
+    PureunHwpx: hwpxCtx.PureunHwpx,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    PuAiCall: {
+      ask: async () => ({ text: hallucinatedText }),
+      textOf: (r) => r.text
+    }
+  };
+  uiCtx.URL = {
+    createObjectURL: (blob) => { downloads.push(blob); return 'blob:mock'; },
+    revokeObjectURL: () => {}
+  };
+  uiCtx.window = {
+    location: uiCtx.location,
+    URL: uiCtx.URL,
+    Blob,
+    btoa: uiCtx.btoa,
+    PureunZip: hwpxCtx.PureunZip,
+    PureunHwpx: hwpxCtx.PureunHwpx,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: uiCtx.PuPBoxLawIndex,
+    PuAiCall: uiCtx.PuAiCall,
+    navigator: uiCtx.navigator,
+    document: domDoc,
+    localStorage: uiCtx.localStorage,
+    open: (url) => {
+      if (!allowPopup) return null;
+      const child = { url, closed: false, posted: [], postMessage(msg, orig) { this.posted.push({ msg, orig }); } };
+      openedPopups.push(child);
+      return child;
+    },
+    addEventListener: (ev, fn) => { (winListeners[ev] = winListeners[ev] || []).push(fn); },
+    removeEventListener: (ev, fn) => {
+      if (winListeners[ev]) winListeners[ev] = winListeners[ev].filter((x) => x !== fn);
+    }
+  };
+  uiCtx.globalThis = uiCtx.window;
+  vm.createContext(uiCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), uiCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), uiCtx);
+
+  const Store = uiCtx.window.PuPBoxStore;
+  const App = uiCtx.window.PuPBoxApp;
+  App.mount(elementsById.pboxRoot);
+  App.setAuthUser({ uid: 'user-zero-hallu', displayName: '권형하' });
+  await new Promise((r) => setImmediate(r));
+
+  /* Cloud AI가 허구 판례(2099다999999)를 생성해도 Store.askLegalAi 단계에서 즉시 자동 격리되어 저장됨 */
+  const aiRes = await Store.askLegalAi({
+    query: '통상임금 고정성 판례 검토',
+    sourceText: sampleSource,
+    mode: 'review',
+    stance: 'worker',
+    auth: { currentUser: { uid: 'user-zero-hallu' } }
+  });
+  assert.equal(aiRes.hallucinationBlockedCount, 3, 'Cloud AI 응답 내 미검증 인용 3건이 저장 전 자동 격리되어야 합니다');
+  assert.ok(aiRes.thread.answer.includes('[⚠ 미검증 인용 자동 차단: 2099다999999 — 원문 미확인]'));
+  assert.equal(aiRes.thread.hallucinationBlockedCount, 3);
+
+  function clickAct(attrs) {
+    const btn = {
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    };
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* 워크스페이스에 스레드 열고 [의견서·서면 연결 작성] 모달 → [푸른 한글 편집기로 바로 넘기기] 클릭 */
+  clickAct({ 'data-act': 'open-thread', 'data-id': aiRes.thread.id });
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('data-act="open-handoff-modal"'));
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('data-act="quick-open-hangul"'));
+  assert.ok(elementsById.pboxMainArea.innerHTML.includes('data-act="export-thread-hwpx"'));
+
+  clickAct({ 'data-act': 'open-handoff-modal' });
+  assert.equal(elementsById.pboxModalBackdrop.style.display, 'flex');
+  assert.ok(elementsById.pboxModalBox.innerHTML.includes('무복사 공식 서면 연결 작성'));
+  assert.ok(elementsById.pboxModalBox.innerHTML.includes('class="pbox-modal-bd"') && !elementsById.pboxModalBox.innerHTML.includes('pbox-chk-tap'), '서면 연결 모달은 표준 .pbox-modal-bd 와 일반 flex 체크박스 라벨을 사용해야 합니다');
+
+  clickAct({ 'data-act': 'handoff-open-hangul' });
+  assert.equal(openedPopups.length, 1, '푸른 한글 편집기 전용 팝업이 열려야 합니다');
+  assert.ok(openedPopups[0].url.startsWith('hangul.html?from=pbox&bid=pbox_'), 'from=pbox&bid=pbox_ 보안 파라미터로 열려야 합니다');
+  assert.equal(lsStore.get('pureun_hangul_bridge') || null, null, '기밀 서면 데이터는 localStorage에 절대 기록되면 안 됩니다');
+
+  const bid = new URLSearchParams(openedPopups[0].url.split('?')[1]).get('bid');
+  /* 자식 팝업의 pureun_hangul_ready 수신 시 opener가 pureun_hangul_open + b64 HWPX 전송 */
+  (winListeners.message || []).slice().forEach((fn) => fn({
+    origin: 'https://erp.pureunlabor.co.kr',
+    source: openedPopups[0],
+    data: { type: 'pureun_hangul_ready', from: 'pbox', bid }
+  }));
+  assert.equal(openedPopups[0].posted.length, 1, 'ready 신호 수신 즉시 HWPX 페이로드가 postMessage로 전달되어야 합니다');
+  assert.equal(openedPopups[0].posted[0].msg.type, 'pureun_hangul_open');
+  assert.equal(openedPopups[0].posted[0].msg.payload.bridgeId, bid);
+  assert.equal(openedPopups[0].posted[0].msg.payload.html, undefined, '기밀 브리지는 원시 HTML 없이 HWPX 바이너리만 전송해야 합니다');
+  assert.ok(openedPopups[0].posted[0].msg.payload.b64.length > 100);
+
+  /* pureun_hangul_ack 수신 시 메모리 페이로드 즉시 파기 + 리스너 해제 */
+  const sentPayloadRef = openedPopups[0].posted[0].msg.payload;
+  (winListeners.message || []).slice().forEach((fn) => fn({
+    origin: 'https://erp.pureunlabor.co.kr',
+    source: openedPopups[0],
+    data: { type: 'pureun_hangul_ack', bridgeId: bid }
+  }));
+  assert.equal(sentPayloadRef.b64, '', 'ack 수신 즉시 메모리 내 base64 HWPX 페이로드가 완전 파기되어야 합니다');
+
+  /* 팝업 차단 시 무단 로컬 다운로드 없이 안내 토스트만 표시 (명시적 저장 버튼으로만 다운로드) */
+  allowPopup = false;
+  const dlBefore = downloads.length;
+  clickAct({ 'data-act': 'quick-open-hangul' });
+  assert.equal(downloads.length, dlBefore, '팝업 차단 시 사용자 명시적 저장 클릭 없이 로컬 디스크에 자동 다운로드되면 안 됩니다');
+  assert.ok(elementsById.pboxToast.textContent.includes('팝업이 차단되어'), '팝업 차단 시 재시도·직접 저장 안내가 표시되어야 합니다');
+
+  /* 로그아웃 시 열린 브리지 정리 */
+  App.setAuthUser(null);
+});
