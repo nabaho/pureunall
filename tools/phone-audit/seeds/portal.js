@@ -2,8 +2,18 @@
 /* 포털(enter.html) 폰 화면 점검 시드 — 기본 홈 화면 + 오케스트레이션 컴팩트 팝업(#orchModal) 열림 상태 측정 */
 const NOW = Date.UTC(2026, 9, 18, 1, 0, 0);
 
+/* 📋 머리줄 «내 업무» 단추 숫자(work_erp/mysum/{사번}) — 업무관리가 적는 한 줄을 지어낸다(2026-11-21).
+   날짜는 «점검하는 날» 기준으로 만든다 — 오래된 값(14일 넘음)은 단추가 숫자를 안 보이기 때문이다. */
+const 오늘 = new Date();
+const 날 = (n) => { const d = new Date(오늘.getTime() + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+
 module.exports = {
   data: {
+    work_erp: {
+      mysum: {
+        P001: { v: 1, n: 12, dd: [날(-1), 날(3), 날(20)], nx: [날(0)], at: Date.now() - 3600000 }
+      }
+    },
     data: {
       companies: {
         v: [
