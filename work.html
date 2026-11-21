@@ -22,6 +22,8 @@
 <script src="js/pu-ontology.js?v=107"></script>
 <script src="js/pu-kakao-work.js?v=4"></script>
 <script src="js/pu-kakao-export.js?v=2"></script>
+<!-- 📋 내 업무 숫자 한 줄(work_erp/mysum/{사번}) — 포털 머리줄 «내 업무» 단추·이알피 「나의 업무」가 읽는다(2026-11-21) -->
+<script src="js/pu-mywork.js?v=1"></script>
 <!-- 카톡 받을 파일 → 사진첩·기업정보함으로 건네는 통로(2026-10-24) — 메일 첨부와 같은 것 -->
 <script src="js/pu-handoff.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -1168,6 +1170,21 @@
      ⚠ minmax(0,1fr) — 그냥 1fr 은 «내용보다 좁아지지 않아» 같은 일이 되풀이된다.
      ⚠ 창 상자도 min-width:0 — flex 안의 상자는 기본이 «내용 폭 이상»이라 창째 화면 밖으로 넓어진다.
      넓은 화면은 두 칸 그대로다. */
+  /* 📦 이알피 일반업무·업무케이스 옮기기 창(2026-11-21) — PC 는 한 칸 한 줄 표, 폰은 줄마다 «두 줄 카드»
+     (☐·번호는 왼쪽 끝 그대로, 업체·담당·기한은 업무 아래 둘째 줄로). */
+  .mvtbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+  .mvtbl th,.mvtbl td{padding:5px 4px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+  .mvtbl thead th{border-top:0;background:var(--bg)}
+  .mvtbl .mv-sub{display:none}
+  /* ☐ 는 label 로 감싸 칸 전체를 누르는 자리로 — 손가락이 13px 네모를 맞추지 않아도 된다(24px 넘게) */
+  .mvtbl .mvck{display:flex;align-items:center;justify-content:center;min-width:24px;min-height:26px;cursor:pointer}
+  .mvtbl .mvck input{width:16px;height:16px;margin:0;cursor:pointer}
+  @media (max-width:560px){
+    .mvtbl .mv-pc{display:none}
+    .mvtbl .mv-sub{display:block;font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+    .mvtbl td.mv-w{white-space:normal}
+    .mvtbl td.mv-w .mv-n{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  }
   @media (max-width:560px){
     .grid2{grid-template-columns:minmax(0,1fr)}
     .grid2 .fld input,.grid2 .fld select{min-width:0;width:100%;box-sizing:border-box}
@@ -7472,6 +7489,40 @@ function focusCounts(){
   var done=allItems().filter(function(it){return it.state==='done'&&isOf(it,v)&&it.done_date&&inWeek(it.done_date,S.week);});
   return {due:due,nolog:nolog,next:next,done:done};
 }
+/* 📋 내 업무 숫자 한 줄 — 포털 머리줄 «내 업무» 단추와 이알피 「나의 업무」가 읽는다 (대표 지시 2026-11-21 「추천대로」).
+   work_erp/mysum/{로그인 UID} — 모양·읽는 법은 js/pu-mywork.js 머리글. 규칙이 «본인 UID 자리만» 쓰게 막는다.
+   ★ «내 몫» 한 줄만 적는다 — 남의 숫자를 대신 적지 않는다(그 사람 화면의 셈은 그 사람 화면이 한다).
+   ★ 이번 주를 볼 때만 적는다 — 「미기록」은 «이번 주» 숫자여야 한다. 지난주를 보는 동안은 안 적는다.
+   ★ 진행(n)은 머리 숫자와 같은 셈 — 이관한 계약·자문·급여를 뺀다. «펴 보기» 단추를 눌렀는지와 상관없이 같다.
+   ★ 임박·다음 할 일은 «날짜»로 남긴다 — 읽는 쪽이 그날 «오늘»로 다시 센다(focusCounts 와 같은 잣대).
+   ★ 바뀐 것이 없으면 안 적는다 — 화면은 자주 다시 그려진다. 적는 사이 또 바뀌면 끝난 뒤 한 번 더.
+   ⚠ 실패해도 화면에는 아무 일 없다 — 숫자는 덤이다. 못 적으면 포털은 숫자 없이 단추만 선다. */
+var _mysumLast=null, _mysumBusy=false, _mysumAgain=null;
+function mysumWrite(fc){
+  try{
+    var M=window.PuMyWork;
+    if(!M||typeof fbDb==='undefined'||!fbDb||!S.me||!S.me.sid||!fc||!isCurWeek()) return;
+    if(_mysumBusy){ _mysumAgain=fc; return; }
+    var me=S.me, open=openItems().filter(function(it){ return isOf(it,me); });
+    var dues=[], nexts=[];
+    open.forEach(function(it){
+      var d=itemDue(it); if(d) dues.push(String(d).slice(0,10));
+      if(it.next&&it.next.date) nexts.push(String(it.next.date).slice(0,10));
+    });
+    var mon=curMonday();
+    var rec=M.build({ n:open.filter(function(it){ return !xferOf(it)&&!wsAdv(it); }).length,
+      dues:dues, nexts:nexts, nolog:fc.nolog.length, ws:ymd(mon), we:ymd(addDays(mon,6)), now:Date.now() });
+    if(_mysumLast&&M.same(_mysumLast,rec)) return;
+    var fu=null; try{ fu=firebase.auth().currentUser; }catch(e){}
+    var p=M.pathOf(fu&&fu.uid); if(!p) return;
+    _mysumBusy=true;
+    fbDb.ref(p).set(rec).then(function(){ _mysumLast=rec; },function(){}).then(function(){
+      _mysumBusy=false;
+      var again=_mysumAgain; _mysumAgain=null;
+      if(again) mysumWrite(again);
+    });
+  }catch(e){ _mysumBusy=false; }
+}
 /* ══════ 보기 바꾸기 — 표 · 보드 · 타임라인 ══════════════════════
    같은 목록을 세 가지 모양으로 본다. ★ 거르는 일은 «한 번만» 한다 —
    renderMy 가 만든 list 를 그대로 받아 그리므로, 세 보기가 늘 같은 것을 보여준다.
@@ -7823,6 +7874,7 @@ function renderMy(){
      ⚠ 조용히 지우지 않는다 — 몇 건을 감췄는지 칩으로 내고 눌러서 볼 수 있게 한다.
        숫자가 안 맞으면 자료가 없어진 줄 알기 때문이다. */
   xferRefresh();
+  mysumWrite(fc);              /* 📋 포털 «내 업무» 단추·이알피 「나의 업무」가 읽는 숫자 한 줄 */
   var xferHid=mine.filter(xferOf).length;
   if(!S.myXfer) mine=mine.filter(function(it){ return !xferOf(it); });
   /* 자문·급여는 접어 둔다 (대표 지시 2026-10-05 「그대로 두되 접어 둔다」).
@@ -14054,7 +14106,8 @@ function peTypeName(kv,code){
 // 마스터에 없을 때 쓰는 예전 칸 (푸른이알피 kindSubLabel의 뒷단과 같다)
 /* 푸른이알피 원본이 스스로 달고 있는 상태 — 계약관리의 상담접수·계약협의·
    계약확정 같은 것. 우리 '상태'(내가 손으로 바꾸는 진행 상태)와는 다른 축이라
-   덮지 않고 따로 읽어 나란히 보여준다. 이름은 푸른이알피 나의 업무와 같게 쓴다. */
+   덮지 않고 따로 읽어 나란히 보여준다. 이름은 푸른이알피 계약관리 화면과 같게 쓴다
+   (예전에는 이알피 「나의 업무」 표의 상태 칸과 맞췄다 — 그 표는 2026-11-21 걷었다). */
 var PE_ST_LABEL={progress:'진행중',pending:'대기',review:'검토중',open:'진행중',
   closed:'완료',done:'완료',cancelled:'취소',hold:'보류',
   consult:'상담접수',negotiate:'협의중',confirmed:'계약확정',signed:'최종확정',active:'진행중'};
@@ -15088,11 +15141,220 @@ function _puerpModal(){
 // 푸른이알피 나의 업무 → work.html#item=<건ID> 로 들어온 경우 해당 업무 열기
 function openFromHash(){
   try{
-    var m=/^#item=(.+)$/.exec(location.hash||''); if(!m) return;
+    /* 이알피 「나의 업무」의 단추가 여는 자리 (2026-11-21 — 새 업무·옮기기·연결은 업무관리 한 곳에서) */
+    var hs=String(location.hash||'');
+    if(hs==='#new'){ itemModal(); return; }
+    if(hs==='#erpmove'){ erpMoveModal(); return; }
+    if(hs==='#peimport'){ puerpMineModal(); return; }
+    /* 이알피 「나의 업무」의 숫자(임박·할 일·미기록)를 누르면 그 건만 거른 「내 업무」로 */
+    var fm=/^#f=(due|next|nolog)$/.exec(hs);
+    if(fm){ if(S.view==='my'){ S.f=fm[1]; renderMy(); } return; }
+    var m=/^#item=(.+)$/.exec(hs); if(!m) return;
     var id=decodeURIComponent(m[1]);
     if(!items[id]){ toast('해당 업무를 찾을 수 없습니다 (보관함에 있을 수 있습니다)','warn'); return; }
     openDrawer(id);
   }catch(e){}
+}
+/* ══ 📦 이알피 «일반업무·업무케이스» → 업무관리로 옮기기 (대표 지시 2026-11-21 「추천대로」 — 나의 업무 2단계) ══
+   이알피 「나의 업무」의 「+ 일반업무」「+ 업무케이스」는 업무관리로 안 넘어오는 «섬»이었다
+   (업무관리·전체 검색·인수인계·캘린더 어디에도 안 나왔다). 이제 새 업무는 업무관리 「＋ 새 업무」 한 곳에서 만들고,
+   이미 있던 것은 여기서 «한 번» 옮긴다.
+   ★ 원본(data/my_work_items · data/biz_cases)은 «읽기만» 한다 — 고치지도 지우지도 않는다(언제든 다시 볼 수 있다).
+   ★ 옮긴 줄에는 mv:{store,id} 가 붙는다 — 두 번 옮기지 않고, 이알피 「나의 업무」가 «옮겼다»를 알아본다.
+     ⚠ src:'puerp'·ref 를 붙이지 않는다 — 그것은 이알피 사무관리 5종의 «종료 동기화» 표식이라,
+       붙이면 동기화 엔진(wsSyncRun)이 이알피 원본에 손을 댄다.
+   ★ 끝난 것·휴지통에 든 것은 안 옮긴다 · 사람이 고른 것만 · 한 번의 update 로 다 같이(반쯤 옮겨지는 일 없음).
+   ★ 업체는 companyId 가 있을 때만 co_id 로 잇는다 — 이름으로 업체를 짐작해 잇지 않는다(온톨로지).
+   ★ 담당은 원본의 사번을 그대로 쓴다. 옛 자료에 이름만 있으면 명부에서 «이름이 정확히 같은» 한 사람일 때만 사번을 붙인다. */
+var MV_STORES=[['my_work_items','일반업무'],['biz_cases','업무케이스']];
+var MV_TYPE={ /* 이알피 종류 값 → 업무명 앞에 붙는 이름 (pu-erp MY_WORK_TYPES · BIZ_CASE_TYPES 와 같은 말) */
+  consult:'상담', labor:'노동부대응', written:'서면대응', review:'검토', phone:'전화상담', visit:'방문', other:'기타',
+  'labor-office':'노동부 대응', 'advisory-consult':'자문상담', 'written-response':'서면대응', 'phone-consult':'전화상담',
+  'visit-consult':'방문상담', 'doc-review':'서류검토' };
+/* 이알피 원본 한 줄이 «끝났나» — pu-erp isItemClosed 와 같은 잣대(일반업무는 status:'closed'·archived 로 끝낸다) */
+function mvClosed(x){
+  if(!x) return true;
+  if(x._deleted||x.permanentArchived||x.archived) return true;
+  if(x.closedDate||x.closedAt||x.closeDate) return true;
+  var st=String(x.status||'');
+  return st==='closed'||st==='cancelled'||st==='transferred'||st==='done';
+}
+/* 사번 또는 (옛 자료의) 이름 → {sid,name}. 명부에서 못 찾으면 사번을 지어내지 않는다 */
+function mvWho(v,staff){
+  var s=String(v==null?'':v).trim(); if(!s) return null;
+  var bySid=staff.filter(function(u){ return u&&u.sid===s; })[0];
+  if(bySid) return {sid:bySid.sid,name:bySid.name||''};
+  var byName=staff.filter(function(u){ return u&&u.name===s; });
+  if(byName.length===1) return {sid:byName[0].sid,name:byName[0].name};
+  return {sid:'',name:s};
+}
+/* «내 것»인가 — 사번으로만 본다. isOf 는 이름이 같아도 «내 것»으로 치므로(동명이인이면 남의 일이 섞인다,
+   2026-11-21 보안 검토 지적) 여기서는 쓰지 않는다. 사번 없는 옛 자료(이름만, 명부에서 하나로 안 정해짐)는
+   «내 것»으로 치지 않는다 — 관리자 화면(전 직원)에서는 그대로 보이니 그때 옮긴다. */
+function mvMine(main,subs,me){
+  var ms=me&&me.sid; if(!ms) return false;
+  return [main].concat(subs||[]).some(function(w){ return !!(w&&w.sid&&w.sid===ms); });
+}
+/* 이미 옮긴 것 — store|id */
+function mvDoneMap(){
+  var m={};
+  allItems().forEach(function(it){ if(it&&it.mv&&it.mv.store&&it.mv.id!=null) m[it.mv.store+'|'+it.mv.id]=it._id; });
+  return m;
+}
+/* 옮길 후보 — 원본 두 곳을 읽어 «안 끝난 것 · 아직 안 옮긴 것»만. 관리자는 전 직원, 나머지는 내 것 */
+function mvCandidates(){
+  var staff=(_allStaffCache&&_allStaffCache.length?_allStaffCache:(_staffCache||[]));
+  var done=mvDoneMap(), me=S.me||{}, all=isAdmin();
+  return Promise.all(MV_STORES.map(function(d){
+    return fbDb.ref('data/'+d[0]+'/v').once('value').then(function(s){ return _peArr(s.val())||[]; },function(){ return null; });
+  })).then(function(res){
+    var out=[], fail=[];
+    res.forEach(function(arr,i){
+      var st=MV_STORES[i][0], lbl=MV_STORES[i][1];
+      if(arr===null){ fail.push(lbl); return; }
+      arr.forEach(function(x){
+        if(!x||x.id==null||mvClosed(x)||done[st+'|'+x.id]) return;
+        var main=st==='my_work_items'?mvWho(x.sid,staff):mvWho(x.managerMain,staff);
+        var subs=(st==='biz_cases'?[].concat(x.managerSub?[x.managerSub]:[],x.managerSubs||[]):[])
+          .map(function(v){ return mvWho(v,staff); }).filter(Boolean)
+          .filter(function(w){ return !main||w.sid!==main.sid||w.name!==main.name; });
+        var c={ store:st, kind:lbl, id:String(x.id), no:String(x.itemNo||x.caseNo||''),
+          type:MV_TYPE[x.workType||x.caseType]||'', title:String(x.title||'').trim(),
+          company:String(x.companyName||'').trim(), coId:String(x.companyId||'').trim(),
+          contact:String(x.contactPerson||'').trim(), phone:String(x.contactPhone||'').trim(),
+          due:String(x.dueDate||'').slice(0,10), start:String(x.startDate||'').slice(0,10),
+          brief:[x.detail||x.description||'', x.result?('결과: '+x.result):''].filter(Boolean).join(' / '),
+          main:main, subs:subs };
+        var mine=mvMine(main,subs,me);
+        if(!all&&!mine) return;
+        if(!mvKey(c)) return;              // 열쇠를 못 만드는 원본(id 가 너무 김)은 옮기지 않는다 — 이알피에 그대로 보인다
+        c.mine=mine;
+        out.push(c);
+      });
+    });
+    out.sort(function(a,b){ return (b.mine?1:0)-(a.mine?1:0)||String(a.company).localeCompare(String(b.company),'ko'); });
+    return {list:out, fail:fail};
+  });
+}
+/* 고르기 칸 머리 ☐ — 지금 보이는 줄만 고른다 */
+function mvAll(on){ [].slice.call(document.querySelectorAll('.mvchk')).forEach(function(c){ c.checked=!!on; }); mvCount(); }
+function mvCount(){
+  var n=[].slice.call(document.querySelectorAll('.mvchk')).filter(function(c){ return c.checked; }).length;
+  var b=$('mv-go'); if(b){ b.textContent=n?(n+'건 옮기기'):'고른 것 옮기기'; b.disabled=!n; }
+}
+function erpMoveModal(){
+  showModal('<h2 style="margin:0 0 10px">📦 이알피 일반업무·업무케이스 옮기기</h2><p class="muted" style="font-size:12.5px">불러오는 중…</p>');
+  loadStaff().then(function(){ return mvCandidates(); }).then(function(r){
+    S._mvList=r.list;
+    var h='<h2 style="margin:0 0 8px">📦 이알피 일반업무·업무케이스 옮기기</h2>'
+      +'<p class="muted" style="font-size:12.5px;margin:0 0 10px">이알피 「나의 업무」에서 만들던 <b>일반업무·업무케이스</b>를 업무관리로 옮깁니다. '
+      +'이제부터 새 업무는 업무관리 <b>＋ 새 업무</b>에서 만듭니다. 이알피 원본은 지우지 않습니다.</p>';
+    if(r.fail.length) h+='<div class="muted" style="font-size:12px;color:var(--warn);margin-bottom:8px">⚠ '+esc(r.fail.join('·'))
+      +'를 읽지 못했습니다 — 그쪽 것은 이번 목록에 없습니다. 잠시 뒤 다시 열어 주세요.</div>';
+    if(!r.list.length){
+      h+='<p class="muted" style="font-size:12.5px">옮길 것이 없습니다 (끝난 것·이미 옮긴 것은 뺐습니다).</p>'
+        +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>';
+      showModal(h); return;
+    }
+    h+='<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">'
+      +'<table class="mvtbl"><colgroup><col style="width:28px"><col style="width:36px"><col>'
+      +'<col class="mv-pc" style="width:26%"><col class="mv-pc" style="width:15%"><col class="mv-pc" style="width:88px"></colgroup>'
+      +'<thead><tr>'
+      +'<th scope="col" style="text-align:center"><label class="mvck"><input type="checkbox" checked onclick="mvAll(this.checked)" title="보이는 줄 모두 고르기" aria-label="보이는 줄 모두 고르기"></label></th>'
+      +'<th scope="col" style="text-align:right">#</th>'
+      +'<th scope="col">업무</th><th scope="col" class="mv-pc">업체</th><th scope="col" class="mv-pc">담당</th><th scope="col" class="mv-pc">기한</th></tr></thead><tbody>'
+      +r.list.map(function(c,i){
+        var nm=(c.type?'['+c.type+'] ':'')+(c.title||'(제목 없음)');
+        var who=c.main?(c.main.name||c.main.sid):'';
+        var whoH=who?esc(who):'<span style="color:var(--warn)">담당 모름</span>';
+        return '<tr><td style="text-align:center"><label class="mvck">'
+          +'<input type="checkbox" class="mvchk" value="'+i+'" checked onchange="mvCount()" aria-label="'+esc('옮기기 고르기: '+c.kind+' '+nm)+'"></label></td>'
+          +'<td class="muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
+          +'<td class="mv-w" title="'+esc(c.kind+' · '+nm+(c.company?' · '+c.company:''))+'">'
+          +'<span class="mv-n"><span class="muted">'+esc(c.kind)+'</span> '+esc(nm)+'</span>'
+          /* 폰에서만 보이는 둘째 줄 — 업체 · 담당 · 기한 */
+          +'<span class="mv-sub">'+esc(c.company||'—')+' · '+whoH+(c.due?' · '+esc(c.due):'')+'</span></td>'
+          +'<td class="mv-pc">'+esc(c.company||'—')+'</td>'
+          +'<td class="mv-pc">'+whoH+'</td>'
+          +'<td class="mv-pc" style="font-variant-numeric:tabular-nums">'+esc(c.due||'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div>'
+      +'<div id="mv-msg" class="muted" role="status" aria-live="polite" style="font-size:12px;min-height:18px;margin-top:8px"></div>'
+      +'<div class="row" style="justify-content:flex-end;margin-top:6px"><button onclick="closeM()">취소</button>'
+      +'<button class="primary" id="mv-go" onclick="erpMoveRun()">'+r.list.length+'건 옮기기</button></div>';
+    showModal(h);
+  }).catch(function(e){
+    showModal('<h2 style="margin:0 0 10px">📦 이알피 일반업무·업무케이스 옮기기</h2><p class="muted" style="font-size:12.5px;color:var(--danger)">불러오지 못했습니다: '
+      +esc(e&&e.message||e)+'</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>');
+  });
+}
+/* 옮긴 업무의 열쇠 — 원본에서 «정해진 이름»(같은 원본이면 늘 같은 자리).
+   ★ 두 창(두 사람)이 같은 것을 동시에 옮겨도 «같은 자리»라 한 줄만 남는다(2회차 보안 검토 «중간» — 무작위 열쇠면 둘이 생겼다).
+   ★ 원본 id 를 encodeURIComponent 로 옮겨 적는다 — 열쇠 금지 글자(# $ [ ] /)는 %xx 로, 점(.)은 %2E 로.
+     서로 다른 id 가 같은 열쇠가 되지 않는다(되돌릴 수 있는 바꿈). 무작위 열쇠로 물러서지 않는다(3회차 «낮음»).
+   ⚠ 열쇠가 너무 길면(200자 넘음) 만들지 않는다 — 그 원본은 옮기기 목록에서 뺀다(mvCandidates). */
+function mvKey(c){
+  var s=String(c&&c.id!=null?c.id:''); if(!s) return '';
+  var k='MV-'+(c.store==='biz_cases'?'B':'W')+'-'+encodeURIComponent(s).replace(/\./g,'%2E');
+  return k.length<=200?k:'';
+}
+/* 옮길 한 줄 → 업무관리 업무. «＋ 새 업무»(saveItem)와 같은 칸에 출처(mv)·온톨로지 칸을 더한다 */
+function mvRecord(c,no,nowIso,id){
+  var rec={ cat:'기타', company:c.company, client:'', officer:'',
+    title:((c.type?'['+c.type+'] ':'')+(c.title||c.kind)).slice(0,200),
+    due:c.due||'', brief:briefTrim(c.brief),
+    mgr_main:c.main||{sid:'',name:''}, mgr_subs:c.subs||[],
+    no:no, status:'진행중', start:c.start||todayStr(), created_at:nowIso,
+    mv:{store:c.store, id:c.id, no:c.no||'', at:nowIso, by:(S.me&&S.me.sid)||''},
+    id:id, entityType:'Task', createdAt:nowIso, updatedAt:nowIso };
+  if(c.coId) rec.co_id=c.coId;
+  if(c.contact||c.phone) rec.contact={name:c.contact||'', rank:'', phone:c.phone||''};
+  /* 요약 칸(brief)은 짧게 잘린다(BRIEF_MAX) — 원본의 내용·결과 «전문»은 서랍의 옛 메모 자리(pe_notes)에 둔다.
+     서랍에 「🔗 푸른이알피 메모」로 보이고 「✎ 기록에 담기」로 기록 줄이 된다(ppFor·ppTake 와 같은 길).
+     ⚠ 이 업무에는 ref 가 없어 동기화 엔진이 이 메모를 덮지 않는다. */
+  var note=String(c.brief||'').trim();
+  if(note){
+    var nk=String((c.main&&c.main.sid)||'mv').replace(/[.#$\[\]\/]/g,'_')||'mv';
+    rec.pe_notes={}; rec.pe_notes[nk]={t:note.slice(0,2000), at:nowIso, id:'mv-'+c.store+'-'+c.id};
+  }
+  return rec;
+}
+function erpMoveRun(){
+  var list=S._mvList||[], msg=$('mv-msg'), btn=$('mv-go');
+  var pick=[].slice.call(document.querySelectorAll('.mvchk')).filter(function(c){ return c.checked; })
+    .map(function(c){ return list[+c.value]; }).filter(Boolean);
+  if(!pick.length){ if(msg) msg.textContent='고른 것이 없습니다.'; return; }
+  /* 그 사이 다른 창에서 옮겼을 수 있다 — 지금 목록으로 한 번 더 거른다(진짜 막이는 아래 «처음 한 번만») */
+  var done=mvDoneMap();
+  pick=pick.filter(function(c){ var k=mvKey(c); return k && !done[c.store+'|'+c.id] && !items[k]; });
+  if(!pick.length){ if(msg) msg.textContent='이미 옮겨진 것들입니다.'; return; }
+  if(btn) btn.disabled=true;
+  var nowIso=new Date().toISOString(), base=genNo('기타'), m=/^(.*-)(\d+)$/.exec(base), n0=m?+m[2]:1, recs={};
+  pick.forEach(function(c,i){
+    /* 세 자리로 채우되 1000번을 넘으면 자르지 않는다(slice(-3) 은 1000 → 000 으로 겹친다) */
+    var n=String(n0+i); while(n.length<3) n='0'+n;
+    var id=mvKey(c), no=m?(m[1]+n):base;
+    recs[id]=mvRecord(c,no,nowIso,id);
+  });
+  /* ★ 건마다 «처음 한 번만» 만든다(서버 트랜잭션 — 3회차 보안 검토 «중간»).
+       같은 자리에 이미 업무가 있으면(다른 창이 먼저 옮겼고 그 뒤 고치거나 끝냈을 수 있다) 덮지 않고 그만둔다.
+     ⚠ 그래서 «한꺼번에 다 아니면 하나도»는 아니다 — 몇 건이 실패하면 그 건만 안 옮겨지고, 다시 누르면 남은 것만 옮긴다(열쇠가 같아 겹치지 않는다). */
+  var ids=Object.keys(recs);
+  Promise.all(ids.map(function(id){
+    return fbDb.ref(NS+'/items/'+id).transaction(function(cur){ return cur ? undefined : recs[id]; })
+      .then(function(r){ return (r&&r.committed)?'ok':'had'; },function(){ return 'fail'; });
+  })).then(function(rs){
+    var ok=0, had=0, fail=0;
+    rs.forEach(function(r,i){ if(r==='ok'){ ok++; items[ids[i]]=recs[ids[i]]; } else if(r==='had') had++; else fail++; });
+    if(!fail){
+      closeM();
+      toast('✅ '+ok+'건을 업무관리로 옮겼습니다'+(had?' (이미 옮겨진 '+had+'건은 그대로 두었습니다)':''));
+      route(); return;
+    }
+    if(btn) btn.disabled=false;
+    if(msg) msg.textContent='옮긴 것 '+ok+'건 · 못 옮긴 것 '+fail+'건'+(had?' · 이미 있던 것 '+had+'건':'')
+      +' — 다시 누르면 못 옮긴 것만 옮깁니다.';
+    if(ok) route();
+  });
 }
 // 푸른이알피 해당 메뉴로 이동 (pu-erp는 #menu= 딥링크를 지원)
 function openPuerp(type){

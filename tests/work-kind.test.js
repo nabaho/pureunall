@@ -186,11 +186,12 @@ ok('이미 우리말이면 그대로', peStatus({ status: '상담접수' }) === 
 ok('모르는 코드는 버린다 (화면에 영어가 튀어나오지 않게)',
   peStatus({ status: 'weird_code' }) === '' && peStatus({}) === '' && peStatus(null) === '');
 ok('옛 칸(progressStatus)도 읽는다', peStatus({ progressStatus: 'review' }) === '검토중');
-ok('푸른이알피가 쓰는 짝과 같다', (function () {
-  const i = P.indexOf("var sMap = { progress:'진행중'");
-  const blk = P.slice(i, i + 260);
-  return ["progress:'진행중'", "review:'검토중'", "consult:'상담접수'", "signed:'최종확정'"]
-    .every(s => blk.indexOf(s) > 0);
+/* 이알피 「나의 업무」 표의 상태 칸(sMap)은 2026-11-21 표와 함께 걷었다(대표 「추천대로」 — 업무 목록은 업무관리 한 곳).
+   상태 말은 이제 업무관리 PE_ST_LABEL 한 곳이다. 대신 이알피 계약관리 화면이 «스스로» 쓰는 말과 견준다. */
+ok('푸른이알피 계약관리가 쓰는 말과 같다', (function () {
+  const has = P.indexOf("negotiate:'협의중', confirmed:'계약확정', signed:'최종확정'") > 0;
+  return has && peStatus({ status: 'negotiate' }) === '협의중'
+    && peStatus({ status: 'confirmed' }) === '계약확정' && peStatus({ status: 'signed' }) === '최종확정';
 })());
 
 /* ── 구분 정리 (엑셀 이관분: 구분 칸에 유형이 들어가 있던 것) ── */

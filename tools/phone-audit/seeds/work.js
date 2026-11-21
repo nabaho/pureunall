@@ -105,11 +105,26 @@ for (let i = 0; i < 6; i++) add(me, i + 1, { state: 'done', status: '종료', do
 const reset = `try{closeM()}catch(e){} try{sideDrawer(false)}catch(e){} try{if(S.drawerId)closeDrawer()}catch(e){}`;
 const go = (js) => async (page) => { await page.evaluate(reset + ';' + js); };
 
+/* 📦 이알피 「일반업무·업무케이스」 → 업무관리 옮기기 창(2026-11-21) — 이알피 원본 자리(data/…)를 지어낸다.
+   이알피 저장 꼴({u, v:[…]})을 그대로 쓴다. 이름·업체는 모두 지어낸 것. */
+const 옮길일반 = [
+  { id: 'mw-pa1', sid: 'P001', title: '퇴직금 산정 상담', workType: 'consult', companyName: '(주)점검상사', status: 'open', detail: '퇴직금 산정 기간 문의 — 평균임금 계산 안내', dueDate: inDays(5) },
+  { id: 'mw-pa2', sid: 'P001', title: '근로계약서 검토', workType: 'review', companyName: '점검물류', status: 'open' },
+  { id: 'mw-pa3', sid: 'P001', title: '끝난 상담', workType: 'phone', status: 'closed' },
+];
+const 옮길케이스 = [
+  { id: 'bc-pa1', managerMain: 'P001', caseType: 'labor-office', title: '임금체불 진정 대응', companyName: '(주)점검제조', companyId: 'co-pa1', status: 'open', dueDate: inDays(2) },
+];
+
 module.exports = {
   data: {
     work_erp: {
       items,
       logs: { [wk.y]: { [wk.wk]: logs } },
+    },
+    data: {
+      my_work_items: { u: Date.now(), v: 옮길일반 },
+      biz_cases: { u: Date.now(), v: 옮길케이스 },
     },
   },
   localStorage: {},
@@ -126,6 +141,8 @@ module.exports = {
     { name: 'board', run: go(`setMyMode('board')`), wait: 2500 },
     { name: 'timeline', run: go(`setMyMode('timeline')`), wait: 2500 },
     { name: 'item', run: go(`setMyMode('phone');itemModal()`), wait: 1500 },
+    /* 이알피 일반업무·업무케이스 옮기기 창(이알피 「나의 업무」의 「업무관리로 옮기기 →」 = #erpmove) */
+    { name: 'erp-move', run: go(`erpMoveModal()`), wait: 2000 },
     /* 묶기를 고르면 조종칸 단추 글이 길어진다(「묶기 · 사업장 ▾」) — 조종칸이 넘치는지 */
     { name: 'grouped', run: go(`setMyGroup('co')`), wait: 1500 },
   ],
