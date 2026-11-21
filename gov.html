@@ -417,9 +417,41 @@ table.cmp td{white-space:nowrap}
   .rec-line .mchip{flex:none}
   .rec-line .sp,.rec-line .rec-sep{display:none}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 탭·거르개·칸·줄은 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 탭(#tabs .tb·.rsub)은 밑줄 그대로 둔다 — 아래 «찾는 말»(.kw)·갈래(.mchip)가 이미 알약이라, 탭까지 알약이면
+     «화면을 바꾸는 탭»과 «거르개»가 눈에 안 갈린다(뉴스레터 2026-10-11 같은 까닭). 고른 탭 글자만 굵게.
+   ★ 색은 팔레트 안·var(--pu-*) 만(이 앱은 색 검사 밖이다). */
+:where(body.pu-design) #head{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) #top .ttl{font-weight:800;letter-spacing:-.02em}
+:where(body.pu-design) #tabs .tb.on,:where(body.pu-design) .rsub.on{font-weight:800}
+/* 상자 — 둥근 카드 + 옅은 그림자(목업 .card) */
+:where(body.pu-design) .card{border-radius:var(--pu-r);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .sec{border-radius:var(--pu-r-sm)}
+:where(body.pu-design) .sel-bar{border-radius:var(--pu-r-sm)}
+:where(body.pu-design) .pop-box{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+/* 단추 — 둥글기, 짙은 단추는 옅은 그림자 */
+:where(body.pu-design) .btn{border-radius:10px}
+:where(body.pu-design) .btn.primary{box-shadow:var(--pu-sh-sm)}
+/* 표 머리 — 흐린 회색(#64748b)을 읽히는 회색으로, 굵게 */
+:where(body.pu-design) th{color:var(--pu-sub);font-weight:800}
+/* 작은 표식은 알약 */
+:where(body.pu-design) .tag{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .kw{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) #toast{border-radius:12px;box-shadow:0 8px 24px rgba(30,41,59,.28)}
+/* 폰 — 앱이 상자·창·선택 띠를 화면 폭 그대로(둥근 모서리 없이) 편다. 위에서 덮은 둥글기·그림자를 다시 걷는다(상자는 한 겹) */
+@media (max-width:640px){
+  :where(body.pu-design) .card{border-radius:0;box-shadow:none}
+  :where(body.pu-design) .pop-box{border-radius:0;box-shadow:none}
+  :where(body.pu-design) .sel-bar{border-radius:0}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 
 <div id="head">
 <div id="top">

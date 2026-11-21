@@ -923,8 +923,26 @@ table.daejo td.dj2{padding:0}
   /* 편집 칸의 점선 테두리는 인쇄에 필요 없다 */
   [contenteditable]{outline:none!important;background:none!important}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다(숨기기·옮기기 없음). 이 화면은 이미 둥근 판(16px)·그림자·그라데이션 단추라, 작은 상자 모서리와 그림자 값만 맞춘다.
+   ★ 머리줄 갈래 단추(.rmode) 모양은 css/rules-shell.css 한 벌에만 둔다(tests/rules-shell.test.js ③). */
+/* 큰 판·도구 띠 — 그림자를 목업 값으로(머리줄 안 도구 띠는 앱 규칙이 그림자를 계속 뺀다) */
+:where(body.pu-design) .pane,:where(body.pu-design) .toolbar{box-shadow:var(--pu-sh-md)}
+/* 작은 상자 — 둥근 모서리(11px) + 옅은 그림자 */
+:where(body.pu-design) .panel-card{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .ask-qa{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+/* 작은 표식은 알약 */
+:where(body.pu-design) .lw-chip{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .ask-pane .ask-lock{border-radius:var(--pu-r-sm)}
+/* 상태 띠(10인이상 · 기준일 · 사업장 · ＋ 신규)는 폰 폭에 «꼭 맞게» 한 줄이다 — 공용 파일의 숫자 자리 맞춤(tabular-nums)으로 날짜가 몇 px 넓어지자
+   「＋ 신규」가 둘째 줄로 내려갔다(411px 갈무리 2026-11-21). 이 띠만 앱 글자 그대로 둔다 */
+:where(body.pu-design) #statusbar{font-variant-numeric:normal}
+/* ══ pu-design 끝 ══ */
 </style>
-<link rel="stylesheet" href="css/rules-shell.css?v=4">
+<link rel="stylesheet" href="css/rules-shell.css?v=5">
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리·머리줄 한 벌 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -943,7 +961,7 @@ table.daejo td.dj2{padding:0}
     if(!go()) document.addEventListener('DOMContentLoaded', go); })();
   </script>
 </head>
-<body>
+<body class="pu-design">
 <div id="dropOverlay"><div class="box"><div class="ic">📄</div><b>여기에 놓으면 업로드</b><span>취업규칙 HWP · HWPX · DOCX · ODT · RTF · PDF · TXT 파일을 끌어다 놓으세요</span></div></div>
 <header class="rs-head">
   <!-- 왼쪽 묶음 — rules-v2.html 과 «글자까지 같다»(css/rules-shell.css · tests/rules-shell.test.js).

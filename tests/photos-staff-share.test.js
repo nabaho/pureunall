@@ -377,6 +377,12 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-20 — won·wn 게시 완료(GitHub 「Firebase 배포」 실행 44634743342 · rules-deploy.js --deploy, 대표 「지금해」):
        새로 2 · 바뀜 0 · 사라짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
        새 기준 docs/firebase-rules-콘솔원문-2026-11-20.json(만들개 출력과 같다) — 목록을 비운다. */
+  /* 2026-11-21 게시 전 — 데이터관리(대표 전용) 새 자리 일곱(대표 「한번에 모든 것 다해고 내부관리에 넣어달라」).
+     새로 생김 7 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — app_owner 는 읽기 재직 직원·쓰기 아무도, datahub·datahub_device 는 대표 본인만(LOGIN + 본인 + app_owner),
+     datahub_device_req·nonce·activity 는 화면 읽기·쓰기 모두 금지(서버만), datahub_board 는 대표만 읽기·서버만 쓰기.
+     게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 일곱 줄을 뺄 것. */
+  /* ★ 2026-11-21 — 데이터관리 일곱 자리 게시 완료(rules-deploy.js --deploy, 이 PC): 새로 7 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-21.json — 목록을 비운다. */
   const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +

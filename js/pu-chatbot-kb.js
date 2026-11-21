@@ -187,7 +187,7 @@
     },
     {
       id: 'inside',
-      title: '④ 내부관리 (5개 앱)',
+      title: '④ 내부관리 (6개 앱)',
       badge: '권한 보유자 전용 · 법인 운영 · 재무 · 인사',
       summary: '권한이 부여된 담당자·관리자에게만 타일이 보이는 우리 법인 내부 살림(입출금·정산·직원 급여·변경등기·이력서) 줄입니다.',
       apps: [
@@ -195,7 +195,8 @@
         { key: 'fin',    icon: '📒', name: '재무관리',     when: '법인 계좌 입출금·세금계산서·청구 매칭, 미확인 입금 확인(누구 입금인가요), 월 마감', from: '은행 입출금 알림(하나은행 브리지), 푸른이알피(업체·계약·사건 원장 공유)', to: '포털 미확인 입금 알림 배지, 컨설팅정산 입금 대조 기초자료 제공', ask: '재무관리의 입금 확인과 푸른이알피·컨설팅정산 연결 구조를 알려줘' },
         { key: 'settle', icon: '🧾', name: '컨설팅정산',   when: '개인 통장으로 입금되는 정부컨설팅 사업의 주관·담당 노무사 간 정산표 작성', from: '푸른이알피(컨설팅 사업·업체 읽기), 재무관리(거래내역 읽기 대조)', to: '지급월 정산표 산출 및 정산 안내 발송(원본 장부 무변경)', ask: '컨설팅정산 앱은 어떻게 사용하며 원본 데이터를 건드리지 않나요?' },
         { key: 'deungi', icon: '🖋', name: '푸른등기',     when: '노무법인 사원(노무사) 입사·퇴사, 대표사원·주소·분사무소가 바뀔 때 변경등기 서류(의사록·총사원 동의서·정관 변경인가 신청서·변경 정관·위임장 등)를 한글 파일로 만들고 필요서류를 체크(관리자·위임관리인 전용)', from: '등기 현황(지금 등기부의 사원·출자·분사무소·정관 본문)과 이번 등기 건의 «바뀌는 것»', to: '한글 서류 묶음·필요서류 확인표·등기 기한(인가증 받은 날부터 2주일), 등기 완료 뒤 등기 현황 갱신', ask: '푸른등기로 노무사 입사·퇴사 변경등기 서류를 만드는 순서를 알려줘' },
-        { key: 'career', icon: '👤', name: '경력관리',     when: '대표·전문위원 수행 경력 실적 관리, 제안서용 이력서 및 경력 요청 메일 확인(관리자 전용)', from: '푸른이알피(사건·사업·자문 실적 영구 ID 연결), 법인 메일함(경력 요청 메일 감지)', to: '포털 [요청 N] 배지 알림, 정부사업신청 지원 재료 제공', ask: '경력관리 앱은 푸른이알피 실적·메일함과 어떻게 연결되나요?' }
+        { key: 'career', icon: '👤', name: '경력관리',     when: '대표·전문위원 수행 경력 실적 관리, 제안서용 이력서 및 경력 요청 메일 확인(관리자 전용)', from: '푸른이알피(사건·사업·자문 실적 영구 ID 연결), 법인 메일함(경력 요청 메일 감지)', to: '포털 [요청 N] 배지 알림, 정부사업신청 지원 재료 제공', ask: '경력관리 앱은 푸른이알피 실적·메일함과 어떻게 연결되나요?' },
+        { key: 'datahub', icon: '📊', name: '데이터관리',   when: '대표 한 사람만 여는 화면 — 매월 입금·노무사·직원 수행업무·업무량을 3D·2D로 보고, 앱별 현황판·업체 연결 지도·다년 매출과 세금계산서·재무제표 대조를 한 곳에서 봄(대표 전용)', from: '재무관리 확정 입금, 직원 명부(사번), 업체 담당, 업무관리 주간기록, 온톨로지 관계망 — 모두 읽기만', to: '대표 화면 안의 집계·그림(원본은 고치지도 지우지도 않음), 등록된 대표 PC 에서만 데이터 채팅', ask: '데이터관리는 누가 볼 수 있고 무엇을 보여 주나요?' }
       ]
     }
   ];
@@ -341,7 +342,7 @@
         '푸른포털 전체 4대 영역 요약을 다시 보여줘'
       ],
       tags: ['내부관리', '네번째줄', '4번째줄', '내부관리사용법', '내부관리연결도', '재무관리', '인사관리', '컨설팅정산', '경력관리', '입금확인', '미확인입금', '하나은행', '법인계좌', '입금매칭', '푸른등기', '변경등기'],
-      apps: ['fin', 'hr', 'settle', 'deungi', 'career']
+      apps: ['fin', 'hr', 'settle', 'deungi', 'career', 'datahub']
     },
     {
       id: 'SYS-deungi-01',
@@ -1162,7 +1163,7 @@
     erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1,
     hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
     aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1,
-    hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1
+    hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1, datahub: 1
   };
   var SINGLE_APP_DOC_ID = {
     erp: 'SYS-erp-01',
@@ -1225,6 +1226,7 @@
     { prefix: 'settle', label: '컨설팅정산(주관·담당 정산표)', app: 'settle' },
     { prefix: 'deungi', label: '푸른등기(법인 변경등기)', app: 'deungi' },
     { prefix: 'kcareer', label: '경력관리(수행실적·이력서)', app: 'career' },
+    { prefix: 'datahub', label: '데이터관리(대표 보기 설정)', app: 'datahub' },
     { prefix: 'pubdata/co', label: '공공데이터(고용보험·국민연금 인원)', app: '' },
     { prefix: 'data/user_dir', label: '직원 명부(담당자 확인)', app: '' },
     { prefix: 'uid_roles', label: '포털 재직·권한 확인', app: '' },
@@ -2028,7 +2030,7 @@
     office: 1, hrwelf: 1, etc: 1
   };
   var APP_TO_SG_CAT = {
-    erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
+    erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', datahub: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
     consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult',
     work: 'work', mail: 'work', cal: 'work',
     fund: 'fund',
@@ -2196,7 +2198,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];

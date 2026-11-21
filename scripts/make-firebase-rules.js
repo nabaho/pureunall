@@ -2315,4 +2315,69 @@ rules.scal_jobtrans = {
   $other: { '.validate': false }
 };
 
+/* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
+   - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
+     (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).
+   - ⚠ ADMIN(isAdmin)·SUB·FIN 으로 열지 않는다 — 이알피는 관리자대행(admin-delegate)에게도 isAdmin 을 적는다.
+     uid_roles/{uid}/role 칸은 본인이 쓸 수 있어 믿지 않는다. 대표만 가리키는 것은 app_owner/uid 뿐이다.
+   - datahub/{uid}/settings = 보기 설정(ViewState). 대표 본인만 읽고 쓴다. 알려진 칸 밖은 막는다.
+     메타 칸은 js/pu-ontology-write.js prepareRecord·tombstone 이 저절로 붙이는 것 전부(하나라도 빠지면 저장이 막힌다).
+     thresholds = 현황판 «주의» 기준(결정 ⑩) — 대표가 정하기 전엔 비어 있고, 비어 있으면 화면은 색을 칠하지 않는다.
+   - datahub_device/{uid} = 승인된 기기 공개 열쇠·지문. 대표 본인만 읽고, 쓰기는 서버·터미널만(.write:false).
+   - datahub_device_req·datahub_nonce·datahub_activity = 서버만 읽고 쓴다(화면은 읽지도 못한다).
+   - datahub_board = 현황판 «건수·비율» — 대표만 읽고, 쓰기는 서버(datahubBoardTally)만.
+   ⚠ 서버(Cloud Functions)·firebase CLI 는 관리자 권한이라 이 규칙을 안 탄다 — 그래서 .write:false 여도 서버는 쓴다. */
+const DATAHUB_IS_OWNER = "auth.uid === root.child('app_owner').child('uid').val()";
+const DATAHUB_OWNER = `(${LOGIN}) && ${DATAHUB_IS_OWNER}`;
+const DATAHUB_SELF = `(${LOGIN}) && auth.uid === $uid && ${DATAHUB_IS_OWNER}`;
+const 짧은글 = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n}` });
+const 시각칸 = { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' };
+const 숫자칸 = { '.validate': 'newData.isNumber()' };
+/* 기준선 묶음 — aLines {goal: A안 달 입금 기준선(만원)} · cLines {warn, over: C안 주당 업무 건수 «많음·넘침»(결정 ④)}.
+   숫자·짧은 글 하나 또는 {이름: 짧은 글·숫자} 묶음 */
+const 줄묶음 = {
+  '.validate': 'newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 400) || newData.hasChildren()',
+  $i: { '.validate': '$i.length <= 64 && (newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 64))' }
+};
+rules.app_owner = { '.read': LOGIN, '.write': false };
+/* ⚠ 쓰기는 settings 자리에만 연다($uid 통째 쓰기 없음). 통째 지우기는 막고(newData.exists — 지우려면 저장 관문의 _deleted 표식),
+     수정차수(revision)는 저장 관문처럼 «전 값 + 1»만 받는다 — 두 기기가 서로를 조용히 덮지 못하게(보안 검토 2026-11-21 «중간»). */
+rules.datahub = { $uid: {
+  '.read': DATAHUB_SELF,
+  settings: {
+    '.write': `${DATAHUB_SELF} && newData.exists()`,
+    '.validate': "newData.hasChildren(['id', 'entityType', 'revision']) && newData.child('entityType').val() === 'ViewState'"
+      + " && newData.child('revision').isNumber()"
+      + " && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    /* 저장 관문 메타 칸 */
+    id: 짧은글(200), entityType: 짧은글(40), schemaVersion: 숫자칸, contractVersion: 숫자칸, revision: 숫자칸,
+    createdAt: 시각칸, updatedAt: 시각칸, createdBy: 짧은글(128), updatedBy: 짧은글(128),
+    _deleted: { '.validate': 'newData.isBoolean()' }, deletedAt: 시각칸, deletedBy: 짧은글(128),
+    /* 보기 설정 */
+    view: 짧은글(40), period: 짧은글(40), basis: 짧은글(40), vmode: 짧은글(40),
+    net: { '.validate': 'newData.isBoolean() || (newData.isString() && newData.val().length <= 20)' },
+    aLines: 줄묶음, cLines: 줄묶음,
+    /* 주의 기준(결정 ⑩) — {앱 key: {w,b}} · _rec(기록률 %) · _recon {w,b}(다년 대조 차이 %). 정하기 전엔 화면이 색을 안 칠한다 */
+    thresholds: {
+      '.validate': 'newData.hasChildren()',
+      $app: {
+        '.validate': '$app.length <= 32 && (newData.isNumber() || newData.hasChildren())',
+        $k: { '.validate': '$k.length <= 32 && (newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 40))' }
+      }
+    },
+    /* 다년 전망 손잡이 기본값 {adv 자문·기금 순증률, case 사건·컨설팅 성장률, cost 원가·판관비율} — 숫자 하나 또는 {이름: 숫자·짧은 글} */
+    baseline: {
+      '.validate': 'newData.isNumber() || newData.hasChildren()',
+      $k: { '.validate': '$k.length <= 32 && (newData.isNumber() || (newData.isString() && newData.val().length <= 40))' }
+    },
+    $other: { '.validate': false }
+  },
+  $other: { '.validate': false }
+} };
+rules.datahub_device = { $uid: { '.read': DATAHUB_SELF, '.write': false } };
+rules.datahub_device_req = { '.read': false, '.write': false };
+rules.datahub_nonce = { '.read': false, '.write': false };
+rules.datahub_activity = { '.read': false, '.write': false };
+rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
+
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');
