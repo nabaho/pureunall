@@ -64,7 +64,17 @@ function render(items) {
     cutFn(ERP, 'function _nbDigits(v)'),
     cutFn(ERP, 'function erpNicebillCoIndex()'),
     cutFn(ERP, 'function erpNicebillMatchCo(idx, name, bizNo, out)'),
-    cutFn(ERP, 'function erpCmsAutoCandidate(ix, name)'),
+    cutFn(ERP, 'function _cmsKey(s)'),
+    cutFn(ERP, 'function erpCmsNameKeys(name)'),
+    cutFn(ERP, 'function _cmsEd1(a, b)'),
+    cutFn(ERP, 'function _cmsTypoOk(a, b)'),
+    cutFn(ERP, 'function _cmsLikeLevel(rk, ck)'),
+    cutFn(ERP, 'function _cmsNameSame(rk, ck)'),
+    cutFn(ERP, 'function erpCmsLikePool(ix)'),
+    cutFn(ERP, 'function erpCmsNameClash(ix, name, exceptId)'),
+    cutFn(ERP, 'function erpCmsLikeFind(ix, name, biz)'),
+    cutFn(ERP, 'function erpCmsAutoCandidate(ix, name, bizNo, amount)'),
+    cutFn(ERP, 'function erpCmsSureLinks(ix, items)'),
     cutFn(ERP, 'function FinanceAuto(props)'),
     'this.tree = FinanceAuto({ onNavigate: function(r){ __nav(r); } });',
   ].join('\n'), ctx);
@@ -134,7 +144,9 @@ test('②★ 종료 업체 단추는 회원코드도 입금도 만들지 않고 
 test('③★ 비슷한 이름은 종료 업체에 붙지 않는다 — 후보 없음, 눌러도 아무것도 안 한다', () => {
   const r = render(ITEMS);
   const c = r.cells('k-near');
-  assert.equal(c[6], '후보 없음');
+  /* 비슷한 «종료» 업체는 이름만 알려 준다(2026-11-22) — 붙이지는 않는다: 「무엇」 칸·단추·잇기는 아래에서 그대로 못 박는다 */
+  assert.match(c[6], /^후보 없음/);
+  assert.match(c[6], /자동으로는 안 붙입니다/);
   assert.ok(!c.some((t) => t === '종료 업체'), '★ 비슷한 이름이 종료 업체로 보였다');
   const b = r.button('k-near');
   assert.equal(b.c.join(''), '이 업체로 잇기');
@@ -168,7 +180,7 @@ test('④★ 종료 업체에 이어져 있는 회원코드라도 자동 확정�
 });
 
 test('화면 소스 — 후보는 한 곳(erpCmsAutoCandidate)에서 찾고, 그 호출만 종료 업체를 허용한다', () => {
-  const helper = cutFn(ERP, 'function erpCmsAutoCandidate(ix, name)');
+  const helper = cutFn(ERP, 'function erpCmsAutoCandidate(ix, name, bizNo, amount)');
   assert.match(helper, /allowClosed\s*:\s*true/);
   const screen = cutFn(ERP, 'function FinanceAuto(props)');
   assert.doesNotMatch(screen, /erpNicebillMatchCo\(/, '화면이 직접 찾으면 허용 규칙이 두 군데로 갈라진다');
