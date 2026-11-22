@@ -74,6 +74,10 @@ module.exports = {
     { name: 'sel', run: async (p) => { await p.click('#tabs button[data-tab=list]'); const c = await p.$$('#list input[data-pick]'); for (const x of c.slice(0, 2)) await x.click(); } },
     { name: 'detail', run: async (p) => { await p.click('#tabs button[data-tab=list]'); await p.click('#list [data-open]'); }, back: async (p) => { await p.click('#dX'); } },
     { name: 'year', run: async (p) => { await p.click('#tabs button[data-tab=list]'); await p.selectOption('#fGroup', 'year'); } },
+    /* 왼쪽 메뉴(PC 만 보인다) — 종류 누르기·묶음 접기. 폰에서는 메뉴가 숨으므로 한눈에 카드로 같은 일을 한다 */
+    { name: 'sbcat', run: async (p) => { if (await p.isVisible('#sb')) await p.click('#sbNav [data-sbcat=sexual]'); else { await p.click('#tabs button[data-tab=dash]'); await p.click('#cats [data-cat=sexual]'); } } },
+    { name: 'sbfold', run: async (p) => { await p.click('#tabs button[data-tab=dash]'); if (await p.isVisible('#sb')) await p.click('#sbNav [data-sbfold=legal]'); },
+      back: async (p) => { if (await p.isVisible('#sb')) await p.click('#sbNav [data-sbfold=legal]'); } },
     { name: 'add', run: async (p) => { await p.click('#tabs button[data-tab=add]'); } },
     { name: 'mail', run: async (p) => { await p.click('#tabs button[data-tab=mail]'); await p.click('#mScan'); } },
   ],
