@@ -167,6 +167,8 @@
   .fcold{color:var(--danger);font-size:10.5px;font-weight:400}
   @media(max-width:860px){ .row.sdtabs{flex-wrap:nowrap;overflow-x:auto;gap:0}.row.sdtabs button{white-space:nowrap;padding:5px 6px!important;font-size:12px} }   /* 폰 — 탭은 한 줄(넘치면 옆으로 밀어 본다) */
   @media print{.fcv.fcnew,.fcv.fcchg{color:#000!important;font-weight:400}.fcold{display:none}}
+  .rgpox th,.rgpox td{padding:5px 4px}
+  .rgp-smbtn{padding:4px 8px;font-size:11.5px;min-height:28px}
   .pmdoc tr.pmsec{background:#e2e8f0}   /* 단계 줄 배경은 줄(tr)에 — 폰에서 줄이 flex 로 바뀌어도 끊기지 않는다 */
   /* ✉ 기업에 설립시 준비서류 — 폰에서는 줄마다 «카드»(☐·번호는 왼쪽 끝, 받는 사람은 한 줄 꽉, 단추는 오른쪽 끝). PC 는 그대로 */
   @media(max-width:860px){
@@ -203,6 +205,25 @@
     .sdcmat td.sdc-doc{display:inline-flex;align-items:center;gap:4px;background:var(--ok-bg);border:1px solid var(--line)!important;border-radius:7px;padding:4px 7px!important}
     .sdcmat td.sdc-doc::before{content:attr(data-lbl);font-size:11px;font-weight:700;color:var(--sub);margin-right:2px}
     .sdcmat td.sdc-mail{flex:1 1 100%;display:flex;justify-content:flex-end;gap:6px;margin-top:2px}
+    /* 🏛 지역공동기금 설립 요청서류 · 기업별 OX 수합 체크 — 폰·태블릿(<=860px) 줄별 카드 전환 및 터치/글자 크기 보장 */
+    .rgp-modal input:not([type=checkbox]),.rgp-modal select,.rgp-modal textarea{font-size:16px!important}
+    .rgp-modal button:not(.hbtn){min-height:36px!important;padding:6px 11px!important;font-size:13px!important}
+    .rgpreq table,.rgpreq tbody,.rgpreq tr,.rgpreq td,.rgpox table,.rgpox tbody,.rgpox tr,.rgpox td{display:block;width:100%}
+    .rgpreq thead,.rgpox thead{display:none}
+    .rgpreq tr,.rgpox tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+    .rgpreq td,.rgpox td{border:0!important;padding:0!important;width:auto!important;max-width:100%!important;white-space:normal!important}
+    .rgpreq input[type=checkbox],.rgpox input[type=checkbox]{width:20px;height:20px}
+    .rgpreq td.rgp-ttl{flex:1 1 100%;min-width:0;word-break:keep-all}
+    .rgpreq td.rgp-colact{margin-left:auto;display:flex;gap:6px}
+    .rgpox td.rgp-co{flex:1 1 100%;word-break:keep-all}
+    .rgpox td.rgp-meta{flex:1 1 100%;font-size:12px}
+    .rgpox td.rgp-cell{display:inline-flex!important;width:auto!important;align-items:center;gap:5px;background:var(--ok-bg);border:1px solid var(--line)!important;border-radius:7px;padding:4px 8px!important}
+    .rgpox td.rgp-cell::before{content:attr(data-lbl);font-size:11.5px;font-weight:700;color:var(--sub);margin-right:2px}
+    .rgpox td.rgp-cell button{min-height:30px!important;padding:4px 9px!important;font-size:12px!important}
+    .rgpox td.rgp-act{flex:1 1 100%;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:2px}
+    .rgpagbar input,.rgpagbar select{flex:1 1 100%!important;width:100%!important;max-width:none!important}
+    .rgp-addbar input{flex:1 1 calc(50% - 6px)!important;width:auto!important;min-width:125px!important}
+    .rgp-addbar input.rgp-wide,.rgp-addbar button{flex:1 1 100%!important;width:100%!important}
   }
   /* 거래·분개입력 — 아주 넓은 화면(1850px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
   @media(min-width:1850px){
@@ -7420,6 +7441,7 @@ function reqDocsBoxHTML(phase,cur,fundMode){
     +'<span id="reqCnt_'+phase+'" class="chip '+(allOn?'ok':(doneN?'warn':''))+'" style="font-size:10.5px">확인 '+doneN+'/'+list.length+'</span>'
     +hlp('forms.reqdocs')+'</div>'
     +'<span style="flex:1"></span>'
+    +(fundMode&&ftype==='공동'?'<button data-fid="'+esc(S.formFund)+'" onclick="rgpOpen(this.dataset.fid)" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="지역공동기금 설립 시 주관기관(상공회의소·지자체) 및 참여기업 요청서류 리스트와 기업별 OX 수합 체크표를 확인·엑셀정리·메일발송합니다">🏛 지역공동기금 서류·OX체크</button>':'')
     +(fundMode?'<button onclick="openSiteDocCenter(S.formFund,\''+({inka:'inka',reg:'inka',tax:'inka',subsidy:'subsidy',ops:'ops',dis:'chg'}[phase]||'inka')+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="참여·설립사업장별 필요서류를 간결한 체크리스트 메일로 요청하고 푸른메일함 수신 서류를 자동 감지·내용검토합니다">✉ 사업장 체크리스트 메일·수신검토</button>':'')
     +'<button class="'+(isSel?'':'primary')+'" onclick="selectForm(\''+rKind+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="기업에 발송하거나 인쇄할 수 있는 준비·첨부서류 안내문 및 사업장별 체크리스트(A4)를 오른쪽에 표시합니다">'
     +(isSel?'▶ 오른쪽에 안내문 표시 중':'📋 기업 안내문 미리보기·인쇄')+'</button>'
@@ -12623,8 +12645,12 @@ function renderSetupDash(){
       +'<td style="white-space:nowrap">'+_sdDueChip(st)+'</td><td>'+_sdGapChip(st)+'</td><td style="white-space:nowrap">'+_fcChip(r.fc)+'</td>'
       +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td></tr>';
   }).join('');
+  var gongSetup=list.filter(function(f){ return f.fund_type!=='사내'; });
+  var rgpDefFid=(SD.sel&&funds[SD.sel]&&funds[SD.sel].fund_type!=='사내')?SD.sel:(gongSetup[0]?gongSetup[0]._id:'');
   $('app').innerHTML='<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
-    +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button>'
+    +'<span style="flex:1"></span>'
+    +(rgpDefFid?'<button data-fid="'+esc(rgpDefFid)+'" onclick="rgpOpen(this.dataset.fid)" title="지역공동기금 설립 시 상공회의소·지자체 담당자 및 참여기업에 요청할 서류 리스트와 기업별 OX 수합 체크 창을 별도로 띄워 확인·엑셀정리·메일발송합니다">🏛 지역공동기금 서류·OX체크</button>':'')
+    +'<button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button>'
     +(list.length?'<button onclick="sdTrash()" style="color:var(--danger)" title="□ 로 짚은 기금을 삭제 보관함으로 옮깁니다 — 잘못 만든 중복 기금 정리용. 언제든 복원할 수 있습니다">🗑 선택한 기금 삭제 보관</button>':'')
     +'<button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
     +(list.length
@@ -12683,7 +12709,9 @@ function _sdBoard(f,st){
     +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
     +(fc&&fc.nForm?'<span class="chip dg" style="font-size:10.5px">🔴 서식 '+fc.nForm+'</span>':'')+ciChip(fid)
     +(_pmSentN(f,SD.sites[fid])?'<span class="chip ok" style="font-size:10.5px" title="기업에 설립시 준비서류 요청 메일을 «보냈음»으로 표시한 곳">✉ 준비서류 '+_pmSentN(f,SD.sites[fid])+'곳 보냄</span>':'')
-    +'<span style="flex:1"></span><button data-fid="'+esc(fid)+'" onclick="openSiteDocCenter(this.dataset.fid,\'inka\')" title="참여·설립사업장에 간략 체크리스트로 서류를 요청하고 메일함 수신 서류를 자동 체크·내용검토합니다">📋 체크리스트·수신검토</button>'
+    +'<span style="flex:1"></span>'
+    +(f.fund_type!=='사내'?'<button data-fid="'+esc(fid)+'" onclick="rgpOpen(this.dataset.fid)" title="지역공동기금 설립 시 상공회의소·지자체 담당자 및 참여기업에 보낼 요청서류 리스트와 기업별 서류·도장·고용보험·메일 OX 수합 현황을 확인·엑셀정리·메일발송합니다">🏛 지역공동기금 서류·OX체크</button>':'')
+    +'<button data-fid="'+esc(fid)+'" onclick="openSiteDocCenter(this.dataset.fid,\'inka\')" title="참여·설립사업장에 간략 체크리스트로 서류를 요청하고 메일함 수신 서류를 자동 체크·내용검토합니다">📋 체크리스트·수신검토</button>'
     +'<button data-fid="'+esc(fid)+'" onclick="pmOpen(this.dataset.fid)" title="설립에 필요한 서류와 함께 정할 사항을 정리해 기업에 보내는 메일을 만듭니다 — 기업 정보·받는 사람은 기업정보함에서">✉ 기업에 설립시 준비서류</button>'
     +'<button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
     +'<button onclick="closeM();trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button><button onclick="closeM()">✕ 닫기</button></div>'
@@ -15674,7 +15702,11 @@ function _siteCardMatch(site,idx){
   }
   var key=_cardFundKey(site.name);
   if(key.length<3) return null;                          // 너무 짧은 이름은 아무거나 걸린다
-  var byName=biz.filter(function(r){ return _cardFundKey(r.c)===key; });
+  var byName=biz.filter(function(r){
+    var rb=_digits(r.bz);
+    if(d.length>=10&&rb.length>=10&&rb!==d) return false; // 서로 다른 10자리 사업자번호면 동명 타기업이므로 제외
+    return _cardFundKey(r.c)===key;
+  });
   return byName.length===1 ? byName[0] : null;
 }
 var CARD_TARGETS={
@@ -16816,6 +16848,1686 @@ function _siteFilter(arr){
 }
 function setSiteQ(v){ _siteQ=v; renderFund(); setTimeout(function(){ var el=$('siteQ'); if(el){ el.focus(); el.selectionStart=el.selectionEnd=el.value.length; } },0); }
 function setSiteOnly(v){ _siteOnly=(_siteOnly===v)?'':v; renderFund(); }
+/* ══ 🏛 지역공동기금 설립 요청서류 리스트 · 기업별 OX 수합 체크 · 엑셀 · 메일 발송 (공통 체계화 2026-11-22) ══
+   · 지역공동기금(상공회의소·지자체 주관 공동근로복지기금) 설립 시 주관기관 담당자(예: 제주상공회의소)와 참여기업 담당자에게
+     요청할 서류·기초자료(사업자등록증·법인등기부·중소기업확인서·직전연도 고용보험 연간명부·노사 재직증명서·도장/막도장동의서·
+     직전매출 손익계산서·담당자 메일/연락처·출연확인서 등)를 체계화한 별도 창으로 띄워 확인·체크·발송한다.
+   · 기존 정리된 수합 엑셀(참여예정업체현황·구비서류 제출현황·참여신청 명단)을 불러와 O/X/△/개인 상태를 한 번에 채울 수 있고,
+     요청서류 리스트 + 기업별 OX 수합현황 + 도장제작명단 3시트 엑셀(.xlsx)로 다시 내려받아 메일에 첨부할 수 있다.
+   · 보안 원칙: 엑셀 가져오기 시 주민등록번호·생년월일·아이디·비밀번호 열은 원천 차단하며, 메일은 푸른메일함 쓰기 창에 채워 열기만 한다. */
+var RGP=null;
+var RGP_UI={help:'setup.regprep'};
+var RGP_MAX_XLSX=8*1024*1024;
+var RGP_MAX_UNCOMP=12*1024*1024;
+var RGP_MAX_ENTRY=4*1024*1024;
+var RGP_MAX_ROWS=300;
+var RGP_MAX_COLS=60;
+var RGP_ITEMS=[
+  {id:'apply',abbr:'참여<br>신청',short:'참여신청서',col:'참여신청서',who:'참여기업(회사·대표자)',title:'[참여기업(회사·대표자)] 공동근로복지기금 참여신청서 1부 (대표자 서명·날인)',defOn:true},
+  {id:'bizreg',abbr:'사업자<br>등록증',short:'사업자등록증',col:'사업자등록증',who:'참여기업(회사)',title:'[참여기업(회사)] 사업자등록증 사본 1부',defOn:true,sdcIds:['inka_bizreg','sub_bizreg']},
+  {id:'corpreg',abbr:'법인<br>등기부',short:'법인등기부',col:'법인등기부등본',who:'참여기업(법인)',title:'[참여기업(법인)] 법인등기부등본 1부 (말소사항 포함·발급 3개월 이내, 개인사업자 제외)',defOn:true,allowDash:true,sdcIds:['inka_corpreg','sub_corpreg']},
+  {id:'smecert',abbr:'중기<br>확인서',short:'중소기업확인서',col:'중소기업확인서',who:'참여기업(회사)',title:'[참여기업(회사)] 중소기업확인서 1부 (중소벤처기업부 발급 · 유효기간 내)',defOn:true,sdcIds:['sub_smecert']},
+  {id:'ei_list',abbr:'고용<br>명부',short:'고용보험명부(연간)',col:'고용보험명부(연간)',who:'참여기업(회사)',title:'[참여기업(회사)] 고용보험 사업장 자격취득자 명부 1부 (직전연도 1월~12월 연간 내역 · 월평균 피보험자 수 산정용)',defOn:true,sdcIds:['sub_fin']},
+  {id:'wrep',abbr:'재직<br>노·사',short:'재직증명(노1·사1)',col:'재직증명서(노1·사1)',who:'근로자·사용자 위원 (노1·사1)',title:'[근로자측·사용자측 위원] 설립준비위원 재직증명서 (대표자 1부, 근로자대표 1부 · 노 1부, 사 1부)',defOn:true,sdcIds:['inka_wrep']},
+  {id:'stamp',abbr:'도장<br>노·사',short:'도장·동의서(노1·사1)',col:'도장·막도장동의(노1·사1)',who:'근로자·사용자 위원 (노1·사1)',title:'[근로자측·사용자측 위원] 대표자·근로자대표 도장 날인 또는 막도장 사용동의서 (노 1부, 사 1부)',defOn:true},
+  {id:'fin_sales',abbr:'손익<br>매출',short:'손익·매출서류',col:'직전매출(손익계산서)',who:'참여기업(회사)',title:'[참여기업(회사)] 직전년도 손익계산서(표준재무제표증명) 1부 (직전년도 매출액 확인용)',defOn:true,sdcIds:['ops_fin']},
+  {id:'contact_info',abbr:'담당<br>메일',short:'담당자·메일·노대표',col:'담당자·메일·노대표',who:'참여기업(실무·노사대표)',title:'[참여기업(실무·노사대표)] 실무 담당자 성명·직위·휴대폰·이메일(명함) 및 근로자대표 성명·연락처',defOn:true},
+  {id:'contrib_seal',abbr:'출연<br>확인',short:'출연확인서(날인)',col:'출연확인서(날인)',who:'참여기업(양식 날인)',title:'[참여기업(회사)] 기금출연확인서 날인본 (제공 양식에 법인직인·대표자 날인)',defOn:false,sdcIds:['sub_contrib','chg_contrib']}
+];
+var RGP_REG_DOCS=[
+  '[근로자측·사용자측 이사] 개인인감증명서 (노 1부, 사 1부 · 발급 3개월 이내)',
+  '[근로자측·사용자측 이사] 주민등록등본 또는 초본 (노 1부, 사 1부 · 발급 3개월 이내)',
+  '[근로자측·사용자측 이사] 신분증 사본 및 개인인감도장 (노 1부, 사 1부)'
+];
+var RGP_BLOCK_COL_RE=/주민\s*(?:등록)?\s*번호|생년\s*월일|아이디|비밀\s*번호|패스\s*워드|암호|계좌\s*번호/i;
+function _rgpSafeKey(k){
+  var s=String(k||'');
+  if(s==='__proto__'||s==='constructor'||s==='prototype') return false;
+  return /^[A-Za-z0-9_-]{1,80}$/.test(s);
+}
+function _rgpIsActiveSite(s){
+  if(!s||!s._id) return false;
+  var st=String(s.status||'active').toLowerCase();
+  if(st==='closed'||st==='inactive'||st==='deleted'||st==='withdrawn'||st==='탈퇴'||st==='종료'||st==='폐업') return false;
+  if(s.closed||s.deleted||s.withdrawn||s.trashed) return false;
+  return true;
+}
+function _rgpSafeExportCell(v){
+  if(typeof v!=='string') return v;
+  if(v==='-'||!v) return v;
+  return /^[=+\-@\t\r]/.test(v)?("'"+v):v;
+}
+function _rgpCleanText(s,maxLen){
+  var t=String(s==null?'':s).replace(/[\r\n\t]+/g,' ').trim();
+  t=(typeof _sdcMaskRrn==='function')?_sdcMaskRrn(t):t.replace(/(^|[^\d])(\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]))[\s\-]*([1-8])\d{6}(?!\d)/g,'$1$2-$3******');
+  return maxLen?t.slice(0,maxLen):t;
+}
+function rgpDefaultAgencyName(f){
+  f=f||{};
+  var s=String(f.region||'')+' '+String(f.name||'')+' '+String(f.short_name||'');
+  if(/제주/.test(s)) return '제주상공회의소';
+  if(/경기북부|양주|의정부|동두천|포천|연천/.test(s)) return '경기북부상공회의소';
+  if(/서산|태안/.test(s)) return '서산상공회의소';
+  if(/당진/.test(s)) return '당진상공회의소';
+  if(/천안|아산|충남북부/.test(s)) return '충남북부상공회의소';
+  if(/경기/.test(s)) return '경기상공회의소';
+  if(/충남|충청남도/.test(s)) return '충남상공회의소';
+  var rg=String(f.region||'').trim();
+  return rg?(rg+'상공회의소'):'';
+}
+function rgpNormOx(v){
+  if(v===true||v===1) return 'O';
+  if(v===false) return 'X';
+  var s=String(v==null?'':v).trim();
+  if(!s) return 'X';
+  var low=s.toLowerCase();
+  if(/^(o|○|●|◎|✓|✔|☑|y|yes|ok|okay|제출|완료|확인|수령|입수|보유|회원)$/i.test(low)) return 'O';
+  if(/개인|해당\s*없음|면제|비대상|^-$|^―$/.test(low)) return '-';
+  if(/^(△|▲|보완|일부|진행|대기|검토)$/i.test(low)) return '△';
+  if(/^(x|×|✕|✗|미제출|미수령|없음|미비|불참)$/i.test(low)) return 'X';
+  return 'X';
+}
+function rgpNextOx(cur,allowDash){
+  var c=rgpNormOx(cur);
+  if(c==='X') return 'O';
+  if(c==='O') return '△';
+  if(c==='△') return allowDash?'-':'X';
+  return 'X';
+}
+function rgpInferRowOx(row,docChk,bizMatched,today){
+  row=row||{}; docChk=docChk||{}; today=today||'';
+  var out={};
+  RGP_ITEMS.forEach(function(it){
+    var hit=false;
+    if(it.sdcIds){
+      for(var i=0;i<it.sdcIds.length;i++){
+        var c=docChk[it.sdcIds[i]];
+        if(c&&(c.ok||c.recv)){ hit=true; break; }
+      }
+    }
+    if(it.id==='bizreg'&&bizMatched) hit=true;
+    if(it.id==='smecert'&&row.site&&row.site.sme_to&&(!today||String(row.site.sme_to)>=today)) hit=true;
+    if(it.id==='wrep'&&row.site&&typeof _siteWrep==='function'&&_siteWrep(row.site).doc) hit=true;
+    if(it.id==='contact_info'&&row.cname&&PM_MAIL_RE.test(String(row.email||'').trim())&&row.wrep) hit=true;
+    if(it.id==='ei_list'&&row.eiFromExcel) hit=true;
+    out[it.id]=hit?'O':'X';
+  });
+  return out;
+}
+function rgpEffectiveOx(row,savedOx,docChk,bizMatched,today){
+  var inf=rgpInferRowOx(row,docChk,bizMatched,today), sv=savedOx||{}, res={};
+  RGP_ITEMS.forEach(function(it){
+    if(sv[it.id]!==undefined&&sv[it.id]!==null&&sv[it.id]!==''){
+      res[it.id]=rgpNormOx(sv[it.id]);
+    }else{
+      res[it.id]=inf[it.id]||'X';
+    }
+  });
+  return res;
+}
+function rgpRowSummary(oxMap,docSel){
+  oxMap=oxMap||{};
+  var items=docSel?RGP_ITEMS.filter(function(it){ return !!docSel[it.id]; }):RGP_ITEMS;
+  var nO=0, nX=0, nTri=0, nDash=0, miss=[], hold=[];
+  items.forEach(function(it){
+    var v=rgpNormOx(oxMap[it.id]);
+    if(v==='O') nO++;
+    else if(v==='-') nDash++;
+    else if(v==='△'){ nTri++; hold.push(it); }
+    else { nX++; miss.push(it); }
+  });
+  var effTot=items.length-nDash;
+  return {tot:items.length, effTot:effTot, nO:nO, nX:nX, nTri:nTri, nDash:nDash, allDone:items.length>0&&nX===0&&nTri===0, miss:miss, hold:hold};
+}
+/* 기존 수합 엑셀 2차원 배열 파싱 — 순수 함수(검사 대상)
+   · 충남 1~12호 참여예정업체현황·구비서류 제출현황, 경기 1호 참여신청 명단(고용보험 1~12월 열 포함), 표준 OX 수합표를 모두 수용한다.
+   · 주민번호·생년월일·아이디·비밀번호 열은 즉시 버리며, 사업자등록증 열이 번호(123-81-...)인지 제출여부(O/제출)인지 값으로 구분한다. */
+function rgpParseSheetRows(aoa){
+  if(!Array.isArray(aoa)||!aoa.length) return [];
+  var hdrIdx=-1, hdr=[];
+  for(var r=0;r<Math.min(aoa.length,12);r++){
+    var row=aoa[r]||[];
+    var joined=row.map(function(x){ return String(x==null?'':x).replace(/\s+/g,''); }).join('|');
+    if(/(상호|기업명|업체명|회사명|사업장명)/.test(joined)){
+      hdrIdx=r; hdr=row.map(function(x){ return String(x==null?'':x).replace(/[\r\n]+/g,' ').trim(); });
+      break;
+    }
+  }
+  if(hdrIdx<0) return [];
+  var dataStart=hdrIdx+1;
+  if(aoa[hdrIdx+1]){
+    var nmIdx=-1;
+    for(var nc=0;nc<hdr.length;nc++){ if(/(상호|기업명|업체명|회사명|사업장명)/.test(hdr[nc].replace(/\s+/g,''))){ nmIdx=nc; break; } }
+    var subRow=aoa[hdrIdx+1]||[];
+    var subNm=nmIdx>=0?String(subRow[nmIdx]==null?'':subRow[nmIdx]).replace(/\s+/g,''):'';
+    var subJoined=subRow.map(function(x){ return String(x==null?'':x).replace(/\s+/g,''); }).join('|');
+    if(nmIdx>=0&&(!subNm||subNm===hdr[nmIdx].replace(/\s+/g,''))&&/(신청서|등록증|등기부|확인서|명부|증명서|동의서|매출액|담당자|이메일|휴대폰|\d+월|\(\d+\))/.test(subJoined)){
+      var maxLen=Math.max(hdr.length,subRow.length);
+      for(var sc=0;sc<maxLen;sc++){
+        var sv2=String(subRow[sc]==null?'':subRow[sc]).replace(/[\r\n]+/g,' ').trim();
+        if(sv2&&sv2!==hdr[sc]) hdr[sc]=sv2;
+      }
+      dataStart=hdrIdx+2;
+    }
+  }
+  var colMap={}, eiMonthCols=[], dupBizCols=[];
+  for(var c=0;c<hdr.length;c++){
+    var h=hdr[c], hc=h.replace(/\s+/g,'');
+    if(!hc||RGP_BLOCK_COL_RE.test(hc)) continue;
+    if(/고용보험.*\(\d+\)|^\d+월$/.test(hc)){ eiMonthCols.push(c); continue; }
+    if(/^(지역|시군|시군구|지자체)$/.test(hc)&&colMap.area===undefined) colMap.area=c;
+    else if(/(상호|기업명|업체명|회사명|사업장명)/.test(hc)&&colMap.name===undefined) colMap.name=c;
+    else if(/사업자\s*등록\s*번호|사업자\s*번호/.test(hc)&&colMap.biz_no===undefined) colMap.biz_no=c;
+    else if(/^사업자\s*등록증/.test(hc)) dupBizCols.push(c);
+    else if(/근로자\s*대표|대표\s*근로자|노측\s*대표/.test(hc)){
+      if(/연락처|핸드폰|전화/.test(hc)){ if(colMap.wrep_phone===undefined) colMap.wrep_phone=c; }
+      else if(colMap.wrep===undefined) colMap.wrep=c;
+    }
+    else if(/^대표자$|^대표이사$|대표자\s*성명/.test(hc)&&colMap.ceo===undefined) colMap.ceo=c;
+    else if(/약정\s*근로자|확정|인원\s*평균|고용보험.*평균|상시\s*근로자|^근로자수|^노동자수|^종업원수/.test(hc)){
+      /* 인원평균·고용보험평균 열에 '○'가 찍힌 표(충남 4·5호)와 숫자가 찍힌 표(경기 1호)를 함께 지원 */
+      if(/평균/.test(hc)&&colMap.ei_avg===undefined) colMap.ei_avg=c;
+      else if(colMap.emp===undefined) colMap.emp=c;
+    }
+    else if(/담당자.*(핸드폰|휴대폰|연락처)|^휴대폰번호$/.test(hc)) colMap.phone=c;
+    else if(/^전화번호$|^유선번호$|사업장\s*전화/.test(hc)&&colMap.tel===undefined) colMap.tel=c;
+    else if(/이메일|메일\s*주소|^e-?mail$/i.test(hc)&&colMap.email===undefined) colMap.email=c;
+    else if(/담당자\s*직위|담당자\s*직책|^직위$|^직책$/.test(hc)&&colMap.cpos===undefined) colMap.cpos=c;
+    else if(/담당자|업무\s*담당/.test(hc)){
+      if(/메일|연락/.test(hc)&&colMap.ox_contact_info===undefined) colMap.ox_contact_info=c;
+      else if(colMap.cname===undefined) colMap.cname=c;
+    }
+    else if(/참여\s*신청|참여\s*의향/.test(hc)&&colMap.ox_apply===undefined) colMap.ox_apply=c;
+    else if(/법인\s*등기|등기부/.test(hc)&&colMap.ox_corpreg===undefined) colMap.ox_corpreg=c;
+    else if(/중소기업/.test(hc)){
+      /* 경기 1호처럼 '소기업/중기업' 분류 텍스트가 적힌 열도 유효 확인서 보유(O) 판단에 활용 */
+      colMap.ox_smecert=c;
+    }
+    else if(/자격\s*취득자|고용보험.*명부|월평균\s*근로자\s*확인|고용보험\s*가입명부/.test(hc)&&colMap.ox_ei_list===undefined) colMap.ox_ei_list=c;
+    else if(/재직\s*증명/.test(hc)&&colMap.ox_wrep===undefined) colMap.ox_wrep=c;
+    else if(/막도장|도장/.test(hc)&&colMap.ox_stamp===undefined) colMap.ox_stamp=c;
+    else if(/매출액\s*서류|손익\s*계산서|영업\s*이익|재무\s*제표/.test(hc)&&colMap.ox_fin_sales===undefined) colMap.ox_fin_sales=c;
+    else if(/매출액|연매출/.test(hc)&&colMap.sales===undefined) colMap.sales=c;
+    else if(/출연\s*확인서/.test(hc)&&colMap.ox_contrib_seal===undefined) colMap.ox_contrib_seal=c;
+  }
+  /* '사업자등록증' 머리글 열이 사업자번호(10자리 숫자)인지 O/X 제출여부인지 표본 값으로 판별 */
+  dupBizCols.forEach(function(ci){
+    var hasBizNo=false;
+    for(var rr=dataStart;rr<Math.min(aoa.length,dataStart+25);rr++){
+      var sv=String((aoa[rr]||[])[ci]==null?'':(aoa[rr]||[])[ci]).replace(/\D/g,'');
+      if(sv.length===10){ hasBizNo=true; break; }
+    }
+    if(hasBizNo&&colMap.biz_no===undefined) colMap.biz_no=ci;
+    else if(colMap.ox_bizreg===undefined) colMap.ox_bizreg=ci;
+  });
+  if(colMap.name===undefined) return [];
+  var out=[], lastArea='', truncated=false;
+  for(var i=dataStart;i<aoa.length;i++){
+    var line=aoa[i]||[];
+    var rawName=_rgpCleanText(line[colMap.name],80);
+    if(!rawName) continue;
+    if(/^(합\s*계|소\s*계|총\s*계|계)$/.test(rawName)||/^\d+\s*개\s*(업체|기업|사)$/.test(rawName)||/(참여\s*기업|근로자\s*수)$/.test(rawName)) continue;
+    if(out.length>=RGP_MAX_ROWS){ truncated=true; break; }
+    var area=colMap.area!==undefined?_rgpCleanText(String(line[colMap.area]||'').replace(/\s*\/\s*/g,''),30):'';
+    if(area) lastArea=area; else area=lastArea;
+    var bzRaw=colMap.biz_no!==undefined?String(line[colMap.biz_no]==null?'':line[colMap.biz_no]).trim():'';
+    var bzDig=bzRaw.replace(/\D/g,'');
+    var bizNo=bzDig.length===10?(bzDig.slice(0,3)+'-'+bzDig.slice(3,5)+'-'+bzDig.slice(5)):_rgpCleanText(bzRaw,20);
+    var empVal=colMap.emp!==undefined?line[colMap.emp]:'';
+    var empNum=parseFloat(String(empVal==null?'':empVal).replace(/,/g,''));
+    var emp=isFinite(empNum)&&empNum>0?Math.round(empNum):0;
+    var eiFromExcel=false;
+    if(eiMonthCols.length){
+      var mSum=0, mCnt=0;
+      eiMonthCols.forEach(function(mc){
+        var mv=parseFloat(String(line[mc]==null?'':line[mc]).replace(/,/g,''));
+        if(isFinite(mv)&&mv>=0){ mSum+=mv; mCnt++; }
+      });
+      if(mCnt>0){
+        eiFromExcel=true;
+        if(!emp) emp=Math.round(mSum/mCnt);
+      }
+    }
+    if(!emp&&colMap.ei_avg!==undefined){
+      var av=parseFloat(String(line[colMap.ei_avg]==null?'':line[colMap.ei_avg]).replace(/,/g,''));
+      if(isFinite(av)&&av>0){ emp=Math.round(av); eiFromExcel=true; }
+    }
+    var ox={};
+    var setOxFrom=function(itemId,ci,treatTextAsO){
+      if(ci===undefined) return;
+      var raw=String(line[ci]==null?'':line[ci]).trim();
+      if(!raw) return;
+      if(treatTextAsO&&/소기업|중기업|소상공인|중소기업/.test(raw)){ ox[itemId]='O'; return; }
+      if(treatTextAsO&&itemId==='fin_sales'&&/\d+\s*억|\d{4,}/.test(raw)&&!/없음|미제출/.test(raw)){ ox[itemId]='O'; return; }
+      ox[itemId]=rgpNormOx(raw);
+    };
+    setOxFrom('apply',colMap.ox_apply,false);
+    setOxFrom('bizreg',colMap.ox_bizreg,false);
+    setOxFrom('corpreg',colMap.ox_corpreg,false);
+    setOxFrom('smecert',colMap.ox_smecert,true);
+    if(colMap.ox_ei_list!==undefined){
+      var eiRaw=String(line[colMap.ox_ei_list]==null?'':line[colMap.ox_ei_list]).trim();
+      if(eiRaw){
+        var eiNum=parseFloat(eiRaw.replace(/,/g,''));
+        ox.ei_list=(isFinite(eiNum)&&eiNum>0)?'O':rgpNormOx(eiRaw);
+      }
+    }else if(colMap.ei_avg!==undefined){
+      var avgRaw=String(line[colMap.ei_avg]==null?'':line[colMap.ei_avg]).trim();
+      if(avgRaw) ox.ei_list=rgpNormOx(avgRaw);
+    }else if(eiFromExcel){
+      ox.ei_list='O';
+    }
+    setOxFrom('wrep',colMap.ox_wrep,false);
+    setOxFrom('stamp',colMap.ox_stamp,false);
+    setOxFrom('fin_sales',colMap.ox_fin_sales,true);
+    setOxFrom('contrib_seal',colMap.ox_contrib_seal,false);
+    setOxFrom('contact_info',colMap.ox_contact_info,false);
+    var cname=colMap.cname!==undefined?_rgpCleanText(line[colMap.cname],30):'';
+    var cpos=colMap.cpos!==undefined?_rgpCleanText(line[colMap.cpos],30):'';
+    var phone=colMap.phone!==undefined?_rgpCleanText(line[colMap.phone],40):(colMap.tel!==undefined?_rgpCleanText(line[colMap.tel],40):'');
+    var email=colMap.email!==undefined?_rgpCleanText(line[colMap.email],80):'';
+    var ceo=colMap.ceo!==undefined?_rgpCleanText(line[colMap.ceo],40):'';
+    var wrep=colMap.wrep!==undefined?_rgpCleanText(line[colMap.wrep],40):'';
+    var sales=colMap.sales!==undefined?_rgpCleanText(line[colMap.sales],30):'';
+    if(!ox.contact_info&&cname&&PM_MAIL_RE.test(email)&&wrep) ox.contact_info='O';
+    out.push({
+      area:area, name:rawName, biz_no:bizNo, ceo:ceo, wrep:wrep,
+      emp:emp||'', sales:sales, cname:cname, cpos:cpos, phone:phone, email:email,
+      eiFromExcel:eiFromExcel, ox:ox
+    });
+  }
+  if(truncated) out._truncated=true;
+  return out;
+}
+/* 주관기관(상공회의소·지자체) 담당자에게 보낼 메일 제목·본문 생성 — 순수 함수(검사 대상) */
+function rgpBuildAgencyMail(f,state){
+  f=f||{}; state=state||{};
+  var fn=String(f.name||f.short_name||'지역공동근로복지기금').trim()+(f.name_temp?'(가칭)':'');
+  var ag=state.agency||{}, opts=state.opts||{incList:true,incOx:true,incReg:false};
+  var docSel=state.docSel||{};
+  var org=String(ag.org||'').trim(), rName=String(ag.name||'').trim(), rPos=String(ag.pos||'').trim();
+  var who=rName?((org?org+' ':'')+rName+(rPos?' '+rPos:'')+'님'):(org?org+' 담당자님':'담당자님');
+  var mgr=String(state.mgr||(f.mgr_main&&f.mgr_main.name)||f.manager||'').trim();
+  var selItems=RGP_ITEMS.filter(function(it){ return !!docSel[it.id]; });
+  var rows=state.rows||[];
+  var L=[who+' 안녕하세요.', mgr?('푸른노무법인 '+mgr+'입니다.'):'푸른노무법인입니다.',''];
+  L.push(fn+' 설립을 위한 참여기업 요청서류 리스트 및 서류 수합 체크사항 보내드립니다.');
+  var secNo=0;
+  if(opts.incList!==false&&selItems.length){
+    secNo++;
+    L.push('','■ '+secNo+'. 참여기업별 설립 요청서류 및 기초 확인사항 ('+selItems.length+'종)');
+    selItems.forEach(function(it,idx){
+      L.push('[ ] '+(idx+1)+'. '+it.title);
+    });
+  }
+  if(opts.incReg){
+    secNo++;
+    L.push('','■ '+secNo+'. 법인 설립등기 시 선임 등기이사 준비서류 (선임된 노·사 이사 소속 기업만 해당)');
+    RGP_REG_DOCS.forEach(function(t,idx){
+      L.push('[ ] '+(idx+1)+'. '+t);
+    });
+  }
+  var doneCnt=0, pendCnt=0;
+  if(opts.incOx!==false){
+    secNo++;
+    if(rows.length){
+      var rowLines=rows.map(function(r,idx){
+        var sm=rgpRowSummary(r.effOx||{},selItems.length?docSel:null);
+        if(sm.allDone){ doneCnt++; return '- '+(idx+1)+'. '+r.name+': 수합완료(O)'; }
+        pendCnt++;
+        var parts=[];
+        if(sm.miss.length) parts.push('미제출(X): '+sm.miss.map(function(x){ return x.short; }).join(', '));
+        if(sm.hold.length) parts.push('보완(△): '+sm.hold.map(function(x){ return x.short; }).join(', '));
+        return '- '+(idx+1)+'. '+r.name+' (O '+sm.nO+'/'+sm.effTot+'종) — '+parts.join(' / ');
+      });
+      L.push('','■ '+secNo+'. 참여기업별 서류 수합 OX 체크 현황 (총 '+rows.length+'개사 · 완료 '+doneCnt+'곳 · 미비 '+pendCnt+'곳)');
+      rowLines.forEach(function(ln){ L.push(ln); });
+    }else{
+      L.push('','■ '+secNo+'. 참여기업 명단 및 서류 수합 OX 체크표 회신 안내');
+      L.push('- 참여(예정)기업 명단(기업명·사업자번호·대표자·근로자대표·담당자 연락처/이메일·직전연도 고용보험 인원·직전매출액)과 수합 현황(O/X)을 첨부 수합표 엑셀에 표시해 회신해 주시면 감사하겠습니다.');
+    }
+  }
+  if(ag.note&&String(ag.note).trim()){
+    L.push('','※ 안내 메모: '+String(ag.note).trim());
+  }
+  L.push('','감사합니다.','푸른노무법인 드림');
+  var subj='[푸른노무법인] '+(org?org+' ':'')+fn+' 설립 참여기업 요청서류 및 수합 체크리스트 안내';
+  return {subject:subj, body:L.join('\n'), nReq:selItems.length, stats:{total:rows.length, done:doneCnt, pending:pendCnt}};
+}
+/* 개별 참여기업 담당자에게 보낼 미제출(X)·보완(△) 서류 요청 메일 — 순수 함수(검사 대상) */
+function rgpBuildSiteMail(f,row,oxMap,docSel,opts){
+  f=f||{}; row=row||{}; oxMap=oxMap||{}; opts=opts||{};
+  var fn=String(f.name||f.short_name||'지역공동근로복지기금').trim()+(f.name_temp?'(가칭)':'');
+  var cn=String(row.name||'').trim();
+  var who=row.cname?(String(row.cname).trim()+(row.cpos?' '+String(row.cpos).trim():'')+'님'):(cn?cn+' 담당자님':'담당자님');
+  var mgr=String(opts.mgr||(f.mgr_main&&f.mgr_main.name)||f.manager||'').trim();
+  var items=RGP_ITEMS.filter(function(it){ return !docSel||!!docSel[it.id]; });
+  var todo=[], done=[];
+  items.forEach(function(it){
+    var v=rgpNormOx(oxMap[it.id]);
+    if(v==='O') done.push(it.short);
+    else if(v==='-') return;
+    else todo.push({it:it, v:v});
+  });
+  var L=[who+' 안녕하세요.', mgr?('푸른노무법인 '+mgr+'입니다.'):'푸른노무법인입니다.',''];
+  L.push(fn+' 설립 참여기업 필요서류 요청드립니다.');
+  L.push('','■ 제출 요청서류 ('+todo.length+'종)');
+  if(!todo.length){
+    L.push('- 모든 요청서류(O)가 확인되었습니다. 추가로 제출하실 서류가 없습니다.');
+  }else{
+    todo.forEach(function(x,idx){
+      L.push('[ ] '+(idx+1)+'. '+x.it.title+(x.v==='△'?' [보완요청]':''));
+    });
+  }
+  if(opts.incReg){
+    L.push('','■ 법인 설립등기 시 선임 등기이사 준비서류 (등기이사 선임 시에만 해당)');
+    RGP_REG_DOCS.forEach(function(t,idx){ L.push('[ ] '+(idx+1)+'. '+t); });
+  }
+  if(done.length){
+    L.push('','※ 제출 확인 완료(O): '+done.join(', '));
+  }
+  L.push('','감사합니다.','푸른노무법인 드림');
+  var cp=cn.replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s/g,''), dup=!!cp&&fn.replace(/\s/g,'').indexOf(cp)>=0;
+  var subj='[푸른노무법인] '+((cn&&!dup)?cn+' ':'')+fn+' 설립 필요서류 요청';
+  return {subject:subj, body:L.join('\n'), nTodo:todo.length, todoList:todo, doneList:done};
+}
+/* 3시트 엑셀(요청서류리스트 · 기업별_OX수합현황 · 도장제작명단) 데이터 생성 — 순수 함수(검사 대상) */
+function rgpBuildWorkbookData(f,state){
+  f=f||{}; state=state||{};
+  var fn=String(f.name||f.short_name||'지역공동근로복지기금').trim();
+  var docSel=state.docSel||{};
+  var selItems=RGP_ITEMS.filter(function(it){ return !!docSel[it.id]; });
+  if(!selItems.length) selItems=RGP_ITEMS.slice();
+  var s1=[
+    [fn+' 설립 — 참여기업 요청서류 및 기초자료 체크리스트'],
+    [],
+    ['순번','구분(준비 주체)','요청서류 및 확인사항','요청포함','비고']
+  ];
+  RGP_ITEMS.forEach(function(it,idx){
+    s1.push([idx+1, it.who, it.title, docSel[it.id]?'O':'선택', it.id==='corpreg'?'개인사업자는 면제(-)':(it.id==='contrib_seal'?'기금 제공 양식에 날인':'필수 확인')]);
+  });
+  s1.push([]);
+  s1.push(['[법인 설립등기 단계 — 선임 등기이사(노·사) 소속 기업만 해당]']);
+  RGP_REG_DOCS.forEach(function(t,idx){
+    s1.push([idx+1, '근로자·사용자 등기이사 (노1·사1)', t, state.opts&&state.opts.incReg?'O':'별도안내', '등기이사 선임 기업만 준비']);
+  });
+  var hdr2=['연번','지역(시·군)','기업명(상호)','사업자등록번호','대표자(사)','근로자대표(노)','고용보험 평균인원','직전매출액(억)','담당자','직위','연락처(휴대폰)','담당자 이메일']
+    .concat(RGP_ITEMS.map(function(it){ return it.col; }))
+    .concat(['완료(O) 수','미비(X/△) 수','수합상태']);
+  var s2=[[fn+' — 참여기업별 설립서류 OX 수합 현황표'], ['※ 표시 기준: O(제출완료) / X(미제출) / △(보완필요) / -(개인사업자 등 면제)'], hdr2];
+  var rows=state.rows||[];
+  if(rows.length){
+    rows.forEach(function(r,idx){
+      var ox=r.effOx||{};
+      var sm=rgpRowSummary(ox,docSel);
+      s2.push([
+        idx+1, r.area||'', r.name||'', r.biz_no||'', r.ceo||'', r.wrep||'', r.emp||'', r.sales||'',
+        r.cname||'', r.cpos||'', r.phone||'', r.email||''
+      ].concat(RGP_ITEMS.map(function(it){ return rgpNormOx(ox[it.id]); }))
+       .concat([sm.nO, sm.nX+sm.nTri, sm.allDone?'완비':'수합중']));
+    });
+  }else{
+    for(var b=1;b<=35;b++){
+      s2.push([b,'','','','','','','','','','',''].concat(RGP_ITEMS.map(function(){ return ''; })).concat(['','','']));
+    }
+  }
+  var sealName=fn.replace(/\(가칭\)/g,'').trim()+' 인';
+  var s3=[
+    [fn+' — 설립서류 날인용 필요도장 목록'],
+    ['기금 법인직인', sealName, '사각형 법인직인 (2.5cm × 2.5cm)', '', '등기이사 외 일반 준비위원은 막도장 가능(동의서 징구)'],
+    [],
+    ['연번','기업명(상호)','사용자측 대표자 성명 (사 1부)','근로자측 대표자 성명 (노 1부)','도장·동의서 수합(O/X)','비고']
+  ];
+  if(rows.length){
+    rows.forEach(function(r,idx){
+      var ox=r.effOx||{};
+      s3.push([idx+1, r.name||'', r.ceo||'', r.wrep||'', rgpNormOx(ox.stamp), '']);
+    });
+  }else{
+    for(var d=1;d<=35;d++) s3.push([d,'','','','','']);
+  }
+  var safeFn=fn.replace(/[\\/:*?"<>|]/g,'_');
+  return {
+    fileName:safeFn+'_설립요청서류_OX수합현황.xlsx',
+    sheets:[
+      {name:'1_요청서류리스트', aoa:s1},
+      {name:'2_기업별_OX수합현황', aoa:s2},
+      {name:'3_도장제작명단', aoa:s3}
+    ]
+  };
+}
+/* 사업자등록번호 불일치 시 상호 오매칭 원천 차단 — 양쪽 모두 10자리 사업자번호가 있으면 번호가 같을 때만 같은 기업으로 본다 */
+function _rgpSameCompany(bzA,nmA,bzB,nmB){
+  var normCo=function(s){ return String(s||'').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s+/g,'').toLowerCase(); };
+  var dA=String(bzA||'').replace(/\D/g,''), dB=String(bzB||'').replace(/\D/g,'');
+  if(dA.length===10&&dB.length===10) return dA===dB;
+  var nA=normCo(nmA), nB=normCo(nmB);
+  return !!(nA&&nA===nB);
+}
+function _rgpMergeRows(sites,regData,cardIdx,docChkAll,today){
+  sites=sites||[]; regData=regData||{}; cardIdx=cardIdx||[]; docChkAll=docChkAll||{};
+  var savedOx=regData.ox||{}, extra=regData.extraRows||{}, rowMeta=regData.rowMeta||{};
+  var rows=[], usedExtra={};
+  /* 1) 참여사업장(sites) 활성 목록 */
+  var activeSites=sites.filter(_rgpIsActiveSite);
+  activeSites.forEach(function(s){
+    var sid=String(s._id);
+    var pc=typeof _primaryContact==='function'?_primaryContact(s):{list:s.contacts||[],idx:0};
+    var c0=(pc.list&&pc.list.length)?(pc.list[pc.idx>=0?pc.idx:0]||{}):{};
+    var wr=typeof _siteWrep==='function'?_siteWrep(s):{name:s.worker_rep||''};
+    var bizCard=(cardIdx.length&&typeof _siteCardMatch==='function')?_siteCardMatch(s,cardIdx):null;
+    if(bizCard&&!_rgpSameCompany(s.biz_no,s.name,bizCard.bz,bizCard.c)) bizCard=null;
+    var exMatch=null, exKey='', meta=rowMeta[sid]||{};
+    Object.keys(extra).forEach(function(ek){
+      if(usedExtra[ek]) return;
+      var er=extra[ek]||{};
+      if(_rgpSameCompany(s.biz_no,s.name,er.biz_no,er.name)){ exMatch=er; exKey=ek; }
+    });
+    if(exKey) usedExtra[exKey]=1;
+    var mergedOx=Object.assign({}, (exKey&&savedOx[exKey])||{}, savedOx[sid]||{});
+    var area=meta.area||'';
+    if(!area&&exMatch&&exMatch.area) area=exMatch.area;
+    else if(!area&&s.address){ var am=/(?:특별자치도|북도|남도|경기도|강원도|광역시|특별시)?\s*([가-힣]{2,5}(?:시|군|구))/.exec(s.address); if(am) area=am[1]; }
+    var rObj={
+      id:sid, fromSite:true, site:s,
+      area:area,
+      name:String(s.name||(exMatch&&exMatch.name)||'').trim(),
+      biz_no:String(s.biz_no||(exMatch&&exMatch.biz_no)||'').trim(),
+      ceo:String(s.ceo||(exMatch&&exMatch.ceo)||'').trim(),
+      wrep:String(wr.name||(exMatch&&exMatch.wrep)||'').trim(),
+      emp:num(s.company_size)||(exMatch&&exMatch.emp)||'',
+      sales:String(s.sales_prev||meta.sales||(exMatch&&exMatch.sales)||'').trim(),
+      cname:String(c0.name||(exMatch&&exMatch.cname)||'').trim(),
+      cpos:String(c0.position||c0.title||(exMatch&&exMatch.cpos)||'').trim(),
+      phone:String(c0.mobile||c0.phone||s.phone||(exMatch&&exMatch.phone)||'').trim(),
+      email:String(c0.email||(bizCard&&bizCard.e)||(exMatch&&exMatch.email)||'').trim(),
+      eiFromExcel:!!(meta.eiFromExcel||(exMatch&&exMatch.eiFromExcel)),
+      bizMatched:!!bizCard,
+      sent:(regData.site_sent&&regData.site_sent[sid])||null
+    };
+    rObj.savedOx=mergedOx;
+    rObj.docChk=docChkAll[sid]||{};
+    rObj.effOx=rgpEffectiveOx(rObj,mergedOx,rObj.docChk,rObj.bizMatched,today);
+    rows.push(rObj);
+  });
+  /* 2) 아직 sites 에 안 들어간 엑셀 수합·수동 추가 기업(extraRows) */
+  Object.keys(extra).sort().forEach(function(ek){
+    if(usedExtra[ek]||!_rgpSafeKey(ek)) return;
+    var er=extra[ek]||{};
+    if(!er.name) return;
+    var sv=savedOx[ek]||{};
+    var rObj={
+      id:ek, fromSite:false, site:null,
+      area:String(er.area||'').trim(),
+      name:String(er.name||'').trim(),
+      biz_no:String(er.biz_no||'').trim(),
+      ceo:String(er.ceo||'').trim(),
+      wrep:String(er.wrep||'').trim(),
+      emp:er.emp||'',
+      sales:String(er.sales||'').trim(),
+      cname:String(er.cname||'').trim(),
+      cpos:String(er.cpos||'').trim(),
+      phone:String(er.phone||'').trim(),
+      email:String(er.email||'').trim(),
+      eiFromExcel:!!er.eiFromExcel,
+      bizMatched:false,
+      sent:(regData.site_sent&&regData.site_sent[ek])||null,
+      savedOx:sv, docChk:{}
+    };
+    rObj.effOx=rgpEffectiveOx(rObj,sv,{},false,today);
+    rows.push(rObj);
+  });
+  rows.forEach(function(r,idx){ r.key='g'+idx; });
+  return rows;
+}
+function _rgpAgencyCands(orgName,cardIdx){
+  var out=[], seen={};
+  var q=_cardFundKey(orgName||'');
+  var add=function(e,n,ti,c){
+    e=String(e||'').trim(); if(!PM_MAIL_RE.test(e)) return;
+    var k=e.toLowerCase(); if(seen[k]) return; seen[k]=1;
+    out.push({email:e, name:String(n||'').trim(), pos:String(ti||'').trim(), org:String(c||'').trim()});
+  };
+  (cardIdx||[]).forEach(function(r){
+    if(!r||!r.e) return;
+    var ck=_cardFundKey(r.c||'');
+    if((q.length>=2&&ck.indexOf(q)>=0)||(/상공|회의소|도청|시청|군청|일자리|노동/.test(r.c||'')&&(!q||ck.indexOf(q.slice(0,2))>=0))){
+      add(r.e, r.n, r.ti, r.c);
+    }
+  });
+  return out;
+}
+function rgpOpen(fid){
+  fid=String(fid||S.fundId||SD.sel||'').trim();
+  if(!fid||!funds[fid]){ toast('기금을 먼저 선택해 주세요','warn'); return; }
+  var f=Object.assign({},funds[fid],{_id:fid});
+  var defSel={}; RGP_ITEMS.forEach(function(it){ defSel[it.id]=!!it.defOn; });
+  var fromSetup=!!SD.pop;
+  var G=RGP={
+    fid:fid, f:f, fromSetup:fromSetup, loading:true, shown:false, help:false,
+    mode:'agency', curKey:'g0', syncSitesOnImport:true,
+    agency:{org:rgpDefaultAgencyName(f), name:'', pos:'', email:'', note:'', sent_at:'', sent_by:''},
+    agCands:[], agPick:-1,
+    docSel:defSel, opts:{incList:true, incOx:true, incReg:false},
+    regData:{}, cardIdx:[], docChkAll:{}, sites:[], rows:[]
+  };
+  rgpRender();
+  var idxP=(typeof loadCardIdx==='function')?loadCardIdx().then(function(x){ return x||[]; },function(){ return []; }):Promise.resolve([]);
+  var siteP=_loadSites(fid).catch(function(){ return []; });
+  var regP=_rgpSafeKey(fid)?fbDb.ref(NS+'/regional_prep/'+fid).once('value').then(function(sn){ return sn.val()||{}; },function(){ return {}; }):Promise.resolve({});
+  var chkP=_rgpSafeKey(fid)?fbDb.ref(NS+'/site_doc_chk/'+fid).once('value').then(function(sn){ return sn.val()||{}; },function(){ return {}; }):Promise.resolve({});
+  return Promise.all([siteP, regP, chkP, idxP]).then(function(res){
+    if(RGP!==G) return;
+    G.sites=res[0]||[]; G.regData=res[1]||{}; G.docChkAll=res[2]||{}; G.cardIdx=res[3]||[];
+    if(G.regData.agency) G.agency=Object.assign({},G.agency,G.regData.agency);
+    if(!G.agency.org) G.agency.org=rgpDefaultAgencyName(f);
+    if(G.regData.docSel) G.docSel=Object.assign({},defSel,G.regData.docSel);
+    if(G.regData.opts) G.opts=Object.assign({},G.opts,G.regData.opts);
+    G.agCands=_rgpAgencyCands(G.agency.org, G.cardIdx);
+    if(!G.agency.email&&G.agCands.length===1&&G.agency.org&&_cardFundKey(G.agCands[0].org)===_cardFundKey(G.agency.org)){
+      G.agPick=0; G.agency.email=G.agCands[0].email;
+      if(!G.agency.name) G.agency.name=G.agCands[0].name;
+      if(!G.agency.pos) G.agency.pos=G.agCands[0].pos;
+    }
+    G.rows=_rgpMergeRows(G.sites, G.regData, G.cardIdx, G.docChkAll, ymd());
+    G.curKey=G.rows.length?G.rows[0].key:'';
+    G.loading=false;
+    rgpRender();
+  }).catch(function(e){
+    if(RGP===G){ G.loading=false; toast('수합 자료 로드 실패: '+((e&&e.message)||e),'err'); rgpRender(); }
+  });
+}
+function rgpSwitchFund(fid){
+  if(!fid||!funds[fid]) return;
+  rgpOpen(fid);
+}
+function rgpBack(){
+  var fid=RGP&&RGP.fid;
+  closeM();
+  if(fid&&funds[fid]&&typeof sdPop==='function'){ SD.sel=fid; sdPop(); }
+}
+function rgpHelp(){
+  if(!RGP) return;
+  RGP.help=!RGP.help;
+  var el=$('rgpHelp'), btn=$('rgpHelpBtn');
+  if(el) el.style.display=RGP.help?'block':'none';
+  if(btn&&btn.setAttribute) btn.setAttribute('aria-expanded',RGP.help?'true':'false');
+}
+function _rgpRowByKey(G,k){
+  var a=(G&&G.rows)||[];
+  for(var i=0;i<a.length;i++) if(a[i].key===k||a[i].id===k) return a[i];
+  return null;
+}
+function rgpSetMode(m){
+  if(!RGP) return;
+  RGP.mode=(m==='site')?'site':'agency';
+  if(RGP.mode==='site'&&!_rgpRowByKey(RGP,RGP.curKey)&&RGP.rows.length) RGP.curKey=RGP.rows[0].key;
+  rgpRender();
+}
+function rgpSelRow(rKey){
+  var G=RGP; if(!G) return;
+  var r=_rgpRowByKey(G,rKey); if(!r) return;
+  G.curKey=r.key;
+  if(G.mode!=='site'){ G.mode='site'; rgpRender(); return; }
+  G.rows.forEach(function(x){
+    var tr=$('rgpTr_'+x.key);
+    if(tr){
+      tr.style.background=(x.key===G.curKey)?'var(--acc-soft)':'';
+      if(x.key===G.curKey){ if(tr.setAttribute) tr.setAttribute('aria-current','true'); }
+      else if(tr.removeAttribute) tr.removeAttribute('aria-current');
+    }
+  });
+  rgpRefreshPreview();
+}
+function rgpRowKey(ev,rKey){
+  if(!ev) return;
+  if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); rgpSelRow(rKey); }
+}
+function _rgpSaveSub(subPath,val){
+  var G=RGP; if(!G||!_rgpSafeKey(G.fid)) return Promise.resolve();
+  return fbDb.ref(NS+'/regional_prep/'+G.fid+'/'+subPath).set(val);
+}
+function rgpAgencyPick(v){
+  var G=RGP; if(!G) return;
+  var idx=parseInt(v,10);
+  if(isFinite(idx)&&idx>=0&&G.agCands[idx]){
+    G.agPick=idx;
+    var c=G.agCands[idx];
+    G.agency.email=c.email;
+    if(c.name) G.agency.name=c.name;
+    if(c.pos) G.agency.pos=c.pos;
+    if(c.org&&!G.agency.org) G.agency.org=c.org;
+    _rgpSaveSub('agency',G.agency).catch(function(){});
+    rgpRender();
+  }else{
+    G.agPick=-1;
+    rgpRender();
+  }
+}
+function rgpAgencyField(field,val){
+  var G=RGP; if(!G) return;
+  if(['org','name','pos','email','note'].indexOf(field)<0) return;
+  G.agency[field]=_rgpCleanText(val,field==='note'?200:80);
+  if(field==='org') G.agCands=_rgpAgencyCands(G.agency.org,G.cardIdx);
+  rgpRefreshPreview();
+}
+function rgpSaveAgency(){
+  var G=RGP; if(!G) return;
+  _rgpSaveSub('agency',G.agency).catch(function(e){ toast('주관기관 정보 저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpDocSel(itemId,checked){
+  var G=RGP; if(!G||!_rgpSafeKey(itemId)) return;
+  G.docSel[itemId]=!!checked;
+  _rgpSaveSub('docSel',G.docSel).catch(function(){});
+  var allCk=$('rgpDocAllCk');
+  if(allCk) allCk.checked=RGP_ITEMS.every(function(it){ return !!G.docSel[it.id]; });
+  var cntEl=$('rgpReqCnt');
+  if(cntEl) cntEl.textContent=RGP_ITEMS.filter(function(it){ return !!G.docSel[it.id]; }).length+'/'+RGP_ITEMS.length+'종 선택';
+  G.rows.forEach(function(r){ _rgpRefreshRowStatDom(G,r); });
+  _rgpRefreshKpiDom(G);
+  rgpRefreshPreview();
+}
+function rgpDocSelAll(checked){
+  var G=RGP; if(!G) return;
+  RGP_ITEMS.forEach(function(it){ G.docSel[it.id]=!!checked; });
+  _rgpSaveSub('docSel',G.docSel).catch(function(){});
+  rgpRender();
+}
+function rgpOpt(k,checked){
+  var G=RGP; if(!G||['incList','incOx','incReg'].indexOf(k)<0) return;
+  G.opts[k]=!!checked;
+  _rgpSaveSub('opts',G.opts).catch(function(){});
+  rgpRefreshPreview();
+}
+function _rgpOxBtnStyle(v){
+  var c=rgpNormOx(v);
+  if(c==='O') return {cls:'chip ok', txt:'O', tip:'제출완료(O) — 클릭하여 상태 변경'};
+  if(c==='△') return {cls:'chip warn', txt:'△', tip:'보완필요(△) — 클릭하여 상태 변경'};
+  if(c==='-') return {cls:'chip', txt:'개인', tip:'개인사업자·면제(-) — 클릭하여 상태 변경'};
+  return {cls:'chip dg', txt:'X', tip:'미제출(X) — 클릭하여 O/△ 전환'};
+}
+function _rgpRefreshRowStatDom(G,r){
+  var sm=rgpRowSummary(r.effOx,G.docSel);
+  var stEl=$('rgpRst_'+r.key);
+  if(stEl){
+    stEl.innerHTML=sm.allDone?'<span class="chip ok" style="font-size:10.5px">완비 '+sm.nO+'/'+sm.effTot+'</span>'
+      :'<span class="chip warn" style="font-size:10.5px">O '+sm.nO+'/'+sm.effTot+' · 미비 '+(sm.nX+sm.nTri)+'</span>';
+  }
+}
+function _rgpRefreshKpiDom(G){
+  var kp=$('rgpOxKpi'); if(!kp) return;
+  var doneN=0, pendN=0;
+  G.rows.forEach(function(r){ if(rgpRowSummary(r.effOx,G.docSel).allDone) doneN++; else pendN++; });
+  kp.textContent='총 '+G.rows.length+'개사 · 완비 '+doneN+'곳 · 수합중 '+pendN+'곳';
+}
+function rgpToggleOx(rKey,itemId){
+  var G=RGP; if(!G||!_rgpSafeKey(itemId)) return;
+  var r=_rgpRowByKey(G,rKey); if(!r||!_rgpSafeKey(r.id)) return;
+  var def=RGP_ITEMS.filter(function(it){ return it.id===itemId; })[0]; if(!def) return;
+  var prevEff=r.effOx[itemId], hadSaved=Object.prototype.hasOwnProperty.call(r.savedOx||{},itemId), prevSaved=r.savedOx[itemId];
+  var nx=rgpNextOx(prevEff, !!def.allowDash);
+  r.effOx[itemId]=nx;
+  r.savedOx[itemId]=nx;
+  if(!G.regData.ox) G.regData.ox={};
+  if(!G.regData.ox[r.id]) G.regData.ox[r.id]={};
+  G.regData.ox[r.id][itemId]=nx;
+  var btn=$('rgpCell_'+r.key+'_'+itemId);
+  if(btn){
+    var bs=_rgpOxBtnStyle(nx);
+    btn.className=bs.cls;
+    btn.textContent=bs.txt;
+    btn.title=def.col+': '+bs.tip;
+    if(btn.setAttribute) btn.setAttribute('aria-label',r.name+' '+def.col+' 현재 '+bs.txt);
+  }
+  _rgpRefreshRowStatDom(G,r);
+  _rgpRefreshKpiDom(G);
+  rgpRefreshPreview();
+  _rgpSaveSub('ox/'+r.id+'/'+itemId, nx).catch(function(e){
+    r.effOx[itemId]=prevEff;
+    if(hadSaved){ r.savedOx[itemId]=prevSaved; if(G.regData.ox&&G.regData.ox[r.id]) G.regData.ox[r.id][itemId]=prevSaved; }
+    else { delete r.savedOx[itemId]; if(G.regData.ox&&G.regData.ox[r.id]) delete G.regData.ox[r.id][itemId]; }
+    if(RGP===G) rgpRender();
+    toast('체크 저장 실패: '+((e&&e.message)||e),'err');
+  });
+}
+function rgpSetRowAllOx(rKey,val){
+  var G=RGP; if(!G) return;
+  var r=_rgpRowByKey(G,rKey); if(!r||!_rgpSafeKey(r.id)) return;
+  var v=rgpNormOx(val), patch={};
+  RGP_ITEMS.forEach(function(it){
+    if(v==='O'&&it.id==='corpreg'&&r.effOx.corpreg==='-') patch[it.id]='-';
+    else patch[it.id]=v;
+  });
+  _rgpSaveSub('ox/'+r.id, patch).then(function(){
+    if(RGP!==G) return;
+    RGP_ITEMS.forEach(function(it){ r.effOx[it.id]=patch[it.id]; r.savedOx[it.id]=patch[it.id]; });
+    if(!G.regData.ox) G.regData.ox={};
+    G.regData.ox[r.id]=patch;
+    rgpRender();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpSetColAllOx(itemId,val){
+  var G=RGP; if(!G||!_rgpSafeKey(itemId)||!G.rows.length) return;
+  var v=rgpNormOx(val), updates={}, targets=[];
+  G.rows.forEach(function(r){
+    if(!_rgpSafeKey(r.id)) return;
+    updates[r.id+'/'+itemId]=v;
+    targets.push(r);
+  });
+  if(!targets.length) return;
+  fbDb.ref(NS+'/regional_prep/'+G.fid+'/ox').update(updates).then(function(){
+    if(RGP!==G) return;
+    if(!G.regData.ox) G.regData.ox={};
+    targets.forEach(function(r){
+      r.effOx[itemId]=v; r.savedOx[itemId]=v;
+      if(!G.regData.ox[r.id]) G.regData.ox[r.id]={};
+      G.regData.ox[r.id][itemId]=v;
+    });
+    rgpRender();
+  }).catch(function(e){ toast('일괄 변경 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpAutoSyncOx(){
+  var G=RGP; if(!G) return;
+  if(!G.rows.length){ toast('연동할 참여기업 목록이 없습니다 — 먼저 기업을 등록하거나 수합 엑셀을 불러오세요','warn'); return; }
+  var updates={}, changes=[], cnt=0, today=ymd();
+  G.rows.forEach(function(r){
+    if(!_rgpSafeKey(r.id)) return;
+    var inf=rgpInferRowOx(r,r.docChk,r.bizMatched,today);
+    RGP_ITEMS.forEach(function(it){
+      if(inf[it.id]==='O'&&r.effOx[it.id]!=='O'){
+        updates[r.id+'/'+it.id]='O';
+        changes.push({r:r, id:it.id});
+        cnt++;
+      }
+    });
+  });
+  if(!cnt){ toast('추가로 자동 체크할 입수·확인 서류가 없습니다'); return; }
+  fbDb.ref(NS+'/regional_prep/'+G.fid+'/ox').update(updates).then(function(){
+    if(RGP!==G) return;
+    if(!G.regData.ox) G.regData.ox={};
+    changes.forEach(function(ch){
+      ch.r.effOx[ch.id]='O'; ch.r.savedOx[ch.id]='O';
+      if(!G.regData.ox[ch.r.id]) G.regData.ox[ch.r.id]={};
+      G.regData.ox[ch.r.id][ch.id]='O';
+    });
+    _audit(G.fid,'지역공동기금 OX 자동반영','기금·메일·기업정보함 확인분 '+cnt+'건 O 반영');
+    toast('기금·메일함·기업정보함 보유 자료 '+cnt+'건을 O(완료)로 반영했습니다');
+    rgpRender();
+  }).catch(function(e){ toast('자동 반영 저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpAddRowInline(){
+  var G=RGP; if(!G||!_rgpSafeKey(G.fid)) return;
+  var targetFid=G.fid;
+  var nmEl=$('rgpNewNm'), emEl=$('rgpNewEm'), cnEl=$('rgpNewCn'), wrEl=$('rgpNewWr'), ceEl=$('rgpNewCeo'), arEl=$('rgpNewAr');
+  var nm=_rgpCleanText(nmEl&&nmEl.value,80);
+  if(!nm){ toast('추가할 기업명(상호)을 입력해 주세요','warn'); if(nmEl&&nmEl.focus) nmEl.focus(); return; }
+  var em=_rgpCleanText(emEl&&emEl.value,80);
+  if(em&&!PM_MAIL_RE.test(em)){
+    toast('올바른 담당자 이메일 주소 형식으로 입력해 주세요','warn');
+    if(emEl&&emEl.focus) emEl.focus();
+    return;
+  }
+  var ek='ex_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+  var rec={
+    area:_rgpCleanText(arEl&&arEl.value,30),
+    name:nm,
+    ceo:_rgpCleanText(ceEl&&ceEl.value,40),
+    wrep:_rgpCleanText(wrEl&&wrEl.value,40),
+    cname:_rgpCleanText(cnEl&&cnEl.value,30),
+    email:em,
+    biz_no:'', emp:'', sales:'', cpos:'', phone:''
+  };
+  var gate=(typeof askIfNotMine==='function')?askIfNotMine(G.f,'지역공동기금 기업 추가'):Promise.resolve(true);
+  gate.then(function(ok){
+    if(!ok||RGP!==G||G.fid!==targetFid) return;
+    return fbDb.ref(NS+'/regional_prep/'+targetFid+'/extraRows/'+ek).set(rec).then(function(){
+      if(RGP!==G||G.fid!==targetFid) return;
+      if(!G.regData.extraRows) G.regData.extraRows={};
+      G.regData.extraRows[ek]=rec;
+      G.rows=_rgpMergeRows(G.sites, G.regData, G.cardIdx, G.docChkAll, ymd());
+      G.curKey=G.rows[G.rows.length-1].key;
+      toast(nm+' 기업을 수합표에 추가했습니다');
+      rgpRender();
+    });
+  }).catch(function(e){ toast('기업 추가 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpDelExtraRow(rKey){
+  var G=RGP; if(!G) return;
+  var targetFid=G.fid;
+  var r=_rgpRowByKey(G,rKey); if(!r||r.fromSite||!_rgpSafeKey(r.id)) return;
+  confirmM('수합표 임시 기업 «'+r.name+'» 줄을 지울까요?\n(참여사업장 정식 명부는 건드리지 않습니다)',{danger:true,ok:'삭제'}).then(function(ok){
+    if(!ok||RGP!==G||G.fid!==targetFid) return;
+    var patch={};
+    patch['regional_prep/'+targetFid+'/extraRows/'+r.id]=null;
+    patch['regional_prep/'+targetFid+'/ox/'+r.id]=null;
+    return fbDb.ref(NS).update(patch).then(function(){
+      if(RGP!==G||G.fid!==targetFid) return;
+      if(G.regData.extraRows) delete G.regData.extraRows[r.id];
+      if(G.regData.ox) delete G.regData.ox[r.id];
+      G.rows=_rgpMergeRows(G.sites, G.regData, G.cardIdx, G.docChkAll, ymd());
+      G.curKey=G.rows.length?G.rows[0].key:'';
+      rgpRender();
+    });
+  }).catch(function(e){ toast('삭제 실패: '+((e&&e.message)||e),'err'); });
+}
+/* ── 보안 경계 제한 자체 .xlsx(OOXML) · .csv 리더 (구버전 SheetJS XLSX.read 미사용 · 프로토타입 오염/ReDoS/압축폭탄 차단) ── */
+function _rgpDecodeBytesUtf8(u8,allowEucKr){
+  if(!u8||!u8.length) return '';
+  var sub=(u8.length>=3&&u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF)?u8.subarray(3):u8;
+  if(typeof TextDecoder!=='undefined'){
+    if(allowEucKr){
+      try{ return new TextDecoder('utf-8',{fatal:true}).decode(sub); }
+      catch(_e){ try{ return new TextDecoder('euc-kr').decode(sub); }catch(_e2){} }
+    }
+    return new TextDecoder('utf-8').decode(sub);
+  }
+  var out='';
+  for(var i=0;i<sub.length;i++) out+=String.fromCharCode(sub[i]);
+  return out;
+}
+function _rgpDecodeXml(s){
+  if(!s) return '';
+  return String(s)
+    .replace(/_x([0-9A-Fa-f]{4})_/g,function(_,h){
+      var cp=parseInt(h,16);
+      return (cp===9||cp===10||cp===13||(cp>=32&&!(cp>=0xD800&&cp<=0xDFFF)))?String.fromCharCode(cp):' ';
+    })
+    .replace(/&(?:#[xX]([0-9A-Fa-f]{1,6})|#(\d{1,7})|(quot|apos|lt|gt|amp));/g,function(_m,hx,dc,nm){
+      if(nm){ return nm==='quot'?'"':nm==='apos'?"'":nm==='lt'?'<':nm==='gt'?'>':'&'; }
+      var cp=hx?parseInt(hx,16):parseInt(dc,10);
+      if(!(cp===9||cp===10||cp===13||(cp>=32&&cp<=0x10FFFF&&!(cp>=0xD800&&cp<=0xDFFF)))) return '';
+      return String.fromCodePoint?String.fromCodePoint(cp):String.fromCharCode(cp);
+    });
+}
+function _rgpXmlAttr(attrs,name){
+  if(!attrs) return '';
+  var escN=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  var re=new RegExp('(?:^|[\\s"\'])'+escN+'\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')','i');
+  var m=re.exec(attrs);
+  return m?_rgpDecodeXml(m[1]!==undefined?m[1]:m[2]):'';
+}
+function _rgpColIdx(ref){
+  var m=/^([A-Za-z]+)/.exec(String(ref||''));
+  if(!m) return -1;
+  var letters=m[1].toUpperCase(), idx=0;
+  for(var i=0;i<letters.length;i++){
+    idx=idx*26+(letters.charCodeAt(i)-64);
+    if(idx>RGP_MAX_COLS+5) return RGP_MAX_COLS+5;
+  }
+  return idx-1;
+}
+function _rgpEachXmlTag(xml,tagName,maxCount,onTag){
+  var openPat='<'+tagName, closePat='</'+tagName+'>', tLen=openPat.length, cLen=closePat.length;
+  var pos=0, cnt=0, n=xml?xml.length:0;
+  while(pos<n&&cnt<maxCount){
+    var s=xml.indexOf(openPat,pos);
+    if(s<0) break;
+    var ch=xml.charCodeAt(s+tLen);
+    if(ch!==32&&ch!==9&&ch!==10&&ch!==13&&ch!==47&&ch!==62){ pos=s+tLen; continue; }
+    var e=xml.indexOf('>',s+tLen);
+    if(e<0) break;
+    var raw=xml.slice(s+tLen,e);
+    var selfClose=raw.length>0&&raw.charCodeAt(raw.length-1)===47;
+    var attrs=selfClose?raw.slice(0,-1):raw;
+    var inner=null;
+    if(selfClose){
+      pos=e+1;
+    }else{
+      var ce=xml.indexOf(closePat,e+1);
+      if(ce<0) break;
+      inner=xml.slice(e+1,ce);
+      pos=ce+cLen;
+    }
+    cnt++;
+    if(onTag(attrs,inner)===false) break;
+  }
+}
+function _rgpStripXmlTag(xml,tagName){
+  if(!xml) return '';
+  var openPat='<'+tagName, closePat='</'+tagName+'>', out='', pos=0;
+  while(pos<xml.length){
+    var s=xml.indexOf(openPat,pos);
+    if(s<0){ out+=xml.slice(pos); break; }
+    var ch=xml.charCodeAt(s+openPat.length);
+    if(ch!==32&&ch!==9&&ch!==10&&ch!==13&&ch!==47&&ch!==62){ out+=xml.slice(pos,s+openPat.length); pos=s+openPat.length; continue; }
+    out+=xml.slice(pos,s);
+    var e=xml.indexOf('>',s+openPat.length);
+    if(e<0) break;
+    if(xml.charCodeAt(e-1)===47){ pos=e+1; continue; }
+    var ce=xml.indexOf(closePat,e+1);
+    if(ce<0) break;
+    pos=ce+closePat.length;
+  }
+  return out;
+}
+function _rgpExtractRichText(frag,pfx){
+  if(!frag) return '';
+  var clean=_rgpStripXmlTag(frag,(pfx||'')+'rPh'), parts=[];
+  _rgpEachXmlTag(clean,(pfx||'')+'t',200,function(_a,inner){
+    if(inner!==null) parts.push(_rgpDecodeXml(inner));
+  });
+  return parts.join('');
+}
+function _rgpNormZipPath(target){
+  var p=String(target||'').replace(/\\/g,'/').replace(/^\/+/,'').trim();
+  if(!p||/(?:^|\/)\.\.(?:\/|$)/.test(p)) return '';
+  if(!/^xl\//i.test(p)) p='xl/'+p.replace(/^\.\//,'');
+  return p;
+}
+function _rgpReadZipBytesBounded(zf,maxBytes){
+  if(!zf) return Promise.reject(new Error('엑셀 내부 시트 파일이 없습니다'));
+  var d=zf._data||{};
+  var decl=Number(d.uncompressedSize||zf.uncompressedSize||0)||0;
+  if(decl>maxBytes) return Promise.reject(new Error('압축 해제 전 파일 크기가 보안 상한을 초과합니다'));
+  if(typeof zf.internalStream==='function'){
+    return new Promise(function(resolve,reject){
+      var chunks=[], total=0, done=false, st=zf.internalStream('uint8array');
+      st.on('data',function(ch){
+        if(done) return;
+        total+=ch.length;
+        if(total>maxBytes){
+          done=true;
+          try{ if(typeof st.pause==='function') st.pause(); }catch(_e){}
+          reject(new Error('압축 해제 중 용량 상한 초과'));
+          return;
+        }
+        chunks.push(ch);
+      }).on('error',function(err){
+        if(!done){ done=true; reject(err); }
+      }).on('end',function(){
+        if(done) return;
+        done=true;
+        var out=new Uint8Array(total), off=0;
+        for(var i=0;i<chunks.length;i++){ out.set(chunks[i],off); off+=chunks[i].length; }
+        resolve(out);
+      });
+      if(typeof st.resume==='function') st.resume();
+    });
+  }
+  return zf.async('uint8array').then(function(b){
+    if(b.length>maxBytes) throw new Error('압축 해제 중 용량 상한 초과');
+    return b;
+  });
+}
+function _rgpParseCsvBytes(u8){
+  var txt=_rgpDecodeBytesUtf8(u8,true);
+  var rows=[], row=[], cur='', inQ=false, maxRows=RGP_MAX_ROWS+25;
+  for(var i=0;i<txt.length;i++){
+    var ch=txt.charAt(i);
+    if(inQ){
+      if(ch==='"'){
+        if(txt.charAt(i+1)==='"'){ cur+='"'; i++; }
+        else inQ=false;
+      }else{
+        cur+=ch;
+      }
+    }else{
+      if(ch==='"') inQ=true;
+      else if(ch===','){ if(row.length<RGP_MAX_COLS) row.push(cur); cur=''; }
+      else if(ch==='\r'||ch==='\n'){
+        if(ch==='\r'&&txt.charAt(i+1)==='\n') i++;
+        if(row.length<RGP_MAX_COLS) row.push(cur);
+        rows.push(row);
+        row=[]; cur='';
+        if(rows.length>=maxRows) break;
+      }else{
+        cur+=ch;
+      }
+    }
+  }
+  if((cur||row.length)&&rows.length<maxRows){
+    if(row.length<RGP_MAX_COLS) row.push(cur);
+    rows.push(row);
+  }
+  return [{name:'CSV', aoa:rows}];
+}
+function _rgpParseSheetXml(shXml,shared){
+  if(/<!ENTITY/i.test(shXml)) throw new Error('허용되지 않는 XML 엔티티가 포함되어 있습니다');
+  var nsM=/<([A-Za-z0-9_]+):worksheet\b/.exec(shXml);
+  var pfx=nsM?(nsM[1]+':'):'';
+  var aoa=[], maxRows=RGP_MAX_ROWS+25;
+  _rgpEachXmlTag(shXml,pfx+'row',maxRows,function(rAttrs,rInner){
+    var rNum=parseInt(_rgpXmlAttr(rAttrs,'r'),10);
+    if(isFinite(rNum)&&rNum>0){
+      while(aoa.length<rNum-1&&aoa.length<maxRows) aoa.push([]);
+    }
+    if(aoa.length>=maxRows) return false;
+    var rowArr=[], seqCol=0;
+    if(rInner){
+      _rgpEachXmlTag(rInner,pfx+'c',200,function(cAttrs,cInner){
+        var rRef=_rgpXmlAttr(cAttrs,'r');
+        var ci=rRef?_rgpColIdx(rRef):seqCol;
+        if(ci<0) ci=seqCol;
+        seqCol=ci+1;
+        if(ci>=RGP_MAX_COLS||cInner===null) return;
+        var cType=_rgpXmlAttr(cAttrs,'t'), val='';
+        if(cType==='inlineStr'){
+          _rgpEachXmlTag(cInner,pfx+'is',1,function(_ia,isInner){
+            val=_rgpExtractRichText(isInner,pfx);
+          });
+        }else if(cType==='e'){
+          val='';
+        }else{
+          var vRaw=null;
+          _rgpEachXmlTag(cInner,pfx+'v',1,function(_va,vInner){ vRaw=vInner; });
+          if(vRaw!==null){
+            if(cType==='s'){
+              var sIdx=parseInt(vRaw,10);
+              val=(isFinite(sIdx)&&sIdx>=0&&sIdx<shared.length)?shared[sIdx]:'';
+            }else if(cType==='b'){
+              val=String(vRaw).trim()==='1'?'O':'';
+            }else{
+              val=_rgpDecodeXml(vRaw);
+              if(cType!=='str'&&(val.indexOf('.')>=0||/[eE]/.test(val))){
+                var nv=Number(val);
+                if(isFinite(nv)) val=String(Math.round(nv*1e6)/1e6);
+              }
+            }
+          }
+        }
+        while(rowArr.length<ci) rowArr.push('');
+        rowArr[ci]=val;
+      });
+    }
+    aoa.push(rowArr);
+  });
+  /* 상단 머리글 구역(1~12행) 세로 병합 셀 값 전파 — 2줄 병합 머리글 지원 */
+  _rgpEachXmlTag(shXml,pfx+'mergeCell',500,function(mAttrs){
+    var ref=_rgpXmlAttr(mAttrs,'ref');
+    var mm=/^([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$/.exec(ref||'');
+    if(!mm) return;
+    var c1=_rgpColIdx(mm[1]), r1=parseInt(mm[2],10)-1, c2=_rgpColIdx(mm[3]), r2=parseInt(mm[4],10)-1;
+    if(c1<0||c1!==c2||c1>=RGP_MAX_COLS||r1<0||r2<=r1||r2>=Math.min(aoa.length,12)) return;
+    var topVal=(aoa[r1]&&aoa[r1][c1])||'';
+    if(!topVal) return;
+    for(var rr=r1+1;rr<=r2;rr++){
+      if(!aoa[rr]) aoa[rr]=[];
+      while(aoa[rr].length<=c1) aoa[rr].push('');
+      if(!aoa[rr][c1]) aoa[rr][c1]=topVal;
+    }
+  });
+  return aoa;
+}
+function rgpReadWorkbookSafe(buf,fileName){
+  var u8=(buf instanceof Uint8Array)?buf:new Uint8Array(buf||0);
+  if(!u8.byteLength) return Promise.reject(new Error('빈 파일입니다'));
+  if(u8.byteLength>RGP_MAX_XLSX) return Promise.reject(new Error('8MB 이하 파일만 불러올 수 있습니다'));
+  var isZip=(u8.length>=4&&u8[0]===0x50&&u8[1]===0x4B&&u8[2]===0x03&&u8[3]===0x04);
+  var isOle=(u8.length>=4&&u8[0]===0xD0&&u8[1]===0xCF&&u8[2]===0x11&&u8[3]===0xE0);
+  if(isOle||/\.xls$/i.test(fileName||'')){
+    return Promise.reject(new Error('구형 .xls 형식은 보안상 지원하지 않습니다 — 엑셀에서 .xlsx(통합 문서) 또는 .csv로 저장한 뒤 불러와 주세요'));
+  }
+  if(!isZip){
+    if(/\.csv$/i.test(fileName||'')) return Promise.resolve(_rgpParseCsvBytes(u8));
+    return Promise.reject(new Error('올바른 .xlsx 또는 .csv 파일이 아닙니다'));
+  }
+  var loadZip=(typeof _loadJsZip==='function')?_loadJsZip():Promise.reject(new Error('ZIP 리더를 불러올 수 없습니다'));
+  return loadZip.then(function(JSZ){
+    return JSZ.loadAsync(u8);
+  }).then(function(zip){
+    var fKeys=Object.keys(zip.files||{});
+    if(fKeys.length>250) throw new Error('엑셀 내부 항목 수가 보안 상한을 초과합니다');
+    var entryMap=Object.create(null);
+    fKeys.forEach(function(k){
+      var zf=zip.files[k];
+      if(zf&&!zf.dir) entryMap[k.replace(/\\/g,'/').replace(/^\/+/,'').toLowerCase()]=zf;
+    });
+    var budget=RGP_MAX_UNCOMP;
+    var readXml=function(lowPath){
+      var zf=entryMap[lowPath];
+      if(!zf) return Promise.resolve('');
+      var cap=Math.min(RGP_MAX_ENTRY, budget);
+      if(cap<=0) return Promise.reject(new Error('압축 해제 총량이 보안 상한을 초과합니다'));
+      return _rgpReadZipBytesBounded(zf,cap).then(function(bytes){
+        budget-=bytes.byteLength;
+        var xml=_rgpDecodeBytesUtf8(bytes,false);
+        if(/<!ENTITY/i.test(xml)) throw new Error('허용되지 않는 XML 엔티티가 포함되어 있습니다');
+        return xml;
+      });
+    };
+    return Promise.all([
+      readXml('xl/workbook.xml'),
+      readXml('xl/_rels/workbook.xml.rels'),
+      readXml('xl/sharedstrings.xml')
+    ]).then(function(meta){
+      var wbXml=meta[0], relsXml=meta[1], ssXml=meta[2];
+      var shared=[];
+      if(ssXml){
+        var ssNs=/<([A-Za-z0-9_]+):sst\b/.exec(ssXml);
+        var ssPfx=ssNs?(ssNs[1]+':'):'';
+        _rgpEachXmlTag(ssXml,ssPfx+'si',50000,function(_sa,siInner){
+          shared.push(_rgpExtractRichText(siInner,ssPfx));
+        });
+      }
+      var relMap=Object.create(null);
+      if(relsXml){
+        _rgpEachXmlTag(relsXml,'Relationship',120,function(rAttrs){
+          var rid=_rgpXmlAttr(rAttrs,'Id'), rTarget=_rgpXmlAttr(rAttrs,'Target'), rType=_rgpXmlAttr(rAttrs,'Type');
+          if(!rid||!rTarget) return;
+          if(rType&&!/worksheet/i.test(rType)) return;
+          var norm=_rgpNormZipPath(rTarget);
+          if(norm) relMap[rid]=norm.toLowerCase();
+        });
+      }
+      var sheetList=[];
+      if(wbXml){
+        var wbNs=/<([A-Za-z0-9_]+):workbook\b/.exec(wbXml);
+        var wbPfx=wbNs?(wbNs[1]+':'):'';
+        _rgpEachXmlTag(wbXml,wbPfx+'sheet',12,function(sAttrs){
+          var nm=_rgpXmlAttr(sAttrs,'name')||('시트'+(sheetList.length+1));
+          var rid=_rgpXmlAttr(sAttrs,'r:id')||_rgpXmlAttr(sAttrs,'id');
+          var p=(rid&&relMap[rid])||('xl/worksheets/sheet'+(sheetList.length+1)+'.xml');
+          if(entryMap[p]) sheetList.push({name:nm, path:p});
+        });
+      }
+      if(!sheetList.length){
+        Object.keys(entryMap).sort().forEach(function(p){
+          if(/^xl\/worksheets\/sheet\d+\.xml$/.test(p)&&sheetList.length<12){
+            sheetList.push({name:'시트'+(sheetList.length+1), path:p});
+          }
+        });
+      }
+      if(!sheetList.length) throw new Error('엑셀 워크시트를 찾을 수 없습니다');
+      var outSheets=[], seq=Promise.resolve();
+      sheetList.slice(0,12).forEach(function(sh){
+        seq=seq.then(function(){
+          return readXml(sh.path).then(function(shXml){
+            outSheets.push({name:sh.name, aoa:_rgpParseSheetXml(shXml,shared)});
+          });
+        });
+      });
+      return seq.then(function(){ return outSheets; });
+    });
+  });
+}
+function rgpPickImportFile(){
+  var el=$('rgpImpFile'); if(el) el.click();
+}
+function rgpImportFile(inp){
+  var G=RGP; if(!G||!inp||!inp.files||!inp.files[0]) return;
+  var targetFid=G.fid;
+  var file=inp.files[0]; inp.value='';
+  if(file.size>RGP_MAX_XLSX){ toast('8MB 이하 엑셀(.xlsx)·CSV 파일만 불러올 수 있습니다','warn'); return; }
+  if(/\.xls$/i.test(file.name||'')){
+    toast('구형 .xls 형식은 보안상 지원하지 않습니다 — 엑셀에서 .xlsx(통합 문서) 또는 .csv로 저장한 뒤 불러와 주세요','warn');
+    return;
+  }
+  var gate=(typeof askIfNotMine==='function')?askIfNotMine(G.f,'지역공동기금 수합엑셀 반영'):Promise.resolve(true);
+  return gate.then(function(ok){
+    if(!ok||RGP!==G||G.fid!==targetFid) return;
+    return new Promise(function(resolve,reject){
+      var reader=new FileReader();
+      reader.onload=function(ev){ resolve(ev&&ev.target?ev.target.result:null); };
+      reader.onerror=function(){ reject(new Error('파일을 읽지 못했습니다')); };
+      reader.readAsArrayBuffer(file);
+    }).then(function(buf){
+      if(!buf||RGP!==G||G.fid!==targetFid) return;
+      return rgpReadWorkbookSafe(buf, file.name);
+    }).then(function(sheets){
+      if(!sheets||RGP!==G||G.fid!==targetFid) return;
+      var parsed=[], pickedSheet='', wasTrunc=false;
+      var ordered=sheets.slice(0,12).sort(function(a,b){
+        var sa=/구비서류|OX|수합|제출현황|참여.*현황|참여신청/.test(a.name||'')?1:0;
+        var sb=/구비서류|OX|수합|제출현황|참여.*현황|참여신청/.test(b.name||'')?1:0;
+        return sb-sa;
+      });
+      ordered.forEach(function(sh){
+        var rows=rgpParseSheetRows(sh.aoa);
+        if(rows.length>parsed.length){ parsed=rows; pickedSheet=sh.name||'시트1'; wasTrunc=!!rows._truncated; }
+      });
+      if(!parsed.length){
+        toast('엑셀에서 «기업명(상호)» 열이 있는 참여기업 수합표를 찾지 못했습니다','warn');
+        return;
+      }
+      if(wasTrunc){
+        toast('최대 '+RGP_MAX_ROWS+'개사까지만 반영하여 초과 행은 생략했습니다','warn');
+      }
+      return _rgpApplyImportedRows(G, targetFid, parsed, pickedSheet, file.name);
+    });
+  }).catch(function(e){
+    toast('엑셀 읽기 오류: '+((e&&e.message)||e),'err');
+  });
+}
+function _rgpApplyImportedRows(G,targetFid,parsed,sheetName,fileName){
+  if(RGP!==G||G.fid!==targetFid||!_rgpSafeKey(targetFid)) return Promise.resolve();
+  var extra=Object.assign(Object.create(null),G.regData.extraRows||{});
+  var oxAll=Object.assign(Object.create(null),G.regData.ox||{});
+  var rowMeta=Object.assign(Object.create(null),G.regData.rowMeta||{});
+  var dbPatch=Object.create(null), newSitesN=0;
+  var siteFieldPatches=[], stagedNewSites=[];
+  parsed.forEach(function(pr,idx){
+    var validEmail=PM_MAIL_RE.test(pr.email||'')?pr.email:'';
+    var pool=G.sites.concat(stagedNewSites);
+    var matchSite=pool.filter(function(s){
+      return _rgpIsActiveSite(s)&&_rgpSameCompany(s.biz_no,s.name,pr.biz_no,pr.name);
+    })[0]||null;
+    var targetId='';
+    if(matchSite){
+      targetId=String(matchSite._id);
+      var isStaged=stagedNewSites.indexOf(matchSite)>=0;
+      if(G.syncSitesOnImport&&_rgpSafeKey(targetId)&&!isStaged){
+        var sPatch=Object.create(null), cLeaf=null;
+        if(!matchSite.biz_no&&pr.biz_no) sPatch.biz_no=pr.biz_no;
+        if(!matchSite.ceo&&pr.ceo) sPatch.ceo=pr.ceo;
+        if(!matchSite.worker_rep&&pr.wrep) sPatch.worker_rep=pr.wrep;
+        if(!matchSite.company_size&&pr.emp) sPatch.company_size=pr.emp;
+        if(!matchSite.sales_prev&&pr.sales) sPatch.sales_prev=pr.sales;
+        if(pr.cname||validEmail||pr.phone){
+          if(!Array.isArray(matchSite.contacts)||!matchSite.contacts.length){
+            sPatch.contacts=[{name:pr.cname||'',position:pr.cpos||'',mobile:pr.phone||'',email:validEmail,isPrimary:true}];
+          }else{
+            var pc=(typeof _primaryContact==='function')?_primaryContact(matchSite):{list:matchSite.contacts,idx:0};
+            var pIdx=(pc.idx>=0&&pc.idx<matchSite.contacts.length&&matchSite.contacts[pc.idx])?pc.idx:0;
+            var c0=matchSite.contacts[pIdx]||{};
+            var cf=Object.create(null), cHas=false;
+            if(!c0.name&&pr.cname){ cf.name=pr.cname; cHas=true; }
+            if(!c0.position&&!c0.title&&pr.cpos){ cf.position=pr.cpos; cHas=true; }
+            if(!c0.mobile&&!c0.phone&&pr.phone){ cf.mobile=pr.phone; cHas=true; }
+            if(!c0.email&&validEmail){ cf.email=validEmail; cHas=true; }
+            if(cHas){
+              cLeaf={idx:pIdx, fields:cf};
+              Object.keys(cf).forEach(function(ck){
+                dbPatch['sites/'+targetFid+'/'+targetId+'/contacts/'+pIdx+'/'+ck]=cf[ck];
+              });
+            }
+          }
+        }
+        Object.keys(sPatch).forEach(function(sk){
+          dbPatch['sites/'+targetFid+'/'+targetId+'/'+sk]=sPatch[sk];
+        });
+        if(Object.keys(sPatch).length||cLeaf){
+          siteFieldPatches.push({site:matchSite, sPatch:sPatch, cLeaf:cLeaf});
+        }
+      }
+      if(_rgpSafeKey(targetId)&&(pr.area||pr.sales||pr.eiFromExcel)){
+        var nxMeta=Object.assign({},rowMeta[targetId]||{});
+        if(pr.area) nxMeta.area=pr.area;
+        if(pr.sales) nxMeta.sales=pr.sales;
+        if(pr.eiFromExcel) nxMeta.eiFromExcel=true;
+        rowMeta[targetId]=nxMeta;
+        dbPatch['regional_prep/'+targetFid+'/rowMeta/'+targetId]=nxMeta;
+      }
+    }else if(G.syncSitesOnImport){
+      var newRef=fbDb.ref(NS+'/sites/'+targetFid).push();
+      targetId=String(newRef.key||('imp_'+idx));
+      var newSite={
+        seq_label:String(G.sites.length+newSitesN+1),
+        name:pr.name, biz_no:pr.biz_no||'', ceo:pr.ceo||'', worker_rep:pr.wrep||'',
+        company_size:pr.emp||'', sales_prev:pr.sales||'', address:pr.area||'', status:'active',
+        contacts:(pr.cname||validEmail||pr.phone)?[{name:pr.cname||'',position:pr.cpos||'',mobile:pr.phone||'',email:validEmail,isPrimary:true}]:[]
+      };
+      if(_rgpSafeKey(targetId)){
+        newSitesN++;
+        stagedNewSites.push(Object.assign({_id:targetId},newSite));
+        dbPatch['sites/'+targetFid+'/'+targetId]=newSite;
+        if(pr.area||pr.sales||pr.eiFromExcel){
+          var nmMeta={area:pr.area||'',sales:pr.sales||'',eiFromExcel:!!pr.eiFromExcel};
+          rowMeta[targetId]=nmMeta;
+          dbPatch['regional_prep/'+targetFid+'/rowMeta/'+targetId]=nmMeta;
+        }
+      }
+    }else{
+      var foundEk='';
+      Object.keys(extra).forEach(function(ek){
+        var er=extra[ek]||{};
+        if(_rgpSameCompany(er.biz_no,er.name,pr.biz_no,pr.name)) foundEk=ek;
+      });
+      targetId=foundEk||('ex_'+idx+'_'+Date.now().toString(36));
+      if(_rgpSafeKey(targetId)){
+        var exRec={
+          area:pr.area||'', name:pr.name, biz_no:pr.biz_no||'', ceo:pr.ceo||'', wrep:pr.wrep||'',
+          emp:pr.emp||'', sales:pr.sales||'', cname:pr.cname||'', cpos:pr.cpos||'',
+          phone:pr.phone||'', email:validEmail, eiFromExcel:!!pr.eiFromExcel
+        };
+        extra[targetId]=exRec;
+        dbPatch['regional_prep/'+targetFid+'/extraRows/'+targetId]=exRec;
+      }
+    }
+    if(targetId&&_rgpSafeKey(targetId)){
+      var curOx=Object.assign({},oxAll[targetId]||{});
+      Object.keys(pr.ox||{}).forEach(function(okKey){
+        if(_rgpSafeKey(okKey)){
+          curOx[okKey]=pr.ox[okKey];
+          dbPatch['regional_prep/'+targetFid+'/ox/'+targetId+'/'+okKey]=pr.ox[okKey];
+        }
+      });
+      oxAll[targetId]=curOx;
+    }
+  });
+  var patchKeys=Object.keys(dbPatch);
+  var writeP=patchKeys.length?fbDb.ref(NS).update(dbPatch):Promise.resolve();
+  return writeP.then(function(){
+    if(RGP!==G||G.fid!==targetFid) return;
+    siteFieldPatches.forEach(function(op){
+      Object.keys(op.sPatch).forEach(function(sk){ op.site[sk]=op.sPatch[sk]; });
+      if(op.cLeaf&&Array.isArray(op.site.contacts)&&op.site.contacts[op.cLeaf.idx]){
+        Object.keys(op.cLeaf.fields).forEach(function(ck){
+          op.site.contacts[op.cLeaf.idx][ck]=op.cLeaf.fields[ck];
+        });
+      }
+    });
+    stagedNewSites.forEach(function(ns){ G.sites.push(ns); });
+    G.regData.extraRows=Object.assign({},extra);
+    G.regData.ox=Object.assign({},oxAll);
+    G.regData.rowMeta=Object.assign({},rowMeta);
+    if(SD&&SD.sites&&targetFid) SD.sites[targetFid]=G.sites.slice();
+    if(S.sitesFor===targetFid) S.sitesFor=null;
+    G.rows=_rgpMergeRows(G.sites, G.regData, G.cardIdx, G.docChkAll, ymd());
+    G.curKey=G.rows.length?G.rows[0].key:'';
+    _audit(targetFid,'지역공동기금 수합엑셀 반영',_rgpCleanText(fileName,60)+' ('+sheetName+') '+parsed.length+'개사 반영');
+    toast('수합 엑셀 ['+sheetName+']에서 '+parsed.length+'개사 OX 현황을 불러왔습니다'+(newSitesN?' (신규 사업장 '+newSitesN+'곳 등록)':''));
+    rgpRender();
+  }).catch(function(e){ toast('엑셀 반영 저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpExportXlsx(){
+  var G=RGP; if(!G) return;
+  if(typeof XLSX==='undefined'){ toast('엑셀 라이브러리를 읽지 못했습니다 — 새로고침하세요','err'); return; }
+  var data=rgpBuildWorkbookData(G.f,{docSel:G.docSel, opts:G.opts, rows:G.rows});
+  var wb=XLSX.utils.book_new();
+  data.sheets.forEach(function(sh){
+    var safeAoa=(sh.aoa||[]).map(function(row){ return (row||[]).map(_rgpSafeExportCell); });
+    var ws=XLSX.utils.aoa_to_sheet(safeAoa);
+    ws['!cols']=(safeAoa[2]||safeAoa[0]||[]).map(function(_,i){ return {wch:i===2?26:(i<=11?14:13)}; });
+    XLSX.utils.book_append_sheet(wb, ws, sh.name);
+  });
+  XLSX.writeFile(wb, data.fileName);
+  toast('«'+data.fileName+'» (요청리스트·OX수합표·도장명단 3시트) 파일을 내려받았습니다');
+}
+function _rgpCurMail(G){
+  if(!G) return {to:'',name:'',subject:'',body:''};
+  var mgr=(G.f.mgr_main&&G.f.mgr_main.name)||G.f.manager||'';
+  if(G.mode==='site'){
+    var r=_rgpRowByKey(G,G.curKey)||G.rows[0];
+    if(!r) return {to:'',name:'',subject:'',body:'참여기업이 아직 없습니다 — 주관기관 탭에서 요청서류 리스트 메일과 빈 수합 엑셀을 먼저 보내거나 수합 엑셀을 불러오세요.'};
+    var sm=rgpBuildSiteMail(G.f, r, r.effOx, G.docSel, {mgr:mgr, incReg:G.opts.incReg});
+    return {to:String(r.email||'').trim(), name:r.name, subject:sm.subject, body:sm.body, row:r};
+  }
+  var am=rgpBuildAgencyMail(G.f, {agency:G.agency, docSel:G.docSel, opts:G.opts, rows:G.rows, mgr:mgr});
+  return {to:String(G.agency.email||'').trim(), name:G.agency.org||G.agency.name||'주관기관', subject:am.subject, body:am.body};
+}
+function rgpRefreshPreview(){
+  var G=RGP; if(!G) return;
+  var m=_rgpCurMail(G);
+  var sEl=$('rgpSubj'), bEl=$('rgpBody'), wEl=$('rgpWho');
+  if(sEl) sEl.value=m.subject||'';
+  if(bEl) bEl.value=m.body||'';
+  if(wEl){
+    wEl.innerHTML=esc(m.name||'수신처')+' — 받는 메일 '+(PM_MAIL_RE.test(m.to)?'<b>'+esc(m.to)+'</b>':'<b style="color:var(--danger)">이메일 입력 필요</b>');
+  }
+}
+function rgpCopyMail(){
+  var G=RGP; if(!G) return;
+  var m=_rgpCurMail(G);
+  if(!m.subject){ toast('복사할 메일 문안이 없습니다','warn'); return; }
+  _pmCopy((m.to?'받는 사람: '+m.to+'\n':'')+'제목: '+m.subject+'\n\n'+m.body).then(function(ok){
+    toast(ok?'메일 제목·본문을 클립보드에 복사했습니다':'복사에 실패했습니다 — 아래 미리보기에서 직접 복사해 주세요',ok?'':'warn');
+  });
+}
+/* 푸른메일함 쓰기 창 전달 — URL 쿼리(방문기록·리퍼러)에 수신 이메일·담당자명·제목을 절대 노출하지 않는다 */
+function _rgpOpenMailSafe(m){
+  m=m||{};
+  var payload={card:'',to:String(m.to||''),name:String(m.name||''),subject:String(m.subject||''),body:String(m.body||'')};
+  var copyP=_pmCopy(payload.body), w=null, ok=false;
+  var winHost=(typeof window!=='undefined'&&window&&typeof window.open==='function')?window:null;
+  if(!winHost){
+    copyP.then(function(copied){
+      toast(copied?'메일 본문을 클립보드에 복사했습니다':'메일 미리보기에서 복사해 붙여 넣으세요',copied?'':'warn');
+    });
+    return false;
+  }
+  try{ w=winHost.open('','puMailWrite'); }catch(e){ w=null; }
+  if(!w){ toast('쓰기 창이 막혔습니다 — 브라우저에서 팝업을 허용하세요','warn'); return false; }
+  var cleanUrl='pu-cards.html?view=mail';
+  try{
+    if(w!==winHost&&typeof w.puMailComposeTo==='function'){
+      ok=!!w.puMailComposeTo(payload);
+      if(ok){ try{ if(w.history&&w.history.replaceState) w.history.replaceState(null,'',cleanUrl); }catch(_h){} }
+    }
+  }catch(e){ ok=false; }
+  if(!ok){
+    try{ w.location.href=cleanUrl; }catch(e){ try{ w=winHost.open(cleanUrl,'puMailWrite')||w; }catch(_x){} }
+    var tries=0;
+    var pump=function(){
+      if(!w||w.closed) return;
+      try{
+        if(w!==winHost&&typeof w.puMailComposeTo==='function'&&w.puMailComposeTo(payload)){
+          try{ if(w.history&&w.history.replaceState) w.history.replaceState(null,'',cleanUrl); }catch(_h2){}
+          toast('푸른메일함에 받는 사람·제목·본문을 채웠습니다 — 읽어 보고 보내세요');
+          return;
+        }
+      }catch(_e){}
+      if(++tries<30) setTimeout(pump,200);
+    };
+    setTimeout(pump,200);
+  }
+  try{ if(typeof w.focus==='function') w.focus(); }catch(e){}
+  copyP.then(function(copied){
+    if(ok) toast('푸른메일함에 받는 사람·제목·본문을 채웠습니다 — 읽어 보고 보내세요');
+    else toast(copied?'쓰기 창을 열었습니다 — 잠시 후 자동으로 채워지며 본문도 복사해 두었습니다':'쓰기 창을 열었습니다 — 자동으로 채워지지 않으면 [📋 제목·본문 복사]로 붙여 넣으세요',copied?undefined:'warn');
+  });
+  return true;
+}
+function rgpComposeAgency(){
+  var G=RGP; if(!G) return;
+  G.mode='agency';
+  rgpSaveAgency();
+  var m=_rgpCurMail(G);
+  if(!PM_MAIL_RE.test(m.to)){
+    toast('주관기관(상공회의소·지자체) 담당자 이메일 주소를 먼저 입력해 주세요','warn');
+    var el=$('rgpAgEmail'); if(el&&el.focus) el.focus();
+    return;
+  }
+  if(!RGP_ITEMS.some(function(it){ return !!G.docSel[it.id]; })&&!G.opts.incOx){
+    toast('본문에 포함할 요청서류 또는 OX 수합현황을 하나 이상 선택해 주세요','warn');
+    return;
+  }
+  _rgpOpenMailSafe({to:m.to, name:m.name, subject:m.subject, body:m.body});
+}
+function rgpMarkAgencySent(flag){
+  var G=RGP; if(!G||G._busySent) return;
+  G._busySent=true;
+  var nextAgency=Object.assign({},G.agency,{sent_at:flag?ymd():'', sent_by:flag?(S.user||''):''});
+  _rgpSaveSub('agency',nextAgency).then(function(){
+    G._busySent=false;
+    if(RGP!==G) return;
+    G.agency=nextAgency;
+    if(flag) _audit(G.fid,'지역공동기금 주관기관 메일표시',(G.agency.org||'주관기관')+' 요청·체크리스트 보냄 표시');
+    rgpRender();
+  }).catch(function(e){ G._busySent=false; toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function rgpComposeSite(rKey){
+  var G=RGP; if(!G) return;
+  var r=_rgpRowByKey(G,rKey||G.curKey);
+  if(!r){ toast('보낼 참여기업을 먼저 선택해 주세요','warn'); return; }
+  G.curKey=r.key; G.mode='site';
+  var m=_rgpCurMail(G);
+  if(!PM_MAIL_RE.test(m.to)){
+    toast('«'+r.name+'» 담당자 이메일이 없거나 형식이 올바르지 않습니다 — 참여사업장 또는 수합표에서 이메일을 확인해 주세요','warn');
+    rgpRender();
+    return;
+  }
+  _rgpOpenMailSafe({to:m.to, name:r.name, subject:m.subject, body:m.body});
+  rgpRender();
+}
+function rgpComposeNextSite(){
+  var G=RGP; if(!G) return;
+  if(!G.rows.length){ toast('참여기업이 없습니다','warn'); return; }
+  var pend=G.rows.filter(function(r){ return !r.sent&&!rgpRowSummary(r.effOx,G.docSel).allDone&&PM_MAIL_RE.test(String(r.email||'').trim()); });
+  if(!pend.length){ toast('미제출 서류가 남고 이메일이 등록된 미발송 기업이 없습니다'); return; }
+  var curIdx=-1;
+  for(var i=0;i<pend.length;i++) if(pend[i].key===G.curKey) curIdx=i;
+  var pick=pend[(curIdx+1)%pend.length];
+  rgpComposeSite(pick.key);
+}
+function rgpMarkSiteSent(rKey,flag){
+  var G=RGP; if(!G||G._busyRowSent) return;
+  var r=_rgpRowByKey(G,rKey); if(!r||!_rgpSafeKey(r.id)) return;
+  G._busyRowSent=true;
+  var v=flag?{at:ymd(),by:(S.user||'')}:null;
+  _rgpSaveSub('site_sent/'+r.id,v).then(function(){
+    G._busyRowSent=false;
+    if(RGP!==G) return;
+    r.sent=v;
+    if(!G.regData.site_sent) G.regData.site_sent={};
+    if(v) G.regData.site_sent[r.id]=v; else delete G.regData.site_sent[r.id];
+    if(flag) _audit(G.fid,'지역공동기금 기업서류 메일표시',r.name+' 요청메일 보냄 표시');
+    rgpRender();
+  }).catch(function(e){ G._busyRowSent=false; toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function _rgpHTML(G){
+  var f=G.f, fid=G.fid;
+  var gongFunds=Object.keys(funds||{}).filter(function(k){ var x=funds[k]; return x&&!isTrashed(x)&&x.fund_type!=='사내'; });
+  var fundSel=gongFunds.length>1?'<select aria-label="대상 공동기금 선택" onchange="rgpSwitchFund(this.value)" style="max-width:220px;font-size:12px">'
+    +gongFunds.map(function(k){ var x=funds[k]; return '<option value="'+esc(k)+'"'+(k===fid?' selected':'')+'>'+esc(x.short_name||x.name||k)+'</option>'; }).join('')+'</select>':'';
+  var head='<div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px;overflow-wrap:anywhere">🏛 지역공동기금 설립 요청서류 · 기업별 OX 수합 체크 — '+esc(f.short_name||f.name||fid)+'</h2>'
+    +fundSel
+    +'<button class="hbtn" id="rgpHelpBtn" aria-expanded="'+(G.help?'true':'false')+'" aria-controls="rgpHelp" onclick="rgpHelp()" title="사용 안내 보기">ⓘ</button>'
+    +'<span style="flex:1"></span>'
+    +(G.fromSetup?'<button onclick="rgpBack()">← 진행판</button>':'')
+    +'<button onclick="closeM()">✕ 닫기</button></div>'
+    +'<div class="muted" style="font-size:12px;margin:5px 0 8px">상공회의소·지자체 담당자(예: 제주상공회의소) 및 참여기업에 요청할 <b>설립 서류·고용보험·도장·담당자 메일 리스트</b>와 <b>기업별 OX 수합 현황</b>을 한 창에서 정리해 엑셀·푸른메일로 보냅니다.</div>'
+    +'<div id="rgpHelp" class="helpbody" style="display:'+(G.help?'block':'none')+';background:var(--acc-soft);border-radius:9px;padding:8px 12px;margin:0 0 10px">'+((typeof HELP!=='undefined'&&HELP[RGP_UI.help])?HELP[RGP_UI.help].h:'')+'</div>';
+  if(G.loading) return head+loadingHTML('참여사업장·수합 현황·기업정보함을 불러오는 중…');
+
+  /* ① 받는 대상 탭 (주관기관 담당자 vs 참여기업 개별 담당자) */
+  var isAg=(G.mode!=='site');
+  var modeBar='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:var(--acc-soft);border-radius:10px">'
+    +'<button class="'+(isAg?'primary':'')+'" data-rgpk="m_ag" onclick="rgpSetMode(\'agency\')">🏛 주관기관(상공회의소·지자체) 담당자에게 보내기</button>'
+    +'<button class="'+(!isAg?'primary':'')+'" data-rgpk="m_site" onclick="rgpSetMode(\'site\')">🏢 참여기업별 미제출(X) 서류 개별 요청 ('+G.rows.length+'곳)</button>'
+    +'<span style="flex:1"></span>'
+    +'<input id="rgpImpFile" type="file" accept=".xlsx,.csv" aria-label="기존 정리된 수합 엑셀 파일 선택" style="display:none" onchange="rgpImportFile(this)">'
+    +'<label style="font-size:11.5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer" title="켜 두면 수합 엑셀의 기업명·사업자번호·대표자·근로자대표·담당자 메일을 참여사업장 명부에도 함께 채웁니다">'
+    +'<input type="checkbox" aria-label="엑셀 불러올 때 참여사업장 명부에도 동기화"'+(G.syncSitesOnImport?' checked':'')+' onchange="RGP.syncSitesOnImport=this.checked">명부 동기화</label>'
+    +'<button onclick="rgpPickImportFile()" title="과거·상공회의소에서 정리한 참여업체 현황·구비서류 OX 엑셀을 불러와 자동 반영합니다">📥 기존 수합 엑셀 불러오기</button>'
+    +'<button onclick="rgpExportXlsx()" title="1_요청서류리스트 · 2_기업별_OX수합현황 · 3_도장제작명단 3시트 엑셀(.xlsx)로 내려받습니다">📊 OX 수합·도장 엑셀 받기</button>'
+    +'</div>';
+
+  /* 주관기관 담당자 정보 입력 줄 */
+  var candOpts='<option value="-1"'+(G.agPick<0?' selected':'')+'>직접 입력'+(G.agCands.length?' ('+G.agCands.length+'건 후보 있음)':'')+'</option>'
+    +G.agCands.map(function(c,i){ return '<option value="'+i+'"'+(G.agPick===i?' selected':'')+'>'+esc((c.org?c.org+' · ':'')+(c.name?c.name+(c.pos?' '+c.pos:'')+' · ':'')+c.email)+'</option>'; }).join('');
+  var agBox='<div class="rgpagbar" style="border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:10px">'
+    +'<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">'
+    +'<b style="font-size:12.5px;white-space:nowrap">🏛 주관기관 · 담당자</b>'
+    +'<input type="text" data-rgpk="ag_org" value="'+esc(G.agency.org||'')+'" oninput="rgpAgencyField(\'org\',this.value)" onblur="rgpSaveAgency()" placeholder="기관명 (예: 제주상공회의소)" aria-label="주관기관명" style="width:155px;font-size:12.5px">'
+    +'<input type="text" data-rgpk="ag_nm" value="'+esc(G.agency.name||'')+'" oninput="rgpAgencyField(\'name\',this.value)" onblur="rgpSaveAgency()" placeholder="담당자 성명" aria-label="주관기관 담당자 성명" style="width:96px;font-size:12.5px">'
+    +'<input type="text" data-rgpk="ag_pos" value="'+esc(G.agency.pos||'')+'" oninput="rgpAgencyField(\'pos\',this.value)" onblur="rgpSaveAgency()" placeholder="직책(팀장·주임 등)" aria-label="주관기관 담당자 직책" style="width:108px;font-size:12.5px">'
+    +(G.agCands.length?'<select aria-label="기업정보함 명함 이메일 후보" onchange="rgpAgencyPick(this.value)" style="max-width:210px;font-size:12px">'+candOpts+'</select>':'')
+    +'<input type="email" id="rgpAgEmail" data-rgpk="ag_em" value="'+esc(G.agency.email||'')+'" oninput="rgpAgencyField(\'email\',this.value)" onblur="rgpSaveAgency()" placeholder="담당자 이메일 주소" aria-label="주관기관 담당자 이메일 주소" style="width:205px;font-size:12.5px">'
+    +'<span style="flex:1"></span>'
+    +(G.agency.sent_at?'<span class="chip ok" style="font-size:10.5px">✔ '+esc(G.agency.sent_at.slice(5).replace('-','/'))+' 보냄</span> <button class="rgp-smbtn" onclick="rgpMarkAgencySent(false)">↩ 취소</button>'
+      :'<button class="rgp-smbtn" onclick="rgpMarkAgencySent(true)" title="메일 발송 후 보냈음 날짜를 기록합니다">✔ 보냈음 표시</button>')
+    +'<button class="primary" onclick="rgpComposeAgency()" style="padding:5px 11px">✉ 주관기관 메일 쓰기</button>'
+    +'</div>'
+    +'<div class="row" style="gap:10px;flex-wrap:wrap;margin-top:6px;font-size:12px">'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="참여기업 요청서류 리스트 포함"'+(G.opts.incList!==false?' checked':'')+' onchange="rgpOpt(\'incList\',this.checked)">① 요청서류·기초자료 리스트 포함</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="기업별 서류 수합 OX 현황 포함"'+(G.opts.incOx!==false?' checked':'')+' onchange="rgpOpt(\'incOx\',this.checked)">② 기업별 OX 수합 현황 포함</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="선임 등기이사 노·사 등기서류 안내 포함"'+(G.opts.incReg?' checked':'')+' onchange="rgpOpt(\'incReg\',this.checked)">③ 선임 등기이사(노 1부·사 1부) 등기서류 안내 추가</label>'
+    +'<input type="text" data-rgpk="ag_note" value="'+esc(G.agency.note||'')+'" oninput="rgpAgencyField(\'note\',this.value)" onblur="rgpSaveAgency()" placeholder="추가 전달 메모 (선택)" aria-label="메일 하단 추가 전달 메모" style="flex:1;min-width:160px;font-size:12px">'
+    +'</div></div>';
+
+  /* ② 요청서류 리스트 체크 표 */
+  var nSel=RGP_ITEMS.filter(function(it){ return !!G.docSel[it.id]; }).length;
+  var reqRows=RGP_ITEMS.map(function(it,idx){
+    return '<tr><td class="ckcol"><input type="checkbox" data-rgpk="ds_'+it.id+'"'+(G.docSel[it.id]?' checked':'')+' aria-label="'+esc(it.col+' 요청 목록에 포함')+'" onchange="rgpDocSel(\''+it.id+'\',this.checked)"></td>'
+      +'<td class="no">'+(idx+1)+'</td>'
+      +'<td style="white-space:nowrap"><span class="chip" style="font-size:10.5px">'+esc(it.who)+'</span></td>'
+      +'<td class="rgp-ttl" style="font-weight:600;word-break:keep-all">'+esc(it.title)+'</td>'
+      +'<td class="rgp-colact" style="white-space:nowrap"><button class="rgp-smbtn" onclick="rgpSetColAllOx(\''+it.id+'\',\'O\')" title="전체 기업 이 항목을 O로 표시">전부O</button> '
+      +'<button class="rgp-smbtn" onclick="rgpSetColAllOx(\''+it.id+'\',\'X\')" title="전체 기업 이 항목을 X로 초기화">전부X</button></td></tr>';
+  }).join('');
+  var reqBox='<details open style="margin-bottom:10px;border:1px solid var(--line);border-radius:9px;padding:7px 10px">'
+    +'<summary style="cursor:pointer;font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<span>① 지역공동기금 기업 요청서류 · 기초자료 표준 리스트</span>'
+    +'<span class="chip" id="rgpReqCnt" style="font-size:10.5px">'+nSel+'/'+RGP_ITEMS.length+'종 선택</span>'
+    +'<span class="muted" style="font-weight:400;font-size:11.5px">체크한 항목이 요청 메일과 수합 기준에 들어갑니다 (접기/펼치기)</span></summary>'
+    +'<div id="rgpReqTbl" class="rgpreq" style="max-height:220px;overflow:auto;margin-top:6px"><table style="font-size:12px"><thead><tr>'
+    +'<th class="ckcol"><input type="checkbox" id="rgpDocAllCk"'+(nSel===RGP_ITEMS.length?' checked':'')+' aria-label="요청서류 전체 선택" onclick="rgpDocSelAll(this.checked)"></th>'
+    +'<th style="width:34px">#</th><th style="width:145px">누구 서류인지</th><th>요청서류 · 기초 확인 항목</th><th style="width:124px">일괄 OX</th></tr></thead><tbody>'+reqRows+'</tbody></table></div></details>';
+
+  /* ③ 참여기업별 OX 수합 체크 표 — 1280px 화면에서 가로 스크롤 없이 15열 전체가 한눈에 들어오도록 열 폭·2줄 머리글 압축 */
+  var doneCo=0, pendCo=0;
+  G.rows.forEach(function(r){ if(rgpRowSummary(r.effOx,G.docSel).allDone) doneCo++; else pendCo++; });
+  var oxHdr='<tr><th style="width:28px">#</th><th style="width:136px">기업명(지역)</th><th style="width:160px">담당자 · 이메일 · 노사대표</th>'
+    +RGP_ITEMS.map(function(it){ return '<th class="center" style="font-size:10.5px;line-height:1.25;width:44px" title="'+esc(it.title)+'">'+(it.abbr||esc(it.short))+'</th>'; }).join('')
+    +'<th style="width:88px">수합상태</th><th style="width:132px">개별메일</th></tr>';
+  var oxBody=G.rows.map(function(r,idx){
+    var cur=(G.mode==='site'&&r.key===G.curKey);
+    var sm=rgpRowSummary(r.effOx,G.docSel);
+    var stHtml=sm.allDone?'<span class="chip ok" style="font-size:10.5px">완비 '+sm.nO+'/'+sm.effTot+'</span>'
+      :'<span class="chip warn" style="font-size:10.5px">O '+sm.nO+'/'+sm.effTot+' · 미비 '+(sm.nX+sm.nTri)+'</span>';
+    var meta=(r.cname?esc(r.cname+(r.cpos?' '+r.cpos:'')):'<span class="muted">담당 미기재</span>')
+      +' · '+(PM_MAIL_RE.test(r.email||'')?'<span style="word-break:break-all">'+esc(r.email)+'</span>':'<span style="color:var(--danger)">메일없음</span>')
+      +'<div class="muted" style="font-size:10.5px">사:'+esc(r.ceo||'—')+' / 노:'+esc(r.wrep||'—')+(r.emp?' · '+esc(r.emp)+'명':'')+(r.sales?' · '+esc(r.sales):'')+'</div>';
+    var cells=RGP_ITEMS.map(function(it){
+      var bs=_rgpOxBtnStyle(r.effOx[it.id]);
+      return '<td class="center rgp-cell" data-lbl="'+esc(it.short)+'"><button id="rgpCell_'+r.key+'_'+it.id+'" data-rgpk="ox_'+r.key+'_'+it.id+'" class="'+bs.cls+'" style="min-width:30px;padding:3px 6px;font-weight:700;font-size:11px;cursor:pointer" aria-label="'+esc(r.name+' '+it.col+' 현재 '+bs.txt)+'" title="'+esc(it.col+': '+bs.tip)+'" onclick="rgpToggleOx(\''+r.key+'\',\''+it.id+'\')">'+bs.txt+'</button></td>';
+    }).join('');
+    return '<tr id="rgpTr_'+r.key+'"'+(cur?' style="background:var(--acc-soft)" aria-current="true"':'')+'>'
+      +'<td class="no">'+(idx+1)+'</td>'
+      +'<td class="rgp-co" tabindex="0" role="button" data-rgpk="rn_'+r.key+'" style="cursor:pointer;font-weight:700;max-width:150px;word-break:keep-all;overflow-wrap:anywhere" onclick="rgpSelRow(\''+r.key+'\')" onkeydown="rgpRowKey(event,\''+r.key+'\')" title="눌러서 이 기업의 미제출 서류 요청 메일을 아래에서 미리 봅니다">'
+      +esc(r.name)+(r.area?' <span class="muted" style="font-weight:400;font-size:11px">('+esc(r.area)+')</span>':'')
+      +(!r.fromSite?' <span class="chip" style="font-size:9.5px" title="수합표에서 추가된 기업">수합표</span>':'')+'</td>'
+      +'<td class="rgp-meta" style="font-size:11.5px;max-width:170px">'+meta+'</td>'
+      +cells
+      +'<td id="rgpRst_'+r.key+'" style="white-space:nowrap">'+stHtml+'</td>'
+      +'<td class="rgp-act" style="white-space:nowrap">'
+      +'<button class="rgp-smbtn" onclick="rgpSetRowAllOx(\''+r.key+'\',\'O\')" title="이 기업 전체 항목 O 표시">전부O</button> '
+      +'<button class="primary rgp-smbtn" onclick="rgpComposeSite(\''+r.key+'\')" aria-label="'+esc(r.name+' 미제출 서류 메일 쓰기')+'">✉ 쓰기</button> '
+      +'<button class="rgp-smbtn" onclick="rgpMarkSiteSent(\''+r.key+'\','+(r.sent?'false':'true')+')" aria-label="'+esc(r.name+(r.sent?' 보냄 표시 취소':' 보냈음 표시'))+'">'+(r.sent?'↩':'✔')+'</button>'
+      +(!r.fromSite?' <button class="rgp-smbtn" onclick="rgpDelExtraRow(\''+r.key+'\')" style="color:var(--danger)" aria-label="'+esc(r.name+' 수합표 줄 삭제')+'" title="수합표 임시 줄 삭제">✕</button>':'')
+      +'</td></tr>';
+  }).join('');
+  var addRowBar='<div class="row rgp-addbar" style="gap:5px;flex-wrap:wrap;margin-top:6px">'
+    +'<input id="rgpNewAr" type="text" placeholder="시·군(선택)" aria-label="추가 기업 지역" style="width:86px;font-size:12px">'
+    +'<input id="rgpNewNm" type="text" placeholder="기업명(상호)" aria-label="추가 기업명" style="width:140px;font-size:12px">'
+    +'<input id="rgpNewCeo" type="text" placeholder="대표자(사)" aria-label="추가 기업 대표자" style="width:88px;font-size:12px">'
+    +'<input id="rgpNewWr" type="text" placeholder="근로자대표(노)" aria-label="추가 기업 근로자대표" style="width:98px;font-size:12px">'
+    +'<input id="rgpNewCn" type="text" placeholder="담당자명" aria-label="추가 기업 담당자명" style="width:86px;font-size:12px">'
+    +'<input id="rgpNewEm" class="rgp-wide" type="email" placeholder="담당자 이메일" aria-label="추가 기업 담당자 이메일" style="width:175px;font-size:12px">'
+    +'<button class="rgp-smbtn" onclick="rgpAddRowInline()">＋ 기업 한 줄 추가</button>'
+    +'</div>';
+  var oxBox='<div class="row" style="gap:8px;flex-wrap:wrap;margin:4px 0"><b style="font-size:13px">② 기업별 서류 수합 OX 체크표</b>'
+    +'<span class="chip" id="rgpOxKpi" style="font-size:10.5px">총 '+G.rows.length+'개사 · 완비 '+doneCo+'곳 · 수합중 '+pendCo+'곳</span>'
+    +'<span class="muted" style="font-size:11.5px">칸 클릭: X(미제출) → O(완료) → △(보완) → 개인(면제)</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="rgp-smbtn" onclick="rgpAutoSyncOx()" title="참여사업장·기업정보함·메일 자동보관함에 이미 들어온 서류와 연락처를 읽어 자동으로 O 표시합니다">⚡ 기존 자료 자동 체크</button>'
+    +(!isAg&&G.rows.length?'<button class="primary rgp-smbtn" onclick="rgpComposeNextSite()">▶ 다음 미비 기업 메일 쓰기</button>':'')
+    +'</div>'
+    +'<div id="rgpOxTbl" class="rgpox" style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:11.5px"><thead>'+oxHdr+'</thead><tbody>'
+    +(oxBody||'<tr><td colspan="'+(RGP_ITEMS.length+5)+'" class="center muted" style="padding:16px">아직 등록된 참여기업이 없습니다 — 위 <b>[📥 기존 수합 엑셀 불러오기]</b>로 명단·OX를 불러오거나, 먼저 <b>주관기관(예: '+esc(G.agency.org||'상공회의소')+') 담당자에게 요청서류 리스트 메일 + [📊 OX 수합 엑셀]</b>을 보내세요.</td></tr>')
+    +'</tbody></table></div>'+addRowBar;
+
+  /* ④ 메일 실시간 미리보기 */
+  var m=_rgpCurMail(G);
+  var pvBox='<div class="row" style="gap:8px;flex-wrap:wrap;margin:12px 0 4px"><b style="font-size:13px">③ 메일 미리보기 ('+(isAg?'주관기관 발송용':'개별 참여기업 발송용')+')</b>'
+    +'<span class="muted" id="rgpWho" style="font-size:12px;overflow-wrap:anywhere">'+esc(m.name||'수신처')+' — 받는 메일 '+(PM_MAIL_RE.test(m.to)?'<b>'+esc(m.to)+'</b>':'<b style="color:var(--danger)">이메일 입력 필요</b>')+'</span>'
+    +'<span style="flex:1"></span>'
+    +'<button onclick="rgpCopyMail()" style="white-space:nowrap">📋 제목·본문 복사</button>'
+    +'<button class="primary" onclick="'+(isAg?'rgpComposeAgency()':'rgpComposeSite()')+'" style="white-space:nowrap">✉ 푸른메일함 쓰기 창 열기</button>'
+    +'</div>'
+    +'<input id="rgpSubj" readonly aria-label="메일 제목 미리보기" value="'+esc(m.subject||'')+'" style="width:100%;margin:0 0 4px;font-size:15px">'
+    +'<textarea id="rgpBody" readonly aria-label="메일 본문 미리보기" rows="11" style="width:100%;font-size:12.5px;font-family:inherit;word-break:keep-all">'+esc(m.body||'')+'</textarea>';
+
+  return '<div class="rgp-modal">'+head+modeBar+agBox+reqBox+oxBox+pvBox+'</div>';
+}
+function rgpRender(){
+  var G=RGP; if(!G) return;
+  var html=_rgpHTML(G), box=$('modalbox');
+  if(G.shown&&box){
+    var top=box.scrollTop, rt=$('rgpReqTbl'), rTop=rt?rt.scrollTop:0, ot=$('rgpOxTbl'), oTop=ot?ot.scrollTop:0, fk='';
+    try{ var ae=(typeof document!=='undefined')?document.activeElement:null; fk=(ae&&ae.getAttribute&&ae.getAttribute('data-rgpk'))||''; }catch(e){}
+    box.innerHTML=html; box.scrollTop=top;
+    var rt2=$('rgpReqTbl'); if(rt2) rt2.scrollTop=rTop;
+    var ot2=$('rgpOxTbl'); if(ot2) ot2.scrollTop=oTop;
+    if(fk&&box.querySelector){ var el=box.querySelector('[data-rgpk="'+fk+'"]'); if(el&&el.focus) el.focus(); }
+    return;
+  }
+  closeM();
+  showModal(html,{width:1220,onclose:function(){ if(RGP===G) RGP=null; }});
+  G.shown=true;
+  var mbg=$('modalbg');
+  if(mbg&&mbg.setAttribute) mbg.setAttribute('aria-label','지역공동기금 설립 요청서류 및 OX 수합 체크');
+}
 /* ══ 📋 사업장 제출서류 체크리스트 · 메일 요청 · 수신 자동체크 · 내용검토 (공동기금·사내기금 공용) ══
    · 공동기금(참여사업장별) 및 사내기금(설립·설치사업장)에 필요한 제출서류를 간결한 체크리스트(□) 메일로 요청하고,
      푸른메일함에 회신·수신된 첨부(ZIP 묶음 포함)를 자동 감지해 입수 체크(recv)한 뒤,
@@ -18202,6 +19914,7 @@ function sitesTab(){
       :(있음?'<span class="stat" style="color:var(--faint)" title="명부에서 상호 앞의 ☆ 를 눌러 지정하면 서식의 「대표회사·사무국」이 채워집니다">대표사업장 미지정</span>':''))
     +sub
     +'<span style="flex:1"></span>'
+    +((funds[S.fundId]||{}).fund_type!=='사내'?'<button data-fid="'+esc(S.fundId)+'" onclick="rgpOpen(this.dataset.fid)" title="지역공동기금 설립 시 상공회의소·지자체 담당자 및 참여기업 요청서류 리스트와 기업별 OX 수합 체크 창을 엽니다">🏛 지역공동기금 서류·OX체크</button>':'')
     +(있음?'<button onclick="openSiteDocCenter()" title="참여·설립사업장별 필요서류를 체크리스트 메일로 요청하고, 메일함 수신 서류를 자동 체크·내용검토합니다">📋 제출서류 요청·검토</button>':'')
     +'<button class="primary" onclick="editSite(\'\')">+ 사업장 추가</button>'
     +siteToolsMenu()+'</div>';
@@ -18215,6 +19928,7 @@ function sitesTab(){
     +'<button class="primary" onclick="editSite(\'\')">+ 한 곳씩 직접</button>'
     +'<button onclick="openCardPick(\'site\')" title="푸른 기업정보함에서 여러 곳을 한 번에 고릅니다">🏢 기업정보함에서</button>'
     +'<button onclick="openErpCoPick(\'new\')" title="업체관리(푸른이알피)의 회사를 골라 업체 번호로 이어 넣습니다">🔗 업체관리에서</button>'
+    +((funds[S.fundId]||{}).fund_type!=='사내'?'<button data-fid="'+esc(S.fundId)+'" onclick="rgpOpen(this.dataset.fid)" title="상공회의소·지자체 담당자에게 먼저 요청서류 리스트와 수합 양식 엑셀을 보내거나 기존 수합 엑셀을 불러옵니다">🏛 지역공동기금 요청서류·OX체크</button>':'')
     +엑셀+'</div></div>';
   /* ★ 사내기금인데 한 곳도 없다 = 모회사가 빠졌다(대표 지시 2026-10-05 「항상체크해라」) — 맨 위에 후보 */
   var _fcur=funds[S.fundId]||{};
@@ -30772,6 +32486,10 @@ var HELP={
    +'<p><b>① 개인정보 원천 제거 및 비공개 저장</b> — 인감증명서·주민등록등초본 페이지와 주민등록번호·자택 상세주소가 포함된 원본은 그대로 올릴 수 없으며(감지 시 자동 차단), 개인정보가 제거된 클린 문서만 재직 담당자 전용 보안 노드(공개 URL 미생성)에 보관합니다.</p>'
    +'<p><b>② 푸른메일함 실시간·과거 메일 연동</b> — 현재 푸른메일함과 지난 메일 보관함의 관련 메일을 연결해 수발신 경위와 비식별 요약·원문을 바로 열람할 수 있습니다.</p>'
    +'<p><b>③ 신고반려·미이행 이력보존 분리</b> — 주식출연 변경신고 접수 후 명의개서 미이행 등으로 노동청에 <b>반려 요청</b>한 건은 <b>신고반려·미이행(이력보존)</b> 상태로 두어 재무상태표 매도가능증권 잔액에는 산입하지 않으면서 당시 서류와 메일 경위만 보존합니다.</p>'},
+ 'setup.regprep':{t:'지역공동기금 설립 요청서류 리스트 · 기업별 OX 수합 체크 및 메일 발송',h:'<p>제주상공회의소·경기북부상공회의소·충남북부상공회의소·지자체 등 <b>지역공동기금 설립</b> 시 반복되는 참여기업 요청서류 안내와 서류 수합 OX 관리를 한 창으로 체계화한 화면입니다.</p>'
+   +'<p><b>① 주관기관(상공회의소·지자체) 담당자에게 보내기</b> — 참여기업별 필수 요청서류·기초자료 리스트(참여신청서, 사업자등록증, 법인등기부등본, 중소기업확인서, 직전연도 고용보험 연간 자격취득자명부·월평균 인원, 노·사 재직증명서 각 1부, 노·사 도장/막도장 사용동의서 각 1부, 직전년도 손익계산서, 담당자 연락처·메일)와 현재 기업별 수합 OX 현황을 정리해 푸른메일함 쓰기 창에 바로 채워 엽니다.</p>'
+   +'<p><b>② 기존 수합 엑셀 불러오기 & 3시트 엑셀 받기</b> — 상공회의소·과거 폴더에 정리된 엑셀(참여예정업체현황·구비서류 제출현황·참여신청 명단)을 <b>[📥 기존 수합 엑셀 불러오기]</b>로 올리면 O/X/제출/개인 상태와 담당자 메일·고용보험 인원을 자동으로 읽어오며(주민등록번호·비밀번호 열은 원천 차단), <b>[📊 OX 수합·도장 엑셀 받기]</b>로 요청서류리스트·기업별 OX 수합현황·도장제작명단 3시트 엑셀을 내려받아 메일에 첨부할 수 있습니다.</p>'
+   +'<p><b>③ 개별 참여기업 미제출(X) 서류 요청</b> — 이미 제출 완료(O)이거나 개인사업자 면제(-)인 서류는 자동으로 빼고 아직 미제출(X)·보완(△)인 서류만 간추려 기업별 메일 쓰기 창에 채워 엽니다.</p>'},
  'lib.chat':{t:'법령·유권해석·공단 지침 챗봇',h:'<p><b>근로복지기본법령</b>, <b>고용노동부 예규 제169호(사내·공동근로복지기금 업무처리지침)</b>, <b>근로복지공단 근로복지기금 지원사업 업무처리규정(제1375호)</b> 및 주요 <b>고용노동부 행정해석·국민신문고 회신</b>을 한곳에 모아 질의응답하는 도우미입니다.</p>'
    +'<p><b>💬 질문하기(즉시 판시)</b> — 입력한 질문과 가장 관련도가 높은 유권해석·지침·법령 조문을 즉시 찾아 핵심 결론과 원문 판시를 보여 줍니다.</p>'
    +'<p><b>🤖 AI 심층답변</b> — 검색된 공식 법령·유권해석 근거만을 바탕으로 Claude AI가 사내·공동기금 맞춤 검토의견을 종합해 작성합니다. 근거에 없는 문서번호나 조문은 지어내지 않으며, 인용 배지를 누르면 원문 전체를 확인할 수 있습니다.</p>'
