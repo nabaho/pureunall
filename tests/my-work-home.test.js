@@ -519,6 +519,22 @@ test('⑥★ 업무관리 목록을 못 읽었으면 «업무관리에 없음»�
   assert.match(MYDESK, /PuMyWork\.counts\(wsSum, todayStr/, '숫자를 공용 모듈 셈으로 안 센다 — 포털과 숫자가 갈린다');
 });
 
+test('⑥★ 이알피 첫 화면(dash/my) 이름·그림이 업무관리 «내 업무»와 겹치지 않는다 (대표 「«오늘»로 바꿔」 2026-11-22)', () => {
+  /* 업무 목록은 업무관리 한 곳(포털 «📋 내 업무»)으로 옮겼는데, 이알피 첫 화면 이름이 «나의 업무»라
+     «내 업무가 둘»로 보였다. 이름은 바뀔 수 있으니 글자를 박지 않고 «겹치지 않는가»를 본다. */
+  const m = ERP.match(/\{ id:'dash\/my',\s*icon:'([^']+)',\s*text:'([^']+)' \}/);
+  assert.ok(m, '메뉴에서 dash/my 를 못 찾았다 — 검사가 헛돈다');
+  const [, 그림, 이름] = m;
+  assert.ok(!/업무/.test(이름), '★ 첫 화면 이름에 «업무»가 다시 들어갔다 — 업무관리 «내 업무»와 헷갈린다: ' + 이름);
+  const 단추 = ENTER.match(/id="headApp_work"[\s\S]*?class="hd-ico[^"]*"[^>]*>([^<]+)</);
+  assert.ok(단추, '포털 «내 업무» 단추 그림을 못 찾았다 — 검사가 헛돈다');
+  assert.notEqual(그림, 단추[1].trim(), '★ 첫 화면 그림이 포털 «내 업무» 단추와 같다 — 같은 것으로 보인다');
+  assert.ok(MYDESK.indexOf("'" + 그림 + ' ' + 이름 + "'") >= 0, '★ 화면 제목이 메뉴 이름과 다르다');
+  /* 화면에 뜨는 글자(따옴표 안)에 옛 이름이 남지 않는다 — 주석은 보지 않는다 */
+  const 남음 = stripJs(ERP).match(/'[^'\n]*나의 ?업무[^'\n]*'/g) || [];
+  assert.equal(남음.length, 0, '★ 이알피 화면 글자에 옛 이름이 남았다: ' + 남음.join(' | '));
+});
+
 test('⑥ 남은 업무 딱지는 키보드로도 누른다(Tab·Enter·Space)', () => {
   const chip = 몸(MYDESK, 'function _chipList(');
   assert.match(chip, /role:'button'/, '딱지가 단추라고 스크린리더에 안 알린다');

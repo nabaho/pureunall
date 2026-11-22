@@ -11812,7 +11812,7 @@ var HELP={
     +'다음에 같은 대상을 만나면 업무를 열 때 여기로 자동으로 따라옵니다.',
   note:'평소에 조금씩 적어 두는 인수인계 자료입니다. 갑자기 자리를 비우게 되어도 '
       +'남은 사람이 그대로 이어받을 수 있습니다.',
-  ppnote:'예전에 푸른이알피 <b>「나의 업무」</b>에 적어 두었던 메모입니다.<br>'
+  ppnote:'예전에 푸른이알피 <b>「나의 업무」</b>(지금 「오늘」)에 적어 두었던 메모입니다.<br>'
         +'⚠ 그 적는 창은 2026-09-27 에 없앴습니다 — 이제 진행 기록은 <b>여기(업무관리) 한 곳</b>에만 적습니다. '
         +'옛 메모를 기록으로 남기려면 <b>✎ 기록에 담기</b>를 누르세요.<br>'
         +'담으면 <b>「🔗 푸른이알피 메모 — …」</b> 한 줄이 그 주 기록으로 들어가, '
@@ -15247,7 +15247,7 @@ function erpMoveModal(){
   loadStaff().then(function(){ return mvCandidates(); }).then(function(r){
     S._mvList=r.list;
     var h='<h2 style="margin:0 0 8px">📦 이알피 일반업무·업무케이스 옮기기</h2>'
-      +'<p class="muted" style="font-size:12.5px;margin:0 0 10px">이알피 「나의 업무」에서 만들던 <b>일반업무·업무케이스</b>를 업무관리로 옮깁니다. '
+      +'<p class="muted" style="font-size:12.5px;margin:0 0 10px">이알피 「오늘」(옛 「나의 업무」)에서 만들던 <b>일반업무·업무케이스</b>를 업무관리로 옮깁니다. '
       +'이제부터 새 업무는 업무관리 <b>＋ 새 업무</b>에서 만듭니다. 이알피 원본은 지우지 않습니다.</p>';
     if(r.fail.length) h+='<div class="muted" style="font-size:12px;color:var(--warn);margin-bottom:8px">⚠ '+esc(r.fail.join('·'))
       +'를 읽지 못했습니다 — 그쪽 것은 이번 목록에 없습니다. 잠시 뒤 다시 열어 주세요.</div>';
