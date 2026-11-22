@@ -639,6 +639,16 @@ tr.fc-row:hover td{background:var(--acc-l)}
 /* 무대 — 그림자 줄이고, 위 글씨는 바탕 없이. «2D 연동» 꼬리표는 차트 이름(왼쪽 위 글)과 겹쳐 걷음 */
 .stage,.stage.dark{box-shadow:var(--sh-md)}
 .stage .tag2d{display:none}
+/* 2D 업체 목록 넘기기(◀ 1–11 / 181곳 ▶) — 3D 손잡이(.ctl)와 같은 모양 */
+.pg2d{position:absolute;right:10px;bottom:10px;display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.92);border:1px solid var(--line);padding:3px;border-radius:12px}
+.stage.dark .pg2d{background:rgba(30,41,59,.88);border-color:rgba(148,163,184,.32)}
+.pg2d button{width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;padding:0}
+.stage.dark .pg2d button{color:#f8fafc}
+.pg2d button:hover:not(:disabled){background:var(--acc-soft);color:var(--acc2)}
+.stage.dark .pg2d button:hover:not(:disabled){background:var(--sub);color:#ffffff}
+.pg2d button:disabled{opacity:.35;cursor:default}
+.pg2d span{font-size:12px;font-weight:700;color:var(--sub);padding:0 4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stage.dark .pg2d span{color:#cbd5e1}
 .stage .hint,.stage.pane-2d .hint{border:0;box-shadow:none;font-weight:600;max-width:calc(100% - 22px)}
 
 /* 접어 둔 설명 */
@@ -657,6 +667,7 @@ details.about .pc{margin-top:10px}
   .vh p{font-size:12px}
   .govbar,.mbar,.kpis,.viz-sec,.main,.src,.m-below,.apphd{padding-left:0;padding-right:0}
   .bstrip,.chat{margin-left:0;margin-right:0}
+  #cvE2d{height:420px}   /* 폰은 2D 가 기본 — 업체 목록이 한 쪽에 열한 줄쯤 보이게 */
 }
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -1111,14 +1122,14 @@ details.about .pc{margin-top:10px}
 <!-- ═════════ E 업체 도시 ═════════ -->
 <section class="view" id="v-e">
   <div class="vh"><div class="L">E</div><h2>업체 도시</h2>
-    <p>담당 구역 × 업체 · 2D 가로=업무 건수 · 세로=12개월 입금 · 노란 고리=자문료 미수 추정(이알피와 같은 규칙, 지난달까지)</p></div>
+    <p>담당 구역 × 업체 · 2D 는 업체마다 한 줄(12개월 입금 막대 · 업무 건수) · 노란 고리=자문료 미수 추정(이알피와 같은 규칙, 지난달까지)</p></div>
   <div class="modebar">
     <div class="mseg" data-target="dualE" role="group" aria-label="E안 3D·2D 보기 선택">
       <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
       <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
       <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
     </div>
-    <div class="sync-pill"><span id="syncTxtE">🔗 건물이나 2D 업체 원을 누르면 미수·입금·업무가 양쪽에서 함께 잡힙니다</span></div>
+    <div class="sync-pill"><span id="syncTxtE">🔗 건물이나 2D 업체 줄을 누르면 미수·입금·업무가 양쪽에서 함께 잡힙니다</span></div>
   </div>
   <div class="dual-stage" id="dualE">
     <div class="stage dark pane-3d">
@@ -1128,18 +1139,19 @@ details.about .pc{margin-top:10px}
       <div class="ctl" data-for="cvE"></div>
     </div>
     <div class="stage dark pane-2d">
-      <canvas id="cvE2d" tabindex="0" aria-label="E안 2D 업체 입금·업무 포트폴리오 차트"></canvas>
-      <span class="hint">2D 포트폴리오 · 가로=업무 건수 · 세로=12개월 입금 · 노란 고리=미수</span>
+      <canvas id="cvE2d" tabindex="0" aria-label="E안 2D 업체별 12개월 입금 막대 목록. 줄을 누르면 3D 에서 그 업체 건물이 함께 잡힙니다."></canvas>
+      <span class="hint">2D 업체 목록 · 한 줄에 한 업체 · 노란 고리=미수 추정 · 줄을 누르면 3D 연동</span>
+      <div class="pg2d" id="e2dPg" hidden><button type="button" id="e2dPrev" aria-label="앞 쪽 업체" title="앞 쪽">◀</button><span id="e2dPgTx"></span><button type="button" id="e2dNext" aria-label="다음 쪽 업체" title="다음 쪽">▶</button></div>
       <span class="tag2d">2D 연동</span>
       <div class="smsg" id="smE2d"></div>
     </div>
   </div>
   <div class="chips" id="eDist"><span class="lb">구역</span></div>
-  <div class="chips"><button class="chip" type="button" id="eMisu" aria-pressed="false">노란 지붕(미수)만 밝게</button></div>
+  <div class="chips"><span class="chips" id="eSort" style="margin:0"><span class="lb">2D 차례</span></span><button class="chip" type="button" id="eMisu" aria-pressed="false" title="3D 는 미수 추정 업체만 밝게, 2D 목록은 미수 추정 업체만 보입니다">노란 지붕(미수)만 밝게</button></div>
   <details class="tbl"><summary>표로 보기 (업체별)</summary><div class="tw"><table class="t" id="eTbl"></table></div></details>
   <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
-    <p class="about-p">왼쪽 3D 담당 구역 건물 숲과 오른쪽 2D 업체 분포(업무 건수 × 12개월 입금 · 노란 고리=자문료 미수 추정)를 눌러서 이어 봅니다. 미수는 이알피와 같은 규칙(erpAdvisoryDues)으로 지난달까지 셉니다.</p>
-  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>2D 에서 «업무는 많은데 입금이 적은 업체»와 «미수 업체»를 찍어 3D 구역 위치까지 바로 확인</li><li>담당자별 수임 규모를 한눈에 견줌</li></ul></div>
+    <p class="about-p">왼쪽 3D 담당 구역 건물 숲과 오른쪽 2D 업체 막대 목록(한 줄에 한 업체 — 12개월 입금 막대 · 업무 건수 · 노란 고리=자문료 미수 추정, ◀ ▶ 로 넘겨 봄)을 눌러서 이어 봅니다. 미수는 이알피와 같은 규칙(erpAdvisoryDues)으로 지난달까지 셉니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>2D 차례를 «업무 많은 차례»·«미수 큰 차례»로 바꿔 «업무는 많은데 입금이 적은 업체»와 «미수 업체»를 찾고, 줄을 눌러 3D 구역 위치까지 바로 확인</li><li>담당자별 수임 규모를 한눈에 견줌</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>미수는 매달 자문료를 걷는 업체만 셈 — 사건·컨설팅 잔금 미수는 아직 안 셈</li></ul></div></div>
   </details>
 </section>
@@ -1283,7 +1295,7 @@ try{
 </script>
 <script src="js/pu-datahub-calc.js?v=1"></script>
 <script src="js/pu-3d-lite.js?v=1"></script>
-<script src="js/pu-datahub-view.js?v=2"></script>
+<script src="js/pu-datahub-view.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 (function(){

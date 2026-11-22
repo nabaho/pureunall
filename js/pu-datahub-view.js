@@ -588,20 +588,126 @@
       p.m.forEach(function (v, idx) { var px = padL + (v.task / maxX) * pw, py = padT + ph - (FO ? v.inc / maxY : 0) * ph; if (idx === 0) g.moveTo(px, py); else g.lineTo(px, py); });
       g.stroke();
     });
-    var used = [];
-    ppl.forEach(function (p) {
-      var v = p.m[bMi], px = padL + (v.task / maxX) * pw, py = padT + ph - (FO ? v.inc / maxY : 0) * ph;
-      var r = 8 + Math.sqrt(p.cos) * 3.2, isHot = (c.hot === p.id || c.pin === p.id);
+    /* 원과 이름표를 따로 그린다 (대표 2026-11-22 「2D 가 빡빡하게 붙어 확인이 안 된다」)
+       ① 원 둘레(열 방향 × 세 거리)에서 — 원·다른 이름·가로축 숫자·이미 그은 잇는 선과 겹치지 않고, 멀리 둘 때 잇는 선이 다른 원·이름을 가로지르지 않는 자리
+       ② 없으면 그림 오른쪽·왼쪽 가장자리 줄(같은 조건)
+       ③ 그래도 없으면 이름을 생략한다(원에 올려 보면 이름) — 엉뚱한 원을 가리키는 선보다 생략이 낫다. 좁은 화면에서는 원도 함께 줄인다 */
+    var rs = Math.max(0.6, Math.min(1, pw / 420));
+    var pts = ppl.map(function (p) {
+      var v = p.m[bMi];
+      return { p: p, v: v, x: padL + (v.task / maxX) * pw, y: padT + ph - (FO ? v.inc / maxY : 0) * ph, r: (8 + Math.sqrt(p.cos) * 3.2) * rs, hot: (c.hot === p.id || c.pin === p.id) };
+    });
+    pts.forEach(function (o) {
+      var p = o.p, v = o.v, px = o.x, py = o.y, r = o.r, isHot = o.hot;
       var rgb = hex2rgb(p.color); if (ST.dark) rgb = shade(rgb, 0.18);
-      if (FO && v.proc > 0) { var ang = (v.proc / Math.max(1, BMAX.proc)) * Math.PI * 2; g.strokeStyle = ST.dark ? '#4ade80' : '#16a34a'; g.lineWidth = 3.2; g.beginPath(); g.arc(px, py, r + 4, -Math.PI / 2, -Math.PI / 2 + ang); g.stroke(); }
+      if (FO && v.proc > 0) { var ang = (v.proc / Math.max(1, BMAX.proc)) * Math.PI * 2; g.strokeStyle = ST.dark ? '#4ade80' : '#16a34a'; g.lineWidth = 3.2 * rs; g.beginPath(); g.arc(px, py, r + 4 * rs, -Math.PI / 2, -Math.PI / 2 + ang); g.stroke(); }
       g.fillStyle = rgba(rgb, isHot ? 1 : 0.88); g.beginPath(); g.arc(px, py, r, 0, 6.2832); g.fill();
       g.strokeStyle = isHot ? '#fbbf24' : '#ffffff'; g.lineWidth = isHot ? 2.6 : 1.2; g.stroke();
-      g.font = '750 11.5px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = ST.dark ? '#f8fafc' : '#1e293b';
-      var lx = px, ly = py - r - 5, al = 'center', tb = 'bottom';
-      for (var ui = 0; ui < used.length; ui++) { if (Math.abs(used[ui][0] - lx) < 24 && Math.abs(used[ui][1] - ly) < 16) { lx = px - r - 6; ly = py + 2; al = 'right'; tb = 'middle'; break; } }
-      used.push([lx, ly]); g.textAlign = al; g.textBaseline = tb; g.fillText(p.name, lx, ly);
       c.hits.push({ id: p.id, pid: p.id, circle: [px, py, r + 5], tip: '<b>' + esc(p.name) + '</b> (' + esc(MONTHS()[bMi]) + ' · 2D 사분면)<br>업무 ' + v.task + '건 · 입금 ' + (FO ? won(v.inc) : '못 읽음') + ' · 입금처리 ' + (FO ? v.proc + '건' : '—') });
+      o.ro = (FO && v.proc > 0) ? r + 4 * rs + 2 * rs : r;   /* 초록 고리를 그렸으면 그 바깥까지 */
+      o.box = [px - o.ro - 2, py - o.ro - 2, o.ro * 2 + 4, o.ro * 2 + 4];
     });
+    /* 피할 것: 원 상자 · 가로축 숫자(0건·19건 …) · 놓은 이름 · 그은 잇는 선 */
+    var ob = { boxes: pts.map(function (o) { return o.box; }), labs: [], lines: [] };
+    g.font = '600 10.5px Pretendard,"Malgun Gothic",sans-serif';
+    for (var ti = 0; ti <= 4; ti++) { var tt = n(maxX * ti / 4) + '건', tw = g.measureText(tt).width, tb = [padL + (ti / 4) * pw - tw / 2 - 2, padT + ph + 7, tw + 4, 16]; ob.boxes.push(tb); ob.labs.push(tb); }
+    g.font = '750 11.5px Pretendard,"Malgun Gothic",sans-serif';
+    var lineCol = ST.dark ? 'rgba(203,213,225,.55)' : 'rgba(71,85,105,.45)', nameCol = ST.dark ? '#f8fafc' : '#1e293b';
+    function put(o, s) {
+      ob.boxes.push(s.box); ob.labs.push(s.box);
+      if (s.far) {
+        var a = leadFrom(o, s.lx, s.ly); ob.lines.push([a[0], a[1], s.lx, s.ly]);
+        g.strokeStyle = lineCol; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(s.lx, s.ly); g.stroke();
+      }
+      g.fillStyle = nameCol; g.textAlign = s.al; g.textBaseline = s.tb; g.fillText(o.p.name, s.tx, s.ty);
+    }
+    var order = pts.slice().sort(function (a, b) { return (b.hot ? 1 : 0) - (a.hot ? 1 : 0) || b.r - a.r; }), rest = [], hidden = 0;
+    order.forEach(function (o) {
+      var s = labelSpot(g, o, ob, [padL + 2, padT - 2, W - 2, H - 2], pts);   /* 왼쪽 세로축 숫자 자리로는 내보내지 않는다 */
+      if (s) put(o, s); else rest.push(o);
+    });
+    rest.sort(function (a, b) { return a.y - b.y; }).forEach(function (o) {
+      var s = edgeSpot(g, o, ob, padL + 4, W - 6, padT + 8, padT + ph - 2, pts);
+      if (s) put(o, s); else hidden++;
+    });
+    if (hidden) {
+      /* 머리 줄 오른쪽 — 왼쪽 머리 글(↑ 입금 기여 …)과 안 겹치는 가장 긴 문구 */
+      g.font = '700 11px Pretendard,"Malgun Gothic",sans-serif';
+      var headW = g.measureText((FO ? '↑ 입금 기여(만원)' : '입금 못 읽음 — 세로축 없음') + ' · ' + (MONTHS()[bMi] || '')).width;
+      g.font = '600 10.5px Pretendard,"Malgun Gothic",sans-serif';
+      var notes = ['이름 생략 ' + hidden + '명 — 원에 올려 보면 이름', '이름 생략 ' + hidden + '명', '생략 ' + hidden];
+      var note = notes.filter(function (t) { return headW + 12 + g.measureText(t).width <= pw; })[0];
+      if (note) { g.fillStyle = txtCol; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(note, padL + pw, padT - 14); }
+    }
+  }
+  /* 잇는 선은 원 테두리에서 시작한다 */
+  function leadFrom(o, lx, ly) { var dx = lx - o.x, dy = ly - o.y, d = Math.sqrt(dx * dx + dy * dy) || 1, R = (o.ro || o.r) + 2; return [o.x + dx / d * R, o.y + dy / d * R]; }
+  /* 선분이 상자(안쪽 1px)를 지나가나 — 리앙–바스키 자르기로 정확히(모서리만 스치는 것도 잡는다) */
+  function segHitsBox(x1, y1, x2, y2, b) {
+    var dx = x2 - x1, dy = y2 - y1, t0 = 0, t1 = 1;
+    var p = [-dx, dx, -dy, dy], q = [x1 - (b[0] + 1), (b[0] + b[2] - 1) - x1, y1 - (b[1] + 1), (b[1] + b[3] - 1) - y1];
+    for (var i = 0; i < 4; i++) {
+      if (p[i] === 0) { if (q[i] < 0) return false; continue; }
+      var t = q[i] / p[i];
+      if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+    }
+    return t0 <= t1;
+  }
+  /* 원 o 에서 (lx,ly) 로 잇는 선이 다른 원이나 이름(·축 숫자)을 지나가나 */
+  function lineCrosses(o, lx, ly, pts, labs) {
+    var a = leadFrom(o, lx, ly), x = a[0], y = a[1], dx = lx - x, dy = ly - y, L = dx * dx + dy * dy || 1;
+    for (var i = 0; i < (pts || []).length; i++) {
+      var q = pts[i]; if (q === o) continue;
+      var t = Math.max(0, Math.min(1, ((q.x - x) * dx + (q.y - y) * dy) / L)), cx = x + t * dx - q.x, cy = y + t * dy - q.y, R = (q.ro || q.r) + 1;
+      if (cx * cx + cy * cy < R * R) return true;
+    }
+    for (var j = 0; j < (labs || []).length; j++) if (segHitsBox(x, y, lx, ly, labs[j])) return true;
+    return false;
+  }
+  /* 이름 상자가 테두리 안이고, 다른 상자·그은 선과 안 겹치나 (own = 제 원 상자는 빼고) */
+  function boxFree(box, ob, bound, own) {
+    if (box[0] < bound[0] || box[1] < bound[1] || box[0] + box[2] > bound[2] || box[1] + box[3] > bound[3]) return false;
+    for (var bi = 0; bi < ob.boxes.length; bi++) {
+      var b = ob.boxes[bi];
+      if (b === own) continue;
+      if (box[0] < b[0] + b[2] && box[0] + box[2] > b[0] && box[1] < b[1] + b[3] && box[1] + box[3] > b[1]) return false;
+    }
+    for (var li = 0; li < ob.lines.length; li++) { var s = ob.lines[li]; if (segHitsBox(s[0], s[1], s[2], s[3], box)) return false; }
+    return true;
+  }
+  /* 이름표 자리 — 원 둘레 열 방향 × 세 거리 */
+  function labelSpot(g, o, ob, bound, pts) {
+    var w = g.measureText(o.p.name).width, h = 14;
+    var dirs = [[0, -1], [0, 1], [1, 0], [-1, 0], [0.75, -0.75], [-0.75, -0.75], [0.75, 0.75], [-0.75, 0.75], [0.4, -0.92], [-0.4, -0.92]];
+    var R0 = o.ro || o.r, dists = [R0 + 5, R0 + 26, R0 + 48];
+    for (var di = 0; di < dists.length; di++) {
+      for (var k = 0; k < dirs.length; k++) {
+        var ux = dirs[k][0], uy = dirs[k][1], lx = o.x + ux * dists[di], ly = o.y + uy * dists[di];
+        var al = ux > 0.1 ? 'left' : (ux < -0.1 ? 'right' : 'center'), tb = uy < -0.1 ? 'bottom' : (uy > 0.1 ? 'top' : 'middle');
+        var bx = al === 'left' ? lx : (al === 'right' ? lx - w : lx - w / 2), by = tb === 'bottom' ? ly - h : (tb === 'top' ? ly : ly - h / 2);
+        var box = [bx - 2, by - 1, w + 4, h + 2];
+        if (!boxFree(box, ob, bound, o.box)) continue;
+        if (di > 0 && lineCrosses(o, lx, ly, pts, ob.labs)) continue;
+        return { tx: lx, ty: ly, al: al, tb: tb, box: box, far: di > 0, lx: lx, ly: ly };
+      }
+    }
+    return null;
+  }
+  /* 가장자리 줄 — 원과 가까운 쪽 가장자리부터, 원 높이에서 위아래로 16px 씩 비켜 가며 */
+  function edgeSpot(g, o, ob, xl, xr, top, bot, pts) {
+    var w = g.measureText(o.p.name).width, sides = (o.x > (xl + xr) / 2) ? ['r', 'l'] : ['l', 'r'];
+    for (var k = 0; k < 40; k++) {
+      var y = o.y + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 16;
+      if (y < top || y > bot) continue;
+      for (var si = 0; si < 2; si++) {
+        var right = sides[si] === 'r', box = right ? [xr - w - 2, y - 8, w + 4, 16] : [xl - 2, y - 8, w + 4, 16];
+        if (!boxFree(box, ob, [xl - 3, top - 9, xr + 3, bot + 9], null)) continue;
+        var lx = right ? xr - w - 4 : xl + w + 4;
+        if (lineCrosses(o, lx, y, pts, ob.labs)) continue;
+        return { tx: right ? xr : xl, ty: y, al: right ? 'right' : 'left', tb: 'middle', box: box, far: true, lx: lx, ly: y };
+      }
+    }
+    return null;
   }
 
   /* ══ 7-C. 업무량 산맥 (업무 기록 건수 — 근태 시간은 근태 자료 연결 전) ══ */
@@ -804,41 +910,99 @@
     });
     return groups.length ? (!FO ? finWhy() + ' — 건물 높이는 그리지 않습니다' : '') : '보일 업체가 없습니다(업체 목록을 못 읽었거나 비어 있음)';
   }
+  /* 2D 는 «업체 막대 목록» (대표 2026-11-22 「2D 는 너무 빡빡하게 붙어 내용이 전혀 확인이 안 된다」).
+     옛 점 그림(가로=업무 건수·세로=12개월 입금)은 업무 건수가 0~2건에 몰려 업체 백몇십 곳이 세 줄로 겹치고, 미수 업체마다 이름을 달아 글자가 뭉쳤다.
+     → 한 줄에 한 업체: 담당 색 점(노란 고리 = 자문료 미수 추정) · 업체 이름 · 12개월 입금 막대 · 업무 건수 · 미수 달 수.
+       구역·«미수만»을 고르면 그 업체만 남기고, 한 쪽에 들어가는 만큼씩 ◀ ▶ 로 넘겨 본다. 막대 길이는 «고른 업체 전체» 가운데 가장 큰 값 기준(쪽마다 잣대가 바뀌지 않게). */
+  var E2D = { sort: 'inc', off: 0, ps: 0, pg: '', want: null };
+  var E2D_SORTS = { inc: '12개월 입금 큰 차례', task: '업무 많은 차례', misu: '미수 큰 차례' };
+  function e2dList() {
+    var out = [], FO = finOk();
+    cityGroups().forEach(function (gr) {
+      if (eState.focus != null && eState.focus !== gr.key) return;
+      gr.list.forEach(function (co) { if (eState.misu && co.misu !== true) return; out.push({ co: co, gr: gr }); });
+    });
+    var s = FO ? E2D.sort : 'task';
+    out.sort(function (a, b) {
+      var A = a.co, B = b.co;
+      if (s === 'task') return (B.task - A.task) || (B.inc12 - A.inc12);
+      if (s === 'misu') return ((B.misu === true ? 1 : 0) - (A.misu === true ? 1 : 0)) || ((B.misuAmt || 0) - (A.misuAmt || 0)) || (B.inc12 - A.inc12);
+      return (B.inc12 - A.inc12) || (B.task - A.task);
+    });
+    return out;
+  }
+  /* 3D 에서 고른 업체가 다른 쪽에 있으면 그 쪽으로 넘긴다 — 쪽 크기는 그릴 때 정해지므로(3D 만 볼 때는 아직 모름) 그릴 때 넘긴다 */
+  function e2dShow(cid) {
+    if (!cid) return;
+    E2D.want = cid; CH.e.dirty = true;
+  }
+  function e2dPager(total) {
+    var box = $('e2dPg'); if (!box) return;
+    var ps = E2D.ps || 1, key = total + '|' + E2D.off + '|' + ps;
+    if (key === E2D.pg) return;
+    E2D.pg = key;
+    box.hidden = total <= ps;
+    $('e2dPgTx').textContent = total ? (E2D.off + 1) + '–' + Math.min(E2D.off + ps, total) + ' / ' + total + '곳' : '';
+    $('e2dPrev').disabled = E2D.off <= 0;
+    $('e2dNext').disabled = E2D.off + ps >= total;
+  }
   function drawCity2D(c, g) {
-    var groups = cityGroups(), FO = finOk(); if (!groups.length) return;
-    var W = c.w, H = c.h, padL = 58, padR = 20, padT = 62, padB = 38;
-    var pw = Math.max(40, W - padL - padR), ph = Math.max(40, H - padT - padB);
-    var txtCol = ST.dark ? '#cbd5e1' : '#475569', gridCol = ST.dark ? 'rgba(148,163,184,.20)' : 'rgba(203,213,225,.70)';
-    var maxX = 1, maxY = 1, all = [];
-    groups.forEach(function (gr) { gr.list.forEach(function (co) { all.push({ co: co, gr: gr }); if (co.task > maxX) maxX = co.task; if (co.inc12 > maxY) maxY = co.inc12; }); });
-    maxX = Math.max(4, maxX * 1.12); maxY *= 1.12;
-    for (var i = 0; i <= 4; i++) {
-      var gy = padT + ph - (i / 4) * ph, gx = padL + (i / 4) * pw;
-      g.strokeStyle = gridCol; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, gy); g.lineTo(padL + pw, gy); g.stroke(); g.beginPath(); g.moveTo(gx, padT); g.lineTo(gx, padT + ph); g.stroke();
-      g.font = '600 10.5px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = txtCol;
-      if (FO) { g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText(man(maxY * i / 4), padL - 7, gy); }
-      g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(n(maxX * i / 4) + '건', gx, padT + ph + 8);
+    var FO = finOk(), list = e2dList(), W = c.w, H = c.h;
+    var txtCol = ST.dark ? '#cbd5e1' : '#475569', ink = ST.dark ? '#f8fafc' : '#1e293b', lineCol = ST.dark ? 'rgba(148,163,184,.16)' : 'rgba(226,232,240,1)';
+    var narrow = W < 470, padX = narrow ? 10 : 16, padT = 78, padB = 50, rowH = narrow ? 27 : 26;
+    var ps = Math.max(3, Math.floor((H - padT - padB) / rowH));
+    if (E2D.ps && E2D.ps !== ps) E2D.off = Math.floor(E2D.off / ps) * ps;   /* 폭·높이가 바뀌면 쪽 경계를 새 쪽 크기에 맞춘다(앞뒤 쪽이 겹치지 않게) */
+    E2D.ps = ps;
+    if (E2D.want) {
+      if (SC.e && SC.e.pin) { for (var wi = 0; wi < list.length; wi++) if (list[wi].co.id === E2D.want) { E2D.off = Math.floor(wi / ps) * ps; break; } }   /* 3D 에서 아직 고른 채일 때만(Esc·처음 자리로 단추로 풀었으면 넘기지 않는다) */
+      E2D.want = null;
     }
-    g.font = '700 11px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = txtCol; g.textAlign = 'left';
-    g.fillText(FO ? '↑ 12개월 입금(만원) · 노란 고리 = 자문료 미수 추정' : '입금 못 읽음 — 업무 건수만', padL, padT - 13);
-    var used = [];
-    all.forEach(function (o2) {
-      var co = o2.co, gr = o2.gr;
-      var fade = (eState.focus != null && eState.focus !== gr.key) || (eState.misu && co.misu !== true);
-      var px = padL + (co.task / maxX) * pw, py = padT + ph - (FO ? co.inc12 / maxY : 0) * ph;
-      var r = co.misu === true ? 8.5 : 6.5, isHot = (c.hot === co.id || c.pin === co.id);
-      var rgb = hex2rgb(gr.color); if (ST.dark) rgb = shade(rgb, 0.22);
-      g.globalAlpha = fade ? 0.16 : 0.92;
-      if (co.misu === true) { g.strokeStyle = '#fbbf24'; g.lineWidth = 2.6; g.beginPath(); g.arc(px, py, r + 3.5, 0, 6.2832); g.stroke(); }
-      g.fillStyle = rgba(rgb, 1); g.beginPath(); g.arc(px, py, r, 0, 6.2832); g.fill();
-      g.strokeStyle = isHot ? '#ffffff' : 'rgba(255,255,255,.55)'; g.lineWidth = isHot ? 2.4 : 1; g.stroke();
-      if (isHot || (co.misu === true && !fade) || (FO && co.inc12 > maxY * 0.55)) {
-        var lx = px, ly = py - r - 5, skip = false;
-        for (var ui = 0; ui < used.length; ui++) { if (Math.abs(used[ui][0] - lx) < 26 && Math.abs(used[ui][1] - ly) < 13) { if (!isHot && co.misu !== true) { skip = true; break; } ly = py + r + 13; break; } }
-        if (!skip) { used.push([lx, ly]); g.font = '700 10px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = ST.dark ? '#f8fafc' : '#1e293b'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(fitText(g, coShort(co), 96), lx, ly); }
-      }
-      g.globalAlpha = 1;
-      if (!fade) c.hits.push({ id: co.id, cid: co.id, circle: [px, py, r + 5], tip: '<b>' + esc(coLabel(co)) + '</b> (2D · 담당 ' + esc(gr.name) + ')<br>12개월 입금 ' + (FO ? won(co.inc12) : '못 읽음') + ' · 업무 ' + co.task + '건' + (co.misu === true ? '<br><b>⚠ 자문료 미수 추정</b>' : '') });
+    if (E2D.off >= list.length) E2D.off = Math.max(0, Math.floor((list.length - 1) / ps) * ps);
+    e2dPager(list.length);
+    /* 머리 한 줄 — 무엇을 어떤 차례로 몇 곳 보이는지 */
+    var gname = '';
+    if (eState.focus != null) { var fg = cityGroups().filter(function (x) { return x.key === eState.focus; })[0]; gname = fg ? fg.name + ' 구역 · ' : ''; }
+    g.font = '700 11.5px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = txtCol; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText(fitText(g, gname + (eState.misu ? '미수 업체만 · ' : '') + (FO ? E2D_SORTS[E2D.sort] : '업무 많은 차례(입금 못 읽음)') + ' · ' + n(list.length) + '곳', W - padX * 2), padX, 46);
+    if (!list.length) {
+      g.font = '700 13px Pretendard,"Malgun Gothic",sans-serif'; g.textAlign = 'center'; g.fillStyle = txtCol;
+      g.fillText(eState.misu ? '고른 구역에 미수 추정 업체가 없습니다' : '보일 업체가 없습니다', W / 2, H / 2);
+      return;
+    }
+    var maxV = 1; list.forEach(function (x) { var v = FO ? x.co.inc12 : x.co.task; if (v > maxV) maxV = v; });
+    var nameX = padX + 18, nameW = narrow ? Math.max(76, Math.min(118, W * 0.33)) : Math.max(120, Math.min(220, W * 0.27));
+    var misuW = narrow ? 0 : 66, taskW = narrow ? 42 : 58;
+    var taskR = W - padX - misuW, barX0 = nameX + nameW + 10, barX1 = taskR - taskW - 6;
+    /* 금액 글자 자리는 «고른 업체 전체에서 가장 긴 금액»을 재서 비운다 — 큰 금액이 업무 칸을 덮지 않고, 쪽을 넘겨도 막대 잣대가 같게(막대 칸의 절반까지) */
+    var page = list.slice(E2D.off, E2D.off + ps);
+    function amtTxt(co) { var v = FO ? co.inc12 : co.task; return FO ? (v ? won(v) : '0원') : n(v) + '건'; }   /* 음수 입금은 부호 그대로(won 이 − 를 붙임) */
+    g.font = '700 11px Pretendard,"Malgun Gothic",sans-serif';
+    var amtW = 8; list.forEach(function (o2) { amtW = Math.max(amtW, g.measureText(amtTxt(o2.co)).width + 8); });
+    amtW = Math.min(amtW, Math.max(40, (barX1 - barX0) * 0.5));
+    var barMax = Math.max(20, barX1 - barX0 - amtW);
+    /* 칸 이름 */
+    g.font = '700 10.5px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = txtCol; g.textBaseline = 'middle';
+    g.textAlign = 'left'; g.fillText('업체', nameX, padT - 12); g.fillText(FO ? '12개월 입금' : '업무 건수', barX0, padT - 12);
+    g.textAlign = 'right'; g.fillText('업무', taskR, padT - 12); if (misuW) g.fillText('미수 추정', W - padX, padT - 12);
+    g.strokeStyle = lineCol; g.lineWidth = 1; g.beginPath(); g.moveTo(padX, padT - 2); g.lineTo(W - padX, padT - 2); g.stroke();
+    page.forEach(function (o2, i) {
+      var co = o2.co, gr = o2.gr, y = padT + i * rowH, cy = y + rowH / 2;
+      var isHot = (c.hot === co.id || c.pin === co.id), rgb = hex2rgb(gr.color); if (ST.dark) rgb = shade(rgb, 0.22);
+      if (isHot) { g.fillStyle = ST.dark ? 'rgba(96,165,250,.20)' : 'rgba(37,99,235,.08)'; g.fillRect(padX - 4, y + 1, W - padX * 2 + 8, rowH - 2); }
+      g.strokeStyle = lineCol; g.lineWidth = 1; g.beginPath(); g.moveTo(padX, y + rowH - 0.5); g.lineTo(W - padX, y + rowH - 0.5); g.stroke();
+      /* 담당 색 점 + 미수면 노란 고리 */
+      if (co.misu === true) { g.strokeStyle = '#fbbf24'; g.lineWidth = 2.2; g.beginPath(); g.arc(padX + 6, cy, 7, 0, 6.2832); g.stroke(); }
+      g.fillStyle = rgba(rgb, 1); g.beginPath(); g.arc(padX + 6, cy, 4.2, 0, 6.2832); g.fill();
+      g.font = (isHot ? '800' : '650') + ' 12px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = ink; g.textAlign = 'left';
+      g.fillText(fitText(g, coShort(co), nameW), nameX, cy);
+      var v = FO ? co.inc12 : co.task, bw = v > 0 ? Math.max(2, v / maxV * barMax) : 0;
+      if (bw) { g.fillStyle = rgba(rgb, isHot ? 1 : 0.82); g.fillRect(barX0, cy - 5.5, bw, 11); }
+      g.font = '700 11px Pretendard,"Malgun Gothic",sans-serif'; g.fillStyle = v > 0 ? ink : txtCol; g.textAlign = 'left';
+      g.fillText(fitText(g, amtTxt(co), Math.max(20, barX1 - barX0 - bw - 6)), barX0 + bw + 6, cy);
+      g.fillStyle = txtCol; g.textAlign = 'right'; g.font = '600 11px Pretendard,"Malgun Gothic",sans-serif';
+      g.fillText(fitText(g, n(co.task) + '건', taskW - 4), taskR, cy);
+      if (misuW && co.misu === true) { g.fillStyle = ST.dark ? '#fde68a' : '#854d0e'; g.font = '700 11px Pretendard,"Malgun Gothic",sans-serif'; g.fillText(co.misuMonths ? co.misuMonths + '달' : '미수', W - padX, cy); }
+      c.hits.push({ id: co.id, cid: co.id, rect: [padX - 4, y, W - padX * 2 + 8, rowH], tip: '<b>' + esc(coLabel(co)) + '</b> (2D · 담당 ' + esc(gr.name) + ')<br>12개월 입금 ' + (FO ? won(co.inc12) : '못 읽음') + ' · 누적 ' + (FO ? won(co.incAll) : '—') + ' · 업무 ' + co.task + '건' + (co.misu === true ? '<br><b>⚠ 자문료 미수 추정 ' + (co.misuMonths || '') + '달 · ' + won(co.misuAmt) + '</b>' : '') });
     });
   }
 
@@ -890,7 +1054,7 @@
       var p = co.owner ? personById(co.owner) : null;
       setSync('syncTxtE', '🔗 E안 연동됨: ' + coLabel(co) + ' · ' + (p ? p.name : '담당 없음') + ' (12개월 ' + (finOk() ? won(co.inc12) : '못 읽음') + (co.misu === true ? ' · ⚠미수' : '') + ')');
     }
-    SC.e.onPick = function (it) { var cid = it ? it.cid : null; CH.e.pin = SC.e.pin ? cid : null; CH.e.dirty = true; if (cid) eSync(cid); };
+    SC.e.onPick = function (it) { var cid = it ? it.cid : null; CH.e.pin = SC.e.pin ? cid : null; CH.e.dirty = true; if (cid) eSync(cid); if (cid && CH.e.pin) e2dShow(cid); else E2D.want = null; };
     CH.e.onPick = function (h) { SC.e.pin = CH.e.pin; SC.e.dirty = true; if (h && h.cid) eSync(h.cid); };
     /* (7) 다년 */
     SC.m.onHover = function (it) { CH.m.hot = it ? it.id : null; CH.m.dirty = true; };
@@ -1158,7 +1322,9 @@
     chipRow('cMetric', [{ k: 'cnt', name: '업무 기록 건수(건/주)', on: true }, { k: 'hour', name: '근태 기준 근로시간(시간/주) — 근태 자료 연결 전', disabled: true, title: '근태 자료(data/attendance_records)를 아직 잇지 않았습니다 — 잇더라도 근로시간 확정치가 아니라 눈대중입니다' }], function () {});
     chipRow('dCats', CATS().map(function (c) { return { k: c.k, name: c.name, color: c.color, off: !!dHidden[c.k] }; }), function (k, on) { if (on) delete dHidden[k]; else dHidden[k] = 1; smsg('smD', buildRing(SC.d, dHidden)); SC.d.dirty = true; CH.d.dirty = true; renderDTbl(); }, true);
     var groups = cityGroups();
-    chipRow('eDist', [{ k: null, name: '모두', on: eState.focus == null }].concat(groups.map(function (g) { return { k: g.key, name: g.name, color: g.color, on: eState.focus === g.key }; })), function (k) { eState.focus = k; smsg('smE', buildCity(SC.e, eState)); SC.e.dirty = true; CH.e.dirty = true; });
+    chipRow('eDist', [{ k: null, name: '모두', on: eState.focus == null }].concat(groups.map(function (g) { return { k: g.key, name: g.name, color: g.color, on: eState.focus === g.key }; })), function (k) { eState.focus = k; E2D.off = 0; smsg('smE', buildCity(SC.e, eState)); SC.e.dirty = true; CH.e.dirty = true; });
+    var eFO = finOk();
+    chipRow('eSort', Object.keys(E2D_SORTS).map(function (k) { return { k: k, name: E2D_SORTS[k], on: (eFO ? E2D.sort : 'task') === k, disabled: !eFO && k !== 'task', title: !eFO && k !== 'task' ? '입금을 못 읽어 업무 많은 차례로만 봅니다' : '' }; }), function (k) { E2D.sort = k; E2D.off = 0; CH.e.dirty = true; });
   }
   function rebuildScenes(grow) {
     refreshBMax();
@@ -1783,7 +1949,9 @@
       btn.textContent = '⏸ 멈춤'; setPressed(btn, true); var mi = 0; setB(0);
       bTimer = setInterval(function () { mi++; if (mi > MONTHS().length - 1) { stop(); return; } setB(mi); }, 820);
     });
-    $('eMisu').addEventListener('click', function (e) { if (!DS) return; eState.misu = !eState.misu; setPressed(e.currentTarget, eState.misu); smsg('smE', buildCity(SC.e, eState)); SC.e.dirty = true; CH.e.dirty = true; });
+    $('e2dPrev').addEventListener('click', function () { E2D.off = Math.max(0, E2D.off - (E2D.ps || 1)); CH.e.dirty = true; });
+    $('e2dNext').addEventListener('click', function () { E2D.off += (E2D.ps || 1); CH.e.dirty = true; });
+    $('eMisu').addEventListener('click', function (e) { if (!DS) return; eState.misu = !eState.misu; E2D.off = 0; setPressed(e.currentTarget, eState.misu); smsg('smE', buildCity(SC.e, eState)); SC.e.dirty = true; CH.e.dirty = true; });
     chipRow('bRow', [{ k: null, name: '모두', on: true }, { k: 'client', name: '의뢰인 업무' }, { k: 'store', name: '자료함' }, { k: 'sales', name: '영업관리' }, { k: 'inside', name: '내부관리' }], function (k) { bState.row = k; renderBoard(); });
     $('bWarnOnly').addEventListener('click', function (e) { bState.warnOnly = !bState.warnOnly; setPressed(e.currentTarget, bState.warnOnly); renderBoard(); });
     $('bSortWarn').addEventListener('click', function (e) { bState.warnFirst = !bState.warnFirst; setPressed(e.currentTarget, bState.warnFirst); renderBoard(); });
