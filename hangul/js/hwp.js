@@ -9,7 +9,11 @@
   function readCfb(buffer) {
     const b = new Uint8Array(buffer), v = new DataView(b.buffer, b.byteOffset, b.byteLength);
     const SIG = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
-    if (!SIG.every((x, i) => b[i] === x)) throw new Error('HWP 문서 형식이 아닙니다.');
+    if (!SIG.every((x, i) => b[i] === x)) {
+      // 한글 97 이전(HWP 3.x) 문서는 머리가 "HWP Document File" — 이유를 알려 준다
+      if (String.fromCharCode(...b.subarray(0, 17)) === 'HWP Document File') throw new Error('한글 97 이전 형식(HWP 3.0) 문서는 열 수 없습니다 — 한글에서 열어 .hwpx 로 다시 저장해 주세요.');
+      throw new Error('HWP 문서 형식이 아닙니다.');
+    }
     const secSize = 1 << v.getUint16(30, true), miniSize = 1 << v.getUint16(32, true);
     const numFat = v.getUint32(44, true), dirStart = v.getUint32(48, true), miniCutoff = v.getUint32(56, true);
     const miniFatStart = v.getUint32(60, true), difatStart = v.getUint32(68, true);
@@ -64,21 +68,138 @@
     return files;
   }
 
-  // 압축 해제 — HWP 스트림은 압축 끝 뒤에 채움 바이트가 붙는 경우가 있어, 그때까지 풀린 내용을 사용
-  async function inflate(data) {
+  /* 압축 해제 — ⚠★ 절대 «잘린 결과»를 «성공»으로 돌려주지 않는다 (2026-11-08).
+     한컴이 저장한 HWP 의 압축 스트림(DocInfo·BodyText·BinData) 끝에는 8바이트 꼬리(CRC32 + 풀린 크기)가 붙어 있다.
+     브라우저의 DecompressionStream 은 이 꼬리를 «Junk found after end of compressed data» 로 거절하는데,
+     옛 코드는 «그때까지 풀린 내용을 사용» 했다 → 이미 읽어 둔 첫 128KB 만 건지고 나머지는 버려져
+     큰 문서는 본문 글이 약 5%(편람: 문단 1,974개 중 411개)만 읽히고, DocInfo(글자·문단 모양)와 큰 그림도 잘렸다.
+     그래서 ① 통째로 풀어 보고 ② 오류면 꼬리 8바이트를 떼고(풀린 크기가 꼬리에 적힌 크기와 «같을 때만» 받는다)
+     ③ 그래도 안 되면 자체 해제기(inflateRawJs — 압축 끝에서 멈추고 뒤의 자투리는 보지 않는다)로 푼다. */
+  /* 압축 폭탄 방어(2026-11-09): 한 줄기(스트림)는 128MB, 문서 전체는 256MB 까지만 푼다(실제 문서: 바탕화면 .hwp 18,287개 중 가장 큰 한 줄기 37MB, 문서 합 38MB).
+     넘으면 «다시 시도하지 않고» 바로 던진다. 자체 해제기도 버퍼를 이 상한 안에서만 잡는다. */
+  const MAX_INFLATE_STREAM = 128 * 1024 * 1024, MAX_INFLATE_DOC = 256 * 1024 * 1024;
+  const tooBig = () => Object.assign(new Error('압축을 푼 크기가 너무 큽니다. (손상됐거나 악의적으로 만든 파일일 수 있어 열지 않습니다)'), { tooBig: true });
+  async function nativeInflate(data, limit) {
     const ds = new DecompressionStream('deflate-raw');
     const w = ds.writable.getWriter();
     w.write(data).catch(() => {});
     w.close().catch(() => {});
     const reader = ds.readable.getReader(), chunks = [];
     let total = 0;
-    try {
-      for (;;) { const { value, done } = await reader.read(); if (done) break; chunks.push(value); total += value.length; }
-    } catch (e) { if (!total) throw e; }
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break; // 오류가 나면 그대로 던진다(일부만 돌려주지 않는다)
+      total += value.length;
+      if (total > limit) { Promise.resolve().then(() => reader.cancel()).catch(() => {}); throw tooBig(); }
+      chunks.push(value);
+    }
     const out = new Uint8Array(total);
     let o = 0;
     for (const c of chunks) { out.set(c, o); o += c.length; }
     return out;
+  }
+  // RFC 1951 inflate — 압축 끝(마지막 블록)에서 멈춘다. 느리지만(한 비트씩) 브라우저 해제기가 거절하는 자투리 있는 자료의 마지막 보루.
+  function inflateRawJs(src, limit = MAX_INFLATE_STREAM) {
+    // 첫 버퍼도 늘릴 때도 상한(limit)을 넘지 않는다
+    let pos = 0, bitBuf = 0, bitCnt = 0, out = new Uint8Array(Math.min(limit, Math.max(4096, src.length * 4))), op = 0;
+    const bits = n => {
+      while (bitCnt < n) { if (pos >= src.length) throw new Error('압축 자료가 중간에 끝났습니다.'); bitBuf |= src[pos++] << bitCnt; bitCnt += 8; }
+      const v = bitBuf & ((1 << n) - 1);
+      bitBuf >>>= n; bitCnt -= n;
+      return v;
+    };
+    const build = (lens, n) => {
+      const count = new Uint16Array(16), offs = new Uint16Array(16), symbol = new Uint16Array(n);
+      for (let i = 0; i < n; i++) count[lens[i]]++;
+      count[0] = 0;
+      for (let l = 1; l < 15; l++) offs[l + 1] = offs[l] + count[l];
+      for (let i = 0; i < n; i++) if (lens[i]) symbol[offs[lens[i]]++] = i;
+      return { count, symbol };
+    };
+    const decode = h => {
+      let code = 0, first = 0, index = 0;
+      for (let len = 1; len <= 15; len++) {
+        code |= bits(1);
+        const c = h.count[len];
+        if (code - c < first) return h.symbol[index + (code - first)];
+        index += c; first += c; first <<= 1; code <<= 1;
+      }
+      throw new Error('압축 자료가 잘못됐습니다.');
+    };
+    const LBASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+    const LEXT = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+    const DBASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+    const DEXT = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+    const grow = n => { if (op + n > limit) throw tooBig(); if (op + n > out.length) { const t = new Uint8Array(Math.min(limit, Math.max(out.length * 2, op + n))); t.set(out.subarray(0, op)); out = t; } };
+    const codes = (lh, dh) => {
+      for (;;) {
+        const sym = decode(lh);
+        if (sym < 256) { grow(1); out[op++] = sym; continue; }
+        if (sym === 256) return;
+        const li = sym - 257;
+        if (li >= 29) throw new Error('압축 자료가 잘못됐습니다.');
+        const len = LBASE[li] + bits(LEXT[li]);
+        const ds = decode(dh);
+        if (ds >= 30) throw new Error('압축 자료가 잘못됐습니다.');
+        const dist = DBASE[ds] + bits(DEXT[ds]);
+        if (dist > op) throw new Error('압축 자료가 잘못됐습니다.');
+        grow(len);
+        for (let i = 0; i < len; i++, op++) out[op] = out[op - dist];
+      }
+    };
+    let fixed = null;
+    for (let last = 0; !last;) {
+      last = bits(1);
+      const type = bits(2);
+      if (type === 0) {
+        bitBuf = 0; bitCnt = 0; // 바이트 경계로
+        if (pos + 4 > src.length) throw new Error('압축 자료가 중간에 끝났습니다.');
+        const len = src[pos] | (src[pos + 1] << 8), nlen = src[pos + 2] | (src[pos + 3] << 8);
+        if ((len ^ 0xffff) !== nlen) throw new Error('압축 자료가 잘못됐습니다.');
+        pos += 4;
+        if (pos + len > src.length) throw new Error('압축 자료가 중간에 끝났습니다.');
+        grow(len); out.set(src.subarray(pos, pos + len), op); op += len; pos += len;
+      } else if (type === 1) {
+        if (!fixed) {
+          const l = new Uint8Array(288);
+          for (let i = 0; i < 144; i++) l[i] = 8;
+          for (let i = 144; i < 256; i++) l[i] = 9;
+          for (let i = 256; i < 280; i++) l[i] = 7;
+          for (let i = 280; i < 288; i++) l[i] = 8;
+          fixed = { lh: build(l, 288), dh: build(new Uint8Array(30).fill(5), 30) };
+        }
+        codes(fixed.lh, fixed.dh);
+      } else if (type === 2) {
+        const nlen = bits(5) + 257, ndist = bits(5) + 1, ncode = bits(4) + 4;
+        if (nlen > 286 || ndist > 30) throw new Error('압축 자료가 잘못됐습니다.');
+        const ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+        const lens = new Uint8Array(320);
+        for (let i = 0; i < ncode; i++) lens[ORDER[i]] = bits(3);
+        const ch = build(lens.subarray(0, 19), 19);
+        lens.fill(0);
+        for (let i = 0; i < nlen + ndist;) {
+          const sym = decode(ch);
+          if (sym < 16) { lens[i++] = sym; continue; }
+          let rep, val = 0;
+          if (sym === 16) { if (!i) throw new Error('압축 자료가 잘못됐습니다.'); val = lens[i - 1]; rep = 3 + bits(2); }
+          else if (sym === 17) rep = 3 + bits(3);
+          else rep = 11 + bits(7);
+          if (i + rep > nlen + ndist) throw new Error('압축 자료가 잘못됐습니다.');
+          while (rep--) lens[i++] = val;
+        }
+        if (!lens[256]) throw new Error('압축 자료가 잘못됐습니다.');
+        codes(build(lens.subarray(0, nlen), nlen), build(lens.subarray(nlen, nlen + ndist), ndist));
+      } else throw new Error('압축 자료가 잘못됐습니다.');
+    }
+    return out.slice(0, op);
+  }
+  async function inflate(data, limit = MAX_INFLATE_STREAM) {
+    let err;
+    try { return await nativeInflate(data, limit); } catch (e) { if (e && e.tooBig) throw e; err = e; }
+    if (data.length > 8) { // 한컴 꼬리: CRC32(4) + 풀린 크기(4)
+      const isize = u32(data, data.length - 4);
+      try { const out = await nativeInflate(data.subarray(0, data.length - 8), limit); if (out.length === isize) return out; } catch (e) { if (e && e.tooBig) throw e; /* 아래로 */ }
+    }
+    try { return inflateRawJs(data, limit); } catch (e) { if (e && e.tooBig) throw e; throw err || e; }
   }
 
   // ---------------- 레코드 ----------------
@@ -178,6 +299,14 @@
   // 선 종류 (테두리·도형 선): 3 = 파선(DASH) — 서식 268개 변을 한글 HWPX 와 대조. 2 = 점선(DOT)은 각주 구분선 차례와 같게
   const LINE_TYPES = ['NONE', 'SOLID', 'DOT', 'DASH', 'DASH_DOT', 'DASH_DOT_DOT', 'LONG_DASH', 'CIRCLE', 'DOUBLE_SLIM', 'SLIM_THICK', 'THICK_SLIM', 'SLIM_THICK_SLIM', 'WAVE', 'DOUBLEWAVE', 'THICK_3D', 'THICK_3D_REVERS', '3D', '3D_REVERS'];
   const LINE_WIDTHS = [0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+  // 그리기 개체의 화살표·그림자·그림 채우기·그림 효과 — 읽기(readShapeComp)와 쓰기(buildHwp)가 같은 목록을 쓴다
+  const ARROWS = ['NORMAL', 'ARROW', 'SPEAR', 'CONCAVE_ARROW', 'EMPTY_DIAMOND', 'EMPTY_CIRCLE', 'EMPTY_BOX', 'FILLED_DIAMOND', 'FILLED_CIRCLE', 'FILLED_BOX'];
+  const ARROW_SZ = ['SMALL_SMALL', 'SMALL_MEDIUM', 'SMALL_LARGE', 'MEDIUM_SMALL', 'MEDIUM_MEDIUM', 'MEDIUM_LARGE', 'LARGE_SMALL', 'LARGE_MEDIUM', 'LARGE_LARGE'];
+  const SHADOWS = ['NONE', 'PARALLEL_LEFTTOP', 'PARALLEL_RIGHTTOP', 'PARALLEL_LEFTBOTTOM', 'PARALLEL_RIGHTBOTTOM', 'SHEAR_LEFTTOP', 'SHEAR_RIGHTTOP', 'SHEAR_LEFTBOTTOM', 'SHEAR_RIGHTBOTTOM'];
+  const IMG_MODES = ['TILE', 'TILE_HORZ_TOP', 'TILE_HORZ_BOTTOM', 'TILE_VERT_LEFT', 'TILE_VERT_RIGHT', 'TOTAL', 'CENTER', 'CENTER_TOP', 'CENTER_BOTTOM', 'LEFT_CENTER', 'LEFT_TOP', 'LEFT_BOTTOM', 'RIGHT_CENTER', 'RIGHT_TOP', 'RIGHT_BOTTOM', 'ZOOM'];
+  const EFFECTS = ['REAL_PIC', 'GRAY_SCALE', 'BLACK_WHITE', 'PATTERN8x8'];
+  const HATCHES = ['HORIZONTAL', 'VERTICAL', 'BACK_SLASH', 'SLASH', 'CROSS', 'CROSS_DIAGONAL'];
+  const GRAD_TYPES = ['LINEAR', 'LINEAR', 'RADIAL', 'CONICAL', 'SQUARE'];
   // 탭 채울 모양·각주 구분선 종류 (12가지 모두 한글 시험 문서로 확인)
   const TAB_LEADERS = ['NONE', 'SOLID', 'DOT', 'DASH', 'DASH_DOT', 'DASH_DOT_DOT', 'LONG_DASH', 'CIRCLE', 'DOUBLE_SLIM', 'SLIM_THICK', 'THICK_SLIM', 'SLIM_THICK_SLIM'];
   // 글자 밑줄·취소선 모양 (선 종류에서 '없음' 뺀 차례, 11 물결 · 15 이중 물결), 외곽선 종류, 강조점 —
@@ -222,7 +351,12 @@
         }
       } else if (r.tag === T.BORDER_FILL) {
         // 속성(2) + 테두리 4개 [종류(1) 굵기(1) 색(4)] + 대각선(6) + 채우기
+        const bfAttr = u16(d, 0), sl = (bfAttr >> 2) & 7, bsl = (bfAttr >> 5) & 7;
         const side = o => ({ type: LINE_TYPES[d[o]] || 'SOLID', width: LINE_WIDTHS[d[o + 1]] || 0.12, color: colorHex(u32(d, o + 2)) });
+        const diag = side(26);
+        const borders = { l: side(2), r: side(8), t: side(14), b: side(20) };
+        if (sl) borders.slash = Object.assign({}, diag);
+        if (bsl) borders.backSlash = Object.assign({}, diag);
         const ft = u32(d, 32), bg = u32(d, 36);
         // 채우기: 단색(12) · 그러데이션(유형1 + 4×5 + [위치] + 색) · 그림(채우는 방식 1 · 밝기·명암·효과 3 · 자료 번호 2)
         let fo = 36, img = null;
@@ -232,7 +366,7 @@
         info.fills.push({
           bg: ft & 1 && (bg >>> 24) !== 0xff ? colorHex(bg) : null, // 흰색 채우기도 그대로 (한글 HWPX 와 대조: 흰 칸 7개)
           rawBg: ft & 1 && (bg >>> 24) !== 0xff ? colorHex(bg) : null, // 흰색도 그대로 (문단 배경용). 맨 위 바이트 FF = 투명
-          borders: { l: side(2), r: side(8), t: side(14), b: side(20) },
+          borders,
           img,
         });
       } else if (r.tag === T.CHAR_SHAPE) {
@@ -406,14 +540,14 @@
     return d.subarray(off, off + 16);
   }
   // ViewText 구역 → 평문 레코드 자료
-  async function viewTextSection(raw, compressed) {
+  async function viewTextSection(raw, compressed, inflater = inflate) {
     const h = u32(raw, 0), tag = h & 0x3ff;
     let size = h >>> 20, o = 4;
     if (size === 0xfff) { size = u32(raw, 4); o = 8; }
     if (tag !== 28 || size < 256) throw new Error('배포용 문서 자료를 찾지 못했습니다.');
     const key = distributeKey(raw.subarray(o, o + 256));
     const plain = AES.decryptECB(key, raw.subarray(o + size));
-    return compressed ? inflate(plain) : plain;
+    return compressed ? inflater(plain) : plain;
   }
 
   // opts.docDate: 서식 파일(HWT)로 새로 만든 문서의 만든 날짜 (ISO 문자열) — '만든 날짜' 필드를 저장할 때 이 날짜로 채움
@@ -427,7 +561,10 @@
     if (props & 2) throw new Error('암호가 걸린 문서입니다. 한글 2022에서 암호를 해제한 뒤 여세요.');
     const distributed = !!(props & 4); // 배포용 문서: 본문이 ViewText 에 암호화돼 있음
     const compressed = !!(props & 1);
-    const load = async name => { const raw = files[name]; if (!raw) return null; return compressed ? inflate(raw) : raw; };
+    // 문서 전체에서 푼 크기를 합쳐 상한을 지킨다(압축 폭탄: 줄기를 여럿으로 쪼개 한 줄기 상한을 피하는 길도 막음)
+    let inflatedTotal = 0;
+    const inflateDoc = async d => { const out = await inflate(d, Math.min(MAX_INFLATE_STREAM, MAX_INFLATE_DOC - inflatedTotal)); inflatedTotal += out.length; return out; };
+    const load = async name => { const raw = files[name]; if (!raw) return null; return compressed ? inflateDoc(raw) : raw; };
 
     const info = parseDocInfo(records(await load('DocInfo')));
     const binFiles = {};
@@ -461,16 +598,24 @@
       return cand.find(f => f && /wingdings|webdings|symbol|marlett|dingbat/i.test(f)) || null;
     };
 
+    // 같은 그림을 여러 곳에서 가리켜도 한 번만 푼다 — 가리킬 때마다 풀면 메모리를 겹으로 잡고, 풀린 크기 상한에서도 거듭 빠져
+    //  정상 문서가 «너무 큽니다» 로 거절될 수 있다 (2026-11-20 점검). 풀린 자료는 함께 쓴다(고치지 않음)
+    const binCache = new Map();
     async function image(binId, w, h) {
       const bin = info.bins[binId - 1];
       if (!bin || bin.type === 0) return null;
       const ext = bin.ext || 'png';
       const mime = MIME[ext] || 'image/' + ext;
-      const name = ('BIN' + binId.toString(16).toUpperCase().padStart(4, '0') + '.' + ext).toUpperCase();
-      let data = binFiles[name];
-      if (!data) return null;
-      if (bin.comp === 1 || (bin.comp === 0 && compressed)) { try { data = await inflate(data); } catch (e) { /* 압축 안 된 그림 */ } }
-      return { mime, data: new Uint8Array(data), w: mm(w), h: mm(h) };
+      let data = binCache.get(binId);
+      if (!data) {
+        const name = ('BIN' + binId.toString(16).toUpperCase().padStart(4, '0') + '.' + ext).toUpperCase();
+        data = binFiles[name];
+        if (!data) return null;
+        if (bin.comp === 1 || (bin.comp === 0 && compressed)) { try { data = await inflateDoc(data); } catch (e) { if (e && e.tooBig) throw e; /* 압축 안 된 그림 */ } }
+        data = new Uint8Array(data);
+        binCache.set(binId, data);
+      }
+      return { mime, data, w: mm(w), h: mm(h) };
     }
 
     // 문단 묶음(리스트) 해석
@@ -493,20 +638,24 @@
       // 여백 (mm) + 원래 HWPUNIT 값 hu [왼·오·위·아래]
       const marginAt = (d, o) => ({ l: mm(u16(d, o)), r: mm(u16(d, o + 2)), t: mm(u16(d, o + 4)), b: mm(u16(d, o + 6)), hu: [u16(d, o), u16(d, o + 2), u16(d, o + 4), u16(d, o + 6)] });
       const tblMargin = tbl ? marginAt(tbl.data, 10) : null;
+      const tblIdx = ctrl.children.indexOf(tbl);
       const cells = [];
-      for (let k = 0; k < ctrl.children.length; k++) {
+      for (let k = Math.max(0, tblIdx + 1); k < ctrl.children.length; k++) {
         const n = ctrl.children[k];
         if (n.tag !== T.LIST_HEADER) continue;
         const d = n.data;
+        if (d.length < 32) continue; // 캡션 등 셀 속성이 없는 LIST_HEADER 건너뜀
         // 셀 속성 시작 위치: 대부분 8, 일부 6 — 값이 말이 되는 쪽을 고름
         let base = 8;
-        const ok = o => u16(d, o + 4) >= 1 && u16(d, o + 6) >= 1 && u16(d, o) < Math.max(colCnt, 1) + 1 && u16(d, o + 2) < Math.max(rowCnt, 1) + 1;
-        if (!ok(8) && ok(6)) base = 6;
+        const ok = o => o + 26 <= d.length && u16(d, o + 4) >= 1 && u16(d, o + 6) >= 1 && u16(d, o) < Math.max(colCnt, 1) + 1 && u16(d, o + 2) < Math.max(rowCnt, 1) + 1;
+        if (!ok(8)) { if (ok(6)) base = 6; else continue; }
         const flags = u32(d, base - 4);
         const va = (flags >> 5) & 3;
         cells.push({
           col: u16(d, base), row: u16(d, base + 2), colSpan: u16(d, base + 4) || 1, rowSpan: u16(d, base + 6) || 1,
-          width: u32(d, base + 8), height: mm(u32(d, base + 12)), hh: u32(d, base + 12),
+          // ⚠ 셀 높이는 «부호 있는» 32비트다 — 음수(예: -282)를 u32 로 읽으면 약 4,294,967,014 HWPUNIT(≈1,515만 mm)이 돼
+          //   표 한 칸이 브라우저 한계(33,554,428px)까지 늘어나 쪽 수가 157 → 29,445 로 터졌다(2026-11-08). 음수는 «높이 지정 없음»(내용에 맞춤)으로 본다.
+          width: u32(d, base + 8), height: mm(Math.max(0, i32(d, base + 12))), hh: Math.max(0, i32(d, base + 12)),
           // 셀 여백: 속성 16비트(셀 여백 지정)가 켜졌을 때만 셀 자체 값, 아니면 표의 안쪽 여백 (서식 예제 33568칸으로 확인)
           margin: (flags >> 16) & 1 ? marginAt(d, base + 16) : tblMargin,
           ...(fill => ({ bg: fill ? fill.bg : null, borders: fill ? H.compactBorders(fill.borders) : null }))(info.fills[u16(d, base + 24) - 1]),
@@ -537,13 +686,8 @@
 
     // ---------- 그리기 개체(gso): HWP 레코드 → 한글이 HWPX 로 저장하는 것과 같은 요소 나무 (shape.js 가 그림) ----------
     const SHP_TAG = { '$rec': 'rect', '$ell': 'ellipse', '$lin': 'line', '$arc': 'arc', '$pol': 'polygon', '$cur': 'curve', '$con': 'container', '$pic': 'pic', '$ole': 'ole' };
-    const ARROWS = ['NORMAL', 'ARROW', 'SPEAR', 'CONCAVE_ARROW', 'EMPTY_DIAMOND', 'EMPTY_CIRCLE', 'EMPTY_BOX', 'FILLED_DIAMOND', 'FILLED_CIRCLE', 'FILLED_BOX'];
-    const ARROW_SZ = ['SMALL_SMALL', 'SMALL_MEDIUM', 'SMALL_LARGE', 'MEDIUM_SMALL', 'MEDIUM_MEDIUM', 'MEDIUM_LARGE', 'LARGE_SMALL', 'LARGE_MEDIUM', 'LARGE_LARGE'];
-    const SHADOWS = ['NONE', 'PARALLEL_LEFTTOP', 'PARALLEL_RIGHTTOP', 'PARALLEL_LEFTBOTTOM', 'PARALLEL_RIGHTBOTTOM', 'SHEAR_LEFTTOP', 'SHEAR_RIGHTTOP', 'SHEAR_LEFTBOTTOM', 'SHEAR_RIGHTBOTTOM'];
     const WREL = ['PAPER', 'PAGE', 'COLUMN', 'PARA', 'ABSOLUTE'], HRELS = ['PAPER', 'PAGE', 'ABSOLUTE'];
     const NUMTYPE = ['NONE', 'PICTURE', 'TABLE', 'EQUATION'], FLOWS = ['BOTH_SIDES', 'LEFT_ONLY', 'RIGHT_ONLY', 'LARGEST_ONLY'];
-    const IMG_MODES = ['TILE', 'TILE_HORZ_TOP', 'TILE_HORZ_BOTTOM', 'TILE_VERT_LEFT', 'TILE_VERT_RIGHT', 'TOTAL', 'CENTER', 'CENTER_TOP', 'CENTER_BOTTOM', 'LEFT_CENTER', 'LEFT_TOP', 'LEFT_BOTTOM', 'RIGHT_CENTER', 'RIGHT_TOP', 'RIGHT_BOTTOM', 'ZOOM'];
-    const EFFECTS = ['REAL_PIC', 'GRAY_SCALE', 'BLACK_WHITE', 'PATTERN8x8'];
     const N = (tag, attrs, kids) => ({ tag, attrs: attrs || {}, kids: kids || [] });
     const f64 = (d, o) => (o + 8 <= d.length ? dvOf(d).getFloat64(o, true) : 0);
     // 한글은 행렬 값을 float 정밀도로 소수 여섯째 자리까지 씀
@@ -803,6 +947,7 @@
       const fresh = () => Object.assign({ type: 'p', runs: [] }, style);
       let cur = fresh();
       if (breakType & 0x04) cur.pageBreak = true;
+      if (breakType & 0x08) cur.columnBreak = true;
       // fields: 열린 필드(누름틀·하이퍼링크) 쌓기 — 끝 표시(문자 4)는 안쪽부터 닫힘
       let lastShapeId = -1, lastLink = null;
       const fields = [];
@@ -933,10 +1078,15 @@
               if (r.tag !== T.LIST_HEADER) return;
               mps.push({ idx, textWidth: u32(r.data, 8), textHeight: u32(r.data, 12) });
             });
-            for (const mp of mps) {
+            // 바탕쪽 종류: 구역 속성 29·30·31 비트(양 쪽·짝수 쪽·홀수 쪽 있음)가 켜진 차례로 목록이 놓인다 — 이 PC 의 .hwp 1만 3천여 구역에서
+            //  바탕쪽 1개는 29번, 2개는 30·31번 비트였고, 2개짜리의 첫째는 장식이 왼쪽(짝수 쪽 모양)이었다 (2026-11-21 대조).
+            //  예전에는 차례대로 양 쪽·짝수 쪽으로 붙여 짝수·홀수 바탕쪽이 서로 바뀌어 그려졌다. 비트가 없으면(다른 프로그램이 쓴 파일) 예전처럼 차례대로
+            const sbits = u32(ctrl.data, 4) >>> 29;
+            const mpTypes = ['BOTH', 'EVEN', 'ODD'].filter((t, k) => (sbits >> k) & 1);
+            for (const [k, mp] of mps.entries()) {
               const blocks = await parseParas(listParas(ctrl.children, mp.idx));
               if (!blocks.length) continue;
-              (doc.masterPages = doc.masterPages || []).push({ type: ['BOTH', 'EVEN', 'ODD'][doc.masterPages ? doc.masterPages.length : 0] || 'BOTH', attrs: { pageNumber: '0', pageDuplicate: '0', pageFront: '0' },
+              (doc.masterPages = doc.masterPages || []).push({ type: (mpTypes.length === mps.length ? mpTypes[k] : ['BOTH', 'EVEN', 'ODD'][k]) || 'BOTH', attrs: { pageNumber: '0', pageDuplicate: '0', pageFront: '0' },
                 sub: { id: '', textDirection: 'HORIZONTAL', lineWrap: 'BREAK', vertAlign: 'TOP', linkListIDRef: '0', linkListNextIDRef: '0', textWidth: String(mp.textWidth), textHeight: String(mp.textHeight), hasTextRef: '0', hasNumRef: '0' }, blocks });
             }
           }
@@ -1017,7 +1167,7 @@
     }
 
     for (let s = 0; files[(distributed ? 'ViewText/Section' : 'BodyText/Section') + s]; s++) {
-      const data = distributed ? await viewTextSection(files['ViewText/Section' + s], compressed) : await load('BodyText/Section' + s);
+      const data = distributed ? await viewTextSection(files['ViewText/Section' + s], compressed, inflateDoc) : await load('BodyText/Section' + s);
       const recs = tree(records(data));
       const blocks = await parseParas(recs);
       if (s > 0 && blocks[0]) blocks[0].pageBreak = true; // 구역이 바뀌면 새 쪽에서 시작 (한글과 같음)
@@ -1034,5 +1184,1113 @@
     return doc;
   }
 
-  g.PureunHwp = { readHwp, readCfb, AES, distributeKey };
+  // ---------------- HWP 5.0 (바이너리) 쓰기 ----------------
+  function writeCfb(files) {
+    const NONE = 0xffffffff, END = 0xfffffffe, FATSECT = 0xfffffffd, DIFSECT = 0xfffffffc;
+    const cfbCmp = (a, b) => {
+      if (a.length !== b.length) return a.length - b.length;
+      const ua = a.toUpperCase(), ub = b.toUpperCase();
+      for (let i = 0; i < ua.length; i++) if (ua.charCodeAt(i) !== ub.charCodeAt(i)) return ua.charCodeAt(i) - ub.charCodeAt(i);
+      return 0;
+    };
+    const entries = [{ name: 'Root Entry', type: 5, kids: [], left: NONE, right: NONE, child: NONE, start: END, size: 0 }];
+    const storages = { '': entries[0] };
+    const ensureStorage = name => {
+      if (storages[name]) return storages[name];
+      const st = { name, type: 1, kids: [], left: NONE, right: NONE, child: NONE, start: 0, size: 0 };
+      storages[name] = st;
+      entries[0].kids.push(st);
+      entries.push(st);
+      return st;
+    };
+    for (const [path, data] of Object.entries(files)) {
+      if (!data) continue;
+      const slash = path.indexOf('/');
+      const parent = slash >= 0 ? ensureStorage(path.slice(0, slash)) : entries[0];
+      const nm = slash >= 0 ? path.slice(slash + 1) : path;
+      const e = { name: nm, type: 2, data: data instanceof Uint8Array ? data : new Uint8Array(data), left: NONE, right: NONE, child: NONE, start: END, size: data.length };
+      parent.kids.push(e);
+      entries.push(e);
+    }
+    entries.forEach((e, i) => { e.idx = i; });
+    const buildBst = (arr, lo, hi) => {
+      if (lo > hi) return NONE;
+      const mid = (lo + hi) >> 1, node = arr[mid];
+      node.left = buildBst(arr, lo, mid - 1);
+      node.right = buildBst(arr, mid + 1, hi);
+      return node.idx;
+    };
+    for (const e of entries) {
+      if (e.kids && e.kids.length) {
+        e.kids.sort((a, b) => cfbCmp(a.name, b.name));
+        e.child = buildBst(e.kids, 0, e.kids.length - 1);
+      }
+    }
+    const miniChunks = [], miniFat = [];
+    for (const e of entries) {
+      if (e.type !== 2 || e.size === 0 || e.size >= 4096) continue;
+      const nMini = Math.ceil(e.size / 64);
+      e.start = miniFat.length;
+      for (let i = 0; i < nMini; i++) {
+        const buf = new Uint8Array(64);
+        buf.set(e.data.subarray(i * 64, Math.min(e.size, (i + 1) * 64)));
+        miniChunks.push(buf);
+        miniFat.push(i + 1 < nMini ? miniFat.length + 1 : END);
+      }
+    }
+    const sectors = [], fat = [];
+    const allocBytes = bytes => {
+      if (!bytes.length) return END;
+      const nSec = Math.ceil(bytes.length / 512), start = sectors.length;
+      for (let i = 0; i < nSec; i++) {
+        const sec = new Uint8Array(512);
+        sec.set(bytes.subarray(i * 512, Math.min(bytes.length, (i + 1) * 512)));
+        sectors.push(sec);
+        fat.push(i + 1 < nSec ? sectors.length : END);
+      }
+      return start;
+    };
+    for (const e of entries) {
+      if (e.type === 2 && e.size >= 4096) e.start = allocBytes(e.data);
+    }
+    if (miniChunks.length) {
+      const ms = new Uint8Array(miniChunks.length * 64);
+      miniChunks.forEach((c, i) => ms.set(c, i * 64));
+      entries[0].start = allocBytes(ms);
+      entries[0].size = ms.length;
+    }
+    let miniFatStart = END, numMiniFat = 0;
+    if (miniFat.length) {
+      numMiniFat = Math.ceil(miniFat.length / 128);
+      const mfBytes = new Uint8Array(numMiniFat * 512), mfv = new DataView(mfBytes.buffer);
+      for (let i = 0; i < numMiniFat * 128; i++) mfv.setUint32(i * 4, i < miniFat.length ? miniFat[i] : NONE, true);
+      miniFatStart = allocBytes(mfBytes);
+    }
+    const numDir = Math.ceil(entries.length / 4);
+    const dirBytes = new Uint8Array(numDir * 512), dv = new DataView(dirBytes.buffer);
+    for (let i = 0; i < numDir * 4; i++) {
+      const p = i * 128, e = entries[i];
+      if (!e) { dv.setUint32(p + 68, NONE, true); dv.setUint32(p + 72, NONE, true); dv.setUint32(p + 76, NONE, true); continue; }
+      const nlen = Math.min(31, e.name.length);
+      for (let k = 0; k < nlen; k++) dv.setUint16(p + k * 2, e.name.charCodeAt(k), true);
+      dv.setUint16(p + 64, (nlen + 1) * 2, true);
+      dirBytes[p + 66] = e.type;
+      dirBytes[p + 67] = 1; // black node
+      dv.setUint32(p + 68, e.left, true);
+      dv.setUint32(p + 72, e.right, true);
+      dv.setUint32(p + 76, e.child, true);
+      dv.setUint32(p + 116, e.start, true);
+      dv.setUint32(p + 120, e.size, true);
+    }
+    const dirStart = allocBytes(dirBytes);
+    let numFat = 0, numDifat = 0;
+    while (true) {
+      const total = sectors.length + numFat + numDifat;
+      const needFat = Math.ceil(total / 128);
+      const needDifat = needFat > 109 ? Math.ceil((needFat - 109) / 127) : 0;
+      if (needFat === numFat && needDifat === numDifat) break;
+      numFat = needFat;
+      numDifat = needDifat;
+    }
+    const fatSecIndices = [];
+    for (let i = 0; i < numFat; i++) {
+      fatSecIndices.push(sectors.length);
+      sectors.push(new Uint8Array(512));
+      fat.push(FATSECT);
+    }
+    let difatStart = END;
+    const difatSecIndices = [];
+    for (let i = 0; i < numDifat; i++) {
+      if (i === 0) difatStart = sectors.length;
+      difatSecIndices.push(sectors.length);
+      sectors.push(new Uint8Array(512));
+      fat.push(DIFSECT);
+    }
+    for (let i = 0; i < numFat; i++) {
+      const fv = new DataView(sectors[fatSecIndices[i]].buffer);
+      for (let j = 0; j < 128; j++) {
+        const idx = i * 128 + j;
+        fv.setUint32(j * 4, idx < fat.length ? fat[idx] : NONE, true);
+      }
+    }
+    for (let i = 0; i < numDifat; i++) {
+      const dfv = new DataView(sectors[difatSecIndices[i]].buffer);
+      for (let j = 0; j < 127; j++) {
+        const fi = 109 + i * 127 + j;
+        dfv.setUint32(j * 4, fi < fatSecIndices.length ? fatSecIndices[fi] : NONE, true);
+      }
+      dfv.setUint32(127 * 4, i + 1 < numDifat ? difatSecIndices[i + 1] : END, true);
+    }
+    const out = new Uint8Array((1 + sectors.length) * 512), hv = new DataView(out.buffer, 0, 512);
+    [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1].forEach((b, i) => { out[i] = b; });
+    hv.setUint16(24, 0x003e, true);
+    hv.setUint16(26, 0x0003, true);
+    hv.setUint16(28, 0xfffe, true);
+    hv.setUint16(30, 9, true);
+    hv.setUint16(32, 6, true);
+    hv.setUint32(44, numFat, true);
+    hv.setUint32(48, dirStart, true);
+    hv.setUint32(56, 4096, true);
+    hv.setUint32(60, miniFatStart, true);
+    hv.setUint32(64, numMiniFat, true);
+    hv.setUint32(68, difatStart, true);
+    hv.setUint32(72, numDifat, true);
+    for (let i = 0; i < 109; i++) hv.setUint32(76 + i * 4, i < fatSecIndices.length ? fatSecIndices[i] : NONE, true);
+    sectors.forEach((s, i) => out.set(s, (i + 1) * 512));
+    return out;
+  }
+
+  function makeRec(tag, level, data) {
+    const len = data.length, ext = len >= 0xfff;
+    const out = new Uint8Array((ext ? 8 : 4) + len), v = new DataView(out.buffer);
+    v.setUint32(0, (tag & 0x3ff) | ((level & 0x3ff) << 10) | ((ext ? 0xfff : len) << 20), true);
+    if (ext) v.setUint32(4, len, true);
+    out.set(data, ext ? 8 : 4);
+    return out;
+  }
+  const concatBytes = list => {
+    const out = new Uint8Array(list.reduce((s, a) => s + a.length, 0));
+    let o = 0;
+    for (const a of list) { out.set(a, o); o += a.length; }
+    return out;
+  };
+  const encodeWstr = s => {
+    // 글자 수는 16비트에 적는다 — 65,535 자를 넘으면 잘라야 뒤 자료가 어긋나지 않는다
+    s = String(s || '').slice(0, 0xffff);
+    const out = new Uint8Array(2 + s.length * 2), v = new DataView(out.buffer);
+    v.setUint16(0, s.length, true);
+    for (let i = 0; i < s.length; i++) v.setUint16(2 + i * 2, s.charCodeAt(i), true);
+    return out;
+  };
+  const parseHexColor = hex => {
+    if (!hex || hex === 'none') return 0xffffffff;
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+    if (!m) return 0x000000;
+    return (parseInt(m[1], 16) | (parseInt(m[2], 16) << 8) | (parseInt(m[3], 16) << 16)) >>> 0;
+  };
+  const ctrlId = s => ((s.charCodeAt(0) << 24) | (s.charCodeAt(1) << 16) | (s.charCodeAt(2) << 8) | s.charCodeAt(3)) >>> 0;
+  const lineWidthIdx = w => {
+    let best = 1, minDiff = Infinity;
+    LINE_WIDTHS.forEach((lw, i) => { const d = Math.abs(lw - (w || 0.12)); if (d < minDiff) { minDiff = d; best = i; } });
+    return best;
+  };
+  const lineTypeIdx = t => { const i = LINE_TYPES.indexOf(t || 'SOLID'); return i >= 0 ? i : 1; };
+
+  function buildHwp(input) {
+    const doc = H.normalizeDoc(input);
+    const st = H.makeRegistry();
+    st.numberings = doc.numberings;
+    st.bullets = doc.bullets;
+    st.compat = doc.compat;
+    st.fontInfo = doc.fontInfo;
+    st.styleOf = b => (b && doc.styles && b.styleId > 0 && b.styleId < doc.styles.length ? b.styleId : 0);
+    const pg = doc.page || H.defaultPage();
+    const hu = v => Math.round(v * MM);
+    // 읽을 때 둔 원래 값(pg.hu)은 mm 값을 바꾸지 않았을 때만 쓴다 (HWPX 쓰기의 pageHu 와 같은 규칙) — 여백·용지를 바꾸면 바꾼 값을 쓴다
+    const phu = k => {
+      const v = k === 'width' || k === 'height' ? pg[k] : (pg.margin || {})[k], raw = pg.hu && pg.hu[k];
+      return raw !== undefined && Math.abs(raw / MM - v) < 0.051 ? raw : hu(v || 0);
+    };
+    // 용지는 한글처럼 늘 «세로로 둔» 크기(pg.width·height)로 적고 가로면 방향 비트를 켠다. pageW 는 눕힌 뒤의 실제 폭
+    //  (예전에는 원래 값이 있을 때 한 번 더 맞바꿔 가로 문서가 저장할 때마다 세로·가로로 뒤집혔다, 2026-11-20 점검)
+    const paperW = phu('width'), paperH = phu('height');
+    const pageW = pg.landscape ? paperH : paperW;
+    const mgL = phu('left'), mgR = phu('right'), mgT = phu('top'), mgB = phu('bottom'), mgH = phu('header'), mgF = phu('footer');
+    const bodyWidth = Math.max(2834, pageW - mgL - mgR);
+
+    const makeCtrlHead = (name, extraBytes) => {
+      const b = new Uint8Array(4 + (extraBytes ? extraBytes.length : 0)), v = new DataView(b.buffer);
+      v.setUint32(0, ctrlId(name), true);
+      if (extraBytes) b.set(extraBytes, 4);
+      return b;
+    };
+    const makeObjCommon = (name, pl, w, h, id) => {
+      pl = pl || {};
+      const b = new Uint8Array(46), v = new DataView(b.buffer);
+      v.setUint32(0, ctrlId(name), true);
+      const inline = pl.inline !== false;
+      const vrel = Math.max(0, VREL.indexOf(pl.vertRelTo || 'PARA'));
+      const valign = Math.max(0, VALIGN.indexOf(pl.vertAlign || 'TOP'));
+      const hrel = Math.max(0, HREL.indexOf(pl.horzRelTo || 'COLUMN'));
+      const halign = Math.max(0, HALIGN.indexOf(pl.horzAlign || 'LEFT'));
+      const wrap = Math.max(0, WRAP.indexOf(pl.wrap || 'TOP_AND_BOTTOM'));
+      // 너비·높이 기준(15~17·18~19 비트): 비워 두면 0 = «종이 대비 %» 로 읽혀 그림·도형이 몇 배로 커진다 — 한글처럼 기본은 절대값
+      const wrelI = ['PAPER', 'PAGE', 'COLUMN', 'PARA', 'ABSOLUTE'].indexOf(pl.widthRelTo || 'ABSOLUTE');
+      const hrelI = ['PAPER', 'PAGE', 'ABSOLUTE'].indexOf(pl.heightRelTo || 'ABSOLUTE');
+      const at = (inline ? 1 : 0) | (pl.affect ? 4 : 0) | (vrel << 3) | (valign << 5) | (hrel << 8) | (halign << 10)
+        | (pl.flow ? 0x2000 : 0) | (pl.overlap ? 0x4000 : 0) | ((wrelI < 0 ? 4 : wrelI) << 15) | ((hrelI < 0 ? 2 : hrelI) << 18) | (wrap << 21)
+        // 글 흐름(24~25 비트) · 번호 종류(26~28 비트: 그림·표·수식 — 캡션 번호를 매길 때 씀) — 읽기 readShapeComp 와 같은 자리
+        | (((pl.textFlow || 0) & 3) << 24) | (((pl.numType || 0) & 7) << 26);
+      v.setUint32(4, at >>> 0, true);
+      v.setInt32(8, pl.vertOffset || 0, true);
+      v.setInt32(12, pl.horzOffset || 0, true);
+      v.setUint32(16, Math.max(100, Math.round(w || bodyWidth)), true);
+      v.setUint32(20, Math.max(100, Math.round(h || 1000)), true);
+      v.setInt32(24, pl.zOrder || 0, true);
+      const out = pl.out || { l: 0, r: 0, t: 0, b: 0 };
+      v.setUint16(28, out.l || 0, true);
+      v.setUint16(30, out.r || 0, true);
+      v.setUint16(32, out.t || 0, true);
+      v.setUint16(34, out.b || 0, true);
+      v.setUint32(36, id || st.nextId(), true);
+      return b;
+    };
+
+    const writeFieldCtrl = (name, cmdStr, prop = 0, bmkName = '') => {
+      const cmd = encodeWstr(cmdStr || '');
+      const d = new Uint8Array(9 + cmd.length + 4), v = new DataView(d.buffer);
+      v.setUint32(0, ctrlId(name), true);
+      v.setUint32(4, name === '%clk' ? 1 : 0, true);
+      d[8] = prop & 0xff;
+      d.set(cmd, 9);
+      v.setUint32(9 + cmd.length, st.nextId(), true);
+      const recs = [makeRec(T.CTRL_HEADER, 0, d)];
+      if (name === '%bmk' && bmkName) {
+        const nm = encodeWstr(bmkName);
+        const cd = new Uint8Array(10 + nm.length), cv = new DataView(cd.buffer);
+        cv.setUint16(8, 1, true);
+        cd.set(nm, 10);
+        recs.push(makeRec(87, 1, cd));
+      }
+      return recs;
+    };
+
+    const adjustLevels = (recs, delta) => recs.map(r => {
+      const h = new DataView(r.buffer, r.byteOffset, r.byteLength).getUint32(0, true);
+      const tag = h & 0x3ff, lv = ((h >>> 10) & 0x3ff) + delta, sz = (h >>> 20) & 0xfff;
+      const out = r.slice();
+      new DataView(out.buffer).setUint32(0, (tag & 0x3ff) | ((lv & 0x3ff) << 10) | (sz << 20), true);
+      return out;
+    });
+
+    const writeTableCtrl = (t, width) => {
+      const rows = t.rows || [], nRows = rows.length;
+      const nCols = (t.colWidths && t.colWidths.length) || Math.max(1, ...(rows[0] || []).map(c => c.colSpan || 1));
+      const total = t.totalWidth || Math.round(width * (t.widthRatio || 1));
+      const colWs = (t.colWidths && t.colWidths.length ? t.colWidths : Array(nCols).fill(1 / nCols)).map(r => Math.round(r * total));
+      const pl = t.place || { inline: true };
+      const headData = makeObjCommon('tbl ', pl, total, 2000, st.nextId());
+      const tblData = new Uint8Array(18 + nRows * 2), tv = new DataView(tblData.buffer);
+      const pbIdx = pl.pageBreak === 'NONE' ? 0 : pl.pageBreak === 'TABLE' ? 1 : 2;
+      tv.setUint32(0, pbIdx | (pl.repeatHeader ? 4 : 0) | (pl.noAdjust ? 8 : 0), true);
+      tv.setUint16(4, nRows, true);
+      tv.setUint16(6, nCols, true);
+      const im = pl.inMargin || { l: 510, r: 510, t: 141, b: 141 };
+      tv.setUint16(10, im.l, true);
+      tv.setUint16(12, im.r, true);
+      tv.setUint16(14, im.t, true);
+      tv.setUint16(16, im.b, true);
+      const recs = [makeRec(T.CTRL_HEADER, 0, headData), makeRec(T.TABLE, 1, tblData)];
+      const grid = [];
+      for (let r = 0; r < nRows; r++) {
+        let cIdx = 0;
+        for (const cell of rows[r]) {
+          while (grid[r] && grid[r][cIdx]) cIdx++;
+          const cs = cell.colSpan || 1, rs = cell.rowSpan || 1;
+          for (let dr = 0; dr < rs; dr++) for (let dc = 0; dc < cs; dc++) { grid[r + dr] = grid[r + dr] || []; grid[r + dr][cIdx + dc] = true; }
+          const cw = colWs.slice(cIdx, cIdx + cs).reduce((a, b) => a + b, 0);
+          const ch = cell.hh || (cell.height ? hu(cell.height) : 1000);
+          const bfId = st.fillId(cell);
+          const cBlocks = cell.blocks && cell.blocks.length ? cell.blocks : [{ type: 'p', runs: [] }];
+          const cParas = H.mergeGroups(cBlocks);
+          const lh = new Uint8Array(34), lv = new DataView(lh.buffer);
+          lv.setInt16(0, cParas.length, true);
+          const va = cell.valign === 'top' ? 0 : cell.valign === 'bottom' ? 2 : 1;
+          const dir = cell.dir === 'VERTICAL' ? 1 : cell.dir === 'VERTICALALL' ? 2 : 0;
+          const wrap = cell.wrap === 'SQUEEZE' ? 1 : cell.wrap === 'KEEP' ? 2 : 0;
+          const hasMg = !!cell.margin;
+          lv.setUint32(4, dir | (wrap << 3) | (va << 5) | (hasMg ? 0x10000 : 0), true);
+          lv.setUint16(8, cIdx, true);
+          lv.setUint16(10, r, true);
+          lv.setUint16(12, cs, true);
+          lv.setUint16(14, rs, true);
+          lv.setUint32(16, cw, true);
+          lv.setUint32(20, ch, true);
+          const mg = cell.margin ? (cell.margin.hu || [hu(cell.margin.l), hu(cell.margin.r), hu(cell.margin.t), hu(cell.margin.b)]) : [im.l, im.r, im.t, im.b];
+          lv.setUint16(24, mg[0], true);
+          lv.setUint16(26, mg[1], true);
+          lv.setUint16(28, mg[2], true);
+          lv.setUint16(30, mg[3], true);
+          lv.setUint16(32, bfId, true);
+          recs.push(makeRec(T.LIST_HEADER, 1, lh));
+          recs.push(...writeParas(cBlocks, 2, cw, null));
+          cIdx += cs;
+        }
+      }
+      return recs;
+    };
+
+    // ---- 그리기 개체: 요소 나무(읽기 readShapeComp 가 만든 것 · 편집기가 새로 만든 것) → SHAPE_COMPONENT 와 그 아래 레코드 ----
+    //  진짜 한글 파일(편람·표준 취업규칙·비밀유지서약서 표본)과 같은 짜임 (2026-11-21 대조):
+    //   맨 위 개체는 컨트롤 ID 두 번, 묶음 안 개체는 한 번 → 위치 · 묶음 수준 · 판 · 원래 크기 · 지금 크기 · 뒤집기 · 회전각 · 회전 중심
+    //   · 행렬 쌍 개수 · 이동 행렬 · (확대 · 회전 행렬) × 쌍 개수 — 모두 요소 나무의 값 그대로 (단위 행렬로 덮으면 크기를 바꾼 선·묶음 안 개체가 제자리를 잃는다)
+    //   묶음: 그 뒤 자식 수(2) · 자식 ID(4 × 수) · instid(4), 자식 SHAPE_COMPONENT 들은 한 수준 아래
+    //   그림: 행렬 뒤에 더 없고, 그림 레코드(85)에 테두리 · 영역 · 자르기 · 안 여백 · 밝기·명암·효과 · 자료 번호 · instid · 원래 크기
+    //   그 밖의 도형: 선(13) · 채우기 · 그림자(16) · instid(4) · 2바이트, 그 아래 글상자(목록 머리 + 문단) · 기하 레코드
+    //  (예전에는 묶음을 빈 사각형으로 써 안의 그림·글상자가 모두 빠졌고, 행렬을 늘 단위 행렬로 써 편집기에서 그린 선이 100분의 1 크기가 됐다 — 2026-11-21.
+    //   그 전에는 행렬을 @46·@70 에 써 자리가 6바이트 어긋나, 다시 열면 선·채우기가 엉뚱하게 읽히고 도형이 안 보였다 — 2026-11-20)
+    const SHP_CODE = { rect: '$rec', ellipse: '$ell', line: '$lin', arc: '$arc', polygon: '$pol', curve: '$cur', pic: '$pic', container: '$con' };
+    const lname = n => ((n && n.tag) || '').split(':').pop();
+    const kidOf = (n, t) => ((n && n.kids) || []).find(k => lname(k) === t);
+    const kidsOf = (n, t) => ((n && n.kids) || []).filter(k => lname(k) === t);
+    const av = (n, k, d = 0) => { const v = n && n.attrs ? +n.attrs[k] : NaN; return Number.isFinite(v) ? v : d; };
+    const idxOf = (list, v, d) => { const i = list.indexOf(v); return i >= 0 ? i : d; };
+    // 색: '#RRGGBB' 또는 투명도가 붙은 '#AARRGGBB'(읽기 cstr 가 쓰는 꼴) → 0xAABBGGRR, 'none' → 0xFFFFFFFF
+    const colorOf = s => {
+      if (!s || s === 'none') return 0xffffffff;
+      const m = /^#?([0-9a-f]{2})?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(s).trim());
+      return m ? ((m[1] ? parseInt(m[1], 16) << 24 : 0) | parseInt(m[2], 16) | (parseInt(m[3], 16) << 8) | (parseInt(m[4], 16) << 16)) >>> 0 : 0;
+    };
+    // 선 속성 비트: 종류 0~5 · 끝 모양 6~9 · 시작·끝 화살표 10~15·16~21 · 화살표 크기 22~25·26~29 · 채움 30·31 (읽기와 같은 짜임)
+    const lineAttr = A => ((idxOf(LINE_TYPES, A.style || 'SOLID', 1) & 63) | ((A.endCap === 'FLAT' ? 1 : 0) << 6) | (idxOf(ARROWS, A.headStyle, 0) << 10) | (idxOf(ARROWS, A.tailStyle, 0) << 16)
+      | (idxOf(ARROW_SZ, A.headSz, 4) << 22) | (idxOf(ARROW_SZ, A.tailSz, 4) << 26) | (A.headfill === '1' ? 1 << 30 : 0) | (A.tailfill === '1' ? 1 << 31 : 0)) >>> 0;
+    const MAT_I = [1, 0, 0, 0, 1, 0];
+    const matVals = m => ['e1', 'e2', 'e3', 'e4', 'e5', 'e6'].map((k, i) => av(m, k, MAT_I[i]));
+    const orgOf = (node, w, h) => {
+      const org = kidOf(node, 'orgSz'), cur = kidOf(node, 'curSz');
+      const ow = av(org, 'width') || w, oh = av(org, 'height') || h;
+      return { ow, oh, cw: av(cur, 'width') || ow, ch: av(cur, 'height') || oh }; // 한글은 원래 크기와 같은 쪽을 0 으로 씀
+    };
+    const shapeHead = (node, code, top, w, h) => {
+      const { ow, oh, cw, ch } = orgOf(node, w, h);
+      const off = kidOf(node, 'offset'), fl = kidOf(node, 'flip'), ro = kidOf(node, 'rotationInfo'), ri = kidOf(node, 'renderingInfo');
+      const sca = kidsOf(ri, 'scaMatrix'), rot = kidsOf(ri, 'rotMatrix');
+      const mats = ri ? [kidOf(ri, 'transMatrix'), ...sca.flatMap((s, k) => [s, rot[k]])] : [null, null, null];
+      const base = top ? 8 : 4;
+      const b = new Uint8Array(base + 44 + 48 * mats.length), v = new DataView(b.buffer);
+      v.setUint32(0, ctrlId(code), true);
+      if (top) v.setUint32(4, ctrlId(code), true);
+      let o = base;
+      v.setUint32(o, av(off, 'x') >>> 0, true); v.setUint32(o + 4, av(off, 'y') >>> 0, true); o += 8; // 한글은 음수 위치도 부호 없는 수로 씀
+      v.setUint16(o, av(node, 'groupLevel') & 0xffff, true); v.setUint16(o + 2, 1, true); o += 4;
+      v.setUint32(o, ow >>> 0, true); v.setUint32(o + 4, oh >>> 0, true); v.setUint32(o + 8, cw >>> 0, true); v.setUint32(o + 12, ch >>> 0, true); o += 16;
+      v.setUint32(o, ((av(fl, 'horizontal') & 1) | ((av(fl, 'vertical') & 1) << 1) | ((av(ro, 'rotateimage', 1) & 1) << 19)) >>> 0, true); o += 4;
+      v.setInt16(o, av(ro, 'angle') | 0, true);
+      v.setUint32(o + 2, (ro ? av(ro, 'centerX') : Math.round(cw / 2)) >>> 0, true);
+      v.setUint32(o + 6, (ro ? av(ro, 'centerY') : Math.round(ch / 2)) >>> 0, true); o += 10;
+      v.setUint16(o, ri ? sca.length : 1, true); o += 2;
+      for (const m of mats) { matVals(m).forEach((x, k) => v.setFloat64(o + k * 8, x, true)); o += 48; }
+      return b;
+    };
+    // 채우기: 종류(4) · [단색 12] · [그러데이션 21 + 색] · [그림 6] · 추가 속성 길이(4)+자료 · 종류마다 투명도 1바이트 (읽기 readFill 과 같은 차례)
+    const fillBytes = fb => {
+      const wb = kidOf(fb, 'winBrush'), gr = kidOf(fb, 'gradation'), ib = kidOf(fb, 'imgBrush'), im = kidOf(ib, 'img');
+      const parts = [], alphas = [];
+      let type = 0;
+      if (wb) {
+        type |= 1;
+        const d = new Uint8Array(12), dv = new DataView(d.buffer);
+        dv.setUint32(0, colorOf(wb.attrs.faceColor), true);
+        dv.setUint32(4, colorOf(wb.attrs.hatchColor || '#000000'), true);
+        dv.setInt32(8, wb.attrs.hatchStyle ? idxOf(HATCHES, wb.attrs.hatchStyle, -1) : -1, true);
+        parts.push(d); alphas.push(av(wb, 'alpha') & 255);
+      }
+      if (gr) {
+        // 색이 셋 이상이면 한글은 색 위치도 적는데 그 단위를 확인하지 못했다 — 처음·끝 두 색만 쓴다
+        let cols = kidsOf(gr, 'color').map(c => colorOf(c.attrs.value));
+        if (cols.length > 2) cols = [cols[0], cols[cols.length - 1]];
+        if (cols.length < 2) cols = [cols[0] !== undefined ? cols[0] : 0xffffff, 0];
+        type |= 4;
+        const d = new Uint8Array(21 + cols.length * 4), dv = new DataView(d.buffer);
+        d[0] = Math.max(1, idxOf(GRAD_TYPES, gr.attrs.type, 1));
+        dv.setInt32(1, av(gr, 'angle') | 0, true); dv.setInt32(5, av(gr, 'centerX') | 0, true); dv.setInt32(9, av(gr, 'centerY') | 0, true);
+        dv.setInt32(13, av(gr, 'step', 50) | 0, true); dv.setInt32(17, cols.length, true);
+        cols.forEach((c, k) => dv.setUint32(21 + k * 4, c, true));
+        parts.push(d); alphas.push(av(gr, 'alpha') & 255);
+      }
+      if (ib && im && im.image && im.image.data) {
+        type |= 2;
+        const d = new Uint8Array(6), dv = new DataView(d.buffer);
+        d[0] = idxOf(IMG_MODES, ib.attrs.mode, 0); d[1] = av(im, 'bright') & 255; d[2] = av(im, 'contrast') & 255; d[3] = idxOf(EFFECTS, im.attrs.effect, 0);
+        dv.setUint16(4, parseInt(st.imageId(im.image).replace(/\D+/g, ''), 10) || 1, true);
+        parts.push(d); alphas.push(av(im, 'alpha') & 255);
+      }
+      const head = new Uint8Array(4); new DataView(head.buffer).setUint32(0, type, true);
+      // 추가 속성: 그러데이션이 있으면 번짐 중심 한 바이트
+      const extra = new Uint8Array(gr ? 5 : 4); new DataView(extra.buffer).setUint32(0, gr ? 1 : 0, true);
+      if (gr) extra[4] = av(gr, 'stepCenter', 50) & 255;
+      // 투명도: 채우기 종류마다 한 바이트 (읽기는 켜진 종류 수만큼 건너뜀) — 값은 0 이 보통
+      return concatBytes([head, ...parts, extra, Uint8Array.from(alphas)]);
+    };
+    // 그림 레코드(85): 진짜 한글 파일은 91바이트 — 자르기 영역과 원래 크기를 비우면 한글이 그림을 0 크기로 자를 수 있다
+    const picBytes = (node, img, ow, oh, inst) => {
+      const im = kidOf(node, 'img'), data = img || (im && im.image);
+      const sp = new Uint8Array(91), pv = new DataView(sp.buffer);
+      const ls = kidOf(node, 'lineShape');
+      if (ls) { pv.setUint32(0, colorOf(ls.attrs.color), true); pv.setInt32(4, av(ls, 'width') | 0, true); pv.setUint32(8, lineAttr(ls.attrs), true); }
+      const rect = kidOf(node, 'imgRect');
+      [['pt0', 0, 0], ['pt1', ow, 0], ['pt2', ow, oh], ['pt3', 0, oh]].forEach(([t, x, y], k) => {
+        const p = kidOf(rect, t);
+        pv.setInt32(12 + k * 8, (p ? av(p, 'x') : x) | 0, true); pv.setInt32(16 + k * 8, (p ? av(p, 'y') : y) | 0, true);
+      });
+      const clip = kidOf(node, 'imgClip');
+      const cl = clip ? [av(clip, 'left'), av(clip, 'top'), av(clip, 'right'), av(clip, 'bottom')] : [0, 0, ow, oh];
+      cl.forEach((x, k) => pv.setInt32(44 + k * 4, x | 0, true));
+      const mg = kidOf(node, 'inMargin');
+      ['left', 'right', 'top', 'bottom'].forEach((k, i) => pv.setUint16(60 + i * 2, av(mg, k) & 0xffff, true));
+      sp[68] = av(im, 'bright') & 255; sp[69] = av(im, 'contrast') & 255; sp[70] = idxOf(EFFECTS, im && im.attrs.effect, 0);
+      pv.setUint16(71, parseInt(st.imageId(data).replace(/\D+/g, ''), 10) || 1, true);
+      pv.setUint32(74, inst >>> 0, true);
+      const dim = kidOf(node, 'imgDim');
+      pv.setUint32(82, (dim ? av(dim, 'dimwidth') : cl[2] - cl[0]) >>> 0, true);
+      pv.setUint32(86, (dim ? av(dim, 'dimheight') : cl[3] - cl[1]) >>> 0, true);
+      return sp;
+    };
+    // 그림 자료가 있는 그림인가 (자료 없는 그림은 쓰지 않는다)
+    const picData = n => { const im = kidOf(n, 'img'); return im && im.image && im.image.data ? im.image : null; };
+    //  묶음은 쓸 수 있는 자식이 하나라도 있어야 쓴다 (빈 묶음은 쓰지 않는다)
+    const canWrite = n => {
+      const t = lname(n);
+      if (!SHP_CODE[t]) return false;
+      if (t === 'pic') return !!picData(n);
+      return t !== 'container' || ((n && n.kids) || []).some(canWrite);
+    };
+    // SHAPE_COMPONENT 와 그 아래 레코드들 (level: SHAPE_COMPONENT 의 수준). img: 개체 나무 없이 그림 자료만 있을 때(글자처럼 넣은 그림)
+    const shapeCompRecs = (node, code, top, w, h, level, img) => {
+      const head = shapeHead(node, code, top, w, h), { ow, oh } = orgOf(node, w, h);
+      const inst = av(node, 'instid') || st.nextId();
+      if (code === '$con') {
+        const kids = ((node && node.kids) || []).filter(canWrite).slice(0, 0xffff); // 자식 수는 16비트
+        const tail = new Uint8Array(2 + kids.length * 4 + 4), tv = new DataView(tail.buffer);
+        tv.setUint16(0, kids.length, true);
+        kids.forEach((k, i) => tv.setUint32(2 + i * 4, ctrlId(SHP_CODE[lname(k)]), true));
+        tv.setUint32(2 + kids.length * 4, inst >>> 0, true);
+        const recs = [makeRec(T.SHAPE_COMPONENT, level, concatBytes([head, tail]))];
+        for (const k of kids) recs.push(...shapeCompRecs(k, SHP_CODE[lname(k)], false, 100, 100, level + 1));
+        return recs;
+      }
+      if (code === '$pic') return [makeRec(T.SHAPE_COMPONENT, level, head), makeRec(T.SHAPE_PICTURE, level + 1, picBytes(node, img, ow, oh, inst))];
+      const ls = kidOf(node, 'lineShape'), sh = kidOf(node, 'shadow');
+      const LA = (ls && ls.attrs) || { color: '#000000', width: '33', style: 'SOLID' };
+      const L = new Uint8Array(13), lv = new DataView(L.buffer);
+      lv.setUint32(0, colorOf(LA.color || '#000000'), true);
+      lv.setInt32(4, (+LA.width || 0) | 0, true);
+      lv.setUint32(8, lineAttr(LA), true);
+      L[12] = idxOf(['NORMAL', 'OUTER', 'INNER'], LA.outlineStyle, 0);
+      const SA = (sh && sh.attrs) || {};
+      const Sb = new Uint8Array(22), sv = new DataView(Sb.buffer);
+      sv.setUint32(0, idxOf(SHADOWS, SA.type || 'NONE', 0), true);
+      sv.setUint32(4, colorOf(SA.color || '#B2B2B2'), true);
+      sv.setInt32(8, av(sh, 'offsetX') | 0, true);
+      sv.setInt32(12, av(sh, 'offsetY') | 0, true);
+      sv.setUint32(16, inst >>> 0, true);
+      const recs = [makeRec(T.SHAPE_COMPONENT, level, concatBytes([head, L, fillBytes(kidOf(node, 'fillBrush')), Sb]))];
+      // 글상자: 목록 머리(문단 수 · 글 방향·줄 바꿈·세로 정렬 · 안 여백 4 · 최대 폭, 진짜 파일은 33바이트) + 문단 — 모두 SHAPE_COMPONENT 한 수준 아래
+      const dt = kidOf(node, 'drawText');
+      if (dt && dt.text && dt.text.blocks) {
+        const sub = dt.text.sub || {}, tm = kidOf(dt, 'textMargin'), tw = av(dt, 'lastWidth') || ow;
+        const lh = new Uint8Array(33), lhv = new DataView(lh.buffer);
+        lhv.setUint32(0, H.mergeGroups(dt.text.blocks.length ? dt.text.blocks : [{ type: 'p', runs: [] }]).length, true);
+        lhv.setUint32(4, idxOf(['HORIZONTAL', 'VERTICAL', 'VERTICALALL'], sub.textDirection, 0) | (idxOf(['BREAK', 'SQUEEZE', 'KEEP'], sub.lineWrap, 0) << 3) | (idxOf(['TOP', 'CENTER', 'BOTTOM'], sub.vertAlign, 0) << 5), true);
+        ['left', 'right', 'top', 'bottom'].forEach((k, i) => lhv.setUint16(8 + i * 2, (tm ? av(tm, k) : 283) & 0xffff, true));
+        lhv.setUint32(16, tw >>> 0, true);
+        recs.push(makeRec(T.LIST_HEADER, level + 1, lh), ...writeParas(dt.text.blocks, level + 1, tw, null));
+      }
+      // 기하 레코드 — 읽기(readShapeComp)와 같은 짜임. 점이 없으면 원래 크기 상자에 맞춘 기본값
+      const num = v => (+v || 0) | 0;
+      const xy = (t, dx, dy) => { const k = kidOf(node, t); return k ? [num(k.attrs.x), num(k.attrs.y)] : [dx | 0, dy | 0]; };
+      const putPts = (gv, at, pts) => pts.forEach(([x, y], k) => { gv.setInt32(at + k * 8, x, true); gv.setInt32(at + 4 + k * 8, y, true); });
+      let g, gtag;
+      if (code === '$lin') {
+        g = new Uint8Array(18); gtag = 78;
+        const gv = new DataView(g.buffer);
+        putPts(gv, 0, [xy('startPt', 0, 0), xy('endPt', ow, oh)]);
+        gv.setUint16(16, av(node, 'isReverseHV') & 1, true);
+      } else if (code === '$ell') {
+        g = new Uint8Array(60); gtag = 80;
+        const gv = new DataView(g.buffer);
+        gv.setUint32(0, (av(node, 'intervalDirty') & 1) | ((av(node, 'hasArcPr') & 1) << 1) | (idxOf(['NORMAL', 'PIE', 'CHORD'], node && node.attrs.arcType, 0) << 2), true);
+        putPts(gv, 4, [xy('center', ow / 2, oh / 2), xy('ax1', ow, oh / 2), xy('ax2', ow / 2, 0), xy('start1', 0, 0), xy('end1', 0, 0), xy('start2', 0, 0), xy('end2', 0, 0)]);
+      } else if (code === '$arc') {
+        // 호: 종류 1바이트 + 중심·축1·축2 (예전에는 사각형 것으로 써 다시 열면 점이 0개 — 도형이 사라졌다, 2026-11-20 점검)
+        g = new Uint8Array(25); gtag = 81;
+        g[0] = idxOf(['NORMAL', 'PIE', 'CHORD'], node && node.attrs.type, 0);
+        putPts(new DataView(g.buffer), 1, [xy('center', 0, 0), xy('ax1', 0, 0), xy('ax2', 0, 0)]);
+      } else if (code === '$pol' || code === '$cur') {
+        // 다각형 = 점 개수 + 점들 · 곡선 = 점 개수 + 점들 + 구간 종류(곡선 1 / 직선 0). 곡선의 점은 첫 구간의 시작점 + 구간마다 끝점
+        const segs = code === '$cur' ? kidsOf(node, 'seg') : [];
+        const pts = code === '$pol' ? kidsOf(node, 'pt').map(k => [num(k.attrs.x), num(k.attrs.y)])
+          : segs.length ? [[num(segs[0].attrs.x1), num(segs[0].attrs.y1)], ...segs.map(s => [num(s.attrs.x2), num(s.attrs.y2)])] : [];
+        g = new Uint8Array(4 + pts.length * 8 + (code === '$cur' ? Math.max(0, pts.length - 1) : 0)); gtag = code === '$pol' ? 82 : 83;
+        const gv = new DataView(g.buffer);
+        gv.setInt32(0, pts.length, true);
+        putPts(gv, 4, pts);
+        segs.forEach((s, k) => { g[4 + pts.length * 8 + k] = s.attrs && s.attrs.type === 'CURVE' ? 1 : 0; });
+      } else {
+        g = new Uint8Array(33); gtag = 79;
+        g[0] = av(node, 'ratio') & 255;
+        putPts(new DataView(g.buffer), 1, [xy('pt0', 0, 0), xy('pt1', ow, 0), xy('pt2', ow, oh), xy('pt3', 0, oh)]);
+      }
+      recs.push(makeRec(gtag, level + 1, g));
+      return recs;
+    };
+    // 개체 컨트롤 머리(46바이트) 끝의 설명 문자열 자리(@44)에 개체 설명(shapeComment)을 — 읽기는 46바이트를 넘으면 @44 를 읽는다
+    const withComment = (headData, node) => {
+      const cm = kidOf(node, 'shapeComment');
+      return cm && cm.txt ? concatBytes([headData.subarray(0, 44), encodeWstr(cm.txt)]) : headData;
+    };
+
+    const writePicCtrl = (img, pl) => {
+      const w = Math.max(100, hu(img.w || 30)), h = Math.max(100, hu(img.h || 20));
+      const headData = makeObjCommon('gso ', Object.assign({ numType: 1 }, pl || { inline: true }), w, h, st.nextId());
+      return [makeRec(T.CTRL_HEADER, 0, headData), ...shapeCompRecs(null, '$pic', true, w, h, 1, img)];
+    };
+
+    // 쓸 줄 모르는 개체(OLE·글맵시·연결선 등)는 null — 빈 사각형으로 바꿔 쓰지 않는다(저장 전 묻기 창이 빠진 개체로 센다)
+    const writeShapeNodeCtrl = (node, width) => {
+      const local = lname(node);
+      const kid = t => kidOf(node, t);
+      const sz = kid('sz'), pos = kid('pos');
+      const w = +(sz && sz.attrs && sz.attrs.width) || 5000;
+      const h = +(sz && sz.attrs && sz.attrs.height) || 3000;
+      const inline = !pos || pos.attrs.treatAsChar === '1';
+      // 배치(기준·정렬·오프셋·글 감싸기·여백)도 그대로 쓴다 — { inline } 만 넘기면 떠 있는 그림·도형이 글자처럼 취급됐다 (2026-11-20 점검)
+      const pa = (pos && pos.attrs) || {}, na = node.attrs || {}, om = kid('outMargin'), oma = (om && om.attrs) || {};
+      const pl = { inline, affect: pa.affectLSpacing === '1', vertRelTo: pa.vertRelTo, horzRelTo: pa.horzRelTo, vertAlign: pa.vertAlign, horzAlign: pa.horzAlign,
+        vertOffset: (+pa.vertOffset || 0) | 0, horzOffset: (+pa.horzOffset || 0) | 0, flow: pa.flowWithText === '1', overlap: pa.allowOverlap === '1',
+        wrap: inline ? 'TOP_AND_BOTTOM' : na.textWrap, zOrder: +na.zOrder || 0, out: { l: +oma.left || 0, r: +oma.right || 0, t: +oma.top || 0, b: +oma.bottom || 0 },
+        widthRelTo: sz && sz.attrs && sz.attrs.widthRelTo, heightRelTo: sz && sz.attrs && sz.attrs.heightRelTo,
+        numType: idxOf(['NONE', 'PICTURE', 'TABLE', 'EQUATION'], na.numberingType, 0), textFlow: idxOf(['BOTH_SIDES', 'LEFT_ONLY', 'RIGHT_ONLY', 'LARGEST_ONLY'], na.textFlow, 0) };
+      const FORM_REV = { edit: '+edt', btn: '+pbt', radioBtn: '+rbt', checkBtn: '+cbt', comboBox: '+cob', listBox: '+lsb', scrollBar: '+scr' };
+      if (FORM_REV[local]) {
+        const fCode = FORM_REV[local], at = node.attrs || {};
+        const ws = (k, v) => `${k}:wstring:${String(v || '').length}:${v || ''}`;
+        const set = (k, body) => `${k}:set:${body.length}:${body}`;
+        const common = [ws('Name', at.name || ''), `ForeColor:int:${parseHexColor(at.foreColor || '#000000')}`, `BackColor:int:${parseHexColor(at.backColor || '#FFFFFF')}`,
+          ws('GroupName', at.groupName || ''), `TabStop:int:${at.tabStop || 1}`, `Editable:int:${at.editable || 1}`, `TabOrder:int:${at.tabOrder || 0}`,
+          `Enabled:int:${at.enabled || 1}`, `BorderType:int:${at.borderTypeIDRef || 0}`, `DrawFrame:int:${at.drawFrame || 1}`, `Printable:int:${at.printable || 1}`, ws('Command', at.command || '')].join(' ');
+        const parts = [set('CommonSet', common)];
+        const fcp = kid('formCharPr');
+        if (fcp && fcp.attrs) parts.push(set('CharShapeSet', `CharShapeID:int:${fcp.attrs.charPrIDRef || 0} FollowContext:int:${fcp.attrs.followContext || 0} AutoSize:int:${fcp.attrs.autoSz || 0} WordWrap:int:${fcp.attrs.wordWrap || 0}`));
+        if (local === 'edit') {
+          const txtEl = kid('text');
+          parts.push(set('EditSet', [`MultiLine:int:${at.multiLine || 0}`, ws('PasswordChar', at.passwordChar || ''), `MaxLength:int:${at.maxLength || 2147483647}`,
+            `ScrollBars:int:${Math.max(0, ['NONE', 'VERTICAL', 'HORIZONTAL', 'BOTH'].indexOf(at.scrollBars || 'NONE'))}`,
+            `TabKeyBehavior:int:${at.tabKeyBehavior === 'INSERT_TAB' ? 1 : 0}`, `Number:int:${at.numOnly || 0}`, `ReadOnly:int:${at.readOnly || 0}`,
+            `AlignText:int:${Math.max(0, ['LEFT', 'CENTER', 'RIGHT'].indexOf(at.alignText || 'LEFT'))}`, ws('Text', (txtEl && txtEl.txt) || '')].join(' ')));
+        } else if (local === 'btn' || local === 'radioBtn' || local === 'checkBtn') {
+          const valIdx = Math.max(0, ['UNCHECKED', 'CHECKED', 'INDETERMINATE'].indexOf(at.value || 'UNCHECKED'));
+          parts.push(set('ButtonSet', [ws('Caption', at.caption || ''), `Value:int:${valIdx}`, ws('RadioGroupName', at.radioGroupName || ''),
+            `TriState:int:${at.triState || 0}`, `BackStyle:int:${at.backStyle === 'OPAQUE' ? 1 : 0}`].join(' ')));
+        } else if (local === 'comboBox' || local === 'listBox') {
+          const li = kid('listItem');
+          parts.push(set(local === 'comboBox' ? 'ComboBoxSet' : 'ListBoxSet', [`ListBoxRows:int:${at.listBoxRows || 10}`, `ListBoxWidth:int:${at.listBoxWidth || 0}`,
+            `EditEnable:int:${at.editEnable || 0}`, ws('Text', (li && li.attrs && li.attrs.value) || at.selectedValue || '')].join(' ')));
+        }
+        const propW = encodeWstr(parts.join(' '));
+        const fd = new Uint8Array(12 + propW.length), fv = new DataView(fd.buffer);
+        fv.setUint32(0, ctrlId(fCode), true);
+        fv.setUint32(4, ctrlId(fCode), true);
+        fd.set(propW, 12);
+        return [makeRec(T.CTRL_HEADER, 0, makeObjCommon('form', pl, w, h, st.nextId())), makeRec(91, 1, fd)];
+      }
+      if (local === 'equation') {
+        const scEl = kid('script'), sc = encodeWstr((scEl && scEl.txt) || '');
+        const ver = encodeWstr((node.attrs && node.attrs.version) || 'Equation Version 60');
+        const fnt = encodeWstr((node.attrs && node.attrs.font) || 'HancomEQN');
+        const eq = new Uint8Array(4 + sc.length + 12 + ver.length + fnt.length), ev = new DataView(eq.buffer);
+        ev.setUint32(0, node.attrs && node.attrs.lineMode === 'LINE' ? 1 : 0, true);
+        eq.set(sc, 4);
+        let o = 4 + sc.length;
+        ev.setUint32(o, +(node.attrs && node.attrs.baseUnit) || 1000, true);
+        ev.setUint32(o + 4, parseHexColor((node.attrs && node.attrs.textColor) || '#000000'), true);
+        ev.setInt16(o + 8, +(node.attrs && node.attrs.baseLine) || 85, true);
+        eq.set(ver, o + 12);
+        eq.set(fnt, o + 12 + ver.length);
+        return [makeRec(T.CTRL_HEADER, 0, withComment(makeObjCommon('eqed', pl, w, h, st.nextId()), node)), makeRec(88, 1, eq)];
+      }
+      const code = SHP_CODE[local];
+      if (!code || !canWrite(node)) return null;
+      const headData = withComment(makeObjCommon('gso ', pl, w, h, st.nextId()), node);
+      return [makeRec(T.CTRL_HEADER, 0, headData), ...shapeCompRecs(node, code, true, w, h, 1)];
+    };
+
+    const writeNoteCtrl = (note, width) => {
+      const name = note.kind === 'end' ? 'en  ' : 'fn  ';
+      const nBlocks = note.blocks && note.blocks.length ? note.blocks : [{ type: 'p', runs: [] }];
+      const nParas = H.mergeGroups(nBlocks);
+      const hd = new Uint8Array(20), hv = new DataView(hd.buffer);
+      hv.setUint32(0, ctrlId(name), true);
+      const lh = new Uint8Array(16), lv = new DataView(lh.buffer);
+      lv.setInt16(0, nParas.length, true);
+      return [makeRec(T.CTRL_HEADER, 0, hd), makeRec(T.LIST_HEADER, 1, lh), ...writeParas(nBlocks, 1, width, null)];
+    };
+
+    const writeHfCtrl = (kind, apply, blocks, width) => {
+      const name = kind === 'header' ? 'head' : 'foot';
+      const hBlocks = blocks && blocks.length ? blocks : [{ type: 'p', runs: [] }];
+      const hParas = H.mergeGroups(hBlocks);
+      const hd = new Uint8Array(8), hv = new DataView(hd.buffer);
+      hv.setUint32(0, ctrlId(name), true);
+      hv.setUint32(4, apply === 'EVEN' ? 1 : apply === 'ODD' ? 2 : 0, true);
+      const lh = new Uint8Array(16), lv = new DataView(lh.buffer);
+      lv.setInt16(0, hParas.length, true);
+      return [makeRec(T.CTRL_HEADER, 0, hd), makeRec(T.LIST_HEADER, 1, lh), ...writeParas(hBlocks, 1, width, null)];
+    };
+
+    const writeSecFirstCtrls = () => {
+      const ctrls = [];
+      // 1. secd
+      const cd = new Uint8Array(48), cv = new DataView(cd.buffer);
+      cv.setUint32(0, ctrlId('secd'), true);
+      const vis = (doc.sec && doc.sec.visibility) || {};
+      // 바탕쪽: 있는 종류만 29·30·31 비트(양 쪽·짝수 쪽·홀수 쪽)를 켜고 그 차례로 목록을 둔다 — 이 PC 의 .hwp 1만 3천여 구역에서
+      //  바탕쪽 1개는 29번, 2개는 30·31번 비트였고, 2개짜리의 첫째는 장식이 왼쪽(짝수 쪽 모양)이었다 (2026-11-21 대조)
+      const MP_TYPES = ['BOTH', 'EVEN', 'ODD'];
+      const mps = MP_TYPES.map(t => (doc.masterPages || []).find(m => m && (m.type || 'BOTH') === t && m.blocks && m.blocks.length)).filter(Boolean);
+      const mpBits = mps.reduce((s, m) => s | (1 << (29 + MP_TYPES.indexOf(m.type || 'BOTH'))), 0);
+      const sn = (doc.sec && doc.sec.startNum) || {};
+      const sa = (vis.hideFirstHeader === '1' ? 1 : 0) | (vis.hideFirstFooter === '1' ? 2 : 0) | (vis.hideFirstMasterPage === '1' ? 4 : 0)
+        | (vis.hideFirstPageNum === '1' ? 32 : 0) | (vis.showLineNumber === '1' ? (1 << 24) : 0)
+        | (idxOf(MP_TYPES, sn.pageStartsOn, 0) << 20) | mpBits;
+      cv.setUint32(4, sa >>> 0, true);
+      cv.setUint16(8, +((doc.sec && doc.sec.attrs && doc.sec.attrs.spaceColumns) || 1134), true);
+      // 줄·글자 격자 · 기본 탭 간격 · 개요 번호 · 쪽·그림·표·수식 시작 번호 (읽기와 같은 자리 — 예전에는 시작 번호를 쓰지 않아 «쪽 번호 5부터» 가 1로 돌아갔다)
+      const grid = (doc.sec && doc.sec.grid) || {};
+      cv.setUint16(10, (+grid.lineGrid || 0) & 0xffff, true);
+      cv.setUint16(12, (+grid.charGrid || 0) & 0xffff, true);
+      cv.setUint32(14, +((doc.sec && doc.sec.attrs && doc.sec.attrs.tabStop) || 8000), true);
+      cv.setUint16(18, doc.outlineId || 1, true);
+      cv.setUint16(20, (+sn.page || 0) & 0xffff, true);
+      cv.setUint16(22, (+sn.pic || 0) & 0xffff, true);
+      cv.setUint16(24, (+sn.tbl || 0) & 0xffff, true);
+      cv.setUint16(26, (+sn.equation || 0) & 0xffff, true);
+      if (doc.sec && doc.sec.lineNumberShape) {
+        const ln = doc.sec.lineNumberShape;
+        cd[38] = +(ln.restartType || 0);
+        cv.setUint16(39, +(ln.countBy || 1), true);
+        cv.setUint16(41, +(ln.distance || 0), true);
+        cv.setUint16(45, +(ln.startNumber || 1), true);
+      }
+      const pd = new Uint8Array(40), pv = new DataView(pd.buffer);
+      pv.setUint32(0, paperW, true);
+      pv.setUint32(4, paperH, true);
+      pv.setUint32(8, mgL, true);
+      pv.setUint32(12, mgR, true);
+      pv.setUint32(16, mgT, true);
+      pv.setUint32(20, mgB, true);
+      pv.setUint32(24, mgH, true);
+      pv.setUint32(28, mgF, true);
+      pv.setUint32(36, pg.landscape ? 1 : 0, true);
+      const fnRec = new Uint8Array(28), fv = new DataView(fnRec.buffer);
+      fv.setInt32(12, -1, true); fv.setUint16(16, 850, true); fv.setUint16(18, 567, true); fv.setUint16(20, 283, true); fnRec[22] = 1; fnRec[23] = 1;
+      const secRecs = [makeRec(T.CTRL_HEADER, 0, cd), makeRec(T.PAGE_DEF, 1, pd), makeRec(74, 1, fnRec), makeRec(74, 1, fnRec)];
+      for (const t of ['BOTH', 'EVEN', 'ODD']) {
+        const pb = (doc.pageBorders || []).find(x => (x.type || 'BOTH') === t);
+        const pbd = new Uint8Array(14), pbv = new DataView(pbd.buffer);
+        if (pb) {
+          pbv.setUint32(0, (pb.textBorder === 'PAPER' ? 1 : 0) | (pb.headerInside ? 2 : 0) | (pb.footerInside ? 4 : 0), true);
+          pbv.setUint16(4, (pb.offset && pb.offset.l) || 1417, true);
+          pbv.setUint16(6, (pb.offset && pb.offset.r) || 1417, true);
+          pbv.setUint16(8, (pb.offset && pb.offset.t) || 1417, true);
+          pbv.setUint16(10, (pb.offset && pb.offset.b) || 1417, true);
+          pbv.setUint16(12, st.pageFillId(pb), true);
+        } else {
+          pbv.setUint16(4, 1417, true); pbv.setUint16(6, 1417, true); pbv.setUint16(8, 1417, true); pbv.setUint16(10, 1417, true);
+          pbv.setUint16(12, 1, true);
+        }
+        secRecs.push(makeRec(75, 1, pbd));
+      }
+      // 바탕쪽마다 목록 머리(문단 수 · 속성 · 글 폭 · 글 높이 · 글·번호 참조, 진짜 파일은 34바이트) + 문단 — 목록 머리와 문단이 같은 수준
+      //  (예전에는 바탕쪽을 쓰지 않아 .hwp 로 저장하면 쪽마다 깔던 그림·글이 사라졌다)
+      const bodyH = Math.max(2834, (pg.landscape ? paperW : paperH) - mgT - mgB - mgH - mgF);
+      for (const mp of mps) {
+        const sub = mp.sub || {};
+        const lh = new Uint8Array(34), lv = new DataView(lh.buffer);
+        lv.setUint32(0, H.mergeGroups(mp.blocks).length, true);
+        lv.setUint32(8, (+sub.textWidth || bodyWidth) >>> 0, true);
+        lv.setUint32(12, (+sub.textHeight || bodyH) >>> 0, true);
+        lh[16] = sub.hasTextRef === '1' ? 1 : 0;
+        lh[17] = sub.hasNumRef === '1' ? 1 : 0;
+        secRecs.push(makeRec(T.LIST_HEADER, 1, lh), ...writeParas(mp.blocks, 1, +sub.textWidth || bodyWidth, null));
+      }
+      ctrls.push({ ch: 2, recs: secRecs });
+      // 2. cold
+      const colD = new Uint8Array(16), colV = new DataView(colD.buffer);
+      colV.setUint32(0, ctrlId('cold'), true);
+      const colCnt = (doc.columns && doc.columns.count > 1) ? doc.columns.count : 1;
+      const colGap = (doc.columns && doc.columns.gap) ? hu(doc.columns.gap) : 1134;
+      colV.setUint16(4, (colCnt << 2) | 0x1000, true);
+      colV.setUint16(6, colGap, true);
+      ctrls.push({ ch: 2, recs: [makeRec(T.CTRL_HEADER, 0, colD)] });
+      // 3. header / footer
+      if (doc.header && doc.header.length) ctrls.push({ ch: 16, recs: writeHfCtrl('header', 'BOTH', doc.header, bodyWidth) });
+      if (doc.footer && doc.footer.length) ctrls.push({ ch: 16, recs: writeHfCtrl('footer', 'BOTH', doc.footer, bodyWidth) });
+      // 4. pgnp
+      if (doc.pageNum && doc.pageNum.pos && doc.pageNum.pos !== 'NONE') {
+        const pnD = new Uint8Array(16), pnV = new DataView(pnD.buffer);
+        pnV.setUint32(0, ctrlId('pgnp'), true);
+        const posIdx = Math.max(1, PN_POS.indexOf(doc.pageNum.pos));
+        pnV.setUint32(4, posIdx << 8, true);
+        if (doc.pageNum.dash) { pnV.setUint16(10, 0x2d, true); pnV.setUint16(12, 0x2d, true); }
+        ctrls.push({ ch: 21, recs: [makeRec(T.CTRL_HEADER, 0, pnD)] });
+      }
+      return ctrls;
+    };
+
+    const writeParas = (blocks, level, width, firstCtrls) => {
+      const merged = H.mergeGroups(blocks && blocks.length ? blocks : [{ type: 'p', runs: [] }]);
+      const out = [];
+      merged.forEach((b, idx) => {
+        const isLast = idx === merged.length - 1;
+        const wchars = [], shapes = [], ctrlRecs = [];
+        const pushShape = cid => {
+          const pos = wchars.length;
+          if (!shapes.length || shapes[shapes.length - 1].id !== cid) {
+            if (shapes.length && shapes[shapes.length - 1].pos === pos) shapes[shapes.length - 1].id = cid;
+            else shapes.push({ pos, id: cid });
+          }
+        };
+        const pushCtrlChar = (ch, recs) => {
+          for (let k = 0; k < 8; k++) wchars.push(k === 0 || k === 7 ? ch : 0);
+          if (recs) ctrlRecs.push(...adjustLevels(recs, level + 1));
+        };
+        if (idx === 0 && firstCtrls && firstCtrls.length) {
+          pushShape(0);
+          for (const fc of firstCtrls) pushCtrlChar(fc.ch, fc.recs);
+        }
+        if (b.type === 'table') {
+          // 표와 한 문단에 있던 떠 있는 개체(anchors: 선·도형·묶음)는 원래 자리대로 표 앞·뒤에 — HWPX 쓰기(paraXml)와 같다 (예전에는 .hwp 로 쓰면 빠졌다)
+          const anch = after => (b.anchors || []).filter(r => r.shape && !!r.shape.afterTable === after);
+          const putAnch = after => { for (const r of anch(after)) { const recs = writeShapeNodeCtrl(r.shape, width); if (recs) { pushShape(st.charId(r.style || {})); pushCtrlChar(11, recs); } } };
+          putAnch(false);
+          const cid = st.charId(b.para && b.para.charSize ? { size: b.para.charSize } : {});
+          pushShape(cid);
+          pushCtrlChar(11, writeTableCtrl(b, width));
+          putAnch(true);
+        } else {
+          let openLink = null, openCh = null;
+          const closeLink = () => { if (openLink) { pushCtrlChar(4, null); openLink = null; } };
+          const closeCh = () => { if (openCh) { pushCtrlChar(4, null); openCh = null; } };
+          for (const r of b.runs || []) {
+            if (r.field && r.field.node) {
+              closeLink(); closeCh();
+              const cid = st.charId(r.style || {});
+              pushShape(cid);
+              const fType = r.field.node.attrs && r.field.node.attrs.type;
+              if (fType === 'BOOKMARK') {
+                pushCtrlChar(3, writeFieldCtrl('%bmk', '', 0, r.field.node.attrs.name || ''));
+                pushCtrlChar(4, null);
+              }
+              continue;
+            }
+            const wantCh = r.ch ? r.ch.id : null;
+            if (wantCh !== openCh) {
+              closeLink(); closeCh();
+              if (wantCh) {
+                openCh = wantCh;
+                pushShape(st.charId(r));
+                pushCtrlChar(3, writeFieldCtrl('%clk', r.ch.cmd || (r.ch.name || '입력') + ';', 9));
+              }
+            }
+            if (r.placeholder) continue;
+            const wantLink = r.text && r.link ? r.link : null;
+            if (wantLink !== openLink && (r.text || r.image || r.shape || r.table || r.note || r.compose || r.autoNum)) {
+              closeLink();
+              if (wantLink) {
+                openLink = wantLink;
+                pushShape(st.charId(r));
+                // 명령 문자열은 «\» 가 다음 글자를 살리고 «;» 가 끝이다 — 주소 속 \ · : · ; 를 모두 살린다 (\\server\share 의 \ 와 ;jsessionid 뒤가 사라지던 것)
+                pushCtrlChar(3, writeFieldCtrl('%hlk', wantLink.replace(/[\\:;]/g, m => '\\' + m) + ';1;0;0', 0));
+              }
+            }
+            if (r.table) { pushShape(st.charId(r.style || {})); pushCtrlChar(11, writeTableCtrl(r.table, width)); continue; }
+            if (r.image) { pushShape(st.charId(r.style || {})); pushCtrlChar(11, writePicCtrl(r.image)); continue; }
+            // 쓸 줄 모르는 개체(null)는 조판 문자도 넣지 않는다 — 머리 레코드 없는 개체 문자는 문서를 깨뜨린다
+            if (r.shape) { const recs = writeShapeNodeCtrl(r.shape, width); if (recs) { pushShape(st.charId(r.style || {})); pushCtrlChar(11, recs); } continue; }
+            if (r.note) { pushShape(st.charId(r.note.style || {})); pushCtrlChar(17, writeNoteCtrl(r.note, width)); continue; }
+            if (r.hf) { pushShape(st.charId(r.style || {})); pushCtrlChar(16, writeHfCtrl(r.hf.kind, r.hf.apply, r.hf.blocks, width)); continue; }
+            if (r.autoNum) {
+              pushShape(st.charId(r.style || {}));
+              // 자동 번호: 종류(0~3비트) · 모양(4~11비트) · 위 첨자(12비트) · 번호 · 사용자 기호 · 앞뒤 장식 — 읽기와 같은 자리 (예전에는 번호만 써 «쪽 번호» 로만 읽혔다)
+              const an = r.autoNum, fm = an.format || {};
+              const ftype = fm.type === 'SYMBOL' ? 0x80 : fm.type === 'USER_CHAR' ? 0x81 : idxOf(H.NUM_TYPES, fm.type, 0);
+              const ad = new Uint8Array(16), adv = new DataView(ad.buffer);
+              adv.setUint32(0, ctrlId('atno'), true);
+              adv.setUint32(4, (idxOf(['PAGE', 'FOOTNOTE', 'ENDNOTE', 'PICTURE', 'TABLE', 'EQUATION'], an.numType, 0) | (ftype << 4) | ((+fm.supscript ? 1 : 0) << 12)) >>> 0, true);
+              adv.setUint16(8, an.num || 1, true);
+              const ch1 = s => (s ? String(s).charCodeAt(0) : 0);
+              adv.setUint16(10, ch1(fm.userChar), true); adv.setUint16(12, ch1(fm.prefixChar), true); adv.setUint16(14, ch1(fm.suffixChar), true);
+              pushCtrlChar(18, [makeRec(T.CTRL_HEADER, 0, ad)]);
+              continue;
+            }
+            if (r.compose) {
+              const cid = st.charId(r.style || {});
+              pushShape(cid);
+              const txt = String(r.compose.text || '');
+              const cd = new Uint8Array(6 + txt.length * 2 + 8), cv = new DataView(cd.buffer);
+              cv.setUint32(0, ctrlId('tcps'), true);
+              cv.setUint16(4, txt.length, true);
+              for (let k = 0; k < txt.length; k++) cv.setUint16(6 + k * 2, txt.charCodeAt(k), true);
+              const o = 6 + txt.length * 2;
+              // 테두리 모양(원·사각형 등) · 글자 크기 조정도 함께 (예전에는 늘 «글자» 겹침으로 읽혔다)
+              cd[o] = idxOf(['CHAR', 'SHAPE_CIRCLE', 'SHAPE_REVERSAL_CIRCLE', 'SHAPE_RECTANGLE', 'SHAPE_REVERSAL_RECTANGLE', 'SHAPE_TRIANGLE', 'SHAPE_REVERSAL_TRIANGLE', 'SHAPE_LIGHT', 'SHAPE_RHOMBUS', 'SHAPE_REVERSAL_RHOMBUS', 'SHAPE_ROUNDED_RECTANGLE', 'SHAPE_EMPTY_CIRCULATE_TRIANGLE', 'SHAPE_THIN_CIRCULATE_TRIANGLE', 'SHAPE_THICK_CIRCULATE_TRIANGLE'], r.compose.circleType, 0);
+              cd[o + 1] = (+r.compose.charSz || 0) & 255;
+              cd[o + 2] = r.compose.composeType === 'OVERLAP' ? 1 : 0;
+              cd[o + 3] = 1;
+              cv.setUint32(o + 4, cid, true);
+              pushCtrlChar(23, [makeRec(T.CTRL_HEADER, 0, cd)]);
+              continue;
+            }
+            if (!r.text) continue;
+            pushShape(st.charId(r));
+            // 글자 그대로의 NBSP(뒤에 FEFF 가 붙은 NBSP_LIT)는 0xA0 로, 맨 NBSP 는 묶음 빈칸(30)으로 쓴다
+            //  (예전에는 FEFF 를 먼저 지워 둘을 가리지 못했다) · 탭·줄바꿈 밖의 제어 문자(0~31)는 문단을 끊으므로 쓰지 않는다
+            const s = r.text;
+            for (let k = 0; k < s.length; k++) {
+              const code = s.charCodeAt(k);
+              if (code === 9) pushCtrlChar(9, null);
+              else if (code === 10) wchars.push(10);
+              else if (code === 0xa0) { if (s.charCodeAt(k + 1) === 0xfeff) { wchars.push(0xa0); k++; } else wchars.push(30); }
+              else if (code === 0x2007) wchars.push(31);
+              else if (code < 32) continue;
+              else wchars.push(code);
+            }
+          }
+          closeLink();
+          closeCh();
+        }
+        if (!shapes.length) pushShape(st.charId(b.mark || (b.runs && b.runs[0]) || {}));
+        else if (b.endMark) pushShape(st.charId(b.endMark));
+        wchars.push(13);
+
+        const paraId = b.type === 'table' ? (b.para ? st.paraId(b.para) : 0) : st.paraId(b);
+        const styleId = b.type === 'table' ? st.styleOf(b.para) : st.styleOf(b);
+        const ph = new Uint8Array(24), phv = new DataView(ph.buffer);
+        phv.setUint32(0, (wchars.length | (isLast ? 0x80000000 : 0)) >>> 0, true);
+        phv.setUint16(8, paraId, true);
+        ph[10] = styleId & 0xff;
+        ph[11] = (b.pageBreak ? 4 : 0) | (b.columnBreak ? 8 : 0);
+        phv.setUint16(12, shapes.length, true);
+        phv.setUint16(16, 1, true);
+        out.push(makeRec(T.PARA_HEADER, level, ph));
+
+        const pt = new Uint8Array(wchars.length * 2), ptv = new DataView(pt.buffer);
+        for (let k = 0; k < wchars.length; k++) ptv.setUint16(k * 2, wchars[k], true);
+        out.push(makeRec(T.PARA_TEXT, level + 1, pt));
+
+        const pcs = new Uint8Array(shapes.length * 8), pcsv = new DataView(pcs.buffer);
+        shapes.forEach((sh, k) => { pcsv.setUint32(k * 8, sh.pos, true); pcsv.setUint32(k * 8 + 4, sh.id, true); });
+        out.push(makeRec(T.PARA_CHAR_SHAPE, level + 1, pcs));
+        out.push(...ctrlRecs);
+      });
+      return out;
+    };
+
+    const bodyBlocks = doc.blocks && doc.blocks.length ? doc.blocks : [{ type: 'p', runs: [] }];
+    const sec0Recs = writeParas(bodyBlocks, 0, bodyWidth, writeSecFirstCtrls());
+    for (const nb of st.numberings || []) for (const l of nb.levels || []) if (l.style) st.charId(l.style);
+    for (const b of st.bullets || []) if (b.style) st.charId(b.style);
+    st.styleRefs = (doc.styles && doc.styles.length ? doc.styles : [{ name: '바탕글', engName: 'Normal', type: 'PARA', next: 0, langId: 1042, para: {}, char: {} }])
+      .map(x => ({ s: x, p: x.type === 'CHAR' ? 0 : st.paraId(x.para || {}), c: st.charId(x.char || {}) }));
+
+    // DocInfo 생성
+    const docRecs = [];
+    const dp = new Uint8Array(26), dpv = new DataView(dp.buffer);
+    dpv.setUint16(0, 1, true); dpv.setUint16(2, 1, true); dpv.setUint16(4, 1, true);
+    dpv.setUint16(6, 1, true); dpv.setUint16(8, 1, true); dpv.setUint16(10, 1, true); dpv.setUint16(12, 1, true);
+    docRecs.push(makeRec(T.DOC_PROPS, 0, dp));
+
+    const numList = (st.numberings || []).slice();
+    if (!numList.some(n => n.id === 1)) numList.unshift({ id: 1, start: 1, levels: H.DEFAULT_OUTLINE });
+    const bulList = st.bullets || [];
+    const allFills = [
+      { sides: Array(4).fill({ type: 'NONE', width: 0.1, color: '#000000' }), bg: null },
+      { sides: Array(4).fill(H.DEFAULT_SIDE), bg: null },
+      ...st.fills,
+    ];
+    const allTabs = [{ l: 0, r: 0, items: [] }, ...st.tabs];
+
+    const idm = new Uint8Array(72), idmv = new DataView(idm.buffer);
+    const counts = [st.images.length, st.fonts.length, st.fonts.length, st.fonts.length, st.fonts.length, st.fonts.length, st.fonts.length, st.fonts.length,
+      allFills.length, st.chars.length, allTabs.length, numList.length, bulList.length, st.paras.length, st.styleRefs.length, 0, 0, 0];
+    counts.forEach((c, i) => idmv.setInt32(i * 4, c, true));
+    docRecs.push(makeRec(T.ID_MAPPINGS, 0, idm));
+
+    st.images.forEach((im, idx) => {
+      const ext = encodeWstr(im.ext || 'png');
+      const bd = new Uint8Array(4 + ext.length), bdv = new DataView(bd.buffer);
+      bdv.setUint16(0, 1 | (2 << 4), true); // EMBEDDING + «무조건 비압축»(4~5비트 = 2). 1 은 «무조건 압축» 이라 날 자료를 풀려다 그림이 깨진다
+      bdv.setUint16(2, idx + 1, true);
+      bd.set(ext, 4);
+      docRecs.push(makeRec(T.BIN_DATA, 0, bd));
+    });
+    for (let lang = 0; lang < 7; lang++) {
+      for (const f of st.fonts) {
+        const fn = encodeWstr(f), fd = new Uint8Array(1 + fn.length);
+        fd[0] = 1;
+        fd.set(fn, 1);
+        docRecs.push(makeRec(T.FACE_NAME, 0, fd));
+      }
+    }
+    for (const f of allFills) {
+      const bfd = new Uint8Array(49), bfv = new DataView(bfd.buffer);
+      const sl = f.slash && f.slash.type && f.slash.type !== 'NONE' ? f.slash : null;
+      const bsl = f.backSlash && f.backSlash.type && f.backSlash.type !== 'NONE' ? f.backSlash : null;
+      bfv.setUint16(0, (sl ? (2 << 2) : 0) | (bsl ? (2 << 5) : 0), true);
+      for (let s = 0; s < 4; s++) {
+        const sd = (f.sides && f.sides[s]) || H.DEFAULT_SIDE, o = 2 + s * 6;
+        bfd[o] = lineTypeIdx(sd.type);
+        bfd[o + 1] = lineWidthIdx(sd.width);
+        bfv.setUint32(o + 2, parseHexColor(sd.color), true);
+      }
+      const dg = sl || bsl || { type: 'SOLID', width: 0.12, color: '#000000' };
+      bfd[26] = lineTypeIdx(dg.type);
+      bfd[27] = lineWidthIdx(dg.width);
+      bfv.setUint32(28, parseHexColor(dg.color), true);
+      bfv.setUint32(32, 1, true);
+      bfv.setUint32(36, f.bg ? parseHexColor(f.bg) : 0xffffffff, true);
+      bfv.setUint32(40, 0xffffffff, true);
+      bfv.setInt32(44, -1, true);
+      docRecs.push(makeRec(T.BORDER_FILL, 0, bfd));
+    }
+    for (const c of st.chars) {
+      const cd = new Uint8Array(74), cv = new DataView(cd.buffer);
+      const arr7 = (v, d) => (Array.isArray(v) && v.length === 7 ? v : Array(7).fill(v !== undefined ? v : d));
+      arr7(c.font, 0).forEach((fid, k) => cv.setUint16(k * 2, fid, true));
+      arr7(c.ratio, 100).forEach((rv, k) => { cd[14 + k] = rv & 0xff; });
+      arr7(c.spacing, 0).forEach((sv, k) => { cd[21 + k] = sv & 0xff; });
+      arr7(c.relSz, 100).forEach((zv, k) => { cd[28 + k] = zv & 0xff; });
+      arr7(c.offset, 0).forEach((ov, k) => { cd[35 + k] = ov & 0xff; });
+      cv.setInt32(42, c.height || 1000, true);
+      const fx = H.parseFx(c.fx), u = fx.u ? fx.u.split('/') : null, s = fx.s ? fx.s.split('/') : null, sh = fx.sh ? fx.sh.split('/') : null;
+      const ulType = c.underline ? Math.max(1, ['NONE', 'BOTTOM', 'CENTER', 'TOP'].indexOf(u ? u[0] : 'BOTTOM')) : 0;
+      const ulShape = Math.max(0, LINE_SHAPES.indexOf(u ? u[1] : 'SOLID'));
+      const stShape = Math.max(0, LINE_SHAPES.indexOf(s ? s[0] : 'SOLID'));
+      const olIdx = fx.o ? Math.max(0, OUTLINES.indexOf(fx.o)) : 0;
+      const shIdx = sh ? Math.max(0, ['NONE', 'DROP', 'CONTINUOUS'].indexOf(sh[0])) : 0;
+      const symIdx = fx.sym ? Math.max(0, SYM_MARKS.indexOf(fx.sym)) : 0;
+      const attr = (c.italic ? 1 : 0) | (c.bold ? 2 : 0) | (ulType << 2) | (ulShape << 4) | (olIdx << 8) | (shIdx << 11)
+        | (fx.em ? (1 << 13) : 0) | (fx.en ? (1 << 14) : 0) | (c.sup ? (1 << 15) : 0) | (c.sub ? (1 << 16) : 0)
+        | (c.strike ? (1 << 18) : 0) | (symIdx << 21) | (fx.fs ? (1 << 25) : 0) | (stShape << 26) | (fx.k ? (1 << 30) : 0);
+      cv.setUint32(46, attr >>> 0, true);
+      cd[50] = sh ? (+sh[2] & 0xff) : 10;
+      cd[51] = sh ? (+sh[3] & 0xff) : 10;
+      cv.setUint32(52, parseHexColor(c.color || '#000000'), true);
+      cv.setUint32(56, parseHexColor(u ? u[2] : (c.color || '#000000')), true);
+      cv.setUint32(60, c.shade && c.shade !== 'none' ? parseHexColor(c.shade) : 0xffffffff, true);
+      cv.setUint32(64, parseHexColor(sh ? sh[1] : '#B2B2B2'), true);
+      cv.setUint16(68, 1, true);
+      cv.setUint32(70, parseHexColor(s ? s[1] : (c.color || '#000000')), true);
+      docRecs.push(makeRec(T.CHAR_SHAPE, 0, cd));
+    }
+    for (const t of allTabs) {
+      const items = (t && t.items) || [];
+      const td = new Uint8Array(8 + items.length * 8), tv = new DataView(td.buffer);
+      tv.setUint32(0, ((t && t.l) ? 1 : 0) | ((t && t.r) ? 2 : 0), true);
+      tv.setInt32(4, items.length, true);
+      items.forEach((it, k) => {
+        const o = 8 + k * 8;
+        tv.setUint32(o, Math.round((it[0] || 0) * 2), true);
+        td[o + 4] = Math.max(0, ['LEFT', 'RIGHT', 'CENTER', 'DECIMAL'].indexOf(it[1] || 'LEFT'));
+        td[o + 5] = Math.max(0, TAB_LEADERS.indexOf(it[2] || 'NONE'));
+      });
+      docRecs.push(makeRec(22, 0, td));
+    }
+    for (const nb of numList) {
+      const parts = [];
+      for (let l = 0; l < 7; l++) {
+        const lv = (nb.levels || []).find(x => x.level === l + 1) || { level: l + 1, format: '', type: 'DIGIT', start: 1 };
+        const head = new Uint8Array(12), hv = new DataView(head.buffer);
+        const alignIdx = Math.max(0, ['LEFT', 'CENTER', 'RIGHT'].indexOf(lv.align || 'LEFT'));
+        const numIdx = Math.max(0, H.NUM_TYPES.indexOf(lv.type || 'DIGIT'));
+        hv.setUint32(0, alignIdx | ((lv.inst !== 0 ? 1 : 0) << 2) | ((lv.auto !== 0 ? 1 : 0) << 3) | ((lv.offType === 'HWPUNIT' ? 1 : 0) << 4) | (numIdx << 5), true);
+        hv.setInt16(4, lv.wa || 0, true);
+        hv.setInt16(6, lv.off !== undefined ? lv.off : 50, true);
+        hv.setUint32(8, lv.style ? st.charId(lv.style) : 0xffffffff, true);
+        parts.push(head, encodeWstr(lv.format || ''));
+      }
+      const tail = new Uint8Array(30), tv = new DataView(tail.buffer);
+      tv.setUint16(0, nb.start || 1, true);
+      for (let l = 0; l < 7; l++) {
+        const lv = (nb.levels || []).find(x => x.level === l + 1);
+        tv.setUint32(2 + l * 4, (lv && lv.start) || 1, true);
+      }
+      parts.push(tail);
+      docRecs.push(makeRec(T.NUMBERING, 0, concatBytes(parts)));
+    }
+    for (const b of bulList) {
+      const bd = new Uint8Array(25), bv = new DataView(bd.buffer);
+      bv.setUint32(0, 8, true);
+      bv.setInt16(6, 50, true);
+      bv.setUint32(8, b.style ? st.charId(b.style) : 0xffffffff, true);
+      bv.setUint16(12, (b.char || '•').charCodeAt(0), true);
+      if (b.checked) bv.setUint16(23, b.checked.charCodeAt(0), true);
+      docRecs.push(makeRec(T.BULLET, 0, bd));
+    }
+    const ALIGN_IDX = { JUSTIFY: 0, LEFT: 1, RIGHT: 2, CENTER: 3, DISTRIBUTE: 4 };
+    for (const p of st.paras) {
+      const pd = new Uint8Array(54), pv = new DataView(pd.buffer);
+      const x = H.parsePP(p.pp);
+      const lsType = Math.max(0, ['PERCENT', 'FIXED', 'BETWEEN_LINES', 'AT_LEAST'].indexOf(p.lineType || 'PERCENT'));
+      const align = ALIGN_IDX[p.align] !== undefined ? ALIGN_IDX[p.align] : 0;
+      const [ht, hid, hlv] = p.head ? p.head.split(':') : ['NONE', 0, 0];
+      const htIdx = Math.max(0, ['NONE', 'OUTLINE', 'NUMBER', 'BULLET'].indexOf(ht));
+      const blw = Math.max(0, ['KEEP_WORD', 'HYPHENATION', 'BREAK_WORD'].indexOf(x.breakLatinWord || 'KEEP_WORD'));
+      const bnlw = x.breakNonLatinWord === 'BREAK_WORD' ? 0 : 1;
+      const vert = Math.max(0, ['BASELINE', 'TOP', 'CENTER', 'BOTTOM'].indexOf(x.vertical || 'BASELINE'));
+      const a1 = (lsType & 3) | (align << 2) | (blw << 5) | (bnlw << 7) | ((x.snapToGrid ? 1 : 0) << 8)
+        | (((x.condense || 0) & 127) << 9) | ((x.widowOrphan ? 1 : 0) << 16) | ((x.keepWithNext ? 1 : 0) << 17)
+        | ((x.keepLines ? 1 : 0) << 18) | ((x.pageBreakBefore ? 1 : 0) << 19) | (vert << 20)
+        | ((x.fontLineHeight ? 1 : 0) << 22) | (htIdx << 23) | ((+hlv & 7) << 25)
+        | ((x.border && x.border.connect ? 1 : 0) << 28) | ((x.border && x.border.ignoreMargin ? 1 : 0) << 29);
+      pv.setUint32(0, a1 >>> 0, true);
+      pv.setInt32(4, (p.left || 0) * 2, true);
+      pv.setInt32(8, (p.right || 0) * 2, true);
+      pv.setInt32(12, (p.indent || 0) * 2, true);
+      pv.setInt32(16, (p.before || 0) * 2, true);
+      pv.setInt32(20, (p.after || 0) * 2, true);
+      const lsVal = lsType === 0 ? (p.line || 160) : (p.line || 1200) * 2;
+      pv.setInt32(24, lsVal, true);
+      pv.setUint16(28, p.tab || 0, true);
+      pv.setUint16(30, +hid || 0, true);
+      pv.setUint16(32, p.bf || 1, true);
+      if (x.border && Array.isArray(x.border.off)) x.border.off.forEach((ov, k) => pv.setInt16(34 + k * 2, ov || 0, true));
+      const lwIdx = Math.max(0, ['BREAK', 'SQUEEZE', 'KEEP'].indexOf(x.lineWrap || 'BREAK'));
+      pv.setUint32(42, lwIdx | ((x.eAsianEng ? 1 : 0) << 4) | ((x.eAsianNum ? 1 : 0) << 5), true);
+      pv.setUint32(46, lsType, true);
+      pv.setUint32(50, lsVal, true);
+      docRecs.push(makeRec(T.PARA_SHAPE, 0, pd));
+    }
+    for (const sr of st.styleRefs) {
+      const n1 = encodeWstr(sr.s.name || '바탕글'), n2 = encodeWstr(sr.s.engName || 'Normal');
+      const sd = new Uint8Array(n1.length + n2.length + 10), sv = new DataView(sd.buffer);
+      sd.set(n1, 0);
+      sd.set(n2, n1.length);
+      const o = n1.length + n2.length;
+      sd[o] = (sr.s.type === 'CHAR' ? 1 : 0) | (sr.s.lockForm ? 0x40 : 0);
+      sd[o + 1] = sr.s.next || 0;
+      sv.setUint16(o + 2, sr.s.langId || 1042, true);
+      sv.setUint16(o + 4, sr.p, true);
+      sv.setUint16(o + 6, sr.c, true);
+      docRecs.push(makeRec(T.STYLE, 0, sd));
+    }
+    const cdRec = new Uint8Array(4);
+    new DataView(cdRec.buffer).setUint32(0, doc.compat && doc.compat.target === 'MS_WORD' ? 2 : 0, true);
+    docRecs.push(makeRec(30, 0, cdRec));
+
+    const fh = new Uint8Array(256), fhv = new DataView(fh.buffer);
+    const sig = 'HWP Document File';
+    for (let i = 0; i < sig.length; i++) fh[i] = sig.charCodeAt(i);
+    fhv.setUint32(32, 0x05010001, true); // 5.1.0.1
+    fhv.setUint32(36, 0, true); // 비압축 표준 HWP 5.0
+
+    const prvStr = H.plainText(bodyBlocks).slice(0, 1000);
+    const prv = new Uint8Array(prvStr.length * 2), prvv = new DataView(prv.buffer);
+    for (let i = 0; i < prvStr.length; i++) prvv.setUint16(i * 2, prvStr.charCodeAt(i), true);
+
+    const cfbFiles = {
+      FileHeader: fh,
+      DocInfo: concatBytes(docRecs),
+      'BodyText/Section0': concatBytes(sec0Recs),
+      PrvText: prv,
+    };
+    st.images.forEach((im, idx) => {
+      const hex = (idx + 1).toString(16).toUpperCase().padStart(4, '0');
+      cfbFiles[`BinData/BIN${hex}.${im.ext || 'png'}`] = im.data;
+    });
+    return writeCfb(cfbFiles);
+  }
+
+  g.PureunHwp = { readHwp, buildHwp, readCfb, writeCfb, AES, distributeKey };
 })(typeof window !== 'undefined' ? window : globalThis);
