@@ -1516,6 +1516,7 @@
       : [];
     return E.buildFormalLegalDocument({
       docType: opts.docType || 'opinion',
+      includeLetterhead: opts.includeLetterhead !== false,
       title: opts.title !== undefined ? opts.title : (th && th.title ? th.title : '법률·노무 검토 의견서'),
       recipient: opts.recipient || '',
       sender: opts.sender || ((state.userName ? (state.userName + ' 공인노무사') : '푸른노무법인 담당 공인노무사')),
@@ -1534,6 +1535,22 @@
     });
   }
 
+  /* 서면·한글 출력 직전 인용된 모든 미로드 법령 원문을 자동 로드해 조문 실존 여부(예: 근로기준법 제9999조 차단)까지 100% 대조 */
+  function prepareFormalDocFromThread(th, opts) {
+    var store = global.PuPBoxStore;
+    var seedText = [
+      th && th.answer ? th.answer : '',
+      th && th.sourceText ? th.sourceText : '',
+      th && th.query ? th.query : ''
+    ].filter(Boolean).join('\n');
+    var preloadP = (store && typeof store.preloadCitedLaws === 'function' && seedText)
+      ? store.preloadCitedLaws(seedText, false).catch(function () {})
+      : Promise.resolve();
+    return preloadP.then(function () {
+      return buildFormalDocFromThread(th, opts);
+    });
+  }
+
   function downloadFormalHwpx(formalDoc) {
     var E = global.PuPBoxEngine;
     var bytes = E.buildFormalHwpxBytes(formalDoc, global.PureunHwpx);
@@ -1541,25 +1558,134 @@
     return bytes;
   }
 
-  function openFormalDocInHangulEditor(formalDoc) {
+  function applyHangulRoundTripSave(savedPayload, boundMeta) {
+    if (!savedPayload || typeof savedPayload !== 'object') return Promise.resolve(false);
+    boundMeta = boundMeta || {};
+    var editedText = String(savedPayload.plainText || '').trim();
+    if (!editedText) return Promise.resolve(false);
+    var store = global.PuPBoxStore;
     var E = global.PuPBoxEngine;
-    var bytes = E.buildFormalHwpxBytes(formalDoc, global.PureunHwpx);
-    var b64 = bytesToBase64Chunked(bytes);
+    if (!store || typeof store.saveThread !== 'function') return Promise.resolve(false);
+
+    var startGen = (typeof store.getSessionGen === 'function') ? store.getSessionGen() : 0;
+    var startUid = (typeof store.getActiveUid === 'function') ? store.getActiveUid() : '';
+    var boundTid = String(boundMeta.threadId || '');
+    var boundPid = String(boundMeta.projectId || '');
+    if (!boundTid) return Promise.resolve(false);
+
+    /* 편집기에서 새로 추가된 미로드 법령 조문도 자동 로드해 실존 대조 후 격리 */
+    var preloadP = (typeof store.preloadCitedLaws === 'function')
+      ? store.preloadCitedLaws(editedText, false).catch(function () {})
+      : Promise.resolve();
+
+    return preloadP.then(function () {
+      /* 비동기 프리로드 도중 브리지가 닫히거나 로그아웃/계정 전환된 경우 쓰기 즉시 중단 */
+      if (typeof boundMeta.isCancelled === 'function' && boundMeta.isCancelled()) return false;
+      if (typeof store.getSessionGen === 'function' && store.getSessionGen() !== startGen) return false;
+      if (typeof store.getActiveUid === 'function' && store.getActiveUid() !== startUid) return false;
+
+      var scrubField = function (rawVal, partyNames) {
+        var s = String(rawVal || '').trim();
+        if (!s) return '';
+        if (E && typeof E.anonymizeLegalText === 'function') {
+          var r = E.anonymizeLegalText(s, partyNames || []);
+          s = (r && typeof r === 'object' && typeof r.text === 'string') ? r.text : String(r || '');
+        }
+        if (global && global.PuRrnScrub && typeof global.PuRrnScrub.scrub === 'function') {
+          s = global.PuRrnScrub.scrub(s);
+        }
+        return s;
+      };
+      var rawDocName = String(savedPayload.name || '').trim();
+      var sharedNames = (E && typeof E.extractPartyNames === 'function')
+        ? E.extractPartyNames(editedText + '\n' + rawDocName, '')
+        : [];
+      var safeEditedText = scrubField(editedText, sharedNames);
+      var docs = (typeof store.getDocs === 'function') ? store.getDocs() : [];
+      var loadedLaws = (typeof store.getLoadedLaws === 'function') ? store.getLoadedLaws() : [];
+      var lawIndex = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
+        ? global.PuPBoxLawIndex.list()
+        : [];
+      var finalText = safeEditedText;
+      var finalVerification = null;
+      var blockedCnt = 0;
+      if (E && typeof E.enforceZeroHallucinationGuard === 'function') {
+        var g = E.enforceZeroHallucinationGuard(safeEditedText, {
+          docs: docs,
+          loadedLaws: loadedLaws,
+          lawIndex: lawIndex
+        });
+        finalText = g.text;
+        finalVerification = g.verification;
+        blockedCnt = g.blockedCount || 0;
+      }
+
+      /* 브리지 개설 시 고정된 스레드·프로젝트 ID만 허용 (임의 대상 덮어쓰기 차단) */
+      var threads = (typeof store.getThreads === 'function') ? store.getThreads() : [];
+      var existing = threads.find(function (t) { return t.id === boundTid; });
+      if (!existing) return false;
+      var docName = scrubField(rawDocName || existing.title || '한글 최종 서면', sharedNames) || '한글 최종 서면';
+      var docLabel = String(savedPayload.docTypeLabel || '공식 서면').trim();
+
+      var nextHist = Array.isArray(existing.history) ? existing.history.slice() : [];
+      nextHist.push({
+        query: '[한글 편집기 최종본 반영] ' + docLabel + ' — ' + docName,
+        answer: finalText,
+        mode: existing.mode || 'review',
+        engineLabel: '푸른 한글 편집기 양방향 반영',
+        at: Number(savedPayload.savedAt) || Date.now()
+      });
+      var updated = store.saveThread({
+        id: existing.id,
+        title: existing.title || docName,
+        mode: existing.mode || 'review',
+        stance: existing.stance || state.reviewStance || 'neutral',
+        query: existing.query || '',
+        answer: finalText,
+        sourceText: existing.sourceText || '',
+        sourceFileName: existing.sourceFileName || '',
+        projectId: existing.projectId || boundPid,
+        workflowStyle: existing.workflowStyle || 'lbox',
+        engineLabel: '푸른 한글 편집기 양방향 반영',
+        verification: finalVerification || existing.verification,
+        hallucinationBlockedCount: blockedCnt,
+        attachedTitles: existing.attachedTitles || [],
+        retrievedDocIds: existing.retrievedDocIds || [],
+        history: nextHist
+      });
+      if (state.activeThread && state.activeThread.id === updated.id) {
+        state.activeThread = updated;
+      }
+
+      var projSaved = false;
+      if (boundPid && typeof store.getProjects === 'function' && typeof store.saveProject === 'function') {
+        var proj = store.getProjects().find(function (p) { return p.id === boundPid; });
+        if (proj) {
+          proj.drafts = [{
+            title: '[한글최종본 · ' + docLabel + '] ' + docName,
+            answer: finalText,
+            savedAt: Number(savedPayload.savedAt) || Date.now()
+          }].concat(proj.drafts || []);
+          store.saveProject(proj);
+          projSaved = true;
+        }
+      }
+
+      toast(projSaved
+        ? ('푸른 한글 편집기 최종본을 P박스 작업 및 사건 프로젝트에 자동 반영했습니다.' + (blockedCnt > 0 ? (' (미검증 인용 ' + blockedCnt + '건 격리)') : ''))
+        : ('푸른 한글 편집기 최종본을 P박스 작업에 자동 반영했습니다.' + (blockedCnt > 0 ? (' (미검증 인용 ' + blockedCnt + '건 격리)') : '')));
+      renderAll();
+      return true;
+    });
+  }
+
+  function openFormalDocInHangulEditor(formalDoc, meta) {
+    meta = meta || {};
+    var E = global.PuPBoxEngine;
     var bridgeId = 'pbox_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    var payload = {
-      bridgeId: bridgeId,
-      format: 'hwpx',
-      name: formalDoc.fileNameBase + '.hwpx',
-      label: formalDoc.title,
-      sourceLabel: 'P박스 ' + formalDoc.docTypeLabel,
-      b64: b64,
-      sentAt: Date.now()
-    };
     var url = 'hangul.html?from=pbox&bid=' + encodeURIComponent(bridgeId);
     var w = (typeof global.open === 'function') ? global.open(url, '_blank') : null;
     if (!w) {
-      payload.b64 = '';
-      payload.html = '';
       toast('팝업이 차단되어 푸른 한글 편집기를 열지 못했습니다. 브라우저 팝업을 허용한 뒤 다시 누르거나 [📥 한글(.hwpx)] 버튼으로 직접 저장해 주세요.', 'err');
       return { opened: false, popupBlocked: true, bridgeId: bridgeId };
     }
@@ -1568,20 +1694,50 @@
       ? String(global.location.origin)
       : '';
     if (!origin) {
-      payload.b64 = '';
       try { if (w && typeof w.close === 'function') w.close(); } catch (_) {}
       toast('보안 출처(https/http) 환경에서만 푸른 한글 편집기 직접 전송이 가능합니다. [📥 한글(.hwpx)] 저장을 이용해 주세요.', 'err');
       return { opened: false, invalidOrigin: true, bridgeId: bridgeId };
     }
+
+    var payload = null;
+    var childReady = false;
+    var acked = false;
     var cleaned = false;
     var timers = [];
+    var activeTh = meta.thread || state.activeThread || null;
+    var activePid = String(meta.projectId || (activeTh && activeTh.projectId) || state.activeProjectId || '');
+    var activeTid = String(meta.threadId || (activeTh && activeTh.id) || '');
+
+    function attachFormalDoc(docObj) {
+      if (cleaned || !docObj) return;
+      var bytes = E.buildFormalHwpxBytes(docObj, global.PureunHwpx);
+      var b64 = bytesToBase64Chunked(bytes);
+      payload = {
+        bridgeId: bridgeId,
+        format: 'hwpx',
+        name: docObj.fileNameBase + '.hwpx',
+        label: docObj.title,
+        docType: docObj.docType,
+        docTypeLabel: docObj.docTypeLabel,
+        threadId: activeTid,
+        projectId: activePid,
+        sourceLabel: 'P박스 ' + docObj.docTypeLabel,
+        b64: b64,
+        sentAt: Date.now()
+      };
+      if (childReady && !acked) pushToChild();
+    }
+
     function pushToChild() {
-      if (cleaned || !payload.b64) return;
+      if (cleaned || acked || !payload || !payload.b64) return;
       try {
         if (w && !w.closed) {
           w.postMessage({ type: 'pureun_hangul_open', payload: payload }, origin);
         }
       } catch (_) {}
+    }
+    function wipeSendPayload() {
+      if (payload) payload.b64 = '';
     }
     function cleanup() {
       if (cleaned) return;
@@ -1593,7 +1749,8 @@
           global.removeEventListener('message', onMsg);
         }
       } catch (_) {}
-      payload.b64 = '';
+      wipeSendPayload();
+      payload = null;
       _activeHangulBridges.delete(cleanup);
     }
     function onMsg(e) {
@@ -1603,18 +1760,59 @@
       var d = e.data;
       if (!d || typeof d !== 'object') return;
       if (d.type === 'pureun_hangul_ready' && d.bid === bridgeId) {
+        childReady = true;
         pushToChild();
       } else if (d.type === 'pureun_hangul_ack' && d.bridgeId === bridgeId) {
-        cleanup();
+        acked = true;
+        /* 전송 페이로드는 즉시 메모리 파기하되, 한글 편집기 → P박스 양방향 최종본 반영(pureun_pbox_save)은 창이 닫히거나 로그아웃 전까지 수신 */
+        wipeSendPayload();
+      } else if (d.type === 'pureun_pbox_save' && d.bridgeId === bridgeId && d.payload) {
+        applyHangulRoundTripSave(d.payload, {
+          threadId: activeTid,
+          projectId: activePid,
+          isCancelled: function () { return cleaned; }
+        });
       }
     }
     if (global && typeof global.addEventListener === 'function') {
       global.addEventListener('message', onMsg);
     }
     _activeHangulBridges.add(cleanup);
-    timers.push(setTimeout(cleanup, 25000));
-    toast('푸른 한글 편집기로 \'' + formalDoc.docTypeLabel + '\'을 복사 없이 바로 전송했습니다.');
+    /* 25초 안에 ack 미수신 시 전송 버퍼 자동 파기 */
+    timers.push(setTimeout(function () {
+      if (!acked) wipeSendPayload();
+      if (w && w.closed) cleanup();
+    }, 25000));
+
+    if (formalDoc && typeof formalDoc.then === 'function') {
+      formalDoc.then(function (resolvedDoc) {
+        attachFormalDoc(resolvedDoc);
+        toast('푸른 한글 편집기로 \'' + resolvedDoc.docTypeLabel + '\'을 복사 없이 바로 전송했습니다. (편집기에서 [P박스에 최종본 반영]으로 다시 저장 가능)');
+      }).catch(function (err) {
+        cleanup();
+        try { if (w && typeof w.close === 'function') w.close(); } catch (_) {}
+        toast('한글 편집기 전송 준비 오류: ' + (err && err.message ? err.message : String(err)), 'err');
+      });
+    } else if (formalDoc) {
+      attachFormalDoc(formalDoc);
+      toast('푸른 한글 편집기로 \'' + formalDoc.docTypeLabel + '\'을 복사 없이 바로 전송했습니다. (편집기에서 [P박스에 최종본 반영]으로 다시 저장 가능)');
+    }
     return { opened: true, fallbackDownload: false, bridgeId: bridgeId };
+  }
+
+  function renderHandoffGuardBadgeHtml(docObj, isPreloading) {
+    if (!docObj) return '';
+    if (isPreloading) {
+      return '<span class="pbox-badge-blue">⏳ 인용된 국가법령 원문을 자동 로드해 조문 실존 여부를 정밀 대조 중입니다...</span>';
+    }
+    if (!docObj.clean) {
+      return '<span class="pbox-badge-red">⚠️ 미검증 인용 ' + docObj.blockedCount + '건 자동 격리됨 — 서면 내 격리 표시를 원문 확인 후 정리하세요</span>';
+    }
+    var extra = [];
+    if (docObj.unfetchedLawCount > 0) extra.push('미로드 법령 ' + docObj.unfetchedLawCount + '건');
+    if (docObj.refOnlyCount > 0) extra.push('참조판례 ' + docObj.refOnlyCount + '건');
+    return '<span class="pbox-badge-green">🛡️ 할루시네이션 차단 관문 통과 · 검증 완료 인용 ' + docObj.verifiedCount + '건 / 미검증 차단 0건' +
+      (extra.length ? (' (' + extra.join(' · ') + ')') : '') + '</span>';
   }
 
   function showDocumentHandoffModal() {
@@ -1630,9 +1828,8 @@
       toast('서면 준비 오류: ' + e.message, 'err');
       return;
     }
-    var guardHtml = previewDoc.clean
-      ? '<span class="pbox-badge-green">🛡️ 할루시네이션 차단 관문 통과 · 검증 완료 인용 ' + previewDoc.verifiedCount + '건 / 미검증 차단 0건</span>'
-      : '<span class="pbox-badge-red">⚠️ 미검증 인용 ' + previewDoc.blockedCount + '건 자동 격리됨 — 서면 내 격리 표시를 원문 확인 후 정리하세요</span>';
+    var needPreload = previewDoc.unfetchedLawCount > 0 && global.PuPBoxStore && typeof global.PuPBoxStore.preloadCitedLaws === 'function';
+    var guardHtml = renderHandoffGuardBadgeHtml(previewDoc, needPreload);
 
     var html = [
       '<div class="pbox-modal-hd">',
@@ -1640,16 +1837,18 @@
       '  <button type="button" class="pbox-icon-btn" data-act="close-modal" aria-label="창 닫기">✕</button>',
       '</div>',
       '<div class="pbox-modal-bd">',
-      '  <div class="pbox-muted" style="margin-bottom:10px">Ctrl+C / Ctrl+V 없이 현재 검토 보고서·연표·신구대비표·제척기간·검증 완료 판례를 공식 노무 서면으로 조립해 푸른 한글 편집기 또는 .hwpx 파일로 바로 넘깁니다.</div>',
-      '  <div style="margin-bottom:12px">' + guardHtml + '</div>',
+      '  <div class="pbox-muted" style="margin-bottom:10px">Ctrl+C / Ctrl+V 없이 현재 검토 보고서·연표·신구대비표·제척기간·검증 완료 판례를 공식 노무 서면으로 조립해 푸른 한글 편집기로 바로 넘기고, 편집 후 다시 P박스 프로젝트에 최종본을 반영할 수 있습니다.</div>',
+      '  <div id="pboxHandoffGuardSlot" style="margin-bottom:12px">' + guardHtml + '</div>',
       '  <div class="pbox-form-stack">',
       '    <label class="pbox-field">',
-      '      <span class="pbox-label">서면 양식 선택</span>',
+      '      <span class="pbox-label">서면 양식 선택 (공식 노무 서식 6종)</span>',
       '      <select id="pboxHandoffType" class="pbox-input" style="width:100%;max-width:100%;box-sizing:border-box">',
       '        <option value="opinion">법률·노무 자문의견서 (의뢰인 발송용)</option>',
       '        <option value="nlrc_brief">노동위원회 이유서·답변서 초안</option>',
       '        <option value="notice">내용증명·시정요구서 (통지서)</option>',
       '        <option value="redline_memo">취업규칙·근로계약서 신·구 조항 대비 의견서</option>',
+      '        <option value="complaint">고용노동부 진정서·고소장 초안</option>',
+      '        <option value="disciplinary">징계위원회 검토·의결서 초안</option>',
       '      </select>',
       '    </label>',
       '    <label class="pbox-field">',
@@ -1667,10 +1866,11 @@
       '    <div class="pbox-field">',
       '      <span class="pbox-label">자동 연계 포함 항목 (개인정보 자동 비식별 + 미검증 인용 차단 적용)</span>',
       '      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">',
-      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncTimeline" checked> 사실관계 일자별 연표</label>',
-      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncRedline" checked> 3단 신·구 조항 대비표</label>',
-      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncDeadlines" checked> 노동법 제척기간·시효표</label>',
-      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid var(--bd);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncCitations" checked> 검증 완료 근거 (' + previewDoc.verifiedCount + '건)</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncLetterhead" checked> 푸른노무법인 공식 레터헤드·직인란</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncTimeline" checked> 사실관계 일자별 연표</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncRedline" checked> 3단 신·구 조항 대비표</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncDeadlines" checked> 노동법 제척기간·시효표</label>',
+      '        <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-height:36px;padding:4px 10px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="pboxHandoffIncCitations" checked> 검증 완료 근거 (<span id="pboxHandoffCiteCnt">' + previewDoc.verifiedCount + '</span>건)</label>',
       '      </div>',
       '    </div>',
       '  </div>',
@@ -1682,6 +1882,35 @@
       '</div>'
     ].join('\n');
     openModalHtml(html, false, false);
+
+    /* 양식 변경 시 기본 수신처를 양식별 기본값으로 자동 연동 (사용자가 직접 수정한 수신처는 유지) */
+    var typeSel = document.getElementById('pboxHandoffType');
+    var recInp = document.getElementById('pboxHandoffRecipient');
+    var E0 = global.PuPBoxEngine;
+    if (typeSel && recInp && E0 && E0.FORMAL_DOC_TEMPLATES && typeof typeSel.addEventListener === 'function') {
+      var allDefaultRecs = new Set(Object.keys(E0.FORMAL_DOC_TEMPLATES).map(function (k) {
+        return E0.FORMAL_DOC_TEMPLATES[k].defaultRecipient;
+      }));
+      typeSel.addEventListener('change', function () {
+        var nextTpl = E0.FORMAL_DOC_TEMPLATES[typeSel.value];
+        if (!nextTpl) return;
+        var curVal = String(recInp.value || '').trim();
+        if (!curVal || allDefaultRecs.has(curVal)) {
+          recInp.value = nextTpl.defaultRecipient;
+        }
+      });
+    }
+
+    if (needPreload) {
+      var expectedTid = th.id;
+      prepareFormalDocFromThread(th, { docType: 'opinion' }).then(function (rechecked) {
+        if (!state.activeThread || state.activeThread.id !== expectedTid) return;
+        var slot = document.getElementById('pboxHandoffGuardSlot');
+        if (slot) slot.innerHTML = renderHandoffGuardBadgeHtml(rechecked, false);
+        var cntEl = document.getElementById('pboxHandoffCiteCnt');
+        if (cntEl) cntEl.textContent = String(rechecked.verifiedCount);
+      }).catch(function () {});
+    }
   }
 
   function readHandoffModalOptions() {
@@ -1689,6 +1918,7 @@
     var titleEl = document.getElementById('pboxHandoffTitle');
     var recEl = document.getElementById('pboxHandoffRecipient');
     var sndEl = document.getElementById('pboxHandoffSender');
+    var lhEl = document.getElementById('pboxHandoffIncLetterhead');
     var tlEl = document.getElementById('pboxHandoffIncTimeline');
     var rlEl = document.getElementById('pboxHandoffIncRedline');
     var dlEl = document.getElementById('pboxHandoffIncDeadlines');
@@ -1698,6 +1928,7 @@
       title: titleEl ? titleEl.value.trim() : '',
       recipient: recEl ? recEl.value.trim() : '',
       sender: sndEl ? sndEl.value.trim() : '',
+      includeLetterhead: lhEl ? !!lhEl.checked : true,
       includeTimeline: tlEl ? !!tlEl.checked : true,
       includeRedline: rlEl ? !!rlEl.checked : true,
       includeDeadlines: dlEl ? !!dlEl.checked : true,
@@ -5310,66 +5541,65 @@
       }
     } else if (act === 'export-thread-doc') {
       if (state.activeThread) {
-        try {
-          var formalForDoc = buildFormalDocFromThread(state.activeThread, { docType: 'opinion' });
+        prepareFormalDocFromThread(state.activeThread, { docType: 'opinion' }).then(function (formalForDoc) {
           downloadBlob(formalForDoc.fileNameBase + '.doc', formalForDoc.html, 'application/msword;charset=utf-8');
-          toast('할루시네이션 차단 검증을 거친 Word(.doc) 의견서를 저장했습니다.');
-        } catch (errDoc) {
-          toast('Word(.doc) 생성 오류: ' + errDoc.message, 'err');
-        }
+          toast('법령 조문 대조·할루시네이션 차단 검증을 거친 Word(.doc) 의견서를 저장했습니다.');
+        }).catch(function (errDoc) {
+          toast('Word(.doc) 생성 오류: ' + (errDoc && errDoc.message ? errDoc.message : String(errDoc)), 'err');
+        });
       }
     } else if (act === 'open-handoff-modal') {
       showDocumentHandoffModal();
     } else if (act === 'quick-open-hangul') {
       if (state.activeThread) {
         try {
-          var quickFormal = buildFormalDocFromThread(state.activeThread, { docType: 'opinion' });
-          openFormalDocInHangulEditor(quickFormal);
+          var thQuick = state.activeThread;
+          openFormalDocInHangulEditor(prepareFormalDocFromThread(thQuick, { docType: 'opinion' }), { thread: thQuick });
         } catch (errQuick) {
           toast('한글 편집기 연결 오류: ' + errQuick.message, 'err');
         }
       }
     } else if (act === 'export-thread-hwpx') {
       if (state.activeThread) {
-        try {
-          var quickHwpxDoc = buildFormalDocFromThread(state.activeThread, { docType: 'opinion' });
+        prepareFormalDocFromThread(state.activeThread, { docType: 'opinion' }).then(function (quickHwpxDoc) {
           downloadFormalHwpx(quickHwpxDoc);
           toast('표준 한글(.hwpx) 공식 의견서를 저장했습니다.');
-        } catch (errHwpx) {
-          toast('한글(.hwpx) 생성 오류: ' + errHwpx.message, 'err');
-        }
+        }).catch(function (errHwpx) {
+          toast('한글(.hwpx) 생성 오류: ' + (errHwpx && errHwpx.message ? errHwpx.message : String(errHwpx)), 'err');
+        });
       }
     } else if (act === 'handoff-open-hangul') {
       if (state.activeThread) {
         try {
-          var hDoc = buildFormalDocFromThread(state.activeThread, readHandoffModalOptions());
+          var thHandoff = state.activeThread;
+          var hOpts = readHandoffModalOptions();
           closeModal();
-          openFormalDocInHangulEditor(hDoc);
+          openFormalDocInHangulEditor(prepareFormalDocFromThread(thHandoff, hOpts), { thread: thHandoff });
         } catch (errH1) {
           toast('한글 편집기 연결 오류: ' + errH1.message, 'err');
         }
       }
     } else if (act === 'handoff-download-hwpx') {
       if (state.activeThread) {
-        try {
-          var hDoc2 = buildFormalDocFromThread(state.activeThread, readHandoffModalOptions());
+        var hOpts2 = readHandoffModalOptions();
+        closeModal();
+        prepareFormalDocFromThread(state.activeThread, hOpts2).then(function (hDoc2) {
           downloadFormalHwpx(hDoc2);
-          closeModal();
           toast(hDoc2.docTypeLabel + ' 한글(.hwpx) 파일을 저장했습니다.');
-        } catch (errH2) {
-          toast('한글(.hwpx) 생성 오류: ' + errH2.message, 'err');
-        }
+        }).catch(function (errH2) {
+          toast('한글(.hwpx) 생성 오류: ' + (errH2 && errH2.message ? errH2.message : String(errH2)), 'err');
+        });
       }
     } else if (act === 'handoff-download-doc') {
       if (state.activeThread) {
-        try {
-          var hDoc3 = buildFormalDocFromThread(state.activeThread, readHandoffModalOptions());
+        var hOpts3 = readHandoffModalOptions();
+        closeModal();
+        prepareFormalDocFromThread(state.activeThread, hOpts3).then(function (hDoc3) {
           downloadBlob(hDoc3.fileNameBase + '.doc', hDoc3.html, 'application/msword;charset=utf-8');
-          closeModal();
           toast(hDoc3.docTypeLabel + ' Word(.doc) 파일을 저장했습니다.');
-        } catch (errH3) {
-          toast('Word(.doc) 생성 오류: ' + errH3.message, 'err');
-        }
+        }).catch(function (errH3) {
+          toast('Word(.doc) 생성 오류: ' + (errH3 && errH3.message ? errH3.message : String(errH3)), 'err');
+        });
       }
     } else if (act === 'save-thread-proj') {
       if (!state.activeThread) return;

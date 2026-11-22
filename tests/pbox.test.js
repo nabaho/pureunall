@@ -5538,6 +5538,8 @@ test('㉖ 절대 할루시네이션 차단 관문 · 인용 오탐 해소 · 4�
   assert.ok(elementsById.pboxModalBox.innerHTML.includes('class="pbox-modal-bd"') && !elementsById.pboxModalBox.innerHTML.includes('pbox-chk-tap'), '서면 연결 모달은 표준 .pbox-modal-bd 와 일반 flex 체크박스 라벨을 사용해야 합니다');
 
   clickAct({ 'data-act': 'handoff-open-hangul' });
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
   assert.equal(openedPopups.length, 1, '푸른 한글 편집기 전용 팝업이 열려야 합니다');
   assert.ok(openedPopups[0].url.startsWith('hangul.html?from=pbox&bid=pbox_'), 'from=pbox&bid=pbox_ 보안 파라미터로 열려야 합니다');
   assert.equal(lsStore.get('pureun_hangul_bridge') || null, null, '기밀 서면 데이터는 localStorage에 절대 기록되면 안 됩니다');
@@ -5572,5 +5574,223 @@ test('㉖ 절대 할루시네이션 차단 관문 · 인용 오탐 해소 · 4�
   assert.ok(elementsById.pboxToast.textContent.includes('팝업이 차단되어'), '팝업 차단 시 재시도·직접 저장 안내가 표시되어야 합니다');
 
   /* 로그아웃 시 열린 브리지 정리 */
+  App.setAuthUser(null);
+});
+
+/* ══════════════════════════════════════════════════════════════════
+ * ㉗ 서면 출력 전 법령 조문 자동 대조 · 6종 공식 서면 + 푸른 레터헤드 · 한글 양방향 역저장 · 링크 URL 화이트리스트 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('㉗ 서면 출력 전 미로드 법령 조문 자동 대조 · 6종 서식+레터헤드 · 한글→P박스 양방향 반영 · 한글 링크 스킴 차단', async () => {
+  const lawIndex = loadLawIndex().list();
+  const docs = Corpus.SEED_DOCS;
+
+  /* 1) hangul/js/hwpx.js + dom.js 위험 URL 스킴(javascript:/data:) 차단 검증 */
+  const domCtx = { console, Uint8Array, ArrayBuffer, DataView, TextEncoder, TextDecoder };
+  domCtx.window = domCtx;
+  domCtx.globalThis = domCtx;
+  vm.createContext(domCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'hangul', 'js', 'zip.js'), 'utf8'), domCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'hangul', 'js', 'hwpx.js'), 'utf8'), domCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'hangul', 'js', 'dom.js'), 'utf8'), domCtx);
+
+  const linkTestHtml = domCtx.PureunDom.blocksToHtml([
+    {
+      type: 'p',
+      runs: [
+        { text: '안전링크', link: 'https://www.law.go.kr/법령/근로기준법' },
+        { text: '위험JS', link: 'javascript:alert(1)' },
+        { text: '위험DATA', link: 'data:text/html,<script>alert(1)</script>' }
+      ]
+    }
+  ]);
+  assert.ok(linkTestHtml.includes('href="https://www.law.go.kr/법령/근로기준법"') && linkTestHtml.includes('rel="noopener noreferrer"'), 'https 링크는 noopener noreferrer와 함께 안전하게 렌더링되어야 합니다');
+  assert.ok(!linkTestHtml.includes('javascript:') && !linkTestHtml.includes('data:text/html'), 'javascript:/data: 위험 링크 스킴은 DOM 렌더링에서 완전히 차단되어야 합니다');
+  assert.ok(linkTestHtml.includes('위험JS') && linkTestHtml.includes('위험DATA'), '차단된 링크의 본문 텍스트 자체는 보존되어야 합니다');
+
+  /* 2) 신규 2종(진정서·징계의결서) 포함 6종 공식 서면 + 푸른노무법인 레터헤드·문서번호·직인란 검증 */
+  for (const docType of ['complaint', 'disciplinary']) {
+    const fDoc = Engine.buildFormalLegalDocument({
+      docType,
+      includeLetterhead: true,
+      title: '임금체불 및 징계절차 검토',
+      sender: '권형하 공인노무사',
+      answer: '대법원 2020다247190 전원합의체 판결 기준 검토',
+      docs,
+      loadedLaws: [],
+      lawIndex
+    });
+    assert.equal(fDoc.docType, docType);
+    assert.ok(/^푸른-(?:진정|징계)-\d{8}-[A-F0-9]{4}$/.test(fDoc.docControlNo), '공식 문서번호 형식이 생성되어야 합니다: ' + fDoc.docControlNo);
+    const bytes = Engine.buildFormalHwpxBytes(fDoc, domCtx.PureunHwpx);
+    const entries = await domCtx.PureunZip.readZip(bytes);
+    const secXml = new TextDecoder().decode(entries instanceof Map ? entries.get('Contents/section0.xml') : entries['Contents/section0.xml']);
+    assert.ok(secXml.includes('푸른노무법인') && secXml.includes(fDoc.docControlNo) && secXml.includes('(직인)'), docType + ' HWPX에 푸른노무법인 공식 레터헤드·문서번호·직인란이 포함되어야 합니다');
+  }
+
+  /* 3) 서면 생성 전 미로드 법령 원문 자동 로드 → 허구 조문(근로기준법 제9999조) 자동 격리 + 한글→P박스 양방향 반영 */
+  const docListeners = {};
+  const winListeners = {};
+  const elementsById = {};
+  function makeEl(id) {
+    const el = {
+      id, value: '', checked: true, style: {}, _innerHTML: '', textContent: '',
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      setAttribute() {}, getAttribute() { return ''; }, querySelectorAll() { return []; }, querySelector() { return null; },
+      focus() {}, click() {}, appendChild() {}, removeChild() {}
+    };
+    Object.defineProperty(el, 'innerHTML', { get() { return this._innerHTML; }, set(v) { this._innerHTML = String(v); } });
+    if (id) elementsById[id] = el;
+    return el;
+  }
+  ['pboxRoot', 'pboxMainArea', 'pboxSidebar', 'pboxReader', 'pboxModalBackdrop', 'pboxModalBox', 'pboxToast',
+    'pboxHandoffGuardSlot', 'pboxHandoffCiteCnt', 'pboxHandoffType', 'pboxHandoffTitle', 'pboxHandoffRecipient',
+    'pboxHandoffSender', 'pboxHandoffIncLetterhead', 'pboxHandoffIncTimeline', 'pboxHandoffIncRedline',
+    'pboxHandoffIncDeadlines', 'pboxHandoffIncCitations'
+  ].forEach(makeEl);
+  elementsById.pboxHandoffType.value = 'complaint';
+  elementsById.pboxHandoffTitle.value = '체불임금 진정서';
+  elementsById.pboxHandoffRecipient.value = '서울지방고용노동청장 귀하';
+  elementsById.pboxHandoffSender.value = '권형하 공인노무사';
+
+  const domDoc = {
+    body: makeEl('body'), activeElement: null,
+    getElementById: (id) => elementsById[id] || null,
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null, querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); }
+  };
+  const openedPopups = [];
+  const fakeLsaMd = '---\ntitle: 근로기준법\neffective_date: 2025-01-01\n---\n\n### 제23조(해고 등의 제한)\n① 사용자는 근로자에게 정당한 이유 없이 해고, 휴직, 정직, 전직, 감봉, 그 밖의 징벌을 하지 못한다.\n';
+
+  const uiCtx = {
+    console, URL, URLSearchParams, Blob, Uint8Array, ArrayBuffer, DataView, TextEncoder, TextDecoder,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+    setTimeout, clearTimeout, setInterval, clearInterval,
+    location: { protocol: 'https:', origin: 'https://erp.pureunlabor.co.kr', href: 'https://erp.pureunlabor.co.kr/pu-pbox.html' },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    navigator: { clipboard: { writeText: async () => {} } },
+    document: domDoc,
+    fetch: async (url) => {
+      if (String(url).includes(encodeURIComponent('근로기준법')) || String(url).includes('근로기준법')) {
+        return { ok: true, status: 200, text: async () => fakeLsaMd };
+      }
+      return { ok: false, status: 404, text: async () => '' };
+    },
+    PureunZip: domCtx.PureunZip,
+    PureunHwpx: domCtx.PureunHwpx,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex()
+  };
+  uiCtx.window = {
+    location: uiCtx.location, URL: { createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} }, Blob,
+    btoa: uiCtx.btoa, atob: uiCtx.atob,
+    PureunZip: domCtx.PureunZip, PureunHwpx: domCtx.PureunHwpx,
+    PuPBoxEngine: Engine, PuPBoxCorpus: Corpus, PuPBoxLawIndex: uiCtx.PuPBoxLawIndex,
+    navigator: uiCtx.navigator, document: domDoc, localStorage: uiCtx.localStorage, fetch: uiCtx.fetch,
+    open: (url) => {
+      const child = { url, closed: false, posted: [], postMessage(msg, orig) { this.posted.push({ msg, orig }); }, close() { this.closed = true; } };
+      openedPopups.push(child);
+      return child;
+    },
+    addEventListener: (ev, fn) => { (winListeners[ev] = winListeners[ev] || []).push(fn); },
+    removeEventListener: (ev, fn) => { if (winListeners[ev]) winListeners[ev] = winListeners[ev].filter((x) => x !== fn); }
+  };
+  uiCtx.globalThis = uiCtx.window;
+  vm.createContext(uiCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), uiCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), uiCtx);
+
+  const Store = uiCtx.window.PuPBoxStore;
+  const App = uiCtx.window.PuPBoxApp;
+  App.mount(elementsById.pboxRoot);
+  App.setAuthUser({ uid: 'user-roundtrip', displayName: '권형하' });
+  await new Promise((r) => setImmediate(r));
+
+  const proj = Store.saveProject({ name: '테스트 사건 프로젝트', clientName: '의뢰인' });
+  const th = Store.saveThread({
+    title: '허구 조문 포함 테스트',
+    mode: 'review',
+    projectId: proj.id,
+    answer: '근로기준법 제23조에 따라 정당한 이유가 필요하며, 근로기준법 제9999조는 적용되지 않습니다.'
+  });
+
+  function clickAct(attrs) {
+    const btn = {
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    };
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  clickAct({ 'data-act': 'open-thread', 'data-id': th.id });
+  clickAct({ 'data-act': 'handoff-open-hangul' });
+  await new Promise((r) => setTimeout(r, 25));
+
+  assert.equal(openedPopups.length, 1);
+  const child = openedPopups[0];
+  const bid = new URLSearchParams(child.url.split('?')[1]).get('bid');
+
+  (winListeners.message || []).slice().forEach((fn) => fn({
+    origin: 'https://erp.pureunlabor.co.kr',
+    source: child,
+    data: { type: 'pureun_hangul_ready', from: 'pbox', bid }
+  }));
+  assert.equal(child.posted.length, 1);
+  const sentPayload = child.posted[0].msg.payload;
+  assert.equal(sentPayload.threadId, th.id);
+  assert.equal(sentPayload.projectId, proj.id);
+
+  /* 전송된 HWPX 안에 근로기준법 제23조는 정상 유지되고, 존재하지 않는 근로기준법 제9999조는 자동 로드 대조 후 격리되었는지 검증 */
+  const sentBytes = new Uint8Array(Buffer.from(sentPayload.b64, 'base64'));
+  const sentEntries = await domCtx.PureunZip.readZip(sentBytes);
+  const sentSecXml = new TextDecoder().decode(sentEntries instanceof Map ? sentEntries.get('Contents/section0.xml') : sentEntries['Contents/section0.xml']);
+  assert.ok(sentSecXml.includes('근로기준법 제23조'), '실존 조문(근로기준법 제23조)은 정상 유지되어야 합니다');
+  assert.ok(sentSecXml.includes('[⚠ 미검증 인용 자동 차단: 근로기준법 제9999조 — 원문 미확인]'), '미로드 법령의 허구 조문(근로기준법 제9999조)도 자동 로드 대조 후 격리되어야 합니다');
+
+  /* ack 후 전송 버퍼 파기 */
+  (winListeners.message || []).slice().forEach((fn) => fn({
+    origin: 'https://erp.pureunlabor.co.kr',
+    source: child,
+    data: { type: 'pureun_hangul_ack', bridgeId: bid }
+  }));
+  assert.equal(sentPayload.b64, '', 'ack 후 전송 버퍼는 즉시 파기되어야 합니다');
+
+  /* 잘못된 출처의 pureun_pbox_save 메시지는 무시되어야 함 */
+  (winListeners.message || []).slice().forEach((fn) => fn({
+    origin: 'https://evil.example.com',
+    source: child,
+    data: { type: 'pureun_pbox_save', bridgeId: bid, payload: { threadId: th.id, projectId: proj.id, plainText: '악성 덮어쓰기' } }
+  }));
+  assert.ok(!Store.getThreads().find((x) => x.id === th.id).answer.includes('악성 덮어쓰기'), '다른 출처의 역저장 메시지는 차단되어야 합니다');
+
+  /* 정상 출처·자식 창·일치 bid의 한글 편집기 최종본 역저장 → 법령 재대조·개인정보 비식별 후 작업 스레드 + 프로젝트 초안에 모두 반영 */
+  (winListeners.message || []).slice().forEach((fn) => fn({
+    origin: 'https://erp.pureunlabor.co.kr',
+    source: child,
+    data: {
+      type: 'pureun_pbox_save',
+      bridgeId: bid,
+      payload: {
+        bridgeId: bid,
+        threadId: 'tampered-thread-id',
+        projectId: 'tampered-project-id',
+        docTypeLabel: '고용노동부 진정서·고소장 초안',
+        name: '체불임금 진정서 최종본',
+        plainText: '한글 편집기에서 최종 검수 완료한 진정서 본문입니다. 연락처 010-9999-8888. 근로기준법 제23조 및 근로기준법 제9999조 적용.',
+        savedAt: Date.now()
+      }
+    }
+  }));
+  await new Promise((r) => setTimeout(r, 25));
+  const updatedTh = Store.getThreads().find((x) => x.id === th.id);
+  const updatedProj = Store.getProjects().find((x) => x.id === proj.id);
+  assert.ok(updatedTh.answer.includes('한글 편집기에서 최종 검수 완료한 진정서 본문입니다'), '한글 편집기 최종본이 브리지 개설 시 고정된 P박스 스레드에 양방향 반영되어야 합니다');
+  assert.ok(!updatedTh.answer.includes('010-9999-8888'), '한글 편집기 역저장 본문의 연락처는 저장 전 자동 비식별화되어야 합니다');
+  assert.ok(updatedTh.answer.includes('[⚠ 미검증 인용 자동 차단: 근로기준법 제9999조 — 원문 미확인]'), '한글 편집기에서 추가된 허구 조문도 역저장 시 자동 격리되어야 합니다');
+  assert.ok(updatedProj.drafts.some((d) => d.title.includes('[한글최종본') && d.answer.includes('최종 검수 완료한 진정서') && !d.answer.includes('010-9999-8888')), '한글 편집기 최종본이 비식별 상태로 연결된 P박스 사건 프로젝트 초안에도 자동 보관되어야 합니다');
+
   App.setAuthUser(null);
 });

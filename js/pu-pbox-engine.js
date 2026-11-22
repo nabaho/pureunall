@@ -5046,11 +5046,30 @@
     },
     redline_memo: {
       id: 'redline_memo',
+      code: '규정',
       label: '취업규칙·계약서 신·구 대비 의견서',
       bannerTitle: '규 정 · 계 약 서  검 토  및  개 정 의 견 서',
       defaultRecipient: '대표이사 / 인사노무 담당자 귀하',
       closingLine: '위 강행법규 위반 및 분쟁 위험 조항을 적법한 개정안으로 정비하시기를 권고합니다.',
       sections: ['Ⅰ. 검토 대상 문서 및 총평', 'Ⅱ. 강행법규·판례 기준 세부 검토 의견', 'Ⅲ. 주요 일정 및 시행 경위', 'Ⅳ. 현행 조항 vs 적법 수정안 3단 대비표', 'Ⅴ. 개정 절차 및 법정 기한 점검', 'Ⅵ. 검증 완료 법령·판례 근거']
+    },
+    complaint: {
+      id: 'complaint',
+      code: '진정',
+      label: '고용노동부 진정서·고소장 초안',
+      bannerTitle: '진 정 서 (고 소 장) 초 안',
+      defaultRecipient: '관할 지방고용노동청(지청)장 귀하',
+      closingLine: '이상의 사실관계와 검증된 법령·판례에 비추어 피진정인의 노동관계법령 위반 여부를 엄정히 조사하여 시정 및 처벌하여 주시기 바랍니다.',
+      sections: ['Ⅰ. 진정(고소) 취지 및 사건 개요', 'Ⅱ. 법령 위반 사실 및 관련 판례·행정해석 검토', 'Ⅲ. 피해 경위 일자별 연표', 'Ⅳ. 위법 계약·규정 조항 대비 정리', 'Ⅴ. 공소시효·임금채권 소멸시효 점검', 'Ⅵ. 입증·인용 근거 (검증 완료 법령·판례)']
+    },
+    disciplinary: {
+      id: 'disciplinary',
+      code: '징계',
+      label: '징계위원회 출석통지·의결서 초안',
+      bannerTitle: '징 계 위 원 회  검 토 · 의 결 서  초 안',
+      defaultRecipient: '징계위원회 위원장 / 대상 근로자 귀하',
+      closingLine: '관련 취업규칙과 대법원 징계 양정·절차 정당성 기준에 따라 공정하게 심의·의결합니다.',
+      sections: ['Ⅰ. 징계 혐의 사실 및 심의 개요', 'Ⅱ. 징계사유·양정·절차 정당성에 관한 판례·법리 검토', 'Ⅲ. 비위 및 절차 진행 일자별 연표', 'Ⅳ. 관련 취업규칙·징계규정 대비 검토', 'Ⅴ. 징계시효 및 구제신청 제척기간 점검', 'Ⅵ. 검증 완료 법령·판례 근거']
     }
   };
 
@@ -5267,29 +5286,51 @@
     }
 
     /* 3. KS X 6101 HWPX 블록 조립 */
+    var includeLetterhead = params.includeLetterhead !== false;
+    var docCodeMap = { opinion: '자문', nlrc_brief: '노위', notice: '통지', redline_memo: '규정', complaint: '진정', disciplinary: '징계' };
+    var docCode = tpl.code || docCodeMap[tpl.id] || '서면';
+    var ymdCompact = dateYmd.replace(/-/g, '').slice(0, 8);
+    var docHash4 = deterministicDocHash16(tpl.id + '|' + safeTitle + '|' + dateYmd).slice(0, 4).toUpperCase();
+    var docControlNo = '푸른-' + docCode + '-' + ymdCompact + '-' + docHash4;
+
+    var guardStatusText = guardRes.clean
+      ? ('통과 — 검증 완료 인용 ' + guardRes.verifiedCount + '건 / 미검증 차단 0건' +
+          (guardRes.unfetchedLawCount > 0 ? (' · 미로드 법령 ' + guardRes.unfetchedLawCount + '건') : '') +
+          (guardRes.refOnlyCount > 0 ? (' · 참조판례 ' + guardRes.refOnlyCount + '건') : '') +
+          ' (P박스 원문 대조 완료)')
+      : ('주의 — 미검증 인용 ' + guardRes.blockedCount + '건 자동 격리됨 (격리 항목은 원문 확인 후 사용)');
+
     var blocks = [];
-    blocks.push(hwpP(tpl.bannerTitle, { align: 'center', bold: true, sizePt: 18, color: '#1E3A8A' }));
-    blocks.push(hwpP('', { sizePt: 8 }));
+    if (includeLetterhead) {
+      blocks.push({
+        type: 'table',
+        colWidths: [92, 74],
+        rows: [[
+          hwpCell('푸른노무법인  |  PUREUN CERTIFIED PUBLIC LABOR ATTORNEYS', { bold: true, size: 9.5, color: '#1E3A8A', bg: '#EFF6FF', align: 'left' }),
+          hwpCell('문서번호: ' + docControlNo, { bold: true, size: 8.8, color: '#374151', bg: '#EFF6FF', align: 'right' })
+        ]]
+      });
+      blocks.push(hwpP('', { size: 6 }));
+    }
+    blocks.push(hwpP(tpl.bannerTitle, { align: 'center', bold: true, size: 18, color: '#1E3A8A' }));
+    blocks.push(hwpP('', { size: 8 }));
 
     blocks.push({
       type: 'table',
       colWidths: [34, 132],
       rows: [
+        [hwpCell('문서 번호', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(docControlNo)],
         [hwpCell('문서 제목', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(safeTitle, { bold: true })],
         [hwpCell('수 신', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(safeRecipient)],
         [hwpCell('발 신', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(safeSender)],
         [hwpCell('작성 일자', { bold: true, bg: '#EFF6FF', align: 'center' }), hwpCell(dateKorean + '  (검토 관점: ' + stanceLabel + ')')],
         [
           hwpCell('할루시네이션 검증', { bold: true, bg: '#EFF6FF', align: 'center' }),
-          hwpCell(
-            guardRes.clean
-              ? ('통과 — 검증 완료 인용 ' + guardRes.verifiedCount + '건 / 미검증 차단 0건 (P박스 원문 대조 완료)')
-              : ('주의 — 미검증 인용 ' + guardRes.blockedCount + '건 자동 격리됨 (격리 항목은 원문 확인 후 사용)')
-          )
+          hwpCell(guardStatusText)
         ]
       ]
     });
-    blocks.push(hwpP('', { sizePt: 10 }));
+    blocks.push(hwpP('', { size: 10 }));
 
     var secIdx = 0;
     /* 섹션 1: 사안 개요 */
@@ -5394,11 +5435,17 @@
       blocks.push(hwpP('', { sizePt: 8 }));
     }
 
-    /* 맺음말 + 작성일 + 서명 */
-    blocks.push(hwpP(tpl.closingLine, { sizePt: 10 }));
-    blocks.push(hwpP('', { sizePt: 12 }));
-    blocks.push(hwpP(dateKorean, { align: 'center', bold: true, sizePt: 11 }));
-    blocks.push(hwpP(safeSender + '  (인)', { align: 'right', bold: true, sizePt: 11.5 }));
+    /* 맺음말 + 작성일 + 푸른노무법인 서명·직인란 */
+    blocks.push(hwpP(tpl.closingLine, { size: 10 }));
+    blocks.push(hwpP('', { size: 12 }));
+    blocks.push(hwpP(dateKorean, { align: 'center', bold: true, size: 11 }));
+    blocks.push(hwpP('', { size: 8 }));
+    if (includeLetterhead) {
+      blocks.push(hwpP('푸 른 노 무 법 인', { align: 'right', bold: true, size: 13, color: '#1E3A8A' }));
+      blocks.push(hwpP('담당 공인노무사: ' + safeSender + '  (직인)', { align: 'right', bold: true, size: 11 }));
+    } else {
+      blocks.push(hwpP(safeSender + '  (인)', { align: 'right', bold: true, size: 11.5 }));
+    }
 
     /* 4. Markdown 및 Word(.doc) 호환 HTML 동시 생성 */
     var mdParts = [
@@ -5472,6 +5519,8 @@
     return {
       docType: tpl.id,
       docTypeLabel: tpl.label,
+      docControlNo: docControlNo,
+      includeLetterhead: includeLetterhead,
       title: safeTitle,
       recipient: safeRecipient,
       sender: safeSender,
@@ -5482,6 +5531,8 @@
       html: html,
       blockedCount: guardRes.blockedCount,
       blockedItems: guardRes.blockedItems,
+      unfetchedLawCount: guardRes.unfetchedLawCount,
+      refOnlyCount: guardRes.refOnlyCount,
       verifiedCount: guardRes.verifiedCount,
       verifiedCitations: verifiedCitations,
       verification: guardRes.verification,
