@@ -8038,6 +8038,17 @@ exports.runMailContractSweep = functions
     }
   });
 
+/* 🎓 강의자료 원본의 내려받기 토큰 정리 (2026-11-22 «원본 열기를 권한 확인 방식으로»)
+   화면은 원본을 로그인 증표로만 받는다(창고 규칙 isStaff() 를 매번). 화면에서 올린 파일에 파이어베이스가 저절로 붙이는 토큰을
+   매일 밤 edulibMailSweep 이 메일 정리 뒤에 지운다(사람이 바로 돌릴 때는 scripts/edulib-revoke-download-tokens.js).
+   ⚠ 창고에 쓰는 것은 «edulib/ 파일의 토큰 열쇠 하나를 null 로»뿐 — 내용·다른 메타데이터는 그대로. 판정·조건은 edulib-token-sweep.js 한 곳. */
+const EdulibTokenSweep = require("./edulib-token-sweep");
+async function runEdulibTokenSweepOnce() {
+  const r = await EdulibTokenSweep.revokeTokens({ bucket: getStorage().bucket(PHOTO_BUCKET), log: (...a) => console.warn(...a) });
+  console.log("edulibTokenSweep", JSON.stringify(r));
+  return r;
+}
+
 /* 🎓 보낸 메일의 강의자료 → 강의자료 앱 자동 정리 (대표 지시 2026-11-21
      「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
    실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
@@ -8045,7 +8056,8 @@ exports.runMailContractSweep = functions
    ★ «정리»까지만 자동이다 — 결과(종류·강의일·내용 요약)를 관리자만 읽는 자동 정리함(edulib_inbox)에 쌓고, 원본은 복사하지 않는다.
      자료함(재직 직원 모두)에 넣는 것은 관리자가 자동 정리함에서 골라 «넣기»를 누를 때다(화면의 «가져오기» 길).
    ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 빈 자리일 때만 · 창고·자료함에는 안 씀 · AI 안 씀.
-   ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다) */
+   ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다)
+   ★ 매일 밤 메일 정리 뒤에 강의자료 토큰 정리(runEdulibTokenSweepOnce, 바로 위)도 돈다 — 메일 쪽이 잠금·실패여도 따로 돈다. */
 const EdulibMailSweep = require("./edulib-mail-sweep");
 async function runEdulibMailSweepOnce(trigger, opts) {
   const MS = require("./mail-sync");
@@ -8084,12 +8096,16 @@ exports.edulibMailSweep = functions
   .pubsub.schedule("30 19 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
-    let release = null;
-    try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); return null; }
-    try {
-      const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
-      console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
-    } finally { if (release) await release(); }
+    let release = null, mailErr = null;
+    try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); }
+    if (release) {
+      try {
+        const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
+        console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
+      } catch (e) { mailErr = e; } finally { await release(); }
+    }
+    try { await runEdulibTokenSweepOnce(); } catch (e) { console.error("edulibTokenSweep", String(e && e.message || e)); }
+    if (mailErr) throw mailErr;
     return null;
   });
 exports.runEdulibMailSweep = functions

@@ -8,37 +8,37 @@
    ■ 무엇을 하나
    - 기본은 «보기만»: 창고 pureun-erp-hrphotos 의 edulib/ 아래 파일 중 토큰이 붙은 것의 «개수»만 센다. 토큰 값은 출력하지 않는다.
    - --apply: 파일마다 메타데이터의 firebaseStorageDownloadTokens «하나만» 지운다.
-     내용(바이트)·이름·다른 메타데이터(originalName·sha256 등)는 그대로다. ifMetagenerationMatch 로 그 사이 바뀐 파일은 건너뛴다.
+     내용(바이트)·이름·다른 메타데이터(originalName·sha256 등)는 그대로다.
+     ifGenerationMatch + ifMetagenerationMatch 로 그 사이 바뀌거나 갈아 끼운 파일은 건너뛴다.
      끝나면 다시 세어 «남은 것 0»인지 보여 준다.
    - 자리는 edulib/ 로 못 박는다 — 사진첩·서고 같은 다른 앱의 파일은 건드리지 않는다(그 앱들은 토큰 주소를 아직 쓴다).
+   - 판정(어느 파일·무엇을 지우나)은 매일 밤 도는 서버 정리(functions/edulib-token-sweep.js)와 «같은 함수»를 쓴다.
    - 인증: gcloud auth print-access-token (창고 관리 권한이 있는 계정).
 
    ■ 순서 ⚠
    - 앱 새 판(권한 확인 길)이 «배포된 뒤에» 돌린다. 예전 판 화면을 열어 둔 사람은 원본을 못 연다 — 새로고침하면 된다.
-   - 앱에서 새로 올리는 파일에는 파이어베이스가 토큰을 또 붙인다(앱은 그 주소를 만들지도 쓰지도 않는다). 가끔 다시 돌리면 그것도 지워진다.
+   - 앱에서 새로 올리는 파일에는 파이어베이스가 토큰을 또 붙인다 — 그것은 매일 밤 서버 정리(edulibMailSweep 이 함께 부른다)가 지운다.
    - 사람의 허락을 받고 돌린다 — 살아 있는 창고의 메타데이터를 바꾸는 일이다. */
 const { execSync } = require('child_process');
+const T = require('../functions/edulib-token-sweep');
 
 const BUCKET = 'pureun-erp-hrphotos';
-const PREFIX = 'edulib/';
+const PREFIX = T.PREFIX;
 const PROJECT = 'pureun-erp';
-const KEY = 'firebaseStorageDownloadTokens';
+const KEY = T.KEY;
 const API = 'https://storage.googleapis.com/storage/v1/b/' + BUCKET + '/o';
 
-/* edulib/{id}/{이름} 꼴만 — 다른 자리·이상한 이름은 손대지 않는다 */
-function isEdulibObject(name) {
-  return typeof name === 'string' && name.indexOf(PREFIX) === 0 && name.split('/').length >= 3 && name.indexOf('..') < 0;
-}
-function needsRevoke(o) {
-  return !!(o && isEdulibObject(o.name) && o.metadata && typeof o.metadata[KEY] === 'string' && o.metadata[KEY] !== '');
-}
-/* 사용자 메타데이터에서 «그 열쇠 하나»를 null 로 보내면 그 열쇠만 지워진다(PATCH 는 합치기) */
-function patchBody() { return { metadata: { [KEY]: null } }; }
+/* 판정은 서버 정리와 한 곳 — edulib/{id}/{이름} 꼴만, 토큰이 붙은 것만, 그 열쇠 하나만 */
+const isEdulibObject = T.isEdulibObject;
+const needsRevoke = T.needsRevoke;
+const patchBody = T.patchBody;
 function patchUrl(o) {
-  return API + '/' + encodeURIComponent(o.name) + '?ifMetagenerationMatch=' + encodeURIComponent(String(o.metageneration)) + '&fields=name,metageneration';
+  const p = T.preconditionsOf(o);
+  return API + '/' + encodeURIComponent(o.name) + '?ifGenerationMatch=' + encodeURIComponent(p.ifGenerationMatch) +
+    '&ifMetagenerationMatch=' + encodeURIComponent(p.ifMetagenerationMatch) + '&fields=name,metageneration';
 }
 function listUrl(pageToken) {
-  return API + '?prefix=' + encodeURIComponent(PREFIX) + '&maxResults=1000&fields=' + encodeURIComponent('nextPageToken,items(name,metageneration,metadata)') +
+  return API + '?prefix=' + encodeURIComponent(PREFIX) + '&maxResults=1000&fields=' + encodeURIComponent('nextPageToken,items(name,generation,metageneration,metadata)') +
     (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
 }
 
@@ -63,7 +63,7 @@ async function listAll() {
 async function main() {
   const apply = process.argv.includes('--apply');
   const all = await listAll();
-  const todo = all.filter(needsRevoke);
+  const todo = all.filter((o) => needsRevoke(o) && o.generation && o.metageneration);
   console.log('창고 ' + BUCKET + ' · ' + PREFIX + ' 파일 ' + all.length + '개 · 토큰 붙은 것 ' + todo.length + '개');
   if (!apply) { console.log('보기만 했습니다 — 지우려면 --apply'); return; }
   let ok = 0, changed = 0, bad = 0;
