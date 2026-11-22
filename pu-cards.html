@@ -47,6 +47,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
+<script src="js/pu-pub-search.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
@@ -39463,6 +39464,7 @@ function coToolsHtml(){
      ⚠ 여기 것은 «거르기»이고 위 둘(거래처·전체)은 «고르기»다 — 뜻이 다르므로
        사이에 자리를 띄워 붙여 놓지 않는다(2026-08-28 에 한 줄에 섞어 겪은 일이다). */
   h += `<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">`
+    + `<button class="pctool" onclick="typeof PuPubSearch!=='undefined'&&PuPubSearch.open()" title="금융위·국세청·고용산재 무료 공공 기업정보를 바로 조회하고 기업정보함에 반영합니다">🔍 공공 기업검색</button>`
     + coFilterBtnHtml() + coSizeSelHtml(state.coPageSize) + `</span>`;
   return h;
 }
@@ -39607,6 +39609,8 @@ function coFilterMenuPaint(r){
      ⚠ 띠는 폐업·휴업이 «나온 뒤에야» 뜬다 — 한 곳도 안 물어봤으면 띠가 없어 들어갈
        길이 없다. 그래서 늘 있는 이 메뉴에 문을 하나 둔다.
      ⚠ 거르개가 아니라 «창을 여는» 줄이다 — 켜고 끄는 것이 아니므로 ✓ 를 안 붙인다. */
+  h += `<div class="fmi" title="금융위·국세청·고용산재 무료 공공 기업정보를 조회하고 나이스비즈(폰/웹)로 연결합니다"
+      onclick="closeFolderMenu();typeof PuPubSearch!=='undefined'&&PuPubSearch.open()">🔍 무료 공공 기업검색…</div>`;
   h += `<div class="fmi" title="국세청에 사업자 상태를 물어봅니다 — 사업자번호가 밖으로 나갑니다"
       onclick="closeFolderMenu();openCoNts()">🏛 국세청 훑기…</div>`;
   m.innerHTML = h;
@@ -44813,6 +44817,7 @@ function coDetailPanelHtml(o){
     ${/* 기업정보는 접힌 채로 시작한다(대표 지시 2026-08-31) — #coInfoBox 한 칸에
          담아 펼침 단추가 «이 칸만» 다시 그리게 한다. */''}
     <div id="coInfoBox" style="margin-top:12px">${coInfoBoxHtml(o)}</div>
+    ${typeof PuPubSearch !== 'undefined' ? PuPubSearch.detailBarHtml(o) : ''}
     ${/* 📝 메모 — 기업정보 «바로 아래». 서류에서 읽어온 값 다음에 사람이 적은 값이 온다. */''}
     ${coMemoHtml(o)}
     ${/* 서류 — 「읽어 온 것·안 붙은 것·보낸 것·붙이기」를 한 카드에 담는다.
