@@ -92,24 +92,6 @@
     METRIC_TO_TAXONOMY[TAXONOMY_TO_METRIC[tk]] = tk;
   });
 
-  var TOPIC_CHIP_ORDER = [
-    ['ALL', '전체 13대쟁점 한눈대조'],
-    ['PERSONNEL', '인사·승진·전보'],
-    ['DISCIPLINE', '징계·해고·재심'],
-    ['WAGE', '임금·수당·퇴직금'],
-    ['TIMEOFF', '타임오프·노조활동'],
-    ['LEAVE', '휴일·연차·경조휴가'],
-    ['WORK_HOURS', '근로시간·유연근무'],
-    ['SICK_SAFETY', '병가·산재·안전'],
-    ['MATERNITY', '모성보호·육아휴직'],
-    ['RETIREMENT', '정년·임금피크·고용'],
-    ['UNION_SHOP', '조합원자격·유니온숍'],
-    ['CHECKOFF', '조합비공제·편의제공'],
-    ['WELFARE', '복리후생·학자금'],
-    ['BARGAINING', '단체교섭·유효기간'],
-    ['ETC', '기타 조항']
-  ];
-
   var LAW_API_SOURCES = [
     { key: '노동조합및노동관계조정법', name: '노동조합 및 노동관계조정법', file: '법률(법률).md', mainArts: ['5', '24', '29', '29의2', '31', '32', '33', '81'] },
     { key: '근로기준법', name: '근로기준법', file: '법률(법률).md', mainArts: ['23', '27', '43', '50', '53', '55', '56', '60', '74', '93', '94'] },
@@ -2499,6 +2481,22 @@
       '.pau-col-no{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;margin-right:4px;border-radius:999px;color:#ffffff;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0;vertical-align:middle;}',
       '@media (min-width:769px){.pau-tbl th.pau-sticky-col,.pau-tbl td.pau-sticky-col{position:sticky;left:0;z-index:3;background:var(--pau-card);box-shadow:1px 0 0 var(--pau-bd-lt);}.pau-tbl th.pau-sticky-col{z-index:4;background:var(--pau-th);}}',
       '.pau-flt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 10px;background:var(--pau-card);border:1px solid var(--pau-bd-lt);border-radius:9px;margin-bottom:6px;}',
+      '.pau-dash-dock > .pau-flt:last-child{margin-bottom:0;}',
+      '.pau-modal-back{display:none;position:fixed;inset:0;z-index:9990;background:rgba(15,23,42,.52);align-items:center;justify-content:center;padding:12px;}',
+      '.pau-modal-back.on{display:flex;}',
+      '.pau-modal-dlg{background:var(--pau-card);color:var(--pau-txt);border:1px solid var(--pau-bd);border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.24);width:min(860px,100%);max-height:min(86vh,760px);display:flex;flex-direction:column;overflow:hidden;}',
+      '.pau-modal-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--pau-bd-lt);background:var(--pau-th);}',
+      '.pau-modal-tit{font-size:14px;font-weight:900;color:var(--pau-pri);display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0;}',
+      '.pau-modal-flt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--pau-bd-lt);background:var(--pau-card);}',
+      '.pau-modal-bd{flex:1 1 auto;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;}',
+      '.pau-modal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}',
+      '.pau-modal-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;border:1px solid var(--pau-bd-lt);border-radius:8px;background:var(--pau-bg);min-width:0;}',
+      '.pau-modal-item.on{background:var(--pau-pri-bg);border-color:#2563eb;}',
+      '.pau-modal-item-lbl{display:flex;align-items:center;gap:7px;cursor:pointer;min-width:0;flex:1 1 auto;font-size:12.5px;margin:0;}',
+      '.pau-modal-item-lbl input[type=checkbox]{width:16px;height:16px;accent-color:#2563eb;flex-shrink:0;cursor:pointer;margin:0;}',
+      '.pau-modal-item-nm{font-weight:800;color:var(--pau-txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.pau-modal-item-sub{font-size:11px;color:var(--pau-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.pau-modal-ft{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 14px;border-top:1px solid var(--pau-bd-lt);background:var(--pau-th);}',
       '.pau-flt select,.pau-flt input[type=search],.pau-flt input[type=text],.pau-flt input[type=password],.pau-root select,.pau-root input[type=search],.pau-root input[type=text],.pau-root input[type=password]{height:33px;min-height:33px;max-width:100%;border:1px solid var(--pau-bd);border-radius:7px;padding:0 8px;background:var(--pau-card);color:var(--pau-txt);font-size:16px;}',
       '.pau-flt select:focus-visible,.pau-flt input:focus-visible,.pau-root select:focus-visible,.pau-root input:focus-visible,.pau-chip:focus-visible{outline:2px solid #2563eb;outline-offset:1px;border-color:#2563eb;}',
       '.pau-root input::placeholder{font-size:13px;color:var(--pau-muted);}',
@@ -2707,7 +2705,14 @@
       '  .pau-hero-tit{font-size:15.5px;}',
       '  .pau-hero-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}',
       '  .pau-hero-tab{padding:5px 9px;font-size:11.5px;min-height:30px;}',
-      '  .pau-dom-grid,.pau-issue-mini-grid,.pau-ab-grid,.pau-issue-detail-grid,.pau-clause-cmp-grid,.pau-art-subgrid,.pau-cc-prov-grid{grid-template-columns:1fr;}',
+      '  .pau-dom-grid,.pau-issue-mini-grid,.pau-ab-grid,.pau-issue-detail-grid,.pau-clause-cmp-grid,.pau-art-subgrid,.pau-cc-prov-grid,.pau-modal-grid{grid-template-columns:1fr;}',
+      '  .pau-modal-back{padding:6px;}',
+      '  .pau-modal-dlg{max-height:92vh;}',
+      '  .pau-modal-flt{padding:6px 10px;gap:4px;}',
+      '  .pau-modal-flt select{flex:1 1 calc(50% - 4px);min-width:120px;max-width:100%;height:32px;min-height:32px;font-size:16px!important;}',
+      '  .pau-modal-flt input[type=search]{flex:1 1 100%;min-width:120px;max-width:100%;height:32px;min-height:32px;font-size:16px!important;}',
+      '  .pau-modal-bd{padding:8px 10px;}',
+      '  .pau-modal-hd,.pau-modal-ft{padding:8px 10px;}',
       '  .pau-doc-row{flex-wrap:wrap;gap:4px 6px;}',
       '  .pau-doc-tit{flex:1 1 100%;order:3;white-space:normal;}',
       '  .pau-doc-meta{margin-left:auto;}',
@@ -3266,11 +3271,13 @@
       '  </div>',
       '  <div class="pau-cmp-tray" data-pau-cmp-tray></div>',
       '  <div class="pau-body" id="pau-tabpanel" role="tabpanel" aria-labelledby="pau-tab-' + state.tab + '" data-pau-body></div>',
+      '  <div class="pau-modal-back" id="puAlioModalBack" data-pau-modal-back></div>',
       '</div>'
     ].join('');
 
     var bodyEl = container.querySelector('[data-pau-body]');
     var cmpTrayEl = container.querySelector('[data-pau-cmp-tray]');
+    var modalBackEl = container.querySelector('[data-pau-modal-back]');
     var apiBadgeEl = container.querySelector('[data-pau-api-badge]');
 
     function toggleCompareOrgan(aid) {
@@ -3375,6 +3382,566 @@
       state.rChecked = {};
       state.mSubMode = 'REGION';
       switchTab('matrix');
+    }
+
+    var activePopupCleanup = null;
+    var activePopupBackHandle = null;
+    var activePopupReturnEl = null;
+
+    function closeOrganPickerPopup(skipFocusRestore) {
+      if (activePopupCleanup) {
+        try { activePopupCleanup(); } catch (e) {}
+        activePopupCleanup = null;
+      }
+      if (activePopupBackHandle && global.PuBack && typeof global.PuBack.close === 'function') {
+        var h = activePopupBackHandle;
+        activePopupBackHandle = null;
+        try { global.PuBack.close(h); } catch (e) {}
+      }
+      if (modalBackEl) {
+        if (modalBackEl.classList && modalBackEl.classList.toggle) modalBackEl.classList.toggle('on', false);
+        modalBackEl.innerHTML = '';
+      }
+      var ret = activePopupReturnEl;
+      activePopupReturnEl = null;
+      if (!skipFocusRestore && ret && typeof ret.focus === 'function') {
+        try { ret.focus(); } catch (e) {}
+      }
+    }
+
+    function openOrganPickerPopup(cfg) {
+      if (!modalBackEl) return;
+      closeOrganPickerPopup(true);
+      cfg = cfg || {};
+      var mode = cfg.mode || 'CC'; // 'CC' | 'REGION' | 'COMPARE'
+      var subCtx = cfg.subCtx || '';
+      activePopupReturnEl = cfg.triggerEl || (typeof document !== 'undefined' ? document.activeElement : null);
+
+      var pm = {
+        prov: cfg.prov || (mode === 'CC' ? (state.ccReg || 'ALL') : (mode === 'REGION' ? (state.rProvince || '충청남도') : 'ALL')),
+        muni: cfg.muni != null ? cfg.muni : (mode === 'CC' ? (state.ccMuni || '') : (mode === 'REGION' ? (state.rMuni || '') : '')),
+        cat: cfg.cat != null ? cfg.cat : (mode === 'CC' ? (state.ccCat || 'ALL') : (mode === 'REGION' ? (state.rTypeGroup || '') : '')),
+        union: mode === 'CC' ? (state.ccUnion || '') : (mode === 'REGION' ? (state.rUnionFilter || '') : ''),
+        q: '',
+        pickedIds: (cfg.initialIds || []).filter(function (id) { return !!organById[id]; }).slice(0, 6)
+      };
+
+      function getModalPool() {
+        var list = [];
+        if (mode === 'CC') {
+          list = ccAllRecords.filter(function (r) {
+            if (pm.prov && pm.prov !== 'ALL' && r.ccProvinceKey !== pm.prov) return false;
+            if (pm.muni && r.ccCity !== pm.muni) return false;
+            if (!matchChungcheongCat(r, pm.cat)) return false;
+            if (pm.union === 'has_union' && !r.hasUnion) return false;
+            if (pm.union === 'no_union' && r.hasUnion) return false;
+            if (pm.q && !matchSmartQuery(r.searchHaystack, pm.q)) return false;
+            return true;
+          });
+        } else if (mode === 'REGION') {
+          list = organRecords.filter(function (r) {
+            if (!r.provinceKey) return false;
+            if (pm.prov && pm.prov !== 'ALL' && r.provinceKey !== pm.prov) return false;
+            if (pm.muni) {
+              var hqNm = PROVINCE_BY_KEY[r.provinceKey] ? (PROVINCE_BY_KEY[r.provinceKey].short + ' 본청') : '';
+              if ((r.muniName || hqNm) !== pm.muni) return false;
+            }
+            if (pm.cat && !matchOrganScope(r.inst, pm.cat)) return false;
+            if (pm.union === 'has_union' && !r.hasUnion) return false;
+            if (pm.union === 'no_union' && r.hasUnion) return false;
+            if (pm.q && !matchSmartQuery(r.searchHaystack, pm.q)) return false;
+            return true;
+          });
+        } else {
+          list = organRecords.filter(function (r) {
+            if (pm.prov === 'CENTRAL') { if (r.isLocal) return false; }
+            else if (pm.prov === 'LOCAL_ERC_MOIS') { if (!r.isMois) return false; }
+            else if (pm.prov && pm.prov !== 'ALL' && PROVINCE_BY_KEY[pm.prov]) {
+              if (r.provinceKey !== pm.prov && r.ccProvinceKey !== pm.prov) return false;
+            }
+            if (pm.muni) {
+              var rCity = r.muniName || r.ccCity || (r.provinceShort ? r.provinceShort + ' 본청' : '');
+              if (rCity !== pm.muni) return false;
+            }
+            if (pm.q && !matchSmartQuery(r.searchHaystack, pm.q)) return false;
+            return true;
+          });
+        }
+
+        if (pm.q) {
+          return sortRecordsByQueryRelevance(list, pm.q);
+        }
+        list.sort(function (a, b) {
+          if (subCtx === 'ARTICLES') {
+            var aa = a.domains.articles.length;
+            var ba = b.domains.articles.length;
+            if ((aa > 0) !== (ba > 0)) return ba > 0 ? 1 : -1;
+            if (ba !== aa) return ba - aa;
+          }
+          if (a.hasUnion !== b.hasUnion) return a.hasUnion ? -1 : 1;
+          if (b.memberTotal !== a.memberTotal) return b.memberTotal - a.memberTotal;
+          return a.name.localeCompare(b.name, 'ko');
+        });
+        return list;
+      }
+
+      function getModalMuniOptions() {
+        if (!pm.prov || pm.prov === 'ALL' || pm.prov === 'CENTRAL' || pm.prov === 'LOCAL_ERC_MOIS') return [];
+        if (mode === 'CC') {
+          var cMap = Object.create(null);
+          var cHq = PROVINCE_BY_KEY[pm.prov] ? (PROVINCE_BY_KEY[pm.prov].short + ' 본청') : '';
+          ccAllRecords.forEach(function (r) {
+            if (r.ccProvinceKey === pm.prov && r.ccCity) cMap[r.ccCity] = (cMap[r.ccCity] || 0) + 1;
+          });
+          return Object.keys(cMap).sort(function (a, b) {
+            var ah = a === cHq || a.indexOf('본청') >= 0;
+            var bh = b === cHq || b.indexOf('본청') >= 0;
+            if (ah !== bh) return ah ? -1 : 1;
+            return (cMap[b] - cMap[a]) || a.localeCompare(b, 'ko');
+          }).map(function (k) { return { name: k, count: cMap[k] }; });
+        }
+        return getMunicipalitiesForProvince(pm.prov);
+      }
+
+      function renderModalBodyParts() {
+        var pool = getModalPool();
+        var shown = pool.slice(0, 140);
+        var rankMap = Object.create(null);
+        pm.pickedIds.forEach(function (id, idx) { rankMap[id] = idx + 1; });
+
+        var selStripHtml = [
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 8px;background:var(--pau-bg);border:1px solid var(--pau-bd-lt);border-radius:8px;">',
+          '  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;">',
+          '    <b style="font-size:12px;color:var(--pau-pri);">🎯 비교 선택 (' + pm.pickedIds.length + '/6곳):</b>',
+          (pm.pickedIds.length ? pm.pickedIds.map(function (id, idx) {
+            var r = organById[id];
+            if (!r) return '';
+            var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
+            return '<button type="button" class="pau-act-btn" data-pm-rm="' + esc(id) + '" aria-label="' + esc(r.name + ' 선택 해제') + '" style="border-color:' + pal.stroke + ';">' +
+              '<span class="pau-col-no" style="background:' + pal.numBg + ';">' + (idx + 1) + '</span>' + esc(r.name) + ' ✕</button>';
+          }).join('') : '<span style="font-size:12px;color:var(--pau-muted);">아래 목록에서 비교할 기관을 선택하세요 (최대 6곳)</span>'),
+          '  </div>',
+          '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">',
+          '    <button type="button" class="pau-act-btn" data-pm-top-pick>⚡ 상위 5곳 선택</button>',
+          (pm.pickedIds.length ? '    <button type="button" class="pau-act-btn" data-pm-clr>비우기</button>' : ''),
+          '  </div>',
+          '</div>'
+        ].join('');
+
+        var gridHtml = shown.length ? ('<div class="pau-modal-grid">' + shown.map(function (r) {
+          var rk = rankMap[r.aid] || 0;
+          var pal = rk > 0 ? COMPARE_PALETTE[(rk - 1) % COMPARE_PALETTE.length] : null;
+          var locTag = r.ccCity || r.muniName || r.provinceShort || r.scopeLabel;
+          var subInfo = locTag + ' · ' + r.inst_type + ' · ' + (r.hasUnion ? ('노조 ' + fmtNum(r.memberTotal) + '명') : '사규운영') +
+            (subCtx === 'ARTICLES' && r.domains.articles.length ? (' · 조문 ' + r.domains.articles.length + '건') : '');
+          return '<div class="pau-modal-item' + (rk > 0 ? ' on' : '') + '">' +
+            '<label class="pau-modal-item-lbl">' +
+              '<input type="checkbox" data-pm-ck="' + esc(r.aid) + '"' + (rk > 0 ? ' checked' : '') + ' aria-label="' + esc(r.name + ' 선택') + '">' +
+              '<div style="min-width:0;flex:1 1 auto;">' +
+                '<div class="pau-modal-item-nm">' + (rk > 0 && pal ? '<span class="pau-col-no" style="background:' + pal.numBg + ';">' + rk + '</span>' : '') + esc(r.name) + '</div>' +
+                '<div class="pau-modal-item-sub">' + esc(subInfo) + '</div>' +
+              '</div>' +
+            '</label>' +
+            '<button type="button" class="pau-act-btn" data-pm-detail="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 상세 보기') + '">🔎</button>' +
+          '</div>';
+        }).join('') + '</div>') : '<div style="padding:24px;text-align:center;color:var(--pau-muted);font-size:12.5px;">해당 조건에 일치하는 기관이 없습니다.</div>';
+
+        return {
+          poolCount: pool.length,
+          pool: pool,
+          bodyHtml: selStripHtml + gridHtml
+        };
+      }
+
+      function renderFullModal() {
+        var muniOpts = getModalMuniOptions();
+        if (pm.muni && !muniOpts.some(function (m) { return m.name === pm.muni; })) pm.muni = '';
+        var parts = renderModalBodyParts();
+        var titleTxt = mode === 'CC'
+          ? ('📍 ' + (pm.prov === 'ALL' ? '대전·세종·충청 전체' : pm.prov) + ' 산하·공공기관 (' + fmtNum(parts.poolCount) + '곳)')
+          : (mode === 'REGION'
+            ? ('📍 ' + (pm.prov === 'ALL' ? '전국 16개 시·도' : pm.prov) + ' 산하기관 (' + fmtNum(parts.poolCount) + '곳)')
+            : ('🎯 비교 대상 기관 · 지자체 선택 (' + pm.pickedIds.length + '/6곳)'));
+
+        modalBackEl.innerHTML = [
+          '<div class="pau-modal-dlg" role="dialog" aria-modal="true" aria-labelledby="pauPickerModalTitle">',
+          '  <div class="pau-modal-hd">',
+          '    <h3 class="pau-modal-tit" id="pauPickerModalTitle" data-pm-title>' + esc(titleTxt) + '</h3>',
+          '    <button type="button" class="pau-act-btn" data-pm-close aria-label="닫기">✕ 닫기</button>',
+          '  </div>',
+          '  <div class="pau-modal-flt">',
+          (mode === 'CC' ? [
+            '    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;width:100%;">',
+            '      <button type="button" class="pau-act-btn' + (pm.prov === 'ALL' ? ' pri' : '') + '" data-pm-cc-prov="ALL">전체(' + ccAllRecords.length + ')</button>',
+            CHUNGCHEONG_PROVS.map(function (pk) {
+              var cnt = ccAllRecords.filter(function (r) { return r.ccProvinceKey === pk; }).length;
+              return '<button type="button" class="pau-act-btn' + (pm.prov === pk ? ' pri' : '') + '" data-pm-cc-prov="' + esc(pk) + '">' + esc(pk) + '(' + cnt + ')</button>';
+            }).join(''),
+            '    </div>',
+            (muniOpts.length ? [
+              '    <select data-pm-muni aria-label="본청·시·군·구 선택">',
+              '      <option value="">본청 · 시/군/구 전체</option>',
+              muniOpts.map(function (m) {
+                return '<option value="' + esc(m.name) + '"' + (pm.muni === m.name ? ' selected' : '') + '>' + esc(m.name + ' (' + m.count + '곳)') + '</option>';
+              }).join(''),
+              '    </select>'
+            ].join('') : ''),
+            '    <select data-pm-cat aria-label="기관 세부유형 선택">',
+            '      <option value="ALL"' + (pm.cat === 'ALL' ? ' selected' : '') + '>세부유형 전체</option>',
+            '      <option value="FACILITY_CORP"' + (pm.cat === 'FACILITY_CORP' ? ' selected' : '') + '>🏢 시설관리공단·시군도시공사</option>',
+            '      <option value="ALL_CORP"' + (pm.cat === 'ALL_CORP' ? ' selected' : '') + '>🏗️ 지방공사·공단 전체</option>',
+            '      <option value="MEDICAL"' + (pm.cat === 'MEDICAL' ? ' selected' : '') + '>🏥 지방의료원·국립대병원</option>',
+            '      <option value="AFFIL"' + (pm.cat === 'AFFIL' ? ' selected' : '') + '>🔬 출자·출연(재단·연구원)</option>',
+            '      <option value="CENTRAL_CORP"' + (pm.cat === 'CENTRAL_CORP' ? ' selected' : '') + '>🚄 소재 중앙공공기관(ALIO)</option>',
+            '      <option value="LOCAL_DIRECT"' + (pm.cat === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업</option>',
+            '    </select>',
+            '    <select data-pm-union aria-label="노조 보유 필터">',
+            '      <option value=""' + (!pm.union ? ' selected' : '') + '>노조 전체</option>',
+            '      <option value="has_union"' + (pm.union === 'has_union' ? ' selected' : '') + '>👥 노조보유만</option>',
+            '      <option value="no_union"' + (pm.union === 'no_union' ? ' selected' : '') + '>📘 노조미설립</option>',
+            '    </select>'
+          ].join('') : ''),
+          (mode === 'REGION' ? [
+            '    <select data-pm-prov aria-label="광역 시·도 지자체 선택" style="font-weight:800;">',
+            '      <option value="ALL"' + (pm.prov === 'ALL' ? ' selected' : '') + '>전국 16개 시·도 전체</option>',
+            PROVINCE_DEFS.map(function (p) {
+              return '<option value="' + esc(p.key) + '"' + (pm.prov === p.key ? ' selected' : '') + '>' + esc(p.key + ' (' + (provinceCounts[p.key] || 0) + '곳)') + '</option>';
+            }).join(''),
+            '    </select>',
+            (muniOpts.length ? [
+              '    <select data-pm-muni aria-label="본청·시·군·구 선택">',
+              '      <option value="">본청 · 시/군/구 전체</option>',
+              muniOpts.map(function (m) {
+                return '<option value="' + esc(m.name) + '"' + (pm.muni === m.name ? ' selected' : '') + '>' + esc(m.name + ' (' + m.count + '곳)') + '</option>';
+              }).join(''),
+              '    </select>'
+            ].join('') : ''),
+            '    <select data-pm-cat aria-label="산하기관 유형 선택">',
+            '      <option value=""' + (!pm.cat ? ' selected' : '') + '>산하유형 전체</option>',
+            '      <option value="LOCAL_CORP"' + (pm.cat === 'LOCAL_CORP' ? ' selected' : '') + '>🚇 지방공사·공단</option>',
+            '      <option value="LOCAL_AFFIL"' + (pm.cat === 'LOCAL_AFFIL' ? ' selected' : '') + '>🏢 지방출자·출연</option>',
+            '      <option value="LOCAL_DIRECT"' + (pm.cat === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업</option>',
+            '    </select>'
+          ].join('') : ''),
+          (mode === 'COMPARE' ? [
+            '    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;width:100%;">',
+            (subCtx === 'ARTICLES' ? [
+              '      <button type="button" class="pau-act-btn" data-pm-preset="CENTRAL_CLAUSE">🏛️ 주요공기업</button>',
+              '      <button type="button" class="pau-act-btn" data-pm-preset="LOCAL_METRO">🚇 도시철도·교통</button>',
+              '      <button type="button" class="pau-act-btn" data-pm-preset="LOCAL_MEDICAL">🏥 지방의료원</button>',
+              '      <button type="button" class="pau-act-btn" data-pm-preset="CN_FACILITY">⚡ 충남 공단·공사</button>'
+            ].join('') : [
+              '      <button type="button" class="pau-act-btn" data-pm-preset="PEER">🔄 유사그룹</button>',
+              '      <button type="button" class="pau-act-btn" data-pm-preset="METRO">🚇 교통공사</button>',
+              '      <button type="button" class="pau-act-btn" data-pm-preset="MOIS">🏛️ 행안부유관</button>',
+              '      <button type="button" class="pau-act-btn" data-pm-preset="CN_FACILITY">⚡ 충남 공단·공사</button>'
+            ].join('')),
+            '    </div>',
+            '    <select data-pm-prov aria-label="권역·지자체 선택">',
+            '      <option value="ALL"' + (pm.prov === 'ALL' ? ' selected' : '') + '>권역·지자체 전체</option>',
+            '      <option value="CENTRAL"' + (pm.prov === 'CENTRAL' ? ' selected' : '') + '>🏛️ 중앙 ALIO</option>',
+            '      <option value="LOCAL_ERC_MOIS"' + (pm.prov === 'LOCAL_ERC_MOIS' ? ' selected' : '') + '>🏛️ 평가원·행안부 유관</option>',
+            PROVINCE_DEFS.map(function (p) {
+              return '<option value="' + esc(p.key) + '"' + (pm.prov === p.key ? ' selected' : '') + '>📍 ' + esc(p.key) + '</option>';
+            }).join(''),
+            '    </select>',
+            (muniOpts.length ? [
+              '    <select data-pm-muni aria-label="시·군·구 선택">',
+              '      <option value="">본청 · 시/군/구 전체</option>',
+              muniOpts.map(function (m) {
+                return '<option value="' + esc(m.name) + '"' + (pm.muni === m.name ? ' selected' : '') + '>' + esc(m.name + ' (' + m.count + '곳)') + '</option>';
+              }).join(''),
+              '    </select>'
+            ].join('') : '')
+          ].join('') : ''),
+          '    <input type="search" data-pm-q aria-label="팝업 기관·지역 검색" placeholder="기관명·시군구·노조 검색" value="' + esc(pm.q) + '" style="min-width:160px;flex:1;">',
+          '  </div>',
+          '  <div class="pau-modal-bd" data-pm-body>' + parts.bodyHtml + '</div>',
+          '  <div class="pau-modal-ft">',
+          '    <span data-pm-cnt style="font-size:12px;color:var(--pau-sub);">조회 <b>' + fmtNum(parts.poolCount) + '</b>곳 · 선택 <b>' + pm.pickedIds.length + '</b>/6곳</span>',
+          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
+          (mode === 'CC' || mode === 'REGION' ? '      <button type="button" class="pau-act-btn" data-pm-view-scope>📋 이 지자체·조건 전체 보기</button>' : ''),
+          '      <button type="button" class="pau-act-btn pri" data-pm-apply>⚖️ 선택 기관 비교 적용</button>',
+          '    </div>',
+          '  </div>',
+          '</div>'
+        ].join('');
+
+        bindModalEvents(parts.pool);
+      }
+
+      function updateModalBodyOnly() {
+        var parts = renderModalBodyParts();
+        var bd = modalBackEl.querySelector('[data-pm-body]');
+        if (bd) bd.innerHTML = parts.bodyHtml;
+        var cnt = modalBackEl.querySelector('[data-pm-cnt]');
+        if (cnt) cnt.innerHTML = '조회 <b>' + fmtNum(parts.poolCount) + '</b>곳 · 선택 <b>' + pm.pickedIds.length + '</b>/6곳';
+        bindModalBodyEvents(parts.pool);
+      }
+
+      function bindModalBodyEvents(curPool) {
+        var bd = modalBackEl.querySelector('[data-pm-body]');
+        if (!bd) return;
+        Array.prototype.forEach.call(bd.querySelectorAll('[data-pm-ck]'), function (ck) {
+          ck.addEventListener('change', function () {
+            var id = ck.getAttribute('data-pm-ck') || '';
+            if (!id || !organById[id]) return;
+            var idx = pm.pickedIds.indexOf(id);
+            if (ck.checked) {
+              if (idx === -1) {
+                if (pm.pickedIds.length >= 6) pm.pickedIds.shift();
+                pm.pickedIds.push(id);
+              }
+            } else if (idx >= 0) {
+              pm.pickedIds.splice(idx, 1);
+            }
+            updateModalBodyOnly();
+          });
+        });
+        Array.prototype.forEach.call(bd.querySelectorAll('[data-pm-rm]'), function (b) {
+          b.addEventListener('click', function () {
+            var id = b.getAttribute('data-pm-rm') || '';
+            pm.pickedIds = pm.pickedIds.filter(function (x) { return x !== id; });
+            updateModalBodyOnly();
+          });
+        });
+        var topBtn = bd.querySelector('[data-pm-top-pick]');
+        if (topBtn) {
+          topBtn.addEventListener('click', function () {
+            pm.pickedIds = (curPool || []).slice(0, 5).map(function (r) { return r.aid; });
+            updateModalBodyOnly();
+          });
+        }
+        var clrBtn = bd.querySelector('[data-pm-clr]');
+        if (clrBtn) {
+          clrBtn.addEventListener('click', function () {
+            pm.pickedIds = [];
+            updateModalBodyOnly();
+          });
+        }
+        Array.prototype.forEach.call(bd.querySelectorAll('[data-pm-detail]'), function (b) {
+          b.addEventListener('click', function () {
+            var id = b.getAttribute('data-pm-detail') || '';
+            closeOrganPickerPopup(true);
+            openOrganInHistoryTab(id, true, 'OVERVIEW');
+          });
+        });
+      }
+
+      function bindModalEvents(curPool) {
+        var closeBtn = modalBackEl.querySelector('[data-pm-close]');
+        if (closeBtn) closeBtn.addEventListener('click', function () { closeOrganPickerPopup(false); });
+
+        Array.prototype.forEach.call(modalBackEl.querySelectorAll('[data-pm-cc-prov]'), function (b) {
+          b.addEventListener('click', function () {
+            pm.prov = b.getAttribute('data-pm-cc-prov') || 'ALL';
+            pm.muni = '';
+            renderFullModal();
+          });
+        });
+
+        var provSel = modalBackEl.querySelector('[data-pm-prov]');
+        if (provSel) {
+          provSel.addEventListener('change', function () {
+            pm.prov = provSel.value || 'ALL';
+            pm.muni = '';
+            renderFullModal();
+          });
+        }
+
+        var muniSel = modalBackEl.querySelector('[data-pm-muni]');
+        if (muniSel) {
+          muniSel.addEventListener('change', function () {
+            pm.muni = muniSel.value || '';
+            renderFullModal();
+          });
+        }
+
+        var catSel = modalBackEl.querySelector('[data-pm-cat]');
+        if (catSel) {
+          catSel.addEventListener('change', function () {
+            pm.cat = catSel.value;
+            renderFullModal();
+          });
+        }
+
+        var unionSel = modalBackEl.querySelector('[data-pm-union]');
+        if (unionSel) {
+          unionSel.addEventListener('change', function () {
+            pm.union = unionSel.value || '';
+            renderFullModal();
+          });
+        }
+
+        Array.prototype.forEach.call(modalBackEl.querySelectorAll('[data-pm-preset]'), function (b) {
+          b.addEventListener('click', function () {
+            var p = b.getAttribute('data-pm-preset') || '';
+            var picks = [];
+            if (p === 'CN_FACILITY') {
+              picks = ['L_2014000008', 'L_2023000002', 'L_2024000007', 'L_2010000010', 'L_2007100359', 'L_2013000006'].map(function (id) { return organById[id]; }).filter(Boolean);
+            } else if (p === 'LOCAL_METRO' || p === 'METRO') {
+              picks = organRecords.filter(function (r) { return r.sectorCode === 'RAIL_TRANSIT' && r.hasUnion; }).slice(0, 5);
+            } else if (p === 'LOCAL_MEDICAL') {
+              picks = organRecords.filter(function (r) { return r.isLocal && r.sectorCode === 'MEDICAL_HEALTH' && r.hasUnion; }).slice(0, 5);
+            } else if (p === 'MOIS') {
+              picks = ['L_ERC', 'L_KLID', 'L_LOFA', 'L_POBA', 'L_KRILA', 'L_KILF'].map(function (id) { return organById[id]; }).filter(Boolean);
+            } else if (p === 'PEER') {
+              var baseId = pm.pickedIds[0] || state.compareIds[0] || state.hOrgan;
+              if (baseId && organById[baseId]) {
+                picks = [organById[baseId]].concat(findSimilarOrgans(data, baseId, 'ALL').slice(0, 4).map(function (s) { return organById[s.apba_id]; }).filter(Boolean));
+              }
+            } else {
+              picks = organRecords.filter(function (r) { return !r.isLocal && r.domains.articles.length >= 8 && r.hasUnion; });
+              picks.sort(function (a, c) { return (c.domains.articles.length - a.domains.articles.length) || (c.memberTotal - a.memberTotal); });
+              picks = picks.slice(0, 4);
+            }
+            if (picks.length) {
+              pm.pickedIds = picks.slice(0, 6).map(function (r) { return r.aid; });
+              updateModalBodyOnly();
+            }
+          });
+        });
+
+        var qIn = modalBackEl.querySelector('[data-pm-q]');
+        if (qIn) {
+          var lastQ = pm.q;
+          var onQ = function () {
+            if (qIn.value === lastQ) return;
+            lastQ = qIn.value;
+            pm.q = lastQ;
+            updateModalBodyOnly();
+          };
+          qIn.addEventListener('input', onQ);
+          qIn.addEventListener('compositionend', onQ);
+          qIn.addEventListener('search', onQ);
+        }
+
+        var viewScopeBtn = modalBackEl.querySelector('[data-pm-view-scope]');
+        if (viewScopeBtn) {
+          viewScopeBtn.addEventListener('click', function () {
+            if (mode === 'CC') {
+              state.ccPreset = '';
+              state.ccReg = pm.prov || 'ALL';
+              state.ccMuni = pm.muni || '';
+              state.ccOwner = pm.cat === 'CENTRAL_CORP' ? 'CENTRAL' : 'ALL';
+              state.ccCat = pm.cat || 'ALL';
+              state.ccUnion = pm.union || '';
+              state.ccChecked = {};
+              closeOrganPickerPopup(false);
+              renderTabChungcheong();
+              syncUrlState();
+            } else if (mode === 'REGION') {
+              state.rMultiMode = false;
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
+              state.rProvince = pm.prov || '충청남도';
+              state.rMuni = pm.muni || '';
+              state.rTypeGroup = pm.cat || '';
+              state.rUnionFilter = pm.union || '';
+              state.rChecked = {};
+              closeOrganPickerPopup(false);
+              renderTabMatrix();
+              syncUrlState();
+            }
+          });
+        }
+
+        var applyBtn = modalBackEl.querySelector('[data-pm-apply]');
+        if (applyBtn) {
+          applyBtn.addEventListener('click', function () {
+            var finalIds = pm.pickedIds.slice(0, 6);
+            if (!finalIds.length) {
+              finalIds = getModalPool().slice(0, 5).map(function (r) { return r.aid; });
+            }
+            if (mode === 'CC') {
+              state.ccPreset = '';
+              state.ccReg = pm.prov || 'ALL';
+              state.ccMuni = pm.muni || '';
+              state.ccCat = pm.cat || 'ALL';
+              state.ccUnion = pm.union || '';
+              state.ccChecked = {};
+              finalIds.forEach(function (id) { state.ccChecked[id] = true; });
+              closeOrganPickerPopup(false);
+              renderTabChungcheong();
+              syncUrlState();
+            } else if (mode === 'REGION') {
+              state.rMultiMode = false;
+              state.rMultiProvs = [];
+              state.rMultiMunis = [];
+              state.rProvince = pm.prov || '충청남도';
+              state.rMuni = pm.muni || '';
+              state.rTypeGroup = pm.cat || '';
+              state.rChecked = {};
+              finalIds.forEach(function (id) { state.rChecked[id] = true; });
+              closeOrganPickerPopup(false);
+              renderTabMatrix();
+              syncUrlState();
+            } else {
+              if (finalIds.length) state.compareIds = finalIds;
+              closeOrganPickerPopup(false);
+              renderCompareTray();
+              renderCurrentTab();
+              syncUrlState();
+            }
+          });
+        }
+
+        bindModalBodyEvents(curPool);
+      }
+
+      renderFullModal();
+      if (modalBackEl.classList && modalBackEl.classList.toggle) modalBackEl.classList.toggle('on', true);
+
+      var onBackdropClick = function (e) {
+        if (e.target === modalBackEl) closeOrganPickerPopup(false);
+      };
+      var onEscKey = function (e) {
+        if (!e) return;
+        if (e.key === 'Escape') {
+          if (e.preventDefault) e.preventDefault();
+          closeOrganPickerPopup(false);
+          return;
+        }
+        if (e.key === 'Tab' && modalBackEl && modalBackEl.querySelectorAll) {
+          var focusables = Array.prototype.filter.call(
+            modalBackEl.querySelectorAll('button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+            function (el) { return !!(el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length)); }
+          );
+          if (!focusables.length) return;
+          var firstEl = focusables[0];
+          var lastEl = focusables[focusables.length - 1];
+          var activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+          if (e.shiftKey && (activeEl === firstEl || !modalBackEl.contains(activeEl))) {
+            if (e.preventDefault) e.preventDefault();
+            lastEl.focus();
+          } else if (!e.shiftKey && activeEl === lastEl) {
+            if (e.preventDefault) e.preventDefault();
+            firstEl.focus();
+          }
+        }
+      };
+      modalBackEl.addEventListener('click', onBackdropClick);
+      if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('keydown', onEscKey);
+      }
+      activePopupCleanup = function () {
+        modalBackEl.removeEventListener('click', onBackdropClick);
+        if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+          document.removeEventListener('keydown', onEscKey);
+        }
+      };
+      if (global.PuBack && typeof global.PuBack.open === 'function') {
+        try {
+          activePopupBackHandle = global.PuBack.open('지자체·기관 선택', function () {
+            activePopupBackHandle = null;
+            closeOrganPickerPopup(false);
+          });
+        } catch (e) {}
+      }
+      var firstQ = modalBackEl.querySelector('[data-pm-q]');
+      if (firstQ && typeof firstQ.focus === 'function') {
+        try { firstQ.focus(); } catch (e) {}
+      }
     }
 
     // 위임 클릭 핸들러 (독립 창 열기, 클린아이 POST, 비교함 토글, 지역산하비교 이동, 인라인 펼침, 상세 전환)
@@ -3630,6 +4197,7 @@
     }
 
     function switchTab(nextTab, focusTabBtn) {
+      closeOrganPickerPopup(true);
       if (nextTab === 'detail') {
         state.tab = 'articles';
         state.docMode = 'DISC';
@@ -5653,56 +6221,43 @@
 
         bodyEl.innerHTML = [
           '<div class="pau-dash-dock">',
-          '<div class="pau-sec-card" style="padding:8px 10px;margin-bottom:0;">',
-          '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-          '    ' + renderMatrixSubModeSegHtml(),
-          '    <select data-f="rProvince" aria-label="광역 시·도 지자체 선택" style="font-weight:800;max-width:235px;">',
-          '      <option value="ALL"' + (isAllProv ? ' selected' : '') + '>🗺️ 전국 16개 시·도 산하 전체 (' + fmtNum(allLocalAffilCount) + '곳)</option>',
+          '<div class="pau-flt">',
+          '  ' + renderMatrixSubModeSegHtml(),
+          '  <select data-f="rProvince" aria-label="광역 시·도 지자체 선택" style="font-weight:800;max-width:225px;">',
+          '    <option value="ALL"' + (isAllProv ? ' selected' : '') + '>🗺️ 전국 16개 시·도 전체 (' + fmtNum(allLocalAffilCount) + '곳)</option>',
           PROVINCE_DEFS.map(function (p) {
-            return '<option value="' + esc(p.key) + '"' + (!isAllProv && curProv === p.key ? ' selected' : '') + '>' + esc(p.key + ' (' + p.short + ' · 산하 ' + fmtNum(provinceCounts[p.key] || 0) + '곳 · 노조 ' + fmtNum(provinceUnionCounts[p.key] || 0) + '곳)') + '</option>';
+            return '<option value="' + esc(p.key) + '"' + (!isAllProv && curProv === p.key ? ' selected' : '') + '>' + esc(p.key + ' (' + fmtNum(provinceCounts[p.key] || 0) + '곳)') + '</option>';
           }).join(''),
-          '    </select>',
-          (!hasMultiProvs && !isAllProv ? [
-            '    <select data-f="rMuni" aria-label="본청·기초지자체 시·군·구 선택" style="max-width:175px;">',
-            '      <option value="">본청 · 시/군/구 전체 (' + fmtNum(provinceCounts[curProv] || 0) + '곳)</option>',
-            muniOptions.map(function (m) {
-              return '<option value="' + esc(m.name) + '"' + (state.rMuni === m.name ? ' selected' : '') + '>' + esc(m.name + ' (' + m.count + '곳)') + '</option>';
-            }).join(''),
-            '    </select>'
-          ].join('') : ''),
-          '    <select data-f="rTypeGroup" aria-label="산하기관 유형 분류" style="max-width:130px;">',
-          '      <option value=""' + (!state.rTypeGroup ? ' selected' : '') + '>산하유형 전체</option>',
-          '      <option value="LOCAL_CORP"' + (state.rTypeGroup === 'LOCAL_CORP' ? ' selected' : '') + '>🚇 지방공사·공단</option>',
-          '      <option value="LOCAL_AFFIL"' + (state.rTypeGroup === 'LOCAL_AFFIL' ? ' selected' : '') + '>🏢 지방출자·출연</option>',
-          '      <option value="LOCAL_DIRECT"' + (state.rTypeGroup === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업</option>',
-          '    </select>',
-          '    <select data-f="rUnionFilter" aria-label="노조 보유 필터" style="max-width:130px;">',
-          '      <option value=""' + (!state.rUnionFilter ? ' selected' : '') + '>노조유무 전체</option>',
-          '      <option value="has_union"' + (state.rUnionFilter === 'has_union' ? ' selected' : '') + '>👥 노조보유 산하만</option>',
-          '      <option value="multi"' + (state.rUnionFilter === 'multi' ? ' selected' : '') + '>🔀 복수노조 산하</option>',
-          '      <option value="no_union"' + (state.rUnionFilter === 'no_union' ? ' selected' : '') + '>📘 미설립·사규운영</option>',
-          '    </select>',
-          '    <input type="search" data-f="rQuery" aria-label="산하기관명·시군구 검색" placeholder="산하기관·시군구 검색" value="' + esc(state.rQuery) + '" style="min-width:148px;max-width:195px;flex:1 1 148px;">',
-          '  </div>',
-          '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed var(--pau-bd-lt);">',
-          '    <button type="button" class="pau-act-btn' + (state.rMultiMode ? ' pri' : '') + '" aria-pressed="' + (state.rMultiMode ? 'true' : 'false') + '" data-r-multi-toggle title="여러 시·도 또는 여러 시·군·구를 동시에 선택하여 총괄 비교합니다">⚖️ 지자체 다중비교' + (state.rMultiMode ? ' ON' : '') + '</button>',
-          '    <button type="button" class="pau-act-btn" data-open-cc-hub="' + esc(CHUNGCHEONG_PROVS.indexOf(curProv) >= 0 ? curProv : '') + '" title="대전·세종·충남·충북 산하기관·시설관리공단·공공기관 전담 비교 탭으로 이동">🏙️ 대전·세종·충청 전담비교 ↗</button>',
-          '    <button type="button" class="pau-act-btn' + (!state.rMultiMode && isAllProv ? ' pri' : '') + '" aria-pressed="' + (!state.rMultiMode && isAllProv ? 'true' : 'false') + '" data-r-prov="ALL">전국(' + fmtNum(allLocalAffilCount) + ')</button>',
-          PROVINCE_DEFS.map(function (p) {
-            var isCurP = state.rMultiMode ? (state.rMultiProvs.indexOf(p.key) >= 0) : (curProv === p.key);
-            return '<button type="button" class="pau-act-btn' + (isCurP ? ' pri' : '') + '" aria-pressed="' + (isCurP ? 'true' : 'false') + '" data-r-prov="' + esc(p.key) + '">' + (state.rMultiMode && isCurP ? '✓ ' : '') + esc(p.short) + '(' + (provinceCounts[p.key] || 0) + ')</button>';
-          }).join(''),
+          '  </select>',
+          '  <select data-f="rTypeGroup" aria-label="산하기관 유형 분류" style="max-width:130px;">',
+          '    <option value=""' + (!state.rTypeGroup ? ' selected' : '') + '>산하유형 전체</option>',
+          '    <option value="LOCAL_CORP"' + (state.rTypeGroup === 'LOCAL_CORP' ? ' selected' : '') + '>🚇 지방공사·공단</option>',
+          '    <option value="LOCAL_AFFIL"' + (state.rTypeGroup === 'LOCAL_AFFIL' ? ' selected' : '') + '>🏢 지방출자·출연</option>',
+          '    <option value="LOCAL_DIRECT"' + (state.rTypeGroup === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업</option>',
+          '  </select>',
+          '  <select data-f="rUnionFilter" aria-label="노조 보유 필터" style="max-width:130px;">',
+          '    <option value=""' + (!state.rUnionFilter ? ' selected' : '') + '>노조유무 전체</option>',
+          '    <option value="has_union"' + (state.rUnionFilter === 'has_union' ? ' selected' : '') + '>👥 노조보유만</option>',
+          '    <option value="multi"' + (state.rUnionFilter === 'multi' ? ' selected' : '') + '>🔀 복수노조</option>',
+          '    <option value="no_union"' + (state.rUnionFilter === 'no_union' ? ' selected' : '') + '>📘 미설립·사규</option>',
+          '  </select>',
+          '  <input type="search" data-f="rQuery" aria-label="산하기관명·시군구 검색" placeholder="산하기관·시군구 검색" value="' + esc(state.rQuery) + '" style="min-width:140px;max-width:185px;">',
+          '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:auto;">',
+          '    <button type="button" class="pau-act-btn pri" data-r-open-picker aria-haspopup="dialog">📍 지자체·산하기관 팝업</button>',
+          '    <button type="button" class="pau-act-btn' + (state.rMultiMode ? ' pri' : '') + '" aria-pressed="' + (state.rMultiMode ? 'true' : 'false') + '" data-r-multi-toggle>⚖️ 다중지자체' + (state.rMultiMode ? ' ON' : '') + '</button>',
           '  </div>',
           (state.rMultiMode ? [
-            '  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:6px;padding:5px 8px;background:var(--pau-pri-bg);border-radius:7px;font-size:12px;">',
-            '    <b style="color:var(--pau-pri);">💡 다중비교 선택:</b>',
-            '    <span style="color:var(--pau-sub);">위 시·도 버튼(또는 우측 시·군·구 막대)을 여러 개 클릭하세요.</span>',
-            '    <button type="button" class="pau-act-btn" data-r-bloc="CHUNGCHEONG">충청권 4곳(충남·대전·세종·충북)</button>',
-            '    <button type="button" class="pau-act-btn" data-r-bloc="CAPITAL">수도권 3곳(서울·경기·인천)</button>',
-            '    <button type="button" class="pau-act-btn" data-r-bloc="YEONGNAM">동남권 3곳(부산·울산·경남)</button>',
-            '    <button type="button" class="pau-act-btn" data-r-bloc="DAEGYEONG">대경권 2곳(대구·경북)</button>',
-            '    <button type="button" class="pau-act-btn" data-r-bloc="HONAM">호남권 2곳(전북·전남광주)</button>',
-            '    <button type="button" class="pau-act-btn" data-r-multi-reset>다중비교 해제</button>',
+            '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;width:100%;padding-top:5px;border-top:1px dashed var(--pau-bd-lt);">',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="CHUNGCHEONG">충청권 4곳</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="CAPITAL">수도권 3곳</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="YEONGNAM">동남권 3곳</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="DAEGYEONG">대경권 2곳</button>',
+            '    <button type="button" class="pau-act-btn" data-r-bloc="HONAM">호남권 2곳</button>',
+            PROVINCE_DEFS.map(function (p) {
+              var isCurP = state.rMultiProvs.indexOf(p.key) >= 0;
+              return '<button type="button" class="pau-act-btn' + (isCurP ? ' pri' : '') + '" aria-pressed="' + (isCurP ? 'true' : 'false') + '" data-r-prov="' + esc(p.key) + '">' + (isCurP ? '✓ ' : '') + esc(p.short) + '</button>';
+            }).join(''),
+            '    <button type="button" class="pau-act-btn" data-r-multi-reset>해제</button>',
             '  </div>'
           ].join('') : ''),
           '</div>',
@@ -5888,6 +6443,19 @@
         }
 
         bindMatrixSubModeButtons();
+        var regPickerBtn = bodyEl.querySelector('[data-r-open-picker]');
+        if (regPickerBtn) {
+          regPickerBtn.addEventListener('click', function () {
+            openOrganPickerPopup({
+              mode: 'REGION',
+              prov: state.rProvince || '충청남도',
+              muni: state.rMuni || '',
+              cat: state.rTypeGroup || '',
+              initialIds: getPickedOrTopRegIds(),
+              triggerEl: regPickerBtn
+            });
+          });
+        }
         var multiToggleBtn = bodyEl.querySelector('[data-r-multi-toggle]');
         if (multiToggleBtn) {
           multiToggleBtn.addEventListener('click', function () {
@@ -5930,7 +6498,7 @@
             }
           });
         });
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-sec-card [data-r-multi-reset]'), function (rb) {
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-flt [data-r-multi-reset]'), function (rb) {
           rb.addEventListener('click', function () {
             state.rMultiMode = false;
             state.rMultiProvs = [];
@@ -5938,7 +6506,7 @@
             renderTabMatrix();
           });
         });
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-sec-card > div [data-r-prov]'), function (b) {
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-flt [data-r-prov]'), function (b) {
           b.addEventListener('click', function () {
             var nextProv = b.getAttribute('data-r-prov') || 'ALL';
             if (state.rMultiMode && nextProv !== 'ALL') {
@@ -5960,7 +6528,7 @@
               state.rChecked = {};
             }
             renderTabMatrix();
-            var nextProvBtn = bodyEl.querySelector('.pau-sec-card > div [data-r-prov="' + nextProv + '"]');
+            var nextProvBtn = bodyEl.querySelector('.pau-flt [data-r-prov="' + nextProv + '"]');
             if (nextProvBtn && typeof nextProvBtn.focus === 'function') nextProvBtn.focus();
           });
         });
@@ -6154,32 +6722,6 @@
       var scatterPool = organRecords.filter(function (r) { return r.sectorCode === baseRec.sectorCode; });
       if (scatterPool.length < 8) scatterPool = organRecords;
 
-      function computeAddCandidates() {
-        var hasQ = !!String(state.cmpAddQuery || '').trim();
-        var matched = organRecords.filter(function (r) {
-          if (!hasQ) return r.hasUnion;
-          return matchSmartQuery(r.searchHaystack, state.cmpAddQuery);
-        });
-        if (hasQ) {
-          matched = sortRecordsByQueryRelevance(matched, state.cmpAddQuery);
-        }
-        return matched.slice(0, 150);
-      }
-
-      function renderAddSelectOptionsHtml(cands) {
-        var hasQ = !!String(state.cmpAddQuery || '').trim();
-        if (!cands.length) {
-          return '<option value="">검색 결과 없음 (0곳)</option>';
-        }
-        var headerTxt = hasQ ? ('검색 일치 ' + fmtNum(cands.length) + '곳 — 선택 시 비교 추가') : '+ 기관 추가 (최대 6곳)';
-        return '<option value="">' + esc(headerTxt) + '</option>' + cands.map(function (c) {
-          var sub = c.muniName ? (c.provinceShort + '·' + c.muniName) : c.scopeLabel;
-          return '<option value="' + esc(c.aid) + '">' + esc('(' + sub + ') ' + c.name + (c.hasUnion ? (' · ' + fmtNum(c.memberTotal) + '명') : ' · 사규운영')) + '</option>';
-        }).join('');
-      }
-
-      var addCandidates = computeAddCandidates();
-
       var quantRows = [
         { label: '권역 · 소관부처/지자체', fn: function (r) { return r.scopeLabel + ' · ' + r.ministry + (r.muniName ? (' (' + r.muniName + ')') : ''); }, benchTxt: esc(bench.label) },
         { label: '기능·업종 분류 · 기관유형', fn: function (r) { return r.sectorLabel + ' · ' + r.inst_type; }, benchTxt: fmtNum(bench.count) + '개 기관 평균' },
@@ -6196,41 +6738,22 @@
 
       bodyEl.innerHTML = [
         '<div class="pau-dash-dock">',
-        '<div class="pau-sec-card" style="padding:8px 10px;margin-bottom:0;">',
-        '  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">',
-        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      ' + renderMatrixSubModeSegHtml(),
-        '      <button type="button" class="pau-act-btn" data-preset-cmp="PEER">🔄 유사그룹</button>',
-        '      <button type="button" class="pau-act-btn" data-preset-cmp="METRO">🚇 교통공사</button>',
-        '      <button type="button" class="pau-act-btn" data-preset-cmp="MOIS">🏛️ 행안부유관</button>',
-        '    </div>',
-        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      <input type="search" data-f="cmpAddQuery" aria-label="비교 추가할 기관·지역 검색" placeholder="추가 기관·지역 검색" value="' + esc(state.cmpAddQuery) + '" style="min-width:145px;max-width:190px;">',
-        '      <select data-cmp-add-sel aria-label="비교함에 추가할 기관 선택" style="max-width:240px;">',
-        renderAddSelectOptionsHtml(addCandidates),
-        '      </select>',
-        '    </div>',
-        '  </div>',
-        '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;margin-top:6px;border-top:1px dashed var(--pau-bd);">',
-        '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-        '      <b style="font-size:12px;">🎯 비교 대상 (' + cmpRecs.length + '곳):</b>',
-        cmpRecs.map(function (r, idx) {
-          var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
-          return '<span style="display:inline-flex;align-items:center;gap:3px;">' +
-            '<a class="pau-act-btn" href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="border:2px solid ' + pal.stroke + ';font-weight:800;text-decoration:none;">' +
-            '<span class="pau-col-no" style="background:' + pal.numBg + ';">' + (idx + 1) + '</span>' + esc(r.name) + '</a>' +
-            '<button type="button" class="pau-act-btn" data-cmp-rm-here="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 제외') + '" style="padding:4px 7px;">✕</button></span>';
-        }).join(''),
-        '    </div>',
+        '<div class="pau-flt">',
+        '  ' + renderMatrixSubModeSegHtml(),
+        '  <button type="button" class="pau-act-btn pri" data-m-open-picker aria-haspopup="dialog">🎯 비교기관 선택·변경 (' + cmpRecs.length + '/6)</button>',
+        '  <button type="button" class="pau-act-btn" data-preset-cmp="PEER">🔄 유사그룹</button>',
+        '  <button type="button" class="pau-act-btn" data-preset-cmp="METRO">🚇 교통공사</button>',
+        '  <button type="button" class="pau-act-btn" data-preset-cmp="MOIS">🏛️ 행안부유관</button>',
         (baseRec.provinceKey
-          ? '<button type="button" class="pau-act-btn" data-jump-region="' + esc(baseRec.provinceKey) + '">🗺️ ' + esc(baseRec.provinceKey) + ' 산하기관 비교 →</button>'
+          ? '  <button type="button" class="pau-act-btn" data-jump-region="' + esc(baseRec.provinceKey) + '" style="margin-left:auto;">🗺️ ' + esc(baseRec.provinceKey) + ' 산하 비교 →</button>'
           : ''),
-        '  </div>',
         '</div>',
         '</div>',
 
         '<div class="pau-sec-card">',
-        '  <div class="pau-sec-tit"><span>📊 ① 다중 기관 핵심 수치 · 6대 영역 그래프 비교</span></div>',
+        '  <div class="pau-sec-tit">',
+        '    <span>📊 ① 다중 기관 핵심 수치 · 6대 영역 그래프 비교 (' + cmpRecs.length + '곳)</span>',
+        '  </div>',
         '  <div class="pau-vis-grid">',
         '    <div class="pau-card">',
         '      <div class="pau-card-hd"><span>🕸️ 6축 프로파일 레이더 비교</span></div>',
@@ -6354,62 +6877,19 @@
         '</div>'
       ].join('');
 
-      var addSel = bodyEl.querySelector('[data-cmp-add-sel]');
-      function addOrganToStudio(aidToAdd) {
-        if (!aidToAdd || !organById[aidToAdd]) return;
-        if (!state.compareIds.length) {
-          state.compareIds = cmpRecs.map(function (r) { return r.aid; });
-        }
-        if (state.compareIds.indexOf(aidToAdd) === -1) {
-          if (state.compareIds.length >= 6) state.compareIds.pop();
-          state.compareIds.push(aidToAdd);
-        }
-        renderCompareTray();
-        renderTabMatrix();
-      }
-
-      function updateStudioAddOptions() {
-        if (!addSel) return;
-        var nextCands = computeAddCandidates();
-        addSel.innerHTML = renderAddSelectOptionsHtml(nextCands);
-      }
-
-      bindFilterInputs(renderTabMatrix, { cmpAddQuery: updateStudioAddOptions });
-
-      var addQIn = bodyEl.querySelector('input[data-f="cmpAddQuery"]');
-      if (addQIn) {
-        addQIn.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' && !e.isComposing) {
-            e.preventDefault();
-            var nextCands = computeAddCandidates();
-            var pick = nextCands.find(function (c) { return cmpRecs.every(function (r) { return r.aid !== c.aid; }); }) || nextCands[0];
-            if (pick) {
-              state.cmpAddQuery = '';
-              addOrganToStudio(pick.aid);
-            }
-          }
-        });
-      }
-
       bindMatrixSubModeButtons();
 
-      if (addSel) {
-        addSel.addEventListener('change', function () {
-          addOrganToStudio(addSel.value);
+      var studioPickerBtn = bodyEl.querySelector('[data-m-open-picker]');
+      if (studioPickerBtn) {
+        studioPickerBtn.addEventListener('click', function () {
+          openOrganPickerPopup({
+            mode: 'COMPARE',
+            subCtx: 'STUDIO',
+            initialIds: cmpRecs.map(function (r) { return r.aid; }),
+            triggerEl: studioPickerBtn
+          });
         });
       }
-
-      Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cmp-rm-here]'), function (b) {
-        b.addEventListener('click', function () {
-          var rmId = b.getAttribute('data-cmp-rm-here') || '';
-          if (!state.compareIds.length) {
-            state.compareIds = cmpRecs.map(function (r) { return r.aid; });
-          }
-          state.compareIds = state.compareIds.filter(function (x) { return x !== rmId; });
-          renderCompareTray();
-          renderTabMatrix();
-        });
-      });
 
       Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-preset-cmp]'), function (b) {
         b.addEventListener('click', function () {
@@ -6592,61 +7072,8 @@
     function renderTabArticles() {
       var curView = state.aViewMode || 'COMPARE';
 
-      function computeClauseAddCandidates(cmpRecs) {
-        var used = {};
-        cmpRecs.forEach(function (r) { used[r.aid] = true; });
-        var q = String(state.aCmpAddQ || '').trim();
-        var list = organRecords.filter(function (r) {
-          if (used[r.aid]) return false;
-          if (!matchOrganScope(r.inst, state.aScope)) return false;
-          if (!q) return true;
-          return matchSmartQuery(r.searchHaystack, q);
-        });
-        if (q) {
-          var instRank = {};
-          sortInstsByQueryRelevance(list.map(function (r) { return r.inst; }), q).forEach(function (inst, idx) {
-            instRank[inst.apba_id] = idx;
-          });
-          list.sort(function (a, b) { return (instRank[a.aid] || 0) - (instRank[b.aid] || 0); });
-        } else {
-          list.sort(function (a, b) {
-            var ac = a.domains.articles.length;
-            var bc = b.domains.articles.length;
-            if ((ac > 0) !== (bc > 0)) return bc > 0 ? 1 : -1;
-            if (bc !== ac) return bc - ac;
-            return b.memberTotal - a.memberTotal;
-          });
-        }
-        return list.slice(0, 120);
-      }
-
-      function renderClauseAddOptionsHtml(cands) {
-        if (!cands.length) return '<option value="">추가 가능한 기관 없음 (0곳)</option>';
-        return '<option value="">+ 비교기관 추가 선택 (' + fmtNum(cands.length) + '곳)</option>' +
-          cands.map(function (r) {
-            var artTag = r.domains.articles.length ? (' · 조문 ' + r.domains.articles.length + '건') : (' · ' + (r.hasUnion ? fmtNum(r.memberTotal) + '명' : '미설립'));
-            return '<option value="' + esc(r.aid) + '">' + esc('[' + r.scopeLabel + '] ' + r.name + artTag) + '</option>';
-          }).join('');
-      }
-
-      function renderClauseCompareModeHtml(filteredRows) {
+      function renderClauseCompareModeHtml() {
         var cmpRecs = getClauseCompareRecords();
-        var addCands = computeClauseAddCandidates(cmpRecs);
-        var autoPairedNotice = state.compareIds.length === 1
-          ? '기준기관 1곳에 유사·조문수록 기관을 자동 매칭했습니다'
-          : (state.compareIds.length === 0 ? '조문 수록 주요기관을 기본 대조 중입니다 (기관 추가·변경 가능)' : '비교함에 담긴 기관들을 조문·쟁점 단위로 직접 대조합니다');
-
-        var topicCounts = Object.create(null);
-        var allCmpArts = 0;
-        cmpRecs.forEach(function (r) {
-          r.domains.articles.forEach(function (a) {
-            if (state.aQuery && !matchSmartQuery(getOrganSearchHaystack(r.aid, (a.article_title || '') + ' ' + (a.text || '') + ' ' + (a.taxonomy_name || '')), state.aQuery)) return;
-            allCmpArts += 1;
-            var tc = a.taxonomy_code || 'ETC';
-            topicCounts[tc] = (topicCounts[tc] || 0) + 1;
-          });
-        });
-
         var mappedMetricKey = (state.aCat && state.aCat !== 'ALL') ? (TAXONOMY_TO_METRIC[state.aCat] || '') : '';
         var activeDef = mappedMetricKey ? METRIC_DEFS.find(function (d) { return d.key === mappedMetricKey; }) : null;
         var hasQueryFilter = !!String(state.aQuery || '').trim();
@@ -6655,45 +7082,6 @@
         var colPct = Math.max(12, Math.floor(80 / Math.max(1, cmpRecs.length)));
 
         return [
-          '<div class="pau-card" style="padding:10px 12px;">',
-          '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
-          '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
-          '      <span style="font-size:12.5px;font-weight:900;color:var(--pau-pri);">🎯 조문 병렬비교 대상 (' + cmpRecs.length + '/6곳):</span>',
-          cmpRecs.map(function (r, idx) {
-            var pal = COMPARE_PALETTE[idx % COMPARE_PALETTE.length];
-            return '<span class="pau-pill" style="background:' + pal.fill + ';border:1px solid ' + pal.stroke + ';color:var(--pau-txt);padding:3px 8px;gap:5px;">' +
-              '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + pal.stroke + ';"></span>' +
-              '<a href="pu-alio-union.html?organ=' + encodeURIComponent(r.aid) + '" data-jump-organ="' + esc(r.aid) + '" style="font-weight:800;color:inherit;text-decoration:none;">' + (idx === 0 ? '⭐ ' : '') + esc(r.name) + '</a>' +
-              '<span style="font-size:10.5px;color:var(--pau-muted);">조문 ' + r.domains.articles.length + '</span>' +
-              (cmpRecs.length > 2 ? '<button type="button" data-a-cmp-rm="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 비교 제외') + '" style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;min-height:24px;border:0;border-radius:999px;background:rgba(15,23,42,.08);color:var(--pau-txt);cursor:pointer;padding:0 5px;font-size:11px;font-weight:800;line-height:1;">✕</button>' : '') +
-            '</span>';
-          }).join(''),
-          '    </div>',
-          '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
-          '      <input type="search" data-f="aCmpAddQ" aria-label="조문 비교기관 검색" placeholder="비교기관 추가 검색" value="' + esc(state.aCmpAddQ) + '" style="width:140px;min-width:120px;">',
-          '      <select data-a-cmp-add aria-label="조문 비교기관 추가 선택" style="max-width:225px;">' + renderClauseAddOptionsHtml(addCands) + '</select>',
-          '      <button type="button" class="pau-act-btn" data-a-preset="CENTRAL_CLAUSE">🏛️ 주요공기업</button>',
-          '      <button type="button" class="pau-act-btn" data-a-preset="LOCAL_METRO">🚇 도시철도·교통</button>',
-          '      <button type="button" class="pau-act-btn" data-a-preset="LOCAL_MEDICAL">🏥 지방의료원</button>',
-          '      <button type="button" class="pau-act-btn" data-a-go-studio>📊 레이더·수치 비교</button>',
-          '    </div>',
-          '  </div>',
-          '  <div style="font-size:11.5px;color:var(--pau-muted);margin-top:4px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
-          '    <span>💡 ' + esc(autoPairedNotice) + ' — 아래 쟁점 칩이나 표 행을 클릭하면 해당 쟁점 조문만 나란히 모아 비교합니다.</span>',
-          '    <span>전체 조건 일치 조문 <b>' + fmtNum(filteredRows.length) + '</b>건</span>',
-          '  </div>',
-          '  <div class="pau-topic-bar" role="group" aria-label="단협 쟁점 빠른 선택" style="margin-top:6px;">',
-          TOPIC_CHIP_ORDER.map(function (tp) {
-            var code = tp[0];
-            var label = tp[1];
-            var on = state.aCat === code;
-            var cnt = code === 'ALL' ? allCmpArts : (topicCounts[code] || 0);
-            return '<button type="button" class="pau-topic-chip' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-a-topic="' + esc(code) + '">' +
-              esc(label) + (cnt > 0 ? (' <b>(' + cnt + ')</b>') : '') + '</button>';
-          }).join(''),
-          '  </div>',
-          '</div>',
-
           (activeDef ? [
             '<div class="pau-law-strip">',
             '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">',
@@ -6708,6 +7096,7 @@
             '<div class="pau-card">',
             '  <div class="pau-card-hd">',
             '    <span>📊 ① 13대 핵심 단협 쟁점 한눈 비교표 (' + cmpRecs.length + '곳)</span>',
+            '    <button type="button" class="pau-act-btn" data-a-open-picker aria-haspopup="dialog">🎯 비교기관 변경 (' + cmpRecs.length + '/6)</button>',
             '  </div>',
             '  <div class="pau-tbl-wrap" style="max-height:540px;">',
             '    <table class="pau-tbl pau-hm-tbl">',
@@ -7034,6 +7423,17 @@
           });
         });
 
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-open-picker]'), function (btn) {
+          btn.addEventListener('click', function () {
+            openOrganPickerPopup({
+              mode: 'COMPARE',
+              subCtx: 'ARTICLES',
+              initialIds: getClauseCompareRecords().map(function (r) { return r.aid; }),
+              triggerEl: btn
+            });
+          });
+        });
+
         Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-topic]'), function (el) {
           function applyTopic(keepFocus) {
             var nextTopic = el.getAttribute('data-a-topic') || 'ALL';
@@ -7041,7 +7441,7 @@
             state.aPage = 0;
             renderTabArticles();
             if (keepFocus) {
-              var nextEl = bodyEl.querySelector('.pau-topic-chip[data-a-topic="' + nextTopic + '"]');
+              var nextEl = bodyEl.querySelector('[data-a-topic="' + nextTopic + '"], select[data-f="aCat"]');
               if (nextEl && typeof nextEl.focus === 'function') nextEl.focus();
             }
           }
@@ -7059,82 +7459,7 @@
           }
         });
 
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-cmp-rm]'), function (b) {
-          b.addEventListener('click', function () {
-            var rmAid = b.getAttribute('data-a-cmp-rm') || '';
-            if (state.compareIds.length < 2) {
-              state.compareIds = getClauseCompareRecords().map(function (r) { return r.aid; });
-            }
-            state.compareIds = state.compareIds.filter(function (x) { return x !== rmAid; });
-            renderCompareTray();
-            renderTabArticles();
-            syncUrlState();
-          });
-        });
-
-        var addSel = bodyEl.querySelector('[data-a-cmp-add]');
-        function addClauseOrgan(aidToAdd) {
-          if (!aidToAdd || !organById[aidToAdd]) return;
-          if (!state.compareIds.length) {
-            state.compareIds = getClauseCompareRecords().map(function (r) { return r.aid; });
-          }
-          if (state.compareIds.indexOf(aidToAdd) === -1) {
-            if (state.compareIds.length >= 6) state.compareIds.pop();
-            state.compareIds.push(aidToAdd);
-          }
-          state.aCmpAddQ = '';
-          renderCompareTray();
-          renderTabArticles();
-          syncUrlState();
-        }
-        if (addSel) {
-          addSel.addEventListener('change', function () {
-            addClauseOrgan(addSel.value);
-          });
-        }
-
-        var addQIn = bodyEl.querySelector('input[data-f="aCmpAddQ"]');
-        if (addQIn) {
-          var applyAddSearch = function () {
-            state.aCmpAddQ = addQIn.value;
-            if (!addSel) return;
-            addSel.innerHTML = renderClauseAddOptionsHtml(computeClauseAddCandidates(getClauseCompareRecords()));
-          };
-          addQIn.addEventListener('input', applyAddSearch);
-          addQIn.addEventListener('compositionend', applyAddSearch);
-          addQIn.addEventListener('search', applyAddSearch);
-          addQIn.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && !e.isComposing) {
-              e.preventDefault();
-              var cands = computeClauseAddCandidates(getClauseCompareRecords());
-              if (cands[0]) addClauseOrgan(cands[0].aid);
-            }
-          });
-        }
-
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-preset]'), function (b) {
-          b.addEventListener('click', function () {
-            var p = b.getAttribute('data-a-preset') || '';
-            var picks = [];
-            if (p === 'LOCAL_METRO') {
-              picks = organRecords.filter(function (r) { return r.isLocal && r.sectorCode === 'RAIL_TRANSIT' && r.hasUnion; });
-            } else if (p === 'LOCAL_MEDICAL') {
-              picks = organRecords.filter(function (r) { return r.isLocal && r.sectorCode === 'MEDICAL_HEALTH' && r.hasUnion; });
-            } else {
-              picks = organRecords.filter(function (r) { return !r.isLocal && r.domains.articles.length >= 8 && r.hasUnion; });
-            }
-            picks.sort(function (a, c) { return (c.domains.articles.length - a.domains.articles.length) || (c.memberTotal - a.memberTotal); });
-            if (picks.length) {
-              state.compareIds = picks.slice(0, 4).map(function (r) { return r.aid; });
-            }
-            renderCompareTray();
-            renderTabArticles();
-            syncUrlState();
-          });
-        });
-
-        var goStudioBtn = bodyEl.querySelector('[data-a-go-studio]');
-        if (goStudioBtn) {
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-go-studio]'), function (goStudioBtn) {
           goStudioBtn.addEventListener('click', function () {
             if (!state.compareIds.length) {
               state.compareIds = getClauseCompareRecords().map(function (r) { return r.aid; });
@@ -7142,7 +7467,7 @@
             state.mSubMode = 'STUDIO';
             switchTab('matrix');
           });
-        }
+        });
 
         Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-a-jump-org]'), function (b) {
           b.addEventListener('click', function () {
@@ -7183,6 +7508,7 @@
       }
 
       var initRows = filterArticles();
+      var initCmpCnt = curView === 'COMPARE' ? getClauseCompareRecords().length : 0;
 
       bodyEl.innerHTML = [
         '<div class="pau-dash-dock">',
@@ -7204,8 +7530,13 @@
           return '<option value="' + esc(t[0]) + '"' + (state.aCat === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>';
         }).join(''),
         '  </select>',
-        '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문·기관·지역 검색 (예: 충남, 징계)" value="' + esc(state.aQuery) + '" style="min-width:190px;">',
-        (curView !== 'COMPARE' ? [
+        '  <input type="search" data-f="aQuery" aria-label="단체협약 조문 검색" placeholder="조문·기관·지역 검색" value="' + esc(state.aQuery) + '" style="min-width:160px;max-width:220px;">',
+        (curView === 'COMPARE' ? [
+          '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:auto;">',
+          '    <button type="button" class="pau-act-btn pri" data-a-open-picker aria-haspopup="dialog">🎯 비교기관 선택 (' + initCmpCnt + '/6)</button>',
+          '    <button type="button" class="pau-act-btn" data-a-go-studio>📊 레이더비교</button>',
+          '  </div>'
+        ].join('') : [
           '  <select class="pau-sub-sort" data-f="aSort" aria-label="단협 조문 정렬 기준">',
           [
             ['', curView === 'BY_ORGAN' ? '정렬: 수록조문 많은순' : '정렬: 기본순'],
@@ -7220,9 +7551,9 @@
           ].map(function (it) {
             return '<option value="' + esc(it[0]) + '"' + ((state.aSort || '') === it[0] ? ' selected' : '') + '>' + esc(it[1]) + '</option>';
           }).join(''),
-          '  </select>'
-        ].join('') : ''),
-        '  <span data-a-cnt style="font-size:12px;margin-left:auto;">조회 <b>' + fmtNum(initRows.length) + '</b>건</span>',
+          '  </select>',
+          '  <span data-a-cnt style="font-size:12px;margin-left:auto;">조회 <b>' + fmtNum(initRows.length) + '</b>건</span>'
+        ].join('')),
         '</div>',
         '</div>',
         '<div data-a-dyn>' + renderArticlesDynHtml(initRows) + '</div>'
@@ -7239,7 +7570,7 @@
         }
       }
 
-      bindFilterInputs(renderTabArticles, { aQuery: updateArticlesDyn }, '[data-f]:not([data-f="aCmpAddQ"])');
+      bindFilterInputs(renderTabArticles, { aQuery: updateArticlesDyn });
       bindArticlesDynEvents();
     }
 
@@ -8026,13 +8357,13 @@
       }
 
       var CC_PRESETS = [
+        { key: 'CC_ALL_RESET', label: '🗺️ 충청권 분류 프리셋 전체 (' + ccAllRecords.length + '곳)' },
         { key: 'CN_FACILITY', label: '⚡ 충남 시설공단·도시공사 (7곳)' },
         { key: 'CC_FACILITY_ALL', label: '🏢 충청 공단·공사 전체 (12곳)' },
         { key: 'CN_PROV_AFFIL', label: '🏛️ 충남도청 산하기관' },
         { key: 'DJ_SJ_LOCAL', label: '🚇 대전·세종 산하기관' },
         { key: 'CC_MEDICAL', label: '🏥 충청 의료원·대학병원' },
-        { key: 'CC_CENTRAL', label: '🚄 충청 중앙공공기관' },
-        { key: 'CC_ALL_RESET', label: '🗺️ 전체 (' + ccAllRecords.length + ')' }
+        { key: 'CC_CENTRAL', label: '🚄 충청 중앙공공기관(ALIO)' }
       ];
 
       function computeActiveCcCompareRecs(filteredRows) {
@@ -8055,65 +8386,6 @@
           return [first].concat(rest);
         }
         return basePool.slice(0, Math.min(5, basePool.length));
-      }
-
-      function renderCcTopCheckbarHtml(rows, cmpRecs) {
-        var checkedIds = Object.keys(state.ccChecked).filter(function (k) { return !!state.ccChecked[k] && !!organById[k]; });
-        var activeCmpMap = Object.create(null);
-        (cmpRecs || []).forEach(function (r, idx) { activeCmpMap[r.aid] = idx + 1; });
-        var pool = [];
-        var seen = Object.create(null);
-        (cmpRecs || []).forEach(function (r) {
-          if (!seen[r.aid]) { seen[r.aid] = true; pool.push(r); }
-        });
-        (rows || []).forEach(function (r) {
-          if (pool.length < 9 && !seen[r.aid]) { seen[r.aid] = true; pool.push(r); }
-        });
-
-        return [
-          '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;flex:1 1 auto;">',
-          '  <span style="font-size:12px;font-weight:800;color:var(--pau-pri);white-space:nowrap;">☑ 비교선택(' + (cmpRecs ? cmpRecs.length : 0) + '/6):</span>',
-          pool.map(function (r) {
-            var cIdx = activeCmpMap[r.aid] || 0;
-            var isCk = checkedIds.length >= 2 ? !!state.ccChecked[r.aid] : (cIdx > 0);
-            var pal = cIdx > 0 ? COMPARE_PALETTE[(cIdx - 1) % COMPARE_PALETTE.length] : null;
-            return '<label class="pau-cc-ck-pill' + (cIdx > 0 ? ' on' : '') + '">' +
-              '<input type="checkbox" data-cc-top-ck="' + esc(r.aid) + '" aria-label="' + esc(r.name + ' 비교 선택') + '"' + (isCk ? ' checked' : '') + '>' +
-              (cIdx > 0 && pal ? '<span class="pau-col-no" style="background:' + pal.numBg + ';margin-right:1px;">' + cIdx + '</span>' : '') +
-              '<span>' + esc(r.name) + '</span>' +
-            '</label>';
-          }).join(''),
-          '</div>',
-          '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0;">',
-          '  <button type="button" class="pau-act-btn pri" data-cc-go-studio>📊 레이더비교 ↗</button>',
-          '  <button type="button" class="pau-act-btn" data-cc-go-clauses>⚖️ 조문대조 ↗</button>',
-          '  <button type="button" class="pau-act-btn" data-cc-sync-tray>📥 비교함(' + (cmpRecs ? cmpRecs.length : 0) + ')</button>',
-          (checkedIds.length > 0 ? '  <button type="button" class="pau-act-btn" data-cc-clr-ck>초기화</button>' : ''),
-          '</div>'
-        ].join('');
-      }
-
-      function renderCcProvOverviewHtml() {
-        var cardsHtml = CHUNGCHEONG_PROVS.map(function (pk) {
-          var subAll = ccAllRecords.filter(function (r) { return r.ccProvinceKey === pk; });
-          var locSub = subAll.filter(function (r) { return r.isLocal; });
-          var cenSub = subAll.filter(function (r) { return !r.isLocal; });
-          var facCnt = locSub.filter(function (r) { return r.ccSubCat === 'FACILITY_CORP' || r.ccSubCat === 'METRO_CORP'; }).length;
-          var uSub = subAll.filter(function (r) { return r.hasUnion; });
-          var memSum = 0;
-          subAll.forEach(function (r) { memSum += r.memberTotal; });
-          var isOn = state.ccReg === pk && state.ccPreset !== 'DJ_SJ_LOCAL';
-          return [
-            '<button type="button" class="pau-cc-prov-card' + (isOn ? ' on' : '') + '" data-cc-pick-reg="' + esc(pk) + '" aria-pressed="' + (isOn ? 'true' : 'false') + '">',
-            '  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;">',
-            '    <span style="font-size:13.5px;font-weight:900;color:var(--pau-pri);">' + (isOn ? '✓ ' : '📍 ') + esc(pk) + '</span>',
-            '    <span class="pau-pill ok">' + fmtNum(subAll.length) + '곳</span>',
-            '  </div>',
-            '  <div style="font-size:11.5px;color:var(--pau-sub);">산하 <b>' + locSub.length + '</b>(공단·공사 ' + facCnt + ') · 중앙 <b>' + cenSub.length + '</b> · 노조 <b>' + uSub.length + '곳</b>(' + fmtNum(memSum) + '명)</div>',
-            '</button>'
-          ].join('');
-        }).join('');
-        return '<div class="pau-cc-prov-grid">' + cardsHtml + '</div>';
       }
 
       function renderCcCompareMatrixHtml(cmpRecs) {
@@ -8140,7 +8412,10 @@
           '<div class="pau-sec-card" data-cc-cmp-matrix style="border:2px solid #2563eb;">',
           '  <div class="pau-sec-tit">',
           '    <span>⚖️ ① 기관별 임단협 · 핵심 근로조건 비교표 (' + cmpRecs.length + '곳)</span>',
-          (checkedCnt > 0 ? '    <button type="button" class="pau-act-btn" data-cc-clr-ck>체크 초기화(' + checkedCnt + ')</button>' : ''),
+          '    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">',
+          '      <button type="button" class="pau-act-btn" data-cc-open-picker>🏛️ 비교기관 변경 (' + cmpRecs.length + '/6)</button>',
+          (checkedCnt > 0 ? '      <button type="button" class="pau-act-btn" data-cc-clr-ck>초기화</button>' : ''),
+          '    </div>',
           '  </div>',
           '  <div class="pau-tbl-wrap" style="max-height:none;">',
           '    <table class="pau-tbl">',
@@ -8212,14 +8487,8 @@
         var uRows = rows.filter(function (r) { return r.hasUnion; });
         var locCnt = rows.filter(function (r) { return r.isLocal; }).length;
         var cenCnt = rows.length - locCnt;
-        var facCnt = rows.filter(function (r) { return r.ccSubCat === 'FACILITY_CORP' || r.ccSubCat === 'METRO_CORP'; }).length;
-        var memSum = 0, toSum = 0, toCnt = 0, caDocSum = 0;
-        rows.forEach(function (r) {
-          memSum += r.memberTotal;
-          caDocSum += r.domains.caDiscs.length + r.domains.wageDiscs.length + r.domains.ruleDiscs.length;
-          if (r.timeoffHours > 0 && !r.timeoffAnomalyNote) { toSum += r.timeoffHours; toCnt += 1; }
-        });
-        var avgTo = toCnt ? Math.round(toSum / toCnt) : 0;
+        var memSum = 0;
+        rows.forEach(function (r) { memSum += r.memberTotal; });
         var checkedIds = Object.keys(state.ccChecked).filter(function (k) { return !!state.ccChecked[k] && !!organById[k]; });
         var scopeTitle = state.ccPreset === 'DJ_SJ_LOCAL'
           ? '대전 · 세종 산하기관'
@@ -8228,19 +8497,11 @@
         return {
           rows: rows,
           cmpRecs: cmpRecs,
-          topChecksHtml: renderCcTopCheckbarHtml(rows, cmpRecs),
           html: [
-            renderCcProvOverviewHtml(),
-            '<div class="pau-kpis">',
-            '  <div class="pau-kpi"><span>대상 기관 (산하 · 중앙)</span><b>' + fmtNum(rows.length) + '곳 (' + fmtNum(locCnt) + ' · ' + fmtNum(cenCnt) + ')</b></div>',
-            '  <div class="pau-kpi"><span>공사 · 시설공단 (노조보유)</span><b>' + fmtNum(facCnt) + '곳 (' + fmtNum(uRows.length) + '곳)</b></div>',
-            '  <div class="pau-kpi"><span>조합원 합계</span><b>' + fmtNum(memSum) + '명</b></div>',
-            '  <div class="pau-kpi"><span>평균 타임오프 · 수록문서</span><b>' + (avgTo ? fmtNum(avgTo) + 'h' : '—') + ' · ' + fmtNum(caDocSum) + '건</b></div>',
-            '</div>',
             renderCcCompareMatrixHtml(cmpRecs),
             '<div class="pau-sec-card">',
             '  <div class="pau-sec-tit">',
-            '    <span>📋 ② ' + esc(scopeTitle) + ' 전체 기관 목록 (' + fmtNum(rows.length) + '곳)</span>',
+            '    <span>📋 ② ' + esc(scopeTitle) + ' 기관 목록 (' + fmtNum(rows.length) + '곳 · 산하 ' + fmtNum(locCnt) + ' · 중앙 ' + fmtNum(cenCnt) + ' · 노조 ' + fmtNum(uRows.length) + '곳 ' + fmtNum(memSum) + '명)</span>',
             '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">',
             '      <select class="pau-sub-sort" data-cc-sort aria-label="충청권 기관 정렬 기준">',
             [
@@ -8321,63 +8582,48 @@
       }
 
       var initCc = renderCcDynHtml();
+      var isAllResetOn = !state.ccPreset && state.ccReg === 'ALL' && state.ccOwner === 'ALL' && state.ccCat === 'ALL' && !state.ccMuni;
 
       bodyEl.innerHTML = [
         '<div class="pau-dash-dock">',
         '<div class="pau-flt">',
-        '  <select data-f="ccReg" aria-label="충청권 광역 시·도 선택" style="font-weight:800;max-width:215px;">',
-        '    <option value="ALL"' + (state.ccReg === 'ALL' ? ' selected' : '') + '>🏙️ 대전·세종·충청 전체 (' + ccAllRecords.length + '곳)</option>',
+        '  <div role="group" aria-label="충청권 지자체 팝업 선택" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">',
+        '    <button type="button" class="pau-act-btn' + (isAllResetOn ? ' pri' : '') + '" data-cc-reg-all aria-pressed="' + (isAllResetOn ? 'true' : 'false') + '">전체(' + ccAllRecords.length + ')</button>',
         CHUNGCHEONG_PROVS.map(function (pk) {
           var cnt = ccAllRecords.filter(function (r) { return r.ccProvinceKey === pk; }).length;
-          return '<option value="' + esc(pk) + '"' + (state.ccReg === pk ? ' selected' : '') + '>' + esc(pk + ' (' + cnt + '곳)') + '</option>';
+          var isOn = state.ccReg === pk && state.ccPreset !== 'DJ_SJ_LOCAL';
+          return '<button type="button" class="pau-act-btn' + (isOn ? ' pri' : '') + '" data-cc-prov-popup="' + esc(pk) + '" aria-haspopup="dialog" title="' + esc(pk + ' 산하기관·공공기관 선택 팝업 열기') + '">📍 ' + esc(pk) + '(' + cnt + ')</button>';
+        }).join(''),
+        '  </div>',
+        '  <select data-cc-preset-sel aria-label="대전·세종·충청 빠른 비교 프리셋" style="font-weight:800;max-width:235px;">',
+        CC_PRESETS.map(function (pr) {
+          var sel = pr.key === 'CC_ALL_RESET' ? isAllResetOn : (state.ccPreset === pr.key);
+          return '<option value="' + esc(pr.key) + '"' + (sel ? ' selected' : '') + '>' + esc(pr.label) + '</option>';
         }).join(''),
         '  </select>',
-        (state.ccReg !== 'ALL' && cityOptions.length ? [
-          '  <select data-f="ccMuni" aria-label="충청권 본청·시·군·구 선택" style="max-width:175px;">',
-          '    <option value="">본청 · 시/군/구 전체</option>',
-          cityOptions.map(function (m) {
-            return '<option value="' + esc(m.name) + '"' + (state.ccMuni === m.name ? ' selected' : '') + '>' + esc(m.name + ' (' + m.count + '곳)') + '</option>';
-          }).join(''),
-          '  </select>'
-        ].join('') : ''),
-        '  <select data-f="ccOwner" aria-label="지자체 산하기관·중앙공공기관 구분" style="max-width:195px;">',
-        '    <option value="ALL"' + (state.ccOwner === 'ALL' ? ' selected' : '') + '>산하기관 + 소재 공공기관 전체</option>',
-        '    <option value="LOCAL"' + (state.ccOwner === 'LOCAL' ? ' selected' : '') + '>🏛️ 지자체 산하기관만 (시·도·시군)</option>',
-        '    <option value="CENTRAL"' + (state.ccOwner === 'CENTRAL' ? ' selected' : '') + '>🏢 충청소재 중앙공공기관(ALIO)</option>',
-        '  </select>',
-        '  <select data-f="ccCat" aria-label="충청권 기관 세부유형 선택" style="max-width:195px;">',
+        '  <select data-f="ccCat" aria-label="충청권 기관 세부유형 선택" style="max-width:190px;">',
         '    <option value="ALL"' + (state.ccCat === 'ALL' ? ' selected' : '') + '>세부유형 전체</option>',
         '    <option value="FACILITY_CORP"' + (state.ccCat === 'FACILITY_CORP' ? ' selected' : '') + '>🏢 시설관리공단·시군도시공사</option>',
-        '    <option value="ALL_CORP"' + (state.ccCat === 'ALL_CORP' ? ' selected' : '') + '>🏗️ 지방공사·공단 전체(광역+기초)</option>',
+        '    <option value="ALL_CORP"' + (state.ccCat === 'ALL_CORP' ? ' selected' : '') + '>🏗️ 지방공사·공단 전체</option>',
         '    <option value="MEDICAL"' + (state.ccCat === 'MEDICAL' ? ' selected' : '') + '>🏥 지방의료원·국립대병원</option>',
-        '    <option value="AFFIL"' + (state.ccCat === 'AFFIL' ? ' selected' : '') + '>🔬 지자체 출자·출연(재단·연구원·TP)</option>',
-        '    <option value="CENTRAL_CORP"' + (state.ccCat === 'CENTRAL_CORP' ? ' selected' : '') + '>🚄 충청소재 중앙공기업·준정부·연구</option>',
-        '    <option value="LOCAL_DIRECT"' + (state.ccCat === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업(상·하수도)</option>',
+        '    <option value="AFFIL"' + (state.ccCat === 'AFFIL' ? ' selected' : '') + '>🔬 출자·출연(재단·연구원)</option>',
+        '    <option value="CENTRAL_CORP"' + (state.ccCat === 'CENTRAL_CORP' ? ' selected' : '') + '>🚄 소재 중앙공공기관(ALIO)</option>',
+        '    <option value="LOCAL_DIRECT"' + (state.ccCat === 'LOCAL_DIRECT' ? ' selected' : '') + '>💧 지방직영기업</option>',
         '  </select>',
-        '  <select data-f="ccUnion" aria-label="충청권 노조 보유 필터" style="max-width:140px;">',
-        '    <option value=""' + (!state.ccUnion ? ' selected' : '') + '>노조유무 전체</option>',
-        '    <option value="has_union"' + (state.ccUnion === 'has_union' ? ' selected' : '') + '>👥 노조보유만</option>',
-        '    <option value="multi"' + (state.ccUnion === 'multi' ? ' selected' : '') + '>🔀 복수노조</option>',
-        '    <option value="no_union"' + (state.ccUnion === 'no_union' ? ' selected' : '') + '>📘 노조미설립</option>',
-        '  </select>',
-        '  <input type="search" data-f="ccQuery" aria-label="대전·세종·충청 기관·시군·노조 검색" placeholder="기관·시군·노조 검색 (예: 시설공단, 아산)" value="' + esc(state.ccQuery) + '" style="min-width:165px;max-width:240px;">',
+        '  <input type="search" data-f="ccQuery" aria-label="대전·세종·충청 기관·시군·노조 검색" placeholder="기관·시군·노조 검색" value="' + esc(state.ccQuery) + '" style="min-width:148px;max-width:210px;">',
+        '  <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:auto;">',
+        '    <button type="button" class="pau-act-btn pri" data-cc-go-studio>📊 레이더비교 ↗</button>',
+        '    <button type="button" class="pau-act-btn" data-cc-go-clauses>⚖️ 조문대조 ↗</button>',
+        '  </div>',
         '</div>',
-        '<div class="pau-topic-bar" role="group" aria-label="대전·세종·충청 핵심 비교 프리셋">',
-        CC_PRESETS.map(function (pr) {
-          var isOn = (pr.key === 'CC_ALL_RESET')
-            ? (!state.ccPreset && state.ccReg === 'ALL' && state.ccOwner === 'ALL' && state.ccCat === 'ALL' && !state.ccMuni)
-            : (state.ccPreset === pr.key);
-          return '<button type="button" class="pau-topic-chip' + (isOn ? ' on' : '') + '" aria-pressed="' + (isOn ? 'true' : 'false') + '" data-cc-preset="' + esc(pr.key) + '">' + esc(pr.label) + '</button>';
-        }).join(''),
-        '</div>',
-        '<div class="pau-cc-checkdock" data-cc-top-checks>' + initCc.topChecksHtml + '</div>',
         '</div>',
         '<div data-cc-dyn>' + initCc.html + '</div>'
       ].join('');
 
+      var curCcCmpRecsRef = initCc.cmpRecs;
+
       function toggleCcCheckAid(aid, shouldCheck, curCmpRecs) {
         if (!aid) return;
-        // 기본 자동대조 상태(체크 2곳 미만)에서 상단/하단 체크박스를 조작할 때 현재 대조군을 기준으로 자연스럽게 편집되도록 동기화
         var curCkIds = Object.keys(state.ccChecked).filter(function (k) { return !!state.ccChecked[k] && !!organById[k]; });
         if (curCkIds.length < 2 && curCmpRecs && curCmpRecs.length >= 2) {
           state.ccChecked = {};
@@ -8394,21 +8640,70 @@
         }
       }
 
+      function applyCcPresetKey(pKey) {
+        state.ccChecked = {};
+        state.ccQuery = '';
+        state.ccUnion = '';
+        if (pKey === 'CN_FACILITY') {
+          state.ccPreset = 'CN_FACILITY';
+          state.ccReg = '충청남도';
+          state.ccMuni = '';
+          state.ccOwner = 'LOCAL';
+          state.ccCat = 'ALL_CORP';
+        } else if (pKey === 'CC_FACILITY_ALL') {
+          state.ccPreset = 'CC_FACILITY_ALL';
+          state.ccReg = 'ALL';
+          state.ccMuni = '';
+          state.ccOwner = 'LOCAL';
+          state.ccCat = 'FACILITY_CORP';
+        } else if (pKey === 'CN_PROV_AFFIL') {
+          state.ccPreset = 'CN_PROV_AFFIL';
+          state.ccReg = '충청남도';
+          state.ccMuni = '충남 본청';
+          state.ccOwner = 'LOCAL';
+          state.ccCat = 'ALL';
+        } else if (pKey === 'DJ_SJ_LOCAL') {
+          state.ccPreset = 'DJ_SJ_LOCAL';
+          state.ccReg = 'ALL';
+          state.ccMuni = '';
+          state.ccOwner = 'LOCAL';
+          state.ccCat = 'ALL';
+        } else if (pKey === 'CC_MEDICAL') {
+          state.ccPreset = 'CC_MEDICAL';
+          state.ccReg = 'ALL';
+          state.ccMuni = '';
+          state.ccOwner = 'ALL';
+          state.ccCat = 'MEDICAL';
+        } else if (pKey === 'CC_CENTRAL') {
+          state.ccPreset = 'CC_CENTRAL';
+          state.ccReg = 'ALL';
+          state.ccMuni = '';
+          state.ccOwner = 'CENTRAL';
+          state.ccCat = 'ALL';
+        } else {
+          state.ccPreset = '';
+          state.ccReg = 'ALL';
+          state.ccMuni = '';
+          state.ccOwner = 'ALL';
+          state.ccCat = 'ALL';
+        }
+        renderTabChungcheong();
+        syncUrlState();
+      }
+
       function bindCcDynEvents(curRows, curCmpRecs) {
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-pick-reg]'), function (btn) {
+        curCcCmpRecsRef = curCmpRecs;
+
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-open-picker]'), function (btn) {
           btn.addEventListener('click', function () {
-            var pk = btn.getAttribute('data-cc-pick-reg') || 'ALL';
-            state.ccPreset = '';
-            state.ccChecked = {};
-            if (state.ccReg === pk) {
-              state.ccReg = 'ALL';
-              state.ccMuni = '';
-            } else {
-              state.ccReg = pk;
-              state.ccMuni = '';
-            }
-            renderTabChungcheong();
-            syncUrlState();
+            openOrganPickerPopup({
+              mode: 'CC',
+              prov: state.ccReg || 'ALL',
+              muni: state.ccMuni || '',
+              cat: state.ccCat || 'ALL',
+              initialIds: (curCcCmpRecsRef || []).map(function (r) { return r.aid; }),
+              triggerEl: btn
+            });
           });
         });
 
@@ -8435,9 +8730,9 @@
           });
         }
 
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-ck],[data-cc-top-ck]'), function (ck) {
+        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-ck]'), function (ck) {
           ck.addEventListener('change', function () {
-            var aid = ck.getAttribute('data-cc-ck') || ck.getAttribute('data-cc-top-ck') || '';
+            var aid = ck.getAttribute('data-cc-ck') || '';
             toggleCcCheckAid(aid, !!ck.checked, curCmpRecs);
             updateCcDyn();
           });
@@ -8449,99 +8744,68 @@
             updateCcDyn();
           });
         });
-
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-go-studio]'), function (goStudioBtn) {
-          goStudioBtn.addEventListener('click', function () {
-            state.compareIds = curCmpRecs.slice(0, 6).map(function (r) { return r.aid; });
-            state.mSubMode = 'STUDIO';
-            renderCompareTray();
-            switchTab('matrix');
-          });
-        });
-
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-go-clauses]'), function (goClausesBtn) {
-          goClausesBtn.addEventListener('click', function () {
-            state.compareIds = curCmpRecs.slice(0, 6).map(function (r) { return r.aid; });
-            state.docMode = 'ARTICLES';
-            state.aViewMode = 'COMPARE';
-            renderCompareTray();
-            switchTab('articles');
-          });
-        });
-
-        Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-sync-tray]'), function (syncTrayBtn) {
-          syncTrayBtn.addEventListener('click', function () {
-            state.compareIds = curCmpRecs.slice(0, 6).map(function (r) { return r.aid; });
-            renderCompareTray();
-            updateCcDyn();
-          });
-        });
       }
 
       function updateCcDyn() {
         var dynEl = bodyEl.querySelector('[data-cc-dyn]');
         if (!dynEl) return;
         var nextCc = renderCcDynHtml();
-        var topChecksEl = bodyEl.querySelector('[data-cc-top-checks]');
-        if (topChecksEl) topChecksEl.innerHTML = nextCc.topChecksHtml;
         dynEl.innerHTML = nextCc.html;
         bindCcDynEvents(nextCc.rows, nextCc.cmpRecs);
         syncUrlState();
       }
 
-      Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-preset]'), function (btn) {
+      var regAllBtn = bodyEl.querySelector('[data-cc-reg-all]');
+      if (regAllBtn) {
+        regAllBtn.addEventListener('click', function () {
+          applyCcPresetKey('CC_ALL_RESET');
+        });
+      }
+
+      Array.prototype.forEach.call(bodyEl.querySelectorAll('[data-cc-prov-popup]'), function (btn) {
         btn.addEventListener('click', function () {
-          var pKey = btn.getAttribute('data-cc-preset') || '';
-          state.ccChecked = {};
-          state.ccQuery = '';
-          state.ccUnion = '';
-          if (pKey === 'CN_FACILITY') {
-            state.ccPreset = 'CN_FACILITY';
-            state.ccReg = '충청남도';
-            state.ccMuni = '';
-            state.ccOwner = 'LOCAL';
-            state.ccCat = 'ALL_CORP';
-          } else if (pKey === 'CC_FACILITY_ALL') {
-            state.ccPreset = 'CC_FACILITY_ALL';
-            state.ccReg = 'ALL';
-            state.ccMuni = '';
-            state.ccOwner = 'LOCAL';
-            state.ccCat = 'FACILITY_CORP';
-          } else if (pKey === 'CN_PROV_AFFIL') {
-            state.ccPreset = 'CN_PROV_AFFIL';
-            state.ccReg = '충청남도';
-            state.ccMuni = '충남 본청';
-            state.ccOwner = 'LOCAL';
-            state.ccCat = 'ALL';
-          } else if (pKey === 'DJ_SJ_LOCAL') {
-            state.ccPreset = 'DJ_SJ_LOCAL';
-            state.ccReg = 'ALL';
-            state.ccMuni = '';
-            state.ccOwner = 'LOCAL';
-            state.ccCat = 'ALL';
-          } else if (pKey === 'CC_MEDICAL') {
-            state.ccPreset = 'CC_MEDICAL';
-            state.ccReg = 'ALL';
-            state.ccMuni = '';
-            state.ccOwner = 'ALL';
-            state.ccCat = 'MEDICAL';
-          } else if (pKey === 'CC_CENTRAL') {
-            state.ccPreset = 'CC_CENTRAL';
-            state.ccReg = 'ALL';
-            state.ccMuni = '';
-            state.ccOwner = 'CENTRAL';
-            state.ccCat = 'ALL';
-          } else {
-            state.ccPreset = '';
-            state.ccReg = 'ALL';
-            state.ccMuni = '';
-            state.ccOwner = 'ALL';
-            state.ccCat = 'ALL';
-          }
-          renderTabChungcheong();
-          syncUrlState();
-          var focusPreset = bodyEl.querySelector('[data-cc-preset="' + pKey + '"]');
-          if (focusPreset && typeof focusPreset.focus === 'function') focusPreset.focus();
+          var pk = btn.getAttribute('data-cc-prov-popup') || 'ALL';
+          var provRows = ccAllRecords.filter(function (r) { return r.ccProvinceKey === pk; });
+          var initIds = state.ccReg === pk
+            ? (curCcCmpRecsRef || []).map(function (r) { return r.aid; })
+            : provRows.filter(function (r) { return r.hasUnion; }).slice(0, 5).map(function (r) { return r.aid; });
+          openOrganPickerPopup({
+            mode: 'CC',
+            prov: pk,
+            muni: state.ccReg === pk ? (state.ccMuni || '') : '',
+            cat: state.ccReg === pk ? (state.ccCat || 'ALL') : 'ALL',
+            initialIds: initIds,
+            triggerEl: btn
+          });
+        });
+      });
+
+      var presetSel = bodyEl.querySelector('[data-cc-preset-sel]');
+      if (presetSel) {
+        presetSel.addEventListener('change', function () {
+          var pk = presetSel.value || 'CC_ALL_RESET';
+          applyCcPresetKey(pk);
+          var nextSel = bodyEl.querySelector('[data-cc-preset-sel]');
+          if (nextSel && typeof nextSel.focus === 'function') nextSel.focus();
+        });
+      }
+
+      Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-dash-dock [data-cc-go-studio]'), function (goStudioBtn) {
+        goStudioBtn.addEventListener('click', function () {
+          state.compareIds = (curCcCmpRecsRef || []).slice(0, 6).map(function (r) { return r.aid; });
+          state.mSubMode = 'STUDIO';
+          renderCompareTray();
+          switchTab('matrix');
+        });
+      });
+
+      Array.prototype.forEach.call(bodyEl.querySelectorAll('.pau-dash-dock [data-cc-go-clauses]'), function (goClausesBtn) {
+        goClausesBtn.addEventListener('click', function () {
+          state.compareIds = (curCcCmpRecsRef || []).slice(0, 6).map(function (r) { return r.aid; });
+          state.docMode = 'ARTICLES';
+          state.aViewMode = 'COMPARE';
+          renderCompareTray();
+          switchTab('articles');
         });
       });
 
