@@ -107,6 +107,10 @@ test('★★★ ② 실행되는 조각을 걷는다 — 스크립트·이벤트
     '<p style="background:url(https://erp.example\\29 @evil.example/track.png)">x</p>',
     '<p style="background-image:url(https://erp.example/a.png), url(https://evil.example/b.png)">x</p>',
     '<p style="position:absolute;top:0;z-index:99999">x</p>',
+    // 마지막 재검토 — 그림 속성으로 바깥에 알리기 · 변수로 바깥 그림 끌어오기 · 테두리 그림
+    '<img src="data:image/png;base64,AAAA" attributionsrc="https://evil.example/r" ping="https://evil.example/p">',
+    '<p style="--w:url(https://evil.example/a.png);background-image:var(--w)">x</p>',
+    '<p style="border-image:url(https://evil.example/b.png) 30;list-style-image:url(https://evil.example/c.png)">x</p>',
   ];
   const { dom } = cleaner();
   for (const h of bad) {
@@ -141,6 +145,11 @@ test('★★★ ② 서식은 그대로 둔다 — 글꼴·크기·색·표·칸
     + '<p>각주<sup class="note" contenteditable="false" data-kind="end" data-note="&lt;p&gt;미주 글&lt;/p&gt;">※</sup></p>'
     + '<p data-pb="1">쪽 나눔</p><p data-cb="1">단 나눔</p><p data-newpage="1" data-kept="1"></p>'
     + '<table><tbody><tr><td data-border="SOLID,0.12,#000000;SOLID,0.12,#000000;SOLID,0.4,#000000;NONE,0.12,#000000" data-dir="v" data-hh="2834">칸</td></tr></tbody></table>'
+    + '<span style="white-space:nowrap">한 줄</span>'
+    + '<div style="display:flex;justify-content:space-between;gap:8px"><div style="flex:1">날인1</div><div style="flex:1">날인2</div></div>'
+    + '<table class="hwp-tbl" data-wr="0.5" style="--w:50%;width:calc(var(--w) + var(--tbl, 0px) + var(--tbr, 0px))"><tbody><tr><td>너비표</td></tr></tbody></table>'
+    + '<p data-head="OUTLINE:1:2" data-lt="FIXED" data-lv="1200" data-ls="160">개요</p><span data-ratio="90" data-sp="-5" data-spl="-0.05em" data-lse="3">장평</span>'
+    + '<div style="background-image:url(data:image/png;base64,iVBORw0KGgo=);background-position:right top;background-repeat:no-repeat">배경2</div>'
     + '<a href="https://www.law.go.kr/">법령</a>';
   const out = S.clean(keep);
   const box = dom.window.document.createElement('div');
@@ -164,6 +173,18 @@ test('★★★ ② 서식은 그대로 둔다 — 글꼴·크기·색·표·칸
   assert.ok(q('sup.note[data-kind="end"][data-note]'), '미주 구분이 빠졌습니다(각주로 바뀜)');
   assert.ok(q('p[data-pb="1"]') && q('p[data-cb="1"]') && q('p[data-newpage="1"]'), '쪽·단 나누기 표시가 빠졌습니다');
   assert.ok(q('td[data-border^="SOLID"][data-dir="v"][data-hh="2834"]'), '칸 테두리·글자 방향·높이 표시가 빠졌습니다');
+  // 마지막 재검토가 찾은 서식 손실 — 묶음 속성이 잘게 풀려 빠지던 것·날인란 배치·편집기 표 너비·문단 번호·장평·줄 간격
+  const byText = (sel, t) => Array.from(box.querySelectorAll(sel)).find(e => e.textContent === t);
+  assert.strictEqual(css(byText('span', '한 줄'), 'white-space'), 'nowrap', '한 줄(white-space)이 빠졌습니다: ' + out);
+  const flex = Array.from(box.querySelectorAll('div')).find(d => d.textContent === '날인1날인2');
+  assert.ok(css(flex, 'display') === 'flex' && css(flex, 'justify-content') === 'space-between' && css(flex, 'gap'), '날인란 배치(flex·gap)가 빠졌습니다: ' + out);
+  assert.ok(/^1/.test(css(byText('div', '날인1'), 'flex')) || css(byText('div', '날인1'), 'flex-grow') === '1', '날인란 칸 넓이(flex)가 빠졌습니다: ' + out);
+  const wt = q('table.hwp-tbl[data-wr="0.5"]');
+  assert.ok(wt && css(wt, '--w').trim() === '50%' && /var\(--w\)/.test(css(wt, 'width')), '편집기 표 너비(--w·data-wr)가 빠졌습니다: ' + out);
+  assert.ok(q('p[data-head="OUTLINE:1:2"][data-lt="FIXED"][data-lv="1200"][data-ls="160"]'), '문단 번호·줄 간격 표시가 빠졌습니다');
+  assert.ok(q('span[data-ratio="90"][data-sp="-5"][data-spl="-0.05em"][data-lse="3"]'), '장평·자간 보정 표시가 빠졌습니다');
+  const bg2 = byText('div', '배경2');
+  assert.ok(/right/.test(css(bg2, 'background-position') || css(bg2, 'background-position-x')) && /no-repeat/.test(css(bg2, 'background-repeat') || ((css(bg2, 'background-repeat-x') || '') + 'no-repeat')), '배경 그림 자리·되풀이가 빠졌습니다: ' + out);
   assert.ok(q('a[href="https://www.law.go.kr/"]'), '안전한 링크가 빠졌습니다');
   assert.ok(box.textContent.includes('제목') && box.textContent.includes('칸'), '글이 빠졌습니다');
 });
