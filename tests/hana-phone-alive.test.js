@@ -38,6 +38,8 @@ function chipRunner() {
     const ctx = {
       hanaStat: { devices: device ? [device] : [] },
       setHanaFix: function () {},
+      /* 표의 «말»을 보는 검사다 — 대표 여부(누를 수 있는가)는 tests/hana-chip-owner-pair 가 본다 */
+      _meNow: function () { return { isOwner: false }; },
       HANA_SKIP_KO: {},
       /* h() 를 가짜로 두고 «무엇을 그렸는지»만 받아 본다 */
       h: function (tag, props, txt) {
