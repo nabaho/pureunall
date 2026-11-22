@@ -138,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,planStarOnly,planStarBtn,'
+    + 'feedMthd,isSole,mthdOf,limTitle,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,planStarOnly,planStarBtn,'
     + 'healthPop,healthHtml,healthStat,healthErr,fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -616,20 +616,29 @@ test('★★ 수의계약 가르기 — 계약방법에 「수의」(수의계�
   ['제한경쟁', '일반경쟁', '지명경쟁', ''].forEach((m) => assert.equal(r.api.isSole({ mthd: m }), false, m));
   assert.equal(r.api.isSole({ src: '알리오' }), false); assert.equal(r.api.isSole(null), false);
 });
-test('★★★ 목록에 「수의계약」 딱지 — 공고명 «앞»에(긴 이름에 잘려 안 보이면 안 된다)', () => {
+/* ★ 대표 지시 2026-11-22 「수의계약이나 업종제한 표시는 별도의 열을 만들어 … 수의계약은 들어가서 입찰이 되지 않기 때문에
+     표시만 하고 자동으로 빠질 수 있게」 — 딱지는 공고명 앞이 아니라 «계약·제한» 칸에, 수의계약은 기본으로 뺀다 */
+const cellsOf = (row) => (row.match(/<td[\s>]/g) || []).length;
+test('★★★ 「계약·제한」 칸 — 수의계약 딱지는 공고명에서 떼어 «따로 한 칸»에 · 머리 칸 수 = 줄 칸 수', () => {
   const r = runApp({ feed: SOLE() });
-  r.api.draw();
+  r.api.feedMthd('all');
   const tb = r.el('tb').innerHTML;
   const row = (nm) => tb.split('<tr').find((x) => x.indexOf(nm) >= 0) || '';
-  assert.match(row('노무 자문 용역'), /<td class="nm"[^>]*><span class="tag amber"[^>]*>수의계약<\/span> <b>노무 자문 용역<\/b>/);
-  assert.match(row('인사 컨설팅'), /수의계약<\/span> <b>인사 컨설팅/);
-  assert.doesNotMatch(row('평가체계 기획연구'), /tag amber/, '경쟁 입찰에 수의계약 딱지');
-  assert.doesNotMatch(row('경영평가위원 모집'), /tag amber/);
-  assert.match(row('노무 자문 용역'), /title="노무 자문 용역 · 수의계약"/, '이름 칸 풍선에도');
+  const nmCell = (nm) => (/<td class="nm"[\s\S]*?<\/b>/.exec(row(nm)) || [''])[0];
+  assert.match(row('노무 자문 용역'), /<td class="lim" title="수의계약 — 들어가 입찰할 수 없습니다"><span class="limw"><span class="tag amber"[^>]*>수의계약<\/span><\/span><\/td><td class="nm"/);
+  assert.match(row('인사 컨설팅'), /<td class="lim" title="수의계약 \(수의\(소액\)\)[^"]*"><span class="limw"><span class="tag amber"[^>]*>수의계약<\/span>/, '계약방법 이름은 풍선에');
+  ['노무 자문 용역', '인사 컨설팅'].forEach((nm) => assert.doesNotMatch(nmCell(nm), /tag amber|수의계약/, '공고명 칸에 수의계약이 남았다: ' + nm));
+  assert.match(row('평가체계 기획연구'), /<td class="lim"><\/td>/, '경쟁 입찰은 빈 칸(아무것도 안 그린다)');
+  assert.match(row('경영평가위원 모집'), /<td class="lim"><\/td>/);
+  const head = (src.match(/<thead><tr><th class="stc" title="별표\(관심\)">★<\/th><th class="chk"><input type="checkbox" id="fSelAll"[\s\S]*?<\/tr><\/thead>/) || [''])[0];
+  assert.match(head, /<th>상태<\/th><th class="lim"[^>]*>계약·제한<\/th><th class="nmh">공고명<\/th>/, '상태 다음, 공고명 앞에 「계약·제한」 머리');
+  assert.equal((head.match(/<th[\s>]/g) || []).length, cellsOf(row('노무 자문 용역')), '머리 칸 수와 줄 칸 수가 다르다');
+  assert.match(src, /<td colspan="(\d+)" class="empty">'\+\(!v\.every\.length\?'아직 받은 공고가 없습니다'/);
+  assert.equal(Number(/<td colspan="(\d+)" class="empty">'\+\(!v\.every\.length/.exec(src)[1]), (head.match(/<th[\s>]/g) || []).length, '빈 표 칸 수');
 });
-test('★★★ 「수의계약 빼기」 — 목록에서만 빼고(숨기지·지우지 않음) 몇 건 뺐는지 말한다 · 「수의계약만」', () => {
+test('★★★ 수의계약은 «기본으로» 뺀다 — 고른 적이 없어도 · 목록에서만 빼고(숨기지·지우지 않음) 몇 건 뺐는지 말한다 · 「수의계약만」 · 「수의계약도 보기」', () => {
   const r = runApp({ feed: SOLE() });
-  r.el('fMthd').value = 'nosole'; r.api.draw();
+  r.api.draw();   /* 아무것도 안 골랐다 */
   assert.equal(rowCount(r.el('tb').innerHTML), 2);
   assert.doesNotMatch(r.el('tb').innerHTML, /노무 자문 용역|인사 컨설팅/);
   assert.match(r.el('cnt').textContent, /수의계약 2건 뺌/);
@@ -637,19 +646,33 @@ test('★★★ 「수의계약 빼기」 — 목록에서만 빼고(숨기지·
   r.el('fMthd').value = 'sole'; r.api.draw();
   assert.equal(rowCount(r.el('tb').innerHTML), 2); assert.match(r.el('cnt').textContent, /수의계약만/);
   assert.doesNotMatch(r.el('tb').innerHTML, /평가체계|경영평가위원/);
-  r.el('fMthd').value = ''; r.api.draw();
+  r.el('fMthd').value = 'all'; r.api.draw();
   assert.equal(rowCount(r.el('tb').innerHTML), 4); assert.doesNotMatch(r.el('cnt').textContent, /수의계약/);
 });
-test('★★ 고른 것은 이 기기에 기억하고(feed_mthd) 첫 쪽으로 · 이상한 값은 안 남긴다 · 부팅 때 되살린다', () => {
+test('★★ 고른 것은 이 기기에 기억하고(feed_mthd) 첫 쪽으로 · 옛 값 「」(전체 계약)·이상한 값은 「빼기」 · 부팅 때 되살린다', () => {
   const r = runApp({ feed: many(120).map((x, i) => Object.assign(x, { mthd: i % 2 ? '수의계약' : '일반경쟁' })) });
-  r.api.draw(); r.api.feedPageTo(1);
-  r.el('fMthd').value = 'nosole'; r.api.feedMthd('nosole');
-  assert.equal(r.store.gov3_feed_mthd, 'nosole');
+  r.api.feedMthd('all'); r.api.feedPageTo(1);
+  r.api.feedMthd('nosole');
+  assert.equal(r.store.gov3_feed_mthd, 'nosole'); assert.equal(r.el('pMthd').value, 'nosole');
   assert.match(r.el('tb').innerHTML, /<td class="rn">1<\/td>/, '거르면 첫 쪽부터');
   assert.equal(rowCount(r.el('tb').innerHTML), 50); assert.match(r.el('cnt').textContent, /수의계약 60건 뺌/);
-  r.api.feedMthd('<x>'); assert.equal(r.store.gov3_feed_mthd, '');
-  assert.match(src, /function boot\(\)\{\s*recStickyWatch\(\);\s*var fmd=\$\('fMthd'\); if\(fmd\)\{ var fmv=lsGet\('feed_mthd'\); fmd\.value=\(fmv==='sole'\|\|fmv==='nosole'\)\?fmv:''; \}/);
-  assert.match(src, /<select id="fMthd" onchange="feedMthd\(this\.value\)"[^>]*><option value="">전체 계약<\/option>\s*<option value="nosole">수의계약 빼기<\/option><option value="sole">수의계약만<\/option><\/select>/);
+  r.api.feedMthd('<x>'); assert.equal(r.store.gov3_feed_mthd, 'nosole');
+  r.api.feedMthd('all'); assert.equal(r.store.gov3_feed_mthd, 'all');
+  ['', null, undefined, 'nosole', '<x>'].forEach((v) => assert.equal(r.api.mthdOf(v), 'nosole', String(v)));
+  assert.equal(r.api.mthdOf('all'), 'all'); assert.equal(r.api.mthdOf('sole'), 'sole');
+  assert.match(src, /function boot\(\)\{\s*recStickyWatch\(\);\s*var fmd=\$\('fMthd'\); if\(fmd\) fmd\.value=mthdOf\(lsGet\('feed_mthd'\)\);/);
+  /* 맨 앞 옵션이 「빼기」 — 부팅 전에도 고르개가 «뺀다»를 보인다 */
+  assert.match(src, /<select id="fMthd" onchange="feedMthd\(this\.value\)"[^>]*><option value="nosole">수의계약 빼기<\/option>\s*<option value="all">수의계약도 보기<\/option><option value="sole">수의계약만<\/option><\/select>/);
+  assert.match(src, /<select id="pMthd" onchange="planMthd\(this\.value\)"[^>]*><option value="nosole">수의계약 빼기<\/option>\s*<option value="all">수의계약도 보기<\/option><option value="sole">수의계약만<\/option><\/select>/);
+  assert.doesNotMatch(src, /<option value="">전체 계약<\/option>/, '옛 「전체 계약」(빈 값)이 남았다');
+});
+test('★★ 「계약·제한」 칸 풍선 — 수의계약·업종·지역을 한 번에 · 없으면 빈 글', () => {
+  const r = runApp({});
+  assert.equal(r.api.limTitle({ mthd: '수의(소액)', ind: '정보통신공사업', rgn: '충청남도 · 대전광역시', src: '나라장터' }),
+    '수의계약 (수의(소액)) — 들어가 입찰할 수 없습니다 / 업종·면허 제한 — 정보통신공사업 / 참가 가능 지역 — 충청남도 · 대전광역시');
+  assert.match(r.api.limTitle({ indY: 'Y' }), /^업종 제한 있음 — 어떤 업종인지는 원문 공고에서$/);
+  assert.match(r.api.limTitle({ rgn: '충남', src: '기업마당' }), /^지역\(해시태그·제목 기준\) — 충남$/);
+  assert.equal(r.api.limTitle({ mthd: '일반경쟁', lk: '2' }), ''); assert.equal(r.api.limTitle(null), '');
 });
 test('★ 팝업 계약방법 칸에도 딱지', () => {
   const r = runApp({ feed: SOLE() });
@@ -687,7 +710,7 @@ test('★★ 「📅 발주 예정」 탭이 있고 고르면 그 화면만 보�
 });
 test('★★★ 공고 전(기본) — 임박·이번 달·예정월 지남·몇 달 뒤 차례, 공고 나온 것·숨긴 것은 빼고 ㅁ·№ · 탭에 임박 건수', () => {
   const r = runApp({ plan: PLANS() });
-  r.el('pView').value = 'ahead'; r.api.planDraw();
+  r.el('pView').value = 'ahead'; r.api.planMthd('all');   /* 수의계약도 보기 — 차례만 본다(기본으로 빼는 것은 아래 검사) */
   const h = r.el('ptb').innerHTML;
   assert.equal(planRowsOf(h), 4);
   const order = ['인사평가체계', '노무 자문', '조직진단', '직무분석'].map((t) => h.indexOf(t));
@@ -695,7 +718,8 @@ test('★★★ 공고 전(기본) — 임박·이번 달·예정월 지남·몇
   assert.doesNotMatch(h, /임금체계|숨긴 노무/);
   assert.match(h, /<td class="rn">1<\/td>[\s\S]*<td class="rn">4<\/td>/);
   assert.match(h, /<span class="tag red">사전규격<\/span>[\s\S]*🔔 공고 임박 · 의견 마감/);
-  assert.match(h, /<span class="tag amber"[^>]*>수의계약<\/span> <b>노무 자문 용역<\/b>/, '수의계약 딱지');
+  assert.match(h, /<td class="sml" style="color:var\(--amber\);font-weight:700">수의계약<\/td>/, '수의계약은 계약방법 칸에서 눈에 띄게');
+  assert.doesNotMatch(h, /수의계약<\/span> <b>노무 자문 용역<\/b>/, '사업명 앞 딱지는 걷었다(2026-11-22 — 계약방법 칸 한 곳)');
   assert.match(h, /⏳ 이번 달 발주 예정/); assert.match(h, /⚠ 예정월 지남 · 아직 공고 없음/); assert.match(h, /3개월 뒤 발주 예정/);
   assert.match(h, /경영지원팀<div>02-000-0000<\/div>/, '담당 부서·전화');
   assert.match(h, /href="https:\/\/www\.g2b\.go\.kr:8082\/ep\/co\/fileDownload\.do\?fileTask=PS&amp;fileSeq=9::1"/, '사전규격서 링크');
@@ -715,15 +739,26 @@ test('★★★ 「공고 나옴」 보기 — 공고 모아보기에 그 공고
 });
 test('★★ 수의계약 고르개는 두 탭이 «한 값» — 발주 예정에서 빼면 공고 모아보기도 빠진다', () => {
   const r = runApp({ plan: PLANS() });
-  r.el('pView').value = 'ahead'; r.el('pMthd').value = 'nosole'; r.api.planMthd('nosole');
+  r.el('pView').value = 'ahead'; r.api.planMthd('all');
+  assert.match(r.el('ptb').innerHTML, /노무 자문 용역/);
+  assert.equal(r.el('fMthd').value, 'all', '공고 모아보기도 「수의계약도 보기」로');
+  r.api.planMthd('nosole');
   assert.doesNotMatch(r.el('ptb').innerHTML, /노무 자문 용역/);
   assert.match(r.el('pCnt').innerHTML, /수의계약 1건 뺌/);
   assert.equal(r.store.gov3_feed_mthd, 'nosole'); assert.equal(r.el('fMthd').value, 'nosole');
-  r.api.feedMthd(''); assert.equal(r.el('pMthd').value, '', '반대쪽도 따라온다');
+  r.api.feedMthd('all'); assert.equal(r.el('pMthd').value, 'all', '반대쪽도 따라온다');
+  assert.match(r.el('ptb').innerHTML, /노무 자문 용역/, '공고 쪽에서 바꿔도 발주 예정 표가 다시 그려진다');
+});
+test('★★ 발주 예정도 수의계약은 «기본으로» 뺀다 — 탭 숫자(임박·이번 달)에도 안 센다', () => {
+  const r = runApp({ plan: PLANS() });
+  r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 3); assert.doesNotMatch(r.el('ptb').innerHTML, /노무 자문 용역/);
+  assert.match(r.el('pCnt').innerHTML, /수의계약 1건 뺌/);
+  assert.match(r.el('tbPlan').innerHTML.replace(/<span class="mx">([^<]*)<\/span>/g, '$1'), /📅 발주 예정 <span class="tag red"[^>]*>1<\/span>/, '임박 1 — 이번 달 수의계약은 안 센다');
 });
 test('★★ ★ 관심 · 숨기기(지우지 않음) · 골라서 한꺼번에', () => {
   const r = runApp({ plan: PLANS() });
-  r.el('pView').value = 'ahead'; r.api.planDraw();
+  r.el('pView').value = 'ahead'; r.api.planMthd('all');
   r.api.planStar('P2'); assert.equal(JSON.parse(r.store.gov3_plan).find((x) => x.no === 'P2').star, true);
   r.api.planTog('P1', true); r.api.planTog('P3', true);
   assert.match(r.el('planSel').innerHTML, /<b>2건<\/b> 선택/);
@@ -859,7 +894,7 @@ const FULL = () => [
 const TD = { target: { closest: () => null } };
 test('★★★ 발주계획 줄을 누르면 상세 — 표에 없는 용도·규격·비고·관할·조달방식·바뀐 날·계약금액까지', () => {
   const r = runApp({ plan: FULL(), feed: [{ id: 'G9', src: '나라장터', type: '새 공고', no: 'R26BK00000009-000', nm: '직무분석 용역', org: '갑공단' }] });
-  r.el('pView').value = 'all'; r.api.planDraw();
+  r.el('pView').value = 'all'; r.api.planMthd('all');
   assert.match(r.el('ptb').innerHTML, /<tr class="fr[^"]*" onclick="planRowClick\(event,'R26DD9'\)">/, '줄에 누르는 길이 없다');
   r.api.planRowClick(TD, 'R26DD9');
   assert.equal(r.el('pop').className, 'pop on', '팝업이 안 떴다');
@@ -999,7 +1034,7 @@ const PASTS = () => [
   { kind: 'spec', no: 'S1', nm: '사전규격 노무', org: '사', rcptDt: '2026-10-07 09:00:00', closeDt: '2099-01-01 18:00:00', bids: [], kw: '노무' }
 ];
 test('★★★ 기본 보기(공고 전)는 «예정월이 3달 전 이전»인 지난 계획을 빼고 ⌛ 지난 계획에 따로 둔다 — 지우지 않는다', () => {
-  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planMthd('all');   /* 수의계약도 보기 — 갈래만 본다 */
   let h = r.el('ptb').innerHTML;
   assert.equal(planRowsOf(h), 3, '이번 달·두 달 전·사전규격');
   assert.match(h, /이번 달 노무/); assert.match(h, /두 달 전 노무/, '1~2달 지난 것은 곧 나올 수 있어 앞으로에 둔다'); assert.match(h, /사전규격 노무/);
@@ -1011,40 +1046,43 @@ test('★★★ 기본 보기(공고 전)는 «예정월이 3달 전 이전»인
   r.api.planView('all'); assert.equal(planRowsOf(r.el('ptb').innerHTML), 6, '모두 = 숨긴 것 빼고 전부');
 });
 test('★★★ 보기 고르개에 건수 — 목록과 «같은 잣대» · 계약방법 고르개는 따르고 검색어는 안 따른다 · 고른 보기는 그대로', () => {
-  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'past'; r.api.planDraw();
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'past'; r.api.planMthd('all');
   const o = r.el('pView').innerHTML;
   for (const [v, n, t] of [['ahead', 3, '공고 전 · 앞으로'], ['past', 2, '⌛ 지난 계획'], ['posted', 1, '✅ 공고 나옴'], ['all', 6, '모두'], ['hidden', 1, '🙈 숨긴 것']])
     assert.match(o, new RegExp('<option value="' + v + '">' + t + ' \\(' + n + '\\)</option>'), v + ' 건수');
   assert.equal(r.el('pView').value, 'past', '다시 그려도 고른 보기가 남는다');
   r.el('pq').value = '반 년'; r.api.planDraw();
   assert.match(r.el('pView').innerHTML, /⌛ 지난 계획 \(2\)/, '검색어는 건수에 안 든다');
-  r.el('pMthd').value = 'nosole'; r.api.planDraw();
+  r.api.planMthd('nosole');
   assert.match(r.el('pView').innerHTML, /⌛ 지난 계획 \(1\)/, '수의계약 빼기를 따른다');
-  for (const v of ['ahead', 'past', 'posted', 'all', 'hidden', 'star']) {
-    r.el('pq').value = ''; r.el('pMthd').value = ''; r.api.planView(v);
+  for (const m of ['nosole', 'all']) for (const v of ['ahead', 'past', 'posted', 'all', 'hidden', 'star']) {
+    r.el('pq').value = ''; r.api.planMthd(m); r.api.planView(v);
     const n = Number(new RegExp('<option value="' + v + '">[^<]*\\((\\d+)\\)').exec(r.el('pView').innerHTML)[1]);
-    assert.equal(planRowsOf(r.el('ptb').innerHTML), Math.min(n, 50), v + ': 건수와 줄 수가 다르다');
+    assert.equal(planRowsOf(r.el('ptb').innerHTML), Math.min(n, 50), m + ' · ' + v + ': 건수와 줄 수가 다르다');
   }
 });
 test('★★ 앞으로 보기에서는 «⌛ 지난 계획 N건은 따로» 링크로 알리고 누르면 그 보기로 · 지난 계획 보기에서는 안 띄운다', () => {
-  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planMthd('all');
   assert.match(r.el('pCnt').innerHTML, /onclick="planView\('past'\);return false"[^>]*>⌛ 지난 계획 2건은 따로<\/a>/);
   r.api.planView('past'); assert.equal(r.el('pView').value, 'past');
   assert.doesNotMatch(r.el('pCnt').innerHTML, /따로/);
   const e = runApp({ plan: PASTS().filter((x) => x.no === 'P4') }); e.el('pView').value = 'ahead'; e.api.planDraw();
   assert.match(e.el('ptb').innerHTML, /걸리는 것이 없습니다[^<]*\(⌛ 지난 계획 1건은 보기에서\)/, '빈 표에서도 어디 있는지 알려 준다');
 });
-test('★★ 수의계약은 «두되 표시» — 기본으로 빼지 않고 이름 앞 딱지 + 계약방법 칸 강조', () => {
+test('★★ 수의계약은 «기본으로 뺀다»(2026-11-22 — 그 전 2026-10-10 「두되 표시」를 바꿈) · 「수의계약도 보기」에서는 계약방법 칸만 강조', () => {
   const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planDraw();
-  assert.equal(r.el('pMthd').value || '', '', '기본은 전체 계약');
-  const h = r.el('ptb').innerHTML;
-  assert.match(h, /<span class="tag amber"[^>]*>수의계약<\/span> <b>이번 달 노무 용역<\/b>/);
-  assert.match(h, /<td class="sml" style="color:var\(--amber\);font-weight:700">수의계약<\/td>/, '계약방법 칸도 강조');
+  let h = r.el('ptb').innerHTML;
+  assert.doesNotMatch(h, /이번 달 노무 용역/, '고른 적이 없는데 수의계약이 보인다');
+  assert.match(r.el('pCnt').innerHTML, /수의계약 1건 뺌/);
+  r.api.planMthd('all'); h = r.el('ptb').innerHTML;
+  assert.match(h, /이번 달 노무 용역/);
+  assert.doesNotMatch(h, /수의계약<\/span> <b>이번 달 노무 용역<\/b>/, '사업명 앞 딱지는 걷었다 — 계약방법 칸 한 곳');
+  assert.match(h, /<td class="sml" style="color:var\(--amber\);font-weight:700">수의계약<\/td>/, '계약방법 칸 강조');
   assert.doesNotMatch(h, /<td class="sml" style="[^"]*">-<\/td>/, '수의계약 아닌 칸은 강조하지 않는다');
 });
 
 test('★★ 진짜 select 처럼 — 옵션을 다시 그리면 값이 비워지는 환경에서도 고른 보기가 남는다', () => {
-  const r = runApp({ plan: PASTS() });
+  const r = runApp({ plan: PASTS() }); r.el('fMthd').value = 'all';   /* 수의계약도 보기 — 지난 계획 둘(하나는 수의계약) */
   const sel = r.el('pView'); let v = 'past';
   Object.defineProperty(sel, 'value', { get: () => v, set: (x) => { v = x; }, configurable: true });
   Object.defineProperty(sel, 'innerHTML', { get: () => sel._h || '', set: (h) => { sel._h = h; v = ''; }, configurable: true });   // 브라우저는 옵션을 갈아 끼우면 고른 값을 잃는다
