@@ -273,8 +273,12 @@ test('왼쪽 메뉴 — 이알피 왼쪽 메뉴와 같은 모양값 · PC 에만
   });
   /* PC 에만 — 폰은 한눈에 카드가 같은 일을 한다(폰 구간에서만 바꾼다) */
   assert.match(sbBlock, /\.sb\{display:none\}/);
-  assert.match(sbBlock, /@media \(min-width:769px\)\{\s*body\.has-sb\{padding-left:\d+px\}\s*\.sb\{display:flex/);
-  assert.match(html, /<body class="[^"]*\bhas-sb\b/);
+  assert.match(sbBlock, /@media \(min-width:769px\)\{\s*body\.has-sb\{padding-left:\d+px\}\s*body\.has-sb \.sb\{display:flex/);
+  /* 로그인 전·잠금 화면에는 빈 메뉴를 띄우지 않는다 — has-sb 는 재직 직원으로 들어온 뒤에만 */
+  assert.doesNotMatch(html, /<body class="[^"]*\bhas-sb\b/, '처음부터 붙이면 잠금 화면에도 빈 메뉴가 뜬다');
+  const au = app.slice(app.indexOf('firebase.auth().onAuthStateChanged('), app.indexOf('firebase.auth().onAuthStateChanged(') + 900);
+  assert.ok(au.indexOf('sbOn(false)') > 0 && au.indexOf('sbOn(false)') < au.indexOf('PuEduLibGate.show()'), '로그아웃·바뀜이면 먼저 걷는다');
+  assert.ok(au.indexOf('sbOn(true)') > au.indexOf('if (!r.sid)'), '재직 직원 확인 뒤에만 붙인다');
   assert.ok(html.indexOf('id="sbNav"') > 0 && html.indexOf('id="sbName"') > 0);
   /* 그리기 — 같은 잣대(splitLegal) · 거르개가 바뀔 때도 다시 그린다 */
   const sb = app.slice(app.indexOf('function drawSb('), app.indexOf('function sbUser('));

@@ -89,7 +89,7 @@
     else if (TAB === 'list') drawList();
     else if (TAB === 'add') drawStage();
     else if (TAB === 'mail') { drawMail(); drawSweep(); }
-    drawSb();
+    if (TAB !== 'list') drawSb();               /* 자료 탭은 drawList 가 그린다(두 번 그리지 않게) */
   }
 
   /* ───────── 왼쪽 메뉴(PC) — 이알피 왼쪽 메뉴와 같은 모양 (대표 지시 2026-11-22 「대시보드 캡쳐처럼 만들어라」) ─────────
@@ -131,6 +131,8 @@
     h += '<div class="sb-sep"></div><div class="sb-menu top"><button type="button" class="sb-menu-item add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부"><span class="mi-icon">＋</span><span class="mi-text">새 강의 종류</span></button></div>';
     nav.innerHTML = h;
   }
+  /* 왼쪽 메뉴는 재직 직원으로 들어온 뒤에만(PC) — 로그인 전·잠금·로그아웃이면 걷는다 */
+  function sbOn(on) { document.body.classList.toggle('has-sb', !!on); }
   /* 메뉴 위 사람 칸 — 이름(명부)과 자격만. 로그인 이메일·사번은 적지 않는다 */
   function sbUser() {
     var nm = who() || '';
@@ -1582,13 +1584,14 @@
     firebase.auth().onAuthStateChanged(function (u) {
       $('outBtn').style.display = u ? '' : 'none';
       if (!u || (ME.uid && u.uid !== ME.uid)) resetOriginals();
+      sbOn(false);
       if (!u) { PuEduLibGate.show(); return; }
       PuEduLibGate.hide();
       roleOf(u).then(function (r) {
         /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다 */
         if (!r.sid) { lock((who() ? '접속: ' + who() + ' — ' : '') + '재직 중인 직원 계정이 아닙니다'); return; }
         ME.sid = r.sid; ME.uid = u.uid; ME.admin = r.admin;
-        sbUser();
+        sbUser(); sbOn(true);
         gate = PuOntologyWrite.createGateway({ mode: 'enforce', actor: r.sid });
         $('mailTab').style.display = ME.admin ? '' : 'none';
         $('lock').style.display = 'none'; $('app').style.display = '';

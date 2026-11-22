@@ -151,9 +151,10 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
    ★ 색은 이알피와 같은 짙은 남색 바탕(밝은·어두운 화면 모두). 이알피 메뉴 색 가운데 팔레트(5계열 27색) 밖인 것은 «팔레트 안 가장 가까운 색»으로 —
      tests/color-palette-apps.test.js 예외 목록은 늘리지 않는다. 글자 대비는 모두 4.5:1 넘음 */
 .sb{display:none}
+/* has-sb 는 «재직 직원으로 들어온 뒤»에만 붙는다(js: sbOn) — 로그인 전·잠금 화면에는 빈 메뉴를 띄우지 않는다 */
 @media (min-width:769px){
   body.has-sb{padding-left:230px}
-  .sb{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;width:230px;z-index:30;background:#1e293b;color:#cbd5e1;overflow:hidden}
+  body.has-sb .sb{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;width:230px;z-index:30;background:#1e293b;color:#cbd5e1;overflow:hidden}
 }
 .sb-logo{padding:12px 16px 10px;border-bottom:1px solid #475569;color:#ffffff;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-user{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #475569;min-width:0}
@@ -185,8 +186,9 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .sb-menu-item .mi-icon{width:16px;font-size:13px;flex:0 0 auto;text-align:center}
 .sb-menu-item .mi-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .sb-menu-item .mi-n{color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums;flex:0 0 auto}
-.sb-menu-item.active .mi-n{color:#eff6ff}
-.sb-menu-item.zero .mi-text,.sb-menu-item.zero .mi-n{opacity:.6}
+.sb-menu-item.active .mi-n{color:#ffffff}
+.sb-menu-item:hover .mi-n,.sb-grp-h:hover .arrow,.sb-grp-h.on .arrow,.sb-row:hover .sb-ed{color:#e2e8f0}   /* 밝은 칸(#475569) 위에서도 4.5:1 넘게 */
+.sb-menu-item.zero .mi-text{color:#cbd5e1}   /* 0건은 흐리게 — 투명도 대신 색으로(대비를 지킨다) */
 .sb-menu-item.add{color:#bfdbfe}
 .sb-row.mine .sb-menu-item{padding-right:30px}
 .sb-ed{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:#94a3b8;cursor:pointer;font-size:12px;padding:3px 6px;border-radius:4px}
@@ -423,7 +425,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
 <link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body class="pu-design pu-frame-a has-sb">
+<body class="pu-design pu-frame-a">
 <aside class="sb" id="sb" aria-label="강의자료 메뉴">
   <div class="sb-logo">🎓 강의자료</div>
   <div class="sb-user"><div class="sb-avatar" id="sbAv" aria-hidden="true"></div><div class="sb-user-info"><div class="n" id="sbName"></div><div class="r" id="sbRole"></div></div></div>
@@ -567,6 +569,6 @@ window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ Pu
 <script src="js/pu-edulib-classify.js?v=4"></script>
 <script src="js/pu-edulib-core.js?v=4"></script>
 <script src="js/pu-edulib-preview.js?v=2"></script>
-<script src="js/pu-edulib-app.js?v=9"></script>
+<script src="js/pu-edulib-app.js?v=10"></script>
 </body>
 </html>
