@@ -3,6 +3,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const T = require("./typesafe-evaluate");
 
+/* 메일 자동분류가 실제로 묻는 모양과 같은 결 — 칸 하나를 고르게 한다 */
+const QS = { bin: { type: "choice", instructions: "Which folder fits?", criteria: { "가": "folder 가", "나": "folder 나" } } };
+
 test("Jev 전송 전 식별번호와 연락처를 가린다", () => {
   const got = T.redact("홍길동 님 900101-1234567 010-1234-5678 test@example.com 123-45-67890");
   assert.match(got.text, /\[주민번호\]/);
@@ -13,17 +16,29 @@ test("Jev 전송 전 식별번호와 연락처를 가린다", () => {
 });
 
 test("Jev 응답은 제안값만 돌려주고 열쇠는 담지 않는다", async () => {
-  const got = await T.evaluate(async () => ({ ok: true, status: 200, json: async () => ({ answers: { urgency: { noul: 0.9 } }, usage: { input_tokens: 1 } }) }), "비밀열쇠", "로그인이 자꾸 멈춥니다");
+  const got = await T.evaluate(async () => ({ ok: true, status: 200, json: async () => ({ answers: { bin: { choice: "가" } }, usage: { input_tokens: 1 } }) }), "비밀열쇠", "로그인이 자꾸 멈춥니다", QS);
   assert.equal(got.ok, true);
-  assert.equal(got.answers.urgency.noul, 0.9);
+  assert.equal(got.answers.bin.choice, "가");
   assert.equal(JSON.stringify(got).includes("비밀열쇠"), false);
 });
 
-test("업무 제안은 기한·영향·위험·주의·자료·첫 조치를 나누어 묻는다", () => {
-  const q = T.questions();
-  ["deadline", "impact", "legal_wage_risk", "privacy_security", "info_missing", "first_action"].forEach((key) => {
-    assert.ok(q[key], key + " 질문이 있어야 합니다.");
-  });
+/* 2026-11-22 포털 「TypeSafe 검토」 단추를 걷어내며 기본 물음(9가지)도 없앴다.
+   그 뒤로는 «무엇을 물을지» 없이 부르면 글이 업체로 나가면 안 된다 — 빈 물음으로 글만 남기는 셈이다. */
+test("물음(qs) 없이 부르면 업체에 아무것도 보내지 않는다", async () => {
+  for (const qs of [undefined, null, {}, [], "bin"]) {
+    let sent = 0;
+    const got = await T.evaluate(async () => { sent++; return { ok: true, status: 200, json: async () => ({}) }; }, "열쇠", "글", qs);
+    assert.equal(sent, 0, "물음 없이 업체를 불렀습니다: " + JSON.stringify(qs));
+    assert.equal(got.ok, false);
+    assert.ok(got.why, "까닭표가 있어야 부른 쪽이 무엇이 빠졌는지 압니다.");
+  }
+  assert.equal("questions" in T, false, "걷어낸 기본 물음이 되살아났습니다.");
+});
+
+test("보내는 몸통에는 부른 쪽이 준 물음이 그대로 실린다", async () => {
+  let body = null;
+  await T.evaluate(async (url, o) => { body = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ answers: {} }) }; }, "열쇠", "글", QS);
+  assert.deepEqual(body.questions, QS);
 });
 
 /* ── 왜 못 받았나를 «갈라» 말하는가 (2026-09-20) ────────────────────────────────
@@ -58,42 +73,8 @@ test("업체가 곁들인 한마디는 싣되 통째로는 안 흘린다", () =>
 });
 
 test("업체에 닿지도 못한 것은 또 다른 갈래다", async () => {
-  const got = await T.evaluate(async () => { throw new Error("getaddrinfo ENOTFOUND"); }, "열쇠", "글");
+  const got = await T.evaluate(async () => { throw new Error("getaddrinfo ENOTFOUND"); }, "열쇠", "글", QS);
   assert.equal(got.ok, false);
   assert.equal(got.why, "network");
   assert.notEqual(got.why, T.failureOf(503, {}).why, "닿지 못한 것과 업체가 아픈 것은 다릅니다.");
-});
-
-/* ── 하루 문 (2026-09-20) ──────────────────────────────────────────────────
-   ⚠ 숫자(30·200)를 못 박지 않는다 — 「사람 몫과 전체 몫을 갈라 세는가」,
-     「적은 쪽이 이기는가」, 「다 쓰면 막는가」라는 규칙만 본다. */
-test("하루 몫은 사람 몫과 전체 몫을 갈라 세고, 적은 쪽이 이긴다", () => {
-  assert.ok(T.PERSON_DAY_LIMIT > 0 && T.ALL_DAY_LIMIT > 0, "한도가 있어야 합니다.");
-  assert.ok(T.ALL_DAY_LIMIT >= T.PERSON_DAY_LIMIT, "전체 몫이 한 사람 몫보다 작으면 뜻이 없습니다.");
-
-  const 넉넉 = T.leftOf(0, 0);
-  assert.equal(넉넉.over, false);
-  assert.equal(넉넉.left, T.PERSON_DAY_LIMIT, "아무도 안 썼으면 내 몫이 그대로 남습니다.");
-
-  /* 전체가 다 찼으면 내가 한 번도 안 썼어도 막힌다 — 갈라 세지 않으면 이걸 못 잡는다. */
-  const 전체동남 = T.leftOf(0, T.ALL_DAY_LIMIT);
-  assert.equal(전체동남.over, true);
-
-  /* 내 몫만 다 썼으면 전체가 비어 있어도 막힌다. */
-  const 내것동남 = T.leftOf(T.PERSON_DAY_LIMIT, 0);
-  assert.equal(내것동남.over, true);
-  assert.notEqual(T.overLimitError(전체동남).error, T.overLimitError(내것동남).error,
-    "내 몫이 찬 것과 사무실 몫이 찬 것은 다른 말이어야 합니다.");
-  assert.equal(T.overLimitError(내것동남).status, 429);
-});
-
-test("세는 자리는 날짜·사람별로 갈라지고, 열쇠로 못 쓸 글자는 걷어 낸다", () => {
-  const [내것, 전체] = T.tallyPaths("uid-1", "2026-09-20");
-  assert.ok(내것.includes("2026-09-20") && 전체.includes("2026-09-20"), "날짜가 자리에 들어가야 날마다 새로 셉니다.");
-  assert.notEqual(내것, 전체, "사람 자리와 전체 자리가 같으면 갈라 셀 수가 없습니다.");
-  /* 실시간DB 열쇠에 못 쓰는 글자가 섞이면 «조용히» 안 써진다 — 그러면 한도가 없는 것과 같다. */
-  const [더러운것] = T.tallyPaths("a.b#c$d[e]", "2026-09-20");
-  assert.doesNotMatch(더러운것.split("/").pop(), /[.#$[\]]/);
-  const [빈것] = T.tallyPaths("", "2026-09-20");
-  assert.ok(빈것.split("/").pop().length > 0, "누군지 몰라도 셀 자리는 있어야 합니다.");
 });

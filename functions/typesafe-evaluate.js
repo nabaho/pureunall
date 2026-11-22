@@ -1,6 +1,8 @@
 "use strict";
 
-/* Jev 는 결정만 돌려준다. 원문·열쇠·자동처리 권한은 이 대리인 밖으로 나가지 않는다. */
+/* Jev 는 결정만 돌려준다. 원문·열쇠·자동처리 권한은 이 대리인 밖으로 나가지 않는다.
+   ★ 2026-11-22 — 포털 「✨ TypeSafe 검토」 단추(9가지 업무 검토 물음 · 사람별 하루 30번 셈)를 대표 지시로 걷어냈다.
+     지금 이 모듈을 쓰는 곳은 받은메일함 자동분류(mail-ai-classify.js) «하나»다 — 물음(qs)은 부르는 쪽이 준다. */
 const MAX_TEXT = 4000;
 
 function clean(text) {
@@ -27,58 +29,6 @@ function redact(text) {
     out = out.replace(re, replacement);
   });
   return { text: out, maskedKinds: kinds };
-}
-
-function questions() {
-  return {
-    urgency: { type: "noul", instructions: "Is this request urgent or time-sensitive?" },
-    route: {
-      type: "choice", instructions: "Which internal work queue should review this?",
-      criteria: {
-        "인사·노무": "Employment, payroll, personnel, or labor-law matter",
-        "계약·사건": "Contract, client case, dispute, or filing matter",
-        "시스템·자료": "ERP fault, account, data, access, or technical matter",
-        "일반 문의": "General question or request not covered above",
-      },
-    },
-    human_review: { type: "noul", instructions: "Should a human review this before any action is taken?" },
-    deadline: {
-      type: "choice", instructions: "What response timeframe does this request need?",
-      criteria: {
-        "오늘": "Needs action today or within 24 hours",
-        "3일 이내": "Needs action within three days",
-        "이번 주": "Needs action this week but not today",
-        "일반": "No clear near-term deadline",
-      },
-    },
-    impact: {
-      type: "choice", instructions: "How broad is the likely impact if this is not handled?",
-      criteria: {
-        "한 사람·한 업체": "Affects one person or one client company",
-        "여러 업체": "Affects multiple client companies or workers",
-        "시스템 전체": "Affects shared ERP, access, or a system-wide process",
-      },
-    },
-    legal_wage_risk: {
-      type: "choice", instructions: "How much labor-law, payroll, or contractual risk needs expert attention?",
-      criteria: {
-        "높음": "Could create material legal, payroll, filing, or contractual risk",
-        "보통": "Needs routine professional review but is not clearly high risk",
-        "낮음": "Appears administrative or low risk",
-      },
-    },
-    privacy_security: { type: "noul", instructions: "Does this request require privacy or information-security caution?" },
-    info_missing: { type: "noul", instructions: "Is essential information missing before a person can act on this request?" },
-    first_action: {
-      type: "choice", instructions: "What is the safest first human action?",
-      criteria: {
-        "담당자 확인": "Confirm facts or ownership with the responsible person",
-        "자료 요청": "Request missing documents, details, or evidence",
-        "즉시 대응": "Take prompt human action to prevent a deadline or operational issue",
-        "일반 답변": "A normal informational response is the appropriate first step",
-      },
-    },
-  };
 }
 
 /* ══ 왜 못 받았나를 «갈라» 말한다 (2026-09-20) ═══════════════════════════════
@@ -130,45 +80,16 @@ function unreachable(e) {
     hint: clean((e && e.message) || "").slice(0, 160) };
 }
 
-/* ══ 하루에 몇 번까지 (2026-09-20) ══════════════════════════════════════════
-   여태 한도가 «없었다» — 로그인한 직원 누구나 무제한으로 부를 수 있었다.
-   ⚠ 막는 까닭은 요금이 아니다(글 백만 자에 0.042달러라 사실상 0원이다).
-     막는 까닭은 **사람 이름·업체명·주소가 든 글이 미국 업체로 나가는 것**이고,
-     공식 API 직접 호출에는 「안 남기기」 선택이 없어 보낸 글이 그쪽에 남는다.
-     그래서 한도는 «아껴 쓰기»가 아니라 «샌 양을 셀 수 있게» 하는 문이다.
-   ★ 사람마다 와 전체 를 «갈라» 센다 — 합치면 한 사람이 다 태운 날과 여럿이
-     고루 쓴 날이 같아 보인다(ai_read_tally 가 n 과 quota 를 가른 것과 같은 까닭). */
-const PERSON_DAY_LIMIT = 30;
-const ALL_DAY_LIMIT = 200;
-
-/* 세는 자리 — 담는 것은 «숫자뿐»이다. 보낸 글도, 받은 판단도 한 글자도 안 담는다.
-   ⚠ 규칙을 안 붙였다 — 이 저장소의 뿌리에는 $other 가 «없어» 이름 없는 최상위
-     자리는 브라우저에 통째로 막힌다. 서버(관리자 SDK)만 지나간다. */
-function tallyPaths(uid, ymd) {
-  const who = String(uid || "").replace(/[.#$/[\]]/g, "") || "_unknown";
-  return ["typesafe_tally/" + ymd + "/" + who, "typesafe_tally/" + ymd + "/_all"];
+/* qs — 무엇을 물을지는 «부르는 쪽»이 정한다(2026-09-26 메일 자동분류가 처음 바꿔 끼웠다).
+   ⚠ 2026-11-22 단추와 함께 기본 물음(긴급도·경로… 9가지)을 걷어냈다 — 물음 없이 부르면
+     업체에 «아무것도 보내지 않고» 돌려보낸다(빈 물음으로 글만 미국 서버에 남기지 않는다).
+     열쇠·가리기·실패 갈래는 이 한 길을 탄다. */
+function hasQuestions(qs) {
+  return !!qs && typeof qs === "object" && !Array.isArray(qs) && Object.keys(qs).length > 0;
 }
 
-/* 남은 횟수 — 둘 가운데 «적은 쪽»이 진짜 남은 것이다. */
-function leftOf(mine, all) {
-  const m = Math.max(0, PERSON_DAY_LIMIT - (Math.max(0, Number(mine) || 0)));
-  const a = Math.max(0, ALL_DAY_LIMIT - (Math.max(0, Number(all) || 0)));
-  return { left: Math.min(m, a), mine: m, all: a, over: Math.min(m, a) <= 0 };
-}
-
-function overLimitError(seen) {
-  return { ok: false, why: "dayLimit", status: 429, left: 0,
-    error: seen.mine <= 0
-      ? ("오늘 쓸 수 있는 " + PERSON_DAY_LIMIT + "번을 다 썼습니다 — 내일 다시 쓸 수 있습니다.")
-      : ("오늘 사무실 전체 몫 " + ALL_DAY_LIMIT + "번을 다 썼습니다 — 내일 다시 쓸 수 있습니다.") };
-}
-
-/* qs — 물음 모양을 바꿔 끼운다(2026-09-26, 메일 자동분류가 처음 쓴다).
-   ⚠ 안 주면 예전 그대로 questions() 다. 업무 검토용 물음(긴급도·경로…)과
-     메일함 분류용 물음(어느 칸인가)은 «묻는 것 자체»가 다르다 — 여기를 하나로
-     묶어 두면 딴 일이 하나를 고칠 때 서로 발을 밟는다. 열쇠·가리기·실패 갈래는
-     «같은 길»을 타야 두 군데가 어긋나지 않는다(대표 결정 「이알피와 같은 기준」). */
 async function evaluate(fetchFn, key, text, qs) {
+  if (!hasQuestions(qs)) return { ok: false, why: "noQuestions", status: 400, error: "무엇을 물을지(qs)가 없습니다 — 업체에 보내지 않았습니다." };
   const masked = redact(text);
   if (!masked.text) return { ok: false, why: "empty", status: 400, error: "판단할 내용이 없습니다." };
   let response;
@@ -176,7 +97,7 @@ async function evaluate(fetchFn, key, text, qs) {
     response = await fetchFn("https://api.typesafe.ai/v1/systemone", {
       method: "POST",
       headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-      body: JSON.stringify({ state: masked.text, model: "jev-latest", questions: qs || questions() }),
+      body: JSON.stringify({ state: masked.text, model: "jev-latest", questions: qs }),
     });
   } catch (e) { return unreachable(e); }
   let body = {};
@@ -185,6 +106,5 @@ async function evaluate(fetchFn, key, text, qs) {
   return { ok: true, maskedKinds: masked.maskedKinds, answers: body.answers || {}, usage: body.usage || {} };
 }
 
-module.exports = { MAX_TEXT, clean, redact, questions, evaluate,
-  FAILURES, failureOf, unreachable,
-  PERSON_DAY_LIMIT, ALL_DAY_LIMIT, tallyPaths, leftOf, overLimitError };
+module.exports = { MAX_TEXT, clean, redact, evaluate, hasQuestions,
+  FAILURES, failureOf, unreachable };
