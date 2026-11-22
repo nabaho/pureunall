@@ -225,4 +225,40 @@ test("⑦ 서버(functions/index.js) 및 화면(pu-cards.html) 배선 규칙", (
   assert.match(cardsSrc, /js\/pu-pub-search\.js/, "pu-cards.html 에 pu-pub-search.js 스크립트가 없습니다");
   assert.match(cardsSrc, /PuPubSearch\.open\(/, "pu-cards.html 에 공공 기업검색 열기 버튼이 없습니다");
   assert.match(cardsSrc, /PuPubSearch\.detailBarHtml\(/, "pu-cards.html 상세 패널에 연결 바가 없습니다");
+
+  const enterSrc = fs.readFileSync(path.join(ROOT, "enter.html"), "utf8");
+  assert.match(enterSrc, /key:'pubsearch'[\s\S]*url:'pu-pubsearch\.html'[\s\S]*row:'store'/, "★ 자료함(store)에 독립 공공 기업검색 타일이 없습니다");
+
+  const appHtml = fs.readFileSync(path.join(ROOT, "pu-pubsearch.html"), "utf8");
+  assert.match(appHtml, /js\/pu-pubsearch-app\.js/, "pu-pubsearch.html 에 앱 스크립트가 없습니다");
+  assert.match(appHtml, /js\/pu-ontology-write\.js/, "★ pu-pubsearch.html 에 온톨로지 쓰기 관문이 없습니다");
+});
+
+test("⑧ 금융위 재무제표·국민연금 후보(보험료 제외)·독립 앱 검색 기록 및 즐겨찾기", () => {
+  const APP = require("../js/pu-pubsearch-app");
+  const fins = S.normalizeFinRows([
+    { bizYear: "2024", fnclDcdNm: "별도재무제표", enpSaleAmt: "10000000000", enpBzopPft: "1000000000", enpTastAmt: "20000000000" },
+    { bizYear: "2024", fnclDcdNm: "연결재무제표", enpSaleAmt: "15000000000", enpBzopPft: "1500000000", enpTastAmt: "30000000000" },
+    { bizYear: "2023", fnclDcdNm: "연결재무제표", enpSaleAmt: "12000000000", enpBzopPft: "1100000000", enpTastAmt: "25000000000" },
+  ]);
+  assert.equal(fins.length, 2);
+  assert.equal(fins[0].year, "2024");
+  assert.equal(fins[0].revenue, 15000000000, "같은 연도면 연결재무제표를 우선합니다");
+
+  const cands = S.npsCandsOf([{ seq: "1", wkplNm: "(주)샘플", wkplJnngStcd: "1", crrmmNtcAmt: 9999999 }], "샘플");
+  assert.equal(cands.length, 1);
+  assert.equal(cands[0].same, true);
+  assert.equal(cands[0].crrmmNtcAmt, undefined, "★ 국민연금 보험료 금액은 절대 포함하지 않습니다");
+
+  assert.equal(APP.fmtWon(15000000000), "150억원");
+  let hist = APP.pushHistoryList([], { query: "샘플기업", count: 2 }, 3);
+  hist = APP.pushHistoryList(hist, { query: "테스트", count: 1 }, 3);
+  hist = APP.pushHistoryList(hist, { query: "샘플기업", count: 3 }, 3);
+  assert.equal(hist.length, 2, "중복 검색어는 맨 위로 합쳐집니다");
+  assert.equal(hist[0].query, "샘플기업");
+
+  let pins = APP.togglePinList([], { bizNo: "1234567890", name: "샘플기업" }, 5);
+  assert.equal(pins.length, 1);
+  pins = APP.togglePinList(pins, { bizNo: "1234567890", name: "샘플기업" }, 5);
+  assert.equal(pins.length, 0);
 });

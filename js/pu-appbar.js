@@ -63,6 +63,7 @@
     { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송' },
     { key: 'signboard', row: 'sales', name: '전광판',   icon: '📺', url: 'pu-signboard.html', desc: '외부 전광판 광고 바꾸기' },
     { key: 'cards',   row: 'store', name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
+    { key: 'pubsearch', row: 'store', name: '공공 기업검색', icon: '🔍', url: 'pu-pubsearch.html',   desc: '금융위·재무·국세청·고용·연금·DART' },
     /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
        whoAmI() 는 주소 꼬리까지 보고 메일을 먼저 가른다 · go() 는 «&» 로 잇는다(2026-10-04).
        tests/appbar-every-link.test.js 가 모든 줄이 «제 앱»으로 가는지 돌려 본다. */
