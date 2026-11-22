@@ -15,5 +15,10 @@
 - `node scripts/korean-everywhere.js --apply` — `~/.claude/CLAUDE.md`(맨 앞에 넣음) · `~/.gemini/GEMINI.md`·`~/.codex/AGENTS.md`(새 글로 바꿈). 바뀐 파일마다 `.bak-날짜시각` 원본을 남김.
 - 열려 있던 Claude Code·Gemini·Codex 창은 다시 열어야 새 지침을 읽는다.
 
+## 자동 검토(ow review)
+- 기능 검증(Antigravity Gemini) «통과». 보안(Codex) 지적을 세 번에 걸쳐 반영: 예전 단락은 글이 똑같을 때만 바꿈 · 멈추면 아무 파일도 안 씀 ·
+  원본 이름 겹침 막기 · 옆에 쓰고 바꿔 끼우기(직전 다시 비교) · `--home` 확인 · 링크는 실제 파일을 바꿈 · 권한 유지 · 예전 값 안 찍음.
+- 재검토 한도(2번)를 다 써서 마지막 고침(바꿔 끼우기 직전 비교·링크·권한)은 내 시험으로만 확인했다(링크·권한 시험은 CI 리눅스에서 돈다).
+
 ## 못 하는 것
 - 앱·웹(claude.ai 등)의 개인 선호는 계정 설정이라 손으로 — `docs/규칙/한국어로-대답.md` 3절.
