@@ -91,7 +91,15 @@ function serve() {
       const host = String(req.headers.host || '').toLowerCase();
       if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
       const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase();
-      if (sfs && sfs !== 'same-origin' && sfs !== 'none') { res.writeHead(403); return res.end(); }
+      /* 예외 하나 — 화면 안의 «격리 칸»(sandbox iframe, 출처 없음)이 스크립트를 부를 때(2026-11-22 슬라이드 미리보기 칸).
+         출처가 없어 cross-site 로 오고 보낸 곳(referer)도 비어 있다. 그래서 «스크립트 요청 · Origin 없음 · js/ 나 vendor/ 의 .js» 일 때만 —
+         저장소에 공개된 화면 스크립트뿐이라 새는 것이 없다. 그 밖의 cross-site 요청은 그대로 막는다 */
+      const sandboxScript = sfs === 'cross-site' && String(req.headers['sec-fetch-dest'] || '') === 'script' && !req.headers.origin &&
+        /^\/(js|vendor)\/[\w.\-]+\.js(\?|$)/.test(String(req.url || ''));
+      if (sfs && sfs !== 'same-origin' && sfs !== 'none' && !sandboxScript) {
+        if (process.env.PA_CONSOLE) console.log('[막음]', req.url, JSON.stringify({ sfs, dest: req.headers['sec-fetch-dest'] || '', origin: req.headers.origin || '', ref: req.headers.referer || '' }));
+        res.writeHead(403); return res.end();
+      }
       const origin = req.headers.origin;
       if (origin && origin !== `http://127.0.0.1:${port}` && origin !== `http://localhost:${port}`) { res.writeHead(403); return res.end(); }
       let u;
@@ -179,12 +187,22 @@ async function auditOne(browser, base, app, width) {
     } catch (e) {}
     window.alert = () => {}; window.confirm = () => false; window.prompt = () => null;
   }, { data, uid: seed.UID, sid: seed.SID, email: seed.EMAIL, ls: extra.localStorage || {} });
+  /* 시드가 «지어낸 창고 파일»(seeds/<key>.js 의 storageFiles)을 주면 창고 주소 요청에 그것을 내준다 — 진짜 창고에는 나가지 않는다(2026-11-22 강의자료 슬라이드 미리보기 점검) */
+  const files = typeof extra.storageFiles === 'function' ? await extra.storageFiles() : null;
   await ctx.route('**/*', (route) => {
     const u = route.request().url();
     if (u.startsWith('data:') || u.startsWith('blob:')) return route.continue();
     let parsed = null;
     try { parsed = new URL(u); } catch (e) { return route.abort(); }
     if (parsed.origin === base) return route.continue();
+    if (files && parsed.protocol === 'https:' && parsed.hostname === 'firebasestorage.googleapis.com') {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Range', 'Access-Control-Allow-Methods': 'GET' };
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
+      const m = parsed.pathname.match(/\/o\/(.+)$/);
+      const key = m ? decodeURIComponent(m[1]) : '';
+      if (files[key]) return route.fulfill({ status: 200, headers: Object.assign({ 'Content-Type': 'application/octet-stream' }, cors), body: files[key] });
+      return route.fulfill({ status: 404, headers: cors, body: '' });
+    }
     if (parsed.protocol === 'https:' && (parsed.hostname === 'www.gstatic.com' || parsed.hostname === 'gstatic.com') && parsed.pathname.startsWith('/firebasejs/')) {
       return route.fulfill({ status: 200, contentType: 'text/javascript', body: fakeSrc });
     }
@@ -196,6 +214,8 @@ async function auditOne(browser, base, app, width) {
   });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 200)));
+  /* PA_CONSOLE=1 — 칸(iframe)까지 콘솔 오류·경고를 찍는다(CSP 막힘 같은 것은 pageerror 에 안 잡힌다) */
+  if (process.env.PA_CONSOLE) page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('[콘솔]', m.type(), m.text().slice(0, 240)); });
   let navErr = null;
   try {
     /* 이알피는 폰에서 포털 타일을 거쳐 온 것(sso=1)이 아니면 포털로 돌려보낸다 */

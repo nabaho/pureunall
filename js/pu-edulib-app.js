@@ -615,6 +615,7 @@
       var a = b.getAttribute('data-act');
       if (a === 'dl') downloadOriginal(it, b);
       else if (a === 'win') openWin(it.id);
+      else if (a === 'pv') togglePpt(it, body, pane);
       else if (a === 'detail') { if (opts.onDetail) opts.onDetail(); openDetail(it.id); }
       else if (a === 'x') { closeFrames(pane); pane.remove(); if (opts.onClose) opts.onClose(); }
     });
@@ -667,27 +668,8 @@
       : bytesOf(it, function (got, total) { if (!live()) return; var m = body.querySelector('.msg'); if (m) m.textContent = '불러오는 중… ' + pctText(got, total); }, pane);
     bufP.then(function (buf) {
       if (!live()) return;
-      if (ext === 'pptx' || ext === 'docx' || ext === 'ppsx') {
-        return loadZip().then(function (Z) { return P.extract(Z, buf, ext === 'docx' ? 'docx' : 'pptx'); }).then(function (r) {
-          if (!live()) return;
-          body.innerHTML = '';
-          var wrap = document.createElement('div'); wrap.className = 'slides';
-          if (!r.parts.length) wrap.innerHTML = '<div class="msg">글자가 없는 자료입니다(그림만 있는 슬라이드) — 원본을 내려받아 보세요.</div>';
-          r.parts.forEach(function (p) {
-            var s = document.createElement('div'); s.className = 'slide';
-            var n = document.createElement('div'); n.className = 'sn'; n.textContent = (ext === 'docx' ? '본문' : p.no + '쪽');
-            var t = document.createElement('div'); t.className = 'st1'; t.textContent = p.title || '(제목 없음)';
-            s.appendChild(n); s.appendChild(t);
-            p.lines.slice(1).forEach(function (l) { var q = document.createElement('p'); q.textContent = l; s.appendChild(q); });
-            wrap.appendChild(s);
-          });
-          if (r.truncated) { var more = document.createElement('div'); more.className = 'hint'; more.textContent = '앞 300쪽까지만 보였습니다.'; wrap.appendChild(more); }
-          var note = document.createElement('div'); note.className = 'hint'; note.style.padding = '0 2px 6px';
-          note.textContent = '글자만 뽑아 보였습니다 — 그림·도형 모양은 원본에서 보세요.';
-          body.appendChild(note); body.appendChild(wrap);
-          var pg = pane.querySelector('.pg'); if (pg) pg.innerHTML = '<span class="hint">' + r.parts.length + (ext === 'docx' ? '' : '장') + '</span>';
-        });
-      }
+      if (ext === 'pptx' || ext === 'ppsx') return showPptx(it, body, pane, buf, live);
+      if (ext === 'docx') return showTextParts(body, pane, buf, 'docx', live);
       var chk = PuViewerKind.check(buf, it.fileName);
       if (!chk.ok) { body.innerHTML = '<div class="msg">' + esc(chk.error || '이 형식은 미리보기를 못 합니다') + ' — 원본을 내려받아 여세요.</div>'; return; }
       body.innerHTML = '';
@@ -699,6 +681,55 @@
       FRAMES.push(f);
       ifr.src = 'pu-viewer-frame.html?v=1';
     }).catch(function (e) { if (live()) body.innerHTML = '<div class="msg">원본을 불러오지 못했습니다 — ' + esc(errMsg(e)) + '</div>'; });
+  }
+  /* 글자만 뽑아 보기 — 워드(docx)와 파워포인트의 «≡ 글자» */
+  function showTextParts(body, pane, buf, kind, live) {
+    return loadZip().then(function (Z) { return P.extract(Z, buf, kind); }).then(function (r) {
+      if (!live()) return;
+      body.innerHTML = '';
+      var wrap = document.createElement('div'); wrap.className = 'slides';
+      if (!r.parts.length) wrap.innerHTML = '<div class="msg">글자가 없는 자료입니다(그림만 있는 슬라이드) — 원본을 내려받아 보세요.</div>';
+      r.parts.forEach(function (p) {
+        var s = document.createElement('div'); s.className = 'slide';
+        var n = document.createElement('div'); n.className = 'sn'; n.textContent = (kind === 'docx' ? '본문' : p.no + '쪽');
+        var t = document.createElement('div'); t.className = 'st1'; t.textContent = p.title || '(제목 없음)';
+        s.appendChild(n); s.appendChild(t);
+        p.lines.slice(1).forEach(function (l) { var q = document.createElement('p'); q.textContent = l; s.appendChild(q); });
+        wrap.appendChild(s);
+      });
+      if (r.truncated) { var more = document.createElement('div'); more.className = 'hint'; more.textContent = '앞 300쪽까지만 보였습니다.'; wrap.appendChild(more); }
+      var note = document.createElement('div'); note.className = 'hint'; note.style.padding = '0 2px 6px';
+      note.textContent = kind === 'docx' ? '글자만 뽑아 보였습니다 — 그림·도형 모양은 원본에서 보세요.' : '글자만 뽑아 보였습니다 — 슬라이드 모양은 아래 «▦ 슬라이드»로 봅니다.';
+      body.appendChild(note); body.appendChild(wrap);
+      var pg = pane.querySelector('.pg'); if (pg) { pg.innerHTML = '<span class="hint">' + r.parts.length + (kind === 'docx' ? '' : '장') + '</span>'; pg.onclick = null; }
+    });
+  }
+  /* 파워포인트 — «▦ 슬라이드»(작게 늘어놓기 · 대표 「원본을 작게 해 가지고 진열 … 어떻게 강의했는지 비교」) / «≡ 글자»(글자만)를 바꿔 본다.
+     고른 보기는 이 브라우저에 기억(pptView). 슬라이드는 격리 칸(pu-slides-frame.html)이 그린다 — 문서뷰어와 같은 격리(allow-same-origin 없음).
+     ★ 바꿔 보려고 받은 바이트를 칸(pane)에 둔다 — 격리 칸에는 «사본»을 넘긴다(넘긴 바이트는 이쪽에서 다시 못 쓴다) */
+  function showPptx(it, body, pane, buf, live) {
+    pane._ppt = buf;
+    var mode = lsGet('pptView') === 'text' ? 'text' : 'slides';
+    var pf = pane.querySelector('.pf');
+    var tg = pf ? pf.querySelector('[data-act="pv"]') : null;
+    if (pf && !tg) { tg = document.createElement('button'); tg.type = 'button'; tg.className = 'sm'; tg.setAttribute('data-act', 'pv'); pf.insertBefore(tg, pf.querySelector('.sp').nextSibling); }
+    if (tg) { tg.textContent = mode === 'slides' ? '≡ 글자' : '▦ 슬라이드'; tg.title = mode === 'slides' ? '글자만 뽑아 보기' : '슬라이드를 작게 늘어놓아 보기'; }
+    if (mode === 'text') return showTextParts(body, pane, buf, 'pptx', live);
+    body.innerHTML = '';
+    var ifr = document.createElement('iframe');
+    ifr.setAttribute('sandbox', 'allow-scripts');                 /* allow-same-origin 을 주지 않는다 — 문서뷰어와 같은 격리 */
+    ifr.setAttribute('title', '슬라이드 미리보기');
+    body.appendChild(ifr);
+    var copy = buf.slice(0);
+    FRAMES.push({ iframe: ifr, body: body, pg: pane.querySelector('.pg'), ready: false, queued: { msg: { t: 'open', buf: copy, name: it.fileName }, tr: [copy] }, pages: 0, cur: 1 });
+    ifr.src = 'pu-slides-frame.html?v=1';
+  }
+  function togglePpt(it, body, pane) {
+    if (!pane._ppt) return;
+    lsSet('pptView', lsGet('pptView') === 'text' ? 'slides' : 'text');
+    closeFrames(pane);
+    var s = body._seq = (body._seq || 0) + 1;     /* 앞의 보기에서 늦게 온 결과는 버린다 */
+    showPptx(it, body, pane, pane._ppt, function () { return body._seq === s && pane.isConnected; });
   }
   function pickLocal(it, body, pane) {
     var inp = document.createElement('input'); inp.type = 'file';

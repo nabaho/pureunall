@@ -558,7 +558,10 @@
        (ref( 호출 없음, 브라우저 localStorage 의 화면 상태뿐). 공개 저장소로 마스터를 보내는 단추는 막았다. 포털 타일 없음 */
     'pu-payroll-mail-sync.html':'급여 메일연동 — 가린 예시 자료만, 서버 저장 자리 없음(포털 비연결)',
     'pu-viewer.html':'문서뷰어 — 이 기기의 파일을 보기만 한다. 서버·저장 자리 없음',
-    'pu-viewer-frame.html':'문서뷰어의 격리된 칸(sandbox iframe) — 부모가 바이트를 건네 주면 그리기만 한다. 저장 자리 없음'
+    'pu-viewer-frame.html':'문서뷰어의 격리된 칸(sandbox iframe) — 부모가 바이트를 건네 주면 그리기만 한다. 저장 자리 없음',
+    /* 강의자료 슬라이드 미리보기 칸 (2026-11-22) — pu-edulib.html 이 sandbox="allow-scripts" 로만 연다. pptx 바이트를 받아 SVG 로 그리기만 하고
+       ref(·fetch·localStorage 가 없다(CSP connect-src 'none'). 강의자료의 딸린 화면이지만 저장 자리가 없어 SATELLITES 가 아니라 여기 */
+    'pu-slides-frame.html':'강의자료의 슬라이드 미리보기 격리 칸(sandbox iframe) — 부모가 pptx 바이트를 건네 주면 그리기만 한다. 저장 자리 없음'
     /* fund-poc.html(기금관리 실험 화면)은 2026-10-09 지웠다 — 운영에 쓰지 않았다(대표 「지워」) */
   };
 
