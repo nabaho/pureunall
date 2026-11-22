@@ -6,12 +6,13 @@
 
    지키는 것.
    ① 기본은 «꺼짐» — 대표가 config/mailAiClassify.on 을 켜야 돈다
-   ② 이름 가림은 js/pu-typesafe.js 의 redactNames 와 «바이트까지 같다»
+   ② 이름 가림 — 긴 이름부터 · 같은 값은 같은 표 · 한 글자 이름은 안 가림 · 목록에 없으면 그대로
+      (2026-11-22 포털 단추 쪽 js/pu-typesafe.js 와 견주던 검사는 단추와 함께 «값으로 직접» 보는 검사로 바꿨다)
    ③ 이름 목록을 못 읽으면 «통째로 건너뛴다»(자동 파이프라인은 더 엄하다)
    ④ 이미 사람(또는 이전 회차)이 정한 메일은 다시 안 묻는다
    ⑤ 하루 문 · 한 회차 한도 · 시간 한도를 지킨다 — 넘으면 «부르지 않는다»
    ⑥ 모르는 칸 이름을 답하면 «쓰지 않는다»
-   ⑦ 사람 몫(typesafe_tally)과는 «다른 자리»에 센다
+   ⑦ 하루 문은 자기 자리(typesafe_tally_mail)에 센다
    ⑧ 옮기는 자리는 config/mailPut 하나(사람이 쓰는 자리와 같다) + mailPutBy 로 짐작표시
    ⑨ mail-sync.js 는 받은메일함(inbox)·새것(fresh) 방향에서만, 실패해도 던지지 않고 부른다 */
 const test = require('node:test');
@@ -21,7 +22,6 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const AC = require(path.join(ROOT, 'functions', 'mail-ai-classify.js'));
-const TSSRC = fs.readFileSync(path.join(ROOT, 'js', 'pu-typesafe.js'), 'utf8');
 const MSSRC = fs.readFileSync(path.join(ROOT, 'functions', 'mail-sync.js'), 'utf8').replace(/\r\n/g, '\n');
 const TSEVAL_SRC = fs.readFileSync(path.join(ROOT, 'functions', 'typesafe-evaluate.js'), 'utf8');
 function code(t){ return t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 '); }
@@ -150,33 +150,40 @@ test('★★★ Jev 열쇠가 서버 금고에 없으면 «부르지 않는다»
   } finally { process.env.TYPESAFE_API_KEY = before; }
 });
 
-/* ══════ ② 이름 가림 — pu-typesafe.js 와 «바이트까지 같다» ══════ */
+/* ══════ ② 이름 가림 — «값»으로 직접 본다 ══════
+   가리기는 값이 틀리면 곧바로 새는 정보라 구조만 봐서는 부족하다. 진짜 함수를 돌려 결과 글을 본다.
+   ⚠ «완벽히 가린다»는 검사하지 않는다 — 목록에 없는 이름은 원래 못 잡는다. */
 
-test('★★★ redactNames 가 js/pu-typesafe.js 의 것과 «같은 답»을 낸다', () => {
-  const m = TSSRC.match(/function redactNames\(text, staff, companies\) \{[\s\S]*?\n  \}/);
-  assert.ok(m, 'js/pu-typesafe.js 에서 redactNames 를 못 찾았습니다 — 견줄 원본이 없습니다');
-  const vm = require('vm');
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(m[0] + '\nthis.redactNames = redactNames;', ctx);
-  const cases = [
-    ['홍길동 님이 계약 마감을 물었습니다.', ['홍길동'], []],
-    ['가나상사와 계약이 곧 끝납니다.', [], ['가나상사']],
-    ['홍길동이 물었는데 홍길동에게 아직 답장을 못 했습니다.', ['홍길동'], []],
-    ['가나상사 소속 가나 대리점 문의입니다.', [], ['가나', '가나상사']],
-    ['홍길동과 가나다가 가나상사 건으로 통화했습니다.', ['홍길동','가나다'], ['가나상사']],
-    ['외부인 김철수 씨가 문의했습니다.', ['홍길동'], ['가나상사']],
-    ['이 문의는 이번 주 안에 처리해야 합니다.', ['이'], []],
-  ];
-  /* ⚠ ctx 는 vm 상자 안이라 그 배열은 다른 «집」이다 — deepEqual(strict) 이 튕긴다.
-     한 번 옮겨 담아 잰다(2026-09-18 보낸 메일 담당자 검사에서 겪은 것과 같은 자리). */
-  const plain = (a) => Array.prototype.slice.call(a || []);
-  cases.forEach(([text, staff, cos])=>{
-    const want = ctx.redactNames(text, staff, cos);
-    const got = AC.redactNames(text, staff, cos);
-    assert.equal(got.text, want.text, '가리는 결과가 다릅니다: ' + text);
-    assert.deepEqual(plain(got.localMaskedKinds), plain(want.localMaskedKinds), '가린 건수 안내가 다릅니다: ' + text);
-  });
+const 직원 = ['홍길동', '가나다'];
+const 업체 = ['가나상사'];
+
+test('★★★ 목록에 있는 직원·업체 이름은 가려지고, 같은 값은 같은 표로', () => {
+  const a = AC.redactNames('홍길동 님이 계약 마감을 물었습니다.', 직원, []);
+  assert.doesNotMatch(a.text, /홍길동/); assert.match(a.text, /\[직원1\]/);
+  const b = AC.redactNames('가나상사와 계약이 곧 끝납니다.', [], 업체);
+  assert.doesNotMatch(b.text, /가나상사/); assert.match(b.text, /\[업체1\]/);
+  const c = AC.redactNames('홍길동이 물었는데 홍길동에게 아직 답장을 못 했습니다.', 직원, []);
+  assert.equal((c.text.match(/\[직원1\]/g) || []).length, 2, '같은 사람인데 다른 번호로 갈라지면 Jev 가 두 사람으로 착각합니다.');
+  assert.doesNotMatch(c.text, /\[직원2\]/);
+  const d = AC.redactNames('홍길동과 가나다가 가나상사 건으로 통화했습니다.', 직원, 업체);
+  assert.match(d.text, /\[직원1\]/); assert.match(d.text, /\[직원2\]/); assert.match(d.text, /\[업체1\]/);
+  assert.ok(d.localMaskedKinds.some((k) => /직원 이름 2건/.test(k)));
+  assert.ok(d.localMaskedKinds.some((k) => /업체명 1건/.test(k)));
+});
+
+test('★★★ 긴 이름부터 바꾼다 — 짧은 이름이 긴 업체명을 먼저 망가뜨리지 않는다', () => {
+  /* ⚠ 목록에는 «짧은 것을 먼저» 넣는다 — 이미 긴 것부터면 정렬을 지워도 우연히 통과한다. */
+  const got = AC.redactNames('가나상사 소속 가나 대리점 문의입니다.', [], ['가나', '가나상사']);
+  assert.doesNotMatch(got.text, /가나상사/, '업체명 전체가 안 가려졌습니다.');
+  assert.doesNotMatch(got.text, /\]상사/, '짧은 이름을 먼저 바꿔 «상사» 글자가 반쪽으로 남았습니다.');
+});
+
+test('★★ 한 글자 이름은 안 가리고, 목록에 없는 이름은 그대로 둔다', () => {
+  const one = AC.redactNames('이 문의는 이번 주 안에 처리해야 합니다.', ['이'], []);
+  assert.equal(one.text, '이 문의는 이번 주 안에 처리해야 합니다.', '흔한 한 글자를 지우면 문장이 망가집니다.');
+  const out = AC.redactNames('외부인 김철수 씨가 문의했습니다.', 직원, 업체);
+  assert.match(out.text, /김철수/, '이 검사는 «목록에 없으면 못 잡는다»는 한계를 확인하는 것입니다.');
+  assert.equal(out.localMaskedKinds.length, 0);
 });
 
 test('★★★ 이름 목록을 못 읽으면 «통째로 건너뛴다» — 사람이 다시 안 보는 자리라 더 엄하다', async () => {
@@ -309,9 +316,9 @@ test('★★★ 「AI가 짚었다」를 «다른 자리»에 적는다 — 사�
   assert.equal(get(db._tree, 'pucards/config/mailPutBy')['INBOX:7'], 'ai');
 });
 
-/* ══════ ⑦ 하루 문은 사람 몫과 다른 자리다 ══════ */
+/* ══════ ⑦ 하루 문은 자기 자리다 (옛 사람 몫 typesafe_tally 는 2026-11-22 단추와 함께 없어졌다 — 그 자리를 다시 쓰지 않는다) ══════ */
 
-test('★★★ 사람이 쓰는 typesafe_tally 는 «건드리지 않는다»', async () => {
+test('★★★ 하루 문은 typesafe_tally_mail 에만 센다 — 옛 사람 몫 자리(typesafe_tally)는 건드리지 않는다', async () => {
   const store = baseStore();
   const db = fakeDb(store);
   const fn = fetchFn();
@@ -355,11 +362,17 @@ test('★★★ Jev 를 부르는 자리가 «진짜로 죽어도»(evaluate 내
   assert.equal(r.done, 1, '첫 줄에서 진짜로 죽은 뒤 나머지를 안 봅니다');
 });
 
-/* ══════ ⑨ evaluate() 는 questions 를 «바꿔 끼울 수» 있고, 안 주면 예전 그대로다 ══════ */
+/* ══════ ⑨ evaluate() 에는 자동분류가 «자기 물음»을 끼운다 — 물음 없이는 업체에 안 보낸다 (2026-11-22) ══════ */
 
-test('★★ typesafe-evaluate.evaluate 는 qs 를 안 주면 예전 물음(questions())을 그대로 쓴다', () => {
-  assert.match(code(TSEVAL_SRC), /questions:\s*qs\s*\|\|\s*questions\(\)/,
-    'qs 를 새로 받으면서 이알피가 쓰던 길(questions())을 깼습니다');
+test('★★ 자동분류는 evaluate 에 칸 고르기 물음(binQuestion)을 넘기고, 물음이 없으면 evaluate 가 보내지 않는다', async () => {
+  assert.match(code(fs.readFileSync(path.join(ROOT, 'functions', 'mail-ai-classify.js'), 'utf8')), /TS\.evaluate\(\s*fetchFn\s*,\s*key\s*,\s*text\s*,\s*qs\s*\)/,
+    '자동분류가 물음(qs)을 안 넘깁니다');
+  const TS = require(path.join(ROOT, 'functions', 'typesafe-evaluate.js'));
+  let sent = 0;
+  const r = await TS.evaluate(async () => { sent++; return { ok: true, json: async () => ({}) }; }, 'k', '글');
+  assert.equal(sent, 0, '물음 없이 업체를 불렀습니다');
+  assert.equal(r.ok, false);
+  assert.doesNotMatch(code(TSEVAL_SRC), /questions\(\)/, '걷어낸 기본 물음(questions())이 되살아났습니다');
 });
 
 test('★★ binQuestion 은 실제 칸 이름을 후보로 만든다', () => {

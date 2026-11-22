@@ -296,10 +296,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
 .pbar #chatFab{order:4;}  /* 건의하기 바로 왼쪽 통합 AI 챗봇 */
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
-/* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
-   예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
-   여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
-.pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
 /* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
    챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
    ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
@@ -8965,9 +8961,9 @@ body.portal-mode #moreFab{display:flex;}
   //    대신 그 파일들이 만들어 놓은 단추를 여기서 데려온다. 만들어지는 시점이 제각각이라
   //    (로그인·권한 확인 뒤) 새로 생기는지 지켜보다가 잡는다.
   (function(){
-    // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 둘만
-    /* ✨ TypeSafe(pu-typesafe-review-button)는 PC 에선 「업무 시스템」 줄에 서지만, 폰에서는 여기로 */
-    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'pu-typesafe-review-button', 'appInstallFab'];
+    // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 것만
+    /* (✨ TypeSafe 검토 단추는 2026-11-22 대표 지시 「필요 없으면 완전히 덜어내라」로 걷어냈다) */
+    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'appInstallFab'];
     /* 아래 한 줄 바(#fabBar)에 세우는 것 — 자주 쓰거나(백업·복구),
        바로 눈에 띄어야 하는 것(장애 알림·연결 경고).
        이 셋은 각자 파일이 left/right:12px, bottom:12px 를 쓰고 있어 서로, 그리고
@@ -9005,8 +9001,6 @@ body.portal-mode #moreFab{display:flex;}
       });
       openDock(false);
     }
-    /* ⚠ 차례가 중요하다 — PC 로 돌아갈 땐 «로그인 후 바로가기»를 먼저 제자리에 돌려놓아야
-       그 바로 왼쪽이 자리인 ✨ TypeSafe 단추가 제 옆자리를 찾는다. */
     function sync(){
       if(phone.matches) adopt();
       else release();
@@ -9032,8 +9026,6 @@ body.portal-mode #moreFab{display:flex;}
       new MutationObserver(function(){ if(phone.matches) adopt(); })
         .observe(document.body, { childList:true });
     } catch(_){}
-    /* TypeSafe 단추는 body 가 아니라 「업무 시스템」 줄 안에 생겨 위 지켜보기에 안 걸린다 — 생겼다고 알려 오면 다시 맞춘다 */
-    document.addEventListener('pu-typesafe-mounted', sync);
     sync();
   })();
   // 💳 사용액 — 누르면 항목별 내역 팝업 (설정창과 같은 닫기 방식)
@@ -9146,27 +9138,9 @@ body.portal-mode #moreFab{display:flex;}
 
 })();
 </script>
-<script>
-/* ── ✨ TypeSafe 검토 — 이알피 왼쪽 아래에서 «포털 첫 화면»으로 옮겼다
-   (대표 지시 2026-09-23 「푸른통합시스템 전체로 적용해서 캡쳐3화면으로 옮기고 연결해줘」,
-   목업 ①안 「빼고 포털로만」).
-   ⚠ 포털은 떠 있는 단추 자리를 한 곳에서만 정한다(위 「화면에 떠 있는 단추의 자리」) —
-     그래서 떠 있게 두지 않고 「업무 시스템」 줄 오른쪽 끝에 세운다
-     (옆에 있던 「로그인 후 바로가기」는 2026-09-28 대표 지시 「선택 하느거 필요 없다」로 걷어냈다).
-     ★ 2026-10-24 대표 윗줄 정리 안 1 — 머리 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 나서, 목업대로 «건의하기 왼쪽»에 세운다.
-       폰에서는 ⋯ 안으로 들어간다(DOCK_IDS).
-   관리자만 보이는 것·미국 서버 확인란·하루 한도는 js/pu-typesafe.js 가 그대로 지킨다.
-   포털은 직원·업체 목록을 안 들고 있으므로 가리기용 함수를 넘기지 «않는다» —
-   부품이 「제안 받기」를 누를 때 스스로 목록을 읽어 가린다. */
-window.PU_TYPESAFE_MOUNT = function(){
-  var sg = document.getElementById('sgFab');
-  return sg && sg.parentNode ? { parent: sg.parentNode, before: null } : null;   /* 줄 «끝»에 붙이고 자리는 css order 로 — 남의 요소 앞에 기대지 않는다 */
-};
-</script>
-<script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-orchestrator-core.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=17"></script>
+<script src="js/pu-chatbot-kb.js?v=18"></script>
 <script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>
