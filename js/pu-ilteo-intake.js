@@ -838,6 +838,34 @@
    * - matched: 등록 주소·고유 기업도메인으로 확정 귀속된 메일
    * - nameCandidates: 주소는 미등록이나 제목에 상호(3자 이상) + 컨설팅 키워드가 있는 후보(자동 귀속 안 함, 사람 확인용)
    */
+  var ILTEO_MAIL_MEMO = typeof WeakMap === 'function' ? new WeakMap() : null;
+
+  function computeIlteoMailMemo(m) {
+    var attsStr = Array.isArray(m.attNames) ? m.attNames.join(' ') : '';
+    var headStr = str(m.subject) + ' ' + attsStr;
+    var mailText = headStr + ' ' + str(m.preview);
+    var mYear = Number(m.ts) > 0 ? new Date(Number(m.ts) + 9 * 3600e3).getUTCFullYear() : 0;
+    var expMatch = /(20[12]\d)\s*년/.exec(mailText);
+    return {
+      isNonIlteo: isNonIlteoText(mailText),
+      mYear: mYear,
+      expYr: expMatch ? Number(expMatch[1]) : 0,
+      hasIlteoSig: ILTEO_SIGNAL_RE.test(headStr),
+      normSubj: normCorpName(headStr),
+      dk: null
+    };
+  }
+
+  function getIlteoMailMemo(m) {
+    if (!ILTEO_MAIL_MEMO || !m || typeof m !== 'object') return computeIlteoMailMemo(m || {});
+    var got = ILTEO_MAIL_MEMO.get(m);
+    if (!got) {
+      got = computeIlteoMailMemo(m);
+      ILTEO_MAIL_MEMO.set(m, got);
+    }
+    return got;
+  }
+
   function scanProjectMails(project, folders, msgs, companies, consultings, intakeMap) {
     var prof = buildCompanyMailProfile(project, companies, consultings);
     var flat = Array.isArray(folders) ? folders : flattenMailboxRows(folders, msgs);
@@ -854,21 +882,14 @@
     flat.forEach(function (m) {
       if (!m || seenKeys[m.key]) return;
       var linkedRec = existingByMailKey[m.key] || null;
-      var mailText = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '') + ' ' + str(m.preview);
+      var memo = getIlteoMailMemo(m);
 
       /* 이미 수기·분석 연결된 카드가 아닌 경우: 타 컨설팅 사업 메일 배제 + 프로젝트 수행연도(±1년) 정합성 필터 */
       if (!linkedRec) {
-        if (isNonIlteoText(mailText)) return;
+        if (memo.isNonIlteo) return;
         if (projYear >= 2015) {
-          if (Number(m.ts) > 0) {
-            var mYear = new Date(Number(m.ts) + 9 * 3600e3).getUTCFullYear();
-            if (mYear < projYear - 1 || mYear > projYear + 1) return;
-          }
-          var expYearMatch = /(20[12]\d)\s*년/.exec(mailText);
-          if (expYearMatch) {
-            var expYr = Number(expYearMatch[1]);
-            if (Math.abs(expYr - projYear) > 1) return;
-          }
+          if (memo.mYear > 0 && (memo.mYear < projYear - 1 || memo.mYear > projYear + 1)) return;
+          if (memo.expYr > 0 && Math.abs(memo.expYr - projYear) > 1) return;
         }
       }
 
@@ -880,12 +901,11 @@
         return !!(dom && prof.domains[dom]);
       });
 
-      var dk = classifyDocKind(m.subject, m.attNames, '');
-      var phase = resolvePhase(m.ts, midTs, dk, m.subject, m.attNames);
-      var checked = !!(linkedRec && linkedRec.checkedAt);
-
       if (addrHit) {
         seenKeys[m.key] = 1;
+        var dk = memo.dk || (memo.dk = classifyDocKind(m.subject, m.attNames, ''));
+        var phase = resolvePhase(m.ts, midTs, dk, m.subject, m.attNames);
+        var checked = !!(linkedRec && linkedRec.checkedAt);
         matched.push(Object.assign({}, m, {
           matchKind: 'addr',
           docKind: dk.code,
@@ -899,18 +919,20 @@
         return;
       }
 
-      if (prof.normName.length >= 3) {
-        var normSubj = normCorpName(m.subject + ' ' + m.attNames.join(' '));
-        if (normSubj.indexOf(prof.normName) >= 0 && ILTEO_SIGNAL_RE.test(m.subject + ' ' + m.attNames.join(' '))) {
+      if (prof.normName.length >= 3 && memo.hasIlteoSig) {
+        if (memo.normSubj.indexOf(prof.normName) >= 0) {
           seenKeys[m.key] = 1;
+          var dk2 = memo.dk || (memo.dk = classifyDocKind(m.subject, m.attNames, ''));
+          var phase2 = resolvePhase(m.ts, midTs, dk2, m.subject, m.attNames);
+          var checked2 = !!(linkedRec && linkedRec.checkedAt);
           nameCandidates.push(Object.assign({}, m, {
             matchKind: 'name_candidate',
-            docKind: dk.code,
-            docKindName: dk.short,
-            track: dk.track,
-            phase: phase,
+            docKind: dk2.code,
+            docKindName: dk2.short,
+            track: dk2.track,
+            phase: phase2,
             intakeId: linkedRec ? linkedRec.id : '',
-            checked: checked,
+            checked: checked2,
             analyzed: !!(linkedRec && linkedRec.analyzedAt)
           }));
         }

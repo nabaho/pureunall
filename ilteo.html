@@ -295,6 +295,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <h1>🏭 일터상생혁신<span class="wide-only"> 자동화</span></h1>
     <span class="sub">메일 자료체크 · 비식별 진단 · 중간보고서 · 후속메일 Diff · 결과보고서(.pptx) · 플랫폼 문안</span>
     <span id="who"></span>
+    <span class="chip c-blue wide-only" id="syncStateChip" style="display:none" aria-live="polite"></span>
     <span class="sp"></span>
     <a class="act-link wide-only" href="gov-report.html" title="컨설팅보고서 총괄 현황으로 이동">📑 보고서 총괄</a>
     <button class="sm" id="scanAllBtn" aria-label="전체 메일 체크" title="등록된 모든 일터혁신 사업장의 기초·후속 수신 메일을 다시 점검합니다">🔄<span class="wide-only"> 전체 메일 체크</span></button>
@@ -417,24 +418,18 @@ table.t tr.cur>td.n{color:var(--ink2)}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="vendor/jszip.min.js?v=1"></script>
-<script src="vendor/xlsx.full.min.js?v=1"></script>
-<script src="hangul/js/zip.js?v=1"></script>
-<script src="hangul/js/hwpx.js?v=2"></script>
-<script src="hangul/js/hwp.js?v=1"></script>
-<script src="vendor/pdf.min.js?v=1"></script>
-<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
+<script src="js/pu-fast-boot.js?v=1"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-ilteo-catalog.js?v=7"></script>
-<script src="js/pu-ilteo-intake.js?v=23"></script>
+<script src="js/pu-ilteo-intake.js?v=24"></script>
 <script src="js/pu-ilteo-report.js?v=11"></script>
 <script src="js/pu-ilteo-pptx.js?v=2"></script>
 <script src="js/pu-ilteo-pack.js?v=1"></script>
-<script src="js/pu-ilteo-view.js?v=17"></script>
+<script src="js/pu-ilteo-view.js?v=18"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){

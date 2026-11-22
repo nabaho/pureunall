@@ -74,6 +74,15 @@
   var LAST_FOCUS = null;
   var SESSION_EPOCH = 0;
   var MODAL_SEQ = 0;
+  var RELOAD_IN_FLIGHT = false;
+  var MAIL_VIEW_CACHE = Object.create(null);
+  var CACHED_MAIL_ROWS = null;
+  var _memoCoSrc = null;
+  var _memoCardSrc = null;
+  var _memoFoldersRef = null;
+  var _memoMsgsRef = null;
+  var _memoOldRef = null;
+  var _baseFlattenedRows = [];
   var LIVE_REC = {
     active: false,
     recog: null,
@@ -604,6 +613,7 @@
   /* ═══ 로그아웃·계정 전환 시 기밀 상태 및 DOM 즉시 폐기 ═══ */
   function purgeSessionState() {
     SESSION_EPOCH++;
+    SNAP_ONLY = false;
     if (ACK_WATCHED && fbDb) {
       try { fbDb.ref('harass_invest/erp_ack').off(); } catch (e) {}
     }
@@ -654,6 +664,20 @@
     BUNDLES = [];
     YEARLY_DATA = null;
     MAIL_ROWS = [];
+    RELOAD_IN_FLIGHT = false;
+    MAIL_VIEW_CACHE = Object.create(null);
+    CACHED_MAIL_ROWS = null;
+    _memoCoSrc = null;
+    _memoCardSrc = null;
+    _memoFoldersRef = null;
+    _memoMsgsRef = null;
+    _memoOldRef = null;
+    _baseFlattenedRows = [];
+    CO_DIR = null;
+    setSyncStateText('');
+    if (global.PuFastBoot && typeof global.PuFastBoot.clearAll === 'function') {
+      try { global.PuFastBoot.clearAll(); } catch (e) {}
+    }
     cleanupPendingHangulBridges();
     stopActiveLiveCapture();
     closeModal();
@@ -809,9 +833,37 @@
     return { companyName: co, title: ti };
   }
 
+  function setSyncStateText(txt) {
+    var el = $('syncStateChip');
+    if (!el) return;
+    if (!txt) {
+      el.style.display = 'none';
+      el.textContent = '';
+    } else {
+      el.textContent = txt;
+      el.style.display = '';
+    }
+  }
+
   function rebuildDerived() {
-    CO_DIR = C.buildCompanyDirectory(D.companies, D.cardIdx);
-    var baseRows = C.flattenMailbox(D.mailFolders, D.mailMsgs, D.oldMailMsgs);
+    if (!CO_DIR || D.companies !== _memoCoSrc || D.cardIdx !== _memoCardSrc) {
+      CO_DIR = C.buildCompanyDirectory(D.companies, D.cardIdx);
+      _memoCoSrc = D.companies;
+      _memoCardSrc = D.cardIdx;
+    }
+    var hasLiveMailData = (D.mailMsgs && Object.keys(D.mailMsgs).length > 0) || (D.oldMailMsgs && Object.keys(D.oldMailMsgs).length > 0);
+    var baseRows;
+    if (!hasLiveMailData && Array.isArray(CACHED_MAIL_ROWS) && CACHED_MAIL_ROWS.length > 0) {
+      baseRows = CACHED_MAIL_ROWS;
+    } else {
+      if (D.mailFolders !== _memoFoldersRef || D.mailMsgs !== _memoMsgsRef || D.oldMailMsgs !== _memoOldRef) {
+        _baseFlattenedRows = C.flattenMailbox(D.mailFolders, D.mailMsgs, D.oldMailMsgs);
+        _memoFoldersRef = D.mailFolders;
+        _memoMsgsRef = D.mailMsgs;
+        _memoOldRef = D.oldMailMsgs;
+      }
+      baseRows = _baseFlattenedRows;
+    }
     var seenKeys = {};
     MAIL_ROWS = [];
     baseRows.concat(D.extraMailRows).forEach(function (r) {
@@ -899,22 +951,33 @@
       if (extRes && extRes.casesById) byId = extRes.casesById;
     }
 
-    /* 3) 동일 사업장 동시 사건 충돌 방지를 위해 전체 peer 목록을 함께 전달하여 메일·모호건·한도초과 계산 */
+    /* 3) 동일 사업장 동시 사건 충돌 방지를 위해 전체 peer 목록을 함께 전달하여 메일·모호건·한도초과 계산
+          (이미 mailLinks 가 저장돼 있고 동시 사건 충돌이 없는 등록 사건은 불필요한 전체 메일 재스캔을 생략해 즉시 계산) */
     var rawPeers = Object.keys(byId).map(function (id) { return byId[id]; });
+    var hasAnyMails = MAIL_ROWS.length > 0;
     rawPeers.forEach(function (c) {
-      var scan = C.scanMailsForCaseInternal(c, MAIL_ROWS, CO_DIR, rawPeers);
       var virt = isVirtualCase(c);
-      if (virt || (!(Array.isArray(c.mailLinks) && c.mailLinks.length) && !SESSION_UNLINKED[c.id])) {
-        if (scan.items.length || virt) {
+      var savedLen = Array.isArray(c.mailLinks) ? c.mailLinks.length : 0;
+      var needAutoScan = virt || (!savedLen && !SESSION_UNLINKED[c.id]);
+      var sibs = typeof C.findOverlappingSiblings === 'function' ? C.findOverlappingSiblings(c, rawPeers) : [1];
+      if (hasAnyMails && (needAutoScan || sibs.length > 0 || savedLen >= 300)) {
+        var scan = C.scanMailsForCaseInternal(c, MAIL_ROWS, CO_DIR, rawPeers);
+        if (needAutoScan && (scan.items.length || virt)) {
           c.mailLinks = scan.items;
           c.steps = C.deriveStepsFromMails(c.steps || {}, c.mailLinks, c.receiveDate, c.closeDate);
         }
+        c._ambiguousMails = scan.ambiguous || [];
+        c._truncatedMails = scan.truncated || 0;
+      } else {
+        if (virt) {
+          c.steps = C.deriveStepsFromMails(c.steps || {}, c.mailLinks || [], c.receiveDate, c.closeDate);
+        }
+        c._ambiguousMails = [];
+        c._truncatedMails = 0;
       }
       if (Array.isArray(c._autoLogs) && c._autoLogs.length && typeof C.applyExternalLogsToSteps === 'function') {
         c.steps = C.applyExternalLogsToSteps(c.steps || {}, c._autoLogs, c.receiveDate, c.closeDate);
       }
-      c._ambiguousMails = scan.ambiguous || [];
-      c._truncatedMails = scan.truncated || 0;
     });
 
     MERGED_CASES = rawPeers.map(function (c) {
@@ -1493,6 +1556,7 @@
         var fn = function (snap) {
           if (!isSessionCurrent(SESSION_EPOCH, ME && ME.uid)) return;
           sp.apply(snap ? snap.val() : null);
+          if (RELOAD_IN_FLIGHT) return;
           scheduleLiveRedraw();
         };
         r.on('value', fn);
@@ -1501,22 +1565,252 @@
     });
   }
 
-  /* ═══ 전체 데이터 적재 ═══ */
+  function isAnyModalOpen() {
+    var m = $('modal');
+    return !!(m && m.style && m.style.display && m.style.display !== 'none');
+  }
+
+  function isFilterOrFormFocused() {
+    if (isReportInputFocused()) return true;
+    var ae = typeof document !== 'undefined' ? document.activeElement : null;
+    if (!ae || !ae.tagName) return false;
+    var tag = String(ae.tagName).toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  function slimCardIndex(rawCardIdx) {
+    var slim = {};
+    if (rawCardIdx && typeof rawCardIdx === 'object') {
+      Object.keys(rawCardIdx).forEach(function (ck) {
+        var it = rawCardIdx[ck];
+        if (!it || typeof it !== 'object') return;
+        var co = C.str(it.c || it.company || it.co);
+        var em = C.str(it.e || it.email);
+        if (!co || !em) return;
+        slim[ck] = { c: co, bz: C.str(it.bz || it.bizNo || it.bizno), e: em };
+      });
+    }
+    return slim;
+  }
+
+  function slimStepsForSnap(steps) {
+    var out = {};
+    if (!steps || typeof steps !== 'object') return out;
+    Object.keys(steps).forEach(function (k) {
+      var s = steps[k];
+      if (!s || typeof s !== 'object') return;
+      out[k] = { done: !!s.done, date: C.str(s.date), manual: !!s.manual };
+    });
+    return out;
+  }
+
+  function slimLinkForSnap(m) {
+    if (!m || typeof m !== 'object') return null;
+    return {
+      key: C.str(m.key),
+      folderSlug: C.str(m.folderSlug),
+      msgId: C.str(m.msgId),
+      date: C.str(m.date),
+      ts: Number(m.ts) || 0,
+      dir: C.str(m.dir),
+      isSent: !!m.isSent,
+      role: C.str(m.role),
+      stepCode: C.str(m.stepCode),
+      attCount: Number(m.attCount) || 0
+    };
+  }
+
+  function safeGenericCaseTitle(companyName, category) {
+    var co = C.str(companyName) || '사업장';
+    var cat = C.str(category);
+    var suffix = cat === 'sexual' ? '직장 내 성희롱 조사' : (cat === 'both' ? '괴롭힘·성희롱 복합 조사' : '직장 내 괴롭힘 조사');
+    return co + ' ' + suffix;
+  }
+
+  function buildHarassFastSnapshot() {
+    /* 보안 불변식: IndexedDB 스냅샷에는 판정 요약(verdictSummary)·erpSync 메모·조사자 성명·실명 제목·메일 제목/첨부명/본문/주소를
+       일절 저장하지 않고, 0.2초 선표시에 필요한 비민감 구조화 열쇠·일자·건수만 화이트리스트로 담는다 */
+    var slimCases = {};
+    Object.keys(D.cases || {}).forEach(function (cid) {
+      var rec = D.cases[cid];
+      if (!rec || typeof rec !== 'object') return;
+      slimCases[cid] = {
+        id: C.str(rec.id || cid),
+        erpCaseId: C.str(rec.erpCaseId),
+        erpCaseNo: C.str(rec.erpCaseNo),
+        erpDefer: !!rec.erpDefer,
+        companyId: C.str(rec.companyId),
+        companyLinkStatus: C.str(rec.companyLinkStatus),
+        companyName: C.str(rec.companyName),
+        bizNo: C.str(rec.bizNo),
+        category: C.str(rec.category),
+        performMode: C.str(rec.performMode || rec._performMode),
+        hasDirectReport: !!(rec.hasDirectReport || rec.hasResultReport || rec._hasDirectReport),
+        hasResultReport: !!(rec.hasResultReport || rec.hasDirectReport || rec._hasDirectReport),
+        title: safeGenericCaseTitle(rec.companyName, rec.category),
+        managerMain: C.str(rec.managerMain),
+        managerSubs: Array.isArray(rec.managerSubs) ? rec.managerSubs.slice(0, 5).map(C.str) : [],
+        receiveDate: C.str(rec.receiveDate),
+        dueDate: C.str(rec.dueDate),
+        closeDate: C.str(rec.closeDate),
+        createdAt: Number(rec.createdAt) || 0,
+        updatedAt: Number(rec.updatedAt) || 0,
+        revision: Number(rec.revision) || 0,
+        schemaVersion: Number(rec.schemaVersion) || 1,
+        _deleted: !!rec._deleted,
+        steps: slimStepsForSnap(rec.steps),
+        mailLinks: (Array.isArray(rec.mailLinks) ? rec.mailLinks : []).slice(0, 120).map(slimLinkForSnap).filter(Boolean)
+      };
+    });
+    var slimErpSync = {};
+    Object.keys(D.erpSync || {}).forEach(function (k) {
+      var es = D.erpSync[k];
+      if (!es || typeof es !== 'object') return;
+      slimErpSync[k] = {
+        erpCaseId: C.str(es.erpCaseId),
+        erpCaseNo: C.str(es.erpCaseNo),
+        erpStatus: C.str(es.erpStatus),
+        revision: Number(es.revision) || 0,
+        syncedAt: Number(es.syncedAt) || 0,
+        _deleted: !!es._deleted
+      };
+    });
+    var slimErpAck = {};
+    Object.keys(D.erpAck || {}).forEach(function (k) {
+      var ak = D.erpAck[k];
+      if (!ak || typeof ak !== 'object') return;
+      slimErpAck[k] = {
+        caseId: C.str(ak.caseId || k),
+        erpCaseId: C.str(ak.erpCaseId),
+        erpCaseNo: C.str(ak.erpCaseNo),
+        syncedRevision: Number(ak.syncedRevision) || 0,
+        ackAt: Number(ak.ackAt) || 0,
+        _deleted: !!ak._deleted
+      };
+    });
+    var slimDismissed = {};
+    Object.keys(D.dismissed || {}).forEach(function (k) {
+      var dm = D.dismissed[k];
+      if (!dm || typeof dm !== 'object') return;
+      slimDismissed[k] = {
+        updatedAt: Number(dm.updatedAt || dm.createdAt) || 0,
+        _deleted: !!dm._deleted
+      };
+    });
+    var slimCos = D.companies.slice(0, 2500).map(function (co) {
+      return {
+        id: C.str(co.id),
+        name: C.str(co.name),
+        bizNo: C.str(co.bizNo),
+        managerMain: C.str(co.managerMain)
+      };
+    });
+    var slimErpCases = D.erpCases.filter(function (ec) {
+      return C.isErpInvestigateCase(ec, D.caseTypes);
+    }).slice(0, 400).map(function (ec) {
+      var ecCat = C.inferCategory(C.str(ec.title) + ' ' + C.str(ec.brief) + ' ' + C.str(ec.note));
+      return {
+        id: C.str(ec.id),
+        caseNo: C.str(ec.caseNo),
+        type: C.str(ec.type),
+        category: C.str(ec.category || ecCat),
+        companyId: C.str(ec.companyId),
+        companyName: C.str(ec.companyName),
+        bizNo: C.str(ec.bizNo),
+        title: safeGenericCaseTitle(ec.companyName, ecCat),
+        managerMain: C.str(ec.managerMain),
+        managerSubs: Array.isArray(ec.managerSubs) ? ec.managerSubs.slice(0, 5).map(C.str) : [],
+        receiveDate: C.str(ec.receiveDate),
+        dueDate: C.str(ec.dueDate),
+        closeDate: C.str(ec.closeDate),
+        status: C.str(ec.status),
+        _deleted: !!ec._deleted
+      };
+    });
+    return {
+      cases: slimCases,
+      erpSync: slimErpSync,
+      erpAck: slimErpAck,
+      dismissed: slimDismissed,
+      companies: slimCos,
+      erpCases: slimErpCases,
+      caseTypes: D.caseTypes,
+      staff: STAFF,
+      names: NAMES,
+      sidCanon: SID_CANON,
+      mailRows: []
+    };
+  }
+
+  var SNAP_ONLY = false;
+
+  function wrapSnapGuard(rawGate) {
+    if (!rawGate || typeof rawGate.save !== 'function') return rawGate;
+    return Object.assign({}, rawGate, {
+      save: function () {
+        if (SNAP_ONLY) {
+          toast('최신 원장 동기화 중입니다. 잠시 후 다시 저장해 주세요.');
+          return Promise.reject(new Error('SNAP_ONLY'));
+        }
+        return rawGate.save.apply(rawGate, arguments);
+      }
+    });
+  }
+
+  function applyHarassFastSnapshot(snap) {
+    if (!snap || typeof snap !== 'object') return false;
+    SNAP_ONLY = true;
+    D.cases = snap.cases && typeof snap.cases === 'object' ? snap.cases : {};
+    D.erpSync = snap.erpSync && typeof snap.erpSync === 'object' ? snap.erpSync : {};
+    D.erpAck = snap.erpAck && typeof snap.erpAck === 'object' ? snap.erpAck : {};
+    D.dismissed = snap.dismissed && typeof snap.dismissed === 'object' ? snap.dismissed : {};
+    D.companies = Array.isArray(snap.companies) ? snap.companies : [];
+    D.erpCases = Array.isArray(snap.erpCases) ? snap.erpCases : [];
+    D.caseTypes = Array.isArray(snap.caseTypes) ? snap.caseTypes : [];
+    if (Array.isArray(snap.staff) && snap.staff.length && !STAFF.length) {
+      STAFF = snap.staff.slice();
+      NAMES = Object.assign(Object.create(null), snap.names || {});
+      SID_CANON = Object.assign(Object.create(null), snap.sidCanon || {});
+      fillMgrFilter();
+    }
+    CACHED_MAIL_ROWS = Array.isArray(snap.mailRows) ? snap.mailRows : null;
+    return true;
+  }
+
+  /* ═══ 3단계 점진적 즉시 적재 (핵심 원장 0.2초 선표시 → 교차연동 → 대용량 메일함 백그라운드 동기화) ═══ */
   async function reload(optEpoch, optUid) {
     var reqEpoch = optEpoch || SESSION_EPOCH;
     var reqUid = optUid || (ME && ME.uid ? String(ME.uid) : '');
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
-    var tasks = [
+
+    RELOAD_IN_FLIGHT = true;
+    setSyncStateText('⟳ 최신 동기화 중…');
+
+    /* 실시간 리스너를 먼저 연결해 Firebase RTDB 단일 구독을 재사용(once 후 재구독 이중 다운로드 제거) */
+    if (!ACK_WATCHED) {
+      ACK_WATCHED = true;
+      try {
+        fbDb.ref('harass_invest/erp_ack').on('value', function (snap) {
+          if (!isSessionCurrent(SESSION_EPOCH, ME && ME.uid)) return;
+          D.erpAck = snap.val() || {};
+          if (RELOAD_IN_FLIGHT) return;
+          rebuildDerived();
+          draw();
+        });
+      } catch (e) {}
+    }
+    attachLiveWatchers();
+
+    var coreTasks = [
       fbDb.ref('harass_invest/cases').once('value'),
       fbDb.ref('harass_invest/erp_sync').once('value'),
       fbDb.ref('harass_invest/erp_ack').once('value'),
       fbDb.ref('harass_invest/dismissed').once('value'),
       fbDb.ref('data/companies/v').once('value'),
       fbDb.ref('data/cases/v').once('value'),
-      fbDb.ref('data/biz_case_types/v').once('value'),
-      fbDb.ref('mailbox/folders').once('value'),
-      fbDb.ref('mailbox/msgs').once('value'),
-      fbDb.ref('mailbox/old/msgs').once('value'),
+      fbDb.ref('data/biz_case_types/v').once('value')
+    ];
+    var extTasks = [
       fbDb.ref('pucards/idx').once('value'),
       fbDb.ref('data/case_memos/v').once('value'),
       fbDb.ref('data/contracts/v').once('value'),
@@ -1527,92 +1821,142 @@
       fbDb.ref('work_erp/itemlogs').once('value'),
       fbDb.ref('data/my_schedules/v').once('value')
     ];
-    var labels = ['조사사건', '동기화큐', '동기화응답', '제외목록', '업체원장', '이알피사건', '사건유형', '메일폴더', '메일목록', '지난메일', '명함색인'];
-    var res = await Promise.allSettled(tasks);
-    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+    var mailTasks = [
+      fbDb.ref('mailbox/folders').once('value'),
+      fbDb.ref('mailbox/msgs').once('value'),
+      fbDb.ref('mailbox/old/msgs').once('value')
+    ];
+
+    var pCore = Promise.allSettled(coreTasks);
+    var pExt = Promise.allSettled(extTasks);
+    var pMail = Promise.allSettled(mailTasks);
+    var allDone = false;
+    var coreLabels = ['조사사건', '동기화큐', '동기화응답', '제외목록', '업체원장', '이알피사건', '사건유형'];
+    var mailLabels = ['메일폴더', '메일목록', '지난메일'];
     var fails = [];
-    function valAt(i, fallback, optional) {
-      if (res[i] && res[i].status === 'fulfilled') return res[i].value.val() || fallback;
-      if (!optional && labels[i]) fails.push(labels[i]);
+
+    function readSettled(arr, idx, fallback, label) {
+      if (arr[idx] && arr[idx].status === 'fulfilled') return arr[idx].value.val() || fallback;
+      if (label) fails.push(label);
       return fallback;
     }
-    D.cases = valAt(0, {});
-    D.erpSync = valAt(1, {});
-    D.erpAck = valAt(2, {});
-    D.dismissed = valAt(3, {});
-    D.companies = rowsOf(valAt(4, []));
-    D.erpCases = rowsOf(valAt(5, []));
-    D.caseTypes = rowsOf(valAt(6, []));
-    D.mailFolders = valAt(7, {});
-    D.mailMsgs = valAt(8, {});
-    D.oldMailMsgs = valAt(9, {});
-    var rawCardIdx = valAt(10, {});
-    var slimCardIdx = {};
-    if (rawCardIdx && typeof rawCardIdx === 'object') {
-      Object.keys(rawCardIdx).forEach(function (ck) {
-        var it = rawCardIdx[ck];
-        if (!it || typeof it !== 'object') return;
-        var co = C.str(it.c || it.company || it.co);
-        var em = C.str(it.e || it.email);
-        if (!co || !em) return;
-        slimCardIdx[ck] = { c: co, bz: C.str(it.bz || it.bizNo || it.bizno), e: em };
-      });
-    }
-    D.cardIdx = slimCardIdx;
-    D.caseMemos = rowsOf(valAt(11, [], true));
-    D.contracts = rowsOf(valAt(12, [], true));
-    D.quotes = rowsOf(valAt(13, [], true));
-    D.otherProjects = rowsOf(valAt(14, [], true));
-    D.consultings = rowsOf(valAt(15, [], true));
-    D.workItems = valAt(16, {}, true);
-    D.workItemLogs = valAt(17, {}, true);
-    D.schedules = rowsOf(valAt(18, [], true));
+
+    /* 1단계: 가벼운 조사·이알피 핵심 원장이 도착하는 즉시(~0.2초) 화면을 먼저 그린다 */
+    pCore.then(function (cRes) {
+      if (allDone || !isSessionCurrent(reqEpoch, reqUid)) return;
+      SNAP_ONLY = false;
+      D.cases = readSettled(cRes, 0, {}, '');
+      D.erpSync = readSettled(cRes, 1, {}, '');
+      D.erpAck = readSettled(cRes, 2, {}, '');
+      D.dismissed = readSettled(cRes, 3, {}, '');
+      D.companies = rowsOf(readSettled(cRes, 4, [], ''));
+      D.erpCases = rowsOf(readSettled(cRes, 5, [], ''));
+      D.caseTypes = rowsOf(readSettled(cRes, 6, [], ''));
+      rebuildDerived();
+      applyUrlDeepLink(false);
+      if (!isAnyModalOpen() && !isFilterOrFormFocused()) draw();
+    }).catch(function () {});
+
+    /* 2단계: 계약·업무관리·명함색인 등 교차 연동 원장이 도착하면 대용량 메일함 전이라도 한 번 더 보강 */
+    Promise.all([pCore, pExt]).then(function (pair) {
+      if (allDone || !isSessionCurrent(reqEpoch, reqUid)) return;
+      var eRes = pair[1];
+      D.cardIdx = slimCardIndex(readSettled(eRes, 0, {}, ''));
+      D.caseMemos = rowsOf(readSettled(eRes, 1, [], ''));
+      D.contracts = rowsOf(readSettled(eRes, 2, [], ''));
+      D.quotes = rowsOf(readSettled(eRes, 3, [], ''));
+      D.otherProjects = rowsOf(readSettled(eRes, 4, [], ''));
+      D.consultings = rowsOf(readSettled(eRes, 5, [], ''));
+      D.workItems = readSettled(eRes, 6, {}, '');
+      D.workItemLogs = readSettled(eRes, 7, {}, '');
+      D.schedules = rowsOf(readSettled(eRes, 8, [], ''));
+      rebuildDerived();
+      applyUrlDeepLink(false);
+      if (!isAnyModalOpen() && !isFilterOrFormFocused()) draw();
+    }).catch(function () {});
+
+    /* 3단계: 메일함 거울까지 모두 도착하면 최종 정합 반영 및 경량 스냅샷 갱신 */
+    var settledAll = await Promise.all([pCore, pExt, pMail]);
+    allDone = true;
+    SNAP_ONLY = false;
+    RELOAD_IN_FLIGHT = false;
+    if (!isSessionCurrent(reqEpoch, reqUid)) return;
+
+    fails = [];
+    var cResFinal = settledAll[0];
+    var eResFinal = settledAll[1];
+    var mResFinal = settledAll[2];
+
+    D.cases = readSettled(cResFinal, 0, {}, coreLabels[0]);
+    D.erpSync = readSettled(cResFinal, 1, {}, coreLabels[1]);
+    D.erpAck = readSettled(cResFinal, 2, {}, coreLabels[2]);
+    D.dismissed = readSettled(cResFinal, 3, {}, coreLabels[3]);
+    D.companies = rowsOf(readSettled(cResFinal, 4, [], coreLabels[4]));
+    D.erpCases = rowsOf(readSettled(cResFinal, 5, [], coreLabels[5]));
+    D.caseTypes = rowsOf(readSettled(cResFinal, 6, [], coreLabels[6]));
+
+    D.cardIdx = slimCardIndex(readSettled(eResFinal, 0, {}, '명함색인'));
+    D.caseMemos = rowsOf(readSettled(eResFinal, 1, [], ''));
+    D.contracts = rowsOf(readSettled(eResFinal, 2, [], ''));
+    D.quotes = rowsOf(readSettled(eResFinal, 3, [], ''));
+    D.otherProjects = rowsOf(readSettled(eResFinal, 4, [], ''));
+    D.consultings = rowsOf(readSettled(eResFinal, 5, [], ''));
+    D.workItems = readSettled(eResFinal, 6, {}, '');
+    D.workItemLogs = readSettled(eResFinal, 7, {}, '');
+    D.schedules = rowsOf(readSettled(eResFinal, 8, [], ''));
+
+    D.mailFolders = readSettled(mResFinal, 0, {}, mailLabels[0]);
+    D.mailMsgs = readSettled(mResFinal, 1, {}, mailLabels[1]);
+    D.oldMailMsgs = readSettled(mResFinal, 2, {}, mailLabels[2]);
+    CACHED_MAIL_ROWS = null;
 
     var noteEl = $('loadNote');
     if (noteEl) {
       noteEl.style.display = fails.length ? '' : 'none';
       noteEl.textContent = fails.length ? ('일부 자료를 아직 읽지 못했습니다(' + fails.join('·') + '). 권한 또는 연결 상태를 확인하세요.') : '';
     }
-
-    if (!ACK_WATCHED) {
-      ACK_WATCHED = true;
-      try {
-        fbDb.ref('harass_invest/erp_ack').on('value', function (snap) {
-          if (!isSessionCurrent(SESSION_EPOCH, ME && ME.uid)) return;
-          D.erpAck = snap.val() || {};
-          rebuildDerived();
-          draw();
-        });
-      } catch (e) {}
-    }
-    attachLiveWatchers();
+    setSyncStateText('');
 
     rebuildDerived();
-    applyUrlDeepLink();
+    applyUrlDeepLink(true);
     if (TAB === 'report' && CUR_ID) {
       await ensureSecretLoaded(CUR_ID);
       if (!isSessionCurrent(reqEpoch, reqUid)) return;
     }
-    draw();
+    if (isReportInputFocused() || isAnyModalOpen()) {
+      var ydDone = YEARLY_DATA || C.buildYearlyArchive(MERGED_CASES, BUNDLES);
+      if ($('nCases')) $('nCases').textContent = String(MERGED_CASES.length);
+      if ($('nInbox')) $('nInbox').textContent = String(BUNDLES.length);
+      if ($('nYearly')) $('nYearly').textContent = String(ydDone.totalItems);
+    } else {
+      draw();
+    }
+
+    if (global.PuFastBoot && typeof global.PuFastBoot.writeSnap === 'function') {
+      try { global.PuFastBoot.writeSnap('harass', reqUid, buildHarassFastSnapshot()); } catch (e) {}
+    }
   }
 
-  function applyUrlDeepLink() {
+  function applyUrlDeepLink(allowClearUrl) {
     try {
       var sp = new URLSearchParams(location.search);
       var hp = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
       var wantErp = sp.get('erp') || hp.get('erp') || '';
       var wantCase = sp.get('case') || hp.get('case') || '';
       var wantTab = sp.get('tab') || hp.get('tab') || '';
+      var matched = false;
       if (wantErp) {
         var found = MERGED_CASES.find(function (c) { return C.str(c.erpCaseId) === wantErp || c.id === 'hi_' + C.safeKey(wantErp); });
-        if (found) { CUR_ID = found.id; TAB = 'detail'; }
+        if (found) { CUR_ID = found.id; TAB = 'detail'; matched = true; }
       } else if (wantCase && caseById(wantCase)) {
         CUR_ID = wantCase;
         TAB = 'detail';
+        matched = true;
       } else if (wantTab === 'yearly' || wantTab === 'inbox' || wantTab === 'cases') {
         TAB = wantTab;
+        matched = true;
       }
-      if ((wantErp || wantCase || wantTab) && history && history.replaceState) {
+      if ((allowClearUrl !== false || matched) && (wantErp || wantCase || wantTab) && history && history.replaceState) {
         history.replaceState(null, '', location.pathname);
       }
     } catch (e) {}
@@ -3517,9 +3861,16 @@
     }
 
     async function loadViewerContent(wantFull) {
-      var msg = isOldMail
-        ? await callMailFn('readOldMail', wantFull ? { key: String(ml.uid), full: true } : { key: String(ml.uid) }, reqEpoch, reqUid)
-        : await callMailFn('readMailMessage', { slug: ml.slug, uid: String(ml.uid), peek: 1 }, reqEpoch, reqUid);
+      var mCacheKey = (isOldMail ? ('old:' + String(ml.uid) + (wantFull ? ':full' : ':part')) : ('imap:' + String(ml.slug) + ':' + String(ml.uid)));
+      var msg = MAIL_VIEW_CACHE[mCacheKey];
+      if (!msg) {
+        msg = isOldMail
+          ? await callMailFn('readOldMail', wantFull ? { key: String(ml.uid), full: true } : { key: String(ml.uid) }, reqEpoch, reqUid)
+          : await callMailFn('readMailMessage', { slug: ml.slug, uid: String(ml.uid), peek: 1 }, reqEpoch, reqUid);
+        if (msg && isSessionCurrent(reqEpoch, reqUid)) {
+          MAIL_VIEW_CACHE[mCacheKey] = msg;
+        }
+      }
       if (!isSessionCurrent(reqEpoch, reqUid) || MODAL_SEQ !== reqModalSeq) return;
       var bodyEl = $('mMailBody');
       var attEl = $('mMailAtts');
@@ -7524,6 +7875,16 @@
           else if (act === 'openReport') {
             if (!confirmLeaveDirtyCase(id)) return;
             CUR_ID = id; TAB = 'report'; RPT_MODE = 'split'; clearSel();
+            if (!D.secretCache[id]) {
+              document.querySelectorAll('#tabs button[data-tab]').forEach(function (b) {
+                b.classList.toggle('on', b.getAttribute('data-tab') === 'report');
+              });
+              ['cases', 'inbox', 'yearly', 'detail', 'report'].forEach(function (t) {
+                var p = $('p-' + t);
+                if (p) p.classList.toggle('on', t === 'report');
+              });
+              if ($('reportBox')) $('reportBox').innerHTML = '<div class="card"><div class="empty">🔒 비밀유지 조사 작업실을 불러오고 있습니다…</div></div>';
+            }
             await ensureSecretLoaded(id, evEpoch, evUid);
             if (!isSessionCurrent(evEpoch, evUid)) return;
             draw();
@@ -7978,6 +8339,9 @@
       }
       var authEpoch = ++SESSION_EPOCH;
       if (global.PuGate) global.PuGate.hide();
+      var snapPromise = (global.PuFastBoot && typeof global.PuFastBoot.readSnap === 'function')
+        ? global.PuFastBoot.readSnap('harass', authUid).catch(function () { return null; })
+        : Promise.resolve(null);
       var roleVal = {};
       try { roleVal = (await fbDb.ref('uid_roles/' + authUid).once('value')).val() || {}; } catch (e) {}
       if (authEpoch !== SESSION_EPOCH || currentAuthUid() !== authUid) return;
@@ -7994,12 +8358,28 @@
         isAdmin: roleVal.isAdmin == true,
         isSubAdmin: roleVal.isSubAdmin == true
       };
-      gate = global.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid });
+      gate = wrapSnapGuard(global.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid }));
       $('lock').style.display = 'none';
       $('app').style.display = '';
-      await loadStaffDir(authEpoch, authUid);
+
+      /* 캐시 스냅샷이 있으면 즉시(<0.08초) 표를 먼저 그리고, 없으면 빈 화면 대신 즉시 로딩 안내 표시 */
+      var cachedSnap = await snapPromise;
       if (!isSessionCurrent(authEpoch, authUid)) return;
-      await reload(authEpoch, authUid);
+      if (cachedSnap && applyHarassFastSnapshot(cachedSnap)) {
+        rebuildDerived();
+        applyUrlDeepLink(false);
+        draw();
+      } else if ($('casesBox') && !$('casesBox').innerHTML) {
+        $('casesBox').innerHTML = '<div class="empty">조사 사건 현황을 빠르게 불러오고 있습니다…</div>';
+      }
+
+      /* 직원 명부와 사건·메일 원장을 직렬 대기 없이 동시에 적재 */
+      var staffP = loadStaffDir(authEpoch, authUid).then(function () {
+        if (isSessionCurrent(authEpoch, authUid) && MERGED_CASES.length && !isAnyModalOpen() && !isFilterOrFormFocused()) {
+          draw();
+        }
+      });
+      await Promise.all([staffP, reload(authEpoch, authUid)]);
     });
   }
 

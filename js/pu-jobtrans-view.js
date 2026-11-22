@@ -68,6 +68,33 @@
   var DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
   var UPLOAD_DOC_KIND = '';
   var POST_UPLOAD_DOC_KIND = '';
+  var MAIL_VIEW_CACHE = Object.create(null);
+
+  function setSyncStateText(txt) {
+    var el = $('syncStateChip');
+    if (!el) return;
+    if (!txt) { el.style.display = 'none'; el.textContent = ''; }
+    else { el.textContent = txt; el.style.display = ''; }
+  }
+
+  function isUiBusyForBgRedraw() {
+    var m = $('modal');
+    if (m && m.style && m.style.display && m.style.display !== 'none') return true;
+    var ae = typeof document !== 'undefined' ? document.activeElement : null;
+    if (!ae || !ae.tagName) return false;
+    var tag = String(ae.tagName).toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  async function ensureJobtransLibs(opts) {
+    var o = opts || {};
+    var fbBoot = global.PuFastBoot;
+    if (!fbBoot) return;
+    if (o.zip && !global.JSZip && typeof fbBoot.ensureJsZip === 'function') await fbBoot.ensureJsZip();
+    if (o.xlsx && !global.XLSX && typeof fbBoot.ensureXlsx === 'function') await fbBoot.ensureXlsx();
+    if (o.pdf && !global.pdfjsLib && typeof fbBoot.ensurePdfJs === 'function') await fbBoot.ensurePdfJs();
+    if (o.hwp && !global.PureunHwp && typeof fbBoot.ensureHwpLibs === 'function') await fbBoot.ensureHwpLibs();
+  }
 
   function $(id) { return document.getElementById(id); }
   function str(v) { return v == null ? '' : String(v).trim(); }
@@ -138,8 +165,24 @@
     return !!uid && epoch === SESSION_EPOCH && !!ME && ME.uid === uid && currentAuthUid() === uid;
   }
 
+  var SNAP_ONLY = false;
+
+  function wrapSnapGuard(rawGate) {
+    if (!rawGate || typeof rawGate.save !== 'function') return rawGate;
+    return Object.assign({}, rawGate, {
+      save: function () {
+        if (SNAP_ONLY) {
+          toast('최신 원장 동기화 중입니다. 잠시 후 다시 저장해 주세요.');
+          return Promise.reject(new Error('SNAP_ONLY'));
+        }
+        return rawGate.save.apply(rawGate, arguments);
+      }
+    });
+  }
+
   function purgeSessionState() {
     gate = null;
+    SNAP_ONLY = false;
     ME = { uid: '', sid: '', name: '', email: '', isAdmin: false, isSubAdmin: false };
     TAB = 'projects';
     AGENCY_SCOPE = '';
@@ -148,6 +191,11 @@
     DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
     SCAN_CACHE = {};
     DISCOVER_LIST = [];
+    MAIL_VIEW_CACHE = Object.create(null);
+    setSyncStateText('');
+    if (global.PuFastBoot && typeof global.PuFastBoot.clearAll === 'function') {
+      try { global.PuFastBoot.clearAll(); } catch (e) {}
+    }
     FOLDER_STATE = {
       rootName: '', rawRootName: '', handle: null, needsPerm: false, rawEntries: [], groups: [],
       formFileCount: 0, totalAcceptedFiles: 0, walkedSkippedDirs: 0, skippedNonJobtrans: 0, skippedPersonal: 0
@@ -179,46 +227,187 @@
     }
   }
 
+  function buildJobtransFastSnapshot() {
+    var slimProjects = {};
+    Object.keys(D.projects || {}).forEach(function (pid) {
+      var p = D.projects[pid];
+      if (!p || typeof p !== 'object') return;
+      slimProjects[pid] = {
+        id: str(p.id || pid),
+        companyId: str(p.companyId),
+        scalCoId: str(p.scalCoId),
+        companyName: str(p.companyName),
+        bizNo: str(p.bizNo),
+        year: Number(p.year) || 0,
+        agency: str(p.agency),
+        track: str(p.track),
+        programName: str(p.programName),
+        selectedTasks: Array.isArray(p.selectedTasks) ? p.selectedTasks.slice(0, 12).map(str) : [],
+        industry: str(p.industry),
+        transGoal: str(p.transGoal),
+        consultantSid: str(p.consultantSid),
+        consultantName: str(p.consultantName),
+        midConfirmedAt: Number(p.midConfirmedAt) || 0,
+        finalConfirmedAt: Number(p.finalConfirmedAt) || 0,
+        status: str(p.status),
+        revision: Number(p.revision) || 0,
+        createdAt: Number(p.createdAt) || 0,
+        updatedAt: Number(p.updatedAt) || 0,
+        _deleted: !!p._deleted
+      };
+    });
+    var slimIntake = {};
+    Object.keys(D.intake || {}).forEach(function (pid) {
+      var bucket = D.intake[pid];
+      if (!bucket || typeof bucket !== 'object') return;
+      var sub = {};
+      Object.keys(bucket).forEach(function (cid) {
+        var c = bucket[cid];
+        if (c && typeof c === 'object') sub[cid] = { id: str(c.id || cid), revision: Number(c.revision) || 0, _deleted: !!c._deleted };
+      });
+      slimIntake[pid] = sub;
+    });
+    var slimMid = {}, slimFinal = {};
+    Object.keys(D.mid || {}).forEach(function (pid) {
+      var m = D.mid[pid];
+      if (m && typeof m === 'object') slimMid[pid] = { _deleted: !!m._deleted, revision: Number(m.revision) || 0, sections: null, _hasSections: !!m.sections };
+    });
+    Object.keys(D.final || {}).forEach(function (pid) {
+      var f = D.final[pid];
+      if (f && typeof f === 'object') slimFinal[pid] = { _deleted: !!f._deleted, revision: Number(f.revision) || 0, sections: null, _hasSections: !!f.sections };
+    });
+    var slimConsultings = D.consultings.slice(0, 1200).map(function (ct) {
+      return {
+        id: str(ct.id), companyId: str(ct.companyId), companyName: str(ct.companyName), bizNo: str(ct.bizNo),
+        no: str(ct.no), contractNo: str(ct.contractNo), typeCode: str(ct.typeCode), bizTypeId: str(ct.bizTypeId),
+        bizName: str(ct.bizName), bizCaseType: str(ct.bizCaseType), type: str(ct.type), bizType: str(ct.bizType),
+        status: str(ct.status), year: ct.year || '', startDate: str(ct.startDate), endDate: str(ct.endDate),
+        managerMain: str(ct.managerMain), _deleted: !!ct._deleted
+      };
+    });
+    var slimScalCos = {};
+    Object.keys(D.scalCos || {}).forEach(function (k) {
+      var sc = D.scalCos[k];
+      if (sc && typeof sc === 'object') {
+        slimScalCos[k] = {
+          id: str(sc.id || k), name: str(sc.name), bizNo: str(sc.bizNo), year: sc.year || '',
+          typeId: str(sc.typeId), types: Array.isArray(sc.types) ? sc.types.slice(0, 10) : [], _deleted: !!sc._deleted
+        };
+      }
+    });
+    return {
+      projects: slimProjects,
+      intake: slimIntake,
+      mid: slimMid,
+      final: slimFinal,
+      snapshots: {},
+      companies: D.companies.slice(0, 2500).map(function (c) {
+        return { id: str(c.id), name: str(c.name), bizNo: str(c.bizNo), managerMain: str(c.managerMain) };
+      }),
+      consultings: slimConsultings,
+      bizTypes: D.bizTypes,
+      scalCos: slimScalCos,
+      scalTypes: D.scalTypes,
+      scalScheds: {},
+      flatMails: []
+    };
+  }
+
+  function applyJobtransFastSnapshot(snap) {
+    if (!snap || typeof snap !== 'object') return false;
+    SNAP_ONLY = true;
+    D.projects = snap.projects || {};
+    D.intake = snap.intake || {};
+    D.mid = snap.mid || {};
+    D.final = snap.final || {};
+    D.snapshots = snap.snapshots || {};
+    D.companies = Array.isArray(snap.companies) ? snap.companies : [];
+    D.consultings = Array.isArray(snap.consultings) ? snap.consultings : [];
+    D.bizTypes = Array.isArray(snap.bizTypes) ? snap.bizTypes : [];
+    D.scalCos = snap.scalCos || {};
+    D.scalTypes = snap.scalTypes || {};
+    D.scalScheds = snap.scalScheds || {};
+    D.flatMails = Array.isArray(snap.flatMails) ? snap.flatMails : [];
+    return true;
+  }
+
+  /* 2단계 점진적 즉시 적재: 사업장·계약·일정 원장(~0.2초) 선표시 → 대용량 메일함 백그라운드 동기화 */
   async function reload(optEpoch, optUid) {
     var reqEpoch = optEpoch || SESSION_EPOCH;
     var reqUid = optUid || (ME && ME.uid ? String(ME.uid) : '');
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
 
-    var res = await Promise.all([
+    setSyncStateText('⟳ 메일·자료 동기화 중…');
+
+    var pCore = Promise.all([
       safeVal('scal_jobtrans'),
       safeVal('data/companies'),
       safeVal('data/consultings'),
       safeVal('data/biz_cons_types'),
       safeVal('scal_cos'),
       safeVal('scal_types'),
-      safeVal('scal_scheds'),
+      safeVal('scal_scheds')
+    ]);
+    var pMail = Promise.all([
       safeVal('scal_docs'),
       safeVal('mailbox/folders'),
       safeVal('mailbox/msgs')
     ]);
+    var pFolder = tryRestoreSavedFolderHandle(reqEpoch, reqUid).catch(function () {});
+    var allDone = false;
+
+    pCore.then(function (cRes) {
+      if (allDone || !isSessionCurrent(reqEpoch, reqUid)) return;
+      SNAP_ONLY = false;
+      var jtRoot0 = cRes[0] && typeof cRes[0] === 'object' ? cRes[0] : {};
+      D.projects = jtRoot0.projects || {};
+      D.intake = jtRoot0.intake || {};
+      D.mid = jtRoot0.mid || {};
+      D.final = jtRoot0.final || {};
+      D.snapshots = jtRoot0.snapshots || {};
+      D.companies = rowsOf(cRes[1]);
+      D.consultings = rowsOf(cRes[2]);
+      D.bizTypes = rowsOf(cRes[3]);
+      D.scalCos = cRes[4] || {};
+      D.scalTypes = cRes[5] || {};
+      D.scalScheds = cRes[6] || {};
+      rebuildScanAndDiscover();
+      applyHashTarget();
+      if (!isUiBusyForBgRedraw()) draw();
+    });
+
+    var both = await Promise.all([pCore, pMail, pFolder]);
+    allDone = true;
+    SNAP_ONLY = false;
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
 
-    var jtRoot = res[0] && typeof res[0] === 'object' ? res[0] : {};
+    var cResFinal = both[0];
+    var mResFinal = both[1];
+    var jtRoot = cResFinal[0] && typeof cResFinal[0] === 'object' ? cResFinal[0] : {};
     D.projects = jtRoot.projects || {};
     D.intake = jtRoot.intake || {};
     D.mid = jtRoot.mid || {};
     D.final = jtRoot.final || {};
     D.snapshots = jtRoot.snapshots || {};
-    D.companies = rowsOf(res[1]);
-    D.consultings = rowsOf(res[2]);
-    D.bizTypes = rowsOf(res[3]);
-    D.scalCos = res[4] || {};
-    D.scalTypes = res[5] || {};
-    D.scalScheds = res[6] || {};
-    D.scalDocs = res[7] || {};
-    D.mailFolders = res[8] || {};
-    D.mailMsgs = res[9] || {};
+    D.companies = rowsOf(cResFinal[1]);
+    D.consultings = rowsOf(cResFinal[2]);
+    D.bizTypes = rowsOf(cResFinal[3]);
+    D.scalCos = cResFinal[4] || {};
+    D.scalTypes = cResFinal[5] || {};
+    D.scalScheds = cResFinal[6] || {};
+    D.scalDocs = mResFinal[0] || {};
+    D.mailFolders = mResFinal[1] || {};
+    D.mailMsgs = mResFinal[2] || {};
     D.flatMails = Intake().flattenMailboxRows(D.mailFolders, D.mailMsgs);
+    setSyncStateText('');
 
     rebuildScanAndDiscover();
     applyHashTarget();
-    draw();
-    await tryRestoreSavedFolderHandle(reqEpoch, reqUid);
+    if (!isUiBusyForBgRedraw()) draw();
+
+    if (global.PuFastBoot && typeof global.PuFastBoot.writeSnap === 'function') {
+      try { global.PuFastBoot.writeSnap('jobtrans', reqUid, buildJobtransFastSnapshot()); } catch (e) {}
+    }
   }
 
   function activeProjects() {
@@ -2119,6 +2308,9 @@
 
     var excelTextFallback = '';
     var resolvedNonQuantKind = explicitDk ? explicitDk.code : '';
+    if (/\.(xlsx|xls|csv)$/.test(lower)) {
+      await ensureJobtransLibs({ xlsx: true });
+    }
     if (/\.(xlsx|xls|csv)$/.test(lower) && global.XLSX) {
       var wb = global.XLSX.read(bytes, { type: 'array' });
       var sheetMap = {};
@@ -2227,6 +2419,12 @@
         }
       } catch (e) {}
     }
+    if (/\.hwp$/.test(lower)) {
+      await ensureJobtransLibs({ hwp: true });
+    }
+    if (/\.pdf$/.test(lower)) {
+      await ensureJobtransLibs({ pdf: true });
+    }
     if (/\.hwp$/.test(lower) && global.PureunHwp && typeof global.PureunHwp.extractText === 'function') {
       try { return await global.PureunHwp.extractText(bytes); } catch (e) {}
     }
@@ -2307,7 +2505,12 @@
     var attLeakBlocked = false;
 
     try {
-      var msg = await callMailFn('readMailMessage', { slug: m.slug, uid: m.uid, peek: 1 }, reqEpoch, reqUid);
+      var mCacheKey = 'imap:' + String(m.slug) + ':' + String(m.uid);
+      var msg = MAIL_VIEW_CACHE[mCacheKey];
+      if (!msg) {
+        msg = await callMailFn('readMailMessage', { slug: m.slug, uid: m.uid, peek: 1 }, reqEpoch, reqUid);
+        if (msg && isSessionCurrent(reqEpoch, reqUid)) MAIL_VIEW_CACHE[mCacheKey] = msg;
+      }
       if (!isSessionCurrent(reqEpoch, reqUid)) return;
       bodyPlain = str(msg.text) || htmlToPlainText(msg.html);
       var atts = Array.isArray(msg.atts) ? msg.atts : [];
@@ -3431,6 +3634,7 @@
   }
 
   async function downloadDeliverablesZip(proj, selectedIds, optEpoch, optUid) {
+    await ensureJobtransLibs({ zip: true, xlsx: selectedIds.indexOf('data_xlsx') >= 0 });
     if (!Hwpx() || !global.JSZip) { toast('패키지 생성 엔진이 로드되지 않았습니다.'); return false; }
     var live = buildLiveReportsForExport(proj);
     var safeCo = Hwpx().safeFilePart(proj.companyName);
@@ -4312,6 +4516,7 @@
       var livePC = buildLiveReportsForExport(proj);
       if (!Hwpx().openPrintWindow('completion', proj, livePC.mid, livePC.fin)) toast('팝업 차단을 해제해 주세요.');
     } else if (act === 'dl-data-xlsx') {
+      await ensureJobtransLibs({ xlsx: true });
       var liveX = buildLiveReportsForExport(proj);
       var safeCo = Hwpx() ? Hwpx().safeFilePart(proj.companyName) : safeKey(proj.companyName);
       var agTag = proj.agency === 'cepa' ? '충남경제진흥원' : 'KMAC구조혁신';
@@ -4438,6 +4643,9 @@
       var authEpoch = ++SESSION_EPOCH;
       if (global.PuGate) global.PuGate.hide();
 
+      var snapPromise = (global.PuFastBoot && typeof global.PuFastBoot.readSnap === 'function')
+        ? global.PuFastBoot.readSnap('jobtrans', authUid).catch(function () { return null; })
+        : Promise.resolve(null);
       var roleVal = {};
       try { roleVal = (await fbDb.ref('uid_roles/' + authUid).once('value')).val() || {}; } catch (e) {}
       if (authEpoch !== SESSION_EPOCH || currentAuthUid() !== authUid) return;
@@ -4456,9 +4664,20 @@
         isAdmin: roleVal.isAdmin == true,
         isSubAdmin: roleVal.isSubAdmin == true
       };
-      gate = global.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid });
+      gate = wrapSnapGuard(global.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid }));
       if ($('lock')) $('lock').style.display = 'none';
       if ($('app')) $('app').style.display = '';
+
+      var cachedSnap = await snapPromise;
+      if (!isSessionCurrent(authEpoch, authUid)) return;
+      if (cachedSnap && applyJobtransFastSnapshot(cachedSnap)) {
+        rebuildScanAndDiscover();
+        applyHashTarget();
+        draw();
+      } else if ($('projectsBox') && !$('projectsBox').innerHTML) {
+        $('projectsBox').innerHTML = '<div class="empty">산업일자리전환 사업장 현황을 빠르게 불러오고 있습니다…</div>';
+      }
+
       await reload(authEpoch, authUid);
     });
   }
