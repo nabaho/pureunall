@@ -8,3 +8,12 @@
 .bh .mobile_header_wrap.fixed,.mobile_header_wrap.fixed{background-color:rgba(16,25,43,.96);box-shadow:0 2px 10px rgba(0,0,0,.22)}
 @keyframes puHeadIn{from{transform:translateY(-100%)}to{transform:none}}
 @media (prefers-reduced-motion:reduce){.header_wrap.fixed{animation:none}}
+
+/* ── 펼침 메뉴 판 높이 = 행 수 × 행 높이 (대표 지시 2026-11-22 「주요업무에 AI가 있는데 창이 너무 내려온 것 같다 · 계산해 달라」) ──
+   테마는 흰 판을 345px(헤더 80 + 5행 265)로 박아 두었다. 주요업무가 여섯 행이 되자 맨 아래 「AI 인사노무 시스템」이 판 밖(사진 위)에 걸렸다.
+   그래서 ① 행 높이를 53→44px 로 줄이고 ② 판 높이를 «헤더 높이 + 행 수 × 행 높이 + 여백»으로 계산한다 — 지금(6행)은 판이 약 9px 길어질 뿐이다.
+   ⚠ 메뉴에 행이 더 늘면 --pu-rows 를 그 수로 올린다(가장 긴 메뉴의 행 수 이상). 검사: tests/site-menu-panel.test.js  [puMenuRows] */
+.bh .header_wrap{--pu-row:44px;--pu-rows:6;--pu-pad:10px}
+.bh .header_wrap .main_menu .menu_dropdown-content{height:calc(var(--pu-row) * var(--pu-rows) + var(--pu-pad))}
+.bh .header_wrap .main_menu .menu_dropdown-content>li>a{line-height:var(--pu-row);padding:0}
+.bh .header_wrap.menu-open::before{height:calc(100% + var(--pu-row) * var(--pu-rows) + var(--pu-pad))}
