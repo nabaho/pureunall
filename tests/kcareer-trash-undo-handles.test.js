@@ -45,10 +45,10 @@ function world(initial, o) {
     kcAskDelete: (btn, opt, go) => { ctx._ask = opt; ctx._go = go; },
     kcUndoBar: (msg, tid, f) => ctx._undo.push({ msg, tid, f }),
     KcareerHrCert: o.noHrCert ? undefined : Q,
-    getFileAsync: async () => { if (o.onFile) o.onFile(ctx, store); return null; }, saveFileUnified: () => {},   /* onFile: 첨부 원본을 «기다리는 사이»에 끼어드는 일을 흉내 낸다 */
+    getFileAsync: async () => { if (o.onFile) o.onFile(ctx, store); return o.file || null; }, saveFileUnified: (id, f) => ctx._saved.push(id),   /* onFile: 첨부 원본을 «기다리는 사이»에 끼어드는 일을 흉내 낸다 · _saved: 첨부를 쓴 번호들 */
     kcTrashRedraw: (e) => ctx._redraws.push(e.page || e.store),
     renderCareer: () => {}, renderBizList: () => {},
-    _toasts: [], _undo: [], _redraws: [],
+    _toasts: [], _undo: [], _redraws: [], _saved: [],
   });
   vm.runInContext(fns('kcTrashList', '_kcTrashEntry', 'kcTrashPutMany', 'kcTrashDoneMany', 'kcTrashRestoreEntries', 'kcTrashRestore', 'kcFreeId'), ctx);
   return { ctx, store, writes, run: (src) => vm.runInContext(src, ctx), undoNow: () => ctx._undo[ctx._undo.length - 1] };
@@ -178,6 +178,36 @@ test('기다리는 사이 그 줄이 이미 다른 곳에서 꺼내지거나 지
   const q = world({ certdoc: [{ id: 'CD0001', kind: '경력증명서' }] }, { onFile: (ctx, store) => { store.trash = []; } });
   const es2 = put(q, [{ id: 'CD0001', kind: '재직증명서' }]);
   assert.equal(await q.ctx.kcTrashRestore(es2[0].tid, true), null); assert.equal(q.ctx._toasts.length, 0);
+});
+test('기다리는 사이 그 줄이 완전삭제됐으면 첨부 사본도 쓰지 않는다 — 지워진 줄의 첨부가 남지 않는다(자동 검증 2026-11-22)', async () => {
+  const w = world({ certdoc: [{ id: 'CD0001', kind: '경력증명서' }] }, { file: { name: 'a.hwpx' }, onFile: (ctx, store) => { store.trash = []; } });
+  const es = put(w, [{ id: 'CD0001', kind: '재직증명서' }]);
+  assert.equal(await w.ctx.kcTrashRestore(es[0].tid, true), null);
+  assert.deepEqual(w.ctx._saved, [], '★★ 되살리지 않았는데 첨부를 새 번호로 써 버렸다');
+  /* 줄이 그대로 있으면 새 번호로 첨부를 옮긴다(전과 같음) */
+  const ok = world({ certdoc: [{ id: 'CD0001', kind: '경력증명서' }] }, { file: { name: 'a.hwpx' } });
+  const es2 = put(ok, [{ id: 'CD0001', kind: '재직증명서' }]);
+  const r = await ok.ctx.kcTrashRestore(es2[0].tid, true);
+  assert.deepEqual(ok.ctx._saved, [r.id]); assert.notEqual(r.id, 'CD0001');
+});
+test('기다리는 사이 다른 줄이 «새 번호»로 정해 둔 번호를 먼저 썼어도 번호가 겹치지 않는다 — 번호를 기다린 뒤에 다시 정한다(자동 검증 2026-11-22)', async () => {
+  const w = world({ certdoc: [{ id: 'CD0001', kind: '경력증명서' }] }, { file: { name: 'a.hwpx' }, onFile: (ctx, store) => {
+    store.certdoc = store.certdoc.concat([{ id: 'CD0002', kind: '비용' }]);        /* 기다리는 동안 다른 곳이 CD0002 를 썼다(되살리기 전에 정해 둔 새 번호) */
+  } });
+  const es = put(w, [{ id: 'CD0001', kind: '재직증명서' }]);
+  const r = await w.ctx.kcTrashRestore(es[0].tid, true);
+  const all = ids(w.store.certdoc);
+  assert.equal(new Set(all).size, all.length, '★★ 번호가 겹쳤다: ' + all.join(','));
+  assert.equal(r.id, 'CD0003', '그새 쓰인 번호를 피해 다시 정한다');
+  assert.deepEqual(w.ctx._saved, ['CD0003'], '첨부도 «최종 번호»로 쓴다(덮어쓰지 않는다)');
+  assert.equal(w.store.certdoc.length, 3, '아무 줄도 덮이지 않았다');
+});
+test('기다리는 사이 겹치던 번호가 비었으면(옛 줄이 지워짐) 번호를 바꾸지 않고 제 번호로 되살린다', async () => {
+  const w = world({ certdoc: [{ id: 'CD0001', kind: '경력증명서' }] }, { file: { name: 'a.hwpx' }, onFile: (ctx, store) => { store.certdoc = []; } });
+  const es = put(w, [{ id: 'CD0001', kind: '재직증명서' }]);
+  const r = await w.ctx.kcTrashRestore(es[0].tid, true);
+  assert.equal(r.id, 'CD0001'); assert.equal(r.renamed, false); assert.deepEqual(w.ctx._saved, [], '번호가 그대로면 첨부를 옮길 일이 없다');
+  assert.deepEqual(ids(w.store.certdoc), ['CD0001']);
 });
 test('번호가 겹치지 않으면 기다림이 없다 — 예전처럼 곧바로 되살리고 목록도 다시 읽지 않는다', async () => {
   const w = world({ certdoc: [] });

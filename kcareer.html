@@ -12412,17 +12412,21 @@ async function kcTrashRestore(tid, quiet, noRedraw){
   }
   var newId=kcFreeId(e.store, oldId);
   if(newId!==oldId){
-    rec=Object.assign({}, rec, { id:newId, restoredFrom:oldId });
-    /* 첨부 원본을 새 번호로 옮긴다 — 안 옮기면 되살린 레코드에 원본이 없다 */
-    try{
-      var f=await getFileAsync(oldId);
-      if(f) saveFileUnified(newId, f);
-    }catch(err){ console.warn('휴지통 원본 옮기기', err); }
-    /* ⚠ 첨부 원본을 옮기느라 «기다린» 사이에 휴지통이 바뀌었을 수 있다(다른 곳에서 담음·되살림·완전삭제).
-       맨 위에서 읽어 둔 목록(rest)을 그대로 쓰면 그새 담긴 줄이 사라지고 이미 꺼낸 줄이 되살아난다 — 기다린 «뒤에» 다시 읽고, 그 줄이 아직 있을 때만 되살린다(2026-11-22 자동 검증 지적) */
+    /* 첨부 원본을 새 번호로 옮긴다 — 안 옮기면 되살린 레코드에 원본이 없다. 여기서는 «가져오기만» 하고(기다리는 곳), 쓰는 일은 기다림이 끝난 뒤에 한다 */
+    var f=null;
+    try{ f=await getFileAsync(oldId); }catch(err){ console.warn('휴지통 원본 옮기기', err); }
+    /* ⚠ 기다린 «뒤에» 다시 확인한다 — 그사이 다른 곳에서 담음·되살림·완전삭제·같은 번호 쓰기가 끼어들 수 있다(2026-11-22 자동 검증 지적).
+       ① 맨 위에서 읽어 둔 휴지통 목록(rest)을 그대로 쓰면 그새 담긴 줄이 사라지고 이미 꺼낸 줄이 되살아난다 → 다시 읽고, 그 줄이 아직 있을 때만 되살린다
+       ② 기다리기 전에 정한 새 번호는 그새 다른 줄이 썼을 수 있다 → 다시 정한다
+       ③ 첨부를 쓰는 것도 «확인한 뒤에» — 완전삭제된 줄의 첨부 사본이 남지 않게. 이 아래로는 await 가 없다(확인한 것이 그대로 쓰인다) */
     var 지금=kcTrashList();
     if(!지금.some(function(x){ return x.tid===tid; })){ if(!quiet) toast('휴지통에서 이미 꺼냈거나 지워진 줄입니다 — 되살리지 않았습니다'); return null; }
     rest=지금.filter(function(x){ return x.tid!==tid; });
+    newId=kcFreeId(e.store, oldId);
+    if(newId!==oldId){
+      rec=Object.assign({}, rec, { id:newId, restoredFrom:oldId });
+      try{ if(f) saveFileUnified(newId, f); }catch(err){ console.warn('휴지통 원본 옮기기', err); }
+    }
   }
   var arr=get(e.store); arr.unshift(rec); set(e.store, arr);
   set(TRASH_STORE, rest);
