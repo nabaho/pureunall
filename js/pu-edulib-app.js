@@ -318,10 +318,81 @@
     });
   }
 
-  /* ───────── 원본 가져오기(미리보기·내려받기) ───────── */
-  function urlOf(it) {
-    if (it.store !== 'cloud' || !it.storagePath || !bucket) return Promise.reject(new Error('자료함에 원본이 없습니다'));
-    return bucket.ref(it.storagePath).getDownloadURL();
+  /* ───────── 원본 가져오기(미리보기·내려받기) — 열 때마다 «권한 확인» (2026-11-22) ─────────
+     ★★ 내려받기 토큰 주소를 만들지 않는다 — 그 주소는 한 번 새면(방문 기록·복사·퇴사한 사람) 누구나 «평생» 연다.
+        대신 지금 로그인한 사람의 증표(ID 토큰)를 머리글에 실어 창고에 직접 묻는다 → 창고 규칙 isStaff()(재직 직원)를 «매번» 거친다.
+        받은 바이트는 이 창 안의 blob: 주소로만 쓰고, 칸·창을 닫으면 풀어 준다(freeObjUrls) · 받는 중이면 멈춘다(stopFetches).
+     ⚠ 창고 CORS 는 이 길(Authorization·Range 머리글)을 이미 받는다 — 2026-11-22 사전 요청(OPTIONS)으로 확인.
+     ⚠ 영상은 «다 받은 뒤» 재생한다(머리글을 실은 채 흘려 보기는 브라우저가 못 한다). 큰 것은 눌러야 받는다(MEDIA_AUTO_MAX). */
+  var STORE_API = 'https://firebasestorage.googleapis.com/v0/b/';
+  var MEDIA_AUTO_MAX = 150 * 1024 * 1024;       /* 이보다 큰 영상·소리는 «받아서 보기»를 눌러야 받는다 — 자세히만 열어도 1GB 가 내려오지 않게 */
+  function apiUrlOf(it) {
+    return STORE_API + encodeURIComponent(String(BUCKET).replace(/^gs:\/\//, '')) + '/o/' + encodeURIComponent(it.storagePath) + '?alt=media';
+  }
+  function pctText(got, total) { return total > 0 ? Math.min(99, Math.floor(got * 100 / total)) + '%' : K.fmtBytes(got); }
+  /* blob: 주소는 이 앱과 «같은 출처»다 — 창고에 적힌 종류(Content-Type)를 그대로 두면 html·svg 같은 «문서»가 새 탭에서 앱 출처로 열릴 수 있다.
+     그래서 보기용 blob 은 확장자 허용 목록의 종류로 «다시 싸고», 목록에 없으면 바이트만(octet-stream — 띄우지 않고 내려받기만 된다). */
+  var SAFE_MEDIA_TYPE = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+    mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', mkv: 'video/x-matroska', wmv: 'video/x-ms-wmv', avi: 'video/x-msvideo',
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav'
+  };
+  function safeBlob(b, ext) { return new Blob([b], { type: SAFE_MEDIA_TYPE[String(ext || '').toLowerCase()] || 'application/octet-stream' }); }
+  /* 받는 만큼 알려 준다 — 바이트는 그대로 흘려 보낸다(모아 두지 않는다) */
+  function withProgress(r, total, onProgress) {
+    if (!onProgress || !r.body || typeof r.body.getReader !== 'function' || typeof ReadableStream !== 'function') return r;
+    var reader = r.body.getReader(), got = 0;
+    return new Response(new ReadableStream({
+      pull: function (ctl) {
+        return reader.read().then(function (x) {
+          if (x.done) { ctl.close(); return; }
+          got += x.value.byteLength;
+          try { onProgress(got, total); } catch (e) {}
+          ctl.enqueue(x.value);
+        });
+      },
+      cancel: function (why) { return reader.cancel(why); }
+    }), { headers: r.headers });
+  }
+  var FETCHES = [];                             /* { ac, owner } — 받는 중인 것. owner 칸을 닫으면 멈춘다(내려받기는 owner 없음 → 창을 닫아도 끝까지) */
+  function stopFetches(root) {
+    FETCHES = FETCHES.filter(function (f) {
+      if (root && !(f.owner && root.contains(f.owner))) return true;
+      try { f.ac.abort(); } catch (e) {}
+      return false;
+    });
+  }
+  function authUid() { var u = firebase.auth().currentUser; return u ? String(u.uid || '') : ''; }
+  /* 로그아웃·계정 바꿈 — 받던 것(내려받기 포함)을 모두 멈추고, 열린 칸·blob 주소를 모두 푼다(앞 사람의 원본이 이 탭에 남지 않게) */
+  function resetOriginals() {
+    stopFetches();
+    try { closeCompare(); } catch (e) {}
+    try { if ($('modal').style.display !== 'none' && DETAIL) closeDetail(); } catch (e) {}
+    freeObjUrls();
+    DL_URLS.slice().forEach(freeDl);
+    DL_BUSY = {};
+  }
+  /* as: 'buf'(ArrayBuffer) | 'blob' */
+  function fetchOriginal(it, as, onProgress, owner) {
+    if (!it || it.store !== 'cloud' || !it.storagePath || !bucket) return Promise.reject(new Error('자료함에 원본이 없습니다'));
+    var u = firebase.auth().currentUser;
+    if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+    var f = (typeof AbortController === 'function') ? { ac: new AbortController(), owner: owner || null } : null;
+    if (f) FETCHES.push(f);
+    var done = function () { if (f) FETCHES = FETCHES.filter(function (x) { return x !== f; }); };
+    return u.getIdToken().then(function (tok) {
+      return fetch(apiUrlOf(it), { headers: { Authorization: 'Firebase ' + tok }, cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: f ? f.ac.signal : undefined });
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw new Error('열 권한이 없습니다 — 재직 직원만 엽니다(다시 로그인해 보세요)');
+      if (r.status === 404) throw new Error('창고에 원본이 없습니다');
+      if (!r.ok) throw new Error('창고에서 받지 못했습니다(' + r.status + ')');
+      var rr = withProgress(r, (+it.size || 0) || (+r.headers.get('Content-Length') || 0), onProgress);
+      return as === 'blob' ? rr.blob() : rr.arrayBuffer();
+    }).then(function (x) { done(); return x; }, function (e) {
+      done();
+      if (e && e.name === 'AbortError') throw new Error('닫아서 받기를 멈췄습니다');
+      throw e;
+    });
   }
   function callFn(fn, body) {
     var u = firebase.auth().currentUser;
@@ -338,21 +409,42 @@
     for (var i = 0; i < n; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
-  function bytesOf(it) {
+  function bytesOf(it, onProgress, owner) {
     if (it.store === 'cloud') {
       if ((+it.size || 0) > PuViewerKind.MAX_BYTES && it.kind === 'doc') return Promise.reject(new Error('파일이 커서(' + K.fmtBytes(it.size) + ') 미리보기를 건너뜁니다 — 원본을 내려받아 여세요'));
-      return urlOf(it).then(function (u) { return fetch(u); }).then(function (r) {
-        if (!r.ok) throw new Error('창고에서 받지 못했습니다(' + r.status + ')');
-        return r.arrayBuffer();
-      });
+      return fetchOriginal(it, 'buf', onProgress, owner);
     }
     return Promise.reject(new Error('자료함에 원본이 없습니다'));
   }
-  function downloadOriginal(it) {
-    urlOf(it).then(function (u) {
-      var a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.download = it.fileName;
-      document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 1000);
-    }).catch(function (e) { toast('내려받지 못했습니다 — ' + errMsg(e), 7000); });
+  /* 내려받기 — 권한 확인 길로 받아 이 창에서 파일로 저장한다(새 탭에 창고 주소를 띄우지 않는다 → 방문 기록에도 주소가 안 남는다) */
+  var DL_BUSY = {};
+  var DL_URLS = [];                             /* { u, a } — 저장을 넘긴 뒤 잠깐 두는 blob 주소 */
+  function freeDl(d) {
+    DL_URLS = DL_URLS.filter(function (x) { return x !== d; });
+    try { d.a.remove(); } catch (e) {}
+    try { URL.revokeObjectURL(d.u); } catch (e) {}
+  }
+  function downloadOriginal(it, btn) {
+    if (!it) return;
+    if (DL_BUSY[it.id]) { toast('이미 받는 중입니다'); return; }
+    DL_BUSY[it.id] = true;
+    var label = btn ? btn.textContent : '';
+    var show = function (got, total) { if (btn) btn.textContent = '⬇ ' + pctText(got, total); };
+    var uid0 = authUid();
+    if (btn) btn.disabled = true;
+    show(0, +it.size || 0);
+    fetchOriginal(it, 'blob', show, null).then(function (blob) {
+      if (authUid() !== uid0) throw new Error('로그인한 사람이 바뀌어 저장하지 않았습니다');   /* 받는 사이 로그아웃·계정 바꿈 → 저장하지 않는다 */
+      var u = URL.createObjectURL(safeBlob(blob, ''));      /* 내려받기는 늘 바이트만(octet-stream) — 이 주소가 문서로 열리지 않게 */
+      var a = document.createElement('a'); a.href = u; a.download = it.fileName || 'file'; a.rel = 'noopener';
+      document.body.appendChild(a); a.click();
+      var d = { u: u, a: a }; DL_URLS.push(d);             /* 로그아웃하면 기다리지 않고 바로 푼다(resetOriginals) */
+      setTimeout(function () { freeDl(d); }, 60000);
+      toast('내려받았습니다 — ' + (it.fileName || ''));
+    }).catch(function (e) { toast('내려받지 못했습니다 — ' + errMsg(e), 7000); }).then(function () {
+      delete DL_BUSY[it.id];
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+    });
   }
 
   /* ───────── 보기 칸(나란히 보기·자세히가 함께 쓴다) ───────── */
@@ -380,15 +472,28 @@
     };
   }
   function closeFrames(root) {
+    stopFetches(root);
+    freeObjUrls(root);
     FRAMES = FRAMES.filter(function (f) {
       if (root && !root.contains(f.iframe)) return true;
       post(f, { t: 'close' }); return false;
     });
   }
-  /* PC 파일을 «올리지 않고 보기»로 연 주소 — 칸을 닫을 때 풀어 준다(메모리에 남지 않게) */
-  var OBJURLS = [];
-  function objUrl(file) { var u = URL.createObjectURL(file); OBJURLS.push(u); return u; }
-  function freeObjUrls() { OBJURLS.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); OBJURLS = []; }
+  /* PC 파일(올리지 않고 보기)·권한 확인 길로 받은 원본을 연 blob: 주소 — «그 칸»이 주인이다. 칸을 닫으면 그 칸의 것만 풀고,
+     주인 칸이 화면에서 빠진 것은 다음에 만들 때 함께 푼다(원본 바이트가 메모리에 남지 않게). */
+  var OBJURLS = [];                             /* { u, owner } */
+  function objUrl(blob, owner) {
+    freeObjUrls(null, true);
+    var u = URL.createObjectURL(blob); OBJURLS.push({ u: u, owner: owner || null }); return u;
+  }
+  function freeObjUrls(root, orphansOnly) {
+    OBJURLS = OBJURLS.filter(function (x) {
+      var drop = orphansOnly ? !!(x.owner && !x.owner.isConnected) : (!root || !!(x.owner && root.contains(x.owner)));
+      if (!drop) return true;
+      try { URL.revokeObjectURL(x.u); } catch (e) {}
+      return false;
+    });
+  }
   var _zipP = null;
   function loadZip() {
     if (window.JSZip) return Promise.resolve(window.JSZip);
@@ -420,7 +525,7 @@
     pane.querySelector('.pf').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-act]'); if (!b) return;
       var a = b.getAttribute('data-act');
-      if (a === 'dl') downloadOriginal(it);
+      if (a === 'dl') downloadOriginal(it, b);
       else if (a === 'win') openWin(it.id);
       else if (a === 'detail') { if (opts.onDetail) opts.onDetail(); openDetail(it.id); }
       else if (a === 'x') { closeFrames(pane); pane.remove(); if (opts.onClose) opts.onClose(); }
@@ -430,6 +535,9 @@
   }
   function fillPane(it, body, pane, localFile) {
     var ext = it.ext || C.extOf(it.fileName), kind = it.kind || C.kindOf(ext);
+    /* 이 칸을 다시 채우거나 닫은 뒤에 도착한 결과는 버린다(앞의 받기가 뒤의 화면을 덮지 않게) */
+    var seq = body._seq = (body._seq || 0) + 1;
+    var live = function () { return body._seq === seq && pane.isConnected; };
     if (!localFile && it.store !== 'cloud') {
       var where = it.store === 'mail' ? '메일함 첨부' : 'PC';
       body.innerHTML = '<div class="msg">원본이 아직 <b>' + esc(where) + '</b>에만 있습니다.' +
@@ -440,24 +548,40 @@
       return;
     }
     if (kind === 'video' || kind === 'audio' || kind === 'image') {
-      var urlP = localFile ? Promise.resolve(objUrl(localFile)) : urlOf(it);
-      urlP.then(function (u) {
+      var showMedia = function (u) {
         body.innerHTML = '';
         var el = document.createElement(kind === 'image' ? 'img' : kind);
         if (kind !== 'image') { el.controls = true; el.preload = 'metadata'; }
         el.src = u; el.style.width = '100%';
         body.appendChild(el);
-      }).catch(function (e) { body.innerHTML = '<div class="msg">' + esc(errMsg(e)) + '</div>'; });
+      };
+      if (localFile) { showMedia(objUrl(safeBlob(localFile, ext), pane)); return; }
+      var loadMedia = function () {
+        body.innerHTML = '<div class="msg">원본을 받는 중… <b data-pr>0%</b><br><span class="hint">다 받은 뒤 재생합니다 · 이 칸을 닫으면 멈춥니다</span></div>';
+        var pr = body.querySelector('[data-pr]');
+        fetchOriginal(it, 'blob', function (got, total) { if (live()) pr.textContent = pctText(got, total); }, pane)
+          .then(function (b) { if (live()) showMedia(objUrl(safeBlob(b, ext), pane)); })
+          .catch(function (e) { if (live()) body.innerHTML = '<div class="msg">' + esc(errMsg(e)) + '</div>'; });
+      };
+      if (kind !== 'image' && (+it.size || 0) > MEDIA_AUTO_MAX) {
+        body.innerHTML = '<div class="msg">큰 ' + (kind === 'video' ? '영상' : '소리') + ' 파일(' + esc(K.fmtBytes(it.size)) + ')입니다 — 다 받은 뒤 재생합니다.<br><br><button class="sm" data-load="1">▶ 받아서 보기</button></div>';
+        body.querySelector('[data-load]').onclick = loadMedia;
+        return;
+      }
+      loadMedia();
       return;
     }
     if (kind === 'archive') { body.innerHTML = '<div class="msg">압축 파일입니다 — 원본을 내려받아 풀어 보세요. 압축 안의 파일은 바꾸지 않고 그대로 둡니다.</div>'; return; }
     if (ext === 'ppt' || ext === 'doc' || ext === 'pps' || ext === 'show' || ext === 'key' || ext === 'odp') {
       body.innerHTML = '<div class="msg">옛 형식(' + esc(ext.toUpperCase()) + ')이라 이 화면에서는 미리보기를 못 합니다 — 원본을 내려받아 파워포인트·한쇼로 여세요.</div>'; return;
     }
-    var bufP = localFile ? localFile.arrayBuffer() : bytesOf(it);
+    var bufP = localFile ? localFile.arrayBuffer()
+      : bytesOf(it, function (got, total) { if (!live()) return; var m = body.querySelector('.msg'); if (m) m.textContent = '불러오는 중… ' + pctText(got, total); }, pane);
     bufP.then(function (buf) {
+      if (!live()) return;
       if (ext === 'pptx' || ext === 'docx' || ext === 'ppsx') {
         return loadZip().then(function (Z) { return P.extract(Z, buf, ext === 'docx' ? 'docx' : 'pptx'); }).then(function (r) {
+          if (!live()) return;
           body.innerHTML = '';
           var wrap = document.createElement('div'); wrap.className = 'slides';
           if (!r.parts.length) wrap.innerHTML = '<div class="msg">글자가 없는 자료입니다(그림만 있는 슬라이드) — 원본을 내려받아 보세요.</div>';
@@ -486,7 +610,7 @@
       var f = { iframe: ifr, body: body, pg: pane.querySelector('.pg'), ready: false, queued: { msg: { t: 'open', buf: buf, name: it.fileName, kind: chk.kind }, tr: [buf] }, pages: 0, cur: 1 };
       FRAMES.push(f);
       ifr.src = 'pu-viewer-frame.html?v=1';
-    }).catch(function (e) { body.innerHTML = '<div class="msg">원본을 불러오지 못했습니다 — ' + esc(errMsg(e)) + '</div>'; });
+    }).catch(function (e) { if (live()) body.innerHTML = '<div class="msg">원본을 불러오지 못했습니다 — ' + esc(errMsg(e)) + '</div>'; });
   }
   function pickLocal(it, body, pane) {
     var inp = document.createElement('input'); inp.type = 'file';
@@ -522,7 +646,7 @@
   }
   function closeCompare() {
     if (!$('cmp').classList.contains('on')) return;
-    closeFrames($('cmpGrid')); $('cmpGrid').innerHTML = ''; $('cmp').classList.remove('on'); freeObjUrls();
+    closeFrames($('cmpGrid')); $('cmpGrid').innerHTML = ''; $('cmp').classList.remove('on');
     if (VIEW_ID) { VIEW_ID = ''; try { history.replaceState(null, '', location.pathname); } catch (e) {} }
   }
   function openWin(id) {
@@ -535,6 +659,7 @@
   var DETAIL = '';
   function openDetail(id) {
     var it = ITEMS[id]; if (!it) return;
+    closeFrames($('mbox'));                      /* 앞의 자세히 칸이 받던 것·blob 주소를 먼저 정리 */
     DETAIL = id;
     var catOpts = C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '"' + (c.key === it.cat ? ' selected' : '') + '>' + esc(c.label) + (c.legal ? ' (법정)' : '') + '</option>'; }).join('') +
       (C.CATS.some(function (c) { return c.key === it.cat; }) ? '' : '<option value="' + esc(it.cat) + '" selected>' + esc(it.cat) + ' (종류 목록에 없음)</option>');
@@ -586,7 +711,6 @@
   function closeDetail() {
     if ($('modal').style.display === 'none') return;
     closeFrames($('mbox')); $('modal').style.display = 'none'; $('mbox').innerHTML = ''; DETAIL = '';
-    if (!$('cmp').classList.contains('on')) freeObjUrls();
   }
   function saveDetail() {
     var it = ITEMS[DETAIL]; if (!it) return;
@@ -1197,7 +1321,7 @@
       else if (id === 'cSave') saveCat();
       else if (id === 'cHide') hideCat();
       else if (id === 'dNoteAdd') addNote();
-      else if (id === 'dDl') downloadOriginal(ITEMS[DETAIL]);
+      else if (id === 'dDl') downloadOriginal(ITEMS[DETAIL], e.target);
       else if (id === 'dWin') openWin(DETAIL);
       else if (id === 'dUp') detailUpload();
       else if (id === 'dRestore') { var rd = DETAIL; restoreItem(rd).then(function () { toast('되살렸습니다'); closeDetail(); }, function (er) { toast('되살리지 못했습니다 — ' + errMsg(er), 7000); }); }
@@ -1351,6 +1475,7 @@
     wire();
     firebase.auth().onAuthStateChanged(function (u) {
       $('outBtn').style.display = u ? '' : 'none';
+      if (!u || (ME.uid && u.uid !== ME.uid)) resetOriginals();
       if (!u) { PuEduLibGate.show(); return; }
       PuEduLibGate.hide();
       roleOf(u).then(function (r) {
