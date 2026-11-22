@@ -46,64 +46,20 @@ t('닫기로도 닫힌다', /title\.querySelector\((?:'button'|'\[aria-label="�
 t('바깥을 눌러도 닫힌다', /if \(event\.target === panel\) panel\.remove\(\);/.test(src), true);
 t('처리할 게 없으면 그렇다고 적는다', /처리할 장애 알림이 없습니다/.test(src), true);
 
-/* ══ 장애가 없으면 화면에 아무것도 없다 (대표 지시 2026-08-23, 두 번) ══
-   ① 「장애알림 없는데 왜 빨간색 왼쪽아래 경고인가」
-      → 관리자면 무조건 빨갛게 띄우고 있었다. 0건이어도 늘 빨갰다.
-   ② 「장애알림 글자 왜 안없어지냐 피시와 폰에서 여전히 나온다」
-      → ①을 고칠 때 «아직 안 세어 봤을 때»는 조용한 회색 단추를 남겼는데,
-        세는 것은 «눌렀을 때»뿐이라 실제로는 회색 단추가 모든 화면에 늘 떠 있었다.
-        색만 바꾸고 고쳤다고 여긴 것이다.
+/* ══ 늘 떠 있는 빨간 단추는 이제 없다 (대표 지시 2026-11-22) ══
+   예전에는 이 자리에 「열린 건이 1건 이상인 것을 아는 때에만 뜨는 빨간 단추」의 규칙
+   (knownOpen · paintAdminBadge · HEALTH_ALARM …)을 못 박았다. 대표가 「모두 처리 완료를 안 눌러도
+   저절로 정리되고, 어느 프로그램에도 이 창이 안 뜨게」 하라고 해서 단추 자체를 걷었다.
+   새 규칙(단추·창을 스스로 만들지 않는다 · 저절로 처리 완료로 정리한다)은
+   tests/health-auto-settle.test.js 가 지킨다 — 옛 규칙을 되살리면 거기서 운다.
 
-   지금 규칙 — 열린 건이 «1건 이상인 것을 아는 때»에만 뜬다.
-     모름(null) → 안 뜬다 · 0건 → 안 뜬다 · 1건 이상 → 빨갛게 뜬다 */
-console.log('\n■ 아는 것이 없으면 아무것도 안 띄운다');
-t('★ 「아는 열린 건수」를 따로 둔다 (모를 때는 null)',
-  /var knownOpen = null;/.test(src), true);
-t('★ 모름도 0건과 똑같이 감춘다 — 이것이 «회색 단추가 안 없어지던» 까닭이다',
-  /if \(!isAdminUser\) \{ badge\.hidden = true; return; \}[\s\S]{0,500}?if \(!\(knownOpen > 0\)\) \{ badge\.hidden = true; return; \}/.test(src), true);
-/* 「!== 0」 으로 적으면 모름(null)일 때 또 뜬다 — 처음 문제로 되돌아간다.
-   조용한 회색 단추(HEALTH_QUIET)도 함께 사라져야 한다. */
-t('★ 조용한 회색 단추를 아예 두지 않는다', /HEALTH_QUIET/.test(src), false);
-t('★ 열린 것이 있을 때만 빨갛게, 몇 건인지 함께 적는다',
-  /HEALTH_ALARM[\s\S]{0,120}?'⚠ 장애 알림 ' \+ knownOpen/.test(src), true);
-/* 따옴표로 감싼 «코드의 글자»만 본다 — 왜 없앴는지 적어 둔 주석까지 잡으면
-   설명을 남길 수가 없다(설명은 남겨야 다음 사람이 되돌리지 않는다). */
-t('★ 「장애 알림 없음」 을 화면에 적지 않는다', /'장애 알림 없음'/.test(src), false);
-/* ⚠ 보임 판단이 두 곳에 있으면 서로 되돌린다 — monitorAdmin 이 hidden=false 로
-   덮어써 0건인데도 다시 뜨는 식이다. 한 곳(paintAdminBadge)에서만 정한다. */
-t('★ monitorAdmin 은 hidden 을 직접 만지지 않는다',
-  /if \(!role\.isAdmin\) return;\s*\n\s*isAdminUser = true;\s*\n\s*ensureAdminBadge\(app\);/.test(src), true);
-
-/* ══ 그래도 «지금 난 장애»는 곧바로 알려야 한다 ══
-   평소에 안 세어 보는 대신, 장애를 기록하는 그 순간에는 «있다»는 것을 확실히 안다.
-   그때 켜 주지 않으면 관리자가 서랍을 열어 보기 전까지 아무도 모른다. */
-console.log('\n■ 장애가 나는 순간에는 켜진다');
-t('★ 장애를 적을 때 열린 건수를 올린다',
-  /knownOpen = \(knownOpen \|\| 0\) \+ 1;/.test(src), true);
-t('★ 올린 뒤 곧바로 단추를 다시 그린다',
-  /knownOpen = \(knownOpen \|\| 0\) \+ 1;\s*\n\s*paintAdminBadge\(/.test(src), true);
-
-/* ══ 늘 떠 있는 단추를 치웠으니, 평소에 들여다볼 문은 있어야 한다 ══
-   포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 그 문이다. 밖에서 부를 수 있어야 한다. */
-console.log('\n■ 평소에 들여다볼 문이 남아 있다');
+   창은 «사람이» 포털 설정의 「열어보기」를 눌렀을 때만 뜬다. 그 문은 아래 그대로 남아 있어야 한다. */
+console.log('\n■ 사람이 여는 문은 남아 있다');
 t('★ 밖에서 부를 수 있게 열어 둔다', /openAdminPanel: showAdminPanel/.test(src), true);
-t('★ 단추가 없어도 열린다 — 부르는 쪽이 app 을 안 줘도 스스로 찾는다',
+t('★ 부르는 쪽이 app 을 안 줘도 스스로 찾는다',
   /app = app \|\| activeApp\(\);/.test(src), true);
-t('★ 결과를 돌려준다 — 부르는 쪽이 「불러오는 중」 을 끝낼 수 있다',
+t('★ 결과(남은 건수)를 돌려준다 — 부르는 쪽이 「불러오는 중」 을 끝낼 수 있다',
   /return readAdminAlerts\(app\)\.then\(function \(alertsSnapshot\)/.test(src), true);
-
-console.log('\n■ 세어 본 뒤에는 색이 뜻을 갖는다');
-t('★ 열어 보면 그 수를 기억한다', /knownOpen = adminAlerts\.length;/.test(src), true);
-t('★ 한 건 처리할 때마다 단추도 함께 내린다',
-  /knownOpen = left;\s*\n\s*paintAdminBadge\(/.test(src), true);
-t('★ 못 읽었으면 «0» 이 아니라 «모름» 으로 되돌린다 — 0 으로 적으면 진짜 장애가 조용해진다',
-  /knownOpen = null;\s*\n\s*adminLoadFailed = true;/.test(src), true);
-t('★ 조회 실패를 업무를 막는 브라우저 경고창으로 띄우지 않는다',
-  /window\.alert\('장애 알림을 불러오지 못했습니다/.test(src), false);
-t('★ 실패 상태에서 같은 단추로 다시 시도할 수 있다',
-  /장애 알림 불러오기 실패 — 다시/.test(src), true);
-t('★ 직접 누른 단추의 거절은 받아 줘서 장애가 다시 기록되는 순환을 막는다',
-  /badge\.onclick = function \(\) \{ showAdminPanel\(app\)\.catch\(function \(\) \{\}\); \};/.test(src), true);
 
 /* ══ 포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄 ══
    화면 왼쪽 아래에 늘 떠 있던 단추를 치웠으니(위 참조), 평소에 들여다볼 문이
