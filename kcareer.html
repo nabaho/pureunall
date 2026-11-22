@@ -5106,7 +5106,7 @@ function _peekCloudCopy(cf){
     return true;
   }
   box.innerHTML='<div style="margin-bottom:6px;font-size:12px;color:var(--text-mute)">☁ 클라우드 사본 · '+escapeHtml(nm)+'</div>'
-    +'<img src="'+_peekUrl+'" style="max-width:100%;max-height:82vh;display:block;margin:auto">';
+    +'<img src="'+_peekUrl+'" alt="'+escapeHtml(nm)+'" style="max-width:100%;max-height:82vh;display:block;margin:auto">';
   return true;
 }
 async function openLocalOriginal(relPath){
@@ -10800,7 +10800,7 @@ async function _renderFsFormPreview(rec){
     if(/^(png|jpg|jpeg|gif|webp)$/.test(ext)){
       if(_fsPrevUrl){ try{ URL.revokeObjectURL(_fsPrevUrl); }catch(e){} }
       _fsPrevUrl=URL.createObjectURL(lf||new Blob([cf.buf],{type:_kcFormMime(ext)}));
-      box.innerHTML=사본줄+'<img src="'+_fsPrevUrl+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px">';
+      box.innerHTML=사본줄+'<img src="'+_fsPrevUrl+'" alt="'+escapeHtml(nm)+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px">';
       return;
     }
     알림('📎', escapeHtml(nm)+' (미리보기 미지원 형식)');
@@ -11878,7 +11878,7 @@ async function showPDFInline(id,containerId,alt){
     const n=pdf.numPages;
     box.innerHTML='<div style="background:#1e293b;padding:6px 10px;border-radius:8px 8px 0 0;display:flex;gap:8px;align-items:center">'
       +bar
-      +'<span style="color:#cbd5e1;font-size:12px">'+f.name+'  ('+n+'p)</span></div>'
+      +'<span style="color:#cbd5e1;font-size:12px">'+escapeHtml(f.name||'')+'  ('+n+'p)</span></div>'
       +'<div id="'+containerId+'_pg" style="overflow:auto;height:74vh;background:#475569;padding:12px;display:flex;flex-direction:column;gap:10px;align-items:center"></div>';
     const pg=document.getElementById(containerId+'_pg');
     for(let i=1;i<=Math.min(n,20);i++){

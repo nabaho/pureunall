@@ -199,6 +199,39 @@ test('★ 폴더 줄의 「원본」 단추 — 사본이 올라가 있으면 �
   assert.ok(!/☁/.test(줄({})), '사본이 없는 줄에 표시를 붙이면 거짓말입니다');
 });
 
+test('★★ 파일 이름은 «글자»로만 화면에 들어간다 — 사본 이름은 공유 기록(relPath)에서 오므로 «<» 가 든 이름이 태그가 되면 안 된다', async () => {
+  const 가짜창 = { innerHTML: '' }, 쪽칸 = { appendChild: function () {} };
+  const 쪽 = { getViewport: function () { return { width: 5, height: 5 }; }, render: function () { return { promise: Promise.resolve() }; } };
+  const 문서 = { numPages: 1, getPage: async function () { return 쪽; } };
+  const ctx = {
+    console: { warn: function () {}, log: function () {} },
+    document: {
+      getElementById: function (id) { return id === 'x_pg' ? 쪽칸 : (id === 'x' ? 가짜창 : null); },
+      createElement: function () { return { style: {}, getContext: function () { return {}; } }; }
+    },
+    window: { _pdfjs: { getDocument: function () { return { promise: Promise.resolve(문서) }; } } },
+    _pdfLoadLib: async function () { return true; },
+    b64ToAb: function () { return new ArrayBuffer(1); },
+    escapeHtml: function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
+    getFileAsync: async function () { return null; }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(떼기('async function showPDFInline(id,containerId,alt){').replace(/^(\s*)const /gm, '$1var '), ctx);
+  const 이름 = '<img src=x onerror=1>.pdf';
+  await vm.runInContext('showPDFInline(null,"x",{file:{name:' + JSON.stringify(이름) + ',ext:"pdf",base64:"QQ=="},bar:""})', ctx);
+  assert.ok(!/<img src=x/.test(가짜창.innerHTML), '★★★ 파일 이름이 태그로 들어갑니다 — 저장형 XSS 입니다');
+  assert.match(가짜창.innerHTML, /&lt;img src=x/, '이름은 글자로 보여야 합니다');
+});
+
+test('★ 사본 그림에는 대체 글(alt)이 붙는다 — 스크린리더가 파일 이름을 읽는다', async () => {
+  const 미리 = 무대({ root: null, 사본: 사본('표창.jpg', [1, 2]) });
+  await 미리보기(미리, '3. 표창/표창.jpg'); await 기다림();
+  assert.match(미리.box.innerHTML, /<img [^>]*alt="[^"]+"/, '미리보기 그림에 alt 가 있어야 합니다');
+  const 창 = 무대({ root: null, 진짜열기: true, 사본: 사본('표창.jpg', [1, 2]) });
+  await vm.runInContext('openLocalOriginal("3. 표창/표창.jpg")', 창.ctx); await 기다림();
+  assert.match(창.창.innerHTML, /<img [^>]*alt="[^"]+"/, '원본 창 그림에 alt 가 있어야 합니다');
+});
+
 test('★ 원본 창의 폰용 모양은 «폰 구간 안에서만» 바뀐다 — PC 는 그대로(대표 폰 규칙)', () => {
   const 줄 = SRC.split('\n').filter((l) => /#imgModal\b/.test(l) && /\{/.test(l) && !/id="imgModal"/.test(l));
   assert.ok(줄.length >= 1, '폰용 원본 창 규칙이 있어야 합니다');
