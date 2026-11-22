@@ -133,6 +133,16 @@ main 최신(151건)을 합친 뒤 전체 검사·폰 화면 점검·실제 문�
 - 검사: 새 `tests/hangul-safe-html.test.js`(8건 — 연결 3건은 jsdom 없이, 정리 5건은 jsdom 으로: CI 는 jsdom 을 깔고, 이 PC 는 따로 깐 jsdom 으로 돌림).
   옛 코드에 돌리면 연결 3건 실패, 정리 함수의 on… 거르기·각주 거르기·주소 판정을 일부러 망가뜨리면 각각 실패.
 - 화면 확인(내장 브라우저, 지어낸 서식): 가운데 정렬·칸 합치기·테두리·쪽 나눔·빨간 글자 그대로, 스크립트·on… 속성·javascript: 링크는 사라지고 실행 흔적 0.
+- 자동 검토 1차 반영: 편집기 내부 data-*(각주 data-note 만 걸러 남김)는 받지 않음 · CSS 이스케이프를 풀고 검사(닫지 않은 url( 도) ·
+  그림 SVG·수식 MathML 은 받지 않음 · 저절로 불러오는 그림·배경은 그림 data 주소와 같은 사이트 주소만 · 화면을 덮는 position:fixed 막음 · 시험 늘림(18건).
+
+## 10차 — main 합치기 충돌 풀기 2 (Auto-fix, 2026-11-22)
+
+- main 의 P박스 커밋(72a921aa: «P박스에 최종본 반영»·HTML 거르기 `_sanitizeLegacyBridgeHtml`)과 `hangul.html`·`app.js` 충돌.
+- 살린 것: main 의 P박스 연동(`saveToPBox`·연동 띠·폰 단추·`openBlob(…, opts)` 의 `noAutosave`·`pboxCtx`) + 이 가지의 «연결은 연 문서에만»·`openBlob` 이 연 문서를 돌려줌·.hwp 저장 형식.
+  P박스 연결도 기금 연결처럼 «그 쪽지로 연 문서» 에만 붙인다(창 전체 변수 `let fundCtx`·`let pboxCtx` 는 두지 않음).
+- 거르는 길은 하나로: main 의 `_sanitizeLegacyBridgeHtml` 결정(SVG·MathML 안 받음, 편집기 내부 data-* 지움)을 `hangul/js/safehtml.js` 에 합치고 그 함수는 뺐다.
+- 캐시 번호: hwpx.js 3 · dom.js 5 · app.js 21 (합친 내용이 main 배포본·이 가지 판과 달라 올림).
 - 검사: `tests/hangul-fund-bridge.test.js` 에 기밀 서면 시험 1건(못 열어도 HTML 로 안 엶 · 열면 `noAutosave` · 일반 서식은 그대로 · 자동 저장이 그 표시를 봄), 떠서 돌리는 조각에 가림 도우미를 함께 붙임.
 
 ## ⚠ [확인 필요] — 합치기 전에 사람이 볼 것

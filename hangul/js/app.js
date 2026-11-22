@@ -157,7 +157,9 @@
   });
 
   // 열면 그 문서(탭)를 돌려준다 — 못 열면 null (부르는 쪽이 대신 열기 등을 고를 수 있게)
-  async function openBlob(file, handle) {
+  //  opts.noAutosave: 기밀 서면은 자동 저장 사본을 남기지 않음 · opts.pboxCtx: P박스 연동 서면 (main 2026-11-22)
+  async function openBlob(file, handle, opts) {
+    opts = opts || {};
     // 서식 파일(.hwt)은 한글처럼 그 서식으로 새 문서를 만듦 (같은 이름으로 덮어쓰지 않고, '만든 날짜'는 오늘)
     const isTpl = /\.hwt$/i.test(file.name);
     let isHwp = isTpl || /\.hwp$/i.test(file.name);
@@ -180,6 +182,7 @@
         name: file.name.replace(/\.(hwpx|hwp|hwt)$/i, ''), html: Dm.blocksToHtml(model.blocks), page: Hx.normalizeDoc(model).page,
         header: model.header, footer: model.footer, pageNum: model.pageNum, numberings: model.numberings, bullets: model.bullets, outlineId: model.outlineId, columns: model.columns, pageBorders: model.pageBorders, masterPages: model.masterPages, compat: model.compat, sec: model.sec, styles: model.styles, fontInfo: model.fontInfo,
         handle: isTpl ? null : handle, format: isHwp && !isTpl ? 'hwp' : 'hwpx', pristine: false, readOnly: !!model.distributed,
+        noAutosave: !!opts.noAutosave, pboxCtx: opts.pboxCtx || null,
       });
       const notes = [];
       if (model.distributed) notes.push('배포용 문서라 읽기 전용으로 열었습니다 (고치기·저장·복사·인쇄 불가)');
@@ -2545,9 +2548,11 @@
   const start = PureunTemplates.find(t => t.id === new URLSearchParams(location.search).get('tpl'));
   if (start && start.id !== 'blank') addDoc({ name: start.name, html: start.html, pristine: false });
   else addDoc({ keepBlank: true });
-  // =============== 기금관리(fund.html) 직접 연결 브리지 ===============
+  // =============== 기금관리(fund.html) · P박스(pu-pbox.html) 직접 연결 브리지 ===============
   // 기금 연결 정보는 «그 서식을 연 문서(탭)» 에 붙인다 (doc.fundCtx) — 창 하나에 하나만 두면 다른 탭·빈 문서가
-  //  «기금관리에 반영» 으로 그 기금 서식을 덮어쓴다 (2026-11-20 점검). 띠도 지금 탭의 연결만 보여 준다.
+  //  «기금관리에 반영» 으로 그 기금 서식을 덮어쓴다 (2026-11-20 점검). 띠도 지금 탭의 연결만 보여 준다. P박스 연결(doc.pboxCtx)도 같다.
+  // 다른 화면이 보낸 HTML 은 hangul/js/safehtml.js(PureunSafeHtml.clean) 하나로 거른다 — main 의 _sanitizeLegacyBridgeHtml(2026-11-22)과
+  //  같은 결정(그림 SVG·수식 MathML 은 받지 않음, 편집기 내부 data-* 는 지움)을 그쪽에 합쳤다(거르는 길을 둘로 두지 않는다).
   function _b64ToBytes(b64) {
     const bin = atob(String(b64 || ''));
     const out = new Uint8Array(bin.length);
@@ -2562,8 +2567,14 @@
   }
   function _renderFundBridgeBar() {
     let wrap = $('fundBridgeBar');
+    let mobBtn = $('pboxMobSaveBtn');
     const fundCtx = cur && cur.fundCtx;
-    if (!fundCtx) { if (wrap) wrap.remove(); return; }
+    const activePboxCtx = cur && cur.pboxCtx;
+    if (!fundCtx && !activePboxCtx) {
+      if (wrap) wrap.remove();
+      if (mobBtn) mobBtn.remove();
+      return;
+    }
     if (!wrap) {
       wrap = h('div', { id: 'fundBridgeBar', style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginRight: '8px', padding: '2px 8px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: '6px', fontSize: '12px' } });
       const mb = $('menubar'), qf = $('quickFind');
@@ -2573,6 +2584,32 @@
       if (mb) mb.insertBefore(wrap, ref || null);
     }
     wrap.innerHTML = '';
+    if (activePboxCtx) {
+      wrap.append(
+        h('span', { style: { color: '#1e3a8a', fontWeight: '700' } }, '⚖️ P박스 연동: ' + (activePboxCtx.docTypeLabel || '서면') + (activePboxCtx.label ? ' · ' + activePboxCtx.label.slice(0, 24) : '')),
+        h('button', {
+          style: { padding: '2px 9px', background: '#1d4ed8', color: '#fff', border: '1px solid #1d4ed8', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11.5px' },
+          title: '편집한 최종 서면을 P박스 작업 및 사건 프로젝트 폴더로 안전하게 다시 저장합니다',
+          onclick: () => saveToPBox()
+        }, '💾 P박스에 최종본 반영')
+      );
+      /* 모바일·태블릿(<=820px)은 #menubar가 숨겨지므로 #mTop에도 [P박스 반영] 버튼 배치 */
+      const mTop = $('mTop');
+      if (mTop) {
+        if (!mobBtn) {
+          mobBtn = h('button', {
+            id: 'pboxMobSaveBtn',
+            type: 'button',
+            style: { minHeight: '34px', padding: '4px 10px', marginLeft: '4px', background: '#1d4ed8', color: '#fff', border: '1px solid #1d4ed8', borderRadius: '6px', cursor: 'pointer', fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap' },
+            title: '편집한 최종 서면을 P박스 작업·프로젝트에 반영',
+            onclick: () => saveToPBox()
+          }, '💾 P박스 반영');
+          mTop.appendChild(mobBtn);
+        }
+      }
+      return;
+    }
+    if (mobBtn) mobBtn.remove();
     wrap.append(
       h('span', { style: { color: '#065f46', fontWeight: '700' } }, '📋 기금연동: ' + (fundCtx.fundName || '기금') + (fundCtx.label ? ' · ' + fundCtx.label : '')),
       h('button', {
@@ -2581,6 +2618,46 @@
         onclick: () => saveToFund()
       }, '💾 기금관리에 반영')
     );
+  }
+  function saveToPBox() {
+    const activeCtx = cur && cur.pboxCtx;
+    if (!cur || !activeCtx) return toast('현재 열려 있는 탭은 P박스 연동 서면이 아닙니다. P박스에서 열린 서면 탭을 선택해 주세요.', true);
+    if (!window.opener || window.opener.closed) {
+      return toast('원래 P박스 창이 닫혀 있어 반영할 수 없습니다. 파일 → 저장(.hwpx)을 이용해 주세요.', true);
+    }
+    commit();
+    let plainText = '';
+    let hwpxB64 = '';
+    try {
+      const model = E.getModel();
+      plainText = Hx.plainText(model && Array.isArray(model.blocks) ? model.blocks : []);
+      hwpxB64 = _bytesToB64(Hx.buildHwpx(model));
+    } catch (e) {
+      return toast('P박스 반영용 서면 변환 실패: ' + e.message, true);
+    }
+    const msg = {
+      type: 'pureun_pbox_save',
+      bridgeId: activeCtx.bridgeId,
+      payload: {
+        bridgeId: activeCtx.bridgeId,
+        threadId: activeCtx.threadId || '',
+        projectId: activeCtx.projectId || '',
+        docType: activeCtx.docType || 'opinion',
+        docTypeLabel: activeCtx.docTypeLabel || '자문의견서',
+        name: cur.name || activeCtx.label || 'P박스 서면',
+        plainText,
+        hwpxB64,
+        savedAt: Date.now()
+      }
+    };
+    try {
+      window.opener.postMessage(msg, location.origin);
+      cur.dirty = false;
+      renderTabs();
+      toast(`'${cur.name || activeCtx.label}' 최종본을 P박스 작업·프로젝트로 안전하게 전송했습니다.`);
+    } catch (e) {
+      toast('P박스 창으로 전송하지 못했습니다: ' + e.message, true);
+    }
   }
   function saveToFund() {
     const fundCtx = cur && cur.fundCtx;
@@ -2643,7 +2720,17 @@
         } catch (e) {}
       }
     }
-    const ctx = p.fundId ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
+    // 기금·P박스 연결은 «이 쪽지로 연 문서» 에만 붙인다(창 전체에 두지 않는다)
+    const isPBoxBridge = String(p.bridgeId || '').indexOf('pbox_') === 0 || _initFrom === 'pbox';
+    const ctx = (!isPBoxBridge && p.fundId) ? { fundId: p.fundId, fundName: p.fundName || '', kind: p.kind || '', label: p.label || p.name || '' } : null;
+    const pboxCtx = isPBoxBridge ? {
+      bridgeId: String(p.bridgeId || _initBid || ''),
+      threadId: String(p.threadId || ''),
+      projectId: String(p.projectId || ''),
+      docType: String(p.docType || 'opinion'),
+      docTypeLabel: String(p.docTypeLabel || '자문의견서'),
+      label: String(p.label || p.name || 'P박스 서면')
+    } : null;
     const isPrivateDoc = _isPrivateBridgeId(p.bridgeId) || _isPrivateFrom(_initFrom);
     const srcLabel = p.sourceLabel || '기금관리';
     const docName = (p.name || p.label || '서식문서').replace(/\.(hwpx|hwp|hwt)$/i, '');
@@ -2658,11 +2745,13 @@
         const ext = (p.format === 'hwp') ? 'hwp' : 'hwpx';
         const bytes = _b64ToBytes(p.b64);
         const file = new File([bytes], docName + '.' + ext, { type: ext === 'hwp' ? 'application/x-hwp' : 'application/hwp+zip' });
-        opened = await openBlob(file, null); // 못 열면 null — 함께 온 HTML 로 대신 연다(기밀 서면은 대신 열지 않는다)
+        // 못 열면 null — 함께 온 HTML 로 대신 연다(기밀 서면은 대신 열지 않는다)
+        opened = await openBlob(file, null, { noAutosave: isPrivateDoc, pboxCtx: pboxCtx });
         if (isPrivateDoc) {
           if (!opened) { toast('기밀 서면(.hwpx)을 안전하게 열지 못했습니다.', true); return; }
           opened.noAutosave = true; // 기밀 서면은 이 브라우저에 복구용 사본을 남기지 않는다
         }
+        if (opened && pboxCtx && !opened.pboxCtx) opened.pboxCtx = pboxCtx;
       } catch (e) {
         if (isPrivateDoc) {
           toast('기밀 서면(.hwpx)을 안전하게 열지 못했습니다.', true);
@@ -2740,7 +2829,7 @@
       window.opener.postMessage({ type: 'pureun_hangul_ready', from: _initFrom, bid: _initBid }, location.origin);
     }
   } catch (e) {}
-  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates, loadFromFundPayload, saveToFund };
+  window.PureunApp = { C, D, addDoc, openBlob, setDirty, docs: () => docs, current: () => cur, activate, buildBytes, ribbon: RIBBON, fileMenu: FILE_MENU, menus: MENUS, refreshAll, setZoom, templates: PureunTemplates, loadFromFundPayload, saveToFund, saveToPBox };
 
   // 탐색기에서 더블클릭한 문서 열기: 실행 도우미(launcher/hangul_open.pyw)가 ?open=<토큰> 으로 넘겨 줌
   const openToken = new URLSearchParams(location.search).get('open');

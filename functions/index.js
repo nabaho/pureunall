@@ -8038,6 +8038,87 @@ exports.runMailContractSweep = functions
     }
   });
 
+/* 🎓 보낸 메일의 강의자료 → 강의자료 앱 자동 정리 (대표 지시 2026-11-21
+     「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
+   실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
+   매일 19:30 한 번(최근 14일) · 관리자는 강의자료 앱 «메일에서 찾기»의 [지금 정리](runEdulibMailSweep, 최대 400일).
+   ★ «정리»까지만 자동이다 — 결과(종류·강의일·내용 요약)를 관리자만 읽는 자동 정리함(edulib_inbox)에 쌓고, 원본은 복사하지 않는다.
+     자료함(재직 직원 모두)에 넣는 것은 관리자가 자동 정리함에서 골라 «넣기»를 누를 때다(화면의 «가져오기» 길).
+   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 빈 자리일 때만 · 창고·자료함에는 안 씀 · AI 안 씀.
+   ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다) */
+const EdulibMailSweep = require("./edulib-mail-sweep");
+async function runEdulibMailSweepOnce(trigger, opts) {
+  const MS = require("./mail-sync");
+  return EdulibMailSweep.runSweep({
+    db: getDatabase(),
+    download: (slug, uid, name, max) => MS.withFolder(MAIL_DEPS, slug, async (client) => {
+      const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+      if (!head) return { gone: true };
+      const parts = MS.pickParts(head.bodyStructure, null, 0);
+      /* 이름으로만 집는다 — 색인의 첨부 순서와 IMAP 조각 순서가 다를 수 있다(화면 «가져오기»와 같은 잣대) */
+      const a = parts.atts.find((x) => x.name === name) || parts.atts.find((x) => String(x.name || "").slice(0, 60) === String(name).slice(0, 60));
+      if (!a) return { gone: true };
+      if (Number(a.size || 0) > max) return { big: true };
+      const d = await client.download(String(uid), a.part, { uid: true });
+      const buf = await MS.drain(d.content, max);
+      return { name: a.name, mime: a.mime || "", buf };
+    }),
+    pdfText: (buf) => require("./rules-collect-pdf").pdfText(buf),
+    log: (...a) => console.log(...a),
+  }, Object.assign({ trigger }, opts || {}));
+}
+async function acquireEdulibSweepLock(by) {
+  const now = Date.now();
+  const lockRef = getDatabase().ref("edulib_inbox/lock");
+  const tx = await lockRef.transaction((cur) => {
+    const c = (cur && typeof cur === "object") ? cur : {};
+    if (Number(c.runningUntil || 0) > now) return; /* 이미 도는 중 — 그만둔다 */
+    return { runningUntil: now + 9 * 60 * 1000, by: String(by || "schedule"), at: now };
+  });
+  if (!tx.committed) { const err = new Error("강의자료 메일 정리가 이미 돌고 있습니다. 잠시 뒤 다시 해 주세요."); err.status = 429; throw err; }
+  return async () => { try { await lockRef.update({ runningUntil: 0 }); } catch (_) { /* 다음 잠금이 시간으로 풀린다 */ } };
+}
+exports.edulibMailSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("30 19 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    let release = null;
+    try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); return null; }
+    try {
+      const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
+      console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
+    } finally { if (release) await release(); }
+    return null;
+  });
+exports.runEdulibMailSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 받습니다." }); return; }
+    let staffRole;
+    try {
+      const caller = await requireStaff(req);
+      staffRole = await STAFF_GATE.assertActive(caller.uid);
+    } catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    /* 메일함은 관리자 전용(2026-09-23) — 강의자료 앱의 «메일에서 찾기» 칸도 관리자만 보인다 */
+    if (!(staffRole && staffRole.isAdmin)) { res.status(403).json({ ok: false, error: "관리자만 돌릴 수 있습니다." }); return; }
+    const b = (req.body && typeof req.body === "object") ? req.body : {};
+    let release = null;
+    try { release = await acquireEdulibSweepLock(staffRole.sid); } catch (e) { res.status(e.status || 429).json({ ok: false, error: String(e.message || e) }); return; }
+    try {
+      const days = Math.min(EdulibMailSweep.MAX_DAYS, Math.max(1, Number(b.days) || 30));
+      const r = await runEdulibMailSweepOnce("manual", { days, by: staffRole.sid, budgetMs: 7.5 * 60 * 1000 });
+      res.json({ ok: true, result: { queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
+    } catch (e) {
+      console.error("runEdulibMailSweep", e && e.stack || e);
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+    } finally { if (release) await release(); }
+  });
+
 /* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
    ⚠ 실제 코드는 mail-gone.js 에 있다 — index.js 를 더 키우지 않기 위해서다.
    ⚠ 여기 한 줄을 안 적으면 밖에서 안 보인다(배포가 안 된다). mail-sync 와 같은 까닭. */
@@ -8740,4 +8821,40 @@ exports.collectFundMailOnNew = functions
       console.error("[collectFundMailOnNew]", slug, uid, e && (e.stack || e.message || e));
       return null;
     }
+  });
+
+/* 📊 데이터관리(대표 전용, pu-datahub.html) — 서버 쪽은 functions/datahub.js 한 곳 (2026-11-21, 계획서 4·5·3-5절)
+   문지기: requireReader(토큰 철회 확인 + 재직 로그인 — 규칙 LOGIN 과 같은 뜻) → app_owner/uid 와 같은 uid. 모르면 닫는다.
+   ⚠ 범용 readDoc 을 쓰지 않는다 — 화면이 app 이름을 바꿔 서명 검사를 건너뛸 수 있다. 묻기는 datahubAsk 하나뿐.
+   ⚠ 열쇠(GEMINI_KEY)는 datahubAsk 만 건다 — 나머지 셋은 AI 를 부르지 않는다. */
+const Datahub = require("./datahub");
+function datahubDeps() {
+  return { getDatabase: getDatabase, requireReader: requireReader, setCors: setCors };
+}
+exports.datahubDeviceRequest = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(Datahub.handlers(datahubDeps()).deviceRequest);
+exports.datahubChallenge = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(Datahub.handlers(datahubDeps()).challenge);
+exports.datahubAsk = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB", secrets: ["GEMINI_KEY"] })
+  .https.onRequest(Datahub.handlers(Object.assign(datahubDeps(), {
+    readGeminiKey: readGeminiKey, aiMonthSpend: aiMonthSpend, budgetGate: DR.budgetGate,
+    callGemini: DR.callGemini, dailyQuotaGone: DR.dailyQuotaGone, fetch: fetch,
+    bumpReadTally: bumpReadTally, bumpSpend: bumpSpend
+  })).ask);
+/* 현황판 — 한 시간마다 앱별 «건수·비율만» datahub_board/{앱 key} 에. 원본은 읽기만 한다. */
+exports.datahubBoardTally = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "1GB" })
+  .pubsub.schedule("every 60 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const r = await Datahub.boardTally({ getDatabase: getDatabase, log: (m, o) => console.log(m, o || "") });
+    console.log("[데이터관리 현황판]", r);
+    return null;
   });

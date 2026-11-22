@@ -101,7 +101,7 @@ test('★★★ «열기» 메시지는 같은 사이트가 보낸 것만 듣는
 function runLoad({ openOk = true, initFrom = '' } = {}) {
   const keyLine = /const _bridgeKey = [^\n]*\n/.exec(CODE);
   assert.ok(keyLine, '_bridgeKey 를 못 찾았습니다');
-  const code = keyLine[0] + privHelpers() + 'const _initFrom = ' + JSON.stringify(initFrom) + ';\n' + cutFn(CODE, 'async function loadFromFundPayload(');
+  const code = keyLine[0] + privHelpers() + 'const _initFrom = ' + JSON.stringify(initFrom) + ';\nconst _initBid = "";\n' + cutFn(CODE, 'async function loadFromFundPayload(');
   const log = { opened: [], added: [], bars: 0, toasts: [] };
   const fn = new Function('_seenBridgeIds', 'window', 'location', 'BroadcastChannel', 'openBlob', 'addDoc', '_renderFundBridgeBar', 'Hx', 'toast', '_b64ToBytes', 'File', 'console',
     code + '\nreturn loadFromFundPayload;')(
@@ -155,8 +155,12 @@ test('★★★ 기밀 서면(P박스·괴롭힘 조사)은 못 열어도 HTML �
     assert.ok(r.log.toasts.length >= 1, bridgeId + ': 못 열었다고 알려야 합니다');
   }
   const ok = runLoad({ openOk: true, initFrom: 'pbox' });
-  await ok.load({ bridgeId: 'pbox_2', format: 'hwpx', b64: 'AA==' });
+  await ok.load({ bridgeId: 'pbox_2', format: 'hwpx', b64: 'AA==', fundId: 'F9', label: '의견서' });
   assert.strictEqual(ok.log.opened[0].noAutosave, true, '기밀 서면에 자동 저장 막음 표시가 없습니다');
+  // P박스 연결은 그 문서에만 붙고(main 2026-11-22 «P박스에 최종본 반영»), 기금 연결은 붙지 않는다
+  assert.strictEqual(ok.log.opened[0].pboxCtx && ok.log.opened[0].pboxCtx.bridgeId, 'pbox_2', 'P박스 연결이 연 문서에 붙지 않았습니다');
+  assert.strictEqual(ok.log.opened[0].fundCtx, undefined, 'P박스 서면에 기금 연결이 붙었습니다');
+  assert.doesNotMatch(CODE, /let pboxCtx\b/, 'P박스 연결을 창 하나에 하나(전역)로 두면 다른 탭이 그 서면으로 반영됩니다');
   // 일반 서식은 그대로 자동 저장 대상
   const plain = runLoad({ openOk: true });
   await plain.load({ sentAt: 9, format: 'hwpx', b64: 'AA==' });

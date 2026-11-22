@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=106"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -601,10 +601,32 @@ button{font:inherit;cursor:pointer}
   .dly td.empty{flex:1 1 100%}
   .dly input[type=checkbox]{width:24px;height:24px}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다(숨기기·옮기기 없음). 이 화면은 이미 둥근 상자(16px)·알약 칩이라 그림자·고른 단추만 맞춘다.
+   ★ 머리줄 갈래 단추(.rmode) 모양은 css/rules-shell.css 한 벌에만 둔다(tests/rules-shell.test.js ③) — 여기 두지 않는다.
+   ★ 표 머리 글자 굵기는 그대로 둔다 — 칸이 좁아 «…» 로 줄어드는 머리(★최근 등)가 더 잘린다. */
+:where(body.pu-design) .top{box-shadow:var(--pu-sh-sm)}
+/* 바깥 상자 셋(🏢·📚·📥) — 옅은 그림자 */
+:where(body.pu-design) #lib,:where(body.pu-design) #topics,:where(body.pu-design) #sites{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) #topics .card{border-radius:var(--pu-r)}
+/* 파란 단추·고른 갈래는 목업처럼 파란 그림자 */
+:where(body.pu-design) .btn.p{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .seg button.on,:where(body.pu-design) .tsteps button.on,:where(body.pu-design) .dsw button.on{box-shadow:var(--pu-sh-acc)}
+/* 떠 있는 창 — 둥근 모서리 + 목업 그림자 */
+:where(body.pu-design) .pick{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .cpop{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-md)}
+/* 폰·좁은 화면(900px 이하) — 앱이 바깥 상자를 «없는 셈»으로 편다(테두리·둥글기 0). 그림자도 걷어 상자는 한 겹 */
+@media (max-width:900px){
+  :where(body.pu-design) #lib,:where(body.pu-design) #topics,:where(body.pu-design) #sites{box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
-<link rel="stylesheet" href="css/rules-shell.css?v=4">
+<link rel="stylesheet" href="css/rules-shell.css?v=5">
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리·머리줄 한 벌 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 <div class="top rs-head">
   <div class="logo rs-logo">규</div><b class="rs-name">기업규정집</b>
   <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
@@ -621,7 +643,7 @@ button{font:inherit;cursor:pointer}
 <div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=53"></script>
+<script src="js/pu-appbar.js?v=54"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>

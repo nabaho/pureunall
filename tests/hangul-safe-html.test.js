@@ -28,7 +28,7 @@ test('① 편집기 화면은 정리 함수를 편집기 본체보다 먼저 싣
 function runLoad(win) {
   const pre = [/const _bridgeKey = [^\n]*\n/, /const _isPrivateBridgeId = [\s\S]*?\n {2}\};\n/, /const _isPrivateFrom = [^\n]*\n/]
     .map(re => { const m = re.exec(APP); assert.ok(m, '도우미를 못 찾았습니다: ' + re); return m[0]; }).join('');
-  const code = pre + 'const _initFrom = "";\n' + cutFn(APP, 'async function loadFromFundPayload(');
+  const code = pre + 'const _initFrom = "";\nconst _initBid = "";\n' + cutFn(APP, 'async function loadFromFundPayload(');
   const log = { added: [], toasts: [] };
   const fn = new Function('_seenBridgeIds', 'window', 'location', 'BroadcastChannel', 'openBlob', 'addDoc', '_renderFundBridgeBar', 'Hx', 'toast', '_b64ToBytes', 'File', 'console',
     code + '\nreturn loadFromFundPayload;')(
@@ -58,7 +58,7 @@ test('★★★ ① 정리 함수가 없거나 실패하면 열지 않고 알린
 
 // ---------- ② 정리 함수 — jsdom 으로 진짜 HTML 을 풀어 본다 ----------
 function cleaner() {
-  const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' });
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only', url: 'https://erp.example/hangul.html' });
   dom.window.eval(SAFE_SRC);
   return { S: dom.window.PureunSafeHtml, dom };
 }
@@ -87,6 +87,20 @@ test('★★★ ② 실행되는 조각을 걷는다 — 스크립트·이벤트
     '<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>',
     '<noscript><p title="</noscript><img src=x onerror=alert(1)>"></noscript>',
     '<xmp><img src=x onerror=alert(1)></xmp>',
+    // 자동 검토(2026-11-22)가 찾은 길 — 편집기 내부 data-*·CSS 이스케이프·닫지 않은 url(·수식 속 주소·다른 사이트 불러오기
+    '<span class="hctl" data-hf=\'{"kind":"header","blocks":[{"type":"p","runs":[{"image":{"src":"x\\" onerror=\\"alert(1)"}}]}]}\'></span>',
+    '<span class="cmp" data-cmp=\'{"chars":["<img src=x onerror=alert(1)>"]}\'>x</span>',
+    '<div style="width:\\65 xpression(alert(1))">x</div>',
+    '<div style="background:\\75 rl(\\6a avascript:alert(1))">x</div>',
+    '<div style="\\40 import \'//evil.example/x.css\'">x</div>',
+    '<div style="background:url(jav&#x09;ascript:alert(1)">x</div>',
+    '<div style="background:url(data:text/html,abc">x</div>',
+    '<div style="background:url(https://evil.example/track.png)">x</div>',
+    '<math><mi href="data:image/svg+xml,&lt;svg onload=alert(1)&gt;">x</mi></math>',
+    '<svg><textPath href="https://evil.example/s.svg#x">t</textPath><rect fill="url(https://evil.example/s.svg#x)"/></svg>',
+    '<img src="https://evil.example/track.png"><img src="//evil.example/t.png">',
+    '<table background="https://evil.example/bg.png"><tr><td>x</td></tr></table>',
+    '<div style="position:fixed;top:0;left:0;width:100%;height:100%">가림</div>',
   ];
   const { dom } = cleaner();
   for (const h of bad) {
@@ -96,13 +110,14 @@ test('★★★ ② 실행되는 조각을 걷는다 — 스크립트·이벤트
     box.innerHTML = out;
     const els = Array.from(box.content.querySelectorAll('*'));
     const tags = els.map(e => e.localName.toLowerCase());
-    for (const t of ['script', 'iframe', 'object', 'embed', 'style', 'link', 'meta', 'form', 'input', 'button', 'foreignobject', 'animate', 'set', 'xmp', 'noscript', 'mglyph']) {
+    for (const t of ['script', 'iframe', 'object', 'embed', 'style', 'link', 'meta', 'form', 'input', 'button', 'foreignobject', 'animate', 'set', 'xmp', 'noscript', 'mglyph', 'svg', 'math', 'textpath']) {
       assert.ok(!tags.includes(t), `걸러지지 않은 요소 <${t}>: ${h} → ${out}`);
     }
     for (const e of els) for (const a of Array.from(e.attributes)) {
       assert.ok(!/^on/i.test(a.name), `이벤트 속성이 남았습니다(${a.name}): ${h} → ${out}`);
-      assert.ok(!/^(srcdoc|formaction|action)$/i.test(a.name), `위험한 속성이 남았습니다(${a.name}): ${h} → ${out}`);
-      assert.doesNotMatch(a.value, /javascript\s*:|data:text\/html|expression\(|evil\.example/i, `위험한 주소가 남았습니다(${a.name}): ${h} → ${out}`);
+      assert.ok(!/^(srcdoc|formaction|action|background)$/i.test(a.name), `위험한 속성이 남았습니다(${a.name}): ${h} → ${out}`);
+      assert.ok(!/^data-(?!note$)/i.test(a.name), `편집기 내부 data-* 가 남았습니다(${a.name}): ${h} → ${out}`);
+      assert.doesNotMatch(a.value, /javascript|data:text\/html|expression|evil\.example|@import|position:\s*fixed|\\/i, `위험한 값이 남았습니다(${a.name}): ${h} → ${out}`);
     }
   }
 });
@@ -114,8 +129,8 @@ test('★★★ ② 서식은 그대로 둔다 — 글꼴·크기·색·표·칸
     + '<tr><td colspan="2" rowspan="1" style="border:1px solid #000;padding:2mm">칸</td></tr></tbody></table>'
     + '<hr class="page-break" contenteditable="false">'
     + '<img src="data:image/png;base64,iVBORw0KGgo=" style="width:30mm">'
-    + '<span class="autonum" contenteditable="false" data-an="{&quot;n&quot;:1}">1</span>'
-    + '<svg viewBox="0 0 10 10"><defs><linearGradient id="g1"><stop offset="0" stop-color="#fff"></stop></linearGradient></defs><rect x="1" y="1" width="8" height="8" fill="#000"></rect></svg>'
+    + '<img src="img/stamp.png" alt="도장"><img src="https://erp.example/img/logo.png" alt="로고">'
+    + '<div style="position:relative;background:url(data:image/png;base64,iVBORw0KGgo=)">배경</div>'
     + '<a href="https://www.law.go.kr/">법령</a>';
   const out = S.clean(keep);
   const box = dom.window.document.createElement('div');
@@ -124,9 +139,9 @@ test('★★★ ② 서식은 그대로 둔다 — 글꼴·크기·색·표·칸
   assert.ok(q('p[style*="text-align:center"]') && q('b') && q('span[style*="color"]'), '글자 서식이 빠졌습니다: ' + out);
   assert.ok(q('td[colspan="2"][style*="border"]') && q('col[style*="width"]'), '표 서식이 빠졌습니다: ' + out);
   assert.ok(q('hr.page-break[contenteditable="false"]'), '쪽 나눔이 빠졌습니다');
-  assert.ok(q('img[src^="data:image/png"]'), '그림이 빠졌습니다');
-  assert.ok(q('span.autonum[data-an]'), '편집기 표시(data-*)가 빠졌습니다');
-  assert.ok(q('svg rect') && q('svg stop'), '도형(SVG)이 빠졌습니다');
+  assert.ok(q('img[src^="data:image/png"]'), '그림(data 주소)이 빠졌습니다');
+  assert.ok(q('img[src="img/stamp.png"]') && q('img[src="https://erp.example/img/logo.png"]'), '같은 사이트 그림이 빠졌습니다');
+  assert.ok(q('div[style*="position:relative"][style*="data:image/png"]'), '안전한 배경·위치 서식이 빠졌습니다');
   assert.ok(q('a[href="https://www.law.go.kr/"]'), '안전한 링크가 빠졌습니다');
   assert.ok(box.textContent.includes('제목') && box.textContent.includes('칸'), '글이 빠졌습니다');
 });
@@ -158,6 +173,18 @@ test('② 주소 판정 — 상대 주소·http(s) 는 되고, javascript·vbscr
   assert.ok(S.safeUrl('data:image/png;base64,AAAA', true));
   for (const no of ['javascript:alert(1)', ' JaVaScRiPt:alert(1)', 'java\nscript:alert(1)', 'vbscript:x', 'data:text/html,<script>', 'blob:https://a/b']) {
     assert.ok(!S.safeUrl(no, true), no);
+    assert.ok(!S.safeUrl(no, false), no);
   }
   assert.ok(!S.safeUrl('data:image/png;base64,AAAA', false), '글 링크(a)에는 data 주소를 두지 않습니다');
+  // 저절로 불러오는 그림은 같은 사이트·그림 data 주소만 — 다른 사이트에서 불러와 열람을 알리지 않게
+  assert.ok(S.safeUrl('https://erp.example/a.png', true));
+  assert.ok(!S.safeUrl('https://evil.example/a.png', true));
+  assert.ok(!S.safeUrl('//evil.example/a.png', true));
+});
+
+test('★★ ② 거른 결과를 다시 걸러도 같다(되풀이해도 모양이 안 바뀐다)', opt, () => {
+  const { S } = cleaner();
+  const h = '<p style="color:red">가<b>나</b></p><table><tbody><tr><td colspan="2">칸</td></tr></tbody></table><sup class="note" data-note="&lt;p&gt;각주&lt;/p&gt;">※</sup>';
+  const once = S.clean(h);
+  assert.strictEqual(S.clean(once), once);
 });

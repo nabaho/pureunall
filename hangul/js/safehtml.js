@@ -3,61 +3,72 @@
      편집기는 받은 HTML 을 문서 칸에 그대로 넣으므로, 보낸 쪽 자료에 실행되는 조각이 섞여 있으면 편집기 창에서 돌 수 있다.
    ■ 어떻게
      ① 실행되지 않는 <template> 안에서 푼다(그림을 불러오거나 on… 속성이 도는 일이 없다).
-     ② 위험한 요소(script·style·iframe·object·form …)는 속까지 통째로 지우고, 모르는 요소는 껍데기만 걷어 글은 남긴다.
-     ③ on… 속성·srcdoc·id·name 같은 속성은 지우고, 주소 속성은 http(s)·상대 주소·그림 data 주소만 남긴다.
-     ④ 각주 본문(data-note — 나중에 HTML 로 다시 그려진다)도 같은 방식으로 거른다.
-     ⑤ 다시 풀어 거른 결과가 같아질 때까지 되풀이한다(풀 때마다 모양이 바뀌는 조각을 막는다).
-   ■ 지키는 것: 서식(글꼴·크기·색·표·칸 합치기·테두리·style·편집기의 data-* 표시)은 그대로 둔다.
+     ② 위험한 요소(script·style·iframe·object·form·svg·math …)는 속까지 통째로 지우고, 모르는 요소는 껍데기만 걷어 글은 남긴다.
+        그림(SVG)·수식(MathML)은 받지 않는다 — 도형·수식은 .hwpx(b64) 로 온다(main 의 같은 결정, 2026-11-22).
+     ③ on… 속성·id·name·편집기 내부 data-*(머리말·글자 겹침·필드 등 — 나중에 HTML 로 다시 그려진다)는 지운다.
+        각주 본문(data-note)만 같은 방식으로 걸러 남긴다.
+     ④ 주소: 글 링크(a href)는 http(s)·mailto·tel·상대 주소, 불러오는 그림(img src·style 의 url)은
+        그림 data 주소와 «같은 사이트» 주소만 — 다른 사이트에서 몰래 불러와 열람을 알리는 일을 막는다.
+     ⑤ style: CSS 이스케이프(\65 같은 것)를 풀고 보이지 않는 글자를 걷은 뒤 검사한다(닫는 괄호 없는 url( 도). 화면을 덮는 position:fixed 도 막는다.
+     ⑥ 다시 풀어 거른 결과가 같아질 때까지 되풀이한다(풀 때마다 모양이 바뀌는 조각을 막는다).
+   ■ 지키는 것: 서식(글꼴·크기·색·정렬·표·칸 합치기·테두리·쪽 나눔·그림 data 주소·style)은 그대로 둔다.
+   ⚠ 이 파일에 «백슬래시 u» 이스케이프를 쓰지 않는다 — 편집 도구가 실제 글자로 바꿔 정규식을 깨뜨린 일이 있다(글자 번호로 만든다).
    지킴: tests/hangul-safe-html.test.js */
 (function (g) {
   'use strict';
   // 속까지 통째로 지우는 요소
   const DROP = new Set(['script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'link', 'meta', 'base',
     'form', 'input', 'button', 'textarea', 'select', 'option', 'optgroup', 'noscript', 'noembed', 'noframes', 'template', 'portal',
-    'foreignobject', 'animate', 'animatemotion', 'animatetransform', 'set', 'discard', 'handler', 'listener', 'title', 'head']);
+    'svg', 'math', 'title', 'head', 'xmp', 'plaintext', 'listing']);
   // 그대로 두는 요소 — 편집기·서식이 쓰는 것. 여기 없는 요소는 껍데기만 걷는다(글은 남김)
   const KEEP = new Set([
     'a', 'abbr', 'address', 'article', 'aside', 'b', 'bdi', 'bdo', 'big', 'blockquote', 'br', 'caption', 'center', 'cite', 'code',
     'col', 'colgroup', 'dd', 'del', 'details', 'dfn', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'font', 'footer',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'i', 'img', 'ins', 'kbd', 'label', 'li', 'main', 'mark', 'nobr', 'ol', 'p',
     'pre', 'q', 'rp', 'rt', 'ruby', 's', 'samp', 'section', 'small', 'span', 'strike', 'strong', 'sub', 'summary', 'sup',
-    'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'tt', 'u', 'ul', 'var', 'wbr',
-    // 그림(SVG) — 편집기의 도형·글상자
-    'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'textpath', 'defs',
-    'lineargradient', 'radialgradient', 'stop', 'pattern', 'clippath', 'mask', 'marker', 'image', 'use', 'symbol', 'desc',
-    // 수식(MathML) — hangul/js/eq.js 가 만드는 것
-    'math', 'mi', 'mn', 'mo', 'mover', 'mroot', 'mrow', 'mspace', 'msqrt', 'msub', 'msubsup', 'msup', 'mtable', 'mtd', 'mtext',
-    'mtr', 'munder', 'munderover', 'mfrac']);
-  // 지우는 속성 (on… 은 따로)
+    'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'tt', 'u', 'ul', 'var', 'wbr']);
+  // 지우는 속성 (on… · data-* 는 따로)
   const DROP_ATTR = new Set(['srcdoc', 'formaction', 'action', 'ping', 'srcset', 'imagesrcset', 'id', 'name', 'form', 'is',
-    'autofocus', 'attributename', 'http-equiv']);
-  // 주소가 들어가는 속성
-  const URL_ATTR = new Set(['href', 'xlink:href', 'src', 'background', 'poster', 'data', 'cite', 'longdesc', 'lowsrc', 'dynsrc',
-    'codebase', 'manifest', 'icon']);
+    'autofocus', 'http-equiv', 'xmlns', 'xlink:href']);
+  // 주소가 들어가는 속성 — a[href]·img[src] 말고는 모두 지운다
+  const URL_ATTR = new Set(['href', 'src', 'background', 'poster', 'data', 'cite', 'longdesc', 'lowsrc', 'dynsrc', 'codebase',
+    'manifest', 'icon']);
   const MAX_NOTE_DEPTH = 3;
-
-  // 주소 앞뒤·사이에 숨겨 «javascript:» 를 감추는 데 쓰이는 보이지 않는 글자(제어 문자·빈칸 종류) — 판정 전에 걷는다
-  //  (역슬래시 이스케이프 없이 글자 번호로 만든다 — 편집 도구가 이스케이프를 실제 글자로 바꿔 정규식을 깨뜨린 일이 있다)
+  // 주소·CSS 에서 «javascript:» 따위를 감추는 데 쓰이는 보이지 않는 글자(제어 문자·빈칸 종류) — 판정 전에 걷는다
   const INVISIBLE = new RegExp('[' + [[0x00, 0x20], [0x7f, 0xa0], [0x1680, 0x1680], [0x180e, 0x180e], [0x2000, 0x200f],
     [0x2028, 0x2029], [0x205f, 0x205f], [0x3000, 0x3000], [0xfeff, 0xfeff]]
     .map(([a, b]) => String.fromCharCode(a) + (a === b ? '' : '-' + String.fromCharCode(b))).join('') + ']', 'g');
-  // 주소가 안전한가 — 상대 주소·#·http(s) 만. 그림 자리(img·배경 등)는 그림 data 주소도. 글 링크(a)는 mailto·tel 도.
-  function safeUrl(v, image) {
+
+  const here = () => { try { const o = g.location && g.location.origin; return o && o !== 'null' ? o : ''; } catch (e) { return ''; } };
+
+  // 주소가 안전한가. resource=true 는 «저절로 불러오는 것»(그림·배경): 그림 data 주소와 같은 사이트 주소만.
+  //  resource=false 는 글 링크(누를 때만 감): http(s)·mailto·tel·상대 주소.
+  function safeUrl(v, resource) {
     const s = String(v == null ? '' : v).replace(INVISIBLE, '');
     const m = /^([a-z][a-z0-9+.\-]*):/i.exec(s);
-    if (!m) return true;
+    if (!m) return !(resource && /^[\\/]{2}/.test(s)); // 상대 주소(«//남의사이트» 는 그림으로 불러오지 않는다)
     const sc = m[1].toLowerCase();
-    if (sc === 'http' || sc === 'https') return true;
-    if (!image && (sc === 'mailto' || sc === 'tel')) return true;
-    if (image && sc === 'data') return /^data:image\/(png|jpe?g|gif|webp|bmp|svg\+xml)[;,]/i.test(s);
-    return false;
+    if (resource) {
+      if (sc === 'data') return /^data:image\/(png|jpe?g|gif|webp|bmp|svg\+xml)[;,]/i.test(s);
+      if (sc === 'http' || sc === 'https') { try { return !!here() && new URL(s).origin === here(); } catch (e) { return false; } }
+      return false;
+    }
+    return sc === 'http' || sc === 'https' || sc === 'mailto' || sc === 'tel';
   }
 
-  // style 속성이 안전한가 — 옛 브라우저의 실행 문법·바깥 불러오기·위험한 주소를 막는다(글꼴·크기·테두리 같은 서식은 그대로)
+  // CSS 이스케이프(\65 · \6a 같은 글자 번호, \x 같은 한 글자)를 풀어 «진짜 글자» 로 본다
+  function cssDecode(s) {
+    return s.replace(/\\([0-9a-f]{1,6})[ \t\r\n\f]?/gi, (m, h) => {
+      const c = parseInt(h, 16);
+      return c > 0 && c <= 0x10ffff ? String.fromCodePoint(c) : '';
+    }).replace(/\\([\s\S])/g, '$1').replace(/\\/g, '');
+  }
+
+  // style 속성이 안전한가 — 실행 문법·바깥 불러오기·위험한 주소·화면 덮기를 막는다(글꼴·크기·테두리 같은 서식은 그대로)
   function safeStyle(v) {
-    const s = String(v || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\\/g, '');
-    if (/expression\s*\(|javascript\s*:|vbscript\s*:|-moz-binding|behavior\s*:|@import/i.test(s)) return false;
-    const re = /url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+    const s = cssDecode(String(v || '').replace(/\/\*[\s\S]*?\*\//g, '')).replace(INVISIBLE, '').toLowerCase();
+    if (/expression|javascript:|vbscript:|-moz-binding|behavior:|@import|position:(fixed|sticky)|image-set\(|\bsrc\(/.test(s)) return false;
+    const re = /url\((['"]?)([^'")]*)/g; // 닫는 괄호가 없어도(글 끝에서 저절로 닫힘) 본다
     let m;
     while ((m = re.exec(s))) if (!safeUrl(m[2], true)) return false;
     return true;
@@ -69,13 +80,15 @@
       let ok = true;
       if (n.indexOf('on') === 0 || DROP_ATTR.has(n)) ok = false;
       else if (URL_ATTR.has(n)) {
-        if (tag === 'use') ok = /^#/.test(v.trim()); // 다른 문서의 도형을 끌어오지 않는다
-        else ok = safeUrl(v, tag !== 'a');
+        if (tag === 'a' && n === 'href') ok = safeUrl(v, false);
+        else if (tag === 'img' && n === 'src') ok = safeUrl(v, true);
+        else ok = false;
       } else if (n === 'style') ok = safeStyle(v);
       else if (n === 'data-note') { // 각주 본문 — 나중에 HTML 로 다시 그려지므로 같은 방식으로 거른다
         if (depth >= MAX_NOTE_DEPTH) ok = false;
         else { const c = cleanOnce(v, depth + 1); if (c !== v) el.setAttribute(a.name, c); }
-      }
+      } else if (n.indexOf('data-') === 0) ok = false; // 편집기 내부 표시(JSON 등)는 받지 않는다 — 다시 그려질 때 HTML 이 된다
+      else if (/url\s*\(/i.test(cssDecode(v).replace(INVISIBLE, ''))) ok = false; // 그 밖의 속성 속 url(...) 참조
       if (!ok) el.removeAttribute(a.name);
     }
   }

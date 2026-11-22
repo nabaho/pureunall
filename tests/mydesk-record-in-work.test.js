@@ -11,7 +11,9 @@
    ■ 규칙
      ⓐ 엔진이 «실제로 돈다» — 끝낸 건이 넘어간다.
      ⓑ 상태·다음 할 일·진행률을 이알피 쪽 기록(project_progress)과 주고받지 않는다.
-     ⓒ 「나의 업무」에는 「+ 입력」 창이 없고, 「업무관리에서 기록 →」이 그 건을 연다. */
+     ⓒ 「나의 업무」에는 「+ 입력」 창이 없고, 업무관리로 가는 길이 있다.
+        (2026-11-21 대표 「추천대로」 — 2단계: 줄마다 있던 「업무관리에서 기록 →」 표를 걷고 «업무관리 숫자 한 줄 + 여는 단추»로.
+         자세한 규칙은 tests/my-work-home.test.js) */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -88,13 +90,13 @@ test('ⓑ ★★ 이알피의 빈 상태가 업무관리 «진행중»을 지우
   assert.equal(log.set.indexOf('project_progress'), -1, '★★ 이알피 진행 기록(project_progress)을 다시 고치기 시작했습니다');
 });
 
-test('ⓒ ★★ 「나의 업무」에 「+ 입력」 창이 없고, 「업무관리에서 기록 →」이 그 건을 연다', () => {
+test('ⓒ ★★ 「나의 업무」에 「+ 입력」 창이 없고, 업무관리로 가는 길이 있다', () => {
   const my = stripJs(fn('MyDeskV2'));
   assert.ok(my.indexOf("'📝 메모' : '+ 입력'") < 0, '★★ 「+ 입력」·「📝 메모」 단추가 되살아났습니다 — 기록이 다시 두 곳이 됩니다');
-  const at = my.indexOf("'업무관리에서 기록 →'");
+  const at = my.indexOf("'업무관리에서 열기 →'");
   assert.ok(at > 0, '★★ 업무관리로 가는 단추가 없습니다');
-  assert.match(my.slice(at - 400, at), /wsOpen\(_w\.wid\)/, '★★ 눌러도 업무관리의 그 건이 안 열립니다');
-  /* 상태 칸은 업무관리에 적힌 것이 먼저다 */
-  assert.match(my, /if\(_wsx && _wsx\.status\) return _wsx\.status;/, '★ 상태 칸이 업무관리 상태를 안 봅니다');
+  assert.match(my.slice(at - 300, at), /_goWork\(''\)/, '★★ 눌러도 업무관리가 안 열립니다');
+  assert.match(my, /var _goWork = function\(hash\)\{ try\{ PuAppBar\.goApp\('work\.html\?sso=1'/, '★ 업무관리로 가는 길이 work.html 이 아닙니다');
+  /* 업무관리 목록을 읽어 «연결됐는가»를 본다 — 연결 표(ref)는 그대로 받아 온다 */
   assert.match(my, /status:String\(w\.status\|\|''\)/, '★ 업무관리 상태를 안 받아 옵니다');
 });

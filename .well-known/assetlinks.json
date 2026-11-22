@@ -6,7 +6,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "kr.pureun.portal",
-      "sha256_cert_fingerprints": []
+      "sha256_cert_fingerprints": [
+        "73:7A:D1:86:04:E4:FE:49:2E:41:C5:46:9B:99:40:CD:A4:39:2A:9C:3D:28:A5:12:6E:ED:13:F9:E2:46:31:73"
+      ]
     }
   }
 ]

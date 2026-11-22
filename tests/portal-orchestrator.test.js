@@ -31,9 +31,9 @@ test('① 포털·온톨로지·앱바·챗봇에 업무 오케스트레이션(o
   const orchHtml = readUtf8('pu-orchestrator.html');
   const viewSrc = readUtf8('js/pu-orchestrator-view.js');
 
-  assert.match(enterHtml, /key:\s*'orch'[\s\S]{0,180}?url:\s*'pu-orchestrator\.html'[\s\S]{0,60}?popup:\s*true/);
+  assert.match(enterHtml, /key:\s*'orch'[\s\S]{0,180}?url:\s*'pu-orchestrator\.html'[\s\S]{0,60}?row:\s*'inside'[\s\S]{0,30}?popup:\s*true/);
   assert.doesNotMatch(enterHtml, /id="orchBar"/, '포털 첫 화면에 상단 고정 넓은 오케스트레이션 창(#orchBar)을 띄우지 않습니다');
-  assert.match(enterHtml, /id="orchFab"[^>]*\bhidden\b/, '로그인 전에는 오케스트레이션 알약 단추가 숨겨져 있어야 합니다');
+  assert.doesNotMatch(enterHtml, /id="orchFab"/, '포털 상단에 중복 오케스트레이션 알약 단추(#orchFab)를 두지 않고 내부관리 줄의 타일 하나만 유지합니다');
   assert.match(enterHtml, /id="orchModal"[^>]*\bhidden\b/, '클릭 전에는 오케스트레이션 컴팩트 팝업(#orchModal)이 숨겨져 있어야 합니다');
   assert.match(enterHtml, /<script src="js\/pu-orchestrator-core\.js\?v=\d+"><\/script>/);
   assert.match(enterHtml, /function portalOrchOpenPopup\(/, '클릭 시 현재 화면 위 작은 팝업(#orchModal)으로 열려야 합니다');
@@ -77,7 +77,7 @@ test('① 포털·온톨로지·앱바·챗봇에 업무 오케스트레이션(o
 
   const bar = loadAppBar({ role: 'admin', pathname: '/pu-orchestrator.html', search: '?sso=1' });
   assert.equal(bar.whoAmI(), 'orch');
-  assert.ok(bar._ordered().some((a) => a.key === 'orch'), '공용 앱바 이동 목록에 오케스트레이션이 있어야 합니다');
+  assert.ok(bar.APPS.some((a) => a.key === 'orch' && a.row === 'inside'), '공용 앱바 APPS 에 오케스트레이션이 내부관리(inside) 줄로 등록되어야 합니다');
 
   const picked = ChatbotKb.pick('오케스트레이션 앱은 28개 프로그램 업무 흐름을 어떻게 자동으로 이어 주나요?');
   assert.ok(picked.length > 0 && picked[0].id === 'SYS-orch-01');

@@ -189,7 +189,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=53"></script>
+  <script src="js/pu-appbar.js?v=54"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -199,8 +199,51 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
     if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } })();
   </script>
+<style>
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» ③ 이알피 묶음: 푸른이알피·인사관리·재무관리 (대표 «한번에 모든 것 다해» 2026-11-21)
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md 4-2 ③ · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — 아래 body 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다 — 메뉴·탭·거르개·칸·줄을 하나도 숨기거나 옮기지 않는다(display·visibility·order·position 을 쓰지 않는다).
+     입력칸 글자 크기는 건드리지 않는다(폰 16px 규칙은 css/pu-erp.css 가 지킨다).
+   ★ 결정 Ⓒ(추천) — 왼쪽 메뉴(.sb) 짙은 남색은 그대로 두고 모서리·고른 칸 표시만 맞춘다.
+   ★ 왜 css/pu-erp.css 가 아니라 여기(head 의 style)인가
+     공용 파일은 «앱 style 뒤»에 실어야 같은 세기에서 이긴다(tests/pu-design.test.js ⑥) — 이 덩어리가 그 자리를 만들고,
+     같은 검사가 이 덩어리도 읽어 «body.pu-design 아래만 · 숨기기·옮기기 없음 · 입력칸 글자 크기 없음»을 지켜 준다.
+     css/pu-erp.css 뒤에 실리므로 같은 세기의 이알피 규칙은 여기 값이 이긴다.
+   ★ css/pu-erp.css «전역 디자인 통일» 절이 !important 로 박은 값(창 모서리 12px·입력칸 모서리 6px)은 같은 세기의 !important 로만 바뀐다 — 그 둘만 !important.
+     폰(768px 이하) 구간이 !important 로 «바닥»처럼 펴 둔 흰 판·창(모서리 0)은 그대로 두려고, 흰 판·창은 넓은 화면(769px~)에서만 바꾼다.
+   ⚠ 이알피 어두운 모드(body.dark-mode 색 뒤집기 필터)는 그대로 둔다 — 그림자도 함께 뒤집히지만 옅어서 거의 안 보인다(갈무리로 확인). */
+/* 왼쪽 메뉴 — 칸은 둥글게, 고른 칸은 파랑 그대로 + 옅은 파랑 그림자(목업 .side button.on 의 «떠 있는» 표시) */
+:where(body.pu-design) .sb-menu-item{border-radius:10px}
+:where(body.pu-design) .sb-menu-item.active{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .sb-actions button{border-radius:10px}
+:where(body.pu-design) .sb-grp-h .count,:where(body.pu-design) .sb-menu-item .mi-badge{border-radius:var(--pu-r-pill)}
+/* 머리줄 — 아래 선 위에 옅은 그림자 한 겹(목업 머리 띠) */
+:where(body.pu-design) .hd{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .hd-burger{border-radius:10px}
+:where(body.pu-design) .hd-today{border-radius:var(--pu-r-pill)}
+/* 입력칸 — 모서리만 공용 A 틀 값(10px). 체크·동그라미 고르개는 그대로 */
+:where(body.pu-design) input:where(:not([type=checkbox],[type=radio])),:where(body.pu-design) select,:where(body.pu-design) textarea{border-radius:10px !important}
+/* 단추 — 파란 단추는 둥글게 + 옅은 파랑 그림자, 손 올리면 짙은 파랑(목업 .btn). 줄마다의 수정·삭제 단추는 알약 */
+:where(body.pu-design) .btn-primary{border-radius:10px;box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .btn-primary:hover{background:var(--pu-acc2)}
+:where(body.pu-design) .btn-secondary{border-radius:10px}
+:where(body.pu-design) .dt-row-btn{border-radius:var(--pu-r-pill)}
+/* 알림 — 둥근 모서리 + 목업 토스트 그림자 */
+:where(body.pu-design) .toast{border-radius:12px;box-shadow:0 10px 28px rgba(30,41,59,.3)}
+/* 넓은 화면만 — 흰 판은 둥근 카드 + 옅은 그림자, 창은 둥근 모서리 + 목업 창 그림자 */
+@media (min-width:769px){
+  :where(body.pu-design) .page{border-radius:var(--pu-r);box-shadow:var(--pu-sh-sm)}
+  /* 환경설정 탭띠는 흰 판 윗변에 붙어 있다 — 각진 띠 모서리가 둥근 판 밖으로 비죽 나오지 않게 위 모서리만 같이 둥글게 */
+  :where(body.pu-design) .env-tabs-wrap{border-radius:var(--pu-r) var(--pu-r) 0 0}
+  :where(body.pu-design) .modal{border-radius:var(--pu-r) !important;box-shadow:0 24px 60px rgba(30,41,59,.32)}
+}
+/* ══ pu-design 끝 ══ */
+</style>
+<!-- 제미나이 판 «모양 값»(대표 «한번에 모든 것 다해» 2026-11-21) — 위 style «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#60a5fa);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>
@@ -229,7 +272,9 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사업장 포털(비즈니스지원단·현장클리닉 등) 비번 — 담당자·관리자만 + 보기 클릭 열람 (2026-11-15) -->
 <script src="js/pu-site-secret.js?v=1"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=106"></script>
+<script src="js/pu-ontology.js?v=108"></script>
+<!-- 📋 「나의 업무」의 업무관리 숫자 한 줄(work_erp/mysum) — 포털 머리줄 «내 업무» 단추와 같은 숫자 (2026-11-21) -->
+<script src="js/pu-mywork.js?v=1"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
@@ -1102,9 +1147,14 @@ var MENUS = [
        답이 아니오면 이것도 아니오다.
      ★ flat — 머리(▶ 대시보드 1)를 그리지 않고 항목만 낸다. 항목 하나짜리 접이는
        한 번 더 누르게 할 뿐 아무것도 안 알려 준다. 나의 업무는 로그인하면 처음 뜨는
-       화면이라 맨 위에 홑으로 있는 편이 맞다. */
+       화면이라 맨 위에 홑으로 있는 편이 맞다.
+     ★ 2026-11-22 이름 「나의 업무」 → 「오늘」 (대표 지시 「«오늘»로 바꿔」).
+       업무 목록·새 업무는 업무관리 한 곳(포털 머리줄 «📋 내 업무»)으로 옮겼고, 이 화면에는
+       오늘 할 일·휴가·캘린더·업무관리 요약만 남았다 — «내 업무»와 이름이 겹쳐 헷갈렸다.
+       그림도 📋(= 업무관리 «내 업무»)에서 ☀️ 로 갈랐다. 아이디 dash/my 는 그대로(즐겨찾기·단축키가 쓴다).
+       코드 주석 속 «나의 업무»는 모두 이 화면(dash/my · MyDeskV2)을 말한다. */
   { gid:'dash', name:'대시보드', icon:'📊', flat:true, items:[
-    { id:'dash/my',   icon:'📋', text:'나의 업무' }
+    { id:'dash/my',   icon:'☀️', text:'오늘' }
   ]},
   { gid:'biz', name:'사무관리', icon:'💼', items:[
     { id:'biz/contract',   icon:'📄', text:'계약관리' },
@@ -48998,7 +49048,7 @@ function SystemMapSection(){
     { id:'config',  icon:'⚙️', label:'설정 전파',   desc:'환경설정 변경 → 모든 모듈 드롭다운·검증 규칙 즉시 갱신' },
     { id:'archive', icon:'📦', label:'종료 아카이브', desc:'2년 이상 종료 업무 → 콜드 스토리지 자동 이전 → 조회 속도 개선' },
     { id:'auth',    icon:'🔐', label:'권한 제어',   desc:'사용자별 메뉴 접근 검사 → 데이터 접근 정책 적용 → 감사 로그 기록' },
-    { id:'mywork',  icon:'📝', label:'나의 업무',   desc:'담당 사건·컨설팅·미수금·휴가 잔여 → 한 화면 통합 표시' }
+    { id:'mywork',  icon:'📝', label:'오늘',        desc:'담당 사건·컨설팅·미수금·휴가 잔여 → 한 화면 통합 표시' }
   ];
   var curFlow = flows.find(function(x){ return x.id === flowFilter; }) || flows[0];
 
@@ -57751,7 +57801,7 @@ function FinanceLedger(props){
   async function depAskSend(list){
     if(!list || !list.length) return;
     if(!(await popConfirm('후보가 없는 입금 ' + list.length + '건을 직원에게 묻습니다.\n\n'
-      + '직원 «나의 업무» 맨 위에 날짜·금액·보낸 사람 이름만 보입니다(잔액·계좌는 안 보입니다).\n'
+      + '직원 이알피 «오늘» 화면 맨 위에 날짜·금액·보낸 사람 이름만 보입니다(잔액·계좌는 안 보입니다).\n'
       + '담당자가 어느 건인지 골라 보내면 여기 «골라 둔 짝»으로 들어옵니다 — 확정은 여기서 합니다.'))) return;
     var me = _meNow(), now = new Date().toISOString();
     var recs = list.map(function(r){ return erpDepAskMake(r, me, now); });
@@ -58516,6 +58566,23 @@ function FinanceLedger(props){
        한 화면에 다 나오게 해라」. 여기 설명 석 줄이 창을 두 배로 늘리고 있었다.
      QR 은 «보면 아는 것»이라 설명이 필요 없다 — 한 줄만 남긴다. */
   function hanaApkBlock(){
+    /* Google Play 스토어 정책(알 수 없는 출처 외부 APK 설치 유도 금지):
+       푸른포털 Play 앱(TWA·WebView 폴백) 안에서 열렸을 때는 .apk 직접 다운로드 링크를 숨긴다. */
+    var inPlayApp = false;
+    try{
+      if(typeof document!=='undefined' && document.referrer && document.referrer.indexOf('android-app://kr.pureun.portal')===0){
+        inPlayApp = true;
+        if(typeof sessionStorage!=='undefined') sessionStorage.setItem('pu_play_twa','1');
+      }
+      if(!inPlayApp && typeof sessionStorage!=='undefined' && sessionStorage.getItem('pu_play_twa')==='1') inPlayApp = true;
+      if(!inPlayApp && typeof navigator!=='undefined' && /Android/i.test(navigator.userAgent||'') && /\bwv\b/i.test(navigator.userAgent||'')) inPlayApp = true;
+    }catch(_e){}
+    if(inPlayApp){
+      return h('div',{style:{padding:'11px 12px',borderRadius:'9px',background:'#f8fafc',
+        border:'1px solid #cbd5e1',fontSize:'12.5px',color:'#475569',lineHeight:1.55,marginTop:'2px'}},
+        h('b',{style:{color:'#1e293b',display:'block',marginBottom:'3px'}},'PC 브라우저에서 설치해 주세요'),
+        'Google Play 스토어 보안 정책에 따라 푸른포털 앱 안에서는 외부 설치 파일(.apk) 내려받기를 제공하지 않습니다. PC 브라우저에서 이알피에 접속해 QR 코드로 설치해 주세요.');
+    }
     var url = hanaApkUrl();
     return h('div',{style:{display:'flex',gap:'10px',alignItems:'center',marginTop:'2px'}},
       h('div',{className:'hana-qr','data-url':url,
@@ -59474,7 +59541,7 @@ function FinanceLedger(props){
             /* 💬 직원에게 묻기 — 후보 없는 줄 가운데 아직 안 물은 것. 0이면 그리지 않고, 묻는 중인 수만 보인다 */
             (depAskNew.length>0 || depAskWait>0) && h('button',{
               onClick:function(){ if(depAskNew.length) depAskSend(depAskNew); else showToast('💬 직원 답을 기다리는 입금 '+depAskWait+'건 — 답이 오면 «골라 둔 짝»으로 들어옵니다'); },
-              title:'후보가 없는 입금을 직원 «나의 업무» 맨 위에 올립니다 — 날짜·금액·보낸 사람 이름만 보입니다\n'
+              title:'후보가 없는 입금을 직원 이알피 «오늘» 화면 맨 위에 올립니다 — 날짜·금액·보낸 사람 이름만 보입니다\n'
                     +'담당자가 어느 건인지 골라 보내면 여기 «골라 둔 짝»으로 들어옵니다(확정은 여기서)'
                     +(depAskWait?('\n지금 답을 기다리는 것 '+depAskWait+'건'):''),
               style:{padding:'3px 8px',background:depAskNew.length?'#2563eb':'#fff',color:depAskNew.length?'#fff':'#2563eb',
@@ -64661,6 +64728,7 @@ function IncomeListTab(){
 
   // 유형 깔때기 값 목록 — 다른 조건(출처·월·검색)을 이미 반영한 나머지 기준으로 센다
   var kindFunnelBase = incomes.filter(function(it){
+    if(!erpIncomeLive(it)) return false;   // 확정을 되돌린(undoneDate)·지운 입금은 «없는 돈» — 리스트에 안 남긴다 (건의 -P68n7UF)
     if(sourceFilter !== 'all' && it.sourceKind !== sourceFilter) return false;
     if(monthFilter){
       if(monthFilter.length === 4){ if((it.date||'').slice(0,4) !== monthFilter) return false; }
@@ -64677,6 +64745,7 @@ function IncomeListTab(){
   })();
 
   var filtered = incomes.filter(function(it){
+    if(!erpIncomeLive(it)) return false;   // 되돌린 입금은 리스트·합계에서 뺀다 (건의 -P68n7UF)
     if(sourceFilter !== 'all' && it.sourceKind !== sourceFilter) return false;
     if(kindFunnel.length && kindFunnel.indexOf(it.kind || '(없음)') < 0) return false;
     if(monthFilter){
@@ -66544,6 +66613,7 @@ function IncomeKindTab(props){
   function userName(sid){ var u=users.find(function(x){return x.sid===sid;}); return u?u.name:erpNoName(sid)||'-'; }
 
   var filtered = allIncomes.filter(function(it){
+    if(!erpIncomeLive(it)) return false;   // 되돌린 입금은 이 탭에도 안 남긴다 (건의 -P68n7UF)
     if(it.sourceKind !== kind) return false;
     if(monthFilter){
       // 연도 모드(YYYY) vs 월 모드(YYYY-MM)
@@ -71158,20 +71228,30 @@ function MyDeskV2(props){
   var rfkS = useState(0); var rfk = rfkS[0]; var setRfk = rfkS[1];
   // ── 업무시트(work.html) 최근 기록 읽어오기 ── 읽기 전용. 없거나 실패하면 조용히 넘어감(기존 동작 무영향)
   var wsS = useState({}); var wsLogs = wsS[0]; var setWsLogs = wsS[1];
+  /* 📋 업무관리가 적어 둔 «내 업무 숫자» 한 줄(work_erp/mysum/{사번}) — 포털 머리줄 «내 업무» 단추와 같은 숫자 (2026-11-21).
+     undefined = 아직 읽는 중 · null = 없음/못 읽음(숫자를 안 보인다 — 못 받음 ≠ 0건) */
+  var wsSumS = useState(undefined); var wsSum = wsSumS[0]; var setWsSum = wsSumS[1];
   useEffect(function(){
     try{
       if(typeof fbDb === 'undefined' || !fbDb) return;
       fbDb.ref('work_erp/items').once('value').then(function(snap){
-        var v = snap.val() || {}; var map = {};
+        /* __ok — «다 읽었다». 못 읽었는데 빈 표로 두면 모든 업무가 «업무관리에 없음»으로 보인다 */
+        var v = snap.val() || {}; var map = { __ok:true };
         Object.keys(v).forEach(function(k){
           var w = v[k];
           if(w && w.ref && w.ref.type && w.ref.id) map[w.ref.type + '|' + w.ref.id] = { wid:k, last:w.last||null, status:String(w.status||'') };
+          /* 업무관리로 옮긴 일반업무·업무케이스 (work.html erpMoveRun 이 mv:{store,id} 를 붙인다) */
+          if(w && w.mv && w.mv.store && w.mv.id != null) map['mv|' + w.mv.store + '|' + w.mv.id] = { wid:k };
         });
         setWsLogs(map);
-      }).catch(function(){});
+      }).catch(function(){ setWsLogs({ __fail:true }); });
+      /* 자리 열쇠는 로그인 UID(규칙이 본인 자리만 쓰게 막는다) — 포털·업무관리와 같은 사이트라 같은 로그인이다 */
+      var _fu = null; try{ _fu = (window.firebase && firebase.auth) ? firebase.auth().currentUser : null; }catch(e){}
+      var _mp = (window.PuMyWork && _fu) ? window.PuMyWork.pathOf(_fu.uid) : '';
+      if(_mp) fbDb.ref(_mp).once('value').then(function(s){ setWsSum(s.val() || null); }).catch(function(){ setWsSum(null); });
+      else setWsSum(null);
     }catch(e){}
   }, []);
-  function wsOpen(wid){ try{ PuAppBar.goApp('work.html?sso=1#item=' + encodeURIComponent(wid)); }catch(e){} }
 
   // 업무시트 ↔ 푸른이알피 동기화 엔진은 밖으로 뺐다(wsSyncRun) — 이 화면을 열어야만
   // 돌던 것을 앱 켤 때와 업무관리 신호에도 돌게 하려고. 여기서는 화면을 새로 그리려고
@@ -71413,7 +71493,7 @@ function MyDeskV2(props){
     h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems: IS_MOBILE?'center':'flex-start', marginBottom: IS_MOBILE?'8px':'14px', gap:'6px', flexWrap:'wrap' } },
       h('div', null,
         h('h2', { style:{ fontSize: IS_MOBILE?'15px':'18px', fontWeight:700, color:'#1e293b', margin: IS_MOBILE?'0':'0 0 4px', display:'flex', alignItems:'center', gap:'8px' } },
-          '📋 나의 업무'),
+          '☀️ 오늘'),
         /* ⚠ 이름이 비면 「 · 담당자 · 2026-08 기준」처럼 앞이 텅 빈 줄이 됐다.
              누구 화면인지 알 수 없으니, 이름 자리에 그 사실을 적는다. */
         !IS_MOBILE && h('div', { style:{ fontSize:'12px', color: name ? '#94a3b8' : '#d97706', fontWeight: name ? 400 : 700 } },
@@ -71531,7 +71611,7 @@ function MyDeskV2(props){
 
         // ── 3단계: 내 프로젝트 통합 리스트 (위젯) ──
         h('div', {style:{order: widgetOrder.indexOf('projects')}},
-          widgetBar('projects','📋 내 프로젝트','#fffbeb'),
+          widgetBar('projects','📋 내 업무 — 업무관리','#fffbeb'),
           !collapsed.projects && (function(){
           // 통합 데이터 빌드 (각 항목에 type 부여 + 진행 정보 매핑)
           function buildItems(type, items, getNo, getName, getCompany){
@@ -71680,77 +71760,110 @@ function MyDeskV2(props){
             allItems = allItems.filter(function(x){ return !(x.progressData && x.progressData.status === 'completed'); });
           }
 
-          // 탭 필터링
+          /* ══ 2026-11-21 대표 「추천대로」 — 나의 업무 2단계: 업무 «목록»은 업무관리 한 곳 ══
+             예전 「내 프로젝트」 표(대표 41건)는 업무관리 「내 업무」(46건)와 같은 일을 «다른 숫자»로 보여 「어느 쪽이 맞나」를 낳았다.
+             진행률(늘 0% — 넣을 곳이 없어졌다)·최근 기록·상태는 업무관리에 있다. 머리줄과 칸 순서가 어긋난 버그도 있었다
+             (머리 «담당·진행률·최근 기록» ↔ 본문 «최근 기록·담당·진행률»). 그래서 표를 걷고 «업무관리 숫자 한 줄 + 여는 단추»만 둔다.
+             ★ 조용히 감추지 않는다 — 업무관리에 «아직 안 들어간» 것은 여기 남겨 보인다:
+               ① 이알피에서 내가 담당인데 업무관리에 연결 안 된 업무(사무관리 5종) → 업무관리 「주담당 업무 연결」(#peimport)
+               ② 이알피에만 있는 일반업무·업무케이스 → 업무관리 「옮기기」(#erpmove — 원본은 안 지운다)
+             ★ 「+ 일반업무」「+ 업무케이스」는 없앴다 — 새 업무는 업무관리 「＋ 새 업무」(#new) 한 곳에서 만든다
+               (여기서 만든 것은 업무관리·검색·인수인계·캘린더 어디에도 안 나오는 «섬»이었다).
+             ★ 숫자는 포털 머리줄 «📋 내 업무» 단추와 같은 줄(work_erp/mysum, js/pu-mywork.js)에서 — 세 화면이 같은 숫자다.
+             ⚠ 업무관리 목록을 못 읽었으면(wsLogs.__fail) «없는 것»을 세지 않는다 — 다 «업무관리에 없음»으로 보이면 거짓말이다. */
           var TYPE_LABEL = { contract:'계약', case:'사건', consulting:'컨설팅', fund:'기금', other:'기타', 'biz-case':'업무케이스', 'work-item':'일반업무' };
           var TYPE_COLOR = { contract:'#1e40af', case:'#2563eb', consulting:'#2563eb', fund:'#16a34a', other:'#16a34a', 'biz-case':'#d97706', 'work-item':'#166534' };
           var TYPE_BG = { contract:'#eff6ff', case:'#eff6ff', consulting:'#bfdbfe', fund:'#f0fdf4', other:'#fffbeb', 'biz-case':'#fffbeb', 'work-item':'#bbf7d0' };
-          var filtered = projTab === 'all' ? allItems : allItems.filter(function(x){return x.type===projTab;});
-
-          // 정렬: D-day 임박 우선 → 진행률 낮은 순 → 주담당 우선
-          filtered.sort(function(a,b){
+          var _goWork = function(hash){ try{ PuAppBar.goApp('work.html?sso=1' + (hash || '')); }catch(e){} };
+          var _wsOk = !!(wsLogs && wsLogs.__ok);
+          var _PE5 = { contract:1, 'case':1, consulting:1, fund:1, other:1 };
+          var _MV = { 'work-item':'my_work_items', 'biz-case':'biz_cases' };
+          // 기한이 가까운 것부터(없는 것은 뒤로)
+          var _byDue = function(a, b){
             if(a.dDay !== null && b.dDay === null) return -1;
             if(a.dDay === null && b.dDay !== null) return 1;
             if(a.dDay !== null && b.dDay !== null && a.dDay !== b.dDay) return a.dDay - b.dDay;
-            if(a.role !== b.role) return a.role==='주'?-1:1;
-            return (a.progress||0) - (b.progress||0);
-          });
-
-          function _cntType(t){ return allItems.filter(function(x){return x.type===t;}).length; }
-          var TABS = [
-            { v:'all',        label:'전체',    cnt:allItems.length },
-            { v:'contract',   label:'계약',    cnt:_cntType('contract') },
-            { v:'case',       label:'사건',    cnt:_cntType('case') },
-            { v:'consulting', label:'컨설팅',  cnt:_cntType('consulting') },
-            { v:'fund',       label:'기금',    cnt:_cntType('fund') },
-            { v:'other',      label:'기타',    cnt:_cntType('other') },
-            { v:'biz-case',   label:'업무케이스', cnt:_cntType('biz-case') },
-            { v:'work-item',  label:'일반업무',   cnt:_cntType('work-item') }
-          ];
+            return String(a.company || '').localeCompare(String(b.company || ''), 'ko');
+          };
+          var _unl = _wsOk ? allItems.filter(function(x){ return _PE5[x.type] && !wsLogs[x.type + '|' + x.id]; }).sort(_byDue) : [];
+          var _left = _wsOk ? allItems.filter(function(x){ return _MV[x.type] && !wsLogs['mv|' + _MV[x.type] + '|' + x.id]; }).sort(_byDue) : [];
+          var _cnt = (window.PuMyWork && wsSum) ? window.PuMyWork.counts(wsSum, todayStr, Date.now()) : null;
+          // 숫자 단추 — 누르면 업무관리 「내 업무」가 그 건만 거른 채 열린다
+          function _num(k, label, n, color, hash, tip){
+            return h('button', { key:k, onClick:function(){ _goWork(hash); }, title:tip,
+                style:{ display:'inline-flex', alignItems:'baseline', gap:'4px', padding: IS_MOBILE?'3px 8px':'4px 10px', border:'1px solid #e2e8f0',
+                  borderRadius:'8px', background:'#fff', cursor:'pointer', fontSize:'11.5px', color:'#475569', whiteSpace:'nowrap' } },
+              label, h('b', { style:{ fontSize: IS_MOBILE?'13px':'14px', color: n ? color : '#64748b', fontVariantNumeric:'tabular-nums' } }, String(n)));
+          }
+          // 남은 것 몇 건을 한 줄 딱지로 — 누르면 원본(이알피 메뉴) 또는 옮기기 창. 다 못 보이면 「외 N건」
+          function _chipList(list, onClickItem){
+            var show = list.slice(0, IS_MOBILE ? 3 : 6);
+            return h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'4px 6px', marginTop:'6px' } },
+              show.map(function(it){
+                var dL = it.dDay===null ? '' : it.dDay<0 ? ('D+'+Math.abs(it.dDay)) : it.dDay===0 ? 'D-Day' : ('D-'+it.dDay);
+                // 키보드로도 누른다(Tab 으로 와서 Enter·Space) — span 이라 role·tabIndex 를 붙인다
+                return h('span', { key:it.type+'-'+it.id, role:'button', tabIndex:0, onClick:function(){ onClickItem(it); },
+                    onKeyDown:function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onClickItem(it); } },
+                    // 무슨 기한인지 — 단계 기한과 사람이 넣은 마감일을 구분해야 한다
+                    title: (it.name || '') + (it.no ? ' · ' + it.no : '') + (it.dDayDate ? ' · ' + (it.dDayDate + (it.dDayWhy ? ' · ' + it.dDayWhy : '')) : ''),
+                    style:{ display:'inline-flex', alignItems:'center', gap:'4px', maxWidth: IS_MOBILE?'100%':'280px', padding:'2px 8px',
+                      border:'1px solid #e2e8f0', borderRadius:'10px', background:'#fff', fontSize:'11px', color:'#475569',
+                      cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', boxSizing:'border-box' } },
+                  h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, padding:'0 5px', borderRadius:'8px', background:TYPE_BG[it.type], color:TYPE_COLOR[it.type] } }, TYPE_LABEL[it.type]),
+                  h('span', { style:{ overflow:'hidden', textOverflow:'ellipsis' } }, (it.company && it.company !== '-') ? it.company : (it.name || '—')),
+                  dL && h('span', { style:{ flexShrink:0, fontFamily:'monospace', fontWeight:700, color: it.dDay<=3 ? '#dc2626' : '#64748b' } }, dL)
+                );
+              }),
+              list.length > show.length && h('span', { style:{ fontSize:'11px', color:'#64748b', alignSelf:'center' } }, '외 ' + (list.length - show.length) + '건')
+            );
+          }
+          var _btn = function(bg){ return { padding: IS_MOBILE?'3px 8px':'4px 10px', fontSize: IS_MOBILE?'10.5px':'11px', fontWeight:700, cursor:'pointer',
+            background:bg, color:'#fff', border:'none', borderRadius:'5px', whiteSpace:'nowrap' }; };
 
           return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding: IS_MOBILE?'8px':'12px', marginBottom: IS_MOBILE?'8px':'14px' } },
-            // 헤더 (폰: 위 위젯바에 제목이 이미 있어 중복 제목 숨김 → 버튼들만 한 줄)
-            h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: IS_MOBILE?'6px':'10px', flexWrap:'wrap', gap: IS_MOBILE?'5px':'8px' } },
-              h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e293b' } },
-                !IS_MOBILE && '📁 내 프로젝트 ', !IS_MOBILE && h('span', { style:{ color:'#94a3b8', fontWeight:500 } }, '('+filtered.length+')'),
-                completedItems.length > 0 && h('button', {
-                  onClick:function(){ setShowCompletedProj(!showCompletedProj); },
-                  title:'진행상황을 완료로 표시한 항목 보기/숨기기',
-                  style:{ marginLeft:'8px', padding:'2px 8px', fontSize:'10.5px', fontWeight:600, cursor:'pointer',
-                    background: showCompletedProj ? '#f0fdf4' : '#f8fafc',
-                    color: showCompletedProj ? '#166534' : '#64748b',
-                    border:'1px solid ' + (showCompletedProj ? '#bbf7d0' : '#cbd5e1'), borderRadius:'10px' } },
-                  showCompletedProj ? '✅ 완료 ' + completedItems.length + '건 표시중' : '✅ 완료 ' + completedItems.length + '건 숨김')),
-              h('div', { style:{ display:'flex', gap: IS_MOBILE?'4px':'6px', alignItems:'center', flexWrap:'wrap' } },
-                // 일반업무 추가 버튼
-                h('button', { onClick:function(){
-                    setWorkItemModal({ mode:'add', title:'', companyName:'', contactPerson:'', contactPhone:'',
-                      workType:'consult', status:'open', progress:0,
-                      startDate:todayStr, dueDate:'', detail:'', result:'' });
-                  },
-                  style:{ padding: IS_MOBILE?'3px 8px':'4px 10px', fontSize: IS_MOBILE?'10.5px':'11px', fontWeight:700, cursor:'pointer',
-                    background:'#166534', color:'#fff', border:'none', borderRadius:'5px', whiteSpace:'nowrap' } },
-                  '+ 일반업무'),
-                // 업무케이스 추가 버튼
-                h('button', { onClick:function(){
-                    setBizCaseModal({ mode:'add', companyId:'', companyName:'', caseType:'advisory-consult',
-                      title:'', status:'open', managerMain:sid, managerSubs:[], startDate:todayStr, dueDate:'',
-                      description:'', result:'', progress:0 });
-                  },
-                  style:{ padding: IS_MOBILE?'3px 8px':'4px 10px', fontSize: IS_MOBILE?'10.5px':'11px', fontWeight:700, cursor:'pointer',
-                    background:'#d97706', color:'#fff', border:'none', borderRadius:'5px', whiteSpace:'nowrap' } },
-                  '+ 업무케이스'),
-                // 종료 보관함 버튼 (폰: 짧게 '보관함')
-                h('button', { onClick:function(){ setShowClosedWork(!showClosedWork); },
-                  style:{ padding: IS_MOBILE?'3px 8px':'4px 10px', fontSize: IS_MOBILE?'10.5px':'11px', fontWeight:600, cursor:'pointer',
-                    background:showClosedWork?'#475569':'#f8fafc', color:showClosedWork?'#fff':'#475569',
-                    border:'1px solid #e2e8f0', borderRadius:'5px', whiteSpace:'nowrap' } },
-                  (IS_MOBILE?'🗄️ 보관함':'🗄️ 종료 보관함')+(myClosedWorkItems.length>0?' ('+myClosedWorkItems.length+')':'')),
-                // 유형 필터 (드롭다운) — SEQ135. 폰: 공통 42px input 규칙을 md-proj-sel로 무력화
-                h('select', { className:'md-proj-sel', value: projTab, onChange:function(e){ setProjTab(e.target.value); },
-                  style:{ padding:'5px 10px', fontSize:'12px', fontWeight:600, cursor:'pointer', color:'#1e40af', background:'#f8fafc', border:'1px solid #cbd5e1', borderRadius:'6px' } },
-                  TABS.map(function(t){ return h('option', { key:t.v, value:t.v }, t.label + ' (' + t.cnt + ')'); })
-                )
-              )
+            // ① 업무관리 숫자 한 줄 + 여는 단추
+            h('div', { style:{ display:'flex', alignItems:'center', gap: IS_MOBILE?'5px':'8px', flexWrap:'wrap' } },
+              _cnt ? [
+                  _num('o', '진행', _cnt.open, '#1e40af', '', '업무관리 「내 업무」의 진행 건수'),
+                  _num('d', '🔥 임박', _cnt.due, '#dc2626', '#f=due', '기한이 7일 안이거나 지난 업무 — 누르면 그 건만'),
+                  _num('n', '📌 할 일', _cnt.next, '#854d0e', '#f=next', '다음 할 일 날짜가 오늘이거나 지난 업무 — 누르면 그 건만'),
+                  _cnt.nolog !== null && _num('l', '✍ 미기록', _cnt.nolog, '#854d0e', '#f=nolog', '이번 주에 사람이 쓴 기록이 없는 업무 — 누르면 그 건만')
+                ]
+                : h('span', { style:{ fontSize:'11.5px', color:'#64748b' } }, wsSum === undefined ? '숫자 불러오는 중…' : '숫자는 업무관리를 한 번 열면 나옵니다'),
+              h('span', { style:{ flex:1 } }),
+              h('button', { onClick:function(){ _goWork('#new'); }, title:'업무관리 「＋ 새 업무」 창을 엽니다 — 새 업무는 업무관리 한 곳에서 만듭니다', style:_btn('#166534') }, '＋ 새 업무'),
+              h('button', { onClick:function(){ _goWork(''); }, title:'업무관리 「내 업무」를 엽니다', style:_btn('#1e40af') }, '업무관리에서 열기 →')
+            ),
+            _cnt && h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'4px', wordBreak:'keep-all' } },
+              '업무관리 ' + window.PuMyWork.stamp(_cnt.at) + ' 기준 · 포털 머리줄 «📋 내 업무» 단추와 같은 숫자입니다'),
+            !_wsOk && wsLogs && wsLogs.__fail && h('div', { style:{ marginTop:'8px', fontSize:'11px', color:'#854d0e' } },
+              '⚠ 업무관리 목록을 읽지 못해 «업무관리에 아직 없는 업무»를 세지 못했습니다. 새로고침해 주세요.'),
+            // ② 이알피에서 내가 담당인데 업무관리에 아직 없는 것
+            _unl.length > 0 && h('div', { style:{ marginTop:'10px', padding:'8px 10px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px' } },
+              h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' } },
+                h('span', { title:'이알피 사무관리에서 내가 주담당·부담당인데 업무관리에 아직 연결되지 않은 업무입니다',
+                  style:{ fontSize:'12px', fontWeight:700, color:'#854d0e' } }, '🔗 업무관리에 아직 없는 내 업무 ' + _unl.length + '건'),
+                h('span', { style:{ flex:1 } }),
+                h('button', { onClick:function(){ _goWork('#peimport'); }, title:'업무관리 「주담당 업무 연결」 창을 엽니다', style:_btn('#854d0e') }, '업무관리로 가져오기 →')
+              ),
+              _chipList(_unl, function(it){ navigate('biz/' + it.type); })
+            ),
+            // ③ 이알피에만 있는 일반업무·업무케이스
+            _left.length > 0 && h('div', { style:{ marginTop:'10px', padding:'8px 10px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px' } },
+              h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' } },
+                h('span', { title:'업무관리로 옮기면 전체 검색·인수인계·캘린더에도 나옵니다. 이제 새 업무는 업무관리에서 만듭니다.',
+                  style:{ fontSize:'12px', fontWeight:700, color:'#166534' } }, '📦 이알피에만 있는 일반업무·업무케이스 ' + _left.length + '건'),
+                h('span', { style:{ flex:1 } }),
+                h('button', { onClick:function(){ _goWork('#erpmove'); }, title:'업무관리 「옮기기」 창을 엽니다 — 이알피 원본은 지우지 않습니다', style:_btn('#166534') }, '업무관리로 옮기기 →')
+              ),
+              _chipList(_left, function(){ _goWork('#erpmove'); })
+            ),
+            // 끝난 일반업무 — 예전 「종료 보관함」 그대로(복구하면 ③으로 다시 나온다)
+            myClosedWorkItems.length > 0 && h('div', { style:{ marginTop:'8px' } },
+              h('button', { onClick:function(){ setShowClosedWork(!showClosedWork); },
+                style:{ padding:'2px 8px', fontSize:'10.5px', fontWeight:600, cursor:'pointer', background:showClosedWork?'#475569':'#f8fafc',
+                  color:showClosedWork?'#fff':'#64748b', border:'1px solid #e2e8f0', borderRadius:'10px', whiteSpace:'nowrap' } },
+                '🗄️ 끝난 일반업무 ' + myClosedWorkItems.length + '건 (이알피 보관함)')
             ),
 
             // 종료 보관함 (토글)
@@ -71785,220 +71898,10 @@ function MyDeskV2(props){
                   )
             ),
 
-            // 폰: 유형별 요약 스트립 (한눈에)
-            IS_MOBILE && h('div', { style:{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'4px 8px', fontSize:'11px', fontWeight:600, color:'#475569', margin:'0 2px 8px', paddingBottom:'8px', borderBottom:'1px solid #f8fafc' } },
-              h('span', null, '📁 담당 ', h('b', { style:{ color:'#1e293b' } }, allItems.length + '건')),
-              _cntType('contract')>0 && h('span', { style:{ color:'#94a3b8' } }, '· 계약 ' + _cntType('contract')),
-              _cntType('case')>0 && h('span', { style:{ color:'#94a3b8' } }, '· 사건 ' + _cntType('case')),
-              _cntType('consulting')>0 && h('span', { style:{ color:'#94a3b8' } }, '· 컨설팅 ' + _cntType('consulting')),
-              (function(){ var imm = allItems.filter(function(x){ return x.dDay!==null && x.dDay<=7; }).length; return imm>0 && h('span', { style:{ background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca', borderRadius:'10px', padding:'1px 8px', fontWeight:700 } }, '⏰ 임박 ' + imm); })()
-            ),
-
-            // 표(PC) / 컴팩트 카드(폰)
-            filtered.length === 0
-              ? h('div', { style:{ padding:'30px', textAlign:'center', color:'#94a3b8', fontSize:'12px' } },
-                  '담당 ' + (projTab==='all' ? '프로젝트' : TYPE_LABEL[projTab]) + '이 없습니다.')
-              : IS_MOBILE
-              ? (function(){
-                  function mCard(it){
-                    var dCol = it.dDay===null?'#cbd5e1':it.dDay<0?'#dc2626':it.dDay<=3?'#d97706':it.dDay<=7?'#fbbf24':'#16a34a';
-                    var dLbl = it.dDay===null?'—':it.dDay<0?('D+'+Math.abs(it.dDay)):it.dDay===0?'D-Day':('D-'+it.dDay);
-                    var pCol = it.progress>=80?'#16a34a':it.progress>=40?'#2563eb':'#94a3b8';
-                    var editType = (it.type==='biz-case'||it.type==='work-item');
-                    return h('div', { key:it.type+'-'+it.id,
-                      onClick:function(){ navigate('biz/'+it.type); },
-                      style:{ borderBottom:'1px solid #f8fafc', padding:'7px 2px', cursor:'pointer' } },
-                      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px' } },
-                        h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, padding:'1px 7px', borderRadius:'9px', background:TYPE_BG[it.type], color:TYPE_COLOR[it.type] } }, TYPE_LABEL[it.type]),
-                        h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:600, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, it.name),
-                        h('span', { style:{ flexShrink:0, fontSize:'11px', fontWeight:800, fontFamily:'monospace', color:dCol } }, dLbl)
-                      ),
-                      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginTop:'3px' } },
-                        h('span', { style:{ flex:1, minWidth:0, fontSize:'10.5px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, it.company + (it.no?(' · '+it.no):'')),
-                        h('span', { style:{ flexShrink:0, width:'42px', height:'5px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden' } },
-                          h('span', { style:{ display:'block', height:'100%', width:it.progress+'%', background:pCol } })),
-                        h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, fontFamily:'monospace', color:pCol, minWidth:'26px', textAlign:'right' } }, it.progress+'%'),
-                        h('span', { style:{ flexShrink:0, fontSize:'9px', fontWeight:700, padding:'1px 5px', borderRadius:'4px', background: it.role==='주'?'#fffbeb':'#f8fafc', color: it.role==='주'?'#854d0e':'#64748b' } }, it.role),
-                        h('button', { onClick:function(e){ e.stopPropagation();
-                            if(it.type==='biz-case'){ var bc=allBizCases.find(function(c){return c.id===it.id;}); if(bc) setBizCaseModal({ mode:'edit', id:bc.id, companyId:bc.companyId||'', companyName:bc.companyName||'', caseType:bc.caseType||'advisory-consult', title:bc.title||'', status:bc.status||'open', progress:bc.progress||0, managerMain:bc.managerMain||sid, managerSubs:bc.managerSubs||[], startDate:bc.startDate||'', dueDate:bc.dueDate||'', description:bc.description||'', result:bc.result||'' }); }
-                            else if(it.type==='work-item'){ var wi=allWorkItems.find(function(c){return c.id===it.id;}); if(wi) setWorkItemModal({ mode:'edit', id:wi.id, title:wi.title||'', companyName:wi.companyName||'', contactPerson:wi.contactPerson||'', contactPhone:wi.contactPhone||'', workType:wi.workType||'consult', status:wi.status||'open', progress:wi.progress||0, startDate:wi.startDate||'', dueDate:wi.dueDate||'', detail:wi.detail||'', result:wi.result||'' }); }
-                            else { setProgressModal({ type:it.type, id:it.id, no:it.no, name:it.name, company:it.company, role:it.role, progress:it.progress, status:(it.progressData&&it.progressData.status)||'', nextAction:(it.progressData&&it.progressData.nextAction)||'', nextDate:(it.progressData&&it.progressData.nextDate)||'', note:(it.progressData&&it.progressData.note)||'', isNew:!it.progressData }); }
-                          },
-                          style:{ flexShrink:0, padding:'2px 7px', fontSize:'10px', fontWeight:700, borderRadius:'5px', cursor:'pointer',
-                            background: it.progressData?'#eff6ff':'#f0fdf4', border:'1px solid '+(it.progressData?'#bfdbfe':'#bbf7d0'), color: it.progressData?'#1e40af':'#166534' } },
-                          editType ? '✏️' : (it.progressData?'📝':'+입력'))
-                      )
-                    );
-                  }
-                  // 특정 유형 탭 선택 시: 그냥 카드 나열 / '전체'일 때: 유형별 접기 그룹
-                  if(projTab !== 'all') return h('div', { style:{ display:'flex', flexDirection:'column' } }, filtered.map(mCard));
-                  return h('div', null, TABS.map(function(t){
-                    if(t.v==='all') return null;
-                    var gItems = filtered.filter(function(x){ return x.type===t.v; });
-                    if(!gItems.length) return null;
-                    var collapsed = !!grpCollapse[t.v];
-                    var gImm = gItems.filter(function(x){ return x.dDay!==null && x.dDay<=7; }).length;
-                    return h('div', { key:t.v },
-                      h('div', { onClick:function(){ var nc = Object.assign({}, grpCollapse); nc[t.v] = !collapsed; setGrpCollapse(nc); },
-                        style:{ display:'flex', alignItems:'center', gap:'6px', padding:'6px', cursor:'pointer', background:'#f8fafc', borderRadius:'6px', marginTop:'6px', marginBottom:'2px' } },
-                        h('span', { style:{ fontSize:'10px', color:'#94a3b8', width:'10px', flexShrink:0 } }, collapsed?'▸':'▾'),
-                        h('span', { style:{ flexShrink:0, fontSize:'9.5px', fontWeight:700, padding:'1px 7px', borderRadius:'9px', background:TYPE_BG[t.v], color:TYPE_COLOR[t.v] } }, TYPE_LABEL[t.v]),
-                        h('span', { style:{ fontSize:'12px', fontWeight:700, color:'#475569' } }, gItems.length+'건'),
-                        gImm>0 && h('span', { style:{ marginLeft:'auto', fontSize:'10px', fontWeight:700, color:'#dc2626', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'9px', padding:'1px 7px' } }, '⏰ '+gImm)
-                      ),
-                      !collapsed && h('div', { style:{ display:'flex', flexDirection:'column' } }, gItems.map(mCard))
-                    );
-                  }));
-                })()
-              : h('div', { style:{ overflow:'auto', maxHeight:'500px' } },
-                  h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11.5px' } },
-                    h('thead', { style:{ background:'#f8fafc', position:'sticky', top:0, zIndex:1 } },
-                      h('tr', null,
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'32px' } }, '#'),
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'52px' } }, '구분'),
-                        h('th', { style:{ padding:'8px', textAlign:'left', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0' } }, '제목'),
-                        h('th', { style:{ padding:'8px', textAlign:'left', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'130px' } }, '회사/대상'),
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'40px' } }, '담당'),
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'90px' } }, '진행률'),
-                        h('th', { style:{ padding:'8px', textAlign:'left', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'190px' } }, '최근 기록'),
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'62px' } }, 'D-day'),
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'60px' } }, '상태'),
-                        h('th', { style:{ padding:'8px', textAlign:'center', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', width:'70px' } }, '관리')
-                      )
-                    ),
-                    h('tbody', null,
-                      filtered.map(function(it, idx){
-                        var dDayColor = it.dDay===null ? '#cbd5e1'
-                          : it.dDay < 0 ? '#dc2626'
-                          : it.dDay <= 3 ? '#d97706'
-                          : it.dDay <= 7 ? '#fbbf24' : '#16a34a';
-                        var dDayLabel = it.dDay===null ? '—'
-                          : it.dDay < 0 ? 'D+'+Math.abs(it.dDay)
-                          : it.dDay === 0 ? 'D-Day'
-                          : 'D-'+it.dDay;
-                        var progColor = it.progress >= 80 ? '#16a34a'
-                          : it.progress >= 40 ? '#2563eb' : '#94a3b8';
-                        return h('tr', { key:it.type+'-'+it.id,
-                          style:{ background: idx%2===0?'#fff':'#f8fafc', borderBottom:'1px solid #f8fafc' } },
-                          h('td', { style:{ padding:'7px', textAlign:'center', fontSize:'10.5px', fontWeight:700, color:'#94a3b8', fontFamily:'monospace' } }, idx+1),
-                          h('td', { style:{ padding:'7px', textAlign:'center' } },
-                            h('span', { style:{ padding:'2px 7px', borderRadius:'10px',
-                              background:TYPE_BG[it.type], color:TYPE_COLOR[it.type],
-                              fontSize:'10px', fontWeight:700 } }, TYPE_LABEL[it.type])
-                          ),
-                          h('td', { style:{ padding:'7px', cursor:'pointer', maxWidth:'220px' },
-                            onClick:function(){ navigate('biz/'+it.type); } },
-                    h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
-                            h('span', { style:{ fontWeight:600, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, it.name),
-                            it.no && h('span', { style:{ fontSize:'10.5px', color:'#94a3b8', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, it.no)
-                          )),
-                          h('td', { style:{ padding:'7px', fontSize:'11px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'130px' } }, it.company),
-                          h('td', { style:{ padding:'7px', fontSize:'11px', maxWidth:'190px' } },
-                            (function(){
-                              var w = wsLogs[it.type + '|' + it.id];
-                              if(!w || !w.last) return h('span', { style:{ color:'#cbd5e1' } }, '—');
-                              return h('div', { title:'업무시트에서 보기', onClick:function(e){ e.stopPropagation(); wsOpen(w.wid); },
-                                  style:{ cursor:'pointer', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
-                                h('span', { style:{ color:'#94a3b8', fontFamily:'monospace', marginRight:'4px' } }, String(w.last.d||'').slice(5)),
-                                w.last.t || ''
-                              );
-                            })()
-                          ),
-                          h('td', { style:{ padding:'7px', textAlign:'center' } },
-                            h('span', { style:{ padding:'2px 6px', borderRadius:'5px',
-                              background: it.role==='주'?'#fffbeb':'#f8fafc',
-                              color: it.role==='주'?'#854d0e':'#64748b',
-                              fontSize:'10px', fontWeight:700 } }, it.role)
-                          ),
-                          h('td', { style:{ padding:'7px' } },
-                            h('div', { style:{ display:'flex', alignItems:'center', gap:'4px' } },
-                              h('div', { style:{ flex:1, height:'5px', background:'#e2e8f0', borderRadius:'5px', overflow:'hidden' } },
-                                h('div', { style:{ height:'100%', width:it.progress+'%', background:progColor, transition:'width 0.3s' } })
-                              ),
-                              h('span', { style:{ fontSize:'10px', fontWeight:700, color:progColor, fontFamily:'monospace', minWidth:'28px', textAlign:'right' } }, it.progress+'%')
-                            )
-                          ),
-                          h('td', { style:{ padding:'7px', textAlign:'center', fontSize:'10.5px', fontWeight:700, color:dDayColor, fontFamily:'monospace' },
-                              // 무슨 기한인지 — 단계 기한과 사람이 넣은 마감일을 구분해야 한다
-                              title: it.dDayDate ? (it.dDayDate + (it.dDayWhy ? ' · ' + it.dDayWhy : '')) : '' },
-                            dDayLabel
-                          ),
-                          h('td', { style:{ padding:'7px', textAlign:'center', fontSize:'10.5px', color:'#475569' } },
-                            (function(){
-                              var sMap = { progress:'진행중', pending:'대기', review:'검토중', open:'진행중', closed:'완료', done:'완료', cancelled:'취소', hold:'보류',
-                                           consult:'상담접수', negotiate:'협의중', confirmed:'계약확정', signed:'최종확정', active:'진행중' };
-                              /* 업무관리에 적힌 상태가 먼저다(2026-09-27 ①안 — 기록은 업무관리 한 곳) */
-                              var _wsx = wsLogs[it.type + '|' + it.id];
-                              if(_wsx && _wsx.status) return _wsx.status;
-                              var raw = it.status||'';
-                              return sMap[raw] || raw;
-                            })()),
-                          h('td', { style:{ padding:'5px', textAlign:'center' } },
-                            it.type === 'biz-case'
-                              ? h('button', {
-                                  onClick:function(){
-                                    var bc = allBizCases.find(function(c){return c.id===it.id;});
-                                    if(!bc) return;
-                                    setBizCaseModal({ mode:'edit', id:bc.id,
-                                      companyId:bc.companyId||'', companyName:bc.companyName||'',
-                                      caseType:bc.caseType||'advisory-consult', title:bc.title||'',
-                                      status:bc.status||'open', progress:bc.progress||0,
-                                      managerMain:bc.managerMain||sid, managerSubs:bc.managerSubs||[],
-                                      startDate:bc.startDate||'', dueDate:bc.dueDate||'',
-                                      description:bc.description||'', result:bc.result||'' });
-                                  },
-                                  style:{ padding:'3px 8px', background:'#fffbeb', border:'1px solid #fde68a',
-                                    color:'#d97706', borderRadius:'4px', cursor:'pointer', fontSize:'10.5px', fontWeight:600 } },
-                                  '✏️ 수정')
-                              : it.type === 'work-item'
-                              ? h('div', {style:{display:'flex',gap:'4px'}},
-                                  h('button', {
-                                    onClick:function(){
-                                      var wi=allWorkItems.find(function(c){return c.id===it.id;});
-                                      if(!wi) return;
-                                      setWorkItemModal({mode:'edit',id:wi.id,title:wi.title||'',
-                                        companyName:wi.companyName||'',contactPerson:wi.contactPerson||'',contactPhone:wi.contactPhone||'',
-                                        workType:wi.workType||'consult',status:wi.status||'open',progress:wi.progress||0,
-                                        startDate:wi.startDate||'',dueDate:wi.dueDate||'',detail:wi.detail||'',result:wi.result||''});
-                                    },
-                                    style:{padding:'3px 8px',background:'#bbf7d0',border:'1px solid #4ade80',
-                                      color:'#166534',borderRadius:'4px',cursor:'pointer',fontSize:'10.5px',fontWeight:600}},
-                                    '✏️ 수정'),
-                                  h('button', {
-                                    onClick:async function(){
-                                      if(!(await popConfirm('이 업무를 종료하고 보관함으로 이관하시겠습니까?'))) return;
-                                      var arr=dbGet('my_work_items',[]).map(function(c){
-                                        return c.id===it.id?Object.assign({},c,{status:'closed',archived:true,archivedAt:(new Date()).toISOString()}):c;
-                                      });
-                                      dbSet('my_work_items',arr); setRfk(rfk+1);
-                                      showToast('🗄️ 종료 보관함으로 이관됨');
-                                    },
-                                    style:{padding:'3px 8px',background:'#f8fafc',border:'1px solid #cbd5e1',
-                                      color:'#475569',borderRadius:'4px',cursor:'pointer',fontSize:'10.5px',fontWeight:600}},
-                                    '🗄️ 종료'))
-                              /* 2026-09-27 ①안 — 「+ 입력」·「📝 메모」 창을 없앴다. 기록은 업무관리 한 곳에 적는다.
-                                 누르면 업무관리의 그 건이 바로 열린다(같은 창, PuAppBar.goApp). */
-                              : (function(){
-                                  var _w = wsLogs[it.type + '|' + it.id];
-                                  if(!_w) return h('span', { title:'업무관리에 아직 이어지지 않은 건입니다 — 업무관리를 한 번 열면 이어집니다',
-                                    style:{ fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap' } }, '연결 전');
-                                  return h('button', { onClick:function(){ wsOpen(_w.wid); }, title:'업무관리에서 이 건의 기록을 적습니다',
-                                    style:{ padding:'3px 8px', background:'#eff6ff', border:'1px solid #bfdbfe', color:'#1e40af',
-                                      borderRadius:'4px', cursor:'pointer', fontSize:'10.5px', fontWeight:700, whiteSpace:'nowrap' } },
-                                    '업무관리에서 기록 →');
-                                })()
-                          )
-                        );
-                      })
-                    )
-                  )
-                ),
-
             // 안내
-            h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
-              '💡 사무관리에서 ',h('strong',null,'주담당/부담당'),'으로 지정되면 자동 표시됩니다. ',
-              '진행 기록은 ',h('strong',null,'[업무관리에서 기록 →]'),'으로 업무관리 한 곳에 적습니다. ',
-              '제목 클릭 시 해당 메뉴로 이동합니다.'
+            h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#64748b', lineHeight:'1.6', wordBreak:'keep-all' } },
+              '💡 업무 목록·진행 기록·새 업무는 ',h('strong',null,'업무관리'),' 한 곳에서 봅니다. ',
+              '사무관리에서 주담당/부담당으로 지정되면 업무관리 「내 업무」에 저절로 들어갑니다.'
             )
           );
         })())
@@ -97890,7 +97793,7 @@ document.addEventListener('keydown', function(e){
       + '<button class="x" style="background:rgba(255,255,255,0.15);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;">×</button></div>'
       + '<div style="padding:16px 20px;max-height:70vh;overflow-y:auto;">'
       + grp('이동·검색', [row('Ctrl + K','전역 검색'), row('/','현재 화면 검색창으로 포커스'),
-          row('Alt + 1~9','1 나의업무 · 2 업체 · 3 사건 · 4 컨설팅 · 5 계약 · 6 입금 · 7 근태 · 8 법인대시보드 · 9 환경설정'),
+          row('Alt + 1~9','1 오늘 · 2 업체 · 3 사건 · 4 컨설팅 · 5 계약 · 6 입금 · 7 근태 · 8 법인대시보드 · 9 환경설정'),
           row('Ctrl + /','이 안내판 열기/닫기')])
       + grp('작업', [row('Ctrl + S','열린 모달 저장'), row('Ctrl + N','현재 화면 등록/추가'),
           row('Esc','모달 닫기'), row('Enter','검색 실행 · 입력 저장'), row('Shift + Enter','메모 줄바꿈')])

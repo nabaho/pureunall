@@ -381,7 +381,14 @@
     }
     // 각주·미주: 본문에는 번호만, 내용은 data-note 에 HTML 로 보관 (번호는 쪽 배치 때 매김)
     if (r.note) return `<sup class="note" contenteditable="false" data-kind="${r.note.kind}"${csAttr(r.note.style)} data-note="${escAttr(blocksToHtml(r.note.blocks))}">※</sup>`;
-    if (r.link) return `<a href="${escAttr(r.link)}">${runHtml(Object.assign({}, r, { link: null }))}</a>`;
+    if (r.link) {
+      const safeHref = String(r.link || '').replace(/[\u0000-\u001f\u007f]+/g, '').trim();
+      const inner = runHtml(Object.assign({}, r, { link: null }));
+      if (/^(?:https?:|mailto:)/i.test(safeHref)) {
+        return `<a href="${escAttr(safeHref)}" rel="noopener noreferrer" target="_blank">${inner}</a>`;
+      }
+      return inner;
+    }
     // 내용 없는 필드(책갈피 등): 보이지 않는 표시
     if (r.field) return `<span class="hfd-e" contenteditable="false" data-fd="${escAttr(JSON.stringify(r.field))}"${csAttr(r.style)}></span>`;
     const css = [], deco = [];

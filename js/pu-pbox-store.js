@@ -2538,7 +2538,7 @@
     if (skipAutoFetch || typeof fetch !== 'function') return Promise.resolve();
     var E = global.PuPBoxEngine;
     if (!E || typeof E.extractCitedLawTargets !== 'function') return Promise.resolve();
-    var targets = E.extractCitedLawTargets(answerText, idxList).slice(0, 4);
+    var targets = E.extractCitedLawTargets(answerText, idxList).slice(0, 16);
     var missing = targets.filter(function (t) { return !mem.laws.has(t.dir + '/' + t.fileName); });
     if (!missing.length) return Promise.resolve();
     return Promise.all(missing.map(function (t) {
@@ -2842,6 +2842,12 @@
     getRecents: function () { return mem.recents.slice(); },
     getAlerts: function () { return mem.alerts.slice(); },
     fetchLaw: fetchLaw,
+    preloadCitedLaws: function (text, offlineOnly) {
+      var idxList = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
+        ? global.PuPBoxLawIndex.list()
+        : [];
+      return preloadCitedLawsIfNeeded(String(text || ''), idxList, offlineOnly === true);
+    },
     syncCoreLaborLaws: syncCoreLaborLaws,
     runIncrementalSync: runIncrementalSync,
     addDocuments: addDocuments,

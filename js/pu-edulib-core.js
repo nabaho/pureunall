@@ -22,6 +22,9 @@
   /* 개체 이름은 온톨로지 사전(PuOntology.TERMS.entityTypes)에 먼저 올라 있어야 한다 — 없으면 관문이 저장을 거절한다 */
   var ENTITY = 'EduMaterial';
   var NOTE_ENTITY = 'EduReviewNote';
+  var CAT_ENTITY = 'EduCategory';                /* 사람이 더한 강의 종류(/edulib/cats) — 2026-11-21 「＋ 추가기능」 */
+  /* 자동 정리한 «내용»(문서의 목차·첫 글) 상한 — 서버 메일 자동 정리(functions/edulib-mail-sweep.js)와 같은 값을 쓴다 */
+  var SUMMARY_MAX = 1200;
   /* 자료 구조 판 — 온톨로지 사전의 판(PuOntology.VERSION)을 따른다. 저장할 때는 공용 관문(prepareRecord)이
      schemaVersion·contractVersion·revision·시각을 «다시» 찍으므로, 여기 값은 관문을 거치기 전 모양을 맞추는 것뿐이다. */
   var SCHEMA = (typeof self !== 'undefined' && self.PuOntology && +self.PuOntology.VERSION) || 1;
@@ -71,6 +74,7 @@
       dateFrom: str(o.dateFrom),
       venue: str(o.venue).trim(),
       note: str(o.note).trim(),
+      summary: str(o.summary).replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX),
       status: STATUS[o.status] ? o.status : 'review',
       pii: !!o.pii,
       store: STORE[o.store] ? o.store : 'pc',
@@ -98,7 +102,8 @@
     Object.keys(changes || {}).forEach(function (k) {
       if (!EDITABLE[k]) return;
       var v = changes[k];
-      if (k === 'cat') v = C.catByKey(v).key;
+      /* 지금 종류 그대로면 그대로 — 사람이 더한 종류 목록을 아직 못 읽은 순간에 «기타»로 바뀌지 않게 */
+      if (k === 'cat') v = (cur && v === cur.cat) ? v : C.catByKey(v).key;
       if (k === 'lectureDate' && !okDate(v)) return;
       if (k === 'status' && !STATUS[v]) return;
       if (k === 'pii') v = !!v;
@@ -125,6 +130,7 @@
       if (f.cat && it.cat !== f.cat) return false;
       if (f.year) {
         if (f.year === 'none') { if (yearOf(it.lectureDate)) return false; }
+        else if (/^~\d{4}$/.test(f.year)) { var yy = yearOf(it.lectureDate); if (!yy || yy > f.year.slice(1)) return false; }   /* «~2014» = 2014년까지(대시보드의 «그 이전» 칸) */
         else if (yearOf(it.lectureDate) !== f.year) return false;
       }
       if (f.kind && it.kind !== f.kind) return false;
@@ -132,7 +138,7 @@
       if (f.store && it.store !== f.store) return false;
       if (f.legal && !C.catByKey(it.cat).legal) return false;
       if (words.length) {
-        var hay = [it.title, it.fileName, it.venue, it.note, C.catByKey(it.cat).label,
+        var hay = [it.title, it.fileName, it.venue, it.note, it.summary, C.catByKey(it.cat).label,
           it.source && it.source.path, it.source && it.source.mailSubject].join(' ').toLowerCase();
         for (var i = 0; i < words.length; i++) if (hay.indexOf(words[i]) < 0) return false;
       }
@@ -175,7 +181,7 @@
   function dashboard(items) {
     var L = live(items);
     var cats = C.CATS.map(function (c) {
-      return { key: c.key, label: c.label, legal: c.legal, law: c.law, n: 0, cloud: 0, review: 0, latest: '', bytes: 0 };
+      return { key: c.key, label: c.label, legal: c.legal, law: c.law, custom: !!c.custom, n: 0, cloud: 0, review: 0, latest: '', bytes: 0 };
     });
     var byKey = {}; cats.forEach(function (c) { byKey[c.key] = c; });
     var years = {}, matrix = {};
@@ -195,9 +201,46 @@
       total: L.length,
       cloud: L.filter(function (it) { return it.store === 'cloud'; }).length,
       review: L.filter(function (it) { return it.status === 'review'; }).length,
-      cats: cats.filter(function (c) { return c.n > 0 || c.legal; }),
+      /* 사람이 더한 종류는 아직 0건이어도 보인다 — 더하자마자 «어디 갔나»가 되지 않게 */
+      cats: cats.filter(function (c) { return c.n > 0 || c.legal || c.custom; }),
       years: yearList,
       matrix: matrix
+    };
+  }
+
+  /* 대시보드 «종류 × 연도» 표의 연도 칸 — 최근 max 해만 따로 세우고, 그보다 옛날은 «~YYYY» 한 칸으로 모은다.
+     years: dashboard().years(늦은 해 먼저, 'none' 맨 뒤) → { cols:[옛날→최근 열쇠], olderKey, older:[모은 해], none:bool } */
+  function yearCols(years, max) {
+    max = max || 12;
+    var ys = (years || []).filter(function (y) { return /^\d{4}$/.test(y); });
+    var recent = ys.slice(0, max), older = ys.slice(max);
+    var cols = recent.slice().reverse();
+    var olderKey = older.length ? '~' + older[0] : '';
+    if (olderKey) cols.unshift(olderKey);
+    return { cols: cols, olderKey: olderKey, older: older, none: (years || []).indexOf('none') >= 0 };
+  }
+
+  /* 새 강의 종류 기록 — 이름·법정 여부·근거·찾을 낱말만. 열쇠(id)가 곧 종류 열쇠다(자료 기록의 cat 칸) */
+  function newCatId(now) {
+    var t = (now || Date.now()).toString(36), r = '';
+    for (var i = 0; i < 6; i++) r += 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36));
+    return 'cat_' + t + r;
+  }
+  function makeCat(o, who, now) {
+    now = now || Date.now();
+    var label = str(o.label).replace(/\s+/g, ' ').trim().slice(0, 40);
+    return {
+      id: o.id || newCatId(now),
+      entityType: CAT_ENTITY,
+      schemaVersion: SCHEMA,
+      label: label,
+      legal: !!o.legal,
+      law: str(o.law).trim().slice(0, 60),
+      words: C.cleanWords(o.words, label),
+      createdAt: now,
+      updatedAt: now,
+      createdBy: str(who && who.uid),
+      revision: 1
     };
   }
 
@@ -228,7 +271,8 @@
   }
 
   return {
-    ENTITY: ENTITY, NOTE_ENTITY: NOTE_ENTITY, SCHEMA: SCHEMA,
+    ENTITY: ENTITY, NOTE_ENTITY: NOTE_ENTITY, CAT_ENTITY: CAT_ENTITY, SCHEMA: SCHEMA, SUMMARY_MAX: SUMMARY_MAX,
+    yearCols: yearCols, newCatId: newCatId, makeCat: makeCat,
     STATUS: STATUS, STORE: STORE, KIND_LABEL: KIND_LABEL,
     yearOf: yearOf, okDate: okDate, newId: newId,
     makeItem: makeItem, patchOf: patchOf, live: live,

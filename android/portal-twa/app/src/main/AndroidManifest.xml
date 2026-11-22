@@ -115,6 +115,19 @@
             </intent-filter>
         </service>
 
+        <!-- 홈 화면 빠른 실행 위젯 -->
+        <receiver
+            android:name=".PortalWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/portal_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

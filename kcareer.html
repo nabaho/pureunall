@@ -1618,6 +1618,29 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   .toolbar{padding:6px 7px!important}
   .sel-bar,.dup-badge-bar{padding-left:7px!important;padding-right:7px!important}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 옆줄 메뉴·아래 탭·표·단추는 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 이 앱은 이미 «디자인 업그레이드»(둥근 카드·옅은 그림자·알약 아래 탭)를 입고 있다 — 거기 없는 모양 값만 더한다.
+     옆줄 남색·청록 단추·금빛 표시는 그대로(계획서 Ⓒ 와 같은 뜻).
+   ⚠ 어두운 판(html.dark — 🌙 단추)이 있다. 색은 하나도 안 바꾸고 둥글기·굵기·그림자만 쓴다 — 어두운 판에서도 글자가 그대로 읽힌다.
+   ⚠ <body> 의 pu-dark-auto: 이 앱 <head> 는 사업관리 비교 색(--bzc-*)에서 기기 어두운 모드를 따른다(tests/pu-design.test.js ⑥-2 짝).
+     공용 어두운 값(--pu-card·--pu-ink 등)은 여기서 쓰지 않으므로 기기만 어두울 때 밝은 화면에 어두운 값이 얹히는 일이 없다.
+   ⚠ 이 덩어리는 바로 아래 어두운 판 «공용 표면» 묶음 «앞»에 둔다 — 그 묶음이 <style> 끝까지 html.dark 뿐이어야 한다(tests/kcareer-dark-surfaces.test.js ①).
+     (그 묶음의 머리 글귀를 여기 그대로 적지 않는다 — 검사가 그 글귀의 첫 자리부터 묶음으로 읽는다) */
+/* 숫자 카드 — 작은 카드 둥글기(목업 .kpi). 위 금빛 띠·눌러 가기는 그대로 */
+:where(body.pu-design) .kpi{border-radius:var(--pu-r-sm)}
+/* 표 머리 — 굵게(목업 table.t th 800). 색·붙박이는 앱 값 그대로 */
+:where(body.pu-design) .dt thead th{font-weight:800}
+/* 옆줄 메뉴 칸 — 둥글기만(목업 .side button 12px 에 가깝게) */
+:where(body.pu-design) .nav-item{border-radius:10px}
+/* 아래 탭(알약) — 고른 탭에 옅은 그림자 */
+:where(body.pu-design) #groupTabs .gtab.active{box-shadow:var(--pu-sh-sm)}
+/* 화면 제목 굵게(목업 제목 800) · 끌어다 놓는 칸은 카드 둥글기 */
+:where(body.pu-design) .page-title{font-weight:800}
+:where(body.pu-design) .dropzone{border-radius:var(--pu-r)}
+/* ══ pu-design 끝 ══ */
 /* ===== 어두운 테마 — 공용 표면 (대표 지시 2026-11-15 「경력관리 다른 화면의 어두운 테마도 고쳐 주세요」) =====
    원칙: 어두운 판에서는 «바탕은 어둡게, 글자는 밝게»가 한 벌이어야 한다. 밝은 바탕을 하드코딩하고 글자색은 안 박거나 var(--text)(어두운 판에선 밝은색)로 두면
    글자만 밝아져 1.2:1 이 된다(실측 28개 화면·창 39개에서 948건). 종이(흰 바탕+짙은 글자)는 일부러 흰색으로 두고 «안쪽 변수»를 밝은 판 값으로 되돌린다.
@@ -1672,6 +1695,8 @@ html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="co
 /* ⑧ 화면에 «직접 박힌» 밝은 바탕(글자색 안 박은 것) → 어두운 바탕. 글자색을 같이 박은 밝은 칩·종이·프로필 1장 안내 상자는 뺀다 */
 html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"],[style*="background: rgb(239, 246, 255)"],[style*="background:#e2e8f0" i],[style*="background: rgb(226, 232, 240)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -1682,7 +1707,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=106"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -1752,7 +1777,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=53"></script>
+  <script src="js/pu-appbar.js?v=54"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -1773,7 +1798,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
     })();
   </script>
 </head>
-<body>
+<body class="pu-design pu-dark-auto">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>

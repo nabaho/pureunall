@@ -1058,13 +1058,19 @@
       return name.replace(/[{}\n\r]/g, '').trim().slice(0, 40) || '입력';
     }
     const fieldCmd = fb => { const c = all(fb, 'stringParam').find(s => s.getAttribute('name') === 'Command'); return c ? c.textContent : ''; };
-    // 하이퍼링크 주소: Path 값, 없으면 Command("주소;1;0;0", ':' 는 '\:' 로 저장됨)
+    // 하이퍼링크 주소: Path 값, 없으면 Command("주소;1;0;0", ':' 는 '\:' 로 저장됨) — 위험 URL 스킴(javascript:/data:/vbscript:) 차단
+    function safeLinkUrl(raw) {
+      const s = String(raw || '').replace(/[\u0000-\u001f\u007f]+/g, '').trim();
+      if (!s) return '';
+      if (/^(?:https?:|mailto:)/i.test(s)) return s;
+      return '';
+    }
     function linkUrl(fb) {
       const ps = all(fb, 'stringParam');
       const path = ps.find(s => s.getAttribute('name') === 'Path');
-      if (path && path.textContent) return path.textContent;
+      if (path && path.textContent) return safeLinkUrl(path.textContent);
       const cmd = ps.find(s => s.getAttribute('name') === 'Command');
-      return cmd ? unescapeCmd(cmd.textContent) : '';
+      return cmd ? safeLinkUrl(unescapeCmd(cmd.textContent)) : '';
     }
     function parsePara(p) {
       const pp = Object.assign({}, paras[p.getAttribute('paraPrIDRef')] || { align: 'justify' });

@@ -1,0 +1,1302 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>데이터관리 — 대표 전용</title>
+<!-- 사번 안전망 — 화면에 새어 나온 사번·로그인 이메일을 닦는다(파이어베이스보다 먼저) -->
+<script src="js/pu-sid-guard.js?v=1"></script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📊</text></svg>">
+<style>
+/* 데이터관리(대표 전용) — 3D·2D 동시 연동 통합 관제 (2026-11-21)
+   ★ 화면은 목업(대표가 제미나이로 다시 디자인한 판 docs/목업-데이터관리-3D-2026-11-18.html)을 그대로 살렸다.
+     목업 전용(지어낸 자료 표시·파일 열기 시험·폰 미리보기 틀·가짜 잠금 단추)만 뺐다.
+   ★ 원본은 «읽기만» 한다. 숫자는 js/pu-datahub-calc.js 의 build() 결과로만 그린다.
+   ★ 색은 저장소 5계열 27색 + 흰색만 쓴다(사람 구분색은 자바스크립트 쪽 PuDatahubCalc.PERSON_COLORS).
+   ★ 바깥 라이브러리·CDN·웹 글꼴 없이 캔버스·CSS 로만 그린다(파이어베이스만 gstatic 에서 싣는다). */
+:root{
+  --acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--acc-l:#bfdbfe;--acc-m:#60a5fa;
+  --ink:#1e293b;--sub:#475569;--mid:#475569;--faint:#94a3b8;
+  --line:#e2e8f0;--line2:#cbd5e1;--bg:#f8fafc;--card:#ffffff;
+  --ok:#166534;--okm:#16a34a;--ok-bg:#f0fdf4;--ok-l:#bbf7d0;--ok-b:#4ade80;
+  --warn:#854d0e;--warn-bg:#fffbeb;--wm:#d97706;--wl:#fde68a;--wb:#fbbf24;
+  --dg:#dc2626;--dgi:#991b1b;--dg-bg:#fef2f2;--dg-l:#fecaca;--dg-b:#f87171;
+  --r:16px;--r-sm:11px;
+  --sh-sm:0 2px 8px -2px rgba(30,41,59,.06),0 1px 3px rgba(30,41,59,.04);
+  --sh-md:0 12px 32px -12px rgba(30,41,59,.09),0 3px 10px -3px rgba(30,41,59,.05);
+  --ease:cubic-bezier(.22,1,.36,1)
+}
+*{box-sizing:border-box}
+/* 옆넘침 막기 — hidden 이면 body 가 스크롤 상자가 되어 위 막대·왼쪽 메뉴의 sticky 가 풀린다(목업 버그). clip 은 상자를 만들지 않는다 */
+html,body{max-width:100%;overflow-x:hidden;overflow-x:clip}
+body{
+  margin:0;
+  font:14px/1.55 'Pretendard','-apple-system','BlinkMacSystemFont','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  color:var(--ink);background:var(--bg);
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased
+}
+[hidden]{display:none!important}
+button,input,select{font:inherit}
+button{transition:background-color .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease),box-shadow .18s var(--ease),transform .15s var(--ease)}
+button:active:not(:disabled){transform:scale(.985)}
+
+/* 확인 중·잠금 화면 — 자료를 한 줄도 불러오기 전에 멈춘다 */
+.gatebox{max-width:520px;margin:12vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px 24px;text-align:center;box-shadow:var(--sh-md)}
+.gatebox .ico{font-size:42px;line-height:1}
+.gatebox h2{margin:12px 0 6px;font-size:18px;font-weight:800}
+.gatebox p{margin:6px 0;color:var(--sub);font-size:13.5px;word-break:keep-all;overflow-wrap:anywhere}
+.gatebox .why{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;font-size:12.5px;margin-top:12px}
+.gatebox .why:empty{display:none}
+.gatebox code{font-size:12px}
+
+/* 상단 바 */
+.top{
+  position:sticky;top:0;z-index:40;background:var(--ink);color:#ffffff;
+  padding:6px 14px;height:46px;display:flex;gap:7px;align-items:center;
+  overflow-x:auto;white-space:nowrap;scrollbar-width:none;
+  box-shadow:0 4px 16px rgba(30,41,59,.16)
+}
+.top::-webkit-scrollbar{display:none}
+.top b{font-size:14.5px;letter-spacing:-.01em;margin-right:2px;display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
+.top button,.top .tlink{
+  background:var(--sub);color:#ffffff;border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;padding:5px 11px;font-size:12px;font-weight:750;text-decoration:none;
+  cursor:pointer;flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;line-height:1.2
+}
+.top button:hover,.top .tlink:hover{background:var(--acc);border-color:var(--acc-m)}
+.top button.on{background:var(--acc);border-color:var(--acc-l);box-shadow:0 0 0 2px rgba(96,165,250,.32)}
+.top .sp{flex:1 0 8px}
+.tpill{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:750;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#e2e8f0}
+.tpill.lock{background:rgba(220,38,38,.24);border-color:rgba(248,113,113,.5);color:#ffffff}
+.tpill.ok{background:rgba(22,163,74,.24);border-color:rgba(74,222,128,.45);color:#ffffff}
+.tpill.warn{color:#fde68a}
+#who{flex:0 0 auto;font-size:12px;color:#e2e8f0}
+
+/* 전체 골격 & 왼쪽 대시보드 */
+.shell{display:grid;grid-template-columns:252px minmax(0,1fr);align-items:start}
+.sidebar{
+  position:sticky;top:46px;height:calc(100vh - 46px);overflow-y:auto;
+  background:var(--card);border-right:1px solid var(--line);
+  padding:14px 11px 20px;z-index:25;scrollbar-width:thin
+}
+.sdash{
+  background:linear-gradient(160deg,var(--acc-soft) 0%,#ffffff 100%);
+  border:1px solid var(--acc-l);border-radius:14px;padding:12px 13px;margin-bottom:12px;
+  box-shadow:var(--sh-sm)
+}
+.sdash h3{margin:0 0 7px;font-size:12px;font-weight:800;color:var(--acc2);letter-spacing:-.01em;display:flex;align-items:center;justify-content:space-between}
+.sdash h3::after{content:'3D·2D 연동';font-size:10.5px;font-weight:800;background:#ffffff;color:var(--acc2);padding:1px 7px;border-radius:999px;border:1px solid var(--acc-l)}
+.sdash div{display:flex;gap:8px;font-size:12.5px;padding:3px 0;white-space:nowrap;align-items:center}
+.sdash div span{color:var(--sub);overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sdash div b{margin-left:auto;flex:0 0 auto;color:var(--ink);font-weight:800}
+.side{display:flex;flex-direction:column;gap:3px}
+.side .grp{font-size:11px;color:var(--sub);font-weight:800;margin:11px 8px 4px;letter-spacing:.02em}
+.side button{
+  display:grid;grid-template-columns:34px minmax(0,1fr);column-gap:10px;align-items:center;
+  text-align:left;border:1px solid transparent;background:transparent;border-radius:12px;
+  padding:7px 9px;cursor:pointer;color:var(--ink);font:inherit
+}
+.side button:hover{background:var(--bg);border-color:var(--line)}
+.side button .ic{
+  grid-row:span 2;width:34px;height:34px;border-radius:10px;
+  background:var(--bg);border:1px solid var(--line);color:var(--acc2);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;
+  transition:all .18s var(--ease)
+}
+.side button .nm{font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.side button .mk{font-size:11.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side button.on{background:var(--acc-soft);border-color:var(--acc-l);box-shadow:var(--sh-sm)}
+.side button.on .ic{background:var(--acc);border-color:var(--acc);color:#ffffff;box-shadow:0 4px 10px rgba(37,99,235,.28)}
+.side button.on .nm{color:var(--acc2);font-weight:800}
+.side button:focus-visible{outline:3px solid var(--acc-l);outline-offset:-2px}
+
+.wrap{padding:16px 20px 28px;max-width:1480px;margin:0 auto}
+.view{display:none;animation:fadeView .22s var(--ease)}.view.on{display:block}
+@keyframes fadeView{from{opacity:.45;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+
+/* 부분 머리말 */
+.vh{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px 18px;margin-bottom:13px;display:grid;grid-template-columns:auto 1fr;
+  gap:3px 15px;align-items:center;box-shadow:var(--sh-sm)
+}
+.vh .L{
+  grid-row:span 2;width:45px;height:45px;border-radius:14px;color:#ffffff;
+  font-weight:900;font-size:19px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,var(--acc) 0%,var(--acc2) 100%);
+  box-shadow:0 6px 16px -4px rgba(37,99,235,.35)
+}
+.vh h2{margin:0;font-size:16.5px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+.vh p{margin:0;color:var(--sub);font-size:13px;line-height:1.5}
+.vh .q{
+  display:inline-block;background:var(--acc-soft);color:var(--acc2);
+  border:1px solid var(--acc-l);border-radius:999px;padding:1px 9px;
+  font-weight:800;font-size:12px;margin-right:7px
+}
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.pc div{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;font-size:13px;box-shadow:var(--sh-sm)}
+.pc .p{border-left:4px solid var(--okm)}.pc .m{border-left:4px solid var(--dg)}
+.pc b{font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
+.pc ul{margin:6px 0 0;padding-left:18px;color:var(--sub)}.pc li{margin:4px 0}
+.vh p,.pc li,.note,.msg,.lk p,.lk .why,.flow div,.steps li,.chat .foot,.src,.audit-box p,.audit-box li,.finfo{word-break:keep-all;overflow-wrap:anywhere}
+
+#allTbl{table-layout:fixed}
+#allTbl th,#allTbl td{padding:7px 5px}
+.panel .tw{max-height:430px;overflow:auto}
+input[type=checkbox]{width:18px;height:18px;margin:0;vertical-align:middle;cursor:pointer;accent-color:var(--acc)}
+code{font-family:Consolas,monospace;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;word-break:break-all;color:var(--ink)}
+.note{font-size:12.5px;color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 15px;margin-top:12px;border-left:4px solid var(--acc);box-shadow:var(--sh-sm)}
+.na{color:var(--sub)}
+
+/* 정합성·병목 띠 */
+.govbar{display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--line);flex-wrap:wrap;font-size:12px}
+.govbar .glb{font-weight:800;color:var(--sub);margin-right:2px}
+.govpill{
+  border:1px solid var(--line2);background:var(--card);color:var(--ink);
+  border-radius:999px;padding:3px 10px;font-size:12px;font-weight:750;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap
+}
+.govpill:hover{border-color:var(--acc);color:var(--acc2);background:var(--acc-soft)}
+.govpill.warn{background:var(--warn-bg);border-color:var(--wl);color:var(--warn)}
+.govpill.bad{background:var(--dg-bg);border-color:var(--dg-l);color:var(--dgi)}
+.govpill.ok{background:var(--ok-bg);border-color:var(--ok-l);color:var(--ok)}
+.govpill.nil{background:var(--bg);color:var(--sub);border-style:dashed}
+.govpill.acc{border-color:var(--acc-l);background:var(--acc-soft);color:var(--acc2)}
+.govbar .sp{flex:1}
+.finfo{margin:0;padding:8px 16px;background:var(--acc-soft);border-bottom:1px solid var(--acc-l);font-size:12.5px;color:var(--acc2)}
+
+/* 월별 빠른 이동 */
+.mbar{display:flex;align-items:center;gap:5px;padding:10px 16px 2px;overflow-x:auto;scrollbar-width:none;white-space:nowrap}
+.mbar::-webkit-scrollbar{display:none}
+.mbar .mlb{font-size:12px;font-weight:800;color:var(--sub);margin-right:4px;flex:0 0 auto}
+.mpill{border:1px solid var(--line);background:var(--card);color:var(--sub);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;flex:0 0 auto}
+.mpill:hover{border-color:var(--acc-l);color:var(--acc2);background:var(--acc-soft)}
+.mpill.on{background:var(--acc);border-color:var(--acc);color:#ffffff;box-shadow:0 3px 10px rgba(37,99,235,.24)}
+
+/* 3D · 2D · 3D+2D 보기 전환 & 연동 배지 */
+.modebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 9px}
+.mseg{display:inline-flex;background:var(--card);border:1px solid var(--line2);border-radius:999px;padding:3px;gap:2px;box-shadow:var(--sh-sm)}
+.mseg button{border:0;background:transparent;color:var(--sub);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.mseg button:hover{color:var(--ink);background:var(--bg)}
+.mseg button.on{background:var(--acc);color:#ffffff;box-shadow:0 2px 8px rgba(37,99,235,.25)}
+.sync-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:var(--acc-soft);border:1px solid var(--acc-l);color:var(--acc2);font-size:12px;font-weight:750;min-width:0;max-width:100%}
+.sync-pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-pill button{border:1px solid var(--acc-l);background:#ffffff;color:var(--acc2);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;cursor:pointer;flex:0 0 auto}
+.sync-pill button:hover{background:var(--acc);color:#ffffff}
+
+.dual-stage{display:grid;grid-template-columns:minmax(0,1.04fr) minmax(0,1fr);gap:12px;align-items:stretch}
+.dual-stage.mode-3d{grid-template-columns:minmax(0,1fr)}
+.dual-stage.mode-3d .pane-2d{display:none}
+.dual-stage.mode-2d{grid-template-columns:minmax(0,1fr)}
+.dual-stage.mode-2d .pane-3d{display:none}
+
+/* 무대 (3D & 2D 공통 틀) */
+.stage{position:relative;background:var(--card);border-radius:var(--r);overflow:hidden;border:1px solid var(--line2);box-shadow:var(--sh-md);transition:border-color .25s var(--ease),box-shadow .25s var(--ease)}
+.stage.dark{border-color:var(--sub);box-shadow:0 16px 40px -12px rgba(30,41,59,.35)}
+.stage canvas{display:block;width:100%;height:420px;touch-action:pan-y;cursor:grab;outline:none}
+.stage.pane-2d canvas{cursor:pointer}
+.stage canvas:focus-visible{box-shadow:inset 0 0 0 3px var(--acc-l)}
+.stage canvas.drag{cursor:grabbing}
+.stage .hint{position:absolute;left:11px;top:10px;font-size:11.5px;font-weight:700;color:var(--sub);background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:999px;padding:3px 10px;pointer-events:none;box-shadow:var(--sh-sm);max-width:calc(100% - 22px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stage.dark .hint{background:rgba(30,41,59,.86);border-color:rgba(148,163,184,.32);color:#f8fafc}
+.stage .tag2d{position:absolute;right:11px;top:10px;font-size:11px;font-weight:800;background:var(--acc-soft);color:var(--acc2);border:1px solid var(--acc-l);border-radius:999px;padding:2px 9px;pointer-events:none}
+.stage.pane-2d .hint{max-width:calc(100% - 104px)}
+.stage.dark .tag2d{background:rgba(37,99,235,.85);color:#ffffff;border-color:rgba(191,219,254,.4)}
+/* 무대 가운데 알림 — 못 읽음·자료 없음은 0 으로 그리지 않고 까닭을 띄운다 */
+.smsg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:calc(100% - 40px);text-align:center;background:rgba(255,255,255,.95);color:var(--ink);border:1px solid var(--line2);border-radius:14px;padding:10px 16px;font-size:13px;font-weight:700;pointer-events:none;word-break:keep-all;overflow-wrap:anywhere;box-shadow:var(--sh-md)}
+.smsg:empty{display:none}
+.stage.dark .smsg{background:rgba(30,41,59,.92);color:#f8fafc;border-color:rgba(148,163,184,.4)}
+
+/* 영상 브리핑 자막 */
+.cine-hud{position:absolute;left:12px;right:12px;top:10px;z-index:6;pointer-events:none;background:rgba(30,41,59,.92);color:#ffffff;border:1px solid rgba(191,219,254,.38);border-radius:12px;padding:8px 14px;box-shadow:0 8px 24px rgba(30,41,59,.28);display:none}
+.cine-hud.on{display:block}
+.stage:has(.cine-hud.on) .hint{opacity:0}
+.cine-hud .ct{font-size:11.5px;color:var(--acc-l);font-weight:800;display:flex;align-items:center;gap:6px}
+.cine-hud .cm{font-size:13px;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cine-hud .cbar{height:3px;background:rgba(255,255,255,.18);border-radius:999px;margin-top:6px;overflow:hidden}
+.cine-hud .cbar i{display:block;height:100%;background:var(--ok-b);border-radius:999px;transition:width .35s var(--ease)}
+
+.ctl{position:absolute;right:10px;bottom:10px;display:flex;gap:4px;background:rgba(255,255,255,.92);border:1px solid var(--line);padding:4px;border-radius:12px;box-shadow:var(--sh-sm)}
+.stage.dark .ctl{background:rgba(30,41,59,.88);border-color:rgba(148,163,184,.32)}
+.ctl button{width:31px;height:31px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;padding:0;line-height:29px}
+.stage.dark .ctl button{color:#f8fafc}
+.ctl button:hover{background:var(--acc-soft);color:var(--acc2)}
+.stage.dark .ctl button:hover{background:var(--sub);color:#ffffff}
+.ctl button.on{background:var(--acc);color:#ffffff;border-color:var(--acc)}
+
+.chips{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.chips .lb{font-size:12px;color:var(--sub);font-weight:800;margin-right:3px}
+.chip{border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:650;cursor:pointer;color:var(--sub);display:inline-flex;gap:6px;align-items:center;white-space:nowrap;box-shadow:0 1px 2px rgba(30,41,59,.03)}
+.chip:hover:not(:disabled){border-color:var(--acc-m);color:var(--ink)}
+.chip.on{border-color:var(--acc);background:var(--acc-soft);color:var(--acc2);font-weight:800}
+.chip.off{opacity:.48;text-decoration:line-through;background:var(--bg)}
+.chip:disabled,.ask button:disabled{opacity:.5;cursor:not-allowed}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.rng{display:inline-flex;align-items:center;gap:9px;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);padding:4px 12px;border-radius:999px}
+.rng input{width:220px;max-width:44vw;accent-color:var(--acc);cursor:pointer}
+
+.tip{position:fixed;z-index:80;pointer-events:none;background:var(--ink);color:#ffffff;font-size:12.5px;line-height:1.58;border-radius:12px;padding:9px 13px;border:1px solid rgba(191,219,254,.28);box-shadow:0 14px 32px rgba(30,41,59,.32);display:none;max-width:310px}
+.tip b{color:var(--acc-l)}
+
+details.tbl{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-top:12px;padding:10px 16px;box-shadow:var(--sh-sm)}
+details.tbl summary{cursor:pointer;font-weight:800;font-size:13px;color:var(--sub);padding:2px 0}
+.tw{overflow-x:auto;margin-top:8px;border-radius:10px}
+table.t{border-collapse:collapse;width:100%;font-size:12.5px}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.t th{color:var(--sub);font-weight:800;background:var(--bg);position:sticky;top:0;z-index:2}
+table.t tbody tr{transition:background-color .14s var(--ease)}
+table.t tbody tr:hover td{background:var(--bg)}
+table.t td.l,table.t th.l{text-align:left}
+table.t td.ck,table.t th.ck{width:28px;text-align:center;padding:7px 2px}
+table.t td.no,table.t th.no{width:34px;text-align:center;color:var(--sub);font-weight:700}
+table.t tr.sel td{background:var(--acc-soft)}
+table.t tfoot td{color:var(--sub);font-size:12px;background:var(--bg)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+
+/* 앱 틀 */
+.app{background:var(--bg);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--sh-md)}
+.apphd{display:flex;align-items:center;gap:7px;padding:11px 16px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.apphd .nm{font-weight:800;font-size:16px;letter-spacing:-.01em}
+.badge{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;white-space:nowrap}
+button.badge{cursor:pointer;font:inherit;font-size:12px;font-weight:800}
+.b-lock{background:var(--dg-bg);color:var(--dgi);border:1px solid var(--dg-l)}
+.b-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-l)}
+.b-warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--wl)}
+.b-info{background:var(--acc-soft);color:var(--acc2);border:1px solid var(--acc-l)}
+.b-nil{background:var(--bg);color:var(--sub);border:1px dashed var(--line2)}
+.apphd .sp{flex:1}
+.apphd select{border:1px solid var(--line2);border-radius:999px;padding:5px 12px;background:var(--bg);color:var(--ink);font-weight:700;cursor:pointer}
+.apphd select:focus{outline:2px solid var(--acc-l);border-color:var(--acc)}
+
+/* 숫자 넷 */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;padding:11px 16px 0}
+.kpi{background:var(--card);border-radius:var(--r);padding:12px 15px;border:1px solid var(--line);box-shadow:var(--sh-sm);display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;min-width:0}
+.kpi .kh{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.kpi .k{font-size:12px;color:var(--sub);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kpi .v{font-size:22px;font-weight:850;margin-top:3px;white-space:nowrap;letter-spacing:-.02em;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.kpi .v.nil{color:var(--sub);font-size:18px}
+.kpi .d{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;color:var(--sub)}
+.kpi svg.spk{width:68px;height:22px;flex:0 0 auto;overflow:visible}
+.up{color:var(--ok);font-weight:700}.dn{color:var(--dgi);font-weight:700}
+
+.viz-sec{padding:8px 16px 0}
+.main{display:grid;grid-template-columns:minmax(0,1.32fr) minmax(0,.88fr);gap:12px;padding:12px 16px}
+.panel{background:var(--card);border-radius:var(--r);border:1px solid var(--line);padding:13px 15px;min-width:0;box-shadow:var(--sh-sm)}
+.panel h3{margin:0 0 8px;font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+.panel h3 .sp{flex:1}
+.selbar{display:none;align-items:center;gap:7px;background:var(--acc-soft);border:1px solid var(--acc-l);border-radius:10px;padding:6px 10px;margin-bottom:8px;font-size:12.5px;color:var(--acc2);font-weight:800}
+.selbar.on{display:flex}
+.selbar button{border:1px solid var(--acc-l);background:#ffffff;color:var(--acc2);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.selbar button:hover{background:var(--acc);color:#ffffff;border-color:var(--acc)}
+
+/* 입금 종류별 비중 */
+.cat-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.cat-row{border:1px solid var(--line);background:var(--bg);border-radius:11px;padding:8px 10px;cursor:pointer;transition:border-color .16s var(--ease),background-color .16s var(--ease)}
+.cat-row:hover,.cat-row.on{border-color:var(--acc);background:var(--acc-soft)}
+.cat-top{display:flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap}
+.cat-top b{color:var(--ink)}
+.cat-top .pct{color:var(--sub);font-size:11.5px;font-weight:700}
+.cat-top .amt{margin-left:auto;font-weight:800;color:var(--ok)}
+.cat-bar{height:6px;background:var(--line);border-radius:999px;margin-top:5px;overflow:hidden}
+.cat-bar i{display:block;height:100%;border-radius:999px;transition:width .3s var(--ease)}
+
+.src{font-size:12px;color:var(--sub);padding:2px 16px 14px}
+
+/* 채팅 */
+.chat{margin:0 16px 14px;background:var(--card);border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--sh-sm);overflow:hidden}
+.chat .hd{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
+.chat .hd b{font-size:14px}
+.chat .hd .sp{flex:1}
+.chat .hd .hint2{font-size:12px;color:var(--sub)}
+.chat-body{position:relative;min-height:150px}
+.msgs{max-height:270px;min-height:150px;overflow-y:auto;padding:12px 15px;display:flex;flex-direction:column;gap:9px}
+.msg{max-width:78%;border-radius:14px;padding:9px 13px;font-size:13px;line-height:1.62;white-space:pre-wrap}
+.msg.me{align-self:flex-end;background:var(--acc);color:#ffffff;border-bottom-right-radius:4px;box-shadow:0 4px 12px rgba(37,99,235,.2)}
+.msg.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-bottom-left-radius:4px;color:var(--ink)}
+.msg.sys{align-self:center;background:var(--warn-bg);border:1px solid var(--wl);color:var(--warn);font-size:12.5px}
+.msg .why{display:block;margin-top:6px;font-size:11.5px;color:var(--sub);border-top:1px dashed var(--line2);padding-top:5px}
+.chat-cover{position:absolute;inset:0;z-index:5;background:rgba(248,250,252,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px;gap:6px}
+.chat-cover .ico{font-size:28px;line-height:1}
+.chat-cover p{margin:2px 0;font-size:12.5px;color:var(--sub);max-width:520px;word-break:keep-all;overflow-wrap:anywhere}
+.reauth{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.reauth input{border:1px solid var(--line2);border-radius:999px;padding:7px 14px;min-width:0;width:220px;max-width:100%;background:#ffffff;color:var(--ink)}
+.reauth input:focus{outline:2px solid var(--acc-l);border-color:var(--acc)}
+.reauth .err{flex-basis:100%;font-size:12px;color:var(--dgi);min-height:16px;margin:0}
+.ask{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--card)}
+.ask input{flex:1;min-width:0;border:1px solid var(--line2);border-radius:999px;padding:8px 14px;font-size:16px;background:var(--bg);color:var(--ink)}
+.ask input:focus{outline:2px solid var(--acc-l);border-color:var(--acc);background:#ffffff}
+.ask button{border:0;background:var(--acc);color:#ffffff;border-radius:999px;padding:0 18px;cursor:pointer;font-weight:800}
+.ask button:hover:not(:disabled){background:var(--acc2)}
+.chat .foot{font-size:11.5px;color:var(--sub);padding:0 15px 12px;background:var(--card)}
+
+/* 잠금·채팅 화면 */
+.lockgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.lk{background:var(--card);border-radius:var(--r);border:1px solid var(--line);overflow:hidden;box-shadow:var(--sh-sm)}
+.lk .cap{background:var(--ink);color:#ffffff;font-size:12.5px;font-weight:800;padding:9px 14px}
+.lk .body{padding:18px;min-height:200px}
+.lk .ctr{text-align:center;padding:10px 8px}
+.lk .ico{font-size:38px;line-height:1}
+.lk h4{margin:9px 0 5px;font-size:16px;font-weight:800}
+.lk p{margin:4px 0;color:var(--sub);font-size:13px}
+.lk .why{margin-top:12px;font-size:12px;color:var(--sub);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 12px;text-align:left}
+.lk .fp{display:inline-block;font:800 18px Consolas,monospace;letter-spacing:.08em;color:var(--acc2);background:var(--acc-soft);border:1px solid var(--acc-l);border-radius:10px;padding:4px 12px;margin:6px 0}
+.lk .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.btn{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;padding:8px 16px;font-weight:800;cursor:pointer;background:var(--acc);color:#ffffff;font-size:13px;text-decoration:none}
+.btn:hover{background:var(--acc2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.g{background:#ffffff;color:var(--ink);border:1px solid var(--line2)}
+.btn.g:hover{border-color:var(--acc);color:var(--acc2);background:var(--acc-soft)}
+.steps{counter-reset:s;list-style:none;padding:0;margin:8px 0}
+.steps li{counter-increment:s;position:relative;padding:8px 0 8px 33px;font-size:13px;border-bottom:1px dashed var(--line)}
+.steps li:before{content:counter(s);position:absolute;left:0;top:7px;width:23px;height:23px;border-radius:50%;background:var(--acc-soft);border:1px solid var(--acc-l);color:var(--acc2);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+.steps li.done:before{content:'✓';background:var(--ok-bg);border-color:var(--ok-l);color:var(--ok)}
+.mini{border:1px dashed var(--line2);border-radius:12px;padding:11px;margin-top:9px;background:var(--bg)}
+.mini .mk{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.mini .mk div{background:#ffffff;border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:12px;color:var(--sub)}
+.mini .mk b{display:block;font-size:15.5px;color:var(--ink);margin-top:1px}
+.flow{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;margin-top:14px}
+.flow div{flex:1 1 170px;background:var(--card);border-radius:12px;border:1px solid var(--line);padding:11px 13px;font-size:12.5px;color:var(--sub);box-shadow:var(--sh-sm)}
+.flow div b{display:block;font-size:13px;color:var(--acc2);margin-bottom:3px}
+
+/* 프로그램 현황판 */
+.bsum{display:flex;gap:7px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 15px;box-shadow:var(--sh-sm)}
+.bsum .sp{flex:1}
+.bsum .when{font-size:12px;color:var(--sub);font-weight:600}
+.bmsg{min-height:20px;margin:0 0 6px;font-size:12.5px;color:var(--acc2);font-weight:800}
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.board .empty{grid-column:1/-1;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;text-align:center;color:var(--sub)}
+.pg{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--okm);border-radius:15px;padding:12px 14px 10px;min-width:0;box-shadow:var(--sh-sm);transition:transform .16s var(--ease),box-shadow .16s var(--ease)}
+.pg:hover{transform:translateY(-1px);box-shadow:var(--sh-md)}
+.pg.st-warn{border-left-color:var(--wm)}.pg.st-bad{border-left-color:var(--dg)}.pg.st-na{border-left-color:var(--faint)}.pg.st-nobase{border-left-color:var(--acc-m)}
+.pg-h{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;margin-bottom:9px}
+.pg-h .no{color:var(--acc2);font-weight:800;font-size:12px;flex:0 0 auto;background:var(--acc-soft);padding:1px 6px;border-radius:6px}
+.pg-h b{font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pg-h .badge{padding:1px 7px;font-size:11.5px;flex:0 0 auto}
+.pg-h .tag{margin-left:auto;font-size:12px;color:var(--sub);font-weight:700;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pg-h .open{flex:0 0 auto;width:28px;height:28px;border:1px solid var(--line2);background:var(--bg);color:var(--sub);border-radius:8px;cursor:pointer;padding:0;font-size:13px}
+.pg-h .open:hover{border-color:var(--acc);color:var(--acc2);background:var(--acc-soft)}
+.pg-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pg-k div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 8px;min-width:0}
+.pg-k span{display:block;font-size:11.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-k b{display:block;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.pg-k .w{background:var(--warn-bg);border-color:var(--wl)}.pg-k .w b,.pg-k .w span{color:var(--warn)}
+.pg-k .x{background:var(--dg-bg);border-color:var(--dg-l)}.pg-k .x b,.pg-k .x span{color:var(--dgi)}
+.pg-na{background:var(--bg);border:1px dashed var(--line2);border-radius:10px;padding:13px 10px;font-size:12.5px;color:var(--sub);text-align:center;word-break:keep-all;overflow-wrap:anywhere}
+.pg-bar{height:6px;border-radius:999px;background:var(--line);margin-top:10px;overflow:hidden}
+.pg-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc) 0%,var(--okm) 100%);border-radius:999px}
+.pg-f{display:flex;gap:8px;font-size:11.5px;color:var(--sub);margin-top:4px;white-space:nowrap;min-width:0;font-weight:600}
+.pg-f span:first-child{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pg-f .sp{flex:1}
+.bstrip{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 16px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 15px;font-size:13px;box-shadow:var(--sh-sm)}
+.bstrip .sp{flex:1}
+
+/* 연결 지도 */
+.gbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 9px}
+.gbar input{flex:1 1 220px;min-width:0;border:1px solid var(--line2);border-radius:999px;padding:8px 14px;background:var(--card);color:var(--ink)}
+.gbar input:focus{outline:2px solid var(--acc-l);border-color:var(--acc)}
+.gfound{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 9px}
+.gfound:empty{display:none}
+.gwrap{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:14px;align-items:start}
+.gwrap .stage canvas{height:540px;cursor:default}
+.gside{max-height:540px;overflow-y:auto}
+.gside h4{margin:2px 0 6px;font-size:14.5px;font-weight:800;display:flex;gap:7px;align-items:center;min-width:0}
+.gside h4 span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gside .acts{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0 9px}
+.gside .acts button{border:1px solid var(--line2);background:var(--bg);color:var(--acc2);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.gside .acts button:hover{background:var(--acc-soft);border-color:var(--acc)}
+.gside .gl{font-size:11.5px;color:var(--sub);font-weight:800;margin:10px 0 4px}
+.gside .nb{display:flex;gap:7px;align-items:center;width:100%;border:0;background:transparent;text-align:left;padding:5px 7px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;color:var(--ink);white-space:nowrap}
+.gside .nb:hover{background:var(--acc-soft)}
+.gside .nb span:nth-child(2){overflow:hidden;text-overflow:ellipsis;min-width:0;font-weight:600}
+.gside .nb em{margin-left:auto;font-style:normal;color:var(--sub);font-size:11.5px;flex:0 0 auto}
+.gside p{margin:4px 0;font-size:12.5px;color:var(--sub);word-break:keep-all;overflow-wrap:anywhere}
+.tdot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+
+/* 폰 두 줄 카드 */
+.cards{padding:0 10px 10px;display:flex;flex-direction:column;gap:6px}
+.card{display:grid;grid-template-columns:28px 30px minmax(0,1fr);align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 9px;font-size:13px;box-shadow:var(--sh-sm)}
+.card .no{color:var(--sub);text-align:center;font-size:12px;font-weight:700}
+.card .l1{display:flex;gap:6px;align-items:center;min-width:0;white-space:nowrap}
+.card .l1 b{overflow:hidden;text-overflow:ellipsis}
+.card .l2{display:flex;gap:10px;color:var(--sub);font-size:12px;white-space:nowrap;overflow:hidden;margin-top:2px}
+.card.foot{grid-template-columns:minmax(0,1fr);color:var(--sub);font-size:12px;background:var(--bg)}
+.only-ph{display:none!important}
+
+/* 포함·제외 검토 · 기준 정하기 창 & 알림 */
+.audit-backdrop{position:fixed;inset:0;z-index:70;background:rgba(30,41,59,.55);display:none;align-items:center;justify-content:center;padding:16px}
+.audit-backdrop.on{display:flex}
+.audit-box{background:var(--card);border:1px solid var(--line);border-radius:20px;max-width:980px;width:100%;max-height:86vh;overflow-y:auto;padding:20px 22px;box-shadow:0 24px 60px rgba(30,41,59,.32)}
+.audit-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
+.audit-hd h3{margin:0;font-size:17px;font-weight:850;min-width:0}
+.audit-hd button{flex:0 0 auto;white-space:nowrap}
+.audit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.audit-card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:13px 15px;font-size:13px}
+.audit-card.inc{border-top:4px solid var(--okm)}
+.audit-card.exc{border-top:4px solid var(--dg)}
+.audit-card.add{border-top:4px solid var(--acc);grid-column:1/-1}
+.audit-card h4{margin:0 0 7px;font-size:14px;font-weight:800}
+.audit-card ul{margin:0;padding-left:18px;color:var(--sub)}
+.audit-card li{margin:5px 0}
+.audit-card li b{color:var(--ink)}
+.qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:6px}
+.qgrid div{background:#ffffff;border:1px solid var(--line);border-radius:9px;padding:6px 9px;font-size:12px;color:var(--sub);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qgrid b{color:var(--ink);margin-left:4px}
+.setgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.setrow{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 11px;font-size:12.5px;min-width:0}
+.setrow span{flex:1;min-width:0;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.setrow input{width:96px;border:1px solid var(--line2);border-radius:8px;padding:5px 8px;font-size:13px;text-align:right;background:#ffffff;color:var(--ink)}
+.setrow input:focus{outline:2px solid var(--acc-l);border-color:var(--acc)}
+.setrow em{font-style:normal;color:var(--sub);font-size:12px;flex:0 0 auto}
+.setsec{margin:14px 0 6px;font-size:13px;font-weight:800;color:var(--acc2)}
+.setacts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+.toast-msg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:90;background:var(--ink);color:#ffffff;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 10px 28px rgba(30,41,59,.3);border:1px solid rgba(191,219,254,.3);display:none;max-width:calc(100vw - 24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.toast-msg.on{display:block}
+
+/* 다년 · 전망 · 세무 대조 */
+.wrap{width:100%;max-width:100%;box-sizing:border-box;min-width:0}
+.vh{grid-template-columns:auto minmax(0,1fr)}
+.view,.app,.viz-sec,.dual-stage,.stage,.kpis,.kpi,.panel,.tw{min-width:0}
+.m-ctrlbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:10px 0;box-shadow:var(--sh-sm)}
+.m-ctrlbar .sep{width:1px;height:20px;background:var(--line2);margin:0 2px}
+.drv-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 12px}
+.drv-card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:10px 13px;box-shadow:var(--sh-sm);display:flex;flex-direction:column;gap:5px}
+.drv-card .dh{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:800;color:var(--sub);gap:6px}
+.drv-card .dh b{color:var(--acc2);font-size:13px;flex:0 0 auto}
+.drv-card input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer;margin:2px 0}
+.drv-card .ds{font-size:11px;color:var(--sub);display:flex;justify-content:space-between}
+.fc-note{font-size:12px;color:var(--warn);background:var(--warn-bg);border:1px solid var(--wl);border-radius:10px;padding:6px 11px;margin:0 0 10px}
+.recon-hub{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:12px 0}
+.drop-card{background:var(--card);border:1.5px dashed var(--acc-m);border-radius:15px;padding:13px 15px;box-shadow:var(--sh-sm);transition:border-color .18s var(--ease),background-color .18s var(--ease);display:flex;flex-direction:column;gap:7px}
+.drop-card.dragover{border-color:var(--acc);background:var(--acc-soft)}
+.drop-card.loaded{border-style:solid;border-color:var(--okm);background:var(--ok-bg)}
+.drop-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.drop-hd b{font-size:13.5px;color:var(--ink)}
+.drop-desc{font-size:12px;color:var(--sub);line-height:1.5}
+.drop-acts{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:2px}
+.drop-acts select{border:1px solid var(--line2);border-radius:999px;padding:4px 10px;background:#ffffff;color:var(--ink);font-size:12px;font-weight:700}
+.drop-lbl{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--acc);background:var(--acc);color:#ffffff;border-radius:999px;padding:5px 13px;font-size:12px;font-weight:800;cursor:pointer}
+.drop-lbl:hover{background:var(--acc2)}
+.drop-meta{font-size:11.5px;font-weight:700;color:var(--sub)}
+.drop-card.loaded .drop-meta{color:var(--ok)}
+.preset-strip{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:9px 14px;margin-bottom:12px;box-shadow:var(--sh-sm);font-size:12px}
+.preset-strip .plb{font-weight:800;color:var(--ink);margin-right:2px}
+.num-inp{width:96px;border:1px solid var(--acc-m);border-radius:7px;padding:3px 6px;font-size:12px;font-weight:700;text-align:right;background:#ffffff;color:var(--ink)}
+.num-inp:focus{outline:2px solid var(--acc-l);border-color:var(--acc)}
+.drop-lbl:focus-visible{outline:3px solid var(--acc-l);outline-offset:2px}
+.card.sel{background:var(--acc-soft);border-color:var(--acc-l)}
+#mReconCards .card{cursor:pointer}
+#mReconCards .l2 span:last-child{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#mPanel.editing .m-tw.only-pc{display:block!important}
+#mPanel.editing .m-cards.only-ph{display:none!important}
+tr.fc-row td{background:var(--acc-soft);color:var(--acc2)}
+tr.fc-row:hover td{background:var(--acc-l)}
+
+@media (max-width:1120px){
+  .dual-stage{grid-template-columns:1fr}
+  .main{grid-template-columns:1fr}
+}
+@media (max-width:960px){
+  .drv-bar{grid-template-columns:1fr}
+  .recon-hub{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .lockgrid,.audit-grid,.setgrid{grid-template-columns:1fr}
+  .audit-card.add{grid-column:auto}
+  .qgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pc{grid-template-columns:1fr}
+  .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .shell{grid-template-columns:64px minmax(0,1fr)}
+  .sidebar{padding:10px 6px}
+  .sdash,.side .grp,.side button .nm,.side button .mk{display:none}
+  .side button{grid-template-columns:1fr;justify-items:center;padding:6px 0}
+  .side button .ic{grid-row:auto}
+  .gwrap{grid-template-columns:1fr}
+  .gside{max-height:none}
+}
+/* 태블릿·폰 — 입력칸 글씨 16px 아래면 누를 때 화면이 확대된다 */
+@media (max-width:768px){
+  input,select,textarea{font-size:16px}
+  .drop-acts select,.apphd select,.setrow input,.num-inp,.reauth input{font-size:16px}
+}
+/* 폰 — PC 는 그대로 두고 이 구간에서만 바꾼다(docs/규칙/폰화면.md) */
+@media (max-width:600px){
+  .wrap{padding:10px}
+  .stage canvas{height:300px}
+  .vh{padding:12px}
+  .vh h2{font-size:15.5px}
+  .kpi{padding:10px 11px}
+  .kpi .k{font-size:11px}
+  .kpi .v{font-size:18px}
+  .kpi svg.spk{display:none}
+  .msg{max-width:90%}
+  .rng input{width:140px}
+  .board{grid-template-columns:1fr;gap:8px}
+  .pg{padding:9px 10px 8px}
+  .shell{display:block}
+  .sidebar{position:sticky;top:46px;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .sidebar::-webkit-scrollbar{display:none}
+  .side{flex-direction:row;gap:5px}
+  .side button{display:flex;gap:6px;padding:5px 10px;flex:0 0 auto;white-space:nowrap}
+  .side button .ic{width:24px;height:24px;font-size:12px}
+  .side button .nm{display:block;font-size:12.5px}
+  .gwrap .stage canvas{height:360px}
+  .bstrip{margin:0 10px 10px}
+  .viz-sec{padding:6px 10px 0}
+  .govbar{padding:8px 10px}
+  .mbar{padding:8px 10px 2px}
+  .apphd{padding:9px 10px;gap:6px}
+  .kpis{padding:10px 10px 0;gap:8px}
+  .main{padding:10px}
+  .chat{margin:0 10px 12px}
+  .src{padding:2px 10px 12px}
+  .only-ph{display:flex!important}
+  .only-pc{display:none!important}
+  /* 폰에서 16px 아래 입력칸은 누르면 화면이 확대된다 — 표 안 숫자칸도 같다 */
+  input,select,textarea{font-size:16px}
+  .num-inp{font-size:16px;width:96px}
+  .setrow input{font-size:16px}
+  .reauth input{font-size:16px}
+  /* 위 막대는 그림 단추 + 이름표(title) — 글자는 숨긴다(탭은 한 줄) */
+  .top{padding:6px 8px;gap:5px}
+  .top .tx{display:none}
+  .top button,.top .tlink{min-height:32px;padding:5px 9px}
+  #who{display:none}
+  .chip{min-height:32px}
+  input[type=checkbox]{width:24px;height:24px}
+  .govpill{min-height:30px}
+  .mseg button{padding:4px 9px;font-size:11.5px;min-height:30px}
+  .m-ctrlbar{padding:8px 10px}
+  .m-ctrlbar .sep{display:none}
+  .panel h3{flex-wrap:wrap}
+  .panel h3 > span:first-child{min-width:0;word-break:keep-all;overflow-wrap:anywhere}
+  .qgrid{grid-template-columns:1fr}
+  .gatebox{margin:8vh 12px 0;padding:22px 16px}
+  .audit-box{padding:14px 12px}
+  .audit-hd h3{font-size:15px}
+}
+
+/* ══ 정리판 (2026-11-22 대표 「화면이 너무 정신없다 — 깔끔하게」) ══
+   기능(단추·거르개·표·차트·숫자·채팅)은 하나도 빼지 않았다. 바꾼 것은 셋뿐이다.
+   ① 같은 화면에 두 번 있던 것을 하나로 — 위 막대의 «다년» 단추(왼쪽 메뉴와 같음)·3D/2D 전체 단추(각 화면 단추가 이제 모든 화면에 함께 적용)·
+      전체 배치 머리의 앱 이름·대표 전용·기기 배지(위 막대에 있음)·다년 머리의 둘째 제목·정합성 띠의 «다년» 바로가기
+   ② 테두리·그림자·알약 모양을 걷어 숫자와 차트가 먼저 보이게 — 상자는 한 겹
+   ③ 긴 설명은 한 줄로 줄이고, 원래 글과 «좋은 점·아쉬운 점»은 화면 아래 «이 화면 설명»에 접어 둠(펼치면 그대로)
+   되돌리기: 이 덩어리를 지우고 pu-datahub.html·js/pu-datahub-view.js 를 이 PR 앞으로 */
+:root{--sh-sm:0 1px 2px rgba(30,41,59,.04);--sh-md:0 6px 18px -8px rgba(30,41,59,.14)}
+
+/* 위 막대 — 상태는 테두리 없는 글자 한 줄, 단추는 바탕 없이 */
+.top{gap:3px;box-shadow:none}
+.top .tstat{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;overflow:hidden;margin-left:4px}
+.top .tstat .tpill{background:transparent;border:0;border-radius:0;padding:0 9px;color:#cbd5e1;font-weight:600;font-size:12px}
+.top .tstat .tpill + .tpill{border-left:1px solid rgba(255,255,255,.18)}
+.top .tstat .ti{font-style:normal;display:none}
+.top .tstat .tpill.lock{background:transparent;color:#fecaca}
+.top .tstat .tpill.ok{background:transparent;color:#bbf7d0}
+.top .tstat .tpill.warn{color:#fde68a}
+.top button,.top .tlink{background:transparent;border-color:transparent;font-weight:650;color:#e2e8f0}
+.top button:hover,.top .tlink:hover{background:rgba(255,255,255,.12);border-color:transparent;color:#ffffff}
+.top button.on{background:transparent;border-color:transparent;box-shadow:none}
+
+/* 왼쪽 메뉴 — 그림 칸 테두리·그림자 걷기 */
+.sdash{background:var(--bg);border-color:var(--line);box-shadow:none}
+.sdash h3{color:var(--ink)}
+.sdash h3::after{content:none}
+.side button .ic{background:transparent;border-color:transparent;color:var(--sub)}
+.side button.on{box-shadow:none}
+.side button.on .ic{box-shadow:none}
+
+/* 화면 머리말 — 상자 없이 제목 한 줄 + 설명 한 줄 */
+.vh{display:block;background:transparent;border:0;box-shadow:none;padding:0 2px;margin:2px 0 12px}
+.vh .L,.vh .q{display:none}
+.vh h2{font-size:19px}
+.vh p{margin-top:3px;font-size:12.5px}
+
+/* 앱 틀 걷기 — 상자 안의 상자를 없앤다 */
+.app{background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible}
+.apphd{background:transparent;border:0;padding:0 0 10px}
+.govbar{background:transparent;border:0;padding:0 0 8px}
+.govpill.nil{border-style:solid;border-color:var(--line)}
+.finfo{border:1px solid var(--acc-l);border-radius:10px;margin:0 0 10px}
+.mbar{padding:2px 0}
+.kpis{padding:8px 0 0}
+.viz-sec{padding:6px 0 0}
+.main{padding:12px 0}
+.bstrip{margin:0 0 14px}
+.chat{margin:0 0 14px}
+.src{padding:2px 0 14px}
+.m-below{padding:4px 0 14px}
+
+/* 보기 단추·거르개·연동 글 — 알약 대신 조용한 모양 */
+.modebar{gap:10px}
+.mseg{background:var(--bg);border-color:var(--line);box-shadow:none;padding:2px}
+.mseg button{padding:4px 13px;font-weight:700}
+.mseg button.on{box-shadow:none}
+.chip{box-shadow:none;font-weight:600}
+.sync-pill{background:transparent;border:0;padding:0 2px;color:var(--sub);font-weight:600}
+.m-ctrlbar{background:transparent;border:0;box-shadow:none;padding:0;margin:6px 0 8px}
+.fc-note{background:transparent;border:0;padding:0;margin:0 0 8px}
+.preset-strip{background:transparent;border:0;box-shadow:none;padding:0}
+.drop-card{border:1px dashed var(--line2);box-shadow:none}
+
+/* 무대 — 그림자 줄이고, 위 글씨는 바탕 없이. «2D 연동» 꼬리표는 차트 이름(왼쪽 위 글)과 겹쳐 걷음 */
+.stage,.stage.dark{box-shadow:var(--sh-md)}
+.stage .tag2d{display:none}
+.stage .hint,.stage.pane-2d .hint{border:0;box-shadow:none;font-weight:600;max-width:calc(100% - 22px)}
+
+/* 접어 둔 설명 */
+details.about,details.why3{margin-top:12px;font-size:12.5px;color:var(--sub)}
+details.about summary,details.why3 summary{cursor:pointer;font-weight:700;color:var(--sub);padding:4px 0}
+details.about summary:hover,details.why3 summary:hover{color:var(--acc2)}
+details.about .about-p,details.why3 p{margin:6px 0 0;word-break:keep-all;overflow-wrap:anywhere}
+details.about .pc{margin-top:10px}
+
+@media (max-width:600px){
+  .top .tstat{margin-left:0}
+  .top .tstat .tpill{padding:0 5px}
+  .top .tstat .ti{display:inline}
+  .vh{padding:0}
+  .vh h2{font-size:16.5px}
+  .vh p{font-size:12px}
+  .govbar,.mbar,.kpis,.viz-sec,.main,.src,.m-below,.apphd{padding-left:0;padding-right:0}
+  .bstrip,.chat{margin-left:0;margin-right:0}
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+
+<!-- 확인 중 — 대표 표지(app_owner/uid)를 확인하기 전에는 자료를 한 줄도 불러오지 않는다 -->
+<div class="gatebox" id="boot" role="status" aria-live="polite"><div class="ico">📊</div><h2>데이터관리</h2><p id="bootMsg">대표 확인 중…</p></div>
+<div class="gatebox" id="lock" hidden>
+  <div class="ico">🔒</div><h2>대표 전용 화면입니다</h2><p>이 화면은 대표만 열 수 있습니다.</p>
+  <p class="why" id="lockWhy"></p>
+  <p style="margin-top:14px"><a class="btn" href="enter.html">🏠 포털로 돌아가기</a> <button class="btn g" type="button" id="lockOut" hidden>로그아웃</button></p>
+</div>
+
+<div id="app" hidden>
+<div class="top" id="topBar">
+  <b>📊 데이터관리</b>
+  <!-- 상태 넷은 «글자 한 줄»(테두리 없음) — 폰에서는 그림만 (2026-11-22 정리) -->
+  <span class="tstat" aria-label="지금 상태">
+    <span class="tpill lock" title="대표 한 사람만 열 수 있습니다 — 대표 표지(app_owner)와 같은 계정만"><i class="ti">🔒</i><span class="tx">대표 전용</span></span>
+    <span class="tpill" id="topDev" title="채팅 기기 상태"><i class="ti">🖥</i><span class="tx" id="topDevTx"> 기기 확인 중</span></span>
+    <span class="tpill" id="topAt" title="마지막 집계 시각"><i class="ti">⏱</i><span class="tx" id="topAtTx"> 불러오는 중</span></span>
+    <span class="tpill" title="원본(재무 입금·이알피·업무관리·인사 명부)은 읽기만 합니다 — 고치지도 지우지도 않습니다"><i class="ti">👁</i><span class="tx">원본은 읽기만</span></span>
+  </span>
+  <span class="sp"></span>
+  <button type="button" id="btnStageTheme" class="on" aria-pressed="true" title="무대 조명을 시네마(어두운 무대)와 밝은 스튜디오 사이에서 바꿉니다">🌌<span class="tx"> 시네마 무대</span></button>
+  <button type="button" id="btnOpenAudit" title="입금·업무 집계에 무엇을 넣고 뺐는지, 이번 집계에서 몇 줄을 뺐는지 봅니다">📋<span class="tx"> 포함·제외 검토</span></button>
+  <button type="button" id="btnOpenSet" title="주의(노랑)·넘침(빨강) 기준을 대표가 정합니다 — 정하기 전에는 색을 칠하지 않습니다">⚙<span class="tx"> 기준 정하기</span></button>
+  <button type="button" id="btnReload" title="원본을 다시 읽어 집계를 새로 냅니다">🔄<span class="tx"> 새로고침</span></button>
+  <span id="who"></span>
+  <a class="tlink" href="enter.html" title="통합 포털로">🏠<span class="tx"> 포털</span></a>
+</div>
+
+<div class="shell">
+<aside class="sidebar" aria-label="왼쪽 대시보드">
+  <div class="sdash" id="sDash"><h3>한눈에</h3></div>
+  <div class="side" role="tablist" aria-label="데이터관리 화면 고르기" aria-orientation="vertical">
+    <div class="grp" role="presentation">대표 화면</div>
+    <button type="button" data-v="all" class="on" role="tab" aria-selected="true"><span class="ic">★</span><span class="nm">전체 배치</span><span class="mk" data-mk="all"></span></button>
+    <button type="button" data-v="multi" role="tab" aria-selected="false"><span class="ic">📈</span><span class="nm">다년·전망·재무대조</span><span class="mk" data-mk="multi"></span></button>
+    <button type="button" data-v="board" role="tab" aria-selected="false"><span class="ic">▦</span><span class="nm">프로그램 현황판</span><span class="mk" data-mk="board"></span></button>
+    <button type="button" data-v="graph" role="tab" aria-selected="false"><span class="ic">🕸</span><span class="nm">연결 지도</span><span class="mk" data-mk="graph"></span></button>
+    <button type="button" data-v="lock" role="tab" aria-selected="false"><span class="ic">🔒</span><span class="nm">잠금·채팅</span><span class="mk" data-mk="lock"></span></button>
+    <div class="grp" role="presentation">3D 다섯 안</div>
+    <button type="button" data-v="a" role="tab" aria-selected="false"><span class="ic">A</span><span class="nm">입금 막대 숲</span><span class="mk" data-mk="a"></span></button>
+    <button type="button" data-v="b" role="tab" aria-selected="false"><span class="ic">B</span><span class="nm">사람 구슬</span><span class="mk" data-mk="b"></span></button>
+    <button type="button" data-v="c" role="tab" aria-selected="false"><span class="ic">C</span><span class="nm">업무량 산맥</span><span class="mk" data-mk="c"></span></button>
+    <button type="button" data-v="d" role="tab" aria-selected="false"><span class="ic">D</span><span class="nm">한 해 입금 고리</span><span class="mk" data-mk="d"></span></button>
+    <button type="button" data-v="e" role="tab" aria-selected="false"><span class="ic">E</span><span class="nm">업체 도시</span><span class="mk" data-mk="e"></span></button>
+  </div>
+</aside>
+
+<div class="wrap">
+
+<!-- ═════════ 전체 배치 ═════════ -->
+<section class="view on" id="v-all">
+  <div class="vh"><div class="L">★</div><h2>전체 배치</h2>
+    <p>이달 숫자 · 월별 3D·2D(양쪽 어디든 누르면 함께 맞춰짐) · 사람별 표 · 입금 종류 비중 · 데이터 채팅</p></div>
+  <div class="app">
+    <div class="apphd">
+      <button class="chip" type="button" id="btnBasisToggle" aria-pressed="false" title="입금일(date)과 귀속월을 맞비교합니다 — 귀속월은 자문료면 «몇 월분»(advisoryYm), 그 밖은 «성과 반영 월»(perfYM, 마감월이면 다음 달로 밀림)이라 업무가 실제로 일어난 달과 다를 수 있습니다">📅 기준: 입금일</button>
+      <button class="chip" type="button" id="btnNetToggle" aria-pressed="false" title="카드로 받은 입금은 원래 금액(amount)으로 적고 카드 수수료(cardFee)를 따로 적습니다 — 순액은 amount − cardFee">💳 금액: 수수료 전 총액</button>
+      <button class="chip" type="button" id="btnKpiSwap" aria-pressed="false" title="네 번째 숫자 카드를 «주의·병목 앱 수»(기본)와 «업무 1건당 입금» 사이에서 바꿉니다">4번 카드: 업무 1건당 입금 보기</button>
+      <select id="selPeriod" aria-label="기간"></select>
+      <span class="sp"></span>
+      <button class="badge b-info" type="button" id="btnFilterInfo" aria-expanded="false" aria-controls="filterInfo" title="무엇을 넣고 뺐는지 펼쳐 봅니다">확정 입금만 ▾</button>
+    </div>
+    <p class="finfo" id="filterInfo" hidden>입금은 재무관리 확정 입금(data/finance_income) 한 곳에서만 셉니다 — 되돌린 입금(undoneDate)·휴지통(_deleted)·성과조정 줄(perf-adjust)·과거기록(confirmed:false)·개인수익은 뺍니다. 사건·계약 쪽 금액 사본은 더하지 않습니다(두 번 세지 않음). 성과 몫이 없는 입금(자문료 등)은 업체 주담당 몫으로 봅니다. 마감월·끝난 건은 읽기만 합니다.</p>
+
+    <div class="govbar" aria-label="데이터 정합성 및 주의 신호 바로가기">
+      <span class="glb">🩺 데이터 정합성·병목</span>
+      <button type="button" class="govpill nil" id="gvHoldBtn" data-jump="fin-hold">재무 보류 <b id="gvHold">—</b> ↗</button>
+      <button type="button" class="govpill nil" id="gvOverBtn" data-jump="overload">주간 넘침 <b id="gvOver">—</b>명 · 기록주의 <b id="gvRec">—</b>명 ↗</button>
+      <button type="button" class="govpill nil" id="gvMisuBtn" data-jump="misu">자문료 미수 추정 <b id="gvMisu">—</b>곳 ↗</button>
+      <button type="button" class="govpill nil" id="gvExpBtn" data-jump="expiring">만료 임박 계약 <b id="gvExp">—</b> ↗</button>
+      <span class="sp"></span>
+      <button type="button" class="govpill" id="btnExportCsv" title="지금 고른 기간·기준의 사람별·입금종류별 집계표를 CSV 로 내려받습니다(사람 이름이 들어가므로 이 PC 에만 두세요)">📥 지금 집계 CSV 저장</button>
+    </div>
+
+    <div class="mbar" id="monthScrub" aria-label="월별 빠른 이동"></div>
+    <div class="kpis" id="kpis"></div>
+
+    <div class="viz-sec">
+      <div class="modebar">
+        <div class="mseg" data-target="dualAll" role="group" aria-label="전체 배치 3D·2D 보기 선택">
+          <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+          <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+          <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+        </div>
+        <button type="button" class="chip" id="btnCineTour" title="12개월 통합 자료를 3D와 2D 동시 움직임으로 이어서 브리핑합니다">🎬<span class="tx"> 영상화 브리핑</span></button>
+        <div class="chips" id="allMetric" style="margin:0"><span class="lb">높이</span></div>
+        <span style="flex:1"></span>
+        <div class="sync-pill" id="syncPillAll"><span id="syncTxtAll">🔗 3D·2D 연동 대기 — 양쪽 막대 어디든 누르면 달·사람·표가 함께 맞춰집니다</span><button type="button" id="btnResetSyncAll" style="display:none">전체 보기</button></div>
+      </div>
+      <div class="dual-stage" id="dualAll">
+        <div class="stage dark pane-3d" id="stAll">
+          <canvas id="cvAll" tabindex="0" aria-label="월별·사람별 입금 3D 막대. 끌어서 돌리고 누르면 2D 차트와 표에 연동됩니다."></canvas>
+          <span class="hint">3D · 끌어서 회전 · 막대를 누르면 2D·표 함께 고름</span>
+          <div class="smsg" id="smAll"></div>
+          <div class="cine-hud" id="hudAll"><div class="ct">🎬 월별 통합 브리핑 (3D·2D 동시 연동)</div><div class="cm" id="hudAllTxt"></div><div class="cbar"><i id="hudAllBar" style="width:0%"></i></div></div>
+          <div class="ctl" data-for="cvAll"></div>
+        </div>
+        <div class="stage dark pane-2d" id="stAll2d">
+          <canvas id="cvAll2d" tabindex="0" aria-label="월별·사람별 2D 누적 막대 및 3개월 이동평균 차트. 막대를 누르면 3D와 표가 함께 골라집니다."></canvas>
+          <span class="hint">2D 정밀 · 누적 막대 + 3개월 추세선 (누르면 3D 연동)</span>
+          <span class="tag2d">2D 연동</span>
+          <div class="smsg" id="smAll2d"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="panel">
+        <h3><span id="allTblTitle">사람별</span> <span class="sp"></span><span class="badge b-info" id="allCnt"></span></h3>
+        <div class="selbar" id="allSel"><span id="allSelN"></span><button type="button" data-act="focus">3D에서 강조</button><button type="button" data-act="clear">고르기 풀기</button></div>
+        <div class="tw only-pc"><table class="t" id="allTbl"></table></div>
+        <div class="cards only-ph" id="allCards" style="padding:0"></div>
+        <p style="font-size:11.5px;color:var(--sub);margin:8px 0 0">☐ 를 골라도 아무것도 바뀌지 않습니다 — 「3D에서 강조」를 누르면 3D 와 2D 모두 그 사람만 진하게 보입니다. 차례는 직종·사번 차례이고 순위가 아닙니다. 업무 기록을 빠뜨린 주는 낮게 보이므로 «기록률»을 늘 옆에 둡니다.</p>
+      </div>
+      <div class="panel">
+        <h3><span id="catPanelTitle">입금 종류별 비중</span> <span class="sp"></span><button type="button" class="chip" data-goto="d" style="padding:2px 9px;font-size:11.5px">D안 상세 ↗</button></h3>
+        <div class="cat-list" id="catBreakList"></div>
+        <p style="font-size:11.5px;color:var(--sub);margin:8px 0 0">항목을 누르면 그 입금 종류의 한 해 흐름(D안 3D+2D)으로 이어서 봅니다.</p>
+      </div>
+    </div>
+
+    <div class="bstrip"><b>▦ 프로그램 현황판</b><span id="stripSum"></span><span class="sp"></span><button class="btn g" type="button" data-goto="board">현황판 보기</button></div>
+    <div class="chat" id="chatAll">
+      <div class="hd"><b>💬 데이터 채팅</b><span class="badge b-nil" id="chatDevBadge">🖥 기기 확인 중</span><span class="sp"></span><span class="hint2" title="15분 동안 손대지 않으면 채팅이 잠기고 비밀번호를 다시 확인합니다">15분 자리 비우면 잠김 · 기록은 이 컴퓨터에만</span></div>
+      <div class="chat-body">
+        <div class="msgs" id="msgsAll" role="log" aria-live="polite" aria-label="데이터 채팅 대화"></div>
+        <div class="chat-cover" id="chatCover">
+          <div class="ico" id="ccIco">🖥</div>
+          <b id="ccTitle">기기 확인 중</b>
+          <p id="ccMsg"></p>
+          <form class="reauth" id="reauthForm1" hidden autocomplete="on">
+            <input type="password" id="reauthPw1" autocomplete="current-password" placeholder="대표 비밀번호" aria-label="대표 비밀번호 다시 넣기">
+            <button class="btn" type="submit">비밀번호 다시 넣고 열기</button>
+            <p class="err" id="reauthErr1" role="alert"></p>
+          </form>
+          <button class="btn g" type="button" id="ccGoLock" hidden data-goto="lock">🔒 잠금·채팅에서 기기 등록</button>
+        </div>
+      </div>
+      <div class="ask"><input id="askAll" placeholder="데이터에 물어보기 — 예: 지난달 입금이 왜 줄었어?" aria-label="데이터에 물어보기" maxlength="500"><button type="button" id="sendAll">보내기</button></div>
+      <div class="foot">AI 에는 «집계 숫자»만 보냅니다 — 사람은 P1·P2, 업체는 C-01 같은 가명으로 바꿔 보내고 답은 이 화면에서만 실명으로 되돌립니다. 질문에 적은 이름도 보내기 전에 가명으로 바꿉니다. 고객 이름·주민번호·계좌는 보내지 않습니다. 답 밑에는 늘 «근거(어느 자료·어느 기간·어떤 거르개)»를 붙입니다.</div>
+    </div>
+    <div class="src" id="srcLine">자료: 재무관리 입금(확정분) · 업무관리 주간기록 · 이알피 업체 담당자 · 인사 명부 — 원본은 «읽기만» 합니다(고치지도 지우지도 않음)</div>
+  </div>
+</section>
+
+<!-- ═════════ 다년 매출 분석 · 장기 전망 · 세금계산서/재무제표 대조 ═════════ -->
+<section class="view" id="v-multi">
+  <div class="vh"><div class="L">📈</div><h2>다년·전망·재무대조</h2>
+    <p>해마다 ERP 확정입금 ↔ 세금계산서 공급가액 ↔ 재무제표 결산매출을 맞대고 수익원 구조·계절성·다음 3개 해 시나리오를 봅니다 · ERP 숫자는 이알피에 입금이 있는 해만</p></div>
+  <div class="app">
+    <div class="apphd">
+      <span class="badge b-info" id="mHorizonBadge">불러오는 중</span>
+      <span class="badge b-nil" id="mReconStatusBadge">대조 파일 넣기 전</span>
+      <span class="sp"></span>
+      <button class="chip on" type="button" id="btnVatAlign" aria-pressed="true" title="ERP 입금액을 ÷1.1 해 세금계산서·손익계산서 공급가액과 같은 잣대로 어림합니다 — 입금 줄마다 부가세 포함 여부(deductions.vatIncluded)·증빙 종류(docType)를 보지 않은 어림입니다. 면세·영세율·실비 대납이 섞이면 틀립니다(세무대리인 확인)">🧾 부가세 ÷1.1 공급가 어림</button>
+      <button class="chip" type="button" id="btnMultiCine" title="첫 해 실적부터 전망 해까지 3D 카메라와 2D 훑기선으로 이어서 브리핑합니다">🎬 다년 시네마 전망 영상</button>
+    </div>
+    <div class="kpis" id="mKpis" style="padding-bottom:4px"></div>
+    <div class="viz-sec">
+      <div class="m-ctrlbar">
+        <div class="mseg" data-target="dualM" role="group" aria-label="다년 분석 3D·2D 보기 선택">
+          <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+          <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+          <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+        </div>
+        <span class="sep"></span>
+        <div class="chips" id="mLens" style="margin:0"><span class="lb">분석 각도</span></div>
+        <span class="sep"></span>
+        <div class="chips" id="mScen" style="margin:0"><span class="lb">장기전망</span></div>
+        <span style="flex:1"></span>
+        <div class="sync-pill"><span id="syncTxtM">🔗 연도 기둥이나 2D 곡선 점을 누르면 그 해 대조·수익구조가 함께 잡힙니다</span><button type="button" id="btnResetSyncM" style="display:none">전체 연도</button></div>
+      </div>
+      <p class="fc-note">⚠ 전망은 아래 세 손잡이로 계산한 <b>시나리오</b>입니다 — 예측이 아니며, 은행·투자 같은 외부 제출 자료로 쓰지 않습니다.</p>
+      <div class="drv-bar" aria-label="장기 전망 주요 변수 조절">
+        <div class="drv-card">
+          <div class="dh"><span>① 월정 자문·기금 순증률 (연간)</span><b id="lblDrvAdv">—</b></div>
+          <input type="range" id="rngDrvAdv" min="-5" max="25" step="1" value="0" aria-label="월정 자문 순증률">
+          <div class="ds"><span>줄어듦 -5%</span><span>그대로 0%</span><span>늘어남 +25%</span></div>
+        </div>
+        <div class="drv-card">
+          <div class="dh"><span>② 사건·컨설팅 수임 성장률 (연간)</span><b id="lblDrvCase">—</b></div>
+          <input type="range" id="rngDrvCase" min="-10" max="25" step="1" value="0" aria-label="사건 컨설팅 성장률">
+          <div class="ds"><span>줄어듦 -10%</span><span>그대로 0%</span><span>늘어남 +25%</span></div>
+        </div>
+        <div class="drv-card">
+          <div class="dh"><span>③ 원가·판관비율 (가정)</span><b id="lblDrvCost">—</b></div>
+          <input type="range" id="rngDrvCost" min="40" max="95" step="1" value="70" aria-label="원가 판관비율 가정">
+          <div class="ds"><span>40%</span><span>재무제표를 넣으면 실제 비율</span><span>95%</span></div>
+        </div>
+      </div>
+      <div class="dual-stage" id="dualM">
+        <div class="stage dark pane-3d" id="stM">
+          <canvas id="cvM" tabindex="0" aria-label="다년 매출 대조 및 다음 3개 해 시나리오 3D 무대"></canvas>
+          <span class="hint">3D 거울 무대 · 실선 기둥=확정 실적 · 반투명 기둥=시나리오</span>
+          <div class="smsg" id="smM"></div>
+          <div class="cine-hud" id="hudM"><div class="ct">🎬 다년 실적 · 세무 대조 · 시나리오 브리핑</div><div class="cm" id="hudMTxt"></div><div class="cbar"><i id="hudMBar" style="width:0%"></i></div></div>
+          <div class="ctl" data-for="cvM"></div>
+        </div>
+        <div class="stage dark pane-2d" id="stM2d">
+          <canvas id="cvM2d" tabindex="0" aria-label="다년 대조 곡선, 영업이익률 및 시나리오 폭 차트"></canvas>
+          <span class="hint">2D 곡선 · 부채꼴=시나리오 폭 · 점선=영업이익률(%)</span>
+          <span class="tag2d">2D 정밀 연동</span>
+          <div class="smsg" id="smM2d"></div>
+        </div>
+      </div>
+    </div>
+    <div class="m-below">
+      <div class="recon-hub">
+        <div class="drop-card" id="dropTax">
+          <div class="drop-hd"><span class="badge b-info">증빙 자료 ①</span><b>🧾 해마다 전자세금계산서 · 카드 · 현금영수증 합계 넣기</b></div>
+          <div class="drop-desc">홈택스에서 받은 연도별·월별 매출 세금계산서(공급가액) CSV 또는 JSON 을 끌어 놓거나 고르면 <b>이 브라우저 안에서만</b> 읽어 ERP 입금과 해마다 견줍니다. 서버에 올리거나 저장하지 않습니다 — 새로 고치면 사라집니다.</div>
+          <div class="drop-acts">
+            <label class="drop-lbl" for="inpTaxFile" tabindex="0" role="button">📂 세금계산서 CSV·JSON 불러오기</label>
+            <input type="file" id="inpTaxFile" accept=".csv,.json" style="display:none">
+            <select id="unitTax" aria-label="세금계산서 파일 금액 단위"><option value="auto">단위: 파일 첫 줄대로</option><option value="won">단위: 원</option><option value="man">단위: 만원</option></select>
+            <span class="drop-meta" id="metaTaxFile">아직 넣지 않음 — 표의 세금계산서 칸은 «—»</span>
+          </div>
+        </div>
+        <div class="drop-card" id="dropFs">
+          <div class="drop-hd"><span class="badge b-ok">결산 자료 ②</span><b>📑 해마다 재무제표 (손익계산서 · 기말 미수금) 넣기</b></div>
+          <div class="drop-desc">세무대리인 결산 손익계산서(매출액·인건비·판관비)와 기말 매출채권(미수금), 필요하면 인원 칸을 CSV·JSON 으로 넣으면 수익인식 시점 차이를 봅니다. 이 브라우저 안에서만 읽고 서버에 올리지 않습니다.</div>
+          <div class="drop-acts">
+            <label class="drop-lbl" for="inpFsFile" tabindex="0" role="button">📂 재무제표 CSV·JSON 불러오기</label>
+            <input type="file" id="inpFsFile" accept=".csv,.json" style="display:none">
+            <select id="unitFs" aria-label="재무제표 파일 금액 단위"><option value="auto">단위: 파일 첫 줄대로</option><option value="won">단위: 원</option><option value="man">단위: 만원</option></select>
+            <span class="drop-meta" id="metaFsFile">아직 넣지 않음 — 표의 재무제표 칸은 «—»</span>
+          </div>
+        </div>
+      </div>
+      <div class="preset-strip">
+        <span class="plb">🧾 넣은 파일:</span><span id="mFileSum" class="na">없음 — 이 화면 안에서만 보고, 새로 고치면 사라집니다</span>
+        <span style="flex:1"></span>
+        <button type="button" class="chip" id="btnClearFiles">넣은 파일 비우기</button>
+        <button type="button" class="chip" id="btnEditRecon" aria-pressed="false">✏️ 표에서 세금계산서·재무제표 숫자 직접 고치기</button>
+        <button type="button" class="chip" id="btnDlTemplateCsv" title="세금계산서·재무제표 숫자를 채워 바로 올릴 수 있는 연도별 CSV 양식을 내려받습니다(ERP 칸은 지금 집계로 채움)">📥 표준 업로드 양식 CSV 받기</button>
+      </div>
+      <div class="panel" id="mPanel">
+        <h3><span id="mTblTitle">연도별 대조표 (ERP 확정입금 ↔ 세금계산서 ↔ 재무제표 손익) 및 시나리오</span><span class="sp"></span><span class="badge b-info" id="mVatNotice">단위: 원</span></h3>
+        <div class="selbar" id="mSel"><span id="mSelN"></span><button type="button" data-act="focus">3D·2D에서 강조</button><button type="button" data-act="clear">고르기 풀기</button></div>
+        <div class="tw only-pc m-tw"><table class="t" id="mReconTbl"></table></div>
+        <div class="cards only-ph m-cards" id="mReconCards" style="padding:0"></div>
+        <details class="why3"><summary>왜 세 숫자가 다를 수 있나요?</summary><p>① ERP 입금액은 통장 입금일 기준(부가세·대납실비 포함 가능)이고, ② 세금계산서는 작성일자 공급가액 기준(12월 선발행 미수금 포함), ③ 재무제표(손익계산서)는 결산 조정(기간 귀속·카드/현금영수증 합산) 기준입니다. ☐ 로 연도를 골라도 아무것도 바뀌지 않습니다 — 「3D·2D에서 강조」를 눌러야 그 해만 진하게 보입니다. 판정(점검·차액주의)은 «기준 정하기»에서 대표가 정한 % 로만 칠합니다.</p></details>
+      </div>
+    </div>
+    <div class="src" id="mSrcLine">자료: 해마다 ERP 확정입금(계산 모듈 집계) · 이 브라우저에 넣은 세금계산서·재무제표(서버에 저장하지 않음 — 이 화면 안에서만 비교)</div>
+  </div>
+</section>
+
+<!-- ═════════ 프로그램 현황판 ═════════ -->
+<section class="view" id="v-board">
+  <div class="vh"><div class="L">▦</div><h2>프로그램 현황판</h2>
+    <p>앱마다 카드 한 장 · 서버가 한 시간마다 모은 건수·비율 · 노랑=주의 · 빨강=위험(대표 기준을 넘을 때만) · 파랑 테두리=기준 안 정함 · 회색=못 모음 · ↗ 는 그 앱을 새 탭으로</p></div>
+  <div class="bsum" id="bSum"></div>
+  <div class="chips" id="bRow"><span class="lb">포털 줄</span></div>
+  <div class="chips">
+    <button class="chip" type="button" id="bWarnOnly" aria-pressed="false">주의·위험만</button>
+    <button class="chip" type="button" id="bSortWarn" aria-pressed="false">주의 먼저 보기</button>
+    <button class="chip" type="button" id="bHideNa" aria-pressed="false" title="서버가 숫자를 모으지 못한 회색 카드를 접습니다">못 모음 숨기기</button>
+    <button class="chip" type="button" data-open-set="board" title="앱마다 «주의 신호» 숫자의 기준을 정합니다">⚙ 앱별 주의 기준 정하기</button>
+  </div>
+  <p class="bmsg" id="bMsg" role="status" aria-live="polite"></p>
+  <div class="board" id="board"></div>
+  <details class="tbl"><summary>표로 보기 (카드 숫자 그대로 · 집계 시각)</summary><div class="tw"><table class="t" id="boardTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">카드마다 숫자 셋, 뜻 있는 비율이 있는 앱은 막대 하나. 숫자는 서버가 한 시간마다 «건수·비율만» 모아 둔 것입니다. 노랑은 주의, 빨강은 위험(대표가 정한 기준을 넘었을 때만), 파랑 테두리는 기준을 아직 안 정한 카드, 회색은 숫자를 못 모은 앱입니다. ↗ 를 누르면 그 앱이 새 탭으로 열립니다 — 고치는 일은 늘 그 앱에서 합니다(여기서는 읽기만).</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>앱을 하나씩 열지 않고 «어디에 일이 쌓였나»를 한 장에서 봄</li><li>숫자는 서버가 «건수만» 모아 둔 것이라 가볍고, 원본(이름·금액·본문)은 데이터관리로 옮겨 오지 않음</li><li>포털 앱이 늘면 카드도 저절로 하나 더 — 포털 앱 목록과 같은 열쇠(key)로 묶음</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>숫자는 «집계 시각» 기준 — 앱 안의 지금 값과 최대 한 시간 어긋날 수 있음</li><li>브라우저 안에만 저장하는 앱·자기 자료가 없는 앱·준비 중인 앱은 회색 카드로 남음</li><li>뜻 있는 비율이 없는 앱은 막대를 그리지 않음</li><li>앱마다 «주의» 기준을 하나씩 정해야 색이 칠해짐</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ 연결 지도 ═════════ -->
+<section class="view" id="v-graph">
+  <div class="vh"><div class="L">🕸</div><h2>연결 지도</h2>
+    <p>업체·계약·사건·사람·입금이 어떻게 이어졌나 · 점 하나가 한 건, 선은 관계망에 «확정»된 연결 · 점을 누르면 옆에 연결 목록</p></div>
+  <div class="chips" id="gMode"><span class="lb">보기</span></div>
+  <div class="chips" id="gTypes"><span class="lb">종류</span></div>
+  <div class="gbar">
+    <input type="search" id="gFind" placeholder="찾기 — 업체 이름·번호, 사람 이름" aria-label="연결 지도에서 찾기">
+    <span class="chips" id="gDepth" style="margin:0"><span class="lb">걸음</span></span>
+    <button class="chip" type="button" id="gLabels" aria-pressed="false">이름 늘 보이기</button>
+  </div>
+  <div class="gfound" id="gFound" aria-label="찾은 것"></div>
+  <p class="bmsg" id="gMsg" role="status" aria-live="polite"></p>
+  <div class="gwrap">
+    <div class="stage dark" id="stG">
+      <canvas id="cvG" tabindex="0" aria-label="연결 지도. 빈 곳을 끌면 옮기고, 점을 끌면 그 점을 옮깁니다. 점을 누르면 오른쪽에 연결 목록이 나옵니다. 방향키로 옮기고 + - 로 확대합니다."></canvas>
+      <span class="hint">빈 곳을 끌어 옮기기 · 점을 끌어 자리 바꾸기 · 누른 뒤 휠 확대 · 점을 누르면 연결 목록</span>
+      <div class="smsg" id="smG"></div>
+      <div class="ctl" id="gCtl"></div>
+    </div>
+    <div class="panel gside" id="gSide"></div>
+  </div>
+  <details class="tbl"><summary>표로 보기 (지금 보이는 연결 — 화면읽기·인쇄용)</summary><div class="tw"><table class="t" id="gTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">점 하나가 한 건, 선은 관계망(온톨로지)에 «확정»된 연결입니다. 기본은 «업체 하나 중심»입니다. 점을 누르면 이웃만 진하게 보이고 오른쪽(폰에서는 아래)에 연결 목록이 나옵니다. «앱 지도»는 앱끼리 자료가 몇 건씩 이어졌는지 봅니다. 이름은 이 화면 안에서만 붙이고 어디에도 저장하지 않습니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>한 업체에 계약·사건·입금·문서·일정이 «덩어리»로 모인 모습이 바로 보임</li><li>사람(담당자)을 누르면 그 사람이 맡은 건이 한꺼번에 보여 업무 쏠림을 짐작할 수 있음</li><li>«앱 지도»로 어느 앱끼리 자료를 주고받는지, 아무 데도 안 이어진 앱이 무엇인지 보임</li><li>새로 만드는 자료가 아니라 이미 있는 관계망(ontology/v1)을 읽기만 함</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>실제 점은 수천 개라 «전체»는 실타래가 됨 → «업체 하나 중심»이 기본이고, «전체»는 종류를 거른 뒤에만 그림</li><li>관계망은 이알피 «온톨로지 진단»에서 관리자가 «관계망 올리기»를 눌러야 새로워짐 — 판 시각을 늘 적음</li><li>이름으로 짐작한 연결과 확정 전 후보는 일부러 뺐음 → «선이 없음 = 관계없음»이 아님</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ A 막대 숲 ═════════ -->
+<section class="view" id="v-a">
+  <div class="vh"><div class="L">A</div><h2>입금 막대 숲</h2>
+    <p>월 × 사람 × 금액 · 3D 막대와 2D 월별 누적·추세를 눌러서 함께 봅니다</p></div>
+  <div class="modebar">
+    <div class="mseg" data-target="dualA" role="group" aria-label="A안 3D·2D 보기 선택">
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+    </div>
+    <div class="sync-pill"><span id="syncTxtA">🔗 양쪽 막대 어디든 누르면 그 달·사람이 함께 강조됩니다</span></div>
+  </div>
+  <div class="dual-stage" id="dualA">
+    <div class="stage dark pane-3d">
+      <canvas id="cvA" tabindex="0" aria-label="A안 3D 막대 그래프"></canvas>
+      <span class="hint">3D · 끌어서 돌리기 · 막대를 누르면 2D 함께 고정</span>
+      <div class="smsg" id="smA"></div>
+      <div class="ctl" data-for="cvA"></div>
+    </div>
+    <div class="stage dark pane-2d">
+      <canvas id="cvA2d" tabindex="0" aria-label="A안 2D 월별 누적 막대 및 이동평균 차트"></canvas>
+      <span class="hint">2D · 사람별 누적 막대 + 3개월 이동평균 (눌러서 연동)</span>
+      <span class="tag2d">2D 연동</span>
+      <div class="smsg" id="smA2d"></div>
+    </div>
+  </div>
+  <div class="chips" id="aMetric"><span class="lb">높이</span></div>
+  <div class="chips" id="aPeople"><span class="lb">사람</span></div>
+  <details class="tbl"><summary>표로 보기 (3D 를 못 읽는 경우·인쇄용)</summary><div class="tw"><table class="t" id="aTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">3D 입체 막대와 2D 월별 누적·추세 차트를 나란히 두고 눌러서 함께 대조합니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>3D 로 사람·달 입체 분포를 보면서 2D 로 월별 합계·추세선을 정확히 읽음</li><li>높이를 입금액 ↔ 업무 건수로 바꾸면 «일은 많은데 입금은 적은 달»이 양쪽에 바로 보임</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>사람이 10명을 넘으면 3D 뒷줄이 가려질 수 있으나 오른쪽 2D 누적 막대가 보완함</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ B 사람 구슬 ═════════ -->
+<section class="view" id="v-b">
+  <div class="vh"><div class="L">B</div><h2>사람 구슬</h2>
+    <p>업무 × 입금 × 입금 처리 · 2D 사분면(가로=업무 · 세로=입금 · 바깥 호=입금 처리) · 직종마다 역할이 달라 순위를 매기지 않습니다</p></div>
+  <div class="modebar">
+    <div class="mseg" data-target="dualB" role="group" aria-label="B안 3D·2D 보기 선택">
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+    </div>
+    <div class="sync-pill"><span id="syncTxtB">🔗 구슬이나 2D 사분면 원을 누르면 두 화면에서 그 사람을 함께 따라갑니다</span></div>
+  </div>
+  <div class="dual-stage" id="dualB">
+    <div class="stage dark pane-3d">
+      <canvas id="cvB" tabindex="0" aria-label="B안 3D 구슬 그래프"></canvas>
+      <span class="hint">3D · 끌어서 돌리기 · 구슬을 누르면 2D 사분면 연동</span>
+      <div class="smsg" id="smB"></div>
+      <div class="ctl" data-for="cvB"></div>
+    </div>
+    <div class="stage dark pane-2d">
+      <canvas id="cvB2d" tabindex="0" aria-label="B안 2D 역할 균형 사분면 차트"></canvas>
+      <span class="hint">2D 사분면 · 평균 기준선 + 바깥 초록 호(입금 처리량)</span>
+      <span class="tag2d">2D 연동</span>
+      <div class="smsg" id="smB2d"></div>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="rng"><b id="bMonth" style="min-width:48px">—</b><input type="range" id="bRange" min="0" max="11" value="11" aria-label="달 고르기"></span>
+    <button class="chip" type="button" id="bPlay" aria-pressed="false">▶ 12개월 재생</button>
+    <button class="chip" type="button" id="bTrail" aria-pressed="false">자취 보기</button>
+  </div>
+  <details class="tbl"><summary>표로 보기 (고른 달)</summary><div class="tw"><table class="t" id="bTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽은 3축 구슬 공간, 오른쪽은 2D 역할 사분면(가로=업무, 세로=입금, 바깥 호=입금 처리)으로 함께 비교합니다. 직종마다 기본 역할이 달라 같은 잣대로 순위를 매기지 않습니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>3D 축이 셋이라 낯선 것을 오른쪽 2D 평균 사분면이 보완</li><li>12개월 재생 때 3D 구슬과 2D 원이 함께 움직이며 역할 이동 경로를 보여 줌</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>직종(노무사·직원)에 따라 기본 역할 축이 달라 같은 잣대로 단순 순위화하지 않도록 주의</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ C 업무량 산맥 ═════════ -->
+<section class="view" id="v-c">
+  <div class="vh"><div class="L">C</div><h2>업무량 산맥</h2>
+    <p>최근 26주 × 사람 · 3D 능선과 2D 주간 격자 · 기준을 정하기 전에는 노랑·빨강을 칠하지 않습니다</p></div>
+  <div class="modebar">
+    <div class="mseg" data-target="dualC" role="group" aria-label="C안 3D·2D 보기 선택">
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+    </div>
+    <div class="sync-pill"><span id="syncTxtC">🔗 2D 칸이나 3D 능선을 누르면 그 주·사람이 양쪽에서 함께 잡힙니다</span></div>
+  </div>
+  <div class="dual-stage" id="dualC">
+    <div class="stage dark pane-3d">
+      <canvas id="cvC" tabindex="0" aria-label="C안 3D 산맥 그래프"></canvas>
+      <span class="hint">3D · 부드러운 능선 · 누르면 2D 주간 칸 함께 표시</span>
+      <div class="smsg" id="smC"></div>
+      <div class="ctl" data-for="cvC"></div>
+    </div>
+    <div class="stage dark pane-2d">
+      <canvas id="cvC2d" tabindex="0" aria-label="C안 2D 26주 업무량 히트맵"></canvas>
+      <span class="hint">2D 히트맵 · 사람 × 26주 격자 (칸을 누르면 3D 연동)</span>
+      <span class="tag2d">2D 연동</span>
+      <div class="smsg" id="smC2d"></div>
+    </div>
+  </div>
+  <div class="chips" id="cMetric"><span class="lb">높이</span></div>
+  <div class="note" id="cNote"></div>
+  <details class="tbl"><summary>표로 보기 (사람 × 26주)</summary><div class="tw"><table class="t" id="cTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽 3D 산맥으로 흐름을, 오른쪽 2D 26주 격자로 주·사람별 숫자를 눌러 맞비교합니다. «많음·넘침»을 볼지는 대표 몫입니다 — 기준을 정하기 전에는 노랑·빨강을 칠하지 않습니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>3D 능선으로 이어지는 흐름을 보고, 2D 격자로 앞줄에 가려진 사람의 주별 숫자까지 확인</li><li>주 단위라 이번 주 업무 재배분 판단에 바로 쓸 수 있음</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>업무 기록을 빠뜨린 주는 낮게 보이므로 사람별 기록률을 반드시 함께 봐야 함</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ D 한 해 입금 고리 ═════════ -->
+<section class="view" id="v-d">
+  <div class="vh"><div class="L">D</div><h2>한 해 입금 고리</h2>
+    <p>12개월 × 입금 종류 · 3D 고리로 계절 흐름, 2D 누적 막대 + 업무 선으로 달별 차이</p></div>
+  <div class="modebar">
+    <div class="mseg" data-target="dualD" role="group" aria-label="D안 3D·2D 보기 선택">
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+    </div>
+    <div class="sync-pill"><span id="syncTxtD">🔗 어느 달의 입금 종류 층을 누르면 3D 고리와 2D 막대에서 함께 강조됩니다</span></div>
+  </div>
+  <div class="dual-stage" id="dualD">
+    <div class="stage dark pane-3d">
+      <canvas id="cvD" tabindex="0" aria-label="D안 3D 고리 그래프"></canvas>
+      <span class="hint">3D · 저절로 천천히 돌기 · 층을 누르면 2D 연동</span>
+      <div class="smsg" id="smD"></div>
+      <div class="ctl" data-for="cvD"></div>
+    </div>
+    <div class="stage dark pane-2d">
+      <canvas id="cvD2d" tabindex="0" aria-label="D안 2D 입금 종류별 누적 막대 및 수행업무 추세선"></canvas>
+      <span class="hint">2D 이중축 · 종류별 누적 입금(막대) + 수행업무(파란 선)</span>
+      <span class="tag2d">2D 연동</span>
+      <div class="smsg" id="smD2d"></div>
+    </div>
+  </div>
+  <div class="chips" id="dCats"><span class="lb">입금 종류</span></div>
+  <details class="tbl"><summary>표로 보기 (달 × 입금 종류)</summary><div class="tw"><table class="t" id="dTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽 3D 원형 탑으로 계절 순환을, 오른쪽 2D 누적 막대+업무 꺾은선으로 달별 높이 차이를 함께 봅니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>원형 배치(3D)의 계절 감각과 직교 막대(2D)의 이웃 달 비교를 한 화면에서</li><li>입금 탑과 업무 추세선을 겹쳐 «일한 만큼 입금이 따라왔는지» 바로 봄</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>사람별 구분은 A안·전체 배치와 짝지어 확인</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ E 업체 도시 ═════════ -->
+<section class="view" id="v-e">
+  <div class="vh"><div class="L">E</div><h2>업체 도시</h2>
+    <p>담당 구역 × 업체 · 2D 가로=업무 건수 · 세로=12개월 입금 · 노란 고리=자문료 미수 추정(이알피와 같은 규칙, 지난달까지)</p></div>
+  <div class="modebar">
+    <div class="mseg" data-target="dualE" role="group" aria-label="E안 3D·2D 보기 선택">
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
+    </div>
+    <div class="sync-pill"><span id="syncTxtE">🔗 건물이나 2D 업체 원을 누르면 미수·입금·업무가 양쪽에서 함께 잡힙니다</span></div>
+  </div>
+  <div class="dual-stage" id="dualE">
+    <div class="stage dark pane-3d">
+      <canvas id="cvE" tabindex="0" aria-label="E안 3D 업체 도시"></canvas>
+      <span class="hint">3D · 담당 구역별 건물 · 노란 옥상 불빛=자문료 미수 추정</span>
+      <div class="smsg" id="smE"></div>
+      <div class="ctl" data-for="cvE"></div>
+    </div>
+    <div class="stage dark pane-2d">
+      <canvas id="cvE2d" tabindex="0" aria-label="E안 2D 업체 입금·업무 포트폴리오 차트"></canvas>
+      <span class="hint">2D 포트폴리오 · 가로=업무 건수 · 세로=12개월 입금 · 노란 고리=미수</span>
+      <span class="tag2d">2D 연동</span>
+      <div class="smsg" id="smE2d"></div>
+    </div>
+  </div>
+  <div class="chips" id="eDist"><span class="lb">구역</span></div>
+  <div class="chips"><button class="chip" type="button" id="eMisu" aria-pressed="false">노란 지붕(미수)만 밝게</button></div>
+  <details class="tbl"><summary>표로 보기 (업체별)</summary><div class="tw"><table class="t" id="eTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽 3D 담당 구역 건물 숲과 오른쪽 2D 업체 분포(업무 건수 × 12개월 입금 · 노란 고리=자문료 미수 추정)를 눌러서 이어 봅니다. 미수는 이알피와 같은 규칙(erpAdvisoryDues)으로 지난달까지 셉니다.</p>
+  <div class="pc"><div class="p"><b>좋은 점</b><ul><li>2D 에서 «업무는 많은데 입금이 적은 업체»와 «미수 업체»를 찍어 3D 구역 위치까지 바로 확인</li><li>담당자별 수임 규모를 한눈에 견줌</li></ul></div>
+    <div class="m"><b>아쉬운 점</b><ul><li>미수는 매달 자문료를 걷는 업체만 셈 — 사건·컨설팅 잔금 미수는 아직 안 셈</li></ul></div></div>
+  </details>
+</section>
+
+<!-- ═════════ 잠금·채팅 ═════════ -->
+<section class="view" id="v-lock">
+  <div class="vh"><div class="L" style="background:var(--dgi)">🔒</div><h2>잠금·채팅</h2>
+    <p>대표 한 사람 · 이 컴퓨터 한 대 · 문은 세 겹(포털 타일 안 보임 · 대표 표지 확인 · 서버 규칙) + 채팅은 등록된 컴퓨터 확인이 한 겹 더</p></div>
+  <div class="lockgrid">
+    <div class="lk"><div class="cap">① 대표 계정 확인</div><div class="body"><div class="ctr">
+      <div class="ico">✅</div><h4>대표 표지와 같은 계정입니다</h4><p>로그인한 계정이 서버의 대표 표지(app_owner)와 같아서 열렸습니다.</p>
+      <div class="why">표지가 없거나·못 읽거나·다르면 자료를 한 줄도 불러오기 전에 멈춥니다(«모르면 닫는다»). 사번·이름·관리자 표시(isAdmin)로 열지 않습니다 — 관리자대행도 통과하지 못합니다.</div></div></div></div>
+    <div class="lk"><div class="cap">② 이 기기 — 채팅은 등록된 컴퓨터에서만</div><div class="body">
+      <div class="mini"><div class="mk"><div>이번 달 입금<b id="lkInc">—</b></div><div>수행업무<b id="lkTask">—</b></div></div></div>
+      <div class="mini" style="text-align:center"><div style="font-size:26px" id="devIco">🖥</div><b id="devTitle">기기 확인 중</b>
+        <p style="margin:4px 0 0;font-size:12.5px;color:var(--sub)" id="devMsg"></p>
+        <div class="acts">
+          <button class="btn" type="button" id="btnDevReq">이 컴퓨터를 채팅 기기로 등록 요청</button>
+          <button class="btn g" type="button" id="btnDevCheck">다시 확인</button>
+        </div></div>
+      <div class="why" style="margin-top:10px;font-size:12px;color:var(--sub)">숫자·3D 는 대표 계정이면 어느 기기에서나 볼 수 있습니다(계획서 결정 ② «채팅만 이 PC»). 기기 열쇠는 이 브라우저 안에서 «꺼낼 수 없는 열쇠»로 만들어 둡니다.</div></div></div>
+    <div class="lk"><div class="cap">③ 이 컴퓨터를 채팅 기기로 등록 (처음 한 번)</div><div class="body">
+      <ol class="steps" id="devSteps">
+        <li id="st1" class="done">대표 계정으로 로그인 (포털 그대로)</li>
+        <li id="st2">「이 컴퓨터를 채팅 기기로 등록 요청」 누름 → 이 브라우저 안에 «꺼낼 수 없는 기기 열쇠»를 만들고 지문을 띄움 <span id="devFpWrap" hidden><br><span class="fp" id="devFp"></span></span></li>
+        <li id="st3"><b>이 PC 의 터미널</b>에서 승인: <code id="devCmd">node scripts/datahub-device.js --approve &lt;지문&gt; --apply</code> — 웹 로그인과 다른 열쇠(firebase 관리자 로그인)라 웹 세션을 훔쳐도 승인 못 함</li>
+        <li id="st4">지문이 같으면 «사용 중» · 등록 기기는 <b>1대</b> — 새로 승인하면 옛 기기는 저절로 풀림 · 요청은 10분 지나면 버림</li></ol>
+      <p style="font-size:12.5px;color:var(--sub);margin:6px 0 0">확인번호·푸시 알림은 쓰지 않습니다 — 알림 받는 자리는 웹 세션이 바꿀 수 있어, 세션을 훔친 사람이 번호를 가로챌 수 있기 때문입니다.</p>
+      <div class="acts" style="justify-content:flex-start"><button class="btn g" type="button" id="btnDevForget" title="이 브라우저에 둔 기기 열쇠와 채팅 기록을 지웁니다 — 서버 등록은 터미널(revoke)로 풉니다">이 브라우저의 기기 열쇠·채팅 기록 지우기</button></div></div></div>
+    <div class="lk"><div class="cap">④ 15분 자리를 비웠을 때</div><div class="body"><div class="ctr">
+      <div class="ico" id="idleIco">⏸</div><h4 id="idleTitle">채팅 잠김 상태</h4><p id="idleMsg">15분 동안 손대지 않으면 채팅을 가립니다. 앱을 새로 열었을 때도 가린 채로 시작합니다.</p>
+      <form class="reauth" id="reauthForm2" autocomplete="on">
+        <input type="password" id="reauthPw2" autocomplete="current-password" placeholder="대표 비밀번호" aria-label="대표 비밀번호 다시 넣기">
+        <button class="btn" type="submit">비밀번호 다시 넣고 열기</button>
+        <p class="err" id="reauthErr2" role="alert"></p>
+      </form>
+      <div class="why">다시 열 때는 대표 비밀번호를 한 번 더 넣습니다 — 자리를 비운 사이 이 PC 앞에 앉은 다른 사람을 가르기 위해서입니다. 비밀번호는 칸에서 바로 보내고 어디에도 남기지 않습니다. 가림막을 개발자도구로 걷어 내도, 서버가 «마지막 질문 뒤 15분이 넘었는데 방금 재인증하지 않은 요청»을 거절합니다. 질문은 <b>할 때마다</b> 서버가 낸 일회용 문제에 이 컴퓨터의 기기 열쇠로 서명해 보냅니다(보낼 본문 전체가 서명 안에 들어감). 자리를 뜰 때는 윈도우 잠금(Win+L)을 권합니다.</div></div></div></div>
+  </div>
+  <div class="flow">
+    <div><b>1 · 대표 계정인가</b>로그인 uid = 대표 표지(app_owner — 화면에서 아무도 못 씀). 관리자대행도 통과 못 함</div>
+    <div><b>2 · 이 컴퓨터인가</b>질문마다 서버가 낸 일회용 문제(한 번·2분)에 터미널로 승인된 기기 열쇠로 서명했는가</div>
+    <div><b>3 · 전용 함수만</b>데이터관리 전용 서버 함수가 1·2·자리 비움·실명 없음을 매번 확인 · 범용 AI 창구는 쓰지 않음</div>
+    <div><b>4 · 가명으로 · 이 PC 에만</b>사람·업체는 가명으로 보내고 · 채팅 기록은 이 브라우저 안에만 저장</div>
+  </div>
+</section>
+
+</div>
+</div>
+</div>
+
+<!-- 포함·제외 검토 창 -->
+<div class="audit-backdrop" id="auditModal" role="dialog" aria-modal="true" aria-labelledby="auditModalTitle">
+  <div class="audit-box">
+    <div class="audit-hd"><h3 id="auditModalTitle">📋 월별 데이터 포함 · 제외 검토</h3><button type="button" class="btn g" id="btnCloseAudit">닫기 ✕</button></div>
+    <div class="audit-grid">
+      <div class="audit-card add"><h4>🔢 이번 집계에서 읽고 뺀 줄 (계산 모듈 집계 그대로)</h4><div class="qgrid" id="auditQ"></div></div>
+      <div class="audit-card inc">
+        <h4>✅ 넣는 것</h4>
+        <ul>
+          <li><b>확정 입금 원장 한 곳(<code>data/finance_income</code>)</b>: 입금일 기준 월별 확정액, 입금 종류별(자문·사건·컨설팅·기금·기타) 비중, 카드 수수료 차감 전·후 및 귀속월 대조</li>
+          <li><b>사번(<code>sid</code>)으로만 잇는 사람별 기여·처리</b>: <code>perfShares</code> 분배 비율 + 성과 몫 없는 입금은 업체 주담당(<code>managerMain</code>) + 입금 확정 처리(<code>confirmedBy</code>) 건수</li>
+          <li><b>주·월별 수행업무 + 기록률(<code>work_erp/logs</code>)</b>: 사람별 기록 건수와 기록률(%) — 기록 본문은 읽어도 화면에 그리지 않고 어디로도 보내지 않음</li>
+          <li><b>현황판 «건수·비율»(<code>datahub_board</code>)과 관계망 확정 연결(<code>ontology/v1</code>)</b>: 서버가 모아 둔 숫자와 올라온 관계망 판만 읽음</li>
+        </ul>
+      </div>
+      <div class="audit-card exc">
+        <h4>🚫 빼는 것</h4>
+        <ul>
+          <li><b>두 번 세는 금액</b>: 컨설팅정산(<code>settle/runs</code>), 사건·계약 쪽 금액 사본, 성과조정(<code>perf-adjust</code>), 되돌림(<code>undoneDate</code>)·휴지통(<code>_deleted</code>), 과거기록(<code>confirmed:false</code>)·개인수익</li>
+          <li><b>사번 없는 이름 맞추기</b>: 동명이인·오타 위험이 있는 이름 칸으로는 사람을 잇지 않음</li>
+          <li><b>근태 시간을 확정치처럼 쓰기</b>: C안은 업무 기록 건수만 — 근태 자료는 아직 잇지 않음</li>
+          <li><b>민감 원문·실명</b>: 주민번호·계좌·진술·메일 본문·인증키는 읽지 않고, AI 에는 가명만 보냄</li>
+          <li><b>자동 순위·낙인 문구·자동 경고 메일</b>: 사람 비교는 판단 재료로만</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 기준 정하기 창 — 대표가 정한 값만 노랑·빨강으로 칠한다(계획서 결정 ④⑩) -->
+<div class="audit-backdrop" id="setModal" role="dialog" aria-modal="true" aria-labelledby="setModalTitle">
+  <div class="audit-box">
+    <div class="audit-hd"><h3 id="setModalTitle">⚙ 기준 정하기 — 대표가 정한 값으로만 색을 칠합니다</h3><button type="button" class="btn g" id="btnCloseSet">닫기 ✕</button></div>
+    <p style="margin:0 0 6px;font-size:12.5px;color:var(--sub)">비워 두면 그 기준은 «정하지 않음» — 숫자만 보이고 노랑·빨강을 칠하지 않습니다. 저장하면 대표 전용 자리(datahub/{uid}/settings)에만 남습니다.</p>
+    <div class="setsec">C안 업무량 (주당 업무 기록 건수)</div>
+    <div class="setgrid">
+      <label class="setrow"><span>«많음»(노랑) 기준</span><input type="number" min="0" step="1" inputmode="numeric" id="setCWarn"><em>건/주</em></label>
+      <label class="setrow"><span>«넘침»(빨강) 기준</span><input type="number" min="0" step="1" inputmode="numeric" id="setCOver"><em>건/주</em></label>
+      <label class="setrow"><span title="기록률 «주의» 기준 — 이보다 낮으면 노랑">기록률 «주의» (이보다 낮으면)</span><input type="number" min="0" max="100" step="1" inputmode="numeric" id="setRecWarn"><em>%</em></label>
+      <label class="setrow"><span>A안 달 입금 기준선</span><input type="number" min="0" step="10" inputmode="numeric" id="setAGoal"><em>만원</em></label>
+    </div>
+    <div class="setsec">다년 대조 판정 (ERP ↔ 재무제표 차이)</div>
+    <div class="setgrid">
+      <label class="setrow"><span title="«점검»(노랑) — ERP↔재무제표 차이가 이 % 이상">«점검»(노랑) 차이</span><input type="number" min="0" step="0.1" inputmode="decimal" id="setReconWarn"><em>%</em></label>
+      <label class="setrow"><span title="«차액주의»(빨강) — ERP↔재무제표 차이가 이 % 이상">«차액주의»(빨강) 차이</span><input type="number" min="0" step="0.1" inputmode="decimal" id="setReconBad"><em>%</em></label>
+    </div>
+    <div class="setsec">장기 전망 기본 손잡이 (시나리오 시작값)</div>
+    <div class="setgrid">
+      <label class="setrow"><span>월정 자문·기금 순증률</span><input type="number" min="-5" max="25" step="1" inputmode="numeric" id="setBAdv"><em>%/년</em></label>
+      <label class="setrow"><span>사건·컨설팅 성장률</span><input type="number" min="-10" max="25" step="1" inputmode="numeric" id="setBCase"><em>%/년</em></label>
+      <label class="setrow"><span>원가·판관비율</span><input type="number" min="40" max="95" step="1" inputmode="numeric" id="setBCost"><em>%</em></label>
+    </div>
+    <div class="setsec" id="setBoardSec">현황판 앱별 «주의 신호»(세 번째 숫자) 기준</div>
+    <div class="setgrid" id="setBoard"></div>
+    <div class="setacts">
+      <button type="button" class="btn g" id="btnSetClear">모두 비우기</button>
+      <button type="button" class="btn" id="btnSetSave">저장</button>
+    </div>
+    <p class="bmsg" id="setMsg" role="status" aria-live="polite" style="margin-top:8px"></p>
+  </div>
+</div>
+
+<div class="toast-msg" id="toastMsg" role="status" aria-live="polite"></div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- data-mode="observe" 는 관문 탑재 검사용 — datahub 는 유예 목록 밖이라 실제로는 강제(enforce)로 돈다 -->
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-active.js?v=2"></script>
+<script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-back.js?v=5"></script>
+<script>
+try{
+  PuBack.guard(function(){
+    var ids=['setModal','auditModal'];
+    for(var i=0;i<ids.length;i++){ var m=document.getElementById(ids[i]); if(m && m.classList.contains('on')){ if(window.PuDatahubView) PuDatahubView.closeModal(ids[i]); else m.classList.remove('on'); return true; } }
+    return false;
+  });
+}catch(e){}
+</script>
+<script src="js/pu-datahub-calc.js?v=1"></script>
+<script src="js/pu-3d-lite.js?v=1"></script>
+<script src="js/pu-datahub-view.js?v=2"></script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+(function(){
+  function stop(why){ document.getElementById('boot').hidden=true; document.getElementById('lock').hidden=false; document.getElementById('lockWhy').textContent=why; }
+  if(location.protocol==='file:') stop('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요');
+  else if(typeof firebase==='undefined') stop('인터넷 연결이 필요합니다(파이어베이스를 싣지 못했습니다)');
+  else if(!window.PuDatahubView || !window.PuDatahubCalc || !window.Pu3DLite) stop('화면 파일을 다 싣지 못했습니다 — 새로 고쳐 주세요');
+  else {
+    if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+    PuDatahubView.boot(firebase);
+    /* 세션이 없으면 공용 로그아웃 화면(포털과 같은 자물쇠) — 말없이 포털로 튕기지 않는다 */
+    firebase.auth().onAuthStateChanged(function(u){ if(!u && window.PuGate) PuGate.show(); });
+  }
+})();
+</script>
+</body></html>
