@@ -8,6 +8,9 @@ const 오늘 = new Date();
 const 날 = (n) => { const d = new Date(오늘.getTime() + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 module.exports = {
+  /* 📋 «내 업무» 첫 안내(2026-11-22)는 기본 화면에선 «이미 봤음»으로 둔다 — 홈 화면 잰값이 안내 때문에 흔들리지 않게.
+     안내가 열린 모습은 아래 화면 'mywork-tip' 에서 잰다. */
+  localStorage: { 'pu_mywork_tip_ok:pa-uid-1': '1' },
   data: {
     work_erp: {
       mysum: {
@@ -42,6 +45,17 @@ module.exports = {
           if (tile) tile.click();
         });
         await page.waitForTimeout(350);
+      }
+    },
+    {
+      /* 📋 로그인하면 «내 업무» 단추 아래 뜨는 첫 안내 — 화면 안에 들어오는지·단추를 가리키는지 */
+      name: 'mywork-tip',
+      async run(page) {
+        /* 앞 화면(orch-popup)이 연 창을 가린다 — 화면들은 한 장에서 차례로 돈다 */
+        await page.evaluate(() => { const m = document.getElementById('orchModal'); if (m) m.hidden = true; });
+        await page.evaluate(() => window.portalMyWorkTip && window.portalMyWorkTip(true));
+        await page.waitForFunction(() => !!document.getElementById('mwTip'), null, { timeout: 5000 });
+        await page.waitForTimeout(400);
       }
     }
   ]
