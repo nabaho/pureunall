@@ -5928,3 +5928,138 @@ test('㉘ 음성인식 글자변환 대기/실시간 받아쓰기 분리 · 무�
 
   App.setAuthUser(null);
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * ㉙ 로그인 계정별 100% 완전 격리 — 타 직원의 수집 판례·사건·업로드·알림·검색기록 원천 차단 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('㉙ 계정별 100% 완전 격리 — 타 계정 수집 판례·업로드 사건·알림·공유행 원천 차단 및 본인 전용 조회', async () => {
+  const ctx = {
+    console, URL, URLSearchParams,
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    fetch: async (url, init) => {
+      if (String(url).includes('pboxApi')) {
+        const body = JSON.parse((init && init.body) || '{}');
+        if (body.action === 'live_search') {
+          return {
+            ok: true, status: 200,
+            json: async () => ({
+              ok: true,
+              docs: [{
+                id: 'live-userA-only-1',
+                docType: 'prec_lower',
+                court: '서울중앙지방법원',
+                caseNo: '2026가합77701',
+                decisionDate: '2026-06-01',
+                title: 'A노무사가 검색수집한 특정 사건 하급심 판결',
+                body: '이 하급심 판결문은 A노무사가 로그인하여 직접 검색·수집한 자료이므로 B노무사 계정에서는 절대 검색되어서는 안 됩니다.'
+              }]
+            })
+          };
+        }
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    }
+  };
+  ctx.window = {
+    localStorage: ctx.localStorage,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: ctx.PuPBoxLawIndex,
+    fetch: ctx.fetch,
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  const Store = ctx.window.PuPBoxStore;
+
+  /* 1) 사용자 A 로그인 → 실시간 수집 + 개인 문서 적재 + 알림 + 프로젝트 + 작업 생성 */
+  await Store.init('staff-A');
+  await Store.liveSearchAndCollect({
+    query: '부당해고 서면통지',
+    auth: { currentUser: { uid: 'staff-A', getIdToken: async () => 'tok-A' } }
+  });
+  Store.addDocuments([{
+    id: 'upload-staffA-1',
+    docType: 'internal_case',
+    court: '서울지방노동위원회',
+    caseNo: '2026부해8888',
+    decisionDate: '2026-07-01',
+    title: 'A노무사 비공개 의뢰인 사건',
+    body: 'A노무사 담당 의뢰인 사건 상세 검토 본문입니다. 다른 직원에게 절대 노출되면 안 됩니다.'
+  }], { shareConfirmed: false });
+  Store.addAlert({ kind: 'ingest', title: 'A노무사 전용 비공개 사건 적재 완료', detail: 'A 전용' });
+  Store.saveProject({ name: 'A노무사 전용 의뢰인 프로젝트' });
+  Store.saveThread({ title: 'A노무사 전용 자문 작업', mode: 'review', answer: 'A 전용 자문 내용' });
+
+  /* 외부 공유 경로에 타 직원 소유 문서가 섞여 들어오더라도 차단되고, 공식 자동동기화(system_sync) 문서는 정상 유지되는지 시뮬레이션 */
+  Store.addDocuments([{
+    id: 'foreign-leaked-doc',
+    docType: 'prec_lower',
+    ownerUid: 'staff-A',
+    ingestedBy: 'staff-A',
+    court: '부산지방법원',
+    caseNo: '2026가단55555',
+    decisionDate: '2026-05-01',
+    title: 'A노무사 소유 표식 판결',
+    body: '타 직원(staff-A) 소유 표식이 붙은 문서는 다른 직원(staff-B)의 publicDocs 경로로 유입되더라도 검색에서 완전 차단되어야 합니다.'
+  }, {
+    id: 'official-system-sync-doc',
+    docType: 'prec_sc',
+    ingestedBy: 'system_sync',
+    court: '대법원',
+    caseNo: '2025다44444',
+    decisionDate: '2025-12-15',
+    title: '공식 일일 자동동기화 대법원 판결',
+    body: '서버 공식 자동동기화(system_sync)로 적재된 공공 대법원 판례는 모든 직원 계정에서 정상 검색되어야 합니다.'
+  }], { scope: 'public', shareConfirmed: false });
+
+  assert.ok(Store.getDocs().some((d) => d.caseNo === '2026가합77701'), 'A노무사 본인 계정에서는 자신이 실시간 수집한 판결이 정상 조회되어야 합니다');
+  assert.ok(Store.getDocs().some((d) => d.caseNo === '2026부해8888'), 'A노무사 본인 계정에서는 자신이 등록한 사건이 정상 조회되어야 합니다');
+  assert.ok(Store.getDocs().some((d) => d.caseNo === '2025다44444'), '공식 자동동기화(system_sync) 대법원 판례는 정상 조회되어야 합니다');
+  assert.ok(Store.getAlerts().some((a) => a.title.includes('A노무사 전용')), 'A노무사 본인 계정에서는 본인 알림이 보여야 합니다');
+
+  /* 2) 사용자 B 로그인 → A노무사의 실시간 수집 판결·업로드 사건·소유 표식 문서·알림·프로젝트·작업이 0건이어야 함 */
+  await Store.init('staff-B');
+  const bDocs = Store.getDocs();
+  assert.ok(!bDocs.some((d) => d.caseNo === '2026가합77701'), 'A노무사가 실시간 검색·수집한 판결이 B노무사 계정에서 검색되면 안 됩니다');
+  assert.ok(!bDocs.some((d) => d.caseNo === '2026부해8888'), 'A노무사의 비공개 사건이 B노무사 계정에서 검색되면 안 됩니다');
+  assert.ok(!bDocs.some((d) => d.caseNo === '2026가단55555'), '타 직원(staff-A) 소유 표식이 있는 문서는 publicDocs에 있더라도 B노무사 검색에서 원천 차단되어야 합니다');
+  assert.ok(bDocs.some((d) => d.caseNo === '2025다44444'), '공식 자동동기화(system_sync) 대법원 판례는 B노무사 계정에서도 정상 조회되어야 합니다');
+  assert.ok(!Store.getAlerts().some((a) => a.title.includes('A노무사 전용')), 'A노무사의 활동 알림이 B노무사 계정에 노출되면 안 됩니다');
+  assert.equal(Store.getProjects().length, 0, 'B노무사 계정에 A노무사의 프로젝트가 보이면 안 됩니다');
+  assert.equal(Store.getThreads().length, 0, 'B노무사 계정에 A노무사의 작업 이력이 보이면 안 됩니다');
+  assert.ok(bDocs.some((d) => d.caseNo === '2020다247190'), '국가 공식 기본 판례(SEED_DOCS)는 모든 계정에서 정상 조회되어야 합니다');
+
+  /* 3) 서버 pullSharedDocs 단계에서도 타 직원(staff-A) 소유 문서가 네트워크 응답에서 원천 제외되는지 검증 */
+  const mockSupaRows = [
+    { id: 'k-sys', canonical_key: 'k-sys', doc_type: 'prec_sc', case_no: '2025다44444', title: '공식판례', body: '공식 자동동기화 대법원 판례 본문입니다. 충분히 긴 원문입니다.', ingested_by: 'system_sync' },
+    { id: 'k-uA', canonical_key: 'k-uA', doc_type: 'internal_case', case_no: '2026부해8888', title: 'A전용사건', body: 'A직원 전용 비공개 사건 원문입니다. B에게 절대 내려가면 안 됩니다.', ingested_by: 'staff-A' }
+  ];
+  const mockSupaFetch = async (url) => {
+    if (String(url).includes('deleted_at=not.is.null')) return { ok: true, status: 200, json: async () => [] };
+    return { ok: true, status: 200, json: async () => mockSupaRows };
+  };
+  const srvForB = await PBoxSync.pullSharedDocs(
+    { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'mock-svc-key' },
+    mockSupaFetch, 50, '', '', null, 0, 'staff-B'
+  );
+  assert.ok(srvForB.docs.some((d) => d.caseNo === '2025다44444'), '서버 pull 응답에 공식 자동동기화(system_sync) 판례는 포함되어야 합니다');
+  assert.ok(!srvForB.docs.some((d) => d.caseNo === '2026부해8888'), '서버 pull 응답 단계에서 타 직원(staff-A) 문서는 B노무사에게 전송 자체를 차단해야 합니다');
+
+  /* staffUid가 비어 있거나 guest여도 Fail-Closed로 타 직원 문서 차단 검증 */
+  const srvForGuest = await PBoxSync.pullSharedDocs(
+    { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'mock-svc-key' },
+    mockSupaFetch, 50, '', '', null, 0, ''
+  );
+  assert.ok(!srvForGuest.docs.some((d) => d.caseNo === '2026부해8888'), '빈 staffUid(비로그인) 요청에서도 타 직원 문서는 Fail-Closed로 차단되어야 합니다');
+
+  /* 4) 다시 A노무사로 로그인 시 본인 자료는 그대로 복원 */
+  await Store.init('staff-A');
+  assert.ok(Store.getDocs().some((d) => d.caseNo === '2026가합77701'), 'A노무사 재로그인 시 본인이 수집한 판결이 복원되어야 합니다');
+  assert.ok(Store.getDocs().some((d) => d.caseNo === '2026부해8888'), 'A노무사 재로그인 시 본인 사건이 복원되어야 합니다');
+  assert.ok(Store.getAlerts().some((a) => a.title.includes('A노무사 전용')), 'A노무사 재로그인 시 본인 알림이 복원되어야 합니다');
+});
