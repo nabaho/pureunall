@@ -236,9 +236,7 @@ test('화면 — 한눈에 왼쪽 종류 대시보드·자료함 두 덩어리·
   const html = fs.readFileSync(path.join(ROOT, 'pu-edulib.html'), 'utf8');
   const app = fs.readFileSync(path.join(ROOT, 'js/pu-edulib-app.js'), 'utf8');
   const dg = html.slice(html.indexOf('class="dgrid"'), html.indexOf('id="pane-list"'));
-  assert.ok(dg.indexOf('id="cats"') > 0 && dg.indexOf('id="mx"') > dg.indexOf('id="cats"'), '왼쪽 종류 대시보드, 오른쪽 종류 × 연도');
-  assert.match(html, /\.dgrid\{display:grid;grid-template-columns:minmax\(0,\d+px\) minmax\(0,1fr\)/, 'PC 는 두 칸');
-  assert.match(html, /@media \(max-width:\d+px\)\{\s*\.dgrid\{grid-template-columns:minmax\(0,1fr\)\}/, '좁으면 한 칸으로 쌓는다');
+  assert.ok(dg.indexOf('id="cats"') > 0 && dg.indexOf('id="mx"') > dg.indexOf('id="cats"'), '종류 카드(두 덩어리) 다음 종류 × 연도');
   const dash = app.slice(app.indexOf('function drawDash'), app.indexOf('function drawMatrix'));
   assert.match(dash, /K\.splitLegal\(d\.cats\)/, '한눈에 카드는 공용 잣대로 나눈다');
   assert.match(dash, /data-legal="' \+ s\.key/, '덩어리마다 «자료함에서 보기»');
@@ -252,6 +250,43 @@ test('화면 — 한눈에 왼쪽 종류 대시보드·자료함 두 덩어리·
   assert.ok(/value="legal"/.test(sel) && /value="other"/.test(sel), '거르개: 법정교육 자료 / 법정교육 외 자료');
   assert.match(app, /F\.legal = \$\('fLegal'\)\.value/);
   assert.doesNotMatch(app, /\$\('fLegal'\)\.checked/, '예전 확인란 길이 남지 않는다');
+});
+
+test('왼쪽 메뉴 — 이알피 왼쪽 메뉴와 같은 모양값 · PC 에만 · 법정/법정 외 두 묶음 · 누르면 자료함에서 그것만', () => {
+  const fs = require('node:fs');
+  const html = fs.readFileSync(path.join(ROOT, 'pu-edulib.html'), 'utf8');
+  const app = fs.readFileSync(path.join(ROOT, 'js/pu-edulib-app.js'), 'utf8');
+  const erp = fs.readFileSync(path.join(ROOT, 'css/pu-erp.css'), 'utf8');
+  /* 모양값은 «이알피 파일에서» 읽어 견준다(값을 여기 박지 않는다) — 이알피가 바뀌면 여기도 함께 걸린다 */
+  const ruleOf = (src, sel) => { const m = src.match(new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}')); return m ? m[1] : ''; };
+  const colorOf = (rule, prop) => { const m = rule.match(new RegExp('(?:^|;|\\s)' + prop + '\\s*:\\s*(#[0-9a-fA-F]{3,8})')); return m ? m[1].toLowerCase() : ''; };
+  const sbBlock = html.slice(html.indexOf('/* ══ 왼쪽 메뉴'), html.indexOf('<body'));
+  [['.sb', 'background'], ['.sb-menu-item.active', 'background'], ['.sb-grp-h .name', 'color'], ['.sb-grp-h .count', 'background']].forEach(([sel, prop]) => {
+    const want = colorOf(ruleOf(erp, sel), prop);
+    assert.ok(want, '이알피에서 못 읽음: ' + sel + ' ' + prop);
+    assert.ok(sbBlock.toLowerCase().indexOf(want) >= 0, '이알피 왼쪽 메뉴와 같은 색이어야 합니다: ' + sel + ' ' + prop + ' ' + want);
+  });
+  /* PC 에만 — 폰은 한눈에 카드가 같은 일을 한다(폰 구간에서만 바꾼다) */
+  assert.match(sbBlock, /\.sb\{display:none\}/);
+  assert.match(sbBlock, /@media \(min-width:769px\)\{\s*body\.has-sb\{padding-left:\d+px\}\s*\.sb\{display:flex/);
+  assert.match(html, /<body class="[^"]*\bhas-sb\b/);
+  assert.ok(html.indexOf('id="sbNav"') > 0 && html.indexOf('id="sbName"') > 0);
+  /* 그리기 — 같은 잣대(splitLegal) · 거르개가 바뀔 때도 다시 그린다 */
+  const sb = app.slice(app.indexOf('function drawSb('), app.indexOf('function sbUser('));
+  assert.match(sb, /K\.splitLegal\(d\.cats\)/);
+  assert.ok(sb.indexOf('data-sb="dash"') > 0 && sb.indexOf('data-sb="all"') > 0 && sb.indexOf('data-sbcat=') > 0 && sb.indexOf('data-sblegal=') > 0 && sb.indexOf('data-sbfold=') > 0);
+  assert.ok(sb.indexOf('data-catnew') > 0 && sb.indexOf('data-catedit') > 0, '새 종류 더하기·사람이 더한 종류 고치기도 메뉴에서');
+  assert.match(sb, /aria-expanded=/, '접기 단추는 펼침 상태를 말한다');
+  assert.match(sb, /title="' \+ esc\(tip\)/, '카드에 있던 최근·원본·검토·용량·근거는 줄마다 title 에');
+  const draw = app.slice(app.indexOf('function draw()'), app.indexOf('function drawSb('));
+  assert.match(draw, /drawSb\(\);/);
+  const dl = app.slice(app.indexOf('function drawList()'), app.indexOf('function drawList()') + 200);
+  assert.match(dl, /drawSb\(\);/);
+  /* 누르기 — 종류는 F.cat, 묶음은 F.legal, 접기는 이 브라우저에만 기억 */
+  const wire = app.slice(app.indexOf("$('sb').addEventListener('click'"), app.indexOf("$('cats').addEventListener('click'"));
+  assert.match(wire, /resetFilters\(\);[\s\S]*F\.cat = b\.getAttribute\('data-sbcat'\)[\s\S]*F\.legal = b\.getAttribute\('data-sblegal'\)[\s\S]*setTab\('list'\)/);
+  assert.match(wire, /lsSet\('sbFold'/);
+  assert.match(app, /PuWhoami\.onChange\(function \(\) \{ sbUser\(\); \}\)/, '이름이 늦게 와도 메뉴 위 이름을 다시 쓴다');
 });
 
 test('화면 — 카드 대시보드·표 보기·＋ 새 강의 종류·메일 자동 정리 칸이 이어져 있다', () => {

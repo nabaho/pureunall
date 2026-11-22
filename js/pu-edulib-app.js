@@ -89,6 +89,54 @@
     else if (TAB === 'list') drawList();
     else if (TAB === 'add') drawStage();
     else if (TAB === 'mail') { drawMail(); drawSweep(); }
+    drawSb();
+  }
+
+  /* ───────── 왼쪽 메뉴(PC) — 이알피 왼쪽 메뉴와 같은 모양 (대표 지시 2026-11-22 「대시보드 캡쳐처럼 만들어라」) ─────────
+     한눈에 · 전체 자료 · ⚖ 법정교육 자료 ▾ · 📘 법정교육 외 자료 ▾ · ＋ 새 강의 종류.
+     ★ 나누는 잣대는 한눈에·자료함과 같은 K.splitLegal(종류의 «법정» 표시 하나). 숫자는 지운 것(_deleted)을 세지 않는다(K.dashboard).
+     ★ 종류를 누르면 자료함에서 그 종류만, 묶음 이름을 누르면 그 묶음만(F.legal), ▼/▶ 는 접기(이 브라우저에만 기억).
+     ★ 지금 보고 있는 자리는 파란 칸(.active) — 한눈에 / 전체 자료 / 그 종류 / 그 묶음(머리줄 .on).
+     ★ 메뉴다(사람이 넣고 고치는 자료 목록이 아니다) — ☐·№ 칸은 두지 않는다. 카드에 있던 최근·원본·검토·용량·근거는 줄마다 title 에 */
+  var SB_ICON = { sexual: '🚫', disability: '♿', privacy: '🔒', safety: '⛑️', pension: '💰', bullying: '🤝', youth: '🎒', equality: '👥',
+    labor_rel: '🏛️', hours: '⏰', wage: '💵', ai: '🤖', esop: '🏦', labor_law: '📖', etc: '📄' };
+  var SB_FOLD = (function () { try { return JSON.parse(lsGet('sbFold') || '{}') || {}; } catch (e) { return {}; } })();
+  function drawSb() {
+    var nav = $('sbNav'); if (!nav) return;
+    var d = K.dashboard(list());
+    var onList = TAB === 'list' && !F.trash && !F.ids;
+    var h = '<div class="sb-menu top">' +
+      '<button type="button" class="sb-menu-item' + (TAB === 'dash' ? ' active" aria-current="page' : '') + '" data-sb="dash"><span class="mi-icon">📊</span><span class="mi-text">한눈에</span></button>' +
+      '<button type="button" class="sb-menu-item' + (onList && !F.cat && !F.legal ? ' active" aria-current="page' : '') + '" data-sb="all" title="모든 강의자료 ' + d.total + '건"><span class="mi-icon">📚</span><span class="mi-text">전체 자료</span><span class="mi-n">' + d.total + '</span></button>' +
+      '</div><div class="sb-sep"></div>';
+    K.splitLegal(d.cats).forEach(function (s) {
+      var fold = !!SB_FOLD[s.key];
+      var gOn = onList && !F.cat && F.legal === s.key;
+      h += '<div class="sb-grp ' + s.key + '"><div class="sb-grp-h' + (gOn ? ' on' : '') + '">' +
+        '<button type="button" class="arrow" data-sbfold="' + s.key + '" aria-expanded="' + (fold ? 'false' : 'true') + '" aria-label="' + esc(s.label) + (fold ? ' 펼치기' : ' 접기') + '" title="' + (fold ? '펼치기' : '접기') + '">' + (fold ? '▶' : '▼') + '</button>' +
+        '<button type="button" class="sb-gname" data-sblegal="' + s.key + '" title="' + esc(s.label + ' ' + s.kinds + '종 ' + s.n + '건 · ' + K.fmtBytes(s.bytes) + (s.review ? ' · 검토 ' + s.review : '') + ' — 자료함에서 이 묶음만') + '"' + (gOn ? ' aria-current="page"' : '') + '>' +
+        '<span class="icon">' + (s.key === 'legal' ? '⚖️' : '📘') + '</span><span class="name">' + esc(s.label) + '</span><span class="count">' + s.n + '</span></button></div>';
+      if (!fold) {
+        h += '<div class="sb-menu">' + s.cats.map(function (c) {
+          var on = onList && F.cat === c.key;
+          var tip = c.label + ' ' + c.n + '건 · 최근 ' + (c.latest || '—') + ' · 원본 ' + c.cloud + ' · 검토 ' + c.review + ' · ' + K.fmtBytes(c.bytes) + (c.legal && c.law ? ' · ' + c.law : '');
+          return '<div class="sb-row' + (c.custom ? ' mine' : '') + '">' +
+            '<button type="button" class="sb-menu-item' + (on ? ' active' : '') + (c.n ? '' : ' zero') + '" data-sbcat="' + esc(c.key) + '" title="' + esc(tip) + '" aria-label="' + esc(tip + ' — 이 종류만 보기') + '"' + (on ? ' aria-current="page"' : '') + '>' +
+            '<span class="mi-icon">' + (SB_ICON[c.key] || (c.custom ? '🆕' : '📄')) + '</span><span class="mi-text">' + esc(c.label) + '</span><span class="mi-n">' + c.n + '</span></button>' +
+            (c.custom ? '<button type="button" class="sb-ed" data-catedit="' + esc(c.key) + '" title="이 종류 고치기" aria-label="' + esc(c.label) + ' 종류 고치기">✎</button>' : '') + '</div>';
+        }).join('') + '</div>';
+      }
+      h += '</div>';
+    });
+    h += '<div class="sb-sep"></div><div class="sb-menu top"><button type="button" class="sb-menu-item add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부"><span class="mi-icon">＋</span><span class="mi-text">새 강의 종류</span></button></div>';
+    nav.innerHTML = h;
+  }
+  /* 메뉴 위 사람 칸 — 이름(명부)과 자격만. 로그인 이메일·사번은 적지 않는다 */
+  function sbUser() {
+    var nm = who() || '';
+    $('sbName').textContent = nm || '—';
+    $('sbAv').textContent = nm ? nm.slice(0, 2) : '🎓';
+    $('sbRole').textContent = ME.admin ? '관리자' : '재직 직원';
   }
 
   /* ───────── 한눈에 ───────── */
@@ -197,6 +245,7 @@
   }
   function drawList() {
     fillFilters();
+    drawSb();                                    /* 거르개가 바뀌면 왼쪽 메뉴의 «지금 보는 자리»도 바뀐다 */
     [].forEach.call(document.querySelectorAll('#vSeg [data-view]'), function (b) { var on = b.getAttribute('data-view') === VIEW; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     var rows = visible();
     var groups = K.group(rows, GROUP);
@@ -1279,6 +1328,25 @@
   function wire() {
     $('tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) setTab(b.getAttribute('data-tab')); });
     $('reBtn').addEventListener('click', function () { draw(); toast('최신 자료입니다(바뀌면 저절로 다시 그립니다)'); });
+    /* 메뉴 위 이름 — 머리 칸(#who)과 같은 PuWhoami 에서, 이름이 늦게 와도 바뀌면 다시 쓴다 */
+    try { if (window.PuWhoami && PuWhoami.onChange) PuWhoami.onChange(function () { sbUser(); }); } catch (e) {}
+    $('sb').addEventListener('click', function (e) {
+      var ed = e.target.closest('[data-catedit]'); if (ed) { openCatEditor(ed.getAttribute('data-catedit')); return; }
+      if (e.target.closest('[data-catnew]')) { openCatEditor(''); return; }
+      var fo = e.target.closest('[data-sbfold]');
+      if (fo) {
+        var fk = fo.getAttribute('data-sbfold');
+        SB_FOLD[fk] = !SB_FOLD[fk]; lsSet('sbFold', JSON.stringify(SB_FOLD)); drawSb();
+        var again = $('sbNav').querySelector('[data-sbfold="' + fk + '"]'); if (again) again.focus();   /* 다시 그려도 초점은 그 자리 */
+        return;
+      }
+      var b = e.target.closest('[data-sb],[data-sbcat],[data-sblegal]'); if (!b) return;
+      if (b.getAttribute('data-sb') === 'dash') { setTab('dash'); return; }
+      resetFilters();
+      if (b.hasAttribute('data-sbcat')) F.cat = b.getAttribute('data-sbcat');
+      else if (b.hasAttribute('data-sblegal')) F.legal = b.getAttribute('data-sblegal');
+      setTab('list');
+    });
     $('cats').addEventListener('click', function (e) {
       var ed = e.target.closest('[data-catedit]'); if (ed) { e.stopPropagation(); openCatEditor(ed.getAttribute('data-catedit')); return; }
       if (e.target.closest('[data-catnew]')) { openCatEditor(''); return; }
@@ -1520,6 +1588,7 @@
         /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다 */
         if (!r.sid) { lock((who() ? '접속: ' + who() + ' — ' : '') + '재직 중인 직원 계정이 아닙니다'); return; }
         ME.sid = r.sid; ME.uid = u.uid; ME.admin = r.admin;
+        sbUser();
         gate = PuOntologyWrite.createGateway({ mode: 'enforce', actor: r.sid });
         $('mailTab').style.display = ME.admin ? '' : 'none';
         $('lock').style.display = 'none'; $('app').style.display = '';
