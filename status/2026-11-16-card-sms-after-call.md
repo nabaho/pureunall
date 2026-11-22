@@ -11,6 +11,7 @@
 - `CardActionReceiver`(알림 «보내기/안 보내기», exported=false, 번호표만 든다) · `CardSmsActivity`(설정 화면).
 - 보내는 길은 기존 `VisitSmsSender.sendOne` 을 그대로 쓴다(공개 범위만 package-private 으로).
 - 2026-11-22: 대표 폰에서 «휴대폰 연결»이 안 보인다는 말에 — 재무관리 연결 표(📱 ›)를 대표에게 늘 눌리게(pu-erp.html hanaStatChip), 연결 창 제목·앱 안내문을 새 구조로 고침. APK 다시 빌드해 교체(서명 동일).
+- 2026-11-22(2): 대표 폰 맞춤 탭에서 왼쪽 메뉴 아래(환경설정 줄)가 잘려 안 보이던 것 — 폰 서랍 높이 100vh → 100dvh(css/pu-erp.css). 폰 점검에 drawer-open·ledger-tools 화면 추가.
 - 판 번호 2.6.0 — `build.gradle.kts` · `BridgeConfig.java` · `pu-erp.html`(HANA_APK_VER) 세 곳.
 
 ## 설계 해석 (대표가 바꿔도 되는 것)
