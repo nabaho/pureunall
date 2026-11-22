@@ -8,8 +8,11 @@
 <!-- ⚠ 이 줄이 없으면 안드로이드에서 beforeinstallprompt 가 «영영 안 온다» —
      브라우저가 「무엇을 설치할지」를 모르기 때문이다. 그래서 「홈화면에 설치하기」
      단추가 뜨지도 않았다(2026-08-26 확인). 설치 화면에도 manifest 는 필수다. -->
-<link rel="manifest" href="/pureunall/manifest.json">
-<link rel="apple-touch-icon" href="/pureunall/icon-portal-192.png">
+<!-- ★ 이 화면의 길은 모두 «상대주소»다 (2026-11-15 ERP 주소 이사 준비).
+     옛 주소 nabaho.github.io/pureunall/ 과 새 주소 erp.pureunlabor.co.kr/ (앞머리 /pureunall 없음)
+     양쪽에서 똑같이 열려야 한다 — /pureunall/… 로 박으면 새 주소에서 404 가 된다. -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-portal-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⬇️</text></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -65,7 +68,7 @@ h1{font-size:20px;font-weight:800;margin-bottom:6px;}
   <div class="success" id="already">✅ 이미 설치되어 있습니다!</div>
 
   <!-- 그냥 브라우저로 열기 -->
-  <a class="btn-open" href="/pureunall/enter.html" id="btn-open">
+  <a class="btn-open" href="enter.html" id="btn-open">
     🌐 브라우저로 바로 열기
   </a>
 
@@ -107,7 +110,7 @@ var deferredPrompt = null;
    ⚠ 포털·기업정보함과 «같은 파일» 이라 다시 등록해도 밀어내기가 없다. */
 try{
   if('serviceWorker' in navigator && window.isSecureContext){
-    navigator.serviceWorker.register('/pureunall/pu-sw.js')['catch'](function(){});
+    navigator.serviceWorker.register('pu-sw.js')['catch'](function(){});
   }
 }catch(e){}
 
@@ -149,8 +152,8 @@ function showIosGuide(){
 function installPWA(){
   if(!deferredPrompt){ 
     // 이미 설치됐거나 지원 안 함 → 통합 포털로 이동
-    location.href='/pureunall/enter.html';
-    return; 
+    location.href='enter.html';
+    return;
   }
   deferredPrompt.prompt();
   deferredPrompt.userChoice.then(function(r){
@@ -210,7 +213,7 @@ function installPWA(){
   // 기타 (PC 등)
   badge.textContent='💻 PC / 기타';
   document.getElementById('btn-android').innerHTML='<span style="font-size:22px;">🚀</span> 포털 바로 열기';
-  document.getElementById('btn-android').onclick=function(){ location.href='/pureunall/enter.html'; };
+  document.getElementById('btn-android').onclick=function(){ location.href='enter.html'; };
   document.getElementById('btn-android').classList.remove('hidden');
 })();
 </script>

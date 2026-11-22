@@ -567,7 +567,7 @@
       ['충남 산업일자리전환 장려금', '충남경제진흥원 (산업일자리전환지원센터)', '컨설팅 이수 후 직무전환 배치·교육 및 고용유지 요건 충족 기업·근로자 장려금 지원', '1순위 핵심 연계'],
       [tr.code === 'cepa_diag' ? '충남 산업일자리전환 전문컨설팅' : '충남 지역혁신 프로젝트 직무훈련', '충남경제진흥원 · 충남인적자원개발위원회', tr.code === 'cepa_diag' ? '진단컨설팅 완료 기업 대상 심화 직무재설계·인사제도 구축 후속 연계' : '석탄화력·미래차 전환 재직자 맞춤형 직무재교육 훈련비 지원', '즉시 후속 신청'],
       ['노동전환 고용안정 지원금 · S-OJT', '고용노동부 · 한국산업인력공단', '사업전환·직무전환 교육훈련 기간 인건비·훈련비 및 체계적 현장훈련 비용 지원', '병행 매칭 활용'],
-      ['중진공 구조혁신 · 사업전환자금', '중소벤처기업진흥공단', '신사업 설비투자·운전자금 융자 우대 및 사업전환 계획 승인 기업 세제·금융 특례', '중기 설비투자 연계']
+      ['충남 탄소중립·사업전환 설비투자 자금', '충청남도 · 충남경제진흥원', '신사업 설비투자·운전자금 융자 우대 및 정의로운 전환·사업전환 참여기업 금융 지원', '중기 설비투자 연계']
     ] : [
       ['중진공 사업전환 계획 승인 · 전용자금', '중소벤처기업진흥공단', '구조혁신 컨설팅 이수 기업 대상 신사업 설비·운전자금 융자 및 세제 특례 연계', '1순위 정책자금'],
       ['산업전환 공동훈련센터 · S-OJT 지원', '고용노동부 · 한국산업인력공단', '탄소중립·디지털 전환 재직자 직무재교육 무상훈련 및 사내 체계적 현장훈련 지원', '전환훈련 핵심연계'],
@@ -849,6 +849,157 @@
     };
   }
 
+  /* ══ 7. 소속기관별(KMAC vs CEPA) 분리 보고서 양식 · 검수 적합성 판정기 ═════ */
+  function evaluateReportFormReview(project, kind, reportObj, intakeMap, schedRounds) {
+    var p = project || {};
+    var ag = Cat.getAgency(p.agency);
+    var tr = Cat.getTrack(p.track, ag.code);
+    var spec = Cat.getAgencyFormSpec ? Cat.getAgencyFormSpec(ag.code) : null;
+    var isFinal = kind === 'final';
+    var schema = isFinal ? Cat.getFinalSections(ag.code, tr.code) : Cat.getMidSections(ag.code);
+    var secs = (reportObj && reportObj.sections) || {};
+    var st = (reportObj && reportObj.structured) || {};
+    var sum = collectIntakeSummary(intakeMap || {});
+    var rc = st.roundCheck || normalizeRounds(p, schedRounds || [], sum.mergedDiff);
+
+    var allText = schema.map(function (sc) { return str(secs[sc.key]); }).join('\n');
+    var filledCount = schema.filter(function (sc) { return str(secs[sc.key]).length >= 30; }).length;
+    var tocOk = filledCount === schema.length && schema.length > 0;
+    var hasIlteo = /디자인\s*팀\s*회의|통합\s*진단\s*보고서\s*양식|이행\s*결과표|일터\s*상생\s*컨설팅/i.test(allText);
+
+    var checks = [];
+    if (ag.code === 'cepa') {
+      var hasKmacCross = /중진공\s*구조혁신|한국\s*능률\s*협회\s*컨설팅|정책\s*매니저\s*보고서/i.test(allText);
+      var sectorOk = /석탄\s*화력|발전\s*(?:설비|정비)|미래차|전동화|자동차\s*부품|충남|전방\s*산업/.test(allText);
+      var reskillOk = /직무\s*(?:전환|재설계|재교육)|reskilling|s-ojt|에너지\s*전환|지역\s*혁신|훈련/i.test(allText);
+      var face80Ok = rc.facePct >= 80 && rc.allTimeAndPeopleMet;
+      var compOk = isFinal
+        ? (/완료계|장려금/.test(allText) && Array.isArray(st.govMatchRows) && st.govMatchRows.length >= 1)
+        : /지원\s*사업|장려금|연계/.test(allText);
+      var cepaClean = !hasIlteo && !hasKmacCross;
+
+      checks = [
+        {
+          code: 'cepa_toc',
+          label: '충남경제진흥원(' + tr.short + ') 전용 목차',
+          detail: (isFinal ? '결과보고서 8장' : '중간보고서 7장') + ' 작성 (' + filledCount + '/' + schema.length + '장)',
+          ok: tocOk,
+          statusLabel: tocOk ? '목차 일치 ✓' : '보완 필요'
+        },
+        {
+          code: 'cepa_sector',
+          label: '충남 전환산업(석탄화력/미래차) 공급망 진단',
+          detail: tr.code === 'cepa_coal' ? '석탄화력 폐지 영향 및 업종전환 명시' : '미래차·주력산업 전환 공급망 영향 명시',
+          ok: sectorOk,
+          statusLabel: sectorOk ? '반영됨 ✓' : '보완 필요'
+        },
+        {
+          code: 'cepa_reskill',
+          label: '전환직무·인원 산정 및 지역훈련 연계',
+          detail: '직무재설계(JD)·전환인원 및 S-OJT/충남 특화훈련 반영',
+          ok: reskillOk,
+          statusLabel: reskillOk ? '반영됨 ✓' : '보완 필요'
+        },
+        {
+          code: 'cepa_face80',
+          label: 'CEPA 대면 80%+ · 회차 기준 (권장 ' + rc.targetRounds + '회)',
+          detail: '현재 총 ' + rc.totalCount + '회 · 대면 ' + rc.facePct + '% (증빙 ' + rc.proofReadyCount + '/' + rc.totalCount + ')',
+          ok: face80Ok,
+          statusLabel: face80Ok ? '충족 ✓' : '일정·대면 점검'
+        },
+        {
+          code: 'cepa_completion',
+          label: '컨설팅 완료계(대표자 날인) · 충남 장려금 연계',
+          detail: '갑지 서명·날인 완료계 및 충남 산업일자리전환 장려금 매칭',
+          ok: compOk,
+          statusLabel: compOk ? '구비 ✓' : '확인 필요'
+        },
+        {
+          code: 'cepa_isolation',
+          label: '일터상생 · KMAC 타 기관 양식 무혼입',
+          detail: '일터상생(디자인팀·이행결과표) 및 KMAC(정책매니저) 용어 0건',
+          ok: cepaClean,
+          statusLabel: cepaClean ? '무혼입 ✓' : '타 양식 문구 감지⚠'
+        }
+      ];
+    } else {
+      var hasCepaCross = /충남\s*경제\s*진흥원\s*완료계|충남\s*산업일자리전환지원센터\s*완료계/i.test(allText);
+      var taskCnt = Array.isArray(p.selectedTasks) ? p.selectedTasks.length : 0;
+      var kpi4Ok = taskCnt >= 4 || (Array.isArray(st.jobMatrixRows) && st.jobMatrixRows.length >= 3) || /kpi|성과\s*지표|핵심\s*과제/i.test(allText);
+      var govRowsCnt = Array.isArray(st.govMatchRows) ? st.govMatchRows.length : 0;
+      var gov2Ok = isFinal
+        ? (govRowsCnt >= 2 && /전환\s*지원금|노동\s*전환|구조\s*혁신/.test(allText))
+        : /지원\s*사업|전환\s*지원금|구조\s*혁신/.test(allText);
+      var md75Ok = rc.facePct >= 75 && rc.allTimeAndPeopleMet;
+      var dataOk = !!(sum.finStats || sum.rosterStats || sum.surveyStats || sum.preCards.length > 0);
+      var kmacClean = !hasIlteo && !hasCepaCross;
+
+      checks = [
+        {
+          code: 'kmac_toc',
+          label: 'KMAC 구조혁신(' + tr.short + ') 전용 목차',
+          detail: (isFinal ? '2026년형 결과보고서 8장' : '표준 중간보고서 7장') + ' 작성 (' + filledCount + '/' + schema.length + '장)',
+          ok: tocOk,
+          statusLabel: tocOk ? '목차 일치 ✓' : '보완 필요'
+        },
+        {
+          code: 'kmac_kpi4',
+          label: 'KPI 4개+(필수2·선택2) · 전환과제 정합성',
+          detail: '중점 전환과제(' + (taskCnt || 4) + '개) 및 직무·인식 개선 KPI 도출',
+          ok: kpi4Ok,
+          statusLabel: kpi4Ok ? '충족 ✓' : 'KPI 보완'
+        },
+        {
+          code: 'kmac_gov2',
+          label: '연계 정부지원사업 2개+ (전환지원금 필수)',
+          detail: isFinal ? ('매칭 체계도 ' + govRowsCnt + '종 및 적합사유 명시') : '정부지원사업 연계 설계방향 포함',
+          ok: gov2Ok,
+          statusLabel: gov2Ok ? '충족 ✓' : '매칭 보완'
+        },
+        {
+          code: 'kmac_md',
+          label: 'KMAC 대면 75%+ · MD 기준 (권장 ' + rc.targetRounds + '회)',
+          detail: '현재 총 ' + rc.totalCount + '회 · 대면 ' + rc.facePct + '% (증빙 ' + rc.proofReadyCount + '/' + rc.totalCount + ')',
+          ok: md75Ok,
+          statusLabel: md75Ok ? '충족 ✓' : 'MD·대면 점검'
+        },
+        {
+          code: 'kmac_data',
+          label: '최신 3개년 재무·고용 · 인식수준(5대 영역)',
+          detail: dataOk ? ('수집·분석 카드 ' + sum.preCards.length + '건 반영됨') : '기초자료 수신 시 정량 수치 자동 갱신',
+          ok: dataOk,
+          statusLabel: dataOk ? '데이터 연결 ✓' : '기초자료 대기'
+        },
+        {
+          code: 'kmac_isolation',
+          label: '일터상생 · CEPA 타 기관 양식 무혼입',
+          detail: '일터상생(디자인팀·통합진단보고서) 및 CEPA(완료계) 용어 0건',
+          ok: kmacClean,
+          statusLabel: kmacClean ? '무혼입 ✓' : '타 양식 문구 감지⚠'
+        }
+      ];
+    }
+
+    var passCount = checks.filter(function (c) { return c.ok; }).length;
+    var totalCount = checks.length;
+    var hasContam = checks.some(function (c) { return (c.code === 'kmac_isolation' || c.code === 'cepa_isolation') && !c.ok; });
+
+    return {
+      agencyCode: ag.code,
+      agencyShort: ag.short,
+      trackShort: tr.short,
+      formTitle: spec ? (isFinal ? spec.finalFormTitle : spec.midFormTitle) : (ag.short + ' 보고서'),
+      completionFormTitle: spec ? spec.completionFormTitle : ag.completionDocName,
+      platformName: spec ? spec.platformName : '',
+      checks: checks,
+      passCount: passCount,
+      totalCount: totalCount,
+      passPct: totalCount ? Math.round((passCount / totalCount) * 100) : 100,
+      allPassed: passCount === totalCount,
+      hasCrossContamination: hasContam
+    };
+  }
+
   return {
     collectIntakeSummary: collectIntakeSummary,
     normalizeRounds: normalizeRounds,
@@ -857,6 +1008,7 @@
     buildFinalReport: buildFinalReport,
     buildSubmissionTexts: buildSubmissionTexts,
     buildAiPolishPrompt: buildAiPolishPrompt,
-    checkHallucinatedNumbers: checkHallucinatedNumbers
+    checkHallucinatedNumbers: checkHallucinatedNumbers,
+    evaluateReportFormReview: evaluateReportFormReview
   };
 });

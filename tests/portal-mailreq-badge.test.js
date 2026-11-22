@@ -52,7 +52,8 @@ function liveDb(init) {
   return { ref: wrap, 읽기: db.읽기, writes: () => writes, listeners: () => ls.length };
 }
 const NOW = Date.now(), IN = 'INBOX-a1b2c3d4';
-const mail = (o) => Object.assign({ s: '[가나연구원] 참여 사전동의서', an: ['동의서(양식).hwp'], p: '안녕하세요', f: '가나연구원', e: 'req@example.org', a: 1, d: NOW - 60000, r: 0, w: 0 }, o || {});
+/* 제목에 «이력·회의·비용» 말(인력풀)이 있어야 들어온다 — 그 말이 없으면 걸러 둔다(2026-11-19 «아예 안 들임») */
+const mail = (o) => Object.assign({ s: '[가나연구원] 전문가 인력풀 참여 사전동의서', an: ['동의서(양식).hwp'], p: '안녕하세요', f: '가나연구원', e: 'req@example.org', a: 1, d: NOW - 60000, r: 0, w: 0 }, o || {});
 function world(o) {
   o = o || {};
   const db = liveDb({ mailbox: { folders: { [IN]: { kind: 'inbox' } }, msgs: { [IN]: Object.assign({ '101': mail() }, o.msgs || {}) } } });

@@ -205,26 +205,45 @@ test('★★ sendPayslip 이 비밀값을 «선언»한다 — 안 하면 다시
 test('★ 보내는 곳이 «인증된 도메인»이다 — 인증 안 된 곳을 넣으면 통째로 거절된다', () => {
   const m = /const FROM = process\.env\.PAYSLIP_FROM \|\| "([^"]+)"/.exec(fns);
   assert.ok(m, '★ 보내는 주소를 못 찾았습니다');
-  /* ⚠ 값(fairrunlabor.com)을 박는다 — 이것이 «규칙»이다. Resend 에 인증을 마친
-     도메인이 이곳뿐이고, 다른 곳으로 바꾸면 Resend 가 메일을 통째로 거절한다.
-     바꾸려면 먼저 그 도메인의 DKIM 을 인증해야 한다. 검사고정-허용 */
-  assert.match(m[1], /@fairrunlabor\.com>?$/,
-    '★ 인증 안 된 도메인에서 보내려 합니다 — Resend 가 메일을 통째로 거절합니다.\n' +
-    '  먼저 Resend 에서 그 도메인 인증(DNS 몇 줄)을 마쳐야 합니다.');
+  /* ⚠ 값(payroll@pureunlabor.co.kr)을 박는다 — 2026-11-18 가비아 DNS(resend._domainkey ·
+     rsend · send · _dmarc)와 Resend 에 등록한 새 법인 공식 도메인이다. 다른 곳으로 바꾸면
+     Resend 가 메일을 통째로 거절하므로 먼저 DKIM 인증을 마쳐야 한다. 검사고정-허용 */
+  assert.equal(m[1], '푸른노무법인 <payroll@pureunlabor.co.kr>',
+    '★ 새 법인 공식 발신 주소(푸른노무법인 <payroll@pureunlabor.co.kr>)가 아닙니다.');
   assert.match(m[1], /^푸른노무법인 </, '★ 받는 사람에게 보낸 이가 누군지 안 보입니다');
+
+  /* DNS 전파 과도기 예비 발신 도메인도 Resend 인증이 확인된 기존 도메인이어야 한다. 검사고정-허용 */
+  const fb = /const FALLBACK_FROM = "([^"]+)"/.exec(fns);
+  assert.ok(fb, '★ 과도기 예비 발신 주소(FALLBACK_FROM)를 못 찾았습니다');
+  assert.match(fb[1], /@fairrunlabor\.com>?$/);
+
+  const fnBox = { String, Number };
+  vm.createContext(fnBox);
+  vm.runInContext(떼기('isResendDomainUnverifiedError', fns), fnBox);
+  assert.equal(fnBox.isResendDomainUnverifiedError({ name: 'validation_error', statusCode: 403, message: 'The pureunlabor.co.kr domain is not verified.' }), true);
+  assert.equal(fnBox.isResendDomainUnverifiedError({ name: 'rate_limit_exceeded', statusCode: 429, message: 'domain quota not verified' }), false);
+  assert.equal(fnBox.isResendDomainUnverifiedError({ name: 'validation_error', message: 'Invalid `to` field' }), false);
+  assert.equal(fnBox.isResendDomainUnverifiedError(null), false);
 });
 
-test('★ 회신이 «사람이 보는 곳»으로 온다', () => {
-  /* 본문에 「문의는 연락 주세요」라 써 놓고 회신이 아무도 안 보는 곳으로 가던 자리다 */
-  assert.match(fns, /const REPLY_TO = process\.env\.PAYSLIP_REPLY_TO \|\| "[^"]+@[^"]+"/,
-    '★ 회신 주소가 없습니다 — 근로자가 회신 단추를 누르면 아무도 안 봅니다');
+test('★ 회신이 «사람이 보는 곳»으로 온다 — 메일함 미연동 도메인으로 회신을 보내 반송시키지 않는다', () => {
+  /* pureunlabor.co.kr 은 아직 수신 사서함(MX)을 연동하지 않았으므로 회신은 실제 확인하는 공용함이어야 한다 */
+  const rm = /const REPLY_TO = process\.env\.PAYSLIP_REPLY_TO \|\| "([^"]+)"/.exec(fns);
+  assert.ok(rm, '★ 회신 주소가 없습니다 — 근로자가 회신 단추를 누르면 아무도 안 봅니다');
+  assert.doesNotMatch(rm[1], /@pureunlabor\.(co\.kr|com)$/i,
+    '★ 수신 사서함(MX)을 연동하기 전에 회신 주소를 pureunlabor 로 두면 근로자 답장이 반송됩니다');
 });
 
 test('★ 발송 창구는 «우리 화면»에서만 연다', () => {
-  const m = /const MAIL_ORIGIN = "([^"]+)"/.exec(fns);
-  assert.ok(m, '★ 창구 설정을 못 찾았습니다');
-  assert.notEqual(m[1], '*',
-    '★★ 아무 데서나 부를 수 있습니다 — 주소만 알면 푸른노무법인 이름으로 메일이 나갑니다');
+  /* 2026-11-15 ERP 주소 이사 — 받아 주는 출처는 functions/erp-origins.js 한 자리(옛·새 ERP 주소)다.
+     창구(setCors)가 그 목록을 쓰는지, 그 목록이 남의 출처·와일드카드를 «실제로» 막는지 돌려서 본다. */
+  assert.match(fns, /function setCors\(req, res\) \{\s*ERP_ORIGINS_LIB\.allowOrigin\(req, res\);/,
+    '★ 창구 설정을 못 찾았습니다 — 발송 창구가 공용 출처 목록을 안 쓴다');
+  const O = require(path.join(__dirname, '..', 'functions', 'erp-origins.js'));
+  const 연다 = (origin) => { const h = {}; O.allowOrigin({ headers: { origin } }, { set: (k, v) => { h[k] = v; } }); return h['Access-Control-Allow-Origin']; };
+  ['*', 'https://evil.example', 'null', ''].forEach((o) => assert.equal(연다(o), undefined,
+    '★★ 아무 데서나 부를 수 있습니다(' + o + ') — 주소만 알면 푸른노무법인 이름으로 메일이 나갑니다'));
+  assert.ok(O.ERP_ORIGINS.indexOf('*') < 0, '★★ 출처 목록에 «*» 가 있다');
   /* 화면이 실제로 그 자리에서 돈다 — 어긋나면 발송이 «창구 막힘»으로 조용히 실패한다 */
   assert.match(erp, new RegExp('https://us-central1-pureun-erp\\.cloudfunctions\\.net/sendPayslip'),
     '★ 화면이 부르는 주소가 바뀌었습니다');

@@ -104,16 +104,43 @@
   var PLEDGE_TEXT = [
     '1. 본인은 직장 내 괴롭힘·성희롱 등 사안의 조사 참여자(신고인·피신고인·참고인)로서, 조사 과정에서 알게 된 사건 내용·질문·타인의 진술·개인정보 등 일체의 비밀을 정당한 이유 없이 다른 사람에게 누설하지 않을 것을 서약합니다. (근로기준법 제76조의3 제7항)',
     '2. 조사 내용의 무단 녹음·유포·공유 또는 조사 참여자에 대한 2차 가해·보복 행위가 법령 및 사규 위반이 될 수 있음을 안내받았습니다.',
-    '3. 본 진술확인서에 기재된 문답 및 요지를 직접 열람하였으며, 사실과 다르거나 보완할 사항이 있는 경우 정정·보완 의견란에 기재하여 본인의 진술로 확인합니다.'
+    '3. 본 문서에 기재된 내용을 직접 열람하였으며, 보완·추가할 사항이 있는 경우 의견란에 기재하여 본인의 의사로 확인합니다.'
   ].join('\n');
+
+  var SURVEY_PLEDGE_TEXT = [
+    '1. 본 실태조사 설문은 부서·조직 내 직장 내 괴롭힘·성희롱 실태 파악 및 재발방지 대책 수립을 위해 무기명 종단간 암호화 방식으로 실시됩니다.',
+    '2. 개별 응답자의 성명·연락처·필적은 수집·표시되지 않으며, 통계 집계 및 비식별 요약 형태로만 조사결과보고서에 활용됩니다.',
+    '3. 설문 문항 및 참여 보안코드를 외부에 유출하거나 타인의 응답을 강요·탐문하는 행위는 금지됩니다.'
+  ].join('\n');
+
+  var DEFAULT_MEASURE_OPTIONS = [
+    '근무장소 변경 · 공간 분리',
+    '부서 배치전환 희망',
+    '유급휴가 · 심리상담 · 치료 지원',
+    '행위자 엄정 징계 · 인사조치 요청',
+    '행위자 서면사과 · 재발방지 서약 요청',
+    '현재 소속·업무 유지 희망 (인사상 분리 불원)'
+  ];
+
+  var DOC_KINDS = {
+    pledge_and_stmt: '비밀유지서약 및 면담 진술확인서',
+    pledge_only: '조사 참여자 비밀유지서약서',
+    victim_opinion: '피해근로자 보호·행위자 조치 사전 의견청취서',
+    withdrawal_consent: '신고 취하 · 정식조사 종료 동의 및 합의 확인서',
+    org_survey: '직장 내 괴롭힘·성희롱 조직 실태조사 무기명 보안 설문'
+  };
 
   /* 문서 무결성 검증용 정규화 문자열 생성 (주민등록번호 자동 가림 강제, 최대 500문답 지원) */
   function normalizeSignPayload(input) {
     var src = input && typeof input === 'object' ? input : {};
-    var docKind = src.docKind === 'pledge_only' ? 'pledge_only' : 'pledge_and_stmt';
-    var role = src.role === 'accused' ? 'accused' : src.role === 'witness' ? 'witness' : 'victim';
-    var roleLabel = role === 'accused' ? '피신고인(행위자)' : role === 'witness' ? '참고인' : '신고인(피해근로자)';
-    var qaList = docKind === 'pledge_only' ? [] : (Array.isArray(src.qaList) ? src.qaList : [])
+    var docKind = DOC_KINDS[src.docKind] ? src.docKind : 'pledge_and_stmt';
+    var role = docKind === 'org_survey'
+      ? 'witness'
+      : (src.role === 'accused' ? 'accused' : src.role === 'witness' ? 'witness' : 'victim');
+    var roleLabel = docKind === 'org_survey'
+      ? '부서 구성원(무기명)'
+      : (role === 'accused' ? '피신고인(행위자)' : role === 'witness' ? '참고인' : '신고인(피해근로자)');
+    var qaList = docKind !== 'pledge_and_stmt' ? [] : (Array.isArray(src.qaList) ? src.qaList : [])
       .filter(function (x) { return x && (String(x.q || '').trim() || String(x.a || '').trim()); })
       .slice(0, 500)
       .map(function (x) {
@@ -122,19 +149,39 @@
           a: mask(String(x.a || '').slice(0, 2500))
         };
       });
-    return {
+    var baseOut = {
       docKind: docKind,
-      title: docKind === 'pledge_only' ? '조사 참여자 비밀유지서약서' : '비밀유지서약 및 면담 진술확인서',
+      title: DOC_KINDS[docKind],
       role: role,
       roleLabel: roleLabel,
-      alias: mask(String(src.alias || '').slice(0, 60)) || roleLabel,
+      alias: docKind === 'org_survey' ? '무기명 응답자' : (mask(String(src.alias || '').slice(0, 60)) || roleLabel),
       dept: mask(String(src.dept || '').slice(0, 60)),
       date: String(src.date || '').slice(0, 10),
-      method: mask(String(src.method || '면담').slice(0, 30)),
-      pledgeText: mask(String(src.pledgeText || PLEDGE_TEXT).slice(0, 2000)),
-      summary: docKind === 'pledge_only' ? '' : mask(String(src.summary || '').slice(0, 10000)),
+      method: mask(String(src.method || (docKind === 'org_survey' ? '무기명 온라인 설문' : '면담')).slice(0, 30)),
+      pledgeText: mask(String(src.pledgeText || (docKind === 'org_survey' ? SURVEY_PLEDGE_TEXT : PLEDGE_TEXT)).slice(0, 2000)),
+      summary: docKind === 'pledge_only' || docKind === 'org_survey' ? '' : mask(String(src.summary || '').slice(0, 10000)),
       qaList: qaList
     };
+    if (docKind === 'victim_opinion') {
+      var mOpts = Array.isArray(src.measureOptions) && src.measureOptions.length ? src.measureOptions : DEFAULT_MEASURE_OPTIONS;
+      baseOut.verdictLabel = mask(String(src.verdictLabel || '조사 결과 판단 안내').slice(0, 80));
+      baseOut.measureOptions = mOpts.slice(0, 12).map(function (m) { return mask(String(m || '').slice(0, 120)); }).filter(Boolean);
+    } else if (docKind === 'withdrawal_consent') {
+      var cMode = src.consentMode === 'closed_consent' ? 'closed_consent' : src.consentMode === 'settled' ? 'settled' : 'withdrawn';
+      baseOut.consentMode = cMode;
+      baseOut.consentModeLabel = cMode === 'closed_consent' ? '정식조사 종료 동의' : cMode === 'settled' ? '당사자 합의 종결 확인' : '신고 취하 확인';
+    } else if (docKind === 'org_survey') {
+      var defaultQs = (C && Array.isArray(C.SURVEY_QUESTIONS)) ? C.SURVEY_QUESTIONS : [];
+      var rawQs = Array.isArray(src.surveyQuestions) && src.surveyQuestions.length ? src.surveyQuestions : defaultQs;
+      baseOut.surveyQuestions = rawQs.slice(0, 15).map(function (q, idx) {
+        return {
+          id: String((q && q.id) || ('sq' + (idx + 1))).slice(0, 20),
+          q: mask(String((q && q.q) || '').slice(0, 300)),
+          opts: (Array.isArray(q && q.opts) ? q.opts : []).slice(0, 6).map(function (o) { return mask(String(o || '').slice(0, 80)); })
+        };
+      }).filter(function (q) { return q.q && q.opts.length >= 2; });
+    }
+    return baseOut;
   }
 
   function canonicalString(payload) {
@@ -276,16 +323,23 @@
   /* 1채널 안내문 (이메일·메신저 등 링크 전달용 — 보안코드를 절대 함께 적지 않음!) */
   function shareLinkMessage(opts) {
     var o = opts || {};
-    var who = mask(String(o.alias || '').trim());
-    var kindLabel = o.docKind === 'pledge_only' ? '조사 비밀유지서약서' : '조사 비밀유지서약 및 진술확인서';
+    var who = o.docKind === 'org_survey' ? '' : mask(String(o.alias || '').trim());
+    var kindLabel = DOC_KINDS[o.docKind] || DOC_KINDS.pledge_and_stmt;
+    var guideTail = o.docKind === 'org_survey'
+      ? '· 본 설문은 무기명 암호화 방식으로 집계되며 응답자의 성명·필적은 기록되지 않습니다.'
+      : o.docKind === 'victim_opinion'
+        ? '· 근로기준법 제76조의3 제4항·제5항에 따라 희망하시는 보호조치 및 행위자 조치 의견을 선택·기재해 제출하실 수 있습니다.'
+        : o.docKind === 'withdrawal_consent'
+          ? '· 취하·조사종료·합의 내용을 직접 확인하시고 본인의 자유로운 의사에 따른 동의 여부를 서명으로 제출해 주세요.'
+          : '· 진술 내용 중 수정·보완할 사항이 있으시면 화면 내 「정정·보완 의견」란에 함께 적어 제출하실 수 있습니다.';
     return [
       '[푸른노무법인] ' + (who ? who + '님, ' : '') + '안녕하십니까.',
-      '면담 관련 «' + kindLabel + '» 열람 및 전자서명 보안 링크를 안내드립니다.',
+      '조사 절차 관련 «' + kindLabel + '» 열람 및 전자확인 보안 링크를 안내드립니다.',
       '',
-      '▶ 보안 서명 링크: ' + String(o.link || ''),
+      '▶ 보안 링크: ' + String(o.link || ''),
       '· 본인 확인: 별도 안내드리는 12자리 보안코드 입력 후 복호화 열람 가능',
       '· 유효 기한: ' + ymd(o.exp) + ' 까지 (1회 제출 후 자동 잠금)',
-      '· 진술 내용 중 수정·보완할 사항이 있으시면 화면 내 「정정·보완 의견」란에 함께 적어 제출하실 수 있습니다.'
+      guideTail
     ].join('\n');
   }
 
@@ -293,16 +347,22 @@
   function shareCodeMessage(opts) {
     var o = opts || {};
     var fmt = formatPasscode(o.accessCode || '');
-    return '[푸른노무법인] 진술확인 전자서명 본인확인 보안코드: ' + fmt + ' (타인 공유 금지 · 1회용)';
+    var tag = o.docKind === 'org_survey' ? '무기명 실태조사' : '조사 전자서명';
+    return '[푸른노무법인] ' + tag + ' 본인확인 보안코드: ' + fmt + ' (타인 공유 금지 · 1회용)';
   }
 
   return {
     PLEDGE_TEXT: PLEDGE_TEXT,
+    SURVEY_PLEDGE_TEXT: SURVEY_PLEDGE_TEXT,
+    DEFAULT_MEASURE_OPTIONS: DEFAULT_MEASURE_OPTIONS,
+    DOC_KINDS: DOC_KINDS,
     MAX_ENC_CT_CHARS: MAX_ENC_CT_CHARS,
     newHexKey: newHexKey,
     newPasscode: newPasscode,
+    genAccessCode: newPasscode,
     cleanPasscode: cleanPasscode,
     formatPasscode: formatPasscode,
+    formatAccessCode: formatPasscode,
     ymd: ymd,
     ymdhm: ymdhm,
     normalizeSignPayload: normalizeSignPayload,

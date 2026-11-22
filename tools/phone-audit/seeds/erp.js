@@ -94,6 +94,10 @@ for (let i = 0; i < 30; i++) {
     { code: 'lrc-local', state: 'checked', strength: 'strong', evidence: '지방노동위원회 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' },
     { code: 'lrc-central', state: 'checked', strength: 'strong', evidence: '중앙노동위원회 재심 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' }] },
   { id: 'ct-pa-stg5', no: 94, st: 'consult', i: 27, marks: [], extra: { parentContractId: 'ct-pa-stg4', stageCode: 'court-admin' } },
+  /* ⑥ 확정 · 단계 마크 없음 · 메모에 지노위·중노위 낱말이 있다 → 계약 창 «계약 글에서 읽어 보기»를 누르면 두 단계를 읽는다(2026-11-16, 계획 5 · E)
+     ⑦ 확정 · 단계 마크 없음 · 낱말 없음 → 눌러도 «찾지 못했습니다» */
+  { id: 'ct-pa-stg6', no: 95, st: 'signed', i: 26, marks: [], extra: { note: '수임계약서 — 부당해고 구제신청(지방노동위원회) 및 중앙노동위원회 재심 대리' } },
+  { id: 'ct-pa-stg7', no: 96, st: 'signed', i: 25, marks: [], extra: { note: '임금체불 진정 대리 — 노동청 진정만' } },
 ].forEach((x) => {
   계약.push(Object.assign({
     id: x.id, entityType: 'contract', contractNo: `계약-2026-${String(100 + x.no)}`,
@@ -194,7 +198,13 @@ const 기금후보 = {
     erp: { contractId: 'ct-pa0', contractNo: '계약-2026-100', at: '2026-10-14T01:00:00.000Z', bySid: 'P001' } },
 };
 
+/* 📋 「나의 업무」의 업무관리 숫자 한 줄(work_erp/mysum/{사번}) — 업무관리가 적는 것을 지어낸다(2026-11-21).
+   업무 목록(work_erp/items)은 비워 둔다 — 그러면 «업무관리에 아직 없는 업무»·«옮길 일반업무» 띠가 그려진다(처음 쓰는 날의 모습). */
+const 오늘ms = Date.now();
+const 날짜 = (n) => { const d = new Date(오늘ms + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const data = {
+  /* 열쇠 = 가짜 로그인 UID(seed.js 의 UID — require 하면 서로 부르기가 되어 undefined 라 글자로 적는다) */
+  work_erp: { mysum: { 'pa-uid-1': { v: 1, n: 12, dd: [날짜(-1), 날짜(3)], nx: [날짜(0)], nl: 4, ws: 날짜(-30), we: 날짜(30), at: 오늘ms - 3600000 } } },
   fund_erp: { contract_inbox: 기금후보 },
   data: {
     user_accounts: { u: U, v: 사람 },
@@ -232,6 +242,15 @@ function 창(name, text) {
 module.exports = {
   data,
   views: [
+    /* 📋 첫 화면(나의 업무)의 「내 업무 — 업무관리」 칸 — 폰에서는 캘린더 아래라 내려가서 잰다(2026-11-21) */
+    { name: 'mydesk-work', wait: 800, run: async (page) => {
+      /* 업무관리 목록(work_erp/items)을 받은 뒤에야 «아직 없는 업무» 띠가 선다 — 그 띠가 뜰 때까지 기다린다 */
+      await page.waitForFunction(() => (document.body.innerText || '').indexOf('업무관리에 아직 없는') >= 0, null, { timeout: 8000 }).catch(() => {});
+      await page.evaluate(() => {
+        const b = Array.prototype.find.call(document.querySelectorAll('button'), (x) => (x.textContent || '').indexOf('업무관리에서 열기') >= 0);
+        if (b) b.scrollIntoView({ block: 'start' });
+      });
+    } },
     메뉴('biz/contract'),
     /* 📄 기금 후보 띠 — ☐ 두 개를 눌러 «N건 선택» 줄이 뜨는지 본다(고르기만으로는 아무것도 안 바뀐다) */
     { name: 'contract-fib-pick', wait: 1200,

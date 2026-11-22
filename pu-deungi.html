@@ -28,6 +28,13 @@
      ★ 오른쪽 보기 칸(2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」):
        지난 기록 «👁 보기»는 목록 오른쪽 칸에 열린다(◀ 이전·다음 ▶ 으로 차례로 넘김 · 왼쪽 가장자리를 끌어 너비 조절).
        탭을 옮겨도 칸은 남아 «등기 건 ② 서류»와 나란히 비교한다. 1080px 보다 좁으면 화면 전체를 덮는 창.
+     ★ 새로 만든 서류도 같은 칸(2026-11-15 대표 「새로 만든 서류도 오른쪽으로 — 화면이 너무 정신없다, 간략하게」):
+       ② 서류 확인·도장은 «서류 목록 + 도장 ☑» 한 줄씩만 왼쪽에 두고, 서류를 누르면 오른쪽 칸에 한글 쪽 그대로 나온다(◀ 이전·다음 ▶).
+       칸 위쪽 «새 서류 | 지난 원본» 단추로 같은 자리에서 맞바꿔 본다. ①에서 값을 고치면 칸의 서류도 저절로 다시 그려진다.
+       지난 기록 목록도 한 줄(이름·종류·날짜)로 줄였다 — 종류 바꾸기는 칸 위쪽에서.
+     ★ 화면 개편(2026-11-18 대표 「UI 모두 깔끔하게 — 너무 단순하고 무미건조하고 빈 공백이 많다 · 한 화면에서 가급적 모두 확인 · 각 지사 지사장 정보가 안 맞는다 · 지난 기록은 접어서 펴기」):
+       머리줄 한 줄(탭 알약·개수) · 본문은 화면 너비를 쓴다 · 등기 현황은 «사무소·지사장 띠» + 왼쪽 법인 정보 / 오른쪽 사원·분사무소(넓은 화면 한 화면) ·
+       분사무소마다 «지사장»(사원 줄을 가리킨다 — core branch.head)·사원 줄 «직책» 칸 · 지난 기록 묶음·끝난 건·바뀐 기록은 접고 펴기(FOLD — 이 브라우저에 기억).
      ⚠ 법령 근거(2026-11-14 현행 원문 확인)·기한은 js/pu-deungi-core.js 머리글. 서식·기한·비용은 담당 법무사가 최종 확인한다.
      ═══════════════════════════════════════════════════════ -->
 <style>
@@ -83,6 +90,13 @@ main{padding:12px 16px 40px;max-width:1280px}
 .t td.nw{max-width:340px;overflow:hidden;text-overflow:ellipsis}
 .t tr.cur,.t tr.cur td{background:var(--blue-bg)}
 .t tr.click{cursor:pointer}
+.t tr.click:hover td{background:var(--blue-bg)}
+.t td.kd,.t td.dt{color:var(--mute);font-size:12px}
+.t td.ac{text-align:right}
+/* 목록의 이름 — 누르면 오른쪽 칸에 열린다(한 줄·말줄임) */
+button.lnk{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:none;background:none;padding:2px 0;border-radius:4px;font-weight:600;text-align:left;color:var(--ink)}
+button.lnk:hover{border:none;color:var(--blue-d);text-decoration:underline}
+button.lnk:disabled{opacity:1;color:var(--ink);cursor:default;text-decoration:none}
 .t input:not([type=checkbox]),.t select{width:100%}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 12px}
 .fl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink2);min-width:0}
@@ -94,7 +108,6 @@ main{padding:12px 16px 40px;max-width:1280px}
 .chg{border:1px solid var(--line);border-radius:9px;margin:10px 12px;background:var(--card)}
 .chg>.hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-bottom:1px solid var(--line);border-radius:9px 9px 0 0}
 .chg>.hd b{font-size:13px}
-.arcg{border-top:1px solid var(--line)}
 /* 쉬운 진행 — 단계 막대 · 큰 단추 · 한글 쪽 화면 */
 .wiz{display:flex;gap:6px;padding:10px 12px;flex-wrap:wrap}
 .wiz button{flex:1 1 150px;display:flex;align-items:center;gap:8px;text-align:left;padding:8px 10px;border-radius:10px;white-space:normal}
@@ -104,6 +117,8 @@ main{padding:12px 16px 40px;max-width:1280px}
 .wiz button.on{border-color:var(--blue);background:var(--blue-bg)}
 .wiz button.on .no{background:var(--blue);color:#ffffff}
 .wiz button.done .no{background:var(--green-m);color:#ffffff}
+/* 단계 줄은 지금 단계만 설명을 보인다 — 한눈에 덜 복잡하게 */
+.wiz button:not(.on):not(.skip) .tx small{display:none}
 .easy .adds{display:none}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;padding:10px 12px}
 .tile{padding:12px;font-size:14px;text-align:left;white-space:normal;border-radius:10px;line-height:1.35}
@@ -113,21 +128,16 @@ main{padding:12px 16px 40px;max-width:1280px}
 .howto li{margin:5px 0;line-height:1.5}
 .nextbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line)}
 .nextbar .pri{padding:9px 16px;font-size:14px}
-.doctoc{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
-.hwpv{background:var(--line);max-height:78vh;overflow:auto}
-.docblk{border-bottom:1px solid var(--line2)}
-.dochd{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);font-weight:700;position:sticky;top:0;z-index:2}
-.dochd .sp{flex:1}
+/* 인쇄 — 보기 칸이 열려 있을 때는 칸 안의 서류만(새 서류 «🖨 인쇄») */
 @media print{
-  body *{visibility:hidden !important}
-  #hwpView, #hwpView *{visibility:visible !important}
-  #hwpView{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;background:#ffffff}
-  #hwpView .dochd, #hwpView .doctoc{display:none}
-  #hwpView [id^=hvp]{padding:0 !important;background:#ffffff !important}
-  #hwpView canvas{box-shadow:none !important;margin:0 auto !important;break-after:page;page-break-after:always;max-width:100% !important}
+  body.withSide>*:not(#side){display:none !important}
+  body.withSide #side.on{display:block !important;position:static !important;width:auto !important;border:0 !important;box-shadow:none !important}
+  body.withSide #side .sdh, body.withSide #side .sdt, body.withSide #side .grip{display:none !important}
+  body.withSide main{margin-right:0}
+  #spv{overflow:visible !important;height:auto !important;background:#ffffff !important}
+  #spv .pvi{padding:0 !important;background:#ffffff !important;overflow:visible !important}
+  #spv canvas{box-shadow:none !important;margin:0 auto !important;break-after:page;page-break-after:always;max-width:100% !important}
 }
-.arcg>.hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 12px;background:var(--bg)}
-.arcg>.hd b{white-space:nowrap;font-size:13px}
 .chg>.bd{padding:9px 10px}
 .tos{margin-top:8px;border-top:1px dashed var(--line2);padding-top:8px}
 .tor{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
@@ -162,14 +172,23 @@ main{padding:12px 16px 40px;max-width:1280px}
 .mbox>h3{margin:0;padding:12px 14px;border-bottom:1px solid var(--line);font-size:15px;display:flex;gap:8px;align-items:center}
 .mbox>.mb{padding:12px 14px}
 .mbox>.mf{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-#pv{min-height:200px}
 /* 오른쪽 보기 칸(2026-11-15) — 넓은 화면은 목록 오른쪽에 붙고 본문이 왼쪽으로 좁아진다 · 좁은 화면은 전체를 덮는다 */
 #side{display:none}
 #side.on{display:flex;flex-direction:column;position:fixed;z-index:15;top:var(--headH,92px);right:0;bottom:0;width:var(--sideW,46vw);background:var(--card);border-left:1px solid var(--line2);box-shadow:-4px 0 12px var(--line)}
 body.withSide main{margin-right:var(--sideW,46vw)}
-#side .sdh{display:flex;align-items:center;gap:6px;padding:8px 10px 6px 14px;flex-wrap:wrap}
-#side .sdh b{flex:1 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
-#side .sds{padding:0 14px 7px;font-size:12px;color:var(--mute);border-bottom:1px solid var(--line)}
+#side [hidden]{display:none !important}
+#side .sdh{display:flex;align-items:center;gap:6px;padding:8px 10px 4px 14px;flex-wrap:wrap}
+#side .sdg{display:inline-flex;gap:6px}
+#side .sdt{padding:2px 14px 8px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+#side .sdt b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+#side .sdsub{font-size:12px;color:var(--mute);line-height:1.45}
+#side .sdsub:empty{display:none}
+#side select{font-size:12px;padding:2px 6px;margin-top:2px}
+.seg{display:inline-flex}
+.seg button{border-radius:0;margin-left:-1px}
+.seg button:first-child{border-radius:8px 0 0 8px;margin-left:0}
+.seg button:last-child{border-radius:0 8px 8px 0}
+.seg button[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:#ffffff;position:relative}
 #spv{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;background:var(--line)}
 #spv .pvi.pdf{height:100%}
 #spv iframe{display:block;width:100%;height:100%;border:0;background:var(--card)}
@@ -192,6 +211,8 @@ body.slim .t tbody td.full{flex:1 1 100%;white-space:normal;overflow:visible}
 body.slim .t tbody td[data-l]::before{content:attr(data-l) ' ';color:var(--mute);font-size:12px}
 body.slim .t tbody td input:not([type=checkbox]),body.slim .t tbody td select{width:100%}
 body.slim .t tbody td.inp{flex:1 1 100%}
+body.slim .t tbody td.ac{margin-left:auto}
+body.slim .arct tbody td.ti{flex:1 1 0;min-width:140px}
 body.slim .chg{margin:8px 6px}
 body.slim .tor input,body.slim .tor select{width:100%}
 body.slim .tiles{grid-template-columns:1fr 1fr}
@@ -200,7 +221,6 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
   #side.on{top:0;left:0;width:auto;z-index:45;border-left:none;box-shadow:none}
   body.withSide main{margin-right:0}
   #side .grip{display:none}
-  #side .sdh b{flex-basis:100%}
 }
 .empty{padding:22px 12px;text-align:center;color:var(--mute)}
 .phone-only{display:none}
@@ -226,30 +246,167 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
   .t tbody td[data-l]::before{content:attr(data-l) ' ';color:var(--mute);font-size:12px}
   .t tbody td input:not([type=checkbox]),.t tbody td select{width:100%}
   .t tbody td.inp{flex:1 1 100%}
+  .t tbody td.ac{margin-left:auto}
+  .arct tbody td.ti{flex:1 1 0;min-width:140px}
+  #side select{font-size:16px}
   .chg{margin:8px 6px}
   .tor input,.tor select{width:100%}
   .step{flex:1 1 100%}
   .tiles{grid-template-columns:1fr 1fr}
   .wiz button{flex:1 1 calc(50% - 6px)}
-  .hwpv{max-height:70vh}
   .mbox{border-radius:10px}
 }
+/* 아주 좁은 폰 — 파일 줄: 1줄 ☐ № 이름 ⬇ · 2줄 종류·날짜(받기 단추가 혼자 둘째 줄로 떨어지지 않게 · 외부 검토 2026-11-15) */
+@media (max-width:440px){
+  .arct tbody td.ac{order:2;margin-left:0}
+  .arct tbody td.kd,.arct tbody td.dt{order:3}
+  .arct tbody td.kd{margin-left:54px}
+}
+/* ═══ 화면 개편(2026-11-18 대표 «UI 모두 깔끔하게 — 너무 단순하고 무미건조하고 빈 공백이 많다 · 한 화면에서 가급적 모두 확인 · 지난 기록은 접어서 펴기») ═══
+   · 머리줄 한 줄(이름·탭·사람) · 본문은 화면 너비를 쓴다 · 카드·표를 촘촘하게(표 안 글칸은 가리키면 테두리)
+   · 등기 현황: 사무소·지사장 띠 + 왼쪽 법인 정보 / 오른쪽 사원·분사무소 (넓은 화면에서 한 화면)
+   · 지난 기록: 묶음·끝난 건·바뀐 기록을 접고 펴기 */
+:root{--shadow:0 1px 2px rgba(15,23,42,.07),0 1px 1px rgba(15,23,42,.04)}
+body{background:linear-gradient(180deg,#f8fafc,#e2e8f0) fixed}
+.card{box-shadow:var(--shadow);border-radius:12px}
+.card>h3{padding:8px 12px;background:linear-gradient(#ffffff,#f8fafc);border-radius:12px 12px 0 0;font-size:13.5px}
+.cb{padding:8px 12px}
+.bar{padding:6px 10px}
+.t th,.t td{padding:4px 8px}
+.t th{font-weight:600;letter-spacing:-.1px}
+@media (min-width:769px){ :where(body:not(.slim)) .t tbody tr:where(:nth-child(even))>td{background:#f8fafc} }
+.t td.inp{padding:2px 3px}
+.t td.inp input,.t td.inp select{border-color:transparent;background:transparent;padding:3px 6px;font-size:12.5px;text-overflow:ellipsis}
+.t td.inp input:hover,.t td.inp select:hover{border-color:var(--line2);background:var(--card)}
+.t td.inp input:focus,.t td.inp select:focus{border-color:var(--blue);background:var(--card);outline:none;box-shadow:0 0 0 2px var(--blue-line)}
+.t.fx{table-layout:fixed}
+.t.fx th,.t.fx td{overflow:hidden;text-overflow:ellipsis}
+.t.mt{min-width:940px}
+.t.bt{min-width:900px}
+.t td.duty{white-space:normal;line-height:1.7}
+.mute{color:var(--mute)}
+.tiles{gap:6px;padding:8px 12px}
+.tile{padding:8px 10px;font-size:13px;border-radius:9px}
+.tile small{font-size:11.5px}
+.msgs{padding:0 12px 2px}
+.msg{padding:5px 10px;margin:5px 0}
+.empty{padding:16px 12px}
+/* 머리줄 — 이름 · 탭 · 사람이 한 줄 */
+#head{background:linear-gradient(90deg,#2563eb,#60a5fa) top/100% 3px no-repeat,var(--card);box-shadow:0 1px 3px rgba(15,23,42,.08)}
+.top{padding:6px 16px;gap:10px}
+.top h1{font-size:16px;white-space:nowrap}
+.tabs{padding:0;margin-left:6px;gap:4px;flex-wrap:nowrap}
+.tabs button{border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 13px;font-weight:600;white-space:nowrap}
+.tabs button:hover{background:var(--blue-bg);border-color:var(--blue-line)}
+.tabs button.on{background:var(--blue);border-color:var(--blue);color:#ffffff}
+.tabs .tn{display:inline-block;margin-left:5px;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;font-weight:700;background:var(--blue-bg);color:var(--blue-d)}
+.tabs button.on .tn{background:#ffffff;color:var(--blue-d)}
+.tabs .tn:empty{display:none}
+main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
+/* 등기 현황 — 사무소·지사장 띠 · 왼쪽 법인 정보 / 오른쪽 사원·분사무소 */
+#pane-base,#pane-hist,#pane-case{container-type:inline-size}
+.sums{display:inline-flex;gap:5px;flex-wrap:wrap;align-items:center;font-weight:400}
+.ofc{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:8px;padding:10px 12px}
+.oc{border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:9px;padding:6px 10px;background:var(--card);display:flex;flex-direction:column;gap:1px;min-width:0}
+.oc.hq{border-left-color:var(--blue);background:linear-gradient(90deg,var(--blue-bg),#ffffff 70%)}
+.oc.ok{border-left-color:var(--green-m);background:linear-gradient(90deg,var(--green-bg),#ffffff 70%)}
+.oc.no{border-left-color:var(--amber-m);background:linear-gradient(90deg,var(--amber-bg),#ffffff 70%)}
+.oc .oh{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.oc .oh b{font-size:13px;white-space:nowrap}
+.oc .op{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc .ot{font-size:11px;font-weight:600;color:var(--mute);margin-right:3px}
+.oc .miss{font-size:12.5px;font-weight:600;color:var(--amber)}
+.oc .lic{font-size:11px;font-weight:400;color:var(--mute)}
+.oc .oa,.oc .om{font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcols,.dright{display:block;min-width:0}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.fgrid .fl{font-size:11.5px}
+.fgrid .fl input{padding:4px 7px;font-size:12.5px}
+/* 중간 너비(2단이 못 되는 데스크톱) — 법인 정보를 4칸으로 펼쳐 세로를 줄인다 */
+@container (min-width:720px) and (max-width:1299px){
+  .fgrid{grid-template-columns:repeat(4,1fr)}
+  .fgrid .fl.wide{grid-column:span 2}
+}
+@container (min-width:1300px){
+  .dcols{display:grid;grid-template-columns:330px minmax(0,1fr);gap:12px;align-items:start}
+}
+@container (min-width:1000px){
+  .hcols{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+}
+/* 접고 펴기 — 카드 머리가 단추 */
+.car{display:inline-block;flex:0 0 14px;width:14px;color:var(--mute);font-size:12px;transition:transform .15s}
+.card.fc>.fh{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;border-radius:12px;background:linear-gradient(#ffffff,#f8fafc);padding:8px 12px;white-space:normal;font-weight:400}
+.card.fc>.fh:hover{background:var(--blue-bg)}
+.card.fc>.fh b{font-size:13.5px}
+.card.fc>.fh .hint{flex:1;min-width:0}
+.card.fc.open>.fh{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
+.card.fc.open>.fh .car,.arcg.open .car{transform:rotate(90deg)}
+.arcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(480px,100%),1fr));gap:8px;padding:10px 12px;align-items:start}
+.arcg{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden;min-width:0;box-shadow:var(--shadow)}
+.arcg.open{grid-column:1/-1;border-color:var(--blue-line);box-shadow:0 0 0 1px var(--blue-line)}
+.arcg>.hd{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px 10px;background:none}
+.arcg .tg{flex:1;min-width:0;display:flex;align-items:flex-start;gap:6px;text-align:left;border:none;background:none;padding:2px 0;border-radius:6px;white-space:normal;font-weight:400}
+.arcg .tg:hover{border:none;background:none}
+.arcg .tg:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.arcg .tg .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.arcg .l1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.arcg .l1 .dt{flex:0 0 auto;font-size:12px;color:var(--blue-d);font-weight:700;font-variant-numeric:tabular-nums}
+.arcg .l1 .ttl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.arcg .l2{display:flex;align-items:center;gap:6px;min-width:0}
+.arcg .l2 .ks{font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arcg .l3{font-size:12px;color:var(--ink2);line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.arcg.open .l3{-webkit-line-clamp:unset;line-clamp:unset;display:block}
+.arcg .acts{display:flex;gap:5px;flex:0 0 auto}
+.arcg>.bd{border-top:1px solid var(--line)}
+@media (max-width:768px){
+  .top{padding:6px 10px;gap:6px 8px}
+  .tabs{order:5;flex:1 1 100%;margin-left:0;overflow-x:auto;gap:2px}
+  .tabs button{padding:5px 9px;font-size:13px}
+  .t td.inp input,.t td.inp select{border-color:var(--line2);background:var(--card)}
+  .t.mt,.t.bt{min-width:0}
+  .t.fx{table-layout:auto}
+  .t.fx th,.t.fx td{overflow:visible}
+  .t td.inp input,.t td.inp select,.fgrid .fl input{font-size:16px}   /* 폰 16px — 위의 표 안 글칸·법인 정보 칸 규칙이 이기지 않게(외부 검토 2026-11-18) */
+  .fgrid{grid-template-columns:1fr}
+  .arcg .acts{flex-direction:column}
+}
+body.slim .t td.inp input,body.slim .t td.inp select{border-color:var(--line2);background:var(--card)}
+/* 등기 건 — 넓으면 단추 4칸 · 바뀌는 것 카드 여러 칸 · 옆 칸이 열려 본문이 좁아도(데스크톱) 단계 4칸을 한 줄로 */
+#edChanges{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));column-gap:4px;align-items:start}
+#edChanges>.adds,#edChanges>.empty{grid-column:1/-1}
+@container (min-width:600px){ .tiles{grid-template-columns:repeat(4,1fr)} .wiz button{flex:1 1 0} }
+@media (min-width:1080px){ body.slim .tiles{grid-template-columns:repeat(4,1fr)} body.slim .wiz button{flex:1 1 0;padding:7px 8px} body.slim .wiz button .tx small{display:none} body.slim .wiz button.on .tx small{display:block} }
+body.slim .t.mt,body.slim .t.bt{min-width:0}
+body.slim .t.fx{table-layout:auto}
+body.slim .t.fx th,body.slim .t.fx td{overflow:visible}
+@media (min-width:1080px){ body.slim .t tbody td.c,body.slim .t tbody td.tk{padding:3px 8px} }
+/* ══ pu-design 시작 — 푸른등기는 탭이 머리줄(.top) 한 줄 안에 있다. 공용 A 틀의 탭 여백(옆 16px·아래 9px)이 머리줄을
+   위아래로 어긋나게 하니(자동 검토 2026-11-20) 자기 탭 여백·간격·단추 안쪽 여백을 그대로 둔다. 이름표가 둘이라 공용 파일보다 세다 ══ */
+:where(body.pu-design) .top .tabs{padding:0;gap:4px}
+:where(body.pu-design) .top .tabs button{padding:5px 13px}
+@media (max-width:768px){
+  :where(body.pu-design) .top .tabs{gap:2px}
+  :where(body.pu-design) .top .tabs button{padding:5px 9px;font-size:13px}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a">
 <div id="head">
   <div class="top">
     <h1>🖋 푸른등기</h1>
+    <div class="tabs" id="tabs" role="tablist" aria-label="푸른등기 화면">
+      <button role="tab" data-tab="case">📝 등기 건<span class="tn" data-n="case"></span></button>
+      <button role="tab" data-tab="base">🏛 등기 현황<span class="tn" data-n="base"></span></button>
+      <button role="tab" data-tab="hist">📚 지난 기록<span class="tn" data-n="hist"></span></button>
+    </div>
     <span class="sub wide-only">노무법인 변경등기 — 바뀌는 사람만 넣으면 서류가 한글로</span>
-    <span id="who"></span>
     <span class="sp"></span>
+    <span id="who"></span>
     <button class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
-  </div>
-  <div class="tabs" id="tabs" role="tablist" aria-label="푸른등기 화면">
-    <button role="tab" data-tab="case">📝 등기 건</button>
-    <button role="tab" data-tab="base">🏛 등기 현황</button>
-    <button role="tab" data-tab="hist">📚 지난 기록</button>
   </div>
 </div>
 <div id="lock"><h2>🖋 푸른등기</h2><div id="lockWhy"></div><p>대표·위임관리인만 열 수 있습니다.</p></div>
@@ -270,7 +427,7 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
     <div id="histBox"></div>
   </section>
 </main>
-<aside id="side" role="complementary" aria-label="원본 서류 보기"></aside>
+<aside id="side" role="complementary" aria-label="서류 보기"></aside>
 <div class="modal" id="modal" style="display:none" role="dialog" aria-modal="true" aria-label="창"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
@@ -281,14 +438,14 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=100"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=47"></script>
-<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
@@ -300,7 +457,7 @@ body.slim .wiz button{flex:1 1 calc(50% - 6px)}
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="js/pu-office-store.js?v=11"></script>
-<script src="js/pu-deungi-core.js?v=5"></script>
+<script src="js/pu-deungi-core.js?v=6"></script>
 <script src="js/pu-deungi-docs.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -315,8 +472,9 @@ var RRN={};
 var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
 /* 지난 등기 원본 서류 묶음(deungi/archive) · 올리는 중 · 미리보기 주소 */
 var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='', PV_SEQ=0;
-/* 오른쪽 보기 칸 — 지금 보는 파일 {ev,fid} · 한글 바이트(너비가 바뀌면 다시 그림) · 닫으면 돌아갈 자리 · 다시 그리기 타이머 */
-var SIDE=null, PV_BYTES=null, SIDE_BACK=null, SIDE_T=null, SIDE_RW=0;
+/* 오른쪽 보기 칸 — 지금 보는 것 {kind:'arc',ev,fid} 또는 {kind:'doc',key,cid}(새로 만든 서류) · 마지막으로 본 것(원본·새 서류 각각) · 한글 바이트(너비가 바뀌면 다시 그림) ·
+   닫으면 돌아갈 자리 · 다시 그리기 타이머(너비·서류) · 그려 둔 새 서류 · 사용자가 닫은 건(자동으로 다시 열지 않는다) */
+var SIDE=null, SIDE_LAST={ arc:null, doc:null }, PV_BYTES=null, SIDE_BACK=null, SIDE_T=null, SIDE_DT=null, SIDE_RW=0, SIDE_PK='', DOC_NO_AUTO='';
 var SAVE={ t:null, busy:false, dirty:false, err:'', at:0 };
 
 function $(id){ return document.getElementById(id); }
@@ -390,7 +548,17 @@ function draw(){
   if(TAB==='case'){ drawBaseWarn(); drawCaseList(); drawEditor(); }
   else if(TAB==='base') drawBase();
   else drawHist();
-  sideHead();
+  drawTabBadges(); sideHead(); sideDocRefresh();
+}
+/* 탭 꼬리표 — 진행 중인 건 수 · 지난 기록 묶음 수 */
+function drawTabBadges(){
+  var m={ case:caseRows().filter(function(c){ return c.status!=='cancelled' && !(c.status==='done' && c.applied); }).length||'', base:'', hist:arcRows().length||'' };
+  /* 꼬리표 숫자의 뜻을 말로도(스크린리더·가리키면) — «등기 건 1» 만 읽히지 않게 */
+  var say={ case:function(n){ return '등기 건 — 진행 중 '+n+'건'; }, hist:function(n){ return '지난 기록 — 원본 서류 묶음 '+n+'개'; } };
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs .tn'), function(e){
+    var n=m[e.dataset.n]||''; e.textContent=n;
+    if(e.parentNode) e.parentNode.title=(n&&say[e.dataset.n])?say[e.dataset.n](n):'';
+  });
 }
 function drawBaseWarn(){
   var p=C.baseProblems(BASE);
@@ -541,7 +709,7 @@ function drawDerived(){
   var aft='<div class="reg"><h4>바뀐 뒤</h4>'+regLines(a.members, a.branches, a, false)+'</div>';
   $('edPreview').innerHTML='<div class="two">'+bef+aft+'</div>'+
     '<div class="reg" style="margin-top:10px"><h4>등기할 사항 '+(reg.length?'('+reg.length+')':'')+'</h4>'+(reg.length?reg.map(function(r){ return '<div class="ln"><span class="chip m">'+esc(r.group)+'</span> '+esc(r.lines.join(' / '))+'</div>'; }).join(''):'<div class="hint">없음</div>')+'</div>';
-  drawDocs(a); drawChecklist(a); drawSched(a); drawCost(a); drawSaveState();
+  drawDocs(a); drawChecklist(a); drawSched(a); drawCost(a); drawSaveState(); sideDocRefresh();
 }
 function regLines(members, branches, a, before){
   var h='';
@@ -566,10 +734,11 @@ function drawDocs(a){
   var all=plan.every(function(d){ return d.on; });
   h+='<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" data-docall'+(all?' checked':'')+' title="모두 고르기"></th><th class="n">№</th><th>서류</th><th>쪽</th><th></th></tr></thead><tbody>';
   plan.forEach(function(d, i){
-    h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(d.title)+' 고르기" data-doc="'+d.key+'"'+(d.on?' checked':'')+'></td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(d.title)+'</td><td'+(d.count>1?' data-l="쪽">'+d.count+'명':'>')+'</td>'+
-      '<td><button class="sm" data-act="pv" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>👁 미리보기</button> <button class="sm" aria-label="'+esc(d.title)+' 받기" title="'+esc(d.title)+' 받기" data-act="dl1" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>⬇</button></td></tr>';
+    h+='<tr class="click" data-dockey="'+d.key+'"><td class="c"><input type="checkbox" aria-label="'+esc(d.title)+' 고르기" data-doc="'+d.key+'"'+(d.on?' checked':'')+'></td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(d.title)+'</td><td'+(d.count>1?' data-l="쪽">'+d.count+'명':'>')+'</td>'+
+      '<td><button class="sm" data-act="docView" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>👁 미리보기</button> <button class="sm" aria-label="'+esc(d.title)+' 받기" title="'+esc(d.title)+' 받기" data-act="dl1" data-key="'+d.key+'"'+(a.errors.length?' disabled':'')+'>⬇</button></td></tr>';
   });
   $('edDocs').innerHTML=h+'</tbody></table></div><div class="cb hint">'+(a.c.filing==='agent'?'⚠ «변경등기 신청서»는 법무사 확인용 초안입니다. 서식·기한·비용은 담당 법무사가 최종 확인합니다.':'«변경등기 신청서»는 직접 제출용입니다 — 세액·수수료는 실제 영수필확인서 금액으로 맞추고, 첨부서면·공증 필요 여부는 등기소에 미리 확인하십시오.')+' 지분 양도·양수 계약서의 대금은 당사자 합의로 채웁니다.</div>';
+  sideMark();
 }
 var SRC_CLS={ '법무사':'g', '법령':'g', '서류':'', '지난 서류':'m', '확인 필요':'a' };
 function drawChecklist(a){
@@ -627,7 +796,7 @@ function drawWizSteps(a, st, auto){
   var el=$('wizSteps'); if(!el) return;
   el.innerHTML=EASY_STEPS.map(function(x){
     var k=x[0], done=k<auto, skip=k===3&&!a.charterChanged&&a.c.changes.length;
-    return '<button role="tab" aria-selected="'+(k===st?'true':'false')+'" class="'+(k===st?'on ':'')+(done?'done':'')+'" data-act="wizGo" data-s="'+k+'"><span class="no">'+(done?'✓':k)+'</span><span class="tx"><b>'+esc(x[1])+'</b><small>'+esc(skip?'이번엔 필요 없음':k===4&&a.c.filing==='agent'?'법무사에게 맡기고 끝내기':x[2])+'</small></span></button>';
+    return '<button role="tab" aria-selected="'+(k===st?'true':'false')+'" class="'+(k===st?'on ':'')+(done?'done':'')+(skip?' skip':'')+'" data-act="wizGo" data-s="'+k+'"><span class="no">'+(done?'✓':k)+'</span><span class="tx"><b>'+esc(x[1])+'</b><small>'+esc(skip?'이번엔 필요 없음':k===4&&a.c.filing==='agent'?'법무사에게 맡기고 끝내기':x[2])+'</small></span></button>';
   }).join('');
 }
 function nextBar(k, ok, why){
@@ -641,7 +810,12 @@ function deadlineHtml(a){
     : '<div class="msg '+(dl.overdue?'e':dl.left<=5?'w':'i')+'">등기 기한 <b>'+esc(dl.due)+'</b> ('+esc(dl.basis)+' '+esc(dl.from)+' + 2주일) — '+(dl.overdue?(-dl.left)+'일 지났습니다':dl.left+'일 남음')+'</div>';
   return '<div class="msg i">'+(a.charterChanged?'«인가증 받은 날»을 넣으면 등기 기한(받은 날부터 2주일)이 나옵니다.':'총회 날짜를 넣으면 등기 기한(2주일)이 나옵니다.')+'</div>';
 }
+/* 본문을 그린 뒤 보기 칸을 맞춘다 — ② 에서는 새 서류를 칸에 열고(좁은 화면은 자동으로 덮지 않는다), 다른 단계에서는 머리줄만 */
 function drawWizBody(st, a){
+  drawWizBody0(st, a); sideMark();
+  if(st===2) sideDocsEnter(); else sideHead();
+}
+function drawWizBody0(st, a){
   var c=cur(); if(!c) return; a=a||C.applyChanges(baseOf(c), c); var n=a.c, B0=baseOf(c), h='';
   VIEW_GEN++; SHOWN=st;
   if(st===1){
@@ -652,19 +826,18 @@ function drawWizBody(st, a){
     $('wizBody').innerHTML=h; drawChanges(); $('edCheck').innerHTML=checkMsgs(a, B0); return;
   }
   if(st===2){
-    var rows=C.sealPlan(a, chosenKeys(a)), nR=Object.keys(RRN).length, blocked=!!(a.errors.length||!n.changes.length);
-    h='<div class="card"><h3>② 서류 확인·도장 <span class="hint">만든 한글 서류가 아래에 쪽 그대로 나옵니다 — 받아서 출력하고 도장을 찍으십시오</span></h3>'+
-      '<div class="bar"><button class="pri" data-act="dlPack"'+(blocked?' disabled':'')+'>⬇ 한글 파일로 모두 받기</button><button class="sm" data-act="printView"'+(blocked?' disabled':'')+'>🖨 화면 그대로 인쇄</button><button class="sm" data-act="rrn">🔐 주민번호 넣기</button>'+
-      '<span class="hint">주민번호 뒷자리: '+(nR?'<b>'+nR+'명 넣음</b>(저장 안 함)':'안 넣음 — «앞자리-_______» 빈칸으로 나옵니다')+'</span></div>'+
+    var docs=C.docPlan(a, { today:today() }).filter(function(d){ return d.need && d.on; }), seal={}, sealRows=C.sealPlan(a, chosenKeys(a)), nR=Object.keys(RRN).length, blocked=!!(a.errors.length||!n.changes.length);
+    sealRows.forEach(function(r){ seal[r.key]=r; });
+    h='<div class="card"><h3>② 서류 확인·도장 <span class="hint">서류를 누르면 한글 쪽 그대로 보입니다 — 도장을 찍으면 ☑</span></h3>'+
+      '<div class="bar"><button class="pri" data-act="dlPack"'+(blocked?' disabled':'')+'>⬇ 한글 파일로 모두 받기</button><button class="sm" data-act="rrn">🔐 주민번호 넣기'+(nR?' ('+nR+'명)':'')+'</button></div>'+
       (blocked?'<div class="msgs"><div class="msg w">① 단계를 먼저 마치십시오(바뀌는 것·빨간 글).</div></div>':
-      '<div class="cb"><b>도장 찍을 곳</b> <span class="hint">찍으면 ☑ — 실제 날인·간인·공증 방식은 담당 법무사·공증사무소와 확인</span></div>'+
-      '<div class="scroll"><table class="t"><thead><tr><th class="c">✓</th><th class="n">№</th><th>서류</th><th>누가</th><th>어떻게</th></tr></thead><tbody>'+rows.map(function(r, i){
-        var ck=n.checks['seal_'+r.key]||{};
-        return '<tr><td class="c tk"><input type="checkbox" aria-label="'+esc(r.title)+' 도장 찍음" data-seal="'+esc(r.key)+'"'+(ck.ok?' checked':'')+'></td><td class="n">'+(i+1)+'</td><td class="ti" title="'+esc(r.title)+'">'+esc(r.title)+'</td><td data-l="누가">'+esc(r.who)+'</td><td class="nw full" title="'+esc(r.how)+'">'+esc(r.how)+'</td></tr>';
-      }).join('')+'</tbody></table></div>')+
-      nextBar(2, !blocked && rows.every(function(r){ return (n.checks['seal_'+r.key]||{}).ok; }), '도장 찍을 곳을 모두 ☑ 하면 다음으로 갑니다')+'</div>'+
-      (blocked?'':'<div class="card"><h3>📖 한글 화면 <span class="hint">«⬇ 한글 파일로 모두 받기»와 같은 서류</span><span class="sp"></span><button class="sm" data-act="viewAll">다시 그리기</button></h3><div class="hwpv" id="hwpView"></div></div>');
-    $('wizBody').innerHTML=h; if(!blocked) renderAllDocs(); return;
+      '<div class="scroll"><table class="t"><thead><tr><th class="c">✓</th><th class="n">№</th><th>서류</th></tr></thead><tbody>'+docs.map(function(d, i){
+        var sp=seal[d.key], ck=sp?(n.checks['seal_'+d.key]||{}):null;
+        return '<tr class="click" data-dockey="'+esc(d.key)+'" title="'+esc(sp?sp.who+' — '+sp.how:'도장 찍을 곳 없음')+'"><td class="c tk">'+(sp?'<input type="checkbox" aria-label="'+esc(d.title)+' 도장 찍음" data-seal="'+esc(d.key)+'"'+(ck.ok?' checked':'')+'>':'')+'</td><td class="n">'+(i+1)+'</td>'+
+          '<td class="ti"><button class="lnk" data-act="docView" data-key="'+esc(d.key)+'">'+esc(d.title)+(d.count>1?' <span class="hint">('+d.count+'명)</span>':'')+'</button></td></tr>';
+      }).join('')+'</tbody></table></div><div class="cb hint">실제 날인·간인·공증 방식은 담당 법무사·공증사무소와 확인하십시오. 주민번호 뒷자리는 저장하지 않으며, 안 넣으면 서류에 «앞자리-_______» 빈칸으로 나옵니다.</div>')+
+      nextBar(2, !blocked && sealRows.every(function(r){ return (n.checks['seal_'+r.key]||{}).ok; }), '도장 찍을 곳을 모두 ☑ 하면 다음으로 갑니다')+'</div>';
+    $('wizBody').innerHTML=h; return;
   }
   if(st===3){
     if(!a.charterChanged){
@@ -736,77 +909,118 @@ function drawEasyDerived(){
   }
   var ab=document.querySelector('#wizBody [data-act="applyBase"]');
   if(ab){ var canA=canApplyCase(a, c); ab.disabled=!canA; ab.title=canA?'':applyWhy(a); }
-  drawSaveState();
+  drawSaveState(); sideDocRefresh();
 }
-/* 한글 쪽 화면 — 서류마다 따로 그려 차례(목차)를 붙인다. 다른 단계로 가거나 다시 그리면 앞 그리기는 버린다 */
-function renderAllDocs(){
-  var box=$('hwpView'); if(!box) return;
-  if(!ready()){ box.innerHTML='<div class="msg w">한글 문서 기능을 불러오지 못했습니다 — 새로고침 하십시오</div>'; return; }
-  var x=docCtx(); if(x.after.errors.length){ box.innerHTML='<div class="msg w">① 단계의 빨간 글을 먼저 고치십시오</div>'; return; }
-  var docs; try{ docs=DD.build(x, chosenKeys(x.after)); }catch(e){ box.innerHTML='<div class="msg w">서류를 만들지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; return; }
-  var g=GEN, vg=++VIEW_GEN;
-  box.innerHTML='<div class="doctoc">'+docs.map(function(d, i){ return '<button class="sm" data-act="hvgo" data-i="'+i+'">'+(i+1)+'. '+esc(d.label)+'</button>'; }).join('')+'</div>'+
-    docs.map(function(d, i){ return '<div class="docblk" id="hv'+i+'"><div class="dochd">📄 '+(i+1)+'. '+esc(d.label)+'<span class="sp"></span><button class="sm" data-act="dl1" data-key="'+esc(d.key)+'" aria-label="'+esc(d.label)+' 받기">⬇ 받기</button></div><div id="hvp'+i+'"><div class="empty">그리는 중…</div></div></div>'; }).join('');
-  docs.reduce(function(p, d, i){ return p.then(function(){
-    if(g!==GEN || vg!==VIEW_GEN) return;
-    var el=$('hvp'+i); if(!el) return;
-    return Promise.resolve().then(function(){ return PureunHwp.renderPreview(el, DD.fileOne(d), DD.fileName(x, d)); }).catch(function(e){ if(vg===VIEW_GEN && $('hvp'+i)) $('hvp'+i).innerHTML='<div class="msg w">그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오</div>'; });
-  }); }, Promise.resolve());
-}
+/* 접고 펴기 — 지난 기록 묶음·끝난 건·바뀐 기록·정관 본문(2026-11-18 대표 «지난 기록은 접어서 펴서 보고 내용을 확인»). 펴 둔 것은 이 브라우저에 기억 */
+var FOLD={}; try{ FOLD=JSON.parse(lsGet('fold')||'{}')||{}; }catch(e){ FOLD={}; }
+function isOpen(k, dflt){ return FOLD[k]===undefined ? !!dflt : !!FOLD[k]; }
+function setFold(k, v){ FOLD[k]=!!v; var o={}; Object.keys(FOLD).slice(-300).forEach(function(x){ o[x]=FOLD[x]; }); FOLD=o; lsSet('fold', JSON.stringify(o)); }
+function foldKeyDraw(k){ if(k==='charter') drawBase(); else drawHist(); }
+function foldFocus(k){ Array.prototype.some.call(document.querySelectorAll('[data-act="fold"]'), function(b){ if(b.dataset.k===k){ try{ b.focus(); }catch(e){} return true; } return false; }); }
 
 /* ═══ 등기 현황 ═══ */
 function bd(){ return BASE_DRAFT || BASE; }
+/* 사무소·지사장 한눈에 (대표 2026-11-18 «각 지사의 지사장 등의 정보가 정확하게 매칭이 안 된다»)
+   — 분사무소 표의 «지사장»(사원을 고른다)에서 정한 대로 본점·지사마다 맡은 사람을 보인다. 사람 이름은 사원 줄에서 가져오므로 어긋나지 않는다 */
+function ofcHtml(b){
+  return C.officeRoster(b).map(function(r){
+    if(r.kind==='hq') return '<div class="oc hq"><div class="oh"><b>🏛 본점</b><span class="chip">주사무소</span></div>'+
+      '<div class="op"><span class="ot">대표사원</span> '+(r.head?esc(r.head):'<span class="miss">없음</span>')+'</div>'+
+      '<div class="oa" title="'+esc(r.addr)+'">'+esc(r.addr||'소재지 없음')+'</div>'+
+      '<div class="om">'+(b.firm&&b.firm.court?'관할 '+esc(b.firm.court):'관할 등기소 없음')+'</div></div>';
+    return '<div class="oc '+(r.headOk?'ok':'no')+'"><div class="oh"><b>🏢 '+esc(r.label||'분사무소')+'</b><span class="chip m" title="정관 제3조② 번호">'+esc(r.no)+'호</span></div>'+
+      '<div class="op"><span class="ot">지사장</span> '+(r.headOk?esc(r.head):'<span class="miss">미정 — 아래 표에서 고르기</span>')+(r.licenseNo?' <span class="lic">노무사 '+esc(r.licenseNo)+'</span>':'')+'</div>'+
+      '<div class="oa" title="'+esc(r.addr)+'">'+esc(r.addr||'소재지 없음')+'</div>'+
+      '<div class="om">'+(r.since?'설치 '+esc(r.since):'설치일 없음')+'</div></div>';
+  }).join('');
+}
+function sumHtml(b){
+  var n=C.normBase(b), reps=n.members.filter(function(m){ return m.rep; }).length, hp=C.headProblems(n), dup=C.headDups(n);
+  return '<span class="chip">사원 '+n.members.length+'명</span><span class="chip">대표사원 '+reps+'명</span><span class="chip">분사무소 '+n.branches.length+'곳</span>'+
+    (hp.length?'<span class="chip a" title="'+esc(hp.join('\n'))+'">지사장 미정 '+hp.length+'곳</span>':n.branches.length&&!dup.length?'<span class="chip g">지사장 모두 정함</span>':'')+
+    (dup.length?'<span class="chip a" title="한 사람은 한 곳에 상근합니다 — 공인노무사법 제7조의7③">'+esc(dup.join('·'))+' 지사장 두 곳 이상</span>':'')+
+    (n.asOf?'<span class="chip m">기준일 '+esc(n.asOf)+'</span>':'');
+}
+function dutyHtml(b, m){
+  var d=C.memberDuties(b, m.id), h='';
+  d.forEach(function(t){ h+='<span class="chip g">'+esc(t)+'</span> '; });
+  return h||'<span class="mute">—</span>';
+}
+function headSel(b, x, i){
+  var h=C.branchHead(b, x), v=h?h.id:'', n=C.normBase(b);
+  return '<select data-bb="'+i+'" data-k="head" aria-label="'+esc((x.alias||x.name||'분사무소')+' 지사장')+'"><option value=""'+(v?'':' selected')+'>— 미정 —</option>'+
+    n.members.map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===v?' selected':'')+'>'+esc((m.name||'(이름 없음)')+(m.rep?' · 대표':''))+'</option>'; }).join('')+'</select>';
+}
+/* 글을 치는 동안 — 띠·요약·직책·지사장 고르기 글자만 고친다(표를 다시 그리면 커서가 빠진다) */
+function baseLive(){
+  var e=$('ofc'); if(!e) return;
+  var b=bd(), n=C.normBase(b);
+  e.innerHTML=ofcHtml(b);
+  var s=$('baseSum'); if(s) s.innerHTML=sumHtml(b);
+  Array.prototype.forEach.call(document.querySelectorAll('#baseBox td.duty'), function(td){ var m=b.members[Number(td.dataset.i)]; if(m) td.innerHTML=dutyHtml(b, m); });
+  Array.prototype.forEach.call(document.querySelectorAll('#baseBox select[data-k="head"] option'), function(o){
+    if(!o.value) return; var m=n.members.filter(function(x){ return x.id===o.value; })[0]; if(m) o.textContent=(m.name||'(이름 없음)')+(m.rep?' · 대표':'');
+  });
+}
 function drawBase(){
   var b=bd(), f=b.firm, p=C.baseProblems(b);
   var nm=Object.keys(SEL.mem).filter(function(k){ return SEL.mem[k]; }).length, nb=Object.keys(SEL.br).filter(function(k){ return SEL.br[k]; }).length;
   function bf(label, key, val, opt){ return fld(label, key, val, opt).replace('data-k=', 'data-b='); }
-  var h='<div class="card"><h3>🏛 등기 현황 — 지금 등기부 <span class="hint">등기사항전부증명서를 보고 맞추십시오. 등기 건을 «등기 현황에 반영»하면 저절로 바뀝니다</span><span class="sp"></span>'+
-    '<span id="baseHead">'+baseHeadHtml()+'</span></h3>'+
-    '<div class="bar"><button class="sm" data-act="jsonIn">📂 파일에서 불러오기(JSON)</button><button class="sm" data-act="jsonOut">💾 파일로 내보내기(JSON)</button><span class="hint">내보낸 파일에는 사원 주소·생년월일이 들어 있습니다 — 보관에 주의하십시오</span></div>'+
+  /* ① 맨 위 띠 — 사무소·지사장 한눈에 + 저장 */
+  var h='<div class="dash"><div class="card"><h3>🏢 사무소·지사장 <span class="sums" id="baseSum">'+sumHtml(b)+'</span><span class="sp"></span>'+
+    '<span id="baseHead">'+baseHeadHtml()+'</span>'+
+    '<button class="sm" data-act="jsonIn" title="파일에서 불러오기(JSON)">📂 불러오기</button><button class="sm" data-act="jsonOut" title="파일로 내보내기(JSON) — 사원 주소·생년월일이 들어 있습니다. 보관에 주의하십시오">💾 내보내기</button></h3>'+
     (p.length?'<div class="msgs">'+p.map(function(x){ return '<div class="msg w">⚠ '+esc(x)+'</div>'; }).join('')+'</div>':'')+
-    '<div class="cb"><div class="grid">'+
-      bf('명칭', 'firm.name', f.name)+bf('등기번호', 'firm.regNo', f.regNo)+bf('등록번호(법인)', 'firm.corpNo', f.corpNo)+
-      bf('주사무소(등기부)', 'firm.hq', f.hq, { wide:true })+bf('정관 제3조의 주사무소(예: 충청남도 천안시)', 'firm.hqCharter', f.hqCharter)+
-      bf('관할 등기소', 'firm.court', f.court, { ph:'예: ○○지방법원 ○○지원 등기과' })+bf('정관변경 인가 관청(수신)', 'firm.authority', f.authority, { ph:'예: ○○지방고용노동청 ○○지청장' })+
-      bf('노무법인 인가 번호', 'firm.approvalNo', f.approvalNo)+bf('대표 전화', 'firm.phone', f.phone)+
-      bf('기준일(등기부 발급일)', 'asOf', b.asOf, { type:'date' })+bf('근거', 'source', b.source, { ph:'예: 등기사항전부증명서(현재 유효사항)' })+
-    '</div></div></div>';
-  /* 사원 */
+    '<div class="ofc" id="ofc">'+ofcHtml(b)+'</div></div>';
+  /* ② 왼쪽 법인 정보 */
+  h+='<div class="dcols"><div class="card"><h3>🏛 법인 정보 <span class="hint">등기사항전부증명서에 맞춥니다</span></h3><div class="cb"><div class="fgrid">'+
+      bf('명칭', 'firm.name', f.name)+bf('등기번호', 'firm.regNo', f.regNo)+bf('등록번호(법인)', 'firm.corpNo', f.corpNo)+bf('노무법인 인가 번호', 'firm.approvalNo', f.approvalNo)+
+      bf('주사무소(등기부)', 'firm.hq', f.hq, { wide:true })+bf('정관 제3조의 주사무소', 'firm.hqCharter', f.hqCharter, { ph:'예: 충청남도 천안시' })+bf('대표 전화', 'firm.phone', f.phone)+
+      bf('관할 등기소', 'firm.court', f.court, { wide:true, ph:'예: ○○지방법원 ○○지원 등기과' })+bf('정관변경 인가 관청(수신)', 'firm.authority', f.authority, { wide:true, ph:'예: ○○지방고용노동청 ○○지청장' })+
+      bf('기준일(등기부 발급일)', 'asOf', b.asOf, { type:'date' })+bf('근거', 'source', b.source, { ph:'예: 등기사항전부증명서' })+
+    '</div></div></div><div class="dright">';
+  /* ③ 오른쪽 사원 */
   var allM=b.members.length && b.members.every(function(m){ return SEL.mem[m.id]; });
-  h+='<div class="card"><h3>사원 '+b.members.length+'명 <span class="hint">주민번호는 앞 6자리(생년월일)만 — 뒷자리는 저장하지 않습니다</span><span class="sp"></span>'+(nm?'<b>'+nm+'명 선택</b><button class="sm warn" data-act="memDel">고른 사원 빼기</button>':'')+'<button class="sm" data-act="memAdd">＋ 사원 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="사원 모두 고르기" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>현금·현물 출자(원)</th><th>현물 재산</th><th>노무출자</th><th>대표사원</th><th>입사일</th><th>노무사 등록번호</th></tr></thead><tbody>';
+  h+='<div class="card"><h3>👥 사원 '+b.members.length+'명 <span class="hint wide-only">주민번호는 앞 6자리만 — 뒷자리는 저장하지 않습니다</span><span class="sp"></span>'+(nm?'<b>'+nm+'명 선택</b><button class="sm warn" data-act="memDel">고른 사원 빼기</button>':'')+'<button class="sm" data-act="memAdd">＋ 사원 줄</button></h3>'+
+    '<div class="scroll"><table class="t fx mt"><colgroup><col style="width:26px"><col style="width:34px"><col style="width:84px"><col style="width:76px"><col><col style="width:90px"><col style="width:116px"><col style="width:40px"><col style="width:40px"><col style="width:110px"><col style="width:84px"><col style="width:112px"></colgroup>'+
+    '<thead><tr><th class="c"><input type="checkbox" aria-label="사원 모두 고르기" data-selall="mem"'+(allM?' checked':'')+'></th><th class="n">№</th><th>이름</th><th>생년월일</th><th>주소</th><th>출자(원)</th><th>현물 재산</th><th class="c" title="노무출자">노무</th><th class="c" title="대표사원">대표</th><th>입사일</th><th>등록번호</th><th title="지사장은 아래 분사무소 표에서 고릅니다">직책</th></tr></thead><tbody>';
   b.members.forEach(function(m, i){
     var iv=C.normInvest(m.invest);
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(m.name||'사원')+' 고르기" data-sel="mem" data-id="'+esc(m.id)+'"'+(SEL.mem[m.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
       '<td class="inp" data-l="이름"><input data-bm="'+i+'" data-k="name" value="'+esc(m.name)+'" placeholder="이름"></td>'+
-      '<td class="inp" data-l="생년월일"><input data-bm="'+i+'" data-k="birth" value="'+esc(m.birth)+'" inputmode="numeric" maxlength="6" placeholder="생년월일 6자리"></td>'+
-      '<td class="inp" data-l="주소" style="min-width:260px"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소"></td>'+
-      '<td class="inp" data-l="현금·현물 출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="출자 금액"></td>'+
-      '<td class="inp" data-l="현물 재산" style="min-width:180px"><input data-bm="'+i+'" data-k="invest.inKind" value="'+esc(iv.inKind||'')+'" placeholder="현물이면 — 차종 : ○○ / 연식 : ○○"></td>'+
+      '<td class="inp" data-l="생년월일"><input data-bm="'+i+'" data-k="birth" value="'+esc(m.birth)+'" inputmode="numeric" maxlength="6" placeholder="6자리"></td>'+
+      '<td class="inp" data-l="주소"><input data-bm="'+i+'" data-k="addr" value="'+esc(m.addr)+'" placeholder="주소" title="'+esc(m.addr)+'"></td>'+
+      '<td class="inp" data-l="출자(원)"><input data-bm="'+i+'" data-k="invest.cash" value="'+esc(iv.cash||'')+'" inputmode="numeric" placeholder="금액"></td>'+
+      '<td class="inp" data-l="현물 재산"><input data-bm="'+i+'" data-k="invest.inKind" value="'+esc(iv.inKind||'')+'" placeholder="현물이면 — 차종 : ○○ / …" title="'+esc(iv.inKind||'')+'"></td>'+
       '<td class="tk" data-l="노무출자"><input type="checkbox" aria-label="'+esc((m.name||'사원')+' 노무출자')+'" data-bm="'+i+'" data-k="invest.labor"'+(iv.labor?' checked':'')+'></td>'+
       '<td class="tk" data-l="대표사원"><input type="checkbox" aria-label="'+esc((m.name||'사원')+' 대표사원')+'" data-bm="'+i+'" data-k="rep"'+(m.rep?' checked':'')+'></td>'+
       '<td class="inp" data-l="입사일"><input type="date" data-bm="'+i+'" data-k="joinDate" value="'+esc(m.joinDate)+'"></td>'+
-      '<td class="inp" data-l="노무사 등록번호"><input data-bm="'+i+'" data-k="licenseNo" value="'+esc(m.licenseNo||'')+'" placeholder="등록번호"></td></tr>';
+      '<td class="inp" data-l="등록번호"><input data-bm="'+i+'" data-k="licenseNo" value="'+esc(m.licenseNo||'')+'" placeholder="번호" title="공인노무사 등록번호"></td>'+
+      '<td class="duty" data-l="직책" data-i="'+i+'">'+dutyHtml(b, m)+'</td></tr>';
   });
-  if(!b.members.length) h+='<tr><td colspan="11" class="empty">사원이 없습니다 — «＋ 사원 줄»로 넣거나 파일에서 불러오십시오.</td></tr>';
+  if(!b.members.length) h+='<tr><td colspan="12" class="empty">사원이 없습니다 — «＋ 사원 줄»로 넣거나 파일에서 불러오십시오.</td></tr>';
   h+='</tbody></table></div></div>';
-  /* 분사무소 */
+  /* ④ 오른쪽 분사무소 — 지사장은 사원 중에서 고른다 */
   var allB=b.branches.length && b.branches.every(function(x){ return SEL.br[x.id]; });
-  h+='<div class="card"><h3>분사무소 '+b.branches.length+'곳 <span class="hint">«정관 호»는 정관 제3조②의 번호 — 폐지된 번호는 «삭제»로 남습니다</span><span class="sp"></span>'+(nb?'<b>'+nb+'곳 선택</b><button class="sm warn" data-act="brDel">고른 분사무소 빼기</button>':'')+'<button class="sm" data-act="brAdd">＋ 분사무소 줄</button></h3>'+
-    '<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="분사무소 모두 고르기" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th>정관 호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
+  h+='<div class="card"><h3>🏢 분사무소 '+b.branches.length+'곳 <span class="hint wide-only">«호»는 정관 제3조②의 번호 — 폐지된 번호는 «삭제»로 남습니다 · 지사장은 사원 중에서 고릅니다</span><span class="sp"></span>'+(nb?'<b>'+nb+'곳 선택</b><button class="sm warn" data-act="brDel">고른 분사무소 빼기</button>':'')+'<button class="sm" data-act="brAdd">＋ 분사무소 줄</button></h3>'+
+    '<div class="scroll"><table class="t fx bt"><colgroup><col style="width:26px"><col style="width:34px"><col style="width:44px"><col style="width:112px"><col style="width:90px"><col style="width:140px"><col><col style="width:210px"><col style="width:110px"></colgroup>'+
+    '<thead><tr><th class="c"><input type="checkbox" aria-label="분사무소 모두 고르기" data-selall="br"'+(allB?' checked':'')+'></th><th class="n">№</th><th title="정관 제3조②의 호">호</th><th>명칭(등기부)</th><th>정관 명칭</th><th>지사장</th><th>소재지(등기부)</th><th>정관 소재지(다를 때만)</th><th>설치일</th></tr></thead><tbody>';
   b.branches.forEach(function(x, i){
     h+='<tr><td class="c"><input type="checkbox" aria-label="'+esc(x.name||'분사무소')+' 고르기" data-sel="br" data-id="'+esc(x.id)+'"'+(SEL.br[x.id]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
-      '<td class="inp" data-l="정관 호" style="width:70px"><input data-bb="'+i+'" data-k="no" value="'+esc(x.no)+'" inputmode="numeric"></td>'+
+      '<td class="inp" data-l="호"><input data-bb="'+i+'" data-k="no" value="'+esc(x.no)+'" inputmode="numeric"></td>'+
       '<td class="inp" data-l="명칭(등기부)"><input data-bb="'+i+'" data-k="name" value="'+esc(x.name)+'" placeholder="예: 대전분사무소"></td>'+
       '<td class="inp" data-l="정관 명칭"><input data-bb="'+i+'" data-k="alias" value="'+esc(x.alias)+'" placeholder="예: 대전지사"></td>'+
-      '<td class="inp" data-l="소재지(등기부)" style="min-width:260px"><input data-bb="'+i+'" data-k="addr" value="'+esc(x.addr)+'"></td>'+
-      '<td class="inp" data-l="정관 소재지" style="min-width:200px"><input data-bb="'+i+'" data-k="charterAddr" value="'+esc(x.charterAddr)+'"></td>'+
+      '<td class="inp" data-l="지사장">'+headSel(b, x, i)+'</td>'+
+      '<td class="inp" data-l="소재지(등기부)"><input data-bb="'+i+'" data-k="addr" value="'+esc(x.addr)+'" title="'+esc(x.addr)+'"></td>'+
+      '<td class="inp" data-l="정관 소재지"><input data-bb="'+i+'" data-k="charterAddr" value="'+esc(x.charterAddr)+'" title="'+esc(x.charterAddr)+'"></td>'+
       '<td class="inp" data-l="설치일"><input type="date" data-bb="'+i+'" data-k="since" value="'+esc(x.since)+'"></td></tr>';
   });
-  if(!b.branches.length) h+='<tr><td colspan="8" class="empty">분사무소가 없습니다.</td></tr>';
-  h+='</tbody></table></div></div>';
-  h+='<div class="card"><h3>정관 본문(선택) <span class="hint">넣어 두면 «변경 정관»이 제3·5·6조(대표사원이 바뀌면 제13조도)를 갈아 끼운 전문으로 나옵니다. 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸으로 바뀝니다</span></h3>'+
-    '<div class="cb"><textarea data-b="charter" rows="10" placeholder="정 관&#10;(2001. 10. 30. 제정)&#10;…&#10;제3조【사무소의 소재지】&#10;…">'+esc(b.charter||'')+'</textarea></div></div>';
+  if(!b.branches.length) h+='<tr><td colspan="9" class="empty">분사무소가 없습니다.</td></tr>';
+  h+='</tbody></table></div></div></div></div>';
+  /* ⑤ 정관 본문 — 접어 둔다 */
+  var co=isOpen('charter', false);
+  h+='<div class="card fc'+(co?' open':'')+'"><button class="fh" data-act="fold" data-k="charter" aria-expanded="'+(co?'true':'false')+'"><span class="car" aria-hidden="true">▸</span><b>📜 정관 본문</b><span class="hint">(선택) 넣어 두면 «변경 정관»이 제3·5·6조(대표사원이 바뀌면 제13조도)를 갈아 끼운 전문으로 나옵니다 · 붙여 넣은 주민번호 뒷자리는 저장할 때 빈칸이 됩니다</span></button>'+
+    (co?'<div class="cb"><textarea data-b="charter" rows="10" placeholder="정 관&#10;(2001. 10. 30. 제정)&#10;…&#10;제3조【사무소의 소재지】&#10;…">'+esc(b.charter||'')+'</textarea></div>':'')+'</div>';
   $('baseBox').innerHTML=h;
   /* 표 안 입력칸 이름표(스크린리더) — 폰 카드 이름표(data-l)와 같은 말 */
   Array.prototype.forEach.call($('baseBox').querySelectorAll('td[data-l] input:not([aria-label])'), function(i){ i.setAttribute('aria-label', i.closest('td').getAttribute('data-l')); });
@@ -834,33 +1048,50 @@ function arcRows(){ return C.archiveList(ARCH); }
 function arcById(id){ return arcRows().filter(function(a){ return a.id===id; })[0]||null; }
 function extOf(nm){ var m=/\.([A-Za-z0-9]+)$/.exec(String(nm||'')); return m?m[1].toLowerCase():''; }
 function arcLockAttr(){ return ME.isAdmin?'':' disabled title="🔒 총괄관리자만 엽니다"'; }
+/* 묶음 머리에 «정관 2 · 의사록 3 · 증명서» 처럼 어떤 서류가 들었는지 — 펴지 않고도 내용을 가늠한다 */
+function arcKindSummary(a){
+  var cnt={}, order=[];
+  C.arcFiles(a).forEach(function(x){ var k=C.arcKindLabel(x.kind); if(!cnt[k]){ cnt[k]=0; order.push(k); } cnt[k]++; });
+  return order.map(function(k){ return k+(cnt[k]>1?' '+cnt[k]:''); }).join(' · ');
+}
 function drawArchive(){
   var rows=arcRows(), nsel=Object.keys(SEL.arc).filter(function(k){ return SEL.arc[k]; }).length;
-  var h='<div class="card" id="arcCard"><h3>📁 지난 등기 원본 서류 <span class="chip m">'+rows.length+'묶음</span><span class="hint wide-only">파일은 원본 보관함 🔒 자리 — 보기·받기는 총괄관리자만</span><span class="sp"></span><button class="sm pri" data-act="arcNew">＋ 묶음 만들기</button></h3>';
+  var openN=rows.filter(function(a){ return isOpen('a:'+a.id, false); }).length, allOpen=rows.length>0 && openN===rows.length;
+  var h='<div class="card" id="arcCard"><h3>📁 지난 등기 원본 서류 <span class="chip m">'+rows.length+'묶음</span><span class="hint wide-only">🔒 보기·받기는 총괄관리자만 · 묶음을 누르면 펴집니다</span><span class="sp"></span>'+
+    (rows.length?'<button class="sm" data-act="foldAll" data-v="'+(allOpen?'0':'1')+'">'+(allOpen?'모두 접기':'모두 펴기')+'</button>':'')+
+    '<button class="sm pri" data-act="arcNew">＋ 묶음 만들기</button></h3>';
   if(nsel) h+='<div class="bar"><b>'+nsel+'개 선택</b><button class="sm" data-act="arcSelDl"'+arcLockAttr()+'>⬇ 받기</button><button class="sm warn" data-act="arcSelOut">묶음에서 빼기</button><button class="sm" data-act="arcSelClear">고르기 풀기</button><span class="hint">빼도 파일은 보관함에 남습니다</span></div>';
   if(ARC_BUSY) h+='<div class="msgs"><div class="msg i">파일을 올리는 중입니다 — 창을 닫지 마십시오.</div></div>';
   if(!rows.length) h+='<div class="empty">아직 없습니다. «＋ 묶음 만들기»로 지난 등기(예: 2019-07 서산분사무소 설치)를 만들고 원본 파일을 올리십시오.</div>';
+  h+='<div class="arcgrid">';
   rows.forEach(function(a){
-    var fl=C.arcFiles(a), all=fl.length && fl.every(function(x){ return SEL.arc[a.id+'|'+x.fileId]; });
-    h+='<div class="arcg" data-arc="'+esc(a.id)+'"><div class="hd"><b>'+esc(a.at||'날짜 없음')+'</b> '+esc(a.title||'(이름 없음)')+' <span class="chip m">'+fl.length+'개</span><span class="sp"></span><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp"'+(ARC_BUSY?' disabled':'')+'>＋ 파일 올리기</button></div>';
-    if(a.summary) h+='<div class="cb hint">'+esc(a.summary)+'</div>';
-    if(!fl.length) h+='<div class="empty">파일이 없습니다.</div>';
-    else {
-      h+='<div class="scroll"><table class="t"><thead><tr><th class="c"><input type="checkbox" aria-label="이 묶음 모두 고르기" data-selall="arc:'+esc(a.id)+'"'+(all?' checked':'')+'></th><th class="n">№</th><th>종류</th><th>파일 이름</th><th>날짜</th><th>표시</th><th></th></tr></thead><tbody>';
-      fl.forEach(function(x, i){
-        var k=a.id+'|'+x.fileId;
-        h+='<tr data-arcf="'+esc(x.fileId)+'"><td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
-          '<td data-l="종류"><select data-arckind aria-label="'+esc(x.name)+' 종류">'+C.ARC_KINDS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===x.kind?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></td>'+
-          '<td class="ti" title="'+esc(x.name)+'">'+esc(x.name)+'</td><td data-l="날짜">'+esc(x.date||'—')+'</td>'+
-          '<td>🔒'+(x.masked?' <span class="chip g">주민번호 가림</span>':'')+'</td>'+
-          '<td><button class="sm" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+arcLockAttr()+'>👁 보기</button> <button class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기"'+arcLockAttr()+'>⬇ 받기</button></td></tr>';
-      });
-      h+='</tbody></table></div>';
+    var fl=C.arcFiles(a), op=isOpen('a:'+a.id, false), all=fl.length && fl.every(function(x){ return SEL.arc[a.id+'|'+x.fileId]; }), ks=arcKindSummary(a);
+    h+='<div class="arcg'+(op?' open':'')+'" data-arc="'+esc(a.id)+'"><div class="hd"><button class="tg" data-act="fold" data-k="a:'+esc(a.id)+'" aria-expanded="'+(op?'true':'false')+'"'+(op?' aria-controls="arcb-'+esc(a.id)+'"':'')+'>'+
+      '<span class="car" aria-hidden="true">▸</span><span class="tx"><span class="l1"><span class="dt">'+esc(a.at||'날짜 없음')+'</span><b class="ttl" title="'+esc(a.title||'')+'">'+esc(a.title||'(이름 없음)')+'</b></span>'+
+      '<span class="l2"><span class="chip m">'+fl.length+'개</span>'+(ks?'<span class="ks">'+esc(ks)+'</span>':'')+'</span>'+
+      (a.summary?'<span class="l3">'+esc(a.summary)+'</span>':'')+'</span></button>'+
+      '<span class="acts"><button class="sm" data-act="arcEdit">고치기</button><button class="sm pri" data-act="arcUp" aria-label="파일 올리기"'+(ARC_BUSY?' disabled':'')+'>＋ 파일</button></span></div>';
+    if(op){
+      h+='<div class="bd" id="arcb-'+esc(a.id)+'">';
+      if(!fl.length) h+='<div class="empty">파일이 없습니다. «＋ 파일»로 올리십시오.</div>';
+      else {
+        h+='<div class="scroll"><table class="t arct"><thead><tr><th class="c"><input type="checkbox" aria-label="이 묶음 모두 고르기" data-selall="arc:'+esc(a.id)+'"'+(all?' checked':'')+'></th><th class="n">№</th><th>파일</th><th>종류</th><th>날짜</th><th></th></tr></thead><tbody>';
+        fl.forEach(function(x, i){
+          var k=a.id+'|'+x.fileId;
+          h+='<tr class="click" data-arcf="'+esc(x.fileId)+'"><td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td><td class="n">'+(i+1)+'</td>'+
+            '<td class="ti" title="'+esc(x.name)+'"><button class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+arcLockAttr()+'>'+esc(x.name)+'</button></td>'+
+            '<td class="kd">'+esc(C.arcKindLabel(x.kind))+'</td><td class="dt">'+esc(x.date||'')+'</td>'+
+            '<td class="ac"><button class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기" title="받기"'+arcLockAttr()+'>⬇</button></td></tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+      h+='</div>';
     }
     h+='</div>';
   });
-  return h+'<div style="height:4px"></div></div>';
+  return h+'</div></div>';
 }
+
 /* 묶음 하나 고치기 — 관문으로. 찬 자리에서 previous 가 null 로 먼저 오면 화면 기억(ARCH)으로 만든다 */
 function arcWrite(id, fn){
   var g=GEN;
@@ -955,16 +1186,25 @@ function arcDownload(list){
       .then(function(){ if(g!==GEN){ ARC_DL=false; return; } setTimeout(next, 500); });
   })();
 }
-function arcRevoke(){ PV_SEQ++; PV_BYTES=null; clearTimeout(SIDE_T); SIDE_T=null; if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
-/* ── 오른쪽 보기 칸(2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」) ──
-   넓은 화면: 목록 오른쪽에 붙는 칸(본문은 왼쪽으로 좁아진다) — 탭을 옮겨도 남아 «등기 건 ② 서류»와 나란히 본다.
-   좁은 화면(1080px 미만·폰): 화면 전체를 덮는 창(Tab 은 칸 안에서만 돈다). ◀ 이전·다음 ▶ 은 모든 묶음의 파일을 목록 차례대로.
-   ⚠ 여는 길은 그대로 puDocSecret(총괄관리자만) — 늦게 온 응답은 세대(GEN)·차례(PV_SEQ)·그릴 자리(box)로 버린다. */
+function arcRevoke(){ PV_SEQ++; PV_BYTES=null; clearTimeout(SIDE_T); SIDE_T=null; clearTimeout(SIDE_DT); SIDE_DT=null; if(PV_URL){ try{ URL.revokeObjectURL(PV_URL); }catch(e){} PV_URL=''; } }
+/* ── 오른쪽 보기 칸(2026-11-15 대표 「보기서류는 … 오른쪽에 보여서 하나씩 확인할 수 있게 — 그렇게 해야 실시간으로 비교할 수 있다」 · 「새로 만든 서류도 오른쪽으로」) ──
+   넓은 화면: 목록 오른쪽에 붙는 칸(본문은 왼쪽으로 좁아진다) — 탭을 옮겨도 남아 «지난 원본»과 «새로 만든 서류»를 같은 자리에서 맞바꿔 본다.
+   좁은 화면(1080px 미만·폰): 화면 전체를 덮는 창(Tab 은 칸 안에서만 돈다). ◀ 이전·다음 ▶ 은 보는 쪽(원본 전체·새 서류 전체)을 목록 차례대로.
+   ⚠ 여는 길은 그대로 puDocSecret(총괄관리자만) — 늦게 온 응답은 세대(GEN)·차례(PV_SEQ)·그릴 자리(box)로 버린다.
+   ⚠ 새 서류는 서버를 거치지 않는다 — 지금 건의 값으로 이 브라우저에서 만든다(주민번호 뒷자리는 «🔐 주민번호 넣기»로 넣은 것만, 칸을 닫거나 로그아웃하면 바이트를 비운다). */
 var SIDE_MIN=360, SIDE_KEEP=520;   /* 칸 최소 너비 · 왼쪽 본문에 남길 너비 */
 function sideOverlay(){ try{ return window.matchMedia('(max-width:1079px)').matches; }catch(e){ return false; } }
 function sideW(){ var w=Number(lsGet('sideW'))||Math.round(window.innerWidth*0.46); return Math.max(SIDE_MIN, Math.min(w, window.innerWidth-SIDE_KEEP)); }
 function arcFlat(){ var out=[]; arcRows().forEach(function(a){ C.arcFiles(a).forEach(function(x){ out.push({ ev:a.id, fid:x.fileId }); }); }); return out; }
-function sideIdx(fl){ if(!SIDE) return -1; for(var i=0;i<fl.length;i++) if(fl[i].ev===SIDE.ev && fl[i].fid===SIDE.fid) return i; return -1; }
+/* 새로 만든 서류 목록 — 쉬운 진행은 «고른» 서류, 자세히는 필요한 서류 전부. 건이 없거나 빨간 글이 있으면 빈 목록 */
+function docList(){
+  var c=cur(); if(!c || !window.DeungiDocs) return [];
+  var a=C.applyChanges(baseOf(c), c); if(a.errors.length || !a.c.changes.length) return [];
+  return C.docPlan(a, { today:today() }).filter(function(d){ return d.need && (MODE!=='easy' || d.on); }).map(function(d){ return { key:d.key, title:d.title }; });
+}
+function docTitle(key){ var t=key; (C.DOCS||[]).forEach(function(d){ if(d.key===key) t=d.title; }); return t; }
+function sideList(){ return !SIDE ? [] : SIDE.kind==='doc' ? docList() : arcFlat(); }
+function sideIdx(fl){ if(!SIDE) return -1; for(var i=0;i<fl.length;i++){ var x=fl[i]; if(SIDE.kind==='doc' ? x.key===SIDE.key : (x.ev===SIDE.ev && x.fid===SIDE.fid)) return i; } return -1; }
 function sideFit(){
   var root=document.documentElement, hd=$('head'), s=$('side'), w=sideW();
   root.style.setProperty('--headH', (hd?Math.round(hd.getBoundingClientRect().height):0)+'px');
@@ -978,72 +1218,183 @@ function sideFit(){
   s.setAttribute('role', ov?'dialog':'complementary'); if(ov) s.setAttribute('aria-modal','true'); else s.removeAttribute('aria-modal');
   if(gr){ gr.setAttribute('aria-valuenow', String(w)); gr.setAttribute('aria-valuemax', String(Math.max(SIDE_MIN, window.innerWidth-SIDE_KEEP))); }
 }
-/* 머리줄 — 이름·자리(3 / 48)·이전/다음 가능 여부. 칸을 다시 만들지 않아 누른 단추에 초점이 남는다 */
+/* 칸 뼈대 — 한 번만 만든다(원본↔새 서류를 바꿔도 단추에 초점이 남는다). 종류 칸은 지난 원본일 때만 */
+function sideSkel(){
+  return '<div class="grip" data-grip role="separator" aria-orientation="vertical" aria-label="보기 칸 너비 — 끌거나 ←·→" aria-valuemin="'+SIDE_MIN+'" tabindex="0"></div>'+
+    '<div class="sdh"><span class="seg" role="group" aria-label="보는 서류"><button class="sm" id="sdSrcDoc" data-act="sideSrc" data-k="doc">새 서류</button><button class="sm" id="sdSrcArc" data-act="sideSrc" data-k="arc">지난 원본</button></span><span class="chip m" id="sdPos"></span>'+
+    '<span class="sdg"><button class="sm" id="sdPrev" data-act="sideNav" data-d="-1">◀ 이전</button><button class="sm" id="sdNext" data-act="sideNav" data-d="1">다음 ▶</button></span><span class="sp"></span>'+
+    '<span class="sdg"><button class="sm" id="sdPrint" data-act="sidePrint">🖨 인쇄</button><button class="sm" id="sdDl" data-act="sideDl">⬇ 받기</button><button class="sm" id="sdClose" data-act="sideClose" aria-label="보기 칸 닫기">✕ 닫기</button></span></div>'+
+    '<div class="sdt"><b id="sdName"></b><span class="sdsub" id="sdSub"></span><select id="sdKind" aria-label="이 파일의 종류" hidden>'+C.ARC_KINDS.map(function(o){ return '<option value="'+o[0]+'">'+esc(o[1])+'</option>'; }).join('')+'</select></div>'+
+    '<div id="spv" tabindex="0" aria-label="미리보기 — 화살표·PageDown 으로 넘겨 보기"></div>';
+}
+/* 머리줄 — 이름·자리(3 / 48)·이전/다음 가능 여부·«새 서류|지난 원본». 칸을 다시 만들지 않아 누른 단추에 초점이 남는다 */
 function sideHead(){
   if(!SIDE||!$('sdName')) return;
-  var a=arcById(SIDE.ev), f=a&&a.files[SIDE.fid], fl=arcFlat(), i=sideIdx(fl), k=f&&C.ARC_KINDS.filter(function(o){ return o[0]===f.kind; })[0];
-  /* 보던 파일이 묶음에서 빠졌다(묶음에서 빼기·다른 창) — 남은 바이트·주소와 함께 칸을 닫는다(외부 검토 2026-11-15) */
-  if(!f || i<0){ sideClose(); toast('보던 파일이 묶음에서 빠져 보기 칸을 닫았습니다', 3500); return; }
-  $('sdName').textContent='👁 '+f.name; $('sdName').title=f.name; $('sdDl').setAttribute('aria-label', f.name+' 받기');
+  var isDoc=SIDE.kind==='doc', fl=sideList(), i=sideIdx(fl), name='', dlName='', sub=[], f=null, a=null;
+  if(isDoc){
+    /* 건이 닫히거나 다른 건으로 바뀌면 그 건의 서류 칸도 닫는다 */
+    if(!cur() || CUR!==SIDE.cid){ sideClose(); return; }
+    var ad=after(), sp=ad?C.sealPlan(ad, [SIDE.key])[0]:null;
+    dlName=(fl[i]&&fl[i].title)||docTitle(SIDE.key); name='📄 '+dlName;
+    sub=[sp?'도장: '+sp.who+' — '+sp.how:'도장 찍을 곳 없음'];
+  } else {
+    a=arcById(SIDE.ev); f=a&&a.files[SIDE.fid];
+    /* 보던 파일이 묶음에서 빠졌다(묶음에서 빼기·다른 창) — 남은 바이트·주소와 함께 칸을 닫는다(외부 검토 2026-11-15) */
+    if(!f || i<0){ sideClose(); toast('보던 파일이 묶음에서 빠져 보기 칸을 닫았습니다', 3500); return; }
+    dlName=f.name; name='👁 '+f.name;
+    sub=[((a.at||'')+' '+(a.title||'')).trim(), f.date||'', f.masked?'주민번호 가림':'', extOf(f.name)==='pdf'?'PDF 안을 누른 뒤에는 Esc 대신 ✕ 닫기':''];
+  }
+  $('sdName').textContent=name; $('sdName').title=dlName; $('sdDl').setAttribute('aria-label', dlName+' 받기');
   $('sdPos').textContent=(i>=0?(i+1):'—')+' / '+fl.length;
-  $('sdSub').textContent=[((a.at||'')+' '+(a.title||'')).trim(), k?k[1]:'', f.date||'', extOf(f.name)==='pdf'?'PDF 안을 누른 뒤에는 Esc 대신 ✕ 닫기':''].filter(Boolean).join(' · ');
+  var st=sub.filter(Boolean).join(' · '); $('sdSub').textContent=st; $('sdSub').title=st;
+  var kd=$('sdKind'); kd.hidden=isDoc; if(!isDoc) kd.value=f.kind;
+  $('sdPrint').hidden=!isDoc;
+  var dl=isDoc?fl:docList(), al=isDoc?arcFlat():fl, bd=$('sdSrcDoc'), ba=$('sdSrcArc');
+  bd.setAttribute('aria-pressed', isDoc?'true':'false'); ba.setAttribute('aria-pressed', isDoc?'false':'true');
+  bd.disabled=!isDoc && !dl.length; ba.disabled=isDoc && (!al.length || !ME.isAdmin);
   var ae=document.activeElement, pv=$('sdPrev'), nx=$('sdNext');
   pv.disabled=i<=0; nx.disabled=i<0||i>=fl.length-1;
   if(ae && ae.disabled && (ae===pv||ae===nx)){ var o=ae===pv?nx:pv; (o.disabled?$('sdClose'):o).focus(); }
 }
-/* 지금 보는 줄을 목록에서 칠한다 */
+/* 지금 보는 줄을 목록에서 칠한다(지난 기록 목록 · 등기 건의 서류 목록) */
 function sideMark(){
-  var on=null;
+  var on=null, isDoc=!!SIDE && SIDE.kind==='doc';
   Array.prototype.forEach.call(document.querySelectorAll('#histBox [data-arc] tr[data-arcf]'), function(r){
-    var g=r.closest('[data-arc]'), yes=!!SIDE && r.dataset.arcf===SIDE.fid && !!g && g.dataset.arc===SIDE.ev;
+    var g=r.closest('[data-arc]'), yes=!!SIDE && !isDoc && r.dataset.arcf===SIDE.fid && !!g && g.dataset.arc===SIDE.ev;
+    r.classList.toggle('cur', yes); if(yes){ r.setAttribute('aria-current','true'); on=r; } else r.removeAttribute('aria-current');
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#editor tr[data-dockey]'), function(r){
+    var yes=isDoc && r.dataset.dockey===SIDE.key;
     r.classList.toggle('cur', yes); if(yes){ r.setAttribute('aria-current','true'); on=r; } else r.removeAttribute('aria-current');
   });
   return on;
 }
-function arcView(evId, fid){
-  if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
-  var a=arcById(evId), f=a&&a.files[fid]; if(!f) return;
+/* 칸을 열고(또는 안의 것을 바꾸고) 그릴 자리를 새로 준다 — paint(box, live) 가 그린다. live() 가 거짓이면 늦은 응답이니 버린다 */
+function sideShow(sel, paint){
   var s=$('side'), was=!!SIDE;
   if(!was) SIDE_BACK=document.activeElement;
-  SIDE={ ev:evId, fid:fid };
-  if(!$('spv')) s.innerHTML='<div class="grip" data-grip role="separator" aria-orientation="vertical" aria-label="보기 칸 너비 — 끌거나 ←·→" aria-valuemin="'+SIDE_MIN+'" tabindex="0"></div>'+
-    '<div class="sdh"><b id="sdName"></b><span class="chip m" id="sdPos"></span><button class="sm" id="sdPrev" data-act="sideNav" data-d="-1">◀ 이전</button><button class="sm" id="sdNext" data-act="sideNav" data-d="1">다음 ▶</button><button class="sm" id="sdDl" data-act="sideDl">⬇ 받기</button><button class="sm" id="sdClose" data-act="sideClose" aria-label="보기 칸 닫기">✕ 닫기</button></div>'+
-    '<div class="sds" id="sdSub"></div><div id="spv" tabindex="0" aria-label="미리보기 — 화살표·PageDown 으로 넘겨 보기"></div>';
+  SIDE=sel; SIDE_LAST[sel.kind]=sel;
+  if(!$('spv')) s.innerHTML=sideSkel();
   s.classList.add('on'); document.body.classList.add('withSide'); sideFit(); sideHead(); sideMark();
   if(!SIDE || !$('spv')) return;   /* 머리줄이 칸을 닫았다(목록에 없는 파일) */
   if(!was && sideOverlay()) setTimeout(function(){ var b=$('sdClose'); if(b) b.focus(); }, 0);
   arcRevoke();
   /* 파일마다 새 그릴 자리 — 앞 파일의 늦은 그림이 새 파일 위에 붙지 않게 */
   $('spv').innerHTML='<div class="pvi"><div class="empty">불러오는 중…</div></div>'; $('spv').scrollTop=0;
-  var box=$('spv').firstChild, g=GEN, ext=extOf(f.name), seq=PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && box.isConnected; };
-  PuOfficeStore.secretBlob(f.fileId||fid).then(function(blob){
-    if(!live()) return;
-    if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; PV_BYTES={ u8:new Uint8Array(b), name:f.name }; SIDE_RW=$('spv').clientWidth; return PureunHwp.renderPreview(box, PV_BYTES.u8, f.name); });
-    if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); box.className='pvi pdf'; box.innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'"></iframe>'; }
-    else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(new Blob([blob], { type:ext==='png'?'image/png':'image/jpeg' }));   /* 형식은 확장자로 고정 — 올린 사람이 정한 형식(text/html 등)을 믿지 않는다(보안 검토 2026-11-15) */ box.innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'">'; }
-    else box.innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
-  }).catch(function(e){ if(!live()) return; box.innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
+  var box=$('spv').firstChild, g=GEN, seq=PV_SEQ, live=function(){ return g===GEN && seq===PV_SEQ && box.isConnected; };
+  paint(box, live);
+}
+function arcView(evId, fid){
+  if(!ME.isAdmin) return toast('🔒 총괄관리자만 엽니다');
+  var a=arcById(evId), f=a&&a.files[fid]; if(!f) return;
+  var ext=extOf(f.name);
+  if(!isOpen('a:'+evId, false)){ setFold('a:'+evId, true); if(TAB==='hist') drawHist(); }   /* 접힌 묶음의 파일을 보면 그 묶음을 펴 둔다 */
+  sideShow({ kind:'arc', ev:evId, fid:fid }, function(box, live){
+    PuOfficeStore.secretBlob(f.fileId||fid).then(function(blob){
+      if(!live()) return;
+      if(ext==='hwp'||ext==='hwpx') return blob.arrayBuffer().then(function(b){ if(!live()) return; PV_BYTES={ u8:new Uint8Array(b), name:f.name }; SIDE_RW=$('spv').clientWidth; return PureunHwp.renderPreview(box, PV_BYTES.u8, f.name); });
+      if(ext==='pdf'){ PV_URL=URL.createObjectURL(new Blob([blob], { type:'application/pdf' })); box.className='pvi pdf'; box.innerHTML='<iframe src="'+PV_URL+'" title="'+esc(f.name)+'"></iframe>'; }
+      else if(/^(jpg|jpeg|png)$/.test(ext)){ PV_URL=URL.createObjectURL(new Blob([blob], { type:ext==='png'?'image/png':'image/jpeg' }));   /* 형식은 확장자로 고정 — 올린 사람이 정한 형식(text/html 등)을 믿지 않는다(보안 검토 2026-11-15) */ box.innerHTML='<img src="'+PV_URL+'" alt="'+esc(f.name)+'">'; }
+      else box.innerHTML='<div class="msg i">이 종류는 미리보기가 없습니다 — «⬇ 받기»로 여십시오.</div>';
+    }).catch(function(e){ if(!live()) return; box.innerHTML='<div class="msg w">열지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; });
+  });
+}
+/* ── 새로 만든 서류 ── 지금 건의 값으로 이 브라우저에서 만든다(서버를 거치지 않는다) */
+function docBuild(key){
+  var x=docCtx(), d=DD.make(key, x); if(!d||!d.body) return null;
+  return { u8:DD.fileOne(d), name:DD.fileName(x, d) };
+}
+function sameBytes(a, b){ if(!a||!b||a.length!==b.length) return false; for(var i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
+function docView(key, user){
+  var c=cur(); if(!c || !ready()) return;
+  var list=docList(); if(!list.length) return toast('서류를 만들 수 없습니다 — ① 단계의 바뀌는 것·빨간 글을 먼저 확인하십시오', 4000);
+  if(!list.some(function(x){ return x.key===key; })) key=list[0].key;
+  if(user) DOC_NO_AUTO='';
+  sideShow({ kind:'doc', key:key, cid:CUR }, function(box, live){
+    var b=null; try{ b=docBuild(key); }catch(e){ box.innerHTML='<div class="msg w">서류를 만들지 못했습니다 — '+esc((e&&e.message)||e)+'</div>'; return; }
+    if(!b){ box.innerHTML='<div class="msg i">이 건에는 만들 내용이 없습니다.</div>'; return; }
+    PV_BYTES={ u8:b.u8, name:b.name }; SIDE_PK=key; SIDE_RW=$('spv').clientWidth;
+    Promise.resolve().then(function(){ return PureunHwp.renderPreview(box, b.u8, b.name); }).catch(function(e){ if(live()) box.innerHTML='<div class="msg w">그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오</div>'; });
+  });
+}
+/* 같은 바이트로(또는 새 바이트로) 칸 안을 다시 그린다 — 지금 보던 위치(쪽 비율)를 지킨다 */
+function sideRepaint(b, keep){
+  var spv=$('spv'); if(!spv || !b) return;
+  var at=keep?spv.scrollTop/Math.max(1, spv.scrollHeight):0, seq=++PV_SEQ, g=GEN;
+  PV_BYTES={ u8:b.u8, name:b.name }; SIDE_RW=spv.clientWidth;
+  spv.innerHTML='<div class="pvi"></div>'; var box=spv.firstChild;
+  Promise.resolve().then(function(){ return PureunHwp.renderPreview(box, b.u8, b.name); }).then(function(){
+    if(g===GEN && seq===PV_SEQ && box.isConnected && keep) spv.scrollTop=Math.round(at*spv.scrollHeight);
+  }, function(e){ if(g===GEN && seq===PV_SEQ && box.isConnected) box.innerHTML='<div class="msg w">그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오</div>'; });
+}
+/* 값이 바뀌면(① 칸 고치기·주민번호·새로고침) 칸의 새 서류를 잠시 뒤 다시 만든다 — 같은 서류면 다시 그리지 않는다 */
+function sideDocRefresh(ms){
+  if(!SIDE || SIDE.kind!=='doc') return;
+  clearTimeout(SIDE_DT);
+  SIDE_DT=setTimeout(function(){ SIDE_DT=null; sideDocNow(); }, ms==null?450:ms);
+}
+function sideDocNow(){
+  var spv=$('spv'); if(!SIDE || SIDE.kind!=='doc' || !spv) return;
+  if(!cur() || CUR!==SIDE.cid){ sideClose(); return; }
+  var list=docList(), key=SIDE.key;
+  if(!list.length){
+    arcRevoke(); SIDE_PK='';
+    spv.innerHTML='<div class="pvi"><div class="msg w" style="margin:12px">서류를 만들 수 없습니다 — ① 단계의 바뀌는 것·빨간 글을 확인하십시오.</div></div>';
+    sideHead(); sideMark(); return;
+  }
+  if(!list.some(function(x){ return x.key===key; })){ key=list[0].key; SIDE={ kind:'doc', key:key, cid:CUR }; SIDE_LAST.doc=SIDE; }
+  sideHead(); sideMark();
+  var b=null, err=''; try{ b=docBuild(key); }catch(e){ err=(e&&e.message)||String(e); }
+  if(!b){ arcRevoke(); SIDE_PK=''; spv.innerHTML='<div class="pvi"><div class="msg '+(err?'w':'i')+'" style="margin:12px">'+esc(err?'서류를 만들지 못했습니다 — '+err:'이 건에는 만들 내용이 없습니다.')+'</div></div>'; return; }
+  if(SIDE_PK===key && PV_BYTES && PV_BYTES.name===b.name && sameBytes(PV_BYTES.u8, b.u8) && spv.querySelector('canvas')) return;
+  var keep=SIDE_PK===key; SIDE_PK=key; sideRepaint(b, keep);
+}
+/* ② 단계에 들어올 때 — 칸에 새 서류가 있으면 새로 고치고, 비어 있으면(넓은 화면만) 첫 서류를 연다. 원본을 보던 중이면 그대로 둔다 */
+function sideDocsEnter(){
+  var list=docList();
+  if(SIDE && SIDE.kind==='doc'){ sideDocRefresh(0); sideMark(); return; }
+  if(!list.length){ sideHead(); return; }
+  if(SIDE || sideOverlay() || DOC_NO_AUTO===CUR || !window.PureunHwp || !window.DeungiDocs) return;
+  var last=SIDE_LAST.doc, key=(last && last.cid===CUR && list.some(function(x){ return x.key===last.key; })) ? last.key : list[0].key;
+  docView(key);
 }
 function sideNav(d){
-  var fl=arcFlat(), i=sideIdx(fl), j=i+d; if(i<0||j<0||j>=fl.length) return;
-  arcView(fl[j].ev, fl[j].fid);
+  var fl=sideList(), i=sideIdx(fl), j=i+d; if(i<0||j<0||j>=fl.length) return;
+  if(SIDE.kind==='doc') docView(fl[j].key, true); else arcView(fl[j].ev, fl[j].fid);
   var r=sideMark(); if(r && r.offsetParent) r.scrollIntoView({ block:'nearest' });
 }
+/* «새 서류 | 지난 원본» — 같은 자리에서 맞바꿔 본다(마지막에 보던 것으로) */
+function sideSrc(k){
+  if(!SIDE || SIDE.kind===k) return;
+  if(k==='doc'){
+    var l=docList(); if(!l.length) return toast('새 서류가 아직 없습니다 — 등기 건의 ① 단계를 먼저 마치십시오', 3500);
+    var last=SIDE_LAST.doc, key=(last && last.cid===CUR && l.some(function(x){ return x.key===last.key; })) ? last.key : l[0].key;
+    docView(key, true);
+  } else {
+    var fl=arcFlat(); if(!fl.length) return toast('지난 원본 서류가 없습니다');
+    var la=SIDE_LAST.arc, t=(la && fl.filter(function(x){ return x.ev===la.ev && x.fid===la.fid; })[0]) || fl[0];
+    arcView(t.ev, t.fid);
+  }
+}
+function sideDl(){ if(!SIDE) return; if(SIDE.kind==='doc') dlOne(SIDE.key); else arcDownload([{ ev:SIDE.ev, fid:SIDE.fid }]); }
+function sidePrint(){ if(SIDE && SIDE.kind==='doc' && $('spv') && $('spv').querySelector('canvas')) window.print(); else toast('서류가 그려진 뒤에 인쇄하십시오'); }
 function sideClose(){
-  /* 초점은 마지막에 본 파일 줄의 «보기» 단추로(목록을 다시 그렸으면 처음 누른 단추가 없다) */
-  var had=!!SIDE, row=sideMark(), rb=row&&row.offsetParent?row.querySelector('[data-act=arcView]'):null, back=rb||SIDE_BACK; arcRevoke(); SIDE=null; SIDE_BACK=null;
+  /* 초점은 마지막에 본 줄의 이름 단추로(목록을 다시 그렸으면 처음 누른 단추가 없다) */
+  var had=!!SIDE, row=sideMark(), rb=row&&row.offsetParent?row.querySelector('[data-act=arcView],[data-act=docView]'):null, back=rb||SIDE_BACK; arcRevoke(); SIDE=null; SIDE_BACK=null; SIDE_PK='';
   var s=$('side'); if(s){ s.classList.remove('on'); s.innerHTML=''; s.setAttribute('role','complementary'); s.removeAttribute('aria-modal'); }
   document.body.classList.remove('withSide'); document.body.classList.remove('slim'); [$('head'), $('app')].forEach(function(e){ if(e) e.inert=false; }); sideMark();
   if(had && back && back.isConnected && back.focus){ try{ back.focus(); }catch(e){} }
 }
+/* 다른 건으로 옮기기 전에 새 서류 칸을 닫는다 — 옮겨 간 건의 ② 에서 저절로 다시 열린다(옛 건의 서류가 남지 않게) */
+function sideDropDoc(){ if(SIDE && SIDE.kind==='doc') sideClose(); }
+/* 사용자가 닫았다 — 새 서류 칸은 이 건에서 저절로 다시 열지 않는다 */
+function sideCloseUser(){ if(SIDE && SIDE.kind==='doc') DOC_NO_AUTO=CUR; sideClose(); }
 /* 한글 쪽은 칸 너비에 맞춰 그린다 — 너비가 바뀌면 잠시 뒤 같은 바이트로 다시 그린다(다시 받지 않는다) */
 function sideRedraw(){
   clearTimeout(SIDE_T);
   SIDE_T=setTimeout(function(){ SIDE_T=null; var b=PV_BYTES, spv=$('spv'); if(!SIDE||!b||!spv) return;
     var w=spv.clientWidth; if(!w || Math.abs(w-SIDE_RW)<8) return;   /* 높이만 바뀐 것(폰 주소창)은 그대로 */
-    SIDE_RW=w; var at=spv.scrollTop/Math.max(1, spv.scrollHeight), seq=PV_SEQ;
-    spv.innerHTML='<div class="pvi"></div>'; var box=spv.firstChild;
-    PureunHwp.renderPreview(box, b.u8, b.name).then(function(){ if(seq===PV_SEQ && box.isConnected) spv.scrollTop=Math.round(at*spv.scrollHeight); }, function(){}); }, 250);
+    sideRepaint(b, true); }, 250);
 }
 function sideSetW(w){ lsSet('sideW', String(Math.max(SIDE_MIN, Math.min(Math.round(w), window.innerWidth-SIDE_KEEP)))); sideFit(); sideRedraw(); }
 /* 칸 왼쪽 가장자리를 끌어 너비를 바꾼다 */
@@ -1067,22 +1418,24 @@ function fetchSecret(fileId){
     return r.json().catch(function(){ return {}; }).then(function(j){ throw new Error(j.error||('열지 못했습니다 ('+r.status+')')); });
   });
 }
+function foldCard(k, dflt, title, count, body){
+  var op=isOpen(k, dflt);
+  return '<div class="card fc'+(op?' open':'')+'"><button class="fh" data-act="fold" data-k="'+k+'" aria-expanded="'+(op?'true':'false')+'"><span class="car" aria-hidden="true">▸</span><b>'+title+'</b><span class="chip m">'+count+'</span></button>'+(op?body:'')+'</div>';
+}
 function drawHist(){
-  var done=caseRows().filter(function(c){ return c.status==='cancelled' || (c.status==='done' && c.applied); });
-  var h='<div class="card"><h3>끝난·취소한 등기 건 '+done.length+'</h3>';
-  if(!done.length) h+='<div class="empty">아직 없습니다.</div>';
+  var done=caseRows().filter(function(c){ return c.status==='cancelled' || (c.status==='done' && c.applied); }), dh='';
+  if(!done.length) dh='<div class="empty">아직 없습니다.</div>';
   else {
-    h+='<div class="scroll"><table class="t"><thead><tr><th class="c"></th><th class="n">№</th><th>건 이름</th><th>총회일</th><th>단계</th><th>등기 완료</th><th>바뀐 것</th></tr></thead><tbody>';
+    dh='<div class="scroll"><table class="t"><thead><tr><th class="c"></th><th class="n">№</th><th>건 이름</th><th>총회일</th><th>단계</th><th>등기 완료</th><th>바뀐 것</th></tr></thead><tbody>';
     done.forEach(function(c, i){
       var a=C.applyChanges(baseOf(c), c);
-      h+='<tr class="click" data-open="'+esc(c.id)+'" tabindex="0" aria-label="'+esc(c.title)+' 열기"><td class="c">📄</td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td><td data-l="완료">'+esc((c.dates&&c.dates.done)||'—')+'</td><td class="nw" title="'+esc(C.summary(a))+'">'+esc(C.summary(a)||'—')+'</td></tr>';
+      dh+='<tr class="click" data-open="'+esc(c.id)+'" tabindex="0" aria-label="'+esc(c.title)+' 열기"><td class="c">📄</td><td class="n">'+(i+1)+'</td><td class="ti">'+esc(c.title)+'</td><td data-l="총회">'+esc((c.meeting&&c.meeting.date)||'—')+'</td><td>'+stChip(C.normCase(c).status)+'</td><td data-l="완료">'+esc((c.dates&&c.dates.done)||'—')+'</td><td class="nw" title="'+esc(C.summary(a))+'">'+esc(C.summary(a)||'—')+'</td></tr>';
     });
-    h+='</tbody></table></div>';
+    dh+='</tbody></table></div>';
   }
-  h+='</div>';
   var hi=(BASE.history||[]).slice().reverse();
-  h+='<div class="card"><h3>등기 현황 바뀐 기록 '+hi.length+'</h3>'+(hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>')+'</div>';
-  $('histBox').innerHTML=drawArchive()+h;
+  var hh=hi.length?'<div class="cb items">'+hi.map(function(x){ return '<div class="it"><span class="g">'+esc(x.at)+'</span> '+esc(x.title)+' <span class="hint">'+esc(x.summary)+'</span></div>'; }).join('')+'</div>':'<div class="empty">없음</div>';
+  $('histBox').innerHTML=drawArchive()+'<div class="hcols">'+foldCard('done', true, '끝난·취소한 등기 건', done.length, dh)+foldCard('hist', true, '등기 현황 바뀐 기록', hi.length, hh)+'</div>';
   sideMark(); sideHead();
 }
 
@@ -1120,14 +1473,6 @@ function dlOne(key){
   var u8=DD.fileOne(d), name=DD.fileName(x, d);
   try{ PureunHwp.validate(u8, name); PureunHwp.download(u8, name, 'hwpx'); }catch(e){ toast('만들지 못했습니다 — '+((e&&e.message)||e), 5000); }
 }
-function preview(key){
-  if(!ready()) return; var x=docCtx(), d=DD.make(key, x);
-  if(!d||!d.body) return toast('이 건에는 만들 내용이 없습니다');
-  var u8=DD.fileOne(d), name=DD.fileName(x, d);
-  openModal('<h3>👁 '+esc(d.label)+'<span class="sp"></span><button class="sm" data-act="dl1" data-key="'+esc(key)+'">⬇ 받기</button><button class="sm" data-act="closeModal">닫기</button></h3><div class="mb"><div id="pv"><div class="empty">그리는 중…</div></div></div>');
-  var g=GEN;
-  PureunHwp.renderPreview($('pv'), u8, name).catch(function(e){ if(g!==GEN||!$('pv')) return; $('pv').innerHTML='<div class="msg w">미리보기를 그리지 못했습니다('+esc((e&&e.message)||e)+') — «⬇ 받기»로 한글에서 여십시오.</div>'; });
-}
 var MODAL_BACK=null;
 function openModal(html){ var m=$('modal'); MODAL_BACK=document.activeElement; m.innerHTML='<div class="mbox">'+html+'</div>'; m.style.display='flex';
   var h=m.querySelector('h3'); m.setAttribute('aria-label', h?h.textContent.replace(/\s+/g,' ').trim().slice(0,40):'창');
@@ -1145,14 +1490,18 @@ document.addEventListener('keydown', function(ev){
   var sd=$('side');
   if(SIDE && sd){
     var ov=sideOverlay();
-    if(ev.key==='Escape'){ ev.preventDefault(); sideClose(); return; }
-    if(ov && ev.key==='Tab'){ var sf=Array.prototype.filter.call(sd.querySelectorAll('button,[tabindex],iframe'), function(x){ return !x.disabled && x.offsetParent!==null; });
+    /* 왼쪽 글칸에서 누른 Esc 는 칸을 닫지 않는다(고치다 말고 서류 칸이 사라지지 않게) */
+    var tg=ev.target, fld=!!(tg && tg.matches && tg.matches('input:not([type=checkbox]):not([type=radio]),textarea,select'));
+    if(ev.key==='Escape' && !(fld && (tg.tagName==='SELECT' || !sd.contains(tg)))){ ev.preventDefault(); sideCloseUser(); return; }
+    if(ov && ev.key==='Tab'){ var sf=Array.prototype.filter.call(sd.querySelectorAll('button,select,[tabindex],iframe'), function(x){ return !x.disabled && x.offsetParent!==null; });
       if(sf.length){ var si=sf.indexOf(document.activeElement); if(si<0 || (ev.shiftKey && si===0)){ ev.preventDefault(); sf[ev.shiftKey?sf.length-1:0].focus(); } else if(!ev.shiftKey && si===sf.length-1){ ev.preventDefault(); sf[0].focus(); } } return; }
     if(ev.target && ev.target.hasAttribute && ev.target.hasAttribute('data-grip') && (ev.key==='ArrowLeft'||ev.key==='ArrowRight')){ ev.preventDefault(); sideSetW(sideW()+(ev.key==='ArrowLeft'?40:-40)); return; }
   }
   var tr=ev.target && ev.target.closest && ev.target.closest('tr[data-open]');
   if(tr && ev.target===tr && (ev.key==='Enter'||ev.key===' ')){ ev.preventDefault(); openCase(tr.dataset.open); }
 });
+/* 뒷자리를 넣거나 지웠다 — 서류에 들어가므로 칸의 새 서류를 바로 다시 만들고(지운 뒤에 옛 번호가 화면·인쇄에 남지 않게), ② 단추의 «(N명)»도 고친다 */
+function rrnChanged(){ drawDerived(); if(MODE==='easy' && SHOWN===2){ STEP=SHOWN; drawEasy(); } sideDocRefresh(0); }
 /* 주민번호 뒷자리 — 저장하지 않는다 */
 function rrnModal(){
   var c=cur(); if(!c) return; var B0=baseOf(c);
@@ -1176,13 +1525,13 @@ function newCase(){
   CASES[id]={ id:id, entityType:'DeungiCase', title:y+' 변경등기', status:'draft',
     meeting:{ date:'', time:'10:00', place:'푸른노무법인 본 사무소', chair:rep?rep.id:'' },
     changes:[], agent:prev&&prev.agent?JSON.parse(JSON.stringify(prev.agent)):{}, notary:(prev&&prev.notary)||'', dates:{}, checks:{}, docsOff:{} };
-  CUR=id; lsSet('cur', id); RRN={}; STEP=0; SHOWN=0; draw(); scheduleSave();
+  sideDropDoc(); CUR=id; lsSet('cur', id); RRN={}; STEP=0; SHOWN=0; draw(); scheduleSave();
   setTimeout(function(){ var el=document.querySelector(MODE==='easy'?'#wizBody [data-k="meeting.date"]':'#edBasic [data-k="title"]'); if(el){ el.focus(); if(el.select) el.select(); } }, 30);
 }
 function openCase(id){
   if(CUR===id) return;
   if(SAVE.dirty) saveCase();
-  CUR=id; lsSet('cur', id); RRN={}; SEL.docs={}; STEP=0; SHOWN=0;
+  sideDropDoc(); CUR=id; lsSet('cur', id); RRN={}; SEL.docs={}; STEP=0; SHOWN=0;
   if(TAB!=='case') setTab('case'); else draw();
   var e=$('editor'); if(e) e.scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -1207,7 +1556,7 @@ function applyToBase(){
   var nb=C.nextBase(a, { today:today() });
   /* 반영 전 현황을 건에 남긴다 — 나중에 이 건을 열어도 같은 서류가 나오게(정관 본문·기록은 빼고) */
   var snap=C.normBase(BASE); snap.charter=''; snap.history=[];
-  var msg='등기 현황을 이 건이 끝난 모습으로 바꿉니다.\n\n· '+C.summary(a)+'\n· 사원 '+BASE.members.length+'명 → '+nb.members.length+'명, 분사무소 '+BASE.branches.length+'곳 → '+nb.branches.length+'곳'+
+  var msg='등기 현황을 이 건이 끝난 모습으로 바꿉니다.\n\n· '+C.summary(a)+'\n· 사원 '+BASE.members.length+'명 → '+nb.members.length+'명, 분사무소 '+BASE.branches.length+'곳 → '+nb.branches.length+'곳'+(C.headProblems(nb).length>C.headProblems(BASE).length?'\n· 지사장이 비는 분사무소가 생깁니다 — 반영한 뒤 «등기 현황»에서 지사장을 정하십시오':'')+
     (BASE.charter?'\n· 정관 본문의 제3·5·6조'+(a.arts.indexOf(13)>=0?'·제13조':'')+'도 바꿉니다':'')+'\n\n바꾼 뒤에는 이 건을 «지난 기록»으로 옮깁니다. 진행할까요?';
   if(!confirm(msg)) return;
   var g=GEN;
@@ -1264,33 +1613,30 @@ document.addEventListener('click', function(ev){
     else if(act==='closeCase'){ if(SAVE.dirty) saveCase(); CUR=''; STEP=0; SHOWN=0; lsSet('cur',''); draw(); }
     else if(act==='mode'){ MODE=el.dataset.m==='full'?'full':'easy'; lsSet('mode', MODE); STEP=0; drawEditor(); }
     else if(act==='wizGo'){ var s2=Number(el.dataset.s)||1; if(s2>=1&&s2<=4){ STEP=s2; drawEasy(); var ed=$('editor'); if(ed) ed.scrollIntoView({ block:'start' }); } }
-    else if(act==='viewAll') renderAllDocs();
-    else if(act==='hvgo'){ var hb=$('hv'+el.dataset.i); if(hb) hb.scrollIntoView({ behavior:'smooth', block:'start' }); }
-    else if(act==='printView'){ if(!$('hwpView')) return; window.print(); }
     else if(act==='chgDel'){ var box=el.closest('[data-ch]'); if(c&&box&&confirm('이 변경을 뺄까요?')){ c.changes=c.changes.filter(function(x){ return x.id!==box.dataset.ch; }); drawChanges(); drawDerived(); scheduleSave(); } }
     else if(act==='toAdd'){ var bx=el.closest('[data-ch]'), ch=bx&&chgById(bx.dataset.ch); if(ch){ ch.share=ch.share||{ mode:'transfer', to:[] }; ch.share.to=(ch.share.to||[]).concat([{ member:'', amount:0 }]); drawChanges(); drawDerived(); scheduleSave(); } }
     else if(act==='toDel'){ var bx2=el.closest('[data-ch]'), ch2=bx2&&chgById(bx2.dataset.ch); if(ch2){ ch2.share.to.splice(Number(el.dataset.j),1); drawChanges(); drawDerived(); scheduleSave(); } }
     else if(act==='dlPack') dlPack();
     else if(act==='dlEach') dlEach();
     else if(act==='dl1') dlOne(el.dataset.key);
-    else if(act==='pv') preview(el.dataset.key);
+    else if(act==='docView') docView(el.dataset.key, true);
     else if(act==='closeModal') closeModal();
     else if(act==='rrn') rrnModal();
-    else if(act==='rrnClear'){ RRN={}; Array.prototype.forEach.call(document.querySelectorAll('[data-rrn]'), function(i){ i.value=''; }); }
+    else if(act==='rrnClear'){ RRN={}; Array.prototype.forEach.call(document.querySelectorAll('[data-rrn]'), function(i){ i.value=''; }); rrnChanged(); }
     else if(act==='rrnOk'){
       var bad=[], nx={};
       Array.prototype.forEach.call(document.querySelectorAll('[data-rrn]'), function(i){ var v=i.value.replace(/[^0-9]/g,''); if(!v) return; if(C.backOk(v)) nx[i.dataset.rrn]=v; else bad.push(i); });
       if(bad.length){ toast('뒷자리는 숫자 7자리입니다'); bad[0].focus(); return; }
-      RRN=nx; closeModal(); drawDerived(); if(MODE==='easy' && $('hwpView')){ STEP=SHOWN||STEP; drawEasy(); } toast(Object.keys(RRN).length+'명 넣었습니다(저장 안 함)');
+      RRN=nx; closeModal(); rrnChanged(); toast(Object.keys(RRN).length+'명 넣었습니다(저장 안 함)');
     }
     else if(act==='applyBase') applyToBase();
     else if(act==='cancelSel') cancelSelected();
     else if(act==='clearSel'){ SEL.cases={}; drawCaseList(); }
     else if(act==='baseSave') saveBase();
     else if(act==='baseUndo'){ if(confirm('저장 안 한 고침을 버릴까요?')){ BASE_DRAFT=null; drawBase(); } }
-    else if(act==='memAdd'){ var b=touchBase(); var used={}; b.members.forEach(function(m){ used[m.id]=1; }); var k=1; while(used['m'+k]) k++; b.members.push({ id:'m'+k, name:'', birth:'', addr:'', invest:{ cash:0, labor:false }, rep:false, joinDate:'' }); drawBase(); }
+    else if(act==='memAdd'){ var b=touchBase(); var used={}; b.members.forEach(function(m){ used[m.id]=1; }); b.branches.forEach(function(x){ if(x.head) used[x.head]=1; }); var k=1; while(used['m'+k]) k++; b.members.push({ id:'m'+k, name:'', birth:'', addr:'', invest:{ cash:0, labor:false }, rep:false, joinDate:'' }); drawBase(); }
     else if(act==='brAdd'){ var b2=touchBase(); var u2={}, mx=0; b2.branches.forEach(function(x){ u2[x.id]=1; mx=Math.max(mx, Number(x.no)||0); }); var k2=1; while(u2['b'+k2]) k2++; b2.branches.push({ id:'b'+k2, name:'', alias:'', addr:'', charterAddr:'', since:'', no:mx+1 }); drawBase(); }
-    else if(act==='memDel'){ var ids=Object.keys(SEL.mem).filter(function(k){ return SEL.mem[k]; }); if(ids.length&&confirm(ids.length+'명을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b3=touchBase(); b3.members=b3.members.filter(function(m){ return !SEL.mem[m.id]; }); SEL.mem={}; drawBase(); } }
+    else if(act==='memDel'){ var ids=Object.keys(SEL.mem).filter(function(k){ return SEL.mem[k]; }); if(ids.length&&confirm(ids.length+'명을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b3=touchBase(); b3.branches.forEach(function(x){ if(x.head && SEL.mem[x.head]) x.head=''; }); b3.members=b3.members.filter(function(m){ return !SEL.mem[m.id]; }); SEL.mem={}; drawBase(); } }
     else if(act==='brDel'){ var ids2=Object.keys(SEL.br).filter(function(k){ return SEL.br[k]; }); if(ids2.length&&confirm(ids2.length+'곳을 등기 현황에서 뺄까요? («저장»을 눌러야 바뀝니다)')){ var b4=touchBase(); b4.branches=b4.branches.filter(function(x){ return !SEL.br[x.id]; }); SEL.br={}; drawBase(); } }
     else if(act==='jsonOut') jsonOut();
     else if(act==='jsonIn') $('jsonFile').click();
@@ -1300,15 +1646,22 @@ document.addEventListener('click', function(ev){
     else if(act==='arcUp'){ var au=el.closest('[data-arc]'); if(au&&!ARC_BUSY){ ARC_EV=au.dataset.arc; $('arcFile').click(); } }
     else if(act==='arcView'||act==='arcDl'){ var av=el.closest('[data-arc]'), af=el.closest('[data-arcf]'); if(av&&af){ if(act==='arcView') arcView(av.dataset.arc, af.dataset.arcf); else arcDownload([{ ev:av.dataset.arc, fid:af.dataset.arcf }]); } }
     else if(act==='sideNav') sideNav(Number(el.dataset.d)||0);
-    else if(act==='sideClose') sideClose();
-    else if(act==='sideDl'){ if(SIDE) arcDownload([{ ev:SIDE.ev, fid:SIDE.fid }]); }
+    else if(act==='sideClose') sideCloseUser();
+    else if(act==='sideSrc') sideSrc(el.dataset.k);
+    else if(act==='sidePrint') sidePrint();
+    else if(act==='sideDl') sideDl();
     else if(act==='arcSelDl') arcDownload(arcSelected());
     else if(act==='arcSelOut') arcSelOut();
     else if(act==='arcSelClear'){ SEL.arc={}; drawHist(); }
+    else if(act==='fold'){ var fk=el.dataset.k, fo=el.getAttribute('aria-expanded')==='true'; setFold(fk, !fo); foldKeyDraw(fk); foldFocus(fk); }
+    else if(act==='foldAll'){ var fv=el.dataset.v==='1'; arcRows().forEach(function(a){ setFold('a:'+a.id, fv); }); drawHist(); var fb=document.querySelector('#histBox [data-act="foldAll"]'); if(fb){ try{ fb.focus(); }catch(e){} } }
     return;
   }
   /* ☐ 칸 둘레를 누르면 «고르기»다 — 건이 열리면 안 된다(폰에서 체크칸이 작다 · 기능 검증 2026-11-14) */
   if((el=t.closest('td.c, td.tk')) && el.querySelector('input[type=checkbox]')){ el.querySelector('input[type=checkbox]').click(); return; }
+  /* 서류·파일 줄의 아무 곳이나 누르면 오른쪽 칸에 열린다 */
+  if((el=t.closest('tr[data-dockey]'))){ docView(el.dataset.dockey, true); return; }
+  if((el=t.closest('tr[data-arcf]'))){ var ag=el.closest('[data-arc]'); if(ag) arcView(ag.dataset.arc, el.dataset.arcf); return; }
   if((el=t.closest('tr[data-open]'))){ openCase(el.dataset.open); return; }
   if(t.id==='modal') closeModal();
 });
@@ -1319,7 +1672,7 @@ function joinOptLabel(ch){ var v='new:'+ch.id, lab=(ch.name||'(새 사원)')+' �
 function onField(ev){
   var el=ev.target; if(!el||!el.matches('input,select,textarea')) return;
   if(el.dataset.af!=null) return; /* 묶음 창의 글칸 — «저장» 단추로만 */
-  if(el.hasAttribute('data-arckind')){ if(ev.type==='change'){ var ab2=el.closest('[data-arc]'), af2=el.closest('[data-arcf]'); if(ab2&&af2) arcSetKind(ab2.dataset.arc, af2.dataset.arcf, el.value); } return; }
+  if(el.id==='sdKind'){ if(ev.type==='change' && SIDE && SIDE.kind==='arc') arcSetKind(SIDE.ev, SIDE.fid, el.value); return; }
   var isText=(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&/^(text|search|tel|)$/.test(el.type||'')));
   if(ev.type==='input' && !isText) return;
   if(ev.type==='change' && isText && !el.closest('#pane-base')){ var bx=el.closest('[data-ch]'); if(bx && cur() && el.dataset.k==='name'){ var cj=chgById(bx.dataset.ch); if(cj && cj.type==='join') joinOptLabel(cj); } return; }
@@ -1343,7 +1696,7 @@ function onField(ev){
     else if(el.dataset.bb!=null){ var x=b.branches[Number(el.dataset.bb)]; if(!x) return; x[el.dataset.k]=el.dataset.k==='no'?C.num(v):v; }
     else if(el.dataset.b){ setPath(b, el.dataset.b, v); }
     /* 글자 칸은 다시 그리지 않는다(치는 중 커서가 빠진다) — 고르기·날짜만 다시 그린다 */
-    if(ev.type==='change' && (el.type==='checkbox'||el.type==='date')) drawBase();
+    if(ev.type==='change' && (el.type==='checkbox'||el.type==='date')) drawBase(); else baseLive();
     return;
   }
   var c=cur(); if(!c) return;
@@ -1388,7 +1741,7 @@ document.addEventListener('change', onField);
    대표·위임관리인만 연다(규칙 deungi 와 같은 사람). 로그인 안 함·퇴사·권한 없음은 잠근다. */
 var GEN=0, WHO='';
 function wipe(){ GEN++; clearTimeout(SAVE.t); clearTimeout(DL_T); DL_T=null; if(JSON_READER){ try{ JSON_READER.abort(); }catch(e){} JSON_READER=null; } SAVE={ t:null, busy:false, dirty:false, err:'', at:0 }; RRN={}; BASE=C.emptyBase(); BASE_DRAFT=null; CASES={}; CUR=''; SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} }; DL_EACH=false; gate=null;
-  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; sideClose(); STEP=0; SHOWN=0; VIEW_GEN++; clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
+  ARCH={}; ARC_EV=''; ARC_BUSY=false; ARC_DL=false; sideClose(); SIDE_LAST={ arc:null, doc:null }; DOC_NO_AUTO=''; STEP=0; SHOWN=0; VIEW_GEN++; clearTimeout(toastT); var tt=$('toast'); if(tt) tt.style.display='none'; try{ if(window.PuOfficeStore) PuOfficeStore.init({}); }catch(e){}
   var m=$('modal'); if(m){ m.style.display='none'; m.innerHTML=''; } ['caseList','caseSelBar','editor','baseBox','histBox','baseWarn'].forEach(function(k){ var e=$(k); if(e) e.innerHTML=''; }); }
 function lock(why){ wipe(); $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
 function canOpen(role){ return !!role && role.status==='active' && !!role.sid && (role.isAdmin===true || role.isSubAdmin===true); }

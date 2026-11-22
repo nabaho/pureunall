@@ -14,8 +14,10 @@
 
 /* ★ 홈페이지가 «실제로 서 있는» 저장소.
    ═══════════════════════════════════════════════════════════════════════════
-   도메인(푸른노무법인.kr)은 이 저장소를 가리킨다. 우리 저장소(nabaho/pureunall)의
-   뿌리는 이미 푸른ERP 가 쓰고 있어서, 도메인을 그리로 붙이면 뿌리에 ERP 가 뜬다.
+   도메인 pureunlabor.co.kr 이 이 저장소를 가리킨다(2026-11-15 부터 — 저장소 CNAME 파일).
+   옛 홈페이지 푸른노무법인.kr 은 외부 업체 서버(라이믹스)였고 2026-11-27 만료로 접었다.
+   우리 저장소(nabaho/pureunall)의 뿌리는 이미 푸른ERP 가 쓰고 있어서,
+   도메인을 그리로 붙이면 뿌리에 ERP 가 뜬다 — 그래서 홈페이지는 이 전용 저장소다.
 
    ★ 두 곳에 «함께» 쓴다:
      ① nabaho/pureun-site — 사람이 보는 홈페이지 (쪽 자리에서 site/ 를 뗀다)
@@ -44,6 +46,11 @@ const MAX_BYTES = 2 * 1024 * 1024;
    ★ 자리를 «아주 좁게» 연다 — site/files/logo/ 아래 그림 한 겹만.
      넓히면 화면에서 저장소에 아무 파일이나 넣을 수 있게 된다. */
 const IMAGE_RE = /^site\/files\/logo\/[a-z0-9_-]{1,60}\.(?:png|jpg|jpeg|webp|svg)$/;
+/* ── 구성원 얼굴 사진 (2026-11-16 — 옛 홈페이지를 접어 «새 사이트에 사진 올리기»가 필요해졌다) ──
+   ★ 한 겹 더 열되 역시 «아주 좁게» — site/files/people/ 아래 그림 한 겹, SVG 는 안 받는다(사진에 쓸 일이 없고 스크립트가 숨는다).
+   ★ 파일 이름은 RTDB 구성원 열쇠(숫자 글 번호 또는 new-시각) — 화면 js/pu-site-people.js 사진자리 와 같은 모양.
+     이름·사번은 주소에 안 들어간다(사번에서 로그인 아이디가 나온다 — 대표 결정 2026-10-25). */
+const PEOPLE_IMAGE_RE = /^site\/files\/people\/[a-z0-9_-]{1,60}\.(?:png|jpg|jpeg|webp)$/;
 
 /* 로고 한 장의 크기 한도. 홈페이지 로고는 5~70KB 라 넉넉하다 —
    넉넉히 열어 두면 사진기로 찍은 원본(수 MB)이 그대로 들어와 저장소가 부푼다. */
@@ -53,7 +60,7 @@ function 올릴그림자리인가(p) {
   const s = String(p == null ? "" : p);
   if (s.length > 200) return false;
   if (s.indexOf("..") >= 0 || s.indexOf("//") >= 0 || s.indexOf("\\") >= 0) return false;
-  return IMAGE_RE.test(s);
+  return IMAGE_RE.test(s) || PEOPLE_IMAGE_RE.test(s);
 }
 
 function 올릴자리인가(p) {
@@ -104,22 +111,48 @@ async function 올리기(githubRequest, token, repo, path, content, message, bas
 }
 
 /* ── 실행되는 조각 (2026-11-15 보안) ───────────────────────────────────────────
-   홈페이지 쪽은 이알피와 «같은 주소»(nabaho.github.io/pureunall/site/…)에서도 열린다.
+   홈페이지 쪽은 이알피와 «같은 주소»(2026-11-15 이사 뒤 erp.pureunlabor.co.kr/site/… — 전에는 nabaho.github.io/pureunall/site/…)에서도 열린다.
    그래서 직원 계정 하나가 털려 <script> 를 심은 쪽을 올리면, 관리자가 그 링크를 여는 순간 이알피 로그인이 넘어간다.
    ★ 직원은 «글·그림·표»를 고칠 수 있다(대표 지시 2026-10-30 그대로). 다만 «실행되는 조각»을 새로 넣거나 바꾸는 것은 총괄관리자만.
    실행되는 조각 = <script>…</script> 덩어리 · on…= 속성 · javascript: 주소 · iframe/object/embed/base/meta-refresh 태그.
    비교는 «있던 쪽에 같은 조각이 있었나» — 원래 있던 스크립트를 그대로 둔 채 글만 고치면 통과한다. */
+/* ★ 브라우저는 속성 값의 글자 참조(&#x73; · &#115; · &colon; · &Tab; …)를 먼저 풀고,
+     주소에서는 탭·줄바꿈을 지운 뒤 읽는다(2026-11-16 검토). 그래서 주소 조각(J:)은 브라우저처럼
+     «풀고 지운 사본»에서 찾는다 — 있던 쪽·새 쪽 둘 다 같은 잣대. */
+function 한글자(n) {
+  try { return String.fromCodePoint(n); } catch (e) { return ""; }
+}
+const 이름참조 = { colon: ":", tab: "\t", newline: "\n", sol: "/", lpar: "(", rpar: ")", period: ".",
+  quot: "\"", apos: "'", amp: "&", lt: "<", gt: ">", nbsp: " " };
+function 글자참조풀기(s) {
+  return String(s)
+    .replace(/&#x0*([0-9a-f]{1,6});?/gi, (_, h) => 한글자(parseInt(h, 16)))
+    .replace(/&#0*([0-9]{1,7});?/g, (_, d) => 한글자(parseInt(d, 10)))
+    .replace(/&([a-z]+);/gi, (m, n) => (이름참조[n.toLowerCase()] !== undefined ? 이름참조[n.toLowerCase()] : m));
+}
 function 실행조각(html) {
   const s = String(html == null ? "" : html);
   const out = new Set();
   const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
   let m;
   const re1 = /<script\b[\s\S]*?<\/script\s*>/gi;
-  while ((m = re1.exec(s))) out.add("S:" + norm(m[0]).replace(/\?t=\d+/g, ""));
-  const re2 = /\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
-  while ((m = re2.exec(s))) out.add("H:" + norm(m[0]));
-  const re3 = /(?:href|src|action|formaction|data)\s*=\s*["']?\s*(?:javascript|vbscript|data:text\/html)/gi;
-  while ((m = re3.exec(s))) out.add("J:" + norm(m[0]));
+  let 닫힌수 = 0;
+  while ((m = re1.exec(s))) { 닫힌수++; out.add("S:" + norm(m[0]).replace(/\?t=\d+/g, "")); }
+  /* 닫는 태그가 없는 <script> 도 브라우저는 문서 끝까지를 스크립트로 읽는다 — 수가 모자라면 그 자체를 조각으로 센다 */
+  const 연수 = (s.match(/<script\b/gi) || []).length;
+  if (연수 > 닫힌수) out.add("S:닫히지 않은 script " + (연수 - 닫힌수));
+  /* ★ 속성은 브라우저처럼 «날 글자»에서 가른다(따옴표 구조는 글자 참조로 바뀌지 않는다) — 그다음 값만 풀어 본다(2026-11-16 검토).
+       속성 이름 앞은 빈칸만이 아니다 — <svg/onload=…> 처럼 빗금·따옴표 뒤에도 온다. 이름은 가리지 않는다
+       (href·src 말고도 SVG <set to=…>·<animate values="a;javascript:…"> 가 주소를 바꾼다). 값 «어디든» 실행 주소가 있으면 센다.
+       열쇠는 «속성 통째(풀린 값)» — 있던 javascript:void(0) 옆에 다른 javascript: 를 새로 넣으면 새 조각으로 잡힌다. */
+  const re2 = /([^\s"'<>\/=`]+)\s*=\s*("[^"]*"|'[^']*'|[^\s"'<>`]+)/g;
+  while ((m = re2.exec(s))) {
+    const 이름 = m[1].toLowerCase();
+    const 날값 = m[2].replace(/^["']|["']$/g, "");
+    if (/^on[a-z]+$/.test(이름)) { out.add("H:" + norm(이름 + "=" + 날값)); continue; }
+    const 값 = 글자참조풀기(날값).replace(/[\u0000-\u001f\u007f]/g, "");
+    if (/(?:javascript|vbscript)\s*:|data:text\/html/i.test(값)) out.add("J:" + norm(이름 + "=" + 값));
+  }
   const re4 = /<(?:iframe|object|embed|base|frame|applet)\b[^>]*>|<meta\b[^>]*http-equiv[^>]*>/gi;
   while ((m = re4.exec(s))) out.add("T:" + norm(m[0]));
   return out;
@@ -130,5 +163,5 @@ function 새실행조각(old, neu) {
   return [...b].filter((x) => !a.has(x));
 }
 
-module.exports = { PATH_RE, MAX_BYTES, IMAGE_RE, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
+module.exports = { PATH_RE, MAX_BYTES, IMAGE_RE, PEOPLE_IMAGE_RE, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
                    올릴자리인가, 올릴그림자리인가, 사연, 올리기, 실행조각, 새실행조각 };

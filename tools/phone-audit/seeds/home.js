@@ -29,6 +29,10 @@ for (let i = 0; i < 26; i++) {
   };
 }
 
+/* 얼굴 사진 미리보기 점검(2026-11-18) — 지어낸 회색 실루엣 그림(사람 사진 아님) */
+const 점검사진 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCACWAHgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDs6KKK1ICiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiql5d+SfLQZcjr6UCLLuiY3uq56ZOKh+22//AD0/8dNZLMWOWJJPcmkp2C5uJLHJ9x1bjOAeafWCCQQQcEdDWhZ3hYrFLyTwGz/OhoLl6iiikMKKKKACiiigAooooAKKKKAIbqXyYGYfePC/Wsckkkk5J6mr2pv8yR88DJ9P89aoVSJYUUUUAFFFFAGtYzGWHDHLJwT6+lWay9OfbcbefmGPxrUqWNBRRRQMKKKKACiiigAooooAzNT/AOPhf9wfzNU60tTQmJHH8JwePWs2qRLCiiigAooooAsWP/H4n4/yNa9Z2mId7ydgMdOtaNSxoKKKKBhRRRQAUUUUAFFFFADZEEiMjdCMVjzwtBKUbnuD6itqmSxJMu11z6HuKExGHRVuSwmU/Jhx69Kg8ib/AJ5Sf98mqER0+KNpZAi9TU0djM5G4bFPOT/hWjBbpAoCjLd27mhsLCwRCGIIvOOp9TUlFFSUFFFFABRRRQAUUUUAFFFMllSJC7nAH60APqCW7hiJBbLDsvNULi7kmJCkqnp6/Wq1Owrmi2pDPyxEj1JxSf2l/wBMf/Hv/rVn0U7CuaA1IZGYuO/zVPHewScbtp/2uKyKKLBc36Kx4LmSEjByvdT0/wDrVqQTpOu5D06g9RUtDJKKKKBhRRRQAUUUUABIAJJwB1NY91OZ5d2MKOAKu6jKUhCDq/f2rLpoTCiiimIKKKKACiiigAqSCUwyh15x1HqKjooA3Y3EiK69CM06qGmyk7oj2+YVfqRhRRRQMKKKKAMrUG3XRGPugD+v9aq1Yvv+Px/w/kKr1SJCiiigAooooAKKKKACiiigCa0bZdRnGecfnxWzWJb/APHxF/vj+dbdJjQUUUUhhRRRQBm6mmJlfj5hj8RVKtm6i86BlH3hyv1rGqkSwooooAKKKKACiiigAooooAs2Cb7pTxhQTzWtVWwi8uDcfvPz+HarVSxoKKKKBhRRRQAVnajAFImXADHBHv60UUITKNFFFUIKKKKACiiigAq1YwCWUs2CqdQe9FFDA1aKKKkoKKKKAP/Z';
+members.m00.photo = { bytes: 3000, ver: 'p1', 크기말: '120×150 · 3KB', type: 'image/jpeg', at: '2026-11-18', by: '점검' };
+
 const 업체 = [];
 const 종류 = ['자문', '급여', '노조', '기금'];
 for (let i = 0; i < 40; i++) {
@@ -38,7 +42,22 @@ for (let i = 0; i < 40; i++) {
     status: i % 9 === 8 ? 'closed' : (i % 11 === 10 ? 'suboffice' : 'active'),
     typeCode: 종류[i % 4],
     monthlyAdvisoryFee: i % 3 === 0 ? 0 : 330000 + i * 10000,
+    /* 공공기관·100인 이상 거르개 점검(2026-11-18) — 지어낸 값 */
+    companySize: i % 7 === 1 ? '공공기관' : '',
+    employmentInsuredCount: i % 7 === 2 ? 150 + i : 12,
   });
+}
+/* 방문 통계 점검(2026-11-19) — 지어낸 숫자. 오늘부터 거꾸로 45일 */
+const 통계날 = {};
+for (let i = 0; i < 45; i++) {
+  const d = new Date(Date.now() - i * 86400000 + 9 * 3600000);
+  const 날 = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  const 주말 = [0, 6].indexOf(d.getUTCDay()) >= 0;
+  const v = (주말 ? 26 : 44) + ((i * 7) % 19);
+  통계날[날] = { v, pv: Math.round(v * 2.8), tel: (i % 3) + (주말 ? 0 : 1),
+    p: { home: Math.round(v * 0.95), people: Math.round(v * 0.4), notice: Math.round(v * 0.35), inquiry: Math.round(v * 0.25), work3: Math.round(v * 0.2), work5a: Math.round(v * 0.15), work6: Math.round(v * 0.12) },
+    r: { naver: Math.round(v * 0.38), direct: Math.round(v * 0.21), google: Math.round(v * 0.17), kakao: Math.round(v * 0.1), daum: Math.round(v * 0.06), other: Math.round(v * 0.05), erp: Math.round(v * 0.03) },
+    d: { m: Math.round(v * 0.68), pc: v - Math.round(v * 0.68) } };
 }
 const partners = {};
 업체.forEach((c, i) => { if (i % 2 === 0 || i < 30) partners[c.id] = { posted: i % 5 !== 1 }; });
@@ -51,6 +70,8 @@ module.exports = {
         work: { text: '주요업무 본문 — 인사노무 자문, 노동사건 대리, 급여 아웃소싱' },
       },
       partners,
+      memberPhotos: { m00: { b64: 점검사진, type: 'image/jpeg' } },
+      stats: { day: 통계날 },
       config: { lineFormat: 'plain' },
     },
     data: { companies: 업체 },
@@ -65,6 +86,13 @@ module.exports = {
     { name: 'member', run: async (page) => {
         await page.evaluate(() => { const e = document.querySelector('.edit'); if (e) e.scrollIntoView(); });
       } },
+    /* 글 번호 없는 새 노무사 편집칸 — 새 사이트 «얼굴 사진 · 올리기 허락» 줄(2026-11-16) */
+    { name: 'member-new', run: async (page) => {
+        await page.evaluate(() => {
+          App.pick = 'm04'; if (typeof loadDraft === 'function') loadDraft(); App.render();
+          const e = document.querySelector('.edit'); if (e) e.scrollIntoView();
+        });
+      } },
     /* 편집칸 발(저장·고치기 줄)의 ⋯ — 위로 펴는 칸 */
     { name: 'member-more', run: async (page) => {
         await page.evaluate(() => { const d = document.querySelector('.eft details.more'); if (d) { d.open = true; d.scrollIntoView({ block: 'end' }); window.scrollBy(0, 120); } });
@@ -76,5 +104,21 @@ module.exports = {
       } },
     { name: 'work', run: async (page) => { await page.evaluate(() => App.go('work')); await page.evaluate(() => window.scrollTo(0, 0)); } },
     { name: 'log', run: async (page) => { await page.evaluate(() => App.go('members')); await page.evaluate(() => openChangeLog()); } },
+    /* 얼굴 사진 미리보기(2026-11-18) — 사진 칸 오른쪽 */
+    { name: 'member-photo', run: async (page) => {
+        await page.evaluate(() => { App.go('members'); App.pick = 'm00'; if (typeof loadDraft === 'function') loadDraft(); App.render(); });
+        await page.waitForTimeout(600);
+        await page.evaluate(() => { const e = document.querySelector('.face-fld') || document.querySelector('.edit'); if (e) e.scrollIntoView(); window.scrollBy(0, -80); });
+      } },
+    /* 📈 방문 통계 창(2026-11-19) */
+    { name: 'stats', run: async (page) => { await page.evaluate(() => openStats()); await page.waitForTimeout(800); } },
+    /* 직원 편집칸(2026-11-19 — 넓은 화면 두 칸) */
+    { name: 'staff', run: async (page) => {
+        await page.evaluate(async () => { await App.go('members'); App.filter = 'staff'; App.pick = 'm02'; if (typeof loadDraft === 'function') loadDraft(); App.render(); });
+        await page.waitForTimeout(500);
+      } },
+    /* 고객사 고르기 — 공공기관·100인 이상 · 과거 거래처(2026-11-18) */
+    { name: 'pick-big', run: async (page) => { await page.evaluate(() => { App.go('partner'); openPartnerPick(); pickType('big'); }); } },
+    { name: 'pick-past', run: async (page) => { await page.evaluate(() => { App.go('partner'); openPartnerPick(); pickType('past'); }); } },
   ],
 };

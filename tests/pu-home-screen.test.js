@@ -151,7 +151,7 @@ function rowDeps() {
        ⚠⚠ 이 모래통은 «새 함수를 안 넣어» 네 번 깨졌다 — memberKind·pillShort·offSiteOf,
          그리고 이번 pickTypes. 화면 함수를 새로 만들면 여기부터 볼 것.
          (keepBox() 에도 같은 목록이 있다 — «둘 다» 넣어야 한다.) */
-    fnSource('pickRows'), fnSource('pickTypes'),
+    fnSource('pickRows'), fnSource('pickPastRows'), fnSource('pickAllRows'), fnSource('pickTypes'),
     /* 거르개가 «종류(자문·급여)»에서 «자문료»로 바뀌었다 (2026-09-06) —
        업체관리 딱지가 실제 거래를 안 따라가서다(자문료 182 / 「자문」 딱지 84).
        ⚠ 2026-09-14 부터 푸른이알피 유형(자문·급여·노조·기금)도 «함께» 거른다 —
@@ -1420,6 +1420,71 @@ test('★ 이미 있는 쪽 이름은 두 번 넣지 않는다', async () => {
   assert.ok(ctx.said.some(m => /이미/.test(m)), '이미 있다고 말해 주지 않았습니다');
 });
 
+/* ══════ ③-더함: 홈페이지 메뉴에서 찾은 새 쪽을 「＋ 쪽 추가」에 미리 채운다 (2026-11-16) ══════
+   지어낸 메뉴 조각으로 본다 — 진짜 사이트를 읽지 않는다. */
+const 메뉴조각 = [
+  '<a class="uphover:bh_bg_color_main" href="../greeting/">인사말</a>',
+  '<a class="uphover:bh_bg_color_main" href="../work1/">자문서비스</a>',
+  '<a class="uphover:bh_bg_color_main" href="../work5a/">사내 공동근로복지기금</a>',
+  '<li><a class="uphover:bh_bg_color_main" href="../work5a/">사내근로복지기금</a></li>',
+  '<a class="uphover:bh_bg_color_main" href="../work9/">새 업무 쪽</a>',
+  '<a class="uphover:bh_bg_color_main" href="../inquiry/">오시는길</a>',
+  '<a class="uphover:bh_bg_color_main" href="../notice/">공지사항</a>',
+  '<a class="uphover:bh_bg_color_main" href="../privacy/">개인정보처리방침</a>'
+].join('\n');
+
+function 메뉴상자(cfg, 읽은것) {
+  const ctx = cfgBox(cfg);
+  run(ctx, fnSource('메뉴새쪽'));
+  ctx.OLD_SITE_OFF = true;
+  ctx.새사이트쪽읽기 = () => Promise.resolve(읽은것);
+  ctx.물음 = [];
+  return ctx;
+}
+
+test('★ 메뉴에는 있고 목록에 없는 «주요업무» 쪽만 후보로 낸다', () => {
+  const ctx = 메뉴상자({ work1: { label: '자문서비스', order: 1 } }, 메뉴조각);
+  const 후보 = plain(ctx.메뉴새쪽(메뉴조각, { work1: {} }));
+  const 이름들 = 후보.map(x => x.mid);
+  assert.ok(이름들.indexOf('work9') >= 0, '메뉴에만 있는 새 쪽을 못 찾았습니다');
+  assert.ok(이름들.indexOf('work1') < 0, '이미 목록에 있는 쪽을 후보로 냈습니다');
+  ['greeting', 'inquiry', 'notice', 'privacy'].forEach(m =>
+    assert.ok(이름들.indexOf(m) < 0, m + ' 은(는) 주요업무가 아닌데 후보로 냈습니다'));
+  assert.equal(new Set(이름들).size, 이름들.length, '같은 쪽을 두 번 냈습니다');
+  const 기금 = 후보.filter(x => x.mid === 'work5a')[0];
+  assert.ok(기금 && 기금.label === '사내근로복지기금', '두 번 나온 쪽은 뒤의 작은 이름을 써야 합니다');
+  assert.deepEqual(plain(ctx.메뉴새쪽(null, {})), [], '못 읽은 쪽에서 후보를 지어냈습니다');
+});
+
+test('★ 「＋ 쪽 추가」는 후보를 두 칸에 미리 채우고, 저장은 사람이 눌러야 한다', async () => {
+  const ctx = 메뉴상자(null, 메뉴조각);
+  /* 미리 채운 값을 «그대로» 받아들이는 사람 */
+  ctx.askText = (t, b, o) => { ctx.물음.push({ t, b, o }); return Promise.resolve(o && o.value); };
+  const 전 = [...ctx.PAGE_IDS];
+  await ctx.addPage();
+  assert.ok(ctx.물음.length >= 2, '두 번 물어야 합니다(쪽 이름 · 보일 이름)');
+  assert.ok(/work9/.test(ctx.물음[0].b), '찾은 후보를 안내하지 않았습니다');
+  assert.ok(ctx.물음[0].o.value, '쪽 이름 칸을 미리 채우지 않았습니다');
+  assert.equal(ctx.saved.length, 1, '받아들였는데 자료에 안 적혔습니다');
+  const cfg = plain(ctx.saved[0].value);
+  const 새것 = Object.keys(cfg).filter(k => 전.indexOf(k) < 0);
+  assert.ok(새것.length >= 1, '새 쪽이 자료에 없습니다');
+  새것.forEach(k => assert.equal(cfg[k].label, plain(ctx.메뉴새쪽(메뉴조각, {})).filter(x => x.mid === k)[0].label,
+    '보일 이름 칸에 메뉴 이름을 채우지 않았습니다'));
+
+  /* 그만두면 아무것도 안 적는다 — 후보가 있어도 저절로 넣지 않는다 */
+  const 그만 = 메뉴상자(null, 메뉴조각);
+  그만.askText = () => Promise.resolve(null);
+  await 그만.addPage();
+  assert.equal(그만.saved.length, 0, '사람이 그만뒀는데 후보를 저절로 넣었습니다');
+
+  /* 홈페이지를 못 읽어도 예전처럼 빈 칸으로 묻는다 */
+  const 못읽음 = 메뉴상자(null, null);
+  못읽음.askText = (t, b, o) => { 못읽음.물음.push({ t, b, o }); return Promise.resolve(null); };
+  await 못읽음.addPage();
+  assert.ok(못읽음.물음.length === 1 && !못읽음.물음[0].o.value, '못 읽었는데 칸을 채웠습니다');
+});
+
 test('★ 보일 이름을 안 적으면 추가하지 않는다', async () => {
   const ctx = cfgBox(null);
   dlgStubs(ctx, ['work6', '   ']);
@@ -1943,7 +2008,8 @@ test('★ 갈래는 대시보드 카드로 고른다 — 카드가 우리 자료
   ['구성원 소개', '주요업무', '오시는길', '인사말'].forEach(label =>
     assert.ok(h.indexOf(label) >= 0, '갈래 「' + label + '」 을 고를 수 없습니다'));
   assert.match(h, /App\.go\(/, '카드를 눌러도 옮겨갈 수 없습니다');
-  assert.ok(h.indexOf('자문사현황') >= 0, '자문사현황 자리가 없습니다');
+  /* 2026-11-18 홈페이지 이름 「자문사현황」 → 「고객사」(대표 지시) */
+  assert.ok(h.indexOf('고객사') >= 0, '고객사(옛 자문사현황) 자리가 없습니다');
 
   /* ★ 확인을 안 눌렀고 손댈 것도 없으면 «대조 안 함»이라고 적어야 한다.
      이것을 「이상 없음」으로 적으면 안 본 것이 깨끗한 것으로 읽힌다. */
@@ -2270,7 +2336,7 @@ function partnerBox() {
 test('★ 자문사현황은 «대조 못 함»이라고 말한다 — 「같음」으로 뭉개지 않는다', () => {
   const ctx = partnerBox();
   const card = ctx.dashHtml();
-  assert.ok(card.indexOf('자문사현황') >= 0, '자문사현황 카드가 없습니다');
+  assert.ok(card.indexOf('고객사') >= 0, '고객사(옛 자문사현황) 카드가 없습니다');
   /* 목록 줄에 「확인 전」이 붙으면 언젠가 대조가 될 것처럼 들린다 — 그 갈래는 못 한다 */
   assert.ok(ctx.rowsHtml().indexOf('확인 전') < 0, '자문사 줄에 「확인 전」이 붙었습니다');
   /* ★ 카드는 «상태 한 마디»만 적는다(5차 지시). 할 일이 있으면 그것이 먼저다 —
@@ -2528,7 +2594,7 @@ test('★ 편집칸의 머리와 발이 고정돼 가운데만 구른다', () =>
     + fnSource('memberBandHtml') + '\n' + fnSource('riskReport') + '\n' + fnSource('srlConflict') + '\n'
     + fnSource('stamp') + '\n' + noConst(constLine('MEMBER_KINDS')) + '\n' + fnSource('memberKind') + '\n' + fnSource('memberEdit'));
   const h = ctx.memberEdit(ctx.App.draft);
-  const 가운데 = h.indexOf('class="esc"');
+  const 가운데 = h.search(/class="esc[ "]/);   // (2026-11-18) 두 칸 이름표(mem2)가 더 붙을 수 있다
   const 발 = h.lastIndexOf('class="eft"');
   assert.ok(가운데 >= 0, '구르는 가운데 칸이 없습니다 — 경력이 길면 단추가 화면 밖으로 밀립니다');
   assert.ok(발 > 가운데, '단추줄이 구르는 칸 안에 있습니다 — 굴려야 「저장」이 보입니다');
@@ -2974,4 +3040,95 @@ test('★ 홈페이지로 보내는 안내는 «로그인»을 걸음으로 말�
     '★ 로그인하라면서 어디서 하는지는 안 알려 줍니다');
   /* 안 될 때 «무엇이 보이는지»를 미리 말해 준다 */
   assert.match(h, /그냥 홈페이지/, '★ 로그인이 안 됐을 때 무엇이 보이는지 안 알려 줍니다');
+});
+
+/* ══════ 옛 홈페이지 접음 — 대표 결정 2026-11-15 「푸른노무법인.kr 더이상 연장 안한다」(2026-11-27 만료) ══════
+   ★ 돌려서 본다(되풀이된 실수 ②). 상자에 OLD_SITE_OFF 를 넣으면 «새 사이트 길»로 바뀌고,
+     빼면 옛 길 그대로다(되살릴 길 — 화면 함수는 typeof 로 읽는다). 같은 자료로 둘을 견준다 — 대조군. */
+function 접음할일(접음) {
+  const ctx = rosterBox([{ name: '권형하', leftAt: '' }, { name: '박성수', leftAt: '2026-06-30' }],
+    { at: 1, members: { '193': { name: '박성수', status: 'toRemove', reason: '퇴사' } }, pages: {} });
+  if (접음) ctx.OLD_SITE_OFF = true;
+  ctx.App.members = { '190': { name: '권형하' }, '193': { name: '박성수' } };
+  ctx.App.pages = {}; ctx.App.pageConfig = {}; ctx.App.checking = false;
+  ctx.App.dataErr = ''; ctx.App.staffErr = ''; ctx.App.saveErr = ''; ctx.App.checkMsg = '';
+  ctx.App.companiesErr = ''; ctx.App.companies = [{ id: 'c1', name: '가나상사' }]; ctx.App.partners = {};
+  ctx.App.autoRuns = { '2026-11': { a: { at: 5, 방식: '돌리기', ok: false, 실패: '관리자 로그인 실패',
+    내림: [], 못내림: [{ key: '193' }] } } };
+  run(ctx, fnSource('rowsWith') + '\n' + fnSource('someNames') + '\n' + fnSource('seeBtns') + '\n'
+    + fnSource('leftoverGoBtns') + '\n' + fnSource('jobCard') + '\n' + fnSource('jobsOf') + '\n'
+    + fnSource('bannersHtml') + '\n' + fnSource('todoCount'));
+  return ctx.bannersHtml();
+}
+
+test('★★ 옛 홈페이지를 접으면 퇴사자 할 일은 «구성원 쪽 다시 올리기»로 간다 — 옛 휴지통 단추가 아니다', () => {
+  const 접 = 접음할일(true), 옛 = 접음할일(false);
+  assert.match(접, /퇴사한 노무사가 홈페이지에 남아 있습니다/, '★★ 접었다고 퇴사자 할 일까지 사라졌습니다 — 새 사이트에도 남아 있을 수 있다');
+  assert.match(접, /onclick="publishPeople\(\)"/, '★★ 접었는데 퇴사자를 빼는 새 사이트 길(publishPeople)이 없습니다');
+  assert.ok(접.indexOf('퇴사자한번에내리기') < 0, '★★ 접은 옛 게시판으로 내리는 단추가 남았습니다 — 눌러도 갈 곳이 없다');
+  assert.match(옛, /onclick="퇴사자한번에내리기\(\)"/, '대조군: 스위치가 없으면 옛 길 그대로여야 합니다(되살릴 길)');
+});
+
+test('★★ 옛 홈페이지를 접으면 옛 게시판 자동 연결 할 일(못 돌았다·못 내렸다·로고와 잇기)이 안 뜬다', () => {
+  const 접 = 접음할일(true), 옛 = 접음할일(false);
+  ['자동 연결이 이번에 못 돌았습니다', '자동으로 못 내린 것이 있습니다', '로고와 잇기'].forEach(t => {
+    assert.ok(옛.indexOf(t) >= 0, '대조군: 옛 길에서는 「' + t + '」가 떠야 합니다 — 상자가 그 할 일을 못 만든다');
+    assert.ok(접.indexOf(t) < 0, '★★ 접었는데 「' + t + '」가 뜹니다 — 서버도 건너뛰므로 영영 안 풀리는 할 일이 된다');
+  });
+});
+
+test('★★ 옛 홈페이지를 접으면 쪽 고친 줄은 «홈페이지에 올리기»가 파란 단추다 — 옛 관리자용 복사는 없다', () => {
+  const 고침 = { ['1' + String.fromCharCode(1) + '첫 줄']: '고친 첫 줄' };
+  const 접상자 = 쪽화면([{ text: '첫 줄', n: 1, of: 1, ok: true, why: '' }], 고침);
+  접상자.OLD_SITE_OFF = true;
+  const 접 = 접상자.pageLinesHtml('work1');
+  const 옛 = 쪽화면([{ text: '첫 줄', n: 1, of: 1, ok: true, why: '' }], 고침).pageLinesHtml('work1');
+  assert.ok(접.indexOf('copyPageFix') < 0, '★★ 접었는데 옛 관리자 화면에 붙일 복사 단추가 남았습니다');
+  const i = 접.indexOf('publishPage(');
+  assert.ok(i > 0, '★★ 접었는데 홈페이지에 올리는 단추가 없습니다 — 쪽을 고칠 길이 사라진다');
+  const 단추 = 접.slice(접.lastIndexOf('<button', i), i);
+  assert.match(단추, /\bpri\b/, '★ 올리기가 파란(으뜸) 단추가 아닙니다 — 이제 이것이 본길이다');
+  assert.ok(옛.indexOf('copyPageFix') > 0, '대조군: 스위치가 없으면 옛 복사 단추 그대로여야 합니다');
+});
+
+/* 2026-11-15 검토 «높음» — 줄을 «칠 때»는 다시 그리지 않고 단추 글만 갈아 끼운다. 처음 그린 화면(고친 줄 0)에
+   올리기 단추가 없으면 갈아 낄 것이 없어, 눌러도 안 되는 옛 복사 문구가 떴다. «치는 길»을 그대로 돌려 본다. */
+test('★★ 옛 홈페이지를 접으면 줄을 «치는 중»에도 올리기 단추가 살아난다 — 옛 복사 문구로 덮지 않는다', () => {
+  const runs = [{ text: '첫 줄', n: 1, of: 1, ok: true, why: '' }];
+  const 접상자 = 쪽화면(runs);
+  접상자.OLD_SITE_OFF = true;
+  const 처음 = 접상자.pageLinesHtml('work1');
+  /* 처음(고친 줄 0): 올리기 단추가 «잠긴 채» 이미 있다 — publishPage 를 부르는 #pfixBtn */
+  const i = 처음.indexOf('id="pfixBtn"');
+  assert.ok(i > 0, '★★ 처음 화면에 #pfixBtn 이 없습니다');
+  const 단추 = 처음.slice(처음.lastIndexOf('<button', i), 처음.indexOf('</button>', i));
+  assert.match(단추, /onclick="publishPage\(/, '★★ 처음 화면의 #pfixBtn 이 올리기가 아닙니다 — 줄을 쳐도 갈 곳이 없다');
+  assert.match(단추, / disabled/, '★ 고친 줄이 없는데 올리기가 열려 있습니다');
+  /* 줄을 «친다» — 화면을 다시 그리지 않고 단추만 갈아 끼우는 그 길 */
+  const 단추들 = {};
+  const 가짜단추 = (id) => (단추들[id] = 단추들[id] || { id, disabled: true, textContent: '' });
+  접상자.document = { getElementById: (id) => (id === 'pfixBtn' || id === 'pfixReset') ? 가짜단추(id) : null,
+    querySelector: () => null };
+  접상자.pageFrameDoc안 = () => null;
+  접상자.pageRunEdit('work1', '1' + String.fromCharCode(1) + '첫 줄', '첫 줄', '고친 첫 줄', 0);
+  assert.equal(단추들.pfixBtn.disabled, false, '★★ 줄을 고쳤는데 올리기 단추가 잠겨 있습니다');
+  assert.match(단추들.pfixBtn.textContent, /홈페이지에 올리기 \(1줄\)/, '★★ 줄을 고치니 단추 글이 «' + 단추들.pfixBtn.textContent + '» 입니다');
+  assert.ok(!/채우기용 복사/.test(단추들.pfixBtn.textContent), '★★ 접었는데 옛 복사 문구로 덮었습니다');
+  assert.equal(단추들.pfixReset && 단추들.pfixReset.disabled, false, '★ 되돌리기 단추가 안 풀립니다');
+  /* 대조군 — 스위치가 없으면 옛 문구 그대로 */
+  const 옛상자 = 쪽화면(runs);
+  const 옛단추 = { disabled: true, textContent: '' };
+  옛상자.document = { getElementById: (id) => id === 'pfixBtn' ? 옛단추 : null, querySelector: () => null };
+  옛상자.pageFrameDoc안 = () => null;
+  옛상자.pageRunEdit('work1', '1' + String.fromCharCode(1) + '첫 줄', '첫 줄', '고친 첫 줄', 0);
+  assert.match(옛단추.textContent, /채우기용 복사 \(1줄\)/, '대조군: 스위치가 없으면 옛 복사 문구여야 합니다');
+});
+
+test('★★ 옛 홈페이지를 접으면 구성원 목록 머리의 «📷 여러 장»(옛 게시판 사진 칸)이 안 나온다', () => {
+  const 몸 = fnSource('listHtml');
+  const i = 몸.indexOf('사진여럿열기()');
+  assert.ok(i > 0, '「📷 여러 장」 단추를 못 찾았습니다(되살릴 길이 사라졌다)');
+  const 앞 = 몸.slice(Math.max(0, 몸.lastIndexOf('+ (', i) - 1), i);
+  assert.match(앞, /!접음\s*&&/, '★★ 「📷 여러 장」이 접음과 상관없이 나옵니다 — 눌러도 서버가 410 으로 돌려보낸다');
+  assert.match(몸, /const 접음 = typeof OLD_SITE_OFF !== 'undefined' && OLD_SITE_OFF === true/, '★ listHtml 이 접음을 typeof 로 안 읽습니다');
 });

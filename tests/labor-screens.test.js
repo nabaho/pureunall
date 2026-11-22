@@ -401,9 +401,19 @@ section('UI 한화면 정리 · 계약/취업규칙 빈 상태 진입 · HTML/CS
   var cmpHtml = ctx.renderEmpCompareStudio('1일등한우');
   ok('좌·우 1:1 원본비교 스튜디오가 좌측 원본 뷰어와 우측 콤마 적용 급여·근태 대조표를 나란히 렌더링한다',
     cmpHtml.indexOf('split-compare') > -1 && cmpHtml.indexOf('value="2,500,000"') > -1 && cmpHtml.indexOf('Ctrl + V') > -1);
+  ok('대상 직원 선택이 알약 나열 대신 드롭다운(<select)과 확인 동작으로 렌더링되며 직원 전환이 정상 동작한다',
+    cmpHtml.indexOf('<select') > -1 && cmpHtml.indexOf('<option') > -1 && typeof ctx.confirmEmpCompare === 'function');
+  ctx.confirmEmpCompare('1일등한우', '김철수');
+  var cmpHtml2 = ctx.renderEmpCompareStudio('1일등한우');
+  ok('드롭다운 확인(confirmEmpCompare)으로 선택한 직원의 대조표로 즉시 전환된다',
+    ctx.App.compareEmp === '김철수' && cmpHtml2.indexOf('김철수 님의 급여') > -1);
+  ctx.stepEmpCompare('1일등한우', 1);
+  ok('이전·다음 직원 이동(stepEmpCompare)으로 순차 확인이 동작한다',
+    ctx.App.compareEmp === '홍길동');
   var card360Html = ctx.renderEmp360Card('1일등한우');
-  ok('1인 종합카드(360°) 모드가 급여·연차·퇴직금·원본비교를 한 화면에 렌더링한다',
-    card360Html.indexOf('1인 종합 카드') > -1 && card360Html.indexOf('2,500,000원') > -1);
+  ok('1인 종합카드(360°) 모드가 중복 선택바 없이 급여·연차·퇴직금·원본비교를 한 화면에 렌더링한다',
+    card360Html.indexOf('1인 종합 카드') > -1 && card360Html.indexOf('2,500,000원') > -1 &&
+    (card360Html.match(/emp-select-bar/g) || []).length === 1);
 })();
 
 console.log('\n════════════════════════════════');

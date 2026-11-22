@@ -19,6 +19,9 @@
    ⚠ 기록에는 이름을 담지 않는다(homepage-auto.js 기록줄과 같은 까닭) — 숫자와 글 번호만. */
 require("./site-people/pu-site-people.js");
 const PSP = globalThis.PuSitePeople;
+/* 자문사 로고 부품 — 화면 js/pu-site-partner.js 의 글자 그대로 사본(scripts/sync-site-people.js) */
+require("./site-people/pu-site-partner.js");
+const PSPa = globalThis.PuSitePartner;
 const HA = require("./homepage-auto");
 
 /* 한 번에 이보다 많이 빠지게 되면 «올리지 않고» 멈춘다 — 명부를 잘못 읽은 날 쪽이 텅 비지 않게.
@@ -97,7 +100,68 @@ function 고르기(지금쪽, members, roster) {
   return 결과;
 }
 
-/* 한 번 돈다 — 도구 = { 읽기(path), 쓰기(path,값), 쪽읽기()→html, 올리기(html,note)→{commit}, 지금()→ms, 누가 }
+/* ══ 계약 끝난 자문사 로고 숨기기 (2026-11-16 — 옛 홈페이지 자동 «휴지통 내리기»를 새 사이트로 옮김) ══
+   ★ 잣대는 화면 「새 사이트에 올리기」(publishPartner)와 같은 부품 PuSitePartner.계약끝난로고 — 회사 열쇠(companyId)로만.
+   ★ «지금 올라가 있는 쪽»에서 끝난 로고만 뺀다 — 화면에서 정해 두고 아직 안 올린 차례·숨김·새 로고는 «건드리지 않는다»
+     (그건 사람이 「올리기」를 눌러야 나간다. 자동이 대신 내보내면 고치다 만 것이 나간다).
+   ⚠ 한 번에 이보다 많이 빠지면 멈춘다 — 업체관리를 잘못 읽은 날 로고가 우르르 사라지지 않게(구성원과 같은 문턱).
+   ⚠ 회사 상태·로고 기록은 쓰지 않는다 — 결과 한 줄(homepage/auto/newsiteLogos)만 남긴다(종료·삭제·되돌림 불변). */
+const 로고빠짐문턱 = 3;
+const 자문사자리 = "site/partner/index.html";
+const 메인자리 = "site/index.html";
+
+function 로고고르기(자문사쪽, 메인쪽, partners, companies) {
+  const 업체 = 목록으로(companies);
+  if (!업체 || !업체.length) return { ok: false, 실패: "푸른ERP 업체관리를 읽지 못했습니다" };
+  if (!String(자문사쪽 || "").trim()) return { ok: false, 실패: "새 사이트의 자문사 쪽을 읽지 못했습니다" };
+  const 끝난 = PSPa.계약끝난로고(partners, 업체);
+  const 고른것 = PSPa.올릴로고(자문사쪽, { 숨김: 끝난.숨길 });
+  const 결과 = { ok: true, 실패: "", 멈춤: "", 숨김수: 고른것.숨긴것.length, 겹침수: 끝난.겹침.length,
+                 남는수: 고른것.갈것.length, 바뀜: false, 새쪽: "", 새메인: "" };
+  if (!고른것.숨긴것.length) return 결과;
+  if (고른것.숨긴것.length > 로고빠짐문턱) {
+    결과.멈춤 = "계약 끝난 로고가 한 번에 " + 고른것.숨긴것.length + "장이라 숨기지 않았습니다 — 「새 사이트에 올리기」로 확인해 주십시오";
+    return 결과;
+  }
+  if (!고른것.갈것.length) { 결과.멈춤 = "로고가 하나도 안 남게 되어 숨기지 않았습니다"; return 결과; }
+  결과.새쪽 = PSPa.쪽그리기(자문사쪽, 고른것.갈것);
+  if (String(메인쪽 || "").trim()) {
+    const 그린것 = PSPa.메인그리기(메인쪽, 고른것.갈것, PSPa.로고읽기(자문사쪽));
+    if (그린것 !== 메인쪽) 결과.새메인 = 그린것;
+  }
+  결과.바뀜 = 결과.새쪽 !== 자문사쪽 || !!결과.새메인;
+  return 결과;
+}
+
+/* 도구에 파일읽기·파일올리기가 없으면(옛 부르는 쪽·검사) 아무것도 안 한다 */
+async function 로고돌기(도구) {
+  if (typeof 도구.파일읽기 !== "function" || typeof 도구.파일올리기 !== "function") return null;
+  const 지금 = 도구.지금();
+  let 기록;
+  try {
+    const 메인 = await 도구.파일읽기(메인자리).catch(() => "");
+    const 고른것 = 로고고르기(await 도구.파일읽기(자문사자리), 메인,
+      await 도구.읽기("homepage/partners"), await 도구.읽기("data/companies"));
+    기록 = { at: 지금, by: 도구.누가 || "", ok: 고른것.ok, 실패: 고른것.실패 || "", 멈춤: 고른것.멈춤 || "",
+             숨김수: 고른것.숨김수 || 0, 겹침수: 고른것.겹침수 || 0, 올림: false, commit: "" };
+    if (고른것.ok && !고른것.멈춤 && 고른것.바뀜) {
+      const 사연 = "계약 끝난 자문사 로고 " + 고른것.숨김수 + "장 숨김 (매달 자동)";
+      let 답 = null;
+      if (고른것.새쪽) 답 = await 도구.파일올리기(자문사자리, 고른것.새쪽, 사연);
+      if (고른것.새메인) await 도구.파일올리기(메인자리, 고른것.새메인, 사연);
+      기록.올림 = true;
+      기록.commit = (답 && 답.commit && 답.commit.sha) ? String(답.commit.sha).slice(0, 7) : "";
+    }
+  } catch (e) {
+    기록 = Object.assign(기록 || { at: 지금, by: 도구.누가 || "" }, { ok: false, 올림: false,
+      실패: String((e && e.message) || e).slice(0, 200) });
+  }
+  await 도구.쓰기("homepage/auto/newsiteLogos", 기록);
+  return 기록;
+}
+
+/* 한 번 돈다 — 도구 = { 읽기(path), 쓰기(path,값), 쪽읽기()→html, 올리기(html,note)→{commit}, 지금()→ms, 누가,
+   (있으면) 파일읽기(자리)→html, 파일올리기(자리,html,note)→{commit} — 자문사 로고 숨기기에 쓴다 }
    ★ 결과는 늘 homepage/auto/newsite 에 남긴다 — 화면이 이것을 보고 «새 사이트» 줄과 띠를 그린다.
    ⚠ 끄면(homepage/auto/config.off) 아무것도 안 한다 — 자동 연결 전체를 끄는 스위치와 같은 것을 따른다. */
 async function 돌기(도구) {
@@ -122,6 +186,9 @@ async function 돌기(도구) {
       실패: String((e && e.message) || e).slice(0, 200) });
   }
   await 도구.쓰기("homepage/auto/newsite", 기록);
+  /* 구성원과 «따로» 돈다 — 한쪽이 실패해도 다른 쪽은 간다(서로 다른 쪽이다). 결과는 돌려주는 답에만 붙인다(기록은 따로 남는다). */
+  try { 기록.로고 = await 로고돌기(도구); }
+  catch (e) { 기록.로고 = { ok: false, 실패: String((e && e.message) || e).slice(0, 200) }; }
   return 기록;
 }
 
@@ -138,4 +205,5 @@ async function 열쇠점검(도구) {
   return 기록;
 }
 
-module.exports = { 빠짐문턱, 점검늦음ms, 사본자리, 갈사람, 고르기, 돌기, 열쇠점검 };
+module.exports = { 빠짐문턱, 점검늦음ms, 사본자리, 갈사람, 고르기, 돌기, 열쇠점검,
+                   로고빠짐문턱, 자문사자리, 메인자리, 로고고르기, 로고돌기 };

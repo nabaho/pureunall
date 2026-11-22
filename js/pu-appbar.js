@@ -52,8 +52,11 @@
     { key: 'harass',  row: 'client', name: '괴롭힘·성희롱 조사', icon: '🛡️', url: 'pu-harass.html',      desc: '사건조사·메일수집·보고서' },
     { key: 'ilteo',   row: 'client', name: '일터상생혁신',     icon: '🏭', url: 'ilteo.html',          desc: '메일자료·중간·결과보고·PPT 자동화' },
     { key: 'jobtrans', row: 'client', name: '산업일자리전환',  icon: '⚡', url: 'jobtrans.html',       desc: '능률협회·충경진 메일·보고서·HWPX' },
+    { key: 'orch',    row: 'inside', name: '오케스트레이션',   icon: '🔄', url: 'pu-orchestrator.html', desc: '메일·계약·ERP·정산 흐름연결' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
+    /* 데이터관리(2026-11-21) — 대표 전용. 포털 타일과 짝(adminOnly) */
+    { key: 'datahub', row: 'inside', name: '데이터관리',   icon: '📊', url: 'pu-datahub.html',     desc: '입금·업무량 3D·현황판', adminOnly: true },
     /* 영업관리 다섯(정부사업신청·회생광고·전광판·홈페이지·뉴스레터) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
        adminOnly·perm 을 뺐다 — 포털 타일과 짝. */
     { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기' },
@@ -72,6 +75,8 @@
        2026-10-24 off 로 감췄다가 2026-10-30 대표 「다시 살려」로 off 를 걷었다 — 포털 타일과 함께. */
     { key: 'rules',   row: 'client', name: '기업규정집',    icon: '📋', url: 'rules-v2.html',       desc: '취업규칙·노사협의회·단체협약' },
     { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
+    /* 강의자료(2026-11-19 · 11-20 «법정교육자료함»에서 이름 바꿈) — 강의자료 종류·강의일별 · 재직 직원 모두 — 포털 타일과 짝 */
+    { key: 'edulib',  row: 'store', name: '강의자료', icon: '🎓', url: 'pu-edulib.html',      desc: '종류·강의일별 · 나란히 비교' },
     { key: 'aliounion', row: 'store', name: '공공임단협', icon: '🤝', url: 'pu-alio-union.html', desc: '알리오 노조·임금·단체협약 API 통합비교' },
     { key: 'hangul',  row: 'client', name: '한글 편집기',  icon: '📝', url: 'hangul.html',   desc: '한글 문서 열기·고치기' },
     { key: 'pbox',    row: 'store',  name: 'P박스',        icon: '📚', url: 'pu-pbox.html',  desc: '전 법령·판례·행정해석·AI 서면' },
@@ -619,6 +624,149 @@
     return tab;
   }
 
+  /* ── 🔄 업무 오케스트레이션 바통 수신 안내 띠 (모든 앱 공용, 30분 만료·계정 바인딩·개인정보 비보관) ── */
+  function batonUidTagOf(uid) {
+    var s = String(uid || '').trim();
+    if (!s) return '';
+    var h = 2166136261;
+    var input = 'pu-orch-uid:' + s;
+    for (var i = 0; i < input.length; i++) {
+      h ^= input.charCodeAt(i);
+      h = Math.imul ? Math.imul(h, 16777619) : ((h * 16777619) | 0);
+    }
+    return ('00000000' + (h >>> 0).toString(16)).slice(-8);
+  }
+
+  function clearStoredBaton() {
+    try { if (global.localStorage) global.localStorage.removeItem('pu_orch_baton_v1'); } catch (_) {}
+    try { if (global.sessionStorage) global.sessionStorage.removeItem('pu_orch_baton_v1'); } catch (_) {}
+  }
+
+  function readOrchBaton() {
+    try {
+      if (!global.location) return null;
+      var q = String(global.location.search || '');
+      if (q.indexOf('orchBaton=1') < 0) return null;
+      var curUser = global.firebase && global.firebase.auth && global.firebase.auth().currentUser;
+      if (!curUser || !curUser.uid) return null;
+      var raw = null;
+      try { if (global.localStorage) raw = global.localStorage.getItem('pu_orch_baton_v1'); } catch (_) {}
+      if (!raw) {
+        try { if (global.sessionStorage) raw = global.sessionStorage.getItem('pu_orch_baton_v1'); } catch (_) {}
+      }
+      if (!raw) return null;
+      if (global.PuOrchestratorCore && typeof global.PuOrchestratorCore.unpackBaton === 'function') {
+        var unpacked = global.PuOrchestratorCore.unpackBaton(raw, Date.now(), curUser.uid);
+        if (!unpacked) { clearStoredBaton(); return null; }
+        var cur0 = whoAmI() || _me;
+        if (unpacked.toApp && cur0 && unpacked.toApp !== cur0) return null;
+        return unpacked;
+      }
+      var b = JSON.parse(raw);
+      var now = Date.now();
+      var at = Number(b && b.at) || 0;
+      var exp = Number(b && b.expiresAt) || 0;
+      if (!b || b.v !== 1 || !at || !exp || now > exp || exp > at + 1800000 || now < at - 60000) {
+        clearStoredBaton();
+        return null;
+      }
+      if (!b.uidTag || String(b.uidTag) !== batonUidTagOf(curUser.uid)) {
+        clearStoredBaton();
+        return null;
+      }
+      if (b.toApp && !appOf(String(b.toApp))) {
+        clearStoredBaton();
+        return null;
+      }
+      var cur = whoAmI() || _me;
+      if (b.toApp && cur && b.toApp !== cur) return null;
+      return b;
+    } catch (e) { return null; }
+  }
+
+  var _orchAuthHooked = false;
+  function wireOrchBatonAuth() {
+    if (_orchAuthHooked) return;
+    try {
+      if (!global.firebase || !global.firebase.auth) return;
+      var authObj = global.firebase.auth();
+      if (!authObj || typeof authObj.onAuthStateChanged !== 'function') return;
+      _orchAuthHooked = true;
+      var prevUid = '';
+      authObj.onAuthStateChanged(function (u) {
+        if (!u || !u.uid) {
+          prevUid = '';
+          clearStoredBaton();
+          var oldBar = document.querySelector && document.querySelector('#pu-orch-baton-bar');
+          if (oldBar && oldBar.parentNode) oldBar.parentNode.removeChild(oldBar);
+          return;
+        }
+        if (prevUid && prevUid !== u.uid) {
+          clearStoredBaton();
+        }
+        prevUid = u.uid;
+        mountOrchBatonBanner();
+      });
+    } catch (_) {}
+  }
+
+  function mountOrchBatonBanner() {
+    try {
+      if (!document.body || document.querySelector('#pu-orch-baton-bar')) return;
+      var b = readOrchBaton();
+      if (!b) return;
+      var bar = document.createElement('div');
+      bar.id = 'pu-orch-baton-bar';
+      bar.setAttribute('role', 'region');
+      bar.setAttribute('aria-label', '오케스트레이션 연결 안내');
+      bar.style.cssText =
+        'position:fixed;left:50%;bottom:58px;transform:translateX(-50%);z-index:9996;' +
+        'display:flex;align-items:center;gap:8px;max-width:min(720px,calc(100vw - 24px));' +
+        'padding:6px 10px 6px 14px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;' +
+        'color:#1e40af;font-size:12px;font-family:-apple-system,"Malgun Gothic",sans-serif;' +
+        'box-shadow:0 8px 22px rgba(30,41,59,.18);';
+      var txt = document.createElement('span');
+      txt.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;';
+      var coPart = b.companyLabel ? ('[' + String(b.companyLabel) + '] ') : '';
+      txt.textContent = '🔄 ' + coPart + String(b.title || '오케스트레이션 연결 작업');
+      txt.title = String((b.reason ? b.reason + ' · ' : '') + (b.title || ''));
+
+      var retBtn = document.createElement('button');
+      retBtn.type = 'button';
+      retBtn.textContent = '흐름판 복귀';
+      retBtn.style.cssText =
+        'border:1px solid #2563eb;background:#2563eb;color:#ffffff;border-radius:999px;' +
+        'min-height:30px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;';
+      retBtn.addEventListener('click', function () {
+        var ret = String(b.returnUrl || 'pu-orchestrator.html');
+        if (!/^[A-Za-z0-9._-]+\.html(?:[?#][^\s"'<>]*)?$/.test(ret)) ret = 'pu-orchestrator.html';
+        var hIdx = ret.indexOf('#');
+        var hPart = hIdx >= 0 ? ret.slice(hIdx) : '';
+        var basePart = hIdx >= 0 ? ret.slice(0, hIdx) : ret;
+        var sep = basePart.indexOf('?') >= 0 ? '&' : '?';
+        goApp(basePart + sep + 'sso=1&' + bust() + hPart);
+      });
+
+      var xBtn = document.createElement('button');
+      xBtn.type = 'button';
+      xBtn.setAttribute('aria-label', '오케스트레이션 안내 닫기');
+      xBtn.textContent = '✕';
+      xBtn.style.cssText =
+        'border:none;background:transparent;color:#1e40af;font-size:13px;font-weight:800;' +
+        'min-width:30px;min-height:30px;padding:2px 6px;border-radius:999px;cursor:pointer;flex-shrink:0;';
+      xBtn.addEventListener('click', function () {
+        clearStoredBaton();
+        if (bar.parentNode) bar.parentNode.removeChild(bar);
+      });
+
+      bar.appendChild(txt);
+      bar.appendChild(retBtn);
+      bar.appendChild(xBtn);
+      document.body.appendChild(bar);
+      clearStoredBaton(); // 1회 수신 즉시 소거하여 공용 저장소 잔류를 막는다
+    } catch (e) {}
+  }
+
   function auto() {
     /* 주소로 알아낸 값이 있을 때만 덮어쓴다.
        앱이 mount({current}) 로 알려 준 것을 빈 값으로 지워 버리면
@@ -626,6 +774,8 @@
     _me = whoAmI() || _me;
     phoneCss();
     try { fabWatch(); } catch (e) { /* 자리 재기가 안 돌아도 단추는 바닥 FAB_LOW 에 그대로 있다 */ }
+    wireOrchBatonAuth();
+    mountOrchBatonBanner();
     if (document.querySelector('[data-pu-appbar-btn]')) return;   // 두 번 붙지 않게
     if (!document.body) return;
     document.body.appendChild(makeTab());

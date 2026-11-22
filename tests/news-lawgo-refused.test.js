@@ -79,8 +79,11 @@ test('★★★ ② 옛 꼴(DRF·OC=test) 법제처 주소는 같은 한 건의 
   assert.strictEqual(C.법제처사람주소(옛해), NP.해석보는주소('329741'));
   [옛판, 옛해, NP.보는주소('1'), NP.해석보는주소('1'), NF.법제처주소('prec', '1'), NF.법제처주소('expc', '1')]
     .forEach((u) => assert.ok(!/OC=/.test(C.법제처사람주소(u)), '★★ 사람이 볼 주소에 열쇠가 남았다: ' + u));
-  /* 판례·해석 한 건 주소만 바꾼다 — 그 밖은 받은 그대로 */
-  ['https://www.moel.go.kr/a.do?ID=1', 'https://www.law.go.kr/DRF/lawService.do?OC=test&target=law&MST=1',
+  /* 법령 한 편(target=law · MST)도 같은 까닭으로 공개 쪽으로 (2026-11-16 — 브리핑 「법제처에서 보기」) */
+  assert.strictEqual(C.법제처사람주소('https://www.law.go.kr/DRF/lawService.do?OC=test&target=law&MST=285279&type=HTML'),
+    'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=285279');
+  /* DRF 한 건 주소만 바꾼다 — 그 밖(다른 집·번호 없는 것·이미 공개 쪽)은 받은 그대로 */
+  ['https://www.moel.go.kr/a.do?ID=1', 'https://www.law.go.kr/DRF/lawService.do?OC=test&target=law',
     'https://www.law.go.kr/', '', NP.보는주소('7')].forEach((u) => assert.strictEqual(C.법제처사람주소(u), u));
   /* 옛 꼴로 «보낸» 판례와 새 꼴로 «모은» 같은 판례는 한 열쇠 — 다시 보내지 않게 */
   assert.strictEqual(C.실은열쇠({ 링크: 옛판 }), C.실은열쇠({ 링크: NP.보는주소('622955') }));
@@ -112,14 +115,15 @@ test('★★★ ③ 거절 몸을 알아본다 — 200 이어도 «사용자 정
   assert.ok(!NP.거절인가(''));
 });
 
-test('★★★ ③ 판례·해석 모으개 — «모두 거절»이면 0건이 아니라 탈로 남긴다', () => {
+test('★★★ ③ 판례·해석 모으개 — «모든 낱말이 빈손»이면 0건이 아니라 탈로 남긴다 (2026-11-16 공개 쪽으로 옮긴 뒤에도)', () => {
   ['async function 판례거리모으기', 'async function 해석거리모으기'].forEach((머리) => {
     const 몸 = 서버함수(머리);
-    assert.ok(!/쪽받기\(판례부품\.(해석)?목록주소/.test(몸),
-      '★★★ ' + 머리 + ' — 목록을 거절 확인 없이 받는다. 거절이 «0건»으로 조용히 넘어간다');
-    assert.match(몸, /\bthrow\b/, '★★ ' + 머리 + ' — 모두 거절이어도 던지지 않는다. 탈 칸이 비어 까닭을 모른다');
+    assert.match(몸, /공개목록모으기\(/, '★★★ ' + 머리 + ' — 목록을 «빈손 세기» 없이 받는다. 못 읽음이 «0건»으로 조용히 넘어간다');
+    assert.match(몸, /\bthrow\b/, '★★ ' + 머리 + ' — 한 건 쪽을 하나도 못 읽어도 던지지 않는다');
   });
-  assert.ok(서버.indexOf('판례부품.거절인가(') >= 0, '★★ 서버가 법제처 거절을 안 가린다');
+  const 모으기 = 서버함수('async function 공개목록모으기');
+  assert.match(모으기, /빈손 === 낱말들\.length\) throw/, '★★★ 모든 낱말이 빈손이어도 던지지 않는다 — 다섯 주를 몰랐던 그 일');
+  assert.ok(서버.indexOf('판례부품.거절인가(') >= 0, '★★ 서버가 법제처 거절 쪽을 안 가린다');
   /* 던진 것은 모아담기가 탈로 남긴다 — 그 길은 그대로여야 한다 */
   const 담기 = 서버함수('async function 자료판례모아담기');
   assert.match(담기, /homepage\/newsPrec"\)\.update\(\{ 탈:/, '(그물) 판례 탈을 남기는 길이 사라졌다');

@@ -175,8 +175,8 @@ function 삭제무대(창고) {
     toast: function (m) { 알림.push(m); },
     isAwardType: function (t) { return /표창|포상|감사|공로|상장/.test(String(t || '')); },
     TRASH_DAYS: 30,
-    kcTrashPut: function (store, page, r) { 휴지통.push({ store: store, page: page, id: r.id }); },
-    kcUndoBar: function () {},
+    kcTrashPutMany: function (store, page, rs) { rs.forEach(function (r) { 휴지통.push({ store: store, page: page, id: r.id }); }); return []; },
+    kcTrashDoneMany: function () {},   /* 되살리기 알림은 이 검사(전체 삭제의 «범위»)의 일이 아니다 */
     renderCareer: function () {},
     kcAskDelete: function (btn, o, go) { 물음 = o; ctx._진행 = go; },
     CAREER_CFG: {

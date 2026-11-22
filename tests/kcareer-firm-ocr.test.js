@@ -172,8 +172,8 @@ test('★ 📮 단추는 «여기서 적는» 우편번호에만 — 이알피�
   assert.match(r, /onclick="firmZipFind\(\)"/);
   assert.match(떼기('function _kcLoadPostcode('), /if\(window\.daum && daum\.Postcode\) return Promise\.resolve\(\);/,
     '★ 누를 때마다 남의 스크립트를 또 싣습니다');
-  /* 부팅 때 싣지 않는다 — <script src> 로 박지 않는다 */
-  assert.ok(!/<script[^>]+daumcdn/.test(SRC), '★★ 우편번호 스크립트를 부팅 때 싣습니다 — 누를 때만 받아야 합니다');
+  /* 부팅 때 싣지 않는다 — <script src> 로 박지 않는다 (t1.kakaocdn.net 전환 뒤에도 postcode.v2.js 부팅 적재를 함께 잡는다) */
+  assert.ok(!/<script[^>]+(?:daumcdn|postcode\.v2\.js)/.test(SRC), '★★ 우편번호 스크립트를 부팅 때 싣습니다 — 누를 때만 받아야 합니다');
 });
 
 test('★★ 서식 채우기 — «법인»이라 밝힌 칸만 법인 우편번호·계좌로 본다', () => {

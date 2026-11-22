@@ -3,6 +3,13 @@
    (브라우저 window.KcareerMailReq / Node module.exports 겸용 · 대표 지시 2026-11-09
     「법인메일로 경력요청 및 동의서 등 기타 메일로 요청사항이 있을경우 자동으로 감지하고 경력관리에 정리하면서 알람으로 정리해달라」)
 
+   ■ 들이는 기준 (대표 지시 2026-11-19 「요청메일은 이력서 회의 비용 경력요청 등만 다루는데 불필요한게 자꾸 들어온다」 · 「아예 안 들임」)
+     · 제목·첨부 이름에 «이력·경력·회의·비용» 말이 있고 업무 말이 없는 메일(scopeOf → personal)만 목록에 들인다.
+       업무 말만 있거나, 어느 쪽 말도 없거나, 둘 다 있으면 «걸러 둔다»(st 'ignored' + autoIgnored) — 진행 중·알림·숫자에 안 나오고,
+       «🚫 걸러낸 메일»에서만 보이며 ↩ 로 되돌린다. 실제 64건(2026-11-19)에 대어 본 값: 처리 완료 6건은 모두 들이고, 치운 58건 중 57건을 걸렀다.
+     · 🧠 Laya(이 PC 의 무료 판단 모델)는 «의견»만 적는다(layaAsk → laya 칸). 상태를 바꾸지 않는다 —
+       같은 64건에서 Laya 의견대로 치웠다면 진짜 요청 6건 중 3건이 사라졌다. 대표 판단과 맞는 비율(layaAgree)을 화면에 세어 두고, 충분히 맞을 때 다시 정한다.
+
    ■ 원칙 — 어기면 안 되는 것
      · «알아보고 알릴 뿐» 채우거나 보내지 않는다. 메일 읽기(peek)만 한다 — 답장·서식 채우기는 사람이 한다.
      · 확실한 것만 올린다. 제목·첨부 이름에 단서가 있고 «요청 말투·양식 첨부·기한» 중 하나가 겹칠 때, 또는 본문에만 단서가 있으면
@@ -33,6 +40,8 @@
   var KINDS = [
     { key: 'consent', icon: '📝', label: '동의서' },
     { key: 'career', icon: '📇', label: '경력 요청' },
+    { key: 'meeting', icon: '🗓', label: '회의·위원' },
+    { key: 'fee', icon: '💰', label: '비용' },
     { key: 'other', icon: '📨', label: '기타 요청' }
   ];
   var STATES = { 'new': '새 요청', doing: '처리 중', done: '처리 완료', ignored: '요청 아님' };
@@ -55,6 +64,10 @@
   var ASK = /부탁|바랍니다|바람|요청|주시기|주세요|해\s*주/;
   var FORM_NAME = /양식|서식|신청서|동의서|확인서|서약서|제출|작성/;
   var FORM_EXT = /\.(hwp|hwpx|doc|docx|xls|xlsx|pdf)$/i;
+  /* 회의·위원·비용 메일 (2026-11-19) — 안내 말 · 종류를 좁히는 말. 들일지는 범위(scopeOf)가 정하고, 이 말은 «무슨 종류인가»만 고른다 */
+  var NOTICE = /안내|개최|소집|참석|일정|회신|요청/;
+  var FEE = /수당|강사료|자문료|심사비|회의비|교통비|사례비|출장비|여비|통장\s*사본|지급\s*확인서|정산/;
+  var MEETING = /회의|위원|심의|심사|소집|개최|참석|위촉/;
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function obj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -205,6 +218,14 @@
     if (!kinds.length && WORDS.other.test(head + ' ' + body) && act && (dl || forms.length || actInSubj)) {
       kinds.push('other'); var o = WORDS.other.exec(head + ' ' + body); why.push('서류 말 «' + cut(o[0], 14) + '»');
     }
+    /* 회의·위원·비용 (2026-11-19) — 서류 말이 없어도 제목·첨부 이름이 «이력·회의·비용» 범위(scopeOf personal)이고
+       요청 말투·기한·안내 말(NOTICE)이 있으면 들인다(«회의 참석 여부 회신», «위원 위촉 안내» 같은 메일을 놓치지 않게) */
+    if (!kinds.length) {
+      var sp = scopeOf(row);
+      if (sp.scope === 'personal' && (act || dl || NOTICE.test(subj))) { kinds.push('other'); why.push(cut(sp.why[0], 40)); }
+    }
+    /* «기타 요청» 하나뿐이면 범위 말로 좁힌다 — 비용 말이면 💰 비용, 회의·위원 말이면 🗓 회의·위원 */
+    if (kinds.length === 1 && kinds[0] === 'other') { if (FEE.test(head)) kinds[0] = 'fee'; else if (MEETING.test(head)) kinds[0] = 'meeting'; }
     if (!kinds.length) return null;
     if (act && why.length < 4 && !actInSubj) why.push('요청 말투 «' + cut(act[0], 10) + '»'); else if (actInSubj && why.length < 4) why.push('제목에 요청 말투 «' + cut(ACT.exec(subj)[0], 10) + '»');
     if (forms.length && why.length < 4) why.push('양식 첨부 «' + cut(forms[0], 24) + '»');
@@ -219,14 +240,19 @@
   /* ── 범위(scope) — «이력서·경력·회의·비용»은 남기고 «업무»는 뺀다 (대표 지시 2026-11-15
         「이력서 경력 회의 비용 등에 대한 부분이다 — 업무와 관련된 건 빼라, jev 활용해서 자동 분류」) ──
      ★ 요청 메일은 «내 이력·위원 활동·비용» 서류를 챙기는 자리다. 고객 업무(컨설팅 수행·노동청 사건·급여 …)는 다른 곳에서 챙긴다.
-     ★ 제목·첨부 이름만 본다(본문은 안 본다). 1차는 이 말 목록(밖으로 안 나간다) — «확실한 것만» 가른다:
-         개인(personal) 말만 있다 → 남긴다 · 업무(work) 말만 있다 → «요청 아님»으로 자동 제외 · 둘 다 있거나 둘 다 없다 → 애매(unsure).
-       2차 — 애매한 것만 Jev 에게 묻는다(scopeAsk: 제목·첨부 이름만, 이름 가림, 관리자만, 하루 한도 — 서버 mail-req-scope.js).
-     ⚠ 자동 제외는 «새 요청»(st:'new')에만 한다 — 사람이 «확인함»·«처리 완료»로 만진 건은 건드리지 않는다. 틀리면 «요청 아님» 탭에서 되돌린다.
-     ⚠ 말 목록은 «손으로 정한 것»이다 — 놓치면 애매로 남아 Jev 가 보고, 그래도 못 가르면 사람이 본다(조용히 지우지 않는다). */
+     ★ 제목·첨부 이름만 본다(본문은 안 본다). 이 말 목록은 밖으로 안 나간다:
+         개인(personal) 말만 있다 → 들인다 · 그 밖(업무 말만 · 둘 다 · 둘 다 없음)은 «걸러 둔다»(2026-11-19 «아예 안 들임» — 위 머리말).
+       (2026-11-15 의 «애매한 것만 Jev 에게» 단계는 화면이 더는 부르지 않는다 — 애매한 건이 처음부터 걸러지기 때문. 서버 함수 mail-req-scope.js 는 남아 있다)
+     ⚠ 자동으로 거르는 것은 «새 요청»(st:'new')뿐이다 — 사람이 «확인함»·«처리 완료»로 만진 건은 건드리지 않는다. 틀리면 «🚫 걸러낸 메일»에서 ↩ 되돌린다.
+     ⚠ 말 목록은 «손으로 정한 것»이다 — 이력·회의·비용 말이 없는 진짜 요청은 걸러진다(조용히 지우지 않는다 — 걸러낸 메일에 남는다).
+     ⚠ 기관 이름이 «위원회»·«수당»을 품어도 고객 업무인 것 — 노동위원회·징계위원회·고충처리위원회·산업안전보건위원회, 주휴·연장근로수당 —
+       은 개인 말로 치지 않는다(뒤를 보는 조건 (?<!…)). 노동위원회 «공익위원 위촉» 같은 진짜 위원 일은 «위촉»·«공익위원» 말로 들어온다. */
   var SCOPES = ['work', 'personal', 'unsure'];
-  var SCOPE_PERSONAL = /이력\s*서|이력\s*사항|프로필|약력|경력\s*(?:증명|확인|사항|서|자료|조회|기술)|재직\s*증명|자격증\s*사본|강사\s*(?:이력|등록|프로필)|실적\s*(?:증명|확인)|위촉|위원회|심의|(?:평가|자문|심사|전문)\s*위원|위원\s*(?:명단|등록|활동|수당)|인력\s*풀|제척|기피|회피|서약서|활동\s*(?:증빙|확인|내역|실적)|지급\s*확인서|수당|강사료|자문료|심사비|회의비|교통비|사례비|출장비|통장\s*사본/;
-  var SCOPE_WORK = /업무\s*협조|보고서|이행\s*관리|인터뷰|수행\s*일지|산출물|신고\s*사건|진정\s*(?:사건|서|건)|노동청|고용노동\s*지청|근로\s*감독|근로자|사업장|취업\s*규칙|급여|임금|퇴직금|4대\s*보험|산재|고용\s*보험|세금\s*계산서|견적|협력\s*업체|(?:컨설팅|자문)\s*(?:진행|결과|일정|자료)|근로\s*계약|용역\s*계약|계약서\s*(?:양식|검토)|양식\s*검토|퇴사자|입\s*퇴사|입사\s*(?:자|서류)|신규\s*(?:직원|입사)|취득\s*신고|상실\s*신고|부양\s*가족|가족\s*관계|근태|노무\s*진단|제도\s*설계|\[푸른노무법인\]/;
+  var SCOPE_PERSONAL = /이력\s*(?:서|사항|카드)|프로필|약력|경력\s*(?:증명|확인|사항|서|자료|조회|기술|카드)|재직\s*증명|자격증\s*사본|강사\s*(?:이력|등록|프로필)|실적\s*(?:증명|확인)|위촉|(?<!(?:노동|노사|징계|인사|고충\s*처리|안전\s*보건|재심사)\s*)위원회|(?:평가|자문|심사|전문|심의|운영|외부|공익|조정)\s*위원|위원\s*(?:명단|등록|활동|수당|후보)|인력\s*풀|제척|기피|회피|서약서|심의|활동\s*(?:증빙|확인|내역|실적)|지급\s*확인서|(?<!(?:연장|야간|휴일|주휴|연차|휴업|가족|직책|통상|실업|육아|출산)\s*(?:근로\s*)?)수당|강사료|자문료|심사비|회의비|교통비|사례비|출장비|여비|통장\s*사본|(?:자문|위원|심의|운영|평가)\s*회의/;
+  /* ⚠ «회의 일정»·«참석 요청» 같은 맨 회의 말은 넣지 않는다 — 고객 회의·내부 공유 메일까지 들어온다. 회의는 «위원 활동»과 묶인 말(위원회·자문회의·심의 …)로만 */
+  var SCOPE_WORK = /업무\s*협조|보고서|이행\s*관리|인터뷰|수행\s*일지|산출물|신고\s*사건|진정\s*(?:사건|서|건)|노동청|고용노동\s*지청|근로\s*감독|근로자|사업장|취업\s*규칙|급여|임금|퇴직금|4대\s*보험|산재|고용\s*보험|세금\s*계산서|견적|협력\s*업체|(?:컨설팅|자문)\s*(?:진행|결과|일정|자료)|근로\s*계약|용역\s*계약|계약서\s*(?:양식|검토)|양식\s*검토|퇴사자|입\s*퇴사|입사\s*(?:자|서류)|신규\s*(?:직원|입사)|취득\s*신고|상실\s*신고|부양\s*가족|가족\s*관계|근태|노무\s*진단|제도\s*설계|구제\s*신청|부당\s*(?:해고|정직|전보|징계)|이유서|답변서|준비\s*서면|체불|연차\s*(?:휴가|사용)|(?:연장|야간|휴일|주휴|휴업)\s*(?:근로\s*)?수당|킥오프|\[푸른노무법인\]/;
+  /* ⚠ 업무 말에 «주제» 말(괴롭힘·징계·고충처리·노사협의·회의록 …)을 넣지 않는다 — 대표가 위원으로 앉는 위원회의 주제이기도 하다
+       (실제 처리 완료 건 «괴롭힘 판단 전문위원회» 서류가 «괴롭힘» 한 말에 걸러졌다, 2026-11-19). 업무 말은 «고객 일의 행위·서류»만. */
   function scopeHit(re, subj, names) {
     var m = re.exec(subj); if (m) return '제목 «' + cut(m[0], 12) + '»';
     for (var i = 0; i < names.length; i++) { m = re.exec(names[i]); if (m) return '첨부 «' + cut(m[0], 12) + '»'; }
@@ -243,11 +269,11 @@
     return { scope: 'unsure', why: ['어느 쪽 말도 없다'] };
   }
   var SCOPE_LABELS = { work: '업무', personal: '이력·회의·비용', unsure: '애매' };
-  /* 목록에 붙일 딱지 — 자동으로 «요청 아님»이 된 건만. 어떻게 알았는지(규칙 · Jev)를 «같은 값처럼» 적지 않는다 */
+  /* 목록에 붙일 딱지 — 자동으로 걸러진 건만. 어떻게 알았는지(규칙 · 옛 Jev)를 «같은 값처럼» 적지 않는다 */
   function scopeMark(it) {
     if (!it || !it.autoIgnored) return null;
-    var by = it.scopeBy === 'jev' ? 'Jev' : '규칙';
-    return { text: '🤖 업무 관련 · 자동 제외', title: by + '가 업무 관련 메일로 보고 «요청 아님»으로 치웠습니다' + (it.scopeWhy ? ' — ' + it.scopeWhy : '') + ' · «요청 아님» 탭에서 ↩ 되돌릴 수 있습니다' };
+    var by = it.scopeBy === 'jev' ? 'Jev가' : '규칙이';                // 받침에 맞춘 조사(«규칙가»가 아니다)
+    return { text: '🤖 자동으로 걸러냄', title: by + ' «이력·회의·비용» 메일이 아니라고 보고 걸러 두었습니다' + (it.scopeWhy ? ' — ' + it.scopeWhy : '') + ' · «🚫 걸러낸 메일»에서 ↩ 되돌릴 수 있습니다' };
   }
 
   /* ── 한 건의 기록 — 클라우드(kcareer/{uid}/mailreq/items/<id>)에 그대로 간다 ──
@@ -264,10 +290,11 @@
     };
     if (hit.deadline) rec.deadline = hit.deadline;
     if (hit.replyTo) rec.replyTo = hit.replyTo;
-    /* 범위 — 업무 말만 있으면 처음부터 «요청 아님»(자동 제외)으로 만든다. 알림·진행 중 목록에 올리지 않는다. 애매하면 그대로 두고 Jev 가 본다 */
+    /* 범위 — «이력·회의·비용»(personal)이 아니면 처음부터 걸러 둔다(st 'ignored' + autoIgnored). 진행 중·알림·숫자에 안 나오고
+       «🚫 걸러낸 메일»에서만 보인다(대표 지시 2026-11-19 «아예 안 들임»). 기록은 남긴다 — 잘못 걸렀으면 ↩ 로 되돌린다 */
     var sc = scopeOf(row);
     rec.scope = sc.scope; rec.scopeBy = 'rule'; rec.scopeWhy = cut(sc.why.join(' · '), 60);
-    if (sc.scope === 'work') { rec.st = 'ignored'; rec.autoIgnored = now; }
+    if (sc.scope !== 'personal') { rec.st = 'ignored'; rec.autoIgnored = now; }
     return rec;
   }
 
@@ -327,7 +354,9 @@
     });
   }
   /* 탭 — 진행 중(새 요청+확인함) · 완료 · 요청 아님 · 전체 */
-  var TABS = [{ key: 'open', label: '진행 중' }, { key: 'done', label: '처리 완료' }, { key: 'ignored', label: '요청 아님' }, { key: 'all', label: '전체' }];
+  /* 탭 — 진행 중 · 처리 완료가 «목록»이다. 걸러낸 메일(자동으로 거른 것 + 사람이 🚫 로 치운 것)은 숫자를 키우지 않게 «조용한» 단추(quiet)로 끝에 둔다
+     (대표 지시 2026-11-19 «아예 안 들임» — 「전체 64」처럼 걸러낸 건을 섞어 세는 «전체» 탭은 보이지 않는다. filterItems('all')은 그대로 받는다) */
+  var TABS = [{ key: 'open', label: '진행 중' }, { key: 'done', label: '처리 완료' }, { key: 'ignored', label: '🚫 걸러낸 메일', quiet: true }];
   function filterItems(items, tab) {
     return toList(items).filter(function (it) {
       if (tab === 'all') return true;
@@ -454,7 +483,7 @@
     return res;
   }
   /* 범위를 아직 안 가른 건(이 기능 전에 만든 것)을 규칙으로 한 번 가른다 — 한 번에 SCOPE_BACKFILL_MAX 건.
-     ⚠ 자동 제외는 «새 요청»(st:'new')만 — 사람이 «확인함»·«처리 완료»·«요청 아님»으로 만진 건은 상태를 그대로 둔다(범위 딱지만 붙인다).
+     ⚠ 자동으로 거르는 것은 «새 요청»(st:'new')이고 «이력·회의·비용»이 아닌 건만 — 사람이 «확인함»·«처리 완료»·«요청 아님»으로 만진 건은 상태를 그대로 둔다(범위 딱지만 붙인다).
      ⚠ 건마다 transaction — 읽은 뒤 사람이 상태를 바꿨으면 그 최신 값을 보고 정한다. */
   var SCOPE_BACKFILL_MAX = 60;
   function validId(id) { return typeof id === 'string' && /^[^\/.#$\[\]]+~[0-9]{1,12}$/.test(id); }
@@ -467,51 +496,79 @@
         if (c === null) return c;
         if (!obj(c) || c.scope) return;                                  // 그새 정해졌거나 이상한 값 — 건드리지 않는다
         c.scope = sc.scope; c.scopeBy = 'rule'; c.scopeWhy = cut(sc.why.join(' · '), 60);
-        if (sc.scope === 'work' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
+        if (sc.scope !== 'personal' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
         return c;
       });
       if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) {
         res.scoped = (res.scoped || 0) + 1;
-        if (sc.scope === 'work' && tr.snapshot.val().autoIgnored === now) res.autoIgnored = (res.autoIgnored || 0) + 1;
+        if (sc.scope !== 'personal' && tr.snapshot.val().autoIgnored === now) res.autoIgnored = (res.autoIgnored || 0) + 1;
       }
     }
   }
-  /* ── 2차 — 규칙이 못 가른 «애매한 건»만 Jev 에게 묻는다 ──
-     env = { db, uid, now?, ask(items) → { results: { <id>: { scope } } } }  (ask 는 화면이 준다 — 로그인 토큰을 붙여 서버 함수 mailReqScope 를 부른다)
-     ⚠ 화면은 «건 번호»만 서버에 준다 — 서버가 그 사람의 기록(kcareer/{uid}/mailreq/items)에서 제목·첨부 이름만 직접 읽어 Jev 에게 묻는다(본문·보낸이 주소는 어디에도 안 간다).
-       이름 가림·관리자 확인·하루 한도는 서버가 한다.
-     ⚠ 이미 «사람이 만진»(확인함) 건도 범위 딱지는 붙이되 상태는 안 바꾼다. 못 물으면(열쇠·한도·업체 오류) 던지지 않고 res.errors 에 적는다 — 화면이 한동안 쉰다.
-     ⚠ 한 번 물은 건은 다시 안 묻는다(scopeAsked). 답이 «애매»여도 마찬가지 — 사람이 본다. */
-  var JEV_MAX = 10, JEV_TRY = 2;
-  async function scopeAsk(env) {
+  /* ── 🧠 Laya 의견 — 이 PC 에 깐 무료 판단 모델(tools/laya-judge)에게 «이력·회의·비용인가 업무인가»를 묻고 «의견»만 적는다 (대표 지시 2026-11-19
+        「laya 라는 프로그램 사용해서 설치하고 판단하는 기능 넣어서 만들어 달라」) ──
+     env = { db, uid, now?, ask(list) → { results: { <id>: { v:'work'|'personal', p:0~1 } } } }  (ask 는 화면이 준다 — http://127.0.0.1:LAYA_PORT/judge)
+     ★ 보내는 것은 제목·첨부 이름(최대 3개)뿐이다(layaPayload) — 받는 곳은 이 PC 안(127.0.0.1)이고 밖으로 안 나간다. 본문·보낸이·주소·날짜는 안 보낸다.
+     ★ «의견»만 적는다 — laya 칸 하나(transaction). 상태(st)·범위(scope)·자동 걸러냄 표시는 «절대» 건드리지 않는다:
+       실제 64건(2026-11-19)에 대어 보니 Laya 의견대로 치웠다면 대표가 처리 완료한 진짜 요청 6건 중 3건이 사라졌다(업무 58건 중 «업무»라 본 것은 25건).
+       대표 판단과 맞는 비율(layaAgree)을 화면에 세어 두고, 충분히 맞으면 그때 «움직이게» 할지 대표가 정한다.
+     ⚠ 한 번 의견을 받은 건은 다시 안 묻는다 · 못 받은 건은 LAYA_TRY 번까지만 · 한 번에 LAYA_MAX 건(이 PC CPU 로 한 건 1~3초 — 화면은 훑기 뒤에 따로 기다린다).
+     ⚠ 못 물으면(판단기가 꺼짐·응답 없음) 던지지 않고 errors 에 적는다 — 화면이 한동안 쉰다. 모르는 답·범위 밖 확률은 쓰지 않는다. */
+  var LAYA_PORT = 18766, LAYA_MAX = 10, LAYA_TRY = 2;   // ⚠ 18765 는 이 PC 의 한글편집기 실행 도우미 자리 — 겹쳐 편집기가 안 켜졌다(2026-11-21 옮김)
+  var LAYA_VS = ['work', 'personal'];
+  function layaPayload(x) {
+    return { id: str(x && x.id), s: cut(x && x.s, 120), an: (Array.isArray(x && x.an) ? x.an : []).map(function (n) { return cut(n, 50); }).filter(Boolean).slice(0, 3) };
+  }
+  function layaPick(items, max) {
+    return toList(items).filter(function (x) { return validId(x.id) && !obj(x.laya) && (Number(x.layaTry) || 0) < LAYA_TRY; })
+      .sort(function (a, b) { return (Number(b.d) || 0) - (Number(a.d) || 0); }).slice(0, max > 0 ? max : LAYA_MAX);
+  }
+  async function layaAsk(env) {
     var db = env.db, uid = str(env.uid), now = env.now > 0 ? env.now : Date.now();
-    var res = { asked: 0, work: 0, personal: 0, unsure: 0, errors: [] };
+    var res = { asked: 0, work: 0, personal: 0, errors: [] };
     if (!db || !uid || typeof env.ask !== 'function') return res;
-    var base = ROOT_PATH + '/' + uid + '/mailreq', since = now - WINDOW_DAYS * 864e5;
-    var all = toList((await db.ref(base + '/items').once('value')).val());
-    var todo = all.filter(function (x) {
-      return (x.st === 'new' || x.st === 'doing') && x.scope === 'unsure' && x.scopeBy === 'rule' && !x.scopeAsked
-        && (Number(x.scopeTry) || 0) < JEV_TRY && Number(x.d) >= since && validId(x.id);
-    }).sort(function (a, b) { return (Number(b.d) || 0) - (Number(a.d) || 0); }).slice(0, JEV_MAX);
+    var base = ROOT_PATH + '/' + uid + '/mailreq';
+    var todo = layaPick((await db.ref(base + '/items').once('value')).val(), env.max);
     if (!todo.length) return res;
     var ans;
-    try { ans = await env.ask(todo.map(function (x) { return { id: x.id }; })); }       // 건 번호만 — 서버가 그 사람의 기록에서 제목·첨부 이름을 «직접» 읽는다(화면이 글을 실어 보내지 않는다)
+    try { ans = await env.ask(todo.map(layaPayload)); }
     catch (e) { res.errors.push(cut(e && e.message || e, 80)); return res; }
     var got = obj(ans && ans.results) ? ans.results : {};
     for (var i = 0; i < todo.length; i++) {
-      var x = todo[i], r = got[x.id], sc = obj(r) && SCOPES.indexOf(r.scope) >= 0 ? r.scope : '';
-      if (!sc) { try { await db.ref(base + '/items/' + x.id).update({ scopeTry: (Number(x.scopeTry) || 0) + 1 }); } catch (e2) { /* 다음에 다시 */ } continue; }
+      var x = todo[i], r = got[x.id];
+      var v = obj(r) && LAYA_VS.indexOf(r.v) >= 0 ? r.v : '', p = obj(r) && typeof r.p === 'number' ? r.p : NaN;   // 숫자만 — null·''·false 가 Number() 로 0%가 되지 않게(2026-11-19 검토)
+      if (!v || !(p >= 0 && p <= 1)) { try { await db.ref(base + '/items/' + x.id).update({ layaTry: (Number(x.layaTry) || 0) + 1 }); } catch (e2) { /* 다음에 다시 */ } continue; }
+      var op = { v: v, p: Math.round(p * 100) / 100, at: now };
       var tr = await db.ref(base + '/items/' + x.id).transaction(function (c) {
         if (c === null) return c;
-        if (!obj(c) || c.scopeAsked || c.scope !== 'unsure') return;      // 그새 답이 왔거나 범위가 바뀌었다
-        c.scope = sc; c.scopeBy = 'jev'; c.scopeAsked = now; c.scopeWhy = 'Jev 가 «' + SCOPE_LABELS[sc] + '»으로 봤다';
-        if (sc === 'work' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
+        if (!obj(c) || obj(c.laya)) return;                            // 그새 지워졌거나 의견이 이미 있다 — 건드리지 않는다
+        c.laya = op; delete c.layaTry;                                   // ⚠ st·scope·autoIgnored 는 손대지 않는다
         return c;
       });
-      if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) { res.asked++; res[sc]++; }
+      if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) { res.asked++; res[v]++; }
     }
     return res;
   }
+  /* 대표 판단과 맞는 비율 — «사람이 정한 건»만 견준다: 확인함·처리 완료 = 들일 것(personal), 사람이 🚫 로 치운 건(autoIgnored 없음) = 업무.
+     기계가 걸러 둔 채인 건은 정답이 아니다(세지 않는다). keep = 들일 것 중 Laya 도 들일 것이라 본 수 — «진짜 요청을 지키는가» */
+  function layaAgree(items) {
+    var s = { n: 0, same: 0, keepN: 0, keepSame: 0, dropN: 0, dropSame: 0 };
+    toList(items).forEach(function (x) {
+      if (!obj(x.laya) || LAYA_VS.indexOf(x.laya.v) < 0) return;
+      var truth = (x.st === 'done' || x.st === 'doing') ? 'personal' : (x.st === 'ignored' && !x.autoIgnored ? 'work' : '');
+      if (!truth) return;
+      s.n++; var ok = x.laya.v === truth; if (ok) s.same++;
+      if (truth === 'personal') { s.keepN++; if (ok) s.keepSame++; } else { s.dropN++; if (ok) s.dropSame++; }
+    });
+    return s;
+  }
+  /* 팝업·목록에 쓰는 한 줄 — «의견»임을 분명히 */
+  function layaMark(it) {
+    if (!it || !obj(it.laya) || LAYA_VS.indexOf(it.laya.v) < 0) return null;
+    var p = it.laya.p, hasP = typeof p === 'number' && p >= 0 && p <= 1;   // p = «업무일» 확률(판단기가 그렇게 돌려준다) · 숫자일 때만
+    return { text: '🧠 Laya 의견: ' + (it.laya.v === 'work' ? '업무 메일' : '이력·회의·비용'), short: '🧠 ' + (it.laya.v === 'work' ? '업무' : '이력'), title: 'Laya(이 PC)가 제목·첨부 이름만 보고 낸 의견입니다' + (hasP ? ' — 업무일 확률 ' + Math.round(p * 100) + '%' : '') + ' · 의견일 뿐 상태를 바꾸지 않습니다' };
+  }
+
   /* 본문을 열어 기한·회신 주소를 채운다 — 아직 안 연 «진행 중» 건만, 한 번에 BODY_MAX 건씩.
      ⚠ 상태(st)는 건드리지 않는다. 못 열면 시도 횟수만 올려 BODY_TRY 번까지만 다시 한다. */
   async function enrich(env, db, base, now, since, res) {
@@ -562,8 +619,9 @@
     kindMeta: kindMeta, kindsLabel: kindsLabel, idOf: idOf, makeItem: makeItem,
     urgency: urgency, alarmItems: alarmItems, summary: summary, summaryText: summaryText, sortItems: sortItems, filterItems: filterItems, stateUpdate: stateUpdate,
     editUpdate: editUpdate, MEMO_MAX: MEMO_MAX,
-    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK, JEV_MAX: JEV_MAX,
-    scopeOf: scopeOf, scopeMark: scopeMark, scopeAsk: scopeAsk,
+    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK,
+    scopeOf: scopeOf, scopeMark: scopeMark,
+    LAYA_PORT: LAYA_PORT, LAYA_MAX: LAYA_MAX, LAYA_TRY: LAYA_TRY, layaPayload: layaPayload, layaPick: layaPick, layaAsk: layaAsk, layaAgree: layaAgree, layaMark: layaMark,
     boxesOf: boxesOf, scan: scan, makeReadBody: makeReadBody, toList: toList
   };
   if (isNode) module.exports = api; else root.KcareerMailReq = api;

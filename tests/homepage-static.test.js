@@ -19,8 +19,17 @@ const path = require('node:path');
 
 const R = path.join(__dirname, '..');
 const SITE = path.join(R, 'site');
-const 진짜도메인 = 'https://푸른노무법인.kr';
-const 옛도메인들 = [진짜도메인, 'https://xn--o80bs5mdnbm0bf80anms.kr'];
+/* 「진짜 주소」는 굳히개의 한 자리(REAL_ORIGIN)에서 가져온다 — 여기 따로 박으면 도메인을 옮길 때
+   한쪽만 바뀌어 검사가 옛 주소를 지키게 된다(2026-11-15 pureunlabor.co.kr 로 옮길 때 실제로 그랬다). */
+const 진짜도메인 = (/const REAL_ORIGIN = ['"]([^'"]+)['"]/.exec(
+  fs.readFileSync(path.join(R, 'scripts', 'freeze-homepage.js'), 'utf8')) || [, ''])[1];
+/* 접은 옛 홈페이지(2026-11-27 만료, 연장 안 함) — 방문자를 이리로 보내면 막다른 길이다 */
+const 옛도메인들 = ['https://푸른노무법인.kr', 'https://xn--o80bs5mdnbm0bf80anms.kr'];
+
+test('「진짜 주소」를 굳히개에서 읽었고, 접은 옛 도메인이 아니다', () => {
+  assert.match(진짜도메인, /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i, '★ 굳히개의 REAL_ORIGIN 을 못 읽었다: ' + 진짜도메인);
+  assert.ok(옛도메인들.indexOf(진짜도메인) < 0, '★★ 「진짜 주소」가 접은 옛 도메인이다: ' + 진짜도메인);
+});
 
 function 쪽들() {
   if (!fs.existsSync(SITE)) return [];
@@ -56,6 +65,41 @@ test('★ 「이 쪽의 진짜 주소」는 언제나 «우리 도메인»이다
         '★ ' + 이름 + ' 을 공유하면 엉뚱한 주소가 뿌려진다: ' + og[1]);
     }
   });
+});
+
+test('★ 「진짜 주소」는 «그 쪽 자리 그대로» — 하위 쪽은 끝 빗금까지(301 없이 바로 열리는 최종 주소) (2026-11-16)', () => {
+  /* 쪽은 폴더(…/greeting/index.html)다. 빗금 없이(…/greeting) 적으면 깃허브가 301 로 …/greeting/ 에
+     넘기므로, 검색엔진에 «넘어가는 주소»를 원본이라 알리는 셈이 된다(서치콘솔 제출 때 실측).
+     ★ 값을 박지 않는다 — 각 쪽의 «폴더 자리»에서 기대 주소를 만들어 견준다. */
+  쪽.forEach(p => {
+    const h = fs.readFileSync(p, 'utf8');
+    const 이름 = path.relative(SITE, p);
+    const 자리 = path.relative(SITE, path.dirname(p)).split(path.sep).filter(Boolean).join('/');
+    const 기대 = 진짜도메인 + '/' + (자리 ? 자리 + '/' : '');
+    const c = /<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)["']/i.exec(h);
+    assert.equal(c && c[1], 기대, '★ ' + 이름 + ' 의 진짜 주소가 그 쪽 자리와 다르다(끝 빗금?): ' + (c && c[1]));
+    const og = /<meta[^>]+property=["']og:url["'][^>]*content=["']([^"']+)["']/i.exec(h);
+    if (og) assert.equal(og[1], 기대, '★ ' + 이름 + ' 의 공유 주소가 그 쪽 자리와 다르다(끝 빗금?): ' + og[1]);
+  });
+  /* sitemap 의 하위 주소도 끝 빗금 — 파일 주소(점이 든 마지막 조각)만 예외 */
+  const x = fs.readFileSync(path.join(SITE, 'sitemap.xml'), 'utf8');
+  const 빗금없음 = [...x.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1])
+    .filter(u => !u.endsWith('/') && !/\.[a-z0-9]+$/i.test(u.split('/').pop()));
+  assert.deepEqual(빗금없음, [], '★ sitemap 에 301 로 넘어가는 주소가 있다: ' + 빗금없음.slice(0, 3).join(' '));
+});
+
+test('★ 굳히개도 같은 규칙으로 주소를 만든다 — 다시 굳혀도 빗금이 사라지지 않게', () => {
+  const 굳 = fs.readFileSync(path.join(R, 'scripts', 'freeze-homepage.js'), 'utf8');
+  /* 쪽주소 함수를 떠서 «돌려» 본다(되풀이된 실수 2 — 글자만 보면 꺼진 기능도 통과한다) */
+  const 몸 = /function 쪽주소\(mid\) \{[\s\S]*?\n\}/.exec(굳);
+  assert.ok(몸, '★ 굳히개에 쪽주소 함수가 없다 — 주소를 여기저기서 따로 만들면 한쪽만 빗금이 빠진다');
+  const 쪽주소 = new Function('REAL_ORIGIN', 몸[0] + '\nreturn 쪽주소;')(진짜도메인);
+  assert.equal(쪽주소(''), 진짜도메인 + '/', '뿌리 주소가 틀렸다');
+  assert.equal(쪽주소('greeting'), 진짜도메인 + '/greeting/', '★ 하위 쪽에 끝 빗금이 없다');
+  assert.equal(쪽주소('notice/141'), 진짜도메인 + '/notice/141/', '★ 공지 쪽에 끝 빗금이 없다');
+  /* canonical·sitemap 둘 다 이 함수를 거친다 */
+  assert.ok(/진짜주소 = 쪽주소\(mid\)/.test(굳), '★ canonical 이 쪽주소를 안 거친다');
+  assert.ok(/<loc>' \+ 쪽주소\(mid\)/.test(굳), '★ sitemap 이 쪽주소를 안 거친다');
 });
 
 test('★ 미리보기 동안에는 검색에 안 잡힌다 — 진짜 홈페이지의 노출을 갉아먹지 않게', () => {

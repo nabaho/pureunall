@@ -61,28 +61,33 @@ test('★ 성공은 받은 그대로 돌려준다 (앱이 content\\[\\] 를 읽�
   });
 });
 
+/* ⚠ 2026-11-19 «지금 모델 이름»을 박던 검사를 «규칙»으로 바꿨다 — 은퇴한 claude-sonnet-4-20250514 를
+     검사가 못 박고 있어서, 모델을 바꾸는 «멀쩡한 고침»이 검사에 막혔다(CLAUDE.md 「지금 값이 아니라 규칙」).
+   지키려는 것: ① 코드가 고르는 모델이 문서에 적혀 있다 ② 푸른이알피는 «딴 모델을 쓰는 곳이 없다».
+   은퇴 모델을 안 쓰는지는 tests/ai-models-not-retired.test.js 가 본다. */
+function modelsOf(src, re) { return (src.match(re) || []).map(function (s) { return (s.match(/'([^']+)'/) || [])[1]; }); }
+
 test('★ 문서에 적은 모델이 코드와 같다', () => {
-  const models = (work.match(/var AI_MODELS=\[([^\]]*)\]/) || [])[1];
-  assert.match(models, /'claude-opus-5'/);
-  assert.match(models, /'claude-sonnet-4-20250514'/);
-  assert.match(doc, /`claude-opus-5`/);
-  assert.match(doc, /`claude-sonnet-4-20250514`/);
-  /* 푸른이알피의 AI 부름은 sonnet 고정.
-     ⚠ 「두 곳」이라고 개수를 못 박지 않는다 — AI 부름이 하나 늘면, 같은 모델로
-       제대로 늘려도 검사가 막는다. 지키려는 것은 개수가 아니라
-       **「딴 모델을 쓰는 곳이 없다」**이다. */
-  const used = (erp.match(/model: ?'[^']+'/g) || []).map(function (s) { return s.replace(/model: ?/, ''); });
-  assert.ok(used.length >= 1, '푸른이알피에서 AI 모델을 고르는 자리가 사라졌습니다.');
-  used.forEach(function (m) {
-    assert.equal(m, "'claude-sonnet-4-20250514'", '문서에 없는 모델을 씁니다: ' + m);
+  const list = (work.match(/var AI_MODELS=\[([^\]]*)\]/) || [])[1];
+  assert.ok(list, '업무관리의 AI_MODELS 를 찾지 못했다');
+  const workModels = modelsOf(list, /'[^']+'/g);
+  assert.ok(workModels.length >= 1, '업무관리가 고를 모델이 없다');
+  /* 개수는 못 박지 않는다 — AI 부름이 늘어도 «딴 모델을 쓰는 곳이 없다»면 된다 */
+  const erpModels = modelsOf(erp, /model: ?'[^']+'/g);
+  assert.ok(erpModels.length >= 1, '푸른이알피에서 AI 모델을 고르는 자리가 사라졌습니다.');
+  assert.equal(new Set(erpModels).size, 1, '푸른이알피 AI 부름이 서로 다른 모델을 씁니다: ' + erpModels.join(', '));
+  workModels.concat(erpModels).forEach(function (m) {
+    assert.ok(doc.indexOf('`' + m + '`') >= 0, '문서에 없는 모델을 씁니다: ' + m);
   });
 });
 
 test('★ 문서에 적은 max_tokens 가 코드와 같다', () => {
-  assert.match(erp, /max_tokens:800/);
+  const erpTok = (erp.match(/max_tokens:(\d+)/) || [])[1];
+  const workTok = (work.match(/max_tokens:(\d+)/) || [])[1];
+  assert.ok(erpTok && workTok, 'max_tokens 를 찾지 못했다');
+  assert.ok(doc.indexOf(erpTok + '(요약)') >= 0, '문서의 요약 max_tokens 가 코드(' + erpTok + ')와 다르다');
+  assert.ok(doc.indexOf(workTok + '(업무관리)') >= 0, '문서의 업무관리 max_tokens 가 코드(' + workTok + ')와 다르다');
   /* 1000(도우미)은 2026-09-27 도우미째 걷어냈다 */
-  assert.match(work, /max_tokens:8000/);
-  assert.match(doc, /800\(요약\) · 8000\(업무관리\)/);
   assert.ok(doc.indexOf('1000(도우미)') < 0, '걷어낸 도우미를 문서가 아직 안내합니다');
 });
 

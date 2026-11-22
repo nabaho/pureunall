@@ -43,14 +43,15 @@ test('★★ 제때 돌고 있으면 아무것도 안 한다', () => {
   const d = sync.decide({ at: T(14, 31) }, T(14, 50), {});
   assert.deepStrictEqual(d.act, []);
   assert.deepStrictEqual(sync.decide({ at: T(13, 59) }, T(14, 10), {}).act, [], '★ 예정 뒤 15분 여유 안에서는 기다린다');
+  assert.doesNotThrow(() => sync.decide(null, T(14, 50), {}), '★ 서버 status 가 비어 있으면 갱신기가 죽습니다');
 });
 
 test('★★★ 예정이 15분 넘게 늦으면 깨운다 — 25분 안에 또 깨우지는 않는다', () => {
   const a = sync.decide({ at: T(13, 0) }, T(14, 20), {});
   assert.deepStrictEqual(a.act, ['kick'], '★★★ 늦었는데 안 깨웁니다');
-  /* ⚠ 14:28 — 아직 «늦음» 안이다(14:00 예정 + 15분 지남). 14:30 으로 재면 늦음이 아니라 헛돈다 */
+  /* 14:32(새 슬롯 2분 뒤, 예약 작업이 도는 시각)에도 14:00 미실행 늦음이 유지되고 25분 안에는 또 깨우지 않는다 */
   const b = sync.decide({ at: T(13, 0) }, T(14, 32), a.state); assert.ok(b.state.lateSince > 0, '★★★ 14:32(새 슬롯 2분 뒤)에 늦음이 풀려 버립니다');
-  assert.deepStrictEqual(b.act, [], '★ 8분 만에 또 깨웁니다 — 탭이 자꾸 열립니다');
+  assert.deepStrictEqual(b.act, [], '★ 12분 만에 또 깨웁니다 — 탭이 자꾸 열립니다');
   const c = sync.decide({ at: T(13, 0) }, T(14, 50), b.state);
   assert.deepStrictEqual(c.act, ['kick']);
 });
@@ -59,7 +60,46 @@ test('★★★ 깨워도 한 시간 넘게 그대로면 대표에게 «한 번�
   let s = {};
   const acts = [];
   for (const t of [T(14, 20), T(14, 50), T(15, 20), T(15, 50)]) { const d = sync.decide({ at: T(13, 0) }, t, s); s = d.state; acts.push(d.act.join(',')); }
-  assert.deepStrictEqual(acts, ['kick', 'kick', 'kick,alert:stuck', 'kick'], '★★★ 알림 때가 다르거나 같은 알림이 되풀이됩니다: ' + acts.join(' / '));
+  assert.strictEqual(acts.filter((a) => a.indexOf('alert:stuck') >= 0).length, 1, '★★★ 알림이 안 가거나 되풀이됩니다: ' + acts.join(' / '));
+  assert.ok(acts.slice(0, 2).every((a) => a.indexOf('alert') < 0), '★★ 한 시간도 안 됐는데 대표에게 알립니다: ' + acts.join(' / '));
+});
+
+/* 2026-11-17 대표 「계속 이거 팝업나온다 … 근본적으로 해결」 — 멈춰 있는 내내 30분마다 브라우저를 앞으로 띄웠다(하루 7~39번) */
+test('★★★ 깨우기는 한 번 멈춤에 몇 번까지만 — 그 뒤로는 드물게 한 번씩(브라우저가 꺼졌으면 켜 주게)', () => {
+  let s = {};
+  const kicks = [];
+  for (let t = T(14, 20); t <= T(23, 50); t += 30 * MIN) { const d = sync.decide({ at: T(13, 0) }, t, s); s = d.state; if (d.act.includes('kick')) kicks.push(t); }
+  assert.ok(kicks.length >= 2, '★★ 늦었는데 처음 몇 번도 안 깨웁니다 — 자동으로 되살아나는 길이 없어집니다');
+  const fast = kicks.slice(0, sync.MAX_KICKS);
+  assert.ok(fast[fast.length - 1] - fast[0] < 60 * MIN, '★★ 처음 깨우기들이 너무 띄엄띄엄입니다');
+  for (let i = sync.MAX_KICKS; i < kicks.length; i++) {
+    assert.ok(kicks[i] - kicks[i - 1] >= sync.KICK_RETRY_MS, '★★★ 몇 번 깨운 뒤에도 자주 깨웁니다 — 팝업이 계속 뜹니다: ' + new Date(kicks[i]));
+  }
+  assert.ok(kicks.length <= sync.MAX_KICKS + Math.ceil((T(23, 50) - T(14, 20)) / sync.KICK_RETRY_MS), '★★★ 반나절 멈춤에 깨우기가 너무 많습니다: ' + kicks.length + '번');
+  assert.ok(sync.KICK_RETRY_MS >= 2 * 60 * MIN, '★★ 다시 깨우는 간격이 짧습니다');
+  const back = sync.decide({ at: T(23, 55) }, T(23, 58), s);
+  assert.strictEqual(back.state.kicks, 0, '★★ 다시 돌아도 깨운 횟수가 안 풀립니다 — 다음 멈춤에 한 번도 안 깨웁니다');
+});
+
+test('★★★ 확장이 꺼져 있으면 깨우지 않고 곧바로 «켜 주세요»를 알린다 — 깨워도 «차단됨» 화면만 뜬다', () => {
+  const ext = { browser: '에고라이트', profile: 'P', profileName: '이름', id: 'x', off: true };
+  const d = sync.decide({ at: T(13, 0) }, T(14, 20), {}, ext);
+  assert.ok(!d.act.includes('kick'), '★★★ 꺼진 확장을 깨웁니다 — 30분마다 «…이(가) 차단됨» 창이 뜹니다');
+  assert.ok(d.act.includes('alert:off'), '★★★ 꺼졌다는 것을 대표에게 곧바로 알리지 않습니다: ' + d.act.join(','));
+  assert.deepStrictEqual(sync.decide({ at: T(13, 0) }, T(14, 50), d.state, ext).act, [], '★★ 같은 알림을 되풀이합니다');
+  const m = sync.alertText('off', { at: T(13, 0) }, ext);
+  ['에고라이트', '이름', 'extensions', '개발자 모드', '켜'].forEach((k) => assert.ok(m.indexOf(k) >= 0, '★★ 알림에 «' + k + '» 가 없습니다 — 무엇을 하면 되는지 모릅니다: ' + m));
+  assert.deepStrictEqual(sync.decide({ at: T(14, 31) }, T(14, 50), d.state, ext).act, ['resolve'], '★★ 다시 돌아도 «켜 주세요» 알림이 안 닫힙니다');
+  const both = sync.decide({ at: T(13, 0), err: 'login', errAt: T(13, 30) }, T(14, 20), {}, ext).act;
+  assert.ok(both.includes('alert:off') && !both.includes('kick'), '★★ 꺼져 있고 로그인도 풀렸을 때 «다시 로그인»만 알립니다 — 확장이 꺼져 있으면 로그인해도 안 돕니다: ' + both.join(','));
+});
+
+test('★★ 다른 곳에서 켜져 있으면 그쪽을 깨우고, 꺼진 곳은 멈춤 알림에 덧붙인다', () => {
+  const off = { browser: '에고라이트', profile: 'P', profileName: '이름', id: 'x' };
+  const ext = { browser: '크롬', profile: 'D', id: 'x', offIn: [off] };
+  assert.ok(sync.decide({ at: T(13, 0) }, T(14, 20), {}, ext).act.includes('kick'), '★★ 켜진 곳이 있는데 안 깨웁니다');
+  const m = sync.alertText('stuck', { at: T(13, 0) }, ext);
+  assert.ok(m.indexOf('에고라이트') >= 0 && m.indexOf('꺼져') >= 0, '★ 멈춤 알림에 «에고라이트에서는 꺼져 있다»가 없습니다: ' + m);
 });
 
 test('★★★ 리멤버 로그인이 풀렸으면 깨우지 말고 곧바로 «다시 로그인» 을 알린다 — 깨워도 소용없다', () => {

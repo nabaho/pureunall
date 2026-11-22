@@ -4,6 +4,22 @@ module.exports = {
   data: {},
   views: [
     {
+      name: 'chungcheong',
+      run: async (page) => {
+        await page.click('[data-tab="chungcheong"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
+      name: 'chungcheong_facility',
+      run: async (page) => {
+        await page.click('[data-tab="chungcheong"]');
+        await page.waitForTimeout(180);
+        await page.click('[data-cc-preset="CN_FACILITY"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
       name: 'organ',
       run: async (page) => {
         await page.click('[data-tab="organ"]');
@@ -42,6 +58,21 @@ module.exports = {
       }
     },
     {
+      name: 'region_multicmp',
+      run: async (page) => {
+        await page.click('[data-tab="matrix"]');
+        await page.waitForTimeout(200);
+        await page.click('[data-m-submode="REGION"]');
+        await page.waitForTimeout(150);
+        await page.click('[data-r-multi-toggle]');
+        await page.waitForTimeout(150);
+        await page.click('[data-r-bloc="CHUNGCHEONG"]');
+        await page.waitForTimeout(150);
+        await page.click('[data-r-quick-top4]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
       name: 'studio',
       run: async (page) => {
         await page.click('[data-tab="matrix"]');
@@ -56,6 +87,24 @@ module.exports = {
         await page.click('[data-tab="articles"]');
         await page.waitForTimeout(200);
         await page.click('[data-doc-mode="ARTICLES"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
+      name: 'articles_topic',
+      run: async (page) => {
+        await page.click('[data-tab="articles"]');
+        await page.waitForTimeout(200);
+        await page.click('.pau-topic-chip[data-a-topic="PERSONNEL"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
+      name: 'articles_organ',
+      run: async (page) => {
+        await page.click('[data-tab="articles"]');
+        await page.waitForTimeout(200);
+        await page.click('[data-a-view="BY_ORGAN"]');
         await page.waitForTimeout(250);
       }
     },

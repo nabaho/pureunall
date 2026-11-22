@@ -197,7 +197,8 @@ test('★ 올린 뒤 판독하는 길에서 글자를 쓴다', () => {
     '★ 글자가 있어도 안 쓰면 예전처럼 그림으로 갑니다');
   assert.match(fn, /const text = docTextOf\(list\);/,
     '★ 글자를 안 뽑습니다 — 위 갈림이 늘 거짓이 됩니다');
-  assert.match(fn, /imgChunkMakers\(imgs\)/, '그림으로 물러나는 길이 사라졌습니다');
+  /* 인자 «개수»는 안 박는다(2026-11-19 «Vision 두 번 막기» 옵션이 붙었다) — 지킬 것은 그림 길이 살아 있는가 */
+  assert.match(fn, /imgChunkMakers\(imgs[,)]/, '그림으로 물러나는 길이 사라졌습니다');
   assert.match(fnOf(app, 'textChunkMakers'), /PuDocRead\.readDocText\(/);
   /* ⚠ 인자 «개수»는 안 박는다 — 지킬 것은 「한 장이면 배열로 안 보낸다」이다
      (2026-09-10 에 「사람이 눌렀나」(opts)가 하나 더 붙었다). */

@@ -58,6 +58,10 @@ const DONE = [
   ['pu-pbox.html', 'P박스'],
   ['ilteo.html', '일터상생혁신'],
   ['jobtrans.html', '산업일자리전환'],
+  ['pu-orchestrator.html', '업무오케스트레이션'],
+  ['pu-edulib.html', '강의자료'],
+  ['pu-alio-union.html', '공공임단협'],
+  ['pu-datahub.html', '데이터관리'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */
@@ -123,6 +127,15 @@ const EXCEPT = {
   'ilteo.html': new Set([]),
   /* 산업일자리전환(2026-11-15) — 처음부터 27색 팔레트만 쓴다. 예외 없음 */
   'jobtrans.html': new Set([]),
+  /* 업무오케스트레이션(2026-11-17) — 처음부터 27색 팔레트만 쓴다. 예외 없음 */
+  'pu-orchestrator.html': new Set([]),
+  /* 법정교육자료함(2026-11-19) — 처음부터 팔레트만 쓴다(법정 = 진한 파랑 채움). 예외를 채워 넣지 말 것 */
+  'pu-edulib.html': new Set([]),
+  /* 공공임단협(2026-11-21 제미나이 판 모양을 켜며 넣음 — 계획서 4-1 «켤 때 넣는다»). HTML 쪽은 팔레트만.
+     ⚠ 화면을 그리는 js/pu-alio-union.js 안의 CSS 색은 이 검사 밖이다 */
+  'pu-alio-union.html': new Set([]),
+  /* 데이터관리(2026-11-21, 대표 전용) — 처음부터 27색만. 사람 구분색은 js/pu-datahub-calc.js 의 PERSON_COLORS(저장소 사람 구분색 스물넷)에만 있다 */
+  'pu-datahub.html': new Set([]),
   /* ⚠ DONE 에 든 파일은 EXCEPT 에도 칸이 있어야 한다 — 없으면 팔레트 밖 색이
      나왔을 때 «무엇이 잘못됐는지 말하는 대신» TypeError 로 터진다(2026-09-19 에 그랬다). */
   /* 대표 지시 2026-09-27 「캘린더 ui 와 화면을 구글캘린더 화면과 글자색·테두리·글자형태로

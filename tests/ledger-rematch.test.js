@@ -42,7 +42,7 @@ t('바꾸기는 찾기 창만 연다', /openFindRow\(row\)/.test(REMATCH_BTN), t
 t('CMS 합계 줄에는 안 붙인다 — 거기선 CMS 단추 하나여야 한다',
   /_st\.state!=='none' && !isCms/.test(src), true);
 t('확정 단추는 그대로 있다',
-  /_st\.state==='ready' && pItem && h\('button',\{[\s\S]{0,120}?confirmRow\(row,pItem/.test(src), true);
+  /_st\.state==='ready' && pItem && h\('button',\{[\s\S]{0,120}?confirmRow(?:Ask)?\(row,pItem/.test(src), true);   // confirmRowAsk — 입금자 사유 묻기를 거친다(2026-11-16)
 // 바꾸기가 확정보다 «왼쪽» 이어야 한다 — 오른쪽 끝은 늘 확정 자리다(손이 기억하는 위치)
 t('바꾸기가 확정보다 앞에 온다',
   src.indexOf("'↔ 바꾸기'") < src.indexOf("style:_actBtn('#16a34a','#fff','#16a34a')},'확정'"), true);

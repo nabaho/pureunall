@@ -181,8 +181,8 @@ test('반복·알림 — 서버 대신 넣기가 우리 표의 값을 구글로 
 
 test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 보여 준다 · 저장 길마다 넘긴다', () => {
   const b = 상자();
-  vm.runInContext(함수몸('function 반복글(ymd){'), b);
-  const 글 = vm.runInContext('반복글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
+  vm.runInContext(함수몸('function 반복고르기글(ymd){'), b);
+  const 글 = vm.runInContext('반복고르기글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
   assert.deepStrictEqual(JSON.parse(JSON.stringify(글)), { D: '매일', W: '매주 (수요일)', M: '매월 14일', Y: '매년 10월 14일' });
   assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? 반복알림줄\(m\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
   assert.match(함수몸('function 반복알림줄(m){'), /m\.timed \? '<div class="grow">/, '알림은 시간 일정에만');
@@ -251,7 +251,11 @@ test('칩 크기 — 구글 앱 실측(글자 12px · 굵기 400 · 줄 20px · 
   assert.strictEqual(칩[1], '1px 8px', '좌우 여백이 구글 앱(8px)과 다릅니다: ' + 칩[1]);
   assert.match(캘린더, /\.evs\{display:flex;flex-direction:column;gap:2px\}/, '칩 사이 틈이 2px 이 아닙니다');
   /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
-  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
+  /* 2026-11-15 대표 「둥글게 부드럽게」로 폰 칩을 키웠다 — 값이 아니라 «폰 칩 규칙이 따로 있고, 둥글다»를 본다 */
+  const 폰칩 = 캘린더.match(/body\.mob \.ev\{font-size:([\d.]+)px;line-height:(\d+)px;height:(\d+)px;padding:[^;]+;border-radius:(\d+)px/);
+  assert.ok(폰칩, '폰 칩 규칙이 없습니다');
+  assert.ok(Number(폰칩[4]) >= 6, '폰 칩 모서리가 다시 각졌습니다: ' + 폰칩[4] + 'px');
+  assert.strictEqual(폰칩[2], 폰칩[3], '줄 높이와 칩 높이가 어긋나면 글자가 잘립니다');
 });
 
 /* ── 상세 팝업·시각 일정 글자는 구글 공식 화면 실측 (2026-10-11) ── */

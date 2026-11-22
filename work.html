@@ -19,9 +19,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=100"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-kakao-work.js?v=4"></script>
-<script src="js/pu-kakao-export.js?v=1"></script>
+<script src="js/pu-kakao-export.js?v=2"></script>
+<!-- 📋 내 업무 숫자 한 줄(work_erp/mysum/{사번}) — 포털 머리줄 «내 업무» 단추·이알피 「나의 업무」가 읽는다(2026-11-21) -->
+<script src="js/pu-mywork.js?v=1"></script>
 <!-- 카톡 받을 파일 → 사진첩·기업정보함으로 건네는 통로(2026-10-24) — 메일 첨부와 같은 것 -->
 <script src="js/pu-handoff.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -34,7 +36,8 @@
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <!-- 옵시디언 금고로 내보낼 때 주민번호를 지운다. 없으면 내보내기가 «멈춘다» -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
-<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-ai-mask.js?v=1"></script>
+<script src="js/pu-backup.js?v=3"></script>
 <script src="js/pu-rules-history.js?v=4"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <style>
@@ -835,6 +838,9 @@
     .kxt td.kxsum{order:9;flex:1 1 55%;min-width:0;max-width:none;white-space:normal;overflow:hidden;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
     .kxt input[type=checkbox]{width:22px;height:22px}
     .kxt select,.kxt input[type=text]{font-size:16px;max-width:100%}
+    select.kxroom{font-size:16px;max-width:100%}
+    .kxhead .kxlong{display:none}
+    .kxhead .kxshort{display:inline}
   }
   /* 💬 대화 탭 맨 위 «폰 상태» 한 줄 (2026-11-07) — 업무방 알림이 왜 0건인지 */
   .kkphone{border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin:0 0 10px;font-size:12.5px;line-height:1.6;background:var(--panel)}
@@ -1164,6 +1170,21 @@
      ⚠ minmax(0,1fr) — 그냥 1fr 은 «내용보다 좁아지지 않아» 같은 일이 되풀이된다.
      ⚠ 창 상자도 min-width:0 — flex 안의 상자는 기본이 «내용 폭 이상»이라 창째 화면 밖으로 넓어진다.
      넓은 화면은 두 칸 그대로다. */
+  /* 📦 이알피 일반업무·업무케이스 옮기기 창(2026-11-21) — PC 는 한 칸 한 줄 표, 폰은 줄마다 «두 줄 카드»
+     (☐·번호는 왼쪽 끝 그대로, 업체·담당·기한은 업무 아래 둘째 줄로). */
+  .mvtbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+  .mvtbl th,.mvtbl td{padding:5px 4px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+  .mvtbl thead th{border-top:0;background:var(--bg)}
+  .mvtbl .mv-sub{display:none}
+  /* ☐ 는 label 로 감싸 칸 전체를 누르는 자리로 — 손가락이 13px 네모를 맞추지 않아도 된다(24px 넘게) */
+  .mvtbl .mvck{display:flex;align-items:center;justify-content:center;min-width:24px;min-height:26px;cursor:pointer}
+  .mvtbl .mvck input{width:16px;height:16px;margin:0;cursor:pointer}
+  @media (max-width:560px){
+    .mvtbl .mv-pc{display:none}
+    .mvtbl .mv-sub{display:block;font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+    .mvtbl td.mv-w{white-space:normal}
+    .mvtbl td.mv-w .mv-n{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  }
   @media (max-width:560px){
     .grid2{grid-template-columns:minmax(0,1fr)}
     .grid2 .fld input,.grid2 .fld select{min-width:0;width:100%;box-sizing:border-box}
@@ -1432,19 +1453,57 @@
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» 시범 (대표 「추천대로 시작」 2026-11-19) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 메뉴·탭·거르개·칸·줄은 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 앱 변수(--acc-soft·--radius·--ok-bg)를 목업 값으로 바꾸는 것이 먼저 — 이름표마다 덮는 것보다 앱의 폰 구간과 덜 부딪힌다. */
+:where(body.pu-design){--acc-soft:#eff6ff;--radius:16px;--ok-bg:#f0fdf4}
+:where(body.pu-design) .panel{box-shadow:var(--pu-sh-sm)}
+/* 왼쪽 메뉴 — 고른 칸은 옅은 파랑 + 파랑 테두리 + 옅은 그림자(목업 .side button.on) */
+:where(body.pu-design) .sitem{border:1px solid transparent;border-radius:12px}
+:where(body.pu-design) .sitem.on{border-color:var(--pu-acc-l);box-shadow:var(--pu-sh-sm)}
+/* 표 머리 — 흐린 글자(#94a3b8, 흰 바탕 대비 2.6)를 읽히는 회색으로, 굵게 */
+:where(body.pu-design) th{color:var(--pu-sub);font-weight:800}
+:where(body.pu-design) .panel.tbl thead th{background:var(--pu-bg)}
+/* 단추 — 둥글기와 파란 단추 그림자 */
+:where(body.pu-design) button{border-radius:10px}
+:where(body.pu-design) button.primary{box-shadow:var(--pu-sh-acc)}
+/* 칩 — 고른 칩은 옅은 파랑 바탕 + 파랑 테두리(목업 .chip.on) */
+:where(body.pu-design) .chipbtn{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .chipbtn.on{background:var(--pu-acc-soft);border-color:var(--pu-acc);color:var(--pu-acc-ink);font-weight:800}
+/* 보기 고르개(표·보드·타임라인 / 월·주·일) — 목업 .mseg: 고른 것은 파랑으로 채운다 */
+:where(body.pu-design) .vseg{background:var(--pu-card);border:1px solid var(--pu-line2);border-radius:var(--pu-r-pill);padding:2px}
+:where(body.pu-design) .vseg span{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .vseg span.on{background:var(--pu-acc);color:#ffffff;box-shadow:var(--pu-sh-acc)}
+/* 작은 표식은 알약 */
+:where(body.pu-design) .badge{border-radius:var(--pu-r-pill)}
+/* 보드·현황판·달력 상자 */
+:where(body.pu-design) .bdcol{border-radius:var(--pu-r)}
+:where(body.pu-design) .bdcard{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .tmc{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .calwrap{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) #toast{border-radius:12px}
+/* 폰 — 상자는 한 겹(폰 화면 규칙). 바탕을 걷은 상자에 그림자가 다시 상자를 만들지 않게 그림자를 뺀다
+   (켜고 재 보니 업무량·치울 것 화면 겹 수가 1→2 로 늘었다 — 2026-11-19) */
+@media (max-width:760px){
+  :where(body.pu-design) .panel{box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<link rel="stylesheet" href="css/pu-design.css?v=2">
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=47"></script>
+  <script src="js/pu-appbar.js?v=54"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
-  <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+  <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script>
+  <script src="js/pu-authsync.js?v=7"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
 <!-- 말로 기록 — 소리를 판독 서버(Gemini)로 보낸다. 업무관리의 aiCall 은 글자만 보내는 길이라 소리를 못 싣는다. -->
 <script src="js/pu-ai-call.js?v=5"></script>
 </head>
-<body>
+<body class="pu-design">
 <div id="root"><div class="gate">불러오는 중…</div></div>
 
 <script>
@@ -1562,7 +1621,8 @@ function resBadge(it){
 var LV_TYPES=['퇴사','휴직','연차','기타'];
 var HO_OVERDUE_DAYS=5;   // 인수 확인 지연 → 대표 배지
 // AI(2단계) — 푸른이알피 기존 프록시 재사용(Anthropic Messages API 형식). 최신 모델 우선, 프록시 호환용 폴백.
-var AI_MODELS=['claude-opus-5','claude-sonnet-4-20250514'];
+// 2026-11-19: claude-sonnet-4-20250514 는 2026-06-15 은퇴라 폴백이 늘 실패했다 → Opus 5.5(Opus 5 보다 쌈)·Sonnet 5.5.
+var AI_MODELS=['claude-opus-5-5','claude-sonnet-5-5'];
 
 var fbDb=null;
 var S={view:'my', week:null, f:null, me:null, year:new Date().getFullYear(), drawerId:null, teamMgr:'', teamCat:'', teamNolog:false, calMon:null, noteOpen:false};
@@ -3244,6 +3304,19 @@ function kkLoad(){
   }).catch(function(e){ KK.err=e.message||String(e); })
     .then(function(){ KK.busy=false; if(S.view==='kakao') renderKakao(); });
 }
+/* 📋 진행 기록이 쓸 «서버에 모인 글» 30일치 (2026-11-18) — 폰 알림으로 저절로 온 글 + 전에 「넣기」한 저장본 글.
+   대표 지시 2026-11-17 「업무용 카톡 자료 자동 수집 후 … 업무관리에 자동으로 정리」.
+   대화 탭의 KK.items(기본 1일)와 따로 받는다 — 대화 탭의 날짜 고르기를 흔들지 않는다.
+   ⚠ 글을 쓰지 않는다(kakaoList·kakaoFiles 목록만). 원문 보관은 「넣기」(kakaoImport) 한 곳이고, 진행 기록 정리 구간은 이것만 부른다.
+     (kakaoFiles 는 서버가 45일 지난 파일 줄을 치우는 «기존» 동작이 딸려 있다 — 📎 받을 파일 탭이 부를 때와 같다.)
+   fresh — 「↻ 다시 읽기」: 받을 파일 목록도 새로 받아 📎 탭과 같은 것을 본다. */
+function kkSrvNotes(fresh){
+  var K=window.PuKakaoWork, keep=(K&&K.KEEP_DAYS)||30;
+  var files=(KK.files&&!fresh)?Promise.resolve({items:KK.files})
+    :kkCall('kakaoFiles').then(function(j){ KK.files=j.items||[]; if(j.meta) KK.meta=j.meta; return j; });
+  return Promise.all([kkCall('kakaoList',{days:keep+1}),files])
+    .then(function(r){ return {notes:r[0].items||[],truncated:!!r[0].truncated,files:r[1].items||[],since:Date.now()-keep*864e5}; });
+}
 function kkTime(ms){ var d=new Date(ms); return (d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
 function kkMD(ms){ var d=new Date(ms); return (d.getMonth()+1)+'/'+d.getDate(); }
 function kkHM(ms){ var d=new Date(ms); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
@@ -4033,8 +4106,13 @@ function renderKb(){
      · 진행 기록은 덮어쓰거나 지우지 않는다 — 같은 내용은 건너뛰고, 그날 글이 늘면 새 줄로만 더하고,
        사람이 지운 줄(kxoff 표식)은 다시 올리지 않는다. 저장은 한 번의 쓰기.
      · 이 구간은 서버를 부르지 않는다 — 가린 원문 30일 보관은 💬 대화 탭의 「넣기」(kakaoImport)가 한다.
+       서버에 모인 글을 «읽는» 것은 바깥의 kkSrvNotes 한 곳(kakaoList·kakaoFiles)만 부른다.
+   ■ 2026-11-18 — 저장본을 안 읽었으면 «서버에 모인 글»(폰 알림 + 넣은 저장본, 30일)로 저절로 묶는다.
+     대표 지시 2026-11-17 「업무용 카톡 자료 자동 수집 후 … 업무관리에 자동으로 정리하고 싶다」.
+     묶기·맞추기까지는 저절로, 진행 기록에 «더하기»는 지금처럼 사람이 건수를 보고 한 번 누른다
+     (사건번호·업체명만으로 업무에 확정 연결하지 않는다 — docs/규칙/온톨로지.md).
    ⚠ 묶기·열쇠·맞추기 셈은 js/pu-kakao-export.js 한 곳 — 여기서 다시 짓지 않는다. */
-function kxBlank(){ return {src:null,err:'',busy:false,rows:null,logs:{},off:{}}; }
+function kxBlank(){ return {src:null,err:'',busy:false,rows:null,logs:{},off:{},srv:null,srvBusy:false,srvErr:'',srvRoom:''}; }
 var KX=kxBlank();
 function kxReset(){ KX=kxBlank(); }
 /* main 의 저장본 미리보기 창이 읽은 줄(KK.pend)을 붙잡아 둔다 — 「넣기」를 눌러 KK.pend 가 비워져도 이 탭은 쓸 수 있다 */
@@ -4046,6 +4124,31 @@ function kxKeep(P){
   KX.rows=null; KX.err=''; KX.logs={}; KX.off={};
 }
 function kxOpenLog(){ closeM(); KK.tab='log'; renderKakao(); }
+/* 서버에 모인 글(KX.srv) → 묶기 입력(KX.src). 방은 하나만 — 진행 기록 열쇠가 방 이름을 쓴다(여럿이면 고르게 한다).
+   「사진을 보냈습니다」류는 글이 아니라 세기만 한다 — 판별은 PuKakaoWork.classify 한 곳. */
+function kxSrvUse(room){
+  var X=window.PuKakaoExport, K=window.PuKakaoWork, s=KX.srv;
+  if(!s) return;
+  if(!X||!X.fromServer||!K||!K.classify){ KX.srvErr='묶기 도구(js/pu-kakao-export.js)가 옛 판이거나 없습니다 — 새로고침해 주세요'; return; }
+  /* 방 고르기 칸의 (n) 이 칩의 줄 수와 어긋나지 않게 — 30일 창 밖·사진 알림은 세지 않는다 */
+  var rooms=X.serverRooms((s.notes||[]).filter(function(x){ return x&&Number(x.sentAt)>=s.since&&K.classify(x.text).kind!=='media'; }));
+  var ok=function(r){ return rooms.some(function(x){ return x.room===r; }); };
+  var pick=ok(room)?room:ok(KX.srvRoom)?KX.srvRoom:((rooms[0]&&rooms[0].room)||'');
+  KX.srvRoom=pick; KX.rows=null; KX.err=''; KX.logs={}; KX.off={};
+  if(!pick){ KX.src=null; return; }
+  var f=X.fromServer(s.notes,s.files,{room:pick,since:s.since,isMedia:function(t){ return K.classify(t).kind==='media'; }});
+  KX.src={room:pick,lines:f.lines,files:f.files,fileName:'',from:'server',notify:f.notify,exported:f.exported,media:f.media,truncated:s.truncated,rooms:rooms};
+}
+function kxSrvLoad(fresh){
+  if(KX.srvBusy) return;
+  KX.srvBusy=true; KX.srvErr='';
+  kkSrvNotes(!!fresh).then(function(s){ KX.srv=s; if(!KX.src||KX.src.from==='server') kxSrvUse(KX.srvRoom); })
+    .catch(function(e){ KX.srvErr=(e&&e.message)||String(e); })
+    .then(function(){ KX.srvBusy=false; if(S.view==='kakao'&&KK.tab==='log') renderKakao(); });
+}
+/* ↻ 다시 읽기 · 저장본 대신 서버에 모인 글로 — 읽어 둔 저장본 줄은 이 탭에서 놓는다(대화 탭에서 다시 읽으면 된다) */
+function kxSrvAgain(){ if(KX.busy) return; KX.srv=null; KX.src=null; KX.rows=null; KX.err=''; KX.srvErr=''; kxSrvLoad(true); renderKakao(); }
+function kxSrvRoom(r){ if(KX.busy) return; kxSrvUse(r); renderKakao(); }
 /* 업무 하나가 가진 «심급 사건번호» — 푸른이알피 사건 레코드의 stages[].caseNo (읽기만) */
 function kxStageNos(it){
   var r=null; try{ r=peRec(it); }catch(e){ r=null; }
@@ -4110,7 +4213,14 @@ function kxBuild(){
   });
   var ids={}; KX.rows.forEach(function(r){ if(r.itemId) ids[r.itemId]=1; });
   return Promise.all(Object.keys(ids).map(kxLogsOf)).then(function(){
-    KX.rows.forEach(function(r){ if(!kxElig(r)) r.on=false; });
+    /* 서버에 모인 글로 묶을 때는 더 조심한다(2026-11-18, 독립 검토 지적):
+       · «보강»은 기본 해제 — 같은 글이 알림·저장본으로 글자가 조금 달라 둘 다 남으면 그날 묶음이 «늘어난» 것처럼 보여 근사 중복 줄이 생긴다.
+       · 글이 많아 잘렸으면(truncated) 가장 옛 날 묶음은 그날 글이 일부만 왔다 — 기본 해제. 사람이 보고 고르면 된다. */
+    var srv=src.from==='server', oldest=srv&&src.truncated?KX.rows.reduce(function(a,r){ return !a||r.g.day<a?r.g.day:a; },''):'';
+    KX.rows.forEach(function(r){
+      if(!kxElig(r)) r.on=false;
+      else if(srv&&(kxStatus(r)==='more'||(oldest&&r.g.day===oldest))) r.on=false;
+    });
   }).catch(function(e){ KX.err='기록을 읽지 못했습니다: '+((e&&e.message)||e); KX.rows=null; })
     .then(function(){ KX.busy=false; renderKakao(); });
 }
@@ -4136,6 +4246,7 @@ function kxRowHTML(i,r){
     :st==='same'?'<span class="kkc">이미 있음</span>'
     :st==='gone'?'<span class="kkc" title="이 줄은 사람이 지웠습니다 — 같은 내용은 다시 올리지 않습니다. 그날 글이 늘어 내용이 달라지면 새 줄로 다시 나옵니다">지운 줄 · 다시 안 올림</span>':'<span class="muted">—</span>';
   var full=r.g.msgs.map(function(x){ return x.sender+': '+x.text; }).join('\n');
+  var M=window.PuRrnMask; if(M&&M.maskRrnInText) full=M.maskRrnInText(full).text;   /* 마우스를 올리면 보이는 원문에도 지우개 한 겹 더(요약 줄과 같게) */
   return '<tr'+(ok&&r.on?'':' class="kxoff"')+'><td class="kkfit"><input type="checkbox"'+(r.on?' checked':'')+(ok?'':' disabled')+' onclick="kxPick('+i+',this.checked)"></td>'
     +'<td class="kkfit muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
     +'<td class="kkfit">'+esc(md(r.g.day))+'</td>'
@@ -4149,9 +4260,17 @@ function kxRowHTML(i,r){
 }
 function kxHTML(){
   var src=KX.src;
-  if(!src) return '<div class="panel muted" style="line-height:1.8">💬 <b>대화</b> 탭에서 카톡 저장본(.txt)을 먼저 읽어 주세요 — 미리보기 창의 <b>「📋 진행 기록으로 정리」</b>를 누르면 '
-    +'여기서 사건번호·업체별로 묶어 업무관리 진행 기록으로 정리합니다.<br>'
-    +'<span style="font-size:12px">받는 방 확인·주민번호 가림·원문 보관은 대화 탭이 합니다. 여기서는 확인한 것만 진행 기록에 더합니다.</span></div>';
+  var howTxt='<span style="font-size:12px">저장본(.txt)을 쓰려면 💬 <b>대화</b> 탭에서 읽고 미리보기 창의 <b>「📋 진행 기록으로 정리」</b>를 누릅니다. '
+    +'받는 방 확인·주민번호 가림·원문 보관은 대화 탭이 합니다. 여기서는 확인한 것만 진행 기록에 더합니다.</span>';
+  if(!src){
+    /* 저장본을 안 읽었으면 서버에 모인 글(폰 알림 + 넣은 저장본)로 저절로 묶는다 (2026-11-18) */
+    if(!KX.srv&&!KX.srvBusy&&!KX.srvErr) setTimeout(kxSrvLoad,0);
+    if(KX.srvErr) return '<div class="panel" style="line-height:1.8"><span style="color:#991b1b">서버에 모인 업무방 글을 읽지 못했습니다 — '+esc(KX.srvErr)+'</span> '
+      +'<button class="kksm" onclick="kxSrvAgain()">↻ 다시</button><br>'+howTxt+'</div>';
+    if(!KX.srv||KX.srvBusy) return '<div class="panel muted">서버에 모인 업무방 글(최근 30일)을 읽는 중…</div>';
+    return '<div class="panel muted" style="line-height:1.8">최근 30일 동안 서버에 모인 업무방 글이 없습니다. '
+      +'폰 알림이 들어오는지는 💬 <b>대화</b> 탭 맨 위 «📱 폰 상태»에서 봅니다. <button class="kksm" onclick="kxSrvAgain()">↻ 다시 읽기</button><br>'+howTxt+'</div>';
+  }
   if(KX.rows===null&&!KX.busy&&!KX.err) setTimeout(kxBuild,0);
   var rows=KX.rows||[];
   var h='';
@@ -4160,10 +4279,24 @@ function kxHTML(){
   if(!KX.rows) return h;
   var nSame=rows.filter(function(r){ return kxStatus(r)==='same'; }).length;
   var elig=rows.filter(kxElig), nSel=rows.filter(function(r){ return r.on; }).length;
-  h+='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">'
-    +'<span class="kkc g">✓ '+esc(src.room)+'</span><span class="kkc">'+esc(src.fileName)+'</span>'
-    +'<span class="kkc">글 '+src.lines.length+'줄</span>'+(src.files.length?'<span class="kkc">파일 '+src.files.length+'개</span>':'')
-    +(nSame?'<span class="kkc">이미 반영한 묶음 '+nSame+'개는 건너뜀</span>':'')+'</div>';
+  var srv=src.from==='server';
+  /* 폰에서는 칩 글을 짧게(.kxhead .kxshort) — 폰의 .row 는 «한 줄 + 옆으로 밀기»라 길면 단추가 화면 밖으로 밀린다 */
+  var two=function(long,short){ return '<span class="kxlong">'+long+'</span><span class="kxshort">'+short+'</span>'; };
+  var rooms=srv&&src.rooms&&src.rooms.length>1
+    ?'<select class="kxroom" aria-label="받는 방 고르기" title="받는 방 — 진행 기록은 방마다 따로 묶습니다" onchange="kxSrvRoom(this.value)">'
+      +src.rooms.map(function(x){ return '<option value="'+esc(x.room)+'"'+(x.room===src.room?' selected':'')+'>'+esc(x.room)+' ('+x.n+')</option>'; }).join('')+'</select>'
+    :'<span class="kkc g">✓ '+esc(src.room)+'</span>';
+  h+='<div class="row kxhead" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">'+rooms
+    +(srv?'<span class="kkc" title="서버에 30일 보관된 글 — 폰 알림 '+src.notify+'줄(저절로 온 글) · 저장본 '+src.exported+'줄(「넣기」한 글)">'
+        +two('🔔 폰 알림 '+src.notify+'줄 · 📄 저장본 '+src.exported+'줄 · 최근 30일','🔔'+src.notify+' · 📄'+src.exported)+'</span>'
+      +(src.media?'<span class="kkc" title="「사진을 보냈습니다」류 '+src.media+'개 — 알맹이가 없어 묶지 않습니다">'+two('📷 사진·파일 알림 '+src.media+'개','📷'+src.media)+'</span>':'')
+      +(src.truncated?'<span class="kkc a">글이 많아 최근 것만 읽었습니다</span>':'')
+      :'<span class="kkc">'+esc(src.fileName)+'</span><span class="kkc">글 '+src.lines.length+'줄</span>')
+    +(src.files.length?'<span class="kkc" title="파일 '+src.files.length+'개">'+two('파일 '+src.files.length+'개','📎'+src.files.length)+'</span>':'')
+    +(nSame?'<span class="kkc" title="이미 반영한 묶음 '+nSame+'개는 건너뜀">'+two('이미 반영한 묶음 '+nSame+'개는 건너뜀','반영됨 '+nSame)+'</span>':'')
+    +'<button class="kksm" onclick="kxSrvAgain()" aria-label="'+(srv?'서버에 모인 글 다시 읽기':'서버에 모인 글로 묶기')+'" title="폰 알림으로 저절로 온 글과 넣은 저장본 글(최근 30일)로 다시 묶습니다">'
+      +(srv?two('↻ 다시 읽기','↻'):two('🔔 서버에 모인 글로 묶기','🔔 서버 글'))+'</button></div>';
+  if(!rows.length) return h+'<div class="panel muted">묶을 글이 없습니다 — '+(srv?'서버에 모인 글이 사진 알림뿐이거나 30일이 지났습니다.':'저장본에 글이 없습니다.')+'</div>';
   h+='<div class="row" style="gap:8px;margin-bottom:6px;min-height:30px;flex-wrap:wrap">'
     +'<b style="font-size:12.5px">'+nSel+'건 고름</b>'
     +'<button class="primary"'+(nSel&&!KX.busy?'':' disabled')+' onclick="kxApply()">업무관리에 반영 ('+nSel+'건 · 한 번에 저장)</button>'
@@ -4359,8 +4492,11 @@ function _qToks(q){
   });
   return out;
 }
-function kbAskCtx(q){
+/* known — 넘기면 여기 실리는 이름(지식 카드의 대상·작성자, 관련 업무의 업체·의뢰인·담당자)을 모아 준다.
+   지식 묻기도 이 글을 바깥 AI 로 보내므로 aiCall 이 꼬리표로 가린다(2026-11-19 독립 검토 지적). */
+function kbAskCtx(q,known){
   var toks=_qToks(q);
+  function kn(v,label){ if(known&&v!=null&&String(v).trim()) known.push({value:String(v),label:label}); }
   function score(s){ s=String(s||'').toLowerCase(); return toks.filter(function(t){return s.indexOf(t)>=0;}).length; }
   var cards=kbAll().map(function(c){
       return {c:c,s:score(c.t)*2+score(c.x)+score(c.kl)*2};
@@ -4371,6 +4507,8 @@ function kbAskCtx(q){
   var L=['[지식 카드 '+pick.length+'장]'];
   pick.forEach(function(x){
     var c=x.c;
+    if(c._kind==='person'||c._kind==='company') kn(c.kl,c._kind==='person'?'인물':'업체');
+    kn(c.byName,'담당자');
     L.push('- ('+(KB_KLBL[c._kind]||c._kind)+' · '+(c.kl||c._key)+') '+c.t
       +(c.x?' — '+c.x:'')+' [작성 '+String(c.at||'').slice(0,10)+' '+(c.byName||'')+']'
       +(kbBad(c)?' ※ 정정 요청됨':'')+(kbStale(c)?' ※ 2년 경과':''));
@@ -4383,6 +4521,11 @@ function kbAskCtx(q){
   if(its.length){
     L.push('','[관련 업무의 노트·회고 '+its.length+'건]');
     its.forEach(function(x){
+      kn(x.it.company,'업체'); kn(x.it.client,'의뢰인'); kn(x.it.officer,'상대담당');
+      kn(x.it.mgr_main&&x.it.mgr_main.name,'담당자');
+      (x.it.mgr_subs||[]).forEach(function(m){ kn(m&&m.name,'담당자'); });
+      var cs=[]; try{ cs=cs.concat(itemContacts(x.it)); }catch(e){} try{ cs=cs.concat(coContacts(x.it)); }catch(e){}
+      cs.forEach(function(c){ if(c){ kn(c.name,'업체담당'); kn(c.phone,'전화'); kn(c.email,'전자우편'); } });
       L.push('· '+(x.it.company||'')+' '+(x.it.title||'')+(x.it.state==='done'?' (종료)':''));
       HO_FIELDS.forEach(function(f){ if(String(x.n[f[0]]||'').trim()) L.push('   '+f[1]+': '+x.n[f[0]]); });
       RETRO_FIELDS.forEach(function(f){ if(String(x.r[f[0]]||'').trim()) L.push('   회고·'+f[1]+': '+x.r[f[0]]); });
@@ -4396,7 +4539,8 @@ function kbAsk(){
   if(!kbAll().length){ toast('아직 저장된 지식이 없습니다','warn'); return; }
   aiConsent().then(function(ok){ if(!ok)return;
     var b=$('kbask-btn'); if(b){ b.disabled=true; b.textContent='찾는 중…'; }
-    aiCall(AI_SYS_QA,'[질문]\n'+q+'\n\n'+kbAskCtx(q))
+    var K=[], ctx=kbAskCtx(q,K);
+    aiCall(AI_SYS_QA,'[질문]\n'+q+'\n\n'+ctx,K)
     .then(function(txt){
       var d=aiJson(txt);
       showModal('<h2 style="margin:0 0 6px">🤔 '+esc(q)+'</h2>'
@@ -7345,6 +7489,40 @@ function focusCounts(){
   var done=allItems().filter(function(it){return it.state==='done'&&isOf(it,v)&&it.done_date&&inWeek(it.done_date,S.week);});
   return {due:due,nolog:nolog,next:next,done:done};
 }
+/* 📋 내 업무 숫자 한 줄 — 포털 머리줄 «내 업무» 단추와 이알피 「나의 업무」가 읽는다 (대표 지시 2026-11-21 「추천대로」).
+   work_erp/mysum/{로그인 UID} — 모양·읽는 법은 js/pu-mywork.js 머리글. 규칙이 «본인 UID 자리만» 쓰게 막는다.
+   ★ «내 몫» 한 줄만 적는다 — 남의 숫자를 대신 적지 않는다(그 사람 화면의 셈은 그 사람 화면이 한다).
+   ★ 이번 주를 볼 때만 적는다 — 「미기록」은 «이번 주» 숫자여야 한다. 지난주를 보는 동안은 안 적는다.
+   ★ 진행(n)은 머리 숫자와 같은 셈 — 이관한 계약·자문·급여를 뺀다. «펴 보기» 단추를 눌렀는지와 상관없이 같다.
+   ★ 임박·다음 할 일은 «날짜»로 남긴다 — 읽는 쪽이 그날 «오늘»로 다시 센다(focusCounts 와 같은 잣대).
+   ★ 바뀐 것이 없으면 안 적는다 — 화면은 자주 다시 그려진다. 적는 사이 또 바뀌면 끝난 뒤 한 번 더.
+   ⚠ 실패해도 화면에는 아무 일 없다 — 숫자는 덤이다. 못 적으면 포털은 숫자 없이 단추만 선다. */
+var _mysumLast=null, _mysumBusy=false, _mysumAgain=null;
+function mysumWrite(fc){
+  try{
+    var M=window.PuMyWork;
+    if(!M||typeof fbDb==='undefined'||!fbDb||!S.me||!S.me.sid||!fc||!isCurWeek()) return;
+    if(_mysumBusy){ _mysumAgain=fc; return; }
+    var me=S.me, open=openItems().filter(function(it){ return isOf(it,me); });
+    var dues=[], nexts=[];
+    open.forEach(function(it){
+      var d=itemDue(it); if(d) dues.push(String(d).slice(0,10));
+      if(it.next&&it.next.date) nexts.push(String(it.next.date).slice(0,10));
+    });
+    var mon=curMonday();
+    var rec=M.build({ n:open.filter(function(it){ return !xferOf(it)&&!wsAdv(it); }).length,
+      dues:dues, nexts:nexts, nolog:fc.nolog.length, ws:ymd(mon), we:ymd(addDays(mon,6)), now:Date.now() });
+    if(_mysumLast&&M.same(_mysumLast,rec)) return;
+    var fu=null; try{ fu=firebase.auth().currentUser; }catch(e){}
+    var p=M.pathOf(fu&&fu.uid); if(!p) return;
+    _mysumBusy=true;
+    fbDb.ref(p).set(rec).then(function(){ _mysumLast=rec; },function(){}).then(function(){
+      _mysumBusy=false;
+      var again=_mysumAgain; _mysumAgain=null;
+      if(again) mysumWrite(again);
+    });
+  }catch(e){ _mysumBusy=false; }
+}
 /* ══════ 보기 바꾸기 — 표 · 보드 · 타임라인 ══════════════════════
    같은 목록을 세 가지 모양으로 본다. ★ 거르는 일은 «한 번만» 한다 —
    renderMy 가 만든 list 를 그대로 받아 그리므로, 세 보기가 늘 같은 것을 보여준다.
@@ -7696,6 +7874,7 @@ function renderMy(){
      ⚠ 조용히 지우지 않는다 — 몇 건을 감췄는지 칩으로 내고 눌러서 볼 수 있게 한다.
        숫자가 안 맞으면 자료가 없어진 줄 알기 때문이다. */
   xferRefresh();
+  mysumWrite(fc);              /* 📋 포털 «내 업무» 단추·이알피 「나의 업무」가 읽는 숫자 한 줄 */
   var xferHid=mine.filter(xferOf).length;
   if(!S.myXfer) mine=mine.filter(function(it){ return !xferOf(it); });
   /* 자문·급여는 접어 둔다 (대표 지시 2026-10-05 「그대로 두되 접어 둔다」).
@@ -9584,7 +9763,7 @@ function aiProxyUrl(){
 }
 function aiConsent(){
   if(localStorage.getItem('work_ai_ok')==='1') return Promise.resolve(true);
-  return confirmM('AI 기능을 쓰면 이 업무의 진행 기록·기업명·의뢰인 정보가 회사에 설정된 AI 서비스로 전송됩니다.\n\n의뢰인 개인정보가 포함될 수 있으니 대표님이 승인한 경우에만 사용하세요.\n\n계속할까요? (이 브라우저에서 한 번만 묻습니다)',{ok:'동의하고 사용'})
+  return confirmM('AI 기능을 쓰면 이 업무의 진행 기록이 회사에 설정된 AI 서비스로 전송됩니다.\n\n업체·의뢰인·담당자 이름과 주민번호·전화·계좌 같은 번호는 가려서 보내고 답은 이 화면에서 되돌립니다. 다만 기록 속 다른 사람 이름이나 주소는 그대로 갈 수 있으니 대표님이 승인한 경우에만 사용하세요.\n\n계속할까요? (이 브라우저에서 한 번만 묻습니다)',{ok:'동의하고 사용'})
     .then(function(ok){ if(ok) localStorage.setItem('work_ai_ok','1'); return ok; });
 }
 /* 바깥으로 나가는 부름은 이것 하나뿐이다(AI 프록시). 시간 제한이 없으면
@@ -9608,22 +9787,29 @@ function aiFetch(url,opts){
       throw e;
     });
 }
-function aiCall(system,userText){
+function aiCall(system,userText,known){
   var url=aiProxyUrl();
   /* ⚠ 넣는 자리는 «포털»의 ⚙ 설정 뿐이다(관리자만 보인다). 푸른이알피 환경설정에는
      그 칸이 없다 — 엉뚱한 곳을 가리키면 찾다가 못 찾고 포기한다. */
   if(!url) return Promise.reject(new Error('AI 프록시 주소가 없습니다 — 시작 화면(포털) 왼쪽 아래 [⚙ 설정] → 「AI 프록시 주소」에 등록하세요 (대표만 보입니다)'));
+  /* 개인정보는 꼬리표([의뢰인1]·[전화1])로 가려 보내고 답은 이 브라우저 안에서 되돌린다(js/pu-ai-mask.js).
+     가리개가 안 실렸으면 «보내지 않는다» — 조용히 원문을 보내면 의뢰인 정보가 그대로 바깥으로 나간다. */
+  var MK=window.PuAiMask;
+  if(!MK||!MK.createMasker) return Promise.reject(new Error('개인정보 가림 도구(js/pu-ai-mask.js)가 이 화면에 실려 있지 않습니다 — 그대로 보내면 의뢰인 정보가 바깥으로 나갑니다'));
+  var mk=MK.createMasker({known:known||[]}), sendText=mk.mask(userText), sendSys=mk.withNote(system);
   var i=0;
   function attempt(){
     return aiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:AI_MODELS[i],max_tokens:8000,system:system,
-        messages:[{role:'user',content:userText}]})})
+      body:JSON.stringify({model:AI_MODELS[i],max_tokens:8000,system:sendSys,
+        messages:[{role:'user',content:sendText}]})})
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d&&d.error) throw new Error(d.error.message||'AI 오류');
         var t=d.reply||d.text||((d.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join(''));
+        // 새 모델은 안전 기준에 걸리면 HTTP 200 에 stop_reason:'refusal' 로 빈 답을 준다 — 까닭을 밝히고 다음 모델로 넘긴다
+        if(!t&&d&&d.stop_reason==='refusal') throw new Error('AI가 이 요청을 거절했습니다(안전 기준) — 내용을 줄이거나 바꿔 다시 해 주세요');
         if(!t) throw new Error('AI 응답이 비어 있습니다');
-        return t;
+        return mk.unmaskReply(t);   // 답이 JSON 이면 JSON 에 맞는 꼴로 되돌린다(이름에 따옴표가 있어도 aiJson 이 안 깨진다)
       })
       .catch(function(e){
         // ⚠ 끊긴 것은 «모델 탓»이 아니다. 다음 모델로 다시 걸면 1분을 또 기다린다.
@@ -9638,6 +9824,20 @@ function aiJson(text){
   var s=String(text||''), a=s.indexOf('{'), b=s.lastIndexOf('}');
   if(a<0||b<a) throw new Error('AI 응답을 해석할 수 없습니다');
   return JSON.parse(s.slice(a,b+1));
+}
+/* AI 로 보낼 때 꼬리표로 가릴 «이미 아는 이름» — 업체·의뢰인·상대기관 담당·우리 담당자·기록을 쓴 사람.
+   (js/pu-ai-mask.js 가 [의뢰인1] 처럼 바꿔 보내고 답에서 되돌린다. 기록 본문 속 다른 사람 이름은 모양으로 알 수 없어 못 가린다.) */
+function aiKnown(id){
+  var it=items[id]||{}, logs=itemLogsCache[id]||{}, K=[];
+  function add(v,label){ if(v!=null&&String(v).trim()) K.push({value:String(v),label:label}); }
+  add(it.company,'업체'); add(it.client,'의뢰인'); add(it.officer,'상대담당');
+  add(it.mgr_main&&it.mgr_main.name,'담당자');
+  (it.mgr_subs||[]).forEach(function(m){ add(m&&m.name,'담당자'); });
+  Object.keys(logs).forEach(function(k){ add(logs[k]&&logs[k].byName,'담당자'); });
+  /* 이 건·업체의 담당자(연락처) — 노트·기록에 이름과 전화가 그대로 적힌다 */
+  var cs=[]; try{ cs=cs.concat(itemContacts(it)); }catch(e){} try{ cs=cs.concat(coContacts(it)); }catch(e){}
+  cs.forEach(function(c){ if(!c) return; add(c.name,'업체담당'); add(c.phone,'전화'); add(c.email,'전자우편'); });
+  return K;
 }
 function aiContext(id){
   var it=items[id]||{}, logs=itemLogsCache[id]||{};
@@ -9698,7 +9898,7 @@ function kbHarvest(id){
   aiConsent().then(function(ok){ if(!ok)return;
     showModal('<h2 style="margin:0 0 6px">✨ 남길 지식 뽑기</h2>'
       +'<div class="loading"><span class="spin"></span>기록·노트·회고를 읽고 있습니다…</div>');
-    loadItemLogs(id).then(function(){ return aiCall(AI_SYS_HARVEST,aiHarvestContext(id)); })
+    loadItemLogs(id).then(function(){ return aiCall(AI_SYS_HARVEST,aiHarvestContext(id),aiKnown(id)); })
     .then(function(txt){
       var cards=(aiJson(txt).cards||[]).filter(function(c){ return c&&c.t&&c.kl; }).slice(0,6);
       var it=items[id]||{};
@@ -9764,7 +9964,7 @@ function kbHarvestSave(){
 function aiDraft(id){
   aiConsent().then(function(ok){ if(!ok)return;
     var btn=$('ai-draft'); if(btn){ btn.disabled=true; btn.textContent='✨ 초안 작성 중…'; }
-    loadItemLogs(id).then(function(){ return aiCall(AI_SYS_DRAFT,aiContext(id)); })
+    loadItemLogs(id).then(function(){ return aiCall(AI_SYS_DRAFT,aiContext(id),aiKnown(id)); })
     .then(function(txt){
       var d=aiJson(txt);
       showModal('<h2 style="margin:0 0 6px">✨ AI 인수인계 노트 초안</h2>'
@@ -9788,7 +9988,7 @@ function applyAiDraft(id){
 function aiInterview(id){
   aiConsent().then(function(ok){ if(!ok)return;
     var btn=$('ai-ask'); if(btn){ btn.disabled=true; btn.textContent='🎤 질문 준비 중…'; }
-    loadItemLogs(id).then(function(){ return aiCall(AI_SYS_ASK,aiContext(id)); })
+    loadItemLogs(id).then(function(){ return aiCall(AI_SYS_ASK,aiContext(id),aiKnown(id)); })
     .then(function(txt){
       var qs=(aiJson(txt).questions||[]).filter(Boolean).slice(0,5);
       if(!qs.length) throw new Error('질문을 만들지 못했습니다');
@@ -11612,7 +11812,7 @@ var HELP={
     +'다음에 같은 대상을 만나면 업무를 열 때 여기로 자동으로 따라옵니다.',
   note:'평소에 조금씩 적어 두는 인수인계 자료입니다. 갑자기 자리를 비우게 되어도 '
       +'남은 사람이 그대로 이어받을 수 있습니다.',
-  ppnote:'예전에 푸른이알피 <b>「나의 업무」</b>에 적어 두었던 메모입니다.<br>'
+  ppnote:'예전에 푸른이알피 <b>「나의 업무」</b>(지금 「오늘」)에 적어 두었던 메모입니다.<br>'
         +'⚠ 그 적는 창은 2026-09-27 에 없앴습니다 — 이제 진행 기록은 <b>여기(업무관리) 한 곳</b>에만 적습니다. '
         +'옛 메모를 기록으로 남기려면 <b>✎ 기록에 담기</b>를 누르세요.<br>'
         +'담으면 <b>「🔗 푸른이알피 메모 — …」</b> 한 줄이 그 주 기록으로 들어가, '
@@ -13906,7 +14106,8 @@ function peTypeName(kv,code){
 // 마스터에 없을 때 쓰는 예전 칸 (푸른이알피 kindSubLabel의 뒷단과 같다)
 /* 푸른이알피 원본이 스스로 달고 있는 상태 — 계약관리의 상담접수·계약협의·
    계약확정 같은 것. 우리 '상태'(내가 손으로 바꾸는 진행 상태)와는 다른 축이라
-   덮지 않고 따로 읽어 나란히 보여준다. 이름은 푸른이알피 나의 업무와 같게 쓴다. */
+   덮지 않고 따로 읽어 나란히 보여준다. 이름은 푸른이알피 계약관리 화면과 같게 쓴다
+   (예전에는 이알피 「나의 업무」 표의 상태 칸과 맞췄다 — 그 표는 2026-11-21 걷었다). */
 var PE_ST_LABEL={progress:'진행중',pending:'대기',review:'검토중',open:'진행중',
   closed:'완료',done:'완료',cancelled:'취소',hold:'보류',
   consult:'상담접수',negotiate:'협의중',confirmed:'계약확정',signed:'최종확정',active:'진행중'};
@@ -14940,11 +15141,220 @@ function _puerpModal(){
 // 푸른이알피 나의 업무 → work.html#item=<건ID> 로 들어온 경우 해당 업무 열기
 function openFromHash(){
   try{
-    var m=/^#item=(.+)$/.exec(location.hash||''); if(!m) return;
+    /* 이알피 「나의 업무」의 단추가 여는 자리 (2026-11-21 — 새 업무·옮기기·연결은 업무관리 한 곳에서) */
+    var hs=String(location.hash||'');
+    if(hs==='#new'){ itemModal(); return; }
+    if(hs==='#erpmove'){ erpMoveModal(); return; }
+    if(hs==='#peimport'){ puerpMineModal(); return; }
+    /* 이알피 「나의 업무」의 숫자(임박·할 일·미기록)를 누르면 그 건만 거른 「내 업무」로 */
+    var fm=/^#f=(due|next|nolog)$/.exec(hs);
+    if(fm){ if(S.view==='my'){ S.f=fm[1]; renderMy(); } return; }
+    var m=/^#item=(.+)$/.exec(hs); if(!m) return;
     var id=decodeURIComponent(m[1]);
     if(!items[id]){ toast('해당 업무를 찾을 수 없습니다 (보관함에 있을 수 있습니다)','warn'); return; }
     openDrawer(id);
   }catch(e){}
+}
+/* ══ 📦 이알피 «일반업무·업무케이스» → 업무관리로 옮기기 (대표 지시 2026-11-21 「추천대로」 — 나의 업무 2단계) ══
+   이알피 「나의 업무」의 「+ 일반업무」「+ 업무케이스」는 업무관리로 안 넘어오는 «섬»이었다
+   (업무관리·전체 검색·인수인계·캘린더 어디에도 안 나왔다). 이제 새 업무는 업무관리 「＋ 새 업무」 한 곳에서 만들고,
+   이미 있던 것은 여기서 «한 번» 옮긴다.
+   ★ 원본(data/my_work_items · data/biz_cases)은 «읽기만» 한다 — 고치지도 지우지도 않는다(언제든 다시 볼 수 있다).
+   ★ 옮긴 줄에는 mv:{store,id} 가 붙는다 — 두 번 옮기지 않고, 이알피 「나의 업무」가 «옮겼다»를 알아본다.
+     ⚠ src:'puerp'·ref 를 붙이지 않는다 — 그것은 이알피 사무관리 5종의 «종료 동기화» 표식이라,
+       붙이면 동기화 엔진(wsSyncRun)이 이알피 원본에 손을 댄다.
+   ★ 끝난 것·휴지통에 든 것은 안 옮긴다 · 사람이 고른 것만 · 한 번의 update 로 다 같이(반쯤 옮겨지는 일 없음).
+   ★ 업체는 companyId 가 있을 때만 co_id 로 잇는다 — 이름으로 업체를 짐작해 잇지 않는다(온톨로지).
+   ★ 담당은 원본의 사번을 그대로 쓴다. 옛 자료에 이름만 있으면 명부에서 «이름이 정확히 같은» 한 사람일 때만 사번을 붙인다. */
+var MV_STORES=[['my_work_items','일반업무'],['biz_cases','업무케이스']];
+var MV_TYPE={ /* 이알피 종류 값 → 업무명 앞에 붙는 이름 (pu-erp MY_WORK_TYPES · BIZ_CASE_TYPES 와 같은 말) */
+  consult:'상담', labor:'노동부대응', written:'서면대응', review:'검토', phone:'전화상담', visit:'방문', other:'기타',
+  'labor-office':'노동부 대응', 'advisory-consult':'자문상담', 'written-response':'서면대응', 'phone-consult':'전화상담',
+  'visit-consult':'방문상담', 'doc-review':'서류검토' };
+/* 이알피 원본 한 줄이 «끝났나» — pu-erp isItemClosed 와 같은 잣대(일반업무는 status:'closed'·archived 로 끝낸다) */
+function mvClosed(x){
+  if(!x) return true;
+  if(x._deleted||x.permanentArchived||x.archived) return true;
+  if(x.closedDate||x.closedAt||x.closeDate) return true;
+  var st=String(x.status||'');
+  return st==='closed'||st==='cancelled'||st==='transferred'||st==='done';
+}
+/* 사번 또는 (옛 자료의) 이름 → {sid,name}. 명부에서 못 찾으면 사번을 지어내지 않는다 */
+function mvWho(v,staff){
+  var s=String(v==null?'':v).trim(); if(!s) return null;
+  var bySid=staff.filter(function(u){ return u&&u.sid===s; })[0];
+  if(bySid) return {sid:bySid.sid,name:bySid.name||''};
+  var byName=staff.filter(function(u){ return u&&u.name===s; });
+  if(byName.length===1) return {sid:byName[0].sid,name:byName[0].name};
+  return {sid:'',name:s};
+}
+/* «내 것»인가 — 사번으로만 본다. isOf 는 이름이 같아도 «내 것»으로 치므로(동명이인이면 남의 일이 섞인다,
+   2026-11-21 보안 검토 지적) 여기서는 쓰지 않는다. 사번 없는 옛 자료(이름만, 명부에서 하나로 안 정해짐)는
+   «내 것»으로 치지 않는다 — 관리자 화면(전 직원)에서는 그대로 보이니 그때 옮긴다. */
+function mvMine(main,subs,me){
+  var ms=me&&me.sid; if(!ms) return false;
+  return [main].concat(subs||[]).some(function(w){ return !!(w&&w.sid&&w.sid===ms); });
+}
+/* 이미 옮긴 것 — store|id */
+function mvDoneMap(){
+  var m={};
+  allItems().forEach(function(it){ if(it&&it.mv&&it.mv.store&&it.mv.id!=null) m[it.mv.store+'|'+it.mv.id]=it._id; });
+  return m;
+}
+/* 옮길 후보 — 원본 두 곳을 읽어 «안 끝난 것 · 아직 안 옮긴 것»만. 관리자는 전 직원, 나머지는 내 것 */
+function mvCandidates(){
+  var staff=(_allStaffCache&&_allStaffCache.length?_allStaffCache:(_staffCache||[]));
+  var done=mvDoneMap(), me=S.me||{}, all=isAdmin();
+  return Promise.all(MV_STORES.map(function(d){
+    return fbDb.ref('data/'+d[0]+'/v').once('value').then(function(s){ return _peArr(s.val())||[]; },function(){ return null; });
+  })).then(function(res){
+    var out=[], fail=[];
+    res.forEach(function(arr,i){
+      var st=MV_STORES[i][0], lbl=MV_STORES[i][1];
+      if(arr===null){ fail.push(lbl); return; }
+      arr.forEach(function(x){
+        if(!x||x.id==null||mvClosed(x)||done[st+'|'+x.id]) return;
+        var main=st==='my_work_items'?mvWho(x.sid,staff):mvWho(x.managerMain,staff);
+        var subs=(st==='biz_cases'?[].concat(x.managerSub?[x.managerSub]:[],x.managerSubs||[]):[])
+          .map(function(v){ return mvWho(v,staff); }).filter(Boolean)
+          .filter(function(w){ return !main||w.sid!==main.sid||w.name!==main.name; });
+        var c={ store:st, kind:lbl, id:String(x.id), no:String(x.itemNo||x.caseNo||''),
+          type:MV_TYPE[x.workType||x.caseType]||'', title:String(x.title||'').trim(),
+          company:String(x.companyName||'').trim(), coId:String(x.companyId||'').trim(),
+          contact:String(x.contactPerson||'').trim(), phone:String(x.contactPhone||'').trim(),
+          due:String(x.dueDate||'').slice(0,10), start:String(x.startDate||'').slice(0,10),
+          brief:[x.detail||x.description||'', x.result?('결과: '+x.result):''].filter(Boolean).join(' / '),
+          main:main, subs:subs };
+        var mine=mvMine(main,subs,me);
+        if(!all&&!mine) return;
+        if(!mvKey(c)) return;              // 열쇠를 못 만드는 원본(id 가 너무 김)은 옮기지 않는다 — 이알피에 그대로 보인다
+        c.mine=mine;
+        out.push(c);
+      });
+    });
+    out.sort(function(a,b){ return (b.mine?1:0)-(a.mine?1:0)||String(a.company).localeCompare(String(b.company),'ko'); });
+    return {list:out, fail:fail};
+  });
+}
+/* 고르기 칸 머리 ☐ — 지금 보이는 줄만 고른다 */
+function mvAll(on){ [].slice.call(document.querySelectorAll('.mvchk')).forEach(function(c){ c.checked=!!on; }); mvCount(); }
+function mvCount(){
+  var n=[].slice.call(document.querySelectorAll('.mvchk')).filter(function(c){ return c.checked; }).length;
+  var b=$('mv-go'); if(b){ b.textContent=n?(n+'건 옮기기'):'고른 것 옮기기'; b.disabled=!n; }
+}
+function erpMoveModal(){
+  showModal('<h2 style="margin:0 0 10px">📦 이알피 일반업무·업무케이스 옮기기</h2><p class="muted" style="font-size:12.5px">불러오는 중…</p>');
+  loadStaff().then(function(){ return mvCandidates(); }).then(function(r){
+    S._mvList=r.list;
+    var h='<h2 style="margin:0 0 8px">📦 이알피 일반업무·업무케이스 옮기기</h2>'
+      +'<p class="muted" style="font-size:12.5px;margin:0 0 10px">이알피 「오늘」(옛 「나의 업무」)에서 만들던 <b>일반업무·업무케이스</b>를 업무관리로 옮깁니다. '
+      +'이제부터 새 업무는 업무관리 <b>＋ 새 업무</b>에서 만듭니다. 이알피 원본은 지우지 않습니다.</p>';
+    if(r.fail.length) h+='<div class="muted" style="font-size:12px;color:var(--warn);margin-bottom:8px">⚠ '+esc(r.fail.join('·'))
+      +'를 읽지 못했습니다 — 그쪽 것은 이번 목록에 없습니다. 잠시 뒤 다시 열어 주세요.</div>';
+    if(!r.list.length){
+      h+='<p class="muted" style="font-size:12.5px">옮길 것이 없습니다 (끝난 것·이미 옮긴 것은 뺐습니다).</p>'
+        +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>';
+      showModal(h); return;
+    }
+    h+='<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">'
+      +'<table class="mvtbl"><colgroup><col style="width:28px"><col style="width:36px"><col>'
+      +'<col class="mv-pc" style="width:26%"><col class="mv-pc" style="width:15%"><col class="mv-pc" style="width:88px"></colgroup>'
+      +'<thead><tr>'
+      +'<th scope="col" style="text-align:center"><label class="mvck"><input type="checkbox" checked onclick="mvAll(this.checked)" title="보이는 줄 모두 고르기" aria-label="보이는 줄 모두 고르기"></label></th>'
+      +'<th scope="col" style="text-align:right">#</th>'
+      +'<th scope="col">업무</th><th scope="col" class="mv-pc">업체</th><th scope="col" class="mv-pc">담당</th><th scope="col" class="mv-pc">기한</th></tr></thead><tbody>'
+      +r.list.map(function(c,i){
+        var nm=(c.type?'['+c.type+'] ':'')+(c.title||'(제목 없음)');
+        var who=c.main?(c.main.name||c.main.sid):'';
+        var whoH=who?esc(who):'<span style="color:var(--warn)">담당 모름</span>';
+        return '<tr><td style="text-align:center"><label class="mvck">'
+          +'<input type="checkbox" class="mvchk" value="'+i+'" checked onchange="mvCount()" aria-label="'+esc('옮기기 고르기: '+c.kind+' '+nm)+'"></label></td>'
+          +'<td class="muted" style="text-align:right;font-variant-numeric:tabular-nums">'+(i+1)+'</td>'
+          +'<td class="mv-w" title="'+esc(c.kind+' · '+nm+(c.company?' · '+c.company:''))+'">'
+          +'<span class="mv-n"><span class="muted">'+esc(c.kind)+'</span> '+esc(nm)+'</span>'
+          /* 폰에서만 보이는 둘째 줄 — 업체 · 담당 · 기한 */
+          +'<span class="mv-sub">'+esc(c.company||'—')+' · '+whoH+(c.due?' · '+esc(c.due):'')+'</span></td>'
+          +'<td class="mv-pc">'+esc(c.company||'—')+'</td>'
+          +'<td class="mv-pc">'+whoH+'</td>'
+          +'<td class="mv-pc" style="font-variant-numeric:tabular-nums">'+esc(c.due||'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div>'
+      +'<div id="mv-msg" class="muted" role="status" aria-live="polite" style="font-size:12px;min-height:18px;margin-top:8px"></div>'
+      +'<div class="row" style="justify-content:flex-end;margin-top:6px"><button onclick="closeM()">취소</button>'
+      +'<button class="primary" id="mv-go" onclick="erpMoveRun()">'+r.list.length+'건 옮기기</button></div>';
+    showModal(h);
+  }).catch(function(e){
+    showModal('<h2 style="margin:0 0 10px">📦 이알피 일반업무·업무케이스 옮기기</h2><p class="muted" style="font-size:12.5px;color:var(--danger)">불러오지 못했습니다: '
+      +esc(e&&e.message||e)+'</p><div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>');
+  });
+}
+/* 옮긴 업무의 열쇠 — 원본에서 «정해진 이름»(같은 원본이면 늘 같은 자리).
+   ★ 두 창(두 사람)이 같은 것을 동시에 옮겨도 «같은 자리»라 한 줄만 남는다(2회차 보안 검토 «중간» — 무작위 열쇠면 둘이 생겼다).
+   ★ 원본 id 를 encodeURIComponent 로 옮겨 적는다 — 열쇠 금지 글자(# $ [ ] /)는 %xx 로, 점(.)은 %2E 로.
+     서로 다른 id 가 같은 열쇠가 되지 않는다(되돌릴 수 있는 바꿈). 무작위 열쇠로 물러서지 않는다(3회차 «낮음»).
+   ⚠ 열쇠가 너무 길면(200자 넘음) 만들지 않는다 — 그 원본은 옮기기 목록에서 뺀다(mvCandidates). */
+function mvKey(c){
+  var s=String(c&&c.id!=null?c.id:''); if(!s) return '';
+  var k='MV-'+(c.store==='biz_cases'?'B':'W')+'-'+encodeURIComponent(s).replace(/\./g,'%2E');
+  return k.length<=200?k:'';
+}
+/* 옮길 한 줄 → 업무관리 업무. «＋ 새 업무»(saveItem)와 같은 칸에 출처(mv)·온톨로지 칸을 더한다 */
+function mvRecord(c,no,nowIso,id){
+  var rec={ cat:'기타', company:c.company, client:'', officer:'',
+    title:((c.type?'['+c.type+'] ':'')+(c.title||c.kind)).slice(0,200),
+    due:c.due||'', brief:briefTrim(c.brief),
+    mgr_main:c.main||{sid:'',name:''}, mgr_subs:c.subs||[],
+    no:no, status:'진행중', start:c.start||todayStr(), created_at:nowIso,
+    mv:{store:c.store, id:c.id, no:c.no||'', at:nowIso, by:(S.me&&S.me.sid)||''},
+    id:id, entityType:'Task', createdAt:nowIso, updatedAt:nowIso };
+  if(c.coId) rec.co_id=c.coId;
+  if(c.contact||c.phone) rec.contact={name:c.contact||'', rank:'', phone:c.phone||''};
+  /* 요약 칸(brief)은 짧게 잘린다(BRIEF_MAX) — 원본의 내용·결과 «전문»은 서랍의 옛 메모 자리(pe_notes)에 둔다.
+     서랍에 「🔗 푸른이알피 메모」로 보이고 「✎ 기록에 담기」로 기록 줄이 된다(ppFor·ppTake 와 같은 길).
+     ⚠ 이 업무에는 ref 가 없어 동기화 엔진이 이 메모를 덮지 않는다. */
+  var note=String(c.brief||'').trim();
+  if(note){
+    var nk=String((c.main&&c.main.sid)||'mv').replace(/[.#$\[\]\/]/g,'_')||'mv';
+    rec.pe_notes={}; rec.pe_notes[nk]={t:note.slice(0,2000), at:nowIso, id:'mv-'+c.store+'-'+c.id};
+  }
+  return rec;
+}
+function erpMoveRun(){
+  var list=S._mvList||[], msg=$('mv-msg'), btn=$('mv-go');
+  var pick=[].slice.call(document.querySelectorAll('.mvchk')).filter(function(c){ return c.checked; })
+    .map(function(c){ return list[+c.value]; }).filter(Boolean);
+  if(!pick.length){ if(msg) msg.textContent='고른 것이 없습니다.'; return; }
+  /* 그 사이 다른 창에서 옮겼을 수 있다 — 지금 목록으로 한 번 더 거른다(진짜 막이는 아래 «처음 한 번만») */
+  var done=mvDoneMap();
+  pick=pick.filter(function(c){ var k=mvKey(c); return k && !done[c.store+'|'+c.id] && !items[k]; });
+  if(!pick.length){ if(msg) msg.textContent='이미 옮겨진 것들입니다.'; return; }
+  if(btn) btn.disabled=true;
+  var nowIso=new Date().toISOString(), base=genNo('기타'), m=/^(.*-)(\d+)$/.exec(base), n0=m?+m[2]:1, recs={};
+  pick.forEach(function(c,i){
+    /* 세 자리로 채우되 1000번을 넘으면 자르지 않는다(slice(-3) 은 1000 → 000 으로 겹친다) */
+    var n=String(n0+i); while(n.length<3) n='0'+n;
+    var id=mvKey(c), no=m?(m[1]+n):base;
+    recs[id]=mvRecord(c,no,nowIso,id);
+  });
+  /* ★ 건마다 «처음 한 번만» 만든다(서버 트랜잭션 — 3회차 보안 검토 «중간»).
+       같은 자리에 이미 업무가 있으면(다른 창이 먼저 옮겼고 그 뒤 고치거나 끝냈을 수 있다) 덮지 않고 그만둔다.
+     ⚠ 그래서 «한꺼번에 다 아니면 하나도»는 아니다 — 몇 건이 실패하면 그 건만 안 옮겨지고, 다시 누르면 남은 것만 옮긴다(열쇠가 같아 겹치지 않는다). */
+  var ids=Object.keys(recs);
+  Promise.all(ids.map(function(id){
+    return fbDb.ref(NS+'/items/'+id).transaction(function(cur){ return cur ? undefined : recs[id]; })
+      .then(function(r){ return (r&&r.committed)?'ok':'had'; },function(){ return 'fail'; });
+  })).then(function(rs){
+    var ok=0, had=0, fail=0;
+    rs.forEach(function(r,i){ if(r==='ok'){ ok++; items[ids[i]]=recs[ids[i]]; } else if(r==='had') had++; else fail++; });
+    if(!fail){
+      closeM();
+      toast('✅ '+ok+'건을 업무관리로 옮겼습니다'+(had?' (이미 옮겨진 '+had+'건은 그대로 두었습니다)':''));
+      route(); return;
+    }
+    if(btn) btn.disabled=false;
+    if(msg) msg.textContent='옮긴 것 '+ok+'건 · 못 옮긴 것 '+fail+'건'+(had?' · 이미 있던 것 '+had+'건':'')
+      +' — 다시 누르면 못 옮긴 것만 옮깁니다.';
+    if(ok) route();
+  });
 }
 // 푸른이알피 해당 메뉴로 이동 (pu-erp는 #menu= 딥링크를 지원)
 function openPuerp(type){

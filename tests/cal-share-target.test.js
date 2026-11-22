@@ -8,7 +8,7 @@
      ① 매니페스트의 share_target 은 POST(사진 + 글) — 받을 주소는 앱 범위 안이고, 화면이 «좁은 scope» 로 등록한 일꾼이 받는다
        (scope 를 안 좁히면 /pureunall/ 을 차지하는 다른 앱의 일꾼이 밀어내 공유가 죽는다)
      ② 공유된 글(title·text·url)이 «말로 채우기» 창에 올라오고, 사람이 «읽어서 채우기»를 눌러야 읽는다 — 저장은 안 한다(옛 GET 설치분)
-     ★ 공유는 AI 를 «저절로» 부르지 않는다(2026-11-15 보안 검토) — 일꾼은 폰 공유와 남의 웹페이지가 몰래 보낸 전송을 못 가린다
+     ★ 공유는 AI 를 «저절로» 부르지 않는다 — 무엇을 바깥 AI 로 보낼지·AI 한도를 쓸지는 사람이 보고 누른다
      ③ 읽기 시작하면서 주소의 글·표를 지운다(새로고침이 같은 글을 또 AI 에 보내지 않게)
      ④ 공유와 상관없는 주소(출장 알림 등)는 건드리지 않는다
      ⑤ 공유 글 프롬프트는 «언제 받은 글인지 모른다»를 알리고 오늘 기준 계산을 check 로 남기게 한다 — 말 프롬프트는 그대로
@@ -54,7 +54,7 @@ test('① 화면이 일꾼을 «좁은 scope» 로 등록하고, 받는 주소�
   assert.ok(등록, '★ pu-cal.html 이 scope 를 준 일꾼 등록을 하지 않는다 — POST 공유를 받을 길이 없다');
   assert.ok(일꾼글, '등록한 일꾼 파일이 없다(배포하면 404): ' + (등록 && 등록.파일));
   const scope = new URL(등록.scope, 앱주소).href;
-  assert.notStrictEqual(scope, 앱주소, '★ scope 를 앱 뿌리(/pureunall/)로 두면 pu-sw.js·pu-erp-sw.js 와 자리를 다퉈 밀려난다');
+  assert.notStrictEqual(scope, 앱주소, '★ scope 를 앱 뿌리(/pureunall/)로 두면 통합 일꾼 pu-sw.js 와 자리를 다퉈 밀려난다');
   assert.ok(받는주소.startsWith(scope), '받는 주소(' + 받는주소 + ')가 일꾼 scope(' + scope + ') 밖이다 — 일꾼이 못 받는다');
   assert.ok(받는주소.startsWith(new URL(매니페스트.scope, 앱주소).href), '앱 범위 밖이면 공유 대상으로 안 뜬다');
   assert.ok(new URL(등록.파일, 앱주소).href.startsWith(앱주소), '일꾼 파일이 scope 보다 깊은 곳에 있으면 등록이 거절된다');
@@ -321,7 +321,7 @@ test('② 공유된 글(옛 GET 설치분)이 펼친 새 일정 창 + «말로 �
   assert.ok(t.b.S.cap.text.includes('가나상사 방문'), '받은 글이 칸에 올라와야 사람이 보고 고친다');
   assert.ok(!t.b.S.cap.busy && t.b.S.cap.msg, '읽는 중이 아니라 «눌러 주세요» 안내가 떠야 한다');
   await 기다림();
-  assert.strictEqual(t.기록.ai.length, 0, '★ 저절로 AI 를 부르면 남의 웹페이지가 우리 AI 한도를 쓰게 할 수 있다');
+  assert.strictEqual(t.기록.ai.length, 0, '★ 누르기 전에 AI 를 부르면 안 된다 — 바깥 AI 로 보낼지는 사람이 정한다');
   t.실행('캡처글읽기()');                 /* 사람이 «읽어서 채우기»를 누른다 */
   await 기다림();
   assert.strictEqual(t.기록.ai.length, 1);

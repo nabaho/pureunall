@@ -174,9 +174,13 @@ function 고르기무대(목록, opts) {
     rhDraftAll: function () { return 자리.slice(); },
     rhDraftPut: function (a) { 자리 = a; },
     rhDraftFind: function (id) { return 자리.filter(function (x) { return x.id === id; })[0] || null; },
-    kcTrashPut: function (store, page, rec, what) {
-      담긴것.push({ store: store, page: page, id: rec && rec.id, what: what });
-      return { tid: 'T' + 담긴것.length };
+    /* 여러 건을 «한 번에» 담는 길(kcTrashPutMany) — 호출 횟수도 센다(건마다 부르지 않는다) */
+    kcTrashPutMany: function (store, page, recs, what) {
+      ctx._담은횟수 = (ctx._담은횟수 || 0) + 1;
+      return recs.map(function (rec) {
+        담긴것.push({ store: store, page: page, id: rec && rec.id, what: what });
+        return { tid: 'T' + 담긴것.length };
+      });
     },
     rhDraftDraw: function () { ctx._다시그림 = (ctx._다시그림 || 0) + 1; },
     rhDraftCheck: function () { ctx._딱지 = (ctx._딱지 || 0) + 1; }

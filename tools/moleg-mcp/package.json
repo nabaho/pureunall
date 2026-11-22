@@ -1,0 +1,17 @@
+{
+  "name": "pureun-moleg-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "법제처 국가법령정보센터(law.go.kr) 및 중앙행정심판위원회·특별행정심판원·전 위원회 심판·재결 통합 공식 MCP 서버 (무인증 공식원문 SSR + LAW_OC Open API 자동 전환)",
+  "main": "server.js",
+  "bin": {
+    "pureun-moleg-mcp": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test server.test.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

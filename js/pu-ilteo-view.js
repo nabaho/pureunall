@@ -55,6 +55,8 @@
   var DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
   var UPLOAD_DOC_KIND = '';
   var POST_UPLOAD_DOC_KIND = '';
+  var SPLIT_REVIEW_OPEN = true;
+  var REVIEW_TAB = 'summary';
 
   function $(id) { return document.getElementById(id); }
   function str(v) { return v == null ? '' : String(v).trim(); }
@@ -129,7 +131,7 @@
       mailFolders: {}, mailMsgs: {}, mailOldMsgs: {}, flatMails: []
     };
     closeModal();
-    ['kpiBox', 'projectsBox', 'discoverBox', 'intakeBox', 'midBox', 'finalBox'].forEach(function (id) {
+    ['kpiBox', 'yearQuickBar', 'yearSummaryBar', 'projectsBox', 'projReviewBox', 'discoverBox', 'intakeBox', 'midBox', 'finalBox'].forEach(function (id) {
       var el = $(id);
       if (el) el.innerHTML = '';
     });
@@ -189,15 +191,51 @@
     draw();
   }
 
-  function activeProjects() {
-    return Object.keys(D.projects || {}).map(function (k) { return D.projects[k]; })
-      .filter(function (p) { return p && typeof p === 'object' && !p._deleted && p.id; })
-      .sort(function (a, b) { return (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)); });
+  function compareProjects(a, b, sortMode, scanMap) {
+    var mode = str(sortMode) || 'year_desc';
+    var ya = Number(a && a.year) || 0;
+    var yb = Number(b && b.year) || 0;
+    var sa = (scanMap && a && scanMap[a.id]) || {};
+    var sb = (scanMap && b && scanMap[b.id]) || {};
+    var ua = Number(sa.unseenPreCount || 0) + Number(sa.unseenPostCount || 0);
+    var ub = Number(sb.unseenPreCount || 0) + Number(sb.unseenPostCount || 0);
+
+    if (mode === 'year_asc') {
+      if (ya !== yb) return ya - yb;
+    } else if (mode === 'name_asc') {
+      var cmpName = str(a && a.companyName).localeCompare(str(b && b.companyName), 'ko');
+      if (cmpName !== 0) return cmpName;
+      if (yb !== ya) return yb - ya;
+    } else if (mode === 'updated_desc') {
+      var ta = Number(a && a.updatedAt) || 0;
+      var tb = Number(b && b.updatedAt) || 0;
+      if (tb !== ta) return tb - ta;
+      if (yb !== ya) return yb - ya;
+    } else {
+      /* 기본: 최신 연도순 (2026 → 2015), 동일 연도 내 미확인 메일 우선 → 상호 가나다순 */
+      if (yb !== ya) return yb - ya;
+      if (ub !== ua) return ub - ua;
+    }
+    var cmp = str(a && a.companyName).localeCompare(str(b && b.companyName), 'ko');
+    if (cmp !== 0) return cmp;
+    return str(a && a.id) < str(b && b.id) ? -1 : (str(a && a.id) > str(b && b.id) ? 1 : 0);
+  }
+
+  function sortProjects(list, sortMode, scanMap) {
+    return (Array.isArray(list) ? list.slice() : []).sort(function (a, b) {
+      return compareProjects(a, b, sortMode, scanMap);
+    });
+  }
+
+  function activeProjects(optSortMode) {
+    var raw = Object.keys(D.projects || {}).map(function (k) { return D.projects[k]; })
+      .filter(function (p) { return p && typeof p === 'object' && !p._deleted && p.id && isIlteoProject(p); });
+    return sortProjects(raw, optSortMode || 'year_desc', SCAN_CACHE);
   }
 
   function projectById(pid) {
     var p = D.projects && D.projects[pid];
-    return (p && !p._deleted) ? p : null;
+    return (p && !p._deleted && isIlteoProject(p)) ? p : null;
   }
 
   function schedRoundsForProject(proj) {
@@ -230,9 +268,11 @@
   }
 
   function isIlteoProject(proj) {
-    if (!proj) return true;
-    if (typeof proj.isIlteo === 'boolean') return proj.isIlteo;
+    if (!proj) return false;
+    if (proj.isIlteo === false) return false;
     var prog = str(proj.programName);
+    if (prog && Intake().isNonIlteoText && Intake().isNonIlteoText(prog)) return false;
+    if (typeof proj.isIlteo === 'boolean') return proj.isIlteo;
     if (!prog) return true;
     return /일터\s*혁신|일터\s*상생|상생\s*컨설팅/.test(prog);
   }
@@ -240,11 +280,14 @@
   function rebuildScanAndDiscover() {
     SCAN_CACHE = {};
     var projs = activeProjects();
-    var registeredCoIds = {};
+    var registeredKeys = {};
     projs.forEach(function (p) {
-      if (p.companyId) registeredCoIds[p.companyId] = p.id;
-      if (p.consultingId) registeredCoIds['cons:' + p.consultingId] = p.id;
-      if (p.scalCoId) registeredCoIds['scal:' + p.scalCoId] = p.id;
+      var yr = Number(p.year) || 2026;
+      if (p.companyId) registeredKeys['co:' + p.companyId + ':' + yr] = p.id;
+      if (p.consultingId) registeredKeys['cons:' + p.consultingId] = p.id;
+      if (p.scalCoId) registeredKeys['scal:' + p.scalCoId + ':' + yr] = p.id;
+      var pNorm = Intake().normalizeCorpName ? Intake().normalizeCorpName(p.companyName) : '';
+      if (pNorm) registeredKeys['norm:' + pNorm + ':' + yr] = p.id;
       SCAN_CACHE[p.id] = Intake().scanProjectMails(
         p, D.flatMails, null, D.companies, D.consultings, D.intake[p.id] || {}
       );
@@ -253,7 +296,7 @@
     if (!CUR_PID && projs.length) CUR_PID = projs[0].id;
     if (CUR_PID && !projectById(CUR_PID)) CUR_PID = projs[0] ? projs[0].id : '';
 
-    var cands = [], seenCo = {};
+    var cands = [], seenCoYear = {};
     var ilteoRe = /일터\s*혁신|일터\s*상생|상생\s*컨설팅/;
     var typeMap = {};
     Object.keys(D.scalTypes || {}).forEach(function (k) {
@@ -273,23 +316,36 @@
       if (!cs || cs._deleted) return;
       var bCode = str(cs.typeCode || cs.bizTypeId || cs.consultingTypeCode);
       var bName = str(cs.bizName || cs.typeName || cs.consultingType || bizTypeMap[bCode] || '');
-      if (!ilteoRe.test(bName)) return;
+      var csNo = str(cs.no);
+      var isPureIlteoCons = (
+        bCode === 'consulting-mozfisq7' ||
+        bCode === 'consulting-mp0wphau' ||
+        /^(?:일터상생|일터혁신|일터)-/.test(csNo) ||
+        (ilteoRe.test(bName) && !(Intake().isNonIlteoText && Intake().isNonIlteoText(bName)))
+      );
+      if (!isPureIlteoCons) return;
+      var yr = Number(String(cs.year || cs.contractDate || cs.startDate || '2026').slice(0, 4)) || 2026;
       var coObj = (cs.company && typeof cs.company === 'object') ? cs.company : {};
       var coId = str(cs.companyId || coObj.id) || (cs.id ? ('cons_' + safeKey(cs.id)) : '');
-      if (!coId || registeredCoIds[coId] || (cs.id && registeredCoIds['cons:' + cs.id]) || seenCo[coId]) return;
-      seenCo[coId] = 1;
       var coRec = findCompanyById(coId) || coObj;
+      var coNameStr = str(coRec.name || cs.companyName || cs.name || '사업장');
+      var cNorm = Intake().normalizeCorpName ? Intake().normalizeCorpName(coNameStr) : '';
+      var cyKey = coId + ':' + yr;
+      var normYrKey = cNorm ? ('norm:' + cNorm + ':' + yr) : '';
+      if (!coId || registeredKeys['co:' + cyKey] || (cs.id && registeredKeys['cons:' + cs.id]) || (normYrKey && registeredKeys[normYrKey]) || seenCoYear[cyKey] || (normYrKey && seenCoYear[normYrKey])) return;
+      seenCoYear[cyKey] = 1;
+      if (normYrKey) seenCoYear[normYrKey] = 1;
       cands.push({
-        candKey: 'erp_' + safeKey(coId),
+        candKey: 'erp_' + safeKey(coId) + '_' + yr,
         source: '이알피 컨설팅',
         companyId: coId,
         consultingId: str(cs.id),
-        companyName: str(coRec.name || cs.companyName || cs.name || '사업장'),
+        companyName: coNameStr,
         bizNo: str(coRec.bizNo || cs.bizNo),
         industry: str(coRec.bizType || coRec.bizCategory || cs.industry),
         contactEmail: firstEmailOf(coRec) || firstEmailOf(cs),
-        year: Number(String(cs.year || cs.contractDate || cs.startDate || '2026').slice(0, 4)) || 2026,
-        programName: bName || '일터혁신 상생컨설팅',
+        year: yr,
+        programName: '일터혁신 상생컨설팅',
         isIlteo: true,
         scalCoId: '',
         scalTypeId: ''
@@ -298,39 +354,51 @@
 
     Object.keys(D.scalCos || {}).forEach(function (sk) {
       var sc = D.scalCos[sk];
-      if (!sc || typeof sc !== 'object' || sc._deleted) return;
+      if (!sc || typeof sc !== 'object' || sc._deleted || sc.deleted || sc.mergedInto || sc.active === false) return;
       var scId = str(sc.id || sk);
       if (!scId) return;
       var rawTypes = Array.isArray(sc.types)
-        ? sc.types
-        : (sc.types && typeof sc.types === 'object' ? Object.keys(sc.types).map(function (tk) { return sc.types[tk]; }) : []);
-      if (sc.typeId) rawTypes.push(sc.typeId);
+        ? sc.types.map(str)
+        : (sc.types && typeof sc.types === 'object' ? Object.keys(sc.types).map(function (tk) { return str(sc.types[tk]); }) : []);
+      if (sc.typeId) rawTypes.push(str(sc.typeId));
+      var hasT1 = rawTypes.indexOf('t1') >= 0;
       var tNames = rawTypes.map(function (tid) { return typeMap[str(tid)] || ''; }).filter(Boolean);
       var joinedTypeNames = tNames.join(' ') + ' ' + str(sc.bizName || '');
       var hasIlteoSched = rowsOf(D.scalScheds).some(function (s) {
-        return s && s.coId === scId && ilteoRe.test(typeMap[s.typeId] || '');
+        return s && s.coId === scId && (s.typeId === 't1' || ilteoRe.test(typeMap[s.typeId] || ''));
       });
-      if (!ilteoRe.test(joinedTypeNames) && !hasIlteoSched) return;
+      if (!hasT1 && !ilteoRe.test(joinedTypeNames) && !hasIlteoSched) return;
+      var yr = Number(sc.year) || 2026;
       var matchedErpCo = matchErpCompanyStrict(sc);
       var targetCoId = matchedErpCo ? str(matchedErpCo.id) : ('scal_' + safeKey(scId));
-      if (registeredCoIds[targetCoId] || registeredCoIds['scal:' + scId] || seenCo[targetCoId]) return;
-      seenCo[targetCoId] = 1;
+      var scNameStr = str((matchedErpCo && matchedErpCo.name) || sc.name);
+      var sNorm = Intake().normalizeCorpName ? Intake().normalizeCorpName(scNameStr) : '';
+      var cyKey = targetCoId + ':' + yr;
+      var normYrKey = sNorm ? ('norm:' + sNorm + ':' + yr) : '';
+      if (registeredKeys['co:' + cyKey] || registeredKeys['scal:' + scId + ':' + yr] || (normYrKey && registeredKeys[normYrKey]) || seenCoYear[cyKey] || (normYrKey && seenCoYear[normYrKey])) return;
+      seenCoYear[cyKey] = 1;
+      if (normYrKey) seenCoYear[normYrKey] = 1;
       cands.push({
-        candKey: 'scal_' + safeKey(targetCoId),
+        candKey: 'scal_' + safeKey(targetCoId) + '_' + yr,
         source: '정부사업일정',
         companyId: targetCoId,
-        companyName: str((matchedErpCo && matchedErpCo.name) || sc.name),
+        companyName: scNameStr,
         bizNo: str((matchedErpCo && matchedErpCo.bizNo) || sc.bizNo),
         industry: str((matchedErpCo && (matchedErpCo.bizType || matchedErpCo.bizCategory)) || sc.industry),
         contactEmail: firstEmailOf(matchedErpCo) || firstEmailOf(sc),
-        year: Number(sc.year) || 2026,
+        year: yr,
         programName: '일터혁신 상생컨설팅',
         isIlteo: true,
         scalCoId: scId,
-        scalTypeId: str(rawTypes[0] || sc.typeId || 't1')
+        scalTypeId: hasT1 ? 't1' : str(rawTypes[0] || sc.typeId || 't1')
       });
     });
 
+    cands.sort(function (a, b) {
+      var yd = (Number(b.year) || 0) - (Number(a.year) || 0);
+      if (yd !== 0) return yd;
+      return str(a.companyName).localeCompare(str(b.companyName), 'ko');
+    });
     DISCOVER_LIST = cands;
   }
 
@@ -596,20 +664,103 @@
     return out;
   }
 
+  function safeYearNum(v) {
+    var n = Math.floor(Number(v));
+    return (isFinite(n) && n >= 1990 && n <= 2100) ? n : 2026;
+  }
+
+  function hasMidStored(p) {
+    if (!p) return false;
+    return !!(p.midConfirmedAt || (D.mid[p.id] && !D.mid[p.id]._deleted && D.mid[p.id].sections));
+  }
+  function hasFinalStored(p) {
+    if (!p) return false;
+    return !!(p.finalConfirmedAt || (D.final[p.id] && !D.final[p.id]._deleted && D.final[p.id].sections));
+  }
+
+  function summarizeByYear(projs) {
+    var map = Object.create(null);
+    (Array.isArray(projs) ? projs : []).forEach(function (p) {
+      if (!p || typeof p !== 'object') return;
+      var y = String(safeYearNum(p.year));
+      if (!map[y]) {
+        map[y] = { year: y, count: 0, cardCount: 0, midCount: 0, finalCount: 0, taskCounts: Object.create(null), projects: [] };
+      }
+      var g = map[y];
+      g.count++;
+      g.projects.push(p);
+      g.cardCount += activeIntakeCount(p.id);
+      if (hasMidStored(p)) g.midCount++;
+      if (hasFinalStored(p)) g.finalCount++;
+      resolveTaskNames(p.selectedTasks).forEach(function (tn) {
+        g.taskCounts[tn] = (g.taskCounts[tn] || 0) + 1;
+      });
+    });
+    return Object.keys(map).sort(function (a, b) { return Number(b) - Number(a); }).map(function (y) {
+      var g = map[y];
+      g.projects = sortProjects(g.projects, 'year_desc', SCAN_CACHE);
+      g.topTasks = Object.keys(g.taskCounts)
+        .sort(function (a, b) { return g.taskCounts[b] - g.taskCounts[a]; })
+        .slice(0, 3)
+        .map(function (tn) { return tn + '(' + g.taskCounts[tn] + ')'; });
+      return g;
+    });
+  }
+
+  function currentFilteredProjects() {
+    var sortMode = str($('projSort') && $('projSort').value) || 'year_desc';
+    var projs = activeProjects(sortMode);
+    var q = str($('projQ') && $('projQ').value).toLowerCase();
+    var yr = str($('projYear') && $('projYear').value);
+    var stFilter = str($('projStage') && $('projStage').value);
+
+    return projs.filter(function (p) {
+      if (yr && String(safeYearNum(p.year)) !== yr) return false;
+      var sc = SCAN_CACHE[p.id] || { unseenPreCount: 0, unseenPostCount: 0 };
+      if (stFilter === 'pre_mid' && p.midConfirmedAt) return false;
+      if (stFilter === 'post_mid' && !p.midConfirmedAt) return false;
+      if (stFilter === 'unseen' && (sc.unseenPreCount + sc.unseenPostCount) === 0) return false;
+      if (q) {
+        var taskStr = resolveTaskNames(p.selectedTasks).join(' ');
+        var hay = (str(p.companyName) + ' ' + String(safeYearNum(p.year)) + ' ' + str(p.industry) + ' ' + str(p.consultantName) + ' ' + taskStr).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
   function projectHeaderBarHtml(proj) {
-    var projs = activeProjects();
+    var projs = activeProjects('year_desc');
+    var navList = currentFilteredProjects();
+    if (!navList.length || !navList.some(function (x) { return x.id === proj.id; })) {
+      navList = projs;
+    }
+    var navIdx = navList.findIndex(function (x) { return x.id === proj.id; });
     var lv = Cat().getLevel(proj.level);
     var tasks = resolveTaskNames(proj.selectedTasks);
     var curOrder = proj.finalConfirmedAt ? 6 : (proj.midConfirmedAt ? 4 : (activeIntakeCount(proj.id) ? 2 : 1));
 
-    var opts = projs.map(function (p) {
-      return '<option value="' + esc(p.id) + '"' + (p.id === proj.id ? ' selected' : '') + '>' + esc(p.companyName + ' (' + (p.year || 2026) + ')') + '</option>';
+    var yearGroups = summarizeByYear(projs);
+    var opts = yearGroups.map(function (yg) {
+      var groupItems = yg.projects.map(function (p) {
+        return '<option value="' + esc(p.id) + '"' + (p.id === proj.id ? ' selected' : '') + '>[' + esc(yg.year + '년') + '] ' + esc(p.companyName) + '</option>';
+      }).join('');
+      return '<optgroup label="' + esc(yg.year + '년 (' + yg.count + '건)') + '">' + groupItems + '</optgroup>';
     }).join('');
 
     var progTag = str(proj.programName);
     return '<div class="card">' +
       '<div class="prof">' +
+      '<button class="sm" data-goto-tab="projects" title="사업장 목록 · 연도별 검토 화면으로 이동">📂 목록·연도검토</button>' +
       '<span><b>대상 사업장</b><select data-proj-sel="1" aria-label="작업 사업장 전환">' + opts + '</select></span>' +
+      (navList.length > 1
+        ? '<span style="display:inline-flex;align-items:center;gap:4px">' +
+            '<button class="sm" data-step-proj="-1" aria-label="이전 사업장">◀ 이전</button>' +
+            '<span class="chip">' + (navIdx + 1) + ' / ' + navList.length + '</span>' +
+            '<button class="sm" data-step-proj="1" aria-label="다음 사업장">다음 ▶</button>' +
+          '</span>'
+        : '') +
+      '<span><b>수행연도</b><span class="chip c-blue">' + esc(safeYearNum(proj.year) + '년') + '</span></span>' +
       (progTag ? '<span><b>사업구분</b><span class="chip ' + (isIlteoProject(proj) ? 'c-blue' : '') + '">' + esc(progTag) + '</span></span>' : '') +
       '<span><b>수준</b><span class="chip c-blue">' + esc(lv.name) + '</span></span>' +
       '<span title="' + esc(tasks.join(', ')) + '"><b>개선과제</b>' + esc(tasks.join(' · ') || '미선택') + '</span>' +
@@ -629,37 +780,101 @@
       '</div></div>';
   }
 
-  /* ── 탭 1: 사업장 현황 · 메일 감지 ── */
+  /* ── 탭 1: 사업장 현황 · 메일 감지 · 연도별 필터 및 좌우 즉시 검토 ── */
   function drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen) {
-    var ilteoOnlyCnt = projs.filter(isIlteoProject).length;
+    var yearGroups = summarizeByYear(projs);
+    var finDoneCnt = projs.filter(function (p) {
+      return !!(p.finalConfirmedAt || (D.final[p.id] && !D.final[p.id]._deleted && D.final[p.id].sections));
+    }).length;
+    var midStoredCnt = projs.filter(function (p) {
+      return !!(p.midConfirmedAt || (D.mid[p.id] && !D.mid[p.id]._deleted && D.mid[p.id].sections));
+    }).length;
+
     if ($('kpiBox')) {
+      var minYr = yearGroups.length ? yearGroups[yearGroups.length - 1].year : '2026';
+      var maxYr = yearGroups.length ? yearGroups[0].year : '2026';
       $('kpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>등록 컨설팅 사업장 (일터혁신 ' + ilteoOnlyCnt + ')</span><b>' + projs.length + '개사</b></div>' +
+        '<div class="kpi k-blue"><span>일터혁신 컨설팅 (' + esc(maxYr + '~' + minYr + '년') + ')</span><b>' + projs.length + '건 (' + yearGroups.length + '개 연도)</b></div>' +
+        '<div class="kpi k-green"><span>📌 중간·최종보고서 수록</span><b>중간 ' + midStoredCnt + ' · 최종 ' + finDoneCnt + '건</b></div>' +
         '<div class="kpi k-amber"><span>📩 기초자료 메일 미확인</span><b>' + totalPreUnseen + '건</b></div>' +
-        '<div class="kpi k-green"><span>📌 중간·결과보고 수록 완료</span><b>' + midDoneCnt + '개사</b></div>' +
         '<div class="kpi k-blue"><span>📬 후속·결과 메일 미확인</span><b>' + totalPostUnseen + '건</b></div>';
     }
 
-    var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var progFilter = str($('projProg') && $('projProg').value);
-    var yr = str($('projYear') && $('projYear').value);
-    var stFilter = str($('projStage') && $('projStage').value);
+    var yrSel = $('projYear');
+    var curYrVal = str(yrSel && yrSel.value);
+    var yrCountMap = Object.create(null);
+    yearGroups.forEach(function (yg) { yrCountMap[yg.year] = yg.count; });
 
-    var filtered = projs.filter(function (p) {
-      if (progFilter === 'ilteo' && !isIlteoProject(p)) return false;
-      if (progFilter === 'other' && isIlteoProject(p)) return false;
-      if (yr && String(p.year || '') !== yr) return false;
-      var sc = SCAN_CACHE[p.id] || { unseenPreCount: 0, unseenPostCount: 0 };
-      if (stFilter === 'pre_mid' && p.midConfirmedAt) return false;
-      if (stFilter === 'post_mid' && !p.midConfirmedAt) return false;
-      if (stFilter === 'unseen' && (sc.unseenPreCount + sc.unseenPostCount) === 0) return false;
-      if (q) {
-        var taskStr = resolveTaskNames(p.selectedTasks).join(' ');
-        var hay = (str(p.companyName) + ' ' + str(p.programName) + ' ' + str(p.industry) + ' ' + str(p.consultantName) + ' ' + taskStr).toLowerCase();
-        if (hay.indexOf(q) < 0) return false;
-      }
-      return true;
-    });
+    if (yrSel) {
+      var yrMap = Object.create(null);
+      for (var y = 2026; y >= 2015; y--) yrMap[String(y)] = 1;
+      projs.forEach(function (p) { yrMap[String(safeYearNum(p.year))] = 1; });
+      var sortedYrs = Object.keys(yrMap).sort(function (a, b) { return Number(b) - Number(a); });
+      yrSel.innerHTML = '<option value="">연도 전체 (' + projs.length + '건)</option>' + sortedYrs.map(function (yv) {
+        var cnt = yrCountMap[yv] || 0;
+        return '<option value="' + esc(yv) + '"' + (yv === curYrVal ? ' selected' : '') + '>' + esc(yv) + '년 (' + cnt + '건)</option>';
+      }).join('');
+    }
+
+    if ($('yearQuickBar')) {
+      var pillsHtml = '<span class="yr-lbl">📅 연도별 필터·검토</span>' +
+        '<button type="button" class="yr-pill' + (!curYrVal ? ' on' : '') + '" data-yr-pick="" aria-pressed="' + (!curYrVal ? 'true' : 'false') + '">전체 <span>' + projs.length + '</span></button>' +
+        yearGroups.map(function (yg) {
+          var isOn = yg.year === curYrVal;
+          return '<button type="button" class="yr-pill' + (isOn ? ' on' : '') + '" data-yr-pick="' + esc(yg.year) + '" aria-pressed="' + (isOn ? 'true' : 'false') + '">' +
+            esc(yg.year) + '년 <span>' + yg.count + '</span></button>';
+        }).join('');
+      $('yearQuickBar').innerHTML = pillsHtml;
+    }
+
+    var splitWrap = $('projSplitWrap');
+    var reviewWrap = $('projReviewWrap');
+    var toggleBtn = $('toggleSplitBtn');
+    if (splitWrap) splitWrap.classList.toggle('split-on', SPLIT_REVIEW_OPEN);
+    if (reviewWrap) reviewWrap.style.display = SPLIT_REVIEW_OPEN ? '' : 'none';
+    if (toggleBtn) {
+      toggleBtn.textContent = SPLIT_REVIEW_OPEN ? '📐 검토창 접기' : '📐 검토창 펴기';
+      toggleBtn.setAttribute('aria-expanded', SPLIT_REVIEW_OPEN ? 'true' : 'false');
+    }
+
+    var filtered = currentFilteredProjects();
+    var yr = curYrVal;
+
+    if ($('yearSummaryBar')) {
+      var sumCardCnt = 0, sumMidCnt = 0, sumFinCnt = 0, sumTasks = Object.create(null);
+      filtered.forEach(function (p) {
+        sumCardCnt += activeIntakeCount(p.id);
+        if (hasMidStored(p)) sumMidCnt++;
+        if (hasFinalStored(p)) sumFinCnt++;
+        resolveTaskNames(p.selectedTasks).forEach(function (tn) { sumTasks[tn] = (sumTasks[tn] || 0) + 1; });
+      });
+      var topTaskTxt = Object.keys(sumTasks)
+        .sort(function (a, b) { return sumTasks[b] - sumTasks[a]; })
+        .slice(0, 2)
+        .map(function (tn) { return tn + '(' + sumTasks[tn] + ')'; })
+        .join(' · ');
+
+      $('yearSummaryBar').innerHTML = '<div class="yr-sum">' +
+        '<span><b>' + (yr ? esc(yr + '년 수행분 검토') : '전체 연도(최신순) 검토') + '</b> · 대상 <b>' + filtered.length + '건</b></span>' +
+        '<span>수집·원문 자료 <b>' + sumCardCnt + '건</b></span>' +
+        '<span>중간보고 수록 <b>' + sumMidCnt + '/' + filtered.length + '건</b></span>' +
+        '<span>최종보고 수록 <b>' + sumFinCnt + '/' + filtered.length + '건</b></span>' +
+        (topTaskTxt ? '<span>주요 과제: ' + esc(topTaskTxt) + '</span>' : '') +
+        '<span class="sp"></span>' +
+        '<span style="display:inline-flex;gap:5px;align-items:center;flex-wrap:wrap">' +
+        (yearGroups.length > 1
+          ? '<button type="button" class="sm" data-step-year="-1" title="더 최근 연도로 이동">◀ 최신 연도</button>' +
+            '<button type="button" class="sm" data-step-year="1" title="이전(과거) 연도로 이동">과거 연도 ▶</button>'
+          : '') +
+        (yr ? '<button type="button" class="sm" data-yr-pick="">전체 연도 보기</button>' : '') +
+        '</span>' +
+        '</div>';
+    }
+
+    var activeRvProj = filtered.length
+      ? ((CUR_PID && filtered.find(function (x) { return x.id === CUR_PID; })) || filtered[0])
+      : null;
+    var highlightPid = activeRvProj ? activeRvProj.id : '';
 
     var rows = filtered.map(function (p) {
       var sc = SCAN_CACHE[p.id] || { matched: [], unseenPreCount: 0, unseenPostCount: 0, totalInCount: 0 };
@@ -667,33 +882,31 @@
       var lv = Cat().getLevel(p.level);
       var taskNames = resolveTaskNames(p.selectedTasks).join(' · ');
       var cardCnt = activeIntakeCount(p.id);
-      var hasMid = !!(D.mid[p.id] && D.mid[p.id].sections);
-      var hasFin = !!(D.final[p.id] && D.final[p.id].sections);
+      var hasMid = hasMidStored(p);
+      var hasFin = hasFinalStored(p);
 
       var mailBadges = [];
-      if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber">📩 기초 미확인 ' + sc.unseenPreCount + '</span>');
-      if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green">📬 후속 미확인 ' + sc.unseenPostCount + '</span>');
+      if (sc.unseenPreCount > 0) mailBadges.push('<span class="chip c-amber">📩 기초 ' + sc.unseenPreCount + '</span>');
+      if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green">📬 후속 ' + sc.unseenPostCount + '</span>');
       if (cardCnt > 0) mailBadges.push('<span class="chip c-blue">자료 ' + cardCnt + '건</span>');
+      else if (chkPre.pct > 0) mailBadges.push('<span class="chip">기초 ' + chkPre.pct + '%</span>');
       if (hasMid || hasFin) mailBadges.push('<span class="chip c-green">' + (hasMid && hasFin ? '중간·최종✓' : (hasFin ? '최종✓' : '중간✓')) + '</span>');
-      if (!mailBadges.length) mailBadges.push('<span class="chip">수신 ' + (sc.totalInCount || 0) + '건</span>');
-
-      var progShort = isIlteoProject(p)
-        ? '<span class="chip c-blue">일터혁신</span>'
-        : '<span class="chip">' + esc(str(p.programName || '컨설팅').slice(0, 10)) + '</span>';
+      if (!mailBadges.length) mailBadges.push('<span class="chip">기초 ' + chkPre.pct + '%</span>');
 
       return {
         id: p.id,
         cells: [
-          { cls: 'ti', title: p.companyName + (p.programName ? ' (' + p.programName + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc((p.year || 2026) + '년') + '</span> ' + progShort },
+          { cls: 'yr-col', k: 'yr', html: '<span class="chip c-blue">' + esc(safeYearNum(p.year) + '년') + '</span>' },
+          { cls: 'ti', title: p.companyName + ' (' + safeYearNum(p.year) + '년 일터혁신 상생컨설팅)', html: esc(p.companyName) },
           { k: 'badge', html: '<span class="chip c-blue">' + esc(lv.short) + '</span> ' + stageDotsHtml(p) },
           { cls: 'wide', title: taskNames, html: esc(taskNames || '과제 선택 필요') },
-          { html: '기초자료 <b>' + chkPre.pct + '%</b> (' + chkPre.requiredDone + '/' + chkPre.requiredTotal + ')' },
           { html: mailBadges.join(' ') },
           {
             k: 'act',
-            html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초체크</button>' +
-              '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간보고</button>' +
-              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 결과·산출물</button>'
+            html: '<button class="sm" data-select-proj="' + esc(p.id) + '" title="우측 검토 패널에서 보고서와 수집자료를 바로 검토합니다">검토</button>' +
+              '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초</button>' +
+              '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간</button>' +
+              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 결과</button>'
           }
         ]
       };
@@ -701,9 +914,11 @@
 
     if ($('projectsBox')) {
       $('projectsBox').innerHTML = renderTable('projects',
-        ['사업장명', '단계', '선택 개선과제', '기초자료 충족', '메일 체크 상태', '작업 열기'],
-        rows, CUR_PID);
+        ['연도', '사업장명', '단계', '선택 개선과제', '자료 · 보고서 현황', '검토 · 작업 열기'],
+        rows, highlightPid);
     }
+
+    drawProjectReviewPanel(activeRvProj, filtered);
 
     if ($('discoverCard')) {
       $('discoverCard').style.display = DISCOVER_LIST.length ? '' : 'none';
@@ -713,6 +928,7 @@
         return {
           id: c.candKey,
           cells: [
+            { cls: 'yr-col', k: 'yr', html: '<span class="chip c-blue">' + esc((c.year || 2026) + '년') + '</span>' },
             { cls: 'ti', title: c.companyName, html: esc(c.companyName) },
             { k: 'badge', html: '<span class="chip c-blue">' + esc(c.source) + '</span>' },
             { html: esc(c.bizNo || '-') },
@@ -721,8 +937,159 @@
           ]
         };
       });
-      $('discoverBox').innerHTML = renderTable('discover', ['사업장명', '출처', '사업자번호', '등록 이메일', '활성화'], dRows, '');
+      $('discoverBox').innerHTML = renderTable('discover', ['연도', '사업장명', '출처', '사업자번호', '등록 이메일', '활성화'], dRows, '');
     }
+  }
+
+  function buildReviewPanelHtml(rvProj, navList) {
+    if (!rvProj) {
+      return '<div class="sec"><span>🔎 연도별 · 사업장 즉시 검토</span></div>' +
+        '<div class="empty">조건에 맞는 일터혁신 사업장이 없습니다. 연도 필터를 변경하거나 사업장을 선택해 주세요.</div>';
+    }
+
+    var list = (Array.isArray(navList) && navList.length) ? navList : [rvProj];
+    var idx = list.findIndex(function (x) { return x.id === rvProj.id; });
+    if (idx < 0) idx = 0;
+
+    var lv = Cat().getLevel(rvProj.level);
+    var tasks = resolveTaskNames(rvProj.selectedTasks);
+    var schedRds = schedRoundsForProject(rvProj);
+    var savedMid = (D.mid[rvProj.id] && !D.mid[rvProj.id]._deleted) ? D.mid[rvProj.id] : null;
+    var computedMid = Report().buildMidReport(rvProj, D.intake[rvProj.id] || {}, schedRds, savedMid);
+    var midSecs = (savedMid && savedMid.sections) ? Object.assign({}, computedMid.sections, savedMid.sections) : computedMid.sections;
+
+    var savedFin = (D.final[rvProj.id] && !D.final[rvProj.id]._deleted) ? D.final[rvProj.id] : null;
+    var computedFin = Report().buildFinalReport(rvProj, computedMid, D.intake[rvProj.id] || {}, schedRds, savedFin);
+    var finSecs = (savedFin && savedFin.sections) ? Object.assign({}, computedFin.sections, savedFin.sections) : computedFin.sections;
+
+    var allCards = Object.keys(D.intake[rvProj.id] || {}).map(function (k) { return D.intake[rvProj.id][k]; })
+      .filter(function (c) { return c && !c._deleted; })
+      .sort(function (a, b) {
+        return Number(b.checkedAt || b.analyzedAt || b.updatedAt || 0) - Number(a.checkedAt || a.analyzedAt || a.updatedAt || 0);
+      });
+
+    var wcRaw = Number(rvProj.workerCount);
+    var wcSafe = (isFinite(wcRaw) && wcRaw > 0) ? Math.floor(wcRaw) : 0;
+
+    var bodyHtml = '';
+    if (REVIEW_TAB === 'mid') {
+      bodyHtml = Cat().MID_SECTIONS.map(function (s, sIdx) {
+        var val = str(midSecs[s.key]) || '(수록 내용 없음)';
+        return '<div class="rv-sec">' +
+          '<div class="rv-sec-hd"><span class="chip c-blue">' + (sIdx + 1) + '절 · ' + esc(s.part) + '</span><b>' + esc(s.title) + '</b></div>' +
+          '<div class="rv-sec-txt">' + esc(val) + '</div>' +
+          '</div>';
+      }).join('');
+    } else if (REVIEW_TAB === 'final') {
+      bodyHtml = Cat().FINAL_SECTIONS.map(function (s, sIdx) {
+        var val = str(finSecs[s.key]) || '(수록 내용 없음)';
+        return '<div class="rv-sec">' +
+          '<div class="rv-sec-hd"><span class="chip c-green">' + (sIdx + 1) + '절 · ' + esc(s.part) + '</span><b>' + esc(s.title) + '</b></div>' +
+          '<div class="rv-sec-txt">' + esc(val) + '</div>' +
+          '</div>';
+      }).join('');
+    } else {
+      var cardsListHtml = allCards.length
+        ? allCards.slice(0, 15).map(function (c) {
+            var dk = Cat().getDocKind(c.docKind) || { short: c.docKind };
+            var sumLine = (Array.isArray(c.summaryLines) && c.summaryLines.length)
+              ? c.summaryLines.slice(0, 2).join('\n')
+              : str(c.maskedExcerpt).slice(0, 180);
+            var srcLabel = c.source === 'archive_folder' ? '전용폴더' : (c.source === 'rules_library' ? '규정서고' : '메일·첨부');
+            return '<div class="rv-sec">' +
+              '<div class="rv-sec-hd">' +
+              '<span class="chip ' + (c.phase === 'post_mid' ? 'c-green' : 'c-blue') + '">' + esc(dk.short) + '</span>' +
+              '<span class="chip">' + esc(srcLabel) + '</span>' +
+              '<span style="flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(c.title || dk.short) + '">' + esc(c.title || dk.short) + '</span>' +
+              '<button type="button" class="sm" data-view-proj-card="' + esc(rvProj.id + '|' + c.id) + '">원문보기</button>' +
+              '</div>' +
+              (sumLine ? '<div class="rv-sec-txt">' + esc(sumLine) + '</div>' : '') +
+              '</div>';
+          }).join('')
+        : '<div class="empty">수집된 비식별 자료 카드가 아직 없습니다. [① 기초체크] 탭에서 메일 확인 또는 파일을 끌어다 놓으세요.</div>';
+
+      bodyHtml =
+        '<div class="rv-sec">' +
+        '<div class="rv-sec-hd"><span class="chip c-blue">' + esc((Number(rvProj.year) || 2026) + '년 수행 개요') + '</span><b>' + esc(rvProj.companyName) + '</b></div>' +
+        '<div class="rv-sec-txt">' +
+        '• 업종 / 규모: ' + esc(rvProj.industry || '제조·서비스업') + (wcSafe ? ' (상시 ' + esc(String(wcSafe)) + '명)' : '') + ' · 수준: ' + esc(lv.name) + '\n' +
+        '• 선정 개선과제: ' + esc(tasks.join(' · ') || '미선택') + '\n' +
+        '• 보고서 수록: ' + (hasMidStored(rvProj) ? '중간보고서 수록✓' : '중간보고 자동초안') + ' / ' + (hasFinalStored(rvProj) ? '최종결과보고서 수록✓' : '최종보고 미확정(진행중)') +
+        '</div></div>' +
+        cardsListHtml;
+    }
+
+    return '<div class="sec">' +
+      '<span class="chip c-blue">' + esc((Number(rvProj.year) || 2026) + '년') + '</span>' +
+      '<span style="flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(rvProj.companyName) + '">🔎 ' + esc(rvProj.companyName) + '</span>' +
+      '<span class="chip">' + (idx + 1) + ' / ' + list.length + '</span>' +
+      '<button type="button" class="sm" data-step-proj="-1" data-base-pid="' + esc(rvProj.id) + '" aria-label="이전 사업장 검토">◀ 이전</button>' +
+      '<button type="button" class="sm" data-step-proj="1" data-base-pid="' + esc(rvProj.id) + '" aria-label="다음 사업장 검토">다음 ▶</button>' +
+      '</div>' +
+      '<div class="bar">' +
+      '<button type="button" class="sm" data-open-proj="' + esc(rvProj.id) + '" data-open-tab="intake">① 기초체크</button>' +
+      '<button type="button" class="sm" data-open-proj="' + esc(rvProj.id) + '" data-open-tab="mid">② 중간편집</button>' +
+      '<button type="button" class="sm pri" data-open-proj="' + esc(rvProj.id) + '" data-open-tab="final">③ 최종·산출물</button>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm ok" data-rv-dl="mid:' + esc(rvProj.id) + '">📊 중간PPT</button>' +
+      '<button type="button" class="sm ok" data-rv-dl="final:' + esc(rvProj.id) + '">📊 결과PPT</button>' +
+      '</div>' +
+      '<div class="rv-subtabs" role="group" aria-label="검토 보기 전환">' +
+      '<button type="button" class="rv-tab' + (REVIEW_TAB === 'summary' ? ' on' : '') + '" data-rv-tab="summary" aria-pressed="' + (REVIEW_TAB === 'summary' ? 'true' : 'false') + '">📋 요약·수집자료 (' + allCards.length + ')</button>' +
+      '<button type="button" class="rv-tab' + (REVIEW_TAB === 'mid' ? ' on' : '') + '" data-rv-tab="mid" aria-pressed="' + (REVIEW_TAB === 'mid' ? 'true' : 'false') + '">📊 중간보고서 전문</button>' +
+      '<button type="button" class="rv-tab' + (REVIEW_TAB === 'final' ? ' on' : '') + '" data-rv-tab="final" aria-pressed="' + (REVIEW_TAB === 'final' ? 'true' : 'false') + '">📑 최종보고서 전문</button>' +
+      '</div>' +
+      '<div class="rv-body">' + bodyHtml + '</div>';
+  }
+
+  function drawProjectReviewPanel(rvProj, navList) {
+    var box = $('projReviewBox');
+    if (!box) return;
+    if (!SPLIT_REVIEW_OPEN) {
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = buildReviewPanelHtml(rvProj, navList);
+  }
+
+  function openYearReviewModal() {
+    var projs = activeProjects('year_desc');
+    var groups = summarizeByYear(projs);
+    var totalCards = groups.reduce(function (s, g) { return s + g.cardCount; }, 0);
+    var totalMid = groups.reduce(function (s, g) { return s + g.midCount; }, 0);
+    var totalFin = groups.reduce(function (s, g) { return s + g.finalCount; }, 0);
+
+    var trs = groups.map(function (g, idx) {
+      var coPreview = g.projects.map(function (p) { return p.companyName; }).join(', ');
+      return '<tr>' +
+        '<td class="n">' + (idx + 1) + '</td>' +
+        '<td class="yr-col"><span class="chip c-blue">' + esc(g.year + '년') + '</span></td>' +
+        '<td><b>' + g.count + '개 사업장</b></td>' +
+        '<td class="wide" title="' + esc(coPreview) + '">' + esc(coPreview) + '</td>' +
+        '<td>자료 <b>' + g.cardCount + '건</b></td>' +
+        '<td><span class="chip c-green">중간 ' + g.midCount + ' · 최종 ' + g.finalCount + '</span></td>' +
+        '<td title="' + esc(g.topTasks.join(' · ')) + '">' + esc(g.topTasks.join(' · ') || '-') + '</td>' +
+        '<td data-k="act"><button type="button" class="sm pri" data-modal-yr-pick="' + esc(g.year) + '">이 연도 검토 →</button></td>' +
+        '</tr>';
+    }).join('');
+
+    var body =
+      '<div class="note">노사발전재단 일터혁신 컨설팅 전 연도 수행 이력을 <b>최신 연도순(내림차순)</b>으로 집계한 총괄 검토표입니다. <b>[이 연도 검토 →]</b>를 누르면 해당 연도로 필터링되어 사업장별 기초자료·중간보고서·최종보고서를 차례대로 검토할 수 있습니다.</div>' +
+      '<div class="yr-sum" style="margin-bottom:10px;border-radius:8px;border:1px solid var(--blue-line)">' +
+      '<span>총 수행 사업장 <b>' + projs.length + '건</b> (' + groups.length + '개 연도)</span>' +
+      '<span>비식별 수집·원문 카드 <b>' + totalCards + '건</b></span>' +
+      '<span>중간보고서 수록 <b>' + totalMid + '건</b></span>' +
+      '<span>최종보고서 수록 <b>' + totalFin + '건</b></span>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="sm" data-modal-yr-pick="">전체 연도 보기</button>' +
+      '</div>' +
+      '<div class="scroll"><table class="t resp-plain">' +
+      '<thead><tr><th class="n">번호</th><th>연도</th><th>건수</th><th>수행 사업장 목록</th><th>수집자료</th><th>보고서 수록</th><th>주요 개선과제</th><th>연도 필터</th></tr></thead>' +
+      '<tbody>' + (trs || '<tr><td colspan="8" class="empty">수록된 일터혁신 이력이 없습니다.</td></tr>') + '</tbody>' +
+      '</table></div>';
+
+    openModal('📑 노사발전재단 일터혁신 연도별 수행 · 보고서 종합 검토 (' + (groups[0] ? groups[0].year : '2026') + '~' + (groups[groups.length - 1] ? groups[groups.length - 1].year : '2015') + '년)', body,
+      '<button class="sm" data-close-modal="1">닫기</button>', 'xwide');
   }
 
   function statusBadgeForChecklist(it) {
@@ -807,7 +1174,9 @@
 
     var preCards = Object.keys(D.intake[proj.id] || {}).map(function (k) { return D.intake[proj.id][k]; })
       .filter(function (c) { return c && !c._deleted && (c.phase || 'pre_mid') === 'pre_mid'; })
-      .sort(function (a, b) { return (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)); });
+      .sort(function (a, b) {
+        return Number(b.checkedAt || b.analyzedAt || b.updatedAt || 0) - Number(a.checkedAt || a.analyzedAt || a.updatedAt || 0);
+      });
 
     var cardRows = preCards.map(function (c) {
       var dk = Cat().getDocKind(c.docKind) || { short: c.docKind };
@@ -861,8 +1230,8 @@
       '</div>' +
       '<div class="drop-zone" id="preDropZone" tabindex="0" role="button" aria-label="기초자료 파일 선택 또는 끌어놓기">' +
       '<b>📂 여기에 취업규칙·임금대장·근태기록·인력현황·EOS설문·중간보고서 파일을 끌어다 놓거나 클릭하세요</b>' +
-      '<span>지원 형식: .xlsx · .xls · .csv (브라우저 내 비식별 통계만 집계, 원본 성명·주민번호 폐기) / .pptx · .hwpx · .hwp · .docx · .pdf · .txt (2중 가림 분석)</span>' +
-      '<input type="file" id="preFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.hwpx,.hwp,.docx,.pdf,.txt" style="display:none">' +
+      '<span>지원 형식: .xlsx · .xls · .csv (브라우저 내 비식별 통계만 집계, 원본 성명·주민번호 폐기) / .pptx · .pptm · .ppsx · .hwpx · .hwp · .docx · .pdf · .txt (2중 가림 분석)</span>' +
+      '<input type="file" id="preFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.pptm,.ppsx,.hwpx,.hwp,.docx,.pdf,.txt" style="display:none">' +
       '</div>' +
       '</div>' +
 
@@ -1057,7 +1426,9 @@
 
     var postCards = Object.keys(D.intake[proj.id] || {}).map(function (k) { return D.intake[proj.id][k]; })
       .filter(function (c) { return c && !c._deleted && c.phase === 'post_mid'; })
-      .sort(function (a, b) { return (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)); });
+      .sort(function (a, b) {
+        return Number(b.checkedAt || b.analyzedAt || b.updatedAt || 0) - Number(a.checkedAt || a.analyzedAt || a.updatedAt || 0);
+      });
 
     var postCardRows = postCards.map(function (c) {
       var dk = Cat().getDocKind(c.docKind) || { short: c.docKind };
@@ -1138,7 +1509,7 @@
       '<div class="drop-zone" id="postDropZone" tabindex="0" role="button" aria-label="후속자료 파일 선택 또는 끌어놓기">' +
       '<b>📂 중간보고 이후 받은 디자인팀 피드백·보완 시뮬레이션·찬반투표 집계표·서명지·최종보고서를 끌어다 놓으세요</b>' +
       '<span>채택 모델 · 임금보전 합의 · 시행일 · 찬성률(%) · 수정요청사항을 자동 추출하여 최종 결과보고서 및 규정·계약서에 반영합니다</span>' +
-      '<input type="file" id="postFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.hwpx,.hwp,.docx,.pdf,.txt,.jpg,.jpeg,.png" style="display:none">' +
+      '<input type="file" id="postFileInput" multiple accept=".xlsx,.xls,.csv,.pptx,.pptm,.ppsx,.hwpx,.hwp,.docx,.pdf,.txt,.jpg,.jpeg,.png" style="display:none">' +
       '</div>' +
       (postCards.length ? renderTable('postCards', ['후속자료 제목', '분류', '추출된 합의·변경점 요약', '분석시각', '보기'], postCardRows, '') : '') +
       '</div>' +
@@ -1293,8 +1664,10 @@
       var f = files[i];
       var errLabel = formatSafeErrorLabel(f.name, proj);
       try {
-        if (Number(f.size || 0) > 15 * 1024 * 1024) {
-          throw new Error('파일 크기가 15MB를 초과하여 브라우저 분석을 생략했습니다.');
+        var isSlideDeck = /\.(pptx|pptm|ppsx)$/i.test(str(f.name));
+        var maxBytes = isSlideDeck ? (40 * 1024 * 1024) : (15 * 1024 * 1024);
+        if (Number(f.size || 0) > maxBytes) {
+          throw new Error('파일 크기가 ' + (isSlideDeck ? '40MB' : '15MB') + '를 초과하여 브라우저 분석을 생략했습니다.');
         }
         var safeTitle = await sanitizeMetaLabelAsync(f.name, proj);
         var buf = await f.arrayBuffer();
@@ -1438,7 +1811,7 @@
     if (/\.(txt|md|log)$/.test(lower)) {
       return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
     }
-    if (/\.pptx$/.test(lower) && Intake().extractPptxText) {
+    if (/\.(pptx|pptm|ppsx)$/.test(lower) && Intake().extractPptxText) {
       try {
         var pptTxt = await Intake().extractPptxText(bytes, global.JSZip);
         if (pptTxt) return pptTxt;
@@ -1539,7 +1912,8 @@
       for (var i = 0; i < Math.min(atts.length, 6); i++) {
         var a = atts[i];
         var aName = str(a && a.name);
-        if (!aName || Number(a.size || 0) > 15 * 1024 * 1024) continue;
+        var maxAttBytes = /\.(pptx|pptm|ppsx)$/i.test(aName) ? (40 * 1024 * 1024) : (15 * 1024 * 1024);
+        if (!aName || Number(a.size || 0) > maxAttBytes) continue;
         try {
           var got = isPop3
             ? await callMailFn('readOldMail', { key: m.popKey, index: a.i == null ? i : a.i })
@@ -1966,9 +2340,14 @@
       return '<option value="' + esc(lv.code) + '"' + (lv.code === 'deep' ? ' selected' : '') + '>' + esc(lv.name + ' (최소 EOS ' + lv.eosMinPct + '%+)') + '</option>';
     }).join('');
 
+    var npYearOpts = [];
+    for (var ny = 2026; ny >= 2015; ny--) {
+      npYearOpts.push('<option value="' + ny + '"' + (ny === 2026 ? ' selected' : '') + '>' + ny + '년</option>');
+    }
+
     var body =
       '<div class="fr"><label for="npCo">대상 거래처*</label><div class="fv"><select id="npCo">' + coOpts + '</select></div></div>' +
-      '<div class="fr"><label for="npYear">사업 연도</label><div class="fv"><select id="npYear"><option value="2026" selected>2026년</option><option value="2025">2025년</option><option value="2024">2024년</option><option value="2023">2023년</option><option value="2022">2022년</option><option value="2021">2021년</option></select></div></div>' +
+      '<div class="fr"><label for="npYear">사업 연도</label><div class="fv"><select id="npYear">' + npYearOpts.join('') + '</select></div></div>' +
       '<div class="fr"><label for="npLevel">컨설팅 수준</label><div class="fv"><select id="npLevel">' + lvOpts + '</select></div></div>' +
       '<div class="fr"><label for="npIndustry">업종 / 근로자수</label><div class="fv"><input type="text" id="npIndustry" aria-label="업종" placeholder="예: 정밀기계 제조업"><input type="number" id="npWorkers" aria-label="상시근로자 수" placeholder="상시근로자 수" style="max-width:140px"></div></div>' +
       '<div class="fr"><label for="npEmail">담당자 이메일</label><div class="fv"><input type="email" id="npEmail" placeholder="수신 메일 자동 감지용 이메일 (여러 개는 쉼표 구분)"></div></div>' +
@@ -2001,6 +2380,8 @@
               ceoName: str(co.ceo || co.ceoName),
               contactName: contactNameOfCompany(co),
               year: Number($('npYear').value) || 2026,
+              programName: '일터혁신 상생컨설팅',
+              isIlteo: true,
               level: str($('npLevel').value) || 'deep',
               industry: str($('npIndustry').value) || str(co.bizType),
               workerCount: Number($('npWorkers').value) || 0,
@@ -2547,12 +2928,14 @@
     var saved = D.mid[proj.id] || {};
     var secs = Object.assign({}, saved.sections || {});
     var locks = Object.assign({}, saved.locks || {});
-    Cat().MID_SECTIONS.forEach(function (s) {
-      var ta = $('midSec_' + s.key);
-      if (ta) secs[s.key] = ta.value;
-      var cb = document.querySelector('input[data-mid-lock="' + s.key + '"]');
-      if (cb) locks[s.key] = !!cb.checked;
-    });
+    if (proj && proj.id === CUR_PID && typeof document !== 'undefined') {
+      Cat().MID_SECTIONS.forEach(function (s) {
+        var ta = $('midSec_' + s.key);
+        if (ta) secs[s.key] = ta.value;
+        var cb = document.querySelector('input[data-mid-lock="' + s.key + '"]');
+        if (cb) locks[s.key] = !!cb.checked;
+      });
+    }
     return { sections: secs, locks: locks };
   }
 
@@ -2560,12 +2943,14 @@
     var saved = D.final[proj.id] || {};
     var secs = Object.assign({}, saved.sections || {});
     var locks = Object.assign({}, saved.locks || {});
-    Cat().FINAL_SECTIONS.forEach(function (s) {
-      var ta = $('finalSec_' + s.key);
-      if (ta) secs[s.key] = ta.value;
-      var cb = document.querySelector('input[data-final-lock="' + s.key + '"]');
-      if (cb) locks[s.key] = !!cb.checked;
-    });
+    if (proj && proj.id === CUR_PID && typeof document !== 'undefined') {
+      Cat().FINAL_SECTIONS.forEach(function (s) {
+        var ta = $('finalSec_' + s.key);
+        if (ta) secs[s.key] = ta.value;
+        var cb = document.querySelector('input[data-final-lock="' + s.key + '"]');
+        if (cb) locks[s.key] = !!cb.checked;
+      });
+    }
     return { sections: secs, locks: locks };
   }
 
@@ -2701,13 +3086,28 @@
       };
     }
     if ($('newProjBtn')) $('newProjBtn').onclick = openNewProjectModal;
-    ['projQ', 'projProg', 'projYear', 'projStage'].forEach(function (id) {
+    ['projQ', 'projYear', 'projStage', 'projSort'].forEach(function (id) {
       var el = $(id);
       if (!el) return;
       el.addEventListener(id === 'projQ' ? 'input' : 'change', function () {
         clearSel('projects');
+        var nextList = currentFilteredProjects();
+        if (nextList.length && (!CUR_PID || !nextList.some(function (x) { return x.id === CUR_PID; }))) {
+          CUR_PID = nextList[0].id;
+        }
         draw();
       });
+    });
+
+    document.addEventListener('dblclick', function (e) {
+      if (e.target && e.target.closest && e.target.closest('input,button,select,a,label,textarea,td.c,th.c')) return;
+      var tr = e.target && e.target.closest ? e.target.closest('tr[data-row][data-tname="projects"]') : null;
+      if (tr) {
+        CUR_PID = tr.getAttribute('data-row');
+        TAB = 'intake';
+        clearSel();
+        draw();
+      }
     });
 
     if ($('modal')) {
@@ -2776,6 +3176,118 @@
     });
 
     document.addEventListener('click', async function (e) {
+      var modalYrBtn = e.target.closest('[data-modal-yr-pick]');
+      if (modalYrBtn) {
+        var mYr = str(modalYrBtn.getAttribute('data-modal-yr-pick'));
+        if ($('projYear')) $('projYear').value = mYr;
+        TAB = 'projects';
+        clearSel('projects');
+        var mFiltered = currentFilteredProjects();
+        if (mFiltered.length) CUR_PID = mFiltered[0].id;
+        closeModal();
+        draw();
+        return;
+      }
+
+      var yrPickBtn = e.target.closest('[data-yr-pick]');
+      if (yrPickBtn) {
+        var pickedYr = str(yrPickBtn.getAttribute('data-yr-pick'));
+        var curYrNow = str($('projYear') && $('projYear').value);
+        var nextYrVal = (pickedYr && pickedYr === curYrNow) ? '' : pickedYr;
+        if ($('projYear')) $('projYear').value = nextYrVal;
+        clearSel('projects');
+        var yrFiltered = currentFilteredProjects();
+        if (yrFiltered.length) CUR_PID = yrFiltered[0].id;
+        draw();
+        return;
+      }
+
+      var stepYrBtn = e.target.closest('[data-step-year]');
+      if (stepYrBtn) {
+        var dirYr = Number(stepYrBtn.getAttribute('data-step-year')) || 1;
+        var yGroups = summarizeByYear(activeProjects('year_desc'));
+        if (yGroups.length) {
+          var curSelYr = str($('projYear') && $('projYear').value);
+          var curYIdx = yGroups.findIndex(function (g) { return g.year === curSelYr; });
+          var nextYIdx = curYIdx < 0
+            ? (dirYr < 0 ? 0 : yGroups.length - 1)
+            : (curYIdx + dirYr + yGroups.length) % yGroups.length;
+          if ($('projYear')) $('projYear').value = yGroups[nextYIdx].year;
+          clearSel('projects');
+          var stepYrList = currentFilteredProjects();
+          if (stepYrList.length) CUR_PID = stepYrList[0].id;
+          draw();
+        }
+        return;
+      }
+
+      var stepProjBtn = e.target.closest('[data-step-proj]');
+      if (stepProjBtn) {
+        var dirP = Number(stepProjBtn.getAttribute('data-step-proj')) || 1;
+        var navPList = currentFilteredProjects();
+        if (!navPList.length) navPList = activeProjects('year_desc');
+        if (navPList.length) {
+          var basePid = str(stepProjBtn.getAttribute('data-base-pid')) || CUR_PID;
+          var pIdx = navPList.findIndex(function (x) { return x.id === basePid; });
+          var nextPIdx = pIdx < 0 ? 0 : (pIdx + dirP + navPList.length) % navPList.length;
+          CUR_PID = navPList[nextPIdx].id;
+          clearSel();
+          draw();
+        }
+        return;
+      }
+
+      var selProjBtn = e.target.closest('[data-select-proj]');
+      if (selProjBtn) {
+        CUR_PID = selProjBtn.getAttribute('data-select-proj');
+        SPLIT_REVIEW_OPEN = true;
+        draw();
+        if (typeof global.innerWidth === 'number' && global.innerWidth < 1440 && $('projReviewBox')) {
+          try { $('projReviewBox').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) {}
+        }
+        return;
+      }
+
+      var rvTabBtn = e.target.closest('[data-rv-tab]');
+      if (rvTabBtn) {
+        REVIEW_TAB = str(rvTabBtn.getAttribute('data-rv-tab')) || 'summary';
+        draw();
+        return;
+      }
+
+      var viewProjCardBtn = e.target.closest('[data-view-proj-card]');
+      if (viewProjCardBtn) {
+        var pair = str(viewProjCardBtn.getAttribute('data-view-proj-card')).split('|');
+        var vPid = pair[0], vCid = pair[1];
+        var vCard = vPid && vCid && D.intake[vPid] && D.intake[vPid][vCid];
+        if (vCard) openCardDetailModal(vCard);
+        return;
+      }
+
+      var rvDlBtn = e.target.closest('[data-rv-dl]');
+      if (rvDlBtn) {
+        await withBusy(rvDlBtn, async function () {
+          var dlSpec = str(rvDlBtn.getAttribute('data-rv-dl'));
+          var sep = dlSpec.indexOf(':');
+          var dlMode = sep > 0 ? dlSpec.slice(0, sep) : '';
+          var dlPid = sep > 0 ? dlSpec.slice(sep + 1) : '';
+          var dlProj = projectById(dlPid);
+          if (!dlProj) return;
+          var liveDl = buildLiveReportsForExport(dlProj);
+          var safeDlCo = Pack() ? Pack().safeFilePart(dlProj.companyName) : dlProj.companyName.replace(/[\\/:*?"<>|]/g, '_');
+          if (dlMode === 'mid') {
+            var mb = await Pptx().generateMidPptxBytes(dlProj, liveDl.mid);
+            Pptx().downloadPptxBytes(mb, safeDlCo + '_일터혁신_중간보고서.pptx');
+            toast('중간보고서 PPTX 파일을 생성했습니다.');
+          } else if (dlMode === 'final') {
+            var fb2 = await Pptx().generateFinalPptxBytes(dlProj, liveDl.mid, liveDl.fin);
+            Pptx().downloadPptxBytes(fb2, safeDlCo + '_일터혁신_최종결과보고서.pptx');
+            toast('최종 결과보고서 PPTX 파일을 생성했습니다.');
+          }
+        });
+        return;
+      }
+
       var gotoBtn = e.target.closest('[data-goto-tab]');
       if (gotoBtn) {
         TAB = gotoBtn.getAttribute('data-goto-tab');
@@ -2951,8 +3463,7 @@
         var tr = e.target.closest('tr[data-row][data-tname="projects"]');
         if (tr) {
           CUR_PID = tr.getAttribute('data-row');
-          TAB = 'intake';
-          clearSel();
+          clearSel('projects');
           draw();
         }
       }
@@ -3157,6 +3668,15 @@
   }
 
   async function handleNamedAction(act) {
+    if (act === 'open-year-review') {
+      openYearReviewModal();
+      return;
+    }
+    if (act === 'toggle-split-review') {
+      SPLIT_REVIEW_OPEN = !SPLIT_REVIEW_OPEN;
+      draw();
+      return;
+    }
     var proj = projectById(CUR_PID);
     if (!proj) return;
 
@@ -3336,6 +3856,9 @@
 
   global.PuIlteoView = {
     boot: boot,
-    reload: reload
+    reload: reload,
+    sortProjects: sortProjects,
+    summarizeByYear: summarizeByYear,
+    buildReviewPanelHtml: buildReviewPanelHtml
   };
 })(typeof window !== 'undefined' ? window : globalThis);

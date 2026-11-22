@@ -102,8 +102,10 @@ test('★ newsClick 이 목적지를 «주소로» 받지 않는다 — 열린 �
   assert.ok(!/req\.query\.u\b/.test(s), '목적지를 주소로 받습니다 — 피싱 구멍입니다');
   assert.ok(!/redirect\(\s*30\d\s*,\s*(req|String\(req)/.test(s),
     '받은 값으로 곧바로 보냅니다 — 피싱 구멍입니다');
-  assert.match(s, /갈곳 \|\| .https:\/\/nabaho\.github\.io/,
+  /* 못 찾았을 때 갈 곳은 «받은 값이 아닌 정해 둔 곳» — 2026-11-15 ERP 이사 뒤로는 공개 홈(PUBLIC_HOME) */
+  assert.match(s, /갈곳 \|\| (ERP_ORIGINS_LIB\.PUBLIC_HOME|.https:\/\/)/,
     '못 찾았을 때 갈 곳이 정해져 있지 않습니다');
+  assert.match(require('../functions/erp-origins.js').PUBLIC_HOME, /^https:\/\//, '정해 둔 곳이 https 가 아닙니다');
 });
 
 test('★ 열람은 «무슨 일이 있어도» 그림을 준다 — 깨진 그림은 편지를 이상하게 보이게 한다', () => {

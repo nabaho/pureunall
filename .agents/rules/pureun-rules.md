@@ -18,3 +18,4 @@ trigger: always_on
 7. **로그인된 브라우저에서 보내기·저장·삭제·제출을 누르지 않는다** — 초안까지만, 누르는 것은 사람이다.
 8. **검사는 «지금 값»이 아니라 «규칙»을 박는다.** 표의 한 칸은 한 줄, 목록 맨 왼쪽은 ☐ + 번호, 폰은 `@media` 안에서만 고친다.
 9. **종료·삭제·되돌림 불변을 지킨다.** 종결·이관·취소(`closed`·`transferred`·`cancelled`)·마감월·휴지통(`_deleted`)·확정 되돌림(`undoneDate`) 레코드를 통째 덮어쓰기·물리 삭제·자동 번호 재정렬로 되살리거나 바꾸지 않는다(`docs/규칙/종료-삭제-되돌림-불변.md`, `node scripts/erp-integrity-audit.js`).
+10. **ERP 주소는 `https://erp.pureunlabor.co.kr` 이다(2026-11-15 이사).** 옛 `nabaho.github.io/pureunall/` 은 301 이라 새 코드·안내에 쓰지 않는다. 화면은 상대경로(절대 `/pureunall/` 금지), 서버는 `functions/erp-origins.js` 의 상수만 쓴다(`docs/규칙/ERP-주소.md`).

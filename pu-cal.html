@@ -17,7 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=100"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -43,7 +43,7 @@
 <script src="js/pu-cal-card.js?v=1"></script>
 <script>
 /* 📲 «공유 → 푸른캘린더»로 오는 캡처(사진)·글을 받는 일꾼 (2026-11-15) — 자세한 까닭은 pu-cal-share-sw.js 머리말.
-   ⚠ scope 를 ./cal-share/ 로 «좁혀» 등록한다 — /pureunall/ 전체를 잡는 다른 앱의 일꾼(pu-sw.js·pu-erp-sw.js)과
+   ⚠ scope 를 ./cal-share/ 로 «좁혀» 등록한다 — /pureunall/ 전체를 잡는 통합 일꾼(pu-sw.js)과
      자리를 다투지 않는다(나중에 연 앱이 밀어내지 못한다). 이 화면 자체는 이 일꾼이 잡지 않는다(캐시도 없다).
    ⚠ https 에서만 된다. 깃허브 페이지는 https 다. */
 if('serviceWorker' in navigator && location.protocol === 'https:'){
@@ -902,9 +902,11 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      ⚠ 칩 높이·글자는 위젯 캡처를 쟀다(칩 12px · 글자 9.5px · 간격 2px). 한 칸에 몇 개 드는지는
        용량재기() 가 «그려 놓고 재서» 정한다 — 여기서 숫자를 박지 않는다. */
   body.mob #app.fit .cal{flex:1 1 0;min-height:240px}
-  body.mob .ev{font-size:9.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px;font-weight:500;
+  /* ★ 2026-11-15 대표 「구글과 같은 색 라운드 부드러움」 — 칩 모서리 3→6px(알약에 가깝게), 높이 12→13px, 글자 9.5→10px.
+       좌우 여백 3→5px — 둥근 모서리에 글자가 닿지 않게. 몇 개 드는지는 여전히 용량재기()가 재서 정한다. */
+  body.mob .ev{font-size:10px;line-height:13px;height:13px;padding:0 5px;border-radius:6px;font-weight:500;
     overflow:hidden;text-overflow:clip;white-space:nowrap}
-  body.mob .evph{height:12px}
+  body.mob .evph{height:13px}
   body.mob .evs{gap:2px}
   body.mob .more{font-size:11px;line-height:8px;letter-spacing:1px;padding:0;text-align:center;color:var(--gsub)}
   /* 고른 날 — 구글처럼 옅은 칠 한 겹(테두리를 두르면 칸이 들쭉날쭉해 보인다) */
@@ -943,8 +945,14 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   body.mob.gm #app.fit,body.mob.gm .mhead,body.mob.gm .cal{background:var(--gsurf)}
   body.mob.gm .mhd{border-bottom:none;background:var(--gsurf)}
   body.mob.gm .mhd div{border-right:none}
-  body.mob.gm .calgrid{gap:3px;padding:3px}
-  body.mob.gm .calgrid .day{background:var(--gslot);border:none !important;border-radius:12px}
+  body.mob.gm .calgrid{gap:4px;padding:4px}
+  body.mob.gm .calgrid .day{background:var(--gslot);border:none !important;border-radius:16px}
+  /* ★ 2026-11-15 「부드러움」 — 어두운판 월 보기는 «검은 칸 + 밝은 회색 바탕»의 대비가 세서 칸이 덩어리로 튀었다.
+       바탕을 한 단계 어둡게(#131314), 칸을 그보다 살짝 밝게(#1b1b1d) — 칸이 바탕에서 «살짝 떠 보이는» 정도로 낮췄다.
+       주·일 보기(--gsurf/--gslot 실측값)는 그대로 둔다. */
+  :root[data-theme="dark"] body.mob.gm #app.fit,:root[data-theme="dark"] body.mob.gm .mhead,
+  :root[data-theme="dark"] body.mob.gm .cal,:root[data-theme="dark"] body.mob.gm .mhd{background:#131314}
+  :root[data-theme="dark"] body.mob.gm .calgrid .day{background:#1b1b1d}
   .hs{position:absolute;left:4px;right:4px;margin-top:1.5px;border-radius:12px;background:var(--gslot);pointer-events:none}
   .tgbody .tgtime span{position:absolute;right:6px;transform:translateY(-50%);white-space:nowrap}
   .tgcol{position:relative;border-left:1px solid var(--gline);min-width:0;
@@ -1883,7 +1891,7 @@ var GCAL_SCOPE    = "https://www.googleapis.com/auth/calendar.events";
 function 옛구글로그인(){
   location.href = PuGcalAuth.signInUrl({
     clientId: GCAL_OAUTH_ID, scope: GCAL_SCOPE,
-    fallbackRedirect: "https://nabaho.github.io/pureunall/pu-cal.html"
+    fallbackRedirect: "https://erp.pureunlabor.co.kr/pu-cal.html"
   });
 }
 /* ★ 구글 «늘 연결» (대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다 그래야 혼란이 없다」)
@@ -2771,6 +2779,8 @@ function chipHtml(e, ymd){
   var 옅게 = 어둡나 ? .6 : .7;
   /* 앞으로의 일정 — 어두운판에서만 원색을 15% 눅인다(원색 그대로는 어두운 바탕에서 부시다, 2026-09-28) */
   var 눅임 = 어둡나 ? .15 : 0;
+  /* 폰 어두운판은 한 번 더 부드럽게(25%) — 「구글과 같은 색 … 부드러움」(2026-11-15). 색 자체(구글 열한 색)는 그대로, 판 쪽으로만 눅인다 */
+  if(어둡나 && typeof 폰 === "function" && 폰()) 눅임 = .25;
   var 사람색 = e.color || "#64748b";
   var 어둠 = S.theme === "dark";
   var 판 = 어둠 ? "#1b1b1d" : "#ffffff";
@@ -3743,7 +3753,7 @@ function lockNote(){
 var IEUM_START_YEAR = 2024;
 /* 이알피의 같은 이름과 «같은 값»이어야 한다 — 다르면 밖으로 나간 링크가 갈린다.
    tests/cal-ieum-view.test.js 가 두 값을 맞대 본다. */
-var IEUM_VIEW_BASE = 'https://nabaho.github.io/pureunall/ieum-view.html';
+var IEUM_VIEW_BASE = 'https://erp.pureunlabor.co.kr/ieum-view.html';
 
 /* 사람 목록 — 내부 노무사 → 외부 노무사 → 변호사 → 그만둔 사람(기록이 있는 경우만).
    ⚠ 그만둔 사람을 지우지 않는다 — 지나간 근무 기록이 사라지면 셈이 틀어진다. */
@@ -4586,7 +4596,9 @@ var GIC = {
    ⚠ «새 일정»에만 둔다. 이미 있는 일정에서 바꾸면 반복 일정의 «이 날 것만» 고치는 것과 부딪히고,
      이알피에서 고친 줄이 구글로 따라갈 때(syncEdit) 반복 규칙을 잘못 덮을 수 있다 — 고치기는 구글에서.
    ⚠ 알림은 시간 일정에만(종일의 「몇 분 전」은 뜻이 없다). 「매주 (수요일)」처럼 고른 날을 글자에 보여 준다. */
-function 반복글(ymd){
+/* ⚠ 이름이 «반복고르기글» 인 까닭 — 위쪽 반복글(규칙)(RRULE → 「매주 월·수요일 반복」)과 같은 이름이면 «뒤에 온 이 함수가 이겨»
+     구글 반복 일정 상세의 「🔁」 줄이 [object Object] 로 나왔다(2026-11-22 고침). 같은 이름 함수를 다시 만들지 않는다 — tests/cal-no-duplicate-functions.test.js */
+function 반복고르기글(ymd){
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
   if(!m) return { D:"매일", W:"매주", M:"매월", Y:"매년" };
   var 요 = ["일","월","화","수","목","금","토"][new Date(+m[1], +m[2] - 1, +m[3]).getDay()];
@@ -4594,7 +4606,7 @@ function 반복글(ymd){
 }
 var 알림들 = [["", "알림 추가"], ["10", "10분 전"], ["30", "30분 전"], ["60", "1시간 전"], ["120", "2시간 전"], ["1440", "1일 전"]];
 function 반복알림줄(m){
-  var 글 = 반복글(m.date);
+  var 글 = 반복고르기글(m.date);
   var 반복 = '<select data-m="repeat" title="반복">'
     + [["", (typeof 폰 === "function" && 폰()) ? "반복 안함" : "반복 안 함"], ["DAILY", 글.D], ["WEEKLY", 글.W], ["MONTHLY", 글.M], ["YEARLY", 글.Y]].map(function(o){
         return '<option value="' + o[0] + '"' + (String(m.repeat || "") === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join("")
@@ -5537,9 +5549,8 @@ document.addEventListener("input", function(e){
      지금 pu-cal-manifest.json 의 share_target 은 POST 다 — 일꾼(pu-cal-share-sw.js)이 받아 IndexedDB(공유함)에
      잠깐 두고 이 화면을 ?share=1 로 연다. 옛 설정으로 깔린 폰은 아직 GET 으로 올 수 있어 주소 글도 그대로 받는다.
    ★★ 저절로 읽지 «않는다» — 받은 것을 새 일정 창(펼친 창)에 올려 두고, 사람이 «읽어서 채우기»·«📷 공유받은 캡처 읽기»를
-      한 번 눌러야 AI(구글 Gemini)로 보낸다 (2026-11-15 보안 검토). 까닭 — 일꾼은 «폰 공유»와 «남의 웹페이지가 몰래 보낸 전송»을
-      구별할 수 없다. 저절로 읽으면 아무 사이트나 우리 직원의 AI 한도를 쓰게 하고, 남의 사진을 바깥 AI 로 보내게 된다.
-      (10-31 판은 글을 저절로 읽었다 — 주소 글(GET)도 같은 까닭으로 함께 바꿨다.)
+      한 번 눌러야 AI(구글 Gemini)로 보낸다 — 무엇을 바깥 AI 로 보낼지, AI 한도를 쓸지는 사람이 보고 정한다.
+      ⚠ 저절로 읽게 되돌리지 않는다(tests/cal-share-target.test.js 가 지킨다). 10-31 판의 주소 글(GET)도 함께 바꿨다.
      사진은 «📷 캡처로 채우기»와, 글은 «🎤 말로 채우기»(공유 글 프롬프트)와 같은 길로 읽는다. 저장은 그대로 사람이 «저장»을 눌러야 한다.
    ⚠ 읽기 시작하면서 주소의 글·표를 «지우고», 공유함은 꺼내면서 «비운다» — 새로고침이 같은 것을 또 AI 에 보내지 않게,
      사진이 폰에 남지 않게. 10분 넘은 대기분은 읽지 않고 버린다(엉뚱한 때 옛 캡처가 읽히지 않게).
@@ -6683,9 +6694,9 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=47"></script>
+<script src="js/pu-appbar.js?v=54"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
-<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script>try{
   /* 대표 지시 2026-09-27 「즐겨찾기도 앱으로 바꿔라」 — 공용 단추(pu-appbar.js)는 그대로 두고
      이 앱에 붙은 단추의 글자만 바꾼다(공용을 고치면 15개 앱이 함께 바뀐다). */

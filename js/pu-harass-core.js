@@ -36,6 +36,69 @@
     both:   { code: 'both',   label: '괴롭힘·성희롱 복합', short: '복합조사' }
   };
 
+  /* 사건 특수 형태 구분: 일반 사내 당사자 / 고객·민원인 등 제3자 / 원하청·도급 혼재 */
+  var CASE_SUBTYPES = {
+    '':            { code: '',            label: '사내 당사자 사건 (일반)',            short: '사내일반' },
+    third_party:   { code: 'third_party', label: '고객·민원인 등 제3자 가해 사건',     short: '제3자가해' },
+    subcontract:   { code: 'subcontract', label: '원하청·도급·파견 사업장 혼재 사건',  short: '원하청·도급' }
+  };
+
+  /* 사건·쟁점별 법정 성립요건 스키마 (근로기준법 제76조의2 / 남녀고용평등법 제14조 / 산안법 제41조·남녀고평법 제14조의2) */
+  var LEGAL_SCHEMAS = {
+    harass: {
+      code: 'harass',
+      shortTitle: '괴롭힘 3요건',
+      lawBasis: '근로기준법 제76조의2 및 제76조의3',
+      colHeader: '법정 3요건 (①우위·②초과·③악화)',
+      e1: { short: '①우위', chip: '①우위성', label: '직장에서의 지위 또는 관계 등의 우위 이용' },
+      e2: { short: '②초과', chip: '②적정범위초과', label: '업무상 적정범위를 넘는 행위' },
+      e3: { short: '③악화', chip: '③고통·환경악화', label: '신체적·정신적 고통 유발 또는 근무환경 악화' },
+      verdictYes: '직장 내 괴롭힘 해당(인정)',
+      verdictNo: '직장 내 괴롭힘 비해당'
+    },
+    sexual: {
+      code: 'sexual',
+      shortTitle: '성희롱 성립요건',
+      lawBasis: '남녀고용평등법 제2조 제2호 및 제14조',
+      colHeader: '성희롱 요건 (①업무관련·②성적언동·③굴욕/불이익)',
+      e1: { short: '①업무관련', chip: '①지위·업무관련', label: '사업주·상급자·근로자의 지위 이용 또는 업무 관련성' },
+      e2: { short: '②성적언동', chip: '②성적언동·요구', label: '성적 언동 또는 성적 요구 등 객관적 행위' },
+      e3: { short: '③굴욕·불이익', chip: '③굴욕감·불이익', label: '성적 굴욕감·혐오감 유발 또는 불응을 이유로 한 불이익' },
+      verdictYes: '직장 내 성희롱 해당(인정)',
+      verdictNo: '직장 내 성희롱 비해당'
+    },
+    third_party: {
+      code: 'third_party',
+      shortTitle: '제3자 피해·보호요건',
+      lawBasis: '산업안전보건법 제41조 및 남녀고용평등법 제14조의2',
+      colHeader: '제3자 요건 (①업무수행·②가해언동·③보호필요)',
+      e1: { short: '①업무수행', chip: '①업무수행관련', label: '고객 응대·민원 처리 등 업무 수행 과정과의 관련성' },
+      e2: { short: '②가해언동', chip: '②폭언·성적언동', label: '고객 등 제3자의 폭언·폭행·성적 언동 등 가해 행위' },
+      e3: { short: '③보호필요', chip: '③고통·보호필요', label: '신체·정신적 건강장해·고통 발생 및 업무중단·분리 필요성' },
+      verdictYes: '고객 등 제3자 피해 인정(보호조치 대상)',
+      verdictNo: '제3자 피해 요건 미충족'
+    }
+  };
+
+  /* 징계 양정 참고 기준표 (고용노동부 매뉴얼 및 중앙노동위원회 판정례 경향 요약) */
+  var DISCIPLINARY_GUIDE = [
+    { level: 'light',    name: '경고 · 견책 (경징계)',        scoreRange: '1~2점', criteria: '일회성·우발적 부적절 언동, 피해 경미, 즉시 사과·개선 의지 명확, 2차 가해 없음', caution: '취업규칙상 서면경고·견책 사유 해당 여부 및 재발방지 특별교육 병행 권장' },
+    { level: 'medium',   name: '감봉 · 배치전환 (중간수위)',   scoreRange: '3~5점', criteria: '수차례 반복된 폭언·모욕·부당지시 또는 언어적 성희롱, 근무환경 악화 발생', caution: '근로기준법 제95조 감액 한도(1회 평균임금 1일분 1/2, 총액 1/10 이내) 준수 필수' },
+    { level: 'heavy',    name: '정직 · 강등 · 직위해제 (중징계)', scoreRange: '6~8점', criteria: '장기간·지속적 괴롭힘·집단 따돌림, 우위 악용 업무배제, 성적 접촉·반복 성희롱, 진단서상 정신적 피해 확인', caution: '징계 전 피해근로자 의견 사전 청취(근기법 제76조의3 제5항) 및 인사위원회 충분한 소명기회 부여 필수' },
+    { level: 'dismissal', name: '해고 · 파면 (배제징계)',     scoreRange: '9점 이상', criteria: '폭행·상해, 강제추행 등 중대 성비위, 신고자 보복·회유·2차 가해, 시정지시 불이행 등 고용관계 지속 불가능', caution: '근로기준법 제23조 제1항 사회통념상 고용관계를 계속할 수 없을 정도의 책임 사유 입증 및 서면통지(제27조) 엄수' }
+  ];
+
+  /* 부서·조직 실태조사 무기명 보안 설문 표준 문항 */
+  var SURVEY_QUESTIONS = [
+    { id: 'sq1', type: 'choice', q: '최근 1년 내 부서·사업장 내에서 폭언·욕설·모욕적 언동을 직접 겪거나 목격한 적이 있습니까?', opts: ['전혀 없음', '1~2회 있음', '월 1회 이상 반복됨', '매주·상시 발생함'] },
+    { id: 'sq2', type: 'choice', q: '업무와 무관한 사적 심부름, 과도한 감시, 정당한 이유 없는 업무 배제·전가를 경험하거나 목격한 적이 있습니까?', opts: ['전혀 없음', '일부 있음', '자주 있음', '심각한 수준임'] },
+    { id: 'sq3', type: 'choice', q: '집단 따돌림, 의도적 무시, 정보 공유 배제, 회식·야근 강요 분위기를 경험하거나 목격한 적이 있습니까?', opts: ['전혀 없음', '일부 있음', '자주 있음', '심각한 수준임'] },
+    { id: 'sq4', type: 'choice', q: '성적 농담, 외모 평가, 불쾌한 신체 접촉 등 직장 내 성희롱에 해당하는 언동을 겪거나 목격한 적이 있습니까?', opts: ['전혀 없음', '1~2회 있음', '반복적으로 있음', '심각한 수준임'] },
+    { id: 'sq5', type: 'choice', q: '문제 제기나 고충 신고 시 비밀이 지켜지고 불이익(2차 가해) 없이 공정하게 처리될 것이라고 신뢰하십니까?', opts: ['매우 신뢰함', '대체로 신뢰함', '별로 신뢰하지 않음', '전혀 신뢰하지 않음'] },
+    { id: 'sq6', type: 'choice', q: '현재 부서 내 근무환경으로 인해 스트레스·수면장애·이직 고려 등 신체적·정신적 어려움을 겪고 있습니까?', opts: ['전혀 없음', '약간 있음', '상당히 있음', '진료·상담이 필요할 정도임'] },
+    { id: 'sq7', type: 'choice', q: '조직문화 개선 및 재발 방지를 위해 가장 시급한 조치는 무엇이라고 생각하십니까?', opts: ['관리자 리더십·소통 개선', '가해 행위자 엄정 조치·분리', '명확한 업무분장 및 인력 보충', '익명 고충신고 창구 및 정기 교육'] }
+  ];
+
   /* 수행 유형 구분: 푸른노무법인 직접수행+결과보고 완료 건을 대리·자문·외부위원과 명확히 분리 */
   var PERFORM_MODES = {
     direct_report:    { code: 'direct_report',    label: '푸른노무법인 직접수행 · 결과보고 완료', short: '직접수행·결과보고', icon: '🏅' },
@@ -2405,7 +2468,44 @@
     };
   }
 
-  /* 행위(쟁점) 1건의 근로기준법 제76조의2 3요건(또는 성희롱 요건) 자동 판정 보조 */
+  /* 노동청 연장기한을 반영한 유효 보고마감일 계산 (2차 연장 > 1차 연장 > 최초 보고기한) */
+  function effectiveDueDateOf(caseRec) {
+    if (!obj(caseRec)) return '';
+    var d2 = str(caseRec.extDue2);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d2)) return d2;
+    var d1 = str(caseRec.extDue1);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d1)) return d1;
+    var d0 = str(caseRec.dueDate);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d0) ? d0 : '';
+  }
+
+  /* 사건·쟁점 특성에 맞는 적용 법령 요건 코드 추론 */
+  function inferIssueLawType(issue, caseRec) {
+    var iss = obj(issue) ? issue : {};
+    var c = obj(caseRec) ? caseRec : {};
+    var explicit = str(iss.lawType);
+    if (explicit && LEGAL_SCHEMAS[explicit]) return explicit;
+    if (str(c.caseSubType) === 'third_party') return 'third_party';
+    var cat = str(c.category) || 'harass';
+    if (cat === 'sexual') return 'sexual';
+    if (cat === 'both') {
+      var probe = str(iss.title) + ' ' + str(iss.claimVictim) + ' ' + str(iss.evidenceNote);
+      if (/성희롱|성폭력|성추행|성적|신체\s*접촉|외모\s*평가|음담패설|성비위/.test(probe)) return 'sexual';
+      return 'harass';
+    }
+    return 'harass';
+  }
+
+  function getLegalSchema(categoryOrCase, subType, issueLawType) {
+    if (issueLawType && LEGAL_SCHEMAS[issueLawType]) return LEGAL_SCHEMAS[issueLawType];
+    var cat = obj(categoryOrCase) ? str(categoryOrCase.category) : str(categoryOrCase);
+    var sub = obj(categoryOrCase) ? str(categoryOrCase.caseSubType) : str(subType);
+    if (sub === 'third_party') return LEGAL_SCHEMAS.third_party;
+    if (cat === 'sexual') return LEGAL_SCHEMAS.sexual;
+    return LEGAL_SCHEMAS.harass;
+  }
+
+  /* 행위(쟁점) 1건의 근로기준법 제76조의2 / 남녀고평법 제14조 / 제3자 3요건 자동 판정 보조 */
   function judgeIssue(issue) {
     if (!obj(issue)) return 'hold';
     var fact = str(issue.factStatus); /* recognized | partial | unrecognized */
@@ -2419,110 +2519,1366 @@
     return 'hold';
   }
 
-  /* 조사 데이터 전체로 표준 조사결과보고서 본문 초안 자동 조립 */
-  function assembleReportDraft(caseRec, secretRec) {
+  /* 호증(갑·을·참고자료) 순번 자동 편철 및 표준 호증명 생성 */
+  function renumberEvidences(evidences) {
+    var list = (Array.isArray(evidences) ? evidences : []).filter(function (x) { return obj(x) && !x._deleted; });
+    var counts = { gap: 0, eul: 0, ref: 0 };
+    var sideOrder = { gap: 1, eul: 2, ref: 3 };
+    var sorted = list.slice().sort(function (a, b) {
+      var sa = sideOrder[str(a.side)] || 3;
+      var sb = sideOrder[str(b.side)] || 3;
+      if (sa !== sb) return sa - sb;
+      var da = str(a.date), db = str(b.date);
+      if (da && db && da !== db) return da.localeCompare(db);
+      return str(a.id).localeCompare(str(b.id));
+    });
+    return sorted.map(function (ev) {
+      var side = str(ev.side);
+      if (side !== 'gap' && side !== 'eul') side = 'ref';
+      counts[side] += 1;
+      var no = counts[side];
+      var prefix = side === 'gap' ? ('갑 제' + no + '호증')
+        : side === 'eul' ? ('을 제' + no + '호증')
+        : ('참고자료 ' + no);
+      return Object.assign({}, ev, {
+        side: side,
+        no: no,
+        exhibitNo: prefix,
+        title: maskRrnText(str(ev.title) || '제출 증빙자료'),
+        submitter: maskRrnText(str(ev.submitter)),
+        summary: maskRrnText(str(ev.summary))
+      });
+    });
+  }
+
+  /* 사건 수집 메일·첨부파일로부터 호증 목록 자동 추출 (이미 연결된 mailKey 는 중복 건너뜀) */
+  function extractEvidencesFromMails(caseRec, existingEvidences) {
+    var c = obj(caseRec) ? caseRec : {};
+    var cur = (Array.isArray(existingEvidences) ? existingEvidences : []).filter(function (x) { return obj(x) && !x._deleted; });
+    var seenMailKeys = {};
+    cur.forEach(function (ev) {
+      if (str(ev.mailKey)) seenMailKeys[str(ev.mailKey)] = 1;
+    });
+    var added = [];
+    (Array.isArray(c.mailLinks) ? c.mailLinks : []).forEach(function (ml, idx) {
+      if (!obj(ml) || !str(ml.key) || seenMailKeys[str(ml.key)]) return;
+      var role = str(ml.docRole);
+      var subj = str(ml.subject);
+      var atts = Array.isArray(ml.attNames) ? ml.attNames.map(str).filter(Boolean) : [];
+      if (!atts.length && role === 'general') return;
+      var side = 'ref';
+      var submitter = '사업장·공통';
+      var combinedText = subj + ' ' + atts.join(' ');
+      if (role === 'accused_stmt' || /피신고인|행위자|피진정인|소명|경위서|반박/.test(combinedText)) {
+        side = 'eul';
+        submitter = '피신고인 측';
+      } else if (role === 'victim_stmt' || /(?:^|[^피])신고인|피해자|진정인|진단서|진료|고충\s*신고/.test(combinedText)) {
+        side = 'gap';
+        submitter = '신고인 측';
+      }
+      var title = atts.length ? atts.join(', ') : (subj || '수집 공문·자료');
+      added.push({
+        id: 'ev_' + safeKey(ml.key).slice(0, 48) + '_' + idx,
+        side: side,
+        date: str(ml.date),
+        title: maskRrnText(title),
+        submitter: submitter,
+        summary: maskRrnText(subj + (atts.length ? ' (첨부 ' + atts.length + '건)' : '')),
+        mailKey: str(ml.key)
+      });
+      seenMailKeys[str(ml.key)] = 1;
+    });
+    return renumberEvidences(cur.concat(added));
+  }
+
+  /* 일자순 사건 타임라인 및 양측 주장·객관적 증거 대조표 생성 */
+  function buildCaseTimelineRows(caseRec, secretRec) {
     var c = obj(caseRec) ? caseRec : {};
     var sec = obj(secretRec) ? secretRec : {};
+    var rows = [];
+    var evs = renumberEvidences(sec.evidences || []);
+
+    (Array.isArray(sec.issues) ? sec.issues : []).filter(function (x) { return obj(x) && !x._deleted; }).forEach(function (iss, idx) {
+      var m = /(\d{4}[-./]\d{1,2}[-./]\d{1,2})/.exec(str(iss.whenWhere));
+      var dStr = m ? m[1].replace(/[./]/g, '-').replace(/-(\d)(?=-|$)/g, '-0$1') : '';
+      rows.push({
+        date: dStr || str(iss.whenWhere) || '-',
+        sortKey: /^\d{4}-\d{2}-\d{2}$/.test(dStr) ? dStr : ('9999-' + String(idx + 1).padStart(2, '0')),
+        kind: '쟁점 ' + (idx + 1),
+        title: maskRrnText(str(iss.title) || '쟁점 행위'),
+        victimSide: maskRrnText(str(iss.claimVictim) || '-'),
+        accusedSide: maskRrnText(str(iss.claimAccused) || '-'),
+        objectiveFact: maskRrnText(str(iss.evidenceNote) || '-')
+      });
+    });
+
+    (Array.isArray(sec.interviews) ? sec.interviews : []).filter(function (x) { return obj(x) && !x._deleted; }).forEach(function (iv) {
+      var dStr = str(iv.date);
+      var sum = maskRrnText(str(iv.summary) || '(면담 실시)');
+      rows.push({
+        date: dStr || '-',
+        sortKey: /^\d{4}-\d{2}-\d{2}$/.test(dStr) ? dStr : '9998-00',
+        kind: iv.role === 'accused' ? '피신고인 면담' : iv.role === 'witness' ? '참고인 면담' : '신고인 면담',
+        title: maskRrnText((str(iv.alias) || '익명') + (iv.stmtSigned ? ' (서명필)' : '')),
+        victimSide: iv.role === 'victim' ? sum : '-',
+        accusedSide: iv.role === 'accused' ? sum : '-',
+        objectiveFact: iv.role === 'witness' ? sum : (iv.stmtSigned ? '진술확인 전자서명 봉인' : '면담 조서 작성')
+      });
+    });
+
+    evs.forEach(function (ev) {
+      var dStr = str(ev.date);
+      rows.push({
+        date: dStr || '-',
+        sortKey: /^\d{4}-\d{2}-\d{2}$/.test(dStr) ? dStr : '9998-50',
+        kind: ev.exhibitNo,
+        title: ev.title,
+        victimSide: ev.side === 'gap' ? (ev.summary || ev.title) : '-',
+        accusedSide: ev.side === 'eul' ? (ev.summary || ev.title) : '-',
+        objectiveFact: ev.side === 'ref' ? (ev.summary || ev.title) : ('제출인: ' + (ev.submitter || '-'))
+      });
+    });
+
+    rows.sort(function (a, b) { return a.sortKey.localeCompare(b.sortKey); });
+    return rows;
+  }
+
+  /* 조직 실태조사 무기명 보안 설문 응답 집계 */
+  function aggregateSurveyResponses(responses, questions) {
+    var qs = Array.isArray(questions) && questions.length ? questions : SURVEY_QUESTIONS;
+    var list = (Array.isArray(responses) ? responses : []).filter(function (r) { return obj(r) && !r._deleted; });
+    var total = list.length;
+    var stats = qs.map(function (q) {
+      var opts = Array.isArray(q.opts) ? q.opts : [];
+      var counts = opts.map(function () { return 0; });
+      list.forEach(function (r) {
+        var ansObj = obj(r.answers) ? r.answers : {};
+        var v = ansObj[q.id];
+        var idx = typeof v === 'number' ? v : opts.indexOf(str(v));
+        if (idx >= 0 && idx < counts.length) counts[idx] += 1;
+      });
+      var highRiskCnt = (counts[2] || 0) + (counts[3] || 0);
+      var highRiskPct = total > 0 ? Math.round((highRiskCnt / total) * 100) : 0;
+      return {
+        id: q.id,
+        q: q.q,
+        opts: opts,
+        counts: counts,
+        highRiskCnt: highRiskCnt,
+        highRiskPct: highRiskPct
+      };
+    });
+    var comments = list.map(function (r) { return maskRrnText(str(r.freeComment || r.amendNote)); }).filter(Boolean);
+    return { total: total, items: stats, comments: comments };
+  }
+
+  /* 인정 쟁점 및 가중·감경 요소 기반 징계 양정 참고 수준 산출 */
+  function suggestDisciplinaryLevel(issues, opts) {
+    var o = obj(opts) ? opts : {};
+    var active = (Array.isArray(issues) ? issues : []).filter(function (x) { return obj(x) && !x._deleted; });
+    var recIssues = active.filter(function (iss) { return (str(iss.verdict) || judgeIssue(iss)) === 'yes'; });
+    if (!recIssues.length && !o.hasSecondaryHarm) {
+      return { score: 0, recCount: 0, guide: null, summary: '인정된 괴롭힘·성희롱 쟁점이 없어 징계 대상 아님 (조직 갈등 중재·예방교육 권고)' };
+    }
+    var score = recIssues.length * 2;
+    recIssues.forEach(function (iss) {
+      var txt = str(iss.title) + ' ' + str(iss.claimVictim) + ' ' + str(iss.evidenceNote);
+      if (/폭행|상해|투척|강제\s*추행|신체\s*접촉|성추행/.test(txt)) score += 4;
+      else if (/반복|지속|수차례|장기간|집단|따돌림|배제|진단서|정신과/.test(txt)) score += 2;
+    });
+    if (o.hasSecondaryHarm) score += 4;
+    if (o.isRepeatedOffender) score += 2;
+    if (o.hasSincereApology && score > 1) score -= 1;
+
+    var idx = score >= 9 ? 3 : score >= 6 ? 2 : score >= 3 ? 1 : 0;
+    var g = DISCIPLINARY_GUIDE[idx];
+    return {
+      score: score,
+      recCount: recIssues.length,
+      guide: g,
+      summary: '인정 쟁점 ' + recIssues.length + '건 (참고 양정점수 ' + score + '점) → 통상 권고 수위: 【 ' + g.name + ' 】'
+    };
+  }
+
+  /* 재진정 · 지노위 연계 사건 시 선행 조사 쟁점 vs 현 사건 주장 쟁점 비교 */
+  function buildRecomplaintComparison(curCase, curSec, priorCase, priorSec) {
+    var cIss = (obj(curSec) && Array.isArray(curSec.issues)) ? curSec.issues.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    var pIss = (obj(priorSec) && Array.isArray(priorSec.issues)) ? priorSec.issues.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    function normTok(s) { return str(s).replace(/[^\uAC00-\uD7A3A-Za-z0-9]/g, '').toLowerCase(); }
+    var rows = cIss.map(function (ci, idx) {
+      var cn = normTok(ci.title);
+      var matched = null;
+      for (var j = 0; j < pIss.length; j++) {
+        var pn = normTok(pIss[j].title);
+        if (cn && pn && (cn.indexOf(pn.slice(0, 6)) >= 0 || pn.indexOf(cn.slice(0, 6)) >= 0)) {
+          matched = pIss[j];
+          break;
+        }
+      }
+      var curRes = str(ci.verdict) || judgeIssue(ci);
+      var prevRes = matched ? (str(matched.verdict) || judgeIssue(matched)) : '';
+      return {
+        seq: idx + 1,
+        curTitle: maskRrnText(str(ci.title) || ('쟁점 ' + (idx + 1))),
+        whenWhere: maskRrnText(str(ci.whenWhere)),
+        isDuplicate: !!matched,
+        statusLabel: matched ? '기조사 중복 쟁점' : '신규 추가 쟁점',
+        priorTitle: matched ? maskRrnText(str(matched.title)) : '(1차 조사 미포함)',
+        priorVerdict: matched ? (prevRes === 'yes' ? '기인정' : prevRes === 'no' ? '기불인정' : '검토이력') : '-',
+        curVerdict: curRes === 'yes' ? '인정' : curRes === 'no' ? '불인정' : '검토중',
+        scopeNote: matched ? '선행 조사 기록·증거 원용 및 신규 증빙 유무만 보충 확인' : '신규 사실관계 및 당사자 문답 집중 조사 대상'
+      };
+    });
+    var dupCnt = rows.filter(function (r) { return r.isDuplicate; }).length;
+    return {
+      priorCaseTitle: obj(priorCase) ? str(priorCase.title) : '',
+      priorCloseDate: obj(priorCase) ? str(priorCase.closeDate || priorCase.receiveDate) : '',
+      totalCurrent: rows.length,
+      duplicateCount: dupCnt,
+      newCount: rows.length - dupCnt,
+      rows: rows
+    };
+  }
+
+  /* 보고서·열람청구 대응용 비식별 익명본(신고인 A · 피신고인 B · 참고인 C · 사업장 甲) 일괄 변환 */
+  function anonymizeReportPackage(caseRec, secretRec, opts) {
+    var c = obj(caseRec) ? Object.assign({}, caseRec) : {};
+    var sec = obj(secretRec) ? Object.assign({}, secretRec) : {};
+    var o = obj(opts) ? opts : {};
+    var maskCo = o.maskCompany !== false;
+    var ivs = (Array.isArray(sec.interviews) ? sec.interviews : []).filter(function (x) { return obj(x) && !x._deleted; });
+
+    var roleBuckets = { victim: [], accused: [], witness: [] };
+    ivs.forEach(function (iv) {
+      var r = iv.role === 'accused' ? 'accused' : iv.role === 'witness' ? 'witness' : 'victim';
+      roleBuckets[r].push(iv);
+    });
+
+    var replacements = [];
+    var aliasByIvId = {};
+    var titleSuffixRe = /\s*(?:대표이사|본부장|센터장|사업소장|연구소장|부원장|원장|관장|소장|국장|실장|부장|차장|과장|팀장|계장|주임|대리|사원|책임|선임|전임|매니저|프로|선생님|교사|보육교사|간호사|기사|반장|조장|점장|근로감독관|감독관|공인노무사|노무사|조사위원|조사원|점검원|변호사|위원|님|씨)\s*$/;
+
+    var rolePrefixRe = /^(?:신고인|피신고인|참고인|신청인|피신청인|행위자|피해자)\s+/;
+    var alreadyCodeRe = /^(?:익명(?:\s*참여자)?|(?:신고인|피신고인|참고인)(?:\s*(?:[A-Z](?:-\d+)?|\d+|[가나다라마바사아자차카타파하]|[갑을병정]))?)$/;
+    var nonNameWordsRe = /^(?:신고인|피신고인|참고인|신청인|피신청인|행위자|피해자|담당자|관리자|근로자|조사원|조사위원|조사역|점검원|감독관|근로감독관|노무사|공인노무사|변호사|위원장|심의위원|감사역|외부위원|내부위원|책임|담당|외부|내부|공동|수석|대표|전문|독립|자문|선임|출석|재적|참석|소속|관련|익명|본인|타인|직원|임원|팀원|부서장|인사팀|총무팀|감사실)$/;
+
+    function registerPersonAlias(rawAlias, codeLabel) {
+      var full = str(rawAlias);
+      if (!full || alreadyCodeRe.test(full)) return;
+      replacements.push({ from: full, to: codeLabel });
+      var noParen = str(full.replace(/\([^)]*\)/g, ''));
+      var strippedPrefix = str(noParen.replace(rolePrefixRe, ''));
+      var bare = str(strippedPrefix.replace(titleSuffixRe, ''));
+      if (strippedPrefix && strippedPrefix.length >= 2 && strippedPrefix !== full && !alreadyCodeRe.test(strippedPrefix) && !nonNameWordsRe.test(strippedPrefix)) {
+        replacements.push({ from: strippedPrefix, to: codeLabel });
+      }
+      if (bare && bare.length >= 2 && bare !== full && bare !== strippedPrefix && !alreadyCodeRe.test(bare) && !nonNameWordsRe.test(bare)) {
+        replacements.push({ from: bare, to: codeLabel });
+      }
+    }
+
+    function registerDeptName(rawDept) {
+      var d = str(rawDept);
+      if (!d || d === '관련 부서' || d.length < 2) return;
+      replacements.push({ from: d, to: '관련 부서' });
+    }
+
+    ['victim', 'accused', 'witness'].forEach(function (role) {
+      var arr = roleBuckets[role];
+      var baseCode = role === 'victim' ? '신고인 A' : role === 'accused' ? '피신고인 B' : '참고인 C';
+      arr.forEach(function (iv, i) {
+        var lbl = arr.length > 1 ? (baseCode + '-' + (i + 1)) : baseCode;
+        aliasByIvId[iv.id] = lbl;
+        registerPersonAlias(iv.alias, lbl);
+        registerDeptName(iv.dept);
+      });
+    });
+
+    /* 사전 의견청취·종결합의 확인서에만 적힌 당사자 성명·부서도 비식별 기호 사전에 함께 등록 */
+    (Array.isArray(sec.victimOpinions) ? sec.victimOpinions : []).forEach(function (vo) {
+      if (obj(vo) && !vo._deleted) {
+        if (str(vo.alias)) registerPersonAlias(vo.alias, '신고인 A');
+        registerDeptName(vo.dept);
+      }
+    });
+    (Array.isArray(sec.closureConsents) ? sec.closureConsents : []).forEach(function (cl) {
+      if (obj(cl) && !cl._deleted) {
+        if (str(cl.alias)) {
+          var clCode = cl.role === 'accused' ? '피신고인 B' : cl.role === 'witness' ? '참고인 C' : '신고인 A';
+          registerPersonAlias(cl.alias, clCode);
+        }
+        registerDeptName(cl.dept);
+      }
+    });
+    (Array.isArray(sec.surveyResponses) ? sec.surveyResponses : []).forEach(function (sv) {
+      if (obj(sv) && !sv._deleted) registerDeptName(sv.dept);
+    });
+    if (Array.isArray(o.extraMaskNames)) {
+      o.extraMaskNames.forEach(function (nm) {
+        if (str(nm)) registerPersonAlias(nm, '담당 전문가');
+      });
+    }
+
+    /* 모든 출력 대상 자유서술 칸(templateMeta·issues·interviews·evidences·본문 등)에 등장하는 양방향 어순 직함 인명 및 관리번호 사전 수집 */
+    var postTitleNonNamesRe = /^(?:검토|조사|면담|심의|의견|참석|출석|확인|선임|위촉|입회|주재|보고|판단|구성|전원|과반|외부|내부|공동|단독|작성|서명|날인|진술|소명|제척|기피|회피|자문|배석|주관|수행|명의|측|등|외)$/;
+    var koreanNameEndingRe = /(?:이셨습니다|이었습니다|이십니다|입니다|였습니다|이라며|이라고|이라서|이므로|이지만|이시며|이고|이며|이나|이라|께서|에게서|에게|한테서|한테|으로|로써|로서|부터|까지|[이가은는을를의과와도만로])$/;
+    var titledPersonScanRe = /([가-힣]{2,4})\s*[:：]?\s*(공인노무사|노무사|변호사|조사위원|조사원|조사역|점검원|근로감독관|감독관|심의위원|위원장|감사역)/g;
+    var titleFirstScanRe = /(공인노무사|노무사|변호사|조사위원|조사원|조사역|점검원|근로감독관|감독관|심의위원|위원장|감사역)\s*[:：]?\s*([가-힣]{2,12})(?![가-힣])/g;
+    function harvestTitledNamesFromText(txt) {
+      var s = str(txt);
+      if (!s || s.indexOf('data:image/') === 0) return;
+      var m;
+      titledPersonScanRe.lastIndex = 0;
+      while ((m = titledPersonScanRe.exec(s)) !== null) {
+        var candName = str(m[1]);
+        var candTitle = str(m[2]);
+        if (candName && !nonNameWordsRe.test(candName) && !postTitleNonNamesRe.test(candName)) {
+          replacements.push({ from: m[0], to: '담당 ' + candTitle });
+          replacements.push({ from: candName, to: '담당 ' + candTitle });
+        } else {
+          titledPersonScanRe.lastIndex = m.index + m[1].length;
+        }
+      }
+      titleFirstScanRe.lastIndex = 0;
+      while ((m = titleFirstScanRe.exec(s)) !== null) {
+        var tRole = str(m[1]);
+        var rawAfter = str(m[2]);
+        var strippedJosa = rawAfter.length >= 3 ? rawAfter.replace(koreanNameEndingRe, '') : rawAfter;
+        var checkCand = (strippedJosa.length >= 2 && strippedJosa.length <= 4) ? strippedJosa : rawAfter;
+        if (checkCand.length >= 2 && checkCand.length <= 4 && !nonNameWordsRe.test(checkCand) && !postTitleNonNamesRe.test(checkCand) && !postTitleNonNamesRe.test(rawAfter)) {
+          var tailLen = rawAfter.length - checkCand.length;
+          var matchedPhrase = tailLen > 0 ? m[0].slice(0, m[0].length - tailLen) : m[0];
+          replacements.push({ from: matchedPhrase, to: '담당 ' + tRole });
+          replacements.push({ from: checkCand, to: '담당 ' + tRole });
+        } else {
+          titleFirstScanRe.lastIndex = m.index + m[1].length;
+        }
+      }
+    }
+    var nonHarvestKeys = { signaturePng: 1, id: 1, caseId: 1, fileHash: 1, sha256: 1, mimeType: 1 };
+    function harvestAllRecordStrings(node, keyName, depth) {
+      if (depth > 6 || node == null) return;
+      if (typeof node === 'string') {
+        if ((keyName === 'docRefNo' || keyName === 'agendaNo') && str(node)) {
+          replacements.push({ from: str(node), to: '(문서번호 비식별)' });
+        } else if (!nonHarvestKeys[keyName]) {
+          harvestTitledNamesFromText(node);
+        }
+        return;
+      }
+      if (Array.isArray(node)) {
+        for (var idx = 0; idx < node.length; idx++) {
+          if (obj(node[idx]) && node[idx]._deleted) continue;
+          harvestAllRecordStrings(node[idx], keyName, depth + 1);
+        }
+        return;
+      }
+      if (obj(node)) {
+        if (node._deleted) return;
+        var ks = Object.keys(node);
+        for (var ki = 0; ki < ks.length; ki++) {
+          var k = ks[ki];
+          if (nonHarvestKeys[k]) continue;
+          harvestAllRecordStrings(node[k], k, depth + 1);
+        }
+      }
+    }
+    harvestAllRecordStrings(c, '', 0);
+    harvestAllRecordStrings(sec, '', 0);
+
+    if (str(c.erpCaseNo)) replacements.push({ from: str(c.erpCaseNo), to: '(관리번호 비식별)' });
+    if (str(c.caseNo)) replacements.push({ from: str(c.caseNo), to: '(관리번호 비식별)' });
+
+    if (maskCo && str(c.companyName)) {
+      var fullCo = str(c.companyName);
+      replacements.push({ from: fullCo, to: '의뢰 사업장(甲)' });
+      var strippedCo = str(fullCo.replace(/\((?:주|유|합|사|재|학|의)\)|주식회사|유한회사|사단법인|재단법인|사회복지법인/g, ''));
+      if (strippedCo.length >= 2 && strippedCo !== fullCo) {
+        replacements.push({ from: strippedCo, to: '의뢰 사업장(甲)' });
+      }
+    }
+    if (maskCo && str(c.bizNo)) {
+      replacements.push({ from: str(c.bizNo), to: '***-**-*****' });
+      var bizDigits = str(c.bizNo).replace(/\D+/g, '');
+      if (bizDigits.length === 10) {
+        replacements.push({ from: bizDigits.slice(0, 3) + '-' + bizDigits.slice(3, 5) + '-' + bizDigits.slice(5), to: '***-**-*****' });
+        replacements.push({ from: bizDigits.slice(0, 3) + ' ' + bizDigits.slice(3, 5) + ' ' + bizDigits.slice(5), to: '***-**-*****' });
+        replacements.push({ from: bizDigits.slice(0, 3) + '.' + bizDigits.slice(3, 5) + '.' + bizDigits.slice(5), to: '***-**-*****' });
+        replacements.push({ from: bizDigits, to: '***-**-*****' });
+      }
+    }
+    if (str(c.inspectorName)) {
+      registerPersonAlias(c.inspectorName, '담당 감독관');
+      replacements.push({ from: str(c.inspectorName), to: '담당 감독관' });
+    }
+    if (str(c.govCaseNo)) {
+      replacements.push({ from: str(c.govCaseNo), to: '(사건번호 비식별)' });
+    }
+    (Array.isArray(c.monitoringLogs) ? c.monitoringLogs : []).forEach(function (lg) {
+      if (obj(lg) && str(lg.checker)) {
+        registerPersonAlias(lg.checker, '담당 조사역');
+        replacements.push({ from: str(lg.checker), to: '담당 조사역' });
+      }
+    });
+
+    /* 긴 문자열부터 먼저 치환하여 부분 일치 깨짐 방지 (중복 등록 제거) */
+    var seenFrom = Object.create(null);
+    replacements = replacements.filter(function (pair) {
+      if (!pair.from || seenFrom[pair.from]) return false;
+      seenFrom[pair.from] = 1;
+      return true;
+    }).sort(function (a, b) { return b.from.length - a.from.length; });
+
+    function scrubAnonText(s) {
+      var out = maskRrnText(String(s == null ? '' : s));
+      if (!out) return '';
+      replacements.forEach(function (pair) {
+        if (pair.from && out.indexOf(pair.from) >= 0) {
+          out = out.split(pair.from).join(pair.to);
+        }
+      });
+      /* 휴대전화·일반전화·이메일·사업자번호·행정사건번호 비식별화 */
+      out = out.replace(/\b(01[016789])[-.\s]?(\d{3,4})[-.\s]?(\d{4})\b/g, '$1-****-$3');
+      out = out.replace(/\b(0\d{1,2})[-.\s](\d{3,4})[-.\s](\d{4})\b/g, '$1-****-$3');
+      out = out.replace(/\b([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g, '$1***@$2');
+      if (maskCo) {
+        out = out.replace(/\b\d{3}-\d{2}-\d{5}\b/g, '***-**-*****');
+      }
+      out = out.replace(/(?:진정|고소|고발|사건|접수)[\s-]*(?:제\s*)?\d{4}[-.\s]\d{2,8}\s*호?/g, '(사건번호 비식별)');
+      return out;
+    }
+
+    var anonSteps = {};
+    if (obj(c.steps)) {
+      Object.keys(c.steps).forEach(function (sk) {
+        var st = c.steps[sk];
+        if (obj(st)) {
+          anonSteps[sk] = Object.assign({}, st, { note: scrubAnonText(st.note) });
+        }
+      });
+    }
+
+    var anonCase = Object.assign({}, c, {
+      companyName: maskCo ? '의뢰 사업장(甲)' : scrubAnonText(c.companyName),
+      bizNo: maskCo ? '' : str(c.bizNo),
+      erpCaseNo: '',
+      caseNo: '',
+      title: scrubAnonText(c.title),
+      inspectorName: str(c.inspectorName) ? '담당 감독관' : '',
+      govCaseNo: str(c.govCaseNo) ? '(사건번호 비식별)' : '',
+      steps: anonSteps,
+      monitoringLogs: (Array.isArray(c.monitoringLogs) ? c.monitoringLogs : []).map(function (lg) {
+        return Object.assign({}, lg, {
+          note: scrubAnonText(lg && lg.note),
+          status: scrubAnonText(lg && lg.status),
+          checker: lg && lg.checker ? '담당 조사역' : ''
+        });
+      }),
+      mailLinks: (Array.isArray(c.mailLinks) ? c.mailLinks : []).map(function (m) {
+        return Object.assign({}, m, {
+          subject: scrubAnonText(m.subject),
+          from: scrubAnonText(m.from),
+          attNames: (Array.isArray(m.attNames) ? m.attNames : []).map(scrubAnonText)
+        });
+      })
+    });
+
+    var anonSec = Object.assign({}, sec, {
+      overview: scrubAnonText(sec.overview),
+      conclusion: scrubAnonText(sec.conclusion),
+      recommendations: scrubAnonText(sec.recommendations),
+      companyRuleQuote: scrubAnonText(sec.companyRuleQuote),
+      reportBody: scrubAnonText(sec.reportBody),
+      interviews: ivs.map(function (iv) {
+        return Object.assign({}, iv, {
+          alias: aliasByIvId[iv.id] || scrubAnonText(iv.alias) || '익명 참여자',
+          dept: iv.dept ? '관련 부서' : '',
+          summary: scrubAnonText(iv.summary),
+          amendNote: scrubAnonText(iv.amendNote),
+          sigDataUrl: '', /* 익명 열람본에는 자필서명 필적 이미지를 싣지 않아 신원 노출 원천 차단 */
+          qaList: (Array.isArray(iv.qaList) ? iv.qaList : []).map(function (qa) {
+            return { q: scrubAnonText(qa && qa.q), a: scrubAnonText(qa && qa.a) };
+          })
+        });
+      }),
+      issues: (Array.isArray(sec.issues) ? sec.issues : []).filter(function (x) { return obj(x) && !x._deleted; }).map(function (iss) {
+        return Object.assign({}, iss, {
+          title: scrubAnonText(iss.title),
+          whenWhere: scrubAnonText(iss.whenWhere),
+          claimVictim: scrubAnonText(iss.claimVictim),
+          claimAccused: scrubAnonText(iss.claimAccused),
+          evidenceNote: scrubAnonText(iss.evidenceNote),
+          credibilityNote: scrubAnonText(iss.credibilityNote)
+        });
+      }),
+      templateMeta: (function () {
+        var rawTm = obj(sec.templateMeta) ? sec.templateMeta : {};
+        var cleanTm = {};
+        Object.keys(rawTm).forEach(function (k) {
+          var v = rawTm[k];
+          if (typeof v === 'string') {
+            cleanTm[k] = (k === 'docRefNo' || k === 'agendaNo') ? (str(v) ? '(문서번호 비식별)' : '') : scrubAnonText(v);
+          } else if (typeof v === 'boolean' || typeof v === 'number') {
+            cleanTm[k] = v;
+          } else if (obj(v)) {
+            var sub = {};
+            Object.keys(v).forEach(function (sk) {
+              var sv = v[sk];
+              if (typeof sv === 'string') {
+                sub[sk] = (sk === 'docRefNo' || sk === 'agendaNo') ? (str(sv) ? '(문서번호 비식별)' : '') : scrubAnonText(sv);
+              } else {
+                sub[sk] = sv;
+              }
+            });
+            cleanTm[k] = sub;
+          }
+        });
+        return cleanTm;
+      })(),
+      evidences: (Array.isArray(sec.evidences) ? sec.evidences : []).filter(function (x) { return obj(x) && !x._deleted; }).map(function (ev) {
+        return Object.assign({}, ev, {
+          title: scrubAnonText(ev.title),
+          submitter: scrubAnonText(ev.submitter),
+          summary: scrubAnonText(ev.summary)
+        });
+      }),
+      victimOpinions: (Array.isArray(sec.victimOpinions) ? sec.victimOpinions : []).filter(function (x) { return obj(x) && !x._deleted; }).map(function (vo) {
+        return Object.assign({}, vo, {
+          alias: scrubAnonText(vo.alias) || '신고인 A',
+          dept: vo.dept ? '관련 부서' : '',
+          measuresText: scrubAnonText(vo.measuresText),
+          summary: scrubAnonText(vo.summary),
+          amendNote: scrubAnonText(vo.amendNote),
+          selectedMeasures: (Array.isArray(vo.selectedMeasures) ? vo.selectedMeasures : []).map(scrubAnonText),
+          sigDataUrl: ''
+        });
+      }),
+      closureConsents: (Array.isArray(sec.closureConsents) ? sec.closureConsents : []).filter(function (x) { return obj(x) && !x._deleted; }).map(function (cl) {
+        return Object.assign({}, cl, {
+          alias: scrubAnonText(cl.alias) || '당사자',
+          dept: cl.dept ? '관련 부서' : '',
+          summary: scrubAnonText(cl.summary),
+          amendNote: scrubAnonText(cl.amendNote),
+          sigDataUrl: ''
+        });
+      }),
+      surveyResponses: (Array.isArray(sec.surveyResponses) ? sec.surveyResponses : []).filter(function (x) { return obj(x) && !x._deleted; }).map(function (sv) {
+        return Object.assign({}, sv, {
+          dept: sv.dept ? '관련 부서' : '',
+          freeComment: scrubAnonText(sv.freeComment)
+        });
+      })
+    });
+
+    if (!str(anonSec.reportBody)) {
+      anonSec.reportBody = scrubAnonText(assembleReportDraft(anonCase, anonSec, o.reportTemplate));
+    } else {
+      anonSec.reportBody = scrubAnonText(anonSec.reportBody);
+    }
+
+    return {
+      caseRec: anonCase,
+      secretRec: anonSec,
+      aliasPairs: replacements
+    };
+  }
+
+  /* ═══ 대한민국 노무법인 · 법무법인 · 고용노동부 · 공공기관 · 대기업 6대 마스터 조사양식 체계 ═══ */
+  var CREDIBILITY_FACTORS = [
+    { key: 'consistency', short: '일관성', label: '① 진술의 일관성 (시간 경과·반복 문답에도 핵심 사실 모순 없음)' },
+    { key: 'specificity', short: '구체성', label: '② 내용의 구체성·생생함 (직접 경험자 특유의 세부 정황 묘사)' },
+    { key: 'rationality', short: '합리성', label: '③ 경험칙·상식 부합성 (당시 업무 맥락·조직 여건과의 부합)' },
+    { key: 'noMotive', short: '허위동기 부재', label: '④ 무고·과장 동기 부재 (인사 불만·보복 등 허위 유인 없음)' },
+    { key: 'corroboration', short: '객관증거 부합', label: '⑤ 물증·제3자 목격 부합 (녹취·메신저·참고인 진술 일치)' }
+  ];
+
+  function evaluateIssueCredibility(iss) {
+    var rec = obj(iss) ? iss : {};
+    var cred = obj(rec.credibility) ? rec.credibility : {};
+    var checked = [];
+    var unchecked = [];
+    CREDIBILITY_FACTORS.forEach(function (f) {
+      if (cred[f.key] === true || cred[f.key] === 'yes' || cred[f.key] === 1) {
+        checked.push(f);
+      } else {
+        unchecked.push(f);
+      }
+    });
+    var cnt = checked.length;
+    var hasAnySet = Object.keys(cred).some(function (k) { return cred[k] !== undefined && cred[k] !== ''; });
+    var level = !hasAnySet
+      ? (rec.factStatus === 'recognized' ? '인정근거 확보' : rec.factStatus === 'partial' ? '일부 부합' : rec.factStatus === 'unrecognized' ? '입증 부족' : '검토 전')
+      : cnt >= 4 ? '신빙성 높음 (' + cnt + '/5)'
+      : cnt >= 2 ? '신빙성 보통 (' + cnt + '/5)'
+      : '보강증거 필요 (' + cnt + '/5)';
+    return {
+      count: cnt,
+      total: CREDIBILITY_FACTORS.length,
+      hasExplicit: hasAnySet,
+      level: level,
+      checkedLabels: checked.map(function (f) { return f.short; }),
+      uncheckedLabels: unchecked.map(function (f) { return f.short; }),
+      note: maskRrnText(str(rec.credibilityNote))
+    };
+  }
+
+  var MOEL_OBLIGATION_CHECKS = [
+    { key: 'c1_prompt', label: '지체 없는 객관적 조사 착수·실시 (근기법 제76조의3 제2항 · 남녀고평법 제14조 제2항)' },
+    { key: 'c2_interim', label: '조사 기간 중 피해근로자 잠정 보호·분리조치 검토 및 시행 (제3항)' },
+    { key: 'c3_victim_op', label: '확정 보호조치 및 행위자 조치 전 피해근로자 사전 의견청취 (제4항·제5항)' },
+    { key: 'c4_actor_act', label: '사실 확인 시 행위자에 대한 징계·근무장소 변경 등 지체 없는 조치 (제5항)' },
+    { key: 'c5_no_retal', label: '신고인·피해근로자·참고인에 대한 불리한 처우 금지 고지 및 준수 (제6항)' },
+    { key: 'c6_secret', label: '조사 참여자 전원 비밀누설 금지 서약 징구 및 기밀 관리 (제7항)' }
+  ];
+
+  function isMoelObligationMet(chkKey, caseRec, secRec, optTm) {
+    var c = obj(caseRec) ? caseRec : {};
+    var sec = obj(secRec) ? secRec : {};
+    var tm = obj(optTm) ? optTm : ((obj(sec.templateMeta) && obj(sec.templateMeta.moel_standard)) ? sec.templateMeta.moel_standard : (obj(sec.templateMeta) ? sec.templateMeta : {}));
+    var mc = obj(tm.moelChecks) ? tm.moelChecks : {};
+    if (mc[chkKey] !== undefined) return !!mc[chkKey];
+    var steps = obj(c.steps) ? c.steps : {};
+    var ivs = Array.isArray(sec.interviews) ? sec.interviews.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    var vicOps = Array.isArray(sec.victimOpinions) ? sec.victimOpinions.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    if (chkKey === 'c1_prompt') return !!(steps.intake && steps.intake.done);
+    if (chkKey === 'c2_interim') return !!(str(tm.interimMeasure) || (steps.pledge && steps.pledge.done));
+    if (chkKey === 'c3_victim_op') return vicOps.length > 0;
+    if (chkKey === 'c6_secret') return ivs.some(function (iv) { return iv.pledgeSigned; });
+    return false;
+  }
+
+  var REPORT_TEMPLATES = {
+    laborfirm_deep: {
+      id: 'laborfirm_deep',
+      name: '전문 노무법인 심층 사실조사 표준형',
+      short: '노무법인 심층조사형',
+      orgType: '전문 노무법인 마스터 표준',
+      badge: '사실조사·매트릭스·로드맵',
+      docClassBadge: '대외비 · 외부독립조사 보고서',
+      docTitleSuffix: '사안 외부전문가 조사결과보고서',
+      desc: '당사자·참고인 문답, 갑·을 호증 대조, 쟁점별 법정 3요건 포섭, 단계별 인사조치 실행 로드맵을 가장 균형 있게 수록하는 전문 노무법인 정석 양식입니다.',
+      sections: [
+        '1. 사건 개요 및 외부조사단 구성',
+        '2. 조사 경위 및 공정성·비밀유지 확보 절차',
+        '3. 당사자·참고인 진술 요지 및 제출 호증 편철',
+        '4. 쟁점 행위별 사실인정 및 법정 성립요건 포섭',
+        '5. 종합 판정 결론 및 단계별 인사조치 실행 로드맵'
+      ],
+      fields: [
+        { key: 'investTeam', label: '외부조사단 구성 · 조사방식', type: 'text', placeholder: '예: 책임 공인노무사 외 1인 공동조사 · 독립 대면면담 및 녹취록 교차검증' },
+        { key: 'orgContext', label: '당사자 위계 · 조직 맥락 요약', type: 'text', placeholder: '예: 부서장(1차 인사평가권자) 대 실무 담당자 간 직속 지휘·감독 관계' },
+        { key: 'actionRoadmap', label: '단계별 후속 실행 로드맵', type: 'textarea', placeholder: '예: ① 피해자 사전의견청취 → ② 인사위원회 회부·소명 부여 → ③ 분리배치 확정 및 1·3·6개월 사후모니터링' }
+      ]
+    },
+    lawfirm_opinion: {
+      id: 'lawfirm_opinion',
+      name: '대형 법무법인(로펌) 법률검토의견서형',
+      short: '법무법인 법률의견서형',
+      orgType: '대형 법무법인 인사노무 자문형',
+      badge: '결론선제시·신빙성 5지표·리스크',
+      docClassBadge: '극비(Strictly Confidential) · 법률검토의견서',
+      docTitleSuffix: '사안 사실조사 및 법률검토 의견서',
+      desc: '의뢰 질의와 핵심 결론(Executive Summary)을 서두에 배치하고, 대법원 판례 법리에 따른 진술 신빙성 5대 지표 평가와 분쟁·소송 리스크를 정밀 논증하는 로펌 자문 양식입니다.',
+      sections: [
+        'Ⅰ. 검토 배경 및 핵심 법률의견 요약 (Executive Summary)',
+        'Ⅱ. 조사 범위 및 적법절차(방어권 보장) 이행 경과',
+        'Ⅲ. 관련 법령·판례 법리 및 사규 체계',
+        'Ⅳ. 대법원 판례 기준 진술 신빙성(Credibility) 5대 지표 평가',
+        'Ⅴ. 쟁점별 사실관계 확정 및 법리 포섭(Subsumption)',
+        'Ⅵ. 인사조치 양정 적정성 및 노동위원회·소송 리스크 진단'
+      ],
+      fields: [
+        { key: 'docRefNo', label: '문서관리번호 · 보안표기', type: 'text', placeholder: '예: 법률의견 제2026-HR-001호 · 인사권자 외 열람금지' },
+        { key: 'querySummary', label: '검토 질의 요지 (Issues Presented)', type: 'text', placeholder: '예: 피신고인 각 행위의 직장 내 괴롭힘 성립 여부 및 징계처분 시 법적 유효성 검토' },
+        { key: 'litigationRisk', label: '분쟁·소송 리스크 등급', type: 'select', options: [
+          { value: 'low', label: '안정 (객관적 물증·절차 확보 — 방어력 충분)' },
+          { value: 'mid', label: '보통 (진술 대립 존재 — 양정 비례성·절차 유의)' },
+          { value: 'high', label: '주의 (부당징계·재진정 분쟁 가능성 높음 — 보완 권고)' }
+        ] },
+        { key: 'execSummary', label: '핵심 법률의견 요약 (Brief Answer)', type: 'textarea', placeholder: '서두 Executive Summary 박스에 수록할 결론 선제시 요약을 기재하세요' }
+      ]
+    },
+    moel_standard: {
+      id: 'moel_standard',
+      name: '고용노동부 매뉴얼 별지 · 감독관 대응형',
+      short: '고용노동부 표준·감독관형',
+      orgType: '고용노동부 표준매뉴얼 · 지청 보고용',
+      badge: '별지표준·근기법 §76조의3 점검표',
+      docClassBadge: '법정 조사·조치 이행 증빙문서',
+      docTitleSuffix: '고충사건 조사결과 및 법정의무 이행 보고서',
+      desc: '고용노동부 《직장 내 괴롭힘 판단 및 예방·대응 매뉴얼》 별지 서식과 근로감독관 진정·개선지도 점검 항목(제76조의3 제2~7항 6대 법정의무)에 1:1 대응하는 행정 입증 양식입니다.',
+      sections: [
+        '1. 사건 접수 및 당사자 인적사항 (관할 노동관서 연계)',
+        '2. 신고 행위 요지 및 객관적 조사 실시 경과',
+        '3. 당사자·참고인 문답 요지 및 입증자료 목록',
+        '4. 근로기준법 제76조의2(남녀고평법 제14조) 성립요건 판단',
+        '5. 사용자 법정의무 6대 항목(제76조의3 제2~7항) 이행 점검표',
+        '6. 확정 조치 결과 및 향후 재발방지 시정계획'
+      ],
+      hasMoelChecklist: true,
+      fields: [
+        { key: 'intakeRoute', label: '사건 인지 · 접수 경로', type: 'text', placeholder: '예: 사내 고충상담창구 서면 접수 / 관할 노동지청 자체조사 시정지시' },
+        { key: 'interimMeasure', label: '조사 중 잠정 보호·분리 내역', type: 'text', placeholder: '예: 접수 당일 유급휴가 부여 및 업무공간 즉시 분리 조치 시행' },
+        { key: 'preventPlan', label: '재발방지 및 예방교육 계획', type: 'textarea', placeholder: '예: 전 임직원 특별 예방교육 실시 및 취업규칙 불이익처우 금지 조항 재고지' }
+      ]
+    },
+    public_committee: {
+      id: 'public_committee',
+      name: '공공기관·공기업 감사실·고충심의위원회형',
+      short: '공공기관 고충심의위형',
+      orgType: '공공기관 · 지자체 · 출연연 심의표준',
+      badge: '부의안건·성인지·심의의결주문',
+      docClassBadge: '고충심의위원회 심의·의결 대외비 안건',
+      docTitleSuffix: '고충심의위원회 조사결과 및 심의 부의안건서',
+      desc: '여성가족부·국가인권위원회·인사혁신처 공공기관 표준지침에 맞춰 안건번호, 외부위원 정족수·제척 확인, 성인지 감수성·2차 피해 검토, 위원회 의결 주문(인용/기각) 및 서명란을 갖춘 양식입니다.',
+      sections: [
+        'Ⅰ. 부의 안건 개요 및 위원회 구성·제척 확인',
+        'Ⅱ. 신청인·피신청인 진술 및 참고인 조사 결과',
+        'Ⅲ. 인권·성인지 감수성 및 2차 피해 유발 여부 검토',
+        'Ⅳ. 행위별 관계법령 및 기관 인권·복무지침 위반 판단',
+        'Ⅴ. 고충심의위원회 의결 주문(안) 및 기관장 조치 건의'
+      ],
+      fields: [
+        { key: 'agendaNo', label: '부의 안건번호 · 소관부서', type: 'text', placeholder: '예: 제2026-고충심의-01호 · 감사실(인권윤리센터)' },
+        { key: 'committeeQuorum', label: '외부위원 참여 · 제척 확인', type: 'text', placeholder: '예: 외부 노무·법률 전문가 2인 포함 재적 5인 출석 · 이해충돌 제척사유 없음' },
+        { key: 'resolutionOrder', label: '심의위 의결 주문(안)', type: 'select', options: [
+          { value: 'uphold', label: '인용 — 직장 내 괴롭힘·성희롱에 해당함 (가결)' },
+          { value: 'partial', label: '일부 인용 — 쟁점 중 일부 행위 해당함 (일부 가결)' },
+          { value: 'dismiss', label: '기각 — 직장 내 괴롭힘·성희롱에 해당하지 아니함' },
+          { value: 'reject', label: '각하 — 심의 대상 불해당 또는 신청인 자유의사 취하' }
+        ] },
+        { key: 'secondaryHarmNote', label: '성인지 감수성 · 2차피해 검토', type: 'textarea', placeholder: '조사 및 심의 과정에서의 피해자 보호, 성인지 감수성 기준 검토, 소문 유포 등 2차 피해 유무 기재' }
+      ]
+    },
+    corp_executive: {
+      id: 'corp_executive',
+      name: '대기업 준법감시·경영진(C-Level)·인사위 보고형',
+      short: '대기업 경영진 요약형',
+      orgType: '대기업 윤리경영 · 준법감시 · 인사위',
+      badge: '1쪽 브리프·심각도·리스크 신호등',
+      docClassBadge: '경영진 보고용 대외비 (Executive Brief)',
+      docTitleSuffix: '윤리·준법감시 특별조사 경영진 보고서',
+      desc: '대표이사·인사위원회 의사결정을 위해 첫 장에 심각도 등급(S/A/B/C), 법규·평판 리스크 신호등, 3줄 핵심 결론, 즉시 실행 과제를 요약하고 세부 사실조사를 부록(Annex)으로 편제하는 양식입니다.',
+      sections: [
+        '[Executive Brief] 핵심 결론 · 심각도 등급 · 리스크 신호등',
+        '[Action Plan] 인사위원회 부의 수위 및 즉시 실행 과제',
+        '[Annex 1] 쟁점 행위별 사실인정 및 법정요건 요약 매트릭스',
+        '[Annex 2] 당사자·참고인 진술 및 핵심 물증(호증) 요지',
+        '[Annex 3] 취업규칙·윤리강령 위반 대조 및 조직관리 개선안'
+      ],
+      fields: [
+        { key: 'severityGrade', label: '사안 심각도 등급', type: 'select', options: [
+          { value: 'S', label: 'S등급 (Critical — 중대 비위·중징계 및 즉시 분리 필수)' },
+          { value: 'A', label: 'A등급 (High — 법 위반 인정·정식 징계 및 부서 조정)' },
+          { value: 'B', label: 'B등급 (Medium — 부적절 언행·경고 및 리더십 코칭)' },
+          { value: 'C', label: 'C등급 (Low — 법 위반 불인정·자체 종결 및 모니터링)' }
+        ] },
+        { key: 'riskLegal', label: '법규 · 행정처분 리스크', type: 'select', options: [
+          { value: 'green', label: '🟢 안정 (법정 절차 준수 완료)' },
+          { value: 'amber', label: '🟡 주의 (후속조치·기한 관리 필요)' },
+          { value: 'red', label: '🔴 고위험 (즉시 시정·법률방어 필수)' }
+        ] },
+        { key: 'riskRep', label: '평판 · 조직이탈 리스크', type: 'select', options: [
+          { value: 'green', label: '🟢 안정 (당사자 수용·확산 없음)' },
+          { value: 'amber', label: '🟡 주의 (부서 갈등·이직 우려)' },
+          { value: 'red', label: '🔴 고위험 (외부 제보·집단 갈등 우려)' }
+        ] },
+        { key: 'execKeyPoints', label: '경영진 의사결정 3줄 핵심 요약', type: 'textarea', placeholder: '① 사실확인 결과 요약 / ② 권고 인사조치 수위 / ③ 조직 안정화 대책 3줄 요약' }
+      ]
+    },
+    nlrb_defense: {
+      id: 'nlrb_defense',
+      name: '노동위원회·법원 부당징계 방어 소명형',
+      short: '지노위·소송 방어형',
+      orgType: '지방노동위원회 · 행정/민사 소송 대응',
+      badge: '징계사유·절차·양정 3단 입증',
+      docClassBadge: '부당징계·재진정 방어 입증 자료집',
+      docTitleSuffix: '징계정당성 입증 사실조사 및 소명 보고서',
+      desc: '행위자의 지방노동위원회 부당징계·부당해고 구제신청 또는 재진정에 대비하여 ① 징계사유(사실인정·호증 1:1 매핑), ② 징계절차(방어권 보장), ③ 징계양정(사회통념상 상당성·형평성) 3단 구조로 정리하는 양식입니다.',
+      sections: [
+        'Ⅰ. 처분(조사) 경위 및 소명절차의 적법성 입증',
+        'Ⅱ. 징계(혐의)사유별 구체적 사실인정 및 입증 호증 매핑',
+        'Ⅲ. 당사자 진술 신빙성 대비 및 피징계자 주장 반박',
+        'Ⅳ. 징계양정의 적정성(비례원칙·동종사례 형평성) 법리 검토',
+        'Ⅴ. 선행 사건·재진정 쟁점 구분 및 최종 소명 결론'
+      ],
+      fields: [
+        { key: 'dueProcessNote', label: '방어권 · 소명기회 부여 경과', type: 'text', placeholder: '예: 출석통지 사전 교부, 쟁점별 서면질문지 회신, 면담 진술확인 전자서명 징구 완료' },
+        { key: 'equityNote', label: '양정 형평성 · 참작사유 검토', type: 'text', placeholder: '예: 사내 동종 폭언·성희롱 징계 선례 부합, 반복성·2차가해 가중 및 반성 여부 참작' },
+        { key: 'defensePoint', label: '예상 다툼 쟁점 및 반박 논리', type: 'textarea', placeholder: '피징계자가 노동위원회에서 주장할 것으로 예상되는 항변(업무상 통상 지시 주장 등)과 객관적 반박 근거' }
+      ]
+    }
+  };
+
+  var STATEMENT_STYLES = {
+    confirm_std: {
+      id: 'confirm_std',
+      label: '노무법인 표준 진술확인서형 (개요표 + 문답표 + 핵심요지 + 서명봉인)',
+      short: '표준 진술확인서형'
+    },
+    legal_record: {
+      id: 'legal_record',
+      label: '법무법인·조서형 문답조서 (사전고지 + 【문】/【답】 연속 조서체 + 확인서명)',
+      short: '법무 문답조서형'
+    },
+    moel_sheet: {
+      id: 'moel_sheet',
+      label: '고용노동부 매뉴얼 별지 면담기록지형 (육하원칙 요약칸 + 문답표 + 조사역 확인란)',
+      short: '노동부 면담기록지형'
+    }
+  };
+
+  var INTERVIEW_TEMPLATES = {
+    victim_harass: {
+      id: 'victim_harass',
+      role: 'victim',
+      lawType: 'harass',
+      label: '신고인(괴롭힘) 육하원칙·3요건 심층 문답지 (8문항)',
+      questions: [
+        '피신고인과의 소속 부서, 직급·연차 차이, 업무 지시·인사평가 등 지위·관계상 구조를 구체적으로 말씀해 주십시오.',
+        '신고하신 핵심 피해 행위가 발생한 일시, 장소, 당시 참석자(목격자) 및 구체적인 발언·행동 경위를 육하원칙에 따라 말씀해 주십시오.',
+        '해당 행위가 통상적인 업무 수행이나 업무 지시와 무관하거나 사회통념상 적정범위를 넘었다고 판단하신 구체적인 이유는 무엇입니까?',
+        '동일·유사한 행위가 일회성이었습니까, 아니면 일정 기간 반복·지속되었습니까? (빈도 및 기간)',
+        '당시 현장에서 거부 의사를 표시하거나 상급자·동료에게 고충을 토로한 사실, 또는 직후 남겨둔 기록(메신저·일지·녹음 등)이 있습니까?',
+        '위 행위로 인하여 겪으신 신체적·정신적 고통(병원 진료·상담 여부 포함)이나 실제 업무 수행·근무환경 악화 정황을 말씀해 주십시오.',
+        '현재 회사에 희망하시는 잠정·확정 보호조치(근무장소 분리, 부서 전환, 유급휴가 등) 및 행위자에 대한 조치 의견은 무엇입니까?',
+        '마지막으로 이번 조사와 관련하여 추가로 제출할 객관적 증거자료나 보충 진술할 사항이 있습니까?'
+      ]
+    },
+    accused_harass: {
+      id: 'accused_harass',
+      role: 'accused',
+      lawType: 'harass',
+      label: '피신고인(괴롭힘) 방어권 보장·반박 소명 문답지 (8문항)',
+      questions: [
+        '본 면담에 앞서 조사 목적, 비밀유지 의무(근기법 제76조의3 제7항), 신고인·참고인에 대한 연락·보복 등 2차 가해 금지 고지사항을 안내받으셨습니까?',
+        '신고인과는 언제부터 어떠한 업무 지휘·협업 관계로 근무하셨습니까?',
+        '신고인이 제기한 쟁점 일시·장소에서의 발언 또는 행동 사실 자체를 인정하십니까, 아니면 사실과 다른 부분이 있습니까?',
+        '해당 지시나 발언을 하게 된 구체적인 업무상 배경과 필요성, 긴급성은 무엇이었습니까?',
+        '당시 언성, 표현 수위, 장소(타 직원 동석 여부) 등 전달 방식에 있어 다른 온건한 대안 수단을 택할 수는 없었습니까?',
+        '신고인이 주장하는 내용 중 사실과 다르거나 과장·오해가 있다고 소명하실 부분과 이를 뒷받침할 객관적 자료(메신저·이메일·업무일지 등)가 있습니까?',
+        '당시 현장 상황에 함께 있었던 동료 등 객관적 정황을 확인해 줄 수 있는 참고인이 있습니까?',
+        '현재 신고인과의 분리조치 준수 현황 및 향후 재발방지·근무환경 개선에 관한 입장을 말씀해 주십시오.'
+      ]
+    },
+    victim_sexual: {
+      id: 'victim_sexual',
+      role: 'victim',
+      lawType: 'sexual',
+      label: '신고인(성희롱) 성인지·2차피해 방지 심층 문답지 (8문항)',
+      questions: [
+        '피신고인과의 직급·직무 관계 및 해당 상황이 발생한 장소·모임의 성격(업무시간·회식·출장·메신저 등 업무관련성)을 말씀해 주십시오.',
+        '문제 된 성적 언동이나 신체 접촉, 성적 요구의 구체적인 일시·장소 및 전후 정황을 기억나는 대로 말씀해 주십시오.',
+        '당시 행위에 대하여 거부 의사나 불쾌감을 표현하셨거나, 위계·분위기상 즉시 거부하기 어려웠던 사정이 있었습니까?',
+        '해당 언동 이후 성적 굴욕감·혐오감으로 인한 정신적 고통이나 업무 집중 저하 등 근무환경이 어떻게 변화하였습니까?',
+        '성적 언동에 대한 불응이나 문제 제기를 이유로 업무 배제, 평가 불이익 등 불리한 처우를 겪으신 사실이 있습니까?',
+        '사건 직후 가족·동료·상담기관에 피해 사실을 알린 내역이나 메신저·통화기록 등 간접 정황 증거가 있습니까?',
+        '2차 피해(소문 유포, 합의 종용 등) 발생 여부 및 현재 희망하시는 피해자 보호조치(남녀고평법 제14조 제4항)를 말씀해 주십시오.',
+        '행위자 인사조치 수위에 관한 사전 의견 및 추가로 진술하실 사항이 있습니까?'
+      ]
+    },
+    accused_sexual: {
+      id: 'accused_sexual',
+      role: 'accused',
+      lawType: 'sexual',
+      label: '피신고인(성희롱) 행위 맥락·거부의사 인지 소명 문답지 (7문항)',
+      questions: [
+        '남녀고용평등법 제14조에 따른 비밀누설 금지 및 신고인·참고인에 대한 불리한 처우·2차 가해 금지 의무를 고지받으셨습니까?',
+        '쟁점이 된 일시·장소(회식·회의·출장·메신저 등)에 참석하거나 연락한 사실 및 당시의 전반적인 분위기는 어떠했습니까?',
+        '신고인이 지목한 발언이나 신체 접촉 등 구체적 행위 중 인정하는 부분과 부인하거나 기억이 다른 부분을 구분하여 말씀해 주십시오.',
+        '당시 신고인의 표정·반응·자리 이동 등 불쾌감이나 거부 신호를 인지하신 바가 있습니까?',
+        '사건 이후 신고인에게 별도로 연락하거나 사과 메시지 등을 보낸 사실이 있습니까? 있다면 그 경위는 무엇입니까?',
+        '본 사안과 관련하여 소명하고자 하는 전후 맥락이나 제출하실 증빙자료가 있습니까?',
+        '조사 종결 시까지 공간·업무 분리 및 비밀유지 준수에 관한 확인 말씀을 해주십시오.'
+      ]
+    },
+    witness_common: {
+      id: 'witness_common',
+      role: 'witness',
+      lawType: 'common',
+      label: '참고인(목격자·동료) 직접목격·조직분위기 객관 확인 문답지 (6문항)',
+      questions: [
+        '참고인 진술은 근로기준법 제76조의3 제6항·제7항에 따라 철저히 비밀이 보장되며 어떠한 불이익 처우도 금지됨을 안내받으셨습니까?',
+        '신고인 및 피신고인과는 각각 어떤 업무 관계로 근무하고 계십니까?',
+        '쟁점이 된 일시·장소에서 문제의 발언이나 행동을 직접 목격·청취하신 사실이 있습니까? (직접 목격한 사실과 전해 들은 내용을 구분해 주십시오)',
+        '당시 피신고인의 언성·태도와 직후 신고인의 반응·상태는 어떠했습니까?',
+        '평소 부서 내 업무 지시 방식이나 회식·회의 문화에서 유사한 언행이 반복된 적이 있었습니까?',
+        '그 밖에 객관적 사실 확인을 위해 조사역이 참고해야 할 사항이 있습니까?'
+      ]
+    },
+    third_party_victim: {
+      id: 'third_party_victim',
+      role: 'victim',
+      lawType: 'third_party',
+      label: '고객·원하청 제3자 가해 피해근로자 보호 문답지 (6문항)',
+      questions: [
+        '가해 행위자(고객·민원인·거래처·원하청 관계자 등)의 소속·지위 및 귀하의 담당 업무와의 관련성을 말씀해 주십시오.',
+        '폭언·성적 언동·부당 업무지시 등이 발생한 구체적 일시·장소·매체(대면·유선·현장) 및 발언 내용을 말씀해 주십시오.',
+        '발생 직후 회사 관리자나 고충창구에 보고하고 업무의 일시적 중단·전환 등 보호조치를 요청하신 경위는 어떠합니까?',
+        '산업안전보건법 제41조 및 남녀고용평등법 제14조의2에 따른 분리·휴게시간 연장·치료 지원 등 현재 필요한 보호조치는 무엇입니까?',
+        '원·하청 도급 혼재 사업장인 경우 작업동선 분리나 원청 담당창구 협조가 필요한 사항이 있습니까?',
+        '관련 녹음파일·통화기록·메신저 등 제출하실 입증자료가 있습니까?'
+      ]
+    }
+  };
+
+  function normalizeTemplateId(tplId) {
+    var k = str(tplId);
+    return REPORT_TEMPLATES[k] ? k : 'laborfirm_deep';
+  }
+
+  function pickDefaultInterviewTemplate(caseRec, role) {
+    var c = obj(caseRec) ? caseRec : {};
+    var r = str(role) || 'victim';
+    if (r === 'witness') return 'witness_common';
+    if (str(c.caseSubType) === 'third_party' || str(c.caseSubType) === 'subcontract') {
+      if (r === 'victim') return 'third_party_victim';
+    }
+    if (c.category === 'sexual') {
+      return r === 'accused' ? 'accused_sexual' : 'victim_sexual';
+    }
+    return r === 'accused' ? 'accused_harass' : 'victim_harass';
+  }
+
+  /* 선택된 마스터 양식 기준 필수 구성항목·전용 입력칸 충족도 진단 */
+  function evaluateTemplateCompleteness(caseRec, secretRec, optTplId) {
+    var c = obj(caseRec) ? caseRec : {};
+    var sec = obj(secretRec) ? secretRec : {};
+    var tplId = normalizeTemplateId(optTplId || c.reportTemplate || sec.reportTemplate);
+    var tpl = REPORT_TEMPLATES[tplId];
+    var tm = (obj(sec.templateMeta) && obj(sec.templateMeta[tplId])) ? sec.templateMeta[tplId] : (obj(sec.templateMeta) ? sec.templateMeta : {});
+    var ivs = (Array.isArray(sec.interviews) ? sec.interviews : []).filter(function (x) { return obj(x) && !x._deleted; });
+    var isss = (Array.isArray(sec.issues) ? sec.issues : []).filter(function (x) { return obj(x) && !x._deleted; });
+    var evs = (Array.isArray(sec.evidences) ? sec.evidences : []).filter(function (x) { return obj(x) && !x._deleted; });
+
+    var items = [
+      { key: 'overview', label: '사건·착수 요지', ok: !!str(sec.overview), focusId: 'rOverview' },
+      { key: 'interviews', label: '당사자·참고인 진술 (' + ivs.length + '건)', ok: ivs.length > 0, act: 'addInterview' },
+      { key: 'issues', label: '쟁점·법정요건 검토 (' + isss.length + '건)', ok: isss.length > 0, act: 'addIssue' },
+      { key: 'evidences', label: '호증·공문 편철 (' + (evs.length + (Array.isArray(c.mailLinks) ? c.mailLinks.length : 0)) + '건)', ok: (evs.length > 0 || (Array.isArray(c.mailLinks) && c.mailLinks.length > 0)), act: 'addEvidence' }
+    ];
+
+    (tpl.fields || []).forEach(function (fd) {
+      var val = str(tm[fd.key]);
+      items.push({
+        key: 'tm_' + fd.key,
+        label: fd.label,
+        ok: fd.type === 'select' ? true : !!val,
+        focusId: 'tm_' + fd.key
+      });
+    });
+
+    if (tpl.hasMoelChecklist) {
+      var checkedCnt = MOEL_OBLIGATION_CHECKS.filter(function (chk) { return isMoelObligationMet(chk.key, c, sec, tm); }).length;
+      items.push({
+        key: 'moel_checks',
+        label: '법정의무 6대 점검 (' + checkedCnt + '/6)',
+        ok: checkedCnt >= 4,
+        focusId: 'moelck_' + MOEL_OBLIGATION_CHECKS[0].key
+      });
+    }
+
+    if (tplId === 'lawfirm_opinion' || tplId === 'nlrb_defense') {
+      var credCnt = isss.filter(function (iss) { return evaluateIssueCredibility(iss).hasExplicit || str(iss.credibilityNote); }).length;
+      items.push({
+        key: 'credibility',
+        label: '진술 신빙성 5지표 (' + credCnt + '/' + (isss.length || 1) + ')',
+        ok: isss.length > 0 && credCnt > 0,
+        act: isss.length ? 'editIssueFirst' : 'addIssue'
+      });
+    }
+
+    items.push({ key: 'conclusion', label: '종합 판단·결론', ok: !!(str(c.verdictSummary) && str(sec.conclusion)), focusId: 'rConclusion' });
+
+    var doneCnt = items.filter(function (it) { return it.ok; }).length;
+    var pct = items.length ? Math.round((doneCnt / items.length) * 100) : 100;
+    return {
+      templateId: tplId,
+      template: tpl,
+      total: items.length,
+      done: doneCnt,
+      pct: pct,
+      items: items
+    };
+  }
+
+  /* 조사 데이터 전체 + 선택된 마스터 양식(6종)에 따라 맞춤형 조사결과보고서·법률의견서 본문 자동 조립 */
+  function assembleReportDraft(caseRec, secretRec, optTplId) {
+    var c = obj(caseRec) ? caseRec : {};
+    var sec = obj(secretRec) ? secretRec : {};
+    var tplId = normalizeTemplateId(optTplId || c.reportTemplate || sec.reportTemplate);
+    var tpl = REPORT_TEMPLATES[tplId];
+    var tm = (obj(sec.templateMeta) && obj(sec.templateMeta[tplId])) ? sec.templateMeta[tplId] : (obj(sec.templateMeta) ? sec.templateMeta : {});
     var cat = CATEGORIES[c.category] || CATEGORIES.harass;
+    var subMeta = CASE_SUBTYPES[str(c.caseSubType)] || CASE_SUBTYPES[''];
+    var caseSchema = getLegalSchema(c);
     var steps = obj(c.steps) ? c.steps : {};
     var mails = Array.isArray(c.mailLinks) ? c.mailLinks : [];
     var interviews = Array.isArray(sec.interviews) ? sec.interviews.filter(function (x) { return obj(x) && !x._deleted; }) : [];
     var issues = Array.isArray(sec.issues) ? sec.issues.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    var evidences = renumberEvidences(sec.evidences || []);
+    var victimOpinions = Array.isArray(sec.victimOpinions) ? sec.victimOpinions.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    var closureConsents = Array.isArray(sec.closureConsents) ? sec.closureConsents.filter(function (x) { return obj(x) && !x._deleted; }) : [];
+    var surveyStats = (Array.isArray(sec.surveyResponses) && sec.surveyResponses.length) ? aggregateSurveyResponses(sec.surveyResponses) : null;
     var verdict = VERDICTS[str(c.verdictSummary)] || VERDICTS[''];
 
-    var lines = [];
-    lines.push('【 ' + cat.label + ' 사안 외부전문가 조사결과보고서 】');
-    lines.push('');
-    lines.push('1. 사건 개요');
-    lines.push('  가. 의뢰 사업장: ' + (str(c.companyName) || '(미입력)'));
-    lines.push('  나. 사건명: ' + (str(c.title) || cat.label + ' 조사 건'));
-    lines.push('  다. 조사 구분: ' + cat.label + (c.category === 'sexual' ? ' (남녀고용평등법 제14조)' : c.category === 'both' ? ' (근로기준법 제76조의2·남녀고용평등법 제14조)' : ' (근로기준법 제76조의2·제76조의3)'));
-    lines.push('  라. 조사 기간: ' + (str(c.receiveDate) || '착수일') + ' ~ ' + (str(c.closeDate) || str(c.dueDate) || '진행 중'));
-    if (str(sec.overview)) {
-      lines.push('  마. 신고 요지: ' + maskRrnText(str(sec.overview)));
-    }
-    lines.push('');
+    var lawLawDesc = str(c.caseSubType) === 'third_party'
+      ? ' (산업안전보건법 제41조 · 남녀고용평등법 제14조의2)'
+      : c.category === 'sexual'
+        ? ' (남녀고용평등법 제2조 제2호 · 제14조)'
+        : c.category === 'both'
+          ? ' (근로기준법 제76조의2 · 남녀고용평등법 제14조)'
+          : ' (근로기준법 제76조의2 · 제76조의3)';
 
-    lines.push('2. 조사 경위 및 진행 절차');
-    STEPS.forEach(function (def) {
-      var st = steps[def.code];
-      if (st && st.done) {
-        lines.push('  - ' + def.name + ': ' + (st.date || '완료') + (st.note ? ' (' + maskRrnText(st.note) + ')' : ''));
+    var ynMap = { yes: '충족', no: '미충족', hold: '검토중' };
+    var factMap = { recognized: '사실 인정', partial: '일부 인정', unrecognized: '불인정' };
+    var recCount = issues.filter(function (iss) { return (str(iss.verdict) || judgeIssue(iss)) === 'yes'; }).length;
+
+    function pushPartyStatements(lines) {
+      if (!interviews.length) {
+        lines.push('  - 등록된 면담 진술 요약이 없습니다.');
+      } else {
+        interviews.forEach(function (iv, idx) {
+          var roleKr = iv.role === 'accused' ? '피신고인(행위자)' : iv.role === 'witness' ? '참고인' : '신고인(피해자)';
+          var qaCnt = Array.isArray(iv.qaList) ? iv.qaList.filter(function (q) { return obj(q) && (str(q.q) || str(q.a)); }).length : 0;
+          var badges = [];
+          if (iv.pledgeSigned) badges.push('비밀유지서약 완료');
+          if (iv.stmtSigned) badges.push('진술확인 전자서명 완료' + (iv.docHash ? '·지문 ' + str(iv.docHash).slice(0, 8) : ''));
+          if (qaCnt > 0) badges.push('문답 ' + qaCnt + '항');
+          lines.push('  (' + (idx + 1) + ') [' + roleKr + '] ' + (maskRrnText(str(iv.alias)) || '익명') +
+            (iv.dept ? ' · ' + maskRrnText(str(iv.dept)) : '') +
+            (iv.date ? ' (' + str(iv.date) + ', ' + (maskRrnText(str(iv.method)) || '면담') + ')' : '') +
+            (badges.length ? ' [' + badges.join(' · ') + ']' : ''));
+          lines.push('      진술 요지: ' + (maskRrnText(str(iv.summary)) || '(요지 미입력)'));
+          if (str(iv.amendNote)) {
+            lines.push('      진술인 정정·보완 의견: ' + maskRrnText(str(iv.amendNote)));
+          }
+        });
       }
-    });
-    if (!STEPS.some(function (d) { return steps[d.code] && steps[d.code].done; })) {
-      lines.push('  - (진행 단계 기록 전)');
     }
-    lines.push('');
 
-    lines.push('3. 당사자 및 참고인 면담 요지');
-    if (!interviews.length) {
-      lines.push('  - 등록된 면담 진술 요약이 없습니다.');
-    } else {
-      interviews.forEach(function (iv, idx) {
-        var roleKr = iv.role === 'accused' ? '피신고인(행위자)' : iv.role === 'witness' ? '참고인' : '신고인(피해자)';
-        var qaCnt = Array.isArray(iv.qaList) ? iv.qaList.filter(function (q) { return obj(q) && (str(q.q) || str(q.a)); }).length : 0;
-        var badges = [];
-        if (iv.pledgeSigned) badges.push('비밀유지서약 완료');
-        if (iv.stmtSigned) badges.push('진술확인 전자서명 완료' + (iv.docHash ? '·지문 ' + str(iv.docHash).slice(0, 8) : ''));
-        if (qaCnt > 0) badges.push('문답 ' + qaCnt + '항');
-        lines.push('  (' + (idx + 1) + ') [' + roleKr + '] ' + (maskRrnText(str(iv.alias)) || '익명') +
-          (iv.dept ? ' · ' + maskRrnText(str(iv.dept)) : '') +
-          (iv.date ? ' (' + str(iv.date) + ', ' + (maskRrnText(str(iv.method)) || '면담') + ')' : '') +
-          (badges.length ? ' [' + badges.join(' · ') + ']' : ''));
-        lines.push('      진술 요지: ' + (maskRrnText(str(iv.summary)) || '(요지 미입력)'));
-        if (str(iv.amendNote)) {
-          lines.push('      진술인 정정·보완 의견: ' + maskRrnText(str(iv.amendNote)));
+    function pushEvidencesAndSurvey(lines) {
+      if (evidences.length) {
+        evidences.forEach(function (ev) {
+          lines.push('  - [' + ev.exhibitNo + '] ' + (ev.date ? ev.date + ' · ' : '') + ev.title +
+            (ev.submitter ? ' (제출: ' + ev.submitter + ')' : '') +
+            (ev.summary ? ' — ' + ev.summary : ''));
+        });
+      }
+      if (!evidences.length && !mails.length) {
+        lines.push('  - 수집된 메일·호증 기록이 없습니다.');
+      } else if (mails.length) {
+        mails.slice(0, 25).forEach(function (m, idx) {
+          var rLbl = (DOC_ROLES[m.docRole] || DOC_ROLES.general).label;
+          var atts = (Array.isArray(m.attNames) && m.attNames.length) ? ' (첨부: ' + m.attNames.join(', ') + ')' : '';
+          lines.push('  - [공문 ' + (idx + 1) + '] ' + (m.date || '') + ' [' + rLbl + '] ' + maskRrnText(str(m.subject)) + atts);
+        });
+      }
+      if (surveyStats && surveyStats.total > 0) {
+        lines.push('');
+        lines.push('  [부서·조직 무기명 실태조사 설문 집계 — 응답 ' + surveyStats.total + '명]');
+        surveyStats.items.forEach(function (it, qi) {
+          lines.push('    · 문항 ' + (qi + 1) + '. ' + it.q + ' → 주의·반복 응답 ' + it.highRiskCnt + '명 (' + it.highRiskPct + '%)');
+        });
+        if (surveyStats.comments.length) {
+          lines.push('    · 주요 자유의견 요약: ' + surveyStats.comments.slice(0, 5).join(' / '));
         }
-      });
+      }
     }
-    lines.push('');
 
-    lines.push('4. 수집 공문 및 제출 증거 목록 (총 ' + mails.length + '건)');
-    if (!mails.length) {
-      lines.push('  - 수집된 메일·공문 기록이 없습니다.');
-    } else {
-      mails.slice(0, 30).forEach(function (m, idx) {
-        var rLbl = (DOC_ROLES[m.docRole] || DOC_ROLES.general).label;
-        var atts = (Array.isArray(m.attNames) && m.attNames.length) ? ' (첨부: ' + m.attNames.join(', ') + ')' : '';
-        lines.push('  - [증거/공문 ' + (idx + 1) + '] ' + (m.date || '') + ' [' + rLbl + '] ' + maskRrnText(str(m.subject)) + atts);
-      });
-    }
-    lines.push('');
-
-    lines.push('5. 쟁점 행위별 사실인정 및 법정 요건 검토');
-    if (!issues.length) {
-      lines.push('  - 등록된 쟁점 행위가 없습니다.');
-    } else {
-      var ynMap = { yes: '충족', no: '미충족', hold: '검토중' };
-      var factMap = { recognized: '사실 인정', partial: '일부 인정', unrecognized: '불인정' };
-      var resMap = { yes: '괴롭힘·성희롱 해당', no: '비해당', hold: '판단 보류' };
+    function pushIssuesAnalysis(lines, includeCredibility) {
+      if (!issues.length) {
+        lines.push('  - 등록된 쟁점 행위가 없습니다.');
+        return;
+      }
       issues.forEach(function (iss, idx) {
+        var issLaw = inferIssueLawType(iss, c);
+        var sch = getLegalSchema(c, '', issLaw);
         var autoRes = str(iss.verdict) || judgeIssue(iss);
-        lines.push('  [쟁점 ' + (idx + 1) + '] ' + (maskRrnText(str(iss.title)) || '행위 ' + (idx + 1)) + (iss.whenWhere ? ' (' + maskRrnText(str(iss.whenWhere)) + ')' : ''));
+        var resText = autoRes === 'yes' ? sch.verdictYes : autoRes === 'no' ? sch.verdictNo : '판단 보류';
+        var cred = evaluateIssueCredibility(iss);
+        lines.push('  [쟁점 ' + (idx + 1) + '] ' + (maskRrnText(str(iss.title)) || '행위 ' + (idx + 1)) +
+          (iss.whenWhere ? ' (' + maskRrnText(str(iss.whenWhere)) + ')' : '') +
+          ' — 적용법리: ' + sch.lawBasis);
         if (iss.claimVictim) lines.push('    · 신고인 주장: ' + maskRrnText(str(iss.claimVictim)));
         if (iss.claimAccused) lines.push('    · 피신고인 소명: ' + maskRrnText(str(iss.claimAccused)));
         if (iss.evidenceNote) lines.push('    · 객관적 증거·판단 근거: ' + maskRrnText(str(iss.evidenceNote)));
+        if (includeCredibility || cred.hasExplicit || cred.note) {
+          var credDetail = cred.checkedLabels.length ? (' [충족지표: ' + cred.checkedLabels.join('·') + ']') : '';
+          lines.push('    · 진술 신빙성 평가: ' + cred.level + credDetail + (cred.note ? (' — ' + cred.note) : ''));
+        }
         lines.push('    · 사실인정 결과: ' + (factMap[iss.factStatus] || '검토중'));
-        lines.push('    · 3요건 검토: ① 지위·관계 우위(' + (ynMap[iss.elemSuperiority] || '검토중') +
-          ') / ② 업무상 적정범위 초과(' + (ynMap[iss.elemBeyondScope] || '검토중') +
-          ') / ③ 신체·정신적 고통 또는 근무환경 악화(' + (ynMap[iss.elemHarm] || '검토중') + ')');
-        lines.push('    · 쟁점 판단: 【 ' + (resMap[autoRes] || '검토중') + ' 】');
+        lines.push('    · 법정 요건 포섭: ' + sch.e1.chip + '(' + (ynMap[iss.elemSuperiority] || '검토중') +
+          ') / ' + sch.e2.chip + '(' + (ynMap[iss.elemBeyondScope] || '검토중') +
+          ') / ' + sch.e3.chip + '(' + (ynMap[iss.elemHarm] || '검토중') + ')');
+        lines.push('    · 최종 판단: 【 ' + resText + ' 】' + (autoRes === 'yes' ? ' (괴롭힘·성희롱 해당 · 법 위반 성립)' : ''));
         lines.push('');
       });
     }
 
-    lines.push('6. 종합 결론 및 사용자 조치 권고안');
-    lines.push('  가. 종합 판단: ' + verdict.label);
-    lines.push('  나. 종합 의견: ' + (maskRrnText(str(sec.conclusion)) || '위 사실인정 및 법리 검토 결과를 종합하여 판단함.'));
-    lines.push('  다. 법정 후속 조치 권고 (근로기준법 제76조의3 제4항~제7항):');
-    lines.push('    1) 피해근로자 보호조치: 피해근로자 의견 청취 후 근무장소 변경, 배치전환, 유급휴가 명령 등 적절한 보호조치 시행');
-    lines.push('    2) 행위자 조치: 취업규칙 및 인사규정에 따른 징계·근무장소 변경 등 필요한 조치 (조치 전 피해근로자 의견 청취 필수)');
-    lines.push('    3) 불리한 처우 금지: 신고인·피해근로자·참고인에 대한 해고나 그 밖의 불리한 처우 엄격 금지 (위반 시 3년 이하 징역 또는 3천만원 이하 벌금)');
-    lines.push('    4) 비밀유지 의무: 조사 참여자 전원의 직무상 비밀 누설 금지 안내 (위반 시 500만원 이하 과태료)');
-    if (str(sec.recommendations)) {
-      lines.push('    5) 사업장 맞춤 권고사항: ' + maskRrnText(str(sec.recommendations)));
+    function pushStatutoryRecommendations(lines) {
+      if (victimOpinions.length) {
+        var latestOp = victimOpinions[victimOpinions.length - 1];
+        lines.push('  · 피해근로자 사전 의견청취 확인: ' + (str(latestOp.date) || '확인 완료') +
+          ' — 희망 보호·후속조치: ' + maskRrnText(str(latestOp.measuresText || latestOp.summary) || '의견 확인필'));
+      }
+      if (closureConsents.length) {
+        var latestCl = closureConsents[closureConsents.length - 1];
+        lines.push('  · 당사자 조사종료·취하·합의 의사 확인: ' + (str(latestCl.date) || '확인 완료') +
+          ' — ' + maskRrnText(str(latestCl.summary) || '자유의사에 따른 종결 동의 확인필'));
+      }
+      lines.push('  · 관계 법령상 필수 후속 조치 권고 (' + caseSchema.lawBasis + '):');
+      if (str(c.caseSubType) === 'third_party') {
+        lines.push('    1) 고객 등 제3자 분리·업무중단: 업무의 일시적 중단·전환, 휴게시간 연장, 치료·상담 지원 등 보호조치 즉시 이행');
+        lines.push('    2) 불이익 처우 금지: 피해 주장 및 보호조치 요구를 이유로 한 해고나 불리한 처우 엄금');
+      } else if (str(c.caseSubType) === 'subcontract') {
+        lines.push('    1) 원·하청 도급 근무공간·업무동선 분리: 도급인·수급인 간 인사권 직접 개입을 배제하고 작업장소 분리 및 담당창구 일원화 시행');
+        lines.push('    2) 수급인 소속 피해근로자 보호협조 및 재발방지 공동 예방교육 실시');
+      } else if (c.category === 'sexual') {
+        lines.push('    1) 피해근로자 보호조치(남녀고평법 제14조 제4항): 근무장소 변경, 배치전환, 유급휴가 명령 등 시행 (의사에 반하는 조치 금지)');
+        lines.push('    2) 행위자 징계 등 조치(제14조 제5항): 성희롱 사실 확인 시 지체 없이 징계·근무장소 변경 등 조치 (조치 전 피해근로자 의견 청취 필수)');
+        lines.push('    3) 불리한 처우 및 비밀누설 금지(제14조 제6항·제7항): 신고·피해근로자·참고인에 대한 불리한 처우 및 조사 비밀 누설 엄금');
+      } else {
+        lines.push('    1) 피해근로자 보호조치(근로기준법 제76조의3 제4항): 피해근로자 의견 청취 후 근무장소 변경, 배치전환, 유급휴가 명령 등 적절한 조치 시행');
+        lines.push('    2) 행위자 조치(제76조의3 제5항): 사규에 따른 징계·근무장소 변경 등 필요한 조치 (조치 전 반드시 피해근로자 의견 사전 청취 필수)');
+        lines.push('    3) 불리한 처우 금지(제76조의3 제6항): 신고인·피해근로자·참고인에 대한 해고 등 불리한 처우 엄격 금지 (3년 이하 징역 또는 3천만원 이하 벌금)');
+        lines.push('    4) 비밀유지 및 사후 모니터링(제76조의3 제7항): 조사 참여자 비밀누설 금지 및 종결 후 2차 가해 여부 정기 점검');
+      }
+      if (str(sec.recommendations)) {
+        lines.push('  · 사업장 맞춤 권고사항: ' + maskRrnText(str(sec.recommendations)));
+      }
     }
+
+    function pushStepHistory(lines) {
+      if (c.fairnessChecked) {
+        lines.push('  - 외부 조사위원 제척·기피·회피 해당 없음 공정성 확인 완료');
+      }
+      STEPS.forEach(function (def) {
+        var st = steps[def.code];
+        if (st && st.done) {
+          lines.push('  - ' + def.name + ': ' + (st.date || '완료') + (st.note ? ' (' + maskRrnText(st.note) + ')' : ''));
+        }
+      });
+      if (!STEPS.some(function (d) { return steps[d.code] && steps[d.code].done; })) {
+        lines.push('  - (진행 단계 기록 전)');
+      }
+    }
+
+    var lines = [];
+    lines.push('【 ' + cat.label + ' ' + tpl.docTitleSuffix + ' 】');
+    lines.push('  [적용 양식: ' + tpl.name + ' · ' + tpl.docClassBadge + ']');
+    lines.push('');
+
+    if (tplId === 'lawfirm_opinion') {
+      /* ① 대형 법무법인(로펌) 법률검토의견서형 */
+      var riskMap = { low: '안정 (방어력 충분)', mid: '보통 (절차·양정 비례성 유의)', high: '주의 (분쟁·부당징계 리스크 높음)' };
+      lines.push('Ⅰ. 검토 배경 및 핵심 법률의견 요약 (Executive Summary)');
+      if (str(tm.docRefNo)) lines.push('  1. 문서관리번호: ' + maskRrnText(str(tm.docRefNo)));
+      lines.push('  2. 의뢰인(회사) 및 사안명: ' + (str(c.companyName) || '(미입력)') + ' / ' + (str(c.title) || cat.label + ' 조사 건'));
+      lines.push('  3. 검토 질의 요지 (Issues Presented): ' + (maskRrnText(str(tm.querySummary)) || (cat.label + lawLawDesc + ' 해당 여부 및 인사조치의 법적 적정성 검토')));
+      lines.push('  4. 핵심 법률의견 결론 (Brief Answer): 【 ' + verdict.label + ' 】 (전체 쟁점 ' + issues.length + '건 중 인정 ' + recCount + '건)');
+      lines.push('     ' + (maskRrnText(str(tm.execSummary || sec.conclusion)) || '확보된 문답 진술의 신빙성 및 객관적 호증을 대법원 판례 법리에 비추어 종합 검토한 결과 위와 같이 판단함.'));
+      lines.push('  5. 분쟁·소송 리스크 진단: ' + (riskMap[str(tm.litigationRisk)] || riskMap.low));
+      lines.push('');
+
+      lines.push('Ⅱ. 조사 범위 및 적법절차(Due Process · 방어권 보장) 이행 경과');
+      lines.push('  1. 조사 기간: ' + (str(c.receiveDate) || '착수일') + ' ~ ' + (str(c.closeDate) || effectiveDueDateOf(c) || '진행 중'));
+      if (str(sec.overview)) lines.push('  2. 사건 접수 및 착수 경위: ' + maskRrnText(str(sec.overview)));
+      pushStepHistory(lines);
+      lines.push('');
+
+      lines.push('Ⅲ. 관련 법령·판례 법리 및 사규 체계');
+      lines.push('  1. 적용 법령: ' + caseSchema.lawBasis + ' — ' + caseSchema.e1.label + ', ' + caseSchema.e2.label + ', ' + caseSchema.e3.label);
+      lines.push('  2. 진술 신빙성 판단 법리: 대법원 판례에 따라 진술 내용 자체의 합리성·일관성·구체성, 객관적 정황·참고인 진술과의 부합 여부, 허위 진술 동기 유무를 종합 심리함.');
+      if (str(sec.companyRuleQuote)) lines.push('  3. 관련 사규(취업규칙·인사규정): ' + maskRrnText(str(sec.companyRuleQuote)));
+      lines.push('');
+
+      lines.push('Ⅳ. 당사자·참고인 진술 요지 및 진술 신빙성(Credibility) 5대 지표 분석');
+      pushPartyStatements(lines);
+      lines.push('  [제출 호증 및 객관적 입증자료 (' + evidences.length + '건)]');
+      pushEvidencesAndSurvey(lines);
+      lines.push('');
+
+      lines.push('Ⅴ. 쟁점 행위별 사실관계 확정 및 법리 포섭(Subsumption) 의견');
+      pushIssuesAnalysis(lines, true);
+
+      lines.push('Ⅵ. 인사조치 양정 적정성 및 노동위원회·소송 리스크 관리 제언');
+      lines.push('  · 최종 법률의견: ' + (maskRrnText(str(sec.conclusion)) || verdict.label));
+      pushStatutoryRecommendations(lines);
+
+    } else if (tplId === 'moel_standard') {
+      /* ② 고용노동부 매뉴얼 별지 · 감독관 대응 표준형 */
+      var mc = obj(tm.moelChecks) ? tm.moelChecks : {};
+      lines.push('1. 사건 접수 및 당사자 개요 (고용노동부 표준매뉴얼 기준)');
+      lines.push('  가. 사업장명: ' + (str(c.companyName) || '(미입력)') + (str(c.bizNo) ? ' (사업자등록번호: ' + str(c.bizNo) + ')' : ''));
+      lines.push('  나. 사건명 및 구분: ' + (str(c.title) || cat.label + ' 조사 건') + ' / ' + cat.label + (str(c.caseSubType) ? ' · ' + subMeta.label : '') + lawLawDesc);
+      lines.push('  다. 인지·접수 경로 및 조사 기간: ' + (maskRrnText(str(tm.intakeRoute)) || '고충접수') + ' (' + (str(c.receiveDate) || '착수일') + ' ~ ' + (str(c.closeDate) || effectiveDueDateOf(c) || '진행 중') + ')');
+      if (str(c.laborOffice) || str(c.govCaseNo)) {
+        lines.push('  라. 관할 노동관서 · 사건번호: ' + [str(c.laborOffice), str(c.inspectorName) ? ('담당 ' + str(c.inspectorName)) : '', str(c.govCaseNo)].filter(Boolean).join(' · '));
+      }
+      lines.push('');
+
+      lines.push('2. 신고 행위 요지 및 객관적 조사 실시 경과');
+      if (str(sec.overview)) lines.push('  가. 신고 및 착수 요지: ' + maskRrnText(str(sec.overview)));
+      if (str(tm.interimMeasure)) lines.push('  나. 조사 기간 중 잠정 보호·분리조치(제76조의3 제3항): ' + maskRrnText(str(tm.interimMeasure)));
+      pushStepHistory(lines);
+      lines.push('');
+
+      lines.push('3. 당사자 · 참고인 문답 요지 및 입증자료 목록');
+      pushPartyStatements(lines);
+      pushEvidencesAndSurvey(lines);
+      lines.push('');
+
+      lines.push('4. 법정 성립요건 항목별 판단 (' + caseSchema.lawBasis + ')');
+      pushIssuesAnalysis(lines, false);
+
+      lines.push('5. 사용자 법정의무 6대 항목(근로기준법 제76조의3 · 남녀고용평등법 제14조) 이행 점검표');
+      MOEL_OBLIGATION_CHECKS.forEach(function (chk) {
+        var autoOk = isMoelObligationMet(chk.key, c, sec, tm);
+        lines.push('  ' + (autoOk ? '☑ [이행확인] ' : '☐ [점검대상] ') + chk.label);
+      });
+      lines.push('');
+
+      lines.push('6. 종합 판단 결과 및 재발방지 시정계획');
+      lines.push('  · 종합 판정: ' + verdict.label + ' — ' + (maskRrnText(str(sec.conclusion)) || '위 요건별 검토 결과에 따름.'));
+      if (str(sec.companyRuleQuote)) lines.push('  · 적용 취업규칙 조항: ' + maskRrnText(str(sec.companyRuleQuote)));
+      pushStatutoryRecommendations(lines);
+      if (str(tm.preventPlan)) lines.push('  · 향후 재발방지 및 예방교육 이행계획: ' + maskRrnText(str(tm.preventPlan)));
+
+    } else if (tplId === 'public_committee') {
+      /* ③ 공공기관·공기업 감사실·고충심의위원회 상정형 */
+      var resOrderMap = {
+        uphold: '인용 (직장 내 괴롭힘·성희롱에 해당함 — 가결)',
+        partial: '일부 인용 (일부 쟁점 행위에 한하여 해당함 — 일부 가결)',
+        dismiss: '기각 (직장 내 괴롭힘·성희롱에 해당하지 아니함)',
+        reject: '각하 (심의 요건 불비 또는 신청인 자유의사 취하)'
+      };
+      lines.push('Ⅰ. 고충심의위원회 부의 안건 개요 및 위원회 구성 확인');
+      lines.push('  1. 안건번호 · 소관부서: ' + (maskRrnText(str(tm.agendaNo)) || '제' + caseYearOf(c) + '-고충심의-호 · 감사/인권윤리 부서'));
+      lines.push('  2. 기관명 · 안건명: ' + (str(c.companyName) || '(미입력)') + ' / ' + (str(c.title) || cat.label + ' 심의의 건'));
+      lines.push('  3. 외부위원 참여 및 제척·기피·회피 확인: ' + (maskRrnText(str(tm.committeeQuorum)) || (c.fairnessChecked ? '외부전문가 참여 및 제척사유 없음 확인 완료' : '외부전문가 조사위원 독립 조사 수행')));
+      if (str(sec.overview)) lines.push('  4. 상정(부의) 사유 요지: ' + maskRrnText(str(sec.overview)));
+      lines.push('');
+
+      lines.push('Ⅱ. 신청인·피신청인 진술 및 참고인 조사 결과');
+      pushPartyStatements(lines);
+      pushEvidencesAndSurvey(lines);
+      lines.push('');
+
+      lines.push('Ⅲ. 인권 · 성인지 감수성 및 2차 피해 유발 여부 검토');
+      lines.push('  · ' + (maskRrnText(str(tm.secondaryHarmNote)) || '피해자 중심 보호원칙, 성인지 감수성 판단 기준(대법원 판례) 및 조사 중 소문 유포·회유·보복 등 2차 피해 발생 여부를 병행 점검함.'));
+      pushStepHistory(lines);
+      lines.push('');
+
+      lines.push('Ⅳ. 행위별 관계법령 및 기관 인권·복무지침 위반 판단');
+      if (str(sec.companyRuleQuote)) lines.push('  · 관련 지침·취업규칙 근거: ' + maskRrnText(str(sec.companyRuleQuote)));
+      pushIssuesAnalysis(lines, true);
+
+      lines.push('Ⅴ. 고충심의위원회 의결 주문(안) 및 기관장 조치 건의');
+      lines.push('  1. 의결 주문(안): 【 ' + (resOrderMap[str(tm.resolutionOrder)] || verdict.label) + ' 】');
+      lines.push('  2. 종합 심의 의견: ' + (maskRrnText(str(sec.conclusion)) || '위 사실조사 및 법령·내규 검토 결과와 같음.'));
+      pushStatutoryRecommendations(lines);
+
+    } else if (tplId === 'corp_executive') {
+      /* ④ 대기업 준법감시·경영진(C-Level)·인사위원회 요약보고형 */
+      var sevMap = { S: 'S등급 (Critical — 중대 비위)', A: 'A등급 (High — 법 위반 인정)', B: 'B등급 (Medium — 주의·경고)', C: 'C등급 (Low — 불인정·종결)' };
+      var lightMap = { red: '[고위험/적색]', amber: '[주의/황색]', green: '[안정/녹색]' };
+      lines.push('[Executive Brief] 경영진 의사결정 핵심 요약');
+      lines.push('  · 대상 법인 / 사안명: ' + (str(c.companyName) || '(미입력)') + ' — ' + (str(c.title) || cat.label + ' 특별조사'));
+      lines.push('  · 사안 심각도 등급: ' + (sevMap[str(tm.severityGrade)] || sevMap.A) + '  |  최종 판정: ' + verdict.label + ' (인정 ' + recCount + '건 / 전체 ' + issues.length + '건)');
+      lines.push('  · 리스크 신호등: 법규·행정 ' + (lightMap[str(tm.riskLegal)] || '[안정/녹색]') + '  /  평판·조직이탈 ' + (lightMap[str(tm.riskRep)] || '[주의/황색]'));
+      lines.push('  · 3대 핵심 보고 요지:');
+      lines.push('    ' + (maskRrnText(str(tm.execKeyPoints || sec.conclusion || sec.overview)) || '외부전문가 독립 사실조사 결과 객관적 증거에 기초하여 사실관계를 확정하고 인사위원회 후속조치를 건의함.'));
+      lines.push('');
+
+      lines.push('[Action Plan] 인사위원회 부의 수위 및 즉시 실행 과제');
+      lines.push('  · 종합 결론: ' + (maskRrnText(str(sec.conclusion)) || verdict.label));
+      pushStatutoryRecommendations(lines);
+      lines.push('');
+
+      lines.push('[Annex 1] 쟁점 행위별 사실인정 및 법정요건 검증 매트릭스');
+      pushIssuesAnalysis(lines, true);
+
+      lines.push('[Annex 2] 당사자·참고인 진술 및 핵심 물증(호증) 요지');
+      pushPartyStatements(lines);
+      pushEvidencesAndSurvey(lines);
+      lines.push('');
+
+      lines.push('[Annex 3] 사규·윤리강령 적용 조항 및 조사 절차 기록');
+      if (str(sec.companyRuleQuote)) lines.push('  · 관련 사규·윤리강령: ' + maskRrnText(str(sec.companyRuleQuote)));
+      pushStepHistory(lines);
+
+    } else if (tplId === 'nlrb_defense') {
+      /* ⑤ 지방노동위원회·법원 부당징계 방어 소명형 */
+      lines.push('Ⅰ. 처분(조사) 경위 및 조사·소명 절차의 적법성 입증');
+      lines.push('  1. 당사자 및 사건 개요: ' + (str(c.companyName) || '(미입력)') + ' / ' + (str(c.title) || cat.label + ' 건'));
+      if (str(sec.overview)) lines.push('  2. 사건 발단 및 착수 경위: ' + maskRrnText(str(sec.overview)));
+      lines.push('  3. 방어권 및 소명기회 보장 내역: ' + (maskRrnText(str(tm.dueProcessNote)) || '객관적 외부전문가 조사, 피신고인 대면·서면 소명기회 부여 및 진술확인 서명 절차 적법 이행'));
+      pushStepHistory(lines);
+      lines.push('');
+
+      lines.push('Ⅱ. 징계(혐의)사유별 구체적 사실인정 및 입증 호증 1:1 매핑');
+      pushIssuesAnalysis(lines, true);
+      lines.push('  [입증 호증 편철 목록 (' + evidences.length + '건)]');
+      pushEvidencesAndSurvey(lines);
+      lines.push('');
+
+      lines.push('Ⅲ. 당사자 진술 신빙성 대비 및 피징계자 주장 반박 논리');
+      pushPartyStatements(lines);
+      if (str(tm.defensePoint)) {
+        lines.push('  · 예상 항변 및 핵심 반박 논리: ' + maskRrnText(str(tm.defensePoint)));
+      }
+      lines.push('');
+
+      lines.push('Ⅳ. 징계양정의 적정성(사회통념상 상당성 · 비례원칙 · 형평성) 검토');
+      if (str(sec.companyRuleQuote)) lines.push('  · 취업규칙·인사규정 징계근거: ' + maskRrnText(str(sec.companyRuleQuote)));
+      if (str(tm.equityNote)) lines.push('  · 동종사례 형평성 및 가중·감경 참작사유: ' + maskRrnText(str(tm.equityNote)));
+      var discSug = suggestDisciplinaryLevel(issues, {});
+      if (discSug && discSug.summary) lines.push('  · 양정 기준선 검토: ' + discSug.summary);
+      lines.push('');
+
+      lines.push('Ⅴ. 최종 소명 결론 및 사후 보호조치 이행');
+      lines.push('  · 종합 판단: ' + verdict.label + ' — ' + (maskRrnText(str(sec.conclusion)) || '징계사유·절차·양정 모두 정당성 요건을 충족함.'));
+      pushStatutoryRecommendations(lines);
+
+    } else {
+      /* ⑥ 기본값: 전문 노무법인 심층 사실조사 표준형 (laborfirm_deep) */
+      lines.push('1. 사건 개요');
+      lines.push('  가. 의뢰 사업장: ' + (str(c.companyName) || '(미입력)'));
+      lines.push('  나. 사건명: ' + (str(c.title) || cat.label + ' 조사 건'));
+      lines.push('  다. 조사 구분: ' + cat.label + (str(c.caseSubType) ? ' · ' + subMeta.label : '') + lawLawDesc);
+      lines.push('  라. 조사 기간: ' + (str(c.receiveDate) || '착수일') + ' ~ ' + (str(c.closeDate) || effectiveDueDateOf(c) || '진행 중'));
+      if (str(tm.investTeam)) lines.push('  마. 외부조사단 구성 · 조사방식: ' + maskRrnText(str(tm.investTeam)));
+      if (str(tm.orgContext)) lines.push('  바. 당사자 위계 · 업무체계 맥락: ' + maskRrnText(str(tm.orgContext)));
+      if (str(c.laborOffice) || str(c.govCaseNo)) {
+        lines.push('  사. 행정기관 연계: ' + [str(c.laborOffice), str(c.inspectorName) ? ('담당 ' + str(c.inspectorName)) : '', str(c.govCaseNo)].filter(Boolean).join(' · '));
+      }
+      if (str(sec.overview)) lines.push('  아. 신고 및 착수 요지: ' + maskRrnText(str(sec.overview)));
+      if (str(sec.companyRuleQuote)) lines.push('  자. 관련 사규(취업규칙·인사규정) 근거: ' + maskRrnText(str(sec.companyRuleQuote)));
+      lines.push('');
+
+      lines.push('2. 조사 경위 및 공정성·비밀유지 확보 절차');
+      pushStepHistory(lines);
+      lines.push('');
+
+      lines.push('3. 당사자·참고인 진술 요지 및 제출 호증 편철 (호증 ' + evidences.length + '건 · 공문 ' + mails.length + '건)');
+      pushPartyStatements(lines);
+      lines.push('');
+      pushEvidencesAndSurvey(lines);
+      lines.push('');
+
+      lines.push('4. 쟁점 행위별 사실인정 및 법정 성립요건 포섭');
+      pushIssuesAnalysis(lines, false);
+
+      lines.push('5. 종합 판정 결론 및 단계별 인사조치 실행 로드맵');
+      lines.push('  가. 종합 판단: ' + verdict.label);
+      lines.push('  나. 종합 의견: ' + (maskRrnText(str(sec.conclusion)) || '위 사실인정 및 법리 검토 결과를 종합하여 판단함.'));
+      if (str(tm.actionRoadmap)) {
+        lines.push('  다. 단계별 인사·조직관리 실행 로드맵: ' + maskRrnText(str(tm.actionRoadmap)));
+      }
+      pushStatutoryRecommendations(lines);
+    }
+
     lines.push('');
     lines.push('작성기관: 푸른노무법인');
 
@@ -3098,9 +4454,78 @@
     return nextSec;
   }
 
+  /* 클로바노트·다글로·음성메모 텍스트의 화자 표기(참석자 1, 화자 A 등)를 조사역·진술인 표준 머리말로 일괄 치환 */
+  function replaceTranscriptSpeakers(rawText, qSpeaker, aSpeaker, aRoleLabel) {
+    var out = maskRrnText(String(rawText == null ? '' : rawText));
+    function escRe(v) { return v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    if (Array.isArray(qSpeaker)) {
+      qSpeaker.forEach(function (pair) {
+        if (!obj(pair) || !str(pair.from) || !str(pair.to)) return;
+        var pRe = new RegExp('(^|\\n)(\\s*(?:\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\]\\s*|\\(\\d{1,2}:\\d{2}(?::\\d{2})?\\)\\s*|\\d{1,2}:\\d{2}(?::\\d{2})?\\s*)?)' + escRe(str(pair.from)) + '(?:\\s*[:.)\\]】>]\\s*|\\s{2,})', 'gm');
+        out = out.replace(pRe, '$1$2' + str(pair.to) + ': ');
+      });
+      return out;
+    }
+    if (obj(qSpeaker)) {
+      Object.keys(qSpeaker).forEach(function (fromKey) {
+        var toVal = str(qSpeaker[fromKey]);
+        if (!str(fromKey) || !toVal) return;
+        var oRe = new RegExp('(^|\\n)(\\s*(?:\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\]\\s*|\\(\\d{1,2}:\\d{2}(?::\\d{2})?\\)\\s*|\\d{1,2}:\\d{2}(?::\\d{2})?\\s*)?)' + escRe(str(fromKey)) + '(?:\\s*[:.)\\]】>]\\s*|\\s{2,})', 'gm');
+        out = out.replace(oRe, '$1$2' + toVal + ': ');
+      });
+      return out;
+    }
+    var qs = str(qSpeaker);
+    var as = str(aSpeaker);
+    var rLbl = str(aRoleLabel) || '진술인';
+    if (qs) {
+      var qRe = new RegExp('(^|\\n)(\\s*(?:\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\]\\s*|\\(\\d{1,2}:\\d{2}(?::\\d{2})?\\)\\s*|\\d{1,2}:\\d{2}(?::\\d{2})?\\s*)?)' + escRe(qs) + '(?:\\s*[:.)\\]】>]\\s*|\\s{2,})', 'gm');
+      out = out.replace(qRe, '$1$2문(조사역): ');
+    }
+    if (as) {
+      var aRe = new RegExp('(^|\\n)(\\s*(?:\\[\\d{1,2}:\\d{2}(?::\\d{2})?\\]\\s*|\\(\\d{1,2}:\\d{2}(?::\\d{2})?\\)\\s*|\\d{1,2}:\\d{2}(?::\\d{2})?\\s*)?)' + escRe(as) + '(?:\\s*[:.)\\]】>]\\s*|\\s{2,})', 'gm');
+      out = out.replace(aRe, '$1$2답(' + rLbl + '): ');
+    }
+    return out;
+  }
+
+  /* JSON 형태 녹취록(클로바노트·Whisper segments 배열 등)에서 시간·화자·발화 추출 */
+  function parseJsonTranscript(jsonStr) {
+    try {
+      var objData = JSON.parse(String(jsonStr || ''));
+      var segs = Array.isArray(objData) ? objData
+        : Array.isArray(objData && objData.segments) ? objData.segments
+        : Array.isArray(objData && objData.utterances) ? objData.utterances
+        : [];
+      if (!segs.length) return '';
+      var lines = [];
+      segs.forEach(function (sg) {
+        if (!obj(sg)) return;
+        var txt = str(sg.text || sg.msg || sg.transcript || sg.content);
+        if (!txt) return;
+        var spk = str((obj(sg.speaker) ? (sg.speaker.name || sg.speaker.label) : sg.speaker) || sg.speakerLabel || '');
+        var secVal = typeof sg.start === 'number' ? (sg.start > 1000 ? Math.floor(sg.start / 1000) : Math.floor(sg.start)) : -1;
+        var ts = '';
+        if (secVal >= 0) {
+          var mm = String(Math.floor(secVal / 60)).padStart(2, '0');
+          var ss = String(secVal % 60).padStart(2, '0');
+          ts = '[' + mm + ':' + ss + '] ';
+        }
+        lines.push(ts + (spk ? (spk + ': ') : '') + txt);
+      });
+      return maskRrnText(lines.join('\n'));
+    } catch (e) {
+      return '';
+    }
+  }
+
   return {
     STEPS: STEPS,
     CATEGORIES: CATEGORIES,
+    CASE_SUBTYPES: CASE_SUBTYPES,
+    LEGAL_SCHEMAS: LEGAL_SCHEMAS,
+    DISCIPLINARY_GUIDE: DISCIPLINARY_GUIDE,
+    SURVEY_QUESTIONS: SURVEY_QUESTIONS,
     PERFORM_MODES: PERFORM_MODES,
     DOC_ROLES: DOC_ROLES,
     VERDICTS: VERDICTS,
@@ -3109,6 +4534,9 @@
     str: str,
     safeKey: safeKey,
     ymdOf: ymdOf,
+    effectiveDueDateOf: effectiveDueDateOf,
+    inferIssueLawType: inferIssueLawType,
+    getLegalSchema: getLegalSchema,
     parseAddrs: parseAddrs,
     coNameNorm: coNameNorm,
     coCoreNorm: coCoreNorm,
@@ -3143,11 +4571,30 @@
     buildYearlyArchive: buildYearlyArchive,
     mergeErpNote: mergeErpNote,
     buildErpSyncPayload: buildErpSyncPayload,
+    CREDIBILITY_FACTORS: CREDIBILITY_FACTORS,
+    MOEL_OBLIGATION_CHECKS: MOEL_OBLIGATION_CHECKS,
+    isMoelObligationMet: isMoelObligationMet,
+    REPORT_TEMPLATES: REPORT_TEMPLATES,
+    STATEMENT_STYLES: STATEMENT_STYLES,
+    INTERVIEW_TEMPLATES: INTERVIEW_TEMPLATES,
+    normalizeTemplateId: normalizeTemplateId,
+    pickDefaultInterviewTemplate: pickDefaultInterviewTemplate,
+    evaluateIssueCredibility: evaluateIssueCredibility,
+    evaluateTemplateCompleteness: evaluateTemplateCompleteness,
     judgeIssue: judgeIssue,
+    renumberEvidences: renumberEvidences,
+    extractEvidencesFromMails: extractEvidencesFromMails,
+    buildCaseTimelineRows: buildCaseTimelineRows,
+    aggregateSurveyResponses: aggregateSurveyResponses,
+    suggestDisciplinaryLevel: suggestDisciplinaryLevel,
+    buildRecomplaintComparison: buildRecomplaintComparison,
+    anonymizeReportPackage: anonymizeReportPackage,
     assembleReportDraft: assembleReportDraft,
     synthesizeWorkspaceFromCase: synthesizeWorkspaceFromCase,
     extractCandidateIssuesFromQa: extractCandidateIssuesFromQa,
     parseTranscriptFallback: parseTranscriptFallback,
+    replaceTranscriptSpeakers: replaceTranscriptSpeakers,
+    parseJsonTranscript: parseJsonTranscript,
     buildTranscriptAiPrompt: buildTranscriptAiPrompt,
     normalizeTranscriptAiResult: normalizeTranscriptAiResult
   };

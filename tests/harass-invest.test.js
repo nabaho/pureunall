@@ -2593,3 +2593,457 @@ test('⑯ 조사 필수 공문·서식 4종 정식 한글(.hwpx) 생성 · 기�
   });
   assert.ok(getEl('mbox').innerHTML.includes('회의 중 폭언'), '3요건 검토표 행을 클릭하면 해당 쟁점 행위 수정 모달이 열린다');
 });
+
+test('⑰ [1순위] 사건 유형별 법정 요건 분기 · 법정 필수 서식 14종(.hwpx) 전체 왕복 · 비식별 익명본(A·B·C) 이중 출력 검증', async () => {
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+  const sexualSchema = C.getLegalSchema({ category: 'sexual' });
+  assert.equal(sexualSchema.code, 'sexual', '성희롱 사건은 남녀고용평등법 제2조·제14조 요건 스키마로 분기된다');
+  assert.ok(sexualSchema.lawBasis.includes('남녀고용평등'), '성희롱 스키마 근거 법령에 남녀고용평등법이 명시된다');
+
+  const thirdSchema = C.getLegalSchema({ category: 'harass', caseSubType: 'third_party' });
+  assert.equal(thirdSchema.code, 'third_party', '제3자 가해 특수유형은 산업안전보건법 제41조·남녀고평법 제14조의2 스키마로 분기된다');
+
+  const bothCase = { id: 'hc-both-1', category: 'both', caseSubType: 'subcontract', companyName: '주식회사 푸른가상테크', title: '복합·도급 혼재 조사 사건' };
+  const issSex = { id: 'i1', title: '회식 자리 성적 농담 및 신체접촉', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes', verdict: 'yes' };
+  assert.equal(C.inferIssueLawType(issSex, bothCase), 'sexual', '복합조사 사건에서 성적 언동 쟁점은 자동으로 성희롱 법령 요건으로 추론된다');
+  const subcontractDraft = C.assembleReportDraft(bothCase, { issues: [issSex], interviews: [] });
+  assert.ok(subcontractDraft.includes('원·하청') || subcontractDraft.includes('도급'), '원·하청 도급 특수유형 사건은 원청 사업주 협조·분리 권고 문구가 보고서에 자동 반영된다');
+
+  /* 20종 공식 서식 전수 생성 + ZIP/OWPML 왕복 추출 + 주민번호 마스킹 검증 */
+  const docKeys = Object.keys(H.OFFICIAL_DOC_TYPES);
+  assert.ok(docKeys.length >= 20, '조사 전 과정 법정 필수 공문·서식 20종 이상이 모두 등록되어 있다');
+  const synthRrn = ['880101', '1234567'].join('-');
+  const docCase = {
+    id: 'hc-14doc',
+    caseNo: '성,직괴-2026-901',
+    category: 'both',
+    companyName: '주식회사 푸른샘플산업',
+    title: '사내 복합 고충 조사 건',
+    dueDate: '2026-11-25',
+    laborOffice: '서울지방고용노동청',
+    inspectorName: '김감독',
+    govCaseNo: '진정 제2026-00999호',
+  };
+  for (const dk of docKeys) {
+    const bytes = H.buildOfficialDocHwpx(dk, docCase, {
+      issueDate: '2026-11-15',
+      managerText: '공인노무사 홍길동',
+      targetRole: 'accused',
+      targetName: '박대상 과장 ' + synthRrn,
+      targetDept: '영업1팀',
+      meetWhen: '2026-11-20 14:00',
+      meetWhere: '독립 화상면담실',
+      extDueDate: '2026-12-10',
+      customBody: '보충 기재 ' + synthRrn,
+      issues: [issSex],
+    });
+    assert.ok(bytes instanceof Uint8Array && bytes.byteLength > 600, `${dk} 서식 .hwpx 바이트가 정상 생성된다`);
+    const ext = await H.extractDocumentText(bytes, dk + '.hwpx');
+    assert.equal(ext.ok, true, `${dk} 서식 .hwpx 가 한컴 OWPML 표준으로 재추출된다`);
+    assert.equal(C.hasUnmaskedRrn(ext.text), false, `${dk} 서식 출력물에 미가림 주민번호가 절대 남지 않는다`);
+  }
+
+  /* 실명 원본 vs 비식별 익명본(신고인 A · 피신고인 B · 참고인 C · 의뢰 사업장(甲)) 검증 — reportBody 비어 있는 상태 + 사전의견·합의·설문 자유의견 포함 회귀 검증 */
+  const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=';
+  const realCase = {
+    id: 'hc-anon',
+    companyName: '주식회사 푸른모형물산',
+    title: '주식회사 푸른모형물산 김신고 대 박가해 조사 건',
+    category: 'harass',
+    laborOffice: '서울지방고용노동청',
+    inspectorName: '최감독',
+    govCaseNo: '진정 제2026-99887호',
+    steps: { intake: { done: true, date: '2026-11-01', note: '김신고(010-1234-0000) 접수' } },
+    monitoringLogs: [{ id: 'mn1', round: '1개월차', date: '2026-12-01', status: '양호', note: '김신고 분리 확인', checker: '담당노무사' }],
+  };
+  const realSec = {
+    overview: '주식회사 푸른모형물산 소속 김신고 대리가 박가해 팀장(010-1234-0000, 02-123-0000, test@example.com)을 신고한 건이며 이목격 사원이 참고인으로 진술함.',
+    conclusion: '박가해 팀장의 김신고 대리에 대한 폭언 인정.',
+    recommendations: '박가해 징계 및 김신고 분리보호 권고.',
+    interviews: [
+      { id: 'iv1', role: 'victim', alias: '김신고', dept: '총무팀', date: '2026-11-01', pledgeSigned: true, stmtSigned: true, sigDataUrl: tinyPng, summary: '박가해 팀장이 폭언함', qaList: [{ q: '누가 폭언했나요?', a: '박가해 팀장이 김신고에게 소리쳤고 이목격이 봤습니다.' }] },
+      { id: 'iv2', role: 'accused', alias: '박가해', dept: '총무팀', date: '2026-11-02', pledgeSigned: true, stmtSigned: true, sigDataUrl: tinyPng, summary: '김신고에게 업무지시였음', qaList: [] },
+      { id: 'iv3', role: 'witness', alias: '이목격', dept: '총무팀', date: '2026-11-03', pledgeSigned: true, stmtSigned: false, summary: '박가해가 김신고에게 폭언하는 것을 목격함', qaList: [] },
+    ],
+    issues: [{ id: 'is1', title: '박가해의 김신고 공개 질책', claimVictim: '김신고 주장', claimAccused: '박가해 반박', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes', verdict: 'yes' }],
+    victimOpinions: [{ id: 'vo1', alias: '가상신고자', date: '2026-11-10', measuresText: '가상신고자(010-1234-0000, victim@example.invalid) 근무장소 분리 희망', sigDataUrl: tinyPng }],
+    closureConsents: [{ id: 'cl1', role: 'accused', alias: '박가해', date: '2026-11-12', summary: '박가해(accused@example.invalid) 재발방지 서약', sigDataUrl: tinyPng }],
+    surveyResponses: [{ id: 'sv1', answers: { sq1: 3 }, freeComment: '김신고 대리에게 박가해 팀장(010-1234-0000)이 소리치는 것을 들음' }],
+    reportBody: '', /* reportBody가 비어 있어 assembleReportDraft가 자동 호출되는 경로 검증 */
+  };
+  const anonBytes = H.buildReportHwpx(realCase, realSec, { anonymized: true });
+  const anonZip = await globalThis.PureunZip.readZip(anonBytes);
+  const anonBinKeys = Object.keys(anonZip).filter((k) => k.startsWith('BinData/'));
+  assert.equal(anonBinKeys.length, 0, '비식별 익명본 .hwpx 에는 자필 서명 이미지 바이너리가 포함되지 않는다');
+  const anonExt = await H.extractDocumentText(anonBytes, '익명보고서.hwpx');
+  assert.equal(anonExt.ok, true);
+  assert.ok(!anonExt.text.includes('김신고') && !anonExt.text.includes('박가해') && !anonExt.text.includes('이목격') && !anonExt.text.includes('가상신고자') && !anonExt.text.includes('최감독'), '익명본 .hwpx 본문·사전의견·설문·표 어디에도 실명이 남지 않는다');
+  assert.ok(!anonExt.text.includes('푸른모형물산') && !anonExt.text.includes('010-1234-0000') && !anonExt.text.includes('02-123-0000') && !anonExt.text.includes('test@example.com') && !anonExt.text.includes('victim@example.invalid') && !anonExt.text.includes('accused@example.invalid') && !anonExt.text.includes('99887'), '익명본 .hwpx 에 사업장 실명·전화번호·이메일·사건번호가 비식별 처리된다');
+  assert.ok(anonExt.text.includes('신고인 A') && anonExt.text.includes('피신고인 B'), '익명본 .hwpx 에 신고인 A · 피신고인 B 비식별 기호가 일관되게 적용된다');
+
+  /* 기저장된(비어 있지 않은) reportBody 안에 감독관명·행정사건번호·사업자번호·모니터링 담당자가 직접 서술된 경우도 전수 비식별화 검증 */
+  const savedAnon = C.anonymizeReportPackage(
+    {
+      companyName: '주식회사 푸른모형물산',
+      bizNo: '123-45-67890',
+      inspectorName: '가상감독 감독관',
+      govCaseNo: '진정-2099-87654',
+      monitoringLogs: [{ checker: '가상점검 노무사', note: '가상점검이 가상감독에게 보고함' }],
+    },
+    {
+      overview: '사업자 123 45 67890 확인',
+      reportBody: '담당 가상감독 / 사건 진정-2099-87654 / 사업자 1234567890 / 점검 가상점검 확인',
+    }
+  );
+  assert.ok(
+    !savedAnon.secretRec.reportBody.includes('가상감독') &&
+      !savedAnon.secretRec.reportBody.includes('87654') &&
+      !savedAnon.secretRec.reportBody.includes('1234567890') &&
+      !savedAnon.secretRec.overview.includes('123 45 67890') &&
+      !savedAnon.secretRec.reportBody.includes('가상점검'),
+    '기저장 reportBody·자유서술 안의 직함 제외 감독관명·점검자명 및 구분자 변형 사업자번호까지 전수 비식별 치환된다'
+  );
+});
+
+test('⑱ [2순위] 갑·을 호증 자동 편철·타임라인(.hwpx) · 확장 E2EE 전자서명 3종(사전의견·취하합의·무기명설문) · 연장기한·양정·재진정 비교 검증', async () => {
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+  const S = require(path.join(ROOT, 'js', 'pu-harass-sign.js'));
+  /* 1) 호증 자동 편철 및 타임라인 대조표 .hwpx 검증 */
+  const evCase = {
+    id: 'hc-ev-1',
+    companyName: '주식회사 푸른가상제조',
+    title: '호증 편철 테스트 사건',
+    mailLinks: [
+      { key: 'm1', date: '2026-10-01', docRole: 'intake', subject: '고충 신고서 및 녹음파일 제출', from: '신고인', attNames: ['대화녹취.mp3'] },
+      { key: 'm2', date: '2026-10-05', docRole: 'accused_stmt', subject: '피신고인 소명자료 제출', from: '피신고인', attNames: ['업무일지.pdf'] },
+      { key: 'm3', date: '2026-10-06', docRole: 'official_plan', subject: '인사팀 조직도 송부', from: '인사팀', attNames: [] },
+    ],
+  };
+  const extractedEvs = C.extractEvidencesFromMails(evCase, []);
+  assert.equal(extractedEvs.length, 3, '수집 공문·첨부가 갑/을/참고 호증으로 자동 추출된다');
+  assert.ok(extractedEvs.some((e) => e.exhibitNo === '갑 제1호증'), '신고인 측 자료는 갑 제1호증으로 채번된다');
+  assert.ok(extractedEvs.some((e) => e.exhibitNo === '을 제1호증'), '피신고인 측 소명자료는 을 제1호증으로 채번된다');
+  assert.ok(extractedEvs.some((e) => e.exhibitNo === '참고자료 1'), '회사·공문 자료는 참고자료 1로 채번된다');
+
+  const tlSec = {
+    evidences: extractedEvs,
+    interviews: [{ id: 'iv-t1', role: 'victim', alias: '신고인 A', date: '2026-10-03', method: '대면면담', summary: '최초 피해 경위 진술' }],
+    issues: [{ id: 'is-t1', title: '업무 배제 지시', whenWhere: '2026-09-28 사무실', claimVictim: '일방 배제', claimAccused: '업무 조정' }],
+  };
+  const tlRows = C.buildCaseTimelineRows(evCase, tlSec);
+  assert.ok(tlRows.length >= 4 && tlRows[0].date <= tlRows[tlRows.length - 1].date, '타임라인 행들이 발생일자 오름차순으로 정렬된다');
+  const tlBytes = H.buildEvidenceTimelineHwpx(evCase, tlSec);
+  const tlExt = await H.extractDocumentText(tlBytes, '타임라인대조표.hwpx');
+  assert.equal(tlExt.ok, true);
+  assert.ok(tlExt.text.includes('갑 제1호증') && tlExt.text.includes('을 제1호증'), '타임라인·호증 대조표 .hwpx 에 갑·을 호증 번호가 수록된다');
+
+  /* 2) 확장 모바일 E2EE 전자서명 3종(victim_opinion, withdrawal_consent, org_survey) 암호화·복호화·집계 검증 */
+  const t = S.newHexKey();
+  const k = S.newHexKey();
+  const code = S.genAccessCode();
+  const opPayload = S.normalizeSignPayload({
+    docKind: 'victim_opinion',
+    role: 'victim',
+    alias: '신고인 A',
+    date: '2026-11-15',
+    summary: '조사결과 인정 안내 및 보호조치 의견 청취',
+    measureOptions: S.DEFAULT_MEASURE_OPTIONS,
+  });
+  const docHash = await S.sha256Hex(S.canonicalString(opPayload));
+  const subAuth = await S.computeSubAuth(t, k, code, docHash);
+  const encOpen = await S.encryptWithCode({ payload: opPayload, docHash, issuedAt: Date.now() }, k, code);
+  const decOpen = await S.decryptWithCode(encOpen, k, code);
+  assert.equal(decOpen.payload.docKind, 'victim_opinion', '피해근로자 사전 의견청취 페이로드가 E2EE 복호화된다');
+  assert.ok(decOpen.payload.measureOptions.length >= 4, '희망 보호·후속조치 선택지가 정상 전달된다');
+
+  const subData = {
+    pledgeAgreed: true,
+    stmtConfirmed: true,
+    selectedMeasures: ['근무장소 변경·부서 분리', '행위자 징계 등 인사조치 희망'],
+    measuresText: '즉시 부서 분리를 희망합니다.',
+    sigDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=',
+    signedAt: Date.now(),
+  };
+  const encSub = await S.encryptWithCode(subData, k, code);
+  const decSub = await S.decryptWithCode(encSub, k, code);
+  assert.deepEqual(decSub.selectedMeasures, subData.selectedMeasures, '피해근로자 선택 희망조치가 무결하게 복호화된다');
+  assert.ok(subAuth.length === 64, '2채널 제출 인증자(subAuth)가 정상 생성된다');
+
+  const svAgg = C.aggregateSurveyResponses([
+    { id: 's1', answers: { sq1: 3, sq2: 2, sq3: 1, sq4: 3, sq5: 2, sq6: 2, sq7: 1 }, freeComment: '회의 시 폭언이 잦음' },
+    { id: 's2', answers: { sq1: 2, sq2: 2, sq3: 2, sq4: 2, sq5: 3, sq6: 3, sq7: 2 }, freeComment: '분리 조치 필요' },
+  ]);
+  assert.equal(svAgg.total, 2, '무기명 실태조사 응답자 수가 정확히 집계된다');
+  assert.equal(svAgg.items[0].highRiskCnt, 2, '문항별 주의·위험 응답(인덱스 2·3) 인원이 정확히 계산된다');
+  assert.equal(svAgg.items[0].highRiskPct, 100, '위험 응답 비율(%)이 정확히 계산된다');
+
+  /* 3) 노동청 연장기한 우선 적용 · 징계양정 가이드 · 선행사건 재진정 비교 검증 */
+  assert.equal(C.effectiveDueDateOf({ dueDate: '2026-11-10', extDue1: '2026-11-24', extDue2: '2026-12-05' }), '2026-12-05', '2차 연장기한이 있으면 유효 마감일로 최우선 반영된다');
+  const disc = C.suggestDisciplinaryLevel(
+    [
+      { factStatus: 'recognized', verdict: 'yes' },
+      { factStatus: 'recognized', verdict: 'yes' },
+    ],
+    { hasSecondaryHarm: true }
+  );
+  assert.ok(disc.guide && (disc.guide.name.includes('정직') || disc.guide.name.includes('해고')), '복수 인정 쟁점 + 2차 가해 가중 시 중징계 양정 범위가 권고된다');
+
+  const diff = C.buildRecomplaintComparison(
+    { title: '재진정 사건' },
+    { issues: [{ title: '주간회의 폭언' }, { title: '신고 후 업무배제 보복(2차가해)' }] },
+    { title: '선행 사건' },
+    { issues: [{ title: '주간회의 폭언', verdict: 'yes' }] }
+  );
+  assert.equal(diff.rows.length, 2, '재진정 사건의 모든 쟁점이 선행 사건과 대조된다');
+  assert.ok(diff.rows.some((r) => r.statusLabel.includes('기조사') || r.statusLabel.includes('중복')), '선행 사건과 동일한 쟁점은 기조사 중복 쟁점으로 식별된다');
+  assert.ok(diff.rows.some((r) => r.statusLabel.includes('신규')), '신고 후 보복 쟁점은 신규 추가 쟁점으로 식별된다');
+});
+
+test('⑲ [3순위] 녹취 화자 일괄 치환 · JSON/SRT/VTT 타임스탬프 파싱 · 푸른 한글편집기(hangul.html) 브리지 · 일정(.ics) 생성 검증', async () => {
+  const vm = require('node:vm');
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+  const S = require(path.join(ROOT, 'js', 'pu-harass-sign.js'));
+  /* 1) STT 화자 일괄 치환기 검증 */
+  const rawStt = '참석자 1: 당시 상황을 말씀해 주세요.\n참석자 2: 팀장님이 서류를 던졌습니다.\nSpeaker 1: 목격자가 있었나요?';
+  const replaced = C.replaceTranscriptSpeakers(rawStt, [
+    { from: '참석자 1', to: '문(조사역)' },
+    { from: 'Speaker 1', to: '문(조사역)' },
+    { from: '참석자 2', to: '답(신고인)' },
+  ]);
+  assert.ok(replaced.includes('문(조사역): 당시 상황을 말씀해 주세요.') && replaced.includes('답(신고인): 팀장님이 서류를 던졌습니다.'), '클로바노트·다글로 화자 라벨이 조사역·신고인으로 일괄 치환된다');
+  const parsedQa = C.parseTranscriptFallback(replaced);
+  assert.ok(parsedQa.qaList.length >= 1, '화자 치환 직후 문답(Q&A) 구조화 파서가 조사역 질문과 신고인 답변을 정확히 짝짓는다');
+
+  /* 2) JSON(Whisper/Clova segments) 및 SRT/VTT 자막 녹취록 로컬 추출 검증 */
+  const jsonObj = {
+    segments: [
+      { start: 5, speaker: '조사위원', text: '언제 발생한 일입니까?' },
+      { start: 68, speaker: '피신고인', text: '지난달 15일 오후였습니다.' },
+    ],
+  };
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(jsonObj));
+  const extJson = await H.extractDocumentText(jsonBytes, 'stt_result.json');
+  assert.equal(extJson.ok, true, 'STT .json 파일이 로컬에서 정상 추출된다');
+  assert.ok(extJson.text.includes('[00:05] 조사위원: 언제 발생한 일입니까?') && extJson.text.includes('[01:08] 피신고인: 지난달 15일 오후였습니다.'), 'JSON 세그먼트 초 단위가 [MM:SS] 타임스탬프와 화자로 변환된다');
+
+  const vttTxt = 'WEBVTT\n\n1\n00:00:03.000 --> 00:00:07.000\n조사위원: 출석해 주셔서 감사합니다.\n\n2\n00:00:08.500 --> 00:00:12.000\n참고인: 네 사실대로 말씀드리겠습니다.\n';
+  const extVtt = await H.extractDocumentText(new TextEncoder().encode(vttTxt), 'record.vtt');
+  assert.equal(extVtt.ok, true, '.vtt 자막 녹취록이 정상 추출된다');
+  assert.ok(!extVtt.text.includes('-->') && !extVtt.text.includes('WEBVTT') && extVtt.text.includes('참고인: 네 사실대로 말씀드리겠습니다.'), 'SRT/VTT 타임코드 화살표와 헤더가 깨끗이 제거되고 대화문만 추출된다');
+
+  /* 3) 푸른 한글편집기 브리지 페이로드(디스크 무저장 · ACK/로그아웃 즉시 폐기) 및 캘린더(.ics) 표준 포맷 검증 */
+  const lsStore = new Map();
+  const msgListeners = [];
+  let nextWinMode = 'blocked';
+  const fakePopupWin = { closed: false, posted: [], postMessage(msg, orig) { this.posted.push({ msg, orig }); } };
+  const ctx = vm.createContext({
+    console,
+    Uint8Array,
+    setTimeout,
+    clearTimeout,
+    location: { origin: 'https://nabaho.github.io' },
+    localStorage: {
+      getItem: (k) => (lsStore.has(k) ? lsStore.get(k) : null),
+      setItem: (k, v) => lsStore.set(k, String(v)),
+      removeItem: (k) => lsStore.delete(k),
+    },
+    open: () => (nextWinMode === 'blocked' ? null : fakePopupWin),
+    addEventListener: (ev, fn) => { if (ev === 'message') msgListeners.push(fn); },
+    removeEventListener: (ev, fn) => {
+      if (ev === 'message') {
+        const i = msgListeners.indexOf(fn);
+        if (i >= 0) msgListeners.splice(i, 1);
+      }
+    },
+    btoa: (bin) => Buffer.from(bin, 'binary').toString('base64'),
+    PuHarassCore: C,
+    PuHarassHwpx: H,
+    PuHarassSign: S,
+    document: { getElementById: () => null, addEventListener() {}, querySelectorAll: () => [] },
+  });
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-harass-view.js'), 'utf8'), ctx);
+
+  const sampleBytes = H.buildOfficialDocHwpx('pledge_form', { companyName: '주식회사 푸른샘플', title: '샘플 사건' }, { issueDate: '2026-11-15' });
+  const bridge = ctx.PuHarassView._buildHangulBridgePayload(sampleBytes, '비밀유지서약서.hwpx', '샘플 사건');
+  assert.equal(bridge.format, 'hwpx', '푸른 한글편집기 브리지 포맷이 hwpx 로 표시된다');
+  assert.equal(bridge.name, '비밀유지서약서.hwpx', '.hwpx 확장자 파일명이 보존된다');
+  const decodedBack = Uint8Array.from(Buffer.from(bridge.b64, 'base64'));
+  assert.equal(decodedBack.byteLength, sampleBytes.byteLength, 'Base64 브리지 인코딩·디코딩 전후 .hwpx 바이트 길이가 100% 일치한다');
+
+  /* 팝업 차단 시 localStorage 평문 잔류 0건 검증 */
+  lsStore.set('pureun_hangul_bridge', 'stale-residue');
+  const blockedRes = ctx.PuHarassView._openBytesInHangulEditor(sampleBytes, '비밀유지서약서.hwpx', '샘플 사건');
+  assert.equal(blockedRes, null, '팝업 차단 시 null 을 반환하고 열기를 중단한다');
+  assert.equal(lsStore.has('pureun_hangul_bridge'), false, '팝업 차단·실패 시에도 localStorage 에 조사문서 평문이 절대 남지 않는다');
+
+  /* 정상 팝업 시 postMessage 인계 및 수신 ACK 직후 메모리 평문 즉시 폐기 검증 */
+  nextWinMode = 'ok';
+  const okHandle = ctx.PuHarassView._openBytesInHangulEditor(sampleBytes, '비밀유지서약서.hwpx', '샘플 사건');
+  assert.equal(lsStore.has('pureun_hangul_bridge'), false, '한글편집기 브리지 인계 중에도 localStorage 에 기록하지 않는다');
+  assert.ok(okHandle && okHandle._payloadRef.b64.length > 100, '인계 대기 중에는 메모리 페이로드가 준비된다');
+  msgListeners.slice().forEach((fn) => fn({ origin: 'https://nabaho.github.io', source: { otherTab: true }, data: { type: 'pureun_hangul_ready', from: 'harass', bid: okHandle.bridgeId } }));
+  assert.equal(fakePopupWin.posted.length, 0, '열어 준 대상 팝업이 아닌 다른 탭(source 불일치) 요청에는 문서를 보내지 않는다');
+  msgListeners.slice().forEach((fn) => fn({ origin: 'https://nabaho.github.io', source: fakePopupWin, data: { type: 'pureun_hangul_ready', from: 'harass', bid: 'wrong_bid' } }));
+  assert.equal(fakePopupWin.posted.length, 0, '고유 브리지 ID(bid)가 불일치하면 문서를 보내지 않는다');
+  msgListeners.slice().forEach((fn) => fn({ origin: 'https://nabaho.github.io', source: fakePopupWin, data: { type: 'pureun_hangul_ready', from: 'harass', bid: okHandle.bridgeId } }));
+  assert.equal(fakePopupWin.posted.length, 1, '편집기 준비 신호 및 bid 일치 확인 시에만 대상 팝업으로 문서를 전달한다');
+  msgListeners.slice().forEach((fn) => fn({ origin: 'https://nabaho.github.io', source: fakePopupWin, data: { type: 'pureun_hangul_ack', bridgeId: okHandle.bridgeId } }));
+  assert.equal(okHandle._payloadRef.b64, '', '편집기 수신 확인(ACK) 직후 메모리 내 base64 평문이 즉시 소거된다');
+
+  /* 로그아웃 시 미수신 브리지 메모리도 즉시 소거 검증 */
+  const logoutHandle = ctx.PuHarassView._openBytesInHangulEditor(sampleBytes, '비밀유지서약서.hwpx', '샘플 사건');
+  assert.ok(logoutHandle && logoutHandle._payloadRef.b64.length > 100);
+  ctx.PuHarassView._purgeSessionState();
+  assert.equal(logoutHandle._payloadRef.b64, '', '로그아웃(_purgeSessionState) 시 대기 중인 브리지 메모리 평문도 즉시 폐기된다');
+
+  const ics = ctx.PuHarassView._buildIcsCalendarText([
+    { date: '2026-11-20', title: '[면담] 주식회사 푸른샘플 (신고인 A)', desc: '대면면담' },
+    { date: '2026-11-30', title: '[조사기한] 조사결과보고 마감', desc: '연장기한 반영' },
+  ]);
+  assert.ok(ics.startsWith('BEGIN:VCALENDAR') && ics.includes('DTSTART;VALUE=DATE:20261120') && ics.trim().endsWith('END:VCALENDAR'), '표준 RFC5545 VCALENDAR(.ics) 종일 일정 포맷이 정확히 생성된다');
+});
+
+test('⑳ [마스터 양식 체계] 대한민국 노무·법무·노동부·공공기관·대기업 6대 마스터 양식 · 진술조서 3종 · 심층 질문지 6종 · 양식별 완성도 및 비식별 보안 검증', async () => {
+  const H = require(path.join(ROOT, 'js', 'pu-harass-hwpx.js'));
+  const synthRrn = ['900202', '1234567'].join('-');
+
+  /* 1) 6대 마스터 보고서 양식 전수 조립 · .hwpx 생성 · 왕복 추출 · 견본(.hwpx) 검증 */
+  const tplIds = Object.keys(C.REPORT_TEMPLATES);
+  assert.ok(tplIds.length >= 6, '6대 대한민국 노무법인·법무법인·노동부·공공기관·대기업 마스터 양식이 모두 정의되어 있다');
+  const baseCase = {
+    id: 'hc-tpl-1',
+    erpCaseNo: 'ERP-2099-SECRET-123',
+    caseNo: 'CASE-2099-777',
+    companyName: '주식회사 푸른샘플테크',
+    bizNo: '123-45-67890',
+    title: '주식회사 푸른샘플테크 김신고 대 박가해 사건',
+    category: 'harass',
+    verdictSummary: 'yes',
+    laborOffice: '서울지방고용노동청',
+    inspectorName: '가상감독 감독관',
+    govCaseNo: '진정-2099-55555',
+    steps: { intake: { done: true, date: '2026-11-01' }, pledge: { done: true, date: '2026-11-02' } },
+  };
+  const baseSec = {
+    overview: '기획전략실 소속 김신고 대리가 박가해 부장을 신고한 건(담당 조사위원 최역순입니다. 최역순 검토 완료) ' + synthRrn,
+    conclusion: '박가해 부장의 행위는 직장 내 괴롭힘에 해당함.',
+    recommendations: '피해자 분리 및 인사위원회 회부 권고.',
+    interviews: [
+      { id: 'iv1', role: 'victim', alias: '신고인 김신고', dept: '기획전략실', date: '2026-11-03', pledgeSigned: true, stmtSigned: true, summary: '박가해 부장이 회의 중 폭언함' },
+      { id: 'iv2', role: 'accused', alias: '피신고인 박가해 부장', dept: '기획전략실', date: '2026-11-05', pledgeSigned: true, stmtSigned: true, summary: '업무 질책이었음' },
+    ],
+    evidences: [
+      { id: 'ev1', side: 'gap', date: '2026-10-20', submitter: '김신고 대리', title: '회의 녹취록', summary: '변호사 윤소명이라 확인. 윤소명 제출 폭언 발언 확인' },
+    ],
+    issues: [
+      {
+        id: 'is1',
+        title: '회의실 공개 폭언',
+        whenWhere: '2026-10-20 회의실',
+        claimVictim: '김신고에게 폭언',
+        claimAccused: '박가해 반박',
+        evidenceNote: '조사위원 강증거입니다. 강증거 의견 및 녹취록·참고인 진술 일치',
+        credibility: { consistency: true, specificity: true, rationality: true, noMotive: true, corroboration: true },
+        credibilityNote: '김신고 진술의 구체성 및 박가해 녹취 부합 (010-1234-0000)',
+        factStatus: 'recognized',
+        elemSuperiority: 'yes',
+        elemBeyondScope: 'yes',
+        elemHarm: 'yes',
+        verdict: 'yes',
+      },
+    ],
+    templateMeta: {
+      lawfirm_opinion: { docRefNo: '법률의견 제2099-HR-987호', querySummary: '조사위원 최역순 및 공인노무사: 정자문 검토 질의', litigationRisk: 'low', execSummary: '김가상 조사위원 및 조사위원 최역순이 검토한 결과 최역순 의견대로 박가해(010-1234-0000) 행위 성립 인정' },
+      moel_standard: { intakeRoute: '김신고 서면접수', interimMeasure: '김신고 유급휴가 분리', preventPlan: '전 직원 특별교육', moelChecks: { c1_prompt: true, c2_interim: true, c3_victim_op: true, c4_actor_act: true, c5_no_retal: true, c6_secret: true } },
+      public_committee: { agendaNo: '제2099-고충-888호', committeeQuorum: '이외부 심의위원 · 위원장 한심의 외 2인 출석', resolutionOrder: 'uphold', secondaryHarmNote: '김신고 2차 피해 없음' },
+      corp_executive: { severityGrade: 'S', riskLegal: 'amber', riskRep: 'red', execKeyPoints: '박가해 중징계 회부 및 김신고 분리' },
+      nlrb_defense: { dueProcessNote: '박가해 소명기회 부여', equityNote: '동종 폭언 정직 선례 부합', defensePoint: '박가해 통상 지시 항변 배척' },
+      laborfirm_deep: { investTeam: '책임 공인노무사 2인', orgContext: '박가해(평가권자) 대 김신고', actionRoadmap: '사전의견청취 후 징계위' },
+    },
+  };
+
+  for (const tk of tplIds) {
+    const cForTpl = Object.assign({}, baseCase, { reportTemplate: tk });
+    const sForTpl = Object.assign({}, baseSec, { reportTemplate: tk, reportBody: '' });
+    const draft = C.assembleReportDraft(cForTpl, sForTpl, tk);
+    assert.ok(draft.includes(C.REPORT_TEMPLATES[tk].name), `${tk} 양식으로 조립된 본문에 양식 명칭이 명시된다`);
+    assert.equal(C.hasUnmaskedRrn(draft), false, `${tk} 양식 조립 본문에 미가림 주민번호가 남지 않는다`);
+
+    const comp = C.evaluateTemplateCompleteness(cForTpl, sForTpl, tk);
+    assert.equal(comp.done, comp.total, `${tk} 양식의 모든 전용 관리항목 입력 시 완성도 100%(${comp.done}/${comp.total})로 계산된다`);
+
+    /* 실명본 .hwpx 왕복 추출 검증 */
+    sForTpl.reportBody = draft;
+    const realBytes = H.buildReportHwpx(cForTpl, sForTpl, { reportTemplate: tk });
+    const realExt = await H.extractDocumentText(realBytes, tk + '.hwpx');
+    assert.equal(realExt.ok, true);
+    const extractedBody = H.extractReportBodyFromText(realExt.text);
+    assert.ok(extractedBody.includes(C.REPORT_TEMPLATES[tk].docTitleSuffix), `${tk} 양식 .hwpx 에서 본문 영역이 무손실 왕복 추출된다`);
+
+    /* 익명본 .hwpx 에서 templateMeta · credibilityNote 내부 실명·연락처·사건번호까지 전수 비식별화 검증 */
+    const anonBytes = H.buildReportHwpx(cForTpl, Object.assign({}, sForTpl, { reportBody: '' }), { anonymized: true, reportTemplate: tk });
+    const anonExt = await H.extractDocumentText(anonBytes, tk + '_anon.hwpx');
+    assert.equal(anonExt.ok, true);
+    assert.ok(
+      !anonExt.text.includes('김신고') &&
+        !anonExt.text.includes('박가해') &&
+        !anonExt.text.includes('가상감독') &&
+        !anonExt.text.includes('김가상') &&
+        !anonExt.text.includes('최역순') &&
+        !anonExt.text.includes('정자문') &&
+        !anonExt.text.includes('한심의') &&
+        !anonExt.text.includes('이외부') &&
+        !anonExt.text.includes('강증거') &&
+        !anonExt.text.includes('윤소명') &&
+        !anonExt.text.includes('기획전략실') &&
+        !anonExt.text.includes('2099-HR-987') &&
+        !anonExt.text.includes('2099-고충-888') &&
+        !anonExt.text.includes('ERP-2099-SECRET-123') &&
+        !anonExt.text.includes('CASE-2099-777') &&
+        !anonExt.text.includes('010-1234-0000') &&
+        !anonExt.text.includes('55555'),
+      `${tk} 익명본 .hwpx 의 표지·전용양식표·신빙성표·본문 어디에도 양방향 직함 실명·후속 단독언급·부서명·전화번호·문서관리번호·사건번호가 남지 않는다`
+    );
+
+    /* 빈 견본 .hwpx 생성 검증 */
+    const sampleBytes = H.buildTemplateSampleHwpx(tk, 'sexual');
+    const sampleExt = await H.extractDocumentText(sampleBytes, tk + '_sample.hwpx');
+    assert.equal(sampleExt.ok, true, `${tk} 양식 빈 견본(.hwpx)이 정상 생성·추출된다`);
+  }
+
+  /* 고용노동부 양식에서 사용자가 명시적으로 체크 해제(false)한 항목은 단계 완료 여부와 무관하게 미체크(☐)로 유지된다 */
+  const uncheckSec = Object.assign({}, baseSec, {
+    reportTemplate: 'moel_standard',
+    templateMeta: { moel_standard: { intakeRoute: '접수', interimMeasure: '분리', preventPlan: '교육', moelChecks: { c1_prompt: false, c6_secret: false } } },
+  });
+  assert.equal(C.isMoelObligationMet('c1_prompt', baseCase, uncheckSec), false, '명시적으로 해제(false)한 법정의무 체크박스는 자동추론이 덮어쓰지 않는다');
+  const uncheckDraft = C.assembleReportDraft(Object.assign({}, baseCase, { reportTemplate: 'moel_standard' }), uncheckSec, 'moel_standard');
+  assert.ok(uncheckDraft.includes('☐ [점검대상] 지체 없는 객관적 조사 착수'), '명시적 해제 항목은 조립 본문에도 ☐ 로 반영된다');
+
+  /* 2) 진술조서 3종(.hwpx) 서식 스타일 생성 및 문답 무손실 왕복 복원 검증 */
+  const stmtStyles = Object.keys(C.STATEMENT_STYLES);
+  assert.equal(stmtStyles.length, 3, '진술조서 3종 서식(표준 확인서형·법무 문답조서형·노동부 면담기록지형)이 정의되어 있다');
+  const samplePreset = C.INTERVIEW_TEMPLATES[C.pickDefaultInterviewTemplate({ category: 'sexual' }, 'victim')];
+  assert.equal(samplePreset.id, 'victim_sexual', '성희롱 사건 신고인 면담 시 성희롱 성인지 심층 질문지가 기본 추천된다');
+  const ivSample = {
+    id: 'iv-style-1',
+    role: 'victim',
+    alias: '신고인 A',
+    dept: '인사팀',
+    date: '2026-11-16',
+    method: '대면면담',
+    pledgeSigned: true,
+    summary: '핵심 피해 진술 요지 확인',
+    amendNote: '정정 사항 없음',
+    qaList: samplePreset.questions.slice(0, 3).map((q, idx) => ({ q, a: `답변 진술 내용 ${idx + 1}` })),
+  };
+  for (const st of stmtStyles) {
+    const stBytes = H.buildInterviewHwpx(baseCase, Object.assign({}, ivSample, { stmtStyle: st }), { stmtStyle: st });
+    const stExt = await H.extractDocumentText(stBytes, `stmt_${st}.hwpx`);
+    assert.equal(stExt.ok, true);
+    const roundParsed = C.parseTranscriptFallback(stExt.text, 'victim');
+    assert.equal(roundParsed.qaList.length, 3, `${st} 진술조서 .hwpx 를 다시 불러오면 문답 3항이 손실 없이 복원된다`);
+  }
+});

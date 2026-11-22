@@ -1,6 +1,6 @@
 # 푸른포털 Google Play 스토어 앱 (`kr.pureun.portal`)
 
-푸른노무법인 통합 업무 시스템(**푸른포털**, `https://nabaho.github.io/pureunall/enter.html`)을 **Google Play 스토어**에서 바로 내려받아 설치할 수 있게 묶은 공식 Android Trusted Web Activity(TWA) 프로젝트입니다.
+푸른노무법인 통합 업무 시스템(**푸른포털**, `https://erp.pureunlabor.co.kr/enter.html`(2026-11-15 이사 — 옛 `nabaho.github.io/pureunall` 은 301))을 **Google Play 스토어**에서 바로 내려받아 설치할 수 있게 묶은 공식 Android Trusted Web Activity(TWA) 프로젝트입니다.
 
 ## 핵심 설계 (Google Play 심사 기준 충족)
 1. **최신 API 36 대응**: `compileSdk = 36`, `targetSdk = 36`, `minSdk = 26` (Android 8.0 이상)

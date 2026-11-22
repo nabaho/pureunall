@@ -52,8 +52,12 @@ test('★★★ ② 첫 회차는 기준만 · ③ 기준 뒤에 바뀐 것만, 
 test('★★ ④ 같은 그림은 두 번 쌓지 않는다', () => {
   const c = R.fromApi(stack(1, '2026-10-24T10:00:00+09:00'));
   assert.equal(R.needPhoto(c, null), true);
-  assert.equal(R.needPhoto(c, { front: c.front.split('?')[0] }), false, '★★ 서명 주소만 바뀌었는데 또 올린다');
-  assert.equal(R.needPhoto(c, { front: 'https://remember-cdn.rememberapp.co.kr/other.jpg' }), true);
+  const photo = { owner: 'u1', year: '2026', id: 'p1' };
+  assert.equal(R.needPhoto(c, { front: c.front.split('?')[0], photo }), false, '★★ 서명 주소만 바뀌었는데 또 올린다');
+  /* ★ 2026-11-18 대표 「이미 한번 가져왔던 것은 자동으로 차단」 — 그림이 바뀌어도 «이미 사진을 올린 명함»은 또 올리지 않는다(예전에는 올렸다) */
+  assert.equal(R.needPhoto(c, { front: 'https://remember-cdn.rememberapp.co.kr/other.jpg', photo }), false, '★★★ 한 번 가져온 명함을 그림이 바뀌었다고 또 올린다');
+  assert.equal(R.needPhoto(c, { front: c.front.split('?')[0] }), true, '사진을 올린 적이 없는 명함(올리다 실패)은 다시 올려야 한다');
+  assert.equal(R.needPhoto(Object.assign({}, c, { front: '' }), null), false, '앞면 그림이 없으면 올릴 것이 없다');
   assert.equal(R.okImageUrl('https://remember-cdn.rememberapp.co.kr/a/b.jpg?x=1'), true);
   assert.equal(R.okImageUrl('https://evil.example/a.jpg'), false);
 });
@@ -125,7 +129,8 @@ test('★★ ⑦ 그림은 리멤버 창고만 · 확장은 좁은 권한 · 인
   const hook = man.content_scripts.find((c) => c.js.includes('hook.js'));
   assert.equal(hook.world, 'MAIN', '화면 공간이어야 리멤버 목록 머리를 빌릴 수 있다');
   assert.deepEqual(man.permissions.sort(), ['alarms', 'tabs'], '★★ 필요 없는 권한이 붙었다');
-  assert.ok(man.host_permissions.every((h) => /rememberapp\.co\.kr|nabaho\.github\.io\/pureunall\/remember-intake/.test(h)), '★★ 다른 집까지 권한을 받는다');
+  /* 받는 화면은 옛 주소·새 주소(2026-11-15 ERP 주소 이사 준비) 둘 — 그 «한 화면»만 */
+  assert.ok(man.host_permissions.every((h) => /rememberapp\.co\.kr|nabaho\.github\.io\/pureunall\/remember-intake|^https:\/\/erp\.pureunlabor\.co\.kr\/remember-intake/.test(h)), '★★ 다른 집까지 권한을 받는다');
   const bg = strip(read(path.join(EXT, 'bg.js')));
   assert.match(bg, /IMG_OK\.test\(url/, '★★ 그림 주소를 거르지 않는다');
   const wf = read(path.join(__dirname, '..', '.github', 'workflows', 'deploy-pages.yml'));

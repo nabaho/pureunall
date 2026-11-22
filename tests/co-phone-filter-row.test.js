@@ -38,3 +38,16 @@ test('계약관리 폰 — 윗단추 넷은 «⋯ 더보기» 하나로, 지난 
   assert.match(APP, /window\.innerWidth > 768 && h\('button', \{ type:'button', onClick:function\(\)\{ setDupSweep\(dupSweepScan\(\)\); \}/,
     'PC 는 단추 그대로, 폰은 더보기 안으로');
 });
+
+test('사건·컨설팅·기금·기타 폰 — 칩(내 담당 먼저·중복 훑기·기본값)은 «⋯» 고르기 안으로 (2026-11-15 「같은 방식」)', () => {
+  ['사건관리 더보기', '목록 더보기'].forEach(function (lab) {
+    const at = APP.indexOf("'aria-label':'" + lab + "'");
+    assert.ok(at > 0, lab + ' 가 없습니다');
+    const sel = APP.slice(at, at + 1400);
+    assert.match(sel, /setMineFirst\(!mineFirst\)/, lab + ': 내 담당 먼저를 켜고 끌 길이 없습니다');
+    assert.match(sel, /dupSweepScan\(/, lab + ': 중복 훑기 길이 없습니다');
+  });
+  assert.match(APP.slice(APP.indexOf("'aria-label':'목록 더보기'"), APP.indexOf("'aria-label':'목록 더보기'") + 1400), /resetProjView\(\)/,
+    '컨설팅의 기본값 되돌리기 길이 없습니다');
+  assert.ok((APP.match(/phoneKpiInline:\s*true/g) || []).length >= 4, '업체·계약·사건·공용 목록 넷 모두 요약을 월 줄 안에 둡니다');
+});

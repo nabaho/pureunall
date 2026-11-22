@@ -362,7 +362,8 @@ test('본문 보강 — 사람이 «확인함»으로 바꾼 뒤에 채워도 �
   assert.equal(items(f)[IN + '~101'].st, 'doing'); assert.equal(items(f)[IN + '~101'].deadline.date, '2026-11-16');
 });
 test('본문 보강 — 한 번에 열 건수에 한도가 있고, 열었으면 다시 열지 않는다', async () => {
-  const f = db(); for (let n = 110; n < 118; n++) await f.ref('mailbox/msgs/' + IN + '/' + n).set(row({ s: '동의서 요청 ' + n, d: at(11, 9, 15) }));
+  /* 제목에 «이력·회의·비용» 말(위촉)이 있어야 들어와 본문을 연다 — 그 말이 없는 «동의서 요청»은 걸러져 본문도 안 연다(2026-11-19) */
+  const f = db(); for (let n = 110; n < 118; n++) await f.ref('mailbox/msgs/' + IN + '/' + n).set(row({ s: '평가위원 위촉 동의서 요청 ' + n, d: at(11, 9, 15) }));
   const calls = []; await scan(f, { readBody: read(BODY, calls), bodyMax: 3 });
   assert.equal(calls.length, 3, '한도(bodyMax)만큼만 연다');
   const again = []; await scan(f, { readBody: read(BODY, again), bodyMax: 3 });

@@ -94,7 +94,7 @@
     '모델': 1, '모집': 1, '목록': 1, '목적': 1, '목표': 1, '몰입': 1, '문구': 1, '문안': 1, '문장': 1, '문제': 1, '문체': 1,
     '문화': 1, '반영': 1, '발생': 1, '방법': 1, '방식': 1, '방안': 1, '방지': 1, '배분': 1, '배치': 1, '범위': 1, '변경': 1,
     '보상': 1, '보완': 1, '보장': 1, '보전': 1, '보호': 1, '부담': 1, '부문': 1, '부분': 1, '부여': 1, '부족': 1,
-    '부하': 1, '분야': 1, '분석': 1, '분쟁': 1, '비교': 1, '비율': 1, '비중': 1, '비용': 1, '사람': 1, '사례': 1, '사유': 1,
+    '부하': 1, '분야': 1, '분석': 1, '분쟁': 1, '분포': 1, '비교': 1, '비율': 1, '비중': 1, '비용': 1, '사람': 1, '사례': 1, '사유': 1,
     '사업': 1, '사용': 1, '사전': 1, '사후': 1, '사항': 1, '산정': 1, '상세': 1, '상승': 1, '상호': 1, '상태': 1,
     '상황': 1, '생산': 1, '생산성': 1, '서류': 1, '선택': 1, '설계': 1, '설명': 1, '성과': 1, '성장': 1, '세부': 1,
     '소득': 1, '소수점': 1, '소요': 1, '소지': 1, '소진율': 1, '소통': 1, '수립': 1, '수용': 1, '수용성': 1, '수준': 1,
@@ -161,7 +161,9 @@
     '당사는': 1, '귀사는': 1, '회사는': 1, '기업은': 1, '법인은': 1, '첨부된': 1, '첨부한': 1, '작성된': 1, '작성한': 1,
     '제출된': 1, '제출한': 1, '수정된': 1, '수정한': 1, '보완된': 1, '보완한': 1, '확정된': 1, '확정한': 1, '개정된': 1, '개정한': 1,
     '영업': 1, '개발': 1, '품질': 1, '물류': 1, '자재': 1, '구매': 1, '설비': 1, '기계': 1, '전기': 1, '포장': 1,
-    '조립': 1, '가공': 1, '출하': 1, '배송': 1, '운송': 1, '창고': 1, '비서': 1, '기획': 1, '홍보': 1, '전산': 1, '마케팅': 1, '공통': 1
+    '조립': 1, '가공': 1, '출하': 1, '배송': 1, '운송': 1, '창고': 1, '비서': 1, '기획': 1, '홍보': 1, '전산': 1, '마케팅': 1, '공통': 1,
+    '일터상생': 1, '통합진단': 1, '진단보고': 1, '기초컨설팅': 1, '전문컨설팅': 1, '심화컨설팅': 1, '능률협회': 1, '스마트공장': 1,
+    '수행기관': 1, '참여기업': 1, '컨설턴트': 1, '워크숍': 1, '착수회': 1, '종결회': 1, '지원단': 1, '사업단': 1, '고용부': 1, '노동부': 1
   };
   var TITLE_DOC_SUFFIX_RE = /(?:보고서|계약서|동의서|신청서|확인서|의견서|명세서|내역서|계획서|협약서|이력서|사직서|진술서|경위서|시말서|청구서|증명서|서약서|위임장|추천서|진단서|개선안|설계안|개정안|합의안|변경안|조정안|시행안|단일안|복수안|수정본|최종본|초안본|검토본|요약본|통합본|제출본|서명본|날인본|확정본|발표본|스캔본|배포본|참고본|취합본|보관본|사본|원본|정본|부본|규정집|자료집|사례집|출근부|명부|기록부|관리부|설문지|평가지|질문지|서명지|답변지|조직도|체계도|흐름도|구상도|수수료|자문료|컨설팅|산출물|결과물|유인물|홍보물|제조업|건설업|운수업|서비스|도소매|금융업|의료업|통신업|숙박업|음식업|회차|차수|년도|연도|반기|분기|월분|일분|주차)$/;
 
@@ -181,7 +183,7 @@
   var INDEP_HUMAN_ACT_RE = /(?<![가-힣\[])([가-힣]{2,4}|[가-힣]{1,2}(?:[ \t]+[가-힣]{1,2}){1,3})(?:은|는|이|가|도|과|와)\s+(?:면담|인터뷰|참석했|불참했|동석했|배석했|발언했|진술했|호소했|항의했|서명했|날인했|퇴사했|퇴직했|입사했|휴직했|복직했|찬성했|반대했|동의했|건의했|제안했|요청했|요구했|문의했|답변했|회신했|설명했|전달했|보고했|작성했|제출했|확인했|검토했|(?:면담|회의|설명회|간담회|교육|실사|협의회)에\s*(?:참석|불참|동석|배석|참여|동행)|(?:업무|처우|근무|제도|연차|수당|임금|교대|개선안|설계안|규정안|합의안|변경안|조정안|초안|의견|자료|서류|고충|불만|안건|내용|사항)[^\n.]{0,20}?(?:요청했|요구했|건의했|제안했|문의했|동의했|반대했|찬성했|확인했|검토했|제출했|제시했|개진했|수렴했|청취했|전달했|설명했|작성했|보고했|밝혔))/g;
   var INDEP_GENITIVE_OPINION_RE = /(?<![가-힣\[])([가-힣]{2,4}|[가-힣]{1,2}(?:[ \t]+[가-힣]{1,2}){1,3})의\s+의견을\s*(?:수렴|청취|반영|검토|제시|전달|확인)/g;
   /* 성씨 사전에 의존하지 않고 순서·길이 무관 영숫자 접두·접미 및 구분자(_/-/괄호/확장자)로 문서 종류와 결합된 고유명사를 별도로 탐지 */
-  var DOC_NAME_KIND_SRC = '(?:중간\\s*보고(?:서)?|최종\\s*보고(?:서)?|결과\\s*보고(?:서)?|완료\\s*보고(?:서)?|수행\\s*보고(?:서)?|착수\\s*보고(?:서)?|취업\\s*규칙|근로\\s*계약(?:서)?|연봉\\s*계약(?:서)?|임금\\s*대장|급여\\s*대장|임금\\s*명세(?:서)?|급여\\s*명세(?:서)?|연차(?:\\s*대장|\\s*신청서)?|출퇴근(?:\\s*기록부|부)?|신청서|동의서|확인서|서약서|사직서|이력서|진술서|경위서|시말서|면담록|회의록|상담록|개선안|설계안|서명본|산출물)';
+  var DOC_NAME_KIND_SRC = '(?:통합\\s*진단\\s*보고(?:서)?|현황\\s*진단\\s*보고(?:서)?|진단\\s*보고(?:서)?|중간\\s*보고(?:서)?|최종\\s*보고(?:서)?|결과\\s*보고(?:서)?|완료\\s*보고(?:서)?|수행\\s*보고(?:서)?|착수\\s*보고(?:서)?|취업\\s*규칙|근로\\s*계약(?:서)?|연봉\\s*계약(?:서)?|임금\\s*대장|급여\\s*대장|임금\\s*명세(?:서)?|급여\\s*명세(?:서)?|연차(?:\\s*대장|\\s*신청서)?|출퇴근(?:\\s*기록부|부)?|신청서|동의서|확인서|서약서|사직서|이력서|진술서|경위서|시말서|면담록|회의록|상담록|개선안|설계안|서명본|산출물)';
   var INDEP_DOC_NAME_LEAK_RE_1 = new RegExp(
     '(?<![가-힣])[A-Za-z0-9]*([가-힣]{2,4}|[가-힣]{1,2}(?:[ \\t]+[가-힣]{1,2}){1,2})[A-Za-z0-9]*(?:(?:[_\\-\\s]+[A-Za-z0-9]+)*[\\)\\]]?[_\\-]+(?:[A-Za-z0-9]+[_\\-\\s]*)*' + DOC_NAME_KIND_SRC + '|(?:(?:[_\\-\\s]+[A-Za-z0-9]+)*[\\)\\]][ \\t]*|[ \\t.]+)(?:[A-Za-z0-9]+[ \\t._\\-]+)*' + DOC_NAME_KIND_SRC + '(?=\\.[A-Za-z0-9]{2,5}))',
     'g'
@@ -265,6 +267,7 @@
       }
     }
     if (s.charAt(s.length - 1) === '하' && pt === '는') return false;
+    if (s.length >= 3 && /(?:되|됐|된|될|했|할)$/.test(s)) return false;
     var jong = hasHangulJongseong(s.charAt(s.length - 1));
     if ((pt === '은' || pt === '이' || pt === '을' || pt === '과') && !jong) return false;
     if ((pt === '는' || pt === '가' || pt === '를' || pt === '와') && jong) return false;
@@ -286,6 +289,11 @@
     if (explicitColon) {
       if (NON_PERSON_COMPOUND_SUFFIX_RE.test(s) || /(?:액|년|월)$/.test(s)) return false;
       return true;
+    }
+    if (NARRATIVE_NON_NAME_WORDS[s]) return false;
+    if (s.length >= 3 && /(?:은|는|이|가|을|를|의|와|과|도)$/.test(s)) {
+      var stem = s.slice(0, -1);
+      if (NON_NAME_WORDS[stem] || NARRATIVE_NON_NAME_WORDS[stem]) return false;
     }
     if (NON_PERSON_COMPOUND_SUFFIX_RE.test(s) || TITLE_DOC_SUFFIX_RE.test(s) || /(?:액|년|월)$/.test(s)) return false;
     if (s.length === 4) {
@@ -333,7 +341,7 @@
   /* 숫자·영문 접두·접미('김민준1_중간보고서.pptx', '2026김민준_중간보고서.pptx')도 이름 토큰 경계로 분리 처리 */
   var STANDALONE_SPACED_LABEL_RE = /(?<![가-힣])([가-힣]{1,2}(?:[ \t]+[가-힣]{1,2}){1,2})(?![가-힣])/g;
   var STANDALONE_SOLID_LABEL_RE = /(?<![가-힣])([가-힣]{2,4})(?![가-힣])/g;
-  var FILE_EXT_SRC = '\\.(?:pptx|xlsx|xls|csv|hwpx|hwp|docx|doc|pdf|txt|zip|jpg|jpeg|png|webp)';
+  var FILE_EXT_SRC = '\\.(?:pptx|pptm|ppsx|ppt|xlsx|xls|csv|hwpx|hwp|docx|doc|pdf|txt|zip|jpg|jpeg|png|webp)';
   var INLINE_FILENAME_EXPR_RE = new RegExp(
     '(?:' +
       '[^\\s,{}<>"\'「」『』]*_[^\\s,{}<>"\'「」『』]+|' +
@@ -418,7 +426,7 @@
   }
   function normCorpName(v) {
     return str(v).normalize('NFC')
-      .replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|유한책임회사|\(사\)|사단법인|\(재\)|재단법인|농업회사법인/g, '')
+      .replace(/농업회사법인|\(주\)|㈜|주식회사|\(유\)|유한회사|유한책임회사|\(사\)|사단법인|\(재\)|재단법인|\(합\)|합자회사/g, '')
       .replace(/\s+/g, '')
       .replace(/[.,·・\-–—_'"()\[\]]/g, '')
       .toLowerCase();
@@ -447,7 +455,7 @@
       var v = str(n && n.v), as = str(n && n.as);
       if (v.length < 2 || !as) return;
       namePairs.push({ v: v, as: as, orig: v });
-      var bare = v.replace(/\(주\)|㈜|주식회사|\(유\)|유한회사/g, '').trim();
+      var bare = v.replace(/농업회사법인|\(주\)|㈜|주식회사|\(유\)|유한회사|유한책임회사|\(사\)|사단법인|\(재\)|재단법인|\(합\)|합자회사/g, '').trim();
       if (bare !== v && bare.length >= 2) namePairs.push({ v: bare, as: as, orig: v });
     });
     namePairs.forEach(function (n) {
@@ -671,7 +679,16 @@
 
   /* 메일 제목·첨부파일명·시점으로 서류 종류(14종)와 단계(pre_mid | post_mid)를 판별 */
   var POST_SIGNAL_RE = /중간보고\s*(?:피드백|검토|이후|수정의견|보완)|최종\s*보고|결과\s*보고|완료\s*보고|최종\s*산출물|찬반\s*투표|과반수\s*동의|근로자\s*동의서|근로자대표\s*서면합의|시범\s*운영|시범\s*작성|활동비\s*정산|최종\s*평가|사후\s*교육|이행\s*결과|이행\s*관리|신구\s*대조/i;
-  var ILTEO_SIGNAL_RE = /일터\s*혁신|일터\s*상생|상생\s*컨설팅|노사발전재단|디자인팀|개선과제|취업규칙|근로계약|임금대장|급여대장|근태|출퇴근|연차|노사협의회|조직진단|설문|중간보고|최종보고|결과보고|완료보고|수행보고|수행계획|컨설팅\s*보고서|타임스탬프|서명지|찬반투표/i;
+  var EXPLICIT_ILTEO_RE = /일터\s*혁신|일터\s*상생|상생\s*컨설팅|노사발전재단|이음센터/i;
+  /* 노사발전재단 일터혁신 컨설팅 이외의 타 컨설팅 사업 키워드 (명시적 일터혁신 언급이 없으면 100% 배제) */
+  var NON_ILTEO_PROGRAM_RE = /현장\s*클리닉|클리닉\s*컨설팅|산업\s*일자리|산일\s*충남|산일\s*능률|기술\s*보호|상공\s*회의소|인사\s*충남|인사\s*서산|안전\s*보건\s*컨설팅|위험성\s*평가\s*컨설팅|출산\s*육아\s*컨설팅|사회적\s*기업|통상\s*경영|노동\s*전환|공정\s*채용\s*컨설팅|재기\s*컨설팅|경비원\s*컨설팅|재택\s*근무\s*컨설팅|비즈\s*콜센터|혁신\s*바우처|농촌\s*융합|기금\s*설립|고용\s*안정\s*선제/i;
+  var ILTEO_SIGNAL_RE = /일터\s*혁신|일터\s*상생|상생\s*컨설팅|노사발전재단|디자인팀|개선과제|취업규칙|근로계약|임금대장|급여대장|근태|출퇴근|연차|노사협의회|조직진단|설문|중간보고|최종보고|결과보고|완료보고|통합진단보고|수행보고|수행계획|컨설팅\s*보고서|타임스탬프|서명지|찬반투표/i;
+
+  function isNonIlteoText(text) {
+    var s = str(text);
+    if (!s) return false;
+    return NON_ILTEO_PROGRAM_RE.test(s) && !EXPLICIT_ILTEO_RE.test(s);
+  }
 
   function classifyDocKind(subject, attNames, bodyPreview) {
     var headOnly = (str(subject) + ' ' + (Array.isArray(attNames) ? attNames.join(' ') : str(attNames))).toLowerCase();
@@ -681,11 +698,18 @@
     if (/중간보고\s*(?:피드백|검토의견|수정의견|수정요청|보완요청)/.test(headOnly)) {
       return Cat.getDocKind('design_feedback') || Cat.DOC_KINDS[0];
     }
-    if (/최종\s*보고서|결과\s*보고서|완료\s*보고서|최종\s*결과\s*보고|최종\s*발표\s*자료/.test(headOnly)) {
+    if (/최종\s*보고서|결과\s*보고서|완료\s*보고서|최종\s*결과\s*보고|최종\s*발표\s*자료|완료\s*발표\s*자료/.test(headOnly)) {
       return Cat.getDocKind('final_report_doc') || Cat.DOC_KINDS[0];
     }
-    if (/중간\s*보고서|중간\s*발표\s*자료|중간\s*보고\s*자료|현황\s*진단\s*보고서/.test(headOnly)) {
-      return Cat.getDocKind('mid_report_doc') || Cat.DOC_KINDS[0];
+    if (/\.(pptx|pptm|ppsx|ppt|pdf)\b/.test(headOnly)
+        && /(?:^|[\s_\-(\[])(?:최종|최종본|결과보고|완료보고)(?:[\s_\-)\].]|$)/.test(headOnly)
+        && !/취업\s*규칙|근로\s*계약|임금\s*대장|급여\s*대장|동의서|서명지|설문/.test(headOnly)) {
+      return Cat.getDocKind('final_report_doc') || Cat.DOC_KINDS[0];
+    }
+    if (/중간\s*보고서|중간\s*발표\s*자료|중간\s*보고\s*자료|현황\s*진단\s*보고서|통합\s*진단\s*보고서|진단\s*보고서/.test(headOnly)) {
+      return /최종|결과\s*보고|완료\s*보고/.test(headOnly)
+        ? (Cat.getDocKind('final_report_doc') || Cat.DOC_KINDS[0])
+        : (Cat.getDocKind('mid_report_doc') || Cat.DOC_KINDS[0]);
     }
 
     var best = null, bestScore = 0;
@@ -704,7 +728,7 @@
     if (!best) {
       var joinedAtts = (Array.isArray(attNames) ? attNames.join(' ') : '').toLowerCase();
       if (/\.(xlsx|xls|csv)\b/.test(joinedAtts)) best = Cat.getDocKind('org_roster');
-      else if (/\.(pptx|ppt)\b/.test(joinedAtts)) {
+      else if (/\.(pptx|pptm|ppsx|ppt)\b/.test(joinedAtts)) {
         best = /최종|결과|완료/.test(headOnly) ? Cat.getDocKind('final_report_doc') : Cat.getDocKind('mid_report_doc');
       }
       else if (/\.(jpg|jpeg|png|webp)\b/.test(joinedAtts)) best = Cat.getDocKind('round_proof');
@@ -818,6 +842,7 @@
     var prof = buildCompanyMailProfile(project, companies, consultings);
     var flat = Array.isArray(folders) ? folders : flattenMailboxRows(folders, msgs);
     var midTs = Number(project && project.midConfirmedAt) || 0;
+    var projYear = Number(project && project.year) || 0;
     var existingByMailKey = {};
     Object.keys(intakeMap || {}).forEach(function (id) {
       var rec = intakeMap[id];
@@ -828,6 +853,25 @@
     var matched = [], nameCandidates = [], seenKeys = {};
     flat.forEach(function (m) {
       if (!m || seenKeys[m.key]) return;
+      var linkedRec = existingByMailKey[m.key] || null;
+      var mailText = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '') + ' ' + str(m.preview);
+
+      /* 이미 수기·분석 연결된 카드가 아닌 경우: 타 컨설팅 사업 메일 배제 + 프로젝트 수행연도(±1년) 정합성 필터 */
+      if (!linkedRec) {
+        if (isNonIlteoText(mailText)) return;
+        if (projYear >= 2015) {
+          if (Number(m.ts) > 0) {
+            var mYear = new Date(Number(m.ts) + 9 * 3600e3).getUTCFullYear();
+            if (mYear < projYear - 1 || mYear > projYear + 1) return;
+          }
+          var expYearMatch = /(20[12]\d)\s*년/.exec(mailText);
+          if (expYearMatch) {
+            var expYr = Number(expYearMatch[1]);
+            if (Math.abs(expYr - projYear) > 1) return;
+          }
+        }
+      }
+
       var peerAddrs = m.dir === 'out' ? m.to : [m.from];
       var addrHit = peerAddrs.some(function (em) {
         if (!em) return false;
@@ -838,7 +882,6 @@
 
       var dk = classifyDocKind(m.subject, m.attNames, '');
       var phase = resolvePhase(m.ts, midTs, dk, m.subject, m.attNames);
-      var linkedRec = existingByMailKey[m.key] || null;
       var checked = !!(linkedRec && linkedRec.checkedAt);
 
       if (addrHit) {
@@ -1827,12 +1870,93 @@
       .replace(/&amp;/g, '&');
   }
 
-  /* .pptx 슬라이드 XML(ppt/slides/slide*.xml) 평문 추출기 — 브라우저·Node 공용 (압축 폭탄 방어 포함) */
-  var MAX_PPTX_COMPRESSED_BYTES = 15 * 1024 * 1024;
-  var MAX_PPTX_SLIDES = 120;
+  /* .pptx/.pptm/.ppsx 슬라이드 XML(ppt/slides/slide*.xml) 평문 추출기 — 브라우저·Node 공용 (압축 폭탄 방어 포함) */
+  var MAX_PPTX_COMPRESSED_BYTES = 40 * 1024 * 1024;
+  var MAX_PPTX_SLIDES = 300;
   var MAX_PPTX_SLIDE_XML_BYTES = 2 * 1024 * 1024;
-  var MAX_PPTX_TOTAL_XML_BYTES = 16 * 1024 * 1024;
+  var MAX_PPTX_TOTAL_XML_BYTES = 24 * 1024 * 1024;
   var MAX_PPTX_RATIO = 120;
+
+  function stopJsZipStreamHelper(helper) {
+    if (!helper) return;
+    try { if (typeof helper.pause === 'function') helper.pause(); } catch (e) {}
+    try {
+      for (var w = helper._worker; w; w = w.previous) {
+        w.isFinished = true;
+        w.isPaused = true;
+        if (w._pako && w._pako.strm) {
+          w._pako.strm.avail_in = 0;
+          w._pako.ended = true;
+        }
+      }
+    } catch (e) {}
+  }
+
+  function readPptxSlideXmlBounded(entry, actualEntryCompLen, totalSoFar, archiveInputLen) {
+    return new Promise(function (resolve) {
+      if (!entry || typeof entry.internalStream !== 'function') {
+        resolve({ reason: 'error', xml: '', byteLen: 0 });
+        return;
+      }
+      var settled = false;
+      var slideBytes = 0;
+      var chunks = [];
+      var helper = entry.internalStream('uint8array');
+      function finishAbort(reason) {
+        if (settled) return;
+        settled = true;
+        stopJsZipStreamHelper(helper);
+        chunks = [];
+        resolve({ reason: reason, xml: '', byteLen: slideBytes });
+      }
+      helper
+        .on('data', function (chunk) {
+          if (settled) return;
+          var u8 = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk || 0);
+          slideBytes += u8.byteLength;
+          var nextTotal = totalSoFar + slideBytes;
+          if (
+            slideBytes > MAX_PPTX_SLIDE_XML_BYTES ||
+            (actualEntryCompLen > 0 && slideBytes > 65536 && (slideBytes / actualEntryCompLen) > MAX_PPTX_RATIO) ||
+            (archiveInputLen > 0 && nextTotal > 65536 && (nextTotal / archiveInputLen) > MAX_PPTX_RATIO)
+          ) {
+            finishAbort('bomb');
+            return;
+          }
+          if (nextTotal > MAX_PPTX_TOTAL_XML_BYTES) {
+            finishAbort('budget');
+            return;
+          }
+          chunks.push(u8);
+        })
+        .on('error', function () {
+          finishAbort('error');
+        })
+        .on('end', function () {
+          if (settled) return;
+          settled = true;
+          if (slideBytes <= 0) {
+            resolve({ reason: 'ok', xml: '', byteLen: 0 });
+            return;
+          }
+          var merged = new Uint8Array(slideBytes);
+          var off = 0;
+          for (var k = 0; k < chunks.length; k++) {
+            merged.set(chunks[k], off);
+            off += chunks[k].byteLength;
+          }
+          chunks = [];
+          var xmlStr = '';
+          if (typeof TextDecoder !== 'undefined') {
+            xmlStr = new TextDecoder('utf-8', { fatal: false }).decode(merged);
+          } else if (typeof Buffer !== 'undefined') {
+            xmlStr = Buffer.from(merged).toString('utf8');
+          }
+          resolve({ reason: 'ok', xml: xmlStr, byteLen: slideBytes });
+        });
+      helper.resume();
+    });
+  }
 
   async function extractPptxText(bytes, JSZipCtor) {
     var Zip = JSZipCtor || (root && root.JSZip);
@@ -1858,16 +1982,22 @@
       for (var i = 0; i < slideEntries.length; i++) {
         var entry = zip.files[slideEntries[i].path];
         var metaData = entry && entry._data;
+        var rawCompBuf = metaData && metaData.compressedContent;
+        var actualCompLen = rawCompBuf
+          ? Number(rawCompBuf.byteLength != null ? rawCompBuf.byteLength : (rawCompBuf.length || 0))
+          : Number((metaData && metaData.compressedSize) || 0);
         if (metaData) {
           var uncomp = Number(metaData.uncompressedSize || 0);
-          var comp = Number(metaData.compressedSize || 0);
           if (uncomp > MAX_PPTX_SLIDE_XML_BYTES) return '';
-          if (comp > 0 && uncomp > 65536 && (uncomp / comp) > MAX_PPTX_RATIO) return '';
+          if (actualCompLen > 0 && uncomp > 65536 && (uncomp / actualCompLen) > MAX_PPTX_RATIO) return '';
           if (totalXmlBytes + uncomp > MAX_PPTX_TOTAL_XML_BYTES) break;
         }
-        var xml = await entry.async('string');
-        totalXmlBytes += xml.length;
-        if (xml.length > MAX_PPTX_SLIDE_XML_BYTES || totalXmlBytes > MAX_PPTX_TOTAL_XML_BYTES) break;
+        var slideRes = await readPptxSlideXmlBounded(entry, actualCompLen, totalXmlBytes, inputLen);
+        if (slideRes.reason === 'bomb' || slideRes.reason === 'error') return '';
+        if (slideRes.reason === 'budget') break;
+        var xml = slideRes.xml;
+        totalXmlBytes += slideRes.byteLen;
+        if (slideRes.byteLen > MAX_PPTX_SLIDE_XML_BYTES || totalXmlBytes > MAX_PPTX_TOTAL_XML_BYTES) break;
         var paras = [];
         var pBlocks = xml.split(/<\/a:p>/i);
         for (var j = 0; j < pBlocks.length; j++) {
@@ -1906,7 +2036,21 @@
   function sanitizeAndAnalyzeText(rawText, meta) {
     meta = meta || {};
     var names = [];
-    if (meta.companyName) names.push({ v: meta.companyName, as: '[해당 기업]' });
+    if (meta.companyName) {
+      names.push({ v: meta.companyName, as: '[해당 기업]' });
+      var bareCorp = str(meta.companyName)
+        .replace(/농업회사법인|\(주\)|㈜|주식회사|\(유\)|유한회사|유한책임회사|\(사\)|사단법인|\(재\)|재단법인|\(합\)|합자회사/g, '')
+        .trim();
+      if (bareCorp.length >= 2 && bareCorp !== str(meta.companyName)) {
+        names.push({ v: bareCorp, as: '[해당 기업]' });
+      }
+    }
+    if (Array.isArray(meta.aliasNames)) {
+      meta.aliasNames.forEach(function (al) {
+        var av = str(al);
+        if (av.length >= 2) names.push({ v: av, as: '[해당 기업]' });
+      });
+    }
     if (meta.ceoName) names.push({ v: meta.ceoName, as: '[대표자]' });
     if (meta.contactName) names.push({ v: meta.contactName, as: '[담당자]' });
 
@@ -1915,7 +2059,6 @@
     for (var pass = 0; pass < 3 && hasResidualPii(masked.text); pass++) {
       masked = { text: maskPiiStrict(masked.text, []).text, back: masked.back };
     }
-    var leakBlocked = hasResidualPii(masked.text) || hasIndependentPersonAuditLeak(masked.text);
 
     var safeSubjForMeta = maskStandaloneNamesInLabel(maskPiiStrict(str(meta.subject), names).text);
     for (var sp = 0; sp < 3 && (hasResidualPii(safeSubjForMeta) || hasStandaloneNameInLabel(safeSubjForMeta)); sp++) {
@@ -1928,12 +2071,18 @@
       }
       return ma;
     });
-    var previewForKind = leakBlocked ? '' : Array.from(masked.text).slice(0, 1800).join('').trim();
+    var previewCandidate = Array.from(masked.text).slice(0, 1800).join('').trim();
+    var previewForKind = (hasResidualPii(previewCandidate) || hasIndependentPersonAuditLeak(previewCandidate)) ? '' : previewCandidate;
     var dk = meta.docKind ? (Cat.getDocKind(meta.docKind) || classifyDocKind(safeSubjForMeta, safeAttsForMeta, previewForKind))
                           : classifyDocKind(safeSubjForMeta, safeAttsForMeta, previewForKind);
     var isLongDoc = !!(dk && (dk.code === 'mid_report_doc' || dk.code === 'final_report_doc' || dk.code === 'work_rules'));
     var excerptLimit = isLongDoc ? 6000 : 2000;
-    var safeExcerpt = leakBlocked ? '' : Array.from(masked.text).slice(0, excerptLimit).join('').trim();
+    var maskedArr = Array.from(masked.text);
+    var excerptCandidate = maskedArr.length > excerptLimit
+      ? maskedArr.slice(0, excerptLimit).join('').replace(/\s+\S*$/, '').trim()
+      : masked.text.trim();
+    var leakBlocked = hasResidualPii(excerptCandidate) || hasIndependentPersonAuditLeak(excerptCandidate);
+    var safeExcerpt = leakBlocked ? '' : excerptCandidate;
 
     var metaLeak = hasResidualPii(safeSubjForMeta) || hasIndependentPersonAuditLeak(safeSubjForMeta) || hasStandaloneNameInLabel(safeSubjForMeta)
       || safeAttsForMeta.some(hasResidualPii) || safeAttsForMeta.some(hasIndependentPersonAuditLeak) || safeAttsForMeta.some(hasStandaloneNameInLabel);
@@ -2004,6 +2153,11 @@
   return {
     GARIM: GARIM,
     PUBLIC_DOMAINS: PUBLIC_DOMAINS,
+    EXPLICIT_ILTEO_RE: EXPLICIT_ILTEO_RE,
+    NON_ILTEO_PROGRAM_RE: NON_ILTEO_PROGRAM_RE,
+    isNonIlteoText: isNonIlteoText,
+    normalizeCorpName: normCorpName,
+    normCorpName: normCorpName,
     maskPiiStrict: maskPiiStrict,
     maskStandaloneNamesInLabel: maskStandaloneNamesInLabel,
     hasStandaloneNameInLabel: hasStandaloneNameInLabel,

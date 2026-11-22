@@ -30,7 +30,11 @@ const harassCases = {
     companyId: 'hco-1', companyName: '(주)가나점검테크놀로지솔루션', bizNo: '123-81-20012',
     category: 'harass', title: '생산품질본부 직장 내 괴롭힘 신고 외부전문가 조사 건',
     managerMain: 'P001', managerSubs: ['P002'],
-    receiveDate: '2026-10-05', dueDate: '2026-11-20', closeDate: '',
+    receiveDate: '2026-10-05', dueDate: '2026-11-20', extDue1: '2026-11-30', closeDate: '',
+    laborOffice: '대전지방고용노동청 천안지청', inspectorName: '점검감독관', govCaseNo: '진정 제2026-00101호',
+    fairnessChecked: true,
+    reportTemplate: 'lawfirm_opinion',
+    monitoringLogs: [{ id: 'mn-1', round: '중간점검', date: '2026-10-25', status: '양호(재발·불이익 없음)', note: '임시 부서 분리 유지 확인' }],
     verdictSummary: 'partial',
     steps: {
       intake: { done: true, date: '2026-10-05', note: '조사 위임계약서 및 착수공문 접수 완료' },
@@ -72,14 +76,27 @@ const secrets = {
   'hc-1': {
     id: 'hc-1', entityType: 'Document', schemaVersion: 1, contractVersion: 1,
     createdAt: NOW - 864e5 * 5, updatedAt: NOW - 3600e3, revision: 2,
+    reportTemplate: 'lawfirm_opinion',
+    templateMeta: {
+      lawfirm_opinion: {
+        docRefNo: '법률자문 제2026-HR-001호 · 인사기밀',
+        querySummary: '생산품질본부 내 폭언·업무조정의 근로기준법 제76조의2 해당 여부 및 인사조치 적정성 검토',
+        litigationRisk: 'low',
+        execSummary: '제1쟁점은 참고인 진술 및 녹취로 신빙성이 확보되어 괴롭힘 성립 인정, 제2쟁점은 정당한 순환배치로 불인정함.',
+      },
+    },
     overview: '생산품질본부 내 업무 배제 및 반복적 폭언 관련 외부전문가 조사 의뢰 건(점검용 합성 데이터).',
     interviews: [
-      { id: 'iv-1', role: 'victim', alias: '신고인 가', dept: '품질관리파트', date: '2026-10-14', method: '대면면담', pledgeSigned: true, summary: '회의석상에서 반복적인 모욕성 발언과 메신저 방 배제가 있었다고 진술함.' },
-      { id: 'iv-2', role: 'accused', alias: '피신고인 나', dept: '품질관리파트', date: '2026-10-21', method: '대면면담', pledgeSigned: true, summary: '납기 지연에 따른 업무 질책이었으나 표현이 과했음을 일부 인정함.' },
+      { id: 'iv-1', role: 'victim', alias: '신고인 가', dept: '품질관리파트', date: '2026-10-14', method: '대면면담', stmtStyle: 'legal_record', pledgeSigned: true, summary: '회의석상에서 반복적인 모욕성 발언과 메신저 방 배제가 있었다고 진술함.' },
+      { id: 'iv-2', role: 'accused', alias: '피신고인 나', dept: '품질관리파트', date: '2026-10-21', method: '대면면담', stmtStyle: 'confirm_std', pledgeSigned: true, summary: '납기 지연에 따른 업무 질책이었으나 표현이 과했음을 일부 인정함.' },
     ],
     issues: [
-      { id: 'iss-1', title: '회의석상 폭언 및 모욕적 언동', whenWhere: '2026-09-12 본사 회의실', claimVictim: '다수 팀원 앞에서 인격 모독 발언 반복', claimAccused: '업무상 실수 지적 과정이었음', evidenceNote: '참고인 2명 진술 일치 및 회의록 확인', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes', verdict: 'yes' },
+      { id: 'iss-1', title: '회의석상 폭언 및 모욕적 언동', whenWhere: '2026-09-12 본사 회의실', claimVictim: '다수 팀원 앞에서 인격 모독 발언 반복', claimAccused: '업무상 실수 지적 과정이었음', evidenceNote: '참고인 2명 진술 일치 및 회의록 확인', credibility: { consistency: true, specificity: true, rationality: true, noMotive: true, corroboration: true }, credibilityNote: '최초 신고·면담·참고인 목격담 모두 일치', factStatus: 'recognized', elemSuperiority: 'yes', elemBeyondScope: 'yes', elemHarm: 'yes', verdict: 'yes' },
       { id: 'iss-2', title: '정기 프로젝트 배정 조정 건', whenWhere: '2026-09-20 사내 메신저', claimVictim: '의도적 업무 배제 주장', claimAccused: '전사 분기 순환배치 기준에 따른 조정', evidenceNote: '인사팀 순환배치 공문 확인', factStatus: 'partial', elemSuperiority: 'yes', elemBeyondScope: 'no', elemHarm: 'no', verdict: 'no' },
+    ],
+    evidences: [
+      { id: 'ev-1', side: 'gap', no: 1, exhibitNo: '갑 제1호증', date: '2026-09-12', title: '주간회의 음성녹취 발췌록', submitter: '신고인 가', summary: '회의석상 모욕적 발언 정황 확인' },
+      { id: 'ev-2', side: 'eul', no: 1, exhibitNo: '을 제1호증', date: '2026-09-20', title: '분기 업무분장 순환배치 공문', submitter: '피신고인 나', summary: '전사 기준에 따른 업무 조정 확인' },
     ],
     conclusion: '쟁점 1은 근로기준법 제76조의2 요건을 모두 충족하여 직장 내 괴롭힘에 해당하며, 쟁점 2는 업무상 적정범위 내 인사조정으로 판단함.',
     recommendations: '피해근로자 희망 반영 부서 분리 유지 및 행위자 인사위원회 회부·재발방지 교육 권고.',

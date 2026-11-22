@@ -14,8 +14,16 @@
    그래서 **같은 파일 하나를 네 앱이 함께 등록**한다. 같은 주소·같은 scope면
    다시 등록해도 밀어내기가 일어나지 않는다.
 
+   ★ 2026-11-15 이알피도 이 파일로 들어왔다. 이알피만 자기 일꾼(pu-erp-sw.js)을
+     같은 scope 에 등록해 위 약속을 어기고 있었다 — 이알피를 연 뒤에는 기업정보함·
+     사진첩·급여데이터함·문서뷰어의 공유가 죽고, 다른 앱을 연 뒤에는 이알피 공유가 죽었다.
+     이알피 몫은 아래 takeErp(받은 사진을 사진첩 받은 함에 넣는다)이다.
+     ⚠ scope 를 좁히지 않은 등록은 «어느 화면이든» 이 파일이어야 한다 —
+       tests/sw-one-root-worker.test.js 가 저장소의 모든 html·js 를 훑어 지킨다.
+
    ※ 포털 웹푸시(firebase-messaging-sw.js)는 여기 끼우지 않는다. 그쪽은
      /pureunall/push/ 로 scope를 좁혀 등록하므로 애초에 서로 부딪히지 않는다.
+     푸른캘린더 공유(pu-cal-share-sw.js)도 /pureunall/cal-share/ 로 좁혀 따로 산다.
 
    ⚠ 이 워커는 **아무것도 캐시하지 않는다.**
    캐시를 두면 pu-version.js 의 「새 버전 자동 적용」과 싸워 옛 화면이 남는다.
@@ -38,17 +46,68 @@ var CARDS_SHARE = '/pu-cards-share';    // 기업정보함 manifest 의 share_ta
 var PHOTOS_SHARE = '/pu-photos.html';   // 사진첩 manifest 의 share_target.action
 var PAYDATA_SHARE = '/pu-paydata.html'; // 급여데이터함 manifest 의 share_target.action
 var VIEWER_SHARE = '/pu-viewer.html';   // 문서뷰어 manifest 의 share_target.action
+var ERP_SHARE = '/pu-erp.html';         // 이알피 manifest 의 share_target.action (받은 것은 사진첩 함으로 간다)
 
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'POST') return;          // GET 등은 건드리지 않는다(캐시 없음)
   var url;
   try { url = new URL(e.request.url); } catch (_) { return; }
   var p = url.pathname;
+  /* ⚠ 받는 함수(take…)마다 첫 줄에서 fromOtherSite 로 거른다 — 새 갈래를 더하면 거기도 넣는다 */
   if (p.slice(-CARDS_SHARE.length) === CARDS_SHARE) { e.respondWith(takeCards(e.request)); return; }
   if (p.slice(-PHOTOS_SHARE.length) === PHOTOS_SHARE) { e.respondWith(takePhotos(e.request, url)); return; }
   if (p.slice(-PAYDATA_SHARE.length) === PAYDATA_SHARE) { e.respondWith(takePaydata(e.request, url)); return; }
   if (p.slice(-VIEWER_SHARE.length) === VIEWER_SHARE) { e.respondWith(takeViewer(e.request, url)); return; }
+  if (p.slice(-ERP_SHARE.length) === ERP_SHARE) { e.respondWith(takeErp(e.request, url)); return; }
 });
+
+/* ══════ 다른 웹사이트가 보낸 «공유»는 담지 않는다 (대표 지시 2026-11-16) ══════
+   폰의 공유(갤러리·카톡 → 앱)는 «보낸 곳»이 비어서 오거나 android-app:// 로 온다.
+   웹페이지가 보낸 전송에는 그 페이지의 주소(보낸 곳)가 붙는다 — 그것이 «이 일꾼과 같은 폴더(우리 앱)»
+   밖이면 담지 않고 «받지 않았습니다» 화면을 보인다. 사진첩은 받은 것을 확인 없이 담으므로
+   (대표 지시 2026-10-02) 남의 사이트가 보낸 것이 거기 섞이면 안 된다.
+   ⚠ 보낸 곳이 비었거나 http(s) 주소가 아니면 받는다 — 폰의 공유가 그렇게 온다(막으면 공유가 죽는다).
+   ⚠ pu-cal-share-sw.js 에도 같은 두 함수가 있다(그 일꾼은 따로 산다). 고치면 함께 고친다 —
+     tests/share-target-other-site.test.js 가 공유를 받는 모든 일꾼을 같은 잣대로 돌려 본다. */
+function fromOtherSite(req) {
+  var home = new URL('./', self.location);          // 이 일꾼이 사는 폴더(깃허브 /pureunall/)
+  var from = '';
+  try { from = String(req.referrer || ''); } catch (_) { from = ''; }
+  if (/^https?:/i.test(from)) {
+    var u;
+    try { u = new URL(from); } catch (_) { return true; }
+    /* 같은 깃허브 주소라도 폴더가 다르면 다른 저장소의 페이지다 */
+    if (u.origin !== home.origin || u.pathname.indexOf(home.pathname) !== 0) return true;
+  }
+  var origin = '';
+  try { origin = String((req.headers && req.headers.get && req.headers.get('origin')) || ''); } catch (_) { origin = ''; }
+  if (/^https?:/i.test(origin) && origin !== home.origin) return true;
+  return false;
+}
+
+/* 거절 화면 — 보낸 곳의 주소나 받은 내용은 화면에 싣지 않는다(남의 글을 우리 화면에 띄우지 않는다)
+   home 은 받은 주소가 아니라 «이 일꾼 폴더 기준의 정해 둔 화면»으로 준다. 그래도 풀린 주소가
+   이 폴더 밖이면 폴더 첫 화면으로 — «앱으로 가기»가 앱 밖을 가리키면 안 된다. */
+function refuseOtherSite(home) {
+  var base = new URL('./', self.location);
+  var dest = new URL(home, base);
+  if (dest.origin !== base.origin || dest.pathname.indexOf(base.pathname) !== 0) dest = base;
+  var to = String(dest.href).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+  var html = '<!doctype html><html lang="ko"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>공유를 받지 않았습니다</title></head>' +
+    '<body style="margin:0;padding:24px 16px;font-family:system-ui,sans-serif;line-height:1.7;color:#1f2937;background:#fff">' +
+    '<h1 style="font-size:20px;margin:0 0 12px">공유를 받지 않았습니다</h1>' +
+    '<p style="font-size:16px;margin:0 0 16px">다른 웹사이트에서 보낸 것이라 담지 않았습니다.<br>' +
+    '사진·문서는 폰의 갤러리·카톡 등에서 «공유»로 보내 주세요.</p>' +
+    '<p style="font-size:16px;margin:0"><a href="' + to + '">앱으로 가기</a></p></body></html>';
+  return new Response(html, {
+    status: 403,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
 
 /* 303 — 받은 POST 를 GET 으로 바꿔 돌려보낸다(새로고침해도 다시 안 보낸다) */
 function redirect(to) {
@@ -59,6 +118,7 @@ function redirect(to) {
    pu-cards.html 이 ?shared=1 로 돌아와 'pucards-share' 캐시에서 꺼내 쓴다.
    키 이름(shared-files · shared-N)은 읽는 쪽과 짝이라 바꾸면 안 된다. */
 function takeCards(req) {
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('./pu-cards.html'));
   return (async function () {
     try {
       var form = await req.formData();
@@ -114,6 +174,7 @@ function keepPhotos(files) {
 }
 
 function takePhotos(req, url) {
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + PHOTOS_SHARE));
   var back = url.origin + url.pathname;
   return req.formData().then(function (fd) {
     /* manifest 의 params.files[0].name 과 같은 이름이어야 한다 */
@@ -129,6 +190,34 @@ function takePhotos(req, url) {
   }).catch(function (err) {
     if (self.console) console.warn('[사진첩 공유 받기]', err);
     return redirect(back + '?share=err');
+  });
+}
+
+/* ══════ 이알피: 받은 사진은 «사진첩의 받은 함»에 넣고 사진첩 화면으로 넘긴다 ══════
+   대표 지시 2026-09-17 「이알피에도 공유받기 붙여라」 — 2026-11-15 옛 pu-erp-sw.js 에서 옮겨 왔다.
+   까닭 — 이알피에는 사진이 들어갈 «자리»가 없다. 사진은 사건·업체·계약에 붙는 것이라
+   어느 건인지 모르는 채로는 넣을 데가 없다. 사진첩은 받아서 «명함 판독»까지 하고
+   기업정보함으로 넘기는 길이 이미 있다 — 그 길로 태우는 것이 가장 짧다.
+   그래서 담는 곳은 사진첩 몫과 «같은» keepPhotos 다(이름·판 번호를 따로 들지 않는다 —
+   따로 들면 언젠가 어긋나 사진첩이 빈 함을 열고 「보낸 게 없다」고 한다).
+   ⚠ 파일 칸 이름은 pu-erp-manifest.json 의 params.files[0].name 과 짝이다. */
+function takeErp(req, url) {
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + ERP_SHARE));
+  /* 넘길 곳은 «이 앱과 같은 폴더»의 사진첩이다 — 주소를 손으로 붙이지 않고 받은 주소에서 만든다 */
+  var photos = url.origin + url.pathname.slice(0, url.pathname.length - ERP_SHARE.length) + PHOTOS_SHARE;
+  return req.formData().then(function (fd) {
+    var files = fd.getAll('photos').filter(function (f) {
+      return f && typeof f === 'object' && f.size > 0;
+    });
+    if (!files.length) return 0;
+    return keepPhotos(files);
+  }).then(function (n) {
+    /* 한 장도 못 받았으면 그 사실을 사진첩 화면이 알린다 — 조용히 넘기면
+       "공유했는데 아무 일도 없다"가 되고, 사람은 올라간 줄 안다. */
+    return redirect(photos + (n ? '?share=1' : '?share=none'));
+  }).catch(function (err) {
+    if (self.console) console.warn('[이알피 공유 받기]', err);
+    return redirect(photos + '?share=err');
   });
 }
 
@@ -167,6 +256,7 @@ function keepPaydata(files) {
 }
 
 function takePaydata(req, url) {
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + PAYDATA_SHARE));
   var back = url.origin + url.pathname;
   return req.formData().then(function (fd) {
     var files = fd.getAll('photos').filter(function (f) {
@@ -218,6 +308,7 @@ function keepViewer(files) {
 }
 
 function takeViewer(req, url) {
+  if (fromOtherSite(req)) return Promise.resolve(refuseOtherSite('.' + VIEWER_SHARE));
   var back = url.origin + url.pathname;
   return req.formData().then(function (fd) {
     var files = fd.getAll('docs').filter(function (f) {

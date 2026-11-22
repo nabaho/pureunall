@@ -15,7 +15,13 @@
 
    ★ 사진은 «홈페이지 것»을 그대로 이어받는다
      푸른ERP 는 얼굴 사진을 갖고 있지 않다. 글 번호로 짝지어 지금 쪽의 사진을 그대로 쓴다.
-     짝이 없으면 그 사람은 «올리지 않고» 알린다 — 사진 없는 카드를 내보내지 않는다. */
+     짝이 없으면 그 사람은 «올리지 않고» 알린다 — 사진 없는 카드를 내보내지 않는다.
+   ★ (2026-11-16 옛 홈페이지 접은 뒤) 우리가 «새 사이트에 직접 올린» 사진이 있으면 그것이 먼저다.
+     자리: site/files/people/<구성원 열쇠>.<jpg|png|webp> — photo.site 에 적혀 있다(화면 「새 사이트에 올리기」가 올리고 적는다).
+     ⚠ 열쇠는 우리 RTDB 열쇠(숫자 글 번호 또는 «new-시각»)다 — 이름·사번을 주소에 넣지 않는다(사번에서 로그인 아이디가 나온다).
+   ★ 글 번호(srl) 없는 «새 노무사»도 카드로 간다 — 단 셋이 다 있어야 한다:
+     새 사이트에 올린 사진(photo.site) · 대표의 올리기 허락(publishOk) · 쓸 수 있는 열쇠(key).
+     카드의 data-srl 자리에는 그 열쇠(new-…)가 들어간다 — 숫자 글 번호와 겹칠 일이 없다. */
 (function (global) {
   'use strict';
   /* ── 아주 작은 마크업 도구 ── */
@@ -78,7 +84,8 @@
   function 사람읽기(html) {
     return 카드들(html).map(c => {
       const h = c.html;
-      const srl = (/data-srl="(\d+)"/.exec(h) || [, ''])[1];
+      /* ★ 열쇠가 «숫자만»은 아니다 — 글 번호 없이 올린 새 노무사는 「new-…」다(자문사 로고의 「n…」과 같은 까닭) */
+      const srl = (/data-srl="([A-Za-z0-9_-]+)"/.exec(h) || [, ''])[1];
       const 사진 = (/<img[^>]+src="([^"]+)"/.exec(h) || [, ''])[1];
       /* 모달 안의 제목이 이름과 직책1 을 갈라 준다 */
       const 모달 = h.slice(h.indexOf('bh_modal_header'));
@@ -97,6 +104,10 @@
 
   /* ── 그리기: 자료 → 쪽 ── */
   function 카드그리기(본, 사람, 자리) {
+    /* ★ 열쇠는 속성에 «그대로» 들어간다 — 안전한 글자(영문·숫자·밑줄·빼기)가 아니면 그리지 않는다(2026-11-16 보안) */
+    if (!/^[A-Za-z0-9_-]{1,60}$/.test(String(사람 && 사람.srl))) throw new Error('카드 열쇠 모양이 틀렸습니다');
+    /* 사진 주소도 속성에 들어간다 — 따옴표·꺾쇠가 섞인 주소는 받지 않는다 */
+    if (/["'<>\s]/.test(String((사람 && 사람.사진) || ''))) throw new Error('사진 주소 모양이 틀렸습니다');
     let h = 본;
 
     /* 몇 번째 카드인지 — 홈페이지 반죽이 item1·item2… 로 세므로 그대로 이어 준다.
@@ -105,8 +116,9 @@
     h = h.replace(/(<div class="bh bh_item item item)\d+/, '$1' + (자리 + 1));
 
     /* 글 번호 — 창을 여닫는 열쇠라 세 자리를 다 갈아 끼운다 */
-    h = h.replace(/data-srl="\d+"/g, 'data-srl="' + 사람.srl + '"');
-    h = h.replace(/id="bh_modal_\d+"/, 'id="bh_modal_' + 사람.srl + '"');
+    /* ★ 본 카드가 «new-…» 열쇠일 수도 있다(맨 앞에 새 노무사가 오면) — 숫자만 잡으면 안 갈린다 */
+    h = h.replace(/data-srl="[A-Za-z0-9_-]+"/g, 'data-srl="' + 사람.srl + '"');
+    h = h.replace(/id="bh_modal_[A-Za-z0-9_-]+"/, 'id="bh_modal_' + 사람.srl + '"');
 
     /* 얼굴 사진 */
     h = h.replace(/(<img[^>]+src=")[^"]*(")/, '$1' + 사람.사진 + '$2');
@@ -268,8 +280,49 @@
       });
   }
 
+  /* ── 우리가 새 사이트에 올린 얼굴 사진 (2026-11-16) ──
+     자리는 «좁게» 연다 — site/files/people/ 아래 그림 한 겹(서버 site-publish.js PEOPLE_IMAGE_RE 와 같은 모양).
+     열쇠는 RTDB 구성원 열쇠 그대로(소문자·숫자·밑줄·빼기) — 이름·사번은 주소에 안 들어간다. */
+  var 사진열쇠꼴 = /^[a-z0-9_-]{1,60}$/;
+  var 사진자리꼴 = /^site\/files\/people\/[a-z0-9_-]{1,60}\.(?:png|jpg|jpeg|webp)$/;
+  var 사진끝 = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  /* 구성원 열쇠 + 그림 종류 → 올릴 자리. 못 쓰는 열쇠·종류면 빈 글자 */
+  function 사진자리(key, 종류) {
+    var k = String(key == null ? '' : key);
+    var 끝 = 사진끝[String(종류 || '').toLowerCase()];
+    if (!사진열쇠꼴.test(k) || !끝) return '';
+    return 'site/files/people/' + k + '.' + 끝;
+  }
+  /* 구성원 자료 → 쪽에 넣을 사진 주소("../files/people/…?v=…"). 없거나 모양이 틀리면 빈 글자 */
+  function 사이트사진(m) {
+    var p = (m || {}).photo;
+    var s = p && typeof p === 'object' ? p.site : null;
+    if (!s || typeof s !== 'object') return '';
+    var 자리 = String(s.path || '');
+    if (!사진자리꼴.test(자리)) return '';
+    var v = String(s.v == null ? '' : s.v).replace(/[^0-9A-Za-z]/g, '').slice(0, 20);
+    return '../' + 자리.replace(/^site\//, '') + (v ? '?v=' + v : '');
+  }
+  /* 대표의 올리기 허락이 있나 — 글 번호 없는 새 노무사만 본다(화면 올리기허락과 같은 잣대) */
+  function 허락있나(m) {
+    var a = (m || {}).publishOk;
+    return !!(a && typeof a === 'object' && String(a.경력글 || '').trim());
+  }
+  /* 허락한 «경력 글»과 지금 경력이 같은가 — 허락 뒤에 경력을 고쳤으면 다시 허락받아야 한다
+     (화면 새노무사준비의 «낡은허락»과 같은 잣대: 줄마다 빈칸 정리 → 줄바꿈 또는 <div> 감싸기 두 모양 중 하나).
+     ★ 화면만 보면 매달 자동 재게시(서버)는 낡은 허락으로도 고친 경력을 올린다 — 그래서 부품에서 본다. */
+  function 허락맞나(m) {
+    var a = (m || {}).publishOk || {};
+    var 줄 = (m.경력 || m.careers || []);
+    줄 = (Array.isArray(줄) ? 줄 : [줄]).map(function (l) { return String(l == null ? '' : l).replace(/\s+/g, ' ').trim(); })
+      .filter(Boolean);
+    if (!줄.length) return false;
+    var 허락글 = String(a.경력글 || '');
+    return 허락글 === 줄.join('\n') || 허락글 === 줄.map(function (l) { return '<div>' + l + '</div>'; }).join('\n');
+  }
+
   /* ★ 푸른ERP 자료 + 지금 쪽 → «올릴 자료».
-     ERP 에는 사진이 없으므로 글 번호로 짝지어 지금 쪽의 사진을 이어받는다. */
+     사진은 «우리가 새 사이트에 올린 것» → 없으면 글 번호로 짝지어 지금 쪽의 사진을 이어받는다. */
   function 올릴사람(현재쪽, ours) {
     var 지금 = {};
     사람읽기(현재쪽).forEach(function (p) { 지금[p.srl] = p; });
@@ -278,22 +331,40 @@
       /* 직원은 카드가 아니라 상자로 간다(올릴직원) — 여기서 「글 번호 없음」으로 걸지 않는다 */
       if (직원인가(m)) return;
       var srl = String(m.srl == null ? '' : m.srl).trim();
-      var 옛 = srl && 지금[srl];
-      if (!srl) {
-        못갈것.push({ 이름: m.이름 || m.name || '(이름 없음)', why: '홈페이지 글 번호가 없습니다' });
-        return;
-      }
-      if (!옛 || !옛.사진) {
-        못갈것.push({ 이름: m.이름 || m.name || srl,
-          why: '홈페이지에 이 사람 사진이 없습니다 (글 번호 ' + srl + ')' });
-        return;
+      var 이름 = m.이름 || m.name || '(이름 없음)';
+      var 우리사진 = 사이트사진(m);
+      var 열쇠;
+      var 사진;
+      if (srl) {
+        /* ★ 글 번호는 «숫자만» 받는다 — 카드의 data-srl·창 id 속성에 그대로 들어가고,
+             매달 자동 재게시(서버)도 이 길을 탄다(2026-11-16 검토). */
+        if (!/^\d{1,12}$/.test(srl)) {
+          못갈것.push({ 이름: 이름, why: '홈페이지 글 번호 모양이 틀렸습니다 (숫자만)' });
+          return;
+        }
+        var 옛 = 지금[srl];
+        사진 = 우리사진 || (옛 && 옛.사진) || '';
+        if (!사진) {
+          못갈것.push({ 이름: m.이름 || m.name || srl,
+            why: '홈페이지에 이 사람 사진이 없습니다 (글 번호 ' + srl + ')' });
+          return;
+        }
+        열쇠 = srl;
+      } else {
+        /* 글 번호 없는 새 노무사 — 열쇠·새 사이트 사진·허락이 다 있어야 간다 */
+        열쇠 = String(m.key == null ? '' : m.key);
+        if (!사진열쇠꼴.test(열쇠)) { 못갈것.push({ 이름: 이름, why: '홈페이지 글 번호가 없습니다' }); return; }
+        if (!우리사진) { 못갈것.push({ 이름: 이름, why: '새 사이트에 올린 얼굴 사진이 없습니다' }); return; }
+        if (!허락있나(m)) { 못갈것.push({ 이름: 이름, why: '대표의 올리기 허락이 없습니다' }); return; }
+        if (!허락맞나(m)) { 못갈것.push({ 이름: 이름, why: '허락한 뒤 경력이 바뀌었습니다 — 다시 허락해 주십시오' }); return; }
+        사진 = 우리사진;
       }
       갈것.push({
-        srl: srl,
+        srl: 열쇠,
         이름: String(m.이름 == null ? (m.name || '') : m.이름),
         직책1: String(m.직책1 == null ? (m.position1 || '') : m.직책1),
         직책2: String(m.직책2 == null ? (m.position2 || '') : m.직책2),
-        사진: 옛.사진,
+        사진: 사진,
         경력: (m.경력 || m.careers || []).slice()
       });
     });
@@ -311,6 +382,10 @@
     차례견주기: 차례견주기,
     경력공개: 경력공개,
     경력한도: 경력한도,
+    사진자리: 사진자리,
+    사이트사진: 사이트사진,
+    허락있나: 허락있나,
+    허락맞나: 허락맞나,
     카드들: 카드들,
     덩어리: 덩어리
   };

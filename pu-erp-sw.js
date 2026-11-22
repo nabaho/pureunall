@@ -1,93 +1,22 @@
-/* 푸른이알피 — 「공유 받기」 전용 일꾼 (서비스워커)
+/* ⚠ 더 이상 등록하지 않는다 — 2026-11-15 pu-sw.js 로 합쳐졌다(이알피 몫은 pu-sw.js 의 takeErp).
    ═══════════════════════════════════════════════════════════════════
-   대표 지시 2026-09-17 「이알피에도 공유받기 붙여라」
+   이알피만 이 일꾼을 기본 scope(/pureunall/)에 따로 등록하고 있었다. 한 scope 에 일꾼은
+   하나만 살아서, 이알피를 연 뒤에는 기업정보함·사진첩·급여데이터함·문서뷰어의 폰
+   「공유 받기」가 죽고, 다른 앱을 연 뒤에는 이알피 공유가 죽었다(pu-sw.js 머리말).
 
-   폰에서 사진(명함 등)을 「공유 → 푸른이알피」로 보내면 안드로이드가 **POST** 로 보낸다.
-   보통 웹페이지는 POST 를 받을 수 없어서(서버가 없다) 이 일꾼이 가로챈다.
-
-   ★★ 받은 사진은 «사진첩의 받은 함»에 그대로 넣고 사진첩 확인 화면으로 넘긴다.
-     까닭 — 이알피에는 사진이 들어갈 «자리»가 없다. 사진은 사건·업체·계약에 붙는 것이라
-     어느 건인지 모르는 채로는 넣을 데가 없다. 사진첩은 받아서 «명함 판독»까지 하고
-     기업정보함으로 넘기는 길이 이미 있다 — 그 길로 태우는 것이 가장 짧다.
-     (대표께는 「이알피로 공유해도 된다」가 되고, 뒷일은 사진첩이 한다.)
-   ⚠ 같은 origin(github.io/pureunall/) 이라 IndexedDB 를 사진첩과 «함께 쓴다» —
-     그래서 이름·판 번호를 pu-photos-sw.js 와 «똑같이» 맞춰야 한다. 어긋나면
-     사진첩이 빈 함을 열고 「보낸 게 없다」고 한다.
-
-   ⚠ 이 일꾼은 **아무것도 캐시하지 않는다.** 캐시를 두면 pu-version.js 의
-     「새 버전 자동 적용」과 싸워 옛 화면이 남는다(사진첩·업무관리와 같은 까닭).
-   ⚠ 애플(아이폰)은 웹앱을 공유 목록에 올리는 것을 막아 두었다. 안드로이드 전용이다. */
-
-var SHARE_PATH = '/pu-erp.html';        // 이 길로 오는 POST 만 공유로 본다
-var HAND_TO = 'pu-photos.html?share=1'; // 받은 뒤 넘길 곳(사진첩 확인 화면)
-/* ⚠★ 아래 셋은 pu-photos-sw.js 와 «한 글자도» 달라선 안 된다 */
-var IDB_NAME = 'pu-photos-share';
-var IDB_STORE = 'inbox';
-var IDB_VER = 1;
-
-self.addEventListener('install', function () {
-  self.skipWaiting();
-});
-self.addEventListener('activate', function (e) {
-  e.waitUntil(self.clients.claim());
-});
-
-self.addEventListener('fetch', function (e) {
-  /* 공유 POST 가 아니면 **건드리지 않는다**(캐시도, 가로채기도 없다) */
-  if (e.request.method !== 'POST') return;
-  var url;
-  try { url = new URL(e.request.url); } catch (_) { return; }
-  if (url.pathname.slice(-SHARE_PATH.length) !== SHARE_PATH) return;
-  e.respondWith(takeShare(e.request, url));
-});
-
-function openIdb() {
-  return new Promise(function (ok, no) {
-    var rq = indexedDB.open(IDB_NAME, IDB_VER);
-    rq.onupgradeneeded = function () {
-      var db = rq.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { autoIncrement: true });
-    };
-    rq.onsuccess = function () { ok(rq.result); };
-    rq.onerror = function () { no(rq.error); };
-  });
-}
-
-function keep(files) {
-  return openIdb().then(function (db) {
-    return new Promise(function (ok, no) {
-      var tx = db.transaction(IDB_STORE, 'readwrite');
-      var st = tx.objectStore(IDB_STORE);
-      files.forEach(function (f) {
-        st.add({ name: f.name || '공유사진', type: f.type || 'image/jpeg', at: Date.now(), blob: f, via: 'erp' });
-      });
-      tx.oncomplete = function () { ok(files.length); };
-      tx.onerror = function () { no(tx.error); };
-    });
-  });
-}
-
-function takeShare(req, url) {
-  /* 넘길 곳은 «이 앱과 같은 폴더»다 — 주소를 손으로 붙이지 않고 기준에서 만든다 */
-  var base = url.origin + url.pathname.slice(0, url.pathname.length - SHARE_PATH.length + 1);
-  return req.formData().then(function (fd) {
-    /* manifest 의 params.files[0].name 과 같은 이름이어야 한다 */
-    var files = fd.getAll('photos').filter(function (f) {
-      return f && typeof f === 'object' && f.size > 0;
-    });
-    if (!files.length) return 0;
-    return keep(files);
-  }).then(function (n) {
-    /* 한 장도 못 받았으면 그 사실을 알린다 — 조용히 넘기면
-       "공유했는데 아무 일도 없다"가 되고, 사람은 올라간 줄 안다. */
-    return redirect(base + (n ? HAND_TO : 'pu-photos.html?share=none'));
-  }).catch(function (err) {
-    if (self.console) console.warn('[이알피 공유 받기]', err);
-    return redirect(base + 'pu-photos.html?share=err');
-  });
-}
-
-function redirect(to) {
-  /* 303 — 받은 POST 를 GET 으로 바꿔 돌려보낸다(새로고침해도 다시 안 보낸다) */
-  return Response.redirect(to, 303);
-}
+   ★ 지우지 않고 «통합 일꾼을 그대로 부르는 껍데기»로 남긴 까닭
+     ① 이미 이 일꾼이 깔린 폰이 있다. 브라우저는 깔린 일꾼의 파일을 때때로 다시 받아
+        바뀌었는지 본다 — 이 파일이 바뀌어 있으면 그 자리에서 아래 한 줄짜리로 갈아 끼우고,
+        그때부터 통합 일꾼과 «똑같이» 모든 앱의 공유를 받는다(아무 화면도 안 열어도).
+     ② 배포 직후 잠깐 브라우저에 남은 옛 pu-erp.html 이 이 파일을 다시 등록해도
+        통합 일꾼과 똑같이 움직이므로 다른 앱 공유가 죽지 않는다.
+     ③ 옛 갈래를 따로 들고 있지 않는다 — 들고 있으면 언젠가 통합 일꾼과 갈라진다
+        (pu-photos-sw.js 같은 옛 껍데기들이 실제로 갈라져 있다 — tests/photos-share-target 머리말).
+   지우면 ①의 폰은 새 pu-erp.html(이제 pu-sw.js 를 등록한다)이나 다른 앱을 열 때까지
+   옛 일꾼(이알피 공유만 받는다)으로 남는다. 다 갈아탄 것이 확실해지면 지워도 된다.
+   ⚠ 꼬리표(?from=erp-sw-20261115)는 «처음 갈아탈 때» 폰 캐시에 남은 옛 pu-sw.js(이알피 갈래가 없다)를
+     집지 않게 하려는 것이다 — 불러오는 파일은 브라우저 캐시(깃허브 약 10분)를 거친다. 처음 보는 주소라
+     반드시 새로 받는다. 나중에 pu-sw.js 를 고쳐도 이 꼬리표는 안 바꿔도 된다(브라우저가 불러온 파일도
+     일꾼 갱신 때 다시 견줘 본다 — 늦어도 캐시 시간만큼).
+   지킴: tests/erp-share-target.test.js */
+importScripts('pu-sw.js?from=erp-sw-20261115');

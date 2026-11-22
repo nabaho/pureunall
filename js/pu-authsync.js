@@ -43,8 +43,18 @@
   var LOGOUT_KEY = 'pu_auth_logout_at';
   var lastAuthAt = 0;      // 이 탭이 마지막으로 «사람»을 본 때 — 0 이면 한 번도 안 봤다(공개 화면·부팅 중)
 
-  /* 부팅 직후 「없음」을 기다려 보는 시간. 검사에서는 짧게 바꿔 쓴다. */
-  var GRACE_MS = (typeof global.PU_AUTHSYNC_GRACE_MS === 'number') ? global.PU_AUTHSYNC_GRACE_MS : 2500;
+  /* 부팅 직후 「없음」을 기다려 보는 시간. 검사에서는 짧게 바꿔 쓴다.
+     모바일(폰)은 IndexedDB 세션 복원이 3~10초 걸리는 경우가 잦아, 2.5초 만에 쫓아내면
+     앱 → 포털 → 앱 창 반복 루프가 생긴다. 부팅 직후(!seenUid) 모바일은 12초까지 기다린다. */
+  var CUSTOM_GRACE = typeof global.PU_AUTHSYNC_GRACE_MS === 'number';
+  var GRACE_MS = CUSTOM_GRACE ? global.PU_AUTHSYNC_GRACE_MS : 2500;
+  function bootGraceMs() {
+    if (CUSTOM_GRACE) return GRACE_MS;
+    if (seenUid) return GRACE_MS;
+    var ua = '';
+    try { ua = String((global.navigator && global.navigator.userAgent) || ''); } catch (e) { }
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 12000 : 4000;
+  }
 
   /* 푸른이알피·포털·카메라가 파이어베이스와 «따로» 들고 있는 열쇠들과 공유 임시함.
      여기서 함께 지운다 — 앱이 등록을 잊거나 계정이 바뀌어도 앞사람 흔적·공유 파일이 남지 않게. */
@@ -177,7 +187,7 @@
       if (curUid()) return;              // 그새 돌아왔다 — 부팅 중이었다
       lsSet(KEY, '');
       if (was) kick('signedout', seenUid || was);   // 로그인해 있던 화면이었다면 끊는다
-    }, GRACE_MS);
+    }, bootGraceMs());
   }
 
   /* 다른 탭이 바꾼 것 — 파이어베이스 신호가 늦거나 막혀도 이걸로 안다 */

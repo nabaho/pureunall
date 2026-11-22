@@ -141,5 +141,14 @@ module.exports = {
     { name: 'docbox', run: async (page) => { await page.evaluate(() => { navTile('page-docbox'); window.scrollTo(0, 0); }); } },
     { name: 'resume-hub', run: async (page) => { await page.evaluate(() => { navTile('page-resume-hub'); window.scrollTo(0, 0); }); } },
     { name: 'settings', run: async (page) => { await page.evaluate(() => { navTile('page-settings'); window.scrollTo(0, 0); }); } },
+    /* 🏢 정부사업신청 「사업관리에 담기」로 넘어온 공고(2026-11-22) — 사업 창이 채워져 열리고 서식 «링크»가 한 줄씩. 모두 지어낸 값 */
+    { name: 'biz-from-gov', run: async (page) => { await page.evaluate(() => {
+      /* 받는 문은 «같은 계정 · 주소의 일회용 표(?t=)»가 맞는 넘김만 쓴다 — 점검도 그 모양 그대로 */
+      const me = (typeof fbUid !== 'undefined' && fbUid) || (typeof _kcUid === 'function' && _kcUid()) || '';
+      history.replaceState(null, '', location.pathname + '?go=biz&t=qa-tok');
+      localStorage.setItem('pu_kc_biz_handoff', JSON.stringify({ v: 1, at: Date.now(), uid: me, tok: 'qa-tok', pursueId: 'PS-qa1', title: '2027 점검시 노무관리 컨설팅 용역(가나다라마바사아자차카타파하 사업)',
+        org: '점검시 점검과', url: 'https://example.com/g', no: 'R26BK0000001-000', src: '나라장터', openDt: '2026-11-20 10:00:00', closeDt: '2026-12-01 10:00:00', prc: 50000000,
+        files: [{ name: '표준 공고서', url: 'https://example.com/f/std' }, { name: '제안요청서(가나다라마바사아자차카타파하 점검 사업 과업 내용).hwp', url: 'https://example.com/f/1' }, { name: '입찰참가신청서.hwp', url: 'https://example.com/f/2' }] }));
+      kcBizFromGov(0); }); }, back: async (page) => { await page.evaluate(() => bizClose()); } },
   ],
 };

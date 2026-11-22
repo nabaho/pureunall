@@ -9,17 +9,18 @@
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=100"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="js/pu-photo-store.js?v=36"></script>
 <script src="js/pu-doc-read.js?v=53"></script>
-<script src="js/pu-doc-file.js?v=41"></script>
-<script src="js/pu-remember.js?v=1"></script>
+<script src="js/pu-doc-file.js?v=44"></script>
+<script src="js/pu-remember.js?v=2"></script>
 <script src="js/pu-handoff.js?v=2"></script>
 <script src="js/pu-doc-pick.js?v=2"></script>
+<script src="js/pu-card-spam.js?v=1"></script>
 <script src="js/pu-version.js?v=12"></script>
 <!--
   ══ 📇 리멤버 → 푸른사진첩·기업정보함 «받는 화면» (대표 「반드시 자동으로」 2026-10-24, 목업 승인) ══
@@ -64,7 +65,8 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
   <div class="card"><div id="state" class="band wait">준비 중…</div>
     <p class="muted" style="margin-top:8px">이 탭은 «푸른 리멤버 연결» 확장이 쓰는 받는 창입니다 — 닫지 말고 고정해 두세요.
       리멤버에서 새로 받거나 고친 명함이 낮(09~18시)에는 30분마다, 밤에는 00시·06시에 사진첩과 기업정보함에 저절로 들어옵니다.
-      푸른메일에 처음 보는 사람이 메일을 보내면 서명을 읽어 기업정보함 「📬 메일에서 온 명함」에도 넣습니다.</p></div>
+      푸른메일에 처음 보는 사람이 메일을 보내면 서명을 읽어 기업정보함 「📬 메일에서 온 명함」에도 넣습니다.
+      스팸은 넣지 않고, 스팸으로 의심되는 것은 기업정보함에서 남길지 여쭙니다.</p></div>
   <div class="card"><b>최근에 받은 명함</b><table id="recent"><colgroup><col style="width:110px"><col style="width:90px"><col><col style="width:150px"></colgroup>
     <tr><th>받은 때</th><th>이름</th><th>회사</th><th>결과</th></tr></table></div>
 </div>
@@ -144,15 +146,27 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
     return { dataUrl: c.toDataURL('image/jpeg', q), w: c.width, h: c.height };
   }
 
-  /* 명함 한 장 — 사진첩에 (처음이거나 그림이 바뀌었을 때만) · 기업정보함에 (같은 사람이면 빈 칸만) */
+  /* 그림 내용의 지문(SHA-256) — 같은 그림이 두 번 들어오지 않게 (못 만들면 막지 못하므로 던진다: 지문 없이 올리면 중복이다) */
+  function sha256Data(dataUrl) {
+    var b64 = String(dataUrl).split(',')[1] || '';
+    var bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  }
+
+  /* 명함 한 장 — «올려도 되는지»는 PuRemember.importOne 이 가린다(이미 가져온 명함·같은 사람·같은 그림은 무조건 막고, 기업정보함은 같은 사람이면 빈 칸만).
+     여기는 «올리는 손» 부품만 끼운다. (대표 지시 2026-11-18 「이미 한번 가져왔던 것은 자동으로 차단」) */
   function one(c, img, now) {
-    var seenRef = db.ref(ROOT + '/seen/' + c.rid);
-    return seenRef.once('value').then(function (snap) {
-      var seen = snap.val();
-      var photo = seen && seen.photo ? seen.photo : null;
-      var pic = null;
-      var addPhoto = PuRemember.needPhoto(c, seen) && /^data:image\/(jpeg|png|webp);base64,/.test(String(img || ''));
-      var step = addPhoto ? loadImg(img).then(function (im) {
+    return PuRemember.importOne({ db: db, ROOT: ROOT, withLock: PuDocFile.withLock, sha: sha256Data,
+      addPhoto: function (dataUrl) { return addPhotoOf(c, dataUrl, now); }, sendToCards: PuDocFile.sendToCards }, c, img, now);
+  }
+  /* 사진첩에 그림 하나를 올린다 — 사진첩과 같은 잣대(uploadSpec) */
+  function addPhotoOf(c, img, now) {
+    return (function () {
+      var photo = null, pic = null;
+      var step = loadImg(img).then(function (im) {
         var spec = PuPhotoStore.uploadSpec(true);
         var full = shrink(im, spec.maxEdge, spec.quality), thumb = shrink(im, spec.thumbEdge, 0.85);
         var id = PuPhotoStore.newId();
@@ -163,23 +177,9 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
         pic = { full: full.dataUrl, thumb: thumb.dataUrl };
         return PuPhotoStore.savePhoto({ id: id, full: full.dataUrl, thumb: thumb.dataUrl, meta: meta })
           .then(function (r) { photo = { owner: S.user.uid, year: String((r && r.year) || PuPhotoStore.photoYear(meta)), id: id }; });
-      }) : Promise.resolve();
-      return step.then(function () {
-        var fields = PuRemember.toFields(c);
-        if (!fields.name && !fields.company) return { what: '📇 이름·회사 없음 — 건너뜀' };
-        return PuDocFile.sendToCards({ kind: 'card', fields: fields, takenAt: Date.parse(c.createdAt) || now, byName: '리멤버',
-          photoId: photo ? photo.id : '', photoYear: photo ? photo.year : '', photoOwner: photo ? photo.owner : '',
-          full: pic ? pic.full : '', thumb: pic ? pic.thumb : '' })
-          .then(function (r) {
-            return { what: r && r.created ? '📇 새로 넣음' : (r && r.filled && r.filled.length ? '📇 빈 칸 채움' : '📇 이미 있음'), id: r && r.id };
-          }, function (e) { return { what: '📇 못 넣음: ' + String((e && e.message) || e).slice(0, 40), err: true }; });
-      }).then(function (res) {
-        var rec = { u: c.updatedAt, at: now, card: res.id || '' };
-        if (c.front) rec.front = String(c.front).split('?')[0];
-        if (photo) rec.photo = photo;
-        return seenRef.set(rec).then(function () { return { name: c.name, company: c.company, what: res.what, at: now, isNew: !seen, err: !!res.err }; });
       });
-    });
+      return step.then(function () { return { photo: photo, pic: pic }; });
+    })();
   }
 
   /* 확장이 건넨 한 회차 */
@@ -248,11 +248,48 @@ th{background:var(--bg);color:var(--sub);font-size:11.5px;}
         });
       });
   }
+  /* ── 🚫 스팸·광고는 명함으로 넣지 않는다 (대표 지시 2026-11-18) ──
+     「처음부터 스팸이거나 광고 등으로 들어오는 것은 수집할 필요 없다 · 완전 스팸은 자동으로 걸러라 ·
+      의심되는 것은 따로 모아 팝업으로 남길지 물어라」
+     잣대는 js/pu-card-spam.js 하나 — 기업정보함(pu-cards.html)도 같은 잣대로 이미 들어온 명함을 정리한다.
+       확실한 스팸 → 줄을 st:'spam' 으로 닫는다(명함을 안 만든다 · 이미 있는 명함 빈 칸도 안 채운다)
+       스팸 의심   → 줄을 st:'hold' 로 둔다 → 기업정보함 「🤔 스팸 의심」 창이 대표께 묻는다
+                     (남기기 → st:'read'·keep:1 로 돌아와 이 탭이 넣는다 / 스팸 → st:'spam')
+     ⚠ 잣대 파일을 못 실었으면 «넣지 않고» 그 줄을 그대로 둔다 — 다음에 탭을 열면 다시 본다.
+     ⚠ 사람이 정한 목록(스팸·남기기·메일함 「스팸 아님」)을 못 읽었으면 «버리지 않고» 보류한다 — 모르면 안 버린다. */
+  var CARD_SPAM = 'pucards/mailcard/spam', CARD_OK = 'pucards/mailcard/ok', MAIL_NOTSPAM = 'pucards/config/mailNotSpam';
+  var spamMemo = null, spamAt = 0;
+  function spamLists() {
+    if (spamMemo && Date.now() - spamAt < 60000) return Promise.resolve(spamMemo);
+    return Promise.all([db.ref(CARD_SPAM).once('value'), db.ref(CARD_OK).once('value'), db.ref(MAIL_NOTSPAM).once('value')]).then(function (r) {
+      spamMemo = { spam: r[0].val() || {}, ok: r[1].val() || {}, notSpam: r[2].val() || {} }; spamAt = Date.now();
+      return spamMemo;
+    }, function () { return null; });
+  }
+  function mailShut(id, q, u, what) {
+    var f = q.f || {};
+    return db.ref(MAIL_Q + '/' + id).update(u).then(function () {
+      return note({ name: f.name || q.n || '', company: f.company || '', what: what, at: Date.now() });
+    });
+  }
+  function mailGate(id, q) {
+    if (q.keep) return mailOne(id, q);                  /* 대표가 「남기기」로 정한 줄 — 다시 묻지 않는다 */
+    if (typeof PuCardSpam === 'undefined') return Promise.resolve();
+    return spamLists().then(function (L) {
+      var j = PuCardSpam.judge(Object.assign({ email: q.e }, q.f || {}),
+        { subject: q.s, fromMail: true, spam: L && L.spam, ok: L && L.ok, notSpam: L && L.notSpam });
+      if (j.level === 'spam' && !L) j = { level: 'suspect', why: j.why.concat(['스팸 목록을 못 읽어 버리지 않고 보류합니다']) };
+      var why = j.why.join(' · ').slice(0, 200), now = Date.now();
+      if (j.level === 'spam') return mailShut(id, q, { st: 'spam', why: why, doneAt: now }, '🚫 스팸 — 명함으로 넣지 않음');
+      if (j.level === 'suspect') return mailShut(id, q, { st: 'hold', why: why, heldAt: now }, '🤔 스팸 의심 — 기업정보함에서 남길지 여쭙니다');
+      return mailOne(id, q);
+    });
+  }
   function mailPump() {
     if (mailBusy || !mailWait.length || !S.ready) return;
     mailBusy = true;
     var x = mailWait.shift();
-    mailOne(x.id, x.q).catch(function () {}).then(function () { mailBusy = false; mailPump(); });
+    mailGate(x.id, x.q).catch(function () {}).then(function () { mailBusy = false; mailPump(); });
   }
   var mailOn = false;
   function mailWatch() {
