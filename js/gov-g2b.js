@@ -133,6 +133,52 @@
              rows: items.map(norm).filter(function (x) { return !!x.no; }) };
   }
 
+  /* ── 공고 첨부 서식 (대표 지시 2026-11-22 「사업 신청서 그리고 관련되는 서식을 다 끌어오고 모으고」) ──
+     목록 응답의 한 줄에 «공고규격서» 칸이 열 벌 붙어 온다: ntceSpecDocUrl1~10 · ntceSpecFileNm1~10, 표준 공고서는 stdNtceDocUrl.
+     ⚠ 파일은 받지 않는다 — 이름과 «내려받기 주소»만 모은다(나라장터 파일 서버는 다른 사이트라 화면이 직접 못 받는다).
+     ⚠ http(s) 만 · 아이디·비밀번호가 박힌 주소는 버린다 · 같은 주소는 한 번만. ★ 칸 이름은 명세 기준 — 실응답으로는 아직 못 봤다.
+     ⚠ «나라장터 공식 주소»(g2b.go.kr 과 그 아래)만 받는다 — 칸이 오염돼 다른 사이트를 «나라장터 서식»으로 보이면 안 된다(보안 검토 2026-11-22).
+       뺀 것은 개수(dropped)로 알린다 — 조용히 사라지면 «서식 없음»으로 읽힌다. */
+  var G2B_HOST = /(^|\.)g2b\.go\.kr$/i;
+  function fileUrl(v) {
+    var u = s(v); if (!/^https?:\/\/[^\s"'<>\\]+$/i.test(u)) return '';
+    if (typeof URL !== 'function') {   /* 해석기가 없는 곳(옛 환경) — 아이디 박힌 주소·공식 밖 주소를 글자로 거른다 */
+      var m = u.match(/^https?:\/\/([^\/?#@:]+)(:\d+)?(?=[\/?#]|$)/i);
+      return m && G2B_HOST.test(m[1]) ? u : '';
+    }
+    try {
+      var p = new URL(u);
+      if (!/^https?:$/.test(p.protocol) || p.username || p.password || !G2B_HOST.test(p.hostname)) return '';
+      return p.href;
+    } catch (e) { return ''; }
+  }
+  function specFiles(it, out2) {
+    it = it || {};
+    var out = [], seen = {}, dropped = 0;
+    var add = function (url, name) {
+      if (!s(url)) return;
+      var u = fileUrl(url); if (!u) { dropped++; return; }
+      if (seen[u]) return; seen[u] = 1;
+      out.push({ name: s(name).slice(0, 120) || ('첨부 ' + (out.length + 1)), url: u });
+    };
+    add(it.stdNtceDocUrl, '표준 공고서');
+    for (var i = 1; i <= 10; i++) add(it['ntceSpecDocUrl' + i], it['ntceSpecFileNm' + i]);
+    if (out2) out2.dropped = dropped;
+    return out;
+  }
+  /* 공고일 하루치 목록 응답에서 «그 공고»(번호·차수)를 찾아 서식을 꺼낸다 → { ok, err, found, files, total, count }
+     ⚠ 오류 모양은 parse 와 같다(HTTP 200 ResponseError 포함) — 오류를 «서식 없음»으로 읽지 않는다. */
+  function filesFrom(json, no) {
+    var p = parse(json);
+    if (!p.ok) return { ok: false, err: p.err, found: false, files: [], dropped: 0, total: 0, count: 0 };
+    var r = (json && json.response) || {}, items = (r.body || {}).items;
+    if (!items) items = [];
+    if (!Array.isArray(items)) items = (items.item ? (Array.isArray(items.item) ? items.item : [items.item]) : [items]);
+    var want = s(no), hit = items.filter(function (it) { return it && norm(it).no === want; })[0], o = { dropped: 0 };
+    var files = hit ? specFiles(hit, o) : [];
+    return { ok: true, err: '', found: !!hit, files: files, dropped: o.dropped, total: p.total, count: items.length };
+  }
+
   function s(v) { return v == null ? '' : String(v).trim(); }
 
   /* 칸 이름이 판마다 조금씩 다르다 — 아는 이름을 차례로 본다 */
@@ -421,7 +467,7 @@
               guessSrc: guessSrc, judge: judge, judgeAi: judgeAi, AI_PROGRAMS: AI_PROGRAMS,
               WINDOW_DAYS: WINDOW_DAYS, recentFrom: recentFrom, weekWindows: weekWindows,
               detailUrl: detailUrl, parseDetail: parseDetail, enrich: enrich, bizRegion: bizRegion, LK: LK,
-              toggleKw: toggleKw };
+              toggleKw: toggleKw, specFiles: specFiles, filesFrom: filesFrom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovG2b = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

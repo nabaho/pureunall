@@ -71,8 +71,20 @@ for (let i = 0; i < 28; i++) hits['h' + i] = { key: 'h' + i, title: (i % 2 ? '[�
  ['hrdk', 'hrdkai', 'HRD 전문가 인력풀 신청공고', '중소기업 AI훈련확산센터 AI훈련코치 모집', 11]].forEach(([board, org, boardName, title, d], i) => {
   hits['ai' + i] = { key: 'ai' + i, title, date: addDays(-i), board, org, boardName, href: 'https://example.com/ai-h' + i, per: { to: addDays(d) } };
 });
+/* 🏢 푸른노무법인 지원사업(2026-11-22) — 진행으로 고른 공고(모두 지어낸 것). 법인 진행·컨설턴트 지원·마감 지남·그만둠 + 서식 링크 */
+const 진행 = (id, kind, src, ref, srcName, title, org, d, extra) => Object.assign({ id, entityType: 'Project', schemaVersion: 1, kind, state: '진행', src, ref, srcName,
+  no: src === 'feed' ? feed.find((r) => r.id === ref).no : '', title, org, url: 'https://example.com/' + ref, openDt: addDays(-10) + ' 10:00', closeDt: addDays(d) + ' 18:00',
+  files: [], createdAt: addDays(-2) + 'T01:00:00.000Z', updatedAt: addDays(-1) + 'T01:00:00.000Z' }, extra || {});
+const pursue = [
+  진행('PS-qa1', 'corp', 'feed', 'G0001', '나라장터', feed[0].nm, feed[0].org, 4, { files: [
+    { name: '표준 공고서', url: 'https://example.com/f/std' }, { name: '제안요청서(가나다라마바사아자차카타파하 점검 사업).hwp', url: 'https://example.com/f/1' }, { name: '입찰참가신청서.hwp', url: 'https://example.com/f/2' }] }),
+  진행('PS-qa2', 'corp', 'hit', 'rg3', '모집 글', '2027 충북 지역 일터혁신 컨설턴트 모집', '노사발전재단 사업공고/모집', 14),
+  진행('PS-qa3', 'person', 'feed', 'G0002', '알리오', feed[1].nm, feed[1].org, 1),
+  진행('PS-qa4', 'corp', 'feed', 'G0004', '나라장터', feed[3].nm, feed[3].org, -5, { filesErr: '나라장터 목록에서 이 공고를 찾지 못했습니다(정정·취소된 공고일 수 있습니다) — 원문 공고에서 받으세요' }),
+  진행('PS-qa5', 'person', 'hit', 'h1', '모집 글', hits.h1.title, 기관[1], 9, { state: '그만둠' })
+];
 module.exports = {
-  localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
+  localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_pursue: JSON.stringify(pursue), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
   data: { gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
   views: [
     { name:'application-handoff',run:async(p)=>{
@@ -93,5 +105,10 @@ module.exports = {
     { name: 'ai', run: async (p) => { await p.click('#tbAi'); } },
     { name: 'aisel', run: async (p) => { for (const k of [1, 2]) await p.click('#aiTb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'aipast', run: async (p) => { await p.evaluate(() => lensSub('ai', 'past')); } },
+    /* 🏢 푸른노무법인 지원사업 — 「📝」 고르는 창 · 탭 · 고르기 · 한 줄 창(서식 링크) */
+    { name: 'purask', run: async (p) => { await p.evaluate(() => { setTab('feed'); pursueAsk('feed', 'G0003'); }); }, back: async (p) => { await p.evaluate(() => popClose()); } },
+    { name: 'pur', run: async (p) => { await p.click('#tbPur'); } },
+    { name: 'pursel', run: async (p) => { for (const k of [1, 2]) await p.click('#purTb tr:nth-child(' + k + ') input.row-chk'); } },
+    { name: 'purshow', run: async (p) => { await p.evaluate(() => purShow('PS-qa1')); }, back: async (p) => { await p.evaluate(() => popClose()); } },
   ],
 };
