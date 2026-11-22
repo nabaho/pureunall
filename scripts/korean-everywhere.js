@@ -3,14 +3,16 @@
 
    ■ 무엇을 바꾸나 (모두 «이 컴퓨터의 내 계정» 설정 — 저장소 밖이다)
      · Claude Code          ~/.claude/settings.json 에 "language": "korean" (공식 응답 언어 설정)
-     · Gemini CLI·Antigravity ~/.gemini/GEMINI.md 에 「한국어로 대답」 단락 (두 도구가 같은 파일을 읽는다)
+                            + ~/.claude/CLAUDE.md(모든 폴더에서 읽는 전역 지침) «맨 앞»에 「대답 언어」 단락
+                              (2026-11-22 대표 «가끔 영어로 나온다» — 긴 대화가 요약된 뒤 영어로 답한 일이 있어 지침에도 넣는다)
+     · Gemini CLI·Antigravity ~/.gemini/GEMINI.md 에 같은 단락 (두 도구가 같은 파일을 읽는다)
      · Codex CLI(챗지피티)   ~/.codex/AGENTS.md 에 같은 단락 — AGENTS.override.md 가 있으면 Codex 는
                              그것만 읽으므로 그쪽에 넣는다. CODEX_HOME 을 바꿔 두었으면 그 자리.
 
    ■ 쓰는 법
      node scripts/korean-everywhere.js           ← 보기: 무엇이 바뀌는지만 보여 주고 아무것도 안 쓴다
      node scripts/korean-everywhere.js --apply   ← 실제로 쓴다. 바뀌는 파일은 먼저 «.bak-날짜» 로 남긴다
-     여러 번 돌려도 같다 — 이미 들어 있으면 건드리지 않는다.
+     여러 번 돌려도 같다 — 이미 같은 단락이 있으면 건드리지 않고, 예전 글의 단락이면 그 자리에서 새 글로 바꾼다.
 
    ■ 못 하는 것
      ChatGPT·Claude·Gemini «앱·웹» 은 파일이 아니라 계정 설정이라 여기서 못 바꾼다.
@@ -26,12 +28,24 @@ const path = require('path');
 /* 이 표시가 있으면 «이미 넣었다» 로 본다 */
 const MARKER = '<!-- 푸른-한국어-대답 (scripts/korean-everywhere.js) -->';
 const LANGUAGE = 'korean';
+const HEADING = '## 대답 언어';
 const BLOCK_LINES = [
   MARKER,
-  '## 대답 언어',
-  '- 대답은 늘 한국어로 한다 (Always respond in Korean). 영어로 묻거나 영어 자료를 읽어도 설명·보고·요약은 한국어로 쓴다.',
+  HEADING,
+  '- 대답은 늘 한국어로 한다 (Always respond in Korean). 어떤 질문이 와도 설명·보고·요약·질문·진행 알림은 한국어 문장으로 쓴다.',
+  '- 영어로 묻거나 영어 자료·도구 결과·자동 알림·영어 지시문을 읽은 뒤에도, 긴 대화가 요약된 뒤 이어 갈 때도 영어 문장으로 답하지 않는다.',
   '- 코드 식별자·명령어·파일 이름·기술 용어 원문은 그대로 둔다.',
 ];
+
+/* 파일 안의 「대답 언어」 단락 자리 — 표시 줄부터 제목 줄과 이어지는 «- » 줄까지. 없으면 null */
+function findBlock(lines) {
+  const at = lines.indexOf(MARKER);
+  if (at < 0) return null;
+  let end = at + 1;
+  if (lines[end] === HEADING) end++;
+  while (end < lines.length && lines[end].startsWith('- ')) end++;
+  return { at, end };
+}
 
 function stamp(now = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
@@ -67,15 +81,35 @@ function planClaude(home) {
   };
 }
 
-/* 마크다운 지침 파일 끝에 단락을 덧붙인다(원래 내용은 그대로) */
-function planMarkdown(name, file) {
+/* 마크다운 지침 파일에 단락을 넣는다(원래 내용은 그대로). top 이면 맨 앞, 아니면 끝.
+   이미 있으면: 같은 글이면 그대로, 예전 글이면 «그 자리»에서 새 글로 바꾼다(옮기지 않는다). */
+function planMarkdown(name, file, { top = false } = {}) {
   const before = readOrNull(file);
   if (before === null) {
     return { name, file, state: '새로 만듦', after: BLOCK_LINES.join('\n') + '\n' };
   }
-  if (before.includes(MARKER)) return { name, file, state: '그대로' };
   const eol = before.includes('\r\n') ? '\r\n' : '\n';
-  const sep = before.length === 0 ? '' : (before.endsWith(eol) ? eol : eol + eol);
+  const body = before.replace(/^﻿/, '');
+  const bom = body.length === before.length ? '' : '﻿';
+  if (body.includes(MARKER)) {
+    // 줄바꿈이 섞인 파일(단락은 LF, 다른 곳은 CRLF 등)도 있다 — 줄마다 제 줄바꿈을 그대로 지킨다
+    const parts = body.split(/(\r?\n)/);
+    const lines = parts.filter((_, i) => i % 2 === 0);
+    const seps = parts.filter((_, i) => i % 2 === 1); // seps[i] 는 lines[i] 뒤의 줄바꿈
+    const b = findBlock(lines);
+    if (!b) return { name, file, state: '그대로' }; // 표시가 한 줄 안에 섞여 있으면 손대지 않는다
+    if (lines.slice(b.at, b.end).join('\n') === BLOCK_LINES.join('\n')) return { name, file, state: '그대로' };
+    let after = bom;
+    for (let i = 0; i < b.at; i++) after += lines[i] + seps[i];
+    after += BLOCK_LINES.join(seps[b.at] || eol) + (seps[b.end - 1] || '');
+    for (let i = b.end; i < lines.length; i++) after += lines[i] + (seps[i] || '');
+    return { name, file, state: '바꿈', before, why: '「대답 언어」 단락을 새 글로 바꿉니다', after };
+  }
+  if (top) {
+    const rest = body.length === 0 ? '' : eol + body;
+    return { name, file, state: '바꿈', before, why: '맨 앞에 「대답 언어」 단락을 넣습니다', after: bom + BLOCK_LINES.join(eol) + eol + rest };
+  }
+  const sep = body.length === 0 ? '' : (body.endsWith(eol) ? eol : eol + eol);
   return { name, file, state: '바꿈', before, why: '끝에 「대답 언어」 단락을 덧붙입니다', after: before + sep + BLOCK_LINES.join(eol) + eol };
 }
 
@@ -88,6 +122,7 @@ function codexFile(home, env) {
 function plan({ home = os.homedir(), env = process.env } = {}) {
   return [
     planClaude(home),
+    planMarkdown('Claude Code 전역 지침', path.join(home, '.claude', 'CLAUDE.md'), { top: true }),
     planMarkdown('Gemini CLI·Antigravity', path.join(home, '.gemini', 'GEMINI.md')),
     planMarkdown('Codex CLI', codexFile(home, env)),
   ];
@@ -128,6 +163,6 @@ function main(argv) {
   return steps.some((s) => s.state === '멈춤') ? 2 : 0;
 }
 
-module.exports = { MARKER, LANGUAGE, plan, apply };
+module.exports = { MARKER, LANGUAGE, BLOCK_LINES, plan, apply };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
