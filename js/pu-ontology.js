@@ -321,6 +321,8 @@
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
     mail:{ name:'푸른 메일', file:'pu-cards.html?view=mail', primaryRoots:['pucards/mailbox','pucards/sentBox','pucards/scheduled','mailbox'],
       entityTypes:['Person','Organization','Message','Document'] },
+    pubsearch:{ name:'공공 기업검색', file:'pu-cards.html?view=pubsearch', sharedRoots:['pucards/coInfo','pubdata'],
+      entityTypes:['Organization','Document'] },
     cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies','worker_secret'],
       entityTypes:['Organization','Person','Document','MediaAsset','Message'] },
     photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'],

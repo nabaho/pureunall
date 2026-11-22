@@ -21,6 +21,12 @@
    ⚠ 이 판단은 반드시 <head> 에서 한다. 「홈 화면에 추가」를 누르는 순간 브라우저는
      «그때 걸려 있는» manifest 를 읽는다 — 나중에 바꾸면 이미 기업정보함으로 담긴 뒤다. */
 (function(){ try{
+  if(/(^|[?&])view=pubsearch(&|$)/.test(location.search)){
+    document.title = '공공 기업검색';
+    var pi = document.querySelector('link[rel=icon]');
+    if(pi) pi.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDD0D</text></svg>";
+    return;
+  }
   if(!/(^|[?&])view=mail(&|$)/.test(location.search)) return;
   document.title = '푸른 메일';
   /* ★ 「이상한 화면이 짧게 스친다」 (대표 제보 2026-09-02) ──

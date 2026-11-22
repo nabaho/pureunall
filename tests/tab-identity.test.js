@@ -120,7 +120,7 @@ const tileRe = /\{ key:'([\w]+)',\s*name:'([^']*)',\s*desc:'[^']*',\s*icon:'([^'
 let t, tiles = 0, mismatch = [];
 while((t = tileRe.exec(portal))){
   const [, key, name, icon, url] = t;
-  if(key === 'mail') continue;                 // 메일은 같은 파일을 주소로 갈라 쓴다(아래에서 따로 본다)
+  if(key === 'mail' || key === 'pubsearch') continue; // 메일·공공 기업검색은 같은 파일을 주소(?view=)로 갈라 쓴다(아래 ⑥)
   if(key === 'hr' || key === 'fin') continue;  // 직원 인사·재무도 이알피 파일을 주소로 갈라 쓴다(아래 ⑦)
   if(!info[url] || !info[url].emoji) continue;
   tiles++;
@@ -135,6 +135,8 @@ console.log('\n[⑥ 메일은 같은 파일을 주소로 갈라 쓴다]');
 const cards = fs.readFileSync(path.join(ROOT, 'pu-cards.html'), 'utf8');
 ok('메일 주소일 때 제목을 바꿔 단다', /view=mail[\s\S]{0,400}?document\.title\s*=/.test(cards));
 ok('메일 주소일 때 아이콘도 바꿔 단다', /view=mail[\s\S]{0,700}?link\[rel=icon\]/.test(cards));
+ok('공공 기업검색 주소일 때 제목을 바꿔 단다', /view=pubsearch[\s\S]{0,400}?document\.title\s*=/.test(cards));
+ok('공공 기업검색 주소일 때 아이콘도 바꿔 단다', /view=pubsearch[\s\S]{0,700}?link\[rel=icon\]/.test(cards));
 
 console.log('\n[⑦ 직원 인사·재무도 이알피 파일을 주소(?app=hr·fin)로 갈라 쓴다 — 2026-10-09]');
 /* <head> 에서 제 이름·탭 그림을 바꿔 단다. 그 그림(\\u 로 적힌 그림글자)이 포털 타일 그림과 같아야 한다 */
