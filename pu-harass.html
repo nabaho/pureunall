@@ -314,6 +314,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <h1>🛡️ 괴롭힘·성희롱 조사</h1>
     <span class="sub">공문 자동수집 · 직접수행·결과보고 구분 · 이알피·계약·기타·업무관리 자동분류 · 녹취·전자서명 · 한글(.hwpx)</span>
     <span id="who"></span>
+    <span class="chip c-blue wide-only" id="syncStateChip" style="display:none" aria-live="polite"></span>
     <span class="sp"></span>
     <button class="sm" id="syncAllBtn" title="메일함에서 사건별 공문을 수집하고 진행단계를 푸른이알피에 동기화합니다">🔄 <span class="wide-only">메일 자동수집 · 이알피 동기화</span><span class="phone-only">자동수집</span></button>
     <button class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
@@ -467,18 +468,16 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script src="js/pu-fast-boot.js?v=1"></script>
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
-<script src="hangul/js/hwp.js?v=1"></script>
-<script src="vendor/pdf.min.js?v=1"></script>
-<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-harass-core.js?v=14"></script>
+<script src="js/pu-harass-core.js?v=15"></script>
 <script src="js/pu-harass-sign.js?v=4"></script>
-<script src="js/pu-harass-hwpx.js?v=8"></script>
-<script src="js/pu-harass-view.js?v=19"></script>
+<script src="js/pu-harass-hwpx.js?v=9"></script>
+<script src="js/pu-harass-view.js?v=20"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
