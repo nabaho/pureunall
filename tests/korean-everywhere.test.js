@@ -161,6 +161,27 @@ test('② 같은 초에 두 번 바꿔도 원본(.bak)이 서로 덮이지 않�
   assert.ok(!files(h).some((f) => /\.tmp-/.test(f)), '임시 파일이 남았습니다');
 });
 
+test('② 살펴본 뒤에 다른 프로그램이 파일을 바꿨으면 예전 글로 덮지 않고, 아무 파일도 쓰지 않는다', () => {
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  fs.writeFileSync(geminiMd(h), [...V1, ''].join('\n'));
+  const steps = plan({ home: h, env: {} });
+  fs.writeFileSync(geminiMd(h), '# 그사이 다른 프로그램이 쓴 글\n'); // 계획 뒤에 바뀜
+  apply(steps);
+  assert.equal(fs.readFileSync(geminiMd(h), 'utf8'), '# 그사이 다른 프로그램이 쓴 글\n', '바뀐 글을 덮었습니다');
+  assert.ok(steps.some((s) => s.state === '멈춤'));
+  assert.deepEqual(files(h).sort(), [path.join('.gemini', 'GEMINI.md')], '멈췄는데 다른 파일을 썼습니다');
+});
+
+test('② 예전 language 값은 화면에 찍지 않는다', () => {
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(claudeSettings(h)), { recursive: true });
+  fs.writeFileSync(claudeSettings(h), JSON.stringify({ language: '예전값-비밀-987' }));
+  const r = run(h);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!r.stdout.includes('예전값-비밀-987'));
+});
+
 test('② --home 뒤에 폴더가 빠지면 멈춘다 — 진짜 내 폴더로 넘어가지 않는다', () => {
   // ⚠ --apply 는 주지 않는다(혹시 고장 나도 진짜 폴더에 쓰지 않게)
   for (const args of [['--home'], ['--home', '--apply-x']]) {

@@ -90,7 +90,7 @@ function planClaude(home) {
   const eol = before.includes('\r\n') ? '\r\n' : '\n';
   return {
     name: 'Claude Code', file, state: '바꿈', before,
-    why: old === undefined ? 'language 를 넣습니다' : `language 를 "${old}" → "${LANGUAGE}" 로 바꿉니다`,
+    why: old === undefined ? 'language 를 넣습니다' : `language 를 "${LANGUAGE}" 로 바꿉니다(예전 값은 화면에 찍지 않음)`,
     after: JSON.stringify(next, null, 2).replace(/\n/g, eol) + eol,
   };
 }
@@ -160,6 +160,16 @@ function writeWhole(file, text) {
 
 function apply(steps, now = new Date()) {
   if (steps.some((s) => s.state === '멈춤')) return steps; // 하나라도 멈추면 아무 파일도 쓰지 않는다
+  // 계획을 세운 뒤 다른 프로그램이 파일을 고쳤으면 예전 글로 덮지 않는다 — 모두 다시 보고, 하나라도 다르면 아무것도 안 쓴다
+  for (const s of steps) {
+    if (s.state !== '바꿈' && s.state !== '새로 만듦') continue;
+    const nowText = readOrNull(s.file);
+    if (nowText !== (s.state === '바꿈' ? s.before : null)) {
+      s.state = '멈춤';
+      s.why = '살펴본 뒤에 다른 프로그램이 이 파일을 바꿨습니다 — 아무 파일도 고치지 않았습니다. 다시 돌리십시오.';
+    }
+  }
+  if (steps.some((s) => s.state === '멈춤')) return steps;
   const tag = stamp(now);
   for (const s of steps) {
     if (s.state !== '바꿈' && s.state !== '새로 만듦') continue;
@@ -183,9 +193,9 @@ function main(argv) {
   const home = hi >= 0 ? path.resolve(argv[hi + 1]) : os.homedir();
   // --home 을 주면 그 폴더 안만 본다 — CODEX_HOME 이 밖을 가리켜도 따르지 않는다
   const steps = plan({ home, env: hi >= 0 ? {} : process.env });
+  if (doApply) apply(steps); // 멈출 일이 있으면 apply 가 아무것도 안 쓰고 그 단계를 «멈춤» 으로 표시한다
   const stopped = steps.some((s) => s.state === '멈춤');
   const wrote = doApply && !stopped;
-  if (wrote) apply(steps);
 
   console.log(wrote ? '■ 한국어 대답 — 개인설정을 바꿨습니다'
     : stopped && doApply ? '■ 한국어 대답 — 멈춤: 아무 파일도 바꾸지 않았습니다'
