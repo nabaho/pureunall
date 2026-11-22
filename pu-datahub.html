@@ -62,9 +62,6 @@ button:active:not(:disabled){transform:scale(.985)}
 }
 .top button:hover,.top .tlink:hover{background:var(--acc);border-color:var(--acc-m)}
 .top button.on{background:var(--acc);border-color:var(--acc-l);box-shadow:0 0 0 2px rgba(96,165,250,.32)}
-.top .vseg{display:inline-flex;background:rgba(255,255,255,.08);padding:2px;border-radius:999px;gap:2px;border:1px solid rgba(255,255,255,.14);flex:0 0 auto}
-.top .vseg button{border:0;background:transparent;padding:4px 10px;font-size:12px}
-.top .vseg button.on{background:var(--acc);box-shadow:none}
 .top .sp{flex:1 0 8px}
 .tpill{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:750;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#e2e8f0}
 .tpill.lock{background:rgba(220,38,38,.24);border-color:rgba(248,113,113,.5);color:#ffffff}
@@ -561,7 +558,6 @@ tr.fc-row:hover td{background:var(--acc-l)}
   .top{padding:6px 8px;gap:5px}
   .top .tx{display:none}
   .top button,.top .tlink{min-height:32px;padding:5px 9px}
-  .top .vseg button{min-height:28px}
   #who{display:none}
   .chip{min-height:32px}
   input[type=checkbox]{width:24px;height:24px}
@@ -575,6 +571,92 @@ tr.fc-row:hover td{background:var(--acc-l)}
   .gatebox{margin:8vh 12px 0;padding:22px 16px}
   .audit-box{padding:14px 12px}
   .audit-hd h3{font-size:15px}
+}
+
+/* ══ 정리판 (2026-11-22 대표 「화면이 너무 정신없다 — 깔끔하게」) ══
+   기능(단추·거르개·표·차트·숫자·채팅)은 하나도 빼지 않았다. 바꾼 것은 셋뿐이다.
+   ① 같은 화면에 두 번 있던 것을 하나로 — 위 막대의 «다년» 단추(왼쪽 메뉴와 같음)·3D/2D 전체 단추(각 화면 단추가 이제 모든 화면에 함께 적용)·
+      전체 배치 머리의 앱 이름·대표 전용·기기 배지(위 막대에 있음)·다년 머리의 둘째 제목·정합성 띠의 «다년» 바로가기
+   ② 테두리·그림자·알약 모양을 걷어 숫자와 차트가 먼저 보이게 — 상자는 한 겹
+   ③ 긴 설명은 한 줄로 줄이고, 원래 글과 «좋은 점·아쉬운 점»은 화면 아래 «이 화면 설명»에 접어 둠(펼치면 그대로)
+   되돌리기: 이 덩어리를 지우고 pu-datahub.html·js/pu-datahub-view.js 를 이 PR 앞으로 */
+:root{--sh-sm:0 1px 2px rgba(30,41,59,.04);--sh-md:0 6px 18px -8px rgba(30,41,59,.14)}
+
+/* 위 막대 — 상태는 테두리 없는 글자 한 줄, 단추는 바탕 없이 */
+.top{gap:3px;box-shadow:none}
+.top .tstat{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;overflow:hidden;margin-left:4px}
+.top .tstat .tpill{background:transparent;border:0;border-radius:0;padding:0 9px;color:#cbd5e1;font-weight:600;font-size:12px}
+.top .tstat .tpill + .tpill{border-left:1px solid rgba(255,255,255,.18)}
+.top .tstat .ti{font-style:normal;display:none}
+.top .tstat .tpill.lock{background:transparent;color:#fecaca}
+.top .tstat .tpill.ok{background:transparent;color:#bbf7d0}
+.top .tstat .tpill.warn{color:#fde68a}
+.top button,.top .tlink{background:transparent;border-color:transparent;font-weight:650;color:#e2e8f0}
+.top button:hover,.top .tlink:hover{background:rgba(255,255,255,.12);border-color:transparent;color:#ffffff}
+.top button.on{background:transparent;border-color:transparent;box-shadow:none}
+
+/* 왼쪽 메뉴 — 그림 칸 테두리·그림자 걷기 */
+.sdash{background:var(--bg);border-color:var(--line);box-shadow:none}
+.sdash h3{color:var(--ink)}
+.sdash h3::after{content:none}
+.side button .ic{background:transparent;border-color:transparent;color:var(--sub)}
+.side button.on{box-shadow:none}
+.side button.on .ic{box-shadow:none}
+
+/* 화면 머리말 — 상자 없이 제목 한 줄 + 설명 한 줄 */
+.vh{display:block;background:transparent;border:0;box-shadow:none;padding:0 2px;margin:2px 0 12px}
+.vh .L,.vh .q{display:none}
+.vh h2{font-size:19px}
+.vh p{margin-top:3px;font-size:12.5px}
+
+/* 앱 틀 걷기 — 상자 안의 상자를 없앤다 */
+.app{background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible}
+.apphd{background:transparent;border:0;padding:0 0 10px}
+.govbar{background:transparent;border:0;padding:0 0 8px}
+.govpill.nil{border-style:solid;border-color:var(--line)}
+.finfo{border:1px solid var(--acc-l);border-radius:10px;margin:0 0 10px}
+.mbar{padding:2px 0}
+.kpis{padding:8px 0 0}
+.viz-sec{padding:6px 0 0}
+.main{padding:12px 0}
+.bstrip{margin:0 0 14px}
+.chat{margin:0 0 14px}
+.src{padding:2px 0 14px}
+.m-below{padding:4px 0 14px}
+
+/* 보기 단추·거르개·연동 글 — 알약 대신 조용한 모양 */
+.modebar{gap:10px}
+.mseg{background:var(--bg);border-color:var(--line);box-shadow:none;padding:2px}
+.mseg button{padding:4px 13px;font-weight:700}
+.mseg button.on{box-shadow:none}
+.chip{box-shadow:none;font-weight:600}
+.sync-pill{background:transparent;border:0;padding:0 2px;color:var(--sub);font-weight:600}
+.m-ctrlbar{background:transparent;border:0;box-shadow:none;padding:0;margin:6px 0 8px}
+.fc-note{background:transparent;border:0;padding:0;margin:0 0 8px}
+.preset-strip{background:transparent;border:0;box-shadow:none;padding:0}
+.drop-card{border:1px dashed var(--line2);box-shadow:none}
+
+/* 무대 — 그림자 줄이고, 위 글씨는 바탕 없이. «2D 연동» 꼬리표는 차트 이름(왼쪽 위 글)과 겹쳐 걷음 */
+.stage,.stage.dark{box-shadow:var(--sh-md)}
+.stage .tag2d{display:none}
+.stage .hint,.stage.pane-2d .hint{border:0;box-shadow:none;font-weight:600;max-width:calc(100% - 22px)}
+
+/* 접어 둔 설명 */
+details.about,details.why3{margin-top:12px;font-size:12.5px;color:var(--sub)}
+details.about summary,details.why3 summary{cursor:pointer;font-weight:700;color:var(--sub);padding:4px 0}
+details.about summary:hover,details.why3 summary:hover{color:var(--acc2)}
+details.about .about-p,details.why3 p{margin:6px 0 0;word-break:keep-all;overflow-wrap:anywhere}
+details.about .pc{margin-top:10px}
+
+@media (max-width:600px){
+  .top .tstat{margin-left:0}
+  .top .tstat .tpill{padding:0 5px}
+  .top .tstat .ti{display:inline}
+  .vh{padding:0}
+  .vh h2{font-size:16.5px}
+  .vh p{font-size:12px}
+  .govbar,.mbar,.kpis,.viz-sec,.main,.src,.m-below,.apphd{padding-left:0;padding-right:0}
+  .bstrip,.chat{margin-left:0;margin-right:0}
 }
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -592,22 +674,18 @@ tr.fc-row:hover td{background:var(--acc-l)}
 <div id="app" hidden>
 <div class="top" id="topBar">
   <b>📊 데이터관리</b>
-  <span class="tpill lock" title="대표 한 사람만 열 수 있습니다 — 대표 표지(app_owner)와 같은 계정만">🔒<span class="tx"> 대표 전용</span></span>
-  <span class="tpill" id="topDev" title="채팅 기기 상태">🖥<span class="tx" id="topDevTx"> 기기 확인 중</span></span>
-  <span class="tpill" id="topAt" title="마지막 집계 시각">⏱<span class="tx" id="topAtTx"> 불러오는 중</span></span>
-  <span class="tpill" title="원본(재무 입금·이알피·업무관리·인사 명부)은 읽기만 합니다 — 고치지도 지우지도 않습니다">👁<span class="tx"> 원본은 읽기만 합니다</span></span>
-  <div class="vseg" role="group" aria-label="모든 화면 3D·2D 보기 방식">
-    <button type="button" data-gmode="both" class="on" title="모든 분석 화면에서 3D 입체와 2D 정밀 차트를 나란히 띄워 함께 누르고 맞춰 봅니다">🔀<span class="tx"> 3D+2D 동시</span></button>
-    <button type="button" data-gmode="3d" title="3D 입체 무대만 크게 봅니다">🧊<span class="tx"> 3D만</span></button>
-    <button type="button" data-gmode="2d" title="2D 정밀 평면 차트만 크게 봅니다">📊<span class="tx"> 2D만</span></button>
-  </div>
-  <button type="button" id="btnGoMulti" title="다년 매출 분석 · 장기 전망 · 세금계산서·재무제표 대조 화면으로 갑니다">📈<span class="tx"> 다년·전망·세금대조</span></button>
-  <button type="button" id="btnCineTour" title="12개월 통합 자료를 3D와 2D 동시 움직임으로 이어서 브리핑합니다">🎬<span class="tx"> 영상화 브리핑</span></button>
+  <!-- 상태 넷은 «글자 한 줄»(테두리 없음) — 폰에서는 그림만 (2026-11-22 정리) -->
+  <span class="tstat" aria-label="지금 상태">
+    <span class="tpill lock" title="대표 한 사람만 열 수 있습니다 — 대표 표지(app_owner)와 같은 계정만"><i class="ti">🔒</i><span class="tx">대표 전용</span></span>
+    <span class="tpill" id="topDev" title="채팅 기기 상태"><i class="ti">🖥</i><span class="tx" id="topDevTx"> 기기 확인 중</span></span>
+    <span class="tpill" id="topAt" title="마지막 집계 시각"><i class="ti">⏱</i><span class="tx" id="topAtTx"> 불러오는 중</span></span>
+    <span class="tpill" title="원본(재무 입금·이알피·업무관리·인사 명부)은 읽기만 합니다 — 고치지도 지우지도 않습니다"><i class="ti">👁</i><span class="tx">원본은 읽기만</span></span>
+  </span>
+  <span class="sp"></span>
   <button type="button" id="btnStageTheme" class="on" aria-pressed="true" title="무대 조명을 시네마(어두운 무대)와 밝은 스튜디오 사이에서 바꿉니다">🌌<span class="tx"> 시네마 무대</span></button>
   <button type="button" id="btnOpenAudit" title="입금·업무 집계에 무엇을 넣고 뺐는지, 이번 집계에서 몇 줄을 뺐는지 봅니다">📋<span class="tx"> 포함·제외 검토</span></button>
   <button type="button" id="btnOpenSet" title="주의(노랑)·넘침(빨강) 기준을 대표가 정합니다 — 정하기 전에는 색을 칠하지 않습니다">⚙<span class="tx"> 기준 정하기</span></button>
   <button type="button" id="btnReload" title="원본을 다시 읽어 집계를 새로 냅니다">🔄<span class="tx"> 새로고침</span></button>
-  <span class="sp"></span>
   <span id="who"></span>
   <a class="tlink" href="enter.html" title="통합 포털로">🏠<span class="tx"> 포털</span></a>
 </div>
@@ -635,18 +713,15 @@ tr.fc-row:hover td{background:var(--acc-l)}
 
 <!-- ═════════ 전체 배치 ═════════ -->
 <section class="view on" id="v-all">
-  <div class="vh"><div class="L">★</div><h2>전체 배치 — 대표 화면 한 장 (3D·2D 동시 클릭 관제)</h2>
-    <p><span class="q">한눈에</span>정합성 관제 띠 · 월별 숫자 넷 · <b>3D 막대 숲 ↔ 2D 정밀 추세 동시 클릭 연동</b> · 사람별 표 + 입금 종류 비중 · 데이터 채팅</p></div>
+  <div class="vh"><div class="L">★</div><h2>전체 배치</h2>
+    <p>이달 숫자 · 월별 3D·2D(양쪽 어디든 누르면 함께 맞춰짐) · 사람별 표 · 입금 종류 비중 · 데이터 채팅</p></div>
   <div class="app">
     <div class="apphd">
-      <span class="nm">📊 데이터관리</span>
-      <span class="badge b-lock" title="대표 한 사람만 열 수 있습니다">🔒 대표 전용</span>
-      <span class="badge b-nil" id="allDevBadge" title="채팅은 등록된 이 컴퓨터에서만 열립니다">🖥 기기 확인 중</span>
-      <span class="sp"></span>
       <button class="chip" type="button" id="btnBasisToggle" aria-pressed="false" title="입금일(date)과 귀속월을 맞비교합니다 — 귀속월은 자문료면 «몇 월분»(advisoryYm), 그 밖은 «성과 반영 월»(perfYM, 마감월이면 다음 달로 밀림)이라 업무가 실제로 일어난 달과 다를 수 있습니다">📅 기준: 입금일</button>
       <button class="chip" type="button" id="btnNetToggle" aria-pressed="false" title="카드로 받은 입금은 원래 금액(amount)으로 적고 카드 수수료(cardFee)를 따로 적습니다 — 순액은 amount − cardFee">💳 금액: 수수료 전 총액</button>
       <button class="chip" type="button" id="btnKpiSwap" aria-pressed="false" title="네 번째 숫자 카드를 «주의·병목 앱 수»(기본)와 «업무 1건당 입금» 사이에서 바꿉니다">4번 카드: 업무 1건당 입금 보기</button>
       <select id="selPeriod" aria-label="기간"></select>
+      <span class="sp"></span>
       <button class="badge b-info" type="button" id="btnFilterInfo" aria-expanded="false" aria-controls="filterInfo" title="무엇을 넣고 뺐는지 펼쳐 봅니다">확정 입금만 ▾</button>
     </div>
     <p class="finfo" id="filterInfo" hidden>입금은 재무관리 확정 입금(data/finance_income) 한 곳에서만 셉니다 — 되돌린 입금(undoneDate)·휴지통(_deleted)·성과조정 줄(perf-adjust)·과거기록(confirmed:false)·개인수익은 뺍니다. 사건·계약 쪽 금액 사본은 더하지 않습니다(두 번 세지 않음). 성과 몫이 없는 입금(자문료 등)은 업체 주담당 몫으로 봅니다. 마감월·끝난 건은 읽기만 합니다.</p>
@@ -657,7 +732,6 @@ tr.fc-row:hover td{background:var(--acc-l)}
       <button type="button" class="govpill nil" id="gvOverBtn" data-jump="overload">주간 넘침 <b id="gvOver">—</b>명 · 기록주의 <b id="gvRec">—</b>명 ↗</button>
       <button type="button" class="govpill nil" id="gvMisuBtn" data-jump="misu">자문료 미수 추정 <b id="gvMisu">—</b>곳 ↗</button>
       <button type="button" class="govpill nil" id="gvExpBtn" data-jump="expiring">만료 임박 계약 <b id="gvExp">—</b> ↗</button>
-      <button type="button" class="govpill acc" data-jump="multi-recon" title="다년 매출 추이·장기 전망 및 세금계산서·재무제표 대조 화면으로 갑니다">📈 다년·장기전망·세금대조 ↗</button>
       <span class="sp"></span>
       <button type="button" class="govpill" id="btnExportCsv" title="지금 고른 기간·기준의 사람별·입금종류별 집계표를 CSV 로 내려받습니다(사람 이름이 들어가므로 이 PC 에만 두세요)">📥 지금 집계 CSV 저장</button>
     </div>
@@ -668,10 +742,11 @@ tr.fc-row:hover td{background:var(--acc-l)}
     <div class="viz-sec">
       <div class="modebar">
         <div class="mseg" data-target="dualAll" role="group" aria-label="전체 배치 3D·2D 보기 선택">
-          <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-          <button type="button" data-m="3d">🧊 3D 입체</button>
-          <button type="button" data-m="2d">📊 2D 평면</button>
+          <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+          <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+          <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
         </div>
+        <button type="button" class="chip" id="btnCineTour" title="12개월 통합 자료를 3D와 2D 동시 움직임으로 이어서 브리핑합니다">🎬<span class="tx"> 영상화 브리핑</span></button>
         <div class="chips" id="allMetric" style="margin:0"><span class="lb">높이</span></div>
         <span style="flex:1"></span>
         <div class="sync-pill" id="syncPillAll"><span id="syncTxtAll">🔗 3D·2D 연동 대기 — 양쪽 막대 어디든 누르면 달·사람·표가 함께 맞춰집니다</span><button type="button" id="btnResetSyncAll" style="display:none">전체 보기</button></div>
@@ -710,7 +785,7 @@ tr.fc-row:hover td{background:var(--acc-l)}
 
     <div class="bstrip"><b>▦ 프로그램 현황판</b><span id="stripSum"></span><span class="sp"></span><button class="btn g" type="button" data-goto="board">현황판 보기</button></div>
     <div class="chat" id="chatAll">
-      <div class="hd"><b>💬 데이터 채팅</b><span class="badge b-nil" id="chatDevBadge">🖥 기기 확인 중</span><span class="badge b-warn" title="15분 동안 손대지 않으면 채팅이 잠기고 비밀번호를 다시 확인합니다">15분 자리 비우면 잠김</span><span class="sp"></span><span class="hint2">기록은 이 컴퓨터에만 남습니다</span></div>
+      <div class="hd"><b>💬 데이터 채팅</b><span class="badge b-nil" id="chatDevBadge">🖥 기기 확인 중</span><span class="sp"></span><span class="hint2" title="15분 동안 손대지 않으면 채팅이 잠기고 비밀번호를 다시 확인합니다">15분 자리 비우면 잠김 · 기록은 이 컴퓨터에만</span></div>
       <div class="chat-body">
         <div class="msgs" id="msgsAll" role="log" aria-live="polite" aria-label="데이터 채팅 대화"></div>
         <div class="chat-cover" id="chatCover">
@@ -734,24 +809,23 @@ tr.fc-row:hover td{background:var(--acc-l)}
 
 <!-- ═════════ 다년 매출 분석 · 장기 전망 · 세금계산서/재무제표 대조 ═════════ -->
 <section class="view" id="v-multi">
-  <div class="vh"><div class="L">📈</div><h2>다년 매출 분석 · 장기 전망 · 세금계산서·재무제표 대조</h2>
-    <p><span class="q">몇 년간 흐름과 결산 대조는?</span>해마다 <b>ERP 확정입금 ↔ 세금계산서 공급가액 ↔ 재무제표(손익계산서) 결산매출</b>을 맞대고, 수익원 구조·계절성·<b>다음 3개 해 시나리오</b>를 3D·2D 로 함께 봅니다. ERP 숫자는 이알피에 입금이 들어와 있는 해만 나옵니다.</p></div>
+  <div class="vh"><div class="L">📈</div><h2>다년·전망·재무대조</h2>
+    <p>해마다 ERP 확정입금 ↔ 세금계산서 공급가액 ↔ 재무제표 결산매출을 맞대고 수익원 구조·계절성·다음 3개 해 시나리오를 봅니다 · ERP 숫자는 이알피에 입금이 있는 해만</p></div>
   <div class="app">
     <div class="apphd">
-      <span class="nm">📈 다년 경영·세무 대조 스튜디오</span>
       <span class="badge b-info" id="mHorizonBadge">불러오는 중</span>
       <span class="badge b-nil" id="mReconStatusBadge">대조 파일 넣기 전</span>
       <span class="sp"></span>
       <button class="chip on" type="button" id="btnVatAlign" aria-pressed="true" title="ERP 입금액을 ÷1.1 해 세금계산서·손익계산서 공급가액과 같은 잣대로 어림합니다 — 입금 줄마다 부가세 포함 여부(deductions.vatIncluded)·증빙 종류(docType)를 보지 않은 어림입니다. 면세·영세율·실비 대납이 섞이면 틀립니다(세무대리인 확인)">🧾 부가세 ÷1.1 공급가 어림</button>
-      <button class="btn" type="button" id="btnMultiCine" title="첫 해 실적부터 전망 해까지 3D 카메라와 2D 훑기선으로 이어서 브리핑합니다">🎬 다년 시네마 전망 영상</button>
+      <button class="chip" type="button" id="btnMultiCine" title="첫 해 실적부터 전망 해까지 3D 카메라와 2D 훑기선으로 이어서 브리핑합니다">🎬 다년 시네마 전망 영상</button>
     </div>
     <div class="kpis" id="mKpis" style="padding-bottom:4px"></div>
     <div class="viz-sec">
       <div class="m-ctrlbar">
         <div class="mseg" data-target="dualM" role="group" aria-label="다년 분석 3D·2D 보기 선택">
-          <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-          <button type="button" data-m="3d">🧊 3D 스튜디오</button>
-          <button type="button" data-m="2d">📊 2D 정밀 차트</button>
+          <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+          <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+          <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
         </div>
         <span class="sep"></span>
         <div class="chips" id="mLens" style="margin:0"><span class="lb">분석 각도</span></div>
@@ -794,7 +868,7 @@ tr.fc-row:hover td{background:var(--acc-l)}
         </div>
       </div>
     </div>
-    <div style="padding:4px 16px 14px">
+    <div class="m-below">
       <div class="recon-hub">
         <div class="drop-card" id="dropTax">
           <div class="drop-hd"><span class="badge b-info">증빙 자료 ①</span><b>🧾 해마다 전자세금계산서 · 카드 · 현금영수증 합계 넣기</b></div>
@@ -829,7 +903,7 @@ tr.fc-row:hover td{background:var(--acc-l)}
         <div class="selbar" id="mSel"><span id="mSelN"></span><button type="button" data-act="focus">3D·2D에서 강조</button><button type="button" data-act="clear">고르기 풀기</button></div>
         <div class="tw only-pc m-tw"><table class="t" id="mReconTbl"></table></div>
         <div class="cards only-ph m-cards" id="mReconCards" style="padding:0"></div>
-        <p style="font-size:11.5px;color:var(--sub);margin:8px 0 0">※ <b>왜 세 숫자가 다를 수 있나요?</b> ① ERP 입금액은 통장 입금일 기준(부가세·대납실비 포함 가능)이고, ② 세금계산서는 작성일자 공급가액 기준(12월 선발행 미수금 포함), ③ 재무제표(손익계산서)는 결산 조정(기간 귀속·카드/현금영수증 합산) 기준입니다. ☐ 로 연도를 골라도 아무것도 바뀌지 않습니다 — 「3D·2D에서 강조」를 눌러야 그 해만 진하게 보입니다. 판정(점검·차액주의)은 «기준 정하기»에서 대표가 정한 % 로만 칠합니다.</p>
+        <details class="why3"><summary>왜 세 숫자가 다를 수 있나요?</summary><p>① ERP 입금액은 통장 입금일 기준(부가세·대납실비 포함 가능)이고, ② 세금계산서는 작성일자 공급가액 기준(12월 선발행 미수금 포함), ③ 재무제표(손익계산서)는 결산 조정(기간 귀속·카드/현금영수증 합산) 기준입니다. ☐ 로 연도를 골라도 아무것도 바뀌지 않습니다 — 「3D·2D에서 강조」를 눌러야 그 해만 진하게 보입니다. 판정(점검·차액주의)은 «기준 정하기»에서 대표가 정한 % 로만 칠합니다.</p></details>
       </div>
     </div>
     <div class="src" id="mSrcLine">자료: 해마다 ERP 확정입금(계산 모듈 집계) · 이 브라우저에 넣은 세금계산서·재무제표(서버에 저장하지 않음 — 이 화면 안에서만 비교)</div>
@@ -838,8 +912,8 @@ tr.fc-row:hover td{background:var(--acc-l)}
 
 <!-- ═════════ 프로그램 현황판 ═════════ -->
 <section class="view" id="v-board">
-  <div class="vh"><div class="L">▦</div><h2>프로그램 현황판 — 통합시스템 앱마다 카드 한 장</h2>
-    <p><span class="q">어디가 막혔나?</span>카드마다 숫자 셋, 뜻 있는 비율이 있는 앱은 막대 하나. 숫자는 서버가 한 시간마다 «건수·비율만» 모아 둔 것입니다. 노랑은 주의, 빨강은 위험(대표가 정한 기준을 넘었을 때만), 파랑 테두리는 기준을 아직 안 정한 카드, 회색은 숫자를 못 모은 앱입니다. ↗ 를 누르면 그 앱이 새 탭으로 열립니다 — 고치는 일은 늘 그 앱에서 합니다(여기서는 읽기만).</p></div>
+  <div class="vh"><div class="L">▦</div><h2>프로그램 현황판</h2>
+    <p>앱마다 카드 한 장 · 서버가 한 시간마다 모은 건수·비율 · 노랑=주의 · 빨강=위험(대표 기준을 넘을 때만) · 파랑 테두리=기준 안 정함 · 회색=못 모음 · ↗ 는 그 앱을 새 탭으로</p></div>
   <div class="bsum" id="bSum"></div>
   <div class="chips" id="bRow"><span class="lb">포털 줄</span></div>
   <div class="chips">
@@ -851,14 +925,17 @@ tr.fc-row:hover td{background:var(--acc-l)}
   <p class="bmsg" id="bMsg" role="status" aria-live="polite"></p>
   <div class="board" id="board"></div>
   <details class="tbl"><summary>표로 보기 (카드 숫자 그대로 · 집계 시각)</summary><div class="tw"><table class="t" id="boardTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">카드마다 숫자 셋, 뜻 있는 비율이 있는 앱은 막대 하나. 숫자는 서버가 한 시간마다 «건수·비율만» 모아 둔 것입니다. 노랑은 주의, 빨강은 위험(대표가 정한 기준을 넘었을 때만), 파랑 테두리는 기준을 아직 안 정한 카드, 회색은 숫자를 못 모은 앱입니다. ↗ 를 누르면 그 앱이 새 탭으로 열립니다 — 고치는 일은 늘 그 앱에서 합니다(여기서는 읽기만).</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>앱을 하나씩 열지 않고 «어디에 일이 쌓였나»를 한 장에서 봄</li><li>숫자는 서버가 «건수만» 모아 둔 것이라 가볍고, 원본(이름·금액·본문)은 데이터관리로 옮겨 오지 않음</li><li>포털 앱이 늘면 카드도 저절로 하나 더 — 포털 앱 목록과 같은 열쇠(key)로 묶음</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>숫자는 «집계 시각» 기준 — 앱 안의 지금 값과 최대 한 시간 어긋날 수 있음</li><li>브라우저 안에만 저장하는 앱·자기 자료가 없는 앱·준비 중인 앱은 회색 카드로 남음</li><li>뜻 있는 비율이 없는 앱은 막대를 그리지 않음</li><li>앱마다 «주의» 기준을 하나씩 정해야 색이 칠해짐</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ 연결 지도 ═════════ -->
 <section class="view" id="v-graph">
-  <div class="vh"><div class="L">🕸</div><h2>연결 지도 — 업체·계약·사건·사람·입금이 어떻게 이어졌나</h2>
-    <p><span class="q">옵시디언 그래프처럼</span>점 하나가 한 건, 선은 관계망(온톨로지)에 «확정»된 연결입니다. 기본은 «업체 하나 중심»입니다. 점을 누르면 이웃만 진하게 보이고 오른쪽(폰에서는 아래)에 연결 목록이 나옵니다. «앱 지도»는 앱끼리 자료가 몇 건씩 이어졌는지 봅니다. 이름은 이 화면 안에서만 붙이고 어디에도 저장하지 않습니다.</p></div>
+  <div class="vh"><div class="L">🕸</div><h2>연결 지도</h2>
+    <p>업체·계약·사건·사람·입금이 어떻게 이어졌나 · 점 하나가 한 건, 선은 관계망에 «확정»된 연결 · 점을 누르면 옆에 연결 목록</p></div>
   <div class="chips" id="gMode"><span class="lb">보기</span></div>
   <div class="chips" id="gTypes"><span class="lb">종류</span></div>
   <div class="gbar">
@@ -878,19 +955,22 @@ tr.fc-row:hover td{background:var(--acc-l)}
     <div class="panel gside" id="gSide"></div>
   </div>
   <details class="tbl"><summary>표로 보기 (지금 보이는 연결 — 화면읽기·인쇄용)</summary><div class="tw"><table class="t" id="gTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">점 하나가 한 건, 선은 관계망(온톨로지)에 «확정»된 연결입니다. 기본은 «업체 하나 중심»입니다. 점을 누르면 이웃만 진하게 보이고 오른쪽(폰에서는 아래)에 연결 목록이 나옵니다. «앱 지도»는 앱끼리 자료가 몇 건씩 이어졌는지 봅니다. 이름은 이 화면 안에서만 붙이고 어디에도 저장하지 않습니다.</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>한 업체에 계약·사건·입금·문서·일정이 «덩어리»로 모인 모습이 바로 보임</li><li>사람(담당자)을 누르면 그 사람이 맡은 건이 한꺼번에 보여 업무 쏠림을 짐작할 수 있음</li><li>«앱 지도»로 어느 앱끼리 자료를 주고받는지, 아무 데도 안 이어진 앱이 무엇인지 보임</li><li>새로 만드는 자료가 아니라 이미 있는 관계망(ontology/v1)을 읽기만 함</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>실제 점은 수천 개라 «전체»는 실타래가 됨 → «업체 하나 중심»이 기본이고, «전체»는 종류를 거른 뒤에만 그림</li><li>관계망은 이알피 «온톨로지 진단»에서 관리자가 «관계망 올리기»를 눌러야 새로워짐 — 판 시각을 늘 적음</li><li>이름으로 짐작한 연결과 확정 전 후보는 일부러 뺐음 → «선이 없음 = 관계없음»이 아님</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ A 막대 숲 ═════════ -->
 <section class="view" id="v-a">
-  <div class="vh"><div class="L">A</div><h2>A안 · 입금 막대 숲 — 월 × 사람 × 금액 (3D·2D 동시 연동)</h2>
-    <p><span class="q">누가 언제 얼마를?</span>3D 입체 막대와 2D 월별 누적·추세 차트를 나란히 두고 눌러서 함께 대조합니다.</p></div>
+  <div class="vh"><div class="L">A</div><h2>입금 막대 숲</h2>
+    <p>월 × 사람 × 금액 · 3D 막대와 2D 월별 누적·추세를 눌러서 함께 봅니다</p></div>
   <div class="modebar">
     <div class="mseg" data-target="dualA" role="group" aria-label="A안 3D·2D 보기 선택">
-      <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-      <button type="button" data-m="3d">🧊 3D 입체</button>
-      <button type="button" data-m="2d">📊 2D 평면</button>
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
     </div>
     <div class="sync-pill"><span id="syncTxtA">🔗 양쪽 막대 어디든 누르면 그 달·사람이 함께 강조됩니다</span></div>
   </div>
@@ -911,19 +991,22 @@ tr.fc-row:hover td{background:var(--acc-l)}
   <div class="chips" id="aMetric"><span class="lb">높이</span></div>
   <div class="chips" id="aPeople"><span class="lb">사람</span></div>
   <details class="tbl"><summary>표로 보기 (3D 를 못 읽는 경우·인쇄용)</summary><div class="tw"><table class="t" id="aTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">3D 입체 막대와 2D 월별 누적·추세 차트를 나란히 두고 눌러서 함께 대조합니다.</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>3D 로 사람·달 입체 분포를 보면서 2D 로 월별 합계·추세선을 정확히 읽음</li><li>높이를 입금액 ↔ 업무 건수로 바꾸면 «일은 많은데 입금은 적은 달»이 양쪽에 바로 보임</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>사람이 10명을 넘으면 3D 뒷줄이 가려질 수 있으나 오른쪽 2D 누적 막대가 보완함</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ B 사람 구슬 ═════════ -->
 <section class="view" id="v-b">
-  <div class="vh"><div class="L">B</div><h2>B안 · 사람 구슬 — 업무 × 입금 × 입금 처리 (3D 구슬 · 2D 사분면)</h2>
-    <p><span class="q">사람들 사이 균형은?</span>왼쪽은 3축 구슬 공간, 오른쪽은 2D 역할 사분면(가로=업무, 세로=입금, 바깥 호=입금 처리)으로 함께 비교합니다. 직종마다 기본 역할이 달라 같은 잣대로 순위를 매기지 않습니다.</p></div>
+  <div class="vh"><div class="L">B</div><h2>사람 구슬</h2>
+    <p>업무 × 입금 × 입금 처리 · 2D 사분면(가로=업무 · 세로=입금 · 바깥 호=입금 처리) · 직종마다 역할이 달라 순위를 매기지 않습니다</p></div>
   <div class="modebar">
     <div class="mseg" data-target="dualB" role="group" aria-label="B안 3D·2D 보기 선택">
-      <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-      <button type="button" data-m="3d">🧊 3D 입체</button>
-      <button type="button" data-m="2d">📊 2D 평면</button>
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
     </div>
     <div class="sync-pill"><span id="syncTxtB">🔗 구슬이나 2D 사분면 원을 누르면 두 화면에서 그 사람을 함께 따라갑니다</span></div>
   </div>
@@ -947,19 +1030,22 @@ tr.fc-row:hover td{background:var(--acc-l)}
     <button class="chip" type="button" id="bTrail" aria-pressed="false">자취 보기</button>
   </div>
   <details class="tbl"><summary>표로 보기 (고른 달)</summary><div class="tw"><table class="t" id="bTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽은 3축 구슬 공간, 오른쪽은 2D 역할 사분면(가로=업무, 세로=입금, 바깥 호=입금 처리)으로 함께 비교합니다. 직종마다 기본 역할이 달라 같은 잣대로 순위를 매기지 않습니다.</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>3D 축이 셋이라 낯선 것을 오른쪽 2D 평균 사분면이 보완</li><li>12개월 재생 때 3D 구슬과 2D 원이 함께 움직이며 역할 이동 경로를 보여 줌</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>직종(노무사·직원)에 따라 기본 역할 축이 달라 같은 잣대로 단순 순위화하지 않도록 주의</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ C 업무량 산맥 ═════════ -->
 <section class="view" id="v-c">
-  <div class="vh"><div class="L">C</div><h2>C안 · 업무량 산맥 — 최근 26주 × 사람 (3D 능선 · 2D 주간 히트맵)</h2>
-    <p><span class="q">누가 지쳐 있나?</span>왼쪽 3D 산맥으로 흐름을, 오른쪽 2D 26주 격자로 주·사람별 숫자를 눌러 맞비교합니다. «많음·넘침»을 볼지는 대표 몫입니다 — 기준을 정하기 전에는 노랑·빨강을 칠하지 않습니다.</p></div>
+  <div class="vh"><div class="L">C</div><h2>업무량 산맥</h2>
+    <p>최근 26주 × 사람 · 3D 능선과 2D 주간 격자 · 기준을 정하기 전에는 노랑·빨강을 칠하지 않습니다</p></div>
   <div class="modebar">
     <div class="mseg" data-target="dualC" role="group" aria-label="C안 3D·2D 보기 선택">
-      <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-      <button type="button" data-m="3d">🧊 3D 입체</button>
-      <button type="button" data-m="2d">📊 2D 평면</button>
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
     </div>
     <div class="sync-pill"><span id="syncTxtC">🔗 2D 칸이나 3D 능선을 누르면 그 주·사람이 양쪽에서 함께 잡힙니다</span></div>
   </div>
@@ -980,19 +1066,22 @@ tr.fc-row:hover td{background:var(--acc-l)}
   <div class="chips" id="cMetric"><span class="lb">높이</span></div>
   <div class="note" id="cNote"></div>
   <details class="tbl"><summary>표로 보기 (사람 × 26주)</summary><div class="tw"><table class="t" id="cTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽 3D 산맥으로 흐름을, 오른쪽 2D 26주 격자로 주·사람별 숫자를 눌러 맞비교합니다. «많음·넘침»을 볼지는 대표 몫입니다 — 기준을 정하기 전에는 노랑·빨강을 칠하지 않습니다.</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>3D 능선으로 이어지는 흐름을 보고, 2D 격자로 앞줄에 가려진 사람의 주별 숫자까지 확인</li><li>주 단위라 이번 주 업무 재배분 판단에 바로 쓸 수 있음</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>업무 기록을 빠뜨린 주는 낮게 보이므로 사람별 기록률을 반드시 함께 봐야 함</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ D 한 해 입금 고리 ═════════ -->
 <section class="view" id="v-d">
-  <div class="vh"><div class="L">D</div><h2>D안 · 한 해 입금 고리 — 12개월 × 입금 종류 (3D 고리 · 2D 이중축)</h2>
-    <p><span class="q">한 해 흐름은?</span>왼쪽 3D 원형 탑으로 계절 순환을, 오른쪽 2D 누적 막대+업무 꺾은선으로 달별 높이 차이를 함께 봅니다.</p></div>
+  <div class="vh"><div class="L">D</div><h2>한 해 입금 고리</h2>
+    <p>12개월 × 입금 종류 · 3D 고리로 계절 흐름, 2D 누적 막대 + 업무 선으로 달별 차이</p></div>
   <div class="modebar">
     <div class="mseg" data-target="dualD" role="group" aria-label="D안 3D·2D 보기 선택">
-      <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-      <button type="button" data-m="3d">🧊 3D 입체</button>
-      <button type="button" data-m="2d">📊 2D 평면</button>
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
     </div>
     <div class="sync-pill"><span id="syncTxtD">🔗 어느 달의 입금 종류 층을 누르면 3D 고리와 2D 막대에서 함께 강조됩니다</span></div>
   </div>
@@ -1012,19 +1101,22 @@ tr.fc-row:hover td{background:var(--acc-l)}
   </div>
   <div class="chips" id="dCats"><span class="lb">입금 종류</span></div>
   <details class="tbl"><summary>표로 보기 (달 × 입금 종류)</summary><div class="tw"><table class="t" id="dTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽 3D 원형 탑으로 계절 순환을, 오른쪽 2D 누적 막대+업무 꺾은선으로 달별 높이 차이를 함께 봅니다.</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>원형 배치(3D)의 계절 감각과 직교 막대(2D)의 이웃 달 비교를 한 화면에서</li><li>입금 탑과 업무 추세선을 겹쳐 «일한 만큼 입금이 따라왔는지» 바로 봄</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>사람별 구분은 A안·전체 배치와 짝지어 확인</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ E 업체 도시 ═════════ -->
 <section class="view" id="v-e">
-  <div class="vh"><div class="L">E</div><h2>E안 · 업체 도시 — 담당 구역 × 업체 건물 (3D 도시 · 2D 포트폴리오)</h2>
-    <p><span class="q">어느 업체에서?</span>왼쪽 3D 담당 구역 건물 숲과 오른쪽 2D 업체 분포(업무 건수 × 12개월 입금 · 노란 고리=자문료 미수 추정)를 눌러서 이어 봅니다. 미수는 이알피와 같은 규칙(erpAdvisoryDues)으로 지난달까지 셉니다.</p></div>
+  <div class="vh"><div class="L">E</div><h2>업체 도시</h2>
+    <p>담당 구역 × 업체 · 2D 가로=업무 건수 · 세로=12개월 입금 · 노란 고리=자문료 미수 추정(이알피와 같은 규칙, 지난달까지)</p></div>
   <div class="modebar">
     <div class="mseg" data-target="dualE" role="group" aria-label="E안 3D·2D 보기 선택">
-      <button type="button" data-m="both" class="on">🔀 3D+2D 동시</button>
-      <button type="button" data-m="3d">🧊 3D 입체</button>
-      <button type="button" data-m="2d">📊 2D 평면</button>
+      <button type="button" data-m="both" class="on" title="3D 입체와 2D 정밀 차트를 나란히 — 모든 화면에 함께 적용">3D+2D</button>
+      <button type="button" data-m="3d" title="3D 입체만 크게 — 모든 화면에 함께 적용">3D</button>
+      <button type="button" data-m="2d" title="2D 정밀 차트만 크게 — 모든 화면에 함께 적용">2D</button>
     </div>
     <div class="sync-pill"><span id="syncTxtE">🔗 건물이나 2D 업체 원을 누르면 미수·입금·업무가 양쪽에서 함께 잡힙니다</span></div>
   </div>
@@ -1045,14 +1137,17 @@ tr.fc-row:hover td{background:var(--acc-l)}
   <div class="chips" id="eDist"><span class="lb">구역</span></div>
   <div class="chips"><button class="chip" type="button" id="eMisu" aria-pressed="false">노란 지붕(미수)만 밝게</button></div>
   <details class="tbl"><summary>표로 보기 (업체별)</summary><div class="tw"><table class="t" id="eTbl"></table></div></details>
+  <details class="about"><summary>이 화면 설명 · 좋은 점과 아쉬운 점</summary>
+    <p class="about-p">왼쪽 3D 담당 구역 건물 숲과 오른쪽 2D 업체 분포(업무 건수 × 12개월 입금 · 노란 고리=자문료 미수 추정)를 눌러서 이어 봅니다. 미수는 이알피와 같은 규칙(erpAdvisoryDues)으로 지난달까지 셉니다.</p>
   <div class="pc"><div class="p"><b>좋은 점</b><ul><li>2D 에서 «업무는 많은데 입금이 적은 업체»와 «미수 업체»를 찍어 3D 구역 위치까지 바로 확인</li><li>담당자별 수임 규모를 한눈에 견줌</li></ul></div>
     <div class="m"><b>아쉬운 점</b><ul><li>미수는 매달 자문료를 걷는 업체만 셈 — 사건·컨설팅 잔금 미수는 아직 안 셈</li></ul></div></div>
+  </details>
 </section>
 
 <!-- ═════════ 잠금·채팅 ═════════ -->
 <section class="view" id="v-lock">
-  <div class="vh"><div class="L" style="background:var(--dgi)">🔒</div><h2>잠금 · 채팅 — 대표 한 사람 · 이 컴퓨터 한 대</h2>
-    <p><span class="q">누가 어디서 열 수 있나?</span>문은 세 겹: ① 포털 타일 안 보임 ② 앱이 대표 표지와 같은 계정인지 확인(모르면 닫음) ③ 서버 규칙이 대표 계정만 읽기. 채팅은 여기에 «등록된 컴퓨터» 확인이 한 겹 더.</p></div>
+  <div class="vh"><div class="L" style="background:var(--dgi)">🔒</div><h2>잠금·채팅</h2>
+    <p>대표 한 사람 · 이 컴퓨터 한 대 · 문은 세 겹(포털 타일 안 보임 · 대표 표지 확인 · 서버 규칙) + 채팅은 등록된 컴퓨터 확인이 한 겹 더</p></div>
   <div class="lockgrid">
     <div class="lk"><div class="cap">① 대표 계정 확인</div><div class="body"><div class="ctr">
       <div class="ico">✅</div><h4>대표 표지와 같은 계정입니다</h4><p>로그인한 계정이 서버의 대표 표지(app_owner)와 같아서 열렸습니다.</p>
@@ -1188,7 +1283,7 @@ try{
 </script>
 <script src="js/pu-datahub-calc.js?v=1"></script>
 <script src="js/pu-3d-lite.js?v=1"></script>
-<script src="js/pu-datahub-view.js?v=1"></script>
+<script src="js/pu-datahub-view.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 (function(){

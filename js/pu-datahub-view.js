@@ -281,6 +281,7 @@
     ]).then(function () {
       if (my !== EPOCH) return;
       LOADED = true;
+      applyGlobalMode(GLOBAL_VMODE, true);   /* 저장해 둔 3D·2D 보기를 화면에도 — 설정은 자료와 함께 늦게 와서 앱을 열 때 한 번 부른 것만으로는 안 보였다 */
       computeDs();
       renderAll(true);
       $('topAtTx').textContent = ' 집계 ' + fmtAt(Date.now());
@@ -1620,9 +1621,9 @@
     document.querySelectorAll('.mseg[data-target="' + targetId + '"] button').forEach(function (b) { setPressed(b, b.getAttribute('data-m') === mode); });
     setTimeout(L3.refit, 20);
   }
+  /* 3D·2D 보기 — 어느 화면의 단추를 눌러도 모든 화면에 함께 적용한다(2026-11-22 정리: 위 막대의 전체 단추와 겹쳐 하나로 합침) */
   function applyGlobalMode(mode, silent) {
     GLOBAL_VMODE = mode;
-    document.querySelectorAll('.top .vseg button').forEach(function (x) { setPressed(x, x.getAttribute('data-gmode') === mode); });
     DUALS.forEach(function (id) { setDualMode(id, mode); });
     if (!silent) queueSave();
   }
@@ -1729,10 +1730,9 @@
   /* ══ 16. 한 번만 다는 손잡이 ══ */
   function bindStatic() {
     document.querySelectorAll('.mseg[data-target]').forEach(function (seg) {
-      seg.addEventListener('click', function (e) { var b = e.target.closest('button[data-m]'); if (b) setDualMode(seg.getAttribute('data-target'), b.getAttribute('data-m')); });
+      seg.addEventListener('click', function (e) { var b = e.target.closest('button[data-m]'); if (b) applyGlobalMode(b.getAttribute('data-m')); });
     });
-    document.querySelectorAll('.mseg button, .top .vseg button').forEach(function (b) { b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false'); });
-    document.querySelector('.top .vseg').addEventListener('click', function (e) { var b = e.target.closest('button[data-gmode]'); if (b) applyGlobalMode(b.getAttribute('data-gmode')); });
+    document.querySelectorAll('.mseg button').forEach(function (b) { b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false'); });
     $('monthScrub').addEventListener('click', function (e) { var b = e.target.closest('[data-mi]'); if (b && DS) setGlobalPeriod(+b.getAttribute('data-mi'), false); });
     $('selPeriod').addEventListener('change', function (e) { if (DS) setGlobalPeriod(+e.target.value, false); });
     $('btnBasisToggle').addEventListener('click', function () {
@@ -1751,7 +1751,6 @@
       if (j === 'fin-hold' || j === 'expiring') { bState.row = j === 'fin-hold' ? 'inside' : null; bState.warnFirst = true; renderBoard(); document.querySelector('.side button[data-v="board"]').click(); }
       else if (j === 'overload') { document.querySelector('.side button[data-v="c"]').click(); }
       else if (j === 'misu') { document.querySelector('.side button[data-v="e"]').click(); if (!eState.misu) $('eMisu').click(); }
-      else if (j === 'multi-recon') { document.querySelector('.side button[data-v="multi"]').click(); }
     });
     $('btnExportCsv').addEventListener('click', exportCsv);
     $('allTbl').addEventListener('change', onPickChange);
@@ -1805,7 +1804,6 @@
     });
     trapTab('auditModal'); trapTab('setModal');
     $('btnReload').addEventListener('click', function () { if (GATE_OK && ME.uid) { loadAll(EPOCH); showToast('원본을 다시 읽습니다.'); } });
-    $('btnGoMulti').addEventListener('click', function () { var t = document.querySelector('.side button[data-v="multi"]'); if (t) { t.click(); t.focus(); } });
     document.querySelectorAll('label.drop-lbl[for]').forEach(function (l) {
       l.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); var t = $(l.getAttribute('for')); if (t) t.click(); } });
     });
@@ -2475,7 +2473,7 @@
     var lab = s === 'ok' ? '이 컴퓨터 · 확인됨' : (s === 'pending' ? '승인 대기 — 채팅 잠김' : '등록 안 됨 — 채팅은 등록된 컴퓨터에서만');
     $('topDevTx').textContent = ' ' + deviceLabel();
     $('topDev').className = 'tpill' + (s === 'ok' ? ' ok' : ' warn'); $('topDev').title = '채팅 기기: ' + lab;
-    [$('allDevBadge'), $('chatDevBadge')].forEach(function (b) { if (!b) return; b.className = 'badge ' + (s === 'ok' ? 'b-ok' : (s === 'pending' ? 'b-warn' : 'b-nil')); b.textContent = '🖥 ' + deviceLabel(); b.title = lab; });
+    [$('chatDevBadge')].forEach(function (b) { if (!b) return; b.className = 'badge ' + (s === 'ok' ? 'b-ok' : (s === 'pending' ? 'b-warn' : 'b-nil')); b.textContent = '🖥 ' + deviceLabel(); b.title = lab; });
     $('devIco').textContent = s === 'ok' ? '✅' : (s === 'pending' ? '⏳' : '🖥');
     $('devTitle').textContent = s === 'ok' ? '이 컴퓨터가 채팅 기기로 확인됐습니다' : (s === 'pending' ? '이 PC 터미널 승인을 기다립니다' : '채팅은 등록된 컴퓨터에서만 열립니다');
     var msg;
