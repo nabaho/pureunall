@@ -174,6 +174,8 @@ module.exports = {
     { name: 'c', run: async (p) => { await p.click('.side button[data-v="c"]'); } },
     { name: 'd', run: async (p) => { await p.click('.side button[data-v="d"]'); } },
     { name: 'e', run: async (p) => { await p.click('.side button[data-v="e"]'); } },
+    /* E 2D 업체 막대 목록 — 다음 쪽 넘기기 · 업무 많은 차례 (2026-11-22 「2D 가 빡빡해 확인이 안 된다」) */
+    { name: 'e2d', run: async (p) => { await p.click('.side button[data-v="e"]'); await p.click('#e2dNext'); await p.click('#eSort .chip:nth-of-type(2)'); } },
     { name: 'set', run: async (p) => { await p.click('#btnOpenSet'); }, back: async (p) => { await p.click('#btnCloseSet'); } },
     /* 눌러 보기 — 기준 전환·무대 바꾸기·기기 등록 요청(서버 함수는 점검 도구가 막아 «채팅 서버 준비 전»이 떠야 한다)·재인증(가짜 로그인) */
     { name: 'toggles', run: async (p) => { await p.click('.side button[data-v="all"]'); await p.click('#btnBasisToggle'); await p.click('#btnNetToggle'); await p.click('#btnStageTheme'); await p.click('#monthScrub [data-mi="12"]'); } },
