@@ -65,6 +65,16 @@ items.edu_mseed01 = Object.assign({}, items.edu_seed0002, { id: 'edu_mseed01', t
   ext: 'pptx', kind: 'doc', store: 'cloud', storagePath: 'edulib/edu_mseed01/보낸 메일로 들어온 점검 강의안.pptx', status: 'review', dateFrom: 'mail', lectureDate: '2026-11-20',
   summary: '목차(12장): 점검 강의 시작 · 근로시간 기본 · 휴게시간 · 연차 계산 · 가나다라마바사아자차카타파하 아주 긴 목차 줄 — [메일] 로 문의',
   source: { kind: 'mail', path: '', mailId: 'sent_seed/7001', mailSubject: '[점검상사] 강의자료 송부', mailDate: '2026-11-20', mtime: '' }, createdBy: 'AI-메일자동정리' });
+/* 내용 지문(비슷한 강의) — 지어낸 숫자. 자료를 다 만든 «뒤»에 — 성희롱 예방 자료끼리 «고쳐 쓴 판»처럼 겹친다(앞 넷은 많이, 뒤로 갈수록 덜) */
+const sims = {};
+(function () {
+  const blk = (k, salt) => ((Math.imul(k + 1, 2654435761) + salt) >>> 0).toString(16).padStart(8, '0');
+  Object.keys(items).filter((k) => items[k].cat === 'sexual' && !items[k]._deleted).forEach((id, j) => {
+    let mh = '';
+    for (let k = 0; k < 32; k++) mh += blk(k, k < 32 - Math.min(7, j) * 2 ? 7 : 1000 + j * 31 + k);
+    sims[id] = { id, entityType: 'EduSimilarity', schemaVersion: 3, sourceId: id, v: 1, mh, n: 60, by: 'P001', createdAt: T0, updatedAt: T0 };
+  });
+})();
 /* 자동 정리함(관리자만) — 서버가 정리해 둔 줄 두 개(지어낸 것). 넣기 전이라 자료함에는 없다 */
 const NOWISH = Date.now();
 const inbox = {
@@ -83,7 +93,7 @@ module.exports = {
   /* 지어낸 창고 파일 — run.mjs 가 창고 주소 요청에 내준다(진짜 창고에는 안 나간다) */
   storageFiles: async () => ({ 'edulib/edu_mseed01/보낸 메일로 들어온 점검 강의안.pptx': await fakePptx() }),
   data: {
-    edulib: { items, notes, cats },
+    edulib: { items, notes, cats, sims },
     edulib_inbox: inbox,
     mailbox: { folders: { inbox_seed: { path: 'INBOX', name: '받은편지함', kind: 'inbox', order: 1, total: 14, unseen: 0 } }, msgs: { inbox_seed: msgs }, old: { msgs: {} } },
   },

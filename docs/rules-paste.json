@@ -2073,6 +2073,63 @@
           ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
           ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduCategory' && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 40"
         }
+      },
+      "sims": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('sourceId').val() === $id && newData.child('sourceKind').val() === 'EduMaterial' && newData.child('entityType').val() === 'EduSimilarity' && newData.child('mh').isString() && newData.child('mh').val().length <= 512 && newData.child('mh').val().matches(/^[0-9a-f]*$/)",
+          "id": {
+            ".validate": true
+          },
+          "entityType": {
+            ".validate": true
+          },
+          "sourceId": {
+            ".validate": true
+          },
+          "sourceKind": {
+            ".validate": true
+          },
+          "mh": {
+            ".validate": true
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "v": {
+            ".validate": "newData.isNumber()"
+          },
+          "n": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "by": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "why": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "createdAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
       }
     },
     "edulib_inbox": {

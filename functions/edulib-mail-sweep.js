@@ -314,7 +314,9 @@ async function runSweep(deps, opts) {
   async function markSeen(c, why, id) {
     seen[c.seenKey] = 1;
     const v = { at: clock(), why };
-    if (id) v.id = id;
+    /* 같은 파일이면 그 자료 열쇠 — 칸 이름을 «id» 로 하면 서버 저장 감시가 «레코드»로 보고 공통 칸이 없다고 경고한다(2026-11-22 첫 밤 기록).
+       «본 것»은 레코드가 아니라 대기열 표시다(edulib_inbox) — item 이라 부른다 */
+    if (id) v.item = id;
     await db.ref(SEEN_ROOT + "/" + c.seenKey).set(v);
   }
 
