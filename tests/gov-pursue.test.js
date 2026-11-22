@@ -158,7 +158,7 @@ function runApp(seed) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={setTab,draw,get,pursueAsk,pursueCorp,purShow,purToBiz,purOff,purOn,purDraw,purTog,purSelAll,purBulk,toForm,applicationFromHit,lensDraw,'
-    + 'setWatch:function(w){ _recWatch=w; },setFb:function(db,uid){ fbDb=db; fbUid=uid; },setPull:function(f){ pull=f; },toast:function(f){ toast=f; }};', ctx);
+    + 'setWatch:function(w){ _recWatch=w; },setFb:function(db,uid){ fbDb=db; fbUid=uid; if(uid)_ownerSet(uid); },setPull:function(f){ pull=f; },toast:function(f){ toast=f; }};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setFb(null, 'qa-owner');
   return { api: ctx.__api, el, store, toasts, opened, ss, ctx };

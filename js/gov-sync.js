@@ -145,6 +145,54 @@
     return changed;
   }
 
+  /* ═══ 이 기기 자료의 «주인» (2026-11-22 — 자동 보안 검토 «높음», PR #3241 에서 갈라 온 것) ═══
+     ⚠★ 사고 길: 이 기기 저장소(gov3_*)에 계정 구분이 없어, 한 브라우저에서 A 가 쓰다 B 로 로그인하면
+        A 의 인증키·공고·진행 사업·«보낼 칸» 표시가 B 의 gov/{uid} 와 합쳐져 «B 클라우드로» 올라갔다.
+        2026-10-30 부터 재직 직원도 이 앱을 써서 공용 PC 에서 실제로 생길 수 있다.
+     ★ 그래서 — 이 기기 자료에 «주인 uid»(gov3__owner)를 남기고, 주인과 로그인한 계정이 같을 때만 받고·합치고·보낸다.
+        계정이 바뀌면 앞 계정 자료는 «지우지 않고» 그 계정 이름표를 단 자리로 옮겨 두고(파킹), 돌아오면 꺼낸다.
+     이 아래는 판단만 한다(순수 함수). 옮기기·묻기·막기는 gov.html 의 acctEnter 가 한다. */
+
+  /* 계정에 딸려 옮겨 다니는 이 기기 칸 — 동기화 칸 전부 + 시각·보낼 칸 표시 + «이 계정 공고를 어디까지 받았나» 기록.
+     ⚠ 화면 전용 칸(tab·per·rec_sub …)은 기기 것이라 옮기지 않는다 */
+  var ACCT_LOCAL = ['_stamps', '_dirty', 'ai_back', 'last_win'];
+  function acctKeys() { return FIELDS.map(function (f) { return f.ls; }).concat(ACCT_LOCAL); }
+  /* 옮겨 둔 자리 이름(접두어 gov3_ 뒤에 붙는다). owner 는 uid — 주인 모를 옛 자료는 «?시각» */
+  function parkKey(owner, k) { return '_acct.' + owner + '.' + k; }
+
+  function cloudAt(v, path) {
+    return String(path).split('/').reduce(function (o, k) { return (o && typeof o === 'object') ? o[k] : undefined; }, v);
+  }
+
+  /* 주인 표시가 없는 옛 자료(이번 고침 전)를 «이 계정 것»으로 볼 수 있나 — 보낼 것과 증거를 센다.
+     local: {칸: 이 기기 값} · localStamps: {칸: {열쇠: 시각}} · cloud: 이 계정 gov/{uid} 통째.
+     send  — 합치면 «이 계정 클라우드가 바뀌는» 칸(=자동으로 올라갈 것). 비었으면 올라갈 것이 없다.
+     proof — 이 기기 시각표와 이 계정 클라우드 시각표가 «같은 열쇠·같은 시각»인 개수.
+             시각은 고친 순간의 천분의 1초라, 하나라도 맞으면 이 기기가 이 계정과 주고받은 적이 있다는 뜻이다. */
+  function legacyVerdict(local, localStamps, cloud) {
+    var send = [], proof = 0, cst = (cloud && cloud.stamp) || {};
+    FIELDS.forEach(function (f) {
+      var ls = (localStamps && localStamps[f.ls]) || {}, cs = cst[f.ls] || {};
+      Object.keys(ls).forEach(function (k) { if (ls[k] && ls[k] === cs[k]) proof++; });
+      var m = merge(f, (local || {})[f.ls], ls, cloudAt(cloud, f.path), cs);
+      if (m.cloudChanged) send.push(f.ls);
+    });
+    return { send: send, proof: proof };
+  }
+
+  /* 묻는 말에 적을 이름 — 칸 이름(feed…)이 아니라 사람이 아는 말로, 겹치면 한 번 */
+  var LABELS = { feed: '공고 목록', kw: '찾는 말', key_data: '인증키(공공데이터포털)', key_biz: '인증키(기업마당)',
+    pursue: '진행 사업(🏢)', plan: '발주 예정', pick_off: '숨긴 추천' };
+  function acctLabels(list) {
+    var out = [];
+    (list || []).forEach(function (ls) {
+      var t = LABELS[ls] || (/^recruit_/.test(ls) ? '컨설턴트 모집' : (/^(plan|spec)_/.test(ls) ? '발주 예정' : '받기 기록'));
+      if (out.indexOf(t) < 0) out.push(t);
+    });
+    return out;
+  }
+
   return { FIELDS: FIELDS, SV: SV, field: field, safeKey: safeKey, entries: entries, fromEntries: fromEntries,
-    stampChanges: stampChanges, merge: merge, toCloud: toCloud, dedupeIds: dedupeIds };
+    stampChanges: stampChanges, merge: merge, toCloud: toCloud, dedupeIds: dedupeIds,
+    ACCT_LOCAL: ACCT_LOCAL, acctKeys: acctKeys, parkKey: parkKey, cloudAt: cloudAt, legacyVerdict: legacyVerdict, acctLabels: acctLabels };
 });

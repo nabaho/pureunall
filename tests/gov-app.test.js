@@ -30,7 +30,8 @@ test('★ 경력관리와 저장 자리가 겹치지 않는다', () => {
   // ⚠ 같은 자리를 쓰면 한쪽이 다른 쪽 자료를 덮는다
   assert.match(src, /var NS='gov3_'/, '이 앱만의 접두사를 씁니다');
   assert.ok(src.indexOf("'cm3_'") < 0, '경력관리 접두사를 쓰면 안 됩니다');
-  assert.match(src, /fbDb\.ref\('gov\/'\s*\+\s*fbUid\)/, '클라우드도 gov/{uid} 자리입니다');
+  /* 받기·보내기는 «시작할 때의 계정»을 uid 로 쥐고 쓴다(계정이 바뀌는 사이 섞이지 않게 2026-11-22) */
+  assert.match(src, /fbDb\.ref\('gov\/'\s*\+\s*(?:fbUid|uid)\)/, '클라우드도 gov/{uid} 자리입니다');
   assert.ok(!/ref\('kcareer\//.test(src), '경력관리 자리를 건드리면 안 됩니다');
 });
 
@@ -139,7 +140,7 @@ function runApp(seed) {
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
     + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,planStarOnly,planStarBtn,'
-    + 'healthPop,healthHtml,healthStat,healthErr,fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
+    + 'healthPop,healthHtml,healthStat,healthErr,fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;if(uid)_ownerSet(uid);},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
 

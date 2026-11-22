@@ -717,7 +717,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-bizinfo.js?v=5"></script>
 <script src="js/gov-recruit.js?v=7"></script>
 <script src="js/gov-submit.js?v=4"></script>
-<script src="js/gov-sync.js?v=11"></script>
+<script src="js/gov-sync.js?v=12"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
 <script src="js/gov-inbox.js?v=5"></script>
@@ -2065,7 +2065,7 @@ function doLogout(){ try{ firebase.auth().signOut(); }catch(e){} }
       ③ 받기(cloudSync)가 한 번 성공하기 «전»에는 아무것도 안 올린다 — 빈 기기가 클라우드를 덮지 못하게
       ④ sv:2 를 함께 쓴다 — 보안규칙이 sv 없는 쓰기(옛 판의 통째 set)를 막는다.
    합치는 규칙은 js/gov-sync.js 한 곳에. 보낼 칸 목록은 이 기기에도 남겨(gov3__dirty) 창을 닫아도 다음에 보낸다. */
-var _pushT=null, _syncOk=false, _syncAt=0, _flushing=false, _flushAgain=false;
+var _pushT=null, _syncOk=false, _syncUid=null, _syncAt=0, _flushing=false, _flushAgain=false;   /* _syncUid — 받기가 «어느 계정으로» 됐나 */
 function _syncRead(f){ return f.kind==='scalar' ? lsGet(f.ls) : (f.kind==='map' ? recObj(f.ls) : get(f.ls)); }
 function _rawWrite(f, v){ try{ localStorage.setItem(NS+f.ls, f.kind==='scalar' ? String(v==null?'':v) : JSON.stringify(v)); }catch(e){} }
 function _stampsAll(){ try{ var v=JSON.parse(localStorage.getItem(NS+'_stamps')||'{}'); return (v&&typeof v==='object')?v:{}; }catch(e){ return {}; } }
@@ -2091,23 +2091,28 @@ function cloudPush(){
 }
 async function _cloudFlush(){
   if(!fbDb||!fbUid) return;
-  if(!_syncOk){ await cloudSync(); return; }          /* 받기가 먼저다 — 성공하면 그 안에서 보낸다 */
+  if(!_syncOk || _syncUid!==fbUid){ await cloudSync(); return; }   /* 받기가 먼저다(이 계정으로) — 성공하면 그 안에서 보낸다 */
+  var uid=fbUid;
+  if(!_acctMine(uid)) return;                          /* ⚠★ 이 기기 자료의 주인이 아니면 보내지 않는다(아래 「주인」) */
   if(_flushing){ _flushAgain=true; return; }
   var dirty=Object.keys(_dirtyAll()).filter(function(k){ return GovSync.field(k); });
   if(!dirty.length) return;
   _flushing=true;
   try{
-    var base='gov/'+fbUid, upd={ sv:GovSync.SV, at:Date.now() };
+    var base='gov/'+uid, upd={ sv:GovSync.SV, at:Date.now() }, moved=false;
     for(var i=0;i<dirty.length;i++){
       var f=GovSync.field(dirty[i]);
       var cs=await Promise.all([fbDb.ref(base+'/'+f.path).once('value'), fbDb.ref(base+'/stamp/'+f.ls).once('value')]);
+      if(!_acctSame(uid)){ moved=true; break; }        /* 읽는 사이 계정이 바뀌었다 — 이 기기 칸(이제 새 계정 것)을 앞 계정 자리에 쓰지 않는다 */
       var m=GovSync.merge(f, _syncRead(f), _stampsAll()[f.ls]||{}, cs[0].val(), cs[1].val()||{});
       if(m.localChanged) _syncKeep(f, m);
       upd[f.path]=GovSync.toCloud(f, m.value); upd['stamp/'+f.ls]=m.stamps;
     }
-    await fbDb.ref(base).update(upd);
-    dirty.forEach(function(k){ _syncDirty(k, true); });
-    _cloudFail=0;
+    if(!moved){
+      await fbDb.ref(base).update(upd);
+      if(_acctSame(uid)) dirty.forEach(function(k){ _syncDirty(k, true); });   /* 쓰는 사이 바뀌었으면 새 주인의 «보낼 칸» 표시를 지우지 않는다 */
+      _cloudFail=0;
+    }
   }catch(e){ cloudFailSay('저장', e); }
   _flushing=false;
   if(_flushAgain){ _flushAgain=false; cloudPush(); }
@@ -2115,14 +2120,18 @@ async function _cloudFlush(){
 /* 받기 — 클라우드 전부를 읽어 칸마다 합친다. 클라우드가 더 낡았으면(이 기기가 더 새것) 보낼 것으로 표시 */
 async function cloudSync(){
   if(!fbDb||!fbUid) return false;
+  var uid=fbUid;
+  /* ⚠★ 이 기기 자료의 주인이 아니면 받지도·합치지도 않는다. 주인 표시가 없는 옛 자료면 여기서 정한다(로그인 확인이 끝난 계정만) */
+  if(!_acctMine(uid) && (_lsOwner() || _openUid!==uid || (await acctEnter(uid))!=='ok')) return false;
   try{
-    var s=await fbDb.ref('gov/'+fbUid).once('value'), v=s.val()||{}, cst=v.stamp||{}, changed=0;
+    var s=await fbDb.ref('gov/'+uid).once('value'), v=s.val()||{}, cst=v.stamp||{}, changed=0;
+    if(!_acctSame(uid)) return false;                  /* 받는 사이 계정이 바뀌었다 — 섞지 않는다 */
     GovSync.FIELDS.forEach(function(f){
       var m=GovSync.merge(f, _syncRead(f), _stampsAll()[f.ls]||{}, _cloudAt(v, f.path), cst[f.ls]||{});
       if(m.localChanged){ _syncKeep(f, m); changed++; }
       if(m.cloudChanged) _syncDirty(f.ls);
     });
-    _syncOk=true; _syncAt=Date.now(); _cloudFail=0;
+    _syncOk=true; _syncUid=uid; _syncAt=Date.now(); _cloudFail=0;
     if(Object.keys(_dirtyAll()).length) cloudPush();
     return changed;
   }catch(e){ cloudFailSay('불러오기', e); return false; }
@@ -2145,6 +2154,116 @@ function cloudFailSay(what, e){
 }
 /* 옛 이름 — 부팅이 부른다. 받기는 cloudSync 한 곳이며, 도착 즉시 화면을 먼저 갱신한다 */
 async function cloudPull(){ var n=await cloudSync(); if(n){ drawKw(); draw(); readyNote(); } return n; }
+
+/* ═══ 이 기기 자료의 «주인» — 계정이 바뀌어도 섞이지 않게 (2026-11-22) ═══
+   ⚠★ 자동 보안 검토 «높음»(PR #3241 검토에서 «원래 있던 구조»로 갈라 옴): 이 기기 저장소(gov3_*)에 계정 구분이 없어
+      한 브라우저에서 A 가 쓰다 B 로 로그인하면 A 의 인증키(key_data·key_biz)·공고(feed)·진행 사업(pursue)·
+      «보낼 칸» 표시가 B 의 gov/{uid} 와 합쳐져 «B 클라우드로» 올라갔다. 재직 직원도 이 앱을 쓴다(2026-10-30~).
+   ★ 규칙
+     ① 이 기기 자료에 주인 uid(gov3__owner)를 남긴다. 받기·합치기·보내기는 «주인 = 로그인한 계정»일 때만(_acctMine).
+     ② 계정이 바뀌면 앞 계정 자료(동기화 칸·시각·보낼 칸 표시)를 «지우지 않고» 그 계정 이름표 자리로 옮긴다(_acctPark).
+        새 계정은 제 이름표 자리가 있으면 꺼내고(_acctUnpark), 없으면 빈 채로 제 클라우드에서 받는다. A 로 돌아오면 A 것이 그대로다.
+     ③ 주인 표시가 없는 옛 자료(이번 고침 전)는 «처음 로그인한 계정 것»으로 보되, 이 계정 클라우드로 «새로 올라갈 것»이 있고
+        이 기기가 이 계정과 주고받은 증거(같은 시각표)도 없으면 «올리기 전에 묻는다». 아니라고 하면 옮겨 두기만 한다(지우지 않는다).
+     ④ 옮기지 못하면(저장 공간) 아무것도 지우지 않고, 섞이지 않게 이 계정으로는 열지 않는다.
+   ⚠ 옮기기는 «쓰고 → 다시 읽어 같은지 보고 → 그때만 옛 자리를 지운다». 자리가 모자라면 «같은 크기를 비우고 바로 쓰고»,
+     그래도 못 쓰면 원래 자리에 되돌린다 — 남는 자리가 없어도 옮겨지고, 잃는 길이 없다(되풀이된 실수 ⑪: 저장 공간은 ERP 앱끼리 한 몫).
+   검사: tests/gov-acct-owner.test.js */
+var _openUid=null, _pageUid=null, _acctP=null, _acctFor=null;   /* _openUid — 로그인 확인(whoAmI)이 끝난 계정 · _pageUid — 이 화면이 처음 연 계정 */
+function _lsOwner(){ try{ return localStorage.getItem(NS+'_owner')||''; }catch(e){ return ''; } }
+function _ownerSet(uid){ try{ localStorage.setItem(NS+'_owner', uid); }catch(e){} return _lsOwner()===uid; }
+function _acctMine(uid){ return !!uid && _lsOwner()===uid; }
+function _acctSame(uid){ return fbUid===uid && _acctMine(uid); }
+function _lsMove(from, to){
+  var v=null; try{ v=localStorage.getItem(from); }catch(e){ return false; }
+  if(v==null) return true;                                  /* 옮길 것이 없다 */
+  try{ localStorage.setItem(to, v); }
+  catch(e){                                                 /* 자리가 모자라다 — 같은 크기를 비우고 바로 쓴다 */
+    try{ localStorage.removeItem(from); localStorage.setItem(to, v); }
+    catch(e2){ try{ localStorage.setItem(from, v); }catch(e3){} return false; }   /* 그래도 못 쓰면 원래 자리에 되돌린다 */
+  }
+  var ok=false; try{ ok=(localStorage.getItem(to)===v); }catch(e){}
+  if(!ok){ try{ if(localStorage.getItem(from)==null) localStorage.setItem(from, v); }catch(e){} return false; }
+  try{ localStorage.removeItem(from); }catch(e){}
+  return true;
+}
+/* 이 기기 칸을 owner 이름표 자리로 옮긴다 — 하나라도 못 옮기면 옮긴 것을 모두 되돌리고 false */
+function _acctPark(owner){
+  var keys=GovSync.acctKeys(), moved=[];
+  for(var i=0;i<keys.length;i++){
+    var had=false; try{ had=localStorage.getItem(NS+keys[i])!=null; }catch(e){}
+    if(!had) continue;
+    if(!_lsMove(NS+keys[i], NS+GovSync.parkKey(owner, keys[i]))){
+      moved.forEach(function(k){ _lsMove(NS+GovSync.parkKey(owner, k), NS+k); });
+      return false;
+    }
+    moved.push(keys[i]);
+  }
+  return true;
+}
+/* uid 이름표 자리에 둔 것을 꺼낸다 — ⚠ 이 기기 칸에 이미 값이 있으면 덮지 않는다(그 칸은 이름표 자리에 그대로 둔다) */
+function _acctUnpark(uid){
+  GovSync.acctKeys().forEach(function(k){
+    var p=NS+GovSync.parkKey(uid, k);
+    try{ if(localStorage.getItem(p)==null || localStorage.getItem(NS+k)!=null) return; }catch(e){ return; }
+    _lsMove(p, NS+k);
+  });
+}
+function _acctHasData(){
+  if(Object.keys(_dirtyAll()).length) return true;
+  var st=_stampsAll();
+  if(Object.keys(st).some(function(k){ return st[k] && typeof st[k]==='object' && Object.keys(st[k]).length; })) return true;
+  return GovSync.FIELDS.some(function(f){ return Object.keys(GovSync.entries(f, _syncRead(f))).length>0; });
+}
+/* 옛 자료를 이 계정으로 올려도 되나 묻는다 — 물을 수 없으면 «아니오»(올리지 않는다) */
+function _acctAsk(send){
+  if(typeof confirm!=='function') return false;
+  var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||'';
+  return !!confirm('⚠ 이 브라우저에 «누구 것인지 표시가 없는» 정부사업신청 자료가 있습니다.\n'
+    +'지금 계정'+(nm?'('+nm+')':'')+' 클라우드에 없는 것: '+GovSync.acctLabels(send).join(' · ')+'\n\n'
+    +'[확인] 내 자료가 맞습니다 — 이 계정 클라우드와 합칩니다\n'
+    +'[취소] 내 것이 아닙니다 — 그 자료는 이 기기에 따로 보관하고(지우지 않습니다) 이 계정 자료만 받습니다');
+}
+function _acctBlock(){
+  applyLock('lock', '이 기기에 다른 계정의 자료가 있는데 따로 옮겨 두지 못했습니다(저장 공간) — 섞이지 않게 이 계정으로는 열지 않습니다. 앞 계정으로 로그인해 주세요');
+  return 'lock';
+}
+/* 'ok' 주인 = uid · 'wait' 아직 못 정함(클라우드에 못 닿음 — 받기·보내기를 하지 않는다) · 'lock' 섞일 수 있어 잠갔다.
+   한 계정에 한 번씩만 돈다(로그인과 받기가 겹쳐 부르면 같은 답을 기다린다 — 두 번 묻지 않게) */
+function acctEnter(uid){
+  if(_acctP && _acctFor===uid) return _acctP;
+  _acctFor=uid;
+  _acctP=_acctEnter(uid).then(function(r){ _acctP=null; return r; }, function(){ _acctP=null; return 'wait'; });
+  return _acctP;
+}
+async function _acctEnter(uid){
+  var owner=_lsOwner();
+  if(owner===uid){ _acctUnpark(uid); return 'ok'; }        /* 내 것 — 혹시 남은 이름표 자리가 있으면 빈 칸만 채운다 */
+  if(owner){                                               /* 다른 계정 것 — 옮겨 두고 내 것을 꺼낸다 */
+    if(!_acctPark(owner)) return _acctBlock();
+    if(!_ownerSet(uid)){ _acctUnpark(owner); return _acctBlock(); }
+    _acctUnpark(uid);
+    toast('다른 계정으로 바뀌어 앞 계정 자료는 이 기기에 따로 보관했습니다(지우지 않음)');
+    return 'ok';
+  }
+  /* 주인 표시가 없는 옛 자료(이번 고침 전) */
+  if(!_acctHasData()){ if(!_ownerSet(uid)) return 'wait'; _acctUnpark(uid); return 'ok'; }
+  if(!fbDb) return 'wait';
+  var v;
+  try{ v=(await fbDb.ref('gov/'+uid).once('value')).val()||{}; }catch(e){ cloudFailSay('불러오기', e); return 'wait'; }
+  if(fbUid!==uid) return 'wait';                           /* 기다리는 사이 계정이 바뀌었다 */
+  if(_lsOwner()) return _acctMine(uid) ? 'ok' : 'wait';    /* 그 사이 다른 탭이 정했다 */
+  var local={}; GovSync.FIELDS.forEach(function(f){ local[f.ls]=_syncRead(f); });
+  var vd=GovSync.legacyVerdict(local, _stampsAll(), v);
+  /* 올라갈 것이 없거나 · 이 계정과 주고받은 증거가 있거나 · 사람이 «내 것»이라 하면 — 이 계정 것이다(대표 한 계정 흐름은 묻지 않고 그대로) */
+  if(!vd.send.length || vd.proof>0 || _acctAsk(vd.send)) return _ownerSet(uid) ? 'ok' : 'wait';
+  /* 내 것이 아니다 — 지우지 않고 «주인 모름» 이름표 자리로 옮긴 뒤 이 계정 것만 받는다 */
+  if(!_acctPark('?'+Date.now())) return _acctBlock();
+  if(!_ownerSet(uid)) return 'wait';
+  _acctUnpark(uid);
+  toast('그 자료는 이 기기에 따로 보관했습니다(지우지 않음) — 이 계정 자료를 받습니다');
+  return 'ok';
+}
 
 /* ═══ 경력관리 자료 — «지난 이력과 견주기»(①②③)에만 읽는다 ═══
    대표 지시 2026-10-07 「신청재료 필요없다 모두 정리해달라」 — 「👤 신청 재료」 탭(목록·복사·CSV)은 걷어냈다.
@@ -3962,7 +4081,11 @@ function boot(){
   fbDb=firebase.database();
   try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
   firebase.auth().onAuthStateChanged(async function(u){
-    fbUid=u?u.uid:null;
+    /* ⚠★ 이 화면이 열린 채 «다른 계정»으로 바뀌면 새로 연다 — 화면이 쥔 앞 계정 것(불러온 경력 이력·고른 줄·기다리던 보내기)을
+         새 계정에 넘기지 않는다. 새로 열리면 이 기기 자료의 주인은 acctEnter 가 맞춘다(2026-11-22) */
+    if(u && _pageUid && u.uid!==_pageUid){ fbUid=null; _openUid=null; clearTimeout(_pushT); try{ location.reload(); }catch(e){} return; }
+    if(u) _pageUid=u.uid;
+    fbUid=u?u.uid:null; _openUid=null;
     /* 이름은 공용 부품이 #who 에 그린다 — 여기서 메일로 덮지 않는다(로그아웃 때만 비운다) */
     if(!u) $('who').textContent='';
     $('outBtn').style.display=u?'':'none';
@@ -3975,8 +4098,12 @@ function boot(){
     var r=await whoAmI(u);
     if(!r.ok){ applyLock('lock', r.why); return; }
     applyLock('ok');
+    _openUid=u.uid;
     /* 개인 보관함(gov/{uid})과 서버 공고함(gov_feed)을 직렬 대기 없이 동시에 내려받기 시작 */
     _preGovFeed=fbDb.ref('gov_feed').once('value'); _preGovFeed.catch(function(){});
+    /* ⚠★ 받기 «전에» 이 기기 자료의 주인을 맞춘다 — 다른 계정 자료면 옮겨 두고 이 계정 것을 꺼낸다. 섞일 수 있으면 잠근다 */
+    var meUid=u.uid, acct=await acctEnter(meUid);
+    if(acct==='lock' || fbUid!==meUid) return;           /* 잠갔거나 · 기다리는 사이 계정이 바뀌었다 */
     await cloudPull(); await inboxPull(); srcBackfill(); rejudge(); drawKw(); draw(); readyNote(); auto();
     /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
     setTab(lsGet('tab'));

@@ -53,7 +53,7 @@ function runApp(seed, opt) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={draw,feedPeriod,periodHtml,fetchAll,cloudPush,healthPop,'
-    + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
+    + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;if(uid)_ownerSet(uid);}};', ctx);
   ctx.__api.toast(() => {});
   return { api: ctx.__api, el, store };
 }

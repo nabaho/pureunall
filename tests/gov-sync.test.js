@@ -93,12 +93,24 @@ test('같은 것이면 바뀐 것이 없다 — 괜히 쓰지 않는다', () => 
 test('★★ 화면은 이 모듈을 싣고, 칸 쓰기는 lsSet 한 길로만 한다', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /<script src="js\/gov-sync\.js\?v=\d+"><\/script>/);
-  /* localStorage 에 직접 쓰는 곳은 lsSet · 합친 값 두기(_rawWrite) · 시각·보낼 칸 표시뿐 */
-  /* 그 밖은 경력관리로 «넘기는» 자리뿐 — 다른 앱이 읽고 곧 지운다, 동기화 칸이 아니다.
+  /* 경력관리로 «넘기는» 자리 — 다른 앱이 읽고 곧 지운다, 동기화 칸이 아니다.
      pu_kc_handoff(「➕ 경력관리로 넘기기」 2026-10-05 ③) · pu_kc_biz_handoff(🏢 사업관리에 담기 2026-11-22). 자리마다 한 곳에서만 쓴다 */
   const all = src.match(/localStorage\.setItem\([^)]*/g) || [];
   const handoff = all.filter((x) => /'pu_kc_(biz_)?handoff'/.test(x));
   ['pu_kc_handoff', 'pu_kc_biz_handoff'].forEach((k) =>
     assert.equal(handoff.filter((x) => x.indexOf("'" + k + "'") >= 0).length, 1, k + ' 를 쓰는 곳은 한 곳이어야 한다'));
-  assert.equal(all.length - handoff.length, 4, 'localStorage 를 직접 쓰는 곳이 늘었다 — 시각이 안 찍혀 다른 기기와 합칠 때 진다');
+  /* 그 밖에 localStorage 에 직접 쓰는 곳은 «정해 둔 함수 안»뿐 — 칸 쓰기(lsSet) · 합친 값 두기(_rawWrite) · 시각(_stampsPut)
+     · 보낼 칸 표시(_syncDirty) · 이 기기 자료의 주인(_ownerSet) · 계정이 바뀔 때 칸을 통째로 옮기기(_lsMove — 시각·보낼 칸
+     표시까지 함께 옮겨 합치는 규칙이 안 깨진다, 2026-11-22). 다른 함수에서 쓰면 시각이 안 찍혀 다른 기기와 합칠 때 진다 */
+  const ALLOWED = ['lsSet', '_rawWrite', '_stampsPut', '_syncDirty', '_ownerSet', '_lsMove'];
+  const re = /localStorage\.setItem\(([^)]*)/g;
+  let mm, n = 0;
+  while ((mm = re.exec(src))) {
+    if (/'pu_kc_(biz_)?handoff'/.test(mm[1])) continue;
+    n++;
+    const fns = [...src.slice(0, mm.index).matchAll(/function ([A-Za-z_$][\w$]*)\s*\(/g)];
+    const name = fns.length ? fns[fns.length - 1][1] : '(맨 위)';
+    assert.ok(ALLOWED.includes(name), '«' + name + '» 가 localStorage 에 직접 쓴다 — 칸 쓰기는 lsSet 한 길로');
+  }
+  assert.ok(n >= ALLOWED.length, '직접 쓰는 곳을 못 찾았다 — 이 검사가 헛돈다');
 });

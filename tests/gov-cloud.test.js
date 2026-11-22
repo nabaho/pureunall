@@ -66,7 +66,7 @@ function runApp() {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={cloudPush,cloudPull,lsSet,'
-    + 'setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
+    + 'setFb:function(db,uid){fbDb=db;fbUid=uid;if(uid)_ownerSet(uid);}};', ctx);
   return { api: ctx.__api, el, timers, store };
 }
 
@@ -139,7 +139,8 @@ test('★★★ 규칙이 sv ≥ 2 인 쓰기만 받는다 — 옛 판의 통째
   assert.match(v, /!newData\.exists\(\)/, '지우기는 받아야 합니다');
 });
 test('★★★ 화면은 gov/{uid} 를 «통째로» 쓰지 않는다 — update 에 sv 를 싣는다', () => {
-  assert.doesNotMatch(src, /ref\('gov\/'\s*\+\s*fbUid\)\.set\(/, '통째 set() 이 되살아났습니다');
+  assert.doesNotMatch(src, /ref\('gov\/'\s*\+\s*(?:fbUid|uid)\)\.set\(/, '통째 set() 이 되살아났습니다');
+  assert.doesNotMatch(src, /ref\(base\)\.set\(/, '통째 set() 이 되살아났습니다');
   assert.match(src, /upd=\{ sv:GovSync\.SV, at:Date\.now\(\) \}/);
   assert.match(src, /fbDb\.ref\(base\)\.update\(upd\)/);
   assert.ok(require('../js/gov-sync.js').SV >= 2);
