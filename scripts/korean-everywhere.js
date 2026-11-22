@@ -19,7 +19,10 @@
      손으로 넣는 자리와 붙여 넣을 글: docs/규칙/한국어로-대답.md
 
    ■ 안전장치
-     settings.json 이 깨진 JSON 이면 고치지 않고 멈춘다(종료코드 2) — 덮어쓰면 다른 설정이 사라진다. */
+     settings.json 이 깨진 JSON 이면 «아무 파일도» 고치지 않고 멈춘다(종료코드 2) — 덮어쓰면 다른 설정이 사라진다.
+     예전 판 단락과 한 글자도 다르지 않을 때만 새 글로 바꾼다 — 사람이 고친 단락·바로 뒤에 붙여 쓴 글은 그대로.
+     원본(.bak)은 같은 초에 두 번 돌려도 겹치지 않고, 새 글은 옆에 쓴 뒤 한 번에 바꿔 끼운다(쓰다 멈춰도 반쯤 잘리지 않게).
+     --home 을 주면 그 폴더 안만 본다(값이 빠지면 멈춤). */
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -37,14 +40,22 @@ const BLOCK_LINES = [
   '- 코드 식별자·명령어·파일 이름·기술 용어 원문은 그대로 둔다.',
 ];
 
-/* 파일 안의 「대답 언어」 단락 자리 — 표시 줄부터 제목 줄과 이어지는 «- » 줄까지. 없으면 null */
+/* 예전 판이 넣었던 단락 — 이것과 «한 글자도 다르지 않을 때만» 새 글로 바꾼다.
+   사람이 고쳐 쓴 단락이나 단락 바로 뒤에 붙여 쓴 글머리(«- …»)는 건드리지 않는다. 단락 글을 고치면 지금 글을 여기에 옮겨 둔다. */
+const OLD_BLOCKS = [
+  [MARKER, HEADING, // 2026-11-07 판
+    '- 대답은 늘 한국어로 한다 (Always respond in Korean). 영어로 묻거나 영어 자료를 읽어도 설명·보고·요약은 한국어로 쓴다.',
+    '- 코드 식별자·명령어·파일 이름·기술 용어 원문은 그대로 둔다.'],
+];
+const sameAt = (lines, at, block) => block.every((l, i) => lines[at + i] === l);
+
+/* 파일 안의 단락 자리. 표시는 «줄 하나» 로 있을 때만 센다(문장 속 표시는 없는 것으로 본다). 없으면 null */
 function findBlock(lines) {
   const at = lines.indexOf(MARKER);
   if (at < 0) return null;
-  let end = at + 1;
-  if (lines[end] === HEADING) end++;
-  while (end < lines.length && lines[end].startsWith('- ')) end++;
-  return { at, end };
+  if (sameAt(lines, at, BLOCK_LINES)) return { at, end: at + BLOCK_LINES.length, kind: 'current' };
+  const old = OLD_BLOCKS.find((b) => sameAt(lines, at, b));
+  return old ? { at, end: at + old.length, kind: 'old' } : { at, end: at, kind: 'unknown' };
 }
 
 function stamp(now = new Date()) {
@@ -65,7 +76,10 @@ function planClaude(home) {
   }
   let cfg;
   try { cfg = JSON.parse(before.replace(/^﻿/, '')); } catch (e) {
-    return { name: 'Claude Code', file, state: '멈춤', why: `JSON 이 깨져 있어 고치지 않았습니다(${e.message}). 파일을 바로잡은 뒤 다시 돌리십시오.` };
+    // 오류 글에는 설정 원문 조각이 섞일 수 있다 — 자리만 알린다
+    const pos = /position (\d+)/.exec(String(e && e.message));
+    const where = pos ? `${pos[1]}번째 글자 근처` : '자리 모름';
+    return { name: 'Claude Code', file, state: '멈춤', why: `JSON 이 깨져 있어 아무 파일도 고치지 않았습니다(${where}). 파일을 바로잡은 뒤 다시 돌리십시오.` };
   }
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
     return { name: 'Claude Code', file, state: '멈춤', why: '맨 바깥이 { } 가 아니라 고치지 않았습니다.' };
@@ -91,17 +105,19 @@ function planMarkdown(name, file, { top = false } = {}) {
   const eol = before.includes('\r\n') ? '\r\n' : '\n';
   const body = before.replace(/^﻿/, '');
   const bom = body.length === before.length ? '' : '﻿';
-  if (body.includes(MARKER)) {
-    // 줄바꿈이 섞인 파일(단락은 LF, 다른 곳은 CRLF 등)도 있다 — 줄마다 제 줄바꿈을 그대로 지킨다
-    const parts = body.split(/(\r?\n)/);
-    const lines = parts.filter((_, i) => i % 2 === 0);
-    const seps = parts.filter((_, i) => i % 2 === 1); // seps[i] 는 lines[i] 뒤의 줄바꿈
-    const b = findBlock(lines);
-    if (!b) return { name, file, state: '그대로' }; // 표시가 한 줄 안에 섞여 있으면 손대지 않는다
-    if (lines.slice(b.at, b.end).join('\n') === BLOCK_LINES.join('\n')) return { name, file, state: '그대로' };
+  // 줄바꿈이 섞인 파일(단락은 LF, 다른 곳은 CRLF 등)도 있다 — 줄마다 제 줄바꿈을 그대로 지킨다
+  const parts = body.split(/(\r?\n)/);
+  const lines = parts.filter((_, i) => i % 2 === 0);
+  const seps = parts.filter((_, i) => i % 2 === 1); // seps[i] 는 lines[i] 뒤의 줄바꿈
+  const b = findBlock(lines);
+  if (b && b.kind === 'current') return { name, file, state: '그대로' };
+  if (b && b.kind === 'unknown') return { name, file, state: '그대로', why: '「대답 언어」 단락을 사람이 고친 것 같아 손대지 않았습니다' };
+  if (b) {
+    const oldLen = b.end - b.at;
+    const inner = (i) => seps[b.at + Math.min(i, oldLen - 2)] || eol; // 단락 안 줄바꿈 — 예전 단락의 것을 줄마다 다시 쓴다
     let after = bom;
     for (let i = 0; i < b.at; i++) after += lines[i] + seps[i];
-    after += BLOCK_LINES.join(seps[b.at] || eol) + (seps[b.end - 1] || '');
+    BLOCK_LINES.forEach((l, i) => { after += l + (i < BLOCK_LINES.length - 1 ? inner(i) : (seps[b.end - 1] || '')); });
     for (let i = b.end; i < lines.length; i++) after += lines[i] + (seps[i] || '');
     return { name, file, state: '바꿈', before, why: '「대답 언어」 단락을 새 글로 바꿉니다', after };
   }
@@ -128,16 +144,31 @@ function plan({ home = os.homedir(), env = process.env } = {}) {
   ];
 }
 
+/* 원본 이름 — 같은 초에 두 번 돌려도 앞의 원본을 덮지 않는다 */
+function backupName(file, tag) {
+  for (let n = 0; ; n++) {
+    const p = `${file}.bak-${tag}${n ? '-' + n : ''}`;
+    if (!fs.existsSync(p)) return p;
+  }
+}
+/* 쓰다가 멈춰도 원래 파일이 반쯤 잘리지 않게 — 옆에 새로 쓰고 한 번에 바꿔 끼운다 */
+function writeWhole(file, text) {
+  const tmp = `${file}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmp, text, { encoding: 'utf8', flag: 'wx' });
+  try { fs.renameSync(tmp, file); } catch (e) { try { fs.unlinkSync(tmp); } catch (_) { /* 이미 없음 */ } throw e; }
+}
+
 function apply(steps, now = new Date()) {
+  if (steps.some((s) => s.state === '멈춤')) return steps; // 하나라도 멈추면 아무 파일도 쓰지 않는다
   const tag = stamp(now);
   for (const s of steps) {
     if (s.state !== '바꿈' && s.state !== '새로 만듦') continue;
     fs.mkdirSync(path.dirname(s.file), { recursive: true });
     if (s.state === '바꿈') {
-      s.backup = `${s.file}.bak-${tag}`;
-      fs.copyFileSync(s.file, s.backup);
+      s.backup = backupName(s.file, tag);
+      fs.copyFileSync(s.file, s.backup, fs.constants.COPYFILE_EXCL);
     }
-    fs.writeFileSync(s.file, s.after, 'utf8');
+    writeWhole(s.file, s.after);
   }
   return steps;
 }
@@ -145,24 +176,33 @@ function apply(steps, now = new Date()) {
 function main(argv) {
   const doApply = argv.includes('--apply');
   const hi = argv.indexOf('--home');
-  const home = hi >= 0 && argv[hi + 1] ? path.resolve(argv[hi + 1]) : os.homedir();
-  const steps = plan({ home });
-  if (doApply) apply(steps);
+  if (hi >= 0 && (!argv[hi + 1] || argv[hi + 1].startsWith('--'))) {
+    console.error('--home 뒤에 폴더를 적어 주십시오 — 아무것도 바꾸지 않았습니다.');
+    return 2;
+  }
+  const home = hi >= 0 ? path.resolve(argv[hi + 1]) : os.homedir();
+  // --home 을 주면 그 폴더 안만 본다 — CODEX_HOME 이 밖을 가리켜도 따르지 않는다
+  const steps = plan({ home, env: hi >= 0 ? {} : process.env });
+  const stopped = steps.some((s) => s.state === '멈춤');
+  const wrote = doApply && !stopped;
+  if (wrote) apply(steps);
 
-  console.log(doApply ? '■ 한국어 대답 — 개인설정을 바꿨습니다' : '■ 한국어 대답 — 보기(아무것도 바꾸지 않았습니다)');
+  console.log(wrote ? '■ 한국어 대답 — 개인설정을 바꿨습니다'
+    : stopped && doApply ? '■ 한국어 대답 — 멈춤: 아무 파일도 바꾸지 않았습니다'
+      : '■ 한국어 대답 — 보기(아무것도 바꾸지 않았습니다)');
   const 보기말 = { '새로 만듦': '만들 것', '바꿈': '바꿀 것' };
   for (const s of steps) {
-    console.log(`  [${doApply ? s.state : (보기말[s.state] || s.state)}] ${s.name}  ${s.file}`);
+    console.log(`  [${wrote ? s.state : (보기말[s.state] || s.state)}] ${s.name}  ${s.file}`);
     if (s.why) console.log(`         ${s.why}`);
     if (s.backup) console.log(`         원본: ${s.backup}`);
   }
   const todo = steps.filter((s) => s.state === '바꿈' || s.state === '새로 만듦').length;
-  if (!doApply && todo) console.log(`\n  바꿀 것 ${todo}곳 — 실제로 쓰려면: node scripts/korean-everywhere.js --apply`);
-  if (doApply && todo) console.log('\n  열려 있는 Claude Code·Gemini·Antigravity·Codex 창은 다시 열어야 적용됩니다.');
+  if (!doApply && !stopped && todo) console.log(`\n  바꿀 것 ${todo}곳 — 실제로 쓰려면: node scripts/korean-everywhere.js --apply`);
+  if (wrote && todo) console.log('\n  열려 있는 Claude Code·Gemini·Antigravity·Codex 창은 다시 열어야 적용됩니다.');
   console.log('  ChatGPT·Claude·Gemini 앱(웹)은 계정 설정에서 손으로 — docs/규칙/한국어로-대답.md');
-  return steps.some((s) => s.state === '멈춤') ? 2 : 0;
+  return stopped ? 2 : 0;
 }
 
-module.exports = { MARKER, LANGUAGE, BLOCK_LINES, plan, apply };
+module.exports = { MARKER, LANGUAGE, BLOCK_LINES, OLD_BLOCKS, plan, apply };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

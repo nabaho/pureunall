@@ -13,7 +13,8 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const SCRIPT = path.join(ROOT, 'scripts', 'korean-everywhere.js');
-const { MARKER, LANGUAGE, BLOCK_LINES } = require(SCRIPT);
+const { MARKER, LANGUAGE, BLOCK_LINES, OLD_BLOCKS, plan, apply } = require(SCRIPT);
+const V1 = OLD_BLOCKS[0]; // 2026-11-07 판이 실제로 넣은 단락
 
 function tmpHome() { return fs.mkdtempSync(path.join(os.tmpdir(), 'ko-home-')); }
 function run(home, ...args) {
@@ -85,12 +86,12 @@ test('② Claude 전역 지침은 «맨 앞»에 넣고 원래 글은 뒤에 그
 test('② 예전 글의 단락은 «그 자리»에서 새 글로 바꾸고, 다른 글은 건드리지 않는다', () => {
   const h = tmpHome();
   fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
-  // 2026-11-07 판이 넣은 단락(두 줄) 뒤에 사람이 쓴 글이 이어진다
-  const old = ['# 내 규칙', '', MARKER, '## 대답 언어', '- 예전 줄 하나', '- 예전 줄 둘', '', '## 내 다른 절', '- 그대로 둘 것', ''].join('\n');
+  // 2026-11-07 판이 넣은 단락 뒤에 사람이 쓴 글이 이어진다
+  const old = ['# 내 규칙', '', ...V1, '', '## 내 다른 절', '- 그대로 둘 것', ''].join('\n');
   fs.writeFileSync(geminiMd(h), old);
   assert.equal(run(h, '--apply').status, 0);
   const t = fs.readFileSync(geminiMd(h), 'utf8');
-  assert.ok(!t.includes('예전 줄'), '예전 단락이 남았습니다');
+  assert.ok(!t.includes(V1[2]), '예전 단락이 남았습니다');
   assert.equal(t.split(MARKER).length, 2, '단락이 두 번 들어갔습니다');
   assert.ok(t.startsWith('# 내 규칙\n\n' + BLOCK_LINES.join('\n') + '\n\n## 내 다른 절\n- 그대로 둘 것\n'), '자리·앞뒤 글이 바뀌었습니다');
   assert.ok(files(h).some((f) => /GEMINI\.md\.bak-/.test(f)), '원본을 남겨야 합니다');
@@ -103,12 +104,78 @@ test('② 줄바꿈이 섞인 파일(단락은 LF, 다른 곳은 CRLF)도 예전
   const h = tmpHome();
   fs.mkdirSync(path.dirname(codexMd(h)), { recursive: true });
   // 이 PC 의 ~/.codex/AGENTS.md 가 실제로 이런 모양이었다 (2026-11-22)
-  const head = '﻿' + [MARKER, '## 대답 언어', '- 예전 줄 하나', '- 예전 줄 둘', ''].join('\n') + '\n';
+  const head = '﻿' + [...V1, ''].join('\n') + '\n';
   const tail = '## 다른 도구 절\r\n- 그대로 둘 것\r\n';
   fs.writeFileSync(codexMd(h), head + tail);
   assert.equal(run(h, '--apply').status, 0);
   const t = fs.readFileSync(codexMd(h), 'utf8');
   assert.equal(t, '﻿' + BLOCK_LINES.join('\n') + '\n\n' + tail);
+});
+
+test('② 단락 «안»의 줄바꿈이 줄마다 달라도 그 줄바꿈을 다시 쓴다 — 한 가지로 바꾸지 않는다', () => {
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  // 표시 줄 뒤만 CRLF, 나머지는 LF
+  fs.writeFileSync(geminiMd(h), V1[0] + '\r\n' + V1.slice(1).join('\n') + '\n끝\n');
+  assert.equal(run(h, '--apply').status, 0);
+  const t = fs.readFileSync(geminiMd(h), 'utf8');
+  assert.equal(t, BLOCK_LINES[0] + '\r\n' + BLOCK_LINES.slice(1).join('\n') + '\n끝\n');
+});
+
+test('★② 사람이 고친 단락·단락 바로 뒤에 붙여 쓴 글머리는 지우지 않는다', () => {
+  // 예전 단락 바로 뒤(빈 줄 없이)에 사람이 «- » 글머리를 붙였다 → 단락만 바꾸고 그 줄은 남긴다
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  fs.writeFileSync(geminiMd(h), [...V1, '- 내가 붙인 규칙', ''].join('\n'));
+  assert.equal(run(h, '--apply').status, 0);
+  assert.equal(fs.readFileSync(geminiMd(h), 'utf8'), [...BLOCK_LINES, '- 내가 붙인 규칙', ''].join('\n'));
+  // 단락 글을 사람이 고쳤다 → 손대지 않는다
+  const h2 = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h2)), { recursive: true });
+  const mine = [MARKER, '## 대답 언어', '- 내가 고친 한국어 규칙', ''].join('\n');
+  fs.writeFileSync(geminiMd(h2), mine);
+  assert.equal(run(h2, '--apply').status, 0);
+  assert.equal(fs.readFileSync(geminiMd(h2), 'utf8'), mine);
+});
+
+test('② 표시가 문장 속에만 있으면 «없는 것»으로 보고 단락을 넣는다', () => {
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  fs.writeFileSync(geminiMd(h), '# 메모: ' + MARKER + ' 는 도구가 넣는 표시\n');
+  assert.equal(run(h, '--apply').status, 0);
+  const t = fs.readFileSync(geminiMd(h), 'utf8');
+  assert.ok(t.split('\n').includes(MARKER), '단락이 들어가지 않았습니다');
+});
+
+test('② 같은 초에 두 번 바꿔도 원본(.bak)이 서로 덮이지 않는다', () => {
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  const now = new Date(2026, 10, 22, 13, 0, 0);
+  fs.writeFileSync(geminiMd(h), [...V1, ''].join('\n'));
+  apply(plan({ home: h, env: {} }), now);
+  fs.writeFileSync(geminiMd(h), [...V1, '', '# 두 번째 원본', ''].join('\n'));
+  apply(plan({ home: h, env: {} }), now);
+  const baks = files(h).filter((f) => /GEMINI\.md\.bak-/.test(f));
+  assert.equal(baks.length, 2, '같은 초의 원본이 하나로 덮였습니다');
+  assert.ok(baks.some((f) => fs.readFileSync(path.join(h, f), 'utf8').includes('# 두 번째 원본')));
+  assert.ok(!files(h).some((f) => /\.tmp-/.test(f)), '임시 파일이 남았습니다');
+});
+
+test('② --home 뒤에 폴더가 빠지면 멈춘다 — 진짜 내 폴더로 넘어가지 않는다', () => {
+  // ⚠ --apply 는 주지 않는다(혹시 고장 나도 진짜 폴더에 쓰지 않게)
+  for (const args of [['--home'], ['--home', '--apply-x']]) {
+    const r = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
+    assert.equal(r.status, 2, args.join(' ') + ' 가 멈추지 않았습니다');
+    assert.match(r.stderr, /--home/);
+  }
+});
+
+test('② --home 을 주면 CODEX_HOME 이 밖을 가리켜도 그 폴더 안만 본다', () => {
+  const h = tmpHome(), outside = tmpHome();
+  const r = spawnSync(process.execPath, [SCRIPT, '--home', h, '--apply'], { env: { ...process.env, CODEX_HOME: outside }, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(fs.existsSync(codexMd(h)), '지정한 폴더의 .codex 에 넣어야 합니다');
+  assert.deepEqual(files(outside), [], 'CODEX_HOME(밖)에 썼습니다');
 });
 
 test('② --apply: 다른 설정·원래 글은 그대로 두고, 원본을 .bak 으로 남긴다', () => {
@@ -141,13 +208,16 @@ test('② 두 번 돌려도 같다 — 이미 들어 있으면 건드리지 않�
   assert.deepEqual(files(h).map((f) => [f, fs.readFileSync(path.join(h, f), 'utf8')]), snap);
 });
 
-test('② 깨진 settings.json 은 덮어쓰지 않고 실패로 알린다', () => {
+test('② 깨진 settings.json 은 덮어쓰지 않고, 다른 파일도 하나도 안 쓰고, 종료코드 2 로 알린다', () => {
   const h = tmpHome();
   fs.mkdirSync(path.dirname(claudeSettings(h)), { recursive: true });
-  fs.writeFileSync(claudeSettings(h), '{ "hooks": ');
+  const secretish = '{ "hooks": "비밀값-조각-12345", ';
+  fs.writeFileSync(claudeSettings(h), secretish);
   const r = run(h, '--apply');
-  assert.notEqual(r.status, 0);
-  assert.equal(fs.readFileSync(claudeSettings(h), 'utf8'), '{ "hooks": ');
+  assert.equal(r.status, 2);
+  assert.equal(fs.readFileSync(claudeSettings(h), 'utf8'), secretish);
+  assert.deepEqual(files(h), [path.join('.claude', 'settings.json')], '멈췄는데 다른 파일을 썼습니다');
+  assert.ok(!r.stdout.includes('비밀값-조각'), '오류 알림에 설정 원문 조각이 나왔습니다');
 });
 
 test('② Codex 는 AGENTS.override.md 가 있으면 그쪽에 넣는다(그것만 읽으므로)', () => {
