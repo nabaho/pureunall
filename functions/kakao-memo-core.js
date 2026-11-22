@@ -64,6 +64,11 @@ async function handleCallback(q, d) {
   const role = await d.roleOf(link.uid);
   /* 총괄 관리자·재직이어야 하고, 대표 표지(app_owner/uid — 데이터관리가 쓰는 «대표 uid»)가 있으면 그 사람이어야 한다 */
   const owner = await d.store.get('app_owner/uid');
+  const uidLink = await d.uidLinkOf(link.uid);
+  const linkedNow = !!(uidLink && uidLink.linked === true && uidLink.linkKey === d.linkKeyOf(kakaoId));
+  if (!linkedNow) {
+    return { status: 403, html: page(false, 'ERP 카카오 연결을 한 번 새로 해 주세요', ['ERP 로그인 화면에서 «카카오로 로그인»을 한 번 하신 뒤, 처음 주소부터 다시 열어 주세요.']) };
+  }
   if (!Memo.ownerOk(link.uid, role, owner, true)) {
     return { status: 403, html: page(false, '대표(총괄 관리자) 카카오만 연결할 수 있습니다', ['이 알림은 총괄 관리자이고 대표로 지정된 계정의 카카오로만 받을 수 있습니다.']) };
   }

@@ -16,9 +16,10 @@
 - [x] 보안규칙 `gov_digest`(읽기 재직 직원·쓰기 아무도) — **2026-11-22 콘솔에 올림**: 새로 생긴 규칙 1개(/gov_digest), 바뀜 0·사라짐 0, 다시 읽어 같음. 새 기준 `docs/firebase-rules-콘솔원문-2026-11-22.json`
   · 누가 보게 됐나: `gov_digest` 는 재직 직원(gov_feed·gov_watch 와 같은 사람)이 «읽기만». `gov_digest_secret`(카카오 토큰)·`gov_digest_state`·`gov_digest_cfg` 는 규칙에 없어 화면에서 읽기·쓰기 모두 닫힘(서버만)
 - [x] 구조 검사 맞춤: 사용액 창 자동 일정 문구·하루 횟수 572·스케줄 34개(billing-auto-truth) · 온톨로지 저장 자리 주인(govbid.primaryRoots) · 성능 규칙 허용 최상위
-- [x] 검사: `functions/gov-digest-kakao.test.js` 38건 · `tests/gov-digest-view.test.js` 4건 · 엔진 `tests/gov-digest.test.js` 40건. 서버 코드를 39곳 망가뜨려 봐 모두 잡힘(임시 복사본)
+- [x] 검사: `functions/gov-digest-kakao.test.js` 41건 · `tests/gov-digest-view.test.js` 4건 · 엔진 `tests/gov-digest.test.js` 40건. 서버 코드를 41곳 망가뜨려 봐 모두 잡힘(임시 복사본)
 - [x] 폰 화면 점검(가짜 파이어베이스, `node tools/phone-audit/run.mjs govbid --view=digest`): 360·411px 에서 «📮 오늘의 요약» 팝업 옆넘침·짓눌림·작은 단추 0, 눈으로도 확인(경고·갈래·새/마감 임박 표시·위험 주소는 글자로만). 점검 자료 `tools/phone-audit/seeds/govbid.js` 에 지어낸 요약 더함
-- [x] 자동 검증(제미나이)·보안 검토(코덱스) 1차 → 반영 → 재검증 1회차 → 반영 → 재검증 2회차(마지막). 고친 것: 보내기 직전마다 자격 재확인(총괄 관리자·재직·대표 표지·ERP 카카오 연결 지문) · 연결 때 대표 표지 확인 + 확인 글이 간 뒤에만 토큰 저장 · 보내기 직전 inflight 기록(갔는지 모르면 자동 재발송 안 함, 5xx·잘린 응답도 «모름») · 갈아 낀 토큰은 조건부 한 번에 저장(다시 연결한 토큰·지운 기록을 안 덮음) · 오래된 기록 덜어 내기가 방금 쓴 기록을 안 지움 · 연결표 옛 열쇠 폴백
+- [x] 자동 검증(제미나이)·보안 검토(코덱스) 1차 → 반영 → 재검증 1회차 → 반영 → 재검증 2회차(보고 없이 멈춤) → 다시 돌린 재검증(**높음·중간 없이 통과**, 낮음 반영). 고친 것: 보내기 직전마다 자격 재확인(총괄 관리자·재직·대표 표지·ERP 카카오 연결 지문) · 연결 때 대표 표지 확인 + 확인 글이 간 뒤에만 토큰 저장 · 보내기 직전 inflight 기록(갔는지 모르면 자동 재발송 안 함, 5xx·잘린 응답도 «모름») · 갈아 낀 토큰은 조건부 한 번에 저장(다시 연결한 토큰·지운 기록을 안 덮음) · 오래된 기록 덜어 내기가 방금 쓴 기록을 안 지움 · 연결표 옛 열쇠 폴백 · 자격 확인 중 오류는 안전한 쪽(멈춤) · 연결할 때도 보낼 때와 같은 ERP 연결 지문 대조(지문 없는 옛 연결은 ERP 에서 카카오로 한 번 로그인하라고 안내)
+  ⚠ 마지막 낮은 지적 둘을 고친 부분은 에이전트 재검토를 다시 거치지 않았다(로컬 검사 85건·망가뜨려 보기·전체 검사로만 확인)
 
 ## 아직 (대표 확인 뒤)
 - [ ] 카카오 개발자 콘솔 설정 세 곳(README «대표가 한 번 하실 일») — 동의항목 talk_message · Redirect URI `https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoMemoCallback` · 웹 도메인 `https://erp.pureunlabor.co.kr`

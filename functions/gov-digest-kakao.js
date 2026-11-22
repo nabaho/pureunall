@@ -170,8 +170,14 @@ async function run(o) {
     const tok0 = (await st.get(P.secret)) || null;
     if (!tok0 || !s(tok0.refresh)) { await status({ ok: false, error: 'not-connected' }); res.error = 'not-connected'; return res; }
     /* 보내기 직전 자격 재확인 — 퇴사·권한 회수·연결 해제면 옛 토큰으로 보내지 않는다 */
-    const stillOwner = async () => !o.verifyOwner || !!(await o.verifyOwner(s(tok0.uid), s(tok0.linkKey)));   // 토큰에 적힌 «연결 지문»이 지금 ERP 연결과 같아야 한다(카카오를 바꿔 연결했으면 옛 카카오로 안 보낸다)
-    if (!(await stillOwner())) { await status({ ok: false, error: 'owner-revoked' }); res.error = 'owner-revoked'; return res; }
+    let ownerErr = false;   // 자격을 «확인하다 오류가 났다» — 모르는 채 보내지 않는다(멈춤). 권한 회수와는 다른 말로 알린다
+    const stillOwner = async () => {
+      if (!o.verifyOwner) return true;
+      try { return !!(await o.verifyOwner(s(tok0.uid), s(tok0.linkKey))); }
+      catch (e) { ownerErr = true; return false; }
+    };
+    const ownerCode = () => ownerErr ? 'owner-check-failed' : 'owner-revoked';   // 토큰에 적힌 «연결 지문»이 지금 ERP 연결과 같아야 한다(카카오를 바꿔 연결했으면 옛 카카오로 안 보낸다)
+    if (!(await stillOwner())) { await status({ ok: false, error: ownerCode() }); res.error = ownerCode(); return res; }
     let tok = tok0;
     /* 갈아 낀 토큰은 «내가 시작할 때 본 연결(linkedAt)»이 그대로일 때만 저장한다 — 그사이 대표가 다시 연결했으면 새 토큰을 덮지 않는다 */
     /* 갈아 낀 토큰 저장 — 한 번에 «시작할 때 본 연결(linkedAt)이 그대로이고 기록이 살아 있을 때만»(트랜잭션). 그사이 다시 연결했거나 기록을 지웠으면 옛 토큰을 되살리지 않는다.
@@ -218,9 +224,9 @@ async function run(o) {
       if (!r || !r.ok) {
         if (r && r.revoked) {   // 보내기 직전 자격이 없어졌다 — 안 보냈으니 inflight 를 지우고 멈춘다
           await st.update({ [P.state + '/inflight']: null });
-          res.failed.push({ section: m.section, error: 'owner-revoked' });
-          await status({ ok: false, error: 'owner-revoked', section: m.section });
-          res.error = 'owner-revoked';
+          res.failed.push({ section: m.section, error: ownerCode() });
+          await status({ ok: false, error: ownerCode(), section: m.section });
+          res.error = ownerCode();
           break;
         }
         if (r && r.unknown) {   // 갔는지 모른다 — inflight 를 남겨 다음 실행이 «보냄(불확실)»로 돌린다. 자동으로 다시 보내지 않는다
@@ -230,7 +236,7 @@ async function run(o) {
         }
         await st.update({ [P.state + '/inflight']: null });   // 카카오가 «안 받았다»고 답했다 — 안 간 것이니 다음 날 다시 보낸다
         res.failed.push({ section: m.section, error: 'send-' + (r ? r.status : 0) + (r && r.code != null ? '/' + r.code : '') });
-        await status({ ok: false, error: 'send-failed', section: m.section, httpStatus: r ? r.status : 0, kakaoCode: r ? r.code : null });
+        await status({ ok: false, error: (r && r.msg === 'reconnected') ? 'reconnected' : 'send-failed', section: m.section, httpStatus: r ? r.status : 0, kakaoCode: r ? r.code : null });
         break;                                              // 한 통이 막히면 멈춘다 — 순서가 뒤섞이지 않게
       }
       res.sent++;

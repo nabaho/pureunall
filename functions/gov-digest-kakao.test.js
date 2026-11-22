@@ -240,7 +240,7 @@ function cbDeps(o) {
   const f = o.fetch || fakeFetch({ token: () => ({ status: 200, json: { access_token: SECRET_A, refresh_token: SECRET_R, expires_in: 43199, refresh_token_expires_in: 5184000, scope: o.scope || 'talk_message' } }) });
   return { store, f, d: Object.assign({
     restKey: CREDS.restKey, clientSecret: CREDS.clientSecret, now: NOW, fetch: f, redirectUri: 'https://example.test/cb',
-    takeState: async () => ({ originIdx: 0 }), kakaoIdOf: async () => '12345', linkKeyOf: (id) => 'k_' + id, linkOf: async () => ({ uid: 'U1' }), roleOf: async () => ({ status: 'active', isAdmin: true }), store
+    takeState: async () => ({ originIdx: 0 }), kakaoIdOf: async () => '12345', linkKeyOf: (id) => 'k_' + id, uidLinkOf: async () => ({ linked: true, linkKey: 'k_12345' }), linkOf: async () => ({ uid: 'U1' }), roleOf: async () => ({ status: 'active', isAdmin: true }), store
   }, o.deps || {}) };
 }
 test('★ 연결 — 대표(총괄 관리자) 카카오가 동의하면 토큰을 저장하고, 확인 글을 «나에게» 보내고, 모드가 비어 있으면 live 로 둔다', async () => {
@@ -487,4 +487,39 @@ test('★ 5xx 로 «모르면» inflight 를 남기고 멈추며 다음 실행�
   const f2 = fakeFetch();
   await go(st, f2, { now: NOW + 3600e3 });
   pending.ids.forEach((id) => assert.equal(st.db.gov_digest_state.sent[Memo.safeKey(id)].unsure, true));
+});
+
+/* ── 마지막 재검토(높음·중간 없음, 낮음)에서 반영한 둘 ── */
+test('★ 자격을 확인하다 오류가 나면 «모른 채» 보내지 않고 멈춘다 — 안 보낸 통의 inflight 는 지운다(안전한 쪽)', async () => {
+  const st = base(), f = fakeFetch();
+  const r = await go(st, f, { verifyOwner: async () => { throw new Error('db read failed'); } });
+  assert.equal(r.error, 'owner-check-failed');
+  assert.equal(f.calls.length, 0, '카카오를 안 부른다');
+  assert.equal(st.db.gov_digest.status.error, 'owner-check-failed');
+  assert.ok(!st.db.gov_digest_state || !st.db.gov_digest_state.inflight);
+  /* 첫 통은 보내고 둘째 통 직전에 오류가 나는 경우 */
+  const data = feedData(); data.gov_feed.rows[3] = row(3, '중소기업 AI 도입 전환 지원 사업 수행기관 모집', { kw: '' });
+  const st2 = memStore(Object.assign(data, { gov_digest_cfg: { mode: 'live' }, gov_digest_secret: { kakao: tokenNode() } }));
+  let n = 0; const f2 = fakeFetch();
+  const r2 = await go(st2, f2, { verifyOwner: async () => { n++; if (n > 2) throw new Error('flaky'); return true; } });
+  assert.equal(r2.sent, 1, '첫 통만 갔다');
+  assert.ok(r2.failed.some((x) => x.error === 'owner-check-failed'));
+  assert.ok(!st2.db.gov_digest_state.inflight, '안 보낸 통의 inflight 는 지운다');
+});
+test('★ 연결할 때도 «지금 ERP 연결(uid_kakao)이 이 카카오의 지문과 같은가»를 본다 — 지문이 없거나 다르면 토큰을 저장하지 않는다', async () => {
+  for (const uidLink of [null, { linked: true }, { linked: true, linkKey: 'k_다른카카오' }, { linked: false, linkKey: 'k_12345' }]) {
+    const { d, store, f } = cbDeps({ deps: { uidLinkOf: async () => uidLink } });
+    const out = await KM.handleCallback({ code: 'C', state: 'S' }, d);
+    assert.equal(out.status, 403, JSON.stringify(uidLink));
+    assert.match(out.html, /카카오로 로그인/);
+    assert.ok(!store.db.gov_digest_secret, '토큰 저장 안 함');
+    assert.equal(f.memos().length, 0);
+  }
+});
+test('★ 401 뒤 «그사이 다시 연결해 건너뜀»은 send-failed 에 가려지지 않고 reconnected 로 남는다', async () => {
+  const st = base();
+  const f = fakeFetch({ memo: () => ({ status: 401, json: { code: -401 } }), token: () => { st.db.gov_digest_secret.kakao = tokenNode({ linkedAt: 999 }); return { status: 200, json: { access_token: 'X', expires_in: 100 } }; } });
+  const r = await go(st, f);
+  assert.equal(st.db.gov_digest.status.error, 'reconnected');
+  assert.equal(r.sent, 0);
 });

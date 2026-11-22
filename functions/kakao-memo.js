@@ -55,6 +55,7 @@ exports.kakaoMemoCallback = functions
       },
       linkOf: (kakaoId) => Core.findLink(async (p) => (await raw.ref(K.DB_LINK + '/' + p).once('value')).val(), K.kakaoLinkKey(kakaoId), K.pathSafe(kakaoId)),
       roleOf: (uid) => K.roleOf(uid), linkKeyOf: (id) => K.kakaoLinkKey(id),
+      uidLinkOf: async (uid) => (await raw.ref(K.DB_UID + '/' + K.pathSafe(uid)).once('value')).val(),
       store: { get: async (p) => (await raw.ref(p).once('value')).val(), update: (u) => raw.ref().update(u) }
     };
     try {
