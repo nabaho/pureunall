@@ -311,7 +311,7 @@ test('⑧-2 올린 직후 한 파일 — 다른 자리는 손대지 않고, 알�
   ['bucket.getFiles(query)', 'file.getMetadata()', 'file.setMetadata(patchBody(), preconditionsOf(o))'].forEach((c) =>
     assert.ok(tsrc.includes('withTimeout(' + c + ', REQ_TIMEOUT_MS)'), '시간 상한 없이 부르면 밤 함수가 540초를 넘긴다: ' + c));
   assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 404)), 'gone');
-  await assert.rejects(T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 503)), '일시 실패는 던져서 다시 시도하게');
+  await assert.rejects(T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 503)), '그 밖의 실패는 던진다(트리거는 기록하고 밤 정리에 맡김 · 밤 정리는 failed 로 셈)');
 });
 
 test('⑨ 서버 이음 — 매일 밤 메일 정리 뒤에 토큰 정리가 따로 돈다(잠금·실패와 상관없이) · 사진 창고 이름 한 곳', () => {
@@ -336,10 +336,12 @@ test('⑨ 서버 이음 — 매일 밤 메일 정리 뒤에 토큰 정리가 따
   assert.ok(s0 > 0, '올린 직후 지우는 창고 트리거가 있어야 합니다');
   const strip = idx.slice(s0, idx.indexOf('\n  });', s0));
   assert.match(strip, /\.region\(MAIL_REGION\)/, '사진 창고와 같은 지역');
-  assert.match(strip, /failurePolicy: true/, '일시 실패는 다시 시도');
+  /* ⚠ «다시 시도»(failurePolicy)를 걸면 배포 도구가 --force 없이는 안 올린다(2026-11-22 배포 실패) — 배포 작업에 --force 를 더하지 않는다 */
+  assert.doesNotMatch(strip, /failurePolicy/, '다시 시도를 걸면 배포가 막힌다 — 실패는 밤 정리가 메운다');
+  assert.doesNotMatch(read('.github/workflows/firebase-deploy.yml'), /firebase deploy[^\n]*--force/, '배포 작업에 --force 를 더하지 않는다');
   assert.match(strip, /\.storage\.bucket\(PHOTO_BUCKET\)\.object\(\)\s*\.onFinalize\(/);
-  const iSkip = strip.indexOf('isEdulibObject('), iAge = strip.indexOf('60 * 60 * 1000'), iStrip = strip.indexOf('stripOne(');
-  assert.ok(iSkip > 0 && iSkip < iAge && iAge < iStrip, '순서: 다른 자리는 곧바로 끝 → 오래된 되풀이는 버림 → 지우기');
+  const iSkip = strip.indexOf('isEdulibObject('), iTry = strip.indexOf('try {'), iStrip = strip.indexOf('stripOne('), iCatch = strip.indexOf('catch (e)');
+  assert.ok(iSkip > 0 && iSkip < iTry && iTry < iStrip && iStrip < iCatch, '순서: 다른 자리는 곧바로 끝 → 지우기 → 실패는 기록만(던지지 않음)');
   /* 사람이 부르는 [지금 정리]는 메일만 — 토큰 정리는 밤에만 */
   const r0 = idx.indexOf('exports.runEdulibMailSweep');
   const run = idx.slice(r0, idx.indexOf('\nexports.', r0 + 10));
