@@ -261,10 +261,15 @@ test('왼쪽 메뉴 — 이알피 왼쪽 메뉴와 같은 모양값 · PC 에만
   const ruleOf = (src, sel) => { const m = src.match(new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}')); return m ? m[1] : ''; };
   const colorOf = (rule, prop) => { const m = rule.match(new RegExp('(?:^|;|\\s)' + prop + '\\s*:\\s*(#[0-9a-fA-F]{3,8})')); return m ? m[1].toLowerCase() : ''; };
   const sbBlock = html.slice(html.indexOf('/* ══ 왼쪽 메뉴'), html.indexOf('<body'));
-  [['.sb', 'background'], ['.sb-menu-item.active', 'background'], ['.sb-grp-h .name', 'color'], ['.sb-grp-h .count', 'background']].forEach(([sel, prop]) => {
+  /* 이알피 색이 팔레트(5계열 27색) 안이면 «같은 색», 밖이면 그 색은 쓰지 않고 팔레트 안 색으로(팔레트 규칙이 이긴다 — color-palette-apps) */
+  const PAL = Object.values(require('./lib-palette.js').PALETTE).flat().map((c) => c.toLowerCase());
+  const sbCss = require('./strip-comments').stripJs(sbBlock).toLowerCase();   // CSS 조각이라 stripJs 로 블록 주석만 걷는다
+  [['.sb', 'background'], ['.sb-menu-item.active', 'background'], ['.sb-menu-item', 'color'], ['.sb-user-info .r', 'color'],
+    ['.sb-grp-h .name', 'color'], ['.sb-grp-h .count', 'background'], ['.sb-grp-h:hover', 'background']].forEach(([sel, prop]) => {
     const want = colorOf(ruleOf(erp, sel), prop);
     assert.ok(want, '이알피에서 못 읽음: ' + sel + ' ' + prop);
-    assert.ok(sbBlock.toLowerCase().indexOf(want) >= 0, '이알피 왼쪽 메뉴와 같은 색이어야 합니다: ' + sel + ' ' + prop + ' ' + want);
+    if (PAL.indexOf(want) >= 0) assert.ok(sbCss.indexOf(want) >= 0, '이알피 왼쪽 메뉴와 같은 색이어야 합니다: ' + sel + ' ' + prop + ' ' + want);
+    else assert.ok(sbCss.indexOf(want) < 0, '팔레트 밖 색은 가까운 팔레트 색으로: ' + sel + ' ' + prop + ' ' + want);
   });
   /* PC 에만 — 폰은 한눈에 카드가 같은 일을 한다(폰 구간에서만 바꾼다) */
   assert.match(sbBlock, /\.sb\{display:none\}/);

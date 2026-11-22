@@ -148,14 +148,15 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 /* ══ 왼쪽 메뉴 — 이알피 왼쪽 메뉴(css/pu-erp.css 의 .sb·.sb-grp-h·.sb-menu-item)와 «같은 모양값» (대표 지시 2026-11-22 「대시보드 캡쳐처럼 만들어라」) ══
    ★ PC(769px~)에서만 왼쪽에 붙는다 — 폰은 그대로(한눈에 종류 카드가 같은 일을 한다).
    ★ 한눈에 · 전체 자료 · ⚖ 법정교육 자료 ▾ · 📘 법정교육 외 자료 ▾ · ＋ 새 강의 종류 — 종류를 누르면 자료함에서 그 종류만, 묶음 이름을 누르면 그 묶음만, ▾ 는 접기.
-   ★ 색은 이알피와 같은 짙은 남색 바탕(밝은·어두운 화면 모두) — 글자 대비는 흰 글자·#94a3b8 모두 4.5:1 넘음 */
+   ★ 색은 이알피와 같은 짙은 남색 바탕(밝은·어두운 화면 모두). 이알피 메뉴 색 가운데 팔레트(5계열 27색) 밖인 것은 «팔레트 안 가장 가까운 색»으로 —
+     tests/color-palette-apps.test.js 예외 목록은 늘리지 않는다. 글자 대비는 모두 4.5:1 넘음 */
 .sb{display:none}
 @media (min-width:769px){
   body.has-sb{padding-left:230px}
   .sb{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;width:230px;z-index:30;background:#1e293b;color:#cbd5e1;overflow:hidden}
 }
-.sb-logo{padding:12px 16px 10px;border-bottom:1px solid #2a3656;color:#ffffff;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sb-user{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2a3656;min-width:0}
+.sb-logo{padding:12px 16px 10px;border-bottom:1px solid #475569;color:#ffffff;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #475569;min-width:0}
 .sb-avatar{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0}
 .sb-user-info{min-width:0}
 .sb-user-info .n{color:#ffffff;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -163,33 +164,33 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .sb-nav{flex:1;overflow-y:auto;padding:6px 0}
 .sb-nav::-webkit-scrollbar{width:4px}
 .sb-nav::-webkit-scrollbar-thumb{background:#475569;border-radius:2px}
-.sb-sep{height:1px;background:#2a3656;margin:6px 12px}
+.sb-sep{height:1px;background:#475569;margin:6px 12px}
 .sb-grp-h{display:flex;align-items:center;padding:10px 12px 8px 6px;min-width:0}
-.sb-grp-h:hover,.sb-grp-h.on{background:#2a3656}
+.sb-grp-h:hover,.sb-grp-h.on{background:#475569}
 .sb-grp-h.on{box-shadow:inset 3px 0 0 #60a5fa}
 .sb-grp-h .arrow{width:24px;height:24px;flex:0 0 auto;color:#94a3b8;font-size:10px;background:none;border:0;padding:0;cursor:pointer;border-radius:4px}
 .sb-gname{flex:1;display:flex;align-items:center;min-width:0;background:none;border:0;padding:0;cursor:pointer;text-align:left;font-family:inherit;color:inherit}
 .sb-gname .icon{font-size:15px;margin:0 8px 0 2px;flex:0 0 auto}
-.sb-gname .name{flex:1;min-width:0;color:#93c5fd;font-size:14px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sb-gname .count{background:#2a3656;color:#94a3b8;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex:0 0 auto;font-variant-numeric:tabular-nums}
-.sb-grp-h.on .sb-gname .count,.sb-grp-h:hover .sb-gname .count{background:#334155}
+.sb-gname .name{flex:1;min-width:0;color:#bfdbfe;font-size:14px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-gname .count{background:#475569;color:#e2e8f0;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.sb-grp-h.on .sb-gname .count,.sb-grp-h:hover .sb-gname .count{background:#1e293b}
 .sb-menu{padding:0 8px 4px}
 .sb-row{position:relative}
 .sb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px 7px 22px;border-radius:4px;cursor:pointer;font-size:12px;color:#f8fafc;margin:1px 0;background:none;border:0;text-align:left;font-family:inherit;white-space:nowrap;min-width:0}
 .sb-menu.top .sb-menu-item{padding-left:12px;font-size:13px;font-weight:600}
-.sb-menu-item:hover{background:#2a3656;color:#ffffff}
-.sb-menu-item:focus-visible,.sb-gname:focus-visible,.sb-grp-h .arrow:focus-visible,.sb-ed:focus-visible{outline:none;background:#1e3a8a;color:#ffffff;box-shadow:inset 2px 0 0 #60a5fa}
+.sb-menu-item:hover{background:#475569;color:#ffffff}
+.sb-menu-item:focus-visible,.sb-gname:focus-visible,.sb-grp-h .arrow:focus-visible,.sb-ed:focus-visible{outline:none;background:#1e40af;color:#ffffff;box-shadow:inset 2px 0 0 #60a5fa}
 .sb-menu-item.active{background:#2563eb;color:#ffffff;position:relative}
 .sb-menu-item.active::before{content:'';position:absolute;left:-8px;top:0;bottom:0;width:3px;background:#60a5fa}
 .sb-menu-item .mi-icon{width:16px;font-size:13px;flex:0 0 auto;text-align:center}
 .sb-menu-item .mi-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .sb-menu-item .mi-n{color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums;flex:0 0 auto}
-.sb-menu-item.active .mi-n{color:#dbeafe}
+.sb-menu-item.active .mi-n{color:#eff6ff}
 .sb-menu-item.zero .mi-text,.sb-menu-item.zero .mi-n{opacity:.6}
-.sb-menu-item.add{color:#93c5fd}
+.sb-menu-item.add{color:#bfdbfe}
 .sb-row.mine .sb-menu-item{padding-right:30px}
 .sb-ed{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:#94a3b8;cursor:pointer;font-size:12px;padding:3px 6px;border-radius:4px}
-.sb-ed:hover{color:#ffffff;background:#334155}
+.sb-ed:hover{color:#ffffff;background:#475569}
 
 /* ── 자료 목록 — 한 칸은 한 줄(넘치면 … + title 에 전문) ── */
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
