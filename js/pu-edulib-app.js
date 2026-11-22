@@ -318,10 +318,63 @@
     });
   }
 
-  /* ───────── 원본 가져오기(미리보기·내려받기) ───────── */
-  function urlOf(it) {
-    if (it.store !== 'cloud' || !it.storagePath || !bucket) return Promise.reject(new Error('자료함에 원본이 없습니다'));
-    return bucket.ref(it.storagePath).getDownloadURL();
+  /* ───────── 원본 가져오기(미리보기·내려받기) — 열 때마다 «권한 확인» (2026-11-22) ─────────
+     ★★ 내려받기 토큰 주소를 만들지 않는다 — 그 주소는 한 번 새면(방문 기록·복사·퇴사한 사람) 누구나 «평생» 연다.
+        대신 지금 로그인한 사람의 증표(ID 토큰)를 머리글에 실어 창고에 직접 묻는다 → 창고 규칙 isStaff()(재직 직원)를 «매번» 거친다.
+        받은 바이트는 이 창 안의 blob: 주소로만 쓰고, 칸·창을 닫으면 풀어 준다(freeObjUrls) · 받는 중이면 멈춘다(stopFetches).
+     ⚠ 창고 CORS 는 이 길(Authorization·Range 머리글)을 이미 받는다 — 2026-11-22 사전 요청(OPTIONS)으로 확인.
+     ⚠ 영상은 «다 받은 뒤» 재생한다(머리글을 실은 채 흘려 보기는 브라우저가 못 한다). 큰 것은 눌러야 받는다(MEDIA_AUTO_MAX). */
+  var STORE_API = 'https://firebasestorage.googleapis.com/v0/b/';
+  var MEDIA_AUTO_MAX = 150 * 1024 * 1024;       /* 이보다 큰 영상·소리는 «받아서 보기»를 눌러야 받는다 — 자세히만 열어도 1GB 가 내려오지 않게 */
+  function apiUrlOf(it) {
+    return STORE_API + encodeURIComponent(String(BUCKET).replace(/^gs:\/\//, '')) + '/o/' + encodeURIComponent(it.storagePath) + '?alt=media';
+  }
+  function pctText(got, total) { return total > 0 ? Math.min(99, Math.floor(got * 100 / total)) + '%' : K.fmtBytes(got); }
+  /* 받는 만큼 알려 준다 — 바이트는 그대로 흘려 보낸다(모아 두지 않는다) */
+  function withProgress(r, total, onProgress) {
+    if (!onProgress || !r.body || typeof r.body.getReader !== 'function' || typeof ReadableStream !== 'function') return r;
+    var reader = r.body.getReader(), got = 0;
+    return new Response(new ReadableStream({
+      pull: function (ctl) {
+        return reader.read().then(function (x) {
+          if (x.done) { ctl.close(); return; }
+          got += x.value.byteLength;
+          try { onProgress(got, total); } catch (e) {}
+          ctl.enqueue(x.value);
+        });
+      },
+      cancel: function (why) { return reader.cancel(why); }
+    }), { headers: r.headers });
+  }
+  var FETCHES = [];                             /* { ac, owner } — 받는 중인 것. owner 칸을 닫으면 멈춘다(내려받기는 owner 없음 → 창을 닫아도 끝까지) */
+  function stopFetches(root) {
+    FETCHES = FETCHES.filter(function (f) {
+      if (root && !(f.owner && root.contains(f.owner))) return true;
+      try { f.ac.abort(); } catch (e) {}
+      return false;
+    });
+  }
+  /* as: 'buf'(ArrayBuffer) | 'blob' */
+  function fetchOriginal(it, as, onProgress, owner) {
+    if (!it || it.store !== 'cloud' || !it.storagePath || !bucket) return Promise.reject(new Error('자료함에 원본이 없습니다'));
+    var u = firebase.auth().currentUser;
+    if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+    var f = (typeof AbortController === 'function') ? { ac: new AbortController(), owner: owner || null } : null;
+    if (f) FETCHES.push(f);
+    var done = function () { if (f) FETCHES = FETCHES.filter(function (x) { return x !== f; }); };
+    return u.getIdToken().then(function (tok) {
+      return fetch(apiUrlOf(it), { headers: { Authorization: 'Firebase ' + tok }, cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: f ? f.ac.signal : undefined });
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw new Error('열 권한이 없습니다 — 재직 직원만 엽니다(다시 로그인해 보세요)');
+      if (r.status === 404) throw new Error('창고에 원본이 없습니다');
+      if (!r.ok) throw new Error('창고에서 받지 못했습니다(' + r.status + ')');
+      var rr = withProgress(r, (+it.size || 0) || (+r.headers.get('Content-Length') || 0), onProgress);
+      return as === 'blob' ? rr.blob() : rr.arrayBuffer();
+    }).then(function (x) { done(); return x; }, function (e) {
+      done();
+      if (e && e.name === 'AbortError') throw new Error('닫아서 받기를 멈췄습니다');
+      throw e;
+    });
   }
   function callFn(fn, body) {
     var u = firebase.auth().currentUser;
@@ -338,21 +391,33 @@
     for (var i = 0; i < n; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
-  function bytesOf(it) {
+  function bytesOf(it, onProgress, owner) {
     if (it.store === 'cloud') {
       if ((+it.size || 0) > PuViewerKind.MAX_BYTES && it.kind === 'doc') return Promise.reject(new Error('파일이 커서(' + K.fmtBytes(it.size) + ') 미리보기를 건너뜁니다 — 원본을 내려받아 여세요'));
-      return urlOf(it).then(function (u) { return fetch(u); }).then(function (r) {
-        if (!r.ok) throw new Error('창고에서 받지 못했습니다(' + r.status + ')');
-        return r.arrayBuffer();
-      });
+      return fetchOriginal(it, 'buf', onProgress, owner);
     }
     return Promise.reject(new Error('자료함에 원본이 없습니다'));
   }
-  function downloadOriginal(it) {
-    urlOf(it).then(function (u) {
-      var a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.download = it.fileName;
-      document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 1000);
-    }).catch(function (e) { toast('내려받지 못했습니다 — ' + errMsg(e), 7000); });
+  /* 내려받기 — 권한 확인 길로 받아 이 창에서 파일로 저장한다(새 탭에 창고 주소를 띄우지 않는다 → 방문 기록에도 주소가 안 남는다) */
+  var DL_BUSY = {};
+  function downloadOriginal(it, btn) {
+    if (!it) return;
+    if (DL_BUSY[it.id]) { toast('이미 받는 중입니다'); return; }
+    DL_BUSY[it.id] = true;
+    var label = btn ? btn.textContent : '';
+    var show = function (got, total) { if (btn) btn.textContent = '⬇ ' + pctText(got, total); };
+    if (btn) btn.disabled = true;
+    show(0, +it.size || 0);
+    fetchOriginal(it, 'blob', show, null).then(function (blob) {
+      var u = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = u; a.download = it.fileName || 'file'; a.rel = 'noopener';
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { a.remove(); try { URL.revokeObjectURL(u); } catch (e) {} }, 60000);
+      toast('내려받았습니다 — ' + (it.fileName || ''));
+    }).catch(function (e) { toast('내려받지 못했습니다 — ' + errMsg(e), 7000); }).then(function () {
+      delete DL_BUSY[it.id];
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+    });
   }
 
   /* ───────── 보기 칸(나란히 보기·자세히가 함께 쓴다) ───────── */
@@ -380,12 +445,13 @@
     };
   }
   function closeFrames(root) {
+    stopFetches(root);
     FRAMES = FRAMES.filter(function (f) {
       if (root && !root.contains(f.iframe)) return true;
       post(f, { t: 'close' }); return false;
     });
   }
-  /* PC 파일을 «올리지 않고 보기»로 연 주소 — 칸을 닫을 때 풀어 준다(메모리에 남지 않게) */
+  /* PC 파일(올리지 않고 보기)·권한 확인 길로 받은 원본을 연 blob: 주소 — 칸을 닫을 때 풀어 준다(메모리에 남지 않게) */
   var OBJURLS = [];
   function objUrl(file) { var u = URL.createObjectURL(file); OBJURLS.push(u); return u; }
   function freeObjUrls() { OBJURLS.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); OBJURLS = []; }
@@ -420,7 +486,7 @@
     pane.querySelector('.pf').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-act]'); if (!b) return;
       var a = b.getAttribute('data-act');
-      if (a === 'dl') downloadOriginal(it);
+      if (a === 'dl') downloadOriginal(it, b);
       else if (a === 'win') openWin(it.id);
       else if (a === 'detail') { if (opts.onDetail) opts.onDetail(); openDetail(it.id); }
       else if (a === 'x') { closeFrames(pane); pane.remove(); if (opts.onClose) opts.onClose(); }
@@ -440,21 +506,35 @@
       return;
     }
     if (kind === 'video' || kind === 'audio' || kind === 'image') {
-      var urlP = localFile ? Promise.resolve(objUrl(localFile)) : urlOf(it);
-      urlP.then(function (u) {
+      var showMedia = function (u) {
         body.innerHTML = '';
         var el = document.createElement(kind === 'image' ? 'img' : kind);
         if (kind !== 'image') { el.controls = true; el.preload = 'metadata'; }
         el.src = u; el.style.width = '100%';
         body.appendChild(el);
-      }).catch(function (e) { body.innerHTML = '<div class="msg">' + esc(errMsg(e)) + '</div>'; });
+      };
+      if (localFile) { showMedia(objUrl(localFile)); return; }
+      var loadMedia = function () {
+        body.innerHTML = '<div class="msg">원본을 받는 중… <b data-pr>0%</b><br><span class="hint">다 받은 뒤 재생합니다 · 이 칸을 닫으면 멈춥니다</span></div>';
+        var pr = body.querySelector('[data-pr]');
+        fetchOriginal(it, 'blob', function (got, total) { pr.textContent = pctText(got, total); }, pane)
+          .then(function (b) { showMedia(objUrl(b)); })
+          .catch(function (e) { body.innerHTML = '<div class="msg">' + esc(errMsg(e)) + '</div>'; });
+      };
+      if (kind !== 'image' && (+it.size || 0) > MEDIA_AUTO_MAX) {
+        body.innerHTML = '<div class="msg">큰 ' + (kind === 'video' ? '영상' : '소리') + ' 파일(' + esc(K.fmtBytes(it.size)) + ')입니다 — 다 받은 뒤 재생합니다.<br><br><button class="sm" data-load="1">▶ 받아서 보기</button></div>';
+        body.querySelector('[data-load]').onclick = loadMedia;
+        return;
+      }
+      loadMedia();
       return;
     }
     if (kind === 'archive') { body.innerHTML = '<div class="msg">압축 파일입니다 — 원본을 내려받아 풀어 보세요. 압축 안의 파일은 바꾸지 않고 그대로 둡니다.</div>'; return; }
     if (ext === 'ppt' || ext === 'doc' || ext === 'pps' || ext === 'show' || ext === 'key' || ext === 'odp') {
       body.innerHTML = '<div class="msg">옛 형식(' + esc(ext.toUpperCase()) + ')이라 이 화면에서는 미리보기를 못 합니다 — 원본을 내려받아 파워포인트·한쇼로 여세요.</div>'; return;
     }
-    var bufP = localFile ? localFile.arrayBuffer() : bytesOf(it);
+    var bufP = localFile ? localFile.arrayBuffer()
+      : bytesOf(it, function (got, total) { var m = body.querySelector('.msg'); if (m) m.textContent = '불러오는 중… ' + pctText(got, total); }, pane);
     bufP.then(function (buf) {
       if (ext === 'pptx' || ext === 'docx' || ext === 'ppsx') {
         return loadZip().then(function (Z) { return P.extract(Z, buf, ext === 'docx' ? 'docx' : 'pptx'); }).then(function (r) {
@@ -1197,7 +1277,7 @@
       else if (id === 'cSave') saveCat();
       else if (id === 'cHide') hideCat();
       else if (id === 'dNoteAdd') addNote();
-      else if (id === 'dDl') downloadOriginal(ITEMS[DETAIL]);
+      else if (id === 'dDl') downloadOriginal(ITEMS[DETAIL], e.target);
       else if (id === 'dWin') openWin(DETAIL);
       else if (id === 'dUp') detailUpload();
       else if (id === 'dRestore') { var rd = DETAIL; restoreItem(rd).then(function () { toast('되살렸습니다'); closeDetail(); }, function (er) { toast('되살리지 못했습니다 — ' + errMsg(er), 7000); }); }
