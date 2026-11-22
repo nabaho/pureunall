@@ -1101,6 +1101,14 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
 .modal-ov.as-drawer .form-split{flex-direction:row;gap:16px}
 .modal-ov.as-drawer .fs-prev{max-height:calc(100vh - 110px);overflow:auto;position:sticky;top:0}
 @media(max-width:900px){ .modal-ov.as-drawer .modal{width:100%!important} .modal-ov.as-drawer .form-split{flex-direction:column} .modal-ov.as-drawer .fs-prev{max-height:46vh;position:static} }
+/* ☁ 앱 안 원본 창(imgModal) — 폰에서는 화면 폭을 거의 다 쓴다 (대표 지시 2026-11-22 「핸드폰에서도 위촉장 원본을 간단하게 잠깐」).
+   기본은 창 92%·안쪽 여백 20px·쪽 둘레 12px 라 A4 한 장이 화면 폭의 70% 만 차지해 글자가 작았다. 폰 구간에서만 — PC 는 그대로. */
+@media(max-width:520px){
+  #imgModal{padding:8px}
+  #imgModal .modal{width:100%!important;max-width:none!important}
+  #imgModal .modal-b{padding:8px}
+  #imgBody_pg{padding:6px!important}
+}
 /* 페이지 진입 페이드 */
 .page-view.active .page{animation:fadein .22s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -5077,21 +5085,50 @@ async function recFileAsync(rec, id){
   return await getFileAsync(id || (rec && rec.id));
 }
 
+/* ☁ 클라우드 사본을 «앱 안 창»에서 잠깐 본다 (대표 지시 2026-11-22 「핸드폰에서도 위촉장 원본을 간단하게 잠깐 볼 수 있어야」).
+   ⚠ 새 탭으로 열지 않는다 — 폰 Chrome 은 PDF 를 탭에서 못 그려 «내려받기»만 하고, 사본을 받은 «뒤»(await) 여는 새 탭은
+     팝업으로 막힌다. 그래서 사본이 폰에서는 열리지 않는 것처럼 보였다. 앱 안 원본 창(imgModal)에 그린다.
+   ⚠ PDF 그리개는 showPDFInline «한 벌»만 쓴다 — 따로 만들지 말 것(두 벌이 되면 한쪽만 고쳐진다).
+   ⚠ 「↗ 새 탭」 단추는 사본을 받아 둔 «그 자리»에서 주소를 만들어 둔다 — 눌렀을 때 바로 열려야 팝업으로 안 막힌다. */
+var _peekUrl=null;
+function _peekCloudCopy(cf){
+  var nm=cf.name||'원본', ext=(nm.split('.').pop()||'').toLowerCase();
+  var box=document.getElementById('imgBody'), ov=document.getElementById('imgModal');
+  if(!box||!ov||!(ext==='pdf'||/^(png|jpg|jpeg|gif|webp)$/.test(ext))) return false;
+  if(_peekUrl){ try{ URL.revokeObjectURL(_peekUrl); }catch(e){} _peekUrl=null; }
+  _peekUrl=URL.createObjectURL(new Blob([cf.buf],{type:_kcFormMime(ext)}));
+  var 딱지='<span style="color:#cbd5e1;font-size:12px;white-space:nowrap" title="클라우드에 보관한 사본">☁ 사본</span>';
+  ov.classList.add('open');
+  if(ext==='pdf'){
+    box.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-mute)">⏳ PDF 그리는 중…</div>';
+    showPDFInline(null,'imgBody',{ file:{ name:nm, ext:'pdf', base64:abToB64(cf.buf) },
+      bar:'<button class="btn primary" onclick="window.open(_peekUrl,\'_blank\')">↗ 새 탭</button>'+딱지 });
+    return true;
+  }
+  box.innerHTML='<div style="margin-bottom:6px;font-size:12px;color:var(--text-mute)">☁ 클라우드 사본 · '+escapeHtml(nm)+'</div>'
+    +'<img src="'+_peekUrl+'" alt="'+escapeHtml(nm)+'" style="max-width:100%;max-height:82vh;display:block;margin:auto">';
+  return true;
+}
 async function openLocalOriginal(relPath){
   try{
     var f = null; try{ f = await _fsFileOf(relPath); }catch(e0){ f = null; }
     if(!f){
       /* ☁ 이 기기에 폴더가 없거나 파일이 옮겨졌으면 클라우드 사본으로 연다 (2026-10-10) */
+      toast('원본 사본을 찾는 중…', 2500);
       var cf = await _fsCloudFile(relPath);
       if(cf){
         if(_isHwpName(cf.name)){ try{ openHwpViewer(cf.buf, cf.name); return; }catch(e3){ console.warn('한글 뷰어', e3); } }
+        /* PDF·그림은 앱 안 창에서 — 폰에서도 열린다(위 머리말). 그 밖의 형식만 옛 길(새 탭) */
+        if(_peekCloudCopy(cf)){ toast('☁ 클라우드에 보관한 사본으로 열었습니다', 3000); return; }
         var cu = URL.createObjectURL(new Blob([cf.buf], { type:/\.pdf$/i.test(cf.name)?'application/pdf':(/\.(jpe?g)$/i.test(cf.name)?'image/jpeg':(/\.png$/i.test(cf.name)?'image/png':'application/octet-stream')) }));
         window.open(cu, '_blank'); setTimeout(function(){ URL.revokeObjectURL(cu); }, 60000);
         toast('☁ 클라우드에 보관한 사본으로 열었습니다', 3000);
         return;
       }
+      /* 폰은 폴더 연결 자체가 안 된다 — «더보기 › 폴더 연결»만 알리면 막다른 길이라, 사본이 올라가는 길(PC 에서 연결)을 알린다 */
       toast(_fsRoot ? '원본을 못 찾았습니다 — 파일이 이동·삭제되었을 수 있습니다. 다시 스캔하세요'
-                    : '이 기기에는 서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'); return;
+                    : (fsSupported() ? '이 기기에는 서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'
+                                     : '이 기기에서는 서류 폴더를 연결할 수 없고 클라우드 사본도 아직 없습니다 — PC에서 서류 폴더를 연결하면 사본이 올라가 여기서도 열립니다'), 6000); return;
     }
     /* ★★ 한글 문서는 브라우저가 못 연다 — 새 탭에 «날것»(PK…mimetypeapplication/hwp+zip)으로
        뜬다(대표 제보 2026-09-12). 앱 안의 한글 뷰어로 보낸다.
@@ -10727,7 +10764,11 @@ function _renderFormPreview(id, rec){
 
 /* ★★ 서류 폴더에 있는 원본을 편집창 왼쪽에 그린다 (대표 제보 2026-09-12).
    ⚠ 막히면 «왜 막혔는지»와 «원본 열기» 길을 함께 준다 — 빈 칸은 고장으로 읽힌다.
-   ⚠ 한글 문서는 브라우저가 못 그린다. 앱 안 한글 뷰어로 보낸다(날것 바이트 금지). */
+   ⚠ 한글 문서는 브라우저가 못 그린다. 앱 안 한글 뷰어로 보낸다(날것 바이트 금지).
+   ★★ 서류 폴더에 원본이 «없을 때»(이 기기에 폴더가 없거나 파일이 옮겨졌을 때)는 ☁ 클라우드 사본으로 그린다
+      (대표 제보 2026-11-22 「위촉장 원문이 다 사라졌다」 — 주소 이사로 폴더 연결이 새 주소에서 끊긴 PC·폰).
+      원본 열기(openLocalOriginal)·서식 채우기(recFileAsync)는 전부터 사본으로 넘어갔는데 «여기만» 빠져
+      사본이 있어도 「폴더 연결 안 됨」만 떴다. 폴더 원본이 «먼저», 사본은 폴더에 없을 때만. */
 let _fsPrevUrl=null;
 async function _renderFsFormPreview(rec){
   const box=document.getElementById('fsPrevBox'); if(!box) return;
@@ -10735,19 +10776,31 @@ async function _renderFsFormPreview(rec){
   const 알림=function(icon,msg){ box.innerHTML='<div class="empty" style="padding:18px;text-align:center">'+icon+' '+msg
       +'<div style="margin-top:10px">'+열기+'</div></div>'; };
   try{
-    const lf=await _fsFileOf(rec.relPath);
-    if(!lf){ box.innerHTML='<div class="empty" style="padding:14px">이 기기에는 서류 폴더가 연결돼 있지 않습니다<br>위촉장 › ⋯ 더보기 › 서류 폴더 연결</div>'; return; }
-    const nm=lf.name||String(rec.relPath).split('/').pop(), ext=(nm.split('.').pop()||'').toLowerCase();
-    if(_isHwpName(nm)){ 알림('📄', escapeHtml(nm)+'<div style="font-size:12px;color:var(--text-mute);margin-top:4px">한글 문서는 원본 열기로 봅니다</div>'); return; }
+    let lf=null, 못찾음=false;
+    try{ lf=await _fsFileOf(rec.relPath); }catch(e0){ lf=null; 못찾음=true; console.warn('_renderFsFormPreview', rec.relPath, e0); }
+    /* ☁ 폴더에 없을 때만 사본 — 사본을 못 받아도(없거나 오프라인) 아래 «까닭 말하기»로 이어진다 */
+    let cf=null;
+    if(!lf){ try{ cf=await _fsCloudFile(rec.relPath); }catch(e1){ cf=null; } }
+    if(!lf && !cf){
+      if(못찾음){ 알림('⚠', '원본을 불러올 수 없습니다 — 파일이 옮겨졌거나 이름이 바뀌었을 수 있습니다'); return; }
+      /* 폰·모바일 브라우저는 폴더 연결 자체가 안 된다 — «더보기 › 폴더 연결»을 안내하면 막다른 길이다 */
+      const 안내=(typeof fsSupported==='function' && !fsSupported())
+        ? 'PC(Chrome·Edge)에서 서류 폴더를 연결하면 원본 사본이 클라우드에 올라가 이 기기에서도 볼 수 있습니다'
+        : '위촉장 › ⋯ 더보기 › 서류 폴더 연결 — 연결하면 원본 사본이 클라우드에도 올라갑니다';
+      box.innerHTML='<div class="empty" style="padding:14px">이 기기에는 서류 폴더가 연결돼 있지 않습니다<br>클라우드 사본도 아직 없거나 받지 못했습니다<br>'+안내+'</div>'; return;
+    }
+    const nm=lf?(lf.name||String(rec.relPath).split('/').pop()):(cf.name||String(rec.relPath).split('/').pop()), ext=(nm.split('.').pop()||'').toLowerCase();
+    const 사본줄=cf?'<div style="font-size:11.5px;color:var(--text-mute);margin:0 0 6px">☁ 클라우드에 보관한 사본으로 보여 드립니다 — 이 기기에서 서류 폴더 원본을 못 찾았습니다</div>':'';
+    if(_isHwpName(nm)){ 알림('📄', escapeHtml(nm)+'<div style="font-size:12px;color:var(--text-mute);margin-top:4px">한글 문서는 원본 열기로 봅니다'+(cf?' (☁ 클라우드 사본)':'')+'</div>'); return; }
     if(ext==='pdf'){
-      box.innerHTML='<div id="splitPdfBox" style="height:78vh;border-radius:8px;overflow:hidden;background:#475569"><div style="text-align:center;padding:30px;color:#cbd5e1">⏳ PDF 로딩 중...</div></div>';
-      showPDFInline(null,'splitPdfBox',{ file:{ name:nm, ext:'pdf', base64:abToB64(await lf.arrayBuffer()) }, bar:열기 });
+      box.innerHTML=사본줄+'<div id="splitPdfBox" style="height:78vh;border-radius:8px;overflow:hidden;background:#475569"><div style="text-align:center;padding:30px;color:#cbd5e1">⏳ PDF 로딩 중...</div></div>';
+      showPDFInline(null,'splitPdfBox',{ file:{ name:nm, ext:'pdf', base64:abToB64(lf?await lf.arrayBuffer():cf.buf) }, bar:열기 });
       return;
     }
     if(/^(png|jpg|jpeg|gif|webp)$/.test(ext)){
       if(_fsPrevUrl){ try{ URL.revokeObjectURL(_fsPrevUrl); }catch(e){} }
-      _fsPrevUrl=URL.createObjectURL(lf);
-      box.innerHTML='<img src="'+_fsPrevUrl+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px">';
+      _fsPrevUrl=URL.createObjectURL(lf||new Blob([cf.buf],{type:_kcFormMime(ext)}));
+      box.innerHTML=사본줄+'<img src="'+_fsPrevUrl+'" alt="'+escapeHtml(nm)+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px">';
       return;
     }
     알림('📎', escapeHtml(nm)+' (미리보기 미지원 형식)');
@@ -11098,7 +11151,7 @@ function rowActions(id,store,label,page,rec){ const isFs=!!(rec&&rec.src==='fs'&
          앞으로 원본을 «모두» 폴더 경로로 붙일 계획이라 모든 줄이 그렇게 될 참이었다.
        ⚠ 「⬇ 저장」은 일부러 안 붙인다 — 그 파일은 «이미 서류 폴더에 있다». 넣으면 죽은 단추가 된다.
        ⚠ 편집 서랍(openForm)은 첨부와 상관없이 열린다 — 그래서 폴더 줄에도 안전하다. */
-    (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="폴더에서 바로 열기">📄 원본</button>`
+    (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="${rec.fsCloud?'폴더에서 바로 열기 — 폴더가 없으면 ☁ 클라우드 사본으로':'폴더에서 바로 열기'}">📄 원본${rec.fsCloud?'☁':''}</button>`
       :has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadToFolder('${id}','${store}','${_jsAttr((rec&&rec.type)||'')}',_dlRec('${store}','${id}'))" title="서류 폴더의 제자리에 저장 (안 되면 내려받기 폴더로)">⬇ 저장</button><button class="btn sm" onclick="deleteAttach('${id}','${page}',this)" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
         :`<button class="btn sm" onclick="attachRec('${id}','${store}','${page}')">📎 첨부</button>`)+
     /* 🔎(이알피 현재 값)는 번호 칸의 관리번호를 누르면 뜨는 창으로 옮겼다 — puNoPop */
@@ -11825,7 +11878,7 @@ async function showPDFInline(id,containerId,alt){
     const n=pdf.numPages;
     box.innerHTML='<div style="background:#1e293b;padding:6px 10px;border-radius:8px 8px 0 0;display:flex;gap:8px;align-items:center">'
       +bar
-      +'<span style="color:#cbd5e1;font-size:12px">'+f.name+'  ('+n+'p)</span></div>'
+      +'<span style="color:#cbd5e1;font-size:12px">'+escapeHtml(f.name||'')+'  ('+n+'p)</span></div>'
       +'<div id="'+containerId+'_pg" style="overflow:auto;height:74vh;background:#475569;padding:12px;display:flex;flex-direction:column;gap:10px;align-items:center"></div>';
     const pg=document.getElementById(containerId+'_pg');
     for(let i=1;i<=Math.min(n,20);i++){
