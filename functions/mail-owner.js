@@ -78,12 +78,14 @@ async function loadTables(db, readCompanies) {
     MAIL_ROOT + "/config/mailWork", MAIL_ROOT + "/config/staffSucc",
     PUSH_CFG, MAIL_ROOT + "/config/mailBoxWho", MAIL_ROOT + "/config/mailNoWho",
     /* 업무관리 「이 주소는 앞으로도 이 사업장」 — 화면 mbCoRecOfAddr 와 같은 칸 (2026-10-11) */
-    "work_erp/mailaddr"];
+    "work_erp/mailaddr",
+    /* 🔀 사업장별 담당 분리·과거 담당 제외 규칙 (2026-11-22) */
+    MAIL_ROOT + "/config/mailCoSplit"];
   const FIXED_PATHS = paths.length;
   paths.push.apply(paths, WORK_STORES.map(([store]) => "data/" + store + "/v"));
   const snaps = await Promise.all(paths.map((p) => p === "data/companies" && readCompanies
     ? readCompanies().then((v) => ({ val: () => ({ v: v }) })) : db.ref(p).once("value")));
-  const [dir, cos, roles, hand, co, workLink, succ, pushCfg, boxWho, noWho, wkAddrSnap] = snaps;
+  const [dir, cos, roles, hand, co, workLink, succ, pushCfg, boxWho, noWho, wkAddrSnap, coSplitSnap] = snaps;
 
   /* 사람 — 사번↔이름, 퇴사, 이어받기, 사번→로그인(uid) */
   const nameBySid = {}, sidByName = {}, retired = {};
@@ -113,7 +115,7 @@ async function loadTables(db, readCompanies) {
      ⚠ 끝난 업체는 «안 담는다». 화면은 담되 그 메일을 「자문종료」 칸으로 보낸다 —
        담당자 칸에 안 들어가는 메일로 폰을 울리면 안 된다.
      ⚠ 먼저 넣은 것이 이긴다 — 화면과 같은 규칙이다. */
-  const coById = {}, coByName = {}, coByBiz = {}, erpAddr = {};
+  const coById = {}, coByName = {}, coByBiz = {}, erpAddr = {}, erpCoId = {};
   const okMail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e || "").trim());
   /* 지사(사무대행)의 담당은 «본사» 푸른이알피 주담당 기준 (대표 결정 2026-10-11) — 화면 mbHqRec 와 같은 잣대.
      열쇠는 사업자번호: 열 자리가 같고 종사업장이 본사업장인 지사 → 그 번호의 본사 «한 곳».
@@ -135,7 +137,8 @@ async function loadTables(db, readCompanies) {
   arr(cos.val()).forEach((c) => {
     if (!c) return;
     const eff = (String(c.status || "") === "suboffice" && hqOfSub[String(c.id)]) || c;
-    const rec = { main: eff.managerMain ? (nameBySid[eff.managerMain] || eff.managerMain) : "",
+    const rec = { id: String((eff && eff.id) || c.id || ""),
+      main: eff.managerMain ? (nameBySid[eff.managerMain] || eff.managerMain) : "",
       left: coLeft(eff) };
     if (c.id) coById[String(c.id)] = rec;
     const n = normName(c.name);
@@ -148,7 +151,7 @@ async function loadTables(db, readCompanies) {
       .forEach((e0) => {
         const e = String(e0 || "").trim().toLowerCase();
         if (!okMail(e) || /@pureun\.kr$/.test(e)) return;   /* 우리 주소는 아니다 */
-        if (!erpAddr[e]) erpAddr[e] = rec.main;
+        if (!erpAddr[e]) { erpAddr[e] = rec.main; if (rec.id) erpCoId[e] = rec.id; }
       });
   });
   /* 대표·세금계산서·세무 담당 메일 칸 — 화면 mbWhoIndex ①-2 와 «같은 잣대» (2026-10-11).
@@ -176,12 +179,12 @@ async function loadTables(db, readCompanies) {
     CO_EXTRA.forEach((f) => {
       const e = String(c[f] || "").trim().toLowerCase();
       if (!okMail(e) || /@pureun\.kr$/.test(e) || (extraCos[e] || []).length !== 1) return;
-      if (!erpAddr[e]) erpAddr[e] = main;
+      if (!erpAddr[e]) { erpAddr[e] = main; if (eff.id || c.id) erpCoId[e] = String(eff.id || c.id); }
     });
   });
 
-  /* 진행 중인 사건·컨설팅 — 주소로 · 번호로 */
-  const workByAddr = {}, workByKey = {};
+  /* 진행 중인 사건·컨설팅 — 주소로 · 번호로 · 업체 id로 */
+  const workByAddr = {}, workByKey = {}, workByCo = {};
   WORK_STORES.forEach(([store, kind, label], i) => {
     /* ⚠ 앞의 고정 자리 수가 늘면 «여기»도 같이 늘려야 한다 — 어긋나면 사건 자료 자리에
          엉뚱한 표가 들어와 조용히 0건이 된다. 그래서 세지 않고 목록에서 끌어 쓴다. */
@@ -193,6 +196,12 @@ async function loadTables(db, readCompanies) {
         co: String(r.companyName || r.company || ""),
         title: String(r.title || r.typeName || "") };
       if (id) workByKey[kind + ":" + id] = w;
+      const matchedCo = (r.companyId && coById[String(r.companyId)])
+        || (digits(r.bizNo).length >= 10 ? coByBiz[digits(r.bizNo)] : null);
+      if (matchedCo && matchedCo.id) {
+        const ca = workByCo[matchedCo.id] = workByCo[matchedCo.id] || [];
+        if (!ca.some((x) => x.kind === w.kind && x.id === w.id)) ca.push(w);
+      }
       /* 건 기록의 «회사정보 상자»(r.company)도 본다 — 화면 mbWorkBuild 와 같은 칸 (2026-10-11) */
       const rc = (r.company && typeof r.company === "object") ? r.company : {};
       [r.email, r.primaryContactEmail, rc.email, rc.primaryContactEmail]
@@ -220,8 +229,9 @@ async function loadTables(db, readCompanies) {
   return { hand: hand.val() || {}, co: co.val() || {}, workLink: workLink.val() || {}, wkAddr,
     succ: succ.val() || {}, pushCfg: pushCfg.val() || {},
     boxWho: boxWho.val() || {}, noWho: noWho.val() || {},
-    nameBySid, sidByName, retired, uidBySid, coById, coByName, coByBiz, erpAddr,
-    workByAddr, workByKey };
+    coSplit: (coSplitSnap && coSplitSnap.val()) || {},
+    nameBySid, sidByName, retired, uidBySid, coById, coByName, coByBiz, erpAddr, erpCoId,
+    workByAddr, workByKey, workByCo };
 }
 
 /* 퇴사자면 이어받은 사람 — 화면의 mbWhoLive 와 같다 */
@@ -250,35 +260,93 @@ function workHandOf(em, T) {
   if (!v || !v.kind || !v.id) return null;
   return T.workByKey[String(v.kind) + ":" + String(v.id)] || null;
 }
+/* 사업장별 분리·제외 규칙(config/mailCoSplit) — 화면 mbCoSplitRuleOf 와 같은 모양 */
+function coSplitOf(em, T) {
+  const map = (T && T.coSplit) || {};
+  const ak = "addr:" + whoKey(em);
+  const rec = coRecOf(em, T);
+  const cid = (rec && rec.id) || ((T && T.erpCoId) || {})[em] || "";
+  const raw = (cid && map[cid]) || map[ak] || null;
+  if (!raw || typeof raw !== "object") return null;
+  const ex = [];
+  const src = Array.isArray(raw.ex) ? raw.ex : (raw.ex && typeof raw.ex === "object" ? Object.values(raw.ex) : []);
+  src.forEach((n) => {
+    const nm = String((T.nameBySid && T.nameBySid[String(n)]) || n || "").trim();
+    if (nm && ex.indexOf(nm) < 0) ex.push(nm);
+  });
+  const toRaw = String(raw.to || raw.toName || "").trim();
+  const toName = String((T.nameBySid && T.nameBySid[toRaw]) || toRaw).trim();
+  return { coId: cid, mode: String(raw.mode || ""), ex: ex, toName: toName };
+}
+function singleProjectWork(em, coId, ex, T) {
+  const hand = workHandOf(em, T);
+  if (hand) {
+    const h = live(hand.mgr, T);
+    if (h && ex.indexOf(h) < 0) return { who: h, why: "work", work: hand };
+  }
+  const cands = [].concat(T.workByAddr[em] || [], (coId && T.workByCo && T.workByCo[coId]) || []);
+  const ms = [], ws = [];
+  cands.forEach((w) => {
+    const n = live(w && w.mgr, T);
+    if (!n || ex.indexOf(n) >= 0) return;
+    if (ms.indexOf(n) < 0) { ms.push(n); ws.push(w); }
+  });
+  return ms.length === 1 ? { who: ms[0], why: "work", work: ws[0] } : null;
+}
 
 /* ══ 이 주소의 담당자 — ①·①-2·①-3 까지만 ══ */
 function whoOf(em0, T) {
   const em = String(em0 || "").trim().toLowerCase();
   const none = { who: "", why: "", work: null };
   if (!em) return none;
+  const sp = coSplitOf(em, T);
+  const ex = (sp && sp.ex) || [];
+  const allowed = (n) => !!(n && ex.indexOf(n) < 0);
 
   const byHand = live(T.hand[whoKey(em)], T);
-  if (byHand) return { who: byHand, why: "hand", work: null };          /* ① */
+  if (allowed(byHand)) return { who: byHand, why: "hand", work: null };   /* ① */
 
   const rec = coRecOf(em, T);
+  const erpCid = (rec && rec.id) || ((T && T.erpCoId) || {})[em] || "";
+  const anyCo = rec || (erpCid && T.coById ? T.coById[erpCid] : null);
+  /* 자문이 종료된 업체(left)는 workOnly·ex 여부와 무관하게 폰 알림을 울리지 않는다 */
+  if (anyCo && anyCo.left) return none;
+
+  /* 🔀 진행 사업 담당자 단독(workOnly) 모드면 업체 주담당보다 진행 중 건 담당자를 먼저 본다 */
+  if (sp && sp.mode === "workOnly") {
+    const pw = singleProjectWork(em, sp.coId, ex, T);
+    if (pw) return pw;
+    const tn = live(sp.toName, T);
+    if (allowed(tn)) return { who: tn, why: "co", work: null };
+    return none;
+  }
+
   if (rec && !rec.left) {
     const c1 = live(rec.main, T);
-    if (c1) return { who: c1, why: "co", work: null };                  /* ①-2 */
+    if (allowed(c1)) return { who: c1, why: "co", work: null };            /* ①-2 */
   }
   /* ①-3 — 사람이 고른 것이 «건에 적힌 주소»보다 세다(화면과 같은 차례) */
   const hand = workHandOf(em, T);
-  if (hand) { const h = live(hand.mgr, T); if (h) return { who: h, why: "work", work: hand }; }
+  if (hand) { const h = live(hand.mgr, T); if (allowed(h)) return { who: h, why: "work", work: hand }; }
   const ws = T.workByAddr[em] || [];
-  const ms = [];
-  ws.forEach((w) => { const n = live(w.mgr, T); if (n && ms.indexOf(n) < 0) ms.push(n); });
+  const ms = [], wPick = [];
+  ws.forEach((w) => { const n = live(w.mgr, T); if (allowed(n) && ms.indexOf(n) < 0) { ms.push(n); wPick.push(w); } });
   /* 담당이 둘로 갈리면 정하지 않는다 — 틀린 사람에게 보내는 것이 안 보내는 것보다 나쁘다 */
-  if (ms.length === 1) return { who: ms[0], why: "work", work: ws[0] };
+  if (ms.length === 1) return { who: ms[0], why: "work", work: wPick[0] };
 
   /* ② 업체관리에 «적힌» 주소 → 그 업체 주담당 (화면 mbWhoIndex 의 byAddr 와 같은 자료).
      ⚠ 건(①-3)보다 «뒤»다 — 화면과 같은 차례여야 한다. 앞으로 당기면 같은 주소에서
        화면은 건 담당, 알림은 업체 담당이 되어 둘이 어긋난다. */
   const a1 = live(T.erpAddr[em], T);
-  if (a1) return { who: a1, why: "erp", work: null };
+  if (allowed(a1)) return { who: a1, why: "erp", work: null };
+
+  /* 과거 담당자가 제외(ex)되어 빠진 자리면 지정된 새 담당자(toName) 또는 단일 진행 건 담당자로 잇는다 */
+  if (sp && ex.length) {
+    const tn = live(sp.toName, T);
+    if (allowed(tn)) return { who: tn, why: "co", work: null };
+    const pw = singleProjectWork(em, sp.coId, ex, T);
+    if (pw) return pw;
+  }
 
   return none;
 }
