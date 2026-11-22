@@ -5567,6 +5567,81 @@
     });
   }
 
+  function summarizeSpokenRequest(rawText, lawIndex) {
+    var src = String(rawText || '').trim();
+    if (!src) {
+      return {
+        hasContent: false,
+        intentCode: 'search',
+        intentLabel: '🔍 법령·판례 검색',
+        issues: [],
+        laws: [],
+        facts: [],
+        cleanedText: '',
+        organizedText: ''
+      };
+    }
+    var anonRes = anonymizeText(src);
+    var safeText = (anonRes && typeof anonRes === 'object' && typeof anonRes.text === 'string')
+      ? anonRes.text
+      : String(anonRes || src);
+    /* 구어체 군더더기 추임새 정리(지시대명사 '그'·사실관계·법률용어는 100% 보존, 연속 추임새도 모두 정리) */
+    var cleaned = safeText
+      .replace(/(?:^|\s)(?:(?:어+|음+|저기|있잖아|그러니까|뭐랄까)[,.…]*\s+)+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    var intentCode = 'search';
+    var intentLabel = '🔍 법령·판례 검색';
+    if (/(?:의견서|이유서|답변서|진정서|고소장|내용증명|통지서|징계|작성해|써\s*줘|만들어\s*줘|초안)/.test(cleaned)) {
+      intentCode = 'draft';
+      intentLabel = '📝 의견서·서면 작성';
+    } else if (cleaned.length >= 16 || /(?:검토|될까|되나요|가능한지|위법|정당한지|부당|해고|징계|산재|체불|임금|퇴직금|괴롭힘|연차|통상임금|포괄임금|근로자성|프리랜서)/.test(cleaned)) {
+      intentCode = 'review';
+      intentLabel = '⚖️ 사실관계·법률 검토';
+    }
+
+    var detectedIssues = detectFactIssues(cleaned).slice(0, 3).map(function (it) { return it.title; });
+    var lawDirSet = buildLawDirLookupMap(lawIndex);
+    var citedLaws = extractLawCitationsFromText(cleaned, lawDirSet).map(function (c) {
+      return c.rawLawName + ' ' + c.rawArtNo;
+    });
+    var uniqLaws = [];
+    for (var i = 0; i < citedLaws.length; i++) {
+      if (uniqLaws.indexOf(citedLaws[i]) === -1) uniqLaws.push(citedLaws[i]);
+      if (uniqLaws.length >= 3) break;
+    }
+
+    var facts = [];
+    var tl = extractFactTimeline(cleaned);
+    if (tl && Array.isArray(tl.events) && tl.events.length) {
+      facts.push('일자 ' + tl.events.slice(0, 2).map(function (e) { return e.date; }).join(' · '));
+    }
+    var headMatch = /(?:상시\s*)?(\d{1,4})\s*(?:인|명)\s*(?:미만|이상|사업장|회사|규모)?/.exec(cleaned);
+    if (headMatch) facts.push('규모 ' + headMatch[0].trim());
+    var moneyMatch = /(\d{1,3}(?:,\d{3})+|\d{1,5})\s*(?:만\s*원|억\s*원|원)/.exec(cleaned);
+    if (moneyMatch) facts.push('금액 ' + moneyMatch[0].replace(/\s+/g, ''));
+    var periodMatch = /(\d{1,2})\s*(?:년|개월|주|일)\s*(?:근무|재직|근속|동안|전|후)/.exec(cleaned);
+    if (periodMatch) facts.push('기간 ' + periodMatch[0].trim());
+
+    var orgLines = [];
+    if (detectedIssues.length) orgLines.push('[핵심 쟁점] ' + detectedIssues.join(', '));
+    if (facts.length) orgLines.push('[주요 사실] ' + facts.join(' / '));
+    if (uniqLaws.length) orgLines.push('[언급 법령] ' + uniqLaws.join(', '));
+    orgLines.push('[요청 내용] ' + cleaned);
+
+    return {
+      hasContent: true,
+      intentCode: intentCode,
+      intentLabel: intentLabel,
+      issues: detectedIssues,
+      laws: uniqLaws,
+      facts: facts,
+      cleanedText: cleaned,
+      organizedText: orgLines.join('\n')
+    };
+  }
+
   global.PuPBoxEngine = {
     todayKstYmd: todayKstYmd,
     parseYamlFrontmatter: parseYamlFrontmatter,
@@ -5627,7 +5702,8 @@
     enforceZeroHallucinationGuard: enforceZeroHallucinationGuard,
     FORMAL_DOC_TEMPLATES: FORMAL_DOC_TEMPLATES,
     buildFormalLegalDocument: buildFormalLegalDocument,
-    buildFormalHwpxBytes: buildFormalHwpxBytes
+    buildFormalHwpxBytes: buildFormalHwpxBytes,
+    summarizeSpokenRequest: summarizeSpokenRequest
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -478,16 +478,56 @@
   }
 
   function voicePhaseMeta(phase) {
+    var charCnt = String(joinVoiceParts(
+      joinVoiceParts(state.voiceBaseText, state._voiceRawCommitted || state.voiceCommittedText),
+      state._voiceRawInterim || state.voiceInterim
+    ) || '').trim().length;
+    if (phase === 'transcribing') {
+      return { cls: 'speaking', text: '✍️ 실시간 받아쓰기 중 (' + charCnt + '자 인식됨)' };
+    }
     if (phase === 'speaking') {
-      return { cls: 'speaking', text: '🔵 음성 인식됨 · 실시간 받아쓰기 중' };
+      return { cls: 'speaking', text: '🔵 음성 인식됨 · 글자 변환 대기 중…' };
+    }
+    if (phase === 'stalled') {
+      return { cls: 'connecting', text: '⚠️ 음성 감지됨 · 글자 변환 응답 없음 (아래 대안 확인)' };
     }
     if (phase === 'recognized') {
-      return { cls: 'recognized', text: '✓ 음성 인식 완료 · 이어서 말씀하거나 실행하세요' };
+      return { cls: 'recognized', text: '✓ 음성 인식 완료' + (charCnt > 0 ? (' (' + charCnt + '자)') : '') + ' · 이어서 말씀하거나 실행하세요' };
     }
     if (phase === 'ready') {
       return { cls: 'ready', text: '🟢 마이크 켜짐 · 지금 말씀해 주세요' };
     }
     return { cls: 'connecting', text: '⏳ 마이크 연결 중…' };
+  }
+
+  function buildVoiceSummaryHtml(fullScrubbed) {
+    var E = global.PuPBoxEngine;
+    if (!fullScrubbed || !E || typeof E.summarizeSpokenRequest !== 'function') return '';
+    var lawIndex = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
+      ? global.PuPBoxLawIndex.list()
+      : [];
+    var sum = E.summarizeSpokenRequest(fullScrubbed, lawIndex);
+    if (!sum || !sum.hasContent) return '';
+    var chips = ['<span class="pbox-badge-blue">' + esc(sum.intentLabel) + '</span>'];
+    for (var i = 0; i < sum.issues.length; i++) {
+      chips.push('<span class="pbox-badge-green">쟁점: ' + esc(sum.issues[i]) + '</span>');
+    }
+    for (var j = 0; j < sum.facts.length; j++) {
+      chips.push('<span class="pbox-badge-gray">' + esc(sum.facts[j]) + '</span>');
+    }
+    for (var k = 0; k < sum.laws.length; k++) {
+      chips.push('<span class="pbox-badge-amber">' + esc(sum.laws[k]) + '</span>');
+    }
+    return [
+      '<div id="pboxVoiceSummaryBox" class="pbox-voice-summary">',
+      '  <div class="pbox-voice-summary-hd">',
+      '    <strong class="pbox-voice-summary-title">🎙 지금 말씀하신 내용 실시간 정리</strong>',
+      '    <button type="button" class="pbox-btn-sm" data-act="apply-voice-organized">✨ 정리문으로 입력창 채우기</button>',
+      '  </div>',
+      '  <div class="pbox-voice-summary-chips">' + chips.join('') + '</div>',
+      '  <div class="pbox-voice-summary-body">' + esc(sum.organizedText) + '</div>',
+      '</div>'
+    ].join('\n');
   }
 
   function buildVoiceLiveScreenHtml() {
@@ -500,19 +540,37 @@
       var fullScrubbed = scrubVoiceTranscript(rawJoined, fullNames);
       var committed = scrubVoiceTranscript(rawCommitted, fullNames);
       var interim = scrubVoiceTranscript(rawInterim, fullNames);
-      if (joinVoiceParts(committed, interim) !== fullScrubbed) {
-        return '<span class="pbox-voice-committed">' + esc(fullScrubbed) + '</span>' +
-          '<span class="pbox-voice-caret" aria-hidden="true">▍</span>';
-      }
-      return (committed ? '<span class="pbox-voice-committed">' + esc(committed) + '</span>' : '') +
-        (committed && interim ? ' ' : '') +
-        (interim ? '<span class="pbox-voice-interim">' + esc(interim) + '</span>' : '') +
-        '<span class="pbox-voice-caret" aria-hidden="true">▍</span>';
+      var textHtml = (joinVoiceParts(committed, interim) !== fullScrubbed)
+        ? ('<span class="pbox-voice-committed">' + esc(fullScrubbed) + '</span><span class="pbox-voice-caret" aria-hidden="true">▍</span>')
+        : ((committed ? '<span class="pbox-voice-committed">' + esc(committed) + '</span>' : '') +
+          (committed && interim ? ' ' : '') +
+          (interim ? '<span class="pbox-voice-interim">' + esc(interim) + '</span>' : '') +
+          '<span class="pbox-voice-caret" aria-hidden="true">▍</span>');
+      return textHtml + buildVoiceSummaryHtml(fullScrubbed);
+    }
+    if (state.voicePhase === 'stalled') {
+      var micDiag = (state._voiceMicProbeActive && (state._voiceMicPeakLevel || 0) < 2)
+        ? '마이크 소리 입력이 감지되지 않습니다. 화면 우측 하단 <b>마이크 OFF(F8)</b> 상태나 Windows·크롬 마이크 입력 장치를 확인해 주세요.'
+        : '브라우저(Chrome) 음성변환 서버 응답이 지연되고 있습니다. 아래 버튼으로 다시 연결하거나 <b>Windows 음성입력(Win+H)</b>을 바로 사용하세요.';
+      return [
+        '<div class="pbox-voice-stalled">',
+        '  <div>⚠️ ' + micDiag + '</div>',
+        '  <div class="pbox-btn-group" style="margin-top:8px;flex-wrap:wrap">',
+        '    <button type="button" class="pbox-btn-sm" data-act="retry-voice-input">🔄 마이크 다시 연결</button>',
+        '    <button type="button" class="pbox-btn-primary" data-act="use-win-voice-input">⌨️ 윈도우 음성입력(Win+H)으로 바로 말하기</button>',
+        '  </div>',
+        '</div>'
+      ].join('\n');
     }
     if (state.voiceNoSpeechCount > 0) {
       return '<span class="pbox-voice-placeholder">아직 음성이 들리지 않았습니다 — 마이크 가까이 말씀해 주세요 (무음 지속 시 자동 종료)</span>';
     }
-    return '<span class="pbox-voice-placeholder">지금 말씀하시면 인식되는 글자가 이곳과 아래 입력창에 바로 표시됩니다…</span>';
+    var micBadge = state._voiceMicProbeActive
+      ? ((state._voiceMicPeakLevel || 0) >= 2
+        ? ' <b class="pbox-voice-mic-ok">[🔊 마이크 소리 감지 중]</b>'
+        : ' <b class="pbox-voice-mic-mute">[🔇 소리 입력 없음 — 마이크 음소거·장치 확인]</b>')
+      : '';
+    return '<span class="pbox-voice-placeholder">지금 말씀하시면 인식되는 글자가 이곳과 아래 입력창에 바로 표시되고 자동 정리됩니다…' + micBadge + '</span>';
   }
 
   function syncVoiceUiDom() {
@@ -551,7 +609,7 @@
           bannerSlot._voiceMounted = true;
         } else {
           if (waveEl && waveEl.classList) {
-            if (state.voicePhase === 'speaking') waveEl.classList.add('speaking');
+            if (state.voicePhase === 'speaking' || state.voicePhase === 'transcribing') waveEl.classList.add('speaking');
             else waveEl.classList.remove('speaking');
           }
           if (pillEl) {
@@ -586,9 +644,84 @@
     }
   }
 
+  function stopMicLevelProbe() {
+    state._voiceMicProbeActive = false;
+    state._voiceMicPeakLevel = 0;
+    if (state._voiceMicTimer) {
+      try { clearInterval(state._voiceMicTimer); } catch (_) {}
+      state._voiceMicTimer = null;
+    }
+    if (state._voiceMicStream) {
+      try {
+        var tracks = state._voiceMicStream.getTracks ? state._voiceMicStream.getTracks() : [];
+        for (var t = 0; t < tracks.length; t++) tracks[t].stop();
+      } catch (_) {}
+      state._voiceMicStream = null;
+    }
+    if (state._voiceAudioCtx) {
+      try { state._voiceAudioCtx.close(); } catch (_) {}
+      state._voiceAudioCtx = null;
+    }
+  }
+
+  function startMicLevelProbe(mySeq) {
+    stopMicLevelProbe();
+    var nav = global && global.navigator;
+    var AudioCtx = global && (global.AudioContext || global.webkitAudioContext);
+    if (!nav || !nav.mediaDevices || typeof nav.mediaDevices.getUserMedia !== 'function' || typeof AudioCtx !== 'function') {
+      return;
+    }
+    nav.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      if (!state.voiceActive || state._voiceStartSeq !== mySeq) {
+        try { stream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (_) {}
+        return;
+      }
+      try {
+        var actx = new AudioCtx();
+        var src = actx.createMediaStreamSource(stream);
+        var analyser = actx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        var data = new Uint8Array(analyser.frequencyBinCount);
+        state._voiceMicStream = stream;
+        state._voiceAudioCtx = actx;
+        state._voiceMicProbeActive = true;
+        state._voiceMicPeakLevel = 0;
+        var lastHadSound = false;
+        state._voiceMicTimer = setInterval(function () {
+          if (!state.voiceActive || state._voiceStartSeq !== mySeq) {
+            stopMicLevelProbe();
+            return;
+          }
+          analyser.getByteTimeDomainData(data);
+          var sumSq = 0;
+          for (var i = 0; i < data.length; i++) {
+            var v = (data[i] - 128) / 128;
+            sumSq += v * v;
+          }
+          var rms = Math.round(Math.sqrt(sumSq / data.length) * 100);
+          if (rms > (state._voiceMicPeakLevel || 0)) state._voiceMicPeakLevel = rms;
+          var hasSoundNow = (state._voiceMicPeakLevel || 0) >= 2;
+          if (hasSoundNow !== lastHadSound && !state._voiceHasResult) {
+            lastHadSound = hasSoundNow;
+            syncVoiceUiDom();
+          }
+        }, 350);
+        syncVoiceUiDom();
+      } catch (_) {
+        try { stream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (_e) {}
+      }
+    }).catch(function () {});
+  }
+
   function stopVoiceDictation(opts) {
     opts = opts || {};
     state._voiceStartSeq = (state._voiceStartSeq || 0) + 1;
+    stopMicLevelProbe();
+    if (state._voiceResultWatchdog) {
+      try { clearTimeout(state._voiceResultWatchdog); } catch (_) {}
+      state._voiceResultWatchdog = null;
+    }
     if (state._voiceSilenceTimer) {
       try { clearTimeout(state._voiceSilenceTimer); } catch (_) {}
       state._voiceSilenceTimer = null;
@@ -610,6 +743,8 @@
     state._voiceRestartFn = null;
     state._voiceRawCommitted = '';
     state._voiceRawInterim = '';
+    state._voiceHasResult = false;
+    state._voiceStallRetries = 0;
     state.voiceActive = false;
     state.voicePhase = 'idle';
     state.voiceInterim = '';
@@ -676,6 +811,44 @@
       state.homePromptDraft = '';
       runPromptSubmit(finalTxt, null, { mode: state.promptMode || 'auto' });
     }
+  }
+
+  function applyOrganizedVoiceToInput() {
+    var tgt = state.voiceTarget || 'home';
+    var inputEl = document.getElementById(tgt === 'ws' ? 'pboxWsFollowInput' : 'pboxPromptInput');
+    var rawTxt = currentCombinedVoiceText();
+    var E = global.PuPBoxEngine;
+    if (!rawTxt) return;
+    var lawIndex = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
+      ? global.PuPBoxLawIndex.list()
+      : [];
+    var organized = (E && typeof E.summarizeSpokenRequest === 'function')
+      ? (E.summarizeSpokenRequest(rawTxt, lawIndex).organizedText || rawTxt)
+      : rawTxt;
+    stopVoiceDictation({ skipDom: false });
+    state.voiceBaseText = '';
+    state.voiceCommittedText = '';
+    if (inputEl) {
+      inputEl.value = organized;
+      if (typeof inputEl.focus === 'function') inputEl.focus();
+    }
+    if (tgt === 'home') {
+      state.homePromptDraft = organized;
+      updateLiveFactReviewDom(organized);
+    }
+    toast('말씀하신 내용을 핵심 쟁점·사실관계 형식으로 정리해 입력창에 채웠습니다.');
+  }
+
+  function switchToWindowsVoiceInput() {
+    var tgt = state.voiceTarget || 'home';
+    var keepTxt = currentCombinedVoiceText();
+    stopVoiceDictation({ abort: true });
+    var inputEl = document.getElementById(tgt === 'ws' ? 'pboxWsFollowInput' : 'pboxPromptInput');
+    if (inputEl) {
+      if (keepTxt) inputEl.value = keepTxt;
+      if (typeof inputEl.focus === 'function') inputEl.focus();
+    }
+    toast('입력창에 커서를 맞췄습니다. 키보드에서 [Win + H]를 누르면 Windows 음성입력이 바로 받아쓰기·자동정리됩니다.');
   }
 
   function keepVoiceTextAndClose() {
@@ -788,9 +961,51 @@
     state._voiceRawCommitted = '';
     state._voiceRawInterim = '';
     state.voiceNoSpeechCount = 0;
+    state._voiceHasResult = false;
+    state._voiceStallRetries = 0;
+    state._voiceNonContinuous = false;
     state.voiceActive = true;
     state.voicePhase = 'connecting';
     syncVoiceUiDom();
+    startMicLevelProbe(mySeq);
+
+    function armResultWatchdog() {
+      if (state._voiceResultWatchdog) {
+        try { clearTimeout(state._voiceResultWatchdog); } catch (_) {}
+        state._voiceResultWatchdog = null;
+      }
+      if (state._voiceHasResult || typeof setTimeout !== 'function') return;
+      state._voiceResultWatchdog = setTimeout(function () {
+        if (!state.voiceActive || state._voiceStartSeq !== mySeq || !isSameSession(startGen, startUid) || state._voiceHasResult) return;
+        if ((state._voiceStallRetries || 0) < 1) {
+          /* Windows Chrome에서 continuous:true가 글자 변환 없이 멈추는 현상 자동 복구 (단문 연속 모드로 1회 재연결) */
+          state._voiceStallRetries = 1;
+          state._voiceNonContinuous = true;
+          launchSegment(true, true);
+        } else {
+          /* 2차 무응답 시 기존 인식기의 후속 onerror/onend가 stalled 안내창을 덮어쓰지 않도록 분리 중단 */
+          var stalledRec = state._speechRec;
+          state._speechRec = null;
+          if (stalledRec) {
+            try {
+              stalledRec.onstart = null;
+              stalledRec.onaudiostart = null;
+              stalledRec.onsoundstart = null;
+              stalledRec.onspeechstart = null;
+              stalledRec.onspeechend = null;
+              stalledRec.onsoundend = null;
+              stalledRec.onnomatch = null;
+              stalledRec.onresult = null;
+              stalledRec.onend = null;
+              stalledRec.onerror = null;
+              if (typeof stalledRec.abort === 'function') stalledRec.abort();
+            } catch (_) {}
+          }
+          state.voicePhase = 'stalled';
+          syncVoiceUiDom();
+        }
+      }, 6000);
+    }
 
     if (state._voiceMaxTimer) {
       try { clearTimeout(state._voiceMaxTimer); } catch (_) {}
@@ -825,7 +1040,7 @@
       syncVoiceUiDom();
     }
 
-    function launchSegment(forceFresh) {
+    function launchSegment(forceFresh, nonContinuousFallback) {
       if (!state.voiceActive || state._voiceStartSeq !== mySeq || !isSameSession(startGen, startUid)) return false;
       if (state._voiceRestartTimer) {
         try { clearTimeout(state._voiceRestartTimer); } catch (_) {}
@@ -859,7 +1074,7 @@
       }
 
       rec.lang = 'ko-KR';
-      rec.continuous = true;
+      rec.continuous = !nonContinuousFallback;
       rec.interimResults = true;
       try { rec.maxAlternatives = 1; } catch (_) {}
 
@@ -871,10 +1086,11 @@
 
       rec.onstart = function () {
         if (!state.voiceActive || state._voiceStartSeq !== mySeq || !isSameSession(startGen, startUid)) return;
-        if (state.voicePhase === 'connecting') {
+        if (state.voicePhase === 'connecting' || state.voicePhase === 'stalled') {
           state.voicePhase = (state._voiceRawCommitted || state.voiceBaseText) ? 'recognized' : 'ready';
           syncVoiceUiDom();
         }
+        armResultWatchdog();
       };
 
       rec.onaudiostart = function () {
@@ -887,14 +1103,18 @@
 
       rec.onsoundstart = function () {
         if (!state.voiceActive || state._voiceStartSeq !== mySeq || !isSameSession(startGen, startUid)) return;
-        state.voicePhase = 'speaking';
-        syncVoiceUiDom();
+        if (!state._voiceHasResult) {
+          state.voicePhase = 'speaking';
+          syncVoiceUiDom();
+          armResultWatchdog();
+        }
       };
 
       rec.onspeechstart = function () {
         if (!state.voiceActive || state._voiceStartSeq !== mySeq || !isSameSession(startGen, startUid)) return;
-        state.voicePhase = 'speaking';
+        state.voicePhase = state._voiceHasResult ? 'transcribing' : 'speaking';
         syncVoiceUiDom();
+        armResultWatchdog();
       };
 
       rec.onresult = function (ev) {
@@ -918,10 +1138,17 @@
         }
         segFinal = accFin;
         segInterim = accInt;
-        if (segFinal || segInterim) state.voiceNoSpeechCount = 0;
+        if (segFinal || segInterim) {
+          state.voiceNoSpeechCount = 0;
+          state._voiceHasResult = true;
+          if (state._voiceResultWatchdog) {
+            try { clearTimeout(state._voiceResultWatchdog); } catch (_) {}
+            state._voiceResultWatchdog = null;
+          }
+        }
         state._voiceRawCommitted = joinVoiceParts(rawCommittedBeforeSeg, segFinal);
         state._voiceRawInterim = segInterim;
-        state.voicePhase = 'speaking';
+        state.voicePhase = (segFinal || segInterim) ? 'transcribing' : 'speaking';
         writeLiveTranscriptToDom();
 
         if (state._voicePhaseTimer) {
@@ -986,7 +1213,7 @@
           writeLiveTranscriptToDom();
           restartCount++;
           state._voiceRestartTimer = setTimeout(function () {
-            launchSegment(false);
+            launchSegment(false, Boolean(state._voiceNonContinuous));
           }, 120);
         } else {
           var hasSpoken = Boolean(joinVoiceParts(state.voiceBaseText, state._voiceRawCommitted).trim());
@@ -1489,7 +1716,10 @@
   }
   try {
     if (global && typeof global.addEventListener === 'function') {
-      global.addEventListener('pagehide', clearAllHangulBridges);
+      global.addEventListener('pagehide', function () {
+        clearAllHangulBridges();
+        stopVoiceDictation({ abort: true, skipDom: true });
+      });
     }
   } catch (_) {}
 
@@ -4717,6 +4947,20 @@
       clearVoiceText();
     } else if (act === 'cancel-voice-input') {
       cancelVoiceInput();
+    } else if (act === 'apply-voice-organized') {
+      applyOrganizedVoiceToInput();
+    } else if (act === 'retry-voice-input') {
+      if (typeof state._voiceRestartFn === 'function') {
+        state._voiceStallRetries = 0;
+        state._voiceNonContinuous = false;
+        state.voicePhase = 'connecting';
+        syncVoiceUiDom();
+        state._voiceRestartFn(true, false);
+      } else {
+        startVoiceDictation(state.voiceTarget || 'home');
+      }
+    } else if (act === 'use-win-voice-input') {
+      switchToWindowsVoiceInput();
     } else if (act === 'run-home-review') {
       var rhrQ = btn.getAttribute('data-q') || '';
       if (rhrQ) {

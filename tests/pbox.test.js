@@ -5794,3 +5794,137 @@ test('㉗ 서면 출력 전 미로드 법령 조문 자동 대조 · 6종 서식
 
   App.setAuthUser(null);
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * ㉘ 실시간 음성인식 정직한 상태 분리 · 무응답 자동 복구(continuous:false) · 말씀 내용 실시간 구조화 정리 검증
+ * ══════════════════════════════════════════════════════════════════ */
+test('㉘ 음성인식 글자변환 대기/실시간 받아쓰기 분리 · 무응답 6초 자동복구 · 말씀 내용 실시간 정리 및 입력창 적용', async () => {
+  const lawIndex = loadLawIndex().list();
+
+  /* 1) PuPBoxEngine.summarizeSpokenRequest — 구어체 추임새 제거 · 요구유형/쟁점/사실관계/법령 추출 · 개인정보 마스킹 */
+  const sum1 = Engine.summarizeSpokenRequest(
+    '어 음 상시 12인 회사에서 2025년 11월 10일 근로자 박민수(010-1234-5678)가 카카오톡으로 해고 통보를 받았는데 근로기준법 제27조 위반인지 의견서 작성해 줘',
+    lawIndex
+  );
+  assert.equal(sum1.hasContent, true);
+  assert.equal(sum1.intentCode, 'draft');
+  assert.ok(sum1.issues.some((t) => t.includes('서면통지') || t.includes('해고')));
+  assert.ok(sum1.laws.some((l) => l.includes('근로기준법 제27조')));
+  assert.ok(sum1.facts.some((f) => f.includes('12인')));
+  assert.ok(!sum1.organizedText.includes('010-1234-5678') && !sum1.organizedText.includes('박민수'), '정리된 음성 요약에서도 연락처·당사자 실명이 완전 비식별화되어야 합니다');
+  assert.ok(sum1.organizedText.includes('[핵심 쟁점]') && sum1.organizedText.includes('[요청 내용]'));
+
+  /* 2) UI: onspeechstart(글자 변환 대기) vs onresult(실시간 받아쓰기 + 실시간 정리 카드) + 무응답 6초 워치독 자동복구 */
+  const docListeners = {};
+  const elementsById = {};
+  function makeEl(id) {
+    const el = {
+      id, value: '', style: {}, _innerHTML: '', textContent: '', focused: false,
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      setAttribute() {}, getAttribute() { return ''; }, querySelectorAll() { return []; }, querySelector() { return null; },
+      focus() { this.focused = true; }, click() {}, appendChild() {}, removeChild() {}
+    };
+    Object.defineProperty(el, 'innerHTML', { get() { return this._innerHTML; }, set(v) { this._innerHTML = String(v); } });
+    if (id) elementsById[id] = el;
+    return el;
+  }
+  ['pboxRoot', 'pboxMainArea', 'pboxSidebar', 'pboxReader', 'pboxModalBackdrop', 'pboxModalBox', 'pboxToast',
+    'pboxPromptInput', 'pboxVoiceBannerSlot', 'pboxVoiceWave', 'pboxVoiceStatePill', 'pboxVoiceLiveScreen', 'pboxLiveFactReview'
+  ].forEach(makeEl);
+
+  const speechInstances = [];
+  const watchdogTimers = [];
+  function MockSpeechRec() {
+    this.lang = '';
+    this.continuous = false;
+    this.interimResults = false;
+    this.started = false;
+    this.aborted = false;
+    this.start = () => { this.started = true; };
+    this.stop = () => {};
+    this.abort = () => { this.aborted = true; };
+    speechInstances.push(this);
+  }
+
+  const domDoc = {
+    body: makeEl('body'), activeElement: null,
+    getElementById: (id) => elementsById[id] || null,
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null, querySelectorAll: () => [],
+    addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); }
+  };
+  const uiCtx = {
+    console, URL, URLSearchParams, Blob, Uint8Array,
+    setTimeout: (fn, ms) => {
+      if (ms === 6000) { watchdogTimers.push(fn); return watchdogTimers.length; }
+      return setTimeout(fn, ms);
+    },
+    clearTimeout, setInterval, clearInterval,
+    location: { protocol: 'https:', origin: 'https://erp.pureunlabor.co.kr', href: 'https://erp.pureunlabor.co.kr/pu-pbox.html' },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    navigator: { clipboard: { writeText: async () => {} } },
+    document: domDoc,
+    PuPBoxEngine: Engine, PuPBoxCorpus: Corpus, PuPBoxLawIndex: loadLawIndex(),
+    SpeechRecognition: MockSpeechRec
+  };
+  uiCtx.window = {
+    location: uiCtx.location, navigator: uiCtx.navigator, document: domDoc, localStorage: uiCtx.localStorage,
+    PuPBoxEngine: Engine, PuPBoxCorpus: Corpus, PuPBoxLawIndex: uiCtx.PuPBoxLawIndex,
+    SpeechRecognition: MockSpeechRec,
+    confirm: () => true,
+    addEventListener: () => {}, removeEventListener: () => {}
+  };
+  uiCtx.globalThis = uiCtx.window;
+  vm.createContext(uiCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), uiCtx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), uiCtx);
+
+  const App = uiCtx.window.PuPBoxApp;
+  App.mount(elementsById.pboxRoot);
+  App.setAuthUser({ uid: 'user-voice-diag', displayName: '권형하' });
+  await new Promise((r) => setImmediate(r));
+
+  function clickAct(attrs) {
+    const btn = {
+      disabled: false,
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? btn : null)
+    };
+    (docListeners.click || []).forEach((fn) => fn({ target: btn, stopPropagation: () => {}, preventDefault: () => {} }));
+  }
+
+  /* 1) 음성 시작 → onspeechstart는 '글자 변환 대기'로 표시, 6초 무응답 시 continuous:false로 자동 재연결, 재차 무응답 시 stalled 대안 안내 */
+  clickAct({ 'data-act': 'toggle-voice-input', 'data-voice-target': 'home' });
+  assert.equal(speechInstances.length, 1);
+  assert.equal(speechInstances[0].continuous, true);
+  speechInstances[0].onspeechstart();
+  assert.ok(elementsById.pboxVoiceStatePill.textContent.includes('글자 변환 대기'), 'onresult 전에는 글자 변환 대기 상태임을 정직하게 표시해야 합니다');
+
+  assert.ok(watchdogTimers.length >= 1, '6초 무응답 감지 워치독이 등록되어야 합니다');
+  watchdogTimers[watchdogTimers.length - 1]();
+  assert.equal(speechInstances.length, 2, '1차 6초 무응답 시 자동으로 재연결되어야 합니다');
+  assert.equal(speechInstances[1].continuous, false, '자동 복구 재연결 시 안정적인 단문 모드(continuous:false)로 전환되어야 합니다');
+
+  speechInstances[1].onstart();
+  watchdogTimers[watchdogTimers.length - 1]();
+  assert.equal(speechInstances[1].aborted, true, '2차 무응답 시 stalled 안내가 덮어쓰이지 않도록 기존 인식기를 중단해야 합니다');
+  assert.ok(elementsById.pboxVoiceLiveScreen.innerHTML.includes('Win+H'), '2차 무응답 시 Windows 음성입력(Win+H) 및 재연결 안내가 표시되어야 합니다');
+
+  /* 2) [마이크 다시 연결] 후 실제 onresult 수신 시 실시간 받아쓰기 글자 수 + 입력창 반영 + 실시간 정리 카드 + [정리문으로 입력창 채우기] 동작 */
+  clickAct({ 'data-act': 'retry-voice-input' });
+  assert.equal(speechInstances.length, 3, '재연결 버튼 클릭 시 새 음성 인식기가 시작되어야 합니다');
+  speechInstances[2].onresult({
+    results: [
+      Object.assign([{ transcript: '상시 15인 회사에서 카카오톡 해고 통보를 받았는데 부당해고인지 검토해 줘' }], { isFinal: true })
+    ]
+  });
+  assert.ok(elementsById.pboxVoiceStatePill.textContent.includes('실시간 받아쓰기 중'), '실제 onresult 수신 시 실시간 받아쓰기 상태로 전환되어야 합니다');
+  assert.ok(elementsById.pboxPromptInput.value.includes('카카오톡 해고 통보'), '말한 내용이 아래 입력창에 즉시 반영되어야 합니다');
+  assert.ok(elementsById.pboxVoiceLiveScreen.innerHTML.includes('지금 말씀하신 내용 실시간 정리'), '실시간 구조화 정리 카드가 표시되어야 합니다');
+
+  clickAct({ 'data-act': 'apply-voice-organized' });
+  assert.ok(elementsById.pboxPromptInput.value.includes('[핵심 쟁점]') && elementsById.pboxPromptInput.value.includes('[요청 내용]'), '[정리문으로 입력창 채우기] 클릭 시 구조화된 요청문이 입력창에 반영되어야 합니다');
+  assert.equal(elementsById.pboxPromptInput.focused, true);
+
+  App.setAuthUser(null);
+});
