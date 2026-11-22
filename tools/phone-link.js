@@ -162,7 +162,7 @@ const 안올릴창 = ['AI 사용량 현황'];
    · 내려가 있으면(최소화) 되살리고, 잠깐 «늘 위»로 올렸다가 바로 푼다 — 윈도는 뒤에서 앞을 빼앗는 것을 막아서
      SetForegroundWindow 하나로는 작업표시줄만 깜빡일 때가 있다. 푸는 것을 빼먹으면 크롬이 영영 맨 위에 박힌다.
    · 안 떠 있으면 켠다 — Claude in Chrome 은 크롬이 떠 있어야 붙는다
-   · 덧.보기만 — 아무것도 켜거나 올리지 않고 «올릴 창 제목»만 찍는다(--dry --front 가 쓴다) */
+   · 덧.보기만 — 아무것도 켜거나 올리지 않고 «올릴 창의 종류»와 거른 창 수만 찍는다(--dry --front 가 쓴다) */
 function 앞으로스크립트(덧) {
   const 보기만 = !!(덧 && 덧.보기만);
   return [
@@ -216,7 +216,11 @@ function 앞으로스크립트(덧) {
     '$pick = @($all | Where-Object { -not $_.Skip } | Sort-Object R, Z) | Select-Object -First 1',
     "if (-not $pick) { 'skipped'; exit }",
     '$h = $pick.H',
-  ].concat(보기만 ? ["'pick: ' + $pick.T"] : [
+  ].concat(보기만 ? [
+    /* 창 제목은 웹페이지가 정하는 글(이메일·고객 이름이 들 수 있다)이라 찍지 않고 «종류»만 찍는다 */
+    "$kind = @('보통 크롬 창(탭)', '보통 엣지 창(탭)', '크롬의 다른 창', '엣지의 다른 창')[$pick.R]",
+    "'pick: ' + $kind + ' · 거른 창(대시보드) ' + @($all | Where-Object { $_.Skip }).Count + '개'",
+  ] : [
     'if ([PuWin]::IsIconic($h)) { [void][PuWin]::ShowWindowAsync($h, 9) }',
     '[void][PuWin]::SetWindowPos($h, [IntPtr](-1), 0, 0, 0, 0, 3)',
     '[void][PuWin]::SetWindowPos($h, [IntPtr](-2), 0, 0, 0, 0, 3)',
@@ -230,7 +234,7 @@ function 앞으로(마른것) {
   if (process.env.PUREUN_CHROME_FRONT === '0') return 0;
   if (마른것) {
     console.log('[dry] 크롬 창을 맨 앞으로');
-    /* 윈도에서는 «어느 창을 올릴지»만 읽어 보인다 — 켜거나 올리지 않는다 */
+    /* 윈도에서는 «어떤 창을 올릴지»(종류만, 제목은 안 찍음)만 읽어 보인다 — 켜거나 올리지 않는다 */
     if (윈도우) {
       try {
         const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', 인코딩(앞으로스크립트({ 보기만: true }))],
