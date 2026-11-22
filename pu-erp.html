@@ -1147,9 +1147,14 @@ var MENUS = [
        답이 아니오면 이것도 아니오다.
      ★ flat — 머리(▶ 대시보드 1)를 그리지 않고 항목만 낸다. 항목 하나짜리 접이는
        한 번 더 누르게 할 뿐 아무것도 안 알려 준다. 나의 업무는 로그인하면 처음 뜨는
-       화면이라 맨 위에 홑으로 있는 편이 맞다. */
+       화면이라 맨 위에 홑으로 있는 편이 맞다.
+     ★ 2026-11-22 이름 「나의 업무」 → 「오늘」 (대표 지시 「«오늘»로 바꿔」).
+       업무 목록·새 업무는 업무관리 한 곳(포털 머리줄 «📋 내 업무»)으로 옮겼고, 이 화면에는
+       오늘 할 일·휴가·캘린더·업무관리 요약만 남았다 — «내 업무»와 이름이 겹쳐 헷갈렸다.
+       그림도 📋(= 업무관리 «내 업무»)에서 ☀️ 로 갈랐다. 아이디 dash/my 는 그대로(즐겨찾기·단축키가 쓴다).
+       코드 주석 속 «나의 업무»는 모두 이 화면(dash/my · MyDeskV2)을 말한다. */
   { gid:'dash', name:'대시보드', icon:'📊', flat:true, items:[
-    { id:'dash/my',   icon:'📋', text:'나의 업무' }
+    { id:'dash/my',   icon:'☀️', text:'오늘' }
   ]},
   { gid:'biz', name:'사무관리', icon:'💼', items:[
     { id:'biz/contract',   icon:'📄', text:'계약관리' },
@@ -49043,7 +49048,7 @@ function SystemMapSection(){
     { id:'config',  icon:'⚙️', label:'설정 전파',   desc:'환경설정 변경 → 모든 모듈 드롭다운·검증 규칙 즉시 갱신' },
     { id:'archive', icon:'📦', label:'종료 아카이브', desc:'2년 이상 종료 업무 → 콜드 스토리지 자동 이전 → 조회 속도 개선' },
     { id:'auth',    icon:'🔐', label:'권한 제어',   desc:'사용자별 메뉴 접근 검사 → 데이터 접근 정책 적용 → 감사 로그 기록' },
-    { id:'mywork',  icon:'📝', label:'나의 업무',   desc:'담당 사건·컨설팅·미수금·휴가 잔여 → 한 화면 통합 표시' }
+    { id:'mywork',  icon:'📝', label:'오늘',        desc:'담당 사건·컨설팅·미수금·휴가 잔여 → 한 화면 통합 표시' }
   ];
   var curFlow = flows.find(function(x){ return x.id === flowFilter; }) || flows[0];
 
@@ -57796,7 +57801,7 @@ function FinanceLedger(props){
   async function depAskSend(list){
     if(!list || !list.length) return;
     if(!(await popConfirm('후보가 없는 입금 ' + list.length + '건을 직원에게 묻습니다.\n\n'
-      + '직원 «나의 업무» 맨 위에 날짜·금액·보낸 사람 이름만 보입니다(잔액·계좌는 안 보입니다).\n'
+      + '직원 이알피 «오늘» 화면 맨 위에 날짜·금액·보낸 사람 이름만 보입니다(잔액·계좌는 안 보입니다).\n'
       + '담당자가 어느 건인지 골라 보내면 여기 «골라 둔 짝»으로 들어옵니다 — 확정은 여기서 합니다.'))) return;
     var me = _meNow(), now = new Date().toISOString();
     var recs = list.map(function(r){ return erpDepAskMake(r, me, now); });
@@ -59536,7 +59541,7 @@ function FinanceLedger(props){
             /* 💬 직원에게 묻기 — 후보 없는 줄 가운데 아직 안 물은 것. 0이면 그리지 않고, 묻는 중인 수만 보인다 */
             (depAskNew.length>0 || depAskWait>0) && h('button',{
               onClick:function(){ if(depAskNew.length) depAskSend(depAskNew); else showToast('💬 직원 답을 기다리는 입금 '+depAskWait+'건 — 답이 오면 «골라 둔 짝»으로 들어옵니다'); },
-              title:'후보가 없는 입금을 직원 «나의 업무» 맨 위에 올립니다 — 날짜·금액·보낸 사람 이름만 보입니다\n'
+              title:'후보가 없는 입금을 직원 이알피 «오늘» 화면 맨 위에 올립니다 — 날짜·금액·보낸 사람 이름만 보입니다\n'
                     +'담당자가 어느 건인지 골라 보내면 여기 «골라 둔 짝»으로 들어옵니다(확정은 여기서)'
                     +(depAskWait?('\n지금 답을 기다리는 것 '+depAskWait+'건'):''),
               style:{padding:'3px 8px',background:depAskNew.length?'#2563eb':'#fff',color:depAskNew.length?'#fff':'#2563eb',
@@ -71488,7 +71493,7 @@ function MyDeskV2(props){
     h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems: IS_MOBILE?'center':'flex-start', marginBottom: IS_MOBILE?'8px':'14px', gap:'6px', flexWrap:'wrap' } },
       h('div', null,
         h('h2', { style:{ fontSize: IS_MOBILE?'15px':'18px', fontWeight:700, color:'#1e293b', margin: IS_MOBILE?'0':'0 0 4px', display:'flex', alignItems:'center', gap:'8px' } },
-          '📋 나의 업무'),
+          '☀️ 오늘'),
         /* ⚠ 이름이 비면 「 · 담당자 · 2026-08 기준」처럼 앞이 텅 빈 줄이 됐다.
              누구 화면인지 알 수 없으니, 이름 자리에 그 사실을 적는다. */
         !IS_MOBILE && h('div', { style:{ fontSize:'12px', color: name ? '#94a3b8' : '#d97706', fontWeight: name ? 400 : 700 } },
@@ -97788,7 +97793,7 @@ document.addEventListener('keydown', function(e){
       + '<button class="x" style="background:rgba(255,255,255,0.15);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;">×</button></div>'
       + '<div style="padding:16px 20px;max-height:70vh;overflow-y:auto;">'
       + grp('이동·검색', [row('Ctrl + K','전역 검색'), row('/','현재 화면 검색창으로 포커스'),
-          row('Alt + 1~9','1 나의업무 · 2 업체 · 3 사건 · 4 컨설팅 · 5 계약 · 6 입금 · 7 근태 · 8 법인대시보드 · 9 환경설정'),
+          row('Alt + 1~9','1 오늘 · 2 업체 · 3 사건 · 4 컨설팅 · 5 계약 · 6 입금 · 7 근태 · 8 법인대시보드 · 9 환경설정'),
           row('Ctrl + /','이 안내판 열기/닫기')])
       + grp('작업', [row('Ctrl + S','열린 모달 저장'), row('Ctrl + N','현재 화면 등록/추가'),
           row('Esc','모달 닫기'), row('Enter','검색 실행 · 입력 저장'), row('Shift + Enter','메모 줄바꿈')])
