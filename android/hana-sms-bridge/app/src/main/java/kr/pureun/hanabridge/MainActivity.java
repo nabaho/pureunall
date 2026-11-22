@@ -193,7 +193,7 @@ public final class MainActivity extends Activity {
         stepPair.addView(connect, withTop(matchWrap(), 10));
 
         /* 대표가 「어디에 있나」를 물은 자리다 — 폰 앱이 스스로 답한다 */
-        TextView where = text("번호는 PC 푸른이알피 → 재무관리 → 거래내역 → 📱 하나문자 → 🔗 휴대폰 연결", 13, Color.rgb(100, 116, 139));
+        TextView where = text("번호는 재무관리 앱 → 거래내역 → ⚙ 도구 → 📱 하나문자 → 🔗 휴대폰 연결\n(또는 거래내역 맨 위 📱 › 표를 누르면 «8자리 번호 받기»가 나옵니다)", 13, Color.rgb(100, 116, 139));
         where.setPadding(dp(2), dp(10), dp(2), 0);
         stepPair.addView(where);
 
@@ -261,6 +261,11 @@ public final class MainActivity extends Activity {
         Button sendSms = button("방문 안내 문자 보내기 허용", Color.rgb(37, 99, 235));
         sendSms.setOnClickListener(v -> askSendSms());
         moreBox.addView(sendSms, withTop(matchWrap(), 8));
+
+        /* 통화 후 명함 문자 (2026-11-16) — 설정 화면은 따로 연다. 권한은 거기서 스위치를 켤 때 묻는다. */
+        Button cardSms = button("통화 후 명함 문자", Color.rgb(124, 58, 237));
+        cardSms.setOnClickListener(v -> startActivity(new Intent(this, CardSmsActivity.class)));
+        moreBox.addView(cardSms, withTop(matchWrap(), 8));
 
         /* ⚠ 예전에는 「문자 읽기 권한은 사용하지 않습니다」라고 적혀 있었다.
              지난 문자 가져오기를 넣으면서 그 말이 «거짓»이 되었다 —
