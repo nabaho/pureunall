@@ -1434,6 +1434,7 @@ async function pickLoad(){
 /* 하루 한 번 자동 — 자료를 받은 뒤 «쓸 만한 줄»이 있을 때만 · 이미 열린 팝업은 덮지 않는다 */
 async function pickAuto(){
   try{
+    if(/[?&]digest=1(?:&|$)/.test(String(location.search||''))) return;   /* 📮 카톡 «전체 보기»(?digest=1)로 들어왔으면 오늘의 요약 팝업과 겹치지 않게 물러난다 */
     if(typeof GovPick==='undefined' || !fbDb || !fbUid) return;
     await pickLoad();
     var res=pickRank(); pickBadge(res);
@@ -1444,6 +1445,38 @@ async function pickAuto(){
     lsSet('pick_day', day);
     pickOpen(true);
   }catch(e){}
+}
+/* ═══ 📮 오늘의 요약 — 카톡 «전체 보기» 단추가 여는 곳 (대표 지시 2026-11-22 「카카오톡으로 매일 받고 싶다」 → 「공식 방식으로」) ═══
+   서버(govDigestKakao, 매일 08:30)가 gov_digest/last 에 쓴 «오늘의 요약»을 «읽기만» 한다 — 규칙은 공고 모아보기·🎯 지원할 만한 것과 같다(functions/gov-digest.js).
+   카톡 글은 200자라 줄마다 원문 주소를 못 싣는다 → 여기서 줄마다 원문으로 간다.
+   ⚠ 서버가 못 보냈을 때의 이유 코드(gov_digest/status)도 쉬운 말로 보여 준다. 카카오 토큰은 여기 없다(서버 전용 자리).
+   ⚠ 남이 쓴 글이라 모든 글은 esc() 를 거치고, 원문 주소는 https 만 링크로 건다(javascript: 같은 것은 못 쓴다). */
+var DIGEST_WHY={ 'not-connected':'카카오 연결이 아직 안 됐습니다', 'reconnect-needed':'카카오 연결이 풀렸습니다 — 다시 연결해야 합니다', 'refresh-failed':'카카오 토큰을 갱신하지 못했습니다', 'send-failed':'카카오가 메시지를 받아 주지 않았습니다', 'no-data':'서버가 모은 공고가 아직 없습니다', 'owner-revoked':'카톡을 받던 계정이 지금은 대표(총괄 관리자)·재직이 아니거나 ERP 카카오 연결이 바뀌었습니다 — 다시 연결해야 합니다', 'send-unknown':'마지막 카톡이 갔는지 확실하지 않습니다(통신 오류) — 같은 글을 또 보내지 않았습니다', 'record-failed':'카톡은 갔지만 기록을 못 남겼습니다 — 같은 글을 또 보내지 않았습니다', 'reconnected':'그사이 카카오를 다시 연결해 이번 보내기를 건너뛰었습니다', 'owner-check-failed':'자격을 확인하다 오류가 나 이번 보내기를 건너뛰었습니다 — 다음에 다시 시도합니다' };
+function digestBody(v, st){
+  var head='';
+  if(st && st.ok===false) head+='<div class="sml" style="color:var(--amber);margin-bottom:6px">⚠ 마지막 카톡 보내기가 안 됐습니다 — '+esc(DIGEST_WHY[st.error]||'알 수 없는 오류')+'</div>';
+  if(!v || !v.sections) return head+'<div class="empty" style="padding:18px 6px">아직 요약이 없습니다 — 서버가 매일 아침 8시 30분에 만듭니다.</div>';
+  var intro='<div class="sml" style="margin-bottom:6px">'+esc(String(v.today||''))+' 기준 · 새로 걸린 것 <b>'+(v.fresh|0)+'</b>건 · 마감 임박 <b>'+(v.remind|0)+'</b>건. '
+    +'정부사업신청 화면과 같은 규칙으로 서버가 추렸습니다 — 수의계약·마감 지난 것은 뺐습니다. 틀릴 수 있으니 원문을 확인해 주세요.</div>';
+  var body=v.sections.map(function(sec){
+    var items=(sec&&sec.items)||[];
+    var rows=items.length ? items.map(function(x,i){
+      var t=esc(x.title||''), u=/^https:\/\//.test(String(x.url||''))?String(x.url):'';
+      var link=u?'<a class="tlink" href="'+esc(u)+'" target="_blank" rel="noopener">'+t+'</a>':'<b>'+t+'</b>';
+      var tags=(x.isNew?' <span class="tag teal">새</span>':'')+(x.isSoon?' <span class="tag amber">⏰ 마감 임박</span>':'');
+      var why=(x.why||[]).map(function(w){ return '<span>'+esc(w)+'</span>'; }).join('');
+      return '<div class="pk-row"><div class="pk-no">'+(i+1)+'</div><div class="pk-main"><div class="pk-ttl">'+link+tags+'</div>'
+        +'<div class="pk-sub">'+esc([x.org,x.due].filter(Boolean).join(' · '))+'</div>'+(why?'<div class="pk-why">'+why+'</div>':'')+'</div></div>';
+    }).join('') : '<div class="sml" style="padding:6px 4px;color:var(--text-mute)">오늘은 이 갈래에 걸린 것이 없습니다.</div>';
+    return '<div style="margin:10px 0 2px;font-weight:700">'+esc((sec&&sec.title)||'')+' <span class="sml">'+items.length+'건</span></div>'+rows;
+  }).join('');
+  return head+intro+body;
+}
+async function digestOpen(){
+  if(!fbDb||!fbUid) return;
+  var o={};
+  try{ o=(await fbDb.ref('gov_digest').once('value')).val()||{}; }catch(e){ o={}; }
+  popOpen('📮 오늘의 요약', digestBody(o.last||null, o.status||null));
 }
 /* ═══ 📡 수집 상태 — 나라장터·알리오·기업마당이 «계속 새로 들어오는지» (대표 지시 2026-10-19) ═══
    출처마다 마지막으로 받은 때·건수·받은 «전체» 중 가장 최근 게시일(걸러진 공고가 아니라 받은 전체 — 걸린 건 드물어 목록 날짜로는 못 안다).
@@ -3941,7 +3974,8 @@ function boot(){
     await cloudPull(); await inboxPull(); srcBackfill(); rejudge(); drawKw(); draw(); readyNote(); auto();
     /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
     setTab(lsGet('tab'));
-    pickAuto();   /* 🎯 하루 한 번 — 쓸 만한 줄이 있을 때만 팝업 */
+    pickAuto();   /* 🎯 하루 한 번 — 쓸 만한 줄이 있을 때만 팝업(카톡 «전체 보기»로 들어오면 스스로 물러난다) */
+    if(/[?&]digest=1(?:&|$)/.test(location.search)) digestOpen();   /* 📮 카톡 «전체 보기» 로 들어오면 오늘의 요약을 연다 */
   });
 }
 boot();
