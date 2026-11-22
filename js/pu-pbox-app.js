@@ -3805,7 +3805,7 @@
       '    <div class="pbox-sec-hd"><span>본문 직접 붙여넣기</span></div>',
       '    <textarea id="pboxIngestTa" class="pbox-textarea" rows="5" aria-label="수집할 판결문 본문 입력" placeholder="판결문·결정문·유권해석 본문을 붙여넣으세요">' + esc(state.ingestRawText) + '</textarea>',
       '    <div style="margin-top:8px">',
-      '      <label class="pbox-chk-line"><input type="checkbox" id="pboxShareConfirmChk" aria-label="비식별화 마스킹 결과 검토 완료 및 사무실 공유 DB 동시 업로드"' + (state.ingestShareConfirmed ? ' checked' : '') + '> 비식별화 결과를 확인했으며 사무실 공유 DB에도 함께 업로드합니다</label>',
+      '      <div class="pbox-badge-green" style="display:inline-flex;align-items:center;gap:6px">🔒 본인 계정 전용 비공개 보관 — 업로드·수집한 사건·판례는 로그인한 본인만 검색·열람하며 다른 직원에게는 절대 노출되지 않습니다</div>',
       '    </div>',
       '    <div class="pbox-btn-group" style="margin-top:10px">',
       '      <button type="button" class="pbox-btn-sm" data-act="preview-ingest"' + busyAttr + '>미리보기</button>',
@@ -4429,8 +4429,7 @@
     var startGen = global.PuPBoxStore.getSessionGen();
     var startUid = global.PuPBoxStore.getActiveUid();
     var startAuth = snapshotAuthForUid(startUid);
-    var shareChk = document.getElementById('pboxShareConfirmChk');
-    var allowShare = !!(shareChk && shareChk.checked);
+    var allowShare = false;
 
     state.ingestBusy = true;
     if (state.view === 'ingest') renderMain();
@@ -5603,9 +5602,8 @@
       }
     } else if (act === 'commit-ingest') {
       var ita2 = document.getElementById('pboxIngestTa');
-      var schk2 = document.getElementById('pboxShareConfirmChk');
       var raw2 = ita2 ? ita2.value : state.ingestRawText;
-      var allowShare2 = !!(schk2 && schk2.checked);
+      var allowShare2 = false;
       if (!raw2.trim()) { toast('적재할 본문을 입력해 주세요.', 'err'); return; }
       try {
         var ing = global.PuPBoxEngine.ingestRawDocument(raw2, { sourceLabel: '직접 입력 수집' });
