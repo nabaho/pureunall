@@ -493,3 +493,65 @@ test('요율표 칸 머리 두 줄 — 끝의 괄호 한 덩이만 2줄로, 자�
   assert.match(th(2), /title="[^"]*설정 필요/, '설정 필요는 마우스를 올릴 때');
   assert.doesNotMatch(visible(th(2)), /설정 필요/, '머리에 글자로 늘어놓지 않는다');
 });
+
+/* ── 함께 정산 — 정산표 ☐ · 이 달 전체 · 합산 표(사람 × 사업별 차액, 합계·정산 방향, 주관 합계) ── */
+test('정산 확인 — 정산표마다 «함께 정산» ☐, 둘 이상이면 «이 달 전체 함께 정산», 고른 게 있으면 «선택 풀기 N»', () => {
+  const r1 = fakeRun('draft'), r2 = Object.assign({}, fakeRun('confirmed'), { id: 'cons-b_2026-10', typeCode: 'cons-b' }), m = Object.assign({}, fakeRun('manual'), { id: 'cons-m_2026-10', typeCode: 'cons-m', status: 'manual' });
+  const h = V.monthRuns([r1, r2, m], { names: NAMES, biz: { 'cons-test': 'A사업', 'cons-b': 'B사업', 'cons-m': 'M사업' }, comb: { 'cons-b_2026-10': 1 }, combN: 1 });
+  assert.match(h, /<input type="checkbox" data-comb="cons-test_2026-10">/);
+  assert.match(h, /<input type="checkbox" data-comb="cons-b_2026-10" checked>/);
+  assert.doesNotMatch(h, /data-comb="cons-m_2026-10"/, '기록만 정산표는 합칠 수 없다');
+  assert.match(h, /data-comb-all/);
+  assert.match(h, /data-comb-clear>선택 풀기 1</);
+  /* 합칠 수 있는 정산표가 하나뿐이면 «이 달 전체» 단추가 없다 */
+  const one = V.monthRuns([r1], { names: NAMES, biz: {} });
+  assert.doesNotMatch(one, /data-comb-all|data-comb-clear/);
+  assert.match(one, /data-comb="cons-test_2026-10"/);
+});
+
+test('함께 정산 상자 — 사람 × 사업별 차액(+초록 − 주황), 합계·방향, 주관 합계, 확정 전이면 복사 없음, 모두 확정이면 복사', () => {
+  const site = (lead, staff) => ({ company: '가나', round: 1, members: [{ role: 'lead', sid: lead, name: '주관' }].concat(staff.map(([sid, name, settle]) => ({ role: 'staff', sid, name, settle }))) });
+  const mk = (id, type, status, staff, transfers) => ({ id, typeCode: type, monthKey: '2026-11', label: '2026년 11월', status, sites: [site('L1', staff)], transfers: transfers || [] });
+  const A = mk('A', 'cons-a', 'confirmed', [['S1', '김가나', -87915], ['S2', '<b>이다라</b>', 50000]]);
+  const B = mk('B', 'cons-b', 'confirmed', [['S1', '김가나', 675933]]);
+  const names = { L1: '홍길동', S1: '김가나', S2: '<b>이다라</b>' };
+  const title = { A: '일터혁신상생컨설팅 (에프엠어소시에이션)', B: '산업일자리전환컨설팅 (한국능률협회)' };
+  const ok = V.combBox(C.combineRuns([A, B], names), { title });
+  const v = visible(ok);
+  /* 사업 이름은 괄호 앞만, 전체는 마우스를 올릴 때 */
+  assert.match(ok, /<span class="cn">일터혁신상생컨설팅<\/span><span class="cm">2026년 11월<\/span>/);
+  assert.match(ok, /title="일터혁신상생컨설팅 \(에프엠어소시에이션\) \(2026년 11월\)"/);
+  assert.match(v, /−87,915/);
+  assert.match(v, /\+675,933/);
+  assert.match(v, /\+588,018/, '사람 합계 = 반환 87,915 와 추가 지급 675,933 의 상계');
+  assert.match(v, /추가 지급 588,018원/);
+  assert.match(ok, /class="r cv pos">\+675,933</);
+  assert.match(ok, /class="r cv neg">−87,915</);
+  assert.match(v, /—/, '한 사업에만 든 사람의 빈 칸');
+  assert.match(v, /합계[\s\S]*주관 순 지급 638,018원/, '주관 합계(줄 돈 − 받을 돈)');
+  assert.match(ok, /title="줄 돈 638,018원 · 받을 돈 0원"/);
+  /* 모두 확정 → 사람마다 복사 */
+  assert.match(ok, /data-comb-copy="S1\|L1"/);
+  assert.match(ok, /data-comb-copy="S2\|L1"/);
+  assert.doesNotMatch(v, /확정 전 포함/);
+  assert.doesNotMatch(ok, /<b>이다라/, '글 끼워 넣기');
+  /* 확정 전이 끼면 — 미리보기, 복사 없음 */
+  const draft = V.combBox(C.combineRuns([A, Object.assign({}, B, { status: 'draft' })], names), { title });
+  assert.match(visible(draft), /확정 전 포함 · 미리보기/);
+  assert.doesNotMatch(draft, /data-comb-copy=/);
+  assert.match(draft, /확정 전<\/span><\/th>/);
+  /* 이미 보낸 정산표가 끼면 경고 */
+  const sent = V.combBox(C.combineRuns([Object.assign({}, A, { transfers: [{ paid: true }] }), B], names), { title });
+  assert.match(visible(sent), /이미 송금\(«보냄 표시»\)한 정산표가 들어 있습니다[\s\S]*이중 지급/);
+  assert.doesNotMatch(visible(ok), /이미 송금/);
+  /* 주관이 둘이면 줄이 따로 · 주관 칸 */
+  const C2 = mk('C', 'cons-c', 'confirmed', []); C2.sites = [site('L2', [['S1', '김가나', 1000]])];
+  const mixed = V.combBox(C.combineRuns([A, C2], Object.assign({ L2: '박주관' }, names)), { title: Object.assign({ C: '다사업' }, title) });
+  assert.match(mixed, /<th>주관<\/th>/);
+  assert.match(visible(mixed), /→ 홍길동/);
+  assert.match(visible(mixed), /→ 박주관/);
+  assert.match(visible(mixed), /박주관 합계/);
+  /* 빈 자료 */
+  assert.match(visible(V.combBox(C.combineRuns([], {}), {})), /담당노무사 정산이 있는 줄이 없습니다/);
+  assert.doesNotMatch(visible(ok), /T-[A-Z]/);
+});

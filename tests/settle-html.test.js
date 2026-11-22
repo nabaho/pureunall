@@ -218,7 +218,8 @@ test('월별 정산 — 해 넘기기 · 열두 달 줄 · 고른 달의 ① 입
   assert.ok(NOC.indexOf('id="step1"') < NOC.indexOf('id="step2"') && NOC.indexOf('id="step2"') < NOC.indexOf('id="step3"'), '①②③ 차례');
   const dm = fnBody('function drawMonth(');
   assert.match(dm, /V\.monthStrip\(YEAR, monthInfo\(\), CUR_MONTH\)/);
-  assert.match(dm, /V\.monthRuns\(runs/);
+  assert.match(dm, /drawRunsBox\(runs\)/);
+  assert.match(fnBody('function drawRunsBox('), /V\.monthRuns\(runs/);
   assert.match(dm, /drawAuto\(runs\)/);
   assert.match(dm, /drawSend\(runs\)/);
   assert.match(fnBody('function monthRunsOf('), /yearRuns\(\)\.filter\(function\(r\)\{ return r\.monthKey===key; \}\)/);
@@ -437,4 +438,32 @@ test('월별 한 화면 — 카톡 보내기는 사람 줄·카톡 방을 누를
   /* PC 카톡 연결은 한 줄짜리 딱지(긴 경고 줄은 설정 › 카톡 연결에서만) */
   assert.match(fnBody('function drawSend('), /V\.agentPill\(/);
   assert.match(fnBody('function drawRooms('), /V\.agentLine\(/);
+});
+
+test('함께 정산 — ☐ 로 고른 정산표(달이 달라도)를 사람별로 상계해 «보여 주기만» 하고, 복사는 모두 확정일 때만 (대표 2026-11-22)', () => {
+  assert.match(NOC, /id="stepC"/);
+  assert.ok(NOC.indexOf('id="step2"') < NOC.indexOf('id="stepC"') && NOC.indexOf('id="stepC"') < NOC.indexOf('id="step3"'), '② 아래 ③ 위');
+  /* 고르기 — ☐ 하나씩, 이 달 전체, 풀기. 서버에 쓰지 않는다 */
+  assert.match(NOC, /input\[data-comb\]/);
+  assert.match(NOC, /closest\('\[data-comb-all\]'\)/);
+  assert.match(NOC, /closest\('\[data-comb-clear\]'\)/);
+  ['function combRuns(', 'function drawComb(', 'function copyCombined(', 'function drawRunsBox('].forEach((h) =>
+    assert.doesNotMatch(fnBody(h), /gate\.save|patchRecord|save\(|softDelete|fbDb\.ref/, h + ' 가 서버에 쓰거나 읽는다'));
+  /* 둘 이상일 때만 패널, 기록만·지운 정산표는 안 넣는다, 지워진 것은 고른 목록에서 뺀다 */
+  const dc = fnBody('function drawComb(');
+  assert.match(dc, /rs\.length<2/);
+  assert.match(dc, /delete COMB\[rid\]/);
+  assert.match(dc, /V\.combBox\(C\.combineRuns\(rs, NAMES\)/);
+  const cr = fnBody('function combRuns(');
+  assert.match(cr, /r\.status==='draft' \|\| r\.status==='confirmed'/);
+  assert.match(cr, /!r\._deleted/);
+  /* 복사는 모두 확정일 때만 */
+  const cc = fnBody('function copyCombined(');
+  assert.match(cc, /r\.status!=='confirmed'/);
+  assert.ok(cc.indexOf("r.status!=='confirmed'") < cc.indexOf('C.combinedMessage('), '검사가 문구 만들기보다 먼저');
+  /* 달을 바꿔도 고른 것은 이어지고(달을 넘는 합산), 해를 바꾸면 비운다 */
+  assert.doesNotMatch(NOC.match(/closest\('\[data-month\]'\)[\s\S]{0,400}/)[0].split('return; }')[0], /COMB=\{\}/, '달을 바꾸면 고른 것이 사라진다');
+  assert.match(fnBody('function setYear('), /COMB=\{\}/);
+  /* 그릴 때마다 패널도 */
+  assert.match(fnBody('function drawMonth('), /drawComb\(\)/);
 });

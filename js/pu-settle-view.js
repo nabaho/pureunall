@@ -106,13 +106,18 @@
     opt = opt || {};
     var names = opt.names || {}, biz = opt.biz || {};
     var list = (runs || []).filter(function (r) { return r && !r._deleted; });
-    var h = stepHead(2, '정산 확인', '사업장별 자세한 표·통장 실입금 고치기는 «자세히»', '');
+    var comb = opt.comb || {}, can = list.filter(function (r) { return r.status === 'draft' || r.status === 'confirmed'; });
+    var right = (can.length >= 2 ? '<button class="sm" data-comb-all title="이 달 정산표를 모두 골라 함께 정산(플러스·마이너스 상계)">이 달 전체 함께 정산</button>' : '')
+      + (opt.combN ? '<button class="sm" data-comb-clear>선택 풀기 ' + esc(opt.combN) + '</button>' : '');
+    var h = stepHead(2, '정산 확인', '사업장별 자세한 표·통장 실입금 고치기는 «자세히» · 정산표 앞 ☐ 를 둘 이상 고르면 «함께 정산»(여러 사업을 합쳐 플러스·마이너스 상계)이 아래에 나옵니다', right);
     if (!list.length) return h + '<div class="empty">정산표가 없습니다.</div>';
     list.forEach(function (r) {
       var draft = r.status === 'draft', tr = draft ? previewTransfers(r.sites) : (r.transfers || []), open = r.id === opt.cur, iss = issuesOf(r).length, leadBy = {};
       (r.sites || []).forEach(function (s) { s.members.forEach(function (m) { if (m.role === 'lead') leadBy[s.consultingId || s.company] = m.sid; }); });
       var bn = biz[r.typeCode] || r.typeCode || '';
-      h += '<div class="mrun' + (open ? ' on' : '') + '"><div class="mrun-h"><b title="' + esc(bn) + '">' + esc(bn) + '</b>'
+      var ck = r.status === 'draft' || r.status === 'confirmed'
+        ? '<label class="ck" title="함께 정산할 사업으로 고르기"><input type="checkbox" data-comb="' + esc(r.id) + '"' + (comb[r.id] ? ' checked' : '') + '></label>' : '';
+      h += '<div class="mrun' + (open ? ' on' : '') + '"><div class="mrun-h">' + ck + '<b title="' + esc(bn) + '">' + esc(bn) + '</b>'
         + '<span class="pill st-' + esc(r.status) + '">' + esc(STATUS_KO[r.status] || r.status) + '</span>' + (r.changed ? '<span class="pill st-chg">바뀜</span>' : '')
         + (iss ? '<span class="pill bad-pill">확인 필요 ' + iss + '</span>' : '') + '<span class="sp"></span>'
         + (draft ? '<button class="sm pri" data-act="confirm" data-rid="' + esc(r.id) + '">확정</button>' : '')
@@ -598,6 +603,53 @@
     }).join('') + '</div>';
   }
 
+  /* ── 함께 정산 — 고른 정산표(둘 이상)의 사람별 차액을 더해 플러스·마이너스를 상계한다(대표 지시 2026-11-22) ──
+     comb = C.combineRuns 결과. opt = {title:{rid:사업 이름}}.  읽기만 — 정산표·송금·카톡 기록은 바꾸지 않는다.
+     표: 사람 · 사업별 차액(+ 추가 지급 · − 반환) · 합계 · 정산 방향 · (모두 확정이면) 복사. 아래에 주관별 합계(줄 돈·받을 돈·순).
+     ⚠ 이미 «보냄 표시»한 정산표가 들어 있으면 이중 지급이 될 수 있어 경고한다. 확정 전이 하나라도 있으면 복사는 없다(미리보기). */
+  function signed(v) { v = Number(v) || 0; return (v > 0 ? '+' : v < 0 ? '−' : '') + C.fmt(Math.abs(v)); }
+  function dirPill(v) {
+    v = Number(v) || 0;
+    return v > 0 ? '<span class="pill dir-more">추가 지급 ' + esc(C.fmt(v)) + '원</span>' : v < 0 ? '<span class="pill dir-back">반환 ' + esc(C.fmt(-v)) + '원</span>' : '<span class="pill">주고받을 금액 없음</span>';
+  }
+  function combBox(comb, opt) {
+    comb = comb || { cols: [], rows: [], leads: [] }; opt = opt || {};
+    var cols = comb.cols || [], rows = comb.rows || [], titles = opt.title || {};
+    var allOk = cols.length > 0 && cols.every(function (c) { return c.status === 'confirmed'; });
+    var short = function (t) { var m = String(t || '').match(/^(.*?)\s*\([^()]*\)\s*$/); return m && m[1] ? m[1] : String(t || ''); };
+    var months = [], seen = {};
+    cols.forEach(function (c) { var m = c.label || c.monthKey; if (m && !seen[m]) { seen[m] = 1; months.push(m); } });
+    var head = '<span class="hint" title="' + esc(cols.map(function (c) { return (titles[c.rid] || c.typeCode) + ' (' + (c.label || c.monthKey) + ')'; }).join(' + ')) + '">'
+      + esc(cols.map(function (c) { return short(titles[c.rid] || c.typeCode); }).join(' + ')) + (months.length ? ' · ' + esc(months.join(' · ')) : '') + '</span>';
+    var right = head + (allOk ? '' : '<span class="pill st-draft" title="확정 전 정산표가 들어 있어 문구 복사는 모두 확정한 뒤에만 됩니다">확정 전 포함 · 미리보기</span>')
+      + '<button class="sm" data-comb-clear>선택 풀기</button>';
+    var h = stepHead('합', '함께 정산', '고른 정산표의 차액을 사람마다 더해 플러스·마이너스를 맞춥니다 — 사업별로 따로 보내지 않고 합계만 주고받습니다 · 정산표·송금·카톡 기록은 바꾸지 않습니다 · + 는 주관이 줄 돈, − 는 받을 돈', right);
+    var sent = cols.filter(function (c) { return c.sent; });
+    if (sent.length) h += '<div class="warn">⚠ 이미 송금(«보냄 표시»)한 정산표가 들어 있습니다 — ' + esc(sent.map(function (c) { return short(titles[c.rid] || c.typeCode) + ' ' + (c.label || c.monthKey); }).join(' · ')) + ' · 이중 지급이 되지 않게 합계에서 빼려면 ☐ 를 풀어 주세요</div>';
+    if (!rows.length) return h + '<div class="empty">담당노무사 정산이 있는 줄이 없습니다.</div>';
+    var th = '<th>받는 사람</th>' + (comb.mixed ? '<th>주관</th>' : '')
+      + cols.map(function (c) {
+        var t = titles[c.rid] || c.typeCode;
+        return '<th class="r" title="' + esc(t + ' (' + (c.label || c.monthKey) + ')') + '"><span class="cn">' + esc(short(t)) + '</span><span class="cm">' + esc(c.label || c.monthKey) + (c.status === 'draft' ? ' · 확정 전' : '') + '</span></th>';
+      }).join('') + '<th class="r">합계</th><th>정산</th>' + (allOk ? '<th></th>' : '');
+    var cell = function (v) { return v == null ? '<td class="r hint">—</td>' : '<td class="r cv ' + (v > 0 ? 'pos' : v < 0 ? 'neg' : '') + '">' + esc(signed(v)) + '</td>'; };
+    var body = rows.map(function (r) {
+      return '<tr><td class="ti" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' + (comb.mixed ? '<td class="nw hint" title="' + esc(r.leadName) + '">→ ' + esc(r.leadName) + '</td>' : '')
+        + cols.map(function (c) { return cell(r.parts[c.rid]); }).join('')
+        + '<td class="r cv ' + (r.net > 0 ? 'pos' : r.net < 0 ? 'neg' : '') + '"><b>' + esc(signed(r.net)) + '</b></td><td class="nw">' + dirPill(r.net) + '</td>'
+        + (allOk ? '<td class="nw"><button class="sm" data-comb-copy="' + esc(r.sid + '|' + r.leadSid) + '">복사</button></td>' : '') + '</tr>';
+    }).join('');
+    var foot = (comb.leads || []).map(function (L) {
+      var tip = '줄 돈 ' + C.fmt(L.pay) + '원 · 받을 돈 ' + C.fmt(L.back) + '원';
+      return '<tr class="sum"><td title="+ 는 주관이 내줄 돈, − 는 받을 돈">' + esc(comb.mixed ? (L.leadName || '주관') + ' 합계' : '합계') + '</td>' + (comb.mixed ? '<td></td>' : '')
+        + cols.map(function (c) { return cell(L.parts[c.rid] == null ? 0 : L.parts[c.rid]); }).join('')
+        + '<td class="r cv ' + (L.net > 0 ? 'pos' : L.net < 0 ? 'neg' : '') + '"><b title="' + esc(tip) + '">' + esc(signed(L.net)) + '</b></td>'
+        + '<td class="nw" title="' + esc(tip) + '">' + (L.net > 0 ? '<span class="pill dir-more">주관 순 지급 ' + esc(C.fmt(L.net)) + '원</span>' : L.net < 0 ? '<span class="pill dir-back">주관 순 수령 ' + esc(C.fmt(-L.net)) + '원</span>' : '<span class="pill">순 0원</span>') + '</td>'
+        + (allOk ? '<td></td>' : '') + '</tr>';
+    }).join('');
+    return h + '<div class="scroll"><table class="t kc"><thead><tr>' + th + '</tr></thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>';
+  }
+
   /* ── ⑤-1 카톡 자동 발송 — 대기열 상태 딱지 · 심부름꾼 상태 · 카톡 방 · 보낸 기록 ── */
   function kqState(k) {
     if (!k) return { cls: '', text: '' };
@@ -643,6 +695,6 @@
     return h + '</tbody></table></div>';
   }
 
-  return { STATUS_KO: STATUS_KO, esc: esc, kqState: kqState, agentLine: agentLine, agentPill: agentPill, roomsTable: roomsTable, kqTable: kqTable, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, monthStrip: monthStrip, reviewBox: reviewBox, monthRuns: monthRuns, monthMsgs: monthMsgs, splitMsg: splitMsg, yearMonths: yearMonths, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
+  return { STATUS_KO: STATUS_KO, esc: esc, kqState: kqState, agentLine: agentLine, agentPill: agentPill, combBox: combBox, roomsTable: roomsTable, kqTable: kqTable, calcBox: calcBox, calcResult: calcResult, revBox: revBox, revResult: revResult, yearBox: yearBox, monthStrip: monthStrip, reviewBox: reviewBox, monthRuns: monthRuns, monthMsgs: monthMsgs, splitMsg: splitMsg, yearMonths: yearMonths, manualBox: manualBox, runDetail: runDetail, depositBox: depositBox, noticesTable: noticesTable, linkBox: linkBox,
     rateMatrix: rateMatrix, ruleDetails: ruleDetails, adjustsTable: adjustsTable };
 });
