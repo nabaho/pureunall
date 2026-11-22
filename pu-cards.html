@@ -27786,6 +27786,16 @@ function mbLiveStart(){
   }, ()=>{ _mbLiveOn = false; }); }catch(_){ _mbLiveOn = false; }
 }
 function mbLiveApply(m){
+  /* ★ 다음메일에 폴더가 «생기거나 없어졌는가» (대표 지시 2026-11-22
+       「다음메일에서 새 폴더를 만들면 푸른메일함에도 자동으로 만들어지게」)
+     — 새 폴더는 푸른 분류의 「업무별」 칸으로 저절로 나타난다(mbBins). 그런데 열려 있는 화면은 폴더 목록을
+       「뺀 메일이 있거나 새 메일이 온 회차」에만 다시 읽었다. 빈 새 폴더만 생긴 회차(rows 0 · gone 없음)에는
+       다시 읽지 않아, 새로고침하기 전까지 옆줄에 안 나타났다.
+     ⚠ 폴더 «기록»의 개수와 견주지 않는다 — 다음메일에서 지우거나 이름을 바꾼 폴더의 옛 기록이 서버에 남아 있으면
+       개수가 늘 달라 회차마다 다시 읽게 된다. 서버 회차 기록(meta.folders)끼리, 「폴더 목록을 읽은 때의 값」과
+       「이번 회차의 값」만 견준다. 숫자가 아니면(옛 기록·못 읽음) 견주지 않는다. 합치기 «전에» 견준다. */
+  const folderWas = (_mbMeta||{}).folders, folderNow = m.folders;
+  const folderMoved = typeof folderWas==='number' && typeof folderNow==='number' && folderWas !== folderNow;
   _mbMeta = Object.assign({}, _mbMeta||{}, m);
   /* ① 그 회차가 뺀 메일 — 「칸:번호」 */
   let dropped = 0, openGone = false;
@@ -27812,9 +27822,9 @@ function mbLiveApply(m){
       .catch(()=>{ /* 다음 회차에 또 본다 */ });
   }) : [];
   /* 옆줄 수(안 읽음·통수)도 새것으로 */
-  const fold = (dropped || asks.length) ? new Promise(ok=>loadMailFolders(ok)) : Promise.resolve();
+  const fold = (dropped || asks.length || folderMoved) ? new Promise(ok=>loadMailFolders(ok)) : Promise.resolve();
   return Promise.all(asks.concat([fold])).then(()=>{
-    if(!dropped && !asks.length) return;
+    if(!dropped && !asks.length && !folderMoved) return;
     mbMemoClear();
     if(state.view!=='mail') return;
     renderPCSide();

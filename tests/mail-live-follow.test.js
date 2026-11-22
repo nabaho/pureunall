@@ -48,7 +48,7 @@ function makeBox(o) {
     firebase: { database: () => db },
     state: Object.assign({ view: 'mail', mailSent: 'box', mbOpen: null }, opt.state || {}),
     _mbMsgs: opt.msgs || {},
-    _mbMeta: {},
+    _mbMeta: opt.meta || {},
     document: { activeElement: opt.active || null },
     mbAuthOk: () => true,
     mbMemoClear: () => {},
@@ -95,6 +95,64 @@ test('★ 바뀐 것이 없는 회차에는 아무것도 안 묻고 안 그린�
   assert.equal(b.__calls.asks.length, 0);
   assert.equal(b.__calls.folders, 0);
   assert.equal(b.__calls.page, 0);
+});
+
+/* ── 다음메일에 새 폴더가 «생기면» 열려 있는 화면 옆줄에도 저절로 나타난다 (대표 지시 2026-11-22) ──
+   새 폴더는 mbBins 가 업무별 칸으로 바로 세운다. 그런데 화면이 폴더 목록을 «다시 읽어야» 보인다.
+   빈 새 폴더만 생긴 회차(새 메일 0 · 뺀 메일 없음)에도 다시 읽는지를 «돌려서» 본다. */
+test('★★ 빈 새 폴더만 생긴 회차에도 폴더 목록을 다시 읽고 옆줄을 새로 그린다', async () => {
+  const b = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: 12 } });
+  await b.mbLiveApply({ at: 2, rows: 0, folders: 13 });
+  assert.ok(b.__calls.folders >= 1, '새 폴더가 생겼는데 폴더 목록을 다시 읽지 않았다 — 새로고침 전에는 안 보인다');
+  assert.ok(b.__calls.side >= 1, '폴더 목록을 읽고도 옆줄을 안 그렸다');
+});
+
+test('★ 폴더가 없어진 회차에도 다시 읽는다 — 없는 칸이 옆줄에 남지 않게', async () => {
+  const b = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: 13 } });
+  await b.mbLiveApply({ at: 2, rows: 0, folders: 12 });
+  assert.ok(b.__calls.folders >= 1, '폴더가 없어졌는데 폴더 목록을 다시 읽지 않았다');
+});
+
+test('★ 폴더 수가 그대로면 다시 읽지 않는다 — 회차마다 읽으면 요금만 는다', async () => {
+  const b = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: 12 } });
+  await b.mbLiveApply({ at: 2, rows: 0, folders: 12 });
+  assert.equal(b.__calls.folders, 0, '폴더가 그대로인데 목록을 다시 읽었다');
+  assert.equal(b.__calls.side, 0);
+  assert.equal(b.__calls.page, 0);
+});
+
+test('★ 견줄 옛 값이 없으면(처음·옛 기록) 다시 읽지 않는다 — 있는 것을 «새 폴더»로 착각하지 않는다', async () => {
+  const none = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: {} });
+  await none.mbLiveApply({ at: 2, rows: 0, folders: 13 });
+  assert.equal(none.__calls.folders, 0, '견줄 값이 없는데 다시 읽었다');
+  const bad = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: '12' } });
+  await bad.mbLiveApply({ at: 2, rows: 0, folders: 13 });
+  assert.equal(bad.__calls.folders, 0, '숫자가 아닌 옛 값을 견줬다');
+});
+
+test('★★ 폴더 수가 달라진 것은 «한 번만» 알아챈다 — 다음 회차에 또 읽지 않는다', async () => {
+  const b = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: 12 } });
+  await b.mbLiveApply({ at: 2, rows: 0, folders: 13 });
+  const first = b.__calls.folders;
+  await b.mbLiveApply({ at: 3, rows: 0, folders: 13 });
+  assert.equal(b.__calls.folders, first, '이미 알아챈 폴더 수로 또 다시 읽었다');
+});
+
+test('★ 메일을 읽는 중이면 옆줄만 새로 그리고 목록은 건드리지 않는다 — 새 폴더 때문에 읽던 자리가 튀지 않게', async () => {
+  const b = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: 12 },
+                      state: { mbOpen: { slug: 'INBOX', uid: '5' } } });
+  await b.mbLiveApply({ at: 2, rows: 0, folders: 13 });
+  assert.ok(b.__calls.side >= 1, '옆줄을 새로 안 그렸다');
+  assert.equal(b.__calls.page, 0, '읽는 중에 목록을 다시 그렸다');
+});
+
+test('★★ 열린 듣기 길로도 이어진다 — 회차 기록의 폴더 수가 바뀌면 옆줄이 따라온다', async () => {
+  const b = makeBox({ msgs: { INBOX: { 5: row('a') } }, meta: { at: 1, folders: 12 } });
+  b.mbLiveStart();
+  b.__fire({ at: 100, rows: 0, folders: 12 });     /* 첫 값은 이미 받은 것 */
+  b.__fire({ at: 200, rows: 0, folders: 13 });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(b.__calls.folders >= 1, '듣기 길로 온 폴더 수 변화를 놓쳤다');
 });
 
 test('★★ 메일을 읽는 중에는 목록을 다시 그리지 않는다 — 읽던 자리가 튄다', async () => {
