@@ -795,10 +795,15 @@
     if (buf.byteLength > PuViewerKind.MAX_BYTES) return Promise.resolve(false);
     SIG_BUSY[id] = true;
     var copy = buf.slice(0);                     /* 이 바이트는 곧 칸(iframe)으로 넘어갈 수 있다 — 사본으로 */
-    return loadZip().then(function (Z) { return P.extract(Z, copy, kind); }).then(function (r) {
-      var lines = [];
-      r.parts.forEach(function (p) { lines = lines.concat(p.lines); });
-      return gate.save(simRef(id), K.makeSim(id, K.simSig(lines), ME.sid, Date.now()), { entityType: K.SIM_ENTITY }).then(function () { return true; });
+    return loadZip().then(function (Z) {
+      /* 파일을 못 열면(암호·손상) «열지 못함»(mh:'' · why:'unreadable')을 남긴다 — 일괄 만들기가 같은 파일을 되풀이해 받지 않게 */
+      return P.extract(Z, copy, kind).then(function (r) {
+        var lines = [];
+        r.parts.forEach(function (p) { lines = lines.concat(p.lines); });
+        return { sig: K.simSig(lines), why: '' };
+      }, function () { return { sig: { mh: '', n: 0 }, why: 'unreadable' }; });
+    }).then(function (x) {
+      return gate.save(simRef(id), K.makeSim(id, x.sig, ME.sid, Date.now(), x.why), { entityType: K.SIM_ENTITY }).then(function () { return true; });
     }).catch(function () { return false; }).then(function (x) { delete SIG_BUSY[id]; return x; });
   }
   /* 새로 올린 원본 — 받은 파일 그대로 지문(기다리지 않는다 · 실패해도 올리기는 그대로) */
@@ -823,14 +828,18 @@
     var me = SIMS[it.id];
     var h = '<div class="sec" style="font-size:13px">비슷한 강의 <span class="hint">슬라이드·문서 글이 겹치는 정도</span></div>';
     if (!me) h += '<div class="hint">' + (SIG_KINDS[ext] ? (it.store === 'cloud' ? '아직 내용 지문이 없습니다 — 미리보기를 열면 만들어집니다' : '원본이 자료함에 올라오면 지문을 만듭니다') : '이 형식(' + esc(ext.toUpperCase() || '?') + ')은 아직 내용 비교를 못 합니다') + '</div>';
-    else if (!K.okMh(me.mh)) h += '<div class="hint">글이 적어 비교하지 않습니다(그림 위주 자료)</div>';
+    else if (!K.okMh(me.mh)) h += '<div class="hint">' + (me.why === 'unreadable' ? '파일을 열지 못해 비교하지 않습니다(암호가 걸렸거나 손상된 파일)' : '글이 적어 비교하지 않습니다(그림 위주 자료)') + '</div>';
     else {
       var last = K.lastSimilar(it, list(), SIMS), all = K.similarOf(it.id, list(), SIMS).slice(0, 6);
       if (!all.length) h += '<div class="hint">비슷한 강의가 없습니다 — 새로 만든 강의로 보입니다</div>';
       else {
         var lo = last ? ITEMS[last.id] : null;
         if (lo) h += '<div class="simlast">↺ 마지막으로 비슷했던 강의 <b>' + esc(last.date || '강의일 모름') + '</b> 「' + esc(lo.title) + '」 — ' + simPct(last.score) + ' ' + simWord(last.score) + '</div>';
-        else if (it.lectureDate) h += '<div class="hint">이보다 앞선 비슷한 강의는 없습니다 — 아래는 뒤에 고쳐 쓴 강의입니다</div>';
+        else if (it.lectureDate) {
+          /* 앞선 것이 없다 — 뒤에 고쳐 쓴 것만 있는지, 강의일을 모르거나 같은 날이라 앞뒤를 못 가리는지 갈라 말한다 */
+          var later = all.some(function (x) { return x.date && x.date > it.lectureDate; });
+          h += '<div class="hint">' + (later ? '이보다 앞선 비슷한 강의는 없습니다 — 아래는 뒤에 고쳐 쓴 강의입니다' : '강의일을 모르거나 같은 날 강의라 앞뒤를 가리지 못했습니다') + '</div>';
+        }
         h += all.map(function (x) {
           var o = ITEMS[x.id]; if (!o) return '';
           return '<div class="simr' + (last && last.id === x.id ? ' on' : '') + '"><span class="sd">' + esc(x.date || '강의일 모름') + '</span>' +
@@ -849,6 +858,7 @@
     });
   }
   function simDone(it) { var x = SIMS[it.id]; return !!(x && x.v === K.SIM_V); }
+  var SIM_FAILED = {};                          /* 이 화면에서 받기에 실패한 자료 — 다시 누르면 건너뛴다(새로고침하면 다시 해 본다) */
   function drawSimCard() {
     var card = $('simCard'); if (!card) return;
     if (!ME.admin) { card.style.display = 'none'; return; }
@@ -863,19 +873,20 @@
           : '<span class="hint">모두 만들었습니다 — 새로 넣는 자료는 저절로 만들어집니다</span>')) + '</div>';
   }
   function runSimBatch() {
-    if (SIMRUN) { SIMRUN.stop = true; SIMRUN.msg = '멈추는 중…'; drawSimCard(); return; }
-    var todo = simTargets().filter(function (it) { return !simDone(it); });
+    if (SIMRUN) { SIMRUN.stop = true; SIMRUN.msg = '멈추는 중…'; stopFetches(SIMRUN.owner); drawSimCard(); return; }   /* 받던 것도 끊는다 */
+    var todo = simTargets().filter(function (it) { return !simDone(it) && !SIM_FAILED[it.id]; });
     if (!todo.length) return;
     var bytes = todo.reduce(function (a, it) { return a + (+it.size || 0); }, 0);
     if (!window.confirm(todo.length + '건의 원본을 차례로 받아 내용 지문을 만들까요?\n받는 양 약 ' + K.fmtBytes(bytes) + ' · 원본은 바꾸지 않습니다 · 언제든 멈출 수 있습니다')) return;
-    SIMRUN = { stop: false, ok: 0, bad: 0, msg: '' };
+    SIMRUN = { stop: false, ok: 0, bad: 0, msg: '', owner: document.createElement('span') };   /* owner — 멈추기가 받던 요청을 끊는 표(stopFetches) */
     var i = 0;
     todo.reduce(function (p, it) {
       return p.then(function () {
         if (!SIMRUN || SIMRUN.stop || !ME.admin) return;
         i++; SIMRUN.msg = i + ' / ' + todo.length + ' — ' + (it.title || it.fileName); drawSimCard();
-        return fetchOriginal(it, 'buf', null, null).then(function (b) { return ensureSig(it.id, it.ext || C.extOf(it.fileName), b); })
-          .then(function (ok) { if (ok) SIMRUN.ok++; else SIMRUN.bad++; }, function () { SIMRUN.bad++; });
+        return fetchOriginal(it, 'buf', null, SIMRUN.owner).then(function (b) { return ensureSig(it.id, it.ext || C.extOf(it.fileName), b); })
+          .then(function (ok) { if (!SIMRUN) return; if (ok) SIMRUN.ok++; else { SIMRUN.bad++; SIM_FAILED[it.id] = true; } },
+            function () { if (!SIMRUN) return; if (!SIMRUN.stop) { SIMRUN.bad++; SIM_FAILED[it.id] = true; } });
       });
     }, Promise.resolve()).then(function () {
       var r = SIMRUN || { ok: 0, bad: 0 };

@@ -72,11 +72,48 @@ test('⑤ 지운 자료는 잇지 않는다 · 지문 기록에 강의 글이 �
   const sims = { old: K.makeSim('old', a), now: K.makeSim('now', a) };
   assert.equal(K.lastSimilar(items[1], items, sims), null, '휴지통 자료와 잇지 않는다');
   const rec = K.makeSim('now', a, 'P001', 1700000000000);
-  assert.deepEqual(Object.keys(rec).sort(), ['by', 'createdAt', 'entityType', 'id', 'mh', 'n', 'schemaVersion', 'sourceId', 'updatedAt', 'v'].sort(), '지문 기록 칸 — 글 칸이 없다');
+  assert.deepEqual(Object.keys(rec).sort(), ['by', 'createdAt', 'entityType', 'id', 'mh', 'n', 'schemaVersion', 'sourceId', 'sourceKind', 'updatedAt', 'v'].sort(), '지문 기록 칸 — 글 칸이 없다');
   assert.equal(rec.id, rec.sourceId, '열쇠 = 자료 id');
   assert.equal(rec.entityType, K.SIM_ENTITY);
   assert.ok(!JSON.stringify(rec).includes('근로'), '강의 글이 기록에 없다');
   assert.equal(K.makeSim('x', { mh: '<script>', n: 1 }).mh, '', '모양이 틀린 지문은 비운다');
+});
+
+test('★★ 저장 관문 — 지문 기록이 온톨로지 강제 관문(prepareRecord)을 통과한다(sourceKind·sourceId 함께) · 규칙의 칸 목록과 같다', () => {
+  /* 2026-11-22 검토에서 찾음 — sourceKind 가 빠져 관문이 모든 지문 저장을 거부했고, 실패가 조용히 삼켜져 «지문 없음»으로만 보였다 */
+  const W = require(path.join(ROOT, 'js/pu-ontology-write.js'));
+  const r = W.prepareRecord(K.makeSim('edu_x1', K.simSig(A), 'P001', Date.now()), { entityType: K.SIM_ENTITY, actor: 'P001', expectedRevision: -1 });
+  assert.equal(r.ok, true, '관문 통과: ' + JSON.stringify(r.issues));
+  const r2 = W.prepareRecord(K.makeSim('edu_x2', { mh: '', n: 0 }, 'P001', Date.now(), 'unreadable'), { entityType: K.SIM_ENTITY, actor: 'P001', expectedRevision: -1 });
+  assert.equal(r2.ok, true, '«열지 못함» 기록도 통과');
+  /* 규칙 — 관문을 지난 기록의 칸은 모두 규칙의 칸 목록 안(그 밖은 $other false) */
+  const sims = require(path.join(ROOT, 'docs/rules-paste.json')).rules.edulib.sims.$id;
+  assert.equal(sims.$other['.validate'], false, '정해 둔 칸 밖은 막는다');
+  Object.keys(r2.value).forEach((k) => assert.ok(sims[k], '규칙에 없는 칸이 저장된다: ' + k));
+  assert.ok(sims['.validate'].includes("newData.child('sourceKind').val() === 'EduMaterial'"));
+  assert.match(sims.by['.validate'], /length <= \d+/, '누가 칸 길이 한도');
+  assert.match(sims.n['.validate'], /isNumber/);
+});
+
+test('열지 못한 파일·안내 문구·일괄 멈춤 — 되풀이해 받지 않고, 앞뒤를 못 가리면 그렇게 말하고, 멈추면 받던 것도 끊는다', () => {
+  const app = stripJs(read('js/pu-edulib-app.js'));
+  const es = app.slice(app.indexOf('function ensureSig('), app.indexOf('function sigLater('));
+  assert.match(es, /function \(\) \{ return \{ sig: \{ mh: '', n: 0 \}, why: 'unreadable' \}; \}/, '못 열면 «열지 못함»을 남긴다');
+  const ds = app.slice(app.indexOf('function drawSim('), app.indexOf('function simTargets('));
+  assert.match(ds, /me\.why === 'unreadable'/);
+  assert.match(ds, /강의일을 모르거나 같은 날 강의라 앞뒤를 가리지 못했습니다/);
+  const run = app.slice(app.indexOf('function runSimBatch('), app.indexOf('/* ───────── 자세히·검토'));
+  assert.match(run, /stopFetches\(SIMRUN\.owner\)/, '멈추면 받던 요청도 끊는다');
+  assert.match(run, /fetchOriginal\(it, 'buf', null, SIMRUN\.owner\)/);
+  assert.match(run, /!SIM_FAILED\[it\.id\]/, '이 화면에서 실패한 것은 다시 누를 때 건너뛴다');
+  assert.match(run, /SIM_FAILED\[it\.id\] = true/);
+});
+
+test('글 뽑기 — 한글(hwpx)도 문단 글을 뽑는다(지문용) · 글자 칸 속 태그는 지운다', async () => {
+  const z0 = new JSZip();
+  z0.file('Contents/section0.xml', '<hs:sec xmlns:hp="x"><hp:p><hp:run><hp:t>근로<hp:tab width="400"/>계약</hp:t></hp:run></hp:p></hs:sec>');
+  const r0 = await P.extract(JSZip, await z0.generateAsync({ type: 'arraybuffer' }), 'hwpx');
+  assert.deepEqual(r0.parts[0].lines, ['근로 계약'], '<hp:tab/> 같은 태그 이름이 글에 섞이지 않는다');
 });
 
 test('글 뽑기 — 한글(hwpx)도 문단 글을 뽑는다(지문용)', async () => {
@@ -92,7 +129,7 @@ test('화면 이음 — 지문은 열 때·올릴 때·관리자 일괄로 만�
   /* 저장 — 관문으로, 자기 자리(edulib/sims/{id})에, 같은 개체 이름 */
   const es = app.slice(app.indexOf('function ensureSig('), app.indexOf('function sigLater('));
   assert.match(es, /var copy = buf\.slice\(0\)/, '칸으로 넘어갈 바이트는 사본으로');
-  assert.match(es, /gate\.save\(simRef\(id\), K\.makeSim\(id, K\.simSig\(lines\), ME\.sid, Date\.now\(\)\), \{ entityType: K\.SIM_ENTITY \}\)/);
+  assert.match(es, /gate\.save\(simRef\(id\), K\.makeSim\(id, x\.sig, ME\.sid, Date\.now\(\), x\.why\), \{ entityType: K\.SIM_ENTITY \}\)/);
   assert.match(es, /cur && cur\.v === K\.SIM_V/, '이미 있으면 다시 만들지 않는다');
   assert.match(app, /function simRef\(id\) \{ return fbDb\.ref\('edulib\/sims\/' \+ id\); \}/);
   /* 만드는 때 — 자료함 원본을 열 때(PC 에서 고른 파일은 아님) · 새로 올릴 때 세 길 */
@@ -108,7 +145,7 @@ test('화면 이음 — 지문은 열 때·올릴 때·관리자 일괄로 만�
   const run = app.slice(app.indexOf('function runSimBatch('), app.indexOf('/* ───────── 자세히·검토'));
   assert.match(run, /window\.confirm\(/, '건수·받는 양을 묻는다');
   assert.match(run, /SIMRUN\.stop = true/, '멈출 수 있다');
-  assert.match(run, /fetchOriginal\(it, 'buf', null, null\)/, '원본은 권한 확인 길로 받는다');
+  assert.match(run, /fetchOriginal\(it, 'buf', null, SIMRUN\.owner\)/, '원본은 권한 확인 길로 받는다');
   /* 보이기 — 목록 ↺(제목 단추 안) · 자세히 칸 */
   assert.ok((app.match(/simBadge\(it\.id\) \+ esc\(it\.title\)/g) || []).length >= 2, '카드·표 둘 다 제목 앞에 ↺');
   assert.match(app, /'<div class="simsec" id="dSim"><\/div>'/);

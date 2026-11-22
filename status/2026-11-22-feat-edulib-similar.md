@@ -17,6 +17,8 @@
 - `js/pu-ontology.js` — `EduSimilarity`(강의 내용 지문) · writeContracts `edulib/sims/{id}` · 캐시 110.
 - 점검 도구 시드 — 지어낸 지문(성희롱 예방 자료끼리 겹침).
 - 검사 `tests/edulib-similar.test.js`(8개).
+- 곁다리: `functions/edulib-mail-sweep.js` — 자동 정리함 «본 것»의 같은 파일 열쇠 칸 `id` → `item`(첫 밤 기록에 서버 저장 감시가 «레코드인데 공통 칸이 없다»고 경고).
+  다음에 `edulibMailSweep` 을 올릴 때 반영된다(경고일 뿐 막히지 않음). 첫 밤 결과(토큰 729건 지움 · 자동 정리함 4건)는 STATUS.md 2절에 적었다.
 
 ## 확인한 것
 - 이 PC 의 실제 강의 파일 27개(2026강의 폴더)로 겹침을 재 봄(올리지 않음): 같은 강의의 판끼리 0.59~1.00(v2↔v3 1.00 · 기초노동법↔2026수정 0.94 · V4↔V8 0.81 ·

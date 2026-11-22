@@ -76,7 +76,8 @@
         var gt = seg.indexOf('>', ts); if (gt < 0) break;
         if (seg.charAt(gt - 1) === '/') { q = gt + 1; continue; }
         var te = seg.indexOf(tClose, gt); if (te < 0) break;
-        line += unescapeXml(seg.slice(gt + 1, te));
+        /* 글자 칸 안의 자식 태그(한글 <hp:tab/>·<hp:lineBreak/> 같은 것)는 지운다 — 태그 이름이 낱말로 섞이면 지문이 실제보다 비슷해진다 */
+        line += unescapeXml(seg.slice(gt + 1, te).replace(/<[^>]*>/g, ' '));
         q = te + tClose.length;
       }
       line = line.replace(/\s+/g, ' ').trim();

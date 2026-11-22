@@ -333,10 +333,14 @@
     var eq = 0; for (var i = 0; i < a.length; i += 8) if (a.substr(i, 8) === b.substr(i, 8)) eq++;
     return eq / SIM_K;
   }
-  function makeSim(itemId, sig, who, now) {
+  /* ⚠ sourceKind 와 sourceId 는 «함께» — 하나만 있으면 온톨로지 저장 관문이 저장을 거부한다(source_pair_incomplete · 2026-11-22 검토에서 찾음).
+     why: '' 보통 · 'unreadable' 파일을 못 열었다(암호·손상) — 둘 다 mh:'' 이면 다시 받지 않는다 */
+  function makeSim(itemId, sig, who, now, why) {
     now = now || Date.now();
-    return { id: itemId, entityType: SIM_ENTITY, schemaVersion: SCHEMA, sourceId: itemId, v: SIM_V, mh: okMh(sig && sig.mh) ? sig.mh : '',
-      n: Math.max(0, +(sig && sig.n) || 0), by: str(who), createdAt: now, updatedAt: now };
+    var r = { id: itemId, entityType: SIM_ENTITY, schemaVersion: SCHEMA, sourceKind: ENTITY, sourceId: itemId, v: SIM_V, mh: okMh(sig && sig.mh) ? sig.mh : '',
+      n: Math.max(0, +(sig && sig.n) || 0), by: str(who).slice(0, 64), createdAt: now, updatedAt: now };
+    if (why === 'unreadable') r.why = why;
+    return r;
   }
   /* id 와 비슷한 다른 자료 — 지운 것·지문 없는 것은 뺀다. 점수 높은 순(같으면 늦은 강의 먼저) */
   function similarOf(id, items, sims, min) {
