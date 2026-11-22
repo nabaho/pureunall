@@ -2672,10 +2672,17 @@
       }
     }
     if (!opened && p.html && !isPrivateDoc) {
-      const pg = Hx.defaultPage();
-      if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
-      opened = addDoc({ name: docName, html: p.html, page: pg, pristine: false });
-      toast(`${srcLabel}에서 '${docName}' 서식을 불러왔습니다.`);
+      // 다른 화면이 보낸 HTML 은 거른 뒤에만 연다 — 거르지 못하면 열지 않는다 (hangul/js/safehtml.js, 2026-11-22)
+      let safe = null;
+      try { safe = window.PureunSafeHtml ? window.PureunSafeHtml.clean(String(p.html)) : null; } catch (e) { safe = null; }
+      if (safe === null) {
+        toast(`${srcLabel}에서 온 서식을 안전하게 거르지 못해 열지 않았습니다.`, true);
+      } else {
+        const pg = Hx.defaultPage();
+        if (p.margin && typeof p.margin === 'object') pg.margin = Object.assign({}, pg.margin, p.margin);
+        opened = addDoc({ name: docName, html: safe, page: pg, pristine: false });
+        toast(`${srcLabel}에서 '${docName}' 서식을 불러왔습니다.`);
+      }
     }
     // 연결은 «실제로 열린 그 문서» 에만 — 못 열었으면 아무 탭에도 붙이지 않는다
     if (opened && ctx) opened.fundCtx = ctx;

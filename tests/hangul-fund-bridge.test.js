@@ -105,7 +105,7 @@ function runLoad({ openOk = true, initFrom = '' } = {}) {
   const log = { opened: [], added: [], bars: 0, toasts: [] };
   const fn = new Function('_seenBridgeIds', 'window', 'location', 'BroadcastChannel', 'openBlob', 'addDoc', '_renderFundBridgeBar', 'Hx', 'toast', '_b64ToBytes', 'File', 'console',
     code + '\nreturn loadFromFundPayload;')(
-    new Set(), {}, { origin: 'https://erp.example' }, undefined,
+    new Set(), { PureunSafeHtml: { clean: s => s } }, { origin: 'https://erp.example' }, undefined, // 거르기는 tests/hangul-safe-html.test.js 가 본다
     async file => { const d = { name: file.name }; log.opened.push(d); return openOk ? d : null; },
     o => { const d = Object.assign({}, o); log.added.push(d); return d; },
     () => { log.bars++; }, { defaultPage: () => ({ margin: {} }) }, m => log.toasts.push(m), () => new Uint8Array([1]),
