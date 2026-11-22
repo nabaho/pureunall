@@ -21,27 +21,28 @@
    ⚠ 이 판단은 반드시 <head> 에서 한다. 「홈 화면에 추가」를 누르는 순간 브라우저는
      «그때 걸려 있는» manifest 를 읽는다 — 나중에 바꾸면 이미 기업정보함으로 담긴 뒤다. */
 (function(){ try{
+  if(/(^|[?&])view=mail(&|$)/.test(location.search)){
+    document.title = '푸른 메일';
+    /* ★ 「이상한 화면이 짧게 스친다」 (대표 제보 2026-09-02) ──
+       자바스크립트가 돌기 «전»에 기업정보함의 갈래 줄(#tabs)과 거르개 줄(#subbar)이
+       먼저 그려진다. render() 가 mailview 를 붙이는 것은 그 뒤라 이미 한 번 스친 뒤다.
+       ⚠ 그래서 <head> 에서, body 가 만들어지기도 전에 <html> 에 붙인다.
+         body 는 아직 없으므로 documentElement 여야 한다. */
+    document.documentElement.classList.add('mailview');
+    var m = document.querySelector('link[rel=manifest]'); if(m) m.href = 'pu-mail-manifest.json';
+    var t = document.querySelector('meta[name=theme-color]'); if(t) t.content = '#1e40af';
+    var i = document.querySelector('link[rel=icon]');
+    if(i) i.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDCE7</text></svg>";
+    /* 「이 창은 메일 문」 — mailview 는 화면(render)이 떼었다 붙이지만 이것은 «문»이라 떼지 않는다. 자료함·환경설정처럼
+       state.view 가 mail 이 아닌 화면에서도 머리줄 이름이 안 바뀐다. ⚠ 탭 그림 갈아 달기 «뒤»에 둔다(app-icons 검사가 그 앞뒤를 읽는다). */
+    document.documentElement.classList.add('maildoor');
+    return;
+  }
   if(/(^|[?&])view=pubsearch(&|$)/.test(location.search)){
     document.title = '공공 기업검색';
     var pi = document.querySelector('link[rel=icon]');
     if(pi) pi.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDD0D</text></svg>";
-    return;
   }
-  if(!/(^|[?&])view=mail(&|$)/.test(location.search)) return;
-  document.title = '푸른 메일';
-  /* ★ 「이상한 화면이 짧게 스친다」 (대표 제보 2026-09-02) ──
-     자바스크립트가 돌기 «전»에 기업정보함의 갈래 줄(#tabs)과 거르개 줄(#subbar)이
-     먼저 그려진다. render() 가 mailview 를 붙이는 것은 그 뒤라 이미 한 번 스친 뒤다.
-     ⚠ 그래서 <head> 에서, body 가 만들어지기도 전에 <html> 에 붙인다.
-       body 는 아직 없으므로 documentElement 여야 한다. */
-  document.documentElement.classList.add('mailview');
-  var m = document.querySelector('link[rel=manifest]'); if(m) m.href = 'pu-mail-manifest.json';
-  var t = document.querySelector('meta[name=theme-color]'); if(t) t.content = '#1e40af';
-  var i = document.querySelector('link[rel=icon]');
-  if(i) i.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDCE7</text></svg>";
-  /* 「이 창은 메일 문」 — mailview 는 화면(render)이 떼었다 붙이지만 이것은 «문»이라 떼지 않는다. 자료함·환경설정처럼
-     state.view 가 mail 이 아닌 화면에서도 머리줄 이름이 안 바뀐다. ⚠ 탭 그림 갈아 달기 «뒤»에 둔다(app-icons 검사가 그 앞뒤를 읽는다). */
-  document.documentElement.classList.add('maildoor');
 }catch(e){} })();
 </script>
 <script src="js/pu-sid-guard.js?v=1"></script>
