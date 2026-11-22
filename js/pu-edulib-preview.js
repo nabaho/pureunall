@@ -101,6 +101,11 @@
       } else if (kind === 'docx') {
         targets = names.filter(function (n) { return n === 'word/document.xml'; });
         pTag = 'w:p'; tTag = 'w:t';
+      } else if (kind === 'hwpx') {
+        /* 한글(hwpx) — Contents/section0.xml … 의 <hp:p> 문단 · <hp:t> 글자(비슷한 강의 지문용 · 2026-11-22) */
+        targets = names.filter(function (n) { return /^Contents\/section\d+\.xml$/.test(n); })
+          .sort(function (a, b) { return (+(a.match(/(\d+)\.xml$/) || [0, 0])[1]) - (+(b.match(/(\d+)\.xml$/) || [0, 0])[1]); });
+        pTag = 'hp:p'; tTag = 'hp:t';
       } else {
         return Promise.reject(new Error('글자 미리보기를 못 하는 형식입니다'));
       }

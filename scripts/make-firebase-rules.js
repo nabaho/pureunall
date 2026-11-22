@@ -1526,7 +1526,10 @@ const EDULIB_W = `(${LOGIN}) && newData.exists()`;
 rules.edulib = { '.read': LOGIN,
   items: { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduMaterial'" } },
   notes: { $item: { $id: { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('sourceId').val() === $item && newData.child('entityType').val() === 'EduReviewNote'" } } },
-  cats:  { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduCategory' && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 40" } } };
+  cats:  { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduCategory' && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 40" } },
+  /* 2026-11-22 sims(EduSimilarity — 자료의 «내용 지문», 대표 「마지막에 언제 강의랑 유사하다 표시」): 열쇠 = 자료 id(sourceId 도 같아야).
+     지문(mh)은 16진수 숫자 글자만, 길이 상한 — 글(강의 내용) 자체는 담지 못한다. 자료와 «같은 사람»(재직 직원)이 읽고 쓴다(더 넓게 열리는 칸 없음). */
+  sims:  { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('sourceId').val() === $id && newData.child('entityType').val() === 'EduSimilarity' && newData.child('mh').isString() && newData.child('mh').val().length <= 512 && newData.child('mh').val().matches(/^[0-9a-f]*$/)" } } };
 /* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
    대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,
    자료함(재직 직원 모두)에 «넣기»는 관리자가 고른다. 담기는 것: 메일 자리·첨부 이름·가린 메일 제목·추정 종류·내용 요약·지문 — 원본 파일은 없다.

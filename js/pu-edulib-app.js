@@ -33,6 +33,7 @@
   var CARD_TOP = 6;                             /* 카드 한 장에 먼저 보이는 줄 — 나머지는 «더 보기» */
   var EXPAND = {};                              /* «더 보기»로 펼친 카드(묶음 열쇠) */
   var CATSDB = {};                              /* 사람이 더한 강의 종류(/edulib/cats) */
+  var SIMS = {}, SIMBEST = null, SIMRUN = null;  /* 내용 지문(/edulib/sims) · 목록 ↺ 셈(자료·지문이 바뀌면 비운다) · 관리자 일괄 만들기 */
   var ADD_CAT = '';                             /* 새 종류를 막 더하고 «넣기»로 왔을 때 — 짐작 못 한 파일을 그 종류로 */
   var SWEEP = null;                             /* 보낸 메일 자동 정리 상태(/edulib_inbox/state — 서버만 쓰고 관리자만 읽는다) */
   var INBOX = {}, IPICK = {};                   /* 자동 정리함(/edulib_inbox/q) — 서버가 정리해 둔 강의자료 첨부, 관리자가 골라 «넣기» */
@@ -61,6 +62,7 @@
   function catLabel(k) { return C.catByKey(k).label; }
   function list() { return Object.keys(ITEMS).map(function (k) { return ITEMS[k]; }); }
   function itemRef(id) { return fbDb.ref('edulib/items/' + id); }
+  function simRef(id) { return fbDb.ref('edulib/sims/' + id); }
   function dateCell(it) {
     if (!it.lectureDate) return '<span class="hint">모름</span>';
     var est = it.dateFrom && it.dateFrom !== 'manual';
@@ -171,6 +173,7 @@
         '<div class="cats">' + (cards || '<div class="empty">아직 없습니다</div>') + '</div></section>';
     }).join('');
     drawMatrix(d);
+    drawSimCard();
   }
   /* 종류 × 연도 — 종류를 줄로, 연도를 칸으로(연도 칸은 좁아 옆으로 넘치지 않는다). 최근 12해만 따로, 그 이전은 «~YYYY» 한 칸.
      칸 색이 진할수록 많다(가장 많은 칸 대비). 칸을 누르면 그 종류·연도만 목록으로. */
@@ -269,7 +272,7 @@
           '<td class="no">' + n + '</td>' +
           '<td class="dt">' + dateCell(it) + '</td>' +
           '<td class="ct"><span class="one"><span title="' + esc(catLabel(it.cat)) + '">' + esc(catLabel(it.cat)) + '</span>' + (C.catByKey(it.cat).legal ? '<span class="tag legal">법정</span>' : '') + '</span></td>' +
-          '<td class="tt"><span class="one"><button type="button" class="ttl" data-open="' + esc(it.id) + '" title="' + esc(it.title + ' — ' + it.fileName) + '">' + esc(it.title) + '</button></span></td>' +
+          '<td class="tt"><span class="one"><button type="button" class="ttl" data-open="' + esc(it.id) + '" title="' + esc(it.title + ' — ' + it.fileName) + '">' + simBadge(it.id) + esc(it.title) + '</button></span></td>' +
           '<td class="vn" title="' + esc(it.venue) + '">' + esc(it.venue) + '</td>' +
           '<td class="fm" title="' + esc(it.fileName + ' · ' + K.fmtBytes(it.size)) + '">' + esc((it.ext || '').toUpperCase() + ' · ' + K.fmtBytes(it.size)) + '</td>' +
           '<td class="st"><span class="one">' + statusTags(it) + '</span></td>' +
@@ -324,7 +327,7 @@
             '<input type="checkbox" aria-label="' + esc(it.title || it.fileName) + ' 고르기" data-pick="' + esc(it.id) + '"' + (on ? ' checked' : '') + '>' +
             '<span class="no">' + (i + 1) + '</span>' +
             '<span class="gd' + (est ? ' est' : '') + '" title="' + esc(it.lectureDate ? (est ? estWhy(it.dateFrom) : '강의일(확정)') : '강의일 모름') + '">' + esc(it.lectureDate || '—') + '</span>' +
-            '<button type="button" class="ttl" data-open="' + esc(it.id) + '" title="' + esc(tip) + '">' + esc(it.title) + '</button>' +
+            '<button type="button" class="ttl" data-open="' + esc(it.id) + '" title="' + esc(tip) + '">' + simBadge(it.id) + esc(it.title) + '</button>' +
             '<span class="ge" title="' + esc(it.fileName + ' · ' + K.fmtBytes(it.size)) + '">' + esc((it.ext || '').toUpperCase()) + '</span>' +
             (it._wasDeleted ? '<span class="hint">지움</span>' : '<span class="dot ' + esc(it.status) + '" title="' + esc((K.STATUS[it.status] || '') + (it.store !== 'cloud' ? ' · ' + (K.STORE[it.store] || '') : '')) + '"></span>') +
             '</div>';
@@ -668,6 +671,8 @@
       : bytesOf(it, function (got, total) { if (!live()) return; var m = body.querySelector('.msg'); if (m) m.textContent = '불러오는 중… ' + pctText(got, total); }, pane);
     bufP.then(function (buf) {
       if (!live()) return;
+      /* 내용 지문(비슷한 강의) — 자료함 원본을 열었고 아직 없으면 만든다. 바이트가 칸으로 넘어가기 «전»에 사본을 뜬다(ensureSig 안) */
+      if (!localFile && it.store === 'cloud') ensureSig(it.id, ext, buf).then(function (ok) { if (ok && live() && DETAIL === it.id) drawSim(); });
       if (ext === 'pptx' || ext === 'ppsx') return showPptx(it, body, pane, buf, live);
       if (ext === 'docx') return showTextParts(body, pane, buf, 'docx', live);
       var chk = PuViewerKind.check(buf, it.fileName);
@@ -778,6 +783,108 @@
     return !!w;
   }
 
+  /* ───────── 비슷한 강의 — 내용 지문 (대표 지시 2026-11-22 「기존 강의를 바꾼 게 있다 그러면 마지막에 언제 강의랑 유사하다 그런 표시」) ─────────
+     지문은 슬라이드·문서 글로 만든 숫자(K.simSig) — edulib/sims/{자료 id}. 만드는 때: ① 자료함 원본을 미리보기로 열 때 ② 새로 올릴 때
+     ③ 관리자가 한눈에의 «남은 지문 만들기»를 누를 때(원본을 차례로 받는다). 원본은 바꾸지 않는다. 글이 적으면 mh:'' 로 «비교 안 함». */
+  var SIG_KINDS = { pptx: 'pptx', ppsx: 'pptx', docx: 'docx', hwpx: 'hwpx' };
+  var SIG_BUSY = {};
+  function ensureSig(id, ext, buf) {
+    var kind = SIG_KINDS[String(ext || '').toLowerCase()];
+    if (!kind || !id || !gate || !buf || SIG_BUSY[id]) return Promise.resolve(false);
+    var cur = SIMS[id]; if (cur && cur.v === K.SIM_V) return Promise.resolve(false);
+    if (buf.byteLength > PuViewerKind.MAX_BYTES) return Promise.resolve(false);
+    SIG_BUSY[id] = true;
+    var copy = buf.slice(0);                     /* 이 바이트는 곧 칸(iframe)으로 넘어갈 수 있다 — 사본으로 */
+    return loadZip().then(function (Z) { return P.extract(Z, copy, kind); }).then(function (r) {
+      var lines = [];
+      r.parts.forEach(function (p) { lines = lines.concat(p.lines); });
+      return gate.save(simRef(id), K.makeSim(id, K.simSig(lines), ME.sid, Date.now()), { entityType: K.SIM_ENTITY }).then(function () { return true; });
+    }).catch(function () { return false; }).then(function (x) { delete SIG_BUSY[id]; return x; });
+  }
+  /* 새로 올린 원본 — 받은 파일 그대로 지문(기다리지 않는다 · 실패해도 올리기는 그대로) */
+  function sigLater(id, fileName, blob) {
+    var ext = C.extOf(fileName || '');
+    if (!SIG_KINDS[ext] || !blob || !blob.arrayBuffer || blob.size > PuViewerKind.MAX_BYTES) return;
+    blob.arrayBuffer().then(function (b) { return ensureSig(id, ext, b); }).catch(function () {});
+  }
+  function simBest(id) { if (!SIMBEST) SIMBEST = K.lastSimilarAll(list(), SIMS); return SIMBEST[id] || null; }
+  function simPct(sc) { return Math.round(sc * 100) + '%'; }
+  function simWord(sc) { return sc >= 0.85 ? '거의 같음' : sc >= 0.65 ? '많이 비슷' : '비슷'; }
+  /* 목록 줄의 ↺ — 제목 단추 안 맨 앞(칸을 새로 만들지 않는다). 마우스를 올리면 언제·어느 강의와 몇 % */
+  function simBadge(id) {
+    var b = simBest(id); if (!b) return '';
+    var o = ITEMS[b.id];
+    return '<span class="simb" title="' + esc('↺ ' + (b.date || '강의일 모름') + ' 「' + (o ? o.title : '') + '」와 ' + simPct(b.score) + ' 비슷 — 고쳐 쓴 강의로 보입니다') + '">↺</span>';
+  }
+  /* 자세히의 «비슷한 강의» 칸 */
+  function drawSim() {
+    var box = $('dSim'), it = ITEMS[DETAIL]; if (!box || !it) return;
+    var ext = String(it.ext || C.extOf(it.fileName) || '').toLowerCase();
+    var me = SIMS[it.id];
+    var h = '<div class="sec" style="font-size:13px">비슷한 강의 <span class="hint">슬라이드·문서 글이 겹치는 정도</span></div>';
+    if (!me) h += '<div class="hint">' + (SIG_KINDS[ext] ? (it.store === 'cloud' ? '아직 내용 지문이 없습니다 — 미리보기를 열면 만들어집니다' : '원본이 자료함에 올라오면 지문을 만듭니다') : '이 형식(' + esc(ext.toUpperCase() || '?') + ')은 아직 내용 비교를 못 합니다') + '</div>';
+    else if (!K.okMh(me.mh)) h += '<div class="hint">글이 적어 비교하지 않습니다(그림 위주 자료)</div>';
+    else {
+      var last = K.lastSimilar(it, list(), SIMS), all = K.similarOf(it.id, list(), SIMS).slice(0, 6);
+      if (!all.length) h += '<div class="hint">비슷한 강의가 없습니다 — 새로 만든 강의로 보입니다</div>';
+      else {
+        var lo = last ? ITEMS[last.id] : null;
+        if (lo) h += '<div class="simlast">↺ 마지막으로 비슷했던 강의 <b>' + esc(last.date || '강의일 모름') + '</b> 「' + esc(lo.title) + '」 — ' + simPct(last.score) + ' ' + simWord(last.score) + '</div>';
+        else if (it.lectureDate) h += '<div class="hint">이보다 앞선 비슷한 강의는 없습니다 — 아래는 뒤에 고쳐 쓴 강의입니다</div>';
+        h += all.map(function (x) {
+          var o = ITEMS[x.id]; if (!o) return '';
+          return '<div class="simr' + (last && last.id === x.id ? ' on' : '') + '"><span class="sd">' + esc(x.date || '강의일 모름') + '</span>' +
+            '<button type="button" class="ttl" data-simopen="' + esc(x.id) + '" title="' + esc(o.title + ' — 자세히') + '">' + esc(o.title) + '</button>' +
+            '<span class="sp2">' + simPct(x.score) + '</span><button type="button" class="sm" data-simcmp="' + esc(x.id) + '" title="두 자료를 나란히 보기">⧉</button></div>';
+        }).join('');
+      }
+    }
+    box.innerHTML = h;
+  }
+  /* 관리자 — 지문이 없는 자료함 원본을 차례로 받아 지문을 만든다(멈출 수 있다) */
+  function simTargets() {
+    return K.live(list()).filter(function (it) {
+      var ext = String(it.ext || C.extOf(it.fileName) || '').toLowerCase();
+      return it.store === 'cloud' && it.storagePath && SIG_KINDS[ext] && (+it.size || 0) <= PuViewerKind.MAX_BYTES;
+    });
+  }
+  function simDone(it) { var x = SIMS[it.id]; return !!(x && x.v === K.SIM_V); }
+  function drawSimCard() {
+    var card = $('simCard'); if (!card) return;
+    if (!ME.admin) { card.style.display = 'none'; return; }
+    var all = simTargets(), done = all.filter(simDone).length, left = all.length - done;
+    if (!SIMBEST) SIMBEST = K.lastSimilarAll(list(), SIMS);
+    var linked = Object.keys(SIMBEST).length;
+    card.style.display = '';
+    card.innerHTML = '<div class="bar"><div class="sec" style="margin:0">비슷한 강의 찾기</div><span class="hint">관리자 · 슬라이드·문서 글로 «내용 지문»을 만들어 고쳐 쓴 강의를 이어 줍니다 — 원본은 바꾸지 않습니다</span></div>' +
+      '<div class="simrun"><span>지문 ' + done + ' / ' + all.length + '건' + (linked ? ' · 예전 강의와 이어진 자료 ' + linked + '건' : '') + '</span>' +
+      (SIMRUN ? '<span class="hint">' + esc(SIMRUN.msg || '') + '</span><button type="button" class="sm" data-simrun>■ 멈추기</button>'
+        : (left ? '<button type="button" class="sm pri" data-simrun title="자료함 원본을 차례로 받아 지문을 만듭니다">▶ 남은 ' + left + '건 지문 만들기</button>'
+          : '<span class="hint">모두 만들었습니다 — 새로 넣는 자료는 저절로 만들어집니다</span>')) + '</div>';
+  }
+  function runSimBatch() {
+    if (SIMRUN) { SIMRUN.stop = true; SIMRUN.msg = '멈추는 중…'; drawSimCard(); return; }
+    var todo = simTargets().filter(function (it) { return !simDone(it); });
+    if (!todo.length) return;
+    var bytes = todo.reduce(function (a, it) { return a + (+it.size || 0); }, 0);
+    if (!window.confirm(todo.length + '건의 원본을 차례로 받아 내용 지문을 만들까요?\n받는 양 약 ' + K.fmtBytes(bytes) + ' · 원본은 바꾸지 않습니다 · 언제든 멈출 수 있습니다')) return;
+    SIMRUN = { stop: false, ok: 0, bad: 0, msg: '' };
+    var i = 0;
+    todo.reduce(function (p, it) {
+      return p.then(function () {
+        if (!SIMRUN || SIMRUN.stop || !ME.admin) return;
+        i++; SIMRUN.msg = i + ' / ' + todo.length + ' — ' + (it.title || it.fileName); drawSimCard();
+        return fetchOriginal(it, 'buf', null, null).then(function (b) { return ensureSig(it.id, it.ext || C.extOf(it.fileName), b); })
+          .then(function (ok) { if (ok) SIMRUN.ok++; else SIMRUN.bad++; }, function () { SIMRUN.bad++; });
+      });
+    }, Promise.resolve()).then(function () {
+      var r = SIMRUN || { ok: 0, bad: 0 };
+      SIMRUN = null;
+      toast('지문 ' + r.ok + '건 만들었습니다' + (r.bad ? ' · 못 한 것 ' + r.bad + '건' : ''), 7000);
+      drawSimCard();
+    });
+  }
+
   /* ───────── 자세히·검토 ───────── */
   var DETAIL = '';
   function openDetail(id) {
@@ -809,6 +916,7 @@
       (it.sha256 ? kv('지문', it.sha256.slice(0, 16) + '…') : '') +
       '</div>' +
       (it.summary ? '<div class="sumx"><div class="sec" style="font-size:13px">자동 정리 내용 <span class="hint">문서의 목차·첫 글을 그대로 옮긴 것</span></div><p>' + esc(it.summary) + '</p></div>' : '') +
+      '<div class="simsec" id="dSim"></div>' +
       '<div class="notes"><div class="sec" style="font-size:13px">검토 메모</div><div id="dNotes" class="hint">불러오는 중…</div>' +
       '<textarea id="dNoteNew" rows="2" placeholder="이 자료를 본 의견 — 예) 2026 개정 반영 필요 · 3쪽 사례 좋음"></textarea>' +
       '<div class="bar" style="margin-top:4px"><span class="sp"></span><button class="sm" id="dNoteAdd">메모 남기기</button></div></div>' +
@@ -823,6 +931,7 @@
     openModal('자세히·검토 — ' + it.title, it._deleted ? 'dX' : 'dTitle');
     makePane($('dView'), it, { inDetail: true });
     loadNotes(id);
+    drawSim();
   }
   /* 같은 창(#modal)을 여러 일에 쓴다 — 열 때마다 대화상자 이름을 그 일로 바꾸고 첫 칸에 초점을 준다 */
   function openModal(label, focusId) {
@@ -903,7 +1012,7 @@
           prev.store = 'cloud'; prev.storagePath = path; if (h) prev.sha256 = h;
           if (!prev.size) prev.size = file.size;
           return prev;
-        });
+        }).then(function (x) { sigLater(id, it.fileName || file.name, file); return x; });
       });
     });
   }
@@ -1060,7 +1169,7 @@
       return uploadBlob(it.id, r.file, r.fileName, onPct);
     }).then(function (path) {
       it.store = 'cloud'; it.storagePath = path;
-      return saveNew(it);
+      return saveNew(it).then(function (x) { sigLater(it.id, r.fileName, r.file); return x; });
     });
   }
 
@@ -1198,7 +1307,7 @@
                 if (same && same.how === 'sha256') return n;          /* 같은 파일이 이미 있다 — 또 올리지 않는다 */
                 it.sha256 = h;
               }
-              return uploadBlob(it.id, blob, name).then(function (path) { it.storagePath = path; return saveNew(it); }).then(function () { return n + 1; });
+              return uploadBlob(it.id, blob, name).then(function (path) { it.storagePath = path; return saveNew(it); }).then(function () { sigLater(it.id, name, blob); return n + 1; });
             });
           });
         });
@@ -1367,6 +1476,7 @@
     $('reBtn').addEventListener('click', function () { draw(); toast('최신 자료입니다(바뀌면 저절로 다시 그립니다)'); });
     /* 메뉴 위 이름 — 머리 칸(#who)과 같은 PuWhoami 에서, 이름이 늦게 와도 바뀌면 다시 쓴다 */
     try { if (window.PuWhoami && PuWhoami.onChange) PuWhoami.onChange(function () { sbUser(); }); } catch (e) {}
+    $('simCard').addEventListener('click', function (e) { if (e.target.closest('[data-simrun]')) runSimBatch(); });
     $('sb').addEventListener('click', function (e) {
       var ed = e.target.closest('[data-catedit]'); if (ed) { openCatEditor(ed.getAttribute('data-catedit')); return; }
       if (e.target.closest('[data-catnew]')) { openCatEditor(''); return; }
@@ -1458,6 +1568,9 @@
     });
     $('modal').addEventListener('click', function (e) {
       if (e.target === $('modal')) { closeDetail(); return; }
+      var so = e.target.closest('[data-simopen]'); if (so) { openDetail(so.getAttribute('data-simopen')); return; }
+      var scm = e.target.closest('[data-simcmp]');
+      if (scm) { var a0 = DETAIL, b0 = scm.getAttribute('data-simcmp'); closeDetail(); openCompare([a0, b0], '나란히 — 비슷한 강의'); return; }
       var id = e.target.id;
       if (id === 'dX' || id === 'dCancel') closeDetail();
       else if (id === 'dSave') saveDetail();
@@ -1565,6 +1678,7 @@
       ITEMS = {};
       Object.keys(v).forEach(function (k) { var it = v[k]; if (it && typeof it === 'object' && it.id === k) ITEMS[k] = it; });
       LOADED = true;
+      SIMBEST = null;
       clearTimeout(drawT); drawT = setTimeout(function () {
         if (TAB !== 'add') draw(); else $('nItems').textContent = K.live(list()).length;
         if (VIEW_ID && ITEMS[VIEW_ID] && !$('cmp').classList.contains('on')) openCompare([VIEW_ID], ITEMS[VIEW_ID].title);
@@ -1578,6 +1692,15 @@
       Object.keys(v).forEach(function (k) { var c = v[k]; if (c && typeof c === 'object' && c.id === k) CATSDB[k] = c; });
       applyCats();
       clearTimeout(drawC); drawC = setTimeout(function () { if (TAB !== 'add' && LOADED) draw(); }, 60);
+    }, function () {});
+    /* 내용 지문(비슷한 강의) — 바뀌면 목록 ↺ 셈을 비우고 다시 그린다(자세히가 열려 있으면 그 칸도) */
+    var drawS = null;
+    fbDb.ref('edulib/sims').on('value', function (s) {
+      var v = s.val() || {};
+      SIMS = {};
+      Object.keys(v).forEach(function (k) { var x = v[k]; if (x && typeof x === 'object' && x.id === k && x.entityType === K.SIM_ENTITY) SIMS[k] = x; });
+      SIMBEST = null;
+      clearTimeout(drawS); drawS = setTimeout(function () { if (TAB !== 'add' && LOADED) draw(); if (DETAIL) drawSim(); }, 120);
     }, function () {});
     if (ME.admin) {
       fbDb.ref('edulib_inbox/state').on('value', function (s) { SWEEP = s.val(); if (TAB === 'mail') drawSweep(); }, function () {});

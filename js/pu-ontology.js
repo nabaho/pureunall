@@ -30,6 +30,8 @@
       EduMaterial:'강의자료', EduReviewNote:'강의자료 검토 메모',
       /* 강의자료(2026-11-21) — 사람이 더한 강의 종류 하나(이름·법정 여부·찾을 낱말). 그 id 가 자료 기록의 cat 칸이 된다 */
       EduCategory:'강의 종류',
+      /* 강의자료(2026-11-22) — 자료 한 건의 «내용 지문»(슬라이드·문서 글로 만든 숫자 MinHash). 비슷한 강의(고쳐 쓴 판)를 잇는 데만 쓴다 — 글 자체는 담지 않는다 */
+      EduSimilarity:'강의 내용 지문',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
@@ -280,7 +282,8 @@
                       {path:'signboard/log/{id}',entityType:'SignboardLog'}],
       entityTypes:['SignboardAd','SignboardPublish','SignboardControl','SignboardLog'] },
     /* 법정교육자료함 — 강의자료를 종류·강의일로 모아 보고·나란히 비교하고·검토해 더한다(대표 지시 2026-11-19).
-       ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모) · cats(EduCategory — 사람이 더한 강의 종류, 2026-11-21).
+       ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모) · cats(EduCategory — 사람이 더한 강의 종류, 2026-11-21)
+         · sims(EduSimilarity — 자료의 내용 지문, 열쇠 = 자료 id, 2026-11-22 «마지막에 언제 강의랑 유사» 표시용).
          원본 파일은 창고 edulib/{id}/ 에 받은 그대로.
        ★ 서버 자동 정리(functions/edulib-mail-sweep.js, 2026-11-21)는 보낸 메일의 강의자료를 «정리»만 해 관리자 전용 자동 정리함
          edulib_inbox(레코드 아닌 대기열·상태 — 서버만 쓴다)에 쌓는다. 자료함 기록(items)은 관리자가 골라 «넣기»할 때 화면 관문이 만든다.
@@ -289,8 +292,9 @@
     edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib','edulib_inbox'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
       writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
                       {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'},
-                      {path:'edulib/cats/{id}',entityType:'EduCategory'}],
-      entityTypes:['EduMaterial','EduReviewNote','EduCategory'] },
+                      {path:'edulib/cats/{id}',entityType:'EduCategory'},
+                      {path:'edulib/sims/{id}',entityType:'EduSimilarity'}],
+      entityTypes:['EduMaterial','EduReviewNote','EduCategory','EduSimilarity'] },
     /* 컨설팅정산 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 사이 차액을 정산한다(대표 지시 2026-10-31).
        설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md.
        ★ 쓰는 것: rules(SettleRule) · links(SettleLink — 사람이 확정한 연결만) · notices(SettleNotice) · runs(SettleRun) · adjusts(SettleAdjust).

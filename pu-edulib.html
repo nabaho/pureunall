@@ -145,6 +145,17 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .lsec.other{background:var(--bg);color:var(--ink2)}
 .lsec .lgm{font-weight:400;color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #list>.lsec:first-child,#list>label.phone-only+.lsec{margin-top:0}
+/* 비슷한 강의(내용 지문) — 목록 ↺ · 자세히 칸 · 관리자 일괄 만들기 (2026-11-22) */
+.simb{color:var(--blue-d);font-weight:700;margin-right:4px;cursor:help}
+.simsec{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line)}
+.simlast{margin:2px 0 6px;padding:6px 8px;border-radius:8px;background:var(--blue-bg);color:var(--ink);line-height:1.5}   /* 한 문장 안내 — 표 칸이 아니라 줄을 넘겨도 된다(몇 % 가 잘리지 않게) */
+.simr{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0;padding:3px 2px;border-radius:6px}
+.simr.on{background:var(--blue-bg)}
+.simr .sd{flex:0 0 auto;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+.simr .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.simr .sp2{flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink2)}
+.simrun{display:flex;align-items:center;gap:10px;margin-top:8px;white-space:nowrap;min-width:0}
+.simrun .hint{overflow:hidden;text-overflow:ellipsis;min-width:0}
 /* ══ 왼쪽 메뉴 — 이알피 왼쪽 메뉴(css/pu-erp.css 의 .sb·.sb-grp-h·.sb-menu-item)와 «같은 모양값» (대표 지시 2026-11-22 「대시보드 캡쳐처럼 만들어라」) ══
    ★ PC(769px~)에서만 왼쪽에 붙는다 — 폰은 그대로(한눈에 종류 카드가 같은 일을 한다).
    ★ 한눈에 · 전체 자료 · ⚖ 법정교육 자료 ▾ · 📘 법정교육 외 자료 ▾ · ＋ 새 강의 종류 — 종류를 누르면 자료함에서 그 종류만, 묶음 이름을 누르면 그 묶음만, ▾ 는 접기.
@@ -334,6 +345,9 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   .lgrp{padding:6px}
   .lgh{gap:6px}
   .lgh .lgm{display:none}   /* 폰에서는 «N건»만 — 종 수·용량은 PC 에서 */
+  .simrun{flex-wrap:wrap;gap:6px 10px}   /* 비슷한 강의 찾기 — 폰에서는 글과 단추가 줄을 나눈다(옆으로 넘치지 않게) */
+  .simrun .hint{flex-basis:100%}
+  #simCard .bar .hint{white-space:normal}
   .cat{padding:8px 9px}
   .cat .ln+.ln{display:none}
   .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
@@ -454,6 +468,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
     <div class="kpis" id="kpis"></div>
     <div class="dgrid">
       <div class="card dcat"><div class="bar"><div class="sec" style="margin:0">강의 종류</div><span class="hint">법정교육 자료 · 법정교육 외 자료 · 누르면 그 종류만 · 점선 = 직접 더한 종류</span></div><div id="cats" style="margin-top:8px"></div></div>
+      <div class="card" id="simCard" style="display:none"></div>
       <div class="card dmx"><div class="bar"><div class="sec" style="margin:0">종류 × 연도</div><span class="hint">진할수록 많음 · 칸을 누르면 그 종류·연도만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
     </div>
   </section>
@@ -546,7 +561,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=109"></script>
+<script src="js/pu-ontology.js?v=110"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 gate(createGateway enforce)로만 한다. -->
@@ -568,8 +583,8 @@ window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ Pu
 </script>
 <script src="js/pu-viewer-kind.js?v=1"></script>
 <script src="js/pu-edulib-classify.js?v=4"></script>
-<script src="js/pu-edulib-core.js?v=4"></script>
-<script src="js/pu-edulib-preview.js?v=3"></script>
-<script src="js/pu-edulib-app.js?v=11"></script>
+<script src="js/pu-edulib-core.js?v=5"></script>
+<script src="js/pu-edulib-preview.js?v=4"></script>
+<script src="js/pu-edulib-app.js?v=12"></script>
 </body>
 </html>

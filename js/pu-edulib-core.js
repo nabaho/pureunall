@@ -294,8 +294,87 @@
     return 'edulib/' + id + '/' + safe;
   }
 
+  /* ───────── 비슷한 강의 — 내용 지문 (대표 지시 2026-11-22 「기존 강의를 바꾼 게 있다 그러면 마지막에 언제 강의랑 유사하다 그런 표시도」) ─────────
+     슬라이드·문서 글을 «낱말 두 개씩 짝»(shingle)으로 쪼개 MinHash 32개로 줄인다 — 같은 자리 값이 같은 비율 ≈ 두 글의 겹침(자카드 유사도).
+     ★ 지문은 edulib/sims/{자료 id} 에 따로 둔다 — 자료 기록의 «고친 때»를 바꾸지 않는다. 글 자체는 저장하지 않는다(숫자 지문뿐).
+     ★ 글이 적은 자료(그림 위주)는 mh:'' 로 «비교 안 함»을 남긴다 — 다시 받아 다시 세지 않게.
+     ★ 이름이 비슷한 것은 보지 않는다 — 내용만. 똑같은 파일(지문 sha256 같음)은 넣을 때 이미 걸러진다. */
+  var SIM_ENTITY = 'EduSimilarity', SIM_V = 1, SIM_K = 32, SIM_MIN = 0.5, SIM_MIN_SHINGLES = 12;
+  var SIM_SEEDS = (function () {
+    var s = [], x = 0x2545f491;
+    for (var i = 0; i < SIM_K; i++) { x = (x ^ (x << 13)) >>> 0; x = (x ^ (x >>> 17)) >>> 0; x = (x ^ (x << 5)) >>> 0; s.push(x); }
+    return s;
+  })();
+  function fnv1a(s) { var h = 0x811c9dc5; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+  function mix(h, seed) { h = (h ^ seed) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return (h ^ (h >>> 16)) >>> 0; }
+  /* 낱말 — 한글·영문·숫자 덩어리(2글자 이상, 숫자만은 뺀다 — 쪽 번호·연도가 «같은 강의»를 만들지 않게) */
+  function simWords(lines) {
+    var t = str((lines || []).join('\n'));
+    try { t = t.normalize('NFKC'); } catch (e) {}
+    return (t.toLowerCase().match(/[0-9a-z\u3131-\u318e\uac00-\ud7a3]+/g) || []).filter(function (w) { return w.length >= 2 && !/^\d+$/.test(w); });
+  }
+  function simShingles(lines) {
+    var w = simWords(lines), set = Object.create(null), out = [];
+    for (var i = 0; i + 1 < w.length; i++) { var k = w[i] + ' ' + w[i + 1]; if (!set[k]) { set[k] = 1; out.push(k); } }
+    return out;
+  }
+  /* lines(문단 글 목록) → { mh:'8자리 16진수 × 32', n:짝 수 } · 글이 적으면 { mh:'', n } */
+  function simSig(lines) {
+    var sh = simShingles(lines);
+    if (sh.length < SIM_MIN_SHINGLES) return { mh: '', n: sh.length };
+    var mins = []; for (var k = 0; k < SIM_K; k++) mins.push(0xffffffff);
+    sh.forEach(function (s) { var h = fnv1a(s); for (var j = 0; j < SIM_K; j++) { var v = mix(h, SIM_SEEDS[j]); if (v < mins[j]) mins[j] = v; } });
+    return { mh: mins.map(function (v) { return ('0000000' + v.toString(16)).slice(-8); }).join(''), n: sh.length };
+  }
+  function okMh(mh) { return typeof mh === 'string' && mh.length === SIM_K * 8 && /^[0-9a-f]+$/.test(mh); }
+  /* 두 지문의 겹침(0~1) — 같은 자리 값이 같은 비율 */
+  function simScore(a, b) {
+    if (!okMh(a) || !okMh(b)) return 0;
+    var eq = 0; for (var i = 0; i < a.length; i += 8) if (a.substr(i, 8) === b.substr(i, 8)) eq++;
+    return eq / SIM_K;
+  }
+  function makeSim(itemId, sig, who, now) {
+    now = now || Date.now();
+    return { id: itemId, entityType: SIM_ENTITY, schemaVersion: SCHEMA, sourceId: itemId, v: SIM_V, mh: okMh(sig && sig.mh) ? sig.mh : '',
+      n: Math.max(0, +(sig && sig.n) || 0), by: str(who), createdAt: now, updatedAt: now };
+  }
+  /* id 와 비슷한 다른 자료 — 지운 것·지문 없는 것은 뺀다. 점수 높은 순(같으면 늦은 강의 먼저) */
+  function similarOf(id, items, sims, min) {
+    var me = sims && sims[id]; if (!me || !okMh(me.mh)) return [];
+    min = min == null ? SIM_MIN : min;
+    var out = [];
+    live(items).forEach(function (it) {
+      if (!it || it.id === id) return;
+      var o = sims[it.id]; if (!o || !okMh(o.mh)) return;
+      var sc = simScore(me.mh, o.mh);
+      if (sc >= min) out.push({ id: it.id, score: sc, date: str(it.lectureDate) });
+    });
+    return out.sort(function (a, b) { return b.score - a.score || (a.date < b.date ? 1 : a.date > b.date ? -1 : 0); });
+  }
+  /* «마지막으로 비슷했던 예전 강의» — 비슷한 것 가운데 강의일이 이 자료보다 앞선 것의 «가장 늦은 것».
+     이 자료의 강의일을 모르면 가장 비슷한 것. 앞선 것이 없으면 null(이 자료가 처음 만든 강의). */
+  function lastSimilar(it, items, sims) {
+    if (!it) return null;
+    var cands = similarOf(it.id, items, sims);
+    if (!cands.length) return null;
+    var d = str(it.lectureDate);
+    if (!d) return cands[0];
+    var earlier = cands.filter(function (x) { return x.date && x.date < d; });
+    if (!earlier.length) return null;
+    return earlier.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : b.score - a.score; })[0];
+  }
+  /* 목록 표시용 — 모든 자료의 «마지막 비슷한 예전 강의»를 한 번에(자료·지문이 바뀔 때 화면이 한 번 다시 센다) */
+  function lastSimilarAll(items, sims) {
+    var out = Object.create(null);
+    live(items).forEach(function (it) { var x = lastSimilar(it, items, sims); if (x) out[it.id] = x; });
+    return out;
+  }
+
   return {
     ENTITY: ENTITY, NOTE_ENTITY: NOTE_ENTITY, CAT_ENTITY: CAT_ENTITY, SCHEMA: SCHEMA, SUMMARY_MAX: SUMMARY_MAX,
+    SIM_ENTITY: SIM_ENTITY, SIM_V: SIM_V, SIM_K: SIM_K, SIM_MIN: SIM_MIN,
+    simWords: simWords, simShingles: simShingles, simSig: simSig, simScore: simScore, okMh: okMh, makeSim: makeSim,
+    similarOf: similarOf, lastSimilar: lastSimilar, lastSimilarAll: lastSimilarAll,
     yearCols: yearCols, newCatId: newCatId, makeCat: makeCat,
     LEGAL_SIDES: LEGAL_SIDES, sideOf: sideOf, splitLegal: splitLegal, splitGroups: splitGroups,
     STATUS: STATUS, STORE: STORE, KIND_LABEL: KIND_LABEL,
