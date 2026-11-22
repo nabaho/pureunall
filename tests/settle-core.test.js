@@ -531,3 +531,81 @@ test('개인입금 사업 종류 — 법인 예외(off)·지운 건·해에 안 
   assert.deepEqual(C.personalTypes(null, null), []);
   assert.deepEqual(C.personalTypes(biz, [{ id: 6, typeCode: 'T-B', personalDepositMode: 'on', startDate: '2001-01-01', endDate: '2001-02-01' }]).map((x) => x.code), ['T-A', 'T-B']);
 });
+
+/* ── 여러 정산표 «함께 정산» — 사람마다 차액을 더해 플러스·마이너스를 상계한다(읽기만) ── */
+function cmbSite(leadSid, staff) {
+  return { company: '가나상사', round: 1, members: [{ role: 'lead', sid: leadSid, name: '주관' + leadSid }].concat(staff.map(([sid, name, settle]) => ({ role: 'staff', sid, name, settle }))) };
+}
+function cmbRun(id, type, sites, status, transfers) {
+  return { id, typeCode: type, monthKey: '2026-11', label: '2026년 11월', status: status || 'draft', sites, transfers: transfers || [] };
+}
+const CMB_NAMES = { L1: '홍길동', L2: '박주관', S1: '김가나', S2: '이다라', S3: '박마바' };
+
+test('함께 정산 — 사람마다 사업별 차액을 더해 상계, 주관 기준 합계(줄 돈·받을 돈·순)', () => {
+  const A = cmbRun('A', 'cons-a', [cmbSite('L1', [['S1', '김가나', -87915], ['S2', '이다라', 50000]])]);
+  const B = cmbRun('B', 'cons-b', [cmbSite('L1', [['S1', '김가나', 675933], ['S3', '박마바', -2000]])]);
+  const c = C.combineRuns([A, B], CMB_NAMES);
+  assert.deepEqual(c.cols.map((x) => x.rid), ['A', 'B']);
+  const s1 = c.rows.find((r) => r.sid === 'S1');
+  assert.deepEqual(s1.parts, { A: -87915, B: 675933 });
+  assert.equal(s1.net, 588018, '반환 87,915 와 추가 지급 675,933 이 한 번에 상계된다');
+  assert.equal(c.rows.find((r) => r.sid === 'S2').net, 50000, '한 사업에만 있는 사람도 그대로');
+  assert.deepEqual(c.rows.find((r) => r.sid === 'S2').parts, { A: 50000 });
+  assert.equal(c.rows.find((r) => r.sid === 'S3').net, -2000);
+  assert.equal(c.mixed, false);
+  assert.equal(c.leads.length, 1);
+  const L = c.leads[0];
+  assert.equal(L.leadName, '홍길동');
+  assert.equal(L.pay, 588018 + 50000, '주관이 줄 돈 = 순이 +인 사람들의 합');
+  assert.equal(L.back, 2000, '주관이 받을 돈 = 순이 −인 사람들의 합');
+  assert.equal(L.net, 588018 + 50000 - 2000);
+  assert.deepEqual(L.parts, { A: -87915 + 50000, B: 675933 - 2000 }, '사업별 합(열 합계)');
+  /* 순 = 사람별 순의 합 = 사업별 합의 합 */
+  assert.equal(L.net, Object.values(L.parts).reduce((a, b) => a + b, 0));
+  /* 사람 이름 순 */
+  assert.deepEqual(c.rows.map((r) => r.name), ['김가나', '박마바', '이다라']);
+});
+
+test('함께 정산 — 주관이 다르면 같은 사람도 줄이 따로, 기록만·지운 정산표는 뺀다, 이미 보낸 정산표는 표시', () => {
+  const A = cmbRun('A', 'cons-a', [cmbSite('L1', [['S1', '김가나', -10000]])], 'confirmed', [{ paid: true }, { paid: false }]);
+  const D = cmbRun('D', 'cons-d', [cmbSite('L2', [['S1', '김가나', 3000]])]);
+  const M = cmbRun('M', 'cons-m', [cmbSite('L1', [['S1', '김가나', 999999]])], 'manual');
+  const X = Object.assign(cmbRun('X', 'cons-x', [cmbSite('L1', [['S1', '김가나', 888888]])]), { _deleted: true });
+  const c = C.combineRuns([A, D, M, X, null], CMB_NAMES);
+  assert.deepEqual(c.cols.map((x) => x.rid), ['A', 'D'], '기록만·지운 정산표·null 은 빠진다');
+  assert.equal(c.rows.length, 2, '주관이 다르면 줄이 따로(서로 다른 사람 사이를 맞바꿔 줄 수 없다)');
+  assert.equal(c.mixed, true);
+  const r1 = c.rows.find((r) => r.leadSid === 'L1'), r2 = c.rows.find((r) => r.leadSid === 'L2');
+  assert.equal(r1.net, -10000);
+  assert.equal(r2.net, 3000);
+  assert.deepEqual(c.leads.map((l) => [l.leadSid, l.pay, l.back, l.net]).sort(), [['L1', 0, 10000, -10000], ['L2', 3000, 0, 3000]]);
+  assert.equal(c.cols[0].sent, true, '이미 «보냄 표시»한 송금이 든 확정 정산표');
+  assert.equal(c.cols[1].sent, false);
+  /* 읽기만 — 넘긴 정산표를 바꾸지 않는다 */
+  assert.equal(A.sites[0].members[1].settle, -10000);
+  assert.deepEqual(C.combineRuns([], {}), { cols: [], rows: [], leads: [], mixed: false });
+  assert.deepEqual(C.combineRuns(null, null).rows, []);
+});
+
+test('함께 정산 문구 — 사업별 차액 + 합계 한 줄(반환/추가 지급), 사람마다 한 통', () => {
+  const A = cmbRun('A', 'cons-a', [cmbSite('L1', [['S1', '김가나', -87915]])], 'confirmed');
+  const B = cmbRun('B', 'cons-b', [cmbSite('L1', [['S1', '김가나', 675933], ['S2', '이다라', 100]])], 'confirmed');
+  const c = C.combineRuns([A, B], CMB_NAMES);
+  const row = c.rows.find((r) => r.sid === 'S1');
+  const t = C.combinedMessage(c, row, { title: { A: '일터혁신상생컨설팅', B: '산업일자리전환컨설팅' }, label: '2026년 11월' });
+  const lines = t.split('\n');
+  assert.match(lines[0], /^\[컨설팅 비용 정산 안내\]$/);
+  assert.match(lines[1], /일터혁신상생컨설팅 \+ 산업일자리전환컨설팅 · 2026년 11월/);
+  assert.match(t, /김가나님 함께 정산 내역입니다/);
+  assert.match(t, /■ 일터혁신상생컨설팅 \(2026년 11월\) 차액 −?87,915원/);
+  assert.match(t, /■ 산업일자리전환컨설팅 \(2026년 11월\) 차액 \+675,933원/);
+  assert.match(t, /■ 합계 ▶ 추가 지급 588,018원 \(홍길동 → 김가나\) 보내 드립니다/);
+  assert.match(t, /사업별로 따로 보내지 않고 위 합계만 주고받습니다/);
+  /* 한 사업에만 든 사람은 그 사업 줄만 */
+  const t2 = C.combinedMessage(c, c.rows.find((r) => r.sid === 'S2'), { title: { A: '가', B: '나' }, label: '11월' });
+  assert.doesNotMatch(t2, /■ 가 /);
+  assert.match(t2, /■ 나 \(2026년 11월\) 차액 \+100원/);
+  /* 반환이면 방향이 거꾸로 */
+  const neg = C.combinedMessage(C.combineRuns([A], CMB_NAMES), C.combineRuns([A], CMB_NAMES).rows[0], { title: { A: '가' }, label: '11월' });
+  assert.match(neg, /▶ 반환 87,915원 \(김가나 → 홍길동\) 송금 부탁드립니다/);
+});
