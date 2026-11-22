@@ -20,7 +20,30 @@
 
   var MAX_FILE = 50 * 1024 * 1024;
   var MAX_PART = 8 * 1024 * 1024;
+  var MAX_TOTAL = 80 * 1024 * 1024;     /* 풀린 글자 합계 — 작은 zip 이 풀면 엄청 커지는 파일 대비 */
   var MAX_SLIDES = 300;
+
+  /* zip 안 파일을 «실제로 풀린 바이트»를 세며 읽는다(선언된 크기를 믿지 않는다) — 한도를 넘으면 그 자리에서 멈추고 실패 */
+  function readLimited(file, limit) {
+    return new Promise(function (res, rej) {
+      var chunks = [], got = 0, done = false, st;
+      try { st = file.internalStream('uint8array'); } catch (e) { rej(e); return; }
+      st.on('data', function (c) {
+        if (done) return;
+        got += c.length;
+        if (got > limit) { done = true; try { st.pause(); } catch (_) {} rej(new Error('풀린 크기가 한도를 넘었습니다')); return; }
+        chunks.push(c);
+      }).on('error', function (e) { if (!done) { done = true; rej(e); } })
+        .on('end', function () {
+          if (done) return; done = true;
+          var out = new Uint8Array(got), o = 0;
+          chunks.forEach(function (c) { out.set(c, o); o += c.length; });
+          res(out);
+        });
+      st.resume();
+    });
+  }
+  function utf8(u8) { return new TextDecoder('utf-8').decode(u8); }
 
   /* XML 글자에서 <a:t>…</a:t>(pptx) · <w:t>…</w:t>(docx) 만 뽑는다.
      DOMParser 가 없는 곳(node 검사)에서도 돌게 정규식으로 한다 — 태그 속 글자만 꺼내고 엔티티를 푼다. */
@@ -67,12 +90,16 @@
       }
       var truncated = targets.length > MAX_SLIDES;
       targets = targets.slice(0, MAX_SLIDES);
-      return Promise.all(targets.map(function (n) {
-        var f = zip.files[n];
-        var sz = f && f._data && f._data.uncompressedSize;
-        if (sz && sz > MAX_PART) return Promise.resolve('');
-        return f.async('string');
-      })).then(function (xmls) {
+      /* 차례로 읽으며 합계를 센다 — 한 부분이 한도를 넘으면 그 부분만 비우고, 합계를 넘으면 거기서 멈춘다 */
+      var xmls = [], total = 0;
+      return targets.reduce(function (p, n) {
+        return p.then(function () {
+          if (total >= MAX_TOTAL) { xmls.push(''); truncated = true; return; }
+          return readLimited(zip.files[n], Math.min(MAX_PART, MAX_TOTAL - total)).then(function (u8) {
+            total += u8.length; xmls.push(utf8(u8));
+          }, function () { xmls.push(''); truncated = true; });
+        });
+      }, Promise.resolve()).then(function () {
         var parts = xmls.map(function (x, i) {
           var lines = x ? paragraphs(x, pTag, tTag) : [];
           return { no: kind === 'pptx' ? slideNo(targets[i]) : i + 1, title: lines[0] || '', lines: lines };

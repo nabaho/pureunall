@@ -223,6 +223,59 @@ test('④ 나쁜 파일 — 합친 칸 값이 엄청나도 남은 칸까지만 �
   assert.match(src, /var rels = Object\.create\(null\)/);
 });
 
+test('④ 압축 폭탄 — 풀리는 «실제 바이트»를 세다가 한도에서 멈춘다(zip 이 적어 둔 크기를 믿지 않는다)', async () => {
+  /* 똑같은 글자가 잔뜩 — 아주 잘 줄어드는 큰 파일. 한도를 작게 주고 읽으면 끝까지 풀지 않고 실패해야 한다 */
+  const z = new JSZip();
+  z.file('big.xml', 'a'.repeat(3 * 1048576), { compression: 'DEFLATE' });
+  const zz = await JSZip.loadAsync(await z.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' }));
+  await assert.rejects(R.readLimited(zz.file('big.xml'), 64 * 1024), /너무 커서/, '한도를 넘으면 실패');
+  const ok = await R.readLimited(zz.file('big.xml'), 4 * 1048576);
+  assert.equal(ok.length, 3 * 1048576, '한도 안이면 다 읽는다');
+  /* 해석기·글자 보기 둘 다 «풀면서 세는» 길을 탄다 — 통째로 async('string') 하지 않는다 */
+  const src = stripJs(read('js/pu-pptx-render.js'));
+  const textFn = src.slice(src.indexOf('function text(p)'), src.indexOf('function load(p'));
+  assert.match(textFn, /readLimited\(f, room\)/);
+  assert.doesNotMatch(textFn, /async\('string'\)/);
+  const pv = stripJs(read('js/pu-edulib-preview.js'));
+  assert.match(pv, /readLimited\(zip\.files\[n\], Math\.min\(MAX_PART, MAX_TOTAL - total\)\)/, '글자 보기도 한 부분·합계 한도로 풀며 센다');
+  assert.doesNotMatch(pv.slice(pv.indexOf('function extract(')), /async\('string'\)/);
+  const fj = stripJs(read('js/pu-slides-frame.js'));
+  assert.match(fj, /PuPptx\.readLimited\(model\.zip\.file\(p\), room\)/, '그림도 풀며 센다');
+});
+
+test('④ 장이 많은 정상 자료는 합계 한도에 막히지 않는다(여러 부분을 함께 풀어도 몫은 적힌 크기만큼)', async () => {
+  /* 2026-11-22 — 몫을 부분마다 «최대치»로 잡았더니 46장짜리 진짜 강의안이 «너무 커서»로 막혔다 */
+  const z = await JSZip.loadAsync(await makePptx());
+  const s2 = await z.file('ppt/slides/slide2.xml').async('string');
+  const ids = [], rels = [];
+  for (let i = 0; i < 150; i++) {
+    z.file('ppt/slides/s' + i + '.xml', s2);
+    z.file('ppt/slides/_rels/s' + i + '.xml.rels', REL([['rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml']]));
+    ids.push('<p:sldId id="' + (300 + i) + '" r:id="rX' + i + '"/>');
+    rels.push(['rX' + i, 'slide', 'slides/s' + i + '.xml']);
+  }
+  z.file('ppt/presentation.xml', `<?xml version="1.0"?><p:presentation ${NS}><p:sldIdLst>${ids.join('')}</p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`);
+  z.file('ppt/_rels/presentation.xml.rels', REL(rels));
+  const m = await R.parse(JSZip, await z.generateAsync({ type: 'arraybuffer' }));
+  assert.equal(m.slides.length, 150, '150장 모두');
+  const src = stripJs(read('js/pu-pptx-render.js'));
+  const textFn = src.slice(src.indexOf('function text(p)'), src.indexOf('function load(p'));
+  assert.match(textFn, /var room = declared >= 0 \? declared : LIMIT\.xmlPart/, '몫은 적힌 크기 — 넘게 풀리면 readLimited 가 멈춘다');
+});
+
+test('④ 큰 자료 — 마스터·레이아웃 장식은 한 번만 읽고 같은 목록을 쓴다 · 도형 합계 한도 · 그림은 화면 가까이 올 때만 그린다', async () => {
+  const m = await R.parse(JSZip, await makePptx());
+  const a = m.slides[1].shapes.find((s) => s.fill && s.fill.c === '#c0504d');
+  assert.ok(a, '마스터 장식');
+  const src = stripJs(read('js/pu-pptx-render.js'));
+  assert.match(src, /shared\(master, function \(\) \{ return shapesOf\(master/, '마스터 도형은 한 번만');
+  assert.match(src, /shared\(layout, function \(\) \{ return shapesOf\(layout/, '레이아웃 도형은 한 번만');
+  assert.ok(R.LIMIT.shapes > 0, '도형 합계 한도');
+  const fj = stripJs(read('js/pu-slides-frame.js'));
+  assert.match(fj, /new IntersectionObserver\(/, '보일 때 그린다');
+  assert.ok(fj.indexOf('PuPptx.draw(MODEL, i, document, urlOf)') > fj.indexOf('function fill('), '작은 그림은 fill 에서만 그린다');
+});
+
 test('④ 칸 움직임 — 새로 열거나 닫으면 크게 보기도 닫힌다 · 양끝 단추는 못 누름 · 크게 보기 안에서 초점이 돈다 · 그림 한도', () => {
   const fj = stripJs(read('js/pu-slides-frame.js'));
   assert.match(fj, /function open\(buf\) \{\s*hideBig\(\);/);

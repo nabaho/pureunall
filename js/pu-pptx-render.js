@@ -24,7 +24,29 @@
   var EMU_PT = 12700;                 /* 1pt = 12700 EMU */
   var MAX_SLIDES = 300;
   /* 한도 — 남의 파일(메일·PC)이라 «작은 zip 이 풀면 엄청 커지는» 파일·끝없는 XML 로 칸이 멈추거나 메모리를 다 쓰지 않게 */
-  var LIMIT = { xmlPart: 8 * 1048576, xmlTotal: 80 * 1048576, nodes: 400000, depth: 40, cols: 60, rows: 60 };
+  var LIMIT = { xmlPart: 8 * 1048576, xmlTotal: 80 * 1048576, nodes: 400000, depth: 40, cols: 60, rows: 60, shapes: 40000 };
+
+  /* zip 안 파일을 «실제로 풀린 바이트»를 세며 읽는다 — 선언된 크기(_data)를 믿지 않는다. 한도를 넘으면 그 자리에서 멈추고 실패 */
+  function readLimited(file, limit) {
+    return new Promise(function (res, rej) {
+      var chunks = [], got = 0, done = false, st;
+      try { st = file.internalStream('uint8array'); } catch (e) { rej(e); return; }
+      st.on('data', function (c) {
+        if (done) return;
+        got += c.length;
+        if (got > limit) { done = true; try { st.pause(); } catch (_) {} rej(new Error('자료가 너무 커서 그리지 않았습니다')); return; }
+        chunks.push(c);
+      }).on('error', function (e) { if (!done) { done = true; rej(e); } })
+        .on('end', function () {
+          if (done) return; done = true;
+          var out = new Uint8Array(got), o = 0;
+          chunks.forEach(function (c) { out.set(c, o); o += c.length; });
+          res(out);
+        });
+      st.resume();
+    });
+  }
+  function utf8(u8) { return new TextDecoder('utf-8').decode(u8); }
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var XHTML_NS = 'http://www.w3.org/1999/xhtml';
 
@@ -355,11 +377,13 @@
       function text(p) {
         var f = zip.file(p); if (!f) return Promise.resolve('');
         if (sizeOf(f) > LIMIT.xmlPart) return Promise.reject(new Error('슬라이드 한 장이 너무 큽니다'));
-        return f.async('string').then(function (t) {
-          xmlUsed += t.length;
-          if (t.length > LIMIT.xmlPart || xmlUsed > LIMIT.xmlTotal) throw new Error('자료가 너무 커서 그리지 않았습니다');
-          return t;
-        });
+        /* 몫은 «zip 에 적힌 크기»만큼 미리 잡는다(여러 부분이 함께 풀려도 합계가 넘지 않게).
+           그리고 «풀리는 동안» 실제 바이트를 세어, 적힌 크기를 넘으면(거짓 크기) 그 자리에서 멈추고 실패한다 */
+        var declared = sizeOf(f);
+        var room = declared >= 0 ? declared : LIMIT.xmlPart;
+        if (xmlUsed + room > LIMIT.xmlTotal) return Promise.reject(new Error('자료가 너무 커서 그리지 않았습니다'));
+        xmlUsed += room;
+        return readLimited(f, room).then(function (u8) { xmlUsed -= room - u8.length; return utf8(u8); }, function (e) { xmlUsed -= room; throw e; });
       }
       function load(p, rootName) {
         if (!p) return Promise.resolve(null);
@@ -375,6 +399,8 @@
         });
         return cache[p];
       }
+      var sharedShapes = Object.create(null);
+      function shared(part, make) { return sharedShapes[part.path] || (sharedShapes[part.path] = make()); }
       function relOf(part, type) { if (!part) return ''; for (var k in part.rels) if (part.rels[k].type === type) return joinPath(part.path, part.rels[k].target); return ''; }
       return load('ppt/presentation.xml', 'p:presentation').then(function (pres) {
         if (!pres) throw new Error('파워포인트(pptx) 파일이 아닙니다');
@@ -407,8 +433,9 @@
                   if (bg === undefined && layout) bg = bgOf(layout, ctx);
                   if (bg === undefined && master) bg = bgOf(master, ctx);
                   var shapes = [];
-                  if (master && showMaster) shapes = shapes.concat(shapesOf(master, ctx, { skipPh: true, master: master }));
-                  if (layout && showMaster) shapes = shapes.concat(shapesOf(layout, ctx, { skipPh: true, master: master, masterPh: common.masterPh }));
+                  /* 마스터·레이아웃 장식은 여러 슬라이드가 함께 쓴다 — 한 번만 읽고 같은 목록을 쓴다(장마다 다시 읽지 않는다) */
+                  if (master && showMaster) shapes = shapes.concat(shared(master, function () { return shapesOf(master, ctx, { skipPh: true, master: master }); }));
+                  if (layout && showMaster) shapes = shapes.concat(shared(layout, function () { return shapesOf(layout, ctx, { skipPh: true, master: master, masterPh: common.masterPh }); }));
                   shapes = shapes.concat(shapesOf(slide, ctx, common));
                   if (bg && bg.img) media[bg.img] = true;
                   shapes.forEach(function (s) { if (s.img) media[s.img] = true; if (s.fill && s.fill.img) media[s.fill.img] = true; });
@@ -432,7 +459,14 @@
             });
           });
         })).then(function (slides) {
-          return { w: W, h: H, slides: slides.filter(Boolean), media: media, truncated: truncated, zip: zip };
+          /* 도형 합계 한도 — 앞에서부터 세어 넘으면 거기서 끊는다(«앞 N장까지»로 알린다) */
+          var out = [], count = 0;
+          slides.filter(Boolean).some(function (s) {
+            count += s.shapes.length;
+            if (count > LIMIT.shapes && out.length) { truncated = true; return true; }
+            out.push(s); return false;
+          });
+          return { w: W, h: H, slides: out, media: media, truncated: truncated, zip: zip };
         });
       });
     });
@@ -525,5 +559,5 @@
     g.appendChild(t);
   }
 
-  return { parse: parse, draw: draw, DRAWABLE: DRAWABLE, MAX_SLIDES: MAX_SLIDES, LIMIT: LIMIT, _xml: xml, _colorOf: colorOf, _joinPath: joinPath, _textOf: textOf };
+  return { parse: parse, draw: draw, readLimited: readLimited, DRAWABLE: DRAWABLE, MAX_SLIDES: MAX_SLIDES, LIMIT: LIMIT, _xml: xml, _colorOf: colorOf, _joinPath: joinPath, _textOf: textOf };
 });

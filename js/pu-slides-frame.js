@@ -24,22 +24,20 @@
 
   /* 그림 — 그릴 수 있는 꼴(png·jpg·gif·bmp·webp·svg)만 blob: 주소로. EMF·WMF 는 그리기 쪽이 «그림» 칸으로 */
   function loadMedia(model) {
-    var ps = Object.keys(model.media || {}).filter(function (p) { return window.PuPptx.DRAWABLE.test(p); });
-    var total = 0;
-    ps = ps.filter(function (p) {
-      var f = model.zip.file(p); if (!f) return false;
-      var sz = f._data && typeof f._data.uncompressedSize === 'number' ? f._data.uncompressedSize : IMG_ONE;
-      if (sz > IMG_ONE || total + sz > IMG_ALL) return false;
-      total += sz; return true;
-    });
-    return Promise.all(ps.map(function (p) {
-      var f = model.zip.file(p);
-      return f.async('uint8array').then(function (u8) {
-        if (u8.length > IMG_ONE) return;
-        var ext = (p.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
-        URLS[p] = URL.createObjectURL(new Blob([u8], { type: MIME[ext.toLowerCase()] || 'application/octet-stream' }));
-      }).catch(function () {});
-    }));
+    var ps = Object.keys(model.media || {}).filter(function (p) { return window.PuPptx.DRAWABLE.test(p) && model.zip.file(p); });
+    var used = 0;
+    /* 차례로 «실제로 풀린 바이트»를 세며 읽는다(선언 크기를 믿지 않는다) — 한 장·합계 한도를 넘는 그림은 «그림» 칸으로 */
+    return ps.reduce(function (pr, p) {
+      return pr.then(function () {
+        var room = Math.min(IMG_ONE, IMG_ALL - used);
+        if (room <= 0) return;
+        return window.PuPptx.readLimited(model.zip.file(p), room).then(function (u8) {
+          used += u8.length;
+          var ext = (p.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+          URLS[p] = URL.createObjectURL(new Blob([u8], { type: MIME[ext.toLowerCase()] || 'application/octet-stream' }));
+        }, function () {});
+      });
+    }, Promise.resolve());
   }
 
   function setSize(i) {
@@ -64,14 +62,22 @@
     var grid = h('div', 'grid');
     grid.style.setProperty('--tw', TW + 'px');
     root.appendChild(grid);
-    var i = 0;
-    /* 한꺼번에 다 그리면 큰 자료(300장)에서 칸이 멈춘다 — 조금씩 */
-    (function step() {
-      if (!MODEL) return;
-      var end = Math.min(n, i + 8);
-      for (; i < end; i++) grid.appendChild(thumb(i));
-      if (i < n) setTimeout(step, 0);
-    })();
+    /* 자리만 먼저 깔고, 그림(SVG)은 «화면 가까이 올 때» 그린다 — 300장이어도 보이는 것만(메모리·멈춤 대비) */
+    if (OBS) { try { OBS.disconnect(); } catch (_) {} }
+    OBS = typeof IntersectionObserver === 'function' ? new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { OBS.unobserve(e.target); fill(e.target); } });
+    }, { root: null, rootMargin: '400px 0px' }) : null;
+    for (var i = 0; i < n; i++) { var f = thumb(i); grid.appendChild(f); if (OBS) OBS.observe(f); else fill(f); }
+  }
+  var OBS = null;
+  function fill(fig) {
+    if (!MODEL || fig._done) return;
+    fig._done = true;
+    var i = fig._i, svg;
+    try { svg = window.PuPptx.draw(MODEL, i, document, urlOf); } catch (e) { svg = null; }
+    var ph = fig.querySelector('.ph');
+    if (svg) { svg.style.aspectRatio = MODEL.w + ' / ' + MODEL.h; fig.replaceChild(svg, ph); }
+    else fig.replaceChild(h('div', 'msg err', '이 쪽을 그리지 못했습니다'), ph);
   }
   function thumb(i) {
     var sl = MODEL.slides[i];
@@ -80,11 +86,10 @@
     fig.setAttribute('role', 'button');
     fig.setAttribute('aria-label', sl.no + '쪽 크게 보기' + (sl.title ? ' — ' + sl.title : ''));
     fig.title = sl.no + '쪽' + (sl.title ? ' — ' + sl.title : '');
-    var svg;
-    try { svg = window.PuPptx.draw(MODEL, i, document, urlOf); }
-    catch (e) { svg = null; }
-    if (svg) { svg.style.aspectRatio = MODEL.w + ' / ' + MODEL.h; fig.appendChild(svg); }
-    else fig.appendChild(h('div', 'msg err', '이 쪽을 그리지 못했습니다'));
+    fig._i = i;
+    var ph = h('div', 'ph');                                       /* 그리기 전 자리 — 슬라이드 비율만큼 */
+    ph.style.aspectRatio = MODEL.w + ' / ' + MODEL.h;
+    fig.appendChild(ph);
     var cap = h('div', 'cap');
     cap.appendChild(h('b', '', String(sl.no)));
     cap.appendChild(h('span', '', sl.title || ''));
@@ -163,7 +168,7 @@
     var m = e.data; if (!m || typeof m !== 'object') return;
     if (m.t === 'open' && m.buf instanceof ArrayBuffer) open(m.buf);
     else if (m.t === 'goto' && MODEL) { var n = m.page | 0; var idx = MODEL.slides.findIndex(function (s) { return s.no === n; }); openBig(idx < 0 ? n - 1 : idx); }
-    else if (m.t === 'close') { hideBig(); freeAll(); MODEL = null; clear(root); }
+    else if (m.t === 'close') { hideBig(); if (OBS) { try { OBS.disconnect(); } catch (_) {} } freeAll(); MODEL = null; clear(root); }
   });
   post({ t: 'ready' });
 })();
