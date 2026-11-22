@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>공공 기업검색</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔍</text></svg>">
-<link rel="stylesheet" href="css/pu-design.css?v=1">
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;min-height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#1e293b;word-break:keep-all}
@@ -101,23 +100,27 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
   .ps-btn{min-height:38px}
 }
 </style>
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
 <body class="pu-design">
 <div id="pubSearchRoot"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="js/pu-sid-guard.js?v=1"></script>
 <script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-authsync.js?v=7"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-appbar.js?v=54"></script>
 <script src="js/pu-active.js?v=2"></script>
 <script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
-<script src="js/pu-version.js?v=12"></script>
-<script src="js/pu-authsync.js?v=1"></script>
+<script src="js/pu-back.js?v=5"></script>
+<script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
 <script src="js/pu-pubsearch-app.js?v=1"></script>
 <script>
 (function(){
@@ -132,6 +135,16 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
   };
   var rootEl = document.getElementById('pubSearchRoot');
   if(rootEl && window.PuPubSearchApp) window.PuPubSearchApp.mount(rootEl);
+  function mountWho(){
+    try{
+      if(window.PuWhoami && document.getElementById('who')){
+        PuWhoami.mount('#who');
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  if(!mountWho()) document.addEventListener('DOMContentLoaded', mountWho);
   try{
     if(location.protocol !== 'file:' && typeof firebase !== 'undefined' && firebase.auth){
       if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FB_CONFIG);
