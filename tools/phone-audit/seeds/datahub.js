@@ -178,6 +178,10 @@ module.exports = {
     /* 눌러 보기 — 기준 전환·무대 바꾸기·기기 등록 요청(서버 함수는 점검 도구가 막아 «채팅 서버 준비 전»이 떠야 한다)·재인증(가짜 로그인) */
     { name: 'toggles', run: async (p) => { await p.click('.side button[data-v="all"]'); await p.click('#btnBasisToggle'); await p.click('#btnNetToggle'); await p.click('#btnStageTheme'); await p.click('#monthScrub [data-mi="12"]'); } },
     { name: 'devreq', run: async (p) => { await p.click('.side button[data-v="lock"]'); await p.click('#btnDevReq'); }, wait: 2500 },
+    /* 3D·2D 보기는 «어느 화면에서 바꿔도 모든 화면에 함께» (2026-11-22 정리 — 위 막대 전체 단추를 합침). A 화면에서 3D 를 누르고 전체 배치로 가서 찍는다 */
+    { name: 'mode3d', run: async (p) => { await p.click('.side button[data-v="a"]'); await p.click('.mseg[data-target="dualA"] button[data-m="3d"]'); await p.click('.side button[data-v="all"]');
+      const ok = await p.evaluate(() => ['dualAll', 'dualM', 'dualE'].every((id) => document.getElementById(id).classList.contains('mode-3d')) && document.querySelector('.mseg[data-target="dualAll"] button[data-m="3d"]').getAttribute('aria-pressed') === 'true');
+      if (!ok) throw new Error('A 화면에서 고른 3D 가 다른 화면에 함께 적용되지 않았다'); } },
     /* 재인증 칸은 기기가 확인된 뒤에만 보인다 — 점검에서는 기기 등록이 안 되므로 숨어 있어야 맞다 */
     { name: 'scroll', run: async (p) => { await p.click('.side button[data-v="all"]'); await p.evaluate(() => window.scrollTo(0, 1600)); }, wait: 800 },
   ],
