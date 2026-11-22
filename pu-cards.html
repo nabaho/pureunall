@@ -1357,6 +1357,30 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .csp-db.empty{color:#64748b}
 .mck .nck-bulk button.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
 .mck .nck-bulk button.no{color:#991b1b}
+/* 🔄 사업장 담당 변경 · 중복 정리 창 (2026-11-22) */
+.mck.mbtr-box{width:min(760px,100%)}
+.mck.mbtr-box header button.x{background:none;border:none;font-size:18px;line-height:1;padding:4px 8px;color:#64748b;cursor:pointer;border-radius:6px}
+.mck.mbtr-box header button.x:hover,.mck.mbtr-box header button.x:focus-visible{background:#f8fafc;color:#1e293b}
+.mck.mbtr-box input[type="text"],.mck.mbtr-box select,.mck.mbtr-box textarea{width:100%;font-family:inherit;font-size:16px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#1e293b;box-sizing:border-box}
+.mck.mbtr-box .mbtr-card{margin:0 0 12px;padding:11px 13px;border:1px solid #e2e8f0;border-radius:9px;background:#ffffff}
+.mck.mbtr-box .mbtr-card h4{margin:0 0 7px;font-size:13px;color:#1e293b;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mck.mbtr-box .mbtr-fld{display:flex;flex-direction:column;gap:4px}
+.mck.mbtr-box .mbtr-fld label{font-size:11.5px;font-weight:700;color:#475569}
+.mck.mbtr-box .mbtr-pill{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font-size:11.5px;font-weight:700;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+.mck.mbtr-box .mbtr-pill.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
+.mck.mbtr-box .mbtr-pill.ok{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+.mck.mbtr-box .mbtr-tabs{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
+.mck.mbtr-box .mbtr-tabs button,.mck.mbtr-box .mbtr-tab{flex:1;min-width:200px;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+.mck.mbtr-box .mbtr-tabs button.on,.mck.mbtr-box .mbtr-tab.on{border-color:#1e40af;background:#1e40af;color:#ffffff}
+.mck.mbtr-box .mbtr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.mck.mbtr-box .mbtr-chk{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;margin-bottom:6px;border:1px solid #e2e8f0;border-radius:7px;background:#ffffff;font-size:12.5px;line-height:1.5;color:#1e293b;cursor:pointer}
+.mck.mbtr-box .mbtr-chk input{margin-top:3px;flex:none}
+.mck.mbtr-box .mbtr-chips{display:flex;flex-wrap:wrap;gap:6px}
+.mck.mbtr-box .mbtr-chip{display:inline-flex;align-items:center;gap:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;padding:4px 10px;border:1px solid #cbd5e1;border-radius:999px;background:#f8fafc;color:#1e293b;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.mck.mbtr-box .mbtr-chip.on{border-color:#2563eb;background:#2563eb;color:#ffffff}
+.mck.mbtr-box .mbtr-chip.ex{border-color:#dc2626;background:#fef2f2;color:#991b1b;font-weight:700}
+.mck.mbtr-box>footer{flex-wrap:wrap;gap:6px}
+@media (max-width:760px){ #mbTrBox .mbtr-dim{padding:10px} .mck.mbtr-box .mbtr-grid{grid-template-columns:1fr} }
 /* 폰에서는 창 바깥 여백을 줄인다(폰 규칙 「양옆 8~14px」) — PC 는 그대로.
    ⚠ `.mck-dim.이름{` 꼴로 쓰지 않는다 — 메일 미리보기 폰 규칙을 찾는 검사(mail-preview-phone-footer)가 그 꼴의 첫 줄을 고른다 */
 @media (max-width:760px){ #cspBox .csp-dim{padding:10px} }
@@ -21641,6 +21665,7 @@ function mbEnsureBins(cb){
     mbPushMasterLoad();         /* 📵 받은 메일 폰 알림 전체 스위치 — 이것도 «따로» (거절돼도 위 묶음은 멀쩡하게) */
     if(typeof mbCalInboxLoad === 'function') mbCalInboxLoad();
     if(typeof mbSubLoad === 'function') mbSubLoad();
+    if(typeof mbCoSplitLoad === 'function') mbCoSplitLoad();
   });
 }
 
@@ -21799,7 +21824,8 @@ function mbJudgeSig(){
   for(const k in (_mbFolders || {})){ const f = _mbFolders[k] || {}; fd += k + '=' + (f.kind||'') + '/' + (f.path||'') + ';'; }
   return [typeof _mbPut !== 'undefined' ? kv(_mbPut) : '', typeof _mbBinRule !== 'undefined' ? kv(_mbBinRule) : '',
     kv(_mbWhoMsg), kv(_mbCo), kv(_mbNotSpam), String(_mbSpamOff),
-    typeof _mbBins !== 'undefined' ? kv(_mbBins) : '', fd].join('|');
+    typeof _mbBins !== 'undefined' ? kv(_mbBins) : '',
+    typeof _mbCoSplit !== 'undefined' ? kv(_mbCoSplit) : '', fd].join('|');
 }
 function mbJudge(){
   const m = mbMemoOf();
@@ -23556,8 +23582,19 @@ function mbWhoWhy(em0, idx0){
 /* 위 판정의 «속» — 한 주소의 담당자와 그 까닭. 셈에 담는 것은 바깥(mbWhoWhy)이 한다. */
 function mbWhoWhyOf(em, idx0, none){
   const set = _mbOwner || {};
+  const sp = (typeof mbCoSplitRuleOf === 'function') ? mbCoSplitRuleOf(em, idx0) : null;
+  const ex = (sp && sp.ex) || [];
+  const ok = n => !!(n && ex.indexOf(n) < 0);
   const byHand = mbWhoLive(set[mbWhoKey(em)]);
-  if(byHand) return { who:byHand, why:'hand' };           /* ① 사람이 정한 주소 */
+  if(ok(byHand)) return { who:byHand, why:'hand' };       /* ① 사람이 정한 주소 */
+  /* 🔀 진행 사업 담당자 단독(workOnly) 설정 시 — 과거 업체 주담당보다 진행 중 건 담당자를 먼저 본다 */
+  if(sp && sp.mode === 'workOnly'){
+    const wkOnly = (typeof mbCoSingleWorkMgr === 'function') ? mbCoSingleWorkMgr(em, idx0, ex) : mbWorkMgrOfAddr(em);
+    if(ok(wkOnly)) return { who:wkOnly, why:'work' };
+    const tn0 = mbWhoLive(sp.toName || '');
+    if(ok(tn0)) return { who:tn0, why:'co' };
+    return none;
+  }
   /* ①-2 «자문사»에 이어 둔 주소 — 담당자는 그 회사에서 따라온다 (2026-08-29).
      ⚠ ① 보다 뒤다: 사람이 «이 사람»이라고 못 박은 것이 회사보다 세다.
      ⚠ ② 기업정보함보다 앞이다: 여기 이은 것은 «사람이 직접 고른» 회사이고,
@@ -23566,22 +23603,28 @@ function mbWhoWhyOf(em, idx0, none){
   const coRec = mbCoRecOfAddr(em);
   if(coRec && !coRec.left){
     const c1 = mbWhoLive(coRec.main);
-    if(c1) return { who:c1, why:'co' };
+    if(ok(c1)) return { who:c1, why:'co' };
   }
   /* ①-3 이알피 «진행 중» 사건·컨설팅에 이 주소가 그대로 적혀 있다 → 그 건 주담당
      (대표 승인 목업 2026-09-28). ⚠ ②(기업정보함)보다 앞이다 — 명함은 이름으로 업체를
      짚은 것이고, 이것은 담당이 그 건에 «직접 적은 주소»다. ⚠ 사람이 정한 ①·①-2 보다는 뒤. */
-  const wk = mbWorkMgrOfAddr(em);
-  if(wk) return { who:wk, why:'work' };
+  const wk = (sp && ex.length && typeof mbCoSingleWorkMgr === 'function') ? mbCoSingleWorkMgr(em, idx0, ex) : mbWorkMgrOfAddr(em);
+  if(ok(wk)) return { who:wk, why:'work' };
   const idx = idx0 || mbWhoIndex();
   const a1 = mbWhoLive(idx.byAddr[em]);
-  if(a1) return { who:a1, why:'card' };                   /* ② 기업정보함 주소 */
+  if(ok(a1)) return { who:a1, why:'card' };               /* ② 기업정보함 주소 */
   const d = mbDomOf(em);
   if(d){
     const h2 = mbWhoLive(set[mbWhoKey('@' + d)]);
-    if(h2) return { who:h2, why:'hand' };                 /* ③ 사람이 정한 도메인 */
+    if(ok(h2)) return { who:h2, why:'hand' };             /* ③ 사람이 정한 도메인 */
     const a2 = mbWhoLive(idx.byDom[d]);
-    if(a2) return { who:a2, why:'card' };                 /* ④ 기업정보함 도메인 */
+    if(ok(a2)) return { who:a2, why:'card' };             /* ④ 기업정보함 도메인 */
+  }
+  if(sp && ex.length){
+    const tn = mbWhoLive(sp.toName || '');
+    if(ok(tn)) return { who:tn, why:'co' };
+    const pw = (typeof mbCoSingleWorkMgr === 'function') ? mbCoSingleWorkMgr(em, idx0, ex) : '';
+    if(ok(pw)) return { who:pw, why:'work' };
   }
   return none;                                            /* ⑤ 담당 모름 */
 }
@@ -23772,32 +23815,41 @@ function mbTaxRecOfRow(v){
 function mbWhoOfRow(v, idx0){
   const em = String((v&&v.e)||'').trim().toLowerCase();
   if(!em) return '';
+  const sp = (typeof mbCoSplitRuleOf === 'function') ? mbCoSplitRuleOf(em, idx0) : null;
+  const ex = (sp && sp.ex) || [];
+  const ok = n => !!(n && ex.indexOf(n) < 0);
   /* ①-0 이 «메일 한 통»에 박은 것 — 가장 세다 (대표 지시 2026-08-29 「담당자 보내기」).
      ⚠ 주소 규칙보다 «앞»이어야 한다. 한 통만 다르게 두려고 박는 것이라, 주소 규칙이
        덮으면 그 단추가 아무 뜻이 없어진다.
      ⚠ _key 가 없는 자리에서도 부른다(딱지·귀띔) — 없으면 그냥 건너뛴다. */
   const byMsg = mbWhoLive((v && v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '');
-  if(byMsg) return byMsg;
+  if(ok(byMsg)) return byMsg;
   /* ①-0b 업무관리에서 이 메일 «한 통»을 업무에 이었다 → 그 업무의 주담당 (2026-10-11 「항상 서로 동기화」).
      ⚠ 메일함이 박은 것(①-0)보다는 뒤다 — 메일함에서 박은 것이 이 화면의 일이다.
      ⚠ 주소 규칙보다는 앞이다 — «한 통»을 골라 이은 것이 주소 하나로 미루어 본 것보다 정확하다. */
   const wkMsg = mbWkMsgOf(v);
   const byWk = wkMsg ? mbWhoLive(wkMsg.mgr) : '';
-  if(byWk) return byWk;
+  if(ok(byWk)) return byWk;
+  /* 🔀 사업별 분리(split) 설정된 사업장 — 컨설팅·사건·기금 메일은 그 건 담당자에게 단독 배정하고 자문·급여 담당과 겹치지 않는다 */
+  if(sp && sp.mode === 'split' && typeof mbSplitPrimaryOfRow === 'function'){
+    const spWho = mbSplitPrimaryOfRow(v, idx0, sp);
+    if(ok(spWho)) return spWho;
+  }
   const w = mbWhoWhy(em, idx0).who;
-  if(w) return w;
+  if(ok(w)) return w;
   /* ⑤-2 다수 사업장 공용 세무사무실(byTaxEmail) — 이 메일이 가리키는 사업장의 주담당 */
   const taxRec = (typeof mbTaxRecOfRow === 'function') ? mbTaxRecOfRow(v) : null;
   if(taxRec){
     const tw = mbWhoLive(taxRec.main);
-    if(tw) return tw;
+    if(ok(tw)) return tw;
   }
   /* ⑥ 이 칸을 보는 사람 — «맨 뒤»다 (대표 승인 목업 2026-10-06).
      ⚠ 주소 판정(mbWhoWhy)이 아니라 «여기»에 둔다. 칸은 줄마다 다르고, 주소 판정은
        주소 하나에 한 번만 셈해 담아 둔다 — 거기 넣으면 같은 주소의 메일이 어느 칸에
        있든 «먼저 그려진 칸»의 사람으로 굳는다.
      ⚠ 업체·건 담당이 있으면 그쪽이 이긴다(위에서 이미 돌아왔다). 칸은 거친 그물이다. */
-  return mbBoxWhoOfRow(v)[0] || '';
+  const bw = mbBoxWhoOfRow(v).filter(ok);
+  return bw[0] || '';
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -24407,51 +24459,51 @@ function mbSubsOfRow(v, idx0){
     rec = co ? mbHqRec(mbCoRec(co)) : null;
   }
   if(!rec && typeof mbTaxRecOfRow === 'function') rec = mbTaxRecOfRow(v);
+  const sp = (typeof mbCoSplitRuleOf === 'function') ? mbCoSplitRuleOf(em, idx0, rec) : null;
+  const ex = (sp && sp.ex) || [];
+  const ok = n => !!(n && ex.indexOf(n) < 0);
+  const splitOn = !!(sp && (sp.mode === 'split' || sp.mode === 'workOnly'));
+  const projKind = (splitOn && typeof mbRowProjectKind === 'function') ? mbRowProjectKind(v) : '';
   const out = [];
   const main = (rec && rec.main) || '';
-  if(rec && !rec.left && Array.isArray(rec.subs)){
+  /* 🔀 사업별 분리(split)·진행건 단독(workOnly) 시: 프로젝트 메일에는 업체 부담당을 안 섞고, workOnly 는 업체 부담당을 모두 뺀다 */
+  if(rec && !rec.left && Array.isArray(rec.subs) && !(sp && sp.mode === 'workOnly') && !(splitOn && projKind)){
     rec.subs.forEach(s=>{
       const n = mbPerson(s);   /* ⚠ 사번이면 여기서 이름으로 — 표가 이미 와 있다 */
-      if(!n || mbRetired(n)) return;
+      if(!n || mbRetired(n) || !ok(n)) return;
       if(n !== main && out.indexOf(n) < 0) out.push(n);
     });
   }
-  /* ★ 사무관리 건의 부담당도 더한다 — 회사가 «끝난» 곳이면 안 더한다 */
-  if(!(rec && rec.left)){
-    const co = mbCoNameOf(em, idx0);
-    const biz = co ? ((_mbBizSubs||{})[ErpMatch._norm(co)] || []) : [];
-    /* ⚠ 퇴사 여부를 «여기서도» 본다. 표를 만들 때 한 번 걸렀지만 표는 세션 내내 산다 —
-         표를 만든 «뒤»에 퇴사한 사람이 그대로 남는다. 업체 부담당과 «같은 규칙»이어야
-         한쪽만 걸러지는 일이 없다(검사가 두 길을 같은 잣대로 잰다). */
-    biz.forEach(n=>{
-      if(!n || mbRetired(n)) return;
-      if(n !== main && out.indexOf(n) < 0) out.push(n);
-    });
-    /* ★ 📁 진행 중인 사건·컨설팅의 «주담당»도 함께 본다 (대표 승인 목업 2026-09-28)
-       업체 담당(자문)과 건 담당이 다를 때, 건 담당 칸에도 그 메일이 보인다 —
-       부담당과 «같은 길»이라 세는 곳(mbWhoTally)·거르는 곳(mbRowFits)이 저절로 맞는다.
-       ⚠ 메일 담당(w)은 뺀다 — 주소로 잡힌 건(①-3)은 업체가 없어 main 이 비어 있다.
-         안 빼면 한 사람 칸에 같은 메일이 두 번 세어진다. 건이 걸린 줄에서만 묻는다. */
-    /* ⚠ 업체는 «위에서 찾은 것»을 넘긴다 — 메일 한 통마다 같은 업체를 두 번 찾으면
-         그것이 곧 느림이다(대표 화면 2026-10-02 「mbWhoKey 871,624번」). */
+  /* ★ 사무관리 건의 부담당도 더한다 — 회사가 «끝난» 곳이면 안 더한다.
+     🔀 사업별 분리(split) 시에는 일반 자문·급여 메일(!projKind)에 다른 사업(컨설팅·사건) 주·부담당을 중복 합산하지 않는다! */
+  if(!(rec && rec.left) && !(sp && sp.mode === 'split' && !projKind)){
+    if(!splitOn){
+      const co = mbCoNameOf(em, idx0);
+      const biz = co ? ((_mbBizSubs||{})[ErpMatch._norm(co)] || []) : [];
+      biz.forEach(n=>{
+        if(!n || mbRetired(n) || !ok(n)) return;
+        if(n !== main && out.indexOf(n) < 0) out.push(n);
+      });
+    }
     const ws = mbWorkOfRow(v, idx0, rec || null);
     if(ws.length){
       const w = mbWhoOfRow(v, idx0);
-      mbWorkMgrs(ws).forEach(n=>{
-        if(n !== main && n !== w && out.indexOf(n) < 0) out.push(n);
+      const matchWs = (sp && sp.mode === 'split' && projKind && projKind !== 'any')
+        ? (ws.filter(x => x && x.kind === projKind).length ? ws.filter(x => x && x.kind === projKind) : ws)
+        : ws;
+      mbWorkMgrs(matchWs).forEach(n=>{
+        if(!ok(n)) return;
+        if((splitOn || n !== main) && n !== w && out.indexOf(n) < 0) out.push(n);
       });
     }
   }
   /* ★ 👤 이 칸을 «함께 보는» 사람들 (대표 승인 목업 2026-10-06)
-     맨 앞 사람은 주담당으로 이미 갔다 — 나머지를 부담당 길에 얹는다.
-     ⚠ 업체가 끝났는지와 상관없이 더한다. 칸은 «업무 갈래»지 업체가 아니다 —
-       기관 안내가 자문 종료 때문에 아무에게도 안 보이면 안 된다.
-     ⚠ 주담당과 같은 사람은 안 더한다 — 한 사람 칸에 같은 메일이 두 번 세어진다. */
+     맨 앞 사람은 주담당으로 이미 갔다 — 나머지를 부담당 길에 얹는다. */
   const bw = mbBoxWhoOfRow(v);
   if(bw.length > 1){
     const w2 = mbWhoOfRow(v, idx0);
     bw.forEach(n=>{
-      if(!n || n === main || n === w2 || out.indexOf(n) >= 0) return;
+      if(!n || !ok(n) || n === main || n === w2 || out.indexOf(n) >= 0) return;
       out.push(n);
     });
   }
@@ -26993,7 +27045,10 @@ function mbWhoAsk(email, ev){
           onclick="mbWhoAskDom('${esc(em)}')">🏢 ${esc(d)} «전체»를 한 사람에게 ›
           <small>그 회사에서 오는 메일이 모두 그 담당자로 갑니다</small></div>`}
     ${now0 ? `<div class="fmi danger" onclick="mbWhoSet('${esc(em)}','',false)">↩ 정한 것 지우기
-        <small>다시 기계가 짚습니다(기업정보함 · 도메인)</small></div>` : ''}`;
+        <small>다시 기계가 짚습니다(기업정보함 · 도메인)</small></div>` : ''}
+    <div class="fmi" style="border-top:1px solid #e2e8f0;color:#1e40af;font-size:12px"
+      data-em="${esc(em)}" onclick="closeFolderMenu();mbTransferOpen('',this.dataset.em)">🔄 담당 단독 전환 · 사업별 분리 · 변경 신청 ›
+      <small>갑은 빠지고 을만 담당하게 하거나, 자문·급여와 컨설팅·사건 중복 연결을 가릅니다</small></div>`;
   mbPlaceMenu(m, ev);
 }
 function mbWhoAskDom(email){
@@ -31216,10 +31271,13 @@ function mgrHtml(){
   const r = mgrRows();
   const day = t => { const d = new Date(Number(t||0)); return isNaN(d) ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
   const none = '<div class="mn-none">없습니다</div>';
+  const canDir = !!(state.isAdmin || state.isSubAdmin);
   let h = `<div class="mn-head"><b>🔎 담당 점검</b>
-    <span>이알피 담당이 바뀌었거나 비었거나 퇴사자인 곳 · 손으로 정한 담당이 이알피와 다른 곳 — 고치는 것은 이알피에서 합니다</span></div>`;
+    <span>이알피 담당이 바뀌었거나 비었거나 퇴사자인 곳 · 중복 담당 분리 및 단독 전환 신청</span>
+    <span style="margin-left:auto"><button class="pri" onclick="mbTransferOpen('','')">🔄 담당 변경 · 중복 정리 신청</button></span></div>`;
   if(_mgrSeen !== null && !Object.keys(_mgrSeen).length)
     h += `<div class="mn-none">처음 켜는 날입니다 — 서버가 지금 담당을 적어 두고(업무 시간 10분마다), 다음에 바뀌면 여기 잡힙니다</div>`;
+  if(typeof mbSplitSummaryHtml === 'function') h += mbSplitSummaryHtml();
   h += `<div class="mn-sec">🔄 이알피에서 담당이 바뀐 업체 <small>지난번과 다릅니다 — 맞게 바뀐 것이면 「확인」, 아니면 이알피에서 고치십시오</small></div>`;
   h += r.changes.length ? r.changes.map((x, i)=>{
     const n = (typeof ErpMatch!=='undefined' && ErpMatch.ready) ? (mgrMailCount()[ErpMatch._norm(x.coName)] || 0) : 0;
@@ -31231,13 +31289,19 @@ function mgrHtml(){
       <span class="mg-cnt">${day(x.at)} 알아챔${x.by ? ' · ' + esc(x.by) : ''}${n ? ' · 최근 30일 메일 ' + n + '통' : ''}</span><span class="sj"></span>
       <button class="pri" onclick="mgrAck('${esc(x.co)}')">확인</button>
       <button onclick="mgrErp()">이알피에서 보기</button></div>`; }).join('') : none;
-  h += `<div class="mn-sec">⏳ 승인 기다리는 담당 변경 <small>이알피 업체관리에서 직원이 요청한 것 — 관리자가 업체관리 맨 위 띠에서 승인합니다</small></div>`;
-  h += (r.pending || []).length ? r.pending.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
-      <span class="nm" title="${esc(x.coName)}">${esc(x.coName)}</span>
+  h += `<div class="mn-sec">⏳ 승인 기다리는 담당 변경 <small>직원이 신청한 일괄 전환·변경 요청 — 관리자는 여기서 바로 승인하거나 이알피에서 처리할 수 있습니다</small></div>`;
+  const cosAll = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+  h += (r.pending || []).length ? r.pending.map((x, i)=>{
+    const liveCo = cosAll.find(c=>c && String(c.id) === String(x.coId));
+    const shownCo = (liveCo && liveCo.name) || x.coName || '(미확인 업체)';
+    return `<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="nm" title="${esc(shownCo)}">${esc(shownCo)}</span>
       <span class="mg-old">${esc(mgrName(x.from) || '(없음)')}</span><span class="mg-ar">→</span>
       <span class="mg-new${x.to ? '' : ' none'}">${esc(mgrName(x.to) || '(비움)')}</span>
-      <span class="mg-cnt">${esc(x.byName || x.by || '')} · ${day(x.at)}${x.reason ? ' · ' + esc(x.reason) : ''}</span><span class="sj"></span>
-      <button onclick="mgrErp()">이알피에서 보기</button></div>`).join('') : none;
+      <span class="mg-cnt">${esc(x.byName || x.by || '')} · ${day(x.at)}${typeof mbReqScopeLabel === 'function' ? esc(mbReqScopeLabel(x)) : ''}${x.reason ? ' · ' + esc(x.reason) : ''}</span><span class="sj"></span>
+      ${canDir ? `<button class="pri" data-id="${esc(x.id)}" onclick="mgrDecideReq(this.dataset.id,true)">바로 승인</button>
+      <button data-id="${esc(x.id)}" onclick="mgrDecideReq(this.dataset.id,false)">반려</button>` : ''}
+      <button onclick="mgrErp()">이알피에서 보기</button></div>`; }).join('') : none;
   h += `<div class="mn-sec">⚠ 담당이 퇴사자인 업체 <small>메일이 갈 사람이 없습니다 — 이어받을 사람을 정하면 한 번에 넘어갑니다</small></div>`;
   h += r.retired.length ? r.retired.map((x, i)=>`<div class="mn-r"><span class="mn-no">${i+1}</span>
       <span class="nm" title="${esc(x.co.name)}">${esc(x.co.name)}</span><span class="mg-ret">${esc(x.name)}</span>
@@ -31255,6 +31319,994 @@ function mgrHtml(){
       <button class="pri" onclick="mgrFollowErp('${esc(x.key)}')">이알피 따르기</button>
       <button onclick="mgrKeepIt('${esc(x.key)}')">그대로 두기</button></div>`).join('') : none;
   return `<div class="mn">${h}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🔀 사업장 중복 담당 분리 · 단독 전환 및 일괄 변경 신청 (대표 지시 2026-11-22)
+   ══════════════════════════════════════════════════════════════════════════
+   · 과거 담당자(갑)와 신규 사업 담당자(을)가 한 사업장에 겹쳐 메일이 양쪽 칸에 중복 연결될 때:
+     유형 A (단독 전환): 갑은 빠지고 을만 단독 담당 — 업체 주·부담당 + 진행 중 컨설팅·사건·기금 +
+                        업무시트(work_erp) + 푸른메일 수동 고정 해제·제외를 한 번에 변경/신청
+     유형 B (사업별 분리): 갑(자문·급여)과 을(컨설팅·사건·기금)이 각자 사업 메일만 받도록 갈래 분리
+   · 규칙 저장소: pucards/mailCoSplit/{coId | addr:<열쇠>}
+       { mode:'split'|'workOnly'|'', ex:['이름',...], toName:'이름', coName:'업체명', at, by, note }
+   · 요청 저장소: data/co_mgr_requests (푸른이알피 CoMgrReqModal 과 같은 한 벌) */
+let _mbCoSplit = null, _mbCoSplitBusy = false;
+function mbCoSplitLoad(cb){
+  if(_mbCoSplit !== null){ if(cb) cb(); return; }
+  if(_mbCoSplitBusy) return;
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase'){ _mbCoSplit = {}; if(cb) cb(); return; }
+  _mbCoSplitBusy = true;
+  firebase.database().ref(DB_ROOT + '/mailCoSplit').once('value')
+    .then(s=>{ _mbCoSplit = s.val() || {}; })
+    .catch(()=>{ if(_mbCoSplit === null) _mbCoSplit = {}; })
+    .then(()=>{ _mbCoSplitBusy = false; mbWhoBust(); if(cb) cb(); if(state.view === 'mail') mbDrawSoon(); });
+}
+function mbCoIdOfAddr(em0, idx0, rec0){
+  const em = String(em0 || '').trim().toLowerCase();
+  if(!em) return '';
+  let rec = rec0 !== undefined ? rec0 : mbCoRecOfAddr(em);
+  if(rec0 === undefined && !rec){
+    const idx = idx0 || mbWhoIndex();
+    const co = String((idx.coAddr && idx.coAddr[em]) || (idx.rawCo && idx.rawCo[em]) || '');
+    rec = co ? mbHqRec(mbCoRec(co)) : null;
+  }
+  if(rec && rec.id) return String(rec.id);
+  const d = typeof mbDomOf === 'function' ? mbDomOf(em) : '';
+  if(d && MB_PUB_DOM.indexOf(d) < 0 && !MB_PUB_TAIL.test(d) && typeof mnewDomCo === 'function'){
+    const m = mbMemoOf();
+    const tbl = m.splitDomTbl || (m.splitDomTbl = mnewDomTable());
+    const dco = mnewDomCo(em, tbl);
+    if(dco && dco.id){
+      const hq = (typeof ErpMatch !== 'undefined' && ErpMatch.byId && ErpMatch.byId[String(dco.id)]) ? mbHqRec(ErpMatch.byId[String(dco.id)]) : dco;
+      if(hq && hq.id) return String(hq.id);
+    }
+  }
+  return '';
+}
+function mbCoSplitParseRule(raw, key, coId){
+  if(!raw || typeof raw !== 'object') return null;
+  const mode = String(raw.mode || '');
+  const ex = Array.isArray(raw.ex) ? raw.ex.map(x=>String(x||'').trim()).filter(Boolean)
+    : (raw.ex && typeof raw.ex === 'object' ? Object.values(raw.ex).map(x=>String(x||'').trim()).filter(Boolean) : []);
+  const toName = String(raw.toName || '').trim();
+  if(!mode && !ex.length && !toName) return null;
+  return { key:String(key||''), coId:String(coId || raw.coId || ''), coName:String(raw.coName || ''),
+    mode:mode, ex:ex, toName:toName, note:String(raw.note || ''), at:Number(raw.at || 0), by:String(raw.by || '') };
+}
+function mbCoSplitRuleOf(em0, idx0, rec0){
+  const map = _mbCoSplit;
+  if(!map || typeof map !== 'object') return null;
+  const em = String(em0 || '').trim().toLowerCase();
+  if(!em) return null;
+  const aKey = 'addr:' + mbWhoKey(em);
+  if(map[aKey]){
+    const r0 = mbCoSplitParseRule(map[aKey], aKey, '');
+    if(r0) return r0;
+  }
+  const coId = mbCoIdOfAddr(em, idx0, rec0);
+  if(coId && map[coId]) return mbCoSplitParseRule(map[coId], coId, coId);
+  return null;
+}
+function mbCoSingleWorkMgr(em0, idx0, ex0){
+  const em = String(em0 || '').trim().toLowerCase();
+  if(!em) return '';
+  const ex = Array.isArray(ex0) ? ex0 : [];
+  const ok = n => !!(n && ex.indexOf(n) < 0);
+  const hand = typeof mbWorkHandOf === 'function' ? mbWorkHandOf(em) : null;
+  if(hand){
+    const hm = mbWhoLive(hand.mgr);
+    if(ok(hm)) return hm;
+  }
+  const byA = ((_mbWork && _mbWork.byAddr) || {})[em] || [];
+  const msA = [];
+  byA.forEach(w=>{ const n = mbWhoLive(w && w.mgr); if(ok(n) && msA.indexOf(n) < 0) msA.push(n); });
+  if(msA.length === 1) return msA[0];
+  const ws = typeof mbWorkOfRow === 'function' ? mbWorkOfRow({ e:em }, idx0) : [];
+  const ms = [];
+  ws.forEach(w=>{ const n = mbWhoLive(w && w.mgr); if(ok(n) && ms.indexOf(n) < 0) ms.push(n); });
+  return ms.length === 1 ? ms[0] : (ms[0] || '');
+}
+const MB_PROJ_CONS_RE = /컨설팅|노무진단|구조혁신|일터혁신|고용안정|인터뷰|수행기관|지원사업|정부사업|사업계획|착수보고|중간보고|최종보고|결과보고|산학|클러스터|현장지원/;
+const MB_PROJ_CASE_RE = /사건|노동위|진정|구제신청|부당해고|체불|산재|근로복지공단|고용노동|심판|화해|조정|징계/;
+const MB_PROJ_FUND_RE = /기금|사내근로복지|공동근로복지/;
+const MB_ROUTINE_CO_RE = /급여|임금대장|근태|4대보험|사대보험|입사|퇴사|상실|취득|보수총액|원천징수|두루누리|사무대행|자문료|세금계산서/;
+function mbRowProjectKind(v){
+  if(!v) return '';
+  const em = String(v.e || '').trim().toLowerCase();
+  if(typeof mbWkMsgOf === 'function' && mbWkMsgOf(v)) return 'any';
+  const hand = (em && typeof mbWorkHandOf === 'function') ? mbWorkHandOf(em) : null;
+  if(hand && hand.kind) return String(hand.kind);
+  const src = v._src || v;
+  const bin = (typeof mbBinOfRow === 'function') ? mbBinOfRow(v) : null;
+  const bName = String((bin && bin.name) || '');
+  const subj = String(v.s || src.s || '') + ' ' + String(v.p || src.p || '');
+  const hay = bName + ' ' + subj;
+  if(MB_PROJ_CONS_RE.test(hay)) return 'consulting';
+  if(MB_PROJ_CASE_RE.test(hay)) return 'case';
+  if(MB_PROJ_FUND_RE.test(hay)) return 'fund';
+  if(MB_ROUTINE_CO_RE.test(hay)) return '';
+  const byA = (em && _mbWork && _mbWork.byAddr && _mbWork.byAddr[em]) || [];
+  if(byA.length){
+    const idx = mbWhoIndex();
+    /* 회사 공용 연락처가 아니라 컨설팅·사건 건에만 적힌 전용 연락처면 그 건 갈래로 본다 */
+    if(!(idx.byAddr && idx.byAddr[em])) return String(byA[0].kind || 'any');
+  }
+  return '';
+}
+function mbSplitPrimaryOfRow(v, idx0, sp0){
+  const em = String((v && v.e) || '').trim().toLowerCase();
+  if(!em) return '';
+  const sp = sp0 || mbCoSplitRuleOf(em, idx0);
+  if(!sp || sp.mode !== 'split') return '';
+  const ex = sp.ex || [];
+  const ok = n => !!(n && ex.indexOf(n) < 0);
+  const projKind = mbRowProjectKind(v);
+  if(projKind){
+    const ws = mbWorkOfRow(v, idx0);
+    const hit = (projKind !== 'any') ? ws.filter(w=>w && w.kind === projKind) : ws;
+    const mgrs = mbWorkMgrs(hit.length ? hit : ws).filter(ok);
+    if(mgrs.length) return mgrs[0];
+  }
+  /* 일반 자문·급여 메일 — 수동 컨설팅 주소에 묶여 있더라도 사업장 주담당(갑)을 우선한다 */
+  let rec = mbCoRecOfAddr(em);
+  if(!rec){
+    const idx = idx0 || mbWhoIndex();
+    const co = String((idx.coAddr && idx.coAddr[em]) || (idx.rawCo && idx.rawCo[em]) || '');
+    rec = co ? mbHqRec(mbCoRec(co)) : null;
+  }
+  if(!rec && typeof mbTaxRecOfRow === 'function') rec = mbTaxRecOfRow(v);
+  if(rec && !rec.left){
+    const cm = mbWhoLive(rec.main);
+    if(ok(cm)) return cm;
+  }
+  const tn = mbWhoLive(sp.toName || '');
+  return ok(tn) ? tn : '';
+}
+function mbReqScopeLabel(req){
+  if(!req) return '';
+  if(req.kind === 'split'){
+    const sr = req.splitRule;
+    if(!sr) return ' · [분리해제]';
+    const m = sr.mode === 'split' ? '사업별분리' : sr.mode === 'workOnly' ? '진행건단독' : '과거제외';
+    const ex = Array.isArray(sr.ex) && sr.ex.length ? ':' + sr.ex.join(',') : '';
+    return ' · [' + m + ex + ']';
+  }
+  if(!req.scope) return '';
+  const sc = req.scope || {};
+  const parts = [];
+  if(sc.cleanSubs) parts.push('부담당제외');
+  if(sc.works) parts.push('진행사업');
+  if(sc.workSheet) parts.push('업무시트');
+  if(sc.mailClean) parts.push('메일정리');
+  return parts.length ? ' · [' + parts.join('+') + ']' : '';
+}
+function mbSplitSummaryHtml(){
+  const map = _mbCoSplit || {};
+  const rows = Object.keys(map).map(k=>mbCoSplitParseRule(map[k], k, k.indexOf('addr:') === 0 ? '' : k)).filter(Boolean);
+  if(!rows.length) return '';
+  const canDir = !!(state.isAdmin || state.isSubAdmin);
+  const modeLb = m => m === 'split' ? '🔀 사업별 분리 (자문·급여 ↔ 컨설팅·사건)'
+    : m === 'workOnly' ? '🎯 진행 사업 담당자 단독'
+    : '🚫 과거 담당 제외';
+  let h = `<div class="mn-sec">🔀 사업장 중복 담당 분리 · 제외 규칙 (${rows.length}곳) <small>과거 담당자 재연결을 막거나 사업별로 메일함을 가릅니다</small></div>`;
+  rows.sort((a,b)=>Number(b.at||0) - Number(a.at||0)).forEach((r, i)=>{
+    const coObj = (r.coId && typeof ErpMatch !== 'undefined' && ErpMatch.companies)
+      ? ErpMatch.companies.find(c=>c && String(c.id) === r.coId) : null;
+    const nm = (coObj && coObj.name) || r.coName || (r.key.indexOf('addr:') === 0 ? r.key.slice(5).replace(/,/g, '.') : r.key);
+    const exTxt = r.ex.length ? ' · 제외: ' + r.ex.join(', ') : '';
+    const toTxt = r.toName ? ' · 전환: ' + r.toName : '';
+    h += `<div class="mn-r"><span class="mn-no">${i+1}</span>
+      <span class="nm" title="${esc(nm)}">${esc(nm)}</span>
+      <span class="mg-cnt"><b>${esc(modeLb(r.mode))}</b>${esc(exTxt + toTxt)}${r.note ? ' · ' + esc(r.note) : ''}</span><span class="sj"></span>
+      ${r.coId ? `<button data-id="${esc(r.coId)}" onclick="mbTransferOpen(this.dataset.id,'')">고치기</button>` : ''}
+      ${canDir ? `<button data-k="${esc(r.key)}" onclick="mbCoSplitClear(this.dataset.k)">풀기</button>` : ''}</div>`;
+  });
+  return h;
+}
+function mbCoSplitClear(key){
+  if(!(state.isAdmin || state.isSubAdmin)) return toast('관리자만 분리·제외 규칙을 해제할 수 있습니다', 6000);
+  const k = String(key || '').trim();
+  if(!k) return;
+  if(!confirm('이 사업장의 담당 분리·제외 규칙을 해제할까요?\n(해제하면 다시 기본 공동 열람 규칙을 따릅니다)')) return;
+  _mbCoSplit = _mbCoSplit || {};
+  const before = _mbCoSplit[k];
+  delete _mbCoSplit[k];
+  mbWhoBust(); renderPCSide(); renderMailPage();
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase') return toast('↩ 담당 분리·제외 규칙을 풀었습니다', 5000);
+  firebase.database().ref(DB_ROOT + '/mailCoSplit/' + k).remove()
+    .then(()=>toast('↩ 담당 분리·제외 규칙을 풀었습니다', 5000))
+    .catch(e=>{
+      if(before !== undefined) _mbCoSplit[k] = before;
+      mbWhoBust(); renderPCSide(); renderMailPage();
+      toast('풀지 못했습니다 — ' + ((e && e.message) || e), 8000);
+    });
+}
+function mbStaffActiveList(){
+  const s = (typeof ErpMatch !== 'undefined' && ErpMatch.staff) ? ErpMatch.staff : {};
+  const seen = {};
+  const out = [];
+  Object.keys(s).forEach(k=>{
+    const x = s[k];
+    if(!x || !x.sid || !x.name || seen[x.sid]) return;
+    if(mbRetired(x.name)) return;
+    seen[x.sid] = 1;
+    out.push({ sid:String(x.sid), name:String(x.name), title:String(x.title || '') });
+  });
+  return out.sort((a,b)=>a.sid.localeCompare(b.sid));
+}
+function mbSidByName(name){
+  const nm = String(name || '').trim();
+  if(!nm) return '';
+  const st = mbStaffOf(nm);
+  return (st && st.sid) ? String(st.sid) : '';
+}
+function mbMyStaffInfo(){
+  try{
+    const w = window.PuWhoami && PuWhoami.get && PuWhoami.get();
+    if(w && (w.sid || w.name)){
+      const sid = String(w.sid || mbSidByName(w.name) || '');
+      const nm = String(w.name || mgrName(sid) || '');
+      return { sid:sid, name:nm };
+    }
+  }catch(_){}
+  const em = String(myEmail || '').trim().toLowerCase();
+  const s = (typeof ErpMatch !== 'undefined' && ErpMatch.staff) ? ErpMatch.staff : {};
+  const hit = Object.keys(s).map(k=>s[k]).find(x=>x && String(x.email || '').trim().toLowerCase() === em);
+  return hit ? { sid:String(hit.sid || ''), name:String(hit.name || '') } : { sid:'', name:em };
+}
+function mbCoAllEmails(coId, coName){
+  const out = [];
+  const add = e=>{
+    const v = String(e || '').trim().toLowerCase();
+    if(v && v.indexOf('@') > 0 && !/@pureun\.kr$/.test(v) && out.indexOf(v) < 0) out.push(v);
+  };
+  const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+  const co = cos.find(c=>c && String(c.id) === String(coId));
+  if(co){
+    [co.email, co.primaryContactEmail, co.ceoEmail, co.taxInvoiceEmail, co.taxEmail].forEach(add);
+    (co.contacts || []).forEach(c=>{ if(c && c.email) add(c.email); });
+  }
+  const nm = coName || (co && co.name) || '';
+  if(nm && typeof whoAddrOfName === 'function'){
+    whoAddrOfName(nm).forEach(a=>{ if(a && a.charAt(0) !== '@') add(a); });
+  }
+  Object.keys(_mbWkAddr || {}).forEach(em=>{
+    if(String(_mbWkAddr[em]) === String(coId)) add(em);
+  });
+  return out;
+}
+function mbCoDiag(coId, em0){
+  const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+  const co = coId ? cos.find(c=>c && String(c.id) === String(coId)) : null;
+  if(!co) return null;
+  const rec = (typeof ErpMatch !== 'undefined' && ErpMatch.byId && ErpMatch.byId[String(co.id)])
+    ? mbHqRec(ErpMatch.byId[String(co.id)]) : (ErpMatch.recOfCo ? ErpMatch.recOfCo(co) : null);
+  const mainSid = String(co.managerMain || '');
+  const mainName = mgrName(mainSid) || String((rec && rec.main) || '');
+  const subSids = Array.isArray(co.managerSubs) ? co.managerSubs.map(x=>String(x||'')).filter(Boolean) : [];
+  const subNames = subSids.map(s=>mgrName(s)).filter(Boolean);
+  const works = (rec && _mbWork && _mbWork.byCo && _mbWork.byCo.get(rec)) ? (_mbWork.byCo.get(rec) || []).slice() : [];
+  if(em0 && _mbWork && _mbWork.byAddr && _mbWork.byAddr[em0]){
+    _mbWork.byAddr[em0].forEach(w=>{ if(w && !works.some(x=>x.kind===w.kind && x.id===w.id)) works.push(w); });
+  }
+  const emails = mbCoAllEmails(co.id, co.name);
+  if(em0 && emails.indexOf(em0) < 0) emails.unshift(em0);
+  const handPins = [];
+  const own = _mbOwner || {};
+  emails.forEach(e=>{
+    const k = mbWhoKey(e);
+    if(own[k]) handPins.push({ em:e, key:k, who:String(own[k]) });
+  });
+  const sp = (_mbCoSplit && _mbCoSplit[String(co.id)]) ? mbCoSplitParseRule(_mbCoSplit[String(co.id)], String(co.id), String(co.id)) : null;
+  const pend = (_mgrReqs || []).find(r=>r && String(r.coId) === String(co.id) && r.status === 'wait') || null;
+  const people = [];
+  const pushP = (nm, role)=>{
+    if(!nm) return;
+    const p = people.find(x=>x.name === nm);
+    if(p){ if(p.roles.indexOf(role) < 0) p.roles.push(role); }
+    else people.push({ name:nm, sid:mbSidByName(nm), roles:[role] });
+  };
+  if(mainName) pushP(mainName, '업체 주담당');
+  subNames.forEach(n=>pushP(n, '업체 부담당'));
+  works.forEach(w=>{ if(w && w.mgr) pushP(w.mgr, (MB_WORK_KIND[w.kind] || w.kind) + '(' + (w.title || '진행중') + ')'); });
+  handPins.forEach(h=>pushP(h.who, '메일수동(' + h.em + ')'));
+  return { co, rec, mainSid, mainName, subSids, subNames, works, emails, handPins, sp, pend, people };
+}
+
+let _mbTr = null, _mbTrEscBound = false;
+function _mbTrOnKey(ev){
+  if(ev && ev.key === 'Escape' && _mbTr){ ev.preventDefault(); mbTransferClose(); }
+}
+function mbTransferOpen(coId0, em0){
+  closeFolderMenu();
+  if(!_mbTrEscBound && typeof document !== 'undefined'){
+    document.addEventListener('keydown', _mbTrOnKey);
+    _mbTrEscBound = true;
+  }
+  mbCoSplitLoad(()=>{ if(_mbTr) mbTransferMount(); });
+  if(_mgrReqs === null) mgrLoad(()=>{ if(_mbTr) mbTransferMount(); });
+  mbBizSubsLoad();
+  const em = String(em0 || '').trim().toLowerCase();
+  let coId = String(coId0 || '').trim();
+  if(!coId && em) coId = mbCoIdOfAddr(em);
+  const diag = coId ? mbCoDiag(coId, em) : null;
+  const me = mbMyStaffInfo();
+  const sp = diag && diag.sp;
+  let fromSid = diag ? diag.mainSid : '';
+  let toSid = '';
+  if(diag && diag.works.length){
+    const diffW = diag.works.find(w=>w && w.mgr && w.mgr !== diag.mainName);
+    if(diffW) toSid = mbSidByName(diffW.mgr);
+  }
+  if(!toSid && me.sid && me.sid !== fromSid) toSid = me.sid;
+  const exMap = {};
+  if(sp && sp.ex) sp.ex.forEach(n=>{ exMap[n] = 1; });
+  _mbTr = {
+    tab: (sp && (sp.mode === 'split' || sp.mode === 'workOnly')) ? 'split' : 'sole',
+    coId: coId,
+    em: em,
+    q: diag && diag.co ? String(diag.co.name || '') : '',
+    fromSid: fromSid,
+    toSid: toSid,
+    cleanSubs: true,
+    works: true,
+    workSheet: true,
+    mailClean: true,
+    reason: '',
+    splitMode: (sp && sp.mode) ? sp.mode : 'split',
+    exMap: exMap,
+    busy: false
+  };
+  mbTransferMount();
+}
+function mbTransferClose(){
+  _mbTr = null;
+  if(_mbTrEscBound && typeof document !== 'undefined'){
+    document.removeEventListener('keydown', _mbTrOnKey);
+    _mbTrEscBound = false;
+  }
+  const el = $('mbTrBox');
+  if(el && el.parentNode) el.parentNode.removeChild(el);
+}
+function mbTransferTab(t){
+  if(!_mbTr) return;
+  _mbTr.tab = t === 'split' ? 'split' : 'sole';
+  mbTransferMount();
+}
+function mbTransferFilterCo(q){
+  if(!_mbTr) return;
+  _mbTr.q = String(q || '');
+  const box = $('mbTrCoHits');
+  if(box) box.innerHTML = mbTransferCoHitsHtml();
+}
+function mbTransferPickCo(coId){
+  if(!_mbTr) return;
+  const diag = mbCoDiag(coId, _mbTr.em);
+  const me = mbMyStaffInfo();
+  _mbTr.coId = String(coId || '');
+  _mbTr.q = diag && diag.co ? String(diag.co.name || '') : '';
+  _mbTr.fromSid = diag ? diag.mainSid : '';
+  _mbTr.toSid = '';
+  if(diag && diag.works.length){
+    const diffW = diag.works.find(w=>w && w.mgr && w.mgr !== diag.mainName);
+    if(diffW) _mbTr.toSid = mbSidByName(diffW.mgr);
+  }
+  if(!_mbTr.toSid && me.sid && me.sid !== _mbTr.fromSid) _mbTr.toSid = me.sid;
+  _mbTr.exMap = {};
+  if(diag && diag.sp && diag.sp.ex) diag.sp.ex.forEach(n=>{ _mbTr.exMap[n] = 1; });
+  if(diag && diag.sp && diag.sp.mode) _mbTr.splitMode = diag.sp.mode;
+  mbTransferMount();
+}
+function mbTransferCoHitsHtml(){
+  if(!_mbTr) return '';
+  const q = ErpMatch._norm(_mbTr.q || '');
+  const cos = mgrLiveCos();
+  if(!cos.length) return '<div style="font-size:12px;color:#64748b;padding:4px 0">업체 목록을 불러오는 중입니다…</div>';
+  const hits = (q ? cos.filter(c=>ErpMatch._norm(c.name).indexOf(q) >= 0 || String(c.bizNo||'').indexOf(_mbTr.q.trim()) >= 0) : cos.slice(0, 18)).slice(0, 24);
+  if(!hits.length) return '<div style="font-size:12px;color:#64748b;padding:4px 0">일치하는 활성 사업장이 없습니다</div>';
+  return hits.map(c=>{
+    const on = String(c.id) === String(_mbTr.coId);
+    const mn = mgrName(c.managerMain) || '미지정';
+    return `<button type="button" class="mbtr-chip${on?' on':''}" data-id="${esc(String(c.id))}" onclick="mbTransferPickCo(this.dataset.id)"
+      title="${esc(c.name + ' · 주담당 ' + mn)}">${esc(c.name)} <small style="opacity:.8">(${esc(mn)})</small></button>`;
+  }).join('');
+}
+function mbTransferToggleEx(name){
+  if(!_mbTr || !name) return;
+  if(_mbTr.exMap[name]) delete _mbTr.exMap[name];
+  else _mbTr.exMap[name] = 1;
+  mbTransferMount();
+}
+function mbTransferSetMode(m){
+  if(!_mbTr) return;
+  _mbTr.splitMode = String(m || '');
+  mbTransferMount();
+}
+function mbTransferField(k, v){
+  if(!_mbTr) return;
+  _mbTr[k] = v;
+  if(k === 'fromSid' || k === 'toSid') mbTransferMount();
+}
+function mbTransferMount(){
+  let host = $('mbTrBox');
+  if(!_mbTr){ if(host && host.parentNode) host.parentNode.removeChild(host); return; }
+  if(!host){
+    host = document.createElement('div');
+    host.id = 'mbTrBox';
+    document.body.appendChild(host);
+  }
+  host.innerHTML = mbTransferHtml();
+}
+function mbTransferHtml(){
+  if(!_mbTr) return '';
+  const d = _mbTr.coId ? mbCoDiag(_mbTr.coId, _mbTr.em) : null;
+  const staff = mbStaffActiveList();
+  const canDir = !!(state.isAdmin || state.isSubAdmin);
+  const dupWarn = d && d.people.length > 1;
+  const diagHtml = d ? `<div class="mbtr-card" style="background:${dupWarn?'#fffbeb':'#f8fafc'};border-color:${dupWarn?'#fde68a':'#e2e8f0'}">
+      <h4>🏢 ${esc(d.co.name)} — 현재 연결된 담당자 진단 ${dupWarn ? `<span class="mbtr-pill warn">중복 연결 ${d.people.length}명</span>` : `<span class="mbtr-pill ok">단일 연결</span>`}</h4>
+      <div style="font-size:12.5px;color:#1e293b;line-height:1.7">
+        <div>· <b>업체 주담당(자문·급여)</b>: <b>${esc(d.mainName || '(비어 있음)')}</b>${d.subNames.length ? ` · <b>부담당</b>: ${esc(d.subNames.join(', '))}` : ''}</div>
+        <div>· <b>진행 중 컨설팅·사건·기금</b>: ${d.works.length ? d.works.map(w=>`<span class="mbtr-pill">${esc((MB_WORK_KIND[w.kind]||w.kind) + ' · ' + (w.title||'건') + ' → ' + (w.mgr||'미지정'))}</span>`).join(' ') : '<span style="color:#64748b">없음</span>'}</div>
+        ${d.handPins.length ? `<div>· <b>메일 주소 수동 고정</b>: ${d.handPins.map(p=>`<span class="mbtr-pill warn">${esc(p.em + ' → ' + p.who)}</span>`).join(' ')}</div>` : ''}
+        ${d.sp ? `<div>· <b>현재 분리·제외 설정</b>: <span class="mbtr-pill ok">${esc(d.sp.mode === 'split' ? '사업별 분리' : d.sp.mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외')}${d.sp.ex.length ? ' (제외: ' + esc(d.sp.ex.join(', ')) + ')' : ''}</span></div>` : ''}
+        ${d.pend ? `<div style="color:#854d0e;font-weight:700">⏳ 대기 중인 변경 신청: ${esc(mgrName(d.pend.from)||'(없음)')} → ${esc(mgrName(d.pend.to)||'(비움)')} (${esc(d.pend.byName||d.pend.by||'')})</div>` : ''}
+      </div>
+    </div>` : `<div class="mbtr-card" style="background:#f8fafc"><div style="font-size:12.5px;color:#475569">위에서 정리할 <b>사업장</b>을 먼저 검색해 선택해 주세요.</div></div>`;
+
+  let tabBody = '';
+  if(_mbTr.tab === 'sole'){
+    const fromOpts = `<option value="">— 빠질 기존 담당자 선택 (선택) —</option>`
+      + staff.map(u=>`<option value="${esc(u.sid)}" ${_mbTr.fromSid===u.sid?'selected':''}>${esc(u.name)}${u.title?' ('+esc(u.title)+')':''}</option>`).join('');
+    const toOpts = `<option value="">— 단독으로 맡을 담당자(을) 선택 —</option>`
+      + staff.map(u=>`<option value="${esc(u.sid)}" ${_mbTr.toSid===u.sid?'selected':''}>${esc(u.name)}${u.title?' ('+esc(u.title)+')':''}</option>`).join('');
+    tabBody = `<div class="mbtr-card">
+      <h4>👤 유형 A — 기존 담당자(갑)는 빠지고 새 담당자(을)만 단독 담당</h4>
+      <div style="font-size:12px;color:#475569;margin-bottom:8px;line-height:1.6">
+        특별한 사정이나 업무 이관으로 <b>갑은 완전히 빠지고 을만 이 사업장을 맡아야 할 때</b> 한 번에 정리합니다.
+        ${canDir ? '관리자 권한으로 <b>즉시 일괄 반영</b>됩니다.' : '신청하면 <b>관리자 승인 즉시</b> 아래 체크한 항목이 한꺼번에 변경됩니다.'}
+      </div>
+      <div class="mbtr-grid">
+        <div class="mbtr-fld">
+          <label for="mbTrFromSel">빠지는 기존 담당자 (갑)</label>
+          <select id="mbTrFromSel" onchange="mbTransferField('fromSid',this.value)">${fromOpts}</select>
+        </div>
+        <div class="mbtr-fld">
+          <label for="mbTrToSel">전환 후 단독 담당자 (을) *</label>
+          <select id="mbTrToSel" onchange="mbTransferField('toSid',this.value)">${toOpts}</select>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">
+        <label class="mbtr-chk"><input type="checkbox" ${_mbTr.cleanSubs?'checked':''} onchange="mbTransferField('cleanSubs',this.checked)">
+          <span><b>업체 부담당 정리</b> — 업체 부담당 명단에 갑이 남아 있으면 함께 제거</span></label>
+        <label class="mbtr-chk"><input type="checkbox" ${_mbTr.works?'checked':''} onchange="mbTransferField('works',this.checked)">
+          <span><b>진행 중 컨설팅·사건·기금 담당 동시 변경</b> — 이 사업장의 진행 중 건에서 갑을 을로 함께 변경</span></label>
+        <label class="mbtr-chk"><input type="checkbox" ${_mbTr.workSheet?'checked':''} onchange="mbTransferField('workSheet',this.checked)">
+          <span><b>푸른업무(업무시트) 동시 변경</b> — 진행 중 업무시트(work_erp)의 담당자도 을로 변경</span></label>
+        <label class="mbtr-chk"><input type="checkbox" ${_mbTr.mailClean?'checked':''} onchange="mbTransferField('mailClean',this.checked)">
+          <span><b>푸른메일 수동 고정 해제 · 과거 담당 재연결 차단</b> — 갑으로 박힌 메일 주소를 풀고 갑의 메일함 중복 유입 차단</span></label>
+      </div>
+      <div class="mbtr-fld" style="margin-top:10px">
+        <label for="mbTrReasonIn">변경·전환 사유 (이력 및 관리자 검토용)</label>
+        <input id="mbTrReasonIn" type="text" maxlength="200" value="${esc(_mbTr.reason)}" placeholder="예: 컨설팅·자문 일원화로 박한별 노무사 단독 담당 전환"
+          oninput="_mbTr.reason=this.value">
+      </div>
+    </div>`;
+  } else {
+    const candNames = [];
+    if(d){
+      d.people.forEach(p=>{ if(p.name && candNames.indexOf(p.name) < 0) candNames.push(p.name); });
+    }
+    staff.forEach(u=>{ if(candNames.indexOf(u.name) < 0) candNames.push(u.name); });
+    const m = _mbTr.splitMode || 'split';
+    const optCard = (val, title, desc) => `<label class="mbtr-chk" style="padding:8px 10px;border:1px solid ${m===val?'#2563eb':'#e2e8f0'};border-radius:8px;background:${m===val?'#eff6ff':'#ffffff'}">
+      <input type="radio" name="mbtrMode" value="${val}" ${m===val?'checked':''} onchange="mbTransferSetMode('${val}')">
+      <span><b style="color:${m===val?'#1e40af':'#1e293b'}">${title}</b><br><span style="font-size:12px;color:#475569">${desc}</span></span></label>`;
+    tabBody = `<div class="mbtr-card">
+      <h4>🔀 유형 B — 한 사업장에 자문(갑)과 컨설팅·사건(을)이 따로 진행될 때 중복 차단</h4>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+        ${optCard('split', '🔀 사업 갈래별 분리 (추천 — 자문·급여는 갑, 컨설팅·사건은 을 단독)',
+          '컨설팅·사건·기금 메일은 그 건 담당자(을)에게만 가고, 급여·4대보험·일반자문 메일은 업체 주담당(갑)에게만 갑니다. 양쪽 메일함에 중복으로 뜨지 않습니다.')}
+        ${optCard('workOnly', '🎯 진행 사업 담당자(을)만 메일 받기 (과거 업체 담당 배제)',
+          '과거 자문 이력으로 업체 담당(갑)이 적혀 있으나 현재는 컨설팅·사건 담당자(을)만 메일을 받으면 되는 경우, 모든 메일을 진행 건 담당자에게만 연결합니다.')}
+        ${optCard('share', '👥 함께 보기 (기본 공동 열람)',
+          '분리 규칙을 두지 않고 업체 주·부담당과 진행 중 사업 담당자가 메일을 함께 봅니다.')}
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-size:11.5px;font-weight:700;color:#475569;margin-bottom:5px">🚫 이 사업장 메일에서 아예 뺄 과거 담당자 (누르면 제외 토글)</div>
+        <div class="mbtr-chips">
+          ${candNames.slice(0, 14).map(nm=>{
+            const on = !!_mbTr.exMap[nm];
+            return `<button type="button" class="mbtr-chip${on?' ex':''}" data-nm="${esc(nm)}" onclick="mbTransferToggleEx(this.dataset.nm)">${on?'🚫 ':'+ '}${esc(nm)}</button>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const footBtn = _mbTr.tab === 'sole'
+    ? `<button type="button" class="pri" ${_mbTr.busy?'disabled':''} onclick="mbTransferSubmit()">${
+        _mbTr.busy ? '처리 중…' : (canDir ? '✔ 지금 바로 일괄 변경' : '📨 일괄 변경 신청 보내기')}</button>`
+    : `<button type="button" class="pri" ${_mbTr.busy?'disabled':''} onclick="mbTransferSaveSplit()">${
+        _mbTr.busy ? '처리 중…' : (canDir ? '✔ 분리·제외 규칙 저장' : '📨 분리·제외 규칙 신청')}</button>`;
+
+  return `<div class="mck-dim mbtr-dim" onclick="if(event.target===this)mbTransferClose()">
+    <div class="mck mbtr-box" role="dialog" aria-modal="true" aria-label="사업장 담당 전환 및 중복 연결 정리">
+      <header><span>🔄</span><h2>사업장 담당 전환 · 중복 연결 정리</h2>
+        <button type="button" class="x" aria-label="닫기" onclick="mbTransferClose()" title="닫기">✕</button></header>
+      <div class="body">
+        <div class="mbtr-card" style="margin-bottom:10px">
+          <div class="mbtr-fld">
+            <label for="mbTrCoQ">대상 사업장 검색 · 선택</label>
+            <input id="mbTrCoQ" type="text" value="${esc(_mbTr.q)}" placeholder="사업장 이름 또는 사업자번호 입력"
+              oninput="mbTransferFilterCo(this.value)">
+          </div>
+          <div id="mbTrCoHits" class="mbtr-chips" style="margin-top:8px;max-height:86px;overflow-y:auto">${mbTransferCoHitsHtml()}</div>
+        </div>
+        ${diagHtml}
+        <div class="mbtr-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected="${_mbTr.tab==='sole'?'true':'false'}" class="mbtr-tab${_mbTr.tab==='sole'?' on':''}" onclick="mbTransferTab('sole')">👤 갑 빠지고 을 단독 전환 (일괄 변경·신청)</button>
+          <button type="button" role="tab" aria-selected="${_mbTr.tab==='split'?'true':'false'}" class="mbtr-tab${_mbTr.tab==='split'?' on':''}" onclick="mbTransferTab('split')">🔀 사업별 분리 · 과거 담당 중복 차단</button>
+        </div>
+        ${tabBody}
+      </div>
+      <footer>
+        <span>푸른메일 · 푸른이알피 · 푸른업무·폰 알림에 함께 반영됩니다</span>
+        <span class="sp"></span>
+        <button type="button" onclick="mbTransferClose()">닫기</button>
+        ${footBtn}
+      </footer>
+    </div>
+  </div>`;
+}
+async function mbTransferSaveSplit(){
+  if(!_mbTr || _mbTr.busy) return;
+  const d = _mbTr.coId ? mbCoDiag(_mbTr.coId, _mbTr.em) : null;
+  const canDir = !!(state.isAdmin || state.isSubAdmin);
+  if(!d && !_mbTr.em) return toast('먼저 정리할 사업장을 골라 주세요', 6000);
+  if(!canDir && !d) return toast('먼저 정리할 사업장을 검색해 골라 주세요 (신청은 사업장 기준으로 올라갑니다)', 6500);
+  const key = d ? String(d.co.id) : ('addr:' + mbWhoKey(_mbTr.em));
+  const mode = _mbTr.splitMode === 'share' ? '' : String(_mbTr.splitMode || 'split');
+  const ex = Object.keys(_mbTr.exMap || {}).filter(k=>_mbTr.exMap[k]);
+  const me = mbMyStaffInfo();
+  const next = (!mode && !ex.length) ? null : {
+    coId: d ? String(d.co.id) : '',
+    coName: d ? String(d.co.name || '') : '',
+    mode: mode,
+    ex: ex,
+    at: Date.now(),
+    by: me.name || String(myEmail || '')
+  };
+  _mbTr.busy = true; mbTransferMount();
+  if(!canDir){
+    try{
+      const prev = (_mgrReqs || []).find(x=>x && String(x.coId) === String(d.co.id) && x.status === 'wait' && x.kind === 'split' && me.sid && x.by === me.sid);
+      const modeDesc = !next ? '공동 열람 복귀' : (mode === 'split' ? '사업별 분리' : mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외');
+      const req = {
+        id: prev ? prev.id : ('cmr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6)),
+        kind: 'split',
+        coId: String(d.co.id),
+        coName: String(d.co.name || ''),
+        from: String(d.mainSid || ''),
+        to: String(d.mainSid || ''),
+        splitKey: key,
+        splitRule: next,
+        reason: modeDesc + (ex.length ? ' (제외: ' + ex.join(', ') + ')' : ''),
+        by: me.sid || '',
+        byName: me.name || String(myEmail || ''),
+        at: Date.now(),
+        status: 'wait',
+        batch: ''
+      };
+      await mbUpsertMgrReqRecord(req);
+      mbTransferClose();
+      mbMemoClear(); renderPCSide(); renderMailPage();
+      toast('📨 「' + d.co.name + '」 분리·제외 규칙을 신청했습니다 — 관리자가 승인하면 바로 적용됩니다', 7000);
+    }catch(e){
+      if(_mbTr){ _mbTr.busy = false; mbTransferMount(); }
+      toast('신청하지 못했습니다 — ' + ((e && e.message) || e), 8000);
+    }
+    return;
+  }
+  _mbCoSplit = _mbCoSplit || {};
+  const before = _mbCoSplit[key];
+  try{
+    if(next) _mbCoSplit[key] = next; else delete _mbCoSplit[key];
+    /* 제외된 과거 담당자로 수동 고정된 메일 주소(mailWho)가 있으면 함께 풀어 줘야 진짜로 빠진다 */
+    if(d && ex.length){
+      d.handPins.forEach(p=>{
+        if(ex.indexOf(p.who) >= 0) mbWhoSet(p.em, '');
+      });
+    }
+    if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
+      const ref = firebase.database().ref(DB_ROOT + '/mailCoSplit/' + key);
+      if(next) await ref.set(next); else await ref.remove();
+    }
+    mbWhoBust();
+    mbTransferClose();
+    renderPCSide(); renderMailPage();
+    toast(next ? ('✔ 「' + (d ? d.co.name : _mbTr.em) + '」 중복 연결 분리·제외 규칙을 적용했습니다')
+               : '↩ 기본 공동 열람으로 되돌렸습니다', 6500);
+  }catch(e){
+    if(before === undefined) delete _mbCoSplit[key]; else _mbCoSplit[key] = before;
+    _mbTr.busy = false; mbTransferMount();
+    toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000);
+  }
+}
+async function mbUpdateErpWorksForCo(db, co, fromSid, toSid, toName){
+  let n = 0;
+  if(!db || !co || !toSid || !fromSid) return 0;
+  const biz = String(co.bizNo || '').replace(/\D/g, '');
+  const tables = ['consultings', 'cases', 'funds', 'other_projects'];
+  for(const tbl of tables){
+    const snap = await db.ref('data/' + tbl + '/v').once('value').catch(()=>null);
+    const val = snap && snap.val ? snap.val() : null;
+    if(!val || Array.isArray(val) || typeof val !== 'object') continue;
+    const isFrozen = w => !w || w._deleted || w.permanentArchived || w.undoneDate || !mbWorkLive(w)
+      || /^(transferred)$|이관/.test(String(w.status || '').trim().toLowerCase());
+    const candIds = [];
+    Object.keys(val).forEach(id=>{
+      const w = val[id];
+      if(isFrozen(w)) return;
+      const same = (w.companyId && String(w.companyId) === String(co.id))
+        || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
+      if(!same) return;
+      const curMain = String(w.managerMain || '');
+      const subs = Array.isArray(w.managerSubs) ? w.managerSubs : [];
+      if((curMain === fromSid && curMain !== toSid) || subs.indexOf(fromSid) >= 0) candIds.push(id);
+    });
+    let hit = 0;
+    for(const id of candIds){
+      let changed = false;
+      await db.ref('data/' + tbl + '/v/' + id).transaction(cur=>{
+        if(isFrozen(cur)) return cur;
+        const curMain = String(cur.managerMain || '');
+        const subs = Array.isArray(cur.managerSubs) ? cur.managerSubs.slice() : [];
+        let nx = null;
+        if(curMain === fromSid && curMain !== toSid){
+          nx = Object.assign({}, cur, { managerMain:toSid, managerMainName:toName });
+        }
+        if(subs.indexOf(fromSid) >= 0){
+          nx = Object.assign({}, nx || cur, { managerSubs:subs.filter(s=>String(s) !== fromSid && String(s) !== toSid) });
+        }
+        if(!nx){ changed = false; return cur; }
+        changed = true;
+        nx.id = String(cur.id || id);
+        nx.updatedAt = Date.now();
+        return nx;
+      });
+      if(changed) hit++;
+    }
+    if(hit){
+      await db.ref('data/' + tbl + '/u').set(Date.now()).catch(()=>{});
+      n += hit;
+    }
+  }
+  return n;
+}
+async function mbUpdateWorkSheetForCo(db, coId, fromSid, toSid, toName){
+  if(!db || !coId || !toSid || !fromSid) return 0;
+  let snap = await db.ref('work_erp/items').orderByChild('coid').equalTo(String(coId)).once('value').catch(()=>null);
+  if(!snap) snap = await db.ref('work_erp/items').once('value').catch(()=>null);
+  const items = snap && snap.val ? snap.val() : null;
+  if(!items || typeof items !== 'object') return 0;
+  const isSheetClosed = it => !it || it._deleted || /^(done|closed|cancel|cancelled|canceled|transferred|archived)$|종료|완료|취소|이관/.test(String(it.state || '').trim().toLowerCase());
+  const candIds = [];
+  Object.keys(items).forEach(id=>{
+    const it = items[id];
+    if(isSheetClosed(it) || String(it.coid || '') !== String(coId)) return;
+    const curSid = String((it.mgr_main && it.mgr_main.sid) || '');
+    const subs = Array.isArray(it.mgr_subs) ? it.mgr_subs : [];
+    if((curSid === fromSid && curSid !== toSid) || subs.some(s=>s && String(s.sid) === fromSid)) candIds.push(id);
+  });
+  let n = 0;
+  for(const id of candIds){
+    let changed = false;
+    await db.ref('work_erp/items/' + id).transaction(cur=>{
+      if(isSheetClosed(cur) || String(cur.coid || '') !== String(coId)) return cur;
+      const curSid = String((cur.mgr_main && cur.mgr_main.sid) || '');
+      const subs = Array.isArray(cur.mgr_subs) ? cur.mgr_subs : [];
+      let nx = null;
+      if(curSid === fromSid && curSid !== toSid){
+        nx = Object.assign({}, cur, { mgr_main:{ sid:toSid, name:toName } });
+      }
+      if(subs.some(s=>s && String(s.sid) === fromSid)){
+        nx = Object.assign({}, nx || cur, { mgr_subs:subs.filter(s=>s && String(s.sid) !== fromSid && String(s.sid) !== toSid) });
+      }
+      if(!nx){ changed = false; return cur; }
+      changed = true;
+      return nx;
+    });
+    if(changed) n++;
+  }
+  return n;
+}
+async function mbCleanMailPinsForCo(db, coId, coName, dropNames, toName, actorName){
+  const drops = (dropNames || []).filter(Boolean);
+  const emails = mbCoAllEmails(coId, coName);
+  const up = {};
+  let cleaned = 0;
+  const own = _mbOwner || {};
+  emails.forEach(em=>{
+    const k = mbWhoKey(em);
+    if(own[k] && (!drops.length || drops.indexOf(String(own[k])) >= 0)){
+      delete own[k];
+      up[DB_ROOT + '/config/mailWho/' + k] = null;
+      cleaned++;
+    }
+  });
+  const msgMap = _mbWhoMsg || {};
+  Object.keys(_mbMsgs || {}).forEach(slug=>{
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid=>{
+      const r = box[uid];
+      if(!r) return;
+      const em = String(r.e || '').trim().toLowerCase();
+      if(emails.indexOf(em) < 0) return;
+      const mk = mbWhoKey(slug + ':' + uid);
+      if(msgMap[mk] && (!drops.length || drops.indexOf(String(msgMap[mk])) >= 0)){
+        delete msgMap[mk];
+        up[DB_ROOT + '/config/mailWhoMsg/' + mk] = null;
+        cleaned++;
+      }
+    });
+  });
+  if(coId && drops.length){
+    _mbCoSplit = _mbCoSplit || {};
+    const prev = mbCoSplitParseRule(_mbCoSplit[coId], coId, coId);
+    const mergedEx = (prev ? prev.ex.slice() : []).filter(x=>x !== toName);
+    drops.forEach(nm=>{ if(nm && nm !== toName && mergedEx.indexOf(nm) < 0) mergedEx.push(nm); });
+    const rule = {
+      coId: String(coId),
+      coName: String(coName || ''),
+      mode: (prev && prev.mode) ? prev.mode : '',
+      ex: mergedEx,
+      toName: String(toName || ''),
+      at: Date.now(),
+      by: String(actorName || '')
+    };
+    _mbCoSplit[coId] = rule;
+    up[DB_ROOT + '/mailCoSplit/' + coId] = rule;
+  }
+  if(db && Object.keys(up).length) await db.ref().update(up);
+  return cleaned;
+}
+async function mbApplyHandoverPlan(plan){
+  const db = (typeof Store !== 'undefined' && Store.mode === 'firebase') ? firebase.database() : null;
+  const coId = String(plan.coId || '');
+  const fromSid = String(plan.fromSid || '');
+  const toSid = String(plan.toSid || '');
+  const toName = mgrName(toSid) || String(plan.toName || '');
+  const fromName = mgrName(fromSid) || String(plan.fromName || '');
+  const sc = plan.scope || {};
+  const me = mbMyStaffInfo();
+  const actor = me.name || String(myEmail || '');
+  const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+  const co = cos.find(c=>c && String(c.id) === coId) || { id:coId, name:String(plan.coName || ''), bizNo:'' };
+
+  /* 1) 업체 주담당 변경 + 부담당에서 기존 담당자(갑) 제거 + 담당 이력 기록 */
+  const res = await erpCoPatchMany([{
+    id: coId,
+    by: actor,
+    plan: function(cur){
+      const histEntry = Object.assign({
+        at: Date.now(),
+        from: String(cur.managerMain || fromSid || ''),
+        to: toSid,
+        by: me.sid || '',
+        byName: actor
+      }, plan.reqMeta || {});
+      const nextHist = (((cur && cur.mgrHistory) || []).concat([histEntry])).slice(-50);
+      const fields = {
+        managerMain: toSid,
+        managerMainName: toName,
+        mgrHistory: nextHist
+      };
+      if(sc.cleanSubs && Array.isArray(cur.managerSubs)){
+        fields.managerSubs = cur.managerSubs.filter(s=>String(s) !== fromSid && String(s) !== toSid);
+      }
+      return { fields:fields, info:{ ok:true } };
+    }
+  }]);
+  if(res.failed && res.failed.length) throw new Error(res.failed[0].why || '업체 저장에 실패했습니다');
+  /* 메모리 사본(ErpMatch.companies)도 즉시 갱신해 새로고침 없이 바로 반영 */
+  if(co){
+    co.managerMain = toSid;
+    co.managerMainName = toName;
+    if(sc.cleanSubs && Array.isArray(co.managerSubs)){
+      co.managerSubs = co.managerSubs.filter(s=>String(s) !== fromSid && String(s) !== toSid);
+    }
+    if(typeof ErpMatch !== 'undefined' && ErpMatch.byId && ErpMatch.byId[coId]){
+      ErpMatch.byId[coId].main = toName;
+      if(sc.cleanSubs && Array.isArray(ErpMatch.byId[coId].subs)){
+        ErpMatch.byId[coId].subs = ErpMatch.byId[coId].subs.filter(n=>n !== fromName && n !== toName);
+      }
+    }
+  }
+  let wkN = 0, wsN = 0, mailN = 0;
+  if(db && sc.works && fromSid) wkN = await mbUpdateErpWorksForCo(db, co, fromSid, toSid, toName);
+  if(db && sc.workSheet && fromSid) wsN = await mbUpdateWorkSheetForCo(db, coId, fromSid, toSid, toName);
+  if(sc.mailClean) mailN = await mbCleanMailPinsForCo(db, coId, co.name || plan.coName || '', fromName ? [fromName] : [], toName, actor);
+  if(sc.works){ _mbBizSubs = null; mbBizSubsLoad(); }
+  mbWhoBust();
+  return { wkN, wsN, mailN, toName, fromName };
+}
+async function mbUpsertMgrReqRecord(rec){
+  const db = (typeof Store !== 'undefined' && Store.mode === 'firebase') ? firebase.database() : null;
+  _mgrReqs = (_mgrReqs || []).filter(r=>r && r.id !== rec.id);
+  if(rec.status === 'wait') _mgrReqs.unshift(rec);
+  if(!db) return rec;
+  const vSnap = await db.ref('data/co_mgr_requests/v').once('value').catch(()=>null);
+  const curV = vSnap && vSnap.val ? vSnap.val() : null;
+  if(Array.isArray(curV)){
+    await db.ref('data/co_mgr_requests/v').transaction(arr=>{
+      if(!Array.isArray(arr)) return arr;
+      const next = arr.filter(x=>x && x.id !== rec.id);
+      next.push(rec);
+      return next;
+    });
+    await db.ref('data/co_mgr_requests/u').set(Date.now()).catch(()=>{});
+  } else {
+    const up = {};
+    up['data/co_mgr_requests/v/' + rec.id] = rec;
+    up['data/co_mgr_requests/u'] = Date.now();
+    await db.ref().update(up);
+  }
+  return rec;
+}
+async function mbTransferSubmit(){
+  if(!_mbTr || _mbTr.busy) return;
+  const d = _mbTr.coId ? mbCoDiag(_mbTr.coId, _mbTr.em) : null;
+  if(!d) return toast('먼저 대상 사업장을 선택해 주세요', 6000);
+  if(!_mbTr.toSid) return toast('전환 후 단독 담당자(을)를 선택해 주세요', 6000);
+  if(_mbTr.fromSid && _mbTr.fromSid === _mbTr.toSid) return toast('빠지는 담당자와 단독 담당자가 같습니다', 6000);
+  const scope = {
+    cleanSubs: !!_mbTr.cleanSubs,
+    works: !!_mbTr.works,
+    workSheet: !!_mbTr.workSheet,
+    mailClean: !!_mbTr.mailClean
+  };
+  const canDir = !!(state.isAdmin || state.isSubAdmin);
+  const fromSid = _mbTr.fromSid || d.mainSid || '';
+  if((scope.works || scope.workSheet) && !fromSid){
+    return toast('진행 중 사업·업무시트 담당도 함께 바꾸려면 빠지는 기존 담당자(갑)를 선택해 주세요', 6500);
+  }
+  const toName = mgrName(_mbTr.toSid);
+  const fromName = mgrName(fromSid);
+  _mbTr.busy = true; mbTransferMount();
+  try{
+    if(canDir){
+      const r = await mbApplyHandoverPlan({
+        coId: String(d.co.id),
+        coName: String(d.co.name || ''),
+        fromSid: fromSid,
+        fromName: fromName,
+        toSid: _mbTr.toSid,
+        toName: toName,
+        scope: scope,
+        reason: _mbTr.reason
+      });
+      mbTransferClose();
+      renderPCSide(); renderMailPage();
+      const extra = [];
+      if(r.wkN) extra.push('진행사업 ' + r.wkN + '건');
+      if(r.wsN) extra.push('업무시트 ' + r.wsN + '건');
+      if(scope.mailClean) extra.push('메일 중복차단 완료');
+      toast('✔ 「' + d.co.name + '」 단독 담당을 ' + toName + '님으로 일괄 변경했습니다' + (extra.length ? ' (' + extra.join(' · ') + ')' : ''), 7500);
+    } else {
+      const me = mbMyStaffInfo();
+      const prev = (_mgrReqs || []).find(x=>x && String(x.coId) === String(d.co.id) && x.status === 'wait' && !x.kind && me.sid && x.by === me.sid);
+      const req = {
+        id: prev ? prev.id : ('cmr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6)),
+        coId: String(d.co.id),
+        coName: String(d.co.name || ''),
+        from: fromSid,
+        to: String(_mbTr.toSid),
+        reason: String(_mbTr.reason || '').slice(0, 200),
+        scope: scope,
+        by: me.sid || '',
+        byName: me.name || String(myEmail || ''),
+        at: Date.now(),
+        status: 'wait',
+        batch: ''
+      };
+      await mbUpsertMgrReqRecord(req);
+      mbTransferClose();
+      mbMemoClear(); renderPCSide(); renderMailPage();
+      toast('📨 「' + d.co.name + '」 단독 담당 전환을 신청했습니다 — 관리자가 승인하면 일괄 반영됩니다', 7500);
+    }
+  }catch(e){
+    if(_mbTr){ _mbTr.busy = false; mbTransferMount(); }
+    toast('처리하지 못했습니다 — ' + ((e && e.message) || e), 8500);
+  }
+}
+async function mgrDecideReq(reqId, ok){
+  if(!(state.isAdmin || state.isSubAdmin)) return toast('관리자만 승인·반려할 수 있습니다', 6000);
+  const req = (_mgrReqs || []).find(x=>x && String(x.id) === String(reqId));
+  if(!req) return toast('이미 처리되었거나 찾을 수 없는 요청입니다', 6000);
+  const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) || [];
+  const liveCo = cos.find(c=>c && String(c.id) === String(req.coId));
+  const verifiedName = (liveCo && liveCo.name) || String(req.coName || '');
+  let note = '';
+  if(!ok){
+    const ans = prompt('반려 사유 (선택)', '');
+    if(ans === null) return;
+    note = String(ans || '').slice(0, 200);
+  }
+  try{
+    const me = mbMyStaffInfo();
+    if(ok){
+      if(!liveCo) return toast('실제 사업장 기록을 찾지 못해 승인할 수 없습니다 — 새로고침 후 확인해 주세요', 7500);
+      if(req.kind === 'split'){
+        const k = String(liveCo.id);
+        const sr = req.splitRule && typeof req.splitRule === 'object' ? req.splitRule : null;
+        let cleanRule = null;
+        if(sr){
+          const mode = (sr.mode === 'split' || sr.mode === 'workOnly') ? sr.mode : '';
+          const ex = (Array.isArray(sr.ex) ? sr.ex : [])
+            .map(n=>String(n || '').trim())
+            .filter(n=>n && mbStaffOf(n));
+          if(mode || ex.length){
+            cleanRule = {
+              coId: k,
+              coName: String(liveCo.name || ''),
+              mode: mode,
+              ex: ex,
+              at: Date.now(),
+              by: me.name || String(myEmail || '')
+            };
+          }
+        }
+        const desc = !cleanRule ? '분리·제외 규칙 해제 (공동 열람 복귀)'
+          : ((cleanRule.mode === 'split' ? '사업별 분리' : cleanRule.mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외')
+            + (cleanRule.ex.length ? ' · 제외: ' + cleanRule.ex.join(', ') : ''));
+        if(!confirm('「' + liveCo.name + '」 분리·제외 규칙 신청을 승인할까요?\n\n· 적용 내용: ' + desc)) return;
+        _mbCoSplit = _mbCoSplit || {};
+        if(cleanRule) _mbCoSplit[k] = cleanRule; else delete _mbCoSplit[k];
+        if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
+          const ref = firebase.database().ref(DB_ROOT + '/mailCoSplit/' + k);
+          if(cleanRule) await ref.set(cleanRule); else await ref.remove();
+        }
+        if(cleanRule && cleanRule.ex.length){
+          const d0 = mbCoDiag(k, '');
+          if(d0) d0.handPins.forEach(p=>{ if(cleanRule.ex.indexOf(p.who) >= 0) mbWhoSet(p.em, ''); });
+        }
+        mbWhoBust();
+      } else {
+        const curMain = mgrName(liveCo.managerMain) || '(없음)';
+        const nextMain = mgrName(req.to) || '(비움)';
+        const scTxt = mbReqScopeLabel(req);
+        if(!confirm('「' + liveCo.name + '」 담당 변경을 승인할까요?\n\n· 현재 실제 주담당: ' + curMain
+          + '\n· 빠지는 담당(요청): ' + (mgrName(req.from) || '(없음)')
+          + '\n· 전환 단독 담당: ' + nextMain
+          + (scTxt ? '\n· 동시 반영 범위:' + scTxt.replace(/^ · /, ' ') : ''))) return;
+        await mbApplyHandoverPlan({
+          coId: String(liveCo.id),
+          coName: String(liveCo.name || ''),
+          fromSid: String(req.from || ''),
+          fromName: mgrName(req.from),
+          toSid: String(req.to || ''),
+          toName: mgrName(req.to),
+          scope: req.scope || { cleanSubs:false, works:false, workSheet:false, mailClean:false },
+          reqMeta: { req:req.id, reqBy:req.by || '', reqByName:req.byName || '', okBy:me.sid || '', okByName:me.name || '' }
+        });
+      }
+    }
+    const doneRec = Object.assign({}, req, {
+      status: ok ? 'ok' : 'no',
+      decidedBy: me.sid || '',
+      decidedByName: me.name || String(myEmail || ''),
+      decidedAt: Date.now(),
+      note: note
+    });
+    await mbUpsertMgrReqRecord(doneRec);
+    mbMemoClear(); renderPCSide(); renderMailPage();
+    toast(ok ? ('✅ 승인 완료 — 「' + verifiedName + '」 요청 사항이 반영되었습니다')
+             : ('↩ 반려했습니다 — ' + verifiedName), 6500);
+  }catch(e){
+    toast('승인 처리 중 오류가 났습니다 — ' + ((e && e.message) || e), 8500);
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -34714,6 +35766,8 @@ function mbOwnerMove(ev, only){
     ${one ? `<div class="fmi" data-em="${esc(one)}" onclick="mbWorkLinkOpen(this.dataset.em, event)" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px">📁 사건·컨설팅에 잇기 ›
       <small>이 주소가 그 건의 것이면 담당이 «건에서» 따라옵니다${
         mbWorkHandOf(one) ? ' — 지금 이어져 있습니다' : ''}</small></div>` : ''}
+    <div class="fmi" data-em="${esc(one||'')}" onclick="closeFolderMenu();mbTransferOpen('',this.dataset.em)" style="border-top:1px solid #e2e8f0;color:#1e40af;font-size:12px">🔄 사업장 담당 변경 · 중복 정리 ›
+      <small>과거 담당(갑) 제외·을 단독 전환 신청 또는 자문·컨설팅 중복 연결을 분리합니다</small></div>
     ${/* ── ㉯ 로 가는 문 (대표 승인 목업 2026-09-05) ──
          ⚠ 한 통씩으로는 1,600통을 못 줄인다. 「이 창에서 한 통 정했다」의 다음 손이
            여기 있어야 한다 — 따로 들어가야 하는 화면이면 아무도 안 간다. */''}
