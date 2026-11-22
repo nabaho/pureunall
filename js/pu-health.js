@@ -152,7 +152,9 @@
         var item = value[uid][id] || {};
         if (item.status !== 'new') return;
         if (!includeNoise && isNoise(item.message)) return;   /* 예전에 쌓인 잔소리도 창에는 세지 않는다 */
-        list.push(Object.assign({ uid: uid, id: id }, item));
+        /* ★ 서버 «키»(uid·id)가 늘 이긴다 — 본문에 같은 이름의 칸을 적어 넣어도 덮이지 않는다.
+           본문이 이기면 «처리 완료»가 엉뚱한 자리(없는 번호)로 가서 묶음 전체가 거절된다. */
+        list.push(Object.assign({}, item, { uid: uid, id: id }));
       });
     });
     return list.sort(function (a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); });
@@ -235,14 +237,15 @@
     return now - rec.at >= (rec.ok ? SETTLE_EVERY_MS : SETTLE_RETRY_MS);
   }
 
+  /* 이 묶음에서 «하나라도» 쓰였으면 true — 전부 거절됐으면(통신 끊김·권한) false */
   function writeSettled(app, part) {
     var db = app.database();
-    return db.ref().update(resolveAllPatch(part, Date.now(), AUTO_BY)).catch(function () {
+    return db.ref().update(resolveAllPatch(part, Date.now(), AUTO_BY)).then(function () { return true; }, function () {
       return part.reduce(function (chain, item) {
-        return chain.then(function () {
-          return db.ref().update(resolveAllPatch([item], Date.now(), AUTO_BY)).catch(function () {});
+        return chain.then(function (okSoFar) {
+          return db.ref().update(resolveAllPatch([item], Date.now(), AUTO_BY)).then(function () { return true; }, function () { return okSoFar; });
         });
-      }, Promise.resolve());
+      }, Promise.resolve(false));
     });
   }
 
@@ -254,12 +257,14 @@
     writeJson(SETTLE_KEY, { at: now, ok: false });
     return readAdminAlerts(app).then(function (snapshot) {
       var items = flattenAlerts(snapshot.val(), true);
+      var anyOk = false;
       var chain = Promise.resolve();
       for (var i = 0; i < items.length; i += SETTLE_CHUNK) {
-        (function (part) { chain = chain.then(function () { return writeSettled(app, part); }); })(items.slice(i, i + SETTLE_CHUNK));
+        (function (part) { chain = chain.then(function () { return writeSettled(app, part).then(function (ok) { if (ok) anyOk = true; }); }); })(items.slice(i, i + SETTLE_CHUNK));
       }
       return chain.then(function () {
-        writeJson(SETTLE_KEY, { at: Date.now(), ok: true });
+        /* 하나라도 쓰였거나 정리할 것이 없었으면 «잘 끝남»(6시간 뒤). 전부 거절됐으면 «못 함»(30분 뒤 다시) */
+        writeJson(SETTLE_KEY, { at: Date.now(), ok: !items.length || anyOk });
         return items.length;
       });
     }).catch(function () { return 0; });

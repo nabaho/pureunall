@@ -182,6 +182,21 @@ test('③ 총괄관리자가 아니면 서버 알림을 읽지도 쓰지도 않�
   }
 });
 
+test('② 본문에 적힌 uid·id 가 서버 «키»를 덮지 못한다 — 처리 완료는 늘 키 자리로 간다', async () => {
+  const 서버본문 = { uidA: {
+    a1: { id: 'zzz', uid: 'uidX', kind: 'javascript', message: '본문에 다른 번호를 적어 둔 알림', page: 'p.html', createdAt: 1, status: 'new' }
+  } };
+  const b = boot({ role: { isAdmin: true }, alerts: 서버본문 });
+  await b.login();
+  assert.equal(b.calls.updates.length, 1);
+  assert.deepEqual(Object.keys(b.calls.updates[0]).sort(),
+    ['systemAlerts/uidA/a1/resolvedAt', 'systemAlerts/uidA/a1/resolvedBy', 'systemAlerts/uidA/a1/status'],
+    '★ 본문의 id(zzz)·uid(uidX)를 따라가면 없는 자리를 쓰려다 묶음 전체가 거절된다');
+  const 목록 = b.win.PUHealth._flattenAlerts(서버본문);
+  assert.equal(목록[0].id, 'a1');
+  assert.equal(목록[0].uid, 'uidA');
+});
+
 /* ── ④ 얼마나 자주 · 실패했을 때 ── */
 test('④ 정리가 잘 끝났으면 한참 동안 다시 읽지 않는다 — 장애 이력 전체를 읽는 일이다', async () => {
   const first = boot({ role: { isAdmin: true }, alerts: 서버() });
@@ -216,6 +231,19 @@ test('④ 읽기에 실패해도 조용하다 — 실패를 새 장애로 다시
   assert.equal(b.settleRecord().ok, false, '실패했다고 적어 둔다 — 짧게 기다린 뒤 다시 한다');
 });
 
+test('④ 쓰기가 전부 거절되면 «못 한 것»으로 적는다 — 30분 뒤 다시 한다(6시간을 기다리지 않는다)', async () => {
+  const b = boot({ role: { isAdmin: true }, alerts: 서버(), rejectIf: () => true });
+  await b.login();
+  assert.equal(b.calls.updates.length, 0);
+  assert.equal(b.settleRecord().ok, false, '★ 하나도 못 썼는데 잘 끝났다고 적으면 6시간 동안 다시 안 한다');
+});
+
+test('④ 정리할 것이 없었으면 «잘 끝남»으로 적는다', async () => {
+  const b = boot({ role: { isAdmin: true }, alerts: {} });
+  await b.login();
+  assert.equal(b.settleRecord().ok, true);
+});
+
 test('④ 묶음 하나가 거절돼도 나머지는 정리된다 — 걸린 묶음은 건별로 다시 쓴다', async () => {
   const b = boot({
     role: { isAdmin: true }, alerts: 서버(),
@@ -225,6 +253,7 @@ test('④ 묶음 하나가 거절돼도 나머지는 정리된다 — 걸린 묶
   const done = new Set();
   b.calls.updates.forEach((u) => Object.keys(u).forEach((k) => { if (/\/status$/.test(k)) done.add(k.split('/')[2]); }));
   assert.deepEqual(Array.from(done).sort(), ['a2', 'b1'], '막힌 한 건(a1) 때문에 나머지가 안 정리되면 14건이 영영 남는다');
+  assert.equal(b.settleRecord().ok, true, '일부만 막혔으면 잘 끝난 것 — 막힌 한 건 때문에 30분마다 이력을 다시 읽지 않는다');
 });
 
 /* ── ⑤ 스스로 단추·창을 만들지 않는다 ── */
