@@ -53752,7 +53752,7 @@ function erpParseNicebill(raw, det){
 
 // ── 회원명·사업자번호 → ERP 업체 색인 (파싱 1회만 만든다 — 행마다 업체목록을 훑지 않도록) ──
 function erpNicebillCoIndex(){
-  var idx = { byNorm:{}, byBiz:{}, byPrev:{}, list:[], cache:{}, closed:{ byNorm:{}, byBiz:{} } };
+  var idx = { byNorm:{}, byBiz:{}, byPrev:{}, prevList:{}, list:[], cache:{}, closed:{ byNorm:{}, byBiz:{} } };
   var all = dbGet('companies', []) || [];
   if(!Array.isArray(all)) return idx;
   for(var i=0; i<all.length; i++){
@@ -53785,6 +53785,8 @@ function erpNicebillCoIndex(){
       erpPrevList(c).forEach(function(p){
         var pk = erpNormName(p);
         if(pk && !idx.byNorm[pk] && !idx.byPrev[pk]) idx.byPrev[pk] = { e:e, matched:p };
+        /* 같은 예전 상호를 쓰는 활성 업체가 또 있으면 모아 둔다 — byPrev 는 «첫 업체»만 들고 있어 모호함이 가려진다(자동 처리 후보 찾기가 본다) */
+        if(pk && !idx.byNorm[pk]){ var _pl = (idx.prevList[pk] = idx.prevList[pk] || []); if(_pl.indexOf(e) < 0) _pl.push(e); }
       });
     }
   }
@@ -54084,14 +54086,234 @@ function erpCmsLinkMember(code, companyId){
   if(other) dbPatch('companies', other.id, { cmsMemberCodes: (other.cmsMemberCodes || []).filter(function(x){ return x !== code; }) });
   return true;
 }
-/* 재무관리 › 🤖 자동 처리 의 «처음 보는 회원» 후보 — 이름으로만 찾는다(사업자번호는 이 줄에 없다).
-   종료(closed) 업체도 «이름이 꼭 같을 때만» 알아보되, 이 화면은 그 업체에 회원코드를 잇지도 입금을 만들지도 않는다 —
+/* ── 더빌 회원명 ↔ 업체명 «비슷함» 가리기 — 재무관리 › 자동 처리 의 후보 전용 (2026-11-22 대표 「비슷한 이름을 제대로 비교해 일치」) ──
+   ⚠ 이것으로 «잇지» 않는다 — 제안만 한다. 잇는 것은 사람이 누를 때(erpCmsLinkMember).
+   업체 이름에는 지점·옛 상호·대표자 변경 같은 «설명»이 괄호로 붙고(「○○(구 △△)」), 상호가 바뀐 곳은 「옛이름→새이름」으로 적혀 있다.
+   더빌 회원명에는 그 설명이 없어서 이름 «전체»를 견주면 한 글자도 안 맞았다(자동 처리 「후보 없음」의 큰 몫).
+   돌려주는 것: { mains:[지금 이름], notes:[괄호 설명], olds:[예전 이름] } — 모두 법인 표기·공백·기호를 걷은 글자 */
+function _cmsKey(s){
+  return String(s == null ? '' : s).toLowerCase()
+    .replace(/주식회사|유한책임회사|유한회사|합자회사|합명회사|재단법인|사단법인|의료법인|사회복지법인|학교법인|농업회사법인|영농조합법인|㈜|㈔|\(주\)|\(유\)|\(재\)|\(사\)|\(합\)/g, '')
+    .replace(/[\s\-_.,·'"\/&+:;!?~]/g, '').replace(/[()\[\]{}]/g, '');
+}
+function erpCmsNameKeys(name){
+  var s = String(name == null ? '' : name).replace(/（/g, '(').replace(/）/g, ')');
+  s = s.replace(/\((?:주|유|재|사|합)\)/g, '');            // 법인 표기 「(주)」는 먼저 걷는다 — 괄호 설명 «안»에 들어 있으면 바깥 괄호가 안 갈라진다
+  var parts = s.split(/→|->|=>/);                       // 상호가 바뀐 업체 — 화살표 왼쪽이 옛 이름
+  var out = { mains:[], notes:[], olds:[] };
+  function add(arr, k, min){ if(k && k.length >= min && arr.indexOf(k) < 0) arr.push(k); }
+  parts.forEach(function(p, i){
+    var isOld = i < parts.length - 1, notes = [];
+    var base = p.replace(/\(([^()]*)\)/g, function(_m, g){ notes.push(g); return ' '; });
+    add(isOld ? out.olds : out.mains, _cmsKey(base), 2);
+    notes.forEach(function(n){
+      var m = /^\s*(?:구|옛|전|前)[\s.\-:]+([\s\S]*)$/.exec(n);   // 「(구 ○○상사)」「(구-A, B)」 = 예전 이름 — 구분 글자가 «있어야» 한다(「구로지점」「전주지점」의 첫 글자를 자르지 않게)
+      if(m){ m[1].split(/[,、]/).forEach(function(o){ add(out.olds, _cmsKey(o), 2); }); return; }
+      add(isOld ? out.olds : out.notes, _cmsKey(n), 3);
+    });
+  });
+  return out;
+}
+/* 한 글자만 다른가(바꾸기·넣기·빼기 하나) — 같은 글자면 false */
+function _cmsEd1(a, b){
+  if(a === b) return false;
+  var la = a.length, lb = b.length;
+  if(Math.abs(la - lb) > 1) return false;
+  var i = 0, j = 0, diff = 0;
+  while(i < la && j < lb){
+    if(a.charAt(i) === b.charAt(j)){ i++; j++; continue; }
+    if(++diff > 1) return false;
+    if(la === lb){ i++; j++; } else if(la > lb){ i++; } else { j++; }
+  }
+  return diff + (la - i) + (lb - j) <= 1;
+}
+/* 한 글자 다름을 «오타»로 볼 수 있나 — 숫자가 다르면(1공장·2공장) 다른 곳이고, 같은 꼬리(점·공장·지점…)를 가진 두 이름이
+   꼬리 «앞»에서 다르면(아산점·예산점) 다른 지점이다. 이런 것을 오타로 제안하면 사람이 속는다(2026-11-22 자동 검토). */
+function _cmsTypoOk(a, b){
+  if(!_cmsEd1(a, b)) return false;
+  var i = 0;
+  while(i < a.length && i < b.length && a.charAt(i) === b.charAt(i)) i++;
+  if(/[0-9]/.test(a.charAt(i)) || /[0-9]/.test(b.charAt(i))) return false;
+  var tail = /(?:지점|호점|공장|지사|영업소|사업소|점)$/, ta = tail.exec(a), tb = tail.exec(b);
+  if(ta && tb && i < a.length - ta[0].length && i < b.length - tb[0].length) return false;
+  return true;
+}
+/* 두 이름이 얼마나 닮았나 — 'same' 같은 이름(표기만 다름) › 'old' 예전 이름 › 'contains' 일부가 같음 › 'typo' 한 글자 다름 › '' */
+function _cmsLikeLevel(rk, ck){
+  var i, j, a, b;
+  for(i = 0; i < rk.mains.length; i++){
+    a = rk.mains[i];
+    for(j = 0; j < ck.mains.length; j++) if(a === ck.mains[j]) return 'same';
+    for(j = 0; j < ck.notes.length; j++) if(a === ck.notes[j]) return 'same';
+    for(j = 0; j < ck.olds.length; j++) if(a === ck.olds[j]) return 'old';
+  }
+  for(i = 0; i < rk.olds.length; i++) for(j = 0; j < ck.mains.length; j++) if(rk.olds[i] === ck.mains[j]) return 'old';
+  for(i = 0; i < rk.mains.length; i++){
+    a = rk.mains[i];
+    for(j = 0; j < ck.mains.length; j++){
+      b = ck.mains[j];
+      var sh = a.length <= b.length ? a : b, lg = a.length <= b.length ? b : a;
+      if(sh.length >= 4 && sh !== lg && lg.indexOf(sh) >= 0) return 'contains';
+    }
+  }
+  for(i = 0; i < rk.notes.length; i++){                  // 더빌 이름의 괄호 설명(「…재단(○○병원)」)이 업체 이름 안에 들어 있다
+    a = rk.notes[i];
+    for(j = 0; j < ck.mains.length; j++) if(a.length >= 5 && ck.mains[j].indexOf(a) >= 0) return 'contains';
+  }
+  for(i = 0; i < rk.mains.length; i++){
+    a = rk.mains[i];
+    for(j = 0; j < ck.mains.length; j++){ b = ck.mains[j]; if(a.length >= 4 && b.length >= 4 && _cmsTypoOk(a, b)) return 'typo'; }
+  }
+  return '';
+}
+/* 활성 업체 색인에서 «비슷한 이름»을 찾는다. ⚠ 종료 업체는 여기서 «붙이지» 않는다(이름·사업자번호가 꼭 같을 때만 — 2026-10-27 건의).
+   사업자번호가 둘 다 있고 서로 다르면 이름이 닮아도 «다른 업체»로 본다(「A 아산점」과 「A 서산점」).
+   돌려주는 것: { level, co:업체|null(한 곳으로 안 좁혀지면), n:닮은 곳 수, alts:[이름…] } | null
+   ⚠ 종료 업체 중 닮은 곳은 closedLike 에 «이름만» 알려 준다 — 사람이 거래내역에서 직접 고르게. */
+function erpCmsLikePool(ix){
+  if(!ix.likePool){
+    ix.likePool = [];
+    ix.list.forEach(function(e){ ix.likePool.push({ co:e, closed:false, k:erpCmsNameKeys(e.name) }); });
+    Object.keys((ix.closed && ix.closed.byNorm) || {}).forEach(function(n){ var c = ix.closed.byNorm[n]; ix.likePool.push({ co:c, closed:true, k:erpCmsNameKeys(c.name) }); });
+  }
+  return ix.likePool;
+}
+/* 이름이 «현재 상호·예전 상호»로 같은가 — 괄호 설명(지점·메모)은 보지 않는다.
+   충돌 알림 전용이다: 흔한 설명이 다른 업체와 겹쳤다는 이유로 번호와 상호가 모두 맞는 후보를 막지 않게(2026-11-22 자동 검토). */
+function _cmsNameSame(rk, ck){
+  var i, j;
+  for(i = 0; i < rk.mains.length; i++){
+    for(j = 0; j < ck.mains.length; j++) if(rk.mains[i] === ck.mains[j]) return true;
+    for(j = 0; j < ck.olds.length; j++) if(rk.mains[i] === ck.olds[j]) return true;
+  }
+  for(i = 0; i < rk.olds.length; i++) for(j = 0; j < ck.mains.length; j++) if(rk.olds[i] === ck.mains[j]) return true;
+  return false;
+}
+/* 이름이 «같다고 볼 만한»(표기·괄호 설명만 다름 · 예전 이름) 다른 «활성» 업체 — 사업자번호는 보지 않는다.
+   번호가 가리키는 업체와 이름이 가리키는 업체가 다를 때 «충돌»로 알리려고 쓴다(괄호 설명이 붙은 다른 지점도 놓치지 않게). */
+function erpCmsNameClash(ix, name, exceptId){
+  var rk = erpCmsNameKeys(name), hit = null;
+  if(!rk.mains.length && !rk.olds.length) return null;
+  erpCmsLikePool(ix).forEach(function(p){
+    if(hit || p.closed || p.co.id === exceptId) return;
+    if(_cmsNameSame(rk, p.k)) hit = p.co;
+  });
+  return hit;
+}
+function erpCmsLikeFind(ix, name, biz){
+  var rk = erpCmsNameKeys(name);
+  if(!rk.mains.length && !rk.olds.length) return null;
+  var by = { same:[], old:[], contains:[], typo:[] }, cl = [];
+  erpCmsLikePool(ix).forEach(function(p){
+    var cb = p.co.biz || '';
+    if(biz && biz.length >= 10 && cb.length >= 10 && cb !== biz) return;
+    var lv = _cmsLikeLevel(rk, p.k);
+    if(!lv) return;
+    if(p.closed){ cl.push(p.co.name); return; }
+    by[lv].push(p.co);
+  });
+  var order = ['same', 'old', 'contains', 'typo'];
+  for(var i = 0; i < order.length; i++){
+    var arr = by[order[i]];
+    if(!arr.length) continue;
+    return { level:order[i], co:(arr.length === 1 ? arr[0] : null), n:arr.length,
+             alts:arr.slice(0, 4).map(function(c){ return c.name; }), closedLike:cl.slice(0, 3) };
+  }
+  return cl.length ? { level:'', co:null, n:0, alts:[], closedLike:cl.slice(0, 3) } : null;
+}
+/* 재무관리 › 🤖 자동 처리 의 «처음 보는 회원» 후보.
+   찾는 순서: ① 사업자번호(활성 → 종료) — 법적으로 한 업체를 가리키므로 이름보다 먼저 ② 이름이 꼭 같음·예전 이름·학습 별칭
+   ③ 비슷한 이름(활성 업체만 · 한 곳으로 좁혀질 때만). 번호가 있어도 이름이 꼭 같은 «다른» 활성 업체가 있으면 충돌로 알린다.
+   종료(closed) 업체는 «번호나 이름이 꼭 같을 때만» 알아보되, 이 화면은 그 업체에 회원코드를 잇지도 입금을 만들지도 않는다 —
    종료 업체는 몇 개월분인지·달별로 나눌지 사람이 정해야 해서 거래내역 CMS 창에서 확정한다(건의 · 김보람 2026-10-27).
-   돌려주는 것: { co:업체|null, via:'closed'|'prev'|'name'|'' } */
-function erpCmsAutoCandidate(ix, name){
-  var out = { allowClosed:true };
-  var c = erpNicebillMatchCo(ix, name, '', out);
-  return { co:c, via:out.via };
+   돌려주는 것: { co, via:'biz'|'closed'|'prev'|'name'|'like'|'', by:'biz'|'name'|'like'|'', level, evidence:[], conflict:'', alts:[], closedLike:[] }
+   ⚠ 돌려준 값은 캐시에 있다 — 부르는 쪽이 고치지 않는다. */
+function erpCmsAutoCandidate(ix, name, bizNo, amount){
+  var res = { co:null, via:'', by:'', level:'', evidence:[], conflict:'', alts:[], closedLike:[], multiBiz:false, multiName:false };
+  if(!ix) return res;
+  var biz = _nbDigits(bizNo), amt = parseInt(amount, 10) || 0;
+  var ck = 'cand|' + String(name == null ? '' : name) + '|' + biz + '|' + amt;   // 이름은 «그대로» 키로 — 괄호 유무가 다른 이름이 같은 칸을 쓰면 답이 섞인다
+  ix.candCache = ix.candCache || {};
+  if(ix.candCache.hasOwnProperty(ck)) return ix.candCache[ck];
+  function feeSame(co){ var f = (co && co.fee) || 0; return !!(f && amt && (amt === f || amt === Math.round(f * 1.1))); }
+  var bc = null, bClosed = false, bizDup = null;
+  if(biz.length >= 10){
+    if(ix.byBiz[biz]){
+      bc = ix.byBiz[biz];
+      /* 색인(byBiz)은 번호마다 «첫 활성 업체»만 담는다 — 같은 번호를 쓰는 활성 업체가 여럿(본점·지점)이면 어느 쪽인지 모른다 */
+      var dup = ix.list.filter(function(e){ return e.biz === biz; });
+      if(dup.length > 1) bizDup = dup;
+    } else if(ix.closed && ix.closed.byBiz && ix.closed.byBiz[biz]){ bc = ix.closed.byBiz[biz]; bClosed = true; }
+  }
+  var o2 = { allowClosed:true };
+  var nc = erpNicebillMatchCo(ix, name, '', o2);       // 번호는 위에서 이미 봤다 — 이름 쪽만
+  var nAct = (nc && !nc.closed) ? nc : null;
+  var ncBizOff = !!(nc && biz.length >= 10 && nc.biz && nc.biz.length >= 10 && nc.biz !== biz);   // 이름은 같은데 사업자번호는 다른 업체
+  /* 번호가 없는 회원의 «꼭 같은 이름»이 활성 업체 여럿과 겹치면 색인의 첫 업체가 단독 후보로 나온다 — 모호하므로 고르지 않는다.
+     (이 후보로 이으면 스위치가 켜져 있을 때 곧바로 자동 확정까지 가기 때문 — 2026-11-22 자동 검토) */
+  var nameDup = null;
+  if(!bc && nAct){
+    var nd = ix.list.filter(function(e){ return e.norm === nAct.norm; });
+    if(nd.length > 1) nameDup = nd;
+    else if(o2.via === 'prev'){                         // 예전 상호로 찾았는데 같은 예전 상호를 쓰는 활성 업체가 또 있다
+      var pl = (ix.prevList || {})[erpNormName(name)];
+      if(pl && pl.length > 1) nameDup = pl;
+    }
+  }
+  if(bizDup){
+    /* 하나를 고르지 않는다 — 고르는 것은 사람이다. 한꺼번에 잇기에도 안 들어간다 */
+    res.multiBiz = true; res.alts = bizDup.slice(0, 4).map(function(e){ return e.name; });
+  } else if(nameDup){
+    res.multiName = true; res.alts = nameDup.slice(0, 4).map(function(e){ return e.name; });
+  } else if(bc){
+    res.co = bc; res.via = bClosed ? 'closed' : 'biz'; res.by = 'biz';
+    res.evidence.push('사업자번호가 같음');
+    if(!bClosed && feeSame(bc)) res.evidence.push('월 금액도 같음');
+    /* 번호와 «다른» 활성 업체가 이름으로도 가리켜지면 충돌 — 꼭 같은 이름뿐 아니라 괄호 설명·옛 상호만 다른 이름까지 본다 */
+    var clash = (nAct && nAct.id !== bc.id) ? nAct : erpCmsNameClash(ix, name, bc.id);
+    if(clash) res.conflict = '이름은 다른 활성 업체 「' + clash.name + '」과 같음 — 번호는 「' + bc.name + '」';
+    else if(nc && nc.closed && nc.id !== bc.id && !bClosed) res.evidence.push('같은 이름의 종료 업체 「' + nc.name + '」도 있음 — 사업자번호로 가렸음');
+  } else if(nc && !(nc.closed && ncBizOff)){
+    res.co = nc; res.via = o2.via || 'name'; res.by = 'name';
+    res.evidence.push(res.via === 'prev' ? '예전 이름과 같음' : '이름이 꼭 같음');
+    if(!nc.closed && feeSame(nc)) res.evidence.push('월 금액도 같음');
+    if(ncBizOff) res.conflict = '이름은 같지만 사업자번호가 다름';
+  } else {
+    var lk = erpCmsLikeFind(ix, name, biz);
+    if(lk){
+      res.level = lk.level; res.alts = lk.alts; res.closedLike = lk.closedLike || [];
+      if(lk.co){
+        res.co = lk.co; res.via = 'like'; res.by = 'like';
+        res.evidence.push({ same:'이름이 같음(법인 표기·괄호 설명만 다름)', old:'예전 이름과 같음', contains:'이름 일부가 같음', typo:'이름이 한 글자 다름' }[lk.level]);
+        if(feeSame(lk.co)) res.evidence.push('월 금액도 같음');
+      }
+    }
+    /* 이름이 꼭 같은 «종료» 업체인데 사업자번호가 다르면 그 업체가 아니다 — 활성 업체의 비슷한 이름을 막지 않고, 종료 업체는 이름만 알려 준다 */
+    if(nc && nc.closed && ncBizOff && res.closedLike.indexOf(nc.name) < 0) res.closedLike = [nc.name].concat(res.closedLike).slice(0, 3);
+  }
+  ix.candCache[ck] = res;
+  return res;
+}
+/* «확실한 것 한꺼번에 잇기» 대상 — 사업자번호가 같은 «활성» 업체이고 충돌이 없는 «처음 보는 회원»만.
+   같은 회원코드의 여러 줄(달마다 출금)은 한 건으로 센다. 한 코드가 줄마다 다른 업체를 가리키면 뺀다(사람이 본다).
+   종료 업체·이름만 비슷한 곳·이름만 같은 곳은 넣지 않는다(하나씩 확인) — 번호는 법적 신원이라 틀릴 일이 거의 없다. */
+function erpCmsSureLinks(ix, items){
+  var byCode = {}, order = [];
+  (items || []).forEach(function(it){
+    if(!it || it.verdict !== 'new_member' || !it.row || !it.row.code) return;
+    if(it.why === '회원코드가 두 업체에 이어져 있음') return;
+    var k = erpCmsAutoCandidate(ix, it.row.name, it.row.bizNo, it.row.amount);
+    var code = String(it.row.code).trim();
+    var cur = byCode[code];
+    if(!cur){ byCode[code] = cur = { code:code, name:it.row.name, co:null, ok:true, rows:0, fee:false }; order.push(code); }
+    cur.rows++;
+    var sure = !!(k.co && k.via === 'biz' && !k.conflict);
+    if(!sure){ cur.ok = false; return; }
+    if(cur.co && cur.co.id !== k.co.id) cur.ok = false;   // 같은 코드인데 줄마다 다른 업체
+    cur.co = cur.co || k.co;
+    if(k.evidence.indexOf('월 금액도 같음') >= 0) cur.fee = true;
+  });
+  return order.map(function(c){ return byCode[c]; }).filter(function(x){ return x.ok && x.co; });
 }
 window.erpCmsLinkMember = erpCmsLinkMember;
 
@@ -75401,25 +75623,85 @@ function FinanceAuto(props){
   function cand(it){
     if(it.verdict !== 'new_member' || it.why === DUAL) return null;
     ix = ix || erpNicebillCoIndex();
-    return erpCmsAutoCandidate(ix, it.row.name);
+    /* 사업자번호·금액도 함께 넘긴다 — 번호가 있으면 이름이 달라도(괄호 설명·옛 상호·오타) 같은 업체를 가리킨다(2026-11-22) */
+    return erpCmsAutoCandidate(ix, it.row.name, it.row.bizNo, it.row.amount);
   }
   function isClosedCand(it){ var k = cand(it); return !!(k && k.co && k.via === 'closed'); }
   function hint(it){
     var k = cand(it);
     if(!k) return it.why;
-    if(!k.co) return '후보 없음';
-    if(k.via === 'closed') return '종료 업체 「' + k.co.name + '」 (이름이 꼭 같음) — 거래내역에서 그 CMS 입금 줄을 눌러 확인하면 입금표시가 만들어집니다';
-    return '후보: ' + k.co.name + ' (' + (k.via === 'prev' ? '예전 이름' : '이름') + '으로 찾음 — 누르기 전엔 안 이음)';
+    if(!k.co){
+      /* 닮은 곳이 여럿이면 «고르는 것은 사람» — 이름만 알려 준다. 종료 업체는 자동으로 안 붙인다(이름·번호가 꼭 같을 때만) */
+      if(k.multiBiz) return '후보 없음 — 사업자번호가 같은 활성 업체가 여러 곳: ' + k.alts.join(' · ') + ' (직접 골라야 합니다)';
+      if(k.multiName) return '후보 없음 — 이름이 같은 활성 업체가 여러 곳: ' + k.alts.join(' · ') + ' (직접 골라야 합니다)';
+      if(k.alts && k.alts.length > 1) return '후보 없음 — 비슷한 이름이 여러 곳: ' + k.alts.join(' · ') + ' (직접 골라야 합니다)';
+      if(k.closedLike && k.closedLike.length) return '후보 없음 — 비슷한 종료 업체: 「' + k.closedLike.join('」·「') + '」 (자동으로는 안 붙입니다)';
+      return '후보 없음';
+    }
+    var warn = k.conflict ? (' ⚠ ' + k.conflict) : '';
+    if(k.via === 'closed') return '종료 업체 「' + k.co.name + '」 (' + (k.by === 'biz' ? '사업자번호가 같음' : '이름이 꼭 같음') + ') — 거래내역에서 그 CMS 입금 줄을 눌러 확인하면 입금표시가 만들어집니다' + warn;
+    var why = (k.by === 'biz' || k.by === 'like') ? k.evidence.join(' · ') : ((k.via === 'prev' ? '예전 이름' : '이름') + '으로 찾음');
+    return '후보: ' + k.co.name + ' (' + why + ' — 누르기 전엔 안 이음)' + warn;
   }
   function link(it){
     if(it.why === DUAL){ showToast('회원코드가 두 업체에 이어져 있습니다 — 업체관리에서 한 업체만 남겨 주세요'); return; }
-    var k = cand(it) || { co:null };
+    var shown = cand(it) || { co:null };
+    if(!shown.co){ showToast('후보가 없습니다 — 업체관리에서 업체를 먼저 확인해 주세요'); return; }
+    /* 누르는 «지금의 업체 목록»으로 후보를 다시 구한다 — 화면을 연 뒤 사업자번호가 바뀌었거나 같은 번호·같은 이름의 활성 업체가 늘었으면
+       처음 보여 준 후보가 더는 맞지 않는다. 다른 업체를 가리키거나 후보가 사라졌으면 잇지 않고 화면을 새로 읽는다(2026-11-22 자동 검토).
+       근거·충돌 표시도 «지금 것»으로 확인창에 보여 준다. */
+    var k = erpCmsAutoCandidate(erpNicebillCoIndex(), it.row.name, it.row.bizNo, it.row.amount);
+    if(!k.co || k.co.id !== shown.co.id){
+      showToast('⚠ 그사이 업체 정보가 바뀌어 후보가 달라졌습니다 — 화면을 새로 읽었으니 다시 확인해 주세요');
+      erpCmsAutoRun({ write:false });
+      return;
+    }
     var c = k.co;
-    if(!c){ showToast('후보가 없습니다 — 업체관리에서 업체를 먼저 확인해 주세요'); return; }
     /* 종료 업체는 여기서 잇지 않는다 — 몇 개월분인지·나눌지는 거래내역 CMS 창에서 사람이 정한다 */
     if(k.via === 'closed'){ props.onNavigate && props.onNavigate('fin/ledger'); return; }
-    if(!window.confirm('더빌 「' + it.row.name + '」(회원코드 ' + it.row.code + ')를 업체 「' + c.name + '」에 잇습니다.')) return;
-    if(erpCmsLinkMember(it.row.code, c.id)) erpCmsAutoRun({ write:true });
+    var evi = (k.evidence && k.evidence.length) ? ('\n· ' + k.evidence.join('\n· ')) : '';
+    var warn = (k.via === 'like' ? '\n\n⚠ 이름만 닮았습니다 — 다른 업체일 수 있으니 사업자번호·대표자를 확인한 뒤 잇습니다.' : '') + (k.conflict ? ('\n\n⚠ ' + k.conflict) : '');
+    if(!window.confirm('더빌 「' + it.row.name + '」(회원코드 ' + it.row.code + ')를 업체 「' + c.name + '」에 잇습니다.' + evi + warn)) return;
+    if(erpCmsLinkMember(it.row.code, c.id)){
+      /* 이름만 닮은 후보나 충돌이 있는 후보로 이었다면 입금표시를 «바로» 만들지 않는다 — 스위치가 켜져 있으면 write:true 는 이은 즉시
+         그 회원의 줄을 자동 확정한다. 잘못 이었을 때 돈 기록이 먼저 생기지 않게 미리보기로만 다시 읽는다(2026-11-22 자동 검토). */
+      var weak = (k.via === 'like') || !!k.conflict;
+      erpCmsAutoRun({ write:!weak });
+      if(weak) showToast('🔗 이었습니다 — 이름만 닮았거나 충돌이 있는 후보라 입금표시는 바로 만들지 않습니다(다음 자동 처리 때 만들어집니다)');
+    }
+  }
+  /* 확실한 것 한꺼번에 — 사업자번호가 같은 «활성» 업체만(충돌 없음). 한 번 묻고, 잇기만 한다.
+     입금표시는 만들지 않는다: 다시 읽기는 «미리보기»(write:false)로만 — 스위치가 켜져 있으면 다음 자동 처리 때 만들어진다. */
+  var sure = [];
+  if(faTab === 'check' && check.some(function(x){ return x.verdict === 'new_member'; })){
+    ix = ix || erpNicebillCoIndex();
+    sure = erpCmsSureLinks(ix, check);
+  }
+  function linkSure(){
+    if(!sure.length) return;
+    var lines = sure.slice(0, 30).map(function(s){ return '· 「' + s.name + '」 → 「' + s.co.name + '」' + (s.fee ? ' (월 금액도 같음)' : ''); });
+    var more = sure.length > 30 ? ('\n… 외 ' + (sure.length - 30) + '곳') : '';
+    if(!window.confirm('사업자번호가 같은 활성 업체 ' + sure.length + '곳에 더빌 회원코드를 한꺼번에 잇습니다.\n\n' + lines.join('\n') + more
+      + '\n\n· 종료 업체·이름만 비슷한 곳은 넣지 않았습니다(하나씩 확인).\n· 잇기만 합니다 — 입금표시는 다음 자동 처리 때 만들어집니다.')) return;
+    /* 누르는 «지금» 다시 확인한다 — 화면을 연 뒤 업체가 종료됐거나 코드가 다른 업체에 이어졌을 수 있다.
+       종료된 업체에 쓰지 않고, 다른 업체에 이어진 코드는 «옮길까요?» 로 묻지 않고 건너뛴다(한꺼번에 중에 묻는 일이 없게). */
+    var cosNow = dbGet('companies', []) || [];
+    /* 대상을 «지금의 업체 목록»으로 다시 고른다 — 화면을 연 뒤 사업자번호가 바뀌었거나 같은 번호의 활성 업체가 늘었으면
+       처음 보여 준 후보가 더는 «확실»하지 않다. 번호의 유일성·충돌까지 새로 따져, 같은 업체를 가리킬 때만 잇는다(2026-11-22 자동 검토). */
+    var freshBy = {};
+    erpCmsSureLinks(erpNicebillCoIndex(), check).forEach(function(f){ freshBy[f.code] = f; });
+    var ok = 0, ng = [];
+    sure.forEach(function(s){
+      var fresh = freshBy[s.code];
+      if(!fresh || fresh.co.id !== s.co.id){ ng.push(s.name); return; }
+      var cur = cosNow.find(function(c){ return c && c.id === s.co.id; });
+      var elsewhere = cosNow.some(function(c){ return c && c.id !== s.co.id && (c.cmsMemberCodes || []).indexOf(s.code) >= 0; });
+      if(!cur || cur.status !== 'active' || elsewhere){ ng.push(s.name); return; }
+      if((cur.cmsMemberCodes || []).indexOf(s.code) >= 0){ ok++; return; }       // 이미 이어져 있다
+      if(erpCmsLinkMember(s.code, s.co.id)) ok++; else ng.push(s.name);
+    });
+    showToast('🔗 ' + ok + '곳을 이었습니다' + (ng.length ? (' · 못 이은 곳 ' + ng.length + '곳(' + ng.slice(0, 3).join(', ') + ')') : ''));
+    erpCmsAutoRun({ write:false });
   }
   var cell = { whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'260px', padding:'6px 7px', borderBottom:'1px solid #e2e8f0' };
   var th = Object.assign({}, cell, { background:'#f8fafc', color:'#475569', fontWeight:700, textAlign:'left' });
@@ -75428,7 +75710,7 @@ function FinanceAuto(props){
   function row(it, i, act){
     var k = it.row._k;
     return h('tr', { key:k },
-      h('td', { style:cell }, h('input', { type:'checkbox', checked:!!pick[k], onChange:function(){ var p = Object.assign({}, pick); p[k] = !p[k]; setPick(p); } })),
+      h('td', { style:cell }, h('input', { type:'checkbox', 'aria-label':'이 줄 고르기', checked:!!pick[k], onChange:function(){ var p = Object.assign({}, pick); p[k] = !p[k]; setPick(p); } })),
       h('td', { style:cell }, i + 1),
       h('td', { style:cell }, isClosedCand(it) ? '종료 업체' : (CHECK[it.verdict] || (it.verdict === 'fail' ? '출금 실패' : '자동 확정'))),
       h('td', { style:cell }, it.row.wdate),
@@ -75456,6 +75738,10 @@ function FinanceAuto(props){
     /* R14 — 수수료는 출금 쪽 일이다 */
     h('div', { style:{ marginTop:'4px', fontSize:'13px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
       'CMS 수수료는 자동으로 안 넣습니다 — 출금관리에서 따로'),
+    sure.length ? h('div', { className:'fa-sure', style:{ marginTop:'8px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', padding:'7px 10px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'7px', fontSize:'13px', color:'#166534', wordBreak:'keep-all' } },
+      h('span', { style:{ fontWeight:700 } }, '✓ 사업자번호가 같은 활성 업체 ' + sure.length + '곳'),
+      h('span', { style:{ color:'#64748b' } }, '확인 한 번으로 한꺼번에 잇습니다 — 종료 업체·이름만 비슷한 곳은 빼고 하나씩 확인'),
+      h('button', { style:Object.assign({}, smallBtn, { borderColor:'#16a34a', color:'#166534', minHeight:'32px', padding:'6px 12px' }), onClick:linkSure, title:'사업자번호가 같은 활성 업체에만 더빌 회원코드를 잇습니다' }, '한꺼번에 잇기')) : null,
     h('div', { style:{ display:'flex', gap:'4px', marginTop:'12px' } },
       [['check', '● 확인할 것 ' + check.length], ['fail', '✕ 출금 실패 ' + fails.length], ['auto', '✓ 자동 확정 ' + autos.length]].map(function(t){
         return h('button', { key:t[0], onClick:function(){ setFaTab(t[0]); }, style:{ padding:'5px 11px', border:'1px solid #e2e8f0', borderBottom:'none',
