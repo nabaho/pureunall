@@ -1612,16 +1612,23 @@ const RESTR = () => [
   { id: 'R3', src: '기업마당', type: '새 공고', no: 'RB3', nm: '일터혁신 컨설팅 지원', org: '병기관', rgn: '충남', savedAt: '2026-10-07T01:37:00Z' },
   { id: 'R4', src: '나라장터', type: '새 공고', no: 'RR4-000', nm: '임금체계 용역', org: '정기관', lk: '2', savedAt: '2026-10-08T01:37:00Z' }
 ];
-test('★★★ 목록에 📍지역·🏭업종제한 딱지 — 있는 공고에만, 공고명 «앞»에 · 제한 없음(lk 만 있음)은 아무것도 안 그린다', () => {
+/* 2026-11-22 대표 지시 「업종제한 표시는 별도의 열을 만들어」 — 공고명 앞이 아니라 「계약·제한」 칸에(🏭 업종 → 📍 지역 차례: 지역이 가장 길어 뒤) */
+test('★★★ 「계약·제한」 칸에 🏭업종제한·📍지역 딱지 — 있는 공고에만 · 공고명 칸에는 없다 · 제한 없음(lk 만 있음)은 아무것도 안 그린다', () => {
   const r = runApp({ feed: RESTR() }, { Date: FixedDate('2026-10-19T09:00:00') });
   r.api.draw();
   const tb = r.el('tb').innerHTML, row = (nm) => tb.split('<tr').find((x) => x.indexOf(nm) >= 0) || '';
-  assert.match(row('노무 컨설팅 용역'), /<td class="nm"[^>]*><span class="tag amber"[^>]*>📍 충청남도·세종특별자치시 외 1<\/span> <span class="tag amber"[^>]*>🏭 업종제한<\/span> <b>노무 컨설팅 용역<\/b>/);
-  assert.match(row('노무 컨설팅 용역'), /title="참가 가능 지역 — 충청남도 · 세종특별자치시 · 대전광역시"/, '풍선에 전체 지역');
-  assert.match(row('인사 컨설팅 용역'), /🏭 업종제한<\/span> <b>인사 컨설팅 용역<\/b>/, '이름을 모르는 업종제한도 표시');
-  assert.doesNotMatch(row('인사 컨설팅 용역'), /📍/);
-  assert.match(row('일터혁신 컨설팅 지원'), /title="지역\(해시태그·제목 기준\) — 충남">📍 충남<\/span>/);
-  assert.doesNotMatch(row('임금체계 용역'), /📍|🏭/, '확인했는데 제한이 없는 공고에 딱지를 달면 안 된다');
+  const lim = (nm) => (/<td class="lim"[^>]*>[\s\S]*?<\/td>/.exec(row(nm)) || [''])[0];
+  const nmc = (nm) => (/<td class="nm"[\s\S]*?<\/b>/.exec(row(nm)) || [''])[0];
+  assert.match(lim('노무 컨설팅 용역'), /<span class="limw"><span class="tag amber"[^>]*>🏭 업종제한<\/span> <span class="tag amber"[^>]*>📍 충남 외 2<\/span><\/span>/, '칸 안 지역은 짧게(시도 줄임 · 첫 곳 + 외 N)');
+  assert.match(lim('노무 컨설팅 용역'), /title="참가 가능 지역 — 충청남도 · 세종특별자치시 · 대전광역시"/, '풍선에 전체 지역');
+  assert.match(lim('노무 컨설팅 용역'), /<td class="lim" title="[^"]*업종·면허 제한 — 정보통신공사업[^"]*">/, '칸 풍선에 업종 이름');
+  assert.match(lim('인사 컨설팅 용역'), /🏭 업종제한<\/span><\/span><\/td>/, '이름을 모르는 업종제한도 표시');
+  assert.doesNotMatch(lim('인사 컨설팅 용역'), /📍/);
+  assert.match(lim('일터혁신 컨설팅 지원'), /title="지역\(해시태그·제목 기준\) — 충남">📍 충남<\/span>/);
+  assert.equal(lim('임금체계 용역'), '<td class="lim"></td>', '확인했는데 제한이 없는 공고에 딱지를 달면 안 된다');
+  RESTR().forEach((x) => assert.doesNotMatch(nmc(x.nm), /📍|🏭|tag amber/, '공고명 칸에 딱지가 남았다: ' + x.nm));
+  /* 폰은 「계약·제한」 칸을 숨기고 둘째 줄(msub)에서 보인다 */
+  assert.match(row('노무 컨설팅 용역'), /<div class="m-only msub">[\s\S]*📍[\s\S]*🏭 업종제한/);
 });
 test('★★ 상세 팝업 — 참가 가능 지역·업종·면허 이름을 «있을 때만» 보인다', () => {
   const r = runApp({ feed: RESTR() }, { Date: FixedDate('2026-10-19T09:00:00') });
@@ -1704,6 +1711,15 @@ test('★★★ 팝업 — 모집 글·공고를 한 목록으로: 곧 마감이
   assert.match(h, /마감 4일 전|마감 3일 전/);
   assert.match(h, /<span class="tag teal">새 글<\/span>/); assert.match(h, /★ 관심으로 이미 고른 1건은 뺐습니다/); assert.match(h, /지역 제한이 우리 지역/);
   assert.match(h, /순서는 규칙/); assert.equal(r.el('pickN').textContent, ' 3', '단추 숫자는 지역 안의 것만');
+});
+test('★★★ 수의계약 공고는 🎯 에도 «기본으로» 안 낸다 — 공고 모아보기와 «한 값»(「수의계약도 보기」면 낸다 · 점수는 깎인 채)', async () => {
+  /* 대표 지시 2026-11-22 「수의계약은 들어가서 입찰이 되지 않는다 — 표시만 하고 자동으로 빠지게」 */
+  const feed = PK_FEED().concat([{ id: 'G5', src: '나라장터', type: '새 공고', no: 'N5', nm: '노무 진단 수의 용역', org: '무기관', closeDt: '2026-10-27 10:00:00', dday: 3, mthd: '수의계약', rgn: '충청남도' }]);
+  let r = await pkApp(feed); r.api.pickOpen(true);
+  assert.doesNotMatch(r.el('popBody').innerHTML, /노무 진단 수의 용역/, '기본(수의계약 빼기)인데 수의계약 공고를 추천했다');
+  assert.equal(r.el('pickN').textContent, ' 3', '단추 숫자에도 안 센다');
+  r = await pkApp(feed); r.el('fMthd').value = 'all'; r.api.pickOpen(true);
+  assert.match(r.el('popBody').innerHTML, /노무 진단 수의 용역[\s\S]*?수의계약 — 정해진 곳과 직접 계약하는 경우가 많음/, '「수의계약도 보기」에서는 까닭을 달고 낸다');
 });
 test('★★ 모집 글 제목은 «열면 봤음» 길(recOpenPost)로 · 공고는 새 탭 링크 · 줄마다 관심/숨기기', async () => {
   const r = await pkApp(); r.api.pickOpen(true);
@@ -1872,6 +1888,6 @@ test('★ 별표·이력은 클라우드 칸에 적히고(recruit_star), 직접 
   assert.match(STAR_SRC, /<th class="stc" title="별표\(★\)">★<\/th><th class="chk"><input type="checkbox" id="recOrgAll"/, '기관 표 머리');
   assert.equal((STAR_SRC.match(/<th class="stc" title="별표\(★\)">★<\/th>'\+recChkHead\(/g) || []).length, 3, '모집 글 표 + 메일 표 둘(할 일·참고용 공용 한 곳 + 공고 묶음)에 ★ 머리 칸');
   /* 공고·발주 줄에도 지원 이력 표시 */
-  assert.match(STAR_SRC, /restrictTags\(r\)\+appTag\(mt\(\)\.orgId\)\+orgRecTag\(r\)/);
-  assert.match(STAR_SRC, /soleTag\(r\)\+appTag\(appOrgOf\(\(r\.org\|\|''\)\+' '\+\(r\.nm\|\|''\)\)\)\+'<b>'/);
+  assert.match(STAR_SRC, /appTag\(mt\(\)\.orgId\)\+orgRecTag\(r\)/);
+  assert.match(STAR_SRC, /'">'\+appTag\(appOrgOf\(\(r\.org\|\|''\)\+' '\+\(r\.nm\|\|''\)\)\)\+'<b>'/);
 });

@@ -162,6 +162,12 @@ tr.sel-on td.rn{color:var(--navy);font-weight:700}
 #pgFeed table{width:100%}
 #pgFeed td{white-space:nowrap;vertical-align:middle}
 td.nm{width:42%;max-width:0;overflow:hidden;text-overflow:ellipsis}
+/* 계약·제한 칸 (대표 지시 2026-11-22) — 수의계약·업종제한·참가 지역 딱지를 공고명에서 떼어 한 칸에 모은다.
+   내용만큼만 넓히고(1%), 넘치면 한 줄에서 잘린다 — 전부는 칸 풍선(title)에 */
+#pgFeed td.lim{width:1%}
+.limw{display:block;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 태블릿 폭(641~1099px)에서는 칸이 하나 늘어 기관·공고명이 한 글자로 짓눌렸다(2026-11-22 검토 768px 실측) — 📍·🤖 탭처럼 표를 넓혀 옆으로 민다 */
+@media (min-width:641px) and (max-width:1099px){ #pgFeed .scroll>table{min-width:1100px} }
 /* 📅 발주 예정 — 좁은 칸(담당·금액·예정)이 한 글자씩 접혀 줄이 97px 이 됐다(2026-10-09 실측). 사업명만 줄임표로 */
 #pgPlan td{white-space:nowrap}
 #pgPlan td.og{max-width:220px;overflow:hidden;text-overflow:ellipsis}
@@ -383,8 +389,8 @@ table.cmp td{white-space:nowrap}
   #pgFeed .rn,#pgPlan .rn{flex:0 0 26px;width:auto;padding-right:5px}
   /* ☐ 는 손끝 크기로(2026-10-18 폰화면관리 — 20px 였고, 컨설턴트 모집 머리 ☐ 는 이름표가 없어 13px 그대로였다) */
   .row-chk,#fSelAll,#pSelAll,th.chk>input[type=checkbox]{width:24px;height:24px}
-  #pgFeed thead th:nth-child(n+4):not(:nth-child(6)),#pgPlan thead th:nth-child(n+4):not(:nth-child(6)){display:none}
-  #pgFeed thead th:nth-child(6),#pgPlan thead th:nth-child(6){flex:1 1 0}
+  #pgFeed thead th:nth-child(n+4):not(.nmh),#pgPlan thead th:nth-child(n+4):not(.nmh){display:none}   /* 이름 칸은 자리 번호가 아니라 .nmh 로 — 공고 표에 「계약·제한」 칸이 앞에 들어왔다(2026-11-22) */
+  #pgFeed thead th.nmh,#pgPlan thead th.nmh{flex:1 1 0}
   #pgFeed tr.fr>td:not(.stc):not(.chk):not(.rn):not(.nm),#pgPlan tr.fr>td:not(.stc):not(.chk):not(.rn):not(.nm){display:none}
   #pgFeed td.empty,#pgPlan td.empty{flex:1 1 0}
   #pgFeed td.nm,#pgPlan td.nm{flex:1 1 0;width:auto;max-width:none;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;overflow:hidden}
@@ -504,8 +510,8 @@ table.cmp td{white-space:nowrap}
       <select id="fSt" onchange="draw()"><option value="">전체 상태</option>
         <option>새 공고</option><option>관심</option><option>지원함</option><option>지나감</option>
         <option value="__hidden">🙈 숨긴 것</option><option value="__all">모두 (숨긴 것 포함)</option></select>
-      <select id="fMthd" onchange="feedMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
-        <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
+      <select id="fMthd" onchange="feedMthd(this.value)" title="수의계약 — 기관이 정한 곳과 직접 계약해 들어가 입찰할 수 없어 기본으로 뺍니다(뺀 건수는 오른쪽에)"><option value="nosole">수의계약 빼기</option>
+        <option value="all">수의계약도 보기</option><option value="sole">수의계약만</option></select>
       <button class="btn" id="fStarBtn" onclick="feedStarOnly()" title="별표(관심) 친 공고만 모아 봅니다 — 한 번 더 누르면 전체로 돌아옵니다">☆ 별표만</button>
       <div class="sp"></div>
       <span id="cnt" class="sub"></span>
@@ -521,7 +527,7 @@ table.cmp td{white-space:nowrap}
     <div id="note" style="font-size:12.5px;margin-bottom:9px"></div>
     <div id="feedSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th>받은 날</th><th>마감</th>
+      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th class="lim" title="수의계약·업종제한·참가 지역 — 수의계약은 들어가 입찰할 수 없어 기본으로 뺍니다(위 고르개 「수의계약도 보기」로 함께 봅니다)">계약·제한</th><th class="nmh">공고명</th><th>기관</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th>받은 날</th><th>마감</th>
         <th style="text-align:right">남음</th><th style="text-align:right">추정가격</th><th>관리</th></tr></thead>
       <tbody id="tb"></tbody>
     </table></div>
@@ -538,8 +544,8 @@ table.cmp td{white-space:nowrap}
       <input id="pq" placeholder="사업명·기관 검색" style="min-width:190px" oninput="_planPage=0;planDraw()">
       <select id="pView" onchange="_planPage=0;planDraw()"><option value="ahead">공고 전 · 앞으로</option><option value="past">⌛ 지난 계획</option><option value="posted">✅ 공고 나옴</option>
         <option value="star">★ 관심</option><option value="all">모두</option><option value="hidden">🙈 숨긴 것</option></select>
-      <select id="pMthd" onchange="planMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
-        <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
+      <select id="pMthd" onchange="planMthd(this.value)" title="수의계약 — 기관이 정한 곳과 직접 계약해 들어가 입찰할 수 없어 기본으로 뺍니다(뺀 건수는 오른쪽에)"><option value="nosole">수의계약 빼기</option>
+        <option value="all">수의계약도 보기</option><option value="sole">수의계약만</option></select>
       <button class="btn" id="pStarBtn" onclick="planStarOnly()" title="별표(관심) 친 것만 모아 봅니다 — 한 번 더 누르면 「공고 전 · 앞으로」로 돌아옵니다">☆ 별표만</button>
       <div class="sp"></div>
       <span id="pCnt" class="sub"></span>
@@ -550,7 +556,7 @@ table.cmp td{white-space:nowrap}
     <div class="sml" id="planNote" style="margin:0 0 8px"></div>
     <div id="planSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="pSelAll" title="보이는 것 모두" onchange="planSelAll(this.checked)"></th><th class="rn">№</th><th>구분</th><th>예정</th><th>사업명</th><th>기관</th>
+      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="pSelAll" title="보이는 것 모두" onchange="planSelAll(this.checked)"></th><th class="rn">№</th><th>구분</th><th>예정</th><th class="nmh">사업명</th><th>기관</th>
         <th style="text-align:right">금액</th><th>계약방법</th><th>담당</th><th>상태</th><th>관리</th></tr></thead>
       <tbody id="ptb"></tbody>
     </table></div>
@@ -1012,7 +1018,7 @@ async function planFetchNow(quiet){
     toast('발주 예정 '+pl.added+'건이 새로 걸렸습니다 (받은 '+pl.got+'건)'+(pl.errs.length?' — 못 받은 것이 있습니다(안내 참고)':''));
   } finally { _fetching=false; planDraw(); }
 }
-function planMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('fMthd')) $('fMthd').value=lsGet('feed_mthd'); _planPage=0; planDraw(); draw(); }
+function planMthd(v){ feedMthd(v); }   /* 두 탭이 «한 값» — 고치는 길은 feedMthd 하나 */
 /* 보기 하나에 이 줄이 드는가 — 목록과 보기 고르개의 건수가 «같은 잣대»를 쓴다(다르면 「(29)」인데 29줄이 안 나온다).
    ahead 공고 전(앞으로) · past ⌛ 지난 계획(예정월 지난 지 2달 넘음) · posted ✅ 공고 나옴 · star ★ · hidden 🙈 · all 모두 */
 function planInView(r, v, today){
@@ -1027,7 +1033,7 @@ function planInView(r, v, today){
 }
 var PLAN_VIEWS=[['ahead','공고 전 · 앞으로'],['past','⌛ 지난 계획'],['posted','✅ 공고 나옴'],['star','★ 관심'],['all','모두'],['hidden','🙈 숨긴 것']];
 function planRows(){
-  var q=(($('pq')&&$('pq').value)||'').toLowerCase(), v=($('pView')&&$('pView').value)||'ahead', fm=($('pMthd')&&$('pMthd').value)||'';
+  var q=(($('pq')&&$('pq').value)||'').toLowerCase(), v=($('pView')&&$('pView').value)||'ahead', fm=mthdNow();
   var today=GovPlan.ymd(new Date()), every=get('plan').filter(Boolean), soleOut=0;
   var rows=every.filter(function(r){
     if(!planInView(r,v,today)) return false;
@@ -1047,7 +1053,7 @@ function planRows(){
 /* 보기 고르개 — 「공고 전 (29)」처럼 건수를 붙인다. 계약방법 고르개는 따르고 검색어는 안 따른다(열기 전에 크기를 알 수 있게).
    ⚠ 고르개를 다시 그려도 고른 보기는 그대로 둔다. */
 function planViewCounts(every, today){
-  var fm=($('pMthd')&&$('pMthd').value)||'', c={};
+  var fm=mthdNow(), c={};
   PLAN_VIEWS.forEach(function(x){ c[x[0]]=0; });
   every.forEach(function(r){
     if(fm==='nosole' && isSole(r)) return; if(fm==='sole' && !isSole(r)) return;
@@ -1064,7 +1070,7 @@ function planDraw(){
   var o=planRows(), today=o.today, feed=get('feed'), pg=_planPaged(o.rows), rows=pg.page;
   var vc=planViewSel(o.every, today, o.view);
   planStarBtn(vc, o.view);
-  var soon=o.every.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;
+  var soon=soleCut(o.every).rows.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;   /* 뺀 수의계약은 탭 숫자에도 안 센다 */
   if($('tbPlan')) $('tbPlan').innerHTML='<span class="mx">📅 </span>발주<span class="mx"> 예정</span>'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
   var vis={}; o.rows.forEach(function(r){ vis[r.no]=1; });
   Object.keys(_planSel).forEach(function(k){ if(!vis[k]) delete _planSel[k]; });
@@ -1098,10 +1104,10 @@ function planDraw(){
       +'<td class="rn">'+(pg.from+i+1)+'</td>'
       +'<td><span class="tag '+(r.kind==='spec'?'red':'navy')+'">'+(r.kind==='spec'?'사전규격':'발주계획')+'</span></td>'
       +'<td class="dt">'+when+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+planMobile(r, st, stc, lk)+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+'">'+appTag(appOrgOf((r.org||'')+' '+(r.nm||'')))+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+planMobile(r, st, stc, lk)+'</td>'
       +'<td class="og" title="'+esc((r.top&&r.top!==r.org?r.top+' · ':'')+(r.org||''))+'">'+esc(r.org||'-')+'</td>'
       +'<td style="text-align:right">'+(r.prc?Math.round(r.prc/10000).toLocaleString()+'만원':'-')+'</td>'
-      +'<td class="sml"'+(isSole(r)?' style="color:var(--amber);font-weight:700"':'')+'>'+esc(r.mthd||'-')+'</td>'   /* 수의계약은 두되 눈에 띄게(대표 2026-10-10) */
+      +'<td class="sml"'+(isSole(r)?' style="color:var(--amber);font-weight:700"':'')+'>'+esc(r.mthd||'-')+'</td>'   /* 수의계약 표시는 이 「계약방법」 칸 한 곳(2026-11-22 사업명 앞 딱지는 걷음) — 기본으로는 빠지고 「수의계약도 보기」에서 눈에 띄게 */
       +'<td class="sml" title="'+esc([r.dept,r.ofcl,r.tel].filter(Boolean).join(' · '))+'">'+esc(r.dept||r.ofcl||'-')+(r.tel?'<div>'+esc(r.tel)+'</div>':'')+'</td>'
       +'<td>'+stHtml+'</td>'
       +'<td class="act">'
@@ -1314,21 +1320,49 @@ function feedPageTo(p){ _feedPage=p; draw(); }
 
 /* ═══ 수의계약 (대표 지시 2026-10-09 「수의계약의 경우 대부분 직접계약을 하는 사업장이 있다 — 표시하고, 빼고 볼 수 있게」) ═══
    계약방법(나라장터 cntrctCnclsMthdNm)에 「수의」가 들면 수의계약(「수의계약」·「수의(소액)」…). 알리오·기업마당은 계약방법이 없어 아니다.
-   ⚠ 거르개는 «보이는 것»만 바꾼다 — 공고를 숨기거나 지우지 않는다. 고른 것은 이 기기만 기억한다(feed_mthd). */
+   ⚠ 거르개는 «보이는 것»만 바꾼다 — 공고를 숨기거나 지우지 않는다. 고른 것은 이 기기만 기억한다(feed_mthd).
+   ★ 기본은 «뺀다» (대표 지시 2026-11-22 「수의계약은 들어가서 입찰이 되지 않는다 — 표시만 하고 자동으로 빠지게」) —
+     'nosole'(기본) · 'all'(수의계약도 보기) · 'sole'(수의계약만). 고른 적이 없거나 옛 값 ''(예전 「전체 계약」)·이상한 값은 'nosole'.
+     공고 모아보기·발주 예정·📍 충청권·🤖 AI 탭·🎯 지원할 만한 것이 «한 값»을 따른다(매일 카톡 요약 functions/gov-digest.js 도 수의계약은 뺀다). */
 function isSole(r){ return /수의/.test(String(r&&r.mthd||'')); }
-function soleTag(r){ return isSole(r)?'<span class="tag amber" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다'+(r.mthd?' ('+esc(r.mthd)+')':'')+'">수의계약</span> ':''; }
+function soleTag(r){ return isSole(r)?'<span class="tag amber" title="수의계약 — 기관이 정한 곳과 직접 계약해 들어가 입찰할 수 없습니다'+(r.mthd?' ('+esc(r.mthd)+')':'')+'">수의계약</span> ':''; }
+function mthdOf(v){ return v==='all'||v==='sole' ? v : 'nosole'; }
+function mthdNow(){ var el=$('fMthd'); return mthdOf(el ? el.value : lsGet('feed_mthd')); }
+/* 빌려 그리는 목록(📍·🤖 탭 · 🎯)용 — 「빼기」일 때만 뺀다(「수의계약만」은 공고·발주 표의 일이다). 뺀 건수를 함께 돌려준다 */
+function soleCut(rows){ var out=0, cut=mthdNow()==='nosole';
+  var kept=(rows||[]).filter(function(r){ if(cut && isSole(r)){ out++; return false; } return true; });
+  return {rows:kept, out:out}; }
 /* 지역·업종 제한 표시 (대표 지시 2026-10-19) — 있을 때만 그린다. 나라장터 = 참가 가능 지역(rgn)·면허/업종 이름(ind)·업종제한 여부(indY),
    기업마당 = 해시태그·제목에서 읽은 지역(rgn). ⚠ 「제한 없음」은 그리지 않는다 — 못 읽은 것과 없는 것을 구분 못 하면 거짓 안심이 된다. */
 function _rgShort(v){ var a=String(v||'').split(' · '); return a.slice(0,2).join('·')+(a.length>2?' 외 '+(a.length-2):''); }
-function restrictTags(r){
+function rgnTag(r){ return r&&r.rgn ? '<span class="tag amber" title="'+esc((r.src==='기업마당'?'지역(해시태그·제목 기준) — ':'참가 가능 지역 — ')+r.rgn)+'">📍 '+esc(_rgShort(r.rgn))+'</span> ' : ''; }
+function indTag(r){
   if(!r) return '';
-  var h='';
-  if(r.rgn) h+='<span class="tag amber" title="'+esc((r.src==='기업마당'?'지역(해시태그·제목 기준) — ':'참가 가능 지역 — ')+r.rgn)+'">📍 '+esc(_rgShort(r.rgn))+'</span> ';
-  if(r.ind) h+='<span class="tag amber" title="'+esc('업종·면허 제한 — '+r.ind)+'">🏭 업종제한</span> ';
-  else if(r.indY==='Y') h+='<span class="tag amber" title="업종 제한이 있는 공고입니다 — 어떤 업종인지는 원문 공고에서 확인해 주세요">🏭 업종제한</span> ';
-  return h;
+  if(r.ind) return '<span class="tag amber" title="'+esc('업종·면허 제한 — '+r.ind)+'">🏭 업종제한</span> ';
+  if(r.indY==='Y') return '<span class="tag amber" title="업종 제한이 있는 공고입니다 — 어떤 업종인지는 원문 공고에서 확인해 주세요">🏭 업종제한</span> ';
+  return '';
 }
-function feedMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('pMthd')) $('pMthd').value=lsGet('feed_mthd'); _feedPage=0; draw(); }
+function restrictTags(r){ return rgnTag(r)+indTag(r); }   /* 폰 둘째 줄·상세 팝업 차례(지역 → 업종) */
+/* 「계약·제한」 칸 (대표 지시 2026-11-22 「수의계약이나 업종제한 표시는 별도의 열을 만들어」) — 공고명 앞에 붙던 딱지를 한 칸에.
+   차례: 수의계약 · 🏭 업종제한 · 📍 지역(가장 길어 맨 뒤 — 잘려도 앞의 둘은 보인다). 없으면 빈 칸(「제한 없음」은 안 쓴다 — 못 읽은 것일 수 있다) */
+function limTitle(r){
+  if(!r) return '';
+  var t=[];
+  if(isSole(r)) t.push('수의계약'+(r.mthd&&r.mthd!=='수의계약'?' ('+r.mthd+')':'')+' — 들어가 입찰할 수 없습니다');
+  if(r.ind) t.push('업종·면허 제한 — '+r.ind); else if(r.indY==='Y') t.push('업종 제한 있음 — 어떤 업종인지는 원문 공고에서');
+  if(r.rgn) t.push((r.src==='기업마당'?'지역(해시태그·제목 기준) — ':'참가 가능 지역 — ')+r.rgn);
+  return t.join(' / ');
+}
+/* 칸 안의 지역 딱지는 짧게 — 「충청남도 · 세종특별자치시 · 대전광역시」 → 「📍 충남 외 2」(시도 줄임은 🎯 와 같은 GovPick.regionFit). 전부는 풍선에 */
+function rgnShortTag(r){
+  if(!r || !r.rgn) return '';
+  var nm=[]; try{ nm=(window.GovPick && GovPick.regionFit(r.rgn).names) || []; }catch(e){ nm=[]; }
+  var first=nm.length ? nm[0] : String(r.rgn).split(' · ')[0], more=nm.length ? nm.length-1 : String(r.rgn).split(' · ').length-1;
+  return '<span class="tag amber" title="'+esc((r.src==='기업마당'?'지역(해시태그·제목 기준) — ':'참가 가능 지역 — ')+r.rgn)+'">📍 '+esc(first)+(more>0?' 외 '+more:'')+'</span> ';
+}
+function limCell(r){ var h=(soleTag(r)+indTag(r)+rgnShortTag(r)).replace(/ $/,'');
+  return '<td class="lim"'+(h?' title="'+esc(limTitle(r))+'"':'')+'>'+(h?'<span class="limw">'+h+'</span>':'')+'</td>'; }
+function feedMthd(v){ lsSet('feed_mthd', mthdOf(v)); if($('fMthd')) $('fMthd').value=lsGet('feed_mthd'); if($('pMthd')) $('pMthd').value=lsGet('feed_mthd'); _feedPage=0; _planPage=0; planDraw(); draw(); try{ pickBadge(); }catch(e){} }   /* 🎯 단추 숫자도 같은 값으로 */
 /* 🤖 «AI 로만 걸린 공고» — 받을 때 AI 갈래 표시(r.ai)가 붙었고, «지금» 찾는 말에는 안 걸리는 줄 (대표 지시 2026-11-19).
    이런 줄은 🤖 AI 사업 탭에만 보인다 — 공고 모아보기·📍 지역 탭·🎯 추천·CSV 는 노무 쪽 일감이라 섞지 않는다.
    ⚠ r.ai 가 없는 줄(옛 줄 · 찾는 말로 걸린 줄)은 절대 빼지 않는다 — 표시 없는 것을 짐작으로 숨기면 공고가 사라진다. */
@@ -1337,7 +1371,7 @@ function aiOnly(r, kw){ return !!r && (!!r.back || (!!r.ai && !GovG2b.judge(r, k
 function feedMainRows(){ var kw=kws(); return get('feed').filter(function(r){ return !!r && !aiOnly(r, kw); }); }
 function feedVisible(){
   var q=($('q').value||'').toLowerCase(), fs=$('fSrc').value, ft=$('fSt').value;
-  var fm=($('fMthd')&&$('fMthd').value)||'', soleOut=0;
+  var fm=mthdNow(), soleOut=0;
   var every=feedMainRows();
   var base=every.filter(function(r){
     if(ft==='__hidden') return !!r.hidden;
@@ -1376,7 +1410,7 @@ function pickDeps(){
     orgName:matchOrgName, monthsAhead:GovRecruit.monthsAhead, appliedThisYear:GovRecruit.appliedThisYear };
 }
 function pickRank(){
-  return GovPick.rank({ today:recYmd(recToday()), hits:recWatchHits(), feed:feedMainRows(), orgs:recGroups().orgs,
+  return GovPick.rank({ today:recYmd(recToday()), hits:recWatchHits(), feed:soleCut(feedMainRows()).rows, orgs:recGroups().orgs,   /* 뺀 수의계약은 추천에도 안 낸다(2026-11-22) */
     off:recObj('pick_off'), seen:recObj('recruit_seen'), deps:pickDeps() });
 }
 function pickBadge(res){
@@ -1590,7 +1624,8 @@ function draw(){
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+purTag('feed', r.id)+soleTag(r)+restrictTags(r)+appTag(mt().orgId)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
+      +limCell(r)
+      +'<td class="nm" title="'+esc(r.nm||'')+'">'+purTag('feed', r.id)+appTag(mt().orgId)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
       +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
       +matchCell(mt)
       +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
@@ -1603,7 +1638,7 @@ function draw(){
         +'<button class="btn sm" title="진행·지원 — 🏢 푸른노무법인 사업으로 진행(경력관리 사업관리) 또는 👤 컨설턴트로 지원 준비(경력관리 지원 작업함)" data-id="'+id+'" onclick="pursueAsk(\'feed\',this.dataset.id)">📝</button> '
         +(r.hidden ? '<button class="btn sm" title="되살리기" onclick="unhide(\''+id+'\')">↩</button>'
                    : '<button class="btn sm" onclick="hide(\''+id+'\')">🚫</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="13" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
+  }).join('') : '<tr><td colspan="14" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
   var pg=$('feedPager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, 'feedPageTo');
   lensRedraw();   /* 📍·🤖 탭은 공고 목록을 «빌려» 그린다 — ★·숨김이 바뀌면 함께 */
   if(_curTab==='pur') purDraw(); else purBadge();   /* 🏢 지원사업 — 다른 기기에서 고친 것을 받아도(cloudSync → draw) 따라 그린다 */
@@ -2853,8 +2888,8 @@ var _lens={ rgn:{ sel:{}, page:0, grp:'' },
 function lensEl(id, k){ return $(LENS[id].el[k]); }
 function lensToday(){ return recYmd(recToday()); }
 function lensBuild(id){
-  var L=LENS[id], M=L.mod(), today=lensToday();
-  return M.build({ feed:L.feed(), hits:recWatchHits(), today:today, seen:recObj('recruit_seen'),
+  var L=LENS[id], M=L.mod(), today=lensToday(), fc=soleCut(L.feed());   /* 수의계약은 공고 모아보기와 «같은 값»으로 뺀다(2026-11-22) */
+  var b=M.build({ feed:fc.rows, hits:recWatchHits(), today:today, seen:recObj('recruit_seen'),
     deps:{
       /* 공고도 모집 글과 «같은 잣대»(dueState)로 — 날짜만 보고 센다(받은 날 적어 둔 r.dday 는 낡는다) */
       feedDue:function(r){ var c=closeYmd(r.closeDt);   /* 공고 목록 「남음」 칸과 같은 마감일 읽기 */
@@ -2865,6 +2900,7 @@ function lensBuild(id){
           return (age!=null && age>90) ? { k:'past', text:'마감 모름 · 공고 '+age+'일 지남', days:null } : null; }
         var st=GovRecruit.dueState({to:c}, today); st.to=c; return st; },
       hitDue:function(h){ var pp=recPer(h.key, h.per, h.title, h.date), st=GovRecruit.dueState(pp, today); st.to=(pp&&pp.to)||''; return st; } } });
+  b.soleOut=fc.out; return b;
 }
 function lensStarOn(x){ return x.kind==='feed' ? x.type==='관심' : recStarOn('h', x.ref); }
 /* 보기 — live 마감 안 지난 것(기본) · fresh 새 것만 · star ★ · all 마감 지난 것까지 · hidden 숨긴 공고(되살리는 자리)
@@ -2961,7 +2997,7 @@ function lensDraw(id){
     return '<button class="mchip'+(st.grp===k?' on':'')+'" data-grp="'+esc(k)+'" onclick="lensGrp(\''+id+'\',this.dataset.grp)">'
       +(k?'<span class="mx">'+M.icon(k)+' </span>'+esc(M.label(k)):'전체')+' <span class="n">'+(o.chip[k]||0)+'</span></button>'; }).join('');
   var nf=rows.filter(function(x){ return x.kind==='feed'; }).length, cnt=lensEl(id,'cnt');
-  cnt.textContent='지금 '+rows.length+'건 · 공고 '+nf+' · 모집 글 '+(rows.length-nf);
+  cnt.textContent='지금 '+rows.length+'건 · 공고 '+nf+' · 모집 글 '+(rows.length-nf)+(o.b.soleOut?' · 수의계약 '+o.b.soleOut+'건 뺌':'');
   cnt.title=cnt.textContent;
   if(lensEl(id,'per')) lensEl(id,'per').innerHTML=perSel(L.per, "lensPer.bind(null,'"+id+"')");
   /* 모집 글을 못 읽었으면 «없다»가 아니라 «못 읽었다»고 말한다 */
@@ -3952,8 +3988,8 @@ function recStickyWatch(){
 
 function boot(){
   recStickyWatch();
-  var fmd=$('fMthd'); if(fmd){ var fmv=lsGet('feed_mthd'); fmd.value=(fmv==='sole'||fmv==='nosole')?fmv:''; }
-  if($('pMthd')) $('pMthd').value=($('fMthd')&&$('fMthd').value)||'';
+  var fmd=$('fMthd'); if(fmd) fmd.value=mthdOf(lsGet('feed_mthd'));   /* 고른 적이 없으면 「수의계약 빼기」(2026-11-22) */
+  if($('pMthd')) $('pMthd').value=mthdNow();
   planDraw();
   drawKw(); draw(); readyNote(); applyLock('checking');
   if(location.protocol==='file:'){ applyLock('lock','file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
