@@ -498,8 +498,8 @@ test('요율표 칸 머리 두 줄 — 끝의 괄호 한 덩이만 2줄로, 자�
 test('정산 확인 — 정산표마다 «함께 정산» ☐, 둘 이상이면 «이 달 전체 함께 정산», 고른 게 있으면 «선택 풀기 N»', () => {
   const r1 = fakeRun('draft'), r2 = Object.assign({}, fakeRun('confirmed'), { id: 'cons-b_2026-10', typeCode: 'cons-b' }), m = Object.assign({}, fakeRun('manual'), { id: 'cons-m_2026-10', typeCode: 'cons-m', status: 'manual' });
   const h = V.monthRuns([r1, r2, m], { names: NAMES, biz: { 'cons-test': 'A사업', 'cons-b': 'B사업', 'cons-m': 'M사업' }, comb: { 'cons-b_2026-10': 1 }, combN: 1 });
-  assert.match(h, /<input type="checkbox" data-comb="cons-test_2026-10">/);
-  assert.match(h, /<input type="checkbox" data-comb="cons-b_2026-10" checked>/);
+  assert.match(h, /<input type="checkbox" data-comb="cons-test_2026-10" aria-label="A사업 함께 정산에 넣기">/);
+  assert.match(h, /<input type="checkbox" data-comb="cons-b_2026-10" aria-label="B사업 함께 정산에 넣기" checked>/);
   assert.doesNotMatch(h, /data-comb="cons-m_2026-10"/, '기록만 정산표는 합칠 수 없다');
   assert.match(h, /data-comb-all/);
   assert.match(h, /data-comb-clear>선택 풀기 1</);
@@ -525,8 +525,14 @@ test('함께 정산 상자 — 사람 × 사업별 차액(+초록 − 주황), �
   assert.match(v, /\+675,933/);
   assert.match(v, /\+588,018/, '사람 합계 = 반환 87,915 와 추가 지급 675,933 의 상계');
   assert.match(v, /추가 지급 588,018원/);
-  assert.match(ok, /class="r cv pos">\+675,933</);
-  assert.match(ok, /class="r cv neg">−87,915</);
+  assert.match(ok, /class="r cv cp pos" data-lb="산업일자리전환컨설팅 2026년 11월">\+675,933</);
+  assert.match(ok, /class="r cv cp neg" data-lb="일터혁신상생컨설팅 2026년 11월">−87,915</);
+  /* 폰에서 카드로 접히도록 역할 클래스(이름 ti · 합계 ct · 방향 cd · 복사 cx · 사업별 cp) */
+  assert.match(ok, /<td class="ti" title="김가나">/);
+  assert.match(ok, /class="r cv ct pos"><b>\+588,018</);
+  assert.match(ok, /<td class="nw cd">/);
+  assert.match(ok, /<td class="nw cx"><button class="sm" data-comb-copy=/);
+  assert.match(ok, /class="r hint cp none">—</, '빈 칸은 폰 카드에서 숨긴다');
   assert.match(v, /—/, '한 사업에만 든 사람의 빈 칸');
   assert.match(v, /합계[\s\S]*주관 순 지급 638,018원/, '주관 합계(줄 돈 − 받을 돈)');
   assert.match(ok, /title="줄 돈 638,018원 · 받을 돈 0원"/);

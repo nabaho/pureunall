@@ -331,6 +331,22 @@ details.dep textarea{min-height:64px}
   .mtr-r .co{max-width:100%}
   .kmsgs{padding:0 4px 4px}
   .kroom input{width:100%;flex:1 1 140px}
+  /* 함께 정산 표 — 폰에서는 사람마다 카드: 1줄 이름·합계·방향·복사, 아래에 사업별 차액(이름표 + 금액)을 한 줄씩. 합계·방향이 옆으로 밀려 가려지지 않게 */
+  .t.kc,.t.kc tbody,.t.kc tfoot{display:block;width:100%}
+  .t.kc thead{display:none}
+  .t.kc tr{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .t.kc td{border:0;padding:0;max-width:none}
+  .t.kc td.ti{order:1;flex:1 1 0;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .t.kc td.cl{order:2;font-size:12px}
+  .t.kc td.ct{order:3}
+  .t.kc td.cd{order:4}
+  .t.kc td.cx{order:5}
+  .t.kc td.cp{order:6;flex:0 0 100%;display:flex;justify-content:space-between;gap:8px;font-size:12px}
+  .t.kc td.cp::before{content:attr(data-lb);color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .t.kc td.cp.none{display:none}
+  .t.kc tr.sum td{background:none}
+  .t.kc tr.sum{background:var(--bg)}
+  .mrun-h .ck input{width:22px;height:22px}
   .subtabs{padding:0 10px}
   .t[data-name=auto] tbody td[data-k="pick"]{order:7;flex:0 0 100%}
   .t[data-name=auto] tbody td[data-k="exp"]::before{content:'예상 '}

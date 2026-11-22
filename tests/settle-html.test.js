@@ -467,3 +467,14 @@ test('함께 정산 — ☐ 로 고른 정산표(달이 달라도)를 사람별�
   /* 그릴 때마다 패널도 */
   assert.match(fnBody('function drawMonth('), /drawComb\(\)/);
 });
+
+test('함께 정산 표 — 폰(640px 이하)에서는 사람마다 카드로 접어 합계·방향·복사가 옆으로 밀려 가려지지 않는다 (기능 검증 지적)', () => {
+  const phone = NOC.slice(NOC.indexOf('@media (max-width:640px)'));
+  assert.match(phone, /\.t\.kc thead\{display:none\}/, '머리 줄은 접는다');
+  assert.match(phone, /\.t\.kc td\.cp::before\{content:attr\(data-lb\)/, '사업별 차액에 사업 이름표');
+  assert.match(phone, /\.t\.kc td\.ct\{order:3\}/);
+  /* 사람마다 줄: 이름·합계·방향 뒤에 사업별 */
+  const o = (k) => Number((phone.match(new RegExp('\\.t\\.kc td\\.' + k + '\\{order:(\\d+)')) || [])[1]);
+  assert.ok(o('ti') < o('ct') && o('ct') < o('cd') && o('cd') < o('cx') && o('cx') < o('cp'), '이름 → 합계 → 방향 → 복사 → 사업별');
+  assert.match(phone, /\.mrun-h \.ck input\{width:2\d+px/, '☐ 터치 크기');
+});

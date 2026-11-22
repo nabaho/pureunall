@@ -116,7 +116,7 @@
       (r.sites || []).forEach(function (s) { s.members.forEach(function (m) { if (m.role === 'lead') leadBy[s.consultingId || s.company] = m.sid; }); });
       var bn = biz[r.typeCode] || r.typeCode || '';
       var ck = r.status === 'draft' || r.status === 'confirmed'
-        ? '<label class="ck" title="함께 정산할 사업으로 고르기"><input type="checkbox" data-comb="' + esc(r.id) + '"' + (comb[r.id] ? ' checked' : '') + '></label>' : '';
+        ? '<label class="ck" title="함께 정산할 사업으로 고르기"><input type="checkbox" data-comb="' + esc(r.id) + '" aria-label="' + esc(bn) + ' 함께 정산에 넣기"' + (comb[r.id] ? ' checked' : '') + '></label>' : '';
       h += '<div class="mrun' + (open ? ' on' : '') + '"><div class="mrun-h">' + ck + '<b title="' + esc(bn) + '">' + esc(bn) + '</b>'
         + '<span class="pill st-' + esc(r.status) + '">' + esc(STATUS_KO[r.status] || r.status) + '</span>' + (r.changed ? '<span class="pill st-chg">바뀜</span>' : '')
         + (iss ? '<span class="pill bad-pill">확인 필요 ' + iss + '</span>' : '') + '<span class="sp"></span>'
@@ -632,20 +632,23 @@
         var t = titles[c.rid] || c.typeCode;
         return '<th class="r" title="' + esc(t + ' (' + (c.label || c.monthKey) + ')') + '"><span class="cn">' + esc(short(t)) + '</span><span class="cm">' + esc(c.label || c.monthKey) + (c.status === 'draft' ? ' · 확정 전' : '') + '</span></th>';
       }).join('') + '<th class="r">합계</th><th>정산</th>' + (allOk ? '<th></th>' : '');
-    var cell = function (v) { return v == null ? '<td class="r hint">—</td>' : '<td class="r cv ' + (v > 0 ? 'pos' : v < 0 ? 'neg' : '') + '">' + esc(signed(v)) + '</td>'; };
+    /* 칸마다 사업 이름표(data-lb) — 폰에서는 표를 사람마다 «카드»로 접고(CSS) 사업별 차액은 이 이름표를 앞에 붙여 한 줄씩 보인다 */
+    var lbOf = function (c) { return short(titles[c.rid] || c.typeCode) + ' ' + (c.label || c.monthKey); };
+    var colOf = {}; cols.forEach(function (c) { colOf[c.rid] = lbOf(c); });
+    var cell = function (v, rid) { return v == null ? '<td class="r hint cp none">—</td>' : '<td class="r cv cp ' + (v > 0 ? 'pos' : v < 0 ? 'neg' : '') + '" data-lb="' + esc(colOf[rid]) + '">' + esc(signed(v)) + '</td>'; };
     var body = rows.map(function (r) {
-      return '<tr><td class="ti" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' + (comb.mixed ? '<td class="nw hint" title="' + esc(r.leadName) + '">→ ' + esc(r.leadName) + '</td>' : '')
-        + cols.map(function (c) { return cell(r.parts[c.rid]); }).join('')
-        + '<td class="r cv ' + (r.net > 0 ? 'pos' : r.net < 0 ? 'neg' : '') + '"><b>' + esc(signed(r.net)) + '</b></td><td class="nw">' + dirPill(r.net) + '</td>'
-        + (allOk ? '<td class="nw"><button class="sm" data-comb-copy="' + esc(r.sid + '|' + r.leadSid) + '">복사</button></td>' : '') + '</tr>';
+      return '<tr><td class="ti" title="' + esc(r.name) + '">' + esc(r.name) + '</td>' + (comb.mixed ? '<td class="nw hint cl" title="' + esc(r.leadName) + '">→ ' + esc(r.leadName) + '</td>' : '')
+        + cols.map(function (c) { return cell(r.parts[c.rid], c.rid); }).join('')
+        + '<td class="r cv ct ' + (r.net > 0 ? 'pos' : r.net < 0 ? 'neg' : '') + '"><b>' + esc(signed(r.net)) + '</b></td><td class="nw cd">' + dirPill(r.net) + '</td>'
+        + (allOk ? '<td class="nw cx"><button class="sm" data-comb-copy="' + esc(r.sid + '|' + r.leadSid) + '">복사</button></td>' : '') + '</tr>';
     }).join('');
     var foot = (comb.leads || []).map(function (L) {
       var tip = '줄 돈 ' + C.fmt(L.pay) + '원 · 받을 돈 ' + C.fmt(L.back) + '원';
-      return '<tr class="sum"><td title="+ 는 주관이 내줄 돈, − 는 받을 돈">' + esc(comb.mixed ? (L.leadName || '주관') + ' 합계' : '합계') + '</td>' + (comb.mixed ? '<td></td>' : '')
-        + cols.map(function (c) { return cell(L.parts[c.rid] == null ? 0 : L.parts[c.rid]); }).join('')
-        + '<td class="r cv ' + (L.net > 0 ? 'pos' : L.net < 0 ? 'neg' : '') + '"><b title="' + esc(tip) + '">' + esc(signed(L.net)) + '</b></td>'
-        + '<td class="nw" title="' + esc(tip) + '">' + (L.net > 0 ? '<span class="pill dir-more">주관 순 지급 ' + esc(C.fmt(L.net)) + '원</span>' : L.net < 0 ? '<span class="pill dir-back">주관 순 수령 ' + esc(C.fmt(-L.net)) + '원</span>' : '<span class="pill">순 0원</span>') + '</td>'
-        + (allOk ? '<td></td>' : '') + '</tr>';
+      return '<tr class="sum"><td class="ti" title="+ 는 주관이 내줄 돈, − 는 받을 돈">' + esc(comb.mixed ? (L.leadName || '주관') + ' 합계' : '합계') + '</td>' + (comb.mixed ? '<td class="cl"></td>' : '')
+        + cols.map(function (c) { return cell(L.parts[c.rid] == null ? 0 : L.parts[c.rid], c.rid); }).join('')
+        + '<td class="r cv ct ' + (L.net > 0 ? 'pos' : L.net < 0 ? 'neg' : '') + '"><b title="' + esc(tip) + '">' + esc(signed(L.net)) + '</b></td>'
+        + '<td class="nw cd" title="' + esc(tip) + '">' + (L.net > 0 ? '<span class="pill dir-more">주관 순 지급 ' + esc(C.fmt(L.net)) + '원</span>' : L.net < 0 ? '<span class="pill dir-back">주관 순 수령 ' + esc(C.fmt(-L.net)) + '원</span>' : '<span class="pill">순 0원</span>') + '</td>'
+        + (allOk ? '<td class="cx"></td>' : '') + '</tr>';
     }).join('');
     return h + '<div class="scroll"><table class="t kc"><thead><tr>' + th + '</tr></thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>';
   }
