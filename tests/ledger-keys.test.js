@@ -119,7 +119,7 @@ t('CMS 줄은 CMS 창으로 (업체 후보로 확정하면 남의 돈이 된다)
   /isCmsMemo\[row\._k\][\s\S]{0,40}?setCmsRow\(row\)/.test(ACT), true);
 t('후보가 없으면 찾기 창', /openFindRow\(row\)/.test(ACT), true);
 t('줄이 빠졌는지를 돌려준다 (커서를 어디로 옮길지가 여기 달렸다)',
-  /confirmRow\(row, p, \{ feeAmount:_s\.fee \|\| 0 \}\);\s*\n\s*return true;/.test(ACT), true);
+  /confirmRow(?:Ask)?\(row, p, \{ feeAmount:_s\.fee \|\| 0 \}\);\s*\n\s*return (?:true|!erpPayerNeedsReason\(_pa\));/.test(ACT), true);   // 사유를 묻는 줄은 아직 목록에 남는다(2026-11-16)
 
 console.log('\n[⑩ 되돌리기]');
 const UNDO = grab('function undoLast(){', '/* ══════ Enter 한 번이 하는 일 ══════');
@@ -143,7 +143,7 @@ console.log('\n[⑪ 되돌리기는 한 곳에서만 — 두 길이 다른 일�
    「되돌리는 길이 여럿이어도 실제 일은 한 함수가 한다」이다 —
    그래야 되돌린 뒤의 장부가 하나다. 그것을 직접 센다. */
 t('되돌리는 길이 여럿이어도 실제 일은 erpUndoIncome 한 곳이 한다',
-  (src.match(/erpUndoIncome\(fi\)/g) || []).length >= 3, true);
+  (src.match(/erpUndoIncome\(fi(?:, true)?\)/g) || []).length >= 3, true);   // 업체 바꾸기는 «한 줄만»(_noCascade) 무른다 — 같은 문, 다른 인자(2026-11-16)
 t('되돌리기 본체는 하나뿐이다',
   (src.match(/rollback\.retainerPaid=false/g) || []).length, 1);
 t('무른 표시를 남긴다 (지우지 않는다)', /undoneDate:new Date\(\)\.toISOString\(\)/.test(src), true);

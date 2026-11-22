@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -65,7 +65,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="std_2026.js?v=2"></script>
 <script src="js/rules-v2/lib-topics.js?v=3"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
-<script src="js/rules-v2/view-topics.js?v=7"></script>
+<script src="js/rules-v2/view-topics.js?v=8"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;background:#e2e8f0;color:#1e293b;font-size:13px}
@@ -185,6 +185,9 @@ button{font:inherit;cursor:pointer}
 #topics .btn{height:26px;padding:0 10px;border-radius:8px;background:#ffffff;font-size:12px}
 #topics .txt{padding:10px 14px;line-height:1.85;white-space:pre-wrap;font-size:12.5px}
 #topics ins{background:#fde68a;text-decoration:none;border-radius:2px;padding:0 1px}
+/* 찾은 말(본문 찾기, 2026-11-15) — 다른 곳을 칠하는 ins(노랑)와 겹치지 않게 파랑 */
+#topics mark{background:#bfdbfe;color:#1e40af;border-radius:2px;padding:0 1px}
+#topics .tp.bd i{color:#1e40af}
 #topics del{background:#fecaca;color:#991b1b;border-radius:2px;padding:0 1px}
 #topics .warn{padding:0 14px 10px;color:#991b1b;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #topics .who{border-top:1px dashed #e2e8f0;padding:6px 14px 10px;font-size:12px;color:#475569}
@@ -395,8 +398,14 @@ button{font:inherit;cursor:pointer}
   #sites .sites td:nth-child(2){order:1;flex:0 0 22px}
   #sites .sites td:nth-child(3){order:2;flex:1 1 0}
   #sites .sites td:nth-child(7){order:3;flex:none;font-size:12.5px}
-  #sites .sites td:nth-child(10){order:5;flex:none;margin-left:56px}
+  /* 자료 칸(규칙·노사·단협 체크 + 확정·후보)은 «자기 줄 하나»를 갖는다 — 이웃 칸(마지막 신고·★최종본·담당·규모·업태)과 한 줄에 두면
+     폭이 모자라 이웃이 2px 로 짓눌렸다(360·411·430px 실측 2026-11-15: 짓눌림 42·22·18). 이웃은 그 아랫줄에 한 줄로 모인다.
+     격자(.dc)는 폰에서 «글자 폭만큼»만 차지한다(PC 표의 줄마다 같은 자리 맞추기용 최소 칸 폭은 폰에 필요 없다) */
+  #sites .sites td:nth-child(10){order:5;flex:0 0 calc(100% - 56px);margin-left:56px}
   #sites .sites td:nth-child(10) .btn{display:none}
+  #sites .dc{display:flex;flex-wrap:nowrap;gap:3px;align-items:center}
+  #sites .dc .ds{display:inline-flex;grid-column:auto;justify-content:flex-start}
+  #sites .dc .sck{padding:0 5px}
   #sites .sites td:nth-child(n+4):not(:nth-child(7)):not(:nth-child(10)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
   #sites .sites td:nth-child(8){order:6}
   #sites .sites td:nth-child(9){order:7}
@@ -592,10 +601,32 @@ button{font:inherit;cursor:pointer}
   .dly td.empty{flex:1 1 100%}
   .dly input[type=checkbox]{width:24px;height:24px}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다(숨기기·옮기기 없음). 이 화면은 이미 둥근 상자(16px)·알약 칩이라 그림자·고른 단추만 맞춘다.
+   ★ 머리줄 갈래 단추(.rmode) 모양은 css/rules-shell.css 한 벌에만 둔다(tests/rules-shell.test.js ③) — 여기 두지 않는다.
+   ★ 표 머리 글자 굵기는 그대로 둔다 — 칸이 좁아 «…» 로 줄어드는 머리(★최근 등)가 더 잘린다. */
+:where(body.pu-design) .top{box-shadow:var(--pu-sh-sm)}
+/* 바깥 상자 셋(🏢·📚·📥) — 옅은 그림자 */
+:where(body.pu-design) #lib,:where(body.pu-design) #topics,:where(body.pu-design) #sites{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) #topics .card{border-radius:var(--pu-r)}
+/* 파란 단추·고른 갈래는 목업처럼 파란 그림자 */
+:where(body.pu-design) .btn.p{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .seg button.on,:where(body.pu-design) .tsteps button.on,:where(body.pu-design) .dsw button.on{box-shadow:var(--pu-sh-acc)}
+/* 떠 있는 창 — 둥근 모서리 + 목업 그림자 */
+:where(body.pu-design) .pick{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .cpop{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-md)}
+/* 폰·좁은 화면(900px 이하) — 앱이 바깥 상자를 «없는 셈»으로 편다(테두리·둥글기 0). 그림자도 걷어 상자는 한 겹 */
+@media (max-width:900px){
+  :where(body.pu-design) #lib,:where(body.pu-design) #topics,:where(body.pu-design) #sites{box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
-<link rel="stylesheet" href="css/rules-shell.css?v=4">
+<link rel="stylesheet" href="css/rules-shell.css?v=5">
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리·머리줄 한 벌 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 <div class="top rs-head">
   <div class="logo rs-logo">규</div><b class="rs-name">기업규정집</b>
   <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
@@ -612,18 +643,14 @@ button{font:inherit;cursor:pointer}
 <div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=42"></script>
+<script src="js/pu-appbar.js?v=54"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
-<script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 -->
-<script src="js/pu-active.js?v=1"></script>
-<script>
-/* 「준비중」 — 포털 타일의 준비중 딱지와 «짝»이다(주소를 직접 친 사람도 막는다).
-   ⚠ 역할을 모르는 동안에는 안 씌운다 — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
-/* 이름은 포털 타일과 같게 — 「취업규칙」 타일 하나(두 앱 합치기 2026-10-04), rules.html 도 같은 이름 */
-try { PuGate.soonUnlessAdmin('기업규정집'); } catch (_) {}
-</script>
+<script src="js/pu-active.js?v=2"></script>
+<!-- 「준비중」 문(PuGate.soonUnlessAdmin)은 2026-11-15 대표 「기업규정집 준비중 열어라」로 걷었다 — 포털 타일의 준비중 딱지와 «짝»이라 함께 뺐다.
+     하나만 남으면 반쪽이 된다(딱지만: 주소를 직접 친 사람에게 열림 · 안쪽만: 포털에서 눌러도 막힘). 로그인 화면(PuGate.show)은 아래에서 그대로 쓴다 -->
 <script>
 var FB_CONFIG = {apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',storageBucket:'pureun-erp.firebasestorage.app',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 /* 가린 파일은 서고와 같은 창고(국내 서울) — 서버가 rules_lib/{docId}.{ext} 에 담는다 */

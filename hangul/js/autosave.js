@@ -38,7 +38,7 @@
   // 지금 편집기에 올라 있는 문서를 저장 (다른 문서는 탭을 바꿀 때 저장됨)
   async function saveCurrent() {
     const app = A(), d = app && app.current();
-    if (!d || d.readOnly || (d.pristine && !d.dirty)) return;
+    if (!d || d.readOnly || d.noAutosave || (d.pristine && !d.dirty)) return;
     if (saving) { again = true; return; }
     saving = true;
     try {

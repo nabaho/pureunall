@@ -140,8 +140,18 @@ function 우체국고르기(from) {
   return 우체국들[우체국들.length - 1];
 }
 
-/* 보내는 사람 표시 이름. 주소만 나가면 스팸으로 걸리기 쉽다. */
-function fromLine(u) { return u ? '푸른노무법인 <' + u + '>' : ''; }
+/* 보내는 사람 표시 이름. 주소만 나가면 스팸으로 걸리기 쉽다.
+   개인 발송 시 보낸 직원의 이름·직책(예: 푸른노무법인 권형하 대표노무사 <370-6@daum.net>)을 함께 표기한다.
+   ⚠ RFC5322 주소 구분자(, ; : < > " ( ) @ [ ] \)와 제어문자를 모두 걷어내 표시명이 복수 주소로 쪼개지거나 헤더가 오염되지 않게 한다. */
+function fromLine(u, senderLabel) {
+  if (!u) return '';
+  const clean = String(senderLabel || '')
+    .replace(/[\x00-\x1f\x7f"<>\\,;:()@[\]]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40);
+  return clean ? ('푸른노무법인 ' + clean + ' <' + u + '>') : ('푸른노무법인 <' + u + '>');
+}
 
 /* 접속 아이디 후보 — @ 앞부분 먼저, 그다음 주소 전체.
    다음메일 설정 화면이 「아이디: 370-6」이라고 알려 주지만, 주소 전체로도 되는
@@ -256,15 +266,20 @@ async function readMailOut(deps, path) {
    ⚠ 한 번에 치우는 수를 못 박는다 — 많이 쌓인 사람에게서 배달이 늦어지면 안 된다. */
 const MAILOUT_STALE_MS = 24 * 60 * 60 * 1000;
 const MAILOUT_SWEEP_MAX = 20;
-async function sweepStaleMailOut(deps, uid, now) {
+async function sweepStaleMailOut(deps, uid, now, keep) {
   if (!deps || !uid) return 0;
   const t0 = Number(now) || Date.now();
+  /* ⚠ keep — «이번 요청이 쓰려는» 파일 경로. 하루 넘은 것이라도 «지금 붙이려는 것»은 안 지운다.
+       훑기를 배달과 «동시에» 시작하게 바꾼 뒤(2026-11-14), 첨부를 읽기 전에 묵은 첨부(다시 보내기·늦게 보내는 글)가
+       지워져 «첨부가 조용히 빠진 채 나가는» 길이 생길 뻔했다(보안 검토 지적). 안 지운 것은 보낸 뒤 «쓴 파일 치우기»가 치운다. */
+  const 지킬 = new Set((Array.isArray(keep) ? keep : []).map(String));
   let n = 0;
   try {
     const [files] = await deps.getStorage().bucket(CARDS_BUCKET)
       .getFiles({ prefix: 'pucards/mailout/' + uid + '/' });
     for (const f of (files || [])) {
       if (n >= MAILOUT_SWEEP_MAX) break;
+      if (지킬.has(String((f && f.name) || ''))) continue;
       const m = (f && f.metadata) || {};
       const at = Date.parse(m.timeCreated || m.updated || '');
       /* 언제 만든 것인지 모르면 «건드리지 않는다» — 지금 쓰고 있는 것일 수 있다 */
@@ -369,20 +384,214 @@ async function collectAttachments(db, body, deps, uid) {
      묵은 임시 파일을 치운다. 나가는 길이 다섯인데(주소 없음·비밀번호 없음·자료 못 찾음·
      첨부 너무 큼·메일 서버가 안 받음) 성공한 길에만 치우는 줄이 있어, 실패하면
      창고에 영영 남았다(2026-09-03 실측). */
+/* ── 접속막힘 — 로그인이 거절된 적이 있으면 «얼마 동안» 미리 접속을 쉰다 (계정 보호, 2026-11-14 보안 검토) ──
+   ★ 미리 접속은 배달(SMTP)과 «동시에» 다음메일 IMAP 에 로그인한다. 비밀번호가 틀린 때(SMTP 가 EAUTH)는 그 로그인이
+     «틀린 로그인을 하나 더» 얹어 계정이 잠길 수 있다. 그래서 한 번 거절당하면 이 서버(인스턴스)는 30분 동안 미리
+     접속을 안 하고, 예전처럼 «배달이 성공한 뒤에만» 사본 접속을 한다. 서버가 새로 뜨면 기억이 사라지는 것은 알고 있다 —
+     그래도 «연달아 눌러 틀린 로그인이 쌓이는» 가장 위험한 경우는 같은 서버가 받으므로 막힌다.
+   ⚠ 밖에서 되돌릴 수 있게 내놓는다(resetPrefetchBreaker) — 검사들이 서로의 기억에 흔들리면 안 된다. */
+const 접속막힘 = { smtp: 0, imap: 0 };
+const 접속막힘유지ms = 30 * 60 * 1000;
+function 미리접속막힘(now) {
+  const t = Number(now) || Date.now();
+  return (t - 접속막힘.smtp) < 접속막힘유지ms || (t - 접속막힘.imap) < 접속막힘유지ms;
+}
+function resetPrefetchBreaker() { 접속막힘.smtp = 0; 접속막힘.imap = 0; }
+
 async function deliver(opts) {
+  /* ★ 묵은 임시 파일 훑기는 배달과 «동시에» 시작한다 (속도, 대표 지시 2026-11-14 「메일 보내는 속도가 너무 늦다」).
+       예전에는 배달이 다 끝난 «뒤에» 창고 목록을 훑어 그 시간이 응답에 그대로 얹혔다. 하루 지난 것만 치우므로
+       «지금 쓰는» 파일(방금 만든 것)과 겹칠 일이 없다 — 일찍 시작해도 안전하다. 끝은 아래에서 «기다린다»(성공이든 실패든).
+     ⚠ 배달 결과를 «절대» 바꾸지 않는다 — 안에서 다 삼킨다(sweepStaleMailOut). */
+  /* ⚠ 이번 요청이 붙이려는 창고 파일(body.files 의 path)은 «지킨다» — 하루 넘은 것이라도 첨부 읽기 전에 지워지면 안 된다. */
+  const 쓸경로 = ((opts && opts.body && Array.isArray(opts.body.files)) ? opts.body.files : [])
+    .map((f) => (f && typeof f.path === 'string') ? f.path : '').filter(Boolean);
+  const 훑는중 = sweepStaleMailOut(opts && opts.deps, opts && opts.uid, Date.now(), 쓸경로).catch(() => 0);
   try {
     return await deliverOnce(opts);
   } finally {
-    /* ⚠ 배달 결과를 «절대» 바꾸지 않는다 — 안에서 다 삼킨다(sweepStaleMailOut) */
-    try { await sweepStaleMailOut(opts && opts.deps, opts && opts.uid, Date.now()); }
+    try { await 훑는중; }
     catch (_) { /* 치우기가 배달을 막지 않는다 */ }
   }
+}
+
+/* ── 보낸 직원의 본인 명함 찾기 (대표 지시 2026-11-18 「담당자가 본인이 메일을 보내는경우 본인의 명함이 자동으로 첨부」) ──
+   ① perUser/<signKey> 에 저장된 내 명함 번호를 먼저 본다.
+   ② 아직 안 골랐더라도 로그인한 직원의 재직 명부(uid_roles → data/user_dir) 이름으로
+      기업정보함 색인(pucards/idx)에서 가장 최근 푸른노무법인 명함을 스스로 찾는다.
+   ③ 썸네일이 우리 파이어베이스 창고 주소(https://firebasestorage...)로 적혀 있으면 내려받아 dataURL 로 바꾼다. */
+function fetchAllowedThumbDataUrl(rawUrl) {
+  const safeUrl = SG.allowedCardThumbUrl(rawUrl);
+  if (!safeUrl) return Promise.resolve('');
+  return new Promise((resolve) => {
+    const https = require('node:https');
+    let settled = false;
+    let req = null;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(wallTimer);
+      resolve(val);
+    };
+    const wallTimer = setTimeout(() => {
+      try { if (req) req.destroy(); } catch (_) {}
+      finish('');
+    }, 8000);
+    req = https.get(safeUrl, { timeout: 6000 }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); finish(''); return; }
+      const ct = String((res.headers && res.headers['content-type']) || '').toLowerCase();
+      const chunks = [];
+      let size = 0;
+      res.on('data', (d) => {
+        if (settled) return;
+        size += d.length;
+        if (size > SG.SIGN_MAX_BYTES) { req.destroy(); finish(''); return; }
+        chunks.push(d);
+      });
+      res.on('end', () => {
+        if (settled || !size) { finish(''); return; }
+        const buf = Buffer.concat(chunks);
+        let mime = 'image/jpeg';
+        if (ct.indexOf('png') >= 0 || (buf[0] === 0x89 && buf[1] === 0x50)) mime = 'image/png';
+        else if (ct.indexOf('webp') >= 0) mime = 'image/webp';
+        else if (ct.indexOf('gif') >= 0) mime = 'image/gif';
+        else if (ct.indexOf('jpeg') < 0 && ct.indexOf('jpg') < 0 && !(buf[0] === 0xff && buf[1] === 0xd8)) {
+          finish(''); return;
+        }
+        finish('data:' + mime + ';base64,' + buf.toString('base64'));
+      });
+    });
+    req.on('timeout', () => { req.destroy(); finish(''); });
+    req.on('error', () => finish(''));
+  });
+}
+
+function sidFromByEmail(byEmail) {
+  const m = /^([pa])(\d{3})@pureun\.kr$/i.exec(String(byEmail || '').trim());
+  return m ? (m[1].toUpperCase() + '-' + m[2]) : '';
+}
+
+function isPureunCompany(co) {
+  return /푸른\s*노무법인|pureun/i.test(String(co || ''));
+}
+
+async function resolveSenderStaffProfile(db, byEmail, uid) {
+  let sid = '';
+  if (uid && !/[.#$/[\]]/.test(String(uid))) {
+    const role = (await db.ref('uid_roles/' + String(uid)).once('value')).val() || {};
+    if (role.status === 'retired' || role.status === 'resigned') return null;
+    sid = String(role.sid || '').trim();
+  }
+  if (!sid) sid = sidFromByEmail(byEmail);
+  if (!sid) return null;
+  const safeSid = !/[.#$/[\]]/.test(sid) ? sid : '';
+  /* ⚠ 이름·재직 상태는 관리자 전용 쓰기 경로(data/user_dir)만 신뢰하고,
+       보조 연락처·직책 미러도 인사·재무·관리자 전용 쓰기 경로(data/company_info/v/staffCards)만 읽는다. */
+  const [dirSnap, rosterSnap] = await Promise.all([
+    db.ref('data/user_dir').once('value'),
+    safeSid ? db.ref('data/company_info/v/staffCards/' + safeSid).once('value') : Promise.resolve({ val: () => null }),
+  ]);
+  const dirRaw = dirSnap ? dirSnap.val() : null;
+  const roster = (rosterSnap && rosterSnap.val()) || null;
+  const users = Array.isArray(dirRaw) ? dirRaw : (dirRaw && dirRaw.v ? dirRaw.v : Object.values(dirRaw || {}));
+  const me = (users || []).find((u) => u && String(u.sid || '') === sid && u.status !== 'retired' && u.status !== 'resigned' && u.status !== 'scheduled');
+  if (!me) return null;
+  const name = String(me.name || '').trim();
+  if (!name) return null;
+  let title = String(me.title || (roster && roster.title) || '').trim();
+  if (title === '노무사') title = '공인노무사';
+  const phone = String((roster && roster.phone) || '').trim();
+  const branch = String(me.branch || (roster && roster.branch) || '천안본사').trim();
+  return { sid, name, title, phone, branch };
+}
+
+async function resolveSenderStaffName(db, byEmail, uid) {
+  const prof = await resolveSenderStaffProfile(db, byEmail, uid);
+  return prof ? prof.name : '';
+}
+
+async function resolveSenderCard(db, byEmail, uid) {
+  const key = SG.signKey(byEmail);
+  let cardId = '';
+  let rec = null;
+  if (key) {
+    rec = (await db.ref(CARDS_ROOT + '/config/matMail/perUser/' + key).once('value')).val() || null;
+    if (rec && rec.cleared) return { cardId: '', thumb: '', name: '', rec: rec };
+    if (rec && rec.cardId && !/[.#$/[\]]/.test(String(rec.cardId))) {
+      cardId = String(rec.cardId);
+    }
+  }
+  const senderProfile = await resolveSenderStaffProfile(db, byEmail, uid);
+  const senderName = senderProfile ? senderProfile.name : '';
+
+  if (cardId) {
+    const itemVal = (await db.ref(CARDS_ROOT + '/items/' + cardId).once('value')).val();
+    if (itemVal && typeof itemVal === 'object') {
+      const itemName = String(itemVal.name || '').trim();
+      const itemPureun = isPureunCompany(itemVal.company) || cardId.indexOf('pu_staff_') === 0;
+      if (!itemPureun || (senderName && itemName && itemName !== senderName)) {
+        cardId = '';
+      }
+    } else if (senderName) {
+      const idxVal = (await db.ref(CARDS_ROOT + '/idx/' + cardId).once('value')).val();
+      if (idxVal && typeof idxVal === 'object') {
+        const idxName = String(idxVal.n || idxVal.name || '').trim();
+        const idxPureun = isPureunCompany(idxVal.c || idxVal.company) || cardId.indexOf('pu_staff_') === 0;
+        if (!idxPureun || (idxName && idxName !== senderName)) cardId = '';
+      }
+    }
+  }
+
+  if (!cardId && senderName) {
+    const idxRef = db.ref(CARDS_ROOT + '/idx');
+    let idxAll = null;
+    if (typeof idxRef.orderByChild === 'function') {
+      try {
+        idxAll = (await idxRef.orderByChild('n').equalTo(senderName).once('value')).val();
+      } catch (_) { idxAll = null; }
+    }
+    if (!idxAll) idxAll = (await idxRef.once('value')).val() || {};
+    let bestId = '', bestRank = -1, bestAt = -1;
+    Object.keys(idxAll).forEach((id) => {
+      if (/[.#$/[\]]/.test(id)) return;
+      const it = idxAll[id];
+      if (!it) return;
+      const kind = String(it.k || it.kind || '');
+      if (kind && kind !== 'card') return;
+      const nm = String(it.n || it.name || '').trim();
+      if (nm !== senderName) return;
+      const comp = String(it.c || it.company || '');
+      const isPu = isPureunCompany(comp);
+      const isOfficial = id.indexOf('pu_staff_') === 0;
+      if (!isPu && !isOfficial) return;
+      const rank = (isPu ? 2 : 0) + (isOfficial ? 1 : 0);
+      const at = Number(it.updatedAt || it.createdAt || 0);
+      if (rank > bestRank || (rank === bestRank && (at > bestAt || (at === bestAt && id > bestId)))) {
+        bestRank = rank; bestAt = at; bestId = id;
+      }
+    });
+    if (bestId) cardId = bestId;
+  }
+
+  if (!cardId) return { cardId: '', thumb: '', name: senderName, authName: senderName, title: senderProfile ? senderProfile.title : '', rec: rec };
+  const [rawThumbSnap, itemNameSnap] = await Promise.all([
+    db.ref(CARDS_ROOT + '/thumbs/' + cardId).once('value'),
+    senderName ? Promise.resolve(null) : db.ref(CARDS_ROOT + '/items/' + cardId + '/name').once('value'),
+  ]);
+  const finalName = senderName || (itemNameSnap ? String(itemNameSnap.val() || '').trim() : '');
+  let thumb = String(rawThumbSnap.val() || '');
+  if (thumb && !thumb.startsWith('data:image/') && SG.allowedCardThumbUrl(thumb)) {
+    thumb = await fetchAllowedThumbDataUrl(thumb);
+  }
+  return { cardId: cardId, thumb: thumb, name: finalName, authName: senderName, title: senderProfile ? senderProfile.title : '', rec: rec };
 }
 
 async function deliverOnce(opts) {
   /* ⚠ deps·uid 는 «창고 첨부»에만 쓴다(2026-08-31). 안 넘어오면 창고 길은 조용히
      건너뛰고 예전 길(dataUrl)만 붙는다 — 부르는 곳을 하나 빠뜨려도 메일은 나간다. */
   const { db, body, from, pass, envId, byEmail, deps, uid } = opts;
+  /* 단계별 걸린 시간 — 끝에서 한 줄로 남긴다(숫자뿐, 개인정보 없음). «어디가 느린지» 재 보려는 것이다(2026-11-14). */
+  const T = { t0: Date.now() };
   if (!from) {
     return { ok: false, status: 500,
       error: '보내는 주소가 비어 있습니다.\n기업정보함 → 자료함 → ✉️ 메일 본문에서 「보내는 주소」를 넣어 주세요.' };
@@ -395,12 +604,38 @@ async function deliverOnce(opts) {
   }
 
   const got = await collectAttachments(db, body, deps, uid);
+  T.collect = Date.now() - T.t0;
   if (got.noneFound) {
     return { ok: false, status: 400, error: '붙일 자료를 찾지 못했습니다. 자료함에서 파일을 다시 올려 주세요.' };
   }
   /* 창고에서 꺼내다 한도를 넘었다 — 다 끌어오기 «전»에 멈춘 것이다.
      ⚠ 조용히 빼고 보내지 않는다. 첨부가 빠진 채 나가면 받는 쪽은 그걸 모른다. */
   if (got.tooBig) return { ok: false, status: 400, error: MS.sizeError(got.tooBig) };
+
+  /* ── 보낸 직원의 본인 명함 파일 자동 첨부 (body.attachMyCard) ──
+     ⚠ 명함 조회가 실패해도 메일 발송 자체는 멈추지 않는다(try/catch). */
+  let cachedSenderCard = null;
+  const getSenderCard = async () => {
+    if (!cachedSenderCard) cachedSenderCard = await resolveSenderCard(db, byEmail, uid);
+    return cachedSenderCard;
+  };
+  if (body && body.attachMyCard) {
+    try {
+      const sc = await getSenderCard();
+      const autoAllowed = !(sc && sc.rec && (sc.rec.cleared || sc.rec.autoAttach === false));
+      const fileAtt = (autoAllowed && sc && sc.thumb) ? SG.cardFileAttachment(sc.thumb, sc.name) : null;
+      if (fileAtt && (got.bytes + fileAtt.bytes) <= MS.MAX_TOTAL_BYTES) {
+        const dup = got.attachments.some((a) => a && a.filename === fileAtt.filename);
+        if (!dup) {
+          got.attachments.push(fileAtt);
+          got.names.push(fileAtt.filename);
+          got.bytes += fileAtt.bytes;
+        }
+      }
+    } catch (e) {
+      console.warn('attachMyCard', (e && e.message) || e);
+    }
+  }
 
   const v = MS.validateSend({
     to: body.to, cc: body.cc, bcc: body.bcc,
@@ -435,17 +670,8 @@ async function deliverOnce(opts) {
   const signAtt = [];
   try {
     if (signHtml && SG.hasSignMark(signHtml)) {
-      const key = SG.signKey(byEmail);
-      let thumb = '';
-      if (key) {
-        const rec = (await db.ref(CARDS_ROOT + '/config/matMail/perUser/' + key).once('value')).val() || {};
-        const cardId = String(rec.cardId || '');
-        /* 열쇠에 못 쓰는 글자가 든 번호는 아예 읽지 않는다 — 경로가 어긋난다 */
-        if (cardId && !/[.#$/[\]]/.test(cardId)) {
-          thumb = (await db.ref(CARDS_ROOT + '/thumbs/' + cardId).once('value')).val() || '';
-        }
-      }
-      const att = SG.signAttachment(thumb);
+      const sc = await getSenderCard();
+      const att = sc && sc.thumb ? SG.signAttachment(sc.thumb) : null;
       if (att) signAtt.push(att);
       else signHtml = SG.stripSignMark(signHtml);   // 못 찾았다 — 표시를 지운다
     }
@@ -491,8 +717,21 @@ async function deliverOnce(opts) {
     console.warn('mailTrack', (e && e.message) || e);   /* 못 달아도 메일은 나간다 */
   }
 
+  let senderLabel = '';
+  if (!(body && body.bulk) && !(opts.copy && opts.copy.mode === 'rep')) {
+    try {
+      /* ⚠ From 표시명은 관리자 전용 명부(data/user_dir)에서 확인된 authName 만 신뢰한다 (items.name 대체 금지) */
+      const prof = cachedSenderCard
+        ? { name: cachedSenderCard.authName, title: cachedSenderCard.title }
+        : await resolveSenderStaffProfile(db, byEmail, uid);
+      if (prof && prof.name) {
+        senderLabel = [prof.name, prof.title].filter(Boolean).join(' ');
+      }
+    } catch (_) {}
+  }
+
   const baseMail = {
-    from: fromLine(from),
+    from: fromLine(from, senderLabel),
     // 답장은 보낸 직원에게 — 회사 대표주소로만 오면 누구 건인지 모른다
     replyTo: byEmail || undefined,
     cc: v.cc.length ? v.cc.join(', ') : undefined,
@@ -530,6 +769,28 @@ async function deliverOnce(opts) {
   let lastErr = null, usedId = '', done = 0;
   const 우체국 = 우체국고르기(from);
   const 열쇠 = 우체국.열쇠다듬기(pass);
+  /* ★ 속도 — 다음메일 보낸함 사본을 올릴 «연결»을 배달과 동시에 미리 열어 둔다 (대표 지시 2026-11-14).
+       서버 로그에서 한 통에 4~6초가 걸렸고, 사본을 올리려고 «배달이 끝난 뒤에야» 다음메일 IMAP 에 새로 접속·로그인·
+       목록 읽기를 했다. 그 시간이 응답에 그대로 얹혔다 — 편지와 상관없는 일이라 배달과 겹쳐서 한다(mail-archive 머리 참고).
+     ⚠ 곳별 사본(each)일 때만이다 — 대표 사본·건너뜀(대량 발송)은 예전 그대로. 사본 IMAP 이 다음메일이라 «다음» 우체국일 때만.
+     ⚠ 첨부가 사본 한도를 넘으면 어차피 사본을 건너뛰므로 미리 접속도 안 한다. 끄는 스위치(MAIL_ARCHIVE_OFF)도 따른다.
+     ⚠ 배달이 실패하면 아래에서 닫는다. 미리 접속이 안 되어도 배달은 멀쩡하다 — 사본을 올릴 때 예전처럼 새로 붙는다. */
+  const 사본규칙 = OC.규칙(opts.copy);
+  const 접속아이디 = loginIds(from, envId, 우체국);
+  /* ⚠ 계정 보호 — 로그인이 «거절된 적이 있으면» 얼마 동안은 미리 접속을 하지 않는다(접속막힘).
+       자격이 틀린 때 미리 접속이 «틀린 로그인을 하나 더» 얹으면 계정이 잠길 수 있다(2026-11-14 보안 검토).
+       그때는 예전처럼 «배달이 성공한 뒤에만» 사본 접속을 한다. */
+  const 미리 = (사본규칙.mode === 'each' && 우체국.host === DAUM_HOST && typeof MA.prefetchSent === 'function'
+                && !(Number(v.bytes || 0) > MA.ARCHIVE_MAX_BYTES) && !미리접속막힘(Date.now())
+                && String(process.env.MAIL_ARCHIVE_OFF || '') !== '1')      /* 사본을 끄면 접속도 «아예» 안 만든다 */
+    ? MA.prefetchSent({ user: 접속아이디[0], loginIds: 접속아이디, pass: pass, openClient: opts.imapOpen, closeLimitMs: opts.prefetchCloseMs })
+    : null;
+  /* 미리 접속에서 로그인이 «거절됐다»는 것이 밝혀지면 — 배달이 어떻게 끝나든(성공이든 연결 끊김 같은 다른 실패든),
+     늦게 밝혀지든 — 한동안 미리 접속을 쉰다. 한 곳에서 모두 잡는다(배달이 «인증 아닌 오류»로 실패해도 틀린 로그인이 쌓이지 않게). */
+  if (미리) 미리.done.then((s) => { if (s && s.authFailed) 접속막힘.imap = Date.now(); }).catch(() => {});
+  const 닫기기다림ms = Number.isFinite(Number(opts.prefetchReleaseMs)) ? Number(opts.prefetchReleaseMs) : MA.PREFETCH_RELEASE_WAIT_MS;
+  T.prep = Date.now() - T.t0 - T.collect;
+  const tSmtp = Date.now();
   for (const id of loginIds(from, envId, 우체국)) {
     try {
       const tx = nodemailer.createTransport({
@@ -544,12 +805,18 @@ async function deliverOnce(opts) {
       break;
     } catch (e) {
       lastErr = e;
+      if (String((e && e.code) || '') === 'EAUTH') 접속막힘.smtp = Date.now();   /* 로그인 거절 — 한동안 미리 접속을 쉰다 */
       // 자격 문제일 때만 다른 아이디로. 첨부가 크거나 주소가 틀린 것은 아이디를
       // 바꿔도 똑같은데, 되풀이하면 같은 메일이 여러 통 나간다.
       if (String((e && e.code) || '') !== 'EAUTH') break;
     }
   }
   if (lastErr) {
+    /* 배달이 안 됐으니 미리 열어 둔 사본 연결은 «쓸 일이 없다» — 닫는다.
+       ⚠ 응답 전에 «닫을 때까지» 기다린다(안 기다리면 응답 뒤 함수가 멈춰 연결이 남을 수 있다 — 보안 검토 지적).
+         다만 접속이 아직 안 끝났으면 닫기기다림ms 까지만 기다린다 — 실패 응답이 그 이상 늦어지면 안 된다.
+         그때는 «취소 표시»가 남아 접속이 늦게 끝나는 순간 스스로 닫힌다(mail-archive prefetchSent). */
+    if (미리) { try { await 미리.release(닫기기다림ms); } catch (_) { /* 닫기 실패가 실패 응답을 바꾸지 않는다 */ } }
     console.error('deliver', lastErr && lastErr.message);
     let error = errorHint(lastErr);
     /* ⚠ 몇 통은 이미 나갔다는 것을 «반드시» 알린다. 안 알리면 대표가 그대로 다시
@@ -570,63 +837,97 @@ async function deliverOnce(opts) {
      한 통도 없었다(상대는 정상으로 받았다).
      ⚠ 배달은 «이미 끝났다». 여기서 무슨 일이 나도 배달 결과를 바꾸지 않는다 —
        실패를 되돌려 주면 대표가 「안 나갔다」고 오해해 같은 메일을 두 번 보낸다. */
+  /* ★ 속도 — 사본 올리기 · 창고 임시 파일 치우기 · 기록 쓰기(sendLog·sentBox)는 서로 «상관없는 일»이라 동시에 한다
+       (대표 지시 2026-11-14 「메일 보내는 속도가 너무 늦다」). 예전에는 이것들을 차례로 했고 그 합이 응답에 얹혔다.
+     ⚠ 셋 모두 «스스로 삼킨다» — 어느 하나가 실패해도 배달 결과(성공)는 그대로고, 서로를 막지 않는다.
+     ⚠ 응답은 «셋이 다 끝난 뒤에» 한다 — 먼저 답하고 뒤에서 하면 함수가 답한 뒤 멈춰 사본·기록이 사라진다
+       («보낸함에 안 보인다» 2026-08-23 의 되풀이). 그래서 줄이는 것은 «겹치기»뿐이다. */
+  const 후시작 = Date.now();
+  let 사본메모 = '';
+  const 사본일 = (async () => {
   try {
     /* ★ 대량 줄(뉴스레터·안내문)은 곳별 사본을 넣지 않는다 — 보낸함에 «한 번에 한 통»만 남기려고
          (대표 지시 2026-10-12 「한번에 보내면 한번에 보낸 걸로」). 규칙은 대기열 줄이 들고 온다(opts.copy).
        ⚠ 안 주거나 알 수 없으면 «예전 그대로»(곳별 사본)다 — 사본이 하나 더 쌓이는 쪽이 없어지는 쪽보다 낫다. */
-    const 사본규칙 = OC.규칙(opts.copy);
     if (사본규칙.mode === 'skip') {
       /* 대표 사본이 따로 있다 — 여기서는 아무것도 넣지 않는다 */
+      사본메모 = '건너뜀';
     } else if (사본규칙.mode === 'one') {
       const 결과 = await OC.대표사본넣기({
         db: db, MA: MA, 편지: batches[0], 규칙: 사본규칙, 보낸주소: from,
         이름들: loginIds(from, envId), 아이디: usedId, 열쇠: pass, 바이트: v.bytes, 지금: at,
       });
       if (결과.did === 'fail') console.warn('대표 사본 못 남김:', 결과.why);
+      사본메모 = '대표:' + String(결과.did);
     } else {
       const raws = [];
       for (const m of batches) raws.push(await MA.buildRaw(m));
+      /* ⚠ 배달에 «성공한» 아이디를 맨 앞에 둔다 — SMTP 가 첫 후보에서 로그인을 거절당하고 둘째로 성공했다면, 사본 접속이
+           이미 거절된 첫 후보를 먼저 두드려 틀린 로그인을 또 늘린다(2026-11-14 재검증). 같은 계정이라 성공한 아이디가 IMAP 에서도 맞다. */
       const kept = await MA.archiveSent({
-        user: usedId, loginIds: loginIds(from, envId), pass: pass,
+        user: usedId, loginIds: [usedId].concat(loginIds(from, envId).filter((id) => id !== usedId)), pass: pass,
         raws: raws, bytes: v.bytes,
+        prefetch: 미리, openClient: opts.imapOpen,   /* 미리 붙어 둔 연결이 있으면 그것으로(없거나 못 쓰면 새로 붙는다) */
+        closeLimitMs: opts.prefetchCloseMs,          /* 닫는 시간 한도(시험용 — 안 주면 기본) */
       });
       if (!kept.ok) console.warn('archiveSent 못 남김:', kept.why, kept.box);
       else if (kept.dropped) console.warn('archiveSent 상한 초과 —', kept.dropped, '통은 사본 없음');
+      /* ⚠ 시간 로그에는 «고정된 말»만 적는다 — 서버 오류 문구에 주소 같은 개인정보가 섞일 수 있다(보안 검토 지적) */
+      사본메모 = kept.put > 0 ? ('올림' + (kept.viaPrefetch ? '·미리접속' : '·새접속')) : (kept.ok ? '건너뜀' : '못함');
     }
-  } catch (e) { console.warn('archiveSent', (e && e.message) || e); }
+  } catch (e) { console.warn('archiveSent', (e && e.message) || e); 사본메모 = '못함'; }
+  /* 쓰지 않은 미리 접속(사본 건너뜀·대표 사본·미리 접속 실패·굽기 실패)은 여기서 닫는다 — 쓴 것은 올리기 쪽이 이미 닫았다 */
+  if (미리) { try { await 미리.release(닫기기다림ms); } catch (_) { /* 닫기 실패는 배달과 무관하다 */ } }
+  })();
   /* 창고에서 꺼내 쓴 임시 파일을 치운다 — 나간 «뒤»에 치운다(먼저 치우면 못 붙인다).
      ⚠ 치우다 실패해도 보내기는 성공이다 — 안에서 삼킨다(sweepMailOut). */
-  if (deps && got.used && got.used.length) await sweepMailOut(deps, got.used);
+  const 치우기 = (async () => {
+    try { if (deps && got.used && got.used.length) await sweepMailOut(deps, got.used); }
+    catch (e) { console.warn('mailout 치우기', (e && e.message) || e); }
+  })();
   const cardId = String(body.cardId || '');
-  if (cardId && !/[.#$/\[\]]/.test(cardId)) {
+  const 명함기록 = (async () => {
+    if (cardId && !/[.#$/\[\]]/.test(cardId)) {
+      try {
+        await db.ref(CARDS_ROOT + '/sendLog/' + cardId).push(MS.sentLogRec({
+          at: at, by: byEmail || '', to: v.to, names: got.names, set: body.set || '',
+        }));
+      } catch (e) { console.warn('sendLog', e && e.message); }
+    }
+  })();
+  const 보낸기록 = (async () => {
     try {
-      await db.ref(CARDS_ROOT + '/sendLog/' + cardId).push(MS.sentLogRec({
-        at: at, by: byEmail || '', to: v.to, names: got.names, set: body.set || '',
-      }));
-    } catch (e) { console.warn('sendLog', e && e.message); }
-  }
-  try {
-    await db.ref(CARDS_ROOT + '/sentBox').push({
-      at: at,
-      by: byEmail || '',
-      to: v.to.join(', '),
-      toName: String(body.toName || ''),
-      cc: v.cc.join(', '),
-      subject: v.subject,
-      body: v.body,
-      /* 서식 몫도 남긴다 — 없으면 「다시 쓰기」가 꾸민 것을 잃고 평문으로 돌아간다.
-         ⚠ 자리를 더 쓴다. 본문은 보통 1KB 안쪽이라 값을 치를 만하다고 봤다 —
-           썸네일(2.48MB)과 달리 이건 글자뿐이다. 커지면 여기부터 다시 본다. */
-      html: v.html || '',
-      ids: (Array.isArray(body.matIds) ? body.matIds : []).filter((x) => typeof x === 'string'),
-      names: got.names,
-      localNames: got.extras.map((f) => String((f && f.name) || '')).filter(Boolean),
-      set: String(body.set || ''),
-      cardId: cardId,
-      from: from,
-      scheduled: !!body.wasScheduled,      /* 예약해 두었다가 나간 것인지 */
-    });
-  } catch (e) { console.warn('sentBox', e && e.message); }
+      await db.ref(CARDS_ROOT + '/sentBox').push({
+        at: at,
+        by: byEmail || '',
+        to: v.to.join(', '),
+        toName: String(body.toName || ''),
+        cc: v.cc.join(', '),
+        subject: v.subject,
+        body: v.body,
+        /* 서식 몫도 남긴다 — 없으면 「다시 쓰기」가 꾸민 것을 잃고 평문으로 돌아간다.
+           ⚠ 자리를 더 쓴다. 본문은 보통 1KB 안쪽이라 값을 치를 만하다고 봤다 —
+             썸네일(2.48MB)과 달리 이건 글자뿐이다. 커지면 여기부터 다시 본다. */
+        html: v.html || '',
+        ids: (Array.isArray(body.matIds) ? body.matIds : []).filter((x) => typeof x === 'string'),
+        names: got.names,
+        localNames: got.extras.map((f) => String((f && f.name) || '')).filter(Boolean),
+        set: String(body.set || ''),
+        cardId: cardId,
+        from: from,
+        scheduled: !!body.wasScheduled,      /* 예약해 두었다가 나간 것인지 */
+      });
+    } catch (e) { console.warn('sentBox', e && e.message); }
+  })();
+  await Promise.all([사본일, 치우기, 명함기록, 보낸기록]);
+
+  /* 단계별 시간 한 줄 — «어디가 느린지» 재 보려는 것(2026-11-14). 숫자와 짧은 말뿐, 주소·제목·글은 안 적는다. */
+  T.smtp = at - tSmtp; T.post = Date.now() - 후시작; T.total = Date.now() - T.t0;
+  console.log('[mail-timing] ' + JSON.stringify({
+    총: T.total, 첨부모으기: T.collect, 서명열람준비: T.prep, 배달: T.smtp, 배달뒤: T.post,
+    통수: batches.length, 첨부: got.attachments.length, 바이트: v.bytes,
+    미리접속: 미리 ? (미리.state.used ? '썼음' : (미리.state.why ? '못씀' : '안씀')) : '끔', 사본: 사본메모,
+  }));
 
   return {
     ok: true, sent: v.to.length, files: got.attachments.length,
@@ -665,18 +966,21 @@ function slimPayload(body) {
     matIds: (Array.isArray(p.matIds) ? p.matIds : []).filter((x) => typeof x === 'string').slice(0, 10),
     set: String(p.set || ''),
     toName: String(p.toName || ''),
+    attachMyCard: !!p.attachMyCard,
     droppedFiles: (Array.isArray(p.files) ? p.files : [])
       .map((f) => String((f && f.name) || '')).filter(Boolean),
   };
 }
 
 module.exports = {
-  deliver, collectAttachments, loginIds, errorHint, fromLine,
+  deliver, collectAttachments, resolveSenderCard, resolveSenderStaffProfile, loginIds, errorHint, fromLine,
   mailOutPathOk, sweepMailOut, CARDS_BUCKET, MAILOUT_MAX,
   errorsBefore, slimPayload, CARDS_ROOT,
   /* 검사가 밖에서 견줄 수 있게 내놓는다 — 안 내놓으면 「묵은 것만 치우는가」를
      글자로밖에 못 보고, 글자로 보는 검사는 이빨이 없다. */
   statMailOut, sweepStaleMailOut, MAILOUT_STALE_MS, MAILOUT_SWEEP_MAX,
+  /* 미리 접속의 «로그인 거절 뒤 쉼» 기억을 검사가 되돌릴 수 있게 */
+  resetPrefetchBreaker,
   /* 📬 열람 확인 — 화면과 «같은 열쇠»를 쓰는지 검사가 견준다 */
   trackFp, trackPixel, trackToken, TRACK_ROOT, PIXEL_URL,
   /* 스위치도 내놓는다 — 화면이 쓰는 자리와 «같은 길»인지 검사가 견준다 */

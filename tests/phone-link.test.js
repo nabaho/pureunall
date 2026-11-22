@@ -14,6 +14,8 @@
  *   ⑨ 크롬 창 띄우기(--front)는 내려간 창을 되살리고, 잠깐 «늘 위»로 올렸으면 «반드시 푼다» — 안 풀면 크롬이 영영 맨 위에 박힌다.
  *      그리고 무슨 일이 있어도 0 으로 끝난다 — 훅이 실패하면 크롬 일이 막힐 수 있다
  *   ⑩ .claude/settings.json 훅이 «크롬 도구에만» 걸려 --front 를 부르고, 뒤에서 돈다(크롬 일을 늦추지 않는다)
+ *   ⑪ 크롬 «앱 창»으로 뜨는 내 프로그램 창(AI 사용량 대시보드)은 올리지 않는다 — 프로세스의 «주 창»으로 고르면
+ *      그 창이 걸려 클릭하지 않았는데 튀어나온다(2026-11-22 대표 「클릭할 때만 뜨게」). 보기만 모드는 아무것도 켜거나 올리지 않는다
  * ★ 결정은 순수 함수로 떼어 두었다 — CI 는 리눅스라 윈도우 길(where·powershell·창)을 밟을 수 없다.
  * 실행: node --test tests/phone-link.test.js */
 'use strict';
@@ -160,6 +162,21 @@ test('⑨ 크롬 창 띄우기 — 되살리고, 올렸으면 풀고, 늘 0 으�
       { encoding: 'utf8', env: Object.assign({}, process.env, env) });
     assert.equal(r.status, 0, '★ --front 가 0 이 아닌 값으로 끝납니다 — 훅이 크롬 일을 막을 수 있습니다');
   }
+});
+
+test('⑪ 크롬 창 띄우기는 «크롬으로 띄운 내 프로그램 창»(사용량 대시보드)을 올리지 않는다', () => {
+  const ps = P.앞으로스크립트();
+  assert.ok(Array.isArray(P.안올릴창) && P.안올릴창.length >= 1, '★ 올리지 않을 창 목록이 없습니다');
+  for (const 제목 of P.안올릴창) {
+    assert.ok(ps.includes(제목), '★ «' + 제목 + '» 창을 거르지 않습니다 — 크롬 도구를 쓸 때마다 클릭하지 않은 창이 튀어나옵니다');
+  }
+  assert.doesNotMatch(ps, /MainWindowHandle/,
+    '★ 크롬 프로세스의 «주 창»으로 고릅니다 — 크롬 창은 모두 한 프로세스라 대시보드 같은 앱 창이 걸립니다. 창마다 제목을 보고 고르세요');
+  assert.match(ps, /EnumWindows/, '★ 창을 하나하나 훑지 않습니다 — 거를 창을 알아볼 수 없습니다');
+  /* 보기만(--dry --front) — 읽기만 하고 아무것도 켜거나 올리지 않는다 */
+  const 보기 = P.앞으로스크립트({ 보기만: true });
+  assert.doesNotMatch(보기, /\[PuWin\]::(SetForegroundWindow|SetWindowPos|ShowWindowAsync)\(/, '★ 보기만 모드가 창을 움직입니다');
+  assert.doesNotMatch(보기, /Start-Process/, '★ 보기만 모드가 크롬을 켭니다');
 });
 
 test('⑩ 훅은 크롬 도구에만 걸려 --front 를 부르고, 뒤에서 돈다', () => {

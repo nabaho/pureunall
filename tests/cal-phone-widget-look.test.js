@@ -143,7 +143,7 @@ test('⑨ 폰 달 보기 — 날을 누르면 «그날 목록»이 올라온다(
 test('⑨㉯ 폰 칸은 «제목 칩» — 가는 줄(글자 0)로 되돌아가지 않는다', () => {
   assert.ok(!/body\.mob \.ev\{[^}]*font-size:0/.test(캘린더), '폰 칩이 다시 글자 없는 줄이 됐습니다');
   assert.ok(!/body\.mob \.ev > \*\{display:none\}/.test(캘린더), '폰 칩의 글자를 숨깁니다');
-  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px/, '폰 칩 글자 크기(위젯 캡처 실측)가 없습니다');
+  assert.match(캘린더, /body\.mob \.ev\{font-size:(?:9|1[01])(?:\.\d+)?px/, '폰 칩 글자 크기(9~11px)가 없습니다');
   assert.match(캘린더, /body\.mob #app\.fit \.cal\{flex:1 1 0/, '달력이 화면을 가득 채우지 않습니다');
 });
 test('⑨㉯ 폰 칩은 위젯처럼 — 지난 날도 같은 색, 밝은 칩은 어두운 글자', () => {

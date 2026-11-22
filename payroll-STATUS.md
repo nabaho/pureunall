@@ -12,15 +12,15 @@
 푸른노무법인의 **약 110개 외부 고객 사업장 급여·노동법 아웃소싱 자동화**. 자료(엑셀·PDF·사진)를 읽어 계산→검토(3색)→확정→명세서→파생신고까지. 담당자는 확인·확정만.
 
 ## 1. 아키텍처 (A안 — 통합시스템 통합)
-- 런처 `enter.html`(nabaho.github.io/pureunall) **급여관리 타일** → `payroll-os.html`(라이브).
+- 런처 `enter.html`(erp.pureunlabor.co.kr — 2026-11-15 이사, 옛 nabaho.github.io/pureunall 은 301) **급여관리 타일** → `payroll-os.html`(라이브).
 - **같은 Firebase `pureun-erp`** 공유 → pu-erp 직원이 **같은 이메일/비번 로그인(SSO)**·권한(`uid_roles`) 공유.
 - 데이터는 **`payroll_os` 노드만** 사용(pu-erp data 미접촉 — kcareer·ieum·fund_erp와 동일 앱별 칸 분리).
 - 계산 코어·기준값은 pu-erp에서 이식(공유), 데이터 분리.
 
 ## 2. Firebase
 - 프로젝트 `pureun-erp`, RTDB `https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app`, SDK **10.13.2 compat** + App Check reCAPTCHA v3(키 `6Ldu1hEt...`).
-- 인증: **이메일/비번**(pu-erp 공유). 로그인 후 `uid_roles/{uid}`(isAdmin/fin) 권한 판별.
-- **규칙에 `payroll_os` 블록 게시됨**(`auth!=null && (fin || isAdmin)`). 그 외 pu-erp 규칙 불변.
+- 인증: **이메일/비번 · 패스키 · 카카오**(pu-erp 공유). 로그인 후 `uid_roles/{uid}`(재직 `status === 'active'`, `isAdmin`/`fin`/`sid`) 확인.
+- **규칙에 `payroll_os` 블록 게시됨**(2026-11-18 대표 지시로 재직 직원 전원 `LOGIN` 접근 가능, 이름표 `site_co_link` 관리자 전용 · `rrn_key` 덮어쓰기 차단 · `rrn_log`/`lock_log` 덧붙이기 전용). 그 외 pu-erp 규칙 불변.
 - 데이터 키: `payroll_os/site_cards`(설정카드 배열)·`/payroll`(급여, 사업장→시트/월→직원)·`/payroll_locked`(확정잠금맵 `사업장|월`).
 - 앱의 "가져오기" 버튼으로 `_harness_out`의 JSON을 payroll_os에 업로드.
 - ⚠️ 처음 열면 서버가 비어 "0곳"으로 보임 → 아래 4-데이터 재업로드로 복구(정상).
@@ -103,10 +103,11 @@
 > ~~다온원/새별 일용 지급항목 결측~~ → `parse_daygrid.py` 로 **해결됨**(§7).
 
 ## 7. 알려진 이슈
-- ⚠ **(2026-11-08) 서버에 지어낸 급여 줄이 남아 있을 수 있다 — 지우기는 대표 승인 대기.** #2911 「2026 메일 자동수집」이
-  빈 달마다 코드에 박힌 근로자 3명을 초록으로 써 넣었다(id `r_auto_…`, 출처 `푸른메일자동수집`). 쓰는 길은 끊었고,
-  남은 줄은 목록 읽기(`payRecs`)에서 걸러 화면·명세서·신고 어디에도 안 섞인다(서버엔 남아 있다). 자세히 `status/2026-11-08-payroll-no-fake-autofill.md`.
+- ✅**해결(2026-11-12) 서버의 가짜 급여 줄 1,116개** — #2911 「2026 메일 자동수집」 흔적(출처 `푸른메일자동수집`)이었다. 두 종류:
+  지어낸 3명짜리 표 396 + **다른 달 직원 표를 그대로 복사한 달 720**(진짜 근로자 이름·임금이 엉뚱한 달에 초록으로 붙어 있었다). 백업(저장소 밖) 후
+  줄·직원 표·자동수집 짝 119개를 지웠고, 남긴 줄은 정리 전과 똑같음을 확인했다(사업장 140→104곳). 자세히 `status/2026-11-12-payroll-server-cleanup.md`.
   ⚠ 급여 칸에 «빈 달 채우기»를 다시 만들지 말 것 — 값은 급여데이터함이 사람 확인을 거쳐 넘긴다(§10).
+  ⚠ 남음: 지운 달에 걸렸던 «확정 잠금» 15개(사업장 2곳)는 대표 결정 대기. 사람이 확정한 업체 짝은 0개(이름 짐작만).
 - ✅**해결(2026-09-13) 근태·연차·퇴직·사업장설정이 «쓰기만 되고 읽히지 않았다»** — `payroll_os/attend`·`leave`·`sever`·`labor_policy` 를 시작할 때 안 읽어, 새로고침하면 화면에서 사라졌다(서버엔 남아 있었다). 아직 아무도 안 넣어 잃은 자료는 없었다. 넷 다 얇아 시작 읽기에 넣었다. ★조용한 고장이라 누가 쓰기 시작해야 드러났을 자리.
 - ✅**해결(2026-07-27) 다온원 "노임대장"=일용노무비 날짜격자형**(성명·주민·일당·출역 1~31일칸, 급여=일당×출역일수, 기본급/과세 컬럼 없음). 표준 파서가 기본급"-"·깨진행 → **`engine/parse_daygrid.py` 전용 파서 신설**(라벨로 임금총액·주민세·실지급액·일수 매핑, 2줄/인·#VALUE!·계행·무근무0급여행 제외). build_pilot이 노임/노무 시트를 제외 대신 **재파싱**(다온원 118→151시트). 검산 6건 지급−공제=실수령 전부 일치(이순민 800000−75190=724810 등).
 - 다온원/새별 표준 시트도 일부 지급/공제 항목 결측.
@@ -124,7 +125,7 @@
 ```
 cd ~/Documents/pureunall
 git pull --rebase origin main          # ⚠️ 반드시 먼저 (원격에 여러 작업 올라옴)
-# payroll-os.html / enter.html 편집  → main = 라이브(push 시 nabaho.github.io 즉시 반영)
+# payroll-os.html / enter.html 편집  → main = 라이브(push 시 erp.pureunlabor.co.kr 즉시 반영)
 git add payroll-os.html && git commit -m "..."
 git rebase origin/main && git push origin <작업브랜치>:main   # main 은 pu-deploy 가 점유
 # 하네스/엔진/데이터생성도 이제 main 저장소에서 함께 커밋(워크트리 없어짐)
@@ -143,6 +144,8 @@ git rebase origin/main && git push origin <작업브랜치>:main   # main 은 pu
 - OCR도 마찬가지: `js/pu-doc-read.js`(데이터함 판독기)가 이미 한다. **주민번호·급여 금액을 애초에 읽지 않고**, 불확실한 줄은 노랗게 표시해 사람이 원본과 대조한다. ✅**하네스 OCR은 폐기 완료(2026-09-05)** — `engine/ocr_pipeline.py`·`ocr_triage.py`·`OCR_PLAN.md` 451줄 삭제. 하네스 방식은 「읽고 나서 마스킹」이라 「애초에 안 읽는」 판독기보다 위험했다. **급여관리에 OCR을 다시 만들지 말 것** — 필요하면 데이터함 판독기를 쓴다. (되살릴 일이 생기면 git 이력에 있다)
 
 ## 9. 변경 로그 (최신순 — 끝낼 때 추가)
+- 2026-11-18: **준비중 해제 · 재직 직원 전원 접근 개방**(대표 지시 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」) — 포털 `enter.html` 타일 `soon:true` 제거 + `payroll-os.html` 안쪽 `PuGate.soonUnlessAdmin('급여아웃소싱')` 제거(짝) + 실시간DB 규칙 `payroll_os` 를 재직 직원(`LOGIN`) 업무 칸으로 게시 완료(`docs/firebase-rules-콘솔원문-2026-11-18.json`, 이름표 `site_co_link` 관리자 전용 · `rrn_key` 덮어쓰기 차단 · `rrn_log`/`lock_log` 덧붙이기 전용) + 카카오·패스키 로그인 직원의 사번(`uid_roles.sid`) 기반 `내 담당` 매칭 보강. `status/2026-11-18-payroll-open-all-staff.md`.
+- 2026-11-12: **서버의 가짜 급여 줄 1,116개 정리** — 백업(저장소 밖) 후 월 줄·직원 표·자동수집 짝 119개 삭제, 남긴 줄은 정리 전과 동일(사업장 104곳·월 줄 2,262). `status/2026-11-12-payroll-server-cleanup.md`.
 - 2026-11-08: **가짜 급여 채우기 끔** — `autoSync2026FromMail` 은 이제 메일 요약(`mail_digest_2026`)만 모으고, 로그인 때 저절로 돌지 않는다.
   이미 들어간 가짜 줄은 `payRecs` 가 거르고, 뒷막이로 `effSig` 가 빨강. 검사 `tests/payroll-no-fake-autofill.test.js`(vm 에서 돌림, 옛 코드는 5/5 실패).
   ⚠ 2026-11-02~11-05 의 변경(#2905·#2906·#2908·#2911·#2912·#2916·#2917·#2919·#2930)은 이 로그에 없다 — `status/2026-11-0*-payroll-*.md` 를 볼 것.

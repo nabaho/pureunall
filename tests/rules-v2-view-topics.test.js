@@ -2,7 +2,7 @@
    그림(DOM)이 아니라 «그린 글»을 본다 — 화면은 문자열 그리기 함수(model·listHtml·topicHtml)를 따로 낸다.
    ★ 못 박는 것은 규칙이다(값·개수가 아니다):
      ① 주제는 표준 차례·장 머리 아래 — 장 머리가 빈 맨 앞은 「제1장 총칙」, 표준에 없는 주제는 「그 밖의 조」
-     ② 찾기 글은 주제 «이름»만 거른다(본문 낱말로는 안 걸린다)
+     ② 찾기 — 주제 «이름»이 맞는 조가 먼저, 이름은 안 맞아도 «본문»에 말이 든 조는 아래에 따로(두 글자부터) — 2026-11-15 대표 「검색할 수 있게」
      ③ 덩어리 차례(★최종본 → 곳 수 → 최근), 맨 위는 전문, 아래는 <ins>/<del> 과 「A 와 다른 곳」 한 줄
      ④ 위반 의심 — 규정관리와 같은 검토 기준을 «진짜로» 돌려, 기준 미달 덩어리에만 한 줄
      ⑤ 「쓴 회사」 — 미확정은 「(미확정)」, 최종본은 ★
@@ -84,17 +84,49 @@ test('① «곳» — 같은 회사의 여러 문서는 한 곳, 미확정 문�
   assert.equal(t.count, V.places(M().byTopic[K].flatMap((g) => g.members)));
 });
 
-test('② 찾기 글은 주제 «이름»만 거른다', () => {
+test('② 찾기 — 이름이 맞는 조가 먼저, 본문에만 있는 말은 「본문에 있는 조」로 따로 · 한 글자는 이름만', () => {
   const m = M();
   const h = V.listHtml(m, '', '연차');
   assert.match(h, />연차유급휴가</);
   assert.doesNotMatch(h, />목적</);
   assert.doesNotMatch(h, />동호회</);
-  // 본문에만 있는 낱말로는 아무 주제도 안 걸린다
+  // 이름은 안 맞아도 본문에 든 말 — 「퍼센트」는 연차유급휴가 조 «본문»에만 있다(예전에는 아무것도 안 걸렸다)
   const b = V.listHtml(m, '', '퍼센트');
-  assert.doesNotMatch(b, /data-act="topic"/);
-  assert.match(b, /맞는 조 주제가 없습니다/);
+  assert.match(b, /data-act="topic" data-k="연차유급휴가"/, '본문에 말이 든 조가 안 걸린다');
+  assert.match(b, /본문에 「퍼센트」 이\(가\) 든 조/, '본문 찾기 묶음 머리가 없다');
+  assert.match(b, /<i>본문 \d+곳<\/i>/, '본문 «곳 수»가 안 보인다');
+  assert.doesNotMatch(b, />동호회</, '본문에 없는 조까지 걸렸다');
+  // 이름도 맞는 조는 한 번만, 이름 쪽에 — 본문 묶음에 또 나오지 않는다
+  assert.equal((h.match(/data-k="연차유급휴가"/g) || []).length, 1, '이름이 맞는 조가 본문 묶음에도 또 나온다');
+  // 띄어쓰기는 보지 않는다
+  assert.match(V.listHtml(m, '', '유급 휴가 를'), /본문에 「유급 휴가 를」 이\(가\) 든 조/, '글자 사이 공백이 있으면 본문이 안 걸린다');
+  // 한 글자는 이름만 — 거의 모든 조가 걸린다
+  const one = V.listHtml(m, '', '퍼');
+  assert.doesNotMatch(one, /data-act="topic"/);
+  assert.match(one, /본문은 두 글자부터/);
+  // 아무데도 없는 말
+  assert.match(V.listHtml(m, '', '존재하지않는말씀'), /맞는 조 주제가 없습니다/);
+  // 본문을 훑는 값은 모델·말마다 한 번만 센다
+  const hit = V.bodyHits(m, '퍼센트');
+  assert.strictEqual(V.bodyHits(m, '퍼센트'), hit, '같은 말을 또 훑었다 — 글자를 칠 때마다 수만 조를 다시 훑는다');
 });
+
+test('② 본문을 찾으면 고른 조의 문안 카드에 찾은 말을 칠한다 — 태그·꺾쇠는 건드리지 않는다', () => {
+  const m = M();
+  const t = V.topicHtml(m, K, new Set(), '유급휴가');
+  assert.match(t, /<mark>유급휴가<\/mark>/, '찾은 말에 형광이 안 칠해졌다');
+  // 아래 덩어리의 <ins>·<del> 태그가 깨지지 않는다 — 여는 태그와 닫는 태그 수가 같다
+  ['ins', 'del', 'mark'].forEach((tag) => {
+    assert.equal((t.match(new RegExp('<' + tag + '>', 'g')) || []).length, (t.match(new RegExp('</' + tag + '>', 'g')) || []).length, '<' + tag + '> 짝이 안 맞는다');
+  });
+  // 찾는 말이 없거나 한 글자면 아무것도 안 칠한다
+  assert.doesNotMatch(V.topicHtml(m, K, new Set(), ''), /<mark>/);
+  assert.doesNotMatch(V.topicHtml(m, K, new Set(), '유'), /<mark>/);
+  // 꺾쇠가 든 말도 글자로만 — 태그가 되지 않는다
+  assert.equal(V.markIn('a &lt;b&gt; c', '<b>'), 'a <mark>&lt;b&gt;</mark> c');
+  assert.equal(V.markIn('<ins>연차유급</ins>', '연차유급'), '<ins><mark>연차유급</mark></ins>');
+});
+
 
 test('③ 덩어리 차례와 맨 위 전문, 아래 덩어리는 다른 곳만 칠하고 한 줄 요약', () => {
   const m = M(), gs = m.byTopic[K];
@@ -230,6 +262,42 @@ test('⑦ 모델은 한 번만 — 주제를 바꾸고 펼쳐도 다시 셈하�
     assert.equal(n, 1, '주제를 바꿀 때마다 모델을 다시 셈했다');
     assert.match(el.innerHTML, /<h2>연차유급휴가<\/h2>/);
     assert.match(el.innerHTML, /class="who"/);
+  } finally { V.model = real; }
+});
+
+test('② 화면에서 본문을 찾으면 — 목록에 「본문에 있는 조」, 고른 조의 카드에 형광, 모델은 다시 셈하지 않는다 · 글자 칠 때는 잠깐 기다린다', async () => {
+  const real = V.model;
+  let n = 0;
+  V.model = function () { n++; return real.apply(this, arguments); };
+  const S = { load: () => Promise.resolve(DATA),
+    texts: (docs) => { const t = {}; Object.keys(docs).forEach((id) => { t[id] = TEXTS[id]; }); return Promise.resolve({ texts: t, failed: [] }); } };
+  const el = { innerHTML: '' };
+  try {
+    const ctl = V.mount(el, { S, cache: null, companies: COS, stdText: STD, today: TODAY, criteria: { evaluate: CR.evaluate, useMatchFix() {} },
+      loadFix: () => Promise.resolve({}) });
+    await ctl.ready;
+    ctl.select(K);
+    ctl.search('퍼센트');
+    assert.match(el.innerHTML, /본문에 「퍼센트」 이\(가\) 든 조/);
+    assert.match(el.innerHTML, /<mark>퍼센트<\/mark>/, '고른 조의 문안에 형광이 없다');
+    assert.equal(n, 1, '찾을 때마다 모델을 다시 셈했다');
+    ctl.search('');
+    assert.doesNotMatch(el.innerHTML, /<mark>/, '찾는 말을 지웠는데 형광이 남았다');
+    assert.doesNotMatch(el.innerHTML, /본문에 「/);
+    // 글자를 칠 때(oninput)는 잠깐 기다렸다가 한 번만 그린다 — 연달아 쳐도 마지막 글만
+    const real_st = global.setTimeout, real_ct = global.clearTimeout;
+    const waits = []; let nextId = 0;
+    global.setTimeout = (fn, ms) => { waits.push({ id: ++nextId, fn, ms }); return nextId; };
+    global.clearTimeout = (id) => { const i = waits.findIndex((w) => w.id === id); if (i >= 0) waits.splice(i, 1); };
+    try {
+      const inp = (v) => ({ target: { dataset: { role: 'tq' }, value: v } });
+      el.oninput(inp('유')); el.oninput(inp('유급')); el.oninput(inp('유급휴가'));
+      assert.equal(waits.length, 1, '연달아 친 글자마다 따로 기다린다 — 앞 것을 취소해야 한다');
+      assert.ok(waits[0].ms > 0 && waits[0].ms <= 400, '기다리는 시간이 이상하다: ' + waits[0].ms);
+      assert.doesNotMatch(el.innerHTML, /<mark>/, '기다리는 동안 그렸다');
+      waits[0].fn();
+      assert.match(el.innerHTML, /<mark>유급휴가<\/mark>/, '기다린 뒤 마지막 글로 안 그렸다');
+    } finally { global.setTimeout = real_st; global.clearTimeout = real_ct; }
   } finally { V.model = real; }
 });
 

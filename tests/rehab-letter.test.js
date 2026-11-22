@@ -121,3 +121,22 @@ test('⑫ 파산 공고(kind: bankruptcy)는 대지급금 한 가지만 — 회�
   assert.ok(L.buildMailBody(c, {}).length > 50);
   assert.match(L.buildLetter(co('주식회사 가나')), /회생절차 중 근로자 임금/, '회생 안내문은 그대로');
 });
+
+test('⑬ 회생 안내문·메일에 «AI 인사노무 프로그램»(푸른 자체 시스템) 항목이 있다 — 바우처로 된다고 하지 않는다, 파산 안내엔 없다', () => {
+  const S = L.SYSTEM;
+  /* 대표 지시(2026-11-16)의 핵심 낱말 — AI 인사노무 · 급여 · 푸른 자체 시스템 */
+  assert.match(S.head, /AI 인사노무/); assert.match(S.head + S.sub, /급여/); assert.match(S.head, /직접 만든 시스템/);
+  /* 선정분야(재기컨설팅) 밖 — 바우처·자부담 금액을 이 항목에 붙이지 않는다 */
+  [S.head, S.sub, S.short].forEach((t) => assert.ok(!/바우처|자부담|만원|%/.test(t), '프로그램 항목에 바우처·금액 문구가 섞였다: ' + t));
+  assert.match(S.sub + S.short, /상담/, '비용은 상담 때 안내한다');
+  const c = co('주식회사 가나');
+  const h = L.buildLetter(c);
+  assert.ok(h.includes(L.esc(S.head)) && h.includes(L.esc(S.sub)), '안내문(우편)에 없다');
+  assert.ok((h.match(/class="no"/g) || []).length >= 3, '번호 붙은 항목으로 들어가야 한다');
+  assert.ok(L.buildPlainText(c).includes(S.head), '글자 판(메일 쓰기)에 없다');
+  assert.ok(L.buildMailBody(c, {}).includes(S.short), '짧은 메일 본문에 없다');
+  assert.ok(L.buildAdMail(c, {}).text.includes(S.head), '거래처 (광고) 메일에 없다');
+  const bk = co('주식회사 가나', { kind: 'bankruptcy' });
+  [L.buildLetter(bk), L.buildPlainText(bk), L.buildMailBody(bk, {}), L.buildAdMail(bk, {}).text]
+    .forEach((t) => assert.ok(!/AI 인사노무/.test(t), '파산 안내에는 싣지 않는다'));
+});

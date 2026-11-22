@@ -11,14 +11,20 @@ const doc = fs.readFileSync(path.join(ROOT, 'docs', 'kcareer-요청메일.md'), 
 const kc = fs.readFileSync(path.join(ROOT, 'kcareer.html'), 'utf8');
 const portal = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
 const mod = fs.readFileSync(path.join(ROOT, 'js', 'kcareer-mailreq.js'), 'utf8');
-const rows = doc.split('\n').filter((l) => /^\|\s*(consent|career|other)\s*\|/.test(l)).map((l) => l.split('|').map((c) => c.trim()));
+const rows = doc.split('\n').filter((l) => /^\|\s*(consent|career|meeting|fee|other)\s*\|/.test(l)).map((l) => l.split('|').map((c) => c.trim()));
 
 test('문서의 «알아보는 말»이 코드의 말 목록에 모두 걸린다(문서가 코드가 모르는 말을 약속하지 않는다)', () => {
-  assert.equal(rows.length, 3, '종류 세 줄');
+  assert.equal(rows.length, Q.KINDS.length, '종류마다 한 줄 — 코드에 있는 종류를 문서가 빠뜨리지 않는다');
   rows.forEach((r) => {
     const words = [...r[2].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
     assert.ok(words.length >= 4, r[1] + ' 말이 너무 적다');
-    words.forEach((w) => assert.ok(Q.WORDS[r[1]].test(w), '문서가 «' + w + '» 를 ' + r[1] + ' 으로 알아본다고 하는데 코드가 못 알아본다'));
+    words.forEach((w) => {
+      if (Q.WORDS[r[1]]) { assert.ok(Q.WORDS[r[1]].test(w), '문서가 «' + w + '» 를 ' + r[1] + ' 으로 알아본다고 하는데 코드가 못 알아본다'); return; }
+      /* 회의·위원·비용(2026-11-19) — 범위 말(개인)이어야 들어오고, 그 말로 그 종류가 달린다 */
+      assert.ok(Q.SCOPE_PERSONAL.test(w), '«' + w + '» 가 이력·회의·비용 범위 말이 아니다');
+      const hit = Q.detect({ s: w + ' 안내 요청', an: [], p: '', d: Date.now() });
+      assert.ok(hit && hit.kinds.indexOf(r[1]) >= 0, '«' + w + ' 안내 요청» 이 ' + r[1] + ' 으로 달리지 않는다');
+    });
   });
 });
 test('문서의 종류 이름이 화면의 이름(아이콘 + 이름)과 같다', () => {
@@ -68,4 +74,42 @@ test('문서가 말한 «답장(RE:)은 새 요청이 아니다»가 코드에�
 });
 test('문서가 «아직 안 되는 것»을 적는다 — 서버 상시 감지 · 말 목록의 한계 · 실측 못 함', () => {
   assert.match(doc, /켜 둔 동안/); assert.match(doc, /손으로 정한 목록/); assert.match(doc, /\[확인 필요\]/);
+});
+
+/* ── 범위(이력·회의·비용만 들인다) · 🧠 Laya 의견 — 문서가 코드와 어긋나지 않는다 (대표 지시 2026-11-15 · 2026-11-19) ── */
+const srows = doc.split('\n').filter((l) => /^\|\s*(personal|work)\s*\|/.test(l)).map((l) => l.split('|').map((c) => c.trim()));
+test('문서의 «범위» 말이 코드의 말 목록에 모두 걸린다(문서가 코드가 모르는 말을 약속하지 않는다)', () => {
+  assert.equal(srows.length, 2, '개인 · 업무 두 줄');
+  srows.forEach((r) => {
+    const re = r[1] === 'personal' ? Q.SCOPE_PERSONAL : Q.SCOPE_WORK;
+    const words = [...r[2].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+    assert.ok(words.length >= 5, r[1] + ' 말이 너무 적다');
+    words.forEach((w) => assert.ok(re.test(w), '문서가 «' + w + '» 를 ' + r[1] + ' 말이라고 하는데 코드가 못 알아본다'));
+  });
+  /* 문서가 «개인 말로 치지 않는다»고 한 기관 이름은 코드에서도 개인 말이 아니다 */
+  ['노동위원회', '징계위원회', '고충처리위원회', '산업안전보건위원회', '주휴수당', '연장근로수당'].forEach((w) => {
+    assert.ok(doc.indexOf('`' + w + '`') >= 0, '문서가 «' + w + '» 를 적는다'); assert.ok(!Q.SCOPE_PERSONAL.test(w), w);
+  });
+  ['괴롭힘', '징계', '회의록'].forEach((w) => assert.ok(!Q.SCOPE_WORK.test(w), '«주제» 말 «' + w + '» 은 업무 말이 아니다(문서의 약속)'));
+});
+test('문서의 Laya 숫자·자리가 코드와 같다 — 자리(포트) · 한 번에 건수 · 다시 묻는 횟수 · 쉬는 시간 · 깐 판', () => {
+  const py = fs.readFileSync(path.join(ROOT, 'tools', 'laya-judge', 'laya_judge.py'), 'utf8');
+  const ps = fs.readFileSync(path.join(ROOT, 'tools', 'laya-judge', 'install.ps1'), 'utf8');
+  assert.ok(doc.indexOf('`127.0.0.1:' + Q.LAYA_PORT + '`') >= 0, '문서의 자리 = 모듈 LAYA_PORT');
+  assert.equal(Number(/PUREUN_LAYA_PORT", "(\d+)"/.exec(py)[1]), Q.LAYA_PORT, '판단기의 자리 = 모듈 LAYA_PORT');
+  assert.equal(Number(/한 번에 최대 \*\*(\d+)건\*\*/.exec(doc)[1]), Q.LAYA_MAX);
+  assert.ok(Number(/^MAX_ITEMS = (\d+)/m.exec(py)[1]) >= Q.LAYA_MAX, '판단기가 화면이 보내는 건수를 받는다');
+  assert.equal(Number(/\*\*(\d+)분 쉰다\*\*/.exec(doc)[1]), 10); assert.ok(kc.indexOf('Date.now()+10*60*1000') >= 0, '화면이 실제로 10분 쉰다');
+  assert.ok(/두 번까지만/.test(doc) && Q.LAYA_TRY === 2);
+  const ver = /\$LayaVersion = '([\d.]+)'/.exec(ps)[1];
+  assert.ok(doc.indexOf('**' + ver + '**') >= 0, '문서의 판 = install.ps1'); assert.ok(py.indexOf('LAYA_VERSION = "' + ver + '"') >= 0, '판단기의 판 = install.ps1');
+  assert.equal(Number(/한 번에 (\d+)건까지\)/.exec(doc)[1]), 60, '옛 건 한 번 가르기 한도'); assert.ok(mod.indexOf('SCOPE_BACKFILL_MAX = 60') >= 0);
+});
+test('문서가 약속한 것이 코드에서 참이다 — 걸러냄 딱지 · 걸러낸 메일 단추 · Laya 꺼짐이 기본 · 의견만 · 본문은 안 본다', () => {
+  assert.ok(doc.indexOf('「🤖 자동으로 걸러냄」') >= 0 && Q.scopeMark({ st: 'ignored', autoIgnored: 1 }).text === '🤖 자동으로 걸러냄');
+  assert.ok(doc.indexOf('«🚫 걸러낸 메일»') >= 0 && Q.TABS.some((t) => t.label === '🚫 걸러낸 메일' && t.quiet));
+  assert.match(doc, /꺼짐이 기본/); assert.ok(kc.indexOf("function mrLayaOn(){ return mrLocal('laya')==='1'; }") >= 0);
+  assert.match(doc, /의견만 적는다/); assert.match(doc, /본문은 안 본다/); assert.match(doc, /\[확인 필요\]/);
+  assert.match(doc, /자동으로 거르는 것은 «새 요청»뿐/);
+  assert.match(doc, /mailReqScope/, '쓰지 않게 된 Jev 서버 함수가 남아 있다는 것을 숨기지 않는다');
 });

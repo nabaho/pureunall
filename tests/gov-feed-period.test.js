@@ -2,7 +2,8 @@
    ═══════════════════════════════════════════════════════════════════════════
    ★ 지키는 것
      ① 머리줄과 탭이 «한 덩어리»(#head)로 붙는다 — 따로 붙이면 머리줄이 접힐 때 탭이 숨는다
-     ② 목록 위에 «공고일 ~ · 마감은 ~까지 · 마지막으로 받은 때»를 보인다
+     ② «공고일 ~ · 마감은 ~까지 · 마지막으로 받은 때»를 보인다 — 2026-11-16 대표 「(캡쳐2) 불필요한 부분이다 빼달라」로
+        목록 위에서는 걷고 📡 수집 기록 팝업(healthPop)으로 옮겼다. 목록 위(#period)는 평소 비어 있다.
      ③ 숨긴 공고도 범위에 센다 — 「전체 0건 · 숨김 32건」(대표 화면)에서 범위가 비면 안 된다
      ④ 「새로 받기」가 받은 때(last_at)·범위(last_win)를 남기고, 클라우드에도 싣는다
    gov.html 의 스크립트를 vm 에 올려 «실제로» 돌린다. */
@@ -51,7 +52,7 @@ function runApp(seed, opt) {
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
-  vm.runInNewContext(code + '\n;globalThis.__api={draw,feedPeriod,periodHtml,fetchAll,cloudPush,'
+  vm.runInNewContext(code + '\n;globalThis.__api={draw,feedPeriod,periodHtml,fetchAll,cloudPush,healthPop,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast(() => {});
   return { api: ctx.__api, el, store };
@@ -81,7 +82,9 @@ test('★★ 「전체 0건 · 숨김 N건」이어도 범위가 보인다 — �
   const r = runApp({ feed: 다숨김, last: '2026-10-04', last_at: '2026-10-04T06:20:00.000Z' }, { Date: FixedDate('2026-10-04T16:00:00') });
   r.api.draw();
   assert.match(r.el('cnt').textContent, /전체 0건 · 숨김 4건/);
-  const h = r.el('period').innerHTML;
+  assert.doesNotMatch(r.el('period').innerHTML, /공고일/, '목록 위에서는 걷었다(2026-11-16 캡쳐2 정리)');
+  r.api.healthPop();
+  const h = r.el('popBody').innerHTML;
   assert.match(h, /공고일 <b>2026-09-21<\/b> ~ <b>2026-10-03<\/b>/);
   assert.match(h, /마감은 <b>2026-10-20<\/b>까지/);
   assert.match(h, /마지막으로 받은 때 <b>2026-10-04 \d\d:20<\/b>/);
@@ -103,8 +106,10 @@ test('★★ 「새로 받기」가 받은 때·범위를 남긴다 — 그래�
   await r.api.fetchAll();
   assert.ok(r.store.gov3_last_at, 'last_at 을 남기지 않았다');
   assert.equal(new Date(r.store.gov3_last_at).getTime(), new Date('2026-10-04T15:20:00').getTime());
-  assert.equal(r.store.gov3_last_win, '2026-09-27~2026-10-04', '나라장터에 물은 범위(지난 7일)');
-  assert.match(r.el('period').innerHTML, /마지막으로 받은 때 <b>2026-10-04 15:20<\/b>/);
+  assert.equal(r.store.gov3_last_win, '2026-09-28~2026-10-04', '나라장터에 물은 범위 — «오늘 포함 7일»(2026-11-10 부터 한 번에 7일까지, 8일치는 거절)');
+  r.api.healthPop();
+  assert.match(r.el('popBody').innerHTML, /마지막으로 받은 때 <b>2026-10-04 15:20<\/b>/);
+  assert.match(r.el('popBody').innerHTML, /지난번 받은 결과[\s\S]*받은 공고 0건 중 <b>0건<\/b>이 새로 걸렸습니다/, '받은 결과의 자세한 셈은 팝업에 남는다');
 });
 
 test('★ 받은 때를 클라우드에도 싣는다 — 다른 기기에서도 같은 범위를 말하게', async () => {
@@ -119,7 +124,8 @@ test('★ 받은 때를 클라우드에도 싣는다 — 다른 기기에서도 
 });
 
 test('★★ 틀고정 — 머리줄과 탭이 «한 덩어리»(#head)로 붙는다', () => {
-  const body = src.slice(src.indexOf('<body>'));
+  /* body 에 class(예: 제미나이 판 모양 pu-design)가 붙어도 찾게 — 글자 그대로 '<body>' 를 찾으면 못 찾는다(2026-11-21) */
+  const body = src.slice(src.search(/<body\b[^>]*>/));
   const head = body.indexOf('<div id="head">'), top = body.indexOf('<div id="top">'), tabs = body.indexOf('<div id="tabs">');
   const feed = body.indexOf('<div class="wrap" id="pgFeed">');
   assert.ok(head >= 0 && head < top && top < tabs && tabs < feed, '머리줄·탭이 #head 안에 차례로 있어야 한다');

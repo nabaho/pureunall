@@ -138,7 +138,7 @@ test('★★ 포털 로그아웃이 «같은 열쇠»에 시각을 적고 이알
   const key = SRC.match(/var LOGOUT_KEY = '([^']+)'/)[1];
   const i = PORTAL.indexOf('function broadcastLogout()');
   assert.ok(i > 0, '★★ 포털에 «지금 나갔다» 적는 자리가 없습니다 — auth.signOut() 하나면 잠든 탭은 모릅니다');
-  const fn = PORTAL.slice(i, i + 600);
+  const fn = cutFn(PORTAL, 'function broadcastLogout(');
   assert.ok(fn.indexOf("'" + key + "'") > 0, '★★ 포털과 authsync 의 열쇠 이름이 다릅니다 — 신호가 서로 안 닿습니다');
   assert.match(fn, /pureun_v6_autologin_sid/, '★★ 이알피 자동 로그인 열쇠를 안 지웁니다');
   assert.match(fn, /pu_auth_uid/, 'uid 를 안 지웁니다');
@@ -147,8 +147,10 @@ test('★★ 포털 로그아웃이 «같은 열쇠»에 시각을 적고 이알
 });
 
 test('★ 유휴 자동 로그아웃도 «전체»다', () => {
-  const i = PORTAL.indexOf('Date.now() - last >= LIMIT');
-  assert.ok(i > 0);
+  // 시간 이름은 박지 않는다 — 2026-11-18 카카오 3시간(lim = idleLimit())으로 바뀌었다. «쉰 시간 ≥ 한도» 판정을 찾는다.
+  const m = /Date\.now\(\)\s*-\s*last\s*>=\s*[A-Za-z_$][\w$]*/.exec(PORTAL);
+  const i = m ? m.index : -1;
+  assert.ok(i > 0, '포털의 유휴 자동 로그아웃 판정(쉰 시간 ≥ 한도)을 못 찾았습니다');
   assert.match(PORTAL.slice(i, i + 120), /broadcastLogout\(\)/, '★ 60분 유휴로 나갈 때는 신호를 안 냅니다 — 다른 탭은 그대로 로그인돼 있습니다');
 });
 

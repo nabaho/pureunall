@@ -1070,7 +1070,7 @@ test('넘버 옆 □ 로 여러 건을 골라 한 번에 지운다', () => {
   assert.ok(!/confirm\(/.test(del),
     '확인은 «단추 옆 쪽지»로 한다 — confirm 은 화면 맨 위에 뜬다');
   assert.match(del, /kcAskDelete\(/, '지우기 전에 물어봐야 합니다');
-  assert.match(del, /kcTrashPut\(/, '휴지통에 담아야 되살릴 수 있습니다');
+  assert.match(del, /kcTrashPut(Many)?\(/, '휴지통에 담아야 되살릴 수 있습니다(여러 건은 한 번에 담는 kcTrashPutMany)');
   assert.ok(!/deleteFile\(/.test(del),
     '첨부 원본은 휴지통이 들고 있다 — 여기서 지우면 되살려도 원본이 없습니다');
   assert.match(del, /set\(cfg\.store, get\(cfg\.store\)\.filter/);
@@ -2463,9 +2463,10 @@ test('★★ 체크를 누른 채 끌면 지나간 줄이 모두 같은 상태�
   const dg = funcSource('bindDragSel');
   assert.match(dg, /addEventListener\('mousedown'/, '누를 때 시작합니다');
   assert.match(dg, /addEventListener\('mouseover'/, '끌면서 칠합니다');
-  // ⚠ 누른 «뒤»의 값으로 칠해야 켜며 끌면 켜지고 끄며 끌면 꺼진다
-  assert.match(dg, /setTimeout\(function\(\)\{ _dragSel=\{sync:sync, on:c\.checked\}/,
-    '⚠ 누르기 «전» 값으로 칠하면 반대로 동작합니다');
+  // ⚠ 누른 «그 자리에서» 끌기를 세운다 — 타이머로 미루면 누름·뗌이 더 빨리 끝날 때(터치 탭·자동 클릭) 끌기가 남는다
+  //    (2026-11-15 — 자세히는 tests/kcareer-select-trash-hardening.test.js)
+  assert.match(dg, /_dragSel=\{sync:sync, on:!c\.checked/, '⚠ 끌기를 세우고 누른 칸이 «눌린 뒤» 갖게 될 값(!checked)으로 칠합니다 — 누르기 전 값이면 꺼진 칸에서 끌어도 안 켜집니다');
+  assert.ok(!/setTimeout\(/.test(dg.replace(/\/\*[\s\S]*?\*\//g, '')), '⚠ 끌기를 타이머로 미루지 않는다');
   assert.match(dg, /document\.body\.style\.userSelect='none'/, '끌 때 글자가 잡히지 않게 합니다');
   assert.match(funcSource('careerDragSel'), /bindDragSel\(/,
     '★★ 목록 화면이 제 나름의 끌기를 쓰면 안 됩니다 — 얼개는 하나입니다');

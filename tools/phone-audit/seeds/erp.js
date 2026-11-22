@@ -76,13 +76,48 @@ for (let i = 0; i < 30; i++) {
     createdAt: `2026-10-${String(1 + (i % 17)).padStart(2, '0')}T01:00:00.000Z`,
   });
 }
+/* ── 📌 심급·단계를 읽어 단 사건 계약 둘 (2026-11-15, 계획 5) — 모두 지어낸 것
+   ① 상담접수 · 지노위(읽음·확실) + 중노위(읽음·불확실) — 점선 칩 «?» · 계약 창에서 ☑/✕
+   ② 계약협의 · 요양(확인함) + 심사청구(읽음) — 칩은 «?» 가 남는다(하나는 아직 확인 전) */
+[
+  { id: 'ct-pa-stg1', no: 90, st: 'consult', i: 30, marks: [
+    { code: 'lrc-local', state: 'auto', strength: 'strong', evidence: '부당해고 구제신청(지방노동위원회) 대리 및', srcDoc: '수임계약서', at: U },
+    { code: 'lrc-central', state: 'auto', strength: 'weak', evidence: '중앙노동위원회 재심 사례 참고', srcDoc: '수임계약서', at: U }] },
+  { id: 'ct-pa-stg2', no: 91, st: 'review', i: 31, marks: [
+    { code: 'wc-apply', state: 'checked', strength: 'strong', evidence: '산재 요양급여 신청 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' },
+    { code: 'wc-review', state: 'auto', strength: 'strong', evidence: '불승인 시 심사청구 대리', srcDoc: '수임계약서', at: U }] },
+  /* ③ 계약확정 · 지노위(확인함) → 다음 단계 중노위가 «후속 계약 후보»로 뜬다(2026-11-15, 계획 5 · D)
+     ④ 계약확정 · 지노위·중노위(둘 다 확인함) → 다음은 행정소송 후보, 이미 만든 후속 계약(⑤)이 있어 «있음»으로 보인다 */
+  { id: 'ct-pa-stg3', no: 92, st: 'signed', i: 28, marks: [
+    { code: 'lrc-local', state: 'checked', strength: 'strong', evidence: '구제신청(지방노동위원회) 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' }] },
+  { id: 'ct-pa-stg4', no: 93, st: 'signed', i: 27, marks: [
+    { code: 'lrc-local', state: 'checked', strength: 'strong', evidence: '지방노동위원회 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' },
+    { code: 'lrc-central', state: 'checked', strength: 'strong', evidence: '중앙노동위원회 재심 대리', srcDoc: '수임계약서', at: U, bySid: 'P001' }] },
+  { id: 'ct-pa-stg5', no: 94, st: 'consult', i: 27, marks: [], extra: { parentContractId: 'ct-pa-stg4', stageCode: 'court-admin' } },
+  /* ⑥ 확정 · 단계 마크 없음 · 메모에 지노위·중노위 낱말이 있다 → 계약 창 «계약 글에서 읽어 보기»를 누르면 두 단계를 읽는다(2026-11-16, 계획 5 · E)
+     ⑦ 확정 · 단계 마크 없음 · 낱말 없음 → 눌러도 «찾지 못했습니다» */
+  { id: 'ct-pa-stg6', no: 95, st: 'signed', i: 26, marks: [], extra: { note: '수임계약서 — 부당해고 구제신청(지방노동위원회) 및 중앙노동위원회 재심 대리' } },
+  { id: 'ct-pa-stg7', no: 96, st: 'signed', i: 25, marks: [], extra: { note: '임금체불 진정 대리 — 노동청 진정만' } },
+].forEach((x) => {
+  계약.push(Object.assign({
+    id: x.id, entityType: 'contract', contractNo: `계약-2026-${String(100 + x.no)}`,
+    companyName: 업체명(x.i), clientName: 업체명(x.i), bizNo: 사업자(x.i), companyId: 'co-pa' + (x.i % 32),
+    managerMain: 담당(x.i), managerSubs: [], kind: 'case', kinds: ['case'],
+    typeCodes: { case: 'case-dismiss' }, amounts: { case: 0 }, briefs: { case: '점검 구제신청 대리' },
+    company: { name: 업체명(x.i), bizNo: 사업자(x.i), ceo: '점검대표자' + x.i, address: '', phone: '', email: '', fax: '', contacts: [{ name: '점검담당' + x.i }] },
+    status: x.st, programName: '부당해고 구제신청', stageMarks: x.marks && x.marks.length ? x.marks : undefined,
+    consultDate: 날(11, 10), contractDate: 날(11, 10), note: '📄 계약서 자동 정리 (수임계약서)',
+    createdAt: '2026-11-10T01:00:00.000Z', regAt: '2026-11-10T01:00:00.000Z',
+  }, x.extra || {}));
+});
 
 /* ── 사건 28 ── */
 const 사건 = [];
 for (let i = 0; i < 28; i++) {
   사건.push({
     id: 'cs-pa' + i, entityType: 'case', caseNo: `사건-2026-${String(200 + i)}`, companyName: 업체명(i + 3), bizNo: 사업자(i + 3),
-    managerMain: 담당(i + 1), managerSubs: i % 3 ? [담당(i + 3)] : [], typeCode: ['부당해고', '임금체불', '산재', '직장내괴롭힘'][i % 4],
+    /* 산재는 이알피의 실제 유형 코드(case-injury)로 — 그래야 산재 사건 전용 단추(⚖ 사례·🧰 산재 묶음)가 뜬다(2026-11-15) */
+    managerMain: 담당(i + 1), managerSubs: i % 3 ? [담당(i + 3)] : [], typeCode: ['부당해고', '임금체불', 'case-injury', '직장내괴롭힘'][i % 4],
     typeName: ['부당해고 구제신청', '임금체불 진정', '산업재해 보상 청구', '직장 내 괴롭힘 조사'][i % 4],
     status: ['progress', 'progress', 'pending', 'closed'][i % 4], jurisdiction: ['서울지방노동위원회', '중앙노동위원회', '근로복지공단 서울남부지사'][i % 3],
     receiveDate: 날(1 + (i % 9), 1 + (i % 27)), dueDate: 날(10, 18 + (i % 12)), retainerFee: [1100000, 2200000, 3300000][i % 3],
@@ -163,7 +198,13 @@ const 기금후보 = {
     erp: { contractId: 'ct-pa0', contractNo: '계약-2026-100', at: '2026-10-14T01:00:00.000Z', bySid: 'P001' } },
 };
 
+/* 📋 「나의 업무」의 업무관리 숫자 한 줄(work_erp/mysum/{사번}) — 업무관리가 적는 것을 지어낸다(2026-11-21).
+   업무 목록(work_erp/items)은 비워 둔다 — 그러면 «업무관리에 아직 없는 업무»·«옮길 일반업무» 띠가 그려진다(처음 쓰는 날의 모습). */
+const 오늘ms = Date.now();
+const 날짜 = (n) => { const d = new Date(오늘ms + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const data = {
+  /* 열쇠 = 가짜 로그인 UID(seed.js 의 UID — require 하면 서로 부르기가 되어 undefined 라 글자로 적는다) */
+  work_erp: { mysum: { 'pa-uid-1': { v: 1, n: 12, dd: [날짜(-1), 날짜(3)], nx: [날짜(0)], nl: 4, ws: 날짜(-30), we: 날짜(30), at: 오늘ms - 3600000 } } },
   fund_erp: { contract_inbox: 기금후보 },
   data: {
     user_accounts: { u: U, v: 사람 },
@@ -201,6 +242,15 @@ function 창(name, text) {
 module.exports = {
   data,
   views: [
+    /* 📋 첫 화면(나의 업무)의 「내 업무 — 업무관리」 칸 — 폰에서는 캘린더 아래라 내려가서 잰다(2026-11-21) */
+    { name: 'mydesk-work', wait: 800, run: async (page) => {
+      /* 업무관리 목록(work_erp/items)을 받은 뒤에야 «아직 없는 업무» 띠가 선다 — 그 띠가 뜰 때까지 기다린다 */
+      await page.waitForFunction(() => (document.body.innerText || '').indexOf('업무관리에 아직 없는') >= 0, null, { timeout: 8000 }).catch(() => {});
+      await page.evaluate(() => {
+        const b = Array.prototype.find.call(document.querySelectorAll('button'), (x) => (x.textContent || '').indexOf('업무관리에서 열기') >= 0);
+        if (b) b.scrollIntoView({ block: 'start' });
+      });
+    } },
     메뉴('biz/contract'),
     /* 📄 기금 후보 띠 — ☐ 두 개를 눌러 «N건 선택» 줄이 뜨는지 본다(고르기만으로는 아무것도 안 바뀐다) */
     { name: 'contract-fib-pick', wait: 1200,
@@ -248,6 +298,18 @@ module.exports = {
     창('company-open', '(주)파하바이오헬스케어점검글로벌홀딩스제7공장'),
     메뉴('biz/case'),
     창('case-open', '사건-2026-208'),
+    /* 🧰 산재 묶음 (2026-11-15) — 산재 사건(사건-2026-202)을 열고 단추를 눌러 창을 띄운 뒤, 급여 하나를 골라 «저장됨»이 뜨는지 본다 */
+    { name: 'case-sanjae-kit', wait: 1500,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/case')); await page.waitForTimeout(2500);   /* --view 로 이것만 열어도 되게 */
+        await page.locator('main').getByText('사건-2026-202', { exact: false }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(1500);
+        await page.getByText('🧰 서류·기한·계산 열기', { exact: false }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(500);
+        await page.locator('#puSjkBox .sjk-chip', { hasText: '휴업급여' }).click({ timeout: 3000 });
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
+    },
     메뉴('biz/consulting'),
     메뉴('biz/fund'),
     메뉴('biz/other'),

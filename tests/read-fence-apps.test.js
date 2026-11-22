@@ -131,8 +131,10 @@ const GATED = {
      ⚠ 이름을 한글로 짓지 «말 것». 아래 fnAround 의 \w 가 한글을 못 읽어 자리가
        「(모름)」이 되고, 그러면 이 목록에 적을 수가 없어 **울타리 밖**에 놓인다
        (freeReadAsk 가 처음엔 「무료판독」이었다가 그래서 이름을 바꿨다). */
+  /* freeOcrRan (2026-11-19 비용 점검) — freeReadTry 와 «같은 조건»으로 «무료 판독이 이 사진을 이미 Vision 에 보냈나»만
+     참·거짓으로 답한다. PuDocRead.freeRead 는 «있는지»만 보고 부르지 않는다 — 사진을 어디로도 안 보낸다. */
   'pu-photos.html': ['startRead', 'readPhoto', 'imgChunkMakers', 'readDocChunked',
-    'runReadChunks', 'textChunkMakers', 'freeReadTry', 'freeReadAsk'],
+    'runReadChunks', 'textChunkMakers', 'freeReadTry', 'freeReadAsk', 'freeOcrRan'],
   'gov-consulting.html': ['refCapRead'],      // 아는 채로 열어 둔 곳(KNOWN_OPEN)
   /* 계약서등관리 — 보낸메일 견적·계약 가져오기(총괄관리자만, 견적·계약 자동화 계획 1 · 2026-11-08).
      ★ 한글·PDF 에서 «뽑은 글자»만 보낸다 — 사진·원본 파일을 그대로 보내는 readWithPrompt 는 쓰지 않는다

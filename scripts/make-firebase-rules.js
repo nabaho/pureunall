@@ -251,9 +251,15 @@ rules.data = {
      (2026-09-06 메일 수집기가 이 자리의 업체 담당자 주소를 읽게 되면서 드러났다) */
   cases:          { '.read': LOGIN, '.write': LOGIN,     /* 사건 기록 */
                     v: { $id: { workers: { $i: 근로자칸막기 } } } },
+  other_projects: { '.read': LOGIN, '.write': LOGIN,     /* 기타사업 기록(이알피·업무관리·괴롭힘조사 연동) */
+                    v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 «업무 메모» (2026-10-05) — 여태 그 PC 의 localStorage 에만 있어 다른 PC 에서 안 보였다
      (pu-erp.html CaseMemoPanel). 권한은 사건 기록과 «같게» — 사건을 보는 사람이 그 메모도 본다. */
   case_memos:     { '.read': LOGIN, '.write': LOGIN },
+  /* 🧰 산재 묶음 (2026-11-15, js/pu-sanjae-kit.js) — 산재 사건마다 한 줄: 고른 급여·서류 받음/제출·기한 날짜·질병 «갈래».
+     권한은 사건 기록·업무 메모와 «같게»(재직 직원) — 여태 이름이 없으면 떨어지던 $other 와도 같다. 이름만 붙인다.
+     ⚠ 임금·가족 정보는 이 칸에 안 담는다(모듈이 저장하지 않는다). */
+  case_sanjae:    { '.read': LOGIN, '.write': LOGIN },
 
   /* 근태·일정 — 여태 이름이 없어 $other 로 떨어져 있었다.
      ★ 권한은 «지금 그대로»다(재직 직원 전원 읽기·쓰기). 이름만 적는다 — 동작은 한 톨도 안 바뀐다.
@@ -296,7 +302,7 @@ rules.data = {
     '.read': MGR, '.write': MGR,
     $uid: {
       '.read':  `auth != null && (auth.uid === $uid || ${MGR})`,
-      '.write': `auth != null && (auth.uid === $uid || ${MGR})`
+      '.write': `(${LOGIN}) && (auth.uid === $uid || ${MGR})`
     }
   },
 
@@ -383,7 +389,7 @@ rules.data = {
      ⚠ 제 칸만 쓴다(uid 로 가른다). 남의 «보던 자리»를 고칠 까닭이 없다.
      ⚠ 읽기도 제 것만이다 — 누가 무엇을 보고 있었는지는 남이 알 일이 아니다. */
   cal_view: { '$uid': { '.read': "auth != null && auth.uid == $uid",
-                        '.write': "auth != null && auth.uid == $uid" } },
+                        '.write': `(${LOGIN}) && auth.uid == $uid` } },
 
   /* 사업(컨설팅 종류) 색표(푸른이알피 유형 코드 → 색) — «컨설팅일정»이 정하는 한 곳
      (대표 결정 2026-08-30 「㉮」). 사람 색과 방향이 반대다 — 푸른이알피의 컨설팅 유형
@@ -404,7 +410,7 @@ rules.data = {
     '.read': MGR, '.write': MGR,
     $uid: {
       '.read':  `auth != null && (auth.uid === $uid || ${MGR})`,
-      '.write': `auth != null && (auth.uid === $uid || ${MGR})`
+      '.write': `(${LOGIN}) && (auth.uid === $uid || ${MGR})`
     }
   },
 
@@ -513,16 +519,58 @@ rules.invoice_arc = {
 };
 
 /* ══ 다른 앱들 ═════════════════════════════════════════════════════════ */
-rules.payroll_os = {
-  '.read': `auth != null && (${FIN} || ${ADMIN})`,
-  '.write': ADMIN,
-  $k: {
-    '.write': `(auth != null && (${FIN} || ${ADMIN})) && (newData.exists() || ${ADMIN})`,
-    $k2: { '.write': `auth != null && (${FIN} || ${ADMIN})` }
+/* 급여아웃소싱 — 대표 지시 2026-11-18 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」
+   재직 직원(LOGIN) 모두가 읽고 처리할 수 있는 업무 칸(workspace)으로 연다.
+   ⚠ 전 직원으로 넓히는 만큼 지워지거나 바뀌면 안 되는 네 자리는 이름으로 못 박는다:
+     · site_co_link — 사업장↔업체 이름표 확정은 대표(관리자)만 쓴다(화면 안내와 짝)
+     · rrn_key      — 주민번호 암호화 열쇠는 처음 한 번만 만들고 덮어쓰지 못한다(덮으면 옛 암호문이 영영 안 풀린다)
+     · rrn_log      — 주민번호 열람·입력 기록은 덧붙이기만 된다(고치거나 지우면 기록이 아니다)
+     · lock_log     — 급여 확정·되돌리기 기록도 덧붙이기만 된다 */
+rules.payroll_os = workspace({
+  site_co_link: { '.write': `auth != null && ${ADMIN}` },
+  rrn_key: {
+    $v: {
+      '.write': `(${LOGIN}) && !data.exists()`,
+      '.validate': '!data.exists() && newData.isString() && newData.val().length >= 32 && newData.val().length <= 200'
+    }
+  },
+  rrn_log: {
+    $id: { '.write': `(${LOGIN}) && !data.exists() && newData.exists()` }
+  },
+  lock_log: {
+    $site: {
+      $id: { '.write': `(${LOGIN}) && !data.exists() && newData.exists()` }
+    }
   }
-};
+});
 rules.fund_erp = workspace();
-rules.work_erp = workspace();
+/* 업무관리. ★ mysum/{로그인 UID} = «내 업무 숫자» 한 줄(2026-11-21 — 포털 머리줄 «📋 내 업무» 단추·이알피 나의 업무가 읽는다).
+   «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
+   이름 붙은 자리가 $k 보다 먼저 잡힌다. 읽기는 work_erp 전체와 같다(로그인 직원) — 날짜·건수뿐이라 더 넓어지지 않는다.
+   ⚠ 관리자 쓰기는 위(work_erp .write)에서 그대로 내려온다. */
+/* ★ 모양도 좁힌다(2회차 보안 검토 «중간» — n·at 만 보면 본인 자리에 아무 큰 자료나 쌓을 수 있었다):
+     아는 칸만(v·n·at·dd·nx·nl·ws·we, 나머지 $other 거부) · 건수는 0~10만 · 날짜 목록은 «0~999 번째»까지 «YYYY-MM-DD» 글자만
+     (js/pu-mywork.js MAX_DATES 400 보다 넉넉히) · 통짜 값(글자 하나)은 $uid·dd·nx 의 hasChildren 로 막는다(자식 규칙이 안 도는 함정). */
+const 날짜칸 = "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)";
+const 날짜목록 = { '.validate': 'newData.hasChildren()', $i: { '.validate': `$i.matches(/^[0-9]{1,3}$/) && ${날짜칸}` } };
+const 건수 = (hi) => `newData.isNumber() && newData.val() >= 0 && newData.val() <= ${hi}`;
+rules.work_erp = workspace({
+  mysum: {
+    $uid: {
+      '.write': `(${LOGIN}) && auth.uid === $uid`,
+      '.validate': "newData.hasChildren(['n','at'])",
+      v: { '.validate': 'newData.isNumber()' },
+      n: { '.validate': 건수(100000) },
+      at: { '.validate': 'newData.isNumber()' },
+      nl: { '.validate': 건수(100000) },
+      ws: { '.validate': 날짜칸 },
+      we: { '.validate': 날짜칸 },
+      dd: 날짜목록,
+      nx: 날짜목록,
+      $other: { '.validate': false }
+    }
+  }
+});
 rules.chwieop  = workspace();
 rules.companies = workspace({ '.indexOn': ['folder', 'updatedAt'] });
 rules.improve_requests = workspace({ '.indexOn': ['authorSid', 'done'] });
@@ -901,17 +949,27 @@ rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
 /* 푸른 캘린더 «나만 보기» 일정 (대표 지시 2026-09-27 「본인만 확인가능하고 다른사람은 확인안되게」,
    추천대로 «관리자도 못 본다»). ⚠ data 아래가 아니다 — data 는 재무 권한자가 통째로 읽는다.
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
-rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+rules.cal_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
-/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」) ═══════════════
+/* ══ 📥 일정 후보함 (대표 지시 2026-10-24 「메일로 온 일정을 달력에 넣는 자동화」 · 2026-11-15 자동등록·병합) ═══
    받은 메일에서 서버(AI)가 뽑은 «일정 초안». 메일에서 나온 이름·전화·이메일이 들어 있다.
    ⚠ 읽기는 «관리자(대표)만». 메일함은 직원이 함께 읽지만 후보함은 대표 몫이다 —
      위쪽 읽기가 막혀 있으니(위에서 허락해야 아래에서도 읽힌다) 직원은 못 읽는다.
-   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»만 바꾼다
-     (new → added | dismissed). 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
+   ⚠ 쓰기는 서버(관리자 SDK)만 — 규칙에는 쓰기 문이 없다. 브라우저(대표)는 «상태 한 칸»(cand/$id/status)과
+     자동등록 스위치·한도(cfg)만 바꾼다. 초안 내용은 못 고친다(고쳐서 넣는 것은 달력 창이 한다).
    ⚠ at 색인 — 30일 지난 후보를 서버가 정리할 때 쓴다. state 는 서버가 적는 «마지막 돈 기록»(한도 멈춤 표시 포함). */
 rules.cal_inbox = {
   '.read': `auth != null && ${ADMIN}`,
+  cfg: {
+    '.write': `auth != null && ${ADMIN}`,
+    on:        { '.validate': 'newData.isBoolean()' },
+    autoAdd:   { '.validate': 'newData.isBoolean()' },
+    perRunMax: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 30' },
+    dayLimit:  { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 300' },
+    at:        { '.validate': 'newData.isNumber()' },
+    by:        { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    $other:    { '.validate': false }
+  },
   cand: {
     '.indexOn': ['at'],
     $id: { status: {
@@ -920,7 +978,7 @@ rules.cal_inbox = {
     } }
   }
 };
-rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } };
 
 /* ══ 반출 기록 — 기업정보함에서 «밖으로 나간 것» (대표 지시 2026-08-29) ══
    설계서: docs/superpowers/specs/2026-08-29-기업정보함-반출기록-design.md
@@ -1216,6 +1274,18 @@ rules.pu_mailseen = {
        서버(관리자 SDK)는 규칙을 지나지 않아 영향이 없다. */
 const 통째지우기막음 = { '.write': ADMIN, $part: { '.write': `${LOGIN} && (newData.exists() || ${ADMIN})` } };
 rules.homepage = Object.assign({ '.read': LOGIN }, 통째지우기막음);
+/* ★ 자동 모으개 밑감은 «서버만» 쓴다 (2026-11-16, 뉴스레터 법제처 수정의 보안 검토 «낮음» 반영)
+     homepage/newsBrief·newsDocs·newsPrec 은 서버(관리자 SDK)가 날마다 모아 담는 자리다. 화면은 «읽기만» 한다
+     (pu-news.html 자동화 점검·뉴스레터 짓기 — 2026-11-16 저장소 전체에서 쓰는 곳이 없음을 확인).
+     그런데 위 $part 규칙으로 재직 직원도 쓸 수 있어, 「탈」 칸에 아무 글이나 적어 자동화 점검 경고에 띄울 수 있었다
+     (화면 출력은 모두 씻긴다 — 그래도 길을 닫는다).
+   → 이름 붙은 갈래로 두어 $part 를 안 타게 한다: 쓰기는 총괄관리자만 · 서버는 규칙을 안 지나 그대로 쓴다.
+     읽기는 그대로(LOGIN — 위 homepage '.read'). 보는 사람은 넓어지지 않고 쓰는 사람만 좁아진다. */
+['newsBrief', 'newsDocs', 'newsPrec'].forEach((k) => { rules.homepage[k] = { '.write': ADMIN }; });
+/* ★ 홈페이지 방문 통계(homepage/stats)도 «서버만» 쓴다 (2026-11-19 대표 「추천대로」 — 방문 통계 자체 집계).
+     서버 함수 siteHit 이 날짜 칸에 숫자만 올린다(functions/site-stats.js). 화면(홈페이지 관리 「📈 방문 통계」)은 읽기만.
+     $part 규칙을 타면 재직 직원이 숫자를 고칠 수 있어 이름 붙은 갈래로 둔다 — 읽기는 그대로(LOGIN), 쓰기만 좁아진다. */
+rules.homepage.stats = { '.write': ADMIN };
 /* ★ 직원 경력 제안함 (대표 지시 2026-11-01 「필요시 개인이 추가할 수 있게」 · 결정 「대표 확인 뒤」)
      직원이 포털 「내 정보」에서 새 사이트에 실릴 «내 경력»을 보낸다 — 대표가 홈페이지 관리에서 「받기」.
    ⚠ 이름이 붙은 갈래(careerInbox)는 $part 대신 이 규칙을 탄다 — 그래서 남의 칸에는 못 쓴다.
@@ -1261,7 +1331,7 @@ rules.ilabor = { '.read': LOGIN, '.write': false };
      남의 고침을 덮지 않는다(거절되면 화면이 띠로 «저장/불러오기»를 고르게 한다).
    ⚠ prevAt 을 «안 보내는» 쓰기(옛 판 화면·통째 되돌리기)는 이 검사를 안 거친다 — 일부러다. 받는 칸 이름도 늘리지 말 것.
    ⚠ 첫 저장(at 이 아직 없음)은 그대로 받는다. */
-rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid`,
   prevAt: { '.validate': "!data.parent().child('at').exists() || newData.val() === data.parent().child('at').val()" } } };
 
 /* ══ 정부사업신청(gov.html) — 대표 «개인» 자리 (2026-10-03) ═══════════════
@@ -1275,7 +1345,7 @@ rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write
      새 판은 칸마다 update() 하면서 sv:2 를 함께 쓴다(js/gov-sync.js). 옛 판의 통째 set() 에는 sv 가 없어
      이 규칙에 막힌다 — 그 화면은 「클라우드 저장 실패 — 권한」을 보이고 새로고침하면 새 판이 된다.
    ⚠ 지우기(newData 없음)는 그대로 받는다 — 대표가 자기 자리를 비울 길은 남긴다. */
-rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid`,
   '.validate': "!newData.exists() || newData.child('sv').val() >= 2" } };
 
 /* ══ 컨설턴트 모집 감시(서버 recruitWatch) — 기관 게시판 새 모집 글 (2026-10-04) ══
@@ -1351,6 +1421,25 @@ rules.signboard = { '.read': LOGIN,
   log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
   state:     { '.write': false } };
 
+/* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
+   대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
+   ★ 읽기·쓰기 = 재직 직원(LOGIN). 담기는 것: 강의자료 목록(파일 이름·종류·강의일·강의처·원본 창고 경로) · 검토 메모.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식으로만. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ⚠ 메모는 «그 자료의 메모»여야 한다(sourceId = 자료 열쇠). 원본 파일은 창고 규칙(edulib/{id}/…)이 따로 지킨다.
+   ★ 2026-11-21 cats(사람이 더한 강의 종류 — 대표 「새로운 강의가 생길수 있으니 + 추가기능」): 자료와 «같은 사람»(재직 직원)이 읽고 쓴다.
+     이름은 1~40자, 찾을 낱말은 목록(words)으로만. 더 넓게 열리는 칸은 없다(edulib 전체가 이미 재직 직원 읽기).
+   ★ 보낸 메일 자동 정리의 결과는 edulib 아래가 아니라 «edulib_inbox»(아래)에 둔다 — edulib 는 재직 직원 읽기라 아래 칸을 좁힐 수 없다. */
+const EDULIB_W = `(${LOGIN}) && newData.exists()`;
+rules.edulib = { '.read': LOGIN,
+  items: { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduMaterial'" } },
+  notes: { $item: { $id: { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('sourceId').val() === $item && newData.child('entityType').val() === 'EduReviewNote'" } } },
+  cats:  { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduCategory' && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 40" } } };
+/* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
+   대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,
+   자료함(재직 직원 모두)에 «넣기»는 관리자가 고른다. 담기는 것: 메일 자리·첨부 이름·가린 메일 제목·추정 종류·내용 요약·지문 — 원본 파일은 없다.
+   ★ 읽기 = 관리자만(메일함 화면과 같은 사람) · 쓰기 = 아무도(서버 관리자 SDK 만 — functions/edulib-mail-sweep.js). */
+rules.edulib_inbox = { '.read': `(${LOGIN}) && ${ADMIN}`, '.write': false };
+
 /* ══ 🧾 컨설팅정산(pu-settle.html) — 개인입금 사업의 주관·담당 정산 (2026-10-31) ══
    설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md §6 · 대표 선택 2026-10-31 「대표·재무권한자만」.
    ★ 읽기·쓰기 = 재직 + (관리자 · 위임관리인 · 재무권한) — 포털 타일(perm 'fin')·재무관리와 «같은 사람». 재무관리보다 넓게 열지 않는다.
@@ -1377,6 +1466,23 @@ rules.settle = { '.read': SETTLE_R,
   kakaoQueue: { $id: { '.write': `${SETTLE_KAKAO_W} && !data.exists()`,
     '.validate': "newData.child('id').val() === $id && newData.child('status').val() === 'pending' && newData.child('text').isString() && newData.child('text').val().length <= 4000" } },
   agent:   { '.write': false } };
+
+/* ══ 🏛 푸른등기(pu-deungi.html) — 노무법인 변경등기 서류·필요서류 (2026-11-14) ══
+   대표 지시 2026-11-14 「노무사 변경될 때마다 등기 … 서류가 자동으로 한글파일로 … 내부관리에 넣어라」.
+   ★ 읽기·쓰기 = 재직 + (관리자 · 위임관리인) — 포털 타일(perm 'deungi' — 아무에게도 안 준 깃발)과 «같은 사람».
+     담기는 것: 지금 등기부 현황(사원 이름·생년월일·주소·출자, 대표사원, 분사무소) · 등기 건(바뀌는 사람·서류 고르기·필요서류 확인·일정).
+     ⚠ 주민등록번호 뒷자리는 화면이 저장하지 않는다(생년월일만) — 그래도 주소가 들어 있어 재무권한자에게도 열지 않는다.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 등기 건은 «취소» 상태로만 거둔다. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ★ archive(2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」) — 지난 등기 원본 서류 묶음. 파일 바이트는 원본 보관함 🔒 자리,
+     여기엔 파일 번호·종류만. 파일 줄의 열쇠 = 파일 번호이고, 원본 보관함에서 «🔒(secret) 이고 푸른등기가 올린(from.kind deungi)» 번호만 받는다
+     — 다른 업무의 보통 원본(직원 누구나 여는 자리)을 이어 «총괄관리자만 연다»는 약속이 깨지지 않게(보안 검토 2026-11-14). */
+const DEUNGI_R = `(${LOGIN}) && (${ADMIN} || ${SUB})`;
+const DEUNGI_W = `${DEUNGI_R} && newData.exists()`;
+rules.deungi = { '.read': DEUNGI_R,
+  base:  { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === 'base' && newData.child('entityType').val() === 'DeungiBase'" },
+  cases: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiCase'" } },
+  archive: { $id: { '.write': DEUNGI_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'DeungiArchive'",
+    files: { $f: { '.validate': "newData.child('fileId').val() === $f && root.child('pu_docs/originals').child($f).child('secret').val() === true && root.child('pu_docs/originals').child($f).child('from').child('kind').val() === 'deungi'" } } } } };
 
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
@@ -1485,6 +1591,19 @@ rules.worker_secret = { $kind: { $rec: {
   }
 } } };
 
+/* ══ 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번 — 그 건의 담당자와 대표만 (2026-11-15) ══
+   화면 쪽: js/pu-site-secret.js
+   ★ data/consultings·contracts·companies 는 재직 직원 누구나 통째로 읽으므로
+     공개 덩어리에는 siteId 와 hasSitePw(표시)만 두고, 실제 비번(sitePw)은 여기 둔다.
+   ★ 권한 잣대는 worker_secret 과 같다(그 건의 주담당·부담당 앞 5명 또는 총괄관리자). */
+rules.site_secret = { $kind: { $rec: {
+  '.read': WS_OWNER,
+  '.write': WS_OWNER,
+  '.validate': "$kind.matches(/^(cases|contracts|consultings|funds|other_projects|companies)$/)",
+  sitePw: { '.validate': wsText(120) },
+  $other: { '.validate': false }
+} } };
+
 /* ══ 직원 주민번호·계좌·예금주 금고(staff_secret) — 대표 승인 2026-11-01 (개인정보 2단계) ══
    근로자명부(user_accounts)는 재무 권한자가 «한 덩어리»로 읽는다. 그 안의 칸 하나는 규칙이 못 막으므로
    주민번호·계좌·예금주를 이 금고로 떼어 «대표(isAdmin)만» 읽고 쓰게 한다. 위임관리인·재무 권한자는 못 본다.
@@ -1515,11 +1634,12 @@ rules.staff_secret = {
 };
 
 /* ══ 취업규칙 관리 ═════════════════════════════════════════════════════ */
-const revWrite = `auth != null && ( !data.exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} ) && ( !newData.exists() || newData.child('ownerUid').val() === auth.uid )`;
-const origWrite = `auth != null && ( !data.exists() || !data.child('ownerUid').exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} )`;
+/* 2026-11-15 보안 — 익명 로그인 토큰(auth != null)으로는 쓰지 못하게 LOGIN(재직 직원)으로 좁혔다. 위 개인 자리들도 같다(쓰기만, 읽기는 제 것). */
+const revWrite = `(${LOGIN}) && ( !data.exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} ) && ( !newData.exists() || newData.child('ownerUid').val() === auth.uid )`;
+const origWrite = `(${LOGIN}) && ( !data.exists() || !data.child('ownerUid').exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} )`;
 rules.rules_mgmt = {
   wip: { $uid: {
-    '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+    '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid`,
     $site: { '.validate': "newData.hasChildren(['site','asof'])" }
   } },
   done: { '.read': LOGIN, $site: { $rev: {
@@ -1553,7 +1673,7 @@ rules.rules_mgmt = {
   } } },
   orig:    { '.read': LOGIN, $id: { '.write': origWrite } },
   archive: { '.read': LOGIN, $id: { '.write': origWrite } },
-  worksession: { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } },
+  worksession: { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': `(${LOGIN}) && auth.uid === $uid` } },
   decisions: { '.read': LOGIN, '.write': LOGIN },
   matchfix:  { '.read': LOGIN, '.write': LOGIN },
   /* ── 법 개정 감시 ─ 2026-09-26 ───────────────────────────────────────
@@ -1741,6 +1861,9 @@ rules.ai_read_tally = {
        ⚠ n 에 합치지 말 것 — Gemini 는 «하루» 몫이고 Vision 은 «달마다» 1,000장이다.
          합치면 어느 쪽이 남았는지 알 수가 없다. */
     vision: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    /* won = 실제 토큰으로 센 원화 합 · wn = 그렇게 센 판독 수 (2026-11-19) — 달 금액 = (n − wn) × 단가 + won */
+    won:    { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    wn:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
     $other: { '.validate': false }
   } }
 };
@@ -1806,8 +1929,9 @@ rules.pu_docs = {
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     from:   {
       '.validate': "newData.hasChild('kind')",
-      /* 'quote' — 보낸메일에서 가져온 견적·계약 원본(🔒, 견적·계약 자동화 계획 1). puDocSecret 이 «견적 길» 파일인지 이 값으로 가린다 */
-      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote'" },
+      /* 'quote' — 보낸메일에서 가져온 견적·계약 원본(🔒, 견적·계약 자동화 계획 1). puDocSecret 이 «견적 길» 파일인지 이 값으로 가린다
+         'deungi' — 푸른등기 «지난 등기 원본 서류»(🔒, 2026-11-14 대표 「지난기록 서식 원본과 자료들 모두 넣어달라」). 여는 길은 puDocSecret 총괄관리자 길 그대로 */
+      kind: { '.validate': "newData.val() === 'form' || newData.val() === 'co' || newData.val() === 'photo' || newData.val() === 'folder' || newData.val() === 'quote' || newData.val() === 'deungi'" },
       $f:   { '.validate': 'newData.isString() && newData.val().length <= 200' }
     },
     $other: { '.validate': false }
@@ -2034,5 +2158,261 @@ rules.pu_sign = {
     }
   } }
 };
+
+/* ══ 🛡️ 괴롭힘·성희롱 조사 (pu-harass.html, 2026-11-11) ═════════════════════════
+   근로기준법 제76조의3 제7항(직무상 비밀유지 의무)에 따라 저장 자리를 둘로 가른다:
+     ① harass_invest : 사건 목록·8단계 진행현황·수집 공문 머리글·푸른이알피 동기화 큐 — 읽기는 재직 직원(LOGIN) 공유, 물리 삭제 금지(newData.exists()).
+        ★ 권한 상승 방지: 사건(cases/$id) 수정과 동기화 큐(erp_sync/$id) 발행은 대표(ADMIN) 또는 «이미 배정된» 주·부담당 노무사만 허용하며,
+          부담당은 담당자 목록(managerMain·managerSubs)을 바꿀 수 없고, 신규 생성 시에도 기존재 비밀금고($id) 선점 우회를 차단한다.
+     ② harass_secret : 면담 진술 요약·쟁점별 사실인정 및 3요건 검토·조사결과보고서 본문 —
+        위(루트)에는 .read/.write 를 두지 않고 사건 칸($cid)마다 «그 사건의 주·부담당 노무사 또는 대표(ADMIN)»만 열람·저장한다. */
+const 조사건 = (keyVar) => `root.child('harass_invest').child('cases').child(${keyVar})`;
+const 조사담당식 = (recExpr) => `(${내사번} != null && (${recExpr}.child('managerMain').val() === ${내사번}`
+  + [0, 1, 2, 3, 4].map(function (i) { return ` || ${recExpr}.child('managerSubs').child('${i}').val() === ${내사번}`; }).join('')
+  + '))';
+const 기존조사담당 = 조사담당식('data');
+const 담당자불변 = "newData.child('managerMain').val() === data.child('managerMain').val()"
+  + [0, 1, 2, 3, 4].map(function (i) { return ` && newData.child('managerSubs').child('${i}').val() === data.child('managerSubs').child('${i}').val()`; }).join('');
+const HARASS_CASE_WRITE = `(${LOGIN}) && newData.exists() && (!data.exists()`
+  + ` ? (${ADMIN} || (!root.child('harass_secret').child($id).exists() && ${조사담당식('newData')}))`
+  + ` : (${ADMIN} || (${기존조사담당} && ((${내사번} != null && data.child('managerMain').val() === ${내사번}) || (${담당자불변})))))`;
+const HARASS_SYNC_OWNER = `(${LOGIN}) && (${ADMIN} || ${조사담당식(조사건('$id'))})`;
+const HARASS_SECRET_OWNER = `(${LOGIN}) && (${ADMIN} || ${조사담당식(조사건('$cid'))})`;
+
+rules.harass_invest = {
+  '.read': LOGIN,
+  cases: { $id: {
+    '.write': HARASS_CASE_WRITE,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'",
+    managerMain: {
+      '.validate': "newData.isString() && newData.val().length <= 20 && (newData.val() === '' || newData.val().matches(/^[A-Za-z0-9_-]+$/))"
+    },
+    managerSubs: {
+      $subIdx: {
+        '.validate': "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+      }
+    }
+  } },
+  erp_sync: { $id: {
+    '.write': `(${HARASS_SYNC_OWNER}) && newData.exists()`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  erp_ack: { $id: {
+    '.write': `(${HARASS_SYNC_OWNER}) && newData.exists() && root.child('harass_invest').child('erp_sync').child($id).exists()`
+      + " && newData.child('syncedRevision').val() === root.child('harass_invest').child('erp_sync').child($id).child('revision').val()",
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  dismissed: { $id: {
+    '.write': `(${LOGIN}) && newData.exists()`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  $other: { '.validate': false }
+};
+
+rules.harass_secret = {
+  $cid: {
+    '.read': HARASS_SECRET_OWNER,
+    '.write': `(${HARASS_SECRET_OWNER}) && newData.exists()`,
+    '.validate': "newData.child('id').val() === $cid && newData.child('entityType').val() === 'Document'"
+  }
+};
+
+/* 🛡️ 괴롭힘·성희롱 조사 전용 비밀 전자서명 (sign-harass.html, 2026-11-12)
+   - req/$cid/$r : 사건 주·부담당 노무사 및 대표(HARASS_SECRET_OWNER)만 열람·생성(일반 직원 열람 차단).
+   - open/$t     : 128비트 열쇠를 아는 사람만 단일 슬롯 읽기(목록 열람 차단). 내부에는 AES-256-GCM 암호문만 담기며 평문 진술·성명·사업장명·연락처 없음.
+                   생성·회수는 해당 cid 담당 노무사·대표만 허용하고 cid·reqId 재바인딩 우회를 막는다.
+   - open/$t/sub : 익명 서명자가 1회만 제출(!data.exists()), 기한 안·미취소·제출인증자(subAuth = SHA256(t|#k|code|docHash)) 일치·문서지문 일치 강제.
+                   연락처 끝자리(p4)나 보안코드를 평문 저장하지 않으며 #k 와 12자리 보안코드를 모두 모르면 슬롯 선점 불가능. */
+const HARASS_OPEN_CASE_OWNER = (cidExpr) => `(${LOGIN}) && (${ADMIN} || ${조사담당식(조사건(cidExpr))})`;
+const HARASS_OPEN_WRITE = "newData.exists() && (!data.exists()"
+  + ` ? (${HARASS_OPEN_CASE_OWNER("newData.child('cid').val()")})`
+  + ` : (newData.child('cid').val() === data.child('cid').val() && newData.child('reqId').val() === data.child('reqId').val() && (${HARASS_OPEN_CASE_OWNER("data.child('cid').val()")})))`;
+
+rules.harass_sign = {
+  req: {
+    $cid: {
+      '.read': HARASS_SECRET_OWNER,
+      $r: {
+        '.write': `(${HARASS_SECRET_OWNER}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $r && newData.child('cid').val() === $cid && newData.child('entityType').val() === 'Submission'"
+          + " && newData.hasChildren(['t','k','ivId','accessCode','subAuth','exp','docHash'])",
+        accessCode: { '.validate': "newData.isString() && newData.val().matches(/^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/)" },
+        subAuth:    { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+        t:          { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)" },
+        k:          { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)" }
+      }
+    }
+  },
+  open: {
+    $t: {
+      '.read': 'auth != null',
+      '.write': HARASS_OPEN_WRITE,
+      '.validate': "$t.matches(/^[0-9a-f]{32}$/) && newData.child('id').val() === $t && newData.child('entityType').val() === 'Submission'"
+        + " && newData.hasChildren(['cid','reqId','exp','docHash'])"
+        + " && root.child('harass_sign').child('req').child(newData.child('cid').val()).child(newData.child('reqId').val()).child('t').val() === $t",
+      encPayload: {
+        '.validate': "newData.hasChildren(['ct','iv','salt'])",
+        ct:     { '.validate': 'newData.isString() && newData.val().length <= 2500000' },
+        iv:     { '.validate': 'newData.isString() && newData.val().length <= 64' },
+        salt:   { '.validate': 'newData.isString() && newData.val().length <= 64' },
+        $other: { '.validate': false }
+      },
+      seen: { '.write': 'auth != null && !data.exists()', '.validate': 'newData.val() === now || (data.exists() && newData.val() === data.val())' },
+      sub: {
+        '.write': "auth != null && !data.exists() && newData.exists()"
+          + " && data.parent().child('void').val() !== true && data.parent().child('_deleted').val() !== true"
+          + " && data.parent().child('exp').val() > now"
+          + " && newData.child('subAuth').val() === root.child('harass_sign').child('req').child(data.parent().child('cid').val()).child(data.parent().child('reqId').val()).child('subAuth').val()"
+          + " && newData.child('docHash').val() === data.parent().child('docHash').val()",
+        '.validate': "newData.hasChildren(['id','entityType','schemaVersion','contractVersion','createdAt','updatedAt','revision','subAuth','docHash','agree','pledgeAgree','at','encSub'])"
+          + " && newData.child('id').val() === $t && newData.child('entityType').val() === 'Submission'",
+        id:              { '.validate': 'newData.isString() && newData.val() === $t' },
+        entityType:      { '.validate': "newData.val() === 'Submission'" },
+        schemaVersion:   { '.validate': 'newData.isNumber()' },
+        contractVersion: { '.validate': 'newData.val() === 1' },
+        createdAt:       { '.validate': 'newData.isNumber()' },
+        updatedAt:       { '.validate': 'newData.isNumber()' },
+        revision:        { '.validate': 'newData.val() === 1' },
+        subAuth:         { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+        docHash:         { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+        agree:           { '.validate': 'newData.val() === true' },
+        pledgeAgree:     { '.validate': 'newData.val() === true' },
+        at:              { '.validate': 'newData.val() === now || (data.exists() && newData.val() === data.val())' },
+        ua:              { '.validate': 'newData.isString() && newData.val().length <= 300' },
+        encSub: {
+          '.validate': "newData.hasChildren(['ct','iv','salt'])",
+          ct:     { '.validate': 'newData.isString() && newData.val().length >= 8 && newData.val().length < 400000' },
+          iv:     { '.validate': 'newData.isString() && newData.val().length >= 8 && newData.val().length <= 64' },
+          salt:   { '.validate': 'newData.isString() && newData.val().length >= 8 && newData.val().length <= 64' },
+          $other: { '.validate': false }
+        },
+        $other: { '.validate': false }
+      }
+    }
+  },
+  $other: { '.validate': false }
+};
+
+/* 🏭 일터상생혁신 자동화 (ilteo.html, 2026-11-15)
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 중간보고·최종보고 확정 기준선 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_ilteo = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  mid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  final: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
+/* ⚡ 산업·일자리전환 컨설팅 자동화 (jobtrans.html, 2026-11-15)
+   - 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 사업장 워크스페이스·비식별 분석 카드·중간/최종보고서·불변 스냅샷.
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 중간보고·최종보고 확정 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_jobtrans = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  mid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  final: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
+/* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
+   - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
+     (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).
+   - ⚠ ADMIN(isAdmin)·SUB·FIN 으로 열지 않는다 — 이알피는 관리자대행(admin-delegate)에게도 isAdmin 을 적는다.
+     uid_roles/{uid}/role 칸은 본인이 쓸 수 있어 믿지 않는다. 대표만 가리키는 것은 app_owner/uid 뿐이다.
+   - datahub/{uid}/settings = 보기 설정(ViewState). 대표 본인만 읽고 쓴다. 알려진 칸 밖은 막는다.
+     메타 칸은 js/pu-ontology-write.js prepareRecord·tombstone 이 저절로 붙이는 것 전부(하나라도 빠지면 저장이 막힌다).
+     thresholds = 현황판 «주의» 기준(결정 ⑩) — 대표가 정하기 전엔 비어 있고, 비어 있으면 화면은 색을 칠하지 않는다.
+   - datahub_device/{uid} = 승인된 기기 공개 열쇠·지문. 대표 본인만 읽고, 쓰기는 서버·터미널만(.write:false).
+   - datahub_device_req·datahub_nonce·datahub_activity = 서버만 읽고 쓴다(화면은 읽지도 못한다).
+   - datahub_board = 현황판 «건수·비율» — 대표만 읽고, 쓰기는 서버(datahubBoardTally)만.
+   ⚠ 서버(Cloud Functions)·firebase CLI 는 관리자 권한이라 이 규칙을 안 탄다 — 그래서 .write:false 여도 서버는 쓴다. */
+const DATAHUB_IS_OWNER = "auth.uid === root.child('app_owner').child('uid').val()";
+const DATAHUB_OWNER = `(${LOGIN}) && ${DATAHUB_IS_OWNER}`;
+const DATAHUB_SELF = `(${LOGIN}) && auth.uid === $uid && ${DATAHUB_IS_OWNER}`;
+const 짧은글 = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n}` });
+const 시각칸 = { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' };
+const 숫자칸 = { '.validate': 'newData.isNumber()' };
+/* 기준선 묶음 — aLines {goal: A안 달 입금 기준선(만원)} · cLines {warn, over: C안 주당 업무 건수 «많음·넘침»(결정 ④)}.
+   숫자·짧은 글 하나 또는 {이름: 짧은 글·숫자} 묶음 */
+const 줄묶음 = {
+  '.validate': 'newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 400) || newData.hasChildren()',
+  $i: { '.validate': '$i.length <= 64 && (newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 64))' }
+};
+rules.app_owner = { '.read': LOGIN, '.write': false };
+/* ⚠ 쓰기는 settings 자리에만 연다($uid 통째 쓰기 없음). 통째 지우기는 막고(newData.exists — 지우려면 저장 관문의 _deleted 표식),
+     수정차수(revision)는 저장 관문처럼 «전 값 + 1»만 받는다 — 두 기기가 서로를 조용히 덮지 못하게(보안 검토 2026-11-21 «중간»). */
+rules.datahub = { $uid: {
+  '.read': DATAHUB_SELF,
+  settings: {
+    '.write': `${DATAHUB_SELF} && newData.exists()`,
+    '.validate': "newData.hasChildren(['id', 'entityType', 'revision']) && newData.child('entityType').val() === 'ViewState'"
+      + " && newData.child('revision').isNumber()"
+      + " && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    /* 저장 관문 메타 칸 */
+    id: 짧은글(200), entityType: 짧은글(40), schemaVersion: 숫자칸, contractVersion: 숫자칸, revision: 숫자칸,
+    createdAt: 시각칸, updatedAt: 시각칸, createdBy: 짧은글(128), updatedBy: 짧은글(128),
+    _deleted: { '.validate': 'newData.isBoolean()' }, deletedAt: 시각칸, deletedBy: 짧은글(128),
+    /* 보기 설정 */
+    view: 짧은글(40), period: 짧은글(40), basis: 짧은글(40), vmode: 짧은글(40),
+    net: { '.validate': 'newData.isBoolean() || (newData.isString() && newData.val().length <= 20)' },
+    aLines: 줄묶음, cLines: 줄묶음,
+    /* 주의 기준(결정 ⑩) — {앱 key: {w,b}} · _rec(기록률 %) · _recon {w,b}(다년 대조 차이 %). 정하기 전엔 화면이 색을 안 칠한다 */
+    thresholds: {
+      '.validate': 'newData.hasChildren()',
+      $app: {
+        '.validate': '$app.length <= 32 && (newData.isNumber() || newData.hasChildren())',
+        $k: { '.validate': '$k.length <= 32 && (newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 40))' }
+      }
+    },
+    /* 다년 전망 손잡이 기본값 {adv 자문·기금 순증률, case 사건·컨설팅 성장률, cost 원가·판관비율} — 숫자 하나 또는 {이름: 숫자·짧은 글} */
+    baseline: {
+      '.validate': 'newData.isNumber() || newData.hasChildren()',
+      $k: { '.validate': '$k.length <= 32 && (newData.isNumber() || (newData.isString() && newData.val().length <= 40))' }
+    },
+    $other: { '.validate': false }
+  },
+  $other: { '.validate': false }
+} };
+rules.datahub_device = { $uid: { '.read': DATAHUB_SELF, '.write': false } };
+rules.datahub_device_req = { '.read': false, '.write': false };
+rules.datahub_nonce = { '.read': false, '.write': false };
+rules.datahub_activity = { '.read': false, '.write': false };
+rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

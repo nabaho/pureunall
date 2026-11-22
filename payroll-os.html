@@ -14,7 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
@@ -23,12 +23,12 @@
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
-<script src="js/pu-backup.js?v=2"></script>
+<script src="js/pu-backup.js?v=3"></script>
 <script src="js/pu-labor-core.js?v=14"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=6"></script>
 <script src="js/pu-co-thread.js?v=3"></script>
-<script src="js/pu-hwp-engine.js?v=21"></script>
+<script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="xlsx_gen.js?v=15"></script>
@@ -57,8 +57,20 @@ main{flex:1;padding:12px 18px;overflow:auto}
 .sum-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer}
 .sum-card:hover{border-color:var(--navy);background:#f8fafc}
 .dash-2col{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,0.95fr);gap:10px;align-items:start}
-.filing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
-.rrn-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.filing-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.rrn-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.ov-stack{display:flex;flex-direction:column;gap:8px}
+.ov-box{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.ov-head{padding:6px 12px;min-height:34px;border-bottom:1px solid var(--line);background:var(--paper);font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;flex-shrink:0}
+.ov-head>div{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-body{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable}
+.ov-row{display:flex;align-items:center;gap:8px;padding:4px 12px;min-height:32px;border-bottom:1px solid var(--line);font-size:12px;flex-wrap:nowrap;min-width:0}
+.ov-row:last-child{border-bottom:none}
+.ov-row:hover{background:#f8fafc}
+.ov-lbl{width:170px;flex:0 0 170px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-val{flex:1;min-width:0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-act{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ov-empty{padding:10px 12px;font-size:12px;color:var(--sub)}
 .pay-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
 .pay-kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .mpills{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:10px;align-items:center}
@@ -224,7 +236,7 @@ nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh -
 .chips button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:2px 10px;cursor:pointer;font-family:inherit;font-size:12px}
 .chips button.on{border-color:var(--navy);color:var(--navy);font-weight:700}
 .tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:12px 0 14px}
-.tabs button{border:none;background:none;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;color:var(--ink)}
+.tabs button{border:none;background:none;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;color:var(--ink);white-space:nowrap}
 .tabs button.on{border-bottom-color:var(--navy);color:var(--navy);font-weight:700}
 .tabbody h1{font-size:16px}
 @media (max-width:760px){
@@ -273,9 +285,27 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
   #colist{height:calc(100vh - 48px);max-height:calc(100vh - 48px);overflow:hidden;position:static}
   #colRows{overflow-y:auto;scrollbar-gutter:stable}
   main{height:calc(100vh - 48px);max-height:calc(100vh - 48px);overflow-y:auto;scrollbar-gutter:stable;padding:14px 24px 22px}
-  main>.tabs{position:sticky;top:-14px;z-index:5;background:var(--paper);margin:-14px 0 14px;padding-top:12px;flex-wrap:nowrap}
+  main>.tabs{position:sticky;top:-14px;z-index:16;height:40px;min-height:40px;max-height:40px;background:#fff;margin:-14px -24px 0;padding:2px 24px 0;border-bottom:1px solid var(--line);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  main>.tabs::-webkit-scrollbar{display:none}
+  main>.uimode-bar{position:sticky;top:26px;z-index:15;height:36px;min-height:36px;max-height:36px;margin:0 -24px 10px;padding:0 24px;border-radius:0;border-left:0;border-right:0;border-top:0;border-bottom:1px solid var(--line);background:var(--paper);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  main>.uimode-bar::-webkit-scrollbar{display:none}
+  .ov-box.ov-sum{height:164px;min-height:164px;max-height:164px}
+  .ov-box.ov-filing{height:228px;min-height:228px;max-height:228px}
+  .ov-box.ov-rrn{height:220px;min-height:220px;max-height:220px}
+  .ov-box.ov-mail{height:220px;min-height:220px;max-height:220px}
+  .ov-box.ov-var{height:150px;min-height:150px;max-height:150px}
+  .ov-box.ov-lock{height:150px;min-height:150px;max-height:150px}
 }
 @media (max-width:760px){
+  .uimode-bar{max-width:100%;padding:6px 8px;gap:6px}
+  .uimode-btns{width:100%;min-width:0}
+  .uimode-btn{white-space:nowrap;flex-shrink:0}
+  #uiModeSel{flex:1 1 140px;min-width:0;max-width:100%}
+  .uimode-hint{display:none}
+  .ov-head{flex-wrap:wrap;padding:6px 8px}
+  .ov-row{padding:5px 8px;gap:5px;flex-wrap:wrap}
+  .ov-lbl{width:auto;flex:0 1 auto;max-width:130px}
+  .ov-body{max-height:260px}
   header{flex-wrap:wrap}
   header .cobar{order:5;flex-basis:100%;flex-wrap:wrap;white-space:normal}
   header .cobar .cn{max-width:none}
@@ -341,25 +371,18 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 }
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
-<script src="js/pu-appbar.js?v=42"></script>
+<script src="js/pu-appbar.js?v=54"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
-<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-<script src="js/pu-authsync.js?v=6"></script>
+<script src="js/pu-authsync.js?v=7"></script>
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-whoami.js?v=4"></script>
-<script>
-/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-10-20 「급여관리도 준비중으로」) ══
-   2026-09-23 에 처음 막았고, 2026-10-09 「준비중 풀기」로 열었다가 다시 닫는다.
-   포털 타일의 `soon:true` 와 «짝»이다 — 포털은 타일을 못 누르게 하고, 여기는
-   주소창에 payroll-os.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
-   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
-   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin.
-   `tests/app-soon-gate.test.js` ①·⑨ 가 지킨다. */
-try { PuGate.soonUnlessAdmin('급여아웃소싱'); } catch(_){}
-</script>
+<!-- 「준비중」 문(PuGate.soonUnlessAdmin)은 2026-11-18 대표 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」로 걷었다 —
+     포털 타일의 `soon:true` 와 실시간DB 규칙(`payroll_os` → 재직 직원 LOGIN)을 «짝»으로 함께 열었다.
+     `tests/app-soon-gate.test.js` ⑨ 가 「다시 잠기지 않음」을 지킨다. -->
 <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
      자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
      이 앱은 머리줄 #whoami 에 스스로 이름을 그리므로 뜬 표가 그 위에 겹친다. -->
@@ -420,7 +443,7 @@ var ROOT = "payroll_os";
 var cache = {}, fbDb = null, me = null, ready = false;
 /* 관리자인가 — 이름표 맞추기(대표 지시 2026-10-05 「이름표 맞추기는 내가」)를 누가 하나 가른다.
    ⚠ 화면에서 단추를 감추는 것일 뿐이다. 실제로 막는 것은 콘솔 규칙이다. */
-var isAdminUser = false;
+var isAdminUser = false, mySid = '';
 
 firebase.initializeApp(FB_CONFIG);
 try { if(firebase.appCheck) FB_APPCHECK_ON && firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(FB_APPCHECK_KEY), true); } catch(e){}
@@ -455,9 +478,10 @@ function afterLogin(){
     document.getElementById('whoami').textContent=nm?(nm+(whoRole?' · '+whoRole:'')):whoRole;
   }
   drawWho();
-  if(window.PuWhoami&&!window.__payWhoHooked){ window.__payWhoHooked=true; PuWhoami.onChange(function(){ drawWho(); }); }
+  if(window.PuWhoami&&!window.__payWhoHooked){ window.__payWhoHooked=true; PuWhoami.onChange(function(m){ if(m&&m.sid&&!mySid) mySid=String(m.sid); drawWho(); if(ready) render(); }); }
   fbDb.ref('uid_roles/'+me.uid).once('value').then(function(s){
     var r=s.val()||{}; whoRole=r.isAdmin?'관리자':(r.fin?'재무/급여':'일반');
+    if(r.sid) mySid=String(r.sid);
     isAdminUser=!!r.isAdmin; if(ready) render();
     drawWho();
   }).catch(function(){ drawWho(); });
@@ -546,13 +570,13 @@ function afterLogin(){
          그래서 «무엇을 하면 되는지»를 적는다. 만든 사람을 위한 코드는 작게 뒤에 둔다. */
     var 권한없음 = String((e && e.code) || '').indexOf('permission') >= 0;
     document.getElementById('main').innerHTML = 권한없음
-      ? '<div class="empty"><b>급여 자료를 볼 권한이 없습니다.</b><br><br>'
-        + '급여관리는 <b>재무·급여 권한</b>이 있는 분만 자료가 보입니다.<br>'
-        + '대표께 <b>「급여관리 권한」</b>을 요청해 주세요.<br>'
-        + '<span style="color:#94a3b8;font-size:12px">(권한이 생기면 바로 보입니다 — 다시 설치할 것은 없습니다)</span></div>'
-      : '<div class="empty"><b>급여 자료를 읽지 못했습니다.</b><br><br>'
+      ? '<div class="empty" role="alert"><b>급여 자료를 볼 권한이 없습니다.</b><br><br>'
+        + '급여아웃소싱은 <b>재직 직원으로 등록된 계정</b>만 자료가 보입니다.<br>'
+        + '대표(관리자)께 <b>계정 등록·재직 상태</b>를 확인해 주세요.<br>'
+        + '<span style="color:var(--sub);font-size:12px">(등록되면 바로 보입니다 — 다시 설치할 것은 없습니다)</span></div>'
+      : '<div class="empty" role="alert"><b>급여 자료를 읽지 못했습니다.</b><br><br>'
         + '잠시 뒤 새로고침해 주세요. 그래도 안 되면 이 말을 전해 주세요 — '
-        + '<span style="color:#94a3b8">' + ((e && e.code) || '알 수 없음') + '</span></div>'; });
+        + '<span style="color:var(--sub)">' + ((e && e.code) || '알 수 없음') + '</span></div>'; });
 }
 function dbGet(k,fb){ return (cache[k]!=null)?cache[k]:fb; }
 
@@ -769,22 +793,25 @@ function ensureLockLog(site){
   }).catch(function(e){ delete lockLogBusy[site]; lockLogBox[site]=[]; console.warn('[확정 기록]', e&&e.code); });
 }
 function lockLogHtml(site){
-  if(!site) return '';
+  var head='<div class="ov-head"><div><b>🔒 확정 기록</b> <span style="font-size:11.5px;color:var(--sub)">누가·언제 확정하고 되돌렸나 (최근 10건)</span></div></div>';
+  if(!site) return '<div class="ov-box ov-lock">'+head+'<div class="ov-body"><div class="ov-empty">이 회사에 연결된 급여 자료가 아직 없습니다.</div></div></div>';
   ensureLockLog(site);
   var list=lockLogBox[site];
-  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">'
-    +'<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>확정 기록</b> <span style="font-size:12px;color:var(--sub)">누가·언제 확정하고 되돌렸나 (최근 10건)</span></div>';
-  if(list===undefined) return h+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">불러오는 중…</div></div>';
-  if(!list.length) return h+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">아직 기록이 없습니다 — 이 기능 이전의 확정은 시각만 남아 있습니다.</div></div>';
-  list.forEach(function(x){
+  if(list===undefined) return '<div class="ov-box ov-lock">'+head+'<div class="ov-body"><div class="ov-empty">불러오는 중…</div></div></div>';
+  if(!list.length) return '<div class="ov-box ov-lock">'+head+'<div class="ov-body"><div class="ov-empty">아직 기록이 없습니다 — 이 기능 이전의 확정은 시각만 남아 있습니다.</div></div></div>';
+  var RM=lmap('row_marks')||{}, h='<div class="ov-box ov-lock">'+head+'<div class="ov-body">';
+  list.forEach(function(x, idx){
     var d=new Date(x.at||0), when=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
-    h+='<div style="display:flex;gap:10px;padding:7px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
-      +'<span style="width:120px;color:var(--sub)">'+when+'</span>'
-      +'<b style="width:70px;'+(x.action==='되돌리기'?'color:var(--warn)':'')+'">'+(x.action||'')+'</b>'
-      +'<span style="flex:1">'+(x.months||[]).join(', ')+(x.why?(' · <span style="color:var(--sub)">'+x.why+'</span>'):'')+'</span>'
-      +'<span style="color:var(--sub)">'+esc(whoName(x.by))+'</span></div>';   /* ⚠ 메일 앞부분(p001)이 아니라 이름 (대표 결정 2026-10-25) */
+    var k='lkl:'+site+'|'+(x.at||idx), q=esc(k), mk=RM[k]||{};
+    var whoStr=(typeof whoName==='function')?esc(whoName(x.by)):esc(x.by||'');
+    h+='<div class="ov-row">'
+      +'<span class="mkwrap"><span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+(mk.chk?' on':'')+'" aria-label="확정기록 '+(idx+1)+'번 체크" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'chk\')">'+(mk.chk?'\u2611':'\u2610')+'</button><button type="button" class="rst'+(mk.star?' on':'')+'" aria-label="확정기록 '+(idx+1)+'번 별표" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'star\')">'+(mk.star?'\u2605':'\u2606')+'</button></span>'
+      +'<span style="width:118px;flex:0 0 118px;color:var(--sub);font-variant-numeric:tabular-nums">'+when+'</span>'
+      +'<b style="width:68px;flex:0 0 68px;'+(x.action==='되돌리기'?'color:var(--warn)':'')+'">'+esc(x.action||'')+'</b>'
+      +'<span class="ov-val" title="'+esc((x.months||[]).join(', ')+(x.why?(' · '+x.why):''))+'">'+esc((x.months||[]).join(', '))+(x.why?(' · <span style="color:var(--sub)">'+esc(x.why)+'</span>'):'')+'</span>'
+      +'<span class="ov-act" style="color:var(--sub)">'+whoStr+'</span></div>';   /* ⚠ 메일 앞부분(p001)이 아니라 이름 (대표 결정 2026-10-25) */
   });
-  return h+'</div>';
+  return h+'</div></div>';
 }
 function toggleOnlyReview(){ App.onlyReview=!App.onlyReview; render(); }
 /* ══════ 모든 사업장·모든 사람 번호(1,2,3…) · ㅁ 체크(☐/☑) · 별표(☆/★) 저장·기록 (2026-11-02 대표 지시) ══════
@@ -2416,42 +2443,39 @@ function mailDigestOf(co, sites){
 }
 function mailDigestPanelHtml(co, sites){
   var d = mailDigestOf(co, sites);
-  var siteName = (sites && sites[0]) || (co && co.name) || App.site || '';
-  var head = '<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">' +
-    '<div><b>📬 푸른메일함 수신·발신 자동수집 (2026)</b></div>' +
-    '<button type="button" class="btn sec" style="padding:3px 8px;font-size:11px" onclick="autoSync2026FromMail()" title="메일 제목·건수 요약만 모읍니다. 급여 자료는 넣지 않습니다.">🔄 메일 요약 다시 모으기</button></div>';
-  var box = '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px">' + head;
-  if(!d){
-    return box + '<div style="padding:8px 12px;font-size:12px;color:var(--sub)">메일 요약이 아직 없습니다 — [🔄 메일 요약 다시 모으기]를 누르면 모읍니다.</div></div>';
+  var siteName = (sites && sites[0]) || (co && co.name) || App.site || 'site';
+  var rxN = d ? (d.rxCount||0) : 0, txN = d ? (d.txCount||0) : 0, fN = d ? (d.fileCount||0) : 0, hN = d ? (d.hireCount||0) : 0, lN = d ? (d.leaveCount||0) : 0;
+  var head = '<div class="ov-head">' +
+    '<div><b>📬 푸른메일함 수신·발신 자동수집 (2026)</b> <span style="font-size:11.5px;color:var(--sub)">' +
+    (d ? ('수신 '+rxN+'건 · 발신 '+txN+'건 · 첨부 '+fN+'건 · 입사 '+hN+' · 퇴사 '+lN) : '세로 한 줄씩 확인·체크') + '</span></div>' +
+    '<button type="button" class="btn sec" style="padding:3px 8px;font-size:11px;flex-shrink:0" onclick="autoSync2026FromMail()" title="메일 제목·건수 요약만 모읍니다. 급여 자료는 넣지 않습니다.">🔄 메일 요약 다시 모으기</button></div>';
+  var RM = lmap('row_marks') || {};
+  var lines = [
+    { key:'msum:'+siteName+'|rx',   badge:'📥 수신',     bg:'#eff6ff', tone:'#1e40af', lbl:'수신 메일 확인',     val:d ? ('수신 '+rxN+'건 확인') : '아직 수집 전 — 우측 위 [🔄 메일 요약 다시 모으기] 실행' },
+    { key:'msum:'+siteName+'|tx',   badge:'📤 발신',     bg:'#f0fdf4', tone:'#166534', lbl:'발신 메일 확인',     val:d ? ('발신 '+txN+'건 확인') : '발신 내역 수집 전' },
+    { key:'msum:'+siteName+'|file', badge:'📎 첨부엑셀', bg:'#fffbeb', tone:'#854d0e', lbl:'첨부 급여엑셀 확인', val:d ? ('첨부엑셀 '+fN+'건 확인') : '첨부파일 수집 전' },
+    { key:'msum:'+siteName+'|move', badge:'👤 입·퇴사',  bg:'#f8fafc', tone:'#475569', lbl:'입사·퇴사 연락 확인', val:d ? ('입사 '+hN+'건 · 퇴사 '+lN+'건') : '입사·퇴사 변동 수집 전' }
+  ];
+  if(d){
+    (d.recentFiles||[]).slice(0,5).forEach(function(f){
+      lines.push({key:'mf:'+siteName+'|'+(f.id||f.filename), badge:'📎 첨부', bg:'#fffbeb', tone:'#854d0e', lbl:String(f.ym||'2026'), val:(f.filename||'급여자료.xlsx')+(f.note?(' · '+f.note):'')});
+    });
+    (d.recentRx||[]).slice(0,5).forEach(function(m){
+      lines.push({key:'mrx:'+siteName+'|'+(m.id||m.ts), badge:'📥 수신', bg:'#eff6ff', tone:'#1e40af', lbl:String(m.ym||'2026'), val:(m.subject||'(제목 없음)')+(m.from?(' · '+m.from):'')});
+    });
+    (d.recentTx||[]).slice(0,5).forEach(function(m){
+      lines.push({key:'mtx:'+siteName+'|'+(m.id||m.ts), badge:'📤 발신', bg:'#f0fdf4', tone:'#166534', lbl:String(m.ym||'2026'), val:(m.subject||'(발신 메일)')+(m.to?(' · '+m.to):'')});
+    });
   }
-  var kpi = '<div style="padding:7px 12px;display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;background:var(--paper)">' +
-    '<span class="badge" style="background:#eff6ff;color:#1e40af">📥 수신 '+(d.rxCount||0)+'건</span>' +
-    '<span class="badge" style="background:#f0fdf4;color:#166534">📤 발신 '+(d.txCount||0)+'건</span>' +
-    '<span class="badge" style="background:#fffbeb;color:#854d0e">📎 첨부엑셀 '+(d.fileCount||0)+'건</span>' +
-    '<span class="badge ok">입사 '+(d.hireCount||0)+'</span>' +
-    '<span class="badge warn">퇴사 '+(d.leaveCount||0)+'</span>' +
-    '</div>';
-  var rows = [];
-  (d.recentFiles||[]).slice(0,3).forEach(function(f){
-    rows.push({key:'mf:'+siteName+'|'+(f.id||f.filename), kind:'📎 첨부', ym:f.ym||'2026', title:f.filename||'급여자료.xlsx', who:f.note||'첨부파일', tone:'#854d0e', bg:'#fffbeb'});
-  });
-  (d.recentRx||[]).slice(0,3).forEach(function(m){
-    rows.push({key:'mrx:'+siteName+'|'+(m.id||m.ts), kind:'📥 수신', ym:m.ym||'2026', title:m.subject||'(제목 없음)', who:m.from||'수신', tone:'#1e40af', bg:'#eff6ff'});
-  });
-  (d.recentTx||[]).slice(0,3).forEach(function(m){
-    rows.push({key:'mtx:'+siteName+'|'+(m.id||m.ts), kind:'📤 발신', ym:m.ym||'2026', title:m.subject||'(발신 메일)', who:m.to||'발신', tone:'#166534', bg:'#f0fdf4'});
-  });
-  if(!rows.length){
-    return box + kpi + '</div>';
-  }
-  var tbl = '<details style="border-top:1px solid var(--line)"><summary style="padding:6px 12px;font-size:11.5px;color:var(--sub);cursor:pointer">수신·발신·첨부 상세 내역 ('+rows.length+'건) 펼치기</summary><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">' +
-    rows.map(function(r, idx){
-      return '<tr style="border-top:1px solid var(--line)">' +
-        '<td style="padding:4px 8px;white-space:nowrap">' + rowMarkBox(r.key, idx+1) + '</td>' +
-        '<td style="padding:4px 6px;white-space:nowrap"><span class="badge" style="background:'+r.bg+';color:'+r.tone+'">'+r.kind+'</span></td>' +
-        '<td style="padding:4px 6px;font-weight:600">'+esc(r.title)+'</td></tr>';
-    }).join('') + '</table></div></details>';
-  return box + kpi + tbl + '</div>';
+  var body = '<div class="ov-body">' + lines.map(function(r, idx){
+    var mk = RM[r.key] || {}, q = esc(r.key);
+    return '<div class="ov-row">' +
+      '<span class="mkwrap"><span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+(mk.chk?' on':'')+'" aria-label="메일 '+(idx+1)+'번 체크" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'chk\')">'+(mk.chk?'\u2611':'\u2610')+'</button><button type="button" class="rst'+(mk.star?' on':'')+'" aria-label="메일 '+(idx+1)+'번 별표" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'star\')">'+(mk.star?'\u2605':'\u2606')+'</button></span>' +
+      '<span class="badge" style="background:'+r.bg+';color:'+r.tone+';flex:0 0 74px;text-align:center">'+r.badge+'</span>' +
+      '<b class="ov-lbl" style="width:140px;flex:0 0 140px" title="'+esc(r.lbl)+'">'+esc(r.lbl)+'</b>' +
+      '<span class="ov-val" title="'+esc(r.val)+'">'+esc(r.val)+'</span></div>';
+  }).join('') + '</div>';
+  return '<div class="ov-box ov-mail">' + head + body + '</div>';
 }
 
 /* ⚠ 2026-11-08 고침 — 이 함수는 «메일 요약(mail_digest_2026)»만 다시 모은다.
@@ -2648,8 +2672,8 @@ function kakaoOcrPanelHtml(site, month){
     preview='<div style="margin-top:8px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#f8fafc">' +
       '<tr style="background:#eff6ff"><th style="padding:5px 8px;text-align:left">성명</th><th style="padding:5px 8px;text-align:left">날짜</th><th style="padding:5px 8px;text-align:left">유형</th><th style="padding:5px 8px;text-align:left">출퇴근·휴게</th><th style="padding:5px 8px;text-align:left">원문 증빙</th></tr>' +
       kakaoOcrDraft.map(function(r){
-        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name||'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
-          '<td style="padding:5px 8px">'+r.date+'</td><td style="padding:5px 8px">'+r.type+'</td>' +
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px;font-weight:700">'+(r.name?esc(r.name):'<span style="color:var(--bad)">성명미상</span>')+'</td>' +
+          '<td style="padding:5px 8px">'+esc(r.date)+'</td><td style="padding:5px 8px">'+esc(r.type)+'</td>' +
           '<td style="padding:5px 8px">'+(r.type==='work'||r.type==='holiday'?(r.in+'~'+r.out+' (휴게 '+r.breakMin+'분)'):'-')+'</td>' +
           '<td style="padding:5px 8px;color:var(--sub)">'+esc(r.raw)+'</td></tr>';
       }).join('') + '</table>' +
@@ -2714,7 +2738,11 @@ function attendOf(site, month, name) { return lmap('attend')[site + '|' + month 
 function leaveOf(site, year, name) { return lmap('leave')[site + '|' + year + '|' + name] || {}; }
 function severOf(site, name) { return lmap('sever')[site + '|' + name] || {}; }
 
-function esc(s) { return String(s == null ? '' : s).replace(/'/g, '').replace(/"/g, ''); }
+/* ★ 2026-11-15 보안 — 따옴표만 지우던 것을 «& < > 도 바꾼다».
+   바깥에서 온 글(받은 메일 제목·첨부 이름·카톡 판독 이름)이 화면에 그대로 그려졌다.
+   ⚠ 따옴표 «지우기»는 그대로 둔다 — 이 함수가 onclick="f('…')" 안의 JS 글자에도 쓰인다(&#39; 로 바꾸면 속성을 풀 때 ' 로 되살아나 빠져나간다).
+   & < > 는 속성을 풀 때 원래 글자로 돌아오므로 onclick 안의 값·열쇠는 바뀌지 않는다. */
+function esc(s) { return String(s == null ? '' : s).replace(/'/g, '').replace(/"/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function fmtComma(val) {
   if (val == null || val === '') return '';
   var n = Number(String(val).replace(/,/g, ''));
@@ -3046,7 +3074,8 @@ function byKoName(a,b){ return PuSiteStaff.coreName(a.name).localeCompare(PuSite
 function shellModel(){
   /* ⚠ 기본 달은 «정해 두지 않고» 그때그때 센다 — 자료를 받기 전에 정해 버리면 이번 달로 굳는다 */
   var S=PuSiteStaff, links=lmap('site_co_link'), ym=App.ym||defaultYm();
-  var em=((me&&me.email)||'').toLowerCase();
+  var fbSid=(typeof mySid!=='undefined'&&mySid)||((typeof window!=='undefined'&&window.PuWhoami&&PuWhoami.get&&PuWhoami.get()||{}).sid||'');
+  var em=(((me&&me.email)||(fbSid?S.sidToEmail(fbSid):''))||'').toLowerCase();
   var cos=coData?S.payrollCos(coData.companies).slice().sort(byKoName):[];
   var active={}; cos.forEach(function(c){ active[c.id]=c; });
   var bySite={}, sitesByCo={}, loose=[];
@@ -3254,24 +3283,31 @@ function coVariance(sites, ym){
   return out;
 }
 function varianceHtml(sites, ym){
-  var v=coVariance(sites, ym); if(!v||!v.prev) return '';
-  var head='<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>지난달 대비</b> '
-    +'<span style="font-size:12px;color:var(--sub)">'+v.prev.y+'년 '+v.prev.m+'월 \u2192 '+v.cur.y+'년 '+v.cur.m+'월 · 달라진 것만</span></div>';
-  var box='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">';
-  if(v.loading) return box+head+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">두 달 직원 표를 불러오는 중…</div></div>';
-  if(!v.n) return box+head+'<div style="padding:10px 16px;font-size:12.5px;color:#166534">\u2714 크게 달라진 사람이 없습니다</div></div>';
-  function line(icon, label, items, tone){
-    if(!items.length) return '';
-    return '<div style="display:flex;gap:10px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
-      +'<span style="width:18px">'+icon+'</span><b style="width:150px;flex-shrink:0;'+(tone?'color:'+tone:'')+'">'+label+' '+items.length+'명</b>'
-      +'<span style="flex:1">'+items.join(', ')+'</span></div>';
+  var v=coVariance(sites, ym);
+  /* ⚠ 앞 달 자료가 없을 때는 '지난달 대비' 문구를 쓰지 않되(payroll-shell 검사), 상자 높이는 고정해 아래 칸이 움직이지 않게 한다 */
+  if(!v||!v.prev){
+    return '<div class="ov-box ov-var"><div class="ov-head"><div><b>↕ 직전 월 비교</b> <span style="font-size:11.5px;color:var(--sub)">비교 대상 확인</span></div></div><div class="ov-body"><div class="ov-empty">비교할 앞 달 급여대장이 없습니다.</div></div></div>';
   }
-  return box+head
-    +line('\u26a0','4대보험 공제가 빠짐', v.insGone, 'var(--warn)')
-    +line('\u2195','지급 20% 이상 변동', v.jump.map(function(j){ return j.nm+' '+manwon(j.from)+'\u2192'+manwon(j.to)+' ('+(j.pct>0?'+':'')+j.pct+'%)'; }), 'var(--warn)')
-    +line('\u2795','새로 들어옴', v.joined)
-    +line('\u2796','빠짐(퇴사?)', v.left)
-    +'</div>';
+  var head='<div class="ov-head"><div><b>↕ 지난달 대비</b> <span style="font-size:11.5px;color:var(--sub)">'+v.prev.y+'년 '+v.prev.m+'월 \u2192 '+v.cur.y+'년 '+v.cur.m+'월 · 달라진 것만</span></div></div>';
+  var box='<div class="ov-box ov-var">';
+  if(v.loading) return box+head+'<div class="ov-body"><div class="ov-empty">두 달 직원 표를 불러오는 중…</div></div></div>';
+  if(!v.n) return box+head+'<div class="ov-body"><div class="ov-empty" style="color:#166534">\u2714 크게 달라진 사람이 없습니다</div></div></div>';
+  var RM=lmap('row_marks')||{}, siteKey=esc((sites&&sites[0])||App.site||'site')+'|'+esc(ym||''), seq=0;
+  function line(code, icon, label, items, tone){
+    if(!items.length) return '';
+    seq++;
+    var k='var:'+siteKey+'|'+code, mk=RM[k]||{}, txt=items.join(', ');
+    return '<div class="ov-row">'
+      +'<span class="mkwrap"><span class="rno">'+seq+'</span><button type="button" class="rmk'+(mk.chk?' on':'')+'" aria-label="변동 '+seq+'번 체크" onclick="event.stopPropagation();toggleRowMark(\''+k+'\',\'chk\')">'+(mk.chk?'\u2611':'\u2610')+'</button><button type="button" class="rst'+(mk.star?' on':'')+'" aria-label="변동 '+seq+'번 별표" onclick="event.stopPropagation();toggleRowMark(\''+k+'\',\'star\')">'+(mk.star?'\u2605':'\u2606')+'</button></span>'
+      +'<b class="ov-lbl" style="width:176px;flex:0 0 176px;'+(tone?'color:'+tone:'')+'">'+icon+' '+label+' '+items.length+'명</b>'
+      +'<span class="ov-val" title="'+esc(txt)+'">'+esc(txt)+'</span></div>';
+  }
+  return box+head+'<div class="ov-body">'
+    +line('ins','\u26a0','4대보험 공제가 빠짐', v.insGone, 'var(--warn)')
+    +line('jmp','\u2195','지급 20% 이상 변동', v.jump.map(function(j){ return j.nm+' '+manwon(j.from)+'\u2192'+manwon(j.to)+' ('+(j.pct>0?'+':'')+j.pct+'%)'; }), 'var(--warn)')
+    +line('in','\u2795','새로 들어옴', v.joined)
+    +line('out','\u2796','빠짐(퇴사?)', v.left)
+    +'</div></div>';
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -3383,23 +3419,34 @@ function enterRrn(site, name){
 window.uploadRrn=uploadRrn; window.revealRrn=revealRrn; window.enterRrn=enterRrn;
 /* 회사 한 장(한눈에)의 주민번호 칸 — 그 달 직원 명단 기준, 가린 값 · 「보기」 · 없으면 「입력」 */
 function rrnPanelHtml(sites, ym){
-  var site=App.site; if(!site) return '';
+  var site=App.site;
+  if(!site){
+    return '<div class="ov-box ov-rrn"><div class="ov-head"><div><b>🔐 주민번호</b> <span style="font-size:11.5px;color:var(--sub)">(암호화 저장)</span></div></div><div class="ov-body"><div class="ov-empty">이 회사에 등록된 급여대장 명단이 아직 없습니다.</div></div></div>';
+  }
   ensureRrn(site);
-  var mr=monthRecsFor(sites, ym); if(!mr) return '';
+  var mr=monthRecsFor(sites, ym);
+  if(!mr){
+    return '<div class="ov-box ov-rrn"><div class="ov-head"><div><b>🔐 주민번호</b> <span style="font-size:11.5px;color:var(--sub)">(암호화 저장)</span></div></div><div class="ov-body"><div class="ov-empty">기준 월 명단 기록이 아직 없습니다.</div></div></div>';
+  }
   var emps=empsMonth(mr);
-  var box='<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden">';
-  var head='<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><b>🔐 주민번호</b> <span style="font-size:11.5px;color:var(--sub)">('+mr.y+'년 '+mr.m+'월 명단 · 암호화 저장)</span></div>';
-  if(!emps||rrnBox[site]===undefined) return box+head+'</div><div style="padding:8px 12px;font-size:12px;color:var(--sub)">불러오는 중…</div></div>';
+  var headLeft='<div><b>🔐 주민번호</b> <span style="font-size:11.5px;color:var(--sub)">('+mr.y+'년 '+mr.m+'월 명단 · 암호화 저장)</span></div>';
+  if(!emps||rrnBox[site]===undefined){
+    return '<div class="ov-box ov-rrn"><div class="ov-head">'+headLeft+'</div><div class="ov-body"><div class="ov-empty">불러오는 중…</div></div></div>';
+  }
+  if(!emps.length){
+    return '<div class="ov-box ov-rrn"><div class="ov-head">'+headLeft+'<span style="font-size:11.5px;color:var(--sub)">등록 0/0명</span></div><div class="ov-body"><div class="ov-empty">표시할 직원이 없습니다.</div></div></div>';
+  }
   var have=emps.filter(function(e){ return rrnRec(site, e.성명); }).length;
-  var h=box+head+'<span style="font-size:11.5px">등록 <b>'+have+'/'+emps.length+'명</b>'
-    +(emps.length-have?(' · <span style="color:var(--warn)">미등록 '+(emps.length-have)+'</span>'):'')+'</span></div><div class="rrn-grid">';
-  var RM=lmap('row_marks')||{};
+  var head='<div class="ov-head">'+headLeft+'<span style="font-size:11.5px;white-space:nowrap">등록 <b>'+have+'/'+emps.length+'명</b>'
+    +(emps.length-have?(' · <span style="color:var(--warn)">미등록 '+(emps.length-have)+'</span>'):'')+'</span></div>';
+  var RM=lmap('row_marks')||{}, h='<div class="ov-box ov-rrn">'+head+'<div class="ov-body">';
   emps.forEach(function(e, idx){
-    var nm=String(e.성명||'').trim(), rec=rrnRec(site, nm), q=esc(site), qn=esc(nm);
-    h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);font-size:12px">'
-      +'<span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+((RM['emp:'+site+'|'+nm]||{}).chk?' on':'')+'" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'chk\',event)" title="체크 저장">'+((RM['emp:'+site+'|'+nm]||{}).chk?'☑':'☐')+'</button><button type="button" class="rst'+((RM['emp:'+site+'|'+nm]||{}).star?' on':'')+'" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'star\',event)" title="별표 저장">'+((RM['emp:'+site+'|'+nm]||{}).star?'★':'☆')+'</button><b style="min-width:56px">'+nm+'</b>'
-      +(rec?('<span style="font-family:monospace;font-size:11.5px;color:var(--sub)">'+rec.mask+'</span><span style="flex:1"></span><button class="btn sec" style="padding:1px 7px;font-size:11px" onclick="revealRrn(\''+q+'\',\''+qn+'\')">보기</button>')
-           :('<span style="color:var(--warn);font-size:11px">없음</span><span style="flex:1"></span><button class="btn" style="padding:1px 7px;font-size:11px" onclick="enterRrn(\''+q+'\',\''+qn+'\')">입력</button>'))
+    var nm=String(e.성명||'').trim(), rec=rrnRec(site, nm), q=esc(site), qn=esc(nm), mk=RM['emp:'+site+'|'+nm]||{};
+    h+='<div class="ov-row">'
+      +'<span class="mkwrap"><span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+(mk.chk?' on':'')+'" aria-label="'+qn+' 체크" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'chk\',event)" title="체크 저장">'+(mk.chk?'☑':'☐')+'</button><button type="button" class="rst'+(mk.star?' on':'')+'" aria-label="'+qn+' 별표" onclick="toggleRowMark(\'emp:'+q+'|'+qn+'\',\'star\',event)" title="별표 저장">'+(mk.star?'★':'☆')+'</button></span>'
+      +'<b class="ov-lbl" title="'+qn+'">'+qn+'</b>'
+      +(rec?('<span class="ov-val" style="font-family:monospace;color:var(--sub)">'+esc(rec.mask)+'</span><span class="ov-act"><button type="button" class="btn sec" style="padding:2px 8px;font-size:11px" onclick="revealRrn(\''+q+'\',\''+qn+'\')">보기</button></span>')
+           :('<span class="ov-val" style="color:var(--warn)">없음 (미등록)</span><span class="ov-act"><button type="button" class="btn" style="padding:2px 8px;font-size:11px" onclick="enterRrn(\''+q+'\',\''+qn+'\')">입력</button></span>'))
       +'</div>';
   });
   return h+'</div></div>';
@@ -3407,7 +3454,7 @@ function rrnPanelHtml(sites, ym){
 /* 만 원 단위로 짧게 — 정확한 값은 알약에 손을 대면 보인다 */
 function manwon(n){ return (n==null)?'-':(Math.abs(n)>=10000?(Math.round(n/10000).toLocaleString()+'만원'):(won(n)+'원')); }
 
-/* ★ 본문은 탭부터 시작한다(대표 지시 2026-10-05 「캡쳐4는 위로」) — 회사 이름·지표는 머리줄로 갔다 */
+/* ★ 본문은 탭부터 시작한다(대표 지시 2026-10-05 「캡쳐4는 위로」 · 2026-11-18 상단 정리·틀고정) — 회사 이름·지표는 머리줄로 갔다 */
 function shellMainHtml(m){
   if(!coData&&!coErr) return '<div class="empty">업체 명단을 불러오는 중…</div>';
   var x=shellCtx(m);
@@ -3416,19 +3463,27 @@ function shellMainHtml(m){
     return '<div class="empty">왼쪽 목록에서 회사를 고르세요.<br><span style="font-size:12px">'+(v?v.label:'')+' '+n+'곳 · 기준 '+ymText(m.ym)+'</span></div>';
   }
   var mode = App.uiMode || 'focus';
-  var chips=x.sites.length>1?('<span class="chips">자료 묶음 '+x.sites.map(function(s){
-      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+s+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</span>'):'';
+  var chips=x.sites.length>1?('<span class="chips" style="margin:0;flex-wrap:nowrap">자료 묶음 '+x.sites.map(function(s){
+      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+esc(s)+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</span>'):'';
+  var modeOpts = [
+    { v:'focus',   label:'✨ A. 심플 기본형 (세로 한줄 점검)' },
+    { v:'compare', label:'🔍 B. 좌·우 1:1 원본비교(카톡·문자·메일)' },
+    { v:'card360', label:'🪪 C. 1인 종합카드(360°)' },
+    { v:'stepper', label:'🧭 D. 4단계 마감스텝' }
+  ];
   var modeBar = '<div class="uimode-bar noprint">' +
     '<div class="uimode-btns">' +
-      '<button type="button" class="uimode-btn" onclick="toggleSidebarFold()" title="왼쪽 담당자·사업장 목록을 접어 화면을 넓게 씁니다">' + (App.foldSide ? '▶ 좌측목록 펼치기' : '◀ 좌측목록 접기(넓게보기)') + '</button>' +
-      '<span style="color:var(--line)">|</span>' +
-      '<b style="font-size:11.5px;color:var(--sub);margin:0 2px">화면 형태:</b>' +
-      '<button type="button" class="uimode-btn' + (mode === 'focus' ? ' on' : '') + '" onclick="setUiMode(\'focus\')">✨ A. 심플 기본형</button>' +
-      '<button type="button" class="uimode-btn' + (mode === 'compare' ? ' on' : '') + '" onclick="setUiMode(\'compare\')">🔍 B. 좌·우 1:1 원본비교(카톡·문자·메일)</button>' +
-      '<button type="button" class="uimode-btn' + (mode === 'card360' ? ' on' : '') + '" onclick="setUiMode(\'card360\')">🪪 C. 1인 종합카드(360°)</button>' +
-      '<button type="button" class="uimode-btn' + (mode === 'stepper' ? ' on' : '') + '" onclick="setUiMode(\'stepper\')">🧭 D. 4단계 마감스텝</button>' +
+      '<button type="button" class="uimode-btn" onclick="toggleSidebarFold()" title="왼쪽 담당자·사업장 목록을 접어 화면을 넓게 씁니다">' + (App.foldSide ? '▶ 좌측목록 펼치기' : '◀ 좌측목록 접기') + '</button>' +
+      '<label for="uiModeSel" style="font-size:11.5px;font-weight:700;color:var(--navy);white-space:nowrap">화면 형태:</label>' +
+      '<select id="uiModeSel" aria-label="화면 형태 선택" onchange="setUiMode(this.value)" style="padding:3px 8px;border:1px solid var(--navy);border-radius:6px;font-size:12px;font-weight:700;color:var(--navy);background:#eff6ff;min-width:0;max-width:100%">' +
+        modeOpts.map(function(o){ return '<option value="'+o.v+'"'+(mode===o.v?' selected':'')+'>'+o.label+'</option>'; }).join('') +
+      '</select>' +
+      '<button type="button" class="uimode-btn on" style="white-space:nowrap" onclick="var el=document.getElementById(\'uiModeSel\');if(el)setUiMode(el.value)">✔ 확인</button>' +
     '</div>' +
-    chips + '</div>';
+    '<div class="uimode-hint" style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap">' +
+      chips +
+      '<span style="font-size:11px;color:var(--sub);white-space:nowrap">📌 상단 틀고정 · 칸 위치 고정</span>' +
+    '</div></div>';
   var stepperBar = '';
   if (mode === 'stepper') {
     var steps = [
@@ -3486,7 +3541,7 @@ function coBarHtml(m){
     }
   }
   var RM=lmap('row_marks')||{}, ckKey=co?('co:'+co.id):('site:'+App.loose), ckEsc=co?('co:'+esc(co.id)):('site:'+esc(App.loose)), cmk=RM[ckKey]||{};
-  var h='<span class="cn" title="'+esc(name)+'">'+name+'</span>'
+  var h='<span class="cn" title="'+esc(name)+'">'+esc(name)+'</span>'
     +'<button type="button" class="rmk'+(cmk.chk?' on':'')+'" style="color:#fff" onclick="toggleRowMark(\''+ckEsc+'\',\'chk\',event)" title="사업장 체크 저장">'+(cmk.chk?'☑':'☐')+'</button>'
     +'<button type="button" class="rst'+(cmk.star?' on':'')+'" onclick="toggleRowMark(\''+ckEsc+'\',\'star\',event)" title="사업장 별표 저장">'+(cmk.star?'★':'☆')+'</button>'
     +'<span class="cm">'+[who, card?('급여일 '+(card.급여일||'미지정')):'', '기준 '+ymText(m.ym)].filter(Boolean).join(' · ')+'</span>'
@@ -3525,27 +3580,33 @@ function shellSummary(m, co, sites){
   var arr=coArrivals(co, sites, m.ym, m.links);
   var c=sumCounts(sites);
   var arrText=arr.length?('데이터함 알림 '+arr.length+'건'):(st.key==='nodata'?'급여관리에 자료 없음':'도착 알림 없음');
-  var h='<div class="sum-grid4">'
-    +'<div class="sum-card" onclick="pickTab(\'payroll\')"><div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--sub)"><span>📥 '+ymText(m.ym)+' 상태</span><span class="st '+st.key+'">'+st.label+'</span></div>'
-    +'<div style="font-weight:800;font-size:14px;margin-top:4px">'+(c.months?(c.months+'개월 급여대장'):'급여자료 미등록')+'</div>'
-    +'<div style="font-size:11px;color:var(--sub);margin-top:2px">'+arrText+'</div></div>'
-    +'<div class="sum-card" onclick="pickTab(\'payroll\')"><div style="font-size:11.5px;color:var(--sub)">💰 급여 · 📄 명세서</div>'
-    +'<div style="font-weight:800;font-size:14px;margin-top:4px;color:'+(c.review?'var(--warn)':'var(--ink)')+'">확정 '+c.lock+' / '+c.months+'개월'+(c.review?(' · 검토 '+c.review):'')+'</div>'
-    +'<div style="font-size:11px;color:var(--sub);margin-top:2px">웹 임금대장 표 · 명세서 즉시 발급 ›</div></div>'
-    +'<div class="sum-card" onclick="pickTab(\'leave\')"><div style="font-size:11.5px;color:var(--sub)">🕒 근태 · 🌴 연차 · 🎓 퇴직</div>'
-    +'<div style="font-weight:800;font-size:14px;margin-top:4px">근태 '+c.attend+' · 연차 '+c.leave+' · 퇴직 '+c.sever+'</div>'
-    +'<div style="font-size:11px;color:var(--sub);margin-top:2px">시간차(1h단위) · 퇴직금 · 📑 신고 ›</div></div>'
-    +'<div class="sum-card" onclick="pickTab(\'compliance\')" style="background:#eff6ff;border-color:#bfdbfe"><div style="font-size:11.5px;color:#1e40af;font-weight:700">👤 근로자명부 · 📜 계약·취업규칙</div>'
-    +'<div style="font-weight:800;font-size:14px;color:#1e40af;margin-top:4px">계약서·취업규칙 자동검토 열기 ›</div>'
-    +'<div style="font-size:11px;color:#1e40af;margin-top:2px">자료 없어도 즉시 작성·검토 가능</div></div>'
+  var RM=lmap('row_marks')||{}, ckBase=co?('co:'+co.id):('site:'+(App.loose||App.site||'site'));
+  function sumRow(idx, code, lbl, val, tab, btnTxt, tone){
+    var k=ckBase+'|'+code, q=esc(k), mk=RM[k]||{};
+    return '<div class="ov-row">'
+      +'<span class="mkwrap"><span class="rno">'+idx+'</span><button type="button" class="rmk'+(mk.chk?' on':'')+'" aria-label="'+lbl+' 체크" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'chk\')">'+(mk.chk?'☑':'☐')+'</button><button type="button" class="rst'+(mk.star?' on':'')+'" aria-label="'+lbl+' 별표" onclick="event.stopPropagation();toggleRowMark(\''+q+'\',\'star\')">'+(mk.star?'★':'☆')+'</button></span>'
+      +'<b class="ov-lbl"'+(tone?(' style="color:'+tone+'"'):'')+'>'+lbl+'</b>'
+      +'<span class="ov-val"'+(tone?(' style="color:'+tone+'"'):'')+'>'+val+'</span>'
+      +'<span class="ov-act"><button type="button" class="hrbtn'+(tone?' on':'')+'" onclick="pickTab(\''+tab+'\')">'+btnTxt+' ›</button></span></div>';
+  }
+  var sumBox='<div class="ov-box ov-sum">'
+    +'<div class="ov-head"><div><b>📋 기업 당월 업무 현황</b> <span style="font-size:11.5px;color:var(--sub)">('+ymText(m.ym)+' 기준 · 한 줄씩 확인 후 ☐ 체크)</span></div><span class="st '+st.key+'">'+st.label+'</span></div>'
+    +'<div class="ov-body">'
+      +sumRow(1, 'sum_arr',  '📥 급여자료 도착·대장', (c.months?(c.months+'개월 급여대장'):'급여자료 미등록')+' · <span style="color:var(--sub)">'+arrText+'</span>', 'payroll', '급여대장')
+      +sumRow(2, 'sum_pay',  '💰 급여 · 명세서 확정', '<b style="color:'+(c.review?'var(--warn)':'var(--ink)')+'">확정 '+c.lock+' / '+c.months+'개월</b>'+(c.review?(' · <span style="color:var(--warn)">검토 '+c.review+'</span>'):'')+' · 웹 임금대장 표·명세서 발급', 'payroll', '임금대장·명세서')
+      +sumRow(3, 'sum_att',  '🕒 근태 · 연차 · 퇴직', '근태 <b>'+c.attend+'</b>명 · 연차 <b>'+c.leave+'</b>명 · 퇴직 <b>'+c.sever+'</b>명 (1h 시간차 · 퇴직금 · 신고)', 'leave', '근태·연차')
+      +sumRow(4, 'sum_comp', '📜 명부 · 계약 · 규칙', '근로계약서·취업규칙 자동검토 (자료 없어도 즉시 작성·검토 가능)', 'compliance', '자동검토 열기', '#1e40af')
+    +'</div></div>';
+  return '<div class="ov-stack">'
+    +sumBox
+    +filingHtml(co)
+    +rrnPanelHtml(sites, m.ym)
+    +(typeof mailDigestPanelHtml==='function'?mailDigestPanelHtml(co, sites):'')
+    +varianceHtml(sites, m.ym)
+    +lockLogHtml(App.site)
     +'</div>';
-  h+='<div class="dash-2col">'
-    +'<div>'+filingHtml(co)+varianceHtml(sites, m.ym)+lockLogHtml(App.site)+'</div>'
-    +'<div>'+rrnPanelHtml(sites, m.ym)+(typeof mailDigestPanelHtml==='function'?mailDigestPanelHtml(co, sites):'')+'</div>'
-    +'</div>';
-  return h;
 }
-/* ══════ 신고 담당 — 2026-10-07 대표 「순서대로」 4번 ══════
+/* ══════ 신고 담당 — 2026-10-07 대표 「순서대로」 4번 · 2026-11-18 세로 1줄 체크 고정 ══════
    노무법인은 근로내용확인신고·4대보험을, 고객의 기장 세무사는 원천세·지급명세서를 맡는 경우가 많다.
    서로 «상대가 냈겠지» 하다 빠지면 가산세(일용 지급명세서 0.25% 등)가 붙고, 둘 다 내면 중복이다.
    그래서 회사마다 신고 여섯 가지를 «누가» 하는지 적어 둔다 — 우리 / 세무사 / 고객.
@@ -3573,21 +3634,26 @@ function setFiling(coId, k, who){
 }
 window.setFiling=setFiling;
 function filingHtml(co){
-  if(!co) return '';
-  var f=filingOf(co.id), n=filingUnset(co.id);
-  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden">'
-    +'<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px"><b>📌 신고 담당</b> '
-    +'<span style="font-size:11.5px;color:var(--sub)">우리 / 세무사 / 고객 역할 분담'+(n?(' · <span style="color:var(--warn)">미정 '+n+'</span>'):'')+'</span></div><div class="filing-grid">';
-  FILINGS.forEach(function(x){
-    var who=f[x.k]||'';
-    h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);font-size:12px;flex-wrap:wrap">'
-      +'<b style="min-width:128px;flex:1">'+x.label+'</b><span class="chips" style="margin:0;gap:3px">'
-      +FILING_WHO.map(function(w){
-        return '<button style="padding:1px 7px;font-size:11px" class="'+(who===w[0]?'on':'')+'" onclick="setFiling(\''+esc(co.id)+'\',\''+x.k+'\',\''+w[0]+'\')">'+w[1]+'</button>'; }).join('')
+  if(!co){
+    return '<div class="ov-box ov-filing"><div class="ov-head"><div><b>📌 신고 담당</b> <span style="font-size:11.5px;color:var(--sub)">우리 / 세무사 / 고객 역할 분담</span></div></div><div class="ov-body"><div class="ov-empty">업체관리와 연결된 뒤 신고 담당을 지정할 수 있습니다.</div></div></div>';
+  }
+  var f=filingOf(co.id), n=filingUnset(co.id), RM=lmap('row_marks')||{};
+  var h='<div class="ov-box ov-filing">'
+    +'<div class="ov-head"><div><b>📌 신고 담당</b> '
+    +'<span style="font-size:11.5px;color:var(--sub)">우리 / 세무사 / 고객 역할 분담'+(n?(' · <span style="color:var(--warn)">미정 '+n+'</span>'):'')+'</span></div></div><div class="ov-body">';
+  FILINGS.forEach(function(x, idx){
+    var who=f[x.k]||'', rk='fil:'+co.id+'|'+x.k, rq=esc(rk), mk=RM[rk]||{};
+    h+='<div class="ov-row">'
+      +'<span class="mkwrap"><span class="rno">'+(idx+1)+'</span><button type="button" class="rmk'+(mk.chk?' on':'')+'" aria-label="'+x.label+' 체크" onclick="event.stopPropagation();toggleRowMark(\''+rq+'\',\'chk\')">'+(mk.chk?'☑':'☐')+'</button><button type="button" class="rst'+(mk.star?' on':'')+'" aria-label="'+x.label+' 별표" onclick="event.stopPropagation();toggleRowMark(\''+rq+'\',\'star\')">'+(mk.star?'★':'☆')+'</button></span>'
+      +'<b class="ov-lbl">'+x.label+'</b>'
+      +'<span class="ov-val">'
+        +(!who?'<span style="color:var(--warn);font-size:11.5px">미정</span>':'<span style="color:#166534;font-size:11.5px">✔ 지정됨</span>')
+        +((x.tax&&who==='us')?' <span style="color:var(--warn);font-size:11.5px" title="원천세·지급명세서 제출 대리는 세무대리 영역일 수 있습니다 — 담당 노무사 검토">\u26a0 세무대리 경계 확인</span>':'')
       +'</span>'
-      +(!who?'<span style="color:var(--warn);font-size:11px">미정</span>':'')
-      +((x.tax&&who==='us')?'<span style="color:var(--warn);font-size:11px" title="원천세·지급명세서 제출 대리는 세무대리 영역일 수 있습니다 — 담당 노무사 검토">\u26a0 세무대리 경계 확인</span>':'')
-      +'</div>';
+      +'<span class="ov-act chips" style="margin:0;gap:4px;flex-wrap:nowrap">'
+        +FILING_WHO.map(function(w){
+          return '<button type="button" style="padding:2px 8px;font-size:11.5px" class="'+(who===w[0]?'on':'')+'" onclick="setFiling(\''+esc(co.id)+'\',\''+x.k+'\',\''+w[0]+'\')">'+w[1]+'</button>'; }).join('')
+      +'</span></div>';
   });
   return h+'</div></div>';
 }
@@ -4285,11 +4351,15 @@ function screenSever() {
     h += '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-      '<b style="font-size:13.5px;color:var(--navy)">👤 직원 선택 및 퇴직금 제도(법정 · DC형 · DB형) 지정</b>' +
-      '<select id="sevPick" onchange="pickSeverEmp(this.value)" style="padding:5px 10px;border:1px solid var(--navy);border-radius:8px;font-size:13px;font-weight:700;color:var(--navy);background:#eff6ff">' +
-      emps.map(function (e) {
-        return '<option value="' + esc(e.성명) + '"' + (e.성명 === selName ? ' selected' : '') + '>' + e.성명 + ' (' + won(empBaseMonthlyWage(e, empMeta(App.site, e.성명))) + '원)</option>';
+      '<label for="sevPick" style="font-size:13.5px;font-weight:700;color:var(--navy)">👤 대상 직원 선택:</label>' +
+      '<select id="sevPick" aria-label="대상 직원 선택" onchange="pickSeverEmp(this.value)" style="padding:5px 10px;border:1px solid var(--navy);border-radius:8px;font-size:13px;font-weight:700;color:var(--navy);background:#eff6ff;max-width:100%">' +
+      emps.map(function (e, idx) {
+        var eSv = severOf(App.site, e.성명);
+        var eType = LC.normalizeSeveranceType(eSv.유형, P);
+        var tBadge = (eType === 'DC') ? 'DC' : ((eType === 'DB') ? 'DB' : '법정');
+        return '<option value="' + esc(e.성명) + '"' + (e.성명 === selName ? ' selected' : '') + '>' + (idx + 1) + '. ' + esc(e.성명) + ' [' + tBadge + '] (' + won(empBaseMonthlyWage(e, empMeta(App.site, e.성명))) + '원)</option>';
       }).join('') + '</select>' +
+      '<button type="button" class="btn" style="padding:5px 11px;font-size:12px" onclick="var el=document.getElementById(\'sevPick\');if(el)pickSeverEmp(el.value)">✔ 확인</button>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
       [
@@ -4302,17 +4372,6 @@ function screenSever() {
       }).join('') +
       '<button type="button" class="btn sec" style="padding:5px 9px;font-size:11.5px" onclick="setSiteSeverTypeAll(\'' + s + '\',\'' + selCalc.유형 + '\')" title="현재 선택한 퇴직금 제도를 이 사업장 전 직원에게 일괄 적용">전원 ' + selCalc.유형명 + ' 적용</button>' +
       '</div></div>';
-
-    // 직원 빠른 선택 알약 줄
-    h += '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' +
-      emps.map(function (e) {
-        var on = (e.성명 === selName);
-        var eSv = severOf(App.site, e.성명);
-        var eType = LC.normalizeSeveranceType(eSv.유형, P);
-        var tBadge = (eType === 'DC') ? 'DC' : ((eType === 'DB') ? 'DB' : '법정');
-        return '<button type="button" class="mpill' + (on ? ' on' : '') + '" onclick="pickSeverEmp(\'' + esc(e.성명) + '\')">' +
-          e.성명 + ' <span style="font-size:10.5px;opacity:.85">[' + tBadge + ']</span></button>';
-      }).join('') + '</div>';
 
     // 선택된 직원의 해당 퇴직금 메인 결과 배너
     h += '<div style="background:#eff6ff;border:1px solid var(--navy);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
@@ -5023,10 +5082,71 @@ function autoFindEmpEvidence(site, name) {
 function openEmpCompare(site, name) {
   if (site) App.site = site;
   App.compareEmp = String(name || '');
+  App.activeEvId = null;
   App.uiMode = 'compare';
   App.tab = 'compare';
   try { localStorage.setItem('pu_payroll_uimode', 'compare'); } catch(e){}
   render();
+}
+function confirmEmpCompare(site, name) {
+  if (site) App.site = site;
+  if (name === undefined || name === null) {
+    var selEl = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('compareEmpSel') : null;
+    name = selEl ? selEl.value : App.compareEmp;
+  }
+  App.compareEmp = String(name || '');
+  App.activeEvId = null;
+  if (App.uiMode !== 'card360' && App.uiMode !== 'compare') {
+    App.uiMode = 'compare';
+    App.tab = 'compare';
+  }
+  render();
+}
+function stepEmpCompare(site, delta) {
+  var st = site || App.site;
+  if (!st) return;
+  var recs = payRecs(st) || [];
+  var curMonth = App.month || (recs[0] && recs[0].월) || (App.ym || laborYear() + '-11');
+  var emps = rosterEmployees(st);
+  if (!emps.length && recs.length) emps = siteEmployees(st, curMonth);
+  if (!emps.length) return;
+  var idx = 0;
+  for (var i = 0; i < emps.length; i++) {
+    if (String(emps[i].성명 || '').trim() === String(App.compareEmp || '').trim()) { idx = i; break; }
+  }
+  var nextIdx = (idx + (Number(delta) || 1) + emps.length) % emps.length;
+  confirmEmpCompare(st, String(emps[nextIdx].성명 || '').trim());
+}
+function renderEmpSelectBar(site, emps, nm, labelText) {
+  var s = esc(site), nmEsc = esc(nm);
+  var curIdx = 0;
+  for (var i = 0; i < emps.length; i++) {
+    if (String(emps[i].성명 || '').trim() === nm) { curIdx = i; break; }
+  }
+  var curEmp = emps[curIdx] || { 성명: nm, 기본급: 0 };
+  var curEvCnt = empEvidencesOf(site, nm).length;
+  var curBase = empBaseMonthlyWage(curEmp, empMeta(site, nm));
+  return '<div class="emp-select-bar" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+      '<label for="compareEmpSel" style="font-size:12.5px;font-weight:700;color:var(--navy);white-space:nowrap">' + (labelText || '👤 대상 직원 선택:') + '</label>' +
+      (emps.length ? (
+        '<select id="compareEmpSel" aria-label="대상 직원 선택" onchange="confirmEmpCompare(\'' + s + '\',this.value)" style="padding:5px 10px;border:1px solid var(--navy);border-radius:8px;font-size:12.5px;font-weight:700;color:var(--navy);background:#eff6ff;min-width:240px;max-width:100%">' +
+        emps.map(function (e, idx) {
+          var enm = String(e.성명 || '').trim();
+          var cnt = empEvidencesOf(site, enm).length;
+          return '<option value="' + esc(enm) + '"' + (enm === nm ? ' selected' : '') + '>' +
+            (idx + 1) + '. ' + esc(enm) + ' (원본 ' + cnt + '건 · ' + fmtComma(empBaseMonthlyWage(e, empMeta(site, enm))) + '원)</option>';
+        }).join('') +
+        '</select>' +
+        '<button type="button" class="btn" style="padding:5px 12px;font-size:12px" onclick="confirmEmpCompare(\'' + s + '\')">✔ 확인</button>' +
+        (emps.length > 1 ? (
+          '<button type="button" class="btn sec" style="padding:5px 9px;font-size:12px" onclick="stepEmpCompare(\'' + s + '\',-1)" title="이전 직원 보기">◀ 이전</button>' +
+          '<button type="button" class="btn sec" style="padding:5px 9px;font-size:12px" onclick="stepEmpCompare(\'' + s + '\',1)" title="다음 직원 보기">다음 ▶</button>'
+        ) : '')
+      ) : '<span style="font-size:12px;color:var(--sub)">등록된 직원이 없습니다</span>') +
+    '</div>' +
+    (emps.length ? ('<span class="badge ok" style="font-size:11.5px;padding:4px 10px">✔ 확인 중 (' + (curIdx + 1) + '/' + emps.length + '명): <b>' + nmEsc + '</b> · 원본 ' + curEvCnt + '건 · ' + fmtComma(curBase) + '원</span>') : '') +
+  '</div>';
 }
 function setUiMode(mode) {
   App.uiMode = mode || 'focus';
@@ -5053,12 +5173,14 @@ window.delEmpEvidence = delEmpEvidence;
 window.toggleVerifyEmpEvidence = toggleVerifyEmpEvidence;
 window.autoFindEmpEvidence = autoFindEmpEvidence;
 window.openEmpCompare = openEmpCompare;
+window.confirmEmpCompare = confirmEmpCompare;
+window.stepEmpCompare = stepEmpCompare;
 window.setUiMode = setUiMode;
 window.toggleSidebarFold = toggleSidebarFold;
 window.setEvZoom = setEvZoom;
 
 /* ── 목업 B: 좌·우 1:1 개인별 원본 캡쳐(카톡/문자/메일) ↔ 급여·근태 눈으로 비교 화면 ── */
-function renderEmpCompareStudio(site) {
+function renderEmpCompareStudio(site, opts) {
   resolveActiveSite();
   site = site || App.site;
   if (!site) return '<div class="empty">왼쪽에서 사업장을 먼저 선택하세요.</div>';
@@ -5068,7 +5190,7 @@ function renderEmpCompareStudio(site) {
   var mEsc = esc(curMonth);
   var emps = rosterEmployees(site);
   if (!emps.length && recs.length) emps = siteEmployees(site, curMonth);
-  var selEmp = emps.filter(function (e) { return e.성명 === App.compareEmp; })[0] || emps[0] || { 성명: '홍길동', 기본급: 2200000 };
+  var selEmp = emps.filter(function (e) { return String(e.성명 || '').trim() === String(App.compareEmp || '').trim(); })[0] || emps[0] || { 성명: '홍길동', 기본급: 2200000 };
   var nm = String(selEmp.성명 || '홍길동').trim(), nmEsc = esc(nm);
   App.compareEmp = nm;
 
@@ -5101,27 +5223,23 @@ function renderEmpCompareStudio(site) {
   var h = '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
     '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
     '<b style="color:var(--navy);font-size:13.5px">🔍 개인별 원본자료(카톡·문자·메일 캡쳐) ↔ 급여·근태 1:1 눈으로 비교</b>' +
-    '<span style="font-size:12px;color:var(--sub)">— 직원을 고르면 좌측 원본 캡쳐와 우측 급여·근태를 나란히 보며 대조·수정합니다</span></div>' +
+    '<span style="font-size:12px;color:var(--sub)">— 드롭다운에서 직원을 선택·확인하면 좌측 원본 캡쳐와 우측 급여·근태를 나란히 대조·수정합니다</span></div>' +
     '<div style="display:flex;gap:6px;align-items:center">' +
     '<button type="button" class="btn sec" style="padding:4px 10px;font-size:12px" onclick="autoFindEmpEvidence(\'' + s + '\',\'' + nmEsc + '\')">🔎 메일·카톡·수신함 원본 자동찾기</button>' +
     '<button type="button" class="btn sec" style="padding:4px 10px;font-size:12px" onclick="setUiMode(\'focus\')">✕ 기본 화면으로</button>' +
     '</div></div>';
 
-  // 직원 빠른 선택 알약 바
-  h += '<div class="mpills" style="margin-bottom:10px"><b style="font-size:12px;color:var(--navy);margin-right:4px">👤 대상 직원 선택:</b>' +
-    (emps.length ? emps.map(function (e, i) {
-      var enm = String(e.성명 || '').trim();
-      var cnt = empEvidencesOf(site, enm).length;
-      return '<button type="button" class="mpill' + (enm === nm ? ' on' : '') + '" onclick="openEmpCompare(\'' + s + '\',\'' + esc(enm) + '\')">' +
-        (i + 1) + '. ' + enm + ' <span style="font-size:10.5px;opacity:.85">(원본 ' + cnt + '건 · ' + fmtComma(empBaseMonthlyWage(e, empMeta(site, enm))) + '원)</span></button>';
-    }).join('') : '<span style="font-size:12px;color:var(--sub)">등록된 직원이 없습니다</span>') + '</div>';
+  // 대상 직원 드롭다운 선택·확인 바 (2026-11-18 대표 지시: 알약 나열 대신 드롭다운 선택·확인 방식으로 정리)
+  if (!(opts && opts.hideEmpBar)) {
+    h += renderEmpSelectBar(site, emps, nm, '👤 대상 직원 선택:');
+  }
 
   // 좌·우 1:1 분할 대조 본문
   h += '<div class="split-compare">' +
     // [좌측] 원본 캡쳐·카톡·문자·메일 보관 및 뷰어
     '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">' +
-        '<div><b style="font-size:13.5px;color:var(--navy)">🖼 [좌측] ' + nm + ' 님의 사업장 원본 자료 (' + evList.length + '건)</b>' +
+        '<div><b style="font-size:13.5px;color:var(--navy)">🖼 [좌측] ' + nmEsc + ' 님의 사업장 원본 자료 (' + evList.length + '건)</b>' +
         '<div style="font-size:11.5px;color:var(--sub)">카톡 캡쳐 · 문자 캡쳐 · 메일화면 캡쳐 · 출근부 사진을 보관하고 눈으로 확인합니다</div></div>' +
         '<div style="display:flex;gap:4px">' +
           [100, 140, 180].map(function (z) {
@@ -5172,7 +5290,7 @@ function renderEmpCompareStudio(site) {
     // [우측] 해당 직원의 급여·근태·수당·공제·실수령 1:1 대조 및 즉시 수정 패널 (모든 금액에 콤마 적용!)
     '<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
-        '<div><b style="font-size:13.5px;color:var(--navy)">💻 [우측] ' + nm + ' 님의 급여·근태·수당 계산 대조표 (' + curMonth + ')</b>' +
+        '<div><b style="font-size:13.5px;color:var(--navy)">💻 [우측] ' + nmEsc + ' 님의 급여·근태·수당 계산 대조표 (' + curMonth + ')</b>' +
         '<div style="font-size:11.5px;color:var(--sub)">좌측 원본 캡쳐와 숫자를 눈으로 비교하며 바로 수정·저장할 수 있습니다 (천단위 콤마 자동 적용)</div></div>' +
         '<span class="badge ok">실수령 ' + won(mp.실수령) + '원</span>' +
       '</div>' +
@@ -5219,7 +5337,7 @@ function renderEmp360Card(site) {
   var curMonth = App.month || (recs[0] && recs[0].월) || (App.ym || laborYear() + '-11');
   var emps = rosterEmployees(site);
   if (!emps.length && recs.length) emps = siteEmployees(site, curMonth);
-  var selEmp = emps.filter(function (e) { return e.성명 === App.compareEmp; })[0] || emps[0] || { 성명: '홍길동', 기본급: 2200000 };
+  var selEmp = emps.filter(function (e) { return String(e.성명 || '').trim() === String(App.compareEmp || '').trim(); })[0] || emps[0] || { 성명: '홍길동', 기본급: 2200000 };
   var nm = String(selEmp.성명 || '홍길동').trim(), nmEsc = esc(nm);
   App.compareEmp = nm;
   var meta = empMeta(site, nm), sv = severOf(site, nm), lv = leaveOf(site, laborYear(), nm);
@@ -5229,20 +5347,15 @@ function renderEmp360Card(site) {
     월급여: baseWage, 입사일: meta.입사일 || '', 퇴사일: sv.퇴사일 || '',
     기간임금총액: sv.삼개월임금, 연간임금총액: sv.연간임금총액, DC납입: sv.DC납입, DB적립: sv.DB적립, policy: P
   });
-  var evList = empEvidencesOf(site, nm);
 
-  var h = '<div class="mpills" style="margin-bottom:10px"><b style="font-size:12px;color:var(--navy)">🪪 1인 종합 카드 (직원 클릭 시 전 분야 한눈에):</b>' +
-    (emps.length ? emps.map(function (e, i) {
-      var enm = String(e.성명 || '').trim();
-      return '<button type="button" class="mpill' + (enm === nm ? ' on' : '') + '" onclick="App.compareEmp=\'' + esc(enm) + '\';render()">' + (i + 1) + '. ' + enm + ' (' + fmtComma(empBaseMonthlyWage(e, empMeta(site, enm))) + '원)</button>';
-    }).join('') : '') + '</div>';
+  var h = renderEmpSelectBar(site, emps, nm, '🪪 1인 종합 카드 · 대상 직원 선택:');
 
   h += '<div class="sev-3col" style="margin-bottom:10px">' +
     '<div class="pay-kpi"><div style="font-size:11.5px;color:var(--sub)">💰 ① 급여 · 통상임금월액</div><div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:4px">' + fmtComma(baseWage) + '원</div><div style="font-size:11.5px;color:var(--sub);margin-top:3px">시급 ' + won(Math.round(LC.hourlyOrdinary(baseWage, P))) + '원 · <a href="#" onclick="openEmpCompare(\'' + s + '\',\'' + nmEsc + '\');return false">원본대조·수정 ›</a></div></div>' +
     '<div class="pay-kpi"><div style="font-size:11.5px;color:var(--sub)">🌴 ② 연차 · 시간차 (1h단위)</div><div style="font-size:18px;font-weight:800;color:var(--ink);margin-top:4px">사용 ' + Number(lv.사용 || 0) + '일 · 시간차 ' + Number(lv.사용시간 || 0) + 'h</div><div style="font-size:11.5px;color:var(--sub);margin-top:3px">최대 시간차 ' + LC.maxHourLeaveOf(P, meta.일소정근로시간) + 'h · <a href="#" onclick="App.uiMode=\'focus\';pickTab(\'leave\');return false">연차대장 ›</a></div></div>' +
     '<div class="pay-kpi" style="background:#eff6ff;border-color:#bfdbfe"><div style="font-size:11.5px;color:#1e40af;font-weight:700">🎓 ③ 퇴직금 (' + sevCalc.유형명 + ')</div><div style="font-size:18px;font-weight:800;color:#1e40af;margin-top:4px">' + won(sevCalc.금액) + '원</div><div style="font-size:11.5px;color:#1e40af;margin-top:3px">세후 ' + won(sevCalc.세후수령액) + '원 · <a href="#" onclick="App.sevEmp=\'' + nmEsc + '\';App.uiMode=\'focus\';pickTab(\'sever\');return false">법정/DC/DB 변경 ›</a></div></div>' +
   '</div>';
-  h += renderEmpCompareStudio(site);
+  h += renderEmpCompareStudio(site, { hideEmpBar: true });
   return h;
 }
 window.renderEmpCompareStudio = renderEmpCompareStudio;

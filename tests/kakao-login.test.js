@@ -351,7 +351,8 @@ test('★★ 서버 — state 는 서버가 발급하고 한 번만 쓸 수 있�
   const K = fresh();
   const issuedState = await authUrl(K, { mode: 'login' });
   const state = issuedState.body.state;
-  assert.match(state, /^login\.\d{13}\.[A-Za-z0-9_-]{32}\.[A-Za-z0-9_-]{43}$/);
+  /* 셋째 조각 = 출처 번호(o0·o1) + 무작위 32자 — 출처를 안 밝힌 요청은 옛 출처(o0) (2026-11-15 ERP 주소 이사) */
+  assert.match(state, /^login\.\d{13}\.o0[A-Za-z0-9_-]{32}\.[A-Za-z0-9_-]{43}$/);
   assert.equal(new URL(issuedState.body.url).searchParams.get('state'), state);
   const first = await call(K.kakaoLoginFinish, { body: { code: 'cA', state } });
   assert.equal(first.body.needLink, true, '처음 요청이 state 문턱을 못 넘었다');
@@ -611,3 +612,131 @@ test('★★ 기록이 실패해도 로그인 응답은 그대로 간다', async
   assert.equal(r.body.needLink, true, '★★ 감시 기록이 막혀 로그인 안내가 안 갑니다');
 });
 
+
+/* ══════ 2026-11-15 ERP 주소 이사 — 옛(nabaho.github.io/pureunall)·새(erp.pureunlabor.co.kr) 두 출처 ══════
+   GitHub 에서 도메인을 켜는 순간 옛 주소는 301 로 바뀐다. 그 순간 앞뒤로 카카오 로그인이 끊기지 않으려면
+   ① 두 출처 모두 받아 주고 ② 돌아올 주소는 «시작한 출처»의 것이고 ③ code 교환은 인가 때와 «같은» 주소를 써야 한다
+   (카카오는 둘이 다르면 거절한다). 전환 순간 교환 요청이 다른 출처에서 와도 state 에 서명된 번호를 따른다. */
+const NEW_ORIGIN = 'https://erp.pureunlabor.co.kr';
+const OLD_ORIGIN = 'https://nabaho.github.io';
+
+function reqFrom(handler, { origin, method = 'GET', query = {}, body, token } = {}) {
+  return new Promise((resolve) => {
+    const headers = {};
+    const req = { method, headers: Object.assign(origin ? { origin } : {}, token ? { authorization: 'Bearer ' + token } : {}), body: body || {}, query };
+    const res = {
+      _s: 200, set(k, v) { headers[k] = v; }, status(s) { this._s = s; return this; },
+      json(j) { resolve({ status: this._s, body: j, headers }); }, send() { resolve({ status: this._s, headers }); },
+    };
+    handler(req, res);
+  });
+}
+async function exchangedRedirects(run) {
+  const seen = []; const orig = global.fetch;
+  global.fetch = async (url, opts) => {
+    if (String(url).startsWith('https://kauth.kakao.com/oauth/token')) seen.push(new URLSearchParams(opts.body).get('redirect_uri'));
+    return orig(url, opts);
+  };
+  try { await run(); } finally { global.fetch = orig; }
+  return seen;
+}
+
+test('★★ 새 출처에서 시작하면 돌아올 주소도 새 출처 — code 교환도 «같은» 주소다(교환이 옛 출처에서 와도)', async () => {
+  const K = fresh();
+  const a = await reqFrom(K.kakaoAuthUrl, { origin: NEW_ORIGIN, query: { mode: 'login' } });
+  assert.equal(new URL(a.body.url).searchParams.get('redirect_uri'), NEW_ORIGIN + '/enter.html',
+    '★★ 새 출처에서 눌렀는데 옛 주소로 돌아간다');
+  const seen = await exchangedRedirects(() => reqFrom(K.kakaoLoginFinish, { origin: OLD_ORIGIN, method: 'POST', body: { code: 'cA', state: a.body.state } }));
+  assert.deepEqual(seen, [NEW_ORIGIN + '/enter.html'],
+    '★★ 교환 때 돌아올 주소가 인가 때와 다르다 — 카카오가 거절해 로그인이 막힌다');
+});
+
+test('★ 옛 출처에서 시작하면 전과 같은 주소(/pureunall/enter.html) — 교환도 같은 주소', async () => {
+  const K = fresh();
+  const a = await reqFrom(K.kakaoAuthUrl, { origin: OLD_ORIGIN, query: { mode: 'login' } });
+  assert.equal(new URL(a.body.url).searchParams.get('redirect_uri'), OLD_ORIGIN + '/pureunall/enter.html');
+  const seen = await exchangedRedirects(() => reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: a.body.state } }));
+  assert.deepEqual(seen, [OLD_ORIGIN + '/pureunall/enter.html']);
+});
+
+test('★ 이 배포 전에 받은 옛 꼴 state(출처 번호 없음)도 그대로 받는다 — 옛 출처 주소로 교환', async () => {
+  const K = fresh();
+  const seen = await exchangedRedirects(() => reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: signedState('login') } }));
+  assert.deepEqual(seen, [OLD_ORIGIN + '/pureunall/enter.html'], '배포하는 순간 진행 중이던 로그인이 끊긴다');
+});
+
+test('★★ 출처 번호는 서명 안에 든다 — o1 을 o0 으로 바꿔 치면 받지 않는다', async () => {
+  const K = fresh();
+  const a = await reqFrom(K.kakaoAuthUrl, { origin: NEW_ORIGIN, query: { mode: 'login' } });
+  const parts = a.body.state.split('.');
+  assert.equal(parts[2].slice(0, 2), 'o1', '새 출처 번호가 state 에 안 실렸다');
+  parts[2] = 'o0' + parts[2].slice(2);
+  const r = await reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: parts.join('.') } });
+  assert.match(String(r.body.error), /이미 사용|만료/, '★★ 서명 밖에서 출처를 바꿔 치기 할 수 있다');
+});
+
+test('★★ 서버가 주는 state 는 «두 출처 모두» 화면(js/pu-kakao.js)의 모양 검사를 통과한다', async () => {
+  /* 화면은 state 모양이 이상하면 「요청번호를 받지 못했습니다」로 카카오 로그인을 통째로 막는다 —
+     서버가 모양을 바꾸면 화면 정규식이 그대로인지 «돌려서» 본다. */
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'pu-kakao.js'), 'utf8');
+  const m = /if \(!j\.state \|\| !(\/\^\(login\|link\)[^\n]*?\$\/)\.test\(/.exec(src);
+  assert.ok(m, '화면의 state 모양 검사를 못 찾았다');
+  const re = vm.runInNewContext(m[1]);
+  const K = fresh();
+  for (const origin of [OLD_ORIGIN, NEW_ORIGIN, '']) {
+    for (const mode of ['login', 'link']) {
+      const a = await reqFrom(K.kakaoAuthUrl, { origin, query: { mode } });
+      assert.ok(re.test(a.body.state), '★★ ' + (origin || '출처 없음') + ' ' + mode + ' state 를 화면이 거절한다: ' + a.body.state);
+    }
+  }
+});
+
+test('★ 로그아웃 돌아올 주소도 요청 출처를 따른다', async () => {
+  const K = fresh();
+  const n = await reqFrom(K.kakaoAuthUrl, { origin: NEW_ORIGIN, query: { kind: 'logout' } });
+  assert.equal(new URL(n.body.url).searchParams.get('logout_redirect_uri'), NEW_ORIGIN + '/enter.html');
+  const o = await reqFrom(K.kakaoAuthUrl, { origin: OLD_ORIGIN, query: { kind: 'logout' } });
+  assert.equal(new URL(o.body.url).searchParams.get('logout_redirect_uri'), OLD_ORIGIN + '/pureunall/enter.html');
+});
+
+test('★★ CORS — 두 출처는 그 값 그대로 열고(Vary), 목록 밖은 안 연다', async () => {
+  const K = fresh();
+  for (const origin of [OLD_ORIGIN, NEW_ORIGIN]) {
+    const r = await reqFrom(K.kakaoAuthUrl, { origin, method: 'OPTIONS' });
+    assert.equal(r.headers['Access-Control-Allow-Origin'], origin);
+    assert.equal(r.headers['Vary'], 'Origin');
+  }
+  for (const origin of ['https://evil.example', 'http://nabaho.github.io', 'https://erp.pureunlabor.co.kr.evil.example', 'null']) {
+    const r = await reqFrom(K.kakaoAuthUrl, { origin, method: 'OPTIONS' });
+    assert.equal(r.headers['Access-Control-Allow-Origin'], undefined, '★★ 남의 출처(' + origin + ')에 문을 열었다');
+  }
+});
+
+test('★★ 계정 «연결»도 — 새 출처에서 시작하면 교환이 새 출처 주소를 쓴다', async () => {
+  const K = fresh();
+  const a = await reqFrom(K.kakaoAuthUrl, { origin: NEW_ORIGIN, query: { mode: 'link' } });
+  assert.equal(new URL(a.body.url).searchParams.get('redirect_uri'), NEW_ORIGIN + '/enter.html');
+  const seen = await exchangedRedirects(() => reqFrom(K.kakaoLink, { origin: NEW_ORIGIN, method: 'POST', token: 'staff1', body: { code: 'cA', state: a.body.state } }));
+  assert.deepEqual(seen, [NEW_ORIGIN + '/enter.html'], '★★ 연결 교환 주소가 인가 때와 다르다 — 카카오가 거절해 연결이 막힌다');
+});
+
+/* 서명 마지막 글자의 «쓰지 않는 비트»만 바꾼 다른 글자 — 풀면 같은 바이트가 된다 */
+function 같은바이트다른글자(sig) {
+  const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const last = sig.charAt(sig.length - 1);
+  const other = ABC.charAt(ABC.indexOf(last) ^ 1);
+  return sig.slice(0, -1) + other;
+}
+
+test('★★ 서명 «다른 글자 같은 바이트»로 한 번 쓴 state 를 다시 쓰지 못한다 (2026-11-15 보안 검토 중간 1)', async () => {
+  const K = fresh();
+  const a = await reqFrom(K.kakaoAuthUrl, { origin: NEW_ORIGIN, query: { mode: 'login' } });
+  const parts = a.body.state.split('.');
+  const 변형 = parts.slice(0, 3).concat([같은바이트다른글자(parts[3])]).join('.');
+  assert.notEqual(변형, a.body.state);
+  assert.deepEqual(Buffer.from(변형.split('.')[3], 'base64url'), Buffer.from(parts[3], 'base64url'), '시험 밑감이 «같은 바이트»가 아니다');
+  const first = await reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: a.body.state } });
+  assert.equal(first.body.needLink, true, '처음 요청이 state 문턱을 못 넘었다');
+  const replay = await reqFrom(K.kakaoLoginFinish, { origin: NEW_ORIGIN, method: 'POST', body: { code: 'cA', state: 변형 } });
+  assert.match(String(replay.body.error), /이미 사용|만료/, '★★ 서명 글자만 비틀어 같은 state 를 한 번 더 썼다');
+});

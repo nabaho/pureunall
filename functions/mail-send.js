@@ -105,7 +105,10 @@ const SIGN_IMG_OK = 'cid:pusign';
      남의 서버 그림을 계속 막는 까닭(열람 시각이 남에게 새는 것)은 그대로 지킨다.
    ⚠ 이 한 줄이 없으면 «우리 추적 그림도 함께 버려져» 열람이 영영 안 찍힌다.
      tests/mail-bulk.test.js 가 그것을 본다 — 그리고 남의 도메인이 여전히 막히는지도. */
+/* 2026-11-15 ERP 주소 이사 — 새 ERP 출처(erp.pureunlabor.co.kr)의 그림도 «우리 것»이다. 옛 주소는 이미 나간
+   회차 때문에 남긴다. 셋 모두 «우리» 집이다(남의 도메인 아님). 화면·CSP·편지짓개 넷이 같은 목록이어야 한다. */
 const IMG_HOST_OK = ['https://nabaho.github.io/pureunall/',
+                     'https://erp.pureunlabor.co.kr/',
                      'https://asia-northeast3-pureun-erp.cloudfunctions.net/'];
 /* ★★ 뉴스레터 «열람 그림» — 우리 도메인의 newsOpen 한 길만 (2026-10-05 실측: 10월 1주차 147곳 나갔는데 열람 0).
      편지 짓개가 추적밑주소(https://news.fairrunlabor.com)로 그림을 그리는데, 이 주소가 아래 목록에 없어
@@ -128,12 +131,12 @@ function imgSrcOk(v) {
      이 다섯은 «자기 칸 안»에서만 힘을 쓴다. 받는 화면을 덮는 것들과 다르다. */
 const STYLE_OK = ['color','background-color','background','font-family','font-size',
                   'font-weight','font-style','text-decoration','text-align',
-                  'line-height','margin','margin-left','padding-left','text-indent',
+                  'line-height','margin','margin-top','margin-right','margin-bottom','margin-left','padding-left','text-indent',
                   'padding','padding-top','padding-right','padding-bottom',
                   'border','border-top','border-bottom','border-left','border-right',
                   'border-radius','border-collapse','border-spacing',
                   'width','max-width','height','min-height','vertical-align',
-                  'letter-spacing','display'];
+                  'letter-spacing','display','overflow','word-break'];
 
 /* 태그마다 남길 속성. 여기 없는 속성은 다 버린다(on* 손잡이가 여기서 걸러진다). */
 /* ★ class 는 2026-09-26 에 더했다 — 화면 크기별 규칙(@media)이 붙잡을 손잡이다.
@@ -184,6 +187,7 @@ function cleanStyle(v) {
 /* 누를 수 있는 주소인가 — http·https·mailto 만. javascript: 는 받는 쪽에서 돈다. */
 function cleanHref(v) {
   const s = String(v == null ? '' : v).trim().replace(/[ -\s]/g, '');
+  if (/^tel:\+?[0-9-]{7,20}$/i.test(s)) return s;
   return /^(https?:\/\/|mailto:)/i.test(s) ? s.replace(/"/g, '&quot;') : '';
 }
 

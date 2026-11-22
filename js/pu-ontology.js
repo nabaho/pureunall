@@ -26,8 +26,16 @@
       SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
+      /* 법정교육자료함(2026-11-19) — 강의자료 파일 한 건(원본은 창고에 받은 그대로) · 그 자료를 본 노무사의 검토 메모 */
+      EduMaterial:'강의자료', EduReviewNote:'강의자료 검토 메모',
+      /* 강의자료(2026-11-21) — 사람이 더한 강의 종류 하나(이름·법정 여부·찾을 낱말). 그 id 가 자료 기록의 cat 칸이 된다 */
+      EduCategory:'강의 종류',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
+      /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
+      DeungiBase:'노무법인 등기 현황', DeungiCase:'노무법인 변경등기 건', DeungiArchive:'노무법인 지난 등기 원본 서류 묶음',
+      /* 산재 묶음(2026-11-15) — 이알피 산재 사건 «한 건»의 청구 급여·서류 받음/제출·기한 날짜. 사건을 sourceKind 'case'·sourceId 로 가리킨다(js/pu-sanjae-kit.js) */
+      SanjaeKit:'산재 묶음(급여·서류·기한)',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -111,9 +119,11 @@
          다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
       /* worker_secret — 사건·계약 근로자 주민번호·계좌·예금주. 그 건의 담당자와 대표만(대표 결정 2026-10-15) */
+      /* site_secret — 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번. 그 건의 담당자와 대표만(2026-11-15) */
       /* staff_secret — 직원 주민번호·계좌·예금주 금고. 대표만(대표 승인 2026-11-01, 개인정보 2단계) */
-      primaryRoots:['data','improve_requests','ieum_public','worker_secret','staff_secret'],
-      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
+      primaryRoots:['data','improve_requests','ieum_public','worker_secret','site_secret','staff_secret'],
+      sharedRoots:['harass_invest'],
+      entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document','SanjaeKit'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다(pu-erp.html PU_APPS 머리글).
@@ -206,6 +216,14 @@
       note:'한글 문서를 이 PC 안에서 열고 고치는 도구 — 파이어베이스에 쓰지 않는다' },
     aliounion:{ name:'공공임단협', file:'pu-alio-union.html', primaryRoots:[], entityTypes:['Document'], localOnly:true,
       note:'알리오 공공기관 노동조합·단체협약 비교분석 도구 — 파이어베이스에 쓰지 않는다' },
+    pbox:{ name:'P박스', file:'pu-pbox.html', primaryRoots:[], entityTypes:['Document','Project'], localOnly:true,
+      note:'대한민국 전 법령·판례·유권해석·AI 서면 도구 — 브라우저 로컬 및 무료 외부 색인 기반으로 파이어베이스에 쓰지 않는다' },
+    orch:{ name:'오케스트레이션', file:'pu-orchestrator.html', primaryRoots:[],
+      sharedRoots:['uid_roles','data/companies','data/user_dir','data/contracts','data/contract_requests',
+        'data/cases','data/consultings','data/funds','work_erp/items','pu_quotes','pucards/ontIdx',
+        'kcareer/{uid}/counts'],
+      entityTypes:['Organization','Person','Contract','Case','Project','Task','Document'], localOnly:true,
+      note:'전 프로그램 업무 바통 감지·360° 생애주기 연결 지휘소 — in_app 민감 본문은 읽지 않고 허용된 경량 원장·거울만 읽기 전용으로 조립한다' },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
       entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],
@@ -261,6 +279,18 @@
                       {path:'signboard/control',entityType:'SignboardControl'},
                       {path:'signboard/log/{id}',entityType:'SignboardLog'}],
       entityTypes:['SignboardAd','SignboardPublish','SignboardControl','SignboardLog'] },
+    /* 법정교육자료함 — 강의자료를 종류·강의일로 모아 보고·나란히 비교하고·검토해 더한다(대표 지시 2026-11-19).
+       ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모) · cats(EduCategory — 사람이 더한 강의 종류, 2026-11-21).
+         원본 파일은 창고 edulib/{id}/ 에 받은 그대로.
+       ★ 서버 자동 정리(functions/edulib-mail-sweep.js, 2026-11-21)는 보낸 메일의 강의자료를 «정리»만 해 관리자 전용 자동 정리함
+         edulib_inbox(레코드 아닌 대기열·상태 — 서버만 쓴다)에 쌓는다. 자료함 기록(items)은 관리자가 골라 «넣기»할 때 화면 관문이 만든다.
+       ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 관리자 화면에서만, 머리글·첨부 이름만)
+       ⚠ 재직 직원 모두 읽고 쓴다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만. */
+    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib','edulib_inbox'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
+      writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
+                      {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'},
+                      {path:'edulib/cats/{id}',entityType:'EduCategory'}],
+      entityTypes:['EduMaterial','EduReviewNote','EduCategory'] },
     /* 컨설팅정산 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 사이 차액을 정산한다(대표 지시 2026-10-31).
        설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md.
        ★ 쓰는 것: rules(SettleRule) · links(SettleLink — 사람이 확정한 연결만) · notices(SettleNotice) · runs(SettleRun) · adjusts(SettleAdjust).
@@ -276,6 +306,16 @@
                       {path:'settle/rooms/{sid}',entityType:'SettleRoom'},
                       {path:'settle/kakaoQueue/{id}',entityType:'SettleKakao'}],
       entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust','SettleRoom','SettleKakao'] },
+    /* 푸른등기 — 노무법인 변경등기(사원 입사·퇴사·지분 양도, 대표사원 취임·사임, 주소변경, 분사무소 설치·이전·폐지) 서류를 한글로 만든다(대표 지시 2026-11-14).
+       ★ 쓰는 것: base(DeungiBase — 지금 등기부 현황 하나) · cases(DeungiCase — 등기 건) · archive(DeungiArchive — 지난 등기 원본 서류 묶음, 2026-11-14).
+       ★ 원본 파일은 원본 보관함(pu_docs, 공용 층 js/pu-office-store.js)의 🔒 자리에 올린다(from.kind 'deungi') — 묶음에는 파일 번호만.
+       ★ 사람은 «등기 현황 안의 사원 줄»(id m1…)로만 가리킨다 — 직원 명부(sid)와 이름으로 잇지 않는다(사원이 퇴사·입사해도 명부와 따로 간다).
+       ⚠ 주민등록번호 뒷자리는 저장하지 않는다(생년월일만). 대표·위임관리인만(규칙 deungi). */
+    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles','pu_docs'],
+      writeContracts:[{path:'deungi/base',entityType:'DeungiBase'},
+                      {path:'deungi/cases/{id}',entityType:'DeungiCase'},
+                      {path:'deungi/archive/{id}',entityType:'DeungiArchive'}],
+      entityTypes:['DeungiBase','DeungiCase','DeungiArchive'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
@@ -341,7 +381,49 @@
          읽은 사람이 안심하고 틀린다. */
     news:{ name:'뉴스레터', file:'pu-news.html', primaryRoots:['newsletter','ilabor'],
       sharedRoots:['data/companies','homepage/newsBrief','pucards/scheduled','mailbox'],
-      entityTypes:['Organization','Person','Message','Document'] }
+      entityTypes:['Organization','Person','Message','Document'] },
+    /* 괴롭힘·성희롱 조사(pu-harass.html) — 의뢰인 업무 조사 사건 공문 메일 자동수집 · 8단계 진행관리 · 조사결과보고서 · 푸른이알피 자동연동(2026-11-11).
+       ★ 비밀유지 분리(근로기준법 제76조의3 제7항): harass_invest(목록·8단계 진행·공문 머리글·이알피 동기화)는 재직 직원 공유,
+         harass_secret(면담 진술·쟁점 사실인정·조사결과보고서 본문) 및 harass_sign(진술·비밀서약 종단간 암호화 전자서명)은 사건 주·부담당 노무사 및 대표만 읽고 쓴다. */
+    harass:{ name:'괴롭힘·성희롱 조사', file:'pu-harass.html', primaryRoots:['harass_invest','harass_secret','harass_sign'],
+      sharedRoots:['uid_roles','data/companies','data/cases','data/biz_case_types','data/user_dir','mailbox'],
+      writeContracts:[{path:'harass_invest/cases/{id}',entityType:'Case'},
+                      {path:'harass_invest/erp_sync/{id}',entityType:'Task'},
+                      {path:'harass_invest/erp_ack/{id}',entityType:'Task'},
+                      {path:'harass_invest/dismissed/{id}',entityType:'Task'},
+                      {path:'harass_secret/{id}',entityType:'Document'},
+                      {path:'harass_sign/req/{cid}/{id}',entityType:'Submission'},
+                      {path:'harass_sign/open/{id}',entityType:'Submission'}],
+      entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] },
+    /* 일터상생혁신(ilteo.html) — 노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 비식별 진단 요약, 중간보고서·최종결과보고서·PPTX 자동화(2026-11-15).
+       ★ 임금대장·근태·명부 원본은 브라우저 로컬 비식별 통계만 산출하고 DB·외부 AI 로 전송하지 않는다. 확정 스냅샷(snapshots)은 불변으로 보관한다. */
+    ilteo:{ name:'일터상생혁신', file:'ilteo.html', primaryRoots:['scal_ilteo'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','data/user_dir','scal_cos','scal_types','scal_scheds','scal_docs','mailbox'],
+      writeContracts:[{path:'scal_ilteo/projects/{id}',entityType:'Project'},
+                      {path:'scal_ilteo/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/mid/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/final/{id}',entityType:'Document'},
+                      {path:'scal_ilteo/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 산업일자리전환(jobtrans.html) — 한국능률협회컨설팅(KMAC 구조혁신) 및 충남경제진흥원(CEPA 산업일자리전환) 맞춤 중간·최종보고서·완료계 자동화(2026-11-15).
+       ★ 재무·인력·임금·설문 정량 엑셀 원본은 브라우저 로컬에서만 비식별 집계하고 DB·외부 AI 로 전송하지 않으며, 확정 스냅샷(snapshots)은 불변 보관한다. */
+    jobtrans:{ name:'산업일자리전환', file:'jobtrans.html', primaryRoots:['scal_jobtrans'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','data/user_dir','scal_cos','scal_types','scal_scheds','scal_docs','mailbox'],
+      writeContracts:[{path:'scal_jobtrans/projects/{id}',entityType:'Project'},
+                      {path:'scal_jobtrans/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/mid/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/final/{id}',entityType:'Document'},
+                      {path:'scal_jobtrans/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 데이터관리(2026-11-21) — 대표 전용. 원본(입금·명부·업체·업무·관계망)은 «읽기만» 하고 화면 안에서 센다.
+       제 자리는 보기 설정(datahub/{uid}/settings)뿐 — 기기·일회용 문제·현황판 숫자는 서버 함수만 쓴다(INFRA_ROOTS).
+       ⚠ 사람 이름·업체명을 관계 열쇠로 쓰지 않는다(sid·companyId). 채팅으로는 가명 숫자만 나간다. */
+    datahub:{ name:'데이터관리', file:'pu-datahub.html', primaryRoots:['datahub/{uid}'],
+      sharedRoots:['uid_roles','app_owner','data/finance_income','data/user_dir','data/companies','work_erp/items','work_erp/logs',
+        'ontology/v1','datahub_device/{uid}','datahub_board'],
+      entityTypes:['ViewState'], sourceMutation:'never',
+      writeContracts:[{path:'datahub/{uid}/settings',entityType:'ViewState'}],
+      note:'대표 전용 3D·현황판·연결 지도·다년 대조 — 원본은 읽기만, 자기 자리는 보기 설정뿐' }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -456,10 +538,16 @@
       note:'근로자가 폰으로 제출하는 쪽 — 문서관리가 받는다' },
     /* ✍ 계약서 서명 요청 (2026-10-09) — 받는 사람이 폰으로 확인·서명하는 쪽. 쓰는 곳은 pu_sign/open/{열쇠}/seen·sub 뿐 */
     contract_sign:{ name:'계약서 서명', file:'sign-contract.html', program:'docs',
-      note:'받는 사람이 폰으로 계약서를 확인·서명 — 문서관리(기업별 계약서 › 서명 요청)가 받아 🔒 서명본으로 저장' }
+      note:'받는 사람이 폰으로 계약서를 확인·서명 — 문서관리(기업별 계약서 › 서명 요청)가 받아 🔒 서명본으로 저장' },
+    /* 🛡️ 괴롭힘·성희롱 조사 비밀유지서약·진술확인 서명 (2026-11-12) — 당사자·참고인이 폰으로 종단간 복호화 확인·정정의견·손서명 제출 */
+    harass_sign:{ name:'진술·비밀서약 서명', file:'sign-harass.html', program:'harass',
+      note:'면담 대상자가 폰으로 비밀유지서약·진술확인서에 서명 — 괴롭힘·성희롱 조사가 받아 사건 비밀금고(harass_secret)에 봉인' }
   };
   var EXCLUDED_SCREENS = {
     'install.html':'포털 설치 안내 — 업무 자료를 담지 않는다',
+    /* ERP 주소 이사 준비 (2026-11-15) — 뿌리 주소·없는 주소를 포털 입구로 잇는 «길잡이»뿐. 자료·Firebase 없음 */
+    'index.html':'뿌리 주소 → 포털 입구(enter.html)로 넘기기만 — 자료·저장 자리 없음',
+    '404.html':'없는 주소 안내 · 새 주소에서 옛 꼴(/pureunall/…) 넘기기만 — 자료·저장 자리 없음',
     /* 푸른 문서뷰어 (2026-10-25) — 이 기기의 파일을 «보기만» 한다. 서버·Firebase 를 쓰지 않고 저장하는 자리가 없다
        (최근 목록은 이 브라우저 localStorage 의 이름·크기·형식·때뿐, 파일 내용은 안 담는다). 그래서 PROGRAMS(저장 자리)도
        SATELLITES(주인 프로그램)도 아니다. 포털 타일은 «저장 자리 없는 프로그램»을 등록부가 어떻게 받을지 정한 뒤에 단다. 설계 docs/폰-문서뷰어-설계.md */
@@ -525,7 +613,17 @@
     login_countries:'계정별 알려진 접속 국가', login_fail_burst:'짧은 시간 비밀번호 반복실패 셈',
     /* 2026-09-27 카카오 로그인 — 「연결됨」 표시만. 카카오 회원번호(누구 것인지 찾는 표)는
        서버 전용 자리(kakao_links)에 있어 화면이 아예 안 읽는다. */
-    uid_kakao:'계정별 카카오 로그인 연결 표시'
+    uid_kakao:'계정별 카카오 로그인 연결 표시',
+    /* 데이터관리(2026-11-21) — 업무 자료가 아니라 «문·기기·살림 숫자»다. 사람이 화면에서 쓰지 않는다(규칙 .write:false — 서버 함수·터미널만). */
+    app_owner:'대표 표지 — 대표 uid 하나(화면에서 아무도 못 씀, 터미널 scripts/datahub-owner.js)',
+    datahub_device:'데이터관리 채팅 기기 — 승인된 공개 열쇠·지문(서버·터미널만 씀)',
+    datahub_device_req:'데이터관리 채팅 기기 등록 요청 — 승인되면 지움(서버만)',
+    datahub_nonce:'데이터관리 채팅 일회용 문제 — 쓰면 지움(서버만)',
+    datahub_activity:'데이터관리 채팅 마지막 질문 시각 — 15분 재인증용(서버만)',
+    datahub_board:'데이터관리 현황판 — 앱별 건수·비율만(서버가 한 시간마다 씀, 대표만 읽음)',
+    /* 관계망 판(ontology/v1) — 원본이 아니라 원본에서 «파생»한 관계층이다. 이알피 «온톨로지 진단»의 관계망 올리기가 쓰고(관리자),
+       데이터관리 연결 지도가 읽기만 한다. 쓰는 쪽은 변수(ONT_ROOT)로 불러 검사의 눈에 안 띄었고, 2026-11-21 데이터관리가 글자로 읽으면서 여기 밝힌다 */
+    ontology:'온톨로지 관계망 판 — 확정 관계만, 이름·본문 없음(이알피 온톨로지 진단이 올림, 데이터관리는 읽기만)'
   };
 
   /* ── 사전에만 있고 아직 만들지 않는 관계어 ──
@@ -597,9 +695,24 @@
     /* 전광판 — 광고 문구·올린 판이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     signboard_core:{program:'signboard',strategy:'in_app',path:'signboard',parser:'coverage',
       gives:'전광판 광고·올린 판·올린 기록·심부름꾼 상태 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 법정교육자료함 — 강의처(고객사 이름)·검토 메모가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
+    edulib_core:{program:'edulib',strategy:'in_app',path:'edulib',parser:'coverage',
+      gives:'강의자료 목록·종류·강의일·검토 메모 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     /* 컨설팅정산 — 사람별 금액·요율·송금이 든 재무 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     settle_core:{program:'settle',strategy:'in_app',path:'settle',parser:'coverage',
       gives:'컨설팅정산 규칙·연결·안내 파일·정산표·이월 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 괴롭힘·성희롱 조사 — 사건 진행·공문 연결 및 비밀유지 금고(harass_secret)는 앱 안에서만 본다(통합 진단에 민감 진술·본문 미포함). */
+    harass_core:{program:'harass',strategy:'in_app',path:'harass_invest',parser:'coverage',
+      gives:'괴롭힘·성희롱 조사 사건·8단계 진행현황·공문 연결 (진술·보고서 본문은 harass_secret 비밀유지 분리 — 앱 안에서만 본다)'},
+    /* 푸른등기 — 사원 주소·생년월일이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
+    deungi_core:{program:'deungi',strategy:'in_app',path:'deungi',parser:'coverage',
+      gives:'등기 현황·변경등기 건·지난 등기 원본 서류 묶음 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 일터상생혁신 — 고객사 진단 요약·중간보고서·최종보고서 원고가 든 자리라 통합 진단에서 읽지 않고 앱 안에서만 본다. */
+    ilteo_core:{program:'ilteo',strategy:'in_app',path:'scal_ilteo',parser:'coverage',
+      gives:'일터상생혁신 사업장 워크스페이스·비식별 분석 카드·중간보고·최종보고 원고 (앱 안에서만 본다)'},
+    /* 산업일자리전환 — 능률협회·충남경제진흥원 사업장 비식별 요약 및 중간·최종보고서 원고가 든 자리라 앱 안에서만 본다. */
+    jobtrans_core:{program:'jobtrans',strategy:'in_app',path:'scal_jobtrans',parser:'coverage',
+      gives:'산업일자리전환 사업장 워크스페이스·비식별 분석 카드·기관별 중간·최종보고 원고 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.
@@ -641,7 +754,9 @@
     fin_private:{program:'fin',strategy:'in_app',parser:'finMetadata'},
     rules_documents:{program:'rules',strategy:'in_app',parser:'ruleMetadata'},
     esign_cases:{program:'docs',strategy:'in_app',parser:'esignMetadata'},
-    newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'}
+    newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'},
+    /* 데이터관리 — 돈·사람별 실적이라 통합 화면에서 따로 열지 않는다. 앱 안에서만(대표 전용) */
+    datahub_view:{program:'datahub',strategy:'in_app',path:'datahub/{uid}',parser:'coverage',gives:'대표 보기 설정만 — 집계는 화면 안에서 하고 저장하지 않는다'}
   };
 
   function arr(v){

@@ -115,6 +115,12 @@ function 글쪽만들기(본, 글) {
   h = h.replace(/(<meta[^>]+(?:name="description"|name="twitter:description"|property="og:description")[^>]*content=")[^"]*(")/gi,
     '$1' + 감싸기(글.요약 || 글.제목) + '$2');
 
+  /* 주간 브리핑 꾸밈 — 본(바로 앞 글 쪽)에 꾸밈 줄이 없으면 붙인다 (2026-11-18 「주간브리핑 깔끔하게」).
+     글 쪽은 notice/<번호>/ 라 두 칸 올라가야 assets 다. 본에 이미 있으면 두 번 넣지 않는다. */
+  if (/class="pu_brief"/.test(String(글.본문 || '')) && h.indexOf('assets/css/pu-brief.css') < 0) {
+    h = h.replace(/<\/head>/i, '<link rel="stylesheet" href="../../assets/css/pu-brief.css" />\n</head>');
+  }
+
   /* 날짜 */
   h = h.replace(/(<i class="xi-time"><\/i>날짜 : <\/span><span class="detail_content">)[^<]*(<\/span>)/i,
     '$1' + 감싸기(글.날짜) + '$2');
@@ -140,12 +146,16 @@ function 글쪽만들기(본, 글) {
    · 이미 있으면 그대로 돌려준다(두 번 불려도 한 줄) · /notice 줄 바로 아래(새 글이 위)에 넣는다
    · 주소 머리는 sitemap 에 적힌 /notice 줄에서 따온다 — 도메인을 여기에 박지 않는다
    · /notice 줄을 못 찾으면 null — 호출하는 쪽이 sitemap 을 건드리지 않고 넘어간다 */
+/* ★ 쪽 주소는 끝 빗금까지 적는다(2026-11-16) — 쪽은 폴더(index.html)라 빗금 없는 주소는
+     깃허브가 301 로 넘긴다. sitemap 에 «넘어가는 주소»를 적으면 검색엔진이 원본을 헷갈린다.
+     옛 꼴(빗금 없음) sitemap 도 읽고, 이미 실린 번호는 어느 꼴이든 다시 안 넣는다. */
 function 사이트맵더하기(xml, 번호, 날짜) {
   const 틀 = String(xml || '');
-  const m = /^([ \t]*)<url><loc>([^<]*?)\/notice<\/loc>[^\n]*\n/m.exec(틀);
+  const m = /^([ \t]*)<url><loc>([^<]*?)\/notice\/?<\/loc>[^\n]*\n/m.exec(틀);
   if (!m || !/^\d+$/.test(String(번호))) return null;
-  const 주소 = m[2] + '/notice/' + 번호;
-  if (틀.indexOf('<loc>' + 주소 + '</loc>') >= 0) return 틀;
+  const 주소 = m[2] + '/notice/' + 번호 + '/';
+  if (틀.indexOf('<loc>' + 주소 + '</loc>') >= 0
+    || 틀.indexOf('<loc>' + 주소.slice(0, -1) + '</loc>') >= 0) return 틀;
   const 줄 = m[1] + '<url><loc>' + 주소 + '</loc><lastmod>' + 날짜 + '</lastmod></url>\n';
   const 끝 = m.index + m[0].length;
   return 틀.slice(0, 끝) + 줄 + 틀.slice(끝);
@@ -161,7 +171,7 @@ function 사이트맵더하기(xml, 번호, 날짜) {
    · /notice 줄을 못 찾으면 null(사이트맵더하기와 같다). */
 function 사이트맵채우기(xml, 새번호, 목록번호들, 날짜) {
   let 틀 = String(xml || '');
-  const 실린 = [...틀.matchAll(/\/notice\/(\d+)<\/loc>/g)].map(function (m) { return Number(m[1]); });
+  const 실린 = [...틀.matchAll(/\/notice\/(\d+)\/?<\/loc>/g)].map(function (m) { return Number(m[1]); });
   const 새 = Number(새번호);
   const 바닥 = 실린.length ? Math.min.apply(null, 실린) : 새;
   const 넣을 = (목록번호들 || []).map(Number).filter(function (n) { return n >= 바닥; }).concat(새)

@@ -4,7 +4,7 @@
  *    (tests/portal-chatbot.test.js)
  *
  * 검증 범위:
- *   1. 지식베이스·연결도 지도(PORTAL_FLOWS 6선 · PORTAL_ROWS_GUIDE 4대 영역 24개 앱) 및 RAG 정확도
+ *   1. 지식베이스·연결도 지도(PORTAL_FLOWS 6선 · PORTAL_ROWS_GUIDE 4대 영역 25개 앱) 및 RAG 정확도
  *   2. 개인·기업 식별정보 자동 마스킹(현재 질문 + 멀티턴 대화 맥락 + 자동 개선요청 티켓 본문·제목)
  *   3. 코딩·문제해결 필요 의도 자동 판별(detectImproveIntent — 단순 질문 오탐 차단 + 오류/개선 감지)
  *   4. 간소화 UI(PuChatbotUI) — 비사전 모드 범주줄 숨김, 우측하단 단추 비간섭 배치, 압축 연결도 칩
@@ -41,7 +41,7 @@ function loadWithFundKb() {
 }
 
 /* ── 1. 통합 지식베이스 · 연결도 지도 · RAG 검색 정확도 ── */
-test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결도(PORTAL_FLOWS)·4대 영역 24개 앱 가이드(PORTAL_ROWS_GUIDE)가 완비되어 있다', () => {
+test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결도(PORTAL_FLOWS)·4대 영역 25개 앱 가이드(PORTAL_ROWS_GUIDE)가 완비되어 있다', () => {
   const ctx = loadWithFundKb();
   const C = ctx.PuChatbot;
   assert.ok(C, 'PuChatbot 전역 객체가 생성되어야 합니다');
@@ -64,8 +64,20 @@ test('통합 지식베이스 & 연결도 지도: 4대 범주·6대 실무 연결
   assert.equal(C.findFlowById('NON-EXISTENT'), null);
 
   assert.deepEqual(Array.from(C.PORTAL_ROWS_GUIDE.map((r) => r.id)), ['client', 'store', 'sales', 'inside']);
-  const totalRowApps = C.PORTAL_ROWS_GUIDE.reduce((sum, r) => sum + r.apps.length, 0);
-  assert.equal(totalRowApps, 24, '포털 4대 영역 24개 앱 전체가 수록되어야 합니다');
+  const appsBlock = /(?:const|var)\s+APPS\s*=\s*\[([\s\S]*?)\n\s*\];/.exec(enterHtml);
+  assert.ok(appsBlock, 'enter.html 의 APPS 배열을 읽을 수 있어야 합니다');
+  const activeEnterKeys = [];
+  for (const line of appsBlock[1].split('\n')) {
+    const km = /\bkey:\s*'([^']+)'/.exec(line);
+    if (!km) continue;
+    if (/\boff:\s*true\b/.test(line)) continue;
+    activeEnterKeys.push(km[1]);
+  }
+  const guideKeys = C.PORTAL_ROWS_GUIDE.flatMap((r) => r.apps.map((a) => a.key));
+  assert.equal(guideKeys.length, activeEnterKeys.length, '포털 활성 앱 전체가 PORTAL_ROWS_GUIDE 에 빠짐없이 수록되어야 합니다');
+  for (const k of activeEnterKeys) {
+    assert.ok(guideKeys.includes(k), '활성 포털 앱이 연결도 가이드에 있어야 합니다: ' + k);
+  }
   for (const r of C.PORTAL_ROWS_GUIDE) {
     for (const ap of r.apps) {
       assert.ok(ap.key && ap.name && ap.when && ap.from && ap.to && ap.ask, ap.key + ' 입출력 설명이 모두 있어야 합니다');
@@ -122,11 +134,78 @@ test('RAG 검색 & 간결 요약: 4대 영역·연결도·수임 순서·노동�
 
 /* ── 2. 코딩·문제해결 의도 판별(detectImproveIntent) 및 개인정보 마스킹 ── */
 test('개선요청 자동 판별 & 개인정보 가림: 단순 사용법 질문은 오탐하지 않고 실제 오류·수정 요청만 잡아내며 개인정보를 가린다', () => {
-  // 단순 사용법·법령 질문 → needed: false (오탐 방지)
+  // 단순 사용법·법령·권한 질문 → needed: false (오탐 방지)
   assert.equal(PuChatbot.detectImproveIntent('업무관리에 거래처 메일이 안 보일 때는 어떻게 연결해?').needed, false);
   assert.equal(PuChatbot.detectImproveIntent('푸른이알피에서 입금 매칭 오류 내역은 어디서 어떻게 확인하나요?').needed, false);
   assert.equal(PuChatbot.detectImproveIntent('기금 감사가 이사를 겸직할 수 있나요?').needed, false);
   assert.equal(PuChatbot.detectImproveIntent('연차 안 쓰면 수당은 어떻게 되나요?').needed, false);
+  assert.equal(PuChatbot.detectImproveIntent('의뢰인 주민등록번호가 들어있는 한글(.hwp) 서식을 고쳐야 하는데 서버에 안 남기고 내 PC에서만 안전하게 편집하려면 뭘 써?').needed, false);
+  assert.equal(PuChatbot.detectImproveIntent('기업규정집이랑 급여아웃소싱 타일에 준비중이라고 떠 있고 일반 직원 계정에서는 클릭이 안 되는데 왜 그런 거야?').needed, false);
+
+  // 시스템 예시 고유번호(자문-10001·급여-10001)와 조사(상호가·에서·으로)는 보존하고 실제 상호·내부사건번호·지노위사건번호·계좌번호는 모두 가려야 한다
+  const codeMask = PuChatbot.maskPersonal('거래처 상호가 (주)대한에서 (주)한빛으로 바뀌거나 자문-10001이 급여-10001로 바뀌고 사건 서울부해-2026-123 접수 시 연결');
+  assert.match(codeMask.text, /거래처 상호가 \(주\)○○에서 \(주\)○○으로 바뀌거나 자문-10001이 급여-10001로/);
+  assert.doesNotMatch(codeMask.text, /대한|한빛|서울부해-2026-123/);
+
+  const realCaseAndSpacedCorp = '한빛 (주) 및 한빛 산업 (주), 주식회사한빛, 주식회사 한빛 산업, 홍길동 대표에게 연락, 홍길동 대표입니다, 성명: 이영희님, 사건-54321 및 사건-54321-7, 서울2026부해123, 계좌 110-000-000000, 계좌 123456789012, 계좌 123 456 789012, 계좌 123-456789-01 업로드 오류 고쳐줘';
+  const mReal = PuChatbot.maskPersonal(realCaseAndSpacedCorp);
+  assert.doesNotMatch(mReal.text, /한빛|산업|홍길동|이영희|54321|부해123|110-000|123456789012|789012|456789/);
+  const prReal = PuChatbot.makePrompt([], realCaseAndSpacedCorp, { history: [{ q: realCaseAndSpacedCorp, answer: '가'.repeat(195) + ' 110-000-000000' }] });
+  assert.doesNotMatch(prReal.user, /한빛|산업|홍길동|이영희|54321|부해123|110-|123456789012|789012|456789/);
+  const payReal = PuChatbot.buildImprovePayload(realCaseAndSpacedCorp, [{ q: realCaseAndSpacedCorp, answer: '가'.repeat(175) + ' 110-000-000000' }], [], null);
+  assert.doesNotMatch(payReal.title + '\n' + payReal.content, /한빛|산업|홍길동|이영희|54321|부해123|110-|123456789012|789012|456789/);
+
+  // 2000자 경계선 절단 시에도 경계에 걸친 계좌·주민번호 조각이 미가림 상태로 남으면 안 된다
+  const boundaryMask = PuChatbot.maskPersonal('가'.repeat(1995) + ' 110-000-000000');
+  assert.doesNotMatch(boundaryMask.text, /110-|000000/);
+  // 법령·실무 일반 용어(회사 대표이사, 기금 감사)는 사람 이름으로 오탐하지 않아야 한다
+  assert.match(PuChatbot.maskPersonal('회사 대표이사나 기금 감사 겸직 기준').text, /회사 대표이사나 기금 감사/);
+
+  // 100문항 상호검증 회귀 방어: 기금 무관 질문의 기금 유권해석 노이즈 차단 · 멀티턴 주제 전환 오염 방지 · 사진첩 개선요청 분류 보정
+  const ctx100 = loadWithFundKb();
+  const C100 = ctx100.PuChatbot;
+  const pFlex = C100.pick('전일제 근로자가 학업이나 가족돌봄 때문에 주 20시간으로 소정근로시간을 줄일 때 회사가 받는 지원금은 뭐야?');
+  assert.equal(pFlex[0].id, 'GOV-flex-01');
+  assert.ok(pFlex.every((x) => x.cat !== 'fund'), '기금과 무관한 장려금 질문에 기금 유권해석이 섞이면 안 됩니다');
+
+  // 직전에 기금 질문을 했더라도 지시어 없는 독립 주제 전환(연차·주휴수당·휴게시간·무관어) 시 기금 유권해석이 섞이면 안 된다
+  const fundHist = [{ q: '사내근로복지기금 대부사업 무이자 대출 증여세 비과세 한도 알려줘', answer: '연간 증여이익 1천만 원 미만 비과세입니다.' }];
+  assert.equal(C100.pick('연차', { history: fundHist })[0].id, 'LAB-leave-01');
+  assert.equal(C100.pick('주휴수당', { history: fundHist })[0].id, 'LAB-minwage-01');
+  const pBreak = C100.pick('휴게시간', { history: fundHist });
+  assert.ok(pBreak.length > 0 && pBreak.every((x) => x.cat !== 'fund'));
+  const pBreakIf = C100.pick('만약 휴게시간에 일을 시키면?', { history: fundHist });
+  assert.ok(pBreakIf.length > 0 && pBreakIf[0].id === 'LAB-contract-01' && pBreakIf.every((x) => x.cat !== 'fund'));
+  const pBreakEx = C100.pick('휴게시간 예외는?', { history: fundHist });
+  assert.ok(pBreakEx.length > 0 && pBreakEx.every((x) => x.cat !== 'fund'));
+  assert.equal(C100.pick('블록체인암호화폐채굴', { history: fundHist }).length, 0);
+
+  const pPokwal = C100.pick('포괄임금제 약정이 있어도 실제 연장근로시간을 계산했을 때 약정 수당보다 부족하면 차액을 추가로 지급해야 하나요?');
+  assert.equal(pPokwal[0].id, 'LAB-pokwal-01');
+
+  const pMailMulti = C100.pick('만약 개인 지메일로 와서 자동으로 안 붙으면 어디서 손으로 연결해?', {
+    history: [{ q: '자료함에서 푸른 메일이랑 업무관리는 어떻게 이어져?', answer: '거래처와 주고받은 메일이 사업장별로 분류됩니다.' }]
+  });
+  assert.ok(pMailMulti.some((x) => x.id === 'SYS-cards-mail-01' || x.id === 'SYS-row-store'));
+
+  const pFundDup = C100.pick('사내근로복지기금이 이미 있는 회사가 협력사들이랑 공동근로복지기금에도 중복 참여해서 출연할 수 있어?');
+  assert.equal(pFundDup[0].id, 'MOEL-setup-02');
+
+  const photoPayload = C100.buildImprovePayload(
+    '사진첩에서 사업자등록증 PDF 업로드 창이 모바일에서 깨져서 안 열려요',
+    [],
+    [],
+    { needed: true, cat: 'etc', title: '사진첩 업로드 창 모바일 깨짐' }
+  );
+  assert.equal(photoPayload.cat, 'cards', 'AI가 etc 로 모호하게 답해도 명시된 앱(사진첩→cards) 분류가 우선되어야 합니다');
+
+  const switchedImprovePayload = C100.buildImprovePayload(
+    '업로드 창이 안 열려요',
+    [{ q: '기금관리 어떻게 써?', answer: '기금관리 안내입니다.' }],
+    [],
+    { needed: true, cat: 'cards', title: '사진첩 업로드 오류' }
+  );
+  assert.equal(switchedImprovePayload.cat, 'cards', '현재 발화에 앱 이름이 없을 때 AI가 특정한 유효 분류(cards)를 이전 대화의 앱(fund)이 덮어쓰면 안 됩니다');
 
   // 실제 화면 오류·기능 개선·코딩 수정 요청 → needed: true + 유효 분류키
   const d1 = PuChatbot.detectImproveIntent('푸른이알피에서 계약 저장 버튼이 안 눌려요 오류 확인해주세요');
@@ -703,4 +782,329 @@ test('배선·위치·팔레트·모바일 규칙: 우측하단 단추와 겹치
     '.puc-imp-st.s-wait 배지는 WCAG AA 명암비(4.5:1 이상)를 만족해야 합니다'
   );
   assert.match(fundHtml, /openFundChat\(\)/);
+  const fundRefInHtml = /fund_kb\.js\?[^"']+/.exec(fundHtml);
+  const fundRefInUi = /fund_kb\.js\?[^"']+/.exec(uiSrc);
+  assert.ok(fundRefInHtml && fundRefInUi && fundRefInHtml[0] === fundRefInUi[0], 'fund.html 과 js/pu-chatbot.js 지연 로더의 fund_kb.js 참조 문자열이 일치해야 합니다');
 });
+
+/* 2026-11-14 기능 검증 2차: 푸른등기를 길잡이에 넣고도 검색·연결이 빠져 «수임 순서» 글이 뽑혔다 */
+test('푸른등기 질문은 푸른등기 길잡이로 — 내부관리 연결도·앱 목록·개선요청 분류에도 있다', () => {
+  const ask = C0('PORTAL_ROWS_GUIDE').find((r) => r.id === 'inside').apps.find((a) => a.key === 'deungi').ask;
+  assert.equal(PuChatbot.pick(ask)[0].id, 'SYS-deungi-01');
+  assert.equal(PuChatbot.pick('푸른등기 사용법')[0].id, 'SYS-deungi-01');
+  const inside = PuChatbot.PORTAL_KB.find((k) => k.id === 'SYS-row-inside');
+  assert.ok(inside.apps.indexOf('deungi') >= 0 && inside.tags.indexOf('푸른등기') >= 0 && /푸른등기/.test(inside.law));
+  assert.match(kbSrc, /deungi: 'erp'/);
+  assert.match(kbSrc, /deungi:푸른등기/);
+});
+test('P박스 질문은 P박스 길잡이로 — 자료함(store) 연결도·앱 목록·개선요청 분류에도 있다', () => {
+  const ask = C0('PORTAL_ROWS_GUIDE').find((r) => r.id === 'store').apps.find((a) => a.key === 'pbox').ask;
+  assert.equal(PuChatbot.pick(ask)[0].id, 'SYS-pbox-01');
+  assert.equal(PuChatbot.pick('P박스 사용법')[0].id, 'SYS-pbox-01');
+  const store = PuChatbot.PORTAL_KB.find((k) => k.id === 'SYS-row-store');
+  assert.ok(store.apps.indexOf('pbox') >= 0 && store.tags.indexOf('P박스') >= 0 && /P박스/.test(store.law));
+  assert.match(kbSrc, /pbox: 'portal'/);
+  assert.match(kbSrc, /pbox:P박스/);
+});
+function C0(k) { return PuChatbot[k]; }
+
+test('최근 추가된 프로그램(괴롭힘·성희롱 조사 · 일터상생혁신 · 산업일자리전환 · 급여데이터함) 사용법·연결도·개선분류 검증', () => {
+  assert.equal(PuChatbot.pick('괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?')[0].id, 'SYS-harass-01');
+  assert.equal(PuChatbot.pick('괴롭힘 성희롱 조사 프로그램 사용법')[0].id, 'SYS-harass-01');
+  // 순수 노동법 질문은 기존 LAB-harass-01 유지
+  assert.equal(PuChatbot.pick('직장 내 괴롭힘이나 성희롱 신고가 들어오면 회사가 반드시 밟아야 하는 절차와 주의사항은 무엇인가요?')[0].id, 'LAB-harass-01');
+
+  assert.equal(PuChatbot.pick('일터상생혁신 앱의 단계별 사용법과 메일·비식별 진단 연결 방식을 알려줘')[0].id, 'SYS-ilteo-01');
+  assert.equal(PuChatbot.pick('일터상생혁신 어떻게 써?')[0].id, 'SYS-ilteo-01');
+
+  assert.equal(PuChatbot.pick('산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?')[0].id, 'SYS-jobtrans-01');
+  assert.equal(PuChatbot.pick('산업일자리전환 사용법')[0].id, 'SYS-jobtrans-01');
+
+  // 온톨로지에 등록된 비공개 준비 앱(paydata: 급여데이터함)도 자동 카드(SYS-auto-paydata)로 안내 가능해야 함
+  const pPaydata = PuChatbot.pick('급여데이터함은 어떻게 사용하고 어디에 저장되나요?');
+  assert.ok(pPaydata.length > 0 && pPaydata[0].id === 'SYS-auto-paydata');
+
+  assert.equal(PuChatbot.detectImproveIntent('일터상생혁신 화면에서 보고서 다운로드 버튼이 안 눌려요 고쳐줘').cat, 'consult');
+  assert.equal(PuChatbot.detectImproveIntent('괴롭힘·성희롱 조사 진술서 저장 에러 수정해주세요').cat, 'erp');
+});
+
+test('신규 프로그램 무보수 자동 업데이트(Zero-Touch Auto-Sync): 앞으로 새 앱이 추가되면 KB 수정 없이도 사용법·연결도·개선요청을 자동 안내한다', async () => {
+  const { win, byId } = makeFakeDom([
+    { key: 'erp', name: '푸른이알피', desc: '업체·계약' },
+    { key: 'retireplan', name: '퇴직연금설계', desc: 'DB·DC 퇴직연금 규약 설계 및 부담금 시뮬레이션', href: 'pu-retire.html?sso=1' }
+  ]);
+
+  // 미래에 새로 만들어진 포털 앱 카탈로그 + 온톨로지 + 실제 앱 HTML 시뮬레이션 (pu-chatbot-kb.js 수정 없음!)
+  win.portalAppCatalog = () => ({
+    rows: [{ id: 'client', label: '의뢰인 업무' }, { id: 'store', label: '자료함' }, { id: 'sales', label: '영업관리' }, { id: 'inside', label: '내부관리' }],
+    apps: [
+      { key: 'erp', name: '푸른이알피', desc: '업체·계약', icon: '🏢', url: 'pu-erp.html', row: 'client', off: false },
+      { key: 'retireplan', name: '퇴직연금설계', desc: 'DB·DC 퇴직연금 규약 설계 및 부담금 시뮬레이션', icon: '🏦', url: 'pu-retire.html', row: 'client', off: false }
+    ]
+  });
+  win.PuOntology = {
+    PROGRAMS: {
+      retireplan: {
+        name: '퇴직연금설계',
+        file: 'pu-retire.html',
+        primaryRoots: ['retire_plans'],
+        sharedRoots: ['data/companies', 'mailbox'],
+        writeContracts: [
+          { path: 'retire_plans/{id}', entityType: 'Project' },
+          { path: 'work_erp/items/{id}', entityType: 'Task' }
+        ],
+        entityTypes: ['Organization', 'Project', 'Task']
+      }
+    }
+  };
+  let fetchedUrls = [];
+  win.fetch = async (url) => {
+    fetchedUrls.push(url);
+    return {
+      ok: true,
+      text: async () => [
+        '<!-- ★ 하는 일:',
+        '  1. 이알피 사업장 연결 및 현행 퇴직금 제도 불러오기',
+        '  2. DB·DC 전환 부담금 비교 시뮬레이션 실행',
+        '  3. 퇴직연금 규약 신고서 및 동의서 패키지 출력',
+        '-->',
+        '<!doctype html><html><head><title>퇴직연금설계 — 푸른노무법인</title></head><body>',
+        '<div class="sub">기업별 DB·DC 전환 시뮬레이션과 규약 신고 자동화</div>',
+        '<div class="ws-step">1단계 사업장·명부 연결</div>',
+        '<div class="ws-step">2단계 부담금 비교 산출</div>',
+        '<div class="ws-step">3단계 규약·동의서 출력</div>',
+        '<button class="pri">규약 패키지 생성</button>',
+        '</body></html>'
+      ].join('\n')
+    };
+  };
+
+  let capturedPrompt = null;
+  win.firebase = { auth: () => ({ currentUser: { uid: 'u1' } }) };
+  win.PuAiCall = {
+    ask: async (parts) => {
+      capturedPrompt = parts[0].text;
+      return {
+        text: JSON.stringify({
+          answer: '[퇴직연금설계]는 의뢰인 업무 줄에서 열고 1단계 사업장 연결 → 2단계 부담금 비교 → 3단계 규약 패키지 생성 순으로 진행합니다.',
+          cites: ['SYS-auto-retireplan'],
+          apps: ['retireplan', 'erp'],
+          flowId: 'flow-core',
+          followUps: ['퇴직연금설계는 업무관리와 어떻게 연결돼?'],
+          improve: null
+        })
+      };
+    },
+    textOf: (r) => r.text
+  };
+
+  vm.createContext(win);
+  vm.runInContext(fundKbSrc, win);
+  vm.runInContext(kbSrc, win);
+  vm.runInContext(uiSrc, win);
+
+  win.PuChatbotUI.open();
+  await win.PuChatbotUI.ask('퇴직연금설계 프로그램은 어떻게 사용해야 하나요?');
+
+  assert.deepEqual(fetchedUrls, ['pu-retire.html'], '질문된 신규 앱의 동일출처 HTML을 온디맨드로 읽어 화면 단계를 파악해야 합니다');
+  assert.match(capturedPrompt, /SYS-auto-retireplan/, '자동 합성된 KB 카드가 AI 근거자료로 전달되어야 합니다');
+  assert.match(capturedPrompt, /1단계 사업장·명부 연결.*2단계 부담금 비교 산출/, '앱 HTML에서 추출한 실제 단계가 사용법 근거에 포함되어야 합니다');
+  assert.match(capturedPrompt, /푸른이알피\(업체 원장\).*푸른 메일/, '온톨로지 sharedRoots 연결도가 한국어로 자동 번역되어야 합니다');
+  assert.match(capturedPrompt, /업무관리\(주간 할 일\) 연동 기록/, '온톨로지 writeContracts 연결도가 자동 반영되어야 합니다');
+  assert.match(byId.puChatBody.innerHTML, /data-chat-app="retireplan"/, '신규 앱 바로 열기 단추가 말풍선에 나타나야 합니다');
+
+  // [🔗 연결도] 탭에서도 신규 앱이 의뢰인 업무 줄에 자동 노출되어야 함
+  win.PuChatbotUI.setMode('map');
+  win.PuChatbotUI._state.mapTab = 'client';
+  win.PuChatbotUI.setMode('chat');
+  win.PuChatbotUI.setMode('map');
+  assert.match(byId.puChatBody.innerHTML, /퇴직연금설계/);
+
+  // 신규 앱에 대한 오류·개선 요청도 자동으로 감지·분류해야 함
+  const imp = win.PuChatbot.detectImproveIntent('퇴직연금설계에서 규약 패키지 생성이 안 돼요');
+  assert.equal(imp.needed, true);
+  assert.equal(imp.cat, 'erp');
+
+  // 온톨로지가 나중에 지연 도착해도 PORTAL_ROWS_GUIDE 의 입출력(from/to) 설명이 자동 갱신되어야 함
+  win.PuChatbot.syncCatalog({
+    apps: [{ key: 'lateapp', name: '노사협의회관리', desc: '분기별 노사협의회 회의록 작성', icon: '🤝', url: 'pu-council.html', row: 'client', off: false }],
+    ontologyPrograms: null
+  });
+  let lateRow = win.PuChatbot.PORTAL_ROWS_GUIDE.find((r) => r.id === 'client').apps.find((a) => a.key === 'lateapp');
+  assert.ok(lateRow);
+  assert.match(lateRow.from, /사용자 직접 입력/);
+  win.PuChatbot.syncCatalog({
+    apps: [{ key: 'lateapp', name: '노사협의회관리', desc: '분기별 노사협의회 회의록 작성', icon: '🤝', url: 'pu-council.html', row: 'client', off: false }],
+    ontologyPrograms: {
+      lateapp: {
+        name: '노사협의회관리',
+        file: 'pu-council.html',
+        primaryRoots: ['council_minutes'],
+        sharedRoots: ['data/companies'],
+        writeContracts: [{ path: 'work_erp/items/{id}', entityType: 'Task' }]
+      }
+    }
+  });
+  lateRow = win.PuChatbot.PORTAL_ROWS_GUIDE.find((r) => r.id === 'client').apps.find((a) => a.key === 'lateapp');
+  assert.match(lateRow.from, /푸른이알피\(업체 원장\)/, '지연 로드된 온톨로지 정보가 연결도 카드에 즉시 반영되어야 합니다');
+  assert.match(lateRow.to, /업무관리\(주간 할 일\) 연동 기록/);
+});
+
+test('음성 질문(STT 🎤) 및 음성 답변(TTS 🔊): 말로 질문하면 개인정보 가림 후 답변하고 한국어 음성으로 자동 읽어주며 닫기·로그아웃 시 즉시 멈춘다', async () => {
+  const { win, byId } = makeFakeDom([
+    { key: 'pbox', name: 'P박스', desc: '법령·판례 검색' }
+  ]);
+
+  let activeRec = null;
+  const spokenUtterances = [];
+  let cancelCount = 0;
+
+  win.SpeechRecognition = function FakeSpeechRecognition() {
+    this.lang = '';
+    this.interimResults = false;
+    this.continuous = false;
+    this.start = () => { activeRec = this; };
+    this.stop = () => { if (this.onend) this.onend(); };
+    this.abort = () => { if (this.onerror) this.onerror({ error: 'aborted' }); };
+  };
+  win.SpeechSynthesisUtterance = function FakeUtterance(text) {
+    this.text = text;
+    this.lang = '';
+    this.rate = 1;
+    this.voice = null;
+  };
+  win.speechSynthesis = {
+    getVoices: () => [{ lang: 'ko-KR', name: 'Korean Voice' }],
+    speak: (u) => { spokenUtterances.push(u); },
+    cancel: () => { cancelCount++; }
+  };
+
+  let receivedPrompt = '';
+  win.firebase = { auth: () => ({ currentUser: { uid: 'u1' } }) };
+  win.PuAiCall = {
+    ask: async (parts) => {
+      receivedPrompt = parts[0].text;
+      return {
+        text: JSON.stringify({
+          answer: '① [P박스]는 자료함 줄에서 열며 ➔ 법령·판례 검색과 계약서 위험 진단을 지원합니다.',
+          cites: ['SYS-pbox-01'],
+          apps: ['pbox'],
+          flowId: 'flow-core',
+          followUps: ['판례 원문 확인은 어떻게 해?'],
+          improve: null
+        })
+      };
+    },
+    textOf: (r) => r.text
+  };
+
+  vm.createContext(win);
+  vm.runInContext(fundKbSrc, win);
+  vm.runInContext(kbSrc, win);
+  vm.runInContext(uiSrc, win);
+
+  win.PuChatbotUI.open();
+  assert.ok(byId.puChatMic, '하단 입력줄에 🎤 음성 질문 단추가 있어야 합니다');
+  assert.ok(byId.puChatTtsBtn, '하단 입력줄에 🔊 음성 답변 설정 단추가 있어야 합니다');
+
+  // 1) 🎤 음성 인식 시작 → 중간 인식 자막 표시 → 인식 완료 시 자동 질문 전송 + 개인정보 가림 + 자동 음성 답변!
+  const started = win.PuChatbotUI.startVoice();
+  assert.equal(started, true);
+  assert.ok(activeRec && activeRec.lang === 'ko-KR');
+  assert.equal(byId.puChatVoiceBar.classList.contains('on'), true);
+
+  activeRec.onresult({
+    results: [[{ transcript: '홍길동 과장 010-1234-5678 P박스 어떻게 써요' }]],
+  });
+  assert.match(byId.puChatVoiceBar.innerHTML, /P박스 어떻게 써요/);
+
+  // onend 발화 종료 → ask(..., { viaVoice: true }) 자동 실행 대기
+  const finalSeg = Object.assign([{ transcript: '홍길동 과장 010-1234-5678 P박스 어떻게 써요' }], { isFinal: true });
+  activeRec.onresult({ results: [finalSeg] });
+  activeRec.onend();
+  await new Promise((r) => setTimeout(r, 30));
+
+  assert.doesNotMatch(receivedPrompt, /홍길동|010-1234-5678/, '음성으로 들어온 질문도 외부 AI 전송 전 개인정보가 가려져야 합니다');
+  assert.equal(spokenUtterances.length, 1, '음성으로 질문하면 답변도 자동으로 음성 합성(TTS)되어야 합니다');
+  assert.equal(spokenUtterances[0].lang, 'ko-KR');
+  assert.match(spokenUtterances[0].text, /첫째,.*P박스.*다음으로/, 'TTS 읽기 문장은 기호(①, ➔)가 자연스러운 한국어로 정돈되어야 합니다');
+  assert.match(byId.puChatBody.innerHTML, /⏹ 멈춤/, '음성 재생 중에는 말풍선에 멈춤 단추가 표시되어야 합니다');
+  assert.match(byId.puChatBody.innerHTML, /class="puc-spkbtn on"[^>]*aria-pressed="true"/, '재생 중인 말풍선 듣기 단추는 aria-pressed="true" 여야 합니다');
+
+  // 2) 말풍선 듣기/멈춤 토글 및 종료 시 음성 중단 검증
+  win.PuChatbotUI.speakTurn(0); // 재생 중 다시 누르면 멈춤
+  assert.equal(win.PuChatbotUI._state.speakingTurnIdx, -1);
+  assert.match(byId.puChatBody.innerHTML, /🔊 듣기/);
+  assert.match(byId.puChatBody.innerHTML, /class="puc-spkbtn"[^>]*aria-pressed="false"/);
+
+  win.PuChatbotUI.speakTurn(0); // 수동 다시 듣기
+  assert.equal(spokenUtterances.length, 2);
+
+  // 음성 답변 모드 전환(voice -> all -> off -> voice)
+  assert.equal(win.PuChatbotUI.toggleVoiceReply(), 'all');
+  assert.equal(win.PuChatbotUI.toggleVoiceReply(), 'off');
+  assert.equal(win.PuChatbotUI.toggleVoiceReply(), 'voice');
+
+  // 3) 음성 인식 중 창 닫기 또는 로그아웃 시 지연된 onresult/onend 콜백이 뒤늦게 질문을 전송하거나 입력창에 남으면 안 됨
+  let aiCallCount = 1;
+  win.PuAiCall.ask = async () => { aiCallCount++; return { text: '{"answer":"추가 응답"}' }; };
+  assert.equal(win.PuChatbotUI.startVoice(), true);
+  const staleRec = activeRec;
+  staleRec.onresult({ results: [[{ transcript: '공용PC 민감질문 900101-1234567' }]] });
+  assert.match(byId.puChatInp.value, /공용PC 민감질문/);
+  win.PuChatbotUI.close();
+  assert.equal(byId.puChatInp.value, '', '음성 인식 중 창을 닫으면 입력란 임시 음성 문장도 비워져야 합니다');
+  // 브라우저가 닫힌 뒤 지연 onend 이벤트를 발생시켜도 ask()가 절대 호출되지 않아야 함
+  staleRec.onend();
+  await new Promise((r) => setTimeout(r, 25));
+  assert.equal(aiCallCount, 1, '창 닫기·취소 후 도착한 지연 음성 콜백이 질문을 자동 전송하면 안 됩니다');
+
+  // 로그아웃 시에도 동일하게 지연 콜백 완벽 차단
+  win.PuChatbotUI.open();
+  assert.equal(win.PuChatbotUI.startVoice(), true);
+  const logoutRec = activeRec;
+  logoutRec.onresult({ results: [[{ transcript: '로그아웃 직전 음성' }]] });
+  win.firebase = { auth: () => ({ currentUser: null }) };
+  win.PuChatbotUI.resetOnLogout();
+  logoutRec.onend();
+  await new Promise((r) => setTimeout(r, 25));
+  assert.equal(aiCallCount, 1, '로그아웃 이후 도착한 음성 콜백은 절대 전송되면 안 됩니다');
+  assert.equal(byId.puChatInp.value, '');
+
+  // stopVoice(false) 호출 후 브라우저 비동기 onend 가 오기 전에 창을 닫더라도 입력란 민감문장이 남지 않아야 함
+  win.firebase = { auth: () => ({ currentUser: { uid: 'u1' } }) };
+  win.SpeechRecognition = function AsyncStopSpeechRecognition() {
+    this.lang = '';
+    this.start = () => { activeRec = this; };
+    this.stop = () => { /* 실제 브라우저처럼 onend 를 동기로 즉시 호출하지 않음 */ };
+    this.abort = () => { this._aborted = true; };
+  };
+  win.PuChatbotUI.open();
+  assert.equal(win.PuChatbotUI.startVoice(), true);
+  const asyncStopRec = activeRec;
+  asyncStopRec.onresult({ results: [[{ transcript: '비동기 종료 직전 880101-1234567' }]] });
+  assert.match(byId.puChatInp.value, /880101-1234567/);
+  win.PuChatbotUI.stopVoice(false); // 사용자가 완료 단추를 눌렀으나 아직 onend 도착 전
+  win.PuChatbotUI.close();          // 그 직후 창을 닫음
+  assert.equal(byId.puChatInp.value, '', '비동기 stop 대기 중 창을 닫아도 음성 임시 입력란이 즉시 비워져야 합니다');
+  assert.equal(asyncStopRec._aborted, true);
+  asyncStopRec.onend();
+  await new Promise((r) => setTimeout(r, 25));
+  assert.equal(aiCallCount, 1);
+  assert.ok(cancelCount >= 3);
+
+  // 4) SpeechRecognition 미지원 브라우저에서는 원본 오디오를 외부 서버로 절대 업로드하지 않고 한국어 안내만 표시해야 함
+  const noSrEnv = makeFakeDom([{ key: 'pbox', name: 'P박스', desc: '법령' }]);
+  let rawUploadCalls = 0;
+  noSrEnv.win.navigator = { mediaDevices: { getUserMedia: async () => { rawUploadCalls++; return {}; } } };
+  noSrEnv.win.MediaRecorder = function () { rawUploadCalls++; };
+  noSrEnv.win.PuAiCall = { ask: async () => { rawUploadCalls++; return { text: '' }; }, textOf: () => '' };
+  vm.createContext(noSrEnv.win);
+  vm.runInContext(kbSrc, noSrEnv.win);
+  vm.runInContext(uiSrc, noSrEnv.win);
+  noSrEnv.win.PuChatbotUI.open();
+  assert.equal(noSrEnv.win.PuChatbotUI.startVoice(), false);
+  assert.equal(rawUploadCalls, 0, '개인정보 가림 전 원본 오디오 녹음·업로드는 절대 실행되면 안 됩니다');
+  assert.match(noSrEnv.byId.puChatVoiceBar.innerHTML, /크롬·엣지·사파리에서 🎤 음성 질문/);
+});
+

@@ -51,7 +51,8 @@ test('★ 나라장터는 «지난 7일»을 묻고, 총 건수가 더 많으면
   const r = await C.collect({ keyData: 'KD', today: '2026-10-12', now: NOW, getJson: f.getJson });
   const g = f.calls.filter((u) => /BidPublicInfoService/.test(u));
   assert.equal(g.length, 3, '3건이 될 때까지 쪽을 넘겨야 한다');
-  assert.match(g[0], /inqryBgnDt=202610050000/); assert.match(g[0], /inqryEndDt=202610122359/);
+  /* 2026-11-10 부터 나라장터는 한 번에 7일까지(공공데이터포털 공지) — «오늘 포함 7일». 10-05~10-12 는 8일치라 거절된다 */
+  assert.match(g[0], /inqryBgnDt=202610060000/); assert.match(g[0], /inqryEndDt=202610122359/);
   assert.equal(r.rows.filter((x) => x.src === '나라장터').length, 3);
   const f2 = fake({ g2b: () => g2bResp([g2bRow('X', '노무 용역')], 99999) });
   const r2 = await C.collect({ keyData: 'KD', today: '2026-10-12', now: NOW, getJson: f2.getJson });

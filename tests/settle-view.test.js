@@ -29,7 +29,10 @@ test('열두 달 줄 — 달마다 단추(data-month), 할 일 점·고른 달 �
   assert.match(h, /class="mo mo-todo on" data-month="2026-10" title="10월 — 정산표 2 · 임시저장 1 · 할 일 남음"/);
   assert.match(h, /class="mo mo-done" data-month="2026-07"/);
   assert.match(h, /class="mo mo-none" data-month="2026-01"/);
-  assert.match(visible(h), /할 일 남음[\s\S]*끝\(확정·송금 다 함\)[\s\S]*정산 없음/);
+  /* 범례 줄은 화면에 늘어놓지 않는다 — 띠에 마우스를 올리면 보인다(대표 2026-11-12 「불필요한 설명」) */
+  assert.doesNotMatch(h, /class="[^"]*mleg/);
+  assert.match(h, /class="mstrip" title="[^"]*할 일 남음[^"]*끝\(확정·송금 다 함\)[^"]*정산 없음/);
+  assert.doesNotMatch(visible(h), /끝\(확정·송금 다 함\)/);
 });
 
 test('입금 확인 상자 — ☐·번호, 같은 금액은 ✓ 맞음, 고른 입금이 다르면 △ 차이, 없으면 ✕, 넣은 실입금은 «넣음»(☐ 없음), 담당 통장 안내', () => {
@@ -47,13 +50,18 @@ test('입금 확인 상자 — ☐·번호, 같은 금액은 ✓ 맞음, 고른 
   assert.match(ths[1], /번호/);
   const v = visible(h);
   assert.match(v, /✓ 맞음 1[\s\S]*△ 확인 1[\s\S]*✕ 못 찾음 1[\s\S]*넣음 1/);
-  assert.match(v, /홍길동 통장\(재무관리\)/);
-  assert.match(v, /기간 10-01 ~ 11-20 · 입금 2건/);
+  /* 설명·읽은 때 줄은 눈에 늘어놓지 않고 마우스를 올리면 보인다 — 화면에는 «입금 N건» 만 */
+  assert.match(h, /title="홍길동 통장\(재무관리\)/);
+  assert.match(h, /title="[^"]*기간 10-01 ~ 11-20 · 입금 2건/);
+  assert.match(v, /입금 2건/);
+  assert.doesNotMatch(v, /기간 10-01/);
   assert.match(h, /data-ck="r1::C-1\|T-LEAD" checked/);
   assert.match(v, /△ −1,000원 다름/);
   assert.doesNotMatch(h, /data-ck="r2::C-4\|T-LEAD"/, '넣은 줄에 ☐');
-  assert.match(v, /담당 개인 통장으로 들어간 돈은 대표 통장에 보이지 않아/);
+  assert.match(h, /title="[^"]*담당 개인 통장으로 들어간 돈은 대표 통장에 보이지 않아/);
+  assert.doesNotMatch(v, /담당 개인 통장으로 들어간 돈은/, '설명 줄은 마우스를 올릴 때만');
   assert.match(h, /id="auto_save"/);
+  assert.ok(h.indexOf('id="auto_save"') < h.indexOf('data-name="auto"'), '저장 단추는 머리 줄에(표 아래 줄을 따로 두지 않는다)');
   assert.doesNotMatch(h, /<b>가나/);
   assert.doesNotMatch(v, /T-[A-Z]/);
   assert.match(visible(V.reviewBox({ rows: [] }, {})), /맞출 입금이 없습니다/);
@@ -64,7 +72,8 @@ test('정산 확인 상자 — 정산표마다 사업 이름·상태·송금 줄
   const v = visible(d);
   assert.match(v, /테스트사업 \(테스트재단\)\s+임시저장/);
   assert.match(v, /반환\s+&lt;b&gt;김가나&lt;\/b&gt; → 홍길동\s+87,915원\s+가나상사/);
-  assert.match(v, /확정하면 송금/);
+  assert.match(d, /class="mtr-r" title="확정하면 송금"/, '«확정하면 송금» 글자는 줄 위에 마우스를 올릴 때만');
+  assert.doesNotMatch(v, /확정하면 송금/);
   assert.match(d, /data-act="confirm" data-rid="cons-test_2026-10"/);
   assert.match(d, /data-run="cons-test_2026-10">자세히 ▾/);
   const c = V.monthRuns([fakeRun('confirmed')], { names: NAMES, biz: {}, cur: 'cons-test_2026-10', detail: '<p id="det"></p>' });
@@ -83,15 +92,17 @@ test('한 해 합계 — 달마다 한 줄(달 이름은 그 달로 가는 단�
   assert.match(visible(V.yearMonths([])), /이 해에 정산표가 없습니다/);
 });
 
-test('카톡 보내기 상자 — 요약은 펼치고 계산 설명은 접는다, 미리보기는 복사·보내기 없음, 확정+대표+방이면 «카톡 보내기», 방이 없으면 대표에게 등록 칸', () => {
+test('카톡 보내기 상자 — 사람마다 한 줄(금액까지), 문구는 줄·카톡 방을 누를 때만 펼침, 미리보기는 복사·보내기 없음, 확정+대표+방이면 «카톡 보내기», 방이 없으면 대표에게 등록 칸', () => {
   const text = '[컨설팅 비용 정산 안내]\n요약 줄\n──────────\n[계산 설명]\n1) 설명';
   assert.deepEqual(V.splitMsg(text), { summary: '[컨설팅 비용 정산 안내]\n요약 줄', explain: '[계산 설명]\n1) 설명' });
   assert.deepEqual(V.splitMsg('한 줄'), { summary: '한 줄', explain: '' });
   /* 계산 모듈 문구와 같은 줄로 나뉜다 */
   const real = C.buildMessages(fakeRun('confirmed'), { title: '테스트사업', leadSid: 'T-LEAD' }, NAMES)[0].text;
   assert.match(V.splitMsg(real).explain, /^\[계산 설명\]/);
-  const items = [{ rid: 'r1', i: 0, sid: 'T-A', name: '김가나', text, biz: '테스트사업' }, { rid: 'r1', i: 1, sid: 'T-B', name: '<i>이다라</i>', text: 'y', biz: '테스트사업' }];
-  const h = V.monthMsgs(items, { rooms: { 'T-A': '김가나 노무사' }, last: { r1: { 'T-A': { status: 'sent', sentAt: Date.UTC(2026, 10, 2, 7, 0) } } }, isAdmin: true, go: { label: '카톡 1통 보내기' } });
+  const tot = { sid: 'T-A', name: '김가나', share: 1000000, used: 912085, settle: 87915, adjust: 0, n: 1, leadName: '홍길동' };
+  const items = [{ rid: 'r1', i: 0, sid: 'T-A', name: '김가나', text, biz: '테스트사업', tot }, { rid: 'r1', i: 1, sid: 'T-B', name: '<i>이다라</i>', text: 'y', biz: '테스트사업' }];
+  const base = { rooms: { 'T-A': '김가나 노무사' }, last: { r1: { 'T-A': { status: 'sent', sentAt: Date.UTC(2026, 10, 2, 7, 0) } } }, isAdmin: true, go: { label: '카톡 1통 보내기' } };
+  const h = V.monthMsgs(items, base);
   const v = visible(h);
   assert.match(h, /data-copy="r1\|0"/);
   assert.match(h, /data-kq="r1\|0"/);
@@ -99,15 +110,64 @@ test('카톡 보내기 상자 — 요약은 펼치고 계산 설명은 접는다
   assert.match(h, /data-room="T-B"[^>]*>[\s\S]*?data-room-save="T-B">방 등록/);
   assert.match(v, /💬 김가나 노무사/);
   assert.match(v, /✓ 보냄 · 11-02 16:00/);
-  assert.match(h, /<div class="msg">\[컨설팅 비용 정산 안내\]\n요약 줄<\/div><details class="why"><summary>계산 설명 펼치기<\/summary>/);
   assert.match(h, /id="monthGo">카톡 1통 보내기</);
   assert.doesNotMatch(h, /<i>이다라/);
   assert.doesNotMatch(v, /T-[A-Z]/);
+  /* 사람별 금액이 한 줄에 — 대표가 «다 정리됐나»를 문구를 펼치기 전에 본다 */
+  assert.match(v, /추가 지급\s+87,915원/);
+  assert.match(v, /몫 1,000,000 · 받은 912,085/);
+  assert.match(h, /title="몫 1,000,000원 − 받은 금액 912,085원 = 차액 \+87,915원 \(주관 홍길동\)"/);
+  /* 접힌 채로 연다 — 문구는 «누를 때만» 펼친다 */
+  assert.doesNotMatch(h, /<div class="msg">/);
+  assert.doesNotMatch(h, /class="kdet"/);
+  assert.match(h, /data-msg-open="r1\|0"[^>]*aria-expanded="false"/);
+  assert.equal((h.match(/data-msg-open="r1\|0"/g) || []).length, 2, '이름과 카톡 방, 둘 다 누르면 펼친다');
+  /* 펼치면 그 줄만 — 요약은 펼치고 계산 설명은 접는다 */
+  const o = V.monthMsgs(items, Object.assign({ open: 'r1|0' }, base));
+  assert.match(o, /<div class="kdet"><div class="msg">\[컨설팅 비용 정산 안내\]\n요약 줄<\/div><details class="why"><summary>계산 설명 펼치기<\/summary>/);
+  assert.equal((o.match(/class="kdet"/g) || []).length, 1, '하나만 펼친다');
+  assert.match(o, /data-msg-open="r1\|0"[^>]*aria-expanded="true"/);
+  /* 확정 전 미리보기 — 금액·문구는 보이되 복사·보내기는 없다 */
   const pv = V.monthMsgs([Object.assign({}, items[0], { preview: true })], { rooms: { 'T-A': '김가나 노무사' }, isAdmin: true });
   assert.match(visible(pv), /확정 전 미리보기/);
+  assert.match(visible(pv), /추가 지급\s+87,915원/);
   assert.doesNotMatch(pv, /data-copy=|data-kq=/);
   assert.doesNotMatch(V.monthMsgs(items, { rooms: { 'T-A': '김가나 노무사' }, isAdmin: false }), /data-kq=|data-room-save=/, '대표가 아닌데 보내기·방 등록');
+  /* 반환(−) · 차액 없음 */
+  const back = V.monthMsgs([Object.assign({}, items[0], { tot: Object.assign({}, tot, { settle: -50000 }) })], { rooms: {}, isAdmin: false });
+  assert.match(visible(back), /반환\s+50,000원/);
+  assert.match(back, /class="pill dir-back"/);
+  assert.match(visible(V.monthMsgs([Object.assign({}, items[0], { tot: Object.assign({}, tot, { settle: 0 }) })], {})), /차액 없음\s+0원/);
   assert.match(visible(V.monthMsgs([], {})), /보낼 문구가 없습니다/);
+});
+
+test('PC 카톡 연결 딱지 — 한 줄짜리 작은 딱지, 설명은 마우스를 올릴 때(월별 화면). 설정 탭은 agentLine 그대로', () => {
+  const now = Date.UTC(2026, 10, 12, 0, 0);
+  const none = V.agentPill(null, now);
+  assert.match(none, /^<span class="pill st-draft" title="[^"]*아직 연결되지 않았습니다[^"]*복사/);
+  assert.match(visible(none), /PC 카톡 연결 전/);
+  assert.doesNotMatch(visible(none), /아직 연결되지 않았습니다/, '긴 경고 줄을 화면에 늘어놓지 않는다');
+  const ok = V.agentPill({ agentSeenAt: now - 3 * 60000, mode: 'live' }, now);
+  assert.match(ok, /class="pill st-confirmed"/);
+  assert.match(visible(ok), /3분 전/);
+  const old = V.agentPill({ agentSeenAt: now - 30 * 60000, mode: 'live' }, now);
+  assert.match(old, /class="pill bad-pill" title="[^"]*끊긴 것 같습니다/);
+  assert.match(V.agentPill({ agentSeenAt: now, mode: 'dry-run' }, now), /시험 모드/);
+  assert.doesNotMatch(V.agentPill({ agentSeenAt: now, mode: 'live', message: '<b>x</b>' }, now), /<b>x/, '글 끼워 넣기');
+});
+
+/* 담당 한 사람의 금액 요약 — 카톡 문구와 «같은 사람 · 같은 순서»(어긋나면 줄에 남의 금액이 붙는다) */
+test('personTotals — 카톡 문구(buildMessages)와 같은 사람·같은 순서, 몫·받은 금액·차액 합', () => {
+  const run = fakeRun('confirmed');
+  const msgs = C.buildMessages(run, { title: '테스트사업', leadSid: 'T-LEAD' }, NAMES);
+  const tots = C.personTotals(run, NAMES);
+  assert.deepEqual(tots.map((x) => x.sid), msgs.map((x) => x.sid));
+  assert.ok(tots.length >= 1);
+  tots.forEach((t) => {
+    assert.equal(t.name, msgs.find((m) => m.sid === t.sid).name);
+    assert.equal(t.settle, t.share - t.used + t.adjust, '차액 = 몫 − 받은 금액 + 이월·조정');
+  });
+  assert.deepEqual(C.personTotals(null, NAMES), []);
 });
 
 test('정산표 — 한 칸 한 줄(<br> 없음), 사람이 적은 글은 막는다, 사번은 화면에 없다', () => {
@@ -225,7 +285,11 @@ test('요율표 — 줄 = 사람(☐·번호), 칸 = 사업 종류, 주관·켜�
   const ths = [...h.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
   assert.match(ths[0], /data-all="mxpeople"/);
   assert.match(ths[1], /번호/);
-  assert.match(visible(ths[3]), /가나사업 \(가나재단\)/, '칸 머리는 사업 이름 전체(대표 지시 「사업 이름 정확하게」)');
+  assert.match(visible(ths[3]), /가나사업\s+\(가나재단\)/, '칸 머리는 사업 이름 전체(대표 지시 「사업 이름 정확하게」)');
+  /* 칸 머리는 «두 줄» — 1줄 이름 · 2줄 (기관). 괄호가 없으면 1줄. 한 줄로 이으면 칸이 넓어져 표가 잘린다(대표 2026-11-12) */
+  assert.match(ths[3], /<span class="mxn">가나사업<\/span><span class="mxs">\(가나재단\)<\/span>/);
+  assert.match(ths[4], /<span class="mxn">나다사업<\/span><\/th>/);
+  assert.doesNotMatch(ths[4], /mxs/);
   assert.match(h, /data-mx="cons-a\|T-A" value="25"/);
   assert.match(h, /data-mx="cons-b\|T-B" value=""/);
   assert.match(h, /<select data-lead="cons-a">[\s\S]*?value="T-LEAD" selected/);
@@ -236,6 +300,8 @@ test('요율표 — 줄 = 사람(☐·번호), 칸 = 사업 종류, 주관·켜�
   assert.match(visible(h), /이퇴사/, '퇴사자라도 이미 든 요율은 이름으로 보인다');
   assert.doesNotMatch(visible(h), /T-[A-Z]/);
   assert.doesNotMatch(h, /<br/i);
+  /* 이름과 기관이 한 줄에 이어 붙지 않는다 — 두 줄 칸 머리는 줄을 «블록»으로 나눈다(CSS) */
+  assert.match(h, /<span class="mxn">/);
   assert.match(h, /id="mx_save"(?! disabled)/);
   assert.match(visible(h), /저장하지 않은 변경/);
 });
@@ -412,4 +478,86 @@ test('카톡 상태 딱지·심부름꾼 줄·카톡 방 표·보낸 기록 — 
   assert.match(k, /data-all="kq"/);
   assert.ok(visible(k).indexOf('이다라') < visible(k).indexOf('김가나'), '최근 것이 위가 아니다');
   [r, k].forEach((x) => assert.doesNotMatch(visible(x), /T-[A-Z]/));
+});
+
+test('요율표 칸 머리 두 줄 — 끝의 괄호 한 덩이만 2줄로, 자동 개인입금 칸은 «👤 이름» + (기관)·마우스를 올리면 설정 필요', () => {
+  const work = { types: ['cons-a', 'cons-b', 'cons-c'], people: [], dirty: false, rules: {
+    'cons-a': { title: '긴사업이름컨설팅 (중소기업기술보호울타리)', leadSid: 'T-LEAD', rates: {}, active: true },
+    'cons-b': { title: '괄호둘 (가나) (다라재단)', leadSid: 'T-LEAD', rates: {}, active: true },
+    'cons-c': { title: '점검일자리전환 (점검협회)', leadSid: '', rates: {}, active: true, auto: { why: 'type', count: 0 } } } };
+  const h = V.rateMatrix(work, { names: {}, staff: [] });
+  const th = (n) => [...h.matchAll(/<th class="mxc"[^>]*>[\s\S]*?<\/th>/g)].map((m) => m[0])[n];
+  assert.match(th(0), /<span class="mxn">긴사업이름컨설팅<\/span><span class="mxs">\(중소기업기술보호울타리\)<\/span>/);
+  assert.match(th(1), /<span class="mxn">괄호둘 \(가나\)<\/span><span class="mxs">\(다라재단\)<\/span>/, '끝의 괄호만 2줄로');
+  assert.match(th(2), /<span class="mxn">👤 점검일자리전환<\/span><span class="mxs">\(점검협회\)<\/span>/);
+  assert.match(th(2), /title="[^"]*설정 필요/, '설정 필요는 마우스를 올릴 때');
+  assert.doesNotMatch(visible(th(2)), /설정 필요/, '머리에 글자로 늘어놓지 않는다');
+});
+
+/* ── 함께 정산 — 정산표 ☐ · 이 달 전체 · 합산 표(사람 × 사업별 차액, 합계·정산 방향, 주관 합계) ── */
+test('정산 확인 — 정산표마다 «함께 정산» ☐, 둘 이상이면 «이 달 전체 함께 정산», 고른 게 있으면 «선택 풀기 N»', () => {
+  const r1 = fakeRun('draft'), r2 = Object.assign({}, fakeRun('confirmed'), { id: 'cons-b_2026-10', typeCode: 'cons-b' }), m = Object.assign({}, fakeRun('manual'), { id: 'cons-m_2026-10', typeCode: 'cons-m', status: 'manual' });
+  const h = V.monthRuns([r1, r2, m], { names: NAMES, biz: { 'cons-test': 'A사업', 'cons-b': 'B사업', 'cons-m': 'M사업' }, comb: { 'cons-b_2026-10': 1 }, combN: 1 });
+  assert.match(h, /<input type="checkbox" data-comb="cons-test_2026-10" aria-label="A사업 함께 정산에 넣기">/);
+  assert.match(h, /<input type="checkbox" data-comb="cons-b_2026-10" aria-label="B사업 함께 정산에 넣기" checked>/);
+  assert.doesNotMatch(h, /data-comb="cons-m_2026-10"/, '기록만 정산표는 합칠 수 없다');
+  assert.match(h, /data-comb-all/);
+  assert.match(h, /data-comb-clear>선택 풀기 1</);
+  /* 합칠 수 있는 정산표가 하나뿐이면 «이 달 전체» 단추가 없다 */
+  const one = V.monthRuns([r1], { names: NAMES, biz: {} });
+  assert.doesNotMatch(one, /data-comb-all|data-comb-clear/);
+  assert.match(one, /data-comb="cons-test_2026-10"/);
+});
+
+test('함께 정산 상자 — 사람 × 사업별 차액(+초록 − 주황), 합계·방향, 주관 합계, 확정 전이면 복사 없음, 모두 확정이면 복사', () => {
+  const site = (lead, staff) => ({ company: '가나', round: 1, members: [{ role: 'lead', sid: lead, name: '주관' }].concat(staff.map(([sid, name, settle]) => ({ role: 'staff', sid, name, settle }))) });
+  const mk = (id, type, status, staff, transfers) => ({ id, typeCode: type, monthKey: '2026-11', label: '2026년 11월', status, sites: [site('L1', staff)], transfers: transfers || [] });
+  const A = mk('A', 'cons-a', 'confirmed', [['S1', '김가나', -87915], ['S2', '<b>이다라</b>', 50000]]);
+  const B = mk('B', 'cons-b', 'confirmed', [['S1', '김가나', 675933]]);
+  const names = { L1: '홍길동', S1: '김가나', S2: '<b>이다라</b>' };
+  const title = { A: '일터혁신상생컨설팅 (에프엠어소시에이션)', B: '산업일자리전환컨설팅 (한국능률협회)' };
+  const ok = V.combBox(C.combineRuns([A, B], names), { title });
+  const v = visible(ok);
+  /* 사업 이름은 괄호 앞만, 전체는 마우스를 올릴 때 */
+  assert.match(ok, /<span class="cn">일터혁신상생컨설팅<\/span><span class="cm">2026년 11월<\/span>/);
+  assert.match(ok, /title="일터혁신상생컨설팅 \(에프엠어소시에이션\) \(2026년 11월\)"/);
+  assert.match(v, /−87,915/);
+  assert.match(v, /\+675,933/);
+  assert.match(v, /\+588,018/, '사람 합계 = 반환 87,915 와 추가 지급 675,933 의 상계');
+  assert.match(v, /추가 지급 588,018원/);
+  assert.match(ok, /class="r cv cp pos" data-lb="산업일자리전환컨설팅 2026년 11월">\+675,933</);
+  assert.match(ok, /class="r cv cp neg" data-lb="일터혁신상생컨설팅 2026년 11월">−87,915</);
+  /* 폰에서 카드로 접히도록 역할 클래스(이름 ti · 합계 ct · 방향 cd · 복사 cx · 사업별 cp) */
+  assert.match(ok, /<td class="ti" title="김가나">/);
+  assert.match(ok, /class="r cv ct pos"><b>\+588,018</);
+  assert.match(ok, /<td class="nw cd">/);
+  assert.match(ok, /<td class="nw cx"><button class="sm" data-comb-copy=/);
+  assert.match(ok, /class="r hint cp none">—</, '빈 칸은 폰 카드에서 숨긴다');
+  assert.match(v, /—/, '한 사업에만 든 사람의 빈 칸');
+  assert.match(v, /합계[\s\S]*주관 순 지급 638,018원/, '주관 합계(줄 돈 − 받을 돈)');
+  assert.match(ok, /title="줄 돈 638,018원 · 받을 돈 0원"/);
+  /* 모두 확정 → 사람마다 복사 */
+  assert.match(ok, /data-comb-copy="S1\|L1"/);
+  assert.match(ok, /data-comb-copy="S2\|L1"/);
+  assert.doesNotMatch(v, /확정 전 포함/);
+  assert.doesNotMatch(ok, /<b>이다라/, '글 끼워 넣기');
+  /* 확정 전이 끼면 — 미리보기, 복사 없음 */
+  const draft = V.combBox(C.combineRuns([A, Object.assign({}, B, { status: 'draft' })], names), { title });
+  assert.match(visible(draft), /확정 전 포함 · 미리보기/);
+  assert.doesNotMatch(draft, /data-comb-copy=/);
+  assert.match(draft, /확정 전<\/span><\/th>/);
+  /* 이미 보낸 정산표가 끼면 경고 */
+  const sent = V.combBox(C.combineRuns([Object.assign({}, A, { transfers: [{ paid: true }] }), B], names), { title });
+  assert.match(visible(sent), /이미 송금\(«보냄 표시»\)한 정산표가 들어 있습니다[\s\S]*이중 지급/);
+  assert.doesNotMatch(visible(ok), /이미 송금/);
+  /* 주관이 둘이면 줄이 따로 · 주관 칸 */
+  const C2 = mk('C', 'cons-c', 'confirmed', []); C2.sites = [site('L2', [['S1', '김가나', 1000]])];
+  const mixed = V.combBox(C.combineRuns([A, C2], Object.assign({ L2: '박주관' }, names)), { title: Object.assign({ C: '다사업' }, title) });
+  assert.match(mixed, /<th>주관<\/th>/);
+  assert.match(visible(mixed), /→ 홍길동/);
+  assert.match(visible(mixed), /→ 박주관/);
+  assert.match(visible(mixed), /박주관 합계/);
+  /* 빈 자료 */
+  assert.match(visible(V.combBox(C.combineRuns([], {}), {})), /담당노무사 정산이 있는 줄이 없습니다/);
+  assert.doesNotMatch(visible(ok), /T-[A-Z]/);
 });

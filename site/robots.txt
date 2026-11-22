@@ -1,3 +1,4 @@
-# 아직 미리보기입니다 — 검색에 싣지 마십시오
 User-agent: *
-Disallow: /
+Allow: /
+
+Sitemap: https://pureunlabor.co.kr/sitemap.xml

@@ -33,8 +33,8 @@ const {
 const 브리핑부품 = require("./news-brief");
 const NoticeLib = require("./notice-lib");
 const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
-        올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
-const { homepageUrl } = require("./homepage-fetch");
+        올릴자리인가, 올릴그림자리인가, 사연, 올리기, 새실행조각 } = require("./site-publish");
+const { homepageUrl, OLD_SITE_CLOSED, OLD_SITE_CLOSED_MSG } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
 const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
 const PUSH = require("./push-admins");   /* 관리자 폰 알림 — 건의·메일 신규 문의가 함께 쓴다 */
@@ -59,6 +59,7 @@ function geoip나라(ip) {
 }
 const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
+const MailReqScope = require("./mail-req-scope");   /* 경력관리 «요청 메일» 범위 분류(업무 vs 이력·회의·비용) — 애매한 건만 Jev 에게 */
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
@@ -84,33 +85,35 @@ const SECRET_ACCESS = require("./doc-secret-access");
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
 
 /* ══════════════════════════════════════════════════════════════════════════
-   급여명세서가 «어디서» 나가고 «어디로» 답장이 오나 — 2026-09-05 대표 지시로 손봄
+   급여명세서·인사 메일이 «어디서» 나가고 «어디로» 답장이 오나 — 2026-11-18 새 법인 도메인 전환
    ══════════════════════════════════════════════════════════════════════════
-   ⚠ 여기는 원래 「PoC 설정 — 도메인 인증 전까지는」이라 적힌 임시 자리였다.
-     그 임시가 굳어서, 근로자 메일함에는 푸른이 아닌 fairrunlabor.com 이 뜬다.
-
-   ★ 보내는 주소를 푸른 것으로 바꾸려면 «먼저» Resend 에서 그 도메인 인증을
-     마쳐야 한다(DNS 에 몇 줄 넣는 일). 인증 안 된 도메인을 넣으면 Resend 가
-     메일을 통째로 거절한다 — 그래서 여기서 혼자 바꿀 수가 없다.
-     인증이 끝나면 아래 한 줄만 고치고 sendPayslip 을 다시 올리면 된다.
-
-   ★ 회신 주소(Reply-To)가 아예 없었다. 본문에는 「문의사항은 사무실로 연락
-     주세요」라 써 놓고, 근로자가 회신 단추를 누르면 아무도 안 보는 곳으로 갔다.
-     이것은 도메인 인증과 상관없이 지금 고칠 수 있다 — 자료 발송이 쓰는
-     공용함(370-6@daum.net)으로 오게 한다. */
-const FROM = process.env.PAYSLIP_FROM || "푸른노무법인 <payroll@fairrunlabor.com>";
+   ① 발신(FROM): 2026-11-18 가비아 DNS(resend._domainkey · rsend · send · _dmarc)와
+      Resend(도쿄 ap-northeast-1)에 새 법인 공식 도메인 pureunlabor.co.kr 을 등록·연결해
+      「푸른노무법인 <payroll@pureunlabor.co.kr>」로 내보낸다.
+      만약 DNS 전파 과도기에 Resend 가 도메인 미인증 오류를 돌려줄 때만 기존 인증 도메인
+      (payroll@fairrunlabor.com)으로 한 번 비켜 보내 발송 중단을 막는다.
+   ② 회신(REPLY_TO): pureunlabor.co.kr 은 아직 수신 사서함(MX)을 연동하지 않았으므로,
+      근로자가 회신을 눌렀을 때 반송되지 않도록 실제 확인하는 공용함(370-6@daum.net)을 유지한다. */
+const FROM = process.env.PAYSLIP_FROM || "푸른노무법인 <payroll@pureunlabor.co.kr>";
+const FALLBACK_FROM = "푸른노무법인 <payroll@fairrunlabor.com>";
 const REPLY_TO = process.env.PAYSLIP_REPLY_TO || "370-6@daum.net";
+
+function isResendDomainUnverifiedError(err) {
+  if (!err || typeof err !== "object") return false;
+  const name = String(err.name || "").toLowerCase();
+  const code = Number(err.statusCode || 0);
+  if (name && name !== "validation_error" && code !== 403) return false;
+  const msg = String(err.message || err.error || "");
+  return /pureunlabor\.co\.kr[\s\S]*not\s+verified|domain\s+is\s+not\s+verified/i.test(msg);
+}
 
 // 발송 창구는 우리 포털에서만 연다. 예전에는 "*" 라서 주소만 알면
 // 전 세계 누구나 푸른노무법인 이름으로 메일을 보낼 수 있었다.
-const MAIL_ORIGIN = "https://nabaho.github.io";
+// 받아 주는 출처는 ./erp-origins 한 자리 — 옛(nabaho.github.io)·새(erp.pureunlabor.co.kr) 둘 다 (2026-11-15 ERP 주소 이사).
+const ERP_ORIGINS_LIB = require("./erp-origins");
 
 function setCors(req, res) {
-  const origin = String((req && req.headers && req.headers.origin) || "");
-  if (origin === MAIL_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   // Authorization 을 허용해야 브라우저가 토큰을 붙인 요청을 보낼 수 있다.
   res.set("Access-Control-Allow-Headers", "Authorization,Content-Type");
@@ -211,12 +214,17 @@ exports.sendPayslip = functions
     const atts = Array.isArray(b.attachments)
       ? b.attachments.map(function (a) { return { filename: a.filename, content: Buffer.from(a.content, "base64") }; })
       : undefined;
-    const payload = { from: FROM, to: to, subject: subject, html: html };
+    let usedFrom = FROM;
+    const payload = { from: usedFrom, to: to, subject: subject, html: html };
     /* 근로자가 «회신»을 누르면 우리 공용함으로 오게 한다 — 본문에 「연락 주세요」라고
        써 놓고 답장 갈 곳이 없으면 그 말이 거짓말이 된다. */
     if (REPLY_TO) payload.reply_to = REPLY_TO;
     if (atts && atts.length) payload.attachments = atts;
-    const r = await resend.emails.send(payload);
+    let r = await resend.emails.send(payload);
+    if (r && r.error && !process.env.PAYSLIP_FROM && usedFrom !== FALLBACK_FROM && isResendDomainUnverifiedError(r.error)) {
+      usedFrom = FALLBACK_FROM;
+      r = await resend.emails.send(Object.assign({}, payload, { from: usedFrom }));
+    }
     if (r && r.error) {
       res.status(500).json({ ok: false, error: r.error });
       return;
@@ -226,20 +234,15 @@ exports.sendPayslip = functions
        나중에 「안 받았다」는 말에 내놓을 것이 없다. */
     res.status(200).json({ ok: true, id: (r && r.data && r.data.id) || null, to: to,
                            by: (sender && sender.email) || "",
-                           from: FROM, replyTo: REPLY_TO });
+                           from: usedFrom, replyTo: REPLY_TO });
   } catch (e) {
     res.status(500).json({ ok: false, error: String((e && e.message) || e) });
   }
 });
 
-const PORTAL_ORIGIN = "https://nabaho.github.io";
-
+/* 자동화 창구도 같은 출처 목록(./erp-origins)을 쓴다 — 옛·새 ERP 주소 둘 다 */
 function setAutomationCors(req, res) {
-  const origin = String(req.headers.origin || "");
-  if (origin === PORTAL_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-    res.set("Access-Control-Allow-Origin", origin);
-    res.set("Vary", "Origin");
-  }
+  ERP_ORIGINS_LIB.allowOrigin(req, res);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Automation-Bridge");
   res.set("Cache-Control", "no-store");
@@ -1238,6 +1241,7 @@ exports.recruitWatch = functions
       if (!key) throw new Error("AI 키가 없습니다");
       const r = await DR.callGemini(fetch, key, parts, [2000], {});
       await bumpReadTally("gov", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+      await bumpSpend("gov", r);
       if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
       const ps = (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
       return ps.map((p) => (p && p.text) || "").join("");
@@ -1831,6 +1835,7 @@ async function 뉴스레터AI(글, cfg) {
   if (!key) throw new Error("AI 키가 없습니다");
   const r = await DR.callGemini(fetch, key, [{ text: 글 }], null, cfg || {});
   await bumpReadTally("news", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+  await bumpSpend("news", r);
   if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
   const parts = (r.json && r.json.candidates && r.json.candidates[0]
     && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
@@ -1936,7 +1941,8 @@ async function 뉴스레터전달경보다시보기(db, 열쇠, w, 반송들) {
    가장 최근 회차의 감시 기록에서 «지금 사람이 볼 것»을 세어 둔다. 포털이 이 한 칸만 읽는다.
    ⚠ 3시간마다(감시꾼) · 점검 · 경보 · 발송 · 전달 뒤에 늘 새로 쓴다 — 고치면 저절로 사라진다. */
 async function 뉴스레터경고판갱신(db) {
-  const v = (await db.ref("newsletter/watch").orderByKey().limitToLast(4).once("value")).val() || {};
+  /* ★ 숫자로 시작하는 열쇠(회차)만 읽는다 — «현재» 같은 글자 열쇠가 늘어도 회차가 창 밖으로 밀리지 않는다(2026-11-16) */
+  const v = (await db.ref("newsletter/watch").orderByKey().endAt("9\uf8ff").limitToLast(3).once("value")).val() || {};
   const 열쇠 = Object.keys(v).filter((k) => /^\d{4}-\d{2}-w\d{1,2}$/.test(k)).sort().pop();
   const 반송들 = (await db.ref("newsletter/bounces").once("value")).val() || {};
   /* ★ 걸려 있는 «전달 실패» 경고를 다시 센다 — 못 간 주소를 서버가 이미 처리했으면(반송 자동 확인이 «없는 주소» 로 뺌 등)
@@ -1955,35 +1961,59 @@ async function 뉴스레터경고판갱신(db) {
   await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
 /* 법제처 원문 조문 읽기 (대표 결정 2026-10-05 「추천대로」 — 서버가 원문을 직접 읽어 AI 에게 넘긴다)
-   ⚠ 공개 열쇠(OC=test) — 판례 모으개(news-prec.js)와 같은 문. 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다). */
+   ★ 국가법령정보센터 «공개 쪽»에서 읽는다 (2026-11-16 — 법제처 DRF 가 OC=test 를 거절해 옮겼다. 판례 모으개와 같은 까닭).
+     ① lsLinkProc.do?lsNm=법이름 → 그 법의 현행 번호(lsiSeq)·시행일(frm_efYd)·이름(lsNm)이 숨은 칸으로 온다
+     ② lsInfoR.do 에 POST(lsiSeq·efYd) → 법 전문 HTML. 조마다 <a name="J60:0"> 표지가 붙는다(제18조의2 = J18:2)
+     ③ 그 표지부터 다음 조 표지 앞까지를 글자로 — 아이콘 줄·「<개정 …>」 표지는 뺀다
+   ⚠ 이름이 «정확히 같은» 법만 쓴다 — 다른 법(시행령 등)으로 넘어가면 그 조문은 뺀다(2026-10-05 시행령 제60조가 왔던 일).
+   ⚠ 공개 쪽은 번호를 «한 번만» 적는다 — 예전 XML 의 「① ①」 겹침(2026-10-11 제55조 오탐)은 이 길에서 생기지 않는다.
+   ⚠ 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다).
+   ⚠ 이 함수는 «혼자 선다» — 검사(news-ai-review·news-law-numbering)가 본문을 잘라 가짜 fetch 로 돌린다. 바깥 도우미를 부르지 말 것. */
 async function 법조문원문(조목록) {
-  const 밑 = "https://www.law.go.kr/DRF/";
-  /* ⚠ 법제처 XML 은 «번호 칸»(<항번호>①)과 «내용 칸»(<항내용>① 사용자는…)이 둘 다 번호를 적는다 — 태그만 걷으면
-       「① ① 사용자는」 이 되어 AI 교정자가 «번호 중복»이라고 올린다(2026-10-11 근로기준법 제55조 오탐, 편지는 멀쩡했다).
-       내용 맨 앞에 «같은 번호»가 있을 때만 번호 칸을 버린다(없으면 번호를 살린다). 항·호·목이 같은 모양이다. */
-  const 번호겹침 = /<(항|호|목)번호>\s*([^<]*?)\s*<\/\1번호>\s*(<\1내용>\s*)(?=\2\s)/g;
-  const 받기 = async (u) => {
+  const 밑 = "https://www.law.go.kr/LSW/";
+  const 머리 = { "User-Agent": "pureun-erp-news-watch" };
+  const 받기 = async (u, 몸) => {
     const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
-    try { const r = await fetch(u, { signal: ac.signal }); return r.ok ? await r.text() : ""; }
-    catch (_) { return ""; } finally { clearTimeout(t); }
+    try {
+      const r = await fetch(u, 몸
+        ? { method: "POST", body: 몸, signal: ac.signal,
+          headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" }, 머리) }
+        : { signal: ac.signal, headers: 머리 });
+      return r.ok ? await r.text() : "";
+    } catch (_) { return ""; } finally { clearTimeout(t); }
   };
+  const 같게 = (t) => String(t).replace(/[\s·ㆍ・]/g, "");   /* 가운뎃점 모양(· ㆍ)이 법마다 다르다 */
+  const 값 = (h, id) => ((new RegExp('id="' + id + '"[^>]*value="([^"]*)"').exec(h) || [])[1] || "");
+  const 글로 = (h) => h
+    .replace(/<ul class="lawico01">[\s\S]*?<\/ul>/g, " ")           /* 조문체계도·연혁 아이콘 줄 */
+    .replace(/<span class="sfon">[\s\S]*?<\/span>/g, " ")           /* 「<개정 2012. 2. 1.>」 고친 표지 */
+    .replace(/<\/?(?:a|span|strong|b|label|input|img)\b[^>]*>/gi, "") /* 글 속 꾸밈 — 「제60조(연차 유급휴가)」가 벌어지지 않게 */
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0*39;/g, "'")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ").trim();
+  const 법전문 = {};   /* 같은 법의 조문이 여럿이면 한 번만 받는다 */
   const 결과 = [];
   for (const c of (조목록 || []).slice(0, 5)) {
-    const 찾음 = await 받기(밑 + "lawSearch.do?OC=test&target=law&type=XML&display=20&query=" + encodeURIComponent(c.법.replace(/[·・]/g, "ㆍ")));
-    /* ⚠ 한 법령씩 잘라 읽는다 — 목록은 «일련번호가 이름보다 앞»이라, 이름 뒤의 번호를 잡으면
-         다음 법령(시행령)의 번호를 가져온다(2026-10-05 근로기준법 제60조가 시행령 제60조로 왔다). */
-    const 줄 = [...찾음.matchAll(/<law [^>]*>([\s\S]*?)<\/law>/g)].map((m) => [m[0],
-      ((m[1].match(/<법령명한글><!\[CDATA\[(.*?)\]\]>/) || [])[1] || ""),
-      ((m[1].match(/<법령일련번호>(\d+)<\/법령일련번호>/) || [])[1] || "")]);
-    const 같게 = (t) => String(t).replace(/[\s·ㆍ・]/g, "");   /* 가운뎃점 모양(· ㆍ)이 법마다 다르다 */
-    const 맞음 = 줄.find((m) => m[2] && 같게(m[1]) === 같게(c.법)) || null;
-    if (!맞음) continue;
-    const JO = String(c.조).padStart(4, "0") + String(c.의 || 0).padStart(2, "0");
-    const 글 = await 받기(밑 + "lawService.do?OC=test&target=law&type=XML&MST=" + 맞음[2] + "&JO=" + JO);
-    const 조 = 글.replace(/<!\[CDATA\[|\]\]>/g, "").match(/<조문내용>[\s\S]*?<\/조문단위>/);
-    if (!조) continue;
-    결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""),
-      원문: 조[0].replace(번호겹침, "$3").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
+    const 이름 = String(c.법 || "").replace(/[·・]/g, "ㆍ");
+    if (!(이름 in 법전문)) {
+      법전문[이름] = "";
+      const 문 = await 받기(밑 + "lsLinkProc.do?lsNm=" + encodeURIComponent(이름) + "&chrClsCd=010202&mode=20");
+      const 번 = 값(문, "lsiSeq"), 날 = 값(문, "frm_efYd");
+      if (/^\d{1,12}$/.test(번) && /^\d{8}$/.test(날) && 같게(값(문, "lsNm")) === 같게(c.법)) {
+        법전문[이름] = await 받기(밑 + "lsInfoR.do", "lsiSeq=" + 번 + "&efYd=" + 날 + "&chrClsCd=010202&ancYnChk=0");
+      }
+    }
+    const 전 = 법전문[이름];
+    if (!전) continue;
+    const 표 = 'id="J' + Number(c.조) + ":" + Number(c.의 || 0) + '"';
+    const i = 전.indexOf(표);
+    if (i < 0) continue;
+    const 뒤 = 전.slice(i + 표.length);
+    const j = 뒤.search(/<a name="J\d+:\d+"/);
+    const 조 = 글로((j < 0 ? 뒤.slice(0, 30000) : 뒤.slice(0, j)).replace(/^[^<]*/, ""));
+    if (!/^제\d+조/.test(조)) continue;   /* 조문 머리(「제60조(…)」)가 아니면 모양이 바뀐 것 — 엉뚱한 글을 원문이라 넘기지 않는다 */
+    결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""), 원문: 조.slice(0, 1500) });
   }
   return 결과;
 }
@@ -2116,13 +2146,15 @@ exports.newsletterWatchSunday = functions
     if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
     const 회차 = await 감시용회차(db, 열쇠);
     const 링크결과 = await NWatch.링크재기(NWatch.편지링크들(회차), fetch);
-    const [판례모음, 지난것, 노무사회메타] = await Promise.all([
+    /* ★ 판례탈 — 판례 모으개가 남긴 «못 모은 까닭»(2026-11-15). 「3주 넘게 새로 없음」에 까닭을 붙인다 */
+    const [판례모음, 지난것, 노무사회메타, 판례탈] = await Promise.all([
       db.ref("homepage/newsPrec/모음").once("value"),
       db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value"),
-      db.ref("ilabor/meta").once("value")]);
+      db.ref("ilabor/meta").once("value"),
+      db.ref("homepage/newsPrec/탈").once("value")]);
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
-      판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
+      판례모음: 판례모음.val(), 판례탈: 판례탈.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
     /* ★ AI 교정 (2026-10-05) — 우리 말·한마디를 원문(판례 사건번호·선고일·판시사항, 법제처 조문)과 대조.
          AI 는 «확인할 것»만 올린다. 실패하면 그 줄만 빠지고 규칙 점검은 그대로 간다. */
     try {
@@ -3666,6 +3698,39 @@ exports.typeSafeEvaluate = functions
     }
   });
 
+/* 📬 경력관리 «요청 메일» 범위 분류 — 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 Jev 에게 묻는다 (대표 지시 2026-11-15).
+   화면은 «건 번호»만 준다 — 서버가 그 사람의 kcareer/{uid}/mailreq/items 에서 제목·첨부 이름을 직접 읽는다(임의 글 중계 금지).
+   본문·보낸이는 받지도 보내지도 않는다. 이름 가림·하루 한도·건수 한도는 mail-req-scope.js 한 곳.
+   ⚠ 관리자만 · 열쇠 없으면 503 — 둘 다 «다른 무엇보다 먼저» 본다(typeSafeEvaluate 와 같은 순서).
+   ⚠ 이 함수는 분류만 돌려준다 — 상태 바꾸기는 브라우저(kcareer-mailreq.js scopeAsk)가 «새 요청»에만 한다. */
+exports.mailReqScope = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let who;
+    try { who = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    if (!(await typeSafeIsAdmin(who && who.uid))) {
+      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
+      return;
+    }
+    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
+    if (!key || key === "unset") {
+      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
+      return;
+    }
+    try {
+      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST(), uid: who.uid }, req.body);
+      res.status(out.status).json(out.body);
+    } catch (e) {
+      console.warn("요청 메일 범위 분류 실패:", String((e && e.message) || e).slice(0, 300));
+      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
+    }
+  });
+
 /* 열쇠를 얻는다 — 서버 비밀이 먼저.
    ⚠ 실시간DB 갈래는 **옮기는 동안만** 쓰는 임시 다리다. 네 앱(사진첩·기업정보함·
      enter·경력관리)을 다 옮기고 `firebase functions:secrets:set GEMINI_KEY` 를
@@ -3783,11 +3848,27 @@ exports.readDoc = functions
       const 줄인것 = await freeFirstSlim(v.parts, v.app);
       if (줄인것) parts = 줄인것;
     }
+    if (v.app === "pbox") {
+      if (parts.some((p) => !p || typeof p !== "object" || Object.keys(p).length !== 1 || typeof p.text !== "string")) {
+        res.status(400).json({ ok: false, error: "P박스 AI 질의는 비식별 텍스트만 허용됩니다.", status: 400 });
+        return;
+      }
+      const PBoxSync = require("./pbox-sync");
+      parts = parts.map(function (p) {
+        const names = PBoxSync.extractPartyNamesServer(p.text, "");
+        return { text: PBoxSync.scrubServerPii(p.text, names) };
+      });
+      if (PBoxSync.hasResidualHardPii(parts)) {
+        res.status(400).json({ ok: false, error: "민감 개인정보가 감지되어 외부 AI 호출을 차단했습니다.", status: 400 });
+        return;
+      }
+    }
 
     // cfg = 부르는 쪽이 정한 값(온도·최대 길이). 걸러진 것만 넘어온다.
     const r = await DR.callGemini(fetch, key, parts, null, v.cfg);
     // ⑤ 한 번 불렀다 — 세어 둔다(대표 물음 2026-09-08). 숫자만 담는다.
     await bumpReadTally(v.app, r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+    await bumpSpend(v.app, r);
     if (!r.ok) {
       /* ⚠ 상태를 **그대로** 돌려준다. 브라우저의 재시도·모델 갈아타기 판단이
          이 숫자를 보고 움직인다(429 면 잠시 뒤, 403 이면 곧바로 포기). */
@@ -3819,11 +3900,12 @@ async function aiMonthSpend() {
   try {
     const db = getDatabase();
     const [셈, 설정] = await Promise.all([
-      db.ref(DR.aiMonthPath()).once("value"),
+      /* 달 «_all» 통째 — n(부른 수)·won(실제 토큰 원화)·wn(원화로 센 수)를 함께 읽는다(2026-11-19) */
+      db.ref(DR.aiMonthAllPath()).once("value"),
       db.ref(DR.AI_BUDGET_PATH).once("value")
     ]);
     const b = DR.aiBudgetOf(설정.val());
-    const spent = DR.aiSpentWon(셈.val(), b.wonPerRead);
+    const spent = DR.aiSpentWonOf(셈.val(), b.wonPerRead);
     return { spent: spent, limit: b.limit, warn: b.warn,
              over: b.limit > 0 && spent >= b.limit, known: true };
   } catch (e) {
@@ -3841,6 +3923,28 @@ async function visionMonthLeft() {
   } catch (e) {
     console.warn("Vision 달 셈 못 읽음(그래서 안 부른다):", String((e && e.message) || e));
     return { left: 0, used: 0, known: false };
+  }
+}
+
+/* 실제 토큰으로 센 원화를 쌓는다(2026-11-19 비용 점검) — won 은 원화 합, wn 은 «원화로 센 판독 수».
+   달 금액은 DR.aiSpentWonOf 가 (n − wn) × 단가 + won 으로 낸다. 셈을 못 내면(usageMetadata 없음) 안 쌓는다 —
+   그 판독은 예전처럼 n × 단가로 잡힌다. ⚠ 판독 성공(r.ok) 뒤 bumpReadTally(…"n") 바로 다음에 부른다. */
+async function bumpSpend(app, r) {
+  if (!r || !r.ok) return;
+  const won = DR.wonOfUsage(r.json, r.model);
+  if (won === null) return;
+  try {
+    const db = getDatabase();
+    await Promise.all([].concat(
+      DR.tallyPaths(app, null, "won").map(function (p) {
+        return db.ref(p).transaction(function (cur) { return Math.round(((Number(cur) || 0) + won) * 100) / 100; });
+      }),
+      DR.tallyPaths(app, null, "wn").map(function (p) {
+        return db.ref(p).transaction(function (cur) { return (Number(cur) || 0) + 1; });
+      })
+    ));
+  } catch (e) {
+    console.warn("원화 셈 적기 실패(판독은 계속):", String((e && e.message) || e));
   }
 }
 
@@ -3910,6 +4014,7 @@ async function buildSuggestionAssist(id, record) {
   const r = await DR.callGemini(fetch, key, 보낼것.parts, null,
     { temperature: 0.2, maxOutputTokens: 900 });
   await bumpReadTally(SG_ASSIST_APP, r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+  await bumpSpend(SG_ASSIST_APP, r);
   if (!r.ok) {
     await writeAssist(id, { ok: false, why: "ai", note: "AI가 응답하지 않았습니다.",
       maskedKinds: 보낼것.maskedKinds });
@@ -4489,8 +4594,11 @@ exports.newsClick = functions
     /* ⚠ 모르는 번호일 때 튕겨 보내는 자리다. 예전에는 «/pureunall/» 로 보냈는데
          그 자리에는 index 파일이 없어서 깃허브의 영어 404 가 떴다 —
          2026-09-05 에 대표께서 미리보기에서 링크를 눌러 실제로 그 화면을 보셨다.
-         받는 분이 눌러도 같은 일이 난다. 문(enter.html)으로 보낸다. */
-    res.redirect(302, 갈곳 || "https://nabaho.github.io/pureunall/enter.html");
+         받는 분이 눌러도 같은 일이 난다. 문(enter.html)으로 보냈었다.
+       ★ 2026-11-15 공개 홈페이지(pureunlabor.co.kr)가 열리고 ERP 가 erp.pureunlabor.co.kr 로
+         옮겨 갔다 — 누르는 분은 뉴스레터를 받은 «바깥 사람»이라 ERP 로그인 문이 아니라
+         공개 홈페이지(PUBLIC_HOME)로 보낸다(위 주석의 «우리 홈페이지로» 그대로). */
+    res.redirect(302, 갈곳 || ERP_ORIGINS_LIB.PUBLIC_HOME);
   });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -4612,6 +4720,7 @@ exports.newsView = functions
       const 제목 = (await db.ref(밑 + "제목").once("value")).val();
       /* 줄 것이 있을 때만 잠깐 굳힌다 — 이미 나간 회차라 잘 안 바뀐다 */
       res.set("Cache-Control", "public, max-age=300");
+      res.set("Content-Security-Policy", NV.전문보안);   // 2026-11-15 보안 — 전문 칸에 심은 스크립트·양식이 돌지 않게
       res.status(200).send(NV.쪽(제목, String(전문.val())));
     } catch (e) {
       console.warn("newsView", (e && e.message) || e);
@@ -4705,15 +4814,21 @@ exports.newsFullPage = functions
       const xml = await 글자로받기(NF.받을주소(q.갈래, q.번호), 6000);
       const 것 = NF.풀기(q.갈래, xml);
       if (!것.ok) {
+        /* ★★ 못 펴면 «오류 쪽»이 아니라 국가법령정보센터 공개 쪽으로 곧장 보낸다 (2026-11-15).
+             법제처 DRF 가 OC=test 를 거절하면서 받는 분이 「전문 보기」를 누를 때마다 «받아 오지 못했습니다»
+             쪽을 먼저 보고, 그 아래 단추를 한 번 더 눌러야 했다(그 단추마저 예전에는 실패 쪽이었다).
+           ★ 2026-11-16 부터는 그 공개 쪽을 우리가 읽어 우리 양식으로 편다 — 여기로 오는 것은 공개 쪽 모양이
+             바뀌었거나 그 쪽이 안 열릴 때뿐이다.
+           ⚠ 공개 쪽은 우리 양식이 아니다 — 그래도 판례를 «바로» 보시는 편이 오류 쪽보다 낫다. 굳히지 않는다. */
         res.set("Cache-Control", "no-store");
-        res.status(404).send(NF.오류쪽(NF.까닭말[것.까닭] || NF.까닭말["빈답"], 법제처));
+        res.redirect(302, 법제처);
         return;
       }
       /* ⚠⚠ 하루(86400)로 굳혀 두었더니, 쪽 «모양»을 고쳐 배포해도 이미 갈무리된
            것이 하루까지 그대로 나왔다 — 2026-09-20 실측(age=15056 으로 옛 모양).
            대표께서 고친 것을 눌러 보시고 «안 고쳐졌다»고 보시게 된다.
-         ★ 한 시간으로 줄인다. 법제처 문을 두드리는 횟수는 여전히 24 배 적고
-           (OC 가 시험 계정이라 한도가 있다 — 그래서 아주 끄지는 않는다),
+         ★ 한 시간으로 줄인다. 국가법령정보센터를 두드리는 횟수는 여전히 24 배 적고
+           (남의 공개 쪽이라 자주 두드리지 않는다 — 그래서 아주 끄지는 않는다),
            모양을 고치면 한 시간 안에 모두에게 닿는다.
          ★ 그래도 «지금 당장» 바꿔야 할 때가 있다 — 그때는 편지가 주소 끝에 붙이는
            모양 판(js/pu-news-tpl.js 전문쪽모양판)을 올린다. 주소가 달라져 곧바로 새것이 된다. */
@@ -4721,8 +4836,9 @@ exports.newsFullPage = functions
       res.status(200).send(NF.쪽(것, 법제처));
     } catch (e) {
       console.warn("newsFullPage", (e && e.message) || e);
+      /* 받다가 끊겨도 같다 — 공개 쪽으로 곧장(위 ★★ 참고) */
       res.set("Cache-Control", "no-store");
-      res.status(502).send(NF.오류쪽(NF.까닭말["못받음"], 법제처));
+      res.redirect(302, 법제처);
     }
   });
 
@@ -4741,6 +4857,9 @@ exports.readHomepage = functions
          잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
       try { await STAFF_GATE.assertActive(decoded.uid); }
       catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
+
+      /* 옛 홈페이지를 접었다(2026-11-15) — 읽으러 나가지 않는다. 화면은 새 사이트 원본을 직접 읽는다. */
+      if (OLD_SITE_CLOSED) { res.status(410).json({ error: OLD_SITE_CLOSED_MSG, 접음: true }); return; }
 
       const url = homepageUrl((req.body && req.body.path) || "");
       if (!url) { res.status(400).json({ error: "읽을 수 없는 쪽입니다." }); return; }
@@ -4787,6 +4906,9 @@ function 홈쿠키그릇() {
 }
 
 async function 홈부르기(주소, 그릇, 더할것) {
+  /* ★★ 옛 홈페이지를 접었다(2026-11-15) — 옛 사이트로 가는 요청은 모두 이 문을 지난다. 여기서 «보내기 전에» 멈춘다.
+       만료 도메인을 남이 다시 등록하면 쿠키·관리자 계정이 그쪽으로 간다(functions/homepage-fetch.js OLD_SITE_CLOSED). */
+  if (OLD_SITE_CLOSED) throw new Error(OLD_SITE_CLOSED_MSG);
   const 옵 = Object.assign({
     redirect: "manual",
     headers: Object.assign({
@@ -4803,6 +4925,8 @@ async function 홈부르기(주소, 그릇, 더할것) {
 /* 관리자로 들어간다. 들어갔는지 «말»로 묻지 않는다 —
    고치는 화면이 오는지로 판단한다(막을까 가 본다). 그게 가장 정직하다. */
 async function 홈로그인(아이디, 암호, 그릇) {
+  /* 접은 옛 홈페이지에는 관리자로 들어가지 않는다 — 아이디·비밀번호를 «만지기 전»에 멈춘다(홈부르기와 겹쳐 둔다) */
+  if (OLD_SITE_CLOSED) throw new Error(OLD_SITE_CLOSED_MSG);
   const 걸음 = [];
   /* ① 로그인 칸을 «받아 온다». 손님이 게시판을 열면 403 과 함께 그 칸이 딸려 온다.
        ⚠ 403 은 실패가 아니다 — 여기서 멈추면 안 된다. */
@@ -4851,6 +4975,9 @@ exports.homepageWrite = functions
          잣대는 공용 문 STAFF_GATE(uid_roles 의 sid + status==='active') — 규칙 LOGIN 과 같다. 못 읽으면 막는다. */
       try { await STAFF_GATE.assertActive(decoded.uid); }
       catch (e) { res.status(e.status || 403).json({ ok: false, error: String((e && e.message) || e) }); return; }
+
+      /* 옛 홈페이지를 접었다(2026-11-15) — 관리자 비밀값을 꺼내기 «전에» 돌려보낸다 */
+      if (OLD_SITE_CLOSED) { res.status(410).json({ ok: false, 접음: true, error: OLD_SITE_CLOSED_MSG }); return; }
 
       const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
       /* 보기 = 무엇이 바뀌는지만 · 쓰기 = 진짜로 보낸다 · 정찰 = 칸 «이름»만 본다
@@ -5161,6 +5288,7 @@ async function 홈자동게시판보기(그릇, 목록) {
    ⚠ 값은 한 글자도 안 남긴다(HW.정찰·HW.채운칸들 규칙). 읽기만 하고 아무것도 보내지 않는다.
    결과는 homepage/auto/recon 에 — 재직 직원이 읽는 자리다(2026-10-30 전엔 관리자만). */
 async function 홈자동정찰(그릇) {
+  if (OLD_SITE_CLOSED) throw new Error(OLD_SITE_CLOSED_MSG);   // 접은 옛 사이트는 정찰하지 않는다(2026-11-15)
   let 로고글번호 = 0;
   try {
     const p = await fetch(HW.ORIGIN + "/partner", { headers: { "User-Agent": HW.브라우저표시 } });
@@ -5361,6 +5489,13 @@ async function 홈자동올리기(그릇, 목록) {
 }
 
 async function 홈자동한번(방식, 받은지문, 누가) {
+  /* ★ 옛 홈페이지를 접었다(2026-11-15) — 옛 게시판의 내리기·올리기·정찰을 «통째로» 건너뛴다.
+       돌기(HA.돌기)도 안 부른다: 부르면 매달 「못 내림·못 올림」 할 일만 쌓인다(옛 게시판이 없으므로).
+       퇴사자 빼기는 새 사이트 쪽(새사이트한번 · 화면 「저장하고 반영」)이 명부로 따로 한다.
+       ⚠ config.off 를 켜지 않는 까닭: 그 스위치는 새 사이트 재게시까지 멈춘다. */
+  if (OLD_SITE_CLOSED) {
+    return { ok: true, 접음: true, 안내: OLD_SITE_CLOSED_MSG, 달: 서울달(Date.now()), 내림: [], 못내림: [] };
+  }
   const 아이디 = process.env.HOME_ADMIN_ID, 암호 = process.env.HOME_ADMIN_PW;
   let 그릇 = null;
   /* 들어가는 것은 «내릴 것이 있을 때만» — 할 일 없는 달에 관리자 로그인을 남기지 않는다 */
@@ -5450,16 +5585,41 @@ async function 새사이트파일읽기(토큰, repo, path) {
 async function 새사이트한번(누가) {
   const 토큰 = process.env.GITHUB_AUTOMATION_TOKEN;
   const db = getDatabase();
+  /* ★ 자동으로 올리는 쪽도 «실행되는 조각»을 새로 넣지 못한다 (2026-11-16 보안 검토 높음) —
+       publishSite 가 관리자 아닌 올리기에 하는 검사(새실행조각)를 그대로. 재직 직원이 고칠 수 있는 자료(homepage/members·partners)로
+       그려지는 쪽이라, 자료에 스크립트·속성이 섞여 들어오면 사람 손을 안 거치고 홈페이지에 실릴 수 있었다. */
+  const 실행조각막기 = async (자리, html) => {
+    let 있던 = "";
+    try { 있던 = await 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(자리)); } catch (e) { 있던 = ""; }
+    const 새것 = 새실행조각(있던, String(html));
+    if (새것.length) throw new Error("실행되는 조각이 새로 들어간 쪽이라 자동으로 올리지 않았습니다(" + 새것.length + "곳) — 「새 사이트에 올리기」로 확인해 주십시오");
+  };
   return HN.돌기({
     읽기: async (p) => (await db.ref(p).once("value")).val(),
     쓰기: (p, v) => db.ref(p).set(v),
     쪽읽기: () => 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(HN.사본자리)),
     /* 화면의 「새 사이트에 올리기」(publishSite)와 같은 차례 — 사람이 보는 쪽 먼저, 우리 사본은 실패해도 알리기만 */
     올리기: async (html, note) => {
+      await 실행조각막기(HN.사본자리, html);
       const 사연글 = 사연(누가, HN.사본자리, note);
       const 답 = await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(HN.사본자리), html, 사연글);
       try { await 올리기(githubRequest, 토큰, REPO, HN.사본자리, html, 사연글); }
       catch (e) { console.warn("[새 사이트 자동] 사본 올리기 실패", (e && e.message) || e); }
+      return 답;
+    },
+    /* 계약 끝난 자문사 로고 숨기기(2026-11-16) — 자문사 쪽·메인 쪽만. 자리는 HN 이 정한 둘뿐이고,
+       올릴자리인가(site/ 아래 .html) 를 한 번 더 지난다 — 엉뚱한 자리에 쓰지 않게 */
+    파일읽기: (자리) => {
+      if (자리 !== HN.자문사자리 && 자리 !== HN.메인자리) return Promise.reject(new Error("읽을 수 없는 자리: " + 자리));
+      return 새사이트파일읽기(토큰, SITE_REPO, 홈페이지자리(자리));
+    },
+    파일올리기: async (자리, html, note) => {
+      if ((자리 !== HN.자문사자리 && 자리 !== HN.메인자리) || !올릴자리인가(자리)) throw new Error("올릴 수 없는 자리: " + 자리);
+      await 실행조각막기(자리, html);
+      const 사연글 = 사연(누가, 자리, note);
+      const 답 = await 올리기(githubRequest, 토큰, SITE_REPO, 홈페이지자리(자리), html, 사연글);
+      try { await 올리기(githubRequest, 토큰, REPO, 자리, html, 사연글); }
+      catch (e) { console.warn("[새 사이트 자동] 로고 사본 올리기 실패", (e && e.message) || e); }
       return 답;
     },
     지금: () => Date.now(),
@@ -5474,7 +5634,8 @@ exports.monthlyHomepageAuto = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const r = await 홈자동한번("돌리기", "", "auto");
-    console.log("[홈페이지 자동] " + r.달 + " 내림 " + (r.내림 || []).length
+    if (r.접음) console.log("[홈페이지 자동] " + r.달 + " 옛 홈페이지 접음 — 옛 게시판 일은 건너뜀");
+    else console.log("[홈페이지 자동] " + r.달 + " 내림 " + (r.내림 || []).length
       + " · 못내림 " + (r.못내림 || []).length
       + (r.꺼짐 ? " · 꺼져 있음" : "") + (r.멈춤 ? " · 멈춤" : "") + (r.실패 ? " · 실패 " + r.실패 : ""));
     /* ★ 내리기를 «마친 뒤» 새 사이트를 만든다 — 방금 내린 사람(takenDown)이 새 사이트에서도 함께 빠진다.
@@ -5482,6 +5643,8 @@ exports.monthlyHomepageAuto = functions
     const n = await 새사이트한번("auto");
     console.log("[새 사이트 자동] " + (n.꺼짐 ? "꺼져 있음" : n.ok ? (n.멈춤 ? "멈춤 " + n.멈춤
       : n.올림 ? "올림 " + n.인원 + "명 · 뺌 " + n.뺀수 : "바뀐 것 없음") : "실패 " + n.실패));
+    if (n.로고) console.log("[새 사이트 자동·로고] " + (n.로고.ok ? (n.로고.멈춤 ? "멈춤 " + n.로고.멈춤
+      : n.로고.올림 ? "계약 끝난 로고 " + n.로고.숨김수 + "장 숨김" : "숨길 것 없음") : "실패 " + n.로고.실패));
     return null;
   });
 
@@ -5736,9 +5899,9 @@ async function 브리핑거리모으기(법령몇) {
   }
   for (const w of 브리핑샘.법령말) {
     try {
-      const xml = await 글자로받기("https://www.law.go.kr/DRF/lawSearch.do?OC=test"
-        + "&target=law&type=XML&sort=ddes&display=" + 몇 + "&query=" + encodeURIComponent(w));
-      법령 = 법령.concat(브리핑부품.법령읽기(xml));
+      /* ★ 국가법령정보센터 공개 쪽(공포일 내림차순) — DRF 가 OC=test 를 거절해 옮겼다(2026-11-16, news-brief.js 공개법령목록읽기) */
+      const 글 = await 글자로받기(브리핑부품.공개법령목록주소(w, 몇));
+      법령 = 법령.concat(브리핑부품.법령읽기(글));
     } catch (e) { console.warn("[브리핑] 법령(" + w + ")을 못 읽었습니다", e.message); }
   }
   return { 뉴스: 뉴스, 법령: 브리핑부품.법령추리기(법령, 몇) };
@@ -5890,7 +6053,7 @@ exports.dailyRegionalNewsCollect = functions
    ★ 어디서 오는가
      · 자료 — 고용노동부 «정책자료실». 받으신 원본(8월 5주차)에 실린 두 건이
               그대로 여기 있었다(2026-09-05 실측). 짐작이 아니라 맞춰 본 것이다.
-     · 판례 — 법제처 판례 API. 판결문은 저작권 대상이 아니라 «내용까지» 싣는다.
+     · 판례 — 국가법령정보센터 공개 쪽(2026-11-16 까지는 법제처 DRF). 판결문은 저작권 대상이 아니라 «내용까지» 싣는다.
 
    ★ 「다운받아서 확인할 수 있게」 — 파일을 실제로 «내려받아» 본다.
      ① 크기를 재서 편지에 적는다(누르기 전에 얼마짜리인지 알게)
@@ -5973,18 +6136,45 @@ async function 자료거리모으기(몇개) {
      편지 짓는 층을 안 고쳐도 되고, 한 꼭지에 섞여 나란히 실린다. */
 const 해석찾을말 = ["근로기준법", "근로자퇴직급여", "산업안전보건법", "노동조합"];
 
+/* ★ 국가법령정보센터 «공개 쪽»에서 읽는다 (2026-11-16 대표 「남은거 모두해라」).
+     법제처 DRF 가 공개 열쇠(OC=test)를 거절해(2026-10-09 무렵부터) 열쇠 없이 열리는 사람용 쪽으로 옮겼다.
+     쪽 모양 읽기는 functions/news-prec.js 「⑥ 공개 쪽」 — 여기는 두드리고 세기만 한다.
+   ⚠⚠ 예전에는 거절 몸이 «0건»으로 조용히 넘어가 다섯 주를 몰랐다(10-09 ~ 11-15).
+     그래서 «모든 낱말이 빈손»이면 모으기 전체를 탈로 남긴다 — 노무 낱말 네댓 개가 한꺼번에 0건일 리 없다.
+     그때는 쪽 모양이 바뀌었거나 막힌 것이다. 한 건 쪽을 «하나도» 못 읽어도 마찬가지다. */
+const 공개쪽못읽음말 = "국가법령정보센터 공개 쪽을 읽지 못했습니다 — 쪽 모양이 바뀌었거나 막혔을 수 있습니다"
+  + "(functions/news-prec.js ⑥ 공개 쪽 읽기를 실제 쪽과 견줘 고쳐야 합니다)";
+async function 공개쪽받기(주소) {
+  const 글 = await 쪽받기(주소);
+  /* 혹시 공개 쪽에도 공동활용 실패 쪽이 오면 «못 읽음»이다 — 빈손으로 넘기지 않는다 */
+  if (판례부품.거절인가(글)) throw new Error("법제처가 거절한 쪽입니다: " + 주소);
+  return 글;
+}
+/* 낱말마다 목록을 읽어 모은다. 모두 빈손이면 던진다(위 머리글). */
+async function 공개목록모으기(이름, 낱말들, 주소짓기, 읽기) {
+  let 다 = [], 빈손 = 0;
+  for (const w of 낱말들) {
+    try {
+      const 줄 = 읽기(await 공개쪽받기(주소짓기(w, 5)));
+      if (!줄.length) 빈손++;
+      다 = 다.concat(줄);
+    } catch (e) { 빈손++; console.warn("[" + 이름 + "] " + w + " 를 못 읽었습니다: " + e.message); }
+  }
+  if (빈손 === 낱말들.length) throw new Error(이름 + " 목록 — " + 공개쪽못읽음말);
+  return 다;
+}
+
 async function 해석거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(6, Number(몇개) || 2));
-  let 다 = [];
-  for (const w of 해석찾을말) {
-    try { 다 = 다.concat(판례부품.해석목록읽기(await 쪽받기(판례부품.해석목록주소(w, 5)))); }
-    catch (e) { console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
-  }
+  const 다 = await 공개목록모으기("해석", 해석찾을말, 판례부품.해석목록주소, 판례부품.해석목록읽기);
   const out = [];
+  let 부른 = 0, 읽은 = 0;
   for (const c of 판례부품.해석추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
     try {
-      const one = 판례부품.해석한건읽기(await 쪽받기(판례부품.해석한건주소(c.일련번호)));
+      부른++;
+      const one = 판례부품.해석한건읽기(await 공개쪽받기(판례부품.해석한건주소(c.일련번호)), c.일련번호);
+      if (one) 읽은++;
       if (!one || !판례부품.노무해석인가(one)) continue;
       const it = 판례부품.해석으로만들기(one);
       if (it) out.push(it);
@@ -5992,23 +6182,24 @@ async function 해석거리모으기(몇개, 모아둔것) {
       console.warn("[해석] " + c.일련번호 + " 를 못 읽었습니다: " + e.message);
     }
   }
+  if (부른 && !읽은) throw new Error("해석 한 건 쪽 — " + 공개쪽못읽음말);
   console.log("[해석] " + out.length + "건");
   return out;
 }
 
-/* 법제처에서 노무 판례를 모은다 — 판시사항이 있는 것만 */
+/* 노무 판례를 모은다 — 판시사항이 있는 것만 */
 async function 판례거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(8, Number(몇개) || 4));
-  let 다 = [];
-  for (const w of 판례찾을말) {
-    try { 다 = 다.concat(판례부품.목록읽기(await 쪽받기(판례부품.목록주소(w, 5)))); }
-    catch (e) { console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
-  }
+  /* 모두 빈손이면 «0건»이 아니라 «못 모았다» — 자료판례모아담기 가 탈로 남기고 감시꾼이 까닭을 보인다 */
+  const 다 = await 공개목록모으기("판례", 판례찾을말, 판례부품.목록주소, 판례부품.목록읽기);
   const out = [];
+  let 부른 = 0, 읽은 = 0;
   for (const c of 판례부품.판례추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
     try {
-      const one = 판례부품.한건읽기(await 쪽받기(판례부품.한건주소(c.일련번호)));
+      부른++;
+      const one = 판례부품.한건읽기(await 공개쪽받기(판례부품.한건주소(c.일련번호)), c.일련번호);
+      if (one) 읽은++;
       if (!one || !판례부품.노무판례인가(one)) continue;
       const it = 판례부품.판례로만들기(one);
       if (it) out.push(it);
@@ -6016,6 +6207,7 @@ async function 판례거리모으기(몇개, 모아둔것) {
       console.warn("[판례] " + c.일련번호 + " 를 못 읽었습니다: " + e.message);
     }
   }
+  if (부른 && !읽은) throw new Error("판례 한 건 쪽 — " + 공개쪽못읽음말);
   return out;
 }
 
@@ -6337,6 +6529,43 @@ exports.weeklyNewsBrief = functions
                         뉴스수: 주간뉴스.length, 법령수: 법령.length });
     console.log("[브리핑] 올렸습니다 — " + 글.제목);
     return null;
+  });
+
+/* ══════════ 홈페이지 방문 통계 — 숫자만 센다 (대표 지시 2026-11-19 「추천대로」, 목업 2026-11-18) ══════════
+   홈페이지 쪽마다 site/assets/js/pu-count.js 가 «쪽 이름·유입 갈래·폰/PC·행동»만 보낸다 → 날짜 칸 하나를 «거래»로 올린다.
+   ★ 셈·모양 검사는 functions/site-stats.js(순수 부품) — 여기는 «바깥을 두드리는» 일만.
+   ★ 우리 홈페이지 출처만 받는다 · 로봇은 안 센다 · 너무 잦으면 버린다(IP 는 메모리에만, 적지 않는다).
+   ★ 무슨 일이 있어도 204 로 조용히 끝낸다 — 홈페이지 쪽이 이 함수 때문에 느려지거나 오류를 보이면 안 된다.
+   ⚠ ServerValue.increment 를 쓰지 않는다(이 파일에 admin 변수가 없다 — bumpReadTally 머리말). «거래»로 올린다.
+   자리: homepage/stats/day/<서울 날짜> — 쓰기는 서버만(scripts/make-firebase-rules.js), 읽기는 재직 직원(홈페이지 관리). */
+const SiteStats = require("./site-stats");
+exports.siteHit = functions
+  .runWith({ timeoutSeconds: 10, memory: "128MB" })
+  .https.onRequest(async (req, res) => {
+    const 출처 = String(req.headers.origin || "");
+    const 우리 = SiteStats.받는출처.indexOf(출처) >= 0;
+    if (우리) { res.set("Access-Control-Allow-Origin", 출처); res.set("Vary", "Origin"); }
+    res.set("Cache-Control", "no-store");
+    if (req.method === "OPTIONS") {
+      res.set("Access-Control-Allow-Methods", "POST");
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "POST" || !우리 || SiteStats.봇인가(req.headers["user-agent"])) { res.status(204).send(""); return; }
+    const 곳 = String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim();
+    if (!SiteStats.숨돌리기(곳, Date.now())) { res.status(204).send(""); return; }
+    const 몸 = (typeof req.body === "string" || Buffer.isBuffer(req.body)) ? req.body
+      : ((req.body && typeof req.body === "object" && Object.keys(req.body).length) ? req.body : req.rawBody);
+    const 받은 = SiteStats.받기(몸);
+    if (!받은.ok) { res.status(204).send(""); return; }
+    try {
+      await getDatabase().ref("homepage/stats/day/" + SiteStats.서울날(Date.now()))
+        .transaction((cur) => SiteStats.셈더하기(cur, 받은));
+    } catch (e) {
+      console.warn("[방문 셈] 못 적었습니다", String((e && e.message) || e));
+    }
+    res.status(204).send("");
   });
 
 
@@ -6715,7 +6944,7 @@ exports.publishSite = functions
       const path = (req.body && req.body.path) || "";
       const content = (req.body && req.body.content) || "";
       /* ★ 그림(base64)인지 쪽(글자)인지에 따라 «자리도 한도도» 다르다.
-         그림은 site/files/logo/ 아래만, 700KB 까지. 한 규칙으로 뭉뚱그리면
+         그림은 site/files/logo/ · site/files/people/(얼굴 사진, 2026-11-16 — SVG 안 받음) 아래만, 700KB 까지. 한 규칙으로 뭉뚱그리면
          쪽 자리에 그림을, 그림 자리에 쪽을 넣을 수 있게 된다. */
       const 그림인가 = (req.body && req.body.image) === true;
       if (그림인가 ? !올릴그림자리인가(path) : !올릴자리인가(path)) {
@@ -6735,6 +6964,25 @@ exports.publishSite = functions
         res.status(413).json({ error: "너무 큽니다(" + Math.round(bytes / 1024) + "KB). "
           + "한도는 " + Math.round(한도 / 1024) + "KB 입니다." });
         return;
+      }
+
+      /* ★ 2026-11-15 보안 — «실행되는 조각»을 새로 넣는 올리기와 SVG 그림은 총괄관리자만(까닭은 site-publish.js 실행조각 머리).
+         글·표·그림(png·jpg·webp) 고치기는 지금처럼 재직 직원 누구나. 있던 쪽을 못 읽으면(새 쪽 포함) 빈 쪽과 견준다 — 막는 쪽으로 기운다. */
+      const 관리자인가 = ((await getDatabase().ref("uid_roles/" + decoded.uid + "/isAdmin").once("value")).val() === true);
+      if (!관리자인가) {
+        if (그림인가 && /\.svg$/i.test(String(path))) {
+          res.status(403).json({ error: "SVG 그림은 총괄관리자만 올릴 수 있습니다 — png·jpg·webp 로 올려 주세요." });
+          return;
+        }
+        if (!그림인가) {
+          let 있던쪽 = "";
+          try { 있던쪽 = await 새홈페이지쪽(홈페이지자리(path)); } catch (e) { 있던쪽 = ""; }
+          const 새것 = 새실행조각(있던쪽, String(content));
+          if (새것.length) {
+            res.status(403).json({ error: "스크립트·실행 코드가 새로 들어간 쪽은 총괄관리자만 올릴 수 있습니다(" + 새것.length + "곳). 글만 고쳐 다시 올려 주세요." });
+            return;
+          }
+        }
       }
 
       const 누가 = decoded.name || ("직원 " + String(decoded.uid || "").slice(0, 6));   // 이메일(사번 → 로그인 아이디)은 적지 않는다(2026-10-25)
@@ -7574,6 +7822,7 @@ exports.mailCardRead = functions
       if (q.sig) {
         const r = await DR.callGemini(fetch, key, [{ text: MAILCARD.prompt(q.sig, q) }], [2000], {});
         await bumpReadTally("cards", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+        await bumpSpend("cards", r);
         if (!r.ok) return done({ st: "skip", why: String(r.why || "AI 오류").slice(0, 80) });
         const parts = (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
         f = MAILCARD.fieldsFrom(MAILCARD.parseAi(parts.map((p) => (p && p.text) || "").join("")), q);
@@ -7634,6 +7883,278 @@ exports.newsletterNoticeArchive = functions
       now: t0, 끝나는때: t0 + 500 * 1000, 로그: (...a) => console.log(...a)   /* 모든 인자 — 첫 인자만 넘기면 NOTICE_ARCHIVE_POP 의 JSON 이 사라진다(2026-10-12) */
     });
     return null;
+  });
+
+/* 📬 푸른메일함 전체(받은·내게쓴·보낸·보관·업무함) 정기 자동 검토 → 계약관리 큐 (대표 지시 2026-11-18)
+   매일 09시부터 18시까지 2시간 간격(09·11·13·15·17·18시)으로 푸른메일함을 동기화·전수 검토해
+   견적서와 계약서(위임약정서·자문계약서·용역계약서 등)를 `data/contract_requests`에 올린다. */
+const MailContractSweep = require("./mail-contract-sweep");
+async function runMailContractSweepOnce(trigger, opts) {
+  const MS = require("./mail-sync");
+  const manual = !!(opts && opts.manual);
+  return MailContractSweep.runSweep(
+    {
+      getDatabase,
+      getSelfEmail: mailUserAsync,
+      syncBefore: () => MS.runSync(MAIL_DEPS, { deadlineMs: 90000 }),
+      downloadQuoteAttachment: (slug, uid) =>
+        MS.withFolder(MAIL_DEPS, slug, async (client) => {
+          const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+          if (!head) return null;
+          const parts = MS.pickParts(head.bodyStructure, null, 0);
+          const picked = MailContractSweep.pickBestQuoteAttachment(parts.atts);
+          if (!picked || !picked.att || Number(picked.att.size || 0) > MailContractSweep.MAX_ATT_BYTES) return null;
+          const d = await client.download(String(uid), picked.att.part, { uid: true });
+          const buf = await MS.drain(d.content, MailContractSweep.MAX_ATT_BYTES);
+          return { name: picked.att.name, mime: picked.att.mime || "", buf };
+        }),
+      downloadContractAttachment: (slug, uid) =>
+        MS.withFolder(MAIL_DEPS, slug, async (client) => {
+          const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+          if (!head) return null;
+          const parts = MS.pickParts(head.bodyStructure, null, 0);
+          const picked = MailContractSweep.pickBestContractAttachment(parts.atts);
+          if (!picked || !picked.att || Number(picked.att.size || 0) > MailContractSweep.MAX_ATT_BYTES) return null;
+          const d = await client.download(String(uid), picked.att.part, { uid: true });
+          const buf = await MS.drain(d.content, MailContractSweep.MAX_ATT_BYTES);
+          return { name: picked.att.name, mime: picked.att.mime || "", buf };
+        }),
+      callContractAi: async (parts) => {
+        /* 방어 심층화: 비식별 텍스트 외 원본 바이너리(inline_data)는 절대 외부 AI로 보내지 않는다 */
+        const safeParts = (Array.isArray(parts) ? parts : []).filter((p) => p && typeof p.text === "string" && !p.inline_data && !p.inlineData);
+        if (!safeParts.length) return null;
+        const 몫 = await aiMonthSpend();
+        const 판정 = DR.budgetGate(몫, manual);
+        if (판정.block) return { overBudget: true };
+        const key = await readGeminiKey();
+        if (!key) return null;
+        const r = await DR.callGemini(fetch, key, safeParts, null, { temperature: 0, maxOutputTokens: 1600 });
+        await bumpReadTally("erp", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+        await bumpSpend("erp", r);
+        if (!r.ok) return null;
+        const candParts =
+          (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
+        return { text: candParts.map((p) => (p && p.text) || "").join("") };
+      },
+    },
+    Object.assign({ trigger }, opts || {})
+  );
+}
+
+async function acquireMailSweepLock(opts) {
+  const o = opts || {};
+  const now = Date.now();
+  const isManual = o.manual === true;
+  const isRescan = o.rescan === true;
+  const cooldownMs = isRescan ? 10 * 60 * 1000 : (isManual ? 60 * 1000 : 0);
+  const lockRef = getDatabase().ref("data/app_config/mailContractSweepLock");
+  let blockedWhy = "";
+  const tx = await lockRef.transaction((cur) => {
+    const c = (cur && typeof cur === "object") ? cur : {};
+    if (Number(c.runningUntil || 0) > now) {
+      blockedWhy = "메일 자동검토가 이미 실행 중입니다. 잠시 후 다시 시도해 주세요.";
+      return; /* abort */
+    }
+    if (isManual && cooldownMs > 0 && Number(c.lastManualAt || 0) > 0 && (now - Number(c.lastManualAt)) < cooldownMs) {
+      const waitSec = Math.ceil((cooldownMs - (now - Number(c.lastManualAt))) / 1000);
+      blockedWhy = "최근 수동 메일검토 직후입니다. " + waitSec + "초 뒤 다시 실행해 주세요.";
+      return; /* abort */
+    }
+    return {
+      runningUntil: now + 5 * 60 * 1000,
+      lastManualAt: isManual ? now : Number(c.lastManualAt || 0),
+      by: String(o.by || "schedule"),
+    };
+  });
+  if (!tx.committed) {
+    const err = new Error(blockedWhy || "메일 자동검토 잠금 획득에 실패했습니다.");
+    err.status = 429;
+    throw err;
+  }
+  return async () => {
+    try { await lockRef.update({ runningUntil: 0 }); } catch (_) {}
+  };
+}
+
+exports.mailContractSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD", "GEMINI_KEY", "TYPESAFE_API_KEY"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("0 0,9,11,13,15,17,18 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    let release = null;
+    try {
+      release = await acquireMailSweepLock({ manual: false, by: "schedule" });
+    } catch (e) {
+      console.log("mailContractSweep skipped(locked):", String(e && e.message || e));
+      return null;
+    }
+    try {
+      const r = await runMailContractSweepOnce("schedule", { days: 45 });
+      console.log("mailContractSweep", JSON.stringify(r));
+    } finally {
+      if (release) await release();
+    }
+    return null;
+  });
+
+exports.runMailContractSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD", "GEMINI_KEY", "TYPESAFE_API_KEY"], timeoutSeconds: 300, memory: "1GB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용합니다." }); return; }
+    let caller, staffRole;
+    try {
+      caller = await requireStaff(req);
+      staffRole = await STAFF_GATE.assertActive(caller.uid);
+    } catch (e) {
+      res.status(e.status || 401).json({ ok: false, error: String(e.message || e) });
+      return;
+    }
+    const b = (req.body && typeof req.body === "object") ? req.body : {};
+    const wantRescan = b.rescan === true;
+    if (wantRescan && !(staffRole && staffRole.isAdmin)) {
+      res.status(403).json({ ok: false, error: "전체 재검토(rescan)는 관리자만 실행할 수 있습니다." });
+      return;
+    }
+    let release = null;
+    try {
+      release = await acquireMailSweepLock({ manual: true, rescan: wantRescan, by: staffRole && staffRole.sid });
+    } catch (e) {
+      res.status(e.status || 429).json({ ok: false, error: String(e.message || e) });
+      return;
+    }
+    try {
+      const days = Math.min(365, Math.max(1, Number(b.days) || 60));
+      const r = await runMailContractSweepOnce("manual", { days, manual: true, rescan: wantRescan });
+      res.json(r);
+    } catch (e) {
+      console.error("runMailContractSweep", e && e.stack || e);
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+    } finally {
+      if (release) await release();
+    }
+  });
+
+/* 🎓 강의자료 원본의 내려받기 토큰 정리 (2026-11-22 «원본 열기를 권한 확인 방식으로»)
+   화면은 원본을 로그인 증표로만 받는다(창고 규칙 isStaff() 를 매번). 화면에서 올린 파일에 파이어베이스가 저절로 붙이는 토큰을
+   ① 올리기가 끝나는 순간 창고 트리거(edulibTokenStrip)가 지우고 ② 매일 밤 edulibMailSweep 이 메일 정리 뒤에 빠진 것을 메운다.
+   (사람이 바로 돌릴 때는 scripts/edulib-revoke-download-tokens.js — 기본 보기만)
+   ⚠ 창고에 쓰는 것은 «edulib/ 파일의 토큰 열쇠 하나를 null 로»뿐 — 내용·다른 메타데이터는 그대로. 판정·조건은 edulib-token-sweep.js 한 곳.
+   ⚠ 배포는 «이름 찍어서» — functions:edulibTokenStrip (밤 정리는 edulibMailSweep 과 함께 올라간다) */
+const EdulibTokenSweep = require("./edulib-token-sweep");
+async function runEdulibTokenSweepOnce(budgetMs) {
+  const r = await EdulibTokenSweep.revokeTokens({ bucket: getStorage().bucket(PHOTO_BUCKET), log: (...a) => console.warn(...a) }, { budgetMs });
+  console.log("edulibTokenSweep", JSON.stringify(r));
+  return r;
+}
+/* 올리기가 끝나는 순간 — 사진 창고(함수와 같은 asia-northeast3)의 «모든» 파일에 불리지만 edulib/ 가 아니면 곧바로 끝낸다(짧은 호출 하나).
+   ⚠ 일시 실패는 창고가 다시 부른다(failurePolicy). 412(그 사이 바뀜)·404(없어짐)는 끝난 것으로 친다.
+   ⚠ 한 시간 넘게 되풀이된 알림은 버린다 — 밤 정리가 메운다(실패가 이레 동안 되풀이되지 않게). */
+exports.edulibTokenStrip = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", failurePolicy: true })
+  .storage.bucket(PHOTO_BUCKET).object()
+  .onFinalize(async (obj, context) => {
+    if (!EdulibTokenSweep.isEdulibObject(obj && obj.name)) return null;
+    const age = Date.now() - Date.parse((context && context.timestamp) || "");
+    if (age > 60 * 60 * 1000) { console.warn("edulibTokenStrip too old — 밤 정리에 맡김", String(obj.name).split("/")[1]); return null; }
+    const r = await EdulibTokenSweep.stripOne(obj, { bucket: getStorage().bucket(PHOTO_BUCKET) });
+    console.log("edulibTokenStrip", r, String(obj.name).split("/")[1]);
+    return null;
+  });
+
+/* 🎓 보낸 메일의 강의자료 → 강의자료 앱 자동 정리 (대표 지시 2026-11-21
+     「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
+   실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
+   매일 19:30 한 번(최근 14일) · 관리자는 강의자료 앱 «메일에서 찾기»의 [지금 정리](runEdulibMailSweep, 최대 400일).
+   ★ «정리»까지만 자동이다 — 결과(종류·강의일·내용 요약)를 관리자만 읽는 자동 정리함(edulib_inbox)에 쌓고, 원본은 복사하지 않는다.
+     자료함(재직 직원 모두)에 넣는 것은 관리자가 자동 정리함에서 골라 «넣기»를 누를 때다(화면의 «가져오기» 길).
+   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 빈 자리일 때만 · 창고·자료함에는 안 씀 · AI 안 씀.
+   ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다)
+   ★ 매일 밤 메일 정리 뒤에 강의자료 토큰 정리(runEdulibTokenSweepOnce, 바로 위)도 돈다 — 메일 쪽이 잠금·실패여도 따로 돈다. */
+const EdulibMailSweep = require("./edulib-mail-sweep");
+async function runEdulibMailSweepOnce(trigger, opts) {
+  const MS = require("./mail-sync");
+  return EdulibMailSweep.runSweep({
+    db: getDatabase(),
+    download: (slug, uid, name, max) => MS.withFolder(MAIL_DEPS, slug, async (client) => {
+      const head = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+      if (!head) return { gone: true };
+      const parts = MS.pickParts(head.bodyStructure, null, 0);
+      /* 이름으로만 집는다 — 색인의 첨부 순서와 IMAP 조각 순서가 다를 수 있다(화면 «가져오기»와 같은 잣대) */
+      const a = parts.atts.find((x) => x.name === name) || parts.atts.find((x) => String(x.name || "").slice(0, 60) === String(name).slice(0, 60));
+      if (!a) return { gone: true };
+      if (Number(a.size || 0) > max) return { big: true };
+      const d = await client.download(String(uid), a.part, { uid: true });
+      const buf = await MS.drain(d.content, max);
+      return { name: a.name, mime: a.mime || "", buf };
+    }),
+    pdfText: (buf) => require("./rules-collect-pdf").pdfText(buf),
+    log: (...a) => console.log(...a),
+  }, Object.assign({ trigger }, opts || {}));
+}
+async function acquireEdulibSweepLock(by) {
+  const now = Date.now();
+  const lockRef = getDatabase().ref("edulib_inbox/lock");
+  const tx = await lockRef.transaction((cur) => {
+    const c = (cur && typeof cur === "object") ? cur : {};
+    if (Number(c.runningUntil || 0) > now) return; /* 이미 도는 중 — 그만둔다 */
+    return { runningUntil: now + 9 * 60 * 1000, by: String(by || "schedule"), at: now };
+  });
+  if (!tx.committed) { const err = new Error("강의자료 메일 정리가 이미 돌고 있습니다. 잠시 뒤 다시 해 주세요."); err.status = 429; throw err; }
+  return async () => { try { await lockRef.update({ runningUntil: 0 }); } catch (_) { /* 다음 잠금이 시간으로 풀린다 */ } };
+}
+exports.edulibMailSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("30 19 * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const t0 = Date.now();
+    let release = null, mailErr = null;
+    try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); }
+    if (release) {
+      try {
+        const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
+        console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
+      } catch (e) { mailErr = e; } finally {
+        /* 잠금 풀기가 실패해도 토큰 정리까지는 간다(잠금은 9분 뒤 저절로 풀린다) */
+        try { await release(); } catch (e) { console.error("edulibMailSweep release", String(e && e.message || e)); }
+      }
+    }
+    /* 540초를 메일 정리와 나눠 쓴다 — 남은 시간만큼만(넘치면 다음 날 이어서) */
+    try { await runEdulibTokenSweepOnce(Math.max(20000, 520000 - (Date.now() - t0))); } catch (e) { console.error("edulibTokenSweep", String(e && e.message || e)); }
+    if (mailErr) throw mailErr;
+    return null;
+  });
+exports.runEdulibMailSweep = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 받습니다." }); return; }
+    let staffRole;
+    try {
+      const caller = await requireStaff(req);
+      staffRole = await STAFF_GATE.assertActive(caller.uid);
+    } catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    /* 메일함은 관리자 전용(2026-09-23) — 강의자료 앱의 «메일에서 찾기» 칸도 관리자만 보인다 */
+    if (!(staffRole && staffRole.isAdmin)) { res.status(403).json({ ok: false, error: "관리자만 돌릴 수 있습니다." }); return; }
+    const b = (req.body && typeof req.body === "object") ? req.body : {};
+    let release = null;
+    try { release = await acquireEdulibSweepLock(staffRole.sid); } catch (e) { res.status(e.status || 429).json({ ok: false, error: String(e.message || e) }); return; }
+    try {
+      const days = Math.min(EdulibMailSweep.MAX_DAYS, Math.max(1, Number(b.days) || 30));
+      const r = await runEdulibMailSweepOnce("manual", { days, by: staffRole.sid, budgetMs: 7.5 * 60 * 1000 });
+      res.json({ ok: true, result: { queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
+    } catch (e) {
+      console.error("runEdulibMailSweep", e && e.stack || e);
+      res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+    } finally { if (release) await release(); }
   });
 
 /* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
@@ -8163,4 +8684,215 @@ exports.visitSmsSend = functions
       if (!e.status) console.error("visitSmsSend", String((e && e.message) || e));
       res.status(e.status || 500).json({ ok: false, error: e.status ? String(e.message) : "문자를 보내지 못했습니다." });
     }
+  });
+
+/* ── P박스(pu-pbox.html) 법령·판례·행정해석·산재하급심 자동 동기화 (2026-11-14) ──
+   선언되지 않은 비밀키로 배포가 막히지 않게 secrets 배열을 두지 않고 process.env 에서 선택적으로 읽는다.
+   파이어베이스 실시간DB에는 아무것도 쓰지 않아 RTDB 저장·대역폭 비용이 0원이다. */
+exports.pboxDailySync = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 180, memory: "512MB" })
+  .pubsub.schedule("every day 03:20")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const PBoxSync = require("./pbox-sync");
+    const r = await PBoxSync.runSync({
+      env: process.env,
+      storageBucket: getStorage().bucket(PHOTO_BUCKET),
+      includeKcplaa: true
+    });
+    console.log("[P박스 일일 동기화]", JSON.stringify({
+      krTreeSha: r.krTreeSha,
+      dedupedCount: r.dedupedCount,
+      supabasePushed: r.supabasePushed,
+      sharedBackend: r.sharedBackend || ""
+    }));
+    return null;
+  });
+
+const _pboxRateState = {
+  globalByAct: Object.create(null),
+  uidByAct: new Map(),
+  pullBurstByUid: new Map()
+};
+
+function enforcePboxPullBurstGuard(uid) {
+  const now = Date.now();
+  if (_pboxRateState.pullBurstByUid.size > 500) {
+    for (const [k, win] of _pboxRateState.pullBurstByUid.entries()) {
+      if (!win || now - win.startMs > 60000) _pboxRateState.pullBurstByUid.delete(k);
+    }
+  }
+  const key = String(uid || "anon");
+  const cur = _pboxRateState.pullBurstByUid.get(key);
+  if (!cur || now - cur.startMs > 10000) {
+    _pboxRateState.pullBurstByUid.set(key, { startMs: now, count: 1 });
+    return "";
+  }
+  if (cur.count >= 15) {
+    return "공유 저장소 연속 조회 요청이 너무 빠릅니다. 잠시 후 다시 시도해 주세요.";
+  }
+  cur.count += 1;
+  return "";
+}
+
+async function enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs) {
+  if (action === "pull") {
+    return enforcePboxPullBurstGuard(uid);
+  }
+  const now = Date.now();
+  if (_pboxRateState.uidByAct.size > 500) {
+    for (const [k, ts] of _pboxRateState.uidByAct.entries()) {
+      if (now - ts > 300000) _pboxRateState.uidByAct.delete(k);
+    }
+  }
+  const gLast = _pboxRateState.globalByAct[action] || 0;
+  if (globalMinMs > 0 && now - gLast < globalMinMs) {
+    const waitSec = Math.max(1, Math.ceil((globalMinMs - (now - gLast)) / 1000));
+    return "공용 공공API 한도 보호를 위해 잠시 후(" + waitSec + "초 뒤) 다시 시도해 주세요.";
+  }
+  const uKey = String(uid || "") + ":" + action;
+  const uLast = _pboxRateState.uidByAct.get(uKey) || 0;
+  if (uidMinMs > 0 && now - uLast < uidMinMs) {
+    const waitSec2 = Math.max(1, Math.ceil((uidMinMs - (now - uLast)) / 1000));
+    return "연속 수집 요청 간격 제한입니다. " + waitSec2 + "초 후 다시 시도해 주세요.";
+  }
+  const shared = await PBoxSync.claimActionCooldownShared({
+    db: getDatabase(),
+    uid,
+    action,
+    uidMinMs,
+    globalMinMs,
+    nowMs: now
+  });
+  if (!shared || shared.ok !== true) {
+    return (shared && shared.error) || "수집 호출 제한 확인 중 잠시 후 다시 시도해 주세요.";
+  }
+  _pboxRateState.globalByAct[action] = now;
+  _pboxRateState.uidByAct.set(uKey, now);
+  return "";
+}
+
+exports.pboxApi = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireReader(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const PBoxSync = require("./pbox-sync");
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    try {
+      const result = await PBoxSync.handleApiAction({
+        body,
+        uid: me.uid,
+        env: process.env,
+        storageBucket: getStorage().bucket(PHOTO_BUCKET),
+        fetchFn: fetch,
+        enforceCooldown: (uid, action, uidMinMs, globalMinMs) =>
+          enforcePboxActionCooldown(PBoxSync, uid, action, uidMinMs, globalMinMs)
+      });
+      res.status(result.status).json(result.payload);
+    } catch (e) {
+      console.error("[pboxApi]", e && (e.stack || e.message || e));
+      res.status(500).json({ ok: false, error: "서버 처리 중 일시적 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." });
+    }
+  });
+
+/* 📬 푸른메일함 기금 서류 상시 자동 수집 → 관리기금 자동 적재 (대표 지시 2026-11-18)
+   새 수신 메일이 /mailbox/msgs/{slug}/{uid} 에 들어오는 즉시 관리기금과 매칭해
+   회계·결산 백업 보관함 · 변경 이벤트 · 사업장 제출서류 체크리스트 · 기금 자동보관함에 적재한다. */
+exports.collectFundMailOnNew = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 180, memory: "512MB" })
+  .database.ref("/mailbox/msgs/{slug}/{uid}")
+  .onCreate(async (snap, ctx) => {
+    const msg = (snap && snap.val && snap.val()) || null;
+    if (!msg || !(Number(msg.a) > 0)) return null;
+    const slug = String((ctx && ctx.params && ctx.params.slug) || "");
+    const uid = String((ctx && ctx.params && ctx.params.uid) || "");
+    const FMC = require("./fund-mail-collect");
+    if (!FMC.isFundCollectableFolder(slug)) return null;
+    const MS = require("./mail-sync");
+    try {
+      return await FMC.collectSingleMail(
+        {
+          db: getDatabase(),
+          getSelfEmail: mailUserAsync,
+          fetchAttachments: (folderSlug, mailUid) =>
+            MS.withFolder(MAIL_DEPS, folderSlug, async (client) => {
+              const head = await client.fetchOne(
+                String(mailUid),
+                { uid: true, bodyStructure: true, headers: ["authentication-results"] },
+                { uid: true }
+              );
+              if (!head) return { atts: [], authResults: "" };
+              const authResults = head.headers ? head.headers.toString("utf8") : "";
+              const parts = MS.pickParts(head.bodyStructure, null, 0);
+              const out = [];
+              let totalBytes = 0;
+              for (const att of (parts.atts || []).slice(0, FMC.MAX_ATT_COUNT)) {
+                const sz = Number(att && att.size) || 0;
+                if (!att || !att.part || sz > FMC.MAX_RAW_ATT_BYTES) continue;
+                if (totalBytes + sz > FMC.MAX_TOTAL_ATT_BYTES) break;
+                try {
+                  const d = await client.download(String(mailUid), att.part, { uid: true });
+                  const buf = await MS.drain(d.content, Math.min(FMC.MAX_RAW_ATT_BYTES, FMC.MAX_TOTAL_ATT_BYTES - totalBytes));
+                  totalBytes += buf.length;
+                  out.push({ name: att.name || "", part: att.part, mime: att.mime || "", buf });
+                } catch (_) {
+                  continue;
+                }
+                if (totalBytes >= FMC.MAX_TOTAL_ATT_BYTES) break;
+              }
+              return { atts: out, authResults };
+            })
+        },
+        slug,
+        uid,
+        msg
+      );
+    } catch (e) {
+      console.error("[collectFundMailOnNew]", slug, uid, e && (e.stack || e.message || e));
+      return null;
+    }
+  });
+
+/* 📊 데이터관리(대표 전용, pu-datahub.html) — 서버 쪽은 functions/datahub.js 한 곳 (2026-11-21, 계획서 4·5·3-5절)
+   문지기: requireReader(토큰 철회 확인 + 재직 로그인 — 규칙 LOGIN 과 같은 뜻) → app_owner/uid 와 같은 uid. 모르면 닫는다.
+   ⚠ 범용 readDoc 을 쓰지 않는다 — 화면이 app 이름을 바꿔 서명 검사를 건너뛸 수 있다. 묻기는 datahubAsk 하나뿐.
+   ⚠ 열쇠(GEMINI_KEY)는 datahubAsk 만 건다 — 나머지 셋은 AI 를 부르지 않는다. */
+const Datahub = require("./datahub");
+function datahubDeps() {
+  return { getDatabase: getDatabase, requireReader: requireReader, setCors: setCors };
+}
+exports.datahubDeviceRequest = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(Datahub.handlers(datahubDeps()).deviceRequest);
+exports.datahubChallenge = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(Datahub.handlers(datahubDeps()).challenge);
+exports.datahubAsk = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB", secrets: ["GEMINI_KEY"] })
+  .https.onRequest(Datahub.handlers(Object.assign(datahubDeps(), {
+    readGeminiKey: readGeminiKey, aiMonthSpend: aiMonthSpend, budgetGate: DR.budgetGate,
+    callGemini: DR.callGemini, dailyQuotaGone: DR.dailyQuotaGone, fetch: fetch,
+    bumpReadTally: bumpReadTally, bumpSpend: bumpSpend
+  })).ask);
+/* 현황판 — 한 시간마다 앱별 «건수·비율만» datahub_board/{앱 key} 에. 원본은 읽기만 한다. */
+exports.datahubBoardTally = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "1GB" })
+  .pubsub.schedule("every 60 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const r = await Datahub.boardTally({ getDatabase: getDatabase, log: (m, o) => console.log(m, o || "") });
+    console.log("[데이터관리 현황판]", r);
+    return null;
   });

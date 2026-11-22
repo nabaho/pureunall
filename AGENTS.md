@@ -8,14 +8,14 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
   어떤 일을 하기 전에 `CLAUDE.md` 의 그 절이 가리키는 `docs/규칙/` 문서를 먼저 읽는다.
 - 두 파일이 어긋나면 **`CLAUDE.md` 가 이긴다.** 고칠 때는 둘 다 고친다.
 - `CLAUDE.md` 는 짧게 둔다(대화마다 통째로 실린다) — 새 규칙은 지킬 것 한두 줄만 넣고 까닭은 `docs/규칙/` 에.
-- **대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어.
+- **대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어. 어떤 질문이든, 긴 대화가 요약된 뒤나 영어 알림·도구 결과를 읽은 뒤에도 영어 문장으로 답하지 않는다.
   Gemini·Antigravity 는 `GEMINI.md` 를 읽고, Antigravity 는 `.agents/rules/pureun-rules.md`(늘 켜짐)도 싣는다. 개인설정(Claude Code·Gemini·Antigravity·Codex): `node scripts/korean-everywhere.js --apply` · 자세히: `docs/규칙/한국어로-대답.md`
 - **한국어로 쓴다** — 주석·커밋·검사 이름·화면 글자 전부. 노무 용어를 지킨다
   (급여→임금, 직원→근로자).
 
 ---
 
-## ★ 어기면 되돌려지는 것 여덟
+## ★ 어기면 되돌려지는 것 아홉
 
 ### ① 검사는 「지금 값」이 아니라 「규칙」을 박는다
 `maxHeight:'calc(100vh - 340px)'` 가 아니라 «높이 한도가 있는가»,
@@ -88,7 +88,21 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 진짜 폰으로 볼 때는 `폰미러-켜기.bat`(`tools/phone-mirror.js` — scrcpy 미러 · `--shot` 갈무리 · `--measure` 폰 크롬의 푸른 화면만 measure.js 로 재기).
 **폰을 누르거나 치지 않는다**(사람이 미러 창에서 한다). 갈무리(`tools/phone-mirror/out/`)는 고객 화면이라 저장소·채팅에 올리지 않는다. → `tests/phone-mirror.test.js` · `docs/폰-미러.md`
 
+### ⑨ 종료·삭제·되돌림·마감된 자료는 되살리거나 번호·상태를 바꾸지 않는다 (대표 지시 2026-11-11)
+코드를 고치든 데이터를 검토·정리하든 이미 끝난 기록(`closed`·`transferred`·`cancelled`, `closedAt`/`closedDate`/`closeDate`, `permanentArchived`, 마감월 `locked_*`)의 관리번호(`no`·`contractNo`·`caseNo`)·상태·금액을 자동 재정렬이나 정리 스크립트로 바꾸지 않는다.
+삭제는 물리 제거 대신 무덤 표식(`_deleted: true` · `co_tombstones`)으로 남겨 다른 기기 옛 캐시에서 되살아나지 않게 하고, `DIFF_KEYS` 표 루트(`data/<표>`)를 배열·스냅샷으로 통째 덮어쓰지 않는다.
+`finance_income` 을 읽는 모든 목록·집계·검색은 `erpIncomeLive`, 성과·임금·퇴사자 정산은 `erpPerfCounts`(또는 `!fi._deleted && !(fi.undoneDate && !fi.perfSettled)`)를 거치고, 되돌림 원본 롤백은 `erpIncomeSourceStore` 로 맞춘다.
+데이터 검토·정리 전후에는 반드시 `docs/규칙/종료-삭제-되돌림-불변.md` 의 5단계 절차와 `scripts/erp-integrity-audit.js` 를 돌린다.
+→ `tests/anti-resurrection-guards.test.js` · `scripts/erp-integrity-audit.js`
+
 ---
+
+## ERP 주소 — `https://erp.pureunlabor.co.kr` (2026-11-15 이사)
+
+배포 주소는 `https://erp.pureunlabor.co.kr`, 홈페이지는 `https://pureunlabor.co.kr` 이다. 옛 `https://nabaho.github.io/pureunall/*` 은 GitHub 이 301 로 새 주소에 넘긴다 — «동작은 하지만» 새 코드·문서·안내 글에 쓰지 않는다.
+화면 코드는 상대경로만 쓴다(절대 `/pureunall/` 경로 금지 — 새 주소에는 그 앞머리가 없다). 서버(functions)는 `functions/erp-origins.js` 의 `ERP_ORIGINS`(받아 주는 출처 — 옛 출처는 2027-02-15 무렵까지 남김)·`ERP_LINK_BASE`(사람에게 내보내는 링크 뿌리)·`PUBLIC_HOME`(공개 홈페이지)만 쓰고, 주소 글자를 새로 박지 않는다.
+브라우저 저장소(localStorage·IndexedDB·로그인)는 출처별이라 옛 주소 것은 새 주소에서 안 보인다 — 이사 전 기기 자료는 구출 쪽 `https://nabaho.github.io/pureunall-rescue/` 로 꺼낸다.
+→ `tests/no-hardcoded-old-erp-url.test.js` · `docs/규칙/ERP-주소.md`
 
 ## 건의함의 고칠 일은 점수와 상관없이 직접 검토하고 고친다 (2026-10-18)
 
@@ -110,6 +124,22 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 - 새 함수·화면·검사·스크립트를 만들기 전에 저장소 안에 같은 일을 하는 것이 있는지 먼저 찾는다
   (`rg`, `STATUS.md` 「4. 이 저장소에서 되풀이된 실수」, `status/`). 있으면 그 길을 탄다.
 - 찾지 못한 곳은 «못 찾았다»고 밝힌다 — 검색 길이 막혔는데 「없습니다」라고 보고하지 않는다.
+
+---
+
+## 입금자 이름이 사업장과 다르면 «사유 없이는 확정하지 않는다» (2026-11-16)
+
+- 다른 사업장 이름·모르는 이름으로 온 돈은 «왜 다른지» 사유를 고른 뒤에만 확정한다. 앱이 스스로 그 사업장에 붙이지 않는다. 화면의 확정 길은 `confirmRowAsk` 하나 — `confirmRow` 를 곧장 부르지 않는다.
+- 그런 돈은 입금자 별칭으로 «배우지» 않는다. 계속 대신 내는 사람은 사람이 «관계 입금자»로 등록한다(사업장 기록 `payerRelations`, 지울 수 있다). CMS 통로·합계 후보 적요는 등록 못 한다.
+- 지킴: `tests/erp-payer-relation.test.js` · 자세히: `docs/규칙/입금-명의-처리.md`. 어긋나면 CLAUDE.md 가 이긴다.
+
+---
+
+## 카드로 낸 상담료는 «같은 번호로 두 곳에» 적는다 (2026-11-16)
+
+- 상담료 결제 한 줄을 입금 줄(`consultId`·`consultPayId`·`approvalNo`…)과 상담접수 카드(`consultPayments[]`)에 함께 적는다. 카드는 카드사 + 승인번호가 있어야 등록되고, 카드번호는 «끝 네 자리»만 — 전체 번호·유효기간·CVC 는 저장하지 않는다.
+- 카드 승인만 먼저 적으면 `approved`(입금 전 — 받은 돈이 아니다). 정산 입금은 «같은 줄»을 `received` 로 잇는다(두 번 적지 않는다). 후보는 낼 뿐 고르는 것은 사람이다.
+- 지킴: `tests/erp-consult-card.test.js` · 자세히: `docs/규칙/카드-상담료-기록.md`. 어긋나면 CLAUDE.md 가 이긴다.
 
 ---
 
@@ -196,6 +226,11 @@ PC 에 에고라이트를 깔면 `ego-browser` 스킬이 Codex 에도 붙고 «�
 - 준비 확인: `폰연결-켜기.bat` 5번. 쓰는 법: `docs/화면-같이보기.md` (`tests/phone-link.test.js`).
 
 ---
+
+## 보안 점검 결과는 공개 저장소에 적지 않는다 (2026-11-15)
+
+이 저장소는 공개다. 고치기 전의 약점 목록은 저장소·PR 설명에 쓰지 않고 대표에게만 따로 건넨다.
+점검은 코드·규칙·설정만 — 고객 자료와 살아 있는 서버는 건드리지 않는다. 자세히: `docs/규칙/보안점검-미토스.md`
 
 ## 개인정보 — 이 저장소가 여러 겹으로 막아 온 것
 

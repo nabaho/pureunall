@@ -30,6 +30,11 @@
     var d = Math.round((Date.parse(to) - Date.parse(today)) / 864e5);
     return isNaN(d) ? null : d;
   }
+  /* 'YYYY-MM-DD' 가 «있는 날»인지 — 2026-02-30 은 Date 가 03-02 로 바꿔 버리니 되돌려 견준다. 아니면 빈 글자 */
+  function ymdOk(ymd) {
+    ymd = s(ymd); if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return '';
+    var t = new Date(ymd + 'T00:00:00Z'); return (!isNaN(t.getTime()) && t.toISOString().slice(0, 10) === ymd) ? ymd : '';
+  }
   function mmdd(ymd) { return /^\d{4}-\d{2}-\d{2}/.test(s(ymd)) ? Number(s(ymd).slice(5, 7)) + '.' + Number(s(ymd).slice(8, 10)) : ''; }
 
   /* 지난 이력 견줌 결과 → 점수·까닭 (같은 기관·사업 / 비슷한 이력) */
@@ -93,12 +98,18 @@
       if (r.type === '관심') { counts.starred++; return; }
       if (r.hidden || r.type === '지나감' || r.type === '지원함') return;
       var key = 'f|' + s(r.no || r.id); if (off[key]) return;
-      var d = typeof r.dday === 'number' ? r.dday : (r.closeDt ? days(s(r.closeDt).slice(0, 10), today) : null);
+      /* ⚠ 마감일로 «오늘» 다시 센다 — r.dday 는 받은 날 적어 둔 값이라 낡는다(2026-11-17, 「지나감」인데 D-14).
+           마감일을 못 읽을 때만(없음·2월 30일 같은 없는 날) 적어 둔 값 — 그것도 숫자가 아니면 «마감 모름» */
+      var cd = ymdOk(s(r.closeDt).replace(/^(\d{4})(\d{2})(\d{2})/, '$1-$2-$3').slice(0, 10));
+      var d = cd ? days(cd, today) : null;
+      if (d == null && typeof r.dday === 'number' && isFinite(r.dday)) d = r.dday;
       if (d != null && d < 0) return;
       var why = [], sc = r.src === '알리오' ? 15 : 20;
       var mt = deps.matchFeed ? deps.matchFeed(r) : null;
       sc += byMatch(mt, why);
-      var due = d == null ? { k: 'unknown', text: '마감 모름' } : (d <= 7 ? { k: 'soon', days: d, text: (d === 0 ? '오늘 마감' : '~' + mmdd(r.closeDt) + ' · D-' + d) } : { k: 'open', days: d, text: '~' + mmdd(r.closeDt) + ' · D-' + d });
+      /* 글에 보이는 날짜도 읽은 마감일(cd)로 — 붙여 쓴 날짜(YYYYMMDDHHmm)면 원본으로는 「~ · D-5」가 됐다 */
+      var md = cd ? mmdd(cd) : '';
+      var due = d == null ? { k: 'unknown', text: '마감 모름' } : (d <= 7 ? { k: 'soon', days: d, text: (d === 0 ? '오늘 마감' : (md ? '~' + md + ' · ' : '') + 'D-' + d) } : { k: 'open', days: d, text: (md ? '~' + md + ' · ' : '') + 'D-' + d });
       if (due.k === 'soon') { sc += 40 + Math.max(0, 7 - d); why.unshift(d === 0 ? '오늘 마감' : '마감 ' + d + '일 전'); } else if (due.k === 'open') sc += 10;
       var out = false;
       var fit = regionFit(r.rgn, mine);

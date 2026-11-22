@@ -25,12 +25,21 @@
     }
   ],
   "share_target": {
-    "action": "./pu-cal.html",
-    "method": "GET",
+    "action": "./cal-share/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
     "params": {
       "title": "title",
       "text": "text",
-      "url": "url"
+      "url": "url",
+      "files": [
+        {
+          "name": "images",
+          "accept": [
+            "image/*"
+          ]
+        }
+      ]
     }
   }
 }

@@ -7,7 +7,8 @@
        · 보조율 90%(기업 자부담 10%) · 부가가치세는 기업 부담 — 2024년 혁신바우처 지원계획 공고(재기컨설팅 바우처)
        · 사업정리 노무 분야 1~2일 60~120만원 — 혁신바우처 플랫폼 「재기 컨설팅 바우처 사업이란?」
        · 조문 4곳은 담당 노무사 최종 검토 대상이다([확인 필요]).
-   ⚠ 해마다 공고가 바뀐다 — 안내문에도 «해당 연도 공고에 따른다»고 적는다. 숫자를 고치면 아래 FIRM·COST 한 곳만 고친다. */
+   ⚠ 해마다 공고가 바뀐다 — 안내문에도 «해당 연도 공고에 따른다»고 적는다. 숫자를 고치면 아래 FIRM·COST 한 곳만 고친다.
+   ■ 3번 항목 «AI 인사노무 프로그램»(2026-11-16 대표 지시) — 문구는 아래 SYSTEM 한 곳만 고친다. 회생 안내에만 싣고 파산 안내에는 싣지 않는다. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.RehabLetter = factory();
@@ -39,6 +40,17 @@
     support: 90,        // 정부 지원 %
     exampleFee: 120,    // 예시: 사업정리 노무 컨설팅 120만원
     stamp: '[초안 — 담당 노무사 최종 검토 필요: 대지급금 처리 기간·한도·비용 문구]'
+  };
+  /* 푸른 자체 인사노무 시스템 — 대표 지시(2026-11-16) 「혁신바우처사업 홍보물에 AI 인사노무 프로그램 설치 등도 홍보 ·
+     푸른 자체시스템으로 인사노무 급여 등 전체 시스템 설정 가능」.
+     ⚠ 바우처(재기컨설팅)로 된다고 적지 않는다 — 우리 선정분야는 재기컨설팅이고, 프로그램 도입이 바우처 지원 대상인지는
+       해당 연도 공고·중진공 확인 전이다. 그래서 «범위·비용은 상담 때 따로»라고만 쓴다(12만원 문구와 섞지 않는다).
+     ⚠ 기능은 이알피에 실제로 있는 것만 적는다 — 인사관리(명부·급여·근태) · 급여아웃소싱(급여·근태·명세서·연차) · 기업규정집(취업규칙). */
+  var SYSTEM = {
+    head: 'AI 인사노무 프로그램 — 푸른노무법인이 직접 만든 시스템으로 인사·노무·급여를 한 번에 설정해 드립니다.',
+    sub: '근로자 명부·근로계약·근태·연차·급여(임금명세서)·취업규칙까지 귀사에 맞게 설정하고, 공인노무사가 법에 맞는지 함께 점검합니다. ' +
+      '회생 뒤 다시 사람을 쓰실 때 바로 쓰실 수 있습니다. 도입 범위·비용은 상담 때 따로 안내드립니다.',
+    short: 'AI 인사노무 프로그램: 푸른노무법인이 직접 만든 시스템으로 인사·노무·급여(명부·근태·연차·임금명세서)를 귀사에 맞게 설정해 드립니다(범위·비용은 상담 때 안내).'
   };
   function shareWon() { return Math.round(COST.exampleFee * COST.share) / 100; }
   function officeLines() {
@@ -102,7 +114,7 @@
     ].join('\n');
   }
 
-  /* 안내문 한 장 — 회사명이 들어간다. 핵심은 두 가지: ① 대지급금 ② 회사 부담 12만원 */
+  /* 안내문 한 장 — 회사명이 들어간다. ① 대지급금 ② 회사 부담 12만원 ③ AI 인사노무 프로그램(SYSTEM) */
   function buildLetter(c, opts) {
     opts = opts || {};
     if (isBk(c)) return buildLetterBk(c, opts);
@@ -110,12 +122,14 @@
     return '<section class="letter">' +
       '<h1>회생절차 중 근로자 임금, 푸른노무법인이 도와드립니다</h1>' +
       '<p class="to">' + esc(coName(c)) + (c && c.ceoName ? ' ' + esc(c.ceoName) : '') + ' 대표이사님 귀하</p>' +
-      '<p>안녕하십니까. ' + esc(FIRM.name) + '입니다. 법원 공고를 보고 회생절차 중 꼭 필요한 두 가지를 간단히 안내드립니다.</p>' +
+      '<p>안녕하십니까. ' + esc(FIRM.name) + '입니다. 법원 공고를 보고 회생절차 중 도움이 될 세 가지를 간단히 안내드립니다.</p>' +
       '<div class="big"><span class="no">1</span><div><b>임금을 받지 못한 근로자는 «간이대지급금·대지급금»을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다.</b>' +
       '<div class="max">간이대지급금 최대 <b>' + LIMIT.simple + '</b> · 도산대지급금 최대 <b>' + LIMIT.insolvency + '</b></div>' +
       '<div class="sub">체불임금·퇴직금 등 받을 수 있는 한도를 꼼꼼히 따져 근로복지공단 신청을 처음부터 끝까지 지원합니다. 실제 지급액은 연령·체불액·퇴직 시기에 따라 달라집니다(' + LIMIT.asOf + '). 근거: 임금채권보장법 제7조·제7조의2</div></div></div>' +
       '<div class="big"><span class="no">2</span><div><b>회사는 ' + share + '만원(+부가가치세)만 부담하시면 노무 상담·컨설팅을 받으실 수 있습니다.</b>' +
       '<div class="sub">정부 재기컨설팅 바우처가 ' + COST.support + '%를 지원합니다. ' + esc(FIRM.name) + '은 2026년 재기컨설팅(사업정리) 공급기업입니다.</div></div></div>' +
+      '<div class="big"><span class="no">3</span><div><b>' + esc(SYSTEM.head) + '</b>' +
+      '<div class="sub">' + esc(SYSTEM.sub) + '</div></div></div>' +
       '<h2>문의·상담 — 공인노무사가 직접 답해 드립니다</h2>' +
       '<p class="tel">' + esc(telLine()) + ' · ' + esc(FIRM.email) + '</p>' +
       '<table class="off">' + OFFICES.map(function (o) {
@@ -142,7 +156,7 @@
       to, '',
       '안녕하십니까. ' + FIRM.name + '입니다.',
       opts.existing ? '평소 ' + FIRM.name + '과 거래해 주셔서 감사드립니다.' : '',
-      '법원 공고를 보고 회생절차 중 꼭 필요한 두 가지를 간단히 안내드립니다.',
+      '법원 공고를 보고 회생절차 중 도움이 될 세 가지를 간단히 안내드립니다.',
       '',
       '1. 임금을 받지 못한 근로자는 「간이대지급금·대지급금」을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다.',
       '   간이대지급금 최대 ' + LIMIT.simple + ' · 도산대지급금 최대 ' + LIMIT.insolvency + '까지 받을 수 있습니다(실제 지급액은 연령·체불액·퇴직 시기에 따라 달라집니다, ' + LIMIT.asOf + ').',
@@ -151,6 +165,9 @@
       '2. 회사는 ' + share + '만원(+부가가치세)만 부담하시면 노무 상담·컨설팅을 받으실 수 있습니다.',
       '   정부 재기컨설팅 바우처가 ' + COST.support + '%를 지원합니다. ' + FIRM.name + '은 2026년 재기컨설팅(사업정리) 공급기업입니다.',
       '   (예: 노무 컨설팅 ' + COST.exampleFee + '만원 → 기업 자부담 ' + share + '만원 + 부가가치세 ' + share + '만원 [정부 지원 ' + COST.support + '% · 기업 자부담 ' + COST.share + '% + 부가가치세]. 비율·한도·신청 자격은 해당 연도 공고에 따라 달라질 수 있어 신청 가능 여부와 함께 확인해 드립니다. ' + COST.basis + ' 기준)',
+      '',
+      '3. ' + SYSTEM.head,
+      '   ' + SYSTEM.sub,
       '',
       '문의·상담 — 공인노무사가 직접 답해 드립니다.',
       '전화 ' + telLine() + ' · 이메일 ' + FIRM.email,
@@ -186,9 +203,10 @@
       coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께',
       '',
       '안녕하십니까. ' + FIRM.name + '입니다.' + (opts.existing ? ' 평소 거래해 주셔서 감사드립니다.' : ''),
-      '법원 공고를 보고 두 가지를 안내드립니다.',
+      '법원 공고를 보고 세 가지를 안내드립니다.',
       '1. 임금을 받지 못한 근로자는 간이대지급금·대지급금을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다(간이대지급금 최대 ' + LIMIT.simple + ', 도산대지급금 최대 ' + LIMIT.insolvency + '; 임금채권보장법 제7조·제7조의2).',
       '2. 회사는 ' + share + '만원(+부가가치세)만 부담하시면 노무 상담·컨설팅을 받으실 수 있습니다(정부 바우처 ' + COST.support + '% 지원, 해당 연도 공고에 따름).',
+      '3. ' + SYSTEM.short,
       '',
       '상담: ' + telLine() + ' / ' + FIRM.email,
       OFFICES.map(function (o) { return o.name + ' ' + o.addr; }).join('\n'),
@@ -249,6 +267,6 @@
       (opts && opts.noPrint ? '' : '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>') + '</body></html>';
   }
 
-  return { isBk: isBk, BK_SUBJECT: BK_SUBJECT, buildAdMail: buildAdMail, AD_SUBJECT: AD_SUBJECT, LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
+  return { SYSTEM: SYSTEM, isBk: isBk, BK_SUBJECT: BK_SUBJECT, buildAdMail: buildAdMail, AD_SUBJECT: AD_SUBJECT, LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
     buildLabelSheets: buildLabelSheets, buildDocument: buildDocument, CSS: CSS };
 });

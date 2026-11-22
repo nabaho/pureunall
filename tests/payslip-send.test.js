@@ -118,7 +118,7 @@ test('★ 기록에 «금액»은 안 넣는다 — 여기 있을 것이 아니�
 test('★ 서버가 발송번호와 나간 주소를 «돌려준다» — 화면이 적을 수 있게', () => {
   const 보냄 = 서버.slice(서버.indexOf('exports.sendPayslip'));
   assert.ok(/id\s*:\s*\(r &&/.test(보냄), '★ 발송번호를 안 돌려준다');
-  assert.ok(/from\s*:\s*FROM/.test(보냄), '★ 어느 주소로 나갔는지 안 돌려준다');
+  assert.ok(/from\s*:\s*(?:FROM|usedFrom)\b/.test(보냄), '★ 어느 주소로 나갔는지 안 돌려준다');
 });
 
 test('★ 기록이 «보이는 자리»에 있다 — 적기만 하면 없는 것과 같다', () => {

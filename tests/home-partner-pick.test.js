@@ -61,7 +61,7 @@ function 상자(회사들, 표시들) {
   /* ⚠ typeMatch 는 feeMatch 가 부른다 (2026-09-14 푸른이알피 유형 거르기).
        안 실으면 「typeMatch is not defined」로 그 자리에서 죽는다. */
   ['partnerMark', 'postedOf', 'partnerRows', 'typeMatch', 'feeMatch', 'feeCounts',
-   'pickRows', 'pickVisible', 'pickTypes',
+   'pickRows', 'pickPastRows', 'pickAllRows', 'pickVisible', 'pickTypes',
    'pickChanges', 'openPartnerPick'].forEach(n => vm.runInContext(콘스트풀기(함수(n)), ctx));
   /* openPartnerPick 은 그리기까지 부른다 — 셈만 볼 것이므로 그리기는 삼킨다 */
   vm.runInContext('function renderPartnerPick(){}', ctx);
@@ -86,12 +86,18 @@ const 표시들 = {
 };
 
 /* ══════ ① 거래가 끝난 곳 ══════ */
-test('★★ 거래가 끝난 곳은 고르는 창에도 안 나온다', () => {
-  /* 2026-09-03 「업체 종료된 곳은 모두 자동으로 명단 빼라」. 목록에서만 빼고
-     고르는 창에는 남겨 두면, 거기서 체크해 도로 올릴 수 있게 된다. */
+test('★★ 거래가 끝난 곳은 고르는 창 «기본»에는 안 나오고, 「과거 거래처」로만 꺼내 고른다', () => {
+  /* 2026-09-03 「업체 종료된 곳은 모두 자동으로 명단 빼라」 → 2026-11-18 「과거 컨설팅등 거래했던
+     사업장도 넣을 수 있게」. 기본 화면에는 여전히 안 나오고, 거르개 「과거 거래처」로만 꺼낸다. */
   const ctx = 상자(회사들, 표시들);
-  const 이름들 = ctx.pickRows().map(r => r.name);
-  assert.ok(이름들.indexOf('삼정테크') < 0, '★★ 거래가 끝난 곳이 고르는 창에 있다');
+  const 이름들 = ctx.pickVisible().map(r => r.name);
+  assert.ok(이름들.indexOf('삼정테크') < 0, '★★ 거래가 끝난 곳이 고르는 창 기본 화면에 있다');
+  ctx.Pick.type = 'past';
+  const 지난 = ctx.pickVisible().map(r => r.name);
+  assert.ok(지난.indexOf('삼정테크') >= 0, '★★ 「과거 거래처」로도 거래 끝난 곳을 못 꺼낸다');
+  assert.ok(지난.indexOf('푸른사무대행') < 0, '★ 사무대행이 과거 거래처에 섞였다');
+  assert.ok(ctx.pickTypes().some(t => t.k === 'past' && t.n >= 1), '★ 거르개 목록에 「과거 거래처」가 없다');
+  ctx.Pick.type = '';
   회사들.filter(c => c.status === 'active').forEach(c =>
     assert.ok(이름들.indexOf(c.name) >= 0, '★ 거래 중인 곳이 빠졌다: ' + c.name));
 });
@@ -103,7 +109,8 @@ test('★★ 열면 «지금 올림»인 곳이 체크돼 있다 — 고르는 �
   assert.equal(ctx.Pick.sel.c1, true, '★★ 이미 올라가 있는 곳이 안 체크돼 있다 — 풀린 줄 알고 다시 올린다');
   assert.ok(!ctx.Pick.sel.c2, '★ 「안 올림」인 곳이 체크돼 있다');
   assert.ok(!ctx.Pick.sel.c3, '★ 표시 안 한 곳이 체크돼 있다');
-  assert.ok(!ctx.Pick.sel.c4, '★ 거래 끝난 곳이 체크돼 있다 — 창에 없는 것이 골라져 있다');
+  /* 2026-11-18 부터 거래 끝난 곳도 「과거 거래처」로 창에 있다 — 올림이면 체크돼 있어야 «지금 올라가 있음»이 보인다 */
+  assert.equal(ctx.Pick.sel.c4, true, '★ 과거 거래처인데 올림인 곳이 체크 안 돼 있다');
 });
 
 /* ══════ ③④ 무엇을 쓰고 무엇을 «안 쓰는가» ══════ */
@@ -561,4 +568,80 @@ test('★★ 자문사 화면에 «고르기» 단추가 있다 — 없으면 �
   const 앞 = H.slice(Math.max(0, at - 400), at);
   assert.match(앞, /App\.group === 'partner'/,
     '★ 자문사 화면이 아닐 때도 「자문사 고르기」가 보인다');
+});
+
+/* ══════ 공공기관 · 100인 이상 거르개 (대표 지시 2026-11-18) ══════
+   「현재 자문하고 있는 사업장 중에서 공공기관 모두 찾아서 … 100인 이상 사업장 자문사도 확인해서 넣어달라」
+   ★ 업체관리에 사람이 적은 칸(규모 · 고용보험 가입자 수)으로만 가른다 — 이름으로 짐작하지 않는다. */
+test('★★ 「공공기관·100인 이상」은 자문 중인 곳 가운데 규모 공공기관 또는 고용보험 100명 이상만 고른다', () => {
+  const 판 = [
+    { id: 'p1', name: '가온공사', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 500000, companySize: '공공기관' },
+    { id: 'p2', name: '대형제조', typeCode: '급여', status: 'active', monthlyAdvisoryFee: 300000, employmentInsuredCount: 152 },
+    { id: 'p3', name: '작은상회', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 100000, employmentInsuredCount: 12 },
+    { id: 'p4', name: '어느공단', typeCode: '자문', status: 'active', monthlyAdvisoryFee: 100000 },          // 이름만 공단
+    { id: 'p5', name: '끝난공사', typeCode: '자문', status: 'closed', monthlyAdvisoryFee: 500000, companySize: '공공기관' },
+    { id: 'p6', name: '자문없는큰곳', typeCode: '노조', status: 'active', employmentInsuredCount: 300 }  // 자문 중이 아니다
+  ];
+  const ctx = 상자(판, {});
+  ctx.Pick.type = 'big';
+  const 이름들 = ctx.pickVisible().map(r => r.name);
+  assert.ok(이름들.indexOf('가온공사') >= 0, '★★ 규모 「공공기관」인 자문사를 못 찾았다');
+  assert.ok(이름들.indexOf('대형제조') >= 0, '★★ 고용보험 100명 이상 자문사를 못 찾았다');
+  assert.ok(이름들.indexOf('작은상회') < 0, '★ 100명이 안 되는 곳이 끼었다');
+  assert.ok(이름들.indexOf('어느공단') < 0, '★★ 이름만 보고 공공기관으로 짐작했다 — 업체관리 규모 칸으로만 가른다');
+  assert.ok(이름들.indexOf('끝난공사') < 0, '★★ 거래가 끝난 곳이 끼었다');
+  assert.ok(이름들.indexOf('자문없는큰곳') < 0, '★ 자문 중이 아닌 곳이 끼었다');
+  assert.ok(ctx.pickTypes().some(t => t.k === 'big' && t.n >= 2), '★ 고르는 창의 거르개 목록에 「공공기관·100인 이상」이 없다');
+});
+
+test('★ 「목록 복사」는 번호·연락처·금액 없이 회사 · 구분 · 고용보험 · 홈페이지 · 지금 표시만 옮긴다', () => {
+  const 몸 = 함수('pickCopyList');
+  assert.match(몸, /pickVisible\(\)/, '★ 지금 보이는 것만 옮겨야 한다 — 거르개와 어긋난다');
+  assert.ok(!/monthlyAdvisoryFee|advFee|phone|email|ceo/.test(몸), '★★ 금액·연락처를 옮긴다 — 넘길 곳에 필요한 만큼만');
+  assert.match(H, /onclick="pickCopyList\(\)"/, '★ 목록 복사 단추가 없다');
+});
+
+/* ══════ 과거 거래처를 고객사로 (대표 지시 2026-11-18) ══════ */
+test('★★ 과거 거래처를 새로 고르면 «남기기» 사유가 함께 적힌다 — 올릴 때 로고가 저절로 안 숨게', () => {
+  const 끝난 = 회사들.filter(c => c.status === 'closed')[0];
+  assert.ok(끝난, '검사 자료에 과거 거래처가 하나는 있어야 한다');
+  const 표 = Object.assign({}, 표시들);
+  delete 표[끝난.id];                       // 아직 안 올린 과거 거래처로 둔다
+  const ctx = 상자(회사들, 표);
+  ctx.openPartnerPick();
+  ctx.Pick.sel[끝난.id] = true;
+  const 고침 = ctx.pickChanges();
+  assert.equal(고침[끝난.id] && 고침[끝난.id].posted, true, '★★ 과거 거래처를 골랐는데 안 올라간다');
+  assert.ok(고침[끝난.id].keep && String(고침[끝난.id].keep.why || '').trim(),
+    '★★ 남기기 사유가 없다 — 올릴 때 계약 끝난 로고로 저절로 숨는다');
+  /* 지금 거래처를 고를 때는 남기기를 안 적는다 — 거래 중인 곳에 «끝나도 남기기»가 미리 붙으면 안 된다 */
+  ctx.Pick.sel.c3 = true;
+  assert.ok(!ctx.pickChanges().c3.keep, '★ 거래 중인 곳에 남기기를 적었다');
+});
+
+test('★ 이미 남기기 사유가 있는 과거 거래처는 그 사유를 덮지 않는다', () => {
+  const 끝난 = 회사들.filter(c => c.status === 'closed')[0];
+  const 표 = Object.assign({}, 표시들);
+  표[끝난.id] = { posted: false, keep: { why: '실적으로 남김 — 대표 확인', by: '권형하', at: '2026-10-01' } };
+  const ctx = 상자(회사들, 표);
+  ctx.openPartnerPick();
+  ctx.Pick.sel[끝난.id] = true;
+  const 고침 = ctx.pickChanges();
+  assert.equal(고침[끝난.id].posted, true);
+  assert.ok(!('keep' in 고침[끝난.id]), '★★ 남이 적은 남기기 사유를 덮어쓴다');
+});
+
+test('★★ 남기기가 있는 과거 거래처는 「자문 종료」 할 일을 안 띄우고, 올린 회사 셈에 든다', () => {
+  const 끝난 = 회사들.filter(c => c.status === 'closed')[0];
+  const 표 = Object.assign({}, 표시들);
+  표[끝난.id] = { posted: true, keep: { why: '과거 거래처 — 고객사로 올림', by: '권형하', at: '2026-11-18' } };
+  const ctx = 상자(회사들, 표);
+  const 줄 = ctx.partnerRows().filter(r => r.key === 끝난.id)[0];
+  assert.equal(줄.kept, true, '★ 남기기를 못 읽었다');
+  assert.equal(줄.roster, null, '★★ 일부러 남긴 과거 거래처에 「자문 종료」를 띄운다 — 할 일이 영영 안 사라진다');
+  표[끝난.id] = { posted: true };
+  const 그냥 = 상자(회사들, 표).partnerRows().filter(r => r.key === 끝난.id)[0];
+  assert.ok(그냥.roster && 그냥.roster.kind === 'ended', '★★ 남기기 없이 끝난 곳의 「자문 종료」 알림이 사라졌다');
+  const 몸 = 함수('postedNames');
+  assert.match(몸, /r\.kept/, '★ 올린 회사 셈이 남기기 과거 거래처를 빼 버린다');
 });

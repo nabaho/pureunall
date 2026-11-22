@@ -6,7 +6,8 @@
      ① AI 는 «읽고 의견만» — 명단에서 빼기·수신거부·갈래 확정·편지 고치기·보내기를 서버에서 하지 않는다
      ② AI 답은 닫힌 갈래로만 받고, 원문에 없는 «근거»는 버린다(지어낸 인용을 막는다)
      ③ 법 조문은 서버가 법제처 원문을 읽어 «함께» 넘긴다 — 원문 없는 조문은 판단하지 말라고 못 박는다
-        · 법령 목록은 한 법령씩 잘라 읽는다(이름 뒤의 번호를 잡으면 시행령을 가져온다 — 2026-10-05 실제로 그랬다)
+        · 이름이 «정확히 같은» 법만 읽는다(시행령을 가져온 일 — 2026-10-05 실제로 그랬다)
+        · 2026-11-16 부터 국가법령정보센터 공개 쪽에서 읽는다(DRF 가 OC=test 를 거절)
         · 「같은 법 제61조」 는 바로 앞의 법 · 가운뎃점(· ㆍ) 모양은 같게 본다
      ④ 결과 숫자는 서버가 센다 — AI 는 세 줄 요약만, 새 숫자를 만들지 말라고 못 박는다
      ⑤ AI 가 실패해도 규칙 점검·결과 메일은 그대로 간다 */
@@ -40,24 +41,40 @@ test('③ 조문 뽑기 — 같은 법은 앞의 법, 다섯 개까지', () => {
   assert.strictEqual(W.조문들뽑기(많이).length, 5);
 });
 
-test('③ 법제처 원문 — 한 법령씩 잘라 읽는다 (시행령 번호를 집지 않는다)', async () => {
+test('③ 법제처 원문 — 이름이 «정확히 같은» 법에서 그 조(의)만 잘라 읽는다 (국가법령정보센터 공개 쪽 · 2026-11-16)', async () => {
   const i = 서버원.indexOf('async function 법조문원문');
   const 법조문원문 = new Function('fetch', 서버원.slice(i, 서버원.indexOf('\n}\n', i) + 2) + '; return 법조문원문;');
-  /* 진짜 목록과 같은 꼴 — 일련번호가 이름보다 «앞» */
-  const 목록 = '<LawSearch><law id="1"><법령일련번호>111</법령일련번호><법령명한글><![CDATA[근로기준법]]></법령명한글></law>'
-    + '<law id="2"><법령일련번호>222</법령일련번호><법령명한글><![CDATA[근로기준법 시행령]]></법령명한글></law>'
-    + '<law id="3"><법령일련번호>333</법령일련번호><법령명한글><![CDATA[남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률]]></법령명한글></law></LawSearch>';
+  /* 공개 쪽 모양(2026-11-16 실측) — lsLinkProc 는 숨은 칸으로 번호·시행일·이름을, lsInfoR 는 조마다 <a name="J조:의"> 표지를 준다 */
+  const 법들 = { '근로기준법': '111', '남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률': '333' };
+  const 조문들 = (번) => '<a name="J60:0" id="J60:0"></a><div class="pgroup"><ul class="lawico01"><li><img alt="연혁" /></li></ul>'
+    + '<div class="lawcon"><p class="pty1_p4"><span class="bl"><label for="Y006000"> 제60조(<a class="oneView">연차 유급휴가</a>) </label></span>'
+    + ' ① 법' + 번 + ' 제60조 본문 <span class="sfon">&lt;개정 2012. 2. 1.&gt;</span></p></div></div>'
+    + '<a name="J60:2" id="J60:2"></a><div class="lawcon"><p>제60조의2(다른 조) 법' + 번 + ' 제60조의2</p></div>'
+    + '<a name="J18:2" id="J18:2"></a><div class="lawcon"><p>제18조의2(배우자 출산휴가) 법' + 번 + ' 제18조의2</p></div>';
   const 부른 = [];
-  const 가짜 = async (u) => {
-    부른.push(u);
-    if (/lawSearch/.test(u)) return { ok: true, text: async () => 목록 };
-    const mst = (u.match(/MST=(\d+)/) || [])[1], jo = (u.match(/JO=(\d+)/) || [])[1];
-    return { ok: true, text: async () => '<조문단위><조문내용><![CDATA[MST' + mst + ' JO' + jo + ' 본문]]></조문내용></조문단위>' };
+  const 가짜 = async (u, o) => {
+    부른.push(u + (o && o.body ? ' ' + o.body : ''));
+    if (/lsLinkProc\.do/.test(u)) {
+      const 이름 = decodeURIComponent((u.match(/lsNm=([^&]*)/) || [])[1] || '');
+      /* 시행령을 물었는데 법률 쪽으로 넘어가는 일을 흉내 — 이름이 다르면 그 조문은 빼야 한다 */
+      const 간곳 = 이름 === '근로기준법 시행령' ? '근로기준법' : 이름;
+      const 번 = 법들[간곳];
+      return { ok: true, text: async () => (번 ? '<input type="hidden" id="lsiSeq" value="' + 번 + '" />'
+        + '<input type="hidden" id="frm_efYd" name="efYd" value="20261008" /><input type="hidden" id="lsNm" value="' + 간곳 + '" />' : '<p>검색 결과가 없습니다</p>') };
+    }
+    const 번 = (String((o && o.body) || '').match(/lsiSeq=(\d+)/) || [])[1];
+    return { ok: true, text: async () => (번 ? 조문들(번) : '') };
   };
-  const r = await 법조문원문(가짜)([{ 법: '근로기준법', 조: 60, 의: 0 }, { 법: '남녀고용평등과 일·가정 양립 지원에 관한 법률', 조: 18, 의: 2 }]);
-  assert.strictEqual(r.length, 2);
-  assert.match(r[0].원문, /MST111 JO006000/, '시행령(222)의 번호를 집었다');
-  assert.match(r[1].원문, /MST333 JO001802/, '가운뎃점 모양이 달라 못 찾았거나 «의» 번호를 잘못 붙였다');
+  const r = await 법조문원문(가짜)([{ 법: '근로기준법', 조: 60, 의: 0 }, { 법: '남녀고용평등과 일·가정 양립 지원에 관한 법률', 조: 18, 의: 2 },
+    { 법: '근로기준법 시행령', 조: 60, 의: 0 }, { 법: '근로기준법', 조: 60, 의: 2 }]);
+  assert.strictEqual(r.length, 3, '이름이 다른 법(시행령 → 법률)의 조문을 원문이라고 넘겼다');
+  assert.match(r[0].원문, /^제60조\(연차 유급휴가\) ① 법111 제60조 본문$/, '조문 머리가 벌어졌거나 아이콘·고친 표지가 섞였다: ' + r[0].원문);
+  assert.ok(r[0].원문.indexOf('제60조의2') < 0, '다음 조(제60조의2)까지 붙여 읽었다');
+  assert.match(r[1].원문, /법333 제18조의2/, '가운뎃점 모양이 달라 못 찾았거나 «의» 번호를 잘못 붙였다');
+  assert.strictEqual(r[1].이름, '남녀고용평등과 일·가정 양립 지원에 관한 법률 제18조의2');
+  assert.match(r[2].원문, /^제60조의2\(다른 조\) 법111/);
+  assert.strictEqual(부른.filter((x) => /lsInfoR\.do lsiSeq=111&/.test(x)).length, 1, '같은 법 전문을 조문마다 다시 받는다');
+  assert.ok(부른.every((x) => !/OC=|\/DRF\//.test(x)), '★★ 거절되는 문(DRF·OC=test)을 아직 부른다');
 });
 
 test('③ 교정 지시 — 원문을 나란히 주고, 원문 없는 것은 판단하지 말라고 못 박는다', () => {

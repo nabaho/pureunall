@@ -1,5 +1,6 @@
 /* 프로필 1장 — 컨설팅 실적은 «사업별»로 묶고 「외 N건」 줄은 그리지 않는다 (대표 지시 2026-10-12)
-   모델(more·show)은 그대로 — 건수는 칸 제목 옆 «(최근 N · 전체 M)» 이 말한다. */
+   2026-11-12 대표 지시 「최근 전체 이런 표시 없애라 · 제출하면 제출된 내용만 있어야 된다」 — 제목 옆 «(최근 N · 전체 M)» 도 종이에 찍지 않는다.
+   모델(more·show)은 화면 옆 «넣을 칸 고르기»가 쓰므로 그대로 둔다. */
 const test = require('node:test');
 const assert = require('node:assert');
 const P = require('../js/kcareer-profile1.js');
@@ -23,12 +24,19 @@ test('① 컨설팅 실적은 같은 사업끼리 한 줄로 묶는다', () => {
   assert.ok(/일터혁신컨설팅 \(\d+건\)/.test(html), '사업명 옆에 건수');
 });
 
-test('② 「외 N건」 줄은 그리지 않는다 — 제목 옆 (최근 N · 전체 M) 은 남는다', () => {
-  const m = P.build(src(10), { use: 'general', on: { perf: true } });
+test('② ★ 「외 N건」 줄도, 제목 옆 (최근 N · 전체 M) 도, 「연도별」 줄도 종이에 없다 — 제출하는 종이에는 제출한 내용만 (대표 2026-11-12)', () => {
+  const m = P.build(src(10), { use: 'general', on: { perf: true }, pins: { wic: ['w29'] } });
   assert.ok(m.sections.some((x) => x.more > 0), '줄인 칸이 있어야 시험이 된다');
-  const html = P.toHtml(m, '');
-  assert.ok(!/외\s*\d+건/.test(html), '외 N건 줄 없음');
-  assert.ok(/전체\s*\d+/.test(html), '전체 건수는 제목 옆에');
+  assert.ok(m.sections.some((x) => x.pin > 0), '고른(⭐) 칸이 있어야 «주요 N» 꼴도 시험이 된다');
+  /* 쪽(A4)·화면용 둘 다 — 같은 칸 글(secHtml)을 쓴다 */
+  [P.toHtml(m, ''), P.toScreenHtml(m, '')].forEach((html) => {
+    assert.ok(!/외\s*\d+건/.test(html), '외 N건 줄 없음');
+    assert.ok(!/전체\s*\d+/.test(html), '★ 「전체 M」 건수 표시가 종이에 찍힌다');
+    assert.ok(!/최근\s*\d+/.test(html), '★ 「최근 N」 건수 표시가 종이에 찍힌다');
+    assert.ok(!/주요\s*\d+/.test(html), '★ 「주요 N」 건수 표시가 종이에 찍힌다');
+    assert.ok(!/연도별/.test(html), '★ 「연도별」 줄이 종이에 찍힌다');
+    assert.ok(!/<small>\s*\(/.test(html), '칸 제목 옆에 괄호 표시를 달지 않는다');
+  });
 });
 
 test('③ 사업 묶음은 없는 값을 지어내지 않는다', () => {

@@ -213,10 +213,8 @@ function make(deps) {
     .region(REGION)
     .runWith({ secrets: ['GCAL_OAUTH_SECRET'], timeoutSeconds: 300, memory: '256MB' })
     .https.onRequest(async (req, res) => {
-      const origin = s(req.headers && req.headers.origin);
-      if (origin === 'https://nabaho.github.io' || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-        res.set('Access-Control-Allow-Origin', origin); res.set('Vary', 'Origin');
-      }
+      /* 받아 주는 출처는 공용 목록(./erp-origins) — 옛·새 ERP 주소 둘 다 (2026-11-15) */
+      require('./erp-origins').allowOrigin(req, res);
       res.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
       res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
       res.set('Cache-Control', 'no-store');

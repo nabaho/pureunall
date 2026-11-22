@@ -8,44 +8,99 @@
 <!-- ══════════════════════════════════════════════════════════════
      푸른노무법인 공공임단협 (pu-alio-union.html)
      푸른통합시스템의 별개 독립 프로그램(창 이름 pureun-aliounion).
-     대한민국 기획재정부 공공기관 경영정보 공개시스템(ALIO)의
-     전체 중앙공공기관(355개) 노동조합 현황 및 단체협약·임금협약·별도합의·내부규정
-     통합 조회·13대 핵심 쟁점 비교 매트릭스·조문 Side-by-Side 대조·5대 공공/법령 API 연동 프로그램.
+     대한민국 기획재정부 공공기관 경영정보 공개시스템(ALIO 355개 중앙공공기관),
+     행정안전부 산하 지방유관기관(지방공기업평가원·한국지역정보개발원 등 6곳) 및
+     지방공공기관 클린아이(Cleaneye 1,332개 지방공사·지방공단·지방직영기업·지방출자출연기관 산하단체)
+     총 1,693개 공공기관·산하단체를 「기관 중심(1기관=1통합뷰)」으로 분류하고,
+     기관 내부 6대 핵심 영역(노조·임금·단협13대쟁점·별도합의·내부규정·연혁/신구대비) 한눈에 보기 및
+     다중 기관 SVG 그래프(레이더·산점도·그룹막대·분포)·정량표·히트맵 비교분석을 제공한다.
      포털(enter.html) 자료함의 「🤝 공공임단협」 타일 또는 오른쪽 앱바(pu-appbar.js)에서 바로 열린다.
      ══════════════════════════════════════════════════════════════ -->
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#0f172a}
+html,body{margin:0;padding:0;height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#1e293b}
 #alioAppRoot{height:100vh;display:flex;flex-direction:column}
 /* 폰에서 입력칸에 손을 대도 화면이 커지지 않게(포털 앱 공통 규칙) */
 @media (max-width:768px){
   input,select,textarea{font-size:16px}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) ══
+   공용 값은 css/pu-design.css. 화면과 그 CSS 는 js/pu-alio-union.js 가 그린다 — injectStyles() 가 <head> 맨 끝에 <style> 을 붙인다.
+   그래서 이 덩어리는 «뒤에 실리는» 앱 CSS 를 이기도록 앞머리에 .pau-root 를 하나 더 두어 세기를 한 단계 올린다. JS 는 고치지 않는다.
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다(모서리·그림자·색·굵기). 탭·거르개·칸·줄·그래프는 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 앱 고유 어두운 판(.pau-root[data-theme="dark"] · body.dark)은 그대로 둔다 — 색은 밝은 판에만 얹고, 어두운 판 규칙은 세기가 더 높아 그대로 이긴다. */
+/* 1. 앱 색 변수(--pau-*)를 공용 값에 잇는다 — 밝은 판만 */
+:where(body.pu-design:not(.dark)) .pau-root:not([data-theme="dark"]){
+  --pau-txt:var(--pu-ink);--pau-sub:var(--pu-sub);--pau-muted:var(--pu-sub);
+  --pau-bd:var(--pu-line2);--pau-bd-lt:var(--pu-line);--pau-bg:var(--pu-bg);--pau-card:var(--pu-card);
+  --pau-th:var(--pu-bg);--pau-hov:var(--pu-bg);--pau-pri:var(--pu-acc-ink);--pau-pri-bg:var(--pu-acc-soft);
+}
+/* 2. 상자 — 둥근 카드 + 옅은 그림자 */
+:where(body.pu-design) .pau-root .pau-sec-card,:where(body.pu-design) .pau-root .pau-card,
+:where(body.pu-design) .pau-root .pau-dom-card,:where(body.pu-design) .pau-root .pau-org-hero,
+:where(body.pu-design) .pau-root .pau-tbl-wrap,:where(body.pu-design) .pau-root .pau-dom-board:not(.plain),
+:where(body.pu-design) .pau-root .pau-clause-card,:where(body.pu-design) .pau-root .pau-org-art-card{border-radius:var(--pu-r);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .pau-root .pau-flt,:where(body.pu-design) .pau-root .pau-topic-bar,
+:where(body.pu-design) .pau-root .pau-bulk,:where(body.pu-design) .pau-root .pau-pager,
+:where(body.pu-design) .pau-root .pau-ab-card,:where(body.pu-design) .pau-root .pau-issue-card,
+:where(body.pu-design) .pau-root .pau-bar-grp,:where(body.pu-design) .pau-root .pau-diff-list{border-radius:var(--pu-r-sm)}
+/* 숫자 카드 — 목업 .kpi: 흰 카드 · 굵은 이름 · 굵은 숫자(글자 크기는 그대로 — 칸이 좁아 키우면 숫자가 … 로 잘린다) */
+:where(body.pu-design) .pau-root .pau-kpi{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .pau-root .pau-hero-kpi{border-radius:var(--pu-r-sm)}
+:where(body.pu-design) .pau-root .pau-kpi span,:where(body.pu-design) .pau-root .pau-hero-kpi-lbl{font-weight:800}
+:where(body.pu-design) .pau-root .pau-kpi b,:where(body.pu-design) .pau-root .pau-hero-kpi-val{font-weight:850;letter-spacing:-.02em}
+:where(body.pu-design) .pau-root .pau-hero-tit{letter-spacing:-.02em}
+/* 3. 탭 — 위쪽만 둥근 탭을 알약 탭으로(자리·개수·글자 그대로). 고른 탭은 파랑으로 채운다 */
+:where(body.pu-design) .pau-root .pau-tabs{padding-bottom:6px}
+:where(body.pu-design) .pau-root .pau-tab{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .pau-root .pau-tab.on{background:var(--pu-acc);border-color:var(--pu-acc);color:#ffffff;box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .pau-root .pau-hero-tab{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .pau-root .pau-hero-tab.on{background:var(--pu-acc);border-color:var(--pu-acc);box-shadow:var(--pu-sh-acc)}
+/* 보기 고르개(기관 통합/단위노조 나열 · 다중비교…) — 목업 .mseg: 알약 · 고른 것은 파랑 */
+:where(body.pu-design) .pau-root .pau-seg,:where(body.pu-design) .pau-root .pau-seg-btn{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .pau-root .pau-seg-btn.on{background:var(--pu-acc);box-shadow:var(--pu-sh-acc)}
+/* 칩 — 고른 칩은 옅은 파랑 바탕 + 파랑 테두리 + 짙은 파랑 글자(목업 .chip.on). 어두운 판은 앱 값 그대로 */
+:where(body.pu-design:not(.dark)) .pau-root:not([data-theme="dark"]) .pau-chip.on,
+:where(body.pu-design:not(.dark)) .pau-root:not([data-theme="dark"]) .pau-topic-chip.on{background:var(--pu-acc-soft);border-color:var(--pu-acc);color:var(--pu-acc-ink);font-weight:800}
+/* 4. 단추 — 둥글기와 파란 단추 그림자 */
+:where(body.pu-design) .pau-root .pau-act-btn,:where(body.pu-design) .pau-root .pau-btn{border-radius:10px}
+:where(body.pu-design) .pau-root .pau-act-btn.pri,:where(body.pu-design) .pau-root .pau-btn.pri{box-shadow:var(--pu-sh-acc)}
+/* 5. 표 — 머리줄 굵게 */
+:where(body.pu-design) .pau-root .pau-tbl th,:where(body.pu-design) .pau-root .pau-th-btn{font-weight:800}
+/* 폰 — 앱이 표 상자를 걷고(테두리·바탕 없음) 줄마다 카드로 편다. 그림자가 남으면 카드 묶음 둘레에 «상자 한 겹»이 더 생긴다 */
+@media (max-width:768px){
+  :where(body.pu-design) .pau-root .pau-tbl-wrap{box-shadow:none}
+  :where(body.pu-design) .pau-root .pau-tbl tr{border-radius:var(--pu-r-sm)}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값» — 자기 <style> 뒤에 싣는다. <body> 의 pu-design 과 함께 다닌다 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 <div id="alioAppRoot"></div>
 
 <script src="js/pu-sid-guard.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=93"></script>
+<script src="js/pu-ontology.js?v=108"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-authsync.js?v=6"></script>
+<script src="js/pu-authsync.js?v=7"></script>
 <script src="js/pu-health.js?v=7"></script>
 <script src="js/pu-version.js?v=12"></script>
-<script src="js/pu-appbar.js?v=42"></script>
-<script src="js/pu-active.js?v=1"></script>
+<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-active.js?v=2"></script>
 <script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script src="js/pu-back.js?v=5"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#pauOrganDetailModal,#puAlioModalBack'); }); }catch(e){}</script>
-<script src="js/pu-alio-data.js?v=2"></script>
-<script src="js/pu-alio-union.js?v=5"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#puAlioModalBack'); }); }catch(e){}</script>
+<script src="js/pu-alio-data.js?v=5"></script>
+<script src="js/pu-alio-union.js?v=14"></script>
 <script>
 (function(){
   'use strict';

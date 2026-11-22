@@ -35,6 +35,171 @@ function isTransient(status) {
   return status === 429 || status === 408 || (status >= 500 && status < 600);
 }
 
+function ndToDigit(ch) {
+  if (!/\p{Nd}/u.test(ch)) return -1;
+  const cp = ch.codePointAt(0);
+  let base = cp;
+  while (base > 0 && /\p{Nd}/u.test(String.fromCodePoint(base - 1))) base--;
+  return (cp - base) % 10;
+}
+
+function findRrnSpans(raw) {
+  const s = String(raw == null ? "" : raw);
+  if (!s) return [];
+  const vis = [];
+  let idx = 0;
+  for (const ch of s) {
+    const start = idx;
+    idx += ch.length;
+    if (/[\u00AD\p{Cf}\p{Mn}]/u.test(ch)) continue;
+    const d = ndToDigit(ch);
+    vis.push({
+      ch,
+      pos: start,
+      end: idx,
+      d,
+      isHws: ch === "\t" || ch === "\v" || ch === "\f" || /\p{Zs}/u.test(ch),
+      isLb: ch === "\n" || ch === "\r" || ch === "\u2028" || ch === "\u2029",
+      isWord: d >= 0 || /\p{L}/u.test(ch),
+    });
+  }
+  const maxDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const spans = [];
+  let i = 0;
+  while (i < vis.length) {
+    if (vis[i].d < 0 || (i > 0 && vis[i - 1].d >= 0)) { i++; continue; }
+    let cur = i;
+    const digits = [vis[cur].d];
+    let usedInnerSpace = false;
+    let usedDateDot = false;
+    let ok = true;
+    for (let k = 1; k < 6; k++) {
+      let sp = 0;
+      if ((k === 2 || k === 4) && cur + 1 < vis.length && (vis[cur + 1].ch === "." || vis[cur + 1].ch === "．")) {
+        sp = 1;
+        usedDateDot = true;
+      }
+      let hws = 0;
+      while (cur + 1 + sp + hws < vis.length && vis[cur + 1 + sp + hws].isHws && hws < 2) hws++;
+      if (cur + 1 + sp + hws >= vis.length || vis[cur + 1 + sp + hws].d < 0) { ok = false; break; }
+      if (hws > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp + hws;
+      digits.push(vis[cur].d);
+    }
+    if (!ok) { i++; continue; }
+    const mm = digits[2] * 10 + digits[3];
+    const dd = digits[4] * 10 + digits[5];
+    if (mm < 1 || mm > 12 || dd < 1 || dd > maxDays[mm]) { i++; continue; }
+
+    let sepEnd = cur + 1;
+    let sepSteps = 0;
+    let lbCount = 0;
+    let hasExplicitSep = false;
+    while (sepEnd < vis.length && vis[sepEnd].d < 0 && !vis[sepEnd].isWord && sepSteps < 8) {
+      if (vis[sepEnd].isLb) {
+        if (!(vis[sepEnd].ch === "\n" && sepEnd > cur + 1 && vis[sepEnd - 1].ch === "\r")) {
+          lbCount++;
+        }
+        if (lbCount > 2) break;
+      } else if (!vis[sepEnd].isHws) {
+        hasExplicitSep = true;
+      }
+      sepEnd++;
+      sepSteps++;
+    }
+    if (usedDateDot && !hasExplicitSep) { i++; continue; }
+    if (sepEnd >= vis.length || vis[sepEnd].d < 1 || vis[sepEnd].d > 8) { i++; continue; }
+
+    cur = sepEnd;
+    digits.push(vis[cur].d);
+    for (let k = 1; k < 7; k++) {
+      let sp = 0;
+      while (cur + 1 + sp < vis.length && vis[cur + 1 + sp].isHws && sp < 2) sp++;
+      if (cur + 1 + sp >= vis.length || vis[cur + 1 + sp].d < 0) { ok = false; break; }
+      if (sp > 0) usedInnerSpace = true;
+      cur = cur + 1 + sp;
+      digits.push(vis[cur].d);
+    }
+    if (!ok || (cur + 1 < vis.length && vis[cur + 1].d >= 0)) { i++; continue; }
+    if (usedInnerSpace) {
+      let lp = i - 1;
+      while (lp >= 0 && vis[lp].isHws) lp--;
+      if (lp >= 0 && vis[lp].d >= 0) { i++; continue; }
+      let rp = cur + 1;
+      while (rp < vis.length && vis[rp].isHws) rp++;
+      if (rp < vis.length && vis[rp].d >= 0) { i++; continue; }
+    }
+    spans.push({ start: vis[i].pos, end: vis[cur].end, front: digits.slice(0, 6).join(""), gender: String(digits[6]) });
+    i = cur + 1;
+  }
+  return spans;
+}
+
+/* 괴롭힘 조사 앱(pu-harass-core.js · tests/harass-invest.test.js)은 당사자 동명이인 구별용으로
+   생년월일+성별 첫 자리(YYMMDD-G******) 가림 규약을 사용하므로 동일 형식을 유지한다(P박스는 13자리 전량 차단·전량 마스킹). */
+function maskHarassRrn(text) {
+  const s = String(text == null ? "" : text);
+  const spans = findRrnSpans(s);
+  if (!spans.length) return s;
+  let out = "", last = 0;
+  for (const sp of spans) {
+    out += s.slice(last, sp.start) + sp.front + "-" + sp.gender + "******";
+    last = sp.end;
+  }
+  return out + s.slice(last);
+}
+
+/* 산업일자리전환(jobtrans) AI 윤문 요청은 주민등록번호뿐 아니라 공백 포함 이메일·9~11자리 국내 전화·계좌번호도 서버에서 재가림한다. */
+const JT_EMAIL_RE = /[A-Za-z0-9._%+-]+(?:\s*@\s*)[A-Za-z0-9-]+(?:\s*\.\s*[A-Za-z0-9-]+)*\s*\.\s*[A-Za-z]{2,}/g;
+const JT_BIZ_RE = /(?<!\d)\d{3}-\d{2}-\d{5}(?!\d)/g;
+const JT_TEL_SEP_RE = /(?<!\d)(?:\+82[-.\s]?)?\(?0(?:1[016789]|2|[3-6][1-5]|70)\)?(?:[-.\s]\d{3,4}[-.\s]\d{4}|[-.\s]\d{7,8})(?!\d)/g;
+const JT_TEL_TIGHT_RE = /(?<!\d)0(?:1[016789][1-9]\d{6,7}|2[1-9]\d{6,7}|(?:[3-6][1-5]|70)[1-9]\d{6,7})(?!\d)/g;
+const JT_ACCT_CTX_RE = /((?:계좌(?:\s*번호)?|입금(?:\s*계좌)?|통장(?:\s*번호)?|예금|(?:신한|국민|우리|하나|기업|농협|수협|부산|대구|경남|광주|전북|제주|씨티|SC제일|산업)\s*은행|우체국|새마을금고|신협|카카오\s*뱅크|토스\s*뱅크|케이\s*뱅크)(?:\s+[가-힣A-Za-z]{2,10})?\s*[:：]?\s*)(\d[\d\s.\-]{8,22}\d)(?!\d)/g;
+const JT_ACCT_SEP_RE = /(?<!\d)\d{2,6}(?:[-.]\d{2,8}){1,3}(?!\d)/g;
+const JT_ACCT_SPACED_RE = /(?<!\d)(?!19\d{2}\s|20\d{2}\s)\d{2,6}\s+\d{2,6}\s+\d{4,8}(?:\s+\d{1,6})?(?!\d)/g;
+const JT_ACCT_LONG_RE = /\b\d[\d-]{9,18}\d\b/g;
+
+function isJtAccountDigits(raw) {
+  const d = String(raw || "").replace(/\D/g, "");
+  if (/^(19|20)\d{6}$/.test(d)) return false;
+  return d.length >= 10 && d.length <= 16;
+}
+
+function maskJobtransServerPii(text) {
+  return String(text == null ? "" : text)
+    .replace(JT_EMAIL_RE, "[가림]")
+    .replace(JT_BIZ_RE, "[가림]")
+    .replace(JT_TEL_SEP_RE, "[가림]")
+    .replace(JT_TEL_TIGHT_RE, "[가림]")
+    .replace(JT_ACCT_CTX_RE, (m, prefix, acc) => {
+      const d = String(acc || "").replace(/\D/g, "");
+      return d.length >= 9 && d.length <= 16 ? prefix + "[가림]" : m;
+    })
+    .replace(JT_ACCT_SEP_RE, (m) => (isJtAccountDigits(m) ? "[가림]" : m))
+    .replace(JT_ACCT_SPACED_RE, (m) => (isJtAccountDigits(m) ? "[가림]" : m))
+    .replace(JT_ACCT_LONG_RE, (m) => (isJtAccountDigits(m) ? "[가림]" : m));
+}
+
+function hasJobtransResidualPii(text) {
+  const s = String(text == null ? "" : text);
+  JT_EMAIL_RE.lastIndex = 0;
+  if (JT_EMAIL_RE.test(s)) return true;
+  JT_TEL_TIGHT_RE.lastIndex = 0;
+  if (JT_TEL_TIGHT_RE.test(s)) return true;
+  const sepPhones = s.match(JT_TEL_SEP_RE) || [];
+  for (const ph of sepPhones) {
+    const tail = ph.replace(/^(?:\+82[-.\s]?)?\(?0(?:1[016789]|2|[3-6][1-5]|70)\)?[-.\s]?/, "").replace(/\D/g, "");
+    if (tail && !/^0+$/.test(tail)) return true;
+  }
+  const accts = (s.match(JT_ACCT_SEP_RE) || [])
+    .concat(s.match(JT_ACCT_SPACED_RE) || [])
+    .concat(s.match(JT_ACCT_LONG_RE) || []);
+  for (const ac of accts) {
+    if (isJtAccountDigits(ac)) return true;
+  }
+  return false;
+}
+
 /* 요청이 말이 되는지 본다. 못 알아보면 **부르기 전에** 돌려보낸다 —
    구글을 부르고 나서 실패하면 그만큼이 그대로 요금이다. */
 function validate(body) {
@@ -42,9 +207,36 @@ function validate(body) {
   const parts = body.parts;
   if (!Array.isArray(parts) || !parts.length) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const resolvedApp = appOf(body.app);
   let imgs = 0, chars = 0;
+  const cleanHarassParts = [];
+
   for (const p of parts) {
-    if (!p || typeof p !== "object") return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    if (!p || typeof p !== "object" || Array.isArray(p)) {
+      return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
+    }
+    if (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans") {
+      /* 괴롭힘 조사 · 일터상생혁신 · 산업일자리전환 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
+         오직 단일 text 문자열만 허용하여 서버에서 주민등록번호 재가림 후 새 객체로 재조립한다. */
+      const keys = Object.keys(p);
+      if (keys.length !== 1 || keys[0] !== "text" || typeof p.text !== "string") {
+        const appName = resolvedApp === "jobtrans" ? "산업일자리전환 앱은 " : (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : "괴롭힘 조사 앱은 ");
+        return { ok: false, error: appName + "주민등록번호 가림이 완료된 글자만 요청할 수 있습니다" };
+      }
+      let masked = maskHarassRrn(p.text);
+      if (findRrnSpans(masked).length > 0) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      if (resolvedApp === "jobtrans") {
+        masked = maskJobtransServerPii(masked);
+        if (hasJobtransResidualPii(masked)) {
+          return { ok: false, error: "비식별화되지 않은 연락처·이메일 등 개인정보가 포함되어 AI 전송을 차단했습니다." };
+        }
+      }
+      chars += masked.trim().length;
+      cleanHarassParts.push({ text: masked });
+      continue;
+    }
     if (p.inline_data) {
       const d = p.inline_data.data;
       if (typeof d !== "string" || !d) return { ok: false, error: "사진을 읽을 수 없습니다" };
@@ -66,13 +258,28 @@ function validate(body) {
      ⚠ 그림도 글자도 없으면 그대로 돌려보낸다 — 부르는 만큼이 요금이다. */
   if (!imgs && !chars) return { ok: false, error: "보낼 내용이 없습니다" };
 
+  const outParts = (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans") ? cleanHarassParts : parts;
   const size = Buffer.byteLength(JSON.stringify(body), "utf8");
   if (size > MAX_BODY_BYTES) {
     return { ok: false, error: imgs
       ? "사진이 너무 큽니다 — 장수를 나눠 판독해 주세요"
       : "글자가 너무 많습니다 — 나눠서 판독해 주세요" };
   }
-  return { ok: true, parts: parts, cfg: body.generationConfig, app: appOf(body.app) };
+  if (resolvedApp === "pbox") {
+    const cleanPboxParts = [];
+    for (const p of parts) {
+      const pKeys = Object.keys(p);
+      if (pKeys.length !== 1 || pKeys[0] !== "text" || typeof p.text !== "string") {
+        return { ok: false, error: "P박스 AI 질의는 비식별 텍스트(text 단일 속성)만 허용되며 이미지·첨부 데이터 전송은 차단됩니다." };
+      }
+      if (findRrnSpans(p.text).length > 0) {
+        return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
+      }
+      cleanPboxParts.push({ text: p.text });
+    }
+    return { ok: true, parts: cleanPboxParts, cfg: body.generationConfig, app: resolvedApp };
+  }
+  return { ok: true, parts: outParts, cfg: body.generationConfig, app: resolvedApp };
 }
 
 /* ══ ⑤ 어느 앱이 몫을 썼나 (대표 물음 2026-09-08 「판독 한도 어떻게 해결할까」) ══
@@ -85,7 +292,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo", "jobtrans", "datahub"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";
@@ -106,7 +313,8 @@ function ymdKST(now) {
      같아 보인다.
    ⚠ vision 을 n 에 합치면 «몫이 다른 곳»이 한 숫자에 섞인다 — Gemini 는 하루 몫이고
      Vision 은 «달마다» 1,000장이다. 합치면 어느 쪽이 남았는지 알 수가 없다. */
-const TALLY_KINDS = ["n", "quota", "vision"];
+/* won = 실제 토큰으로 센 원화 합 · wn = 그렇게 센 판독 수 (2026-11-19) — aiSpentWonOf 머리 참고 */
+const TALLY_KINDS = ["n", "quota", "vision", "won", "wn"];
 
 /* ── Vision 의 무료 몫은 «달마다» 1,000장이다 (2026-09-08) ────────────────────
    ⚠⚠ Gemini 의 «하루» 몫과 **다른 셈**이다. 날짜로만 세면 「이달에 얼마 썼나」에
@@ -158,6 +366,60 @@ function aiBudgetOf(raw) {
   };
 }
 function aiMonthPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all/n"; }
+/* 달 «_all» 자리 통째 — n·won·wn 을 함께 읽어 aiSpentWonOf 에 넘긴다 */
+function aiMonthAllPath(now) { return "ai_read_tally/" + ymKST(now) + "/_all"; }
+
+/* ── 실제 토큰으로 원화를 센다 (2026-11-19 비용 점검) ─────────────────────────────
+   여태 달 금액은 «부른 횟수 × ₩4» 였다 — 2만 자 계약서·30분 녹음도 한 번(₩4)으로 잡혀 적게 셌다.
+   구글이 답마다 주는 usageMetadata(입력·출력·생각 토큰)로 그 자리에서 원화를 셈해 따로 쌓는다.
+     won = 그렇게 센 원화 합 · wn = 그렇게 센 판독 수
+   달 금액 = (n − wn) × 단가 + won — 원화로 못 센 판독(옛 기록·사진 지우개 등)은 예전처럼 횟수×단가.
+   ⚠ 이 식은 화면(js/pu-billing.js aiSpentWonOf)과 «글자 그대로 같아야» 한다 — tests/ai-spend-cap 이 견준다.
+   ⚠ 단가 0 은 «무료로 쓰는 중»(화면은 횟수만) — 그때는 금액을 0 으로 둔다(예전과 같다).
+   단가: AI Studio 유료 등급 표준, USD/100만 토큰(2026-11-19 원문 확인). 바뀌면 이 표와 환율만 고친다. */
+const KRW_PER_USD = 1400;
+const GEMINI_PRICE_USD = {
+  "gemini-2.5-flash-lite": { in: 0.10, out: 0.40, audio: 0.30 },
+  "gemini-2.5-flash": { in: 0.30, out: 2.50, audio: 1.00 },
+  "gemini-2.5-pro": { in: 1.25, out: 10.00, audio: 1.25 },
+  "gemini-3.1-flash-lite": { in: 0.25, out: 1.50, audio: 0.50 },
+  /* 2026-12-01 부터 2.5 Flash 가 넘어가는 곳(같은 값) · 2.5 Pro 가 넘어가는 곳(2027-01-01 값으로 넉넉히) */
+  "gemini-3.5-flash-lite": { in: 0.30, out: 2.50, audio: 0.30 },
+  "gemini-3.8-flash": { in: 1.50, out: 7.50, audio: 1.50 }
+};
+/* 모델 이름 → 단가. 가장 길게 맞는 이름을 고른다(2.5-flash-lite 가 2.5-flash 로 잘못 잡히지 않게).
+   모르는 모델이면 2.5 Flash 값 — 가장 많이 쓰는 모델이고, lite 보다 비싸게 잡혀 덜 세는 일이 없다. */
+function priceOf(model) {
+  const m = String(model || "").replace(/^models\//, "");
+  let best = "";
+  Object.keys(GEMINI_PRICE_USD).forEach(function (k) { if (m.indexOf(k) === 0 && k.length > best.length) best = k; });
+  return GEMINI_PRICE_USD[best || "gemini-2.5-flash"];
+}
+/* 답 하나의 원화(소수 둘째 자리). usageMetadata 가 없으면 null — 부르는 쪽은 안 쌓는다(그 판독은 횟수×단가로 잡힌다). */
+function wonOfUsage(json, model) {
+  const u = json && json.usageMetadata;
+  if (!u || typeof u !== "object") return null;
+  const p = priceOf((json && json.modelVersion) || model);
+  const prompt = Math.max(0, Number(u.promptTokenCount) || 0);
+  let audio = 0;
+  (Array.isArray(u.promptTokensDetails) ? u.promptTokensDetails : []).forEach(function (d) {
+    if (d && String(d.modality || "").toUpperCase() === "AUDIO") audio += Math.max(0, Number(d.tokenCount) || 0);
+  });
+  audio = Math.min(audio, prompt);
+  const out = Math.max(0, Number(u.candidatesTokenCount) || 0) + Math.max(0, Number(u.thoughtsTokenCount) || 0);
+  const usd = ((prompt - audio) * p.in + audio * p.audio + out * p.out) / 1e6;
+  return Math.round(usd * KRW_PER_USD * 100) / 100;
+}
+/* 달 금액 — 달 «_all» 자리(n·won·wn)와 판독 단가로. 화면 js/pu-billing.js 의 aiSpentWonOf 와 같은 식이다. */
+function aiSpentWonOf(all, wonPerRead) {
+  const a = (all && typeof all === "object") ? all : {};
+  const w = Math.max(0, Number(wonPerRead) || 0);
+  if (w === 0) return 0;
+  const n = Math.max(0, Number(a.n) || 0);
+  const wn = Math.min(n, Math.max(0, Number(a.wn) || 0));
+  const won = Math.max(0, Number(a.won) || 0);
+  return Math.round((n - wn) * w + won);
+}
 
 /* ── 한도 판정 한 곳 (대표 지시 2026-11-05 「유료 API 통제 — 추천대로」) ─────────────
    여태 «사람이 누른 판독(manual)»은 한도를 넘어도 끝없이 통과했다 — 화면 하나가
@@ -197,7 +459,8 @@ function tallyPaths(app, ymd, kind) {
        섞지 않는다. 하루 몫과 달 몫, 무료와 유료가 뒤엉키면 둘 다 못 읽는다.
      ⚠ quota(막힌 수)는 달 자리에 안 올린다 — 그것은 «못 쓴 것»이라 요금이 아니다.
      ⚠ 이미 달 자리를 받았으면 더하지 않는다 — 같은 자리를 한 번에 두 번 올린다. */
-  if ((k === "vision" || k === "n") && String(d).length > 7) {
+  /* won·wn — 실제 토큰 원화 셈도 달 금액에 쓰이므로 달 자리에 올린다(2026-11-19) */
+  if ((k === "vision" || k === "n" || k === "won" || k === "wn") && String(d).length > 7) {
     out.push("ai_read_tally/" + String(d).slice(0, 7) + "/_all/" + k);
   }
   return out;
@@ -220,6 +483,10 @@ function geminiBody(parts, cfg) {
   }
   const mot = Number(c.maxOutputTokens);
   if (Number.isFinite(mot) && mot > 0) g.maxOutputTokens = Math.min(Math.round(mot), MAX_OUTPUT_TOKENS);
+  /* 부르는 쪽이 안 정하면 «기본 상한»을 건다(2026-11-19 비용 점검). 여태는 안 정하면 상한이 없어
+     모델 최대(6만+ 토큰)까지 나올 수 있었다 — 생각(thinking) 토큰도 출력 요금이다.
+     값은 부르는 쪽이 정할 수 있는 최대와 같다(사진첩은 10장 묶음이라 이 안에 든다). */
+  else g.maxOutputTokens = MAX_OUTPUT_TOKENS;
   return { contents: [{ parts: parts }], generationConfig: g };
 }
 
@@ -266,7 +533,8 @@ async function callGemini(fetchFn, key, parts, waits, cfg) {
         last = { status: 0, why: String((e && e.message) || e) };
         break;   // 그물이 끊겼다 — 다음 모델로
       }
-      if (r && r.ok) return { ok: true, json: await r.json() };
+      /* model — 실제로 답한 모델(원화 셈 wonOfUsage 가 단가를 고른다) */
+      if (r && r.ok) return { ok: true, json: await r.json(), model: model };
 
       const status = (r && r.status) || 0;
       let why = "";
@@ -367,6 +635,8 @@ module.exports = {
   APPS, appOf, ymdKST, tallyPaths, TALLY_KINDS,
   /* AI 판독 이번 달 요금 한도 (대표 결정 2026-09-10) — 까닭은 AI_BUDGET_PATH 머리에 */
   AI_BUDGET_PATH, AI_BUDGET_DEFAULT, aiBudgetOf, aiSpentWon, aiMonthPath,
+  /* 실제 토큰으로 원화 셈 (2026-11-19) — 까닭은 KRW_PER_USD 머리에 */
+  KRW_PER_USD, GEMINI_PRICE_USD, priceOf, wonOfUsage, aiSpentWonOf, aiMonthAllPath,
   /* 한도 판정 한 곳 (2026-11-05) — 까닭은 MANUAL_CEIL 머리에 */
   MANUAL_CEIL, budgetGate,
   /* 달 몫 문턱 — 까닭은 ymKST 머리에 */

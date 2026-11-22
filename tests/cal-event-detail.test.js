@@ -142,7 +142,7 @@ test('③-1★ 옛 일정 설명의 「푸른 담당: 이름 (P-005)」 — 보�
   assert.match(몸, /var 담당 = 일정담당\(ev\)/, '담당 찾기가 원문을 읽는 길이 사라졌습니다');
 });
 
-test('③-2 상세 창이 장소·설명·만든이를 낸다', () => {
+test('③-2 상세 창이 장소·설명·만든이를 낸다 (2026-11-15 — 담당·메일 줄은 «걷지 않고» 그대로 둔다)', () => {
   const b = 상자({ 구글: [{ id: 'g1', text: '가나상사 방문', color: '#039be5', date: '2026-09-16',
     time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), place: '천안시 서북구', desc: '설문지 지참', mail: 'hong@example.com', mailSid: 'P-001',
     gcalUrl: 'https://x' }] });
@@ -150,6 +150,8 @@ test('③-2 상세 창이 장소·설명·만든이를 낸다', () => {
   /* ⚠ 상자 안에서 «만들어진» 배열은 겉보기가 같아도 deepEqual 이 튕긴다 —
      글자로 바꿔 견준다(2026-09-27 에 여기서 한 번 헛돌았다). */
   const 줄 = vm.runInContext('구글상세("g1").rows.map(function(r){return r.i+" "+r.t;}).join(" | ")', b);
+  /* ⚠ 「👤 담당」·「✉ 메일 이 만듦」·「🕒 넣은 날」 줄은 PC 에서도 그대로다 — 대표 지시 2026-11-15 「글자크기 디자인만 바꾸고 기존에 있던 것은 그대로」.
+     (구글 앱 상세처럼 «생성자» 줄로 바꿔 걷었다가 되돌렸다) */
   assert.strictEqual(줄, '👤 홍길동 | 📍 천안시 서북구 | ≡ 설문지 지참 | ✉ hong@example.com 이 만듦');
   assert.strictEqual(d.url, 'https://x', '구글로 갈 주소가 없습니다');
 });
@@ -221,7 +223,12 @@ test('★ 시각이 있으면 «몇 시부터 몇 시까지»를 적는다', () 
     end: '', time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), rows: [], hint: [], url: 'https://x' } });
   const html = vm.runInContext('detailHtml()', b);
   assert.match(html, /오후 2:00~오후 4:00/, '★ 끝 시각을 안 적습니다(구글 꼴 「오후 2:00~오후 4:00」)');
-  assert.match(html, /data-dgo="1"/, '★ 구글 일정인데 「구글에서 열기」가 없습니다');
+  /* PC — 「구글에서 열기」는 구글 앱처럼 ⋮ 옵션 메뉴 안에 있다(메뉴를 열었을 때 나온다). 도구줄에는 ✏️ 🗑 ✉ ⋮ ✕ */
+  assert.match(html, /data-dopt="1"/, '★ 구글 일정인데 ⋮ 옵션 단추가 없습니다(「구글에서 열기」가 들어 있다)');
+  assert.ok(html.indexOf('data-dgo') < 0, '메뉴를 열기 전에는 「구글에서 열기」가 안 보여야 합니다');
+  const 연 = 상자({ 상세: { kind: 'gcal', title: '방문', color: '#039be5', date: '2026-09-16', menu: true,
+    end: '', time: '14:00', endAt: 0, rows: [], hint: [], url: 'https://x' } });
+  assert.match(vm.runInContext('detailHtml()', 연), /data-dgo="1"/, '★ ⋮ 메뉴를 열었는데 「구글에서 열기」가 없습니다');
 });
 
 test('★ ESC 로 닫힌다 — 창이 열렸는데 못 닫으면 화면이 잠긴다', () => {

@@ -11,7 +11,8 @@ const F = (ls) => S.field(ls);
 test('★★ 칸 목록이 화면이 쓰는 클라우드 칸을 «모두» 덮는다 — 빠지면 그 칸은 기기 사이로 안 간다', () => {
   const want = ['feed', 'kw', 'key_data', 'key_biz', 'last', 'last_at', 'recruit_scan', 'recruit_at', 'recruit_log', 'recruit_url',
     'recruit_custom', 'recruit_seen', 'recruit_mailitems', 'recruit_mail_at', 'recruit_mailfolders', 'recruit_mailmap',
-    'recruit_mailskip', 'recruit_mailtidy', 'recruit_need', 'recruit_due', 'recruit_star', 'recruit_match', 'plan', 'plan_since', 'plan_ver', 'spec_since', 'plan_at', 'plan_err', 'src_stat', 'pick_off'];
+    'recruit_mailskip', 'recruit_mailtidy', 'recruit_need', 'recruit_due', 'recruit_star', 'recruit_match', 'plan', 'plan_since', 'plan_ver', 'spec_since', 'plan_at', 'plan_err', 'src_stat', 'pick_off',
+    'pursue' /* 🏢 푸른노무법인 지원사업(2026-11-22) — 폰에서 고른 진행 공고가 PC 에도 보여야 한다 */];
   want.forEach((k) => assert.ok(F(k), k + ' 가 빠졌다'));
   assert.equal(S.FIELDS.length, want.length);
   /* 푸른 캘린더(pu-cal-recruit.js)가 읽는 자리 — 모양을 바꾸면 달력이 빈다 */
@@ -93,9 +94,11 @@ test('★★ 화면은 이 모듈을 싣고, 칸 쓰기는 lsSet 한 길로만 �
   const src = fs.readFileSync(path.join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /<script src="js\/gov-sync\.js\?v=\d+"><\/script>/);
   /* localStorage 에 직접 쓰는 곳은 lsSet · 합친 값 두기(_rawWrite) · 시각·보낼 칸 표시뿐 */
-  /* 다섯째는 경력관리로 «넘기는» 자리(pu_kc_handoff — 다른 앱이 읽고 곧 지운다, 동기화 칸이 아니다 · 2026-10-05 ③) */
+  /* 그 밖은 경력관리로 «넘기는» 자리뿐 — 다른 앱이 읽고 곧 지운다, 동기화 칸이 아니다.
+     pu_kc_handoff(「➕ 경력관리로 넘기기」 2026-10-05 ③) · pu_kc_biz_handoff(🏢 사업관리에 담기 2026-11-22). 자리마다 한 곳에서만 쓴다 */
   const all = src.match(/localStorage\.setItem\([^)]*/g) || [];
-  const handoff = all.filter((x) => /'pu_kc_handoff'/.test(x));
-  assert.equal(handoff.length, 1);
+  const handoff = all.filter((x) => /'pu_kc_(biz_)?handoff'/.test(x));
+  ['pu_kc_handoff', 'pu_kc_biz_handoff'].forEach((k) =>
+    assert.equal(handoff.filter((x) => x.indexOf("'" + k + "'") >= 0).length, 1, k + ' 를 쓰는 곳은 한 곳이어야 한다'));
   assert.equal(all.length - handoff.length, 4, 'localStorage 를 직접 쓰는 곳이 늘었다 — 시각이 안 찍혀 다른 기기와 합칠 때 진다');
 });

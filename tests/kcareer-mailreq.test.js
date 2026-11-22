@@ -201,9 +201,11 @@ test('탭 — 진행 중은 새 요청+확인함, 끝난 것은 따로', () => {
   assert.deepEqual(Q.filterItems(items, 'ignored').map((x) => x.id), ['d~4']);
   assert.equal(Q.filterItems(items, 'all').length, 4);
 });
-test('상태 바꾸기 — 한 번에 쓰는 update 모양 · st 와 시각만 · 이상한 id 는 버린다', () => {
+test('상태 바꾸기 — 한 번에 쓰는 update 모양 · 상태에 딸린 칸(st·시각·자동 제외 표시)만 · 이상한 id 는 버린다', () => {
   const u = Q.stateUpdate([IN + '~1', 'bad id', 'a/b~2', IN + '~3'], 'done', NOW);
-  assert.deepEqual(Object.keys(u).sort(), [IN + '~1/doneAt', IN + '~1/st', IN + '~1/updatedAt', IN + '~3/doneAt', IN + '~3/st', IN + '~3/updatedAt']);
+  assert.deepEqual(Object.keys(u).sort(), [IN + '~1/autoIgnored', IN + '~1/doneAt', IN + '~1/st', IN + '~1/updatedAt', IN + '~3/autoIgnored', IN + '~3/doneAt', IN + '~3/st', IN + '~3/updatedAt']);
+  assert.equal(u[IN + '~1/autoIgnored'], null, '사람이 상태를 바꾸면 «기계가 치웠다» 표시를 지운다');
+  assert.ok(!Object.keys(u).some((k) => /\/(kinds|deadline|memo|fixed|s|f|e|an)$/.test(k)), '기한·종류·메모·제목·보낸이는 건드리지 않는다');
   assert.equal(u[IN + '~1/st'], 'done'); assert.equal(u[IN + '~1/doneAt'], NOW);
   assert.equal(Q.stateUpdate([IN + '~1'], 'doing', NOW)[IN + '~1/doneAt'], null, '되돌리면 처리 시각을 지운다');
   assert.deepEqual(Q.stateUpdate([IN + '~1'], 'nope', NOW), {}, '모르는 상태는 쓰지 않는다');
@@ -360,7 +362,8 @@ test('본문 보강 — 사람이 «확인함»으로 바꾼 뒤에 채워도 �
   assert.equal(items(f)[IN + '~101'].st, 'doing'); assert.equal(items(f)[IN + '~101'].deadline.date, '2026-11-16');
 });
 test('본문 보강 — 한 번에 열 건수에 한도가 있고, 열었으면 다시 열지 않는다', async () => {
-  const f = db(); for (let n = 110; n < 118; n++) await f.ref('mailbox/msgs/' + IN + '/' + n).set(row({ s: '동의서 요청 ' + n, d: at(11, 9, 15) }));
+  /* 제목에 «이력·회의·비용» 말(위촉)이 있어야 들어와 본문을 연다 — 그 말이 없는 «동의서 요청»은 걸러져 본문도 안 연다(2026-11-19) */
+  const f = db(); for (let n = 110; n < 118; n++) await f.ref('mailbox/msgs/' + IN + '/' + n).set(row({ s: '평가위원 위촉 동의서 요청 ' + n, d: at(11, 9, 15) }));
   const calls = []; await scan(f, { readBody: read(BODY, calls), bodyMax: 3 });
   assert.equal(calls.length, 3, '한도(bodyMax)만큼만 연다');
   const again = []; await scan(f, { readBody: read(BODY, again), bodyMax: 3 });
