@@ -32153,7 +32153,7 @@ function coMgrDecide(req, ok, note){
             mode: mode,
             ex: ex,
             at: Date.now(),
-            by: String(me.name || me.sid || '')
+            by: String(me.name || '')
           };
         }
       }
@@ -32161,7 +32161,7 @@ function coMgrDecide(req, ok, note){
         : ((cleanRule.mode === 'split' ? '사업별 분리' : cleanRule.mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외')
           + (cleanRule.ex.length ? ' · 제외: ' + cleanRule.ex.join(', ') : ''));
       if(!confirm('「' + co.name + '」 분리·제외 규칙 신청을 승인할까요?\n\n· 적용 내용: ' + desc)) return false;
-      var sRef = fbDb.ref('pucards/config/mailCoSplit/' + String(co.id));
+      var sRef = fbDb.ref('pucards/mailCoSplit/' + String(co.id));
       (cleanRule ? sRef.set(cleanRule) : sRef.remove()).then(function(){
         if(cleanRule && cleanRule.ex.length && typeof coMgrCleanMailWho === 'function'){
           coMgrCleanMailWho(co, cleanRule.ex);
@@ -32257,8 +32257,8 @@ function coMgrApplyScope(co, req){
   if(sc.works && toSid && fromSid){
     ['consultings', 'cases', 'funds', 'other_projects'].forEach(function(tbl){
       (dbGet(tbl, []) || []).forEach(function(w){
-        if(!w || !w.id || w._deleted || w.closedDate) return;
-        if(/^(closed|done|complete|completed|cancel|cancelled|canceled|inactive)$|종료|완료|취소/.test(String(w.status || '').trim().toLowerCase())) return;
+        if(!w || !w.id || w._deleted || w.permanentArchived || w.closedDate || w.undoneDate) return;
+        if(/^(closed|done|complete|completed|cancel|cancelled|canceled|transferred|inactive)$|종료|완료|취소|이관/.test(String(w.status || '').trim().toLowerCase())) return;
         var same = (w.companyId && String(w.companyId) === String(co.id))
           || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
         if(!same) return;
@@ -32286,14 +32286,17 @@ function coMgrApplyScope(co, req){
         .then(function(snap){
           var items = snap && snap.val ? snap.val() : null;
           if(!items || typeof items !== 'object') return;
+          var isSheetClosed = function(it){
+            return !it || it._deleted || /^(done|closed|cancel|cancelled|canceled|transferred|archived)$|종료|완료|취소|이관/.test(String(it.state || '').trim().toLowerCase());
+          };
           Object.keys(items).forEach(function(id){
             var it = items[id];
-            if(!it || String(it.coid || '') !== String(co.id) || it.state === 'done') return;
+            if(isSheetClosed(it) || String(it.coid || '') !== String(co.id)) return;
             var curSid = String((it.mgr_main && it.mgr_main.sid) || '');
             var subs = Array.isArray(it.mgr_subs) ? it.mgr_subs : [];
             if(!((curSid === fromSid && curSid !== toSid) || subs.some(function(s){ return s && String(s.sid) === fromSid; }))) return;
             fbDb.ref('work_erp/items/' + id).transaction(function(cur){
-              if(!cur || String(cur.coid || '') !== String(co.id) || cur.state === 'done') return cur;
+              if(isSheetClosed(cur) || String(cur.coid || '') !== String(co.id)) return cur;
               var cs = String((cur.mgr_main && cur.mgr_main.sid) || '');
               var sb = Array.isArray(cur.mgr_subs) ? cur.mgr_subs : [];
               var nx = null;
@@ -32308,22 +32311,21 @@ function coMgrApplyScope(co, req){
     }
     if(sc.mailClean && fromName){
       coMgrCleanMailWho(co, [fromName]);
-      fbDb.ref('pucards/config/mailCoSplit/' + co.id).once('value').catch(function(){ return null; })
-        .then(function(spSnap){
-          var prevSp = (spSnap && spSnap.val && spSnap.val()) || null;
-          var prevEx = (prevSp && Array.isArray(prevSp.ex)) ? prevSp.ex.slice() : [];
-          var ex = prevEx.filter(function(x){ return x && x !== toName; });
-          if(fromName !== toName && ex.indexOf(fromName) < 0) ex.push(fromName);
-          return fbDb.ref('pucards/config/mailCoSplit/' + co.id).set({
-            coId: String(co.id),
-            coName: String(co.name || ''),
-            mode: (prevSp && prevSp.mode) ? String(prevSp.mode) : '',
-            ex: ex,
-            toName: String(toName || ''),
-            at: Date.now(),
-            by: String(me.name || me.sid || '')
-          });
-        }).catch(function(){});
+      fbDb.ref('pucards/mailCoSplit/' + co.id).transaction(function(cur){
+        var prevSp = (cur && typeof cur === 'object') ? cur : null;
+        var prevEx = (prevSp && Array.isArray(prevSp.ex)) ? prevSp.ex.slice() : [];
+        var ex = prevEx.filter(function(x){ return x && x !== toName; });
+        if(fromName !== toName && ex.indexOf(fromName) < 0) ex.push(fromName);
+        return {
+          coId: String(co.id),
+          coName: String(co.name || ''),
+          mode: (prevSp && prevSp.mode) ? String(prevSp.mode) : '',
+          ex: ex,
+          toName: String(toName || ''),
+          at: Date.now(),
+          by: String(me.name || '')
+        };
+      }).catch(function(){});
     }
   }
   return { works:wkCount };
@@ -32457,8 +32459,8 @@ function CoOwnerHandoverModal(props){
     var biz = String(targetCo.bizNo || '').replace(/\D/g, '');
     [['consultings', '컨설팅'], ['cases', '사건'], ['funds', '기금'], ['other_projects', '기타']].forEach(function(p){
       (dbGet(p[0], []) || []).forEach(function(w){
-        if(!w || w._deleted || w.closedDate) return;
-        if(/^(closed|done|complete|completed|cancel|cancelled|canceled|inactive)$|종료|완료|취소/.test(String(w.status || '').trim().toLowerCase())) return;
+        if(!w || w._deleted || w.permanentArchived || w.closedDate || w.undoneDate) return;
+        if(/^(closed|done|complete|completed|cancel|cancelled|canceled|transferred|inactive)$|종료|완료|취소|이관/.test(String(w.status || '').trim().toLowerCase())) return;
         var same = (w.companyId && String(w.companyId) === String(targetCo.id))
           || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
         if(!same) return;
@@ -32470,7 +32472,7 @@ function CoOwnerHandoverModal(props){
 
   useEffect(function(){
     if(!coId || typeof fbDb === 'undefined' || !fbDb) return;
-    fbDb.ref('pucards/config/mailCoSplit/' + coId).once('value').then(function(s){
+    fbDb.ref('pucards/mailCoSplit/' + coId).once('value').then(function(s){
       var v = s && s.val ? s.val() : null;
       if(v && typeof v === 'object'){
         if(v.mode) setSplitMode(v.mode);
@@ -32545,7 +32547,7 @@ function CoOwnerHandoverModal(props){
       mode: mode,
       ex: ex,
       at: Date.now(),
-      by: String(me.name || me.sid || '')
+      by: String(me.name || '')
     };
     if(!canDir){
       var modeDesc = !nextRule ? '공동 열람 복귀' : (mode === 'split' ? '사업별 분리' : mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외');
@@ -32564,7 +32566,7 @@ function CoOwnerHandoverModal(props){
     if(typeof fbDb === 'undefined' || !fbDb){ showToast('실시간 DB 연결이 필요합니다'); return; }
     if(busy) return;
     setBusy(true);
-    var ref = fbDb.ref('pucards/config/mailCoSplit/' + co.id);
+    var ref = fbDb.ref('pucards/mailCoSplit/' + co.id);
     var p = (!nextRule) ? ref.remove() : ref.set(nextRule);
     p.then(function(){
       if(ex.length) return coMgrCleanMailWho(co, ex);
@@ -32612,13 +32614,13 @@ function CoOwnerHandoverModal(props){
           h('div', null, '· 진행 중 컨설팅·사건·기금: ', openWorks.length
             ? openWorks.map(function(w){ return w.kind + '(' + w.title + ' → ' + (coMgrName(w.mgr) || '미지정') + ')'; }).join(' · ')
             : '없음')) : null,
-        h('div', { style:{ display:'flex', gap:'6px', marginBottom:'10px' } },
-          h('button', { type:'button', onClick:function(){ setTab('sole'); },
+        h('div', { role:'tablist', style:{ display:'flex', gap:'6px', marginBottom:'10px' } },
+          h('button', { type:'button', role:'tab', 'aria-selected': tab === 'sole', onClick:function(){ setTab('sole'); },
             style:{ flex:1, padding:'8px 10px', borderRadius:'8px', cursor:'pointer', fontWeight:700, fontSize:'12.5px',
               border:'1px solid ' + (tab === 'sole' ? '#1e40af' : '#cbd5e1'),
               background: tab === 'sole' ? '#1e40af' : '#f8fafc', color: tab === 'sole' ? '#ffffff' : '#475569' } },
             '👤 갑 빠지고 을 단독 전환 (일괄 변경·신청)'),
-          h('button', { type:'button', onClick:function(){ setTab('split'); },
+          h('button', { type:'button', role:'tab', 'aria-selected': tab === 'split', onClick:function(){ setTab('split'); },
             style:{ flex:1, padding:'8px 10px', borderRadius:'8px', cursor:'pointer', fontWeight:700, fontSize:'12.5px',
               border:'1px solid ' + (tab === 'split' ? '#1e40af' : '#cbd5e1'),
               background: tab === 'split' ? '#1e40af' : '#f8fafc', color: tab === 'split' ? '#ffffff' : '#475569' } },

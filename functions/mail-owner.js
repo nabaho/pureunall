@@ -80,7 +80,7 @@ async function loadTables(db, readCompanies) {
     /* 업무관리 「이 주소는 앞으로도 이 사업장」 — 화면 mbCoRecOfAddr 와 같은 칸 (2026-10-11) */
     "work_erp/mailaddr",
     /* 🔀 사업장별 담당 분리·과거 담당 제외 규칙 (2026-11-22) */
-    MAIL_ROOT + "/config/mailCoSplit"];
+    MAIL_ROOT + "/mailCoSplit"];
   const FIXED_PATHS = paths.length;
   paths.push.apply(paths, WORK_STORES.map(([store]) => "data/" + store + "/v"));
   const snaps = await Promise.all(paths.map((p) => p === "data/companies" && readCompanies
@@ -260,7 +260,7 @@ function workHandOf(em, T) {
   if (!v || !v.kind || !v.id) return null;
   return T.workByKey[String(v.kind) + ":" + String(v.id)] || null;
 }
-/* 사업장별 분리·제외 규칙(config/mailCoSplit) — 화면 mbCoSplitRuleOf 와 같은 모양 */
+/* 사업장별 분리·제외 규칙(pucards/mailCoSplit) — 화면 mbCoSplitRuleOf 와 같은 모양 */
 function coSplitOf(em, T) {
   const map = (T && T.coSplit) || {};
   const ak = "addr:" + whoKey(em);

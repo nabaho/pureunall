@@ -91,7 +91,7 @@ function makeMailCtx(opts) {
     'mbHqMap', 'mbHqRec', 'mbCoRecOfAddr', 'mbCoNameOf',
     'mbWkMsgOf', 'mbNoWhoBox', 'mbBoxWhoList', 'mbBoxWhoOfRow',
     'mbWorkLive', 'mbWorkBuild', 'mbWorkHandOf', 'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbWorkMgrs',
-    'mbCoIdOfAddr', 'mbCoSplitNormRule', 'mbCoSplitRuleOf', 'mbCoSingleWorkMgr',
+    'mbCoIdOfAddr', 'mbCoSplitParseRule', 'mbCoSplitRuleOf', 'mbCoSingleWorkMgr',
     'mbRowProjectKind', 'mbSplitPrimaryOfRow',
     'mbWhoWhy', 'mbWhoWhyOf', 'mbWhoOfRow', 'mbSubsOfRow', 'mbWhoAllOfRow'
   ].forEach((fn) => vm.runInContext(sliceFn(CARDS_SRC, 'function ' + fn + '('), ctx));
@@ -185,7 +185,7 @@ test('② 유형 A (과거 담당자 제외 ex + workOnly) — 수동 고정(mai
       v: [{ id: 'co-gana', name: '가나상사', bizNo: '123-45-67890', status: 'active', managerMain: 'P-006', email: 'hr@gana.example' }]
     },
     'pucards/config/mailWho': { 'hr@gana,example': '홍길동' },
-    'pucards/config/mailCoSplit': splitTbl,
+    'pucards/mailCoSplit': splitTbl,
     'data/consultings/v': [
       { id: 'cons-2', status: 'progress', companyId: 'co-gana', bizNo: '123-45-67890', managerMain: 'P-002', primaryContactEmail: 'hr@gana.example' }
     ]
@@ -211,7 +211,8 @@ test('③ 일괄 변경 신청 및 승인 (푸른이알피 coMgrRequest + coMgrD
     }],
     consultings: [
       { id: 'cons-live', companyId: 'co-gana', status: 'progress', managerMain: 'P-006', managerSubs: ['P-006'] },
-      { id: 'cons-done', companyId: 'co-gana', status: 'closed', closedDate: '2025-12-31', managerMain: 'P-006' }
+      { id: 'cons-done', companyId: 'co-gana', status: 'closed', closedDate: '2025-12-31', managerMain: 'P-006' },
+      { id: 'cons-xfer', companyId: 'co-gana', status: 'transferred', managerMain: 'P-006' }
     ],
     cases: [
       { id: 'case-live', bizNo: '123-45-67890', status: '진행중', managerMain: 'P-006' }
@@ -272,6 +273,7 @@ test('③ 일괄 변경 신청 및 승인 (푸른이알피 coMgrRequest + coMgrD
   assert.equal(store.consultings[0].managerMain, 'P-002');
   assert.deepEqual(Array.from(store.consultings[0].managerSubs), []);
   assert.equal(store.consultings[1].managerMain, 'P-006', '이미 종료된 과거 컨설팅 이력은 건드리지 않아야 합니다');
+  assert.equal(store.consultings[2].managerMain, 'P-006', '이관(transferred)된 컨설팅 건은 건드리지 않아야 합니다');
   assert.equal(store.cases[0].managerMain, 'P-002');
 
   /* fromSid 가 비어 있으면 제3자 담당 건을 건드리지 않는다 */
@@ -282,11 +284,11 @@ test('③ 일괄 변경 신청 및 승인 (푸른이알피 coMgrRequest + coMgrD
 
 test('④ 보안 규칙 및 XSS 방어 — mailCoSplit 쓰기는 관리자·위임관리인(MGR)만 허용하고 화면 단추는 data-id 속성을 쓴다', () => {
   const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'firebase-rules-전체-적용본.json'), 'utf8')).rules;
-  assert.ok(rules.pucards.config && rules.pucards.config.mailCoSplit, 'pucards/config/mailCoSplit 보안 규칙이 없습니다');
-  const wExpr = rules.pucards.config.mailCoSplit['.write'];
+  assert.ok(rules.pucards.mailCoSplit, 'pucards/mailCoSplit 보안 규칙이 없습니다');
+  const wExpr = rules.pucards.mailCoSplit['.write'];
   assert.match(wExpr, /isAdmin/);
   assert.match(wExpr, /isSubAdmin/);
-  assert.ok(rules.pucards.config.$k2 && rules.pucards.config.$k2['.write'], 'pucards/config 의 다른 설정($k2) 쓰기 권한이 유지되어야 합니다');
+  assert.ok(!rules.pucards.config, 'pucards/config 를 따로 풀어 quoteWatch ADMIN 잠금을 건드리면 안 됩니다');
 
   const sumFn = sliceFn(CARDS_SRC, 'function mbSplitSummaryHtml(');
   assert.ok(!/onclick="mbTransferOpen\('\$\{/.test(sumFn), 'mbSplitSummaryHtml 에 JS 문자열 보간 XSS 위험이 남아 있습니다');

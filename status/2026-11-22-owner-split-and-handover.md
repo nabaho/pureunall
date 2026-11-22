@@ -5,7 +5,7 @@
 - 또한 특별한 사정이나 업무 일원화로 기존 담당자(갑)는 완전히 빠지고 새 담당자(을)만 단독 담당해야 하는 상황에서 업체 주담당·부담당·진행 중 사업·업무시트·메일 고정을 한 번에 신청·변경할 수 있는 창구가 필요했다.
 
 ## 변경 사항
-1. **사업장별 분리·과거 담당 제외 규칙 (`pucards/config/mailCoSplit`)**
+1. **사업장별 분리·과거 담당 제외 규칙 (`pucards/mailCoSplit`)**
    - `pu-cards.html`: `mbCoSplitLoad`, `mbCoSplitRuleOf`, `mbRowProjectKind`, `mbSplitPrimaryOfRow` 추가 및 `mbWhoWhyOf`·`mbWhoOfRow`·`mbSubsOfRow` 연동.
      - **유형 B (`mode: 'split'`)**: 컨설팅·사건·기금 갈래 메일은 해당 건 담당자(을)에게만 단독 배정하고, 급여·4대보험·일반자문 메일은 업체 주담당(갑)에게만 배정해 양쪽 메일함 중복 연결 차단.
      - **`mode: 'workOnly'` 및 `ex` 제외 목록**: 과거 담당자(갑) 재연결을 수동 고정(`mailWho`)보다 앞단에서 차단.

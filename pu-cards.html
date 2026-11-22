@@ -31328,7 +31328,7 @@ function mgrHtml(){
      유형 A (단독 전환): 갑은 빠지고 을만 단독 담당 — 업체 주·부담당 + 진행 중 컨설팅·사건·기금 +
                         업무시트(work_erp) + 푸른메일 수동 고정 해제·제외를 한 번에 변경/신청
      유형 B (사업별 분리): 갑(자문·급여)과 을(컨설팅·사건·기금)이 각자 사업 메일만 받도록 갈래 분리
-   · 규칙 저장소: pucards/config/mailCoSplit/{coId | addr:<열쇠>}
+   · 규칙 저장소: pucards/mailCoSplit/{coId | addr:<열쇠>}
        { mode:'split'|'workOnly'|'', ex:['이름',...], toName:'이름', coName:'업체명', at, by, note }
    · 요청 저장소: data/co_mgr_requests (푸른이알피 CoMgrReqModal 과 같은 한 벌) */
 let _mbCoSplit = null, _mbCoSplitBusy = false;
@@ -31337,7 +31337,7 @@ function mbCoSplitLoad(cb){
   if(_mbCoSplitBusy) return;
   if(typeof Store === 'undefined' || Store.mode !== 'firebase'){ _mbCoSplit = {}; if(cb) cb(); return; }
   _mbCoSplitBusy = true;
-  firebase.database().ref(DB_ROOT + '/config/mailCoSplit').once('value')
+  firebase.database().ref(DB_ROOT + '/mailCoSplit').once('value')
     .then(s=>{ _mbCoSplit = s.val() || {}; })
     .catch(()=>{ if(_mbCoSplit === null) _mbCoSplit = {}; })
     .then(()=>{ _mbCoSplitBusy = false; mbWhoBust(); if(cb) cb(); if(state.view === 'mail') mbDrawSoon(); });
@@ -31364,7 +31364,7 @@ function mbCoIdOfAddr(em0, idx0, rec0){
   }
   return '';
 }
-function mbCoSplitNormRule(raw, key, coId){
+function mbCoSplitParseRule(raw, key, coId){
   if(!raw || typeof raw !== 'object') return null;
   const mode = String(raw.mode || '');
   const ex = Array.isArray(raw.ex) ? raw.ex.map(x=>String(x||'').trim()).filter(Boolean)
@@ -31381,11 +31381,11 @@ function mbCoSplitRuleOf(em0, idx0, rec0){
   if(!em) return null;
   const aKey = 'addr:' + mbWhoKey(em);
   if(map[aKey]){
-    const r0 = mbCoSplitNormRule(map[aKey], aKey, '');
+    const r0 = mbCoSplitParseRule(map[aKey], aKey, '');
     if(r0) return r0;
   }
   const coId = mbCoIdOfAddr(em, idx0, rec0);
-  if(coId && map[coId]) return mbCoSplitNormRule(map[coId], coId, coId);
+  if(coId && map[coId]) return mbCoSplitParseRule(map[coId], coId, coId);
   return null;
 }
 function mbCoSingleWorkMgr(em0, idx0, ex0){
@@ -31483,7 +31483,7 @@ function mbReqScopeLabel(req){
 }
 function mbSplitSummaryHtml(){
   const map = _mbCoSplit || {};
-  const rows = Object.keys(map).map(k=>mbCoSplitNormRule(map[k], k, k.indexOf('addr:') === 0 ? '' : k)).filter(Boolean);
+  const rows = Object.keys(map).map(k=>mbCoSplitParseRule(map[k], k, k.indexOf('addr:') === 0 ? '' : k)).filter(Boolean);
   if(!rows.length) return '';
   const canDir = !!(state.isAdmin || state.isSubAdmin);
   const modeLb = m => m === 'split' ? '🔀 사업별 분리 (자문·급여 ↔ 컨설팅·사건)'
@@ -31514,7 +31514,7 @@ function mbCoSplitClear(key){
   delete _mbCoSplit[k];
   mbWhoBust(); renderPCSide(); renderMailPage();
   if(typeof Store === 'undefined' || Store.mode !== 'firebase') return toast('↩ 담당 분리·제외 규칙을 풀었습니다', 5000);
-  firebase.database().ref(DB_ROOT + '/config/mailCoSplit/' + k).remove()
+  firebase.database().ref(DB_ROOT + '/mailCoSplit/' + k).remove()
     .then(()=>toast('↩ 담당 분리·제외 규칙을 풀었습니다', 5000))
     .catch(e=>{
       if(before !== undefined) _mbCoSplit[k] = before;
@@ -31529,7 +31529,7 @@ function mbStaffActiveList(){
   Object.keys(s).forEach(k=>{
     const x = s[k];
     if(!x || !x.sid || !x.name || seen[x.sid]) return;
-    if(x.status === 'retired') return;
+    if(mbRetired(x.name)) return;
     seen[x.sid] = 1;
     out.push({ sid:String(x.sid), name:String(x.name), title:String(x.title || '') });
   });
@@ -31598,7 +31598,7 @@ function mbCoDiag(coId, em0){
     const k = mbWhoKey(e);
     if(own[k]) handPins.push({ em:e, key:k, who:String(own[k]) });
   });
-  const sp = (_mbCoSplit && _mbCoSplit[String(co.id)]) ? mbCoSplitNormRule(_mbCoSplit[String(co.id)], String(co.id), String(co.id)) : null;
+  const sp = (_mbCoSplit && _mbCoSplit[String(co.id)]) ? mbCoSplitParseRule(_mbCoSplit[String(co.id)], String(co.id), String(co.id)) : null;
   const pend = (_mgrReqs || []).find(r=>r && String(r.coId) === String(co.id) && r.status === 'wait') || null;
   const people = [];
   const pushP = (nm, role)=>{
@@ -31845,9 +31845,9 @@ function mbTransferHtml(){
           <div id="mbTrCoHits" class="mbtr-chips" style="margin-top:8px;max-height:86px;overflow-y:auto">${mbTransferCoHitsHtml()}</div>
         </div>
         ${diagHtml}
-        <div class="mbtr-tabs">
-          <button type="button" class="mbtr-tab${_mbTr.tab==='sole'?' on':''}" onclick="mbTransferTab('sole')">👤 갑 빠지고 을 단독 전환 (일괄 변경·신청)</button>
-          <button type="button" class="mbtr-tab${_mbTr.tab==='split'?' on':''}" onclick="mbTransferTab('split')">🔀 사업별 분리 · 과거 담당 중복 차단</button>
+        <div class="mbtr-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected="${_mbTr.tab==='sole'?'true':'false'}" class="mbtr-tab${_mbTr.tab==='sole'?' on':''}" onclick="mbTransferTab('sole')">👤 갑 빠지고 을 단독 전환 (일괄 변경·신청)</button>
+          <button type="button" role="tab" aria-selected="${_mbTr.tab==='split'?'true':'false'}" class="mbtr-tab${_mbTr.tab==='split'?' on':''}" onclick="mbTransferTab('split')">🔀 사업별 분리 · 과거 담당 중복 차단</button>
         </div>
         ${tabBody}
       </div>
@@ -31920,7 +31920,7 @@ async function mbTransferSaveSplit(){
       });
     }
     if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
-      const ref = firebase.database().ref(DB_ROOT + '/config/mailCoSplit/' + key);
+      const ref = firebase.database().ref(DB_ROOT + '/mailCoSplit/' + key);
       if(next) await ref.set(next); else await ref.remove();
     }
     mbWhoBust();
@@ -31943,10 +31943,12 @@ async function mbUpdateErpWorksForCo(db, co, fromSid, toSid, toName){
     const snap = await db.ref('data/' + tbl + '/v').once('value').catch(()=>null);
     const val = snap && snap.val ? snap.val() : null;
     if(!val || Array.isArray(val) || typeof val !== 'object') continue;
+    const isFrozen = w => !w || w._deleted || w.permanentArchived || w.undoneDate || !mbWorkLive(w)
+      || /^(transferred)$|이관/.test(String(w.status || '').trim().toLowerCase());
     const candIds = [];
     Object.keys(val).forEach(id=>{
       const w = val[id];
-      if(!w || w._deleted || !mbWorkLive(w)) return;
+      if(isFrozen(w)) return;
       const same = (w.companyId && String(w.companyId) === String(co.id))
         || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
       if(!same) return;
@@ -31958,7 +31960,7 @@ async function mbUpdateErpWorksForCo(db, co, fromSid, toSid, toName){
     for(const id of candIds){
       let changed = false;
       await db.ref('data/' + tbl + '/v/' + id).transaction(cur=>{
-        if(!cur || cur._deleted || !mbWorkLive(cur)) return cur;
+        if(isFrozen(cur)) return cur;
         const curMain = String(cur.managerMain || '');
         const subs = Array.isArray(cur.managerSubs) ? cur.managerSubs.slice() : [];
         let nx = null;
@@ -31989,10 +31991,11 @@ async function mbUpdateWorkSheetForCo(db, coId, fromSid, toSid, toName){
   if(!snap) snap = await db.ref('work_erp/items').once('value').catch(()=>null);
   const items = snap && snap.val ? snap.val() : null;
   if(!items || typeof items !== 'object') return 0;
+  const isSheetClosed = it => !it || it._deleted || /^(done|closed|cancel|cancelled|canceled|transferred|archived)$|종료|완료|취소|이관/.test(String(it.state || '').trim().toLowerCase());
   const candIds = [];
   Object.keys(items).forEach(id=>{
     const it = items[id];
-    if(!it || String(it.coid || '') !== String(coId) || it.state === 'done') return;
+    if(isSheetClosed(it) || String(it.coid || '') !== String(coId)) return;
     const curSid = String((it.mgr_main && it.mgr_main.sid) || '');
     const subs = Array.isArray(it.mgr_subs) ? it.mgr_subs : [];
     if((curSid === fromSid && curSid !== toSid) || subs.some(s=>s && String(s.sid) === fromSid)) candIds.push(id);
@@ -32001,7 +32004,7 @@ async function mbUpdateWorkSheetForCo(db, coId, fromSid, toSid, toName){
   for(const id of candIds){
     let changed = false;
     await db.ref('work_erp/items/' + id).transaction(cur=>{
-      if(!cur || String(cur.coid || '') !== String(coId) || cur.state === 'done') return cur;
+      if(isSheetClosed(cur) || String(cur.coid || '') !== String(coId)) return cur;
       const curSid = String((cur.mgr_main && cur.mgr_main.sid) || '');
       const subs = Array.isArray(cur.mgr_subs) ? cur.mgr_subs : [];
       let nx = null;
@@ -32051,7 +32054,7 @@ async function mbCleanMailPinsForCo(db, coId, coName, dropNames, toName, actorNa
   });
   if(coId && drops.length){
     _mbCoSplit = _mbCoSplit || {};
-    const prev = mbCoSplitNormRule(_mbCoSplit[coId], coId, coId);
+    const prev = mbCoSplitParseRule(_mbCoSplit[coId], coId, coId);
     const mergedEx = (prev ? prev.ex.slice() : []).filter(x=>x !== toName);
     drops.forEach(nm=>{ if(nm && nm !== toName && mergedEx.indexOf(nm) < 0) mergedEx.push(nm); });
     const rule = {
@@ -32064,7 +32067,7 @@ async function mbCleanMailPinsForCo(db, coId, coName, dropNames, toName, actorNa
       by: String(actorName || '')
     };
     _mbCoSplit[coId] = rule;
-    up[DB_ROOT + '/config/mailCoSplit/' + coId] = rule;
+    up[DB_ROOT + '/mailCoSplit/' + coId] = rule;
   }
   if(db && Object.keys(up).length) await db.ref().update(up);
   return cleaned;
@@ -32262,7 +32265,7 @@ async function mgrDecideReq(reqId, ok){
         _mbCoSplit = _mbCoSplit || {};
         if(cleanRule) _mbCoSplit[k] = cleanRule; else delete _mbCoSplit[k];
         if(typeof Store !== 'undefined' && Store.mode === 'firebase'){
-          const ref = firebase.database().ref(DB_ROOT + '/config/mailCoSplit/' + k);
+          const ref = firebase.database().ref(DB_ROOT + '/mailCoSplit/' + k);
           if(cleanRule) await ref.set(cleanRule); else await ref.remove();
         }
         if(cleanRule && cleanRule.ex.length){

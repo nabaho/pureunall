@@ -459,11 +459,11 @@ rules.data = {
        예전 그대로다 — 이 자리를 좁혀도 담당이 바뀌는 길이 막히지는 않는다. */
   co_mgr_requests: {
     '.read': LOGIN,
-    '.write': `(${LOGIN}) && (newData.exists() || ${MGR})`,
+    '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
     v: {
-      '.write': `(${LOGIN}) && (newData.exists() || ${MGR})`,
+      '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
       $id: {
-        '.write': `(${LOGIN}) && (newData.exists() || ${MGR})`,
+        '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
         '.validate': `(${MGR}) || !data.exists() || data.child('status').val() === 'wait'`
           + ` || (newData.child('status').val() === data.child('status').val()`
           + ` && newData.child('coId').val() === data.child('coId').val()`
@@ -961,12 +961,9 @@ rules.pucards = {
   /* 🔎 명함 «이름으로 묻기» — 번호가 빈 명함의 둘째 중복 열쇠(이름+회사/이메일)가 같은 이름 몇 줄만 받는다 (2026-10-30).
      쓰기·읽기는 위 $k 와 «똑같이» 옮긴다 — idx 를 이름 붙은 칸으로 빼면 $k 가 주던 쓰기 허락이 사라진다. */
   idx: { '.write': pucardsWrite, '.indexOn': ['n'], $k2: { '.write': LOGIN } },
-  /* 🔀 사업장별 담당 분리·제외 규칙(config/mailCoSplit)은 정식 담당·알림 대상을 바꾸므로 관리자·위임관리인(MGR)만 쓴다 (2026-11-22).
-     ⚠ config 자체에 .write 를 두면 아래로 흘러 mailCoSplit 잠금이 풀리므로, 다른 설정($k2)에만 LOGIN 을 준다. */
-  config: {
-    mailCoSplit: { '.write': MGR },
-    $k2: { '.write': LOGIN }
-  },
+  /* 🔀 사업장별 담당 분리·제외 규칙(pucards/mailCoSplit)은 정식 담당·알림 대상을 바꾸므로 관리자·위임관리인(MGR)만 쓴다 (2026-11-22).
+     ⚠ config 아래에 두지 않고 pucards 바로 아래 이름 붙은 칸으로 두어 config(견적 자동 감지 ADMIN 잠금 등)와 섞이지 않게 한다. */
+  mailCoSplit: { '.write': MGR },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
