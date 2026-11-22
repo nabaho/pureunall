@@ -373,6 +373,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script src="js/pu-fast-boot.js?v=1"></script>
 <script src="js/pu-govaid-match.js?v=9"></script>
 <script src="js/pu-govaid-view.js?v=10"></script>
 <script src="js/pu-govaid-seed.js?v=1"></script>
@@ -467,20 +468,42 @@ function drawBulk(){
 function openModal(html){ $('mbox').innerHTML=html; $('modal').style.display='flex'; }
 function closeModal(){ $('modal').style.display='none'; $('mbox').innerHTML=''; $('mbox').classList.remove('wide','case'); SUBJ=null; JCTX=null; HCTX=null; LCTX=null; CCTX=null; dropPicked(['caseDocs']); }
 
-/* ═══ 불러오기 — 하나가 막혀도 나머지로 이어 간다. 못 읽은 자료에서 오는 값은 «모름» ═══ */
+/* ═══ 불러오기 — 대용량 국민연금·고용보험(pubdata/co)을 기다리지 않고 지원사업·업체원장을 먼저 그려(~0.2초) 빈 화면 대기를 없앤다 ═══ */
 async function reload(){
   var names=['기업정부지원금 자료','업체관리','국민연금·고용보험 인원'], fail=[];
-  /* govaid 는 칸마다 따로 읽는다 — 서버가 매일 쌓는 공고 함(govaid/notices)은 「새 공고」를 열 때만 읽는다(2026-10-12) */
   var G=['programs','prospects','extras','reviews'], GP=['govaid/programs','govaid/prospects','govaid/extras','govaid/reviews'];
-  var gres=await Promise.allSettled(GP.map(function(p){ return fbDb.ref(p).once('value'); }));
-  var res=await Promise.allSettled([fbDb.ref('govaid/noticeLast').once('value'), fbDb.ref('data/companies/v').once('value'), fbDb.ref('pubdata/co').once('value')]);
-  if(res[0].status==='fulfilled') D.noticeLast=res[0].value.val();
+  var pG=Promise.allSettled(GP.map(function(p){ return fbDb.ref(p).once('value'); }));
+  var pFast=Promise.allSettled([fbDb.ref('govaid/noticeLast').once('value'), fbDb.ref('data/companies/v').once('value')]);
+  var pPub=Promise.allSettled([fbDb.ref('pubdata/co').once('value')]);
+  var allDone=false;
+
+  Promise.all([pG,pFast]).then(function(pair){
+    if(allDone) return;
+    var g0=pair[0], f0=pair[1];
+    if(f0[0].status==='fulfilled') D.noticeLast=f0[0].value.val();
+    if(g0.every(function(x){ return x.status==='fulfilled'; })){ G.forEach(function(k,i){ D[k]=g0[i].value.val()||{}; }); }
+    if(f0[1].status==='fulfilled') D.companies=f0[1].value.val();
+    recompute(); draw();
+  });
+
+  var all=await Promise.all([pG,pFast,pPub]);
+  allDone=true;
+  var gres=all[0], fres=all[1], pres=all[2];
+  if(fres[0].status==='fulfilled') D.noticeLast=fres[0].value.val();
   if(gres.every(function(x){ return x.status==='fulfilled'; })){ G.forEach(function(k,i){ D[k]=gres[i].value.val()||{}; }); } else fail.push(names[0]);
-  if(res[1].status==='fulfilled') D.companies=res[1].value.val(); else fail.push(names[1]);
-  if(res[2].status==='fulfilled') D.pub=res[2].value.val()||{}; else fail.push(names[2]);
+  if(fres[1].status==='fulfilled') D.companies=fres[1].value.val(); else fail.push(names[1]);
+  if(pres[0].status==='fulfilled') D.pub=pres[0].value.val()||{}; else fail.push(names[2]);
   $('loadNote').style.display=fail.length?'':'none';
   $('loadNote').textContent=fail.length?('읽지 못한 자료: '+fail.join('·')+' — 그 자료에서 오는 값은 «모름»으로 보입니다'):'';
   recompute(); draw();
+  if(window.PuFastBoot&&ME.uid&&!fail.length){
+    try{
+      var slimCos=GovaidMatch.list(D.companies).slice(0,3000).map(function(c){
+        return {id:c.id||'',name:c.name||'',bizNo:c.bizNo||'',address:c.address||'',bizType:c.bizType||'',companySize:c.companySize||'',status:c.status||'',_deleted:!!c._deleted};
+      });
+      PuFastBoot.writeSnap('govaid',ME.uid,{programs:D.programs,prospects:D.prospects,extras:D.extras,reviews:D.reviews,companies:slimCos,noticeLast:D.noticeLast,names:NAMES,staff:STAFF});
+    }catch(e){}
+  }
 }
 async function reloadReviews(){ try{ D.reviews=(await fbDb.ref('govaid/reviews').once('value')).val()||{}; }catch(e){} draw(); }
 /* ★만 보기 — 사업 목록이 필요한 화면은 모두 이것을 쓴다(한 스위치가 모든 탭에 같이 걸리게) */
@@ -1659,15 +1682,35 @@ function boot(){
   try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
   firebase.auth().onAuthStateChanged(async function(u){
     $('outBtn').style.display=u?'':'none';
-    if(!u){ PuGate.show(); return; }
+    if(!u){
+      ME={sid:'',uid:''};
+      if(window.PuFastBoot){ try{ PuFastBoot.clearAll(); }catch(e){} }
+      PuGate.show(); return;
+    }
+    if(ME.uid&&ME.uid!==u.uid&&window.PuFastBoot){ try{ PuFastBoot.clearAll(); }catch(e){} }
     PuGate.hide();
+    var snapP=window.PuFastBoot?PuFastBoot.readSnap('govaid',u.uid).catch(function(){ return null; }):Promise.resolve(null);
     var sid=await staffSid(u);
     /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25). 이름을 아직 모르면 이름 줄은 생략 */
-    if(!sid){ var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||''; lock((nm?'접속: '+nm+' — ':'')+'재직 중인 직원 계정이 아닙니다'); return; }
-    ME.sid=sid; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
+    if(!sid){
+      if(window.PuFastBoot){ try{ PuFastBoot.clearAll(); }catch(e){} }
+      var nm=(window.PuWhoami&&PuWhoami.get()&&PuWhoami.get().name)||''; lock((nm?'접속: '+nm+' — ':'')+'재직 중인 직원 계정이 아닙니다'); return;
+    }
+    ME.sid=sid; ME.uid=String(u.uid||''); gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
     $('lock').style.display='none'; $('app').style.display='';
-    await loadNames();
-    await reload();
+    var cached=await snapP;
+    if(cached&&typeof cached==='object'){
+      D.programs=cached.programs||{}; D.prospects=cached.prospects||{}; D.extras=cached.extras||{}; D.reviews=cached.reviews||{};
+      if(cached.companies) D.companies=cached.companies;
+      if(cached.noticeLast) D.noticeLast=cached.noticeLast;
+      if(cached.names) NAMES=Object.assign({},cached.names);
+      if(Array.isArray(cached.staff)&&cached.staff.length) STAFF=cached.staff.slice();
+      recompute(); draw();
+    }
+    await Promise.all([
+      loadNames().then(function(){ if(PROGS.length||PROFILES.length) draw(); }),
+      reload()
+    ]);
   });
 }
 boot();

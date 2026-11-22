@@ -89,18 +89,18 @@ const COOF = { '다라전자': { e: 'info@dara.test' } };
 const flush = () => new Promise((r) => setTimeout(r, 0));
 async function opened(o) { const w = world(Object.assign({ sites: SITES, idx: IDX, coOf: COOF }, o || {})); w.api.pmOpen('F1'); await flush(); await flush(); return w; }
 
-test('★ 서류 목록은 새로 짓지 않는다 — 서식 탭의 «기업 준비·첨부서류 목록»(REQ_DOCS) 인가·등기 2단계만 간결하게 유지', () => {
+test('★ 서류 목록은 새로 짓지 않는다 — 서식 탭의 «기업 준비·첨부서류 목록»(REQ_DOCS) 설립준비·인가·등기 3단계를 한 번에 유지', () => {
   const w = world();
   const secs = w.api._pmDocs('공동', null);
-  assert.deepEqual(secs.map((s) => s.ph), ['inka', 'reg'], '인가·등기 2단계만 유지 (세무·은행 불필요 안내 제거)');
+  assert.deepEqual(secs.map((s) => s.ph), ['prep', 'inka', 'reg'], '설립준비·인가·등기 3단계를 한 번에 요청 (세무·은행 불필요 안내 제거)');
   secs.forEach((s) => assert.deepEqual(s.docs.map((d) => d.id), w.api.reqDocsFor(s.ph, '공동').map((d) => d.id), s.ph + ' 목록이 REQ_DOCS 와 다르다'));
   const ids = secs.flatMap((s) => s.docs.map((d) => d.id));
   assert.equal(new Set(ids).size, ids.length, '서류 번호가 겹친다');
-  assert.ok(ids.length >= 8, '설립 필수서류 개수 확인');
-  /* 사내기금 인가 단계에서 불필요한 재무제표·고용보험명부·개인도장·기금직인 및 기업 준비 불필요 기금출연확인서가 완전히 빠졌는지 검증 */
-  const saneInkaIds = w.api._pmDocs('사내', null)[0].docs.map((d) => d.id);
-  ['inka_fin', 'inka_ei', 'inka_pseal', 'inka_fseal', 'inka_cseal'].forEach((bad) => {
-    assert.ok(!saneInkaIds.includes(bad), '사내기금 인가 단계에 불필요한 서류가 남아 있음: ' + bad);
+  assert.ok(ids.length >= 12, '설립준비·인가·등기 필수서류 개수 확인');
+  /* 사내기금 전 단계에서 불필요한 재무제표·고용보험명부·중소기업확인서·기금출연확인서가 완전히 빠졌는지 검증 */
+  const saneAllIds = w.api._pmDocs('사내', null).flatMap((s) => s.docs.map((d) => d.id));
+  ['inka_fin', 'inka_ei', 'prep_fin', 'prep_ei', 'prep_smecert', 'inka_pseal', 'inka_fseal', 'inka_cseal'].forEach((bad) => {
+    assert.ok(!saneAllIds.includes(bad), '사내기금에 불필요한 서류가 남아 있음: ' + bad);
   });
   assert.ok(!ids.includes('inka_cseal'), '기금출연확인서는 기업 준비 요청 목록에서 제외되어야 한다');
 });
@@ -119,21 +119,26 @@ test('★ 기본으로 고르는 것 — 기업이 준비하는 줄만 고르고
   assert.ok(got.filter((x) => x.id === 'inka_wrep')[0].on, '확인 안 한 서류는 그대로 고른다');
 });
 
-test('★ 메일 본문은 불필요한 단락(고유번호증·은행, 도장·날인 협조사항, 함께 정할 사항, 기업정보, 부연설명) 없이 필요서류 제목만 간결하게 표시한다', async () => {
+test('★ 메일 본문은 설립준비·인가·등기 3단계를 한 번에 요청하며, 인감증명·인감도장은 «등기자 딱 2명(사용자 1명, 근로자 1명)만 필요»함을 오해 없이 명시한다', async () => {
   const w = await opened();
   const P = w.api.getPM();
   const m = w.api._pmMail(P, P.rows[0]);
-  assert.ok(!/고유번호증 발급|은행 계좌개설/.test(m.body), '3. 고유번호증·은행 단락이 남아 있다');
-  assert.ok(!/협조해 주실 사항|도장·날인·납부/.test(m.body), '4. 협조 단락이 남아 있다');
+  assert.ok(!/고유번호증 발급|은행 계좌개설/.test(m.body), '고유번호증·은행 단락이 남아 있다');
+  assert.ok(!/협조해 주실 사항|도장·날인·납부/.test(m.body), '협조 단락이 남아 있다');
   assert.ok(!/함께 정해 주실 사항/.test(m.body), '함께 정해 주실 사항 단락이 남아 있다');
   assert.ok(!/기업 정보 확인/.test(m.body), '기업 정보 확인 단락이 남아 있다');
   assert.ok(!/준비:\s/.test(m.body) && !/\n {3}- /.test(m.body), '서류 아래 부연 설명줄이나 (준비: ...) 꼬리표가 남아 있다');
   ['설립인가증 원본', '인가받은 정관 사본', '기금출연확인서'].forEach((t) => assert.ok(!m.body.includes(t), t + ' — 기업 준비 대상이 아닌 줄이 들어갔다'));
+  assert.match(m.body, /■ 1\. 기업 설립 시 준비서류/);
+  assert.match(m.body, /■ 2\. 노동부 설립인가 필요서류/);
+  assert.match(m.body, /■ 3\. 법인 설립등기 필요서류 — 등기자 딱 2명\(사용자 1명, 근로자 1명\)만 필요/);
+  assert.match(m.body, /※ 인감증명서·개인인감도장은 등기할 사람 딱 2명\(사용자 1명, 근로자 1명\)만 필요합니다\. 나머지 인원은 인감증명·인감도장이 필요 없습니다\./);
+  assert.match(m.body, /일반 막도장 또는 막도장 사용동의서 \(노 1부, 사 1부 · 인감증명·인감도장 불필요\)/);
   assert.match(m.body, /\[ \] 1\. \[근로자측·사용자측 위원\] 설립준비위원 재직증명서 \(노 1부, 사 1부\)/);
   assert.match(m.body, /\[참여기업\(회사\)\] 법인등기부등본 1부/);
-  assert.match(m.body, /\[근로자측·사용자측 이사\] 개인인감증명서 \(노 1부, 사 1부 · 발급 3개월 이내\)/);
-  assert.match(m.body, /\[근로자측·사용자측 이사\] 주민등록등본 또는 초본 \(노 1부, 사 1부 · 발급 3개월 이내\)/);
-  assert.match(m.body, /\[근로자측·사용자측 이사\] 신분증 사본 및 개인인감도장 \(노 1부, 사 1부\)/);
+  assert.match(m.body, /\[등기자 딱 2명만 — 사용자 1명, 근로자 1명\] 개인인감증명서 각 1부 \(발급 3개월 이내 · 나머지 인원은 인감증명 불필요\)/);
+  assert.match(m.body, /\[등기자 딱 2명만 — 사용자 1명, 근로자 1명\] 주민등록등본 또는 초본 각 1부 \(주소변동 포함·발급 3개월 이내 · 등기자 딱 2명만 필요\)/);
+  assert.match(m.body, /\[등기자 딱 2명만 — 사용자 1명, 근로자 1명\] 신분증 사본 및 개인인감도장 각 1부 \(나머지 인원은 인감도장 불필요\)/);
 });
 
 test('화면 — 기금법인 줄은 «우리 진행»으로 남고 기본 해제된다', async () => {
@@ -285,7 +290,7 @@ test('쓰기 창이 «아직 안 떠 있으면» 받는이·제목만 주소로 
   assert.match(href, /^pu-cards\.html\?view=mail&to=park%40ganasan\.test&name=/);
   assert.ok(!/body=/.test(href), '본문을 주소에 실었다');
   assert.ok(href.length < 600, '주소가 길다 — 서버 한도에 걸린다: ' + href.length);
-  assert.equal(w.copied.length, 1); assert.match(w.copied[0], /■ 2\. 법인 설립등기 필요서류/, '본문 전체를 복사해 두어야 한다');
+  assert.equal(w.copied.length, 1); assert.match(w.copied[0], /■ 3\. 법인 설립등기 필요서류/, '본문 전체를 복사해 두어야 한다');
   assert.ok(w.toasts.some((t) => /붙여 넣/.test(t[0])), '붙여 넣으라고 알려야 한다');
 });
 
@@ -308,7 +313,7 @@ test('★ 받는 사람 이메일이 올바르지 않거나 요청할 서류가 
   w.api.pmManual('s3', 'lee@maba.test'); w.api.pmCompose('s3'); await flush();
   assert.equal(w.opened.length, 1, '올바른 이메일을 직접 적으면 열려야 한다'); assert.equal(w.composed[0].to, 'lee@maba.test');
   const w2 = await opened();
-  w2.api.pmDocAll('inka', false); w2.api.pmDocAll('reg', false); w2.api.pmDocAll('tax', false);
+  w2.api.pmDocAll('prep', false); w2.api.pmDocAll('inka', false); w2.api.pmDocAll('reg', false); w2.api.pmDocAll('tax', false);
   w2.api.pmCompose('s1'); await flush();
   assert.equal(w2.opened.length, 0); assert.ok(w2.toasts.some((t) => /서류/.test(t[0])), '서류를 하나도 안 골랐는데 열었다');
 });
@@ -379,7 +384,7 @@ test('서류 □ 는 미리보기만 다시 그린다(창 전체를 다시 그�
 test('★ 서류 □ 를 누르면 «요청 N종»·단계 머리의 n/m종·단계 □ 도 같이 바뀐다 — 창을 다시 그리지 않고 그 자리만 고친다(외부 검토 지적)', async () => {
   const w = await opened();
   ['r0', 'r1', 'r2'].forEach((s) => { w.els['pmN_' + s] = { innerHTML: '' }; w.els['pmR_' + s] = { style: {} }; });
-  ['inka', 'reg'].forEach((p) => { w.els['pmS_' + p] = { textContent: '' }; w.els['pmSck_' + p] = { checked: false }; });
+  ['prep', 'inka', 'reg'].forEach((p) => { w.els['pmS_' + p] = { textContent: '' }; w.els['pmSck_' + p] = { checked: false }; });
   w.els.pmSubj = { value: '' }; w.els.pmBody = { value: '' }; w.els.pmWho = { innerHTML: '' };
   const P = w.api.getPM(), before = w.els.modalbox.innerHTML;
   const nOn = (ph) => P.secs.filter((s) => s.ph === ph)[0].docs.filter((d) => P.sel[d.id]).length, tot = (ph) => P.secs.filter((s) => s.ph === ph)[0].docs.length;
@@ -564,6 +569,6 @@ test('★ 배선 — 진행판 팝업 머리에 [✉ 기업에 설립시 준비�
   assert.match(board, /_pmSentN\(f,SD\.sites\[fid\]\)/, '보낸 곳 칩이 없다');
   assert.ok(SRC.indexOf("'setup.prepmail':{") >= 0 && /onclick="pmHelp\(\)"/.test(BLOCK) && /HELP\[PM_UI\.help\]\.h/.test(BLOCK) && /var PM_UI=\{help:'setup\.prepmail'\}/.test(BLOCK), 'ⓘ 도움말이 없다');
   assert.ok(!/hlp\('setup\.prepmail'\)/.test(BLOCK), 'ⓘ 가 모달을 겹쳐 띄운다 — 닫을 때 «뒤» 준비서류 창이 먼저 닫힌다');
-  const m = REQ_SRC; ['inka', 'reg', 'tax'].forEach((k) => assert.ok(new RegExp('\\b' + k + ':\\[').test(m), k + ' 단계가 REQ_DOCS 에 없다'));
+  const m = REQ_SRC; ['prep', 'inka', 'reg', 'tax'].forEach((k) => assert.ok(new RegExp('\\b' + k + ':\\[').test(m), k + ' 단계가 REQ_DOCS 에 없다'));
   assert.match(fnSrc('sdPop'), /Object\.assign\(\{\},f,\{_id:SD\.sel\}\)/, 'sdPop 이 기금 번호를 실어 주지 않는다(prep_mail 단추가 undefined 로 나간다)');
 });

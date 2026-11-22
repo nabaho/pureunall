@@ -2926,13 +2926,48 @@ async function upsertSharedDocs(docs, env, fetchFn, ingestedByUid, opts) {
   return { ok: true, pushed: 0, skipped: true, conflicts: [], tombstoned: [] };
 }
 
-async function pullSharedDocs(env, fetchFn, limit, sinceDeletedAt, afterCanonicalKey, storageBucket, offset) {
+const SERVER_PUBLIC_OWNERS = new Set(["", "system", "system_sync", "official", "official_auto", "builtin", "seed", "auto_sync", "pbox_auto"]);
+function filterPulledDocsForStaff(result, staffUid) {
+  if (!result || typeof result !== "object") return result;
+  const rawUid = String(staffUid || "").trim();
+  const uid = (!rawUid || rawUid === "guest") ? "" : rawUid;
+  const srcDocs = Array.isArray(result.docs) ? result.docs : [];
+  const filtered = srcDocs.filter((d) => {
+    if (!d || typeof d !== "object") return false;
+    const ingRaw = String(d.ingestedBy || d.ingested_by || "").trim();
+    const ownRaw = String(d.ownerUid || d.owner_uid || "").trim();
+    const ing = ingRaw === "guest" ? "" : ingRaw;
+    const own = ownRaw === "guest" ? "" : ownRaw;
+    if (ing && !SERVER_PUBLIC_OWNERS.has(ing) && (!uid || ing !== uid)) return false;
+    if (own && !SERVER_PUBLIC_OWNERS.has(own) && (!uid || own !== uid)) return false;
+    if (d.docType === "internal_case" && (!uid || (ing !== uid && own !== uid))) return false;
+    return true;
+  });
+  const srcDel = Array.isArray(result.deletedKeys) ? result.deletedKeys : [];
+  const filteredDel = srcDel.filter((k) => {
+    const s = String(k || "").trim();
+    if (!s) return false;
+    /* 해시형 툼스톤 키('hash|<uid>|...')는 본인 또는 시스템 소유만 반환하여 타 직원 UID 유출 방지 */
+    if (s.indexOf("hash|") === 0) {
+      const parts = s.split("|");
+      const keyOwner = String(parts[1] || "").trim();
+      if (keyOwner && !SERVER_PUBLIC_OWNERS.has(keyOwner) && (!uid || keyOwner !== uid)) {
+        return false;
+      }
+    }
+    return true;
+  });
+  return Object.assign({}, result, { docs: filtered, deletedKeys: filteredDel });
+}
+
+async function pullSharedDocs(env, fetchFn, limit, sinceDeletedAt, afterCanonicalKey, storageBucket, offset, staffUid) {
   if (getSupabaseCreds(env)) {
     const supaPulled = await pullFromSupabaseServer(env, fetchFn, limit, sinceDeletedAt, afterCanonicalKey);
-    return Object.assign({ sharedBackend: supaPulled.configured ? "supabase" : "none" }, supaPulled);
+    return filterPulledDocsForStaff(Object.assign({ sharedBackend: supaPulled.configured ? "supabase" : "none" }, supaPulled), staffUid);
   }
   if (isStorageBucketLike(storageBucket)) {
-    return pullFromBucketStore(storageBucket, limit, sinceDeletedAt, afterCanonicalKey, offset);
+    const bucketPulled = await pullFromBucketStore(storageBucket, limit, sinceDeletedAt, afterCanonicalKey, offset);
+    return filterPulledDocsForStaff(bucketPulled, staffUid);
   }
   return {
     ok: true,
@@ -5937,7 +5972,8 @@ async function handleApiAction(opts) {
       body.sinceDeletedAt || "",
       body.afterDeletedKey || "",
       storageBucket,
-      body.offset
+      body.offset,
+      uid
     );
     return { status: pulled.ok === false ? 502 : 200, payload: pulled };
   }

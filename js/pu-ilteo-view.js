@@ -57,6 +57,33 @@
   var POST_UPLOAD_DOC_KIND = '';
   var SPLIT_REVIEW_OPEN = true;
   var REVIEW_TAB = 'summary';
+  var MAIL_VIEW_CACHE = Object.create(null);
+
+  function setSyncStateText(txt) {
+    var el = $('syncStateChip');
+    if (!el) return;
+    if (!txt) { el.style.display = 'none'; el.textContent = ''; }
+    else { el.textContent = txt; el.style.display = ''; }
+  }
+
+  function isUiBusyForBgRedraw() {
+    var m = $('modal');
+    if (m && m.style && m.style.display && m.style.display !== 'none') return true;
+    var ae = typeof document !== 'undefined' ? document.activeElement : null;
+    if (!ae || !ae.tagName) return false;
+    var tag = String(ae.tagName).toUpperCase();
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  async function ensureIlteoLibs(opts) {
+    var o = opts || {};
+    var fbBoot = global.PuFastBoot;
+    if (!fbBoot) return;
+    if (o.zip && !global.JSZip && typeof fbBoot.ensureJsZip === 'function') await fbBoot.ensureJsZip();
+    if (o.xlsx && !global.XLSX && typeof fbBoot.ensureXlsx === 'function') await fbBoot.ensureXlsx();
+    if (o.pdf && !global.pdfjsLib && typeof fbBoot.ensurePdfJs === 'function') await fbBoot.ensurePdfJs();
+    if (o.hwp && (!global.PureunHwpx || !global.PureunHwp) && typeof fbBoot.ensureHwpLibs === 'function') await fbBoot.ensureHwpLibs();
+  }
 
   function $(id) { return document.getElementById(id); }
   function str(v) { return v == null ? '' : String(v).trim(); }
@@ -115,8 +142,24 @@
     return !!uid && epoch === SESSION_EPOCH && !!ME && ME.uid === uid && currentAuthUid() === uid;
   }
 
+  var SNAP_ONLY = false;
+
+  function wrapSnapGuard(rawGate) {
+    if (!rawGate || typeof rawGate.save !== 'function') return rawGate;
+    return Object.assign({}, rawGate, {
+      save: function () {
+        if (SNAP_ONLY) {
+          toast('최신 원장 동기화 중입니다. 잠시 후 다시 저장해 주세요.');
+          return Promise.reject(new Error('SNAP_ONLY'));
+        }
+        return rawGate.save.apply(rawGate, arguments);
+      }
+    });
+  }
+
   function purgeSessionState() {
     gate = null;
+    SNAP_ONLY = false;
     ME = { uid: '', sid: '', name: '', email: '', isAdmin: false, isSubAdmin: false };
     TAB = 'projects';
     CUR_PID = '';
@@ -124,6 +167,11 @@
     DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
     SCAN_CACHE = {};
     DISCOVER_LIST = [];
+    MAIL_VIEW_CACHE = Object.create(null);
+    setSyncStateText('');
+    if (global.PuFastBoot && typeof global.PuFastBoot.clearAll === 'function') {
+      try { global.PuFastBoot.clearAll(); } catch (e) {}
+    }
     D = {
       projects: {}, intake: {}, mid: {}, final: {}, snapshots: {},
       companies: [], consultings: [], bizTypes: [],
@@ -148,47 +196,187 @@
     }
   }
 
+  function buildIlteoFastSnapshot() {
+    var slimProjects = {};
+    Object.keys(D.projects || {}).forEach(function (pid) {
+      var p = D.projects[pid];
+      if (!p || typeof p !== 'object') return;
+      slimProjects[pid] = {
+        id: str(p.id || pid),
+        companyId: str(p.companyId),
+        scalCoId: str(p.scalCoId),
+        companyName: str(p.companyName),
+        bizNo: str(p.bizNo),
+        year: Number(p.year) || 0,
+        track: str(p.track),
+        programName: str(p.programName),
+        isIlteo: p.isIlteo !== false,
+        selectedTasks: Array.isArray(p.selectedTasks) ? p.selectedTasks.slice(0, 12).map(str) : [],
+        industry: str(p.industry),
+        consultantSid: str(p.consultantSid),
+        consultantName: str(p.consultantName),
+        midConfirmedAt: Number(p.midConfirmedAt) || 0,
+        finalConfirmedAt: Number(p.finalConfirmedAt) || 0,
+        status: str(p.status),
+        revision: Number(p.revision) || 0,
+        createdAt: Number(p.createdAt) || 0,
+        updatedAt: Number(p.updatedAt) || 0,
+        _deleted: !!p._deleted
+      };
+    });
+    var slimIntake = {};
+    Object.keys(D.intake || {}).forEach(function (pid) {
+      var bucket = D.intake[pid];
+      if (!bucket || typeof bucket !== 'object') return;
+      var sub = {};
+      Object.keys(bucket).forEach(function (cid) {
+        var c = bucket[cid];
+        if (c && typeof c === 'object') sub[cid] = { id: str(c.id || cid), revision: Number(c.revision) || 0, _deleted: !!c._deleted };
+      });
+      slimIntake[pid] = sub;
+    });
+    var slimMid = {}, slimFinal = {};
+    Object.keys(D.mid || {}).forEach(function (pid) {
+      var m = D.mid[pid];
+      if (m && typeof m === 'object') slimMid[pid] = { _deleted: !!m._deleted, revision: Number(m.revision) || 0, sections: null, _hasSections: !!m.sections };
+    });
+    Object.keys(D.final || {}).forEach(function (pid) {
+      var f = D.final[pid];
+      if (f && typeof f === 'object') slimFinal[pid] = { _deleted: !!f._deleted, revision: Number(f.revision) || 0, sections: null, _hasSections: !!f.sections };
+    });
+    var slimConsultings = D.consultings.slice(0, 1200).map(function (ct) {
+      return {
+        id: str(ct.id), companyId: str(ct.companyId), companyName: str(ct.companyName), bizNo: str(ct.bizNo),
+        no: str(ct.no), contractNo: str(ct.contractNo), typeCode: str(ct.typeCode), bizTypeId: str(ct.bizTypeId),
+        bizName: str(ct.bizName), bizCaseType: str(ct.bizCaseType), type: str(ct.type), bizType: str(ct.bizType),
+        status: str(ct.status), year: ct.year || '', startDate: str(ct.startDate), endDate: str(ct.endDate),
+        managerMain: str(ct.managerMain), _deleted: !!ct._deleted
+      };
+    });
+    var slimScalCos = {};
+    Object.keys(D.scalCos || {}).forEach(function (k) {
+      var sc = D.scalCos[k];
+      if (sc && typeof sc === 'object') {
+        slimScalCos[k] = {
+          id: str(sc.id || k), name: str(sc.name), bizNo: str(sc.bizNo), year: sc.year || '',
+          typeId: str(sc.typeId), types: Array.isArray(sc.types) ? sc.types.slice(0, 10) : [], _deleted: !!sc._deleted
+        };
+      }
+    });
+    return {
+      projects: slimProjects,
+      intake: slimIntake,
+      mid: slimMid,
+      final: slimFinal,
+      snapshots: {},
+      companies: D.companies.slice(0, 2500).map(function (c) {
+        return { id: str(c.id), name: str(c.name), bizNo: str(c.bizNo), managerMain: str(c.managerMain) };
+      }),
+      consultings: slimConsultings,
+      bizTypes: D.bizTypes,
+      scalCos: slimScalCos,
+      scalTypes: D.scalTypes,
+      scalScheds: {},
+      flatMails: []
+    };
+  }
+
+  function applyIlteoFastSnapshot(snap) {
+    if (!snap || typeof snap !== 'object') return false;
+    SNAP_ONLY = true;
+    D.projects = snap.projects || {};
+    D.intake = snap.intake || {};
+    D.mid = snap.mid || {};
+    D.final = snap.final || {};
+    D.snapshots = snap.snapshots || {};
+    D.companies = Array.isArray(snap.companies) ? snap.companies : [];
+    D.consultings = Array.isArray(snap.consultings) ? snap.consultings : [];
+    D.bizTypes = Array.isArray(snap.bizTypes) ? snap.bizTypes : [];
+    D.scalCos = snap.scalCos || {};
+    D.scalTypes = snap.scalTypes || {};
+    D.scalScheds = snap.scalScheds || {};
+    D.flatMails = Array.isArray(snap.flatMails) ? snap.flatMails : [];
+    return true;
+  }
+
+  /* 2단계 점진적 즉시 적재: 사업장·일정 핵심 원장(~0.2초) 선표시 → 대용량 메일함 백그라운드 동기화 */
   async function reload(optEpoch, optUid) {
     var reqEpoch = optEpoch || SESSION_EPOCH;
     var reqUid = optUid || (ME && ME.uid ? String(ME.uid) : '');
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
 
-    var res = await Promise.all([
+    setSyncStateText('⟳ 메일·자료 동기화 중…');
+
+    var pCore = Promise.all([
       safeVal('scal_ilteo'),
       safeVal('data/companies'),
       safeVal('data/consultings'),
       safeVal('data/biz_cons_types'),
       safeVal('scal_cos'),
       safeVal('scal_types'),
-      safeVal('scal_scheds'),
+      safeVal('scal_scheds')
+    ]);
+    var pMail = Promise.all([
       safeVal('scal_docs'),
       safeVal('mailbox/folders'),
       safeVal('mailbox/msgs'),
       safeVal('mailbox/old/msgs')
     ]);
+    var allDone = false;
+
+    pCore.then(function (cRes) {
+      if (allDone || !isSessionCurrent(reqEpoch, reqUid)) return;
+      SNAP_ONLY = false;
+      var ilteoRoot0 = cRes[0] && typeof cRes[0] === 'object' ? cRes[0] : {};
+      D.projects = ilteoRoot0.projects || {};
+      D.intake = ilteoRoot0.intake || {};
+      D.mid = ilteoRoot0.mid || {};
+      D.final = ilteoRoot0.final || {};
+      D.snapshots = ilteoRoot0.snapshots || {};
+      D.companies = rowsOf(cRes[1]);
+      D.consultings = rowsOf(cRes[2]);
+      D.bizTypes = rowsOf(cRes[3]);
+      D.scalCos = cRes[4] || {};
+      D.scalTypes = cRes[5] || {};
+      D.scalScheds = cRes[6] || {};
+      rebuildScanAndDiscover();
+      applyHashTarget();
+      if (!isUiBusyForBgRedraw()) draw();
+    });
+
+    var both = await Promise.all([pCore, pMail]);
+    allDone = true;
+    SNAP_ONLY = false;
     if (!isSessionCurrent(reqEpoch, reqUid)) return;
 
-    var ilteoRoot = res[0] && typeof res[0] === 'object' ? res[0] : {};
+    var cResFinal = both[0];
+    var mResFinal = both[1];
+    var ilteoRoot = cResFinal[0] && typeof cResFinal[0] === 'object' ? cResFinal[0] : {};
     D.projects = ilteoRoot.projects || {};
     D.intake = ilteoRoot.intake || {};
     D.mid = ilteoRoot.mid || {};
     D.final = ilteoRoot.final || {};
     D.snapshots = ilteoRoot.snapshots || {};
-    D.companies = rowsOf(res[1]);
-    D.consultings = rowsOf(res[2]);
-    D.bizTypes = rowsOf(res[3]);
-    D.scalCos = res[4] || {};
-    D.scalTypes = res[5] || {};
-    D.scalScheds = res[6] || {};
-    D.scalDocs = res[7] || {};
-    D.mailFolders = res[8] || {};
-    D.mailMsgs = res[9] || {};
-    D.mailOldMsgs = res[10] || {};
+    D.companies = rowsOf(cResFinal[1]);
+    D.consultings = rowsOf(cResFinal[2]);
+    D.bizTypes = rowsOf(cResFinal[3]);
+    D.scalCos = cResFinal[4] || {};
+    D.scalTypes = cResFinal[5] || {};
+    D.scalScheds = cResFinal[6] || {};
+    D.scalDocs = mResFinal[0] || {};
+    D.mailFolders = mResFinal[1] || {};
+    D.mailMsgs = mResFinal[2] || {};
+    D.mailOldMsgs = mResFinal[3] || {};
     D.flatMails = Intake().flattenMailboxRows(D.mailFolders, D.mailMsgs, D.mailOldMsgs);
+    setSyncStateText('');
 
     rebuildScanAndDiscover();
     applyHashTarget();
-    draw();
+    if (!isUiBusyForBgRedraw()) draw();
+
+    if (global.PuFastBoot && typeof global.PuFastBoot.writeSnap === 'function') {
+      try { global.PuFastBoot.writeSnap('ilteo', reqUid, buildIlteoFastSnapshot()); } catch (e) {}
+    }
   }
 
   function compareProjects(a, b, sortMode, scanMap) {
@@ -671,11 +859,11 @@
 
   function hasMidStored(p) {
     if (!p) return false;
-    return !!(p.midConfirmedAt || (D.mid[p.id] && !D.mid[p.id]._deleted && D.mid[p.id].sections));
+    return !!(p.midConfirmedAt || (D.mid[p.id] && !D.mid[p.id]._deleted && (D.mid[p.id].sections || D.mid[p.id]._hasSections)));
   }
   function hasFinalStored(p) {
     if (!p) return false;
-    return !!(p.finalConfirmedAt || (D.final[p.id] && !D.final[p.id]._deleted && D.final[p.id].sections));
+    return !!(p.finalConfirmedAt || (D.final[p.id] && !D.final[p.id]._deleted && (D.final[p.id].sections || D.final[p.id]._hasSections)));
   }
 
   function summarizeByYear(projs) {
@@ -783,12 +971,8 @@
   /* ── 탭 1: 사업장 현황 · 메일 감지 · 연도별 필터 및 좌우 즉시 검토 ── */
   function drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen) {
     var yearGroups = summarizeByYear(projs);
-    var finDoneCnt = projs.filter(function (p) {
-      return !!(p.finalConfirmedAt || (D.final[p.id] && !D.final[p.id]._deleted && D.final[p.id].sections));
-    }).length;
-    var midStoredCnt = projs.filter(function (p) {
-      return !!(p.midConfirmedAt || (D.mid[p.id] && !D.mid[p.id]._deleted && D.mid[p.id].sections));
-    }).length;
+    var finDoneCnt = projs.filter(hasFinalStored).length;
+    var midStoredCnt = projs.filter(hasMidStored).length;
 
     if ($('kpiBox')) {
       var minYr = yearGroups.length ? yearGroups[yearGroups.length - 1].year : '2026';
@@ -1714,6 +1898,9 @@
 
     var excelTextFallback = '';
     var resolvedNonQuantKind = explicitDk ? explicitDk.code : '';
+    if (/\.(xlsx|xls|csv)$/.test(lower)) {
+      await ensureIlteoLibs({ xlsx: true });
+    }
     if (/\.(xlsx|xls|csv)$/.test(lower) && global.XLSX) {
       var wb = global.XLSX.read(bytes, { type: 'array' });
       var sheetMap = {};
@@ -1812,10 +1999,17 @@
       return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
     }
     if (/\.(pptx|pptm|ppsx)$/.test(lower) && Intake().extractPptxText) {
+      await ensureIlteoLibs({ zip: true });
       try {
         var pptTxt = await Intake().extractPptxText(bytes, global.JSZip);
         if (pptTxt) return pptTxt;
       } catch (e) {}
+    }
+    if (/\.(hwpx|hwp|docx)$/.test(lower)) {
+      await ensureIlteoLibs({ hwp: true });
+    }
+    if (/\.pdf$/.test(lower)) {
+      await ensureIlteoLibs({ pdf: true });
     }
     if (global.PuKordocText && typeof global.PuKordocText.read === 'function' && /\.(hwpx|hwp|docx)$/.test(lower)) {
       try {
@@ -1903,9 +2097,14 @@
 
     try {
       var isPop3 = m.src === 'pop3' && !!m.popKey;
-      var msg = isPop3
-        ? await callMailFn('readOldMail', { key: m.popKey, full: 1 })
-        : await callMailFn('readMailMessage', { slug: m.slug, uid: m.uid, peek: 1 });
+      var mCacheKey = isPop3 ? ('old:' + String(m.popKey)) : ('imap:' + String(m.slug) + ':' + String(m.uid));
+      var msg = MAIL_VIEW_CACHE[mCacheKey];
+      if (!msg) {
+        msg = isPop3
+          ? await callMailFn('readOldMail', { key: m.popKey, full: 1 })
+          : await callMailFn('readMailMessage', { slug: m.slug, uid: m.uid, peek: 1 });
+        if (msg) MAIL_VIEW_CACHE[mCacheKey] = msg;
+      }
       bodyPlain = str(msg.text) || htmlToPlainText(msg.html) || str(m.preview);
       var atts = Array.isArray(msg.atts) ? msg.atts : [];
 
@@ -2888,6 +3087,7 @@
   }
 
   async function downloadSelectedDeliverablesZip(proj, selectedIds) {
+    await ensureIlteoLibs({ zip: true, xlsx: selectedIds.indexOf('sim_xlsx') >= 0 });
     if (!Pack() || !global.JSZip) { toast('패키지 생성 엔진이 로드되지 않았습니다.'); return; }
     var live = buildLiveReportsForExport(proj);
     var safeCo = Pack().safeFilePart(proj.companyName);
@@ -3719,6 +3919,7 @@
       draw();
       toast('수집된 기초자료 기준으로 중간보고서가 자동 정리되었습니다(수기 고정 섹션 보존).');
     } else if (act === 'dl-mid-pptx') {
+      await ensureIlteoLibs({ zip: true });
       var liveM = buildLiveReportsForExport(proj);
       var midBytes = await Pptx().generateMidPptxBytes(proj, liveM.mid);
       var safeCoM = Pack() ? Pack().safeFilePart(proj.companyName) : proj.companyName.replace(/[\\/:*?"<>|]/g, '_');
@@ -3751,24 +3952,28 @@
       draw();
       toast('중간보고 기준선과 후속 메일 Diff를 반영해 최종 결과보고서를 조립했습니다.');
     } else if (act === 'dl-final-pptx') {
+      await ensureIlteoLibs({ zip: true });
       var liveF = buildLiveReportsForExport(proj);
       var finBytes = await Pptx().generateFinalPptxBytes(proj, liveF.mid, liveF.fin);
       var safeCoF = Pack() ? Pack().safeFilePart(proj.companyName) : proj.companyName.replace(/[\\/:*?"<>|]/g, '_');
       Pptx().downloadPptxBytes(finBytes, safeCoF + '_일터혁신_최종결과보고서.pptx');
       toast('최종 결과보고서 PPTX 파일을 생성했습니다.');
     } else if (act === 'dl-rules-docx' && Pack()) {
+      await ensureIlteoLibs({ zip: true });
       var liveR = buildLiveReportsForExport(proj);
       var rulesBytes = await Pack().generateWorkRulesDocxBytes(proj, liveR.mid, liveR.fin);
       Pack().downloadBytes(rulesBytes, Pack().safeFilePart(proj.companyName) + '_취업규칙개정안_신구대조표.docx',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       toast('취업규칙 개정안 및 신구대조표(.docx)를 생성했습니다.');
     } else if (act === 'dl-contract-docx' && Pack()) {
+      await ensureIlteoLibs({ zip: true });
       var liveC = buildLiveReportsForExport(proj);
       var contBytes = await Pack().generateLaborContractDocxBytes(proj, liveC.mid, liveC.fin);
       Pack().downloadBytes(contBytes, Pack().safeFilePart(proj.companyName) + '_표준근로계약서_서면합의동의서.docx',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       toast('표준 근로계약서 및 서면합의서(.docx)를 생성했습니다.');
     } else if (act === 'dl-sim-xlsx' && Pack()) {
+      await ensureIlteoLibs({ xlsx: true });
       var liveX = buildLiveReportsForExport(proj);
       var xlsxBytes = Pack().generateSimulationXlsxBytes(proj, liveX.mid, liveX.fin, D.intake[proj.id] || {}, liveX.schedRds);
       Pack().downloadBytes(xlsxBytes, Pack().safeFilePart(proj.companyName) + '_통상시급모의계산_신구대조_이행점검표.xlsx',
@@ -3781,6 +3986,7 @@
       Pack().downloadBytes(txtBytes, Pack().safeFilePart(proj.companyName) + '_노사발전재단_플랫폼입력문안_3종.txt', 'text/plain;charset=utf-8');
       toast('노사발전재단 플랫폼 입력문안 3종(.txt)을 생성했습니다.');
     } else if (act === 'dl-full-zip' && Pack()) {
+      await ensureIlteoLibs({ zip: true, xlsx: true });
       var liveZ = buildLiveReportsForExport(proj);
       toast('최종산출물 6종 통합 ZIP 패키지 생성 중…');
       var zipBytes = await Pack().generateFullPackageZipBytes(proj, D.intake[proj.id] || {}, liveZ.schedRds, liveZ.midSaved, liveZ.finSaved);
@@ -3830,6 +4036,9 @@
       var authEpoch = ++SESSION_EPOCH;
       if (global.PuGate) global.PuGate.hide();
 
+      var snapPromise = (global.PuFastBoot && typeof global.PuFastBoot.readSnap === 'function')
+        ? global.PuFastBoot.readSnap('ilteo', authUid).catch(function () { return null; })
+        : Promise.resolve(null);
       var roleVal = {};
       try { roleVal = (await fbDb.ref('uid_roles/' + authUid).once('value')).val() || {}; } catch (e) {}
       if (authEpoch !== SESSION_EPOCH || currentAuthUid() !== authUid) return;
@@ -3847,9 +4056,20 @@
         isAdmin: roleVal.isAdmin == true,
         isSubAdmin: roleVal.isSubAdmin == true
       };
-      gate = global.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid });
+      gate = wrapSnapGuard(global.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid }));
       if ($('lock')) $('lock').style.display = 'none';
       if ($('app')) $('app').style.display = '';
+
+      var cachedSnap = await snapPromise;
+      if (!isSessionCurrent(authEpoch, authUid)) return;
+      if (cachedSnap && applyIlteoFastSnapshot(cachedSnap)) {
+        rebuildScanAndDiscover();
+        applyHashTarget();
+        draw();
+      } else if ($('projectsBox') && !$('projectsBox').innerHTML) {
+        $('projectsBox').innerHTML = '<div class="empty">일터상생혁신 사업장 현황을 빠르게 불러오고 있습니다…</div>';
+      }
+
       await reload(authEpoch, authUid);
     });
   }

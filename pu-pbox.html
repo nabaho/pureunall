@@ -561,6 +561,15 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
   .pbox-matrix-table td[data-label]::before{content:attr(data-label) ' · ';font-weight:700;color:#475569}
 }
 
+.pbox-voice-summary{margin-top:8px;padding:8px 10px;border:1px solid #bfdbfe;border-radius:8px;background:#f8fafc}
+.pbox-voice-summary-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.pbox-voice-summary-title{font-size:12px;color:#1e40af}
+.pbox-voice-summary-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.pbox-voice-summary-body{font-size:12.5px;color:#1e293b;line-height:1.5;white-space:pre-line}
+.pbox-voice-stalled{color:#991b1b;font-size:13px;line-height:1.55}
+.pbox-voice-mic-ok{color:#166534}
+.pbox-voice-mic-mute{color:#854d0e}
+
 /* 어두운 테마 지원 (모바일 미디어쿼리 뒤에 배치하여 PC·모바일·모달 모든 상태에서 WCAG AA 4.5:1~13:1 고대비 보장) */
 html[data-theme="dark"],html[data-theme="dark"] body,html[data-theme="dark"] .pbox-center-col,html[data-theme="dark"] .pbox-main-scroll{background:#000000;color:#f8fafc}
 html[data-theme="dark"] .pbox-profile-card,html[data-theme="dark"] .pbox-cite-bar,html[data-theme="dark"] .pbox-info-note,html[data-theme="dark"] .pbox-doc-meta-box,html[data-theme="dark"] .pbox-draft-box,html[data-theme="dark"] .pbox-reader-hd,html[data-theme="dark"] .pbox-modal-hd,html[data-theme="dark"] .pbox-md-quote,html[data-theme="dark"] .pbox-inline-code,html[data-theme="dark"] .pbox-mode-seg,html[data-theme="dark"] .pbox-clause-quote,html[data-theme="dark"] .pbox-op-hint,html[data-theme="dark"] .pbox-biglaw-card,html[data-theme="dark"] .pbox-unified-col{background:#000000;color:#cbd5e1;border-color:#475569}
@@ -577,6 +586,12 @@ html[data-theme="dark"] .pbox-voice-wave.speaking .pbox-vw-bar{background:#4ade8
 html[data-theme="dark"] .pbox-voice-state-pill.connecting{background:#854d0e;color:#fffbeb;border-color:#d97706}
 html[data-theme="dark"] .pbox-voice-state-pill.ready,html[data-theme="dark"] .pbox-voice-state-pill.recognized{background:#166534;color:#ffffff;border-color:#4ade80}
 html[data-theme="dark"] .pbox-voice-state-pill.speaking{background:#2563eb;color:#ffffff;border-color:#60a5fa}
+html[data-theme="dark"] .pbox-voice-summary{background:#1e293b;border-color:#475569;color:#f8fafc}
+html[data-theme="dark"] .pbox-voice-summary-title{color:#60a5fa}
+html[data-theme="dark"] .pbox-voice-summary-body{color:#f8fafc}
+html[data-theme="dark"] .pbox-voice-stalled{color:#fecaca}
+html[data-theme="dark"] .pbox-voice-mic-ok{color:#4ade80}
+html[data-theme="dark"] .pbox-voice-mic-mute{color:#fffbeb}
 html[data-theme="dark"] .pbox-live-issue-card,html[data-theme="dark"] .pbox-unified-item:hover{background:#000000;color:#f8fafc;border-color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-title{color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-body,html[data-theme="dark"] .pbox-unified-title,html[data-theme="dark"] .pbox-unified-col-hd,html[data-theme="dark"] .pbox-unified-item-title{color:#f8fafc;border-color:#475569}
@@ -714,9 +729,9 @@ html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-pbox-lawindex.js?v=2"></script>
 <script src="js/pu-pbox-corpus.js?v=10"></script>
-<script src="js/pu-pbox-engine.js?v=27"></script>
-<script src="js/pu-pbox-store.js?v=31"></script>
-<script src="js/pu-pbox-app.js?v=35"></script>
+<script src="js/pu-pbox-engine.js?v=28"></script>
+<script src="js/pu-pbox-store.js?v=32"></script>
+<script src="js/pu-pbox-app.js?v=37"></script>
 <script>
 try {
   PuBack.guard(function () {

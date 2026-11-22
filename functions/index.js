@@ -1298,6 +1298,54 @@ exports.govFeedCollect = functions
     return null;
   });
 
+/* 📮 정부사업신청 — 매일 카톡 요약 (대표 지시 2026-11-22 「카카오톡으로 매일 받고 싶다 — 내 개인톡으로」 → 「공식 방식으로」, functions/gov-digest-kakao.js)
+   서버가 모은 공고(07:40)·모집 글(07:20)·정부지원금 공고(08:10)가 다 끝난 뒤인 08:30 에, 화면과 같은 규칙(functions/gov-digest.js)으로 추려 «나에게 보내기»로 보낸다.
+   ⚠ 모드 gov_digest_cfg/mode — off · dry(기본: 요약만 쓰고 안 보낸다) · live. 카카오 연결(kakaoMemoStart)을 처음 마치면 live 가 된다.
+   ⚠ 카카오 토큰은 gov_digest_secret/kakao(보안규칙에 없어 닫힘)에만 두고 로그·상태에 안 남긴다. 한 통이 막히면 멈추고 못 보낸 줄은 다음 날 다시 나간다. */
+const GovDigestKakao = require("./gov-digest-kakao");
+exports.govDigestKakao = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["KAKAO_REST_KEY", "KAKAO_CLIENT_SECRET"] })
+  .pubsub.schedule("every day 08:30")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const raw = getDatabase();
+    const store = {
+      get: async (p) => (await raw.ref(p).once("value")).val(),
+      update: (u) => raw.ref().update(u),
+      /* 조건부 저장 — 그 자리의 linkedAt 이 «내가 본 것 그대로»일 때만 value 로 바꾼다(없거나 달라졌으면 안 쓴다) */
+      cas: async (p, expectLinkedAt, value) => {
+        const ref = raw.ref(p), keep = () => {};
+        ref.on("value", keep);
+        try {
+          await ref.once("value");   // 캐시를 채워 둬야 트랜잭션 첫 호출이 «진짜 값»으로 온다
+          const r = await ref.transaction((cur) => (cur && cur.linkedAt === expectLinkedAt) ? value : undefined, undefined, false);
+          return !!(r && r.committed);
+        } finally { ref.off("value", keep); }
+      },
+      lock: async (p, ttl, now) => {
+        const ref = raw.ref(p), tok = crypto.randomBytes(8).toString("hex");
+        const r = await ref.transaction((cur) => (cur && Number(cur.at || 0) + ttl > now) ? undefined : { at: now, tok }, undefined, false);
+        return r && r.committed ? async () => { await ref.transaction((cur) => (cur && cur.tok === tok) ? null : undefined, undefined, false); } : null;
+      },
+    };
+    const KK = require("./kakao")._shared;
+    const r = await GovDigestKakao.run({
+      store, fetch: (u, o) => fetch(u, Object.assign({ signal: AbortSignal.timeout(25000) }, o)), now: Date.now(),
+      creds: { restKey: KK.restKeyOf(), clientSecret: KK.clientSecretOf() }, log: (...a) => console.log(...a),
+      /* 보내기 직전 자격 재확인 — 총괄 관리자·재직·대표 표지(app_owner/uid)·ERP 카카오 연결이 지금도 살아 있는가 */
+      verifyOwner: async (uid, linkKey) => {
+        if (!uid || !linkKey) return false;   // 연결 지문이 없는 토큰은 믿지 않는다 — 다시 연결
+        const role = await KK.roleOf(uid);
+        const owner = (await raw.ref("app_owner/uid").once("value")).val();
+        const link = (await raw.ref(KK.DB_UID + "/" + KK.pathSafe(uid)).once("value")).val();
+        return GovDigestKakao.ownerOk(uid, role, owner, !!(link && link.linked === true && link.linkKey === linkKey));
+      },
+    });
+    console.log("[매일 카톡 요약]", { mode: r.mode, skipped: r.skipped, fresh: r.fresh, remind: r.remind, messages: r.messages, sent: r.sent, failed: (r.failed || []).length, error: r.error });
+    return null;
+  });
+
 /* 📮 컨설팅보고서 — 받은 메일 서류 «자동 연결·완료» (대표 지시 2026-10-22 「매일 메일 주고 받은 서류들을 완전히 자동화」 · 선택 «전부 자동 완료», functions/gov-report-auto.js)
    한 시간마다 돌되 서울 07~20시만 일하고 나머지는 바로 끝낸다. 모드는 scal_autoRun/cfg/mode(off·dry·live) — 없으면 시범 운행(dry: scal_autoRun/last 만 쓴다).
    ⚠ 열쇠(비밀) 없음 — 업체·일정·서류 기록·메일함 거울과 DB 만 읽는다. 첨부 파일은 읽지 않는다(첨부 «이름»만 거울에서 본다).
@@ -3421,6 +3469,11 @@ exports.kakaoAuthUrl      = _kakao.kakaoAuthUrl;
 exports.kakaoLink         = _kakao.kakaoLink;
 exports.kakaoUnlink       = _kakao.kakaoUnlink;
 exports.kakaoLoginFinish  = _kakao.kakaoLoginFinish;
+
+/* 📮 정부사업신청 «매일 카톡 요약» — 카카오 공식 «나에게 보내기» 연결(대표가 한 번만 동의). 판단은 functions/kakao-memo.js 한 곳 */
+const _kakaoMemo = require('./kakao-memo');
+exports.kakaoMemoStart    = _kakaoMemo.kakaoMemoStart;
+exports.kakaoMemoCallback = _kakaoMemo.kakaoMemoCallback;
 
 /* 📮 주소 → 우편번호 (대표 지시 2026-10-17 「우편번호찾기 기능있는데 자동으로 니가 찾아서 항상 입력해라」)
    판단은 functions/zip-lookup.js — «한 곳으로 딱 떨어질 때만» 돌려준다. 저장은 안 한다.
@@ -8186,6 +8239,53 @@ exports.npsMonthly = NPSM.npsMonthly;
 exports.pubdataAsk = NPSM.pubdataAsk;
 /* 🏛 기업정보함 국세청 상태 → 공용 자리 옮겨 적기 (2026-10-12) */
 exports.pubdataNtsMirror = NPSM.pubdataNtsMirror;
+
+/* 🔍 무료 공공 기업검색 — 기업정보함(pu-cards.html)에서 회사명·사업자번호로 즉시 조회 (functions/pub-company-search.js).
+   금융위 기업기본정보 + 국세청 사업상태 + 근로복지공단 고용·산재 (+ Open DART / NICE BizAPI 슬롯).
+   ⚠ 서울 리전(MAIL_REGION) 필수 — 공공데이터포털은 해외 IP를 차단한다. 재직 직원(STAFF_GATE)만 호출 가능. */
+const PUB_CO_SEARCH = require("./pub-company-search");
+const pubCoRateAllow = PUB_CO_SEARCH.createRateLimiter(20, 60 * 1000);
+exports.pubCompanySearch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", maxInstances: 10 })
+  .https.onRequest(async (req, res) => {
+    setAutomationCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(m[1], true);
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
+      if (!pubCoRateAllow(decoded.uid)) {
+        res.status(429).json({ ok: false, error: "잠시 후 다시 검색해 주세요 (분당 호출 한도 초과)." });
+        return;
+      }
+      const body = (req.body && typeof req.body === "object") ? req.body : {};
+      const db = getDatabase();
+      if (body.action === "applyToCoInfo") {
+        const applied = await PUB_CO_SEARCH.applyItemToCoInfo(db, body.item || {}, Date.now());
+        res.status(applied.ok ? 200 : 400).json(applied);
+        return;
+      }
+      const keys = await PUB_CO_SEARCH.readConfigKeys(db);
+      const fetchWithTimeout = (u, opts) => fetch(u, Object.assign({}, opts || {}, { signal: AbortSignal.timeout(15000) }));
+      const result = await PUB_CO_SEARCH.searchPublicCompany({
+        query: body.query,
+        detailBizNo: body.detailBizNo,
+        detailCorpNo: body.detailCorpNo,
+        detailName: body.detailName,
+        keys,
+        fetchFn: fetchWithTimeout,
+        db,
+      });
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      console.error("[pubCompanySearch]", err);
+      res.status(500).json({ ok: false, error: "공공 기업검색 중 오류가 발생했습니다." });
+    }
+  });
 /* 📥 사업자등록증 자동 검토 — 사진첩·메일 첨부·기업정보함 어디로 들어와도 서버가 바로 (2026-10-13, functions/bizreg-review.js) */
 const BIZREG = require("./bizreg-review")({ functions, getDatabase, MAIL_REGION });
 exports.bizregReviewDoc = BIZREG.bizregReviewDoc;

@@ -10,7 +10,9 @@ for (let i = 0; i < 32; i++) {
   feed.push({ id: 'G' + String(i + 1).padStart(4, '0'), no: 'R26BK' + String(1000000 + i * 37) + '-000', src: ['나라장터', '알리오', '기업마당'][i % 3],
     type: ['새 공고', '관심', '지원함', '지나감', '새 공고'][i % 5], nm: 이름[i % 이름.length] + (i >= 6 ? ' ' + (i + 1) : ''), org: 기관[i % 기관.length], ntce: 기관[(i + 1) % 기관.length],
     openDt: addDays(-10) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: i % 4 === 3 ? 0 : 12000000 * (i + 1) + 3456789, mthd: i % 6 === 2 ? '수의계약' : '일반경쟁', kw: ['노무', '임금', '컨설팅', '조직진단'][i % 4],
-    url: 'https://example.com/g' + i, savedAt: addDays(-(i % 7)) + 'T09:00:00', hidden: i % 11 === 10 });
+    url: 'https://example.com/g' + i, savedAt: addDays(-(i % 7)) + 'T09:00:00', hidden: i % 11 === 10,
+    /* 「계약·제한」 칸(2026-11-22) — 업종제한(이름 있음·이름 모름)이 섞인 줄 */
+    ind: i % 7 === 4 ? '엔지니어링사업(점검 분야)' : undefined, indY: i % 7 === 1 ? 'Y' : undefined });
 }
 /* 📍 대전·세종·충남·충북 탭(2026-11-16, 세종은 11-17)이 «그 지역 것»을 골라 그리는지 보려는 줄 — 기관·참가 가능 지역·제목에 지역이 적힌 것(모두 지어낸 이름).
    「세종문화…」 줄은 세종시가 아니라 빠져야 하는 줄이다. */
@@ -27,7 +29,8 @@ const 지역줄 = [
 지역줄.forEach(([src, org, rgn, nm, d], i) => {
   feed.push({ id: 'G' + String(33 + i).padStart(4, '0'), no: 'R26RG' + String(2000000 + i * 41) + '-000', src, type: d < 0 ? '지나감' : '새 공고', nm, org, ntce: org,
     openDt: addDays(-7) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: 23000000 + i * 4567891, mthd: '일반경쟁', kw: '노무', rgn: rgn || undefined,
-    url: 'https://example.com/rg' + i, savedAt: addDays(-(i % 4)) + 'T09:00:00', hidden: false });
+    url: 'https://example.com/rg' + i, savedAt: addDays(-(i % 4)) + 'T09:00:00', hidden: false,
+    ind: i === 3 ? '엔지니어링사업(점검 분야)' : undefined });   /* 지역 + 업종 둘 다 — 「계약·제한」 칸에서 가장 긴 줄 */
 });
 /* 🤖 AI 사업 탭(2026-11-19)이 그리는 줄 — 찾는 말에는 안 걸리고 AI 갈래로만 걸린 줄(kw 빔 · ai 표시) + 노무 말에도 걸린 AI 줄.
    「AI 기반 … 감시 구축」은 AI 갈래가 아니라 원래 안 담기는 줄이라 넣지 않는다(모두 지어낸 이름) */
@@ -71,6 +74,16 @@ for (let i = 0; i < 28; i++) hits['h' + i] = { key: 'h' + i, title: (i % 2 ? '[�
  ['hrdk', 'hrdkai', 'HRD 전문가 인력풀 신청공고', '중소기업 AI훈련확산센터 AI훈련코치 모집', 11]].forEach(([board, org, boardName, title, d], i) => {
   hits['ai' + i] = { key: 'ai' + i, title, date: addDays(-i), board, org, boardName, href: 'https://example.com/ai-h' + i, per: { to: addDays(d) } };
 });
+/* 📮 오늘의 요약(2026-11-22) — 서버(govDigestKakao)가 gov_digest/last·status 에 쓰는 모양 그대로. 카톡 «전체 보기»(gov.html?digest=1)가 여는 팝업을 그려 보려는 자료(모두 지어낸 것) */
+const DIGEST = { last: { at: Date.now() - 3600e3, today, mode: 'live', counts: { rows: 121, hits: 52, soleOut: 7 }, fresh: 3, remind: 1, sections: [
+  { key: 'rgn', title: '🧑‍💼 컨설턴트·위원 모집 — 대전·세종·충남·충북 (+공인노무사회 전국)', items: [
+    { id: 'hit:rg1', title: '점검위원회 위원(공인노무사) 공개모집 — 가나다라마바사아자차카타파하', org: '충청남도 도정공고', due: '~' + addDays(3).slice(5).replace('-', '.') + ' · D-3', days: 3, why: ['📍 충남', '지역 기관 게시판 — 충남'], url: 'https://example.com/rg-h1', groups: ['충남'], isNew: false, isSoon: true },
+    { id: 'hit:rg2', title: '직장 내 괴롭힘 사건 외부 조사자 선임 공고', org: '공인노무사회 채용', due: '수시(사람이 정해지면 마감)', why: ['전국 · 공인노무사회 게시판'], url: 'https://example.com/rg-h2', groups: [], isNew: true, isSoon: false }] },
+  { key: 'main', title: '📋 정부사업 공고 — 노무사·노무컨설팅 쪽', items: [
+    { id: 'feed:R26BK1', title: '2026년 일터혁신 상생컨설팅 지원사업 기업 모집 공고', org: '한국점검협회컨설팅', due: '~' + addDays(8).slice(5).replace('-', '.') + ' · D-8', days: 8, why: ['걸린 낱말 일터혁신·컨설팅'], url: 'https://example.com/g1', groups: [], isNew: true, isSoon: false },
+    { id: 'feed:R26BK2', title: '위험 주소 시험 — javascript 주소는 링크로 걸리지 않는다', org: '점검기관', due: '마감 모름', why: [], url: 'javascript:alert(1)', groups: [], isNew: true, isSoon: false }] },
+  { key: 'ai', title: '🤖 AI 사업 (전국)', items: [] }] },
+  status: { at: Date.now() - 3600e3, today, mode: 'live', ok: false, error: 'not-connected' } };
 /* 🏢 푸른노무법인 지원사업(2026-11-22) — 진행으로 고른 공고(모두 지어낸 것). 법인 진행·컨설턴트 지원·마감 지남·그만둠 + 서식 링크 */
 const 진행 = (id, kind, src, ref, srcName, title, org, d, extra) => Object.assign({ id, entityType: 'Project', schemaVersion: 1, kind, state: '진행', src, ref, srcName,
   no: src === 'feed' ? feed.find((r) => r.id === ref).no : '', title, org, url: 'https://example.com/' + ref, openDt: addDays(-10) + ' 10:00', closeDt: addDays(d) + ' 18:00',
@@ -85,7 +98,7 @@ const pursue = [
 ];
 module.exports = {
   localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_pursue: JSON.stringify(pursue), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
-  data: { gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
+  data: { gov_digest: DIGEST, gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
   views: [
     { name:'application-handoff',run:async(p)=>{
       await p.evaluate(()=>{localStorage.setItem('cm3_owner_uid','pa-uid-1');toForm(get('feed')[0].id);});
@@ -96,6 +109,11 @@ module.exports = {
     { name:'application-pick',run:async(p)=>{await p.evaluate(()=>pickOpen());},back:async(p)=>{await p.evaluate(()=>popClose());} },
     { name: 'sel', run: async (p) => { for (const k of [1, 2, 3]) await p.click('#tb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'pop', run: async (p) => { await p.click('#tb tr:nth-child(2) td.nm'); }, back: async (p) => { await p.evaluate(() => popClose()); } },
+    /* 「수의계약도 보기」 — 기본은 빠지는 수의계약 줄이 「계약·제한」 칸에 딱지와 함께 돌아온다(2026-11-22) */
+    { name: 'soleall', run: async (p) => { await p.evaluate(() => feedMthd('all')); }, back: async (p) => { await p.evaluate(() => feedMthd('nosole')); } },
+    /* 지역 + 업종이 함께 걸린 줄(칸이 가장 넓어지는 줄)만 남겨 본다 */
+    { name: 'limrgn', run: async (p) => { await p.evaluate(() => { document.getElementById('q').value = '지역 제한'; draw(); }); },
+      back: async (p) => { await p.evaluate(() => { document.getElementById('q').value = ''; draw(); }); } },
     { name: 'plan', run: async (p) => { await p.click('#tbPlan'); } },
     { name: 'rec', run: async (p) => { await p.click('#tbRec'); } },
     { name: 'recpub', run: async (p) => { await p.evaluate(() => recSub('pub')); } },
@@ -105,6 +123,7 @@ module.exports = {
     { name: 'ai', run: async (p) => { await p.click('#tbAi'); } },
     { name: 'aisel', run: async (p) => { for (const k of [1, 2]) await p.click('#aiTb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'aipast', run: async (p) => { await p.evaluate(() => lensSub('ai', 'past')); } },
+    { name: 'digest', run: async (p) => { await p.evaluate(() => digestOpen()); await p.waitForSelector('#pop.on .pk-row', { timeout: 25000 }); }, back: async (p) => { await p.evaluate(() => popClose()); } },
     /* 🏢 푸른노무법인 지원사업 — 「📝」 고르는 창 · 탭 · 고르기 · 한 줄 창(서식 링크) */
     { name: 'purask', run: async (p) => { await p.evaluate(() => { setTab('feed'); pursueAsk('feed', 'G0003'); }); }, back: async (p) => { await p.evaluate(() => popClose()); } },
     { name: 'pur', run: async (p) => { await p.click('#tbPur'); } },

@@ -162,17 +162,24 @@ function buildSandbox(overrides = {}) {
 test('1. 공동기금·사내기금 단계별 필요서류 구성 및 간략 체크리스트 메일 생성', () => {
   const { ctx } = buildSandbox();
 
-  /* 공동기금 vs 사내기금 항목 구분 · 대상자 및 노1·사1 표기 · 기금출연확인서 제외 확인 */
+  /* 공동기금 vs 사내기금 항목 구분 · 3단계(설립준비·인가·등기) 구성 · 등기자 딱 2명 인감 명시 · 기금출연확인서 제외 확인 */
   const coopInka = ctx.sdcDocsFor('inka', '공동');
   const intraInka = ctx.sdcDocsFor('inka', '사내');
   assert.ok(coopInka.some((d) => d.id === 'inka_match'), '공동기금은 참여신청서 항목 포함');
-  assert.ok(!intraInka.some((d) => d.id === 'inka_match'), '사내기금은 공동기금 전용 참여신청서 제외');
+  assert.ok(coopInka.some((d) => d.id === 'prep_smecert') && coopInka.some((d) => d.id === 'prep_ei'), '공동기금 설립 시 중기확인서·고용보험명부 함께 요청');
+  assert.ok(!intraInka.some((d) => d.id === 'inka_match' || d.id === 'prep_smecert' || d.id === 'prep_ei' || d.id === 'prep_fin'), '사내기금은 공동기금 전용 서류(참여신청서·중기확인서·고용보험명부·손익계산서) 제외');
   assert.ok(!coopInka.some((d) => /기금출연확인서/.test(d.title)), '설립·인가 요청서류에서 기금출연확인서 제외');
   assert.ok(coopInka.some((d) => d.title === '[근로자측·사용자측 위원] 설립준비위원 재직증명서 (노 1부, 사 1부)'), '위원 재직증명서 노 1부·사 1부 명시');
-  assert.ok(coopInka.some((d) => d.title === '[근로자측·사용자측 이사] 개인인감증명서 (노 1부, 사 1부 · 발급 3개월 이내)'), '이사 인감증명서 노 1부·사 1부 명시');
-  assert.ok(coopInka.some((d) => d.title === '[근로자측·사용자측 이사] 주민등록등본 또는 초본 (노 1부, 사 1부 · 발급 3개월 이내)'), '이사 등·초본 노 1부·사 1부 명시');
-  assert.ok(coopInka.some((d) => d.title === '[근로자측·사용자측 이사] 신분증 사본 및 개인인감도장 (노 1부, 사 1부)'), '이사 신분증·도장 노 1부·사 1부 명시');
+  assert.ok(coopInka.some((d) => d.title === '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 개인인감증명서 각 1부 (발급 3개월 이내 · 나머지 인원은 인감증명 불필요)'), '등기자 딱 2명만 인감증명서 필요 명시');
+  assert.ok(coopInka.some((d) => d.title === '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 주민등록등본 또는 초본 각 1부 (주소변동 포함·발급 3개월 이내 · 등기자 딱 2명만 필요)'), '등기자 딱 2명만 등·초본 필요 명시');
+  assert.ok(coopInka.some((d) => d.title === '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 신분증 사본 및 개인인감도장 각 1부 (나머지 인원은 인감도장 불필요)'), '등기자 딱 2명만 인감도장 필요 명시');
   assert.ok(intraInka.some((d) => d.title === '[설립기업(회사)] 사업자등록증 사본 1부'), '사내기금은 설립기업(회사)으로 표기');
+
+  const inkaMail = ctx.sdcMailText(ctx.funds.F_COOP, { sid: 'S_A', name: '(주)가상테크' }, { phase: 'inka', docs: coopInka });
+  assert.match(inkaMail.body, /■ 1\. 기업 설립 시 준비서류/);
+  assert.match(inkaMail.body, /■ 2\. 노동부 설립인가 필요서류/);
+  assert.match(inkaMail.body, /■ 3\. 법인 설립등기 필요서류 — 등기자 딱 2명\(사용자 1명, 근로자 1명\)만 필요/);
+  assert.match(inkaMail.body, /※ 인감증명서·개인인감도장은 등기할 사람 딱 2명\(사용자 1명, 근로자 1명\)만 필요합니다\. 나머지 인원은 인감증명·인감도장이 필요 없습니다\./);
 
   const docs = ctx.sdcDocsFor('subsidy', '공동');
   const f = ctx.funds.F_COOP;

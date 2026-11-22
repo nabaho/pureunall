@@ -1094,6 +1094,9 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
 
     function getCombinedHtml() {
       let out = rawBodyHtml;
+      if (dynNodes['data-cc-top-checks']) {
+        out = out.replace(/<div class="pau-cc-checkdock" data-cc-top-checks>[\s\S]*?<\/div><\/div><div data-cc-dyn>/, `<div class="pau-cc-checkdock" data-cc-top-checks>${dynNodes['data-cc-top-checks'].innerHTML}</div></div><div data-cc-dyn>`);
+      }
       for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn', 'data-cc-dyn']) {
         if (dynNodes[k]) {
           out = out.replace(new RegExp(`<div ${k}>[\\s\\S]*$`), `<div ${k}>${dynNodes[k].innerHTML}</div>`);
@@ -1107,6 +1110,19 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
       set: (v) => {
         rawBodyHtml = String(v || '');
         dynNodes = {};
+        const topCkMatch = rawBodyHtml.match(/<div class="pau-cc-checkdock" data-cc-top-checks>([\s\S]*?)<\/div><\/div><div data-cc-dyn>/);
+        if (topCkMatch) {
+          const tn = makeNode('DIV');
+          let tHtml = topCkMatch[1];
+          Object.defineProperty(tn, 'innerHTML', {
+            get: () => tHtml,
+            set: (nv) => {
+              tHtml = String(nv || '');
+              rebuildParsed();
+            }
+          });
+          dynNodes['data-cc-top-checks'] = tn;
+        }
         for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn', 'data-cc-dyn']) {
           const dm = rawBodyHtml.match(new RegExp(`<div ${k}>([\\s\\S]*)<\\/div>$`));
           if (dm) {
@@ -1129,6 +1145,7 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
     });
 
     bodyEl.querySelector = (sel) => {
+      if (sel === '[data-cc-top-checks]' && dynNodes['data-cc-top-checks']) return dynNodes['data-cc-top-checks'];
       if (sel === '[data-m-reg-dyn]' && dynNodes['data-m-reg-dyn']) return dynNodes['data-m-reg-dyn'];
       if (sel === '[data-a-dyn]' && dynNodes['data-a-dyn']) return dynNodes['data-a-dyn'];
       if (sel === '[data-d-dyn]' && dynNodes['data-d-dyn']) return dynNodes['data-d-dyn'];
@@ -1138,10 +1155,75 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
     bodyEl.querySelectorAll = (sel) => parsedMap[sel] || [];
 
     const cmpTrayEl = makeNode('DIV');
+    const modalBackEl = makeNode('DIV');
+    let modalOuterParsed = {};
+    let modalBodyParsed = {};
+    let rawModalHtml = '';
+    let modalBodyHtml = '';
+    function parseTagsInto(htmlStr, targetMap) {
+      const tagRe = /<(button|select|input|div|h3|span)\b([^>]*)>/gi;
+      let m;
+      while ((m = tagRe.exec(htmlStr)) !== null) {
+        const node = makeNode(m[1].toUpperCase());
+        const attrStr = m[2];
+        let am;
+        const attrRe = /([a-zA-Z0-9_-]+)(?:="([^"]*)")?/g;
+        while ((am = attrRe.exec(attrStr)) !== null) {
+          node.setAttribute(am[1], am[2] !== undefined ? am[2] : '');
+        }
+        const dataAttrs = [...attrStr.matchAll(/\b(data-[a-z0-9-]+)(?:="([^"]*)")?/g)];
+        for (const da of dataAttrs) {
+          const k = da[1];
+          const v = da[2];
+          if (!targetMap[`[${k}]`]) targetMap[`[${k}]`] = [];
+          targetMap[`[${k}]`].push(node);
+          if (v !== undefined) {
+            if (!targetMap[`[${k}="${v}"]`]) targetMap[`[${k}="${v}"]`] = [];
+            targetMap[`[${k}="${v}"]`].push(node);
+          }
+        }
+      }
+    }
+    const modalBodyNode = makeNode('DIV');
+    Object.defineProperty(modalBodyNode, 'innerHTML', {
+      get: () => modalBodyHtml,
+      set: (nv) => {
+        modalBodyHtml = String(nv || '');
+        modalBodyParsed = {};
+        parseTagsInto(modalBodyHtml, modalBodyParsed);
+      }
+    });
+    modalBodyNode.querySelector = (sel) => (modalBodyParsed[sel] && modalBodyParsed[sel][0]) || null;
+    modalBodyNode.querySelectorAll = (sel) => modalBodyParsed[sel] || [];
+
+    Object.defineProperty(modalBackEl, 'innerHTML', {
+      get: () => rawModalHtml ? rawModalHtml.replace(/<div class="pau-modal-bd" data-pm-body>[\s\S]*?<\/div><div class="pau-modal-ft">/, `<div class="pau-modal-bd" data-pm-body>${modalBodyHtml}</div><div class="pau-modal-ft">`) : '',
+      set: (v) => {
+        rawModalHtml = String(v || '');
+        modalOuterParsed = {};
+        modalBodyParsed = {};
+        if (!rawModalHtml) {
+          modalBodyHtml = '';
+          return;
+        }
+        const bm = rawModalHtml.match(/<div class="pau-modal-bd" data-pm-body>([\s\S]*?)<\/div><div class="pau-modal-ft">/);
+        modalBodyHtml = bm ? bm[1] : '';
+        const outerOnly = rawModalHtml.replace(/<div class="pau-modal-bd" data-pm-body>[\s\S]*?<\/div><div class="pau-modal-ft">/, '<div class="pau-modal-bd" data-pm-body></div><div class="pau-modal-ft">');
+        parseTagsInto(outerOnly, modalOuterParsed);
+        parseTagsInto(modalBodyHtml, modalBodyParsed);
+      }
+    });
+    modalBackEl.querySelector = (sel) => {
+      if (sel === '[data-pm-body]') return modalBodyNode;
+      return (modalOuterParsed[sel] && modalOuterParsed[sel][0]) || (modalBodyParsed[sel] && modalBodyParsed[sel][0]) || null;
+    };
+    modalBackEl.querySelectorAll = (sel) => [...(modalOuterParsed[sel] || []), ...(modalBodyParsed[sel] || [])];
+
     const root = makeNode('DIV');
     root.querySelector = (sel) => {
       if (sel === '[data-pau-body]') return bodyEl;
       if (sel === '[data-pau-cmp-tray]') return cmpTrayEl;
+      if (sel === '[data-pau-modal-back]') return modalBackEl;
       return makeNode('DIV');
     };
 
@@ -1161,7 +1243,8 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
         createElement: (t) => makeNode(t),
         getElementById: () => null,
         querySelector: () => null,
-        addEventListener: () => {}
+        addEventListener: () => {},
+        removeEventListener: () => {}
       },
       fetch: () => Promise.resolve({ ok: false }),
       URL,
@@ -1171,7 +1254,7 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
     vm.runInNewContext(uiSrc, sandbox);
     sandbox.PuAlioUnion.mount(root, { isModal: false });
 
-    return { bodyEl, cmpTrayEl, loc };
+    return { bodyEl, cmpTrayEl, modalBackEl, loc };
   }
 
   // 0) 정의되지 않은 CSS 변수(--pau-text, --pau-surface-alt, --pau-border) 미사용 및 .pau-hm-tag 스타일 정의 검증
@@ -1205,16 +1288,24 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
   assert.match(artCmp.bodyEl.innerHTML, /13대 핵심 단협 쟁점 한눈 비교표/, '전체 쟁점 상태에서는 13대 핵심 쟁점 한눈 비교표가 먼저 제시되어야 합니다');
   assert.match(artCmp.bodyEl.innerHTML, /class="pau-clause-cmp-grid"/, '비교 기관별 주요 수록 조문 카드 대조 그리드가 렌더링되어야 합니다');
 
-  const persChip = artCmp.bodyEl.querySelector('.pau-topic-chip[data-a-topic="PERSONNEL"]');
-  assert.ok(persChip, '인사·승진·전보 쟁점 빠른 선택 칩이 존재해야 합니다');
-  persChip.trigger('click');
+  const persRow = artCmp.bodyEl.querySelector('[data-a-topic="PERSONNEL"]');
+  assert.ok(persRow, '인사·승진·전보 쟁점 행(data-a-topic="PERSONNEL")이 존재해야 합니다');
+  persRow.trigger('click');
   assert.match(artCmp.bodyEl.innerHTML, /data-a-law-out/, '특정 쟁점 선택 시 대한민국 현행 노동관계법령 기준 스트립이 표시되어야 합니다');
   assert.match(artCmp.bodyEl.innerHTML, /기관별 조문 전문 병렬 대조/, '특정 쟁점 선택 시 기관별 조문 전문 병렬 대조 그리드로 전환되어야 합니다');
 
-  const medPresetBtn = artCmp.bodyEl.querySelector('[data-a-preset="LOCAL_MEDICAL"]');
-  assert.ok(medPresetBtn, '지방의료원 빠른 비교 프리셋 버튼이 존재해야 합니다');
+  const artOpenPickerBtn = artCmp.bodyEl.querySelector('[data-a-open-picker]');
+  assert.ok(artOpenPickerBtn, '조문 비교기관 선택 팝업 열기 버튼이 존재해야 합니다');
+  artOpenPickerBtn.trigger('click');
+  assert.match(artCmp.modalBackEl.innerHTML, /role="dialog"/, '비교기관 선택 클릭 시 레이어 팝업 모달이 열려야 합니다');
+  const medPresetBtn = artCmp.modalBackEl.querySelector('[data-pm-preset="LOCAL_MEDICAL"]');
+  assert.ok(medPresetBtn, '팝업 내 지방의료원 빠른 비교 프리셋 버튼이 존재해야 합니다');
   medPresetBtn.trigger('click');
-  assert.match(artCmp.bodyEl.innerHTML, /의료원/, '지방의료원 프리셋 클릭 시 실제 지방의료원 기관들이 비교 대상에 채워져야 합니다');
+  const pmApplyBtn = artCmp.modalBackEl.querySelector('[data-pm-apply]');
+  assert.ok(pmApplyBtn, '팝업 내 선택 기관 비교 적용 버튼이 존재해야 합니다');
+  pmApplyBtn.trigger('click');
+  assert.equal(artCmp.modalBackEl.innerHTML, '', '비교 적용 클릭 후 팝업 모달이 깔끔하게 닫혀야 합니다');
+  assert.match(artCmp.bodyEl.innerHTML, /의료원/, '지방의료원 프리셋 적용 시 실제 지방의료원 기관들이 비교 대상에 채워져야 합니다');
 
   // 2-1) 추출 조문이 없고 신·구대비표(diffs)가 있는 기관(C0352 우체국금융개발원) 진입 시 신·구대비 미리보기 정상 표시 + 악성 검색어(XSS) 이스케이프 검증
   const artRev = mountInteractive('?tab=articles&compare=C0352');
@@ -1259,9 +1350,26 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
   assert.ok(ccCentral.some((r) => r.name.includes('한국서부발전') && r.ccProvinceKey === '충청남도'), '충남 태안 소재 한국서부발전이 매핑되어야 합니다');
   assert.ok(ccCentral.some((r) => r.name.includes('한국가스안전공사') && r.ccProvinceKey === '충청북도'), '충북 혁신도시 소재 한국가스안전공사가 매핑되어야 합니다');
 
-  // 미확인 조문 쟁점의 미단정·채점제외 표시 및 결산공시 전임자수 이상치 원값 보존·평균왜곡 방지 검증
+  // 충남 주요 공단·공사 실제 원문 추출 반영 및 표준 taxonomy_code 일치 · 미추출 기관 비단정(미확인·채점제외) · 이상치 원값 보존 검증
+  const validTaxCodes = new Set(['UNION_SHOP', 'TIMEOFF', 'CHECKOFF', 'PERSONNEL', 'DISCIPLINE', 'WORK_HOURS', 'LEAVE', 'SICK_SAFETY', 'MATERNITY', 'WAGE', 'WELFARE', 'RETIREMENT', 'BARGAINING', 'ETC']);
+  assert.ok(dataMod.articles.every((a) => validTaxCodes.has(a.taxonomy_code)), '모든 단협 조문(articles)의 taxonomy_code는 표준 분류 코드 집합에 속해야 합니다');
   const cheonanRec = ccMaster.records.find((r) => r.name === '천안도시공사');
-  assert.ok(cheonanRec && cheonanRec.issueScores.personnel_participation.verified === false && cheonanRec.issueScores.personnel_participation.tag.includes('미확인'), '추출 조문·지표가 없는 쟁점은 단정하지 않고 미확인(채점제외)으로 표시해야 합니다');
+  const seosanRec = ccMaster.records.find((r) => r.name === '서산시시설관리공단');
+  const buyeoRec = ccMaster.records.find((r) => r.name === '부여군시설관리공단');
+  const sejongFacRec = ccMaster.records.find((r) => r.name === '세종특별자치시시설관리공단');
+  const danyangRec = ccMaster.records.find((r) => r.name === '단양관광공사');
+  assert.ok(cheonanRec && cheonanRec.issueScores.personnel_participation.verified === true && !cheonanRec.issueScores.personnel_participation.tag.includes('미확인'), '천안도시공사는 실제 단협 원문 추출 지표가 반영되어야 합니다');
+  assert.ok(seosanRec && seosanRec.issueScores.discipline_committee.verified === true && !seosanRec.issueScores.discipline_committee.tag.includes('미확인'), '서산시시설관리공단은 실제 단협·규정 원문 추출 지표가 반영되어야 합니다');
+  assert.ok(buyeoRec && buyeoRec.issueScores.work_hours_overtime.val.indexOf('노조 미설립') === -1, '노조 미설립 공단(부여군시설관리공단)도 클린아이 실제 취업·인사·보수규정 근로조건이 표시되어야 합니다');
+  assert.ok(sejongFacRec && sejongFacRec.issueScores.work_hours_overtime.verified === true, '세종특별자치시시설관리공단 근로시간 지표가 실제 원문에서 매칭되어야 합니다');
+  assert.ok(danyangRec && danyangRec.issueScores.retirement_age_peak.verified === true, '단양관광공사 정년·퇴직 지표가 실제 원문에서 매칭되어야 합니다');
+  const cheonanArtView = mountInteractive('?tab=articles&compare=L_2023000002');
+  const whRow = cheonanArtView.bodyEl.querySelector('[data-a-topic="WORK_HOURS"]');
+  assert.ok(whRow, '근로시간 쟁점 행이 존재해야 합니다');
+  whRow.trigger('click');
+  assert.match(cheonanArtView.bodyEl.innerHTML, /제44조/, '천안도시공사 근로시간 선택 시 실제 추출된 제44조 조문이 표시되어야 합니다');
+  const unverifiedSample = ccMaster.records.find((r) => r.hasUnion && !r.isChungcheong && r.issueScores.personnel_participation.verified === false);
+  assert.ok(unverifiedSample && unverifiedSample.issueScores.personnel_participation.score === null && unverifiedSample.issueScores.personnel_participation.tag.includes('미확인'), '추출 조문·지표가 없는 쟁점은 단정하지 않고 미확인(채점제외)으로 표시해야 합니다');
   const chungjuFound = ccMaster.records.find((r) => r.name.includes('충주문화관광재단'));
   assert.ok(chungjuFound && chungjuFound.timeoffHours > 0 && chungjuFound.timeoffAnomalyNote.includes('원문 확인'), '결산공시 이상치는 원값을 유지하되 이상치 안내(timeoffAnomalyNote)를 표시해야 합니다');
 
@@ -1274,12 +1382,31 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
   assert.ok(cbToMatch && Number(cbToMatch[1].replace(/,/g, '')) <= 5000, '충북 지역산하비교 평균 타임오프에서 결산공시 기입 이상치가 제외되어 왜곡되지 않아야 합니다');
 
   const ccHub = mountInteractive('?tab=chungcheong');
-  assert.match(ccHub.bodyEl.innerHTML, /class="pau-cc-prov-grid"/, '대전·세종·충남·충북 4대 권역 요약 카드가 렌더링되어야 합니다');
+  assert.match(uiSrc, /\.pau-dash-dock\{position:sticky;top:0;/, '상단 필터·체크 컨트롤 영역이 대시보드 상단 틀에 sticky 고정되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /class="pau-dash-dock"/, '대전·세종·충청 탭 상단에 고정 대시보드 독이 렌더링되어야 합니다');
+  assert.doesNotMatch(ccHub.bodyEl.innerHTML, /pau-cc-guide|pau-cc-prov-grid|pau-cc-checkdock/, '상단의 과도한 설명 박스·거대 지자체 카드·기업 나열 바가 제거되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /data-cc-prov-popup="충청남도"/, '상단에 간결한 지자체 이름 팝업 열기 버튼(충청남도 등)이 표시되어야 합니다');
   assert.match(ccHub.bodyEl.innerHTML, /data-cc-cmp-matrix/, '충청권 대표 기관 임단협 병렬 비교 매트릭스가 즉시 표시되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /<span class="pau-row-no">01<\/span>/, '비교표 좌측 비교 항목마다 넘버링 배지(01~15)가 표시되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /<span class="pau-row-no">15<\/span>/, '비교표 마지막 비교 항목(15)까지 넘버링이 일관되게 표시되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /<span class="pau-col-no"[^>]*>1<\/span>/, '비교표 상단 기관 열 머리글에도 번호 배지(1~6)가 표시되어야 합니다');
 
-  const cnFacBtn = ccHub.bodyEl.querySelector('[data-cc-preset="CN_FACILITY"]');
-  assert.ok(cnFacBtn, '충남 시설관리공단·도시공사 집중비교 프리셋이 존재해야 합니다');
-  cnFacBtn.trigger('click');
+  // 지자체 이름(충청남도) 클릭 시 산하기관·기업 팝업이 열리고 닫기·전체보기 동작 검증
+  const cnPopupBtn = ccHub.bodyEl.querySelector('[data-cc-prov-popup="충청남도"]');
+  assert.ok(cnPopupBtn, '충청남도 지자체 팝업 버튼이 존재해야 합니다');
+  cnPopupBtn.trigger('click');
+  assert.match(ccHub.modalBackEl.innerHTML, /충청남도 산하·공공기관/, '지자체 이름 클릭 시 해당 지자체 산하기관·기업 팝업이 열려야 합니다');
+  assert.match(ccHub.modalBackEl.innerHTML, /아산시시설관리공단/, '충청남도 팝업 안에 산하 공단·기업 목록이 표시되어야 합니다');
+  const viewScopeBtn = ccHub.modalBackEl.querySelector('[data-pm-view-scope]');
+  assert.ok(viewScopeBtn, '팝업 내 이 지자체·조건 전체 보기 버튼이 존재해야 합니다');
+  viewScopeBtn.trigger('click');
+  assert.equal(ccHub.modalBackEl.innerHTML, '', '전체 보기 적용 후 팝업이 닫혀야 합니다');
+  assert.match(decodeURIComponent(ccHub.loc.search), /ccReg=충청남도/, '팝업에서 지자체 선택 시 URL ccReg가 동기화되어야 합니다');
+
+  const cnPresetSel = ccHub.bodyEl.querySelector('[data-cc-preset-sel]');
+  assert.ok(cnPresetSel, '충청권 빠른 비교 프리셋 드롭다운이 존재해야 합니다');
+  cnPresetSel.value = 'CN_FACILITY';
+  cnPresetSel.trigger('change');
   assert.match(decodeURIComponent(ccHub.loc.search), /tab=chungcheong/, '대전·세종·충청 탭 URL 상태가 유지되어야 합니다');
   assert.match(decodeURIComponent(ccHub.loc.search), /ccPreset=CN_FACILITY/, '선택한 충남 시설공단 프리셋이 URL에 동기화되어야 합니다');
   for (const orgNm of ['아산시시설관리공단', '천안도시공사', '서산시시설관리공단', '보령시시설관리공단', '충청남도개발공사', '부여군시설관리공단', '당진도시공사']) {

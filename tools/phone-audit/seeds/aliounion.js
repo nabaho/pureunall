@@ -15,7 +15,7 @@ module.exports = {
       run: async (page) => {
         await page.click('[data-tab="chungcheong"]');
         await page.waitForTimeout(180);
-        await page.click('[data-cc-preset="CN_FACILITY"]');
+        await page.selectOption('[data-cc-preset-sel]', 'CN_FACILITY');
         await page.waitForTimeout(250);
       }
     },
@@ -95,7 +95,7 @@ module.exports = {
       run: async (page) => {
         await page.click('[data-tab="articles"]');
         await page.waitForTimeout(200);
-        await page.click('.pau-topic-chip[data-a-topic="PERSONNEL"]');
+        await page.selectOption('select[data-f="aCat"]', 'PERSONNEL');
         await page.waitForTimeout(250);
       }
     },
@@ -121,6 +121,15 @@ module.exports = {
       name: 'apihub',
       run: async (page) => {
         await page.click('[data-tab="apihub"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
+      name: 'chungcheong_popup',
+      run: async (page) => {
+        await page.click('[data-tab="chungcheong"]');
+        await page.waitForTimeout(180);
+        await page.click('[data-cc-prov-popup="충청남도"]');
         await page.waitForTimeout(250);
       }
     }

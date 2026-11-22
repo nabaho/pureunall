@@ -457,7 +457,26 @@ rules.data = {
      담는 것: 업체 id·이름·전/새 담당 사번·요청자·까닭 한 줄 — 금액·개인정보는 없다.
      ⚠ 승인은 앱이 관리자에게만 단추를 준다(일하는 순서의 문). 업체 자료(companies) 자체의 쓰기 권한은
        예전 그대로다 — 이 자리를 좁혀도 담당이 바뀌는 길이 막히지는 않는다. */
-  co_mgr_requests: { '.read': LOGIN, '.write': LOGIN },
+  co_mgr_requests: {
+    '.read': LOGIN,
+    '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
+    v: {
+      '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
+      $id: {
+        '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
+        '.validate': `(${MGR}) || !data.exists() || data.child('status').val() === 'wait'`
+          + ` || (newData.child('status').val() === data.child('status').val()`
+          + ` && newData.child('coId').val() === data.child('coId').val()`
+          + ` && newData.child('from').val() === data.child('from').val()`
+          + ` && newData.child('to').val() === data.child('to').val())`,
+        status: {
+          '.validate': `newData.isString() && (newData.val() === 'wait' || newData.val() === 'cancel'`
+            + ` || (data.exists() && newData.val() === data.val())`
+            + ` || ((newData.val() === 'ok' || newData.val() === 'no') && (${MGR})))`
+        }
+      }
+    }
+  },
 
   /* 💬 누구 입금인가요? (대표 「시안대로」 2026-10-24) — 재무가 «후보 없는 입금»을 묻고, 담당 직원이 어느 건인지 답한다.
      담는 것: 날짜·금액·보낸 사람 이름(통장 적요에서 계좌 끝자리를 뺀 것)·답(건 번호·고른 사람)뿐 —
@@ -942,6 +961,9 @@ rules.pucards = {
   /* 🔎 명함 «이름으로 묻기» — 번호가 빈 명함의 둘째 중복 열쇠(이름+회사/이메일)가 같은 이름 몇 줄만 받는다 (2026-10-30).
      쓰기·읽기는 위 $k 와 «똑같이» 옮긴다 — idx 를 이름 붙은 칸으로 빼면 $k 가 주던 쓰기 허락이 사라진다. */
   idx: { '.write': pucardsWrite, '.indexOn': ['n'], $k2: { '.write': LOGIN } },
+  /* 🔀 사업장별 담당 분리·제외 규칙(pucards/mailCoSplit)은 정식 담당·알림 대상을 바꾸므로 관리자·위임관리인(MGR)만 쓴다 (2026-11-22).
+     ⚠ config 아래에 두지 않고 pucards 바로 아래 이름 붙은 칸으로 두어 config(견적 자동 감지 ADMIN 잠금 등)와 섞이지 않게 한다. */
+  mailCoSplit: { '.write': MGR },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
@@ -1427,6 +1449,13 @@ rules.gov_watch = { '.read': LOGIN, '.write': false };
    ★ 읽기 = 재직 직원(LOGIN, gov_watch 와 같다) — 2026-10-30 정부사업신청을 직원에게 열면서 함께(전엔 관리자만).
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
 rules.gov_feed = { '.read': LOGIN, '.write': false };
+
+/* ══ 📮 정부사업신청 «매일 카톡 요약» 의 공개 요약 (대표 지시 2026-11-22 「카카오톡으로 매일 받고 싶다」 → 「공식 방식으로」) ══
+   서버(govDigestKakao, 08:30)가 «오늘의 요약»(last — 갈래별 줄·새 것·마감 임박)과 «돌린 결과»(status — 모드·보낸 통수·오류 코드)를 쓴다.
+   카톡 «전체 보기» 단추가 정부사업신청(gov.html?digest=1)에서 이것을 읽어 보여 준다. 담기는 것은 gov_feed·gov_watch 와 같은 «공개 공고» 정보뿐이다.
+   ★ 읽기 = 재직 직원(LOGIN, gov_feed 와 같다). ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다).
+   ⚠ 일부러 «여기 없는» 자리: gov_digest_secret(카카오 토큰) · gov_digest_state(보낸 기록·잠금) · gov_digest_cfg(모드) — 규칙에 없어 화면에서는 읽기·쓰기 모두 닫힌다. 서버만 만진다. */
+rules.gov_digest = { '.read': LOGIN, '.write': false };
 
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.

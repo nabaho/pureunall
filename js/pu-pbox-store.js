@@ -13,7 +13,7 @@
 
   var CORPUS_DB = 'pu_pbox_corpus_v1';
   var WORKSPACE_DB = 'pu_pbox_workspace_v1';
-  var WORKSPACE_DB_VERSION = 2;
+  var WORKSPACE_DB_VERSION = 3;
   var RAW_LAW_BASE = 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/main/kr/';
   var PBOX_API_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/pboxApi';
   var CFG_LS_KEY = 'pu_pbox_sync_cfg_v1';
@@ -132,7 +132,8 @@
       privateDocs: mem.privateDocs.slice(),
       projects: mem.projects.slice(),
       threads: mem.threads.slice(),
-      recents: mem.recents.slice()
+      recents: mem.recents.slice(),
+      alerts: mem.alerts.slice()
     });
   }
 
@@ -232,7 +233,8 @@
       { name: 'private_docs', keyPath: 'id' },
       { name: 'projects', keyPath: 'id' },
       { name: 'threads', keyPath: 'id' },
-      { name: 'recents', keyPath: 'id' }
+      { name: 'recents', keyPath: 'id' },
+      { name: 'alerts', keyPath: 'id' }
     ], WORKSPACE_DB_VERSION);
   }
 
@@ -403,18 +405,42 @@
     return false;
   }
 
+  /* ── 타 계정(다른 직원) 소유·수집·업로드 사건 문서 원천 차단 가드 ── */
+  var SYSTEM_PUBLIC_OWNERS = new Set(['', 'system', 'system_sync', 'official', 'official_auto', 'builtin', 'seed', 'auto_sync', 'pbox_auto']);
+  function normStaffOwner(v) {
+    var s = String(v || '').trim();
+    return (!s || s === 'guest') ? '' : s;
+  }
+  function isForeignUserDoc(doc, activeUid) {
+    if (!doc || typeof doc !== 'object') return true;
+    var uid = normStaffOwner(activeUid);
+    var own = normStaffOwner(doc.ownerUid);
+    var ing = normStaffOwner(doc.ingestedBy);
+    if (own && !SYSTEM_PUBLIC_OWNERS.has(own) && own !== uid) return true;
+    if (ing && !SYSTEM_PUBLIC_OWNERS.has(ing) && ing !== uid) return true;
+    if (doc.userIngested === true || doc.docType === 'internal_case') {
+      if (!uid) return true;
+      if (own && own !== uid) return true;
+    }
+    return false;
+  }
+
   function rebuildEffectiveDocs() {
     var E = global.PuPBoxEngine;
     var C = global.PuPBoxCorpus;
     var seedDocs = (C && C.SEED_DOCS) ? C.SEED_DOCS : [];
     var basePub = mem.publicDocs.length ? mem.publicDocs : seedDocs;
-    var cleanPub = basePub.filter(function (d) { return !isDocTombstoned(d); });
-    var cleanPriv = mem.privateDocs.filter(function (d) { return !isDocTombstoned(d); });
+    var cleanPub = basePub.filter(function (d) {
+      return !isDocTombstoned(d) && !isForeignUserDoc(d, mem.uid);
+    });
+    var cleanPriv = mem.privateDocs.filter(function (d) {
+      return !isDocTombstoned(d) && !isForeignUserDoc(d, mem.uid);
+    });
     mem.docs = E ? E.deduplicateDocs(cleanPub, cleanPriv).docs : cleanPub.concat(cleanPriv);
     return mem.docs;
   }
 
-  /* ── 초기 부팅 및 계정 전환: 세션 세대(sessionGen) 보호 + UID별 개인 수집문서/작업공간 완전 분리 ── */
+  /* ── 초기 부팅 및 계정 전환: 세션 세대(sessionGen) 보호 + UID별 개인 수집문서/작업공간/알림 완전 분리 ── */
   function init(uid) {
     var myGen = ++sessionGen;
     var prevUid = mem.uid;
@@ -426,6 +452,7 @@
       mem.projects = [];
       mem.threads = [];
       mem.recents = [];
+      mem.alerts = [];
     }
     mem.uid = nextUid;
 
@@ -448,7 +475,8 @@
       cleanUid ? idbGetAll(wsDbPromise, 'private_docs') : Promise.resolve([]),
       cleanUid ? idbGetAll(wsDbPromise, 'projects') : Promise.resolve([]),
       cleanUid ? idbGetAll(wsDbPromise, 'threads') : Promise.resolve([]),
-      cleanUid ? idbGetAll(wsDbPromise, 'recents') : Promise.resolve([])
+      cleanUid ? idbGetAll(wsDbPromise, 'recents') : Promise.resolve([]),
+      cleanUid ? idbGetAll(wsDbPromise, 'alerts') : Promise.resolve([])
     ]).then(function (res) {
       /* 복원 도중 다른 계정으로 바뀌었거나 로그아웃되었다면 지연된 복원 결과를 즉시 폐기 */
       if (myGen !== sessionGen || mem.uid !== nextUid) {
@@ -462,6 +490,7 @@
       var savedProjects = res[4] || [];
       var savedThreads = res[5] || [];
       var savedRecents = res[6] || [];
+      var savedAlerts = res[7] || [];
 
       if (!hasIdb && cleanUid && memByUid.has(cleanUid)) {
         var snap = memByUid.get(cleanUid);
@@ -469,17 +498,21 @@
         savedProjects = (snap.projects || []).slice();
         savedThreads = (snap.threads || []).slice();
         savedRecents = (snap.recents || []).slice();
+        savedAlerts = (snap.alerts || []).slice();
       }
 
       for (var m = 0; m < savedMeta.length; m++) {
         if (savedMeta[m].key === 'syncMeta') {
           mem.syncMeta = Object.assign({}, mem.syncMeta, savedMeta[m].value || {});
-        } else if (savedMeta[m].key === 'alerts') {
-          mem.alerts = Array.isArray(savedMeta[m].value) ? savedMeta[m].value : [];
         } else if (savedMeta[m].key === 'deletedDocKeys' && Array.isArray(savedMeta[m].value)) {
           savedMeta[m].value.forEach(function (k) { mem.deletedDocKeys.add(k); });
         }
       }
+      mem.alerts = cleanUid
+        ? savedAlerts.filter(function (al) { return al && (!al.ownerUid || al.ownerUid === nextUid); })
+            .sort(function (a, b) { return (b.at || 0) - (a.at || 0); })
+            .slice(0, 40)
+        : [];
 
       if (hasIdb) {
         mem.laws.clear();
@@ -490,33 +523,38 @@
         }
       }
 
-      /* 과거 버전에 corpus DB로 잘못 들어간 로컬 개인 수집문서(userIngested) 및 구버전 가공·요약 시드 캐시는 공통 코퍼스·IndexedDB에서 즉시 영구 정화 */
+      /* 과거 버전에 corpus DB로 잘못 들어간 공용 알림('alerts')·로컬 개인 수집문서(userIngested)·타 직원 문서 및 구버전 가공·요약 시드 캐시는 공통 코퍼스·IndexedDB에서 즉시 영구 정화 */
       var cDb = getCorpusDb();
+      idbDelete(cDb, 'meta', 'alerts');
       var cleanSavedPublic = savedPublicDocs.filter(function (d) {
-        if (!d || d.userIngested || isDocTombstoned(d)) return false;
-        if (E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) {
+        if (!d) return false;
+        if (d.userIngested || isForeignUserDoc(d, nextUid) || (E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d))) {
           if (d.id) idbDelete(cDb, 'docs', d.id);
           return false;
         }
+        if (isDocTombstoned(d)) return false;
         return true;
       });
       var basePublic = !hasIdb && mem.publicDocs.length
         ? mem.publicDocs.filter(function (d) {
-            return !d.userIngested && !isDocTombstoned(d) && !(E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d));
+            return !d.userIngested && !isDocTombstoned(d) && !isForeignUserDoc(d, nextUid) && !(E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d));
           })
         : cleanSavedPublic;
 
       mem.publicDocs = E.deduplicateDocs(seedDocs, basePublic).docs;
       mem.privateDocs = cleanUid
-        ? savedPrivateDocs.filter(function (d) { return !isDocTombstoned(d); })
+        ? savedPrivateDocs.filter(function (d) { return !isDocTombstoned(d) && !isForeignUserDoc(d, nextUid); })
         : [];
       rebuildEffectiveDocs();
 
       mem.projects = cleanUid
-        ? savedProjects.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })
+        ? savedProjects.filter(function (p) { return p && (!p.ownerUid || p.ownerUid === nextUid); })
+            .sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })
         : [];
       if (cleanUid) {
-        var sortedInitThreads = savedThreads.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+        var sortedInitThreads = savedThreads
+          .filter(function (t) { return t && (!t.ownerUid || t.ownerUid === nextUid); })
+          .sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
         mem.threads = sortedInitThreads.slice(0, 60);
         if (sortedInitThreads.length > 60) {
           var initWsDb = getWorkspaceDb();
@@ -884,6 +922,7 @@
       if (!d || typeof d !== 'object') return false;
       if (String(d.body || '').trim().length < 20) return false;
       if (isPublicScope && isMemberOnlyClientDoc(d)) return false;
+      if (isPublicScope && isForeignUserDoc(d, activeOwner)) return false;
       if (isPublicScope && E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) return false;
       if (opts.overrideDeleted) {
         if (d.id) mem.deletedDocKeys.delete(String(d.id));
@@ -1643,7 +1682,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -1752,7 +1791,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -1851,7 +1890,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -2029,7 +2068,7 @@
           var merged = 0;
           if (mapped.length) {
             var st = addDocuments(mapped, {
-              scope: 'public',
+              scope: 'private',
               shareConfirmed: false,
               expectedGen: startGen,
               expectedUid: startUid
@@ -2160,7 +2199,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -2522,15 +2561,29 @@
   }
 
   function addAlert(al) {
+    var now = Date.now();
     var item = {
-      id: 'al-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      id: 'al-' + now + '-' + Math.random().toString(36).slice(2, 7),
+      ownerUid: mem.uid,
+      at: now,
       date: global.PuPBoxEngine.todayKstYmd(),
       kind: al.kind || 'info',
       title: al.title || '',
       detail: al.detail || ''
     };
-    mem.alerts = [item].concat(mem.alerts).slice(0, 40);
-    idbPut(getCorpusDb(), 'meta', { key: 'alerts', value: mem.alerts });
+    var allNext = [item].concat(mem.alerts);
+    var evictedAlerts = allNext.slice(40);
+    mem.alerts = allNext.slice(0, 40);
+    saveUidSnapshot();
+    if (sanitizeUid(mem.uid)) {
+      var wsDbAl = getWorkspaceDb();
+      idbPut(wsDbAl, 'alerts', item);
+      for (var ea = 0; ea < evictedAlerts.length; ea++) {
+        if (evictedAlerts[ea] && evictedAlerts[ea].id) {
+          idbDelete(wsDbAl, 'alerts', evictedAlerts[ea].id);
+        }
+      }
+    }
     return item;
   }
 
@@ -2774,6 +2827,7 @@
     mem.projects = [];
     mem.threads = [];
     mem.recents = [];
+    mem.alerts = [];
     mem.serverSharedState = { connected: false, backend: '', totalSharedActive: 0, lastAutoSyncAt: '', lastSyncAttemptAt: '' };
     rebuildEffectiveDocs();
   }
@@ -2790,6 +2844,7 @@
     mem.projects = [];
     mem.threads = [];
     mem.recents = [];
+    mem.alerts = [];
     mem.serverSharedState = { connected: false, backend: '', totalSharedActive: 0, lastAutoSyncAt: '', lastSyncAttemptAt: '' };
     rebuildEffectiveDocs();
 
@@ -2834,6 +2889,7 @@
     hasSupabase: hasSupabase,
     getStateSummary: getStateSummary,
     getDocs: function () { return mem.docs.slice(); },
+    getPrivateDocs: function () { return mem.privateDocs.slice(); },
     getDocById: function (id) { return mem.docs.find(function (d) { return d.id === id; }) || null; },
     getLoadedLaws: function () { return Array.from(mem.laws.values()); },
     getCachedLaw: function (dir, fileName) { return mem.laws.get(dir + '/' + (fileName || '법률.md')) || null; },

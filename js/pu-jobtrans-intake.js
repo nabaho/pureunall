@@ -361,6 +361,39 @@
     return out;
   }
 
+  var JT_MAIL_MEMO = typeof WeakMap === 'function' ? new WeakMap() : null;
+  var JT_STRICT_EXEMPT_BLOCK_RE = /일터\s*상생|상생\s*컨설팅|상생\s*혁신|통합\s*진단\s*보고서\s*양식[_\s]*일반형|디자인\s*팀\s*회의|이행\s*결과표|석유\s*화학.*노동\s*전환|노동\s*전환\s*지원\s*센터/i;
+
+  function computeJtMailMemo(m) {
+    var combined = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '');
+    var hasExplicitJt = EXPLICIT_JOBTRANS_RE.test(combined);
+    var hardBlocked = JT_STRICT_EXEMPT_BLOCK_RE.test(combined)
+      || (ILTEO_AND_OTHER_STRICT_RE.test(combined) && !hasExplicitJt)
+      || (NON_JOBTRANS_MAIL_RE.test(combined) && !hasExplicitJt);
+    return {
+      combined: combined,
+      hasExplicitJt: hasExplicitJt,
+      hardBlocked: hardBlocked,
+      cepaOnly: !hardBlocked && CEPA_ONLY_MAIL_RE.test(combined),
+      kmacOnly: !hardBlocked && KMAC_ONLY_MAIL_RE.test(combined),
+      hasDocSig: !hardBlocked && DOC_SIGNAL_RE.test(combined),
+      mailYr: m.ts > 0 ? new Date(m.ts).getUTCFullYear() : 0,
+      normSubj: null,
+      phonSubj: null,
+      dk: null
+    };
+  }
+
+  function getJtMailMemo(m) {
+    if (!JT_MAIL_MEMO || !m || typeof m !== 'object') return computeJtMailMemo(m || {});
+    var got = JT_MAIL_MEMO.get(m);
+    if (!got) {
+      got = computeJtMailMemo(m);
+      JT_MAIL_MEMO.set(m, got);
+    }
+    return got;
+  }
+
   function scanProjectMails(project, folders, msgs, companies, consultings, intakeMap) {
     var prof = buildCompanyMailProfile(project, companies, consultings);
     var flat = Array.isArray(folders) ? folders : flattenMailboxRows(folders, msgs);
@@ -375,20 +408,14 @@
     var matched = [], nameCandidates = [], seenKeys = {};
     flat.forEach(function (m) {
       if (!m || seenKeys[m.key]) return;
-      var combined = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '');
-      var hasExplicitJt = EXPLICIT_JOBTRANS_RE.test(combined);
-      /* 일터혁신 상생컨설팅(일터상생)·석유화학 노동전환지원센터 서식은 어떤 경우에도 산업일자리전환 메일로 섞이지 않도록 무조건 차단 */
-      if (ILTEO_AND_OTHER_STRICT_RE.test(combined) && !hasExplicitJt) return;
-      if (/일터\s*상생|상생\s*컨설팅|상생\s*혁신|통합\s*진단\s*보고서\s*양식[_\s]*일반형|디자인\s*팀\s*회의|이행\s*결과표|석유\s*화학.*노동\s*전환|노동\s*전환\s*지원\s*센터/i.test(combined)) return;
-      /* 타 컨설팅(기술보호·현장클리닉 등)·일반자문(징계·해고·산재)·세금계산서는 명시적 산업일자리 표지가 없으면 차단 */
-      if (NON_JOBTRANS_MAIL_RE.test(combined) && !hasExplicitJt) return;
+      var memo = getJtMailMemo(m);
+      if (memo.hardBlocked) return;
       /* 소속기관(KMAC vs CEPA) 교차 혼입 방지: 상대편 기관 전용 표식만 있는 메일은 자동 귀속에서 제외 */
-      if (prof.agency === 'kmac' && CEPA_ONLY_MAIL_RE.test(combined) && !KMAC_ONLY_MAIL_RE.test(combined)) return;
-      if (prof.agency === 'cepa' && KMAC_ONLY_MAIL_RE.test(combined) && !CEPA_ONLY_MAIL_RE.test(combined)) return;
+      if (prof.agency === 'kmac' && memo.cepaOnly && !memo.kmacOnly) return;
+      if (prof.agency === 'cepa' && memo.kmacOnly && !memo.cepaOnly) return;
       /* 사업 연도와 2년 이상 동떨어진 과거 연도 메일은 명시적 해당 연도 표기가 없는 한 타 사업 이력으로 보아 제외 */
       if (prof.year >= 2024 && m.ts > 0) {
-        var mailYr = new Date(m.ts).getUTCFullYear();
-        if (isFinite(mailYr) && mailYr < prof.year - 1 && combined.indexOf(String(prof.year)) < 0) return;
+        if (isFinite(memo.mailYr) && memo.mailYr < prof.year - 1 && memo.combined.indexOf(String(prof.year)) < 0) return;
       }
 
       var peerAddrs = m.dir === 'out' ? m.to : [m.from];
@@ -399,14 +426,14 @@
         return !!(dom && prof.domains[dom]);
       });
 
-      var dk = classifyDocKind(m.subject, m.attNames, '');
-      var phase = resolvePhase(m.ts, midTs, dk, m.subject, m.attNames);
       var linkedRec = existingByMailKey[m.key] || null;
       var checked = !!(linkedRec && linkedRec.checkedAt);
-      var hasDocSignal = hasExplicitJt || DOC_SIGNAL_RE.test(combined) || !!m.dedicatedConsultingFolder || !!linkedRec;
+      var hasDocSignal = memo.hasExplicitJt || memo.hasDocSig || !!m.dedicatedConsultingFolder || !!linkedRec;
 
       if (addrHit) {
         seenKeys[m.key] = 1;
+        var dk = memo.dk || (memo.dk = classifyDocKind(m.subject, m.attNames, ''));
+        var phase = resolvePhase(m.ts, midTs, dk, m.subject, m.attNames);
         if (hasDocSignal) {
           matched.push(Object.assign({}, m, {
             matchKind: 'addr',
@@ -434,19 +461,21 @@
         return;
       }
 
-      if (prof.normName.length >= 2) {
-        var normSubj = normCorpName(combined);
-        var phonSubj = normCorpPhonetic(combined);
+      if (prof.normName.length >= 2 && memo.hasExplicitJt) {
+        var normSubj = memo.normSubj !== null ? memo.normSubj : (memo.normSubj = normCorpName(memo.combined));
+        var phonSubj = memo.phonSubj !== null ? memo.phonSubj : (memo.phonSubj = normCorpPhonetic(memo.combined));
         var nameHit = normSubj.indexOf(prof.normName) >= 0
           || (prof.phoneticName.length >= 2 && phonSubj.indexOf(prof.phoneticName) >= 0);
-        if (nameHit && hasExplicitJt) {
+        if (nameHit) {
           seenKeys[m.key] = 1;
+          var dk2 = memo.dk || (memo.dk = classifyDocKind(m.subject, m.attNames, ''));
+          var phase2 = resolvePhase(m.ts, midTs, dk2, m.subject, m.attNames);
           nameCandidates.push(Object.assign({}, m, {
             matchKind: 'name_candidate',
-            docKind: dk.code,
-            docKindName: dk.short,
-            track: dk.track,
-            phase: phase,
+            docKind: dk2.code,
+            docKindName: dk2.short,
+            track: dk2.track,
+            phase: phase2,
             intakeId: linkedRec ? linkedRec.id : '',
             checked: checked,
             analyzed: !!(linkedRec && linkedRec.analyzedAt)

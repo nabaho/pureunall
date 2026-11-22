@@ -526,3 +526,6 @@ exports.kakaoLoginFinish = functions
       + (t3 - t2) + "ms · 표·내정보 " + (Date.now() - t3) + "ms · 빠른진입 " + !!profile);
     res.json({ ok: true, token, profile });
   });
+
+/* 카카오 «나에게 보내기» 연결(functions/kakao-memo.js)이 같은 앱 키·state 서명·연결표를 빌려 쓰는 안쪽 도구 — 함수로 내보내는 것이 아니다(index.js 가 이름으로만 고른다) */
+exports._shared = { REGION, DB_LINK, DB_UID, pathSafe, issueState, takeState, kakaoLinkKey, roleOf, restKeyOf, clientSecretOf };

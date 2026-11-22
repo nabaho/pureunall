@@ -294,7 +294,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-contact.js?v=2"></script>
 <script src="js/pu-sanjae-cases.js?v=2"></script>
 <script src="js/pu-sanjae-kit.js?v=1"></script>
-<script src="js/pu-harass-core.js?v=14"></script>
+<script src="js/pu-harass-core.js?v=15"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
@@ -32063,13 +32063,19 @@ function coMgrPendingAll(){
     .sort(function(a, b){ return Number(b.at || 0) - Number(a.at || 0); });
 }
 /* 요청을 남긴다 — 같은 업체에 기다리는 요청이 있으면 그것을 고쳐 쓴다(두 줄로 쌓지 않는다) */
-function coMgrRequest(co, toSid, reason, batch){
+function coMgrRequest(co, toSid, reason, batch, extra){
   if(!co || !co.id) return null;
   var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
   var prev = coMgrPending(co.id);
+  if(extra && prev && !coMgrCanDirect() && me.sid && prev.by && prev.by !== me.sid) prev = null;
+  var fromVal = (extra && extra.fromSid !== undefined) ? String(extra.fromSid || '') : String(co.managerMain || '');
   var rec = { id: prev ? prev.id : uid('cmr'), coId: String(co.id), coName: String(co.name || co.companyName || ''),
-    from: String(co.managerMain || ''), to: String(toSid || ''), reason: String(reason || '').slice(0, 200),
+    from: fromVal, to: String(toSid || ''), reason: String(reason || '').slice(0, 200),
     by: String(me.sid || ''), byName: String(me.name || ''), at: Date.now(), status: 'wait', batch: String(batch || '') };
+  if(extra && extra.scope) rec.scope = extra.scope;
+  if(extra && extra.kind) rec.kind = String(extra.kind);
+  if(extra && extra.splitKey) rec.splitKey = String(extra.splitKey);
+  if(extra && extra.splitRule !== undefined) rec.splitRule = extra.splitRule;
   return dbUpsert(CO_MGR_REQ_KEY, rec) ? rec : null;
 }
 /* 진행 중 사건·컨설팅 가운데 담당이 «바뀔 사람과 다른» 것 — 「그 건 담당은 그대로」를 알리려고 */
@@ -32124,24 +32130,70 @@ function coMgrDecide(req, ok, note){
   if(!coMgrCanDirect()){ showToast('관리자만 승인할 수 있습니다'); return false; }
   var me = CURRENT_USER || {};
   var co = (dbGet('companies', []) || []).filter(function(c){ return c && c.id === req.coId; })[0];
+  var realCoName = (co && co.name) || req.coName || '';
   if(ok){
     if(!co){ showToast('❌ 그 업체를 찾지 못했습니다'); return false; }
-    if(String(co.managerMain || '') !== String(req.from || '')
-      && !confirm('요청한 뒤에 이 업체 담당이 이미 바뀌었습니다.\n\n요청 때: ' + (coMgrName(req.from) || '(없음)')
-        + '\n지금: ' + (coMgrName(co.managerMain) || '(없음)') + '\n바꿀 사람: ' + (coMgrName(req.to) || '(비움)') + '\n\n그래도 승인할까요?')) return false;
-    var patch = { managerMain: req.to, managerMainName: coMgrName(req.to),
-      mgrHistory: coMgrHistAdd(co, req.to, { req: req.id, reqBy: req.by, reqByName: req.byName,
-        okBy: String(me.sid || ''), okByName: String(me.name || '') }) };
-    if(!dbPatch('companies', co.id, patch)){ showToast('❌ 저장 실패'); return false; }
+    if(req.kind === 'split'){
+      if(typeof fbDb === 'undefined' || !fbDb){ showToast('❌ 실시간 DB 연결이 필요합니다'); return false; }
+      var sr = (req.splitRule && typeof req.splitRule === 'object') ? req.splitRule : null;
+      var validNames = {};
+      (dbGet('user_dir', []) || []).concat(dbGet('user_accounts', []) || []).forEach(function(u){
+        if(u && u.name) validNames[String(u.name).trim()] = 1;
+      });
+      var cleanRule = null;
+      if(sr){
+        var mode = (sr.mode === 'split' || sr.mode === 'workOnly') ? sr.mode : '';
+        var ex = (Array.isArray(sr.ex) ? sr.ex : [])
+          .map(function(n){ return String(n || '').trim(); })
+          .filter(function(n){ return !!(n && validNames[n]); });
+        if(mode || ex.length){
+          cleanRule = {
+            coId: String(co.id),
+            coName: String(co.name || ''),
+            mode: mode,
+            ex: ex,
+            at: Date.now(),
+            by: String(me.name || '')
+          };
+        }
+      }
+      var desc = !cleanRule ? '분리·제외 규칙 해제 (공동 열람 복귀)'
+        : ((cleanRule.mode === 'split' ? '사업별 분리' : cleanRule.mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외')
+          + (cleanRule.ex.length ? ' · 제외: ' + cleanRule.ex.join(', ') : ''));
+      if(!confirm('「' + co.name + '」 분리·제외 규칙 신청을 승인할까요?\n\n· 적용 내용: ' + desc)) return false;
+      var sRef = fbDb.ref('pucards/mailCoSplit/' + String(co.id));
+      (cleanRule ? sRef.set(cleanRule) : sRef.remove()).then(function(){
+        if(cleanRule && cleanRule.ex.length && typeof coMgrCleanMailWho === 'function'){
+          coMgrCleanMailWho(co, cleanRule.ex);
+        }
+      }).catch(function(e){
+        dbUpsert(CO_MGR_REQ_KEY, Object.assign({}, req, { status:'wait' }));
+        showToast('❌ 분리 규칙 서버 반영 실패: ' + ((e && e.message) || e), 7000);
+      });
+    } else {
+      if(String(co.managerMain || '') !== String(req.from || '')
+        && !confirm('요청한 뒤에 이 업체 담당이 이미 바뀌었습니다.\n\n요청 때: ' + (coMgrName(req.from) || '(없음)')
+          + '\n지금: ' + (coMgrName(co.managerMain) || '(없음)') + '\n바꿀 사람: ' + (coMgrName(req.to) || '(비움)') + '\n\n그래도 승인할까요?')) return false;
+      var patch = { managerMain: req.to, managerMainName: coMgrName(req.to),
+        mgrHistory: coMgrHistAdd(co, req.to, { req: req.id, reqBy: req.by, reqByName: req.byName,
+          okBy: String(me.sid || ''), okByName: String(me.name || '') }) };
+      if(req.scope && req.scope.cleanSubs && Array.isArray(co.managerSubs)){
+        patch.managerSubs = co.managerSubs.filter(function(s){
+          return String(s) !== String(req.from || '') && String(s) !== String(req.to || '');
+        });
+      }
+      if(!dbPatch('companies', co.id, patch)){ showToast('❌ 저장 실패'); return false; }
+      if(req.scope && typeof coMgrApplyScope === 'function') coMgrApplyScope(co, req);
+    }
   }
   dbUpsert(CO_MGR_REQ_KEY, Object.assign({}, req, { status: ok ? 'ok' : 'no', decidedBy: String(me.sid || ''),
     decidedByName: String(me.name || ''), decidedAt: Date.now(), note: String(note || '').slice(0, 200) }));
   if(req.by && req.by !== me.sid && typeof handoffSend === 'function' && typeof fbDb !== 'undefined' && fbDb){
-    handoffSend({ toSid: req.by, toName: req.byName, k: 'companies', id: req.coId, label: req.coName },
-      (ok ? '✅ 담당 변경 승인 — ' : '↩ 담당 변경 반려 — ') + req.coName + ' ' + (coMgrName(req.from) || '(없음)')
+    handoffSend({ toSid: req.by, toName: req.byName, k: 'companies', id: req.coId, label: realCoName },
+      (ok ? '✅ 담당 변경 승인 — ' : '↩ 담당 변경 반려 — ') + realCoName + ' ' + (coMgrName(req.from) || '(없음)')
         + ' → ' + (coMgrName(req.to) || '(비움)') + (note ? ' · ' + note : '')).catch(function(){});
   }
-  showToast(ok ? '✅ 승인했습니다 — ' + req.coName : '↩ 반려했습니다 — ' + req.coName, 5000);
+  showToast(ok ? '✅ 승인했습니다 — ' + realCoName : '↩ 반려했습니다 — ' + realCoName, 5000);
   return true;
 }
 /* 요청한 사람(또는 관리자)이 거둔다 */
@@ -32153,6 +32205,130 @@ function coMgrCancel(req){
     decidedByName: String(me.name || ''), decidedAt: Date.now() }));
   showToast('요청을 거뒀습니다 — ' + req.coName, 4000);
   return true;
+}
+function coMgrScopeText(scope, req){
+  if(req && req.kind === 'split'){
+    var sr = req.splitRule;
+    if(!sr) return '[분리해제]';
+    var m = sr.mode === 'split' ? '사업별분리' : sr.mode === 'workOnly' ? '진행건단독' : '과거제외';
+    return '[' + m + (Array.isArray(sr.ex) && sr.ex.length ? ':' + sr.ex.join(',') : '') + ']';
+  }
+  if(!scope) return '';
+  var a = [];
+  if(scope.cleanSubs) a.push('부담당제외');
+  if(scope.works) a.push('진행사업');
+  if(scope.workSheet) a.push('업무시트');
+  if(scope.mailClean) a.push('메일정리');
+  return a.length ? '[' + a.join('+') + ']' : '';
+}
+function coMgrCleanMailWho(co, dropNames){
+  if(!co || typeof fbDb === 'undefined' || !fbDb) return Promise.resolve(0);
+  var drops = (dropNames || []).filter(Boolean);
+  if(!drops.length) return Promise.resolve(0);
+  var emails = [];
+  var pushEm = function(e){
+    var v = String(e || '').trim().toLowerCase();
+    if(v && v.indexOf('@') > 0 && !/@pureun\.kr$/.test(v) && emails.indexOf(v) < 0) emails.push(v);
+  };
+  [co.email, co.primaryContactEmail, co.ceoEmail, co.taxInvoiceEmail, co.taxEmail].forEach(pushEm);
+  (co.contacts || []).forEach(function(c){ if(c && c.email) pushEm(c.email); });
+  if(!emails.length) return Promise.resolve(0);
+  var whoKey = function(s){ return String(s || '').trim().toLowerCase().replace(/\./g, ',').replace(/[#$/\[\]]/g, '_'); };
+  return fbDb.ref('pucards/config/mailWho').once('value').then(function(snap){
+    var own = (snap && snap.val && snap.val()) || {};
+    var up = {}, cnt = 0;
+    emails.forEach(function(em){
+      var k = whoKey(em);
+      if(own[k] && drops.indexOf(String(own[k])) >= 0){ up['pucards/config/mailWho/' + k] = null; cnt++; }
+    });
+    return cnt ? fbDb.ref().update(up).then(function(){ return cnt; }) : 0;
+  }).catch(function(){ return 0; });
+}
+function coMgrApplyScope(co, req){
+  if(!co || !req || !req.scope) return { works:0 };
+  var sc = req.scope || {};
+  var fromSid = String(req.from || '');
+  var toSid = String(req.to || '');
+  var toName = coMgrName(toSid);
+  var fromName = coMgrName(fromSid);
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var biz = String(co.bizNo || '').replace(/\D/g, '');
+  var wkCount = 0;
+  if(sc.works && toSid && fromSid){
+    ['consultings', 'cases', 'funds', 'other_projects'].forEach(function(tbl){
+      (dbGet(tbl, []) || []).forEach(function(w){
+        if(!w || !w.id || w._deleted || w.permanentArchived || w.closedDate || w.undoneDate) return;
+        if(/^(closed|done|complete|completed|cancel|cancelled|canceled|transferred|inactive)$|종료|완료|취소|이관/.test(String(w.status || '').trim().toLowerCase())) return;
+        var same = (w.companyId && String(w.companyId) === String(co.id))
+          || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
+        if(!same) return;
+        var curMain = String(w.managerMain || '');
+        var subs = Array.isArray(w.managerSubs) ? w.managerSubs.slice() : [];
+        var wp = {};
+        var chg = false;
+        if(curMain === fromSid && curMain !== toSid){
+          wp.managerMain = toSid;
+          wp.managerMainName = toName;
+          chg = true;
+        }
+        if(subs.indexOf(fromSid) >= 0){
+          wp.managerSubs = subs.filter(function(s){ return String(s) !== fromSid && String(s) !== toSid; });
+          chg = true;
+        }
+        if(chg && dbPatch(tbl, w.id, wp)) wkCount++;
+      });
+    });
+  }
+  if(typeof fbDb !== 'undefined' && fbDb){
+    if(sc.workSheet && toSid && fromSid){
+      fbDb.ref('work_erp/items').orderByChild('coid').equalTo(String(co.id)).once('value')
+        .catch(function(){ return fbDb.ref('work_erp/items').once('value'); })
+        .then(function(snap){
+          var items = snap && snap.val ? snap.val() : null;
+          if(!items || typeof items !== 'object') return;
+          var isSheetClosed = function(it){
+            return !it || it._deleted || /^(done|closed|cancel|cancelled|canceled|transferred|archived)$|종료|완료|취소|이관/.test(String(it.state || '').trim().toLowerCase());
+          };
+          Object.keys(items).forEach(function(id){
+            var it = items[id];
+            if(isSheetClosed(it) || String(it.coid || '') !== String(co.id)) return;
+            var curSid = String((it.mgr_main && it.mgr_main.sid) || '');
+            var subs = Array.isArray(it.mgr_subs) ? it.mgr_subs : [];
+            if(!((curSid === fromSid && curSid !== toSid) || subs.some(function(s){ return s && String(s.sid) === fromSid; }))) return;
+            fbDb.ref('work_erp/items/' + id).transaction(function(cur){
+              if(isSheetClosed(cur) || String(cur.coid || '') !== String(co.id)) return cur;
+              var cs = String((cur.mgr_main && cur.mgr_main.sid) || '');
+              var sb = Array.isArray(cur.mgr_subs) ? cur.mgr_subs : [];
+              var nx = null;
+              if(cs === fromSid && cs !== toSid) nx = Object.assign({}, cur, { mgr_main:{ sid:toSid, name:toName } });
+              if(sb.some(function(s){ return s && String(s.sid) === fromSid; })){
+                nx = Object.assign({}, nx || cur, { mgr_subs:sb.filter(function(s){ return s && String(s.sid) !== fromSid && String(s.sid) !== toSid; }) });
+              }
+              return nx || cur;
+            }).catch(function(){});
+          });
+        }).catch(function(){});
+    }
+    if(sc.mailClean && fromName){
+      coMgrCleanMailWho(co, [fromName]);
+      fbDb.ref('pucards/mailCoSplit/' + co.id).transaction(function(cur){
+        var prevSp = (cur && typeof cur === 'object') ? cur : null;
+        var prevEx = (prevSp && Array.isArray(prevSp.ex)) ? prevSp.ex.slice() : [];
+        var ex = prevEx.filter(function(x){ return x && x !== toName; });
+        if(fromName !== toName && ex.indexOf(fromName) < 0) ex.push(fromName);
+        return {
+          coId: String(co.id),
+          coName: String(co.name || ''),
+          mode: (prevSp && prevSp.mode) ? String(prevSp.mode) : '',
+          ex: ex,
+          toName: String(toName || ''),
+          at: Date.now(),
+          by: String(me.name || '')
+        };
+      }).catch(function(){});
+    }
+  }
+  return { works:wkCount };
 }
 /* 업체관리 맨 위 띠 — 관리자는 «기다리는 요청 전부», 직원은 «내 요청» */
 function coMgrBanner(onOpen){
@@ -32187,16 +32363,19 @@ function CoMgrReqModal(props){
         !list.length ? h('div', { style:{ color:'#64748b', fontSize:'13px', padding:'14px', textAlign:'center' } }, '기다리는 요청이 없습니다')
         : list.map(function(r, i){
             var hot = coMgrRecent(cos[r.coId]);
+            var scTxt = coMgrScopeText(r.scope, r);
+            var shownCoName = (cos[r.coId] && cos[r.coId].name) || r.coName || '(미확인 업체)';
             return h('div', { key:r.id, className:'co-mgr-row', style:{ display:'flex', alignItems:'center', gap:'10px', height:'40px',
                 borderTop: i ? '1px solid #e2e8f0' : 'none', fontSize:'13px', whiteSpace:'nowrap' } },
               h('span', { style:cell('20px', { color:'#94a3b8', textAlign:'right', fontSize:'12px' }) }, i + 1),
-              h('span', { style:cell('130px'), title:r.coName }, r.coName),
+              h('span', { style:cell('130px'), title:shownCoName }, shownCoName),
               h('span', { style:cell('190px') },
                 h('span', { style:{ textDecoration:'line-through', color:'#94a3b8' } }, coMgrName(r.from) || '(없음)'), ' → ',
                 h('b', { style:{ color: r.to ? '#1e40af' : '#991b1b' } }, coMgrName(r.to) || '(비움)')),
               h('span', { style:cell('120px', { color:'#64748b', fontSize:'12px' }) }, (r.byName || r.by) + ' · ' + coMgrDay(r.at)),
               h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', color:'#475569' },
-                  title:(r.reason || '') + (hot.length ? '\n' + coMgrHotText(hot) : '') },
+                  title:(scTxt ? scTxt + ' ' : '') + (r.reason || '') + (hot.length ? '\n' + coMgrHotText(hot) : '') },
+                scTxt ? h('b', { style:{ color:'#1e40af', fontSize:'11.5px', marginRight:'5px' } }, scTxt) : null,
                 r.reason || '', hot.length ? h('b', { style:{ color:'#991b1b', fontSize:'11px', marginLeft:'6px' } }, '· ' + CO_MGR_HOT_DAYS + '일에 ' + hot.length + '번 바뀜') : null),
               admin ? h('button', { className:'btn-primary', style:{ padding:'3px 12px' },
                 onClick:function(){ if(coMgrDecide(r, true)) done(); } }, '승인') : null,
@@ -32207,7 +32386,7 @@ function CoMgrReqModal(props){
           })),
       h('div', { className:'modal-f' },
         h('div', { style:{ marginRight:'auto', fontSize:'11.5px', color:'#64748b' } },
-          admin ? '승인하면 업체 담당이 바로 바뀌고, 요청한 사람에게 알림이 갑니다' : '관리자가 승인하면 바뀝니다 — 그 사이에는 지금 담당 그대로입니다'),
+          admin ? '승인하면 업체 담당·일괄 전환 범위가 바로 반영되고 요청한 사람에게 알림이 갑니다' : '관리자가 승인하면 바뀝니다 — 그 사이에는 지금 담당 그대로입니다'),
         h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))));
 }
 /* 업체 상세 — 「담당 이력」과 기다리는 요청 */
@@ -32228,7 +32407,9 @@ function coMgrHistBox(co, onChange){
     pend ? h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11.5px', color:'#854d0e', background:'#fffbeb',
         border:'1px solid #fde68a', borderRadius:'4px', padding:'4px 8px', margin:'2px 0 4px' } },
       h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
-        '⏳ 담당 변경 요청 중 — ' + (coMgrName(pend.from) || '(없음)') + ' → ' + (coMgrName(pend.to) || '(비움)') + ' (' + (pend.byName || pend.by) + ' · ' + coMgrDay(pend.at) + ')'),
+        '⏳ 담당 변경 요청 중 — ' + (coMgrName(pend.from) || '(없음)') + ' → ' + (coMgrName(pend.to) || '(비움)')
+        + (coMgrScopeText(pend.scope, pend) ? ' ' + coMgrScopeText(pend.scope, pend) : '')
+        + ' (' + (pend.byName || pend.by) + ' · ' + coMgrDay(pend.at) + ')'),
       coMgrCanDirect() ? h('button', { className:'btn-primary', style:{ padding:'1px 10px', fontSize:'11px' },
         onClick:function(){ if(coMgrDecide(pend, true) && onChange) onChange(); } }, '승인') : null,
       (pend.by === me.sid || coMgrCanDirect()) ? h('button', { className:'btn-secondary', style:{ padding:'1px 10px', fontSize:'11px' },
@@ -32246,6 +32427,264 @@ function coMgrPendTag(co){
   return h('span', { className:'erp-tip',
     'data-tip':'담당 변경 요청 중 — ' + (coMgrName(p.from) || '(없음)') + ' → ' + (coMgrName(p.to) || '(비움)') + '\n' + (p.byName || p.by) + ' · ' + coMgrDay(p.at) + '\n관리자가 승인하면 바뀝니다',
     style:{ flexShrink:0, fontSize:'10.5px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'3px', padding:'0 4px' } }, '⏳');
+}
+/* 🔄 사업장 담당 단독 전환 · 사업별 중복 분리 모달 (푸른메일 mbTransferOpen 과 같은 규칙 공유) */
+function CoOwnerHandoverModal(props){
+  useEscClose(props.onClose);
+  var cos = (dbGet('companies', []) || []).filter(function(c){ return c && !c._deleted && c.status !== 'closed'; });
+  var initCo = props.coId ? (cos.filter(function(c){ return c.id === props.coId; })[0] || null) : null;
+  var activeUsers = (dbGet('user_accounts', []) || []).filter(function(u){ return u && u.sid && u.status !== 'retired' && u.status !== 'resigned'; });
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) || {};
+  var canDir = coMgrCanDirect();
+
+  var _tab = useState('sole'); var tab = _tab[0]; var setTab = _tab[1];
+  var _cid = useState(initCo ? initCo.id : ''); var coId = _cid[0]; var setCoId = _cid[1];
+  var _q   = useState(initCo ? (initCo.name || '') : ''); var q = _q[0]; var setQ = _q[1];
+  var _fs  = useState(initCo ? (initCo.managerMain || '') : ''); var fromSid = _fs[0]; var setFromSid = _fs[1];
+  var _ts  = useState(''); var toSid = _ts[0]; var setToSid = _ts[1];
+  var _cs  = useState(true); var cleanSubs = _cs[0]; var setCleanSubs = _cs[1];
+  var _wk  = useState(true); var syncWorks = _wk[0]; var setSyncWorks = _wk[1];
+  var _ws  = useState(true); var syncSheet = _ws[0]; var setSyncSheet = _ws[1];
+  var _mc  = useState(true); var syncMail = _mc[0]; var setSyncMail = _mc[1];
+  var _rs  = useState(''); var reason = _rs[0]; var setReason = _rs[1];
+  var _sm  = useState('split'); var splitMode = _sm[0]; var setSplitMode = _sm[1];
+  var _ex  = useState({}); var exMap = _ex[0]; var setExMap = _ex[1];
+  var _bz  = useState(false); var busy = _bz[0]; var setBusy = _bz[1];
+
+  var co = coId ? (cos.filter(function(c){ return c.id === coId; })[0] || null) : null;
+
+  function calcOpenWorksFor(targetCo){
+    var out = [];
+    if(!targetCo) return out;
+    var biz = String(targetCo.bizNo || '').replace(/\D/g, '');
+    [['consultings', '컨설팅'], ['cases', '사건'], ['funds', '기금'], ['other_projects', '기타']].forEach(function(p){
+      (dbGet(p[0], []) || []).forEach(function(w){
+        if(!w || w._deleted || w.permanentArchived || w.closedDate || w.undoneDate) return;
+        if(/^(closed|done|complete|completed|cancel|cancelled|canceled|transferred|inactive)$|종료|완료|취소|이관/.test(String(w.status || '').trim().toLowerCase())) return;
+        var same = (w.companyId && String(w.companyId) === String(targetCo.id))
+          || (biz.length === 10 && String(w.bizNo || '').replace(/\D/g, '') === biz);
+        if(!same) return;
+        out.push({ kind:p[1], title:String(w.title || w.typeName || w.programName || '진행건'), mgr:String(w.managerMain || '') });
+      });
+    });
+    return out;
+  }
+
+  useEffect(function(){
+    if(!coId || typeof fbDb === 'undefined' || !fbDb) return;
+    fbDb.ref('pucards/mailCoSplit/' + coId).once('value').then(function(s){
+      var v = s && s.val ? s.val() : null;
+      if(v && typeof v === 'object'){
+        if(v.mode) setSplitMode(v.mode);
+        var m = {};
+        (Array.isArray(v.ex) ? v.ex : []).forEach(function(nm){ if(nm) m[nm] = 1; });
+        setExMap(m);
+      } else {
+        setSplitMode('split');
+        setExMap({});
+      }
+    }).catch(function(){});
+  }, [coId]);
+
+  var openWorks = calcOpenWorksFor(co);
+
+  function pickCo(c){
+    var cw = calcOpenWorksFor(c);
+    setCoId(c.id);
+    setQ(c.name || '');
+    setFromSid(c.managerMain || '');
+    var diff = cw.find(function(w){ return w.mgr && w.mgr !== c.managerMain; });
+    setToSid(diff ? diff.mgr : (me.sid && me.sid !== c.managerMain ? me.sid : ''));
+  }
+
+  var qNorm = String(q || '').trim().toLowerCase().replace(/\s/g, '');
+  var hits = (qNorm ? cos.filter(function(c){
+    return String(c.name || '').toLowerCase().replace(/\s/g, '').indexOf(qNorm) >= 0
+      || String(c.bizNo || '').indexOf(q.trim()) >= 0;
+  }) : cos.slice(0, 18)).slice(0, 24);
+
+  function doSubmitSole(){
+    if(!co){ showToast('먼저 대상 사업장을 선택해 주세요'); return; }
+    if(!toSid){ showToast('전환 후 단독 담당자(을)를 선택해 주세요'); return; }
+    if(fromSid && fromSid === toSid){ showToast('빠지는 담당자와 단독 담당자가 같습니다'); return; }
+    var scope = { cleanSubs:cleanSubs, works:syncWorks, workSheet:syncSheet, mailClean:syncMail };
+    var effFrom = fromSid || String(co.managerMain || '');
+    if((syncWorks || syncSheet) && !effFrom){
+      showToast('진행 중 사업·업무시트 담당도 함께 바꾸려면 빠지는 기존 담당자(갑)를 선택해 주세요');
+      return;
+    }
+    if(!canDir){
+      var req = coMgrRequest(co, toSid, reason, '', { fromSid:effFrom, scope:scope });
+      if(!req){ showToast('❌ 신청 저장에 실패했습니다'); return; }
+      showToast('⏳ 「' + co.name + '」 단독 담당 전환을 신청했습니다 — 관리자 승인 시 일괄 반영됩니다', 6000);
+      if(props.onChange) props.onChange();
+      props.onClose();
+      return;
+    }
+    var patch = {
+      managerMain: toSid,
+      managerMainName: coMgrName(toSid),
+      mgrHistory: coMgrHistAdd(co, toSid, reason ? { note:reason } : undefined)
+    };
+    if(cleanSubs && Array.isArray(co.managerSubs)){
+      patch.managerSubs = co.managerSubs.filter(function(s){ return String(s) !== effFrom && String(s) !== toSid; });
+    }
+    if(!dbPatch('companies', co.id, patch)){ showToast('❌ 저장 실패'); return; }
+    var r = coMgrApplyScope(co, { from:effFrom, to:toSid, scope:scope });
+    showToast('✅ 「' + co.name + '」 단독 담당을 ' + coMgrName(toSid) + '님으로 일괄 전환했습니다'
+      + (r.works ? ' (진행사업 ' + r.works + '건 동시 변경)' : ''), 6000);
+    if(props.onChange) props.onChange();
+    props.onClose();
+  }
+
+  function doSaveSplit(){
+    if(!co){ showToast('먼저 대상 사업장을 선택해 주세요'); return; }
+    var mode = splitMode === 'share' ? '' : splitMode;
+    var ex = Object.keys(exMap).filter(function(k){ return exMap[k]; });
+    var nextRule = (!mode && !ex.length) ? null : {
+      coId: String(co.id),
+      coName: String(co.name || ''),
+      mode: mode,
+      ex: ex,
+      at: Date.now(),
+      by: String(me.name || '')
+    };
+    if(!canDir){
+      var modeDesc = !nextRule ? '공동 열람 복귀' : (mode === 'split' ? '사업별 분리' : mode === 'workOnly' ? '진행건 담당 단독' : '과거 담당 제외');
+      var sReq = coMgrRequest(co, co.managerMain || '', modeDesc + (ex.length ? ' (제외: ' + ex.join(', ') + ')' : ''), '', {
+        fromSid: String(co.managerMain || ''),
+        kind: 'split',
+        splitKey: String(co.id),
+        splitRule: nextRule
+      });
+      if(!sReq){ showToast('❌ 신청 저장에 실패했습니다'); return; }
+      showToast('⏳ 「' + co.name + '」 분리·제외 규칙을 신청했습니다 — 관리자 승인 시 바로 적용됩니다', 6000);
+      if(props.onChange) props.onChange();
+      props.onClose();
+      return;
+    }
+    if(typeof fbDb === 'undefined' || !fbDb){ showToast('실시간 DB 연결이 필요합니다'); return; }
+    if(busy) return;
+    setBusy(true);
+    var ref = fbDb.ref('pucards/mailCoSplit/' + co.id);
+    var p = (!nextRule) ? ref.remove() : ref.set(nextRule);
+    p.then(function(){
+      if(ex.length) return coMgrCleanMailWho(co, ex);
+    }).then(function(){
+      setBusy(false);
+      showToast('✅ 「' + co.name + '」 푸른메일 중복 연결 분리·제외 규칙을 저장했습니다', 5500);
+      props.onClose();
+    }).catch(function(e){
+      setBusy(false);
+      showToast('❌ 저장 실패: ' + ((e && e.message) || e));
+    });
+  }
+
+  var candNames = [];
+  if(co && co.managerMain) candNames.push(coMgrName(co.managerMain));
+  if(co && Array.isArray(co.managerSubs)) co.managerSubs.forEach(function(s){ var n = coMgrName(s); if(n && candNames.indexOf(n) < 0) candNames.push(n); });
+  openWorks.forEach(function(w){ var n = coMgrName(w.mgr); if(n && candNames.indexOf(n) < 0) candNames.push(n); });
+  activeUsers.forEach(function(u){ if(u.name && candNames.indexOf(u.name) < 0) candNames.push(u.name); });
+
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', role:'dialog', 'aria-modal':'true', 'aria-label':'사업장 담당 전환 및 중복 연결 정리', style:{ maxWidth:'760px', width:'96vw' }, onClick:function(e){ e.stopPropagation(); } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '🔄 사업장 담당 전환 · 중복 연결 정리'),
+        h('button', { type:'button', className:'x', 'aria-label':'닫기', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'76vh', overflowY:'auto', padding:'14px 16px' } },
+        h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'10px 12px', marginBottom:'10px', background:'#ffffff' } },
+          h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'5px' } }, '대상 사업장 검색 · 선택'),
+          h('input', { type:'text', 'aria-label':'대상 사업장 검색', value:q, onChange:function(e){ setQ(e.target.value); }, placeholder:'사업장 이름 또는 사업자번호 입력',
+            style:{ width:'100%', boxSizing:'border-box', padding:'8px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', fontSize:'16px' } }),
+          h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'6px', marginTop:'8px', maxHeight:'84px', overflowY:'auto' } },
+            hits.map(function(c){
+              var on = c.id === coId;
+              return h('button', { key:c.id, type:'button', onClick:function(){ pickCo(c); },
+                style:{ padding:'4px 10px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
+                  border:'1px solid ' + (on ? '#2563eb' : '#cbd5e1'),
+                  background: on ? '#2563eb' : '#f8fafc', color: on ? '#ffffff' : '#1e293b', fontWeight: on ? 700 : 500 } },
+                c.name + ' (' + (coMgrName(c.managerMain) || '미지정') + ')');
+            }))),
+        co ? h('div', { style:{ border:'1px solid ' + (openWorks.some(function(w){ return w.mgr && w.mgr !== co.managerMain; }) ? '#fde68a' : '#e2e8f0'),
+            background: openWorks.some(function(w){ return w.mgr && w.mgr !== co.managerMain; }) ? '#fffbeb' : '#f8fafc',
+            borderRadius:'8px', padding:'10px 12px', marginBottom:'10px', fontSize:'12.5px', lineHeight:1.7, color:'#1e293b' } },
+          h('div', { style:{ fontWeight:700, marginBottom:'3px' } }, '🏢 ' + co.name + ' — 현재 담당 연결 현황'),
+          h('div', null, '· 업체 주담당(자문·급여): ', h('b', null, coMgrName(co.managerMain) || '(비어 있음)'),
+            (co.managerSubs && co.managerSubs.length) ? ' · 부담당: ' + co.managerSubs.map(coMgrName).join(', ') : ''),
+          h('div', null, '· 진행 중 컨설팅·사건·기금: ', openWorks.length
+            ? openWorks.map(function(w){ return w.kind + '(' + w.title + ' → ' + (coMgrName(w.mgr) || '미지정') + ')'; }).join(' · ')
+            : '없음')) : null,
+        h('div', { role:'tablist', style:{ display:'flex', gap:'6px', marginBottom:'10px' } },
+          h('button', { type:'button', role:'tab', 'aria-selected': tab === 'sole', onClick:function(){ setTab('sole'); },
+            style:{ flex:1, padding:'8px 10px', borderRadius:'8px', cursor:'pointer', fontWeight:700, fontSize:'12.5px',
+              border:'1px solid ' + (tab === 'sole' ? '#1e40af' : '#cbd5e1'),
+              background: tab === 'sole' ? '#1e40af' : '#f8fafc', color: tab === 'sole' ? '#ffffff' : '#475569' } },
+            '👤 갑 빠지고 을 단독 전환 (일괄 변경·신청)'),
+          h('button', { type:'button', role:'tab', 'aria-selected': tab === 'split', onClick:function(){ setTab('split'); },
+            style:{ flex:1, padding:'8px 10px', borderRadius:'8px', cursor:'pointer', fontWeight:700, fontSize:'12.5px',
+              border:'1px solid ' + (tab === 'split' ? '#1e40af' : '#cbd5e1'),
+              background: tab === 'split' ? '#1e40af' : '#f8fafc', color: tab === 'split' ? '#ffffff' : '#475569' } },
+            '🔀 사업별 분리 · 과거 담당 중복 차단')),
+        tab === 'sole' ? h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px' } },
+          h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'10px', marginBottom:'10px' } },
+            h('div', null,
+              h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'4px' } }, '빠지는 기존 담당자 (갑)'),
+              h('select', { 'aria-label':'빠지는 기존 담당자 (갑)', value:fromSid, onChange:function(e){ setFromSid(e.target.value); }, style:{ width:'100%', padding:'7px 8px', fontSize:'16px', border:'1px solid #cbd5e1', borderRadius:'6px' } },
+                h('option', { value:'' }, '— 빠질 담당자 선택 (선택) —'),
+                activeUsers.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name + (u.role ? ' (' + u.role + ')' : '')); }))),
+            h('div', null,
+              h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'4px' } }, '전환 후 단독 담당자 (을) *'),
+              h('select', { 'aria-label':'전환 후 단독 담당자 (을)', value:toSid, onChange:function(e){ setToSid(e.target.value); }, style:{ width:'100%', padding:'7px 8px', fontSize:'16px', border:'1px solid #cbd5e1', borderRadius:'6px' } },
+                h('option', { value:'' }, '— 단독 담당자(을) 선택 —'),
+                activeUsers.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name + (u.role ? ' (' + u.role + ')' : '')); })))),
+          [
+            [cleanSubs, setCleanSubs, '업체 부담당 정리 — 부담당 명단에 갑이 남아 있으면 함께 제거'],
+            [syncWorks, setSyncWorks, '진행 중 컨설팅·사건·기금 담당 동시 변경 — 이 사업장 진행 건의 갑을 을로 함께 전환'],
+            [syncSheet, setSyncSheet, '푸른업무(업무시트) 동시 변경 — 진행 중 업무시트(work_erp) 담당자도 함께 전환'],
+            [syncMail, setSyncMail, '푸른메일 수동 고정 해제 · 과거 담당 재연결 차단 — 갑의 메일함 중복 유입 차단']
+          ].map(function(row, idx){
+            return h('label', { key:idx, style:{ display:'flex', alignItems:'center', gap:'8px', padding:'4px 0', fontSize:'12.5px', color:'#1e293b', cursor:'pointer' } },
+              h('input', { type:'checkbox', checked:row[0], onChange:function(e){ row[1](e.target.checked); } }),
+              h('span', null, row[2]));
+          }),
+          h('div', { style:{ marginTop:'8px' } },
+            h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'4px' } }, '변경·전환 사유'),
+            h('input', { type:'text', 'aria-label':'변경 및 전환 사유', maxLength:200, value:reason, onChange:function(e){ setReason(e.target.value); },
+              placeholder:'예: 업무 일원화로 을 단독 담당 전환',
+              style:{ width:'100%', boxSizing:'border-box', padding:'7px 10px', fontSize:'16px', border:'1px solid #cbd5e1', borderRadius:'6px' } })))
+        : h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px' } },
+            [
+              ['split', '🔀 사업 갈래별 분리 (추천 — 자문·급여는 갑, 컨설팅·사건은 을 단독)', '컨설팅·사건·기금 메일은 그 건 담당자(을)에게만 가고, 급여·4대보험·일반자문 메일은 업체 주담당(갑)에게만 갑니다.'],
+              ['workOnly', '🎯 진행 사업 담당자(을)만 메일 받기 (과거 업체 담당 배제)', '과거 자문 이력으로 업체 담당이 남아 있으나 현재는 진행 중 사업 담당자(을)만 메일을 받게 합니다.'],
+              ['share', '👥 함께 보기 (기본 공동 열람)', '분리 규칙을 두지 않고 업체 담당과 진행 건 담당이 메일을 함께 봅니다.']
+            ].map(function(opt){
+              var on = splitMode === opt[0];
+              return h('label', { key:opt[0], style:{ display:'flex', alignItems:'flex-start', gap:'8px', padding:'8px 10px', marginBottom:'6px',
+                  borderRadius:'8px', cursor:'pointer', border:'1px solid ' + (on ? '#2563eb' : '#e2e8f0'), background: on ? '#eff6ff' : '#ffffff' } },
+                h('input', { type:'radio', name:'erpSplitMode', checked:on, onChange:function(){ setSplitMode(opt[0]); }, style:{ marginTop:'3px' } }),
+                h('div', null, h('b', { style:{ fontSize:'12.5px', color: on ? '#1e40af' : '#1e293b' } }, opt[1]),
+                  h('div', { style:{ fontSize:'12px', color:'#475569', marginTop:'2px' } }, opt[2])));
+            }),
+            h('div', { style:{ marginTop:'8px' } },
+              h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#475569', marginBottom:'5px' } }, '🚫 이 사업장 메일에서 아예 뺄 과거 담당자 (누르면 제외 토글)'),
+              h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'6px' } },
+                candNames.slice(0, 14).map(function(nm){
+                  var on = !!exMap[nm];
+                  return h('button', { key:nm, type:'button', onClick:function(){
+                      setExMap(function(p){ var nx = Object.assign({}, p); if(nx[nm]) delete nx[nm]; else nx[nm] = 1; return nx; });
+                    },
+                    style:{ padding:'4px 10px', borderRadius:'99px', fontSize:'12px', cursor:'pointer',
+                      border:'1px solid ' + (on ? '#dc2626' : '#cbd5e1'),
+                      background: on ? '#fef2f2' : '#f8fafc', color: on ? '#991b1b' : '#475569', fontWeight: on ? 700 : 500 } },
+                    (on ? '🚫 ' : '+ ') + nm);
+                }))))),
+      h('div', { className:'modal-f' },
+        h('div', { style:{ marginRight:'auto', fontSize:'11.5px', color:'#64748b' } },
+          canDir ? '관리자 권한으로 즉시 반영됩니다' : '신청 시 관리자 승인 후 반영됩니다'),
+        h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'),
+        tab === 'sole'
+          ? h('button', { type:'button', className:'btn-primary', disabled:busy, onClick:doSubmitSole }, canDir ? '✔ 지금 바로 일괄 변경' : '📨 일괄 변경 신청 보내기')
+          : h('button', { type:'button', className:'btn-primary', disabled:busy, onClick:doSaveSplit }, busy ? '처리 중…' : (canDir ? '✔ 분리·제외 규칙 저장' : '📨 분리·제외 규칙 신청')))));
 }
 
 /* ── «살아 있는 업체» 판정 하나 (2026-10-11 검토 §6) ──
@@ -32973,6 +33412,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   function clearSel(){ setSelIds(new Set()); }
   /* 🔐 담당 변경 요청 창 — 업체관리 맨 위 띠에서 연다 */
   var _cmrS = useState(false); var mgrReqOpen = _cmrS[0]; var setMgrReqOpen = _cmrS[1];
+  var _hndS = useState(null); var handoverTarget = _hndS[0]; var setHandoverTarget = _hndS[1];
   function applyBulkMgr(sid){
     if(!sid) return;
     var u = users.find(function(u){return u.sid===sid;});
@@ -33686,15 +34126,22 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
         { label:'✨ 이번 달 신규', value:companies.filter(function(c){return erpDateStr(c.contractStartDate||c.firstContractDate||c.createdAt).slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
         { label:'⏸ 계약 중단', value:suspendedCount+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
       ],
-      extra: h('button', { onClick:function(){setMonthOnly(!monthOnly);},
-        title:MONTH_ONLY_TIP,
-        style:{ padding:'6px 12px', background: monthOnly?'#1e40af':'#fff', color: monthOnly?'#fff':'#475569',
-          border:'1px solid '+(monthOnly?'#1e40af':'#cbd5e1'), borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } },
-        monthOnly ? '✓ 이번 달만' : '📅 이번 달만')
+      extra: h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' } },
+        h('button', { onClick:function(){ setHandoverTarget({ coId:'' }); },
+          title:'기존 담당자(갑) 빠지고 새 담당자(을) 단독 전환 일괄 신청·변경 및 컨설팅·사건 중복 연결 분리',
+          style:{ padding:'6px 11px', background:'#eff6ff', color:'#1e40af',
+            border:'1px solid #bfdbfe', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700, whiteSpace:'nowrap' } },
+          '🔄 담당 전환·중복정리'),
+        h('button', { onClick:function(){setMonthOnly(!monthOnly);},
+          title:MONTH_ONLY_TIP,
+          style:{ padding:'6px 12px', background: monthOnly?'#1e40af':'#fff', color: monthOnly?'#fff':'#475569',
+            border:'1px solid '+(monthOnly?'#1e40af':'#cbd5e1'), borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600 } },
+          monthOnly ? '✓ 이번 달만' : '📅 이번 달만'))
     }),
     /* 🔐 담당 변경 요청 — 관리자는 기다리는 것 전부, 직원은 내 것 */
     coMgrBanner(function(){ setMgrReqOpen(true); }),
     mgrReqOpen && h(CoMgrReqModal, { onClose:function(){ setMgrReqOpen(false); }, onChange: refreshCompanies }),
+    handoverTarget && h(CoOwnerHandoverModal, { coId: handoverTarget.coId || '', onClose:function(){ setHandoverTarget(null); }, onChange: refreshCompanies }),
     // 통합 필터 — 모바일 compact / PC 기존
     window.innerWidth <= 768
     ? /* 🧊 폰 틀 고정 (대표 지시 2026-10-23 「데이터가 들어가는 … 틀 고정이 필요한 모든 부분」) — 목록을 내려도 검색·거르개 줄은 위에 붙어 있다. 모양은 css 의 .pu-mfreeze */ h('div', { className:'pu-mfreeze', style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px', flexWrap:'nowrap' } },
@@ -33722,6 +34169,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               { v:'mis', tip:CO_MIS_TIP, t:'🔍 정보 대조', run:function(){ setMisOpen(true); } },
               addrMisN !== 0 && { v:'addr', tip:CO_ADDR_TIP, t: addrMisN > 0 ? '📍 주소 다름 ' + addrMisN : '📍 주소 대조', run:function(){ setAddrOpen(true); } },
               vatPend.total > 0 && { v:'vat', tip:CO_VAT_ALL_TIP, t:'🧾 부가세 포함 일괄 ' + vatPend.total, run:doVatAll },
+              { v:'handover', t:'🔄 담당 전환·중복정리', run:function(){ setHandoverTarget({ coId:'' }); } },
               /* 📥 엑셀도 여기로 — 따로 단추를 두면 검색칸이 그만큼 좁아진다 */
               { v:'xls', t:'📥 엑셀로 받기', run:exportExcel }
             ].filter(Boolean);
@@ -34424,6 +34872,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   h('td', { className:'ac' },
                     h(RowActions, { items:[
                       { label:'✏️ 수정',     tone:'edit', onClick:function(){ editCompany(co.id); } },
+                      { label:'🔄 담당 전환·분리', tone:'edit', onClick:function(){ setHandoverTarget({ coId:co.id }); } },
                       coUndoItem(co),
                       { label:'✓ 종료 처리', tone:'warn', onClick:function(){ closeCompany(co.id); } }
                     ] })
@@ -34470,7 +34919,8 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
         // 계약관리 동기화 — 연 때 값(editModal)과 견줘 «바뀐 칸만», 계약표에 한 번만 쓴다 (검토 §1)
         erpCoSyncContracts(editModal, form);
       },
-      onClose: function(){ setEditModal(null); }
+      onClose: function(){ setEditModal(null); },
+      onOpenHandover: function(c){ setEditModal(null); setHandoverTarget({ coId: (c && c.id) || '' }); }
     }),
     // 중복 업체 정리 모달
     // ★ 급여담당자 엑셀 미리보기 (대표 결정 2026-08-24)
@@ -35320,7 +35770,12 @@ function CompanyEditModal(props){
                    +'— 빈 칸은 채우고, 값이 다른 칸은 지금 값과 나란히 보여 드립니다',
               style:{ background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', borderRadius:'5px',
                 padding:'4px 9px', fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' } },
-              '📷 사진첩에서 찾기')),
+              '📷 사진첩에서 찾기'),
+            props.onOpenHandover && f.id ? h('button', { type:'button', onClick:function(){ props.onOpenHandover(f); },
+              title:'기존 담당자(갑) 빠지고 새 담당자(을) 단독 전환 신청·변경 또는 컨설팅·사건 중복 연결 분리',
+              style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', borderRadius:'5px',
+                padding:'4px 9px', fontSize:'11px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } },
+              '🔄 담당 전환·중복정리') : null),
           /* ⚠★ 차례를 계약창과 같게 맞췄다 (대표 지시 2026-09-19 「추천대로 진행」).
                계약창·기업정보함과 같은 «덩어리 차례»: 신원 → 주소 → 연락처 → 업종·규모.
                tests/company-4col-order.test.js 가 이 차례를 지킨다. */

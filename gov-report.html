@@ -2163,53 +2163,91 @@ function grReset(){
   grRender();
 }
 
-/* ═══ 읽기 — 일정 넷을 한 번씩, 보고서는 줄마다 한 자리씩(확정본 사본 _v 는 안 읽는다) ═══ */
+/* ═══ 읽기 — 독립 노드를 모두 병렬 선행 시작하고, 기본 사업·업체 목록이 오는 즉시(~0.2초) 판을 먼저 그린 뒤 세부 보고서·체크 상태를 얹는다 ═══ */
+var _grPreDocs=null, _grPreBiz=null, _grPreTrack=null;
 async function grLoad(){
   var L=PuGovReportList, input={}, keys=Object.keys(GR_NODES);
   var seq=++GR.seq;
+  var allDone=false;
   GR.err=''; GR.today=grToday(); grRender();
   grLoadAuto();   /* 메일 자동 처리 상태 — 시작만 하고 기다리지 않는다(판이 먼저 그려진다). 값이 오면 첫 화면만 다시 그리고, 못 읽어도 앱은 그대로(구역에 안내 한 줄) */
+
+  var pNodes=Promise.all(keys.map(function(k){ return fbDb.ref(GR_NODES[k]).once('value').then(function(s){ return s.val(); }); }));
+  var pIdx=fbDb.ref('scal_rptFormsIndex').once('value').then(function(s){ return {ok:true,v:s.val()||{}}; }, function(){ return {ok:false,v:null}; });
+  _grPreDocs=null; _grPreBiz=null; _grPreTrack=null;
+  var preDocs=grLoadDocs(), preBiz=grLoadBizState(), preTrack=grLoadTrack();
+  _grPreDocs=preDocs; _grPreBiz=preBiz; _grPreTrack=preTrack;
+
   try{
-    var vals=await Promise.all(keys.map(function(k){ return fbDb.ref(GR_NODES[k]).once('value').then(function(s){ return s.val(); }); }));
+    var vals=await pNodes;
+    if(seq!==GR.seq) return;
     keys.forEach(function(k,i){ input[k]=vals[i]; });
     input.today=GR.today;
+    GR.staffMap=L.staffNames(input.staff);
+    if(!GR.f.year) GR.f.year=GR.today.slice(0,4);
+
     var reps={};
-    await Promise.all(L.reportKeys(input).map(function(x){
+    var pReps=Promise.all(L.reportKeys(input).map(function(x){
       return fbDb.ref('scal_reports/'+x.coId+'/'+x.rid).once('value').then(function(s){
         var v=s.val(); if(v){ reps[x.coId]=reps[x.coId]||{}; reps[x.coId][x.rid]=v; }
       });
     }));
+
+    /* 보고서 수백 건 개별 조회(pReps)나 서류 추적(preTrack)을 기다리지 않고, 사업 목록·일정이 모이는 즉시 첫 화면을 먼저 표시 */
+    Promise.all([preDocs,preBiz]).then(function(){
+      if(allDone||seq!==GR.seq||GR.err) return;
+      input.reports=reps;
+      GR.rows=L.buildRows(input);
+      GR.input=input;
+      if(GR.email&&GR.docs&&!GR.docs.bad.dir){
+        try{ GR.me=L.staffIdFor(input.staff,GR.docs.dir,GR.email); }catch(e){}
+      }
+      grApplyTrack();
+      GR.loaded=true; GR.dver++;
+      grRender();
+    }).catch(function(){});
+
+    await pReps;
     if(seq!==GR.seq) return;
     input.reports=reps;
     GR.rows=L.buildRows(input); GR.dver++;
     GR.input=input;
-    GR.staffMap=L.staffNames(input.staff);
-    if(!GR.f.year) GR.f.year=GR.today.slice(0,4);
-  }catch(e){ if(seq!==GR.seq) return; console.warn('[컨설팅보고서] 못 읽음',e); GR.err=String((e&&e.message)||e); GR.rows=[]; GR.input=null; GR.dver++; }
-  var idx=null, idxErr=false;
-  try{ idx=(await fbDb.ref('scal_rptFormsIndex').once('value')).val()||{}; }
-  catch(e){ idx=null; idxErr=true; }
-  if(seq!==GR.seq) return;
-  GR.index=idx; GR.indexErr=idxErr;
-  GR.me='';
-  if(!GR.err&&GR.email){
-    var me='';
-    try{ me=L.staffIdFor(input.staff,(await fbDb.ref('data/user_dir').once('value')).val(),GR.email); }catch(e){ me=''; }
+  }catch(e){
+    allDone=true;
     if(seq!==GR.seq) return;
-    GR.me=me;
+    console.warn('[컨설팅보고서] 못 읽음',e);
+    GR.err=String((e&&e.message)||e); GR.rows=[]; GR.input=null; GR.dver++;
   }
+
+  var idxRes=await pIdx;
+  if(seq!==GR.seq) return;
+  GR.index=idxRes.ok?idxRes.v:null;
+  GR.indexErr=!idxRes.ok;
   await grLoadDocs();
   if(seq!==GR.seq) return;
   await grLoadBizState();
   if(seq!==GR.seq) return;
   await grLoadTrack();
+  allDone=true;
   if(seq!==GR.seq) return;
+  GR.me='';
+  if(!GR.err&&GR.email){
+    var me='';
+    try{
+      var dirVal=(GR.docs&&!GR.docs.bad.dir)?GR.docs.dir:(await fbDb.ref('data/user_dir').once('value')).val();
+      if(seq!==GR.seq) return;
+      me=L.staffIdFor(input.staff,dirVal,GR.email);
+    }catch(e){ me=''; }
+    if(seq!==GR.seq) return;
+    GR.me=me;
+  }
   grApplyTrack();
   GR.loaded=true; GR.dver++;
   grRender();
 }
 /* 왼쪽 패널 자료 — 하나라도 못 읽어도 오른쪽 목록은 돈다. 사업 목록을 못 읽은 것만 «오류»로 친다 */
 async function grLoadDocs(){
+  if(_grPreDocs){ var p=_grPreDocs; _grPreDocs=null; return p; }
   var seq=++GR.dseq, keys=Object.keys(GR_DOC_NODES);
   var got=await Promise.all(keys.map(function(k){
     return fbDb.ref(GR_DOC_NODES[k]).once('value').then(function(s){ return {ok:true,v:s.val()}; },
@@ -2221,6 +2259,7 @@ async function grLoadDocs(){
   GR.docs=d; GR.dver++;
 }
 async function grRetryDocs(){
+  _grPreDocs=null;
   GR.docs={loaded:false,err:false}; GR.dver++; grRenderBiz();
   await grLoadDocs();
   grApplyTrack();
@@ -2228,6 +2267,7 @@ async function grRetryDocs(){
 }
 /* 서류 진행 기록 — 통째로 한 번(once). 못 읽으면(규칙 게시 전·권한 없음) 체크표 ③④⑤ 만 읽기 전용 「—」, 나머지는 그대로 돈다 */
 async function grLoadTrack(){
+  if(_grPreTrack){ var p=_grPreTrack; _grPreTrack=null; return p; }
   var seq=++GR.tseq;
   try{ var t=PuGovReportTrack.normalize((await fbDb.ref(GR_TRACK_NODES.docs).once('value')).val()); if(seq!==GR.tseq) return; GR.track=t; GR.trackErr=false; GR.trackAt=Date.now(); GR.dver++; }
   catch(e){ if(seq!==GR.tseq) return; console.warn('[컨설팅보고서] 못 읽음 '+GR_TRACK_NODES.docs,e); GR.track=null; GR.trackErr=true; GR.dver++; }
@@ -2244,10 +2284,13 @@ function grApplyTrack(){
    ★ 종결 = 고른 해 >= closedFrom(「사업 전체」는 2000). 종결 사업은 숫자·챙길 것·받은 서류 확인에서 빠진다(grClosedTypes) — 눌러 고르면 행·서류가 그대로 보인다.
    ★ 상태를 못 읽어도(규칙 게시 전·권한) «종결 없음»으로 돌고 오류 줄은 없다 */
 async function grLoadBizState(){
+  if(_grPreBiz){ var p=_grPreBiz; _grPreBiz=null; return p; }
   var seq=++GR.bseq;
-  try{ var v=(await fbDb.ref(GR_BIZ.node).once('value')).val(); if(seq!==GR.bseq) return; GR.bizState=(v&&typeof v==='object'&&!Array.isArray(v))?v:{}; GR.dver++; }
-  catch(e){ if(seq!==GR.bseq) return; console.warn('[컨설팅보고서] 못 읽음 '+GR_BIZ.node,e); GR.bizState={}; GR.dver++; }
-  await grLoadBizOrder();   /* 사업 순서 — 종결 표시와 같은 때에 통째 한 번(아래) */
+  var pState=(async function(){
+    try{ var v=(await fbDb.ref(GR_BIZ.node).once('value')).val(); if(seq!==GR.bseq) return; GR.bizState=(v&&typeof v==='object'&&!Array.isArray(v))?v:{}; GR.dver++; }
+    catch(e){ if(seq!==GR.bseq) return; console.warn('[컨설팅보고서] 못 읽음 '+GR_BIZ.node,e); GR.bizState={}; GR.dver++; }
+  })();
+  await Promise.all([pState,grLoadBizOrder()]);   /* 사업 순서 — 종결 표시와 동시에 병렬로 한 번(아래) */
 }
 /* 쓰기 자리에 들어갈 사업 코드 점검 — 규칙 열쇠 꼴 + 프로토타입 이름 막기 */
 function grOkBizCode(k){ return typeof k==='string'&&GR_BIZ.code.test(k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'; }

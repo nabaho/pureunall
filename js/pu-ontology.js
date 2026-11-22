@@ -235,7 +235,7 @@
        빌려 읽는 곳: data/user_dir(대표인지 확인) · uid_roles(권한). 쓰지는 않는다. */
     /* ⚠ kcareer/{uid}/ls 는 «읽기만» 한다 — 원본은 경력관리다(2026-09-10 「신청 재료」 탭).
        ⚠ 노드를 통째로 읽지 않는다: 밑에 API 열쇠(_secrets)와 첨부 조각(수 MB)이 있다. */
-    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */,'gov_feed' /* 공고 받은 함(서버 govFeedCollect 가 매일 모음) — 2026-10-12 */],
+    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */,'gov_feed' /* 공고 받은 함(서버 govFeedCollect 가 매일 모음) — 2026-10-12 */,'gov_digest' /* 오늘의 요약(서버 govDigestKakao 가 매일 08:30 에 쓰는 공개 요약·돌린 결과) — 2026-11-22 */],
       sharedRoots:['data/user_dir','uid_roles','kcareer/{uid}/ls'],
       entityTypes:['Organization','Project','Document'] },
     /* 회생광고 — 법원 회생 공고(법인회생 «포괄적 금지명령»)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
@@ -321,6 +321,9 @@
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
     mail:{ name:'푸른 메일', file:'pu-cards.html?view=mail', primaryRoots:['pucards/mailbox','pucards/sentBox','pucards/scheduled','mailbox'],
       entityTypes:['Person','Organization','Message','Document'] },
+    pubsearch:{ name:'공공 기업검색', file:'pu-pubsearch.html', primaryRoots:[],
+      sharedRoots:['pucards/coInfo','pubdata','data/companies'], entityTypes:['Organization','Document'], localOnly:true,
+      note:'금융위·재무·국세청·고용산재·국민연금·DART 무료 공공 기업검색 독립 프로그램 — 조회 결과를 기업정보함(pucards/coInfo) 빈 칸에만 반영한다' },
     cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies','worker_secret'],
       entityTypes:['Organization','Person','Document','MediaAsset','Message'] },
     photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'],
