@@ -38,29 +38,46 @@ function preconditionsOf(o) {
 
 function statusOf(e) { return +(e && (e.code || (e.response && e.response.status))) || 0; }
 
-/* 올리기가 끝난 바로 그 파일 하나 — 창고 트리거(edulibTokenStrip)가 부른다.
-   obj: 트리거가 넘기는 ObjectMetadata(name·generation·metageneration·metadata). 사진 창고 «모든» 파일에 불리므로 edulib/ 가 아니면 곧바로 끝낸다.
-   알림에 토큰이 안 실려 왔으면 지금 메타데이터를 한 번 읽어 본다(토큰이 나중에 붙는 경우 대비).
-   돌려줌: 'skip'(다른 자리) · 'none'(토큰 없음) · 'revoked' · 'changed'(412 — 그 사이 바뀜) · 'gone'(404). 그 밖의 실패는 던진다(트리거가 다시 시도). */
+const REQ_TIMEOUT_MS = 20000;        /* 창고 요청 하나가 이보다 오래 걸리면 실패로 친다(밤 함수가 540초 안에 끝나게) */
+const MAX_TRIES = 3;                 /* 412(그 사이 메타데이터가 바뀜)면 지금 판을 다시 읽어 이만큼까지 다시 해 본다 */
+function withTimeout(p, ms) {
+  let t = null;
+  return Promise.race([
+    Promise.resolve(p).finally(() => clearTimeout(t)),
+    new Promise((_, rej) => { t = setTimeout(() => { const e = new Error('창고 요청이 ' + ms + 'ms 안에 끝나지 않았습니다'); e.code = 'TIMEOUT'; rej(e); }, ms); }),
+  ]);
+}
+function fromMeta(name, md) {
+  return { name, metadata: (md && md.metadata) || {}, generation: md && md.generation, metageneration: md && md.metageneration };
+}
+function ready(o) { return needsRevoke(o) && !!o.generation && !!o.metageneration; }
+
+/* 파일 하나 — 창고 트리거(edulibTokenStrip)와 밤 정리(revokeTokens)가 함께 쓴다.
+   obj: ObjectMetadata 꼴(name·generation·metageneration·metadata). 사진 창고 «모든» 파일에 불리므로 edulib/ 가 아니면 곧바로 끝낸다.
+   알림에 토큰이 안 실려 왔거나 412(그 사이 다른 메타데이터가 바뀜)면 «지금 판»을 읽어 다시 한다(MAX_TRIES 까지) — 토큰이 남은 채 끝내지 않게.
+   돌려줌: 'skip'(다른 자리) · 'none'(토큰 없음) · 'revoked' · 'changed'(되풀이해도 412 — 밤 정리가 메운다) · 'gone'(404).
+   그 밖의 실패(시간 넘김 포함)는 던진다(트리거는 다시 시도, 밤 정리는 failed 로 센다). */
 async function stripOne(obj, deps) {
   const name = obj && obj.name;
   if (!isEdulibObject(name)) return 'skip';
   const file = deps.bucket.file(name);
-  let o = { name, metadata: (obj && obj.metadata) || {}, generation: obj && obj.generation, metageneration: obj && obj.metageneration };
-  try {
-    if (!needsRevoke(o) || !o.generation || !o.metageneration) {
-      const [md] = await file.getMetadata();
-      o = { name, metadata: (md && md.metadata) || {}, generation: md && md.generation, metageneration: md && md.metageneration };
-      if (!needsRevoke(o) || !o.generation || !o.metageneration) return 'none';
+  let o = fromMeta(name, obj);
+  for (let n = 0; n < MAX_TRIES; n++) {
+    try {
+      if (n > 0 || !ready(o)) {
+        const [md] = await withTimeout(file.getMetadata(), REQ_TIMEOUT_MS);
+        o = fromMeta(name, md);
+        if (!ready(o)) return 'none';
+      }
+      await withTimeout(file.setMetadata(patchBody(), preconditionsOf(o)), REQ_TIMEOUT_MS);
+      return 'revoked';
+    } catch (e) {
+      const st = statusOf(e);
+      if (st === 404) return 'gone';
+      if (st !== 412) throw e;
     }
-    await file.setMetadata(patchBody(), preconditionsOf(o));
-    return 'revoked';
-  } catch (e) {
-    const st = statusOf(e);
-    if (st === 412) return 'changed';
-    if (st === 404) return 'gone';
-    throw e;
   }
+  return 'changed';
 }
 
 /* deps.bucket: @google-cloud/storage 의 Bucket(관리자) · deps.log
@@ -71,26 +88,33 @@ async function revokeTokens(deps, opts) {
   const max = Math.max(1, Math.min(MAX_PER_RUN, (opts && +opts.max) || MAX_PER_RUN));
   const budgetMs = (opts && +opts.budgetMs > 0) ? +opts.budgetMs : Infinity;
   const t0 = Date.now();
-  const [files] = await bucket.getFiles({ prefix: PREFIX, autoPaginate: true });
-  const todo = [];
-  for (const f of files) {
-    const md = f.metadata || {};
-    const o = { name: f.name, metadata: md.metadata || {}, generation: md.generation, metageneration: md.metageneration };
-    if (needsRevoke(o) && o.generation && o.metageneration) todo.push({ f, o });
+  const left = () => budgetMs - (Date.now() - t0);
+  /* 목록은 쪽(1000개)마다 — 남은 시간 안에서만, 쪽마다 시간 상한 */
+  const files = [];
+  let more = false;
+  let query = { prefix: PREFIX, autoPaginate: false, maxResults: 1000 };
+  while (query) {
+    if (left() <= 0) { more = true; break; }
+    const [page, next] = await withTimeout(bucket.getFiles(query), REQ_TIMEOUT_MS);
+    (page || []).forEach((f) => files.push(f));
+    query = (next && next.pageToken) ? Object.assign({}, query, { pageToken: next.pageToken }) : null;
   }
-  const out = { listed: files.length, had: todo.length, revoked: 0, changed: 0, failed: 0, more: todo.length > max, ms: 0 };
-  for (const { f, o } of todo.slice(0, max)) {
-    if (Date.now() - t0 > budgetMs) { out.more = true; break; }
+  const todo = files.map((f) => fromMeta(f.name, f.metadata || {})).filter(ready);
+  const out = { listed: files.length, had: todo.length, revoked: 0, changed: 0, gone: 0, failed: 0, more: more || todo.length > max, ms: 0 };
+  for (const o of todo.slice(0, max)) {
+    if (left() <= 0) { out.more = true; break; }
     try {
-      await f.setMetadata(patchBody(), preconditionsOf(o));
-      out.revoked++;
+      const r = await stripOne(o, { bucket });
+      if (r === 'revoked') out.revoked++;
+      else if (r === 'changed') out.changed++;
+      else out.gone++;                    /* 'none'·'gone' — 그 사이 누가 지웠거나 파일이 없어졌다 */
     } catch (e) {
-      if (statusOf(e) === 412) out.changed++;
-      else { out.failed++; log('edulibTokenSweep fail', String(o.name).split('/')[1], String((e && e.message) || e).slice(0, 120)); }
+      out.failed++;
+      log('edulibTokenSweep fail', String(o.name).split('/')[1], String((e && e.message) || e).slice(0, 120));
     }
   }
   out.ms = Date.now() - t0;
   return out;
 }
 
-module.exports = { PREFIX, KEY, MAX_PER_RUN, isEdulibObject, needsRevoke, patchBody, preconditionsOf, stripOne, revokeTokens };
+module.exports = { PREFIX, KEY, MAX_PER_RUN, MAX_TRIES, REQ_TIMEOUT_MS, isEdulibObject, needsRevoke, patchBody, preconditionsOf, stripOne, revokeTokens };

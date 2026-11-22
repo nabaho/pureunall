@@ -8120,7 +8120,10 @@ exports.edulibMailSweep = functions
       try {
         const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
         console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
-      } catch (e) { mailErr = e; } finally { await release(); }
+      } catch (e) { mailErr = e; } finally {
+        /* 잠금 풀기가 실패해도 토큰 정리까지는 간다(잠금은 9분 뒤 저절로 풀린다) */
+        try { await release(); } catch (e) { console.error("edulibMailSweep release", String(e && e.message || e)); }
+      }
     }
     /* 540초를 메일 정리와 나눠 쓴다 — 남은 시간만큼만(넘치면 다음 날 이어서) */
     try { await runEdulibTokenSweepOnce(Math.max(20000, 520000 - (Date.now() - t0))); } catch (e) { console.error("edulibTokenSweep", String(e && e.message || e)); }

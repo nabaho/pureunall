@@ -369,6 +369,7 @@
     try { closeCompare(); } catch (e) {}
     try { if ($('modal').style.display !== 'none' && DETAIL) closeDetail(); } catch (e) {}
     freeObjUrls();
+    DL_URLS.slice().forEach(freeDl);
     DL_BUSY = {};
   }
   /* as: 'buf'(ArrayBuffer) | 'blob' */
@@ -417,6 +418,12 @@
   }
   /* 내려받기 — 권한 확인 길로 받아 이 창에서 파일로 저장한다(새 탭에 창고 주소를 띄우지 않는다 → 방문 기록에도 주소가 안 남는다) */
   var DL_BUSY = {};
+  var DL_URLS = [];                             /* { u, a } — 저장을 넘긴 뒤 잠깐 두는 blob 주소 */
+  function freeDl(d) {
+    DL_URLS = DL_URLS.filter(function (x) { return x !== d; });
+    try { d.a.remove(); } catch (e) {}
+    try { URL.revokeObjectURL(d.u); } catch (e) {}
+  }
   function downloadOriginal(it, btn) {
     if (!it) return;
     if (DL_BUSY[it.id]) { toast('이미 받는 중입니다'); return; }
@@ -431,7 +438,8 @@
       var u = URL.createObjectURL(safeBlob(blob, ''));      /* 내려받기는 늘 바이트만(octet-stream) — 이 주소가 문서로 열리지 않게 */
       var a = document.createElement('a'); a.href = u; a.download = it.fileName || 'file'; a.rel = 'noopener';
       document.body.appendChild(a); a.click();
-      setTimeout(function () { a.remove(); try { URL.revokeObjectURL(u); } catch (e) {} }, 60000);
+      var d = { u: u, a: a }; DL_URLS.push(d);             /* 로그아웃하면 기다리지 않고 바로 푼다(resetOriginals) */
+      setTimeout(function () { freeDl(d); }, 60000);
       toast('내려받았습니다 — ' + (it.fileName || ''));
     }).catch(function (e) { toast('내려받지 못했습니다 — ' + errMsg(e), 7000); }).then(function () {
       delete DL_BUSY[it.id];

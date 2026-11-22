@@ -166,7 +166,7 @@ test('⑥ 화면 이음 — 칸 닫기가 받기를 멈추고, 큰 영상은 눌
   const au = APP.slice(APP.indexOf('firebase.auth().onAuthStateChanged('), APP.indexOf('firebase.auth().onAuthStateChanged(') + 300);
   assert.match(au, /if \(!u \|\| \(ME\.uid && u\.uid !== ME\.uid\)\) resetOriginals\(\);/);
   const ro = APP.slice(APP.indexOf('function resetOriginals('), APP.indexOf('function resetOriginals(') + 400);
-  ['stopFetches()', 'closeCompare()', 'closeDetail()', 'freeObjUrls()'].forEach((s) => assert.ok(ro.includes(s), '로그아웃 때 ' + s));
+  ['stopFetches()', 'closeCompare()', 'closeDetail()', 'freeObjUrls()', 'DL_URLS.slice().forEach(freeDl)'].forEach((s) => assert.ok(ro.includes(s), '로그아웃 때 ' + s));
   const dl = APP.slice(APP.indexOf('function downloadOriginal('), APP.indexOf('function downloadOriginal(') + 900);
   assert.match(dl, /var uid0 = authUid\(\);[\s\S]*\.then\(function \(blob\) \{\s*if \(authUid\(\) !== uid0\) throw/, '받는 사이 사람이 바뀌면 저장하지 않는다');
   /* 받은 뒤 화면을 고치는 곳(then·catch) — zip 도구를 넘겨받는 중간 단계(Z)만 빼고 모두 live() 를 먼저 본다 */
@@ -213,6 +213,7 @@ function fakeBucket(objs, failWith) {
   const files = objs.map((o) => ({
     name: o.name,
     metadata: { generation: o.generation, metageneration: o.metageneration, metadata: o.metadata },
+    getMetadata() { return Promise.resolve([{ generation: o.generation, metageneration: o.metageneration, metadata: o.metadata }]); },
     setMetadata(body, opt) {
       calls.push({ name: o.name, body, opt });
       if (failWith && failWith[o.name]) { const e = new Error('x'); e.code = failWith[o.name]; return Promise.reject(e); }
@@ -220,7 +221,10 @@ function fakeBucket(objs, failWith) {
     },
     save() { throw new Error('내용을 쓰면 안 됩니다'); }, delete() { throw new Error('지우면 안 됩니다'); },
   }));
-  return { calls, bucket: { getFiles: (q) => { calls.q = q; return Promise.resolve([files.filter((f) => f.name.indexOf(q.prefix) === 0)]); } } };
+  return { calls, bucket: {
+    getFiles: (q) => { calls.q = q; return Promise.resolve([files.filter((f) => f.name.indexOf(q.prefix) === 0)]); },
+    file: (n) => files.find((f) => f.name === n),
+  } };
 }
 
 test('⑧ 서버 토큰 정리 — edulib/ 의 토큰만, 그 열쇠 하나만, 둘 다 조건을 걸고, 바뀐 것은 건너뛴다', async () => {
@@ -236,7 +240,9 @@ test('⑧ 서버 토큰 정리 — edulib/ 의 토큰만, 그 열쇠 하나만, 
   const logs = [];
   const r = await T.revokeTokens({ bucket, log: (...a) => logs.push(a.join(' ')) });
   assert.equal(calls.q.prefix, 'edulib/', '목록은 edulib/ 아래만 묻는다');
-  assert.deepEqual(calls.map((c) => c.name).sort(), ['edulib/e1/a.pdf', 'edulib/e3/2024..c.pptx', 'edulib/e4/d.hwp'], '토큰이 붙은 강의자료만');
+  assert.deepEqual([...new Set(calls.map((c) => c.name))].sort(), ['edulib/e1/a.pdf', 'edulib/e3/2024..c.pptx', 'edulib/e4/d.hwp'], '토큰이 붙은 강의자료만');
+  assert.equal(calls.filter((c) => c.name === 'edulib/e4/d.hwp').length, T.MAX_TRIES, '412 면 지금 판을 다시 읽어 정해진 만큼만 다시 해 본다');
+  assert.equal(calls.q.autoPaginate, false, '목록은 쪽마다 — 남은 시간 안에서만');
   calls.forEach((c) => {
     assert.deepEqual(c.body, { metadata: { [K]: null } }, '그 열쇠 하나만 null');
     assert.ok(c.opt.ifGenerationMatch && c.opt.ifMetagenerationMatch, '두 조건을 함께 건다');
@@ -287,7 +293,23 @@ test('⑧-2 올린 직후 한 파일 — 다른 자리는 손대지 않고, 알�
   const none = oneBucket({ generation: '6', metageneration: '2', metadata: { originalName: 'a.pdf' } });
   assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '6', metageneration: '1', metadata: {} }, none), 'none');
   assert.ok(!none.calls.some((c) => c[0] === 'set'), '토큰이 없으면 바꾸지 않는다');
-  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 412)), 'changed');
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } },
+    oneBucket({ generation: '1', metageneration: '1', metadata: { [K]: 't' } }, 412)), 'changed', '되풀이해도 412 면 밤 정리에 맡긴다');
+  /* 412 — 그 사이 다른 메타데이터가 바뀌었을 뿐이면 지금 판으로 다시 해서 토큰을 지운다(토큰이 남은 채 끝내지 않는다) */
+  const sets = [];
+  const flaky = { file: () => ({
+    getMetadata: () => Promise.resolve([{ generation: '1', metageneration: '9', metadata: { [K]: 't', originalName: 'a.pdf' } }]),
+    setMetadata: (body, opt) => { sets.push(opt); if (sets.length === 1) { const e = new Error('x'); e.code = 412; return Promise.reject(e); } return Promise.resolve([{}]); },
+  }) };
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, { bucket: flaky }), 'revoked');
+  assert.deepEqual(sets, [{ ifGenerationMatch: '1', ifMetagenerationMatch: '1' }, { ifGenerationMatch: '1', ifMetagenerationMatch: '9' }]);
+  const gone = { file: () => ({ getMetadata: () => Promise.resolve([{ generation: '1', metageneration: '9', metadata: {} }]),
+    setMetadata: () => { const e = new Error('x'); e.code = 412; return Promise.reject(e); } }) };
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, { bucket: gone }), 'none', '다시 읽어 보니 토큰이 없으면 끝');
+  /* 창고 요청마다 시간 상한 */
+  const tsrc = read('functions/edulib-token-sweep.js');
+  ['bucket.getFiles(query)', 'file.getMetadata()', 'file.setMetadata(patchBody(), preconditionsOf(o))'].forEach((c) =>
+    assert.ok(tsrc.includes('withTimeout(' + c + ', REQ_TIMEOUT_MS)'), '시간 상한 없이 부르면 밤 함수가 540초를 넘긴다: ' + c));
   assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 404)), 'gone');
   await assert.rejects(T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 503)), '일시 실패는 던져서 다시 시도하게');
 });
@@ -307,6 +329,7 @@ test('⑨ 서버 이음 — 매일 밤 메일 정리 뒤에 토큰 정리가 따
     '토큰 정리는 남은 시간만큼만 쓰고, 실패해도 함수를 깨지 않는다');
   assert.match(fn, /const t0 = Date\.now\(\);/);
   assert.ok(fn.indexOf('if (mailErr) throw mailErr') > iTok, '메일 정리 실패는 토큰 정리 뒤에 알린다');
+  assert.match(fn, /try \{ await release\(\); \} catch/, '잠금 풀기가 실패해도 토큰 정리까지 간다');
   assert.match(helper, /\{ budgetMs \}/, '밤 정리는 시간 상한을 넘긴다');
   /* 올리기가 끝나는 순간 — 창고 트리거 */
   const s0 = idx.indexOf('exports.edulibTokenStrip');
