@@ -42,3 +42,14 @@ test('연결 창이 «8자리 번호 받기» 를 갖고, 제목이 «연결» �
   assert.ok(fix.includes('startHanaSmsPair()'), '연결번호 받기 단추가 없다');
   assert.ok(fix.includes('휴대폰 연결'), '창 제목이 연결이라고 말하지 않는다');
 });
+
+test('연결 창을 바로 여는 링크(?hanaPair=1): 대표만, «창만» 열고, 꼬리표를 지우고, 번호는 만들지 않는다', () => {
+  const at = ERP.indexOf("q.get('hanaPair') !== '1'");
+  assert.ok(at > 0, '★ ?hanaPair=1 링크가 없다 — 폰에서 번호 받는 길을 못 찾는다');
+  const seg = bare(ERP.slice(at - 120, at + 700));
+  assert.ok(seg.includes('setHanaFix(true)'), '창을 안 연다');
+  assert.ok(seg.includes('_meNow().isOwner'), '대표가 아닌 사람도 열린다');
+  assert.ok(seg.includes('replaceState'), '꼬리표를 안 지운다 — 새로고침하면 또 열린다');
+  assert.ok(!seg.includes('startHanaSmsPair'), '열기만 했는데 새 연결번호를 만든다');
+  assert.ok(seg.indexOf('replaceState') < seg.indexOf('setHanaFix(true)'), '꼬리표를 지우기 전에 창이 열린다');
+});

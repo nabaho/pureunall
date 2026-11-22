@@ -57,5 +57,7 @@ module.exports = {
     { name: 'auto-fail', wait: 1800, run: async (page) => { await page.locator('main').getByText('출금 실패').first().click(); } },
     { name: 'auto-done', wait: 1800, run: async (page) => { await page.locator('main').getByText('자동 확정').first().click(); } },
     erp.메뉴('fin/close'),
+    /* 연결 창을 바로 여는 링크(?hanaPair=1) — 대표 「번호 받기가 어렵다」(2026-11-22). 마지막 화면이라 뒤 화면에 영향이 없다 */
+    { name: 'hana-pair-link', wait: 6000, run: async (page) => { const u = new URL(page.url()); u.searchParams.set('hanaPair', '1'); u.hash = '#menu=fin%2Fledger'; await page.goto(u.toString()); } },
   ],
 };
