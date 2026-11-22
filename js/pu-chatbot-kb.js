@@ -181,7 +181,8 @@
         { key: 'home',      icon: '🌐', name: '홈페이지',       when: '푸른노무법인 공식 홈페이지 구성원 소개·주요업무 게시글 편집 및 주간 브리핑 확인', from: '매일노동뉴스·법제처 자동 수집 브리핑, 경력관리 프로필 참조', to: '공식 홈페이지 게시 및 뉴스레터 기사 밑감 제공', ask: '홈페이지 관리 앱에서는 무엇을 고치고 뉴스레터와는 어떻게 이어지나요?' },
         { key: 'rehabad',   icon: '⚖️', name: '회생광고',       when: '법원 법인회생(포괄적 금지명령) 공고 기업 확인 및 우편 안내 발송·제외 선별', from: '법원 회생공고 자동 수집 + 푸른이알피·기업정보함 기존 거래처 대조(읽기만)', to: '발송·보류·제외 표시 기록', ask: '회생광고 앱은 어떻게 쓰고 기존 고객사와는 어떻게 구별하나요?' },
         { key: 'signboard', icon: '📺', name: '전광판',         when: '사무실 외부 LED 전광판 홍보 문구 작성 및 송출 판 교체', from: '직원 작성 광고 문안', to: '사무실 전광판 에이전트 송출 및 올린 이력 보존', ask: '전광판 앱으로 외부 전광판 문구를 바꾸는 방법은?' },
-        { key: 'govbid',    icon: '🏛', name: '정부사업신청',   when: '나라장터·알리오·기업마당 신규 입찰·컨설턴트 모집 공고 탐색 및 지원 준비', from: '공고 자동 수집함(gov_feed) + 경력관리 수행실적 재료(읽기만)', to: '입찰·지원서 준비 (수임 확정 후에는 정부사업일정으로 이관)', ask: '정부사업신청과 정부사업일정·경력관리는 어떻게 구분해서 쓰나요?' }
+        { key: 'govbid',    icon: '🏛', name: '정부사업신청',   when: '나라장터·알리오·기업마당 신규 입찰·컨설턴트 모집 공고 탐색 및 지원 준비', from: '공고 자동 수집함(gov_feed) + 경력관리 수행실적 재료(읽기만)', to: '입찰·지원서 준비 (수임 확정 후에는 정부사업일정으로 이관)', ask: '정부사업신청과 정부사업일정·경력관리는 어떻게 구분해서 쓰나요?' },
+        { key: 'pubsearch', icon: '🔍', name: '공공 기업검색',  when: '회사명·사업자번호로 금융위 기업기본정보·국세청 사업상태·고용산재 상시인원 무료 조회', from: '금융위·국세청·근로복지공단 공공API', to: '기업정보함 빈 칸 반영 · 폰 파워기업검색 복사 · 나이스비즈라인', ask: '공공 기업검색 사용법을 알려줘' }
       ]
     },
     {
@@ -1163,7 +1164,7 @@
   var STATIC_COVERED_APPS = {
     erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1,
     hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
-    aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1,
+    aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1, pubsearch: 1,
     hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1, datahub: 1
   };
   var SINGLE_APP_DOC_ID = {

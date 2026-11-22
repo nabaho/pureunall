@@ -8239,6 +8239,44 @@ exports.npsMonthly = NPSM.npsMonthly;
 exports.pubdataAsk = NPSM.pubdataAsk;
 /* 🏛 기업정보함 국세청 상태 → 공용 자리 옮겨 적기 (2026-10-12) */
 exports.pubdataNtsMirror = NPSM.pubdataNtsMirror;
+
+/* 🔍 무료 공공 기업검색 — 기업정보함(pu-cards.html)에서 회사명·사업자번호로 즉시 조회 (functions/pub-company-search.js).
+   금융위 기업기본정보 + 국세청 사업상태 + 근로복지공단 고용·산재 (+ Open DART / NICE BizAPI 슬롯).
+   ⚠ 서울 리전(MAIL_REGION) 필수 — 공공데이터포털은 해외 IP를 차단한다. 재직 직원(STAFF_GATE)만 호출 가능. */
+const PUB_CO_SEARCH = require("./pub-company-search");
+const pubCoRateAllow = PUB_CO_SEARCH.createRateLimiter(20, 60 * 1000);
+exports.pubCompanySearch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", maxInstances: 10 })
+  .https.onRequest(async (req, res) => {
+    setAutomationCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(m[1], true);
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
+      if (!pubCoRateAllow(decoded.uid)) {
+        res.status(429).json({ ok: false, error: "잠시 후 다시 검색해 주세요 (분당 호출 한도 초과)." });
+        return;
+      }
+      const body = (req.body && typeof req.body === "object") ? req.body : {};
+      const keys = await PUB_CO_SEARCH.readConfigKeys(getDatabase());
+      const fetchWithTimeout = (u, opts) => fetch(u, Object.assign({}, opts || {}, { signal: AbortSignal.timeout(15000) }));
+      const result = await PUB_CO_SEARCH.searchPublicCompany({
+        query: body.query,
+        detailBizNo: body.detailBizNo,
+        keys,
+        fetchFn: fetchWithTimeout,
+      });
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      console.error("[pubCompanySearch]", err);
+      res.status(500).json({ ok: false, error: "공공 기업검색 중 오류가 발생했습니다." });
+    }
+  });
 /* 📥 사업자등록증 자동 검토 — 사진첩·메일 첨부·기업정보함 어디로 들어와도 서버가 바로 (2026-10-13, functions/bizreg-review.js) */
 const BIZREG = require("./bizreg-review")({ functions, getDatabase, MAIL_REGION });
 exports.bizregReviewDoc = BIZREG.bizregReviewDoc;
