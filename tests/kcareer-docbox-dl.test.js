@@ -67,7 +67,7 @@ function 세상(o) {
     kcAskDelete: (btn, opt, ok) => { ctx._물음 = opt; if (!o.noConfirm) ok(); },
     kcTrashPutMany: (st, pg, recs) => recs.map((r) => { 휴지통.push(r.id); return { tid: 'T' + 휴지통.length }; }), kcTrashDone: (e, m) => { 알림.push(m || '지움'); },
     /* 여러 건을 지우면 «되돌리기»가 지운 건 «전부»를 되살리는 함수를 받는다(2026-11-14 — 전에는 마지막 한 건의 번호만 쥐었다) */
-    kcUndoBar: (m, t, f) => { ctx._되돌림 = { m, t, f }; }, kcTrashRestore: async () => {},
+    kcUndoBar: (m, t, f) => { ctx._되돌림 = { m, t, f }; }, kcTrashRestore: async () => ({ id: 'x' }), kcTrashRedraw: () => {},
     kcTrashLabel: (r) => r.kind + ' ' + r.org, TRASH_DAYS: 30,
     hideThumb: () => {}, fileExt: (id) => (파일[id] && 파일[id].ext) || '', fileURL: () => 'u',
     openHwpViewer: (b, n) => { 뷰어.push(n); }, showPDFInline: () => {}, _furl: {}
@@ -78,7 +78,7 @@ function 세상(o) {
       'function _dsSelBarHtml(', 'function _docSelBox(', 'function docSelIds(', 'function docSelSync(', 'function docSelAll(', 'async function docSelDl(',
       'function docSelDel(', 'function showBig(',
       /* 2026-09-29 기관별 묶음·미리보기 도우미 */
-      'function _docDlInline(', 'function _dsDay(', 'function _dsShort(', 'function dsTitleOf(', 'function dsPrevDraw(', 'function dbToolsMount(', 'function dsPvWidth(', 'function dsDupKey(', 'function dsDupClusters(', 'function dsDupSummary(', 'function dsSameCheck(', 'function _docTrashIds('].map(떼기)].join('\n').replace(/^(\s*)const /gm, '$1var '), ctx);
+      'function _docDlInline(', 'function _dsDay(', 'function _dsShort(', 'function dsTitleOf(', 'function dsPrevDraw(', 'function dbToolsMount(', 'function dsPvWidth(', 'function dsDupKey(', 'function dsDupClusters(', 'function dsDupSummary(', 'function dsSameCheck(', 'function _docTrashIds(', 'function kcTrashDoneMany(', 'async function kcTrashRestoreEntries('].map(떼기)].join('\n').replace(/^(\s*)const /gm, '$1var '), ctx);
   return { ctx, 통, 알림, 받음, 휴지통, 뷰어, 칸들, 돌려: (s) => vm.runInContext(s, ctx), 몸: 칸들.rsBody };
 }
 const 줄 = (id, year, extra) => Object.assign({ id, kind: '일반 이력서', org: '기관' + id, year, genFileId: 'G' + id, genName: '이력서_' + id + '.hwpx', savedAt: '2026-0' + id }, extra || {});
