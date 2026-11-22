@@ -23,7 +23,7 @@
   var ME = { sid: '', uid: '', admin: false };
   var ITEMS = {}, NAMES = {}, LOADED = false;
   var TAB = 'dash', PICK = {}, SHOWN = PAGE;
-  var F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: false, trash: false };
+  var F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: '', trash: false };   /* legal: '' · 'legal' · 'other' */
   var GROUP = 'cat';
   var STAGE = [];                               /* 넣기 — 저장 전 줄들 */
   var MAIL = [], MPICK = {}, MQ = '';
@@ -98,18 +98,28 @@
     $('kpis').innerHTML =
       kpi(d.total, '모은 강의자료', '') + kpi(d.cloud, '자료함에 원본 있음', 'cloud') +
       kpi(pcOnly, '원본은 아직 PC에만', 'pc') + kpi(d.review, '검토 대기', 'review');
-    /* 종류 카드 — 카드는 «단추 노릇 칸»(role=button). 사람이 더한 종류의 ✎(고치기)는 카드 «밖»의 형제 단추로 둔다
-       (단추 안에 단추를 넣으면 화면 읽기 도구가 안쪽 단추를 못 읽는다) — .catw 로 감싸 카드 오른쪽 아래에 얹는다 */
-    $('cats').innerHTML = d.cats.map(function (c) {
+    /* 종류 카드 — «법정교육 자료» / «법정교육 외 자료» 두 덩어리(자료함과 같은 잣대 K.splitLegal · 대표 지시 2026-11-22).
+       카드는 «단추 노릇 칸»(role=button). 사람이 더한 종류의 ✎(고치기)는 카드 «밖»의 형제 단추로 둔다
+       (단추 안에 단추를 넣으면 화면 읽기 도구가 안쪽 단추를 못 읽는다) — .catw 로 감싸 카드 오른쪽 아래에 얹는다.
+       덩어리 머리줄이 «법정»을 말하므로 카드 안 «법정» 꼬리표는 뺐다(이름 자리를 남긴다) — 근거 조문 줄과 파란 띠는 그대로. */
+    function catCard(c) {
       var words = c.custom ? (C.catByKey(c.key).words || []).join(', ') : '';
       return (c.custom ? '<div class="catw">' : '') +
         '<div class="cat' + (c.legal ? ' legal' : '') + (c.n ? '' : ' zero') + (c.custom ? ' mine' : '') + '" role="button" tabindex="0" data-cat="' + esc(c.key) + '" aria-label="' + esc(c.label + ' ' + c.n + '건 — 이 종류만 보기') + '">' +
-        '<div class="nm"><span title="' + esc(c.label) + '">' + esc(c.label) + '</span>' + (c.legal ? '<span class="tag legal" title="' + esc(c.law) + '">법정</span>' : '') +
-          '<span class="n">' + c.n + '</span></div>' +
+        '<div class="nm"><span title="' + esc(c.label) + '">' + esc(c.label) + '</span><span class="n">' + c.n + '</span></div>' +
         '<div class="ln"><span>최근 ' + esc(c.latest || '—') + '</span><span>원본 ' + c.cloud + '</span><span>검토 ' + c.review + '</span><span>' + esc(K.fmtBytes(c.bytes)) + '</span></div>' +
-        (c.legal && c.law ? '<div class="ln"><span>' + esc(c.law) + '</span></div>' : (c.custom ? '<div class="ln"><span title="' + esc(words) + '">찾을 낱말 ' + esc(words || c.label) + '</span></div>' : '')) + '</div>' +
+        (c.legal && c.law ? '<div class="ln"><span title="' + esc(c.law) + '">' + esc(c.law) + '</span></div>' : (c.custom ? '<div class="ln"><span title="' + esc(words) + '">찾을 낱말 ' + esc(words || c.label) + '</span></div>' : '')) + '</div>' +
         (c.custom ? '<button type="button" class="ced" data-catedit="' + esc(c.key) + '" title="이 종류 고치기" aria-label="' + esc(c.label) + ' 종류 고치기">✎</button></div>' : '');
-    }).join('') + '<button type="button" class="cat add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부">＋ 새 강의 종류<span class="ln"><span>새 강의가 생기면 여기서 종류로 더합니다</span></span></button>';
+    }
+    var addCard = '<button type="button" class="cat add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부">＋ 새 강의 종류<span class="ln"><span>새 강의가 생기면 여기서 종류로 더합니다</span></span></button>';
+    $('cats').innerHTML = K.splitLegal(d.cats).map(function (s) {
+      var cards = s.cats.map(catCard).join('') + (s.key === 'other' ? addCard : '');
+      return '<section class="lgrp ' + s.key + '" aria-label="' + esc(s.label + ' ' + s.n + '건') + '">' +
+        '<div class="lgh"><span class="lgt">' + (s.key === 'legal' ? '⚖ ' : '📘 ') + esc(s.label) + '</span><span class="chip">' + s.n + '건</span>' +
+        '<span class="lgm">' + s.kinds + '종 · ' + esc(K.fmtBytes(s.bytes)) + (s.review ? ' · 검토 ' + s.review : '') + '</span>' +
+        '<button type="button" class="sm" data-legal="' + s.key + '" title="' + esc(s.label) + '만 자료함에서 보기">자료함<span class="wide-only">에서 보기</span> →</button></div>' +
+        '<div class="cats">' + (cards || '<div class="empty">아직 없습니다</div>') + '</div></section>';
+    }).join('');
     drawMatrix(d);
   }
   /* 종류 × 연도 — 종류를 줄로, 연도를 칸으로(연도 칸은 좁아 옆으로 넘치지 않는다). 최근 12해만 따로, 그 이전은 «~YYYY» 한 칸.
@@ -117,9 +127,14 @@
   function drawMatrix(d) {
     if (!d.total) { $('mx').innerHTML = '<div class="empty">자료가 생기면 연도별로 셉니다.</div>'; return; }
     var narrow = window.matchMedia && window.matchMedia('(max-width:768px)').matches;
-    var yc = K.yearCols(d.years, narrow ? 5 : 12);
+    /* 연도 칸 수는 «표가 받은 너비»로 — 왼쪽 종류 대시보드 옆에 설 때는 좁아지므로 칸이 짓눌리지 않게 줄인다(종류 칸·합계 칸을 빼고 한 칸 약 40px) */
+    var w = $('mx').clientWidth || 800;
+    var yc = K.yearCols(d.years, narrow ? 5 : Math.max(4, Math.min(12, Math.floor((w - 246) / 40) - 2)));
     var cols = yc.cols.concat(yc.none ? ['none'] : []);
-    var rowsC = d.cats.filter(function (c) { return c.n > 0; });
+    /* 줄은 «법정교육 자료» 먼저, 그다음 «법정교육 외 자료» — 덩어리마다 머리줄 */
+    var sides = K.splitLegal(d.cats.filter(function (c) { return c.n > 0; })).filter(function (s) { return s.cats.length; });
+    var rowsC = [];
+    sides.forEach(function (s) { rowsC = rowsC.concat(s.cats); });
     function cnt(catKey, y) {
       if (y === yc.olderKey) return yc.older.reduce(function (s, yy) { return s + (((d.matrix[yy] || {})[catKey]) || 0); }, 0);
       return ((d.matrix[y] || {})[catKey]) || 0;
@@ -130,17 +145,21 @@
     rowsC.forEach(function (c) { cols.forEach(function (y) { var n = cnt(c.key, y); if (n > max) max = n; }); });
     function heat(n) { var r = max ? n / max : 0; return r > 0.66 ? ' h3' : r > 0.33 ? ' h2' : ' h1'; }
     var colSum = {}, all = 0;
-    var h = '<table><colgroup><col class="mk">' + cols.map(function () { return '<col>'; }).join('') + '<col class="ms"></colgroup>' +
+    var h = '<table><colgroup><col class="mk">' + cols.map(function (y) { return y === yc.olderKey ? '<col class="mo">' : '<col>'; }).join('') + '<col class="ms"></colgroup>' +
       '<thead><tr><th class="mk">종류</th>' + cols.map(function (y) { return '<th title="' + esc(yName(y)) + '">' + esc(yHead(y)) + '</th>'; }).join('') + '<th>합계</th></tr></thead><tbody>';
-    rowsC.forEach(function (c) {
+    var rowOf = function (c) {
       var sum = 0;
-      h += '<tr><th class="mk" title="' + esc(c.label) + '"><span class="one"><span>' + esc(c.label) + '</span>' + (c.legal ? '<span class="tag legal">법정</span>' : '') + '</span></th>';
+      h += '<tr><th class="mk" title="' + esc(c.label) + '"><span class="one"><span>' + esc(c.label) + '</span></span></th>';
       cols.forEach(function (y) {
         var n = cnt(c.key, y); sum += n; colSum[y] = (colSum[y] || 0) + n;
         h += n ? '<td class="c' + heat(n) + '" role="button" tabindex="0" aria-label="' + esc(yName(y) + ' ' + c.label + ' ' + n + '건') + '" title="' + esc(yName(y) + ' · ' + c.label + ' ' + n + '건') + '" data-y="' + esc(y) + '" data-cat="' + esc(c.key) + '">' + n + '</td>' : '<td class="z">·</td>';
       });
       all += sum;
       h += '<td class="ms"><b>' + sum + '</b></td></tr>';
+    };
+    sides.forEach(function (s) {
+      h += '<tr class="mg ' + s.key + '"><th colspan="' + (cols.length + 2) + '" title="' + esc(s.label) + '">' + esc(s.label) + '<span class="hint">' + s.kinds + '종 · ' + s.n + '건</span></th></tr>';
+      s.cats.forEach(rowOf);
     });
     h += '<tr class="mt"><th class="mk">합계</th>' + cols.map(function (y) { return '<td>' + (colSum[y] || 0) + '</td>'; }).join('') + '<td class="ms"><b>' + all + '</b></td></tr>';
     $('mx').innerHTML = h + '</tbody></table>';
@@ -161,7 +180,7 @@
     $('fIds').style.display = nIds ? '' : 'none';
     $('fIds').innerHTML = nIds ? '<span>추천 ' + nIds + '건만 보는 중</span><button type="button" class="sm" id="fIdsX" title="모든 자료 보기">✕</button>' : '';
     $('fQ').value = F.q; $('fCat').value = F.cat; $('fYear').value = F.year; $('fKind').value = F.kind;
-    $('fStatus').value = F.status; $('fStore').value = F.store; $('fLegal').checked = F.legal; $('fGroup').value = GROUP; $('fTrash').checked = F.trash;
+    $('fStatus').value = F.status; $('fStore').value = F.store; $('fLegal').value = F.legal || ''; $('fGroup').value = GROUP; $('fTrash').checked = F.trash;
     /* 폰에서 «⋯ 더» 안에 접힌 거르개가 걸려 있으면 펼쳐 둔다 — 걸린 거르개가 안 보이면 «왜 적게 나오나»를 모른다 */
     if (F.kind || F.status || F.store || F.legal || F.trash) { $('fMore').parentNode.classList.add('open'); $('fMore').textContent = '접기'; }
   }
@@ -171,6 +190,11 @@
     return K.sortByDate(K.filter(src, F));
   }
   var RENDERED = [];
+  /* 자료함 덩어리 머리줄 — «법정교육 자료» / «법정교육 외 자료»(종류별로 묶었을 때만) */
+  function lsecHead(sec) {
+    return '<div class="lsec ' + esc(sec.key) + '" role="heading" aria-level="3"><span>' + (sec.key === 'legal' ? '⚖ ' : '📘 ') + esc(sec.label) + '</span>' +
+      '<span class="chip">' + sec.n + '건</span><span class="lgm">' + sec.groups.length + '종</span></div>';
+  }
   function drawList() {
     fillFilters();
     [].forEach.call(document.querySelectorAll('#vSeg [data-view]'), function (b) { var on = b.getAttribute('data-view') === VIEW; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
@@ -180,7 +204,7 @@
     var n = 0, h = '';
     RENDERED = [];
     if (!rows.length) h = '<div class="empty">' + (LOADED ? '거르개에 맞는 자료가 없습니다.' : '불러오는 중…') + '</div>';
-    groups.forEach(function (g) {
+    var addGroupTable = function (g) {
       if (n >= SHOWN) return;
       if (GROUP) h += '<div class="grp">' + esc(g.label) + ' <span class="chip">' + g.items.length + '</span></div>';
       h += '<table class="lst"><thead><tr><th class="ck"><input type="checkbox" data-allg="' + esc(g.key) + '" title="이 묶음에서 보이는 줄 모두 고르기"></th><th class="no">№</th>' +
@@ -204,6 +228,13 @@
           '</tr>';
       });
       h += '</tbody></table>';
+    };
+    /* 종류별로 묶었으면 «법정교육 자료» 먼저, 그다음 «법정교육 외 자료» — 번호(№)는 두 덩어리를 이어 «지금 보이는 순서» */
+    var tsecs = GROUP === 'cat' ? K.splitGroups(groups).filter(function (s) { return s.groups.length; }) : [{ key: '', groups: groups }];
+    tsecs.forEach(function (sec) {
+      if (n >= SHOWN) return;
+      if (sec.key) h += lsecHead(sec);
+      sec.groups.forEach(addGroupTable);
     });
     if (rows.length > SHOWN) h += '<button class="more" id="moreBtn">더 보기 (' + (rows.length - SHOWN) + '건 남음)</button>';
     /* 폰에서는 표 머리줄(☐)이 숨으므로 «보이는 줄 모두 고르기»를 따로 둔다 */
@@ -220,10 +251,9 @@
     if (!rows.length) h = '<div class="empty">' + (LOADED ? '거르개에 맞는 자료가 없습니다.' : '불러오는 중…') + '</div>';
     else {
       var gs = GROUP ? groups : [{ key: 'all', label: '모든 자료', items: rows }];
-      h += '<div class="cgrid">';
       /* 한 묶음만 보일 때(종류 카드·표 칸을 눌러 왔을 때)와 추천만 보는 중엔 처음부터 다 펼친다 — 고른 줄·찾던 줄이 숨지 않게 */
       var forced = !!F.ids || gs.length === 1;
-      gs.forEach(function (g) {
+      var addGroupCard = function (g) {
         var open = forced || !!EXPAND[g.key];
         var shown = open ? g.items : g.items.slice(0, CARD_TOP);
         var c = GROUP === 'cat' ? C.catByKey(g.key) : null;
@@ -251,9 +281,16 @@
         h += '</div>';
         if (g.items.length > CARD_TOP && !forced) h += '<button type="button" class="sm gmore" data-gx="' + esc(g.key) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' + (open ? '접기 ▴' : '더 보기 (' + (g.items.length - CARD_TOP) + '건) ▾') + '</button>';
         h += '</section>';
+      };
+      /* 종류별로 묶었으면 «법정교육 자료» / «법정교육 외 자료» 두 덩어리 — 덩어리마다 머리줄(건수·종 수)과 제 카드 칸 */
+      var csecs = GROUP === 'cat' ? K.splitGroups(gs).filter(function (s) { return s.groups.length; }) : [{ key: '', groups: gs }];
+      csecs.forEach(function (sec, si) {
+        if (sec.key) h += lsecHead(sec);
+        h += '<div class="cgrid">';
+        sec.groups.forEach(addGroupCard);
+        if (GROUP === 'cat' && !F.trash && !F.ids && si === csecs.length - 1) h += '<button type="button" class="gcard add" data-catnew title="새로 생긴 강의를 종류로 더합니다">＋ 새 강의 종류</button>';
+        h += '</div>';
       });
-      if (GROUP === 'cat' && !F.trash && !F.ids) h += '<button type="button" class="gcard add" data-catnew title="새로 생긴 강의를 종류로 더합니다">＋ 새 강의 종류</button>';
-      h += '</div>';
     }
     if (RENDERED.length) h = '<label class="phone-only hint" style="margin:2px 0 6px"><input type="checkbox" data-allv> 보이는 ' + RENDERED.length + '줄 모두 고르기</label>' + h;
     $('list').innerHTML = h;
@@ -1245,6 +1282,7 @@
     $('cats').addEventListener('click', function (e) {
       var ed = e.target.closest('[data-catedit]'); if (ed) { e.stopPropagation(); openCatEditor(ed.getAttribute('data-catedit')); return; }
       if (e.target.closest('[data-catnew]')) { openCatEditor(''); return; }
+      var lg = e.target.closest('[data-legal]'); if (lg) { resetFilters(); F.legal = lg.getAttribute('data-legal'); setTab('list'); return; }
       var b = e.target.closest('[data-cat]'); if (!b) return;
       resetFilters(); F.cat = b.getAttribute('data-cat'); setTab('list');
     });
@@ -1268,7 +1306,7 @@
     [['fCat', 'cat'], ['fYear', 'year'], ['fKind', 'kind'], ['fStatus', 'status'], ['fStore', 'store']].forEach(function (p) {
       $(p[0]).addEventListener('change', function () { F[p[1]] = $(p[0]).value; SHOWN = PAGE; PICK = {}; drawList(); });
     });
-    $('fLegal').addEventListener('change', function () { F.legal = $('fLegal').checked; PICK = {}; drawList(); });
+    $('fLegal').addEventListener('change', function () { F.legal = $('fLegal').value; SHOWN = PAGE; PICK = {}; drawList(); });
     $('fTrash').addEventListener('change', function () { F.trash = $('fTrash').checked; PICK = {}; drawList(); });
     $('fGroup').addEventListener('change', function () { GROUP = $('fGroup').value; lsSet('group', GROUP); drawList(); });
     $('fClr').addEventListener('click', function () { resetFilters(); drawList(); });
@@ -1393,7 +1431,7 @@
       if (t.hasAttribute('data-mpick')) { MPICK[t.getAttribute('data-mpick')] = t.checked; drawMail(); }
     });
   }
-  function resetFilters() { F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: false, trash: false, ids: null }; SHOWN = PAGE; PICK = {}; EXPAND = {}; }
+  function resetFilters() { F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: '', trash: false, ids: null }; SHOWN = PAGE; PICK = {}; EXPAND = {}; }
 
   /* 끌어다 놓은 폴더 — 안의 파일을 모두 모은다(경로는 _rel 로 붙여 분류에 쓴다) */
   function readDrop(dt) {

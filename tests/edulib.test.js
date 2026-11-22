@@ -204,6 +204,56 @@ test('자동 정리 내용(summary) — 상한이 있고, 찾기에 걸린다 ·
   assert.equal(Core.patchOf(it, { summary: '바꿈' }), null, '원본에서 읽은 글 — 고치기 칸이 아니다');
 });
 
+test('법정교육 자료 / 법정교육 외 자료 — 종류의 법정 표시 하나로 나누고(이름 짐작 없음), 법정이 먼저 · 거르개가 둘 다 안다', () => {
+  assert.deepEqual(Core.LEGAL_SIDES.map((s) => s.key), ['legal', 'other'], '늘 법정 먼저');
+  const legalCat = C.CATS.find((c) => c.legal), otherCat = C.CATS.find((c) => !c.legal && c.key !== 'etc');
+  assert.ok(legalCat && otherCat);
+  assert.equal(Core.sideOf(legalCat.key), 'legal');
+  assert.equal(Core.sideOf(otherCat.key), 'other');
+  assert.equal(Core.sideOf('없는종류'), 'other', '모르는 종류는 법정으로 치지 않는다');
+  const L = [Core.makeItem({ fileName: 'a.pdf', cat: legalCat.key, size: 10 }), Core.makeItem({ fileName: 'b.pdf', cat: legalCat.key, size: 5 }),
+    Core.makeItem({ fileName: 'c.pdf', cat: otherCat.key, size: 7 })];
+  L.push(Object.assign(Core.makeItem({ fileName: 'd.pdf', cat: legalCat.key }), { _deleted: true }));
+  const sp = Core.splitLegal(Core.dashboard(L).cats);
+  assert.deepEqual(sp.map((s) => [s.key, s.n]), [['legal', 2], ['other', 1]], '지운 것은 세지 않는다');
+  assert.equal(sp[0].bytes, 15);
+  assert.ok(sp[0].cats.every((c) => c.legal) && sp[1].cats.every((c) => !c.legal), '덩어리마다 그쪽 종류만');
+  assert.equal(sp.reduce((a, s) => a + s.n, 0), Core.dashboard(L).total, '두 덩어리를 더하면 전체');
+  assert.equal(Core.filter(L, { legal: 'legal' }).length, 2);
+  assert.equal(Core.filter(L, { legal: 'other' }).length, 1);
+  assert.equal(Core.filter(L, { legal: true }).length, 2, '예전 true 는 «법정만»');
+  assert.equal(Core.filter(L, { legal: '' }).length, 3);
+  const gsp = Core.splitGroups(Core.group(Core.live(L), 'cat'));
+  assert.deepEqual(gsp.map((s) => [s.key, s.n, s.groups.length]), [['legal', 2, 1], ['other', 1, 1]]);
+  /* 사람이 더한 종류도 그 종류의 법정 표시로 간다 */
+  const SC = require(path.join(ROOT, 'js/pu-edulib-classify.js'));
+  SC.setCustom([{ id: 'cat_legal_t', label: '시험용 법정', words: '시험용법정', legal: true, law: '시험' }]);
+  try { assert.equal(Core.sideOf('cat_legal_t'), 'legal'); } finally { SC.setCustom([]); }
+});
+
+test('화면 — 한눈에 왼쪽 종류 대시보드·자료함 두 덩어리·법정 구분 거르개가 같은 잣대로 이어져 있다', () => {
+  const fs = require('node:fs');
+  const html = fs.readFileSync(path.join(ROOT, 'pu-edulib.html'), 'utf8');
+  const app = fs.readFileSync(path.join(ROOT, 'js/pu-edulib-app.js'), 'utf8');
+  const dg = html.slice(html.indexOf('class="dgrid"'), html.indexOf('id="pane-list"'));
+  assert.ok(dg.indexOf('id="cats"') > 0 && dg.indexOf('id="mx"') > dg.indexOf('id="cats"'), '왼쪽 종류 대시보드, 오른쪽 종류 × 연도');
+  assert.match(html, /\.dgrid\{display:grid;grid-template-columns:minmax\(0,\d+px\) minmax\(0,1fr\)/, 'PC 는 두 칸');
+  assert.match(html, /@media \(max-width:\d+px\)\{\s*\.dgrid\{grid-template-columns:minmax\(0,1fr\)\}/, '좁으면 한 칸으로 쌓는다');
+  const dash = app.slice(app.indexOf('function drawDash'), app.indexOf('function drawMatrix'));
+  assert.match(dash, /K\.splitLegal\(d\.cats\)/, '한눈에 카드는 공용 잣대로 나눈다');
+  assert.match(dash, /data-legal="' \+ s\.key/, '덩어리마다 «자료함에서 보기»');
+  const mx = app.slice(app.indexOf('function drawMatrix'), app.indexOf('function kpi('));
+  assert.match(mx, /K\.splitLegal\(/, '종류 × 연도도 같은 순서·같은 덩어리');
+  assert.match(mx, /class="mg ' \+ s\.key/);
+  const list = app.slice(app.indexOf('function drawList'), app.indexOf('function picked'));
+  assert.ok((list.match(/K\.splitGroups\(/g) || []).length >= 2, '자료함 표·카드 둘 다 두 덩어리');
+  assert.match(app, /closest\('\[data-legal\]'\)[^\n]*F\.legal = lg\.getAttribute\('data-legal'\)/);
+  const sel = html.slice(html.indexOf('<select id="fLegal"'), html.indexOf('</select>', html.indexOf('<select id="fLegal"')));
+  assert.ok(/value="legal"/.test(sel) && /value="other"/.test(sel), '거르개: 법정교육 자료 / 법정교육 외 자료');
+  assert.match(app, /F\.legal = \$\('fLegal'\)\.value/);
+  assert.doesNotMatch(app, /\$\('fLegal'\)\.checked/, '예전 확인란 길이 남지 않는다');
+});
+
 test('화면 — 카드 대시보드·표 보기·＋ 새 강의 종류·메일 자동 정리 칸이 이어져 있다', () => {
   const fs = require('node:fs');
   const html = fs.readFileSync(path.join(ROOT, 'pu-edulib.html'), 'utf8');

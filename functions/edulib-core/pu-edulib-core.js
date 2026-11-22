@@ -121,7 +121,8 @@
     return (items || []).filter(function (it) { return it && !it._deleted; });
   }
 
-  /* 거르기 — f: { q, cat, year, kind, status, store, legal } */
+  /* 거르기 — f: { q, cat, year, kind, status, store, legal }
+     legal: '' 전체 · 'legal'(또는 예전 true) 법정교육 자료만 · 'other' 법정교육 외 자료만 */
   function filter(items, f) {
     f = f || {};
     var q = str(f.q).trim().toLowerCase();
@@ -136,7 +137,8 @@
       if (f.kind && it.kind !== f.kind) return false;
       if (f.status && it.status !== f.status) return false;
       if (f.store && it.store !== f.store) return false;
-      if (f.legal && !C.catByKey(it.cat).legal) return false;
+      if (f.legal === 'other') { if (C.catByKey(it.cat).legal) return false; }
+      else if (f.legal && !C.catByKey(it.cat).legal) return false;
       if (words.length) {
         var hay = [it.title, it.fileName, it.venue, it.note, it.summary, C.catByKey(it.cat).label,
           it.source && it.source.path, it.source && it.source.mailSubject].join(' ').toLowerCase();
@@ -208,6 +210,28 @@
     };
   }
 
+  /* 법정교육 자료 / 법정교육 외 자료 — 한눈에·자료함이 «같은 잣대»(종류의 법정 표시 하나)로 나눈다 (대표 지시 2026-11-22
+     「법정교육 자료, 그리고 법정교육 외 자료라고 하고 그렇게 분리하고 … 자료함에도 그렇게 분리해서」).
+     ⚠ 이름으로 짐작하지 않는다 — 종류 표(classify CATS·사람이 더한 종류)의 legal 만 본다. 순서는 늘 법정 먼저. */
+  var LEGAL_SIDES = [{ key: 'legal', label: '법정교육 자료' }, { key: 'other', label: '법정교육 외 자료' }];
+  function sideOf(catKey) { return C.catByKey(catKey).legal ? 'legal' : 'other'; }
+  /* dashboard().cats → [{ key, label, cats, kinds, n, bytes, cloud, review }] × 2(법정·법정 외) */
+  function splitLegal(cats) {
+    return LEGAL_SIDES.map(function (s) {
+      var cs = (cats || []).filter(function (c) { return (c.legal ? 'legal' : 'other') === s.key; });
+      var t = { key: s.key, label: s.label, cats: cs, kinds: cs.length, n: 0, bytes: 0, cloud: 0, review: 0 };
+      cs.forEach(function (c) { t.n += c.n || 0; t.bytes += c.bytes || 0; t.cloud += c.cloud || 0; t.review += c.review || 0; });
+      return t;
+    });
+  }
+  /* group(list,'cat') 의 묶음 → [{ key, label, groups, n }] × 2 — 자료함 카드·표가 두 덩어리로 나눠 그린다 */
+  function splitGroups(groups) {
+    return LEGAL_SIDES.map(function (s) {
+      var gs = (groups || []).filter(function (g) { return sideOf(g.key) === s.key; });
+      return { key: s.key, label: s.label, groups: gs, n: gs.reduce(function (a, g) { return a + g.items.length; }, 0) };
+    });
+  }
+
   /* 대시보드 «종류 × 연도» 표의 연도 칸 — 최근 max 해만 따로 세우고, 그보다 옛날은 «~YYYY» 한 칸으로 모은다.
      years: dashboard().years(늦은 해 먼저, 'none' 맨 뒤) → { cols:[옛날→최근 열쇠], olderKey, older:[모은 해], none:bool } */
   function yearCols(years, max) {
@@ -273,6 +297,7 @@
   return {
     ENTITY: ENTITY, NOTE_ENTITY: NOTE_ENTITY, CAT_ENTITY: CAT_ENTITY, SCHEMA: SCHEMA, SUMMARY_MAX: SUMMARY_MAX,
     yearCols: yearCols, newCatId: newCatId, makeCat: makeCat,
+    LEGAL_SIDES: LEGAL_SIDES, sideOf: sideOf, splitLegal: splitLegal, splitGroups: splitGroups,
     STATUS: STATUS, STORE: STORE, KIND_LABEL: KIND_LABEL,
     yearOf: yearOf, okDate: okDate, newId: newId,
     makeItem: makeItem, patchOf: patchOf, live: live,

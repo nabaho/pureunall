@@ -108,6 +108,7 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .mx table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%;table-layout:fixed}
 .mx col.mk{width:190px}
 .mx col.ms{width:56px}
+.mx col.mo{width:56px}   /* «~2016»(그 이전을 모은 칸)은 다섯 글자 — 짓눌리지 않게 */
 .mx th,.mx td{border:1px solid var(--line);padding:4px 4px;white-space:nowrap;text-align:center;overflow:hidden;text-overflow:ellipsis}
 .mx th{background:var(--bg);color:var(--ink2);font-weight:600}
 .mx th.mk{text-align:left;padding:4px 8px}
@@ -121,6 +122,32 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .mx td.z{color:var(--mute)}
 .mx td.ms{font-weight:600}
 .mx tr.mt th,.mx tr.mt td{background:var(--bg);font-weight:600}
+/* 법정교육 자료 / 법정교육 외 자료 (2026-11-22) — 한눈에는 왼쪽에 종류 대시보드, 오른쪽에 종류 × 연도. 자료함도 같은 두 덩어리 */
+.dgrid{display:grid;grid-template-columns:minmax(0,600px) minmax(0,1fr);gap:12px;align-items:start}
+.dgrid>.card{margin-bottom:0;min-width:0}
+.lgrp{border-radius:10px;padding:8px}
+.lgrp+.lgrp{margin-top:10px}
+.lgrp.legal{background:var(--blue-bg)}
+.lgrp.other{background:var(--bg)}
+.lgh{display:flex;align-items:center;gap:8px;margin:0 0 6px;white-space:nowrap;min-width:0}
+.lgh .lgt{font-weight:700;flex:0 0 auto}
+.lgrp.legal .lgt{color:var(--blue-d)}
+.lgh .lgm{color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lgh .sm{margin-left:auto;flex:0 0 auto}
+.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dcat .cat .ln{gap:8px}
+.mx tr.mg th{background:var(--card);text-align:left;padding:6px 8px;font-weight:700;color:var(--ink2)}
+.mx tr.mg.legal th{color:var(--blue-d)}
+.mx tr.mg th .hint{font-weight:400;margin-left:6px}
+.lsec{display:flex;align-items:center;gap:8px;margin:14px 0 8px;padding:6px 10px;border-radius:8px;white-space:nowrap;font-weight:700;min-width:0}
+.lsec.legal{background:var(--blue-bg);color:var(--blue-d)}
+.lsec.other{background:var(--bg);color:var(--ink2)}
+.lsec .lgm{font-weight:400;color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#list>.lsec:first-child,#list>label.phone-only+.lsec{margin-top:0}
+@media (max-width:1180px){
+  .dgrid{grid-template-columns:minmax(0,1fr)}
+  .dcat .cats{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+}
 
 /* ── 자료 목록 — 한 칸은 한 줄(넘치면 … + title 에 전문) ── */
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -257,7 +284,10 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   .kpi{padding:8px 10px}
   .kpi b{font-size:20px}
   /* 종류 카드 — 폰에서는 두 칸, 근거 조문 줄은 접는다(법정 표시는 그대로) */
-  .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .cats,.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .lgrp{padding:6px}
+  .lgh{gap:6px}
+  .lgh .lgm{display:none}   /* 폰에서는 «N건»만 — 종 수·용량은 PC 에서 */
   .cat{padding:8px 9px}
   .cat .ln+.ln{display:none}
   .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
@@ -371,8 +401,10 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <main id="app" style="display:none">
   <section class="pane" id="pane-dash">
     <div class="kpis" id="kpis"></div>
-    <div class="card"><div class="bar"><div class="sec" style="margin:0">강의 종류별</div><span class="hint">왼쪽 파란 띠 = 법정 의무교육 · 점선 = 직접 더한 종류 · 누르면 그 종류만 · 새 강의는 «＋ 새 강의 종류»</span></div><div class="cats" id="cats" style="margin-top:8px"></div></div>
-    <div class="card"><div class="bar"><div class="sec" style="margin:0">종류 × 연도</div><span class="hint">진할수록 많음 · 칸을 누르면 그 종류·연도만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
+    <div class="dgrid">
+      <div class="card dcat"><div class="bar"><div class="sec" style="margin:0">강의 종류</div><span class="hint">법정교육 자료 · 법정교육 외 자료 · 누르면 그 종류만 · 점선 = 직접 더한 종류</span></div><div id="cats" style="margin-top:8px"></div></div>
+      <div class="card dmx"><div class="bar"><div class="sec" style="margin:0">종류 × 연도</div><span class="hint">진할수록 많음 · 칸을 누르면 그 종류·연도만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
+    </div>
   </section>
 
   <section class="pane" id="pane-list">
@@ -385,7 +417,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
         <select id="fKind" class="fx" aria-label="형식"><option value="">형식 전체</option><option value="doc">문서</option><option value="video">영상</option><option value="archive">압축</option><option value="image">그림</option><option value="audio">소리</option></select>
         <select id="fStatus" class="fx" aria-label="상태"><option value="">상태 전체</option><option value="review">검토 대기</option><option value="ok">참고 가능</option><option value="old">옛 자료</option></select>
         <select id="fStore" class="fx" aria-label="원본 위치"><option value="">원본 위치 전체</option><option value="cloud">자료함에 있음</option><option value="pc">PC에만</option><option value="mail">메일함</option></select>
-        <label class="hint fx" style="white-space:nowrap"><input type="checkbox" id="fLegal"> 법정 의무교육만</label>
+        <select id="fLegal" class="fx" aria-label="법정교육 구분" title="법정교육 자료 / 법정교육 외 자료"><option value="">법정·법정 외 모두</option><option value="legal">법정교육 자료</option><option value="other">법정교육 외 자료</option></select>
         <select id="fGroup" title="묶어 보기" aria-label="묶어 보기"><option value="cat">종류별로 묶기</option><option value="year">연도별로 묶기</option><option value="">묶지 않기</option></select>
         <label class="hint fx" style="white-space:nowrap"><input type="checkbox" id="fTrash"> 휴지통</label>
         <button class="sm fx" id="fClr">거르개 비우기</button>
@@ -485,8 +517,8 @@ window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ Pu
 </script>
 <script src="js/pu-viewer-kind.js?v=1"></script>
 <script src="js/pu-edulib-classify.js?v=4"></script>
-<script src="js/pu-edulib-core.js?v=3"></script>
+<script src="js/pu-edulib-core.js?v=4"></script>
 <script src="js/pu-edulib-preview.js?v=2"></script>
-<script src="js/pu-edulib-app.js?v=7"></script>
+<script src="js/pu-edulib-app.js?v=8"></script>
 </body>
 </html>
