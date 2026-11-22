@@ -12418,6 +12418,11 @@ async function kcTrashRestore(tid, quiet, noRedraw){
       var f=await getFileAsync(oldId);
       if(f) saveFileUnified(newId, f);
     }catch(err){ console.warn('휴지통 원본 옮기기', err); }
+    /* ⚠ 첨부 원본을 옮기느라 «기다린» 사이에 휴지통이 바뀌었을 수 있다(다른 곳에서 담음·되살림·완전삭제).
+       맨 위에서 읽어 둔 목록(rest)을 그대로 쓰면 그새 담긴 줄이 사라지고 이미 꺼낸 줄이 되살아난다 — 기다린 «뒤에» 다시 읽고, 그 줄이 아직 있을 때만 되살린다(2026-11-22 자동 검증 지적) */
+    var 지금=kcTrashList();
+    if(!지금.some(function(x){ return x.tid===tid; })){ if(!quiet) toast('휴지통에서 이미 꺼냈거나 지워진 줄입니다 — 되살리지 않았습니다'); return null; }
+    rest=지금.filter(function(x){ return x.tid!==tid; });
   }
   var arr=get(e.store); arr.unshift(rec); set(e.store, arr);
   set(TRASH_STORE, rest);
