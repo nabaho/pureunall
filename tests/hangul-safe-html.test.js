@@ -101,6 +101,12 @@ test('★★★ ② 실행되는 조각을 걷는다 — 스크립트·이벤트
     '<img src="https://evil.example/track.png"><img src="//evil.example/t.png">',
     '<table background="https://evil.example/bg.png"><tr><td>x</td></tr></table>',
     '<div style="position:fixed;top:0;left:0;width:100%;height:100%">가림</div>',
+    // 자동 검토 재검토(2026-11-22) — 주석·따옴표·이스케이프로 style 검사를 비켜 가는 길
+    '<p style="font-family:\'/*\';background:url(https://evil.example/track.png);position:fixed;content:\'*/\'">x</p>',
+    '<p style="background:url(&quot;https://erp.example\'@evil.example/track.png&quot;)">x</p>',
+    '<p style="background:url(https://erp.example\\29 @evil.example/track.png)">x</p>',
+    '<p style="background-image:url(https://erp.example/a.png), url(https://evil.example/b.png)">x</p>',
+    '<p style="position:absolute;top:0;z-index:99999">x</p>',
   ];
   const { dom } = cleaner();
   for (const h of bad) {
@@ -117,7 +123,7 @@ test('★★★ ② 실행되는 조각을 걷는다 — 스크립트·이벤트
       assert.ok(!/^on/i.test(a.name), `이벤트 속성이 남았습니다(${a.name}): ${h} → ${out}`);
       assert.ok(!/^(srcdoc|formaction|action|background)$/i.test(a.name), `위험한 속성이 남았습니다(${a.name}): ${h} → ${out}`);
       assert.ok(!/^data-(?!note$)/i.test(a.name), `편집기 내부 data-* 가 남았습니다(${a.name}): ${h} → ${out}`);
-      assert.doesNotMatch(a.value, /javascript|data:text\/html|expression|evil\.example|@import|position:\s*fixed|\\/i, `위험한 값이 남았습니다(${a.name}): ${h} → ${out}`);
+      assert.doesNotMatch(a.value, /javascript|data:text\/html|expression|evil\.example|@import|position:\s*(fixed|absolute|sticky)|z-index|\\/i, `위험한 값이 남았습니다(${a.name}): ${h} → ${out}`);
     }
   }
 });
@@ -130,18 +136,34 @@ test('★★★ ② 서식은 그대로 둔다 — 글꼴·크기·색·표·칸
     + '<hr class="page-break" contenteditable="false">'
     + '<img src="data:image/png;base64,iVBORw0KGgo=" style="width:30mm">'
     + '<img src="img/stamp.png" alt="도장"><img src="https://erp.example/img/logo.png" alt="로고">'
-    + '<div style="position:relative;background:url(data:image/png;base64,iVBORw0KGgo=)">배경</div>'
+    + '<div style="position:relative;background-image:url(data:image/png;base64,iVBORw0KGgo=)">배경</div>'
+    + '<p style="scroll-behavior:smooth;color:#00c">파랑</p>'
+    + '<p>각주<sup class="note" contenteditable="false" data-kind="end" data-note="&lt;p&gt;미주 글&lt;/p&gt;">※</sup></p>'
+    + '<p data-pb="1">쪽 나눔</p><p data-cb="1">단 나눔</p><p data-newpage="1" data-kept="1"></p>'
+    + '<table><tbody><tr><td data-border="SOLID,0.12,#000000;SOLID,0.12,#000000;SOLID,0.4,#000000;NONE,0.12,#000000" data-dir="v" data-hh="2834">칸</td></tr></tbody></table>'
     + '<a href="https://www.law.go.kr/">법령</a>';
   const out = S.clean(keep);
   const box = dom.window.document.createElement('div');
   box.innerHTML = out;
   const q = s => box.querySelector(s);
-  assert.ok(q('p[style*="text-align:center"]') && q('b') && q('span[style*="color"]'), '글자 서식이 빠졌습니다: ' + out);
-  assert.ok(q('td[colspan="2"][style*="border"]') && q('col[style*="width"]'), '표 서식이 빠졌습니다: ' + out);
+  const css = (el, p) => (el && el.style ? el.style.getPropertyValue(p) : '');
+  const p0 = q('p');
+  assert.strictEqual(css(p0, 'text-align'), 'center', '가운데 정렬이 빠졌습니다: ' + out);
+  assert.ok(css(p0, 'font-size') === '14pt' && /함초롬바탕/.test(css(p0, 'font-family')), '글꼴·크기가 빠졌습니다: ' + out);
+  assert.ok(q('b') && css(q('span'), 'color'), '글자 서식이 빠졌습니다: ' + out);
+  const td0 = q('td[colspan="2"]');
+  assert.ok(td0 && css(td0, 'border-top-style') === 'solid' && css(td0, 'padding-left') === '2mm', '표 칸 테두리·여백이 빠졌습니다: ' + out);
+  assert.ok(css(q('col'), 'width') === '30%' && css(q('table'), 'border-collapse') === 'collapse', '표 서식이 빠졌습니다: ' + out);
   assert.ok(q('hr.page-break[contenteditable="false"]'), '쪽 나눔이 빠졌습니다');
   assert.ok(q('img[src^="data:image/png"]'), '그림(data 주소)이 빠졌습니다');
   assert.ok(q('img[src="img/stamp.png"]') && q('img[src="https://erp.example/img/logo.png"]'), '같은 사이트 그림이 빠졌습니다');
-  assert.ok(q('div[style*="position:relative"][style*="data:image/png"]'), '안전한 배경·위치 서식이 빠졌습니다');
+  const bg = Array.from(box.querySelectorAll('div')).find(d => d.textContent === '배경');
+  assert.ok(css(bg, 'position') === 'relative' && /data:image\/png/.test(css(bg, 'background-image')), '안전한 배경·위치 서식이 빠졌습니다: ' + out);
+  const blue = Array.from(box.querySelectorAll('p')).find(p => p.textContent === '파랑');
+  assert.ok(css(blue, 'color'), '모르는 속성(scroll-behavior) 하나 때문에 다른 서식까지 빠졌습니다: ' + out);
+  assert.ok(q('sup.note[data-kind="end"][data-note]'), '미주 구분이 빠졌습니다(각주로 바뀜)');
+  assert.ok(q('p[data-pb="1"]') && q('p[data-cb="1"]') && q('p[data-newpage="1"]'), '쪽·단 나누기 표시가 빠졌습니다');
+  assert.ok(q('td[data-border^="SOLID"][data-dir="v"][data-hh="2834"]'), '칸 테두리·글자 방향·높이 표시가 빠졌습니다');
   assert.ok(q('a[href="https://www.law.go.kr/"]'), '안전한 링크가 빠졌습니다');
   assert.ok(box.textContent.includes('제목') && box.textContent.includes('칸'), '글이 빠졌습니다');
 });

@@ -5,13 +5,12 @@
      ① 실행되지 않는 <template> 안에서 푼다(그림을 불러오거나 on… 속성이 도는 일이 없다).
      ② 위험한 요소(script·style·iframe·object·form·svg·math …)는 속까지 통째로 지우고, 모르는 요소는 껍데기만 걷어 글은 남긴다.
         그림(SVG)·수식(MathML)은 받지 않는다 — 도형·수식은 .hwpx(b64) 로 온다(main 의 같은 결정, 2026-11-22).
-     ③ on… 속성·id·name·편집기 내부 data-*(머리말·글자 겹침·필드 등 — 나중에 HTML 로 다시 그려진다)는 지운다.
-        각주 본문(data-note)만 같은 방식으로 걸러 남긴다.
-     ④ 주소: 글 링크(a href)는 http(s)·mailto·tel·상대 주소, 불러오는 그림(img src·style 의 url)은
-        그림 data 주소와 «같은 사이트» 주소만 — 다른 사이트에서 몰래 불러와 열람을 알리는 일을 막는다.
-     ⑤ style: CSS 이스케이프(\65 같은 것)를 풀고 보이지 않는 글자를 걷은 뒤 검사한다(닫는 괄호 없는 url( 도). 화면을 덮는 position:fixed 도 막는다.
+     ③ on… 속성·id·name 은 지운다. 편집기 표시(data-*)는 «값이 안전한 것만» 남긴다 — 쪽·단 나누기·칸 테두리·미주 구분 등.
+        머리말·글자 겹침·필드처럼 나중에 HTML 로 다시 그려지는 JSON 표시는 받지 않는다. 각주 본문(data-note)은 같은 방식으로 걸러 남긴다.
+     ④ 주소: 글 링크(a href)는 http(s)·mailto·tel·상대 주소, 불러오는 그림(img src)은 그림 data 주소와 «같은 사이트» 주소만.
+     ⑤ style: 글자로 검사하지 않고 «브라우저의 CSS 해석기» 로 읽은 뒤, 문서 서식에 쓰는 속성(글꼴·크기·색·정렬·여백·테두리·폭 …)만
+        골라 다시 쓴다 — 주석·따옴표·이스케이프로 감춘 조각이 남지 않는다. 배경 그림은 그림 data 주소만, 위치는 static·relative 만.
      ⑥ 다시 풀어 거른 결과가 같아질 때까지 되풀이한다(풀 때마다 모양이 바뀌는 조각을 막는다).
-   ■ 지키는 것: 서식(글꼴·크기·색·정렬·표·칸 합치기·테두리·쪽 나눔·그림 data 주소·style)은 그대로 둔다.
    ⚠ 이 파일에 «백슬래시 u» 이스케이프를 쓰지 않는다 — 편집 도구가 실제 글자로 바꿔 정규식을 깨뜨린 일이 있다(글자 번호로 만든다).
    지킴: tests/hangul-safe-html.test.js */
 (function (g) {
@@ -33,15 +32,26 @@
   // 주소가 들어가는 속성 — a[href]·img[src] 말고는 모두 지운다
   const URL_ATTR = new Set(['href', 'src', 'background', 'poster', 'data', 'cite', 'longdesc', 'lowsrc', 'dynsrc', 'codebase',
     'manifest', 'icon']);
+  // 남겨도 되는 편집기 표시와 그 값 모양 (hangul/js/dom.js·editor.js 가 읽는 것 — 값이 HTML 로 다시 그려지지 않는 것만)
+  const FLAG = v => /^[0-9a-z]{0,8}$/i.test(v);
+  const DATA_OK = {
+    'data-kind': (v, tag) => tag === 'sup' && /^(foot|end)$/.test(v), // 각주·미주 구분
+    'data-pb': FLAG, 'data-cb': FLAG, 'data-newpage': FLAG, 'data-kept': FLAG, 'data-dm': FLAG, // 쪽·단 나누기, 기본 칸 여백
+    'data-ls0': v => v === '', // 마지막 글자 자간 보기용 표시
+    'data-border': v => /^[A-Za-z0-9_#.,;=-]{0,400}$/.test(v), // 칸 테두리 «종류,굵기,색;…»
+    'data-dir': v => /^[A-Za-z_]{0,24}$/.test(v), 'data-wrap': v => /^[A-Za-z_]{0,24}$/.test(v), // 칸 글자 방향·한 줄 입력
+    'data-hh': v => /^[0-9]{1,9}(\.[0-9]{1,6})?$/.test(v), // 칸 원래 높이
+    'data-c': v => /^[0-9a-f]{1,6}$/i.test(v), // 한컴 전용 글자 번호
+  };
   const MAX_NOTE_DEPTH = 3;
-  // 주소·CSS 에서 «javascript:» 따위를 감추는 데 쓰이는 보이지 않는 글자(제어 문자·빈칸 종류) — 판정 전에 걷는다
+  // 주소에서 «javascript:» 따위를 감추는 데 쓰이는 보이지 않는 글자(제어 문자·빈칸 종류) — 판정 전에 걷는다
   const INVISIBLE = new RegExp('[' + [[0x00, 0x20], [0x7f, 0xa0], [0x1680, 0x1680], [0x180e, 0x180e], [0x2000, 0x200f],
     [0x2028, 0x2029], [0x205f, 0x205f], [0x3000, 0x3000], [0xfeff, 0xfeff]]
     .map(([a, b]) => String.fromCharCode(a) + (a === b ? '' : '-' + String.fromCharCode(b))).join('') + ']', 'g');
 
   const here = () => { try { const o = g.location && g.location.origin; return o && o !== 'null' ? o : ''; } catch (e) { return ''; } };
 
-  // 주소가 안전한가. resource=true 는 «저절로 불러오는 것»(그림·배경): 그림 data 주소와 같은 사이트 주소만.
+  // 주소가 안전한가. resource=true 는 «저절로 불러오는 것»(그림): 그림 data 주소와 같은 사이트 주소만.
   //  resource=false 는 글 링크(누를 때만 감): http(s)·mailto·tel·상대 주소.
   function safeUrl(v, resource) {
     const s = String(v == null ? '' : v).replace(INVISIBLE, '');
@@ -56,25 +66,45 @@
     return sc === 'http' || sc === 'https' || sc === 'mailto' || sc === 'tel';
   }
 
-  // CSS 이스케이프(\65 · \6a 같은 글자 번호, \x 같은 한 글자)를 풀어 «진짜 글자» 로 본다
-  function cssDecode(s) {
-    return s.replace(/\\([0-9a-f]{1,6})[ \t\r\n\f]?/gi, (m, h) => {
-      const c = parseInt(h, 16);
-      return c > 0 && c <= 0x10ffff ? String.fromCodePoint(c) : '';
-    }).replace(/\\([\s\S])/g, '$1').replace(/\\/g, '');
+  // style — 문서 서식에 쓰는 속성만 (브라우저가 풀어 준 이름으로 본다: border → border-top-width 등)
+  const STYLE_PROPS = [
+    /^(margin|padding)(-(top|right|bottom|left))?$/,
+    /^border(-(top|right|bottom|left))?(-(width|style|color))?$/, /^border-(collapse|spacing)$/,
+    /^border(-(top|bottom)-(left|right))?-radius$/,
+    /^font(-(family|size|weight|style|variant|stretch))?$/,
+    /^text-(align|align-all|align-last|indent|transform|overflow|decoration|decoration-line|decoration-style|decoration-color|underline-position|orientation)$/,
+    /^(color|background|background-color|background-image|background-repeat|background-size|line-height|letter-spacing|word-spacing|white-space|vertical-align|direction|unicode-bidi|writing-mode|width|min-width|max-width|height|min-height|max-height|float|clear|display|table-layout|caption-side|empty-cells|box-sizing|word-break|overflow-wrap|word-wrap|opacity|visibility|overflow|overflow-x|overflow-y|position|list-style|list-style-type|list-style-position|tab-size|hyphens)$/,
+    /^(page-break|break)-(before|after|inside)$/,
+  ];
+  // 배경 그림: 그림 data 주소 하나만 — 따옴표로 감싼 것은 속에 따옴표·백슬래시가 없어야, 안 감싼 것은 따옴표·괄호·빈칸·백슬래시가 없어야
+  const SAFE_BG = /^url\((?:"data:image\/(?:png|jpe?g|gif|webp|bmp|svg\+xml)[;,][^"\\]*"|data:image\/(?:png|jpe?g|gif|webp|bmp|svg\+xml)[;,][^"'()\\\s]*)\)$/i;
+  function okStyleValue(prop, val) {
+    const v = String(val).trim();
+    if (prop === 'position') return /^(static|relative)$/i.test(v); // 화면(편집기 단추)을 덮는 fixed·absolute·sticky 는 받지 않는다
+    if (/url\(/i.test(v)) return prop === 'background-image' && SAFE_BG.test(v);
+    return !/expression|image-set|javascript:|vbscript:|-moz-binding|@import|\\|<|>/i.test(v);
   }
-
-  // style 속성이 안전한가 — 실행 문법·바깥 불러오기·위험한 주소·화면 덮기를 막는다(글꼴·크기·테두리 같은 서식은 그대로)
-  function safeStyle(v) {
-    const s = cssDecode(String(v || '').replace(/\/\*[\s\S]*?\*\//g, '')).replace(INVISIBLE, '').toLowerCase();
-    if (/expression|javascript:|vbscript:|-moz-binding|behavior:|@import|position:(fixed|sticky)|image-set\(|\bsrc\(/.test(s)) return false;
-    const re = /url\((['"]?)([^'")]*)/g; // 닫는 괄호가 없어도(글 끝에서 저절로 닫힘) 본다
-    let m;
-    while ((m = re.exec(s))) if (!safeUrl(m[2], true)) return false;
-    return true;
+  function cleanStyle(el) {
+    let st = null;
+    try { st = el.style; } catch (e) { st = null; }
+    if (!st || typeof st.length !== 'number' || typeof st.getPropertyValue !== 'function') { el.removeAttribute('style'); return; }
+    // 고른 속성을 빈 요소에 다시 넣고 «브라우저가 쓴» style 글을 쓴다(브라우저가 묶음 이름으로 다시 묶는다 — 엔진마다 같은 모양)
+    const box = (el.ownerDocument || g.document).createElement('span');
+    const out = box.style;
+    for (let i = 0; i < st.length; i++) {
+      const p = String(st[i] || '').toLowerCase();
+      if (!p || !STYLE_PROPS.some(re => re.test(p))) continue;
+      const v = st.getPropertyValue(p);
+      if (!v || !okStyleValue(p, v)) continue;
+      try { out.setProperty(p, v, st.getPropertyPriority(p) === 'important' ? 'important' : ''); } catch (e) { /* 못 넣는 값은 버림 */ }
+    }
+    const css = String(out.cssText || '').trim();
+    if (css) el.setAttribute('style', css);
+    else el.removeAttribute('style');
   }
 
   function cleanAttrs(el, tag, depth) {
+    let hasStyle = false;
     for (const a of Array.from(el.attributes)) {
       const n = a.name.toLowerCase(), v = a.value;
       let ok = true;
@@ -83,14 +113,15 @@
         if (tag === 'a' && n === 'href') ok = safeUrl(v, false);
         else if (tag === 'img' && n === 'src') ok = safeUrl(v, true);
         else ok = false;
-      } else if (n === 'style') ok = safeStyle(v);
+      } else if (n === 'style') hasStyle = true; // 아래에서 CSS 해석기로 다시 쓴다
       else if (n === 'data-note') { // 각주 본문 — 나중에 HTML 로 다시 그려지므로 같은 방식으로 거른다
         if (depth >= MAX_NOTE_DEPTH) ok = false;
         else { const c = cleanOnce(v, depth + 1); if (c !== v) el.setAttribute(a.name, c); }
-      } else if (n.indexOf('data-') === 0) ok = false; // 편집기 내부 표시(JSON 등)는 받지 않는다 — 다시 그려질 때 HTML 이 된다
-      else if (/url\s*\(/i.test(cssDecode(v).replace(INVISIBLE, ''))) ok = false; // 그 밖의 속성 속 url(...) 참조
+      } else if (n.indexOf('data-') === 0) ok = !!(DATA_OK[n] && DATA_OK[n](v, tag));
+      else if (/url\s*\(|expression|javascript:/i.test(v.replace(INVISIBLE, ''))) ok = false; // 그 밖의 속성 속 참조·실행 문법
       if (!ok) el.removeAttribute(a.name);
     }
+    if (hasStyle) cleanStyle(el);
   }
 
   function walk(parent, depth) {
@@ -129,5 +160,5 @@
     return p.outerHTML;
   }
 
-  g.PureunSafeHtml = { clean, safeUrl, safeStyle };
+  g.PureunSafeHtml = { clean, safeUrl };
 })(typeof window !== 'undefined' ? window : globalThis);
