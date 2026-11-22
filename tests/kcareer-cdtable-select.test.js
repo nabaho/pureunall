@@ -26,7 +26,7 @@ const fns = (...names) => names.map(fn).join('\n');
 
 const TABLE = fn('_cdTable');
 const SELECT = fns('_dsSelBarHtml', '_docSelBox', 'docSelIds', 'docSelSync', 'docSelAll');
-const TRASH = fns('docSelDel', '_docTrashIds');
+const TRASH = fns('docSelDel', '_docTrashIds', 'kcTrashDoneMany', 'kcTrashRestoreEntries');   /* 담은 줄을 알리고 «전부» 되살리는 공용 길(kcTrashDoneMany) 도 진짜를 쓴다 */
 const SRC = fn('_cdSrc');
 const BADGE = fn('_hcBadge');
 const HELPERS = fns('escapeHtml', '_jsAttr');
@@ -156,7 +156,7 @@ function trashWorld(picked, ask) {
     TRASH_DAYS: 30, escapeHtml: (s) => String(s), kcTrashLabel: (r) => r.kind + ' · ' + r.id,
     get: (k) => store[k].slice(), set: (k, v) => { sets.push(k); store[k] = v; },
     kcTrashPutMany: (st, page, recs, what) => { puts.push(recs.length); return recs.map((rec) => { trash.push({ st, rec }); return { tid: 'T' + trash.length }; }); }, kcTrashDone: (e, m) => { done.push(e && e.tid); toasts.push(m); },
-    kcUndoBar: (msg, tid, f) => undo.push({ msg, tid, fn: f }), kcTrashRestore: async (tid) => { restored.push(tid); },
+    kcUndoBar: (msg, tid, f) => undo.push({ msg, tid, fn: f }), kcTrashRestore: async (tid) => { restored.push(tid); return { id: tid }; }, kcTrashRedraw: () => {}, console,
     kcAskDelete: (btn, opt, onYes) => { asks.push(opt); if (ask) onYes(); }, renderDocStore: () => {}, toast: (m) => toasts.push(m),
   });
   ctx.DOMAINS.certdoc.store = 'certdoc'; ctx.DOMAINS.certdoc.label = '경력증명서';
@@ -183,8 +183,9 @@ test('선택 삭제 — 여러 건이면 «되돌리기»가 전부 되살린다
   assert.deepEqual(w.restored, ['T3', 'T2', 'T1'], '지운 세 건 모두 거꾸로 되살린다(옛 순서가 돌아오게)');
   const one = trashWorld([1], true);
   one.ctx.docSelDel('certdoc', {});
-  assert.equal(one.undo.length, 0, '한 건은 기존 길(kcTrashDone)');
-  assert.deepEqual(one.done, ['T1'], '그 건의 번호로 되살린다');
+  assert.equal(one.undo.length, 1, '한 건도 되살리기 줄이 하나 뜬다');
+  assert.equal(one.undo[0].tid, 'T1', '그 건의 번호로 되살린다');
+  assert.equal(one.undo[0].fn, undefined, '한 건은 번호로 되살리는 기존 길(함수를 따로 주지 않는다)');
 });
 test('휴지통·확인창 이름표 — 종류만 있는 줄(증명서)은 «종류 + 발급번호·날짜»로 서로 구분된다 · 제목이 있는 줄의 이름표는 그대로', () => {
   const ctx = vm.createContext({});

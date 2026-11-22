@@ -9820,16 +9820,9 @@ function _docTrashIds(domain, ids, btn, 제목, 덧말){
       var es=kcTrashPutMany(D.store, '', 줄들, D.label||'서류');
       set(D.store, 남길);
       renderDocStore(domain);
-      var 알림='🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다';
-      if(es.length<=1){ kcTrashDone(es[0], 알림); return; }
-      /* ★ 여러 건이면 «되돌리기»가 «전부» 되살린다 — 마지막 한 건의 번호(tid)만 쥐고 있으면 「N건」이라 알려 놓고 1건만 돌아온다(2026-11-14 검토).
-         옛 순서로 놓이도록 거꾸로 되살린다(되살린 줄은 맨 앞에 놓인다) */
-      kcUndoBar(알림+' · '+TRASH_DAYS+'일 보관', null, async function(){
-        var 됨=0, 건너뜀=0;
-        for(var i=es.length-1;i>=0;i--){ var r=await kcTrashRestore(es[i].tid, true); if(r && r.skipped) 건너뜀++; else if(r) 됨++; }
-        /* 같은 발급번호가 그새 보관함에 생긴 줄은 되살리지 않고 휴지통에 둔다 — 몇 건인지 밝힌다 */
-        toast('↩ '+됨+'건을 되살렸습니다'+(건너뜀?' — '+건너뜀+'건은 같은 발급번호가 이미 보관함에 있어 휴지통에 그대로 두었습니다':''), 건너뜀?9000:undefined);
-      });
+      /* ★ «되돌리기»는 담은 «전부»를 되살린다(kcTrashDoneMany) — 마지막 한 건의 번호(tid)만 쥐고 있으면 「N건」이라 알려 놓고 1건만 돌아온다(2026-11-14 검토).
+         옛 순서로 놓이도록 거꾸로 되살리고, 같은 발급번호가 그새 보관함에 생긴 줄은 되살리지 않고 휴지통에 둔 채 몇 건인지 밝힌다 */
+      kcTrashDoneMany(es, '🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다');
     });
 }
 function initDocStore(domain){ const D=DOMAINS[domain]; const s=document.getElementById(D.search); if(!s) return;
@@ -11371,9 +11364,10 @@ function careerDelAll(name, btn){
         +남을것.length+'건은 그대로 둡니다.</span>':'') },
     function(){
       /* ★ 휴지통에는 «한 번 읽고 한 번» 쓴다(kcTrashPutMany) — 수백 건을 건마다 쓰면 N번 저장하고, 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-16) */
-      kcTrashPutMany(cfg.store, name, 갈것, '전체 삭제');
+      var es=kcTrashPutMany(cfg.store, name, 갈것, '전체 삭제');
       set(cfg.store, 남을것); renderCareer(name);
-      kcUndoBar('🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다 · '+TRASH_DAYS+'일 보관 (환경설정 › 휴지통)', null);
+      /* ★ «되살리기»는 담은 «전부»를 되살린다(kcTrashDoneMany) — 예전엔 번호(tid)도 fn 도 안 줘서 눌러도 «휴지통에서 찾지 못했습니다»만 떴다(2026-11-22) */
+      kcTrashDoneMany(es, '🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다', ' (환경설정 › 휴지통)');
     });
 }
 function careerDelSelected(name, btn){
@@ -11391,10 +11385,10 @@ function careerDelSelected(name, btn){
     function(){
       /* ⚠ 첨부 원본을 여기서 지우지 않는다 — 전에는 지웠고, 확인창에 스스로
          「되돌릴 수 없습니다」라고 적어 두었다. 이제 휴지통이 들고 있는다. */
-      kcTrashPutMany(cfg.store, name, 갈것, '경력·실적');   /* 한 번에 담는다 — 건마다 쓰지 않는다(2026-11-16) */
+      var es=kcTrashPutMany(cfg.store, name, 갈것, '경력·실적');   /* 한 번에 담는다 — 건마다 쓰지 않는다(2026-11-16) */
       set(cfg.store, get(cfg.store).filter(function(r){ return !keep[r.id]; }));
       renderCareer(name);
-      kcUndoBar('🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다 · '+TRASH_DAYS+'일 보관 (환경설정 › 휴지통)', null);
+      kcTrashDoneMany(es, '🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다', ' (환경설정 › 휴지통)');   /* 되살리기 = 담은 전부(2026-11-22) */
     });
 }
 
@@ -12382,8 +12376,9 @@ function kcFreeId(store, id){
   var k=2; while(used[id+'-'+k]) k++; return id+'-'+k;
 }
 
-/* 되살린다. 번호가 겹치면 새 번호로 넣고, 첨부 원본도 새 번호로 옮긴다. */
-async function kcTrashRestore(tid, quiet){
+/* 되살린다. 번호가 겹치면 새 번호로 넣고, 첨부 원본도 새 번호로 옮긴다.
+   noRedraw: 화면을 «지금» 다시 그리지 않는다 — 여러 건을 잇달아 되살릴 때 부르는 쪽(kcTrashRestoreEntries)이 끝에 한 번만 그린다(건마다 그리면 수백 건에서 표를 수백 번 다시 그린다). */
+async function kcTrashRestore(tid, quiet, noRedraw){
   var t=kcTrashList(), e=null;
   var rest=t.filter(function(x){ if(x.tid===tid){ e=x; return false; } return true; });
   if(!e){ toast('휴지통에서 찾지 못했습니다'); return null; }
@@ -12426,7 +12421,7 @@ async function kcTrashRestore(tid, quiet){
   }
   var arr=get(e.store); arr.unshift(rec); set(e.store, arr);
   set(TRASH_STORE, rest);
-  kcTrashRedraw(e);
+  if(!noRedraw) kcTrashRedraw(e);
   if(!quiet){
     toast(newId!==oldId
       ? '되살렸습니다 — 번호 ' + oldId + ' 가 이미 쓰이고 있어 ' + newId + ' 로 넣었습니다'
@@ -12809,6 +12804,36 @@ function kcUndoBar(msg, tid, fn){
 function kcTrashDone(e, msg){
   if(!e) return;
   kcUndoBar((msg||'🗑 휴지통으로 옮겼습니다')+' · '+TRASH_DAYS+'일 보관', e.tid);
+}
+/* ★ 방금 휴지통에 담은 «여러 건(es)»을 «전부» 되살린다 (2026-11-22) — 일괄 삭제 넷이 같은 길을 쓴다(증명서 표·전체 삭제·골라 삭제·사업).
+   옛 순서로 놓이도록 «거꾸로» 되살린다(되살린 줄은 맨 앞에 놓인다). 건너뛴 줄(같은 발급번호 — 휴지통에 그대로)과 번호가 바뀐 줄을 세어 밝힌다.
+   ⚠ 화면은 «끝에 한 번만» 다시 그린다(noRedraw) — 건마다 그리면 수백 건 «전체 삭제»를 되살릴 때 표를 수백 번 그린다. 저장은 건마다(kcTrashRestore) 그대로다.
+   돌려주는 것: { 됨, 건너뜀, 이름바뀜 } */
+async function kcTrashRestoreEntries(es){
+  var 됨=0, 건너뜀=0, 이름바뀜=0, 마지막=null;
+  for(var i=(es||[]).length-1;i>=0;i--){
+    if(!es[i]) continue;
+    var r=null;
+    try{ r=await kcTrashRestore(es[i].tid, true, true); }catch(err){ console.warn('휴지통 되살리기', es[i].tid, err); }
+    if(r && r.skipped) 건너뜀++;
+    else if(r){ 됨++; if(r.renamed) 이름바뀜++; 마지막=es[i]; }
+  }
+  if(마지막){ try{ kcTrashRedraw(마지막); }catch(err){ console.warn('휴지통 다시 그리기', err); } }
+  return { 됨:됨, 건너뜀:건너뜀, 이름바뀜:이름바뀜 };
+}
+/* 여러 건을 담은 뒤 알리고 «되돌리기» 손잡이까지 — 한 건이면 kcTrashDone 과 같고, 여러 건이면 «전부» 되살린다.
+   알림 문구: 알림 + ' · N일 보관' + 꼬리. 담은 줄이 없으면 아무것도 띄우지 않는다. */
+function kcTrashDoneMany(es, 알림, 꼬리){
+  es=(es||[]).filter(Boolean);
+  if(!es.length) return;
+  var 문구=(알림||'🗑 휴지통으로 옮겼습니다')+' · '+TRASH_DAYS+'일 보관'+(꼬리||'');
+  if(es.length===1){ kcUndoBar(문구, es[0].tid); return; }
+  kcUndoBar(문구, null, async function(){
+    var 결과=await kcTrashRestoreEntries(es);
+    toast('↩ '+결과.됨+'건을 되살렸습니다'
+      +(결과.이름바뀜?' — 그중 '+결과.이름바뀜+'건은 번호가 이미 쓰이고 있어 새 번호로 넣었습니다':'')
+      +(결과.건너뜀?' — '+결과.건너뜀+'건은 같은 발급번호가 이미 보관함에 있어 휴지통에 그대로 두었습니다':''), 결과.건너뜀?9000:undefined);
+  });
 }
 
 function delRec(store,id,page,btn){
@@ -18289,11 +18314,10 @@ function bizSelDel(btn){
   kcAskDelete(btn, { detail:'고른 사업 <b>'+ids.length+'건</b>과 그 서류를 휴지통으로 보냅니다.<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다.</b>' }, function(){
     var arr=get(BIZ_STORE)||[];
     /* ★ 한 번에 담는다(kcTrashPutMany) — 건마다 쓰면 N번 저장하고 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-16).
-       «되살리기» 손잡이는 예전과 같이 마지막으로 담은 줄이다 */
+       «되살리기»는 담은 «전부»를 되살린다(kcTrashDoneMany) — 예전엔 마지막 한 건의 번호만 쥐어 「사업 N건」이라 알려 놓고 1건만 돌아왔다(2026-11-22) */
     var es=kcTrashPutMany(BIZ_STORE,'page-bizlist',arr.filter(function(r){ return r && ids.indexOf(r.id)>=0; }),'사업');
-    var last=es.length?es[es.length-1]:null;
     set(BIZ_STORE, arr.filter(function(r){ return !(r && ids.indexOf(r.id)>=0); }));
-    renderBizList(); kcTrashDone(last, '🗑 사업 '+ids.length+'건을 휴지통으로 옮겼습니다');
+    renderBizList(); kcTrashDoneMany(es, '🗑 사업 '+ids.length+'건을 휴지통으로 옮겼습니다');
   });
 }
 
