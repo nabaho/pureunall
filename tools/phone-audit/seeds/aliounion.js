@@ -4,6 +4,22 @@ module.exports = {
   data: {},
   views: [
     {
+      name: 'chungcheong',
+      run: async (page) => {
+        await page.click('[data-tab="chungcheong"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
+      name: 'chungcheong_facility',
+      run: async (page) => {
+        await page.click('[data-tab="chungcheong"]');
+        await page.waitForTimeout(180);
+        await page.click('[data-cc-preset="CN_FACILITY"]');
+        await page.waitForTimeout(250);
+      }
+    },
+    {
       name: 'organ',
       run: async (page) => {
         await page.click('[data-tab="organ"]');
