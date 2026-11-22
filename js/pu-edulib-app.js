@@ -708,13 +708,15 @@
      고른 보기는 이 브라우저에 기억(pptView). 슬라이드는 격리 칸(pu-slides-frame.html)이 그린다 — 문서뷰어와 같은 격리(allow-same-origin 없음).
      ★ 바꿔 보려고 받은 바이트를 칸(pane)에 둔다 — 격리 칸에는 «사본»을 넘긴다(넘긴 바이트는 이쪽에서 다시 못 쓴다) */
   function showPptx(it, body, pane, buf, live) {
+    /* PC 에서 고른 파일(올리지 않고 보기)도 같은 길 — 크기 한도는 문서 미리보기와 같다 */
+    if (buf.byteLength > PuViewerKind.MAX_BYTES) { body.innerHTML = '<div class="msg">파일이 커서(' + esc(K.fmtBytes(buf.byteLength)) + ') 미리보기를 건너뜁니다 — 원본을 내려받아 여세요</div>'; return; }
     pane._ppt = buf;
     var mode = lsGet('pptView') === 'text' ? 'text' : 'slides';
     var pf = pane.querySelector('.pf');
     var tg = pf ? pf.querySelector('[data-act="pv"]') : null;
     if (pf && !tg) { tg = document.createElement('button'); tg.type = 'button'; tg.className = 'sm'; tg.setAttribute('data-act', 'pv'); pf.insertBefore(tg, pf.querySelector('.sp').nextSibling); }
     if (tg) { tg.textContent = mode === 'slides' ? '≡ 글자' : '▦ 슬라이드'; tg.title = mode === 'slides' ? '글자만 뽑아 보기' : '슬라이드를 작게 늘어놓아 보기'; }
-    if (mode === 'text') return showTextParts(body, pane, buf, 'pptx', live);
+    if (mode === 'text') return showTextParts(body, pane, buf, 'pptx', live).catch(function (e) { if (live()) body.innerHTML = '<div class="msg">글자를 뽑지 못했습니다 — ' + esc(errMsg(e)) + '</div>'; });
     body.innerHTML = '';
     var ifr = document.createElement('iframe');
     ifr.setAttribute('sandbox', 'allow-scripts');                 /* allow-same-origin 을 주지 않는다 — 문서뷰어와 같은 격리 */
@@ -729,6 +731,8 @@
     lsSet('pptView', lsGet('pptView') === 'text' ? 'slides' : 'text');
     closeFrames(pane);
     var s = body._seq = (body._seq || 0) + 1;     /* 앞의 보기에서 늦게 온 결과는 버린다 */
+    body.innerHTML = '<div class="msg">불러오는 중…</div>';     /* 앞 보기의 화면·쪽수를 먼저 비운다 */
+    var pg = pane.querySelector('.pg'); if (pg) { pg.innerHTML = ''; pg.onclick = null; }
     showPptx(it, body, pane, pane._ppt, function () { return body._seq === s && pane.isConnected; });
   }
   function pickLocal(it, body, pane) {

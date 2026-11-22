@@ -198,3 +198,56 @@ test('화면 이음 — 파워포인트는 «▦ 슬라이드»가 기본 · «�
   /* 배포에서 빠지지 않는다 — 칸·해석기·zip 도구는 화면 쪽 파일 */
   ['pu-slides-frame.html', 'js/pu-pptx-render.js', 'js/pu-slides-frame.js', 'vendor/jszip.min.js'].forEach((f) => assert.ok(fs.existsSync(path.join(ROOT, f)), f));
 });
+
+test('④ 나쁜 파일 — 합친 칸 값이 엄청나도 남은 칸까지만 · 끝없는 XML 은 멈춘다 · 문서 이름이 «toString» 이어도 안 부서진다', async () => {
+  /* 합친 칸 10억 — 그대로 반복하면 칸이 멈춘다 */
+  const z = await JSZip.loadAsync(await makePptx());
+  const s1 = await z.file('ppt/slides/slide1.xml').async('string');
+  z.file('ppt/slides/slide1.xml', s1.replace('<a:tc><a:txBody>', '<a:tc gridSpan="1000000000"><a:txBody>'));
+  const m = await R.parse(JSZip, await z.generateAsync({ type: 'arraybuffer' }));
+  const tbl = m.slides[1].shapes.find((s) => s.type === 'table');
+  assert.ok(tbl.rows[0].cells[0].span <= tbl.cols.length, '합친 칸은 남은 칸 수까지만');
+  const t0 = Date.now();
+  R.draw(m, 1, fakeDoc(), () => '');
+  assert.ok(Date.now() - t0 < 2000, '그리기가 멈추지 않는다');
+  /* 끝없는 XML — 마디 수 상한에서 멈춘다 */
+  assert.throws(() => R._xml('<a>' + '<b/>'.repeat(50) + '</a>', 20), /너무 큽니다/);
+  /* 관계(rels) 대상이 «/toString» — 일반 객체를 쓰면 Object.prototype 과 부딪힌다 */
+  const z2 = await JSZip.loadAsync(await makePptx());
+  z2.file('ppt/_rels/presentation.xml.rels', REL([['rId2', 'slide', '/toString'], ['rId3', 'slide', 'slides/slide2.xml']]));
+  const m2 = await R.parse(JSZip, await z2.generateAsync({ type: 'arraybuffer' }));
+  assert.equal(m2.slides.length, 1, '없는 슬라이드는 건너뛰고 나머지는 그린다');
+  assert.ok(R.LIMIT.xmlPart > 0 && R.LIMIT.xmlTotal >= R.LIMIT.xmlPart && R.LIMIT.nodes > 0, '한도가 있다');
+  const src = stripJs(read('js/pu-pptx-render.js'));
+  assert.match(src, /var cache = Object\.create\(null\)/);
+  assert.match(src, /var rels = Object\.create\(null\)/);
+});
+
+test('④ 칸 움직임 — 새로 열거나 닫으면 크게 보기도 닫힌다 · 양끝 단추는 못 누름 · 크게 보기 안에서 초점이 돈다 · 그림 한도', () => {
+  const fj = stripJs(read('js/pu-slides-frame.js'));
+  assert.match(fj, /function open\(buf\) \{\s*hideBig\(\);/);
+  assert.match(fj, /m\.t === 'close'\) \{ hideBig\(\);/);
+  assert.match(fj, /\.prev'\)\.disabled = CUR <= 0/);
+  assert.match(fj, /\.next'\)\.disabled = CUR >= last/);
+  assert.match(fj, /e\.key === 'Tab'/, '크게 보기가 열려 있으면 Tab 이 그 안에서만');
+  assert.match(fj, /IMG_ONE = \d+ \* 1048576, IMG_ALL = \d+ \* 1048576/, '그림 한 장·합계 한도');
+  assert.match(fj, /URLS = Object\.create\(null\)/);
+  const app = stripJs(read('js/pu-edulib-app.js'));
+  const sp = app.slice(app.indexOf('function showPptx('), app.indexOf('function pickLocal('));
+  assert.match(sp, /buf\.byteLength > PuViewerKind\.MAX_BYTES/, 'PC 에서 고른 파일도 크기 한도');
+  assert.match(sp, /showTextParts\(body, pane, buf, 'pptx', live\)\.catch\(/, '글자 보기 실패도 알린다');
+  const tg = app.slice(app.indexOf('function togglePpt('), app.indexOf('function pickLocal('));
+  assert.match(tg, /body\.innerHTML = '<div class="msg">불러오는 중…<\/div>'/, '바꾸기 전에 앞 화면을 비운다');
+  assert.match(tg, /pg\.onclick = null/);
+});
+
+test('점검 도구 — 격리 칸 스크립트 예외는 «정확한 파일»만(폴더째 열지 않는다)', () => {
+  const run = read('tools/phone-audit/run.mjs');
+  const m = run.match(/const SANDBOX_SCRIPTS = \[([^\]]*)\]/);
+  assert.ok(m, '예외 파일 목록');
+  const list = m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));
+  list.forEach((f) => { assert.match(f, /^\/[\w\-/.]+\.js$/, '정확한 파일 경로: ' + f); assert.ok(fs.existsSync(path.join(ROOT, f)), '있는 파일: ' + f); });
+  /* 격리 칸 html 이 싣는 스크립트는 모두 목록에 있다 */
+  [...read('pu-slides-frame.html').matchAll(/<script src="([^"?]+)/g)].forEach((x) => assert.ok(list.includes('/' + x[1]), '목록에 없음: ' + x[1]));
+  assert.doesNotMatch(run, /\(js\|vendor\)/, '폴더째 여는 정규식이 남지 않는다');
+});

@@ -16,7 +16,7 @@ html,body{background:#e2e8f0;color:#1e293b;font-family:system-ui,-apple-system,"
 .bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:6px;padding:6px 8px;background:#f8fafc;border-bottom:1px solid #cbd5e1;white-space:nowrap}
 .bar .n{font-weight:700}
 .bar .hint{color:#64748b;font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
-.bar button{flex:0 0 auto;min-width:30px;min-height:28px;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#ffffff;color:#1e293b;font-size:13px;font-family:inherit;cursor:pointer}
+.bar button{flex:0 0 auto;min-width:32px;min-height:32px;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#ffffff;color:#1e293b;font-size:13px;font-family:inherit;cursor:pointer}
 .bar button:hover{border-color:#2563eb;color:#1e40af}
 .bar button:focus-visible,.th:focus-visible,.big button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tw,170px),1fr));gap:10px;padding:10px}
@@ -32,8 +32,9 @@ html,body{background:#e2e8f0;color:#1e293b;font-family:system-ui,-apple-system,"
 .big.on{display:flex}
 .big .top{display:flex;align-items:center;gap:6px;padding:6px 8px;color:#f8fafc;white-space:nowrap}
 .big .top .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.big button{min-width:32px;min-height:30px;padding:0 10px;border:1px solid #475569;border-radius:6px;background:#1e293b;color:#f8fafc;font-size:13px;font-family:inherit;cursor:pointer}
-.big button:hover{background:#475569}
+.big button{min-width:36px;min-height:36px;padding:0 10px;border:1px solid #475569;border-radius:6px;background:#1e293b;color:#f8fafc;font-size:13px;font-family:inherit;cursor:pointer}
+.big button:hover:not(:disabled){background:#475569}
+.big button:disabled{opacity:.45;cursor:default}
 .big .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px}
 .big .stage svg{max-width:100%;max-height:100%;width:100%;height:100%;filter:drop-shadow(0 2px 10px rgba(0,0,0,.45))}   /* 슬라이드 밖 여백은 바탕(짙은 색) 그대로 */
 </style>

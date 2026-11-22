@@ -92,10 +92,11 @@ function serve() {
       if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
       const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase();
       /* 예외 하나 — 화면 안의 «격리 칸»(sandbox iframe, 출처 없음)이 스크립트를 부를 때(2026-11-22 슬라이드 미리보기 칸).
-         출처가 없어 cross-site 로 오고 보낸 곳(referer)도 비어 있다. 그래서 «스크립트 요청 · Origin 없음 · js/ 나 vendor/ 의 .js» 일 때만 —
-         저장소에 공개된 화면 스크립트뿐이라 새는 것이 없다. 그 밖의 cross-site 요청은 그대로 막는다 */
+         출처가 없어 cross-site 로 오고 보낸 곳(referer)도 비어 있다. 그래서 «스크립트 요청 · Origin 없음 · 격리 칸이 싣는 그 파일들»일 때만.
+         ★ 파일을 «정확히» 적는다(폴더째 열지 않는다) — 새 격리 칸이 생기면 여기에 그 파일을 더한다. 그 밖의 cross-site 요청은 그대로 막는다 */
+      const SANDBOX_SCRIPTS = ['/vendor/jszip.min.js', '/js/pu-pptx-render.js', '/js/pu-slides-frame.js'];
       const sandboxScript = sfs === 'cross-site' && String(req.headers['sec-fetch-dest'] || '') === 'script' && !req.headers.origin &&
-        /^\/(js|vendor)\/[\w.\-]+\.js(\?|$)/.test(String(req.url || ''));
+        SANDBOX_SCRIPTS.indexOf(String(req.url || '').split('?')[0]) >= 0;
       if (sfs && sfs !== 'same-origin' && sfs !== 'none' && !sandboxScript) {
         if (process.env.PA_CONSOLE) console.log('[막음]', req.url, JSON.stringify({ sfs, dest: req.headers['sec-fetch-dest'] || '', origin: req.headers.origin || '', ref: req.headers.referer || '' }));
         res.writeHead(403); return res.end();

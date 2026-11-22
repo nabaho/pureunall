@@ -23,6 +23,8 @@
 
   var EMU_PT = 12700;                 /* 1pt = 12700 EMU */
   var MAX_SLIDES = 300;
+  /* 한도 — 남의 파일(메일·PC)이라 «작은 zip 이 풀면 엄청 커지는» 파일·끝없는 XML 로 칸이 멈추거나 메모리를 다 쓰지 않게 */
+  var LIMIT = { xmlPart: 8 * 1048576, xmlTotal: 80 * 1048576, nodes: 400000, depth: 40, cols: 60, rows: 60 };
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var XHTML_NS = 'http://www.w3.org/1999/xhtml';
 
@@ -34,9 +36,9 @@
       return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : '';
     });
   }
-  function xml(str) {
+  function xml(str, maxNodes) {
     var rootN = { n: '#root', a: {}, c: [], t: '' };
-    var stack = [rootN];
+    var stack = [rootN], count = 0, cap = maxNodes || LIMIT.nodes;
     var re = /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/g;
     var m;
     str = String(str || '');
@@ -45,6 +47,7 @@
       if (m[1] != null) { top.t += m[1]; continue; }
       if (m[3]) {
         if (m[2] === '/') { if (stack.length > 1) stack.pop(); continue; }
+        if (++count > cap) throw new Error('슬라이드 구조가 너무 큽니다');
         var node = { n: m[3], a: {}, c: [], t: '' };
         var ar = /([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g, am;
         while ((am = ar.exec(m[4] || ''))) node.a[am[1]] = unesc(am[2] != null ? am[2] : am[3]);
@@ -244,7 +247,13 @@
     var out = [];
     var tree = at(part.root, part.rootName + '/p:cSld/p:spTree');
     if (!tree) return out;
+    var depth = 0;
     function walk(node, tf) {
+      if (++depth > LIMIT.depth) { depth--; return; }       /* 묶음 안 묶음이 끝없이 — 거기서 멈춘다 */
+      walkIn(node, tf);
+      depth--;
+    }
+    function walkIn(node, tf) {
       node.c.forEach(function (el) {
         if (el.n === 'mc:AlternateContent') { var fb = kid(el, 'mc:Fallback') || kid(el, 'mc:Choice'); if (fb) walk(fb, tf); return; }
         var ph = phOf(el);
@@ -298,12 +307,17 @@
           var tbl = gd ? kid(gd, 'a:tbl') : null;
           if (tbl) {
             s.type = 'table';
-            var cols = kids(at(tbl, 'a:tblGrid'), 'a:gridCol').map(function (g) { return num(g.a.w, 0) / EMU_PT; });
+            var cols = kids(at(tbl, 'a:tblGrid'), 'a:gridCol').slice(0, LIMIT.cols).map(function (g) { return Math.max(0, num(g.a.w, 0)) / EMU_PT; });
             var tot = cols.reduce(function (a, b) { return a + b; }, 0) || 1;
             s.cols = cols.map(function (c) { return c / tot * s.w; });
-            s.rows = kids(tbl, 'a:tr').slice(0, 60).map(function (tr) {
-              return { h: num(tr.a.h, 0) / EMU_PT, cells: kids(tr, 'a:tc').map(function (tc) {
-                return { span: Math.max(1, num(tc.a.gridSpan, 1)), merged: tc.a.hMerge === '1' || tc.a.vMerge === '1',
+            s.rows = kids(tbl, 'a:tr').slice(0, LIMIT.rows).map(function (tr) {
+              /* 합친 칸(gridSpan)은 «남은 칸 수»까지만 — 문서 값을 그대로 반복 횟수로 쓰지 않는다 */
+              var used = 0;
+              return { h: Math.max(0, num(tr.a.h, 0)) / EMU_PT, cells: kids(tr, 'a:tc').slice(0, cols.length).map(function (tc) {
+                var left = Math.max(0, cols.length - used);
+                var span = Math.max(1, Math.min(left || 1, Math.floor(num(tc.a.gridSpan, 1)) || 1));
+                used += span;
+                return { span: span, merged: tc.a.hMerge === '1' || tc.a.vMerge === '1',
                   fill: fillOf(kid(tc, 'a:tcPr'), ctx, part.rels, part.path) || null,
                   text: textOf(kid(tc, 'a:txBody'), [{ lst: txStyleFor('other', opts.master) }], ctx, '') };
               }) };
@@ -334,15 +348,25 @@
   function parse(JSZip, buf, opts) {
     opts = opts || {};
     var maxSlides = opts.maxSlides || MAX_SLIDES;
-    var cache = {};
+    var cache = Object.create(null);                         /* 열쇠가 문서에서 온다 — «toString» 같은 이름이 Object 와 부딪히지 않게 */
+    var xmlUsed = 0;
     return JSZip.loadAsync(buf).then(function (zip) {
-      function text(p) { var f = zip.file(p); return f ? f.async('string') : Promise.resolve(''); }
+      function sizeOf(f) { return f && f._data && typeof f._data.uncompressedSize === 'number' ? f._data.uncompressedSize : -1; }
+      function text(p) {
+        var f = zip.file(p); if (!f) return Promise.resolve('');
+        if (sizeOf(f) > LIMIT.xmlPart) return Promise.reject(new Error('슬라이드 한 장이 너무 큽니다'));
+        return f.async('string').then(function (t) {
+          xmlUsed += t.length;
+          if (t.length > LIMIT.xmlPart || xmlUsed > LIMIT.xmlTotal) throw new Error('자료가 너무 커서 그리지 않았습니다');
+          return t;
+        });
+      }
       function load(p, rootName) {
         if (!p) return Promise.resolve(null);
         if (cache[p]) return cache[p];
         cache[p] = Promise.all([text(p), text(relsPathOf(p))]).then(function (two) {
           if (!two[0]) return null;
-          var rels = {};
+          var rels = Object.create(null);
           kids(kid(xml(two[1]), 'Relationships'), 'Relationship').forEach(function (r) {
             if (r.a.TargetMode === 'External') return;
             rels[r.a.Id] = { target: r.a.Target, type: String(r.a.Type || '').replace(/^.*\//, '') };
@@ -360,7 +384,7 @@
         var paths = ids.map(function (s) { var r = pres.rels[s.a['r:id']]; return r ? joinPath(pres.path, r.target) : ''; }).filter(Boolean);
         var truncated = paths.length > maxSlides;
         paths = paths.slice(0, maxSlides);
-        var media = {};
+        var media = Object.create(null);
         return Promise.all(paths.map(function (sp, i) {
           return load(sp, 'p:sld').then(function (slide) {
             if (!slide) return null;
@@ -473,7 +497,8 @@
         s.rows.forEach(function (r) {
           var xx = s.x, ci = 0;
           r.cells.forEach(function (c) {
-            var cw = 0; for (var k = 0; k < c.span; k++) cw += s.cols[ci + k] || 0;
+            if (ci >= s.cols.length) return;
+            var cw = 0; for (var k = 0; k < c.span && ci + k < s.cols.length; k++) cw += s.cols[ci + k] || 0;
             if (!c.merged) {
               g.appendChild(el(doc, 'rect', { x: xx, y: yy, width: cw, height: r.h, fill: paint(c.fill) === 'none' ? 'none' : c.fill.c, stroke: '#a6a6a6', 'stroke-width': 0.5 }));
               drawText(doc, g, { x: xx, y: yy, w: cw, h: r.h }, c.text);
@@ -500,5 +525,5 @@
     g.appendChild(t);
   }
 
-  return { parse: parse, draw: draw, DRAWABLE: DRAWABLE, MAX_SLIDES: MAX_SLIDES, _xml: xml, _colorOf: colorOf, _joinPath: joinPath, _textOf: textOf };
+  return { parse: parse, draw: draw, DRAWABLE: DRAWABLE, MAX_SLIDES: MAX_SLIDES, LIMIT: LIMIT, _xml: xml, _colorOf: colorOf, _joinPath: joinPath, _textOf: textOf };
 });
