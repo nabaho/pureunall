@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 강의자료 «슬라이드 미리보기» 격리된 칸 (2026-11-22) — pu-edulib.html 이 sandbox="allow-scripts" 로만 연다(allow-same-origin 을 주지 않는다).
+     ★ 파워포인트(pptx)를 해석하는 곳이다. 해석기(js/pu-pptx-render.js)에 약점이 있어 나쁜 파일이 코드를 돌려도
+       이 칸 밖(포털 로그인 증표·다른 앱 자료)에 손이 안 닿고, 아래 CSP 가 바깥으로 나가는 길을 막는다(connect-src 'none').
+     ★ 문서뷰어 격리 칸(pu-viewer-frame.html)과 같은 원칙 — 부모와는 postMessage 로만 말한다.
+     ⚠ 이 칸을 sandbox 없이 직접 열지 말 것 — tests/edulib-slides.test.js 가 지킨다. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src 'none'; img-src blob: data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; frame-src 'none'">
+<title>슬라이드 칸</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#e2e8f0;color:#1e293b;font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:13px}
+.bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:6px;padding:6px 8px;background:#f8fafc;border-bottom:1px solid #cbd5e1;white-space:nowrap}
+.bar .n{font-weight:700}
+.bar .hint{color:#64748b;font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.bar button{flex:0 0 auto;min-width:32px;min-height:32px;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#ffffff;color:#1e293b;font-size:13px;font-family:inherit;cursor:pointer}
+.bar button:hover{border-color:#2563eb;color:#1e40af}
+.bar button:focus-visible,.th:focus-visible,.big button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tw,170px),1fr));gap:10px;padding:10px}
+.th{background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;cursor:zoom-in;box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.th:hover{border-color:#2563eb}
+.th svg{display:block;width:100%;height:auto;background:#ffffff}
+.th .ph{display:block;width:100%;background:#f8fafc}   /* 화면 가까이 오기 전 자리(그 뒤 슬라이드 그림으로 바뀐다) */
+.th .cap{display:flex;gap:6px;padding:3px 6px;font-size:11px;color:#475569;white-space:nowrap;border-top:1px solid #e2e8f0}
+.th .cap b{flex:0 0 auto;color:#1e293b;font-variant-numeric:tabular-nums}
+.th .cap span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.msg{padding:18px;color:#475569;line-height:1.6}
+.msg.err{color:#991b1b}
+.big{position:fixed;inset:0;z-index:5;display:none;flex-direction:column;background:#1e293b}
+.big.on{display:flex}
+.big .top{display:flex;align-items:center;gap:6px;padding:6px 8px;color:#f8fafc;white-space:nowrap}
+.big .top .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.big button{min-width:36px;min-height:36px;padding:0 10px;border:1px solid #475569;border-radius:6px;background:#1e293b;color:#f8fafc;font-size:13px;font-family:inherit;cursor:pointer}
+.big button:hover:not(:disabled){background:#475569}
+.big button:disabled{opacity:.45;cursor:default}
+.big .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px}
+.big .stage svg{max-width:100%;max-height:100%;width:100%;height:100%;filter:drop-shadow(0 2px 10px rgba(0,0,0,.45))}   /* 슬라이드 밖 여백은 바탕(짙은 색) 그대로 */
+</style>
+</head>
+<body>
+<div id="root"><div class="msg">슬라이드를 그리는 중…</div></div>
+<script src="vendor/jszip.min.js"></script>
+<script src="js/pu-pptx-render.js?v=1"></script>
+<script src="js/pu-slides-frame.js?v=1"></script>
+</body>
+</html>

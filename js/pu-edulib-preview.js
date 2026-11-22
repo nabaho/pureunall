@@ -20,7 +20,30 @@
 
   var MAX_FILE = 50 * 1024 * 1024;
   var MAX_PART = 8 * 1024 * 1024;
+  var MAX_TOTAL = 80 * 1024 * 1024;     /* 풀린 글자 합계 — 작은 zip 이 풀면 엄청 커지는 파일 대비 */
   var MAX_SLIDES = 300;
+
+  /* zip 안 파일을 «실제로 풀린 바이트»를 세며 읽는다(선언된 크기를 믿지 않는다) — 한도를 넘으면 그 자리에서 멈추고 실패 */
+  function readLimited(file, limit) {
+    return new Promise(function (res, rej) {
+      var chunks = [], got = 0, done = false, st;
+      try { st = file.internalStream('uint8array'); } catch (e) { rej(e); return; }
+      st.on('data', function (c) {
+        if (done) return;
+        got += c.length;
+        if (got > limit) { done = true; try { st.pause(); } catch (_) {} rej(new Error('풀린 크기가 한도를 넘었습니다')); return; }
+        chunks.push(c);
+      }).on('error', function (e) { if (!done) { done = true; rej(e); } })
+        .on('end', function () {
+          if (done) return; done = true;
+          var out = new Uint8Array(got), o = 0;
+          chunks.forEach(function (c) { out.set(c, o); o += c.length; });
+          res(out);
+        });
+      st.resume();
+    });
+  }
+  function utf8(u8) { return new TextDecoder('utf-8').decode(u8); }
 
   /* XML 글자에서 <a:t>…</a:t>(pptx) · <w:t>…</w:t>(docx) 만 뽑는다.
      DOMParser 가 없는 곳(node 검사)에서도 돌게 정규식으로 한다 — 태그 속 글자만 꺼내고 엔티티를 푼다. */
@@ -31,18 +54,34 @@
       .replace(/&amp;/g, '&');
   }
 
-  /* 문단(<a:p>·<w:p>) 단위로 글자를 모은다 */
+  /* 문단(<a:p>·<w:p>) 단위로 글자를 모은다 — 앞에서 뒤로 «한 번» 훑는다(indexOf).
+     ⚠ 정규식(.*?</a:p>)으로 하면 닫는 태그가 없는 나쁜 XML 에서 남은 글을 몇 번이고 다시 훑어 화면이 오래 멈춘다(2026-11-22 보안 검토).
+       닫는 태그를 못 찾으면 거기서 멈춘다. 줄 수에도 상한(MAX_LINES). */
+  var MAX_LINES = 20000;
+  function isTagEnd(ch) { return ch === '>' || ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '/'; }
   function paragraphs(xml, pTag, tTag) {
-    var out = [];
-    var pRx = new RegExp('<' + pTag + '[\\s>][\\s\\S]*?</' + pTag + '>', 'g');
-    var tRx = new RegExp('<' + tTag + '(?:\\s[^>]*)?>([\\s\\S]*?)</' + tTag + '>', 'g');
-    var m;
-    while ((m = pRx.exec(xml))) {
-      var line = '', t;
-      tRx.lastIndex = 0;
-      while ((t = tRx.exec(m[0]))) line += unescapeXml(t[1]);
+    var out = [], pos = 0, open = '<' + pTag, close = '</' + pTag + '>', tOpen = '<' + tTag, tClose = '</' + tTag + '>';
+    xml = String(xml || '');
+    while (out.length < MAX_LINES) {
+      var s = xml.indexOf(open, pos); if (s < 0) break;
+      var ch = xml.charAt(s + open.length);
+      if (!isTagEnd(ch)) { pos = s + open.length; continue; }          /* <a:pPr> 같은 다른 태그 */
+      var gt0 = xml.indexOf('>', s); if (gt0 < 0) break;
+      if (xml.charAt(gt0 - 1) === '/') { pos = gt0 + 1; continue; }    /* 빈 문단 <a:p/> */
+      var e = xml.indexOf(close, gt0); if (e < 0) break;               /* 닫는 태그가 없으면 멈춘다 */
+      var seg = xml.slice(gt0 + 1, e), line = '', q = 0;
+      for (;;) {
+        var ts = seg.indexOf(tOpen, q); if (ts < 0) break;
+        if (!isTagEnd(seg.charAt(ts + tOpen.length))) { q = ts + tOpen.length; continue; }   /* <a:tab> 같은 것 */
+        var gt = seg.indexOf('>', ts); if (gt < 0) break;
+        if (seg.charAt(gt - 1) === '/') { q = gt + 1; continue; }
+        var te = seg.indexOf(tClose, gt); if (te < 0) break;
+        line += unescapeXml(seg.slice(gt + 1, te));
+        q = te + tClose.length;
+      }
       line = line.replace(/\s+/g, ' ').trim();
       if (line) out.push(line);
+      pos = e + close.length;
     }
     return out;
   }
@@ -67,12 +106,17 @@
       }
       var truncated = targets.length > MAX_SLIDES;
       targets = targets.slice(0, MAX_SLIDES);
-      return Promise.all(targets.map(function (n) {
-        var f = zip.files[n];
-        var sz = f && f._data && f._data.uncompressedSize;
-        if (sz && sz > MAX_PART) return Promise.resolve('');
-        return f.async('string');
-      })).then(function (xmls) {
+      /* 차례로 읽으며 합계를 센다 — 한 부분이 한도를 넘으면 그 부분만 비우고, 합계를 넘으면 거기서 멈춘다 */
+      var xmls = [], total = 0;
+      return targets.reduce(function (p, n) {
+        return p.then(function () {
+          if (total >= MAX_TOTAL) { xmls.push(''); truncated = true; return; }
+          var room = Math.min(MAX_PART, MAX_TOTAL - total);
+          return readLimited(zip.files[n], room).then(function (u8) {
+            total += u8.length; xmls.push(utf8(u8));
+          }, function () { xmls.push(''); truncated = true; total += room; });   /* 실패해도 그만큼 풀었다 — 합계에 넣어 되풀이되면 멈춘다 */
+        });
+      }, Promise.resolve()).then(function () {
         var parts = xmls.map(function (x, i) {
           var lines = x ? paragraphs(x, pTag, tTag) : [];
           return { no: kind === 'pptx' ? slideNo(targets[i]) : i + 1, title: lines[0] || '', lines: lines };
