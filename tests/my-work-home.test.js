@@ -480,7 +480,8 @@ test('⑤ 단추에 숫자 — PC 는 한 줄, 폰 딱지는 급한 것(임박+�
     querySelector: (s) => (s === '.hd-n' ? 칸 : s === '.hd-nv' ? 딱지 : s === '.hd-wl' ? 줄글 : null),
   };
   el.setAttribute('data-name', '내 업무'); el.setAttribute('data-count', 'myWork');
-  const ctx = { window: { PuMyWork: M }, portalHeadAppLabel: (e) => ctx.portalMyWorkLabel(e) };
+  /* $ — 첫 안내(#mwTip)가 없으면 숫자만 붙인다(안내 자리 맞추기는 tests/portal-mywork-tip.test.js) */
+  const ctx = { window: { PuMyWork: M }, portalHeadAppLabel: (e) => ctx.portalMyWorkLabel(e), $: () => null };
   vm.createContext(ctx);
   vm.runInContext(함수(숫자구역, 'portalMyWorkApply') + '\n' + 함수(숫자구역, 'portalMyWorkLabel'), ctx);
   ctx.portalMyWorkLabel(el);

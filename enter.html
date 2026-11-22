@@ -927,6 +927,33 @@ body.portal-mode #camFab{display:flex;}
   opacity:0;transform:translateY(-4px);transition:opacity .35s,transform .35s;pointer-events:none;}
 .sg-tip::before{content:'';position:absolute;top:-5px;right:24px;width:10px;height:10px;background:#1e293b;transform:rotate(45deg);}
 .sg-tip.on{opacity:1;transform:translateY(0);}
+/* 📋 «내 업무» 첫 안내 — 로그인하면 머리줄 «내 업무» 단추 바로 아래에 뜬다 (대표 지시 2026-11-22, 자세히 JS 「내 업무 첫 안내」)
+   자리(left·top·화살표)는 JS 가 단추를 재서 정한다 — 화면 양옆 8px 안. 확인 창(z 80)보다 아래(z 60)라 겹치면 확인 창이 위다. */
+.mw-tip{position:absolute;z-index:60;box-sizing:border-box;background:#1e293b;color:#fff;border-radius:12px;
+  padding:12px 14px 10px;box-shadow:0 10px 28px rgba(15,23,42,.32);font-size:.78rem;font-weight:500;line-height:1.6;
+  text-align:left;letter-spacing:0;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;animation:mwTipIn .3s ease-out;}
+.mw-tip .mw-ar{position:absolute;top:-6px;left:24px;width:12px;height:12px;background:#1e293b;transform:rotate(45deg);}
+.mw-tip .mw-t{display:block;font-size:.88rem;font-weight:800;margin:0 26px 6px 0;}
+.mw-tip ul{margin:0;padding:0 0 0 17px;}
+.mw-tip li{margin:3px 0;color:#e2e8f0;}
+.mw-tip li b{color:#fff;font-weight:800;}
+.mw-tip .mw-x{position:absolute;top:6px;right:6px;width:30px;height:30px;border:0;border-radius:8px;background:transparent;
+  color:#cbd5e1;font-size:14px;line-height:1;cursor:pointer;}
+.mw-tip .mw-x:hover{background:rgba(255,255,255,.12);color:#fff;}
+.mw-tip .mw-ft{display:flex;gap:6px;margin-top:10px;}
+.mw-tip .mw-ft button{flex:1;min-height:36px;border-radius:9px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.mw-tip .mw-go{background:#2563eb;color:#fff;border:0;}
+.mw-tip .mw-go:hover{background:#1e40af;}
+.mw-tip .mw-ok{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);}
+.mw-tip .mw-ok:hover{background:rgba(255,255,255,.1);}
+.mw-tip small{display:block;margin-top:6px;font-size:.68rem;color:#94a3b8;}
+.mw-tip button:focus-visible{outline:2px solid #60a5fa;outline-offset:2px;}
+@keyframes mwTipIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){ .mw-tip{animation:none;} }
+.mw-tip:focus{outline:none;}   /* 뜰 때 상자 자체가 초점을 받는다(화면읽기용) — 테두리는 안의 단추에만 */
+/* 폰 — 누르는 자리 44px(손가락 권장 크기) */
+@media(max-width:520px){ .mw-tip{font-size:.8rem;} .mw-tip .mw-t{margin-right:44px;} .mw-tip .mw-ft button{min-height:44px;}
+  .mw-tip .mw-x{width:44px;height:44px;top:2px;right:2px;} }
 /* 버튼 숫자 배지: admin=미처리 건수 / 일반=내 미확인 해결 건수 */
 .sg-fabbadge{position:absolute;top:-7px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#fff;color:#dc2626;border:1.5px solid #fecaca;font-size:.62rem;font-weight:800;display:none;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.15);}
 /* 해결 알림 팝업 (로그인 직후 자동) */
@@ -5154,6 +5181,8 @@ body.portal-mode #moreFab{display:flex;}
       try { cfgShowFab(); } catch(e){}
     } else {
       if(window.sgSetUser) window.sgSetUser(acct);
+      mwTipWire();                                               // 📋 단추 누름 = «앎» — 안내가 뜨기 전에 눌러도 기억하게 지금 붙인다
+      setTimeout(function(){ portalMyWorkTip(false); }, 600);   // 📋 내 업무 첫 안내 — 머리줄이 자리 잡은 뒤(대표 지시 2026-11-22)
       initPortalHanaAlerts(role);
       initPortalExpAlerts();
       portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
@@ -5180,6 +5209,7 @@ body.portal-mode #moreFab{display:flex;}
      ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
      ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
   function portalHeadAppsHide(){
+    mwTipRedraw();            // 📋 내 업무 첫 안내도 함께 걷는다 — 앞사람 안내가 남지 않게(같은 사람이면 다시 그린 뒤 또 뜬다)
     var els = document.querySelectorAll('[data-head-app]');
     for(var i = 0; i < els.length; i++) els[i].hidden = true;
   }
@@ -5353,6 +5383,7 @@ body.portal-mode #moreFab{display:flex;}
     if(v) v.textContent = String(urgent);
     if(box){ box.hidden = false; box.classList.toggle('is-zero', urgent === 0); }
     portalHeadAppLabel(el);
+    if($('mwTip')) mwTipPlace();   // 숫자가 붙어 단추 폭이 바뀌었다 — 첫 안내의 화살표를 다시 맞춘다
   }
   /* 접근성 이름·말풍선 — 숫자는 «받았을 때만», 언제 기준인지도 밝힌다(업무관리를 마지막으로 연 때) */
   function portalMyWorkLabel(el){
@@ -5364,6 +5395,126 @@ body.portal-mode #moreFab{display:flex;}
       + (line ? '\n' + line + (st ? ' (업무관리 ' + st + ' 기준)' : '') : '\n숫자는 업무관리를 한 번 열면 나옵니다');
   }
   /* ── 내 업무 숫자 끝 ── */
+
+  /* ══ 📋 내 업무 첫 안내 — 로그인하면 «내 업무» 단추 바로 아래에 안내 상자 (대표 지시 2026-11-22) ══
+     대표 말씀: 「로그인하면 내 업무 현재 진행 상황은 어디다라고 하고 팝업창으로, 내 업무 박스 옆에 여기를 누르면
+       본인 지금 현재 업무를 입력하거나 ERP 진행 상황 등을 확인할 수 있다, 여기에 데이터를 넣을 수 있다, 관리가 가능하다」.
+     ★ 언제: 포털이 그려진 뒤(renderPortal) 사람마다 — «알겠어요»를 누르거나 «내 업무» 단추를 한 번 누를 때까지 로그인마다 뜬다.
+       ✕·Esc 는 «이번만» 닫는다(다음 로그인 때 다시) — 닫은 뒤 같은 창에서 포털을 다시 그려도 또 뜨지 않는다(_mwTipSession).
+       떠 있는 채로 다시 그려지면(같은 사람) 다시 뜬다(mwTipRedraw). 단추 누름은 포털을 그리자마자 듣는다(mwTipWire).
+     ★ 초점: 뜰 때 아무것도 안 잡고 있고 확인 창도 없으면 안내 상자로(화면읽기가 제목을 읽는다), 키보드로 닫으면 «내 업무» 단추로.
+     ★ «알겠어요»는 이 기기 브라우저에만 적는다(localStorage, 열쇠에 로그인 UID — 한 PC 를 여럿이 써도 사람마다).
+       못 적는 브라우저(사생활 보호 창 등)면 다음 로그인에 또 뜰 뿐 — 막히거나 오류가 나지 않는다.
+     ★ 창(모달)이 아니라 말풍선이다 — 포털을 막지 않는다. 확인 창(z 80)이 뜨면 그 아래로 간다. Esc 로 닫힌다.
+     ★ 건의하기 말풍선(sgShowTip)과 자리가 겹친다 — 이 안내가 뜰 차례이거나 떠 있으면 그쪽이 쉰다(portalMyWorkTipDue).
+     ⚠ 심사 전용 계정(reviewer)에는 안 띄운다 — renderPortal 의 직원 갈래에서만 부른다. */
+  var MWTIP_KEY = 'pu_mywork_tip_ok:';
+  var _mwTipSession = {};
+  function mwTipSeen(uid){ try { return localStorage.getItem(MWTIP_KEY + uid) === '1'; } catch(e){ return false; } }
+  function mwTipAck(uid){ try { localStorage.setItem(MWTIP_KEY + uid, '1'); } catch(e){} }
+  function mwTipBtn(){ var b = $('headApp_work'); return (b && !b.hidden) ? b : null; }
+  /* 지금 이 사람에게 안내가 떠 있거나 곧 뜰 차례인가 — 건의하기 말풍선이 묻는다 */
+  function portalMyWorkTipDue(){
+    if($('mwTip')) return true;
+    var uid = _curUid;
+    return !!(uid && mwTipBtn() && !_mwTipSession[uid] && !mwTipSeen(uid));
+  }
+  function mwTipKey(e){ if(e.key === 'Escape') mwTipClose(false); }
+  function mwTipClose(ack){
+    var t = $('mwTip');
+    if(!t) return;
+    if(ack && t.getAttribute('data-uid')) mwTipAck(t.getAttribute('data-uid'));
+    window.removeEventListener('resize', mwTipPlace);
+    document.removeEventListener('keydown', mwTipKey);
+    /* 초점이 안내 안에 있었으면(키보드로 닫음) «내 업무» 단추로 돌려준다 — 안 그러면 초점이 문서 맨 앞(BODY)으로 사라진다 */
+    var ae = document.activeElement, had = !!ae && (ae === t || t.contains(ae));
+    t.remove();
+    var btn = mwTipBtn();
+    if(had && btn){ try { btn.focus(); } catch(e){} }
+  }
+  /* 포털을 다시 그릴 때(portalHeadAppsHide) — 떠 있던 안내는 걷되(앞사람 것이 남지 않게),
+     같은 사람이 다시 그려지면 또 뜨게 «이번 창에서 띄웠음» 표시를 푼다. ✕ 로 닫은 것은 이미 없으니 그대로 «닫음»이다. */
+  function mwTipRedraw(){
+    var t = $('mwTip');
+    if(!t) return;
+    delete _mwTipSession[t.getAttribute('data-uid')];
+    mwTipClose(false);
+  }
+  /* «내 업무» 단추를 누르면 — 안내를 봤든 안 봤든 — 어디인지 아는 것이다. 포털을 그리자마자 붙인다(안내가 뜨기 전 0.6초 사이에 눌러도). */
+  function mwTipWire(){
+    var btn = mwTipBtn();
+    if(!btn || btn.getAttribute('data-tip-wired') === '1') return;
+    btn.setAttribute('data-tip-wired', '1');
+    btn.addEventListener('click', function(){ if($('mwTip')) mwTipClose(true); else if(_curUid) mwTipAck(_curUid); });
+  }
+  /* 확인 창(해결 확인·처리할 건의·오케스트레이션 따위 aria-modal)이 떠 있나 — 그러면 안내로 초점을 빼앗지 않는다 */
+  function mwTipBusy(){
+    var ids = ['sgDoneModal', 'sgPendModal'], i, m;
+    for(i = 0; i < ids.length; i++){ m = $(ids[i]); if(m && !m.hidden && m.getClientRects().length) return true; }
+    var am = document.querySelectorAll('[aria-modal="true"]');
+    for(i = 0; i < am.length; i++){ if(!am[i].hidden && am[i].getClientRects().length) return true; }
+    return false;
+  }
+  /* 단추를 재서 바로 아래에 — 가운데를 단추에 맞추되 화면 양옆 8px 안으로, 화살표는 단추 가운데를 가리킨다 */
+  function mwTipPlace(){
+    var t = $('mwTip'), btn = mwTipBtn(), bar = t && t.parentNode;
+    if(!t || !btn || !bar){ mwTipClose(false); return; }
+    var b = btn.getBoundingClientRect(), p = bar.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth || window.innerWidth || 360;
+    var w = Math.min(340, vw - 16);
+    var cx = b.left + b.width / 2;
+    var left = Math.max(8, Math.min(cx - w / 2, vw - 8 - w));
+    t.style.width = w + 'px';
+    t.style.left = (left - p.left) + 'px';
+    t.style.top = (b.bottom - p.top + 10) + 'px';
+    var ar = t.querySelector('.mw-ar');
+    if(ar) ar.style.left = Math.max(14, Math.min(cx - left - 6, w - 26)) + 'px';
+  }
+  function portalMyWorkTip(force){
+    var uid = _curUid, btn = mwTipBtn();
+    if(!uid || !btn) return;
+    mwTipWire();
+    if(!force && (_mwTipSession[uid] || mwTipSeen(uid))) return;
+    _mwTipSession[uid] = 1;
+    mwTipClose(false);
+    var olds = document.querySelectorAll('.sg-tip');                 // 먼저 떠 있던 건의하기 말풍선은 걷는다(같은 자리)
+    for(var i = 0; i < olds.length; i++) olds[i].remove();
+    var bar = btn.parentNode;
+    var t = document.createElement('div');
+    t.id = 'mwTip';
+    t.className = 'mw-tip';
+    t.setAttribute('role', 'dialog');
+    t.setAttribute('aria-modal', 'false');
+    t.setAttribute('aria-labelledby', 'mwTipT');
+    t.setAttribute('tabindex', '-1');   // 뜰 때 초점을 받아 화면읽기가 «내 업무는 여기서 봅니다»를 읽는다(아래)
+    t.setAttribute('data-uid', uid);
+    /* 고정 글자만 넣는다(이름·숫자 같은 바깥 값 없음) */
+    t.innerHTML =
+      '<span class="mw-ar" aria-hidden="true"></span>'
+      + '<button type="button" class="mw-x" aria-label="안내 닫기" title="닫기 — 다음에 로그인하면 다시 안내합니다">✕</button>'
+      + '<b class="mw-t" id="mwTipT">📋 내 업무는 여기서 봅니다</b>'
+      + '<ul>'
+      + '<li>이 단추에 <b>내가 맡은 업무의 지금 진행 상황</b>(진행·임박·할 일 건수)이 보입니다.</li>'
+      + '<li>누르면 업무관리 「내 업무」가 열립니다 — <b>지금 하는 업무를 입력</b>하고 진행 기록을 남깁니다.</li>'
+      + '<li>이알피(계약·사건·컨설팅)에서 내가 담당인 업무도 여기로 들어와 <b>진행 상황을 함께 확인</b>합니다.</li>'
+      + '<li>새 업무 추가·고치기·끝내기까지 <b>내 업무 자료는 여기에 넣고 관리</b>합니다.</li>'
+      + '</ul>'
+      + '<div class="mw-ft"><button type="button" class="mw-go">📋 내 업무 열기</button><button type="button" class="mw-ok">알겠어요</button></div>'
+      + '<small>«알겠어요»를 누르면 이 기기에서는 다시 뜨지 않습니다.</small>';
+    t.querySelector('.mw-x').addEventListener('click', function(){ mwTipClose(false); });
+    t.querySelector('.mw-ok').addEventListener('click', function(){ mwTipClose(true); });
+    t.querySelector('.mw-go').addEventListener('click', function(){ mwTipClose(true); btn.click(); });   // 단추를 누른 것과 똑같이 연다(PC 새 창·폰 이동)
+    bar.appendChild(t);
+    mwTipPlace();
+    window.addEventListener('resize', mwTipPlace);
+    document.addEventListener('keydown', mwTipKey);
+    /* 초점 — 아무것도 안 잡고 있을 때(문서 맨 앞)만 안내로 옮긴다. 사람이 무엇을 누르거나 적는 중이거나,
+       확인 창이 떠 있으면 빼앗지 않는다(그 창이 먼저다). */
+    var ae = document.activeElement;
+    if((!ae || ae === document.body) && !mwTipBusy()){ try { t.focus({ preventScroll: true }); } catch(e){} }
+  }
+  window.portalMyWorkTip = portalMyWorkTip;   // 점검 도구(tools/phone-audit 씨앗 portal 의 'mywork-tip' 화면)가 다시 띄운다
+  /* ── 내 업무 첫 안내 끝 ── */
   document.addEventListener('visibilitychange', function(){
     if(document.hidden) return;
     var els = document.querySelectorAll('[data-head-app]');
@@ -7213,7 +7364,10 @@ body.portal-mode #moreFab{display:flex;}
   // ── 안내 말풍선: 포털 진입 시 1회, 5초 뒤 자동 소멸 ──
   var _sgTipShown = false;
   function sgShowTip(){
-    if(_sgTipShown) return; _sgTipShown = true;
+    if(_sgTipShown) return;
+    /* 📋 내 업무 첫 안내가 떠 있거나 뜰 차례면 쉰다 — 머리줄 바로 아래 같은 자리라 겹친다 (2026-11-22) */
+    if(typeof portalMyWorkTipDue === 'function' && portalMyWorkTipDue()) return;
+    _sgTipShown = true;
     var tip = document.createElement('span');
     tip.className = 'sg-tip';
     tip.textContent = '프로그램 오류·불편한 점·개선 아이디어를 남겨주세요. 처리되면 결과를 알려드립니다.';
