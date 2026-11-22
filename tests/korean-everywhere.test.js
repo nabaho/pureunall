@@ -173,6 +173,27 @@ test('② 살펴본 뒤에 다른 프로그램이 파일을 바꿨으면 예전 
   assert.deepEqual(files(h).sort(), [path.join('.gemini', 'GEMINI.md')], '멈췄는데 다른 파일을 썼습니다');
 });
 
+test('② 지침 파일이 링크면 링크는 그대로 두고 «가리키는 실제 파일»을 바꾼다', (t) => {
+  const h = tmpHome(), store = tmpHome();
+  const real = path.join(store, 'GEMINI-real.md');
+  fs.writeFileSync(real, '# 내 규칙\n');
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  try { fs.symlinkSync(real, geminiMd(h), 'file'); } catch (e) { t.skip('이 PC 는 링크를 만들 권한이 없음(' + e.code + ')'); return; }
+  assert.equal(run(h, '--apply').status, 0);
+  assert.ok(fs.lstatSync(geminiMd(h)).isSymbolicLink(), '링크가 일반 파일로 바뀌었습니다');
+  assert.ok(fs.readFileSync(real, 'utf8').includes(MARKER), '실제 파일에 들어가지 않았습니다');
+});
+
+test('② 새 글의 권한은 원래 파일보다 넓어지지 않는다', (t) => {
+  if (process.platform === 'win32') { t.skip('윈도우는 폴더 권한을 물려받는다'); return; }
+  const h = tmpHome();
+  fs.mkdirSync(path.dirname(geminiMd(h)), { recursive: true });
+  fs.writeFileSync(geminiMd(h), '# 내 규칙\n', { mode: 0o600 });
+  fs.chmodSync(geminiMd(h), 0o600);
+  assert.equal(run(h, '--apply').status, 0);
+  assert.equal(fs.statSync(geminiMd(h)).mode & 0o777, 0o600);
+});
+
 test('② 예전 language 값은 화면에 찍지 않는다', () => {
   const h = tmpHome();
   fs.mkdirSync(path.dirname(claudeSettings(h)), { recursive: true });

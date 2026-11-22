@@ -151,11 +151,23 @@ function backupName(file, tag) {
     if (!fs.existsSync(p)) return p;
   }
 }
-/* 쓰다가 멈춰도 원래 파일이 반쯤 잘리지 않게 — 옆에 새로 쓰고 한 번에 바꿔 끼운다 */
-function writeWhole(file, text) {
-  const tmp = `${file}.tmp-${process.pid}-${Date.now()}`;
-  fs.writeFileSync(tmp, text, { encoding: 'utf8', flag: 'wx' });
-  try { fs.renameSync(tmp, file); } catch (e) { try { fs.unlinkSync(tmp); } catch (_) { /* 이미 없음 */ } throw e; }
+/* 쓰다가 멈춰도 원래 파일이 반쯤 잘리지 않게 — 옆에 새로 쓰고 한 번에 바꿔 끼운다.
+   · 파일이 링크(dotfile 정리 도구 등)면 링크를 일반 파일로 바꾸지 않고 «가리키는 실제 파일»을 바꾼다.
+   · 새 글의 권한은 원래 파일과 같게 — 원래보다 넓게 읽히지 않게(새로 만드는 파일은 나만 읽기).
+   · 바꿔 끼우기 직전에 한 번 더 비교한다. 새로 만드는 파일은 «없을 때만» 만든다. */
+function writeWhole(file, text, expected) {
+  const changed = () => Object.assign(new Error('살펴본 뒤에 바뀜'), { code: 'PU_CHANGED' });
+  if (expected === null) {
+    try { fs.writeFileSync(file, text, { encoding: 'utf8', flag: 'wx', mode: 0o600 }); }
+    catch (e) { if (e.code === 'EEXIST') throw changed(); throw e; }
+    return;
+  }
+  const real = fs.realpathSync(file);
+  const mode = fs.statSync(real).mode & 0o777;
+  if (readOrNull(real) !== expected) throw changed();
+  const tmp = `${real}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmp, text, { encoding: 'utf8', flag: 'wx', mode });
+  try { fs.chmodSync(tmp, mode); fs.renameSync(tmp, real); } catch (e) { try { fs.unlinkSync(tmp); } catch (_) { /* 이미 없음 */ } throw e; }
 }
 
 function apply(steps, now = new Date()) {
@@ -178,7 +190,12 @@ function apply(steps, now = new Date()) {
       s.backup = backupName(s.file, tag);
       fs.copyFileSync(s.file, s.backup, fs.constants.COPYFILE_EXCL);
     }
-    writeWhole(s.file, s.after);
+    try { writeWhole(s.file, s.after, s.state === '바꿈' ? s.before : null); } catch (e) {
+      if (e.code !== 'PU_CHANGED') throw e;
+      s.state = '멈춤';
+      s.why = '쓰기 바로 전에 다른 프로그램이 이 파일을 바꿔 멈췄습니다(이 파일과 뒤의 파일은 그대로). 다시 돌리십시오.';
+      break;
+    }
   }
   return steps;
 }
