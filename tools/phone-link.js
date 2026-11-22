@@ -13,6 +13,8 @@
  *   ★ 「노트북 크롬창에도 팝업 열려야 된다 반드시」(같은 날) — `--front` 가 크롬 창을 맨 앞으로 띄운다
  *     (안 떠 있으면 켜고, 내려가 있으면 올린다). .claude/settings.json 의 PreToolUse 훅이 크롬 도구를 쓰기
  *     «직전마다» 부른다 — AI 가 잊어도 뜬다. 끄려면 환경변수 PUREUN_CHROME_FRONT=0.
+ *   ★ 「AI 사용량 현황이 코딩할 때마다 팝업으로 뜬다 — 클릭할 때만」(2026-11-22) — 크롬 «앱 창»으로 뜨는 사용량
+ *     대시보드는 올리지 않는다(안올릴창). 올릴 창은 프로세스의 주 창이 아니라 창마다 제목을 보고 고른다.
  *
  * ■ 쓰기 — 저장소 맨 위의 폰연결-켜기.bat 을 두 번 누른다
  *   1  지금 켜기 (5초 안에 안 고르면 이것)
@@ -145,42 +147,99 @@ function 바로가기스크립트(종류, 자리) {
     '; $s.Save(); "saved"';
 }
 
+/* 크롬으로 띄웠지만 «크롬 일»과 상관없는 내 프로그램 창 — 제목이 이것으로 시작하면 절대 올리지 않는다.
+   (2026-11-22 대표 「AI 사용량 현황이 코딩할 때마다 팝업으로 뜬다 — 클릭할 때만 뜨게」)
+   바탕화면 ai-usage-dashboard 의 사용량 막대를 누르면 대시보드가 크롬 «앱 창»(--app)으로 열린다.
+   크롬 창이라 예전처럼 «크롬 프로세스의 주 창»을 올리면, 그 창이 뒤에 깔려 있을 때 크롬 도구를 쓸 때마다
+   대시보드가 되살아나 튀어나왔다(작업표시줄도 빨갛게 깜빡임). 제목은 그 막대의 DASH_TITLE(index.html <title>)과 같다. */
+const 안올릴창 = ['AI 사용량 현황'];
+
 /* 크롬(없으면 엣지) 창을 맨 앞으로 — 윈도 PowerShell.
-   · 이미 맨 앞이면 건드리지 않는다(크롬 일마다 부르니 깜빡이지 않게)
+   · 이미 맨 앞이면 건드리지 않는다(크롬 일마다 부르니 깜빡이지 않게) — 사람이 눌러 띄운 대시보드를 보고 있을 때도 그대로 둔다
+   · 고르는 창: 크롬·엣지의 보이는 창을 맨 위부터 훑어, 탭 있는 보통 창(제목 끝 «- Chrome»·«Microsoft Edge»)을 먼저,
+     없으면 다른 창을 고른다. 안올릴창(대시보드)은 어느 경우에도 고르지 않는다 — 그것뿐이면 아무것도 안 올린다.
+     프로세스의 «주 창»(MainWindowHandle)으로 고르면 크롬 앱 창·작은 창이 걸린다 — 크롬 창은 모두 한 프로세스다.
    · 내려가 있으면(최소화) 되살리고, 잠깐 «늘 위»로 올렸다가 바로 푼다 — 윈도는 뒤에서 앞을 빼앗는 것을 막아서
      SetForegroundWindow 하나로는 작업표시줄만 깜빡일 때가 있다. 푸는 것을 빼먹으면 크롬이 영영 맨 위에 박힌다.
-   · 안 떠 있으면 켠다 — Claude in Chrome 은 크롬이 떠 있어야 붙는다 */
-function 앞으로스크립트() {
+   · 안 떠 있으면 켠다 — Claude in Chrome 은 크롬이 떠 있어야 붙는다
+   · 덧.보기만 — 아무것도 켜거나 올리지 않고 «올릴 창 제목»만 찍는다(--dry --front 가 쓴다) */
+function 앞으로스크립트(덧) {
+  const 보기만 = !!(덧 && 덧.보기만);
   return [
     "$ErrorActionPreference = 'SilentlyContinue'",
+    보기만 ? '[Console]::OutputEncoding = [Text.Encoding]::UTF8' : '',   // 찍는 창 제목이 한글이어도 깨지지 않게
     'Add-Type -TypeDefinition @"',
-    'using System; using System.Runtime.InteropServices;',
+    'using System; using System.Text; using System.Collections.Generic; using System.Runtime.InteropServices;',
     'public static class PuWin {',
+    '  public delegate bool EnumProc(IntPtr h, IntPtr l);',
+    '  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);',
+    '  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);',
+    '  [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h, uint c);',
+    '  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);',
     '  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n);',
     '  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);',
     '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
     '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
     '  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);',
     '  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);',
+    /* 보이는·주인 없는(GW_OWNER=4) 맨 바깥 창을 Z 순서(맨 위부터)로 */
+    '  public static List<IntPtr> TopWindows(uint[] pids) {',
+    '    var o = new List<IntPtr>();',
+    '    EnumWindows(delegate (IntPtr h, IntPtr l) {',
+    '      uint pid = 0;',
+    '      if (IsWindowVisible(h) && GetWindow(h, 4) == IntPtr.Zero) { GetWindowThreadProcessId(h, out pid); if (Array.IndexOf(pids, pid) >= 0) o.Add(h); }',
+    '      return true;',
+    '    }, IntPtr.Zero);',
+    '    return o;',
+    '  }',
+    '  public static string Title(IntPtr h) { var s = new StringBuilder(512); GetWindowText(h, s, 512); return s.ToString(); }',
     '}',
     '"@',
-    "$ps = @(Get-Process chrome, msedge | Where-Object { $_.MainWindowHandle -ne 0 } | Sort-Object { if ($_.ProcessName -eq 'chrome') { 0 } else { 1 } })",
-    "if ($ps.Count -eq 0) { try { Start-Process chrome -ErrorAction Stop } catch { Start-Process msedge }; 'started'; exit }",
+    '$skip = @(' + 안올릴창.map(ps글).join(', ') + ')',
+    "$pids = [uint32[]]@(Get-Process chrome, msedge | ForEach-Object { [uint32]$_.Id })",
+    "$chromePids = @(Get-Process chrome | ForEach-Object { [uint32]$_.Id })",
+    '$all = @(); $z = 0',
+    'foreach ($w in [PuWin]::TopWindows($pids)) {',
+    '  $t = [PuWin]::Title($w); $z++',
+    '  if (-not $t) { continue }',
+    '  $p = [uint32]0; [void][PuWin]::GetWindowThreadProcessId($w, [ref]$p)',
+    "  $rank = if ($t -match ' - (Google )?Chrome( - .*)?$') { 0 } elseif ($t -match 'Microsoft\\W{0,2}Edge( - .*)?$') { 1 } elseif ($chromePids -contains $p) { 2 } else { 3 }",
+    '  $all += [pscustomobject]@{ H = $w; T = $t; Z = $z; R = $rank; Skip = [bool]($skip | Where-Object { $t.StartsWith($_, [StringComparison]::Ordinal) }) }',
+    '}',
+    보기만
+      ? "if ($all.Count -eq 0) { 'would-start'; exit }"
+      : "if ($all.Count -eq 0) { try { Start-Process chrome -ErrorAction Stop } catch { Start-Process msedge }; 'started'; exit }",
     '$fgPid = [uint32]0; [void][PuWin]::GetWindowThreadProcessId([PuWin]::GetForegroundWindow(), [ref]$fgPid)',
-    "if ($ps.Id -contains $fgPid) { 'already'; exit }",
-    '$h = $ps[0].MainWindowHandle',
+    보기만
+      ? "if ($pids -contains $fgPid) { 'already (크롬 창이 이미 맨 앞 — 실제로는 아무것도 안 올림)' }"
+      : "if ($pids -contains $fgPid) { 'already'; exit }",
+    '$pick = @($all | Where-Object { -not $_.Skip } | Sort-Object R, Z) | Select-Object -First 1',
+    "if (-not $pick) { 'skipped'; exit }",
+    '$h = $pick.H',
+  ].concat(보기만 ? ["'pick: ' + $pick.T"] : [
     'if ([PuWin]::IsIconic($h)) { [void][PuWin]::ShowWindowAsync($h, 9) }',
     '[void][PuWin]::SetWindowPos($h, [IntPtr](-1), 0, 0, 0, 0, 3)',
     '[void][PuWin]::SetWindowPos($h, [IntPtr](-2), 0, 0, 0, 0, 3)',
     '[void][PuWin]::SetForegroundWindow($h)',
     "'raised'",
-  ].join('\n');
+  ]).join('\n');
 }
 
 /* 훅이 부른다 — 무슨 일이 있어도 0 으로 끝난다(훅이 실패하면 크롬 일 자체가 막힐 수 있다) */
 function 앞으로(마른것) {
   if (process.env.PUREUN_CHROME_FRONT === '0') return 0;
-  if (마른것) { console.log('[dry] 크롬 창을 맨 앞으로'); return 0; }
+  if (마른것) {
+    console.log('[dry] 크롬 창을 맨 앞으로');
+    /* 윈도에서는 «어느 창을 올릴지»만 읽어 보인다 — 켜거나 올리지 않는다 */
+    if (윈도우) {
+      try {
+        const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', 인코딩(앞으로스크립트({ 보기만: true }))],
+          { encoding: 'utf8', windowsHide: true, timeout: 8000 });
+        console.log('[dry] ' + String(r.stdout || '').trim());
+      } catch (e) { /* 보기는 덤 */ }
+    }
+    return 0;
+  }
   try {
     if (윈도우) {
       spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', 인코딩(앞으로스크립트())],
@@ -384,4 +443,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { 계획, 다시켤까, 서버인자, 판넘나, 크롬쓸까, 확장찾기, 바로가기스크립트, 앞으로스크립트, 바로가기, 다시켜기, 크롬 };
+module.exports = { 계획, 다시켤까, 서버인자, 판넘나, 크롬쓸까, 확장찾기, 바로가기스크립트, 앞으로스크립트, 안올릴창, 바로가기, 다시켜기, 크롬 };
