@@ -7295,6 +7295,13 @@ var REQ_PHASE_LABELS={
   dis:'⑥ 해산·탈퇴 — 법정 첨부서류 및 청산·탈퇴 구비서류 안내문'
 };
 var REQ_DOCS={
+  prep:[
+    {id:'prep_contact',badge:'설립준비',cls:'ok',who:'참여기업(실무·노사대표)',title:'[참여기업(실무·노사대표)] 실무 담당자 성명·직위·휴대폰·이메일(명함) 및 노·사 설립준비위원 명단',desc:'설립·참여사업장 실무 담당자 연락처·이메일 및 노·사 동수 설립준비위원 성명·직책',tab:'sites',siteCol:'담당자·위원명단'},
+    {id:'prep_stamp',badge:'설립준비',cls:'ok',who:'등기자 외 위원 (막도장)',title:'[등기자 외 노·사 위원] 설립준비위원 일반 막도장 또는 막도장 사용동의서 (노 1부, 사 1부 · 인감증명·인감도장 불필요)',desc:'등기자 딱 2명 외 나머지 준비위원·참여기업은 인감증명서·인감도장이 전혀 필요 없으며 일반 막도장(또는 막도장 사용동의서)만 준비',tab:'sites',siteCol:'일반막도장·동의서'},
+    {id:'prep_smecert',badge:'공동준비',cls:'warn',who:'참여기업(회사)',title:'[참여기업(회사)] 중소기업확인서 1부 (중소벤처기업부 발급 · 유효기간 내)',desc:'공동기금 참여기업 지원요건 확인용 각 1부 (유효기간 만료 여부 확인)',tab:'sites',ftype:'공동',siteCol:'중소기업확인서'},
+    {id:'prep_ei',badge:'공동준비',cls:'warn',who:'참여기업(회사)',title:'[참여기업(회사)] 고용보험 사업장 자격취득자 명부 1부 (직전연도 1월~12월 연간 내역)',desc:'공동기금 참여기업별 직전연도 1~12월 월평균 피보험자 수 산정용 각 1부',tab:'sites',ftype:'공동',siteCol:'고용보험명부(연간)'},
+    {id:'prep_fin',badge:'공동준비',cls:'ok',who:'참여기업(회사)',title:'[참여기업(회사)] 직전년도 손익계산서(표준재무제표증명) 1부 (직전년도 매출액 확인용)',desc:'공동기금 참여기업 직전년도 매출액 확인용 각 1부',tab:'sites',ftype:'공동',siteCol:'직전 손익계산서'}
+  ],
   inka:[
     {id:'inka_wrep',badge:'법정첨부',cls:'dg',who:'근로자·사용자 위원 (노1·사1)',title:'[근로자측·사용자측 위원] 설립준비위원 재직증명서 (노 1부, 사 1부)',desc:'근로자측 설립준비위원 1부, 사용자측 설립준비위원 1부',tab:'sites',siteCol:'재직증명서(노1·사1)'},
     {id:'inka_bizreg',badge:'필수',cls:'warn',who:'참여기업(회사)',title:'[참여기업(회사)] 사업자등록증 사본 1부',desc:'설립·참여사업장 회사 각 1부',tab:'sites',siteCol:'사업자등록증(회사 1부)'},
@@ -7302,9 +7309,9 @@ var REQ_DOCS={
     {id:'inka_match',badge:'공동필수',cls:'warn',who:'참여기업(노·사 대표)',title:'[참여기업(노·사 대표)] 공동기금 참여신청서 1부 (근로자대표·사용자 서명)',desc:'참여기업별 사용자·근로자대표 공동 서명본 1부',tab:'sites',ftype:'공동',siteCol:'참여신청서(노·사 서명)'}
   ],
   reg:[
-    {id:'reg_inseal_cert',badge:'필수',cls:'warn',who:'근로자·사용자 이사 (노1·사1)',title:'[근로자측·사용자측 이사] 개인인감증명서 (노 1부, 사 1부 · 발급 3개월 이내)',desc:'근로자측 등기이사 1부, 사용자측 등기이사 1부 (발급 3개월 이내)',tab:'info',siteCol:'이사 인감증명(노1·사1)'},
-    {id:'reg_jumin',badge:'필수',cls:'warn',who:'근로자·사용자 이사 (노1·사1)',title:'[근로자측·사용자측 이사] 주민등록등본 또는 초본 (노 1부, 사 1부 · 발급 3개월 이내)',desc:'근로자측 등기이사 1부, 사용자측 등기이사 1부 (주소 변동사항 포함, 발급 3개월 이내)',tab:'info',siteCol:'이사 등·초본(노1·사1)'},
-    {id:'reg_inseal_stamp',badge:'필수',cls:'ok',who:'근로자·사용자 이사 (노1·사1)',title:'[근로자측·사용자측 이사] 신분증 사본 및 개인인감도장 (노 1부, 사 1부)',desc:'근로자측 등기이사 1부, 사용자측 등기이사 1부 (취임승낙서·법인인감신고서·위원명부 인감날인용)',tab:'info',siteCol:'이사 신분증·인감(노1·사1)'},
+    {id:'reg_inseal_cert',badge:'등기자2명만',cls:'warn',who:'등기자 딱 2명 (사용자1·근로자1)',title:'[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 개인인감증명서 각 1부 (발급 3개월 이내 · 나머지 인원은 인감증명 불필요)',desc:'실제 법인 등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요 — 나머지 준비위원·참여기업은 인감증명서 전혀 불필요',tab:'info',siteCol:'등기자2명 인감증명'},
+    {id:'reg_jumin',badge:'등기자2명만',cls:'warn',who:'등기자 딱 2명 (사용자1·근로자1)',title:'[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 주민등록등본 또는 초본 각 1부 (주소변동 포함·발급 3개월 이내 · 등기자 딱 2명만 필요)',desc:'실제 법인 등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요 — 나머지 준비위원·참여기업은 등·초본 불필요',tab:'info',siteCol:'등기자2명 등·초본'},
+    {id:'reg_inseal_stamp',badge:'등기자2명만',cls:'ok',who:'등기자 딱 2명 (사용자1·근로자1)',title:'[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 신분증 사본 및 개인인감도장 각 1부 (나머지 인원은 인감도장 불필요)',desc:'실제 법인 등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요 — 나머지 준비위원·참여기업은 인감도장 불필요(막도장 가능)',tab:'info',siteCol:'등기자2명 신분증·인감'},
     {id:'reg_inkacert',badge:'법정첨부',cls:'dg',who:'기금법인',title:'설립인가증 원본',desc:'고용노동지청 교부 주무관청 인가서',tab:'info'},
     {id:'reg_charter',badge:'법정첨부',cls:'dg',who:'기금법인',title:'인가받은 정관 사본',desc:'고용노동지청 인가 정관 사본',tab:'info'}
   ],
@@ -7441,11 +7448,13 @@ function reqDocsBoxHTML(phase,cur,fundMode){
     +'<span id="reqCnt_'+phase+'" class="chip '+(allOn?'ok':(doneN?'warn':''))+'" style="font-size:10.5px">확인 '+doneN+'/'+list.length+'</span>'
     +hlp('forms.reqdocs')+'</div>'
     +'<span style="flex:1"></span>'
+    +(fundMode&&(phase==='inka'||phase==='reg')?'<button data-fid="'+esc(S.formFund)+'" onclick="pmOpen(this.dataset.fid)" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="설립준비·노동부인가·법인등기 서류를 한 번에 기업 메일로 안내·요청합니다">✉ 설립·인가·등기 한 번에 요청</button>':'')
     +(fundMode&&ftype==='공동'?'<button data-fid="'+esc(S.formFund)+'" onclick="rgpOpen(this.dataset.fid)" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="지역공동기금 설립 시 주관기관(상공회의소·지자체) 및 참여기업 요청서류 리스트와 기업별 OX 수합 체크표를 확인·엑셀정리·메일발송합니다">🏛 지역공동기금 서류·OX체크</button>':'')
     +(fundMode?'<button onclick="openSiteDocCenter(S.formFund,\''+({inka:'inka',reg:'inka',tax:'inka',subsidy:'subsidy',ops:'ops',dis:'chg'}[phase]||'inka')+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="참여·설립사업장별 필요서류를 간결한 체크리스트 메일로 요청하고 푸른메일함 수신 서류를 자동 감지·내용검토합니다">✉ 사업장 체크리스트 메일·수신검토</button>':'')
     +'<button class="'+(isSel?'':'primary')+'" onclick="selectForm(\''+rKind+'\')" style="padding:5px 11px;font-size:12px;white-space:nowrap" title="기업에 발송하거나 인쇄할 수 있는 준비·첨부서류 안내문 및 사업장별 체크리스트(A4)를 오른쪽에 표시합니다">'
     +(isSel?'▶ 오른쪽에 안내문 표시 중':'📋 기업 안내문 미리보기·인쇄')+'</button>'
     +'</div>'
+    +((phase==='inka'||phase==='reg')?'<div style="font-size:12px;padding:7px 10px;margin-bottom:8px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--line);color:var(--ink)"><b>⚠ [인감 오해 방지]</b> 개인인감증명서·개인인감도장은 실제 법인 등기할 <b>등기자 딱 2명(사용자 1명, 근로자 1명)만 필요</b>합니다. 나머지 준비위원·참여기업은 인감증명서·인감도장이 전혀 필요 없습니다(일반 막도장만 준비).</div>':'')
     +'<div style="overflow-x:auto"><table><thead><tr>'
     +'<th class="ckcol"><input type="checkbox"'+(allOn?' checked':'')+' onclick="toggleReqDocAll(\''+phase+'\',this.checked);_ckAll(this)" title="모두 선택"></th>'
     +'<th class="no">번호</th><th style="white-space:nowrap;width:88px">구분 · 준비처</th><th>기업 준비·첨부서류 및 세부 확인사항</th>'
@@ -12848,10 +12857,18 @@ function sdBundle(fid,phase){
    · 쓰는 곳은 [✔ 보냈음 표시]를 눌렀을 때의 funds/{기금}/prep_mail/{사업장} 한 줄(날짜·누른 사람)과 감사 기록(_audit)뿐이다. 받는 주소는 남기지 않는다.
    ⚠ 문안은 초안이다 — 메일함 쓰기 창에서 담당자가 읽고 고쳐 보낸다. */
 var PM=null;   // 열려 있는 창의 상태 {fid,f,rows,secs,sel,cur,cardsErr,loading,shown}
-/* 단계 · 메일에 쓸 제목 — 부연 설명·세무단계·협조사항·함께정할사항 없이 간결하게 필요서류 제목만 표시 (대표 지시 2026-11-18) */
-var PM_PH=[['inka','노동부 설립인가 필요서류',''],
-  ['reg','법인 설립등기 필요서류 (설립인가 후)','']];
-var PM_SHORT={inka:'① 노동부 인가 필요서류', reg:'② 법인 등기 필요서류'};
+/* 단계 · 메일에 쓸 제목 — 설립준비·노동부인가·법인등기 3단계를 각각 구분해 한 번에 다 요청하며, 인감증명·인감도장은 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요함을 명확히 표시 */
+var PM_REG_NOTE='※ 인감증명서·개인인감도장은 등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요합니다. 나머지 인원은 인감증명·인감도장이 필요 없습니다.';
+var PM_PH=[
+  ['prep','기업 설립 시 준비서류 (기초자료·일반도장)',''],
+  ['inka','노동부 설립인가 필요서류',''],
+  ['reg','법인 설립등기 필요서류 — 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요',PM_REG_NOTE]
+];
+var PM_SHORT={
+  prep:'① 기업 설립 시 준비서류',
+  inka:'② 노동부 설립인가 필요서류',
+  reg:'③ 법인 등기 서류 (등기자 딱 2명만 — 사용자1·근로자1)'
+};
 var PM_MAIL_RE=/^[^\s@,;<>"'()]+@[^\s@,;<>"'()]+\.[^\s@,;<>"'()]+$/;
 var PM_SRC={site:'참여사업장 담당자', card:'기업정보함 명함', co:'기업정보함 회사 메일', hand:'직접 입력'};
 var PM_UI={help:'setup.prepmail'};   // 이 창이 펼치는 도움말 항목(HELP) — 공용 hlp() 는 창을 겹쳐 띄워 쓰지 않는다
@@ -12902,6 +12919,7 @@ function pmText(f,co,o){
   (o.secs||[]).forEach(function(s){
     if(!s||!s.docs||!s.docs.length) return;
     n++; L.push('','■ '+n+'. '+s.label);
+    if(s.note) L.push(s.note);
     s.docs.forEach(function(d,i){ L.push('[ ] '+(i+1)+'. '+d.title); });
   });
   L.push('','감사합니다.','푸른노무법인 드림');
@@ -12934,7 +12952,7 @@ function _pmRowOf(P,k){ var a=(P&&P.rows)||[]; for(var i=0;i<a.length;i++) if(a[
 function _pmMail(P,r){
   var to=_pmTo(r), nDoc=0, secs=P.secs.map(function(s){
     var docs=s.docs.filter(function(d){ return !!(P.sel[d.id]&&!(d.siteBiz&&r.biz)); });
-    nDoc+=docs.length; return {label:s.label, docs:docs};
+    nDoc+=docs.length; return {label:s.label, note:s.note||'', docs:docs};
   });
   var f=P.f, t=pmText(f,r.name,{name:to.name, pos:to.pos, mgr:(f.mgr_main&&f.mgr_main.name)||f.manager||'', secs:secs});
   return {to:to.email, name:r.name, subject:t.subject, body:t.body, nDoc:nDoc};
@@ -13021,7 +13039,8 @@ function _pmHTML(P){
     +'<span style="flex:1"></span><button class="primary" data-pmk="nx" onclick="pmNext()" title="고른 기업 가운데 아직 보냄 표시가 없는 다음 곳의 쓰기 창을 엽니다">▶ 다음 기업 메일 쓰기</button></div>'
     +'<div class="pmco" id="pmCo" style="overflow:auto;max-height:360px;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr><th class="ckcol"><input type="checkbox"'+(nOn&&nOn===rows.length?' checked':'')+' title="모두 짚기" data-pmk="ha" aria-label="받는 기업 모두 고르기" onclick="pmTickAll(this.checked)"></th><th style="width:36px">#</th><th>기업</th><th>받는 사람 (기업정보함)</th><th>기업정보함</th><th>요청</th><th>보냄</th><th></th></tr></thead><tbody>'
     +(body||'<tr><td colspan="8" class="center muted pmempty" style="padding:14px">참여사업장이 없습니다 — 참여사업장 탭에 기업을 먼저 등록해 주세요.</td></tr>')+'</tbody></table></div>';
-  var docs='<div class="row" style="gap:8px;margin:14px 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">② 요청할 서류</b><span class="muted" style="font-size:12px">기금법인이 준비하는 서류와 서식 탭에서 이미 확인한 서류는 기본으로 뺐습니다</span></div>'
+  var docs='<div class="row" style="gap:8px;margin:14px 0 4px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">② 요청할 서류 (설립준비·인가·등기 한 번에 요청)</b><span class="muted" style="font-size:12px">기금법인이 준비하는 서류와 서식 탭에서 이미 확인한 서류는 기본으로 뺐습니다</span></div>'
+    +'<div style="font-size:12px;padding:6px 10px;margin:0 0 6px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--line);color:var(--ink)"><b>⚠ [인감 오해 방지]</b> 개인인감증명서·개인인감도장은 실제 법인 등기할 <b>등기자 딱 2명(사용자 1명, 근로자 1명)만 필요</b>합니다 — 나머지 인원·참여기업은 인감증명·인감도장이 전혀 필요 없습니다.</div>'
     +'<div id="pmDocs" class="pmdoc" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><tbody>'
     +P.secs.map(function(s){
       var nOnS=s.docs.filter(function(d){ return P.sel[d.id]; }).length;
@@ -16862,22 +16881,27 @@ var RGP_MAX_UNCOMP=12*1024*1024;
 var RGP_MAX_ENTRY=4*1024*1024;
 var RGP_MAX_ROWS=300;
 var RGP_MAX_COLS=60;
-var RGP_ITEMS=[
-  {id:'apply',abbr:'참여<br>신청',short:'참여신청서',col:'참여신청서',who:'참여기업(회사·대표자)',title:'[참여기업(회사·대표자)] 공동근로복지기금 참여신청서 1부 (대표자 서명·날인)',defOn:true},
-  {id:'bizreg',abbr:'사업자<br>등록증',short:'사업자등록증',col:'사업자등록증',who:'참여기업(회사)',title:'[참여기업(회사)] 사업자등록증 사본 1부',defOn:true,sdcIds:['inka_bizreg','sub_bizreg']},
-  {id:'corpreg',abbr:'법인<br>등기부',short:'법인등기부',col:'법인등기부등본',who:'참여기업(법인)',title:'[참여기업(법인)] 법인등기부등본 1부 (말소사항 포함·발급 3개월 이내, 개인사업자 제외)',defOn:true,allowDash:true,sdcIds:['inka_corpreg','sub_corpreg']},
-  {id:'smecert',abbr:'중기<br>확인서',short:'중소기업확인서',col:'중소기업확인서',who:'참여기업(회사)',title:'[참여기업(회사)] 중소기업확인서 1부 (중소벤처기업부 발급 · 유효기간 내)',defOn:true,sdcIds:['sub_smecert']},
-  {id:'ei_list',abbr:'고용<br>명부',short:'고용보험명부(연간)',col:'고용보험명부(연간)',who:'참여기업(회사)',title:'[참여기업(회사)] 고용보험 사업장 자격취득자 명부 1부 (직전연도 1월~12월 연간 내역 · 월평균 피보험자 수 산정용)',defOn:true,sdcIds:['sub_fin']},
-  {id:'wrep',abbr:'재직<br>노·사',short:'재직증명(노1·사1)',col:'재직증명서(노1·사1)',who:'근로자·사용자 위원 (노1·사1)',title:'[근로자측·사용자측 위원] 설립준비위원 재직증명서 (대표자 1부, 근로자대표 1부 · 노 1부, 사 1부)',defOn:true,sdcIds:['inka_wrep']},
-  {id:'stamp',abbr:'도장<br>노·사',short:'도장·동의서(노1·사1)',col:'도장·막도장동의(노1·사1)',who:'근로자·사용자 위원 (노1·사1)',title:'[근로자측·사용자측 위원] 대표자·근로자대표 도장 날인 또는 막도장 사용동의서 (노 1부, 사 1부)',defOn:true},
-  {id:'fin_sales',abbr:'손익<br>매출',short:'손익·매출서류',col:'직전매출(손익계산서)',who:'참여기업(회사)',title:'[참여기업(회사)] 직전년도 손익계산서(표준재무제표증명) 1부 (직전년도 매출액 확인용)',defOn:true,sdcIds:['ops_fin']},
-  {id:'contact_info',abbr:'담당<br>메일',short:'담당자·메일·노대표',col:'담당자·메일·노대표',who:'참여기업(실무·노사대표)',title:'[참여기업(실무·노사대표)] 실무 담당자 성명·직위·휴대폰·이메일(명함) 및 근로자대표 성명·연락처',defOn:true},
-  {id:'contrib_seal',abbr:'출연<br>확인',short:'출연확인서(날인)',col:'출연확인서(날인)',who:'참여기업(양식 날인)',title:'[참여기업(회사)] 기금출연확인서 날인본 (제공 양식에 법인직인·대표자 날인)',defOn:false,sdcIds:['sub_contrib','chg_contrib']}
+var RGP_STAGES=[
+  ['prep','기업 설립 시 준비서류 (기초자료·지원요건·일반도장)'],
+  ['inka','노동부 설립인가 필요서류']
 ];
+var RGP_ITEMS=[
+  {id:'contact_info',stage:'prep',abbr:'담당<br>메일',short:'담당자·메일·노대표',col:'담당자·메일·노대표',who:'참여기업(실무·노사대표)',title:'[참여기업(실무·노사대표)] 실무 담당자 성명·직위·휴대폰·이메일(명함) 및 근로자대표 성명·연락처',defOn:true},
+  {id:'stamp',stage:'prep',abbr:'막도장<br>노·사',short:'일반막도장·동의서(노1·사1)',col:'일반막도장·동의(노1·사1)',who:'등기자 외 위원 (막도장)',title:'[등기자 외 노·사 위원] 대표자·근로자대표 일반 막도장 또는 막도장 사용동의서 (노 1부, 사 1부 · 인감증명·인감도장 불필요)',defOn:true,sdcIds:['prep_stamp']},
+  {id:'smecert',stage:'prep',abbr:'중기<br>확인서',short:'중소기업확인서',col:'중소기업확인서',who:'참여기업(회사)',title:'[참여기업(회사)] 중소기업확인서 1부 (중소벤처기업부 발급 · 유효기간 내)',defOn:true,sdcIds:['prep_smecert','sub_smecert']},
+  {id:'ei_list',stage:'prep',abbr:'고용<br>명부',short:'고용보험명부(연간)',col:'고용보험명부(연간)',who:'참여기업(회사)',title:'[참여기업(회사)] 고용보험 사업장 자격취득자 명부 1부 (직전연도 1월~12월 연간 내역 · 월평균 피보험자 수 산정용)',defOn:true,sdcIds:['prep_ei','sub_fin']},
+  {id:'fin_sales',stage:'prep',abbr:'손익<br>매출',short:'손익·매출서류',col:'직전매출(손익계산서)',who:'참여기업(회사)',title:'[참여기업(회사)] 직전년도 손익계산서(표준재무제표증명) 1부 (직전년도 매출액 확인용)',defOn:true,sdcIds:['prep_fin','ops_fin']},
+  {id:'apply',stage:'inka',abbr:'참여<br>신청',short:'참여신청서',col:'참여신청서',who:'참여기업(노·사 대표)',title:'[참여기업(노·사 대표)] 공동근로복지기금 참여신청서 1부 (근로자대표·사용자 서명·날인)',defOn:true,sdcIds:['inka_match']},
+  {id:'bizreg',stage:'inka',abbr:'사업자<br>등록증',short:'사업자등록증',col:'사업자등록증',who:'참여기업(회사)',title:'[참여기업(회사)] 사업자등록증 사본 1부',defOn:true,sdcIds:['inka_bizreg','sub_bizreg']},
+  {id:'corpreg',stage:'inka',abbr:'법인<br>등기부',short:'법인등기부',col:'법인등기부등본',who:'참여기업(법인)',title:'[참여기업(법인)] 법인등기부등본 1부 (말소사항 포함·발급 3개월 이내, 개인사업자 제외)',defOn:true,allowDash:true,sdcIds:['inka_corpreg','sub_corpreg']},
+  {id:'wrep',stage:'inka',abbr:'재직<br>노·사',short:'재직증명(노1·사1)',col:'재직증명서(노1·사1)',who:'근로자·사용자 위원 (노1·사1)',title:'[근로자측·사용자측 위원] 설립준비위원 재직증명서 (대표자 1부, 근로자대표 1부 · 노 1부, 사 1부)',defOn:true,sdcIds:['inka_wrep']},
+  {id:'contrib_seal',stage:'inka',abbr:'출연<br>확인',short:'출연확인서(날인)',col:'출연확인서(날인)',who:'참여기업(양식 날인)',title:'[참여기업(회사)] 기금출연확인서 날인본 (제공 양식에 법인직인·대표자 날인)',defOn:false,sdcIds:['sub_contrib','chg_contrib']}
+];
+var RGP_REG_NOTE='※ 인감증명서·개인인감도장은 실제 법인 등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요합니다. 나머지 참여기업·위원은 인감증명서·인감도장이 전혀 필요 없습니다(일반 막도장만 준비).';
 var RGP_REG_DOCS=[
-  '[근로자측·사용자측 이사] 개인인감증명서 (노 1부, 사 1부 · 발급 3개월 이내)',
-  '[근로자측·사용자측 이사] 주민등록등본 또는 초본 (노 1부, 사 1부 · 발급 3개월 이내)',
-  '[근로자측·사용자측 이사] 신분증 사본 및 개인인감도장 (노 1부, 사 1부)'
+  '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 개인인감증명서 각 1부 (발급 3개월 이내 · 나머지 인원은 인감증명 불필요)',
+  '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 주민등록등본 또는 초본 각 1부 (주소변동 포함·발급 3개월 이내 · 등기자 딱 2명만 필요)',
+  '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 신분증 사본 및 개인인감도장 각 1부 (나머지 인원은 인감도장 불필요)'
 ];
 var RGP_BLOCK_COL_RE=/주민\s*(?:등록)?\s*번호|생년\s*월일|아이디|비밀\s*번호|패스\s*워드|암호|계좌\s*번호/i;
 function _rgpSafeKey(k){
@@ -17143,7 +17167,7 @@ function rgpParseSheetRows(aoa){
 function rgpBuildAgencyMail(f,state){
   f=f||{}; state=state||{};
   var fn=String(f.name||f.short_name||'지역공동근로복지기금').trim()+(f.name_temp?'(가칭)':'');
-  var ag=state.agency||{}, opts=state.opts||{incList:true,incOx:true,incReg:false};
+  var ag=state.agency||{}, opts=Object.assign({incList:true,incOx:true,incReg:true},state.opts||{});
   var docSel=state.docSel||{};
   var org=String(ag.org||'').trim(), rName=String(ag.name||'').trim(), rPos=String(ag.pos||'').trim();
   var who=rName?((org?org+' ':'')+rName+(rPos?' '+rPos:'')+'님'):(org?org+' 담당자님':'담당자님');
@@ -17151,18 +17175,23 @@ function rgpBuildAgencyMail(f,state){
   var selItems=RGP_ITEMS.filter(function(it){ return !!docSel[it.id]; });
   var rows=state.rows||[];
   var L=[who+' 안녕하세요.', mgr?('푸른노무법인 '+mgr+'입니다.'):'푸른노무법인입니다.',''];
-  L.push(fn+' 설립을 위한 참여기업 요청서류 리스트 및 서류 수합 체크사항 보내드립니다.');
+  L.push(fn+' 설립을 위한 기업 설립 준비서류 · 노동부 인가 서류 · 법인 등기 서류 및 수합 체크사항을 한 번에 안내드립니다.');
   var secNo=0;
   if(opts.incList!==false&&selItems.length){
-    secNo++;
-    L.push('','■ '+secNo+'. 참여기업별 설립 요청서류 및 기초 확인사항 ('+selItems.length+'종)');
-    selItems.forEach(function(it,idx){
-      L.push('[ ] '+(idx+1)+'. '+it.title);
+    RGP_STAGES.forEach(function(sg){
+      var sgItems=selItems.filter(function(it){ return it.stage===sg[0]; });
+      if(!sgItems.length) return;
+      secNo++;
+      L.push('','■ '+secNo+'. '+sg[1]+' ('+sgItems.length+'종)');
+      sgItems.forEach(function(it,idx){
+        L.push('[ ] '+(idx+1)+'. '+it.title);
+      });
     });
   }
-  if(opts.incReg){
+  if(opts.incReg!==false){
     secNo++;
-    L.push('','■ '+secNo+'. 법인 설립등기 시 선임 등기이사 준비서류 (선임된 노·사 이사 소속 기업만 해당)');
+    L.push('','■ '+secNo+'. 법인 설립등기 필요서류 — 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요');
+    L.push(RGP_REG_NOTE);
     RGP_REG_DOCS.forEach(function(t,idx){
       L.push('[ ] '+(idx+1)+'. '+t);
     });
@@ -17196,7 +17225,7 @@ function rgpBuildAgencyMail(f,state){
 }
 /* 개별 참여기업 담당자에게 보낼 미제출(X)·보완(△) 서류 요청 메일 — 순수 함수(검사 대상) */
 function rgpBuildSiteMail(f,row,oxMap,docSel,opts){
-  f=f||{}; row=row||{}; oxMap=oxMap||{}; opts=opts||{};
+  f=f||{}; row=row||{}; oxMap=oxMap||{}; opts=Object.assign({incReg:true},opts||{});
   var fn=String(f.name||f.short_name||'지역공동근로복지기금').trim()+(f.name_temp?'(가칭)':'');
   var cn=String(row.name||'').trim();
   var who=row.cname?(String(row.cname).trim()+(row.cpos?' '+String(row.cpos).trim():'')+'님'):(cn?cn+' 담당자님':'담당자님');
@@ -17211,16 +17240,26 @@ function rgpBuildSiteMail(f,row,oxMap,docSel,opts){
   });
   var L=[who+' 안녕하세요.', mgr?('푸른노무법인 '+mgr+'입니다.'):'푸른노무법인입니다.',''];
   L.push(fn+' 설립 참여기업 필요서류 요청드립니다.');
-  L.push('','■ 제출 요청서류 ('+todo.length+'종)');
+  var secN=0;
   if(!todo.length){
-    L.push('- 모든 요청서류(O)가 확인되었습니다. 추가로 제출하실 서류가 없습니다.');
+    secN++;
+    L.push('','■ '+secN+'. 참여기업 제출 서류');
+    L.push('- 모든 요청서류(O)가 확인되었습니다. 추가로 제출하실 기업 서류가 없습니다.');
   }else{
-    todo.forEach(function(x,idx){
-      L.push('[ ] '+(idx+1)+'. '+x.it.title+(x.v==='△'?' [보완요청]':''));
+    RGP_STAGES.forEach(function(sg){
+      var sgTodo=todo.filter(function(x){ return x.it.stage===sg[0]; });
+      if(!sgTodo.length) return;
+      secN++;
+      L.push('','■ '+secN+'. '+sg[1]+' ('+sgTodo.length+'종)');
+      sgTodo.forEach(function(x,idx){
+        L.push('[ ] '+(idx+1)+'. '+x.it.title+(x.v==='△'?' [보완요청]':''));
+      });
     });
   }
-  if(opts.incReg){
-    L.push('','■ 법인 설립등기 시 선임 등기이사 준비서류 (등기이사 선임 시에만 해당)');
+  if(opts.incReg!==false){
+    secN++;
+    L.push('','■ '+secN+'. 법인 설립등기 필요서류 — 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요');
+    L.push(RGP_REG_NOTE);
     RGP_REG_DOCS.forEach(function(t,idx){ L.push('[ ] '+(idx+1)+'. '+t); });
   }
   if(done.length){
@@ -17236,25 +17275,25 @@ function rgpBuildWorkbookData(f,state){
   f=f||{}; state=state||{};
   var fn=String(f.name||f.short_name||'지역공동근로복지기금').trim();
   var docSel=state.docSel||{};
-  var selItems=RGP_ITEMS.filter(function(it){ return !!docSel[it.id]; });
-  if(!selItems.length) selItems=RGP_ITEMS.slice();
   var s1=[
-    [fn+' 설립 — 참여기업 요청서류 및 기초자료 체크리스트'],
-    [],
-    ['순번','구분(준비 주체)','요청서류 및 확인사항','요청포함','비고']
+    [fn+' 설립 — 기업 설립 준비서류 · 노동부 인가 · 법인 등기 요청서류 체크리스트'],
+    [RGP_REG_NOTE],
+    ['단계 구분','순번','구분(준비 주체)','요청서류 및 확인사항','요청포함','비고']
   ];
-  RGP_ITEMS.forEach(function(it,idx){
-    s1.push([idx+1, it.who, it.title, docSel[it.id]?'O':'선택', it.id==='corpreg'?'개인사업자는 면제(-)':(it.id==='contrib_seal'?'기금 제공 양식에 날인':'필수 확인')]);
+  RGP_STAGES.forEach(function(sg){
+    RGP_ITEMS.filter(function(it){ return it.stage===sg[0]; }).forEach(function(it,idx){
+      s1.push([sg[1], idx+1, it.who, it.title, docSel[it.id]?'O':'선택', it.id==='corpreg'?'개인사업자는 면제(-)':(it.id==='stamp'?'등기자 외는 인감증명·인감도장 불필요':(it.id==='contrib_seal'?'기금 제공 양식에 날인':'필수 확인'))]);
+    });
   });
   s1.push([]);
-  s1.push(['[법인 설립등기 단계 — 선임 등기이사(노·사) 소속 기업만 해당]']);
+  s1.push(['법인 설립등기 필요서류 — 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요', '', '', RGP_REG_NOTE, '', '나머지 인원은 인감증명·인감도장 불필요']);
   RGP_REG_DOCS.forEach(function(t,idx){
-    s1.push([idx+1, '근로자·사용자 등기이사 (노1·사1)', t, state.opts&&state.opts.incReg?'O':'별도안내', '등기이사 선임 기업만 준비']);
+    s1.push(['법인 설립등기 서류 (등기자 딱 2명만)', idx+1, '등기자 딱 2명 (사용자1·근로자1)', t, (!state.opts||state.opts.incReg!==false)?'O':'별도안내', '등기자 2명 외 나머지는 인감증명·인감도장 불필요']);
   });
   var hdr2=['연번','지역(시·군)','기업명(상호)','사업자등록번호','대표자(사)','근로자대표(노)','고용보험 평균인원','직전매출액(억)','담당자','직위','연락처(휴대폰)','담당자 이메일']
     .concat(RGP_ITEMS.map(function(it){ return it.col; }))
     .concat(['완료(O) 수','미비(X/△) 수','수합상태']);
-  var s2=[[fn+' — 참여기업별 설립서류 OX 수합 현황표'], ['※ 표시 기준: O(제출완료) / X(미제출) / △(보완필요) / -(개인사업자 등 면제)'], hdr2];
+  var s2=[[fn+' — 참여기업별 설립서류 OX 수합 현황표'], ['※ 표시 기준: O(제출완료) / X(미제출) / △(보완필요) / -(개인사업자 등 면제) · 개인인감증명·인감도장은 등기자 딱 2명(사용자1·근로자1)만 필요'], hdr2];
   var rows=state.rows||[];
   if(rows.length){
     rows.forEach(function(r,idx){
@@ -17274,9 +17313,9 @@ function rgpBuildWorkbookData(f,state){
   var sealName=fn.replace(/\(가칭\)/g,'').trim()+' 인';
   var s3=[
     [fn+' — 설립서류 날인용 필요도장 목록'],
-    ['기금 법인직인', sealName, '사각형 법인직인 (2.5cm × 2.5cm)', '', '등기이사 외 일반 준비위원은 막도장 가능(동의서 징구)'],
+    ['기금 법인직인', sealName, '사각형 법인직인 (2.5cm × 2.5cm)', '', '개인인감증명·개인인감도장은 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요 — 나머지 기업·위원은 일반 막도장(또는 동의서)만 준비'],
     [],
-    ['연번','기업명(상호)','사용자측 대표자 성명 (사 1부)','근로자측 대표자 성명 (노 1부)','도장·동의서 수합(O/X)','비고']
+    ['연번','기업명(상호)','사용자측 대표자 성명 (사 1부)','근로자측 대표자 성명 (노 1부)','일반막도장·동의서 수합(O/X)','비고(등기자 딱 2명만 인감도장·인감증명 필요)']
   ];
   if(rows.length){
     rows.forEach(function(r,idx){
@@ -17408,7 +17447,7 @@ function rgpOpen(fid){
     mode:'agency', curKey:'g0', syncSitesOnImport:true,
     agency:{org:rgpDefaultAgencyName(f), name:'', pos:'', email:'', note:'', sent_at:'', sent_by:''},
     agCands:[], agPick:-1,
-    docSel:defSel, opts:{incList:true, incOx:true, incReg:false},
+    docSel:defSel, opts:{incList:true, incOx:true, incReg:true, _v2:true},
     regData:{}, cardIdx:[], docChkAll:{}, sites:[], rows:[]
   };
   rgpRender();
@@ -17422,7 +17461,10 @@ function rgpOpen(fid){
     if(G.regData.agency) G.agency=Object.assign({},G.agency,G.regData.agency);
     if(!G.agency.org) G.agency.org=rgpDefaultAgencyName(f);
     if(G.regData.docSel) G.docSel=Object.assign({},defSel,G.regData.docSel);
-    if(G.regData.opts) G.opts=Object.assign({},G.opts,G.regData.opts);
+    if(G.regData.opts){
+      G.opts=Object.assign({},G.opts,G.regData.opts);
+      if(!G.regData.opts._v2){ G.opts.incReg=true; G.opts._v2=true; }
+    }
     G.agCands=_rgpAgencyCands(G.agency.org, G.cardIdx);
     if(!G.agency.email&&G.agCands.length===1&&G.agency.org&&_cardFundKey(G.agCands[0].org)===_cardFundKey(G.agency.org)){
       G.agPick=0; G.agency.email=G.agCands[0].email;
@@ -17522,7 +17564,7 @@ function rgpDocSel(itemId,checked){
   var allCk=$('rgpDocAllCk');
   if(allCk) allCk.checked=RGP_ITEMS.every(function(it){ return !!G.docSel[it.id]; });
   var cntEl=$('rgpReqCnt');
-  if(cntEl) cntEl.textContent=RGP_ITEMS.filter(function(it){ return !!G.docSel[it.id]; }).length+'/'+RGP_ITEMS.length+'종 선택';
+  if(cntEl) cntEl.textContent=RGP_ITEMS.filter(function(it){ return !!G.docSel[it.id]; }).length+'/'+RGP_ITEMS.length+'종'+(G.opts.incReg!==false?' + 등기3종':'');
   G.rows.forEach(function(r){ _rgpRefreshRowStatDom(G,r); });
   _rgpRefreshKpiDom(G);
   rgpRefreshPreview();
@@ -17536,7 +17578,10 @@ function rgpDocSelAll(checked){
 function rgpOpt(k,checked){
   var G=RGP; if(!G||['incList','incOx','incReg'].indexOf(k)<0) return;
   G.opts[k]=!!checked;
+  G.opts._v2=true;
   _rgpSaveSub('opts',G.opts).catch(function(){});
+  var cntEl=$('rgpReqCnt');
+  if(cntEl) cntEl.textContent=RGP_ITEMS.filter(function(it){ return !!G.docSel[it.id]; }).length+'/'+RGP_ITEMS.length+'종'+(G.opts.incReg!==false?' + 등기3종':'');
   rgpRefreshPreview();
 }
 function _rgpOxBtnStyle(v){
@@ -18317,8 +18362,8 @@ function rgpComposeAgency(){
     var el=$('rgpAgEmail'); if(el&&el.focus) el.focus();
     return;
   }
-  if(!RGP_ITEMS.some(function(it){ return !!G.docSel[it.id]; })&&!G.opts.incOx){
-    toast('본문에 포함할 요청서류 또는 OX 수합현황을 하나 이상 선택해 주세요','warn');
+  if(!(G.opts.incList!==false&&RGP_ITEMS.some(function(it){ return !!G.docSel[it.id]; }))&&G.opts.incReg===false&&G.opts.incOx===false){
+    toast('본문에 포함할 요청서류·등기서류 또는 OX 수합현황을 하나 이상 선택해 주세요','warn');
     return;
   }
   _rgpOpenMailSafe({to:m.to, name:m.name, subject:m.subject, body:m.body});
@@ -18419,28 +18464,39 @@ function _rgpHTML(G){
     +'<button class="primary" onclick="rgpComposeAgency()" style="padding:5px 11px">✉ 주관기관 메일 쓰기</button>'
     +'</div>'
     +'<div class="row" style="gap:10px;flex-wrap:wrap;margin-top:6px;font-size:12px">'
-    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="참여기업 요청서류 리스트 포함"'+(G.opts.incList!==false?' checked':'')+' onchange="rgpOpt(\'incList\',this.checked)">① 요청서류·기초자료 리스트 포함</label>'
-    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="기업별 서류 수합 OX 현황 포함"'+(G.opts.incOx!==false?' checked':'')+' onchange="rgpOpt(\'incOx\',this.checked)">② 기업별 OX 수합 현황 포함</label>'
-    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="선임 등기이사 노·사 등기서류 안내 포함"'+(G.opts.incReg?' checked':'')+' onchange="rgpOpt(\'incReg\',this.checked)">③ 선임 등기이사(노 1부·사 1부) 등기서류 안내 추가</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="참여기업 설립준비·인가 서류 리스트 포함"'+(G.opts.incList!==false?' checked':'')+' onchange="rgpOpt(\'incList\',this.checked)">① 설립준비·인가 서류 리스트 포함</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="등기자 딱 2명 법인등기 서류 포함"'+(G.opts.incReg!==false?' checked':'')+' onchange="rgpOpt(\'incReg\',this.checked)">② 법인 등기 서류 포함 (등기자 딱 2명만 — 사용자1·근로자1)</label>'
+    +'<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" aria-label="기업별 서류 수합 OX 현황 포함"'+(G.opts.incOx!==false?' checked':'')+' onchange="rgpOpt(\'incOx\',this.checked)">③ 기업별 OX 수합 현황 포함</label>'
     +'<input type="text" data-rgpk="ag_note" value="'+esc(G.agency.note||'')+'" oninput="rgpAgencyField(\'note\',this.value)" onblur="rgpSaveAgency()" placeholder="추가 전달 메모 (선택)" aria-label="메일 하단 추가 전달 메모" style="flex:1;min-width:160px;font-size:12px">'
     +'</div></div>';
 
-  /* ② 요청서류 리스트 체크 표 */
+  /* ② 요청서류 리스트 체크 표 (설립준비 · 노동부 인가 · 법인 등기 3단계 한눈에 표시) */
   var nSel=RGP_ITEMS.filter(function(it){ return !!G.docSel[it.id]; }).length;
-  var reqRows=RGP_ITEMS.map(function(it,idx){
-    return '<tr><td class="ckcol"><input type="checkbox" data-rgpk="ds_'+it.id+'"'+(G.docSel[it.id]?' checked':'')+' aria-label="'+esc(it.col+' 요청 목록에 포함')+'" onchange="rgpDocSel(\''+it.id+'\',this.checked)"></td>'
-      +'<td class="no">'+(idx+1)+'</td>'
-      +'<td style="white-space:nowrap"><span class="chip" style="font-size:10.5px">'+esc(it.who)+'</span></td>'
-      +'<td class="rgp-ttl" style="font-weight:600;word-break:keep-all">'+esc(it.title)+'</td>'
-      +'<td class="rgp-colact" style="white-space:nowrap"><button class="rgp-smbtn" onclick="rgpSetColAllOx(\''+it.id+'\',\'O\')" title="전체 기업 이 항목을 O로 표시">전부O</button> '
-      +'<button class="rgp-smbtn" onclick="rgpSetColAllOx(\''+it.id+'\',\'X\')" title="전체 기업 이 항목을 X로 초기화">전부X</button></td></tr>';
-  }).join('');
+  var reqRows='';
+  RGP_STAGES.forEach(function(sg,sIdx){
+    var sgList=RGP_ITEMS.filter(function(it){ return it.stage===sg[0]; });
+    reqRows+='<tr style="background:var(--acc-soft)"><td colspan="5" style="font-weight:700;font-size:11.5px;color:var(--acc2)">■ '+(sIdx+1)+'. '+esc(sg[1])+'</td></tr>';
+    sgList.forEach(function(it,idx){
+      reqRows+='<tr><td class="ckcol"><input type="checkbox" data-rgpk="ds_'+it.id+'"'+(G.docSel[it.id]?' checked':'')+' aria-label="'+esc(it.col+' 요청 목록에 포함')+'" onchange="rgpDocSel(\''+it.id+'\',this.checked)"></td>'
+        +'<td class="no">'+(idx+1)+'</td>'
+        +'<td style="white-space:nowrap"><span class="chip" style="font-size:10.5px">'+esc(it.who)+'</span></td>'
+        +'<td class="rgp-ttl" style="font-weight:600;word-break:keep-all">'+esc(it.title)+'</td>'
+        +'<td class="rgp-colact" style="white-space:nowrap"><button class="rgp-smbtn" onclick="rgpSetColAllOx(\''+it.id+'\',\'O\')" title="전체 기업 이 항목을 O로 표시">전부O</button> '
+        +'<button class="rgp-smbtn" onclick="rgpSetColAllOx(\''+it.id+'\',\'X\')" title="전체 기업 이 항목을 X로 초기화">전부X</button></td></tr>';
+    });
+  });
+  reqRows+='<tr style="background:var(--acc-soft)"><td class="ckcol"><input type="checkbox" data-rgpk="opt_reg" aria-label="등기자 딱 2명 법인 등기 서류 요청 포함"'+(G.opts.incReg!==false?' checked':'')+' onchange="rgpOpt(\'incReg\',this.checked);rgpRender()"></td>'
+    +'<td colspan="4" style="font-weight:700;font-size:11.5px;color:var(--acc2)">■ 3. 법인 설립등기 필요서류 — 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요 · 나머지 참여기업·인원은 인감증명·인감도장 불필요</td></tr>'
+    +RGP_REG_DOCS.map(function(t,idx){
+      return '<tr><td class="ckcol"></td><td class="no">'+(idx+1)+'</td><td style="white-space:nowrap"><span class="chip warn" style="font-size:10.5px">등기자 딱 2명만</span></td><td class="rgp-ttl" colspan="2" style="font-weight:600;word-break:keep-all">'+esc(t)+'</td></tr>';
+    }).join('');
   var reqBox='<details open style="margin-bottom:10px;border:1px solid var(--line);border-radius:9px;padding:7px 10px">'
     +'<summary style="cursor:pointer;font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-    +'<span>① 지역공동기금 기업 요청서류 · 기초자료 표준 리스트</span>'
-    +'<span class="chip" id="rgpReqCnt" style="font-size:10.5px">'+nSel+'/'+RGP_ITEMS.length+'종 선택</span>'
-    +'<span class="muted" style="font-weight:400;font-size:11.5px">체크한 항목이 요청 메일과 수합 기준에 들어갑니다 (접기/펼치기)</span></summary>'
-    +'<div id="rgpReqTbl" class="rgpreq" style="max-height:220px;overflow:auto;margin-top:6px"><table style="font-size:12px"><thead><tr>'
+    +'<span>① 설립준비 · 노동부 인가 · 법인 등기 요청서류 표준 리스트 (한 번에 다 요청)</span>'
+    +'<span class="chip" id="rgpReqCnt" style="font-size:10.5px">'+nSel+'/'+RGP_ITEMS.length+'종 + 등기3종</span>'
+    +'<span class="muted" style="font-weight:400;font-size:11.5px">인감증명·인감도장은 등기자 딱 2명(사용자1·근로자1)만 필요 (접기/펼치기)</span></summary>'
+    +'<div style="font-size:12px;padding:6px 9px;margin-top:6px;border-radius:7px;background:var(--acc-soft);border:1px solid var(--line);color:var(--ink)"><b>⚠ [인감 오해 방지]</b> 개인인감증명서·개인인감도장은 실제 법인 등기할 <b>등기자 딱 2명(사용자 1명, 근로자 1명)만 필요</b>합니다. 나머지 참여기업·위원은 인감증명·인감도장이 전혀 필요 없습니다.</div>'
+    +'<div id="rgpReqTbl" class="rgpreq" style="max-height:240px;overflow:auto;margin-top:6px"><table style="font-size:12px"><thead><tr>'
     +'<th class="ckcol"><input type="checkbox" id="rgpDocAllCk"'+(nSel===RGP_ITEMS.length?' checked':'')+' aria-label="요청서류 전체 선택" onclick="rgpDocSelAll(this.checked)"></th>'
     +'<th style="width:34px">#</th><th style="width:145px">누구 서류인지</th><th>요청서류 · 기초 확인 항목</th><th style="width:124px">일괄 OX</th></tr></thead><tbody>'+reqRows+'</tbody></table></div></details>';
 
@@ -18537,20 +18593,29 @@ function rgpRender(){
 var SDC=null;
 var SDC_UI={help:'site.doccenter'};
 var SDC_PHASES=[
-  ['inka','① 설립·인가·등기','노동부 설립인가 및 법인 설립등기 단계'],
+  ['inka','① 설립준비·인가·등기','기업 설립준비 · 노동부 설립인가 · 법인 설립등기 단계'],
   ['subsidy','② 지원금 신청','근로복지공단 지원사업 신청 단계'],
   ['ops','③ 결산·운영상황보고','연간 결산 및 고용노동부 운영상황보고 단계'],
   ['chg','④ 추가출연·변경·탈퇴','기본재산 추가출연(현금·주식)·변경등기·탈퇴 단계']
 ];
+var SDC_INKA_STAGES=[
+  ['prep','기업 설립 시 준비서류 (기초자료·일반도장)',''],
+  ['inka','노동부 설립인가 필요서류',''],
+  ['reg','법인 설립등기 필요서류 — 등기자 딱 2명(사용자 1명, 근로자 1명)만 필요','※ 인감증명서·개인인감도장은 등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요합니다. 나머지 인원은 인감증명·인감도장이 필요 없습니다.']
+];
 var SDC_DOC_DEFS={
   inka:[
-    {id:'inka_wrep',kind:'wrep',title:'[근로자측·사용자측 위원] 설립준비위원 재직증명서 (노 1부, 사 1부)',short:'재직증명서(노1·사1)',req:'근로자측 위원 1부, 사용자측 위원 1부'},
-    {id:'inka_bizreg',kind:'bizreg',title:'[참여기업(회사)] 사업자등록증 사본 1부',short:'사업자등록증',req:'참여기업 회사 각 1부'},
-    {id:'inka_corpreg',kind:'corpreg',title:'[참여기업(회사)] 법인등기부등본 1부 (말소사항 포함·제출용)',short:'법인등기부등본',req:'발급 3개월 이내 제출용 1부 (개인사업자 제외)',req3m:true},
-    {id:'inka_match',kind:'match',ftype:'공동',title:'[참여기업(노·사 대표)] 공동기금 참여신청서 1부 (근로자대표·사용자 서명)',short:'참여신청서',req:'사용자·근로자대표 공동 서명본 1부'},
-    {id:'reg_inseal',kind:'inseal',title:'[근로자측·사용자측 이사] 개인인감증명서 (노 1부, 사 1부 · 발급 3개월 이내)',short:'이사 인감증명(노1·사1)',req:'근로자측 이사 1부, 사용자측 이사 1부 (발급 3개월 이내)',sensitive:true},
-    {id:'reg_jumin',kind:'jumin',title:'[근로자측·사용자측 이사] 주민등록등본 또는 초본 (노 1부, 사 1부 · 발급 3개월 이내)',short:'이사 등·초본(노1·사1)',req:'근로자측 이사 1부, 사용자측 이사 1부 (발급 3개월 이내)',sensitive:true},
-    {id:'reg_id',kind:'idcard',title:'[근로자측·사용자측 이사] 신분증 사본 및 개인인감도장 (노 1부, 사 1부)',short:'이사 신분증·도장(노1·사1)',req:'근로자측 이사 1부, 사용자측 이사 1부',sensitive:true}
+    {id:'prep_stamp',stage:'prep',kind:'stamp',title:'[등기자 외 노·사 위원] 설립준비위원 일반 막도장 또는 막도장 사용동의서 (노 1부, 사 1부 · 인감증명·인감도장 불필요)',short:'일반막도장·동의',req:'등기자 외 노·사 위원 막도장(또는 동의서) · 인감증명 불필요'},
+    {id:'prep_smecert',stage:'prep',kind:'smecert',ftype:'공동',subKey:'sme',title:'[참여기업(회사)] 중소기업확인서 1부 (중소벤처기업부 발급 · 유효기간 내)',short:'중기확인서',req:'중소벤처기업부 발급 · 유효기간 내'},
+    {id:'prep_ei',stage:'prep',kind:'ei',ftype:'공동',title:'[참여기업(회사)] 고용보험 사업장 자격취득자 명부 1부 (직전연도 1월~12월 연간 내역)',short:'고용명부(연간)',req:'직전연도 1~12월 연간 자격취득자 명부'},
+    {id:'prep_fin',stage:'prep',kind:'fin',ftype:'공동',title:'[참여기업(회사)] 직전년도 손익계산서(표준재무제표증명) 1부 (직전년도 매출액 확인용)',short:'직전손익계산서',req:'직전년도 매출액 확인용 1부'},
+    {id:'inka_match',stage:'inka',kind:'match',ftype:'공동',title:'[참여기업(노·사 대표)] 공동기금 참여신청서 1부 (근로자대표·사용자 서명)',short:'참여신청서',req:'사용자·근로자대표 공동 서명본 1부'},
+    {id:'inka_bizreg',stage:'inka',kind:'bizreg',subKey:'bizno',title:'[참여기업(회사)] 사업자등록증 사본 1부',short:'사업자등록증',req:'참여기업 회사 각 1부'},
+    {id:'inka_corpreg',stage:'inka',kind:'corpreg',subKey:'reg',title:'[참여기업(회사)] 법인등기부등본 1부 (말소사항 포함·제출용)',short:'법인등기부등본',req:'발급 3개월 이내 제출용 1부 (개인사업자 제외)',req3m:true},
+    {id:'inka_wrep',stage:'inka',kind:'wrep',title:'[근로자측·사용자측 위원] 설립준비위원 재직증명서 (노 1부, 사 1부)',short:'재직증명(노1·사1)',req:'근로자측 위원 1부, 사용자측 위원 1부'},
+    {id:'reg_inseal',stage:'reg',kind:'inseal',title:'[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 개인인감증명서 각 1부 (발급 3개월 이내 · 나머지 인원은 인감증명 불필요)',short:'등기2명 인감증명',req:'등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요 — 나머지 인원은 인감증명 불필요',sensitive:true},
+    {id:'reg_jumin',stage:'reg',kind:'jumin',title:'[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 주민등록등본 또는 초본 각 1부 (주소변동 포함·발급 3개월 이내 · 등기자 딱 2명만 필요)',short:'등기2명 등·초본',req:'등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요',sensitive:true},
+    {id:'reg_id',stage:'reg',kind:'idcard',title:'[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 신분증 사본 및 개인인감도장 각 1부 (나머지 인원은 인감도장 불필요)',short:'등기2명 신분증·인감',req:'등기할 사람 딱 2명(사용자 1명, 근로자 1명)만 필요 — 나머지 인원은 인감도장 불필요',sensitive:true}
   ],
   subsidy:[
     {id:'sub_bizreg',kind:'bizreg',subKey:'bizno',title:'[참여기업(회사)] 사업자등록증 사본 1부',short:'사업자등록증',req:'참여기업 회사 각 1부'},
@@ -18589,6 +18654,7 @@ var SDC_KIND_RULES=[
   ['inseal',/인감\s*증명|취임\s*승낙/],
   ['jumin',/주민\s*등록|초본|등\s*초본/],
   ['idcard',/신분증|운전\s*면허|여권\s*사본|개인\s*인감\s*도장/],
+  ['stamp',/막도장.*동의|도장.*사용\s*동의/],
   ['tax_wh',/원천\s*징수/],
   ['bank_tx',/잔액\s*증명|잔고\s*증명|거래\s*내역|통장\s*사본|계좌\s*내역/],
   ['welfare_ev',/수혜자|지급\s*명단|목적\s*사업\s*증빙|대부\s*명세|차용증/],
@@ -18608,6 +18674,7 @@ var SDC_DOC_KW={
   tax_wh:{lbl:'이자소득 원천징수영수증',must:/원\s*천\s*징\s*수|이\s*자\s*소\s*득|법\s*인\s*세/,sub:/세\s*액|지\s*급\s*액|이\s*자/,needCo:true,allowFund:true},
   welfare_ev:{lbl:'목적사업·대부 증빙',must:/목\s*적\s*사\s*업|복\s*지|수\s*혜|지\s*급|대\s*부|영\s*수\s*증|이\s*체/,sub:/금\s*액|성\s*명|일\s*자/,needCo:true,allowFund:true},
   match:{lbl:'공동기금 참여신청서',must:/참\s*여\s*신\s*청|공\s*동\s*근\s*로\s*복\s*지|출\s*연\s*협\s*약/,sub:/대\s*표|근\s*로\s*자/,needCo:true},
+  stamp:{lbl:'막도장 사용동의서',must:/막\s*도\s*장|도\s*장.*동\s*의/,sub:/대\s*표|근\s*로\s*자|동\s*의/,needCo:false},
   leave_ev:{lbl:'중간탈퇴 사유 증빙',must:/탈\s*퇴|폐\s*업\s*사\s*실|도\s*급|계\s*약\s*종\s*료/,sub:/사\s*유|일\s*자/,needCo:true}
 };
 function _sdcSafeKey(k){
@@ -18666,14 +18733,29 @@ function sdcMailText(f,row,opts){
   });
   var L=[who+' 안녕하세요.', opts.mgr?('푸른노무법인 '+opts.mgr+'입니다.'):'푸른노무법인입니다.',''];
   L.push(fn+' '+phTitle+' 필요서류 요청드립니다.');
-  L.push('','■ 필요서류 ('+todo.length+'종)');
-  if(!todo.length){
-    L.push('- 추가로 제출하실 서류가 없습니다.');
-  }else{
-    todo.forEach(function(x,i){
-      var warn=(x.st.k==='hold'&&x.st.sub)?' [보완요청: '+x.st.sub+']':'';
-      L.push('[ ] '+(i+1)+'. '+x.d.title+warn);
+  if(phObj[0]==='inka'&&todo.length){
+    var inkaSecN=0;
+    SDC_INKA_STAGES.forEach(function(sg){
+      var sgTodo=todo.filter(function(x){ return (x.d.stage||'inka')===sg[0]; });
+      if(!sgTodo.length) return;
+      inkaSecN++;
+      L.push('','■ '+inkaSecN+'. '+sg[1]+' ('+sgTodo.length+'종)');
+      if(sg[2]) L.push(sg[2]);
+      sgTodo.forEach(function(x,i){
+        var warn=(x.st.k==='hold'&&x.st.sub)?' [보완요청: '+x.st.sub+']':'';
+        L.push('[ ] '+(i+1)+'. '+x.d.title+warn);
+      });
     });
+  }else{
+    L.push('','■ 필요서류 ('+todo.length+'종)');
+    if(!todo.length){
+      L.push('- 추가로 제출하실 서류가 없습니다.');
+    }else{
+      todo.forEach(function(x,i){
+        var warn=(x.st.k==='hold'&&x.st.sub)?' [보완요청: '+x.st.sub+']':'';
+        L.push('[ ] '+(i+1)+'. '+x.d.title+warn);
+      });
+    }
   }
   if(done.length){
     L.push('','※ 확인 완료(제출 불필요): '+done.map(function(x){ return x.d.short||x.d.title; }).join(', '));
@@ -19129,7 +19211,7 @@ function _sdcHTML(C){
         +'</span></td>';
     }).join('');
     var reqChip=r.reqSent?'<span class="chip ok" style="font-size:10px" title="'+esc((r.reqSent.by||'')+' '+(r.reqSent.at||''))+'">✉ '+esc(String(r.reqSent.at||'').slice(5).replace('-','/'))+'</span>':'<span class="muted">—</span>';
-    return '<tr id="sdcR_'+k+'"'+(cur?' style="background:var(--acc-soft)"':'')+'>'
+    return '<tr id="sdcR_'+k+'"'+(cur?' style="background:var(--acc-soft)" aria-current="true"':'')+'>'
       +'<td class="ckcol"><input type="checkbox"'+(r.on?' checked':'')+' onchange="sdcTickRow(\''+k+'\',this.checked)" aria-label="'+esc(r.name+' 선택')+'"></td>'
       +'<td class="no">'+(i+1)+'</td>'
       +'<td class="sdc-co" style="font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis"><button type="button" onclick="sdcFocusRow(\''+k+'\')" title="'+esc(r.name+' — 클릭 시 아래 메일 미리보기 전환')+'" style="border:0;background:none;padding:2px 0;font-weight:700;font-size:12.5px;cursor:pointer;max-width:136px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name||'(이름 없음)')+'</button></td>'
@@ -19144,6 +19226,7 @@ function _sdcHTML(C){
     +'<span class="muted" style="font-size:11.5px">칸의 ☑는 수동 확인완료 토글, 배지 단추는 원본 열람·내용 대조·보완 지정입니다.</span>'
     +'<span style="flex:1"></span>'
     +'<button type="button" class="primary" onclick="sdcComposeNext()" style="padding:4px 10px;font-size:12px" title="선택된 사업장 중 아직 보냄 표시가 없는 다음 사업장의 요청 메일 쓰기 창을 엽니다">▶ 다음 사업장 요청메일 쓰기</button></div>'
+    +(C.phase==='inka'?'<div style="font-size:12px;padding:6px 10px;margin:0 0 6px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--line);color:var(--ink)"><b>⚠ [인감 오해 방지]</b> 개인인감증명서·개인인감도장은 실제 법인 등기할 <b>등기자 딱 2명(사용자 1명, 근로자 1명)만 필요</b>합니다 — 나머지 준비위원·참여기업은 인감증명·인감도장이 전혀 필요 없습니다.</div>':'')
     +'<div id="sdcMat" class="sdcmat" style="overflow:auto;max-height:320px;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'
     +'<th class="ckcol"><input type="checkbox"'+(nOn&&nOn===rows.length?' checked':'')+' onclick="sdcTickAll(this.checked)" aria-label="사업장 전체 선택" title="전체 선택"></th>'
     +'<th class="no">#</th><th>사업장</th><th>받는 사람</th>'+thDocs+'<th style="text-align:center">요청</th><th>메일</th></tr></thead><tbody>'
@@ -32072,7 +32155,8 @@ var HELP={
  'setup.fill':{t:'서식 자동 채움 · 바뀐 칸 빨강',h:'<p>서식은 열 때마다 <b>지금 자료로 새로 채워집니다.</b> 여기서는 서식을 열지 않고도 마지막으로 사람이 확인한 뒤 <b>새로 들어오거나 바뀐 자료 칸</b>을 빨강으로 보입니다(바뀐 칸은 전 값이 옆에 작게).</p>'
    +'<p>[✔ 확인]은 값을 고치지 않고 «지금 값을 봤다»는 기록만 남깁니다 — 그러면 빨강이 검정으로 돌아갑니다. 🤖(기계가 넣고 원본 대조 전) 칸도 «원본과 맞음»으로 함께 둡니다.</p>'
    +'<p>빨강은 <b>화면 검토용</b>이라 인쇄·PDF·한글 파일에는 나가지 않습니다. 확인하지 않은 빨강이 남아 있으면 인쇄·받기 전에 한 번 묻습니다. 사람이 고쳐 보관한 서식본(✋)은 덮어쓰지 않습니다.</p>'},
- 'setup.prepmail':{t:'기업에 설립시 준비서류 보내기',h:'<p>설립 준비 중인 기금의 기업에 요청할 <b>노동부 설립인가 · 법인 설립등기 필요서류 제목</b>만 간결하게 정리해 푸른메일함 쓰기 창에 채워 엽니다(발송은 메일함에서 직접 클릭).</p>'
+ 'setup.prepmail':{t:'기업에 설립시 준비서류 보내기 (설립준비·인가·등기 한 번에 요청)',h:'<p>설립 준비 중인 기금의 기업에 요청할 <b>① 기업 설립 시 준비서류 · ② 노동부 설립인가 필요서류 · ③ 법인 설립등기 필요서류</b>를 각각 구분해 <b>한 번에</b> 푸른메일함 쓰기 창에 채워 엽니다(발송은 메일함에서 직접 클릭).</p>'
+   +'<p><b>⚠ 인감 오해 방지</b> — 개인인감증명서·개인인감도장은 실제 법인 등기할 <b>등기자 딱 2명(사용자 1명, 근로자 1명)만 필요</b>하며, 나머지 준비위원·참여기업은 인감증명·인감도장이 전혀 필요 없습니다(일반 막도장 가능).</p>'
    +'<p>기금법인이 직접 준비하는 서류와 서식 탭에서 이미 확인한 서류, 기업정보함에 등록증이 있는 회사의 «사업자등록증 사본»은 기본으로 제외됩니다.</p>'
    +'<p>받는 사람은 참여사업장 담당자 · 기업정보함 명함 · 회사 메일에서 가져오며, 메일 발송 후 [✔ 보냈음]을 누르면 날짜와 담당자만 기록합니다.</p>'},
  'site.doccenter':{t:'사업장 제출서류 체크리스트 요청 · 메일 자동수신 · 내용검토',h:'<p><b>공동기금(참여사업장별)</b>과 <b>사내기금(설립·설치사업장)</b> 모두에서 단계별(①설립·등기 ②지원금 신청 ③결산·운영상황보고 ④추가출연·변경·탈퇴) 기업 제출서류를 한 화면에서 요청·수신·검토합니다.</p>'
@@ -32486,10 +32570,11 @@ var HELP={
    +'<p><b>① 개인정보 원천 제거 및 비공개 저장</b> — 인감증명서·주민등록등초본 페이지와 주민등록번호·자택 상세주소가 포함된 원본은 그대로 올릴 수 없으며(감지 시 자동 차단), 개인정보가 제거된 클린 문서만 재직 담당자 전용 보안 노드(공개 URL 미생성)에 보관합니다.</p>'
    +'<p><b>② 푸른메일함 실시간·과거 메일 연동</b> — 현재 푸른메일함과 지난 메일 보관함의 관련 메일을 연결해 수발신 경위와 비식별 요약·원문을 바로 열람할 수 있습니다.</p>'
    +'<p><b>③ 신고반려·미이행 이력보존 분리</b> — 주식출연 변경신고 접수 후 명의개서 미이행 등으로 노동청에 <b>반려 요청</b>한 건은 <b>신고반려·미이행(이력보존)</b> 상태로 두어 재무상태표 매도가능증권 잔액에는 산입하지 않으면서 당시 서류와 메일 경위만 보존합니다.</p>'},
- 'setup.regprep':{t:'지역공동기금 설립 요청서류 리스트 · 기업별 OX 수합 체크 및 메일 발송',h:'<p>제주상공회의소·경기북부상공회의소·충남북부상공회의소·지자체 등 <b>지역공동기금 설립</b> 시 반복되는 참여기업 요청서류 안내와 서류 수합 OX 관리를 한 창으로 체계화한 화면입니다.</p>'
-   +'<p><b>① 주관기관(상공회의소·지자체) 담당자에게 보내기</b> — 참여기업별 필수 요청서류·기초자료 리스트(참여신청서, 사업자등록증, 법인등기부등본, 중소기업확인서, 직전연도 고용보험 연간 자격취득자명부·월평균 인원, 노·사 재직증명서 각 1부, 노·사 도장/막도장 사용동의서 각 1부, 직전년도 손익계산서, 담당자 연락처·메일)와 현재 기업별 수합 OX 현황을 정리해 푸른메일함 쓰기 창에 바로 채워 엽니다.</p>'
+ 'setup.regprep':{t:'지역공동기금 설립 요청서류 리스트 · 기업별 OX 수합 체크 및 메일 발송',h:'<p>제주상공회의소·경기북부상공회의소·충남북부상공회의소·지자체 등 <b>지역공동기금 설립</b> 시 반복되는 <b>① 기업 설립 시 준비서류 · ② 노동부 설립인가 서류 · ③ 법인 설립등기 서류</b> 요청과 서류 수합 OX 관리를 한 창으로 체계화한 화면입니다.</p>'
+   +'<p><b>⚠ 인감 오해 방지</b> — 개인인감증명서·개인인감도장은 실제 법인 등기할 <b>등기자 딱 2명(사용자 1명, 근로자 1명)만 필요</b>합니다. 나머지 참여기업·위원은 인감증명서·인감도장이 전혀 필요 없으며 일반 막도장(또는 막도장 사용동의서)만 준비합니다.</p>'
+   +'<p><b>① 주관기관(상공회의소·지자체) 담당자에게 보내기</b> — 설립준비·노동부 인가·법인 등기(등기자 2명만) 3단계 요청서류 리스트와 현재 기업별 수합 OX 현황을 한 번에 정리해 푸른메일함 쓰기 창에 바로 채워 엽니다.</p>'
    +'<p><b>② 기존 수합 엑셀 불러오기 & 3시트 엑셀 받기</b> — 상공회의소·과거 폴더에 정리된 엑셀(참여예정업체현황·구비서류 제출현황·참여신청 명단)을 <b>[📥 기존 수합 엑셀 불러오기]</b>로 올리면 O/X/제출/개인 상태와 담당자 메일·고용보험 인원을 자동으로 읽어오며(주민등록번호·비밀번호 열은 원천 차단), <b>[📊 OX 수합·도장 엑셀 받기]</b>로 요청서류리스트·기업별 OX 수합현황·도장제작명단 3시트 엑셀을 내려받아 메일에 첨부할 수 있습니다.</p>'
-   +'<p><b>③ 개별 참여기업 미제출(X) 서류 요청</b> — 이미 제출 완료(O)이거나 개인사업자 면제(-)인 서류는 자동으로 빼고 아직 미제출(X)·보완(△)인 서류만 간추려 기업별 메일 쓰기 창에 채워 엽니다.</p>'},
+   +'<p><b>③ 개별 참여기업 미제출(X) 서류 요청</b> — 이미 제출 완료(O)이거나 개인사업자 면제(-)인 서류는 자동으로 빼고 아직 미제출(X)·보완(△)인 서류와 등기자 2명 안내를 간추려 기업별 메일 쓰기 창에 채워 엽니다.</p>'},
  'lib.chat':{t:'법령·유권해석·공단 지침 챗봇',h:'<p><b>근로복지기본법령</b>, <b>고용노동부 예규 제169호(사내·공동근로복지기금 업무처리지침)</b>, <b>근로복지공단 근로복지기금 지원사업 업무처리규정(제1375호)</b> 및 주요 <b>고용노동부 행정해석·국민신문고 회신</b>을 한곳에 모아 질의응답하는 도우미입니다.</p>'
    +'<p><b>💬 질문하기(즉시 판시)</b> — 입력한 질문과 가장 관련도가 높은 유권해석·지침·법령 조문을 즉시 찾아 핵심 결론과 원문 판시를 보여 줍니다.</p>'
    +'<p><b>🤖 AI 심층답변</b> — 검색된 공식 법령·유권해석 근거만을 바탕으로 Claude AI가 사내·공동기금 맞춤 검토의견을 종합해 작성합니다. 근거에 없는 문서번호나 조문은 지어내지 않으며, 인용 배지를 누르면 원문 전체를 확인할 수 있습니다.</p>'
