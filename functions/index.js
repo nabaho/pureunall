@@ -8263,13 +8263,22 @@ exports.pubCompanySearch = functions
         return;
       }
       const body = (req.body && typeof req.body === "object") ? req.body : {};
-      const keys = await PUB_CO_SEARCH.readConfigKeys(getDatabase());
+      const db = getDatabase();
+      if (body.action === "applyToCoInfo") {
+        const applied = await PUB_CO_SEARCH.applyItemToCoInfo(db, body.item || {}, Date.now());
+        res.status(applied.ok ? 200 : 400).json(applied);
+        return;
+      }
+      const keys = await PUB_CO_SEARCH.readConfigKeys(db);
       const fetchWithTimeout = (u, opts) => fetch(u, Object.assign({}, opts || {}, { signal: AbortSignal.timeout(15000) }));
       const result = await PUB_CO_SEARCH.searchPublicCompany({
         query: body.query,
         detailBizNo: body.detailBizNo,
+        detailCorpNo: body.detailCorpNo,
+        detailName: body.detailName,
         keys,
         fetchFn: fetchWithTimeout,
+        db,
       });
       res.status(result.ok ? 200 : 400).json(result);
     } catch (err) {

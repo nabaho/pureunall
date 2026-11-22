@@ -36,12 +36,6 @@
     /* 「이 창은 메일 문」 — mailview 는 화면(render)이 떼었다 붙이지만 이것은 «문»이라 떼지 않는다. 자료함·환경설정처럼
        state.view 가 mail 이 아닌 화면에서도 머리줄 이름이 안 바뀐다. ⚠ 탭 그림 갈아 달기 «뒤»에 둔다(app-icons 검사가 그 앞뒤를 읽는다). */
     document.documentElement.classList.add('maildoor');
-    return;
-  }
-  if(/(^|[?&])view=pubsearch(&|$)/.test(location.search)){
-    document.title = '공공 기업검색';
-    var pi = document.querySelector('link[rel=icon]');
-    if(pi) pi.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDD0D</text></svg>";
   }
 }catch(e){} })();
 </script>
