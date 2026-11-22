@@ -343,7 +343,7 @@
       bodyHtml += '<div style="padding:24px;text-align:center;color:var(--sub,#94a3b8)">검색 결과가 없습니다. 회사명 일부나 사업자번호 10자리로 다시 검색해 보세요.</div>';
     } else {
       bodyHtml += '<div style="padding:18px;color:var(--sub,#94a3b8);font-size:13px;line-height:1.6">'
-        + '· <b>회사명</b>(예: 삼성전자) 또는 <b>사업자번호 10자리</b>(예: 124-81-00998)로 무료 공공 기업정보를 바로 조회합니다.<br>'
+        + '· <b>회사명</b>(예: 샘플기업) 또는 <b>사업자번호 10자리</b>(예: 123-45-67890)로 무료 공공 기업정보를 바로 조회합니다.<br>'
         + '· 조회 결과는 <b>기업정보함의 빈 칸만</b> 안전하게 채워 넣을 수 있습니다.<br>'
         + '· <b>파워기업검색(폰 앱)</b> 확인이 필요하면 결과 카드의 「📱 파워기업검색용 복사」를 누르고 PC 폰 미러(<code>폰미러-켜기.bat</code>) 창에서 <code>Ctrl+V</code>로 바로 검색하세요.'
         + '</div>';
@@ -352,7 +352,7 @@
     el.innerHTML = '<div class="pubco-dlg" role="dialog" aria-modal="true" aria-label="무료 공공 기업검색">'
       + '<div class="pubco-hd"><h3>🔍 무료 공공 기업검색</h3><button type="button" class="pubco-x" data-pubco-act="close" aria-label="닫기" title="닫기 (Esc)">✕</button></div>'
       + '<form id="puPubSearchForm" class="pubco-form">'
-      + '<input id="puPubSearchIn" class="pubco-in" type="search" aria-label="회사명 또는 사업자번호 10자리" value="' + esc(_state.query) + '" placeholder="회사명 또는 사업자번호 10자리 (예: 삼성전자, 124-81-00998)" autocomplete="off">'
+      + '<input id="puPubSearchIn" class="pubco-in" type="search" aria-label="회사명 또는 사업자번호 10자리" value="' + esc(_state.query) + '" placeholder="회사명 또는 사업자번호 10자리 (예: 샘플기업, 123-45-67890)" autocomplete="off">'
       + '<button type="submit" class="pubco-btn primary" ' + (_state.loading ? 'disabled' : '') + '>' + (_state.loading ? '검색 중…' : '검색') + '</button>'
       + '</form>'
       + '<div class="pubco-meta">' + renderChips() + '</div>'

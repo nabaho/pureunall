@@ -90,7 +90,7 @@ test("② 사업자번호 10자리 검색 — 국세청 + 고용·산재 + 금�
       return {
         ok: true,
         json: async () => ({
-          data: [{ b_no: "1248100998", b_stt: "계속사업자", tax_type: "부가가치세 일반과세자", end_dt: "" }],
+          data: [{ b_no: "1234567891", b_stt: "계속사업자", tax_type: "부가가치세 일반과세자", end_dt: "" }],
         }),
       };
     }
@@ -119,7 +119,7 @@ test("② 사업자번호 10자리 검색 — 국세청 + 고용·산재 + 금�
             header: { resultCode: "00" },
             body: {
               items: {
-                item: [{ corpNm: "샘플기업(주)", bzno: "1248100998", enpRprFnm: "김대표", enpBsadr: "경기도 수원시" }],
+                item: [{ corpNm: "샘플기업(주)", bzno: "1234567891", enpRprFnm: "김대표", enpBsadr: "경기도 수원시" }],
               },
             },
           },
@@ -130,7 +130,7 @@ test("② 사업자번호 10자리 검색 — 국세청 + 고용·산재 + 금�
   };
 
   const r = await S.searchPublicCompany({
-    query: "124-81-00998",
+    query: "123-45-67891",
     keys: { ntsKey: "SECRET_NTS_KEY", dartKey: "DART_K", niceKey: "NICE_K" },
     fetchFn,
   });
