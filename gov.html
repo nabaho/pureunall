@@ -1228,11 +1228,13 @@ function ageOut(){
    서버(govFeedCollect, 매일 07:40)가 나라장터·알리오·기업마당을 받아 gov_feed/rows 에 쌓는다. 여기서는 «열 때» 거기서 내 목록에 없는 것을 가져다 합친다.
    ⚠ 읽기만 한다(서버 칸에 안 쓴다). ⚠ 번호가 내 목록에 이미 있으면(숨긴 것 포함) 건드리지 않는다. ⚠ 재직 직원만 읽힌다(2026-10-30 전엔 관리자만) — 못 읽으면 조용히 넘어간다.
    ⚠ 인증키는 서버가 대표 자리에서 읽어 쓴다 — 이 화면은 키를 서버로 보내지 않는다. */
-var _feedSrv, _feedMerged=0;     /* undefined = 아직 안 읽음 · null = 못 읽음(권한·인터넷) */
+var _feedSrv, _feedMerged=0, _preGovFeed=null;     /* undefined = 아직 안 읽음 · null = 못 읽음(권한·인터넷) */
 async function inboxPull(){
   if(!fbDb||!fbUid) return;
+  var pref=_preGovFeed; _preGovFeed=null;
   try{
-    var v=(await fbDb.ref('gov_feed').once('value')).val()||{};
+    var s=pref ? await pref : await fbDb.ref('gov_feed').once('value');
+    var v=(s&&typeof s.val==='function'?s.val():s)||{};
     _feedSrv={ last:v.last||null };
     var buf=get('feed'), kw=kws(), today=new Date().toISOString().slice(0,10);
     /* 찾는 말이나 🤖 AI 사업 갈래 둘 중 하나에 걸리면 합친다(2026-11-19) — AI 표시가 서버에서 안 붙어 왔으면 여기서 붙인다 */
@@ -2141,8 +2143,8 @@ function cloudFailSay(what, e){
   var why=(e && /permission/i.test(String(e.code||e.message||e))) ? '권한이 막혀 있습니다' : '인터넷을 확인해 주세요';
   toast('⚠ 클라우드 '+what+' 실패 — '+why+'. 이 기기에만 담겼습니다');
 }
-/* 옛 이름 — 부팅이 부른다. 받기는 cloudSync 한 곳이다 */
-async function cloudPull(){ return cloudSync(); }
+/* 옛 이름 — 부팅이 부른다. 받기는 cloudSync 한 곳이며, 도착 즉시 화면을 먼저 갱신한다 */
+async function cloudPull(){ var n=await cloudSync(); if(n){ drawKw(); draw(); readyNote(); } return n; }
 
 /* ═══ 경력관리 자료 — «지난 이력과 견주기»(①②③)에만 읽는다 ═══
    대표 지시 2026-10-07 「신청재료 필요없다 모두 정리해달라」 — 「👤 신청 재료」 탭(목록·복사·CSV)은 걷어냈다.
@@ -3350,11 +3352,13 @@ async function recMailScan(force){
   _recMailBusy=true; _recMailErr=''; recDraw();
   try{
     var fsv=(await fbDb.ref('mailbox/folders').once('value')).val()||{};
-    var pick=recMailFolders(fsv), folders=[];
-    for(var i=0;i<pick.length;i++){
-      var v=(await fbDb.ref('mailbox/msgs/'+pick[i].slug).once('value')).val()||{};
-      folders.push({ folder:pick[i].name, sent:pick[i].kind==='sent', rows:v });
-    }
+    var pick=recMailFolders(fsv);
+    var folderSnaps=await Promise.all(pick.map(function(f){
+      return fbDb.ref('mailbox/msgs/'+f.slug).once('value').then(function(s){ return s.val()||{}; });
+    }));
+    var folders=pick.map(function(f,i){
+      return { folder:f.name, sent:f.kind==='sent', rows:folderSnaps[i]||{} };
+    });
     var items=GovSubmit.collect(folders, recMatches).slice(0,300);
     lsSet('recruit_mailitems', JSON.stringify(items)); lsSet('recruit_mail_at', String(Date.now()));
     lsSet('recruit_mailfolders', String(pick.length));
@@ -3971,6 +3975,8 @@ function boot(){
     var r=await whoAmI(u);
     if(!r.ok){ applyLock('lock', r.why); return; }
     applyLock('ok');
+    /* 개인 보관함(gov/{uid})과 서버 공고함(gov_feed)을 직렬 대기 없이 동시에 내려받기 시작 */
+    _preGovFeed=fbDb.ref('gov_feed').once('value'); _preGovFeed.catch(function(){});
     await cloudPull(); await inboxPull(); srcBackfill(); rejudge(); drawKw(); draw(); readyNote(); auto();
     /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
     setTab(lsGet('tab'));

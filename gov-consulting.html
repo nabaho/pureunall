@@ -3099,12 +3099,24 @@ function _fetchRoster(){
   }).catch(()=>_fbDB.ref('data/user_accounts').once('value').then(s2=>norm(s2.val())||[]).catch(()=>[]));
 }
 
-// 시작 시 Firebase → localStorage (서버 우선)
+// 시작 시 Firebase → localStorage (서버 우선 · 직렬 대기 없이 전체 노드 병렬 수신)
 async function fbSyncDown(){
   const failed=[];
-  for(const[lsKey,node]of Object.entries(FB_NODES)){
+  const entries=Object.entries(FB_NODES);
+  const settled=await Promise.allSettled(entries.map(([,node])=>_fbDB.ref(node).get()));
+  for(let i=0;i<entries.length;i++){
+    const[lsKey,node]=entries[i];
+    const item=settled[i];
+    if(!item||item.status!=='fulfilled'){
+      const e=item?item.reason:new Error('network');
+      /* ★ 예전에는 여기가 «빈 catch» 였다. 권한에 막힌 것과 자료가 없는 것이
+         화면에서 똑같아 보여, 로그인이 안 먹었다는 사실을 아무도 몰랐다. */
+      failed.push({node:node, e:e});
+      console.warn('[내려받기 실패]', node, e);
+      continue;
+    }
     try{
-      const snap=await _fbDB.ref(node).get();
+      const snap=item.value;
       if(snap.exists()){
         const inc=snap.val();
         /* 내가 올리는 중인 칸은 덮지 않는다 — 올리기가 끝나면 그쪽이 새 값을 받아 온다 */
@@ -3120,8 +3132,6 @@ async function fbSyncDown(){
         finally{ _fbSuppress=false; }
       }
     }catch(e){
-      /* ★ 예전에는 여기가 «빈 catch» 였다. 권한에 막힌 것과 자료가 없는 것이
-         화면에서 똑같아 보여, 로그인이 안 먹었다는 사실을 아무도 몰랐다. */
       failed.push({node:node, e:e});
       console.warn('[내려받기 실패]', node, e);
     }

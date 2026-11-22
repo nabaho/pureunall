@@ -7058,7 +7058,7 @@ body.portal-mode #moreFab{display:flex;}
     try { if(window.caches && caches.delete) caches.delete('pucards-share'); } catch(_cd){}
     try {
       if(window.indexedDB && indexedDB.deleteDatabase){
-        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1','pu_fast_boot_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
         if(typeof indexedDB.databases === 'function'){
           indexedDB.databases().then(function(ls){
             (ls || []).forEach(function(it){
