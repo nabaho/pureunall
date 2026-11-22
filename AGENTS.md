@@ -97,6 +97,12 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 
 ---
 
+## 시스템 장애 알림은 화면에 띄우지 않고 저절로 «처리 완료»로 정리한다 (2026-11-22)
+
+어느 프로그램에도 장애 알림용 떠 있는 단추·창을 만들지 않는다(앱바와 겹친다). 오류는 `js/pu-health.js` 가 «처음부터 처리 완료»로 적고,
+서버가 적은 알림·쌓인 것은 총괄관리자 화면이 열릴 때 조용히 정리한다 — 기록은 지우지 않는다. 창은 포털 [⚙ 설정] 「열어보기」를 사람이 눌렀을 때만 뜬다.
+새 프로그램은 `pu-health.js?v=` 한 벌만 싣는다. 지킴: `tests/health-auto-settle.test.js` · 자세히: `docs/규칙/장애알림-자동정리.md`
+
 ## ERP 주소 — `https://erp.pureunlabor.co.kr` (2026-11-15 이사)
 
 배포 주소는 `https://erp.pureunlabor.co.kr`, 홈페이지는 `https://pureunlabor.co.kr` 이다. 옛 `https://nabaho.github.io/pureunall/*` 은 GitHub 이 301 로 새 주소에 넘긴다 — «동작은 하지만» 새 코드·문서·안내 글에 쓰지 않는다.

@@ -124,6 +124,12 @@
 - 입금·성과 조회는 `erpIncomeLive`·`erpPerfCounts` 거르개를 반드시 거치고, 데이터 정리 전후에는 `node scripts/erp-integrity-audit.js` 로 불변성을 검증한다.
 - 지킴: `tests/anti-resurrection-guards.test.js` · 자세히: `docs/규칙/종료-삭제-되돌림-불변.md`
 
+## 시스템 장애 알림은 화면에 띄우지 않고 저절로 «처리 완료»로 정리한다 — 모든 프로그램 (대표 지시 2026-11-22)
+
+- 어느 프로그램에도 장애 알림용 떠 있는 단추·창을 만들지 않는다(앱바와 겹친다). 오류는 `js/pu-health.js` 가 «처음부터 처리 완료»로 적고, 서버가 적은 알림·쌓인 것은 총괄관리자 화면이 열릴 때 조용히 정리한다. 기록은 지우지 않는다.
+- 창은 포털 [⚙ 설정] 「열어보기」를 사람이 눌렀을 때만 뜬다. 새 프로그램은 `pu-health.js?v=` 한 벌만 싣는다 — 따로 만들지 않는다.
+- 지킴: `tests/health-auto-settle.test.js` · 자세히: `docs/규칙/장애알림-자동정리.md`
+
 ## 어느 방이든 — 공용 상태 파일 `STATUS.md`
 
 - 여러 방이 동시에 고친다. 시작할 때 `STATUS.md` 를 읽고 `gh pr list --state open` 을 본다. 코드를 만지기 전에 「되풀이된 실수」 절을 읽는다.

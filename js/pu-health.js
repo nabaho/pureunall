@@ -5,12 +5,30 @@
 
   var STORE_KEY = 'pu_health_pending_v1';
   var DEDUPE_KEY = 'pu_health_dedupe_v1';
+  var SETTLE_KEY = 'pu_health_settle_v1';
   var MAX_PENDING = 30;
   var DEDUPE_MS = 10 * 60 * 1000;
   var boundApps = [];
   var flushing = false;
   var adminAlerts = [];
-  var adminLoadFailed = false;
+
+  /* ── 장애 알림은 «화면에 띄우지 않고» 저절로 «처리 완료»로 정리한다 (대표 지시 2026-11-22) ──
+     「시스템 장애 알림 관련 모두 처리 완료 버튼 안 눌러도 자동으로 정리되게,
+       앞으로 다른 전체 프로그램에 이 창 안 뜨게 다 만들어 달라.」
+
+     ★ 무엇이 있었나 — 어느 프로그램에서든 오류가 한 번 나면 왼쪽 아래에 빨간
+       「⚠ 장애 알림 N」 단추가 떴고, 누르면 «시스템 장애 알림» 창이 열려 건마다
+       「처리 완료」를 눌러야 했다(2026-10-04 「모두 처리 완료」 단추를 달았지만 «누르는 일»은 그대로).
+     ★ 이제 규칙은 셋이다.
+       ① 이 파일은 어느 화면에도 단추·창을 «스스로» 만들지 않는다 — 떠 있는 빨간 단추는 없다.
+          창(renderAdminPanel)은 포털 [⚙ 설정]의 「열어보기」(openAdminPanel)를 사람이 눌렀을 때만 뜬다.
+       ② 이 화면에서 난 오류는 서버에 «처음부터 처리 완료»(status=resolved·resolvedBy='auto')로 적는다.
+          ⚠ 기록을 없애지 않는다 — 나중에 «무슨 오류가 났었나»를 볼 길(서버 systemAlerts)은 남는다.
+       ③ 서버가 적은 알림(새 기기 로그인·카카오 실패·뉴스레터·취업규칙 모으기 등 status=new)과
+          이미 쌓인 것은, 총괄관리자 화면이 열릴 때 «조용히» 처리 완료로 바꾼다(settleOpen).
+          한 건씩 누르던 것과 «같은 세 칸»(status·resolvedAt·resolvedBy)만 바꾸고 지우지 않는다.
+     ⚠ 이 규칙을 되돌려 «늘 떠 있는 단추»를 다시 만들지 않는다 — 앱바(js/pu-appbar.js)가 정리하는
+       떠 있는 단추를 화면마다 따로 만들면 겹치고 가린다. 검사: tests/health-auto-settle.test.js */
 
   function safeText(value, max) {
     return String(value == null ? '' : value).replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').slice(0, max || 700);
@@ -36,12 +54,11 @@
        열린 7건을 서버에서 읽어 보니 «전부» 기금 화면이 10분마다 올린
        「ResizeObserver loop completed with undelivered notifications.」였다(누적 69건).
        이것은 크롬이 «이번 칸에 그림을 한 번 더 그린다»고 알려 주는 말이지 고장이 아니다.
-       그런데 오류 그물(window.error)이 이것을 장애로 세어 10분마다 새 건을 만들었고,
-       새 건이 생길 때마다 배지를 다시 칠해 «깜빡였다».
+       그런데 오류 그물(window.error)이 이것을 장애로 세어 10분마다 새 건을 만들었다.
      ★ 「Script error.」도 같다 — 다른 출처의 스크립트가 낸 오류를 브라우저가 «내용 없이»
        알려 주는 말이다(37건). 무엇이 났는지 알 길이 없어 처리할 것도 없다.
      ⚠ 두 곳에서 «함께» 거른다 — 새로 올릴 때(enqueue)와 읽어 셀 때(flattenAlerts).
-       올릴 때만 거르면 이미 서버에 쌓인 것이 계속 배지를 켠다. 읽을 때만 거르면
+       올릴 때만 거르면 이미 서버에 쌓인 것이 계속 남는다. 읽을 때만 거르면
        서버에는 영영 쌓인다. */
   var NOISE = [
     /ResizeObserver loop/i,
@@ -65,6 +82,8 @@
     Object.keys(dedupe).forEach(function (key) { if (Date.now() - dedupe[key] > 24 * 60 * 60 * 1000) delete dedupe[key]; });
     writeJson(DEDUPE_KEY, dedupe);
 
+    /* 여기 status 'new' 는 «아직 서버에 못 올린 대기 표시»일 뿐이다 — 서버에 적을 때(flush)
+       «처리 완료»로 바꿔 적는다(판단은 한 곳에서만). 화면에는 아무것도 띄우지 않는다. */
     var pending = readJson(STORE_KEY, []);
     pending.push({
       localId: Date.now().toString(36) + id,
@@ -76,12 +95,6 @@
       status: 'new'
     });
     writeJson(STORE_KEY, pending.slice(-MAX_PENDING));
-    /* ★ 방금 장애가 났다 — 이제 «열린 것이 있다»는 것을 안다.
-       평소에는 세어 보지 않아 조용하지만(모르면 안 띄운다), 여기서는 확실히
-       아니까 그 자리에서 빨간불을 켠다. 관리자 화면이 아니면 paintAdminBadge 가
-       알아서 넘긴다 — 여기서 관리자인지 따지지 않는다(판단은 한 곳에서만). */
-    knownOpen = (knownOpen || 0) + 1;
-    paintAdminBadge(window.document.getElementById('pu-health-admin-badge'));
     flush();
     return true;
   }
@@ -100,6 +113,9 @@
     return n.indexOf('@') >= 0 ? '' : n;
   }
 
+  /* 자동으로 «처리 완료»를 적는 사람 표시 — 한 건씩 누른 사람(uid)과 구별된다 */
+  var AUTO_BY = 'auto';
+
   function flush() {
     if (flushing || window.navigator.onLine === false) return Promise.resolve(false);
     var app = activeApp();
@@ -111,8 +127,13 @@
     var chain = Promise.resolve();
     pending.slice().forEach(function (event) {
       chain = chain.then(function () {
-        /* name — 관리자 장애 창에 «누구 것인지» 보여 줄 이름. 창에는 로그인 이메일을 내지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」) */
-        var record = Object.assign({}, event, { uid: user.uid, email: safeText(user.email, 150), name: safeText(myName(user), 60) });
+        /* name — «누구 것인지» 남길 이름. 로그인 이메일은 적지 않는다(대표 결정 2026-10-25 「이름만 있어야한다」)
+           ★ 처음부터 «처리 완료»로 적는다 — 이 업데이트 «전에» 대기줄에 들어 있던 것(status 'new')도 같다.
+             서버 규칙은 본인 알림을 새로 쓰는 것을 허락하고 status 는 new|resolved 만 본다 — 규칙은 그대로다. */
+        var record = Object.assign({}, event, {
+          status: 'resolved', resolvedAt: Date.now(), resolvedBy: AUTO_BY,
+          uid: user.uid, email: safeText(user.email, 150), name: safeText(myName(user), 60)
+        });
         delete record.localId;
         return app.database().ref('systemAlerts/' + user.uid + '/' + event.localId).set(record).then(function () {
           var latest = readJson(STORE_KEY, []).filter(function (item) { return item.localId !== event.localId; });
@@ -123,91 +144,25 @@
     return chain.then(function () { flushing = false; return true; }, function () { flushing = false; return false; });
   }
 
-  function flattenAlerts(value) {
+  /* 열린(status new) 알림 목록. includeNoise 가 참이면 잔소리도 함께 — 정리할 때는 «전부» 처리 완료로 바꾼다. */
+  function flattenAlerts(value, includeNoise) {
     var list = [];
     Object.keys(value || {}).forEach(function (uid) {
       Object.keys(value[uid] || {}).forEach(function (id) {
         var item = value[uid][id] || {};
         if (item.status !== 'new') return;
-        if (isNoise(item.message)) return;        /* 예전에 쌓인 잔소리도 세지 않는다 — 배지가 그것으로 켜졌다 */
-        list.push(Object.assign({ uid: uid, id: id }, item));
+        if (!includeNoise && isNoise(item.message)) return;   /* 예전에 쌓인 잔소리도 창에는 세지 않는다 */
+        /* ★ 서버 «키»(uid·id)가 늘 이긴다 — 본문에 같은 이름의 칸을 적어 넣어도 덮이지 않는다.
+           본문이 이기면 «처리 완료»가 엉뚱한 자리(없는 번호)로 가서 묶음 전체가 거절된다. */
+        list.push(Object.assign({}, item, { uid: uid, id: id }));
       });
     });
     return list.sort(function (a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); });
   }
 
-  /* ── 장애가 없으면 화면에 «아무것도» 없다 (대표 지시 2026-08-23, 두 번째) ──
-     「장애알림 표시가 장애가 없을경우 필요없다 … 이 문구 없애달라」
-     「장애알림 글자 왜 안없어지냐 피시와 폰에서 여전히 나온다」
-
-     처음엔 관리자면 늘 빨간 단추를 띄웠다. 다음엔 0건이면 감추되 «아직 안 세어
-     봤을 때»는 조용한 회색 단추를 남겼다 — 그런데 세는 것은 «눌렀을 때»뿐이라,
-     실제로는 그 회색 단추가 모든 화면에 늘 떠 있었다. 고친 게 아니라 색만 바꾼 것이다.
-
-     이제 규칙은 하나다: 열린 건이 «1건 이상인 것을 아는 때»에만 뜬다.
-       · 모른다(null)  → 안 뜬다
-       · 0건            → 안 뜬다
-       · 1건 이상       → 빨갛게 뜬다
-     늘 켜져 있는 등은 아무것도 알려 주지 못한다 — 이 저장소가 금액 경고에서
-     이미 겪은 실수다. 이제 빨간불이 뜨면 그 자체로 «지금 무슨 일이 있다»는 뜻이 된다.
-
-     ⚠ 그러면 평소에 관리자는 어떻게 들여다보나 — 포털(enter.html)의 [⚙ 설정]
-       안에 「시스템 장애 알림」 줄을 두었다. 늘 떠 있는 단추를 하나 더 만드는
-       대신, 이미 있는 관리자 서랍에 넣는다. 화면을 한 뼘도 차지하지 않는다.
-     ⚠ 미리 세어 두지 않는 까닭 — 그러려면 장애 이력 전체(지금 191건·156KB)를
-       화면을 띄울 때마다 내려받아야 한다. 싸게 알려면 «열린 건수»만 담는 작은
-       자리가 따로 있어야 하고, 그건 규칙(콘솔)에 새 경로를 여는 일이라 대표 확인이
-       필요하다. 그때까지는 «모르면 조용히 있는다»가 옳다. */
-  var HEALTH_ALARM = 'position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:2147483646;border:0;border-radius:999px;padding:10px 14px;background:#b42318;color:#fff;font:800 12px/1.2 system-ui,sans-serif;box-shadow:0 6px 22px #0003;cursor:pointer;';
-
-  /* 아는 열린 건수. null = 아직 안 세어 봐서 «모른다». 모르면 안 띄운다. */
-  var knownOpen = null;
-  /* 총괄관리자로 확인됐는가 — 이 값이 참일 때만 단추가 뜬다.
-     예전에는 monitorAdmin 이 직접 hidden 을 만졌는데, 그러면 「0건이라 감췄다」를
-     곧바로 되돌려 버린다. 판단은 paintAdminBadge 한 곳으로 모은다. */
-  var isAdminUser = false;
-
-  function paintAdminBadge(badge) {
-    if (!badge) return;
-    /* 보이고 감추는 판단은 «여기 한 곳»에서만 한다. 두 곳에서 하면 서로 되돌린다
-       — monitorAdmin 이 hidden=false 로 덮어써 0건인데도 다시 뜨는 식이다.
-       ★ knownOpen > 0 «만» 띄운다. null(모름)도 0 과 똑같이 감춘다 —
-         !== 0 으로 적으면 모름일 때 또 떠서 처음 문제로 되돌아간다. */
-    if (!isAdminUser) { badge.hidden = true; return; }
-    if (adminLoadFailed) {
-      badge.hidden = false;
-      badge.style.cssText = HEALTH_ALARM;
-      badge.textContent = '장애 알림 불러오기 실패 — 다시';
-      badge.title = '일시적인 통신 오류입니다. 다시 눌러 주세요.';
-      return;
-    }
-    if (!(knownOpen > 0)) { badge.hidden = true; return; }
-    badge.hidden = false;
-    badge.style.cssText = HEALTH_ALARM;
-    badge.textContent = '⚠ 장애 알림 ' + knownOpen;
-    badge.title = '처리할 장애 알림이 ' + knownOpen + '건 있습니다';
-  }
-
-  function ensureAdminBadge(app) {
-    var badge = window.document.getElementById('pu-health-admin-badge');
-    if (!badge) {
-      badge = window.document.createElement('button');
-      badge.id = 'pu-health-admin-badge';
-      badge.type = 'button';
-      badge.hidden = true;
-      /* 직접 누른 단추는 화면에서 실패 상태를 보여 준다. 여기서 거절을 받아 주지
-         않으면 전역 unhandledrejection 감시기가 이 조회 실패를 새 장애로 다시 적어
-         같은 알림이 계속 늘어나는 순환이 생긴다. */
-      badge.onclick = function () { showAdminPanel(app).catch(function () {}); };
-      window.document.body.appendChild(badge);
-    }
-    paintAdminBadge(badge);
-    return badge;
-  }
-
   /* 장애 이력은 오래될수록 커진다. 관리자 탭마다 전체 루트를 실시간 구독하면
      오류 한 건이 생길 때마다 과거 이력까지 다시 내려온다. 평소에는 읽지 않고,
-     총괄관리자가 단추를 눌렀을 때 한 번만 최근 미처리 목록을 가져온다. */
+     «정리할 때(몇 시간에 한 번)»와 «사람이 창을 열 때»만 한 번씩 가져온다. */
   function waitForRetry() {
     return new Promise(function (resolve) { window.setTimeout(resolve, 180); });
   }
@@ -235,42 +190,26 @@
     });
   }
 
+  /* 「열어보기」 — 포털 [⚙ 설정]의 줄이 부르는 «사람이 여는 문». 화면 어디에도 단추가 없다.
+     ★ 결과(아직 정리 전인 건수)를 돌려준다 — 부르는 쪽이 「불러오는 중…」 을 끝낼 수 있다. */
   function showAdminPanel(app) {
     app = app || activeApp();
     if (!app) return Promise.resolve(false);
-    var badge = ensureAdminBadge(app);
-    badge.disabled = true;
-    badge.textContent = '장애 알림 불러오는 중…';
-    /* ★ 결과를 돌려준다 — 포털 [⚙ 설정] 의 「시스템 장애 알림」 줄이 이걸 기다렸다가
-       제 단추에 「불러오는 중…」 을 띄운다. 안 돌려주면 부르는 쪽이 끝을 모른다. */
     return readAdminAlerts(app).then(function (alertsSnapshot) {
       adminAlerts = flattenAlerts(alertsSnapshot.val());
-      knownOpen = adminAlerts.length;      // 이제 «안다» — 색이 뜻을 갖는다
-      adminLoadFailed = false;
       renderAdminPanel(app);
-      return knownOpen;
+      return adminAlerts.length;
     }).catch(function (error) {
-      /* 못 읽었으면 «모르는 것»이지 «없는 것»이 아니다 — 0 으로 적어 두면
-         진짜 장애가 있어도 조용해진다. 모름(null)으로 되돌린다. */
-      knownOpen = null;
-      adminLoadFailed = true;
+      /* 못 읽었으면 «없는 것»이 아니라 «모르는 것» — 부르는 쪽이 실패로 알린다. 여기서 창을 띄우지 않는다. */
       if (window.console && typeof window.console.warn === 'function') {
         window.console.warn('[PUHealth] 장애 알림 조회 실패:', safeText(error && (error.code || error.message) || error, 160));
       }
       throw error;
-    }).then(function (result) {
-      badge.disabled = false;
-      paintAdminBadge(badge);
-      return result;
-    }, function (error) {
-      badge.disabled = false;
-      paintAdminBadge(badge);
-      return Promise.reject(error);
     });
   }
 
-  /* 「모두 처리 완료」 한 번에 쓸 칸들 — 한 건씩 누르던 것과 «같은 세 칸»(status·resolvedAt·resolvedBy)만 바꾼다.
-     ⚠ 알림 자체는 지우지 않는다(기록은 남는다). */
+  /* 「처리 완료」로 한꺼번에 쓸 칸들 — 한 건씩 누르던 것과 «같은 세 칸»(status·resolvedAt·resolvedBy)만 바꾼다.
+     ⚠ 알림 자체는 지우지 않는다(기록은 남는다). null 을 쓰면 «지우는 것»이다 — 절대 쓰지 않는다. */
   function resolveAllPatch(items, now, me) {
     var up = {};
     (items || []).forEach(function (it) {
@@ -279,6 +218,56 @@
       up[p + 'status'] = 'resolved'; up[p + 'resolvedAt'] = now; up[p + 'resolvedBy'] = me;
     });
     return up;
+  }
+
+  /* ── 쌓인 알림을 «조용히» 처리 완료로 (총괄관리자 화면이 열릴 때) ──
+     ★ 얼마나 자주 — 잘 됐으면 6시간에 한 번, 못 했으면 30분 뒤에 다시. 장애 이력 전체를 읽는 일이라
+       화면을 열 때마다 하면 읽는 양만 늘어난다(rtdb-cost-guards 의 뜻). 시작 «전에» 시각을 적어 둬
+       탭을 여러 개 열어도 한꺼번에 읽지 않는다.
+     ★ 묶음 하나가 규칙에 걸려 통째로 거절돼도 나머지는 정리된다 — 걸린 묶음은 건별로 다시 쓴다.
+     ★ 모든 오류는 삼킨다 — 정리가 실패한 것을 새 장애로 다시 적으면 같은 알림이 늘어나는 순환이 된다.
+     ⚠ 지우지 않는다 · 이미 처리된 것·잔소리 거르기와 무관하게 «열린 것 전부»가 대상이다. */
+  var SETTLE_EVERY_MS = 6 * 60 * 60 * 1000;
+  var SETTLE_RETRY_MS = 30 * 60 * 1000;
+  var SETTLE_CHUNK = 100;
+
+  function settleDue(now) {
+    var rec = readJson(SETTLE_KEY, null);
+    if (!rec || typeof rec.at !== 'number') return true;
+    return now - rec.at >= (rec.ok ? SETTLE_EVERY_MS : SETTLE_RETRY_MS);
+  }
+
+  /* 이 묶음에서 «하나라도» 쓰였으면 true — 전부 거절됐으면(통신 끊김·권한) false */
+  function writeSettled(app, part) {
+    var db = app.database();
+    return db.ref().update(resolveAllPatch(part, Date.now(), AUTO_BY)).then(function () { return true; }, function () {
+      return part.reduce(function (chain, item) {
+        return chain.then(function (okSoFar) {
+          return db.ref().update(resolveAllPatch([item], Date.now(), AUTO_BY)).then(function () { return true; }, function () { return okSoFar; });
+        });
+      }, Promise.resolve(false));
+    });
+  }
+
+  function settleOpen(app) {
+    app = app || activeApp();
+    if (!app) return Promise.resolve(0);
+    var now = Date.now();
+    if (!settleDue(now)) return Promise.resolve(0);
+    writeJson(SETTLE_KEY, { at: now, ok: false });
+    return readAdminAlerts(app).then(function (snapshot) {
+      var items = flattenAlerts(snapshot.val(), true);
+      var anyOk = false;
+      var chain = Promise.resolve();
+      for (var i = 0; i < items.length; i += SETTLE_CHUNK) {
+        (function (part) { chain = chain.then(function () { return writeSettled(app, part).then(function (ok) { if (ok) anyOk = true; }); }); })(items.slice(i, i + SETTLE_CHUNK));
+      }
+      return chain.then(function () {
+        /* 하나라도 쓰였거나 정리할 것이 없었으면 «잘 끝남»(6시간 뒤). 전부 거절됐으면 «못 함»(30분 뒤 다시) */
+        writeJson(SETTLE_KEY, { at: Date.now(), ok: !items.length || anyOk });
+        return items.length;
+      });
+    }).catch(function () { return 0; });
   }
 
   function renderAdminPanel(app) {
@@ -297,9 +286,10 @@
     var titleText = title.querySelector('span');
     title.querySelector('[aria-label="닫기"]').onclick = function () { panel.remove(); };
     /* 「모두 처리 완료」 — 한 건씩 누르던 것을 한 번에 (대표 지시 2026-10-04 「처리완료 한번에 모두 클릭하는 버튼 만들어라」).
-       ★ 창에 그린 30건이 아니라 «열린 장애 알림 전부»를 바꾼다 — 화면 밖 것이 남으면 빨간불이 그대로다.
+       ★ 창에 그린 30건이 아니라 «열린 장애 알림 전부»를 바꾼다 — 화면 밖 것이 남으면 창에 계속 걸린다.
        ★ 한 번의 update 로 쓴다 — 반쯤 되고 멈추는 일이 없다(전부 되거나 전부 안 된다).
-       ⚠ 지우지 않는다 — 한 건씩과 같이 status 만 resolved 로 바꾼다. 기록은 남는다. */
+       ⚠ 지우지 않는다 — 한 건씩과 같이 status 만 resolved 로 바꾼다. 기록은 남는다.
+       (이제는 저절로 정리되므로 이 창에는 보통 아무것도 없다 — 정리 전의 것이 남았을 때를 위한 «손으로 하는 길».) */
     var allBtn = title.querySelector('[data-all]');
     if (!adminAlerts.length) allBtn.style.display = 'none';
     allBtn.onclick = function () {
@@ -309,8 +299,6 @@
       allBtn.disabled = true; allBtn.textContent = '처리 중…';
       app.database().ref().update(resolveAllPatch(items, Date.now(), app.auth().currentUser.uid)).then(function () {
         adminAlerts = adminAlerts.filter(function (x) { return !items.some(function (y) { return y.uid === x.uid && y.id === x.id; }); });
-        knownOpen = adminAlerts.length;
-        paintAdminBadge(window.document.getElementById('pu-health-admin-badge'));
         panel.remove();
       }).catch(function () {
         // 못 바꿨으면 다시 누를 수 있어야 한다 — 영영 잠긴 단추를 남기지 않는다
@@ -340,10 +328,6 @@
           row.remove();
           adminAlerts = adminAlerts.filter(function (x) { return !(x.uid === item.uid && x.id === item.id); });
           left -= 1;
-          /* 처리한 만큼 단추도 함께 내린다 — 창을 닫고 나서 빨간불만 남으면
-             「처리했는데 왜 아직 빨갛나」가 된다(건의함 배지에서 겪은 것과 같은 일). */
-          knownOpen = left;
-          paintAdminBadge(window.document.getElementById('pu-health-admin-badge'));
           if (left <= 0) { panel.remove(); return; }   // 다 처리했으면 창도 함께 닫는다
           titleText.textContent = '시스템 장애 알림 (' + left + ')';
         }).catch(function () {
@@ -362,12 +346,12 @@
     var div = window.document.createElement('div'); div.textContent = String(value || ''); return div.innerHTML;
   }
 
+  /* 총괄관리자(isAdmin)로 확인되면 쌓인 알림을 조용히 정리한다 — 화면에는 아무것도 만들지 않는다. */
   function monitorAdmin(app, user) {
     app.database().ref('uid_roles/' + user.uid).once('value').then(function (snapshot) {
       var role = snapshot.val() || {};
       if (!role.isAdmin) return;
-      isAdminUser = true;
-      ensureAdminBadge(app);   // 보임·색·글자는 모두 paintAdminBadge 가 정한다
+      settleOpen(app);
     }).catch(function () {});
   }
 
@@ -397,8 +381,7 @@
     return true;
   }
 
-  /* openAdminPanel — 늘 떠 있는 단추 없이도 관리자가 들여다볼 수 있는 유일한 문.
-     포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 이것을 부른다. */
-  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _readAdminAlerts: readAdminAlerts, _resolveAllPatch: resolveAllPatch, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
+  /* openAdminPanel — 사람이 직접 들여다보는 유일한 문. 포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 이것을 부른다. */
+  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _readAdminAlerts: readAdminAlerts, _resolveAllPatch: resolveAllPatch, _flattenAlerts: flattenAlerts, _isNoise: isNoise, _settleOpen: settleOpen };
   install();
 })(typeof window !== 'undefined' ? window : null);
