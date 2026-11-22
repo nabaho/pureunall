@@ -12,7 +12,15 @@
   - 영상·소리는 «다 받은 뒤» 재생한다(머리글을 실은 채 흘려 보기는 브라우저가 못 한다). 150MB 넘는 것은 «▶ 받아서 보기»를 눌러야 받는다.
 - `scripts/edulib-revoke-download-tokens.js` — 창고 `edulib/` 파일의 `firebaseStorageDownloadTokens` 하나만 지우는 도구. 기본은 «보기만»(개수),
   `--apply` 때만 바꾸고 `ifMetagenerationMatch` 로 그 사이 바뀐 것은 건너뛴다. 토큰 값은 출력하지 않는다. **아직 돌리지 않았다**(대표 허락 필요 · STATUS.md 2절).
-- `tests/edulib-auth-open.test.js` — 7개(토큰 주소 금지·증표 머리글·권한 실패·칸별 멈춤·blob 저장·큰 영상은 눌러야·스크립트 범위).
+- `functions/edulib-token-sweep.js` + `functions/index.js` — 화면에서 새로 올린 파일에도 파이어베이스가 토큰을 저절로 붙이므로(막을 수 없음) 두 겹으로 지운다.
+  ① 창고 트리거 `edulibTokenStrip`(사진 창고 onFinalize, 함수와 같은 asia-northeast3) — 올리기가 끝나는 순간 그 파일의 토큰 열쇠 하나만(`stripOne`).
+     edulib/ 가 아니면 곧바로 끝 · 일시 실패는 다시 시도(failurePolicy) · 한 시간 넘은 되풀이는 버리고 밤 정리에 맡김.
+  ② 매일 밤 `edulibMailSweep` 이 메일 정리 뒤에 `edulib/` 전체를 훑어 메운다(`runEdulibTokenSweepOnce` — 메일 쪽 잠금·실패와 따로, 540초 중 남은 시간만).
+  둘 다 generation·metageneration 조건, 스크립트와 판정 함수를 함께 쓴다. **함수는 아직 안 올렸다**(이름 찍어 배포 — STATUS.md 2절).
+- 보안 재검증(1회차) 반영: 로그아웃·계정 바꿈 때 받던 것(내려받기 포함)을 멈추고 칸·blob 주소를 모두 풂(`resetOriginals`) ·
+  받는 사이 사람이 바뀌면 저장 안 함 · 진행 표시도 `live()` 로 옛 칸 글을 덮지 않음.- 보안 검토(1차) 반영: 보기용 blob 은 확장자 허용 목록 종류로 다시 싸고 나머지·내려받기는 바이트만(같은 출처 주소가 문서로 열리지 않게) ·
+  blob 주소는 «그 칸»이 주인(칸을 닫으면 그 칸 것만 풀고, 늦게 온 결과는 `live()` 로 버림) · 자세히를 다시 열 때 앞 칸 정리.
+- `tests/edulib-auth-open.test.js` — 10개(토큰 주소 금지·증표 머리글·권한 실패·칸별 멈춤·blob 저장·blob 종류·칸별 정리·큰 영상은 눌러야·스크립트 범위·밤 정리).
 - `pu-edulib.html` — `pu-edulib-app.js?v=7`.
 - 창고 규칙은 그대로(`edulib/{id}/{file}` 읽기 `isStaff()`) — 바꿀 것 없음.
 

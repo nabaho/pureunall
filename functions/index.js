@@ -8040,14 +8040,31 @@ exports.runMailContractSweep = functions
 
 /* 🎓 강의자료 원본의 내려받기 토큰 정리 (2026-11-22 «원본 열기를 권한 확인 방식으로»)
    화면은 원본을 로그인 증표로만 받는다(창고 규칙 isStaff() 를 매번). 화면에서 올린 파일에 파이어베이스가 저절로 붙이는 토큰을
-   매일 밤 edulibMailSweep 이 메일 정리 뒤에 지운다(사람이 바로 돌릴 때는 scripts/edulib-revoke-download-tokens.js).
-   ⚠ 창고에 쓰는 것은 «edulib/ 파일의 토큰 열쇠 하나를 null 로»뿐 — 내용·다른 메타데이터는 그대로. 판정·조건은 edulib-token-sweep.js 한 곳. */
+   ① 올리기가 끝나는 순간 창고 트리거(edulibTokenStrip)가 지우고 ② 매일 밤 edulibMailSweep 이 메일 정리 뒤에 빠진 것을 메운다.
+   (사람이 바로 돌릴 때는 scripts/edulib-revoke-download-tokens.js — 기본 보기만)
+   ⚠ 창고에 쓰는 것은 «edulib/ 파일의 토큰 열쇠 하나를 null 로»뿐 — 내용·다른 메타데이터는 그대로. 판정·조건은 edulib-token-sweep.js 한 곳.
+   ⚠ 배포는 «이름 찍어서» — functions:edulibTokenStrip (밤 정리는 edulibMailSweep 과 함께 올라간다) */
 const EdulibTokenSweep = require("./edulib-token-sweep");
-async function runEdulibTokenSweepOnce() {
-  const r = await EdulibTokenSweep.revokeTokens({ bucket: getStorage().bucket(PHOTO_BUCKET), log: (...a) => console.warn(...a) });
+async function runEdulibTokenSweepOnce(budgetMs) {
+  const r = await EdulibTokenSweep.revokeTokens({ bucket: getStorage().bucket(PHOTO_BUCKET), log: (...a) => console.warn(...a) }, { budgetMs });
   console.log("edulibTokenSweep", JSON.stringify(r));
   return r;
 }
+/* 올리기가 끝나는 순간 — 사진 창고(함수와 같은 asia-northeast3)의 «모든» 파일에 불리지만 edulib/ 가 아니면 곧바로 끝낸다(짧은 호출 하나).
+   ⚠ 일시 실패는 창고가 다시 부른다(failurePolicy). 412(그 사이 바뀜)·404(없어짐)는 끝난 것으로 친다.
+   ⚠ 한 시간 넘게 되풀이된 알림은 버린다 — 밤 정리가 메운다(실패가 이레 동안 되풀이되지 않게). */
+exports.edulibTokenStrip = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", failurePolicy: true })
+  .storage.bucket(PHOTO_BUCKET).object()
+  .onFinalize(async (obj, context) => {
+    if (!EdulibTokenSweep.isEdulibObject(obj && obj.name)) return null;
+    const age = Date.now() - Date.parse((context && context.timestamp) || "");
+    if (age > 60 * 60 * 1000) { console.warn("edulibTokenStrip too old — 밤 정리에 맡김", String(obj.name).split("/")[1]); return null; }
+    const r = await EdulibTokenSweep.stripOne(obj, { bucket: getStorage().bucket(PHOTO_BUCKET) });
+    console.log("edulibTokenStrip", r, String(obj.name).split("/")[1]);
+    return null;
+  });
 
 /* 🎓 보낸 메일의 강의자료 → 강의자료 앱 자동 정리 (대표 지시 2026-11-21
      「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
@@ -8096,6 +8113,7 @@ exports.edulibMailSweep = functions
   .pubsub.schedule("30 19 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
+    const t0 = Date.now();
     let release = null, mailErr = null;
     try { release = await acquireEdulibSweepLock("schedule"); } catch (e) { console.log("edulibMailSweep skipped:", String(e && e.message || e)); }
     if (release) {
@@ -8104,7 +8122,8 @@ exports.edulibMailSweep = functions
         console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
       } catch (e) { mailErr = e; } finally { await release(); }
     }
-    try { await runEdulibTokenSweepOnce(); } catch (e) { console.error("edulibTokenSweep", String(e && e.message || e)); }
+    /* 540초를 메일 정리와 나눠 쓴다 — 남은 시간만큼만(넘치면 다음 날 이어서) */
+    try { await runEdulibTokenSweepOnce(Math.max(20000, 520000 - (Date.now() - t0))); } catch (e) { console.error("edulibTokenSweep", String(e && e.message || e)); }
     if (mailErr) throw mailErr;
     return null;
   });

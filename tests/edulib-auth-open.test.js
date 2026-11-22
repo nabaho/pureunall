@@ -13,6 +13,8 @@
  *   ⑤ 내려받기는 받은 바이트를 이 창의 blob: 주소로 저장한다(새 탭에 창고 주소를 띄우지 않는다)
  *   ⑥ 큰 영상·소리는 «받아서 보기»를 눌러야 받는다(자세히만 열어도 큰 파일이 내려오지 않게)
  *   ⑦ 토큰 지우기 스크립트는 edulib/ 자리만, 그 열쇠 하나만, 기본은 «보기만»
+ *   ⑧ 서버 정리(올린 직후 트리거·매일 밤)도 같은 판정 — generation·metageneration 조건, 412·404 는 끝난 것, 시간 상한
+ *   ⑨ 밤 정리는 메일 정리와 따로 돈다(잠금·실패와 상관없이) · 로그아웃하면 받던 것·칸·blob 주소를 모두 푼다
  * node --test tests/edulib-auth-open.test.js */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -151,11 +153,22 @@ test('⑥ 화면 이음 — 칸 닫기가 받기를 멈추고, 큰 영상은 눌
   const cf = APP.slice(APP.indexOf('function closeFrames('), APP.indexOf('function closeFrames(') + 200);
   assert.match(cf, /stopFetches\(root\)/, '칸을 닫으면 받던 것을 멈춰야 합니다');
   assert.match(cf, /freeObjUrls\(root\)/, '칸을 닫으면 그 칸의 blob 주소를 풀어야 합니다');
-  assert.doesNotMatch(APP, /freeObjUrls\(\)/, '통째로 풀면 다른 칸(자세히·나란히)의 주소까지 죽는다 — 칸별로');
+  const r0 = APP.indexOf('function resetOriginals(');
+  const outside = APP.slice(0, r0) + APP.slice(APP.indexOf('\n  }', r0));
+  assert.doesNotMatch(outside, /freeObjUrls\(\)/, '통째로 풀면 다른 칸(자세히·나란히)의 주소까지 죽는다 — 칸별로(로그아웃 정리만 예외)');
   const od = APP.slice(APP.indexOf('function openDetail('), APP.indexOf('function openDetail(') + 200);
   assert.match(od, /closeFrames\(\$\('mbox'\)\)/, '자세히를 다시 열 때 앞 칸을 먼저 정리');
   const fp = APP.slice(APP.indexOf('function fillPane('), APP.indexOf('function pickLocal('));
   assert.match(fp, /var live = function \(\) \{ return body\._seq === seq && pane\.isConnected; \}/, '늦게 온 결과를 가려낼 잣대');
+  (fp.match(/function \(got, total\) \{[^}]*/g) || ['없음']).forEach((cb) =>
+    assert.match(cb, /live\(\)/, '진행 표시도 바뀐 칸의 글을 덮지 않게 live() 를 먼저: ' + cb.slice(0, 60)));
+  /* 로그아웃·계정 바꿈 — 받던 것·칸·blob 주소를 모두 정리하고, 받는 사이 사람이 바뀌면 저장하지 않는다 */
+  const au = APP.slice(APP.indexOf('firebase.auth().onAuthStateChanged('), APP.indexOf('firebase.auth().onAuthStateChanged(') + 300);
+  assert.match(au, /if \(!u \|\| \(ME\.uid && u\.uid !== ME\.uid\)\) resetOriginals\(\);/);
+  const ro = APP.slice(APP.indexOf('function resetOriginals('), APP.indexOf('function resetOriginals(') + 400);
+  ['stopFetches()', 'closeCompare()', 'closeDetail()', 'freeObjUrls()'].forEach((s) => assert.ok(ro.includes(s), '로그아웃 때 ' + s));
+  const dl = APP.slice(APP.indexOf('function downloadOriginal('), APP.indexOf('function downloadOriginal(') + 900);
+  assert.match(dl, /var uid0 = authUid\(\);[\s\S]*\.then\(function \(blob\) \{\s*if \(authUid\(\) !== uid0\) throw/, '받는 사이 사람이 바뀌면 저장하지 않는다');
   /* 받은 뒤 화면을 고치는 곳(then·catch) — zip 도구를 넘겨받는 중간 단계(Z)만 빼고 모두 live() 를 먼저 본다 */
   const late = [...fp.matchAll(/\.(then|catch)\(function \((\w*)\) \{([\s\S]{0,140})/g)].filter((m) => m[2] !== 'Z');
   assert.ok(late.length >= 4, '영상 then·catch, 문서 then·catch 를 찾아야 합니다');
@@ -239,9 +252,44 @@ test('⑧ 서버 토큰 정리 — edulib/ 의 토큰만, 그 열쇠 하나만, 
   const r2 = await T.revokeTokens({ bucket: many.bucket }, { max: 2 });
   assert.equal(r2.revoked, 2);
   assert.equal(r2.more, true);
+  /* 시간 상한 — 넘으면 멈추고 다음 날 이어서(밤 함수는 메일 정리와 540초를 나눠 쓴다) */
+  const slow = fakeBucket([1, 2, 3].map((i) => ({ name: 'edulib/s' + i + '/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 'x' } })));
+  const realNow = Date.now; let clock = 1000;
+  Date.now = () => (clock += 600);
+  try {
+    const r3 = await T.revokeTokens({ bucket: slow.bucket }, { budgetMs: 1000 });
+    assert.ok(r3.revoked < 3 && r3.more === true, '시간이 다 되면 남은 것은 다음으로');
+  } finally { Date.now = realNow; }
   /* 내용 쓰기·지우기·복사 길이 아예 없다 */
   const src = read('functions/edulib-token-sweep.js');
   assert.doesNotMatch(src, /\.(save|delete|copy|move|upload|createWriteStream)\(/, '토큰 정리는 메타데이터 열쇠 하나만 바꾼다');
+});
+
+test('⑧-2 올린 직후 한 파일 — 다른 자리는 손대지 않고, 알림에 토큰이 없으면 지금 메타데이터를 보고, 412·404 는 끝난 것', async () => {
+  const T = require(path.join(ROOT, 'functions/edulib-token-sweep.js'));
+  const K = T.KEY;
+  function oneBucket(current, failCode) {
+    const calls = [];
+    return { calls, bucket: { file: (name) => ({
+      getMetadata: () => { calls.push(['get', name]); return Promise.resolve([current]); },
+      setMetadata: (body, opt) => { calls.push(['set', name, body, opt]); if (failCode) { const e = new Error('x'); e.code = failCode; return Promise.reject(e); } return Promise.resolve([{}]); },
+    }) } };
+  }
+  const other = oneBucket({});
+  assert.equal(await T.stripOne({ name: 'puphotos/u/a/p.jpg', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, other), 'skip');
+  assert.equal(other.calls.length, 0, '다른 앱 파일은 읽지도 않는다');
+  const direct = oneBucket({});
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '5', metageneration: '1', metadata: { [K]: 't' } }, direct), 'revoked');
+  assert.deepEqual(direct.calls, [['set', 'edulib/e1/a.pdf', { metadata: { [K]: null } }, { ifGenerationMatch: '5', ifMetagenerationMatch: '1' }]]);
+  const late = oneBucket({ generation: '6', metageneration: '2', metadata: { [K]: 't', originalName: 'a.pdf' } });
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '6', metageneration: '1', metadata: {} }, late), 'revoked', '알림에 토큰이 없으면 지금 것을 읽어 본다');
+  assert.deepEqual(late.calls[1][3], { ifGenerationMatch: '6', ifMetagenerationMatch: '2' }, '조건은 지금 읽은 판으로');
+  const none = oneBucket({ generation: '6', metageneration: '2', metadata: { originalName: 'a.pdf' } });
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '6', metageneration: '1', metadata: {} }, none), 'none');
+  assert.ok(!none.calls.some((c) => c[0] === 'set'), '토큰이 없으면 바꾸지 않는다');
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 412)), 'changed');
+  assert.equal(await T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 404)), 'gone');
+  await assert.rejects(T.stripOne({ name: 'edulib/e1/a.pdf', generation: '1', metageneration: '1', metadata: { [K]: 't' } }, oneBucket({}, 503)), '일시 실패는 던져서 다시 시도하게');
 });
 
 test('⑨ 서버 이음 — 매일 밤 메일 정리 뒤에 토큰 정리가 따로 돈다(잠금·실패와 상관없이) · 사진 창고 이름 한 곳', () => {
@@ -252,11 +300,23 @@ test('⑨ 서버 이음 — 매일 밤 메일 정리 뒤에 토큰 정리가 따
   assert.match(helper, /EdulibTokenSweep\.revokeTokens\(\{ bucket: getStorage\(\)\.bucket\(PHOTO_BUCKET\)/, '사진 창고 이름은 PHOTO_BUCKET 한 곳에서');
   const i = idx.indexOf('exports.edulibMailSweep');
   const fn = idx.slice(i, idx.indexOf('\nexports.', i + 10));
-  const iTok = fn.indexOf('runEdulibTokenSweepOnce()'), iMail = fn.indexOf('runEdulibMailSweepOnce(');
+  const iTok = fn.indexOf('runEdulibTokenSweepOnce('), iMail = fn.indexOf('runEdulibMailSweepOnce(');
   assert.ok(iMail > 0 && iTok > iMail, '메일 정리 뒤에 토큰 정리');
   assert.ok(!/skipped:[^\n]*return null/.test(fn), '메일 쪽이 잠겨 있어도 토큰 정리까지 가야 합니다(일찍 끝내지 않는다)');
-  assert.match(fn.slice(iTok - 20, iTok + 160), /try \{ await runEdulibTokenSweepOnce\(\); \} catch/, '토큰 정리 실패가 함수를 깨지 않는다');
+  assert.match(fn.slice(iTok - 20, iTok + 200), /try \{ await runEdulibTokenSweepOnce\(Math\.max\([^)]*Date\.now\(\) - t0\)\)\); \} catch/,
+    '토큰 정리는 남은 시간만큼만 쓰고, 실패해도 함수를 깨지 않는다');
+  assert.match(fn, /const t0 = Date\.now\(\);/);
   assert.ok(fn.indexOf('if (mailErr) throw mailErr') > iTok, '메일 정리 실패는 토큰 정리 뒤에 알린다');
+  assert.match(helper, /\{ budgetMs \}/, '밤 정리는 시간 상한을 넘긴다');
+  /* 올리기가 끝나는 순간 — 창고 트리거 */
+  const s0 = idx.indexOf('exports.edulibTokenStrip');
+  assert.ok(s0 > 0, '올린 직후 지우는 창고 트리거가 있어야 합니다');
+  const strip = idx.slice(s0, idx.indexOf('\n  });', s0));
+  assert.match(strip, /\.region\(MAIL_REGION\)/, '사진 창고와 같은 지역');
+  assert.match(strip, /failurePolicy: true/, '일시 실패는 다시 시도');
+  assert.match(strip, /\.storage\.bucket\(PHOTO_BUCKET\)\.object\(\)\s*\.onFinalize\(/);
+  const iSkip = strip.indexOf('isEdulibObject('), iAge = strip.indexOf('60 * 60 * 1000'), iStrip = strip.indexOf('stripOne(');
+  assert.ok(iSkip > 0 && iSkip < iAge && iAge < iStrip, '순서: 다른 자리는 곧바로 끝 → 오래된 되풀이는 버림 → 지우기');
   /* 사람이 부르는 [지금 정리]는 메일만 — 토큰 정리는 밤에만 */
   const r0 = idx.indexOf('exports.runEdulibMailSweep');
   const run = idx.slice(r0, idx.indexOf('\nexports.', r0 + 10));
