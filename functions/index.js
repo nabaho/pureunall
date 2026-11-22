@@ -8051,18 +8051,22 @@ async function runEdulibTokenSweepOnce(budgetMs) {
   return r;
 }
 /* 올리기가 끝나는 순간 — 사진 창고(함수와 같은 asia-northeast3)의 «모든» 파일에 불리지만 edulib/ 가 아니면 곧바로 끝낸다(짧은 호출 하나).
-   ⚠ 일시 실패는 창고가 다시 부른다(failurePolicy). 412(그 사이 바뀜)·404(없어짐)는 끝난 것으로 친다.
-   ⚠ 한 시간 넘게 되풀이된 알림은 버린다 — 밤 정리가 메운다(실패가 이레 동안 되풀이되지 않게). */
+   412(그 사이 바뀜)는 지금 판으로 다시 해 보고(stripOne 안), 404(없어짐)는 끝난 것으로 친다.
+   ⚠ «다시 시도»(failurePolicy)는 걸지 않는다 — 걸면 배포 도구가 --force 없이는 안 올린다(2026-11-22 배포 실패로 확인). 배포 작업에 --force 를 더하지 말 것.
+     여기서 실패한 것은 기록만 남기고 끝낸다 — 매일 밤 edulibMailSweep 의 토큰 정리가 메운다. */
 exports.edulibTokenStrip = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 60, memory: "256MB", failurePolicy: true })
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
   .storage.bucket(PHOTO_BUCKET).object()
-  .onFinalize(async (obj, context) => {
+  .onFinalize(async (obj) => {
     if (!EdulibTokenSweep.isEdulibObject(obj && obj.name)) return null;
-    const age = Date.now() - Date.parse((context && context.timestamp) || "");
-    if (age > 60 * 60 * 1000) { console.warn("edulibTokenStrip too old — 밤 정리에 맡김", String(obj.name).split("/")[1]); return null; }
-    const r = await EdulibTokenSweep.stripOne(obj, { bucket: getStorage().bucket(PHOTO_BUCKET) });
-    console.log("edulibTokenStrip", r, String(obj.name).split("/")[1]);
+    const id = String(obj.name).split("/")[1];
+    try {
+      const r = await EdulibTokenSweep.stripOne(obj, { bucket: getStorage().bucket(PHOTO_BUCKET) });
+      console.log("edulibTokenStrip", r, id);
+    } catch (e) {
+      console.error("edulibTokenStrip fail — 밤 정리에 맡김", id, String((e && e.message) || e).slice(0, 120));
+    }
     return null;
   });
 
