@@ -113,7 +113,7 @@ function runApp(seed, opt) {
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={setTab,draw,lensDraw,lensDo,lensTog,lensBulk,lensGrp,lensSub,aiBackfill,aiBackStop,starGo,get,recObj,rejudge,feedMainRows,pickRank,starAllItems,inboxPull,fetchAll,'
     + 'setBackMonths:function(m){ _aiBack.months=m; },'
-    + 'getSel:function(id){ return _lens[id].sel; },setWatch:function(w){ _recWatch=w; },setFb:function(db,uid){ fbDb=db; fbUid=uid; },'
+    + 'getSel:function(id){ return _lens[id].sel; },setWatch:function(w){ _recWatch=w; },setFb:function(db,uid){ fbDb=db; fbUid=uid; if(uid)_ownerSet(uid); },'
     + 'setPull:function(f){ pull=f; },toast:function(f){ toast=f; }};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, toasts, urls };

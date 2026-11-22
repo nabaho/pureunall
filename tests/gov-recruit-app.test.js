@@ -50,7 +50,7 @@ function runApp(seed, opt) {
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
     + 'pickOpen,pickBody,pickOff,pickReset,pickStar,pickAuto,pickRank,pickBadge,inboxPull,feedSrvHtml,healthPop,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
     + 'recStarTog,recStarOnlyTog,recStarMap,recStarOn,appHist,appTag,appOpen,appSetSt,starAllItems,starAllOpen,appOrgOf,'
-    + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
+    + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;if(uid)_ownerSet(uid);}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setOpen = (fn) => { opt._open = fn; };
   return { api: ctx.__api, el, store, opened, toasts };

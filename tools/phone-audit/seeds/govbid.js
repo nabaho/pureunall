@@ -94,7 +94,9 @@ const pursue = [
   진행('PS-qa5', 'person', 'hit', 'h1', '모집 글', hits.h1.title, 기관[1], 9, { state: '그만둠' })
 ];
 module.exports = {
-  localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_pursue: JSON.stringify(pursue), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
+  /* gov3__owner — 이 기기 자료의 주인(2026-11-22). 점검용 계정(seed.js 의 UID 'pa-uid-1') 것으로 둔다 — 없거나 다르면
+     «다른 계정 자료»로 보고 옮겨 두거나 묻는다. ⚠ seed.js 를 require 하면 서로 불러 UID 가 빈다(순환) — 글자로 적는다 */
+  localStorage: { gov3__owner: 'pa-uid-1', gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_pursue: JSON.stringify(pursue), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
   data: { gov_digest: DIGEST, gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
   views: [
     { name:'application-handoff',run:async(p)=>{
