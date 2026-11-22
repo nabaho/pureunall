@@ -23,6 +23,6 @@
 
 ## 아직 (대표 확인 뒤)
 - [ ] 카카오 개발자 콘솔 설정 세 곳(README «대표가 한 번 하실 일») — 동의항목 talk_message · Redirect URI `https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoMemoCallback` · 웹 도메인 `https://erp.pureunlabor.co.kr`
-- [ ] 함수 배포(`govDigestKakao`·`kakaoMemoStart`·`kakaoMemoCallback`) — 이 PR 이 합쳐진 뒤 GitHub 작업 「Firebase 배포」
+- [x] 함수 배포(`govDigestKakao`·`kakaoMemoStart`·`kakaoMemoCallback`) — **2026-11-22 GitHub 작업 「Firebase 배포」 44999559566**(대표 «합쳐지면 올리기»): 세 함수 새로 만듦·함수별 대조 «올라감 3·안 올라감 0», 규칙은 안 올림. 함수 ACTIVE(nodejs22), 예약 작업 매일 08:30 Asia/Seoul ENABLED(스케줄러는 us-central1 — govFeedCollect 와 같은 자리). kakaoMemoStart → 302(카카오 동의 화면, scope talk_message·prompt=login), 빈 콜백 → 400. 모드는 비어 있어 dry(카카오 호출 없음)
 - [ ] 대표가 `kakaoMemoStart` 주소를 열어 동의 한 번 → 확인 글 도착 → 다음 날 08:30 부터 매일
 - ⚠ 확인 못 한 것: 카카오 «나에게 보내기»의 하루 한도(문서에 발신자 100·pair 20 이 나에게 보내기에도 걸리는지 불분명 — 하루 세 통 안쪽으로 보냄) · 텍스트 200자가 글자 수인지 바이트인지(어기면 짧은 글로 한 번 더) · 실제 카카오 호출은 아직 한 번도 안 했다(토큰이 없어서)
