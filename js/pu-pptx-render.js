@@ -24,7 +24,7 @@
   var EMU_PT = 12700;                 /* 1pt = 12700 EMU */
   var MAX_SLIDES = 300;
   /* 한도 — 남의 파일(메일·PC)이라 «작은 zip 이 풀면 엄청 커지는» 파일·끝없는 XML 로 칸이 멈추거나 메모리를 다 쓰지 않게 */
-  var LIMIT = { xmlPart: 8 * 1048576, xmlTotal: 80 * 1048576, nodes: 400000, depth: 40, cols: 60, rows: 60, shapes: 40000 };
+  var LIMIT = { xmlPart: 8 * 1048576, xmlTotal: 80 * 1048576, nodes: 400000, depth: 40, cols: 60, rows: 60, shapes: 40000, chars: 2000000 };
 
   /* zip 안 파일을 «실제로 풀린 바이트»를 세며 읽는다 — 선언된 크기(_data)를 믿지 않는다. 한도를 넘으면 그 자리에서 멈추고 실패 */
   function readLimited(file, limit) {
@@ -177,7 +177,7 @@
   }
   function lvlStyle(lst, lvl) { return lst ? kid(lst, 'a:lvl' + (lvl + 1) + 'pPr') : null; }
   /* 물려받는 순서: 글자 → 문단 → 도형 lstStyle → (레이아웃·마스터 자리) lstStyle → 마스터 txStyles */
-  function textOf(txBody, chain, ctx, phType) {
+  function textOf(txBody, chain, ctx, phType, budget) {
     if (!txBody) return null;
     var bp = kid(txBody, 'a:bodyPr') || { a: {}, c: [] };
     var inhBp = chain.map(function (c) { return c && c.bodyPr; }).filter(Boolean);
@@ -209,6 +209,7 @@
           var rPr = kid(r, 'a:rPr'), t = kid(r, 'a:t');
           var txt = t ? t.t : '';
           if (!txt) return;
+          if (budget) { budget.chars -= txt.length; if (budget.chars < 0) { budget.over = true; return; } }   /* 글자 처리량 한도 — 모델을 만들기 «전»에 뺀다 */
           runs.push({ t: txt, sz: num(ra(rPr, 'sz', phType === 'title' || phType === 'ctrTitle' ? 4400 : 1800), 1800) / 100 * scale,
             b: ra(rPr, 'b', '0') === '1', i: ra(rPr, 'i', '0') === '1', u: (ra(rPr, 'u', 'none') || 'none') !== 'none', col: rcolor(rPr) });
         } else if (r.n === 'a:br') runs.push({ t: '\n', sz: 0, br: true });
@@ -277,6 +278,7 @@
     }
     function walkIn(node, tf) {
       node.c.forEach(function (el) {
+        if (opts.budget && opts.budget.over) return;          /* 처리량 한도를 넘었으면 더 만들지 않는다(첫 장도 같다) */
         if (el.n === 'mc:AlternateContent') { var fb = kid(el, 'mc:Fallback') || kid(el, 'mc:Choice'); if (fb) walk(fb, tf); return; }
         var ph = phOf(el);
         if (ph && opts.skipPh) return;                        /* 레이아웃·마스터의 «자리»는 그리지 않는다(슬라이드가 채운다) */
@@ -317,7 +319,7 @@
           if (ph) chain.push({ lst: txStyleFor(ph.type, opts.master) });
           else chain.push({ lst: txStyleFor('other', opts.master) });
           if (style) { var fontRef = kid(style, 'a:fontRef'); var fc = fontRef ? colorOf(fontRef, ctx) : null; if (fc) chain.fontColor = fc; }
-          s.text = textOf(kid(el, 'p:txBody'), chain, ctx, ph ? ph.type : '');
+          s.text = textOf(kid(el, 'p:txBody'), chain, ctx, ph ? ph.type : '', opts.budget);
           if (s.type === 'shape' && !s.fill && !s.stroke && !(s.text && s.text.has)) return;   /* 보이는 것이 없으면 건너뛴다(빈 자리 등) */
           s.ph = ph ? ph.type : '';
         } else if (el.n === 'p:pic') {
@@ -341,7 +343,7 @@
                 used += span;
                 return { span: span, merged: tc.a.hMerge === '1' || tc.a.vMerge === '1',
                   fill: fillOf(kid(tc, 'a:tcPr'), ctx, part.rels, part.path) || null,
-                  text: textOf(kid(tc, 'a:txBody'), [{ lst: txStyleFor('other', opts.master) }], ctx, '') };
+                  text: textOf(kid(tc, 'a:txBody'), [{ lst: txStyleFor('other', opts.master) }], ctx, '', opts.budget) };
               }) };
             });
           } else {
@@ -350,6 +352,12 @@
             s.label = /chart/.test(uri) ? '차트' : /diagram/.test(uri) ? '도식' : '개체';
           }
         } else return;
+        /* 도형 처리량 한도 — 표는 칸 수만큼 센다 */
+        if (opts.budget) {
+          var cost = s.type === 'table' ? s.rows.reduce(function (a, r) { return a + r.cells.length; }, 0) || 1 : 1;
+          opts.budget.shapes -= cost;
+          if (opts.budget.shapes < 0) { opts.budget.over = true; return; }
+        }
         out.push(s);
       });
     }
@@ -411,7 +419,9 @@
         var truncated = paths.length > maxSlides;
         paths = paths.slice(0, maxSlides);
         var media = Object.create(null);
-        return Promise.all(paths.map(function (sp, i) {
+        /* 처리량 한도(도형·글자)는 «만드는 동안» 빼고, 슬라이드는 앞에서부터 차례로 — 넘으면 거기서 멈추고 «앞 N장까지» */
+        var budget = { shapes: LIMIT.shapes, chars: LIMIT.chars, over: false };
+        function oneSlide(sp, i) {
           return load(sp, 'p:sld').then(function (slide) {
             if (!slide) return null;
             return load(relOf(slide, 'slideLayout'), 'p:sldLayout').then(function (layout) {
@@ -427,15 +437,15 @@
                   var ctx = { scheme: scheme, map: cm ? cm.a : null };
                   var layoutTree = layout ? at(layout.root, 'p:sldLayout/p:cSld/p:spTree') : null;
                   var masterTree = master ? at(master.root, 'p:sldMaster/p:cSld/p:spTree') : null;
-                  var common = { layoutPh: phIndex(layoutTree), masterPh: phIndex(masterTree), master: master };
+                  var common = { layoutPh: phIndex(layoutTree), masterPh: phIndex(masterTree), master: master, budget: budget };
                   var showMaster = slide.root.c[0] && slide.root.c[0].a.showMasterSp !== '0' && !(layout && layout.root.c[0] && layout.root.c[0].a.showMasterSp === '0');
                   var bg = bgOf(slide, ctx);
                   if (bg === undefined && layout) bg = bgOf(layout, ctx);
                   if (bg === undefined && master) bg = bgOf(master, ctx);
                   var shapes = [];
                   /* 마스터·레이아웃 장식은 여러 슬라이드가 함께 쓴다 — 한 번만 읽고 같은 목록을 쓴다(장마다 다시 읽지 않는다) */
-                  if (master && showMaster) shapes = shapes.concat(shared(master, function () { return shapesOf(master, ctx, { skipPh: true, master: master }); }));
-                  if (layout && showMaster) shapes = shapes.concat(shared(layout, function () { return shapesOf(layout, ctx, { skipPh: true, master: master, masterPh: common.masterPh }); }));
+                  if (master && showMaster) shapes = shapes.concat(shared(master, function () { return shapesOf(master, ctx, { skipPh: true, master: master, budget: budget }); }));
+                  if (layout && showMaster) shapes = shapes.concat(shared(layout, function () { return shapesOf(layout, ctx, { skipPh: true, master: master, masterPh: common.masterPh, budget: budget }); }));
                   shapes = shapes.concat(shapesOf(slide, ctx, common));
                   if (bg && bg.img) media[bg.img] = true;
                   shapes.forEach(function (s) { if (s.img) media[s.img] = true; if (s.fill && s.fill.img) media[s.fill.img] = true; });
@@ -458,14 +468,14 @@
               });
             });
           });
-        })).then(function (slides) {
-          /* 도형 합계 한도 — 앞에서부터 세어 넘으면 거기서 끊는다(«앞 N장까지»로 알린다) */
-          var out = [], count = 0;
-          slides.filter(Boolean).some(function (s) {
-            count += s.shapes.length;
-            if (count > LIMIT.shapes && out.length) { truncated = true; return true; }
-            out.push(s); return false;
+        }
+        var out = [];
+        return paths.reduce(function (pr, sp, i) {
+          return pr.then(function () {
+            if (budget.over) { truncated = true; return; }
+            return oneSlide(sp, i).then(function (s) { if (s) out.push(s); if (budget.over) truncated = true; });
           });
+        }, Promise.resolve()).then(function () {
           return { w: W, h: H, slides: out, media: media, truncated: truncated, zip: zip };
         });
       });

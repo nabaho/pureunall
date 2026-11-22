@@ -237,7 +237,7 @@ test('④ 압축 폭탄 — 풀리는 «실제 바이트»를 세다가 한도�
   assert.match(textFn, /readLimited\(f, room\)/);
   assert.doesNotMatch(textFn, /async\('string'\)/);
   const pv = stripJs(read('js/pu-edulib-preview.js'));
-  assert.match(pv, /readLimited\(zip\.files\[n\], Math\.min\(MAX_PART, MAX_TOTAL - total\)\)/, '글자 보기도 한 부분·합계 한도로 풀며 센다');
+  assert.match(pv, /var room = Math\.min\(MAX_PART, MAX_TOTAL - total\);\s*return readLimited\(zip\.files\[n\], room\)/, '글자 보기도 한 부분·합계 한도로 풀며 센다');
   assert.doesNotMatch(pv.slice(pv.indexOf('function extract(')), /async\('string'\)/);
   const fj = stripJs(read('js/pu-slides-frame.js'));
   assert.match(fj, /PuPptx\.readLimited\(model\.zip\.file\(p\), room\)/, '그림도 풀며 센다');
@@ -261,6 +261,34 @@ test('④ 장이 많은 정상 자료는 합계 한도에 막히지 않는다(�
   const src = stripJs(read('js/pu-pptx-render.js'));
   const textFn = src.slice(src.indexOf('function text(p)'), src.indexOf('function load(p'));
   assert.match(textFn, /var room = declared >= 0 \? declared : LIMIT\.xmlPart/, '몫은 적힌 크기 — 넘게 풀리면 readLimited 가 멈춘다');
+});
+
+test('④ 처리량 한도 — 도형·글자는 «만드는 동안» 빼고 첫 장에도 적용 · 글자 뽑기는 한 번 훑기 · 실패한 읽기도 합계에', async () => {
+  /* 도형 한도를 아주 작게 — 첫 장에서 바로 넘어도 거기서 멈추고 «앞 N장까지» */
+  const keep = R.LIMIT.shapes;
+  R.LIMIT.shapes = 2;
+  try {
+    const m = await R.parse(JSZip, await makePptx());
+    const total = m.slides.reduce((a, s) => a + s.shapes.length, 0);
+    assert.ok(total <= 2, '한도보다 많이 만들지 않는다: ' + total);
+    assert.equal(m.truncated, true);
+  } finally { R.LIMIT.shapes = keep; }
+  const keepC = R.LIMIT.chars;
+  R.LIMIT.chars = 5;
+  try {
+    const m = await R.parse(JSZip, await makePptx());
+    assert.equal(m.truncated, true, '글자 처리량 한도도 같다');
+  } finally { R.LIMIT.chars = keepC; }
+  /* 닫는 태그가 없는 나쁜 XML — 한 번 훑기라 금방 끝난다 */
+  const P = require(path.join(ROOT, 'js/pu-edulib-preview.js'));
+  const t0 = Date.now();
+  P._paragraphs('<a:p>'.repeat(200000) + '<a:t>x', 'a:p', 'a:t');
+  assert.ok(Date.now() - t0 < 1000, '나쁜 XML 에서도 오래 멈추지 않는다');
+  assert.deepEqual(P._paragraphs('<a:p><a:pPr/><a:r><a:t>가 &amp; 나</a:t></a:r><a:tab/><a:r><a:t xml:space="preserve"> 다</a:t></a:r></a:p><a:p/><a:p><a:t>라</a:t></a:p>', 'a:p', 'a:t'), ['가 & 나 다', '라']);
+  const pv = stripJs(read('js/pu-edulib-preview.js'));
+  assert.doesNotMatch(pv.slice(pv.indexOf('function paragraphs('), pv.indexOf('function slideNo(')), /new RegExp/, '문단 뽑기는 정규식 되훑기가 아니다');
+  assert.match(pv, /truncated = true; total \+= room;/, '실패한 읽기도 합계에');
+  assert.match(stripJs(read('js/pu-slides-frame.js')), /function \(\) \{ used \+= room; \}/, '그림 실패도 합계에');
 });
 
 test('④ 큰 자료 — 마스터·레이아웃 장식은 한 번만 읽고 같은 목록을 쓴다 · 도형 합계 한도 · 그림은 화면 가까이 올 때만 그린다', async () => {

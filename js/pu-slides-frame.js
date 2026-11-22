@@ -35,7 +35,7 @@
           used += u8.length;
           var ext = (p.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
           URLS[p] = URL.createObjectURL(new Blob([u8], { type: MIME[ext.toLowerCase()] || 'application/octet-stream' }));
-        }, function () {});
+        }, function () { used += room; });                      /* 넘쳐서 실패해도 그만큼은 풀었다 — 합계에 넣어 되풀이되면 멈춘다 */
       });
     }, Promise.resolve());
   }
