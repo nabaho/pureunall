@@ -181,8 +181,8 @@ test('반복·알림 — 서버 대신 넣기가 우리 표의 값을 구글로 
 
 test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 보여 준다 · 저장 길마다 넘긴다', () => {
   const b = 상자();
-  vm.runInContext(함수몸('function 반복글(ymd){'), b);
-  const 글 = vm.runInContext('반복글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
+  vm.runInContext(함수몸('function 반복고르기글(ymd){'), b);
+  const 글 = vm.runInContext('반복고르기글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
   assert.deepStrictEqual(JSON.parse(JSON.stringify(글)), { D: '매일', W: '매주 (수요일)', M: '매월 14일', Y: '매년 10월 14일' });
   assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? 반복알림줄\(m\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
   assert.match(함수몸('function 반복알림줄(m){'), /m\.timed \? '<div class="grow">/, '알림은 시간 일정에만');

@@ -54,7 +54,9 @@
     /* 출처별 «받은 기록»(나라장터·알리오·기업마당이 계속 들어오는지) — 폰·PC 가 같은 기록을 보게. 한 덩이로 다시 읽으면 되는 것(2026-10-19) */
     { ls: 'src_stat',           path: 'src_stat',           kind: 'whole' },
     /* 🎯 «지원할 만한 것» 팝업에서 숨긴 것 — {열쇠: 날짜}. 폰·PC 가 같이 보게 (2026-10-24) */
-    { ls: 'pick_off',           path: 'pick_off',           kind: 'map' }
+    { ls: 'pick_off',           path: 'pick_off',           kind: 'map' },
+    /* 🏢 푸른노무법인 지원사업 — «이 공고를 우리가 진행한다»는 표시(js/gov-pursue.js). 줄마다 영구 id (2026-11-22) */
+    { ls: 'pursue',             path: 'pursue',             kind: 'rows', idf: 'id' }
   ];
   var SV = 2;   /* 이 판의 쓰기 표 — 보안규칙이 이 값 이상만 받는다 */
   var byLs = {};

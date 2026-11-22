@@ -499,8 +499,9 @@ test('⑦ 기관 중심 마스터 인덱스(1기관=1통합뷰), 기관 내부 6
   assert.equal(emptyMaster.benchmarks.ALL.radar.length, 6);
 });
 
-test('⑧ 상단 헤더·탭 중복 제거(4개 핵심 탭 + 우측 API 유틸 탭), 탭 2 3×2 격자 및 서브탭 전환, 조문·원문 통합 토글(docMode), 입력창 플레이스홀더 간결화가 적용되어 있다', () => {
+test('⑧ 상단 헤더·탭 중복 제거(5개 핵심 탭 + 우측 API 유틸 탭), 탭 2 3×2 격자 및 서브탭 전환, 조문·원문 통합 토글(docMode), 입력창 플레이스홀더 간결화가 적용되어 있다', () => {
   assert.match(uiSrc, /data-tab="unions"[^>]*>🏛️ 기관 목록<\/button>/);
+  assert.match(uiSrc, /data-tab="chungcheong"[^>]*>🏙️ 대전·세종·충청<\/button>/);
   assert.match(uiSrc, /data-tab="organ"[^>]*>🔎 기관 상세<\/button>/);
   assert.match(uiSrc, /data-tab="matrix"[^>]*>📊 비교분석<\/button>/);
   assert.match(uiSrc, /data-tab="articles"[^>]*>📚 조문·원문<\/button>/);
@@ -1093,7 +1094,7 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
 
     function getCombinedHtml() {
       let out = rawBodyHtml;
-      for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn']) {
+      for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn', 'data-cc-dyn']) {
         if (dynNodes[k]) {
           out = out.replace(new RegExp(`<div ${k}>[\\s\\S]*$`), `<div ${k}>${dynNodes[k].innerHTML}</div>`);
         }
@@ -1106,7 +1107,7 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
       set: (v) => {
         rawBodyHtml = String(v || '');
         dynNodes = {};
-        for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn']) {
+        for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn', 'data-cc-dyn']) {
           const dm = rawBodyHtml.match(new RegExp(`<div ${k}>([\\s\\S]*)<\\/div>$`));
           if (dm) {
             const dn = makeNode('DIV');
@@ -1131,6 +1132,7 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
       if (sel === '[data-m-reg-dyn]' && dynNodes['data-m-reg-dyn']) return dynNodes['data-m-reg-dyn'];
       if (sel === '[data-a-dyn]' && dynNodes['data-a-dyn']) return dynNodes['data-a-dyn'];
       if (sel === '[data-d-dyn]' && dynNodes['data-d-dyn']) return dynNodes['data-d-dyn'];
+      if (sel === '[data-cc-dyn]' && dynNodes['data-cc-dyn']) return dynNodes['data-cc-dyn'];
       return (parsedMap[sel] && parsedMap[sel][0]) || null;
     };
     bodyEl.querySelectorAll = (sel) => parsedMap[sel] || [];
@@ -1240,6 +1242,55 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
   assert.ok(discOrgExpBtns.length >= 20, '기관별 원문 묶음 행마다 문서 펼침 버튼이 렌더링되어야 합니다');
   discOrgExpBtns[0].trigger('click');
   assert.match(discGrp.bodyEl.innerHTML, /class="pau-exp-row"/, '문서 펼침 클릭 시 해당 기관의 공시 문서 목록이 인라인으로 펼쳐져야 합니다');
+
+  // 5) 전용 탭 「대전·세종·충청」(?tab=chungcheong) 신설 및 충남 시설관리공단·도시공사·지자체 산하기관·소재 공공기관 임단협 병렬 비교 검증
+  assert.match(uiSrc, /data-tab="chungcheong"[^>]*>🏙️ 대전·세종·충청<\/button>/, '상단 메인 탭바에 대전·세종·충청 전담 탭이 별도 항목으로 존재해야 합니다');
+  const sbCc = { URL, URLSearchParams };
+  sbCc.window = sbCc;
+  vm.runInNewContext(uiSrc, sbCc);
+  const ccMaster = sbCc.PuAlioUnion.buildOrganMasterIndex(dataMod);
+  const ccAll = ccMaster.records.filter((r) => r.isChungcheong);
+  const ccLocal = ccAll.filter((r) => r.isLocal);
+  const ccCentral = ccAll.filter((r) => !r.isLocal);
+  assert.ok(ccLocal.length >= 210, '대전·세종·충남·충북 지자체 산하기관 전수가 충청권 인덱스에 포함되어야 합니다');
+  assert.ok(ccCentral.length >= 60, '대전·세종·충남·충북 소재 중앙공공기관(ALIO)이 충청권 인덱스에 포함되어야 합니다');
+  assert.ok(ccCentral.some((r) => r.name.includes('한국철도공사') && r.ccProvinceKey === '대전광역시'), '대전 소재 한국철도공사가 매핑되어야 합니다');
+  assert.ok(ccCentral.some((r) => r.name.includes('한국노동연구원') && r.ccProvinceKey === '세종특별자치시'), '세종 소재 한국노동연구원이 매핑되어야 합니다');
+  assert.ok(ccCentral.some((r) => r.name.includes('한국서부발전') && r.ccProvinceKey === '충청남도'), '충남 태안 소재 한국서부발전이 매핑되어야 합니다');
+  assert.ok(ccCentral.some((r) => r.name.includes('한국가스안전공사') && r.ccProvinceKey === '충청북도'), '충북 혁신도시 소재 한국가스안전공사가 매핑되어야 합니다');
+
+  // 미확인 조문 쟁점의 미단정·채점제외 표시 및 결산공시 전임자수 이상치 원값 보존·평균왜곡 방지 검증
+  const cheonanRec = ccMaster.records.find((r) => r.name === '천안도시공사');
+  assert.ok(cheonanRec && cheonanRec.issueScores.personnel_participation.verified === false && cheonanRec.issueScores.personnel_participation.tag.includes('미확인'), '추출 조문·지표가 없는 쟁점은 단정하지 않고 미확인(채점제외)으로 표시해야 합니다');
+  const chungjuFound = ccMaster.records.find((r) => r.name.includes('충주문화관광재단'));
+  assert.ok(chungjuFound && chungjuFound.timeoffHours > 0 && chungjuFound.timeoffAnomalyNote.includes('원문 확인'), '결산공시 이상치는 원값을 유지하되 이상치 안내(timeoffAnomalyNote)를 표시해야 합니다');
+
+  // 지역산하비교(REGION) 다중 시·도 총괄표 및 충북 평균 타임오프가 충청 탭과 일치하며 0점/이상치 왜곡이 없는지 검증
+  const regCnCb = mountInteractive('?region=%EC%B6%A9%EB%82%A8,%EC%B6%A9%EB%B6%81');
+  const persAvgMatches = [...regCnCb.bodyEl.innerHTML.matchAll(/인사\s*(\d+)점/g)].map((m) => Number(m[1]));
+  assert.ok(persAvgMatches.length >= 2 && persAvgMatches.every((v) => v >= 60), '다중 시·도 총괄표의 인사 평균이 미확인(null) 기관 때문에 10~20점대로 왜곡되면 안 됩니다');
+  const regCbSingle = mountInteractive('?region=%EC%B6%A9%EB%B6%81');
+  const cbToMatch = regCbSingle.bodyEl.innerHTML.match(/타임오프\s*<b>([\d,]+)h<\/b>/);
+  assert.ok(cbToMatch && Number(cbToMatch[1].replace(/,/g, '')) <= 5000, '충북 지역산하비교 평균 타임오프에서 결산공시 기입 이상치가 제외되어 왜곡되지 않아야 합니다');
+
+  const ccHub = mountInteractive('?tab=chungcheong');
+  assert.match(ccHub.bodyEl.innerHTML, /class="pau-cc-prov-grid"/, '대전·세종·충남·충북 4대 권역 요약 카드가 렌더링되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /data-cc-cmp-matrix/, '충청권 대표 기관 임단협 병렬 비교 매트릭스가 즉시 표시되어야 합니다');
+
+  const cnFacBtn = ccHub.bodyEl.querySelector('[data-cc-preset="CN_FACILITY"]');
+  assert.ok(cnFacBtn, '충남 시설관리공단·도시공사 집중비교 프리셋이 존재해야 합니다');
+  cnFacBtn.trigger('click');
+  assert.match(decodeURIComponent(ccHub.loc.search), /tab=chungcheong/, '대전·세종·충청 탭 URL 상태가 유지되어야 합니다');
+  assert.match(decodeURIComponent(ccHub.loc.search), /ccPreset=CN_FACILITY/, '선택한 충남 시설공단 프리셋이 URL에 동기화되어야 합니다');
+  for (const orgNm of ['아산시시설관리공단', '천안도시공사', '서산시시설관리공단', '보령시시설관리공단', '충청남도개발공사', '부여군시설관리공단', '당진도시공사']) {
+    assert.ok(ccHub.bodyEl.innerHTML.includes(orgNm), `충남 공단·공사 비교에 ${orgNm}이 포함되어야 합니다`);
+  }
+
+  const ccQueryIn = ccHub.bodyEl.querySelector('[data-f="ccQuery"]');
+  assert.ok(ccQueryIn, '충청권 검색 입력창이 존재해야 합니다');
+  ccQueryIn.value = '"><script>alert(1)</script>" onmouseover="alert(2)';
+  ccQueryIn.trigger('input');
+  assert.doesNotMatch(ccHub.bodyEl.innerHTML, /<script>alert\(1\)<\/script>|"\s+onmouseover="alert\(2\)/i, '충청권 검색어에 스크립트·속성 탈출 문자열 입력 시 원시 실행 태그나 이벤트 속성이 노출되면 안 됩니다');
 });
 
 

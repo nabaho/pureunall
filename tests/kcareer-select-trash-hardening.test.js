@@ -294,9 +294,9 @@ test('② 되살리기를 여럿 한꺼번에 하는 두 길(휴지통 «선택 
   let j = 0;
   const ctx2 = vm.createContext({ console, TRASH_DAYS: 30, DOMAINS: { certdoc: { store: 'certdoc', label: '경력증명서' } }, escapeHtml: (s) => String(s),
     get: () => [{ id: 'A' }, { id: 'B' }, { id: 'C' }], set: () => {}, kcTrashLabel: (r) => r.id, kcTrashPutMany: (s, p, recs) => recs.map((r, k) => ({ tid: 'T' + k, rec: r })),
-    kcAskDelete: (b, o, y) => y(), renderDocStore: () => {}, kcTrashDone: () => {}, kcUndoBar: (m, t, f) => undo.push(f), toast: (m) => toasts2.push(m),
+    kcAskDelete: (b, o, y) => y(), renderDocStore: () => {}, kcTrashDone: () => {}, kcUndoBar: (m, t, f) => undo.push(f), toast: (m) => toasts2.push(m), kcTrashRedraw: () => {},
     kcTrashRestore: async () => [{ id: 'A' }, { skipped: 'sameIssued' }, { id: 'C' }][j++] });
-  vm.runInContext(fn('_docTrashIds'), ctx2);
+  vm.runInContext(fns('_docTrashIds', 'kcTrashDoneMany', 'kcTrashRestoreEntries'), ctx2);
   ctx2._docTrashIds('certdoc', ['A', 'B', 'C'], null, null, '');
   await undo[0]();
   assert.match(toasts2.join(' '), /2건을 되살렸습니다/); assert.match(toasts2.join(' '), /1건은 같은 발급번호/);

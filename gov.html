@@ -272,6 +272,15 @@ tr.gone td{opacity:.62}
 .lens-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .lens-chips .mchip{flex:none;padding:4px 10px}
 .lens-note:empty{display:none}
+/* 🏢 푸른노무법인 지원사업 — 공고 줄 딱지(js/gov-pursue.js, 2026-11-22). 법인 진행은 초록, 개인 지원은 보라. 한 줄을 넘지 않게 nowrap */
+.ptag{display:inline-block;padding:0 6px;margin-right:4px;border-radius:5px;font-size:11px;line-height:18px;font-weight:600;white-space:nowrap;vertical-align:middle;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+.ptag.person{background:#f5f3ff;color:#5b21b6;border-color:#ddd6fe}
+.pur-ask{display:grid;gap:8px;margin:12px 0}
+.pur-ask .btn{text-align:left;padding:10px 12px;white-space:normal;line-height:1.45;height:auto}
+.pur-ask .btn .sml{display:block;font-weight:400}
+.pur-files{margin:6px 0 10px;padding:0;list-style:none}
+.pur-files li{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);min-width:0}
+.pur-files li a{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 팝업 */
 .pop{position:fixed;inset:0;z-index:9000;display:none;align-items:flex-start;justify-content:center;
   padding:40px 16px;overflow:auto;background:rgba(15,23,42,.45)}
@@ -480,6 +489,8 @@ table.cmp td{white-space:nowrap}
   <button class="tb" id="tbRgn" onclick="setTab('rgn')" title="대전·세종·충남·충북 공공기관의 입찰·공고와 컨설턴트·위원 모집 글만 모아 관리합니다"><span class="mx">📍 대전·세종·충남·충북</span><span class="m-only">충청권</span></button>
   <!-- 🤖 AI 사업 (대표 지시 2026-11-19 「ai 관련 사업 별도로 탭만들어달라」) — HR플랫폼·스마트서비스·AI/클라우드 바우처·스마트공장·AI 도입 지원 -->
   <button class="tb" id="tbAi" onclick="setTab('ai')" title="AI 관련 정부사업 — HR플랫폼·스마트서비스·AI·클라우드 바우처·스마트공장·AI 도입·전환 지원 공고와 모집 글"><span class="mx">🤖 </span>AI<span class="mx"> 사업</span></button>
+  <!-- 🏢 푸른노무법인 지원사업 (대표 지시 2026-11-22) — 어느 탭에서든 「📝 진행」으로 고른 공고를 한곳에. 폰에서는 「지원사업」 -->
+  <button class="tb" id="tbPur" onclick="setTab('pur')" title="푸른노무법인 지원사업 — 법인으로 진행하거나(🏢) 컨설턴트로 지원하는(👤) 공고를 모아 마감·서식·경력관리 연결을 봅니다"><span class="mx">🏢 푸른 </span>지원사업<span id="purN"></span></button>
 </div>
 </div>
 
@@ -641,6 +652,29 @@ table.cmp td{white-space:nowrap}
   </div>
 </div>
 
+<!-- ═══ 🏢 푸른노무법인 지원사업 (대표 지시 2026-11-22 — 별도 탭 + 딱지 · 사업관리에 담기 · 서식은 링크로 모으기) ═══
+     어느 탭에서든 공고 줄의 「📝 진행」 → 🏢 법인 진행(경력관리 사업관리) / 👤 컨설턴트 지원(경력관리 지원 작업함)을 고른 것이 여기에 모인다.
+     기록은 gov/{uid}/pursue(GovSync) · 판정은 js/gov-pursue.js 한 곳. 표 짜임은 모아보기 탭(.lens .rec-hits)과 같아 폰 카드도 같다. -->
+<div class="wrap lens" id="pgPur" style="display:none">
+  <div class="card">
+    <div class="tab-stick">
+    <div class="bar">
+      <input id="uq" placeholder="제목·기관 검색" aria-label="제목·기관 검색" style="min-width:190px" oninput="purDraw()">
+      <select id="uKind" aria-label="갈래" onchange="purDraw()"><option value="">전체 갈래</option><option value="corp">🏢 법인 진행</option><option value="person">👤 컨설턴트 지원</option></select>
+      <select id="uView" aria-label="보기" onchange="purDraw()"><option value="live">진행 중</option><option value="past">마감 지난 것</option><option value="off">그만둔 것</option><option value="all">전체</option></select>
+      <div class="sp"></div>
+      <span id="uCnt" class="sub"></span>
+    </div>
+    </div>
+    <div class="sml lens-note" id="purNote" style="margin:0 0 6px"></div>
+    <div id="purSel"></div>
+    <div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:112px"><col style="width:82px"><col><col style="width:170px"><col style="width:84px"><col style="width:118px"><col style="width:70px"><col style="width:132px"></colgroup>
+      <thead><tr><th class="chk"><input type="checkbox" id="uSelAll" title="보이는 것 모두" aria-label="보이는 것 모두 고르기" onchange="purSelAll(this.checked)"></th><th class="rn">№</th><th>갈래</th><th>출처</th><th>제목</th><th>기관</th><th>진행일</th><th>마감</th><th>서식</th><th style="text-align:right">할 일</th></tr></thead>
+      <tbody id="purTb"></tbody>
+    </table></div>
+  </div>
+</div>
+
 
 <div id="pop" class="pop" onclick="if(event.target===this)popClose()"><div class="pop-box">
   <div class="pop-head"><b id="popTtl"></b><div class="sp"></div><button class="btn sm" onclick="popClose()">✕ 닫기</button></div>
@@ -677,19 +711,20 @@ table.cmp td{white-space:nowrap}
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=3"></script>
-<script src="js/gov-g2b.js?v=12"></script>
+<script src="js/gov-g2b.js?v=13"></script>
 <script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=5"></script>
 <script src="js/gov-recruit.js?v=7"></script>
 <script src="js/gov-submit.js?v=4"></script>
-<script src="js/gov-sync.js?v=10"></script>
+<script src="js/gov-sync.js?v=11"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
 <script src="js/gov-inbox.js?v=5"></script>
 <script src="js/gov-region.js?v=4"></script>
 <script src="js/gov-ai.js?v=1"></script>
 <script src="js/gov-pick.js?v=2"></script>
+<script src="js/gov-pursue.js?v=1"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script>
@@ -1357,7 +1392,7 @@ function pickRow(x, i){
   acts+='<button class="btn sm" onclick="pickOff(\''+esc(x.key)+'\')" title="이 팝업에서만 뺍니다 — 공고·모집 글은 그대로입니다">🙈 숨기기</button>';
   var why=(x.why||[]).map(function(w){ var c=/아님|제한 있음|수의계약/.test(w)?' class="neg"':(/같은|비슷한|지원한|포함|마감/.test(w)?' class="pos"':''); return '<span'+c+'>'+esc(w)+'</span>'; }).join('');
   return '<div class="pk-row'+(x.out?' out':'')+'"><div class="pk-no">'+(i+1)+'</div><div class="pk-main">'
-    +'<div class="pk-ttl">'+x.icon+' '+link+(x.isNew&&x.kind==='hit'?' <span class="tag teal">새 글</span>':'')+'</div>'
+    +'<div class="pk-ttl">'+x.icon+' '+(x.kind==='feed'||x.kind==='hit'?purTag(x.kind, x.ref):'')+link+(x.isNew&&x.kind==='hit'?' <span class="tag teal">새 글</span>':'')+'</div>'
     +'<div class="pk-sub">'+esc(x.typeName)+(x.org?' · '+esc(x.org):'')+(x.sub&&x.kind==='hit'?' · '+esc(x.sub):'')+' · <span class="due '+esc(due.k||'')+'">'+esc(due.text||'')+'</span></div>'
     +(why?'<div class="pk-why">'+why+'</div>':'')+'</div><div class="pk-act">'+acts+'</div></div>';
 }
@@ -1553,7 +1588,7 @@ function draw(){
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+restrictTags(r)+appTag(mt().orgId)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+purTag('feed', r.id)+soleTag(r)+restrictTags(r)+appTag(mt().orgId)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
       +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
       +matchCell(mt)
       +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
@@ -1563,12 +1598,13 @@ function draw(){
       +'<td class="act">'
         +'<button class="btn sm" onclick="star(\''+id+'\')">'+(r.type==='관심'?'★':'☆')+'</button> '
         +(r.url?'<button class="btn sm" onclick="open2(\''+id+'\')">🔗</button> ':'')
-        +'<button class="btn sm" title="지원 준비 — 경력관리에서 서류를 함께 준비합니다" onclick="toForm(\''+id+'\')">📝</button> '
+        +'<button class="btn sm" title="진행·지원 — 🏢 푸른노무법인 사업으로 진행(경력관리 사업관리) 또는 👤 컨설턴트로 지원 준비(경력관리 지원 작업함)" data-id="'+id+'" onclick="pursueAsk(\'feed\',this.dataset.id)">📝</button> '
         +(r.hidden ? '<button class="btn sm" title="되살리기" onclick="unhide(\''+id+'\')">↩</button>'
                    : '<button class="btn sm" onclick="hide(\''+id+'\')">🚫</button>')+'</td></tr>';
   }).join('') : '<tr><td colspan="13" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
   var pg=$('feedPager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, 'feedPageTo');
   lensRedraw();   /* 📍·🤖 탭은 공고 목록을 «빌려» 그린다 — ★·숨김이 바뀌면 함께 */
+  if(_curTab==='pur') purDraw(); else purBadge();   /* 🏢 지원사업 — 다른 기기에서 고친 것을 받아도(cloudSync → draw) 따라 그린다 */
 }
 function feedTog(id,on){ if(on) _feedSel[id]=1; else delete _feedSel[id]; draw(); }
 /* 머리 ㅁ — «이 쪽에 보이는 것»만 고른다(다른 쪽은 그대로) */
@@ -1626,7 +1662,7 @@ function feedPop(id){
     +_kv('공고명','<b>'+esc(r.nm||'-')+'</b>')
     +_kv('출처',esc(r.src||'-'))+_kv('공고번호',esc(r.no||''))
     +_kv('기관',esc(r.org||''))+(r.ntce&&r.ntce!==r.org?_kv('공고기관',esc(r.ntce)):'')
-    +_kv('상태',(r.hidden?'<span class="tag red">'+(r.ruleOut?'숨김 · 걸러내기 규칙':'숨김')+'</span> ':'')+esc(r.type||''))
+    +_kv('상태',(r.hidden?'<span class="tag red">'+(r.ruleOut?'숨김 · 걸러내기 규칙':'숨김')+'</span> ':'')+purTag('feed', r.id)+esc(r.type||''))
     +_kv('걸린 낱말',esc(r.kw||''))
     +_kv('공고일',esc((r.openDt||'').slice(0,16)))+_kv('마감',esc((r.closeDt||'').slice(0,16))+' '+dchip(r))
     +_kv('추정가격',r.prc?_won(r.prc)+' <span class="sml">('+Number(r.prc).toLocaleString()+'원)</span>':'')
@@ -1639,7 +1675,7 @@ function feedPop(id){
     +'<div class="bar" style="margin:12px 0">'
     +'<button class="btn sm" onclick="star(\''+esc(r.id)+'\');feedPop(\''+esc(r.id)+'\')">'+(r.type==='관심'?'★ 관심 끄기':'☆ 관심')+'</button>'
     +(r.url?'<button class="btn sm" onclick="open2(\''+esc(r.id)+'\')">🔗 원문 공고</button>':'')
-    +'<button class="btn sm" onclick="toForm(\''+esc(r.id)+'\')">☑ 지원 준비</button>'
+    +'<button class="btn sm" title="🏢 푸른노무법인 사업으로 진행하거나 👤 컨설턴트로 지원 준비(경력관리)" data-id="'+esc(r.id)+'" onclick="pursueAsk(\'feed\',this.dataset.id)">📝 진행·지원</button>'
     +(r.hidden?'<button class="btn sm" onclick="unhide(\''+esc(r.id)+'\')">↩ 되살리기</button>'
               :'<button class="btn sm" onclick="hide(\''+esc(r.id)+'\');popClose()">🚫 숨기기</button>')
     +'</div>'
@@ -1681,6 +1717,8 @@ function applicationHandoff(source){
   source.uid=fbUid; source.at=Date.now(); source.token='AP-'+Date.now()+'-'+Math.random().toString(36).slice(2);
   try{ sessionStorage.setItem('pu_application_handoff',JSON.stringify(source)); }
   catch(e){ toast('공고를 전달하지 못했습니다. 브라우저 저장공간을 확인해 주세요'); return; }
+  /* 👤 지원 준비로 넘긴 공고는 「🏢 푸른 지원사업」 탭에 표시한다(2026-11-22) — 공고·모집 글·🎯 어디서 눌렀든 이 한 길 */
+  if(typeof purMarkSource==='function'){ try{ purMarkSource(source); }catch(e){} }
   location.href='kcareer.html?go=form&application='+encodeURIComponent(source.token);
 }
 function applicationFromPick(input){
@@ -1698,6 +1736,241 @@ function applicationFromHit(key){
 function toForm(id){
   var h=find(id); if(!h) return; var r=h.a[h.i];
   applicationHandoff({sourceKind:'gov_feed',sourceId:r.id,title:r.nm,org:r.org,url:r.url,deadline:r.closeDt||'',docs:[],text:r.body||r.text||''});
+}
+
+/* ═══ 🏢 푸른노무법인 지원사업 (대표 지시 2026-11-22) ═══
+   「컨설턴트 모집이나 연구사업 일을 진행한다면 … 푸른노무법인에서 사업 진행 아니면 컨설턴트 모집 지원과 관련되는 클릭을 만들어 주고
+    … 진행했다면 정부사업 신청에서는 푸른노무법인 지원사업으로 표시를 해주고 사업 신청서 그리고 관련되는 서식을 다 끌어오고 모으고」
+   대표 결정: ① 법인 진행은 경력관리의 기존 «🏢 사업관리»에 담는다 ② 별도 탭 + 공고 줄 딱지 ③ 서식은 «이름과 링크»만 모은다.
+   · 공고 줄의 「📝」 → 고르는 창(pursueAsk): 🏢 법인 진행(pursueCorp) / 👤 컨설턴트 지원(예전 📝 그대로 — toForm·applicationFromHit).
+   · 기록·거르기는 js/gov-pursue.js 한 곳, 자리는 gov/{uid}/pursue(GovSync). 지우지 않는다 — 「그만둠」으로 옮기고 사람이 되살린다.
+   ⚠ 경력관리 자리(kcareer/…)에 직접 쓰지 않는다 — 같은 사이트 localStorage(pu_kc_biz_handoff)로 «채울 내용»만 건네고,
+     경력관리가 사업 창을 채워 열면 저장은 사람이 누른다(「➕ 경력관리로 넘기기」와 같은 길). */
+var _purSel={}, _purBusy={};
+function purList(){ var a=get('pursue'); return Array.isArray(a)?a.filter(Boolean):[]; }
+function purNow(){ return new Date().toISOString(); }
+function purGet(id){ return purList().filter(function(r){ return r.id===id; })[0]||null; }
+function purSave(list){ set('pursue', list); _purIdxRaw=null; }
+function purDay(iso){ var t=new Date(iso||''); return isFinite(t.getTime()) ? recYmd(t) : ''; }
+var _purIdxRaw=null, _purIdxMap={};
+function purIdx(){
+  var raw=lsGet('pursue');
+  if(raw!==_purIdxRaw){ _purIdxRaw=raw; try{ _purIdxMap=GovPursue.index(JSON.parse(raw||'[]')); }catch(e){ _purIdxMap={}; } }
+  return _purIdxMap;
+}
+/* 공고 줄 딱지 — 「진행」인 것만. 한 줄을 넘지 않게 짧게(🏢 푸른 진행 · 👤 지원 준비), 전문은 title */
+function purTag(src, ref){
+  if(typeof GovPursue==='undefined') return '';
+  var r=purIdx()[GovPursue.keyOf(src, ref)]; if(!r) return '';
+  var K=GovPursue.KINDS[r.kind]||{};
+  return '<span class="ptag'+(r.kind==='person'?' person':'')+'" title="'+esc((K.name||'')+' — 「🏢 푸른 지원사업」 탭에서 봅니다')+'">'+(K.icon||'')+' '+esc(K.tag||'')+'</span>';
+}
+/* 공고 한 줄 → 기록에 «베낄» 사실. feed = 공고 모아보기 줄 · hit = 모집 글(사람이 넣은 마감일이 있으면 그것) */
+function purSrc(src, ref){
+  if(src==='feed'){ var h=find(ref); if(!h) return null; var r=h.a[h.i];
+    return { src:'feed', ref:r.id, srcName:r.src||'공고', no:r.no||'', title:r.nm||'', org:r.org||'', url:r.url||'', openDt:r.openDt||'', closeDt:r.closeDt||'', prc:r.prc||0 }; }
+  if(src!=='hit') return null;
+  var x=recWatchHits().filter(function(h){ return h.key===ref; })[0]; if(!x) return null;
+  var pp=null; try{ pp=recPer(x.key, x.per, x.title, x.date); }catch(e){}
+  return { src:'hit', ref:x.key, srcName:'모집 글', no:'', title:x.title||'', org:x.boardName||x.org||'', url:x.href||'', openDt:x.date||'',
+           closeDt:(pp&&pp.to)||(x.per&&x.per.to)||'', prc:0 };
+}
+/* 👤 지원 준비로 넘길 때(applicationHandoff) — 이미 🏢 법인 진행으로 고른 공고는 갈래를 바꾸지 않는다(🎯 의 ☐ 지원이 몰래 바꾸지 않게) */
+function purMarkSource(source){
+  if(typeof GovPursue==='undefined' || !source) return;
+  var src=source.sourceKind==='gov_feed'?'feed':(source.sourceKind==='gov_watch'?'hit':''); if(!src) return;
+  var had=purIdx()[GovPursue.keyOf(src, source.sourceId)];
+  if(had && had.kind==='corp') return;
+  var o=purSrc(src, source.sourceId)||{ src:src, ref:source.sourceId, title:source.title, org:source.org, url:source.url, closeDt:source.deadline };
+  o.kind='person';
+  var m=GovPursue.mark(purList(), o, purNow()); if(m.rec) purSave(m.list);
+}
+/* 다시 그리기 — 공고 모아보기(📍·🤖 탭도 따라 그려진다) · 컨설턴트 모집(보고 있으면) · 이 탭 */
+function purRefresh(){ try{ draw(); }catch(e){ purDraw(); } if(_curTab==='rec'){ try{ recDraw(); }catch(e){} } }
+
+/* 「📝」 — 고르는 창 */
+function pursueAsk(src, ref){
+  var o=purSrc(src, ref); if(!o){ toast('공고를 찾지 못했습니다 — 목록을 새로 받은 뒤 다시 눌러 주세요'); return; }
+  var cur=purIdx()[GovPursue.keyOf(src, ref)], C=GovPursue.KINDS.corp, P=GovPursue.KINDS.person;
+  var ds=' data-src="'+esc(src)+'" data-ref="'+esc(ref)+'"';
+  /* 👤 은 예전 「📝 지원 준비」 그대로 — 넘기는 함수가 이 탭에 표시도 한다(applicationHandoff) */
+  var person = src==='feed' ? 'onclick="toForm(this.dataset.ref)"' : 'onclick="applicationFromHit(this.dataset.ref)"';
+  var html='<div class="sml">'+esc(o.srcName)+(o.org?' · '+esc(o.org):'')+(o.closeDt?' · 마감 '+esc(String(o.closeDt).slice(0,16)):'')+'</div>'
+    +'<div style="font-weight:700;margin:2px 0 6px">'+esc(o.title||'-')+'</div>'
+    +(cur?'<div class="note">지금: '+purTag(src, ref)+' '+esc(purDay(cur.createdAt))+'부터 · 다른 쪽을 고르면 갈래가 바뀝니다</div>':'')
+    +'<div class="pur-ask">'
+    +'<button class="btn"'+ds+' onclick="pursueCorp(this.dataset.src,this.dataset.ref)" title="경력관리 '+esc(C.to)+'에 담습니다">'+C.icon+' <b>푸른노무법인 사업으로 진행</b>'
+      +'<span class="sml">경력관리 «🏢 사업관리»에 사업을 채워 엽니다(저장은 직접 누릅니다) · 나라장터 공고는 첨부 서식 링크도 모읍니다</span></button>'
+    +'<button class="btn"'+ds+' '+person+' title="지원 준비 — 경력관리 지원 작업함에서 서류를 함께 준비합니다">'+P.icon+' <b>컨설턴트로 지원 준비</b>'
+      +'<span class="sml">경력관리 «지원 작업함»에서 이력서·신청서를 준비합니다(예전 「📝 지원 준비」와 같습니다)</span></button>'
+    +'</div>'
+    +(cur?'<div class="bar"><span class="sp"></span><button class="btn sm" data-id="'+esc(cur.id)+'" onclick="purShow(this.dataset.id)">🏢 지원사업에서 보기</button>'
+      +'<button class="btn sm" data-id="'+esc(cur.id)+'" onclick="purOff(this.dataset.id)" title="지우지 않습니다 — 보기 「그만둔 것」에서 되살립니다">✕ 그만둠</button></div>':'');
+  popOpen('📝 이 공고를 어떻게 진행할까요?', html);
+}
+/* 🏢 법인 진행 — 표시하고, 나라장터면 서식 링크를 모은 뒤 결과 창(사업관리에 담기 단추)을 띄운다.
+   ⚠ 경력관리는 «결과 창의 단추»로 연다 — 기다린 뒤 저절로 새 탭을 열면 팝업 차단에 막힌다(누른 손이 없어서) */
+async function pursueCorp(src, ref){
+  var o=purSrc(src, ref); if(!o) return;
+  o.kind='corp';
+  var m=GovPursue.mark(purList(), o, purNow()); if(!m.rec) return;
+  purSave(m.list); purRefresh();
+  toast('🏢 푸른노무법인 지원사업으로 표시했습니다');
+  if(m.rec.srcName==='나라장터' && !(m.rec.files||[]).length) await purFiles(m.rec.id);
+  purShow(m.rec.id);
+}
+/* 📎 나라장터 첨부 서식 링크 — 그 공고가 올라온 «하루치» 목록을 다시 받아 번호·차수로 찾는다(매일 받기와 같은 조회 · 한두 번 부른다).
+   ⚠ 못 찾으면 «서식 없음»이 아니라 까닭을 남긴다(filesErr) — 인증키 없음 · 공고일 모름 · 오류 · 목록에 없음(정정·취소) */
+async function purFiles(id){
+  var r=purGet(id); if(!r || r.srcName!=='나라장터' || _purBusy[id]) return;
+  var put=function(files, err){ var m=GovPursue.setFiles(purList(), id, files, err, purNow()); if(m.rec) purSave(m.list); };
+  var kd=keyData(); if(!kd){ put([], '공공데이터포털 인증키가 없어 서식 링크를 못 모았습니다'); return; }
+  var day=GovPursue.ymd(r.openDt); if(!day || !r.no){ put([], '공고일·공고번호를 몰라 서식을 찾지 못했습니다 — 원문 공고에서 받으세요'); return; }
+  _purBusy[id]=1;
+  popOpen('🏢 푸른노무법인 지원사업', '<div class="note">나라장터에서 「'+esc(r.title||'')+'」의 첨부 서식을 찾는 중입니다…</div>');
+  try{
+    var at=new Date(day+'T12:00:00+09:00'), found=null, err='';
+    for(var p=1;p<=5;p++){
+      var f=GovG2b.filesFrom(await pull(GovG2b.buildUrl({ key:kd, from:at, to:at, page:p, rows:999 })), r.no);
+      if(!f.ok){ err=f.err; break; }
+      if(f.found){ found=f; break; }
+      if(!f.count || p*999>=f.total) break;
+    }
+    if(found) put(found.files, found.files.length ? ''
+      : (found.dropped ? '나라장터 공식 주소(g2b.go.kr)가 아닌 첨부 '+found.dropped+'개는 뺐습니다 — 원문 공고에서 확인하세요' : '이 공고에는 첨부 서식이 없습니다'));
+    else put([], err ? '나라장터: '+err : '나라장터 목록에서 이 공고를 찾지 못했습니다(정정·취소된 공고일 수 있습니다) — 원문 공고에서 받으세요');
+  }catch(e){ put([], '나라장터에 닿지 못했습니다 — 잠시 뒤 「🔄 서식 다시 모으기」'); }
+  finally{ delete _purBusy[id]; }
+  purRefresh();
+}
+async function purFilesAgain(id){ await purFiles(id); purShow(id); }
+/* 기록 한 줄 창 — 사실 · 모은 서식 · 경력관리로 가는 단추 */
+function purShow(id){
+  var r=purGet(id); if(!r) return;
+  /* 서식 주소는 그릴 때 다시 거른다(http(s)만) — 다른 기기에서 받아 온 값을 그대로 href 에 넣지 않는다 */
+  var K=GovPursue.KINDS[r.kind]||{}, d=GovPursue.days(r, recYmd(recToday())), fs=GovPursue.cleanFiles(r.files), di=' data-id="'+esc(r.id)+'"';
+  var link=GovPursue.safeUrl(r.url);
+  var files = fs.length
+    ? '<ul class="pur-files">'+fs.map(function(f, i){ return '<li><span class="rn sml">'+(i+1)+'</span><a href="'+esc(f.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(f.name)+' — 나라장터에서 내려받습니다">📄 '+esc(f.name)+'</a></li>'; }).join('')+'</ul>'
+    : '<div class="note">'+esc(r.filesErr || (r.srcName==='나라장터' ? '아직 서식을 모으지 않았습니다 — 「🔄 서식 다시 모으기」' : (r.srcName||'이 출처')+'는 첨부 서식 링크를 자동으로 못 모읍니다 — 원문 공고에서 받으세요'))+'</div>';
+  var body='<table class="kv">'
+    +_kv('공고', '<b>'+esc(r.title||'-')+'</b>')
+    +_kv('진행', '<span class="ptag'+(r.kind==='person'?' person':'')+'">'+(K.icon||'')+' '+esc(K.name||'')+'</span> <span style="white-space:nowrap">'+esc(r.state||'')+' · '+esc(purDay(r.createdAt))+'부터</span>')
+    +_kv('출처', esc(r.srcName||'')+(r.no?' · '+esc(r.no):''))
+    +_kv('기관', esc(r.org||''))
+    +_kv('마감', esc(String(r.closeDt||'').slice(0,16))+(d==null?'':' <span class="due '+(d<0?'past':(d<=3?'soon':'open'))+'">'+(d<0?'마감 지남':(d===0?'오늘 마감':'D-'+d))+'</span>'))
+    +_kv('추정가격', r.prc?_won(r.prc):'')
+    +(r.handAt?_kv('경력관리', esc(purDay(r.handAt))+'에 '+(r.kind==='corp'?'사업관리로':'지원 작업함으로')+' 넘김'):'')
+    +'</table>'
+    +'<div class="pop-sub">📎 공고 첨부 서식 '+fs.length+'개 <span class="sml">— 내려받은 파일은 경력관리 사업의 「＋ 파일 올리기」로 담으면 다음 입찰 때 찾아 비교·다시 쓰기가 됩니다</span></div>'
+    +files
+    +'<div class="bar" style="margin:12px 0">'
+    +(r.kind==='corp' ? '<button class="btn sm primary"'+di+' onclick="purToBiz(this.dataset.id)" title="경력관리 🏢 사업관리 — 이미 담았으면 그 사업을, 아니면 채워서 새로 엽니다">🏢 경력관리 사업관리에 담기</button>'
+                      : '<button class="btn sm primary"'+di+' onclick="purPerson(this.dataset.id)" title="지원 준비 — 경력관리 지원 작업함에서 서류를 함께 준비합니다">👤 지원 작업함 열기</button>')
+    +(link?'<a class="btn sm" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">🔗 원문 공고</a>':'')
+    +(r.srcName==='나라장터'?'<button class="btn sm"'+di+' onclick="purFilesAgain(this.dataset.id)">🔄 서식 다시 모으기</button>':'')
+    +(r.state==='그만둠' ? '<button class="btn sm"'+di+' onclick="purOn(this.dataset.id)">↩ 다시 진행</button>'
+                         : '<button class="btn sm"'+di+' onclick="purOff(this.dataset.id)" title="지우지 않습니다 — 보기 「그만둔 것」에서 되살립니다">✕ 그만둠</button>')
+    +'</div>';
+  popOpen('🏢 푸른노무법인 지원사업', body);
+}
+/* 🏢 → 경력관리 사업관리. 같은 사이트 localStorage 로 «채울 내용»만(10분), 경력관리가 govRef(이 기록의 id)로 이미 담은 사업을 찾는다 */
+function purToBiz(id){
+  var r=purGet(id); if(!r) return;
+  if(!fbUid){ toast('로그인한 뒤 눌러 주세요'); return; }
+  /* 보낸 계정·일회용 표를 함께 — 경력관리는 «같은 계정 · 이 표»인 넘김만 쓴다(계정 전환·여러 탭에서 남의 것을 집지 않게) */
+  var tok='BZ-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+  try{ localStorage.setItem('pu_kc_biz_handoff', JSON.stringify(GovPursue.bizHandoff(r, Date.now(), fbUid, tok))); }
+  catch(e){ toast('넘기지 못했습니다 — 이 브라우저 저장소를 쓸 수 없습니다'); return; }
+  var m=GovPursue.setHand(purList(), id, purNow()); if(m.rec) purSave(m.list);
+  var w=window.open('kcareer.html?go=biz&t='+encodeURIComponent(tok), '_blank');
+  toast(w ? '경력관리 사업관리에 채워 엽니다 — 확인하고 「저장」을 누르세요' : '새 탭이 막혔습니다 — 팝업을 허용한 뒤 다시 눌러 주세요(넘길 내용은 10분 동안 남아 있습니다)');
+  purDraw();
+}
+/* 👤 → 지원 작업함. 원래 줄이 남아 있으면 그 길로, 정리됐으면 베껴 둔 사실로 (지원 작업함은 같은 공고면 있던 것을 연다) */
+function purPerson(id){
+  var r=purGet(id); if(!r) return;
+  if(r.src==='feed' && find(r.ref)) return toForm(r.ref);
+  if(r.src==='hit' && recWatchHits().some(function(h){ return h.key===r.ref; })) return applicationFromHit(r.ref);
+  applicationHandoff({ sourceKind:r.src==='feed'?'gov_feed':'gov_watch', sourceId:r.ref, title:r.title||'', org:r.org||'', url:r.url||'', deadline:r.closeDt||'', docs:[], text:'' });
+}
+function purOff(id){
+  var r=purGet(id); if(!r) return;
+  if(!confirm('「'+(r.title||'')+'」을(를) 그만둔 것으로 옮길까요?\n지우지 않습니다 — 보기 「그만둔 것」에서 언제든 되살립니다.')) return;
+  var m=GovPursue.setState(purList(), id, '그만둠', purNow()); if(m.rec){ purSave(m.list); toast('그만둔 것으로 옮겼습니다'); }
+  popClose(); purRefresh();
+}
+function purOn(id){
+  var m=GovPursue.setState(purList(), id, '진행', purNow()); if(m.rec){ purSave(m.list); toast('다시 진행합니다'); }
+  popClose(); purRefresh();
+}
+/* 탭 숫자 — 진행 중(마감 안 지남) */
+function purBadge(){
+  var el=$('purN'); if(!el || typeof GovPursue==='undefined') return;
+  var c=GovPursue.counts(purList(), recYmd(recToday()));
+  el.innerHTML = c.live ? ' <span class="tag teal" title="진행 중인 지원사업 '+c.live+'건">'+c.live+'</span>' : '';
+}
+/* 🏢 탭 그리기 — 표 짜임은 모아보기 탭과 같다(폰에서는 두 줄 카드, ☐·№ 는 왼쪽 끝) */
+function purDraw(){
+  purBadge();
+  var tb=$('purTb'); if(!tb || typeof GovPursue==='undefined') return;
+  var today=recYmd(recToday()), all=purList(), view=$('uView').value;
+  var rows=GovPursue.visible(all, { view:view, kind:$('uKind').value, q:$('uq').value, today:today });
+  var vis={}; rows.forEach(function(r){ vis[r.id]=1; });
+  Object.keys(_purSel).forEach(function(k){ if(!vis[k]) delete _purSel[k]; });   /* 안 보이게 된 줄은 고른 것에서 뺀다 */
+  var c=GovPursue.counts(all, today), cnt=$('uCnt');
+  cnt.textContent='지금 '+rows.length+'건 · 진행 중 '+c.live+'(🏢 '+c.corp+' · 👤 '+c.person+')'+(c.past?' · 마감 지남 '+c.past:'')+(c.off?' · 그만둠 '+c.off:'');
+  cnt.title=cnt.textContent;
+  var ks=Object.keys(_purSel), bk=function(what, txt){ return ' <button class="btn sm" onclick="purBulk(\''+what+'\')">'+txt+'</button>'; };
+  $('purSel').innerHTML = ks.length ? '<div class="sel-bar">✔ <b>'+ks.length+'건</b> 선택'
+      +(view!=='off' ? bk('off','✕ 그만둠으로') : '')+(view==='off'||view==='all' ? bk('on','↩ 다시 진행') : '')
+      +' <button class="btn sm" onclick="purSelAll(false)">선택 해제</button></div>' : '';
+  var sa=$('uSelAll'); if(sa) sa.checked = rows.length>0 && rows.every(function(r){ return _purSel[r.id]; });
+  var bt=function(id, fn, ttl, txt){ return '<button class="btn sm" data-id="'+id+'" title="'+esc(ttl)+'" onclick="'+fn+'(this.dataset.id)">'+txt+'</button>'; };
+  tb.innerHTML = rows.length ? rows.map(function(r, i){
+    var K=GovPursue.KINDS[r.kind], d=GovPursue.days(r, today), id=esc(r.id), on=!!_purSel[r.id], nf=(r.files||[]).length;
+    var due = d==null ? '<span class="due unknown">마감 모름</span>'
+      : '<span class="due '+(d<0?'past':(d<=3?'soon':'open'))+'">'+(d<0?'마감 지남':(d===0?'오늘 마감':'D-'+d))+'</span>';
+    var files = r.srcName==='나라장터' ? bt(id,'purShow', nf?'공고 첨부 서식 '+nf+'개':(r.filesErr||'아직 안 모았습니다'), '📎 '+nf)
+      : '<span class="sml" title="나라장터 공고만 서식 링크를 모읍니다 — 원문 공고에서 받으세요">원문</span>';
+    var go = r.kind==='corp' ? bt(id,'purToBiz','경력관리 🏢 사업관리에서 이 사업을 엽니다(없으면 채워서 새로)','🏢 사업관리')
+      : bt(id,'purPerson','지원 준비 — 경력관리 지원 작업함에서 서류를 함께 준비합니다','👤 작업함');
+    var st = r.state==='그만둠' ? bt(id,'purOn','다시 진행','↩') : bt(id,'purOff','그만둠 — 지우지 않습니다(보기 「그만둔 것」에서 되살립니다)','✕');
+    return '<tr class="rr'+(on?' sel-on':'')+(r.state==='그만둠'||(d!=null&&d<0)?' rec-past':'')+'" data-id="'+id+'" onclick="purRowClick(event,this.dataset.id)">'
+      +'<td class="chk"><input type="checkbox" class="row-chk" aria-label="'+(i+1)+'번 고르기"'+(on?' checked':'')+' data-id="'+id+'" onchange="purTog(this.dataset.id,this.checked)"></td>'
+      +'<td class="rn">'+(i+1)+'</td>'
+      +'<td class="rrg"><span class="ptag'+(r.kind==='person'?' person':'')+'" title="'+esc(K.name)+'">'+K.icon+' '+(r.kind==='corp'?'법인 진행':'컨설턴트 지원')+'</span></td>'
+      +'<td class="rsrc"><span class="sml">'+esc(r.srcName||'-')+'</span></td>'
+      +'<td class="tt" title="'+esc(r.title||'')+'"><a class="tlink" href="#" role="button" data-id="'+id+'" onclick="purShow(this.dataset.id);return false">'+esc(r.title||'-')+'</a></td>'
+      +'<td class="src" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
+      +'<td class="rdt sml" title="진행으로 고른 날">'+esc(purDay(r.createdAt)||'-')+'</td>'
+      +'<td title="'+esc(r.closeDt?'마감 '+r.closeDt:'')+'">'+due+'</td>'
+      +'<td>'+files+'</td>'
+      +'<td class="act">'+go+st+'</td></tr>';
+  }).join('') : '<tr><td colspan="10" class="empty">'+(all.length ? '조건에 맞는 것이 없습니다 — 보기·갈래·검색을 넓혀 보세요'
+      : '아직 고른 공고가 없습니다 — 어느 탭에서든 공고 줄의 「📝」를 눌러 🏢 법인 진행 또는 👤 컨설턴트 지원을 고르면 여기에 모입니다')+'</td></tr>';
+  recStickySync();
+}
+function purRowClick(e, id){ var t=e&&e.target; if(t && t.closest && t.closest('input,button,a,select,label')) return; purShow(id); }
+function purTog(id, on){ if(on) _purSel[id]=1; else delete _purSel[id]; purDraw(); }
+/* 머리 ☐ — «지금 보이는 것»만 */
+function purSelAll(on){
+  if(!on){ _purSel={}; purDraw(); return; }
+  GovPursue.visible(purList(), { view:$('uView').value, kind:$('uKind').value, q:$('uq').value, today:recYmd(recToday()) })
+    .forEach(function(r){ _purSel[r.id]=1; });
+  purDraw();
+}
+/* 고른 것을 한꺼번에 — 건수를 묻고 한 번에 저장 */
+function purBulk(what){
+  var ids=Object.keys(_purSel); if(!ids.length) return;
+  var to=what==='on'?'진행':'그만둠';
+  if(!confirm('고른 '+ids.length+'건을 「'+to+'」으로 옮길까요?'+(to==='그만둠'?'\n지우지 않습니다 — 보기 「그만둔 것」에서 되살립니다.':''))) return;
+  var list=purList(), n=0, now=purNow();
+  ids.forEach(function(id){ var m=GovPursue.setState(list, id, to, now); if(m.rec){ list=m.list; n++; } });
+  _purSel={};
+  if(n) purSave(list);
+  toast(n+'건을 「'+to+'」으로 옮겼습니다');
+  purRefresh();
 }
 /* 출처가 빠진 채 담긴 옛 줄을 되살린다(2026-10-03 첫 실사용 32건). 멱등 — 있으면 건드리지 않는다. */
 function srcBackfill(){
@@ -1879,7 +2152,7 @@ async function cloudPull(){ return cloudSync(); }
 var _mat=null, _matDocs=null, _matAi=null;   /* _matAi — AI·DX 수행·강의 이력(서류 준비 창, 읽기만) */
 
 function setTab(t){
-  if(t!=='rec' && t!=='plan' && !LENS[t]) t='feed';   /* 예전에 「신청 재료」('mat')를 보던 기기도 공고로 연다 */
+  if(t!=='rec' && t!=='plan' && t!=='pur' && !LENS[t]) t='feed';   /* 예전에 「신청 재료」('mat')를 보던 기기도 공고로 연다 */
   _curTab=t;
   $('pgFeed').style.display = (t==='feed'?'':'none');
   /* 모아보기 탭(📍·🤖) — 떠난 탭은 고른 것을 비운다(자료 목록 규칙) */
@@ -1900,6 +2173,11 @@ function setTab(t){
   $('tbFeed').className='tb'+(t==='feed'?' on':'');
   $('tbRec').className ='tb'+(t==='rec'?' on':'');
   if(t==='rec'){ recDraw(); recWatchPull(); recMailScan(false); }
+  /* 🏢 푸른노무법인 지원사업 — 떠나면 고른 것을 비운다(자료 목록 규칙) */
+  if(t!=='pur') _purSel={};
+  if($('pgPur')) $('pgPur').style.display = (t==='pur'?'':'none');
+  if($('tbPur')) $('tbPur').className='tb'+(t==='pur'?' on':'');
+  if(t==='pur') purDraw();
   recStickySync();                        /* 탭을 바꾸면 «보이는» 덩어리 높이를 다시 잰다 */
   tabIntoView();
   lsSet('tab', t);                       /* ⚠ 클라우드로 내보내지 않는다(lsSet 은 안 밀어낸다) */
@@ -2477,7 +2755,7 @@ function recWatchHtml(grp){
     return '<tr class="'+(nw?'rec-now':'')+(past?' rec-past':'')+'">'+recStarCell('h', x.key)+recChk(grp, x.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(x.date||'')+'</td>'
       +'<td class="src">'+recSrcCell(x, grp)+'</td>'
       +'<td class="kd"><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td>'
-      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')+appTag(x.org&&x.org!=='kcplaa'?x.org:appOrgOf(x.title))
+      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')+purTag('hit', x.key)+appTag(x.org&&x.org!=='kcplaa'?x.org:appOrgOf(x.title))
         +(/^https:\/\//.test(x.href||'')?'<a class="tlink" href="'+esc(x.href)+'" title="누르면 공고가 팝업 창으로 열립니다" onclick="return recOpenPost(\''+esc(x.key)+'\')">'+esc(x.title)+'</a>':esc(x.title))+'</td>'
       +matchCell(function(){ return matchTargetHit(x); })
       +docsCell(x)
@@ -2498,8 +2776,9 @@ function recWatchHtml(grp){
 }
 /* 공고를 팝업 창으로 — 한 창을 돌려 쓴다(누를 때마다 창이 쌓이지 않게). 연 글은 «봤음»으로 적는다.
    ⚠ 팝업이 막히면 새 탭으로 연다(a 의 href 가 그대로 산다 — return true). */
+/* 모집 글의 「📝 진행」 — 🏢 법인 진행 / 👤 컨설턴트 지원을 고르는 창(pursueAsk)을 연다 (2026-11-22, 예전엔 ☐ 지원 → 지원 작업함 바로) */
 function recSupportInput(key){
-  return '<label class="btn sm"><input type="checkbox" data-key="'+esc(key)+'" onchange="if(this.checked)applicationFromHit(this.dataset.key)"> 지원</label>';
+  return '<button class="btn sm" data-key="'+esc(key)+'" title="진행·지원 — 🏢 푸른노무법인 사업으로 진행하거나 👤 컨설턴트로 지원 준비(경력관리)" onclick="pursueAsk(\'hit\',this.dataset.key)">📝 진행</button>';
 }
 function recOpenPost(key){
   var x=recWatchHits().filter(function(h){ return h.key===key; })[0];
@@ -2708,10 +2987,11 @@ function lensDraw(id){
     /* 공고 제목은 상세 팝업을 여는 링크 — 줄 누르기(마우스)와 같은 일을 키보드(Tab·Enter)로도 */
     var ttl = x.kind==='hit' && x.url ? '<a class="tlink" href="'+esc(x.url)+'" target="_blank" rel="noopener" data-sel="'+sel+'" onclick="return lensOpen(this.dataset.sel)">'+esc(x.title)+'</a>'
       : (x.kind==='feed' ? '<a class="tlink" href="#" role="button" data-sel="'+sel+'" onclick="lensPop(this.dataset.sel);return false">'+esc(x.title)+'</a>' : esc(x.title));
+    var PUR_TTL='진행·지원 — 🏢 푸른노무법인 사업으로 진행(경력관리 사업관리) 또는 👤 컨설턴트로 지원 준비(경력관리 지원 작업함)';
     var acts = x.kind==='feed'
-      ? (x.url ? b(sel,'open','원문 공고 열기','🔗') : '') + b(sel,'apply','지원 준비 — 경력관리에서 서류를 함께 준비합니다','📝')
+      ? (x.url ? b(sel,'open','원문 공고 열기','🔗') : '') + b(sel,'apply',PUR_TTL,'📝')
         + (x.hidden ? b(sel,'unhide','되살리기','↩') : b(sel,'hide','숨기기 — 지우지 않습니다(보기 「🙈 숨긴 공고」에서 되살립니다)','🚫'))
-      : b(sel,'apply','지원 준비 — 경력관리에서 서류를 함께 준비합니다','📝') + b(sel,'due','마감일 넣기 · 구글 캘린더','📅')
+      : b(sel,'apply',PUR_TTL,'📝') + b(sel,'due','마감일 넣기 · 구글 캘린더','📅')
         + (x.isNew ? b(sel,'seen','봤음','✓') : '');
     return '<tr class="rr'+(on?' sel-on':'')+(x.isNew&&!x.past&&!x.hidden?' rec-now':'')+(x.past||x.hidden?' rec-past':'')+'" data-sel="'+sel+'" onclick="lensRowClick(event,this.dataset.sel)">'
       +'<td class="stc"><button class="starbtn'+(star?' on':'')+'" title="'+(star?'별표 끄기':'별표 치기')+'" data-sel="'+sel+'" onclick="event.stopPropagation();lensDo(this.dataset.sel,\'star\')">'+(star?'★':'☆')+'</button></td>'
@@ -2719,7 +2999,7 @@ function lensDraw(id){
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td class="rrg" title="'+esc(x.why.join(' / '))+'">'+grp+'</td>'
       +'<td class="rsrc"><span class="sml">'+esc(x.kind==='feed'?x.src:'모집 글')+'</span></td>'
-      +'<td class="tt" title="'+esc(x.title)+'">'+tag+ttl+'</td>'
+      +'<td class="tt" title="'+esc(x.title)+'">'+purTag(x.kind, x.ref)+tag+ttl+'</td>'
       +'<td class="src" title="'+esc(x.org)+'">'+esc(x.org||'-')+'</td>'
       +'<td class="rdt sml">'+esc(x.date||'-')+'</td>'
       +'<td title="'+esc(x.to?'마감 '+x.to:'')+'"><span class="due '+esc(x.dueK||'unknown')+'">'+esc(x.dueText||'마감 모름')+'</span></td>'
@@ -2741,13 +3021,13 @@ function lensDo(sel, what){
   if(t.kind==='feed'){
     if(what==='star') star(t.ref);
     else if(what==='open') open2(t.ref);
-    else if(what==='apply') toForm(t.ref);
+    else if(what==='apply') pursueAsk('feed', t.ref);
     else if(what==='hide') hide(t.ref);
     else if(what==='unhide') unhide(t.ref);
     return;
   }
   if(what==='star') recStarTog('h', t.ref);
-  else if(what==='apply') applicationFromHit(t.ref);
+  else if(what==='apply') pursueAsk('hit', t.ref);
   else if(what==='due') recWatchCal(t.ref);
   else if(what==='seen') recSeen(t.ref);
 }
