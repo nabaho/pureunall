@@ -1364,6 +1364,13 @@ rules.gov_watch = { '.read': LOGIN, '.write': false };
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
 rules.gov_feed = { '.read': LOGIN, '.write': false };
 
+/* ══ 📮 정부사업신청 «매일 카톡 요약» 의 공개 요약 (대표 지시 2026-11-22 「카카오톡으로 매일 받고 싶다」 → 「공식 방식으로」) ══
+   서버(govDigestKakao, 08:30)가 «오늘의 요약»(last — 갈래별 줄·새 것·마감 임박)과 «돌린 결과»(status — 모드·보낸 통수·오류 코드)를 쓴다.
+   카톡 «전체 보기» 단추가 정부사업신청(gov.html?digest=1)에서 이것을 읽어 보여 준다. 담기는 것은 gov_feed·gov_watch 와 같은 «공개 공고» 정보뿐이다.
+   ★ 읽기 = 재직 직원(LOGIN, gov_feed 와 같다). ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다).
+   ⚠ 일부러 «여기 없는» 자리: gov_digest_secret(카카오 토큰) · gov_digest_state(보낸 기록·잠금) · gov_digest_cfg(모드) — 규칙에 없어 화면에서는 읽기·쓰기 모두 닫힌다. 서버만 만진다. */
+rules.gov_digest = { '.read': LOGIN, '.write': false };
+
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
    ⚠ 읽기 = 기업정보함(pucards)과 «같은» LOGIN — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 같은 사람이 읽는다.

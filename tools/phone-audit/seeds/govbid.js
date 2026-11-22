@@ -71,9 +71,19 @@ for (let i = 0; i < 28; i++) hits['h' + i] = { key: 'h' + i, title: (i % 2 ? '[�
  ['hrdk', 'hrdkai', 'HRD 전문가 인력풀 신청공고', '중소기업 AI훈련확산센터 AI훈련코치 모집', 11]].forEach(([board, org, boardName, title, d], i) => {
   hits['ai' + i] = { key: 'ai' + i, title, date: addDays(-i), board, org, boardName, href: 'https://example.com/ai-h' + i, per: { to: addDays(d) } };
 });
+/* 📮 오늘의 요약(2026-11-22) — 서버(govDigestKakao)가 gov_digest/last·status 에 쓰는 모양 그대로. 카톡 «전체 보기»(gov.html?digest=1)가 여는 팝업을 그려 보려는 자료(모두 지어낸 것) */
+const DIGEST = { last: { at: Date.now() - 3600e3, today, mode: 'live', counts: { rows: 121, hits: 52, soleOut: 7 }, fresh: 3, remind: 1, sections: [
+  { key: 'rgn', title: '🧑‍💼 컨설턴트·위원 모집 — 대전·세종·충남·충북 (+공인노무사회 전국)', items: [
+    { id: 'hit:rg1', title: '점검위원회 위원(공인노무사) 공개모집 — 가나다라마바사아자차카타파하', org: '충청남도 도정공고', due: '~' + addDays(3).slice(5).replace('-', '.') + ' · D-3', days: 3, why: ['📍 충남', '지역 기관 게시판 — 충남'], url: 'https://example.com/rg-h1', groups: ['충남'], isNew: false, isSoon: true },
+    { id: 'hit:rg2', title: '직장 내 괴롭힘 사건 외부 조사자 선임 공고', org: '공인노무사회 채용', due: '수시(사람이 정해지면 마감)', why: ['전국 · 공인노무사회 게시판'], url: 'https://example.com/rg-h2', groups: [], isNew: true, isSoon: false }] },
+  { key: 'main', title: '📋 정부사업 공고 — 노무사·노무컨설팅 쪽', items: [
+    { id: 'feed:R26BK1', title: '2026년 일터혁신 상생컨설팅 지원사업 기업 모집 공고', org: '한국점검협회컨설팅', due: '~' + addDays(8).slice(5).replace('-', '.') + ' · D-8', days: 8, why: ['걸린 낱말 일터혁신·컨설팅'], url: 'https://example.com/g1', groups: [], isNew: true, isSoon: false },
+    { id: 'feed:R26BK2', title: '위험 주소 시험 — javascript 주소는 링크로 걸리지 않는다', org: '점검기관', due: '마감 모름', why: [], url: 'javascript:alert(1)', groups: [], isNew: true, isSoon: false }] },
+  { key: 'ai', title: '🤖 AI 사업 (전국)', items: [] }] },
+  status: { at: Date.now() - 3600e3, today, mode: 'live', ok: false, error: 'not-connected' } };
 module.exports = {
   localStorage: { gov3_feed: JSON.stringify(feed), gov3_plan: JSON.stringify(plan), gov3_key_data: '점검열쇠', gov3_key_biz: '점검열쇠2', gov3_last: today, gov3_plan_since: today, gov3_plan_at: today + 'T07:40:00' },
-  data: { gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
+  data: { gov_digest: DIGEST, gov_watch: { hits, last: { at: Date.now() - 3600e3, checked: 24, errors: [{ board: 'pub_3', name: '점검공단', why: 'HTTP 503' }] } } },
   views: [
     { name:'application-handoff',run:async(p)=>{
       await p.evaluate(()=>{localStorage.setItem('cm3_owner_uid','pa-uid-1');toForm(get('feed')[0].id);});
@@ -93,5 +103,6 @@ module.exports = {
     { name: 'ai', run: async (p) => { await p.click('#tbAi'); } },
     { name: 'aisel', run: async (p) => { for (const k of [1, 2]) await p.click('#aiTb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'aipast', run: async (p) => { await p.evaluate(() => lensSub('ai', 'past')); } },
+    { name: 'digest', run: async (p) => { await p.evaluate(() => digestOpen()); await p.waitForSelector('#pop.on .pk-row', { timeout: 25000 }); }, back: async (p) => { await p.evaluate(() => popClose()); } },
   ],
 };
