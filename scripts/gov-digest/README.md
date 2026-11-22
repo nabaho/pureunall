@@ -39,10 +39,11 @@
 끄려면 `gov_digest_cfg/mode` 를 `off` 로(Claude 에게 «카톡 요약 꺼 줘»), 카카오 쪽에서는 카카오계정 › 연결된 서비스에서 앱을 끊으면 토큰이 죽는다.
 
 ## 대표가 한 번 하실 일 (연결)
-1. **카카오 개발자 콘솔**(developers.kakao.com › 내 애플리케이션 › «푸른토탈서비스») 세 곳:
-   - **제품 설정 › 카카오 로그인 › 동의항목** → «카카오톡 메시지 전송(talk_message)» 을 **선택 동의**로 켠다.
-   - **제품 설정 › 카카오 로그인 › Redirect URI** 에 `https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoMemoCallback` 을 **글자 그대로** 더한다.
-   - **앱 › 플랫폼 키/제품 링크 관리 › 웹 도메인**에 `https://erp.pureunlabor.co.kr` 가 있는지 본다(카톡 단추 링크가 이 도메인이어야 한다).
+1. **카카오 개발자 콘솔**(developers.kakao.com › 내 애플리케이션 › «푸른토탈서비스», 앱 ID 1589519) 세 곳 — 2026-11-22 설정 끝(화면 이름은 이때 기준):
+   - **제품 설정 › 카카오 로그인 › 동의항목 › 접근권한** 의 «카카오톡 메시지 전송(talk_message)» → 동의 단계 **«이용 중 동의»**(동의 목적 문구 필수).
+     ⚠ «선택 동의»로 하면 직원이 평소 카카오 로그인을 할 때마다 이 항목이 동의 화면에 같이 떠서 헷갈린다 — 이용 중 동의는 연결 주소를 열 때만 묻는다.
+   - **앱 › 플랫폼 키 › REST API 키 수정 › 카카오 로그인 리다이렉트 URI** 에 `https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoMemoCallback` 을 **글자 그대로** 더한다(기존 enter.html 둘은 그대로).
+   - **앱 › 제품 링크 관리 › 웹 도메인**에 `https://erp.pureunlabor.co.kr` 를 등록한다(카톡 단추 링크가 이 도메인이어야 한다).
 2. 서버에 함수가 올라간 뒤(`kakaoMemoStart`) 아래 주소를 브라우저에서 연다 → 카카오 로그인 → «카카오톡 메시지 전송» 동의 → «✅ 연결됐습니다» 화면과 함께 카톡 «나와의 채팅»에 확인 글 한 통이 온다.
    `https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoMemoStart`
 3. 그 뒤 매일 아침 8시 30분에 새 공고·모집이 있으면 알려 준다.
