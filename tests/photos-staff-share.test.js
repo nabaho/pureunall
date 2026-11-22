@@ -395,34 +395,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-21 — 강의자료 «자동 정리함»(/edulib_inbox, 대표 「메일로 보낸 강의 자료 … 자동으로 정리해서 내용 넣을 수 있게」) 게시 완료(rules-deploy.js --deploy, 이 PC):
        새로 1 · 바뀜 0 · 사라짐 0 — 읽기 관리자만(LOGIN + isAdmin, 메일함 화면과 같은 사람)·쓰기 아무도(서버 관리자 SDK 만). 더 넓게 보이게 된 칸 없음.
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-21.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
-  /* 2026-11-12 게시 전 — 건의함 세 자리의 «번호 모양 · 알려진 칸 · 길이 한도»(대표 요청 「건의함 보안규칙: 키 모양·크기 검사 추가」, 외부 보안 검토 «근본 구멍»).
-     새로 생김 18(메타 6 · 건의 원문 9 · 진행함 $id 한 덩어리 · 진행함 $uid/.validate 1+…) · 바뀜 2(건의·메타 $id/.validate 에 번호 모양) · 사라짐 0.
-     ★ 넓어지는 권한 없음 — .validate 만 더했고 읽기·쓰기 조건은 한 글자도 안 바꿨다. 진짜 엔진(에뮬레이터) 111개 통과(tests/suggestion-rules.emulator.mjs),
-     예전 규칙에서는 나쁜 쓰기 36 + 객체 아닌 값 10 + 부분 삭제 5 가 그대로 통과했다.
-     게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 스무 줄을 뺄 것.
-     ⚠ 게시 전에는 «옛 규칙 그대로» 라 구멍이 열려 있다 — 정상 건의 접수·답변·확인은 영향 없다. */
-  const PENDING = [
-    '/suggestions_meta_private/$id/$other',
-    '/suggestions_meta_private/$id/.validate',
-    '/suggestions_meta_private/$id/author',
-    '/suggestions_meta_private/$id/authorEmail',
-    '/suggestions_meta_private/$id/cat',
-    '/suggestions_meta_private/$id/createdAt',
-    '/suggestions_meta_private/$id/title',
-    '/suggestions_private/$id/$other',
-    '/suggestions_private/$id/.validate',
-    '/suggestions_private/$id/author',
-    '/suggestions_private/$id/authorEmail',
-    '/suggestions_private/$id/createdAt',
-    '/suggestions_private/$id/images',
-    '/suggestions_private/$id/relatedId',
-    '/suggestions_private/$id/repliedAt',
-    '/suggestions_private/$id/reply',
-    '/suggestions_private/$id/replyImages',
-    '/suggestions_private/$id/source',
-    '/suggestions_resolved_private/$uid/$id',
-    '/suggestions_resolved_private/$uid/.validate',
-  ];
+  /* ★ 2026-11-22 — 건의함 세 자리 «번호 모양 · 알려진 칸 · 길이 한도» 게시 완료(rules-deploy.js --deploy, 이 PC, PR #3016 합친 뒤):
+       새로 18 · 바뀜 2(건의·메타 $id/.validate 에 번호 모양만 더함) · 사라짐 0 · 넓어짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
+       새 기준 docs/firebase-rules-콘솔원문-2026-11-22.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
