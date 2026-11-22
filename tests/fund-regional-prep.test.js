@@ -233,19 +233,25 @@ test('2. 주관기관(예: 제주상공회의소) 메일 생성 — 초기 0개�
   const mail0 = w0.ctx.rgpBuildAgencyMail(G.f, { agency: G.agency, docSel: G.docSel, opts: G.opts, rows: G.rows });
   assert.match(mail0.subject, /\[푸른노무법인\] 제주상공회의소 가상제주공동근로복지기금1호\(가칭\) 설립 참여기업 요청서류 및 수합 체크리스트 안내/);
   assert.match(mail0.body, /제주상공회의소 강담당 과장님 안녕하세요\./);
+  assert.match(mail0.body, /■ 1\. 기업 설립 시 준비서류 \(기초자료·지원요건·일반도장\)/, '설립준비 서류 단락 기본 포함');
+  assert.match(mail0.body, /■ 2\. 노동부 설립인가 필요서류/, '노동부 인가 서류 단락 기본 포함');
+  assert.match(mail0.body, /■ 3\. 법인 설립등기 필요서류 — 등기자 딱 2명\(사용자 1명, 근로자 1명\)만 필요/, '등기 서류도 기본값(incReg=true)으로 한 번에 요청');
+  assert.match(mail0.body, /※ 인감증명서·개인인감도장은 실제 법인 등기할 사람 딱 2명\(사용자 1명, 근로자 1명\)만 필요합니다\. 나머지 참여기업·위원은 인감증명서·인감도장이 전혀 필요 없습니다/);
   assert.match(mail0.body, /고용보험 사업장 자격취득자 명부 1부/);
-  assert.match(mail0.body, /대표자·근로자대표 도장 날인 또는 막도장 사용동의서 \(노 1부, 사 1부\)/);
+  assert.match(mail0.body, /일반 막도장 또는 막도장 사용동의서 \(노 1부, 사 1부 · 인감증명·인감도장 불필요\)/);
   assert.match(mail0.body, /설립준비위원 재직증명서 \(대표자 1부, 근로자대표 1부 · 노 1부, 사 1부\)/);
   assert.match(mail0.body, /실무 담당자 성명·직위·휴대폰·이메일\(명함\)/);
+  assert.match(mail0.body, /\[등기자 딱 2명만 — 사용자 1명, 근로자 1명\] 개인인감증명서 각 1부 \(발급 3개월 이내 · 나머지 인원은 인감증명 불필요\)/);
+  assert.match(mail0.body, /\[등기자 딱 2명만 — 사용자 1명, 근로자 1명\] 주민등록등본 또는 초본 각 1부/);
+  assert.match(mail0.body, /\[등기자 딱 2명만 — 사용자 1명, 근로자 1명\] 신분증 사본 및 개인인감도장 각 1부 \(나머지 인원은 인감도장 불필요\)/);
   assert.ok(!mail0.body.includes('기금출연확인서 날인본'), '출연확인서 날인본은 기본 요청에서 해제되어 있음');
   assert.match(mail0.body, /첨부 수합표 엑셀에 표시해 회신/, '참여기업 0곳일 때 수합표 회신 안내 출력');
 
-  /* 등기이사 안내 체크 시 노 1부·사 1부 3종 추가 확인 */
+  /* 등기서류 체크 해제 시 본문에서 제외 가능 확인 후 다시 켜기 */
+  w0.ctx.rgpOpt('incReg', false);
+  const mailNoReg = w0.ctx.rgpBuildAgencyMail(G.f, { agency: G.agency, docSel: G.docSel, opts: G.opts, rows: G.rows });
+  assert.ok(!mailNoReg.body.includes('개인인감증명서 각 1부'), 'incReg=false 해제 시 등기서류 단락 제외 가능');
   w0.ctx.rgpOpt('incReg', true);
-  const mailWithReg = w0.ctx.rgpBuildAgencyMail(G.f, { agency: G.agency, docSel: G.docSel, opts: G.opts, rows: G.rows });
-  assert.match(mailWithReg.body, /개인인감증명서 \(노 1부, 사 1부 · 발급 3개월 이내\)/);
-  assert.match(mailWithReg.body, /주민등록등본 또는 초본 \(노 1부, 사 1부 · 발급 3개월 이내\)/);
-  assert.match(mailWithReg.body, /신분증 사본 및 개인인감도장 \(노 1부, 사 1부\)/);
 
   /* 주관기관 메일 발송 창 호출 및 주소창 개인정보 스크러빙 확인 */
   w0.ctx.rgpComposeAgency();
@@ -345,10 +351,11 @@ test('4. OX 원클릭 토글(무깜빡임) · 기존 자료 자동반영 · 개�
   assert.equal(w.openedMails.length, 1);
   const sMail = w.openedMails[0];
   assert.equal(sMail.to, 'jung@ocean.test');
-  assert.ok(!sMail.body.includes('[ ] 1. [참여기업(회사)] 사업자등록증 사본 1부'), '이미 O인 사업자등록증은 미제출 목록에서 제외');
+  assert.ok(!sMail.body.includes('사업자등록증 사본 1부'), '이미 O인 사업자등록증은 미제출 목록에서 제외');
   assert.ok(!sMail.body.includes('법인등기부등본 1부'), '개인 면제(-) 처리된 법인등기부는 미제출 목록에서 제외');
   assert.match(sMail.body, /고용보험 사업장 자격취득자 명부 1부/, '아직 X인 고용보험명부는 요청 목록에 포함');
-  assert.match(sMail.body, /제출 확인 완료\(O\): 사업자등록증, 재직증명\(노1·사1\), 도장·동의서\(노1·사1\), 담당자·메일·노대표/);
+  assert.match(sMail.body, /등기자 딱 2명\(사용자 1명, 근로자 1명\)만 필요/, '개별 기업 메일에도 등기자 딱 2명만 인감증명·인감도장 필요 안내 포함');
+  assert.match(sMail.body, /제출 확인 완료\(O\): 담당자·메일·노대표, 일반막도장·동의서\(노1·사1\), 사업자등록증, 재직증명\(노1·사1\)/);
 
   /* [▶ 다음 미비 기업 메일 쓰기] 호출 시 S2(song@oreum.test)로 이동 */
   w.ctx.rgpComposeNextSite();
