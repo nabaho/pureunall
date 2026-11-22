@@ -1094,6 +1094,9 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
 
     function getCombinedHtml() {
       let out = rawBodyHtml;
+      if (dynNodes['data-cc-top-checks']) {
+        out = out.replace(/<div class="pau-cc-checkdock" data-cc-top-checks>[\s\S]*?<\/div><\/div><div data-cc-dyn>/, `<div class="pau-cc-checkdock" data-cc-top-checks>${dynNodes['data-cc-top-checks'].innerHTML}</div></div><div data-cc-dyn>`);
+      }
       for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn', 'data-cc-dyn']) {
         if (dynNodes[k]) {
           out = out.replace(new RegExp(`<div ${k}>[\\s\\S]*$`), `<div ${k}>${dynNodes[k].innerHTML}</div>`);
@@ -1107,6 +1110,19 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
       set: (v) => {
         rawBodyHtml = String(v || '');
         dynNodes = {};
+        const topCkMatch = rawBodyHtml.match(/<div class="pau-cc-checkdock" data-cc-top-checks>([\s\S]*?)<\/div><\/div><div data-cc-dyn>/);
+        if (topCkMatch) {
+          const tn = makeNode('DIV');
+          let tHtml = topCkMatch[1];
+          Object.defineProperty(tn, 'innerHTML', {
+            get: () => tHtml,
+            set: (nv) => {
+              tHtml = String(nv || '');
+              rebuildParsed();
+            }
+          });
+          dynNodes['data-cc-top-checks'] = tn;
+        }
         for (const k of ['data-m-reg-dyn', 'data-a-dyn', 'data-d-dyn', 'data-cc-dyn']) {
           const dm = rawBodyHtml.match(new RegExp(`<div ${k}>([\\s\\S]*)<\\/div>$`));
           if (dm) {
@@ -1129,6 +1145,7 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
     });
 
     bodyEl.querySelector = (sel) => {
+      if (sel === '[data-cc-top-checks]' && dynNodes['data-cc-top-checks']) return dynNodes['data-cc-top-checks'];
       if (sel === '[data-m-reg-dyn]' && dynNodes['data-m-reg-dyn']) return dynNodes['data-m-reg-dyn'];
       if (sel === '[data-a-dyn]' && dynNodes['data-a-dyn']) return dynNodes['data-a-dyn'];
       if (sel === '[data-d-dyn]' && dynNodes['data-d-dyn']) return dynNodes['data-d-dyn'];
@@ -1259,9 +1276,26 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
   assert.ok(ccCentral.some((r) => r.name.includes('한국서부발전') && r.ccProvinceKey === '충청남도'), '충남 태안 소재 한국서부발전이 매핑되어야 합니다');
   assert.ok(ccCentral.some((r) => r.name.includes('한국가스안전공사') && r.ccProvinceKey === '충청북도'), '충북 혁신도시 소재 한국가스안전공사가 매핑되어야 합니다');
 
-  // 미확인 조문 쟁점의 미단정·채점제외 표시 및 결산공시 전임자수 이상치 원값 보존·평균왜곡 방지 검증
+  // 충남 주요 공단·공사 실제 원문 추출 반영 및 표준 taxonomy_code 일치 · 미추출 기관 비단정(미확인·채점제외) · 이상치 원값 보존 검증
+  const validTaxCodes = new Set(['UNION_SHOP', 'TIMEOFF', 'CHECKOFF', 'PERSONNEL', 'DISCIPLINE', 'WORK_HOURS', 'LEAVE', 'SICK_SAFETY', 'MATERNITY', 'WAGE', 'WELFARE', 'RETIREMENT', 'BARGAINING', 'ETC']);
+  assert.ok(dataMod.articles.every((a) => validTaxCodes.has(a.taxonomy_code)), '모든 단협 조문(articles)의 taxonomy_code는 표준 분류 코드 집합에 속해야 합니다');
   const cheonanRec = ccMaster.records.find((r) => r.name === '천안도시공사');
-  assert.ok(cheonanRec && cheonanRec.issueScores.personnel_participation.verified === false && cheonanRec.issueScores.personnel_participation.tag.includes('미확인'), '추출 조문·지표가 없는 쟁점은 단정하지 않고 미확인(채점제외)으로 표시해야 합니다');
+  const seosanRec = ccMaster.records.find((r) => r.name === '서산시시설관리공단');
+  const buyeoRec = ccMaster.records.find((r) => r.name === '부여군시설관리공단');
+  const sejongFacRec = ccMaster.records.find((r) => r.name === '세종특별자치시시설관리공단');
+  const danyangRec = ccMaster.records.find((r) => r.name === '단양관광공사');
+  assert.ok(cheonanRec && cheonanRec.issueScores.personnel_participation.verified === true && !cheonanRec.issueScores.personnel_participation.tag.includes('미확인'), '천안도시공사는 실제 단협 원문 추출 지표가 반영되어야 합니다');
+  assert.ok(seosanRec && seosanRec.issueScores.discipline_committee.verified === true && !seosanRec.issueScores.discipline_committee.tag.includes('미확인'), '서산시시설관리공단은 실제 단협·규정 원문 추출 지표가 반영되어야 합니다');
+  assert.ok(buyeoRec && buyeoRec.issueScores.work_hours_overtime.val.indexOf('노조 미설립') === -1, '노조 미설립 공단(부여군시설관리공단)도 클린아이 실제 취업·인사·보수규정 근로조건이 표시되어야 합니다');
+  assert.ok(sejongFacRec && sejongFacRec.issueScores.work_hours_overtime.verified === true, '세종특별자치시시설관리공단 근로시간 지표가 실제 원문에서 매칭되어야 합니다');
+  assert.ok(danyangRec && danyangRec.issueScores.retirement_age_peak.verified === true, '단양관광공사 정년·퇴직 지표가 실제 원문에서 매칭되어야 합니다');
+  const cheonanArtView = mountInteractive('?tab=articles&compare=L_2023000002');
+  const whChip = cheonanArtView.bodyEl.querySelector('.pau-topic-chip[data-a-topic="WORK_HOURS"]');
+  assert.ok(whChip, '근로시간 쟁점 칩이 존재해야 합니다');
+  whChip.trigger('click');
+  assert.match(cheonanArtView.bodyEl.innerHTML, /제44조/, '천안도시공사 근로시간 칩 클릭 시 실제 추출된 제44조 조문이 표시되어야 합니다');
+  const unverifiedSample = ccMaster.records.find((r) => r.hasUnion && !r.isChungcheong && r.issueScores.personnel_participation.verified === false);
+  assert.ok(unverifiedSample && unverifiedSample.issueScores.personnel_participation.score === null && unverifiedSample.issueScores.personnel_participation.tag.includes('미확인'), '추출 조문·지표가 없는 쟁점은 단정하지 않고 미확인(채점제외)으로 표시해야 합니다');
   const chungjuFound = ccMaster.records.find((r) => r.name.includes('충주문화관광재단'));
   assert.ok(chungjuFound && chungjuFound.timeoffHours > 0 && chungjuFound.timeoffAnomalyNote.includes('원문 확인'), '결산공시 이상치는 원값을 유지하되 이상치 안내(timeoffAnomalyNote)를 표시해야 합니다');
 
@@ -1274,8 +1308,15 @@ test('⑬ 지역산하비교 다중비교(다중 시·도 총괄표·산하기�
   assert.ok(cbToMatch && Number(cbToMatch[1].replace(/,/g, '')) <= 5000, '충북 지역산하비교 평균 타임오프에서 결산공시 기입 이상치가 제외되어 왜곡되지 않아야 합니다');
 
   const ccHub = mountInteractive('?tab=chungcheong');
+  assert.match(uiSrc, /\.pau-dash-dock\{position:sticky;top:0;/, '상단 필터·체크 컨트롤 영역이 대시보드 상단 틀에 sticky 고정되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /class="pau-dash-dock"/, '대전·세종·충청 탭 상단에 고정 대시보드 독이 렌더링되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /data-cc-top-checks/, '상단 고정 틀 내에 비교기관 빠른 체크바가 포함되어야 합니다');
+  assert.doesNotMatch(ccHub.bodyEl.innerHTML, /pau-cc-guide/, '불필요한 장문 체제 요약 설명 박스가 제거되어야 합니다');
   assert.match(ccHub.bodyEl.innerHTML, /class="pau-cc-prov-grid"/, '대전·세종·충남·충북 4대 권역 요약 카드가 렌더링되어야 합니다');
   assert.match(ccHub.bodyEl.innerHTML, /data-cc-cmp-matrix/, '충청권 대표 기관 임단협 병렬 비교 매트릭스가 즉시 표시되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /<span class="pau-row-no">01<\/span>/, '비교표 좌측 비교 항목마다 넘버링 배지(01~15)가 표시되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /<span class="pau-row-no">15<\/span>/, '비교표 마지막 비교 항목(15)까지 넘버링이 일관되게 표시되어야 합니다');
+  assert.match(ccHub.bodyEl.innerHTML, /<span class="pau-col-no"[^>]*>1<\/span>/, '비교표 상단 기관 열 머리글에도 번호 배지(1~6)가 표시되어야 합니다');
 
   const cnFacBtn = ccHub.bodyEl.querySelector('[data-cc-preset="CN_FACILITY"]');
   assert.ok(cnFacBtn, '충남 시설관리공단·도시공사 집중비교 프리셋이 존재해야 합니다');
