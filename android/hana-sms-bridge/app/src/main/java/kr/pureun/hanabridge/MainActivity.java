@@ -193,7 +193,7 @@ public final class MainActivity extends Activity {
         stepPair.addView(connect, withTop(matchWrap(), 10));
 
         /* 대표가 「어디에 있나」를 물은 자리다 — 폰 앱이 스스로 답한다 */
-        TextView where = text("번호는 PC 푸른이알피 → 재무관리 → 거래내역 → 📱 하나문자 → 🔗 휴대폰 연결", 13, Color.rgb(100, 116, 139));
+        TextView where = text("번호는 재무관리 앱 → 거래내역 → ⚙ 도구 → 📱 하나문자 → 🔗 휴대폰 연결\n(또는 거래내역 맨 위 📱 › 표를 누르면 «8자리 번호 받기»가 나옵니다)", 13, Color.rgb(100, 116, 139));
         where.setPadding(dp(2), dp(10), dp(2), 0);
         stepPair.addView(where);
 
