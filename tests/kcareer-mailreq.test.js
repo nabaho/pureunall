@@ -221,7 +221,8 @@ test('직접 고치기 — 고친 칸만 쓰고, 고친 칸에는 fixed 표시 �
   assert.equal(r.update['INBOX~1/updatedAt'], NOW);
   Object.keys(r.update).forEach((k) => assert.ok(!/\/(st|s|f|e|d|an|why|replyTo|slug|uid|createdAt)$/.test(k), k + ' 은 고치지 않는다'));
   const only = Q.editUpdate('INBOX~1', { memo: '메모만' }, NOW);
-  assert.deepEqual(Object.keys(only.update).sort(), ['INBOX~1/memo', 'INBOX~1/updatedAt'], '메모만 고치면 기한·종류에 fixed 가 안 붙는다');
+  assert.deepEqual(Object.keys(only.update).sort(), ['INBOX~1/edited', 'INBOX~1/memo', 'INBOX~1/updatedAt'], '메모만 고치면 기한·종류에 fixed 가 안 붙는다(사람이 고쳤다는 edited 표시만 더 붙는다)');
+  assert.equal(only.update['INBOX~1/edited'], NOW, '어느 칸을 고쳐도 «사람이 열어 보고 고쳤다» 표시가 남는다 — 다시 가르기가 치우지 않게');
 });
 test('직접 고치기 — 기한을 «없음»으로 고칠 수 있고(null) · 없는 날짜·잘못된 시각·빈 종류·긴 메모는 거절한다', () => {
   const none = Q.editUpdate('INBOX~1', { deadline: null }, NOW);
