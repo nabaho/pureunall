@@ -267,13 +267,18 @@
      ⚠ 제목만 본다(첨부 이름의 «지원서»는 대표 본인이 낸 지원서일 수 있다). 말은 «지원하는 쪽»으로 좁힌다 —
        «노무사 지원 사업»(지원금·제도)·«상담위원 지원 접수 안내»(대표가 지원하는 쪽)는 걸리지 않는다.
      ⚠ 더 걸러야 할 지원 메일이 있으면 «이 줄에만» 말을 더한다 — 개인·업무 말 목록에 섞지 않는다. */
-  var SCOPE_RECRUIT = /노무사\s*지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|시스템|기관))|지원\s*[\(\[（]\s*(?:수습|인턴|채용|신입)\s*[\)\]）]|(?:수습|인턴)\s*(?:노무사\s*)?(?:채용\s*)?지원(?!\s*(?:사업|제도|금|프로그램))|(?:입사|채용)\s*지원(?!\s*(?:사업|제도|금|프로그램))/;
+  var SCOPE_RECRUIT = /노무사\s*지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|시스템|기관|접수|안내|공고|모집|설명회|결과|합격|불합격|통보|발표|면접|심사))|지원\s*[\(\[（]\s*(?:수습|인턴|채용|신입)\s*[\)\]）]|(?:수습|인턴)\s*(?:노무사\s*)?(?:채용\s*)?지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|기관|접수|안내|공고|모집|설명회|결과|합격|불합격|통보|발표|면접|심사))|(?:입사|채용)\s*지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|기관|접수|안내|공고|모집|설명회|결과|합격|불합격|통보|발표|면접|심사))/;
+  /* 대표 본인의 «위원 일» 말 — 제목에 이 말이 있으면 지원 말이 있어도 기관이 대표에게 보낸 요청이다(지원자 메일은 «위촉·위원·심의» 말을 안 쓴다).
+     ⚠ 이력서·프로필·경력은 넣지 않는다 — 지원자가 제목에 «이력서»를 적는 일이 흔하다. */
+  var SCOPE_RECRUIT_NOT = /위촉|위원회|(?:평가|자문|심사|전문|심의|운영|외부|공익|조정)\s*위원|위원\s*(?:명단|등록|활동|수당|후보)|심의|인력\s*풀|제척|기피|회피|강사료|자문료|심사비|회의비|교통비|사례비|출장비|지급\s*확인서|(?:자문|운영|평가)\s*회의/;
+  /* ⚠ 이 예외 말은 «위원 일»을 가리키는 구체적인 말로만 좁힌다 — 맨 «위원»·«서약서»는 넣지 않는다(지원자도 «입사 서약서 및 이력서 제출»을 제목에 쓴다.
+       Orca 재검증 2026-11-23: 맨 말을 넣었더니 «수습노무사 지원 서약서 및 이력서 제출» 이 개인으로 남았다) */
   /* row = { s 제목, an 첨부 이름들 } → { scope:'work'|'personal'|'unsure', why:[…] } */
   function scopeOf(row) {
     row = row || {};
     var subj = oneLine(row.s), names = (Array.isArray(row.an) ? row.an : []).map(str).filter(Boolean);
     var rm = SCOPE_RECRUIT.exec(subj);
-    if (rm) return { scope: 'work', why: ['법인에 지원하는 메일(수습·채용) 제목 «' + cut(rm[0], 12) + '»'] };
+    if (rm && !SCOPE_RECRUIT_NOT.test(subj)) return { scope: 'work', why: ['법인에 지원하는 메일(수습·채용) 제목 «' + cut(rm[0], 12) + '»'] };
     var p = scopeHit(SCOPE_PERSONAL, subj, names), w = scopeHit(SCOPE_WORK, subj, names);
     if (p && !w) return { scope: 'personal', why: ['이력·회의·비용 말 ' + p] };
     if (w && !p) return { scope: 'work', why: ['업무 말 ' + w] };
@@ -427,6 +432,7 @@
     }
     if (!Object.keys(u).length) return fail('바뀐 것이 없습니다');
     u[id + '/updatedAt'] = n;
+    u[id + '/edited'] = n;       // 사람이 «열어 보고 고쳤다» 표시 — 상태가 «새 요청»이어도 말 목록이 바뀐 뒤 다시 가르기로 치우지 않는다(rescopable)
     return { ok: true, update: u };
   }
 
@@ -500,7 +506,10 @@
   var SCOPE_BACKFILL_MAX = 60;
   function validId(id) { return typeof id === 'string' && /^[^\/.#$\[\]]+~[0-9]{1,12}$/.test(id); }
   /* 다시 볼 건 — «옛 판 규칙이 개인으로 들인 새 요청»뿐이다. 사람이 만진 건(확인함·완료·요청 아님)·이미 걸러진 건·Jev/Laya 가 아닌 사람이 정한 범위는 안 본다 */
-  function rescopable(x) { return obj(x) && x.scope === 'personal' && x.scopeBy === 'rule' && x.st === 'new' && (Number(x.scopeV) || 0) < SCOPE_RULE_V; }
+  /* 사람이 «열어 보고 고친» 흔적 — 이 판부터 남기는 edited, 그 전 판의 직접 고치기가 남긴 fixed(종류·기한)·memo(메모).
+     ⚠ 처음 가르는 건(범위 없음)과 다시 가르는 건 «둘 다» 이것을 본다 — 흔적이 있으면 범위 딱지만 붙이고 상태는 그대로 둔다(Orca 재검증 2026-11-23). */
+  function touched(x) { return !!(obj(x) && (x.edited || x.memo || (obj(x.fixed) && Object.keys(x.fixed).length))); }
+  function rescopable(x) { return obj(x) && x.scope === 'personal' && x.scopeBy === 'rule' && x.st === 'new' && !touched(x) && (Number(x.scopeV) || 0) < SCOPE_RULE_V; }
   async function backfillScope(db, base, now, res) {
     var all = toList((await db.ref(base + '/items').once('value')).val());
     var todo = all.filter(function (x) { return validId(x.id) && (!x.scope || rescopable(x)); }).slice(0, SCOPE_BACKFILL_MAX);
@@ -510,7 +519,7 @@
         if (c === null) return c;
         if (!obj(c) || (c.scope && !rescopable(c))) return;               // 그새 정해졌거나 이상한 값 — 건드리지 않는다(사람이 만진 건도 여기서 멈춘다)
         c.scope = sc.scope; c.scopeBy = 'rule'; c.scopeV = SCOPE_RULE_V; c.scopeWhy = cut(sc.why.join(' · '), 60);
-        if (sc.scope !== 'personal' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
+        if (sc.scope !== 'personal' && c.st === 'new' && !touched(c)) { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
         return c;
       });
       if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) {
@@ -633,7 +642,7 @@
     kindMeta: kindMeta, kindsLabel: kindsLabel, idOf: idOf, makeItem: makeItem,
     urgency: urgency, alarmItems: alarmItems, summary: summary, summaryText: summaryText, sortItems: sortItems, filterItems: filterItems, stateUpdate: stateUpdate,
     editUpdate: editUpdate, MEMO_MAX: MEMO_MAX,
-    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK, SCOPE_RECRUIT: SCOPE_RECRUIT, SCOPE_RULE_V: SCOPE_RULE_V,
+    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK, SCOPE_RECRUIT: SCOPE_RECRUIT, SCOPE_RECRUIT_NOT: SCOPE_RECRUIT_NOT, SCOPE_RULE_V: SCOPE_RULE_V,
     scopeOf: scopeOf, scopeMark: scopeMark,
     LAYA_PORT: LAYA_PORT, LAYA_MAX: LAYA_MAX, LAYA_TRY: LAYA_TRY, layaPayload: layaPayload, layaPick: layaPick, layaAsk: layaAsk, layaAgree: layaAgree, layaMark: layaMark,
     boxesOf: boxesOf, scan: scan, makeReadBody: makeReadBody, toList: toList
