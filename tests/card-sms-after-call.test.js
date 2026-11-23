@@ -86,7 +86,9 @@ test("물어보기: 알림이 꺼져 있으면 «보내지 않고» 이유를 �
 });
 
 test("서버로 아무것도 보내지 않는다 — 통화 후 명함 문자는 폰 안에서 끝난다", () => {
-  for (const [name, src] of [["CardSms", card], ["CardCallReceiver", strip(RECV)], ["CardActionReceiver", strip(ACT)], ["CardSmsActivity", strip(SCREEN)]]) {
+  /* 문자 «문구»에 든 사진 주소는 통신이 아니라 받는 사람에게 가는 글자다 — 문구 자리만 빼고 본다 */
+  const cardNoText = card.replace(/static String defaultText\(\) \{[\s\S]*?\n    \}/, "");
+  for (const [name, src] of [["CardSms", cardNoText], ["CardCallReceiver", strip(RECV)], ["CardActionReceiver", strip(ACT)], ["CardSmsActivity", strip(SCREEN)]]) {
     assert.doesNotMatch(src, /HanaUploadWorker|HttpURLConnection|\.post\(|https?:\/\//, name + " 이 밖으로 통신한다");
   }
 });
@@ -97,4 +99,22 @@ test("설정 화면이 메인 화면에서 열리고, 판 번호를 올렸다", 
   const gradle = read("android/hana-sms-bridge/app/build.gradle.kts");
   const code = Number((gradle.match(/versionCode\s*=\s*(\d+)/) || [])[1]);
   assert.ok(code >= 19, "앱 기능을 더했는데 versionCode 를 안 올렸다");
+});
+
+test("명함은 «사진 링크»로 간다 — 기본 문구의 사진 주소는 이 저장소의 실제 사진이고, 글자 명함 통째로 보내지 않는다", () => {
+  const def = card.slice(card.indexOf("static String defaultText()"), card.indexOf("static void save("));
+  const link = (def.match(/https:\/\/[^\s"\\]+\.(?:jpg|jpeg|png)/) || [])[0];
+  assert.ok(link, "★ 기본 문구에 명함 사진 주소가 없다 — 「명함이 아니다」로 돌아간다");
+  const file = path.join(__dirname, "..", new URL(link).pathname.replace(/^\//, ""));
+  assert.ok(fs.existsSync(file), "★ 주소가 가리키는 사진이 저장소에 없다(죽은 링크): " + link);
+  const kb = fs.statSync(file).size / 1024;
+  assert.ok(kb > 5 && kb < 500, "사진이 비었거나 너무 크다: " + Math.round(kb) + "KB");
+  assert.doesNotMatch(link, /nabaho\.github\.io/, "옛 주소다");
+});
+
+test("권한이 빠졌을 때 화면이 «무엇이» 빠졌는지 말하고 폰 설정으로 바로 보낸다", () => {
+  const screen = strip(SCREEN);
+  assert.match(screen, /missingNames\(this\)/, "빠진 권한 이름을 안 보여 준다");
+  assert.match(screen, /ACTION_APPLICATION_DETAILS_SETTINGS/, "폰 설정 앱 정보 화면으로 가는 길이 없다");
+  assert.match(card, /static String missingNames\(/);
 });
