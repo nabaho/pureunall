@@ -1800,6 +1800,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 }
 /* 좁은 화면에서는 손잡이가 없다 — 위아래로 쌓인 것을 좌우로 끌 수는 없다 */
 @media (max-width:899px){ #viewerSplit{display:none} }
+@media (max-width:899px){ #readPanel .box{border-left:0;border-right:0;border-radius:0;padding:10px} #readPanel .acts{margin:-10px -10px 8px;padding:8px 10px} #readPanel .box :is(.fixbox,.wagebox,.ctbox,.fxhint){border-left:0;border-right:0;border-radius:0;box-shadow:none} }
 #readPanel .box{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--ink)}
 #readPanel .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 /* 서류 제목 — 갈래 딱지보다 크게(대표 지시 2026-08-15). 「사업자등록증」 딱지 아래
@@ -2045,6 +2046,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
     if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } })();
   </script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design">
 

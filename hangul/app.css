@@ -425,6 +425,9 @@ body.m .sym-tabs button { padding: 8px 12px; }
 body.m .priv-list div { padding: 10px; }
 body.m .grid-pick .gp-cells { grid-template-columns: repeat(10, 26px); }
 body.m .grid-pick .gp-cells span { width: 26px; height: 26px; }
+body.m #mStart { padding: 8px 8px 64px; }
+body.m .ms-item { padding: 7px 10px; border-radius: 8px; box-shadow: none; }
+body.m .dlg-layer .dlg { max-width: calc(100vw - 12px); border-radius: 8px; box-shadow: none; }
 
 @media print {
   #mTop, #mBar, #mStart, .m-sheet-layer { display: none !important; }

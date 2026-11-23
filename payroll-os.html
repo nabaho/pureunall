@@ -244,7 +244,18 @@ nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh -
   nav.viewbar .ctitle,nav.viewbar .pnote{display:none}
   nav.viewbar .vrow{flex:0 0 auto;border:1px solid var(--line);border-radius:99px;padding:6px 10px}
   #colist{width:100%;flex:none;max-height:42vh;position:static;border-right:0;border-bottom:1px solid var(--line)}
-  .sum-grid4,.dash-2col,.filing-grid,.rrn-grid,.pay-kpis,.sev-3col{grid-template-columns:minmax(0,1fr)!important}
+  .dash-2col,.filing-grid,.rrn-grid,.sev-3col{grid-template-columns:minmax(0,1fr)!important}
+  .sum-grid4,.pay-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important}
+  .pay-kpi,.sum-card{padding:7px 8px!important;min-width:0}
+  .ov-box{border-left:0;border-right:0;border-radius:0;box-shadow:none}
+  .ov-row{flex-wrap:wrap;gap:3px 6px;padding:6px 8px}
+  .ov-lbl{width:auto;flex:1 1 auto;min-width:0;font-size:11.5px}
+  .ov-val{flex:1 1 100%;min-width:0;white-space:normal;font-size:12px}
+  .ov-act{margin-left:auto}
+  .mpills{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:6px 8px;gap:4px;border-left:0;border-right:0;border-radius:0}
+  .mpills::-webkit-scrollbar{display:none}
+  .mpills>b,.mpill{flex:0 0 auto;white-space:nowrap}
+  #main select,#main input{max-width:100%;min-width:0}
   .sev-card{min-width:0;max-width:100%}
   .sev-card .badge{white-space:nowrap;flex:0 0 auto}
   .sev-card>div:first-child{gap:6px}
@@ -345,7 +356,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
      · 본문 여백 8px — 제목·안내·단추는 화면 끝에서 8px
      · 본문 바로 아래의 흰 카드·표 상자는 그 여백만큼 밖으로 펴 «화면 폭 그대로», 둥근 모서리·옆 테두리는 걷는다(위아래 선으로 가른다)
      · 카드 안 줄 여백 16 → 8px · 설정 카드도 같다 · 탭 띠도 화면 끝까지 */
-  main{padding:10px 8px}
+  main{padding:8px 8px 72px}
   #main>[style*="border-radius:14px"],#main .tabbody>[style*="border-radius:14px"],
   #main>[style*="border-radius:12px"],#main .tabbody>[style*="border-radius:12px"]{
     border-radius:0!important;border-left:0!important;border-right:0!important;margin-left:-8px!important;margin-right:-8px!important}
@@ -358,6 +369,54 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
   nav.viewbar{padding:6px 8px}   /* 3칸 치수(padding 4px 0)가 폰까지 와서 첫 알약이 화면 끝에 붙었다 */
   .cards{margin-left:-8px;margin-right:-8px;gap:8px}
   .c{border-radius:0;border-left:0;border-right:0;padding:10px 8px}
+  .pay-kpi>div{flex-wrap:wrap;gap:4px}
+  .pay-kpi .btn{white-space:nowrap;flex-shrink:0}
+}
+@media (min-width:761px) and (max-width:768px){
+  html,body{height:auto;overflow:auto}
+  header{height:auto;min-height:0;max-height:none;padding:8px 10px;gap:6px;flex-wrap:wrap;position:static}
+  header .cobar{order:5;flex-basis:100%;flex-wrap:wrap;white-space:normal}
+  header .cobar .cn{max-width:none}
+  header .cobar .kpis{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none}
+  header .cobar .kpis::-webkit-scrollbar{display:none}
+  header .cobar .kpis .kpi{flex:none}
+  .layout{flex-direction:column;height:auto;min-height:0;overflow:visible}
+  nav.viewbar{width:100%;height:auto;max-height:none;position:sticky;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line)}
+  nav.viewbar .ctitle,nav.viewbar .pnote{display:none}
+  nav.viewbar .vrow{flex:0 0 auto;border:1px solid var(--line);border-radius:99px;padding:6px 10px;white-space:nowrap}
+  #colist{width:100%;height:auto;flex:none;max-height:42vh;position:static;border-right:0;border-bottom:1px solid var(--line)}
+  body.co-open nav.viewbar,body.co-open #colist{display:none}
+  body.co-none #main{display:none}
+  body.co-none #colist{max-height:none}
+  main{height:auto;max-height:none;overflow:visible;padding:8px 8px 72px}
+  main>.tabs,.tabs{position:static;height:auto;max-height:none;margin:0 -8px 10px;padding:0 2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs>button{flex:none;white-space:nowrap;padding:8px}
+  main>.uimode-bar,.uimode-bar{position:static;height:auto;max-height:none;margin:0 0 10px;max-width:100%;padding:6px 8px;gap:6px}
+  .uimode-btns{width:100%;min-width:0}
+  .uimode-btn{white-space:nowrap;flex-shrink:0}
+  #uiModeSel{flex:1 1 140px;min-width:0;max-width:100%}
+  .uimode-hint{display:none}
+  .dash-2col,.filing-grid,.rrn-grid,.sev-3col{grid-template-columns:minmax(0,1fr)!important}
+  .sum-grid4,.pay-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important}
+  .pay-kpi,.sum-card{padding:7px 8px!important;min-width:0}
+  .pay-kpi>div{flex-wrap:wrap;gap:4px}
+  .pay-kpi .btn{white-space:nowrap;flex-shrink:0}
+  .ov-box{height:auto!important;min-height:0!important;max-height:none!important;border-left:0;border-right:0;border-radius:0;box-shadow:none}
+  .ov-row{flex-wrap:wrap;gap:3px 6px;padding:6px 8px}
+  .ov-lbl{width:auto;flex:1 1 auto;min-width:0;font-size:11.5px}
+  .ov-val{flex:1 1 100%;min-width:0;white-space:normal;font-size:12px}
+  .ov-act{margin-left:auto}
+  .mpills{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:6px 8px;gap:4px;border-left:0;border-right:0;border-radius:0}
+  .mpills::-webkit-scrollbar{display:none}
+  .mpills>b,.mpill{flex:0 0 auto;white-space:nowrap}
+  #main select,#main input{max-width:100%;min-width:0}
+  .sev-card{min-width:0;max-width:100%}
+  .sev-card .badge{white-space:nowrap;flex:0 0 auto}
+  .sev-card>div:first-child{gap:6px}
+  .sev-card>div:first-child>b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sev-card>div:first-child>span{white-space:nowrap;flex:0 0 auto}
+  input,select,textarea{font-size:16px !important}
 }
 @media print{header,nav,#colist,.noprint{display:none !important}html,body,.layout,main{height:auto !important;max-height:none !important;overflow:visible !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
@@ -390,6 +449,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body>
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">

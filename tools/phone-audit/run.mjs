@@ -56,6 +56,22 @@ export function portalApps() {
   return out;
 }
 
+export function standaloneApps() {
+  return [
+    { key: 'sa_clinic', name: '현장클리닉접수', url: 'clinic-intake.html' },
+    { key: 'sa_remember', name: '리멤버접수', url: 'remember-intake.html' },
+    { key: 'sa_sign', name: '전자위임장서명', url: 'sign.html' },
+    { key: 'sa_sign_contract', name: '계약서서명', url: 'sign-contract.html' },
+    { key: 'sa_sign_harass', name: '비밀유지서약서명', url: 'sign-harass.html' },
+    { key: 'sa_camera', name: '푸른카메라', url: 'pu-camera.html' },
+    { key: 'sa_viewer', name: '푸른문서뷰어', url: 'pu-viewer.html' },
+    { key: 'sa_ieum', name: '이음센터근무일정', url: 'ieum-view.html' },
+    { key: 'sa_install', name: '포털설치안내', url: 'install.html' },
+    { key: 'sa_rules_old', name: '기업규정집(구)', url: 'rules.html' },
+    { key: 'sa_chwieop', name: '취업규칙작성기(구)', url: 'chwieop.html' },
+  ];
+}
+
 const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter(a => a.startsWith('--')).map(a => { const [k, v] = a.slice(2).split('='); return [k, v ?? true]; }));
 const only = args.filter(a => !a.startsWith('--'));
@@ -129,7 +145,7 @@ function serve() {
 const ALLOW_HOSTS = new Set(['unpkg.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.tailwindcss.com', 'code.jquery.com', 't1.kakaocdn.net', 'developers.kakao.com']);
 
 /* 한 화면을 재고 갈무리한다 */
-async function snapOne(page, key, view, width) {
+async function snapOne(page, key, view, width, base) {
   let m = null, err = null;
   /* --font=1.4 — 폰의 «글자 크게»(접근성 글자 배율)를 흉내 낸다 (2026-10-22).
      대표 폰은 글자가 커서, 보통 크기에서 멀쩡한 칸이 세로로 깨졌다. 배율은 px 글자까지
@@ -146,7 +162,8 @@ async function snapOne(page, key, view, width) {
     await page.waitForTimeout(250);
   }
   try {
-    await page.addScriptTag({ content: measureSrc });
+    try { await page.addScriptTag({ content: measureSrc }); }
+    catch (cspErr) { await page.addScriptTag({ url: base + '/tools/phone-audit/measure.js' }); }
     m = await page.evaluate((w) => __paMeasure({ width: w }), width);
     m.missing = await page.evaluate(() => (window.__PA_LOG__ && window.__PA_LOG__.missing || []).slice(0, 60));
   } catch (e) { err = String(e.message).slice(0, 200); }
@@ -227,13 +244,13 @@ async function auditOne(browser, base, app, width) {
     await page.waitForTimeout(waitMs);
   } catch (e) { navErr = String(e.message).slice(0, 200); }
   const rows = [];
-  const first = await snapOne(page, app.key, 'home', width);
+  const first = await snapOne(page, app.key, 'home', width, base);
   rows.push({ key: app.key, name: app.name, url: app.url, view: 'home', width, navErr: navErr || first.err, errors: errors.slice(0, 8), m: first.m, shot: first.shot });
   for (const v of (extra.views || [])) {
     if (onlyView && v.name !== onlyView) continue;
     let verr = null;
     try { await v.run(page); await page.waitForTimeout(v.wait || 1500); } catch (e) { verr = String(e.message).slice(0, 200); }
-    const s = await snapOne(page, app.key, v.name, width);
+    const s = await snapOne(page, app.key, v.name, width, base);
     rows.push({ key: app.key, name: app.name, url: app.url, view: v.name, width, navErr: verr || s.err, errors: errors.slice(0, 8), m: s.m, shot: s.shot });
     if (v.back) { try { await v.back(page); await page.waitForTimeout(500); } catch (e) {} }
   }
@@ -247,7 +264,8 @@ function line(r) {
   const d = m.design;
   const dz = !d ? '' : d.skipped ? ' · 디자인 안 켬' : ` · 디자인 ${d.offN}→${d.onN} 잃음 ${d.lostN} 밖 ${d.newOffN}` +
     (d.lostN || d.newOffN ? ' ⚠ ' + [...d.lost, ...d.newOff].slice(0, 4).map(x => x.key).join(' | ') : '');
-  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${m.gate ? ' · ⚠잠금화면' : ''}${dz}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
+  const extra = ` · 중첩${m.nestedBoxN ?? '?'} · 두꺼움${m.tallCardN ?? '?'} · 세로KPI${m.stackKpiN ?? '?'} · 글잘림${m.textClipN ?? '?'} · 본문Y${m.contentTopY ?? '?'}`;
+  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${extra}${m.gate ? ' · ⚠잠금화면' : ''}${dz}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
 }
 
 async function main() {
@@ -267,7 +285,7 @@ async function main() {
       browser = await chromium.launch({ args: ['--no-sandbox'] });
     }
   }
-  let apps = portalApps();
+  let apps = opt.standalone ? standaloneApps() : portalApps();
   if (only.length) apps = apps.filter(a => only.includes(a.key));
   const results = [];
   for (const app of apps) {
@@ -276,7 +294,8 @@ async function main() {
       for (const r of rows) { results.push(r); console.log(line(r)); }
     }
   }
-  const file = path.join(outDir, only.length ? `result-${only.join('-')}.json` : 'result.json');
+  const tag = opt.standalone ? 'standalone' + (only.length ? '-' + only.join('-') : '') : only.join('-');
+  const file = path.join(outDir, tag ? `result-${tag}.json` : 'result.json');
   fs.writeFileSync(file, JSON.stringify(results, null, 1));
   await browser.close(); srv.close();
   if (designBad) { console.log(`⚠ 디자인을 켜자 줄거나 화면 밖으로 나간 것이 있는 화면 ${designBad}개 — 값만 바꿔야 한다(design-diff.js)`); process.exitCode = 1; }

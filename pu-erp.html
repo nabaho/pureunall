@@ -185,7 +185,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=46">
+<link rel="stylesheet" href="css/pu-erp.css?v=48">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -242,6 +242,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 </style>
 <!-- 제미나이 판 «모양 값»(대표 «한번에 모든 것 다해» 2026-11-21) — 위 style «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
 <link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
@@ -14594,7 +14595,7 @@ function MonthKpiHeader(props){
   return h('div', { style:{ marginBottom:'6px' } },
     // 월 네비 (배경/border 제거 - KPI와 자연스럽게 연결)
     h('div', { style:{ display:'flex', alignItems:'center', gap:'4px', marginBottom: inlineKpi ? '0' : '5px',
-        flexWrap: props.kpiOwnRow ? 'wrap' : 'nowrap' } },
+        flexWrap: (props.kpiOwnRow || phoneSumInline) ? 'wrap' : 'nowrap' } },
       h('button', { onClick:function(){shift(-1);}, title:'이전 달', style:btnNav }, '◀'),
       // 라벨 = picker 통합 (label 클릭 시 month picker 열림)
       h('label', { style:{ position:'relative', display:'inline-flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'4px 10px', borderRadius:'5px', background:'transparent' },
@@ -14617,7 +14618,7 @@ function MonthKpiHeader(props){
       inlineKpi
         ? h('div', { style:{ flex:1, minWidth:0, margin:'0 8px' } }, kpiGrid)
         : phoneSumInline
-          ? h('div', { style:{ flex:'1 1 0', minWidth:0, margin:'0 2px' } }, kpiGrid)
+          ? h('div', { style:{ flex:'1 1 110px', minWidth:'105px', margin:'0 2px' } }, kpiGrid)
           : h('div', { style:{ flex:1 } }),
       /* 오른쪽 단추 묶음 — 폰에서는 이 줄 «안에서» 옆으로 민다 (폰화면관리 2026-10-18).
          계약관리는 단추가 넷이라 줄이 474px 로 늘어 «화면 전체»가 옆으로 굴렀다(본문 498px · 화면 360px)
@@ -70985,7 +70986,7 @@ function PersonalCalendar(props){
     ),
     // 검색 input
     h('div',{style:{position:'relative'}},
-      h('input',{type:'search', className:'md-cal-search', value:calQuery, placeholder:'🔍 일정 검색',
+      h('input',{type:'search', className:'md-cal-search', value:calQuery, placeholder:'일정 검색',
         onInput:function(e){setCalQuery(e.target.value);},
         style:{width:'100%',padding:'4px 8px 4px 24px',fontSize:'10.5px',border:'1px solid #e2e8f0',borderRadius:'4px',boxSizing:'border-box',background:'#f8fafc'}}),
       h('span',{style:{position:'absolute',left:'7px',top:'50%',transform:'translateY(-50%)',fontSize:'10px',pointerEvents:'none'}},'🔍')

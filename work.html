@@ -1421,8 +1421,8 @@
   #app > .bdwrap .bdhd{padding:7px 6px 5px}
   #app > .bdwrap .bdbody{padding:0;overflow:visible}
   #app > .bdwrap .bdcard{padding-left:8px;padding-right:8px}
-  /* 타임라인 — 업무 이름 칸은 정한 폭에서 … 로 줄인다(긴 이름 줄만 칸이 넓어져 날짜 줄이 들쭉날쭉했다) */
-  #app > .tlwrap .tlname{min-width:0}
+  /* 타임라인 — 업무 이름 칸은 폰에서 112px 로 줄여 날짜 레인을 넓힌다 */
+  #app > .tlwrap .tlname{flex:0 0 112px;min-width:0;padding:6px}
   /* 빠른 기록 바 — 양옆 6px */
   #qwrap{left:6px;right:6px}
   .wkgrp{max-width:100%;min-width:0;flex:0 1 auto;gap:3px}
@@ -1502,6 +1502,7 @@
   <script src="js/pu-whoami.js?v=4"></script>
 <!-- 말로 기록 — 소리를 판독 서버(Gemini)로 보낸다. 업무관리의 aiCall 은 글자만 보내는 길이라 소리를 못 싣는다. -->
 <script src="js/pu-ai-call.js?v=5"></script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design">
 <div id="root"><div class="gate">불러오는 중…</div></div>

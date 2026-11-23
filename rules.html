@@ -218,7 +218,7 @@ select,input[type=date]{font-family:inherit;font-size:13px;height:36px;padding:0
 /* 칸막이를 좁게 끌어도 요약이 뭉개지지 않게 — 덜 중요한 것부터 접는다 */
 #right-pane{container-type:inline-size}
 @container (max-width:470px){ #right-pane h3 .tag{display:none} }
-@container (max-width:370px){ #right-pane h3 .stat .l{display:none} }
+@container (max-width:420px){ #right-pane h3 .stat .l{display:none} }
 .stat.s .n{color:var(--danger)} .stat.m .n{color:var(--warn)} .stat.h .n{color:var(--manual)} .stat.u .n{color:var(--upcoming)}
 .findings{overflow:auto;flex:1;min-height:0;padding:8px 12px;max-height:470px}
 .fitem{border:1px solid var(--line);border-left-width:4px;border-radius:9px;padding:9px 12px;margin:8px 4px;background:#fff}
@@ -881,6 +881,26 @@ table.daejo td.dj2{padding:0}
 .rev-txt{font-size:13px;line-height:1.85;white-space:pre-wrap;color:#1e293b;background:#f8fafc;border-radius:8px;padding:10px 12px}
 .rev-why{font-size:11px;color:var(--sub);margin-top:6px}
 @media(max-width:900px){.grid{grid-template-columns:1fr}#split{display:none}}
+@media(max-width:760px){
+  select,input,textarea{font-size:16px !important}
+  .wrap{margin:6px auto;padding:0 6px}
+  .toolbar,.pane{border-left:0;border-right:0;border-radius:0;box-shadow:none;padding:8px}
+  .pane h3{padding:8px 8px}
+  .preview,.findings{padding:8px 8px}
+  .fitem{margin:5px 0;padding:8px 9px}
+  .rev-item{padding:8px 9px;margin-bottom:8px}
+}
+@media(min-width:761px) and (max-width:768px){
+  .pane h3{flex-wrap:wrap;padding:8px 8px;gap:6px}
+  .pane h3 .btn{flex:none;white-space:nowrap}
+  .pane h3 .summary{flex:1 1 100%;max-width:none;order:3}
+  select,input,textarea{font-size:16px !important}
+  .wrap{margin:6px auto;padding:0 6px}
+  .toolbar,.pane{border-left:0;border-right:0;border-radius:0;box-shadow:none;padding:8px}
+  .preview,.findings{padding:8px 8px}
+  .fitem{margin:5px 0;padding:8px 9px}
+  .rev-item{padding:8px 9px;margin-bottom:8px}
+}
 #upBtn{border:1.5px dashed #cbd5e1;background:rgba(255,255,255,.7);color:var(--accent);}
 #upBtn:hover{border-color:var(--accent);background:#fff;}
 #dropOverlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
@@ -960,6 +980,7 @@ table.daejo td.dj2{padding:0}
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
     if(!go()) document.addEventListener('DOMContentLoaded', go); })();
   </script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design">
 <div id="dropOverlay"><div class="box"><div class="ic">📄</div><b>여기에 놓으면 업로드</b><span>취업규칙 HWP · HWPX · DOCX · ODT · RTF · PDF · TXT 파일을 끌어다 놓으세요</span></div></div>

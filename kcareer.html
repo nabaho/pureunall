@@ -1621,13 +1621,17 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
    ⚠ 이 덩이는 «맨 뒤»에 둔다 — 780px 덩이의 .page{padding:14px 12px!important} 가 앞쪽 520px 덩이의
      .page{padding:10px 10px!important} 를 이기고 있었다(무게가 같으면 뒤가 이긴다). */
 @media(max-width:520px){
-  .page{padding:10px 6px!important}
+  .page{padding:8px 6px 64px!important}
   /* 표 바깥 상자(흰 바탕·테두리·둥근 모서리) — 폰에서는 줄마다 카드라 카드 한 겹이면 된다 */
   .dt table{background:transparent;border:0;border-radius:0!important;box-shadow:none}
   .dt tr{padding:6px 7px}
-  .card{padding:8px 7px!important}
-  .toolbar{padding:6px 7px!important}
+  .card{padding:7px 7px!important;border-left:0;border-right:0;border-radius:0;box-shadow:none}
+  .kpi-grid{gap:5px;margin-bottom:8px}
+  .kpi{padding:5px 7px}
+  .toolbar{padding:5px 7px!important;gap:4px}
   .sel-bar,.dup-badge-bar{padding-left:7px!important;padding-right:7px!important}
+  .dup-badge-bar{flex-wrap:wrap!important;gap:4px 8px!important}
+  .dup-badge-bar>b,.dup-badge-bar>a{white-space:nowrap;flex-shrink:0}
 }
 /* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
    계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
@@ -1808,6 +1812,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
       }
     })();
   </script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design pu-dark-auto">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">

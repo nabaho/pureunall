@@ -331,36 +331,40 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   input,select,textarea{font-size:16px}
   .phone-only{display:inline}
   .wide-only{display:none}
-  #head .top{padding:6px 10px;gap:8px}
+  #head .top{padding:5px 8px;gap:5px;flex-wrap:nowrap}
+  #head .top h1{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   #head .sub{display:none}
   .tabs{padding:0 6px}
-  main{padding:8px 6px 80px}
-  .card{padding:8px 7px}
-  table.lst tr{padding:6px 6px}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .kpi{padding:8px 10px}
-  .kpi b{font-size:20px}
+  main{padding:6px 4px 72px}
+  .card{padding:6px 7px;border-left:0;border-right:0;border-radius:0;box-shadow:none;margin-bottom:6px}
+  .lgrp,.dcat,.card .card,.gcard .gl,.cgrid .gcard .card{border-left:0;border-right:0;border-radius:0;box-shadow:none;background:transparent}
+  table.lst tr{padding:5px 6px}
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-bottom:6px}
+  .kpis:has(> :nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{padding:5px 7px}
+  .kpi b{font-size:16px}
   /* 종류 카드 — 폰에서는 두 칸, 근거 조문 줄은 접는다(법정 표시는 그대로) */
-  .cats,.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .lgrp{padding:6px}
+  .cats,.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .lgrp{padding:5px}
   .lgh{gap:6px}
   .lgh .lgm{display:none}   /* 폰에서는 «N건»만 — 종 수·용량은 PC 에서 */
   .simrun{flex-wrap:wrap;gap:6px 10px}   /* 비슷한 강의 찾기 — 폰에서는 글과 단추가 줄을 나눈다(옆으로 넘치지 않게) */
   .simrun .hint{flex-basis:100%}
   #simCard .bar .hint{white-space:normal}
-  .cat{padding:8px 9px}
+  .cat{padding:6px 8px}
   .cat .ln+.ln{display:none}
   .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
   .cat .nm .tag{display:none}   /* 폰에서는 왼쪽 파란 띠가 «법정»을 말한다(안내줄에 적어 둠) — 이름 자리를 남긴다 */
-  .cat .nm .n{font-size:16px}
+  .cat .nm .n{font-size:15px}
   .cat.add .ln{display:none}
   .mx col.mk{width:112px} .mx col.ms{width:40px}
   .mx table{min-width:560px}
-  .cgrid{grid-template-columns:minmax(0,1fr);gap:8px}
-  .gcard{padding:7px 8px}
+  .cgrid{grid-template-columns:minmax(0,1fr);gap:6px}
+  .gcard{padding:5px 7px;margin-bottom:4px;border-left:0;border-right:0;border-radius:0}
+  .gh{padding:3px 2px;font-size:11.5px}
   .gcard.open .gl{display:block}
   /* 폰 줄 — ☐ · № · 제목 · 강의일 · 상태 점(형식은 숨긴다). 칸 자리를 못 박는다(마크업 순서는 PC 와 같다) */
-  .gr{grid-template-columns:28px 24px minmax(0,1fr) auto 10px;padding:5px 2px}
+  .gr{grid-template-columns:28px 24px minmax(0,1fr) auto 10px;padding:2px 2px;font-size:12px;line-height:1.3}
   .gr>*{grid-row:1}
   .gr>input{grid-column:1} .gr .no{grid-column:2} .gr .ttl{grid-column:3} .gr .gd{grid-column:4} .gr .dot{grid-column:5}
   .gr input[type=checkbox],.gh input[type=checkbox]{width:24px;height:24px}
@@ -395,10 +399,13 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   table.ml td.att{grid-area:att;width:auto} table.ml td.ct{grid-area:ct;width:auto} table.ml td.dt{grid-area:dt;width:auto}
   table.ml td.st{grid-area:st;width:auto} table.ml td.who,table.ml td.meta{display:none}
   .card.flat{padding:0;border:0;background:none}
-  .mbody{grid-template-columns:minmax(0,1fr)}
-  .mview{height:48vh}
-  .modal{padding:0}
-  .mbox{border-radius:0;min-height:100%}
+  .mbody{grid-template-columns:minmax(0,1fr);gap:8px;padding:10px}
+  .mview{height:40vh}
+  .modal{padding:8px;align-items:flex-start}
+  .mbox{border-radius:10px;min-height:100%;width:100%;max-width:100%}
+  .form{grid-template-columns:minmax(0,1fr);gap:4px}
+  .form label{white-space:normal}
+  .simrun>span{white-space:normal;overflow-wrap:anywhere}
   #cmpGrid{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:none!important;grid-auto-rows:minmax(60vh,1fr);overflow:auto;padding:6px 14px 6px 6px}
 }
 @media (min-width:769px){ table.lst td.meta{display:none} }
@@ -433,12 +440,13 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 /* 폰 — 앱 폰 구간 값을 다시 맞춘다: 자세히 창은 화면 가득(둥근 모서리 없음) */
 @media (max-width:768px){
   :where(body.pu-design) .mbox{border-radius:0}
-  :where(body.pu-design) .kpis .kpi b{font-size:20px}
+  :where(body.pu-design) .kpis .kpi b{font-size:16px}
 }
 /* ══ pu-design 끝 ══ */
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
 <link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design pu-frame-a">
 <aside class="sb" id="sb" aria-label="강의자료 메뉴">
