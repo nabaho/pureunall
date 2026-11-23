@@ -58,6 +58,7 @@ const DONE = [
   ['pu-pbox.html', 'P박스'],
   ['ilteo.html', '일터상생혁신'],
   ['jobtrans.html', '산업일자리전환'],
+  ['safety.html', '안전보건체계구축'],
   ['pu-orchestrator.html', '업무오케스트레이션'],
   ['pu-edulib.html', '강의자료'],
   ['pu-alio-union.html', '공공임단협'],
@@ -127,6 +128,8 @@ const EXCEPT = {
   'ilteo.html': new Set([]),
   /* 산업일자리전환(2026-11-15) — 처음부터 27색 팔레트만 쓴다. 예외 없음 */
   'jobtrans.html': new Set([]),
+  /* 안전보건체계구축(2026-11-23) — 처음부터 27색 팔레트만 쓴다. 예외 없음 */
+  'safety.html': new Set([]),
   /* 업무오케스트레이션(2026-11-17) — 처음부터 27색 팔레트만 쓴다. 예외 없음 */
   'pu-orchestrator.html': new Set([]),
   /* 법정교육자료함(2026-11-19) — 처음부터 팔레트만 쓴다(법정 = 진한 파랑 채움). 예외를 채워 넣지 말 것 */

@@ -422,6 +422,15 @@
                       {path:'scal_jobtrans/final/{id}',entityType:'Document'},
                       {path:'scal_jobtrans/snapshots/{pid}/{id}',entityType:'Document'}],
       entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 안전보건체계구축(safety.html) — 과거 수행이력 비식별 아카이브 · 신규 착수 체크 · 8대 업종별 특화 체크리스트 · 위험성평가 · 종합/1P 보고서(.hwpx) */
+    safety:{ name:'안전보건체계구축', file:'safety.html', primaryRoots:['scal_safety'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','scal_cos','scal_types','mailbox'],
+      writeContracts:[{path:'scal_safety/projects/{id}',entityType:'Project'},
+                      {path:'scal_safety/checks/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_safety/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_safety/reports/{id}',entityType:'Document'},
+                      {path:'scal_safety/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
     /* 데이터관리(2026-11-21) — 대표 전용. 원본(입금·명부·업체·업무·관계망)은 «읽기만» 하고 화면 안에서 센다.
        제 자리는 보기 설정(datahub/{uid}/settings)뿐 — 기기·일회용 문제·현황판 숫자는 서버 함수만 쓴다(INFRA_ROOTS).
        ⚠ 사람 이름·업체명을 관계 열쇠로 쓰지 않는다(sid·companyId). 채팅으로는 가명 숫자만 나간다. */
@@ -723,6 +732,9 @@
     /* 산업일자리전환 — 능률협회·충남경제진흥원 사업장 비식별 요약 및 중간·최종보고서 원고가 든 자리라 앱 안에서만 본다. */
     jobtrans_core:{program:'jobtrans',strategy:'in_app',path:'scal_jobtrans',parser:'coverage',
       gives:'산업일자리전환 사업장 워크스페이스·비식별 분석 카드·기관별 중간·최종보고 원고 (앱 안에서만 본다)'},
+    /* 안전보건체계구축 — 과거 수행이력 비식별 아카이브 및 업종별 체크리스트·위험성평가·보고서 원고가 든 자리라 앱 안에서만 본다. */
+    safety_core:{program:'safety',strategy:'in_app',path:'scal_safety',parser:'coverage',
+      gives:'안전보건체계구축 사업장 워크스페이스·착수/업종별 체크리스트·위험성평가·종합/1P 보고서 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

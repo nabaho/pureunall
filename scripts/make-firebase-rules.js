@@ -2457,6 +2457,35 @@ rules.scal_jobtrans = {
   $other: { '.validate': false }
 };
 
+/* 🦺 안전보건관리체계 구축 자동화 (safety.html, 2026-11-23)
+   - 과거 수행이력(2022~2026) 비식별 아카이브, 신규 착수 사전 체크(12), 7대 핵심요소(25), 8대 업종별 특화 체크리스트, 위험성평가, 종합·1P 요약보고서.
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 보고서 확정 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_safety = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  checks: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  reports: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
 /* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
    - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
      (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).

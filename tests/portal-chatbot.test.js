@@ -820,6 +820,10 @@ test('최근 추가된 프로그램(괴롭힘·성희롱 조사 · 일터상생�
   assert.equal(PuChatbot.pick('산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?')[0].id, 'SYS-jobtrans-01');
   assert.equal(PuChatbot.pick('산업일자리전환 사용법')[0].id, 'SYS-jobtrans-01');
 
+  assert.equal(PuChatbot.pick('안전보건체계구축 앱은 어떻게 사용하고 업종별 체크리스트와 1P 요약보고서는 어떻게 만드나요?')[0].id, 'SYS-safety-01');
+  assert.equal(PuChatbot.pick('안전보건체계구축 사용법')[0].id, 'SYS-safety-01');
+  assert.equal(PuChatbot.detectImproveIntent('안전보건체계구축 앱에서 업종별 체크리스트 저장 오류 고쳐줘').cat, 'consult');
+
   // 온톨로지에 등록된 비공개 준비 앱(paydata: 급여데이터함)도 자동 카드(SYS-auto-paydata)로 안내 가능해야 함
   const pPaydata = PuChatbot.pick('급여데이터함은 어떻게 사용하고 어디에 저장되나요?');
   assert.ok(pPaydata.length > 0 && pPaydata[0].id === 'SYS-auto-paydata');
