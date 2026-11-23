@@ -288,3 +288,61 @@ test('사람이 상태를 바꾸면 «기계가 걸렀다» 표시(autoIgnored)�
   assert.equal(x.st, 'ignored'); assert.equal(Q.scopeMark(x), null, '사람이 치운 것에 «자동» 딱지가 다시 붙지 않는다');
   assert.equal(x.scope, 'work', '범위 딱지(왜 업무로 봤는지)는 남는다');
 });
+
+/* ── 법인에 «지원하는 사람»의 메일(수습노무사 지원 등)은 요청 메일이 아니다 (대표 지시 2026-11-23) ──
+   ⚠ 제목·이름은 모두 지어낸 것이다(홍길동·김가나) — 저장소가 공개, 실제 지원자 이름을 넣지 않는다. */
+test('★ 수습노무사 지원 메일은 이력서·경력 서류를 첨부해도 «업무»로 거른다 — 첨부 이름의 «이력서» 말에 개인으로 들어오지 않는다', () => {
+  const 이력 = ['이력서_홍길동.pdf', '자기소개서_홍길동.pdf', '자격증 사본.pdf'];
+  ['노무사 지원(수습)_홍길동', '수습노무사 지원합니다 - 김가나', '[지원] 노무사 수습 채용 지원 건', '입사 지원_홍길동(경력 3년)', '인턴 지원합니다_김가나', '노무사 지원 (수습) 홍길동']
+    .forEach((s) => {
+      const r = Q.scopeOf({ s, an: 이력 });
+      assert.equal(r.scope, 'work', s); assert.ok(r.why.length > 0 && r.why[0].length > 0, '왜 걸렀는지 적는다');
+    });
+  assert.equal(scope('이력서 보냅니다', 이력), 'personal', '제목에 지원 말이 없으면 첨부 이름만으로는 거르지 않는다(규칙은 제목만 본다)');
+});
+test('지원 말은 «지원하는 쪽»으로 좁다 — 지원 사업·대표가 지원하는 쪽·수습 교육 강사 위촉은 그대로 개인 말로 들어온다', () => {
+  assert.equal(scope('노무사 지원 사업 컨설턴트 이력서 제출 안내'), 'personal', '«지원 사업»은 지원금 제도다');
+  assert.equal(scope('노무사 지원센터 자문위원 위촉 안내'), 'personal');
+  assert.equal(scope('[가나재단] 자문위원 지원 접수 안내 — 위촉 신청서 제출'), 'personal', '대표가 지원하는 쪽');
+  assert.equal(scope('수습노무사 직무교육 강사 위촉 안내'), 'personal', '수습 말이 있어도 지원이 아니면 걸리지 않는다');
+  assert.equal(scope('이력서 제출 요청', ['노무사 지원(수습)_홍길동.pdf']), 'personal', '첨부 이름의 지원 말은 안 본다 — 대표 본인이 낸 지원서일 수 있다');
+  const probe = ['이력서', '프로필', '위촉', '심의', '서약서', '지급확인서', '수당', '강사료', '자문회의', '위원회', '경력증명서', '재직증명서'];
+  probe.forEach((w) => assert.ok(!Q.SCOPE_RECRUIT.test(w), '«' + w + '» 가 지원 말에 걸린다'));
+});
+test('새로 온 수습노무사 지원 메일은 처음부터 걸러 둔다 — 진행 중·알림에 안 센다(기록은 남아 걸러낸 메일에서 되돌릴 수 있다)', async () => {
+  const f = dbWith({ 201: mkRow({ s: '노무사 지원(수습)_홍길동', an: ['이력서_홍길동.pdf', '경력기술서.pdf'], p: '안녕하세요 수습노무사로 지원합니다 이력서를 첨부합니다', f: '홍길동', e: 'a@example.org' }) });
+  await scan(f);
+  const x = items(f)[IN + '~201'];
+  assert.ok(x, '기록은 남는다'); assert.equal(x.st, 'ignored'); assert.equal(x.scope, 'work'); assert.ok(x.autoIgnored > 0);
+  assert.equal(x.scopeV, Q.SCOPE_RULE_V, '어느 판 규칙으로 갈랐는지 적는다');
+  const sm = Q.summary(items(f), NOW);
+  assert.equal(sm.open, 0); assert.equal(sm.alarm, 0); assert.equal(sm.ignored, 1);
+});
+test('★ 옛 규칙이 «개인»으로 들인 새 요청도 훑을 때 한 번 다시 가른다 — 이미 목록에 올라와 있던 지원 메일이 치워진다', async () => {
+  const f = dbWith({}, {
+    [IN + '~1']: OLD(IN + '~1', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'rule', an: ['이력서_홍길동.pdf'] }),
+    [IN + '~2']: OLD(IN + '~2', 'new', '위원 활동 확인서 제출 요청', { scope: 'personal', scopeBy: 'rule' }),
+    [IN + '~3']: OLD(IN + '~3', 'doing', '노무사 지원(수습)_김가나', { scope: 'personal', scopeBy: 'rule', an: ['이력서_김가나.pdf'] }),
+    [IN + '~4']: OLD(IN + '~4', 'done', '노무사 지원(수습)_김가나', { scope: 'personal', scopeBy: 'rule' }),
+    [IN + '~5']: OLD(IN + '~5', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'jev' }),
+    [IN + '~6']: OLD(IN + '~6', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'rule', scopeV: Q.SCOPE_RULE_V }),
+  });
+  const r = await scan(f);
+  const it = items(f);
+  assert.equal(it[IN + '~1'].st, 'ignored'); assert.equal(it[IN + '~1'].scope, 'work'); assert.ok(it[IN + '~1'].autoIgnored); assert.equal(it[IN + '~1'].scopeV, Q.SCOPE_RULE_V);
+  assert.equal(it[IN + '~2'].st, 'new', '여전히 개인 말이면 그대로 들인다'); assert.equal(it[IN + '~2'].scopeV, Q.SCOPE_RULE_V, '다시 봤다는 표시만 적는다');
+  assert.equal(it[IN + '~3'].st, 'doing', '사람이 확인함으로 둔 건은 안 건드린다'); assert.equal(it[IN + '~3'].scope, 'personal');
+  assert.equal(it[IN + '~4'].st, 'done'); assert.equal(it[IN + '~4'].scope, 'personal');
+  assert.equal(it[IN + '~5'].st, 'new', 'Jev 가 가른 범위는 규칙이 다시 보지 않는다'); assert.equal(it[IN + '~5'].scopeBy, 'jev');
+  assert.equal(it[IN + '~6'].st, 'new', '이미 이 판 규칙으로 가른 건은 다시 안 본다');
+  assert.equal(r.autoIgnored, 1, '이번에 거른 것은 하나'); assert.equal(r.scoped || 0, 0, '«처음 가른 건수»에는 안 센다');
+  const before = JSON.stringify(items(f));
+  const r2 = await scan(f);
+  assert.equal(JSON.stringify(items(f)), before, '두 번째 훑기는 아무것도 안 바꾼다'); assert.equal(r2.autoIgnored || 0, 0);
+});
+test('다시 가르는 길은 한 번에 한도가 있다 · «개인·규칙·새 요청»만 고른다(사람이 만진 건을 고르지 않는다)', () => {
+  assert.match(mod, /function rescopable\(x\)[\s\S]{0,400}x\.st === 'new'/, '새 요청만');
+  assert.match(mod, /function rescopable\(x\)[\s\S]{0,400}x\.scopeBy === 'rule'/, '규칙이 가른 것만');
+  assert.match(mod, /!x\.scope \|\| rescopable\(x\)\)[\s\S]{0,40}\.slice\(0, SCOPE_BACKFILL_MAX\)/, '한도(SCOPE_BACKFILL_MAX) 안에서');
+  assert.ok(Number(Q.SCOPE_RULE_V) >= 2, '판 번호는 말 목록을 넓힐 때 올린다');
+});
