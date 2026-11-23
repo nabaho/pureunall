@@ -1460,7 +1460,17 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   .grp-warn{padding-left:10px;padding-right:10px;}
   .grp-note{margin-left:10px;margin-right:10px;}
   .grp-scroll{padding:8px 10px 14px;}
-  .grp-card{border:0;border-top:1px solid var(--border);border-radius:0;padding:10px 0;margin-bottom:4px;}
+  .grp-card{border:0;border-top:1px solid var(--border);border-radius:0;padding:8px 0;margin-bottom:2px;background:transparent;}
+  .dash .dcard-hd{flex-wrap:wrap;gap:3px 6px;}
+  .dash .dcard-meta{flex-wrap:wrap;gap:3px;}
+  .dcard{box-shadow:none;border-left:0;border-right:0;border-radius:0;}
+  .gantt-type{flex-wrap:wrap;gap:2px 4px;}
+  .grp-top{padding:7px 10px;gap:5px;}
+  .grp-warn{padding:6px 10px 0;}
+  .grp-note{margin:6px 10px 0;padding:6px 9px;}
+  .grp-it{border:0;border-bottom:1px solid var(--border);border-radius:0;padding:5px 0;background:transparent;}
+  .summary-bar{padding:4px 8px;gap:4px;}
+  .tl-head{padding:4px;gap:4px!important;margin-bottom:5px!important;}
 }
 /* ===== 풀스크린 로그인 화면 ===== */
 #mbLogin{z-index:1000;}
@@ -1639,6 +1649,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
     if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } })();
   </script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">

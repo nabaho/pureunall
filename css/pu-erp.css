@@ -1895,6 +1895,19 @@ body:has(.hd-fav) [data-pu-appbar-tab]{ display:none !important; }
   .stg-ev{flex-basis:100%;max-width:100%}
   .stg-b,.stg-add{min-height:34px;padding:4px 12px}
   .stg-add{font-size:16px}
+  .modal-f{padding:8px 10px !important;flex-wrap:wrap;gap:6px}
+  .modal-f button{white-space:nowrap;padding:6px 10px !important;font-size:12.5px !important;min-height:36px}
+  .modal-card button,.modal button{white-space:nowrap}
+  .modal-card .card,.modal .card,.fin-pnl [style*="border"]{box-shadow:none !important}
+  .mkpi-sum{min-width:0;max-width:100%}
+  .fin-pnl [style*="border"],.fin-pnl [style*="border-radius"],
+  html.pu-app-hr .page [style*="border-radius:10px"],html.pu-app-hr .page [style*="border-radius:8px"],
+  [role="dialog"] [style*="border-radius"]{box-shadow:none !important}
+  .fin-pnl>div [style*="border:1px solid"],
+  html.pu-app-hr .page>div [style*="border:1px solid"],
+  [role="dialog"]>div [style*="border:1px solid"]{border-radius:0 !important;border-left:0 !important;border-right:0 !important}
+  .ld-tb tbody tr,.ld-xt tbody tr{padding:6px 10px 6px 6px !important;row-gap:2px !important}
+  [role="dialog"]>div{padding:12px !important;border-radius:10px !important}
 }
 /* ↪ 후속 계약 후보(계획 5 · D) — 계약 창 «⚖ 심급·단계» 줄 아래. 후보는 연초록, 이미 만든 것은 파랑(확인함 모양) */
 .stg-it.stg-nx{border:1px solid #bbf7d0;background:#f0fdf4}

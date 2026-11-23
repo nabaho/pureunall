@@ -517,15 +517,18 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 #orchModal .orchm-btn.pri{background:#1e40af;border-color:#1e40af;color:#ffffff;}
 #orchModal .orchm-btn.pri:hover{background:#2563eb;border-color:#2563eb;color:#ffffff;}
 @media (max-width:640px){
-  #orchModal{padding:8px;}
-  #orchModal .box{width:100%;max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);border-radius:16px;}
+  #orchModal{padding:6px;}
+  #orchModal .box{width:100%;max-width:calc(100vw - 12px);max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);border-radius:12px;}
+  #orchModal .hd{padding:9px 10px;}
+  #orchModal .bd{padding:6px;background:#ffffff;}
+  #orchModal .orchm-row{padding:7px 8px;margin-bottom:5px;border-radius:8px;}
   #orchModal #orchModalQ{font-size:16px;min-height:38px;flex:1 1 100%;}
   #orchModal .orchm-ico,#orchModal .orchm-x{width:36px;height:36px;}
   #orchModal .orchm-stg,#orchModal .orchm-chip,#orchModal .orchm-sm,#orchModal .orchm-btn,#orchModal .orchm-ck-all{min-height:36px;padding:6px 10px;}
   #orchModal .orchm-ck{width:28px;min-height:28px;}
   #orchModal .orchm-ck input,#orchModal .orchm-ck-all input{width:18px;height:18px;}
   #orchModal .orchm-note{display:none;}
-  #orchModal .ft{justify-content:flex-end;}
+  #orchModal .ft{justify-content:flex-end;padding:7px 10px;}
 }
 body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline-offset:3px;border-radius:12px;min-height:40px;}
 /* ⚠ 앱마다 붙이던 📌(틀 고정 표시·단추)는 걷었다 — 대표 지시 2026-11-08 「각 앱에 고정표시는 없애고 오른쪽 끝에만 고정표시 있으면 된다」.
@@ -1418,6 +1421,7 @@ body.portal-mode #moreFab{display:flex;}
   input, select, textarea{ font-size: 16px !important; }
 }
 </style>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body>
 <div id="pu-boot-splash" role="status" aria-live="polite" style="display:flex;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px">

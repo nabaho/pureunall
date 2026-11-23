@@ -1143,8 +1143,13 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
    ⚠ 지우면 그 증상이 그대로 돌아온다 — tests/phone-input-zoom.test.js 가 지킨다. */
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
+  body.mob .tev b{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  body.mob .tev span{ font-size:9px; overflow:hidden; text-overflow:ellipsis; display:block; }
+  body.mob .sday{ padding:6px 8px; gap:10px; }
+  body.mob .scard{ padding:7px 10px; border-radius:10px; box-shadow:none; }
 }
 </style>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body>
 

@@ -220,27 +220,41 @@ table.t tr.cur>td.n{color:var(--ink2)}
   .mbd{padding:10px;max-height:84vh}
   .phone-only{display:inline}
   .wide-only{display:none}
-  .top{padding:6px 8px;gap:6px;flex-wrap:wrap}
-  .top h1{font-size:15px;white-space:nowrap;flex-shrink:0}
+  .top{padding:5px 8px;gap:5px;flex-wrap:nowrap}
+  .top h1{font-size:14.5px;white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .top .sub{display:none}
-  #who{flex:0 1 auto;min-width:0;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
-  #outBtn{flex-shrink:0;padding:5px 9px}
+  #who{flex:0 1 auto;min-width:0;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+  #outBtn{flex-shrink:0;padding:4px 8px;font-size:12px}
   .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
   .tabs::-webkit-scrollbar{display:none}
-  .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
-  main{padding:8px 0 64px}
-  .card,.scope-bar,.ind-card{border-left:0;border-right:0;border-radius:0}
-  .scope-bar{padding:8px 10px;gap:6px}
+  .tabs button{flex:0 0 auto;padding:7px 8px;font-size:12.5px}
+  main{padding:6px 0 64px}
+  .card,.scope-bar,.ind-card,#discoverCard{border-left:0;border-right:0;border-radius:0;box-shadow:none;margin-bottom:6px}
+  #discoverCard{padding:6px 8px}
+  .card .card,.card .sec{border-left:0;border-right:0;border-radius:0;box-shadow:none;background:transparent}
+  .scope-bar{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:5px 8px;gap:4px;align-items:center}
+  .scope-bar::-webkit-scrollbar{display:none}
+  .scope-bar>*{flex:0 0 auto;white-space:nowrap}
   .ws-steps,.sec,.sec-list-hd,.pill-row{background:transparent}
   .rpt-sec-list{padding:0}
   .rpt-sec-card,.pv-doc{border-left:0;border-right:0;border-radius:0;background:transparent}
   .pv-doc{padding:8px}
-  .rpt-sec-card{border-top:0}
-  .rpt-sec-hd{background:transparent}
+  .rpt-sec-card{border-top:0;padding:5px 8px;gap:3px}
+  .rpt-sec-hd{background:transparent;padding:4px 0}
+  .rpt-sec-body{padding:4px 0}
+  .rpt-sec-body textarea{min-height:68px}
+  .p-projects{margin:0;padding:4px 8px}
   .drop-zone{border-left:0;border-right:0;border-radius:0;background:transparent;margin:6px 0}
-  .note,.warn,.ok-banner,.err-banner{margin:0 10px 10px}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 10px}
-  .ws-steps{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 10px}
+  .note,.warn,.ok-banner,.err-banner{margin:0 8px 8px}
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:0 8px;margin-bottom:6px}
+  .kpi{padding:5px 7px;gap:1px}
+  .kpi span{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi b{font-size:14.5px}
+  .bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:6px 8px;align-items:center}
+  .bar .sp{display:none}
+  .bar input[type="search"],.bar input[type="text"]{grid-column:1 / -1;width:100% !important;max-width:none !important;min-width:0 !important}
+  .bar select{width:100%;min-width:0}
+  .ws-steps{grid-template-columns:repeat(2,minmax(0,1fr));padding:6px 8px;gap:5px}
   .task-pick-grid{grid-template-columns:1fr;padding:8px 10px}
   .eos-row{grid-template-columns:105px minmax(0,1fr) 95px;font-size:11.5px}
   .fr{flex-direction:column;align-items:stretch;gap:4px;padding:6px 10px}
@@ -265,6 +279,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 @media (max-width:520px){#who{display:none}}
 </style>
 <link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design pu-frame-a pu-dark-auto">
 <div id="head">

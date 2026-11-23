@@ -518,7 +518,7 @@ tr.fc-row:hover td{background:var(--acc-l)}
 }
 /* 폰 — PC 는 그대로 두고 이 구간에서만 바꾼다(docs/규칙/폰화면.md) */
 @media (max-width:600px){
-  .wrap{padding:10px}
+  .wrap{padding:6px 6px 64px}
   .stage canvas{height:300px}
   .vh{padding:12px}
   .vh h2{font-size:15.5px}
@@ -662,16 +662,28 @@ details.about .pc{margin-top:10px}
   .top .tstat{margin-left:0}
   .top .tstat .tpill{padding:0 5px}
   .top .tstat .ti{display:inline}
-  .vh{padding:0}
-  .vh h2{font-size:16.5px}
-  .vh p{font-size:12px}
-  .govbar,.mbar,.kpis,.viz-sec,.main,.src,.m-below,.apphd{padding-left:0;padding-right:0}
+  .vh{display:flex;align-items:baseline;gap:8px;padding:0;margin:0 0 6px}
+  .vh h2{font-size:15px;margin:0;white-space:nowrap}
+  .vh p{font-size:11.5px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .apphd,.govbar,.mbar,.modebar{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;padding:4px 0}
+  .apphd::-webkit-scrollbar,.govbar::-webkit-scrollbar,.mbar::-webkit-scrollbar,.modebar::-webkit-scrollbar{display:none}
+  .apphd>*,.govbar>*,.mbar>*,.modebar>*{flex:0 0 auto;white-space:nowrap}
+  .govbar .glb,.govbar .sp,.apphd .sp{display:none}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:4px 0}
+  .kpi{padding:5px 7px}
+  .kpi .k{font-size:10.5px}
+  .kpi .v{font-size:15px}
+  .viz-sec,.main,.src,.m-below{padding-left:0;padding-right:0}
+  .stage canvas{height:240px}
+  .setgrid .audit-card,.lockgrid .card,.panel,.drop-card,.app{border-left:0;border-right:0;border-radius:0;box-shadow:none}
   .bstrip,.chat{margin-left:0;margin-right:0}
-  #cvE2d{height:420px}   /* 폰은 2D 가 기본 — 업체 목록이 한 쪽에 열한 줄쯤 보이게 */
+  #cvE2d{height:300px}   /* 폰은 2D 가 기본 — 업체 목록이 한 쪽에 열한 줄쯤 보이게 */
 }
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-</style></head>
+</style>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
+</head>
 <body>
 
 <!-- 확인 중 — 대표 표지(app_owner/uid)를 확인하기 전에는 자료를 한 줄도 불러오지 않는다 -->

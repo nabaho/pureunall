@@ -135,10 +135,12 @@ main{padding:12px 16px 40px}
   /* 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다, 좌우 옆공간 모두 채워서」) —
      겉 여백(main 10px) + 상자 테두리 + 상자 안 여백이 겹쳐 글이 화면 끝에서 17~25px 에서 시작했다.
      폰에서는 겉 여백을 없애고 상자는 화면 폭 그대로(옆 테두리·둥근 모서리 없이 위아래 줄로만 가른다), 안쪽 여백 하나(10px)만 남긴다 */
-  main{padding:8px 0 60px}
-  .card{border-left:0;border-right:0;border-radius:0}
-  .cards{gap:8px}
-  .cardp{padding:10px}
+  main{padding:6px 0 60px}
+  .card{border-left:0;border-right:0;border-radius:0;box-shadow:none}
+  .cards{gap:6px}
+  .cardp{padding:7px 8px}
+  .mbox .cardp,.modal .cardp{border-left:0;border-right:0;border-radius:0;box-shadow:none;background:transparent;padding:6px 4px}
+  .kv{padding:3px 0;gap:4px}
   .sec{padding:10px 10px 2px}
   #pane-archive>.hint{padding:0 10px}
   .bar{padding:8px 10px}
@@ -209,6 +211,7 @@ main{padding:12px 16px 40px}
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
 <link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design pu-frame-a">
 <div id="head">

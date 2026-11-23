@@ -98,9 +98,17 @@ function __paMeasure(opts) {
   }
 
   var all = Array.prototype.slice.call(document.body ? document.body.querySelectorAll('*') : []);
-  var offscreen = [], vertical = [], wrapBtn = [], smallTap = [], smallInput = [], fixed = [], squeezed = [];
+  var offscreen = [], vertical = [], wrapBtn = [], smallTap = [], smallInput = [], fixed = [], squeezed = [], textClip = [];
   var seenOff = new Set();
   var TAP = 'button,a[href],[onclick],[role=button],[role=tab],input[type=checkbox],input[type=radio],select,summary,label[for]';
+
+  function isScrollableX(el) {
+    for (var p = el; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      var ox = getComputedStyle(p).overflowX;
+      if (ox === 'auto' || ox === 'scroll') return true;
+    }
+    return false;
+  }
 
   all.forEach(function (el) {
     if (el.closest('script,style,svg,noscript,template')) return;
@@ -159,6 +167,13 @@ function __paMeasure(opts) {
       squeezed.push({ sel: sel(el), text: ot.slice(0, 20), w: Math.round(r.width), top: Math.round(r.top) });
     }
 
+    // 글자 잘림(ellipsis 없이 가로 잘림) — 가로 스크롤 상자 밖인데 scrollWidth > clientWidth + 3
+    if (ot.length >= 2 && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT' &&
+        cs.textOverflow !== 'ellipsis' && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 3 &&
+        (cs.overflowX === 'hidden' || cs.overflowX === 'clip') && !isScrollableX(el) && !inFixedHidden(el)) {
+      textClip.push({ sel: sel(el), cw: el.clientWidth, sw: el.scrollWidth, top: Math.round(r.top) });
+    }
+
     // 단추·탭 글자가 두 줄로
     /* 두 줄인가 — 높이로 어림하지 않고 «글자가 실제로 몇 줄에 놓였나»를 센다.
        높이로 보면 여백·min-height 가 큰 한 줄 단추(38px)를 두 줄로 셌다(2026-10-18). */
@@ -191,18 +206,16 @@ function __paMeasure(opts) {
   out.offscreen = offscreen.slice(0, 30); out.offscreenN = offscreen.length;
   out.vertical = vertical.slice(0, 30); out.verticalN = vertical.length;
   out.squeezed = squeezed.slice(0, 30); out.squeezedN = squeezed.length;
+  out.textClip = textClip.slice(0, 20); out.textClipN = textClip.length;
   out.wrapBtn = wrapBtn.slice(0, 30); out.wrapBtnN = wrapBtn.length;
   out.smallTap = smallTap.slice(0, 30); out.smallTapN = smallTap.length;
   out.smallInput = smallInput.slice(0, 10); out.smallInputN = smallInput.length;
   out.fixed = fixed.slice(0, 15);
   out.fixedCoverPct = Math.round(100 * fixedArea / (W * H));
-  /* 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백 … 좌우 옆공간 모두 채워서」)
-     ① 글 시작 — 첫 화면 안에서 «말이 있는» 맨 안쪽 조각들이 화면 왼쪽 끝에서 몇 px 떨어져 시작하나(아래 1/10 값)
-     ② 글 끝 여백 — 오른쪽 끝 단추·값이 화면 오른쪽 끝에서 몇 px 떨어져 끝나나(아래 1/10 값)
-     ③ 상자 겹 — 배경·테두리·그림자가 있는 상자가 몇 겹 겹쳐 그 안에 글이 있나(겹마다 안쪽 여백이 쌓인다)
-     떠 있는 것·머리줄(맨 위 60px)은 뺀다 — 목록·본문의 양옆을 본다. */
+  /* 양옆 빈자리 + 이중·삼중 중첩 상자 + 두꺼운 셀 + 세로 KPI + 첫 본문 시작 Y */
   (function () {
     var lefts = [], rights = [], depths = [];
+    var nestedBoxes = new Set();
     function boxed(e) {
       var c = getComputedStyle(e);
       var bg = c.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(c.backgroundColor);
@@ -225,12 +238,69 @@ function __paMeasure(opts) {
       }
       if (r.left < -1 || r.right > W + 1) return;
       lefts.push(r.left); rights.push(W - r.right);
-      var d = 0; for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) if (boxed(p)) d++;
-      depths.push(d);
+      var boxAnc = [];
+      for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) if (boxed(p)) boxAnc.push(p);
+      depths.push(boxAnc.length);
+      if (boxAnc.length >= 2) nestedBoxes.add(boxAnc[0]);
     });
     function p10(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); return Math.round(a[Math.floor(a.length * 0.1)]); }
     function med(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }
     out.sideL = p10(lefts); out.sideR = p10(rights); out.boxDepth = med(depths);
+    out.nestedBoxN = nestedBoxes.size;
+
+    // 두꺼운 카드/셀 — 목록/카드/셀 요소 높이 > 160px 인데 글자수 < 90자 (하위 카드를 감싸는 큰 래퍼는 제외)
+    var CARD_SEL = '.card,.item,.row,.list-item,.case,.co-card,.biz-card,[class*="card"],[class*="row"],[class*="item"],li,tr';
+    var tallSamples = [];
+    var seenTall = new Set();
+    Array.prototype.forEach.call(document.querySelectorAll(CARD_SEL), function (el) {
+      if (el.closest('script,style,svg,noscript,template')) return;
+      if (!visible(el)) return;
+      var r = el.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= H * 1.5) return;
+      if (r.width <= W * 0.5 || r.height <= 160 || r.height >= H * 0.9) return;
+      var tLen = (el.innerText || '').replace(/\s+/g, '').length;
+      if (tLen >= 90 || tLen < 2) return;
+      var childCards = el.querySelectorAll(CARD_SEL);
+      if (childCards.length >= 2) return;
+      if (seenTall.has(el)) return;
+      seenTall.add(el);
+      tallSamples.push({ sel: sel(el), h: Math.round(r.height), len: tLen, top: Math.round(r.top) });
+    });
+    out.tallCardN = tallSamples.length;
+    out.tallSamples = tallSamples.slice(0, 5);
+
+    // 세로 적재 KPI/요약 그룹 — 형제 3개 이상이 각각 폭 > W * 0.75
+    var KPI_SEL = '.kpi,.stat,.sum,.metric,[class*="kpi"],[class*="stat"],[class*="summary"]';
+    var kpiParents = new Set();
+    var stackGroups = [];
+    Array.prototype.forEach.call(document.querySelectorAll(KPI_SEL), function (el) {
+      if (!visible(el) || !el.parentElement) return;
+      kpiParents.add(el.parentElement);
+    });
+    kpiParents.forEach(function (parent) {
+      var kids = Array.prototype.filter.call(parent.children, function (c) {
+        if (!visible(c)) return false;
+        var r = c.getBoundingClientRect();
+        return r.height > 20 && r.height < 260 && r.width > W * 0.75;
+      });
+      if (kids.length >= 3) stackGroups.push({ sel: sel(parent), count: kids.length });
+    });
+    out.stackKpiN = stackGroups.length;
+    out.stackKpiSamples = stackGroups.slice(0, 5);
+
+    // 첫 본문 시작 Y 좌표(contentTopY) — 헤더·필터를 지나 첫 실제 목록/표/카드가 시작되는 위치
+    var bestY = null;
+    var BODY_SEL = 'tbody tr, .list > *, [class*="list"] > *, .card, .item, [class*="card"], table, main > *';
+    Array.prototype.forEach.call(document.querySelectorAll(BODY_SEL), function (el) {
+      if (el.closest('script,style,svg,noscript,template,header,.hd,.topbar,#top,.head,.tabs,.subtabs')) return;
+      if (!visible(el)) return;
+      var r = el.getBoundingClientRect();
+      if (r.top < 44 || r.top > out.docH) return;
+      if (r.height < 24 || r.height > H * 0.85) return;
+      if (el.matches('table') && el.querySelector('tbody tr')) return;
+      if (bestY === null || r.top < bestY) bestY = Math.round(r.top);
+    });
+    out.contentTopY = bestY;
   })();
   out.gate = !!document.getElementById('pu-gate') && shown(document.getElementById('pu-gate'));
   out.title = document.title;

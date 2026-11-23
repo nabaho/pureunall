@@ -544,6 +544,7 @@
     #fundhead,#app>.row{padding-left:8px;padding-right:8px}   /* 패널 밖에 바로 놓인 줄(기금 머리·회계의 월마감 줄)은 제 여백 */
     /* 기금 정보의 묶음 상자(.secbox)도 화면 폭 그대로 — 둥근 상자 안 여백 16px 이 겹쳐 글이 17px 안쪽이었다 */
     .secbox{border-radius:0;border-left:0;border-right:0;padding-left:8px!important;padding-right:8px!important}
+    .panel .panel,.panel .secbox,.panel .card,.secbox .card{box-shadow:none;border-radius:0;border-left:0;border-right:0;background:transparent}
     #modalbg,#confirmbg{padding:4px!important}
     #modalbg>div,#confirmbg>div{padding:10px!important}
   }
@@ -645,6 +646,7 @@
   <script src="js/pu-authsync.js?v=7"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
+<link rel="stylesheet" href="css/pu-phone.css?v=1">
 </head>
 <body class="pu-design">
 <div id="root"><div class="gate">불러오는 중…</div></div>

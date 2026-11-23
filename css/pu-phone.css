@@ -1,0 +1,283 @@
+/* ═══════════════════════════════════════════════════════════════════
+   푸른 통합 공용 모바일 통일 스타일 (2026-11-23)
+   - 모든 규칙은 @media (max-width: 768px) 안에만 존재 → PC(1366px) 무변화
+   - 색은 저장소 팔레트(5계열 27색 + #ffffff + #000000)만 사용
+   - 입력칸 16px 미만 금지, #pu-version-fab / js/pu-appbar.js 비간섭
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  :where(:root) {
+    --pup-bg: #f8fafc;
+    --pup-card: #ffffff;
+    --pup-ink: #1e293b;
+    --pup-sub: #475569;
+    --pup-faint: #64748b;
+    --pup-line: #e2e8f0;
+    --pup-line2: #cbd5e1;
+    --pup-acc: #2563eb;
+    --pup-acc2: #1e40af;
+    --pup-acc-soft: #eff6ff;
+    --pup-acc-l: #bfdbfe;
+    --pup-ok: #166534;
+    --pup-ok-bg: #f0fdf4;
+    --pup-warn: #854d0e;
+    --pup-warn-bg: #fffbeb;
+    --pup-dg: #dc2626;
+    --pup-dg-bg: #fef2f2;
+    --pup-edge: 8px;
+    --pup-gap: 6px;
+    --pup-pad-y: 8px;
+    --pup-pad-x: 10px;
+    --pup-r: 10px;
+    --pup-r-sm: 8px;
+  }
+
+  :where(html[data-theme="dark"] body, body.pu-always-dark) {
+    --pup-bg: #000000;
+    --pup-card: #1e293b;
+    --pup-ink: #f8fafc;
+    --pup-sub: #cbd5e1;
+    --pup-faint: #94a3b8;
+    --pup-line: #475569;
+    --pup-line2: #64748b;
+    --pup-acc-soft: #1e293b;
+    --pup-ok: #4ade80;
+    --pup-ok-bg: #1e293b;
+    --pup-warn: #fde68a;
+    --pup-warn-bg: #1e293b;
+    --pup-dg: #f87171;
+    --pup-dg-bg: #1e293b;
+  }
+
+  /* 1. 전역 박스 모델·가로 넘침 차단 (sticky·fixed 보존을 위해 clip 사용) */
+  :where(html, body) {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  :where(*, *::before, *::after) {
+    box-sizing: border-box;
+  }
+  :where(img, svg, canvas, video, iframe) {
+    max-width: 100%;
+  }
+
+  /* 2. 입력칸 16px 이상 보장 (iOS 자동 확대 방지) */
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+    textarea
+  ) {
+    font-size: 16px;
+  }
+
+  /* 3. 바깥 래퍼 여백·양옆 빈자리(8~12px) 통일 */
+  :where(.wrap, .container, .page, .shell, .app-wrap, main, .main, .content, .main-body) {
+    max-width: 100%;
+    padding-left: var(--pup-edge);
+    padding-right: var(--pup-edge);
+  }
+
+  /* 4. 이중·삼중 상자 중첩 평탄화 (상자 1겹 원칙) */
+  :where(.card, .panel, .sec, .section, .box, .mbox) {
+    border-radius: var(--pup-r);
+    border-color: var(--pup-line);
+    box-shadow: none;
+  }
+  :where(.card, .panel, .sec, .section, .box, .mbox) :where(.card, .panel, .sec, .section, .box, .subcard) {
+    border-radius: var(--pup-r-sm);
+    box-shadow: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  /* 5. 탭·서브탭 한 줄 유지(넘치면 가로 스크롤) */
+  :where(.tabs, .subtabs, .tabbar, [role="tablist"]) {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px;
+  }
+  :where(.tabs, .subtabs, .tabbar, [role="tablist"])::-webkit-scrollbar {
+    display: none;
+  }
+  :where(.tabs button, .tabs a, .subtabs button, .subtabs a, .tabbar button, [role="tab"]) {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* 6. 모달·시트·대화창 화면 폭 내 수납 */
+  :where(.modal-card, .modal-box, .modal-content, .mbox, .dialog, [role="dialog"] > div) {
+    max-width: calc(100vw - 16px);
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+
+  /* 7. 공용 모바일 통일 유틸리티 클래스 */
+  .pu-m-flat {
+    padding: var(--pup-pad-y) var(--pup-pad-x) !important;
+    margin-bottom: var(--pup-gap) !important;
+    border-radius: var(--pup-r) !important;
+    box-shadow: none !important;
+  }
+  .pu-m-flat-flush {
+    padding: 6px 0 !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .pu-m-hd1 {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px var(--pup-edge) !important;
+  }
+  .pu-m-hd1 .pu-m-title {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .pu-m-scroll {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    gap: 5px !important;
+  }
+  .pu-m-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .pu-m-scroll > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  .pu-m-kpi3 {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+  .pu-m-kpi2 {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+  .pu-m-kpi4 {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+  }
+  .pu-m-kcell {
+    padding: 6px 7px !important;
+    min-height: 0 !important;
+    border-radius: var(--pup-r-sm) !important;
+    min-width: 0 !important;
+  }
+  .pu-m-kcell-lbl {
+    font-size: 10.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .pu-m-kcell-val {
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .pu-m-filters {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+  .pu-m-filters > .pu-m-span2,
+  .pu-m-filters > input[type="search"],
+  .pu-m-filters > input[type="text"] {
+    grid-column: 1 / -1 !important;
+  }
+  .pu-m-row3 {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 4px 6px !important;
+    align-items: center !important;
+  }
+  .pu-m-row2 {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 4px 6px !important;
+    align-items: center !important;
+  }
+  .pu-m-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 3px 6px !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+  }
+  .pu-m-ellip {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .pu-m-compact {
+    padding: 6px 8px !important;
+    gap: 4px !important;
+  }
+
+  /* rules-v2 daily KPI 스트립 한 줄 스크롤 */
+  #lib .dpanel {
+    margin: 6px 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  #lib .dpanel .dkpis {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 5px;
+    padding: 6px 8px;
+  }
+  #lib .dpanel .dkpis::-webkit-scrollbar {
+    display: none;
+  }
+  #lib .dpanel .dkpi {
+    flex: 0 0 auto;
+    min-width: 78px;
+    padding: 4px 8px;
+    border-radius: 8px;
+  }
+  #lib .dpanel .dkpi b {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) and (prefers-color-scheme: dark) {
+  :where(body.pu-dark-auto) {
+    --pup-bg: #000000;
+    --pup-card: #1e293b;
+    --pup-ink: #f8fafc;
+    --pup-sub: #cbd5e1;
+    --pup-faint: #94a3b8;
+    --pup-line: #475569;
+    --pup-line2: #64748b;
+    --pup-acc-soft: #1e293b;
+    --pup-ok: #4ade80;
+    --pup-ok-bg: #1e293b;
+    --pup-warn: #fde68a;
+    --pup-warn-bg: #1e293b;
+    --pup-dg: #f87171;
+    --pup-dg-bg: #1e293b;
+  }
+}
