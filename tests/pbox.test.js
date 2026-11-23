@@ -6063,3 +6063,148 @@ test('㉙ 계정별 100% 완전 격리 — 타 계정 수집 판례·업로드 �
   assert.ok(Store.getDocs().some((d) => d.caseNo === '2026부해8888'), 'A노무사 재로그인 시 본인 사건이 복원되어야 합니다');
   assert.ok(Store.getAlerts().some((a) => a.title.includes('A노무사 전용')), 'A노무사 재로그인 시 본인 알림이 복원되어야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════
+ * 30. 워크스페이스 상단 툴바 틀고정 · 접이식 검증칩 · 우측 근거 탭 · 요청 핵심어 색상 강조 검증
+ * ══════════════════════════════════════════════════════════════ */
+test('㉚ 워크스페이스 상단 툴바 틀고정 · 접이식 검증칩 · 우측 근거 탭 전환 · 요청 핵심어 본문 색상 강조 검증', async () => {
+  const htmlSrc = fs.readFileSync(path.join(ROOT, 'pu-pbox.html'), 'utf8');
+  assert.match(
+    htmlSrc,
+    /@media\s*\(min-width:768px\)\s*\{\s*\.pbox-ws-head\{position:sticky;top:0;z-index:18\}/,
+    'PC·태블릿(>=768px)에서 워크스페이스 상단 툴바(.pbox-ws-head)가 틀고정(sticky)되어야 합니다'
+  );
+
+  const docListeners = {};
+  const elementsById = {};
+  function makeEl(id) {
+    return {
+      id: id || '',
+      style: {},
+      value: '',
+      checked: false,
+      textContent: '',
+      _html: '',
+      _ownedIds: new Set(),
+      get innerHTML() { return this._html; },
+      set innerHTML(v) {
+        for (const oldId of this._ownedIds) delete elementsById[oldId];
+        this._ownedIds.clear();
+        this._html = String(v || '');
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
+        let m;
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const attrsStr = m[2] || '';
+          const idMatch = /\bid="([^"]+)"/i.exec(attrsStr);
+          if (!idMatch) continue;
+          const child = makeEl(idMatch[1]);
+          const valMatch = /\bvalue="([^"]*)"/i.exec(attrsStr);
+          if (valMatch) child.value = valMatch[1];
+          elementsById[idMatch[1]] = child;
+          this._ownedIds.add(idMatch[1]);
+        }
+      },
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      setAttribute(k, v) { this[k] = v; },
+      removeAttribute(k) { delete this[k]; },
+      getAttribute(k) { return this[k] !== undefined ? this[k] : null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      appendChild() {},
+      removeChild() {},
+      focus() {}
+    };
+  }
+  const rootEl = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootEl;
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => {
+      if (!elementsById[id]) elementsById[id] = makeEl(id);
+      return elementsById[id];
+    },
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => {
+      if (!docListeners[ev]) docListeners[ev] = [];
+      docListeners[ev].push(fn);
+    }
+  };
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: async () => ({ ok: false, status: 503 }),
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1440,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    fetch: ctx.fetch,
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  await ctx.window.PuPBoxStore.init('ws-clean-user');
+  const savedTh = ctx.window.PuPBoxStore.saveThread({
+    title: '요양 통근치료 기간동안 임금 어떻게 해야하나',
+    query: '요양 통근치료 기간동안 임금 어떻게 해야하나',
+    mode: 'review',
+    answer: '## 1. 검토 요약\n- **요양** 및 통근치료 기간의 **임금** 지급 기준은 근로기준법과 산재보험법에 따릅니다.\n- 대법원 `2020다247190` 판결을 함께 참고합니다.',
+    verification: {
+      verifiedCount: 1,
+      unverifiedCount: 0,
+      items: [{ raw: '2020다247190', verified: true, kind: 'case' }]
+    }
+  });
+
+  await ctx.window.PuPBoxApp.mount(rootEl, { uid: 'ws-clean-user', name: '테스트 노무사' });
+
+  function fireClick(attrs) {
+    const fakeBtn = {
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? fakeBtn : null)
+    };
+    const ev = { target: fakeBtn, preventDefault() {}, stopPropagation() {} };
+    (docListeners.click || []).forEach((fn) => fn(ev));
+  }
+
+  fireClick({ 'data-act': 'open-thread', 'data-id': savedTh.id });
+  const wsHtmlAll = elementsById.pboxMainArea.innerHTML;
+
+  /* 1) 미확인 0건이면 검증 칩이 1줄 접이식(open 없음)으로 정리됨 */
+  assert.ok(wsHtmlAll.includes('<details class="pbox-cite-details">'), '미확인 0건일 때 인용 검증 목록은 접힌 상태(<details class="pbox-cite-details">)로 렌더링되어야 합니다');
+  assert.ok(!wsHtmlAll.includes('<details class="pbox-cite-details" open>'), '미확인 0건일 때 검증 칩이 펼쳐져 있으면 안 됩니다');
+
+  /* 2) 요청 핵심어 표시줄(.pbox-req-kw-bar) 및 보고서 본문 내 색상 강조(<mark class="pbox-hl">) 검증 */
+  assert.ok(wsHtmlAll.includes('class="pbox-req-kw-bar"'), '요청 핵심어 안내 줄(.pbox-req-kw-bar)이 렌더링되어야 합니다');
+  assert.ok(wsHtmlAll.includes('<mark class="pbox-hl">요양</mark>'), '보고서 본문에 요청 단어(요양)가 <mark class="pbox-hl">로 강조되어야 합니다');
+  assert.ok(wsHtmlAll.includes('<mark class="pbox-hl">임금</mark>'), '보고서 본문에 요청 단어(임금)가 <mark class="pbox-hl">로 강조되어야 합니다');
+  assert.ok(!wsHtmlAll.includes('class="pbox-<mark'), 'HTML 태그 속성이 하이라이트로 깨지면 안 됩니다');
+
+  /* 3) 우측 근거 보드가 탭형(.pbox-auth-tabs)으로 정리되고, 탭 전환 시 편집 중인 제목이 보존됨 */
+  assert.ok(wsHtmlAll.includes('class="pbox-auth-tabs"'), '우측 근거 보드에 분류 탭(.pbox-auth-tabs)이 렌더링되어야 합니다');
+  assert.ok(wsHtmlAll.includes('class="pbox-conn-details"'), '공무원·군인 질의가 아닐 때 유사직역 법령은 접이식(.pbox-conn-details)으로 정리되어야 합니다');
+
+  if (elementsById.pboxWsTitleInput) {
+    elementsById.pboxWsTitleInput.value = '수정 중인 미저장 제목';
+  }
+  fireClick({ 'data-act': 'set-ws-auth-tab', 'data-tab': 'precedents' });
+  const wsHtmlPrecs = elementsById.pboxMainArea.innerHTML;
+  assert.ok(wsHtmlPrecs.includes('대법원 · 헌재 · 하급심 판례'), '판례 탭 전환 시 판례 섹션이 표시되어야 합니다');
+  assert.ok(!wsHtmlPrecs.includes('현행 법령 · 조문'), '판례 탭 전환 시 법령 섹션은 숨겨져 한눈에 보기 쉽게 정리되어야 합니다');
+  assert.equal(ctx.window.PuPBoxStore.getThreads().find((t) => t.id === savedTh.id).title, '수정 중인 미저장 제목', '우측 근거 탭 전환 시 입력 중이던 제목 초안이 유실되지 않고 보존되어야 합니다');
+});
