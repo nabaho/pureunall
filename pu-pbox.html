@@ -252,7 +252,28 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
   .pbox-ws-grid{grid-template-columns:minmax(0,1fr)}
   .pbox-home-dash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-.pbox-ws-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;margin-bottom:12px;flex-wrap:wrap}
+.pbox-ws-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;flex-wrap:wrap}
+@media (min-width:768px){
+  .pbox-ws-head{position:sticky;top:0;z-index:18}
+}
+.pbox-auth-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pbox-auth-tab{min-height:30px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#f8fafc;color:#475569;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.pbox-auth-tab:hover{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+.pbox-auth-tab.active{background:#2563eb;color:#ffffff;border-color:#2563eb}
+.pbox-auth-list{display:flex;flex-direction:column;gap:10px}
+.pbox-auth-sec{display:flex;flex-direction:column;gap:6px}
+.pbox-auth-sec-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 4px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:800;color:#1e293b}
+.pbox-auth-more-btn{border:none;background:transparent;color:#2563eb;font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 4px;white-space:nowrap}
+.pbox-auth-more-btn:hover{text-decoration:underline}
+.pbox-conn-details{margin-bottom:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px}
+.pbox-conn-details>summary{font-size:12px;font-weight:700;color:#475569;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:26px}
+.pbox-conn-details>summary::-webkit-details-marker{display:none}
+.pbox-conn-details[open] .pbox-conn-law-bar{margin-top:8px;margin-bottom:0;border:none;padding:0;background:transparent}
+.pbox-cite-details{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin:0 0 12px}
+.pbox-cite-details>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;list-style:none;min-height:26px}
+.pbox-cite-details>summary::-webkit-details-marker{display:none}
+.pbox-cite-toggle{font-size:11.5px;font-weight:700;color:#2563eb;white-space:nowrap}
+.pbox-cite-details .pbox-cite-chips{margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0}
 .pbox-ws-title-row{display:flex;align-items:center;gap:8px;flex:1;min-width:220px;flex-wrap:wrap}
 .pbox-ws-title-input{flex:1;min-width:180px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:16px;font-weight:800;color:#1e293b;background:#ffffff;font-family:inherit}
 .pbox-ws-tabs-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap}
@@ -315,7 +336,8 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-row-click strong{font-size:13px;letter-spacing:-.01em}
 .pbox-row-click:hover strong{color:#2563eb;text-decoration:underline}
 .pbox-table .pbox-empty-cell{text-align:center;padding:28px 16px;color:#475569;white-space:normal}
-.pbox-hl{background:#fffbeb;color:#854d0e;border-radius:3px;padding:0 2px;font-weight:800}
+.pbox-hl{background:#fffbeb;color:#854d0e;border:1px solid #fde68a;border-radius:4px;padding:0 3px;font-weight:800}
+.pbox-req-kw-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px;font-size:12px;color:#475569}
 
 .pbox-bulk-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 14px;border-radius:10px;background:#1e293b;color:#ffffff;font-size:12px;margin-bottom:10px;flex-wrap:wrap}
 
@@ -522,7 +544,7 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
   .pbox-proj-item{padding:8px 6px}
   .pbox-wf-card{padding:10px 4px}
   .pbox-filter-card,.pbox-list-card,.pbox-flat-m,.pbox-unified-board,.pbox-unified-col,.pbox-live-review-box,.pbox-home-dash-grid>.pbox-lbox-sec{background:transparent;border:none;border-radius:0;padding:0 0 8px;box-shadow:none}
-  .pbox-mini-act,.pbox-subfile-btn,.pbox-btn-sm,.pbox-btn-live,.pbox-icon-btn,.pbox-cat-chip,.pbox-qa-pill,.pbox-mode-btn,.pbox-link-btn,.pbox-plus-btn,.pbox-voice-btn,.pbox-side-newproj-btn,.pbox-ws-tab,.pbox-issue-tab,.pbox-issue-chip,.pbox-ext-pill,.pbox-bundle-btn,.pbox-conn-chip,.pbox-scope-tab,.pbox-kw-chip,.pbox-slim-drawer>summary{min-height:32px;min-width:28px;padding:6px 10px}
+  .pbox-mini-act,.pbox-subfile-btn,.pbox-btn-sm,.pbox-btn-live,.pbox-icon-btn,.pbox-cat-chip,.pbox-qa-pill,.pbox-mode-btn,.pbox-link-btn,.pbox-plus-btn,.pbox-voice-btn,.pbox-side-newproj-btn,.pbox-ws-tab,.pbox-auth-tab,.pbox-auth-more-btn,.pbox-conn-details>summary,.pbox-cite-details>summary,.pbox-issue-tab,.pbox-issue-chip,.pbox-ext-pill,.pbox-bundle-btn,.pbox-conn-chip,.pbox-scope-tab,.pbox-kw-chip,.pbox-slim-drawer>summary{min-height:32px;min-width:28px;padding:6px 10px}
   .pbox-ac-row{min-height:36px;padding:7px 8px}
   .pbox-home-grid,.pbox-home-dash-grid,.pbox-ws-grid,.pbox-unified-grid,.pbox-unified-grid.two-col,.pbox-matched-grid,.pbox-wf-grid,.pbox-proj-layout,.pbox-site-grid{grid-template-columns:minmax(0,1fr)}
   .pbox-op-hint{white-space:normal}
@@ -592,6 +614,13 @@ html[data-theme="dark"] .pbox-voice-summary-body{color:#f8fafc}
 html[data-theme="dark"] .pbox-voice-stalled{color:#fecaca}
 html[data-theme="dark"] .pbox-voice-mic-ok{color:#4ade80}
 html[data-theme="dark"] .pbox-voice-mic-mute{color:#fffbeb}
+html[data-theme="dark"] .pbox-ws-head{background:#1e293b;border-color:#475569;color:#f8fafc}
+html[data-theme="dark"] .pbox-cite-details,html[data-theme="dark"] .pbox-conn-details{background:#000000;border-color:#475569;color:#cbd5e1}
+html[data-theme="dark"] .pbox-cite-details .pbox-cite-chips,html[data-theme="dark"] .pbox-auth-sec-hd{border-color:#475569;color:#f8fafc}
+html[data-theme="dark"] .pbox-cite-toggle,html[data-theme="dark"] .pbox-auth-more-btn{color:#60a5fa}
+html[data-theme="dark"] .pbox-auth-tab{background:#1e293b;color:#cbd5e1;border-color:#475569}
+html[data-theme="dark"] .pbox-auth-tab.active{background:#2563eb;color:#ffffff;border-color:#2563eb}
+html[data-theme="dark"] .pbox-conn-details>summary,html[data-theme="dark"] .pbox-req-kw-bar{color:#cbd5e1}
 html[data-theme="dark"] .pbox-live-issue-card,html[data-theme="dark"] .pbox-unified-item:hover{background:#000000;color:#f8fafc;border-color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-title{color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-body,html[data-theme="dark"] .pbox-unified-title,html[data-theme="dark"] .pbox-unified-col-hd,html[data-theme="dark"] .pbox-unified-item-title{color:#f8fafc;border-color:#475569}
@@ -731,7 +760,7 @@ html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
 <script src="js/pu-pbox-corpus.js?v=10"></script>
 <script src="js/pu-pbox-engine.js?v=28"></script>
 <script src="js/pu-pbox-store.js?v=32"></script>
-<script src="js/pu-pbox-app.js?v=37"></script>
+<script src="js/pu-pbox-app.js?v=38"></script>
 <script>
 try {
   PuBack.guard(function () {
