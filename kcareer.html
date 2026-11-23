@@ -832,14 +832,17 @@ body.kc-staff #hcOpenBtn{display:none!important}
 /* 증명서 보관함 표(#cdBody)의 첫 칸은 이제 ☐ + № 칸이다 — 직원 «보기 전용»에서는 다른 표처럼 감춘다(위 337~338줄). 종류·발급번호는 둘째 칸이라 남는다 */
 #cdBody .dt thead th{white-space:nowrap}   /* 머리글도 한 줄 — 칸이 좁을 때 「증명기간」이 한 글자씩 쌓이지 않게 */
 #cdBody .dt thead th:last-child{width:auto;min-width:0}   /* 공용 표는 끝 칸(관리)을 200px 로 잡는다 — 여기는 작은 단추 서넛이라 좁게(태블릿 폭에서 발급기관 칸이 짓눌리지 않게) */
-/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표 834~913px 대 상자 681px) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게(2026-11-15).
+/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표가 상자보다 넓어 `main` 이 좌우로 구른다) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게.
+   증명서 표(#cdBody)에 먼저 넣었던 것(2026-11-15)을 «☐ 칸이 있는 모든 공용 표(.dt)»로 넓혔다(2026-11-22) — 경력·실적(위촉장·자격·수료·표창·교육·경력·사업·자문)·사업 목록·제출서류 등. 가짜 환경 실측: 1024px 위촉장 표는 `main` 이 127px 구르면 ☐ 가 왼쪽 -90px(화면 밖)이었다.
+   ⚠ «☐ 가 든 칸»에만 건다(:has(input[type=checkbox])) — № 만 있는 보기용 표(설정의 계좌·법인 서류 등)는 그대로 둔다. :has 를 모르는 브라우저는 이 규칙을 통째로 건너뛸 뿐 표는 예전 그대로다.
+   ⚠ 머리줄 칸은 «그 표의 줄에 ☐ 가 있는가»로 정한다(머리 칸 자신이 아니라) — 사업 서류 찾기·프로필 고르기 창의 머리 칸은 ☐ 없이 글자(「☐ №」)만 있어도 줄 칸이 붙들리면 머리 칸도 같이 붙들려야 열 머리글이 어긋나지 않는다(자동 검증 2026-11-23).
    ⚠ 이 폭 띠에서만: 폰 카드(≤520px)는 줄을 카드로 접어 스크롤이 없고, 1280px 를 넘는 PC 는 그대로다(표가 상자 안에 들어와 스크롤이 없다 — 고정해도 안 보이는 «그대로»를 건드리지 않는다). 칸 바탕은 표 바탕과 같아(var(--card)) 스크롤이 없으면 보이는 모양은 같다 */
 @media (min-width:521px) and (max-width:1280px){
-  #cdBody .dt thead th:first-child,#cdBody .dt tbody td:first-child{position:sticky;left:0}
-  #cdBody .dt thead th:first-child{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
-  #cdBody .dt tbody td:first-child{z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
-  #cdBody .dt tbody tr:hover>td:first-child,#cdBody .dt tbody tr.sel-on>td:first-child{background:inherit}   /* 지나가는 줄·고른 줄의 바탕을 그대로 따른다 */
-  html.dark #cdBody .dt tbody tr.sel-on>td:first-child{box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
+  .dt:has(tbody td.rownum input[type=checkbox]) thead th.rownum-h,.dt tbody td.rownum:has(input[type=checkbox]){position:sticky;left:0}
+  .dt:has(tbody td.rownum input[type=checkbox]) thead th.rownum-h{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
+  .dt tbody td.rownum:has(input[type=checkbox]){z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
+  .dt tbody tr:hover>td.rownum:has(input[type=checkbox]),.dt tbody tr.sel-on>td.rownum:has(input[type=checkbox]),.dt tbody tr.row-warn>td.rownum:has(input[type=checkbox]),.dt tbody tr.kc-dying>td.rownum:has(input[type=checkbox]){background:inherit}   /* 지나가는 줄·고른 줄·살필 줄·지우려고 묻는 중인 줄(.kc-dying)의 바탕을 그대로 따른다(줄에 바탕이 없는 보통 줄은 위 var(--card) 가 그대로) */
+  html.dark .dt tbody tr.sel-on>td.rownum:has(input[type=checkbox]){box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
 }
 #hcBody tr.hc-gone td{opacity:.75}
 /* ☑ 고르기 창(#p1PickTbl)의 표는 «끝 칸이 관리 단추»가 아니다. 폰 카드(공용 .dt)가 끝 칸을 오른쪽 단추 열로 세우면 긴 기관명 줄에서 일자 칸이 0px 로 눌려 가려진다
