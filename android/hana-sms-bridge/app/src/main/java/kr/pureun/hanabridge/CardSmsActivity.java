@@ -1,8 +1,11 @@
 package kr.pureun.hanabridge;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputFilter;
 import android.view.Gravity;
 import android.view.View;
@@ -96,6 +99,11 @@ public final class CardSmsActivity extends Activity {
         reset.setOnClickListener(v -> body.setText(CardSms.defaultText()));
         root.addView(reset, top(8));
 
+        /* 권한을 거부했거나 폰이 «제한된 설정»으로 막으면 앱 안 물음창이 안 뜬다 — 폰의 앱 정보 화면을 바로 연다 */
+        Button permBtn = button("폰 설정에서 권한 켜기", Color.rgb(190, 24, 93));
+        permBtn.setOnClickListener(v -> openAppSettings());
+        root.addView(permBtn, top(14));
+
         status = text("", 13, Color.rgb(71, 85, 105));
         status.setPadding(dp(12), dp(12), dp(12), dp(12));
         status.setBackgroundColor(Color.rgb(248, 250, 252));
@@ -158,12 +166,23 @@ public final class CardSmsActivity extends Activity {
         if (toast) Toast.makeText(this, "저장했습니다.", Toast.LENGTH_SHORT).show();
     }
 
+    private void openAppSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+            Toast.makeText(this, "«권한»을 눌러 아래 항목을 «허용»으로 바꿔 주세요. 막혀 있으면 오른쪽 위 ⋮ → «제한된 설정 허용».",
+                    Toast.LENGTH_LONG).show();
+        } catch (Exception noSettings) {
+            Toast.makeText(this, "폰 설정 → 앱 → «푸른 하나문자 연결» → 권한에서 켜 주세요.", Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void refreshStatus() {
         if (status == null) return;
         String[] need = CardSms.missingPermissions(this);
         String perms = need.length == 0 ? "필요한 권한: 모두 허용됨"
-                : "⚠ 아직 허용 안 된 권한이 " + need.length + "개 있습니다 — 스위치를 껐다 켜면 다시 묻습니다. "
-                + "(거부를 거듭했다면 폰 설정 → 앱 → 권한에서 켜 주세요)";
+                : "⚠ 허용 안 된 권한 " + need.length + "개: " + CardSms.missingNames(this)
+                + "\n이대로는 통화가 끝나도 아무것도 하지 않습니다. 아래 «폰 설정에서 권한 켜기»를 눌러 모두 «허용»해 주세요.";
         String last = CardSms.lastNote(this);
         status.setText(perms + "\n마지막 처리: " + (last.isEmpty() ? "아직 없음" : last));
     }

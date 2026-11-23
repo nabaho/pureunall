@@ -96,13 +96,14 @@ final class CardSms {
         return t == null || t.trim().isEmpty() ? defaultText() : t;
     }
 
+    /* ★ 명함은 «사진 링크»로 보낸다 (대표 결정 2026-11-23 — 글자 명함은 「명함이 아니다」).
+         사진 파일은 사이트에 있다(img/namecard.jpg). 문자 한 통에 사진을 직접 붙이는 MMS 는
+         안드로이드가 앱의 자동 발송을 막거나 통신사 설정에 따라 실패해 쓰지 않는다.
+       ⚠ 주소의 사진이 사이트에서 사라지면 받은 사람이 죽은 링크를 받는다 — tests/card-sms-after-call 이 지킨다. */
     static String defaultText() {
-        return "[푸른노무법인] 대표노무사 권형하\n"
-                + "휴대폰 010-2802-4601 · 370-6@hanmail.net\n"
-                + "■ 천안본사 충남 천안시 서북구 원두정8길 6 301호(두정빌딩)\n"
-                + "Tel 041-556-0035 / Fax 041-556-3656\n"
-                + "■ 서산지사 충남 서산시 쌍연남1로 37, 1층(썬샤인빌딩)\n"
-                + "Tel 041-429-0123 / Fax 041-429-0222";
+        return "[푸른노무법인] 대표노무사 권형하입니다. 통화 감사합니다.\n"
+                + "명함 사진: https://erp.pureunlabor.co.kr/img/namecard.jpg\n"
+                + "휴대폰 010-2802-4601";
     }
 
     static void save(Context c, boolean on, int saved, int unknown, String text) {
@@ -136,6 +137,22 @@ final class CardSms {
             need.add(Manifest.permission.POST_NOTIFICATIONS);
         }
         return need.toArray(new String[0]);
+    }
+
+    /* 허용 안 된 권한을 «사람 말»로 — 「5개 있습니다」만으로는 무엇을 켜야 할지 모른다 (2026-11-23) */
+    static String missingNames(Context c) {
+        StringBuilder sb = new StringBuilder();
+        String[][] all = {
+                {Manifest.permission.READ_PHONE_STATE, "통화 상태"},
+                {Manifest.permission.READ_CALL_LOG, "통화기록"},
+                {Manifest.permission.READ_CONTACTS, "연락처"},
+                {Manifest.permission.SEND_SMS, "문자 보내기"},
+        };
+        for (String[] p : all) if (!granted(c, p[0])) sb.append(sb.length() > 0 ? " · " : "").append(p[1]);
+        if (android.os.Build.VERSION.SDK_INT >= 33 && !granted(c, Manifest.permission.POST_NOTIFICATIONS)) {
+            sb.append(sb.length() > 0 ? " · " : "").append("알림");
+        }
+        return sb.toString();
     }
 
     /* ───────── 통화 상태 (받는 쪽이 매번 새로 만들어져서 폰 안에 적어 둔다) ───────── */
