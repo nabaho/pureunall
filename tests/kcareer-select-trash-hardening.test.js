@@ -302,9 +302,10 @@ test('② 되살리기를 여럿 한꺼번에 하는 두 길(휴지통 «선택 
   assert.match(toasts2.join(' '), /2건을 되살렸습니다/); assert.match(toasts2.join(' '), /1건은 같은 발급번호/);
 });
 
-/* ═══════════════ ④ 태블릿 폭 — ☐ + № 칸을 왼쪽에 붙든다 ═══════════════ */
-const MEDIA = /@media \(min-width:(\d+)px\) and \(max-width:(\d+)px\)\{\s*\r?\n\s*(#cdBody \.dt thead th:first-child[\s\S]*?)\r?\n\}/.exec(html);
-test('④ 증명서 표의 첫 칸(☐ + №)을 «스크롤이 생기는 폭 띠»에서만 왼쪽에 붙든다 — 폰 카드·PC 폭은 그대로', () => {
+/* ═══════════════ ④ 태블릿 폭 — ☐ + № 칸을 왼쪽에 붙든다 (증명서 표 → ☐ 칸이 있는 모든 공용 표, 2026-11-22) ═══════════════ */
+const MEDIA = /@media \(min-width:(\d+)px\) and \(max-width:(\d+)px\)\{\s*\r?\n\s*(\.dt thead th\.rownum-h[\s\S]*?)\r?\n\}/.exec(html);
+const HAS = ':has(input[type=checkbox])';
+test('④ ☐ 칸이 있는 공용 표(.dt)의 첫 칸(☐ + №)을 «스크롤이 생기는 폭 띠»에서만 왼쪽에 붙든다 — 폰 카드·PC 폭은 그대로', () => {
   assert.ok(MEDIA, '태블릿 폭 띠 규칙을 못 찾았다');
   const lo = Number(MEDIA[1]), hi = Number(MEDIA[2]), css = MEDIA[3];
   /* 폰 카드가 시작하는 폭 — 줄을 카드로 접는 규칙(.dt{overflow-x:hidden!important…})을 품은 @media(max-width:N) 의 N */
@@ -313,24 +314,41 @@ test('④ 증명서 표의 첫 칸(☐ + №)을 «스크롤이 생기는 폭 �
   assert.ok(lo > Number(card[1]), '폰 카드 폭(' + card[1] + 'px 이하)은 건드리지 않는다: 시작 ' + lo);
   assert.ok(hi < 1366, '1366px PC 는 그대로: 끝 ' + hi);
   assert.ok(hi >= 1024, '태블릿 가로(1024px)는 덮는다: 끝 ' + hi);
-  assert.match(css, /#cdBody \.dt thead th:first-child,#cdBody \.dt tbody td:first-child\{position:sticky;left:0\}/, '머리줄·줄마다 첫 칸을 왼쪽에 붙든다');
-  assert.ok(!/#cdBody \.dt[^{]*first-child\{[^}]*position:sticky/.test(html.replace(MEDIA[0], '')), '이 띠 밖에서는 붙들지 않는다');
+  assert.ok(css.includes('.dt thead th.rownum-h' + HAS + ',.dt tbody td.rownum' + HAS + '{position:sticky;left:0}'), '머리줄·줄마다 ☐ 칸을 왼쪽에 붙든다');
+  assert.ok(!/position:sticky;left:0/.test(html.replace(MEDIA[0], '')), '이 띠 밖에서는 어느 칸도 왼쪽에 붙들지 않는다');
 });
-test('④ 붙든 칸은 «비치지 않게» 바탕이 있고, 머리줄 모서리 칸이 가장 위 · 지나가는 줄·고른 줄의 바탕을 따른다', () => {
+test('④ «☐ 가 든 칸»에만 건다 — № 만 있는 보기용 표(설정의 계좌·법인 서류 등)는 그대로 둔다', () => {
+  assert.ok(MEDIA);
+  const rules = MEDIA[3].split('\n').filter((l) => /rownum/.test(l));
+  assert.ok(rules.length >= 4, '규칙 줄을 못 찾았다');
+  rules.forEach((l) => assert.ok(l.includes(HAS), '☐ 를 요구하지 않는 규칙이 있다 — № 만 있는 표까지 붙든다: ' + l.trim().slice(0, 90)));
+});
+test('④ 붙든 칸은 «비치지 않게» 바탕이 있고, 머리줄 모서리 칸이 가장 위 · 지나가는 줄·고른 줄·살필 줄의 바탕을 따른다', () => {
   assert.ok(MEDIA);
   const css = MEDIA[3];
-  const td = /\n\s*#cdBody \.dt tbody td:first-child\{([^}]*)\}/.exec('\n' + css);
-  assert.ok(td, '줄마다 첫 칸 규칙');
+  const td = new RegExp('\\n\\s*\\.dt tbody td\\.rownum' + HAS.replace(/[()[\]]/g, '\\$&') + '\\{([^}]*)\\}').exec('\n' + css);
+  assert.ok(td, '줄마다 ☐ 칸 규칙');
   assert.match(td[1], /background:var\(--card\)/, '바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 — 표 바탕과 같은 값(어두운 판도 따라간다)');
-  const th = /\n\s*#cdBody \.dt thead th:first-child\{([^}]*)\}/.exec('\n' + css);
-  assert.ok(th, '머리줄 첫 칸 규칙');
+  const th = new RegExp('\\n\\s*\\.dt thead th\\.rownum-h' + HAS.replace(/[()[\]]/g, '\\$&') + '\\{([^}]*)\\}').exec('\n' + css);
+  assert.ok(th, '머리줄 ☐ 칸 규칙');
   const z = (s) => Number((/z-index:(\d+)/.exec(s) || [])[1]);
   const headZ = Number((/\.dt thead th\{[^}]*position:sticky;top:0;z-index:(\d+)/.exec(html) || [])[1]);
   assert.ok(z(th[1]) > headZ, '머리줄(' + headZ + ')보다 위: 위·왼쪽 두 방향으로 붙는 모서리 칸');
   assert.ok(z(td[1]) < headZ, '줄 칸은 머리줄 아래');
   assert.ok(z(td[1]) >= 1, '지나가는 다른 칸(z-index 없음) 위');
-  assert.match(css, /tr:hover>td:first-child,#cdBody \.dt tbody tr\.sel-on>td:first-child\{background:inherit\}/, '지나가는 줄·고른 줄의 바탕을 그대로 따른다');
-  assert.match(css, /html\.dark #cdBody \.dt tbody tr\.sel-on>td:first-child\{box-shadow:[^}]*var\(--blue\)/, '어두운 판의 고른 줄 왼쪽 띠가 칸 바탕에 덮이지 않는다');
+  const inh = /tr:hover>td\.rownum[^{]*\{background:inherit\}/.exec(css);
+  assert.ok(inh, '지나가는 줄의 바탕을 그대로 따른다');
+  ['tr:hover>', 'tr.sel-on>', 'tr.row-warn>'].forEach((k) => assert.ok(inh[0].includes(k), '바탕이 따로 있는 줄(' + k + ')의 ☐ 칸이 줄 바탕을 따르지 않는다 — 어두운 판에서 그 칸만 밝게 남는다'));
+  assert.match(css, /html\.dark \.dt tbody tr\.sel-on>td\.rownum[^{]*\{box-shadow:[^}]*var\(--blue\)/, '어두운 판의 고른 줄 왼쪽 띠가 칸 바탕에 덮이지 않는다');
+});
+test('④ 이 규칙을 받는 표들이 실제로 «머리줄 ☐ + № 칸 / 줄마다 ☐ 칸»을 갖는다 — 경력·실적 표·사업 목록·증명서 표', () => {
+  const th = /<th class="rownum-h"[^>]*>(?:<label[^>]*>)?\s*<input type="checkbox"/;
+  const td = /<td class="rownum"[^>]*><label[^>]*><input type="checkbox" class="row-chk"/;
+  [['renderCareer', '경력·실적 표(위촉장·자격·수료·표창·교육·경력·사업·자문·제출서류)'], ['renderBizList', '사업 목록'], ['_cdTable', '증명서 보관함 표']].forEach(([name, label]) => {
+    const f = fn(name);
+    assert.ok(th.test(f), label + ' 머리줄에 ☐ 가 든 th.rownum-h 가 없다 — 붙들 칸이 없다');
+    assert.ok(td.test(f), label + ' 줄에 ☐ 가 든 td.rownum 이 없다 — 붙들 칸이 없다');
+  });
 });
 test('④ 직원 «보기 전용»(첫 칸을 감춘다)과 충돌하지 않는다 — 감추는 규칙이 그대로 있다', () => {
   assert.match(html, /body\.kc-staff \.dt td:first-child/);
