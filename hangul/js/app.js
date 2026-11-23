@@ -1853,7 +1853,7 @@
       if (!_isPrivateFrom(fromParam)) {
         const p = JSON.parse(raw);
         if (p && !_isPrivateBridgeId(p.bridgeId)) {
-          const freshMs = fromParam === 'jobtrans' ? 300000 : 60000;
+          const freshMs = (fromParam === 'jobtrans' || fromParam === 'safety') ? 300000 : 60000;
           if (fromParam === 'fund' || Date.now() - (p.sentAt || 0) < freshMs) {
             setTimeout(() => loadFromFundPayload(p), 60);
           }
@@ -1883,13 +1883,13 @@
         if (_isPrivateBridgeId(d.payload.bridgeId)) return;
         loadFromFundPayload(d.payload);
       };
-      if (_initFrom === 'jobtrans' || _initFrom === 'fund') {
+      if (_initFrom === 'jobtrans' || _initFrom === 'safety' || _initFrom === 'fund') {
         try { bc.postMessage({ type: 'pureun_hangul_ready', from: _initFrom, bid: _initBid }); } catch (e) {}
       }
     }
   } catch (e) {}
   try {
-    if ((_initFrom === 'jobtrans' || _initFrom === 'fund' || _isPrivateFrom(_initFrom)) && window.opener && !window.opener.closed) {
+    if ((_initFrom === 'jobtrans' || _initFrom === 'safety' || _initFrom === 'fund' || _isPrivateFrom(_initFrom)) && window.opener && !window.opener.closed) {
       window.opener.postMessage({ type: 'pureun_hangul_ready', from: _initFrom, bid: _initBid }, location.origin);
     }
   } catch (e) {}

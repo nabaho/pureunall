@@ -215,19 +215,19 @@ function validate(body) {
     if (!p || typeof p !== "object" || Array.isArray(p)) {
       return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
     }
-    if (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans") {
-      /* 괴롭힘 조사 · 일터상생혁신 · 산업일자리전환 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
+    if (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans" || resolvedApp === "safety") {
+      /* 괴롭힘 조사 · 일터상생혁신 · 산업일자리전환 · 안전보건체계구축 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
          오직 단일 text 문자열만 허용하여 서버에서 주민등록번호 재가림 후 새 객체로 재조립한다. */
       const keys = Object.keys(p);
       if (keys.length !== 1 || keys[0] !== "text" || typeof p.text !== "string") {
-        const appName = resolvedApp === "jobtrans" ? "산업일자리전환 앱은 " : (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : "괴롭힘 조사 앱은 ");
+        const appName = resolvedApp === "safety" ? "안전보건체계구축 앱은 " : (resolvedApp === "jobtrans" ? "산업일자리전환 앱은 " : (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : "괴롭힘 조사 앱은 "));
         return { ok: false, error: appName + "주민등록번호 가림이 완료된 글자만 요청할 수 있습니다" };
       }
       let masked = maskHarassRrn(p.text);
       if (findRrnSpans(masked).length > 0) {
         return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
       }
-      if (resolvedApp === "jobtrans") {
+      if (resolvedApp === "jobtrans" || resolvedApp === "safety") {
         masked = maskJobtransServerPii(masked);
         if (hasJobtransResidualPii(masked)) {
           return { ok: false, error: "비식별화되지 않은 연락처·이메일 등 개인정보가 포함되어 AI 전송을 차단했습니다." };
@@ -258,7 +258,7 @@ function validate(body) {
      ⚠ 그림도 글자도 없으면 그대로 돌려보낸다 — 부르는 만큼이 요금이다. */
   if (!imgs && !chars) return { ok: false, error: "보낼 내용이 없습니다" };
 
-  const outParts = (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans") ? cleanHarassParts : parts;
+  const outParts = (resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans" || resolvedApp === "safety") ? cleanHarassParts : parts;
   const size = Buffer.byteLength(JSON.stringify(body), "utf8");
   if (size > MAX_BODY_BYTES) {
     return { ok: false, error: imgs
@@ -292,7 +292,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo", "jobtrans", "datahub"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo", "jobtrans", "safety", "datahub"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";
