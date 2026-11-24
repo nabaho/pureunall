@@ -105,6 +105,7 @@
 
     /* 오른쪽 원문 리더 */
     readerOpen: false,
+    readerCollapsed: false,
     readerKind: '',          // 'law' | 'doc'
     readerLawMode: 'single', // 'single' | '3dan'
     readerLaw: null,
@@ -1814,6 +1815,7 @@
     }
     var reqSeq = ++state._readerReqSeq;
     state.readerOpen = true;
+    state.readerCollapsed = false;
     state.readerKind = 'law';
     state.readerLawMode = '3dan';
     state.readerLawFamily = fam;
@@ -1845,6 +1847,7 @@
     var reqSeq = ++state._readerReqSeq;
 
     state.readerOpen = true;
+    state.readerCollapsed = false;
     state.readerKind = 'law';
     state.readerLawMode = 'single';
     state.readerLawFamily = fam;
@@ -1895,6 +1898,7 @@
       return;
     }
     state.readerOpen = true;
+    state.readerCollapsed = false;
     state.readerKind = 'doc';
     state.readerDoc = doc;
     global.PuPBoxStore.recordRecent({
@@ -1910,6 +1914,7 @@
 
   function closeReader() {
     state.readerOpen = false;
+    state.readerCollapsed = false;
     renderReader();
   }
 
@@ -2438,7 +2443,7 @@
     }
 
     rootEl.innerHTML = [
-      '<div class="pbox-shell">',
+      '<div id="pboxShell" class="pbox-shell">',
       '  <aside id="pboxSidePanel" class="pbox-sidebar" aria-label="P박스 메뉴">',
       '    <div class="pbox-brand-row">',
       '      <div class="pbox-brand-title" role="button" tabindex="0" data-act="go-view" data-view="home" aria-label="P박스 홈으로 이동">',
@@ -3418,15 +3423,15 @@
       '  <div class="pbox-card pbox-list-card">',
       '    <div class="pbox-sec-hd"><span>법령 목록 <b>' + filtered.length.toLocaleString() + '</b>건</span></div>',
       '    <div class="pbox-table-wrap">',
-      '      <table class="pbox-table" aria-label="국가법령 목록">',
+      '      <table class="pbox-table pbox-laws-table" aria-label="국가법령 목록">',
       '        <thead><tr>',
       '          <th class="col-chk"><label class="pbox-chk-tap"><input type="checkbox" data-act="toggle-all-laws" aria-label="현재 화면 법령 전체 선택"' + (allVisSelected ? ' checked' : '') + '></label></th>',
       '          <th class="col-num">번호</th>',
-      '          <th>법령명</th>',
-      '          <th style="width:265px">수록 법령·시행령·시행규칙 · 3단 비교</th>',
-      '          <th style="width:120px">소관부처</th>',
-      '          <th style="width:105px">보관 상태</th>',
-      '          <th style="width:176px">동작</th>',
+      '          <th class="col-law-name">법령명</th>',
+      '          <th class="pbox-col-subfiles" style="width:260px">수록 법령·시행령·시행규칙 · 3단 비교</th>',
+      '          <th class="pbox-col-dept" style="width:104px">소관부처</th>',
+      '          <th class="pbox-col-cache" style="width:92px">보관 상태</th>',
+      '          <th class="pbox-col-actions" style="width:170px">동작</th>',
       '        </tr></thead>',
       '        <tbody>',
       (visible.length ? visible.map(function (f, i) {
@@ -3445,16 +3450,16 @@
         return '<tr>' +
           '<td class="col-chk"><label class="pbox-chk-tap"><input type="checkbox" data-act="toggle-law-chk" data-dir="' + esc(f.dir) + '" aria-label="' + esc(f.title) + ' 선택"' + checked + '></label></td>' +
           '<td class="col-num">' + (i + 1) + '</td>' +
-          '<td class="pbox-row-click pbox-cell-main" role="button" tabindex="0" data-act="open-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '" title="' + esc(f.title) + '">' +
+          '<td class="pbox-row-click pbox-cell-main col-law-name" role="button" tabindex="0" data-act="open-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '" title="' + esc(f.title) + '">' +
             (f.priority ? '<span class="pbox-star" aria-label="노무 핵심 법령">★</span> ' : '') + '<strong>' + highlightHtml(f.title, hlTerms) + '</strong>' +
           '</td>' +
-          '<td class="pbox-cell-hide-m" title="' + esc(f.files.join(', ')) + '">' + subBtns + '</td>' +
-          '<td class="pbox-cell-meta" title="' + esc(f.dept || '범부처') + '">' + esc(f.dept || '범부처') + '</td>' +
-          '<td class="pbox-cell-hide-m">' + (cached ? '<span class="pbox-badge-green">오프라인보관</span>' : '<span class="pbox-badge-gray">실시간열람</span>') + '</td>' +
-          '<td class="pbox-cell-actions">' +
+          '<td class="pbox-cell-hide-m pbox-col-subfiles" title="' + esc(f.files.join(', ')) + '">' + subBtns + '</td>' +
+          '<td class="pbox-cell-meta pbox-col-dept" title="' + esc(f.dept || '범부처') + '">' + esc(f.dept || '범부처') + '</td>' +
+          '<td class="pbox-cell-hide-m pbox-col-cache">' + (cached ? '<span class="pbox-badge-green">오프라인보관</span>' : '<span class="pbox-badge-gray">실시간열람</span>') + '</td>' +
+          '<td class="pbox-cell-actions pbox-col-actions">' +
             '<button type="button" class="pbox-mini-act" data-act="open-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '">전문</button> ' +
             '<button type="button" class="pbox-mini-act" data-act="open-law-history" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '" title="과거 개정본(구법)·연혁 조회">구법</button> ' +
-            '<button type="button" class="pbox-mini-act" data-act="attach-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '">@첨부</button>' +
+            '<button type="button" class="pbox-mini-act pbox-act-attach-hide" data-act="attach-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '">@첨부</button>' +
           '</td>' +
         '</tr>';
       }).join('') : '<tr class="pbox-empty-row"><td colspan="7" class="pbox-empty-cell">검색어와 일치하는 국가법령이 없습니다.</td></tr>'),
@@ -4235,20 +4240,47 @@
    * ══════════════════════════════════════════════════════════════ */
   function renderReader() {
     var rEl = document.getElementById('pboxReader');
+    var shellEl = document.getElementById('pboxShell');
     var wsGrid = document.getElementById('pboxWsGrid');
+    var isExpanded = !!(state.readerOpen && !state.readerCollapsed);
+    if (shellEl && shellEl.classList) {
+      if (isExpanded) shellEl.classList.add('reader-expanded');
+      else shellEl.classList.remove('reader-expanded');
+    }
     if (wsGrid) {
-      if (state.readerOpen) wsGrid.classList.add('reader-open');
+      if (isExpanded) wsGrid.classList.add('reader-open');
       else wsGrid.classList.remove('reader-open');
     }
     if (!rEl) return;
     if (!state.readerOpen) {
       rEl.style.display = 'none';
-      if (rEl.classList) rEl.classList.remove('wide-3dan');
+      if (rEl.classList) {
+        rEl.classList.remove('wide-3dan');
+        rEl.classList.remove('collapsed');
+      }
       rEl.innerHTML = '';
       return;
     }
     rEl.style.display = 'flex';
+    if (state.readerCollapsed) {
+      if (rEl.classList) {
+        rEl.classList.remove('wide-3dan');
+        rEl.classList.add('collapsed');
+      }
+      var railTitle = state.readerKind === 'law'
+        ? ((state.readerLawMode === '3dan' && state.reader3Dan && state.reader3Dan.title) ||
+           (state.readerLaw && state.readerLaw.title) ||
+           (state.readerLawFamily && state.readerLawFamily.title) || '법령 보기')
+        : ((state.readerDoc && state.readerDoc.title) || '판례·문서 보기');
+      rEl.innerHTML = [
+        '<button type="button" class="pbox-reader-rail-btn" data-act="toggle-reader-collapse" aria-label="법령·원문 큰 화면 펼치기" title="큰 화면 펼치기">◀</button>',
+        '<div class="pbox-reader-rail-title" role="button" tabindex="0" data-act="toggle-reader-collapse" title="클릭하여 다시 펼치기: ' + esc(railTitle) + '">' + esc(railTitle) + '</div>',
+        '<button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기" title="닫기">✕</button>'
+      ].join('\n');
+      return;
+    }
     if (rEl.classList) {
+      rEl.classList.remove('collapsed');
       if (state.readerKind === 'law' && state.readerLawMode === '3dan') rEl.classList.add('wide-3dan');
       else rEl.classList.remove('wide-3dan');
     }
@@ -4305,6 +4337,7 @@
         '  <div class="pbox-btn-group">',
         '    <a class="pbox-btn-sm" href="' + esc(official3Url) + '" target="_blank" rel="noopener noreferrer">🏛️ 법제처 3단비교 ↗</a>',
         '    <button type="button" class="pbox-btn-sm" data-act="open-law" data-dir="' + esc(lawDir3) + '" data-file="' + esc(fam3 ? fam3.primaryFile : '법률.md') + '">단일 보기</button>',
+        '    <button type="button" class="pbox-btn-sm" data-act="toggle-reader-collapse" title="큰 화면을 오른쪽 끝으로 접어 법령 목록 전체 보기">▶ 접기</button>',
         '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
         '  </div>',
         '</div>',
@@ -4322,7 +4355,7 @@
       var law = state.readerLaw;
       var fam = state.readerLawFamily;
       if (!law) {
-        rEl.innerHTML = '<div class="pbox-reader-hd"><strong>📖 법령 원문 불러오는 중…</strong><button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button></div><div class="pbox-reader-bd"><div class="pbox-loading-line">국가법령 미러에서 조문 전체를 가져오고 있습니다…</div></div>';
+        rEl.innerHTML = '<div class="pbox-reader-hd"><strong>📖 법령 원문 불러오는 중…</strong><div class="pbox-btn-group"><button type="button" class="pbox-btn-sm" data-act="toggle-reader-collapse" title="큰 화면 접기">▶ 접기</button><button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button></div></div><div class="pbox-reader-bd"><div class="pbox-loading-line">국가법령 미러에서 조문 전체를 가져오고 있습니다…</div></div>';
         return;
       }
       var effClass = law.isHistorical ? 'pbox-badge-amber' : ((law.effectiveState && law.effectiveState.status === 'upcoming') ? 'pbox-badge-amber' : 'pbox-badge-green');
@@ -4435,6 +4468,7 @@
         '  </div>',
         '  <div class="pbox-btn-group">',
         '    <button type="button" class="pbox-btn-sm" data-act="attach-law" data-dir="' + esc(law.dir) + '" data-file="' + esc(law.fileName) + '">@ AI 첨부</button>',
+        '    <button type="button" class="pbox-btn-sm" data-act="toggle-reader-collapse" title="큰 화면을 오른쪽 끝으로 접어 법령 목록 전체 보기">▶ 접기</button>',
         '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
         '  </div>',
         '</div>',
@@ -4501,6 +4535,7 @@
         '    <button type="button" class="pbox-btn-sm" data-act="copy-doc-citation" data-id="' + esc(d.id) + '">📌 인용문 복사</button>',
         '    <button type="button" class="pbox-btn-sm" data-act="attach-doc" data-id="' + esc(d.id) + '">@ AI 첨부</button>',
         '    <button type="button" class="pbox-btn-sm" data-act="copy-doc-body" data-id="' + esc(d.id) + '">📋 전문복사</button>',
+        '    <button type="button" class="pbox-btn-sm" data-act="toggle-reader-collapse" title="큰 화면을 오른쪽 끝으로 접기">▶ 접기</button>',
         '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
         '  </div>',
         '</div>',
@@ -5515,6 +5550,11 @@
       openDocInReader(btn.getAttribute('data-id'));
     } else if (act === 'close-reader') {
       closeReader();
+    } else if (act === 'toggle-reader-collapse') {
+      if (state.readerOpen) {
+        state.readerCollapsed = !state.readerCollapsed;
+        renderReader();
+      }
     } else if (act === 'attach-law') {
       attachLawByDir(btn.getAttribute('data-dir'), btn.getAttribute('data-file') || '');
     } else if (act === 'attach-doc') {
@@ -7158,6 +7198,7 @@
     state.siteSearchQuery = '';
     state.lawQuery = '';
     state.lawHistoryLookupDate = '';
+    state.readerCollapsed = false;
     state.readerLawMode = 'single';
     state.reader3Dan = null;
     state.readerHistoryOpen = false;

@@ -6394,4 +6394,22 @@ test('㉛ 상단 필터 틀고정 · 법령 3단 비교(법률/시행령/시행�
   assert.ok(readerEl.innerHTML.includes('📜 과거 구법'), '과거 구법 열람 시 상단에 과거 구법 배너가 표시되어야 합니다');
   assert.ok(readerEl.innerHTML.includes('data-act="return-current-law"'), '현행법으로 돌아가기 버튼이 표시되어야 합니다');
   assert.ok(readerEl.innerHTML.includes('2020년 구법'), '리더 본문에 선택한 과거 구법 조문이 표시되어야 합니다');
+
+  /* 5) 법령명 컬럼 보호(min-width:960px + reader-expanded 시 보조열 숨김 및 min-width:440px) 및 리더 접기/펼치기(toggle-reader-collapse) 검증 */
+  assert.match(htmlSrc, /\.pbox-laws-table\{min-width:960px\}/, '법령 목록 표는 법령명과 단추가 찌그러지지 않도록 min-width:960px이 보장되어야 합니다');
+  assert.match(htmlSrc, /\.pbox-shell\.reader-expanded\s+\.pbox-laws-table\{min-width:440px;width:100%\}/, '리더가 펼쳐진 상태에서도 법령명이 0px로 찌그러지지 않도록 min-width:440px이 보장되어야 합니다');
+  assert.match(htmlSrc, /\.pbox-shell\.reader-expanded\s+\.pbox-laws-table\s+\.pbox-col-subfiles[\s\S]*?display:none/, '리더가 펼쳐진 상태에서는 좌측 목록에서 보조열을 숨기고 법령명이 100% 넓게 보여야 합니다');
+  const shellEl = elementsById.pboxShell;
+  assert.ok(shellEl && shellEl.classList.contains('reader-expanded'), '리더가 펼쳐져 있을 때 #pboxShell에 reader-expanded 클래스가 부여되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('data-act="toggle-reader-collapse"'), '리더 상단에 [▶ 접기] 버튼이 표시되어야 합니다');
+
+  fireClick({ 'data-act': 'toggle-reader-collapse' });
+  assert.ok(readerEl.classList.contains('collapsed'), '[▶ 접기] 클릭 시 리더가 44px 접힘 레일(.collapsed)로 접혀야 합니다');
+  assert.ok(!shellEl.classList.contains('reader-expanded'), '리더가 접히면 좌측 법령 목록이 전체 열로 다시 확장되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('근로기준법'), '접힌 레일에도 열람 중인 법령 이름이 표시되어야 합니다');
+
+  fireClick({ 'data-act': 'toggle-reader-collapse' });
+  assert.ok(!readerEl.classList.contains('collapsed'), '접힌 레일을 다시 클릭하면 큰 화면 리더가 원래 상태 그대로 펼쳐져야 합니다');
+  assert.ok(shellEl.classList.contains('reader-expanded'), '다시 펼치면 reader-expanded 클래스가 복구되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('2020년 구법'), '접었다 펼쳐도 열람 중이던 구법 내용이 그대로 유지되어야 합니다');
 });
