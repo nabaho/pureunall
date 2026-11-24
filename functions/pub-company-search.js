@@ -14,11 +14,14 @@
    ⚠ 서울 리전(asia-northeast3)에서 호출해야 공공데이터포털 IP 차단을 피한다. */
 
 const FSC_URL = "https://apis.data.go.kr/1160100/service/GetCorpBasicInfoService_V2/getCorpOutline_V2";
+const FSC_AFF_URL = "https://apis.data.go.kr/1160100/service/GetCorpBasicInfoService_V2/getAffiliate_V2";
+const FSC_SUB_URL = "https://apis.data.go.kr/1160100/service/GetCorpBasicInfoService_V2/getConsSubsComp_V2";
 const FSC_FIN_URL = "https://apis.data.go.kr/1160100/service/GetFinaStatInfoService_V2/getSummFinaStat_V2";
 const NTS_STATUS_URL = "https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=";
 const EI_URL = "https://apis.data.go.kr/B490001/gySjbPstateInfoService/getGySjBoheomBsshItem";
 const NPS_LIST_URL = "https://apis.data.go.kr/B552015/NpsBplcInfoInqireServiceV2/getBassInfoSearchV2";
-const NPS_DETAIL_URL = "https://apis.data.go.kr/B552015/NpsBplcInfoInqireServiceV2/getDetailInfoSearchV2";
+const PPS_CORP_URL = "https://apis.data.go.kr/1230000/ao/UsrInfoService/getPrcrmntCorpBasicInfo";
+const FTC_MLL_URL = "https://apis.data.go.kr/1130000/MllBsDtlInfoService/getMllBsInfoDetail_v2";
 const DART_LIST_URL = "https://opendart.fss.or.kr/api/list.json";
 const MAX_RESULTS = 20;
 const NTS_ENRICH_CAP = 10;
@@ -240,6 +243,80 @@ async function fetchFscFinByCorpNo(corpNo, key, fetchFn) {
   return normalizeFinRows(fscItemsOf(j));
 }
 
+/* 금융위 계열회사 · 종속기업 조회 (GetCorpBasicInfoService_V2 동일 키) */
+async function fetchFscGroupByCorpNo(corpNo, key, fetchFn) {
+  const cr = digits(corpNo);
+  if (cr.length !== 13) return { affiliates: [], subsidiaries: [] };
+  const q = "?serviceKey=" + encodeURIComponent(key) + "&pageNo=1&numOfRows=15&resultType=json&crno=" + cr;
+  const [affRes, subRes] = await Promise.all([
+    fetchFn(FSC_AFF_URL + q).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetchFn(FSC_SUB_URL + q).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+  ]);
+  const affSeen = new Set();
+  const affiliates = fscItemsOf(affRes).map((x) => ({
+    name: clean(x.afilCmpyNm || x.corpNm),
+    corpNo: digits(x.afilCmpyCrno || x.crno),
+    listed: clean(x.lstgYn).toUpperCase() === "Y",
+  })).filter((x) => {
+    if (!x.name || affSeen.has(x.name)) return false;
+    affSeen.add(x.name);
+    return true;
+  }).slice(0, 10);
+
+  const subSeen = new Set();
+  const subsidiaries = fscItemsOf(subRes).map((x) => ({
+    name: clean(x.sbrdEnpNm || x.corpNm),
+    biz: clean(x.sbrdEnpMainBizCtt || ""),
+    ratio: clean(x.dntRto || ""),
+  })).filter((x) => {
+    if (!x.name || subSeen.has(x.name)) return false;
+    subSeen.add(x.name);
+    return true;
+  }).slice(0, 10);
+
+  return { affiliates, subsidiaries };
+}
+
+/* 조달청 나라장터 조달업체 기본정보 (사업자번호 기준 — 미승인 시 null 반환) */
+async function fetchPpsByBizNo(bizNo, key, fetchFn) {
+  const n = digits(bizNo);
+  if (n.length !== 10) return null;
+  const u = PPS_CORP_URL + "?serviceKey=" + encodeURIComponent(key) + "&type=json&numOfRows=5&pageNo=1&inqryDiv=3&bizno=" + n;
+  const res = await fetchFn(u);
+  if (!res.ok) return null;
+  const j = await res.json().catch(() => null);
+  const it = fscItemsOf(j);
+  const row = it[0];
+  if (!row) return null;
+  return {
+    name: clean(row.corpNm),
+    ceo: clean(row.ceoNm),
+    tel: phoneOf(row.telNo),
+    addr: clean((row.adrs || "") + " " + (row.dtlAdrs || "")),
+    div: clean(row.corpBsnsDivNm || row.mnfctDivNm || ""),
+    regDt: fmtDate(row.rgstDt),
+  };
+}
+
+/* 공정거래위원회 통신판매사업자 상세 (사업자번호 기준 — 미승인 시 null 반환) */
+async function fetchFtcByBizNo(bizNo, key, fetchFn) {
+  const n = digits(bizNo);
+  if (n.length !== 10) return null;
+  const u = FTC_MLL_URL + "?serviceKey=" + encodeURIComponent(key) + "&resultType=json&pageNo=1&numOfRows=5&brno=" + n;
+  const res = await fetchFn(u);
+  if (!res.ok) return null;
+  const j = await res.json().catch(() => null);
+  const list = Array.isArray(j && j.items) ? j.items : fscItemsOf(j);
+  const row = list[0];
+  if (!row) return null;
+  return {
+    mallName: clean(row.bzmnNm || row.prmmiMnno),
+    regNo: clean(row.prmmiMnno),
+    status: clean(row.operSttusCdNm || row.opbizSttus || ""),
+    domain: clean(row.domnCn || ""),
+  };
+}
+
 async function fetchNtsStatus(bizNos, key, fetchFn) {
   const list = [...new Set((bizNos || []).map(digits).filter((n) => n.length === 10))].slice(0, NTS_ENRICH_CAP);
   if (!list.length) return {};
@@ -396,6 +473,34 @@ async function checkOurCards(db, bizNos) {
   return out;
 }
 
+/* 초기 화면용 — 우리 기업정보함 최근 등록 사업장 최대 12곳 (상호·사업자번호·국세청 상태만 최소 반환) */
+async function listOurCompanies(db, limit) {
+  if (!db) return [];
+  const cap = Math.min(Math.max(Number(limit) || 12, 1), 20);
+  try {
+    const snap = await db.ref("pucards/coInfo").orderByChild("updatedAt").limitToLast(cap * 2).once("value");
+    const val = (snap && snap.val && snap.val()) || {};
+    return Object.keys(val)
+      .map((k) => {
+        const v = val[k] || {};
+        const bizNo = digits(v.bizno || k);
+        const name = clean(v.company || v.name);
+        if (bizNo.length !== 10 || !name) return null;
+        return {
+          bizNo,
+          bizNoFmt: fmtBizNo(bizNo),
+          name,
+          ntsState: clean(v.ntsState),
+          updatedAt: Number(v.updatedAt || 0),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, cap);
+  } catch (_) {
+    return [];
+  }
+}
 /* UID별 호출 속도 제한 (인스턴스 메모리 슬라이딩 윈도우 — 1분당 최대 20회) */
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 20;
@@ -434,20 +539,23 @@ async function searchPublicCompany({ query, detailBizNo, detailCorpNo, detailNam
   const secretList = [ntsKey, dartKey, niceKey].filter(Boolean);
 
   const integrations = {
-    fsc: { configured: !!ntsKey, label: "금융위 기업기본정보" },
-    fin: { configured: !!ntsKey, label: "금융위 재무제표" },
-    nts: { configured: !!ntsKey, label: "국세청 사업상태" },
-    ei: { configured: !!ntsKey, label: "고용·산재 상시인원" },
-    nps: { configured: !!ntsKey, label: "국민연금 가입자" },
+    fsc: { configured: !!ntsKey, label: "금융위 기업기본정보", desc: "대표자·사업자/법인번호·주소·연락처·설립일·업종" },
+    fscGroup: { configured: !!ntsKey, label: "금융위 계열·종속기업", desc: "같은 그룹 계열회사 및 연결대상 자회사 목록" },
+    fin: { configured: !!ntsKey, label: "금융위 요약재무제표", desc: "최근 결산연도 매출액·영업이익·순이익·자산·자본" },
+    nts: { configured: !!ntsKey, label: "국세청 사업상태", desc: "계속·휴업·폐업 여부 및 과세유형 실시간 확인" },
+    ei: { configured: !!ntsKey, label: "고용·산재 상시인원", desc: "근로복지공단 사업장별 고용·산재 인원 및 성립일" },
+    nps: { configured: !!ntsKey, label: "국민연금 사업장", desc: "사업자번호 앞 6자리 기준 가입 사업장 후보" },
+    pps: { configured: !!ntsKey, label: "조달청 나라장터", desc: "공공조달 등록업체 기본정보·업종·등록일" },
+    ftc: { configured: !!ntsKey, label: "공정위 통신판매", desc: "통신판매업 신고번호·운영상태·도메인" },
     dart: {
       configured: !!dartKey,
-      label: "Open DART",
-      hint: dartKey ? "연동됨" : "DART 전자공시 바로가기 지원 (서버 DART_API_KEY 등록 시 공시 목록 자동 조회)",
+      label: "Open DART 전자공시",
+      desc: dartKey ? "외감·상장법인 최근 공시 자동 조회 연동됨" : "1클릭 공시 바로가기 지원 (DART_API_KEY 등록 시 자동 조회)",
     },
     nice: {
       configured: !!niceKey,
-      label: "NICE BizAPI",
-      hint: niceKey ? "연동됨" : "연간회원용 폰 파워기업검색 복사·나이스비즈라인 바로가기 지원 (NICE_BIZAPI_KEY 등록 시 자동 합산)",
+      label: "NICE 파워기업검색",
+      desc: niceKey ? "공식 NICE BizAPI 자동 연동됨" : "연간회원 폰/PC 복사 · 나이스비즈라인 바로가기 지원",
     },
   };
 
@@ -455,28 +563,34 @@ async function searchPublicCompany({ query, detailBizNo, detailCorpNo, detailNam
     return { ok: false, error: "공공데이터 열쇠(ntsKey)가 설정되어 있지 않습니다.", items: [], warnings: [], integrations };
   }
 
-  /* 단건 통합 상세 요청 (고용·산재 + 국민연금 + 금융위 요약재무 + 국세청 + Open DART) */
+  /* 단건 통합 상세 요청 (고용·산재 + 국민연금 + 금융위 재무 + 계열/종속 + 조달청 + 공정위 + 국세청 + Open DART) */
   if ((dBiz.length === 10 || dCorp.length === 13) && !q) {
     const warnings = [];
     let ei = null;
     let nts = null;
     let nps = null;
     let fin = [];
+    let group = null;
+    let pps = null;
+    let ftc = null;
     let dart = null;
     const jobs = [];
     if (dBiz.length === 10) {
       jobs.push(fetchEiByBizNo(dBiz, ntsKey, fetchFn).then((v) => { ei = v; }).catch((e) => warnings.push("고용·산재 조회 실패: " + maskKey(e && e.message, secretList))));
       jobs.push(fetchNtsStatus([dBiz], ntsKey, fetchFn).then((m) => { nts = m[dBiz] || null; }).catch((e) => warnings.push("국세청 조회 실패: " + maskKey(e && e.message, secretList))));
       jobs.push(fetchNpsByBizNo(dBiz, dName, ntsKey, fetchFn).then((v) => { nps = v; }).catch((e) => warnings.push("국민연금 조회 실패: " + maskKey(e && e.message, secretList))));
+      jobs.push(fetchPpsByBizNo(dBiz, ntsKey, fetchFn).then((v) => { pps = v; }).catch(() => { pps = null; }));
+      jobs.push(fetchFtcByBizNo(dBiz, ntsKey, fetchFn).then((v) => { ftc = v; }).catch(() => { ftc = null; }));
     }
     if (dCorp.length === 13) {
-      jobs.push(fetchFscFinByCorpNo(dCorp, ntsKey, fetchFn).then((v) => { fin = v; }).catch((e) => warnings.push("금융위 재무제표 조회 참고: " + maskKey(e && e.message, secretList))));
+      jobs.push(fetchFscFinByCorpNo(dCorp, ntsKey, fetchFn).then((v) => { fin = v; }).catch((e) => warnings.push("금융위 재무제표 참고: " + maskKey(e && e.message, secretList))));
+      jobs.push(fetchFscGroupByCorpNo(dCorp, ntsKey, fetchFn).then((v) => { group = v; }).catch(() => { group = null; }));
     }
     if (dartKey && dName) {
       jobs.push(fetchDartRecent(dName, dartKey, fetchFn).then((v) => { dart = v; }).catch((e) => warnings.push("DART 조회 실패: " + maskKey(e && e.message, secretList))));
     }
     await Promise.all(jobs);
-    return { ok: true, mode: "detail", bizNo: dBiz, corpNo: dCorp, ei, nts, nps, fin, dart, warnings, integrations };
+    return { ok: true, mode: "detail", bizNo: dBiz, corpNo: dCorp, ei, nts, nps, fin, group, pps, ftc, dart, warnings, integrations };
   }
 
   if (!q) {
@@ -602,6 +716,7 @@ module.exports = {
   eiSumOf,
   npsCandsOf,
   readConfigKeys,
+  listOurCompanies,
   createRateLimiter,
   buildCoInfoPatch,
   applyItemToCoInfo,

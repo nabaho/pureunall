@@ -10,7 +10,9 @@
 html,body{margin:0;padding:0;min-height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#1e293b;word-break:keep-all}
 #pubSearchRoot{min-height:100vh;display:flex;flex-direction:column}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
-.ps-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#ffffff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:20}
+.ps-wrap{max-width:1240px;width:100%;margin:0 auto;padding-left:18px;padding-right:18px}
+.ps-hd{background:#ffffff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:20}
+.ps-hd-in{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;padding-bottom:12px}
 .ps-hd-left{display:flex;align-items:center;gap:10px;min-width:0}
 .ps-logo{font-size:24px;line-height:1}
 .ps-hd h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em}
@@ -18,14 +20,28 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
 .ps-hd-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .ps-navbtn{display:inline-flex;align-items:center;gap:4px;padding:8px 12px;min-height:36px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;text-decoration:none;font-size:12px;font-weight:600}
 .ps-navbtn:hover{background:#eff6ff;border-color:#2563eb;color:#1e40af}
-.ps-searchbar{padding:14px 18px;background:#ffffff;border-bottom:1px solid #e2e8f0}
-.ps-form{display:flex;gap:8px;max-width:960px}
-.ps-in{flex:1;min-width:0;font-size:16px;padding:10px 14px;border-radius:10px;border:1.5px solid #cbd5e1;background:#f8fafc;color:#1e293b}
+.ps-hero{padding:16px 0;background:#ffffff;border-bottom:1px solid #e2e8f0}
+.ps-form{display:flex;gap:8px;width:100%}
+.ps-in{flex:1;min-width:0;font-size:16px;padding:12px 16px;border-radius:10px;border:1.5px solid #cbd5e1;background:#f8fafc;color:#1e293b}
 .ps-in:focus{border-color:#2563eb;background:#ffffff}
 .ps-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .ps-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid #cbd5e1;background:#f8fafc;color:#475569}
 .ps-chip.on{border-color:#16a34a;background:#f0fdf4;color:#166534}
-.ps-layout{flex:1;display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;padding:16px 18px;max-width:1380px;width:100%;margin:0 auto}
+.ps-layout{flex:1;display:grid;grid-template-columns:270px minmax(0,1fr);gap:18px;padding-top:18px;padding-bottom:24px;align-items:start}
+.ps-sec-hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:10px;font-size:14px;color:#1e293b}
+.ps-quick-box{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e2e8f0}
+.ps-quick-list{display:flex;flex-wrap:wrap;gap:8px}
+.ps-qchip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;min-height:36px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;font-size:12px;cursor:pointer}
+.ps-qchip span{color:#475569;font-size:11px}
+.ps-qchip:hover{background:#eff6ff;border-color:#2563eb;color:#1e40af}
+.ps-api-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ps-api-card{padding:11px 13px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc}
+.ps-api-hd{display:flex;align-items:center;gap:6px;font-size:13px;color:#1e293b}
+.ps-api-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:#cbd5e1}
+.ps-api-dot.on{background:#16a34a}
+.ps-api-st{margin-left:auto;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#ffffff;border:1px solid #cbd5e1;color:#475569}
+.ps-api-st.on{background:#f0fdf4;border-color:#16a34a;color:#166534}
+.ps-api-desc{margin-top:5px;font-size:12px;color:#475569;line-height:1.45}
 .ps-side{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;display:flex;flex-direction:column;max-height:calc(100vh - 180px);position:sticky;top:74px;overflow:hidden}
 .ps-stabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #e2e8f0}
 .ps-stab{padding:10px 8px;min-height:40px;border:none;background:#f8fafc;color:#475569;font-size:12px;font-weight:700;cursor:pointer}
@@ -89,11 +105,13 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
 .ps-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9999;background:#1e293b;color:#ffffff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(30,41,59,.28);max-width:calc(100vw - 24px)}
 @media (max-width:768px){
   input,select,textarea{font-size:16px}
-  .ps-hd{padding:10px 12px;flex-wrap:wrap}
+  .ps-wrap{padding-left:12px;padding-right:12px}
+  .ps-hd-in{padding-top:10px;padding-bottom:10px;flex-wrap:wrap}
   .ps-sub{display:none}
-  .ps-searchbar{padding:10px 12px}
+  .ps-hero{padding:12px 0}
   .ps-form{flex-direction:column}
-  .ps-layout{grid-template-columns:1fr;padding:10px 12px;gap:12px}
+  .ps-layout{grid-template-columns:1fr;padding-top:12px;gap:12px}
+  .ps-api-grid{grid-template-columns:1fr}
   .ps-side{position:static;max-height:220px}
   .ps-grid{grid-template-columns:1fr}
   .ps-v{white-space:normal;word-break:break-word}
@@ -121,7 +139,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
 <script src="js/pu-whoami.js?v=4"></script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return false; }); }catch(e){}</script>
-<script src="js/pu-pubsearch-app.js?v=1"></script>
+<script src="js/pu-pubsearch-app.js?v=2"></script>
 <script>
 (function(){
   'use strict';
