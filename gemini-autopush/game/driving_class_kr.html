@@ -1964,6 +1964,7 @@
       <label for="customGlbInput" class="pv-chip pv-file-btn" style="border-color:rgba(167,139,250,0.65);color:#ddd6fe;" title="Meshy·Tripo·Sketchfab에서 받은 .glb 3D 차량 모델 적용">📦 3D모델(.glb)</label>
       <input type="file" id="customGlbInput" accept=".glb,.gltf" style="display:none" />
       <button type="button" class="pv-chip active" id="navTestDriveBtn" onclick="startInstantTestDrive()">🚗 테스트 운전</button>
+      <button type="button" class="pv-chip" id="topTimeCycleBtn" onclick="stepTimeOfDay()" style="border-color:rgba(250,204,21,0.65);color:#fde047;" title="클릭 시 낮→노을→밤→새벽 전환 (자동 시간 변화 중)">☀️ 13:30</button>
       <button type="button" class="pv-chip" id="navKoreaMapBtn" onclick="openKoreaMapModal()" style="border-color:rgba(56,189,248,0.65);color:#7dd3fc;">🗺️ 대한민국 전국지도</button>
       <button type="button" class="pv-chip" id="navLauncherBtn" onclick="jumpToStage('launcher')">앱 홈화면</button>
       <button type="button" class="pv-chip" id="navBootBtn" onclick="startUnityBoot()">유니티 부팅</button>
@@ -2211,12 +2212,19 @@
         <button type="button" class="pv-chip" data-radio="3" onclick="setRadioChannel(3)">🎹 로파이 드라이브</button>
       </div>
 
-      <div class="pod-sec-title">시간대 · 날씨 (우천 시 와이퍼 연동)</div>
+      <div class="pod-sec-title">시간대 · 밤낮 자동 순환 &amp; 날씨</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        <button type="button" class="pv-chip active" id="btnAutoDayNight" onclick="toggleDayNightAuto()">🔄 자동 밤낮 ON</button>
+        <button type="button" class="pv-chip" data-weather="dawn" onclick="setWorldWeather('dawn')">🌅 새벽</button>
         <button type="button" class="pv-chip active" data-weather="day" onclick="setWorldWeather('day')">☀️ 맑은 낮</button>
         <button type="button" class="pv-chip" data-weather="sunset" onclick="setWorldWeather('sunset')">🌇 노을</button>
         <button type="button" class="pv-chip" data-weather="night" onclick="setWorldWeather('night')">🌙 야간</button>
         <button type="button" class="pv-chip" data-weather="rain" onclick="setWorldWeather('rain')">🌧️ 비(폭우)</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11px;color:#e2e8f0;">
+        <span style="flex-shrink:0;color:#fde047;font-weight:700;">🕒 시각조절</span>
+        <input type="range" id="timeOfDaySlider" min="0" max="23.9" step="0.1" value="13.5" oninput="scrubTimeOfDay(this.value)" style="flex:1;accent-color:#facc15;cursor:pointer;" title="00:00~24:00 시간대를 직접 드래그해 해·달·야경을 확인하세요" />
+        <span id="podTimeReadout" style="min-width:56px;text-align:right;font-variant-numeric:tabular-nums;color:#fde68a;font-weight:800;">☀️ 13:30</span>
       </div>
 
       <div class="pod-sec-title">3D운전교실 스페셜 공간 즉시 이동</div>
@@ -2480,6 +2488,7 @@
             <button type="button" class="icon-pill-btn" id="hudBoardNpcBtn" style="display:none;border-color:#fde047;color:#fde047;" onclick="boardNearestVehicle()">🚗 근처 차량 탑승</button>
             <button type="button" class="icon-pill-btn" id="hudEmergencyFuelBtn" style="display:none;border-color:#34d399;color:#6ee7b7;" onclick="callRoadsideFuel()">⛽ 출장주유(+50%)</button>
             <button type="button" id="subwayDoorBtn" class="icon-pill-btn" style="display:none;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleSubwayDoors()">🚇 출입문 개폐</button>
+            <button type="button" class="icon-pill-btn" id="hudQuickTimeBtn" onclick="stepTimeOfDay()" style="border-color:rgba(250,204,21,0.5);color:#fde047;padding:4px 7px;font-variant-numeric:tabular-nums;" title="밤낮 시간대 즉시 전환 (단축키 T · 자동 순환 중)">☀️ 13:30</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickShieldBtn" onclick="toggleCarShield()" title="차량 에너지 실드 ON/OFF">🛡️</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFlightBtn" onclick="toggleCarFlightMode()" title="비행 변신 ON/OFF">✈️</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickMapBtn" onclick="openKoreaMapModal()" title="대한민국 전체 지도 (서울→부산·제주)">🗺️</button>
@@ -3042,7 +3051,10 @@
       spoilerUp: false,
       spoilerAnim: 0,
       rearMirrorOn: true,
-      weather: 'day', // 'day' | 'sunset' | 'night' | 'rain'
+      weather: 'day', // 'dawn' | 'day' | 'sunset' | 'night' | 'rain'
+      timeOfDay: 13.5,
+      dayNightAuto: true,
+      nightFactor: 0.0,
       farView: true,
       hudOpacity: 1.0,
       radioChannel: 0,
@@ -3767,45 +3779,162 @@
       return tex;
     }
 
+    // v36 Dynamic 24-Hour Day/Night Cycle Globals
+    let skyDomeCanvas = null, skyDomeCtx = null, skyDomeTex = null;
+    let sunDiscMesh = null, sunHaloMesh = null, moonDiscMesh = null, moonHaloMesh = null;
+    let starPoints3D = null, cloudMat3D = null;
+    let hemiLight3D = null, keyLight3D = null, fillLight3D = null, rimLight3D = null;
+    let scenicGlassMat3D = null, scenicGrassMat3D = null, scenicOceanMat3D = null;
+    let scenicNightGlowGroup = null;
+    let playerHeadlightGroup = null;
+    let _lastSkyPaintBucket = -1;
+
+    const SKY_TIME_KEYFRAMES = [
+      { h: 0.0,  stops: ['#01040f', '#03081c', '#071029', '#0c1a3b', '#102048', '#050814'], fog: '#040917', hemiSky: '#3b82f6', hemiGnd: '#050814', hemiInt: 0.24, keyCol: '#93c5fd', keyInt: 0.28, exp: 0.90 },
+      { h: 5.2,  stops: ['#030718', '#0a1230', '#1e1b4b', '#312e81', '#581c87', '#1e1b4b'], fog: '#141338', hemiSky: '#818cf8', hemiGnd: '#0f172a', hemiInt: 0.36, keyCol: '#c4b5fd', keyInt: 0.42, exp: 0.96 },
+      { h: 6.3,  stops: ['#172554', '#312e81', '#be185d', '#fb923c', '#fde68a', '#fed7aa'], fog: '#fb923c', hemiSky: '#fed7aa', hemiGnd: '#1e293b', hemiInt: 0.78, keyCol: '#fdba74', keyInt: 1.02, exp: 1.12 },
+      { h: 8.2,  stops: ['#1d4ed8', '#3b82f6', '#7dd3fc', '#bae6fd', '#fef3c7', '#e0f2fe'], fog: '#bae6fd', hemiSky: '#f0f9ff', hemiGnd: '#334155', hemiInt: 1.02, keyCol: '#fff7ed', keyInt: 1.26, exp: 1.17 },
+      { h: 13.0, stops: ['#0f3a7d', '#2563eb', '#60a5fa', '#bae6fd', '#fef9e7', '#dbeafe'], fog: '#b6dcfe', hemiSky: '#f0f9ff', hemiGnd: '#334155', hemiInt: 1.08, keyCol: '#fff6e5', keyInt: 1.34, exp: 1.18 },
+      { h: 16.8, stops: ['#1e3a8a', '#2563eb', '#60a5fa', '#fed7aa', '#fde68a', '#ffedd5'], fog: '#fed7aa', hemiSky: '#ffedd5', hemiGnd: '#334155', hemiInt: 0.96, keyCol: '#fed7aa', keyInt: 1.18, exp: 1.15 },
+      { h: 18.2, stops: ['#1e1b4b', '#581c87', '#c2410c', '#ea580c', '#fde047', '#fdba74'], fog: '#ea580c', hemiSky: '#fb923c', hemiGnd: '#1e1b4b', hemiInt: 0.68, keyCol: '#f97316', keyInt: 0.95, exp: 1.08 },
+      { h: 19.4, stops: ['#060a1d', '#17153b', '#3b0764', '#7c2d12', '#9a3412', '#0f172a'], fog: '#111633', hemiSky: '#60a5fa', hemiGnd: '#090d1a', hemiInt: 0.34, keyCol: '#93c5fd', keyInt: 0.38, exp: 0.95 },
+      { h: 20.6, stops: ['#01040f', '#03081c', '#071029', '#0c1a3b', '#102048', '#050814'], fog: '#040917', hemiSky: '#3b82f6', hemiGnd: '#050814', hemiInt: 0.24, keyCol: '#93c5fd', keyInt: 0.28, exp: 0.90 },
+      { h: 24.0, stops: ['#01040f', '#03081c', '#071029', '#0c1a3b', '#102048', '#050814'], fog: '#040917', hemiSky: '#3b82f6', hemiGnd: '#050814', hemiInt: 0.24, keyCol: '#93c5fd', keyInt: 0.28, exp: 0.90 }
+    ];
+
+    function hexToRgbArr(hex) {
+      const n = parseInt(hex.replace('#', ''), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function lerpHexColor(h1, h2, t) {
+      const a = hexToRgbArr(h1), b = hexToRgbArr(h2);
+      const r = Math.round(a[0] + (b[0] - a[0]) * t);
+      const g = Math.round(a[1] + (b[1] - a[1]) * t);
+      const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+      return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
+    }
+    function sampleSkyStateForHour(rawHour) {
+      const hr = ((rawHour % 24) + 24) % 24;
+      let k0 = SKY_TIME_KEYFRAMES[0], k1 = SKY_TIME_KEYFRAMES[1];
+      for (let i = 0; i < SKY_TIME_KEYFRAMES.length - 1; i++) {
+        if (hr >= SKY_TIME_KEYFRAMES[i].h && hr <= SKY_TIME_KEYFRAMES[i + 1].h) {
+          k0 = SKY_TIME_KEYFRAMES[i];
+          k1 = SKY_TIME_KEYFRAMES[i + 1];
+          break;
+        }
+      }
+      const span = Math.max(0.001, k1.h - k0.h);
+      const t = Math.max(0, Math.min(1, (hr - k0.h) / span));
+      const stops = k0.stops.map((c, idx) => lerpHexColor(c, k1.stops[idx], t));
+      let fog = lerpHexColor(k0.fog, k1.fog, t);
+      if (state.weather === 'rain') {
+        for (let i = 0; i < stops.length; i++) stops[i] = lerpHexColor(stops[i], i < 2 ? '#1e293b' : '#475569', 0.65);
+        fog = lerpHexColor(fog, '#475569', 0.68);
+      }
+      // Compute smooth nightFactor (0 = full day, 1 = deep night)
+      let nf = 0;
+      if (hr < 5.3 || hr >= 20.0) nf = 1;
+      else if (hr < 7.2) nf = 1 - (hr - 5.3) / 1.9;
+      else if (hr > 17.5) nf = (hr - 17.5) / 2.5;
+      return {
+        hr,
+        stops,
+        fog,
+        hemiSky: lerpHexColor(k0.hemiSky, k1.hemiSky, t),
+        hemiGnd: lerpHexColor(k0.hemiGnd, k1.hemiGnd, t),
+        hemiInt: k0.hemiInt + (k1.hemiInt - k0.hemiInt) * t,
+        keyCol: lerpHexColor(k0.keyCol, k1.keyCol, t),
+        keyInt: k0.keyInt + (k1.keyInt - k0.keyInt) * t,
+        exp: k0.exp + (k1.exp - k0.exp) * t,
+        nightFactor: Math.max(0, Math.min(1, nf))
+      };
+    }
+
+    function formatClockAndIcon(rawHour) {
+      const hr = ((rawHour % 24) + 24) % 24;
+      const hh = Math.floor(hr);
+      const mm = Math.floor((hr - hh) * 60);
+      const pad = n => String(n).padStart(2, '0');
+      let icon = '☀️', phase = '낮';
+      if (state.weather === 'rain') { icon = '🌧️'; phase = '비'; }
+      else if (hr >= 5.2 && hr < 7.5) { icon = '🌅'; phase = '새벽'; }
+      else if (hr >= 7.5 && hr < 17.2) { icon = '☀️'; phase = '낮'; }
+      else if (hr >= 17.2 && hr < 19.6) { icon = '🌇'; phase = '노을'; }
+      else { icon = '🌙'; phase = '밤'; }
+      return { text: `${icon} ${pad(hh)}:${pad(mm)}`, icon, phase, hh, mm };
+    }
+
+    function paintSkyDomeForSample(sample) {
+      if (!skyDomeCtx || !skyDomeTex) return;
+      const sg = skyDomeCtx.createLinearGradient(0, 0, 0, 128);
+      sg.addColorStop(0.00, sample.stops[0]);
+      sg.addColorStop(0.26, sample.stops[1]);
+      sg.addColorStop(0.46, sample.stops[2]);
+      sg.addColorStop(0.60, sample.stops[3]);
+      sg.addColorStop(0.72, sample.stops[4]);
+      sg.addColorStop(1.00, sample.stops[5]);
+      skyDomeCtx.fillStyle = sg;
+      skyDomeCtx.fillRect(0, 0, 32, 128);
+      skyDomeTex.needsUpdate = true;
+    }
+
     function buildAtmosphericSkyAndClouds() {
       if (typeof THREE === 'undefined' || !scene) return;
       if (skyDomeMesh) scene.remove(skyDomeMesh);
       if (cloudGroup3D) scene.remove(cloudGroup3D);
 
-      // Rich Atmospheric Sky Gradient Dome (No more flat baby-blue background!)
-      const cv = document.createElement('canvas');
-      cv.width = 64; cv.height = 256;
-      const ctx = cv.getContext('2d');
-      const sg = ctx.createLinearGradient(0, 0, 0, 256);
-      sg.addColorStop(0.00, '#0f3a7d');
-      sg.addColorStop(0.28, '#2563eb');
-      sg.addColorStop(0.48, '#60a5fa');
-      sg.addColorStop(0.62, '#bae6fd');
-      sg.addColorStop(0.72, '#fef9e7'); // Warm golden atmospheric horizon glow!
-      sg.addColorStop(1.00, '#dbeafe');
-      ctx.fillStyle = sg; ctx.fillRect(0, 0, 64, 256);
-      const skyTex = new THREE.CanvasTexture(cv);
+      skyDomeCanvas = document.createElement('canvas');
+      skyDomeCanvas.width = 32; skyDomeCanvas.height = 128;
+      skyDomeCtx = skyDomeCanvas.getContext('2d');
+      skyDomeTex = new THREE.CanvasTexture(skyDomeCanvas);
+      paintSkyDomeForSample(sampleSkyStateForHour(state.timeOfDay || 13.5));
+
       skyDomeMesh = new THREE.Mesh(
         new THREE.SphereGeometry(2900, 32, 20),
-        new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false })
+        new THREE.MeshBasicMaterial({ map: skyDomeTex, side: THREE.BackSide, depthWrite: false, fog: false })
       );
       scene.add(skyDomeMesh);
 
-      // Glowing Sun Disc & Soft Halo + 26 Soft Volumetric 3D Cloud Clusters!
+      // Orbiting Sun, Glowing Moon, 300 Twinkling Stars & 26 Volumetric 3D Cloud Clusters!
       cloudGroup3D = new THREE.Group();
-      const sunDisc = new THREE.Mesh(
-        new THREE.SphereGeometry(52, 16, 16),
+
+      sunDiscMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(56, 16, 16),
         new THREE.MeshBasicMaterial({ color: 0xfffbeb, fog: false })
       );
-      sunDisc.position.set(420, 620, 1400);
-      const sunHalo = new THREE.Mesh(
-        new THREE.SphereGeometry(105, 16, 16),
-        new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.24, fog: false })
+      sunHaloMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(118, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.28, fog: false, depthWrite: false })
       );
-      sunHalo.position.copy(sunDisc.position);
-      cloudGroup3D.add(sunDisc, sunHalo);
+      moonDiscMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(46, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xf8fafc, fog: false })
+      );
+      moonHaloMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(98, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.22, fog: false, depthWrite: false })
+      );
+      cloudGroup3D.add(sunDiscMesh, sunHaloMesh, moonDiscMesh, moonHaloMesh);
 
-      const cloudMat = new THREE.MeshPhongMaterial({
+      // 300-Star Night Sky Dome
+      const starGeo = new THREE.BufferGeometry();
+      const starPos = new Float32Array(300 * 3);
+      for (let i = 0; i < 300; i++) {
+        const theta = (i * 2.39996) % (Math.PI * 2);
+        const phi = 0.08 + ((i * 73) % 100) / 100 * (Math.PI * 0.44);
+        const rad = 2680;
+        starPos[i * 3] = Math.cos(theta) * Math.sin(phi) * rad;
+        starPos[i * 3 + 1] = Math.cos(phi) * rad;
+        starPos[i * 3 + 2] = Math.sin(theta) * Math.sin(phi) * rad;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      starPoints3D = new THREE.Points(
+        starGeo,
+        new THREE.PointsMaterial({ color: 0xf8fafc, size: 14, transparent: true, opacity: 0, fog: false, depthWrite: false })
+      );
+      cloudGroup3D.add(starPoints3D);
+
+      cloudMat3D = new THREE.MeshPhongMaterial({
         color: 0xffffff,
         emissive: 0xe0f2fe,
         emissiveIntensity: 0.28,
@@ -3822,7 +3951,7 @@
         const puffs = 3 + (i % 3);
         for (let p = 0; p < puffs; p++) {
           const r = 24 + ((i + p) % 4) * 12;
-          const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), cloudMat);
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), cloudMat3D);
           puff.scale.set(1.6, 0.62, 1.15);
           puff.position.set((p - 1.2) * 26, (p % 2) * 7, ((p * 17) % 15) - 7);
           cg.add(puff);
@@ -3831,6 +3960,8 @@
         cloudGroup3D.add(cg);
       }
       scene.add(cloudGroup3D);
+      _lastSkyPaintBucket = -1;
+      updateDayNightEnvironment(0, true);
     }
 
     // ============================================================================
@@ -4244,18 +4375,18 @@
       state.parkedCars = [];
 
       // 1. Vast Lush Ground + Sparkling Coastal Ocean on the West/North-West side!
-      const grassBase = new THREE.Mesh(
-        new THREE.PlaneGeometry(2800, 2800),
-        new THREE.MeshStandardMaterial({ color: 0x1e5631, roughness: 0.94 })
-      );
+      streetLampBulbs = [];
+      scenicNightGlowGroup = new THREE.Group();
+      worldGroup.add(scenicNightGlowGroup);
+
+      scenicGrassMat3D = new THREE.MeshStandardMaterial({ color: 0x1e5631, roughness: 0.94 });
+      const grassBase = new THREE.Mesh(new THREE.PlaneGeometry(2800, 2800), scenicGrassMat3D);
       grassBase.rotation.x = -Math.PI / 2;
       grassBase.position.y = -0.35;
       worldGroup.add(grassBase);
 
-      const oceanPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(1100, 1400),
-        new THREE.MeshPhongMaterial({ color: 0x0284c7, specular: 0xbae6fd, shininess: 135 })
-      );
+      scenicOceanMat3D = new THREE.MeshPhongMaterial({ color: 0x0284c7, specular: 0xbae6fd, shininess: 135 });
+      const oceanPlane = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1400), scenicOceanMat3D);
       oceanPlane.rotation.x = -Math.PI / 2;
       oceanPlane.position.set(-460, -0.18, 120);
       worldGroup.add(oceanPlane);
@@ -4295,7 +4426,8 @@
       worldGroup.add(new THREE.Mesh(lGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })));
 
       // 3. Populate 4 Distinct Continuous Biomes Along the Winding Road!
-      const glassM = new THREE.MeshPhongMaterial({ map: getGlassBuildingTexture(), specular: 0xffffff, shininess: 180, envMap: getCarEnvMap(), reflectivity: 0.52 });
+      const glassM = new THREE.MeshPhongMaterial({ map: getGlassBuildingTexture(), emissive: 0xfef08a, emissiveIntensity: (state.nightFactor || 0) * 0.35, specular: 0xffffff, shininess: 180, envMap: getCarEnvMap(), reflectivity: 0.52 });
+      scenicGlassMat3D = glassM;
       const mtnM = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.94 });
       const pineM = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.88 });
       const trunkM = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.92 });
@@ -4395,11 +4527,67 @@
         }
       }
 
+      // v37 Korean Highway LED Streetlamps, Asphalt Warm Light Pools, Hanok Window Glow & Bridge Beacons!
+      const lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 });
+      const lampGlowPoolMat = new THREE.MeshBasicMaterial({
+        color: 0xfef08a,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      const hanokWinGlowMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+      const bridgeBeaconMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      for (let i = 0; i < SCENIC_SEGMENTS; i += 6) {
+        const s = scenicRoadSamples[i];
+        const bId = getScenicBiomeInfo(s.a).id;
+        const lampSides = bId === 'city' ? [-1, 1] : [i % 12 === 0 ? 1 : -1];
+        lampSides.forEach(side => {
+          const lx = s.x + s.nx * side * 9.4;
+          const lz = s.z + s.nz * side * 9.4;
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.14, 7.2, 6), lampPoleMat);
+          pole.position.set(lx, s.y + 3.6, lz);
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.10, 0.10), lampPoleMat);
+          arm.position.set(s.x + s.nx * side * 8.4, s.y + 7.1, s.z + s.nz * side * 8.4);
+          arm.rotation.y = -s.heading;
+          const bulbMat = new THREE.MeshBasicMaterial({ color: (state.nightFactor || 0) > 0.35 ? 0xfef08a : 0x64748b });
+          const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.14, 0.28), bulbMat);
+          bulb.position.set(s.x + s.nx * side * 7.5, s.y + 7.0, s.z + s.nz * side * 7.5);
+          bulb.rotation.y = -s.heading;
+          streetLampBulbs.push(bulb);
+          worldGroup.add(pole, arm, bulb);
+
+          // Warm golden asphalt light pool underneath each streetlamp at dusk/night!
+          const pool = new THREE.Mesh(new THREE.CircleGeometry(5.8, 12), lampGlowPoolMat);
+          pool.rotation.x = -Math.PI / 2;
+          pool.position.set(s.x + s.nx * side * 5.2, s.y + 0.16, s.z + s.nz * side * 5.2);
+          scenicNightGlowGroup.add(pool);
+        });
+        if (bId === 'country') {
+          const side = (i % 12 === 0) ? 1 : -1;
+          const hx = s.x + s.nx * (-side) * 18.6, hz = s.z + s.nz * (-side) * 18.6;
+          const winGlow = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.5), hanokWinGlowMat);
+          winGlow.position.set(hx, s.y + 2.2, hz);
+          winGlow.lookAt(s.x, s.y + 2.2, s.z);
+          scenicNightGlowGroup.add(winGlow);
+        } else if (bId === 'coast' && s.y > 4 && i % 12 === 0) {
+          [-1, 1].forEach(side => {
+            const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), bridgeBeaconMat);
+            beacon.position.set(s.x + s.nx * side * 9.5, s.y + 31.5, s.z + s.nz * side * 9.5);
+            scenicNightGlowGroup.add(beacon);
+          });
+        }
+      }
+      scenicNightGlowGroup.visible = (state.nightFactor || 0) > 0.32;
+
       // Iconic Seoul Lotte World Tower & Namsan Tower visible near City Start!
       const p0 = scenicRoadSamples[0];
       const lt = new THREE.Mesh(new THREE.CylinderGeometry(3, 10, 118, 8), glassM);
       lt.position.set(p0.x + 58, 59, p0.z + 32);
       worldGroup.add(lt);
+      _lastSkyPaintBucket = -1;
+      updateDayNightEnvironment(0, true);
       // Always spawn live exotic NPC Supercars along the curving 4-biome scenic loop!
       if (!state.npcs || state.npcs.length === 0) {
         if (typeof spawnNpcsForMode === 'function') spawnNpcsForMode('autonomous');
@@ -5104,20 +5292,20 @@
         if (typeof data.goalStage === 'number') state.goalStage = data.goalStage;
         if (typeof data.goalAllCleared === 'boolean') state.goalAllCleared = data.goalAllCleared;
         if (typeof data.skyScore === 'number') state.skyScore = data.skyScore;
-        const coinEl = document.getElementById('topCoinsVal');
-        const trEl = document.getElementById('topTrophyVal');
-        if (coinEl) coinEl.textContent = state.coins.toLocaleString();
-        if (trEl) trEl.textContent = String(state.trophies);
+        const coinEl = document.getElementById('topCoinBadge');
+        const trEl = document.getElementById('topTrophyBadge');
+        if (coinEl) coinEl.textContent = '🪙 ' + state.coins.toLocaleString();
+        if (trEl) trEl.textContent = '🏆 ' + String(state.trophies);
       } catch (_) {}
     }
 
     function addCoinsAndTrophies(addCoins, addTrophies) {
       state.coins = Math.max(0, (state.coins || 0) + (addCoins || 0));
       state.trophies = Math.max(0, (state.trophies || 0) + (addTrophies || 0));
-      const coinEl = document.getElementById('topCoinsVal');
-      const trEl = document.getElementById('topTrophyVal');
-      if (coinEl) coinEl.textContent = state.coins.toLocaleString();
-      if (trEl) trEl.textContent = String(state.trophies);
+      const coinEl = document.getElementById('topCoinBadge');
+      const trEl = document.getElementById('topTrophyBadge');
+      if (coinEl) coinEl.textContent = '🪙 ' + state.coins.toLocaleString();
+      if (trEl) trEl.textContent = '🏆 ' + String(state.trophies);
       saveGameProgress();
     }
 
@@ -7433,45 +7621,217 @@
 
     function setWorldWeather(w) {
       state.weather = w;
+      if (w === 'dawn') state.timeOfDay = 6.3;
+      else if (w === 'day') state.timeOfDay = 13.0;
+      else if (w === 'sunset') state.timeOfDay = 18.25;
+      else if (w === 'night') state.timeOfDay = 22.5;
       document.querySelectorAll('[data-weather]').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-weather') === w);
       });
       const rainCanvas = document.getElementById('rainOverlayCanvas');
-      rainCanvas.style.display = (w === 'rain' && state.stage === 'driving') ? 'block' : 'none';
-      if (w === 'night') {
-        state.headlights = true;
-        syncAccessoryButtons();
-        rebuildPlayer3DCar();
+      if (rainCanvas) rainCanvas.style.display = (w === 'rain' && state.stage === 'driving') ? 'block' : 'none';
+      if (w === 'night' || w === 'sunset' || w === 'dawn') {
+        if (!state.headlights) {
+          state.headlights = true;
+          syncAccessoryButtons();
+          rebuildPlayer3DCar();
+        }
       }
+      _lastSkyPaintBucket = -1;
+      updateDayNightEnvironment(0, true);
       applyWeatherTo3DScene();
-      const labels = { day: '☀️ 맑은 주간', sunset: '🌇 노을 시간대', night: '🌙 야간 주행 (가로등 점등)', rain: '🌧️ 우천 주행 (와이퍼 F키 작동 권장!)' };
-      showToast('환경 변경: ' + labels[w]);
+      const labels = { dawn: '🌅 상쾌한 새벽 일출 (06:18)', day: '☀️ 맑은 주간 (13:00)', sunset: '🌇 황금빛 노을 시간대 (18:15)', night: '🌙 별빛 야간 주행 (22:30 · 전조등/가로등 점등)', rain: '🌧️ 우천 주행 (와이퍼 작동 권장!)' };
+      showToast('환경 변경: ' + (labels[w] || w));
+    }
+
+    function toggleDayNightAuto() {
+      state.dayNightAuto = !state.dayNightAuto;
+      const btn = document.getElementById('btnAutoDayNight');
+      if (btn) {
+        btn.classList.toggle('active', state.dayNightAuto);
+        btn.textContent = state.dayNightAuto ? '🔄 자동 밤낮 ON' : '⏸️ 시간 고정됨';
+      }
+      showToast(state.dayNightAuto ? '🔄 실시간 밤낮 자동 변화가 켜졌습니다!' : '⏸️ 현재 시간대로 고정되었습니다.');
+    }
+
+    function scrubTimeOfDay(val) {
+      const num = parseFloat(val);
+      if (isNaN(num)) return;
+      state.timeOfDay = ((num % 24) + 24) % 24;
+      if (state.weather === 'rain') state.weather = 'day';
+      _lastSkyPaintBucket = -1;
+      updateDayNightEnvironment(0, true);
+    }
+
+    function stepTimeOfDay() {
+      const hr = ((state.timeOfDay || 13.5) % 24 + 24) % 24;
+      let nextW = 'day';
+      if (hr >= 7.2 && hr < 17.0) nextW = 'sunset';
+      else if (hr >= 17.0 && hr < 20.5) nextW = 'night';
+      else if (hr >= 20.5 || hr < 5.5) nextW = 'dawn';
+      else nextW = 'day';
+      setWorldWeather(nextW);
+    }
+
+    function updateDayNightEnvironment(dt, forceNow) {
+      if (state.dayNightAuto && state.stage === 'driving' && state.activeZone !== 'b1_parking' && state.activeZone !== 'apt_interior') {
+        const prevHr = state.timeOfDay || 13.5;
+        // 0.40 game hours/sec -> full 24h day/night cycle every 60 seconds!
+        state.timeOfDay = (prevHr + dt * 0.40) % 24;
+        // Auto-turn on headlights gently when crossing into dusk (18:15)
+        if (prevHr < 18.15 && state.timeOfDay >= 18.15 && !state.headlights) {
+          state.headlights = true;
+          syncAccessoryButtons();
+          rebuildPlayer3DCar();
+          showToast('🌙 해가 저물어 차량 전조등과 도시 야경 조명이 자동 점등됩니다!');
+        }
+      }
+      const sample = sampleSkyStateForHour(state.timeOfDay || 13.5);
+      state.nightFactor = sample.nightFactor;
+
+      // Sync weather chip highlight when auto-cycling (unless rain is active)
+      if (state.weather !== 'rain') {
+        const derivedW = sample.hr >= 5.2 && sample.hr < 7.5 ? 'dawn'
+          : (sample.hr >= 7.5 && sample.hr < 17.2 ? 'day'
+          : (sample.hr >= 17.2 && sample.hr < 19.6 ? 'sunset' : 'night'));
+        if (state.weather !== derivedW) {
+          state.weather = derivedW;
+          document.querySelectorAll('[data-weather]').forEach(b => {
+            b.classList.toggle('active', b.getAttribute('data-weather') === derivedW);
+          });
+        }
+      }
+
+      // Update live clock chips & time slider in top header, driving HUD, and pod
+      const clk = formatClockAndIcon(sample.hr);
+      const topBtn = document.getElementById('topTimeCycleBtn');
+      if (topBtn && topBtn.textContent !== clk.text) topBtn.textContent = clk.text;
+      const hudBtn = document.getElementById('hudQuickTimeBtn');
+      if (hudBtn && hudBtn.textContent !== clk.text) hudBtn.textContent = clk.text;
+      const podRd = document.getElementById('podTimeReadout');
+      if (podRd && podRd.textContent !== clk.text) podRd.textContent = clk.text;
+      const tSlider = document.getElementById('timeOfDaySlider');
+      if (tSlider && document.activeElement !== tSlider) tSlider.value = sample.hr.toFixed(1);
+
+      // Update Player 3D Headlight Beams visibility
+      if (playerHeadlightGroup) {
+        playerHeadlightGroup.visible = Boolean(state.headlights && state.engineOn && sample.nightFactor > 0.22 && !state.isWalking);
+      }
+
+      if (!useWebGL || !scene) return;
+
+      // Orbit Sun & Moon around sky dome
+      const sunAng = ((sample.hr - 6.0) / 24.0) * Math.PI * 2;
+      const orbitR = 1750;
+      const sunX = Math.cos(sunAng) * orbitR;
+      const sunY = Math.sin(sunAng) * 1150;
+      const sunZ = 950;
+      if (sunDiscMesh && sunHaloMesh) {
+        sunDiscMesh.position.set(sunX, sunY, sunZ);
+        sunHaloMesh.position.copy(sunDiscMesh.position);
+        const sunVis = sunY > -130 && state.weather !== 'rain';
+        sunDiscMesh.visible = sunVis;
+        sunHaloMesh.visible = sunVis;
+        const lowSun = Math.max(0, Math.min(1, 1 - Math.max(0, sunY) / 520));
+        sunDiscMesh.material.color.set(lerpHexColor('#fffbeb', '#fb923c', lowSun));
+        sunHaloMesh.material.color.set(lerpHexColor('#fef08a', '#f97316', lowSun));
+      }
+      if (moonDiscMesh && moonHaloMesh) {
+        const moonX = -sunX, moonY = -sunY, moonZ = -850;
+        moonDiscMesh.position.set(moonX, moonY, moonZ);
+        moonHaloMesh.position.copy(moonDiscMesh.position);
+        const moonVis = moonY > -90 && state.weather !== 'rain';
+        moonDiscMesh.visible = moonVis;
+        moonHaloMesh.visible = moonVis;
+      }
+      if (starPoints3D) {
+        starPoints3D.material.opacity = state.weather === 'rain' ? 0 : Math.max(0, (sample.nightFactor - 0.20) * 1.18);
+      }
+      if (cloudMat3D) {
+        const sunsetGlow = (sample.hr >= 5.3 && sample.hr <= 7.4) || (sample.hr >= 17.0 && sample.hr <= 19.5) ? 1 : 0;
+        if (sample.nightFactor > 0.65) {
+          cloudMat3D.color.setHex(0x1e293b);
+          cloudMat3D.emissive.setHex(0x0f172a);
+          cloudMat3D.emissiveIntensity = 0.16;
+          cloudMat3D.opacity = 0.52;
+        } else if (sunsetGlow) {
+          cloudMat3D.color.setHex(0xfed7aa);
+          cloudMat3D.emissive.setHex(0xf97316);
+          cloudMat3D.emissiveIntensity = 0.36;
+          cloudMat3D.opacity = 0.84;
+        } else {
+          cloudMat3D.color.setHex(state.weather === 'rain' ? 0x94a3b8 : 0xffffff);
+          cloudMat3D.emissive.setHex(0xe0f2fe);
+          cloudMat3D.emissiveIntensity = 0.26;
+          cloudMat3D.opacity = 0.86;
+        }
+      }
+
+      // Throttle canvas sky gradient & fog/light color updates to ~0.05h (~0.2s) or forceNow
+      const bucket = Math.floor(sample.hr * 20) + (state.weather === 'rain' ? 1000 : 0);
+      if (forceNow || bucket !== _lastSkyPaintBucket) {
+        _lastSkyPaintBucket = bucket;
+        paintSkyDomeForSample(sample);
+        if (hemiLight3D) {
+          hemiLight3D.color.set(sample.hemiSky);
+          hemiLight3D.groundColor.set(sample.hemiGnd);
+          hemiLight3D.intensity = state.stage === 'lobby' ? 1.05 : sample.hemiInt;
+        }
+        if (keyLight3D) {
+          keyLight3D.color.set(sample.keyCol);
+          keyLight3D.intensity = state.stage === 'lobby' ? 1.32 : sample.keyInt;
+          if (state.stage !== 'lobby') {
+            const lx = sunY >= 0 ? sunX * 0.03 : -sunX * 0.03;
+            const ly = Math.max(18, Math.abs(sunY) * 0.055 + 14);
+            keyLight3D.position.set(lx, ly, 34);
+          }
+        }
+        if (fillLight3D) fillLight3D.intensity = state.stage === 'lobby' ? 0.68 : (0.68 * (1 - sample.nightFactor * 0.82));
+        if (rimLight3D) rimLight3D.intensity = state.stage === 'lobby' ? 0.72 : (0.72 * (1 - sample.nightFactor * 0.68));
+        if (renderer && renderer.toneMappingExposure !== undefined && state.stage !== 'lobby') {
+          renderer.toneMappingExposure = sample.exp;
+        }
+        if (scenicGlassMat3D) {
+          scenicGlassMat3D.emissiveIntensity = sample.nightFactor * 0.65;
+        }
+        if (scenicGrassMat3D) {
+          scenicGrassMat3D.color.set(lerpHexColor('#1e5631', '#071910', sample.nightFactor));
+        }
+        if (scenicOceanMat3D) {
+          scenicOceanMat3D.color.set(lerpHexColor('#0284c7', '#05152e', sample.nightFactor));
+        }
+        if (scenicNightGlowGroup) {
+          scenicNightGlowGroup.visible = sample.nightFactor > 0.32 || state.weather === 'rain';
+        }
+        applyWeatherTo3DScene();
+      }
     }
 
     function applyWeatherTo3DScene() {
       if (!useWebGL || !scene) return;
       if (state.stage === 'lobby') return;
-      const far = state.farView ? 265 : 105;
       if (state.activeZone === 'b1_parking' || state.activeZone === 'apt_interior') {
+        if (skyDomeMesh) skyDomeMesh.visible = false;
+        if (cloudGroup3D) cloudGroup3D.visible = false;
         scene.background = new THREE.Color(0x0b0f19);
         scene.fog = new THREE.Fog(0x0b0f19, 30, 120);
         return;
       }
-      if (state.weather === 'day') {
-        scene.background = new THREE.Color(0x8ec5fc);
-        scene.fog = new THREE.Fog(0xb6dcfe, 55, far);
-      } else if (state.weather === 'sunset') {
-        scene.background = new THREE.Color(0xf97316);
-        scene.fog = new THREE.Fog(0xfdba74, 45, far);
-      } else if (state.weather === 'night') {
-        scene.background = new THREE.Color(0x050814);
-        scene.fog = new THREE.Fog(0x090f24, 38, far);
-      } else if (state.weather === 'rain') {
-        scene.background = new THREE.Color(0x475569);
-        scene.fog = new THREE.Fog(0x64748b, 35, far * 0.8);
+      if (skyDomeMesh) skyDomeMesh.visible = true;
+      if (cloudGroup3D) cloudGroup3D.visible = true;
+      const sample = sampleSkyStateForHour(state.timeOfDay || 13.5);
+      scene.background = new THREE.Color(sample.fog);
+      const isOpenScenic = !state.activeZone || state.activeZone === 'korea_map';
+      if (isOpenScenic) {
+        const dens = state.weather === 'rain' ? 0.0011 : (state.farView ? 0.00038 : 0.00085);
+        scene.fog = new THREE.FogExp2(sample.fog, dens);
+      } else {
+        const far = state.farView ? 265 : 105;
+        scene.fog = new THREE.Fog(sample.fog, state.weather === 'rain' ? 35 : 50, far);
       }
+      const lampsOn = sample.nightFactor > 0.38 || state.weather === 'rain';
       streetLampBulbs.forEach(b => {
-        b.material.color.setHex(state.weather === 'night' || state.weather === 'rain' ? 0xfef08a : 0x64748b);
+        b.material.color.setHex(lampsOn ? 0xfef08a : 0x64748b);
       });
     }
 
@@ -8318,21 +8678,21 @@
           scene.fog = new THREE.FogExp2(0xc7e6ff, 0.00038);
           buildAtmosphericSkyAndClouds();
 
-          const hemi = new THREE.HemisphereLight(0xf0f9ff, 0x334155, 1.05);
-          scene.add(hemi);
+          hemiLight3D = new THREE.HemisphereLight(0xf0f9ff, 0x334155, 1.05);
+          scene.add(hemiLight3D);
 
-          const keyLight = new THREE.DirectionalLight(0xfff6e5, 1.32);
-          keyLight.position.set(32, 52, 36);
-          keyLight.castShadow = false;
-          scene.add(keyLight);
+          keyLight3D = new THREE.DirectionalLight(0xfff6e5, 1.32);
+          keyLight3D.position.set(32, 52, 36);
+          keyLight3D.castShadow = false;
+          scene.add(keyLight3D);
 
-          const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.68);
-          fillLight.position.set(-30, 28, 22);
-          scene.add(fillLight);
+          fillLight3D = new THREE.DirectionalLight(0xe0f2fe, 0.68);
+          fillLight3D.position.set(-30, 28, 22);
+          scene.add(fillLight3D);
 
-          const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.72);
-          rimLight.position.set(0, 24, -40);
-          scene.add(rimLight);
+          rimLight3D = new THREE.DirectionalLight(0x7dd3fc, 0.72);
+          rimLight3D.position.set(0, 24, -40);
+          scene.add(rimLight3D);
 
           worldGroup = new THREE.Group();
           scene.add(worldGroup);
@@ -8606,6 +8966,29 @@
       if (isPlayer) {
         brakeLampMaterials = [tailRedLed];
         reverseLampMaterials = [revLampMat];
+        // v36 Volumetric Night Headlight Cones + Forward Road Illumination Light!
+        playerHeadlightGroup = new THREE.Group();
+        const beamGeo = new THREE.ConeGeometry(1.65, 16.0, 14, 1, true);
+        beamGeo.translate(0, -8.0, 0);
+        beamGeo.rotateX(-Math.PI / 2 + 0.07);
+        const beamMat = new THREE.MeshBasicMaterial({
+          color: 0xfef9c3,
+          transparent: true,
+          opacity: 0.16,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        [-hw * 0.66, hw * 0.66].forEach(bx => {
+          const cone = new THREE.Mesh(beamGeo, beamMat);
+          cone.position.set(bx, H * 0.36, hl + 0.05);
+          playerHeadlightGroup.add(cone);
+        });
+        const roadBeamLight = new THREE.PointLight(0xfffbeb, 1.45, 48, 1.6);
+        roadBeamLight.position.set(0, 1.4, hl + 5.5);
+        playerHeadlightGroup.add(roadBeamLight);
+        playerHeadlightGroup.visible = Boolean(state.headlights && state.engineOn && (state.nightFactor || 0) > 0.22);
+        root.add(playerHeadlightGroup);
       }
 
       // Soft ground contact shadow
@@ -10348,22 +10731,47 @@
 
       // Driving / Special Zone Perspective View
       const horizon = Math.floor(h * (w < h ? 0.35 : 0.42));
+      const skySample2D = sampleSkyStateForHour(state.timeOfDay || 13.5);
       const sky = ctx.createLinearGradient(0, 0, 0, horizon);
       if (state.activeZone === 'b1_parking') {
         sky.addColorStop(0, '#090d16'); sky.addColorStop(1, '#1e293b');
       } else if (state.activeZone === 'apt_interior') {
         sky.addColorStop(0, '#1e293b'); sky.addColorStop(1, '#334155');
-      } else if (state.weather === 'night') {
-        sky.addColorStop(0, '#020617'); sky.addColorStop(1, '#0f172a');
-      } else if (state.weather === 'sunset') {
-        sky.addColorStop(0, '#431407'); sky.addColorStop(0.55, '#ea580c'); sky.addColorStop(1, '#fde047');
-      } else if (state.weather === 'rain') {
-        sky.addColorStop(0, '#1e293b'); sky.addColorStop(1, '#64748b');
       } else {
-        sky.addColorStop(0, '#0f172a'); sky.addColorStop(0.45, '#1e3a5f'); sky.addColorStop(1, '#7dd3fc');
+        sky.addColorStop(0, skySample2D.stops[0]);
+        sky.addColorStop(0.52, skySample2D.stops[2]);
+        sky.addColorStop(1, skySample2D.stops[4]);
       }
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, horizon);
+      if (state.activeZone !== 'b1_parking' && state.activeZone !== 'apt_interior' && state.weather !== 'rain') {
+        if (skySample2D.nightFactor > 0.25) {
+          ctx.save();
+          ctx.fillStyle = `rgba(248,250,252,${Math.min(0.9, (skySample2D.nightFactor - 0.2) * 1.1)})`;
+          for (let si = 0; si < 38; si++) {
+            const sx = ((si * 97 + Math.floor(state.heading * 80)) % w + w) % w;
+            const sy = ((si * 53) % Math.max(20, horizon - 18));
+            ctx.fillRect(sx, sy, si % 3 === 0 ? 2.2 : 1.4, si % 3 === 0 ? 2.2 : 1.4);
+          }
+          // Glowing Moon
+          ctx.beginPath();
+          ctx.arc(w * 0.78, horizon * 0.28, 16, 0, Math.PI * 2);
+          ctx.fillStyle = '#fef9c3';
+          ctx.fill();
+          ctx.restore();
+        } else {
+          // Orbiting Sun in 2D
+          const sunProg = Math.max(0, Math.min(1, (skySample2D.hr - 5.8) / 13.2));
+          const sx = w * (0.18 + sunProg * 0.64);
+          const sy = horizon * (0.78 - Math.sin(sunProg * Math.PI) * 0.56);
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+          ctx.fillStyle = (skySample2D.hr < 7.5 || skySample2D.hr > 17.0) ? '#fb923c' : '#fef08a';
+          ctx.fill();
+          ctx.restore();
+        }
+      }
 
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(0, horizon, w, h - horizon);
@@ -11249,6 +11657,7 @@
         if (e.code === 'KeyE') toggleBlinker('right');
         if (e.code === 'KeyZ') toggleHazard();
         if (e.code === 'KeyL') toggleHeadlights();
+        if (e.code === 'KeyT') stepTimeOfDay();
         if (e.code === 'KeyF') toggleWipers();
         if (e.code === 'KeyH') triggerHorn();
         if (e.code === 'KeyC') cycleCameraMode();
@@ -11287,7 +11696,9 @@
         update3DCrashSmoke(dt);
         updateFlyingNpcs(dt);
         updateV16Systems(dt);
+        updateDayNightEnvironment(dt, false);
         if (skyDomeMesh) skyDomeMesh.position.set(state.x, 0, state.z);
+        if (cloudGroup3D) cloudGroup3D.position.set(state.x, 0, state.z);
         const targetMorph = (state.carFlightMode && !state.isWalking) ? 1 : 0;
         if (Math.abs((state.flightMorph || 0) - targetMorph) > 0.002) {
           state.flightMorph += Math.sign(targetMorph - (state.flightMorph || 0)) * Math.min(Math.abs(targetMorph - (state.flightMorph || 0)), dt * 1.15);
