@@ -388,15 +388,15 @@ function buildCoInfoPatch(item, existing, nowMs) {
   if (bizNo.length !== 10) return { bizNo: "", patch: {}, filled: [] };
   const map = [
     ["bizno", bizNo],
-    ["company", clean(it.name)],
-    ["ceo", clean(it.ceo)],
-    ["corpno", digits(it.corpNo)],
-    ["address", clean(it.address)],
-    ["companyTel", phoneOf(it.phone)],
-    ["companyFax", phoneOf(it.fax)],
-    ["homepage", homeOf(it.homepage)],
-    ["bizItem", clean(it.industry)],
-    ["openDate", clean(it.estDate)],
+    ["company", clean(it.name).slice(0, 120)],
+    ["ceo", clean(it.ceo).slice(0, 60)],
+    ["corpno", digits(it.corpNo).slice(0, 13)],
+    ["address", clean(it.address).slice(0, 160)],
+    ["companyTel", phoneOf(it.phone).slice(0, 30)],
+    ["companyFax", phoneOf(it.fax).slice(0, 30)],
+    ["homepage", homeOf(it.homepage).slice(0, 200)],
+    ["bizItem", clean(it.industry).slice(0, 80)],
+    ["openDate", clean(it.estDate).slice(0, 10)],
   ];
   const patch = {};
   const filled = [];
@@ -473,16 +473,17 @@ async function checkOurCards(db, bizNos) {
   return out;
 }
 
-/* 초기 화면용 — 우리 기업정보함 최근 등록 사업장 최대 12곳 (상호·사업자번호·국세청 상태만 최소 반환) */
+/* 초기 화면용 — 우리 기업정보함 등록 사업장 최대 12곳 (키 인덱스 orderByKey 만 사용해 전체 트리 다운로드를 피한다) */
 async function listOurCompanies(db, limit) {
   if (!db) return [];
   const cap = Math.min(Math.max(Number(limit) || 12, 1), 20);
   try {
-    const snap = await db.ref("pucards/coInfo").orderByChild("updatedAt").limitToLast(cap * 2).once("value");
+    const snap = await db.ref("pucards/coInfo").orderByKey().limitToLast(cap * 2).once("value");
     const val = (snap && snap.val && snap.val()) || {};
     return Object.keys(val)
       .map((k) => {
         const v = val[k] || {};
+        if (v._deleted) return null;
         const bizNo = digits(v.bizno || k);
         const name = clean(v.company || v.name);
         if (bizNo.length !== 10 || !name) return null;
@@ -490,7 +491,6 @@ async function listOurCompanies(db, limit) {
           bizNo,
           bizNoFmt: fmtBizNo(bizNo),
           name,
-          ntsState: clean(v.ntsState),
           updatedAt: Number(v.updatedAt || 0),
         };
       })
