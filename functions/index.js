@@ -8150,6 +8150,15 @@ exports.pubCompanySearch = functions
         res.status(applied.ok ? 200 : 400).json(applied);
         return;
       }
+      if (body.action === "init") {
+        const [keys, ourCompanies] = await Promise.all([
+          PUB_CO_SEARCH.readConfigKeys(db),
+          PUB_CO_SEARCH.listOurCompanies(db, 12),
+        ]);
+        const meta = await PUB_CO_SEARCH.searchPublicCompany({ query: "", keys, fetchFn: () => { throw new Error("unused"); } });
+        res.json({ ok: true, integrations: meta.integrations, ourCompanies });
+        return;
+      }
       const keys = await PUB_CO_SEARCH.readConfigKeys(db);
       const fetchWithTimeout = (u, opts) => fetch(u, Object.assign({}, opts || {}, { signal: AbortSignal.timeout(15000) }));
       const result = await PUB_CO_SEARCH.searchPublicCompany({

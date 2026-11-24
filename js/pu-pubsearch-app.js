@@ -34,6 +34,7 @@
     warnings: [],
     items: [],
     integrations: null,
+    ourCompanies: [],
     sideTab: 'hist',
     history: [],
     pins: [],
@@ -300,6 +301,9 @@
       if (res.nts) it.nts = res.nts;
       if (res.nps) it.nps = res.nps;
       if (Array.isArray(res.fin)) it.fin = res.fin;
+      if (res.group) it.group = res.group;
+      if (res.pps) it.pps = res.pps;
+      if (res.ftc) it.ftc = res.ftc;
       if (res.dart != null) it.dart = res.dart;
       if (res.warnings && res.warnings.length) _state.warnings = res.warnings;
       it._detailLoaded = true;
@@ -342,21 +346,53 @@
     }
   }
 
-  function renderChips() {
-    var g = _state.integrations || {
-      fsc: { configured: true, label: '금융위 기업기본정보' },
-      fin: { configured: true, label: '금융위 재무제표' },
-      nts: { configured: true, label: '국세청 사업상태' },
-      ei: { configured: true, label: '고용·산재 상시인원' },
-      nps: { configured: true, label: '국민연금 가입자' },
-      dart: { configured: false, label: 'Open DART', hint: 'DART 전자공시 바로가기 지원 (서버 DART_API_KEY 등록 시 자동 공시 조회)' },
-      nice: { configured: false, label: 'NICE BizAPI', hint: '연간회원용 파워기업검색 복사·나이스비즈라인 연결 (NICE_BIZAPI_KEY 등록 시 자동 합산)' },
+  function defaultIntegrations() {
+    return {
+      fsc: { configured: true, label: '금융위 기업기본정보', desc: '대표자·사업자/법인번호·주소·연락처·설립일·업종' },
+      fscGroup: { configured: true, label: '금융위 계열·종속기업', desc: '같은 그룹 계열회사 및 연결대상 자회사 목록' },
+      fin: { configured: true, label: '금융위 요약재무제표', desc: '최근 결산연도 매출액·영업이익·순이익·자산·자본' },
+      nts: { configured: true, label: '국세청 사업상태', desc: '계속·휴업·폐업 여부 및 과세유형 실시간 확인' },
+      ei: { configured: true, label: '고용·산재 상시인원', desc: '근로복지공단 사업장별 고용·산재 인원 및 성립일' },
+      nps: { configured: true, label: '국민연금 사업장', desc: '사업자번호 앞 6자리 기준 가입 사업장 후보' },
+      pps: { configured: true, label: '조달청 나라장터', desc: '공공조달 등록업체 기본정보·업종·등록일' },
+      ftc: { configured: true, label: '공정위 통신판매', desc: '통신판매업 신고번호·운영상태·도메인' },
+      dart: { configured: false, label: 'Open DART 전자공시', desc: '1클릭 공시 바로가기 지원 (DART_API_KEY 등록 시 자동 조회)' },
+      nice: { configured: false, label: 'NICE 파워기업검색', desc: '연간회원 폰/PC 복사 · 나이스비즈라인 바로가기 지원' },
     };
+  }
+
+  function renderChips() {
+    var g = _state.integrations || defaultIntegrations();
     return Object.keys(g).map(function (k) {
       var x = g[k];
-      return '<span class="ps-chip ' + (x.configured ? 'on' : 'off') + '" title="' + esc(x.hint || x.label) + '">'
+      return '<span class="ps-chip ' + (x.configured ? 'on' : 'off') + '" title="' + esc(x.desc || x.hint || x.label) + '">'
         + (x.configured ? '● ' : '○ ') + esc(x.label) + '</span>';
     }).join('');
+  }
+
+  function renderApiGrid() {
+    var g = _state.integrations || defaultIntegrations();
+    return '<div class="ps-api-grid">' + Object.keys(g).map(function (k) {
+      var x = g[k];
+      return '<div class="ps-api-card">'
+        + '<div class="ps-api-hd"><span class="ps-api-dot ' + (x.configured ? 'on' : 'off') + '"></span>'
+        + '<b>' + esc(x.label) + '</b>'
+        + '<span class="ps-api-st ' + (x.configured ? 'on' : 'off') + '">' + (x.configured ? '연동됨' : '바로가기') + '</span></div>'
+        + '<div class="ps-api-desc">' + esc(x.desc || x.hint || '') + '</div>'
+        + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function renderOurQuickBox() {
+    if (!_state.ourCompanies || !_state.ourCompanies.length) return '';
+    return '<div class="ps-quick-box">'
+      + '<div class="ps-sec-hd"><b>🏢 우리 기업정보함 최근 사업장 바로 조회</b><span class="ps-muted">클릭하면 해당 사업장의 공공정보를 즉시 조회합니다</span></div>'
+      + '<div class="ps-quick-list">'
+      + _state.ourCompanies.map(function (c) {
+        return '<button type="button" class="ps-qchip" data-ps-act="reSearch" data-ps-val="' + esc(c.bizNo) + '">'
+          + '<b>' + esc(c.name) + '</b> <span>' + esc(c.bizNoFmt) + '</span></button>';
+      }).join('')
+      + '</div></div>';
   }
 
   function renderDetailBlocks(it) {
@@ -393,6 +429,25 @@
         + '<tbody>' + finRows + '</tbody></table></div></div>');
     } else if (it._detailLoaded && it.corpNo) {
       blocks.push('<div class="ps-det-box ps-muted">💰 금융위 요약재무제표: 등록된 재무 자료가 없거나 비외감 법인입니다.</div>');
+    }
+    if (it.group && ((it.group.affiliates && it.group.affiliates.length) || (it.group.subsidiaries && it.group.subsidiaries.length))) {
+      var gLines = [];
+      if (it.group.affiliates && it.group.affiliates.length) {
+        gLines.push('<b>🏢 계열회사 (' + it.group.affiliates.length + '):</b> ' + it.group.affiliates.map(function (a) { return esc(a.name) + (a.listed ? '(상장)' : ''); }).join(', '));
+      }
+      if (it.group.subsidiaries && it.group.subsidiaries.length) {
+        gLines.push('<b>🌿 종속기업 (' + it.group.subsidiaries.length + '):</b> ' + it.group.subsidiaries.map(function (s) { return esc(s.name) + (s.ratio ? '(' + esc(s.ratio) + '%)' : ''); }).join(', '));
+      }
+      blocks.push('<div class="ps-det-box">' + gLines.join('<br>') + '</div>');
+    }
+    if (it.pps) {
+      blocks.push('<div class="ps-det-box"><b>🏛 조달청 나라장터 등록업체:</b> ' + esc(it.pps.name || '')
+        + (it.pps.div ? ' · ' + esc(it.pps.div) : '') + (it.pps.regDt ? ' · 등록일 ' + esc(it.pps.regDt) : '')
+        + (it.pps.tel ? ' · ' + esc(it.pps.tel) : '') + '</div>');
+    }
+    if (it.ftc) {
+      blocks.push('<div class="ps-det-box"><b>🛒 공정위 통신판매업:</b> 신고번호 ' + esc(it.ftc.regNo || '-')
+        + (it.ftc.status ? ' · ' + esc(it.ftc.status) : '') + (it.ftc.domain ? ' · ' + esc(it.ftc.domain) : '') + '</div>');
     }
     if (Array.isArray(it.dart) && it.dart.length) {
       var dRows = it.dart.map(function (d) {
@@ -525,28 +580,25 @@
       mainHtml += '<div class="ps-empty">「' + esc(_state.query) + '」에 대한 공공 기업정보가 없습니다.<br>회사명 일부나 사업자번호 10자리로 다시 검색해 보세요.</div>';
     } else {
       mainHtml += '<div class="ps-welcome">'
-        + '<h2>사업장 공공정보 통합 검색</h2>'
-        + '<p>회사명(예: 샘플기업) 또는 사업자번호 10자리(예: 123-45-67890)를 입력하면 <b>금융위 기업기본정보 · 요약재무제표 · 국세청 사업상태 · 고용산재 상시인원 · 국민연금 · DART 공시</b>를 한 화면에서 바로 확인합니다.</p>'
-        + '<ul>'
-        + '<li><b>검색 기록 자동 저장:</b> 왼쪽 최근 검색 목록에서 클릭 한 번으로 이전 검색 사업장을 다시 조회할 수 있습니다.</li>'
-        + '<li><b>기업정보함 바로 연동:</b> 조회된 기업이 우리 기업정보함에 등록되어 있는지 자동 표시되며, <b>빈 칸만</b> 안전하게 채워 넣을 수 있습니다.</li>'
-        + '<li><b>연간회원 파워기업검색 연결:</b> 「📱 파워기업검색용 복사」를 눌러 폰 앱이나 PC 폰 미러(<code>폰미러-켜기.bat</code>) 창에 바로 붙여넣거나, 「🌐 나이스비즈라인」으로 즉시 이동할 수 있습니다.</li>'
-        + '</ul></div>';
+        + renderOurQuickBox()
+        + '<div class="ps-sec-hd"><b>🔗 연동된 공공기관 기업정보 API (10종)</b><span class="ps-muted">회사명·사업자번호 검색 시 자동으로 교차 조회됩니다</span></div>'
+        + renderApiGrid()
+        + '</div>';
     }
 
     _rootEl.innerHTML = ''
-      + '<header class="ps-hd">'
-      + '<div class="ps-hd-left"><span class="ps-logo">🔍</span><div><h1>공공 기업검색</h1><div class="ps-sub">금융위 · 재무제표 · 국세청 · 고용·산재 · 국민연금 · DART · 나이스 연결</div></div></div>'
+      + '<header class="ps-hd"><div class="ps-wrap ps-hd-in">'
+      + '<div class="ps-hd-left"><span class="ps-logo">🔍</span><div><h1>공공 기업검색</h1><div class="ps-sub">금융위 · 계열/종속 · 재무제표 · 국세청 · 고용·산재 · 국민연금 · 조달청 · 공정위 · DART · 나이스</div></div></div>'
       + '<div class="ps-hd-right"><span id="who"></span><a class="ps-navbtn" href="pu-cards.html">📇 기업정보함</a><a class="ps-navbtn" href="enter.html">🏠 포털</a></div>'
-      + '</header>'
-      + '<section class="ps-searchbar">'
+      + '</div></header>'
+      + '<section class="ps-hero"><div class="ps-wrap">'
       + '<form id="psForm" class="ps-form">'
       + '<input id="psQueryIn" class="ps-in" type="search" aria-label="회사명 또는 사업자번호 10자리" value="' + esc(_state.query) + '" placeholder="회사명 또는 사업자번호 10자리 입력 (예: 샘플기업, 123-45-67890)" autocomplete="off">'
       + '<button type="submit" class="ps-btn primary ps-submit" ' + (_state.loading ? 'disabled' : '') + '>' + (_state.loading ? '검색 중…' : '🔍 통합 검색') + '</button>'
       + '</form>'
       + '<div class="ps-chips">' + renderChips() + '</div>'
-      + '</section>'
-      + '<div class="ps-layout">'
+      + '</div></section>'
+      + '<div class="ps-wrap ps-layout">'
       + renderSide()
       + '<main class="ps-main">' + mainHtml + '</main>'
       + '</div>'
@@ -630,6 +682,13 @@
       _state.history = loadStore(HIST_KEY);
       _state.pins = loadStore(PIN_KEY);
       paint();
+      var initSeq = _reqSeq;
+      callApi({ action: 'init' }).then(function (res) {
+        if (initSeq !== _reqSeq || !_state.uid) return;
+        if (res.integrations) _state.integrations = res.integrations;
+        if (Array.isArray(res.ourCompanies)) _state.ourCompanies = res.ourCompanies;
+        paint();
+      }).catch(function () {});
       try {
         var q = new URLSearchParams(root.location.search).get('q');
         if (q && q.trim() && !_state.query) runSearch(q.trim());
