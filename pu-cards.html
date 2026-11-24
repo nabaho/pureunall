@@ -274,7 +274,11 @@ html.mailview #tabs,html.mailview #subbar{display:none}
   cursor:pointer;white-space:nowrap;padding:2px 4px}
 .rulehist .rh-foot{font-size:10px;color:#475569;margin-top:5px}
 .thumb{width:148px;height:88px;flex-shrink:0;border-radius:5px;background:#e2e8f0;
-  display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:800;font-size:22px;overflow:hidden}
+  display:flex;align-items:center;justify-content:center;color:#475569;font-weight:800;font-size:17px;overflow:hidden}
+.thumb.no-img{height:auto;min-height:88px;padding:6px 8px}
+.thumb-tx{display:block;width:100%;text-align:center;line-height:1.25;word-break:keep-all;overflow-wrap:anywhere;white-space:normal}
+.thumb-tx.sm{font-size:14.5px;font-weight:700}
+.thumb-tx.xs{font-size:12px;font-weight:700;line-height:1.2}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .empty{text-align:center;color:var(--sub);padding:70px 24px;font-size:14px;line-height:1.9}
 /* ── 폰 컴팩트: 헤더·행 여백/썸네일/글자 축소 → 화면당 명함 6~7장 → 9~10장 ── */
@@ -289,7 +293,10 @@ html.mailview #tabs,html.mailview #subbar{display:none}
   #groupBtn{font-size:14.5px}
   .subact{font-size:12px}
   .row{padding:8px 12px;gap:10px}
-  .thumb{width:106px;height:63px;font-size:16px}
+  .thumb{width:106px;height:63px;font-size:14px}
+  .thumb.no-img{height:auto;min-height:63px;padding:4px 6px}
+  .thumb-tx.sm{font-size:12.5px}
+  .thumb-tx.xs{font-size:10.5px;line-height:1.18}
   .rowmain .nm{font-size:16.5px}
   .rowmain .l1,.rowmain .l2{font-size:12.5px;margin-top:3px}
   .rowmain .erpmgr{font-size:11.5px;margin-top:3px;padding:1px 6px}
@@ -12990,14 +12997,17 @@ function renderList(){
     const l2 = isCard ? (it.company||'') : fmtBizno(it.bizno);
     /* 썸네일 상태 세 가지를 가른다 —
        ① it.thumb 에 값이 있다 = 옛 자료(아직 안 옮김) 또는 이미 받아 둔 것 → 바로 그린다
-       ② it.thumb 이 빈 문자열 = 사진 없는 명함 → 첫 글자만, 받으러 가지 않는다
+       ② it.thumb 이 빈 문자열 = 사진 없는 명함 → 전체 이름 표시, 받으러 가지 않는다
        ③ it.thumb 이 아예 없다 = 옮겨진 자료 → 화면에 들어올 때 받는다 */
     let thumbSrc = '', needFetch = false;
     if (it.thumb) thumbSrc = it.thumb;
     else if (it.thumb === '') thumbSrc = '';
     else if (Store.thumbCache[it.id] !== undefined) thumbSrc = Store.thumbCache[it.id];
     else needFetch = true;
-    const th = thumbSrc ? `<img src="${thumbSrc}" loading="lazy">` : esc(name.charAt(0));
+    const _thLbl = String(name || '?').trim() || '?';
+    const _thCls = _thLbl.length > 12 ? 'thumb-tx xs' : (_thLbl.length > 6 ? 'thumb-tx sm' : 'thumb-tx');
+    const th = thumbSrc ? `<img src="${thumbSrc}" loading="lazy">`
+      : (typeof thumbTextHtml === 'function' ? thumbTextHtml(name) : `<span class="${_thCls}">${esc(_thLbl)}</span>`);
     const click = state.selMode ? `toggleSel('${it.id}')` : `openDetail('${it.id}')`;
     return `<div class="row" draggable="${!state.selMode}"
       ondragstart="onRowDrag(event,'${it.id}')" ondragend="this.classList.remove('dragging')"
@@ -13035,7 +13045,7 @@ function renderList(){
         ${/* 🔗 — PC 표 회사 칸과 «같은 함수». 확정 업체 이름이 명함과 다를 때만 붙는다
              (2026-10-04 폰 목업에서 폰에만 빠진 것을 봄). 어느 업체인지는 눌러 연 상세의 🏢 줄에 있다. */''}
         ${l2?`<div class="l2">${isCard?cardPinMark(it):''}${esc(l2)}</div>`:''}</div>
-      <div class="thumb"${needFetch?` data-th="${it.id}"`:''}>${th}</div></div>`;
+      <div class="thumb${thumbSrc?'':' no-img'}"${needFetch?` data-th="${it.id}"`:''}>${th}</div></div>`;
   }
   /* 이 쪽에 보일 것만 그린다 — 6,270장을 통째로 그리면 조각이 37,625개가 되어
      명함 하나 고를 때마다(toggleSel→render) 0.2~0.5초씩 멈췄다(대표 확인 2026-08-16).
@@ -13064,15 +13074,20 @@ function renderList(){
 /* ── 화면에 들어온 명함만 썸네일을 받는다 ──
    4,400장을 한꺼번에 받으면 열 때마다 약 90MB. 보이는 것만 받으면 한 화면당 1MB 남짓이다.
    미리 300px 앞에서 받아 두어 내리는 도중에 빈 칸이 보이지 않게 한다. */
+function thumbTextHtml(label){
+  const s = String(label || '?').trim() || '?';
+  const cls = s.length > 12 ? 'thumb-tx xs' : (s.length > 6 ? 'thumb-tx sm' : 'thumb-tx');
+  return `<span class="${cls}">${esc(s)}</span>`;
+}
 let _thObs = null;
 function thumbFill(el){
   const id = el.getAttribute('data-th'); if(!id) return;
   el.removeAttribute('data-th');            /* 두 번 받지 않게 먼저 뗀다 */
   Store.getThumb(id).then(t=>{
-    if(!t) return;                          /* 사진 없는 명함 — 첫 글자 그대로 둔다 */
+    if(!t) return;                          /* 사진 없는 명함 — 전체 이름 그대로 둔다 */
     const it = state.items[id];
     if(it) it.thumb = t;                    /* 상세·확대·끌기 등 나머지 화면이 그대로 쓰게 되꽂는다 */
-    if(el.isConnected) el.innerHTML = `<img src="${t}" loading="lazy">`;
+    if(el.isConnected){ el.classList.remove('no-img'); el.innerHTML = `<img src="${t}" loading="lazy">`; }
   }).catch(()=>{});
 }
 let _thSeen = false, _thFallback = null;
