@@ -319,3 +319,25 @@ test('③ 이름은 한 줄(…으로 줄임) — 이름이 길어도 줄이 밀
   assert.match(t[0], /white-space:nowrap/);
   assert.match(t[0], /text-overflow:ellipsis/);
 });
+
+test('④ 창이 «대화창»이다 — role·aria-modal·제목 연결, 열리면 「닫기」에 초점', async () => {
+  const 틀 = SRC.slice(SRC.indexOf('id="modalDraftMulti"'), SRC.indexOf('id="modalDraftMulti"') + 700);
+  assert.match(틀, /role="dialog"/);
+  assert.match(틀, /aria-modal="true"/);
+  const 제목 = 틀.match(/aria-labelledby="([^"]+)"/);
+  assert.ok(제목 && SRC.includes('id="' + 제목[1] + '"'), 'aria-labelledby 가 가리키는 제목이 화면에 있어야 합니다');
+  const m = 무대({ 서류: { a: { name: 'a.hwpx' } } });
+  let 초점 = 0;
+  const 닫기 = { focus() { 초점++; } };
+  m.칸.modalDraftMulti.querySelector = () => 닫기;
+  await m.ctx.rhDraftViewMany(['a']);
+  assert.equal(초점, 1, '열리면 「닫기」에 초점이 가야 합니다');
+});
+
+test('④ 「닫기」는 PC 에서 왼쪽 — 오른쪽 아래 «새 버전 있음» 단추와 겹치지 않는다(폰은 오른쪽)', () => {
+  const pc = SRC.replace(/@media \(max-width:520px\)\{[\s\S]*?\n\}/g, '');
+  assert.match(pc, /#modalDraftMulti \.modal-foot\{[^}]*justify-content:\s*flex-start/);
+  const 폰 = Array.from(SRC.matchAll(/@media \(max-width:520px\)\{([\s\S]*?)\n\}/g)).map((m) => m[1]).filter((b) => /#modalDraftMulti \.modal-foot/.test(b));
+  assert.equal(폰.length, 1, '폰 구간에 닫기 자리 규칙이 있어야 합니다');
+  assert.match(폰[0], /justify-content:\s*flex-end/);
+});

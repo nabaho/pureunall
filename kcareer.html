@@ -1264,6 +1264,8 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
    한 장이 한 칸 — 칸 폭은 «고른 크기»(--dm-min)가 정하고, 창이 넓으면 여러 장이 나란히, 좁으면 한 줄에 한 장. 쪽 그림은 칸 폭에 맞춰 그려진다.
    ⚠ 폰 구간에서만 한 줄에 한 장으로 — PC 는 그대로. */
 #modalDraftMulti .modal{width:min(1480px,98vw)}
+/* 「닫기」는 왼쪽 — 오른쪽 아래에는 «새 버전 있음» 떠 있는 단추가 앉는다(1366×800 에서 겹침, 2026-11-24 검증). 폰은 왼쪽 아래에 홈 단추가 있어 오른쪽 */
+#modalDraftMulti .modal-foot{justify-content:flex-start}
 .dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--dm-min,300px)),1fr));gap:12px;align-items:start}
 .dm-card{border:1px solid var(--border);border-radius:9px;background:#fff;min-width:0;overflow:hidden}
 .dm-cap{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border);background:#f8fafc;min-width:0}
@@ -1278,6 +1280,7 @@ html.dark .dm-cap{background:var(--hover);border-color:var(--border);color:var(-
   #modalDraftMulti .modal{width:100%;max-height:calc(100vh - 16px);display:flex;flex-direction:column}
   #modalDraftMulti .modal-b{overflow:auto;min-height:0;flex:1 1 auto;padding:10px 8px}
   #modalDraftMulti .modal-h{padding:10px 12px;font-size:14px}
+  #modalDraftMulti .modal-foot{justify-content:flex-end}
   .dm-grid{grid-template-columns:minmax(0,1fr)}
   /* 폰: 상자는 «한 겹» — 칸 테두리·이름줄 바탕·쪽 둘레의 회색 바탕을 걷고 쪽 그림만 남긴다(양옆을 다 쓴다) */
   .dm-card{border:0;border-radius:0;background:transparent}
@@ -3346,8 +3349,8 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
      고른 서류(또는 작성 중 전부)의 쪽을 한 화면에 펼친다. 그리는 일은 «한글 문서 보기»와 같은 엔진(PureunHwp.renderPreview) 하나다.
      ⚠ 이 창은 «보기 전용» — 고치려면 장마다 「이어서」(작성 중 서류 한 건 열기)로 들어간다. -->
 <div class="modal-ov" id="modalDraftMulti">
-  <div class="modal">
-    <div class="modal-h">👁 한꺼번에 보기 — 고른 서류를 한 화면에</div>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
+    <div class="modal-h" id="dmTitle">👁 한꺼번에 보기 — 고른 서류를 한 화면에</div>
     <div class="modal-b">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
         <div id="dmInfo" style="font-size:12px;color:var(--text-mute);flex:1 1 220px;min-width:0"></div>
@@ -21846,6 +21849,8 @@ async function rhDraftViewMany(ids, size){
     b.setAttribute('aria-pressed', k===_dmSize?'true':'false');
   });
   ov.classList.add('open');
+  /* 열리면 「닫기」에 초점 — 키보드·화면 읽기 도구가 이 창 안에서 시작하게(Esc 로도 닫힌다) */
+  try{ var 닫기=ov.querySelector('.modal-foot button'); if(닫기 && 닫기.focus) 닫기.focus(); }catch(e){}
   info.textContent=_hwpEngineReady
     ? '한글 엔진으로 '+ids.length+'건을 그리는 중…'
     : '한글 엔진을 처음 한 번만 받아옵니다(약 7MB) — 다음부터는 바로 열립니다…';

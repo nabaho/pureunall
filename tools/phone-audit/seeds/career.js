@@ -89,6 +89,8 @@ module.exports = {
     { name: 'draft-list', wait: 150, run: async (page) => {
       await page.evaluate(async () => {
         nav_to('page-resume-hub', '이력서 생성·보관', '이력서관리');
+        /* 화면을 여는 길(rhDraftMigrate)이 «잠깐 뒤» 목록을 다시 그리며 고른 것을 지운다 — 그 뒤에 담고 고른다 */
+        await new Promise((r) => setTimeout(r, 500));
         const 제목 = ['점검 공적조서(앞면)', '점검 공적조서(뒷면)', '점검 이력서', '점검 개인정보 이용 동의서'];
         const 내용 = [
           [['성명', '점검가나'], ['소속', '점검노무법인'], ['직위', '대표']],
