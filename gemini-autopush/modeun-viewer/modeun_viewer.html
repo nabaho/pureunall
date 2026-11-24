@@ -3962,7 +3962,7 @@ const sdv = new DataView(sec.buffer, sec.byteOffset, sec.byteLength);
 for (let j = 0; j + 4 <= sec.byteLength; j += 4) {
 fat.push(sdv.getUint32(j, true));
 }}
-function readChain(startSec, exactSize) {
+function readChainV2(startSec, exactSize) {
 const chunks = [];
 let total = 0, cur = startSec, guard = 0;
 while (cur < 0xfffffffc && guard < 200000) {
@@ -3979,7 +3979,7 @@ let p = 0;
 for (const c of chunks) { merged.set(c, p); p += c.byteLength; }
 return (exactSize !== undefined && exactSize < merged.byteLength) ? merged.subarray(0, exactSize) : merged;
 }
-const dirBytes = readChain(firstDirSec);
+const dirBytes = readChainV2(firstDirSec);
 const rawEntries = [];
 for (let pos = 0; pos + 128 <= dirBytes.byteLength; pos += 128) {
 const edv = new DataView(dirBytes.buffer, dirBytes.byteOffset + pos, 128);
@@ -3998,15 +3998,15 @@ rawEntries.push({ name, type: objType, leftSib, rightSib, childId, startSec, siz
 }
 const miniFat = [];
 if (firstMiniFatSec < 0xfffffffc && numMiniFatSecs > 0) {
-const mfBytes = readChain(firstMiniFatSec, numMiniFatSecs * sectorSize);
+const mfBytes = readChainV2(firstMiniFatSec, numMiniFatSecs * sectorSize);
 const mfdv = new DataView(mfBytes.buffer, mfBytes.byteOffset, mfBytes.byteLength);
 for (let j = 0; j + 4 <= mfBytes.byteLength; j += 4) miniFat.push(mfdv.getUint32(j, true));
 }
 const rootEntry = rawEntries[0];
 const miniStream = (rootEntry && rootEntry.startSec < 0xfffffffc && rootEntry.size > 0)
-? readChain(rootEntry.startSec, rootEntry.size)
+? readChainV2(rootEntry.startSec, rootEntry.size)
 : new Uint8Array(0);
-function readMiniChain(startMiniSec, exactSize) {
+function readMiniChainV2(startMiniSec, exactSize) {
 const out = new Uint8Array(exactSize);
 let written = 0, cur = startMiniSec, guard = 0;
 while (cur < 0xfffffffc && written < exactSize && guard < 200000) {
@@ -4033,9 +4033,9 @@ const curPath = e.type === 5 ? 'Root Entry/' : (prefix + e.name + (e.type === 1 
 let content = new Uint8Array(0);
 if (e.type === 2 && e.size > 0 && e.startSec < 0xfffffffc) {
 if (e.size < (miniCutoff > 0 ? miniCutoff : 4096) && miniStream.byteLength > 0 && miniFat.length > 0) {
-content = readMiniChain(e.startSec, e.size);
+content = readMiniChainV2(e.startSec, e.size);
 } else {
-content = readChain(e.startSec, e.size);
+content = readChainV2(e.startSec, e.size);
 }}
 FullPaths.push(curPath);
 FileIndex.push({ name: e.name, type: e.type, size: e.size, content });
@@ -4939,14 +4939,14 @@ blocks: [{ type: 'notice', text: '사용자 암호가 설정된 한글 문서입
 previewText, plainText: previewText, prvImageUrl
 };
 }
-async function inflateHwp(rawArr) {
+async function inflateHwpV2(rawArr) {
 const u8 = rawArr instanceof Uint8Array ? rawArr : new Uint8Array(rawArr);
 return isCompressed ? await inflateUniversal(u8, true) : u8;
 }
 let docStyles = null;
 const docInfoEntry = findOleStream(container, 'DocInfo');
 if (docInfoEntry && docInfoEntry.content) {
-try { docStyles = parseHwpDocInfoStyles(await inflateHwp(docInfoEntry.content)); } catch (e) {}
+try { docStyles = parseHwpDocInfoStyles(await inflateHwpV2(docInfoEntry.content)); } catch (e) {}
 }
 const compressModeBySid = {};
 if (docStyles && docStyles.binDataList.length > 1) {
@@ -5005,7 +5005,7 @@ for (let sIdx = 0; sIdx < 64; sIdx++) {
 const secEntry = findOleStream(container, prefix + sIdx) || (!isDistribute ? findOleStream(container, 'Section' + sIdx) : null);
 if (!secEntry || !secEntry.content) break;
 if (sIdx > 0 && allBlocks.length > 0) allBlocks.push({ type: 'pageBreak' });
-const inflated = await inflateHwp(secEntry.content);
+const inflated = await inflateHwpV2(secEntry.content);
 const flatRecs = isDistribute ? decryptHwpViewTextRecords(inflated) : parseHwp5Records(inflated);
 const tree = buildHwpRecordTree(flatRecs);
 const parsedSec = parseHwpParagraphList(tree.children, ctx, false);
@@ -5666,7 +5666,7 @@ hexToUnicode.set(code.toString(16).toUpperCase().padStart(width, '0'), String.fr
 contentStreams.push(decStr);
 }}
 }
-function decodePdfHexToken(hexRaw) {
+function decodePdfHexTokenV2(hexRaw) {
 const clean = hexRaw.replace(/\s+/g, '').toUpperCase();
 if (hexToUnicode.size > 0 && clean.length % 4 === 0) {
 let s = '';
@@ -5697,7 +5697,7 @@ const useUcs2 = hasUcs2Font && /\/F[2-9]\b/.test(bt);
 const tokenRe = /<([0-9A-Fa-f\s]+)>|\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
 let m, line = '';
 while ((m = tokenRe.exec(bt)) !== null) {
-if (m[1] !== undefined) line += decodePdfHexToken(m[1]);
+if (m[1] !== undefined) line += decodePdfHexTokenV2(m[1]);
 else if (m[2] !== undefined) line += decodePdfLiteralRaw(m[2], useUcs2 || hasUcs2Font);
 }
 if (line.trim()) lines.push(line.trim());
