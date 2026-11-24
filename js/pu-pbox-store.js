@@ -700,6 +700,94 @@
     });
   }
 
+  var lawHistoryCache = new Map();
+  var lawRevisionCache = new Map();
+  var SAFE_GIT_SHA_RE = /^[0-9a-f]{7,40}$/i;
+
+  /* ── 과거 법령(구법·연혁) 개정 이력 조회 (legalize-kr GitHub 커밋 히스토리) ── */
+  function fetchLawHistory(dir, fileName) {
+    var d = String(dir || '').trim();
+    if (!d) return Promise.reject(new Error('법령명이 비어 있습니다.'));
+    var fName = fileName || '법률.md';
+    if (!/\.md$/.test(fName)) fName += '.md';
+    var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (x) { return x.dir === d; }) || null;
+    if (!fileName && fam && fam.primaryFile) fName = fam.primaryFile;
+    var histKey = d + '/' + fName;
+    if (lawHistoryCache.has(histKey)) {
+      return Promise.resolve(lawHistoryCache.get(histKey));
+    }
+    var relPath = 'kr/' + d + '/' + fName;
+    var apiUrl = 'https://api.github.com/repos/legalize-kr/legalize-kr/commits?path=' +
+      encodeURIComponent(relPath) + '&per_page=30';
+    return fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' } }).then(function (res) {
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 429) {
+          throw new Error('GitHub 연혁 조회 한도 초과 — 아래 법제처 공식 연혁 바로가기를 이용해 주세요.');
+        }
+        throw new Error('구법 이력 조회 실패 (HTTP ' + res.status + ')');
+      }
+      return res.json();
+    }).then(function (commits) {
+      if (!Array.isArray(commits)) return [];
+      var list = commits.filter(function (c) {
+        return c && typeof c.sha === 'string' && SAFE_GIT_SHA_RE.test(c.sha);
+      }).map(function (c, i) {
+        var rawDate = (c.commit && c.commit.author && c.commit.author.date) ||
+                      (c.commit && c.commit.committer && c.commit.committer.date) || '';
+        var ymd = rawDate ? String(rawDate).slice(0, 10) : '';
+        var firstLine = String((c.commit && c.commit.message) || '').split('\n')[0].trim();
+        return {
+          sha: c.sha,
+          shortSha: c.sha.slice(0, 8),
+          date: ymd,
+          isLatest: i === 0,
+          label: (ymd || '연혁') + (firstLine ? ' · ' + firstLine : '')
+        };
+      });
+      lawHistoryCache.set(histKey, list);
+      return list;
+    });
+  }
+
+  /* ── 특정 시점 과거 법령(구법) 원문 가져오기 (현행 법령 캐시와 완전 분리) ── */
+  function fetchLawRevision(dir, fileName, sha, revMeta) {
+    var d = String(dir || '').trim();
+    var cleanSha = String(sha || '').trim();
+    if (!d) return Promise.reject(new Error('법령명이 비어 있습니다.'));
+    if (!SAFE_GIT_SHA_RE.test(cleanSha)) return Promise.reject(new Error('유효하지 않은 법령 개정 식별자입니다.'));
+    var fName = fileName || '법률.md';
+    if (!/\.md$/.test(fName)) fName += '.md';
+    var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (x) { return x.dir === d; }) || null;
+    if (!fileName && fam && fam.primaryFile) fName = fam.primaryFile;
+    var revKey = cleanSha + ':' + d + '/' + fName;
+    if (lawRevisionCache.has(revKey)) {
+      return Promise.resolve(lawRevisionCache.get(revKey));
+    }
+    var url = 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/' +
+      encodeURIComponent(cleanSha) + '/kr/' + encodeURIComponent(d) + '/' + encodeURIComponent(fName);
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error('과거 구법 원문 호출 실패 (HTTP ' + res.status + ')');
+      return res.text();
+    }).then(function (mdText) {
+      var parsed = global.PuPBoxEngine.parseLawMarkdown(mdText, {
+        dir: d,
+        fileName: fName,
+        title: fam ? fam.title : d,
+        dept: fam ? fam.dept : ''
+      });
+      parsed.cacheKey = revKey;
+      parsed.isHistorical = true;
+      parsed.revisionSha = cleanSha;
+      parsed.revisionDate = (revMeta && revMeta.date) || parsed.effectiveDate || '';
+      parsed.revisionLabel = (revMeta && revMeta.label) || (parsed.revisionDate + ' 개정본');
+      parsed.fetchedAt = new Date().toISOString();
+      lawRevisionCache.set(revKey, parsed);
+      return parsed;
+    });
+  }
+
   /* 노동·공무원·군인·교원·선원·연결 핵심 40편 일괄 오프라인 적재 (네트워크 실패 시 거짓 lastSyncAt 갱신 금지) */
   function syncCoreLaborLaws(onProgress) {
     var total = CORE_PACK_TARGETS.length;
@@ -2898,6 +2986,8 @@
     getRecents: function () { return mem.recents.slice(); },
     getAlerts: function () { return mem.alerts.slice(); },
     fetchLaw: fetchLaw,
+    fetchLawHistory: fetchLawHistory,
+    fetchLawRevision: fetchLawRevision,
     preloadCitedLaws: function (text, offlineOnly) {
       var idxList = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
         ? global.PuPBoxLawIndex.list()

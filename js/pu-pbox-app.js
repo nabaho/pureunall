@@ -106,11 +106,20 @@
     /* 오른쪽 원문 리더 */
     readerOpen: false,
     readerKind: '',          // 'law' | 'doc'
+    readerLawMode: 'single', // 'single' | '3dan'
     readerLaw: null,
     readerLawFamily: null,
+    reader3Dan: null,        // { dir, title, loading, cols: [...] }
+    readerHistoryOpen: false,
+    readerHistoryBusy: false,
+    readerHistoryList: [],
+    readerHistoryError: '',
+    readerHistoryDate: '',
+    lawHistoryLookupDate: '',
     readerArticleFilter: '',
     readerHighlightArt: '',
     readerDoc: null,
+    _readerReqSeq: 0,
 
     /* 모달 접근성 포커스 복원 · 음성인식 · 실시간 백그라운드 수집 타이머 */
     _modalPrevFocus: null,
@@ -1705,21 +1714,152 @@
     if (state.view === 'home' || state.view === 'workspace') renderMain();
   }
 
-  function openLawInReader(dir, fileName, highlightArt) {
+  function resolve3DanTargets(fam) {
+    if (!fam || !Array.isArray(fam.files)) return [];
+    var active = fam.files.filter(function (fn) {
+      return !(fam.hasRepealStub && fn === '법률');
+    });
+    if (active.length < 2) return [];
+    var picked = [];
+    function pickFirst(label, re) {
+      var found = active.find(function (fn) { return re.test(fn); });
+      if (found) picked.push({ label: label, fileName: found + '.md' });
+    }
+    pickFirst('법률', /^법률(?:\(법률\))?$/);
+    pickFirst('시행령', /^(?:시행령|대통령령)$/);
+    pickFirst('시행규칙', /^(?:시행규칙|부령|총리령)$/);
+    if (picked.length < 2) {
+      picked = active.slice(0, 3).map(function (fn) {
+        return { label: fn === '법률(법률)' ? '법률' : fn.replace(/\(.*\)$/, ''), fileName: fn + '.md' };
+      });
+    }
+    return picked;
+  }
+
+  function buildOfficialHistoricalLawUrl(lawName, ymd) {
+    var cleanName = String(lawName || '').trim();
+    var digits = String(ymd || '').replace(/[^0-9]/g, '');
+    if (cleanName && digits.length === 8) {
+      return 'https://www.law.go.kr/%EB%B2%95%EB%A0%B9/' + encodeURIComponent(cleanName) + '/(' + digits + ')';
+    }
+    if (cleanName) {
+      return 'https://www.law.go.kr/lsSc.do?menuId=1&subMenuId=15&tabMenuId=81&query=' + encodeURIComponent(cleanName);
+    }
+    return 'https://www.law.go.kr/lsSc.do?menuId=1&subMenuId=15&tabMenuId=81';
+  }
+
+  function loadLawHistoryForCurrent() {
+    var law = state.readerLaw;
+    if (!law || !law.dir || !global.PuPBoxStore || typeof global.PuPBoxStore.fetchLawHistory !== 'function') return;
+    var reqSeq = ++state._readerReqSeq;
+    state.readerHistoryBusy = true;
+    state.readerHistoryError = '';
+    renderReader();
+    global.PuPBoxStore.fetchLawHistory(law.dir, law.fileName).then(function (list) {
+      if (state._readerReqSeq !== reqSeq) return;
+      state.readerHistoryBusy = false;
+      state.readerHistoryList = Array.isArray(list) ? list : [];
+      if (!state.readerHistoryList.length) {
+        state.readerHistoryError = '미러 저장소에 기록된 이전 개정 이력이 없습니다. 아래 법제처 공식 연혁 바로가기를 이용해 주세요.';
+      }
+      renderReader();
+    }).catch(function (err) {
+      if (state._readerReqSeq !== reqSeq) return;
+      state.readerHistoryBusy = false;
+      state.readerHistoryError = String((err && err.message) || err || '과거 구법 이력을 불러오지 못했습니다.');
+      renderReader();
+    });
+  }
+
+  function openLawRevisionInReader(sha) {
+    var law = state.readerLaw;
+    if (!law || !law.dir || !sha) return;
+    if (sha === 'current') {
+      openLawInReader(law.dir, law.fileName, state.readerHighlightArt, { openHistory: true });
+      return;
+    }
+    var revMeta = (state.readerHistoryList || []).find(function (x) { return x.sha === sha; }) || null;
+    if (revMeta && revMeta.isLatest) {
+      openLawInReader(law.dir, law.fileName, state.readerHighlightArt, { openHistory: true });
+      return;
+    }
+    var reqSeq = ++state._readerReqSeq;
+    state.readerHistoryBusy = true;
+    state.readerHistoryError = '';
+    renderReader();
+    global.PuPBoxStore.fetchLawRevision(law.dir, law.fileName, sha, revMeta).then(function (parsed) {
+      if (state._readerReqSeq !== reqSeq) return;
+      state.readerHistoryBusy = false;
+      state.readerLaw = parsed;
+      toast('과거 구법(' + (parsed.revisionDate || parsed.effectiveDate || '이전 개정본') + ') 원문을 불러왔습니다.');
+      renderReader();
+    }).catch(function (err) {
+      if (state._readerReqSeq !== reqSeq) return;
+      state.readerHistoryBusy = false;
+      state.readerHistoryError = String((err && err.message) || err || '과거 구법 원문을 불러오지 못했습니다.');
+      toast(state.readerHistoryError, 'err');
+      renderReader();
+    });
+  }
+
+  function openLaw3DanInReader(dir) {
     if (!dir) return;
     var idxList = global.PuPBoxLawIndex ? global.PuPBoxLawIndex.list() : [];
     var fam = idxList.find(function (f) { return f.dir === dir; }) || null;
+    var targets = resolve3DanTargets(fam);
+    if (!targets.length) {
+      toast('이 법령은 시행령·시행규칙이 없어 단일 원문으로 엽니다.');
+      openLawInReader(dir, '', '');
+      return;
+    }
+    var reqSeq = ++state._readerReqSeq;
+    state.readerOpen = true;
+    state.readerKind = 'law';
+    state.readerLawMode = '3dan';
+    state.readerLawFamily = fam;
+    state.readerArticleFilter = '';
+    state.readerHistoryOpen = false;
+    state.reader3Dan = { dir: dir, title: fam ? fam.title : dir, loading: true, cols: [] };
+    renderReader();
+
+    Promise.all(targets.map(function (t) {
+      return global.PuPBoxStore.fetchLaw(dir, t.fileName).then(function (parsed) {
+        return { label: t.label, fileName: t.fileName, law: parsed, error: '' };
+      }).catch(function (e) {
+        return { label: t.label, fileName: t.fileName, law: null, error: String((e && e.message) || e) };
+      });
+    })).then(function (cols) {
+      if (state._readerReqSeq !== reqSeq) return;
+      state.reader3Dan = { dir: dir, title: fam ? fam.title : dir, loading: false, cols: cols };
+      if (cols[0] && cols[0].law) state.readerLaw = cols[0].law;
+      renderReader();
+    });
+  }
+
+  function openLawInReader(dir, fileName, highlightArt, opts) {
+    if (!dir) return;
+    opts = opts || {};
+    var idxList = global.PuPBoxLawIndex ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (f) { return f.dir === dir; }) || null;
     var targetFile = fileName || (fam ? fam.primaryFile : '법률.md');
+    var reqSeq = ++state._readerReqSeq;
 
     state.readerOpen = true;
     state.readerKind = 'law';
+    state.readerLawMode = 'single';
     state.readerLawFamily = fam;
     state.readerLaw = null;
+    state.reader3Dan = null;
+    state.readerHistoryOpen = !!opts.openHistory;
+    state.readerHistoryBusy = false;
+    state.readerHistoryList = [];
+    state.readerHistoryError = '';
     state.readerHighlightArt = highlightArt || '';
     state.readerArticleFilter = '';
     renderReader();
 
     global.PuPBoxStore.fetchLaw(dir, targetFile).then(function (parsed) {
+      if (state._readerReqSeq !== reqSeq) return;
       state.readerLaw = parsed;
       global.PuPBoxStore.recordRecent({
         id: 'law:' + dir + '/' + targetFile,
@@ -1731,6 +1871,9 @@
       });
       reverifyActiveThreadIfAny();
       renderReader();
+      if (opts.openHistory) {
+        loadLawHistoryForCurrent();
+      }
       if (state.view === 'home' || state.view === 'recents') renderMain();
       renderSidebarRecents();
       if (highlightArt) {
@@ -1740,6 +1883,7 @@
         }, 60);
       }
     }).catch(function (err) {
+      if (state._readerReqSeq !== reqSeq) return;
       toast('법령 원문을 불러오지 못했습니다: ' + err.message, 'err');
     });
   }
@@ -3243,6 +3387,12 @@
         '      <div class="pbox-ext-left">' + lawExtBtns + '</div>',
         '    </details>'
       ].join('\n') : ''),
+      '    <div class="pbox-law-hist-row">',
+      '      <span><strong>📜 과거 구법·연혁 찾기:</strong></span>',
+      '      <input type="date" id="pboxLawHistDate" class="pbox-law-hist-date" aria-label="과거 법령 기준 시행일" value="' + esc(state.lawHistoryLookupDate) + '">',
+      '      <button type="button" class="pbox-btn-sm" data-act="open-law-date-official">기준일 구법 열기 ↗</button>',
+      '      <button type="button" class="pbox-btn-sm" data-act="open-law-repeal-official">법제처 연혁·폐지법 검색 ↗</button>',
+      '    </div>',
       '  </div>',
       buildConnectedLawsBarHtml(lawConnList, { label: '🔗 연결 · 유사직역 법령', openInReader: true }),
       (smartJump ? [
@@ -3273,10 +3423,10 @@
       '          <th class="col-chk"><label class="pbox-chk-tap"><input type="checkbox" data-act="toggle-all-laws" aria-label="현재 화면 법령 전체 선택"' + (allVisSelected ? ' checked' : '') + '></label></th>',
       '          <th class="col-num">번호</th>',
       '          <th>법령명</th>',
-      '          <th style="width:215px">수록 법령·시행령·시행규칙</th>',
+      '          <th style="width:265px">수록 법령·시행령·시행규칙 · 3단 비교</th>',
       '          <th style="width:120px">소관부처</th>',
       '          <th style="width:105px">보관 상태</th>',
-      '          <th style="width:136px">동작</th>',
+      '          <th style="width:176px">동작</th>',
       '        </tr></thead>',
       '        <tbody>',
       (visible.length ? visible.map(function (f, i) {
@@ -3288,6 +3438,10 @@
           var label = fn === '법률(법률)' ? '법률' : fn.replace(/\(.*\)$/, '');
           return '<button type="button" class="pbox-subfile-btn" data-act="open-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(fn + '.md') + '" aria-label="' + esc(f.title + ' ' + label) + ' 열기">' + esc(label) + '</button>';
         }).join(' ');
+        var has3Dan = resolve3DanTargets(f).length >= 2;
+        if (has3Dan) {
+          subBtns += ' <button type="button" class="pbox-3dan-btn" data-act="open-law-3dan" data-dir="' + esc(f.dir) + '" aria-label="' + esc(f.title) + ' 법률·시행령·시행규칙 3단 비교 열기">3단 비교</button>';
+        }
         return '<tr>' +
           '<td class="col-chk"><label class="pbox-chk-tap"><input type="checkbox" data-act="toggle-law-chk" data-dir="' + esc(f.dir) + '" aria-label="' + esc(f.title) + ' 선택"' + checked + '></label></td>' +
           '<td class="col-num">' + (i + 1) + '</td>' +
@@ -3299,6 +3453,7 @@
           '<td class="pbox-cell-hide-m">' + (cached ? '<span class="pbox-badge-green">오프라인보관</span>' : '<span class="pbox-badge-gray">실시간열람</span>') + '</td>' +
           '<td class="pbox-cell-actions">' +
             '<button type="button" class="pbox-mini-act" data-act="open-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '">전문</button> ' +
+            '<button type="button" class="pbox-mini-act" data-act="open-law-history" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '" title="과거 개정본(구법)·연혁 조회">구법</button> ' +
             '<button type="button" class="pbox-mini-act" data-act="attach-law" data-dir="' + esc(f.dir) + '" data-file="' + esc(f.primaryFile) + '">@첨부</button>' +
           '</td>' +
         '</tr>';
@@ -4088,10 +4243,80 @@
     if (!rEl) return;
     if (!state.readerOpen) {
       rEl.style.display = 'none';
+      if (rEl.classList) rEl.classList.remove('wide-3dan');
       rEl.innerHTML = '';
       return;
     }
     rEl.style.display = 'flex';
+    if (rEl.classList) {
+      if (state.readerKind === 'law' && state.readerLawMode === '3dan') rEl.classList.add('wide-3dan');
+      else rEl.classList.remove('wide-3dan');
+    }
+
+    function formatLawArticleTextHtml(rawTxt) {
+      return esc(rawTxt).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    }
+
+    if (state.readerKind === 'law' && state.readerLawMode === '3dan') {
+      var td = state.reader3Dan;
+      var fam3 = state.readerLawFamily;
+      var lawTitle3 = (td && td.title) || (fam3 && fam3.title) || '';
+      var lawDir3 = (td && td.dir) || (fam3 && fam3.dir) || '';
+      var official3Url = 'https://www.law.go.kr/%EB%B2%95%EB%A0%B9/' + encodeURIComponent(lawTitle3 || lawDir3);
+      var q3 = state.readerArticleFilter.trim().toLowerCase();
+      var colsHtml = '';
+      if (!td || td.loading) {
+        colsHtml = '<div class="pbox-loading-line">법률 · 시행령 · 시행규칙 3단 비교 원문을 불러오고 있습니다…</div>';
+      } else {
+        colsHtml = '<div class="pbox-3dan-grid">' + (td.cols || []).map(function (col) {
+          var colLaw = col.law;
+          var colArts = (colLaw && Array.isArray(colLaw.articles)) ? colLaw.articles.filter(function (a) {
+            if (!q3) return true;
+            return (a.no + ' ' + (a.heading || '') + ' ' + (a.text || '')).toLowerCase().indexOf(q3) >= 0;
+          }) : [];
+          var colBody = col.error
+            ? '<div class="pbox-empty-mini">불러오기 실패: ' + esc(col.error) + '</div>'
+            : (colArts.length ? colArts.map(function (a) {
+                return '<article class="pbox-law-art">' +
+                  (a.chapter ? '<div class="pbox-art-chap">' + esc(a.chapter) + '</div>' : '') +
+                  '<div class="pbox-art-hd">' +
+                    '<strong>' + esc(a.no + (a.heading ? ' (' + a.heading + ')' : '')) + '</strong>' +
+                    '<button type="button" class="pbox-mini-act" data-act="copy-art" data-law="' + esc((colLaw ? colLaw.title : lawTitle3) + ' ' + col.label) + '" data-no="' + esc(a.no + (a.heading ? '(' + a.heading + ')' : '')) + '">복사</button>' +
+                  '</div>' +
+                  '<div class="pbox-art-txt">' + formatLawArticleTextHtml(a.text) + '</div>' +
+                '</article>';
+              }).join('') : '<div class="pbox-empty-mini">' + (q3 ? '검색어와 일치하는 조문이 없습니다.' : '수록 조문이 없습니다.') + '</div>');
+          var effLbl = (colLaw && colLaw.effectiveState) ? colLaw.effectiveState.label : '';
+          return '<section class="pbox-3dan-col" aria-label="' + esc(col.label) + ' 조문">' +
+            '<div class="pbox-3dan-col-hd">' +
+              '<span>' + esc(col.label) + ' (' + colArts.length + '조)</span>' +
+              '<button type="button" class="pbox-mini-act" data-act="open-law" data-dir="' + esc(lawDir3) + '" data-file="' + esc(col.fileName) + '" title="' + esc(effLbl) + '">단일열기</button>' +
+            '</div>' +
+            colBody +
+          '</section>';
+        }).join('') + '</div>';
+      }
+      rEl.innerHTML = [
+        '<div class="pbox-reader-hd">',
+        '  <div class="pbox-reader-titlewrap">',
+        '    <div class="pbox-reader-kicker"><span class="pbox-badge-green">📊 3단 비교 (법률 · 시행령 · 시행규칙)</span></div>',
+        '    <strong class="pbox-reader-title">' + esc(lawTitle3) + '</strong>',
+        '  </div>',
+        '  <div class="pbox-btn-group">',
+        '    <a class="pbox-btn-sm" href="' + esc(official3Url) + '" target="_blank" rel="noopener noreferrer">🏛️ 법제처 3단비교 ↗</a>',
+        '    <button type="button" class="pbox-btn-sm" data-act="open-law" data-dir="' + esc(lawDir3) + '" data-file="' + esc(fam3 ? fam3.primaryFile : '법률.md') + '">단일 보기</button>',
+        '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
+        '  </div>',
+        '</div>',
+        '<div class="pbox-reader-tools">',
+        '  <input type="search" id="pboxReaderArtInput" class="pbox-input" aria-label="3단 비교 조문 동시 검색" value="' + esc(state.readerArticleFilter) + '" placeholder="법률·시행령·시행규칙 동시 조문 검색 (예: 제23조, 통상임금, 해고…)">',
+        '</div>',
+        '<div class="pbox-reader-bd">',
+        colsHtml,
+        '</div>'
+      ].join('\n');
+      return;
+    }
 
     if (state.readerKind === 'law') {
       var law = state.readerLaw;
@@ -4100,7 +4325,10 @@
         rEl.innerHTML = '<div class="pbox-reader-hd"><strong>📖 법령 원문 불러오는 중…</strong><button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button></div><div class="pbox-reader-bd"><div class="pbox-loading-line">국가법령 미러에서 조문 전체를 가져오고 있습니다…</div></div>';
         return;
       }
-      var effClass = (law.effectiveState && law.effectiveState.status === 'upcoming') ? 'pbox-badge-amber' : 'pbox-badge-green';
+      var effClass = law.isHistorical ? 'pbox-badge-amber' : ((law.effectiveState && law.effectiveState.status === 'upcoming') ? 'pbox-badge-amber' : 'pbox-badge-green');
+      var effText = law.isHistorical
+        ? ('📜 과거 구법 (' + (law.revisionDate || law.effectiveDate || '이전 개정본') + ')')
+        : (law.effectiveState ? law.effectiveState.label : '시행법령');
       var qArt = state.readerArticleFilter.trim().toLowerCase();
       var arts = (law.articles || []).filter(function (a) {
         if (!qArt) return true;
@@ -4153,6 +4381,40 @@
         var isCur = law.fileName === fullFn;
         return '<button type="button" role="tab" aria-selected="' + (isCur ? 'true' : 'false') + '" class="pbox-tab-pill' + (isCur ? ' active' : '') + '" data-act="open-law" data-dir="' + esc(law.dir) + '" data-file="' + esc(fullFn) + '">' + esc(fn === '법률(법률)' ? '법률(현행)' : fn) + '</button>';
       }).join('');
+      var has3DanInReader = resolve3DanTargets(fam).length >= 2;
+      if (has3DanInReader) {
+        siblingTabs += ' <button type="button" class="pbox-3dan-btn" data-act="open-law-3dan" data-dir="' + esc(law.dir) + '">📊 3단 비교</button>';
+      }
+      siblingTabs += ' <button type="button" class="pbox-tab-pill' + (state.readerHistoryOpen || law.isHistorical ? ' active' : '') + '" data-act="toggle-law-history">📜 과거 구법·연혁</button>';
+
+      var historyBarHtml = '';
+      if (state.readerHistoryOpen || law.isHistorical) {
+        var revOptionsHtml = '<option value="current"' + (!law.isHistorical ? ' selected' : '') + '>현재 시행본 (최신)</option>' +
+          (state.readerHistoryList || []).filter(function (r) { return !r.isLatest; }).map(function (r) {
+            var sel = (law.isHistorical && law.revisionSha === r.sha) ? ' selected' : '';
+            return '<option value="' + esc(r.sha) + '"' + sel + '>' + esc(r.label) + '</option>';
+          }).join('');
+        var officialHistUrl = buildOfficialHistoricalLawUrl(law.title, state.readerHistoryDate);
+        var officialAllHistUrl = buildOfficialHistoricalLawUrl(law.title, '');
+        historyBarHtml = [
+          '<div class="pbox-history-bar" role="region" aria-label="과거 법령(구법) 연혁 선택">',
+          '  <div class="pbox-history-row">',
+          '    <strong>📜 과거 구법 선택:</strong>',
+          (state.readerHistoryBusy
+            ? '    <span>개정 이력 불러오는 중…</span>'
+            : '    <select id="pboxLawRevSelect" class="pbox-history-sel" aria-label="과거 개정본(구법) 선택">' + revOptionsHtml + '</select>'),
+          (law.isHistorical ? '    <button type="button" class="pbox-btn-sm" data-act="return-current-law">현행법으로 돌아가기</button>' : ''),
+          '  </div>',
+          (state.readerHistoryError ? '  <div>' + esc(state.readerHistoryError) + '</div>' : ''),
+          '  <div class="pbox-history-row">',
+          '    <span>특정 기준일(법제처 전체 연혁):</span>',
+          '    <input type="date" id="pboxReaderHistDate" class="pbox-law-hist-date" aria-label="법제처 기준일 구법 날짜" value="' + esc(state.readerHistoryDate) + '">',
+          '    <a class="pbox-mini-act" href="' + esc(officialHistUrl) + '" target="_blank" rel="noopener noreferrer">기준일 법제처 ↗</a>',
+          '    <a class="pbox-mini-act" href="' + esc(officialAllHistUrl) + '" target="_blank" rel="noopener noreferrer">전체 연혁·폐지법 ↗</a>',
+          '  </div>',
+          '</div>'
+        ].join('\n');
+      }
 
       var readerConnLaws = (E && typeof E.getConnectedLawsFor === 'function')
         ? E.getConnectedLawsFor(law.dir, global.PuPBoxLawIndex ? global.PuPBoxLawIndex.list() : [], 8)
@@ -4168,7 +4430,7 @@
       rEl.innerHTML = [
         '<div class="pbox-reader-hd">',
         '  <div class="pbox-reader-titlewrap">',
-        '    <div class="pbox-reader-kicker"><span class="' + effClass + '">' + esc(law.effectiveState ? law.effectiveState.label : '시행법령') + '</span> <span class="pbox-muted">공포 제' + esc(law.promulgationNo || '-') + '호</span></div>',
+        '    <div class="pbox-reader-kicker"><span class="' + effClass + '">' + esc(effText) + '</span> <span class="pbox-muted">공포 제' + esc(law.promulgationNo || '-') + '호</span></div>',
         '    <strong class="pbox-reader-title">' + esc(law.title) + '</strong>',
         '  </div>',
         '  <div class="pbox-btn-group">',
@@ -4176,7 +4438,8 @@
         '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
         '  </div>',
         '</div>',
-        (siblingTabs ? '<div class="pbox-reader-tabs" role="tablist" aria-label="관련 하위법령 탭">' + siblingTabs + '</div>' : ''),
+        (siblingTabs ? '<div class="pbox-reader-tabs" role="tablist" aria-label="관련 하위법령 및 3단비교·구법 탭">' + siblingTabs + '</div>' : ''),
+        historyBarHtml,
         readerConnHtml,
         '<div class="pbox-reader-tools">',
         '  <input type="search" id="pboxReaderArtInput" class="pbox-input" aria-label="이 법령 내 조문·별표 찾기" value="' + esc(state.readerArticleFilter) + '" placeholder="이 법령 내 조문·별표 찾기 (예: 제23조, 별표 1, 통상임금…)">',
@@ -4203,10 +4466,10 @@
               '<strong>' + esc(a.no + (a.heading ? ' (' + a.heading + ')' : '')) + '</strong>' +
               '<button type="button" class="pbox-mini-act" data-act="copy-art" data-law="' + esc(law.title) + '" data-no="' + esc(a.no + (a.heading ? '(' + a.heading + ')' : '')) + '">조문복사</button>' +
             '</div>' +
-            '<div class="pbox-art-txt">' + esc(a.text).replace(/\n/g, '<br>') + '</div>' +
+            '<div class="pbox-art-txt">' + formatLawArticleTextHtml(a.text) + '</div>' +
             linkedHtml +
           '</article>';
-        }).join('') : (qArt && filteredAnnexes.length ? '<div class="pbox-empty-mini">해당 검색어와 일치하는 본문 조문은 없으며, 아래 별표·서식 목록에서 일치 항목을 찾았습니다.</div>' : '<div class="pbox-plain-law">' + esc(law.plainText).replace(/\n/g, '<br>') + '</div>')),
+        }).join('') : (qArt && filteredAnnexes.length ? '<div class="pbox-empty-mini">해당 검색어와 일치하는 본문 조문은 없으며, 아래 별표·서식 목록에서 일치 항목을 찾았습니다.</div>' : '<div class="pbox-plain-law">' + formatLawArticleTextHtml(law.plainText) + '</div>')),
         annexHtml,
         (law.addenda ? '<details class="pbox-addenda"><summary>부칙 보기</summary><pre class="pbox-preview-pre">' + esc(law.addenda) + '</pre></details>' : ''),
         '</div>'
@@ -5194,6 +5457,60 @@
       if (inf && (!ev || ev.target !== inf)) inf.click();
     } else if (act === 'open-law') {
       openLawInReader(btn.getAttribute('data-dir'), btn.getAttribute('data-file') || '', btn.getAttribute('data-art') || '');
+    } else if (act === 'open-law-3dan') {
+      openLaw3DanInReader(btn.getAttribute('data-dir'));
+    } else if (act === 'open-law-history') {
+      openLawInReader(btn.getAttribute('data-dir'), btn.getAttribute('data-file') || '', '', { openHistory: true });
+    } else if (act === 'toggle-law-history') {
+      state.readerHistoryOpen = !state.readerHistoryOpen;
+      if (state.readerHistoryOpen && (!state.readerHistoryList || !state.readerHistoryList.length)) {
+        loadLawHistoryForCurrent();
+      } else {
+        renderReader();
+      }
+    } else if (act === 'return-current-law') {
+      if (state.readerLaw && state.readerLaw.dir) {
+        openLawInReader(state.readerLaw.dir, state.readerLaw.fileName, state.readerHighlightArt, { openHistory: true });
+      }
+    } else if (act === 'open-law-date-official') {
+      var liHist = document.getElementById('pboxLawSearchInput');
+      var dtHist = document.getElementById('pboxLawHistDate');
+      var qLaw = (liHist ? liHist.value : state.lawQuery || '').trim();
+      var dtVal = (dtHist ? dtHist.value : state.lawHistoryLookupDate || '').trim();
+      state.lawHistoryLookupDate = dtVal;
+      var targetLawName = '';
+      if (qLaw && global.PuPBoxEngine && typeof global.PuPBoxEngine.resolveSmartLawJump === 'function') {
+        var sj = global.PuPBoxEngine.resolveSmartLawJump(qLaw, global.PuPBoxLawIndex ? global.PuPBoxLawIndex.list() : []);
+        if (sj && sj.lawTitle) targetLawName = sj.lawTitle;
+      }
+      if (!targetLawName && qLaw) {
+        var sanHist = sanitizeExternalSearchQuery(qLaw);
+        if (!sanHist.ok) {
+          toast(sanHist.error, 'err');
+          return;
+        }
+        targetLawName = sanHist.query;
+      }
+      var histUrl = buildOfficialHistoricalLawUrl(targetLawName, dtVal);
+      if (typeof global.open === 'function') global.open(histUrl, '_blank', 'noopener,noreferrer');
+    } else if (act === 'open-law-repeal-official') {
+      var liRep = document.getElementById('pboxLawSearchInput');
+      var qRep = (liRep ? liRep.value : state.lawQuery || '').trim();
+      var safeRepName = '';
+      if (qRep && global.PuPBoxEngine && typeof global.PuPBoxEngine.resolveSmartLawJump === 'function') {
+        var sjRep = global.PuPBoxEngine.resolveSmartLawJump(qRep, global.PuPBoxLawIndex ? global.PuPBoxLawIndex.list() : []);
+        if (sjRep && sjRep.lawTitle) safeRepName = sjRep.lawTitle;
+      }
+      if (!safeRepName && qRep) {
+        var sanRep = sanitizeExternalSearchQuery(qRep);
+        if (!sanRep.ok) {
+          toast(sanRep.error, 'err');
+          return;
+        }
+        safeRepName = sanRep.query;
+      }
+      var repUrl = buildOfficialHistoricalLawUrl(safeRepName, '');
+      if (typeof global.open === 'function') global.open(repUrl, '_blank', 'noopener,noreferrer');
     } else if (act === 'open-doc') {
       openDocInReader(btn.getAttribute('data-id'));
     } else if (act === 'close-reader') {
@@ -6571,6 +6888,13 @@
       } else if (ev.target.id === 'pboxDeadlineBaseInput') {
         state.deadlineBaseDate = String(ev.target.value || '').trim();
         renderMain();
+      } else if (ev.target.id === 'pboxLawRevSelect') {
+        openLawRevisionInReader(String(ev.target.value || ''));
+      } else if (ev.target.id === 'pboxLawHistDate') {
+        state.lawHistoryLookupDate = String(ev.target.value || '').trim();
+      } else if (ev.target.id === 'pboxReaderHistDate') {
+        state.readerHistoryDate = String(ev.target.value || '').trim();
+        renderReader();
       } else if (ev.target.id === 'pboxReviewFileInput') {
         handleReviewFileOpen(ev.target.files);
         ev.target.value = '';
@@ -6833,6 +7157,14 @@
     state.liveCollectBanner = null;
     state.siteSearchQuery = '';
     state.lawQuery = '';
+    state.lawHistoryLookupDate = '';
+    state.readerLawMode = 'single';
+    state.reader3Dan = null;
+    state.readerHistoryOpen = false;
+    state.readerHistoryBusy = false;
+    state.readerHistoryList = [];
+    state.readerHistoryError = '';
+    state.readerHistoryDate = '';
     state.ingestRawText = '';
     state.ingestPreview = null;
     state.ingestShareConfirmed = false;

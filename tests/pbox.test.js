@@ -6208,3 +6208,190 @@ test('㉚ 워크스페이스 상단 툴바 틀고정 · 접이식 검증칩 · �
   assert.ok(!wsHtmlPrecs.includes('현행 법령 · 조문'), '판례 탭 전환 시 법령 섹션은 숨겨져 한눈에 보기 쉽게 정리되어야 합니다');
   assert.equal(ctx.window.PuPBoxStore.getThreads().find((t) => t.id === savedTh.id).title, '수정 중인 미저장 제목', '우측 근거 탭 전환 시 입력 중이던 제목 초안이 유실되지 않고 보존되어야 합니다');
 });
+
+/* ══════════════════════════════════════════════════════════════
+ * 31. 상단 필터 틀고정 · 법령 3단 비교 · 리더 절반 폭 확대 · 과거 구법(연혁) 조회 검증
+ * ══════════════════════════════════════════════════════════════ */
+test('㉛ 상단 필터 틀고정 · 법령 3단 비교(법률/시행령/시행규칙) · 리더 절반 폭 확대 · 과거 구법(연혁) 조회 검증', async () => {
+  const htmlSrc = fs.readFileSync(path.join(ROOT, 'pu-pbox.html'), 'utf8');
+  assert.match(
+    htmlSrc,
+    /@media\s*\(min-width:769px\)\s*\{[\s\S]*?\.pbox-filter-card\{position:sticky;top:0;z-index:16\}/,
+    'PC·태블릿(>=769px)에서 상단 검색·필터 카드(.pbox-filter-card)가 틀고정(sticky)되어야 합니다'
+  );
+  assert.match(
+    htmlSrc,
+    /\.pbox-reader\{width:50vw;min-width:520px;max-width:960px;/,
+    '법령 원문 리더(.pbox-reader)는 PC 화면 절반(50vw) 폭으로 넓게 표시되어야 합니다'
+  );
+  assert.match(
+    htmlSrc,
+    /\.pbox-reader\.wide-3dan\{width:78vw;/,
+    '3단 비교 모드(.pbox-reader.wide-3dan)에서는 3열 비교가 편하도록 78vw로 확장되어야 합니다'
+  );
+
+  const docListeners = {};
+  const elementsById = {};
+  function makeEl(id) {
+    return {
+      id: id || '',
+      style: {},
+      value: '',
+      checked: false,
+      textContent: '',
+      _html: '',
+      _ownedIds: new Set(),
+      get innerHTML() { return this._html; },
+      set innerHTML(v) {
+        for (const oldId of this._ownedIds) delete elementsById[oldId];
+        this._ownedIds.clear();
+        this._html = String(v || '');
+        const tagRe = /<([a-z0-9]+)\b([^>]*)>/gi;
+        let m;
+        while ((m = tagRe.exec(this._html)) !== null) {
+          const attrsStr = m[2] || '';
+          const idMatch = /\bid="([^"]+)"/i.exec(attrsStr);
+          if (!idMatch) continue;
+          const child = makeEl(idMatch[1]);
+          const valMatch = /\bvalue="([^"]*)"/i.exec(attrsStr);
+          if (valMatch) child.value = valMatch[1];
+          elementsById[idMatch[1]] = child;
+          this._ownedIds.add(idMatch[1]);
+        }
+      },
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      setAttribute(k, v) { this[k] = v; },
+      removeAttribute(k) { delete this[k]; },
+      getAttribute(k) { return this[k] !== undefined ? this[k] : null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      contains() { return false; },
+      appendChild() {},
+      removeChild() {},
+      focus() {}
+    };
+  }
+  const rootEl = makeEl('pboxRoot');
+  elementsById.pboxRoot = rootEl;
+  const domDoc = {
+    documentElement: makeEl('html'),
+    head: makeEl('head'),
+    body: makeEl('body'),
+    activeElement: null,
+    getElementById: (id) => {
+      if (!elementsById[id]) elementsById[id] = makeEl(id);
+      return elementsById[id];
+    },
+    createElement: (tag) => makeEl(tag),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (ev, fn) => {
+      if (!docListeners[ev]) docListeners[ev] = [];
+      docListeners[ev].push(fn);
+    }
+  };
+
+  const mockCurrentLawMd = '---\n시행일자: 2026-10-02\n공포번호: 제21857호\n---\n# 근로기준법\n### 제1조(목적)\n**①** 현행 근로기준법 제1조 본문입니다.\n';
+  const mockDecreeMd = '---\n시행일자: 2026-10-02\n공포번호: 제35000호\n---\n# 근로기준법 시행령\n### 제1조(목적)\n현행 근로기준법 시행령 제1조 본문입니다.\n';
+  const mockRuleMd = '---\n시행일자: 2026-10-02\n공포번호: 제420호\n---\n# 근로기준법 시행규칙\n### 제1조(목적)\n현행 근로기준법 시행규칙 제1조 본문입니다.\n';
+  const mockOldLawMd = '---\n시행일자: 2020-05-26\n공포번호: 제17326호\n---\n# 근로기준법\n### 제1조(목적)\n**①** 2020년 구법 근로기준법 제1조 본문입니다.\n';
+
+  const mockFetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.github.com/repos/legalize-kr/legalize-kr/commits')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ([
+          { sha: '98e270ba66bb34722e953b4de37fb26dd983381e', commit: { author: { date: '2026-08-04T03:00:00Z' }, message: '법률: 근로기준법 (타법개정)' } },
+          { sha: 'b2f4792b11223344556677889900aabbccddeeff', commit: { author: { date: '2020-05-26T03:00:00Z' }, message: '법률: 근로기준법 (2020년 구법)' } }
+        ])
+      };
+    }
+    if (u.includes('b2f4792b11223344556677889900aabbccddeeff')) {
+      return { ok: true, status: 200, text: async () => mockOldLawMd };
+    }
+    if (u.includes(encodeURIComponent('시행규칙.md'))) {
+      return { ok: true, status: 200, text: async () => mockRuleMd };
+    }
+    if (u.includes(encodeURIComponent('시행령.md'))) {
+      return { ok: true, status: 200, text: async () => mockDecreeMd };
+    }
+    if (u.includes(encodeURIComponent('근로기준법'))) {
+      return { ok: true, status: 200, text: async () => mockCurrentLawMd };
+    }
+    return { ok: false, status: 404, text: async () => '' };
+  };
+
+  const ctx = {
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    localStorage: { getItem: () => null, setItem: () => {} },
+    document: domDoc,
+    fetch: mockFetch,
+    window: null
+  };
+  ctx.window = {
+    innerWidth: 1440,
+    PuPBoxEngine: Engine,
+    PuPBoxCorpus: Corpus,
+    PuPBoxLawIndex: loadLawIndex(),
+    document: domDoc,
+    localStorage: ctx.localStorage,
+    fetch: mockFetch,
+    addEventListener: () => {}
+  };
+  ctx.globalThis = ctx.window;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-store.js'), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', 'pu-pbox-app.js'), 'utf8'), ctx);
+
+  const Store = ctx.window.PuPBoxStore;
+  const App = ctx.window.PuPBoxApp;
+  await Store.init('law-3dan-user');
+  await App.mount(rootEl, { uid: 'law-3dan-user', name: '테스트 노무사' });
+
+  function fireClick(attrs) {
+    const fakeBtn = {
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null),
+      closest: (sel) => (sel === '[data-act]' ? fakeBtn : null)
+    };
+    const ev = { target: fakeBtn, preventDefault() {}, stopPropagation() {} };
+    (docListeners.click || []).forEach((fn) => fn(ev));
+  }
+
+  /* 1) 법령 조회 화면에 [3단 비교]·[구법] 버튼 및 과거 구법 검색 줄이 표시됨 */
+  App.switchView('laws');
+  const lawsHtml = elementsById.pboxMainArea.innerHTML;
+  assert.ok(lawsHtml.includes('data-act="open-law-3dan"'), '법령 목록에 [3단 비교] 버튼이 표시되어야 합니다');
+  assert.ok(lawsHtml.includes('data-act="open-law-history"'), '법령 목록에 [구법] 버튼이 표시되어야 합니다');
+  assert.ok(lawsHtml.includes('class="pbox-law-hist-row"'), '법령 조회 상단에 과거 구법·연혁 조회 줄이 표시되어야 합니다');
+
+  /* 2) [3단 비교] 클릭 시 법률·시행령·시행규칙 3열 동시 렌더링 + wide-3dan 확장 */
+  fireClick({ 'data-act': 'open-law-3dan', 'data-dir': '근로기준법' });
+  await new Promise((r) => setTimeout(r, 20));
+  const readerEl = elementsById.pboxReader;
+  assert.ok(readerEl.classList.contains('wide-3dan'), '3단 비교 열람 시 리더에 wide-3dan 클래스가 부여되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('class="pbox-3dan-grid"'), '3단 비교 3열 그리드가 렌더링되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('법률 (1조)') && readerEl.innerHTML.includes('시행령 (1조)') && readerEl.innerHTML.includes('시행규칙 (1조)'), '법률·시행령·시행규칙 3열이 모두 표시되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('<strong>①</strong>'), '마크다운 **①** 기호가 굵은 글씨(<strong>①</strong>)로 깔끔히 렌더링되어야 합니다');
+
+  /* 3) 과거 구법(연혁) 조회 — 비정상 SHA 거부 + 과거 개정본 열람 시 현행 법령 캐시 미오염 검증 */
+  await assert.rejects(() => Store.fetchLawRevision('근로기준법', '법률(법률).md', '../evil'), /유효하지 않은/);
+  const histList = await Store.fetchLawHistory('근로기준법', '법률(법률).md');
+  assert.equal(histList.length, 2, '개정 이력 2건이 조회되어야 합니다');
+  const oldLaw = await Store.fetchLawRevision('근로기준법', '법률(법률).md', 'b2f4792b11223344556677889900aabbccddeeff', histList[1]);
+  assert.equal(oldLaw.isHistorical, true, '과거 개정본은 isHistorical=true 표식이 있어야 합니다');
+  assert.ok(oldLaw.plainText.includes('2020년 구법'), '2020년 구법 원문이 정확히 불러와져야 합니다');
+  assert.ok(Store.getCachedLaw('근로기준법', '법률(법률).md').plainText.includes('현행 근로기준법'), '과거 구법 열람이 현행 법령 캐시를 덮어쓰면 안 됩니다');
+
+  /* 4) 리더에서 [구법] 버튼 클릭 후 과거 개정본 선택 시 과거 구법 배너 및 [현행법으로 돌아가기] 표시 */
+  fireClick({ 'data-act': 'open-law-history', 'data-dir': '근로기준법', 'data-file': '법률(법률).md' });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(readerEl.innerHTML.includes('id="pboxLawRevSelect"'), '과거 구법 선택 드롭다운이 렌더링되어야 합니다');
+  (docListeners.change || []).forEach((fn) => fn({ target: { id: 'pboxLawRevSelect', value: 'b2f4792b11223344556677889900aabbccddeeff' } }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(readerEl.innerHTML.includes('📜 과거 구법'), '과거 구법 열람 시 상단에 과거 구법 배너가 표시되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('data-act="return-current-law"'), '현행법으로 돌아가기 버튼이 표시되어야 합니다');
+  assert.ok(readerEl.innerHTML.includes('2020년 구법'), '리더 본문에 선택한 과거 구법 조문이 표시되어야 합니다');
+});
