@@ -29336,11 +29336,11 @@ function ContractManagement(props){
     if(newStatus === 'signed'){
       var prom = promoteContractToSigned(id, '');
       if(!prom || !prom.kept) return;
-      var finalCt = prom.kept;
-      if(finalCt.id && erpConfirmAskOn()) setSendAsk(Object.assign({}, finalCt, { status:'signed' }));   // ✅ 확정 → 서류 보내기 (2026-10-09)
-      setJustMovedId(finalCt.id);
-      setTimeout(function(){ setJustMovedId(function(cur){ return cur===finalCt.id ? null : cur; }); }, 3000);
-      showToast('✅ ' + finalCt.companyName + ' → 계약확정' + (prom.retiredCount ? ' (빈 진행카드 ' + prom.retiredCount + '건 통합 정리)' : '') + ' · 이관 버튼을 눌러 이관하세요');
+      ct = prom.kept;
+      if(newStatus === 'signed' && ct.id && erpConfirmAskOn()) setSendAsk(Object.assign({}, ct, { status:'signed' }));   // ✅ 확정 → 서류 보내기 (2026-10-09)
+      setJustMovedId(ct.id);
+      setTimeout(function(){ setJustMovedId(function(cur){ return cur===ct.id ? null : cur; }); }, 3000);
+      showToast('✅ ' + ct.companyName + ' → 계약확정' + (prom.retiredCount ? ' (빈 진행카드 ' + prom.retiredCount + '건 통합 정리)' : '') + ' · 이관 버튼을 눌러 이관하세요');
       return;
     }
     if(!patchOne(id, { status:newStatus, orderTs: Date.now() })) return;
