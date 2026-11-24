@@ -39217,7 +39217,7 @@ function CaseManagement(props){
                     c.clientType === 'both'
                       ? h('span', null,
                           workerLabel ? ('👤 ' + workerLabel + ' · ') : '',
-                          h('span', { style:{ color:'#475569', fontWeight:500 } }, coNameDisp),
+                          h('span', { style:{ color:'#475569', fontWeight:500 } }, '🏢 ' + (coShown(c, 'name') || '-')),
                           coLinkable(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗'))
                       : (c.clientType === 'worker' && workerLabel)
                         ? workerLabel

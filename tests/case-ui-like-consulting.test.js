@@ -80,9 +80,8 @@ test('5) 행마다 붉게 뜨던 인라인 ⚠️ 복원 단추와 .map 안의 �
 });
 
 test('6) 엑셀 내려받기와 행 드래그 복사는 관할기관·담당자·연락처·이메일 4개 값을 그대로 내보낸다', () => {
-  const excelIdx = CM.indexOf('function exportExcel()');
-  assert.ok(excelIdx > 0);
-  const excelBlock = CM.slice(excelIdx, excelIdx + 1200);
+  const excelBlock = cutFn(CM, 'function exportExcel()');
+  assert.ok(excelBlock.length > 0);
   assert.match(excelBlock, /'관할기관':\s*jur\.org/);
   assert.match(excelBlock, /'관할담당자':\s*jur\.officer/);
   assert.match(excelBlock, /'관할연락처':\s*jur\.phone/);
