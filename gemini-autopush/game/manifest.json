@@ -1,0 +1,9 @@
+{
+  "name": "3D운전교실 한국 버전",
+  "short_name": "3D운전교실 KR",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070a12",
+  "theme_color": "#070a12",
+  "orientation": "any"
+}
