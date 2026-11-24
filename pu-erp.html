@@ -21908,6 +21908,12 @@ function erpQuoteLanePlan(req, cos, cts, users){
     return { action:'noop', why:'이미 반영한 메일입니다' };
   if(reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return _hasMail(c, sk); }); }))
     return { action:'noop', why:'이미 반영한 메일입니다' };
+  /* 휴지통(_deleted)에 보낸 계약의 메일은 «사람이 처리해 치운 메일» — 같은 메일로 카드를 다시 만들지 않는다(2026-11-17: 지운 계약 둘이 그날 되살아남).
+     지운 카드의 메일이 섞여 있고 나머지는 살아 있는 카드가 이미 가진 메일이면 새로 만들 것이 없다. 새 메일이 하나라도 있으면 막지 않는다. */
+  var _deadCts = (cts || []).filter(function(c){ return c && c._deleted; });
+  var _deadHas = function(sk){ return _deadCts.some(function(c){ return _hasMail(c, sk); }); };
+  if(reqSrcMails.some(_deadHas) && reqSrcMails.every(function(sk){ return _deadHas(sk) || all.some(function(c){ return _hasMail(c, sk); }); }))
+    return { action:'noop', why:'지운 계약의 메일입니다' };
   /* 대상 업체 — 요청이 «가리키는» 업체만 믿는다 */
   var co = null;
   if(r.companyId){
@@ -22131,8 +22137,17 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   var ty = erpConsTypeByDocName(docName || scope, consTypes || []);
   if(ty && ty.code) return { kind:'consulting', typeCode:ty.code };
   if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(text)){
+    /* ⚠ 유형을 못 골랐으면 «안 고른다» — 목록 첫 번째를 그냥 찍으면 «인사노무 컨설팅» 위임계약서도
+       현장클리닉이 된다(2026-11-16 점검: 계약 6건이 그렇게 잘못 찍혀 있었다). 사업 이름이 글에 나오고
+       그 이름을 가진 유형이 «딱 하나»일 때만 고른다. 둘 이상이거나 없으면 비워 두어 사람이 고른다
+       (아래 호출부는 typeCode 가 있을 때만 담는다). */
     var kList = consTypes || [];
-    return { kind:'consulting', typeCode:(kList[0] && kList[0].code) || '' };
+    var kwHit = ['클리닉', '일터혁신', '기술보호'].filter(function(kw){ return text.indexOf(kw) >= 0; });
+    if(kwHit.length === 1){
+      var byKw = kList.filter(function(t){ return t && t.code && String(t.name || '').replace(/\s/g, '').indexOf(kwHit[0]) >= 0; });
+      if(byKw.length === 1) return { kind:'consulting', typeCode:byKw[0].code };
+    }
+    return { kind:'consulting', typeCode:'' };
   }
   if(/위임|약정/.test(text)){
     var cList2 = caseTypes || [];
@@ -28157,6 +28172,14 @@ function ContractManagement(props){
       || (reqSrcMails.length && reqSrcMails.every(function(sk){ return all.some(function(c){ return (_isHandledCt(c) || c.status === targetStatus) && _ctHasSrc(c, sk); }); }))){
       await drop();
       return { lane:'photo_contract', noop:'이미 반영한 중복 계약서입니다' };
+    }
+    /* 휴지통에 보낸 계약의 메일·서류는 «사람이 처리해 치운 것» — 같은 메일·사진으로 카드를 다시 만들지 않는다(2026-11-17) */
+    var _deadCtsP = cts.filter(function(c){ return c && c._deleted; });
+    var _deadHasP = function(sk){ return _deadCtsP.some(function(c){ return _ctHasSrc(c, sk); }); };
+    var _deadPhotoP = !!(srcPhoto && srcPhoto.id && _deadCtsP.some(function(c){ return c.srcPhoto && c.srcPhoto.id === srcPhoto.id; }));
+    if(_deadPhotoP || (reqSrcMails.some(_deadHasP) && reqSrcMails.every(function(sk){ return _deadHasP(sk) || all.some(function(c){ return (_isHandledCt(c) || c.status === targetStatus) && _ctHasSrc(c, sk); }); }))){
+      await drop();
+      return { lane:'photo_contract', noop:'지운 계약의 메일·서류입니다' };
     }
     var rCo = (req && req.company) || {};
     var cname = String(rCo.name || (req && req.companyName) || '').trim();

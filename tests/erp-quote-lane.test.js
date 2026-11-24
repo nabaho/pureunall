@@ -116,7 +116,10 @@ test('⑦ 같은 메일은 두 번 반영하지 않는다 — 카드의 srcMails
   const p = P.erpQuoteLanePlan(req(), [CO], [card({ srcMails: ['Sent|1001'] })], USERS);
   assert.equal(p.action, 'noop');
   const del = P.erpQuoteLanePlan(req(), [CO], [card({ srcMails: ['Sent|1001'], _deleted: true })], USERS);
-  assert.equal(del.action, 'create', '지운 카드의 기록은 세지 않는다');
+  /* ⚠ 규칙이 바뀌었다(대표 지시 2026-11-18) — 예전에는 «지운 카드의 기록은 세지 않는다»(create)로 박혀 있었다.
+     그 결과 휴지통에 보낸 계약이 같은 메일로 그날 다시 새 번호를 받아 되살아났다(2026-11-17).
+     이제는 지운 카드의 메일도 «사람이 처리해 치운 메일»이다 — 되살리면(_deleted 가 지워지면) 저절로 다시 센다. */
+  assert.equal(del.action, 'noop', '지운 카드의 메일도 처리한 메일이다 — 같은 메일로 카드를 다시 만들지 않는다');
 });
 
 test('⑧ 같은 사업장에 진행 중 카드가 하나면 덧붙이고, 둘 이상이면 사람이 고르고, 확정만 있으면 재계약 카드', () => {
