@@ -639,7 +639,7 @@
     }).sort(function (a, b) { return String(b.signDate || '').localeCompare(String(a.signDate || '')); });
   }
   /* 계약 값이 «이기는» 칸 — 계약에서만 아는 값. 회사·담당자·근로자 칸은 채우기 창에서 고른 것이 먼저(비면 계약 값) */
-  var CONTRACT_WINS = /^(계약|성공보수$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
+  var CONTRACT_WINS = /^(계약|성공보수율?$|착수금$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
   /* 「계약서 / 제안서·견적서」 두 묶음을 쓰는 종류 (대표 「추천대로」 2026-10-06 — 견적서·제안 공문을 기금 밖에서도).
      사건계약은 사건유형 묶음, 상담사항은 묶음 없음. 이알피 계약서 출력은 어느 종류든 제안서·견적서를 자동 체크하지 않는다. */
   var TWO_GROUP_KINDS = ['company', 'consulting', 'fund', 'other'];
@@ -1839,6 +1839,17 @@
     var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0, srcPick: {}, ok: {}, ntsLive: null, ntsBusy: false,
       pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
       wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
+    function syncWiSuccessFromVals(vals) {
+      var sv = vals && String(vals['성공보수'] || '').trim();
+      if (!sv) return;
+      var mp = /^(\d+(?:\.\d+)?)\s*[%％]$/.exec(sv);
+      if (mp) { st.wi.succ = 'rate'; st.wi.succAmt = mp[1]; }
+      else if (/원$/.test(sv)) {
+        var digits = sv.replace(/[^\d]/g, '');
+        if (digits) { st.wi.succ = 'fixed'; st.wi.succAmt = Number(digits).toLocaleString(); }
+      }
+    }
+    if (host.contractCtx && host.contractCtx.vals) syncWiSuccessFromVals(host.contractCtx.vals);
     /* 근로자 사건은 모두 부가세 포함 (대표 2026-10-24) — 고른 양식이 모두 근로자측이면 「포함」에서 시작한다 */
     if (fms.every(function (fm) { return sideOf(fm) === 'worker'; })) st.wi.vat = 'incl';
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
@@ -1899,7 +1910,11 @@
             host.contractLoad(c.id).then(function (info) {
               if (st.co !== r) return;
               st.ct = { id: info.id || c.id, no: info.contractNo || c.contractNo || '', vals: info.vals, label: '계약 ' + (info.contractNo || info.id) };
+              syncWiSuccessFromVals(info.vals);
               delete st.edits['계약번호'];
+              delete st.edits['성공보수'];
+              delete st.edits['성공보수율'];
+              drawCase();
               drawCtPick(r, list); drawVals();
             }, function (e) { drawCtPick(r, list); toast('⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
           } }, [el('b', { text: c.contractNo || '(번호 없음)' }),
@@ -1934,6 +1949,9 @@
           if (x == null || x === '') return;
           if (CONTRACT_WINS.test(k) || !V[k]) V[k] = x;
         });
+        if (cv['성공보수'] && /[%％]$/.test(String(cv['성공보수']))) V['성공보수율'] = String(cv['성공보수']);
+        if (cv['계약금액'] && !V['착수금']) V['착수금'] = String(cv['계약금액']);
+        if (cv['근로자이름'] && !V['근로자명']) V['근로자명'] = String(cv['근로자이름']);
       }
       if (st.pv.on) {
         var me = host.me ? host.me() : null;

@@ -118,7 +118,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-ai-mask.js?v=1"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-contract-easy.js?v=3"></script>
-<script src="js/pu-contract-forms.js?v=74"></script>
+<script src="js/pu-contract-forms.js?v=75"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -298,7 +298,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
-<script src="js/pu-doc-read.js?v=53"></script>
+<script src="js/pu-doc-read.js?v=54"></script>
 <!-- 옵시디언 업무요약 — 떠 있는 단추를 달지 않는다: 왼쪽 메뉴 맨 아래 「⚙ 환경설정」을 덮었다(2026-09-27).
      메뉴 바닥의 한 줄(환경설정 바로 위)에서 연다. -->
 <script>window.PU_OBSIDIAN_NO_FAB = true;</script>
@@ -14277,7 +14277,10 @@ function PercentInput(props){
   }));
 }
 function NumberInput(props){
-  return h('input', Object.assign({}, props, {
+  var pass = Object.assign({}, props);
+  var onPct = pass.onPercentDetected;
+  delete pass.onPercentDetected;
+  return h('input', Object.assign({}, pass, {
     type:'text',
     inputMode:'numeric',
     value: formatNumber(props.value),
@@ -14287,7 +14290,13 @@ function NumberInput(props){
       if(props.onFocus) props.onFocus(e);
     },
     onChange: function(e){
-      var raw = parseNumber(e.target.value);
+      var vStr = String(e.target.value || '');
+      if(typeof onPct === 'function' && /[%％]/.test(vStr)){
+        var mPct = vStr.match(/(\d+(?:\.\d+)?)/);
+        var pctVal = mPct ? Number(mPct[1]) : 0;
+        if(pctVal > 0 && pctVal <= 100){ onPct(pctVal); return; }
+      }
+      var raw = parseNumber(vStr);
       // synthetic event 변형: target.value를 숫자로 전달
       props.onChange({ target: { value: raw, type:'number' } });
     }
@@ -19173,7 +19182,7 @@ function erpContractPhotoApplyPatch(fields, kindV, f, consTypes){
      한쪽을 고르지 않는다 — 둘 다 내놓고 사람이 고른다(대표 결정 2026-08-17).
      ⚠ fee 는 「자문료」 하나가 아니다 — 판독기가 «보수·자문료·용역비» 를 모두 이 칸에
        담는다. 사건계약에 「자문료」라고 적으면 틀린 말이라 「보수」로 부른다. */
-  var depositAmt = parseAmt(fields.deposit), feeAmt = parseAmt(fields.fee);
+  var depositAmt = parseAmt(fields.deposit), feeAmt = parseAmt(fields.fee), retainerAmt = parseAmt(fields.retainer);
   var amt = 0, amtRaw = '', amountChoices = null;
   if(depositAmt > 0 && feeAmt > 0 && depositAmt !== feeAmt){
     amountChoices = [
@@ -19183,6 +19192,7 @@ function erpContractPhotoApplyPatch(fields, kindV, f, consTypes){
     amt = depositAmt; amtRaw = fields.deposit;      // 안 고르면 계약금이 기본값(칸 이름과 같다)
   } else if(depositAmt > 0){ amt = depositAmt; amtRaw = fields.deposit; }
   else if(feeAmt > 0){       amt = feeAmt;     amtRaw = fields.fee; }
+  else if(retainerAmt > 0){  amt = retainerAmt; amtRaw = fields.retainer; }
 
   /* ⚠ 종류를 아직 안 골랐으면 **금액·업무를 담을 칸이 없다**(2026-08-26).
      그런데도 담으면 amounts[undefined] 라는 없는 칸이 생기고, 화면 어디에도
@@ -19193,10 +19203,58 @@ function erpContractPhotoApplyPatch(fields, kindV, f, consTypes){
   if(amt > 0 && hasKind){
     patch.amounts = Object.assign({}, f.amounts || {});
     patch.amounts[kindV] = amt;
-    lines.push('계약금 ' + amt.toLocaleString() + '원'
+    var firstAmtLabel = (kindV === 'case' || kindV === 'other') ? '착수금' : '계약금';
+    lines.push(firstAmtLabel + ' ' + amt.toLocaleString() + '원'
       + (amtIsMurky(amtRaw) ? ' — 원문 "' + amtRaw + '" (숫자만 읽었습니다 · 확인해 주세요)' : ''));
   } else if(amt > 0){
     lines.push('금액은 안 채웁니다 — 계약 종류를 먼저 골라 주세요 (읽은 값 ' + amt.toLocaleString() + '원)');
+  }
+
+  /* ── 🏆 성공보수(% 요율 또는 금액) 자동 당겨오기 ──
+     계약서의 성공보수(fields.success 또는 pairs 의 성공보수·성과보수·성공보수율)에 % 가 적혀 있으면
+     단위 오인 위험이 없는 비율이므로 successFeeType='percent' 로 당겨오고 원문을 미리보기에 함께 띄워 확인하게 한다. */
+  var rawSucc = String(fields.success === null || fields.success === undefined ? '' : fields.success).trim();
+  if(!rawSucc && Array.isArray(fields.pairs)){
+    for(var pi = 0; pi < fields.pairs.length; pi++){
+      var pk = String((fields.pairs[pi] && (fields.pairs[pi].k || fields.pairs[pi].key)) || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, '');
+      var pv = String((fields.pairs[pi] && (fields.pairs[pi].v || fields.pairs[pi].value)) || '').trim();
+      if(pv && pv !== '-' && /^(?:성공보수율?|성과보수율?|성공수수료|승소보수)$/.test(pk)){ rawSucc = pv; break; }
+    }
+  }
+  if(rawSucc){
+    var cleanSucc = rawSucc
+      .replace(/(?:지연|연체|미지급|지체)[^\n.]{0,35}?연\s*\d+(?:\.\d+)?\s*[%％]\s*(?:의\s*)?이자/g, ' ')
+      .replace(/연\s*\d+(?:\.\d+)?\s*[%％]\s*의?\s*(?:지연\s*|연체\s*)?이자/g, ' ')
+      .replace(/부가(?:가치)?세\s*\d+(?:\.\d+)?\s*[%％]/g, ' ');
+    var mPct1 = cleanSucc.match(/(\d+(?:\.\d+)?)\s*(?:[%％]|퍼센트)/);
+    var mPct2 = !mPct1 ? cleanSucc.match(/백분의\s*(\d+(?:\.\d+)?)/) : null;
+    var mBarePct = (!mPct1 && !mPct2 && /^\d+(?:\.\d+)?$/.test(cleanSucc.trim())) ? cleanSucc.trim() : '';
+    var succPct = mPct1 ? Number(mPct1[1]) : (mPct2 ? Number(mPct2[1]) : (mBarePct ? Number(mBarePct) : 0));
+    if(succPct > 0 && succPct <= 100 && (mPct1 || mPct2 || mBarePct)){
+      if(hasKind && (kindV === 'case' || kindV === 'other')){
+        patch.successFee = succPct;
+        patch.successFeeType = 'percent';
+        var sVatFlag = erpVatTextToFlag(rawSucc);
+        if(sVatFlag !== null) patch.balanceFeeVatIncluded = sVatFlag;
+        lines.push('성공보수 ' + succPct + '%' + (sVatFlag !== null ? ' (부가세 ' + (sVatFlag ? '포함' : '별도') + ')' : '') + ' — 원문 "' + rawSucc + '"');
+      } else if(!hasKind){
+        lines.push('성공보수는 안 채웁니다 — 계약 종류(사건·기타)를 먼저 골라 주세요 (읽은 값 ' + succPct + '%)');
+      } else {
+        lines.push('성공보수 ' + succPct + '% 가 읽혔으나 현재 계약 종류에는 % 칸이 없습니다 — 원문 "' + rawSucc + '"');
+      }
+    } else {
+      var succAmt = parseAmt(rawSucc);
+      if(succAmt > 100 && hasKind && (kindV === 'case' || kindV === 'other' || kindV === 'consulting')){
+        patch.successFee = succAmt;
+        patch.successFeeType = 'amount';
+        var sVatAmt = erpVatTextToFlag(rawSucc);
+        if(sVatAmt !== null) patch.balanceFeeVatIncluded = sVatAmt;
+        lines.push((kindV === 'consulting' ? '잔금 ' : '성공보수 ') + succAmt.toLocaleString() + '원'
+          + (amtIsMurky(rawSucc) ? ' — 원문 "' + rawSucc + '" (숫자만 읽었습니다 · 확인해 주세요)' : ''));
+      } else if(rawSucc){
+        lines.push('성공보수 확인 필요 — 원문 "' + rawSucc + '"');
+      }
+    }
   }
 
   if(fields.scope && hasKind){
@@ -20478,8 +20536,8 @@ var ERP_DOC_FIELD_LABELS = [
   { k:'bizno',      label:'사업자번호',  into:'사업자번호(비어 있을 때만)' },
   { k:'companyTel', label:'연락처',      into:'' },
   { k:'term',       label:'계약기간',    into:'' },
-  { k:'retainer',   label:'착수금',      into:'' },
-  { k:'success',    label:'성공보수',    into:'' },
+  { k:'retainer',   label:'착수금',      into:'착수금' },
+  { k:'success',    label:'성공보수',    into:'성공보수(%·원)' },
   { k:'memo',       label:'특약',        into:'' }
 ];
 
@@ -22083,14 +22141,30 @@ function erpParseContractMoney(v){
   return 0;
 }
 function erpParseSuccessFee(v){
-  var s = String(v == null ? '' : v).replace(/\([^)]*\)/g, '');
-  if(!s.trim()) return { type:'amount', fee:0 };
-  var pct = s.match(/(\d+(?:\.\d+)?)\s*%/);
+  var raw = String(v == null ? '' : v);
+  if(!raw.trim()) return { type:'amount', fee:0 };
+  /* 괄호 안에도 '(승소금액의 15%)' 처럼 실제 성공보수율이 적히는 경우가 흔하므로
+     괄호를 통째로 지우지 않고 지연이자(연 12% 이자)·부가세(10%) 문구만 먼저 걷어낸다. */
+  var sPct = raw
+    .replace(/(?:지연|연체|미지급|지체)[^\n.]{0,35}?연\s*\d+(?:\.\d+)?\s*[%％]\s*(?:의\s*)?이자/g, ' ')
+    .replace(/연\s*\d+(?:\.\d+)?\s*[%％]\s*의?\s*(?:지연\s*|연체\s*)?이자/g, ' ')
+    .replace(/부가(?:가치)?세\s*\d+(?:\.\d+)?\s*[%％]/g, ' ');
+  var pct = sPct.match(/(\d+(?:\.\d+)?)\s*(?:[%％]|퍼센트)/) || sPct.match(/백분의\s*(\d+(?:\.\d+)?)/);
   if(pct){
     var p = parseFloat(pct[1]) || 0;
-    if(p > 0) return { type:'percent', fee:p };
+    if(p > 0 && p <= 100) return { type:'percent', fee:p };
   }
-  var amt = erpParseContractMoney(s);
+  var hal = sPct.match(/(\d)\s*할(?:\s*(\d)\s*푼)?/);
+  if(hal){
+    var hp = (parseInt(hal[1], 10) || 0) * 10 + (parseInt(hal[2], 10) || 0);
+    if(hp > 0 && hp <= 100) return { type:'percent', fee:hp };
+  }
+  var bare = sPct.replace(/\([^)]*\)/g, '').trim();
+  if(/^\d+(?:\.\d+)?$/.test(bare)){
+    var bn = parseFloat(bare) || 0;
+    if(bn > 0 && bn <= 100) return { type:'percent', fee:bn };
+  }
+  var amt = erpParseContractMoney(raw);
   return { type:'amount', fee:amt };
 }
 function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTypes){
@@ -25431,18 +25505,32 @@ function ContractModal(props){
                  원/% 는 금액 «앞» — 그래야 금액 칸이 윗줄 금액 칸과 같은 세로줄에 선다. */
               (isCase || isOther) && h('div', { className:'pu-krow' },
                 kLabel('🏆 성공보수'),
+                f.successFeeType === 'percent' && Number(f.successFee) > 0 && h('span', {
+                  style:{ fontSize:'10.5px', fontWeight:700, color:'#854d0e', background:'#fffbeb', border:'1px solid #fbbf24', borderRadius:'8px', padding:'1px 7px', whiteSpace:'nowrap' },
+                  title:'계약서 성공보수 비율(%)이 반영되었습니다 — 요율을 확인해 주세요'
+                }, '✓ 성공 ' + f.successFee + '% 확인'),
+                f.successFeeType !== 'percent' && Number(f.successFee) > 0 && Number(f.successFee) <= 100 && h('button', {
+                  type:'button',
+                  onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'percent' }); }); },
+                  style:{ fontSize:'10.5px', fontWeight:700, color:'#991b1b', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'8px', padding:'1px 8px', cursor:'pointer', whiteSpace:'nowrap' },
+                  title:'100 이하 숫자가 원 단위로 들어가 있습니다 — 클릭하면 ' + f.successFee + '%(비율)로 바로 전환합니다'
+                }, '⚠ ' + f.successFee + '원 → ' + f.successFee + '%로 전환'),
                 kEnd(
                   h('div', { className:'pu-toggle2' },
                     h('span', { className: f.successFeeType !== 'percent' ? 'on' : '',
                       onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'amount', successFee:0 }); }); } }, '원'),
                     h('span', { className: f.successFeeType === 'percent' ? 'on' : '',
-                      onClick:function(){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'percent', successFee:0 }); }); } }, '%')),
+                      onClick:function(){ setF(function(prev){
+                        var keepPct = (Number(prev.successFee) > 0 && Number(prev.successFee) <= 100) ? Number(prev.successFee) : 0;
+                        return Object.assign({}, prev, { successFeeType:'percent', successFee:keepPct });
+                      }); } }, '%')),
                   f.successFeeType === 'percent'
                     // 소수점을 칠 수 있는 칸 (54.5% 처럼) — 보통 number 칸은 「54.」에서 점이 지워진다
                     ? h(PercentInput, { className:'pu-w-amt', value:f.successFee,
                         onChange:function(e){ setF(function(prev){ return Object.assign({}, prev, { successFee: e.target.value }); }); },
                         placeholder:'성공보수', min:0, max:100 })
                     : h(NumberInput, { className:'pu-w-amt', value:f.successFee, onChange:setSimple('successFee'),
+                        onPercentDetected:function(pctVal){ setF(function(prev){ return Object.assign({}, prev, { successFeeType:'percent', successFee:pctVal }); }); },
                         placeholder:'성공보수',
                         // % 모드는 금액이 아니라 비율이라 안내가 뜻이 없다 — 원 모드에서만 알린다
                         onFocus:function(e){ vatFocusHint(f.balanceFeeVatIncluded, '성공보수', e.target); },
@@ -28202,7 +28290,23 @@ function ContractManagement(props){
       guessed = { kind: kv, typeCode: (_infList[0] && _infList[0].code) || '' };
     }
     var amt = erpParseContractMoney(cf.retainer || cf.deposit || cf.fee);
-    var succ = erpParseSuccessFee(cf.success);
+    var rawCfSuccess = String(cf.success || '').trim();
+    if(!rawCfSuccess && Array.isArray(cf.pairs)){
+      for(var _pi = 0; _pi < cf.pairs.length; _pi++){
+        var _pk = String((cf.pairs[_pi] && (cf.pairs[_pi].k || cf.pairs[_pi].key)) || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, '');
+        var _pv = String((cf.pairs[_pi] && (cf.pairs[_pi].v || cf.pairs[_pi].value)) || '').trim();
+        if(_pv && _pv !== '-' && /^(?:성공보수율?|성과보수율?|성공수수료|승소보수)$/.test(_pk)){ rawCfSuccess = _pv; break; }
+      }
+    }
+    if(!rawCfSuccess){
+      var _mSuccInMemo = /(?:성공\s*보수(?:율)?|성과\s*보수(?:율)?)\s*[:：]?\s*([^\n,;]{1,60}?(?:\d+(?:\.\d+)?\s*(?:[%％]|퍼센트)|백분의\s*\d+(?:\.\d+)?))/.exec([cf.memo, cf.fee].filter(Boolean).join(' '));
+      if(_mSuccInMemo && _mSuccInMemo[1]) rawCfSuccess = _mSuccInMemo[1].trim();
+    }
+    var succ = erpParseSuccessFee(rawCfSuccess);
+    var succVatFlag = rawCfSuccess ? erpVatTextToFlag(rawCfSuccess) : null;
+    var succNoteTag = succ.fee > 0
+      ? (' · 성공보수 ' + (succ.type === 'percent' ? succ.fee + '%' : succ.fee.toLocaleString() + '원'))
+      : '';
     var vatRaw = [cf.vat, cf.retainer, cf.deposit, cf.fee, cf.success].filter(Boolean).join(' ');
     var vatFlag = erpVatTextToFlag(vatRaw);
     var briefText = String(cf.scope || cf.docName || '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -28471,6 +28575,7 @@ function ContractManagement(props){
       var updStatus = (targetStatus === 'signed' && !canPromoteSigned) ? 'review' : targetStatus;
       var noteLine = '📄 계약서 자동 반영 (' + (cf.docName || '계약서') + ')'
         + (briefText ? ' · ' + briefText : '')
+        + succNoteTag
         + (updStatus === 'signed' ? ' → 계약확정' : ' → 계약협의')
         + (extraEmptySiblings.length ? ' (중복 진행카드 ' + extraEmptySiblings.map(function(s){ return s.contractNo || s.id; }).join(', ') + ' 통합 정리)' : '')
         + (synthNote ? '\n' + synthNote : '');
@@ -28489,7 +28594,11 @@ function ContractManagement(props){
       });
       if(updStatus === 'signed') upd.checkReq = null;
       if(reqCoId && !upd.companyId){ upd.companyId = reqCoId; upd.company.companyId = reqCoId; }
-      if(succ.fee > 0 && !(Number(cur.successFee) > 0)){ upd.successFee = succ.fee; upd.successFeeType = succ.type; }
+      if(succ.fee > 0 && !(Number(cur.successFee) > 0)){
+        upd.successFee = succ.fee;
+        upd.successFeeType = succ.type;
+        if(succVatFlag !== null) upd.balanceFeeVatIncluded = succVatFlag;
+      }
       if(vatFlag !== null && !hadExistingMoney){ upd.contractFeeVatIncluded = vatFlag; upd.vatType = vatFlag ? 'inclusive' : 'separate'; }
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.signDate || ''))) upd.signDate = cf.signDate;
       if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) upd.startDate = cf.startDate;
@@ -28551,7 +28660,11 @@ function ContractManagement(props){
     if(guessed.typeCode) form.typeCodes[kv] = guessed.typeCode;
     if(amt > 0) form.amounts[kv] = amt;
     if(briefText && form.briefs.hasOwnProperty(kv)) form.briefs[kv] = briefText;
-    if(succ.fee > 0){ form.successFee = succ.fee; form.successFeeType = succ.type; }
+    if(succ.fee > 0){
+      form.successFee = succ.fee;
+      form.successFeeType = succ.type;
+      if(succVatFlag !== null) form.balanceFeeVatIncluded = succVatFlag;
+    }
     if(vatFlag !== null){ form.contractFeeVatIncluded = vatFlag; form.vatType = vatFlag ? 'inclusive' : 'separate'; }
     if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.signDate || ''))) form.signDate = cf.signDate;
     if(/^\d{4}-\d{2}-\d{2}$/.test(String(cf.startDate || ''))) form.startDate = cf.startDate;
@@ -28567,6 +28680,7 @@ function ContractManagement(props){
     if(req && req.checkReq && req.checkReq.note) form.checkReq = req.checkReq;
     var boxOrigin = isTomeDir ? '내게쓴메일함' : (hasMailMeta ? '푸른메일함' : '사진첩·메일함');
     form.note = '📄 ' + boxOrigin + '에서 계약서 자동 정리 (' + (cf.docName || '계약서') + ')'
+      + succNoteTag
       + (briefText ? '\n업무: ' + briefText : '')
       + (req.by ? ' · 담당 ' + req.by : '')
       + (synthNote ? '\n' + synthNote : '');
@@ -46801,9 +46915,19 @@ function fillContractVars(template, contract){
     korMoney: numToKorMoney,
     today: todayYMD()
   });
+  var cObj = contract || {};
+  var extraVars = {
+    성공보수율: (cObj.successFeeType === 'percent' && cObj.successFee) ? (cObj.successFee + '%') : (m.성공보수 || ''),
+    착수금: m.계약금액 || '',
+    근로자명: m.근로자이름 || '',
+    주민번호: m.근로자주민 || ''
+  };
   var result = template || '';
   Object.keys(m).forEach(function(k){
     result = result.split('{{' + k + '}}').join(m[k]);
+  });
+  Object.keys(extraVars).forEach(function(ek){
+    result = result.split('{{' + ek + '}}').join(extraVars[ek]);
   });
   return result;
 }
@@ -47015,6 +47139,7 @@ function ContractFormPrintBody(props){
   function hasOverride(f){ return !!(_ovr && _ovr[f.id] != null); }
   // 편집중 본문 (양식ID → 텍스트). 초기엔 비움(=overrideBody 사용)
   var em = useState({}); var editMap = em[0]; var setEditMap = em[1];
+  var pm = useState(true); var previewFilled = pm[0]; var setPreviewFilled = pm[1];
   function curBody(f){ return (editMap[f.id] != null) ? editMap[f.id] : overrideBody(f); }
   function setBody(fid, txt){ var n = Object.assign({}, editMap); n[fid] = txt; setEditMap(n); }
   // 이 계약에 저장 (양식 메타 함께 보관 → 표준양식 삭제돼도 복원 가능)
@@ -47339,6 +47464,39 @@ function ContractFormPrintBody(props){
         })
       ),
       h('div', { className:'modal-b', style:{ maxHeight:'65vh', overflowY:'auto', padding:'14px 16px' } },
+        /* 계약 자료에서 자동으로 당겨온 보수·성공보수(%) 요약 확인 바 */
+        (function(){
+          var _sumAmt = 0;
+          if(contract.amounts) kindsArr.forEach(function(kv){ _sumAmt += Number(contract.amounts[kv] || 0) || 0; });
+          else _sumAmt = Number(contract.contractAmount || 0) || 0;
+          var _succTxt = contract.successFee
+            ? (contract.successFeeType === 'percent' ? (contract.successFee + '%') : (Number(contract.successFee).toLocaleString() + '원'))
+            : '없음';
+          var _isPct = !!(contract.successFee && contract.successFeeType === 'percent');
+          return h('div', {
+            style:{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap', padding:'8px 12px', marginBottom:'10px',
+              background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', fontSize:'11.5px', color:'#1e293b' }
+          },
+            h('span', { style:{ fontWeight:700, color:'#1e40af' } }, '✓ 자동 당겨온 조건:'),
+            _sumAmt > 0 && h('span', { style:{ fontFamily:'monospace', fontWeight:700 } },
+              ((kindsArr.indexOf('case') >= 0 || kindsArr.indexOf('other') >= 0) ? '착수금 ' : '계약금액 ') + _sumAmt.toLocaleString() + '원'),
+            contract.successFee > 0 && h('span', {
+              style:{ background: _isPct ? '#fffbeb' : '#fff', color: _isPct ? '#854d0e' : '#2563eb',
+                border: '1px solid ' + (_isPct ? '#fbbf24' : '#bfdbfe'), borderRadius:'6px', padding:'1px 8px', fontWeight:700 }
+            }, (_isPct ? '🏆 성공보수율 ' : '성공·잔금 ') + _succTxt),
+            h('span', { style:{ color:'#64748b' } }, contract.vatType === 'inclusive' ? '부가세 포함' : '부가세 별도'),
+            contract.signDate && h('span', { style:{ color:'#64748b', fontFamily:'monospace' } }, '계약일 ' + contract.signDate),
+            h('div', { style:{ marginLeft:'auto', display:'flex', gap:'4px' } },
+              h('button', { type:'button', onClick:function(){ setPreviewFilled(true); },
+                style:{ padding:'3px 9px', borderRadius:'5px', fontSize:'11px', fontWeight:700, cursor:'pointer',
+                  border:'1px solid ' + (previewFilled ? '#1e40af' : '#cbd5e1'),
+                  background: previewFilled ? '#1e40af' : '#fff', color: previewFilled ? '#fff' : '#475569' } }, '👁 치환 결과 확인'),
+              h('button', { type:'button', onClick:function(){ setPreviewFilled(false); },
+                style:{ padding:'3px 9px', borderRadius:'5px', fontSize:'11px', fontWeight:700, cursor:'pointer',
+                  border:'1px solid ' + (!previewFilled ? '#1e40af' : '#cbd5e1'),
+                  background: !previewFilled ? '#1e40af' : '#fff', color: !previewFilled ? '#fff' : '#475569' } }, '✏ 양식 원문 편집'))
+          );
+        })(),
         // 양식 선택 (체크박스 다중 선택)
         h('div', { style:{ marginBottom:'10px' } },
           h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
@@ -47403,14 +47561,22 @@ function ContractFormPrintBody(props){
                     hasOverride(f) && h('button', { onClick:function(){ if(confirm('이 업체 전용 수정본을 삭제하고 표준 양식으로 되돌립니까?')) resetOverride(f); },
                       style:{ background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', padding:'4px 10px', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer' } }, '↩ 표준으로')
                   ),
-                  h('textarea', { value: curBody(f),
-                    onChange:function(e){ setBody(f.id, e.target.value); },
-                    spellcheck:false,
-                    style:{ width:'100%', minHeight:'220px', boxSizing:'border-box', resize:'vertical',
-                      fontFamily:'"맑은 고딕", monospace', fontSize:'12px', lineHeight:'1.6', color:'#1e293b',
-                      border:'1px solid #cbd5e1', borderRadius:'4px', padding:'10px 12px' } }),
+                  previewFilled
+                    ? h('pre', {
+                        style:{ width:'100%', minHeight:'220px', boxSizing:'border-box', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word',
+                          fontFamily:'"맑은 고딕", monospace', fontSize:'12px', lineHeight:'1.65', color:'#1e293b',
+                          background:'#f8fafc', border:'1px solid #cbd5e1', borderRadius:'4px', padding:'10px 12px' }
+                      }, fillContractVars(curBody(f), contract))
+                    : h('textarea', { value: curBody(f),
+                        onChange:function(e){ setBody(f.id, e.target.value); },
+                        spellcheck:false,
+                        style:{ width:'100%', minHeight:'220px', boxSizing:'border-box', resize:'vertical',
+                          fontFamily:'"맑은 고딕", monospace', fontSize:'12px', lineHeight:'1.6', color:'#1e293b',
+                          border:'1px solid #cbd5e1', borderRadius:'4px', padding:'10px 12px' } }),
                   h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'4px' } },
-                    '※ 위 본문을 직접 수정 후 [💾 이 계약에 저장]을 누르면 이 계약에만 적용됩니다. {{변수}}는 출력 시 자동 치환·직인 날인됩니다.')
+                    previewFilled
+                      ? '※ 계약 금액·성공보수(%) 등이 자동 치환된 미리보기입니다. 문구를 고치려면 상단 [✏ 양식 원문 편집]을 누르세요.'
+                      : '※ 위 본문을 직접 수정 후 [💾 이 계약에 저장]을 누르면 이 계약에만 적용됩니다. {{변수}}는 출력 시 자동 치환·직인 날인됩니다.')
                 );
               })
             )
