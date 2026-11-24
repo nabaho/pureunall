@@ -68,7 +68,7 @@ const CONTRACT_EXTRACT_PROMPT =
   "15. fee (string): 보수·자문료·용역비 원문 표기 (없으면 '').\n" +
   "16. vat (string): 부가세 별도/포함 표기 (없으면 '').\n" +
   "17. retainer (string): 착수금 원문 표기 (없으면 '').\n" +
-  "18. success (string): 성공보수 원문 표기 (없으면 '').\n" +
+  "18. success (string): 성공보수·성과보수·성공보수율 원문 표기 — % 요율(예: '총 수령금의 15%(부가세포함)', '경제적 이익의 10%', '15%') 또는 금액 표기를 빠짐없이 그대로 적으세요 (없으면 '', 단 연 12% 등 지연이자는 제외).\n" +
   "19. deposit (string): 계약금 원문 표기 (없으면 '').\n" +
   "20. managerName (string): 문서에 담당 노무사 성명이 적혀 있으면 그 성명 (없으면 '').\n" +
   "21. memo (string): 특약사항 한 줄 (없으면 '').\n" +
@@ -361,6 +361,68 @@ function extractHwpxText(buf) {
     off = dataStart + compSize;
   }
   return chunks.join("\n").slice(0, 24000);
+}
+
+/* 계약서 본문 텍스트에서 비식별 보수(착수금·계약금·성공보수 %/원) 표기를 로컬 정규식으로 보조 추출한다.
+   AI 응답에서 % 가 누락되거나 비식별 보류(pii_hold_meta)로 외부 AI 호출을 생략한 경우에도
+   외부 전송 없이 계약서의 % 요율·보수 숫자만 안전하게 당겨온다 (주민번호·전화·계좌는 절대 포함하지 않음). */
+function extractContractFeesFromText(rawText) {
+  const res = { retainer: "", success: "", deposit: "", vat: "" };
+  const s = String(rawText || "").replace(/\r\n/g, "\n").slice(0, 24000);
+  if (!s) return res;
+  const noLate = s.replace(/(?:지연|연체|미지급|지체)[^\n.]{0,35}?연\s*\d+(?:\.\d+)?\s*[%％]\s*(?:의\s*)?이자/g, " ")
+    .replace(/연\s*\d+(?:\.\d+)?\s*[%％]\s*의?\s*(?:지연\s*|연체\s*)?이자/g, " ");
+
+  /* 1) 성공보수 조항·표 칸에서 % 요율 또는 정액 추출 (백트래킹 방지를 위해 괄호 제목 길이 상한 {0,40} 제한) */
+  const succPatterns = [
+    /제\s*\d+\s*조\s*[\[【(]?\s*(?:성공|성과)\s*보수[^\]】)\n]{0,40}[\]】)]?([\s\S]{0,220}?)(?=\n\s*제\s*\d+\s*조|\n\s*20\d{2}\s*[.년]|$)/,
+    /(?:성공\s*보수(?:율)?|성과\s*보수(?:율)?|승소\s*보수)\s*[:：]?\s*([^\n]{1,120})/,
+  ];
+  for (let i = 0; i < succPatterns.length; i++) {
+    const m = succPatterns[i].exec(noLate);
+    if (!m || !m[1]) continue;
+    const seg = m[1].replace(/\s+/g, " ").trim();
+    const noVatPct = seg.replace(/부가(?:가치)?세\s*\d+(?:\.\d+)?\s*[%％]/g, " ");
+    const mPct = /(\d{1,2}(?:\.\d+)?)\s*(?:[%％]|퍼센트)|백분의\s*(\d{1,2}(?:\.\d+)?)/.exec(noVatPct);
+    const vatMatch = /부가(?:가치)?세\s*(포함|별도)/.exec(seg);
+    if (mPct) {
+      const rate = mPct[1] || mPct[2];
+      if (Number(rate) > 0 && Number(rate) <= 100) {
+        res.success = rate + "%" + (vatMatch ? " (부가세 " + vatMatch[1] + ")" : "");
+        if (!res.vat && vatMatch) res.vat = "부가세 " + vatMatch[1];
+        break;
+      }
+    }
+    const mAmt = /(?:금\s*)?(\d{1,3}(?:,\d{3})+\s*원|\d+(?:,\d{3})*(?:\.\d+)?\s*만\s*원?)/.exec(seg);
+    if (mAmt && !res.success) {
+      res.success = mAmt[1].replace(/\s+/g, "") + (vatMatch ? " (부가세 " + vatMatch[1] + ")" : "");
+      if (!res.vat && vatMatch) res.vat = "부가세 " + vatMatch[1];
+      break;
+    }
+  }
+
+  /* 2) 착수금·계약금 조항 추출 */
+  const mRet = /(?:착수\s*(?:금|보수)|선지급금)\s*(?:으로|은|:|：)?\s*(?:일금\s*[가-힣\s]+원정\s*\(?\s*)?(?:금\s*|[₩￦]\s*)?(\d{1,3}(?:,\d{3})+\s*원?|\d+(?:,\d{3})*(?:\.\d+)?\s*만\s*원?)(\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?/.exec(noLate);
+  if (mRet && mRet[1]) {
+    const rawR = mRet[1].replace(/\s+/g, "");
+    res.retainer = (/원$|만$/.test(rawR) ? rawR : rawR + "원") + (mRet[2] ? " " + mRet[2].trim() : "");
+    const rv = /부가(?:가치)?세\s*(포함|별도)/.exec(mRet[2] || "");
+    if (!res.vat && rv) res.vat = "부가세 " + rv[1];
+  }
+  const mDep = /(?:계약\s*(?:금|금액)|위탁\s*보수|용역\s*보수)\s*(?:으로|은|:|：)?\s*(?:일금\s*[가-힣\s]+원정\s*\(?\s*)?(?:금\s*|[₩￦]\s*)?(\d{1,3}(?:,\d{3})+\s*원?|\d+(?:,\d{3})*(?:\.\d+)?\s*만\s*원?)(\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?/.exec(noLate);
+  if (mDep && mDep[1]) {
+    const rawD = mDep[1].replace(/\s+/g, "");
+    res.deposit = (/원$|만$/.test(rawD) ? rawD : rawD + "원") + (mDep[2] ? " " + mDep[2].trim() : "");
+    const dv = /부가(?:가치)?세\s*(포함|별도)/.exec(mDep[2] || "");
+    if (!res.vat && dv) res.vat = "부가세 " + dv[1];
+  }
+  /* 출력값 화이트리스트 검증 — 숫자·단위(%·원·만원) 및 고정 부가세 표기 외에는 절대 반출하지 않는다 */
+  const SAFE_FEE_OUT_RE = /^\d[\d.,]*\s*(?:%|원|만원?)(?:\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?$/;
+  if (res.success && !SAFE_FEE_OUT_RE.test(res.success)) res.success = "";
+  if (res.retainer && !SAFE_FEE_OUT_RE.test(res.retainer)) res.retainer = "";
+  if (res.deposit && !SAFE_FEE_OUT_RE.test(res.deposit)) res.deposit = "";
+  if (res.vat && !/^부가세 (?:포함|별도)$/.test(res.vat)) res.vat = "";
+  return res;
 }
 
 /* 외부 AI 호출 전 주민번호·계좌·신분증 비식별화(AGENTS.md · rules-collect-redact 단일 관문 원칙 준수).
@@ -1239,7 +1301,8 @@ async function runSweep(deps, opts) {
       }
     }
 
-    function queueMetaFallbackContract(outCode, checkNote) {
+    function queueMetaFallbackContract(outCode, checkNote, localFeeHints) {
+      const feeHints = localFeeHints || {};
       const isReplySigned = !!(preOpenReply && preOpenReply.verified && preOpenReply.signed);
       const canFallback = (cc.isInternal || (emailMatch && emailMatch.exactEmail && emailMatch.co) || isReplySigned)
         && preCoName && !isOurFirmToken(preCoName);
@@ -1318,10 +1381,10 @@ async function runSweep(deps, opts) {
           endDate: "",
           term: "",
           fee: "",
-          vat: "",
-          retainer: "",
-          success: "",
-          deposit: "",
+          vat: String(feeHints.vat || ""),
+          retainer: String(feeHints.retainer || ""),
+          success: String(feeHints.success || ""),
+          deposit: String(feeHints.deposit || ""),
           memo: "",
         },
         mailMeta: {
@@ -1406,9 +1469,10 @@ async function runSweep(deps, opts) {
       continue;
     }
 
+    const localFeeHints = extractContractFeesFromText(textHint);
     const scrubbed = await scrubContractTextForAi(textHint);
     if (!scrubbed.ok || !scrubbed.text) {
-      if (queueMetaFallbackContract("pii_hold_meta", "첨부 계약서에 비식별 후에도 민감정보 패턴이 남아 외부 AI 전송을 차단하고 제목·첨부명만 반영했습니다 — 첨부 원문을 직접 확인해 주세요.")) {
+      if (queueMetaFallbackContract("pii_hold_meta", "첨부 계약서에 비식별 후에도 민감정보 패턴이 남아 외부 AI 전송을 차단하고 제목·첨부명 및 로컬 보수 표기만 반영했습니다 — 첨부 원문을 직접 확인해 주세요.", localFeeHints)) {
         continue;
       }
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: scrubbed.residualPii ? "residual_pii_blocked" : "scrub_failed" };
@@ -1438,7 +1502,7 @@ async function runSweep(deps, opts) {
     }
 
     if (!extracted) {
-      if (queueMetaFallbackContract("ai_empty_meta", "")) continue;
+      if (queueMetaFallbackContract("ai_empty_meta", "", localFeeHints)) continue;
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "unreadable" };
       out.skippedNonTarget++;
       continue;
@@ -1451,6 +1515,19 @@ async function runSweep(deps, opts) {
     }
 
     extracted = sanitizeOurFirmParty(extracted);
+    /* AI 가 성공보수 % 또는 착수금을 빠뜨렸거나 숫자만 남긴 경우 로컬 계약 본문에서 % 표기를 보강 */
+    if (localFeeHints.success && (!String(extracted.success || "").trim() || (/^\d+(?:\.\d+)?$/.test(String(extracted.success || "").trim()) && /%/.test(localFeeHints.success)))) {
+      extracted.success = localFeeHints.success;
+    }
+    if (localFeeHints.retainer && !String(extracted.retainer || "").trim()) {
+      extracted.retainer = localFeeHints.retainer;
+    }
+    if (localFeeHints.deposit && !String(extracted.deposit || "").trim() && !String(extracted.fee || "").trim()) {
+      extracted.deposit = localFeeHints.deposit;
+    }
+    if (localFeeHints.vat && !String(extracted.vat || "").trim()) {
+      extracted.vat = localFeeHints.vat;
+    }
 
     let compName = String(extracted.company || "").trim();
     if (!compName || isOurFirmToken(compName)) compName = preCoName;
@@ -1651,6 +1728,7 @@ module.exports = {
   normSrcMailKey,
   extractCoFromSubj,
   extractHwpxText,
+  extractContractFeesFromText,
   scrubContractTextForAi,
   parseAiJson,
   bizNoValid,
