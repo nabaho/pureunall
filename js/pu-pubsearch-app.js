@@ -25,6 +25,7 @@
   var _rootEl = null;
   var _bound = false;
   var _reqSeq = 0;
+  var _initSeq = 0;
   var _state = {
     user: null,
     uid: '',
@@ -660,6 +661,7 @@
     var nextUid = u && u.uid ? String(u.uid) : '';
     if (!nextUid) {
       _reqSeq++;
+      _initSeq++;
       _state.user = null;
       _state.uid = '';
       _state.query = '';
@@ -667,6 +669,8 @@
       _state.error = '';
       _state.warnings = [];
       _state.items = [];
+      _state.integrations = null;
+      _state.ourCompanies = [];
       _state.history = [];
       _state.pins = [];
       _state.applied = {};
@@ -679,12 +683,14 @@
     _state.user = u;
     _state.uid = nextUid;
     if (changed) {
+      _state.ourCompanies = [];
       _state.history = loadStore(HIST_KEY);
       _state.pins = loadStore(PIN_KEY);
       paint();
-      var initSeq = _reqSeq;
+      var myInit = ++_initSeq;
+      var myUid = nextUid;
       callApi({ action: 'init' }).then(function (res) {
-        if (initSeq !== _reqSeq || !_state.uid) return;
+        if (myInit !== _initSeq || _state.uid !== myUid) return;
         if (res.integrations) _state.integrations = res.integrations;
         if (Array.isArray(res.ourCompanies)) _state.ourCompanies = res.ourCompanies;
         paint();

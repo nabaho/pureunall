@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔍</text></svg>">
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;min-height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#1e293b;word-break:keep-all}
+html,body{margin:0;padding:0;min-height:100%;font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;color:#1e293b;word-break:keep-all;overflow-wrap:anywhere}
 #pubSearchRoot{min-height:100vh;display:flex;flex-direction:column}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
 .ps-wrap{max-width:1240px;width:100%;margin:0 auto;padding-left:18px;padding-right:18px}
@@ -31,7 +31,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
 .ps-sec-hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:10px;font-size:14px;color:#1e293b}
 .ps-quick-box{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e2e8f0}
 .ps-quick-list{display:flex;flex-wrap:wrap;gap:8px}
-.ps-qchip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;min-height:36px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;font-size:12px;cursor:pointer}
+.ps-qchip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;min-height:36px;max-width:100%;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;font-size:12px;cursor:pointer;overflow-wrap:anywhere}
 .ps-qchip span{color:#475569;font-size:11px}
 .ps-qchip:hover{background:#eff6ff;border-color:#2563eb;color:#1e40af}
 .ps-api-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -110,10 +110,10 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2563
   .ps-sub{display:none}
   .ps-hero{padding:12px 0}
   .ps-form{flex-direction:column}
-  .ps-layout{grid-template-columns:1fr;padding-top:12px;gap:12px}
-  .ps-api-grid{grid-template-columns:1fr}
+  .ps-layout{grid-template-columns:minmax(0,1fr);padding-top:12px;gap:12px}
+  .ps-api-grid{grid-template-columns:minmax(0,1fr)}
   .ps-side{position:static;max-height:220px}
-  .ps-grid{grid-template-columns:1fr}
+  .ps-grid{grid-template-columns:minmax(0,1fr)}
   .ps-v{white-space:normal;word-break:break-word}
   .ps-btn{min-height:38px}
 }
