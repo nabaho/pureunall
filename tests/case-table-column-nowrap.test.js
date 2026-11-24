@@ -29,23 +29,23 @@ const CM = stripJs(cutFn(RAW, 'function CaseManagement(props)'));
 const 칸들 = [
   { 이름:'의뢰인',
     th: /h\('th', \{ onClick:function\(\)\{toggleSort\('companyName'\);\}, style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}, '의뢰인'/,
-    td: /h\('td', \{ style:\{\s*whiteSpace:\s*'nowrap'\s*\} \},\s*h\('div', \{ style:\{ fontWeight:600, color:'#2563eb'/ },
+    td: /h\('td', \{ className:'proj-co'[^}]*style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \},\s*h\('div', \{ style:\{[^}]*whiteSpace:\s*'nowrap'/ },
   { 이름:'상대방',
     th: /colVis\.opponent && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}, '상대방'\)/,
-    td: /colVis\.opponent && h\('td', \{ style:\{\s*whiteSpace:\s*'nowrap'\s*\} \}/ },
+    td: /colVis\.opponent && h\('td', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}/ },
   { 이름:'관할기관',
-    th: /colVis\.jurOrg && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}, '관할기관'\)/,
-    td: /colVis\.jurOrg && h\('td', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}\s*\}, jur\.org/ },
+    th: /colVis\.jurOrg && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}[^}]*\}, '관할기관'\)/,
+    td: /colVis\.jurOrg && h\('td', \{[\s\S]{0,360}?style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}\s*\}, jur\.org/ },
   { 이름:'관할담당자',
-    th: /colVis\.jurOfficer && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}, '관할담당자'\)/,
-    td: /colVis\.jurOfficer && h\('td', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}\s*\}, jur\.officer/ },
-  { 이름:'관할연락처',
-    th: /colVis\.jurPhone && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}, '관할연락처'\)/,
-    td: /colVis\.jurPhone && h\('td', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}\s*\}, jur\.phone/ },
-  { 이름:'관할이메일',
-    th: /colVis\.jurEmail && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\} \}, '관할이메일'\)/,
-    td: /colVis\.jurEmail && h\('td', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}\s*\}, jur\.email/ },
+    th: /colVis\.jurOfficer && h\('th', \{ style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}[^}]*\}, '관할담당자'\)/,
+    td: /colVis\.jurOfficer && h\('td', \{[\s\S]{0,360}?style:\{[^}]*whiteSpace:\s*'nowrap'[^}]*\}\s*\}, \(jur\.officer \|\| hasJurContact\)/ },
 ];
+
+test('사건관리 표는 컨설팅관리와 같은 한 줄 표(.dt.proj-1line)를 쓰고 관할연락처·이메일 별도 열은 두지 않는다', () => {
+  assert.match(CM, /h\('table', \{ className:'dt proj-1line' \}/);
+  assert.doesNotMatch(CM, /colVis\.jurPhone\s*&&\s*h\('th'/);
+  assert.doesNotMatch(CM, /colVis\.jurEmail\s*&&\s*h\('th'/);
+});
 
 칸들.forEach(function(c){
   test('«' + c.이름 + '» 머리(th)에 whiteSpace:nowrap 이 있다', () => {
