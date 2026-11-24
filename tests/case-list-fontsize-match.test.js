@@ -60,21 +60,21 @@ test('★★ 부담당이 10.5px 다 — 컨설팅·기금관리와 같다', () 
   assert.match(block, /fontSize:'10\.5px', fontWeight:600/, '부담당이 10.5px 가 아니다');
 });
 
-test('★ 관할기관·담당자가 11.5px, 연락처·이메일이 10.5px 다', () => {
-  const org = around("colVis.jurOrg && h('td', { style:{ fontSize:", 40);
-  assert.match(org, /jurOrg && h\('td', \{ style:\{ fontSize:'11\.5px'/);
-  const officer = around("colVis.jurOfficer && h('td', { style:{ fontSize:", 40);
-  assert.match(officer, /jurOfficer && h\('td', \{ style:\{ fontSize:'11\.5px'/);
-  const phone = around("colVis.jurPhone && h('td', { style:{ fontSize:", 40);
-  assert.match(phone, /jurPhone && h\('td', \{ style:\{ fontSize:'10\.5px'/);
-  const email = around("colVis.jurEmail && h('td', { style:{ fontSize:", 40);
-  assert.match(email, /jurEmail && h\('td', \{ style:\{ fontSize:'10\.5px'/);
+test('★ 관할기관·담당자는 표에서 11.5px 이고, 클릭 시 열리는 연락처·이메일은 10.5px 다', () => {
+  const org = around('colVis.jurOrg && h(\'td\', {', 360);
+  assert.match(org, /fontSize:'11\.5px'/);
+  const officer = around('colVis.jurOfficer && h(\'td\', {', 360);
+  assert.match(officer, /fontSize:'11\.5px'/);
+  const pop = around('function jRow(lbl, val, opts){', 900);
+  assert.match(pop, /opts\.small\?'10\.5px':'11\.5px'/, '관할 상세 팝오버의 연락처·이메일 small 크기가 10.5px 이어야 한다');
+  assert.match(around("jRow('연락처', jj.phone || ''", 140), /small:true/);
+  assert.match(around("jRow('이메일', jj.email || ''", 140), /small:true/);
 });
 
-test('★ 수임일·기한이 11px 다 — 컨설팅·기금관리의 시작일·종료일과 같다', () => {
-  const recv = around("c.receiveDate ? c.receiveDate.replace(/-/g,'.') : '-'", 90);
+test('★ 수임일·기한이 11px 다 — 컨설팅·기금관리의 시작일·종료일(YYYY-MM-DD)과 같다', () => {
+  const recv = around('colVis.receiveDate && h(\'td\', {', 320);
   assert.match(recv, /fontFamily:'monospace', fontSize:'11px'/, '수임일이 11px 가 아니다');
-  const due = around("c.dueDate.replace(/-/g,'.'))", 160);
+  const due = around('colVis.dueDate && h(\'td\', null,', 220);
   assert.match(due, /fontFamily:'monospace', fontSize:'11px'/, '기한이 11px 가 아니다');
 });
 

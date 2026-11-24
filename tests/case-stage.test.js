@@ -220,21 +220,23 @@ ok('처리기한 초기값(빈칸)은 그대로', caseModal.indexOf("dueDate:''"
 
 /* ══ ⑧ 화면 배선 — 사건 목록 ══ */
 const caseList = slice('function CaseManagement(props){', 'function CaseDetailModal(');
-ok('★ 목록 열이 caseDefaultCols 에 등록돼 있다', /caseDefaultCols = \{[^}]*stage:true/.test(caseList));
+ok('★ 목록 열이 caseDefaultCols 에 등록돼 있다 (기본은 접어 두고 ⚙️ 컬럼에서 켤 수 있다)', /caseDefaultCols = \{[^}]*stage:(?:true|false)/.test(caseList));
 ok('★ 목록 열이 _cvBeforeFee 에도 등록돼 있다 (합계 줄이 밀리지 않게)', /_cvBeforeFee = \[[^\]]*'stage'/.test(caseList));
 ok('컬럼 설정 메뉴에서 숨길 수 있다', /\{k:'stage', l:'심급\/단계'\}/.test(caseList));
 ok('머리행에 심급/단계 칸이 있다', /colVis\.stage && h\('th'/.test(caseList));
 ok('본문에 심급/단계 칸이 있다', /colVis\.stage && h\('td'/.test(caseList));
 ok('배지는 stageCode 를 읽는다 (stages 전체를 훑지 않는다)', /c\.stageCode \? caseStageInfo\(c\.stageCode\) : null/.test(caseList));
 ok('배지 색은 기관 종류로 정한다', /caseStageColor\(_sdef\.orgKind\)/.test(caseList));
-ok('배지 아래 그 심급의 사건번호가 작게 붙는다', /_scur\.caseNo/.test(caseList));
+ok('배지 옆에 그 심급의 사건번호가 작게 붙는다', /_scur\.caseNo/.test(caseList));
 ok('★ 단계 필터가 stageCode 로 걸러낸다', /stageFilter !== 'all' && \(c\.stageCode\|\|''\) !== stageFilter/.test(caseList));
 ok('단계 필터 드롭다운이 있다', count('⚖ 전체 심급') >= 1 && /getCaseStages\(''\)/.test(caseList));
 ok('필터 해제 단추가 단계 필터도 푼다', /setStageFilter\('all'\);/.test(caseList));
 ok('기존 기한 D-day 판정은 그대로', /if\(c\.dueDate && c\.status !== 'closed'\)\{/.test(caseList));
-ok('기존 열이 하나도 빠지지 않았다',
-  ['type', 'opponent', 'mgrMain', 'mgrSubs', 'jurOrg', 'jurOfficer', 'jurPhone', 'jurEmail', 'receiveDate', 'dueDate', 'retainerFee', 'successFee', 'status', 'note']
-    .every(function (k) { return caseList.indexOf(k + ':true') >= 0; }));
+ok('핵심 기본 열과 선택 열이 모두 caseDefaultCols 에 등록돼 있다 (관할연락처·이메일은 클릭 팝오버로 통합)',
+  ['type', 'opponent', 'mgrMain', 'mgrSubs', 'jurOrg', 'jurOfficer', 'receiveDate', 'retainerFee', 'successFee', 'status']
+    .every(function (k) { return caseList.indexOf(k + ':true') >= 0; })
+  && ['dueDate', 'stage', 'note']
+    .every(function (k) { return new RegExp('\\b' + k + ':(?:true|false)').test(caseList); }));
 
 /* ── 엑셀: 뒤에만 붙였고 붙여넣기 반입 순서는 그대로 ── */
 ok('엑셀 내려받기에 심급 열이 붙었다', /'심급\/단계': _stgDef \? _stgDef\.name : ''/.test(caseList));
