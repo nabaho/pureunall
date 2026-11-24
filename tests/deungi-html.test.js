@@ -397,3 +397,34 @@ test('★ 접고 펴기 — 지난 기록 묶음은 기본 접힘, 누르면 펴
   assert.match(html, /\.arcg\.open\{grid-column:1\/-1;/);
   assert.match(html, /\.card\.fc>\.fh\{display:flex;/);
 });
+
+/* 2026-11-24 푸른통합시스템 직원명부 자동 당겨오기 — 읽기 전용 · 세대 가드 · 온톨로지 공유 루트 · 메모리 전용 */
+test('★ 푸른통합시스템 직원명부 연결 — 읽기 전용, 세대 가드, 온톨로지 sharedRoots 등록, localStorage 미저장', () => {
+  /* 읽기 전용: user_accounts·user_dir 은 once('value') 만 호출하고 쓰기는 없다 */
+  assert.match(본문, /fbDb\.ref\('data\/user_accounts'\)\.once\('value'\)/);
+  assert.match(본문, /fbDb\.ref\('data\/user_dir'\)\.once\('value'\)/);
+  assert.doesNotMatch(본문, /ref\('data\/user_(accounts|dir)[^)]*\)\.(set|update|remove|transaction)\(/);
+  assert.doesNotMatch(본문, /save\('data\//);
+  /* loadStaff 에 세대 가드, wipe() 에서 메모리 초기화 */
+  const ls = 본문.slice(본문.indexOf('function loadStaff('), 본문.indexOf('function reload('));
+  assert.ok((ls.match(/if\(gen!==GEN\) return;/g) || []).length >= 3, 'loadStaff 모든 비동기 응답에 세대 가드가 있어야 한다');
+  const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
+  assert.match(wipe, /STAFF=\[\]/);
+  assert.match(wipe, /STAFF_PICK=\{\}/);
+  assert.match(wipe, /STAFF_AUTO=\{\}/);
+  /* 온톨로지 sharedRoots 에 user_accounts·user_dir 등록, 등기 현황·건 저장 경로는 변경 없음 */
+  global.window = global.window || {};
+  const O = require('../js/pu-ontology.js');
+  const Ont = O.PuOntology || O || global.window.PuOntology;
+  assert.ok(Ont.PROGRAMS.deungi.sharedRoots.includes('data/user_accounts'));
+  assert.ok(Ont.PROGRAMS.deungi.sharedRoots.includes('data/user_dir'));
+  /* 사원 입사·퇴사·주소변경·등기현황 불러오기 UI 연결 및 대상 변경 시 이전 자동값 비우기 · 접근성 live 영역 */
+  assert.match(본문, /data-staff-join="1"/);
+  assert.match(본문, /data-act="quickLeave"/);
+  assert.match(본문, /data-act="staffBaseModal"/);
+  assert.match(본문, /function autoFillJoinByName\(/);
+  assert.match(본문, /function clearJoinAuto\(/);
+  assert.match(본문, /data-staff-note role="status" aria-live="polite"/);
+  assert.match(본문, /BASE_REV/);
+  assert.doesNotMatch(읽기('js/pu-deungi-core.js').slice(읽기('js/pu-deungi-core.js').indexOf('function normStaff('), 읽기('js/pu-deungi-core.js').indexOf('function normStaffList(')), /raw\.rrn/);
+});

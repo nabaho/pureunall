@@ -1109,7 +1109,213 @@
       masked: /가림|가린|마스킹|주민번호\s*삭제/.test(String(name || '')), addedAt: now || Date.now() });
   }
 
+  /* ══ 푸른통합시스템 직원명부(data/user_accounts · data/user_dir) 연결 보조 (2026-11-24) ══
+     ★ 읽기 전용: 이름·생년월일(앞 6자리)·주소·입사/퇴사일·퇴사사유·등록번호만 화이트리스트로 추려 쓰고,
+       주민번호 뒷자리(rrn)·계좌·비밀번호 해시는 절대 메모리에 남기거나 저장하지 않는다.
+     ★ 동명이인이 둘 이상이면 자동으로 채우지 않고 목록에서 고르게 한다. */
+  function staffBirth6(rawBirth, rawRrn) {
+    var s = String(rawBirth == null ? '' : rawBirth).trim();
+    if (s) {
+      var m = /^(\d{4})[-./년\s]*(\d{1,2})[-./월\s]*(\d{1,2})일?$/.exec(s) || /^(\d{4})(\d{2})(\d{2})$/.exec(s);
+      if (m) {
+        var y4 = Number(m[1]), mo = Number(m[2]), dy = Number(m[3]);
+        var dt = new Date(Date.UTC(y4, mo - 1, dy));
+        if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && dt.getUTCFullYear() === y4 && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === dy) {
+          return String(y4).slice(-2) + ('0' + mo).slice(-2) + ('0' + dy).slice(-2);
+        }
+      }
+      var m6 = /^(\d{2})(\d{2})(\d{2})$/.exec(s.replace(/\D/g, '').length === 6 ? s.replace(/\D/g, '') : '');
+      if (m6) {
+        var mo6 = Number(m6[2]), dy6 = Number(m6[3]);
+        if (mo6 >= 1 && mo6 <= 12 && dy6 >= 1 && dy6 <= 31) return m6[1] + m6[2] + m6[3];
+      }
+    }
+    var r = String(rawRrn == null ? '' : rawRrn).trim();
+    if (r && !/^enc:/i.test(r)) {
+      var d = r.replace(/\D/g, '');
+      if (d.length >= 6 && d.length <= 13 && (d.length === 6 || /^[1-8]$/.test(d.charAt(6)))) {
+        var mr = Number(d.slice(2, 4)), dr = Number(d.slice(4, 6));
+        if (mr >= 1 && mr <= 12 && dr >= 1 && dr <= 31) return d.slice(0, 6);
+      }
+    }
+    return '';
+  }
+  function staffFullAddr(u) {
+    var a = str(u && (u.address || u.addr));
+    var d = str(u && u.addressDetail);
+    if (a && d && a.indexOf(d) < 0) return a + ' ' + d;
+    return a || d;
+  }
+  function isStaffLabor(u) {
+    if (!u) return false;
+    return /^P-/i.test(String(u.sid || '')) || /노무사/.test(String(u.title || '')) || u.role === 'member' || u.role === 'admin' || u.role === 'admin-delegate';
+  }
+  function normStaff(raw) {
+    if (!raw || typeof raw !== 'object' || raw._deleted === true) return null;
+    var name = str(raw.name).slice(0, 60);
+    if (!name) return null;
+    var st = ['active', 'scheduled', 'leave', 'standby', 'retired'].indexOf(raw.status) >= 0 ? raw.status : 'active';
+    var rd = isDate(raw.retireDate) ? raw.retireDate : (st === 'retired' && isDate(raw.lastWorkDate) ? raw.lastWorkDate : '');
+    return {
+      sid: str(raw.sid).slice(0, 30),
+      name: name,
+      title: str(raw.title).slice(0, 40),
+      role: str(raw.role).slice(0, 30),
+      branch: str(raw.branch).slice(0, 40),
+      status: st,
+      birth: staffBirth6(raw.birthDate || raw.birth),
+      addr: staffFullAddr(raw).slice(0, 300),
+      hireDate: isDate(raw.hireDate) ? raw.hireDate : '',
+      retireDate: rd,
+      leaveReason: str(raw.leaveReason).slice(0, 120),
+      licenseNo: str(raw.licenseNo || raw.certNo || '').slice(0, 30)
+    };
+  }
+  function normStaffList(raw) {
+    var v = (raw && !Array.isArray(raw) && raw.v !== undefined) ? raw.v : raw;
+    var list = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []);
+    var map = {}, order = [];
+    list.forEach(function (item, idx) {
+      var u = normStaff(item);
+      if (!u) return;
+      var k = u.sid ? 's:' + u.sid : 'i:' + idx;
+      if (!Object.prototype.hasOwnProperty.call(map, k)) order.push(k);
+      map[k] = u;
+    });
+    return order.map(function (k) { return map[k]; }).sort(function (a, b) {
+      return String(a.name).localeCompare(String(b.name), 'ko') || String(a.sid).localeCompare(String(b.sid));
+    });
+  }
+  function matchStaffForMember(staffList, member) {
+    var list = Array.isArray(staffList) ? staffList : [];
+    member = member || {};
+    var nm = str(member.name);
+    var mb = String(member.birth || '').replace(/[^0-9]/g, '').slice(0, 6);
+    if (!nm) return { hit: null, how: '', dup: [] };
+    var same = list.filter(function (u) { return u && u.name === nm; });
+    if (!same.length) return { hit: null, how: '', dup: [] };
+    if (mb) {
+      var both = same.filter(function (u) { return u.birth && u.birth === mb; });
+      if (both.length === 1) return { hit: both[0], how: 'name+birth', dup: [] };
+      if (both.length > 1) return { hit: null, how: '', dup: both };
+    }
+    if (same.length === 1) {
+      if (mb && same[0].birth && same[0].birth !== mb) return { hit: null, how: '', dup: [], mismatch: same[0] };
+      return { hit: same[0], how: 'name', dup: [] };
+    }
+    return { hit: null, how: '', dup: same };
+  }
+  function matchStaffByName(staffList, name) {
+    var list = Array.isArray(staffList) ? staffList : [];
+    var nm = str(name);
+    if (!nm) return { hit: null, dup: [] };
+    var same = list.filter(function (u) { return u && u.name === nm; });
+    if (!same.length) return { hit: null, dup: [] };
+    if (same.length === 1) return { hit: same[0], dup: [] };
+    var live = same.filter(function (u) { return u.status !== 'retired'; });
+    if (live.length === 1) return { hit: live[0], dup: [] };
+    return { hit: null, dup: same };
+  }
+  function staffJoinGroups(staffList, base, changes) {
+    var list = Array.isArray(staffList) ? staffList : [];
+    var b = normBase(base);
+    var registeredSids = {}, registeredKey = {};
+    b.members.forEach(function (m) {
+      var res = matchStaffForMember(list, m);
+      if (res.hit) {
+        if (res.hit.sid) registeredSids[res.hit.sid] = true;
+        if (res.hit.birth) registeredKey[res.hit.name + '|' + res.hit.birth] = true;
+      }
+      if (m.name && m.birth) registeredKey[m.name + '|' + m.birth] = true;
+    });
+    var unregLabor = [], unregOther = [], others = [];
+    list.forEach(function (u) {
+      var isReg = (u.sid && registeredSids[u.sid]) || (u.birth && registeredKey[u.name + '|' + u.birth]);
+      if (isReg || u.status === 'retired') others.push(u);
+      else if (isStaffLabor(u)) unregLabor.push(u);
+      else unregOther.push(u);
+    });
+    return { unregLabor: unregLabor, unregOther: unregOther, others: others };
+  }
+  function staffLeaveSignals(staffList, base, changes) {
+    var list = Array.isArray(staffList) ? staffList : [];
+    var b = normBase(base), chList = arr(changes), out = [];
+    b.members.forEach(function (m) {
+      var res = matchStaffForMember(list, m);
+      if (res.hit && (res.hit.status === 'retired' || !!res.hit.retireDate)) {
+        out.push({
+          member: m,
+          staff: res.hit,
+          alreadyInCase: chList.some(function (ch) { return ch && ch.type === 'leave' && ch.member === m.id; })
+        });
+      }
+    });
+    return out;
+  }
+  function staffAddrDiffs(staffList, base) {
+    var list = Array.isArray(staffList) ? staffList : [];
+    var b = normBase(base), out = [];
+    var normA = function (s) { return str(s).replace(/\s+/g, ' '); };
+    b.members.forEach(function (m) {
+      var res = matchStaffForMember(list, m);
+      if (res.hit && res.hit.addr && normA(m.addr) !== normA(res.hit.addr)) {
+        out.push({ member: m, staff: res.hit });
+      }
+    });
+    return out;
+  }
+  function staffFillJoinPatch(staff, currentChange, opts) {
+    opts = opts || {};
+    var cur = currentChange || {};
+    var patch = {}, filled = [], missing = [];
+    if (!staff) return { patch: patch, filled: filled, missing: missing };
+    if (opts.fromPicker) {
+      patch.name = staff.name || '';
+      if (patch.name) filled.push('이름');
+      patch.birth = staff.birth || '';
+      if (patch.birth) filled.push('생년월일');
+      else missing.push('생년월일');
+      patch.addr = staff.addr || '';
+      if (patch.addr) filled.push('주소');
+      else missing.push('주소');
+      patch.license = staff.licenseNo || '';
+      if (patch.license) filled.push('등록번호');
+    } else {
+      if (!str(cur.birth)) {
+        if (staff.birth) { patch.birth = staff.birth; filled.push('생년월일'); }
+        else missing.push('생년월일');
+      }
+      if (!str(cur.addr)) {
+        if (staff.addr) { patch.addr = staff.addr; filled.push('주소'); }
+        else missing.push('주소');
+      }
+      if (!str(cur.license) && staff.licenseNo) {
+        patch.license = staff.licenseNo;
+        filled.push('등록번호');
+      }
+    }
+    return { patch: patch, filled: filled, missing: missing };
+  }
+  function staffFillLeavePatch(staff, currentChange) {
+    var cur = currentChange || {};
+    var patch = {}, filled = [];
+    if (!staff) return { patch: patch, filled: filled };
+    if ((!str(cur.reason) || str(cur.reason) === '개인 사정') && staff.leaveReason) {
+      patch.reason = staff.leaveReason;
+      filled.push('퇴사 사유');
+    }
+    if (!str(cur.date) && staff.retireDate) {
+      patch.date = staff.retireDate;
+      filled.push('퇴사 연월일');
+    }
+    return { patch: patch, filled: filled };
+  }
+
   return {
+    staffBirth6: staffBirth6, staffFullAddr: staffFullAddr, isStaffLabor: isStaffLabor,
+    normStaff: normStaff, normStaffList: normStaffList, matchStaffForMember: matchStaffForMember, matchStaffByName: matchStaffByName,
+    staffJoinGroups: staffJoinGroups, staffLeaveSignals: staffLeaveSignals, staffAddrDiffs: staffAddrDiffs,
+    staffFillJoinPatch: staffFillJoinPatch, staffFillLeavePatch: staffFillLeavePatch,
     SEAL: SEAL, sealPlan: sealPlan, easyStep: easyStep,
     FEES: FEES, costPlan: costPlan, placeOf: placeOf, needsReg: needsReg, hasEffect: hasEffect,
     ARC_KINDS: ARC_KINDS, arcKindLabel: arcKindLabel, guessArcKind: guessArcKind, arcDateFromName: arcDateFromName,

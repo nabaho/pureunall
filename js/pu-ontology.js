@@ -312,10 +312,11 @@
       entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust','SettleRoom','SettleKakao'] },
     /* 푸른등기 — 노무법인 변경등기(사원 입사·퇴사·지분 양도, 대표사원 취임·사임, 주소변경, 분사무소 설치·이전·폐지) 서류를 한글로 만든다(대표 지시 2026-11-14).
        ★ 쓰는 것: base(DeungiBase — 지금 등기부 현황 하나) · cases(DeungiCase — 등기 건) · archive(DeungiArchive — 지난 등기 원본 서류 묶음, 2026-11-14).
+       ★ 읽기만: uid_roles(권한) · data/user_accounts(인사관리 직원명부 — 사원 입사·퇴사·주소변경 입력 보조, 원본 수정 없음 · 이름으로 추정한 sid 저장 없음) · data/user_dir(폴백).
        ★ 원본 파일은 원본 보관함(pu_docs, 공용 층 js/pu-office-store.js)의 🔒 자리에 올린다(from.kind 'deungi') — 묶음에는 파일 번호만.
        ★ 사람은 «등기 현황 안의 사원 줄»(id m1…)로만 가리킨다 — 직원 명부(sid)와 이름으로 잇지 않는다(사원이 퇴사·입사해도 명부와 따로 간다).
        ⚠ 주민등록번호 뒷자리는 저장하지 않는다(생년월일만). 대표·위임관리인만(규칙 deungi). */
-    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles','pu_docs'],
+    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles','pu_docs','data/user_accounts','data/user_dir'],
       writeContracts:[{path:'deungi/base',entityType:'DeungiBase'},
                       {path:'deungi/cases/{id}',entityType:'DeungiCase'},
                       {path:'deungi/archive/{id}',entityType:'DeungiArchive'}],

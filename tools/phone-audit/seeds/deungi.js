@@ -49,8 +49,23 @@ const ar2 = Object.assign(meta('ARtest2017b', 'DeungiArchive'), { title: '2017-1
 /* 앞 화면(자세히·지난 기록·덮는 칸)이 남긴 것을 치우고 «등기 건 탭 · 쉬운 진행»에서 시작 */
 const toEasy = async (p) => { await p.evaluate(() => window.sideClose && window.sideClose()); await p.click('#tabs button[data-tab=case]'); await p.waitForTimeout(300); const r = await p.$('#caseList tr[data-open]'); if (r && !(await p.$('#editor .card'))) { await r.click(); await p.waitForTimeout(600); } const e = await p.$('[data-act=mode][data-m=easy]'); if (e) { await e.click(); await p.waitForTimeout(500); } };
 
+/* 푸른통합시스템 직원명부(지어낸 자료 — 주민번호·전화번호 꼴 없음) */
+const staffAccounts = [
+  { sid: 'P001', name: '점검대표', title: '대표노무사', role: 'admin', branch: '본점', status: 'active', birthDate: '1970-01-01', address: '점검도 점검시 점검구 가나다라로 20, 103동 1303호(점검동, 가나다라마바사아파트)', hireDate: '2017-11-20', licenseNo: '10001' },
+  { sid: 'P002', name: '점검노무', title: '노무사', role: 'member', branch: '가지지사', status: 'retired', birthDate: '1980-01-01', address: '점검도 점검시 마바로 31, 105동 1201호', hireDate: '2017-11-20', retireDate: '2026-11-18', leaveReason: '자발적 퇴사', licenseNo: '10002' },
+  { sid: 'P003', name: '점검사원', title: '노무사', role: 'member', branch: '본점', status: 'active', birthDate: '1990-01-01', address: '점검도 점검시 바뀐새로 88', addressDetail: '201호', hireDate: '2024-02-28', licenseNo: '10003' },
+  { sid: 'P091', name: '가나다노무', title: '노무사', role: 'member', branch: '본점', status: 'active', birthDate: '1992-05-14', address: '점검도 점검시 푸른로 77', addressDetail: '502호', hireDate: '2026-11-01', licenseNo: '90123' },
+  { sid: 'P092', name: '점검동명', title: '노무사', role: 'member', branch: '본점', status: 'active', birthDate: '1988-03-11', address: '점검시 동명로 1', hireDate: '2025-05-01' },
+  { sid: 'P093', name: '점검동명', title: '노무사', role: 'member', branch: '나무지사', status: 'active', birthDate: '1991-09-22', address: '점검시 동명로 2', hireDate: '2026-01-01' },
+  { sid: 'A010', name: '점검사무', title: '사무직', role: 'staff', branch: '본점', status: 'active', birthDate: '1995-08-08', address: '점검시 사무로 10', hireDate: '2026-03-01' },
+];
+const staffDir = staffAccounts.map((u) => ({ sid: u.sid, name: u.name, role: u.role, title: u.title, branch: u.branch, status: u.status }));
+
 module.exports = {
-  data: { deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar1.id]: ar1, [ar2.id]: ar2 } } },
+  data: {
+    data: { user_accounts: { v: staffAccounts }, user_dir: { v: staffDir } },
+    deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar1.id]: ar1, [ar2.id]: ar2 } },
+  },
   localStorage: { pu_deungi_tab: 'case', pu_deungi_cur: c1.id },
   views: [
     { name: 'easy1', run: async (p) => { await p.click('#wizSteps [data-s="1"]'); } },
@@ -176,5 +191,67 @@ module.exports = {
     } },
     /* 새 서류 보기 칸(폰에서는 전체를 덮는 창) — 줄을 눌러 연다 */
     { name: 'docside', wait: 2500, run: async (p) => { await toEasy(p); await p.click('#wizSteps [data-s="2"]'); await p.waitForTimeout(800); await p.click('#editor tr[data-dockey] button.lnk'); } },
+    /* 푸른통합시스템 직원명부 자동 당겨오기 — 퇴사 감지 배너 · 사원 입사 드롭다운 · 동명이인 자동 대입 금지 · 주소 변경 자동 채움 */
+    { name: 'staffpull', wait: 500, run: async (p) => {
+      const must = (ok, why) => { if (!ok) throw new Error('staffpull: ' + why); };
+      const w = (ms) => p.waitForTimeout(ms);
+      await p.evaluate(() => { window.sideClose && window.sideClose(); });
+      await p.click('#tabs button[data-tab=case]'); await w(200);
+      await p.click('#newCaseBtn'); await w(400);
+      /* 1. 퇴사 감지 배너가 보이고 한 번 누르면 퇴사일·사유가 자동으로 들어온다 */
+      must(await p.isVisible('#edChanges [data-act="quickLeave"][data-mid="m2"]'), '퇴사 감지 배너가 보여야 함');
+      await p.click('#edChanges [data-act="quickLeave"][data-mid="m2"]'); await w(300);
+      const lv = await p.evaluate(() => {
+        const bx = document.querySelector('#edChanges [data-ch]');
+        return { mem: bx.querySelector('[data-k="member"]').value, dt: bx.querySelector('[data-k="date"]').value, rs: bx.querySelector('[data-k="reason"]').value };
+      });
+      must(lv.mem === 'm2' && lv.dt === '2026-11-18' && lv.rs === '자발적 퇴사', '퇴사 자동 채움 실패 ' + JSON.stringify(lv));
+      /* 2. 사원 입사 — 드롭다운에서 가나다노무 고르면 이름·생년월일·주소·등록번호가 채워진다(입사 연월일은 인가일 보존을 위해 비움 유지) */
+      await p.click('#wizBody [data-add="join"]'); await w(300);
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption('P091'); await w(300);
+      const jv = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[1];
+        return {
+          name: bx.querySelector('[data-k="name"]').value,
+          birth: bx.querySelector('[data-k="birth"]').value,
+          addr: bx.querySelector('[data-k="addr"]').value,
+          lic: bx.querySelector('[data-k="license"]').value,
+          dt: bx.querySelector('[data-k="date"]').value,
+        };
+      });
+      must(jv.name === '가나다노무' && jv.birth === '920514' && jv.addr === '점검도 점검시 푸른로 77 502호' && jv.lic === '90123' && jv.dt === '', '입사 드롭다운 채움 실패 ' + JSON.stringify(jv));
+      /* 2-1. 드롭다운 선택 해제 시 선택 상태 유지 및 이전 자동값 비움 → 이름 변경 시 타인 정보 미혼입 확인 후 다시 P091 선택 */
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption(''); await w(250);
+      const jClr = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[1];
+        return { sel: bx.querySelector('[data-staff-join="1"]').value, birth: bx.querySelector('[data-k="birth"]').value, addr: bx.querySelector('[data-k="addr"]').value };
+      });
+      must(jClr.sel === '' && jClr.birth === '' && jClr.addr === '', '드롭다운 선택 해제 실패 ' + JSON.stringify(jClr));
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption('P091'); await w(250);
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-k="name"]').fill('점검사무'); await w(250);
+      const jSw = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[1];
+        return { birth: bx.querySelector('[data-k="birth"]').value, addr: bx.querySelector('[data-k="addr"]').value, lic: bx.querySelector('[data-k="license"]').value };
+      });
+      must(jSw.birth === '950808' && jSw.addr === '점검시 사무로 10' && jSw.lic === '', '이름 변경 시 이전 직원 정보 미혼입 실패 ' + JSON.stringify(jSw));
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption('P091'); await w(250);
+      /* 3. 사원 입사 — 동명이인(점검동명) 이름만 치면 자동 대입하지 않고 안내만 띄운다 */
+      await p.click('#wizBody [data-add="join"]'); await w(300);
+      await p.locator('#edChanges [data-ch]').nth(2).locator('[data-k="name"]').fill('점검동명'); await w(300);
+      const dv = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[2];
+        return {
+          birth: bx.querySelector('[data-k="birth"]').value,
+          addr: bx.querySelector('[data-k="addr"]').value,
+          warn: (bx.querySelector('.staff-warn') || {}).textContent || '',
+        };
+      });
+      must(dv.birth === '' && dv.addr === '' && /2명/.test(dv.warn), '동명이인 자동 대입 금지 위반 ' + JSON.stringify(dv));
+      /* 4. 사원 주소 변경 — 점검사원 고르면 인사관리 바뀐 주소가 자동으로 들어온다 */
+      await p.click('#wizBody [data-add="addr"]'); await w(300);
+      await p.locator('#edChanges [data-ch]').nth(3).locator('[data-k="member"]').selectOption('m3'); await w(300);
+      const av = await p.evaluate(() => document.querySelectorAll('#edChanges [data-ch]')[3].querySelector('[data-k="addr"]').value);
+      must(av === '점검도 점검시 바뀐새로 88 201호', '주소변경 자동 채움 실패 ' + av);
+    } },
   ],
 };
