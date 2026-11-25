@@ -1833,6 +1833,62 @@
     }
 
 
+    /* v38 Emergency Siren Lane-Yielding & 119 Fire Water-Cannon Mission HUD */
+    .siren-active-btn {
+      background: linear-gradient(90deg, rgba(239,68,68,0.88), rgba(37,99,235,0.88)) !important;
+      color: #ffffff !important;
+      border-color: #fde047 !important;
+      box-shadow: 0 0 14px rgba(239,68,68,0.65), 0 0 20px rgba(59,130,246,0.55) !important;
+      animation: sirenPulse 0.36s infinite alternate;
+    }
+    #fireMissionBar {
+      display: none;
+      align-self: center;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(9, 13, 22, 0.90);
+      border: 1.5px solid rgba(251, 146, 60, 0.85);
+      box-shadow: 0 6px 22px rgba(234, 88, 12, 0.35);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+      z-index: 38;
+    }
+    #fireHpTrack {
+      width: 78px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    #fireHpFill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #fde047, #f97316, #ef4444);
+      transition: width 0.12s linear;
+    }
+    #waterCannonSprayBtn {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      color: #041322;
+      font-weight: 900;
+      font-size: 11.5px;
+      border: 1.5px solid #bae6fd;
+      border-radius: 999px;
+      padding: 5px 13px;
+      cursor: pointer;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.55);
+      user-select: none;
+    }
+    #waterCannonSprayBtn.spraying {
+      background: linear-gradient(135deg, #bae6fd, #38bdf8);
+      transform: scale(1.05);
+      box-shadow: 0 0 22px rgba(125, 211, 252, 0.95);
+    }
+
     /* v28 10-Minute Playtime Limiter & Parent Unlock Screen */
     #playTimerChip {
       display: inline-flex;
@@ -1964,6 +2020,8 @@
       <label for="customGlbInput" class="pv-chip pv-file-btn" style="border-color:rgba(167,139,250,0.65);color:#ddd6fe;" title="Meshy·Tripo·Sketchfab에서 받은 .glb 3D 차량 모델 적용">📦 3D모델(.glb)</label>
       <input type="file" id="customGlbInput" accept=".glb,.gltf" style="display:none" />
       <button type="button" class="pv-chip active" id="navTestDriveBtn" onclick="startInstantTestDrive()">🚗 테스트 운전</button>
+      <button type="button" class="pv-chip" id="topSirenBtn" onclick="toggleEmergencySiren()" style="border-color:rgba(248,113,113,0.75);color:#fca5a5;" title="사이렌 ON 시 앞차들이 양옆으로 비켜줍니다 (단축키 E)">🚨 사이렌 길터주기</button>
+      <button type="button" class="pv-chip" id="topFireMissionBtn" onclick="startFireExtinguishMission(true)" style="border-color:rgba(251,146,60,0.8);color:#fdba74;" title="119 소방차 장착 및 물대포 화재진압 출동 미션">🚒 소방물대포 미션</button>
       <button type="button" class="pv-chip" id="topTimeCycleBtn" onclick="stepTimeOfDay()" style="border-color:rgba(250,204,21,0.65);color:#fde047;" title="클릭 시 낮→노을→밤→새벽 전환 (자동 시간 변화 중)">☀️ 13:30</button>
       <button type="button" class="pv-chip" id="navKoreaMapBtn" onclick="openKoreaMapModal()" style="border-color:rgba(56,189,248,0.65);color:#7dd3fc;">🗺️ 대한민국 전국지도</button>
       <button type="button" class="pv-chip" id="navLauncherBtn" onclick="jumpToStage('launcher')">앱 홈화면</button>
@@ -2171,6 +2229,8 @@
         <button type="button" class="hud-btn" style="border-color:#a78bfa;color:#c4b5fd;" onclick="toggleVehicleFuncPod();startSeoulMission('parking')">🅿️ 정밀 주차 챌린지</button>
         <button type="button" class="hud-btn" style="border-color:#f87171;color:#fca5a5;" onclick="toggleVehicleFuncPod();startPoliceChase('수동 추격전')">🚔 경찰 추격전 시작</button>
         <button type="button" class="hud-btn" style="border-color:#fb7185;color:#fecdd3;" onclick="toggleVehicleFuncPod();startSkyCombatWave()">🎯 하늘 적기 공중전</button>
+        <button type="button" class="hud-btn" style="border-color:#ef4444;color:#fca5a5;" onclick="toggleVehicleFuncPod();equipEmergencyCar('police_112')">🚔 112 경찰차+사이렌</button>
+        <button type="button" class="hud-btn" style="border-color:#fb923c;color:#fed7aa;" onclick="toggleVehicleFuncPod();startFireExtinguishMission(true)">🚒 119 소방 물대포 출동</button>
       </div>
 
       <div class="pod-sec-title">내비게이션 목적지 설정</div>
@@ -2488,6 +2548,8 @@
             <button type="button" class="icon-pill-btn" id="hudBoardNpcBtn" style="display:none;border-color:#fde047;color:#fde047;" onclick="boardNearestVehicle()">🚗 근처 차량 탑승</button>
             <button type="button" class="icon-pill-btn" id="hudEmergencyFuelBtn" style="display:none;border-color:#34d399;color:#6ee7b7;" onclick="callRoadsideFuel()">⛽ 출장주유(+50%)</button>
             <button type="button" id="subwayDoorBtn" class="icon-pill-btn" style="display:none;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleSubwayDoors()">🚇 출입문 개폐</button>
+            <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickSirenBtn" onclick="toggleEmergencySiren()" title="경찰·소방 사이렌 길터주기 ON/OFF (단축키 E)">🚨</button>
+            <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFireBtn" onclick="startFireExtinguishMission(true)" title="119 소방차 & 물대포 화재진압 미션 시작">🚒</button>
             <button type="button" class="icon-pill-btn" id="hudQuickTimeBtn" onclick="stepTimeOfDay()" style="border-color:rgba(250,204,21,0.5);color:#fde047;padding:4px 7px;font-variant-numeric:tabular-nums;" title="밤낮 시간대 즉시 전환 (단축키 T · 자동 순환 중)">☀️ 13:30</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickShieldBtn" onclick="toggleCarShield()" title="차량 에너지 실드 ON/OFF">🛡️</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFlightBtn" onclick="toggleCarFlightMode()" title="비행 변신 ON/OFF">✈️</button>
@@ -2532,6 +2594,15 @@
         <div id="missionHudPill">
           <span id="missionHudText">🚕 택시 미션 · 목적지까지 85m</span>
           <button type="button" class="pv-chip" style="padding:1px 7px;font-size:9.5px;" onclick="cancelActiveMission()">취소</button>
+        </div>
+        <div id="fireMissionBar">
+          <span id="fireMissionStatusText" style="font-size:11.5px;font-weight:800;color:#fed7aa;">🔥 전방 화재 출동 · 135m</span>
+          <div id="fireHpTrack" title="남은 화재 불길 세기"><div id="fireHpFill"></div></div>
+          <button type="button" id="waterCannonSprayBtn"
+            onpointerdown="setWaterHold(true)" onpointerup="setWaterHold(false)" onpointerleave="setWaterHold(false)" onpointercancel="setWaterHold(false)"
+            onclick="triggerWaterCannonBurst()" title="클릭 또는 길게 누르면 고압 물대포 발사 (단축키 G)">💦 물대포 발사(G)</button>
+          <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#f87171;color:#fca5a5;" onclick="equipEmergencyCar('firetruck_119')" title="119 펌프 소방차로 즉시 전환">🚒 소방차</button>
+          <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#60a5fa;color:#93c5fd;" onclick="equipEmergencyCar('police_112')" title="112 순찰 경찰차로 즉시 전환">🚔 경찰차</button>
         </div>
         <div id="stageGoalBanner" onclick="onStageGoalBannerClick()" title="탭하여 현재 목표 힌트 보기">
           <span id="stageGoalText">🎯 목표 1/6 · 대관령 산길 구간까지 운전하기</span>
@@ -2731,7 +2802,7 @@
       <div class="glass-card pointer-auto" style="width:100%;max-width:940px;padding:13px 16px;background:var(--glass-strong);border-color:rgba(255,255,255,0.16);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="font-size:15px;font-weight:800;color:#f8fafc;letter-spacing:-0.3px;">현대 · 기아 최신 전 차종 컨피규레이터 (53종)</span>
+            <span style="font-size:15px;font-weight:800;color:#f8fafc;letter-spacing:-0.3px;">국산 · 특수긴급 · 슈퍼카 전 차종 컨피규레이터 (67종)</span>
             <input type="search" id="carSearchInput" placeholder="차종 검색 (예: 아이오닉 9, EV3, 타스만, 그랜저...)" oninput="renderCarGrid()"
               style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);border-radius:999px;padding:4px 12px;color:#f8fafc;font-size:11.5px;width:230px;outline:none;" />
           </div>
@@ -2740,7 +2811,9 @@
 
         <!-- Segment & Brand Filter Tabs -->
         <div class="preview-scroll" id="brandFilterBar" style="margin-bottom:8px;padding-bottom:2px;">
-          <button type="button" class="pv-chip active" data-brand="all" onclick="filterCarsByBrand('all')">전체 (53)</button>
+          <button type="button" class="pv-chip active" data-brand="all" onclick="filterCarsByBrand('all')">전체 (67)</button>
+          <button type="button" class="pv-chip" data-brand="긴급_특수" onclick="filterCarsByBrand('긴급_특수')" style="border-color:rgba(248,113,113,0.6);color:#fca5a5;">🚨 경찰·소방 (2)</button>
+          <button type="button" class="pv-chip" data-brand="외제_슈퍼카" onclick="filterCarsByBrand('외제_슈퍼카')" style="border-color:rgba(250,204,21,0.6);color:#fde047;">🏎️ 외제 슈퍼카 (12)</button>
           <button type="button" class="pv-chip" data-brand="현대_승용" onclick="filterCarsByBrand('현대_승용')">현대 승용 · N (7)</button>
           <button type="button" class="pv-chip" data-brand="현대_SUV" onclick="filterCarsByBrand('현대_SUV')">현대 SUV · MPV (9)</button>
           <button type="button" class="pv-chip" data-brand="현대_EV" onclick="filterCarsByBrand('현대_EV')">현대 EV · 상용 (13)</button>
@@ -2965,7 +3038,11 @@
       { id: 'benz_s580', brand: '벤츠', group: '외제_슈퍼카', cat: '플래그십 럭셔리 세단', price: '2억 4,700만원~', name: '메르세데스-벤츠 S 580', plate: '07타 0580', plateType: 'normal', color: '#111827', maxSpeed: 250, accel: 25, profile: 'flagship_sedan', lampSig: 'genesis_quad', dims: [1.95, 1.50, 5.29], drive: 'AWD', desc: '디지털 라이트와 클래식 크롬 그릴 최고급 플래그십 쇼퍼드리븐 세단' },
       { id: 'bmw_m4', brand: 'BMW', group: '외제_슈퍼카', cat: '고성능 스포츠 쿠페', price: '1억 4,000만원~', name: 'BMW M4 컴페티션', plate: '40파 0404', plateType: 'normal', color: '#059669', maxSpeed: 290, accel: 31, profile: 'fastback_sedan', lampSig: 'bmw_kidney', dims: [1.89, 1.39, 4.79], drive: 'AWD', caliper: 0x3b82f6, desc: '아일 오브 맨 그린 · 수직형 프레임을 적용한 M 트윈파워 터보 쿠페' },
       { id: 'rolls_spectre', brand: '롤스로이스', group: '외제_슈퍼카', cat: '울트라 럭셔리 쿠페', price: '6억 2,200만원~', name: '롤스로이스 스펙터', plate: '99하 9999', plateType: 'ev', color: '#1e1b4b', maxSpeed: 250, accel: 28, profile: 'flagship_sedan', lampSig: 'palisade_vert', dims: [2.08, 1.56, 5.45], drive: 'AWD', twoToneRoof: '#e2e8f0', desc: '일루미네이티드 판테온 수직 크롬 그릴과 투톤 실버 보닛 최고급 쿠페' },
-      { id: 'cybertruck', brand: '테슬라', group: '외제_슈퍼카', cat: '스테인리스 전기 픽업', price: '1억 6,000만원~', name: '테슬라 사이버트럭 Cyberbeast', plate: '77하 7777', plateType: 'ev', color: '#94a3b8', maxSpeed: 210, accel: 35, profile: 'retro_wedge', lampSig: 'horizon', dims: [2.03, 1.79, 5.68], drive: 'AWD', desc: '냉간압연 스테인리스 스틸 엑소스켈레톤 바디와 일자형 레이저 라이트바' }
+      { id: 'cybertruck', brand: '테슬라', group: '외제_슈퍼카', cat: '스테인리스 전기 픽업', price: '1억 6,000만원~', name: '테슬라 사이버트럭 Cyberbeast', plate: '77하 7777', plateType: 'ev', color: '#94a3b8', maxSpeed: 210, accel: 35, profile: 'retro_wedge', lampSig: 'horizon', dims: [2.03, 1.79, 5.68], drive: 'AWD', desc: '냉간압연 스테인리스 스틸 엑소스켈레톤 바디와 일자형 레이저 라이트바' },
+
+      // ---------------- KOREAN EMERGENCY DISPATCH VEHICLES (경찰 112 · 소방 119 긴급출동 차량) ----------------
+      { id: 'police_112', brand: '경찰청', group: '긴급_특수', cat: '112 고속순찰차', price: '긴급출동 특수차량', name: '대한민국 112 순찰 경찰차', plate: '112가 0112', plateType: 'normal', color: '#f8fafc', maxSpeed: 265, accel: 31, profile: 'fastback_sedan', lampSig: 'horizon', dims: [1.86, 1.45, 4.91], drive: 'AWD', twoToneRoof: '#1e3a8a', emergencyRole: 'police', caliper: 0x3b82f6, desc: '적·청 LED 경광등과 양보 사이렌이 기본 장착된 대한민국 112 고속순찰차' },
+      { id: 'firetruck_119', brand: '소방청', group: '긴급_특수', cat: '119 고압 펌프 소방차', price: '화재진압 특수차량', name: '대한민국 119 펌프 소방차', plate: '119마 0119', plateType: 'normal', color: '#dc2626', maxSpeed: 215, accel: 26, profile: 'truck_1ton', lampSig: 'commercial_kr', dims: [2.22, 2.48, 6.25], drive: 'AWD', isCommercial: true, emergencyRole: 'fire', caliper: 0xfacc15, desc: '루프 고압 방수포(물대포)와 긴급 사이렌이 탑재된 119 화재진압 소방차' }
     ];
 
     // ============================================================================
@@ -3005,6 +3082,16 @@
       wipers: false,
       seatbelt: true,
       policeSiren: false,
+      sirenAudioTick: 0,
+      sirenToneFlip: false,
+      fireMissionActive: false,
+      fireExtinguishedCount: 0,
+      fireSite: null,
+      fireHp: 100,
+      waterHoldActive: false,
+      waterBurstTimer: 0,
+      waterSpraySoundTick: 0,
+      waterDrops: [],
       hoverMode: false,
       hoverAltitude: 0,
       hoverLift: 0,
@@ -4368,8 +4455,21 @@
     }
 
     function buildScenicCurving3DWorld() {
-      if (!useWebGL || typeof THREE === 'undefined' || !worldGroup) return;
       initScenicSamples();
+      if (!useWebGL || typeof THREE === 'undefined' || !worldGroup) {
+        if (!state.npcs || state.npcs.length === 0) {
+          if (typeof spawnNpcsForMode === 'function') spawnNpcsForMode('autonomous');
+        }
+        (state.npcs || []).forEach((npc, idx) => {
+          npc.scenicFloat = ((idx + 1) * 18) % SCENIC_SEGMENTS;
+          npc.laneOff = idx % 2 === 0 ? -3.6 : 3.6;
+          const sp = scenicRoadSamples[Math.floor(npc.scenicFloat) % SCENIC_SEGMENTS];
+          npc.x = sp.x + sp.nx * npc.laneOff;
+          npc.z = sp.z + sp.nz * npc.laneOff;
+          npc.y = sp.y;
+        });
+        return;
+      }
       while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children[0]);
       state.buildingBoxes = [];
       state.parkedCars = [];
@@ -4765,6 +4865,18 @@
           if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
         });
         ctx.stroke();
+      }
+
+      // Active 119 Blazing Fire Site Marker (🔥 Pulsing Orange-Red)
+      if (state.fireMissionActive && state.fireSite) {
+        const [fx, fy] = toScreen(state.fireSite.x, state.fireSite.z);
+        const pulseR = (isExpanded ? 11 : 7.5) + Math.sin(performance.now() * 0.01) * 2.5;
+        ctx.strokeStyle = 'rgba(249, 115, 22, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(fx, fy, pulseR, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = isExpanded ? '15px sans-serif' : '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔥', fx, fy + 4);
       }
 
       // Nearby NPC Cars (Yellow) & Flying NPCs (Cyan) & Sky Enemies (Red)
@@ -5530,7 +5642,7 @@
 
       // 2. Speed Trap Camera (> 88 km/h in city triggers flash & chase!)
       if (state.policeSpeedTrapCd > 0) state.policeSpeedTrapCd = Math.max(0, state.policeSpeedTrapCd - dt);
-      if (!state.policeChaseActive && !state.carFlightMode && !state.isWalking && state.policeSpeedTrapCd === 0 && kmh >= 88 && state.stage === 'driving') {
+      if (!state.policeSiren && !state.policeChaseActive && !state.carFlightMode && !state.isWalking && state.policeSpeedTrapCd === 0 && kmh >= 88 && state.stage === 'driving') {
         state.policeSpeedTrapCd = 22;
         triggerSpeedCameraFlash(kmh);
       }
@@ -6755,11 +6867,374 @@
       showToast(state.seatbelt ? '안전띠 착용 완료' : '안전띠 해제됨 (시험 중 실격 주의)');
     }
 
+    let sirenPointLight3D = null;
+    let waterCannonTurret3D = null;
+    let fireSiteGroup3D = null;
+
+    function syncEmergencySirenUi() {
+      const on = Boolean(state.policeSiren);
+      const lb = document.getElementById('lobbySirenBtn');
+      if (lb) lb.classList.toggle('on', on);
+      const tb = document.getElementById('topSirenBtn');
+      if (tb) {
+        tb.classList.toggle('siren-active-btn', on);
+        tb.textContent = on ? '🚨 사이렌 ON (길터주기중)' : '🚨 사이렌 길터주기';
+      }
+      const hb = document.getElementById('hudQuickSirenBtn');
+      if (hb) hb.classList.toggle('siren-active-btn', on);
+
+      const fBar = document.getElementById('fireMissionBar');
+      if (fBar) {
+        const showBar = state.stage === 'driving' && (state.fireMissionActive || state.selectedCarId === 'firetruck_119' || state.waterBurstTimer > 0 || state.waterHoldActive);
+        fBar.style.display = showBar ? 'inline-flex' : 'none';
+      }
+    }
+
     function togglePoliceSiren() {
-      state.policeSiren = !state.policeSiren;
-      document.getElementById('lobbySirenBtn').classList.toggle('on', state.policeSiren);
+      toggleEmergencySiren();
+    }
+
+    function toggleEmergencySiren(forceVal) {
+      state.policeSiren = typeof forceVal === 'boolean' ? forceVal : !state.policeSiren;
+      if (state.policeSiren && state.policeChaseActive) {
+        state.policeChaseActive = false;
+        const b = document.getElementById('policeChaseBanner');
+        if (b) b.style.display = 'none';
+        if (policePursuitMesh) policePursuitMesh.visible = false;
+      }
+      syncEmergencySirenUi();
       rebuildPlayer3DCar();
-      showToast(state.policeSiren ? '암행순찰 경광등 ON' : '암행순찰 경광등 OFF');
+      if (state.policeSiren) {
+        playTone(660, 0.24, 'triangle', 0.06, 960);
+        showToast('🚨 긴급출동 사이렌 ON! 전방 NPC 차량들이 좌우 갓길로 길을 비켜줍니다!');
+      } else {
+        showToast('🔕 긴급 사이렌 OFF · 일반 주행 복귀');
+      }
+    }
+
+    function equipEmergencyCar(carId) {
+      if (state.stage !== 'driving') startInstantTestDrive();
+      if (state.isWalking) toggleWalkMode();
+      state.selectedCarId = carId;
+      state.customColor = null;
+      const spec = getCurrentCar();
+      state.customPlate = spec.plate;
+      state.policeSiren = true;
+      updateLobbyCarHeader();
+      const hudTitle = document.getElementById('hudCarTitle');
+      if (hudTitle) hudTitle.textContent = spec.name;
+      syncEmergencySirenUi();
+      rebuildPlayer3DCar();
+      playTone(640, 0.22, 'triangle', 0.07, 980);
+      showToast(carId === 'firetruck_119'
+        ? '🚒 대한민국 119 펌프 소방차 탑승 완료! 사이렌 & 고압 물대포(G) 준비!'
+        : '🚔 대한민국 112 순찰 경찰차 탑승 완료! 사이렌 길터주기 작동 중!');
+    }
+
+    function playWaterSprayNoise() {
+      if (state.muted) return;
+      const ctx = ensureAudio();
+      if (!ctx) return;
+      try {
+        const len = Math.floor(ctx.sampleRate * 0.19);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.55;
+        const srcN = ctx.createBufferSource();
+        srcN.buffer = buf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(1050, ctx.currentTime);
+        bp.Q.setValueAtTime(1.4, ctx.currentTime);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.065, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.002, ctx.currentTime + 0.18);
+        srcN.connect(bp); bp.connect(g); g.connect(ctx.destination);
+        srcN.start(); srcN.stop(ctx.currentTime + 0.19);
+      } catch (_) {}
+    }
+
+    function setWaterHold(flag) {
+      state.waterHoldActive = Boolean(flag);
+      const btn = document.getElementById('waterCannonSprayBtn');
+      if (btn) btn.classList.toggle('spraying', state.waterHoldActive || state.waterBurstTimer > 0);
+    }
+
+    function triggerWaterCannonBurst() {
+      if (state.stage !== 'driving') startInstantTestDrive();
+      state.waterBurstTimer = 2.4;
+      syncEmergencySirenUi();
+      rebuildPlayer3DCar();
+      const btn = document.getElementById('waterCannonSprayBtn');
+      if (btn) btn.classList.add('spraying');
+      playWaterSprayNoise();
+    }
+
+    function clearFireSite3D() {
+      if (fireSiteGroup3D && scene) {
+        try { scene.remove(fireSiteGroup3D); } catch (_) {}
+      }
+      fireSiteGroup3D = null;
+    }
+
+    function spawnBlazingFireScene() {
+      clearFireSite3D();
+      let fx = state.x + 4.2, fy = 0, fz = state.z + 115, fHeading = state.heading || 0;
+      if (state.scenicTourActive && scenicRoadSamples.length) {
+        let bestIdx = 0, bestD = Infinity;
+        scenicRoadSamples.forEach((sp, idx) => {
+          const d = (sp.x - state.x) ** 2 + (sp.z - state.z) ** 2;
+          if (d < bestD) { bestD = d; bestIdx = idx; }
+        });
+        const targetIdx = (bestIdx + 12) % SCENIC_SEGMENTS;
+        const sp = scenicRoadSamples[targetIdx];
+        fx = sp.x + sp.nx * 4.8;
+        fy = sp.y;
+        fz = sp.z + sp.nz * 4.8;
+        fHeading = sp.heading;
+      } else {
+        fx = state.x - Math.sin(fHeading) * 105 + Math.cos(fHeading) * 4.2;
+        fz = state.z + Math.cos(fHeading) * 105 + Math.sin(fHeading) * 4.2;
+        fy = 0;
+      }
+
+      state.fireSite = { x: fx, y: fy, z: fz, heading: fHeading };
+      state.fireHp = 100;
+
+      if (useWebGL && typeof THREE !== 'undefined' && scene) {
+        fireSiteGroup3D = new THREE.Group();
+        const wreck = new THREE.Mesh(
+          new THREE.BoxGeometry(2.0, 1.25, 4.4),
+          new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 })
+        );
+        wreck.position.set(0, 0.65, 0);
+        wreck.rotation.y = fHeading + 0.25;
+        fireSiteGroup3D.add(wreck);
+
+        const flames = [];
+        const flameCols = [0xef4444, 0xf97316, 0xfde047, 0xf97316, 0xef4444, 0xfacc15, 0xfb923c];
+        for (let i = 0; i < 7; i++) {
+          const r = 0.75 + (i % 3) * 0.38;
+          const h = 2.8 + (i % 4) * 1.15;
+          const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(r, h, 9),
+            new THREE.MeshBasicMaterial({
+              color: flameCols[i],
+              transparent: true,
+              opacity: 0.88,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending
+            })
+          );
+          const ang = (i / 7) * Math.PI * 2;
+          const dist = i === 0 ? 0 : 0.95;
+          cone.position.set(Math.cos(ang) * dist, h * 0.48 + 0.4, Math.sin(ang) * dist);
+          cone.userData = { baseH: h, phase: i * 1.17 };
+          fireSiteGroup3D.add(cone);
+          flames.push(cone);
+        }
+
+        const smokes = [];
+        const smokeMat = new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.48, depthWrite: false });
+        for (let s = 0; s < 5; s++) {
+          const sp = new THREE.Mesh(new THREE.SphereGeometry(1.1 + s * 0.28, 8, 8), smokeMat);
+          sp.position.set((s % 2 - 0.5) * 0.8, 3.8 + s * 1.6, 0);
+          sp.userData = { phase: s * 0.2 };
+          fireSiteGroup3D.add(sp);
+          smokes.push(sp);
+        }
+
+        const fireLight = new THREE.PointLight(0xf97316, 2.6, 58, 1.5);
+        fireLight.position.set(0, 3.5, 0);
+        fireSiteGroup3D.add(fireLight);
+
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(2.8, 0.14, 8, 24),
+          new THREE.MeshBasicMaterial({ color: 0xf97316 })
+        );
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(0, 0.22, 0);
+        fireSiteGroup3D.add(ring);
+
+        fireSiteGroup3D.userData = { flames, smokes, fireLight };
+        fireSiteGroup3D.position.set(fx, fy, fz);
+        scene.add(fireSiteGroup3D);
+      }
+    }
+
+    function startFireExtinguishMission(switchToFireTruck) {
+      if (state.stage !== 'driving') startInstantTestDrive();
+      if (state.isWalking) toggleWalkMode();
+      if (switchToFireTruck && state.selectedCarId === 'sonata_edge') {
+        state.selectedCarId = 'firetruck_119';
+        state.customColor = null;
+        state.customPlate = '119마 0119';
+        updateLobbyCarHeader();
+        const hudTitle = document.getElementById('hudCarTitle');
+        if (hudTitle) hudTitle.textContent = getCurrentCar().name;
+      }
+      state.fireMissionActive = true;
+      state.policeSiren = true;
+      spawnBlazingFireScene();
+      syncEmergencySirenUi();
+      rebuildPlayer3DCar();
+      playTone(587, 0.18, 'triangle', 0.07, 880);
+      showToast('🚒 119 긴급 화재출동 발령! 사이렌으로 길을 열고 화재 현장 가까이 가서 물대포(G)를 쏘세요!');
+    }
+
+    function updateEmergencyAndFireSystems(dt) {
+      if (state.policeSiren && state.stage === 'driving' && !state.isWalking) {
+        state.sirenAudioTick = (state.sirenAudioTick || 0) + dt;
+        if (state.sirenAudioTick >= 0.56) {
+          state.sirenAudioTick = 0;
+          state.sirenToneFlip = !state.sirenToneFlip;
+          playTone(state.sirenToneFlip ? 650 : 940, 0.48, 'triangle', 0.032, state.sirenToneFlip ? 920 : 660);
+        }
+        if (sirenPointLight3D) {
+          sirenPointLight3D.visible = true;
+          const redTurn = Math.floor(performance.now() / 160) % 2 === 0;
+          sirenPointLight3D.color.setHex(redTurn ? 0xff1e1e : 0x3b82f6);
+          sirenPointLight3D.intensity = 2.1;
+        }
+      } else if (sirenPointLight3D) {
+        sirenPointLight3D.visible = false;
+      }
+
+      if (state.waterBurstTimer > 0) {
+        state.waterBurstTimer = Math.max(0, state.waterBurstTimer - dt);
+        if (state.waterBurstTimer === 0 && !state.waterHoldActive) {
+          const btn = document.getElementById('waterCannonSprayBtn');
+          if (btn) btn.classList.remove('spraying');
+          syncEmergencySirenUi();
+        }
+      }
+      const spraying = (state.waterHoldActive || state.waterBurstTimer > 0 || Boolean(state.keys['KeyG'])) && state.stage === 'driving' && !state.isWalking;
+      if (spraying) {
+        state.waterSpraySoundTick = (state.waterSpraySoundTick || 0) + dt;
+        if (state.waterSpraySoundTick >= 0.16) {
+          state.waterSpraySoundTick = 0;
+          playWaterSprayNoise();
+        }
+        let dirX = -Math.sin(state.heading);
+        let dirZ = Math.cos(state.heading);
+        let upVel = 7.2;
+        if (state.fireMissionActive && state.fireSite) {
+          const dxF = state.fireSite.x - state.x;
+          const dzF = state.fireSite.z - state.z;
+          const distF = Math.hypot(dxF, dzF);
+          if (distF > 2 && distF < 52) {
+            const nx = dxF / distF, nz = dzF / distF;
+            const dot = nx * dirX + nz * dirZ;
+            if (dot > 0.25) {
+              dirX = dirX * 0.35 + nx * 0.65;
+              dirZ = dirZ * 0.35 + nz * 0.65;
+              const mag = Math.hypot(dirX, dirZ) || 1;
+              dirX /= mag; dirZ /= mag;
+              upVel = Math.min(10.5, Math.max(3.5, distF * 0.17));
+            }
+          }
+        }
+        for (let k = 0; k < 2; k++) {
+          if (state.waterDrops.length > 90) break;
+          let dropMesh = null;
+          if (useWebGL && typeof THREE !== 'undefined' && scene) {
+            dropMesh = new THREE.Mesh(
+              new THREE.SphereGeometry(0.32 + Math.random() * 0.22, 6, 6),
+              new THREE.MeshBasicMaterial({ color: k === 0 ? 0x38bdf8 : 0xe0f2fe, transparent: true, opacity: 0.85 })
+            );
+            scene.add(dropMesh);
+          }
+          const spread = (Math.random() - 0.5) * 2.2;
+          const baseH = (state.y || 0) + (state.selectedCarId === 'firetruck_119' ? 2.55 : 1.75);
+          const ox = state.x + dirX * 1.4 + Math.cos(state.heading) * (spread * 0.15);
+          const oz = state.z + dirZ * 1.4 + Math.sin(state.heading) * (spread * 0.15);
+          if (dropMesh) dropMesh.position.set(ox, baseH, oz);
+          state.waterDrops.push({
+            x: ox, y: baseH, z: oz,
+            vx: dirX * (32 + Math.random() * 5) + (Math.random() - 0.5) * 1.8,
+            vy: upVel + (Math.random() - 0.5) * 1.4,
+            vz: dirZ * (32 + Math.random() * 5) + (Math.random() - 0.5) * 1.8,
+            life: 1.25,
+            mesh: dropMesh
+          });
+        }
+      }
+
+      let hitFireThisFrame = false;
+      for (let i = state.waterDrops.length - 1; i >= 0; i--) {
+        const wd = state.waterDrops[i];
+        wd.life -= dt;
+        wd.vy -= 14.5 * dt;
+        wd.x += wd.vx * dt;
+        wd.y += wd.vy * dt;
+        wd.z += wd.vz * dt;
+        if (wd.mesh) wd.mesh.position.set(wd.x, Math.max(0.1, wd.y), wd.z);
+
+        if (state.fireMissionActive && state.fireSite) {
+          const df = Math.hypot(wd.x - state.fireSite.x, wd.z - state.fireSite.z);
+          if (df < 9.5) {
+            hitFireThisFrame = true;
+            wd.life = 0;
+          }
+        }
+        if (wd.life <= 0 || wd.y <= -0.5) {
+          if (wd.mesh && scene) { try { scene.remove(wd.mesh); } catch (_) {} }
+          state.waterDrops.splice(i, 1);
+        }
+      }
+
+      if (state.fireMissionActive && state.fireSite) {
+        const distToFire = Math.hypot(state.x - state.fireSite.x, state.z - state.fireSite.z);
+        if (spraying && distToFire < 46) hitFireThisFrame = true;
+
+        if (hitFireThisFrame && state.fireHp > 0) {
+          const prevBucket = Math.floor(state.fireHp / 25);
+          state.fireHp = Math.max(0, state.fireHp - 34.0 * dt);
+          if (Math.floor(state.fireHp / 25) < prevBucket && state.fireHp > 0) {
+            addSkyCombatScore(50, '화재 진압 중!', '#38bdf8');
+          }
+        }
+
+        const hpRatio = Math.max(0, state.fireHp / 100);
+        const fillEl = document.getElementById('fireHpFill');
+        if (fillEl) fillEl.style.width = `${Math.round(hpRatio * 100)}%`;
+        const stEl = document.getElementById('fireMissionStatusText');
+        if (stEl) {
+          stEl.textContent = distToFire < 42
+            ? `💦 물대포 명중 가능! · 불길 ${Math.ceil(state.fireHp)}%`
+            : `🔥 화재 현장 전방 ${Math.round(distToFire)}m · 불길 ${Math.ceil(state.fireHp)}%`;
+        }
+
+        if (fireSiteGroup3D && fireSiteGroup3D.userData) {
+          const tNow = performance.now() * 0.008;
+          const scF = 0.18 + 0.82 * hpRatio;
+          fireSiteGroup3D.userData.flames.forEach((cone) => {
+            const flk = scF * (0.82 + Math.sin(tNow * 2.4 + cone.userData.phase) * 0.24);
+            cone.scale.set(scF, Math.max(0.08, flk), scF);
+          });
+          fireSiteGroup3D.userData.smokes.forEach((sm) => {
+            const p = (sm.userData.phase + tNow * 0.12) % 1;
+            sm.position.y = 2.8 + p * 8.5;
+            sm.scale.setScalar((0.7 + p * 1.4) * (0.35 + 0.65 * hpRatio));
+          });
+          if (fireSiteGroup3D.userData.fireLight) {
+            fireSiteGroup3D.userData.fireLight.intensity = hpRatio * (2.2 + Math.sin(tNow * 5) * 0.6);
+          }
+        }
+
+        if (state.fireHp <= 0) {
+          state.fireMissionActive = false;
+          state.fireExtinguishedCount = (state.fireExtinguishedCount || 0) + 1;
+          clearFireSite3D();
+          repairVehicleInstant();
+          addSkyCombatScore(1000, '119 화재 완전 진압!', '#fde047');
+          addCoinsAndTrophies(500, 1);
+          playTone(523.25, 0.16, 'triangle', 0.08, 783.99);
+          setTimeout(() => playTone(783.99, 0.25, 'triangle', 0.09, 1046.5), 160);
+          showToast(`🎉 119 화재 완전 진압 성공!! (+1,000점 · +500코인 · 트로피 +1 · 누적 ${state.fireExtinguishedCount}회)`);
+          syncEmergencySirenUi();
+        }
+      }
     }
 
     function toggleHoverMode() {
@@ -9349,12 +9824,30 @@
       rPlate.position.set(0, H * 0.30, -hl - 0.005);
       bodyGroup.add(fPlate, rPlate);
 
-      if (isPlayer && state.policeSiren) {
-        sirenLightL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-        sirenLightR = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
-        sirenLightL.position.set(-0.20, H + 0.05, 0);
-        sirenLightR.position.set(0.20, H + 0.05, 0);
-        bodyGroup.add(sirenLightL, sirenLightR);
+      if (isPlayer && (state.policeSiren || carSpec.emergencyRole)) {
+        const barBase = new THREE.Mesh(new THREE.BoxGeometry(W * 0.62, 0.045, 0.18), trimBlack);
+        barBase.position.set(0, H + 0.035, 0.05);
+        sirenLightL = new THREE.Mesh(new THREE.BoxGeometry(W * 0.28, 0.075, 0.16), new THREE.MeshBasicMaterial({ color: 0xff1e1e }));
+        sirenLightR = new THREE.Mesh(new THREE.BoxGeometry(W * 0.28, 0.075, 0.16), new THREE.MeshBasicMaterial({ color: carSpec.emergencyRole === 'fire' ? 0xfbbf24 : 0x3b82f6 }));
+        sirenLightL.position.set(-W * 0.16, H + 0.075, 0.05);
+        sirenLightR.position.set(W * 0.16, H + 0.075, 0.05);
+        sirenPointLight3D = new THREE.PointLight(0xff1e1e, state.policeSiren ? 2.0 : 0, 28, 1.6);
+        sirenPointLight3D.position.set(0, H + 0.65, 0.05);
+        sirenPointLight3D.visible = Boolean(state.policeSiren);
+        bodyGroup.add(barBase, sirenLightL, sirenLightR, sirenPointLight3D);
+      }
+      if (isPlayer && (carSpec.id === 'firetruck_119' || state.fireMissionActive || state.waterBurstTimer > 0)) {
+        waterCannonTurret3D = new THREE.Group();
+        const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.22, 10), satinSilver);
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.085, 0.72, 10), satinSilver);
+        barrel.rotation.x = Math.PI / 2 - 0.26;
+        barrel.position.set(0, 0.16, 0.28);
+        const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.07, 0.14, 10), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+        tip.rotation.x = Math.PI / 2 - 0.26;
+        tip.position.set(0, 0.25, 0.64);
+        waterCannonTurret3D.add(ped, barrel, tip);
+        waterCannonTurret3D.position.set(0, H + 0.12, 0.35);
+        bodyGroup.add(waterCannonTurret3D);
       }
 
       if (isPlayer) {
@@ -9448,7 +9941,7 @@
     function rebuildPlayer3DCar() {
       if (!useWebGL || !playerCarGroup) return;
       while (playerCarGroup.children.length > 0) playerCarGroup.remove(playerCarGroup.children[0]);
-      sirenLightL = null; sirenLightR = null; cockpitWheelMesh = null;
+      sirenLightL = null; sirenLightR = null; sirenPointLight3D = null; waterCannonTurret3D = null; cockpitWheelMesh = null;
       const built = buildKoreanVehicleMesh(getCurrentCar(), state.customColor, state.customPlate, true);
       playerCarGroup.add(built.root);
       playerWheels = built.wheels;
@@ -10441,25 +10934,45 @@
       }
 
       state.npcs.forEach((npc, idx) => {
+        if (typeof npc.baseX !== 'number') npc.baseX = npc.x;
+        if (typeof npc.yieldShift !== 'number') npc.yieldShift = 0;
+        const distP = Math.hypot((npc.x || 0) - state.x, (npc.z || 0) - state.z);
+        const shouldYield = Boolean(state.policeSiren && !state.isWalking && distP < 76);
+        npc.yieldingNow = shouldYield;
+
+        if (shouldYield && distP < 17 && Math.abs(state.speed) > 4 && !npc._yieldRewardCd) {
+          npc._yieldRewardCd = 8.0;
+          addSkyCombatScore(30, '🚨 모세의 기적 길터주기 통과!', '#60a5fa');
+        }
+        if (npc._yieldRewardCd > 0) npc._yieldRewardCd = Math.max(0, npc._yieldRewardCd - dt);
+
+        const spdMul = shouldYield ? 0.25 : 1.0;
+
         if (state.scenicTourActive && scenicRoadSamples.length) {
           if (typeof npc.scenicFloat !== 'number') npc.scenicFloat = ((idx + 1) * 18) % SCENIC_SEGMENTS;
-          npc.scenicFloat = (npc.scenicFloat + (npc.dir > 0 ? 1 : -1) * (npc.spd * 0.045) * dt + SCENIC_SEGMENTS) % SCENIC_SEGMENTS;
+          npc.scenicFloat = (npc.scenicFloat + (npc.dir > 0 ? 1 : -1) * (npc.spd * spdMul * 0.045) * dt + SCENIC_SEGMENTS) % SCENIC_SEGMENTS;
           const sp = scenicRoadSamples[Math.floor(npc.scenicFloat) % SCENIC_SEGMENTS];
-          const lane = npc.laneOff || (npc.dir > 0 ? 3.6 : -3.6);
+          const baseLane = npc.laneOff || (npc.dir > 0 ? 3.6 : -3.6);
+          const targetShift = shouldYield ? (baseLane >= 0 ? 4.1 : -4.1) : 0;
+          npc.yieldShift += (targetShift - npc.yieldShift) * Math.min(1, dt * 4.6);
+          const lane = baseLane + npc.yieldShift;
           npc.x = sp.x + sp.nx * lane;
           npc.z = sp.z + sp.nz * lane;
           npc.y = sp.y;
           if (npc.mesh) {
             npc.mesh.position.set(npc.x, sp.y, npc.z);
-            npc.mesh.rotation.y = npc.dir > 0 ? sp.heading : (sp.heading + Math.PI);
+            npc.mesh.rotation.y = (npc.dir > 0 ? sp.heading : (sp.heading + Math.PI)) + (npc.yieldShift * 0.03);
           }
         } else {
+          const targetShift = shouldYield ? (npc.baseX >= state.x ? 3.8 : -3.8) : 0;
+          npc.yieldShift += (targetShift - npc.yieldShift) * Math.min(1, dt * 4.6);
+          npc.x = npc.baseX + npc.yieldShift;
           const stopAtLight = state.signalColor === 'red' && (
             (npc.dir > 0 && npc.z > -22 && npc.z < -11) ||
             (npc.dir < 0 && npc.z < 22 && npc.z > 11)
           );
           if (!stopAtLight) {
-            npc.z += npc.dir * npc.spd * dt;
+            npc.z += npc.dir * npc.spd * spdMul * dt;
             if (npc.z > 118) npc.z = -118;
             if (npc.z < -118) npc.z = 118;
           }
@@ -11084,12 +11597,59 @@
             ctx.fill();
             ctx.fillStyle = '#090d16';
             ctx.fillRect(nxScreen - nw * 0.36, py - nh * 0.88, nw * 0.72, nh * 0.36);
-            // Glowing Supercar Headlights (if oncoming) or Taillights!
-            ctx.fillStyle = npc.dir < 0 ? '#fef08a' : '#ef4444';
+            const blinkHaz = npc.yieldingNow && (Math.floor(performance.now() / 160) % 2 === 0);
+            ctx.fillStyle = blinkHaz ? '#f59e0b' : (npc.dir < 0 ? '#fef08a' : '#ef4444');
             ctx.fillRect(nxScreen - nw * 0.44, py - nh * 0.42, nw * 0.22, Math.max(2, 4 * p));
             ctx.fillRect(nxScreen + nw * 0.22, py - nh * 0.42, nw * 0.22, Math.max(2, 4 * p));
+            if (npc.yieldingNow && p > 0.12) {
+              ctx.fillStyle = '#fde047';
+              ctx.font = '800 10px "Noto Sans KR", sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText('◀ 양보 ▶', nxScreen, py - nh - 5);
+            }
           }
         });
+
+        // 2D Blazing Fire Scene & Water Stream Rendering!
+        if (state.fireMissionActive && state.fireSite) {
+          const dxF = state.fireSite.x - state.x, dzF = state.fireSite.z - state.z;
+          const fwdDist = -dxF * Math.sin(state.heading) + dzF * Math.cos(state.heading);
+          const latDist = dxF * Math.cos(state.heading) + dzF * Math.sin(state.heading);
+          if (fwdDist > 3 && fwdDist < 130) {
+            const pF = Math.min(0.92, 4.2 / fwdDist);
+            const fyScreen = horizon + (h - horizon) * pF;
+            const fxScreen = vanishX + (roadBotCenter - vanishX) * pF + (latDist / 8.0) * ((w * 0.08) + (w * 0.42) * pF);
+            const fScale = (0.3 + 0.7 * (state.fireHp / 100)) * Math.max(0.35, pF * 2.1);
+            ctx.save();
+            for (let fi = 0; fi < 5; fi++) {
+              const wob = Math.sin(performance.now() * 0.015 + fi * 1.4) * 8 * fScale;
+              ctx.fillStyle = fi % 2 === 0 ? 'rgba(239,68,68,0.86)' : 'rgba(250,204,21,0.9)';
+              ctx.beginPath();
+              ctx.ellipse(fxScreen + (fi - 2) * 14 * fScale, fyScreen - 26 * fScale + wob * 0.4, 16 * fScale, 34 * fScale, 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.fillStyle = '#fed7aa';
+            ctx.font = '900 11px "Noto Sans KR", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`🔥 화재 ${Math.ceil(state.fireHp)}% (${Math.round(fwdDist)}m)`, fxScreen, fyScreen - 66 * fScale);
+            ctx.restore();
+          }
+        }
+        if ((state.waterHoldActive || state.waterBurstTimer > 0 || state.keys['KeyG']) && !state.isWalking) {
+          ctx.save();
+          const jetGrad = ctx.createLinearGradient(w * 0.5, h * 0.60, vanishX, horizon + 12);
+          jetGrad.addColorStop(0, 'rgba(224,242,254,0.92)');
+          jetGrad.addColorStop(0.5, 'rgba(56,189,248,0.78)');
+          jetGrad.addColorStop(1, 'rgba(186,230,253,0.18)');
+          ctx.strokeStyle = jetGrad;
+          ctx.lineWidth = 11;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(w * 0.5 + state.steerAngle * 75, h * 0.61);
+          ctx.quadraticCurveTo(w * 0.5, horizon + 18, vanishX, horizon + 36);
+          ctx.stroke();
+          ctx.restore();
+        }
 
         const carCx = w * 0.5 + state.steerAngle * 75;
         const carCy = h * 0.67 - (state.carFlightMode ? Math.min(125, 42 + state.y * 0.7) : (state.hoverMode ? 36 : 0));
@@ -11198,6 +11758,13 @@
           ctx.restore();
         }
         drawSleekRearCar(ctx, carCx, carCy, carSc, car, paint);
+        if (state.policeSiren) {
+          const redOn = Math.floor(performance.now() / 150) % 2 === 0;
+          ctx.fillStyle = redOn ? '#ff1e1e' : '#1e3a8a';
+          ctx.beginPath(); ctx.roundRect(carCx - 24 * carSc, carCy - 45 * carSc, 22 * carSc, 7 * carSc, 3); ctx.fill();
+          ctx.fillStyle = redOn ? '#1e3a8a' : '#38bdf8';
+          ctx.beginPath(); ctx.roundRect(carCx + 2 * carSc, carCy - 45 * carSc, 22 * carSc, 7 * carSc, 3); ctx.fill();
+        }
         ctx.restore();
         if (state.shieldOn) {
           const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.006);
@@ -11658,6 +12225,8 @@
         if (e.code === 'KeyZ') toggleHazard();
         if (e.code === 'KeyL') toggleHeadlights();
         if (e.code === 'KeyT') stepTimeOfDay();
+        if (e.code === 'KeyE') toggleEmergencySiren();
+        if (e.code === 'KeyG' && !e.repeat) triggerWaterCannonBurst();
         if (e.code === 'KeyF') toggleWipers();
         if (e.code === 'KeyH') triggerHorn();
         if (e.code === 'KeyC') cycleCameraMode();
@@ -11696,6 +12265,7 @@
         update3DCrashSmoke(dt);
         updateFlyingNpcs(dt);
         updateV16Systems(dt);
+        updateEmergencyAndFireSystems(dt);
         updateDayNightEnvironment(dt, false);
         if (skyDomeMesh) skyDomeMesh.position.set(state.x, 0, state.z);
         if (cloudGroup3D) cloudGroup3D.position.set(state.x, 0, state.z);
