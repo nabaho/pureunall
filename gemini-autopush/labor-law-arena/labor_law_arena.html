@@ -258,6 +258,7 @@
     .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .grid-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
     @media (min-width: 640px) {
       .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .sm\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -477,23 +478,106 @@
           </div>
         </div>
 
-        <!-- 3 Clean Window Tabs inside Phone App -->
-        <div class="px-2.5 py-2 bg-slate-950 border-b border-slate-800 grid grid-cols-3 gap-1.5 text-[11px] sm:text-xs">
-          <button type="button" id="btnPhoneTabLifeShop" class="py-2 px-2 rounded-xl bg-amber-400 text-slate-950 font-extrabold shadow truncate">
+        <!-- 4 Clean Window Tabs inside Phone App -->
+        <div class="px-2 py-2 bg-slate-950 border-b border-slate-800 grid grid-cols-4 gap-1 text-[11px]">
+          <button type="button" id="btnPhoneTabWeekly" class="py-2 px-1.5 rounded-xl bg-amber-400 text-slate-950 font-extrabold shadow truncate">
+            📅 주급·주휴
+          </button>
+          <button type="button" id="btnPhoneTabLifeShop" class="py-2 px-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold truncate">
             🍚 밥·쇼핑·월세
           </button>
-          <button type="button" id="btnPhoneTabDetective" class="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold truncate">
-            🧾 일하기·수당협상
+          <button type="button" id="btnPhoneTabDetective" class="py-2 px-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold truncate">
+            🧾 수당협상
           </button>
-          <button type="button" id="btnPhoneTabCareer" class="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold truncate">
-            🚀 14단계 스토리
+          <button type="button" id="btnPhoneTabCareer" class="py-2 px-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold truncate">
+            🚀 14단계
           </button>
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 📅 WEEKLY PAY & WEEKLY HOLIDAY ALLOWANCE (주급·주휴수당) GAME   -->
+        <!-- =============================================================== -->
+        <div id="appWeeklyPayView" class="flex flex-col bg-slate-950">
+          <!-- Animated Weekly Pay Canvas Slot -->
+          <div id="weeklyCanvasSlot" class="w-full bg-slate-950 border-b border-slate-800" style="aspect-ratio:16/9;"></div>
+
+          <div class="p-3.5 space-y-3 text-xs">
+            <!-- Wage & Shop Scale Quick Selector -->
+            <div class="flex flex-wrap items-center justify-between gap-1.5 bg-slate-900 border border-slate-800 rounded-xl p-2">
+              <div class="flex items-center gap-1">
+                <span class="text-[11px] text-slate-400 font-bold">시급:</span>
+                <button type="button" data-wk-wage="10320" class="wk-wage-btn px-2 py-1 rounded-lg bg-amber-400 text-slate-950 font-extrabold text-[11px]">10,320원</button>
+                <button type="button" data-wk-wage="12000" class="wk-wage-btn px-2 py-1 rounded-lg bg-slate-800 text-slate-200 font-bold text-[11px]">12,000원</button>
+                <button type="button" data-wk-wage="15000" class="wk-wage-btn px-2 py-1 rounded-lg bg-slate-800 text-slate-200 font-bold text-[11px]">15,000원</button>
+              </div>
+              <button type="button" id="btnWkScaleToggle" class="px-2.5 py-1 rounded-lg bg-sky-500/20 border border-sky-400/50 text-sky-300 font-extrabold text-[11px]">
+                🏢 5인 이상 (연장·야간 1.5배)
+              </button>
+            </div>
+
+            <!-- Mon~Sun 7-Day Interactive Attendance Strip -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 space-y-2">
+              <div class="flex items-center justify-between">
+                <span id="wkWeekTitleTxt" class="font-extrabold text-amber-300">📅 1주차 출근부 (월~일 선택)</span>
+                <span id="wkStreakBadge" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px]">🟢 개근 유지중!</span>
+              </div>
+              <div id="wkDaysGrid" class="grid grid-cols-7 gap-1 text-center text-[11px]"></div>
+            </div>
+
+            <!-- Action Buttons for Current Day of Week -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span id="wkTodayPrompt" class="font-extrabold text-white">👉 [월요일] 오늘 어떻게 근무할까요?</span>
+                <button type="button" id="btnWkResetWeek" class="text-slate-400 hover:text-white font-bold">🔄 이번 주 초기화</button>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button type="button" id="btnWkDoNormal" class="py-2.5 px-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold shadow">
+                  💼 정상 출근 (+5시간)
+                </button>
+                <button type="button" id="btnWkDoFull" class="py-2.5 px-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-extrabold shadow">
+                  🔥 풀타임 (+8시간)
+                </button>
+                <button type="button" id="btnWkDoNightOT" class="py-2.5 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold shadow">
+                  🌙 연장+야간 (+2h 연장·2h 야간)
+                </button>
+                <button type="button" id="btnWkDoRest" class="py-2.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold">
+                  🏖️ 약정 휴무일 (쉬는 날)
+                </button>
+              </div>
+              <button type="button" id="btnWkDoAbsent" class="w-full py-2 px-3 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/60 text-rose-200 font-extrabold text-[11px]">
+                😴 무단 결근(땡땡이) 해보기 — 에너지 +25 회복되지만 주휴수당 소멸!
+              </button>
+            </div>
+
+            <!-- Live Automatic Weekly Payslip & Holiday Pay Calculator -->
+            <div class="bg-white text-slate-900 rounded-xl p-3 border-2 border-amber-400 shadow space-y-1.5">
+              <div class="flex items-center justify-between border-b border-slate-300 pb-1">
+                <span class="font-extrabold text-xs sm:text-sm text-slate-900">🧮 실시간 주급 · 주휴수당 계산표</span>
+                <span id="wkTotalHoursBadge" class="px-2 py-0.5 rounded bg-slate-900 text-amber-400 font-extrabold text-[11px]">누적 0시간</span>
+              </div>
+              <div class="flex justify-between text-xs"><span class="text-slate-600 font-semibold">① 기본 근로 주급</span><strong id="wkBasePayTxt">0원</strong></div>
+              <div class="flex justify-between text-xs"><span class="text-blue-700 font-extrabold">② 주휴수당 (주 15h↑ + 개근)</span><strong id="wkHolidayPayTxt" class="text-blue-700">0원 (15h 미달)</strong></div>
+              <div class="flex justify-between text-xs"><span class="text-indigo-700 font-semibold">③ 연장·야간 가산수당</span><strong id="wkExtraPayTxt" class="text-indigo-700">0원</strong></div>
+              <div class="flex justify-between text-sm font-extrabold border-t-2 border-slate-800 pt-1.5">
+                <span>💰 이번 주 정산 주급 합계</span>
+                <span id="wkGrandTotalTxt" class="text-rose-600 text-base">0원</span>
+              </div>
+              <div id="wkFormulaHint" class="text-[11px] text-slate-600 bg-slate-100 rounded-lg px-2.5 py-1.5 leading-snug">
+                💡 1주 소정근로시간 15시간 이상 + 개근 시 <strong>(주 소정시간 ÷ 40) × 8시간 × 시급</strong>의 주휴수당이 자동 지급됩니다!
+              </div>
+            </div>
+
+            <!-- Settle Weekly Pay into Real Wallet & Next Week! -->
+            <button type="button" id="btnWkSettlePay" class="w-full py-3 px-4 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm shadow-xl transition">
+              💵 이번 주 주급 정산받고 내 지갑에 입금하기! ▶
+            </button>
+          </div>
         </div>
 
         <!-- =============================================================== -->
         <!-- 🍚🛍️🏠 WINDOW: MEALS, SHOPPING, RENT BILLS & WORK-ENERGY LOOP   -->
         <!-- =============================================================== -->
-        <div id="appLivingShopView" class="flex flex-col bg-slate-950">
+        <div id="appLivingShopView" class="hidden flex flex-col bg-slate-950">
           <!-- Animated Living/Dining/Shopping/Rent Scene Canvas Slot -->
           <div id="lifeCanvasSlot" class="w-full bg-slate-950 border-b border-slate-800" style="aspect-ratio:16/9;"></div>
 
@@ -7689,6 +7773,55 @@ create table match_rooms (
     }
 
     function renderSingleFullScene(ctx, W, H) {
+      if (heroWorld.weeklyVisual && heroWorld.weeklyVisual.active) {
+        const wv = heroWorld.weeklyVisual;
+        ctx.fillStyle = wv.absent ? '#2a121f' : (wv.holidayQualified ? '#064e3b' : '#172554');
+        ctx.fillRect(0, 0, W, 445);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 445, W, H - 445);
+
+        // Center Live Weekly Pay & Holiday Allowance Meter Board
+        ctx.fillStyle = '#ffffff'; drawRoundRect(ctx, 355, 82, 570, 232, 18); ctx.fill();
+        ctx.strokeStyle = wv.absent ? '#f43f5e' : (wv.holidayQualified ? '#10b981' : '#fbbf24');
+        ctx.lineWidth = 5; ctx.stroke();
+
+        ctx.fillStyle = '#0f172a'; ctx.font = '900 21px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(`📅 ${wv.weekNum}주차 주급 · 주휴수당 실시간 현황`, 640, 124);
+
+        // 15-hour Weekly Holiday Pay Unlock Bar!
+        const pct15 = Math.min(100, Math.round((wv.baseHours / 15) * 100));
+        ctx.fillStyle = '#e2e8f0'; drawRoundRect(ctx, 395, 146, 490, 26, 13); ctx.fill();
+        ctx.fillStyle = wv.absent ? '#f43f5e' : (wv.holidayQualified ? '#10b981' : '#f59e0b');
+        drawRoundRect(ctx, 395, 146, Math.max(24, 4.9 * pct15), 26, 13); ctx.fill();
+        ctx.fillStyle = '#0f172a'; ctx.font = '800 13.5px "Noto Sans KR", sans-serif';
+        ctx.fillText(
+          wv.absent ? '❌ 무단결근 발생! 이번 주 주휴수당 소멸(0원)' :
+          (wv.holidayQualified ? `🎉 15시간 달성 + 개근 완료! 주휴수당 +${wv.holidayPay.toLocaleString()}원 확보!` : `주휴수당 조건: ${wv.baseHours}h / 15시간 (${Math.max(0, 15 - wv.baseHours)}시간 더 일하면 발동!)`),
+          640, 164
+        );
+
+        ctx.font = '900 22px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#dc2626';
+        ctx.fillText(`이번 주 예상 주급: ${wv.grandTotal.toLocaleString()}원`, 640, 224);
+
+        ctx.fillStyle = '#fef3c7'; drawRoundRect(ctx, 395, 246, 490, 48, 10); ctx.fill();
+        ctx.fillStyle = '#92400e'; ctx.font = '800 14px "Noto Sans KR", sans-serif';
+        ctx.fillText(`기본 ${wv.basePay.toLocaleString()}원 + 주휴 ${wv.holidayPay.toLocaleString()}원 + 연장·야간 ${wv.extraPay.toLocaleString()}원`, 640, 275);
+
+        heroWorld.flyingCoins.forEach(c => {
+          if (c.prog < 0 || c.prog > 1) return;
+          const cx = 400 + (850 - 400) * c.prog;
+          const cy = 460 - Math.sin(c.prog * Math.PI) * 130;
+          ctx.fillStyle = '#fde047'; drawRoundRect(ctx, cx - 15, cy - 9, 30, 18, 4); ctx.fill();
+        });
+
+        drawBigActor(ctx, { x: 390, y: 495, scale: 2.45, shirt: '#1e293b', hat: 'boss', holdingEnvelope: true, facing: 1, label: '👔 주급 정산 사장님' });
+        drawBigActor(ctx, { x: 860, y: 495, scale: 2.55, shirt: '#10b981', apron: true, celebrate: wv.holidayQualified && !wv.absent, sweat: wv.absent, facing: -1, highlightPlayer: true, label: wv.absent ? '⭐ 나 (결근해서 주휴 증발💦)' : '⭐ 나 (주급·주휴수당 적립!)' });
+
+        drawLargeBubble(ctx, 305, 568, heroWorld.boss.bubble, '#38bdf8');
+        drawLargeBubble(ctx, 960, 568, heroWorld.player.bubble, '#fbbf24');
+        return;
+      }
       if (heroWorld.livingVisual && heroWorld.livingVisual.active) {
         const lv = heroWorld.livingVisual;
         const bgCol = lv.cat === 'meal' ? '#1e293b' : lv.cat === 'shop' ? '#2e1065' : '#1c1917';
@@ -9110,7 +9243,7 @@ create table match_rooms (
         renderHeroStage();
 
         document.getElementById('detCaseBadge').textContent = c.badge;
-        if (typeof lifeEco !== 'undefined') walletTotal = lifeEco.wallet;
+        if (window.lifeEco) walletTotal = window.lifeEco.wallet;
         document.getElementById('detWalletBadge').textContent = `💰 내 지갑 ${walletTotal.toLocaleString()}원`;
         document.getElementById('detShopScaleBadge').textContent = c.shopScale;
         document.getElementById('detWorkLogText').textContent = c.workLog;
@@ -9151,12 +9284,12 @@ create table match_rooms (
       }
 
       function showDetOutcome(ok, title, deltaStr, desc, addMoney) {
-        if (typeof lifeEco !== 'undefined') walletTotal = lifeEco.wallet;
+        if (window.lifeEco) walletTotal = window.lifeEco.wallet;
         walletTotal = Math.max(0, walletTotal + addMoney);
-        if (typeof lifeEco !== 'undefined') lifeEco.wallet = walletTotal;
+        if (window.lifeEco) window.lifeEco.wallet = walletTotal;
         heroWorld.money = walletTotal;
         heroWorld.displayedMoney = walletTotal;
-        if (typeof lifeEco !== 'undefined') walletTotal = lifeEco.wallet;
+        if (window.lifeEco) walletTotal = window.lifeEco.wallet;
         document.getElementById('detWalletBadge').textContent = `💰 내 지갑 ${walletTotal.toLocaleString()}원`;
 
         const b = document.getElementById('detOutcomeBanner');
@@ -9333,7 +9466,7 @@ create table match_rooms (
     // =========================================================================
     // 🍚🛍️🏠 DUAL-ENERGY (매일⚡ / 월🌟) & LIVING EXPENSE / RENT ECONOMY LOOP
     // =========================================================================
-    const lifeEco = {
+    var lifeEco = window.lifeEco = {
       wallet: 220000,          // Start with 220,000 KRW so player can buy meals/shopping, see money drop, and need to work for 610,000 KRW rent!
       dailyEnergy: 75,         // ⚡ 매일 에너지 (0..100): Used every shift (-35~-55), refilled by Meals/Food!
       monthlyEnergy: 70,       // 🌟 월 에너지 (0..100): Drains across the month (-10~-15), refilled by Shopping/Leisure!
@@ -9706,6 +9839,303 @@ create table match_rooms (
       // Open initially right on the Living Expense / Dual-Energy Shop Window so user immediately sees Meals (⚡), Shopping (🌟), Rent (🏠), and Work Loop!
       heroWorld.money = lifeEco.wallet;
       openLivingShopWindow('meal');
+    })();
+
+
+    // =========================================================================
+    // 📅 WEEKLY PAY & WEEKLY HOLIDAY ALLOWANCE (주급·주휴수당) GAME ENGINE
+    // =========================================================================
+    (function initWeeklyPayGame() {
+      const DAYS_KR = ['월', '화', '수', '목', '금', '토', '일'];
+      var wkState = window.wkState = {
+        weekNum: 1,
+        wage: 10320,
+        over5Workers: true,
+        curDayIdx: 0, // 0..6 (Mon..Sun)
+        days: [null, null, null, null, null, null, null] // each: { type, baseH, otH, nightH, label, icon }
+      };
+
+      const wkView = document.getElementById('appWeeklyPayView');
+      const shopView = document.getElementById('appLivingShopView');
+      const detView = document.getElementById('appPayslipDetectiveView');
+      const careerView = document.getElementById('appCareerSubView');
+
+      const tabWk = document.getElementById('btnPhoneTabWeekly');
+      const tabShop = document.getElementById('btnPhoneTabLifeShop');
+      const tabDet = document.getElementById('btnPhoneTabDetective');
+      const tabCar = document.getElementById('btnPhoneTabCareer');
+      const canvasEl = document.getElementById('heroActionStageCanvas');
+      const wkSlot = document.getElementById('weeklyCanvasSlot');
+
+      function calcWeeklyPay() {
+        let baseHours = 0;
+        let otHours = 0;
+        let nightHours = 0;
+        let hasAbsent = false;
+        let workedDays = 0;
+
+        wkState.days.forEach(d => {
+          if (!d) return;
+          if (d.type === 'absent') {
+            hasAbsent = true;
+          } else if (d.type !== 'rest') {
+            workedDays++;
+            baseHours += d.baseH;
+            otHours += d.otH;
+            nightHours += d.nightH;
+          }
+        });
+
+        // Cap contractual base hours at 40h for 주휴수당 calculation; any excess over 40h counts as overtime!
+        let regularHours = Math.min(40, baseHours);
+        let weeklyOverflowOT = Math.max(0, baseHours - 40);
+        let totalOT = otHours + weeklyOverflowOT;
+
+        const basePay = Math.round(regularHours * wkState.wage);
+
+        // 주휴수당: 1주 소정근로시간 >= 15시간 AND 무단결근 0일! (5인 미만 사업장도 동일 적용!)
+        const holidayQualified = (regularHours >= 15) && !hasAbsent;
+        const holidayHours = holidayQualified ? Math.min(8, (regularHours / 40) * 8) : 0;
+        const holidayPay = Math.round(holidayHours * wkState.wage);
+
+        // 연장·야간 가산수당: 5인 이상은 연장 1.5배 + 야간 0.5배 가산, 5인 미만은 연장 1.0배(가산 없음)
+        const otMult = wkState.over5Workers ? 1.5 : 1.0;
+        const nightAddon = wkState.over5Workers ? 0.5 : 0.0;
+        const extraPay = Math.round((totalOT * otMult + nightHours * nightAddon) * wkState.wage);
+
+        const grandTotal = basePay + holidayPay + extraPay;
+        return { regularHours, totalOT, nightHours, hasAbsent, workedDays, holidayQualified, holidayHours, basePay, holidayPay, extraPay, grandTotal };
+      }
+
+      function renderWeeklyUI() {
+        const res = calcWeeklyPay();
+
+        // Mount canvas cleanly into weekly slot
+        if (canvasEl && wkSlot && canvasEl.parentElement !== wkSlot) {
+          wkSlot.appendChild(canvasEl);
+        }
+        if (heroWorld.livingVisual) heroWorld.livingVisual.active = false;
+        if (heroWorld.detectiveVisual) heroWorld.detectiveVisual.active = false;
+
+        heroWorld.weeklyVisual = {
+          active: true,
+          weekNum: wkState.weekNum,
+          baseHours: res.regularHours,
+          absent: res.hasAbsent,
+          holidayQualified: res.holidayQualified,
+          basePay: res.basePay,
+          holidayPay: res.holidayPay,
+          extraPay: res.extraPay,
+          grandTotal: res.grandTotal
+        };
+        heroWorld.bannerTitle = `📅 ${wkState.weekNum}주차 주급 게임 (시급 ${wkState.wage.toLocaleString()}원 · ${wkState.over5Workers ? '5인 이상' : '5인 미만'})`;
+        heroWorld.subtitle = res.hasAbsent
+          ? '앗! 무단결근으로 개근이 깨져 이번 주 주휴수당이 0원이 되었습니다! [초기화] 후 개근에 재도전해 보세요!'
+          : (res.holidayQualified
+              ? `🎉 주 ${res.regularHours}시간 개근 달성! 주휴수당 +${res.holidayPay.toLocaleString()}원이 자동 추가되었습니다!`
+              : `월~일 출근 버튼을 눌러 주 15시간 이상 개근하면 주휴수당이 자동으로 터집니다!`);
+
+        heroWorld.boss.bubble = res.holidayQualified
+          ? `개근 축하해! 주휴수당 ${res.holidayPay.toLocaleString()}원까지 합쳐 총 ${res.grandTotal.toLocaleString()}원 정산 준비 완료!`
+          : (res.hasAbsent ? '어이~ 무단결근 하루 해서 이번 주 주휴수당은 법적으로 안 나가네!' : '이번 주 15시간 이상 개근하면 주휴수당까지 꽉 채워 주겠네!');
+        heroWorld.player.bubble = res.holidayQualified
+          ? `야호!! 주휴수당 +${res.holidayPay.toLocaleString()}원 확보! 아래 정산 버튼 눌러 지갑에 넣자! 💰`
+          : (res.hasAbsent ? '으악 결근 하루 때문에 주휴수당이 날아가다니... 다음엔 꼭 개근해야지💦' : `현재 ${res.regularHours}시간 근무! 15시간 개근 채워서 주휴수당 꼭 받자!`);
+        renderHeroStage();
+
+        document.getElementById('wkWeekTitleTxt').textContent = `📅 ${wkState.weekNum}주차 출근부 (월~일 선택)`;
+        const stBadge = document.getElementById('wkStreakBadge');
+        if (res.hasAbsent) {
+          stBadge.textContent = '🔴 결근 발생 (주휴소멸)';
+          stBadge.className = 'px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-extrabold text-[10px]';
+        } else if (res.holidayQualified) {
+          stBadge.textContent = `🎉 주휴수당 확보! (+${res.holidayHours.toFixed(1)}h)`;
+          stBadge.className = 'px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px]';
+        } else {
+          stBadge.textContent = `🟢 개근중 (${res.regularHours}/15h)`;
+          stBadge.className = 'px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-extrabold text-[10px]';
+        }
+
+        // Render Mon~Sun 7 day tiles
+        const grid = document.getElementById('wkDaysGrid');
+        grid.innerHTML = DAYS_KR.map((dName, i) => {
+          const item = wkState.days[i];
+          const isCur = i === wkState.curDayIdx;
+          const borderCls = isCur ? 'border-2 border-amber-400 bg-amber-400/15' : 'border border-slate-700 bg-slate-950';
+          const icon = item ? item.icon : (isCur ? '👇' : '·');
+          const sub = item ? item.short : '대기';
+          return `
+            <button type="button" data-daypick="${i}" class="py-1.5 px-0.5 rounded-lg ${borderCls} flex flex-col items-center justify-center">
+              <span class="font-extrabold ${i >= 5 ? 'text-rose-300' : 'text-slate-200'}">${dName}</span>
+              <span class="text-xs my-0.5">${icon}</span>
+              <span class="text-[9px] text-slate-400 font-bold truncate w-full">${sub}</span>
+            </button>
+          `;
+        }).join('');
+
+        grid.querySelectorAll('[data-daypick]').forEach(b => {
+          b.addEventListener('click', () => {
+            playSfx('click');
+            wkState.curDayIdx = Number(b.getAttribute('data-daypick'));
+            renderWeeklyUI();
+          });
+        });
+
+        document.getElementById('wkTodayPrompt').textContent =
+          wkState.curDayIdx < 7
+            ? `👉 [${DAYS_KR[wkState.curDayIdx]}요일] 근무 형태를 선택하세요:`
+            : '✅ 일주일 완료! 아래 주급 정산 버튼을 누르세요!';
+
+        document.getElementById('wkTotalHoursBadge').textContent = `누적 ${res.regularHours + res.totalOT}시간`;
+        document.getElementById('wkBasePayTxt').textContent = `${res.basePay.toLocaleString()}원 (${res.regularHours}h)`;
+        document.getElementById('wkHolidayPayTxt').textContent = res.holidayQualified
+          ? `+${res.holidayPay.toLocaleString()}원 (${res.holidayHours.toFixed(1)}h분!)`
+          : (res.hasAbsent ? '0원 (무단결근 소멸)' : `0원 (${Math.max(0, 15 - res.regularHours)}h 더 필요)`);
+        document.getElementById('wkExtraPayTxt').textContent =
+          res.extraPay > 0 ? `+${res.extraPay.toLocaleString()}원 (연장 ${res.totalOT}h·야간 ${res.nightHours}h)` : '0원';
+        document.getElementById('wkGrandTotalTxt').textContent = `${res.grandTotal.toLocaleString()}원`;
+
+        const formulaEl = document.getElementById('wkFormulaHint');
+        if (res.holidayQualified) {
+          formulaEl.innerHTML = `✅ <strong>주휴수당 공식 적용됨!</strong> (${res.regularHours}h ÷ 40) × 8h × ${wkState.wage.toLocaleString()}원 = <strong>+${res.holidayPay.toLocaleString()}원</strong> (5인 미만도 동일 지급!)`;
+        } else if (res.hasAbsent) {
+          formulaEl.innerHTML = `❌ <strong>무단결근으로 주휴수당 소멸!</strong> 지각·조퇴는 괜찮지만 1일이라도 무단결근하면 주휴수당이 발생하지 않습니다.`;
+        } else {
+          formulaEl.innerHTML = `💡 1주 소정근로 <strong>15시간 이상 + 개근</strong> 시 (주소정시간 ÷ 40) × 8h × 시급의 주휴수당이 자동 계산됩니다!`;
+        }
+      }
+
+      function applyDayWork(type, baseH, otH, nightH, icon, short, eCost) {
+        if (type !== 'rest' && type !== 'absent' && window.lifeEco && window.lifeEco.dailyEnergy < eCost) {
+          playSfx('warn');
+          showToast('⚡ 매일 에너지(밥심)가 부족해요! [🍚 밥·쇼핑·월세] 탭에서 밥을 먹고 다시 출근하세요!');
+          if (tabShop) tabShop.click();
+          return;
+        }
+        playSfx(type === 'absent' ? 'warn' : 'click');
+        if (window.lifeEco) {
+          if (type === 'absent' || type === 'rest') {
+            window.lifeEco.dailyEnergy = Math.min(100, window.lifeEco.dailyEnergy + 25);
+          } else {
+            window.lifeEco.dailyEnergy = Math.max(0, window.lifeEco.dailyEnergy - eCost);
+            window.lifeEco.monthlyEnergy = Math.max(0, window.lifeEco.monthlyEnergy - (otH > 0 ? 10 : 5));
+          }
+          if (window.__syncLifeEconomyToUI) window.__syncLifeEconomyToUI();
+        }
+        wkState.days[wkState.curDayIdx] = { type, baseH, otH, nightH, icon, short };
+        if (wkState.curDayIdx < 6) wkState.curDayIdx++;
+        renderWeeklyUI();
+      }
+
+      // Wire Day Action Buttons
+      document.getElementById('btnWkDoNormal').addEventListener('click', () => applyDayWork('normal', 5, 0, 0, '💼', '5h', 15));
+      document.getElementById('btnWkDoFull').addEventListener('click', () => applyDayWork('full', 8, 0, 0, '🔥', '8h', 25));
+      document.getElementById('btnWkDoNightOT').addEventListener('click', () => applyDayWork('night', 8, 2, 2, '🌙', '8+2야', 32));
+      document.getElementById('btnWkDoRest').addEventListener('click', () => applyDayWork('rest', 0, 0, 0, '🏖️', '휴무', 0));
+      document.getElementById('btnWkDoAbsent').addEventListener('click', () => applyDayWork('absent', 0, 0, 0, '😴', '결근!', 0));
+
+      document.getElementById('btnWkResetWeek').addEventListener('click', () => {
+        playSfx('click');
+        wkState.days = [null, null, null, null, null, null, null];
+        wkState.curDayIdx = 0;
+        renderWeeklyUI();
+      });
+
+      // Wage buttons
+      document.querySelectorAll('.wk-wage-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          playSfx('click');
+          wkState.wage = Number(btn.getAttribute('data-wk-wage'));
+          document.querySelectorAll('.wk-wage-btn').forEach(b => {
+            b.className = Number(b.getAttribute('data-wk-wage')) === wkState.wage
+              ? 'wk-wage-btn px-2 py-1 rounded-lg bg-amber-400 text-slate-950 font-extrabold text-[11px]'
+              : 'wk-wage-btn px-2 py-1 rounded-lg bg-slate-800 text-slate-200 font-bold text-[11px]';
+          });
+          renderWeeklyUI();
+        });
+      });
+
+      // 5+ vs Under-5 Shop Toggle
+      document.getElementById('btnWkScaleToggle').addEventListener('click', (e) => {
+        playSfx('click');
+        wkState.over5Workers = !wkState.over5Workers;
+        e.currentTarget.textContent = wkState.over5Workers ? '🏢 5인 이상 (연장·야간 1.5배)' : '🍜 5인 미만 (주휴O · 가산X)';
+        renderWeeklyUI();
+      });
+
+      // Settle Weekly Pay into Real Wallet & Advance to Next Week!
+      document.getElementById('btnWkSettlePay').addEventListener('click', () => {
+        const res = calcWeeklyPay();
+        if (res.grandTotal <= 0) {
+          playSfx('warn');
+          showToast('먼저 월~일 출근 버튼을 눌러 이번 주 근무를 기록해 주세요!');
+          return;
+        }
+        playSfx('win');
+        spawnPaydayCoins(16);
+        if (window.lifeEco) {
+          window.lifeEco.wallet += res.grandTotal;
+          window.lifeEco.dailyEnergy = Math.min(100, window.lifeEco.dailyEnergy + 30);
+          if (window.__syncLifeEconomyToUI) window.__syncLifeEconomyToUI();
+        }
+        showToast(`💰 ${wkState.weekNum}주차 주급 +${res.grandTotal.toLocaleString()}원(주휴수당 ${res.holidayPay.toLocaleString()}원 포함)이 지갑에 입금되었습니다!`);
+        wkState.weekNum++;
+        wkState.days = [null, null, null, null, null, null, null];
+        wkState.curDayIdx = 0;
+        renderWeeklyUI();
+      });
+
+      // Tab Switching Coordination across all 4 Phone Tabs
+      function setActivePhoneTab(which) {
+        const map = { weekly: tabWk, shop: tabShop, det: tabDet, career: tabCar };
+        Object.keys(map).forEach(k => {
+          if (!map[k]) return;
+          map[k].className = k === which
+            ? 'py-2 px-1.5 rounded-xl bg-amber-400 text-slate-950 font-extrabold shadow truncate'
+            : 'py-2 px-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold truncate';
+        });
+      }
+
+      tabWk.addEventListener('click', () => {
+        playSfx('click');
+        wkView.classList.remove('hidden');
+        shopView.classList.add('hidden');
+        detView.classList.add('hidden');
+        careerView.classList.add('hidden');
+        setActivePhoneTab('weekly');
+        renderWeeklyUI();
+      });
+
+      [tabShop, tabDet, tabCar].forEach((t, idx) => {
+        if (!t) return;
+        const key = ['shop', 'det', 'career'][idx];
+        t.addEventListener('click', () => {
+          if (heroWorld.weeklyVisual) heroWorld.weeklyVisual.active = false;
+          wkView.classList.add('hidden');
+          setActivePhoneTab(key);
+        });
+      });
+
+      // Also hide weekly view when user clicks "💼 충전된 에너지 써서 출근하고 돈 벌기" in Shop tab
+      const goWorkBtn = document.getElementById('btnGoWorkWithEnergy');
+      if (goWorkBtn) {
+        goWorkBtn.addEventListener('click', () => {
+          if (heroWorld.weeklyVisual) heroWorld.weeklyVisual.active = false;
+          wkView.classList.add('hidden');
+          setActivePhoneTab('det');
+        });
+      }
+
+      // Open directly on Weekly Pay Game with Mon & Tue pre-worked (10h) so user can tap Wed (+5h) right away and watch 주휴수당 unlock!
+      wkState.days[0] = { type: 'normal', baseH: 5, otH: 0, nightH: 0, icon: '💼', short: '5h' };
+      wkState.days[1] = { type: 'normal', baseH: 5, otH: 0, nightH: 0, icon: '💼', short: '5h' };
+      wkState.curDayIdx = 2; // Ready on Wednesday! One click on 💼 정상 출근 (+5h) hits 15h and unlocks 주휴수당!
+      wkView.classList.remove('hidden');
+      shopView.classList.add('hidden');
+      detView.classList.add('hidden');
+      careerView.classList.add('hidden');
+      setActivePhoneTab('weekly');
+      renderWeeklyUI();
     })();
 
   </script>
