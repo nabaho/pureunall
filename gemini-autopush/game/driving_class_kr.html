@@ -3533,6 +3533,7 @@
 
     function summonSkyBossNow() {
       if (state.stage !== 'driving') startInstantTestDrive();
+      if (state.crashedImmobilized) repairVehicleInstant();
       if (state.isWalking) toggleWalkMode();
       if (!state.carFlightMode) {
         toggleCarFlightMode();
@@ -4728,7 +4729,7 @@
           if (typeof spawnNpcsForMode === 'function') spawnNpcsForMode('autonomous');
         }
         (state.npcs || []).forEach((npc, idx) => {
-          npc.scenicFloat = ((idx + 1) * 18) % SCENIC_SEGMENTS;
+          npc.scenicFloat = (14 + idx * 16) % SCENIC_SEGMENTS;
           npc.laneOff = idx % 2 === 0 ? -3.6 : 3.6;
           const sp = scenicRoadSamples[Math.floor(npc.scenicFloat) % SCENIC_SEGMENTS];
           npc.x = sp.x + sp.nx * npc.laneOff;
@@ -5037,7 +5038,7 @@
       }
       if (state.npcs && state.npcs.length) {
         state.npcs.forEach((npc, idx) => {
-          npc.scenicFloat = ((idx + 1) * 18) % SCENIC_SEGMENTS;
+          npc.scenicFloat = (14 + idx * 16) % SCENIC_SEGMENTS;
           npc.laneOff = idx % 2 === 0 ? -3.6 : 3.6;
           const sp = scenicRoadSamples[Math.floor(npc.scenicFloat) % SCENIC_SEGMENTS];
           npc.x = sp.x + sp.nx * npc.laneOff;
@@ -7306,6 +7307,7 @@
     }
 
     function jumpToHipassAndWashCourse() {
+      if (state.crashedImmobilized) repairVehicleInstant();
       if (state.stage !== 'driving' || !state.scenicTourActive) {
         startInstantTestDrive();
       }
@@ -7556,6 +7558,7 @@
 
     function startFireExtinguishMission(switchToFireTruck) {
       if (state.stage !== 'driving') startInstantTestDrive();
+      if (state.crashedImmobilized) repairVehicleInstant();
       if (state.isWalking) toggleWalkMode();
       if (switchToFireTruck && state.selectedCarId === 'sonata_edge') {
         state.selectedCarId = 'firetruck_119';
@@ -8193,7 +8196,7 @@
       // Place NPC Supercars evenly along the curving scenic loop!
       if (state.npcs && state.npcs.length) {
         state.npcs.forEach((npc, idx) => {
-          npc.scenicIdx = ((idx + 1) * 18) % SCENIC_SEGMENTS;
+          npc.scenicIdx = (14 + idx * 16) % SCENIC_SEGMENTS;
           npc.laneOff = idx % 2 === 0 ? -3.4 : 3.4;
           const sp = scenicRoadSamples[npc.scenicIdx];
           npc.x = sp.x + sp.nx * npc.laneOff;
@@ -11441,7 +11444,7 @@
         const spdMul = shouldYield ? 0.25 : 1.0;
 
         if (state.scenicTourActive && scenicRoadSamples.length) {
-          if (typeof npc.scenicFloat !== 'number') npc.scenicFloat = ((idx + 1) * 18) % SCENIC_SEGMENTS;
+          if (typeof npc.scenicFloat !== 'number') npc.scenicFloat = (14 + idx * 16) % SCENIC_SEGMENTS;
           npc.scenicFloat = (npc.scenicFloat + (npc.dir > 0 ? 1 : -1) * (npc.spd * spdMul * 0.045) * dt + SCENIC_SEGMENTS) % SCENIC_SEGMENTS;
           const sp = scenicRoadSamples[Math.floor(npc.scenicFloat) % SCENIC_SEGMENTS];
           const baseLane = npc.laneOff || (npc.dir > 0 ? 3.6 : -3.6);
