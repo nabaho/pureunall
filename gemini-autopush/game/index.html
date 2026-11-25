@@ -1833,6 +1833,59 @@
     }
 
 
+    /* v39 Hi-pass, Bubble Car Wash & Giant Sky Boss Mothership HUD */
+    #carWashBubbleOverlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      z-index: 24;
+      background: radial-gradient(circle at 50% 50%, rgba(186,230,253,0.22), rgba(56,189,248,0.34));
+      overflow: hidden;
+    }
+    .wash-bubble-dot {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 32%, rgba(255,255,255,0.95), rgba(186,230,253,0.55) 60%, rgba(244,114,182,0.35));
+      border: 1.5px solid rgba(255,255,255,0.85);
+      box-shadow: 0 0 10px rgba(186,230,253,0.7);
+      animation: floatBubbleUp 1.35s ease-in-out infinite alternate;
+    }
+    @keyframes floatBubbleUp {
+      from { transform: translateY(14px) scale(0.92); }
+      to { transform: translateY(-22px) scale(1.12); }
+    }
+    #skyBossHudBar {
+      display: none;
+      align-self: center;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(15, 23, 42, 0.94), rgba(76, 29, 149, 0.88), rgba(127, 29, 29, 0.92));
+      border: 1.5px solid rgba(244, 114, 182, 0.88);
+      box-shadow: 0 6px 24px rgba(236, 72, 153, 0.42);
+      color: #fdf2f8;
+      font-size: 11.5px;
+      font-weight: 900;
+      pointer-events: auto;
+      z-index: 39;
+    }
+    #skyBossHpTrack {
+      width: 115px;
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    #skyBossHpFill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #fde047, #ec4899, #ef4444);
+      transition: width 0.12s ease-out;
+    }
+
     /* v38 Emergency Siren Lane-Yielding & 119 Fire Water-Cannon Mission HUD */
     .siren-active-btn {
       background: linear-gradient(90deg, rgba(239,68,68,0.88), rgba(37,99,235,0.88)) !important;
@@ -2022,6 +2075,8 @@
       <button type="button" class="pv-chip active" id="navTestDriveBtn" onclick="startInstantTestDrive()">🚗 테스트 운전</button>
       <button type="button" class="pv-chip" id="topSirenBtn" onclick="toggleEmergencySiren()" style="border-color:rgba(248,113,113,0.75);color:#fca5a5;" title="사이렌 ON 시 앞차들이 양옆으로 비켜줍니다 (단축키 E)">🚨 사이렌 길터주기</button>
       <button type="button" class="pv-chip" id="topFireMissionBtn" onclick="startFireExtinguishMission(true)" style="border-color:rgba(251,146,60,0.8);color:#fdba74;" title="119 소방차 장착 및 물대포 화재진압 출동 미션">🚒 소방물대포 미션</button>
+      <button type="button" class="pv-chip" id="topHipassWashBtn" onclick="jumpToHipassAndWashCourse()" style="border-color:rgba(56,189,248,0.8);color:#bae6fd;" title="전방 하이패스 톨게이트 → 거품 자동세차장 연속 코스로 바로 이동">🛣️ 하이패스·세차장</button>
+      <button type="button" class="pv-chip" id="topSkyBossBtn" onclick="summonSkyBossNow()" style="border-color:rgba(244,114,182,0.85);color:#fbcfe8;" title="즉시 비행 변신 후 하늘 거대 보스 비행선(아크 모선) 소환!">👾 하늘보스 결전</button>
       <button type="button" class="pv-chip" id="topTimeCycleBtn" onclick="stepTimeOfDay()" style="border-color:rgba(250,204,21,0.65);color:#fde047;" title="클릭 시 낮→노을→밤→새벽 전환 (자동 시간 변화 중)">☀️ 13:30</button>
       <button type="button" class="pv-chip" id="navKoreaMapBtn" onclick="openKoreaMapModal()" style="border-color:rgba(56,189,248,0.65);color:#7dd3fc;">🗺️ 대한민국 전국지도</button>
       <button type="button" class="pv-chip" id="navLauncherBtn" onclick="jumpToStage('launcher')">앱 홈화면</button>
@@ -2067,6 +2122,7 @@
           </g>
         </svg>
       </div>
+            <div id="carWashBubbleOverlay"></div>
             <div id="cinematicVignette"></div>
       <div id="airCombatReticle">
         <svg viewBox="0 0 64 64" fill="none" stroke-width="2">
@@ -2231,6 +2287,8 @@
         <button type="button" class="hud-btn" style="border-color:#fb7185;color:#fecdd3;" onclick="toggleVehicleFuncPod();startSkyCombatWave()">🎯 하늘 적기 공중전</button>
         <button type="button" class="hud-btn" style="border-color:#ef4444;color:#fca5a5;" onclick="toggleVehicleFuncPod();equipEmergencyCar('police_112')">🚔 112 경찰차+사이렌</button>
         <button type="button" class="hud-btn" style="border-color:#fb923c;color:#fed7aa;" onclick="toggleVehicleFuncPod();startFireExtinguishMission(true)">🚒 119 소방 물대포 출동</button>
+        <button type="button" class="hud-btn" style="border-color:#38bdf8;color:#bae6fd;" onclick="toggleVehicleFuncPod();jumpToHipassAndWashCourse()">🛣️ 하이패스·거품세차 코스</button>
+        <button type="button" class="hud-btn" style="border-color:#ec4899;color:#fbcfe8;" onclick="toggleVehicleFuncPod();summonSkyBossNow()">👾 하늘 거대 보스 소환</button>
       </div>
 
       <div class="pod-sec-title">내비게이션 목적지 설정</div>
@@ -2550,6 +2608,8 @@
             <button type="button" id="subwayDoorBtn" class="icon-pill-btn" style="display:none;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleSubwayDoors()">🚇 출입문 개폐</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickSirenBtn" onclick="toggleEmergencySiren()" title="경찰·소방 사이렌 길터주기 ON/OFF (단축키 E)">🚨</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFireBtn" onclick="startFireExtinguishMission(true)" title="119 소방차 & 물대포 화재진압 미션 시작">🚒</button>
+            <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickWashBtn" onclick="jumpToHipassAndWashCourse()" title="하이패스 톨게이트 · 거품 자동 세차장 코스로 이동">🫧</button>
+            <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickBossBtn" onclick="summonSkyBossNow()" title="하늘 거대 보스 비행선(아크 모선) 즉시 소환">👾</button>
             <button type="button" class="icon-pill-btn" id="hudQuickTimeBtn" onclick="stepTimeOfDay()" style="border-color:rgba(250,204,21,0.5);color:#fde047;padding:4px 7px;font-variant-numeric:tabular-nums;" title="밤낮 시간대 즉시 전환 (단축키 T · 자동 순환 중)">☀️ 13:30</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickShieldBtn" onclick="toggleCarShield()" title="차량 에너지 실드 ON/OFF">🛡️</button>
             <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFlightBtn" onclick="toggleCarFlightMode()" title="비행 변신 ON/OFF">✈️</button>
@@ -2617,6 +2677,11 @@
         <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:5px;align-self:center;max-width:100%;">
           <button type="button" class="exit-car-hud-btn" id="mainExitPersonBtn" onclick="toggleWalkMode()">🚶 사람 내리기</button>
           <button type="button" class="board-npc-hud-btn" id="mainBoardNpcFastBtn" onclick="boardNearestVehicle()">🚘 앞의 차 바로 타기</button>
+        </div>
+        <div id="skyBossHudBar">
+          <span id="skyBossTitleText">👾 거대 보스 아크 모선</span>
+          <div id="skyBossHpTrack"><div id="skyBossHpFill"></div></div>
+          <span id="skyBossHpText" style="color:#fde047;font-variant-numeric:tabular-nums;">12 / 12</span>
         </div>
         <div id="airKillBadge">🏆 점수 <span id="airScoreNum" style="color:#fde047;">0</span>점 · 격추 <span id="airKillNum">0</span>기 · ❤️ 기체 <span id="airHpNum" style="color:#34d399;">100%</span></div>
 
@@ -3197,6 +3262,13 @@
       skyExplosions: [],
       skyKills: 0,
       skyScore: 0,
+      skyBoss: null,
+      skyBossDefeatedCount: 0,
+      nextBossScoreThreshold: 1500,
+      hipassGates: [],
+      carWashStation: null,
+      carWashTimer: 0,
+      carWashCd: 0,
       airHp: 100,
       enemySkyBullets: [],
       isShotDownFalling: false,
@@ -3390,6 +3462,122 @@
       while (state.skyEnemies.length < 5) {
         state.skyEnemies.push(spawnOneSkyEnemy(state.skyEnemies.length));
       }
+    }
+
+    let skyBossMesh3D = null;
+
+    function buildSkyBoss3DMesh() {
+      if (!useWebGL || typeof THREE === 'undefined' || !scene) return null;
+      const g = new THREE.Group();
+      const hullMat = new THREE.MeshPhongMaterial({ color: 0x1e1b4b, specular: 0xf472b6, shininess: 140 });
+      const armorMat = new THREE.MeshPhongMaterial({ color: 0x0f172a, specular: 0x38bdf8, shininess: 160 });
+      const neonPink = new THREE.MeshBasicMaterial({ color: 0xec4899 });
+      const neonRed = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const neonCyan = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+      const mainHull = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.6, 22, 10), hullMat);
+      mainHull.rotation.x = Math.PI / 2;
+      g.add(mainHull);
+
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(28.0, 0.7, 7.2), armorMat);
+      wing.position.set(0, 0.2, -1.0);
+      const wingTrim = new THREE.Mesh(new THREE.BoxGeometry(28.4, 0.22, 0.65), neonPink);
+      wingTrim.position.set(0, 0.25, 2.5);
+      g.add(wing, wingTrim);
+
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 6.4), armorMat);
+      bridge.position.set(0, 2.8, -1.5);
+      const bridgeVisor = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.6, 0.3), neonRed);
+      bridgeVisor.position.set(0, 3.1, 1.72);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(2.1, 14, 12), neonRed);
+      core.position.set(0, -1.6, 1.2);
+      g.add(bridge, bridgeVisor, core);
+
+      const rotors = [];
+      [-11.5, -5.8, 5.8, 11.5].forEach(rx => {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.24, 8, 18), neonCyan);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(rx, 0.3, -1.0);
+        g.add(ring);
+        rotors.push(ring);
+      });
+      g.userData = { core, rotors };
+      scene.add(g);
+      return g;
+    }
+
+    function spawnSkyBossAirship() {
+      if (state.skyBoss && state.skyBoss.hp > 0) return;
+      if (skyBossMesh3D && scene) { try { scene.remove(skyBossMesh3D); } catch (_) {} }
+      const px = state.isWalking ? state.charX : state.x;
+      const py = Math.max(24, state.isWalking ? state.charY : state.y);
+      const pz = state.isWalking ? state.charZ : state.z;
+      const bx = px + Math.sin(state.heading) * 86;
+      const bz = pz + Math.cos(state.heading) * 86;
+      const by = py + 1.0;
+      skyBossMesh3D = buildSkyBoss3DMesh();
+      if (skyBossMesh3D) skyBossMesh3D.position.set(bx, by, bz);
+      state.skyBoss = {
+        x: bx, y: by, z: bz,
+        hp: 12, maxHp: 12,
+        fireCd: 2.6,
+        hitFlash: 0,
+        phase: 0
+      };
+      syncSkyBossHud();
+      playTone(220, 0.32, 'sawtooth', 0.08, 110);
+      setTimeout(() => playTone(330, 0.35, 'sawtooth', 0.08, 165), 220);
+      showSkyScorePopup('👾 거대 보스 비행선 출현!!', '#f472b6');
+      showToast('🚨 경고! 하늘 거대 보스 비행선(아크 모선 · HP 12) 출현! 직선 미사일(F/Space)로 격추하세요!');
+    }
+
+    function summonSkyBossNow() {
+      if (state.stage !== 'driving') startInstantTestDrive();
+      if (state.isWalking) toggleWalkMode();
+      if (!state.carFlightMode) {
+        toggleCarFlightMode();
+      }
+      state.y = Math.max(28, state.y || 28);
+      state.bodyPitch = 0;
+      ensureSkyEnemies();
+      spawnSkyBossAirship();
+      syncAirCombatHud();
+    }
+
+    function syncSkyBossHud() {
+      const bar = document.getElementById('skyBossHudBar');
+      if (!bar) return;
+      const active = Boolean(state.skyBoss && state.skyBoss.hp > 0 && state.stage === 'driving');
+      bar.style.display = active ? 'inline-flex' : 'none';
+      if (active) {
+        const pct = Math.max(0, Math.round((state.skyBoss.hp / state.skyBoss.maxHp) * 100));
+        const fill = document.getElementById('skyBossHpFill');
+        const txt = document.getElementById('skyBossHpText');
+        if (fill) fill.style.width = pct + '%';
+        if (txt) txt.textContent = `${state.skyBoss.hp} / ${state.skyBoss.maxHp}`;
+      }
+    }
+
+    function fireBossSpreadSalvo(boss, px, py, pz) {
+      const dx = px - boss.x, dy = (py + 0.7) - boss.y, dz = pz - boss.z;
+      const dist = Math.max(1, Math.hypot(dx, dy, dz));
+      const baseVx = (dx / dist) * 48, baseVy = (dy / dist) * 48, baseVz = (dz / dist) * 48;
+      [-0.14, 0, 0.14].forEach(ang => {
+        const cosA = Math.cos(ang), sinA = Math.sin(ang);
+        const vx = baseVx * cosA - baseVz * sinA;
+        const vz = baseVx * sinA + baseVz * cosA;
+        let mesh = null;
+        if (useWebGL && typeof THREE !== 'undefined' && scene) {
+          mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.68, 10, 8),
+            new THREE.MeshBasicMaterial({ color: 0xf43f5e })
+          );
+          mesh.position.set(boss.x, boss.y - 1.2, boss.z);
+          scene.add(mesh);
+        }
+        state.enemySkyBullets.push({ x: boss.x, y: boss.y - 1.2, z: boss.z, vx, vy: baseVy, vz, life: 3.8, mesh });
+      });
+      playTone(420, 0.16, 'sawtooth', 0.055, 180);
     }
 
     function startSkyCombatWave() {
@@ -3672,18 +3860,96 @@
           }
         }
       });
+      if (playerAirborne && !state.skyBoss && (state.skyScore || 0) >= (state.nextBossScoreThreshold || 1500)) {
+        spawnSkyBossAirship();
+      }
+      if (state.skyBoss && state.skyBoss.hp > 0) {
+        const boss = state.skyBoss;
+        if (!playerAirborne) {
+          if (skyBossMesh3D) skyBossMesh3D.visible = false;
+        } else {
+          if (skyBossMesh3D) skyBossMesh3D.visible = true;
+          boss.phase += dt * 0.55;
+          const bDist = Math.hypot(boss.x - px, boss.z - pz);
+          if (bDist > 175 || bDist < 28) {
+            boss.x = px + Math.sin(state.heading) * 86;
+            boss.z = pz + Math.cos(state.heading) * 86;
+            boss.y = Math.max(22, py + 1.5);
+          } else {
+            boss.x += Math.sin(boss.phase) * 5.5 * dt;
+            boss.z += Math.cos(boss.phase * 0.8) * 5.5 * dt;
+            boss.y = Math.max(18, py + 1.5 + Math.sin(boss.phase * 1.3) * 2.2);
+          }
+          if (boss.hitFlash > 0) boss.hitFlash = Math.max(0, boss.hitFlash - dt);
+          if (skyBossMesh3D) {
+            skyBossMesh3D.position.set(boss.x, boss.y, boss.z);
+            skyBossMesh3D.lookAt(px, boss.y, pz);
+            if (skyBossMesh3D.userData && skyBossMesh3D.userData.core) {
+              skyBossMesh3D.userData.core.material.color.setHex(boss.hitFlash > 0 ? 0xffffff : 0xef4444);
+            }
+            if (skyBossMesh3D.userData && skyBossMesh3D.userData.rotors) {
+              skyBossMesh3D.userData.rotors.forEach(r => { r.rotation.z += dt * 5.0; });
+            }
+          }
+          const dxB = boss.x - px, dyB = boss.y - (py + 0.65), dzB = boss.z - pz;
+          const dB = Math.max(1, Math.hypot(dxB, dyB, dzB));
+          const fDot = ((dxB * sinH + dyB * noseY + dzB * cosH) / (dB * nLen));
+          if (dB < 170 && fDot > 0.93) sightAligned = true;
+
+          boss.fireCd -= dt;
+          if (boss.fireCd <= 0) {
+            boss.fireCd = 3.4;
+            if (dB < 155 && (state.enemySkyBullets || []).length < 8) {
+              fireBossSpreadSalvo(boss, px, py, pz);
+            }
+          }
+        }
+        syncSkyBossHud();
+      } else {
+        syncSkyBossHud();
+      }
       state.skyLockedEnemy = null;
       if (ret) ret.classList.toggle('locked', sightAligned);
 
       // Update Player Direct-Aim Missiles (Strictly Straight Ballistic Flight!)
       for (let i = (state.skyBullets || []).length - 1; i >= 0; i--) {
         const b = state.skyBullets[i];
+        if (!b) continue;
         b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
         b.life -= dt;
         if (b.mesh) b.mesh.position.set(b.x, b.y, b.z);
 
         let hit = false;
-        for (let j = (state.skyEnemies || []).length - 1; j >= 0; j--) {
+        if (state.skyBoss && state.skyBoss.hp > 0) {
+          const boss = state.skyBoss;
+          if (Math.hypot(b.x - boss.x, b.y - boss.y, b.z - boss.z) < 18.0) {
+            hit = true;
+            boss.hp = Math.max(0, boss.hp - 1);
+            boss.hitFlash = 0.16;
+            syncSkyBossHud();
+            if (boss.hp <= 0) {
+              const bx = boss.x, by = boss.y, bz = boss.z;
+              for (let exI = 0; exI < 5; exI++) {
+                setTimeout(() => spawnSkyExplosion(bx + (exI - 2) * 5, by + (exI % 2) * 3, bz + (exI % 3 - 1) * 4), exI * 110);
+              }
+              if (skyBossMesh3D && scene) { try { scene.remove(skyBossMesh3D); } catch (_) {} }
+              skyBossMesh3D = null;
+              state.skyBoss = null;
+              state.skyBossDefeatedCount = (state.skyBossDefeatedCount || 0) + 1;
+              state.nextBossScoreThreshold = (state.skyScore || 0) + 4500;
+              state.airHp = 100;
+              syncSkyBossHud();
+              addSkyCombatScore(3000, '👾 거대 보스 모선 격추!!', '#f472b6');
+              addCoinsAndTrophies(1500, 3);
+              syncAirCombatHud();
+              showToast(`🏆 거대 보스 아크 모선 완전 격추!! (+3,000점 · +1,500코인 · 트로피 +3)`);
+            } else {
+              playTone(460, 0.09, 'sawtooth', 0.09, 760);
+              addSkyCombatScore(200, `보스 직격! (${boss.hp}/${boss.maxHp})`, '#f472b6');
+            }
+          }
+        }
+        if (!hit) for (let j = (state.skyEnemies || []).length - 1; j >= 0; j--) {
           const en = state.skyEnemies[j];
           if (Math.hypot(b.x - en.x, b.y - en.y, b.z - en.z) < 8.2) {
             hit = true;
@@ -3713,6 +3979,7 @@
       // Update Enemy Projectiles Attacking the Flying Player!
       for (let i = (state.enemySkyBullets || []).length - 1; i >= 0; i--) {
         const eb = state.enemySkyBullets[i];
+        if (!eb) continue;
         eb.x += eb.vx * dt; eb.y += eb.vy * dt; eb.z += eb.vz * dt;
         eb.life -= dt;
         if (eb.mesh) eb.mesh.position.set(eb.x, eb.y, eb.z);
@@ -4468,6 +4735,7 @@
           npc.z = sp.z + sp.nz * npc.laneOff;
           npc.y = sp.y;
         });
+        setupScenicHipassAndWashCoords();
         return;
       }
       while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children[0]);
@@ -4681,6 +4949,81 @@
       }
       scenicNightGlowGroup.visible = (state.nightFactor || 0) > 0.32;
 
+      // v39 Korean Expressway Hi-pass Tollgates (Seg 8 & Seg 104) + Spinning Bubble Car Wash Tunnel (Seg 16)!
+      setupScenicHipassAndWashCoords();
+      carWashRollers3D = [];
+      const gantryWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 });
+      const hipassBlueMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, side: THREE.DoubleSide });
+      const hipassGlowStrip = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+      state.hipassGates.forEach((gt) => {
+        const gGrp = new THREE.Group();
+        [-5.2, 0, 5.2].forEach(lx => {
+          const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 22), hipassBlueMat);
+          strip.rotation.x = -Math.PI / 2;
+          strip.position.set(lx, 0.15, 0);
+          gGrp.add(strip);
+        });
+        [-9.2, 9.2].forEach(pxCol => {
+          const col = new THREE.Mesh(new THREE.BoxGeometry(0.85, 8.2, 0.85), gantryWhite);
+          col.position.set(pxCol, 4.1, 0);
+          gGrp.add(col);
+        });
+        const signTex = makeSignTexture('#0369a1', '#ffffff', `🟦 ${gt.name} · 하이패스`, '무정차 통과 · 1,200원 자동결제', '#bae6fd');
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(19.6, 2.2, 1.1), new THREE.MeshBasicMaterial({ map: signTex }));
+        beam.position.set(0, 7.6, 0);
+        const ledBar = new THREE.Mesh(new THREE.BoxGeometry(18.8, 0.22, 1.25), hipassGlowStrip);
+        ledBar.position.set(0, 6.38, 0);
+        gGrp.add(beam, ledBar);
+        gGrp.position.set(gt.x, gt.y, gt.z);
+        gGrp.rotation.y = gt.heading;
+        worldGroup.add(gGrp);
+      });
+
+      if (state.carWashStation) {
+        const cw = state.carWashStation;
+        const cwGrp = new THREE.Group();
+        const archMat = new THREE.MeshPhongMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.42, shininess: 140, side: THREE.DoubleSide });
+        [-8.6, 8.6].forEach(wx => {
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(0.55, 6.2, 13.5), archMat);
+          wall.position.set(wx, 3.1, 0);
+          cwGrp.add(wall);
+        });
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(17.8, 0.55, 13.5), archMat);
+        roof.position.set(0, 6.2, 0);
+        const cwSignTex = makeSignTexture('#0284c7', '#ffffff', '🫧 거품 자동 세차장 터널', '통과 시 100% 광택수리 + 연료충전!', '#fbcfe8');
+        const cwSign = new THREE.Mesh(new THREE.BoxGeometry(16.8, 1.65, 0.6), new THREE.MeshBasicMaterial({ map: cwSignTex }));
+        cwSign.position.set(0, 7.25, -6.5);
+        const cwSignBack = cwSign.clone();
+        cwSignBack.position.set(0, 7.25, 6.5);
+        cwGrp.add(roof, cwSign, cwSignBack);
+
+        const cyanBrushMat = new THREE.MeshPhongMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.25 });
+        const pinkBrushMat = new THREE.MeshPhongMaterial({ color: 0xf472b6, emissive: 0xdb2777, emissiveIntensity: 0.22 });
+        [[-7.1, -2.5, cyanBrushMat], [7.1, -2.5, pinkBrushMat], [-7.1, 2.5, pinkBrushMat], [7.1, 2.5, cyanBrushMat]].forEach(([bx, bz, bMat]) => {
+          const roller = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 5.4, 14), bMat);
+          roller.position.set(bx, 2.8, bz);
+          cwGrp.add(roller);
+          carWashRollers3D.push({ mesh: roller, axis: 'y' });
+        });
+        const topRoller = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 14.2, 14), cyanBrushMat);
+        topRoller.rotation.z = Math.PI / 2;
+        topRoller.position.set(0, 5.2, 0);
+        cwGrp.add(topRoller);
+        carWashRollers3D.push({ mesh: topRoller, axis: 'x' });
+
+        const bubMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.72 });
+        for (let bi = 0; bi < 16; bi++) {
+          const bub = new THREE.Mesh(new THREE.SphereGeometry(0.28 + (bi % 3) * 0.14, 8, 8), bubMat);
+          bub.position.set(((bi * 7) % 13) - 6.5, 1.4 + (bi % 4) * 1.1, ((bi * 5) % 11) - 5.5);
+          cwGrp.add(bub);
+        }
+
+        cwGrp.position.set(cw.x, cw.y, cw.z);
+        cwGrp.rotation.y = cw.heading;
+        worldGroup.add(cwGrp);
+      }
+
       // Iconic Seoul Lotte World Tower & Namsan Tower visible near City Start!
       const p0 = scenicRoadSamples[0];
       const lt = new THREE.Mesh(new THREE.CylinderGeometry(3, 10, 118, 8), glassM);
@@ -4865,6 +5208,43 @@
           if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
         });
         ctx.stroke();
+      }
+
+      // Hi-pass Gates (🟦) & Bubble Car Wash (🫧) & Giant Sky Boss (👾) on Minimap!
+      (state.hipassGates || []).forEach(gt => {
+        const [gx, gy] = toScreen(gt.x, gt.z);
+        if (gx > -15 && gx < w + 15 && gy > -15 && gy < h + 15) {
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(gx - 5, gy - 3, 10, 6);
+          if (isExpanded) {
+            ctx.fillStyle = '#bae6fd';
+            ctx.font = '700 9px "Noto Sans KR", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('하이패스', gx + 7, gy + 3);
+          }
+        }
+      });
+      if (state.carWashStation) {
+        const [wx, wy] = toScreen(state.carWashStation.x, state.carWashStation.z);
+        if (wx > -15 && wx < w + 15 && wy > -15 && wy < h + 15) {
+          ctx.fillStyle = '#f472b6';
+          ctx.beginPath(); ctx.arc(wx, wy, isExpanded ? 5.5 : 4, 0, Math.PI * 2); ctx.fill();
+          if (isExpanded) {
+            ctx.fillStyle = '#fbcfe8';
+            ctx.font = '700 9px "Noto Sans KR", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('🫧세차장', wx + 7, wy + 3);
+          }
+        }
+      }
+      if (state.skyBoss && state.skyBoss.hp > 0) {
+        const [bx, by] = toScreen(state.skyBoss.x, state.skyBoss.z);
+        ctx.strokeStyle = '#f472b6';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bx, by, isExpanded ? 11 : 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = isExpanded ? '14px sans-serif' : '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('👾', bx, by + 4);
       }
 
       // Active 119 Blazing Fire Site Marker (🔥 Pulsing Orange-Red)
@@ -6890,6 +7270,118 @@
       }
     }
 
+    let carWashRollers3D = [];
+
+    function setupScenicHipassAndWashCoords() {
+      if (!scenicRoadSamples || !scenicRoadSamples.length) return;
+      const s1 = scenicRoadSamples[8 % SCENIC_SEGMENTS];
+      const s2 = scenicRoadSamples[104 % SCENIC_SEGMENTS];
+      state.hipassGates = [
+        { id: 'seoul_tg', name: '서울 톨게이트', x: s1.x, y: s1.y, z: s1.z, heading: s1.heading, cd: 0 },
+        { id: 'east_tg',  name: '동해대교 톨게이트', x: s2.x, y: s2.y, z: s2.z, heading: s2.heading, cd: 0 }
+      ];
+      const sw = scenicRoadSamples[16 % SCENIC_SEGMENTS];
+      state.carWashStation = { x: sw.x, y: sw.y, z: sw.z, heading: sw.heading };
+    }
+
+    function playHipassDingDong() {
+      playTone(1046.5, 0.14, 'sine', 0.085, 1046.5);
+      setTimeout(() => playTone(1318.5, 0.26, 'triangle', 0.09, 1318.5), 115);
+    }
+
+    function ensureWashBubbleDom() {
+      const ov = document.getElementById('carWashBubbleOverlay');
+      if (!ov || ov.children.length > 0) return;
+      for (let i = 0; i < 28; i++) {
+        const d = document.createElement('div');
+        d.className = 'wash-bubble-dot';
+        const sz = 16 + (i % 5) * 11;
+        d.style.width = sz + 'px';
+        d.style.height = sz + 'px';
+        d.style.left = ((i * 37) % 96) + '%';
+        d.style.top = ((i * 29) % 92) + '%';
+        d.style.animationDelay = ((i % 7) * 0.15) + 's';
+        ov.appendChild(d);
+      }
+    }
+
+    function jumpToHipassAndWashCourse() {
+      if (state.stage !== 'driving' || !state.scenicTourActive) {
+        startInstantTestDrive();
+      }
+      if (state.isWalking) toggleWalkMode();
+      if (state.carFlightMode) toggleCarFlightMode();
+      initScenicSamples();
+      setupScenicHipassAndWashCoords();
+      const sStart = scenicRoadSamples[5];
+      state.x = sStart.x + sStart.nx * 3.2;
+      state.y = sStart.y;
+      state.z = sStart.z + sStart.nz * 3.2;
+      state.heading = sStart.heading;
+      state.speed = 16.5;
+      state.engineOn = true;
+      state.gear = 'D';
+      syncExitAndEngineUi();
+      showToast('🟦 전방 35m 하이패스 톨게이트 → 🫧 거품 자동 세차장 연속 코스로 진입합니다!');
+    }
+
+    function updateHipassAndCarWash(dt) {
+      if (state.stage !== 'driving') return;
+
+      if (carWashRollers3D && carWashRollers3D.length) {
+        carWashRollers3D.forEach(r => {
+          if (r.axis === 'y') r.mesh.rotation.y += dt * 4.5;
+          else r.mesh.rotation.x += dt * 4.5;
+        });
+      }
+
+      const px = state.isWalking ? state.charX : state.x;
+      const pz = state.isWalking ? state.charZ : state.z;
+
+      (state.hipassGates || []).forEach(gt => {
+        if (gt.cd > 0) gt.cd = Math.max(0, gt.cd - dt);
+        const d = Math.hypot(px - gt.x, pz - gt.z);
+        if (d < 9.5 && gt.cd === 0 && !state.carFlightMode) {
+          gt.cd = 9.0;
+          playHipassDingDong();
+          addSkyCombatScore(150, `🟦 ${gt.name} 하이패스 통과!`, '#38bdf8');
+          addCoinsAndTrophies(100, 0);
+          showToast(`🟦 띠링~! ${gt.name} 하이패스 무정차 결제 통과! (+150점 · +100코인)`);
+        }
+      });
+
+      if (state.carWashCd > 0) state.carWashCd = Math.max(0, state.carWashCd - dt);
+      if (state.carWashStation && !state.carFlightMode && !state.isWalking) {
+        const dW = Math.hypot(state.x - state.carWashStation.x, state.z - state.carWashStation.z);
+        if (dW < 9.2 && state.carWashCd === 0) {
+          state.carWashCd = 10.0;
+          state.carWashTimer = 2.8;
+          ensureWashBubbleDom();
+          const ov = document.getElementById('carWashBubbleOverlay');
+          if (ov) ov.style.display = 'block';
+          repairVehicleInstant();
+          state.fuel = 100;
+          const fBtn = document.getElementById('hudEmergencyFuelBtn');
+          if (fBtn) fBtn.style.display = 'none';
+          playWaterSprayNoise();
+          addSkyCombatScore(300, '🫧 거품 광택 세차 완료!', '#f472b6');
+          addCoinsAndTrophies(200, 0);
+          showToast('🫧 거품 회전브러시 자동 세차 완료!! 차량 광택 수리 100% + 연료 100% 충전! (+300점)');
+        }
+      }
+
+      if (state.carWashTimer > 0) {
+        state.carWashTimer = Math.max(0, state.carWashTimer - dt);
+        if (Math.floor((state.carWashTimer + dt) * 5) !== Math.floor(state.carWashTimer * 5)) {
+          playWaterSprayNoise();
+        }
+        if (state.carWashTimer === 0) {
+          const ov = document.getElementById('carWashBubbleOverlay');
+          if (ov) ov.style.display = 'none';
+        }
+      }
+    }
+
     function togglePoliceSiren() {
       toggleEmergencySiren();
     }
@@ -6993,8 +7485,8 @@
         fz = sp.z + sp.nz * 4.8;
         fHeading = sp.heading;
       } else {
-        fx = state.x - Math.sin(fHeading) * 105 + Math.cos(fHeading) * 4.2;
-        fz = state.z + Math.cos(fHeading) * 105 + Math.sin(fHeading) * 4.2;
+        fx = state.x + Math.sin(fHeading) * 105 + Math.cos(fHeading) * 4.2;
+        fz = state.z + Math.cos(fHeading) * 105 - Math.sin(fHeading) * 4.2;
         fy = 0;
       }
 
@@ -7115,7 +7607,7 @@
           state.waterSpraySoundTick = 0;
           playWaterSprayNoise();
         }
-        let dirX = -Math.sin(state.heading);
+        let dirX = Math.sin(state.heading);
         let dirZ = Math.cos(state.heading);
         let upVel = 7.2;
         if (state.fireMissionActive && state.fireSite) {
@@ -11495,6 +11987,43 @@
         // Render visible oncoming & cruising Exotic Supercars (Lamborghinis, Ferraris, Porsches) in 3D perspective!
         // Render Enemy Sky Fighters, Laser Bullets & Explosions in 2D Sky!
         if (state.carFlightMode) {
+          if (state.skyBoss && state.skyBoss.hp > 0) {
+            const boss = state.skyBoss;
+            const dxB = boss.x - state.x, dzB = boss.z - state.z;
+            const fwdB = dxB * Math.sin(state.heading) + dzB * Math.cos(state.heading);
+            const latB = dxB * Math.cos(state.heading) - dzB * Math.sin(state.heading);
+            if (fwdB > 5) {
+              const dist3d = Math.max(14, Math.hypot(dxB, dzB));
+              const pB = Math.min(0.95, 18.0 / dist3d);
+              const bxS = w * 0.5 + (latB / dist3d) * w * 0.45;
+              const byS = Math.max(155, Math.min(horizon - 28, horizon - 36 - (boss.y - state.y) * 1.1 * pB));
+              const bwS = 225 * pB, bhS = 56 * pB;
+              ctx.save();
+              ctx.fillStyle = '#1e1b4b';
+              ctx.strokeStyle = '#ec4899';
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              ctx.moveTo(bxS - bwS, byS + 6);
+              ctx.lineTo(bxS - bwS * 0.35, byS - bhS * 0.5);
+              ctx.lineTo(bxS + bwS * 0.35, byS - bhS * 0.5);
+              ctx.lineTo(bxS + bwS, byS + 6);
+              ctx.lineTo(bxS + bwS * 0.45, byS + bhS * 0.45);
+              ctx.lineTo(bxS - bwS * 0.45, byS + bhS * 0.45);
+              ctx.closePath();
+              ctx.fill(); ctx.stroke();
+              [-0.75, -0.38, 0.38, 0.75].forEach(rf => {
+                ctx.strokeStyle = '#38bdf8';
+                ctx.beginPath(); ctx.ellipse(bxS + bwS * rf, byS + 6, 16 * pB, 6 * pB, 0, 0, Math.PI * 2); ctx.stroke();
+              });
+              ctx.fillStyle = boss.hitFlash > 0 ? '#ffffff' : '#ef4444';
+              ctx.beginPath(); ctx.arc(bxS, byS + 4, 13 * pB, 0, Math.PI * 2); ctx.fill();
+              ctx.fillStyle = '#fbcfe8';
+              ctx.font = '900 12px "Noto Sans KR", sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText(`👾 거대 보스 아크 모선 HP ${boss.hp}/${boss.maxHp}`, bxS, byS - bhS * 0.62 - 6);
+              ctx.restore();
+            }
+          }
           (state.skyEnemies || []).forEach(en => {
             const relZ = en.z - state.z;
             if (relZ > 4 && relZ < 150) {
@@ -11610,11 +12139,61 @@
           }
         });
 
+        // 2D Hi-pass Tollgate Arch & Bubble Auto Car Wash Tunnel Rendering!
+        (state.hipassGates || []).forEach(gt => {
+          const dxG = gt.x - state.x, dzG = gt.z - state.z;
+          const fwdG = dxG * Math.sin(state.heading) + dzG * Math.cos(state.heading);
+          const latG = dxG * Math.cos(state.heading) - dzG * Math.sin(state.heading);
+          if (fwdG > 4 && fwdG < 120) {
+            const pG = Math.min(0.95, 4.5 / fwdG);
+            const gyS = horizon + (h - horizon) * pG;
+            const gxS = vanishX + (roadBotCenter - vanishX) * pG + (latG / 8.0) * (w * 0.25 * pG);
+            const gwS = Math.max(46, 320 * pG), ghS = Math.max(24, 135 * pG);
+            ctx.save();
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(gxS - gwS * 0.5, gyS - ghS, 7 * pG + 2, ghS);
+            ctx.fillRect(gxS + gwS * 0.5 - (7 * pG + 2), gyS - ghS, 7 * pG + 2, ghS);
+            ctx.fillStyle = '#0369a1';
+            ctx.beginPath(); ctx.roundRect(gxS - gwS * 0.54, gyS - ghS - 18 * pG, gwS * 1.08, Math.max(16, 32 * pG), 5); ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `800 ${Math.max(9, Math.round(13 * pG))}px "Noto Sans KR", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`🟦 ${gt.name} · Hi-pass`, gxS, gyS - ghS + 2 * pG);
+            ctx.restore();
+          }
+        });
+        if (state.carWashStation) {
+          const cw = state.carWashStation;
+          const dxW = cw.x - state.x, dzW = cw.z - state.z;
+          const fwdW = dxW * Math.sin(state.heading) + dzW * Math.cos(state.heading);
+          const latW = dxW * Math.cos(state.heading) - dzW * Math.sin(state.heading);
+          if (fwdW > 4 && fwdW < 125) {
+            const pW = Math.min(0.95, 4.5 / fwdW);
+            const wyS = horizon + (h - horizon) * pW;
+            const wxS = vanishX + (roadBotCenter - vanishX) * pW + (latW / 8.0) * (w * 0.25 * pW);
+            const wwS = Math.max(44, 290 * pW), whS = Math.max(24, 125 * pW);
+            ctx.save();
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.35)';
+            ctx.fillRect(wxS - wwS * 0.5, wyS - whS, wwS, whS);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(wxS - wwS * 0.46, wyS - whS * 0.85, 14 * pW + 3, whS * 0.85);
+            ctx.fillStyle = '#f472b6';
+            ctx.fillRect(wxS + wwS * 0.46 - (14 * pW + 3), wyS - whS * 0.85, 14 * pW + 3, whS * 0.85);
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath(); ctx.roundRect(wxS - wwS * 0.52, wyS - whS - 16 * pW, wwS * 1.04, Math.max(15, 28 * pW), 5); ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `800 ${Math.max(9, Math.round(12.5 * pW))}px "Noto Sans KR", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('🫧 거품 자동 세차장 (100% 수리·충전)', wxS, wyS - whS + 2 * pW);
+            ctx.restore();
+          }
+        }
+
         // 2D Blazing Fire Scene & Water Stream Rendering!
         if (state.fireMissionActive && state.fireSite) {
           const dxF = state.fireSite.x - state.x, dzF = state.fireSite.z - state.z;
-          const fwdDist = -dxF * Math.sin(state.heading) + dzF * Math.cos(state.heading);
-          const latDist = dxF * Math.cos(state.heading) + dzF * Math.sin(state.heading);
+          const fwdDist = dxF * Math.sin(state.heading) + dzF * Math.cos(state.heading);
+          const latDist = dxF * Math.cos(state.heading) - dzF * Math.sin(state.heading);
           if (fwdDist > 3 && fwdDist < 130) {
             const pF = Math.min(0.92, 4.2 / fwdDist);
             const fyScreen = horizon + (h - horizon) * pF;
@@ -12266,6 +12845,7 @@
         updateFlyingNpcs(dt);
         updateV16Systems(dt);
         updateEmergencyAndFireSystems(dt);
+        updateHipassAndCarWash(dt);
         updateDayNightEnvironment(dt, false);
         if (skyDomeMesh) skyDomeMesh.position.set(state.x, 0, state.z);
         if (cloudGroup3D) cloudGroup3D.position.set(state.x, 0, state.z);
