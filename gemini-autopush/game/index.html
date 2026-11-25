@@ -2066,6 +2066,8 @@
   <!-- Sleek Top Live-Preview Studio Bar -->
   <header id="previewTopBar">
     <div class="preview-scroll">
+      <button type="button" class="pv-chip" id="openLaptopChromeBtn" onclick="openInLaptopChromeTab()" style="background:linear-gradient(135deg,#059669,#10b981);color:#ffffff;border-color:#6ee7b7;font-weight:900;" title="노트북 크롬 새 탭으로 바로 열거나 독립 .html 파일로 내려받아 크롬 전체창에서 실행합니다">💻 크롬 새탭·전체창 열기</button>
+      <button type="button" class="pv-chip" id="topFullscreenBtn" onclick="toggleBrowserFullscreen()" style="border-color:rgba(52,211,153,0.75);color:#6ee7b7;" title="모니터 꽉 찬 전체화면 전환 (ESC로 해제)">⛶ 모니터 전체화면</button>
       <label for="customSkinInput" class="pv-chip pv-file-btn" title="내 이미지로 차량 보닛 커스텀 랩핑 적용">
         📂 커스텀 랩핑 적용
       </label>
@@ -8438,6 +8440,52 @@
       document.getElementById('toggleHudMapBtn').classList.toggle('on', show);
       updateRearMirrorVisibility();
       showToast(show ? '미니맵·룸미러 화면 표시 ON' : '시야 확보를 위해 미니맵·룸미러 숨김');
+    }
+
+    function openInLaptopChromeTab() {
+      try {
+        const htmlStr = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        let opened = null;
+        try { opened = window.open(url, '_blank'); } catch (_) { opened = null; }
+        if (opened) {
+          showToast('💻 노트북 크롬 새 탭으로 게임 화면을 열었습니다! (F11을 누르면 꽉 찬 화면이 됩니다)');
+          setTimeout(() => URL.revokeObjectURL(url), 15000);
+          return;
+        }
+        // Fallback if sandboxed iframe blocks blob popup: instant 1-click HTML download!
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '3D운전교실_한국버전_PC실행.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast('💻 크롬 우측 상단 다운로드(⬇)에 저장된 [3D운전교실_한국버전_PC실행.html]을 클릭하면 크롬 새 탭으로 바로 열립니다!');
+      } catch (_) {
+        downloadStandaloneMobileApp();
+      }
+    }
+
+    function toggleBrowserFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          const el = document.documentElement;
+          if (el.requestFullscreen) {
+            el.requestFullscreen().catch(() => {
+              toggleImmersiveAppMode();
+              showToast('⛶ 넓게 보기 모드로 전환했습니다! 크롬 새 탭으로 열려면 [💻 크롬 새탭·전체창 열기]를 누르세요.');
+            });
+          } else {
+            toggleImmersiveAppMode();
+          }
+        } else if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      } catch (_) {
+        toggleImmersiveAppMode();
+      }
     }
 
     function downloadStandaloneMobileApp() {
