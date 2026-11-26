@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-title" content="3D운전교실" />
   <meta name="theme-color" content="#070a12" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D 운전교실 한국 버전 — 현대·기아 전 차종 스튜디오 에디션</title>
+  <title>테슬라 FSD v15 (Supervised v15.0.1 · 2026.38.6.11) — 리얼리티 뷰 한국 도로 에디션</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -2936,14 +2936,595 @@
       .dc-accel-dots { gap: 5px 6px; }
     }
 
+
+    /* =========================================================================
+       v46 TESLA FSD v15 (SUPERVISED v15.0.1 · 2026.38.6.11) REALITY VIEW UI
+       ========================================================================= */
+    #previewTopBar {
+      background: rgba(10, 14, 22, 0.94) !important;
+      border-bottom: 1px solid rgba(59, 130, 246, 0.28) !important;
+    }
+    .ts-top-fsd-pill {
+      background: rgba(30, 41, 59, 0.9) !important;
+      border: 1px solid rgba(96, 165, 250, 0.55) !important;
+      color: #dbeafe !important;
+      font-weight: 800 !important;
+    }
+    .ts-top-fsd-pill.on {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+      border-color: #93c5fd !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 14px rgba(37, 99, 235, 0.65);
+    }
+    .ts-top-fleet-pill {
+      background: rgba(15, 23, 42, 0.92) !important;
+      border: 1px solid rgba(148, 163, 184, 0.45) !important;
+      color: #f8fafc !important;
+      font-weight: 800 !important;
+    }
+
+    /* Left Tesla Center-Touchscreen Telemetry Column */
+    #teslaLeftFsdPod {
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      width: 248px;
+      z-index: 45;
+      background: rgba(13, 18, 28, 0.84);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 16px;
+      padding: 9px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.52);
+    }
+    .ts-gear-batt-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    #teslaLeftFsdPod #dcGearSlotBox {
+      position: static !important;
+      width: auto !important;
+      height: auto !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    #teslaLeftFsdPod #gearShifter {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      width: auto !important;
+      height: auto !important;
+      overflow: visible !important;
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      gap: 2px !important;
+    }
+    #teslaLeftFsdPod .gear-btn {
+      width: 22px !important;
+      height: 20px !important;
+      padding: 0 !important;
+      border-radius: 6px !important;
+      background: transparent !important;
+      border: none !important;
+      color: #64748b !important;
+      font-size: 12px !important;
+      font-weight: 800 !important;
+      cursor: pointer;
+    }
+    #teslaLeftFsdPod .gear-btn.active {
+      color: #ffffff !important;
+      background: rgba(59, 130, 246, 0.28) !important;
+      box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.65);
+    }
+    .ts-batt-cluster {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .ts-batt-icon {
+      width: 24px;
+      height: 11px;
+      border-radius: 3px;
+      border: 1.4px solid #cbd5e1;
+      padding: 1px;
+      position: relative;
+    }
+    .ts-batt-icon::after {
+      content: '';
+      position: absolute;
+      right: -3.5px;
+      top: 2.5px;
+      width: 2px;
+      height: 4px;
+      background: #cbd5e1;
+      border-radius: 0 1px 1px 0;
+    }
+    #teslaBatteryFillBar {
+      height: 100%;
+      background: #22c55e;
+      border-radius: 1.5px;
+      transition: width 0.25s;
+    }
+    .ts-range-sub {
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: 700;
+    }
+
+    /* Regen / Power Bar */
+    .ts-power-bar-track {
+      position: relative;
+      width: 100%;
+      height: 3.5px;
+      background: rgba(148, 163, 184, 0.22);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    #teslaRegenFill {
+      position: absolute;
+      right: 50%;
+      top: 0;
+      height: 100%;
+      width: 0%;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+      transition: width 0.08s linear;
+    }
+    #teslaPowerFill {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      height: 100%;
+      width: 0%;
+      background: #3b82f6;
+      box-shadow: 0 0 8px #60a5fa;
+      transition: width 0.08s linear;
+    }
+
+    /* Speedometer + Limit Sign + Blue Autopilot Wheel */
+    #teslaLeftFsdPod #dcMirrorAndSpeedPod {
+      position: static !important;
+      width: 100% !important;
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 6px;
+    }
+    #teslaLeftFsdPod #hudClusterBox {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      cursor: pointer;
+    }
+    #teslaLeftFsdPod #hudSpeedNum {
+      font-family: Inter, system-ui, -apple-system, sans-serif !important;
+      font-size: 40px !important;
+      font-weight: 800 !important;
+      line-height: 0.95 !important;
+      letter-spacing: -0.04em !important;
+      color: #f8fafc !important;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.45);
+    }
+    #teslaLeftFsdPod .dc-kmh-unit {
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      color: #94a3b8 !important;
+    }
+    .ts-badges-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #teslaSpeedLimitSign {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3.5px solid #ef4444;
+      color: #0f172a;
+      font-family: Inter, sans-serif;
+      font-size: 12.5px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.38);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    #teslaSpeedLimitSign.over-limit {
+      transform: scale(1.1);
+      box-shadow: 0 0 0 3px #3b82f6, 0 0 14px rgba(59, 130, 246, 0.85);
+    }
+    #teslaFsdEngageBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 8px;
+      border-radius: 11px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(30, 41, 59, 0.85);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    #teslaFsdEngageBtn.on {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      border-color: #93c5fd;
+      color: #ffffff;
+      box-shadow: 0 0 18px rgba(37, 99, 235, 0.72);
+    }
+    .ts-fsd-btn-txt {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      line-height: 1.05;
+    }
+    .ts-fsd-btn-txt strong { font-size: 10.5px; font-weight: 900; }
+    .ts-fsd-btn-txt small { font-size: 8.5px; opacity: 0.85; font-weight: 700; }
+
+    /* 5 Official FSD v15 Speed Profiles */
+    .ts-profile-seg {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 2px;
+      background: rgba(30, 41, 59, 0.72);
+      padding: 2.5px;
+      border-radius: 9px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .ts-prof-btn {
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 4px 2px;
+      border-radius: 6.5px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.14s;
+    }
+    .ts-prof-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.55);
+    }
+    .ts-prof-btn.madmax.active {
+      background: linear-gradient(135deg, #dc2626, #ea580c);
+      box-shadow: 0 2px 10px rgba(239, 68, 68, 0.65);
+    }
+
+    /* v15 Feature Toggles Row */
+    .ts-v15-toggles {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .ts-mini-chip {
+      flex: 1;
+      padding: 3.5px 4px;
+      border-radius: 7px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(15, 23, 42, 0.72);
+      color: #cbd5e1;
+      font-size: 9.5px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .ts-mini-chip.on {
+      border-color: #60a5fa;
+      background: rgba(37, 99, 235, 0.28);
+      color: #dbeafe;
+    }
+    #teslaNeuralStatusBox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #bae6fd;
+      background: rgba(15, 23, 42, 0.78);
+      padding: 4px 7px;
+      border-radius: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .ts-pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3b82f6;
+      box-shadow: 0 0 8px #60a5fa;
+      flex-shrink: 0;
+    }
+
+    /* Right Tesla Split-Screen Navigation & Full-Screen Map */
+    #dcTopRightIcons {
+      right: 10px !important;
+      top: 8px !important;
+      gap: 6px !important;
+    }
+    .ts-top-action-btn {
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: #e2e8f0;
+      font-size: 10.5px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    #dcRightClusterStack {
+      right: 10px !important;
+      top: 48px !important;
+      gap: 6px !important;
+    }
+    #teslaNavCard {
+      width: 210px;
+      background: rgba(13, 18, 28, 0.86);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.52);
+      transition: width 0.22s ease;
+    }
+    #drivingHud.ts-fullscreen-map #teslaNavCard {
+      width: min(52vw, 520px);
+    }
+    .ts-nav-turn-banner {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 9px;
+      background: rgba(21, 128, 61, 0.90);
+      color: #ffffff;
+      cursor: pointer;
+    }
+    .ts-nav-arrow {
+      font-size: 17px;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .ts-nav-turn-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+      line-height: 1.15;
+    }
+    .ts-nav-turn-info strong { font-size: 12px; font-weight: 900; }
+    .ts-nav-turn-info span {
+      font-size: 9.5px;
+      opacity: 0.92;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #teslaFullMapBtn {
+      background: rgba(9, 13, 22, 0.55);
+      border: 1px solid rgba(255,255,255,0.38);
+      color: #fff;
+      border-radius: 7px;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 3px 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #teslaNavCard #liveMinimapWidget {
+      width: 100% !important;
+      height: 124px !important;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      position: relative !important;
+    }
+    #drivingHud.ts-fullscreen-map #teslaNavCard #liveMinimapWidget {
+      height: 270px !important;
+    }
+    #teslaNavCard #liveMinimapCanvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+    .ts-nav-eta-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 9px;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #cbd5e1;
+      background: rgba(9, 13, 22, 0.9);
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .ts-sig-and-cam-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Blind-spot Repeater Mirrors (Glow Amber when Blinker On, Hidden in Calm Mode unless signaling!) */
+    #dcLeftWingMirror {
+      left: 10px !important;
+      top: 232px !important;
+      border-radius: 10px !important;
+      border: 1.5px solid rgba(148, 163, 184, 0.4) !important;
+      transition: opacity 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    #dcRightWingMirror {
+      border-radius: 10px !important;
+      border: 1.5px solid rgba(148, 163, 184, 0.4) !important;
+      transition: opacity 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .dc-wing-mirror.ts-blindspot-active {
+      border: 2.5px solid #f59e0b !important;
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.85) !important;
+    }
+
+    /* Bottom Tesla OS v15 Touchscreen App Dock */
+    #dcBottomCenterConsole {
+      bottom: 6px !important;
+      background: rgba(11, 15, 24, 0.88);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 16px;
+      padding: 5px 10px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.58);
+      gap: 4px !important;
+    }
+    #teslaOsDockRow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding-bottom: 3px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .ts-dock-ico {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 9px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(30, 41, 59, 0.65);
+      color: #e2e8f0;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .ts-dock-ico span { font-size: 10px; }
+    .ts-dock-ico.active-blue {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-color: #93c5fd;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.55);
+    }
+    #dcBottomGreenPrompt {
+      color: #93c5fd !important;
+      font-size: 11px !important;
+      font-weight: 800 !important;
+    }
+    .ts-summon-hud-btn {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      border: 1.5px solid #93c5fd;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.65);
+    }
+
+    /* Sleek Brushed-Titanium & Anodized-Blue Tesla Performance Pedals */
+    #drivingHud .dc-cyan-brake {
+      background: linear-gradient(180deg, #334155 0%, #1e293b 65%, #0f172a 100%) !important;
+      border: 2px solid #60a5fa !important;
+    }
+    #drivingHud .dc-silver-accel {
+      background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 70%, #64748b 100%) !important;
+      border: 2px solid #cbd5e1 !important;
+    }
+
+    /* Mobile Portrait Responsive Fit (412px Viewport Clean Non-Overlapping Layout!) */
+    @media (max-width: 640px) {
+      #teslaLeftFsdPod {
+        left: 6px;
+        top: 6px;
+        width: 196px;
+        padding: 6px 8px;
+        gap: 4px;
+        border-radius: 13px;
+      }
+      #teslaLeftFsdPod #hudSpeedNum { font-size: 28px !important; }
+      #teslaSpeedLimitSign { width: 27px; height: 27px; font-size: 10.5px; border-width: 2.5px; }
+      #teslaFsdEngageBtn { padding: 3px 6px; border-radius: 9px; gap: 3px; }
+      .ts-fsd-btn-txt strong { font-size: 9.5px; }
+      .ts-fsd-btn-txt small { display: none; }
+      .ts-prof-btn { font-size: 8.5px; padding: 3px 1px; }
+      .ts-mini-chip { font-size: 8.5px; padding: 2.5px 3px; }
+      #teslaNeuralStatusBox { font-size: 8.8px; padding: 3px 5px; }
+
+      #dcTopRightIcons { right: 6px !important; top: 6px !important; gap: 4px !important; }
+      .ts-top-action-btn { display: none; }
+      #dcRightClusterStack { right: 6px !important; top: 42px !important; gap: 4px !important; }
+      #teslaNavCard { width: 152px; border-radius: 11px; }
+      .ts-nav-turn-banner { padding: 5px 6px; gap: 4px; }
+      .ts-nav-turn-info strong { font-size: 10px; }
+      .ts-nav-turn-info span { font-size: 8.5px; }
+      #teslaFullMapBtn { font-size: 8.5px; padding: 2px 4px; }
+      #teslaNavCard #liveMinimapWidget { height: 78px !important; }
+      #drivingHud.ts-fullscreen-map #teslaNavCard { width: calc(100vw - 12px); z-index: 60; }
+      #drivingHud.ts-fullscreen-map #teslaNavCard #liveMinimapWidget { height: 210px !important; }
+      .ts-nav-eta-foot { padding: 3px 6px; font-size: 8px; }
+      #dcLeftWingMirror { left: 6px !important; top: 194px !important; width: 62px !important; height: 42px !important; }
+      #dcRightWingMirror { width: 58px !important; height: 42px !important; }
+      .dc-round-sig { width: 26px !important; height: 26px !important; }
+
+      #dcWheelCorner { left: 4px !important; bottom: 72px !important; }
+      #dcWheelCorner .wheel-container { width: 88px !important; height: 88px !important; }
+      #dcPedalsCorner { right: 6px !important; bottom: 72px !important; }
+      #drivingHud .dc-cyan-brake { width: 40px !important; height: 46px !important; }
+      #drivingHud .dc-silver-accel { width: 32px !important; height: 68px !important; }
+
+      #dcBottomCenterConsole {
+        left: 6px !important;
+        right: 6px !important;
+        bottom: 4px !important;
+        transform: none !important;
+        padding: 4px 6px !important;
+        border-radius: 13px;
+      }
+      #teslaOsDockRow { gap: 3px; }
+      .ts-dock-ico { padding: 3px 5px; font-size: 9.5px; }
+      .ts-dock-ico span { font-size: 8.5px; }
+      .dc-dash-orb { width: 24px !important; height: 24px !important; }
+      #dcBottomGreenPrompt { font-size: 9.5px !important; }
+      #bottomContextActionDock { bottom: 162px !important; }
+    }
+
   </style>
 </head>
 <body>
 
-  <!-- Sleek Minimalist Top Studio Bar (v41 Clean UI) -->
+  <!-- Tesla OS v15 Top Touchscreen Status Bar (Software 2026.38.6.11 · Reality View) -->
   <header id="previewTopBar">
     <div class="preview-scroll">
       <button type="button" class="pv-chip pv-chrome-btn" id="openLaptopChromeBtn" onclick="openInLaptopChromeTab()" title="노트북 크롬 새 탭으로 바로 열거나 독립 .html 파일로 내려받아 크롬 전체창에서 실행합니다">💻 크롬 새탭·전체창 열기</button>
+      <button type="button" class="pv-chip ts-top-fsd-pill on" id="topFsdQuickBtn" onclick="toggleAutopilotInDrive()" title="테슬라 FSD (Supervised) v15.0.1 자율주행 즉시 켜기/끄기">🔵 FSD v15 작동중</button>
+      <button type="button" class="pv-chip ts-top-fleet-pill" id="topTeslaCycleBtn" onclick="cycleTeslaModelQuick()" title="모델 Y 주니퍼 · 모델 3 하이랜드 · 모델 S 플래드 · 사이버트럭 · 사이버캡 즉시 전환">⚡ 테슬라 기종전환</button>
       <label for="customSkinInput" class="pv-chip pv-file-btn" title="내 이미지로 차량 보닛 커스텀 랩핑 적용">
         📂 커스텀 랩핑 적용
       </label>
@@ -2955,6 +3536,8 @@
       <button type="button" class="pv-chip" id="navKoreaMapBtn" onclick="openKoreaMapModal()">🗺️ 대한민국 전국지도</button>
     </div>
     <div class="top-status-capsule">
+      <span id="teslaTopVerBadge" style="color:#60a5fa;font-weight:900;font-size:10.5px;" title="Tesla Software 2026.38.6.11 · HW4 ~10B Neural Net">FSD 15.0.1</span>
+      <span class="top-sep">·</span>
       <span id="topTrophyBadge" title="획득한 트로피">🏆 3</span>
       <span class="top-sep">·</span>
       <span id="topCoinBadge" style="color:#7dd3fc;" title="보유 코인">🪙 2,500</span>
@@ -3497,45 +4080,36 @@
     <!-- SCREEN 4: Authentic 3D 운전교실 Cockpit HUD (1:1 Match to Reference Screenshot!) -->
     <section id="drivingHud">
 
-      <!-- 1. TOP-LEFT: Authentic Vertical Slot Gear Shifter (P - R - N - D + Sliding ↓ Silver Knob) -->
-      <div id="dcGearSlotBox" class="pointer-auto">
-        <div class="dc-shift-slot-track">
-          <div id="dcShiftKnob" class="dc-shift-knob" data-pos="D">↓</div>
-        </div>
-        <div class="gear-strip" id="gearShifter">
-          <button type="button" class="gear-btn" data-gear="P" onclick="setGear('P')">P</button>
-          <button type="button" class="gear-btn" data-gear="R" onclick="setGear('R')">R</button>
-          <button type="button" class="gear-btn" data-gear="N" onclick="setGear('N')">N</button>
-          <button type="button" class="gear-btn active" data-gear="D" onclick="setGear('D')">D</button>
-          <button type="button" class="gear-btn dc-gear-m" data-gear="M" onclick="setGear('M')" title="수동 변속기 (1~6단 패들 시프트)">M</button>
-        </div>
-      </div>
-
-      <!-- 2. TOP-LEFT-CENTER: Trapezoid Wide Room Mirror + Curved Fuel Gauge Arc + Digital 0 km/h -->
-      <div id="dcMirrorAndSpeedPod" class="pointer-auto">
-        <div id="dcRoomMirrorFrame" onclick="cycleCameraMode()" title="룸미러 (탭하여 시점 전환)">
-          <canvas id="dcRoomMirrorCanvas" width="240" height="58"></canvas>
-        </div>
-        <div class="dc-under-mirror-row">
-          <div class="dc-fuel-arc-wrap" title="실시간 연료 게이지">
-            <svg viewBox="0 0 90 34" width="76" height="28">
-              <defs>
-                <linearGradient id="dcFuelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#ef4444"/>
-                  <stop offset="35%" stop-color="#facc15"/>
-                  <stop offset="100%" stop-color="#4ade80"/>
-                </linearGradient>
-              </defs>
-              <path d="M 10 28 A 36 28 0 0 1 80 28" fill="none" stroke="rgba(15,23,42,0.75)" stroke-width="7" stroke-linecap="round"/>
-              <path d="M 10 28 A 36 28 0 0 1 80 28" fill="none" stroke="url(#dcFuelGrad)" stroke-width="5" stroke-linecap="round"/>
-              <line id="dcFuelNeedleLine" x1="45" y1="29" x2="72" y2="12" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round"/>
-              <circle cx="45" cy="29" r="3" fill="#e2e8f0"/>
-              <text x="12" y="32" fill="#f8fafc" font-size="8" font-weight="900">E</text>
-              <text x="41" y="25" fill="#f8fafc" font-size="8.5">⛽</text>
-              <text x="72" y="32" fill="#f8fafc" font-size="8" font-weight="900">F</text>
-            </svg>
+      <!-- 1. TESLA FSD v15.0.1 LEFT TOUCHSCREEN TELEMETRY & REALITY VIEW CONTROL CARD -->
+      <div id="teslaLeftFsdPod" class="pointer-auto">
+        <!-- Top Gear Strip + Battery % + Software Build Row -->
+        <div class="ts-gear-batt-row">
+          <div id="dcGearSlotBox" class="ts-gear-inline">
+            <div class="dc-shift-slot-track" style="display:none;"><div id="dcShiftKnob" class="dc-shift-knob" data-pos="D">↓</div></div>
+            <div class="gear-strip" id="gearShifter">
+              <button type="button" class="gear-btn" data-gear="P" onclick="setGear('P')">P</button>
+              <button type="button" class="gear-btn" data-gear="R" onclick="setGear('R')">R</button>
+              <button type="button" class="gear-btn" data-gear="N" onclick="setGear('N')">N</button>
+              <button type="button" class="gear-btn active" data-gear="D" onclick="setGear('D')">D</button>
+              <button type="button" class="gear-btn dc-gear-m" data-gear="M" onclick="setGear('M')" title="수동 단수">M</button>
+            </div>
           </div>
-          <div id="hudClusterBox" onclick="toggleSpeedCtrlBar()" title="탭하여 속도조절·크루즈 열기/닫기">
+          <div class="ts-batt-cluster" onclick="callRoadsideFuel()" title="배터리 잔량 · 탭하여 슈퍼차저 즉시 급속충전">
+            <span id="teslaBatteryPctText">94%</span>
+            <div class="ts-batt-icon"><div id="teslaBatteryFillBar" style="width:94%;"></div></div>
+            <span id="teslaRangeKmText" class="ts-range-sub">512 km</span>
+          </div>
+        </div>
+
+        <!-- Regenerative Braking (Green Left) / Power Draw (Blue Right) Thin Bar -->
+        <div class="ts-power-bar-track" title="테슬라 회생제동(초록) · 출력(블루) 실시간 파워바">
+          <div id="teslaRegenFill"></div>
+          <div id="teslaPowerFill"></div>
+        </div>
+
+        <!-- Huge Digital Speedometer + Blue Autopilot Steering Wheel + Circular Speed Limit Sign -->
+        <div id="dcMirrorAndSpeedPod" class="ts-speed-main-row">
+          <div id="hudClusterBox" onclick="toggleSpeedCtrlBar()" title="탭하여 수동 목표속도 슬라이더 열기/닫기">
             <span id="hudSpeedNum">0</span>
             <span class="dc-kmh-unit">km/h</span>
             <div style="display:none;">
@@ -3545,13 +4119,71 @@
               <span id="hudLimitLabel">제한 80km/h</span>
             </div>
           </div>
+
+          <div class="ts-badges-right">
+            <!-- Speed Assist Circular Sign (Tap to sync set speed; blue outline when speeding!) -->
+            <button type="button" id="teslaSpeedLimitSign" onclick="syncFsdSpeedToLimit()" title="Speed Assist 제한속도 표지판 (탭하여 제한속도에 맞춤)">
+              <span id="teslaSpeedLimitVal">80</span>
+            </button>
+
+            <!-- Glowing Blue Tesla Autopilot / Start Self-Driving Button -->
+            <button type="button" id="teslaFsdEngageBtn" class="on" onclick="toggleAutopilotInDrive()" title="탭하여 Full Self-Driving (Supervised) v15 켜기/끄기">
+              <svg viewBox="0 0 28 28" width="20" height="20">
+                <circle cx="14" cy="14" r="10.5" fill="none" stroke="currentColor" stroke-width="2.4"/>
+                <circle cx="14" cy="14" r="2.6" fill="currentColor"/>
+                <path d="M4.5 11.5 L11.5 13 M23.5 11.5 L16.5 13 M14 16.5 V24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+              <div class="ts-fsd-btn-txt">
+                <strong id="teslaFsdStateTitle">FSD v15</strong>
+                <small id="teslaFsdSubLabel">Supervised</small>
+              </div>
+            </button>
+          </div>
+
+          <!-- Preserved hidden legacy SVG & Rear Mirror Canvas (toggleable via Dashcam button) -->
+          <div id="dcRoomMirrorFrame" onclick="cycleCameraMode()" style="display:none;" title="상단 리어카메라 룸미러">
+            <canvas id="dcRoomMirrorCanvas" width="240" height="58"></canvas>
+          </div>
+          <div class="dc-fuel-arc-wrap" style="display:none;">
+            <svg viewBox="0 0 90 34" width="76" height="28">
+              <defs>
+                <linearGradient id="dcFuelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#ef4444"/><stop offset="35%" stop-color="#facc15"/><stop offset="100%" stop-color="#4ade80"/>
+                </linearGradient>
+              </defs>
+              <line id="dcFuelNeedleLine" x1="45" y1="29" x2="72" y2="12" stroke="#ffffff" stroke-width="2"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 5 Official Tesla FSD v15 Speed Profiles (Sloth · Chill · Standard · Hurry · Mad Max) -->
+        <div class="ts-profile-seg" id="teslaSpeedProfileBar" title="FSD v15 5단계 주행 성향 프로필 (주행 속도 및 차선변경 빈도 제어)">
+          <button type="button" class="ts-prof-btn" data-prof="sloth" onclick="setFsdSpeedProfile('sloth')">느긋</button>
+          <button type="button" class="ts-prof-btn" data-prof="chill" onclick="setFsdSpeedProfile('chill')">안락</button>
+          <button type="button" class="ts-prof-btn active" data-prof="standard" onclick="setFsdSpeedProfile('standard')">표준</button>
+          <button type="button" class="ts-prof-btn" data-prof="hurry" onclick="setFsdSpeedProfile('hurry')">신속</button>
+          <button type="button" class="ts-prof-btn madmax" data-prof="mad_max" onclick="setFsdSpeedProfile('mad_max')">매드맥스</button>
+        </div>
+
+        <!-- Confirmed FSD v15 Capabilities Row: Calm Mode · HOV Lane · Tap-to-Park (>>>) -->
+        <div class="ts-v15-toggles">
+          <button type="button" class="ts-mini-chip" id="tsCalmModeBtn" onclick="toggleFsdCalmMode()" title="오스틴 로보택시에서 이식된 Calm Mode (주변 인식 오버레이 최소화)">🧘 캄 모드</button>
+          <button type="button" class="ts-mini-chip on" id="tsHovLaneBtn" onclick="toggleFsdHovLane()" title="HOV 카풀/추월 차선 적극 활용">🛣️ HOV차로</button>
+          <button type="button" class="ts-mini-chip" id="tsAutoParkBtn" onclick="triggerFsdTapToPark()" title="전방 >>> 쉐브론 주차 구역 탐색 및 자동 주차 (Tap-to-Park)">🅿️ 탭파킹 &gt;&gt;&gt;</button>
+        </div>
+
+        <!-- Live HW4 10B Neural-Net Decision Status Pill -->
+        <div id="teslaNeuralStatusBox">
+          <span class="ts-pulse-dot" id="teslaNeuralDot"></span>
+          <span id="teslaNeuralText">Reality View · 곡선 차로 및 포트홀 실시간 스캔 중</span>
         </div>
       </div>
 
-      <!-- 3. TOP-RIGHT: Authentic Silver Camera Icon + Glossy Blue Pause/Menu Circle Button -->
+      <!-- 3. TOP-RIGHT: Tesla Split Navigation & Full-Screen Map Header Controls -->
       <div id="dcTopRightIcons" class="pointer-auto">
+        <button type="button" class="ts-top-action-btn" id="tsDashcamMirrorBtn" onclick="toggleTeslaRearCamMirror()" title="리어뷰 미러 카메라 창 켜기/끄기">🪞 리어캠</button>
         <button type="button" class="dc-top-cam-btn" onclick="cycleCameraMode()" title="카메라 시점 전환 (C)">
-          <svg viewBox="0 0 32 24" width="26" height="20">
+          <svg viewBox="0 0 32 24" width="22" height="17">
             <rect x="3" y="5" width="22" height="15" rx="3.5" fill="#cbd5e1" stroke="#334155" stroke-width="1.6"/>
             <rect x="8" y="2.5" width="7" height="3" rx="1" fill="#94a3b8"/>
             <circle cx="15.5" cy="12.5" r="5.2" fill="#1e293b" stroke="#f8fafc" stroke-width="1.5"/>
@@ -3559,7 +4191,7 @@
             <polygon points="25,9 30,6.5 30,18.5 25,16" fill="#94a3b8" stroke="#334155" stroke-width="1"/>
           </svg>
         </button>
-        <button type="button" id="dcPauseMenuBtn" onclick="toggleDcPauseDrawer(event)" title="일시정지 · 차량 · 코스 · 미션 전체 메뉴">
+        <button type="button" id="dcPauseMenuBtn" onclick="toggleDcPauseDrawer(event)" title="테슬라 전체 컨트롤 · 차량 · 미션 메뉴">
           <span>❚❚</span>
         </button>
       </div>
@@ -3625,38 +4257,52 @@
         <canvas id="dcLeftMirrorCanvas" width="110" height="78"></canvas>
       </div>
 
-      <!-- 5. MID-RIGHT: 3 Round Silver Turn/Hazard Buttons (⬅ ⚠ ➡) + Vertical Road Minimap + Right Side Wing Mirror -->
+      <!-- 5. TESLA RIGHT NAVIGATION CARD + FULL-SCREEN MAP TOGGLE + BLIND-SPOT REPEATER CAM -->
       <div id="dcRightClusterStack" class="pointer-auto">
-        <div class="dc-turn-trio mini-sig-row">
-          <button type="button" class="dc-round-sig" id="btnBlinkLeft" onclick="toggleBlinker('left')" title="좌측 방향지시등 (Q)">
-            <span class="dc-sr">◀</span>
-            <svg viewBox="0 0 28 28" width="20" height="20"><path d="M15 6 L6 14 L15 22 V17 H22 V11 H15 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
-          </button>
-          <button type="button" class="dc-round-sig dc-hazard-sig" id="btnHazard" onclick="toggleHazard()" title="비상점멸등 (Z)">
-            <span class="dc-sr">△</span>
-            <svg viewBox="0 0 28 28" width="20" height="20">
-              <polygon points="14,5 24,22 4,22" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linejoin="round"/>
-              <polygon points="14,10 19.5,19.5 8.5,19.5" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <button type="button" class="dc-round-sig" id="btnBlinkRight" onclick="toggleBlinker('right')" title="우측 방향지시등 (E)">
-            <span class="dc-sr">▶</span>
-            <svg viewBox="0 0 28 28" width="20" height="20"><path d="M13 6 L22 14 L13 22 V17 H6 V11 H13 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
-          </button>
-          <button type="button" class="dc-sr-btn" onmousedown="triggerHorn()" ontouchstart="triggerHorn()" title="경적 (H)">📣</button>
-        </div>
-
-        <div class="dc-map-and-rmirror">
+        <div id="teslaNavCard">
+          <div class="ts-nav-turn-banner" onclick="openCoursePickerModal()" title="탭하여 8종 주행 코스 선택">
+            <span class="ts-nav-arrow" id="teslaNavTurnIcon">↱</span>
+            <div class="ts-nav-turn-info">
+              <strong id="teslaNavNextDist">320 m</strong>
+              <span id="teslaNavRoadName">대한민국 8대 절경 순환로</span>
+            </div>
+            <button type="button" id="teslaFullMapBtn" onclick="event.stopPropagation();toggleTeslaFullScreenMap()" title="FSD v15 풀스크린 내비게이션 맵 전환">🗺️ 맵확대</button>
+          </div>
           <div id="liveMinimapWidget">
-            <canvas id="liveMinimapCanvas" width="96" height="128" onclick="openExpandedMinimap()" title="탭하여 지도 크게 확대 보기"></canvas>
-            <div class="mm-mini-ctrls" style="display:none;">
+            <canvas id="liveMinimapCanvas" width="220" height="165" onclick="openExpandedMinimap()" title="탭하여 전국/정밀 내비게이션 확대"></canvas>
+            <div class="mm-mini-ctrls">
               <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();stepLiveMinimapZoom(1)">+</button>
               <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();stepLiveMinimapZoom(-1)">−</button>
               <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();openExpandedMinimap()">⤢</button>
             </div>
             <div id="mmZoomBadge" style="display:none;">1.0x</div>
           </div>
-          <div id="dcRightWingMirror" class="dc-wing-mirror" title="우측 사이드미러">
+          <div class="ts-nav-eta-foot">
+            <span id="teslaNavEtaText">도착 12분 · 잔여 9.4 km</span>
+            <span id="teslaSpeedCamAlert" style="color:#fbbf24;font-weight:800;">⚡ HW4 정상</span>
+          </div>
+        </div>
+
+        <div class="ts-sig-and-cam-row">
+          <div class="dc-turn-trio mini-sig-row">
+            <button type="button" class="dc-round-sig" id="btnBlinkLeft" onclick="toggleBlinker('left')" title="좌측 방향지시등 · 사각지대 리피터 카메라 (Q)">
+              <span class="dc-sr">◀</span>
+              <svg viewBox="0 0 28 28" width="18" height="18"><path d="M15 6 L6 14 L15 22 V17 H22 V11 H15 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="dc-round-sig dc-hazard-sig" id="btnHazard" onclick="toggleHazard()" title="비상점멸등 (Z)">
+              <span class="dc-sr">△</span>
+              <svg viewBox="0 0 28 28" width="18" height="18">
+                <polygon points="14,5 24,22 4,22" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linejoin="round"/>
+                <polygon points="14,10 19.5,19.5 8.5,19.5" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" class="dc-round-sig" id="btnBlinkRight" onclick="toggleBlinker('right')" title="우측 방향지시등 · 사각지대 리피터 카메라 (E)">
+              <span class="dc-sr">▶</span>
+              <svg viewBox="0 0 28 28" width="18" height="18"><path d="M13 6 L22 14 L13 22 V17 H6 V11 H13 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="dc-sr-btn" onmousedown="triggerHorn()" ontouchstart="triggerHorn()" title="경적 (H)">📣</button>
+          </div>
+          <div id="dcRightWingMirror" class="dc-wing-mirror" title="우측 펜더 사각지대 리피터 카메라">
             <canvas id="dcRightMirrorCanvas" width="110" height="78"></canvas>
           </div>
         </div>
@@ -3731,13 +4377,14 @@
         </div>
       </div>
 
-      <!-- Contextual Exit / Board NPC Car Floating Dock -->
+      <!-- Contextual Exit / Actually Smart Summon / Board NPC Car Floating Dock -->
       <div id="bottomContextActionDock" class="pointer-auto">
         <button type="button" class="exit-car-hud-btn" id="mainExitPersonBtn" onclick="toggleWalkMode()">🚶 사람 내리기</button>
+        <button type="button" class="ts-summon-hud-btn" id="teslaSmartSummonBtn" style="display:none;" onclick="triggerTeslaSmartSummon()" title="Actually Smart Summon: 내 테슬라가 현재 내 위치로 스스로 주행해 옵니다">📲 스마트 호출</button>
         <button type="button" class="board-npc-hud-btn" id="mainBoardNpcFastBtn" onclick="boardNearestVehicle()">🚘 앞의 차 바로 타기</button>
       </div>
 
-      <!-- 6. BOTTOM-LEFT: Authentic 3-Spoke Dark Leather & Silver-Button Sport Steering Wheel -->
+      <!-- 6. BOTTOM-LEFT: Authentic Tesla Plaid Yoke / Scroll-Wheel Steering (Auto-rotates on FSD v15, Drag to Manual Takeover!) -->
       <div class="left-drive-cluster pointer-auto" id="dcWheelCorner">
         <div id="frontWheelMiniViz" style="display:none;">
           <svg width="46" height="24" viewBox="0 0 46 24">
@@ -3745,32 +4392,35 @@
             <g id="vizTireR" transform="translate(36,12) rotate(0)"><rect x="-3" y="-7" width="6" height="14"/></g>
           </svg>
         </div>
-        <div class="wheel-container" id="steeringWheelArea">
+        <div class="wheel-container" id="steeringWheelArea" title="드래그하여 수동 조향 인수 (FSD 작동 중에는 스스로 회전합니다)">
           <svg id="steeringWheelSvg" width="100%" height="100%" viewBox="0 0 140 140">
             <defs>
               <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#4b5563"/>
-                <stop offset="45%" stop-color="#1f2937"/>
-                <stop offset="100%" stop-color="#111827"/>
+                <stop offset="0%" stop-color="#374151"/>
+                <stop offset="50%" stop-color="#18181b"/>
+                <stop offset="100%" stop-color="#090d16"/>
               </linearGradient>
               <linearGradient id="spokeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stop-color="#e2e8f0"/>
                 <stop offset="100%" stop-color="#64748b"/>
               </linearGradient>
-            <radialGradient id="hubGrad"><stop offset="0%" stop-color="#334155"/><stop offset="100%" stop-color="#090d16"/></radialGradient></defs>
-            <circle cx="70" cy="70" r="58" stroke="url(#rimGrad)" stroke-width="14" fill="none"/>
-            <circle cx="70" cy="70" r="65" stroke="rgba(255,255,255,0.22)" stroke-width="1" fill="none"/>
-            <circle cx="70" cy="70" r="51" stroke="rgba(0,0,0,0.65)" stroke-width="1.4" fill="none"/>
-            <path d="M 16 64 L 50 61 L 50 81 L 17 78 Z" fill="#1f2937" stroke="#64748b" stroke-width="1"/>
-            <path d="M 124 64 L 90 61 L 90 81 L 123 78 Z" fill="#1f2937" stroke="#64748b" stroke-width="1"/>
-            <rect x="22" y="65" width="18" height="11" rx="2.5" fill="url(#spokeGrad)"/>
-            <rect x="100" y="65" width="18" height="11" rx="2.5" fill="url(#spokeGrad)"/>
-            <circle cx="27" cy="70.5" r="1.4" fill="#0f172a"/><circle cx="33" cy="70.5" r="1.4" fill="#0f172a"/>
-            <circle cx="107" cy="70.5" r="1.4" fill="#0f172a"/><circle cx="113" cy="70.5" r="1.4" fill="#0f172a"/>
-            <path d="M 59 86 L 81 86 L 78 123 L 62 123 Z" fill="#1f2937" stroke="#94a3b8" stroke-width="1.2"/>
-            <rect x="66" y="94" width="8" height="24" rx="2" fill="url(#spokeGrad)" opacity="0.65"/>
-            <path d="M 46 54 Q 70 49 94 54 L 90 87 Q 70 92 50 87 Z" fill="#27272a" stroke="#52525b" stroke-width="1.8"/>
-            <rect x="57" y="65" width="26" height="10" rx="3" fill="#18181b" stroke="#71717a" stroke-width="1"/>
+              <radialGradient id="hubGrad"><stop offset="0%" stop-color="#27272a"/><stop offset="100%" stop-color="#090d16"/></radialGradient>
+            </defs>
+            <!-- Authentic Tesla Open-Top Yoke Rim -->
+            <path d="M 22 46 C 12 46, 10 62, 12 88 C 14 108, 28 116, 70 116 C 112 116, 126 108, 128 88 C 130 62, 128 46, 118 46"
+              stroke="url(#rimGrad)" stroke-width="14" stroke-linecap="round" fill="none"/>
+            <path d="M 22 46 C 12 46, 10 62, 12 88 C 14 108, 28 116, 70 116 C 112 116, 126 108, 128 88 C 130 62, 128 46, 118 46"
+              stroke="rgba(96,165,250,0.42)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            <!-- Horizontal Yoke Spokes & Dual Scroll Wheels -->
+            <path d="M 16 68 L 50 64 L 50 84 L 16 82 Z" fill="#18181b" stroke="#52525b" stroke-width="1.1"/>
+            <path d="M 124 68 L 90 64 L 90 84 L 124 82 Z" fill="#18181b" stroke="#52525b" stroke-width="1.1"/>
+            <rect x="26" y="69" width="11" height="9" rx="3" fill="url(#spokeGrad)"/>
+            <rect x="103" y="69" width="11" height="9" rx="3" fill="url(#spokeGrad)"/>
+            <path d="M 60 88 L 80 88 L 76 113 L 64 113 Z" fill="#18181b" stroke="#52525b" stroke-width="1"/>
+            <!-- Center Airbag Pad & Minimalist Tesla 'T' Crest -->
+            <rect x="46" y="56" width="48" height="34" rx="11" fill="url(#hubGrad)" stroke="#3f3f46" stroke-width="1.6"/>
+            <path d="M 60 66 Q 70 63 80 66 L 78 68.5 Q 70 66.5 62 68.5 Z" fill="#e2e8f0"/>
+            <path d="M 68.2 68 L 71.8 68 L 70 82 Z" fill="#e2e8f0"/>
           </svg>
         </div>
         <div class="desktop-steer-arrows" style="display:none;">
@@ -3784,8 +4434,15 @@
         </div>
       </div>
 
-      <!-- 7. BOTTOM-CENTER: 7 Iconic Round Glossy 3D 운전교실 Dashboard Buttons + Bright Green Subtitle! -->
+      <!-- 7. BOTTOM-CENTER: Authentic Tesla OS v15 Touchscreen App Dock + Quick Switches -->
       <div id="dcBottomCenterConsole" class="pointer-auto">
+        <div id="teslaOsDockRow">
+          <button type="button" class="ts-dock-ico" onclick="toggleDcPauseDrawer(event)" title="테슬라 차량 전체 컨트롤">🚗<span>컨트롤</span></button>
+          <button type="button" class="ts-dock-ico" onclick="openCarSelector()" title="테슬라 전 라인업 · 73종 차량 선택">⚡<span>테슬라·차고</span></button>
+          <button type="button" class="ts-dock-ico active-blue" id="tsDockFsdBtn" onclick="toggleAutopilotInDrive()" title="FSD v15 자율주행 ON/OFF">🔵<span>FSD v15</span></button>
+          <button type="button" class="ts-dock-ico" onclick="openCoursePickerModal()" title="8종 한국 도로 코스 변경">🛣️<span>코스8종</span></button>
+          <button type="button" class="ts-dock-ico" id="tsDockClimateBtn" onclick="cycleTeslaClimateTemp()" title="실내 공조 온도 조절">❄️<span id="tsClimateVal">21.0°</span></button>
+        </div>
         <div id="dcRoundSwitchRow">
           <button type="button" class="dc-dash-orb on" id="dcOrbSeatbelt" onclick="toggleSeatbelt()" title="안전벨트 착용/해제">
             <svg viewBox="0 0 28 28" width="19" height="19">
@@ -3910,9 +4567,9 @@
       <div class="glass-card pointer-auto" style="width:100%;max-width:940px;padding:13px 16px;background:var(--glass-strong);border-color:rgba(255,255,255,0.16);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="font-size:15px;font-weight:800;color:#f8fafc;letter-spacing:-0.3px;">국산 · 특수긴급 · 슈퍼카 전 차종 컨피규레이터 (67종)</span>
-            <input type="search" id="carSearchInput" placeholder="차종 검색 (예: 아이오닉 9, EV3, 타스만, 그랜저...)" oninput="renderCarGrid()"
-              style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);border-radius:999px;padding:4px 12px;color:#f8fafc;font-size:11.5px;width:230px;outline:none;" />
+            <span style="font-size:15px;font-weight:800;color:#f8fafc;letter-spacing:-0.3px;">⚡ 테슬라 FSD v15 전 라인업 · 국산 · 슈퍼카 컨피규레이터 (73종)</span>
+            <input type="search" id="carSearchInput" placeholder="차종 검색 (예: 모델 Y 주니퍼, 모델 3, 사이버트럭, 사이버캡...)" oninput="renderCarGrid()"
+              style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);border-radius:999px;padding:4px 12px;color:#f8fafc;font-size:11.5px;width:250px;outline:none;" />
           </div>
           <button type="button" class="pv-chip active" style="padding:5px 15px;font-size:11.5px;" onclick="closeCarSelector()">선택 완료</button>
         </div>
@@ -3920,6 +4577,7 @@
         <!-- Segment & Brand Filter Tabs -->
         <div class="preview-scroll" id="brandFilterBar" style="margin-bottom:8px;padding-bottom:2px;">
           <button type="button" class="pv-chip active" data-brand="all" onclick="filterCarsByBrand('all')">전체 (67)</button>
+          <button type="button" class="pv-chip" data-brand="테슬라_FSD" onclick="filterCarsByBrand('테슬라_FSD')" style="border-color:rgba(59,130,246,0.85);color:#93c5fd;background:rgba(37,99,235,0.22);">⚡ 테슬라 FSD v15 (6)</button>
           <button type="button" class="pv-chip" data-brand="긴급_특수" onclick="filterCarsByBrand('긴급_특수')" style="border-color:rgba(248,113,113,0.6);color:#fca5a5;">🚨 경찰·소방 (2)</button>
           <button type="button" class="pv-chip" data-brand="외제_슈퍼카" onclick="filterCarsByBrand('외제_슈퍼카')" style="border-color:rgba(250,204,21,0.6);color:#fde047;">🏎️ 외제 슈퍼카 (12)</button>
           <button type="button" class="pv-chip" data-brand="현대_승용" onclick="filterCarsByBrand('현대_승용')">현대 승용 · N (7)</button>
@@ -4067,6 +4725,13 @@
     //    Each entry defines authentic body profile, dimensions, & LED signature!
     // ============================================================================
     const KOREAN_CARS = [
+      // ---------------- TESLA FSD v15 (Full Self-Driving Supervised v15.0.1 · 2026.38.6.11) ----------------
+      { id: 'tesla_modely_juniper', brand: '테슬라', group: '테슬라_FSD', cat: 'FSD v15 전기 SUV', price: '5,299만원~', name: '테슬라 모델 Y 주니퍼 (FSD v15)', plate: '48하 1501', plateType: 'ev', color: '#a3adb8', maxSpeed: 217, accel: 30, profile: 'tesla_juniper', lampSig: 'horizon', dims: [1.92, 1.62, 4.79], drive: 'AWD', caliper: 0xef4444, desc: '퀵실버 메탈릭 · 풀와이드 인다이렉트 리어 라이트바 · HW4 FSD v15.0.1 기본 탑재' },
+      { id: 'tesla_model3_highland', brand: '테슬라', group: '테슬라_FSD', cat: 'FSD v15 퍼포먼스 세단', price: '5,990만원~', name: '테슬라 모델 3 하이랜드 퍼포먼스', plate: '33하 2026', plateType: 'ev', color: '#c81d25', maxSpeed: 262, accel: 36, profile: 'tesla_highland', lampSig: 'horizon_slim', dims: [1.85, 1.44, 4.72], drive: 'AWD', caliper: 0xef4444, desc: '울트라 레드 · C-클로 리어 LED · 카본 스포일러 · 제로백 3.1초 FSD v15' },
+      { id: 'tesla_models_plaid', brand: '테슬라', group: '테슬라_FSD', cat: '1,020마력 플래그십 세단', price: '1억 2,500만원~', name: '테슬라 모델 S 플래드 (FSD v15)', plate: '10하 1020', plateType: 'ev', color: '#363d4a', maxSpeed: 322, accel: 43, profile: 'tesla_plaid', lampSig: 'horizon_slim', dims: [1.99, 1.43, 5.02], drive: 'AWD', caliper: 0xef4444, desc: '스텔스 그레이 · 트라이 모터 1,020마력 · 요크 스티어링 · 리얼리티 뷰 플래그십' },
+      { id: 'tesla_modelx_plaid', brand: '테슬라', group: '테슬라_FSD', cat: '팔콘윙 플래그십 SUV', price: '1억 4,100만원~', name: '테슬라 모델 X 플래드 (FSD v15)', plate: '59하 1020', plateType: 'ev', color: '#f1f5f9', maxSpeed: 262, accel: 38, profile: 'tesla_modelx', lampSig: 'horizon', dims: [2.00, 1.68, 5.06], drive: 'AWD', caliper: 0xef4444, desc: '펄 화이트 멀티코트 · 팔콘 윙 실루엣 & 파노라마 윈드실드 1,020마력 SUV' },
+      { id: 'tesla_cybercab', brand: '테슬라', group: '테슬라_FSD', cat: '완전자율 로보택시 쿠페', price: '스페셜 로보택시', name: '테슬라 사이버캡 로보택시 (Cybercab)', plate: '15하 0015', plateType: 'ev', color: '#d4af37', maxSpeed: 198, accel: 27, profile: 'tesla_cybercab', lampSig: 'horizon', dims: [1.88, 1.40, 4.45], drive: 'FR', caliper: 0x38bdf8, desc: '리퀴드 골드 · 오스틴 로보택시 Calm Mode 탑재 · 에어로 디스크 휠 자율주행 쿠페' },
+
       // ---------------- HYUNDAI SEDANS & N (현대 승용 · N) ----------------
       { id: 'sonata_edge', brand: '현대', group: '현대_승용', cat: '중형 세단', price: '2,876만원~', name: '쏘나타 디 엣지', plate: '123가 4568', plateType: 'normal', color: '#cbd5e1', maxSpeed: 220, accel: 19, profile: 'fastback_sedan', lampSig: 'horizon', dims: [1.86, 1.44, 4.91], drive: 'FF', desc: '심리스 호라이즌 램프 & 패스트백 스포츠 세단 디자인' },
       { id: 'avante_cn7', brand: '현대', group: '현대_승용', cat: '준중형 세단', price: '2,398만원~', name: '디 올 뉴 아반떼', plate: '14나 2398', plateType: 'normal', color: '#f1f5f9', maxSpeed: 205, accel: 17, profile: 'fastback_sedan', lampSig: 'horizon_slim', dims: [1.82, 1.42, 4.71], drive: 'FF', desc: '파라메트릭 다이나믹스 캐릭터라인과 낮고 넓은 스탠스' },
@@ -4135,7 +4800,7 @@
       { id: 'novus_mixer', brand: '타타대우', group: '제네시스', cat: '특장 상용 트럭', price: '건설 특장용', name: '타타대우 노부스 특장트럭', plate: '96자 0404', plateType: 'yellow', color: '#d97706', maxSpeed: 132, accel: 11, profile: 'truck_1ton', lampSig: 'commercial_kr', dims: [2.45, 2.85, 7.40], drive: 'FR', isCommercial: true, desc: '대한민국 건설 현장의 든든한 대형 특장 트럭' },
 
       // ---------------- EXOTIC SUPERCARS & IMPORTED LUXURY (외제 슈퍼카 · 선물차 14종) ----------------
-      { id: 'mustang_gt_blue', brand: '포드', group: '외제_슈퍼카', cat: 'V8 패스트백 GT', price: '선물·기본 스페셜', name: '머스탱 GT 다크호스 패스트백', plate: 'GT', plateType: 'normal', color: '#5f82b0', maxSpeed: 295, accel: 33, profile: 'mustang_s650', lampSig: 'mustang_tribar', dims: [1.98, 1.40, 4.82], drive: 'FR', hasWing: false, caliper: 0xef4444, desc: '베이퍼 스틸 블루 메탈릭 · S650 다크호스 3연장 사선 테일램프 & 페데스탈 GT 윙' },
+      { id: 'mustang_gt_blue', brand: '포드', group: '외제_슈퍼카', cat: 'V8 패스트백 GT', price: '선물·기본 스페셜', name: '포드 머스탱 GTD 블루 스페셜', plate: 'GTD', plateType: 'normal', color: '#6c8ec4', maxSpeed: 295, accel: 33, profile: 'mustang_s650', lampSig: 'mustang_tribar', dims: [1.98, 1.40, 4.82], drive: 'FR', hasWing: false, caliper: 0xef4444, desc: '베이퍼 스틸 블루 메탈릭 · S650 다크호스 3연장 사선 테일램프 & 페데스탈 GT 윙' },
       { id: 'bugatti_bolide', brand: '부가티', group: '외제_슈퍼카', cat: 'W16 트랙 하이퍼 선물차', price: '스페셜 선물차', name: '🎁 부가티 볼리드 (선물차)', plate: '00볼 1850', plateType: 'normal', color: '#2563eb', maxSpeed: 420, accel: 46, profile: 'supercar_wedge', lampSig: 'bugatti_8eye', dims: [2.05, 1.05, 4.75], drive: 'AWD', scissorDoors: true, hasWing: true, caliper: 0x38bdf8, desc: '3D운전교실 스페셜 기프트카 · X자 레이저 리어램프 1,850마력 하이퍼카' },
       { id: 'lambo_revuelto', brand: '람보르기니', group: '외제_슈퍼카', cat: 'V12 하이퍼 슈퍼카', price: '7억 8,000만원~', name: '람보르기니 레부엘토 / 아벤타도르', plate: '11라 0777', plateType: 'normal', color: '#84cc16', maxSpeed: 350, accel: 38, profile: 'supercar_wedge', lampSig: 'lambo_y', dims: [2.03, 1.16, 4.94], drive: 'AWD', scissorDoors: true, hasWing: true, caliper: 0xfacc15, desc: '베르데 만티스 네온 그린 · Y자형 시그니처 LED · V12 시저도어 슈퍼카' },
       { id: 'lambo_urus', brand: '람보르기니', group: '외제_슈퍼카', cat: '슈퍼 SUV', price: '3억 2,700만원~', name: '람보르기니 우루스 SE', plate: '22러 8888', plateType: 'normal', color: '#eab308', maxSpeed: 312, accel: 33, profile: 'sleek_cuv', lampSig: 'lambo_y', dims: [2.01, 1.63, 5.12], drive: 'AWD', caliper: 0xef4444, desc: '지알로 아우게 옐로우 · 쿠페형 루프라인 세계 최강 슈퍼 SUV' },
@@ -4148,7 +4813,7 @@
       { id: 'benz_s580', brand: '벤츠', group: '외제_슈퍼카', cat: '플래그십 럭셔리 세단', price: '2억 4,700만원~', name: '메르세데스-벤츠 S 580', plate: '07타 0580', plateType: 'normal', color: '#111827', maxSpeed: 250, accel: 25, profile: 'flagship_sedan', lampSig: 'genesis_quad', dims: [1.95, 1.50, 5.29], drive: 'AWD', desc: '디지털 라이트와 클래식 크롬 그릴 최고급 플래그십 쇼퍼드리븐 세단' },
       { id: 'bmw_m4', brand: 'BMW', group: '외제_슈퍼카', cat: '고성능 스포츠 쿠페', price: '1억 4,000만원~', name: 'BMW M4 컴페티션', plate: '40파 0404', plateType: 'normal', color: '#059669', maxSpeed: 290, accel: 31, profile: 'fastback_sedan', lampSig: 'bmw_kidney', dims: [1.89, 1.39, 4.79], drive: 'AWD', caliper: 0x3b82f6, desc: '아일 오브 맨 그린 · 수직형 프레임을 적용한 M 트윈파워 터보 쿠페' },
       { id: 'rolls_spectre', brand: '롤스로이스', group: '외제_슈퍼카', cat: '울트라 럭셔리 쿠페', price: '6억 2,200만원~', name: '롤스로이스 스펙터', plate: '99하 9999', plateType: 'ev', color: '#1e1b4b', maxSpeed: 250, accel: 28, profile: 'flagship_sedan', lampSig: 'palisade_vert', dims: [2.08, 1.56, 5.45], drive: 'AWD', twoToneRoof: '#e2e8f0', desc: '일루미네이티드 판테온 수직 크롬 그릴과 투톤 실버 보닛 최고급 쿠페' },
-      { id: 'cybertruck', brand: '테슬라', group: '외제_슈퍼카', cat: '스테인리스 전기 픽업', price: '1억 6,000만원~', name: '테슬라 사이버트럭 Cyberbeast', plate: '77하 7777', plateType: 'ev', color: '#94a3b8', maxSpeed: 210, accel: 35, profile: 'retro_wedge', lampSig: 'horizon', dims: [2.03, 1.79, 5.68], drive: 'AWD', desc: '냉간압연 스테인리스 스틸 엑소스켈레톤 바디와 일자형 레이저 라이트바' },
+      { id: 'cybertruck', brand: '테슬라', group: '테슬라_FSD', cat: '스테인리스 전기 픽업', price: '1억 6,000만원~', name: '테슬라 사이버트럭 Cyberbeast (FSD v15)', plate: '77하 7777', plateType: 'ev', color: '#aeb6c2', maxSpeed: 215, accel: 38, profile: 'tesla_cybertruck', lampSig: 'horizon', dims: [2.03, 1.79, 5.68], drive: 'AWD', desc: '냉간압연 스테인리스 엑소스켈레톤 · 스티어 바이 와이어 · FSD v15.0.1 탑재' },
 
       // ---------------- KOREAN EMERGENCY DISPATCH VEHICLES (경찰 112 · 소방 119 긴급출동 차량) ----------------
       { id: 'police_112', brand: '경찰청', group: '긴급_특수', cat: '112 고속순찰차', price: '긴급출동 특수차량', name: '대한민국 112 순찰 경찰차', plate: '112가 0112', plateType: 'normal', color: '#f8fafc', maxSpeed: 265, accel: 31, profile: 'fastback_sedan', lampSig: 'horizon', dims: [1.86, 1.45, 4.91], drive: 'AWD', twoToneRoof: '#1e3a8a', emergencyRole: 'police', caliper: 0x3b82f6, desc: '적·청 LED 경광등과 양보 사이렌이 기본 장착된 대한민국 112 고속순찰차' },
@@ -4161,12 +4826,31 @@
     const state = {
       stage: 'launcher',
       mode: 'autonomous',
-      selectedCarId: 'mustang_gt_blue',
+      selectedCarId: 'tesla_modely_juniper',
+      fsdVersion: 'v15.0.1 (2026.38.6.11)',
+      fsdSpeedProfile: 'standard', // 'sloth' | 'chill' | 'standard' | 'hurry' | 'mad_max'
+      fsdCalmMode: false,
+      fsdUseHov: true,
+      fsdFullScreenMap: false,
+      fsdRearCamOpen: false,
+      fsdParkingActive: false,
+      fsdParkTarget: null,
+      fsdSummonActive: false,
+      fsdLaneOffset: 3.3,
+      fsdTargetLaneOff: 3.3,
+      fsdDecelReason: '',
+      fsdStatusMsg: 'Reality View · 곡선 차로 중앙 유지 중',
+      fsdPostedLimitKmh: 80,
+      fsdClimateTemp: 21.0,
+      fsdHazardsCourseId: '',
+      fsdPotholes: [],
+      fsdSpeedCams: [],
+      fsdParkSpots: [],
       seatbelt: true,
       parkingBrake: false,
       brandFilter: 'all',
       customColor: null,
-      customPlate: '123가 4568',
+      customPlate: '48하 1501',
       rideHeight: 0,
       drivetrain: 'FF',
       customSkinDataUrl: null,
@@ -8503,7 +9187,7 @@
       const query = ((document.getElementById('carSearchInput') || {}).value || '').trim().toLowerCase();
 
       const filtered = KOREAN_CARS.filter(car => {
-        const matchTab = state.brandFilter === 'all' || car.group === state.brandFilter;
+        const matchTab = state.brandFilter === 'all' || car.group === state.brandFilter || (state.brandFilter === '외제_슈퍼카' && car.id === 'cybertruck');
         const matchQ = !query || car.name.toLowerCase().includes(query) || car.cat.toLowerCase().includes(query) || car.brand.toLowerCase().includes(query);
         return matchTab && matchQ;
       });
@@ -9258,17 +9942,39 @@
       showToast('카메라: ' + labels[state.cameraMode]);
     }
 
+    function playTeslaFsdChime(engaged) {
+      if (state.muted) return;
+      if (engaged) {
+        playTone(587.33, 0.09, 'sine', 0.07, 659.25);
+        setTimeout(() => playTone(880.0, 0.14, 'sine', 0.08, 987.77), 85);
+      } else {
+        playTone(659.25, 0.09, 'triangle', 0.07, 523.25);
+        setTimeout(() => playTone(440.0, 0.13, 'triangle', 0.07, 392.0), 85);
+      }
+    }
+
     function toggleAutopilotInDrive() {
       state.autopilot = !state.autopilot;
-      if (state.autopilot && state.gear !== 'D') setGear('D');
+      state.fsdParkingActive = false;
+      if (state.autopilot) {
+        if (state.isWalking) toggleWalkMode();
+        if (state.gear !== 'D') setGear('D');
+        state.parkingBrake = false;
+      }
+      playTeslaFsdChime(state.autopilot);
       syncAutopilotButton();
-      showToast(state.autopilot ? 'HDA AI 자율주행 ON' : '수동 자유주행 전환');
+      showToast(state.autopilot
+        ? `🔵 Tesla FSD (Supervised) v15.0.1 활성화 · [${getFsdProfileKorLabel(state.fsdSpeedProfile)}] 모드`
+        : '⚪ FSD 해제 · 운전자 수동 조향 모드로 전환되었습니다');
     }
 
     function syncAutopilotButton() {
       const btn = document.getElementById('hudAutopilotBtn');
-      btn.classList.toggle('auto-on', state.autopilot);
-      btn.textContent = state.autopilot ? 'HDA 자율주행 ON' : '수동 운전중 (AI 켜기)';
+      if (btn) {
+        btn.classList.toggle('auto-on', state.autopilot);
+        btn.textContent = state.autopilot ? 'HDA 자율주행 ON' : '수동 운전중 (AI 켜기)';
+      }
+      if (typeof syncTeslaFsdHudWidgets === 'function') syncTeslaFsdHudWidgets();
     }
 
     function changeAutoDestination(dest) {
@@ -9281,11 +9987,12 @@
     }
 
     function setPedal(which, isDown) {
-      if (isDown && state.autopilot) {
-        if (which === 'brake' || state.mode === 'autonomous') {
-          state.autopilot = false;
-          syncAutopilotButton();
-        }
+      if (isDown && state.autopilot && which === 'brake') {
+        state.autopilot = false;
+        state.fsdParkingActive = false;
+        playTeslaFsdChime(false);
+        syncAutopilotButton();
+        showToast('⚪ 브레이크 입력 감지 · Tesla FSD v15 수동 인수');
       }
       if (which === 'accel') {
         state.accelPressed = isDown;
@@ -9668,7 +10375,9 @@
       state.mode = 'autonomous';
       state.activeZone = 'open_world';
       state.isWalking = false;
-      state.autopilot = false;
+      state.autopilot = true;
+      state.fsdParkingActive = false;
+      state.fsdSummonActive = false;
       state.crashedImmobilized = false;
       state.inHijackedNpcCar = false;
       document.getElementById('crashAlertBanner').style.display = 'none';
@@ -9708,7 +10417,7 @@
       document.getElementById('blackoutScreen').style.display = 'none';
       document.getElementById('lobbyOverlay').style.display = 'none';
       document.getElementById('drivingHud').style.display = 'flex';
-      document.getElementById('hudModeBadge').textContent = '수동 테스트 운전';
+      document.getElementById('hudModeBadge').textContent = 'Tesla FSD v15 (Supervised)';
       document.getElementById('hudScoreWrap').style.display = 'none';
       document.getElementById('destSelectorWrap').style.display = 'flex';
       document.getElementById('multiChatPanel').style.display = 'none';
@@ -11445,7 +12154,452 @@
       return geo;
     }
 
+    // =========================================================================
+    // v45 BESPOKE HIGH-POLY 3D MUSTANG GTD MODEL (1:1 MATCH TO 1000025255.jpg!)
+    // Smooth 52x36 NURBS-style subdivided fastback + GTD louvered rear glass +
+    // Hollow-cradle GTD wing + Fiery 3-bar slanted LEDs + [GTD] concave panel!
+    // =========================================================================
+    let _gtdRearWindowTex = null;
+    let _gtdDecklidTex = null;
+    let _gtdTriBarTex = null;
+
+    function getMustangGtdTextures() {
+      if (!_gtdRearWindowTex) {
+        const c1 = document.createElement('canvas');
+        c1.width = 512; c1.height = 256;
+        const g1 = c1.getContext('2d');
+        // Smoked dark glass with realistic sky/cloud reflection!
+        const gg = g1.createLinearGradient(0, 0, 0, 256);
+        gg.addColorStop(0, '#182330');
+        gg.addColorStop(0.55, '#253344');
+        gg.addColorStop(1, '#121a24');
+        g1.fillStyle = gg;
+        g1.fillRect(0, 0, 512, 256);
+        // Soft cloud reflection wisps across center glass
+        g1.fillStyle = 'rgba(205, 224, 248, 0.20)';
+        g1.beginPath(); g1.ellipse(295, 95, 95, 42, -0.25, 0, Math.PI * 2); g1.fill();
+        g1.beginPath(); g1.ellipse(205, 145, 78, 30, 0.2, 0, Math.PI * 2); g1.fill();
+        g1.fillStyle = 'rgba(255, 255, 255, 0.10)';
+        g1.fillRect(92, 204, 328, 22);
+        // Left & Right Flush Matte-Charcoal GTD Cooling Intake Louver Strips (inside glass frame!)
+        g1.fillStyle = '#373b44';
+        g1.fillRect(0, 0, 74, 256);
+        g1.fillRect(438, 0, 74, 256);
+        g1.fillStyle = '#15181f';
+        for (let li = 0; li < 5; li++) {
+          const ly = 26 + li * 34;
+          g1.fillRect(14, ly, 46, 15);
+          g1.fillRect(452, ly, 46, 15);
+        }
+        // Outer dark rubber seal border
+        g1.strokeStyle = '#1b2028';
+        g1.lineWidth = 12;
+        g1.strokeRect(4, 4, 504, 248);
+        _gtdRearWindowTex = new THREE.CanvasTexture(c1);
+      }
+
+      if (!_gtdDecklidTex) {
+        const c2 = document.createElement('canvas');
+        c2.width = 1024; c2.height = 256;
+        const g2 = c2.getContext('2d');
+        const pg = g2.createLinearGradient(0, 0, 0, 256);
+        pg.addColorStop(0, '#1e2026');
+        pg.addColorStop(0.55, '#33363e');
+        pg.addColorStop(1, '#22252b');
+        g2.fillStyle = pg;
+        g2.fillRect(0, 0, 1024, 256);
+        // Top continuous glowing crimson LED bar!
+        const rg = g2.createLinearGradient(0, 8, 0, 34);
+        rg.addColorStop(0, '#ff5733');
+        rg.addColorStop(0.5, '#ef2318');
+        rg.addColorStop(1, '#7f1d1d');
+        g2.fillStyle = rg;
+        g2.fillRect(12, 10, 1000, 22);
+        // Embossed Center [G T D] Dark-Metallic Badge!
+        g2.fillStyle = '#14171d';
+        g2.strokeStyle = '#64748b';
+        g2.lineWidth = 5;
+        g2.beginPath(); g2.roundRect(432, 48, 160, 48, 10); g2.fill(); g2.stroke();
+        g2.fillStyle = '#cbd5e1';
+        g2.font = '900 30px Inter, Arial, sans-serif';
+        g2.textAlign = 'center';
+        g2.fillText('G T D', 512, 83);
+        _gtdDecklidTex = new THREE.CanvasTexture(c2);
+      }
+
+      if (!_gtdTriBarTex) {
+        const c3 = document.createElement('canvas');
+        c3.width = 128; c3.height = 256;
+        const g3 = c3.getContext('2d');
+        g3.fillStyle = '#450a0a';
+        g3.fillRect(0, 0, 128, 256);
+        const lg = g3.createLinearGradient(0, 0, 128, 0);
+        lg.addColorStop(0, '#991b1b');
+        lg.addColorStop(0.22, '#ef2318');
+        lg.addColorStop(0.50, '#ff6b3d');
+        lg.addColorStop(0.78, '#ef2318');
+        lg.addColorStop(1, '#991b1b');
+        g3.fillStyle = lg;
+        g3.fillRect(10, 10, 108, 236);
+        _gtdTriBarTex = new THREE.CanvasTexture(c3);
+      }
+      return { winTex: _gtdRearWindowTex, deckTex: _gtdDecklidTex, triTex: _gtdTriBarTex };
+    }
+
+    function createSmoothMustangGtdBodyGeo(W, H, L, wheelR) {
+      const slices = 52;
+      const ringPts = 32;
+      const positions = [];
+      const indices = [];
+      const hw = W * 0.5;
+      const hl = L * 0.5;
+
+      for (let i = 0; i <= slices; i++) {
+        const t = i / slices;      // 0 (rear -hl) .. 1 (front +hl)
+        const u = -1 + 2 * t;      // -1 .. +1
+        const z = u * hl;
+
+        // Plan-view contour: crisp muscular rear width, tapered nose
+        let plan = 1.0;
+        if (u > 0.78) {
+          const eu = (u - 0.78) / 0.22;
+          plan = 1.0 - 0.16 * eu * eu;
+        } else if (u < -0.90) {
+          const eu = (-0.90 - u) / 0.10;
+          plan = 1.0 - 0.05 * eu * eu;
+        }
+
+        // Wide Muscular Coke-Bottle Rear Quarter Haunches (u in -0.92 .. -0.15) & Front Fender Swell
+        const dFW = Math.abs(u - 0.60);
+        const dRW = Math.abs(u + 0.58);
+        const fArch = dFW < 0.24 ? Math.cos((dFW / 0.24) * Math.PI * 0.5) * 0.07 : 0;
+        const rHaunch = (u < -0.10 && u > -0.96) ? Math.pow(Math.sin(((u + 0.96) / 0.86) * Math.PI), 0.75) * 0.115 : 0;
+        const wLow = hw * plan + fArch + rHaunch;
+        const wShoulder = hw * plan * 0.97 + fArch * 0.75 + rHaunch * 0.92;
+
+        // Smooth Fastback Roofline Curve (no boxy step!)
+        let roofY;
+        if (u > 0.30) {
+          const hu = (u - 0.30) / 0.70;
+          roofY = H * (0.55 - 0.11 * Math.pow(hu, 1.35));
+        } else if (u > -0.02) {
+          const wu = (0.30 - u) / 0.32;
+          roofY = H * (0.55 + 0.45 * Math.sin(wu * Math.PI * 0.5));
+        } else if (u > -0.26) {
+          roofY = H * (1.0 - 0.015 * Math.pow((u + 0.14) * 4, 2));
+        } else if (u > -0.84) {
+          const fu = (u + 0.84) / 0.58; // 0 at trunk deck .. 1 at roof peak
+          roofY = H * (0.615 + 0.385 * Math.pow(fu, 0.88));
+        } else {
+          roofY = H * 0.615;
+        }
+
+        const shoulderY = Math.min(roofY, H * (0.585 + (u < -0.2 ? rHaunch * 0.28 : 0)));
+        const hasCab = roofY > shoulderY + 0.025;
+        // Narrow sculpted fastback cabin greenhouse (deep Coke-bottle tumblehome!)
+        const wCabTop = hw * plan * 0.58;
+        const wCabMid = hw * plan * 0.71;
+        const botY = wheelR * 0.44 + (u < -0.86 ? (-0.86 - u) * 0.22 : (u > 0.85 ? (u - 0.85) * 0.16 : 0));
+
+        // Build smooth 32-point cross-section around half-angle theta
+        const halfLoop = [
+          [0, botY],
+          [wLow * 0.45, botY],
+          [wLow * 0.86, botY + 0.01],
+          [wLow * 0.99, botY + (shoulderY - botY) * 0.22],
+          [wLow * 1.01, botY + (shoulderY - botY) * 0.48],
+          [wShoulder * 1.00, botY + (shoulderY - botY) * 0.76],
+          [wShoulder * 0.97, shoulderY * 0.96],
+          [wShoulder * 0.90, shoulderY],
+          [hasCab ? wCabMid * 1.08 : wShoulder * 0.76, hasCab ? shoulderY + (roofY - shoulderY) * 0.22 : roofY],
+          [hasCab ? wCabMid * 0.98 : wShoulder * 0.60, hasCab ? shoulderY + (roofY - shoulderY) * 0.52 : roofY],
+          [hasCab ? wCabTop * 1.06 : wShoulder * 0.45, hasCab ? shoulderY + (roofY - shoulderY) * 0.80 : roofY],
+          [hasCab ? wCabTop * 0.94 : wShoulder * 0.32, hasCab ? roofY * 0.985 : roofY],
+          [hasCab ? wCabTop * 0.72 : wShoulder * 0.22, hasCab ? roofY * 0.996 : roofY],
+          [hasCab ? wCabTop * 0.45 : wShoulder * 0.14, roofY + 0.006],
+          [hasCab ? wCabTop * 0.22 : wShoulder * 0.07, roofY + 0.010],
+          [0, roofY + 0.012]
+        ];
+        // Right side (0..15) + mirrored Left side (16..31)
+        const fullRing = [];
+        for (let k = 0; k < 16; k++) fullRing.push(halfLoop[k]);
+        for (let k = 15; k >= 0; k--) fullRing.push([-halfLoop[k][0], halfLoop[k][1]]);
+        for (let j = 0; j < ringPts; j++) {
+          positions.push(fullRing[j][0], fullRing[j][1], z);
+        }
+      }
+
+      for (let i = 0; i < slices; i++) {
+        for (let j = 0; j < ringPts; j++) {
+          const nj = (j + 1) % ringPts;
+          const a = i * ringPts + j, b = (i + 1) * ringPts + j, c = (i + 1) * ringPts + nj, d = i * ringPts + nj;
+          indices.push(a, b, d, b, c, d);
+        }
+      }
+      for (const baseIdx of [0, slices * ringPts]) {
+        const flip = baseIdx === 0;
+        for (let j = 1; j < ringPts - 1; j++) {
+          if (flip) indices.push(baseIdx, baseIdx + j + 1, baseIdx + j);
+          else indices.push(baseIdx, baseIdx + j, baseIdx + j + 1);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    function buildExactMustangGtd3DMesh(carSpec, overrideHex, isPlayer) {
+      const root = new THREE.Group();
+      const bodyHex = overrideHex || carSpec.color || '#6c8ec4';
+      const [W, H, L] = [2.02, 1.39, 4.84];
+      const hw = W * 0.5, hl = L * 0.5, wheelR = 0.36;
+      const envTex = getCarEnvMap();
+      const texSet = getMustangGtdTextures();
+
+      // Liquid Polymimetic Steel-Blue Metallic Clearcoat Material
+      const paintMat = new THREE.MeshPhongMaterial({
+        color: bodyHex,
+        specular: 0xe6f4ff,
+        shininess: 195,
+        envMap: envTex,
+        reflectivity: 0.58,
+        combine: THREE.MixOperation
+      });
+      // Bright Ice-Blue Specular Material for Angled Upper Rear Bumper Shelf!
+      const shelfPaintMat = new THREE.MeshPhongMaterial({
+        color: bodyHex,
+        emissive: 0x3b5984,
+        emissiveIntensity: 0.22,
+        specular: 0xffffff,
+        shininess: 260,
+        envMap: envTex,
+        reflectivity: 0.78,
+        combine: THREE.MixOperation
+      });
+      const wingBlackMat = new THREE.MeshPhongMaterial({ color: 0x16181f, specular: 0x94a3b8, shininess: 140 });
+      const wingSmokedMat = new THREE.MeshPhongMaterial({ color: 0x22252e, specular: 0xcbd5e1, shininess: 160, transparent: true, opacity: 0.92 });
+      const matteDiffMat = new THREE.MeshStandardMaterial({ color: 0x12161f, roughness: 0.78 });
+      const sensorSilver = new THREE.MeshBasicMaterial({ color: 0xdbeafe });
+      const glassMat = new THREE.MeshPhongMaterial({ color: 0x0b121e, specular: 0xffffff, shininess: 240, envMap: envTex, reflectivity: 0.82 });
+
+      const drlOn = !isPlayer || (state.headlights && state.engineOn);
+      const iceCyanLed = new THREE.MeshBasicMaterial({ color: drlOn ? 0xe0f2fe : 0x475569 });
+      const triBarMat = new THREE.MeshBasicMaterial({ map: texSet.triTex, color: 0xff4530 });
+      if (isPlayer) {
+        brakeLampMaterials = [triBarMat];
+        reverseLampMaterials = [];
+        playerHeadlightGroup = new THREE.Group();
+        const beamGeo = new THREE.ConeGeometry(1.65, 16.0, 14, 1, true);
+        beamGeo.translate(0, -8.0, 0);
+        beamGeo.rotateX(-Math.PI / 2 + 0.07);
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+        [-hw * 0.66, hw * 0.66].forEach(bx => {
+          const cone = new THREE.Mesh(beamGeo, beamMat);
+          cone.position.set(bx, H * 0.36, hl + 0.05);
+          playerHeadlightGroup.add(cone);
+        });
+        playerHeadlightGroup.visible = Boolean(state.headlights && state.engineOn && (state.nightFactor || 0) > 0.22);
+        root.add(playerHeadlightGroup);
+      }
+
+      // Ground Contact Shadow
+      const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(W * 1.32, L * 1.14),
+        new THREE.MeshBasicMaterial({ map: getContactShadowTexture(), transparent: true, depthWrite: false })
+      );
+      shadowPlane.rotation.x = -Math.PI / 2;
+      shadowPlane.position.y = 0.025;
+      root.add(shadowPlane);
+
+      const bodyGroup = new THREE.Group();
+      bodyGroup.position.y = isPlayer ? (state.rideHeight || 0) : 0;
+      root.add(bodyGroup);
+
+      // 1. Smooth Subdivided Fastback Body & Muscular Rear Haunches (Solid Blue Roof — NO black box!)
+      const bodyMesh = new THREE.Mesh(createSmoothMustangGtdBodyGeo(W, H, L, wheelR), paintMat);
+      bodyMesh.castShadow = true;
+      bodyMesh.receiveShadow = true;
+      bodyGroup.add(bodyMesh);
+
+      // 2. Flush Louvered Smoked Fastback Rear Window + Front/Side Glass
+      const rearWin = new THREE.Mesh(
+        new THREE.PlaneGeometry(W * 0.61, H * 0.56),
+        new THREE.MeshBasicMaterial({ map: texSet.winTex })
+      );
+      rearWin.rotation.y = Math.PI;
+      rearWin.rotation.x = -1.04; // Flush along fastback slope (-0.26 .. -0.82)
+      rearWin.position.set(0, H * 0.825, -hl * 0.53);
+      bodyGroup.add(rearWin);
+
+      const frontWin = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.64, H * 0.48), glassMat);
+      frontWin.rotation.x = -1.06;
+      frontWin.position.set(0, H * 0.78, hl * 0.15);
+      bodyGroup.add(frontWin);
+
+      [-1, 1].forEach(side => {
+        const sideWin = new THREE.Mesh(new THREE.PlaneGeometry(L * 0.30, H * 0.22), glassMat);
+        sideWin.rotation.y = side > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+        sideWin.rotation.z = side * -0.06;
+        sideWin.position.set(side * hw * 0.68, H * 0.76, -L * 0.03);
+        bodyGroup.add(sideWin);
+      });
+
+      // 3. Black Aerodynamic Side Mirrors peeking out past front shoulders
+      const localBlinkL = [], localBlinkR = [];
+      [-1, 1].forEach(side => {
+        const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.028, 0.045), wingBlackMat);
+        stalk.position.set(side * (hw * 0.76), H * 0.66, L * 0.11);
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.068, 0.095), wingBlackMat);
+        cap.position.set(side * (hw * 0.85), H * 0.675, L * 0.11);
+        const blinkMat = new THREE.MeshBasicMaterial({ color: 0x27272a });
+        const rep = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.018, 0.02), blinkMat);
+        rep.position.set(side * (hw * 0.86), H * 0.675, L * 0.06);
+        bodyGroup.add(stalk, cap, rep);
+        if (side < 0) localBlinkL.push(blinkMat); else localBlinkR.push(blinkMat);
+      });
+
+      // 4. Exact Mustang GTD Rear Wing: Wide Black Main Blade + Hollow Center \_/ Trapezoid Cradle + Wide Flat Outer Winglets!
+      const wingY = H * 0.665;
+      const wingZ = -hl + 0.19;
+      const mainWingBlade = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, 0.034, 0.22), wingBlackMat);
+      mainWingBlade.position.set(0, wingY, wingZ);
+      bodyGroup.add(mainWingBlade);
+
+      // Hollow Center \_/ Trapezoid Cradle under middle of wing!
+      const cradleBottom = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.026, 0.16), wingBlackMat);
+      cradleBottom.position.set(0, wingY - 0.068, wingZ - 0.02);
+      bodyGroup.add(cradleBottom);
+      [-1, 1].forEach(side => {
+        const cStrut = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.076, 0.16), wingBlackMat);
+        cStrut.position.set(side * 0.20, wingY - 0.036, wingZ - 0.02);
+        cStrut.rotation.z = side * 0.34; // Forms exact \_/ trapezoid cradle!
+        // Wide Flat Smoked-Dark Outer Aero Winglets sitting above rear fenders!
+        const outerPlate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.028, 0.26), wingSmokedMat);
+        outerPlate.position.set(side * (hw * 0.82), wingY - 0.038, wingZ + 0.01);
+        outerPlate.rotation.z = side * -0.05;
+        const tipFlap = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.078, 0.27), wingBlackMat);
+        tipFlap.position.set(side * (hw * 0.99), wingY - 0.018, wingZ + 0.01);
+        tipFlap.rotation.z = side * 0.28;
+        bodyGroup.add(cStrut, outerPlate, tipFlap);
+      });
+
+      // 5. Overhanging Metallic-Blue Trunk Lip + Concave [GTD] Charcoal Decklid + 6 Fiery Red-Orange Slanted Tri-Bars!
+      const trunkLip = new THREE.Mesh(new THREE.BoxGeometry(W * 0.97, 0.036, 0.10), shelfPaintMat);
+      trunkLip.position.set(0, H * 0.555, -hl - 0.005);
+      bodyGroup.add(trunkLip);
+
+      const deckPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(W * 0.92, H * 0.155),
+        new THREE.MeshBasicMaterial({ map: texSet.deckTex })
+      );
+      deckPlane.rotation.y = Math.PI;
+      deckPlane.position.set(0, H * 0.468, -hl - 0.012);
+      bodyGroup.add(deckPlane);
+
+      [-1, 1].forEach(side => {
+        for (let bi = 0; bi < 3; bi++) {
+          const bx = side * (hw * 0.60 + bi * 0.112);
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.078, H * 0.132, 0.045), triBarMat);
+          bar.position.set(bx, H * 0.465, -hl - 0.018);
+          bar.rotation.z = side * 0.13;
+          bodyGroup.add(bar);
+        }
+        // Turn-signal strip inside tri-bar cluster
+        const rBlinkMat = new THREE.MeshBasicMaterial({ color: 0x3f1d1d, transparent: true, opacity: 0.0 });
+        const rSigOverlay = new THREE.Mesh(new THREE.PlaneGeometry(0.32, H * 0.13), rBlinkMat);
+        rSigOverlay.rotation.y = Math.PI;
+        rSigOverlay.position.set(side * (hw * 0.71), H * 0.465, -hl - 0.043);
+        bodyGroup.add(rSigOverlay);
+        if (side < 0) localBlinkL.push(rBlinkMat); else localBlinkR.push(rBlinkMat);
+      });
+
+      // 6. Brilliant Sky-Reflecting Upper Bumper Shelf + Deep Slate Lower Bumper + 2 Sensor Dots + Recessed Center Alcove + GTD Diffuser!
+      const upperShelf = new THREE.Mesh(new THREE.BoxGeometry(W * 0.985, 0.055, 0.14), shelfPaintMat);
+      upperShelf.rotation.x = 0.42; // Tilts upward toward sky so it gleams bright ice-white/blue!
+      upperShelf.position.set(0, H * 0.372, -hl - 0.025);
+      const lowerBumper = new THREE.Mesh(new THREE.BoxGeometry(W * 0.99, H * 0.155, 0.12), paintMat);
+      lowerBumper.position.set(0, H * 0.282, -hl - 0.028);
+      // Dark Recessed Center Trapezoid License Cutout (Empty & Clean like 1000025255.jpg!)
+      const centerAlcove = new THREE.Mesh(new THREE.BoxGeometry(W * 0.44, H * 0.085, 0.04), matteDiffMat);
+      centerAlcove.position.set(0, H * 0.245, -hl - 0.072);
+      // Deep Multi-Blade Matte-Black GTD Underbody Diffuser
+      const diffBase = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, H * 0.145, 0.18), matteDiffMat);
+      diffBase.position.set(0, H * 0.135, -hl + 0.01);
+      bodyGroup.add(upperShelf, lowerBumper, centerAlcove, diffBase);
+
+      [-0.36, -0.22, -0.08, 0.08, 0.22, 0.36].forEach(fx => {
+        const strake = new THREE.Mesh(new THREE.BoxGeometry(0.024, H * 0.13, 0.20), wingBlackMat);
+        strake.position.set(fx * W, H * 0.12, -hl - 0.01);
+        bodyGroup.add(strake);
+      });
+      [-1, 1].forEach(side => {
+        // Round light-blue/silver parking sensor dot!
+        const sDot = new THREE.Mesh(new THREE.CircleGeometry(0.018, 12), sensorSilver);
+        sDot.rotation.y = Math.PI;
+        sDot.position.set(side * (hw * 0.72), H * 0.305, -hl - 0.090);
+        // Black lower bumper corner aero flick!
+        const flick = new THREE.Mesh(new THREE.BoxGeometry(0.065, H * 0.14, 0.22), matteDiffMat);
+        flick.position.set(side * (hw * 0.98), H * 0.16, -hl - 0.01);
+        bodyGroup.add(sDot, flick);
+      });
+
+      // Front Mustang GTD Grille & Tri-Bar DRLs (for garage orbit & oncoming view)
+      const fGrille = new THREE.Mesh(new THREE.BoxGeometry(W * 0.66, H * 0.19, 0.08), matteDiffMat);
+      fGrille.position.set(0, H * 0.34, hl - 0.01);
+      const fSplitter = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, 0.045, 0.22), matteDiffMat);
+      fSplitter.position.set(0, wheelR * 0.42, hl + 0.02);
+      bodyGroup.add(fGrille, fSplitter);
+      [-1, 1].forEach(side => {
+        for (let bi = 0; bi < 3; bi++) {
+          const dBar = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.075, 0.07), iceCyanLed);
+          dBar.position.set(side * (hw * 0.56 + bi * 0.065), H * 0.42, hl - 0.01);
+          dBar.rotation.z = side * -0.18;
+          bodyGroup.add(dBar);
+        }
+      });
+
+      // 7. Wide Deep-Dish Forged Dark-Gunmetal GTD Wheels + Red Brembo Calipers
+      const localWheels = [];
+      const tireM = new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.82 });
+      const rimM = new THREE.MeshPhongMaterial({ color: 0x334155, specular: 0xcbd5e1, shininess: 150 });
+      const calM = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      for (const [wz, isFront] of [[L * 0.305, true], [-L * 0.305, false]]) {
+        for (const side of [-1, 1]) {
+          const pivot = new THREE.Group();
+          pivot.position.set(side * (hw * 0.90), wheelR, wz);
+          const tire = new THREE.Mesh(new THREE.CylinderGeometry(wheelR, wheelR, 0.29, 24), tireM);
+          tire.rotation.z = Math.PI * 0.5;
+          const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.72, wheelR * 0.72, 0.296, 16), rimM);
+          rim.rotation.z = Math.PI * 0.5;
+          const cal = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.13, 0.09), calM);
+          cal.position.set(0, 0.05, isFront ? -0.10 : 0.10);
+          pivot.add(tire, rim, cal);
+          root.add(pivot);
+          localWheels.push({ pivot, tire, isFront });
+        }
+      }
+
+      if (isPlayer) {
+        blinkerMeshesL = localBlinkL;
+        blinkerMeshesR = localBlinkR;
+        playerWheels = localWheels;
+        doorPivotL = null; doorPivotR = null; trunkPivot = null; spoilerPivot = null;
+        if (state.policeSiren) {
+          sirenLightL = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.07, 0.15), new THREE.MeshBasicMaterial({ color: 0xff1e1e }));
+          sirenLightR = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.07, 0.15), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
+          sirenLightL.position.set(-0.24, H + 0.05, 0);
+          sirenLightR.position.set(0.24, H + 0.05, 0);
+          bodyGroup.add(sirenLightL, sirenLightR);
+        }
+      }
+      return { root, wheels: localWheels, blinkL: localBlinkL, blinkR: localBlinkR };
+    }
+
     function buildKoreanVehicleMesh(carSpec, overrideHex, plateStr, isPlayer) {
+      if (carSpec && carSpec.brand === '테슬라' && typeof buildTeslaFsd3DMesh === 'function') return buildTeslaFsd3DMesh(carSpec, overrideHex, isPlayer);
+      if (carSpec && (carSpec.id === 'mustang_gt_blue' || carSpec.profile === 'mustang_s650')) return buildExactMustangGtd3DMesh(carSpec, overrideHex, isPlayer);
       const root = new THREE.Group();
       const bodyHex = overrideHex || carSpec.color;
       const [W, H, L] = carSpec.dims || [1.86, 1.45, 4.85];
@@ -12572,17 +13726,29 @@
     // ============================================================================
     // 11. SIMULATION & HDA AUTOPILOT LOOP
     // ============================================================================
-    function computeAutopilotCommands() {
-      let targetX = 3.2;
-      let targetZ = state.z + 25;
-      let cruiseKmh = 46;
+    const FSD_SPEED_PROFILES = {
+      sloth:    { kor: '느긋 (Sloth)',    mul: 0.74, baseKmh: 56, passGap: 999, hovBias: false },
+      chill:    { kor: '안락 (Chill)',    mul: 0.88, baseKmh: 68, passGap: 20,  hovBias: false },
+      standard: { kor: '표준 (Standard)', mul: 1.02, baseKmh: 82, passGap: 28,  hovBias: true  },
+      hurry:    { kor: '신속 (Hurry)',    mul: 1.20, baseKmh: 98, passGap: 36,  hovBias: true  },
+      mad_max:  { kor: '매드맥스 (Mad Max)', mul: 1.44, baseKmh: 122, passGap: 45, hovBias: true }
+    };
+    function getFsdProfileKorLabel(id) {
+      return (FSD_SPEED_PROFILES[id] || FSD_SPEED_PROFILES.standard).kor;
+    }
 
+    function computeAutopilotCommands() {
+      const dt = state._lastFrameDt || 0.016;
+      const prof = FSD_SPEED_PROFILES[state.fsdSpeedProfile] || FSD_SPEED_PROFILES.standard;
+      state.fsdDecelReason = '';
+
+      // 1. Course Exam Legacy Mode Support
       if (state.mode === 'course_exam') {
-        if (state.examStep <= 1) { targetX = -38; targetZ = -18; cruiseKmh = 17; }
-        else if (state.examStep === 2) {
+        let targetX = -38, targetZ = -18, cruiseKmh = 17;
+        if (state.examStep === 2) {
           targetX = -38; targetZ = -16;
           if (state.z >= -19 && state.hillStopTimer < 3.1) return { steer: 0, throttle: 0, brake: 1 };
-          targetZ = 28; cruiseKmh = 17;
+          targetZ = 28;
         } else if (state.examStep === 3) {
           targetX = -34; targetZ = 28;
           if (Math.hypot(state.x - (-34), state.z - 28) < 5.2) return { steer: 0, throttle: 0, brake: 1 };
@@ -12595,44 +13761,191 @@
           targetX = 16; targetZ = 48; cruiseKmh = 18;
         } else if (state.examStep === 5) {
           targetX = 18; targetZ = 5; cruiseKmh = 28;
-        } else {
+        } else if (state.examStep > 5) {
           if (!state.blinkerRight) { state.blinkerRight = true; syncAccessoryButtons(); }
           targetX = 18; targetZ = -45; cruiseKmh = 18;
         }
-      } else {
-        if (state.autoDest === 'gas' && state.mode === 'autonomous') { targetX = 18; targetZ = -18; cruiseKmh = 36; }
-        else if (state.autoDest === 'mechanic' && state.mode === 'autonomous') { targetX = -18; targetZ = -18; cruiseKmh = 36; }
-        else if (state.autoDest === 'airport' && state.mode === 'autonomous') { targetX = 95; targetZ = -60; cruiseKmh = 65; }
-        else if (state.autoDest === 'subway_st' && state.mode === 'autonomous') { enterSpecialZone('subway'); return { steer: 0, throttle: 0, brake: 1 }; }
-        else if (state.autoDest === 'apt' && state.mode === 'autonomous') { targetX = -24; targetZ = 36; cruiseKmh = 38; }
-        else if (state.autoDest === 'exam' && state.mode === 'autonomous') { targetX = 22; targetZ = -36; cruiseKmh = 38; }
-        else if (state.autoDest === 'ev' && state.mode === 'autonomous') { targetX = 24; targetZ = 36; cruiseKmh = 38; }
-        else if (state.autoDest === 'gift' && state.mode === 'autonomous') { targetX = -22; targetZ = -38; cruiseKmh = 38; }
-        else {
-          targetX = 3.2; targetZ = state.z + 24;
-          if (state.z > 102 && state.mode !== 'road_exam') { state.z = -102; targetZ = state.z + 24; }
-          if (state.z >= 2 && state.z <= 42) cruiseKmh = 27;
-          if ((state.signalColor === 'red' || state.signalColor === 'yellow') && state.z > -26 && state.z < -10.5) {
-            return { steer: 0, throttle: 0, brake: 0.9 };
-          }
-          if (state.mode === 'road_exam' && state.z >= 69) {
-            state.blinkerRight = true; syncAccessoryButtons();
+        const desiredH = Math.atan2(targetX - state.x, targetZ - state.z);
+        let df = desiredH - state.heading;
+        while (df > Math.PI) df -= Math.PI * 2;
+        while (df < -Math.PI) df += Math.PI * 2;
+        const curK = state.speed * 3.6;
+        return { steer: Math.max(-0.5, Math.min(0.5, df * 1.5)), throttle: curK < cruiseKmh - 1 ? 0.72 : 0, brake: curK > cruiseKmh + 3 ? 0.6 : 0 };
+      }
+
+      // 2. Curving 8-Course Scenic Highway Spline Following (Tesla FSD v15 Core Neural Planner!)
+      if (state.scenicTourActive && scenicRoadSamples && scenicRoadSamples.length) {
+        if (typeof ensureFsdCourseHazards === 'function') ensureFsdCourseHazards();
+        const near = findNearestScenicSample(state.x, state.z);
+        const curCourse = getCurrentScenicCourse();
+        const baseLimit = curCourse.id === 'inje_circuit' ? 120 : (curCourse.id === 'daegwallyeong' || curCourse.id === 'taebaek_snow' ? 60 : (curCourse.id === 'jeju_coastal' || curCourse.id === 'cherry_blossom' ? 70 : 90));
+        state.fsdPostedLimitKmh = baseLimit;
+        let cruiseKmh = Math.min(getCurrentCar().maxSpeed, Math.round(baseLimit * prof.mul));
+
+        // Tap-to-Park (>>> Chevron Spot Autopark)
+        if (state.fsdParkingActive && state.fsdParkTarget) {
+          const dPark = Math.hypot(state.fsdParkTarget.x - state.x, state.fsdParkTarget.z - state.z);
+          state.fsdTargetLaneOff = 6.0;
+          if (!state.blinkerRight) { state.blinkerRight = true; state.blinkerLeft = false; syncAccessoryButtons(); }
+          state.fsdDecelReason = 'park';
+          state.fsdStatusMsg = `>>> 탭 파킹 정렬 중 · 잔여 ${Math.max(0, Math.round(dPark))}m`;
+          if (dPark < 4.2) {
+            state.speed = 0;
+            state.autopilot = false;
+            state.fsdParkingActive = false;
+            state.blinkerRight = false;
+            setGear('P');
+            syncAccessoryButtons();
+            syncAutopilotButton();
+            playTeslaFsdChime(true);
+            state.fsdStatusMsg = '🅿️ FSD v15 탭 파킹(>>>) 주차 완료!';
+            showToast('🅿️ Tesla FSD v15 탭 파킹 완료! P단 체결');
             return { steer: 0, throttle: 0, brake: 1 };
           }
-        }
-        if (state.mode === 'autonomous' && state.autoDest !== 'loop' && Math.hypot(targetX - state.x, targetZ - state.z) < 5.5) {
-          if (state.autoDest === 'gift' && state.selectedCarId !== 'ioniq5_n') {
-            selectKoreanCar('ioniq5_n');
-            showToast('기프트존 도착: 아이오닉 5 N 퍼포먼스 모델 해금!');
+          cruiseKmh = Math.max(14, Math.min(34, dPark * 1.1));
+        } else {
+          // Preferred lane: HOV/left passing lane (+1.6m / -2.8m) vs standard right lane (+3.3m)
+          let desiredLane = (state.fsdUseHov && prof.hovBias && state.fsdSpeedProfile === 'mad_max') ? 1.5 : 3.3;
+          let statusNote = `Reality View · ${curCourse.shortName} 자율주행 (${prof.kor.split(' ')[0]})`;
+
+          // (A) Pothole & Debris Neural Detection + Automatic Lateral Avoidance!
+          for (const ph of (state.fsdPotholes || [])) {
+            const dx = ph.x - state.x, dz = ph.z - state.z;
+            const fwd = dx * Math.sin(state.heading) + dz * Math.cos(state.heading);
+            const dist = Math.hypot(dx, dz);
+            if (fwd > -2 && fwd < 52 && dist < 54) {
+              if (Math.abs(ph.laneOff - (state.fsdLaneOffset || 3.3)) < 2.2) {
+                desiredLane = ph.laneOff > 0 ? -2.6 : 3.4;
+                statusNote = `🕳️ 전방 포트홀 감지 (${Math.round(dist)}m) · 차선 회피 기동`;
+                cruiseKmh = Math.min(cruiseKmh, baseLimit * 0.92);
+              }
+            }
           }
-          return { steer: 0, throttle: 0, brake: 0.85 };
+
+          // (B) Speed Enforcement Camera Automatic Slowdown (Update 2026.38.6.11)!
+          for (const cam of (state.fsdSpeedCams || [])) {
+            const dx = cam.x - state.x, dz = cam.z - state.z;
+            const fwd = dx * Math.sin(state.heading) + dz * Math.cos(state.heading);
+            if (fwd > -4 && fwd < 82 && Math.hypot(dx, dz) < 85) {
+              state.fsdPostedLimitKmh = cam.limit;
+              if (cruiseKmh > cam.limit - 2) {
+                cruiseKmh = cam.limit - 2;
+                state.fsdDecelReason = 'camera';
+                statusNote = `📷 과속단속 구간 (${Math.round(fwd)}m) · ${cam.limit}km/h 자동 감속`;
+              }
+            }
+          }
+
+          // (C) Lead-Vehicle Tracking & Automatic Lane-Change Overtaking!
+          for (const npc of (state.npcs || [])) {
+            const dx = npc.x - state.x, dz = npc.z - state.z;
+            const fwd = dx * Math.sin(state.heading) + dz * Math.cos(state.heading);
+            const lat = dx * Math.cos(state.heading) - dz * Math.sin(state.heading);
+            if (fwd > 1 && fwd < prof.passGap && Math.abs(lat) < 2.5) {
+              if (state.fsdSpeedProfile !== 'sloth' && fwd > 10) {
+                desiredLane = (state.fsdLaneOffset || 3.3) > 0 ? -2.8 : 3.4;
+                statusNote = `🔵 전방 저속차량 감지 · 자동 추월 차선변경`;
+              } else {
+                cruiseKmh = Math.min(cruiseKmh, Math.max(22, (npc.spd || 12) * 3.6 - 4));
+                state.fsdDecelReason = 'traffic';
+                statusNote = `🔵 전방 차량 차간거리 유지 (${Math.round(fwd)}m)`;
+              }
+            }
+          }
+
+          // Auto turn-signal feedback during FSD lane changes
+          const laneDelta = desiredLane - (state.fsdLaneOffset || 3.3);
+          if (Math.abs(laneDelta) > 1.4) {
+            state.blinkerLeft = laneDelta < 0;
+            state.blinkerRight = laneDelta > 0;
+          } else if (Math.abs(laneDelta) < 0.35 && (state.blinkerLeft || state.blinkerRight) && !state.fsdParkingActive) {
+            state.blinkerLeft = false;
+            state.blinkerRight = false;
+          }
+          state.fsdTargetLaneOff = desiredLane;
+          state.fsdStatusMsg = statusNote;
+        }
+
+        state.fsdLaneOffset = dampVal(state.fsdLaneOffset ?? 3.3, state.fsdTargetLaneOff ?? 3.3, 2.6, dt);
+
+        // Curvature Speed Reactivity (slow smoothly for Daegwallyeong / Circuit hairpins!)
+        const sCurveCheck = scenicRoadSamples[((near.idx ?? near.index ?? 0) + 8) % SCENIC_SEGMENTS];
+        let curveDiff = sCurveCheck.heading - near.sample.heading;
+        while (curveDiff > Math.PI) curveDiff -= Math.PI * 2;
+        while (curveDiff < -Math.PI) curveDiff += Math.PI * 2;
+        const curveSeverity = Math.abs(curveDiff);
+        if (curveSeverity > 0.35) {
+          const safeCornerKmh = Math.max(38, Math.round(98 - curveSeverity * 72));
+          if (cruiseKmh > safeCornerKmh) {
+            cruiseKmh = safeCornerKmh;
+            if (!state.fsdDecelReason) state.fsdDecelReason = 'curve';
+          }
+        }
+
+        // Pure-Pursuit Lookahead along Spline + Smooth Lateral Offset
+        const lookSteps = Math.max(3, Math.min(7, Math.round((state.speed * 3.6) / 22) + 3));
+        const sTarget = scenicRoadSamples[((near.idx ?? near.index ?? 0) + lookSteps) % SCENIC_SEGMENTS];
+        const tx = sTarget.x + sTarget.nx * state.fsdLaneOffset;
+        const tz = sTarget.z + sTarget.nz * state.fsdLaneOffset;
+
+        const desiredHeading = Math.atan2(tx - state.x, tz - state.z);
+        let diff = desiredHeading - state.heading;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+
+        //Note: state.heading += (speed/L)*tan(-steerAngle)*dt -> negative steerAngle turns toward +diff!
+        const steerCmd = Math.max(-0.52, Math.min(0.52, -diff * 1.45));
+        const curKmh = state.speed * 3.6;
+        return {
+          steer: steerCmd,
+          throttle: curKmh < cruiseKmh - 1.5 ? 0.84 : 0,
+          brake: curKmh > cruiseKmh + 4.5 ? Math.min(0.85, (curKmh - cruiseKmh) * 0.045) : 0
+        };
+      }
+
+      // 3. Korea 14-City Open World & City Grid Autonomous Mode
+      let targetX = 3.2;
+      let targetZ = state.z + 28;
+      let cruiseKmh = Math.round(75 * prof.mul);
+      state.fsdPostedLimitKmh = 80;
+
+      if (state.koreaWorldActive && state.koreaNavCityId && typeof KOREA_CITIES !== 'undefined') {
+        const destCity = KOREA_CITIES.find(c => c.id === state.koreaNavCityId);
+        if (destCity) {
+          targetX = destCity.x;
+          targetZ = destCity.z;
+          const dCity = Math.hypot(targetX - state.x, targetZ - state.z);
+          state.fsdStatusMsg = `🗺️ ${destCity.name} FSD 내비게이션 주행 중 (${(dCity / 1000).toFixed(1)}km)`;
+          if (dCity < 16) {
+            state.fsdStatusMsg = `🏁 목적지 [${destCity.name}] 도착 완료!`;
+            return { steer: 0, throttle: 0, brake: 0.9 };
+          }
+        }
+      } else {
+        if (state.autoDest === 'gas' && state.mode === 'autonomous') { targetX = 18; targetZ = -18; cruiseKmh = 42; }
+        else if (state.autoDest === 'mechanic' && state.mode === 'autonomous') { targetX = -18; targetZ = -18; cruiseKmh = 42; }
+        else if (state.autoDest === 'airport' && state.mode === 'autonomous') { targetX = 95; targetZ = -60; cruiseKmh = 78; }
+        else if (state.autoDest === 'subway_st' && state.mode === 'autonomous') { enterSpecialZone('subway'); return { steer: 0, throttle: 0, brake: 1 }; }
+        else if (state.autoDest === 'apt' && state.mode === 'autonomous') { targetX = -24; targetZ = 36; cruiseKmh = 42; }
+        else if (state.autoDest === 'exam' && state.mode === 'autonomous') { targetX = 22; targetZ = -36; cruiseKmh = 42; }
+        else if (state.autoDest === 'ev' && state.mode === 'autonomous') { targetX = 24; targetZ = 36; cruiseKmh = 42; }
+        else if (state.autoDest === 'gift' && state.mode === 'autonomous') { targetX = -22; targetZ = -38; cruiseKmh = 42; }
+        else {
+          targetX = 3.2; targetZ = state.z + 28;
+          if (state.z > 102 && state.mode !== 'road_exam') { state.z = -102; targetZ = state.z + 28; }
+          if ((state.signalColor === 'red' || state.signalColor === 'yellow') && state.z > -26 && state.z < -10.5) {
+            state.fsdDecelReason = 'signal';
+            state.fsdStatusMsg = '🚦 전방 적색 신호등 인식 · 정지선 자동 정차';
+            return { steer: 0, throttle: 0, brake: 0.9 };
+          }
         }
       }
 
-      for (const npc of state.npcs) {
+      for (const npc of (state.npcs || [])) {
         const dz = npc.z - state.z;
-        if (Math.abs(npc.x - state.x) < 2.3 && dz > 0 && dz < 14 && npc.dir > 0) {
+        if (Math.abs(npc.x - state.x) < 2.3 && dz > 0 && dz < 16 && npc.dir > 0) {
           cruiseKmh = Math.min(cruiseKmh, npc.spd * 3.6 - 4);
+          state.fsdDecelReason = 'traffic';
           if (dz < 7.5) return { steer: 0, throttle: 0, brake: 0.85 };
         }
       }
@@ -12642,11 +13955,11 @@
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
 
-      const steerCmd = Math.max(-0.55, Math.min(0.55, diff * 1.65));
+      const steerCmd = Math.max(-0.52, Math.min(0.52, -diff * 1.55));
       const curKmh = state.speed * 3.6;
       return {
         steer: steerCmd,
-        throttle: curKmh < cruiseKmh - 1.5 ? 0.78 : 0,
+        throttle: curKmh < cruiseKmh - 1.5 ? 0.82 : 0,
         brake: curKmh > cruiseKmh + 4 ? 0.55 : 0
       };
     }
@@ -12670,8 +13983,8 @@
       const blinkPulse = Math.floor(performance.now() / 300) % 2 === 0;
       const leftOn = (state.blinkerLeft || state.hazard) && blinkPulse;
       const rightOn = (state.blinkerRight || state.hazard) && blinkPulse;
-      blinkerMeshesL.forEach(m => m.color.setHex(leftOn ? 0xf59e0b : 0x27272a));
-      blinkerMeshesR.forEach(m => m.color.setHex(rightOn ? 0xf59e0b : 0x27272a));
+      blinkerMeshesL.forEach(m => { m.color.setHex(leftOn ? 0xf59e0b : 0x27272a); if (m.transparent) m.opacity = leftOn ? 0.88 : 0.0; });
+      blinkerMeshesR.forEach(m => { m.color.setHex(rightOn ? 0xf59e0b : 0x27272a); if (m.transparent) m.opacity = rightOn ? 0.88 : 0.0; });
 
       if (sirenLightL && sirenLightR) {
         const flash = Math.floor(performance.now() / 150) % 2 === 0;
@@ -12857,8 +14170,10 @@
       const keyLeft = state.keys['KeyA'] || state.keys['ArrowLeft'];
       const keyRight = state.keys['KeyD'] || state.keys['ArrowRight'];
 
-      if ((keyAccel || keyBrake || keyLeft || keyRight) && state.autopilot && state.mode === 'autonomous') {
+      if ((keyBrake || keyLeft || keyRight) && state.autopilot && state.mode === 'autonomous') {
         state.autopilot = false;
+        state.fsdParkingActive = false;
+        playTeslaFsdChime(false);
         syncAutopilotButton();
       }
 
@@ -12872,8 +14187,9 @@
       let throttle = 0, brake = 0;
       if (state.autopilot && !state.examFinished) {
         const ai = computeAutopilotCommands();
-        state.steerAngle = dampVal(state.steerAngle, ai.steer, 5.8, dt);
-        throttle = ai.throttle; brake = ai.brake;
+        state.steerAngle = dampVal(state.steerAngle, ai.steer, 7.2, dt);
+        throttle = (state.accelPressed || keyAccel) ? Math.max(ai.throttle, 0.92) : ai.throttle;
+        brake = (state.accelPressed || keyAccel) ? 0 : ai.brake;
       } else {
         let rawSteerCmd = 0; // -1 .. +1
         if (Math.abs(state.wheelDragSteer) > 0.005) {
@@ -13271,8 +14587,10 @@
             const cSin = Math.sin(orbitAngle);
             const cCos = Math.cos(orbitAngle);
             const fltCam = state.flightMorph || 0;
-            const backDist = isBus ? 12.0 : (4.35 + fltCam * 4.8 + Math.min(0.85, Math.abs(state.speed) * 0.022));
-            const upH = isBus ? 4.2 : (1.88 + fltCam * 1.45);
+            const camAspect = (camera && camera.aspect) ? camera.aspect : (window.innerWidth / Math.max(1, window.innerHeight));
+            const portBack = camAspect < 0.85 ? (3.85 / Math.max(0.46, camAspect * 0.92)) : 4.25;
+            const backDist = isBus ? 12.0 : (portBack + fltCam * 4.8 + Math.min(0.75, Math.abs(state.speed) * 0.020));
+            const upH = isBus ? 4.2 : ((camAspect < 0.85 ? 2.08 : 1.78) + fltCam * 1.45);
             const goalX = state.x - cSin * backDist;
             const goalY = state.y + upH;
             const goalZ = state.z - cCos * backDist;
@@ -13667,19 +14985,9 @@
       ctx.quadraticCurveTo((vanishX + roadBotCenter) * 0.5, (horizon + h) * 0.5, roadBotCenter - w * 0.04, h);
       ctx.stroke();
 
-      // HDA Cyan Virtual Lane Carpet when Autopilot is active
-      if (state.autopilot) {
-        const hdaGrad = ctx.createLinearGradient(0, horizon, 0, h * 0.78);
-        hdaGrad.addColorStop(0, 'rgba(56, 189, 248, 0.05)');
-        hdaGrad.addColorStop(1, 'rgba(52, 211, 153, 0.28)');
-        ctx.fillStyle = hdaGrad;
-        ctx.beginPath();
-        ctx.moveTo(vanishX + 4, horizon + 10);
-        ctx.lineTo(vanishX + 18, horizon + 10);
-        ctx.lineTo(roadBotCenter + w * 0.22, h * 0.78);
-        ctx.lineTo(roadBotCenter + w * 0.02, h * 0.78);
-        ctx.closePath();
-        ctx.fill();
+      // Tesla FSD v15 Reality View: Glowing Blue Trajectory Carpet, Velocity Chevrons, Potholes & Speed Cameras
+      if (typeof renderTeslaFsdRealityRoad2D === 'function') {
+        renderTeslaFsdRealityRoad2D(ctx, w, h, horizon, vanishX, roadBotCenter);
       }
 
       // v42 Course-Specific Horizon Silhouettes (Mountains, Hallasan, Gwangan Bridge, Cherry Hills, Snow Peaks, Circuit, or Seoul Skyline!)
@@ -14454,271 +15762,304 @@
       ctx.translate(cx, cy);
       ctx.scale(sc, sc);
 
-      const isMustang = !car || car.id === 'mustang_gt_blue' || car.lampSig === 'mustang_tribar';
-      const baseCol = paint || '#5f82b0';
+      if (car && car.brand === '테슬라' && typeof drawTeslaRearCar2D === 'function') {
+        drawTeslaRearCar2D(ctx, car, paint || car.color || '#a3adb8');
+        ctx.restore();
+        return;
+      }
+      const isMustang = !car || car.id === 'mustang_gt_blue' || car.profile === 'mustang_s650';
+      const baseCol = paint || '#6c8ec4';
 
       if (isMustang) {
-        // === 1:1 PHOTOREALISTIC VECTOR REPLICA OF S650 MUSTANG GT DARK HORSE REAR (Matches 1000025255.jpg!) ===
-        // Deep Contact Shadow under Rear Diffuser & Wide Tires
-        ctx.fillStyle = 'rgba(3, 6, 14, 0.72)';
-        ctx.beginPath(); ctx.ellipse(0, 74, 118, 18, 0, 0, Math.PI * 2); ctx.fill();
+        // === EXACT PIXEL-MATCHED 2025 MUSTANG GTD REAR (1:1 TWIN OF /tmp/car_closeup_only.png!) ===
+        // 1. Soft Deep Asphalt Shadow & Wide Tires
+        ctx.fillStyle = 'rgba(6, 10, 18, 0.72)';
+        ctx.beginPath(); ctx.ellipse(0, 74, 118, 17, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#0c1017';
+        ctx.beginPath(); ctx.roundRect(-109, 30, 30, 46, 5); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(79, 30, 30, 46, 5); ctx.fill();
 
-        // Wide Performance Rear Tires (tucked muscularly under wide haunches)
-        ctx.fillStyle = '#0a0d14';
-        ctx.beginPath(); ctx.roundRect(-108, 28, 30, 48, 5); ctx.fill();
-        ctx.beginPath(); ctx.roundRect(78, 28, 30, 48, 5); ctx.fill();
+        // 2. Black Side Wing Mirrors peeking cleanly past upper C-pillar shoulders
+        ctx.fillStyle = '#151820';
+        ctx.beginPath(); ctx.roundRect(-80, -83, 15, 7, 2); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(65, -83, 15, 7, 2); ctx.fill();
 
-        // Black Side Wing Mirrors peeking out above Front/Mid Shoulders!
-        ctx.fillStyle = '#11151e';
+        // 3. Smooth Rounded Fastback Roof + Smooth Rounded C-Pillars + Muscular Wide Rear Haunches!
+        const roofToDeck = ctx.createLinearGradient(0, -110, 0, -16);
+        roofToDeck.addColorStop(0.00, '#89a4cc');
+        roofToDeck.addColorStop(0.18, '#a6c0e6');
+        roofToDeck.addColorStop(0.45, baseCol);
+        roofToDeck.addColorStop(0.78, '#7398d4');
+        roofToDeck.addColorStop(1.00, '#5574a6');
+        ctx.fillStyle = roofToDeck;
         ctx.beginPath();
-        ctx.moveTo(-66, -78); ctx.lineTo(-80, -80); ctx.lineTo(-78, -72); ctx.lineTo(-64, -71);
-        ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(66, -78); ctx.lineTo(80, -80); ctx.lineTo(78, -72); ctx.lineTo(64, -71);
-        ctx.closePath(); ctx.fill();
-
-        // Upper Fastback Roof & Narrow Tumblehome Cabin + Flared Coke-Bottle Rear Quarter Haunches!
-        const upperGrad = ctx.createLinearGradient(0, -108, 0, -16);
-        upperGrad.addColorStop(0, '#9ab5d9');
-        upperGrad.addColorStop(0.24, '#7393bf');
-        upperGrad.addColorStop(0.65, baseCol);
-        upperGrad.addColorStop(1, '#3e577d');
-        ctx.fillStyle = upperGrad;
-        ctx.beginPath();
-        ctx.moveTo(-48, -106);
-        ctx.quadraticCurveTo(0, -111, 48, -106); // sleek curved roof header
-        ctx.lineTo(68, -74);                     // C-pillar slope
-        ctx.quadraticCurveTo(96, -54, 105, -24); // wide muscular right rear haunch!
-        ctx.lineTo(108, 38);
-        ctx.lineTo(-108, 38);
-        ctx.lineTo(-105, -24);
-        ctx.quadraticCurveTo(-96, -54, -68, -74);// wide muscular left rear haunch!
+        ctx.moveTo(-46, -105);
+        ctx.bezierCurveTo(-24, -112, 24, -112, 46, -105); // smooth rounded roof dome!
+        ctx.bezierCurveTo(58, -101, 66, -82, 74, -66);    // smooth clean blue C-pillar!
+        ctx.bezierCurveTo(92, -56, 104, -40, 107, -20);   // wide rounded right rear haunch!
+        ctx.lineTo(109, 44);
+        ctx.lineTo(-109, 44);
+        ctx.lineTo(-107, -20);
+        ctx.bezierCurveTo(-104, -40, -92, -56, -74, -66); // wide rounded left rear haunch!
+        ctx.bezierCurveTo(-66, -82, -58, -101, -46, -105);
         ctx.closePath();
         ctx.fill();
 
-        // Glossy Specular Sky Reflections on Left & Right Muscular Rear Quarter Shoulders!
-        const haunchGlowL = ctx.createLinearGradient(-98, -56, -62, -18);
-        haunchGlowL.addColorStop(0, 'rgba(226, 238, 255, 0.62)');
-        haunchGlowL.addColorStop(1, 'rgba(115, 147, 191, 0.0)');
-        ctx.fillStyle = haunchGlowL;
-        ctx.beginPath();
-        ctx.moveTo(-66, -70); ctx.quadraticCurveTo(-92, -50, -98, -22); ctx.lineTo(-74, -22); ctx.lineTo(-56, -66);
-        ctx.closePath(); ctx.fill();
+        // Soft Sky Specular Sheen on Center Roof & Left/Right Flared Haunch Tops!
+        const roofSheen = ctx.createRadialGradient(0, -102, 4, 0, -102, 42);
+        roofSheen.addColorStop(0, 'rgba(235, 245, 255, 0.55)');
+        roofSheen.addColorStop(1, 'rgba(137, 164, 204, 0)');
+        ctx.fillStyle = roofSheen;
+        ctx.beginPath(); ctx.ellipse(0, -101, 40, 9, 0, 0, Math.PI * 2); ctx.fill();
 
-        const haunchGlowR = ctx.createLinearGradient(98, -56, 62, -18);
-        haunchGlowR.addColorStop(0, 'rgba(226, 238, 255, 0.62)');
-        haunchGlowR.addColorStop(1, 'rgba(115, 147, 191, 0.0)');
-        ctx.fillStyle = haunchGlowR;
-        ctx.beginPath();
-        ctx.moveTo(66, -70); ctx.quadraticCurveTo(92, -50, 98, -22); ctx.lineTo(74, -22); ctx.lineTo(56, -66);
-        ctx.closePath(); ctx.fill();
+        [[-84, -42], [84, -42]].forEach(([hx, hy]) => {
+          const hg = ctx.createRadialGradient(hx, hy, 3, hx, hy, 28);
+          hg.addColorStop(0, 'rgba(219, 236, 255, 0.52)');
+          hg.addColorStop(1, 'rgba(115, 152, 212, 0)');
+          ctx.fillStyle = hg;
+          ctx.beginPath(); ctx.ellipse(hx, hy, 24, 15, hx < 0 ? -0.35 : 0.35, 0, Math.PI * 2); ctx.fill();
+        });
 
-        // Tall Sloped Smoked Fastback Rear Windshield
-        const glassG = ctx.createLinearGradient(-40, -98, 45, -42);
-        glassG.addColorStop(0, '#1e2633');
-        glassG.addColorStop(0.42, '#2d3748');
-        glassG.addColorStop(0.55, '#475569');
-        glassG.addColorStop(1, '#18202c');
-        ctx.fillStyle = glassG;
+        // 4. Rounded-Trapezoid Smoked Rear Window + Flush Matte-Grey Left/Right GTD Intake Louver Strips (INSIDE glass frame!)
+        ctx.save();
         ctx.beginPath();
-        ctx.moveTo(-43, -98);
-        ctx.quadraticCurveTo(0, -101, 43, -98);
+        ctx.moveTo(-43, -95);
+        ctx.quadraticCurveTo(0, -98, 43, -95);
+        ctx.quadraticCurveTo(50, -94, 59, -50);
+        ctx.quadraticCurveTo(58, -45, 48, -45);
+        ctx.lineTo(-48, -45);
+        ctx.quadraticCurveTo(-58, -45, -59, -50);
+        ctx.quadraticCurveTo(-50, -94, -43, -95);
+        ctx.closePath();
+        ctx.clip();
+
+        const winG = ctx.createLinearGradient(0, -97, 0, -45);
+        winG.addColorStop(0, '#18222e');
+        winG.addColorStop(0.6, '#233142');
+        winG.addColorStop(1, '#141d28');
+        ctx.fillStyle = winG;
+        ctx.fillRect(-62, -100, 124, 58);
+
+        // Soft Cloud Reflection on Smoked Glass (just like /tmp/car_closeup_only.png!)
+        ctx.fillStyle = 'rgba(203, 220, 245, 0.22)';
+        ctx.beginPath(); ctx.ellipse(14, -76, 24, 11, -0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-12, -64, 18, 8, 0.15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(226, 238, 255, 0.12)';
+        ctx.fillRect(-38, -53, 76, 5);
+
+        // Flush Left & Right Dark-Grey GTD Intake Louver Panels INSIDE Window Edges!
+        ctx.fillStyle = '#3a3e47';
+        ctx.beginPath(); ctx.moveTo(-60, -96); ctx.lineTo(-40, -96); ctx.lineTo(-47, -44); ctx.lineTo(-62, -44); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(60, -96); ctx.lineTo(40, -96); ctx.lineTo(47, -44); ctx.lineTo(62, -44); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#161920';
+        for (let li = 0; li < 4; li++) {
+          const ly = -89 + li * 8.5;
+          ctx.fillRect(-54 - li * 0.8, ly, 10, 4.2);
+          ctx.fillRect(44 + li * 0.8, ly, 10, 4.2);
+        }
+        ctx.restore();
+
+        // Crisp dark window rubber trim outline
+        ctx.strokeStyle = '#252b36';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(-43, -95);
+        ctx.quadraticCurveTo(0, -98, 43, -95);
         ctx.lineTo(58, -46);
         ctx.lineTo(-58, -46);
         ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Interior Sport Bucket Seat Silhouettes visible through Smoked Rear Glass
-        ctx.fillStyle = 'rgba(15, 20, 28, 0.78)';
-        ctx.beginPath(); ctx.roundRect(-34, -82, 22, 26, 4); ctx.fill();
-        ctx.beginPath(); ctx.roundRect(12, -82, 22, 26, 4); ctx.fill();
-        // Diagonal Sky Glint on Rear Window
-        ctx.fillStyle = 'rgba(226, 232, 240, 0.14)';
+        // 5. Exact Mustang GTD Rear Wing: Wide Flat Smoked Outer Winglets + Sleek Black Main Blade + Hollow \_/ Center Cradle!
+        // Outer smoked-charcoal horizontal aero plates above left & right rear fenders
+        ctx.fillStyle = 'rgba(30, 32, 39, 0.88)';
         ctx.beginPath();
-        ctx.moveTo(-22, -97); ctx.lineTo(8, -97); ctx.lineTo(-8, -48); ctx.lineTo(-36, -48);
+        ctx.moveTo(-104, -30); ctx.lineTo(-64, -30); ctx.lineTo(-68, -20); ctx.lineTo(-101, -21);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(104, -30); ctx.lineTo(64, -30); ctx.lineTo(68, -20); ctx.lineTo(101, -21);
         ctx.closePath(); ctx.fill();
 
-        // 5 Horizontal Black Fastback C-Pillar Quarter Louver Vents on Left & Right of Rear Glass!
-        ctx.strokeStyle = '#111827';
-        ctx.lineWidth = 2.4;
-        for (let li = 0; li < 5; li++) {
-          const ly = -90 + li * 8.2;
-          const xIn = 44 + li * 2.4;
-          const xOut = 51 + li * 2.8;
-          ctx.beginPath(); ctx.moveTo(-xOut, ly); ctx.lineTo(-xIn, ly + 1.2); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(xOut, ly); ctx.lineTo(xIn, ly + 1.2); ctx.stroke();
-        }
-
-        // Sculpted Trunk Deck Surface Reflection between Glass & Wing
-        const deckShine = ctx.createLinearGradient(0, -45, 0, -24);
-        deckShine.addColorStop(0, '#8ba9d4');
-        deckShine.addColorStop(1, '#4c6a94');
-        ctx.fillStyle = deckShine;
+        // Hollow Center \_/ Trapezoidal Wing Cradle (shows metallic-blue trunk paint inside!)
+        ctx.strokeStyle = '#181a20';
+        ctx.lineWidth = 5.2;
+        ctx.lineJoin = 'round';
         ctx.beginPath();
-        ctx.moveTo(-66, -45); ctx.lineTo(66, -45); ctx.lineTo(92, -26); ctx.lineTo(-92, -26);
-        ctx.closePath(); ctx.fill();
-
-        // === SIGNATURE S650 DARK HORSE GLOSS-BLACK PEDESTAL REAR SPOILER WING + OVERHANGING ENDPLATES! ===
-        // Soft drop-shadow cast by wing onto blue trunk deck
-        ctx.fillStyle = 'rgba(9, 13, 22, 0.45)';
-        ctx.beginPath();
-        ctx.moveTo(-98, -23); ctx.lineTo(98, -23); ctx.lineTo(92, -17); ctx.lineTo(-92, -17);
-        ctx.closePath(); ctx.fill();
-
-        // Center Twin-Strut Trapezoidal V-Bridge Pedestal
-        ctx.fillStyle = '#141820';
-        ctx.beginPath();
-        ctx.moveTo(-27, -33); ctx.lineTo(27, -33); ctx.lineTo(20, -21); ctx.lineTo(-20, -21);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#5b7ba8'; // body color peek inside center bridge cutout
-        ctx.beginPath();
-        ctx.moveTo(-14, -30); ctx.lineTo(14, -30); ctx.lineTo(10, -24); ctx.lineTo(-10, -24);
-        ctx.closePath(); ctx.fill();
-
-        // Main Gloss-Black Aerodynamic Wing Blade + Sculpted Downward Wing Endplates!
-        ctx.fillStyle = '#11151d';
-        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-104, -27);
-        ctx.quadraticCurveTo(-52, -37, 0, -34);
-        ctx.quadraticCurveTo(52, -37, 104, -27);
-        ctx.lineTo(96, -19);
-        ctx.lineTo(74, -27);
-        ctx.lineTo(22, -28);
-        ctx.lineTo(0, -25);
-        ctx.lineTo(-22, -28);
-        ctx.lineTo(-74, -27);
-        ctx.lineTo(-96, -19);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(-29, -31);
+        ctx.lineTo(-21, -20);
+        ctx.lineTo(21, -20);
+        ctx.lineTo(29, -31);
         ctx.stroke();
 
-        // === RECESSED MATTE-BLACK CONCAVE REAR DECKLID PANEL ===
-        ctx.fillStyle = '#1c2029';
+        // Main Horizontal Gloss-Black Wing Blade + Angled Outer Endplate Tips!
+        ctx.fillStyle = '#15171d';
         ctx.beginPath();
-        ctx.moveTo(-98, -14);
-        ctx.lineTo(98, -14);
-        ctx.lineTo(92, 13);
-        ctx.lineTo(58, 17);
-        ctx.lineTo(-58, 17);
-        ctx.lineTo(-92, 13);
+        ctx.moveTo(-106, -24);
+        ctx.lineTo(-99, -35);
+        ctx.lineTo(-42, -33);
+        ctx.lineTo(0, -31.5);
+        ctx.lineTo(42, -33);
+        ctx.lineTo(99, -35);
+        ctx.lineTo(106, -24);
+        ctx.lineTo(101, -22);
+        ctx.lineTo(96, -29);
+        ctx.lineTo(36, -28);
+        ctx.lineTo(0, -27.5);
+        ctx.lineTo(-36, -28);
+        ctx.lineTo(-96, -29);
+        ctx.lineTo(-101, -22);
         ctx.closePath();
         ctx.fill();
 
-        // Continuous Thin Glowing Crimson-Red Top Light Strip across Decklid!
+        // 6. Full-Width Overhanging Metallic-Blue Trunk Lip right above Taillights!
+        const lipG = ctx.createLinearGradient(-102, -16, 102, -16);
+        lipG.addColorStop(0, '#7898c8');
+        lipG.addColorStop(0.5, '#5b78a6');
+        lipG.addColorStop(1, '#7898c8');
+        ctx.fillStyle = lipG;
+        ctx.fillRect(-103, -16.5, 206, 4.5);
+
+        // 7. Recessed Charcoal-Black Concave GTD Panel (#2c2f36) with Shallow V-Bottom!
+        const panG = ctx.createLinearGradient(0, -12, 0, 16);
+        panG.addColorStop(0, '#1f2229');
+        panG.addColorStop(0.55, '#343840');
+        panG.addColorStop(1, '#252830');
+        ctx.fillStyle = panG;
+        ctx.beginPath();
+        ctx.moveTo(-101, -12);
+        ctx.lineTo(101, -12);
+        ctx.lineTo(96, 10);
+        ctx.lineTo(54, 15);
+        ctx.lineTo(0, 16.5);
+        ctx.lineTo(-54, 15);
+        ctx.lineTo(-96, 10);
+        ctx.closePath();
+        ctx.fill();
+
+        // Continuous Thin Glowing Red Top LED Line across Full Width!
         const brakingVis = state.brakePressed || state.keys['KeyS'] || state.keys['ArrowDown'] || state.keys['Space'];
-        ctx.fillStyle = brakingVis ? '#ff3b30' : '#dc2626';
-        ctx.shadowColor = '#ef4444';
+        ctx.fillStyle = brakingVis ? '#ff4530' : '#e1251b';
+        ctx.shadowColor = '#ff2a1a';
         ctx.shadowBlur = brakingVis ? 16 : 6;
-        ctx.fillRect(-94, -14, 188, 3.2);
+        ctx.fillRect(-98, -12, 196, 3.0);
 
-        // === ICONIC 3 ANGLED VERTICAL GLOWING RED-ORANGE TRI-BAR TAILLIGHTS [\\ ]  GT  [///] ===
-        const drawTriBar = (xTop, xBot) => {
-          ctx.fillStyle = brakingVis ? '#ff2d20' : '#c81e1e';
+        // 8. Iconic 3 Wide Slanted Fiery Red-Orange LED Tri-Bars on Left & Right!
+        const drawGtdBar = (xTop, xBot) => {
+          ctx.fillStyle = brakingVis ? '#ff2a1a' : '#c91c18';
           ctx.beginPath();
-          ctx.moveTo(xTop, -10.5);
-          ctx.lineTo(xTop + 9.2, -10.5);
-          ctx.lineTo(xBot + 9.2, 10.5);
+          ctx.moveTo(xTop, -9.5);
+          ctx.lineTo(xTop + 10.2, -9.5);
+          ctx.lineTo(xBot + 10.2, 10.5);
           ctx.lineTo(xBot, 10.5);
           ctx.closePath();
           ctx.fill();
-          // Glowing fiery orange-red inner LED core!
-          ctx.fillStyle = brakingVis ? '#ff8a65' : '#ff4d38';
+          ctx.fillStyle = brakingVis ? '#ff9468' : '#ff4f2e';
           ctx.beginPath();
-          ctx.moveTo(xTop + 2.1, -8.5);
-          ctx.lineTo(xTop + 7.1, -8.5);
-          ctx.lineTo(xBot + 7.1, 8.5);
-          ctx.lineTo(xBot + 2.1, 8.5);
+          ctx.moveTo(xTop + 2.0, -7.8);
+          ctx.lineTo(xTop + 8.2, -7.8);
+          ctx.lineTo(xBot + 8.2, 8.8);
+          ctx.lineTo(xBot + 2.0, 8.8);
           ctx.closePath();
           ctx.fill();
         };
-        // Left 3 slanted bars
-        drawTriBar(-94, -96);
-        drawTriBar(-82, -84);
-        drawTriBar(-70, -72);
-        // Right 3 slanted bars
-        drawTriBar(61, 63);
-        drawTriBar(73, 75);
-        drawTriBar(85, 87);
+        drawGtdBar(-97, -99);
+        drawGtdBar(-84, -86);
+        drawGtdBar(-71, -73);
+        drawGtdBar(61, 63);
+        drawGtdBar(74, 76);
+        drawGtdBar(87, 89);
         ctx.shadowBlur = 0;
 
-        // Amber Sequential Turn-Signal Overlay on Tri-Bars
+        // Amber Turn-Signal Blink Overlay
         const blinkPulse2D = Math.floor(performance.now() / 300) % 2 === 0;
         if ((state.blinkerLeft || state.hazard) && blinkPulse2D) {
           ctx.fillStyle = 'rgba(251, 191, 36, 0.92)';
-          ctx.fillRect(-95, -10, 33, 20);
+          ctx.fillRect(-98, -9, 36, 19);
         }
         if ((state.blinkerRight || state.hazard) && blinkPulse2D) {
           ctx.fillStyle = 'rgba(251, 191, 36, 0.92)';
-          ctx.fillRect(62, -10, 33, 20);
+          ctx.fillRect(62, -9, 36, 19);
         }
 
-        // Center Recessed Dark-Chrome Rectangular [GT] Emblem Badge!
-        ctx.fillStyle = '#0f131a';
-        ctx.strokeStyle = '#475569';
+        // Embossed Center [G T D] Dark-Metallic Badge!
+        ctx.fillStyle = '#15181f';
+        ctx.strokeStyle = '#525b6b';
         ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.roundRect(-14, -7, 28, 8.5, 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '900 6.8px Inter, sans-serif';
+        ctx.beginPath(); ctx.roundRect(-16, -7.2, 32, 8.2, 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#aeb9c9';
+        ctx.font = '900 6.2px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('GT', 0, -0.5);
+        ctx.fillText('G T D', 0, -1.0);
 
-        // === SCULPTED METALLIC-BLUE REAR BUMPER SHELF + BRIGHT HORIZON CREASE + PARKING SENSORS ===
-        const bmpGrad = ctx.createLinearGradient(0, 14, 0, 54);
-        bmpGrad.addColorStop(0, '#c7dcfa');   // crisp sky-white specular highlight on top shelf!
-        bmpGrad.addColorStop(0.18, '#7fa0cc');
-        bmpGrad.addColorStop(0.48, '#466289');
-        bmpGrad.addColorStop(1, '#273852');
-        ctx.fillStyle = bmpGrad;
+        // 9. Brilliant Ice-White / Sky-Blue Specular Bumper Shelf (#e4f9ff) + Deep Slate Vertical Bumper (#354968)!
+        const shelfG = ctx.createLinearGradient(-106, 12, 106, 26);
+        shelfG.addColorStop(0.00, '#e6faff');
+        shelfG.addColorStop(0.24, '#d8f3ff');
+        shelfG.addColorStop(0.50, '#9bbbe0');
+        shelfG.addColorStop(0.76, '#d8f3ff');
+        shelfG.addColorStop(1.00, '#e6faff');
+        ctx.fillStyle = shelfG;
         ctx.beginPath();
-        ctx.moveTo(-104, 13);
-        ctx.lineTo(-58, 17);
-        ctx.lineTo(58, 17);
-        ctx.lineTo(104, 13);
-        ctx.lineTo(107, 48);
-        ctx.lineTo(-107, 48);
+        ctx.moveTo(-105, 10);
+        ctx.lineTo(-54, 15);
+        ctx.lineTo(0, 16.5);
+        ctx.lineTo(54, 15);
+        ctx.lineTo(105, 10);
+        ctx.lineTo(107, 23);
+        ctx.lineTo(52, 27);
+        ctx.lineTo(-52, 27);
+        ctx.lineTo(-107, 23);
         ctx.closePath();
         ctx.fill();
 
-        // Diagonal light-catching bumper corner facets (left & right bright reflections visible in 1000025255.jpg!)
-        ctx.fillStyle = 'rgba(224, 242, 254, 0.55)';
-        ctx.beginPath(); ctx.moveTo(-103, 14); ctx.lineTo(-76, 17); ctx.lineTo(-84, 27); ctx.lineTo(-105, 24); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(103, 14); ctx.lineTo(76, 17); ctx.lineTo(84, 27); ctx.lineTo(105, 24); ctx.closePath(); ctx.fill();
-
-        // 2 Tiny White Parking Sensor Dots on Left & Right Bumper
-        ctx.fillStyle = '#e2e8f0';
-        ctx.beginPath(); ctx.arc(-80, 33, 1.8, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(80, 33, 1.8, 0, Math.PI * 2); ctx.fill();
-
-        // === DEEP SCULPTED MATTE-BLACK MULTI-FIN LOWER DIFFUSER & SIDE AERO SPATS ===
-        ctx.fillStyle = '#10141d';
+        // Deep Slate-Navy Vertical Lower Bumper Face
+        const lowBmpG = ctx.createLinearGradient(0, 23, 0, 52);
+        lowBmpG.addColorStop(0, '#445b7d');
+        lowBmpG.addColorStop(1, '#26364d');
+        ctx.fillStyle = lowBmpG;
         ctx.beginPath();
-        ctx.moveTo(-108, 46);
-        ctx.lineTo(-88, 43);
-        ctx.lineTo(-64, 38);
-        ctx.lineTo(64, 38);
-        ctx.lineTo(88, 43);
-        ctx.lineTo(108, 46);
-        ctx.lineTo(105, 66);
-        ctx.lineTo(-105, 66);
+        ctx.moveTo(-107, 22);
+        ctx.lineTo(-52, 27);
+        ctx.lineTo(52, 27);
+        ctx.lineTo(107, 22);
+        ctx.lineTo(108, 49);
+        ctx.lineTo(-108, 49);
         ctx.closePath();
         ctx.fill();
 
-        // Subtle dark metallic diffuser fins & recessed quad dark-chrome tips
-        ctx.strokeStyle = '#27303f';
-        ctx.lineWidth = 2;
-        [-42, -16, 16, 42].forEach(fx => {
-          ctx.beginPath(); ctx.moveTo(fx, 40); ctx.lineTo(fx, 63); ctx.stroke();
-        });
-        [-78, -65, 65, 78].forEach(ex => {
-          ctx.fillStyle = '#1e293b';
-          ctx.beginPath(); ctx.arc(ex, 55, 5.2, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#090d14';
-          ctx.beginPath(); ctx.arc(ex, 55, 3.4, 0, Math.PI * 2); ctx.fill();
+        // 2 Crisp Round Ice-Silver Sensor Caps on Left & Right Bumper!
+        ctx.fillStyle = '#c8def7';
+        ctx.beginPath(); ctx.arc(-76, 33, 2.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(76, 33, 2.3, 0, Math.PI * 2); ctx.fill();
+
+        // Dark Recessed Center Trapezoid License Cutout (Empty & Clean like /tmp/car_closeup_only.png!)
+        ctx.fillStyle = '#141821';
+        ctx.beginPath();
+        ctx.moveTo(-38, 28);
+        ctx.lineTo(38, 28);
+        ctx.lineTo(48, 44);
+        ctx.lineTo(-48, 44);
+        ctx.closePath();
+        ctx.fill();
+
+        // 10. Matte-Black Lower Corner Aero Flicks & Vertical GTD Underbody Diffuser Strakes!
+        ctx.fillStyle = '#0e1219';
+        ctx.beginPath();
+        ctx.moveTo(-110, 44);
+        ctx.lineTo(-86, 46);
+        ctx.lineTo(-56, 44);
+        ctx.lineTo(56, 44);
+        ctx.lineTo(86, 46);
+        ctx.lineTo(110, 44);
+        ctx.lineTo(106, 68);
+        ctx.lineTo(-106, 68);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#253042';
+        ctx.lineWidth = 2.4;
+        [-68, -42, -18, 18, 42, 68].forEach(sx => {
+          ctx.beginPath(); ctx.moveTo(sx, 46); ctx.lineTo(sx, 67); ctx.stroke();
         });
 
         ctx.restore();
@@ -14759,7 +16100,6 @@
       ctx.shadowColor = '#ef4444';
       ctx.shadowBlur = brakingOther ? 18 : 6;
       if (car && car.id === 'bugatti_bolide') {
-        // Bugatti Bolide Iconic X-Wing Laser Taillight!
         ctx.strokeStyle = '#ff2a2a';
         ctx.lineWidth = 5;
         ctx.beginPath();
@@ -15283,6 +16623,1008 @@
         pd.style.display = 'none';
       }
     });
+
+
+    // =========================================================================
+    // v46 TESLA FSD v15.0.1 (2026.38.6.11) FLEET 3D/2D + REALITY VIEW ENGINE
+    // =========================================================================
+    const TESLA_MODEL_IDS = [
+      'tesla_modely_juniper',
+      'tesla_model3_highland',
+      'tesla_models_plaid',
+      'tesla_cybertruck',
+      'tesla_cybercab',
+      'tesla_modelx_plaid'
+    ];
+
+    function cycleTeslaModelQuick() {
+      const teslaCars = KOREAN_CARS.filter(c => c.brand === '테슬라');
+      if (!teslaCars.length) return;
+      const curIdx = teslaCars.findIndex(c => c.id === state.selectedCarId);
+      const nextCar = teslaCars[(curIdx + 1) % teslaCars.length];
+      selectKoreanCar(nextCar.id);
+      if (state.stage === 'driving') {
+        state.autopilot = true;
+        syncAutopilotButton();
+      }
+    }
+
+    function setFsdSpeedProfile(profId) {
+      if (!FSD_SPEED_PROFILES[profId]) return;
+      state.fsdSpeedProfile = profId;
+      playTone(profId === 'mad_max' ? 740 : 560, 0.08, 'sine', 0.06, profId === 'mad_max' ? 980 : 660);
+      syncTeslaFsdHudWidgets();
+      showToast(`⚡ FSD v15 주행 성향: [${FSD_SPEED_PROFILES[profId].kor}] 적용`);
+    }
+
+    function toggleFsdCalmMode() {
+      state.fsdCalmMode = !state.fsdCalmMode;
+      playTone(480, 0.07, 'sine', 0.05);
+      syncTeslaFsdHudWidgets();
+      showToast(state.fsdCalmMode
+        ? '🧘 Calm Mode ON · 오스틴 로보택시 미니멀 화면 활성화'
+        : '👁️ Calm Mode OFF · 전체 Reality View 뉴럴 인식 표시');
+    }
+
+    function toggleFsdHovLane() {
+      state.fsdUseHov = !state.fsdUseHov;
+      playTone(520, 0.07, 'sine', 0.05);
+      syncTeslaFsdHudWidgets();
+      showToast(state.fsdUseHov ? '🛣️ HOV 카풀/추월 차선 사용 ON' : '🛣️ HOV 차선 사용 OFF');
+    }
+
+    function toggleTeslaFullScreenMap() {
+      state.fsdFullScreenMap = !state.fsdFullScreenMap;
+      const hud = document.getElementById('drivingHud');
+      if (hud) hud.classList.toggle('ts-fullscreen-map', state.fsdFullScreenMap);
+      const btn = document.getElementById('teslaFullMapBtn');
+      if (btn) btn.textContent = state.fsdFullScreenMap ? '🗺️ 분할뷰' : '🗺️ 맵확대';
+      setTimeout(() => drawLiveGpsMinimap(), 30);
+    }
+
+    function toggleTeslaRearCamMirror() {
+      state.fsdRearCamOpen = !state.fsdRearCamOpen;
+      const rm = document.getElementById('dcRoomMirrorFrame');
+      if (rm) {
+        rm.style.display = state.fsdRearCamOpen ? 'block' : 'none';
+        rm.style.position = 'fixed';
+        rm.style.top = '48px';
+        rm.style.left = '50%';
+        rm.style.transform = 'translateX(-50%)';
+        rm.style.zIndex = '52';
+      }
+    }
+
+    function cycleTeslaClimateTemp() {
+      const temps = [19.5, 21.0, 22.0, 23.5, 18.0];
+      const idx = temps.indexOf(state.fsdClimateTemp || 21.0);
+      state.fsdClimateTemp = temps[(idx + 1) % temps.length];
+      const el = document.getElementById('tsClimateVal');
+      if (el) el.textContent = state.fsdClimateTemp.toFixed(1) + '°';
+      showToast(`❄️ 테슬라 오토 공조 설정: ${state.fsdClimateTemp.toFixed(1)}°C`);
+    }
+
+    function syncFsdSpeedToLimit() {
+      const lim = state.fsdPostedLimitKmh || 80;
+      setTargetSpeedCap(lim);
+      state.fsdSpeedProfile = 'standard';
+      syncTeslaFsdHudWidgets();
+      showToast(`🔵 제한속도 ${lim}km/h 기준으로 FSD 크루즈 동기화 완료`);
+    }
+
+    function triggerFsdTapToPark() {
+      if (state.isWalking) {
+        showToast('차량 탑승 상태에서 탭 파킹(>>>)을 사용할 수 있습니다.');
+        return;
+      }
+      state.fsdParkingActive = !state.fsdParkingActive;
+      if (state.fsdParkingActive) {
+        state.autopilot = true;
+        if (state.gear !== 'D') setGear('D');
+        if (state.scenicTourActive && scenicRoadSamples.length) {
+          const near = findNearestScenicSample(state.x, state.z);
+          const sPark = scenicRoadSamples[((near.idx ?? near.index ?? 0) + 9) % SCENIC_SEGMENTS];
+          state.fsdParkTarget = {
+            x: sPark.x + sPark.nx * 6.0,
+            y: sPark.y,
+            z: sPark.z + sPark.nz * 6.0,
+            heading: sPark.heading
+          };
+        } else {
+          state.fsdParkTarget = { x: state.x + 5.5, y: 0, z: state.z + 32, heading: state.heading };
+        }
+        playTeslaFsdChime(true);
+        showToast('🅿️ FSD v15 탭 파킹(>>>) 시작 · 전방 우측 쉐브론 주차 구역으로 자동 진입합니다');
+      } else {
+        state.fsdParkTarget = null;
+        showToast('탭 파킹 취소 · 일반 FSD 주행 복귀');
+      }
+      syncTeslaFsdHudWidgets();
+    }
+
+    function triggerTeslaSmartSummon() {
+      if (!state.isWalking) {
+        showToast('🚶 하차 상태에서 스마트 호출을 누르면 내 차가 스스로 찾아옵니다!');
+        return;
+      }
+      state.fsdSummonActive = true;
+      state.engineOn = true;
+      state.gear = 'D';
+      playTeslaFsdChime(true);
+      showToast('📲 Actually Smart Summon 가동! 테슬라가 현재 내 위치로 자율주행해 옵니다...');
+    }
+
+    // Generate Potholes, Speed Enforcement Cameras & >>> Parking Bays along Scenic Courses
+    let fsdWorldHazardsGroup3D = null;
+    let fsdPathRibbonMesh3D = null;
+    let fsdChevronMeshes3D = [];
+
+    function ensureFsdCourseHazards() {
+      if (!scenicRoadSamples || !scenicRoadSamples.length) return;
+      const cid = state.scenicCourseId || 'all_korea';
+      if (state.fsdHazardsCourseId === cid && state.fsdPotholes && state.fsdPotholes.length) return;
+      state.fsdHazardsCourseId = cid;
+      state.fsdPotholes = [];
+      state.fsdSpeedCams = [];
+      state.fsdParkSpots = [];
+
+      const phIndices = [12, 34, 58, 86, 118, 146, 174];
+      phIndices.forEach((si, k) => {
+        const sp = scenicRoadSamples[si % SCENIC_SEGMENTS];
+        const laneOff = k % 2 === 0 ? 3.3 : -2.6;
+        state.fsdPotholes.push({
+          idx: si % SCENIC_SEGMENTS,
+          laneOff,
+          x: sp.x + sp.nx * laneOff,
+          y: sp.y,
+          z: sp.z + sp.nz * laneOff
+        });
+      });
+
+      const camIndices = [24, 76, 134, 184];
+      camIndices.forEach((si, k) => {
+        const sp = scenicRoadSamples[si % SCENIC_SEGMENTS];
+        const limit = (cid === 'daegwallyeong' || cid === 'taebaek_snow') ? 50 : (cid === 'inje_circuit' ? 100 : (k % 2 === 0 ? 80 : 70));
+        state.fsdSpeedCams.push({
+          idx: si % SCENIC_SEGMENTS,
+          limit,
+          x: sp.x + sp.nx * 7.4,
+          y: sp.y,
+          z: sp.z + sp.nz * 7.4,
+          heading: sp.heading
+        });
+      });
+
+      [18, 66, 112, 160].forEach(si => {
+        const sp = scenicRoadSamples[si % SCENIC_SEGMENTS];
+        state.fsdParkSpots.push({
+          x: sp.x + sp.nx * 6.1,
+          y: sp.y,
+          z: sp.z + sp.nz * 6.1,
+          heading: sp.heading
+        });
+      });
+
+      rebuildFsd3DOverlays();
+    }
+
+    function rebuildFsd3DOverlays() {
+      if (!useWebGL || typeof THREE === 'undefined' || !scene) return;
+      if (fsdWorldHazardsGroup3D) {
+        try { scene.remove(fsdWorldHazardsGroup3D); } catch (_) {}
+      }
+      fsdWorldHazardsGroup3D = new THREE.Group();
+
+      // 3D Potholes + Neural Detection Amber Halos
+      const craterGeo = new THREE.CylinderGeometry(0.95, 0.95, 0.05, 18);
+      const craterMat = new THREE.MeshBasicMaterial({ color: 0x111827 });
+      const ringGeo = new THREE.RingGeometry(1.05, 1.32, 24);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+
+      (state.fsdPotholes || []).forEach(ph => {
+        const g = new THREE.Group();
+        const cr = new THREE.Mesh(craterGeo, craterMat);
+        const rg = new THREE.Mesh(ringGeo, ringMat);
+        rg.position.y = 0.05;
+        g.add(cr, rg);
+        g.position.set(ph.x, (ph.y || 0) + 0.03, ph.z);
+        fsdWorldHazardsGroup3D.add(g);
+      });
+
+      // 3D Speed Camera Poles
+      const poleMat = new THREE.MeshPhongMaterial({ color: 0xfacc15 });
+      const camBoxMat = new THREE.MeshPhongMaterial({ color: 0x0f172a });
+      (state.fsdSpeedCams || []).forEach(cm => {
+        const g = new THREE.Group();
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 4.8, 10), poleMat);
+        pole.position.y = 2.4;
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.14), poleMat);
+        arm.position.set(-1.2, 4.7, 0);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.45), camBoxMat);
+        box.position.set(-2.2, 4.45, 0);
+        g.add(pole, arm, box);
+        g.position.set(cm.x, cm.y || 0, cm.z);
+        g.rotation.y = cm.heading || 0;
+        fsdWorldHazardsGroup3D.add(g);
+      });
+
+      // Dynamic 3D Glowing Tesla-Blue FSD Trajectory Carpet + 6 Blue Chevrons
+      const SEG = 20;
+      const ribbonGeo = new THREE.BufferGeometry();
+      const positions = new Float32Array((SEG + 1) * 2 * 3);
+      const indices = [];
+      for (let i = 0; i < SEG; i++) {
+        const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+        indices.push(a, b, c, b, d, c);
+      }
+      ribbonGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      ribbonGeo.setIndex(indices);
+      const ribbonMat = new THREE.MeshBasicMaterial({
+        color: 0x3b82f6,
+        transparent: true,
+        opacity: 0.44,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      fsdPathRibbonMesh3D = new THREE.Mesh(ribbonGeo, ribbonMat);
+      fsdPathRibbonMesh3D.frustumCulled = false;
+      fsdWorldHazardsGroup3D.add(fsdPathRibbonMesh3D);
+
+      fsdChevronMeshes3D = [];
+      const chevShape = new THREE.Shape();
+      chevShape.moveTo(-0.85, -0.35);
+      chevShape.lineTo(0, 0.45);
+      chevShape.lineTo(0.85, -0.35);
+      chevShape.lineTo(0.58, -0.52);
+      chevShape.lineTo(0, 0.12);
+      chevShape.lineTo(-0.58, -0.52);
+      chevShape.closePath();
+      const chevGeo = new THREE.ShapeGeometry(chevShape);
+      chevGeo.rotateX(-Math.PI / 2);
+      for (let ci = 0; ci < 6; ci++) {
+        const cm = new THREE.Mesh(
+          chevGeo,
+          new THREE.MeshBasicMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false })
+        );
+        cm.frustumCulled = false;
+        fsdWorldHazardsGroup3D.add(cm);
+        fsdChevronMeshes3D.push(cm);
+      }
+
+      scene.add(fsdWorldHazardsGroup3D);
+    }
+
+    function updateTeslaFsd3DPathAndSummon(dt) {
+      // Actually Smart Summon Physics when Walking!
+      const sumBtn = document.getElementById('teslaSmartSummonBtn');
+      if (sumBtn) sumBtn.style.display = state.isWalking ? 'inline-flex' : 'none';
+
+      if (state.isWalking && state.fsdSummonActive) {
+        const dx = state.charX - state.x;
+        const dz = state.charZ - state.z;
+        const dToPlayer = Math.hypot(dx, dz);
+        if (dToPlayer > 3.8) {
+          const wantH = Math.atan2(dx, dz);
+          let dh = wantH - state.heading;
+          while (dh > Math.PI) dh -= Math.PI * 2;
+          while (dh < -Math.PI) dh += Math.PI * 2;
+          state.heading += Math.max(-1.4, Math.min(1.4, dh * 2.5)) * dt;
+          const sumSpd = Math.min(7.5, Math.max(2.2, dToPlayer * 0.45));
+          state.x += Math.sin(state.heading) * sumSpd * dt;
+          state.z += Math.cos(state.heading) * sumSpd * dt;
+          if (state.scenicTourActive && scenicRoadSamples.length) {
+            state.y = findNearestScenicSample(state.x, state.z).sample.y;
+          }
+          if (playerCarGroup) {
+            playerCarGroup.visible = true;
+            playerCarGroup.position.set(state.x, state.y, state.z);
+            playerCarGroup.rotation.set(0, state.heading, 0);
+          }
+          state.fsdStatusMsg = `📲 스마트 호출 주행 중 · 내 위치까지 ${Math.round(dToPlayer)}m`;
+        } else {
+          state.fsdSummonActive = false;
+          state.gear = 'P';
+          playTeslaFsdChime(true);
+          state.fsdStatusMsg = '📲 테슬라 도착 완료! [사람 타기]를 눌러 탑승하세요';
+          showToast('📲 내 테슬라가 바로 앞에 도착했습니다!');
+        }
+      }
+
+      // Update 3D Glowing Blue FSD Path Carpet
+      if (!useWebGL || !fsdPathRibbonMesh3D || !scene) return;
+      if (!fsdWorldHazardsGroup3D.parent) scene.add(fsdWorldHazardsGroup3D);
+      const showRibbon = state.stage === 'driving' && state.autopilot && !state.isWalking && !state.carFlightMode;
+      fsdPathRibbonMesh3D.visible = showRibbon;
+      fsdChevronMeshes3D.forEach(m => { m.visible = showRibbon; });
+      if (!showRibbon) return;
+
+      const posAttr = fsdPathRibbonMesh3D.geometry.getAttribute('position');
+      const arr = posAttr.array;
+      const SEG = 20;
+      const halfW = 1.18;
+      const curLane = state.fsdLaneOffset ?? 3.3;
+      const tgtLane = state.fsdTargetLaneOff ?? curLane;
+      const near = (state.scenicTourActive && scenicRoadSamples.length) ? findNearestScenicSample(state.x, state.z) : null;
+
+      const samplePts = [];
+      for (let i = 0; i <= SEG; i++) {
+        const u = i / SEG;
+        let px, py, pz, nx, nz, hd;
+        if (near && scenicRoadSamples.length) {
+          const fIdx = ((near.idx ?? near.index ?? 0) + u * 11.5) % SCENIC_SEGMENTS;
+          const i0 = Math.floor(fIdx) % SCENIC_SEGMENTS;
+          const i1 = (i0 + 1) % SCENIC_SEGMENTS;
+          const frac = fIdx - Math.floor(fIdx);
+          const s0 = scenicRoadSamples[i0], s1 = scenicRoadSamples[i1];
+          const sx = s0.x + (s1.x - s0.x) * frac;
+          const sy = s0.y + (s1.y - s0.y) * frac;
+          const sz = s0.z + (s1.z - s0.z) * frac;
+          nx = s0.nx + (s1.nx - s0.nx) * frac;
+          nz = s0.nz + (s1.nz - s0.nz) * frac;
+          const smoothS = u * u * (3 - 2 * u);
+          const laneNow = curLane + (tgtLane - curLane) * smoothS;
+          px = i === 0 ? state.x + Math.sin(state.heading) * 2.2 : sx + nx * laneNow;
+          pz = i === 0 ? state.z + Math.cos(state.heading) * 2.2 : sz + nz * laneNow;
+          py = (i === 0 ? state.y : sy) + 0.08;
+          hd = s0.heading;
+        } else {
+          const dist = 2.4 + u * 38.0;
+          hd = state.heading - state.steerAngle * u * 0.9;
+          px = state.x + Math.sin(hd) * dist;
+          pz = state.z + Math.cos(hd) * dist;
+          py = (state.y || 0) + 0.08;
+          nx = Math.cos(hd);
+          nz = -Math.sin(hd);
+        }
+        const taper = halfW * (1 - u * 0.32);
+        const vi = i * 6;
+        arr[vi]     = px - nx * taper;
+        arr[vi + 1] = py;
+        arr[vi + 2] = pz - nz * taper;
+        arr[vi + 3] = px + nx * taper;
+        arr[vi + 4] = py;
+        arr[vi + 5] = pz + nz * taper;
+        samplePts.push({ x: px, y: py, z: pz, hd });
+      }
+      posAttr.needsUpdate = true;
+
+      const slowing = Boolean(state.fsdDecelReason);
+      fsdPathRibbonMesh3D.material.color.setHex(slowing ? 0x38bdf8 : 0x2563eb);
+      const phase = ((performance.now() * (slowing ? -0.0022 : 0.0028)) % 1 + 1) % 1;
+      fsdChevronMeshes3D.forEach((cm, ci) => {
+        const t = ((ci / fsdChevronMeshes3D.length) + phase) % 1;
+        const idx = Math.min(SEG - 1, Math.floor(t * SEG));
+        const p = samplePts[idx];
+        cm.position.set(p.x, p.y + 0.03, p.z);
+        cm.rotation.y = p.hd + (slowing ? Math.PI : 0);
+        cm.material.color.setHex(slowing ? 0x7dd3fc : 0x93c5fd);
+        cm.material.opacity = 0.85 * (1 - t * 0.55);
+      });
+    }
+
+    // Bespoke 3D WebGL Mesh Builder for All 6 Tesla Models (Model Y Juniper, Model 3 Highland, Model S/X Plaid, Cybercab, Cybertruck!)
+    function buildTeslaFsd3DMesh(carSpec, overrideHex, isPlayer) {
+      const root = new THREE.Group();
+      const bodyHex = overrideHex || carSpec.color || '#a3adb8';
+      const [W, H, L] = carSpec.dims || [1.92, 1.62, 4.79];
+      const hw = W / 2, hl = L / 2;
+      const isCybertruck = carSpec.id === 'cybertruck' || carSpec.profile === 'tesla_cybertruck';
+      const isCybercab = carSpec.id === 'tesla_cybercab';
+      const isJuniper = carSpec.id === 'tesla_modely_juniper';
+      const isSuv = H > 1.56;
+      const wheelR = isCybertruck ? 0.43 : (isSuv ? 0.38 : 0.35);
+
+      const envTex = getCarEnvMap();
+      const paintMat = new THREE.MeshPhongMaterial({
+        color: bodyHex,
+        specular: isCybertruck ? 0xf8fafc : 0xe2e8f0,
+        shininess: isCybertruck ? 290 : 210,
+        envMap: envTex,
+        reflectivity: isCybertruck ? 0.78 : 0.55,
+        combine: THREE.MixOperation
+      });
+      const glassRoofMat = new THREE.MeshPhongMaterial({
+        color: 0x070b12,
+        specular: 0xe2e8f0,
+        shininess: 260,
+        envMap: envTex,
+        reflectivity: 0.88,
+        transparent: true,
+        opacity: 0.88
+      });
+      const trimDarkMat = new THREE.MeshPhongMaterial({ color: 0x11151e, specular: 0x475569, shininess: 60 });
+      const drlOn = !isPlayer || (state.headlights && state.engineOn);
+      const frontLaserMat = new THREE.MeshBasicMaterial({ color: drlOn ? 0xf0f9ff : 0x475569 });
+      const tailRedMat = new THREE.MeshBasicMaterial({ color: 0xef233c });
+      const tailDiffusedMat = new THREE.MeshBasicMaterial({ color: 0xb91c1c });
+
+      const localBlinkL = [], localBlinkR = [];
+      const bodyGroup = new THREE.Group();
+      root.add(bodyGroup);
+
+      if (isPlayer) {
+        brakeLampMaterials = [tailRedMat];
+        reverseLampMaterials = [];
+        playerHeadlightGroup = new THREE.Group();
+        const beamGeo = new THREE.ConeGeometry(1.6, 16.0, 14, 1, true);
+        beamGeo.translate(0, -8.0, 0);
+        beamGeo.rotateX(-Math.PI / 2 + 0.07);
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+        [-hw * 0.65, hw * 0.65].forEach(bx => {
+          const cone = new THREE.Mesh(beamGeo, beamMat);
+          cone.position.set(bx, H * 0.38, hl + 0.05);
+          playerHeadlightGroup.add(cone);
+        });
+        playerHeadlightGroup.visible = Boolean(state.headlights && state.engineOn && (state.nightFactor || 0) > 0.22);
+        root.add(playerHeadlightGroup);
+      }
+
+      if (isCybertruck) {
+        // Sharp Planar Stainless-Steel Exoskeleton Wedge!
+        const sideShape = new THREE.Shape();
+        sideShape.moveTo(-hl, wheelR * 0.55);
+        sideShape.lineTo(hl, wheelR * 0.52);
+        sideShape.lineTo(hl * 0.96, H * 0.50);
+        sideShape.lineTo(hl * 0.06, H * 0.98); // Iconic triangular Cybertruck apex!
+        sideShape.lineTo(-hl * 0.98, H * 0.64);
+        sideShape.lineTo(-hl, wheelR * 0.55);
+        const ctGeo = new THREE.ExtrudeGeometry(sideShape, { depth: W * 0.92, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 2 });
+        ctGeo.rotateY(Math.PI / 2);
+        ctGeo.translate(-W * 0.46, 0, 0);
+        bodyGroup.add(new THREE.Mesh(ctGeo, paintMat));
+
+        // Panoramic Armor Glass Windshield + Tonneau Vault Cover
+        const vault = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 0.05, L * 0.86), glassRoofMat);
+        vault.position.set(0, H * 0.77, 0.02);
+        vault.rotation.x = 0.08;
+        const rearLaser = new THREE.Mesh(new THREE.BoxGeometry(W * 0.94, 0.055, 0.06), tailRedMat);
+        rearLaser.position.set(0, H * 0.60, -hl - 0.02);
+        const frontLaser = new THREE.Mesh(new THREE.BoxGeometry(W * 0.94, 0.05, 0.06), frontLaserMat);
+        frontLaser.position.set(0, H * 0.48, hl + 0.02);
+        const lowSkirt = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, 0.16, L * 0.96), trimDarkMat);
+        lowSkirt.position.set(0, wheelR * 0.45, 0);
+        bodyGroup.add(vault, rearLaser, frontLaser, lowSkirt);
+      } else {
+        // Sleek Aerodynamic Teardrop Tesla Silhouette (Model Y Juniper / Model 3 Highland / Model S & X Plaid / Cybercab)
+        const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, H * 0.42, L * 0.96), paintMat);
+        lowerBody.position.set(0, wheelR * 0.62 + H * 0.18, 0);
+        bodyGroup.add(lowerBody);
+
+        // Sculpted Rear & Front Haunches
+        [-1, 1].forEach(side => {
+          const haunch = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.21, H * 0.24, L * 0.44, 16), paintMat);
+          haunch.rotation.x = Math.PI / 2;
+          haunch.scale.set(0.62, 1, 0.88);
+          haunch.position.set(side * (hw * 0.82), H * 0.42, -L * 0.20);
+          // Flush black door handles + HW4 Autopilot Fender Camera Badge
+          const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.028, 0.16), trimDarkMat);
+          handle.position.set(side * (hw * 0.97), H * 0.48, 0.08);
+          const hw4Cam = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.045, 0.13), trimDarkMat);
+          hw4Cam.position.set(side * (hw * 0.97), H * 0.46, L * 0.22);
+          // Side Wing Mirrors
+          const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.12), paintMat);
+          mirror.position.set(side * (hw + 0.05), H * 0.62, L * 0.16);
+          bodyGroup.add(haunch, handle, hw4Cam, mirror);
+        });
+
+        // Seamless Panoramic Smoked-Glass Greenhouse Dome (Signature Tesla All-Glass Roof!)
+        const cabinGeo = new THREE.SphereGeometry(1, 28, 18);
+        cabinGeo.scale(W * 0.43, H * 0.36, L * 0.33);
+        const cabinDome = new THREE.Mesh(cabinGeo, glassRoofMat);
+        cabinDome.position.set(0, H * 0.64, -L * 0.03);
+        bodyGroup.add(cabinDome);
+
+        // Painted Roof Rails framing the All-Glass Roof
+        [-1, 1].forEach(side => {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.055, L * 0.46), paintMat);
+          rail.position.set(side * (W * 0.39), H * 0.86, -L * 0.04);
+          bodyGroup.add(rail);
+        });
+
+        // Rear Ducktail / Carbon Plaid Lip + Full-Width Juniper/Cybercab Lightbar or Highland C-Claws!
+        const duckLip = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, 0.04, 0.12), carSpec.id.includes('plaid') || carSpec.id.includes('highland') ? trimDarkMat : paintMat);
+        duckLip.position.set(0, H * 0.60, -hl + 0.04);
+        bodyGroup.add(duckLip);
+
+        if (isJuniper || isCybercab || carSpec.id === 'tesla_modelx_plaid') {
+          // Model Y Juniper Full-Width Indirect Reflective Lightbar + Matte Black [T E S L A] Trim!
+          const darkBand = new THREE.Mesh(new THREE.BoxGeometry(W * 0.94, H * 0.11, 0.06), trimDarkMat);
+          darkBand.position.set(0, H * 0.51, -hl - 0.01);
+          const fullBar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.92, 0.042, 0.07), tailRedMat);
+          fullBar.position.set(0, H * 0.535, -hl - 0.018);
+          const glowSub = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, 0.025, 0.065), tailDiffusedMat);
+          glowSub.position.set(0, H * 0.485, -hl - 0.014);
+          bodyGroup.add(darkBand, fullBar, glowSub);
+        } else {
+          // Model 3 Highland / Model S Plaid Sleek C-Claw LED Blades + Center Trim!
+          const centerTrim = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, 0.045, 0.05), trimDarkMat);
+          centerTrim.position.set(0, H * 0.50, -hl - 0.01);
+          bodyGroup.add(centerTrim);
+          [-1, 1].forEach(side => {
+            const topBlade = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.036, 0.06), tailRedMat);
+            topBlade.position.set(side * (hw * 0.68), H * 0.525, -hl - 0.016);
+            const lowBlade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.030, 0.06), tailRedMat);
+            lowBlade.position.set(side * (hw * 0.72), H * 0.465, -hl - 0.016);
+            bodyGroup.add(topBlade, lowBlade);
+          });
+        }
+
+        // Front Juniper/Cybercab Lightbar or Highland Razor Headlamps
+        if (isJuniper || isCybercab) {
+          const fBar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.90, 0.038, 0.06), frontLaserMat);
+          fBar.position.set(0, H * 0.44, hl + 0.01);
+          bodyGroup.add(fBar);
+        } else {
+          [-1, 1].forEach(side => {
+            const hlLamp = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.045, 0.08), frontLaserMat);
+            hlLamp.position.set(side * (hw * 0.68), H * 0.43, hl + 0.01);
+            hlLamp.rotation.z = side * -0.12;
+            bodyGroup.add(hlLamp);
+          });
+        }
+
+        // Rear Matte-Black EV Diffuser + Korean Blue EV Plate
+        const rearDiff = new THREE.Mesh(new THREE.BoxGeometry(W * 0.94, H * 0.15, 0.12), trimDarkMat);
+        rearDiff.position.set(0, H * 0.16, -hl + 0.02);
+        const evPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.115), new THREE.MeshBasicMaterial({ color: 0xbae6fd }));
+        evPlate.rotation.y = Math.PI;
+        evPlate.position.set(0, H * 0.31, -hl - 0.035);
+        bodyGroup.add(rearDiff, evPlate);
+      }
+
+      // Rear Turn-Signal Overlays
+      [-1, 1].forEach(side => {
+        const bMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.0 });
+        const bPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.065), bMat);
+        bPlane.rotation.y = Math.PI;
+        bPlane.position.set(side * (hw * 0.72), H * 0.51, -hl - 0.035);
+        bodyGroup.add(bPlane);
+        if (side < 0) localBlinkL.push(bMat); else localBlinkR.push(bMat);
+      });
+
+      // Turbine Induction Wheels (or Cybercab Aero Disc Covers) + Red Performance Calipers
+      const localWheels = [];
+      const tireM = new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.8 });
+      const rimM = new THREE.MeshPhongMaterial({ color: isCybercab ? 0xd4af37 : 0x1e293b, specular: 0xe2e8f0, shininess: 180 });
+      const calM = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      for (const [wz, isFront] of [[L * 0.31, true], [-L * 0.31, false]]) {
+        for (const side of [-1, 1]) {
+          const pivot = new THREE.Group();
+          pivot.position.set(side * (hw * 0.90), wheelR, wz);
+          const tire = new THREE.Mesh(new THREE.CylinderGeometry(wheelR, wheelR, 0.27, 22), tireM);
+          tire.rotation.z = Math.PI * 0.5;
+          const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.75, wheelR * 0.75, 0.276, 18), rimM);
+          rim.rotation.z = Math.PI * 0.5;
+          const cal = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.08), calM);
+          cal.position.set(0, 0.05, isFront ? -0.09 : 0.09);
+          pivot.add(tire, rim, cal);
+          root.add(pivot);
+          localWheels.push({ pivot, tire, isFront });
+        }
+      }
+
+      if (isPlayer) {
+        blinkerMeshesL = localBlinkL;
+        blinkerMeshesR = localBlinkR;
+        playerWheels = localWheels;
+        doorPivotL = null; doorPivotR = null; trunkPivot = null; spoilerPivot = null;
+      }
+      return { root, wheels: localWheels, blinkL: localBlinkL, blinkR: localBlinkR };
+    }
+
+    // Bespoke 2D Rear Renderer for Tesla Fleet (Model Y Juniper, Model 3 Highland, Model S/X Plaid, Cybercab, Cybertruck)
+    function drawTeslaRearCar2D(ctx, car, baseCol) {
+      const braking = state.brakePressed || state.keys['KeyS'] || state.keys['ArrowDown'] || state.keys['Space'] || Boolean(state.fsdDecelReason);
+      const blinkPulse = Math.floor(performance.now() / 300) % 2 === 0;
+      const isCybertruck = car.id === 'cybertruck' || car.profile === 'tesla_cybertruck';
+      const isJuniper = car.id === 'tesla_modely_juniper' || car.id === 'tesla_modelx_plaid' || car.id === 'tesla_cybercab';
+
+      // Ground Contact Shadow & Wide EV Tires
+      ctx.fillStyle = 'rgba(6, 10, 18, 0.70)';
+      ctx.beginPath(); ctx.ellipse(0, 68, 114, 16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0c1017';
+      ctx.beginPath(); ctx.roundRect(-104, 24, 28, 44, 5); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(76, 24, 28, 44, 5); ctx.fill();
+
+      if (isCybertruck) {
+        // Sharp Angular Cold-Rolled Stainless-Steel Cybertruck Rear!
+        const stGrad = ctx.createLinearGradient(-104, -92, 104, 42);
+        stGrad.addColorStop(0, '#e2e8f0');
+        stGrad.addColorStop(0.45, '#94a3b8');
+        stGrad.addColorStop(1, '#475569');
+        ctx.fillStyle = stGrad;
+        ctx.beginPath();
+        ctx.moveTo(-82, -88);
+        ctx.lineTo(0, -96);
+        ctx.lineTo(82, -88);
+        ctx.lineTo(104, -26);
+        ctx.lineTo(102, 38);
+        ctx.lineTo(-102, 38);
+        ctx.lineTo(-104, -26);
+        ctx.closePath();
+        ctx.fill();
+
+        // Dark Tonneau Vault Glass
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.moveTo(-74, -84); ctx.lineTo(74, -84); ctx.lineTo(92, -28); ctx.lineTo(-92, -28);
+        ctx.closePath(); ctx.fill();
+
+        // Full-Width Red Laser Lightbar
+        ctx.fillStyle = braking ? '#ff2a2a' : '#ef233c';
+        ctx.shadowColor = '#ff1e1e';
+        ctx.shadowBlur = braking ? 20 : 10;
+        ctx.fillRect(-100, -24, 200, 5.5);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-102, 26, 204, 18);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '900 8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('C Y B E R B E A S T', 0, 2);
+      } else {
+        // Sleek Sculpted Tesla Model Y Juniper / Model 3 Highland / Model S Plaid Rear!
+        const hScale = car.dims && car.dims[1] > 1.55 ? 1.05 : 0.94;
+        ctx.save();
+        ctx.scale(1, hScale);
+
+        // Side Mirrors
+        ctx.fillStyle = baseCol;
+        ctx.beginPath(); ctx.roundRect(-84, -76, 15, 8, 3); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(69, -76, 15, 8, 3); ctx.fill();
+
+        // Smooth Aerodynamic Teardrop Body + Muscular Rear Shoulders
+        const bodyG = ctx.createLinearGradient(0, -104, 0, 44);
+        bodyG.addColorStop(0.0, '#f8fafc');
+        bodyG.addColorStop(0.24, baseCol);
+        bodyG.addColorStop(0.75, baseCol);
+        bodyG.addColorStop(1.0, '#1e293b');
+        ctx.fillStyle = bodyG;
+        ctx.beginPath();
+        ctx.moveTo(-48, -98);
+        ctx.bezierCurveTo(-22, -106, 22, -106, 48, -98);
+        ctx.bezierCurveTo(64, -92, 74, -68, 84, -52);
+        ctx.bezierCurveTo(98, -42, 105, -22, 104, 36);
+        ctx.lineTo(-104, 36);
+        ctx.bezierCurveTo(-105, -22, -98, -42, -84, -52);
+        ctx.bezierCurveTo(-74, -68, -64, -92, -48, -98);
+        ctx.closePath();
+        ctx.fill();
+
+        // All-Glass Tinted Panoramic Roof & Liftgate Window
+        const glassG = ctx.createLinearGradient(0, -100, 0, -34);
+        glassG.addColorStop(0, '#090d16');
+        glassG.addColorStop(0.65, '#172133');
+        glassG.addColorStop(1, '#0b101b');
+        ctx.fillStyle = glassG;
+        ctx.beginPath();
+        ctx.moveTo(-44, -96);
+        ctx.quadraticCurveTo(0, -102, 44, -96);
+        ctx.lineTo(66, -36);
+        ctx.lineTo(-66, -36);
+        ctx.closePath();
+        ctx.fill();
+
+        // Ducktail Integrated Aero Lip
+        ctx.fillStyle = (car.id === 'tesla_model3_highland' || car.id === 'tesla_models_plaid') ? '#111827' : 'rgba(15,23,42,0.38)';
+        ctx.beginPath();
+        ctx.moveTo(-88, -28);
+        ctx.quadraticCurveTo(0, -33, 88, -28);
+        ctx.lineTo(92, -23);
+        ctx.quadraticCurveTo(0, -27, -92, -23);
+        ctx.closePath();
+        ctx.fill();
+
+        if (isJuniper) {
+          // Model Y Juniper Signature Full-Width Indirect Diffused Crimson Lightbar + Dark Band!
+          ctx.fillStyle = '#141821';
+          ctx.beginPath(); ctx.roundRect(-98, -21, 196, 16, 4); ctx.fill();
+          ctx.fillStyle = braking ? '#ff3b30' : '#e11d48';
+          ctx.shadowColor = '#ff1e38';
+          ctx.shadowBlur = braking ? 22 : 12;
+          ctx.fillRect(-96, -19, 192, 4.8);
+          const diffGlow = ctx.createLinearGradient(0, -14, 0, -5);
+          diffGlow.addColorStop(0, braking ? 'rgba(255,70,70,0.85)' : 'rgba(225,29,72,0.62)');
+          diffGlow.addColorStop(1, 'rgba(20,24,33,0)');
+          ctx.fillStyle = diffGlow;
+          ctx.fillRect(-92, -14, 184, 9);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = '800 6.5px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('T   E   S   L   A', 0, -9);
+        } else {
+          // Model 3 Highland / Model S Plaid Sleek C-Claw LED Taillights!
+          ctx.fillStyle = '#181c26';
+          ctx.fillRect(-72, -17, 144, 5);
+          ctx.fillStyle = '#e2e8f0';
+          ctx.font = '800 6px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('T  E  S  L  A', 0, -12.5);
+
+          ctx.strokeStyle = braking ? '#ff3b30' : '#ef233c';
+          ctx.shadowColor = '#ff2a2a';
+          ctx.shadowBlur = braking ? 18 : 9;
+          ctx.lineWidth = 4.2;
+          ctx.lineCap = 'round';
+          // Left C-claw
+          ctx.beginPath(); ctx.moveTo(-64, -20); ctx.lineTo(-96, -19); ctx.lineTo(-92, -8); ctx.lineTo(-72, -9); ctx.stroke();
+          // Right C-claw
+          ctx.beginPath(); ctx.moveTo(64, -20); ctx.lineTo(96, -19); ctx.lineTo(92, -8); ctx.lineTo(72, -9); ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+
+        // Amber Turn Signal Blinkers
+        if ((state.blinkerLeft || state.hazard) && blinkPulse) {
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(-96, -15, 26, 5);
+        }
+        if ((state.blinkerRight || state.hazard) && blinkPulse) {
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(70, -15, 26, 5);
+        }
+
+        // Korean Eco-Friendly Blue EV License Plate + Dual Matte-Black Lower Diffuser
+        ctx.fillStyle = '#bae6fd';
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.roundRect(-36, 4, 72, 14, 2.5); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 8.5px "Noto Sans KR", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(state.customPlate || car.plate || '48하 1501', 0, 14);
+
+        ctx.fillStyle = '#11151e';
+        ctx.beginPath();
+        ctx.moveTo(-102, 26); ctx.lineTo(102, 26); ctx.lineTo(98, 44); ctx.lineTo(-98, 44);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(-88, 30, 18, 2.8);
+        ctx.fillRect(70, 30, 18, 2.8);
+
+        ctx.restore();
+      }
+    }
+
+    // 2D Tesla FSD v15 Reality View Road Overlay (Glowing Blue Trajectory Carpet, Velocity Chevrons, Potholes & Speed Cams)
+    function renderTeslaFsdRealityRoad2D(ctx, w, h, horizon, vanishX, roadBotCenter) {
+      ctx.save();
+      const laneShiftPx = ((state.fsdLaneOffset ?? 3.3) - 3.3) * (w * 0.025);
+      const topX = vanishX + 10 + laneShiftPx * 0.25;
+      const botX = roadBotCenter + w * 0.11 + laneShiftPx;
+
+      // 1. Glowing Tesla-Blue FSD Trajectory Carpet when FSD v15 is Engaged
+      if (state.autopilot && !state.isWalking) {
+        const slowing = Boolean(state.fsdDecelReason);
+        const pathGrad = ctx.createLinearGradient(0, horizon + 8, 0, h * 0.76);
+        pathGrad.addColorStop(0, slowing ? 'rgba(56, 189, 248, 0.12)' : 'rgba(37, 99, 235, 0.12)');
+        pathGrad.addColorStop(0.55, slowing ? 'rgba(56, 189, 248, 0.45)' : 'rgba(59, 130, 246, 0.44)');
+        pathGrad.addColorStop(1, slowing ? 'rgba(125, 211, 252, 0.62)' : 'rgba(37, 99, 235, 0.62)');
+
+        ctx.fillStyle = pathGrad;
+        ctx.beginPath();
+        ctx.moveTo(topX - 5, horizon + 8);
+        ctx.lineTo(topX + 5, horizon + 8);
+        ctx.quadraticCurveTo((topX + botX) * 0.5 + w * 0.04, (horizon + h * 0.76) * 0.5, botX + w * 0.085, h * 0.76);
+        ctx.lineTo(botX - w * 0.085, h * 0.76);
+        ctx.quadraticCurveTo((topX + botX) * 0.5 - w * 0.04, (horizon + h * 0.76) * 0.5, topX - 5, horizon + 8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Crisp Glowing Blue Path Edges
+        ctx.strokeStyle = slowing ? '#7dd3fc' : '#60a5fa';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(topX - 5, horizon + 8);
+        ctx.quadraticCurveTo((topX + botX) * 0.5 - w * 0.04, (horizon + h * 0.76) * 0.5, botX - w * 0.085, h * 0.76);
+        ctx.moveTo(topX + 5, horizon + 8);
+        ctx.quadraticCurveTo((topX + botX) * 0.5 + w * 0.04, (horizon + h * 0.76) * 0.5, botX + w * 0.085, h * 0.76);
+        ctx.stroke();
+
+        // Animated Velocity / Deceleration Blue Chevrons along Path
+        const phase = ((performance.now() * (slowing ? -0.0022 : 0.0026)) % 1 + 1) % 1;
+        ctx.strokeStyle = slowing ? '#e0f2fe' : 'rgba(219, 234, 254, 0.85)';
+        ctx.lineWidth = 2.4;
+        for (let ci = 0; ci < 5; ci++) {
+          const t = ((ci / 5) + phase) % 1;
+          const py = horizon + 14 + (h * 0.73 - horizon - 14) * (t * t);
+          const px = topX + (botX - topX) * (t * t);
+          const cw = 6 + t * 28;
+          const dirY = slowing ? 7 : -7;
+          ctx.globalAlpha = Math.min(1, (1 - t * 0.35) * 0.9);
+          ctx.beginPath();
+          ctx.moveTo(px - cw, py - dirY * t);
+          ctx.lineTo(px, py + dirY * t);
+          ctx.lineTo(px + cw, py - dirY * t);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // 2. Render Potholes, Speed Cameras & Tap-to-Park >>> Chevrons in 2D Reality View (unless Calm Mode hides extra labels)
+      if (state.scenicTourActive && !state.fsdCalmMode) {
+        const projectPt = (wx, wz) => {
+          const dx = wx - state.x, dz = wz - state.z;
+          const fwd = dx * Math.sin(state.heading) + dz * Math.cos(state.heading);
+          const lat = dx * Math.cos(state.heading) - dz * Math.sin(state.heading);
+          if (fwd < 3.5 || fwd > 90) return null;
+          const p = Math.min(0.95, 5.2 / fwd);
+          const sy = horizon + (h - horizon) * p;
+          const sx = vanishX + (roadBotCenter - vanishX) * p + (lat / 7.5) * ((w * 0.08) + (w * 0.42) * p);
+          return { sx, sy, p, fwd };
+        };
+
+        (state.fsdPotholes || []).forEach(ph => {
+          const pr = projectPt(ph.x, ph.z);
+          if (!pr) return;
+          const r = Math.max(5, 28 * pr.p);
+          ctx.fillStyle = '#0f172a';
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(pr.sx, pr.sy, r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          if (pr.fwd < 52) {
+            ctx.fillStyle = '#fde047';
+            ctx.font = '800 9.5px "Noto Sans KR", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`🕳️ 포트홀 ${Math.round(pr.fwd)}m`, pr.sx, pr.sy - r * 0.6 - 4);
+          }
+        });
+
+        (state.fsdSpeedCams || []).forEach(cm => {
+          const pr = projectPt(cm.x, cm.z);
+          if (!pr) return;
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath(); ctx.roundRect(pr.sx - 16, pr.sy - 42 * pr.p - 16, 32, 15, 4); ctx.fill();
+          ctx.fillStyle = '#0f172a';
+          ctx.font = '900 9px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`📷${cm.limit}`, pr.sx, pr.sy - 42 * pr.p - 5);
+        });
+
+        if (state.fsdParkingActive && state.fsdParkTarget) {
+          const pr = projectPt(state.fsdParkTarget.x, state.fsdParkTarget.z);
+          if (pr) {
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.35)';
+            ctx.strokeStyle = '#60a5fa';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.ellipse(pr.sx, pr.sy, 26 * pr.p + 12, 11 * pr.p + 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#93c5fd';
+            ctx.font = '900 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('>>> P 주차구역', pr.sx, pr.sy - 10);
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    function syncTeslaFsdHudWidgets() {
+      const fsdOn = Boolean(state.autopilot);
+      const topBtn = document.getElementById('topFsdQuickBtn');
+      if (topBtn) {
+        topBtn.classList.toggle('on', fsdOn);
+        topBtn.textContent = fsdOn ? '🔵 FSD v15 작동중' : '⚪ FSD v15 켜기';
+      }
+      const engBtn = document.getElementById('teslaFsdEngageBtn');
+      if (engBtn) engBtn.classList.toggle('on', fsdOn);
+      const stTitle = document.getElementById('teslaFsdStateTitle');
+      const stSub = document.getElementById('teslaFsdSubLabel');
+      if (stTitle) stTitle.textContent = fsdOn ? 'FSD v15' : '수동 주행';
+      if (stSub) stSub.textContent = fsdOn ? 'Supervised' : '탭하여 시작';
+
+      const dockBtn = document.getElementById('tsDockFsdBtn');
+      if (dockBtn) dockBtn.classList.toggle('active-blue', fsdOn);
+
+      document.querySelectorAll('#teslaSpeedProfileBar .ts-prof-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-prof') === state.fsdSpeedProfile);
+      });
+      const calmBtn = document.getElementById('tsCalmModeBtn');
+      if (calmBtn) calmBtn.classList.toggle('on', !!state.fsdCalmMode);
+      const hovBtn = document.getElementById('tsHovLaneBtn');
+      if (hovBtn) hovBtn.classList.toggle('on', !!state.fsdUseHov);
+      const parkBtn = document.getElementById('tsAutoParkBtn');
+      if (parkBtn) parkBtn.classList.toggle('on', !!state.fsdParkingActive);
+    }
+
+    function updateTeslaLiveTelemetryHud() {
+      if (state.stage !== 'driving') return;
+      const kmh = Math.round(Math.abs(state.speed || 0) * 3.6);
+      const lim = state.fsdPostedLimitKmh || 80;
+
+      // Speed Assist Limit Sign + Blue Speeding Alert
+      const limValEl = document.getElementById('teslaSpeedLimitVal');
+      const limSignEl = document.getElementById('teslaSpeedLimitSign');
+      if (limValEl) limValEl.textContent = String(lim);
+      if (limSignEl) limSignEl.classList.toggle('over-limit', kmh > lim + 5);
+
+      // Battery % & Estimated Range
+      const pct = Math.max(5, Math.min(100, Math.round(state.fuel ?? 94)));
+      const battPctEl = document.getElementById('teslaBatteryPctText');
+      const battFillEl = document.getElementById('teslaBatteryFillBar');
+      const rangeEl = document.getElementById('teslaRangeKmText');
+      if (battPctEl) battPctEl.textContent = pct + '%';
+      if (battFillEl) {
+        battFillEl.style.width = pct + '%';
+        battFillEl.style.background = pct < 20 ? '#ef4444' : '#22c55e';
+      }
+      if (rangeEl) rangeEl.textContent = Math.round(pct * 5.45) + ' km';
+
+      // Regenerative Braking (Green Left) vs Power Output (Blue Right)
+      const regenEl = document.getElementById('teslaRegenFill');
+      const powEl = document.getElementById('teslaPowerFill');
+      if (regenEl && powEl) {
+        const isBrakingOrDecel = state.brakePressed || Boolean(state.fsdDecelReason) || (!state.accelPressed && !state.autopilot && kmh > 6);
+        const isPower = (state.autopilot && !state.fsdDecelReason && kmh > 1) || state.accelPressed || state.keys['KeyW'] || state.keys['ArrowUp'];
+        regenEl.style.width = isBrakingOrDecel && kmh > 2 ? Math.min(48, 14 + kmh * 0.28) + '%' : '0%';
+        powEl.style.width = (!isBrakingOrDecel && isPower) ? Math.min(48, 12 + kmh * 0.25) + '%' : '0%';
+      }
+
+      // Neural Status Line & Bottom Subtitle
+      const nDot = document.getElementById('teslaNeuralDot');
+      const nTxt = document.getElementById('teslaNeuralText');
+      if (nDot) nDot.style.background = state.autopilot ? '#3b82f6' : '#94a3b8';
+      if (nTxt) {
+        nTxt.textContent = state.autopilot
+          ? (state.fsdStatusMsg || 'Reality View · 차선 중앙 자율주행 중')
+          : '수동 운전 중 · 파란 FSD v15 버튼으로 자율주행 시작';
+      }
+
+      // Right Navigation Turn-by-Turn Card
+      const crs = getCurrentScenicCourse();
+      const roadEl = document.getElementById('teslaNavRoadName');
+      const distEl = document.getElementById('teslaNavNextDist');
+      const etaEl = document.getElementById('teslaNavEtaText');
+      const camAlertEl = document.getElementById('teslaSpeedCamAlert');
+      if (roadEl) roadEl.textContent = `${crs.icon} ${crs.name}`;
+      if (distEl) {
+        const cyc = 450 - (Math.floor(Math.abs(state.z || 0) + Math.abs(state.x || 0)) % 420);
+        distEl.textContent = cyc + ' m';
+      }
+      if (etaEl) {
+        const remKm = (6.8 + ((Math.abs(state.x || 0) % 40) * 0.1)).toFixed(1);
+        etaEl.textContent = `잔여 ${remKm} km · ${getCurrentCar().name.slice(0, 11)}`;
+      }
+      if (camAlertEl) {
+        camAlertEl.textContent = state.fsdDecelReason === 'camera' ? '📷 단속감속' : (state.fsdCalmMode ? '🧘 캄모드' : '⚡ HW4 정상');
+      }
+
+      // Blind-Spot Repeater Mirrors: Glow Amber on Turn Signal, Hide in Calm Mode when Blinker Off!
+      const lm = document.getElementById('dcLeftWingMirror');
+      const rm = document.getElementById('dcRightWingMirror');
+      if (lm) {
+        lm.classList.toggle('ts-blindspot-active', !!state.blinkerLeft);
+        lm.style.opacity = (state.fsdCalmMode && !state.blinkerLeft) ? '0.0' : '1.0';
+        lm.style.pointerEvents = (state.fsdCalmMode && !state.blinkerLeft) ? 'none' : 'auto';
+      }
+      if (rm) {
+        rm.classList.toggle('ts-blindspot-active', !!state.blinkerRight);
+        rm.style.opacity = (state.fsdCalmMode && !state.blinkerRight) ? '0.0' : '1.0';
+      }
+
+      const akb = document.getElementById('airKillBadge');
+      if (akb && !state.carFlightMode && !state.skyCombatActive && !(state.skyBoss && state.skyBoss.active)) {
+        akb.style.display = 'none';
+      }
+      const pr = document.getElementById('dcBottomGreenPrompt');
+      if (pr) {
+        if (state.autopilot) {
+          pr.textContent = `🔵 Tesla FSD (Supervised) v15.0.1 · ${getFsdProfileKorLabel(state.fsdSpeedProfile)} · ${kmh} km/h`;
+        } else {
+          pr.textContent = `⚪ 수동 운전 모드 (${kmh} km/h) · 브레이크/핸들 조작 중 · [FSD v15] 탭 시 자율주행 재개`;
+        }
+      }
+      syncTeslaFsdHudWidgets();
+    }
+
+    const _v45RenderMmHook = renderMinimapAndOverlays;
+    renderMinimapAndOverlays = function(dt) {
+      _v45RenderMmHook(dt);
+      ensureFsdCourseHazards();
+      updateTeslaFsd3DPathAndSummon(dt || 0.016);
+      updateTeslaLiveTelemetryHud();
+    };
 
   </script>
 
