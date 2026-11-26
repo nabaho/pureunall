@@ -2455,6 +2455,487 @@
       #hudCourseQuickPill { font-size: 9.5px; padding: 2.5px 7px; }
     }
 
+
+    /* =========================================================================
+       v43 AUTHENTIC 3D 운전교실 COCKPIT HUD (1:1 MATCH TO SCREENSHOT)
+       ========================================================================= */
+    .dc-sr {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      overflow: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .dc-sr-btn {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      overflow: hidden !important;
+    }
+
+    #drivingHud {
+      position: absolute !important;
+      inset: 0 !important;
+      pointer-events: none;
+    }
+
+    /* 1. Top-Left Vertical Slot Gear Shifter (P - R - N - D) */
+    #dcGearSlotBox {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      width: 58px;
+      height: 118px;
+      border-radius: 13px;
+      background: linear-gradient(180deg, #525b68 0%, #272e3a 55%, #181d26 100%);
+      border: 2px solid rgba(203, 213, 225, 0.72);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.35);
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      padding: 6px 5px;
+      z-index: 45;
+    }
+    .dc-shift-slot-track {
+      position: relative;
+      width: 20px;
+      background: #090d14;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.9);
+      margin: 2px 0;
+    }
+    .dc-shift-knob {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 70px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #f8fafc, #94a3b8 68%, #334155 100%);
+      border: 1.5px solid #e2e8f0;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.75);
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: top 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+    #dcGearSlotBox #gearShifter {
+      background: transparent !important;
+      border: none !important;
+      backdrop-filter: none !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      padding: 0 !important;
+      width: 24px !important;
+    }
+    #dcGearSlotBox .gear-btn {
+      width: 24px !important;
+      height: 21px !important;
+      padding: 0 !important;
+      font-size: 13px !important;
+      font-weight: 900 !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      color: rgba(203, 213, 225, 0.65) !important;
+    }
+    #dcGearSlotBox .gear-btn.dc-gear-m {
+      font-size: 9.5px !important;
+      height: 15px !important;
+      opacity: 0.72;
+    }
+    #dcGearSlotBox .gear-btn.active {
+      background: transparent !important;
+      box-shadow: none !important;
+      color: #4ade80 !important;
+      text-shadow: 0 0 10px rgba(74, 222, 128, 0.85) !important;
+    }
+    #dcGearSlotBox .gear-btn.active[data-gear="R"] {
+      color: #f87171 !important;
+      text-shadow: 0 0 10px rgba(248, 113, 113, 0.85) !important;
+    }
+    #dcGearSlotBox .gear-btn.active[data-gear="P"] {
+      color: #f8fafc !important;
+      text-shadow: 0 0 8px rgba(255,255,255,0.6) !important;
+    }
+
+    /* 2. Trapezoid Rearview Room Mirror + Fuel Arc + Digital km/h */
+    #dcMirrorAndSpeedPod {
+      position: absolute;
+      left: 78px;
+      top: 8px;
+      z-index: 44;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 204px;
+    }
+    #dcRoomMirrorFrame {
+      width: 204px;
+      height: 50px;
+      background: #0f172a;
+      border: 2.5px solid #18181b;
+      border-radius: 12px 12px 16px 16px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.22);
+      overflow: hidden;
+      cursor: pointer;
+      clip-path: polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%);
+    }
+    #dcRoomMirrorCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .dc-under-mirror-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+    #drivingHud #hudClusterBox {
+      background: transparent !important;
+      border: none !important;
+      backdrop-filter: none !important;
+      box-shadow: none !important;
+      padding: 0 2px !important;
+      min-width: 0 !important;
+      display: inline-flex !important;
+      align-items: baseline !important;
+      gap: 3px !important;
+      cursor: pointer;
+    }
+    #drivingHud #hudSpeedNum {
+      font-family: 'Inter', monospace !important;
+      font-size: 25px !important;
+      font-weight: 900 !important;
+      color: #ffffff !important;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.85) !important;
+    }
+    .dc-kmh-unit {
+      font-size: 11px;
+      font-weight: 800;
+      color: #e2e8f0;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+    }
+
+    /* 3. Top-Right Camera + Blue Pause Button */
+    #dcTopRightIcons {
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      z-index: 48;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .dc-top-cam-btn {
+      background: rgba(15, 23, 42, 0.35);
+      border: 1.5px solid rgba(226, 232, 240, 0.55);
+      border-radius: 10px;
+      padding: 4px 7px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+    }
+    #dcPauseMenuBtn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, #60a5fa 0%, #2563eb 62%, #1e3a8a 100%);
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #dcPauseDrawer {
+      position: absolute;
+      top: 52px;
+      right: 12px;
+      z-index: 275;
+      width: min(335px, calc(100vw - 24px));
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(8, 12, 22, 0.94);
+      border: 1px solid rgba(125, 211, 252, 0.32);
+      backdrop-filter: blur(20px);
+      display: none;
+      flex-direction: column;
+      gap: 9px;
+      box-shadow: 0 20px 48px rgba(0,0,0,0.68);
+    }
+
+    /* 4 & 5. Side Wing Mirrors + Turn Trio + Vertical Road Minimap */
+    .dc-wing-mirror {
+      width: 86px;
+      height: 60px;
+      border-radius: 6px;
+      border: 2px solid #cbd5e1;
+      background: #0f172a;
+      box-shadow: 0 5px 14px rgba(0,0,0,0.55);
+      overflow: hidden;
+    }
+    .dc-wing-mirror canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #dcLeftWingMirror {
+      position: absolute;
+      left: 8px;
+      top: 144px;
+      z-index: 42;
+    }
+    #dcRightClusterStack {
+      position: absolute;
+      right: 8px;
+      top: 104px;
+      z-index: 42;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 7px;
+    }
+    .dc-turn-trio {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center;
+      gap: 8px !important;
+      width: auto !important;
+    }
+    .dc-round-sig {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, #ffffff 0%, #e2e8f0 68%, #94a3b8 100%);
+      border: 1.5px solid #cbd5e1;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.42), inset 0 1px 1px #ffffff;
+      color: #334155;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .dc-round-sig.on {
+      background: radial-gradient(circle at 35% 28%, #bbf7d0 0%, #4ade80 65%, #16a34a 100%) !important;
+      border-color: #dcfce7 !important;
+      color: #052e16 !important;
+      box-shadow: 0 0 14px rgba(74, 222, 128, 0.85) !important;
+    }
+    .dc-round-sig.danger-flash {
+      background: radial-gradient(circle at 35% 28%, #fecaca 0%, #f87171 70%, #dc2626 100%) !important;
+      animation: hazardBlink 0.45s infinite;
+    }
+    .dc-map-and-rmirror {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    #dcRightClusterStack #liveMinimapWidget {
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      width: 54px !important;
+      height: 70px !important;
+      border-radius: 6px !important;
+      border: 2px solid rgba(203, 213, 225, 0.78) !important;
+      background: rgba(30, 41, 59, 0.78) !important;
+      box-shadow: 0 5px 14px rgba(0,0,0,0.5) !important;
+    }
+
+    /* Active Mission Floating Stack (Top-Center only when active) */
+    #dcFloatingActiveBars {
+      position: absolute;
+      top: 66px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 43;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      max-width: 92vw;
+    }
+
+    /* 6. Bottom-Left Steering Wheel */
+    #dcWheelCorner {
+      position: absolute;
+      left: 10px;
+      bottom: 8px;
+      z-index: 46;
+    }
+    #dcWheelCorner .wheel-container {
+      width: 132px !important;
+      height: 132px !important;
+    }
+
+    /* 7. Bottom-Center 7 Glossy Round Dashboard Toggles + Green Prompt */
+    #dcBottomCenterConsole {
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      transform: translateX(-50%);
+      z-index: 47;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    #dcRoundSwitchRow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dc-dash-orb {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, #ffffff 0%, #e2e8f0 62%, #94a3b8 100%);
+      border: 2px solid #cbd5e1;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.48), inset 0 1px 2px #ffffff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: transform 0.1s, background 0.15s;
+    }
+    .dc-dash-orb:active { transform: scale(0.92); }
+    .dc-dash-orb.on {
+      background: radial-gradient(circle at 35% 28%, #dcfce7 0%, #86efac 58%, #22c55e 100%) !important;
+      border-color: #bbf7d0 !important;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.52), inset 0 1px 2px #ffffff !important;
+    }
+    .dc-dash-orb.off {
+      background: radial-gradient(circle at 35% 28%, #fee2e2 0%, #fca5a5 65%, #ef4444 100%) !important;
+      border-color: #fecaca !important;
+    }
+    #dcBottomGreenPrompt {
+      font-size: 12px;
+      font-weight: 900;
+      color: #4ade80;
+      text-shadow: 0 1px 3px #000000, 0 0 8px rgba(0,0,0,0.95);
+      white-space: nowrap;
+      letter-spacing: -0.02em;
+    }
+
+    /* 8. Bottom-Right Authentic Drilled Cyan Brake + Tall Silver Accelerator Pedals */
+    #dcPedalsCorner {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      z-index: 46;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .dc-authentic-pedals {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px !important;
+    }
+    #drivingHud .dc-cyan-brake {
+      width: 58px !important;
+      height: 66px !important;
+      border-radius: 12px 12px 16px 16px !important;
+      background: linear-gradient(180deg, #38bdf8 0%, #06b6d4 58%, #0284c7 100%) !important;
+      border: 2px solid #bae6fd !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.55), inset 0 1px 2px rgba(255,255,255,0.65) !important;
+      clip-path: polygon(0% 0%, 100% 0%, 88% 100%, 12% 100%);
+      padding: 8px 6px !important;
+    }
+    .dc-brake-dots {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px 7px;
+      place-items: center;
+    }
+    .dc-brake-dots i, .dc-accel-dots i {
+      display: block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #1e293b;
+      box-shadow: inset 0 1px 2px #000000, 0 1px 0 rgba(255,255,255,0.35);
+    }
+    #drivingHud .dc-silver-accel {
+      width: 44px !important;
+      height: 98px !important;
+      border-radius: 10px !important;
+      background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 65%, #94a3b8 100%) !important;
+      border: 2px solid #ffffff !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.55), inset 0 1px 2px #ffffff !important;
+      padding: 9px 6px !important;
+      position: relative;
+      overflow: hidden;
+    }
+    .dc-accel-dots {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 7px 8px;
+      place-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    #bottomContextActionDock {
+      bottom: 72px !important;
+      z-index: 49 !important;
+    }
+
+    /* Mobile Responsive Fit (Exact Match to Portrait Phone Screenshot!) */
+    @media (max-width: 640px) {
+      #dcGearSlotBox { left: 6px; top: 6px; width: 48px; height: 102px; padding: 4px; }
+      .dc-shift-slot-track { width: 16px; }
+      .dc-shift-knob { width: 20px; height: 20px; font-size: 11px; }
+      #dcGearSlotBox .gear-btn { font-size: 11.5px !important; height: 18px !important; }
+      #dcMirrorAndSpeedPod { left: 60px; top: 6px; width: 168px; }
+      #dcRoomMirrorFrame { width: 168px; height: 42px; }
+      #drivingHud #hudSpeedNum { font-size: 20px !important; }
+      .dc-kmh-unit { font-size: 9.5px; }
+      #dcTopRightIcons { right: 8px; top: 8px; gap: 6px; }
+      #dcLeftWingMirror { left: 6px; top: 122px; width: 68px; height: 48px; }
+      #dcRightClusterStack { right: 6px; top: 92px; gap: 5px; }
+      .dc-round-sig { width: 30px; height: 30px; }
+      #dcRightClusterStack #liveMinimapWidget { width: 44px !important; height: 56px !important; }
+      #dcRightWingMirror { width: 68px; height: 48px; }
+      #dcWheelCorner { left: 4px; bottom: 18px; }
+      #dcWheelCorner .wheel-container { width: 96px !important; height: 96px !important; }
+      #dcBottomCenterConsole { bottom: 3px; gap: 2px; }
+      #dcRoundSwitchRow { gap: 3px; }
+      .dc-dash-orb { width: 28px; height: 28px; border-width: 1.5px; }
+      .dc-dash-orb svg { width: 15px; height: 15px; }
+      #dcBottomGreenPrompt { font-size: 10px; }
+      #dcPedalsCorner { right: 6px; bottom: 14px; }
+      .dc-authentic-pedals { gap: 6px !important; }
+      #drivingHud .dc-cyan-brake { width: 44px !important; height: 52px !important; }
+      .dc-brake-dots { gap: 4px 5px; }
+      .dc-brake-dots i, .dc-accel-dots i { width: 5.5px; height: 5.5px; }
+      #drivingHud .dc-silver-accel { width: 34px !important; height: 80px !important; }
+      .dc-accel-dots { gap: 5px 6px; }
+    }
+
   </style>
 </head>
 <body>
@@ -3013,68 +3494,185 @@
       </div>
     </section>
 
-    <!-- SCREEN 4: Ultra-Clean Smartphone Native Driving HUD (85%+ Open Road!) -->
+    <!-- SCREEN 4: Authentic 3D 운전교실 Cockpit HUD (1:1 Match to Reference Screenshot!) -->
     <section id="drivingHud">
-      <!-- v27 Always-On Live GPS Minimap (Tap to Expand / + - to Zoom!) -->
-      <div id="liveMinimapWidget">
-        <canvas id="liveMinimapCanvas" width="160" height="160" onclick="openExpandedMinimap()" title="탭하여 지도 크게 확대 보기"></canvas>
-        <div class="mm-mini-ctrls">
-          <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();stepLiveMinimapZoom(1)" title="확대">+</button>
-          <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();stepLiveMinimapZoom(-1)" title="축소">−</button>
-          <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();openExpandedMinimap()" title="크게 보기">⤢</button>
+
+      <!-- 1. TOP-LEFT: Authentic Vertical Slot Gear Shifter (P - R - N - D + Sliding ↓ Silver Knob) -->
+      <div id="dcGearSlotBox" class="pointer-auto">
+        <div class="dc-shift-slot-track">
+          <div id="dcShiftKnob" class="dc-shift-knob" data-pos="D">↓</div>
         </div>
-        <div id="mmZoomBadge">1.0x</div>
+        <div class="gear-strip" id="gearShifter">
+          <button type="button" class="gear-btn" data-gear="P" onclick="setGear('P')">P</button>
+          <button type="button" class="gear-btn" data-gear="R" onclick="setGear('R')">R</button>
+          <button type="button" class="gear-btn" data-gear="N" onclick="setGear('N')">N</button>
+          <button type="button" class="gear-btn active" data-gear="D" onclick="setGear('D')">D</button>
+          <button type="button" class="gear-btn dc-gear-m" data-gear="M" onclick="setGear('M')" title="수동 변속기 (1~6단 패들 시프트)">M</button>
+        </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:5px;" class="pointer-auto">
-        <!-- Single-Line Minimal Smartphone Top Bar -->
-        <div class="slim-top-hud">
-          <div style="display:flex;align-items:center;gap:5px;min-width:0;">
-            <button type="button" class="icon-pill-btn" style="border-color:rgba(248,113,113,0.45);color:#fca5a5;" onclick="returnToLobby()">로비로</button>
-            <button type="button" class="driver-avatar-badge" id="hudDriverAvatarBtn" onclick="openDriverLicenseModal()" title="운전자 프로필"><img id="hudDriverAvatarImg" src="data:image/jpeg;base64,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" alt="운전자" /></button>
+      <!-- 2. TOP-LEFT-CENTER: Trapezoid Wide Room Mirror + Curved Fuel Gauge Arc + Digital 0 km/h -->
+      <div id="dcMirrorAndSpeedPod" class="pointer-auto">
+        <div id="dcRoomMirrorFrame" onclick="cycleCameraMode()" title="룸미러 (탭하여 시점 전환)">
+          <canvas id="dcRoomMirrorCanvas" width="240" height="58"></canvas>
+        </div>
+        <div class="dc-under-mirror-row">
+          <div class="dc-fuel-arc-wrap" title="실시간 연료 게이지">
+            <svg viewBox="0 0 90 34" width="76" height="28">
+              <defs>
+                <linearGradient id="dcFuelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#ef4444"/>
+                  <stop offset="35%" stop-color="#facc15"/>
+                  <stop offset="100%" stop-color="#4ade80"/>
+                </linearGradient>
+              </defs>
+              <path d="M 10 28 A 36 28 0 0 1 80 28" fill="none" stroke="rgba(15,23,42,0.75)" stroke-width="7" stroke-linecap="round"/>
+              <path d="M 10 28 A 36 28 0 0 1 80 28" fill="none" stroke="url(#dcFuelGrad)" stroke-width="5" stroke-linecap="round"/>
+              <line id="dcFuelNeedleLine" x1="45" y1="29" x2="72" y2="12" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round"/>
+              <circle cx="45" cy="29" r="3" fill="#e2e8f0"/>
+              <text x="12" y="32" fill="#f8fafc" font-size="8" font-weight="900">E</text>
+              <text x="41" y="25" fill="#f8fafc" font-size="8.5">⛽</text>
+              <text x="72" y="32" fill="#f8fafc" font-size="8" font-weight="900">F</text>
+            </svg>
+          </div>
+          <div id="hudClusterBox" onclick="toggleSpeedCtrlBar()" title="탭하여 속도조절·크루즈 열기/닫기">
+            <span id="hudSpeedNum">0</span>
+            <span class="dc-kmh-unit">km/h</span>
+            <div style="display:none;">
+              <div id="hudRpmBar"></div>
+              <span id="hudFuelText">⛽ 100%</span>
+              <span id="hudHpText">🛡️ 100%</span>
+              <span id="hudLimitLabel">제한 80km/h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. TOP-RIGHT: Authentic Silver Camera Icon + Glossy Blue Pause/Menu Circle Button -->
+      <div id="dcTopRightIcons" class="pointer-auto">
+        <button type="button" class="dc-top-cam-btn" onclick="cycleCameraMode()" title="카메라 시점 전환 (C)">
+          <svg viewBox="0 0 32 24" width="26" height="20">
+            <rect x="3" y="5" width="22" height="15" rx="3.5" fill="#cbd5e1" stroke="#334155" stroke-width="1.6"/>
+            <rect x="8" y="2.5" width="7" height="3" rx="1" fill="#94a3b8"/>
+            <circle cx="15.5" cy="12.5" r="5.2" fill="#1e293b" stroke="#f8fafc" stroke-width="1.5"/>
+            <circle cx="15.5" cy="12.5" r="2.3" fill="#38bdf8"/>
+            <polygon points="25,9 30,6.5 30,18.5 25,16" fill="#94a3b8" stroke="#334155" stroke-width="1"/>
+          </svg>
+        </button>
+        <button type="button" id="dcPauseMenuBtn" onclick="toggleDcPauseDrawer(event)" title="일시정지 · 차량 · 코스 · 미션 전체 메뉴">
+          <span>❚❚</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Full Feature & Quick-Action Drawer (Opened via Blue ❚❚ Button; Preserves 100% of Controls!) -->
+      <div id="dcPauseDrawer" class="pointer-auto" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.12);">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button type="button" class="icon-pill-btn" style="border-color:rgba(248,113,113,0.5);color:#fca5a5;" onclick="returnToLobby()">로비로</button>
+            <button type="button" class="driver-avatar-badge" id="hudDriverAvatarBtn" onclick="openDriverLicenseModal()" title="운전자 프로필"><img id="hudDriverAvatarImg" src="" alt="운전자" /></button>
             <div class="icon-pill-btn" id="hudStatusChip" style="cursor:default;">
               <span id="hudModeBadge" style="color:#6ee7b7;font-weight:800;">주행</span>
               <span style="opacity:0.3;">·</span>
-              <span id="hudCarTitle" style="max-width:96px;overflow:hidden;text-overflow:ellipsis;">쏘나타 디 엣지</span>
+              <span id="hudCarTitle" style="max-width:96px;overflow:hidden;text-overflow:ellipsis;">머스탱 GT</span>
               <span id="hudScoreWrap" style="display:none;align-items:center;gap:4px;margin-left:4px;">
                 <span id="hudScoreVal" style="color:#fde047;font-weight:900;">100점</span>
                 <span id="hudPassCut" style="display:none;">(80점 이상 합격)</span>
               </span>
             </div>
           </div>
-
-          <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;position:relative;">
-            <button type="button" class="icon-pill-btn" id="hudBoardNpcBtn" style="display:none;border-color:#fde047;color:#fde047;" onclick="boardNearestVehicle()">🚗 근처 차량 탑승</button>
-            <button type="button" class="icon-pill-btn" id="hudEmergencyFuelBtn" style="display:none;border-color:#34d399;color:#6ee7b7;" onclick="callRoadsideFuel()">⛽ 출장주유(+50%)</button>
-            <button type="button" id="subwayDoorBtn" class="icon-pill-btn" style="display:none;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleSubwayDoors()">🚇 출입문 개폐</button>
-            <button type="button" class="icon-pill-btn" id="hudQuickTimeBtn" onclick="stepTimeOfDay()" style="color:#fde047;padding:0 9px;font-variant-numeric:tabular-nums;" title="밤낮 시간대 즉시 전환 (단축키 T · 자동 순환 중)">☀️ 13:30</button>
-            <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickSirenBtn" onclick="toggleEmergencySiren()" title="경찰·소방 사이렌 길터주기 ON/OFF (단축키 E)">🚨</button>
-            <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFlightBtn" onclick="toggleCarFlightMode()" title="비행 변신 ON/OFF">✈️</button>
-            <button type="button" class="icon-pill-btn" onclick="openCarSelector()" title="차량 변경">차량</button>
-            <button type="button" class="icon-pill-btn" id="hudQuickTrayBtn" onclick="toggleHudQuickTray(event)" title="스페셜 미션 · 부스터 · 시점 빠른 실행">⚡ 빠른기능</button>
-            <button type="button" class="icon-pill-btn mini-glass-ico" onclick="toggleVehicleFuncPod()" style="border-color:rgba(56,189,248,0.4);color:#7dd3fc;" title="세부 기능·날씨·설정">☰</button>
-            <button type="button" class="icon-pill-btn" id="immersiveToggleBtn" onclick="toggleImmersiveAppMode()" style="display:none;" title="상단바 숨김 / 전체화면 앱 모드">⛶</button>
-
-            <!-- Clean Collapsible Quick-Action Popover Tray -->
-            <div id="hudQuickTrayPopover" onclick="if(event.target.closest('button')) setTimeout(()=>closeHudQuickTray(), 80)">
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFireBtn" onclick="startFireExtinguishMission(true)" title="119 소방차 & 물대포 화재진압 미션 시작">🚒</button><span>소방미션</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickWashBtn" onclick="jumpToHipassAndWashCourse()" title="하이패스 톨게이트 · 거품 자동 세차장 코스로 이동">🫧</button><span>세차·톨게이트</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickBossBtn" onclick="summonSkyBossNow()" title="하늘 거대 보스 비행선(아크 모선) 즉시 소환">👾</button><span>보스소환</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickNosBtn" onclick="triggerNitroBoost()" title="니트로(NOS) 부스터 발사 (N)">🔥</button><span>니트로</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickShieldBtn" onclick="toggleCarShield()" title="차량 에너지 실드 ON/OFF">🛡️</button><span>에너지실드</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickMapBtn" onclick="openKoreaMapModal()" title="대한민국 전체 지도 (서울→부산·제주)">🗺️</button><span>전국지도</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickSpeedBtn" onclick="toggleSpeedCtrlBar()" title="속도조절·크루즈 열기/닫기">🎚️</button><span>속도조절</span></div>
-              <div class="qtray-item"><button type="button" class="icon-pill-btn" id="hudCamBtn" onclick="cycleCameraMode()" title="시점 전환">시점</button><span>카메라</span></div>
-            </div>
-          </div>
+          <button type="button" class="tsd-close-x" onclick="closeDcPauseDrawer()">✕</button>
         </div>
 
-        <!-- Slim 1-Line Translucent Prompt Pill (Never blocks windshield!) -->
-        <div class="glass-card compact-banner" id="guidanceBanner" style="display:none;align-items:center;justify-content:center;gap:8px;">
-          <span id="guidanceIcon" style="font-size:11px;font-weight:800;color:#38bdf8;flex-shrink:0;">DRIVE</span>
+        <div class="slim-top-hud" style="flex-wrap:wrap;gap:5px;">
+          <button type="button" class="icon-pill-btn" id="hudQuickTimeBtn" onclick="stepTimeOfDay()" style="color:#fde047;">☀️ 13:30</button>
+          <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickSirenBtn" onclick="toggleEmergencySiren()">🚨</button>
+          <button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFlightBtn" onclick="toggleCarFlightMode()">✈️</button>
+          <button type="button" class="icon-pill-btn" onclick="closeDcPauseDrawer();openCarSelector()">차량</button>
+          <button type="button" class="icon-pill-btn" style="color:#fde047;" onclick="closeDcPauseDrawer();selectKoreanCar('bugatti_bolide');showToast('🎁 스페셜 선물차 [부가티 볼리드] 장착 완료!')">🎁 볼리드 선물차</button>
+          <button type="button" class="icon-pill-btn" id="hudQuickTrayBtn" onclick="toggleHudQuickTray(event)">⚡ 빠른기능</button>
+          <button type="button" class="icon-pill-btn mini-glass-ico" onclick="closeDcPauseDrawer();toggleVehicleFuncPod()">☰</button>
+          <button type="button" class="icon-pill-btn" id="immersiveToggleBtn" onclick="toggleImmersiveAppMode()" style="display:none;">⛶</button>
+        </div>
+
+        <div id="hudQuickTrayPopover" style="position:static;display:grid;width:100%;box-shadow:none;padding:6px 0;background:transparent;border:none;">
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickFireBtn" onclick="closeDcPauseDrawer();startFireExtinguishMission(true)">🚒</button><span>소방미션</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickWashBtn" onclick="closeDcPauseDrawer();jumpToHipassAndWashCourse()">🫧</button><span>세차·톨게이트</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickBossBtn" onclick="closeDcPauseDrawer();summonSkyBossNow()">👾</button><span>보스소환</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickNosBtn" onclick="closeDcPauseDrawer();triggerNitroBoost()">🔥</button><span>니트로</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickShieldBtn" onclick="toggleCarShield()">🛡️</button><span>에너지실드</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickMapBtn" onclick="closeDcPauseDrawer();openKoreaMapModal()">🗺️</button><span>전국지도</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn mini-glass-ico" id="hudQuickSpeedBtn" onclick="closeDcPauseDrawer();toggleSpeedCtrlBar()">🎚️</button><span>속도조절</span></div>
+          <div class="qtray-item"><button type="button" class="icon-pill-btn" id="hudCamBtn" onclick="cycleCameraMode()">시점</button><span>카메라</span></div>
+        </div>
+
+        <div id="leftHudInfoStack" style="position:static;max-width:100%;pointer-events:auto;">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            <div id="koreaRegionGpsPill" onclick="closeDcPauseDrawer();openKoreaMapModal()" style="display:flex;">
+              <span id="krRegionLabel">📍 서울특별시 (세종대로)</span>
+              <span id="krNavTargetLabel" style="color:#7dd3fc;">🗺️ 전국지도</span>
+            </div>
+            <button type="button" id="hudCourseQuickPill" onclick="closeDcPauseDrawer();openCoursePickerModal()">🛣️ 코스변경</button>
+          </div>
+          <div id="stageGoalBanner" onclick="onStageGoalBannerClick()">
+            <span id="stageGoalText">🎯 목표 1/6 · 대관령 산길 구간까지 운전하기</span>
+            <span id="stageGoalProg">진행 중</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. MID-LEFT: Rectangular Left Side Wing Mirror -->
+      <div id="dcLeftWingMirror" class="dc-wing-mirror pointer-auto" title="좌측 사이드미러">
+        <canvas id="dcLeftMirrorCanvas" width="110" height="78"></canvas>
+      </div>
+
+      <!-- 5. MID-RIGHT: 3 Round Silver Turn/Hazard Buttons (⬅ ⚠ ➡) + Vertical Road Minimap + Right Side Wing Mirror -->
+      <div id="dcRightClusterStack" class="pointer-auto">
+        <div class="dc-turn-trio mini-sig-row">
+          <button type="button" class="dc-round-sig" id="btnBlinkLeft" onclick="toggleBlinker('left')" title="좌측 방향지시등 (Q)">
+            <span class="dc-sr">◀</span>
+            <svg viewBox="0 0 28 28" width="20" height="20"><path d="M15 6 L6 14 L15 22 V17 H22 V11 H15 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" class="dc-round-sig dc-hazard-sig" id="btnHazard" onclick="toggleHazard()" title="비상점멸등 (Z)">
+            <span class="dc-sr">△</span>
+            <svg viewBox="0 0 28 28" width="20" height="20">
+              <polygon points="14,5 24,22 4,22" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linejoin="round"/>
+              <polygon points="14,10 19.5,19.5 8.5,19.5" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-round-sig" id="btnBlinkRight" onclick="toggleBlinker('right')" title="우측 방향지시등 (E)">
+            <span class="dc-sr">▶</span>
+            <svg viewBox="0 0 28 28" width="20" height="20"><path d="M13 6 L22 14 L13 22 V17 H6 V11 H13 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" class="dc-sr-btn" onmousedown="triggerHorn()" ontouchstart="triggerHorn()" title="경적 (H)">📣</button>
+        </div>
+
+        <div class="dc-map-and-rmirror">
+          <div id="liveMinimapWidget">
+            <canvas id="liveMinimapCanvas" width="96" height="128" onclick="openExpandedMinimap()" title="탭하여 지도 크게 확대 보기"></canvas>
+            <div class="mm-mini-ctrls" style="display:none;">
+              <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();stepLiveMinimapZoom(1)">+</button>
+              <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();stepLiveMinimapZoom(-1)">−</button>
+              <button type="button" class="mm-tiny-btn" onclick="event.stopPropagation();openExpandedMinimap()">⤢</button>
+            </div>
+            <div id="mmZoomBadge" style="display:none;">1.0x</div>
+          </div>
+          <div id="dcRightWingMirror" class="dc-wing-mirror" title="우측 사이드미러">
+            <canvas id="dcRightMirrorCanvas" width="110" height="78"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contextual Mission / Boss / Cruise Overlays (Hidden unless triggered!) -->
+      <div id="dcFloatingActiveBars" class="pointer-auto">
+        <button type="button" class="icon-pill-btn" id="hudBoardNpcBtn" style="display:none;border-color:#fde047;color:#fde047;" onclick="boardNearestVehicle()">🚗 근처 차량 탑승</button>
+        <button type="button" class="icon-pill-btn" id="hudEmergencyFuelBtn" style="display:none;border-color:#34d399;color:#6ee7b7;" onclick="callRoadsideFuel()">⛽ 출장주유(+50%)</button>
+        <button type="button" id="subwayDoorBtn" class="icon-pill-btn" style="display:none;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleSubwayDoors()">🚇 출입문 개폐</button>
+
+        <div class="glass-card compact-banner" id="guidanceBanner" style="display:none;">
+          <span id="guidanceIcon">DRIVE</span>
           <span id="guidanceStageTitle">즉시 주행</span>
-          <span id="guidanceText">우측 악셀을 밟고 좌측 핸들을 돌려 주행하세요</span>
-          <select id="roadCourseSelect" onchange="selectRoadExamCourse(this.value)" style="display:none;background:#090d16;color:#fde047;border:1px solid rgba(250,204,21,0.45);border-radius:999px;padding:2px 6px;font-size:10px;font-weight:700;">
+          <span id="guidanceText">좌측 방향지시등을 켜고 출발하세요.</span>
+          <select id="roadCourseSelect" onchange="selectRoadExamCourse(this.value)" style="display:none;">
             <option value="A">A코스 (도심·스쿨존)</option>
             <option value="B">B코스 (사거리·회전교차로)</option>
             <option value="C">C코스 (아파트·외곽순환)</option>
@@ -3082,17 +3680,17 @@
           </select>
         </div>
 
-        <!-- Centered Smooth Speed Limiter & Cruise Control Pill -->
-        <div class="speed-ctrl-bar" id="speedCtrlBar" style="align-self:center;display:none;">
+        <div class="speed-ctrl-bar" id="speedCtrlBar" style="display:none;">
           <span style="font-size:10px;font-weight:700;color:#94a3b8;padding-left:3px;">속도조절</span>
-          <button type="button" class="spd-step-btn" onclick="stepTargetSpeed(-10)" title="제한속도 -10km/h">-</button>
-          <input type="range" id="targetSpeedSlider" min="20" max="220" step="5" value="80" oninput="setTargetSpeedCap(this.value)" style="width:96px;accent-color:#38bdf8;cursor:pointer;" title="최고 주행 속도 조절" />
-          <button type="button" class="spd-step-btn" onclick="stepTargetSpeed(10)" title="제한속도 +10km/h">+</button>
+          <button type="button" class="spd-step-btn" onclick="stepTargetSpeed(-10)">-</button>
+          <input type="range" id="targetSpeedSlider" min="20" max="220" step="5" value="80" oninput="setTargetSpeedCap(this.value)" style="width:96px;accent-color:#38bdf8;cursor:pointer;" />
+          <button type="button" class="spd-step-btn" onclick="stepTargetSpeed(10)">+</button>
           <span id="targetSpeedLabel" style="font-size:10.5px;font-weight:800;color:#e0f2fe;min-width:44px;text-align:center;">80km/h</span>
-          <button type="button" class="cruise-chip" id="cruiseToggleBtn" onclick="toggleCruiseControl()" title="설정한 속도로 자동 정속 주행">크루즈</button>
-          <button type="button" class="cruise-chip" id="shieldToggleBtn" onclick="toggleCarShield()" title="차량 에너지 실드 방어막 ON/OFF">🛡️ 실드</button>
-          <button type="button" class="cruise-chip" id="flightToggleBtn" onclick="toggleCarFlightMode()" title="내 차 날개 전개 비행 변신 ON/OFF">✈️ 비행</button>
+          <button type="button" class="cruise-chip" id="cruiseToggleBtn" onclick="toggleCruiseControl()">크루즈</button>
+          <button type="button" class="cruise-chip" id="shieldToggleBtn" onclick="toggleCarShield()">🛡️ 실드</button>
+          <button type="button" class="cruise-chip" id="flightToggleBtn" onclick="toggleCarFlightMode()">✈️ 비행</button>
         </div>
+
         <div id="policeChaseBanner">
           <span id="policeChaseText">🚨 경찰 추격 중! 145km/h 돌파로 따돌리세요</span>
           <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;background:#090d16;" onclick="surrenderPoliceChase()">🛑 정차·벌금</button>
@@ -3103,52 +3701,25 @@
         </div>
         <div id="fireMissionBar">
           <span id="fireMissionStatusText" style="font-size:11.5px;font-weight:800;color:#fed7aa;">🔥 전방 화재 출동 · 135m</span>
-          <div id="fireHpTrack" title="남은 화재 불길 세기"><div id="fireHpFill"></div></div>
+          <div id="fireHpTrack"><div id="fireHpFill"></div></div>
           <button type="button" id="waterCannonSprayBtn"
             onpointerdown="setWaterHold(true)" onpointerup="setWaterHold(false)" onpointerleave="setWaterHold(false)" onpointercancel="setWaterHold(false)"
-            onclick="triggerWaterCannonBurst()" title="클릭 또는 길게 누르면 고압 물대포 발사 (단축키 G)">💦 물대포 발사(G)</button>
-          <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#f87171;color:#fca5a5;" onclick="equipEmergencyCar('firetruck_119')" title="119 펌프 소방차로 즉시 전환">🚒 소방차</button>
-          <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#60a5fa;color:#93c5fd;" onclick="equipEmergencyCar('police_112')" title="112 순찰 경찰차로 즉시 전환">🚔 경찰차</button>
-        </div>
-        <!-- Clean Left-Docked GPS, Course Switcher & Stage Goal Stack -->
-        <div id="leftHudInfoStack">
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;pointer-events:auto;">
-            <div id="koreaRegionGpsPill" onclick="openKoreaMapModal()" title="탭하여 대한민국 전체 지도 열기">
-              <span id="krRegionLabel">📍 서울특별시 (세종대로)</span>
-              <span id="krNavTargetLabel" style="color:#7dd3fc;opacity:0.9;">🗺️ 전국지도</span>
-            </div>
-            <button type="button" id="hudCourseQuickPill" onclick="openCoursePickerModal()" title="8대 테마 도로 코스 선택 (단축키 K: 다음 코스)">🛣️ 코스변경</button>
-          </div>
-          <div id="stageGoalBanner" onclick="onStageGoalBannerClick()" title="탭하여 현재 목표 힌트 보기">
-            <span id="stageGoalText">🎯 목표 1/6 · 대관령 산길 구간까지 운전하기</span>
-            <span id="stageGoalProg">진행 중</span>
-          </div>
-        </div>
-
-        <!-- Clean Bottom-Center Contextual Action Dock (Only visible when stopped/near NPC car) -->
-        <div id="bottomContextActionDock">
-          <button type="button" class="exit-car-hud-btn" id="mainExitPersonBtn" onclick="toggleWalkMode()">🚶 사람 내리기</button>
-          <button type="button" class="board-npc-hud-btn" id="mainBoardNpcFastBtn" onclick="boardNearestVehicle()">🚘 앞의 차 바로 타기</button>
+            onclick="triggerWaterCannonBurst()">💦 물대포 발사(G)</button>
+          <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#f87171;color:#fca5a5;" onclick="equipEmergencyCar('firetruck_119')">🚒 소방차</button>
+          <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#60a5fa;color:#93c5fd;" onclick="equipEmergencyCar('police_112')">🚔 경찰차</button>
         </div>
         <div id="skyBossHudBar">
           <span id="skyBossTitleText">👾 거대 보스 아크 모선</span>
           <div id="skyBossHpTrack"><div id="skyBossHpFill"></div></div>
-          <span id="skyBossHpText" style="color:#fde047;font-variant-numeric:tabular-nums;">12 / 12</span>
+          <span id="skyBossHpText" style="color:#fde047;">12 / 12</span>
         </div>
         <div id="airKillBadge">🏆 점수 <span id="airScoreNum" style="color:#fde047;">0</span>점 · 격추 <span id="airKillNum">0</span>기 · ❤️ 기체 <span id="airHpNum" style="color:#34d399;">100%</span></div>
 
-        <!-- Optional Minimap & Mirror (Toggled ON/OFF inside ⚙️ 메뉴, OFF by default on mobile so road is 100% open!) -->
-        <div id="optionalHudWidgets" style="display:none;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;">
-          <div id="minimapCard" class="pointer-auto" onclick="cycleMinimapZoom()" title="클릭하여 미니맵 배율 전환">
-            <canvas id="minimapCanvas" width="120" height="120"></canvas>
-          </div>
-          <div id="rearMirrorBox">
-            <canvas id="rearMirrorCanvas" width="196" height="44"></canvas>
-          </div>
-          <div id="zoneContextPill" class="glass-card pointer-auto" style="display:none;padding:5px 10px;font-size:11px;font-weight:700;color:#fde047;"></div>
+        <div id="optionalHudWidgets" style="display:none;">
+          <div id="minimapCard" onclick="cycleMinimapZoom()"><canvas id="minimapCanvas" width="120" height="120"></canvas></div>
+          <div id="rearMirrorBox"><canvas id="rearMirrorCanvas" width="196" height="44"></canvas></div>
+          <div id="zoneContextPill"></div>
         </div>
-
-        <!-- Multiplayer Live Chat -->
         <div id="multiChatPanel" class="glass-card" style="display:none;padding:6px 10px;max-width:340px;">
           <div style="font-size:10px;font-weight:700;color:#a78bfa;margin-bottom:3px;">한국 오픈월드 #1 채널 (실시간 7명)</div>
           <div id="multiChatLog" style="max-height:44px;overflow-y:auto;font-size:10.5px;display:flex;flex-direction:column;gap:2px;margin-bottom:4px;"></div>
@@ -3160,135 +3731,155 @@
         </div>
       </div>
 
-      <!-- Bottom Corner Controls ONLY: Compact Signals + Wheel (Left) & Compact Pedals (Right) -->
-      <div class="hud-bottom-bar pointer-auto" style="display:flex;justify-content:space-between;align-items:flex-end;gap:6px;width:100%;max-width:100%;box-sizing:border-box;">
-        <div class="left-drive-cluster" style="display:flex;flex-direction:column;gap:5px;align-items:flex-start;min-width:0;">
-          <div style="display:flex;align-items:center;gap:5px;">
-            <div id="frontWheelMiniViz" title="실시간 앞바퀴 조향 각도">
-              <svg width="46" height="24" viewBox="0 0 46 24">
-                <line x1="11" y1="12" x2="35" y2="12" stroke="#64748b" stroke-width="2.2" stroke-linecap="round"/>
-                <circle cx="23" cy="12" r="2.2" fill="#38bdf8"/>
-                <g id="vizTireL" transform="translate(10,12) rotate(0)"><rect x="-3.2" y="-7.5" width="6.4" height="15" rx="2" fill="#e2e8f0" stroke="#38bdf8" stroke-width="1.2"/></g>
-                <g id="vizTireR" transform="translate(36,12) rotate(0)"><rect x="-3.2" y="-7.5" width="6.4" height="15" rx="2" fill="#e2e8f0" stroke="#38bdf8" stroke-width="1.2"/></g>
-              </svg>
-            </div>
-            <div class="mini-sig-row">
-            <button type="button" class="hud-btn sig-icon-btn" id="btnBlinkLeft" onclick="toggleBlinker('left')" title="좌측 방향지시등 (Q)">◀</button>
-            <button type="button" class="hud-btn sig-icon-btn" id="btnHazard" onclick="toggleHazard()" title="비상점멸등 (Z)">△</button>
-            <button type="button" class="hud-btn sig-icon-btn" id="btnBlinkRight" onclick="toggleBlinker('right')" title="우측 방향지시등 (E)">▶</button>
-            <button type="button" class="hud-btn sig-icon-btn" onmousedown="triggerHorn()" ontouchstart="triggerHorn()" title="경적 (H)">📣</button>
-          </div>
-          </div>
+      <!-- Contextual Exit / Board NPC Car Floating Dock -->
+      <div id="bottomContextActionDock" class="pointer-auto">
+        <button type="button" class="exit-car-hud-btn" id="mainExitPersonBtn" onclick="toggleWalkMode()">🚶 사람 내리기</button>
+        <button type="button" class="board-npc-hud-btn" id="mainBoardNpcFastBtn" onclick="boardNearestVehicle()">🚘 앞의 차 바로 타기</button>
+      </div>
 
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div class="wheel-container" id="steeringWheelArea">
-              <svg id="steeringWheelSvg" width="100%" height="100%" viewBox="0 0 120 120">
-                <defs>
-                  <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#334155"/>
-                    <stop offset="45%" stop-color="#0f172a"/>
-                    <stop offset="100%" stop-color="#1e293b"/>
-                  </linearGradient>
-                  <linearGradient id="spokeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#cbd5e1"/>
-                    <stop offset="100%" stop-color="#475569"/>
-                  </linearGradient>
-                  <radialGradient id="hubGrad" cx="40%" cy="35%" r="65%">
-                    <stop offset="0%" stop-color="#334155"/>
-                    <stop offset="100%" stop-color="#090d16"/>
-                  </radialGradient>
-                </defs>
-                <circle cx="60" cy="60" r="52" stroke="url(#rimGrad)" stroke-width="11" fill="rgba(9,13,22,0.18)"/>
-                <circle cx="60" cy="60" r="57.2" stroke="rgba(255,255,255,0.18)" stroke-width="1" fill="none"/>
-                <circle cx="60" cy="60" r="46.5" stroke="rgba(255,255,255,0.10)" stroke-width="1" fill="none"/>
-                <!-- 12 o'clock sport racing marker -->
-                <rect x="57.5" y="2.8" width="5" height="10.5" rx="2.5" fill="#38bdf8"/>
-                <!-- Sculpted brushed-aluminum 3-spoke core -->
-                <path d="M16 57 L43 55 L43 64 L17 65 Z" fill="url(#spokeGrad)" opacity="0.9"/>
-                <path d="M104 57 L77 55 L77 64 L103 65 Z" fill="url(#spokeGrad)" opacity="0.9"/>
-                <path d="M55 75 L65 75 L63 106 L57 106 Z" fill="url(#spokeGrad)" opacity="0.9"/>
-                <!-- Center airbag hub -->
-                <circle cx="60" cy="60" r="17.5" fill="url(#hubGrad)" stroke="rgba(226,232,240,0.32)" stroke-width="1.4"/>
-                <circle cx="60" cy="60" r="11" fill="none" stroke="rgba(56,189,248,0.42)" stroke-width="1"/>
-                <path d="M54 60 H66" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <div class="steer-extra-col" style="display:flex;flex-direction:column;gap:5px;">
-              <div class="desktop-steer-arrows" style="display:flex;gap:4px;">
-                <button type="button" class="hud-btn" style="padding:9px 11px;font-size:13px;"
-                  onpointerdown="setButtonSteer(-1)" onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)">◀</button>
-                <button type="button" class="hud-btn" style="padding:9px 11px;font-size:13px;"
-                  onpointerdown="setButtonSteer(1)" onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)">▶</button>
-              </div>
-              <div id="hoverAltControls" style="display:none;gap:4px;flex-wrap:wrap;">
-                <button type="button" class="hud-btn" onpointerdown="state.hoverLift=1" onpointerup="state.hoverLift=0">상승</button>
-                <button type="button" class="hud-btn" onpointerdown="state.hoverLift=-1" onpointerup="state.hoverLift=0">하강</button>
-                <button type="button" class="hud-btn" onpointerdown="state.hoverYawSpin=1" onpointerup="state.hoverYawSpin=0">호버턴↻</button>
-              </div>
-            </div>
-          </div>
+      <!-- 6. BOTTOM-LEFT: Authentic 3-Spoke Dark Leather & Silver-Button Sport Steering Wheel -->
+      <div class="left-drive-cluster pointer-auto" id="dcWheelCorner">
+        <div id="frontWheelMiniViz" style="display:none;">
+          <svg width="46" height="24" viewBox="0 0 46 24">
+            <g id="vizTireL" transform="translate(10,12) rotate(0)"><rect x="-3" y="-7" width="6" height="14"/></g>
+            <g id="vizTireR" transform="translate(36,12) rotate(0)"><rect x="-3" y="-7" width="6" height="14"/></g>
+          </svg>
         </div>
-
-        <div class="right-drive-cluster" style="flex-direction:column;align-items:flex-end;gap:5px;">
-          <div id="carFlightPad">
-            <button type="button" class="flt-btn" id="fltClimbBtn" onpointerdown="state.carFlightClimb=1" onpointerup="state.carFlightClimb=0" onpointercancel="state.carFlightClimb=0" onpointerleave="state.carFlightClimb=0">▲상승</button>
-            <span id="carFlightAltLabel">12m</span>
-            <button type="button" class="flt-btn" id="fltDescBtn" onpointerdown="state.carFlightClimb=-1" onpointerup="state.carFlightClimb=0" onpointercancel="state.carFlightClimb=0" onpointerleave="state.carFlightClimb=0">▼하강</button>
-            <button type="button" class="flt-btn boost" id="fltBoostBtn" onclick="triggerCarFlightBoost()">🚀부스트</button>
-            <button type="button" class="flt-btn fire" id="fltFireBtn" onpointerdown="fireSkyWeapon()" onclick="fireSkyWeapon()" title="유도 미사일 발사 (F 또는 Space)">🚀미사일</button>
-          </div>
-          <div id="manualShiftBar">
-            <button type="button" class="paddle-btn" id="paddleDownBtn" onclick="shiftManualGear(-1)" title="기어 다운 ([)">▼</button>
-            <span id="manualGearBadge">M1</span>
-            <button type="button" class="paddle-btn" id="paddleUpBtn" onclick="shiftManualGear(1)" title="기어 업 (])">▲</button>
-          </div>
-          <div class="cluster-and-pedals">
-          <div class="glass-card" style="padding:8px 11px;text-align:center;min-width:86px;" id="hudClusterBox" onclick="toggleSpeedCtrlBar()" title="탭하여 속도조절·크루즈 열기/닫기" style="cursor:pointer;">
-            <div style="font-family:'Inter',sans-serif;font-size:24px;font-weight:800;line-height:1;color:#f8fafc;" id="hudSpeedNum">0</div>
-            <div style="font-size:9.5px;font-weight:700;color:#7dd3fc;margin-top:2px;letter-spacing:0.5px;">km/h</div>
-            <div style="width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:99px;margin-top:4px;overflow:hidden;">
-              <div id="hudRpmBar" style="width:12%;height:100%;background:linear-gradient(90deg,#38bdf8,#34d399,#f59e0b);"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:8.5px;color:#cbd5e1;margin-top:4px;font-weight:700;">
-              <span id="hudFuelText">⛽ 100%</span>
-              <span id="hudHpText">🛡️ 100%</span>
-            </div>
-            <div style="font-size:9px;color:#94a3b8;margin-top:2px;font-weight:600;" id="hudLimitLabel">제한 50km/h</div>
-          </div>
-
-          <div class="pedals-row">
-            <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-              <button type="button" class="engine-start-btn" id="hudEngineStartStopBtn" onclick="toggleEnginePower()" title="P단에서 시동을 끄면 사람 내리기 버튼이 나타납니다">
-                <span>ENGINE</span>
-                <span id="hudEngineStateLabel" style="font-size:9.5px;color:#34d399;">ON</span>
-              </button>
-              <div class="gear-strip" id="gearShifter">
-              <button type="button" class="gear-btn active" data-gear="P" onclick="setGear('P')">P</button>
-              <button type="button" class="gear-btn" data-gear="R" onclick="setGear('R')">R</button>
-              <button type="button" class="gear-btn" data-gear="N" onclick="setGear('N')">N</button>
-              <button type="button" class="gear-btn" data-gear="D" onclick="setGear('D')">D</button>
-              <button type="button" class="gear-btn" data-gear="M" onclick="setGear('M')" title="수동 변속기 (1~6단 패들 시프트)">M</button>
-              </div>
-            </div>
-
-            <button type="button" class="pedal-btn pedal-brake" id="pedalBrake"
-              onpointerdown="setPedal('brake', true)" onpointerup="setPedal('brake', false)" onpointerleave="setPedal('brake', false)">
-              <span style="width:22px;height:3px;background:#f87171;border-radius:99px;margin-bottom:6px;"></span>
-              <span>브레이크</span>
-              <span style="font-size:8.5px;color:#94a3b8;margin-top:2px;">S / ↓</span>
-            </button>
-
-            <button type="button" class="pedal-btn pedal-accel" id="pedalAccel">
-              <div id="throttleFillBar"></div>
-              <span style="width:22px;height:3px;background:#38bdf8;border-radius:99px;margin-bottom:8px;position:relative;z-index:1;"></span>
-              <span style="position:relative;z-index:1;">악셀</span>
-              <span style="font-size:8.5px;color:#94a3b8;margin-top:2px;position:relative;z-index:1;">W / ↑</span>
-            </button>
-          </div>
-          </div>
+        <div class="wheel-container" id="steeringWheelArea">
+          <svg id="steeringWheelSvg" width="100%" height="100%" viewBox="0 0 140 140">
+            <defs>
+              <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4b5563"/>
+                <stop offset="45%" stop-color="#1f2937"/>
+                <stop offset="100%" stop-color="#111827"/>
+              </linearGradient>
+              <linearGradient id="spokeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#e2e8f0"/>
+                <stop offset="100%" stop-color="#64748b"/>
+              </linearGradient>
+            <radialGradient id="hubGrad"><stop offset="0%" stop-color="#334155"/><stop offset="100%" stop-color="#090d16"/></radialGradient></defs>
+            <circle cx="70" cy="70" r="58" stroke="url(#rimGrad)" stroke-width="14" fill="none"/>
+            <circle cx="70" cy="70" r="65" stroke="rgba(255,255,255,0.22)" stroke-width="1" fill="none"/>
+            <circle cx="70" cy="70" r="51" stroke="rgba(0,0,0,0.65)" stroke-width="1.4" fill="none"/>
+            <path d="M 16 64 L 50 61 L 50 81 L 17 78 Z" fill="#1f2937" stroke="#64748b" stroke-width="1"/>
+            <path d="M 124 64 L 90 61 L 90 81 L 123 78 Z" fill="#1f2937" stroke="#64748b" stroke-width="1"/>
+            <rect x="22" y="65" width="18" height="11" rx="2.5" fill="url(#spokeGrad)"/>
+            <rect x="100" y="65" width="18" height="11" rx="2.5" fill="url(#spokeGrad)"/>
+            <circle cx="27" cy="70.5" r="1.4" fill="#0f172a"/><circle cx="33" cy="70.5" r="1.4" fill="#0f172a"/>
+            <circle cx="107" cy="70.5" r="1.4" fill="#0f172a"/><circle cx="113" cy="70.5" r="1.4" fill="#0f172a"/>
+            <path d="M 59 86 L 81 86 L 78 123 L 62 123 Z" fill="#1f2937" stroke="#94a3b8" stroke-width="1.2"/>
+            <rect x="66" y="94" width="8" height="24" rx="2" fill="url(#spokeGrad)" opacity="0.65"/>
+            <path d="M 46 54 Q 70 49 94 54 L 90 87 Q 70 92 50 87 Z" fill="#27272a" stroke="#52525b" stroke-width="1.8"/>
+            <rect x="57" y="65" width="26" height="10" rx="3" fill="#18181b" stroke="#71717a" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="desktop-steer-arrows" style="display:none;">
+          <button type="button" class="hud-btn" onpointerdown="setButtonSteer(-1)" onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)">◀</button>
+          <button type="button" class="hud-btn" onpointerdown="setButtonSteer(1)" onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)">▶</button>
+        </div>
+        <div id="hoverAltControls" style="display:none;">
+          <button type="button" class="hud-btn" onpointerdown="state.hoverLift=1" onpointerup="state.hoverLift=0">상승</button>
+          <button type="button" class="hud-btn" onpointerdown="state.hoverLift=-1" onpointerup="state.hoverLift=0">하강</button>
+          <button type="button" class="hud-btn" onpointerdown="state.hoverYawSpin=1" onpointerup="state.hoverYawSpin=0">호버턴↻</button>
         </div>
       </div>
-    
+
+      <!-- 7. BOTTOM-CENTER: 7 Iconic Round Glossy 3D 운전교실 Dashboard Buttons + Bright Green Subtitle! -->
+      <div id="dcBottomCenterConsole" class="pointer-auto">
+        <div id="dcRoundSwitchRow">
+          <button type="button" class="dc-dash-orb on" id="dcOrbSeatbelt" onclick="toggleSeatbelt()" title="안전벨트 착용/해제">
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <circle cx="14" cy="7.5" r="3.3" fill="#1e293b"/>
+              <path d="M8 22 C8 15 11 13 14 13 C17 13 20 15 20 22 Z" fill="#1e293b"/>
+              <line x1="8" y1="11" x2="20" y2="21" stroke="#f8fafc" stroke-width="2.4"/>
+              <line x1="9" y1="21" x2="19" y2="21" stroke="#f8fafc" stroke-width="2"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-dash-orb on" id="hudEngineStartStopBtn" onclick="toggleEnginePower()" title="시동 ON/OFF (P단에서 끄면 하차 가능)">
+            <span class="dc-sr">ENGINE</span>
+            <span id="hudEngineStateLabel" class="dc-sr">ON</span>
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <circle cx="9.5" cy="14" r="4.5" fill="none" stroke="#1e293b" stroke-width="2.5"/>
+              <path d="M14 14 H23 M19 14 V18 M22 14 V17" stroke="#1e293b" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-dash-orb on" id="dcOrbHandbrake" onclick="toggleDcParkingBrake()" title="사이드 브레이크 해제/작동">
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <path d="M6 19 H22 L19 14 L8 17 Z" fill="#1e293b"/>
+              <line x1="7" y1="17" x2="18" y2="11" stroke="#1e293b" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-dash-orb" id="dcOrbLowBeam" onclick="toggleHeadlights()" title="전조등(하향등) ON/OFF (L)">
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <path d="M13 7 C19 7 22 10 22 14 C22 18 19 21 13 21 Z" fill="none" stroke="#1e293b" stroke-width="2.2"/>
+              <line x1="5" y1="10" x2="10" y2="12" stroke="#1e293b" stroke-width="1.9" stroke-linecap="round"/>
+              <line x1="5" y1="14" x2="10" y2="16" stroke="#1e293b" stroke-width="1.9" stroke-linecap="round"/>
+              <line x1="5" y1="18" x2="10" y2="20" stroke="#1e293b" stroke-width="1.9" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-dash-orb" id="dcOrbHighBeam" onclick="toggleEmergencySiren()" title="상향등 · 긴급 사이렌 길터주기 (E)">
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <path d="M13 7 C19 7 22 10 22 14 C22 18 19 21 13 21 Z" fill="none" stroke="#1e293b" stroke-width="2.2"/>
+              <line x1="5" y1="10" x2="10" y2="10" stroke="#1e293b" stroke-width="1.9" stroke-linecap="round"/>
+              <line x1="5" y1="14" x2="10" y2="14" stroke="#1e293b" stroke-width="1.9" stroke-linecap="round"/>
+              <line x1="5" y1="18" x2="10" y2="18" stroke="#1e293b" stroke-width="1.9" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-dash-orb" id="dcOrbWiper" onclick="toggleWipers()" title="와이퍼 작동 ON/OFF">
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <path d="M5 11 Q14 5 23 11 L19 20 Q14 17 9 20 Z" fill="none" stroke="#1e293b" stroke-width="2"/>
+              <line x1="14" y1="20" x2="18" y2="9" stroke="#1e293b" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="dc-dash-orb" id="dcOrbBoostArrow" onmousedown="triggerHorn()" onclick="triggerNitroBoost()" title="경적 · 순간 가속 부스트">
+            <svg viewBox="0 0 28 28" width="19" height="19">
+              <path d="M14 6 L21 14 H17 V22 H11 V14 H7 Z" fill="none" stroke="#1e293b" stroke-width="2.3" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div id="dcBottomGreenPrompt">좌측 방향지시등을 켜고 출발하세요.</div>
+      </div>
+
+      <!-- 8. BOTTOM-RIGHT: Authentic Drilled Cyan Brake Pedal + Tall Drilled Silver Accelerator Pedal -->
+      <div class="right-drive-cluster pointer-auto" id="dcPedalsCorner">
+        <div id="carFlightPad">
+          <button type="button" class="flt-btn" id="fltClimbBtn" onpointerdown="state.carFlightClimb=1" onpointerup="state.carFlightClimb=0" onpointercancel="state.carFlightClimb=0" onpointerleave="state.carFlightClimb=0">▲상승</button>
+          <span id="carFlightAltLabel">12m</span>
+          <button type="button" class="flt-btn" id="fltDescBtn" onpointerdown="state.carFlightClimb=-1" onpointerup="state.carFlightClimb=0" onpointercancel="state.carFlightClimb=0" onpointerleave="state.carFlightClimb=0">▼하강</button>
+          <button type="button" class="flt-btn boost" id="fltBoostBtn" onclick="triggerCarFlightBoost()">🚀부스트</button>
+          <button type="button" class="flt-btn fire" id="fltFireBtn" onpointerdown="fireSkyWeapon()" onclick="fireSkyWeapon()">🚀미사일</button>
+        </div>
+        <div id="manualShiftBar">
+          <button type="button" class="paddle-btn" id="paddleDownBtn" onclick="shiftManualGear(-1)">▼</button>
+          <span id="manualGearBadge">M1</span>
+          <button type="button" class="paddle-btn" id="paddleUpBtn" onclick="shiftManualGear(1)">▲</button>
+        </div>
+
+        <div class="pedals-row dc-authentic-pedals">
+          <button type="button" class="pedal-btn pedal-brake dc-cyan-brake" id="pedalBrake"
+            onpointerdown="setPedal('brake', true)" onpointerup="setPedal('brake', false)" onpointerleave="setPedal('brake', false)">
+            <span class="dc-sr">브레이크 S / ↓</span>
+            <div class="dc-brake-dots">
+              <i></i><i></i><i></i>
+              <i></i><i></i><i></i>
+              <i></i><i></i><i></i>
+            </div>
+          </button>
+
+          <button type="button" class="pedal-btn pedal-accel dc-silver-accel" id="pedalAccel">
+            <div id="throttleFillBar"></div>
+            <span class="dc-sr">악셀 W / ↑</span>
+            <div class="dc-accel-dots">
+              <i></i><i></i>
+              <i></i><i></i>
+              <i></i><i></i>
+              <i></i><i></i>
+              <i></i><i></i>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <!-- v10 On-Foot Console Joystick (Left) + Fly & Jump 250° Action Buttons (Right) -->
       <div id="walkGamepadBar">
         <div class="joy-base" id="walkJoystickBase" title="드래그하여 캐릭터 이동">
@@ -3543,7 +4134,9 @@
       { id: 'spark', brand: '쉐보레', group: '제네시스', cat: '한국 경차 스탠다드', price: '클래식 경차', name: '쉐보레 더 넥스트 스파크', plate: '09오 5151', plateType: 'normal', color: '#cbd5e1', maxSpeed: 162, accel: 14, profile: 'compact_box_suv', lampSig: 'classic_kr', dims: [1.59, 1.48, 3.59], drive: 'FF', desc: '탄탄한 차체 강성의 대한민국 대표 경형 해치백' },
       { id: 'novus_mixer', brand: '타타대우', group: '제네시스', cat: '특장 상용 트럭', price: '건설 특장용', name: '타타대우 노부스 특장트럭', plate: '96자 0404', plateType: 'yellow', color: '#d97706', maxSpeed: 132, accel: 11, profile: 'truck_1ton', lampSig: 'commercial_kr', dims: [2.45, 2.85, 7.40], drive: 'FR', isCommercial: true, desc: '대한민국 건설 현장의 든든한 대형 특장 트럭' },
 
-      // ---------------- EXOTIC SUPERCARS & IMPORTED LUXURY (외제 슈퍼카 · 수입 명차 12종) ----------------
+      // ---------------- EXOTIC SUPERCARS & IMPORTED LUXURY (외제 슈퍼카 · 선물차 14종) ----------------
+      { id: 'mustang_gt_blue', brand: '포드', group: '외제_슈퍼카', cat: 'V8 패스트백 GT', price: '선물·기본 스페셜', name: '머스탱 GT 다크호스 패스트백', plate: '123가 4568', plateType: 'normal', color: '#5c7fa3', maxSpeed: 285, accel: 31, profile: 'fastback_sedan', lampSig: 'horizon_slim', dims: [1.92, 1.39, 4.81], drive: 'FR', hasWing: true, caliper: 0xef4444, desc: '스틸 블루 메탈릭 · 3연장 수직 테일램프 & 블랙 GT 리어 스포일러' },
+      { id: 'bugatti_bolide', brand: '부가티', group: '외제_슈퍼카', cat: 'W16 트랙 하이퍼 선물차', price: '스페셜 선물차', name: '🎁 부가티 볼리드 (선물차)', plate: '00볼 1850', plateType: 'normal', color: '#2563eb', maxSpeed: 420, accel: 46, profile: 'supercar_wedge', lampSig: 'bugatti_8eye', dims: [2.05, 1.05, 4.75], drive: 'AWD', scissorDoors: true, hasWing: true, caliper: 0x38bdf8, desc: '3D운전교실 스페셜 기프트카 · X자 레이저 리어램프 1,850마력 하이퍼카' },
       { id: 'lambo_revuelto', brand: '람보르기니', group: '외제_슈퍼카', cat: 'V12 하이퍼 슈퍼카', price: '7억 8,000만원~', name: '람보르기니 레부엘토 / 아벤타도르', plate: '11라 0777', plateType: 'normal', color: '#84cc16', maxSpeed: 350, accel: 38, profile: 'supercar_wedge', lampSig: 'lambo_y', dims: [2.03, 1.16, 4.94], drive: 'AWD', scissorDoors: true, hasWing: true, caliper: 0xfacc15, desc: '베르데 만티스 네온 그린 · Y자형 시그니처 LED · V12 시저도어 슈퍼카' },
       { id: 'lambo_urus', brand: '람보르기니', group: '외제_슈퍼카', cat: '슈퍼 SUV', price: '3억 2,700만원~', name: '람보르기니 우루스 SE', plate: '22러 8888', plateType: 'normal', color: '#eab308', maxSpeed: 312, accel: 33, profile: 'sleek_cuv', lampSig: 'lambo_y', dims: [2.01, 1.63, 5.12], drive: 'AWD', caliper: 0xef4444, desc: '지알로 아우게 옐로우 · 쿠페형 루프라인 세계 최강 슈퍼 SUV' },
       { id: 'ferrari_sf90', brand: '페라리', group: '외제_슈퍼카', cat: '미드십 V8 슈퍼카', price: '6억 9,000만원~', name: '페라리 SF90 스트라달레', plate: '10바 0999', plateType: 'normal', color: '#dc2626', maxSpeed: 340, accel: 37, profile: 'supercar_wedge', lampSig: 'ferrari_blade', dims: [1.97, 1.18, 4.71], drive: 'AWD', caliper: 0xfacc15, desc: '로쏘 코르사 레드 · 1,000마력 이탈리안 미드십 플래그십 슈퍼카' },
@@ -3568,7 +4161,9 @@
     const state = {
       stage: 'launcher',
       mode: 'autonomous',
-      selectedCarId: 'sonata_edge',
+      selectedCarId: 'mustang_gt_blue',
+      seatbelt: true,
+      parkingBrake: false,
       brandFilter: 'all',
       customColor: null,
       customPlate: '123가 4568',
@@ -8176,7 +8771,7 @@
 
     function setupScenicHipassAndWashCoords() {
       if (!scenicRoadSamples || !scenicRoadSamples.length) return;
-      const s1 = scenicRoadSamples[8 % SCENIC_SEGMENTS];
+      const s1 = scenicRoadSamples[3 % SCENIC_SEGMENTS];
       const s2 = scenicRoadSamples[104 % SCENIC_SEGMENTS];
       state.hipassGates = [
         { id: 'seoul_tg', name: '서울 톨게이트', x: s1.x, y: s1.y, z: s1.z, heading: s1.heading, cd: 0 },
@@ -12819,6 +13414,26 @@
           const sw = Math.max(4, 22 * p1);
           ctx.fillRect(cx0 - hw0 - sw, y0 - 6 * p1, sw, y1 - y0 + 6 * p1);
           ctx.fillRect(cx0 + hw0, y0 - 6 * p1, sw, y1 - y0 + 6 * p1);
+        } else {
+          // Authentic 3D 운전교실 Concrete Highway Side Barrier Walls + Dashed Cyan Lane Guide!
+          const wallH0 = 34 * p0 + 5, wallH1 = 34 * p1 + 5;
+          ctx.fillStyle = '#94a3b8';
+          ctx.beginPath();
+          ctx.moveTo(cx0 - hw0 - 14 * p0, y0 - wallH0);
+          ctx.lineTo(cx0 - hw0, y0);
+          ctx.lineTo(cx1 - hw1, y1 + 1);
+          ctx.lineTo(cx1 - hw1 - 14 * p1, y1 - wallH1);
+          ctx.closePath(); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(cx0 + hw0 + 14 * p0, y0 - wallH0);
+          ctx.lineTo(cx0 + hw0, y0);
+          ctx.lineTo(cx1 + hw1, y1 + 1);
+          ctx.lineTo(cx1 + hw1 + 14 * p1, y1 - wallH1);
+          ctx.closePath(); ctx.fill();
+          if ((si + Math.floor(Math.abs(state.x + state.z) * 0.35)) % 2 === 0) {
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.85)';
+            ctx.fillRect(cx0 - Math.max(2, 7 * p1), y0, Math.max(4, 14 * p1), (y1 - y0) * 0.72);
+          }
         }
       }
 
@@ -13325,21 +13940,35 @@
           const dxG = gt.x - state.x, dzG = gt.z - state.z;
           const fwdG = dxG * Math.sin(state.heading) + dzG * Math.cos(state.heading);
           const latG = dxG * Math.cos(state.heading) - dzG * Math.sin(state.heading);
-          if (fwdG > 4 && fwdG < 120) {
-            const pG = Math.min(0.95, 4.5 / fwdG);
+          if (fwdG > 4 && fwdG < 145) {
+            const pG = Math.min(0.95, 7.2 / fwdG);
             const gyS = horizon + (h - horizon) * pG;
             const gxS = vanishX + (roadBotCenter - vanishX) * pG + (latG / 8.0) * (w * 0.25 * pG);
-            const gwS = Math.max(46, 320 * pG), ghS = Math.max(24, 135 * pG);
+            const gwS = Math.max(76, 390 * pG), ghS = Math.max(38, 165 * pG);
             ctx.save();
-            ctx.fillStyle = '#e2e8f0';
-            ctx.fillRect(gxS - gwS * 0.5, gyS - ghS, 7 * pG + 2, ghS);
-            ctx.fillRect(gxS + gwS * 0.5 - (7 * pG + 2), gyS - ghS, 7 * pG + 2, ghS);
-            ctx.fillStyle = '#0369a1';
-            ctx.beginPath(); ctx.roundRect(gxS - gwS * 0.54, gyS - ghS - 18 * pG, gwS * 1.08, Math.max(16, 32 * pG), 5); ctx.fill();
+            // White tollgate pillars + Toll booth + Yellow/Black hazard bumper island!
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(gxS - gwS * 0.48, gyS - ghS, Math.max(4, 9 * pG), ghS);
+            ctx.fillRect(gxS + gwS * 0.48 - Math.max(4, 9 * pG), gyS - ghS, Math.max(4, 9 * pG), ghS);
+            ctx.fillRect(gxS + gwS * 0.08, gyS - ghS * 0.85, Math.max(3, 6 * pG), ghS * 0.85);
+            ctx.fillStyle = '#f97316';
+            ctx.fillRect(gxS + gwS * 0.09, gyS - ghS * 0.45, Math.max(8, 22 * pG), ghS * 0.35);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(gxS + gwS * 0.06, gyS - ghS * 0.14, Math.max(11, 26 * pG), Math.max(5, 12 * pG));
+            // Sky-Blue Korean Expressway Toll Canopy Roof (Matches 1000025255.jpg!)
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath();
+            ctx.moveTo(gxS - gwS * 0.56, gyS - ghS - 22 * pG);
+            ctx.lineTo(gxS + gwS * 0.56, gyS - ghS - 22 * pG);
+            ctx.lineTo(gxS + gwS * 0.50, gyS - ghS + 4 * pG);
+            ctx.lineTo(gxS - gwS * 0.50, gyS - ghS + 4 * pG);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#0f766e';
+            ctx.fillRect(gxS - gwS * 0.22, gyS - ghS - 2 * pG, gwS * 0.30, Math.max(10, 18 * pG));
             ctx.fillStyle = '#ffffff';
-            ctx.font = `800 ${Math.max(9, Math.round(13 * pG))}px "Noto Sans KR", sans-serif`;
+            ctx.font = `800 ${Math.max(8, Math.round(11.5 * pG))}px "Noto Sans KR", sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(`🟦 ${gt.name} · Hi-pass`, gxS, gyS - ghS + 2 * pG);
+            ctx.fillText('하이패스 전용', gxS - gwS * 0.07, gyS - ghS + Math.max(7, 12 * pG));
             ctx.restore();
           }
         });
@@ -13726,79 +14355,118 @@
     function drawSleekRearCar(ctx, cx, cy, sc, car, paint) {
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.scale(sc, sc);
+      ctx.scale(sc * 1.18, sc * 1.18);
 
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.beginPath(); ctx.ellipse(0, 40, 126, 16, 0, 0, Math.PI * 2); ctx.fill();
+      // Soft Asphalt Contact Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.62)';
+      ctx.beginPath(); ctx.ellipse(0, 44, 134, 17, 0, 0, Math.PI * 2); ctx.fill();
 
-      // Rear Tires
-      ctx.fillStyle = '#0f141d';
-      ctx.fillRect(-106, 8, 28, 34);
-      ctx.fillRect(78, 8, 28, 34);
+      // Wide Performance Rear Tires
+      ctx.fillStyle = '#090d14';
+      ctx.beginPath(); ctx.roundRect(-112, 10, 32, 36, 5); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(80, 10, 32, 36, 5); ctx.fill();
 
-      // Sculpted Rear Body & Shoulders
-      const g = ctx.createLinearGradient(0, -52, 0, 32);
-      g.addColorStop(0, '#f8fafc');
-      g.addColorStop(0.22, paint);
-      g.addColorStop(1, '#090d16');
-      ctx.fillStyle = g;
+      // Sculpted Metallic Fastback GT Body & Muscular Rear Haunches (Matches 1000025255.jpg!)
+      const bodyG = ctx.createLinearGradient(-110, -56, 110, 34);
+      bodyG.addColorStop(0, '#cbd5e1');
+      bodyG.addColorStop(0.18, paint);
+      bodyG.addColorStop(0.55, paint);
+      bodyG.addColorStop(0.85, '#334e6e');
+      bodyG.addColorStop(1, '#0f172a');
+      ctx.fillStyle = bodyG;
       ctx.beginPath();
-      ctx.moveTo(-104, 24);
-      ctx.quadraticCurveTo(-110, -8, -92, -22);
-      ctx.lineTo(-68, -52);
-      ctx.lineTo(68, -52);
-      ctx.lineTo(92, -22);
-      ctx.quadraticCurveTo(110, -8, 104, 24);
+      ctx.moveTo(-108, 26);
+      ctx.quadraticCurveTo(-116, -6, -98, -22);
+      ctx.lineTo(-70, -54);
+      ctx.lineTo(70, -54);
+      ctx.lineTo(98, -22);
+      ctx.quadraticCurveTo(116, -6, 108, 26);
       ctx.closePath();
       ctx.fill();
 
-      // Tinted Rear Glass
-      ctx.fillStyle = '#090d16';
+      // Glossy Metallic Upper Decklid Reflection Highlight
+      const glossG = ctx.createLinearGradient(0, -26, 0, -14);
+      glossG.addColorStop(0, 'rgba(255,255,255,0.42)');
+      glossG.addColorStop(1, 'rgba(255,255,255,0.02)');
+      ctx.fillStyle = glossG;
+      ctx.fillRect(-94, -24, 188, 9);
+
+      // Fastback Tinted Rear Windshield + Interior Headrests
+      ctx.fillStyle = '#111827';
       ctx.beginPath();
-      ctx.moveTo(-62, -48); ctx.lineTo(62, -48); ctx.lineTo(78, -22); ctx.lineTo(-78, -22);
+      ctx.moveTo(-62, -50); ctx.lineTo(62, -50); ctx.lineTo(78, -24); ctx.lineTo(-78, -24);
       ctx.closePath();
       ctx.fill();
+      ctx.fillStyle = '#27272a';
+      ctx.fillRect(-40, -42, 18, 12);
+      ctx.fillRect(22, -42, 18, 12);
 
-      // Interior Headrests visible through rear glass + Side Mirrors + Diffuser & Twin Exhausts
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-42, -41, 18, 12);
-      ctx.fillRect(24, -41, 18, 12);
+      // Side Wing Mirrors
       ctx.fillStyle = paint;
-      ctx.beginPath(); ctx.ellipse(-96, -24, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(96, -24, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#090d16';
-      ctx.fillRect(-84, 16, 168, 9);
-      ctx.fillStyle = '#cbd5e1';
-      ctx.beginPath(); ctx.arc(-66, 20, 4.5, 0, Math.PI * 2); ctx.arc(66, 20, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-98, -26, 12, 5.5, -0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(98, -26, 12, 5.5, 0.1, 0, Math.PI * 2); ctx.fill();
 
-      // Active Glowing Brake Lights + Top 3rd CHMSL Stop Lamp!
+      // Sculpted Black Pedestal GT Rear Spoiler Wing!
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(-58, -26, 7, 7);
+      ctx.fillRect(51, -26, 7, 7);
+      ctx.beginPath();
+      ctx.moveTo(-98, -27);
+      ctx.quadraticCurveTo(0, -31, 98, -27);
+      ctx.lineTo(94, -22);
+      ctx.quadraticCurveTo(0, -25, -94, -22);
+      ctx.closePath();
+      ctx.fill();
+
+      // Matte Black Rear Taillight Deck Panel
+      ctx.fillStyle = '#141821';
+      ctx.beginPath(); ctx.roundRect(-98, -17, 196, 16, 4); ctx.fill();
+
+      // Iconic Triple Vertical Red LED Taillight Bars [|||]  GT  [|||]!
       const brakingVis = state.brakePressed || state.keys['KeyS'] || state.keys['ArrowDown'] || state.keys['Space'];
-      ctx.fillStyle = brakingVis ? '#ff1e1e' : '#b91c1c';
-      ctx.shadowColor = '#ff1e1e';
-      ctx.shadowBlur = brakingVis ? 22 : 6;
-      ctx.fillRect(-92, -14, 184, brakingVis ? 7 : 5);
-      if (brakingVis) {
-        ctx.fillRect(-34, -47, 68, 3.5); // 3rd High-Mount Brake Light!
-      }
+      ctx.fillStyle = brakingVis ? '#ff2a2a' : '#ef4444';
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = brakingVis ? 20 : 8;
+      [-90, -79, -68, 60, 71, 82].forEach(lx => {
+        ctx.beginPath();
+        ctx.roundRect(lx, -15.5, 7.5, 13, 1.5);
+        ctx.fill();
+      });
       ctx.shadowBlur = 0;
 
-      const blinkOn = Math.floor(performance.now() / 300) % 2 === 0;
-      if ((state.blinkerLeft || state.hazard) && blinkOn) {
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(-94, -16, 30, 9);
+      // Amber Blinker Overlay on Triple Bars
+      const blinkPulse2D = Math.floor(performance.now() / 300) % 2 === 0;
+      if ((state.blinkerLeft || state.hazard) && blinkPulse2D) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(-90, -15.5, 29, 13);
       }
-      if ((state.blinkerRight || state.hazard) && blinkOn) {
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(64, -16, 30, 9);
+      if ((state.blinkerRight || state.hazard) && blinkPulse2D) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(60, -15.5, 29, 13);
       }
 
-      // Korean Rear License Plate
-      ctx.fillStyle = car.plateType === 'ev' ? '#38bdf8' : (car.plateType === 'yellow' ? '#facc15' : '#f8fafc');
-      ctx.fillRect(-44, 2, 88, 18);
-      ctx.fillStyle = '#0f172a';
-      ctx.font = '800 11px "Noto Sans KR", sans-serif';
+      // Center GT Emblem
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '900 8px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(state.customPlate || car.plate, 0, 15);
+      ctx.fillText(car.id === 'bugatti_bolide' ? 'EB' : 'GT', 0, -6.5);
+
+      // Lower Sport Diffuser, Quad Exhausts & Plate
+      ctx.fillStyle = '#0f141d';
+      ctx.beginPath(); ctx.roundRect(-96, 12, 192, 16, 5); ctx.fill();
+      ctx.fillStyle = '#e2e8f0';
+      [-76, -64, 64, 76].forEach(ex => {
+        ctx.beginPath(); ctx.arc(ex, 21, 4.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#090d16';
+        ctx.beginPath(); ctx.arc(ex, 21, 2.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e2e8f0';
+      });
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath(); ctx.roundRect(-34, 4, 68, 13, 2.5); ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '800 8.5px "Noto Sans KR", sans-serif';
+      ctx.fillText(state.customPlate || car.plate, 0, 13.5);
+
       ctx.restore();
     }
 
@@ -14139,6 +14807,170 @@
       if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.tagName === 'SELECT')) return;
       if (ev.code === 'KeyK' && !ev.repeat) {
         cycleNextScenicCourse();
+      }
+    });
+
+  
+    // =========================================================================
+    // v43 AUTHENTIC 3D 운전교실 COCKPIT MIRRORS, GAUGES & SWITCHES
+    // =========================================================================
+    function toggleDcPauseDrawer(ev) {
+      if (ev) ev.stopPropagation();
+      const d = document.getElementById('dcPauseDrawer');
+      if (!d) return;
+      const open = d.style.display === 'flex';
+      d.style.display = open ? 'none' : 'flex';
+      const av = document.getElementById('hudDriverAvatarImg');
+      if (av && !av.getAttribute('src') && typeof DRIVER_FACE_DATA_URI !== 'undefined') {
+        av.src = DRIVER_FACE_DATA_URI;
+      }
+    }
+    function closeDcPauseDrawer() {
+      const d = document.getElementById('dcPauseDrawer');
+      if (d) d.style.display = 'none';
+    }
+    function toggleDcParkingBrake() {
+      state.parkingBrake = !state.parkingBrake;
+      playTone(state.parkingBrake ? 280 : 480, 0.08, 'triangle', 0.06);
+      syncDcDashboardOrbs();
+      const pr = document.getElementById('dcBottomGreenPrompt');
+      if (pr) pr.textContent = state.parkingBrake ? '사이드 브레이크가 체결되었습니다. 출발 전 해제하세요.' : '사이드 브레이크 해제 완료! 악셀을 밟아 주행하세요.';
+    }
+
+    function syncDcDashboardOrbs() {
+      const setOn = (id, cond) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('on', !!cond);
+      };
+      setOn('dcOrbSeatbelt', state.seatbelt !== false);
+      const engBtn = document.getElementById('hudEngineStartStopBtn');
+      if (engBtn) {
+        engBtn.classList.toggle('on', !!state.engineOn);
+        engBtn.classList.toggle('off', !state.engineOn);
+      }
+      setOn('dcOrbHandbrake', !state.parkingBrake);
+      setOn('dcOrbLowBeam', !!state.headlights);
+      setOn('dcOrbHighBeam', !!state.policeSiren);
+      setOn('dcOrbWiper', !!state.wipers);
+
+      // Sliding vertical gear knob position
+      const knob = document.getElementById('dcShiftKnob');
+      if (knob) {
+        const isMob = window.innerWidth <= 640;
+        const mapY = isMob
+          ? { P: 3, R: 22, N: 41, D: 60, M: 74 }
+          : { P: 4, R: 26, N: 48, D: 70, M: 84 };
+        knob.style.top = (mapY[state.gear] ?? mapY.D) + 'px';
+      }
+
+      // Curved fuel needle angle
+      const needle = document.getElementById('dcFuelNeedleLine');
+      if (needle) {
+        const pct = Math.max(0, Math.min(100, state.fuel ?? 100)) / 100;
+        const ang = Math.PI - pct * Math.PI;
+        const nx = 45 + Math.cos(ang) * 28;
+        const ny = 29 - Math.sin(ang) * 21;
+        needle.setAttribute('x2', nx.toFixed(1));
+        needle.setAttribute('y2', ny.toFixed(1));
+      }
+    }
+
+    function renderDcThreeMirrors() {
+      if (state.stage !== 'driving') return;
+      const nf = state.nightFactor || 0;
+      const skyTop = nf > 0.5 ? '#0b1329' : '#60a5fa';
+      const skyBot = nf > 0.5 ? '#1e293b' : '#dbeafe';
+
+      const rmc = document.getElementById('dcRoomMirrorCanvas');
+      if (rmc) {
+        const g = rmc.getContext('2d');
+        const w = rmc.width, h = rmc.height;
+        const sg = g.createLinearGradient(0, 0, 0, h * 0.52);
+        sg.addColorStop(0, skyTop); sg.addColorStop(1, skyBot);
+        g.fillStyle = sg; g.fillRect(0, 0, w, h * 0.52);
+        g.fillStyle = '#475569'; g.fillRect(0, h * 0.52, w, h * 0.48);
+        g.fillStyle = '#94a3b8';
+        g.beginPath(); g.moveTo(0, h * 0.40); g.lineTo(w * 0.28, h * 0.52); g.lineTo(0, h * 0.88); g.fill();
+        g.beginPath(); g.moveTo(w, h * 0.40); g.lineTo(w * 0.72, h * 0.52); g.lineTo(w, h * 0.88); g.fill();
+        g.strokeStyle = '#e2e8f0'; g.lineWidth = 1.5;
+        g.setLineDash([5, 5]);
+        g.beginPath(); g.moveTo(w * 0.5, h * 0.52); g.lineTo(w * 0.5, h); g.stroke();
+        g.setLineDash([]);
+      }
+
+      [['dcLeftMirrorCanvas', -1], ['dcRightMirrorCanvas', 1]].forEach(([cid, side]) => {
+        const cv = document.getElementById(cid);
+        if (!cv) return;
+        const g = cv.getContext('2d');
+        const w = cv.width, h = cv.height;
+        g.fillStyle = skyBot; g.fillRect(0, 0, w, h * 0.46);
+        g.fillStyle = '#475569'; g.fillRect(0, h * 0.46, w, h * 0.54);
+        g.fillStyle = '#cbd5e1';
+        if (side < 0) {
+          g.beginPath(); g.moveTo(0, h * 0.28); g.lineTo(w * 0.58, h * 0.46); g.lineTo(0, h * 0.92); g.fill();
+          g.fillStyle = state.customColor || getCurrentCar().color || '#5c7fa3';
+          g.beginPath(); g.moveTo(w * 0.78, h * 0.52); g.lineTo(w, h * 0.44); g.lineTo(w, h); g.lineTo(w * 0.72, h); g.fill();
+        } else {
+          g.beginPath(); g.moveTo(w, h * 0.28); g.lineTo(w * 0.42, h * 0.46); g.lineTo(w, h * 0.92); g.fill();
+          g.fillStyle = state.customColor || getCurrentCar().color || '#5c7fa3';
+          g.beginPath(); g.moveTo(w * 0.22, h * 0.52); g.lineTo(0, h * 0.44); g.lineTo(0, h); g.lineTo(w * 0.28, h); g.fill();
+        }
+        g.strokeStyle = '#f8fafc'; g.lineWidth = 1.6;
+        g.beginPath();
+        g.moveTo(w * 0.5, h * 0.46);
+        g.lineTo(side < 0 ? w * 0.28 : w * 0.72, h);
+        g.stroke();
+      });
+
+      const pr = document.getElementById('dcBottomGreenPrompt');
+      if (pr) {
+        const kmh = Math.round(Math.abs(state.speed || 0) * 3.6);
+        if (state.parkingBrake && kmh < 3) {
+          pr.textContent = '사이드 브레이크를 해제하고 출발하세요.';
+        } else if (kmh < 2 && !state.blinkerLeft && !state.blinkerRight) {
+          pr.textContent = '좌측 방향지시등을 켜고 출발하세요.';
+        } else if (kmh < 2 && state.blinkerLeft) {
+          pr.textContent = '방향지시등 점등 완료! 우측 악셀 페달을 밟아 출발하세요.';
+        } else {
+          const crs = getCurrentScenicCourse();
+          pr.textContent = `${crs.icon} ${crs.shortName} 주행 중 · 안전 거리를 유지하세요 (${kmh}km/h)`;
+        }
+      }
+      syncDcDashboardOrbs();
+    }
+
+    const _origRenderMm = renderMinimapAndOverlays;
+    renderMinimapAndOverlays = function(dt) {
+      _origRenderMm(dt);
+      renderDcThreeMirrors();
+      const rc = document.getElementById('rainOverlayCanvas');
+      if (rc && state.stage === 'driving') {
+        if (state.wipers && state.weather !== 'rain') {
+          rc.style.display = 'block';
+          if (rc.width !== window.innerWidth) { rc.width = window.innerWidth; rc.height = window.innerHeight; }
+          const rctx = rc.getContext('2d');
+          rctx.clearRect(0, 0, rc.width, rc.height);
+          const ang = -Math.PI * 0.5 + Math.sin(performance.now() * 0.007) * 0.68;
+          rctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+          rctx.lineWidth = 5;
+          rctx.lineCap = 'round';
+          [rc.width * 0.34, rc.width * 0.68].forEach(bx => {
+            rctx.beginPath();
+            rctx.moveTo(bx, rc.height * 0.86);
+            rctx.lineTo(bx + Math.cos(ang) * 190, rc.height * 0.86 + Math.sin(ang) * 190);
+            rctx.stroke();
+          });
+        } else if (state.weather !== 'rain') {
+          rc.style.display = 'none';
+        }
+      }
+    };
+
+    document.addEventListener('pointerdown', function(e) {
+      const pd = document.getElementById('dcPauseDrawer');
+      const pb = document.getElementById('dcPauseMenuBtn');
+      if (pd && pd.style.display === 'flex' && !pd.contains(e.target) && (!pb || !pb.contains(e.target))) {
+        pd.style.display = 'none';
       }
     });
 
