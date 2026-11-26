@@ -3515,6 +3515,207 @@
       #bottomContextActionDock { bottom: 162px !important; }
     }
 
+
+    /* =========================================================================
+       v47 ULTRA-CLEAN OPEN-SKY HUD (ZERO TOP CLUTTER · 92% CLEAR VIEWPORT!)
+       ========================================================================= */
+    #previewTopBar {
+      height: 28px !important;
+      min-height: 28px !important;
+      padding: 2px 6px !important;
+      background: rgba(8, 12, 20, 0.74) !important;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;
+    }
+    #previewTopBar .pv-chip {
+      padding: 2px 7px !important;
+      font-size: 10px !important;
+      height: 21px !important;
+    }
+    @media (max-width: 720px) {
+      #teslaTopVerBadge, #topTrophyBadge, #topCoinBadge, #previewTopBar .top-sep,
+      #topFsdQuickBtn, #topTeslaCycleBtn, #navTestDriveBtn, #navKoreaMapBtn {
+        display: none !important;
+      }
+    }
+
+    /* Ultra-Slim Single-Row Top-Left Pill (Only Speed + 1-Tap FSD Button + Gear Icon!) */
+    #teslaLeftFsdPod {
+      left: 8px !important;
+      top: 6px !important;
+      width: auto !important;
+      max-width: calc(100vw - 175px) !important;
+      padding: 4px 8px !important;
+      border-radius: 999px !important;
+      background: rgba(10, 14, 22, 0.58) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      border: 1px solid rgba(148, 163, 184, 0.25) !important;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
+      gap: 0 !important;
+    }
+    #teslaLeftFsdPod.drawer-open {
+      border-radius: 16px !important;
+      width: 236px !important;
+      max-width: calc(100vw - 16px) !important;
+      padding: 8px 10px !important;
+      background: rgba(11, 16, 26, 0.92) !important;
+      z-index: 65 !important;
+    }
+    .ts-slim-pill-row {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 6px !important;
+      width: auto !important;
+    }
+    #teslaLeftFsdPod #hudSpeedNum {
+      font-size: 21px !important;
+      line-height: 1 !important;
+    }
+    #teslaLeftFsdPod .dc-kmh-unit {
+      font-size: 9.5px !important;
+    }
+    #teslaFsdEngageBtn {
+      padding: 3px 8px !important;
+      border-radius: 999px !important;
+      gap: 4px !important;
+    }
+    .ts-fsd-btn-txt strong {
+      font-size: 10px !important;
+      white-space: nowrap;
+    }
+    #tsExpandFsdDetailBtn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(30, 41, 59, 0.65);
+      color: #e2e8f0;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+    #teslaFsdFoldDrawer {
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Ultra-Clean Top-Right Row (Car · Course · Map Toggle · Menu) */
+    #dcTopRightIcons {
+      right: 8px !important;
+      top: 6px !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+    }
+    .ts-clean-top-ico {
+      height: 28px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(10, 14, 22, 0.58);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      color: #f1f5f9;
+      font-size: 10.5px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #dcPauseMenuBtn {
+      width: 30px !important;
+      height: 30px !important;
+      font-size: 13px !important;
+      background: rgba(37, 99, 235, 0.82) !important;
+      border: 1.5px solid #93c5fd !important;
+    }
+
+    /* HIDE ALL BULKY BOXES BY DEFAULT SO SKY & ROAD STAY 100% VISIBLE! */
+    #teslaNavCard {
+      display: none;
+    }
+    #drivingHud.show-clean-map #teslaNavCard {
+      display: block !important;
+    }
+    #dcLeftWingMirror,
+    #dcRightClusterStack .ts-sig-and-cam-row,
+    #dcBottomCenterConsole {
+      display: none !important;
+    }
+    #drivingHud.show-clean-mirrors #dcLeftWingMirror {
+      display: block !important;
+      top: 52px !important;
+    }
+    #drivingHud.show-clean-mirrors #dcRightClusterStack .ts-sig-and-cam-row {
+      display: flex !important;
+    }
+    #drivingHud.show-clean-mirrors #dcBottomCenterConsole {
+      display: flex !important;
+    }
+
+    /* Keep Bottom-Left Wheel & Bottom-Right Pedals Clean, Compact & Out of the Road View! */
+    #dcWheelCorner {
+      left: 10px !important;
+      bottom: 14px !important;
+    }
+    #dcWheelCorner .wheel-container {
+      width: 104px !important;
+      height: 104px !important;
+      opacity: 0.88;
+    }
+    #dcPedalsCorner {
+      right: 10px !important;
+      bottom: 14px !important;
+    }
+    #bottomContextActionDock {
+      bottom: 16px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      opacity: 0.88;
+    }
+    #bottomContextActionDock .exit-car-hud-btn,
+    #bottomContextActionDock .board-npc-hud-btn {
+      padding: 5px 10px !important;
+      font-size: 10.5px !important;
+      background: rgba(10, 14, 22, 0.62) !important;
+    }
+
+    /* Keep Toast Messages Subtle, Single-Line & Low (Never Blocking the Sky!) */
+    #toastBox, .toast-msg {
+      top: auto !important;
+      bottom: 62px !important;
+      font-size: 11px !important;
+      padding: 5px 12px !important;
+      background: rgba(10, 14, 22, 0.72) !important;
+      max-width: 86vw !important;
+    }
+
+    @media (max-width: 640px) {
+      #teslaLeftFsdPod { left: 6px !important; top: 5px !important; padding: 3px 7px !important; }
+      #teslaLeftFsdPod #hudSpeedNum { font-size: 18px !important; }
+      #teslaFsdEngageBtn { padding: 2.5px 7px !important; }
+      .ts-fsd-btn-txt strong { font-size: 9.5px !important; }
+      #dcTopRightIcons { right: 6px !important; top: 5px !important; gap: 3px !important; }
+      .ts-clean-top-ico { height: 25px; padding: 0 6px; font-size: 9.5px; }
+      #dcPauseMenuBtn { width: 27px !important; height: 27px !important; font-size: 12px !important; }
+      #dcWheelCorner { left: 6px !important; bottom: 12px !important; }
+      #dcWheelCorner .wheel-container { width: 82px !important; height: 82px !important; }
+      #dcPedalsCorner { right: 6px !important; bottom: 12px !important; }
+      #drivingHud .dc-cyan-brake { width: 38px !important; height: 44px !important; }
+      #drivingHud .dc-silver-accel { width: 30px !important; height: 64px !important; }
+      #bottomContextActionDock { display: none !important; }
+      #drivingHud.walk-mode-on #bottomContextActionDock { display: flex !important; bottom: 98px !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -4080,36 +4281,10 @@
     <!-- SCREEN 4: Authentic 3D 운전교실 Cockpit HUD (1:1 Match to Reference Screenshot!) -->
     <section id="drivingHud">
 
-      <!-- 1. TESLA FSD v15.0.1 LEFT TOUCHSCREEN TELEMETRY & REALITY VIEW CONTROL CARD -->
+      <!-- 1. ULTRA-SLIM TOP-LEFT PILL: Only Speed + 1-Tap FSD Button + Settings Gear (Zero Screen Obstruction!) -->
       <div id="teslaLeftFsdPod" class="pointer-auto">
-        <!-- Top Gear Strip + Battery % + Software Build Row -->
-        <div class="ts-gear-batt-row">
-          <div id="dcGearSlotBox" class="ts-gear-inline">
-            <div class="dc-shift-slot-track" style="display:none;"><div id="dcShiftKnob" class="dc-shift-knob" data-pos="D">↓</div></div>
-            <div class="gear-strip" id="gearShifter">
-              <button type="button" class="gear-btn" data-gear="P" onclick="setGear('P')">P</button>
-              <button type="button" class="gear-btn" data-gear="R" onclick="setGear('R')">R</button>
-              <button type="button" class="gear-btn" data-gear="N" onclick="setGear('N')">N</button>
-              <button type="button" class="gear-btn active" data-gear="D" onclick="setGear('D')">D</button>
-              <button type="button" class="gear-btn dc-gear-m" data-gear="M" onclick="setGear('M')" title="수동 단수">M</button>
-            </div>
-          </div>
-          <div class="ts-batt-cluster" onclick="callRoadsideFuel()" title="배터리 잔량 · 탭하여 슈퍼차저 즉시 급속충전">
-            <span id="teslaBatteryPctText">94%</span>
-            <div class="ts-batt-icon"><div id="teslaBatteryFillBar" style="width:94%;"></div></div>
-            <span id="teslaRangeKmText" class="ts-range-sub">512 km</span>
-          </div>
-        </div>
-
-        <!-- Regenerative Braking (Green Left) / Power Draw (Blue Right) Thin Bar -->
-        <div class="ts-power-bar-track" title="테슬라 회생제동(초록) · 출력(블루) 실시간 파워바">
-          <div id="teslaRegenFill"></div>
-          <div id="teslaPowerFill"></div>
-        </div>
-
-        <!-- Huge Digital Speedometer + Blue Autopilot Steering Wheel + Circular Speed Limit Sign -->
-        <div id="dcMirrorAndSpeedPod" class="ts-speed-main-row">
-          <div id="hudClusterBox" onclick="toggleSpeedCtrlBar()" title="탭하여 수동 목표속도 슬라이더 열기/닫기">
+        <div id="dcMirrorAndSpeedPod" class="ts-slim-pill-row">
+          <div id="hudClusterBox" onclick="toggleTeslaFsdFoldDrawer(event)" title="탭하여 변속·FSD 성향 열기">
             <span id="hudSpeedNum">0</span>
             <span class="dc-kmh-unit">km/h</span>
             <div style="display:none;">
@@ -4120,27 +4295,21 @@
             </div>
           </div>
 
-          <div class="ts-badges-right">
-            <!-- Speed Assist Circular Sign (Tap to sync set speed; blue outline when speeding!) -->
-            <button type="button" id="teslaSpeedLimitSign" onclick="syncFsdSpeedToLimit()" title="Speed Assist 제한속도 표지판 (탭하여 제한속도에 맞춤)">
-              <span id="teslaSpeedLimitVal">80</span>
-            </button>
+          <button type="button" id="teslaFsdEngageBtn" class="on" onclick="toggleAutopilotInDrive()" title="탭하여 테슬라 FSD v15 자율주행 켜기/끄기">
+            <svg viewBox="0 0 28 28" width="15" height="15">
+              <circle cx="14" cy="14" r="10.5" fill="none" stroke="currentColor" stroke-width="2.5"/>
+              <circle cx="14" cy="14" r="2.6" fill="currentColor"/>
+              <path d="M4.5 11.5 L11.5 13 M23.5 11.5 L16.5 13 M14 16.5 V24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            <div class="ts-fsd-btn-txt">
+              <strong id="teslaFsdStateTitle">FSD v15</strong>
+              <small id="teslaFsdSubLabel" class="dc-sr">Supervised</small>
+            </div>
+          </button>
 
-            <!-- Glowing Blue Tesla Autopilot / Start Self-Driving Button -->
-            <button type="button" id="teslaFsdEngageBtn" class="on" onclick="toggleAutopilotInDrive()" title="탭하여 Full Self-Driving (Supervised) v15 켜기/끄기">
-              <svg viewBox="0 0 28 28" width="20" height="20">
-                <circle cx="14" cy="14" r="10.5" fill="none" stroke="currentColor" stroke-width="2.4"/>
-                <circle cx="14" cy="14" r="2.6" fill="currentColor"/>
-                <path d="M4.5 11.5 L11.5 13 M23.5 11.5 L16.5 13 M14 16.5 V24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-              </svg>
-              <div class="ts-fsd-btn-txt">
-                <strong id="teslaFsdStateTitle">FSD v15</strong>
-                <small id="teslaFsdSubLabel">Supervised</small>
-              </div>
-            </button>
-          </div>
+          <button type="button" id="tsExpandFsdDetailBtn" onclick="toggleTeslaFsdFoldDrawer(event)" title="기어(P·R·N·D) · 속도 성향(느긋~매드맥스) · 탭파킹 설정 열기">⚙️</button>
 
-          <!-- Preserved hidden legacy SVG & Rear Mirror Canvas (toggleable via Dashcam button) -->
+          <!-- Preserved hidden legacy SVG & Rear Mirror Canvas -->
           <div id="dcRoomMirrorFrame" onclick="cycleCameraMode()" style="display:none;" title="상단 리어카메라 룸미러">
             <canvas id="dcRoomMirrorCanvas" width="240" height="58"></canvas>
           </div>
@@ -4156,42 +4325,67 @@
           </div>
         </div>
 
-        <!-- 5 Official Tesla FSD v15 Speed Profiles (Sloth · Chill · Standard · Hurry · Mad Max) -->
-        <div class="ts-profile-seg" id="teslaSpeedProfileBar" title="FSD v15 5단계 주행 성향 프로필 (주행 속도 및 차선변경 빈도 제어)">
-          <button type="button" class="ts-prof-btn" data-prof="sloth" onclick="setFsdSpeedProfile('sloth')">느긋</button>
-          <button type="button" class="ts-prof-btn" data-prof="chill" onclick="setFsdSpeedProfile('chill')">안락</button>
-          <button type="button" class="ts-prof-btn active" data-prof="standard" onclick="setFsdSpeedProfile('standard')">표준</button>
-          <button type="button" class="ts-prof-btn" data-prof="hurry" onclick="setFsdSpeedProfile('hurry')">신속</button>
-          <button type="button" class="ts-prof-btn madmax" data-prof="mad_max" onclick="setFsdSpeedProfile('mad_max')">매드맥스</button>
-        </div>
+        <!-- Collapsible FSD v15 Detail Sheet (Hidden by default so road & sky stay 100% clear!) -->
+        <div id="teslaFsdFoldDrawer" style="display:none;">
+          <div class="ts-gear-batt-row">
+            <div id="dcGearSlotBox" class="ts-gear-inline">
+              <div class="dc-shift-slot-track" style="display:none;"><div id="dcShiftKnob" class="dc-shift-knob" data-pos="D">↓</div></div>
+              <div class="gear-strip" id="gearShifter">
+                <button type="button" class="gear-btn" data-gear="P" onclick="setGear('P')">P</button>
+                <button type="button" class="gear-btn" data-gear="R" onclick="setGear('R')">R</button>
+                <button type="button" class="gear-btn" data-gear="N" onclick="setGear('N')">N</button>
+                <button type="button" class="gear-btn active" data-gear="D" onclick="setGear('D')">D</button>
+                <button type="button" class="gear-btn dc-gear-m" data-gear="M" onclick="setGear('M')">M</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button type="button" id="teslaSpeedLimitSign" onclick="syncFsdSpeedToLimit()" title="제한속도 동기화">
+                <span id="teslaSpeedLimitVal">80</span>
+              </button>
+              <div class="ts-batt-cluster" onclick="callRoadsideFuel()">
+                <span id="teslaBatteryPctText">94%</span>
+                <div class="ts-batt-icon"><div id="teslaBatteryFillBar" style="width:94%;"></div></div>
+                <span id="teslaRangeKmText" class="ts-range-sub">512 km</span>
+              </div>
+            </div>
+          </div>
 
-        <!-- Confirmed FSD v15 Capabilities Row: Calm Mode · HOV Lane · Tap-to-Park (>>>) -->
-        <div class="ts-v15-toggles">
-          <button type="button" class="ts-mini-chip" id="tsCalmModeBtn" onclick="toggleFsdCalmMode()" title="오스틴 로보택시에서 이식된 Calm Mode (주변 인식 오버레이 최소화)">🧘 캄 모드</button>
-          <button type="button" class="ts-mini-chip on" id="tsHovLaneBtn" onclick="toggleFsdHovLane()" title="HOV 카풀/추월 차선 적극 활용">🛣️ HOV차로</button>
-          <button type="button" class="ts-mini-chip" id="tsAutoParkBtn" onclick="triggerFsdTapToPark()" title="전방 >>> 쉐브론 주차 구역 탐색 및 자동 주차 (Tap-to-Park)">🅿️ 탭파킹 &gt;&gt;&gt;</button>
-        </div>
+          <div class="ts-power-bar-track">
+            <div id="teslaRegenFill"></div>
+            <div id="teslaPowerFill"></div>
+          </div>
 
-        <!-- Live HW4 10B Neural-Net Decision Status Pill -->
-        <div id="teslaNeuralStatusBox">
-          <span class="ts-pulse-dot" id="teslaNeuralDot"></span>
-          <span id="teslaNeuralText">Reality View · 곡선 차로 및 포트홀 실시간 스캔 중</span>
+          <div class="ts-profile-seg" id="teslaSpeedProfileBar">
+            <button type="button" class="ts-prof-btn" data-prof="sloth" onclick="setFsdSpeedProfile('sloth')">느긋</button>
+            <button type="button" class="ts-prof-btn" data-prof="chill" onclick="setFsdSpeedProfile('chill')">안락</button>
+            <button type="button" class="ts-prof-btn active" data-prof="standard" onclick="setFsdSpeedProfile('standard')">표준</button>
+            <button type="button" class="ts-prof-btn" data-prof="hurry" onclick="setFsdSpeedProfile('hurry')">신속</button>
+            <button type="button" class="ts-prof-btn madmax" data-prof="mad_max" onclick="setFsdSpeedProfile('mad_max')">매드맥스</button>
+          </div>
+
+          <div class="ts-v15-toggles">
+            <button type="button" class="ts-mini-chip" id="tsCalmModeBtn" onclick="toggleFsdCalmMode()">🧘 캄 모드</button>
+            <button type="button" class="ts-mini-chip on" id="tsHovLaneBtn" onclick="toggleFsdHovLane()">🛣️ HOV차로</button>
+            <button type="button" class="ts-mini-chip" id="tsAutoParkBtn" onclick="triggerFsdTapToPark();closeTeslaFsdFoldDrawer();">🅿️ 탭파킹 &gt;&gt;&gt;</button>
+          </div>
+
+          <div id="teslaNeuralStatusBox">
+            <span class="ts-pulse-dot" id="teslaNeuralDot"></span>
+            <span id="teslaNeuralText">Reality View · 차로 중앙 유지</span>
+          </div>
         </div>
       </div>
 
-      <!-- 3. TOP-RIGHT: Tesla Split Navigation & Full-Screen Map Header Controls -->
+      <!-- 3. ULTRA-CLEAN TOP-RIGHT PILL ROW: Car Switch · Course · Map Toggle · Menu (Zero Giant Boxes!) -->
       <div id="dcTopRightIcons" class="pointer-auto">
-        <button type="button" class="ts-top-action-btn" id="tsDashcamMirrorBtn" onclick="toggleTeslaRearCamMirror()" title="리어뷰 미러 카메라 창 켜기/끄기">🪞 리어캠</button>
-        <button type="button" class="dc-top-cam-btn" onclick="cycleCameraMode()" title="카메라 시점 전환 (C)">
-          <svg viewBox="0 0 32 24" width="22" height="17">
-            <rect x="3" y="5" width="22" height="15" rx="3.5" fill="#cbd5e1" stroke="#334155" stroke-width="1.6"/>
-            <rect x="8" y="2.5" width="7" height="3" rx="1" fill="#94a3b8"/>
-            <circle cx="15.5" cy="12.5" r="5.2" fill="#1e293b" stroke="#f8fafc" stroke-width="1.5"/>
-            <circle cx="15.5" cy="12.5" r="2.3" fill="#38bdf8"/>
-            <polygon points="25,9 30,6.5 30,18.5 25,16" fill="#94a3b8" stroke="#334155" stroke-width="1"/>
-          </svg>
+        <button type="button" class="ts-clean-top-ico" onclick="cycleTeslaModelQuick()" title="테슬라 차량 바로 바꾸기">⚡차종</button>
+        <button type="button" class="ts-clean-top-ico" onclick="openCoursePickerModal()" title="8종 도로 코스 선택">🛣️코스</button>
+        <button type="button" class="ts-clean-top-ico" id="tsQuickMapBtn" onclick="toggleCleanMiniMap(event)" title="미니 내비게이션 지도 켜기/끄기">🗺️</button>
+        <button type="button" class="ts-top-action-btn" id="tsDashcamMirrorBtn" onclick="toggleCleanMirrorsHud()" style="display:none;">🪞 리어캠</button>
+        <button type="button" class="dc-top-cam-btn" onclick="cycleCameraMode()" style="display:none;" title="카메라 시점 전환 (C)">
+          <svg viewBox="0 0 32 24" width="18" height="14"><rect x="3" y="5" width="22" height="15" rx="3.5" fill="#cbd5e1"/></svg>
         </button>
-        <button type="button" id="dcPauseMenuBtn" onclick="toggleDcPauseDrawer(event)" title="테슬라 전체 컨트롤 · 차량 · 미션 메뉴">
+        <button type="button" id="dcPauseMenuBtn" onclick="toggleDcPauseDrawer(event)" title="차량 · 미션 · 시점 · 미러 전체 메뉴">
           <span>❚❚</span>
         </button>
       </div>
@@ -4222,6 +4416,7 @@
           <button type="button" class="icon-pill-btn" onclick="closeDcPauseDrawer();openCarSelector()">차량</button>
           <button type="button" class="icon-pill-btn" style="color:#fde047;" onclick="closeDcPauseDrawer();selectKoreanCar('bugatti_bolide');showToast('🎁 스페셜 선물차 [부가티 볼리드] 장착 완료!')">🎁 볼리드 선물차</button>
           <button type="button" class="icon-pill-btn" id="hudQuickTrayBtn" onclick="toggleHudQuickTray(event)">⚡ 빠른기능</button>
+          <button type="button" class="icon-pill-btn" onclick="closeDcPauseDrawer();toggleCleanMirrorsHud()">🪞 미러·하단바 표시</button>
           <button type="button" class="icon-pill-btn mini-glass-ico" onclick="closeDcPauseDrawer();toggleVehicleFuncPod()">☰</button>
           <button type="button" class="icon-pill-btn" id="immersiveToggleBtn" onclick="toggleImmersiveAppMode()" style="display:none;">⛶</button>
         </div>
@@ -5521,7 +5716,7 @@
       const ret = document.getElementById('airCombatReticle');
       const kBadge = document.getElementById('airKillBadge');
       if (ret) ret.style.display = (state.carFlightMode && !state.isWalking && state.stage === 'driving') ? 'flex' : 'none';
-      if (kBadge) kBadge.style.display = (playerAirborne || (state.skyScore || 0) > 0) && state.stage === 'driving' ? 'inline-flex' : 'none';
+      if (kBadge) kBadge.style.display = playerAirborne && state.stage === 'driving' ? 'inline-flex' : 'none';
 
       // Handle spiraling shot-down fall until hitting ground!
       if (state.isShotDownFalling) {
@@ -17086,45 +17281,35 @@
         lowSkirt.position.set(0, wheelR * 0.45, 0);
         bodyGroup.add(vault, rearLaser, frontLaser, lowSkirt);
       } else {
-        // Sleek Aerodynamic Teardrop Tesla Silhouette (Model Y Juniper / Model 3 Highland / Model S & X Plaid / Cybercab)
-        const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, H * 0.42, L * 0.96), paintMat);
-        lowerBody.position.set(0, wheelR * 0.62 + H * 0.18, 0);
-        bodyGroup.add(lowerBody);
+        // Showroom-Grade Smooth Lofted Fastback Tesla Body (Zero sphere glare dots, zero sticking-out roof boxes!)
+        const smoothBodyMesh = new THREE.Mesh(createSmoothMustangGtdBodyGeo(W, H, L, wheelR), paintMat);
+        smoothBodyMesh.castShadow = true;
+        smoothBodyMesh.receiveShadow = true;
+        bodyGroup.add(smoothBodyMesh);
 
-        // Sculpted Rear & Front Haunches
+        // Flush Matte-Tinted Panoramic Rear & Front Glass (No specular glare dots!)
+        const cleanGlassMat = new THREE.MeshBasicMaterial({ color: 0x121926 });
+        const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.62, H * 0.54), cleanGlassMat);
+        rearGlass.rotation.y = Math.PI;
+        rearGlass.rotation.x = -1.04;
+        rearGlass.position.set(0, H * 0.82, -hl * 0.52);
+        const frontGlass = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.64, H * 0.48), cleanGlassMat);
+        frontGlass.rotation.x = -1.06;
+        frontGlass.position.set(0, H * 0.78, hl * 0.15);
+        bodyGroup.add(rearGlass, frontGlass);
+
+        // Sleek Aerodynamic Side Mirrors & Flush Door Handles
         [-1, 1].forEach(side => {
-          const haunch = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.21, H * 0.24, L * 0.44, 16), paintMat);
-          haunch.rotation.x = Math.PI / 2;
-          haunch.scale.set(0.62, 1, 0.88);
-          haunch.position.set(side * (hw * 0.82), H * 0.42, -L * 0.20);
-          // Flush black door handles + HW4 Autopilot Fender Camera Badge
-          const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.028, 0.16), trimDarkMat);
-          handle.position.set(side * (hw * 0.97), H * 0.48, 0.08);
-          const hw4Cam = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.045, 0.13), trimDarkMat);
-          hw4Cam.position.set(side * (hw * 0.97), H * 0.46, L * 0.22);
-          // Side Wing Mirrors
-          const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.12), paintMat);
-          mirror.position.set(side * (hw + 0.05), H * 0.62, L * 0.16);
-          bodyGroup.add(haunch, handle, hw4Cam, mirror);
+          const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.065, 0.095), paintMat);
+          mirror.position.set(side * (hw * 0.86), H * 0.67, L * 0.11);
+          const handle = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.024, 0.15), trimDarkMat);
+          handle.position.set(side * (hw * 0.96), H * 0.48, 0.06);
+          bodyGroup.add(mirror, handle);
         });
 
-        // Seamless Panoramic Smoked-Glass Greenhouse Dome (Signature Tesla All-Glass Roof!)
-        const cabinGeo = new THREE.SphereGeometry(1, 28, 18);
-        cabinGeo.scale(W * 0.43, H * 0.36, L * 0.33);
-        const cabinDome = new THREE.Mesh(cabinGeo, glassRoofMat);
-        cabinDome.position.set(0, H * 0.64, -L * 0.03);
-        bodyGroup.add(cabinDome);
-
-        // Painted Roof Rails framing the All-Glass Roof
-        [-1, 1].forEach(side => {
-          const rail = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.055, L * 0.46), paintMat);
-          rail.position.set(side * (W * 0.39), H * 0.86, -L * 0.04);
-          bodyGroup.add(rail);
-        });
-
-        // Rear Ducktail / Carbon Plaid Lip + Full-Width Juniper/Cybercab Lightbar or Highland C-Claws!
-        const duckLip = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, 0.04, 0.12), carSpec.id.includes('plaid') || carSpec.id.includes('highland') ? trimDarkMat : paintMat);
-        duckLip.position.set(0, H * 0.60, -hl + 0.04);
+        // Subtle Integrated Ducktail Lip
+        const duckLip = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, 0.032, 0.09), carSpec.id.includes('plaid') || carSpec.id.includes('highland') ? trimDarkMat : paintMat);
+        duckLip.position.set(0, H * 0.57, -hl + 0.02);
         bodyGroup.add(duckLip);
 
         if (isJuniper || isCybercab || carSpec.id === 'tesla_modelx_plaid') {
@@ -17624,6 +17809,63 @@
       ensureFsdCourseHazards();
       updateTeslaFsd3DPathAndSummon(dt || 0.016);
       updateTeslaLiveTelemetryHud();
+    };
+
+
+    // v47 Ultra-Clean Collapsible Popovers (Zero Top Screen Clutter!)
+    function toggleTeslaFsdFoldDrawer(ev) {
+      if (ev) ev.stopPropagation();
+      const dr = document.getElementById('teslaFsdFoldDrawer');
+      const pod = document.getElementById('teslaLeftFsdPod');
+      if (!dr || !pod) return;
+      const open = dr.style.display === 'flex';
+      dr.style.display = open ? 'none' : 'flex';
+      pod.classList.toggle('drawer-open', !open);
+    }
+    function closeTeslaFsdFoldDrawer() {
+      const dr = document.getElementById('teslaFsdFoldDrawer');
+      const pod = document.getElementById('teslaLeftFsdPod');
+      if (dr) dr.style.display = 'none';
+      if (pod) pod.classList.remove('drawer-open');
+    }
+    function toggleCleanMiniMap(ev) {
+      if (ev) ev.stopPropagation();
+      const hud = document.getElementById('drivingHud');
+      if (!hud) return;
+      const on = hud.classList.toggle('show-clean-map');
+      const btn = document.getElementById('tsQuickMapBtn');
+      if (btn) btn.style.borderColor = on ? '#60a5fa' : 'rgba(148,163,184,0.28)';
+      if (on) setTimeout(() => drawLiveGpsMinimap(), 25);
+    }
+    function toggleCleanMirrorsHud() {
+      const hud = document.getElementById('drivingHud');
+      if (!hud) return;
+      hud.classList.toggle('show-clean-mirrors');
+    }
+    document.addEventListener('pointerdown', function(e) {
+      const pod = document.getElementById('teslaLeftFsdPod');
+      if (pod && pod.classList.contains('drawer-open') && !pod.contains(e.target)) {
+        closeTeslaFsdFoldDrawer();
+      }
+    });
+
+    // Keep short friendly label on the slim FSD button ('FSD ON' vs '자율켜기') & sync walk-mode class
+    const _v46SyncWidgets = syncTeslaFsdHudWidgets;
+    syncTeslaFsdHudWidgets = function() {
+      _v46SyncWidgets();
+      const stTitle = document.getElementById('teslaFsdStateTitle');
+      if (stTitle) stTitle.textContent = state.autopilot ? '자율주행 ON' : '자율켜기';
+      const hud = document.getElementById('drivingHud');
+      if (hud) {
+        hud.classList.toggle('walk-mode-on', !!state.isWalking);
+        if (!state.fsdCalmMode) {
+          // Override v46 opacity manipulation on hidden mirrors cleanly
+          const lm = document.getElementById('dcLeftWingMirror');
+          const rm = document.getElementById('dcRightWingMirror');
+          if (lm) lm.style.opacity = '';
+          if (rm) rm.style.opacity = '';
+        }
+      }
     };
 
   </script>
