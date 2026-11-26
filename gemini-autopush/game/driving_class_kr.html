@@ -4135,7 +4135,7 @@
       { id: 'novus_mixer', brand: '타타대우', group: '제네시스', cat: '특장 상용 트럭', price: '건설 특장용', name: '타타대우 노부스 특장트럭', plate: '96자 0404', plateType: 'yellow', color: '#d97706', maxSpeed: 132, accel: 11, profile: 'truck_1ton', lampSig: 'commercial_kr', dims: [2.45, 2.85, 7.40], drive: 'FR', isCommercial: true, desc: '대한민국 건설 현장의 든든한 대형 특장 트럭' },
 
       // ---------------- EXOTIC SUPERCARS & IMPORTED LUXURY (외제 슈퍼카 · 선물차 14종) ----------------
-      { id: 'mustang_gt_blue', brand: '포드', group: '외제_슈퍼카', cat: 'V8 패스트백 GT', price: '선물·기본 스페셜', name: '머스탱 GT 다크호스 패스트백', plate: '123가 4568', plateType: 'normal', color: '#5c7fa3', maxSpeed: 285, accel: 31, profile: 'fastback_sedan', lampSig: 'horizon_slim', dims: [1.92, 1.39, 4.81], drive: 'FR', hasWing: true, caliper: 0xef4444, desc: '스틸 블루 메탈릭 · 3연장 수직 테일램프 & 블랙 GT 리어 스포일러' },
+      { id: 'mustang_gt_blue', brand: '포드', group: '외제_슈퍼카', cat: 'V8 패스트백 GT', price: '선물·기본 스페셜', name: '머스탱 GT 다크호스 패스트백', plate: 'GT', plateType: 'normal', color: '#5f82b0', maxSpeed: 295, accel: 33, profile: 'mustang_s650', lampSig: 'mustang_tribar', dims: [1.98, 1.40, 4.82], drive: 'FR', hasWing: false, caliper: 0xef4444, desc: '베이퍼 스틸 블루 메탈릭 · S650 다크호스 3연장 사선 테일램프 & 페데스탈 GT 윙' },
       { id: 'bugatti_bolide', brand: '부가티', group: '외제_슈퍼카', cat: 'W16 트랙 하이퍼 선물차', price: '스페셜 선물차', name: '🎁 부가티 볼리드 (선물차)', plate: '00볼 1850', plateType: 'normal', color: '#2563eb', maxSpeed: 420, accel: 46, profile: 'supercar_wedge', lampSig: 'bugatti_8eye', dims: [2.05, 1.05, 4.75], drive: 'AWD', scissorDoors: true, hasWing: true, caliper: 0x38bdf8, desc: '3D운전교실 스페셜 기프트카 · X자 레이저 리어램프 1,850마력 하이퍼카' },
       { id: 'lambo_revuelto', brand: '람보르기니', group: '외제_슈퍼카', cat: 'V12 하이퍼 슈퍼카', price: '7억 8,000만원~', name: '람보르기니 레부엘토 / 아벤타도르', plate: '11라 0777', plateType: 'normal', color: '#84cc16', maxSpeed: 350, accel: 38, profile: 'supercar_wedge', lampSig: 'lambo_y', dims: [2.03, 1.16, 4.94], drive: 'AWD', scissorDoors: true, hasWing: true, caliper: 0xfacc15, desc: '베르데 만티스 네온 그린 · Y자형 시그니처 LED · V12 시저도어 슈퍼카' },
       { id: 'lambo_urus', brand: '람보르기니', group: '외제_슈퍼카', cat: '슈퍼 SUV', price: '3억 2,700만원~', name: '람보르기니 우루스 SE', plate: '22러 8888', plateType: 'normal', color: '#eab308', maxSpeed: 312, accel: 33, profile: 'sleek_cuv', lampSig: 'lambo_y', dims: [2.01, 1.63, 5.12], drive: 'AWD', caliper: 0xef4444, desc: '지알로 아우게 옐로우 · 쿠페형 루프라인 세계 최강 슈퍼 SUV' },
@@ -11312,6 +11312,14 @@
         const arch = Math.cos(u * Math.PI * 0.48);
         return base + (H - base) * Math.pow(Math.max(0, arch), 0.72);
       }
+      if (profile === 'mustang_s650') {
+        // Long muscular V8 hood + low fastback cabin + swept S650 rear deck!
+        if (u > 0.28) return H * 0.46 + (H * 0.56 - H * 0.46) * ((1 - u) / 0.72);
+        if (u > -0.02) return H * 0.56 + (H - H * 0.56) * ((0.28 - u) / 0.30);
+        if (u > -0.32) return H * (0.99 + 0.01 * Math.cos((u + 0.15) * 5));
+        if (u > -0.86) return H * 0.61 + (H * 0.99 - H * 0.61) * ((u + 0.86) / 0.54);
+        return H * 0.59;
+      }
       if (profile === 'fastback_sedan' || profile === 'retro_wedge') {
         if (u > 0.36) return H * 0.44 + (H * 0.55 - H * 0.44) * ((1 - u) / 0.64);
         if (u > 0.04) return H * 0.55 + (H - H * 0.55) * ((0.36 - u) / 0.32);
@@ -11377,7 +11385,8 @@
         const dRearW = Math.abs(u + 0.61);
         const archSw = (dFrontW < 0.22 ? Math.cos((dFrontW / 0.22) * Math.PI * 0.5) : 0) +
                        (dRearW < 0.22 ? Math.cos((dRearW / 0.22) * Math.PI * 0.5) : 0);
-        const fenderFlare = profile === 'city_bus' ? 0 : archSw * 0.065;
+        const rearHaunchBoost = (profile === 'mustang_s650' && u < -0.15 && u > -0.94) ? Math.sin(((u + 0.94) / 0.79) * Math.PI) * 0.085 : 0;
+        const fenderFlare = profile === 'city_bus' ? 0 : (archSw * (profile === 'mustang_s650' ? 0.085 : 0.065) + rearHaunchBoost);
 
         const fullRoofY = sampleRooflineHeight(profile, u, H, wheelR);
         const shoulderY = Math.min(fullRoofY, H * beltRatio + (profile === 'supercar_wedge' ? archSw * 0.04 : 0));
@@ -11386,7 +11395,7 @@
 
         const wLow = hw * planScale + fenderFlare;
         const wBelt = hw * planScale * 0.98 + fenderFlare * 0.7;
-        const wRoof = hw * planScale * (profile === 'city_bus' ? 0.95 : 0.76); // Authentic 3D Tumblehome!
+        const wRoof = hw * planScale * (profile === 'city_bus' ? 0.95 : (profile === 'mustang_s650' ? 0.63 : 0.76)); // Deep Mustang Coke-bottle rear shoulder tumblehome!
 
         // Construct smooth symmetric 14-point cross-section loop at station z
         const loop = [
@@ -11552,7 +11561,7 @@
           fin.position.set(fx * W, wheelR * 0.52, -hl + 0.07);
           bodyGroup.add(fin);
         });
-        [-0.36, -0.28, 0.28, 0.36].forEach(ex => {
+        if (carSpec.lampSig !== 'mustang_tribar') [-0.36, -0.28, 0.28, 0.36].forEach(ex => {
           const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.14, 10), satinSilver);
           tip.rotation.x = Math.PI / 2;
           tip.position.set(ex * W, wheelR * 0.50, -hl + 0.02);
@@ -11567,7 +11576,7 @@
       }
 
       // Twin / Quad Chrome Exhaust Pipes (for non-EVs)
-      if (carSpec.plateType !== 'ev') {
+      if (carSpec.plateType !== 'ev' && carSpec.lampSig !== 'mustang_tribar') {
         const exOffsets = isSupercar ? [-0.52, -0.38, 0.38, 0.52] : [-hw * 0.58, hw * 0.58];
         exOffsets.forEach(ex => {
           const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.16, 12), satinSilver);
@@ -11759,7 +11768,92 @@
           bR.position.set(side * (hw * 0.66), rearY, -hl + 0.01);
           bodyGroup.add(bL, bR);
         }
-      } else if (sig === 'horizon' || sig === 'horizon_slim') {
+      } else if (sig === 'mustang_tribar') {
+        // === AUTHENTIC 3D S650 FORD MUSTANG GT / DARK HORSE (1:1 MATCH TO SCREENSHOT!) ===
+        // Front aggressive Mustang LED headlamps + black hexagonal GT grille
+        const gtGrille = new THREE.Mesh(new THREE.BoxGeometry(W * 0.64, H * 0.18, 0.07), darkGrilleMat);
+        gtGrille.position.set(0, frontY - 0.02, hl - 0.01);
+        bodyGroup.add(gtGrille);
+        for (const side of [-1, 1]) {
+          for (let bi = 0; bi < 3; bi++) {
+            const fTri = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.075, 0.07), iceCyanLed);
+            fTri.position.set(side * (hw * 0.56 + bi * 0.065), frontY + 0.03, hl - 0.02);
+            fTri.rotation.z = side * -0.18;
+            bodyGroup.add(fTri);
+          }
+        }
+
+        // Concave Matte-Black Trapezoidal Rear Decklid Panel
+        const deckPanel = new THREE.Mesh(new THREE.BoxGeometry(W * 0.91, H * 0.145, 0.075), darkGrilleMat);
+        deckPanel.position.set(0, H * 0.505, -hl + 0.015);
+        bodyGroup.add(deckPanel);
+
+        // Continuous Thin Glowing Red Upper Accent Light Line across top of black decklid!
+        const topRedLine = new THREE.Mesh(new THREE.BoxGeometry(W * 0.89, 0.020, 0.082), tailRedLed);
+        topRedLine.position.set(0, H * 0.575, -hl + 0.012);
+        bodyGroup.add(topRedLine);
+
+        // Iconic 3 Angled Vertical Red-Orange LED Tri-Bar Taillights on Left [\\ ] and Right [///]!
+        const innerCoreMat = new THREE.MeshBasicMaterial({ color: 0xff453a });
+        if (isPlayer) brakeLampMaterials.push(innerCoreMat);
+        for (const side of [-1, 1]) {
+          for (let bi = 0; bi < 3; bi++) {
+            const bx = side * (hw * 0.56 + bi * 0.105);
+            const outerBar = new THREE.Mesh(new THREE.BoxGeometry(0.068, H * 0.122, 0.086), tailRedLed);
+            outerBar.position.set(bx, H * 0.50, -hl + 0.010);
+            outerBar.rotation.z = side * 0.15;
+            outerBar.rotation.x = -0.10;
+            const coreBar = new THREE.Mesh(new THREE.BoxGeometry(0.038, H * 0.102, 0.092), innerCoreMat);
+            coreBar.position.set(bx, H * 0.50, -hl + 0.008);
+            coreBar.rotation.z = side * 0.15;
+            coreBar.rotation.x = -0.10;
+            bodyGroup.add(outerBar, coreBar);
+          }
+        }
+
+        // Center Recessed Gloss-Black [GT] Badge Plate (No white license plate!)
+        const gtTex = makeSignTexture('#111827', '#cbd5e1', 'G T', '', '#334155');
+        const gtBadge = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.058, 0.088), new THREE.MeshBasicMaterial({ map: gtTex }));
+        gtBadge.position.set(0, H * 0.505, -hl + 0.009);
+        bodyGroup.add(gtBadge);
+
+        // Sculpted Metallic-Blue Rear Bumper Shelf + 2 Tiny White Parking Sensor Dots + Deep Black Diffuser!
+        const bumperShelf = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, H * 0.13, 0.14), paintMat);
+        bumperShelf.position.set(0, H * 0.355, -hl + 0.02);
+        bodyGroup.add(bumperShelf);
+        for (const side of [-1, 1]) {
+          const sensorDot = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), satinSilver);
+          sensorDot.position.set(side * (hw * 0.73), H * 0.34, -hl - 0.048);
+          const cornerSpat = new THREE.Mesh(new THREE.BoxGeometry(0.09, H * 0.14, 0.18), trimBlack);
+          cornerSpat.position.set(side * (hw * 0.95), H * 0.22, -hl + 0.04);
+          bodyGroup.add(sensorDot, cornerSpat);
+        }
+        const deepDiff = new THREE.Mesh(new THREE.BoxGeometry(W * 0.92, H * 0.15, 0.18), darkGrilleMat);
+        deepDiff.position.set(0, H * 0.19, -hl + 0.04);
+        bodyGroup.add(deepDiff);
+
+        // Signature S650 Dark Horse Gloss-Black Pedestal Rear Wing + Center V-Bridge + Overhanging Endplates!
+        const mainBlade = new THREE.Mesh(new THREE.BoxGeometry(W * 0.97, 0.036, 0.24), trimBlack);
+        mainBlade.position.set(0, H * 0.685, -hl + 0.19);
+        mainBlade.rotation.x = 0.08;
+        const centerVBridge = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.068, 0.20), trimBlack);
+        centerVBridge.position.set(0, H * 0.642, -hl + 0.17);
+        bodyGroup.add(mainBlade, centerVBridge);
+        for (const side of [-1, 1]) {
+          const outerStanchion = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.085, 0.16), trimBlack);
+          outerStanchion.position.set(side * (hw * 0.56), H * 0.645, -hl + 0.18);
+          const endPlate = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.095, 0.30), trimBlack);
+          endPlate.position.set(side * (hw * 0.97), H * 0.665, -hl + 0.19);
+          endPlate.rotation.z = side * -0.28;
+          bodyGroup.add(outerStanchion, endPlate);
+          // 5 Horizontal Black Fastback Rear-Window Side Louvers!
+          for (let li = 0; li < 5; li++) {
+            const louv = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.016, 0.05), trimBlack);
+            louv.position.set(side * (W * 0.30), H * (0.72 + li * 0.042), -hl * 0.42 + li * 0.075);
+            bodyGroup.add(louv);
+          }
+        }
+            } else if (sig === 'horizon' || sig === 'horizon_slim') {
         const hBar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, sig === 'horizon' ? 0.05 : 0.036, 0.07), iceCyanLed);
         hBar.position.set(0, frontY + 0.03, hl - 0.02);
         const rBar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, 0.048, 0.06), tailRedLed);
@@ -11858,10 +11952,13 @@
       const pMat = new THREE.MeshBasicMaterial({ map: pTex });
       const fPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.12), pMat);
       fPlate.position.set(0, H * 0.21, hl + 0.005);
-      const rPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.12), pMat);
-      rPlate.rotation.y = Math.PI;
-      rPlate.position.set(0, H * 0.30, -hl - 0.005);
-      bodyGroup.add(fPlate, rPlate);
+      bodyGroup.add(fPlate);
+      if (sig !== 'mustang_tribar') {
+        const rPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.12), pMat);
+        rPlate.rotation.y = Math.PI;
+        rPlate.position.set(0, H * 0.30, -hl - 0.005);
+        bodyGroup.add(rPlate);
+      }
 
       if (isPlayer && (state.policeSiren || carSpec.emergencyRole)) {
         const barBase = new THREE.Mesh(new THREE.BoxGeometry(W * 0.62, 0.045, 0.18), trimBlack);
@@ -13174,8 +13271,8 @@
             const cSin = Math.sin(orbitAngle);
             const cCos = Math.cos(orbitAngle);
             const fltCam = state.flightMorph || 0;
-            const backDist = isBus ? 12.0 : (6.4 + fltCam * 4.8 + Math.min(1.1, Math.abs(state.speed) * 0.028));
-            const upH = isBus ? 4.2 : (2.35 + fltCam * 1.45);
+            const backDist = isBus ? 12.0 : (4.35 + fltCam * 4.8 + Math.min(0.85, Math.abs(state.speed) * 0.022));
+            const upH = isBus ? 4.2 : (1.88 + fltCam * 1.45);
             const goalX = state.x - cSin * backDist;
             const goalY = state.y + upH;
             const goalZ = state.z - cCos * backDist;
@@ -13195,7 +13292,7 @@
             }
             const jolt = state.crashShake > 0 ? (Math.sin(performance.now() * 0.09) * state.crashShake * 0.65) : 0;
             camera.position.set(state.camX + jolt, state.camY + Math.abs(jolt) * 0.4, state.camZ);
-            camera.lookAt(state.camLookX, state.y + 1.15, state.camLookZ);
+            camera.lookAt(state.camLookX, state.y + 0.92, state.camLookZ);
           } else if (state.cameraMode === 1) {
             const seatUp = isBus ? 2.1 : (car.dims[1] * 0.76);
             const seatFwd = isBus ? 3.2 : 0.22;
@@ -14041,8 +14138,8 @@
         }
 
         const carCx = w * 0.5 + state.steerAngle * 75;
-        const carCy = h * 0.67 - (state.carFlightMode ? Math.min(125, 42 + state.y * 0.7) : (state.hoverMode ? 36 : 0));
-        const carSc = Math.min(0.95, w / 460);
+        const carCy = h * 0.735 - (state.carFlightMode ? Math.min(135, 52 + state.y * 0.7) : (state.hoverMode ? 38 : 0));
+        const carSc = Math.min(1.22, Math.max(0.84, w / 430));
         ctx.save();
         if (state.crashedImmobilized) {
           ctx.translate(carCx, carCy);
@@ -14355,118 +14452,331 @@
     function drawSleekRearCar(ctx, cx, cy, sc, car, paint) {
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.scale(sc * 1.18, sc * 1.18);
+      ctx.scale(sc, sc);
 
-      // Soft Asphalt Contact Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.62)';
-      ctx.beginPath(); ctx.ellipse(0, 44, 134, 17, 0, 0, Math.PI * 2); ctx.fill();
+      const isMustang = !car || car.id === 'mustang_gt_blue' || car.lampSig === 'mustang_tribar';
+      const baseCol = paint || '#5f82b0';
 
-      // Wide Performance Rear Tires
+      if (isMustang) {
+        // === 1:1 PHOTOREALISTIC VECTOR REPLICA OF S650 MUSTANG GT DARK HORSE REAR (Matches 1000025255.jpg!) ===
+        // Deep Contact Shadow under Rear Diffuser & Wide Tires
+        ctx.fillStyle = 'rgba(3, 6, 14, 0.72)';
+        ctx.beginPath(); ctx.ellipse(0, 74, 118, 18, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Wide Performance Rear Tires (tucked muscularly under wide haunches)
+        ctx.fillStyle = '#0a0d14';
+        ctx.beginPath(); ctx.roundRect(-108, 28, 30, 48, 5); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(78, 28, 30, 48, 5); ctx.fill();
+
+        // Black Side Wing Mirrors peeking out above Front/Mid Shoulders!
+        ctx.fillStyle = '#11151e';
+        ctx.beginPath();
+        ctx.moveTo(-66, -78); ctx.lineTo(-80, -80); ctx.lineTo(-78, -72); ctx.lineTo(-64, -71);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(66, -78); ctx.lineTo(80, -80); ctx.lineTo(78, -72); ctx.lineTo(64, -71);
+        ctx.closePath(); ctx.fill();
+
+        // Upper Fastback Roof & Narrow Tumblehome Cabin + Flared Coke-Bottle Rear Quarter Haunches!
+        const upperGrad = ctx.createLinearGradient(0, -108, 0, -16);
+        upperGrad.addColorStop(0, '#9ab5d9');
+        upperGrad.addColorStop(0.24, '#7393bf');
+        upperGrad.addColorStop(0.65, baseCol);
+        upperGrad.addColorStop(1, '#3e577d');
+        ctx.fillStyle = upperGrad;
+        ctx.beginPath();
+        ctx.moveTo(-48, -106);
+        ctx.quadraticCurveTo(0, -111, 48, -106); // sleek curved roof header
+        ctx.lineTo(68, -74);                     // C-pillar slope
+        ctx.quadraticCurveTo(96, -54, 105, -24); // wide muscular right rear haunch!
+        ctx.lineTo(108, 38);
+        ctx.lineTo(-108, 38);
+        ctx.lineTo(-105, -24);
+        ctx.quadraticCurveTo(-96, -54, -68, -74);// wide muscular left rear haunch!
+        ctx.closePath();
+        ctx.fill();
+
+        // Glossy Specular Sky Reflections on Left & Right Muscular Rear Quarter Shoulders!
+        const haunchGlowL = ctx.createLinearGradient(-98, -56, -62, -18);
+        haunchGlowL.addColorStop(0, 'rgba(226, 238, 255, 0.62)');
+        haunchGlowL.addColorStop(1, 'rgba(115, 147, 191, 0.0)');
+        ctx.fillStyle = haunchGlowL;
+        ctx.beginPath();
+        ctx.moveTo(-66, -70); ctx.quadraticCurveTo(-92, -50, -98, -22); ctx.lineTo(-74, -22); ctx.lineTo(-56, -66);
+        ctx.closePath(); ctx.fill();
+
+        const haunchGlowR = ctx.createLinearGradient(98, -56, 62, -18);
+        haunchGlowR.addColorStop(0, 'rgba(226, 238, 255, 0.62)');
+        haunchGlowR.addColorStop(1, 'rgba(115, 147, 191, 0.0)');
+        ctx.fillStyle = haunchGlowR;
+        ctx.beginPath();
+        ctx.moveTo(66, -70); ctx.quadraticCurveTo(92, -50, 98, -22); ctx.lineTo(74, -22); ctx.lineTo(56, -66);
+        ctx.closePath(); ctx.fill();
+
+        // Tall Sloped Smoked Fastback Rear Windshield
+        const glassG = ctx.createLinearGradient(-40, -98, 45, -42);
+        glassG.addColorStop(0, '#1e2633');
+        glassG.addColorStop(0.42, '#2d3748');
+        glassG.addColorStop(0.55, '#475569');
+        glassG.addColorStop(1, '#18202c');
+        ctx.fillStyle = glassG;
+        ctx.beginPath();
+        ctx.moveTo(-43, -98);
+        ctx.quadraticCurveTo(0, -101, 43, -98);
+        ctx.lineTo(58, -46);
+        ctx.lineTo(-58, -46);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Interior Sport Bucket Seat Silhouettes visible through Smoked Rear Glass
+        ctx.fillStyle = 'rgba(15, 20, 28, 0.78)';
+        ctx.beginPath(); ctx.roundRect(-34, -82, 22, 26, 4); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(12, -82, 22, 26, 4); ctx.fill();
+        // Diagonal Sky Glint on Rear Window
+        ctx.fillStyle = 'rgba(226, 232, 240, 0.14)';
+        ctx.beginPath();
+        ctx.moveTo(-22, -97); ctx.lineTo(8, -97); ctx.lineTo(-8, -48); ctx.lineTo(-36, -48);
+        ctx.closePath(); ctx.fill();
+
+        // 5 Horizontal Black Fastback C-Pillar Quarter Louver Vents on Left & Right of Rear Glass!
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 2.4;
+        for (let li = 0; li < 5; li++) {
+          const ly = -90 + li * 8.2;
+          const xIn = 44 + li * 2.4;
+          const xOut = 51 + li * 2.8;
+          ctx.beginPath(); ctx.moveTo(-xOut, ly); ctx.lineTo(-xIn, ly + 1.2); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(xOut, ly); ctx.lineTo(xIn, ly + 1.2); ctx.stroke();
+        }
+
+        // Sculpted Trunk Deck Surface Reflection between Glass & Wing
+        const deckShine = ctx.createLinearGradient(0, -45, 0, -24);
+        deckShine.addColorStop(0, '#8ba9d4');
+        deckShine.addColorStop(1, '#4c6a94');
+        ctx.fillStyle = deckShine;
+        ctx.beginPath();
+        ctx.moveTo(-66, -45); ctx.lineTo(66, -45); ctx.lineTo(92, -26); ctx.lineTo(-92, -26);
+        ctx.closePath(); ctx.fill();
+
+        // === SIGNATURE S650 DARK HORSE GLOSS-BLACK PEDESTAL REAR SPOILER WING + OVERHANGING ENDPLATES! ===
+        // Soft drop-shadow cast by wing onto blue trunk deck
+        ctx.fillStyle = 'rgba(9, 13, 22, 0.45)';
+        ctx.beginPath();
+        ctx.moveTo(-98, -23); ctx.lineTo(98, -23); ctx.lineTo(92, -17); ctx.lineTo(-92, -17);
+        ctx.closePath(); ctx.fill();
+
+        // Center Twin-Strut Trapezoidal V-Bridge Pedestal
+        ctx.fillStyle = '#141820';
+        ctx.beginPath();
+        ctx.moveTo(-27, -33); ctx.lineTo(27, -33); ctx.lineTo(20, -21); ctx.lineTo(-20, -21);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#5b7ba8'; // body color peek inside center bridge cutout
+        ctx.beginPath();
+        ctx.moveTo(-14, -30); ctx.lineTo(14, -30); ctx.lineTo(10, -24); ctx.lineTo(-10, -24);
+        ctx.closePath(); ctx.fill();
+
+        // Main Gloss-Black Aerodynamic Wing Blade + Sculpted Downward Wing Endplates!
+        ctx.fillStyle = '#11151d';
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-104, -27);
+        ctx.quadraticCurveTo(-52, -37, 0, -34);
+        ctx.quadraticCurveTo(52, -37, 104, -27);
+        ctx.lineTo(96, -19);
+        ctx.lineTo(74, -27);
+        ctx.lineTo(22, -28);
+        ctx.lineTo(0, -25);
+        ctx.lineTo(-22, -28);
+        ctx.lineTo(-74, -27);
+        ctx.lineTo(-96, -19);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // === RECESSED MATTE-BLACK CONCAVE REAR DECKLID PANEL ===
+        ctx.fillStyle = '#1c2029';
+        ctx.beginPath();
+        ctx.moveTo(-98, -14);
+        ctx.lineTo(98, -14);
+        ctx.lineTo(92, 13);
+        ctx.lineTo(58, 17);
+        ctx.lineTo(-58, 17);
+        ctx.lineTo(-92, 13);
+        ctx.closePath();
+        ctx.fill();
+
+        // Continuous Thin Glowing Crimson-Red Top Light Strip across Decklid!
+        const brakingVis = state.brakePressed || state.keys['KeyS'] || state.keys['ArrowDown'] || state.keys['Space'];
+        ctx.fillStyle = brakingVis ? '#ff3b30' : '#dc2626';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = brakingVis ? 16 : 6;
+        ctx.fillRect(-94, -14, 188, 3.2);
+
+        // === ICONIC 3 ANGLED VERTICAL GLOWING RED-ORANGE TRI-BAR TAILLIGHTS [\\ ]  GT  [///] ===
+        const drawTriBar = (xTop, xBot) => {
+          ctx.fillStyle = brakingVis ? '#ff2d20' : '#c81e1e';
+          ctx.beginPath();
+          ctx.moveTo(xTop, -10.5);
+          ctx.lineTo(xTop + 9.2, -10.5);
+          ctx.lineTo(xBot + 9.2, 10.5);
+          ctx.lineTo(xBot, 10.5);
+          ctx.closePath();
+          ctx.fill();
+          // Glowing fiery orange-red inner LED core!
+          ctx.fillStyle = brakingVis ? '#ff8a65' : '#ff4d38';
+          ctx.beginPath();
+          ctx.moveTo(xTop + 2.1, -8.5);
+          ctx.lineTo(xTop + 7.1, -8.5);
+          ctx.lineTo(xBot + 7.1, 8.5);
+          ctx.lineTo(xBot + 2.1, 8.5);
+          ctx.closePath();
+          ctx.fill();
+        };
+        // Left 3 slanted bars
+        drawTriBar(-94, -96);
+        drawTriBar(-82, -84);
+        drawTriBar(-70, -72);
+        // Right 3 slanted bars
+        drawTriBar(61, 63);
+        drawTriBar(73, 75);
+        drawTriBar(85, 87);
+        ctx.shadowBlur = 0;
+
+        // Amber Sequential Turn-Signal Overlay on Tri-Bars
+        const blinkPulse2D = Math.floor(performance.now() / 300) % 2 === 0;
+        if ((state.blinkerLeft || state.hazard) && blinkPulse2D) {
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.92)';
+          ctx.fillRect(-95, -10, 33, 20);
+        }
+        if ((state.blinkerRight || state.hazard) && blinkPulse2D) {
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.92)';
+          ctx.fillRect(62, -10, 33, 20);
+        }
+
+        // Center Recessed Dark-Chrome Rectangular [GT] Emblem Badge!
+        ctx.fillStyle = '#0f131a';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.roundRect(-14, -7, 28, 8.5, 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '900 6.8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('GT', 0, -0.5);
+
+        // === SCULPTED METALLIC-BLUE REAR BUMPER SHELF + BRIGHT HORIZON CREASE + PARKING SENSORS ===
+        const bmpGrad = ctx.createLinearGradient(0, 14, 0, 54);
+        bmpGrad.addColorStop(0, '#c7dcfa');   // crisp sky-white specular highlight on top shelf!
+        bmpGrad.addColorStop(0.18, '#7fa0cc');
+        bmpGrad.addColorStop(0.48, '#466289');
+        bmpGrad.addColorStop(1, '#273852');
+        ctx.fillStyle = bmpGrad;
+        ctx.beginPath();
+        ctx.moveTo(-104, 13);
+        ctx.lineTo(-58, 17);
+        ctx.lineTo(58, 17);
+        ctx.lineTo(104, 13);
+        ctx.lineTo(107, 48);
+        ctx.lineTo(-107, 48);
+        ctx.closePath();
+        ctx.fill();
+
+        // Diagonal light-catching bumper corner facets (left & right bright reflections visible in 1000025255.jpg!)
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.55)';
+        ctx.beginPath(); ctx.moveTo(-103, 14); ctx.lineTo(-76, 17); ctx.lineTo(-84, 27); ctx.lineTo(-105, 24); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(103, 14); ctx.lineTo(76, 17); ctx.lineTo(84, 27); ctx.lineTo(105, 24); ctx.closePath(); ctx.fill();
+
+        // 2 Tiny White Parking Sensor Dots on Left & Right Bumper
+        ctx.fillStyle = '#e2e8f0';
+        ctx.beginPath(); ctx.arc(-80, 33, 1.8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(80, 33, 1.8, 0, Math.PI * 2); ctx.fill();
+
+        // === DEEP SCULPTED MATTE-BLACK MULTI-FIN LOWER DIFFUSER & SIDE AERO SPATS ===
+        ctx.fillStyle = '#10141d';
+        ctx.beginPath();
+        ctx.moveTo(-108, 46);
+        ctx.lineTo(-88, 43);
+        ctx.lineTo(-64, 38);
+        ctx.lineTo(64, 38);
+        ctx.lineTo(88, 43);
+        ctx.lineTo(108, 46);
+        ctx.lineTo(105, 66);
+        ctx.lineTo(-105, 66);
+        ctx.closePath();
+        ctx.fill();
+
+        // Subtle dark metallic diffuser fins & recessed quad dark-chrome tips
+        ctx.strokeStyle = '#27303f';
+        ctx.lineWidth = 2;
+        [-42, -16, 16, 42].forEach(fx => {
+          ctx.beginPath(); ctx.moveTo(fx, 40); ctx.lineTo(fx, 63); ctx.stroke();
+        });
+        [-78, -65, 65, 78].forEach(ex => {
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath(); ctx.arc(ex, 55, 5.2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#090d14';
+          ctx.beginPath(); ctx.arc(ex, 55, 3.4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        ctx.restore();
+        return;
+      }
+
+      // Generic Rear View for Other Selected Vehicles (Hyundai / Kia / Bugatti Bolide / Firetruck / Police)
+      ctx.scale(1.12, 1.12);
+      ctx.fillStyle = 'rgba(0,0,0,0.58)';
+      ctx.beginPath(); ctx.ellipse(0, 44, 128, 16, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#090d14';
-      ctx.beginPath(); ctx.roundRect(-112, 10, 32, 36, 5); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(80, 10, 32, 36, 5); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-108, 10, 30, 35, 5); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(78, 10, 30, 35, 5); ctx.fill();
 
-      // Sculpted Metallic Fastback GT Body & Muscular Rear Haunches (Matches 1000025255.jpg!)
-      const bodyG = ctx.createLinearGradient(-110, -56, 110, 34);
-      bodyG.addColorStop(0, '#cbd5e1');
-      bodyG.addColorStop(0.18, paint);
-      bodyG.addColorStop(0.55, paint);
-      bodyG.addColorStop(0.85, '#334e6e');
+      const bodyG = ctx.createLinearGradient(-106, -54, 106, 32);
+      bodyG.addColorStop(0, '#e2e8f0');
+      bodyG.addColorStop(0.22, baseCol);
+      bodyG.addColorStop(0.75, baseCol);
       bodyG.addColorStop(1, '#0f172a');
       ctx.fillStyle = bodyG;
       ctx.beginPath();
-      ctx.moveTo(-108, 26);
-      ctx.quadraticCurveTo(-116, -6, -98, -22);
-      ctx.lineTo(-70, -54);
-      ctx.lineTo(70, -54);
-      ctx.lineTo(98, -22);
-      ctx.quadraticCurveTo(116, -6, 108, 26);
+      ctx.moveTo(-104, 25);
+      ctx.quadraticCurveTo(-112, -6, -94, -22);
+      ctx.lineTo(-68, -52);
+      ctx.lineTo(68, -52);
+      ctx.lineTo(94, -22);
+      ctx.quadraticCurveTo(112, -6, 104, 25);
       ctx.closePath();
       ctx.fill();
 
-      // Glossy Metallic Upper Decklid Reflection Highlight
-      const glossG = ctx.createLinearGradient(0, -26, 0, -14);
-      glossG.addColorStop(0, 'rgba(255,255,255,0.42)');
-      glossG.addColorStop(1, 'rgba(255,255,255,0.02)');
-      ctx.fillStyle = glossG;
-      ctx.fillRect(-94, -24, 188, 9);
-
-      // Fastback Tinted Rear Windshield + Interior Headrests
       ctx.fillStyle = '#111827';
       ctx.beginPath();
-      ctx.moveTo(-62, -50); ctx.lineTo(62, -50); ctx.lineTo(78, -24); ctx.lineTo(-78, -24);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#27272a';
-      ctx.fillRect(-40, -42, 18, 12);
-      ctx.fillRect(22, -42, 18, 12);
+      ctx.moveTo(-60, -48); ctx.lineTo(60, -48); ctx.lineTo(76, -22); ctx.lineTo(-76, -22);
+      ctx.closePath(); ctx.fill();
 
-      // Side Wing Mirrors
-      ctx.fillStyle = paint;
-      ctx.beginPath(); ctx.ellipse(-98, -26, 12, 5.5, -0.1, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(98, -26, 12, 5.5, 0.1, 0, Math.PI * 2); ctx.fill();
-
-      // Sculpted Black Pedestal GT Rear Spoiler Wing!
-      ctx.fillStyle = '#090d16';
-      ctx.fillRect(-58, -26, 7, 7);
-      ctx.fillRect(51, -26, 7, 7);
-      ctx.beginPath();
-      ctx.moveTo(-98, -27);
-      ctx.quadraticCurveTo(0, -31, 98, -27);
-      ctx.lineTo(94, -22);
-      ctx.quadraticCurveTo(0, -25, -94, -22);
-      ctx.closePath();
-      ctx.fill();
-
-      // Matte Black Rear Taillight Deck Panel
-      ctx.fillStyle = '#141821';
-      ctx.beginPath(); ctx.roundRect(-98, -17, 196, 16, 4); ctx.fill();
-
-      // Iconic Triple Vertical Red LED Taillight Bars [|||]  GT  [|||]!
-      const brakingVis = state.brakePressed || state.keys['KeyS'] || state.keys['ArrowDown'] || state.keys['Space'];
-      ctx.fillStyle = brakingVis ? '#ff2a2a' : '#ef4444';
+      const brakingOther = state.brakePressed || state.keys['KeyS'] || state.keys['ArrowDown'] || state.keys['Space'];
+      ctx.fillStyle = brakingOther ? '#ff2a2a' : '#ef4444';
       ctx.shadowColor = '#ef4444';
-      ctx.shadowBlur = brakingVis ? 20 : 8;
-      [-90, -79, -68, 60, 71, 82].forEach(lx => {
+      ctx.shadowBlur = brakingOther ? 18 : 6;
+      if (car && car.id === 'bugatti_bolide') {
+        // Bugatti Bolide Iconic X-Wing Laser Taillight!
+        ctx.strokeStyle = '#ff2a2a';
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.roundRect(lx, -15.5, 7.5, 13, 1.5);
-        ctx.fill();
-      });
+        ctx.moveTo(-88, -20); ctx.lineTo(88, -2);
+        ctx.moveTo(-88, -2); ctx.lineTo(88, -20);
+        ctx.stroke();
+      } else {
+        ctx.fillRect(-92, -14, 184, brakingOther ? 7 : 5);
+      }
       ctx.shadowBlur = 0;
 
-      // Amber Blinker Overlay on Triple Bars
-      const blinkPulse2D = Math.floor(performance.now() / 300) % 2 === 0;
-      if ((state.blinkerLeft || state.hazard) && blinkPulse2D) {
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(-90, -15.5, 29, 13);
-      }
-      if ((state.blinkerRight || state.hazard) && blinkPulse2D) {
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(60, -15.5, 29, 13);
-      }
-
-      // Center GT Emblem
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '900 8px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(car.id === 'bugatti_bolide' ? 'EB' : 'GT', 0, -6.5);
-
-      // Lower Sport Diffuser, Quad Exhausts & Plate
-      ctx.fillStyle = '#0f141d';
-      ctx.beginPath(); ctx.roundRect(-96, 12, 192, 16, 5); ctx.fill();
-      ctx.fillStyle = '#e2e8f0';
-      [-76, -64, 64, 76].forEach(ex => {
-        ctx.beginPath(); ctx.arc(ex, 21, 4.2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#090d16';
-        ctx.beginPath(); ctx.arc(ex, 21, 2.6, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#e2e8f0';
-      });
       ctx.fillStyle = '#f8fafc';
       ctx.beginPath(); ctx.roundRect(-34, 4, 68, 13, 2.5); ctx.fill();
       ctx.fillStyle = '#0f172a';
       ctx.font = '800 8.5px "Noto Sans KR", sans-serif';
-      ctx.fillText(state.customPlate || car.plate, 0, 13.5);
-
+      ctx.textAlign = 'center';
+      ctx.fillText(state.customPlate || (car ? car.plate : '123가 4568'), 0, 13.5);
       ctx.restore();
     }
 
