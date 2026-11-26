@@ -2354,6 +2354,107 @@
       }
     }
 
+
+    /* v42 8-Theme Diverse Road Course Selector Styles */
+    .pv-course-btn {
+      background: rgba(245, 158, 11, 0.16) !important;
+      border-color: rgba(251, 191, 36, 0.55) !important;
+      color: #fde68a !important;
+      font-weight: 800 !important;
+    }
+    .pv-course-btn:hover {
+      background: rgba(245, 158, 11, 0.28) !important;
+      color: #ffffff !important;
+    }
+    #hudCourseQuickPill {
+      background: rgba(245, 158, 11, 0.20);
+      border: 1px solid rgba(251, 191, 36, 0.50);
+      backdrop-filter: blur(12px);
+      color: #fde68a;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    #hudCourseQuickPill:hover {
+      background: rgba(245, 158, 11, 0.34);
+      color: #ffffff;
+    }
+    #coursePickerModal .course-modal-card {
+      width: min(620px, 96vw) !important;
+      max-height: 88vh;
+      overflow-y: auto;
+      padding: 15px;
+      gap: 11px;
+    }
+    .course-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .course-pick-card {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 13px;
+      padding: 10px 11px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.16s ease;
+      color: #f8fafc;
+    }
+    .course-pick-card:hover {
+      background: rgba(30, 41, 59, 0.92);
+      border-color: rgba(125, 211, 252, 0.55);
+      transform: translateY(-1px);
+    }
+    .course-pick-card.active {
+      background: linear-gradient(145deg, rgba(14, 165, 233, 0.25), rgba(15, 23, 42, 0.95));
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.55);
+    }
+    .cpc-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .cpc-title {
+      font-size: 12px;
+      font-weight: 900;
+      color: #f8fafc;
+    }
+    .cpc-tag {
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 1.5px 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: #bae6fd;
+      white-space: nowrap;
+    }
+    .cpc-desc {
+      font-size: 10.5px;
+      color: #cbd5e1;
+      line-height: 1.35;
+    }
+    .cpc-meta {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      display: flex;
+      gap: 8px;
+    }
+    @media (max-width: 560px) {
+      .course-cards-grid { grid-template-columns: 1fr; }
+      #hudCourseQuickPill { font-size: 9.5px; padding: 2.5px 7px; }
+    }
+
   </style>
 </head>
 <body>
@@ -2367,6 +2468,7 @@
       </label>
       <input type="file" id="customSkinInput" accept="image/*" style="display:none" />
       <input type="file" id="customGlbInput" accept=".glb,.gltf" style="display:none" />
+      <button type="button" class="pv-chip pv-course-btn" id="topCoursePickerBtn" onclick="openCoursePickerModal()" title="산길·해안대교·제주돌담·벚꽃터널·레이싱서킷·눈길 등 8종 도로 코스 선택 (단축키 K)">🛣️ 도로코스 8종</button>
       <button type="button" class="pv-chip pv-menu-trigger" id="topStudioMenuBtn" onclick="toggleTopStudioDrawer(event)" title="모든 주행 모드 · 스페셜 미션 · 3D 모델 메뉴 열기">🎛️ 모드·미션 메뉴 ▾</button>
       <button type="button" class="pv-chip active" id="navTestDriveBtn" onclick="startInstantTestDrive()">🚗 테스트 운전</button>
       <button type="button" class="pv-chip" id="navKoreaMapBtn" onclick="openKoreaMapModal()">🗺️ 대한민국 전국지도</button>
@@ -2473,6 +2575,23 @@
             <button type="button" class="pv-chip" style="border-color:rgba(56,189,248,0.6);color:#7dd3fc;" onclick="closeExpandedMinimap();openKoreaMapModal();">🗺️ 전국지도</button>
           </div>
           <div id="expMmCoordText" style="font-size:10.5px;color:#94a3b8;text-align:center;">이동 궤적(파란 선) · 내 위치(화살표) · 주변 차량(노랑) · 적기(빨강)</div>
+        </div>
+      </div>
+
+      <!-- v42 8-Theme Diverse Korean Road Course Selector Modal -->
+      <div class="v16-modal-backdrop" id="coursePickerModal" onclick="if(event.target===this)closeCoursePickerModal()">
+        <div class="v16-modal-card course-modal-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:14px;font-weight:900;color:#f8fafc;">🛣️ 대한민국 8대 테마 도로 운전 코스</div>
+              <div style="font-size:10.5px;color:#94a3b8;margin-top:1px;">원하는 코스를 선택하면 도로 지형·커브·터널·풍경·제한속도가 즉시 바뀝니다 (단축키 <strong style="color:#7dd3fc;">K</strong>: 다음 코스)</div>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center;">
+              <button type="button" class="pv-chip" style="border-color:rgba(250,204,21,0.55);color:#fde047;" onclick="pickRandomScenicCourse()">🎲 랜덤 코스</button>
+              <button type="button" class="pv-chip" onclick="closeCoursePickerModal()">닫기</button>
+            </div>
+          </div>
+          <div id="courseCardsGrid" class="course-cards-grid"></div>
         </div>
       </div>
 
@@ -2991,11 +3110,14 @@
           <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#f87171;color:#fca5a5;" onclick="equipEmergencyCar('firetruck_119')" title="119 펌프 소방차로 즉시 전환">🚒 소방차</button>
           <button type="button" class="pv-chip" style="padding:2px 8px;font-size:10px;border-color:#60a5fa;color:#93c5fd;" onclick="equipEmergencyCar('police_112')" title="112 순찰 경찰차로 즉시 전환">🚔 경찰차</button>
         </div>
-        <!-- Clean Left-Docked GPS & Stage Goal Stack (Leaves Center Windshield 100% Open!) -->
+        <!-- Clean Left-Docked GPS, Course Switcher & Stage Goal Stack -->
         <div id="leftHudInfoStack">
-          <div id="koreaRegionGpsPill" onclick="openKoreaMapModal()" title="탭하여 대한민국 전체 지도 열기">
-            <span id="krRegionLabel">📍 서울특별시 (세종대로)</span>
-            <span id="krNavTargetLabel" style="color:#7dd3fc;opacity:0.9;">🗺️ 전국지도</span>
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;pointer-events:auto;">
+            <div id="koreaRegionGpsPill" onclick="openKoreaMapModal()" title="탭하여 대한민국 전체 지도 열기">
+              <span id="krRegionLabel">📍 서울특별시 (세종대로)</span>
+              <span id="krNavTargetLabel" style="color:#7dd3fc;opacity:0.9;">🗺️ 전국지도</span>
+            </div>
+            <button type="button" id="hudCourseQuickPill" onclick="openCoursePickerModal()" title="8대 테마 도로 코스 선택 (단축키 K: 다음 코스)">🛣️ 코스변경</button>
           </div>
           <div id="stageGoalBanner" onclick="onStageGoalBannerClick()" title="탭하여 현재 목표 힌트 보기">
             <span id="stageGoalText">🎯 목표 1/6 · 대관령 산길 구간까지 운전하기</span>
@@ -4990,53 +5112,299 @@
 
     
     // ============================================================================
-    // v30 CONTINUOUS 4-BIOME CURVING KOREAN SCENIC LOOP (NO CUTS, REAL CURVES & HILLS!)
-    // City (서울 도심) -> Mountain Pass (굽이치는 산길) -> Countryside (시골길) -> Ocean Bridge (해안도로)
+    // v42 8 DIVERSE KOREAN ROAD DRIVING COURSES (MULTI-SPLINE, 3D TUNNELS, CURBS & BIOMES!)
     // ============================================================================
     const SCENIC_SEGMENTS = 180;
     let scenicRoadSamples = [];
 
+    const SCENIC_COURSES = [
+      {
+        id: 'all_korea',
+        icon: '🇰🇷',
+        name: '전국 4계절 일주 코스',
+        shortName: '전국 4계절 일주',
+        distKm: '2.8km',
+        limitKmh: 80,
+        speedCapDefault: 110,
+        tag: '기본 종합',
+        desc: '서울 도심 → 대관령 산악터널·산길 → 한옥 시골길 → 동해안 바다대교 통합 순환',
+        roadWidth: 17.0,
+        groundHex: 0x1e5631,
+        roadHex: 0x2a3140,
+        oceanMode: 'west',
+        curbStyle: 'standard',
+        tunnelRanges: [{ start: 54, end: 66, name: '대관령 1터널 (480m)' }]
+      },
+      {
+        id: 'daegwallyeong',
+        icon: '⛰️',
+        name: '대관령 99굽이 헤어핀 산길',
+        shortName: '대관령 헤어핀',
+        distKm: '3.4km',
+        limitKmh: 60,
+        speedCapDefault: 95,
+        tag: '와인딩·터널',
+        desc: '연속 S자 급커브 헤어핀 · 해발 +44m 급경사 고개 · 암반 산악터널 2개 구간',
+        roadWidth: 15.6,
+        groundHex: 0x14532d,
+        roadHex: 0x262e3d,
+        oceanMode: 'none',
+        curbStyle: 'cliff_guard',
+        tunnelRanges: [
+          { start: 34, end: 46, name: '대관령 정상 1터널' },
+          { start: 118, end: 130, name: '영동 산악 2터널' }
+        ]
+      },
+      {
+        id: 'busan_gwangan',
+        icon: '🌉',
+        name: '부산 광안대교 · 해운대 해안로',
+        shortName: '부산 광안대교',
+        distKm: '3.1km',
+        limitKmh: 100,
+        speedCapDefault: 150,
+        tag: '해상현수교',
+        desc: '푸른 남해 바다 위 +28m 해상 현수교 주탑·케이블 · 해운대 마린시티 마천루 코스',
+        roadWidth: 18.6,
+        groundHex: 0x0c4a6e,
+        roadHex: 0x273244,
+        oceanMode: 'all_sea',
+        curbStyle: 'bridge_rail',
+        tunnelRanges: []
+      },
+      {
+        id: 'jeju_coastal',
+        icon: '🌴',
+        name: '제주 애월·성산 해안일주도로',
+        shortName: '제주 해안도로',
+        distKm: '2.9km',
+        limitKmh: 70,
+        speedCapDefault: 100,
+        tag: '돌담·야자수',
+        desc: '현무암 돌담길 · 야자수 가로수 · 노란 유채꽃밭 · 에메랄드 바다와 한라산 전경',
+        roadWidth: 16.4,
+        groundHex: 0x15803d,
+        roadHex: 0x292524,
+        oceanMode: 'island_ring',
+        curbStyle: 'basalt_wall',
+        tunnelRanges: []
+      },
+      {
+        id: 'cherry_blossom',
+        icon: '🌸',
+        name: '경주·진해 벚꽃터널 시골길',
+        shortName: '벚꽃터널 시골길',
+        distKm: '2.6km',
+        limitKmh: 60,
+        speedCapDefault: 90,
+        tag: '벚꽃아치·한옥',
+        desc: '도로 위를 덮는 분홍 벚꽃 가로수 터널 · 흩날리는 꽃잎 · 전통 기와 한옥마을',
+        roadWidth: 15.8,
+        groundHex: 0x166534,
+        roadHex: 0x333846,
+        oceanMode: 'none',
+        curbStyle: 'standard',
+        tunnelRanges: []
+      },
+      {
+        id: 'seoul_gangbyeon',
+        icon: '🏙️',
+        name: '서울 강변북로 · 남산 지하차도',
+        shortName: '강변북로·터널',
+        distKm: '3.2km',
+        limitKmh: 90,
+        speedCapDefault: 130,
+        tag: '도심고속·지하차도',
+        desc: '한강 수변 도심고속화도로 · 투명 방음벽 · 남산 1호 터널 & 강변 연속 지하차도',
+        roadWidth: 18.4,
+        groundHex: 0x1e293b,
+        roadHex: 0x222938,
+        oceanMode: 'han_river',
+        curbStyle: 'sound_wall',
+        tunnelRanges: [
+          { start: 40, end: 58, name: '남산 1호 터널 (620m)' },
+          { start: 130, end: 146, name: '강변북로 지하차도' }
+        ]
+      },
+      {
+        id: 'inje_circuit',
+        icon: '🏁',
+        name: '인제 스피디움 레이싱 서킷',
+        shortName: '인제 레이싱서킷',
+        distKm: '3.9km',
+        limitKmh: 299,
+        speedCapDefault: 220,
+        tag: '무제한·레이싱연석',
+        desc: '프로 GP 테크니컬 코너 · 적백 레이싱 연석(Curb) · 체커기 피트 아치 · 속도 무제한!',
+        roadWidth: 19.6,
+        groundHex: 0x166534,
+        roadHex: 0x181c24,
+        oceanMode: 'none',
+        curbStyle: 'race_redwhite',
+        tunnelRanges: []
+      },
+      {
+        id: 'taebaek_snow',
+        icon: '❄️',
+        name: '태백·평창 설경 눈길 와인딩',
+        shortName: '태백 설경눈길',
+        distKm: '3.0km',
+        limitKmh: 50,
+        speedCapDefault: 85,
+        tag: '설원·눈꽃고개',
+        desc: '새하얀 눈 덮인 설산 고개(+34m) · 눈꽃 전나무 숲 · 갓길 눈더미와 흩날리는 눈송이',
+        roadWidth: 16.0,
+        groundHex: 0xe2e8f0,
+        roadHex: 0x3b4659,
+        oceanMode: 'none',
+        curbStyle: 'snow_bank',
+        tunnelRanges: [{ start: 82, end: 94, name: '태백 눈꽃 피암터널' }]
+      }
+    ];
+
+    function getCurrentScenicCourse() {
+      const cid = state.scenicCourseId || 'all_korea';
+      return SCENIC_COURSES.find(c => c.id === cid) || SCENIC_COURSES[0];
+    }
+
+    function isSampleInCourseTunnel(segIdx, courseObj) {
+      const c = courseObj || getCurrentScenicCourse();
+      if (!c.tunnelRanges || !c.tunnelRanges.length) return null;
+      const idx = ((segIdx % SCENIC_SEGMENTS) + SCENIC_SEGMENTS) % SCENIC_SEGMENTS;
+      for (const tr of c.tunnelRanges) {
+        if (idx >= tr.start && idx <= tr.end) return tr;
+      }
+      return null;
+    }
+
     function evalScenicSpline(t) {
       const a = ((t % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      // Rich S-curves, sweeping bends & mountain switchbacks (~2,800m continuous closed loop!)
-      const x = 350 * Math.sin(a) + 88 * Math.sin(2 * a) - 42 * Math.cos(3 * a);
-      const z = 410 * Math.cos(a) + 72 * Math.sin(3 * a);
-      // Real elevation: Flat City -> +26m Mountain Pass -> Gentle Countryside -> +10m Sea Bridge!
-      let y = 0;
-      if (a >= Math.PI * 0.45 && a <= Math.PI * 1.05) {
-        const u = (a - Math.PI * 0.45) / (Math.PI * 0.60);
-        y = 26 * Math.pow(Math.sin(u * Math.PI), 1.6);
-      } else if (a >= Math.PI * 1.05 && a <= Math.PI * 1.48) {
-        const u = (a - Math.PI * 1.05) / (Math.PI * 0.43);
-        y = 3.5 * Math.sin(u * Math.PI * 2) * Math.sin(u * Math.PI);
+      const cid = state.scenicCourseId || 'all_korea';
+      let x = 0, y = 0, z = 0;
+
+      if (cid === 'daegwallyeong') {
+        // Dramatic multi-switchback 99-bend mountain pass (+44m peak!)
+        x = 335 * Math.sin(a) + 132 * Math.sin(3 * a) + 48 * Math.cos(5 * a);
+        z = 425 * Math.cos(a) - 66 * Math.sin(4 * a);
+        y = 22 + 22 * Math.sin(a * 2 - 0.4) * Math.sin(a);
         if (y < 0) y = 0;
-      } else if (a >= Math.PI * 1.55 && a <= Math.PI * 1.92) {
-        const u = (a - Math.PI * 1.55) / (Math.PI * 0.37);
-        y = 10.5 * Math.sin(u * Math.PI); // Sea suspension bridge arch!
+      } else if (cid === 'busan_gwangan') {
+        // Sweeping double-arch coastal & suspension bridge loop over sea (+28m decks)
+        x = 420 * Math.sin(a) + 92 * Math.sin(2 * a);
+        z = 365 * Math.cos(a) + 56 * Math.cos(2 * a);
+        if (a >= Math.PI * 0.18 && a <= Math.PI * 0.92) {
+          const u = (a - Math.PI * 0.18) / (Math.PI * 0.74);
+          y = 28 * Math.pow(Math.sin(u * Math.PI), 1.25);
+        } else if (a >= Math.PI * 1.28 && a <= Math.PI * 1.85) {
+          const u = (a - Math.PI * 1.28) / (Math.PI * 0.57);
+          y = 16 * Math.sin(u * Math.PI);
+        }
+      } else if (cid === 'jeju_coastal') {
+        // Organic island coastal loop hugging beaches & volcanic headlands
+        x = 385 * Math.sin(a) + 64 * Math.cos(3 * a);
+        z = 340 * Math.cos(a) + 58 * Math.sin(2 * a);
+        y = Math.max(0, 6.5 * Math.sin(a * 3) + 2.5);
+      } else if (cid === 'cherry_blossom') {
+        // Gentle romantic spring S-curves
+        x = 315 * Math.sin(a) + 94 * Math.sin(2 * a);
+        z = 365 * Math.cos(a) - 52 * Math.cos(3 * a);
+        y = Math.max(0, 4.5 * Math.sin(a * 2));
+      } else if (cid === 'seoul_gangbyeon') {
+        // Fast multi-curve urban riverside expressway + underpass dips
+        x = 415 * Math.sin(a) - 64 * Math.sin(3 * a);
+        z = 390 * Math.cos(a) + 48 * Math.sin(2 * a);
+        y = Math.max(0, 9.0 * Math.sin(a * 4));
+      } else if (cid === 'inje_circuit') {
+        // Technical GP racing track: long main straight + hairpin + Esses + elevation crest
+        x = 365 * Math.sin(a) + 116 * Math.sin(2 * a) - 54 * Math.sin(4 * a);
+        z = 315 * Math.cos(a) + 82 * Math.cos(3 * a);
+        y = Math.max(0, 15 * Math.sin(a * 2 + 0.5));
+      } else if (cid === 'taebaek_snow') {
+        // Winding snowy alpine ridge (+34m)
+        x = 335 * Math.sin(a) + 105 * Math.cos(2 * a) + 44 * Math.sin(3 * a);
+        z = 395 * Math.cos(a) - 60 * Math.sin(3 * a);
+        y = 17 + 17 * Math.sin(a * 2 - 0.6);
+      } else {
+        // 'all_korea': Classic 4-Biome Scenic Loop
+        x = 350 * Math.sin(a) + 88 * Math.sin(2 * a) - 42 * Math.cos(3 * a);
+        z = 410 * Math.cos(a) + 72 * Math.sin(3 * a);
+        if (a >= Math.PI * 0.45 && a <= Math.PI * 1.05) {
+          const u = (a - Math.PI * 0.45) / (Math.PI * 0.60);
+          y = 26 * Math.pow(Math.sin(u * Math.PI), 1.6);
+        } else if (a >= Math.PI * 1.05 && a <= Math.PI * 1.48) {
+          const u = (a - Math.PI * 1.05) / (Math.PI * 0.43);
+          y = Math.max(0, 3.5 * Math.sin(u * Math.PI * 2) * Math.sin(u * Math.PI));
+        } else if (a >= Math.PI * 1.55 && a <= Math.PI * 1.92) {
+          const u = (a - Math.PI * 1.55) / (Math.PI * 0.37);
+          y = 10.5 * Math.sin(u * Math.PI);
+        }
       }
       return { x, y, z, a };
     }
 
     function getScenicBiomeInfo(a) {
       const n = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const cid = state.scenicCourseId || 'all_korea';
+      if (cid === 'daegwallyeong') {
+        if (n < Math.PI * 0.65) return { id: 'mountain', label: '⛰️ 대관령 99굽이 오르막 헤어핀', color: '#22c55e' };
+        if (n < Math.PI * 1.35) return { id: 'mountain', label: '⛰️ 백두대간 정상 능선 · 산악터널', color: '#10b981' };
+        return { id: 'mountain', label: '⛰️ 영동 고갯길 연속 와인딩 구간', color: '#34d399' };
+      }
+      if (cid === 'busan_gwangan') {
+        if (n >= Math.PI * 0.16 && n <= Math.PI * 0.94) return { id: 'coast', label: '🌉 부산 광안대교 해상 현수교 상층', color: '#38bdf8' };
+        if (n < Math.PI * 1.32) return { id: 'city', label: '🏙️ 해운대 마린시티 · 센텀 해안로', color: '#60a5fa' };
+        return { id: 'coast', label: '🌊 남항대교 · 송도 바다 해안도로', color: '#06b6d4' };
+      }
+      if (cid === 'jeju_coastal') {
+        if (n < Math.PI * 0.7) return { id: 'jeju', label: '🌴 제주 애월·한담 현무암 해안도로', color: '#2dd4bf' };
+        if (n < Math.PI * 1.4) return { id: 'jeju', label: '🌼 성산일출봉 유채꽃 돌담길', color: '#facc15' };
+        return { id: 'jeju', label: '🍊 서귀포 야자수 해안 일주도로', color: '#fb923c' };
+      }
+      if (cid === 'cherry_blossom') {
+        if (n < Math.PI * 1.0) return { id: 'blossom', label: '🌸 진해 여좌천 만개한 벚꽃터널길', color: '#f472b6' };
+        return { id: 'blossom', label: '🏯 경주 보문호 벚꽃 · 한옥마을길', color: '#fb7185' };
+      }
+      if (cid === 'seoul_gangbyeon') {
+        if (n < Math.PI * 0.7) return { id: 'city', label: '🏙️ 서울 강변북로 한강 수변고속도로', color: '#38bdf8' };
+        if (n < Math.PI * 1.4) return { id: 'city', label: '🚇 남산 지하차도 · 도심 빌딩숲', color: '#818cf8' };
+        return { id: 'city', label: '🌉 올림픽대로 · 여의도 스카이라인', color: '#60a5fa' };
+      }
+      if (cid === 'inje_circuit') {
+        if (n < Math.PI * 0.65) return { id: 'circuit', label: '🏁 인제 스피디움 메인 스트레이트 · T1', color: '#ef4444' };
+        if (n < Math.PI * 1.35) return { id: 'circuit', label: '🏎️ 테크니컬 시케인 · 적백 연석 구간', color: '#f97316' };
+        return { id: 'circuit', label: '🏁 다운힐 헤어핀 · 피트 홈스트레이트', color: '#facc15' };
+      }
+      if (cid === 'taebaek_snow') {
+        if (n < Math.PI * 1.0) return { id: 'snow', label: '❄️ 태백산 설경 눈꽃 와인딩 고개', color: '#bae6fd' };
+        return { id: 'snow', label: '⛄ 대관령·평창 은빛 설원 침엽수림', color: '#e0f2fe' };
+      }
       if (n < Math.PI * 0.48) return { id: 'city', label: '🏙️ 서울 도심 (강남·광화문)', color: '#38bdf8' };
-      if (n < Math.PI * 1.02) return { id: 'mountain', label: '⛰️ 대관령 굽이치는 산길', color: '#22c55e' };
-      if (n < Math.PI * 1.50) return { id: 'country', label: '🌾 평화로운 한국 시골길', color: '#facc15' };
+      if (n < Math.PI * 1.02) return { id: 'mountain', label: '⛰️ 대관령 굽이치는 산길 · 터널', color: '#22c55e' };
+      if (n < Math.PI * 1.50) return { id: 'country', label: '🌾 평화로운 한국 시골길 · 한옥', color: '#facc15' };
       return { id: 'coast', label: '🌊 동해안 해안도로 · 바다대교', color: '#06b6d4' };
     }
 
     function initScenicSamples() {
       scenicRoadSamples = [];
+      const course = getCurrentScenicCourse();
       for (let i = 0; i < SCENIC_SEGMENTS; i++) {
         const t = (i / SCENIC_SEGMENTS) * Math.PI * 2;
         const p = evalScenicSpline(t);
-        const pNext = evalScenicSpline(t + 0.01);
+        const pNext = evalScenicSpline(t + 0.012);
+        const pAhead = evalScenicSpline(t + 0.09);
         const dx = pNext.x - p.x, dy = pNext.y - p.y, dz = pNext.z - p.z;
         const len = Math.max(0.001, Math.hypot(dx, dz));
         p.tx = dx / len; p.tz = dz / len;
-        p.nx = p.tz; p.nz = -p.tx; // Right-hand normal
+        p.nx = p.tz; p.nz = -p.tx;
         p.heading = Math.atan2(dx, dz);
+        const aheadHeading = Math.atan2(pAhead.x - p.x, pAhead.z - p.z);
+        let cDelta = aheadHeading - p.heading;
+        while (cDelta > Math.PI) cDelta -= Math.PI * 2;
+        while (cDelta < -Math.PI) cDelta += Math.PI * 2;
+        p.curveDelta = cDelta;
         p.slopePitch = -Math.atan2(dy, len);
+        p.segIdx = i;
+        p.inTunnel = isSampleInCourseTunnel(i, course);
         scenicRoadSamples.push(p);
       }
     }
@@ -5052,8 +5420,91 @@
       return { sample: best, dist: Math.sqrt(bestD), idx: bestIdx };
     }
 
+    function renderCourseCardsGrid() {
+      const grid = document.getElementById('courseCardsGrid');
+      if (!grid) return;
+      const curId = state.scenicCourseId || 'all_korea';
+      grid.innerHTML = SCENIC_COURSES.map(c => {
+        const isAct = c.id === curId && state.scenicTourActive;
+        const limTxt = c.limitKmh >= 250 ? '속도 무제한 MAX' : `제한 ${c.limitKmh}km/h`;
+        return `<button type="button" class="course-pick-card ${isAct ? 'active' : ''}" onclick="selectScenicDrivingCourse('${c.id}')">
+          <div class="cpc-top">
+            <span class="cpc-title">${c.icon} ${c.name}</span>
+            <span class="cpc-tag">${isAct ? '주행 중 ✓' : c.tag}</span>
+          </div>
+          <div class="cpc-desc">${c.desc}</div>
+          <div class="cpc-meta"><span>📏 총 ${c.distKm}</span><span>⚡ ${limTxt}</span></div>
+        </button>`;
+      }).join('');
+    }
+
+    function openCoursePickerModal() {
+      renderCourseCardsGrid();
+      const m = document.getElementById('coursePickerModal');
+      if (m) m.style.display = 'flex';
+    }
+
+    function closeCoursePickerModal() {
+      const m = document.getElementById('coursePickerModal');
+      if (m) m.style.display = 'none';
+    }
+
+    function selectScenicDrivingCourse(courseId) {
+      const c = SCENIC_COURSES.find(it => it.id === courseId) || SCENIC_COURSES[0];
+      state.scenicCourseId = c.id;
+      state.koreaWorldActive = false;
+      state.scenicTourActive = true;
+      state.activeZone = 'open_world';
+      if (state.stage !== 'driving') {
+        startInstantTestDrive();
+      } else {
+        initScenicSamples();
+        const s0 = scenicRoadSamples[0];
+        state.x = s0.x + s0.nx * 3.2;
+        state.z = s0.z + s0.nz * 3.2;
+        state.y = s0.y;
+        state.heading = s0.heading;
+        state.velHeading = s0.heading;
+        state.camHeading = s0.heading;
+        state.speed = Math.min(state.speed, 12);
+        state.moveTrail = [];
+        buildScenicCurving3DWorld();
+        rebuildPlayer3DCar();
+      }
+      setTargetSpeedCap(c.speedCapDefault);
+      const limEl = document.getElementById('hudLimitLabel');
+      if (limEl) limEl.textContent = c.limitKmh >= 250 ? '서킷 무제한 MAX' : `제한 ${c.limitKmh}km/h`;
+      const qPill = document.getElementById('hudCourseQuickPill');
+      if (qPill) qPill.textContent = `${c.icon} ${c.shortName} ▾`;
+      const topBtn = document.getElementById('topCoursePickerBtn');
+      if (topBtn) topBtn.textContent = `🛣️ ${c.shortName} (8종)`;
+      closeCoursePickerModal();
+      renderCourseCardsGrid();
+      playTone(523, 0.12, 'triangle', 0.07, 784);
+      showToast(`${c.icon} [${c.name}] 코스로 전환되었습니다!`);
+    }
+
+    function cycleNextScenicCourse() {
+      const idx = SCENIC_COURSES.findIndex(c => c.id === (state.scenicCourseId || 'all_korea'));
+      const next = SCENIC_COURSES[(idx + 1) % SCENIC_COURSES.length];
+      selectScenicDrivingCourse(next.id);
+    }
+
+    function pickRandomScenicCourse() {
+      const cur = state.scenicCourseId || 'all_korea';
+      const pool = SCENIC_COURSES.filter(c => c.id !== cur);
+      const pick = pool[Math.floor(Math.random() * pool.length)] || SCENIC_COURSES[0];
+      selectScenicDrivingCourse(pick.id);
+    }
+
     function buildScenicCurving3DWorld() {
+      const course = getCurrentScenicCourse();
       initScenicSamples();
+      const limEl = document.getElementById('hudLimitLabel');
+      if (limEl) limEl.textContent = course.limitKmh >= 250 ? '서킷 무제한 MAX' : `제한 ${course.limitKmh}km/h`;
+      const qPill = document.getElementById('hudCourseQuickPill');
+      if (qPill) qPill.textContent = `${course.icon} ${course.shortName} ▾`;
+
       if (!useWebGL || typeof THREE === 'undefined' || !worldGroup) {
         if (!state.npcs || state.npcs.length === 0) {
           if (typeof spawnNpcsForMode === 'function') spawnNpcsForMode('autonomous');
@@ -5073,25 +5524,46 @@
       state.buildingBoxes = [];
       state.parkedCars = [];
 
-      // 1. Vast Lush Ground + Sparkling Coastal Ocean on the West/North-West side!
       streetLampBulbs = [];
       scenicNightGlowGroup = new THREE.Group();
       worldGroup.add(scenicNightGlowGroup);
 
-      scenicGrassMat3D = new THREE.MeshStandardMaterial({ color: 0x1e5631, roughness: 0.94 });
-      const grassBase = new THREE.Mesh(new THREE.PlaneGeometry(2800, 2800), scenicGrassMat3D);
+      // 1. Course-Themed Ground & Sea / Han River / Island Water!
+      scenicGrassMat3D = new THREE.MeshStandardMaterial({ color: course.groundHex, roughness: course.id === 'taebaek_snow' ? 0.65 : 0.94 });
+      const grassBase = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), scenicGrassMat3D);
       grassBase.rotation.x = -Math.PI / 2;
-      grassBase.position.y = -0.35;
+      grassBase.position.y = course.oceanMode === 'all_sea' ? -1.8 : -0.35;
       worldGroup.add(grassBase);
 
-      scenicOceanMat3D = new THREE.MeshPhongMaterial({ color: 0x0284c7, specular: 0xbae6fd, shininess: 135 });
-      const oceanPlane = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1400), scenicOceanMat3D);
-      oceanPlane.rotation.x = -Math.PI / 2;
-      oceanPlane.position.set(-460, -0.18, 120);
-      worldGroup.add(oceanPlane);
+      scenicOceanMat3D = new THREE.MeshPhongMaterial({ color: course.id === 'jeju_coastal' ? 0x0ea5e9 : 0x0284c7, specular: 0xbae6fd, shininess: 140 });
+      if (course.oceanMode === 'all_sea' || course.oceanMode === 'island_ring') {
+        const fullSea = new THREE.Mesh(new THREE.PlaneGeometry(2900, 2900), scenicOceanMat3D);
+        fullSea.rotation.x = -Math.PI / 2;
+        fullSea.position.y = -0.15;
+        worldGroup.add(fullSea);
+        if (course.oceanMode === 'island_ring') {
+          const jejuLand = new THREE.Mesh(new THREE.CylinderGeometry(355, 390, 1.2, 32), new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 }));
+          jejuLand.position.set(0, -0.45, 0);
+          const hallaCone = new THREE.Mesh(new THREE.ConeGeometry(135, 88, 16), new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.92 }));
+          hallaCone.position.set(0, 43, 0);
+          const hallaCap = new THREE.Mesh(new THREE.ConeGeometry(38, 22, 14), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6 }));
+          hallaCap.position.set(0, 78, 0);
+          worldGroup.add(jejuLand, hallaCone, hallaCap);
+        }
+      } else if (course.oceanMode === 'han_river') {
+        const riverPlane = new THREE.Mesh(new THREE.PlaneGeometry(760, 2400), scenicOceanMat3D);
+        riverPlane.rotation.x = -Math.PI / 2;
+        riverPlane.position.set(0, -0.14, 0);
+        worldGroup.add(riverPlane);
+      } else if (course.oceanMode === 'west') {
+        const oceanPlane = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1400), scenicOceanMat3D);
+        oceanPlane.rotation.x = -Math.PI / 2;
+        oceanPlane.position.set(-460, -0.18, 120);
+        worldGroup.add(oceanPlane);
+      }
 
-      // 2. Continuous 3D Curving Asphalt Ribbon + Yellow Centerline + Metallic Guardrails (180 Seamless Segments!)
-      const roadW = 17.0;
+      // 2. Continuous 3D Curving Asphalt Ribbon + Course-Specific Shoulders/Curbs!
+      const roadW = course.roadWidth || 17.0;
       const roadPos = [], roadUv = [], roadIdx = [];
       const linePos = [], lineIdx = [];
       for (let i = 0; i <= SCENIC_SEGMENTS; i++) {
@@ -5116,45 +5588,138 @@
       rGeo.computeVertexNormals();
       const roadTex = getAsphaltTexture();
       if (roadTex) { roadTex.repeat.set(1, 1); }
-      const rMesh = new THREE.Mesh(rGeo, new THREE.MeshPhongMaterial({ map: roadTex, color: 0x2a3140, specular: 0x475569, shininess: 40, side: THREE.DoubleSide }));
+      const rMesh = new THREE.Mesh(rGeo, new THREE.MeshPhongMaterial({ map: roadTex, color: course.roadHex, specular: 0x475569, shininess: 42, side: THREE.DoubleSide }));
       worldGroup.add(rMesh);
 
       const lGeo = new THREE.BufferGeometry();
       lGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
       lGeo.setIndex(lineIdx);
-      worldGroup.add(new THREE.Mesh(lGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })));
+      worldGroup.add(new THREE.Mesh(lGeo, new THREE.MeshBasicMaterial({ color: course.id === 'inje_circuit' ? 0xf8fafc : 0xfacc15, side: THREE.DoubleSide })));
 
-      // 3. Populate 4 Distinct Continuous Biomes Along the Winding Road!
+      // 3. Build 3D Illuminated Tunnels along course.tunnelRanges!
+      if (course.tunnelRanges && course.tunnelRanges.length) {
+        const tunWallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.78, side: THREE.DoubleSide });
+        const tunLightMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+        course.tunnelRanges.forEach(tr => {
+          const sEnter = scenicRoadSamples[tr.start % SCENIC_SEGMENTS];
+          const pTex = makeSignTexture('#0f172a', '#fde047', `🚇 ${tr.name}`, '전조등 자동점등 · 차선 유지 주행', '#38bdf8');
+          const portalSign = new THREE.Mesh(new THREE.BoxGeometry(roadW + 3.2, 2.1, 1.0), new THREE.MeshBasicMaterial({ map: pTex }));
+          portalSign.position.set(sEnter.x, sEnter.y + 8.3, sEnter.z);
+          portalSign.rotation.y = sEnter.heading;
+          worldGroup.add(portalSign);
+
+          for (let ti = tr.start; ti <= tr.end; ti++) {
+            const ts = scenicRoadSamples[ti % SCENIC_SEGMENTS];
+            const tGrp = new THREE.Group();
+            const halfT = roadW * 0.5 + 1.1;
+            const wL = new THREE.Mesh(new THREE.BoxGeometry(0.9, 7.6, 17.5), tunWallMat);
+            wL.position.set(-halfT, 3.8, 0);
+            const wR = wL.clone(); wR.position.x = halfT;
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(halfT * 2 + 1.0, 1.1, 17.5), tunWallMat);
+            roof.position.set(0, 7.6, 0);
+            tGrp.add(wL, wR, roof);
+            if (ti % 2 === 0) {
+              const led = new THREE.Mesh(new THREE.BoxGeometry(halfT * 1.4, 0.22, 1.2), tunLightMat);
+              led.position.set(0, 6.95, 0);
+              tGrp.add(led);
+            }
+            tGrp.position.set(ts.x, ts.y, ts.z);
+            tGrp.rotation.y = ts.heading;
+            worldGroup.add(tGrp);
+          }
+        });
+      }
+
+      // 4. Populate Course-Specific Curb Details & Roadside Scenery!
       const glassM = new THREE.MeshPhongMaterial({ map: getGlassBuildingTexture(), emissive: 0xfef08a, emissiveIntensity: (state.nightFactor || 0) * 0.35, specular: 0xffffff, shininess: 180, envMap: getCarEnvMap(), reflectivity: 0.52 });
       scenicGlassMat3D = glassM;
-      const mtnM = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.94 });
-      const pineM = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.88 });
+      const mtnM = new THREE.MeshStandardMaterial({ color: course.id === 'taebaek_snow' ? 0xe2e8f0 : 0x14532d, roughness: 0.9 });
+      const pineM = new THREE.MeshStandardMaterial({ color: course.id === 'taebaek_snow' ? 0xcbd5e1 : 0x166534, roughness: 0.88 });
       const trunkM = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.92 });
       const paddyM = new THREE.MeshStandardMaterial({ color: 0xca8a04, roughness: 0.9 });
+      const canolaM = new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide });
+      const basaltM = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.95 });
+      const palmLeafM = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75 });
       const hanokWallM = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.85 });
       const hanokRoofM = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65 });
-      const blossomM = new THREE.MeshStandardMaterial({ color: 0xf9a8d4, roughness: 0.8 });
+      const blossomM = new THREE.MeshStandardMaterial({ color: 0xf9a8d4, roughness: 0.78 });
       const pylonM = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
       const pierM = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
+      const redCurbM = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const whiteCurbM = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+      const snowBankM = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
+      const cableCyanM = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+      // Inje Pro Circuit Start/Finish Checkered Gantry!
+      if (course.id === 'inje_circuit') {
+        const s0 = scenicRoadSamples[0];
+        const sfGrp = new THREE.Group();
+        [-10.5, 10.5].forEach(px => {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.9, 8.5, 0.9), pylonM);
+          post.position.set(px, 4.25, 0);
+          sfGrp.add(post);
+        });
+        const sfTex = makeSignTexture('#090d16', '#facc15', '🏁 INJE SPEEDIUM · START / FINISH', 'PRO GP CIRCUIT · 최고속도 무제한 구간', '#ef4444');
+        const sfBanner = new THREE.Mesh(new THREE.BoxGeometry(22.2, 2.2, 1.0), new THREE.MeshBasicMaterial({ map: sfTex }));
+        sfBanner.position.set(0, 7.8, 0);
+        sfGrp.add(sfBanner);
+        sfGrp.position.set(s0.x, s0.y, s0.z);
+        sfGrp.rotation.y = s0.heading;
+        worldGroup.add(sfGrp);
+      }
 
       for (let i = 0; i < SCENIC_SEGMENTS; i += 2) {
         const s = scenicRoadSamples[i];
+        if (s.inTunnel) continue;
         const biome = getScenicBiomeInfo(s.a).id;
+        const halfW = roadW * 0.5;
 
-        // Road support embankment / bridge piers when elevated!
-        if (s.y > 1.2 && i % 4 === 0) {
-          const pier = new THREE.Mesh(new THREE.BoxGeometry(14, s.y + 1, 3.2), pierM);
-          pier.position.set(s.x, s.y * 0.5 - 0.5, s.z);
+        // Elevated bridge piers
+        if (s.y > 1.4 && i % 4 === 0) {
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(roadW - 2, s.y + 2, 3.2), pierM);
+          pier.position.set(s.x, s.y * 0.5 - 1.0, s.z);
           pier.rotation.y = s.heading;
           worldGroup.add(pier);
         }
 
+        // Course-specific Shoulder Curbs / Walls!
+        if (course.curbStyle === 'race_redwhite') {
+          [-1, 1].forEach(side => {
+            const cb = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.18, 9.8), (i % 4 === 0) ? redCurbM : whiteCurbM);
+            cb.position.set(s.x + s.nx * side * (halfW + 0.55), s.y + 0.12, s.z + s.nz * side * (halfW + 0.55));
+            cb.rotation.y = s.heading;
+            worldGroup.add(cb);
+          });
+          if (i % 18 === 0) {
+            const stand = new THREE.Mesh(new THREE.BoxGeometry(8, 6.5, 22), pierM);
+            stand.position.set(s.x + s.nx * 20, s.y + 3.2, s.z + s.nz * 20);
+            stand.rotation.y = s.heading;
+            worldGroup.add(stand);
+          }
+        } else if (course.curbStyle === 'basalt_wall') {
+          [-1, 1].forEach(side => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.05, 9.5), basaltM);
+            wall.position.set(s.x + s.nx * side * (halfW + 1.1), s.y + 0.52, s.z + s.nz * side * (halfW + 1.1));
+            wall.rotation.y = s.heading;
+            worldGroup.add(wall);
+          });
+        } else if (course.curbStyle === 'snow_bank') {
+          [-1, 1].forEach(side => {
+            const sb = new THREE.Mesh(new THREE.SphereGeometry(2.1, 7, 6), snowBankM);
+            sb.scale.set(0.8, 0.55, 2.6);
+            sb.position.set(s.x + s.nx * side * (halfW + 1.6), s.y + 0.4, s.z + s.nz * side * (halfW + 1.6));
+            sb.rotation.y = s.heading;
+            worldGroup.add(sb);
+          });
+        }
+
+        // Biome Scenery Placement
         if (biome === 'city') {
-          // Downtown Seoul Glass Skyscrapers on both sides!
           if (i % 4 === 0) {
             [-1, 1].forEach(side => {
+              if (course.oceanMode === 'han_river' && side < 0) return;
               const dist = 24 + ((i * 7) % 14);
-              const bh = 24 + ((i * 13 + (side > 0 ? 11 : 3)) % 46);
+              const bh = 26 + ((i * 13 + (side > 0 ? 11 : 3)) % 48);
               const bw = 12 + (i % 6);
               const bldg = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bw), glassM);
               bldg.position.set(s.x + s.nx * side * dist, bh * 0.5 - 0.3, s.z + s.nz * side * dist);
@@ -5162,125 +5727,131 @@
               worldGroup.add(bldg);
             });
           }
-        } else if (biome === 'mountain') {
-          // Towering Green Mountain Peaks & Pine Forests along the curving pass!
+        } else if (biome === 'mountain' || biome === 'snow') {
           if (i % 6 === 0) {
             [-1, 1].forEach(side => {
-              const dist = 48 + ((i * 9) % 30);
-              const mh = 45 + ((i * 17) % 45);
+              const dist = 46 + ((i * 9) % 30);
+              const mh = 48 + ((i * 17) % 46);
               const pk = new THREE.Mesh(new THREE.ConeGeometry(34 + (i % 15), mh, 9), mtnM);
               pk.position.set(s.x + s.nx * side * dist, mh * 0.5 - 2, s.z + s.nz * side * dist);
               worldGroup.add(pk);
             });
           }
           [-1, 1].forEach(side => {
-            const tx = s.x + s.nx * side * 14.5, tz = s.z + s.nz * side * 14.5;
+            const tx = s.x + s.nx * side * (halfW + 5.8), tz = s.z + s.nz * side * (halfW + 5.8);
             const trk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 3.2, 7), trunkM);
             trk.position.set(tx, s.y + 1.6, tz);
-            const pine = new THREE.Mesh(new THREE.ConeGeometry(1.9, 5.4, 7), pineM);
-            pine.position.set(tx, s.y + 4.8, tz);
+            const pine = new THREE.Mesh(new THREE.ConeGeometry(2.0, 5.6, 7), pineM);
+            pine.position.set(tx, s.y + 4.9, tz);
             worldGroup.add(trk, pine);
           });
-        } else if (biome === 'country') {
-          // Golden Rice Paddies, Traditional Korean Hanok Cottages & Cherry Blossom Trees!
+          if (course.id === 'daegwallyeong' && Math.abs(s.curveDelta) > 0.16 && i % 4 === 0) {
+            const cSign = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 0.2), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+            const outSide = s.curveDelta > 0 ? -1 : 1;
+            cSign.position.set(s.x + s.nx * outSide * (halfW + 1.8), s.y + 1.8, s.z + s.nz * outSide * (halfW + 1.8));
+            cSign.rotation.y = s.heading;
+            worldGroup.add(cSign);
+          }
+        } else if (biome === 'jeju') {
+          [-1, 1].forEach(side => {
+            const px = s.x + s.nx * side * (halfW + 4.4), pz = s.z + s.nz * side * (halfW + 4.4);
+            const pTrk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 5.8, 7), trunkM);
+            pTrk.position.set(px, s.y + 2.9, pz);
+            const pCrown = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.5, 6), palmLeafM);
+            pCrown.position.set(px, s.y + 5.9, pz);
+            worldGroup.add(pTrk, pCrown);
+          });
           if (i % 6 === 0) {
-            const side = (i % 12 === 0) ? 1 : -1;
-            const fx = s.x + s.nx * side * 34, fz = s.z + s.nz * side * 34;
-            const paddy = new THREE.Mesh(new THREE.PlaneGeometry(36, 28), paddyM);
-            paddy.rotation.x = -Math.PI / 2;
-            paddy.position.set(fx, -0.22, fz);
-            worldGroup.add(paddy);
-            // Traditional Hanok Cottage (기와집)
-            const hx = s.x + s.nx * (-side) * 22, hz = s.z + s.nz * (-side) * 22;
+            const canPatch = new THREE.Mesh(new THREE.PlaneGeometry(24, 18), canolaM);
+            canPatch.rotation.x = -Math.PI / 2;
+            canPatch.position.set(s.x - s.nx * 24, s.y + 0.05, s.z - s.nz * 24);
+            worldGroup.add(canPatch);
+          }
+        } else if (biome === 'blossom' || biome === 'country') {
+          [-1, 1].forEach(side => {
+            const bx = s.x + s.nx * side * (halfW + 2.8), bz = s.z + s.nz * side * (halfW + 2.8);
+            const trk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, 3.4, 7), trunkM);
+            trk.position.set(bx, s.y + 1.7, bz);
+            const bl = new THREE.Mesh(new THREE.SphereGeometry(biome === 'blossom' ? 3.2 : 1.9, 9, 8), blossomM);
+            bl.position.set(s.x + s.nx * side * (halfW + (biome === 'blossom' ? 0.6 : 2.6)), s.y + 4.4, s.z + s.nz * side * (halfW + (biome === 'blossom' ? 0.6 : 2.6)));
+            worldGroup.add(trk, bl);
+          });
+          if (i % 8 === 0) {
+            const side = (i % 16 === 0) ? 1 : -1;
+            const hx = s.x + s.nx * side * 22, hz = s.z + s.nz * side * 22;
             const house = new THREE.Mesh(new THREE.BoxGeometry(9, 4.2, 6.5), hanokWallM);
             house.position.set(hx, s.y + 2.1, hz);
             house.rotation.y = s.heading;
             const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 3.2, 4), hanokRoofM);
             roof.position.set(hx, s.y + 5.7, hz);
             roof.rotation.y = s.heading + Math.PI / 4;
-            worldGroup.add(house, roof);
+            const paddy = new THREE.Mesh(new THREE.PlaneGeometry(32, 24), paddyM);
+            paddy.rotation.x = -Math.PI / 2;
+            paddy.position.set(s.x - s.nx * side * 30, -0.22, s.z - s.nz * side * 30);
+            worldGroup.add(house, roof, paddy);
           }
-          if (i % 4 === 0) {
+        } else if (biome === 'coast') {
+          if ((s.y > 3.5 || course.id === 'busan_gwangan') && i % 10 === 0) {
             [-1, 1].forEach(side => {
-              const bx = s.x + s.nx * side * 13.2, bz = s.z + s.nz * side * 13.2;
-              const trk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 2.4, 7), trunkM);
-              trk.position.set(bx, s.y + 1.2, bz);
-              const bl = new THREE.Mesh(new THREE.SphereGeometry(1.7, 9, 8), blossomM);
-              bl.position.set(bx, s.y + 3.2, bz);
-              worldGroup.add(trk, bl);
-            });
-          }
-        } else {
-          // Scenic Coastal Highway & Cable-Stayed Sea Bridge Towers!
-          if (s.y > 4 && i % 10 === 0) {
-            [-1, 1].forEach(side => {
-              const py = new THREE.Mesh(new THREE.BoxGeometry(1.4, 34, 1.4), pylonM);
-              py.position.set(s.x + s.nx * side * 9.5, s.y + 14, s.z + s.nz * side * 9.5);
+              const py = new THREE.Mesh(new THREE.BoxGeometry(1.6, 38, 1.6), pylonM);
+              py.position.set(s.x + s.nx * side * (halfW + 1.2), s.y + 16, s.z + s.nz * side * (halfW + 1.2));
               worldGroup.add(py);
+              const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 28, 5), cableCyanM);
+              cable.position.set(s.x + s.nx * side * (halfW + 1.2), s.y + 14, s.z + s.nz * side * (halfW + 1.2));
+              cable.rotation.x = 0.42;
+              worldGroup.add(cable);
             });
-            const cross = new THREE.Mesh(new THREE.BoxGeometry(20, 1.4, 1.4), pylonM);
-            cross.position.set(s.x, s.y + 27, s.z);
+            const cross = new THREE.Mesh(new THREE.BoxGeometry(roadW + 3.6, 1.5, 1.5), pylonM);
+            cross.position.set(s.x, s.y + 30, s.z);
             cross.rotation.y = s.heading;
             worldGroup.add(cross);
           }
         }
       }
 
-      // v37 Korean Highway LED Streetlamps, Asphalt Warm Light Pools, Hanok Window Glow & Bridge Beacons!
+      // v37 Highway LED Streetlamps, Warm Light Pools & Night Beacons
       const lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 });
       const lampGlowPoolMat = new THREE.MeshBasicMaterial({
-        color: 0xfef08a,
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide
+        color: 0xfef08a, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
       });
-      const hanokWinGlowMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
       const bridgeBeaconMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
       for (let i = 0; i < SCENIC_SEGMENTS; i += 6) {
         const s = scenicRoadSamples[i];
+        if (s.inTunnel) continue;
         const bId = getScenicBiomeInfo(s.a).id;
+        const halfW = roadW * 0.5;
         const lampSides = bId === 'city' ? [-1, 1] : [i % 12 === 0 ? 1 : -1];
         lampSides.forEach(side => {
-          const lx = s.x + s.nx * side * 9.4;
-          const lz = s.z + s.nz * side * 9.4;
+          const lx = s.x + s.nx * side * (halfW + 0.9);
+          const lz = s.z + s.nz * side * (halfW + 0.9);
           const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.14, 7.2, 6), lampPoleMat);
           pole.position.set(lx, s.y + 3.6, lz);
           const arm = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.10, 0.10), lampPoleMat);
-          arm.position.set(s.x + s.nx * side * 8.4, s.y + 7.1, s.z + s.nz * side * 8.4);
+          arm.position.set(s.x + s.nx * side * (halfW - 0.1), s.y + 7.1, s.z + s.nz * side * (halfW - 0.1));
           arm.rotation.y = -s.heading;
           const bulbMat = new THREE.MeshBasicMaterial({ color: (state.nightFactor || 0) > 0.35 ? 0xfef08a : 0x64748b });
           const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.14, 0.28), bulbMat);
-          bulb.position.set(s.x + s.nx * side * 7.5, s.y + 7.0, s.z + s.nz * side * 7.5);
+          bulb.position.set(s.x + s.nx * side * (halfW - 1.0), s.y + 7.0, s.z + s.nz * side * (halfW - 1.0));
           bulb.rotation.y = -s.heading;
           streetLampBulbs.push(bulb);
           worldGroup.add(pole, arm, bulb);
 
-          // Warm golden asphalt light pool underneath each streetlamp at dusk/night!
           const pool = new THREE.Mesh(new THREE.CircleGeometry(5.8, 12), lampGlowPoolMat);
           pool.rotation.x = -Math.PI / 2;
-          pool.position.set(s.x + s.nx * side * 5.2, s.y + 0.16, s.z + s.nz * side * 5.2);
+          pool.position.set(s.x + s.nx * side * (halfW - 3.2), s.y + 0.16, s.z + s.nz * side * (halfW - 3.2));
           scenicNightGlowGroup.add(pool);
         });
-        if (bId === 'country') {
-          const side = (i % 12 === 0) ? 1 : -1;
-          const hx = s.x + s.nx * (-side) * 18.6, hz = s.z + s.nz * (-side) * 18.6;
-          const winGlow = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 1.5), hanokWinGlowMat);
-          winGlow.position.set(hx, s.y + 2.2, hz);
-          winGlow.lookAt(s.x, s.y + 2.2, s.z);
-          scenicNightGlowGroup.add(winGlow);
-        } else if (bId === 'coast' && s.y > 4 && i % 12 === 0) {
+        if (bId === 'coast' && s.y > 4 && i % 12 === 0) {
           [-1, 1].forEach(side => {
             const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), bridgeBeaconMat);
-            beacon.position.set(s.x + s.nx * side * 9.5, s.y + 31.5, s.z + s.nz * side * 9.5);
+            beacon.position.set(s.x + s.nx * side * (halfW + 1.2), s.y + 34, s.z + s.nz * side * (halfW + 1.2));
             scenicNightGlowGroup.add(beacon);
           });
         }
       }
       scenicNightGlowGroup.visible = (state.nightFactor || 0) > 0.32;
 
-      // v39 Korean Expressway Hi-pass Tollgates (Seg 8 & Seg 104) + Spinning Bubble Car Wash Tunnel (Seg 16)!
+      // v39 Korean Expressway Hi-pass Tollgates + Spinning Bubble Car Wash Tunnel!
       setupScenicHipassAndWashCoords();
       carWashRollers3D = [];
       const gantryWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 });
@@ -5355,14 +5926,14 @@
         worldGroup.add(cwGrp);
       }
 
-      // Iconic Seoul Lotte World Tower & Namsan Tower visible near City Start!
-      const p0 = scenicRoadSamples[0];
-      const lt = new THREE.Mesh(new THREE.CylinderGeometry(3, 10, 118, 8), glassM);
-      lt.position.set(p0.x + 58, 59, p0.z + 32);
-      worldGroup.add(lt);
+      if (course.id === 'all_korea' || course.id === 'seoul_gangbyeon') {
+        const p0 = scenicRoadSamples[0];
+        const lt = new THREE.Mesh(new THREE.CylinderGeometry(3, 10, 118, 8), glassM);
+        lt.position.set(p0.x + 58, 59, p0.z + 32);
+        worldGroup.add(lt);
+      }
       _lastSkyPaintBucket = -1;
       updateDayNightEnvironment(0, true);
-      // Always spawn live exotic NPC Supercars along the curving 4-biome scenic loop!
       if (!state.npcs || state.npcs.length === 0) {
         if (typeof spawnNpcsForMode === 'function') spawnNpcsForMode('autonomous');
       }
@@ -9210,6 +9781,8 @@
 
     function selectRoadExamCourse(c) {
       state.roadCourse = c;
+      const mapExamToScenic = { A: 'seoul_gangbyeon', B: 'daegwallyeong', C: 'busan_gwangan', D: 'all_korea' };
+      if (mapExamToScenic[c]) state.scenicCourseId = mapExamToScenic[c];
       showToast(`도로주행 ${c}코스 노면 유도선이 설정되었습니다.`);
       startDrivingMode('road_exam');
     }
@@ -12157,32 +12730,108 @@
         }
       }
 
-      ctx.fillStyle = '#1e293b';
+      // v42 Course-Aware 2D Perspective Ground, Curving Spline Road, Tunnels & 8 Biome Sceneries!
+      const curCourse2D = getCurrentScenicCourse();
+      const nearInfo2D = (state.scenicTourActive && scenicRoadSamples.length) ? findNearestScenicSample(state.x, state.z) : null;
+      const curSample2D = nearInfo2D ? nearInfo2D.sample : null;
+      const curBiome2D = curSample2D ? getScenicBiomeInfo(curSample2D.a).id : 'city';
+      const activeTunnel2D = curSample2D ? curSample2D.inTunnel : null;
+
+      // Course-specific ground / sea / snow backdrop below horizon
+      let groundCol2D = '#1e293b';
+      if (curCourse2D.id === 'taebaek_snow') groundCol2D = '#cbd5e1';
+      else if (curCourse2D.id === 'busan_gwangan') groundCol2D = '#0369a1';
+      else if (curCourse2D.id === 'jeju_coastal') groundCol2D = '#0f766e';
+      else if (curCourse2D.id === 'cherry_blossom') groundCol2D = '#14532d';
+      else if (curCourse2D.id === 'inje_circuit') groundCol2D = '#15803d';
+      else if (curCourse2D.id === 'daegwallyeong' || curBiome2D === 'mountain') groundCol2D = '#0f3f24';
+      else if (curBiome2D === 'coast') groundCol2D = '#075985';
+      else if (curBiome2D === 'country') groundCol2D = '#365314';
+      ctx.fillStyle = groundCol2D;
       ctx.fillRect(0, horizon, w, h - horizon);
 
-      // Dynamic 3D Perspective Korean Road (scrolls & curves in real time with state.x, state.z, state.heading!)
-      const roadShiftX = -(state.x - 3.2) * (w * 0.045) + Math.sin(state.heading) * (w * 0.22);
-      const vanishX = w * 0.5 - Math.sin(state.heading) * (w * 0.18);
+      // Compute realistic curve bend & lateral lane offset relative to spline!
+      let latOff2D = state.x - 3.2;
+      let curveBendPx = -Math.sin(state.heading) * (w * 0.16);
+      if (curSample2D) {
+        const dxS = state.x - curSample2D.x, dzS = state.z - curSample2D.z;
+        latOff2D = (dxS * curSample2D.nx + dzS * curSample2D.nz) - 3.2;
+        let headErr = state.heading - curSample2D.heading;
+        while (headErr > Math.PI) headErr -= Math.PI * 2;
+        while (headErr < -Math.PI) headErr += Math.PI * 2;
+        curveBendPx = Math.max(-w * 0.34, Math.min(w * 0.34, (curSample2D.curveDelta * 2.2 - headErr * 0.85) * (w * 0.26)));
+      }
+      const roadShiftX = Math.max(-w * 0.32, Math.min(w * 0.32, -latOff2D * (w * 0.032)));
+      const vanishX = w * 0.5 + curveBendPx;
       const roadBotCenter = w * 0.5 + roadShiftX;
 
-      ctx.fillStyle = '#262f3f';
-      ctx.beginPath();
-      ctx.moveTo(vanishX - w * 0.065, horizon);
-      ctx.lineTo(vanishX + w * 0.065, horizon);
-      ctx.lineTo(roadBotCenter + w * 0.48, h);
-      ctx.lineTo(roadBotCenter - w * 0.48, h);
-      ctx.closePath();
-      ctx.fill();
+      // Tunnel dark rock arch backdrop when driving inside a tunnel!
+      if (activeTunnel2D) {
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(0, 0, w, horizon + 12);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 3;
+        for (let ti = 1; ti <= 4; ti++) {
+          const rT = (w * 0.13) * ti;
+          ctx.beginPath();
+          ctx.arc(vanishX + (roadBotCenter - vanishX) * (ti * 0.18), horizon + 14 * ti, rT, Math.PI, 0, false);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#fde047';
+        ctx.font = '800 11px "Noto Sans KR", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`🚇 ${activeTunnel2D.name} 통과 중`, vanishX, Math.max(58, horizon - 46));
+      }
 
-      // Moving Perspective Curb Stripes, Lane Dashes & Roadside Buildings!
-      const zOffset = ((state.activeZone === 'subway' ? state.subwayPos : state.z) % 12 + 12) % 12;
+      // Draw curved multi-slice asphalt ribbon!
+      const roadSurfCol2D = curCourse2D.id === 'inje_circuit' ? '#181c26' : (curCourse2D.id === 'taebaek_snow' ? '#334155' : '#262f3f');
+      const SLICES = 18;
+      for (let si = 0; si < SLICES; si++) {
+        ctx.fillStyle = roadSurfCol2D;
+        const p0 = si / SLICES, p1 = (si + 1) / SLICES;
+        const y0 = horizon + (h - horizon) * p0, y1 = horizon + (h - horizon) * p1;
+        const ease0 = Math.pow(1 - p0, 1.75), ease1 = Math.pow(1 - p1, 1.75);
+        const cx0 = roadBotCenter + (vanishX - roadBotCenter) * ease0;
+        const cx1 = roadBotCenter + (vanishX - roadBotCenter) * ease1;
+        const hw0 = (w * 0.062) + (w * 0.44) * p0;
+        const hw1 = (w * 0.062) + (w * 0.44) * p1;
+        ctx.beginPath();
+        ctx.moveTo(cx0 - hw0, y0);
+        ctx.lineTo(cx0 + hw0, y0);
+        ctx.lineTo(cx1 + hw1, y1 + 1);
+        ctx.lineTo(cx1 - hw1, y1 + 1);
+        ctx.closePath();
+        ctx.fill();
+
+        // Course-specific Shoulder Curbs (Red/White FIA Racing Curbs, Basalt Stone Wall, Snowbank, Bridge Rail)
+        if (curCourse2D.curbStyle === 'race_redwhite') {
+          ctx.fillStyle = ((si + Math.floor(Math.abs(state.z + state.x) * 0.25)) % 2 === 0) ? '#ef4444' : '#f8fafc';
+          const cw0 = Math.max(3, 18 * p0), cw1 = Math.max(4, 18 * p1);
+          ctx.fillRect(cx0 - hw0 - cw0, y0, cw1, y1 - y0 + 1);
+          ctx.fillRect(cx0 + hw0, y0, cw1, y1 - y0 + 1);
+        } else if (curCourse2D.curbStyle === 'basalt_wall') {
+          ctx.fillStyle = '#1c1917';
+          const bw = Math.max(3, 14 * p1);
+          ctx.fillRect(cx0 - hw0 - bw, y0 - 8 * p1, bw, y1 - y0 + 8 * p1);
+          ctx.fillRect(cx0 + hw0, y0 - 8 * p1, bw, y1 - y0 + 8 * p1);
+        } else if (curCourse2D.curbStyle === 'snow_bank') {
+          ctx.fillStyle = '#f8fafc';
+          const sw = Math.max(4, 22 * p1);
+          ctx.fillRect(cx0 - hw0 - sw, y0 - 6 * p1, sw, y1 - y0 + 6 * p1);
+          ctx.fillRect(cx0 + hw0, y0 - 6 * p1, sw, y1 - y0 + 6 * p1);
+        }
+      }
+
+      // Moving Perspective Lane Dashes & Course-Specific Roadside Props!
+      const scrollDist = (Math.abs(state.x) * 0.7 + Math.abs(state.z) * 0.7);
+      const zOffset = ((state.activeZone === 'subway' ? state.subwayPos : scrollDist) % 12 + 12) % 12;
       for (let i = 0; i < 12; i++) {
         const distZ = 2.5 + i * 6.0 - (zOffset * 0.5);
         if (distZ <= 1.2) continue;
-        const p = Math.min(1, 2.2 / distZ); // perspective factor 0(horizon)..1(near)
+        const p = Math.min(1, 2.2 / distZ);
         const py = horizon + (h - horizon) * p;
-        const halfRoadW = (w * 0.065) + (w * 0.44) * p;
-        const cxLine = vanishX + (roadBotCenter - vanishX) * p;
+        const halfRoadW = (w * 0.062) + (w * 0.44) * p;
+        const cxLine = roadBotCenter + (vanishX - roadBotCenter) * Math.pow(1 - p, 1.75);
 
         // White dashed lane dividers
         ctx.fillStyle = 'rgba(248, 250, 252, 0.85)';
@@ -12191,42 +12840,119 @@
         ctx.fillRect(cxLine - halfRoadW * 0.48, py, dashW, dashH);
         ctx.fillRect(cxLine + halfRoadW * 0.48, py, dashW, dashH);
 
-        // Pink / Cyan Korean Road Guide Line
-        ctx.fillStyle = state.mode === 'highway_exam' ? 'rgba(56, 189, 248, 0.65)' : 'rgba(244, 114, 182, 0.55)';
-        ctx.fillRect(cxLine + halfRoadW * 0.22, py, dashW * 1.4, dashH * 1.3);
-
-        // Blue Seoul Median BRT Bus Lane Lines
-        ctx.fillStyle = '#2563eb';
-        ctx.fillRect(cxLine - halfRoadW * 0.14, py, Math.max(1.5, 4 * p), dashH * 1.5);
-        ctx.fillRect(cxLine + halfRoadW * 0.14, py, Math.max(1.5, 4 * p), dashH * 1.5);
-
-        // Downtown Seoul Glass Skyscrapers & Neon Retail Signboards scrolling smoothly past!
-        if (i % 2 === 0) {
-          const bH = (135 + (i % 3) * 32) * p;
-          const bW = 54 * p;
-          const lxB = cxLine - halfRoadW * 1.08 - bW;
-          const rxB = cxLine + halfRoadW * 1.08;
-          ctx.fillStyle = state.weather === 'night' ? '#0b1120' : '#1e293b';
-          ctx.fillRect(lxB, py - bH, bW, bH);
-          ctx.fillRect(rxB, py - bH * 1.15, bW * 1.08, bH * 1.15);
-
-          // Glowing Seoul Office Window Strips & Neon Sign Accent
-          ctx.fillStyle = state.weather === 'night' ? 'rgba(254,240,138,0.65)' : 'rgba(125,211,252,0.38)';
-          for (let wy = 0.18; wy < 0.85; wy += 0.18) {
-            ctx.fillRect(lxB + bW * 0.15, py - bH * (1 - wy), bW * 0.7, Math.max(1.5, 4 * p));
-            ctx.fillRect(rxB + bW * 0.15, py - bH * 1.15 * (1 - wy), bW * 0.75, Math.max(1.5, 4 * p));
+        if (!activeTunnel2D && i % 2 === 0) {
+          const lxP = cxLine - halfRoadW * 1.12;
+          const rxP = cxLine + halfRoadW * 1.12;
+          if (curBiome2D === 'blossom') {
+            // Overhanging Pink Cherry Blossom Canopy Trees!
+            const trH = 95 * p;
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(lxP - 10 * p, py - trH, 7 * p, trH);
+            ctx.fillRect(rxP + 3 * p, py - trH, 7 * p, trH);
+            ctx.fillStyle = 'rgba(249, 168, 212, 0.90)';
+            ctx.beginPath(); ctx.arc(lxP + 18 * p, py - trH, 42 * p, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(rxP - 18 * p, py - trH, 42 * p, 0, Math.PI * 2); ctx.fill();
+          } else if (curBiome2D === 'jeju') {
+            // Jeju Palm Trees + Yellow Canola Flowers!
+            const pH = 92 * p;
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(lxP - 65 * p, py - 8 * p, 52 * p, 10 * p);
+            ctx.fillRect(rxP + 12 * p, py - 8 * p, 52 * p, 10 * p);
+            ctx.fillStyle = '#57361a';
+            ctx.fillRect(lxP - 12 * p, py - pH, 6 * p, pH);
+            ctx.fillRect(rxP + 6 * p, py - pH, 6 * p, pH);
+            ctx.fillStyle = '#16a34a';
+            ctx.beginPath(); ctx.ellipse(lxP - 9 * p, py - pH, 26 * p, 10 * p, -0.2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(rxP + 9 * p, py - pH, 26 * p, 10 * p, 0.2, 0, Math.PI * 2); ctx.fill();
+          } else if (curBiome2D === 'mountain' || curBiome2D === 'snow') {
+            // Pine Trees & Chevron Sharp-Curve Signs!
+            const tH = 88 * p;
+            ctx.fillStyle = curBiome2D === 'snow' ? '#e2e8f0' : '#15803d';
+            [lxP - 22 * p, rxP + 22 * p].forEach(tx => {
+              ctx.beginPath();
+              ctx.moveTo(tx, py - tH);
+              ctx.lineTo(tx + 22 * p, py);
+              ctx.lineTo(tx - 22 * p, py);
+              ctx.closePath();
+              ctx.fill();
+            });
+            if (curCourse2D.id === 'daegwallyeong' && i % 4 === 0) {
+              ctx.fillStyle = '#facc15';
+              ctx.fillRect(lxP - 14 * p, py - 26 * p, 14 * p, 12 * p);
+            }
+          } else if (curBiome2D === 'coast') {
+            // Suspension Bridge White Towers & Stay Cables!
+            if (i % 4 === 0) {
+              const pyH = 148 * p;
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(lxP - 8 * p, py - pyH, 9 * p, pyH);
+              ctx.fillRect(rxP, py - pyH, 9 * p, pyH);
+              ctx.fillRect(lxP - 8 * p, py - pyH * 0.82, (rxP - lxP) + 17 * p, 6 * p);
+              ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
+              ctx.lineWidth = Math.max(1, 2 * p);
+              ctx.beginPath();
+              ctx.moveTo(lxP, py - pyH * 0.82); ctx.lineTo(cxLine - halfRoadW * 0.85, py);
+              ctx.moveTo(rxP, py - pyH * 0.82); ctx.lineTo(cxLine + halfRoadW * 0.85, py);
+              ctx.stroke();
+            }
+          } else if (curBiome2D === 'circuit') {
+            // Spectator Grandstands & Tire Barriers
+            if (i % 4 === 0) {
+              ctx.fillStyle = '#334155';
+              ctx.fillRect(rxP + 18 * p, py - 45 * p, 68 * p, 38 * p);
+              ctx.fillStyle = '#ef4444';
+              ctx.fillRect(rxP + 18 * p, py - 48 * p, 68 * p, 5 * p);
+            }
+          } else if (curBiome2D === 'country') {
+            // Traditional Hanok Tiled Houses!
+            if (i % 4 === 0) {
+              ctx.fillStyle = '#fef3c7';
+              ctx.fillRect(lxP - 48 * p, py - 28 * p, 36 * p, 26 * p);
+              ctx.fillStyle = '#1e293b';
+              ctx.beginPath();
+              ctx.moveTo(lxP - 54 * p, py - 28 * p);
+              ctx.lineTo(lxP - 30 * p, py - 44 * p);
+              ctx.lineTo(lxP - 6 * p, py - 28 * p);
+              ctx.closePath(); ctx.fill();
+            }
+          } else {
+            // City Glass Skyscrapers
+            const bH = (135 + (i % 3) * 32) * p;
+            const bW = 54 * p;
+            const lxB = lxP - bW;
+            const rxB = rxP;
+            ctx.fillStyle = (state.nightFactor || 0) > 0.45 ? '#0b1120' : '#1e293b';
+            if (!(curCourse2D.oceanMode === 'han_river')) ctx.fillRect(lxB, py - bH, bW, bH);
+            ctx.fillRect(rxB, py - bH * 1.15, bW * 1.08, bH * 1.15);
+            ctx.fillStyle = (state.nightFactor || 0) > 0.45 ? 'rgba(254,240,138,0.65)' : 'rgba(125,211,252,0.38)';
+            for (let wy = 0.18; wy < 0.85; wy += 0.18) {
+              if (!(curCourse2D.oceanMode === 'han_river')) ctx.fillRect(lxB + bW * 0.15, py - bH * (1 - wy), bW * 0.7, Math.max(1.5, 4 * p));
+              ctx.fillRect(rxB + bW * 0.15, py - bH * 1.15 * (1 - wy), bW * 0.75, Math.max(1.5, 4 * p));
+            }
           }
-          ctx.fillStyle = i % 4 === 0 ? '#38bdf8' : '#34d399';
-          ctx.fillRect(lxB + bW * 0.1, py - bH + 3 * p, bW * 0.8, Math.max(2, 5 * p));
         }
       }
 
-      // Yellow Double Center Line
-      ctx.strokeStyle = '#facc15';
+      // Floating Cherry Blossom Petals or Snowflakes in 2D Sky!
+      if (curCourse2D.id === 'cherry_blossom' || curCourse2D.id === 'taebaek_snow') {
+        const isSnow = curCourse2D.id === 'taebaek_snow';
+        ctx.fillStyle = isSnow ? 'rgba(255,255,255,0.88)' : 'rgba(251, 207, 232, 0.88)';
+        const tNowP = performance.now() * 0.04;
+        for (let pi = 0; pi < 28; pi++) {
+          const pxF = ((pi * 97 + tNowP * (isSnow ? 0.7 : 1.1)) % w);
+          const pyF = ((pi * 61 + tNowP * 1.3) % (h * 0.75));
+          ctx.beginPath();
+          ctx.ellipse(pxF, pyF, isSnow ? 2.4 : 3.6, isSnow ? 2.4 : 2.1, pi * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Center Line (White on Racing Circuit, Yellow Double Line on Public Roads)
+      ctx.strokeStyle = curCourse2D.id === 'inje_circuit' ? 'rgba(248,250,252,0.55)' : '#facc15';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(vanishX, horizon);
-      ctx.lineTo(roadBotCenter - w * 0.06, h);
+      ctx.quadraticCurveTo((vanishX + roadBotCenter) * 0.5, (horizon + h) * 0.5, roadBotCenter - w * 0.04, h);
       ctx.stroke();
 
       // HDA Cyan Virtual Lane Carpet when Autopilot is active
@@ -12244,34 +12970,110 @@
         ctx.fill();
       }
 
-      // Downtown Seoul Skyline on Horizon: Namsan + N Seoul Tower (Left), Distant Glass Skyline, & Lotte World Tower 123F (Right)!
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
-      for (let sx = -190; sx <= 190; sx += 26) {
-        const sh = 18 + ((Math.abs(sx * 7) % 34));
-        ctx.fillRect(vanishX + sx, horizon - sh, 21, sh);
+      // v42 Course-Specific Horizon Silhouettes (Mountains, Hallasan, Gwangan Bridge, Cherry Hills, Snow Peaks, Circuit, or Seoul Skyline!)
+      if (!activeTunnel2D) {
+        if (curBiome2D === 'mountain' || curBiome2D === 'snow') {
+          const isSnowH = curBiome2D === 'snow';
+          ctx.fillStyle = isSnowH ? '#cbd5e1' : '#14532d';
+          [[-220, 68, 120], [-110, 92, 135], [15, 78, 125], [135, 86, 130]].forEach(([ox, mh, mw]) => {
+            ctx.beginPath();
+            ctx.moveTo(vanishX + ox - mw, horizon);
+            ctx.lineTo(vanishX + ox, horizon - mh);
+            ctx.lineTo(vanishX + ox + mw, horizon);
+            ctx.closePath();
+            ctx.fill();
+            if (isSnowH) {
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.moveTo(vanishX + ox - mw * 0.36, horizon - mh * 0.64);
+              ctx.lineTo(vanishX + ox, horizon - mh);
+              ctx.lineTo(vanishX + ox + mw * 0.36, horizon - mh * 0.64);
+              ctx.closePath();
+              ctx.fill();
+              ctx.fillStyle = '#cbd5e1';
+            }
+          });
+        } else if (curBiome2D === 'jeju') {
+          // Hallasan Volcano Crater + Seongsan Ilchulbong on Emerald Horizon
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(0, horizon - 6, w, 8);
+          ctx.fillStyle = '#166534';
+          ctx.beginPath();
+          ctx.moveTo(vanishX - 185, horizon);
+          ctx.quadraticCurveTo(vanishX - 20, horizon - 76, vanishX + 145, horizon);
+          ctx.fill();
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillRect(vanishX - 36, horizon - 38, 32, 6);
+          ctx.fillStyle = '#365314';
+          ctx.fillRect(vanishX + 135, horizon - 28, 48, 28);
+        } else if (curBiome2D === 'coast') {
+          // Open Sparkling Sea + Gwangan Suspension Towers + Marine City Skyline
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(0, horizon - 8, w, 10);
+          ctx.fillStyle = '#f8fafc';
+          [-95, 95].forEach(tx => {
+            ctx.fillRect(vanishX + tx - 4, horizon - 72, 8, 72);
+            ctx.strokeStyle = 'rgba(125,211,252,0.65)';
+            ctx.beginPath();
+            ctx.moveTo(vanishX + tx, horizon - 66); ctx.lineTo(vanishX + tx - 58, horizon);
+            ctx.moveTo(vanishX + tx, horizon - 66); ctx.lineTo(vanishX + tx + 58, horizon);
+            ctx.stroke();
+          });
+          ctx.fillStyle = 'rgba(186,230,253,0.75)';
+          [148, 172, 194].forEach((bx, bi) => ctx.fillRect(vanishX + bx, horizon - (54 + bi * 14), 18, 54 + bi * 14));
+        } else if (curBiome2D === 'blossom' || curBiome2D === 'country') {
+          // Rolling Spring Blossom Hills & Gyeongju Cheomseongdae Silhouette
+          ctx.fillStyle = '#15803d';
+          ctx.beginPath();
+          ctx.moveTo(vanishX - 240, horizon);
+          ctx.quadraticCurveTo(vanishX - 110, horizon - 38, vanishX + 10, horizon);
+          ctx.quadraticCurveTo(vanishX + 125, horizon - 34, vanishX + 240, horizon);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(249, 168, 212, 0.78)';
+          [-145, -85, 85, 145].forEach(bx => {
+            ctx.beginPath(); ctx.arc(vanishX + bx, horizon - 14, 18, 0, Math.PI * 2); ctx.fill();
+          });
+        } else if (curBiome2D === 'circuit') {
+          // Pro Circuit Checkered Arch & Mountain Backdrop
+          ctx.fillStyle = '#14532d';
+          ctx.beginPath();
+          ctx.moveTo(vanishX - 240, horizon); ctx.lineTo(vanishX - 90, horizon - 42); ctx.lineTo(vanishX + 70, horizon - 28); ctx.lineTo(vanishX + 240, horizon);
+          ctx.fill();
+          ctx.fillStyle = '#090d16';
+          ctx.fillRect(vanishX - 82, horizon - 38, 6, 38);
+          ctx.fillRect(vanishX + 76, horizon - 38, 6, 38);
+          for (let ci = 0; ci < 10; ci++) {
+            ctx.fillStyle = ci % 2 === 0 ? '#f8fafc' : '#090d16';
+            ctx.fillRect(vanishX - 80 + ci * 16, horizon - 38, 16, 8);
+          }
+        } else {
+          // Downtown Seoul Skyline on Horizon: Namsan + N Seoul Tower & Lotte World Tower 123F!
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+          for (let sx = -190; sx <= 190; sx += 26) {
+            const sh = 18 + ((Math.abs(sx * 7) % 34));
+            ctx.fillRect(vanishX + sx, horizon - sh, 21, sh);
+          }
+          ctx.fillStyle = '#14532d';
+          ctx.beginPath();
+          ctx.moveTo(vanishX - 165, horizon);
+          ctx.quadraticCurveTo(vanishX - 115, horizon - 34, vanishX - 65, horizon);
+          ctx.fill();
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillRect(vanishX - 117, horizon - 56, 4, 34);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(vanishX - 122, horizon - 62, 14, 7);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(vanishX - 116, horizon - 74, 2, 12);
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.82)';
+          ctx.beginPath();
+          ctx.moveTo(vanishX + 106, horizon);
+          ctx.lineTo(vanishX + 114, horizon - 78);
+          ctx.lineTo(vanishX + 118, horizon - 78);
+          ctx.lineTo(vanishX + 126, horizon);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
-      // Namsan Hill + N Seoul Tower
-      ctx.fillStyle = '#14532d';
-      ctx.beginPath();
-      ctx.moveTo(vanishX - 165, horizon);
-      ctx.quadraticCurveTo(vanishX - 115, horizon - 34, vanishX - 65, horizon);
-      ctx.fill();
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillRect(vanishX - 117, horizon - 56, 4, 34);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(vanishX - 122, horizon - 62, 14, 7);
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(vanishX - 116, horizon - 74, 2, 12);
-
-      // Tapered Lotte World Tower 123F
-      ctx.fillStyle = 'rgba(186, 230, 253, 0.82)';
-      ctx.beginPath();
-      ctx.moveTo(vanishX + 106, horizon);
-      ctx.lineTo(vanishX + 114, horizon - 78);
-      ctx.lineTo(vanishX + 118, horizon - 78);
-      ctx.lineTo(vanishX + 126, horizon);
-      ctx.closePath();
-      ctx.fill();
 
       // Green Seoul Road Sign Gantry + Horizontal Traffic Signal
       ctx.fillStyle = '#065f46';
@@ -12284,7 +13086,7 @@
       ctx.fillStyle = '#ffffff';
       ctx.font = '700 9.5px "Noto Sans KR", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(state.koreaWorldActive ? (isPointOverJeju(state.x, state.z) ? '🌴 제주 일주도로 · 한라산 · 성산일출봉' : (isPointOverSouthSea(state.x, state.z) ? '✈️ 남해 · 제주해협 상공 → 제주공항(CJU)' : `↑ 경부고속도로 · ${getNearestKoreaCity(state.x, state.z).city.name} 통과 중 ↗`)) : '↑ 광화문·시청 | 강남역·잠실 ↗', vanishX, horizon - 42);
+      ctx.fillText(state.koreaWorldActive ? (isPointOverJeju(state.x, state.z) ? '🌴 제주 일주도로 · 한라산 · 성산일출봉' : (isPointOverSouthSea(state.x, state.z) ? '✈️ 남해 · 제주해협 상공 → 제주공항(CJU)' : `↑ 경부고속도로 · ${getNearestKoreaCity(state.x, state.z).city.name} 통과 중 ↗`)) : `${curCourse2D.icon} ${curCourse2D.name}`, vanishX, horizon - 42);
 
       ctx.fillStyle = '#090d16';
       ctx.beginPath();
@@ -13329,6 +14131,14 @@
       const qb = document.getElementById('hudQuickTrayBtn');
       if (qt && qt.style.display === 'grid' && !qt.contains(e.target) && (!qb || !qb.contains(e.target))) {
         qt.style.display = 'none';
+      }
+    });
+
+  
+    window.addEventListener('keydown', function(ev) {
+      if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.tagName === 'SELECT')) return;
+      if (ev.code === 'KeyK' && !ev.repeat) {
+        cycleNextScenicCourse();
       }
     });
 
