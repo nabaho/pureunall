@@ -125,6 +125,15 @@ module.exports = {
     edulib: { items, notes, cats, sims, lectures },
     edulib_inbox: inbox,
     mailbox: { folders: { inbox_seed: { path: 'INBOX', name: '받은편지함', kind: 'inbox', order: 1, total: 14, unseen: 0 } }, msgs: { inbox_seed: msgs }, old: { msgs: {} } },
+    /* 2026-11-27 «캘린더에서 가져오기» 점검용 — 지어낸 일정(가나다상사 교육은 메일 자료 edu_mseed02 와 맞는다 · «수강»은 빠져야) */
+    data: {
+      gcal_archive: {
+        ev_seed20: { id: 'ev_seed20', entityType: 'ScheduleEvent', date: '2026-11-19', time: '10:00', allDay: false, summary: '가나다상사 성희롱 예방교육', location: '가나다상사 2층', creator: 'tester@example.com' },
+        ev_seed21: { id: 'ev_seed21', entityType: 'ScheduleEvent', date: '2025-05-02', time: '', allDay: true, summary: '점검복지관 장애인 인식개선 특강', location: '', creator: 'nobody@example.com' },
+        ev_seed22: { id: 'ev_seed22', entityType: 'ScheduleEvent', date: '2026-11-10', time: '', allDay: true, summary: '노무사 보수교육 수강', location: '', creator: 'tester@example.com' },
+      },
+      gcal_mail_sid: { 'tester@example,com': 'P002' },
+    },
   },
   views: [
     { name: 'list', run: async (p) => { await p.click('#tabs button[data-tab=list]'); } },
@@ -152,5 +161,10 @@ module.exports = {
     { name: 'lectsel', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); const c = await p.$$('#lecList input[data-lpick]'); for (const x of c.slice(0, 2)) await x.click(); } },
     { name: 'lectopen', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); await p.click('#lecList [data-lopen=lec_c0000000000000e05]'); }, back: async (p) => { await p.click('#dX'); } },
     { name: 'lectnew', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); await p.click('#lNew'); }, back: async (p) => { await p.click('#dX'); } },
+    /* 관리자 «캘린더에서 가져오기» — 묻는 창은 «2017»·«예»로 답한다(점검 도구는 기본으로 아니오). 맨 끝에 둔다(가짜 자료가 바뀐다) */
+    { name: 'lectcal', run: async (p) => {
+        await p.click('#tabs button[data-tab=lect]');
+        await p.evaluate(() => { window.prompt = () => '2017'; window.confirm = () => true; });
+        await p.click('#lCal'); await p.waitForTimeout(2500); } },
   ],
 };
