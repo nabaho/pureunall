@@ -972,7 +972,7 @@
   function kv(k, v) { return '<div class="kv"><span>' + esc(k) + '</span><b title="' + esc(v) + '">' + esc(v) + '</b></div>'; }
   function closeDetail() {
     if ($('modal').style.display === 'none') return;
-    closeFrames($('mbox')); $('modal').style.display = 'none'; $('mbox').innerHTML = ''; DETAIL = '';
+    closeFrames($('mbox')); $('modal').style.display = 'none'; $('mbox').innerHTML = ''; DETAIL = ''; LDETAIL = ''; LNEW_ITEMS = [];
   }
   function saveDetail() {
     var it = ITEMS[DETAIL]; if (!it) return;
@@ -1437,7 +1437,8 @@
        여기 정리함에는 «남긴 것»(명단·서류 이름·주민번호 꼴)만 보인다. 관리자가 메일에서 확인한 뒤에만 «넣기»(한 번 더 묻는다). */
   /* 자동 정리함 줄 — 이미 자료함에 있는 것(같은 메일·같은 첨부, 같은 지문 — 휴지통 포함)·서버가 저장한 줄(saved·same)·오래된 줄은 안 보인다.
      2026-11-27 부터 서버가 강의자료를 바로 저장하므로 여기 남는 것은 «남김(hold)» — 명단·서류 이름·문서 안 주민번호 꼴·압축 안 명단 등 */
-  var HOLD_WHY = { name: '명단·서류 같은 이름', 'pii-text': '문서 안에 주민번호 꼴', 'zip-name': '압축 안에 명단·서류', diff: '정리 때와 다른 파일', gone: '메일에서 못 찾음', big: '20MB 넘음' };
+  var HOLD_WHY = { name: '명단·서류 같은 이름', 'pii-text': '파일 안에 주민번호 꼴', 'zip-name': '압축 안에 명단·서류', archive: '안을 볼 수 없는 압축(7z·rar 등)',
+    unread: '안을 다 풀어 보지 못한 파일', diff: '정리 때와 다른 파일', gone: '메일에서 못 찾음', big: '20MB 넘음' };
   var INB_ROWS = [];
   function inboxRows() {
     var have = {}, sha = {};
@@ -1678,6 +1679,7 @@
       p = gate.save(lectRef(rec.id), rec, { entityType: L.ENTITY, expectedRevision: -1 }).then(function () { return '적었습니다'; });
     } else {
       var cur = LECTS[id];
+      if (!ch.date && !ch.title.trim()) { toast('날짜나 강의 내용을 적어 주세요(둘 다 비울 수는 없습니다)'); if (btn) btn.disabled = false; return; }
       var pt = L.patchOf(cur, ch) || {};
       if (confirm && cur.status !== 'ok') pt.status = 'ok';
       if (!Object.keys(pt).length) { toast('바뀐 것이 없습니다'); closeDetail(); return; }
@@ -1797,8 +1799,9 @@
         drawLect();
       });
     }).catch(function (e) {
-      LCALRUN = null; $('lCal').disabled = false;
-      toast('캘린더 보관함을 읽지 못했습니다 — ' + errMsg(e), 8000);
+      LCALRUN = null; $('lCal').disabled = false; $('lProg').style.display = 'none';
+      $('lCal').innerHTML = '🗓<span class="wide-only"> 캘린더에서 가져오기</span>';
+      toast('캘린더에서 가져오지 못했습니다 — ' + errMsg(e), 8000);
     });
   }
   function wireLect() {

@@ -98,6 +98,7 @@ test('★★ 저장 관문 — 기록이 온톨로지 강제 관문(prepareRecor
   assert.match(ru.lecturerSid['.validate'], /A-Za-z0-9_-/, '강의자는 사번 꼴만');
   assert.ok(!ru.lecturerName && !ru.creator, '이름·만든이 메일 칸이 없다');
   assert.match(ru.status['.validate'], /'auto'/);
+  assert.ok(ru.confirmedBy['.validate'].includes("root.child('uid_roles').child(auth.uid).child('sid').val()"), '«확인한 사람»은 지금 쓰는 사람의 사번만(남의 이름으로 꾸미지 못한다)');
   assert.ok(require('../docs/rules-paste.json').rules.edulib.lectures.$id['.write'].includes('newData.exists()'), '지우기(빈 값 쓰기) 금지');
   /* 칸 길이 상한 — 셈(L.MAX)이 규칙보다 길게 만들지 않는다 */
   [['title', L.MAX.title], ['venue', L.MAX.venue], ['note', L.MAX.note]].forEach(([k, n]) => {

@@ -21,7 +21,11 @@
      · 이름에 명단·참석자·서명·급여·통장 같은 말(classify PII_NAME_RX · SERVER_EXCLUDE_RX) — 받지도 않는다
      · 문서 안에 주민번호 꼴 · 압축(zip) 안 파일 이름이 위와 같은 것
      · 이름에 주민번호·전화·메일 꼴이 있는 첨부는 정리함에도 올리지 않고 «뺌»으로만 센다(그 글자를 다른 자리에 옮기지 않게)
-   ■ 내용을 못 읽은 것(옛 ppt·hwp·doc, 압축, 글자 없는 스캔 pdf)은 저장하되 «내용 자동 확인 못 함»(auto.check:'none')을 단다.
+   ■ 내용을 못 읽은 것(옛 ppt·hwp·doc, zip 압축, 글자 없는 스캔 pdf)은 저장하되 «내용 자동 확인 못 함»(auto.check:'none')을 단다.
+   ■ 저장하기 «전에» 파일 전체를 한 번 더 훑는다(2026-11-27 보안 검토 «중간» 두 건) —
+     · 원본 바이트를 글자(latin1·UTF-16)로 읽어 주민번호 꼴을 찾는다(옛 ppt·doc 의 글, 한글 미리보기 글, 압축 안 된 PDF 글)
+     · zip 꼴 문서(pptx·docx·hwpx·odp·zip)는 «모든» XML(슬라이드 노트·머리글·바닥글·각주·표)과 포함 개체(embeddings — 들어 있는 엑셀·워드)까지
+     · 안을 볼 수 없는 압축(7z·rar·alz·egg)과 안을 다 풀지 못한 파일은 저장하지 않고 남긴다
 
    ■ 지키는 것
      1. 메일함은 읽기만 — 읽음 표시·이동·삭제 없음(mail-sync withFolder 는 readOnly).
@@ -69,6 +73,8 @@ const DOC_AUTO = { pptx: 1, ppsx: 1, pdf: 1, docx: 1, hwpx: 1 };
 const DOC_HUMAN = { ppt: 1, pps: 1, hwp: 1, doc: 1, show: 1, odp: 1, key: 1, zip: 1, '7z': 1, alz: 1, egg: 1, rar: 1 };
 const ARCHIVE = { zip: 1, '7z': 1, alz: 1, egg: 1, rar: 1 };
 const MIN_TEXT = 40;                            /* 이만큼도 글자가 안 나오면(스캔 pdf 등) 내용을 확인 못 한 것으로 본다 */
+/* 안을 볼 수 없는 압축 — 저장하지 않고 남긴다(zip 만 안을 본다) */
+const ARCHIVE_OPAQUE = { '7z': 1, alz: 1, egg: 1, rar: 1 };
 /* 강의 말이 있어도 «서류»일 수 있는 이름 — 사람이 고르기 전에 걸러 두는 길이라 화면 «가져오기»보다 넓게 뺀다 */
 const SERVER_EXCLUDE_RX = /급여|임금\s?대장|명세서|원천\s?징수|통장|계좌|이력서|주민\s?등록|등본|초본|신분증|가족\s?관계|진단서|건강\s?검진|연봉|인사\s?기록|평가표|성적|합격|채점/;
 /* 주민번호(외국인등록번호) 꼴 — 앞 6자리가 «날짜 꼴»이고 뒤 7자리가 1~8로 시작. 사이는 없음·빈칸·여러 대시(‐‑‒–—―−﹣－)·점 모두.
@@ -162,18 +168,23 @@ function pickCandidates(folders, msgsBySlug, o) {
 
 /* ── 문서 글자 읽기 — pptx·docx·hwpx 는 zip 안 XML, pdf 는 pdfjs(deps.pdfText). 옛 형식(ppt·doc·hwp)은 글자 없이 넣는다 ──
    namesOnly — 압축을 풀지 않고 안의 파일 이름만(압축 첨부 검사용) */
-function zipEntries(buf, want, namesOnly) {
+/* lim — 저장 전 검사(scanPii)는 한도를 넓혀 쓴다(큰 발표자료도 끝까지 보게). 한도에 걸려 다 못 본 것은 out.truncated = true */
+const SCAN_LIM = { entries: 4000, total: 64 * 1024 * 1024 };
+function zipEntries(buf, want, namesOnly, lim) {
   const out = [];
-  if (!Buffer.isBuffer(buf) || buf.length < 22) return out;
+  const maxEntries = (lim && lim.entries) || MAX_ZIP_ENTRIES;
+  const maxTotal = (lim && lim.total) || MAX_ZIP_TOTAL_OUT;
+  if (!Buffer.isBuffer(buf) || buf.length < 22) { out.bad = true; return out; }
   let eocd = -1;
   for (let i = buf.length - 22, lo = Math.max(0, buf.length - 65557); i >= lo; i--) {
     if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
   }
-  if (eocd < 0) return out;
+  if (eocd < 0) { out.bad = true; return out; }       /* zip 꼴인데 목록을 못 찾음(깨짐) */
   const total = buf.readUInt16LE(eocd + 10);
   let pos = buf.readUInt32LE(eocd + 16);
   let used = 0;
-  for (let n = 0; n < Math.min(total, MAX_ZIP_ENTRIES) && pos + 46 <= buf.length; n++) {
+  if (total > maxEntries) out.truncated = true;
+  for (let n = 0; n < Math.min(total, maxEntries) && pos + 46 <= buf.length; n++) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
     const flag = buf.readUInt16LE(pos + 8);
     const method = buf.readUInt16LE(pos + 10);
@@ -191,12 +202,12 @@ function zipEntries(buf, want, namesOnly) {
     if (namesOnly) continue;
     if (lho + 30 > buf.length || buf.readUInt32LE(lho) !== 0x04034b50) continue;
     const start = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28);
-    if (start + comp > buf.length || comp > MAX_ZIP_TOTAL_OUT) continue;
+    if (start + comp > buf.length || comp > maxTotal) continue;
     try {
       const slice = buf.subarray(start, start + comp);
-      const data = method === 0 ? Buffer.from(slice) : method === 8 ? zlib.inflateRawSync(slice, { maxOutputLength: MAX_ZIP_ENTRY_OUT }) : null;
-      if (data) { used += data.length; if (used > MAX_ZIP_TOTAL_OUT) break; entry.data = data; }
-    } catch (_) { /* 깨진 조각·너무 큰 조각은 건너뛴다 */ }
+      const data = method === 0 ? Buffer.from(slice) : method === 8 ? zlib.inflateRawSync(slice, { maxOutputLength: lim ? maxTotal : MAX_ZIP_ENTRY_OUT }) : null;
+      if (data) { used += data.length; if (used > maxTotal) { out.truncated = true; break; } entry.data = data; }
+    } catch (_) { /* 깨진 조각·너무 큰 조각은 건너뛴다(data 없음) */ }
   }
   return out;
 }
@@ -214,13 +225,17 @@ function xmlText(s) {
 /* XML 한 쪽에서 문단(para)마다 글 조각(run)을 이어 줄로 — 발표(a:p/a:t) · 워드(w:p/w:t) · 한글(hp:p/hp:t) */
 function xmlLines(xml, paraTag, runTag) {
   const lines = [];
-  const pr = new RegExp("<" + paraTag + "[\\s>][\\s\\S]*?</" + paraTag + ">", "g");
   const rr = new RegExp("<" + runTag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + runTag + ">", "g");
-  let m;
-  while ((m = pr.exec(xml))) {
+  /* 닫는 문단 태그로 잘라 조각마다 «마지막 여는 문단 태그»부터 본다 — 정규식이 문서 끝까지 거듭 훑지 않는다(닫힘 없는 여는 태그가 많아도 한 번) */
+  const parts = String(xml).split("</" + paraTag + ">");
+  for (let i = 0; i < parts.length - 1; i++) {
+    const seg = parts[i];
+    const start = Math.max(seg.lastIndexOf("<" + paraTag + " "), seg.lastIndexOf("<" + paraTag + ">"));
+    if (start < 0) continue;
+    const body = seg.slice(start);
     let t = "", r;
     rr.lastIndex = 0;
-    while ((r = rr.exec(m[0]))) t += xmlText(r[1].replace(/<[^>]+>/g, ""));
+    while ((r = rr.exec(body))) t += xmlText(r[1].replace(/<[^>]+>/g, ""));
     t = t.replace(/\s+/g, " ").trim();
     if (t) lines.push(t);
   }
@@ -253,6 +268,44 @@ async function extractContent(name, buf, deps) {
     }
   } catch (_) { /* 못 읽으면 글자 없음 — «내용 자동 확인 못 함»으로 저장한다 */ }
   return { text: "" };
+}
+/* ── 저장 전 «한 번 더» — 파일 전체에서 주민번호 꼴 찾기 (2026-11-27 보안 검토 «중간») ──
+   rawRrn: 원본 바이트를 latin1·UTF-16LE(두 정렬)로 읽어 본다 — 옛 ppt·doc 글(UTF-16·8비트), 한글 PrvText, 압축 안 된 PDF 글
+   scanPii: zip 꼴이면 모든 XML(문단·칸 끝은 줄바꿈, 나머지 태그는 지움 — 조각난 숫자도 잇는다)과 포함 개체(한 겹 더)까지, 아니면 rawRrn.
+   돌려줌: 'rrn' 주민번호 꼴 · 'unread' 안을 다 풀지 못함(한도·깨짐) · '' 못 찾음 */
+function rawRrn(buf) {
+  if (!Buffer.isBuffer(buf) || !buf.length) return false;
+  try {
+    if (RRN_RX.test(buf.toString("latin1"))) return true;
+    if (hasRrn(buf.toString("utf16le"))) return true;
+    if (buf.length > 1 && hasRrn(buf.subarray(1).toString("utf16le"))) return true;
+  } catch (_) { /* 못 읽으면 못 찾은 것 */ }
+  return false;
+}
+function isZipBuf(b) { return Buffer.isBuffer(b) && b.length >= 4 && b.readUInt32LE(0) === 0x04034b50; }
+function xmlPlain(s) { return xmlText(String(s).replace(/<\/(a:p|w:p|hp:p|text:p|si|c|row|w:tc|a:tc)>/g, "\n").replace(/<[^>]+>/g, "")); }
+function scanPii(buf, depth) {
+  depth = depth || 0;
+  if (!isZipBuf(buf)) return rawRrn(buf) ? "rrn" : "";
+  let unread = false;
+  const want = (n) => { n = n.toLowerCase(); return /\.(xml|rels)$/.test(n) || /(^|\/)(embeddings|objectdata|bindata)\//.test(n) || /\.(xlsx|xlsm|xls|docx|doc|pptx|ppt|hwp|hwpx|zip|bin|pdf|txt|csv)$/.test(n); };
+  const ents = zipEntries(buf, want, false, SCAN_LIM);
+  if (ents.bad) return rawRrn(buf) ? "rrn" : "unread";  /* 깨진 zip — 바이트로만 훑고, 못 찾아도 «다 못 봄» */
+  if (ents.truncated) unread = true;                   /* 한도에 걸려 뒤쪽을 다 못 봤다 */
+  for (const e of ents) {
+    const n = e.name.toLowerCase();
+    const isXml = /\.(xml|rels)$/.test(n);
+    /* 그림·소리·글꼴은 want 에서 이미 뺐다 — 남은 것은 XML 아니면 포함 개체·안의 문서 */
+    if (!e.data) { unread = true; continue; }           /* 한도를 넘었거나 깨진 조각 — 안을 다 본 것이 아니다 */
+    if (isXml) { if (hasRrn(xmlPlain(e.data.toString("utf8")))) return "rrn"; continue; }
+    if (isZipBuf(e.data)) {
+      if (depth >= 1) { unread = true; continue; }      /* 두 겹 넘게 든 것은 보지 않고 «다 못 봄» */
+      const r = scanPii(e.data, depth + 1);
+      if (r === "rrn") return "rrn";
+      if (r === "unread") unread = true;
+    } else if (rawRrn(e.data)) return "rrn";
+  }
+  return unread ? "unread" : "";
 }
 function scrub(s) { return norm(s).replace(RRN_G, "[주민번호]").replace(MAIL_RX, "[메일]").replace(PHONE_RX, "[전화]"); }
 /* 자동 정리 내용 — 발표자료는 «목차(장마다 첫 줄)», 그 밖은 첫 글. 메일 주소·전화는 가린다. 상한은 화면과 같은 K.SUMMARY_MAX */
@@ -467,8 +520,9 @@ async function runSweep(deps, opts) {
       if (!Buffer.isBuffer(buf) || !buf.length) { skipped.gone++; await markQueue(c, { hold: "gone", holdAt: clock() }); await markSeen(c, "empty"); continue; }
       const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
       const name = str(got.name || c.name);
-      /* 실제로 받은 첨부 이름으로 한 번 더 판정한다 — 색인 이름(앞 60자로 찾은 것 등)과 다를 수 있다 */
-      if (name !== c.name) {
+      /* 실제로 받은 첨부 이름으로 한 번 더 판정한다 — 색인 이름(앞 60자로 찾은 것 등)과 다를 수 있다.
+         지난번 정리함 줄(fromQueue)은 이름이 같아도 지금 잣대로 다시 본다(보안 검토 «낮음») */
+      if (name !== c.name || c.fromQueue) {
         const j2 = judgeAttachment(c.subject, name, ymdSeoul(c.d));
         if (!j2.ok) {
           skipped[j2.why === "pii" ? "pii" : "type"]++;
@@ -481,8 +535,14 @@ async function runSweep(deps, opts) {
       const sameId = idx.sha[sha256] || idx.nameSize[name.toLowerCase() + "|" + buf.length] || qSha[sha256];
       if (sameId) { skipped.same++; await markQueue(c, { same: sameId, savedAt: clock() }); await markSeen(c, "same", sameId); continue; }
       const ext = C.extOf(name);
+      /* 안을 볼 수 없는 압축(7z·rar·alz·egg)은 남긴다 */
+      if (ARCHIVE_OPAQUE[ext]) { skipped.pii++; await hold(c, "archive", got, sha256); continue; }
       /* 압축 — 안의 파일 이름이 명단·서류 같으면 남긴다(풀지 않고 이름만 본다) */
       if (ext === "zip" && zipRisk(buf)) { skipped.pii++; await hold(c, "zip-name", got, sha256); continue; }
+      /* 파일 전체 — 노트·머리글·포함 개체·옛 형식 글까지 주민번호 꼴을 찾는다. 안을 다 풀지 못했으면 남긴다 */
+      const deep = scanPii(buf);
+      if (deep === "rrn") { skipped.pii++; await hold(c, "pii-text", got, sha256); continue; }
+      if (deep === "unread") { skipped.pii++; await hold(c, "unread", got, sha256); continue; }
       const ex = DOC_AUTO[ext] ? await extractContent(name, buf, deps) : { text: "" };
       /* 주민번호 꼴이 보이면 저장하지 않고 남긴다(글자가 적어도) */
       if (hasRrn(ex.text)) { skipped.pii++; await hold(c, "pii-text", got, sha256); continue; }
@@ -524,7 +584,7 @@ async function runSweep(deps, opts) {
 }
 
 module.exports = {
-  runSweep, pickCandidates, judgeAttachment, folderMode, extractContent, summarize, zipEntries, zipRisk, xmlLines,
+  runSweep, pickCandidates, judgeAttachment, folderMode, extractContent, summarize, zipEntries, zipRisk, xmlLines, rawRrn, scanPii,
   queueEntry, buildItem, indexItems, seenKeyOf, itemIdOf, ymdSeoul, scrub, hasRrn, stamp, simLines,
   INBOX_ROOT, Q_ROOT, STATE_PATH, SEEN_ROOT, ITEMS_ROOT, SIMS_ROOT, LECT_ROOT, CAL_MAP_PATH, AUTO_BY, ONTOLOGY_SCHEMA, CONTRACT_VERSION,
   DEFAULT_DAYS, MAX_DAYS, MAX_FILES_PER_RUN, MAX_ATT_BYTES, MIN_TEXT, DOC_AUTO, DOC_HUMAN

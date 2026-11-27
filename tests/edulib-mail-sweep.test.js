@@ -50,7 +50,7 @@ function makeZip(files) {
   const locals = [], centrals = [];
   let off = 0;
   files.forEach(([name, text]) => {
-    const nb = Buffer.from(name, 'utf8'), data = Buffer.from(text, 'utf8'), crc = crc32(data);
+    const nb = Buffer.from(name, 'utf8'), data = Buffer.isBuffer(text) ? text : Buffer.from(text, 'utf8'), crc = crc32(data);
     const lh = Buffer.alloc(30);
     lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x800, 6); lh.writeUInt16LE(0, 8);
     lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(nb.length, 26);
@@ -441,6 +441,52 @@ test('★★ 내용 정리 — 발표자료는 장 순서대로 첫 줄(목차),
   const x = S.xmlLines('<w:p><w:r><w:t>&amp;#60;b&amp;#62;</w:t></w:r></w:p>', 'w:p', 'w:t');
   assert.deepEqual(x, ['&#60;b&#62;'], '엔티티는 한 번만 푼다(글자가 코드가 되지 않게)');
   assert.equal(S.zipRisk(ZIP_PII), true); assert.equal(S.zipRisk(ZIP_OK), false);
+});
+
+test('★★★ 저장 전 «파일 전체» 검사 — 슬라이드 노트·머리글·포함 엑셀·옛 형식 글의 주민번호 꼴, 안을 못 보는 압축은 남긴다(2026-11-27 보안 검토)', async () => {
+  const RRN = '900101-1234567';
+  const NOTE = makeZip([['ppt/slides/slide1.xml', slide('2026 직장 내 괴롭힘 예방교육 강의', '판단 기준과 사례를 차례로 살펴봅니다 — 시험용 긴 글자 시험용 긴 글자')],
+    ['ppt/notesSlides/notesSlide1.xml', slide('참석자 ' + RRN)]]);
+  const HEAD = makeZip([['word/document.xml', '<w:document><w:p><w:r><w:t>노동법 강의 본문 — 근로계약과 근로시간의 기본 원칙을 살펴봅니다. 시험용 긴 글자</w:t></w:r></w:p></w:document>'],
+    ['word/header1.xml', '<w:hdr><w:p><w:r><w:t>담당 900101-</w:t></w:r><w:r><w:t>1234567</w:t></w:r></w:p></w:hdr>']]);
+  const XLSX = makeZip([['xl/sharedStrings.xml', '<sst><si><t>이름</t></si><si><t>' + RRN + '</t></si></sst>']]);
+  const EMB = makeZip([['ppt/slides/slide1.xml', slide('강의 표지', '본문 시험용 긴 글자 시험용 긴 글자 시험용 긴 글자 시험용')],
+    ['ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx', XLSX]]);
+  const OLD = Buffer.concat([Buffer.from('OLE-PPT-'), Buffer.from('수강생 ' + RRN, 'utf16le'), Buffer.from('-END')]);
+  /* 모양만 보는 셈 */
+  assert.equal(S.scanPii(NOTE), 'rrn', '슬라이드 노트');
+  assert.equal(S.scanPii(HEAD), 'rrn', '머리글(조각난 숫자도 잇는다)');
+  assert.equal(S.rawRrn(OLD), true, '옛 형식의 UTF-16 글');
+  assert.equal(S.scanPii(PPTX), '', '주민번호 없는 강의안은 그대로');
+  assert.equal(S.scanPii(Buffer.from('OLD-PPT-BINARY')), '');
+  assert.equal(S.scanPii(EMB), 'rrn', '포함된 엑셀 안의 주민번호 꼴');
+  assert.equal(S.scanPii(Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('깨진 zip')])), 'unread', 'zip 꼴인데 목록이 깨졌으면 «다 못 봄»');
+  /* 한 번 돌기 — 모두 남기고 자료함에는 없다 */
+  const tree = mailTree();
+  tree.mailbox.msgs['Sent-1'] = {
+    201: { u: 201, s: '강의 자료 송부', d: NOW - DAY, an: ['노트 강의안.pptx', '머리글 강의안.docx', '포함 강의안.pptx', '옛 강의안.ppt', '묶음 강의자료.7z'] } };
+  tree.mailbox.msgs['Tome-1'] = {};
+  const files = { '노트 강의안.pptx': NOTE, '머리글 강의안.docx': HEAD, '포함 강의안.pptx': EMB, '옛 강의안.ppt': OLD, '묶음 강의자료.7z': Buffer.from('7z-bytes') };
+  const db = fakeDb(tree);
+  const d = deps(db, { download: async (slug, uid, name) => (files[name] ? { name, mime: '', buf: files[name] } : { gone: true }) });
+  await S.runSweep(d, { days: 14 });
+  assert.deepEqual(items(db).map((it) => it.fileName), [], '하나도 자료함에 넣지 않는다');
+  assert.equal(Object.keys(d.uploads).length, 0, '창고에도 올리지 않는다');
+  const hs = holds(db).map((q) => q.att + ':' + q.hold).sort();
+  assert.deepEqual(hs, ['노트 강의안.pptx:pii-text', '머리글 강의안.docx:pii-text', '묶음 강의자료.7z:archive', '옛 강의안.ppt:pii-text', '포함 강의안.pptx:pii-text'].sort());
+});
+
+test('★★ 지난번 정리함 줄도 지금 잣대로 이름을 다시 본다 · 문단 읽기는 닫힘 없는 태그가 많아도 금방 끝난다', async () => {
+  const tree = mailTree();
+  tree.mailbox.msgs['Sent-1'] = {}; tree.mailbox.msgs['Tome-1'] = {};
+  tree.edulib_inbox = { q: { k_bad: { key: 'k_bad', slug: 'Sent-1', uid: '101', mailKey: '101', mailId: 'Sent-1/101', att: '교육 참석자 명단 강의.pptx', subject: '강의 자료', d: NOW - DAY, cat: 'etc', sha256: '', size: 1, at: 1 } } };
+  const db = fakeDb(tree);
+  await S.runSweep(deps(db, { download: async (s, u, name) => ({ name, mime: '', buf: PPTX }) }), { days: 14 });
+  assert.ok(!items(db).length, '명단 이름은 저장하지 않는다');
+  assert.equal(db.tree.edulib_inbox.q.k_bad.hold, 'name');
+  const t0 = Date.now();
+  S.xmlLines('<a:p x="1">'.repeat(200000) + '<a:p><a:t>끝</a:t></a:p>', 'a:p', 'a:t');
+  assert.ok(Date.now() - t0 < 3000, '한 번 훑기(닫힘 없는 여는 태그 20만 개)');
 });
 
 test('★★ 주민번호 꼴 — 빈칸·여러 대시·전각·붙여 쓴 13자리도 막고 가린다(앞 6자리가 날짜 꼴일 때)', () => {

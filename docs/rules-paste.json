@@ -2231,7 +2231,7 @@
             }
           },
           "confirmedBy": {
-            ".validate": "newData.isString() && newData.val().length <= 64"
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
           },
           "confirmedAt": {
             ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
