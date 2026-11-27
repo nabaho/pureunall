@@ -8008,9 +8008,11 @@ exports.edulibTokenStrip = functions
      「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」)
    실제 코드는 edulib-mail-sweep.js(셈은 js/ 사본 functions/edulib-core/ — node scripts/sync-edulib-core.js).
    매일 19:30 한 번(최근 14일) · 관리자는 강의자료 앱 «메일에서 찾기»의 [지금 정리](runEdulibMailSweep, 최대 400일).
-   ★ «정리»까지만 자동이다 — 결과(종류·강의일·내용 요약)를 관리자만 읽는 자동 정리함(edulib_inbox)에 쌓고, 원본은 복사하지 않는다.
-     자료함(재직 직원 모두)에 넣는 것은 관리자가 자동 정리함에서 골라 «넣기»를 누를 때다(화면의 «가져오기» 길).
-   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 내용을 읽어 확인한 문서만 · 빈 자리일 때만 · 창고·자료함에는 안 씀 · AI 안 씀.
+   ★ 2026-11-27 대표 지시 「새로운 강의 자료 같은 경우는 강의 자료함에 반드시 저장해 달라」(선택 «모두 저장, 위험한 것만 뺌»)부터
+     자료함에 «바로 저장»한다 — 원본은 창고 edulib/{id}/ 에 받은 그대로(새로 쓰기만, ifGenerationMatch:0), 기록은 빈 자리일 때만(transaction).
+     주민번호 꼴·명단·서류 이름·압축 안 명단은 저장하지 않고 관리자 전용 자동 정리함(edulib_inbox)에 «남김»으로 둔다.
+     강의 이력(edulib/lectures, «추정»)은 캘린더 보관함(data/gcal_archive)의 일정과 맞춰 만든다 — 사람이 «확인»한 기록은 고치지 않는다.
+   ⚠ 메일함은 읽기만(withFolder readOnly) · 보낸·내게쓴 폴더만 · 빈 자리일 때만 · AI 안 씀.
    ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다)
    ★ 매일 밤 메일 정리 뒤에 강의자료 토큰 정리(runEdulibTokenSweepOnce, 바로 위)도 돈다 — 메일 쪽이 잠금·실패여도 따로 돈다. */
 const EdulibMailSweep = require("./edulib-mail-sweep");
@@ -8030,6 +8032,24 @@ async function runEdulibMailSweepOnce(trigger, opts) {
       const buf = await MS.drain(d.content, max);
       return { name: a.name, mime: a.mime || "", buf };
     }),
+    /* 원본을 창고에 «새로 쓰기만» — 같은 자리에 이미 있으면(지난번에 올리고 기록 전에 끊긴 것) 그대로 둔다(412) */
+    upload: async (p, buf, mime) => {
+      if (!/^edulib\/edu_m[0-9a-z]+\/[^/]+$/.test(String(p))) throw new Error("강의자료 창고 자리가 아닙니다");
+      try {
+        await getStorage().bucket(PHOTO_BUCKET).file(p).save(buf, { resumable: false, contentType: mime || "application/octet-stream",
+          preconditionOpts: { ifGenerationMatch: 0 }, metadata: { metadata: { by: "edulibMailSweep" } } });
+        return { created: true };
+      } catch (e) {
+        if (Number(e && e.code) === 412) return { exists: true };
+        throw e;
+      }
+    },
+    /* 캘린더 보관함 — 날짜 범위로만 읽는다(규칙 .indexOn date) */
+    calEvents: async (from, to) => {
+      const s = await getDatabase().ref("data/gcal_archive").orderByChild("date").startAt(String(from)).endAt(String(to)).once("value");
+      const v = s.val() || {};
+      return Object.keys(v).map((k) => v[k]).filter((x) => x && typeof x === "object");
+    },
     pdfText: (buf) => require("./rules-collect-pdf").pdfText(buf),
     log: (...a) => console.log(...a),
   }, Object.assign({ trigger }, opts || {}));
@@ -8057,7 +8077,7 @@ exports.edulibMailSweep = functions
     if (release) {
       try {
         const r = await runEdulibMailSweepOnce("schedule", { days: EdulibMailSweep.DEFAULT_DAYS });
-        console.log("edulibMailSweep", JSON.stringify({ queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
+        console.log("edulibMailSweep", JSON.stringify({ saved: r.saved, unchecked: r.unchecked, held: r.held, lectures: r.lectures, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped, ms: r.ms }));
       } catch (e) { mailErr = e; } finally {
         /* 잠금 풀기가 실패해도 토큰 정리까지는 간다(잠금은 9분 뒤 저절로 풀린다) */
         try { await release(); } catch (e) { console.error("edulibMailSweep release", String(e && e.message || e)); }
@@ -8088,7 +8108,7 @@ exports.runEdulibMailSweep = functions
     try {
       const days = Math.min(EdulibMailSweep.MAX_DAYS, Math.max(1, Number(b.days) || 30));
       const r = await runEdulibMailSweepOnce("manual", { days, by: staffRole.sid, budgetMs: 7.5 * 60 * 1000 });
-      res.json({ ok: true, result: { queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
+      res.json({ ok: true, result: { saved: r.saved, unchecked: r.unchecked, held: r.held, lectures: r.lectures, queued: r.queued, tried: r.tried, candidates: r.candidates, more: r.more, skipped: r.skipped } });
     } catch (e) {
       console.error("runEdulibMailSweep", e && e.stack || e);
       res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });

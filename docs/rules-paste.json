@@ -2130,6 +2130,137 @@
             ".validate": false
           }
         }
+      },
+      "lectures": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduLecture' && $id.matches(/^lec_[a-z][0-9a-z]{4,40}$/)",
+          "id": {
+            ".validate": true
+          },
+          "entityType": {
+            ".validate": true
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "date": {
+            ".validate": "newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/)"
+          },
+          "time": {
+            ".validate": "newData.isString() && newData.val().matches(/^([0-9]{2}:[0-9]{2})?$/)"
+          },
+          "lecturerSid": {
+            ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{0,40}$/)"
+          },
+          "venue": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "title": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "cat": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "note": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "status": {
+            ".validate": "newData.val() === 'auto' || newData.val() === 'ok'"
+          },
+          "itemIds": {
+            "$item": {
+              ".validate": "newData.val() === true && $item.matches(/^[A-Za-z0-9_-]{1,60}$/)"
+            }
+          },
+          "cal": {
+            "id": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "summary": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "location": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 10"
+            },
+            "time": {
+              ".validate": "newData.isString() && newData.val().length <= 5"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "mail": {
+            "id": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "subject": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 10"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "guess": {
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "lecturer": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "venue": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "score": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "confirmedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "confirmedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "createdAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "deletedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
       }
     },
     "edulib_inbox": {

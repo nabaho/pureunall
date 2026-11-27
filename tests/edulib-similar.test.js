@@ -168,5 +168,5 @@ test('규칙·온톨로지 — edulib/sims 는 재직 직원 · 열쇠=자료 id
   const onto = read('js/pu-ontology.js');
   assert.match(onto, /EduSimilarity:'강의 내용 지문'/);
   assert.match(onto, /\{path:'edulib\/sims\/\{id\}',entityType:'EduSimilarity'\}/);
-  assert.match(onto, /entityTypes:\['EduMaterial','EduReviewNote','EduCategory','EduSimilarity'\]/);
+  assert.match(onto, /entityTypes:\['EduMaterial'[^\]]*'EduSimilarity'[^\]]*\]/, '강의자료 앱 개체 목록에 지문이 들어 있다(목록 전체를 글자 그대로 박지 않는다 — 개체가 늘 수 있다)');
 });
