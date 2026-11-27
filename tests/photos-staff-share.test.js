@@ -406,7 +406,10 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* 2026-11-27 게시 전 — 강의자료 «강의 이력»(/edulib/lectures, 대표 「누가 언제 강의했는지만 간략하게 … 캘린더에서도 찾아도 된다」).
      새로 1 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — 읽기·쓰기 재직 직원(LOGIN, edulib 와 같은 사람)·지우기 금지·칸 목록 고정($other false)·강의자는 사번 꼴만.
      게시(rules-deploy.js --deploy)한 뒤 콘솔 원문을 새 판으로 갈아 끼우고 아래 한 줄을 뺄 것. */
-  const PENDING = ['/edulib/lectures'];
+  /* ★ 2026-11-27 — 강의자료 «강의 이력»(/edulib/lectures) 게시 완료(rules-deploy.js --deploy, 이 PC): 새로 1 · 바뀜 0 · 사라짐 0,
+       문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 올리기 전 진짜 엔진(에뮬레이터)으로 15개 시험(tests/edulib-lectures-rules.emulator.mjs) 통과.
+       더 넓게 보이게 된 칸 없음(읽기는 edulib 와 같은 재직 직원). 새 기준 docs/firebase-rules-콘솔원문-2026-11-27.json — 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
