@@ -403,3 +403,54 @@ test('★ 지원 «결과 통지»와 후속 서류 요청은 지원자 메일�
   ['결과', '합격', '불합격', '통보', '발표', '면접', '심사'].forEach((w) => ['채용 지원 ', '노무사 지원 ', '수습 지원 ', '인턴 지원 '].forEach((앞) => assert.ok(!Q.SCOPE_RECRUIT.test(앞 + w + ' 안내'), 앞 + w)));
   assert.ok(Q.SCOPE_RECRUIT.test('채용 지원합니다'), '지원자의 «지원합니다»는 걸린다');
 });
+
+/* ── 전문가 참여동의서 메일 (대표 제보 2026-11-27) — 지어낸 제목만 ── */
+test('★ 전문가 참여동의서 메일은 «이력·회의·비용» 말로 들어온다 — 외부 전문가 참여·전문가 풀·멘토 동의서', () => {
+  assert.equal(scope('[가나연구원] 외부 전문가 참여동의서 요청'), 'personal');
+  assert.equal(scope('재송부_개인정보수집이용동의서 첨부 [가나연구원] 외부 전문가 참여동의서 요청'), 'personal', '실제로 걸러져 있던 모양');
+  assert.equal(scope('내·외부 전문가 참여 동의서 제출 안내'), 'personal');
+  assert.equal(scope('[가나재단] 전문가(멘토) 인력풀 참여 사전동의서'), 'personal');
+  assert.equal(scope('서류 제출 부탁드립니다', ['내외부 전문가 참여 동의서.hwp']), 'personal', '제목에 말이 없어도 첨부 이름으로');
+  /* 각 말이 «혼자서도» 걸리는지 — 다른 개인 말에 기대지 않는 제목 */
+  assert.equal(scope('외부 전문가 풀 등록 안내'), 'personal', '«외부 전문가 + 풀·등록» 만으로');
+  assert.equal(scope('[가나재단] 전문가 풀 안내'), 'personal', '«전문가 풀» 만으로');
+  assert.equal(scope('멘토 사전동의서 제출 요청'), 'personal', '«멘토 사전 동의서» 만으로');
+  assert.equal(scope('전문가 참여 동의서 회신'), 'personal', '«전문가 참여 동의서» 만으로');
+  assert.equal(scope('외부 전문가 참여 안내'), 'personal', '«외부 전문가 + 참여» 만으로 — 서류 말이 없어도');
+});
+test('★ 고객사 업무 동의서·안내 메일은 개인 말이 아니다 — 맨 동의서·맨 참여/사전 동의서·위원 동의서·외부 전문가 안내는 걸러진다(Orca 검토 2026-11-27)', () => {
+  ['일터혁신 컨설팅 참여 동의서 제출 요청', '직원 교육 참여 동의서 양식 송부', '휴일근무 사전 동의서 양식 요청', '개인정보 제3자 제공 사전동의서 회신',
+    '노사협의회 위원 동의서 제출', '동의서 서명 요청', '직원 동의서 회수', '개인정보 동의서 회신 요청']
+    .forEach((s) => assert.notEqual(scope(s), 'personal', s));
+  ['외부 전문가 초청 세미나 안내', '외부 전문가 컨설팅 안내', '외부 전문가 활용 지원사업 신청 안내', '전문가 모임 일정 안내', '전문가 참여 세미나 안내']
+    .forEach((s) => assert.notEqual(scope(s), 'personal', '«외부 전문가»·«전문가»는 서류 말이 붙을 때만: ' + s));
+  assert.notEqual(scope('근로자 개인정보 수집·이용 동의서 양식 송부'), 'personal', '업무 말(근로자)');
+  assert.notEqual(scope('근로자 참여 동의서 회수(노사협의회)'), 'personal', '업무 말이 섞이면 «애매» — 걸러 둔다');
+});
+test('새로 온 전문가 참여동의서 메일은 «새 요청»(동의서)으로 들어오고, 외부 전문가 안내 메일은 요청이 되지 않는다', async () => {
+  const f = dbWith({
+    301: mkRow({ s: '[가나연구원] 외부 전문가 참여동의서 요청', an: ['내외부 전문가 참여 동의서.hwp'], p: '아래 서류를 작성하여 회신해 주시기 바랍니다 제출기한 12월 4일' }),
+    302: mkRow({ s: '외부 전문가 초청 세미나 안내', an: [], p: '세미나를 개최하오니 참석 바랍니다' }),
+  });
+  await scan(f);
+  const x = items(f)[IN + '~301'];
+  assert.ok(x, '기록이 생긴다'); assert.equal(x.st, 'new'); assert.equal(x.scope, 'personal'); assert.ok(!x.autoIgnored);
+  assert.ok(x.kinds.indexOf('consent') >= 0, '종류는 동의서');
+  assert.equal(Q.summary(items(f), NOW).alarm, 1, '안내 메일은 알림에 안 센다');
+  const y = items(f)[IN + '~302'];
+  assert.ok(!y || y.st !== 'new', '외부 전문가 초청 세미나 안내는 새 요청이 아니다');
+});
+test('범위를 가르는 글은 길이·공백에 한도가 있다 — 밖에서 오는 긴 반복 입력으로 느려지지 않는다', () => {
+  const t = Date.now();
+  Q.scopeOf({ s: '전문가('.repeat(20000), an: ['내' + ' '.repeat(50000) + '가', '외부' + ' '.repeat(50000) + '전문가'] });
+  assert.ok(Date.now() - t < 1500, '아주 긴 제목·첨부 이름도 한 건 가르는 데 오래 걸리지 않는다(' + (Date.now() - t) + 'ms)');
+  assert.ok(Number(Q.SCOPE_TEXT_MAX) > 0 || /SCOPE_TEXT_MAX/.test(mod), '길이 한도가 있다');
+  /* 말 목록 «자체»도 긴 반복 입력에서 느려지지 않는다(괄호 말에 길이 한도 — 한도가 없으면 8만 자에서 몇 초) */
+  const t2 = Date.now();
+  Q.SCOPE_PERSONAL.test('전문가('.repeat(20000)); Q.SCOPE_WORK.test('전문가('.repeat(20000));
+  Q.SCOPE_PERSONAL.test('내' + ' '.repeat(50000) + '가'); Q.SCOPE_PERSONAL.test('외부' + ' '.repeat(50000) + '가');   // 공백 두 줄이 맞닿는 말(내 [·]? 외부)도 한 번에 끝난다
+  assert.ok(Date.now() - t2 < 1500, '말 목록이 긴 반복 입력에서 느리다(' + (Date.now() - t2) + 'ms)');
+  /* 한도 밖의 글은 보지 않는다 — 첨부 이름도 제목처럼 길이를 자르고 공백을 줄인다 */
+  assert.equal(scope('서류 요청', ['가'.repeat(400) + ' 이력서.pdf']), 'unsure', '한도(수백 자) 밖의 말은 보지 않는다');
+  assert.equal(scope('서류 요청', ['가'.repeat(20) + ' 이력서.pdf']), 'personal', '한도 안의 말은 본다');
+});
