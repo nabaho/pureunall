@@ -12,6 +12,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
+const Q = require('../js/kcareer-hrcert.js');
 /* 함수 하나를 «이름으로 통째» 꺼낸다 — 한 줄짜리는 그 줄, 여러 줄이면 맨 왼쪽 `}` 까지(이 파일의 함수는 모두 그렇게 닫힌다) */
 const fn = (name) => {
   const m = new RegExp('(?:async )?function ' + name + '\\(').exec(html);
@@ -44,11 +45,12 @@ function world(initial) {
     kcTrashFileIds: (r) => [r.id],
     kcAskDelete: (btn, opt, go) => { ctx._ask = opt; ctx._go = go; },
     kcUndoBar: (msg, tid, f) => ctx._undo.push({ msg, tid, f }),
-    kcTrashDone: (e, msg) => { if (e) ctx._done.push({ tid: e.tid, msg }); },   /* 진짜 kcTrashDone 처럼 담은 줄이 없으면 아무 알림도 없다 */
+    /* 되살리기 쪽은 «진짜»를 쓴다(kcTrashDoneMany → kcTrashRestoreEntries → kcTrashRestore). 화면 다시 그리기만 센다 */
+    KcareerHrCert: Q, getFileAsync: async () => null, saveFileUnified: () => {}, kcTrashRedraw: (e) => ctx._redraws.push(e.page || e.store),
     renderCareer: () => {}, renderBizList: () => {},
-    _toasts: [], _undo: [], _done: [],
+    _toasts: [], _undo: [], _redraws: [],
   });
-  vm.runInContext(fns('kcTrashList', '_kcTrashEntry', 'kcTrashPutMany'), ctx);
+  vm.runInContext(fns('kcTrashList', '_kcTrashEntry', 'kcTrashPutMany', 'kcTrashDoneMany', 'kcTrashRestoreEntries', 'kcTrashRestore', 'kcFreeId'), ctx);
   const trashWrites = () => writes.filter((k) => k === 'trash').length;
   return { ctx, store, writes, st, trashWrites, run: (src) => vm.runInContext(src, ctx) };
 }
@@ -110,15 +112,14 @@ function bizWorld(sel) {
   w.run(fns('bizSelDel'));
   return w;
 }
-test('③ 사업 골라 삭제 — 휴지통은 «한 번», 되살리기 손잡이는 예전과 같이 «마지막으로 담은 줄»', () => {
+test('③ 사업 골라 삭제 — 휴지통은 «한 번» (되살리기 손잡이는 아래 «되살리기» 묶음에서)', () => {
   const w = bizWorld(['B2', 'B4', 'B1']);
   w.run('bizSelDel(null)'); w.run('_go()');
   assert.equal(w.trashWrites(), 1, '★ 휴지통에 ' + w.trashWrites() + '번 썼다');
   assert.deepEqual(ids(w.store.trash.map((e) => e.rec)), ['B4', 'B2', 'B1'], '목록 순서대로 담고 마지막 건이 맨 위(B1·B2·B4 중 B4 가 마지막)');
   assert.deepEqual(ids(w.store.biz), ['B3', 'B5']);
-  assert.equal(w.ctx._done.length, 1);
-  assert.equal(w.ctx._done[0].tid, w.store.trash[0].tid, '손잡이는 맨 위(마지막으로 담은) 줄이다');
-  assert.match(w.ctx._done[0].msg, /3건/);
+  assert.equal(w.ctx._undo.length, 1, '되살리기 알림은 끝에 한 번');
+  assert.match(w.ctx._undo[0].msg, /3건/);
   assert.ok(w.store.trash.every((e) => e.store === 'biz' && e.page === 'page-bizlist' && e.what === '사업'));
   assert.ok(w.store.trash.every((e) => e.rec.docs && e.rec.docs.length === 1), '딸린 서류도 줄과 함께 간다');
 });
@@ -134,7 +135,7 @@ test('③ 고른 줄이 하나도 없으면(그새 지워짐) 휴지통을 쓰�
   const w = bizWorld(['B9']);
   w.run('bizSelDel(null)'); w.run('_go()');
   assert.equal(w.trashWrites(), 0, '담을 게 없으면 휴지통을 건드리지 않는다');
-  assert.equal(w.ctx._done.length, 0, '담지 않았으니 되살리기 손잡이도 없다');
+  assert.equal(w.ctx._undo.length, 0, '담지 않았으니 되살리기 손잡이도 없다');
 });
 
 /* ═══════════════ ④ 작성 중 서류 골라 버리기 ═══════════════ */

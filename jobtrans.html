@@ -282,13 +282,16 @@ table.t tr.cur>td.n{color:var(--ink2)}
 }
 @media (max-width:520px){#who{display:none}}
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a pu-dark-auto">
 <div id="head">
   <div class="top">
     <h1>⚡ 산업일자리전환<span class="wide-only"> 자동화</span></h1>
     <span class="sub">능률협회(KMAC) · 충남경제진흥원(CEPA) 맞춤 중간·최종보고서 · 푸른메일함 감지 · 한글(.hwpx) · 푸른한글</span>
     <span id="who"></span>
+    <span class="chip c-blue wide-only" id="syncStateChip" style="display:none" aria-live="polite"></span>
     <span class="sp"></span>
     <a class="act-link wide-only" href="gov-report.html" title="컨설팅보고서 총괄 현황으로 이동">📑 보고서 총괄</a>
     <button class="sm" id="linkFolderBtn" aria-label="컨설팅폴더 연결" title="컨설팅업체 폴더에서 산업·일자리전환 하위 폴더 자료만 선별해 연결합니다">📂<span class="wide-only"> 컨설팅폴더 연결</span></button>
@@ -397,12 +400,12 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, jobtrans 는 유예 목록에 없으므로 강제(enforce) 모드로 동작합니다 -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=51"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -411,23 +414,19 @@ table.t tr.cur>td.n{color:var(--ink2)}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="vendor/jszip.min.js?v=1"></script>
-<script src="vendor/xlsx.full.min.js?v=1"></script>
+<script src="js/pu-fast-boot.js?v=1"></script>
 <script src="hangul/js/zip.js?v=1"></script>
-<script src="hangul/js/hwpx.js?v=1"></script>
-<script src="hangul/js/hwp.js?v=1"></script>
-<script src="vendor/pdf.min.js?v=1"></script>
-<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
+<script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-jobtrans-catalog.js?v=2"></script>
-<script src="js/pu-jobtrans-intake.js?v=3"></script>
+<script src="js/pu-jobtrans-intake.js?v=4"></script>
 <script src="js/pu-jobtrans-report.js?v=2"></script>
 <script src="js/pu-jobtrans-hwpx.js?v=1"></script>
-<script src="js/pu-jobtrans-view.js?v=4"></script>
+<script src="js/pu-jobtrans-view.js?v=5"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){

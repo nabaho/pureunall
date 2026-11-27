@@ -438,7 +438,7 @@ test('④ PuContractForms 통합 — 상단 빠른 작성 막대 · 전 분류 �
   dom.fire(fileInput2, 'change', { target: { files: [{ name: '과거계약서_900101-1234567_9102021234567.hwpx', size: 1024, type: '' }], value: 'x' } });
   await settle(6);
   // 사용자가 본문에 직접 연속 주민번호를 붙여넣은 경우도 maskRrnSafe 가 둘 다 가리는지 검증
-  const bodyArea = dom.allNodes(wModal2).find((n) => n.tag === 'textarea');
+  const bodyArea = dom.allNodes(wModal2).find((n) => n.tag === 'textarea' && n.attrs && n.attrs['aria-label'] === '양식 본문');
   bodyArea.value = '수동 편집 본문 9001011234567 9102021234567';
   dom.allNodes(wModal2).find((n) => n.tag === 'button' && /양식 저장/.test(n.textContent)).click();
   await settle(8);
@@ -793,4 +793,75 @@ test('⑧ 창조적 새 계약서·견적서 생성 — 무과금 맞춤 합성 
   assert.strictEqual(E.startVoiceInput({ confirm: () => false }, GuardedRec), null, '음성 서버 안내 동의를 거절하면 마이크 인식을 시작하지 않음');
   assert.strictEqual(recStarted, false);
 });
+
+test('⑨ 직관적 2단 배너 + ①·②·③ 단계형 양식 스튜디오 · 실시간 종이 모양 미리보기 · [hidden] 누수 방지', async () => {
+  const dom = makeDom();
+  const db = makeFakeDb({});
+  const box = {
+    console, Date, Math, JSON, Promise, Object, Array, String, Number, Error,
+    setTimeout: fastTimeout, clearTimeout, innerWidth: 1280, innerHeight: 900, pageYOffset: 0,
+    addEventListener: () => {}, removeEventListener: () => {},
+    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    document: dom.document,
+    prompt: () => null, confirm: () => true
+  };
+  box.window = box;
+  vm.createContext(box);
+  vm.runInContext(read('js/pu-form-cardfill.js'), box);
+  vm.runInContext(read('js/pu-contract-easy.js'), box);
+  vm.runInContext(read('js/pu-contract-forms.js'), box);
+
+  const treeEl = dom.node('div');
+  const rootEl = dom.node('div');
+  dom.body.appendChild(treeEl);
+  dom.body.appendChild(rootEl);
+  box.PuContractForms.mount(rootEl, { db, tree: treeEl, cards: { rows: () => Promise.resolve([]), coInfo: () => Promise.resolve([]) } });
+  await settle(20);
+
+  // (1) 상단 2카드 배너(거래처 서류 작성 + 새 양식 등록) 및 좌측 목록 머리 바로가기 노출 확인
+  const qcards = rootEl.querySelectorAll('.pcf-qcard');
+  assert.strictEqual(qcards.length, 2, '거래처 서류 작성 카드와 새 양식 등록 강조 카드 2종이 나란히 구분되어 노출됨');
+  assert.match(qcards[0].className, /\bfill\b/);
+  assert.match(qcards[1].className, /\bmake\b/);
+  const quickSteps = rootEl.querySelectorAll('.pcf-qstep');
+  assert.strictEqual(quickSteps.length, 3, '파일 올리기 · 10초 조립 · 새로 창작 원클릭 진입 단추 3종 제공');
+  assert.ok(rootEl.querySelector('.pcf-lh-easy'), '좌측 양식 목록 머리에도 쉽게 새 양식 만들기 단추가 상단 노출됨');
+
+  // (2) CSS [hidden] 보호 규칙 검증 (display:flex/grid 가 hidden 속성을 덮어쓰지 못하게 차단)
+  const assembleQuickBtn = quickSteps[1];
+  assembleQuickBtn.click();
+  await settle(6);
+  const easyStyle = dom.allNodes(dom.head).find((n) => n.id === 'pu-contract-easy-css');
+  assert.ok(easyStyle && /\.pce-m\s+\[hidden\][^{]*\{display:none!important\}/.test(easyStyle.textContent), '.pce-m [hidden] 강제 숨김 규칙이 적용되어 숨김 행이 새어 나오지 않음');
+
+  // (3) [✅ 10초 조립] 바로가기 클릭 시 즉시 ②번 조립 모드 + 오른쪽 종이 미리보기에 파란 [빈칸] 배지로 계약서 표시
+  const wizModal = dom.body.querySelector('.pce-m');
+  assert.ok(wizModal, '마법사 모달 열림');
+  const rawRow = dom.allNodes(wizModal).find((n) => n.attrs && n.attrs['aria-label'] === '빈 공용 서식 원본 파일도 함께 첨부').parentNode;
+  assert.strictEqual(rawRow.hidden, true, '파일을 고르기 전에는 원본 첨부 확인 행이 숨겨짐');
+
+  const paperSheet = wizModal.querySelector('.pce-paper');
+  assert.ok(paperSheet, '우측 실시간 종이 모양 미리보기 시트 존재');
+  const blanksBefore = paperSheet.querySelectorAll('.pce-blank').map((b) => b.textContent);
+  assert.ok(blanksBefore.includes('[회사명]') && blanksBefore.includes('[계약금액]'), '복잡한 {{중괄호}} 대신 직관적인 [회사명]·[계약금액] 배지로 종이에 표시됨');
+  assert.doesNotMatch(paperSheet.textContent, /\{\{회사명\}\}/, '종이 미리보기에는 개발자용 {{중괄호}} 기호가 노출되지 않음');
+
+  // 조항 체크박스(비밀 유지 조항)를 끄면 오른쪽 종이 미리보기에서도 즉시 반영되는지 확인
+  const ndaLabel = dom.allNodes(wizModal).find((n) => n.tag === 'label' && /비밀 유지 조항/.test(n.textContent));
+  const ndaCk = dom.allNodes(ndaLabel).find((n) => n.tag === 'input');
+  assert.match(paperSheet.textContent, /비밀\s*유지/, '체크 상태에서는 비밀 유지 조항이 종이에 표시됨');
+  ndaCk.checked = false;
+  dom.fire(ndaCk, 'change');
+  assert.doesNotMatch(paperSheet.textContent, /비밀\s*유지/, '체크 해제 즉시 오른쪽 종이 미리보기에서 해당 조항이 빠짐');
+
+  // (4) ③번 자동 분류 요약은 기본 1줄이고 [분류·세트 바꾸기] 클릭 시에만 세부 선택상자가 열림
+  const kindSelect = dom.allNodes(wizModal).find((n) => n.attrs && n.attrs['aria-label'] === '계약 분류');
+  const metaWrap = kindSelect.parentNode.parentNode.parentNode;
+  assert.strictEqual(metaWrap.hidden, true, '상위 분류·역할·하위 세트 선택상자는 기본 접힘 상태여서 정신없지 않음');
+  const toggleMetaBtn = dom.allNodes(wizModal).find((n) => n.tag === 'button' && /분류·세트 바꾸기/.test(n.textContent));
+  toggleMetaBtn.click();
+  assert.strictEqual(metaWrap.hidden, false, '[분류·세트 바꾸기] 클릭 시 세부 선택상자 열림');
+  dom.document.dispatchKey('Escape');
+});
+
 

@@ -1331,7 +1331,9 @@
     직위: 'title', 직책: 'title',
     휴대폰: 'mobile', 휴대전화: 'mobile', 휴대폰번호: 'mobile',
     위임내용: 'scope', 위임사무: 'scope', 업무내용: 'scope', 업무범위: 'scope',
-    착수금: 'retainer', 성공보수: 'success', 계약금: 'deposit', 자문료: 'fee', 보수: 'fee'
+    착수금: 'retainer', 착수보수: 'retainer',
+    성공보수: 'success', 성공보수율: 'success', 성과보수: 'success', 성과보수율: 'success', 성공수수료: 'success', 승소보수: 'success',
+    계약금: 'deposit', 자문료: 'fee', 보수: 'fee'
   };
   /* 되메우기를 하는 갈래 — 위 칸 이름들을 실제로 갖고 있는 것만.
      명함(card)은 칸 이름이 달라 섞으면 엉뚱한 자리에 들어간다. */

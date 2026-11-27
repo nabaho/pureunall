@@ -177,12 +177,13 @@ test('★★ ⑫ 기업 준비·첨부서류 실행 검증 — 사내·공동 �
     grabFn('toggleReqDocChk'), grabFn('toggleReqDocAll'), grabFn('reqDocsBoxHTML'), grabFn('reqDocSheetHTML'),
   ].join('\n'), ctx);
 
-  // 1) 사내 vs 공동 필터링 및 명칭 변환 확인
+  // 1) 사내 vs 공동 필터링 및 명칭 변환 확인 (기금출연확인서는 기업 준비 요청에서 제외)
   const saneInka = ctx.reqDocsFor('inka', '사내');
   const gongInka = ctx.reqDocsFor('inka', '공동');
-  assert.equal(saneInka.length, 4, '사내기금 인가 필수 첨부서류 4종(공동기금 전용 및 불필요 재무제표·고용보험 제외)');
-  assert.equal(gongInka.length, 5, '공동기금 인가 필수 첨부서류 5종');
-  assert.ok(saneInka.some((d) => d.who === '설립기업'), '사내기금에서는 참여기업별 → 설립기업으로 표시');
+  assert.equal(saneInka.length, 3, '사내기금 인가 기업 준비 필수서류 3종(기금출연확인서·공동기금 전용·불필요 재무제표·고용보험 제외)');
+  assert.equal(gongInka.length, 4, '공동기금 인가 기업 준비 필수서류 4종(기금출연확인서 제외)');
+  assert.ok(saneInka.some((d) => d.who === '설립기업(회사)'), '사내기금에서는 참여기업(회사) → 설립기업(회사)로 표시');
+  assert.ok(!gongInka.some((d) => /기금출연확인서/.test(d.title)), '기금출연확인서는 기본 생성서식이므로 기업 준비 목록에서 제외');
 
   const saneDis = ctx.reqDocsFor('dis', '사내');
   const gongDis = ctx.reqDocsFor('dis', '공동');
@@ -191,8 +192,8 @@ test('★★ ⑫ 기업 준비·첨부서류 실행 검증 — 사내·공동 �
 
   // 2) reqDocsBoxHTML 렌더링 확인 (체크 상태 2건 반영)
   const boxHtml = ctx.reqDocsBoxHTML('inka', { name: '가나다사내근로복지기금', fund_type: '사내' }, true);
-  assert.ok(boxHtml.includes('확인 2/4'), '체크된 2건 집계 표시');
-  assert.ok(boxHtml.includes('설립준비위원 재직증명서'), '필수 첨부서류 제목 포함');
+  assert.ok(boxHtml.includes('확인 2/3'), '체크된 2건 집계 표시');
+  assert.ok(boxHtml.includes('[근로자측·사용자측 위원] 설립준비위원 재직증명서 (노 1부, 사 1부)'), '대상자 및 노 1부·사 1부 구체 표기 포함');
 
   // 3) reqDocSheetHTML A4 안내문 및 사업장별 수합 점검표 확인
   const sheetHtml = ctx.reqDocSheetHTML('inka',

@@ -39,5 +39,5 @@ test('② ③ ★★ 열린 알림 전부를 한 번의 update 로', () => {
   // ④
   assert.match(body, /window\.confirm\('장애 알림 ' \+ items\.length \+ '건/, '몇 건인지 안 묻고 바꿉니다');
   assert.match(body, /allBtn\.disabled = false; allBtn\.textContent = '처리 실패 — 다시'/, '실패하면 단추가 잠긴 채 남습니다');
-  assert.match(body, /knownOpen = adminAlerts\.length;[\s\S]*paintAdminBadge/, '처리했는데 빨간불이 그대로 남습니다');
+  assert.match(body, /adminAlerts = adminAlerts\.filter[\s\S]*panel\.remove\(\)/, '처리했는데 창이 그대로 남습니다');
 });

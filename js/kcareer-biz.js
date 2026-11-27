@@ -386,7 +386,69 @@
     return out;
   }
 
+  /* ── 정부사업신청 「🏢 푸른노무법인 사업으로 진행」에서 넘어온 공고 (대표 지시 2026-11-22) ──
+     넘어오는 것: { v:1, at, pursueId, title, org, url, no, src(나라장터·기업마당·알리오·모집 글), openDt, closeDt, prc, files:[{name,url}] }
+     ⚠ 공개 공고의 사실만 — 단계는 「준비」(진행하기로 했을 뿐 아직 안 냈다). 저장은 사람이 누른다(이 함수는 칸만 만든다).
+     ⚠ 정부사업신청 기록과는 govRef(그 기록의 영구 id)로만 잇는다 — 사업명으로 찾지 않는다.
+     ⚠ 서식은 «링크»다(govFiles) — 파일은 사람이 내려받아 「＋ 파일 올리기」로 docs 에 담는다(비교·다시 쓰기는 docs 만). */
+  var GOV_TTL = 600000;   /* 10분 — 「➕ 경력관리로 넘기기」(pu_kc_handoff)와 같다 */
+  /* 링크 — http(s) 만 · 아이디 박힌 주소 버림. 브라우저 URL 해석기로 본다(글자 검사만으로는 «\» 같은 비표준 모양을 놓친다 — 보안 검토 2026-11-22) */
+  function govUrl(v) {
+    var u = String(v == null ? '' : v).trim();
+    if (!/^https?:\/\/[^\s"'<>\\]+$/i.test(u)) return '';
+    if (typeof URL !== 'function') return /^https?:\/\/[^\/?#]*@/i.test(u) ? '' : u;
+    try { var p = new URL(u); return (/^https?:$/.test(p.protocol) && !p.username && !p.password && p.hostname) ? p.href : ''; }
+    catch (e) { return ''; }
+  }
+  /* 모양·신선함(10분) */
+  function govOk(h, nowMs) {
+    if (!h || typeof h !== 'object' || h.v !== 1) return false;
+    if (!String(h.pursueId || '').trim() || !String(h.title || '').trim()) return false;
+    var at = Number(h.at || 0), n = Number(nowMs) || Date.now();
+    return at > 0 && n - at < GOV_TTL && at <= n + 30000;
+  }
+  /* 받는 탭이 쓸 수 있나 → 'ok' · 'stale'(낡거나 모양이 틀림 — 지운다) · 'other'(다른 계정·다른 탭의 넘김 — 건드리지 않는다)
+     ⚠ 보낸 계정(uid)과 일회용 표(tok, 주소 ?t=)가 모두 맞아야 쓴다(보안 검토 2026-11-22 — 계정 전환·여러 탭) */
+  function govCheck(h, nowMs, uid, tok) {
+    if (!govOk(h, nowMs)) return 'stale';
+    if (!String(uid || '') || String(h.uid || '') !== String(uid)) return 'other';
+    if (!String(tok || '') || String(h.tok || '') !== String(tok)) return 'other';
+    return 'ok';
+  }
+  function govFiles(list) {
+    var out = [], seen = {};
+    (Array.isArray(list) ? list : []).forEach(function (f) {
+      var u = govUrl(f && f.url); if (!u || seen[u] || out.length >= 20) return; seen[u] = 1;
+      var name = String((f && f.name) || '').trim().slice(0, 120) || ('첨부 ' + (out.length + 1));
+      out.push({ name: name, url: u, kind: guessDocKind(name) });
+    });
+    return out;
+  }
+  function fromGov(h, now) {
+    h = h || {};
+    var t = now ? new Date(now) : new Date(), src = String(h.src || '').trim();
+    var kind = /기업마당/.test(src) ? '공모·바우처' : (/모집/.test(src) ? '수행기관' : '입찰·용역');
+    var d = ymd(h.closeDt), p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    var due = d ? d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) : '';
+    var y = (String(h.openDt || '').match(/20\d{2}/) || [])[0] || String(t.getFullYear());
+    var prc = Number(h.prc) || 0, no = String(h.no || '').trim().slice(0, 60);
+    return { year: y, title: String(h.title || '').trim().slice(0, 300), org: String(h.org || '').trim().slice(0, 200),
+             kind: kind, stage: '준비', due: due, amt: prc > 0 ? String(prc) : '',
+             memo: '정부사업신청에서 넘김' + (src ? ' · ' + src : '') + (no ? ' · 공고번호 ' + no : ''),
+             govRef: String(h.pursueId || '').trim(), govUrl: govUrl(h.url), govNo: no, govFiles: govFiles(h.files) };
+  }
+  /* 이미 담은 사업에 «새로 모은 서식»만 더한다 — 있던 것은 그대로(사람이 고친 갈래를 덮지 않는다) → 더한 개수 */
+  function mergeGovFiles(rec, list) {
+    if (!rec) return 0;
+    var had = {}, add = govFiles(list), n = 0;
+    rec.govFiles = Array.isArray(rec.govFiles) ? rec.govFiles : [];
+    rec.govFiles.forEach(function (f) { if (f && f.url) had[f.url] = 1; });
+    add.forEach(function (f) { if (!had[f.url] && rec.govFiles.length < 20) { rec.govFiles.push(f); had[f.url] = 1; n++; } });
+    return n;
+  }
+
   var api = {
+    govOk: govOk, govCheck: govCheck, fromGov: fromGov, mergeGovFiles: mergeGovFiles, govUrl: govUrl,
     parseCardsLine: parseCardsLine, cardsDays: cardsDays,
     ownerGuess: ownerGuess, reportAtt: reportAtt,
     perfYear: perfYear, perfTable: perfTable, perfBy: perfBy, topCounts: topCounts, flatName: flatName, mailReports: mailReports, REPORT_RE: REPORT_RE,

@@ -639,7 +639,7 @@
     }).sort(function (a, b) { return String(b.signDate || '').localeCompare(String(a.signDate || '')); });
   }
   /* 계약 값이 «이기는» 칸 — 계약에서만 아는 값. 회사·담당자·근로자 칸은 채우기 창에서 고른 것이 먼저(비면 계약 값) */
-  var CONTRACT_WINS = /^(계약|성공보수$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
+  var CONTRACT_WINS = /^(계약|성공보수율?$|착수금$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
   /* 「계약서 / 제안서·견적서」 두 묶음을 쓰는 종류 (대표 「추천대로」 2026-10-06 — 견적서·제안 공문을 기금 밖에서도).
      사건계약은 사건유형 묶음, 상담사항은 묶음 없음. 이알피 계약서 출력은 어느 종류든 제안서·견적서를 자동 체크하지 않는다. */
   var TWO_GROUP_KINDS = ['company', 'consulting', 'fund', 'other'];
@@ -1349,13 +1349,29 @@
     + '.pcf-lr{display:flex;align-items:center;gap:2px}.pcf-lr input{flex:none;margin:0 2px 0 6px;cursor:pointer}.pcf-lr .pcf-li{flex:1;min-width:0}'
     + '.pcf-set{padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:#1e293b;max-width:170px}'
     + '.pcf-bbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid #bfdbfe;border-top:none;background:#eff6ff;color:#1e40af;padding:6px 12px;font-size:12.5px}'
-    + '.pcf-qbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:7px 10px;margin-bottom:8px}'
-    + '.pcf-qbar-go{background:#1e40af;border:1px solid #1e40af;color:#fff;border-radius:7px;padding:6px 12px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
-    + '.pcf-qbar-mk{background:#166534;border:1px solid #166534;color:#fff;border-radius:7px;padding:6px 12px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
-    + '.pcf-qbar-in{flex:1 1 240px;min-width:180px;border:1px solid #cbd5e1;border-radius:7px;padding:6px 10px;font-family:inherit;font-size:12.5px;background:#fff;color:#1e293b}'
-    + '.pcf-qbar-mic{border:1px solid #fde68a;background:#fffbeb;color:#854d0e;border-radius:7px;padding:6px 10px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf [hidden]{display:none!important}'
+    + '.pcf-qbar{display:grid;grid-template-columns:minmax(0,1.24fr) minmax(0,1fr);gap:8px;margin-bottom:10px}'
+    + '.pcf-qcard{display:flex;flex-direction:column;gap:6px;border-radius:10px;padding:9px 11px;min-width:0;box-sizing:border-box}'
+    + '.pcf-qcard.fill{border:1.5px solid #60a5fa;background:#eff6ff}'
+    + '.pcf-qcard.make{border:2px solid #16a34a;background:#f0fdf4}'
+    + '.pcf-qhead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}'
+    + '.pcf-qtag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}'
+    + '.pcf-qtag.fill{background:#1e40af;color:#fff}'
+    + '.pcf-qtag.make{background:#166534;color:#fff}'
+    + '.pcf-qdesc{font-size:12px;font-weight:600;color:#1e293b;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.pcf-qact{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}'
+    + '.pcf-qbar-go{background:#1e40af;border:1px solid #1e40af;color:#fff;border-radius:8px;padding:7px 13px;min-height:36px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf-qbar-mk{background:#166534;border:1px solid #166534;color:#fff;border-radius:8px;padding:7px 14px;min-height:36px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf-qbar-in{flex:1 1 180px;min-width:140px;border:1px solid #cbd5e1;border-radius:7px;padding:6px 10px;min-height:36px;font-family:inherit;font-size:12.5px;background:#fff;color:#1e293b}'
+    + '.pcf-qbar-mic{border:1px solid #fde68a;background:#fffbeb;color:#854d0e;border-radius:7px;padding:6px 10px;min-height:36px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}'
     + '.pcf-qbar-mic.rec{border-color:#fecaca;background:#fef2f2;color:#991b1b}'
-    + '.pcf-qbar-run{border:1px solid #2563eb;background:#fff;color:#1e40af;border-radius:7px;padding:6px 10px;min-height:32px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf-qbar-run{border:1px solid #2563eb;background:#fff;color:#1e40af;border-radius:7px;padding:6px 10px;min-height:36px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf-qbar-steps{display:flex;align-items:center;gap:5px;flex-wrap:wrap}'
+    + '.pcf-qstep{border:1px solid #16a34a;background:#fff;color:#166534;border-radius:99px;padding:5px 10px;min-height:34px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}'
+    + '.pcf-qstep:hover{background:#bbf7d0}'
+    + '.pcf-lh-easy{width:100%;border:1.5px solid #16a34a;background:#f0fdf4;color:#166534;border-radius:8px;padding:6px 10px;min-height:34px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;text-align:center}'
+    + '.pcf-lh-easy:hover{background:#bbf7d0}'
+    + '@media(min-width:701px) and (max-width:1080px){.pcf-qbar{grid-template-columns:minmax(0,1fr)}}'
     + '.pcf-sethits{display:flex;flex-wrap:wrap;gap:5px;padding:6px 8px;background:#eff6ff;border-bottom:1px solid #bfdbfe;align-items:center}'
     + '.pcf-sethit{border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:99px;padding:4px 10px;min-height:32px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}'
     + '.pcf-sethit:hover{background:#bfdbfe}'
@@ -1501,8 +1517,9 @@
     + '.pcf-mf .pcf-b{padding:9px 8px;font-size:12.5px}.pcf-mf .pcf-go{order:-1;flex-basis:100%;padding:12px;font-size:15px;border-radius:8px}.pcf-mf .pcf-mclose{display:none}'
     + '.pcf-vrow{grid-template-columns:24px 18px 82px minmax(0,1fr) 54px}.pcf-vrow input[type=checkbox]{width:24px;height:24px;margin:0}'
     + '.pcf-qbar{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 8px 6px;margin-bottom:4px;background:none;border:0;border-radius:0}'
-    + '.pcf-qbar-in,.pcf-qbar-mic,.pcf-qbar-run{display:none}'
-    + '.pcf-qbar-go,.pcf-qbar-mk{width:100%;padding:8px 6px;font-size:12.5px;text-align:center;overflow:hidden;text-overflow:ellipsis}'
+    + '.pcf-qcard,.pcf-qcard.fill,.pcf-qcard.make{padding:0;border:0;background:none;border-radius:0;display:block}'
+    + '.pcf-qhead,.pcf-qbar-in,.pcf-qbar-mic,.pcf-qbar-run,.pcf-qbar-steps,.pcf-lh-easy{display:none}'
+    + '.pcf-qbar-go,.pcf-qbar-mk{width:100%;min-height:38px;padding:8px 6px;font-size:12.5px;text-align:center;overflow:hidden;text-overflow:ellipsis}'
     + '}';
 
   var _toastT = null;
@@ -1822,6 +1839,17 @@
     var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0, srcPick: {}, ok: {}, ntsLive: null, ntsBusy: false,
       pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
       wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
+    function syncWiSuccessFromVals(vals) {
+      var sv = vals && String(vals['성공보수'] || '').trim();
+      if (!sv) return;
+      var mp = /^(\d+(?:\.\d+)?)\s*[%％]$/.exec(sv);
+      if (mp) { st.wi.succ = 'rate'; st.wi.succAmt = mp[1]; }
+      else if (/원$/.test(sv)) {
+        var digits = sv.replace(/[^\d]/g, '');
+        if (digits) { st.wi.succ = 'fixed'; st.wi.succAmt = Number(digits).toLocaleString(); }
+      }
+    }
+    if (host.contractCtx && host.contractCtx.vals) syncWiSuccessFromVals(host.contractCtx.vals);
     /* 근로자 사건은 모두 부가세 포함 (대표 2026-10-24) — 고른 양식이 모두 근로자측이면 「포함」에서 시작한다 */
     if (fms.every(function (fm) { return sideOf(fm) === 'worker'; })) st.wi.vat = 'incl';
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
@@ -1882,7 +1910,11 @@
             host.contractLoad(c.id).then(function (info) {
               if (st.co !== r) return;
               st.ct = { id: info.id || c.id, no: info.contractNo || c.contractNo || '', vals: info.vals, label: '계약 ' + (info.contractNo || info.id) };
+              syncWiSuccessFromVals(info.vals);
               delete st.edits['계약번호'];
+              delete st.edits['성공보수'];
+              delete st.edits['성공보수율'];
+              drawCase();
               drawCtPick(r, list); drawVals();
             }, function (e) { drawCtPick(r, list); toast('⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
           } }, [el('b', { text: c.contractNo || '(번호 없음)' }),
@@ -1917,6 +1949,9 @@
           if (x == null || x === '') return;
           if (CONTRACT_WINS.test(k) || !V[k]) V[k] = x;
         });
+        if (cv['성공보수'] && /[%％]$/.test(String(cv['성공보수']))) V['성공보수율'] = String(cv['성공보수']);
+        if (cv['계약금액'] && !V['착수금']) V['착수금'] = String(cv['계약금액']);
+        if (cv['근로자이름'] && !V['근로자명']) V['근로자명'] = String(cv['근로자이름']);
       }
       if (st.pv.on) {
         var me = host.me ? host.me() : null;
@@ -3702,6 +3737,10 @@
           chip('거르기 ' + (S.moreOpen || moreOn ? '▴' : '▾'), moreOn, function () { S.moreOpen = !S.moreOpen; drawMain(); }),
           chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
           chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
+        (kind !== '_closed' && w.PuContractEasy) ? el('button', { type: 'button', 'class': 'pcf-lh-easy',
+          title: '기존 파일 올리기 · 10초 체크 조립 · 말로 창작을 ①·②·③ 순서대로 쉽게 진행합니다',
+          text: '✨ 쉽게 새 양식 만들기 (파일 올리기 · 10초 조립 · 창작)',
+          onclick: function () { openEasyWizard(); } }) : null,
         row.length ? el('div', { 'class': 'pcf-crow' }, row) : null]);
     }
     /* ── 묶음 채우기 (설계 2026-09-28 §2-2) — 체크(2-A) · 세트(2-B) · 아래 막대 ── */
@@ -4283,14 +4322,38 @@
       });
       qIn.addEventListener('keydown', function (e) { if (e && e.key === 'Enter') { e.preventDefault(); goInline(); } });
       return el('div', { 'class': 'pcf-qbar', role: 'region', 'aria-label': '빠른 서류·양식 만들기' }, [
-        el('button', { type: 'button', 'class': 'pcf-qbar-go', title: '업무와 견적서·계약서만 간단히 체크해 한 번에 정리·채우기 합니다',
-          text: '⚡ 한 번에 서류 만들기', onclick: function () { openQuickMake(qIn.value); qIn.value = ''; } }),
-        qIn,
-        micBtn,
-        el('button', { type: 'button', 'class': 'pcf-qbar-run', title: '적은 내용을 분석해 맞는 양식 묶음과 입력표를 바로 엽니다',
-          text: '🪄 바로 정리', onclick: goInline }),
-        el('button', { type: 'button', 'class': 'pcf-qbar-mk', title: '기존 파일 자동 변환 · 10초 조항 조립 · 구두/AI 새 양식 창작',
-          text: '✨ 쉽게 새 양식 만들기', onclick: function () { openEasyWizard(); } })
+        el('div', { 'class': 'pcf-qcard fill' }, [
+          el('div', { 'class': 'pcf-qhead' }, [
+            el('span', { 'class': 'pcf-qtag fill', text: '거래처 서류 작성' }),
+            el('span', { 'class': 'pcf-qdesc', text: '업무·서류만 체크하면 견적·계약·위임장 한 번에 완성' })
+          ]),
+          el('div', { 'class': 'pcf-qact' }, [
+            el('button', { type: 'button', 'class': 'pcf-qbar-go', title: '업무와 견적서·계약서만 간단히 체크해 한 번에 정리·채우기 합니다',
+              text: '⚡ 쉽게 서류 작성하기', onclick: function () { openQuickMake(qIn.value); qIn.value = ''; } }),
+            qIn,
+            micBtn,
+            el('button', { type: 'button', 'class': 'pcf-qbar-run', title: '적은 내용을 분석해 맞는 양식 묶음과 입력표를 바로 엽니다',
+              text: '🪄 바로 정리', onclick: goInline })
+          ])
+        ]),
+        el('div', { 'class': 'pcf-qcard make' }, [
+          el('div', { 'class': 'pcf-qhead' }, [
+            el('span', { 'class': 'pcf-qtag make', text: '새 양식 등록' }),
+            el('span', { 'class': 'pcf-qdesc', text: '① 방법 선택 → ② 내용 생성 → ③ 종이 확인·저장' })
+          ]),
+          el('div', { 'class': 'pcf-qact' }, [
+            el('button', { type: 'button', 'class': 'pcf-qbar-mk', title: '① 파일 올리기 · ② 10초 조립 · ③ 말로 창작을 종이 미리보기와 함께 쉽게 만듭니다',
+              text: '✨ 쉽게 새 양식 만들기', onclick: function () { openEasyWizard('convert'); } }),
+            el('div', { 'class': 'pcf-qbar-steps', role: 'group', 'aria-label': '새 양식 만드는 방법 바로가기' }, [
+              el('button', { type: 'button', 'class': 'pcf-qstep', title: '쓰던 한글·워드·PDF 파일을 올려 자동 빈칸 양식으로 변환합니다',
+                text: '📄 파일 올리기', onclick: function () { openEasyWizard('convert'); } }),
+              el('button', { type: 'button', 'class': 'pcf-qstep', title: '조항만 체크해 10초 만에 표준 계약서·견적서 양식을 조립합니다',
+                text: '✅ 10초 조립', onclick: function () { openEasyWizard('assemble'); } }),
+              el('button', { type: 'button', 'class': 'pcf-qstep', title: '말이나 글로 설명해 없던 양식을 새로 창작합니다',
+                text: '🎙 새로 창작', onclick: function () { openEasyWizard('creative'); } })
+            ])
+          ])
+        ])
       ]);
     }
     function drawMain() {

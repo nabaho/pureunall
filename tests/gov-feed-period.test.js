@@ -106,7 +106,7 @@ test('★★ 「새로 받기」가 받은 때·범위를 남긴다 — 그래�
   await r.api.fetchAll();
   assert.ok(r.store.gov3_last_at, 'last_at 을 남기지 않았다');
   assert.equal(new Date(r.store.gov3_last_at).getTime(), new Date('2026-10-04T15:20:00').getTime());
-  assert.equal(r.store.gov3_last_win, '2026-09-27~2026-10-04', '나라장터에 물은 범위(지난 7일)');
+  assert.equal(r.store.gov3_last_win, '2026-09-28~2026-10-04', '나라장터에 물은 범위 — «오늘 포함 7일»(2026-11-10 부터 한 번에 7일까지, 8일치는 거절)');
   r.api.healthPop();
   assert.match(r.el('popBody').innerHTML, /마지막으로 받은 때 <b>2026-10-04 15:20<\/b>/);
   assert.match(r.el('popBody').innerHTML, /지난번 받은 결과[\s\S]*받은 공고 0건 중 <b>0건<\/b>이 새로 걸렸습니다/, '받은 결과의 자세한 셈은 팝업에 남는다');
@@ -124,7 +124,8 @@ test('★ 받은 때를 클라우드에도 싣는다 — 다른 기기에서도 
 });
 
 test('★★ 틀고정 — 머리줄과 탭이 «한 덩어리»(#head)로 붙는다', () => {
-  const body = src.slice(src.indexOf('<body>'));
+  /* body 에 class(예: 제미나이 판 모양 pu-design)가 붙어도 찾게 — 글자 그대로 '<body>' 를 찾으면 못 찾는다(2026-11-21) */
+  const body = src.slice(src.search(/<body\b[^>]*>/));
   const head = body.indexOf('<div id="head">'), top = body.indexOf('<div id="top">'), tabs = body.indexOf('<div id="tabs">');
   const feed = body.indexOf('<div class="wrap" id="pgFeed">');
   assert.ok(head >= 0 && head < top && top < tabs && tabs < feed, '머리줄·탭이 #head 안에 차례로 있어야 한다');

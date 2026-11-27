@@ -111,6 +111,7 @@ test('③ 둘째 줄은 «말을 하는 값»만 — 기관·금액·마감이 �
     { id: 'C', src: '나라장터', type: '지원함', nm: '지원한 공고', org: '라마바시', closeDt: day(9) },
     { id: 'D', src: '나라장터', type: '지나감', nm: '지난 공고', org: '사아자구', closeDt: day(-3), mthd: '수의계약' }
   ] });
+  r.el('fMthd').value = 'all';   /* 수의계약은 기본으로 빠진다(2026-11-22) — 「수의계약도 보기」에서 폰 둘째 줄을 본다 */
   r.api.draw();
   const h = r.el('tb').innerHTML;
   const A = rowOf(h, '노무 진단 용역'), B = rowOf(h, '빈 칸 공고'), C = rowOf(h, '지원한 공고'), D = rowOf(h, '지난 공고');
@@ -125,7 +126,7 @@ test('③ 둘째 줄은 «말을 하는 값»만 — 기관·금액·마감이 �
   /* 마감 지난 「지나감」은 남은 날 칸의 「지남」이 이미 말한다 — 두 번 말하지 않는다 */
   assert.match(D, /class="m-only mdd"><span class="tag">지남<\/span>/);
   assert.doesNotMatch(msubOf(D), /지나감/);
-  assert.match(msubOf(D), /수의계약/, '폰에서도 수의계약은 보여야 한다(대표 2026-10-10)');
+  assert.match(msubOf(D), /수의계약/, '「수의계약도 보기」에서는 폰에서도 수의계약 딱지가 보여야 한다 — 폰에는 「계약·제한」 칸이 없다');
   assert.equal(r.el('cnt').title, r.el('cnt').textContent, '폰에서 줄인 건수의 전문을 title 로');
 });
 
@@ -145,7 +146,7 @@ test('③-2 이력 — 견줄 것이 «있을 때만» 단추, 없으면 빈칸(
 test('③-3 발주 예정 — 1줄 끝은 예정월, 둘째 줄 상태는 짧게(전문은 title)', () => {
   const ym = (n) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n); return d.toISOString().slice(0, 7); };
   const r = runApp({ plan: [{ no: 'P1', kind: 'plan', nm: '노무 자문 용역', org: '가나다구청', ym: ym(0), prc: 12000000, mthd: '수의계약' }] });
-  r.el('pView').value = 'ahead';
+  r.el('pView').value = 'ahead'; r.el('fMthd').value = 'all';   /* 수의계약도 보기 */
   r.api.planDraw();
   const row = rowOf(r.el('ptb').innerHTML, '노무 자문 용역');
   assert.match(row, /<b>노무 자문 용역<\/b><span class="m-only mdd sml">\d{4}\.\d{2}<\/span>/);

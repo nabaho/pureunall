@@ -28,7 +28,11 @@ module.exports = {
   data,
   views: [
     /* 거래내역 — 입금 카드 · 출금 카드(2026-10-24 재무 폰 정리). 통장 묶음은 seeds/erp.js 의 지어낸 40줄 */
-    erp.메뉴('fin/ledger', 3500),
+    erp.메뉴('fin/ledger', 7000),
+    /* ⚙ 도구를 열면 «📱 하나문자 ▾»(휴대폰 연결)가 나온다 — 대표 폰에서 «연결 단추가 안 보인다»(2026-11-22)를 늘 재 둔다 */
+    { name: 'ledger-tools', wait: 1200, run: async (page) => { await page.locator('.ld-tools-btn').first().click(); }, back: async (page) => { await page.locator('.ld-tools-btn').first().click(); await page.waitForTimeout(300); } },
+    /* ☰ 서랍을 열면 맨 아래에 «⚙ 환경설정» 줄이 보여야 한다 — 맞춤 탭에서 아래가 잘려 «환경 설정이 안 보인다»(2026-11-22) */
+    { name: 'drawer-open', wait: 700, run: async (page) => { await page.locator('.hd-burger').first().click(); }, back: async (page) => { await page.locator('.sb-overlay').first().click({ position: { x: 380, y: 300 } }); await page.waitForTimeout(400); } },
     { name: 'ledger-exp', wait: 1500, run: async (page) => { await page.locator('.ld-tab').filter({ hasText: '출금' }).first().click(); } },
     erp.메뉴('fin/income', 3000),
     { name: 'income-confirm', wait: 2500, run: async (page) => { await page.locator('main').getByText('입금확정', { exact: true }).first().click(); }, back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(400); } },
@@ -53,5 +57,7 @@ module.exports = {
     { name: 'auto-fail', wait: 1800, run: async (page) => { await page.locator('main').getByText('출금 실패').first().click(); } },
     { name: 'auto-done', wait: 1800, run: async (page) => { await page.locator('main').getByText('자동 확정').first().click(); } },
     erp.메뉴('fin/close'),
+    /* 연결 창을 바로 여는 링크(?hanaPair=1) — 대표 「번호 받기가 어렵다」(2026-11-22). 마지막 화면이라 뒤 화면에 영향이 없다 */
+    { name: 'hana-pair-link', wait: 6000, run: async (page) => { const u = new URL(page.url()); u.searchParams.set('hanaPair', '1'); u.hash = '#menu=fin%2Fledger'; await page.goto(u.toString()); } },
   ],
 };

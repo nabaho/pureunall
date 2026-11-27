@@ -14,6 +14,10 @@
  *   ⑨ 크롬 창 띄우기(--front)는 내려간 창을 되살리고, 잠깐 «늘 위»로 올렸으면 «반드시 푼다» — 안 풀면 크롬이 영영 맨 위에 박힌다.
  *      그리고 무슨 일이 있어도 0 으로 끝난다 — 훅이 실패하면 크롬 일이 막힐 수 있다
  *   ⑩ .claude/settings.json 훅이 «크롬 도구에만» 걸려 --front 를 부르고, 뒤에서 돈다(크롬 일을 늦추지 않는다)
+ *   ⑪ 크롬 «앱 창»으로 뜨는 내 프로그램 창(AI 사용량 대시보드)은 올리지 않는다 — 프로세스의 «주 창»으로 고르면
+ *      그 창이 걸려 클릭하지 않았는데 튀어나온다(2026-11-22 대표 「클릭할 때만 뜨게」). 보기만 모드는 아무것도 켜거나 올리지 않는다
+ *   ⑫ 에고라이트(ego lite)가 설치·실행 중인 PC 에서는 오직 에고라이트 창만 앞으로 올리고 크롬·엣지는 깨우지 않는다 —
+ *      에고라이트가 없는 PC 에서만 크롬·엣지로 폴백한다(2026-11-24 대표 「에고라이트에만 창이 열리게」)
  * ★ 결정은 순수 함수로 떼어 두었다 — CI 는 리눅스라 윈도우 길(where·powershell·창)을 밟을 수 없다.
  * 실행: node --test tests/phone-link.test.js */
 'use strict';
@@ -162,6 +166,21 @@ test('⑨ 크롬 창 띄우기 — 되살리고, 올렸으면 풀고, 늘 0 으�
   }
 });
 
+test('⑪ 크롬 창 띄우기는 «크롬으로 띄운 내 프로그램 창»(사용량 대시보드)을 올리지 않는다', () => {
+  const ps = P.앞으로스크립트();
+  assert.ok(Array.isArray(P.안올릴창) && P.안올릴창.length >= 1, '★ 올리지 않을 창 목록이 없습니다');
+  for (const 제목 of P.안올릴창) {
+    assert.ok(ps.includes(제목), '★ «' + 제목 + '» 창을 거르지 않습니다 — 크롬 도구를 쓸 때마다 클릭하지 않은 창이 튀어나옵니다');
+  }
+  assert.doesNotMatch(ps, /MainWindowHandle/,
+    '★ 크롬 프로세스의 «주 창»으로 고릅니다 — 크롬 창은 모두 한 프로세스라 대시보드 같은 앱 창이 걸립니다. 창마다 제목을 보고 고르세요');
+  assert.match(ps, /EnumWindows/, '★ 창을 하나하나 훑지 않습니다 — 거를 창을 알아볼 수 없습니다');
+  /* 보기만(--dry --front) — 읽기만 하고 아무것도 켜거나 올리지 않는다 */
+  const 보기 = P.앞으로스크립트({ 보기만: true });
+  assert.doesNotMatch(보기, /\[PuWin\]::(SetForegroundWindow|SetWindowPos|ShowWindowAsync)\(/, '★ 보기만 모드가 창을 움직입니다');
+  assert.doesNotMatch(보기, /Start-Process/, '★ 보기만 모드가 크롬을 켭니다');
+});
+
 test('⑩ 훅은 크롬 도구에만 걸려 --front 를 부르고, 뒤에서 돈다', () => {
   const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude', 'settings.json'), 'utf8'));
   const 걸이 = ((cfg.hooks || {}).PreToolUse || []).filter((h) => (h.hooks || []).some((x) => /phone-link\.js["']?\s+--front/.test(x.command || '')));
@@ -178,4 +197,30 @@ test('⑩ 훅은 크롬 도구에만 걸려 --front 를 부르고, 뒤에서 돈
       assert.equal(x.async, true, '★ 훅이 앞에서 돌아 크롬 일 하나하나를 늦춥니다');
     }
   }
+});
+
+test('⑫ 에고라이트 최우선 지원 — 에고라이트가 있으면 크롬·엣지를 깨우지 않는다', () => {
+  const ps = P.앞으로스크립트();
+  const egoCheck = ps.indexOf('Get-Process ego');
+  const chromeFallback = ps.indexOf('Get-Process chrome, msedge');
+  assert.ok(egoCheck > 0 && chromeFallback > egoCheck, '★ 에고라이트를 크롬·엣지보다 먼저 확인하지 않습니다');
+  assert.match(ps, /Citro Labs\\ego lite\\Application\\ego\.exe/, '★ 에고라이트 설치 경로를 확인하지 않습니다');
+  assert.doesNotMatch(ps, /LOCALAPPDATA[\s\S]*?ego\.exe/, '★ 사용자 쓰기 가능 LOCALAPPDATA 에서 ego.exe 를 찾습니다');
+  assert.match(ps, /\$_\.Path\s+-ieq\s+\$egoExe/, '★ Get-Process ego 의 실행 경로 일치 검증이 없습니다');
+  assert.match(ps, /\$egoExt/, '★ 에고라이트 프로필의 Claude 확장 설치 여부 확인이 없습니다');
+  assert.match(ps, /\$useEgo/, '★ 에고라이트 전용 분기가 없습니다 — 에고라이트만 쓰고 싶어도 크롬이 같이 올라올 수 있습니다');
+  assert.match(ps, /Start-Process -FilePath \$egoExe/, '★ 에고라이트가 꺼져 있을 때 에고라이트를 실행하지 않습니다');
+  assert.match(ps, /\$usable\s*=[\s\S]*?if\s*\(\$usable\.Count\s*-eq\s*0\)/, '★ Skip 제외 창이 비었을 때 브라우저 기동 분기가 없습니다');
+  assert.ok(P.안올릴창.some((t) => /한글 2026/.test(t) && t.startsWith(' ')), '★ 한글편집기 접미사 제목을 거르지 않습니다');
+  assert.match(ps, /EndsWith\(/, '★ 접미사 매칭(EndsWith)이 없습니다');
+
+  /* 확장찾기가 에고라이트 프로필에서도 Claude 확장을 찾는지 확인 */
+  const os = require('node:os');
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'phonelink-ego-'));
+  const egoUd = path.join(base, 'Citro Labs', 'ego lite', 'User Data');
+  fs.mkdirSync(path.join(egoUd, 'Profile 1', 'Extensions', P.크롬.확장ID), { recursive: true });
+  try {
+    assert.equal(P.확장찾기([egoUd]), path.join(egoUd, 'Profile 1'),
+      '★ 에고라이트 프로필에 깔린 Claude 확장을 찾지 못합니다');
+  } finally { fs.rmSync(base, { recursive: true, force: true }); }
 });

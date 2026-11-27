@@ -145,23 +145,72 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script>
 /* 카카오 복귀 문서는 이미 인증 중이다. 버전 확인보다 먼저 표시하여 콜백 중 자동 새로고침을 막는다.
-   이 문서에서 인증을 마친 직후에도 자동 교체하지 않는다 — 포털→진행 화면→포털 왕복 방지. */
+   이 문서에서 인증을 마친 직후에도 자동 교체하지 않는다 — 포털→진행 화면→포털 왕복 방지.
+   ★ 또한 나머지 스크립트(16개)와 8,800줄 HTML을 파싱하기 전에 kakaoLoginFinish 서버 요청을
+     즉시 선제 발사해 파싱 시간과 서버 왕복 시간을 완전히 겹친다. */
 if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
   window.__kkReturning = true;
   window.__puKakaoReturnPage = true;
+  (function () {
+    try {
+      var sp = new URLSearchParams(location.search);
+      var code = sp.get('code') || '', st = sp.get('state') || '';
+      if (!code || sp.get('error') || !/^login\./.test(st) || typeof fetch !== 'function') return;
+      var matched = false;
+      try {
+        var r1 = sessionStorage.getItem('pu_kakao_state');
+        var o1 = r1 ? JSON.parse(r1) : null;
+        if (o1 && o1.mode === 'login' && o1.nonce === st) matched = true;
+      } catch (_) {}
+      if (!matched) {
+        try {
+          var r2 = localStorage.getItem('pu_kakao_state_bak');
+          var o2 = r2 ? JSON.parse(r2) : null;
+          if (o2 && o2.mode === 'login' && o2.nonce === st && (Date.now() - Number(o2.at || 0)) <= 600000) matched = true;
+        } catch (_) {}
+      }
+      if (!matched) return;
+      var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function () { ctl.abort(); }, 15000) : 0;
+      var promise = fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/kakaoLoginFinish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code, state: st }),
+        signal: ctl ? ctl.signal : undefined
+      }).catch(function (e) {
+        throw new Error(e && e.name === 'AbortError'
+          ? '카카오 서버 응답이 늦습니다 — 다시 시도해 주세요'
+          : ('서버에 닿지 못했습니다 [kakaoLoginFinish 연결실패' + (e && e.message ? ' · ' + e.message : '') + ']'));
+      }).then(function (r) {
+        return r.text().then(function (t) { return { status: r.status, text: t }; });
+      }).finally(function () { if (timer) clearTimeout(timer); });
+      /* 소비 전 실패해도 unhandledrejection 이 나지 않게 조용히 붙잡아 둔다(실제 에러는 loginFinish 에서 받는다). */
+      promise.catch(function () {});
+      window.__puKakaoEarlyLogin = { code: code, state: st, promise: promise };
+    } catch (_) {}
+  })();
 }
+/* Google Play TWA(kr.pureun.portal)로 진입한 세션을 기억한다 — 하위 앱(pu-erp.html 등)으로
+   이동해 document.referrer 가 바뀐 뒤에도 Play 앱 정책 가드(외부 APK 다운로드 링크 숨김 등)를 유지한다. */
+try {
+  if (document.referrer && document.referrer.indexOf('android-app://kr.pureun.portal') === 0) {
+    sessionStorage.setItem('pu_play_twa', '1');
+  }
+} catch (_twaErr) {}
 </script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-pw-policy.js?v=1"></script>
 <script src="js/pu-backup.js?v=3"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
-<script src="js/pu-kakao.js?v=8"></script>
-<script src="js/pu-billing.js?v=12"></script>
-<script src="js/kcareer-mailreq.js?v=3"></script>
+<script src="js/pu-kakao.js?v=9"></script>
+<script src="js/pu-billing.js?v=13"></script>
+<!-- 📋 머리줄 «내 업무» 단추의 숫자(work_erp/mysum/{사번} 한 줄 — 업무관리가 적는다, 2026-11-21) -->
+<script src="js/pu-mywork.js?v=1"></script>
+<script src="js/kcareer-mailreq.js?v=7"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -247,10 +296,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
 .pbar #chatFab{order:4;}  /* 건의하기 바로 왼쪽 통합 AI 챗봇 */
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
-/* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
-   예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
-   여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
-.pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
 /* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
    챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
    ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
@@ -271,9 +316,15 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .hd-n{font-size:.7rem;font-weight:700;color:#dc2626;font-variant-numeric:tabular-nums;}
 .pbar .hd-n[hidden]{display:none;}
 .pbar .hd-n.is-zero{color:#64748b;font-weight:600;}
+/* 📋 «내 업무» 단추(업무관리 — 대표 지시 2026-11-21 「로그인한 사람이 자기 업무를 한 번에 보고 클릭」).
+   그림은 달력이 아니라 📋 한 칸. PC 는 이름 아래 «진행 N · 임박 N · 할 일 N» 한 줄(.hd-nl), 급한 수(.hd-nv)는 폰 딱지에만 쓴다.
+   급한 것(임박+할 일)이 0이면 is-zero — PC 는 흐린 한 줄, 폰은 딱지를 안 보인다(아래 ≤900px 규칙이 이미 그렇다). */
+.pbar .hd-ico.hd-ico-w{display:grid;place-items:center;font-size:17px;line-height:1;}
+.pbar .hd-app[data-count="myWork"] .hd-nv{display:none;}
 @media(max-width:900px){ .pbar .hd-app{padding:3px;border-radius:12px;} .pbar .hd-tx{display:contents;} .pbar .hd-tx b{display:none;}
   .pbar .hd-n{position:absolute;top:-9px;right:-7px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff;}
-  .pbar .hd-n .hd-nl{display:none;} .pbar .hd-n.is-zero{display:none;} }
+  .pbar .hd-n .hd-nl{display:none;} .pbar .hd-n.is-zero{display:none;}
+  .pbar .hd-app[data-count="myWork"] .hd-nv{display:inline;} }
 /* 태블릿(521~900px)은 머리줄이 한 줄(nowrap)이라 단추 글자까지 두면 오른쪽(로그아웃)이 화면 밖으로 밀렸다(768px 에서 102px — 2026-11-15 검증 작업자 지적·직접 쟀다).
    그림만 남기고(위 ≤900px 규칙) 줄 사이 틈도 줄여 768·744px(아이패드 세로)에서 한 줄에 들어오게 한다. 폰(≤520px)은 줄이 접히므로 틈은 그대로. */
 @media(min-width:521px) and (max-width:900px){ .pbar{gap:6px;} }
@@ -400,19 +451,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
   background:#1e293b;color:#fff;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(15,23,42,.3);text-align:center;}
 .lay-toast.bad{background:#991b1b;}
 .lay-toast[hidden]{display:none;}
-/* 🔄 포털 업무 오케스트레이션 — 상단 넓은 고정 창 없이 작은 알약 단추(#orchFab) + 클릭 시 열리는 컴팩트 팝업(#orchModal) */
-#orchFab{margin-left:auto;display:inline-flex;align-items:center;gap:5px;min-height:26px;border:1px solid #bfdbfe;background:#eff6ff;
-  color:#1e40af;border-radius:999px;padding:4px 12px;font-size:.7rem;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;transition:.12s;}
-#orchFab:hover{background:#2563eb;border-color:#2563eb;color:#ffffff;}
-#orchFab[data-tone="urgent"]{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
-#orchFab[data-tone="urgent"]:hover{background:#dc2626;border-color:#dc2626;color:#ffffff;}
-#orchFab[data-tone="warn"]{background:#fffbeb;border-color:#fde68a;color:#854d0e;}
-#orchFab[data-tone="warn"]:hover{background:#fde68a;border-color:#d97706;color:#854d0e;}
-#orchFab[hidden],#orchFabBadge[hidden]{display:none;}
-#orchFabBadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;
-  background:#1e40af;color:#ffffff;font-size:.66rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
-#orchFab[data-tone="urgent"] #orchFabBadge{background:#dc2626;color:#ffffff;}
-#orchFab[data-tone="warn"] #orchFabBadge{background:#fde68a;color:#854d0e;border:1px solid #d97706;}
+/* 🔄 포털 업무 오케스트레이션 — 상단 중복 단추 없이 내부관리 줄의 오케스트레이션 타일 하나만 두고 클릭 시 컴팩트 팝업(#orchModal)을 띄운다 */
 #orchModal{display:flex;position:fixed;inset:0;z-index:82;background:rgba(15,23,42,.42);align-items:center;justify-content:center;padding:12px;}
 #orchModal[hidden]{display:none;}
 #orchModal .box{background:#ffffff;border:1px solid #cbd5e1;border-radius:18px;width:472px;max-width:calc(100vw - 24px);
@@ -698,6 +737,7 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
   font-size:10px;font-weight:800;line-height:1;padding:5px 4px;letter-spacing:1px;
   writing-mode:vertical-rl;cursor:pointer;
   box-shadow:0 3px 9px rgba(185,28,28,.42);}
+.tile .tile-alert{color:#ffffff;}
 .tile-alert:hover{background:#991b1b;}
 .tile-alert:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px #1e40af;}   /* 키보드로 닿았을 때 */
 .tile.lock{opacity:.5;cursor:default;}
@@ -846,7 +886,13 @@ body.portal-mode #camFab{display:flex;}
 @media(max-width:520px){
   #chatFab{min-height:30px;padding:5px 10px;font-size:.72rem;border-radius:999px;flex:0 0 auto;}
   .pbar #chatFab{order:4;}
+  .pbar #chatFab{padding:5px 8px;}
 }
+/* 📋 머리줄에 «내 업무» 단추가 들어와(2026-11-21) 411px 에서 캘린더가 둘째 줄로, 768px(태블릿)에서는 로그아웃이 화면 밖으로 17px 밀렸다
+   (검증 작업자가 phone-audit 768px 로 잼). 머리줄 «한 줄»(대표 2026-08-20)을 지키려고 ≤900px 에서는 챗봇도 그림(🤖)만 둔다 —
+   머리줄 단추들(내 업무·캘린더)도 이 폭에선 그림만이다(위 ≤900px 규칙). 이름은 접근성 이름(aria-label)·말풍선(title)에 그대로 있다. */
+@media(max-width:900px){ .pbar #chatFab .chat-lb{display:none;} }
+@media(min-width:521px) and (max-width:900px){ .pbar #chatFab{padding:6px 10px;} }
 /* ── 프로그램 건의함 — 헤더 바(캡쳐2) 안 왼쪽, 브랜드 옆 동그란 눈에 띄는 버튼 ── */
 #sgFab{position:relative;display:none;align-items:center;gap:6px;white-space:nowrap;background:linear-gradient(135deg,#d97706,#dc2626);color:#fff;border:none;padding:8px 16px;border-radius:999px;font-size:.8rem;font-weight:800;letter-spacing:-0.01em;cursor:pointer;box-shadow:0 5px 14px -3px rgba(239,68,68,.5),0 1px 3px rgba(0,0,0,.12);transition:transform .12s,filter .12s,box-shadow .12s;}
 #sgFab:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 8px 18px -3px rgba(239,68,68,.55);}
@@ -877,6 +923,33 @@ body.portal-mode #camFab{display:flex;}
   opacity:0;transform:translateY(-4px);transition:opacity .35s,transform .35s;pointer-events:none;}
 .sg-tip::before{content:'';position:absolute;top:-5px;right:24px;width:10px;height:10px;background:#1e293b;transform:rotate(45deg);}
 .sg-tip.on{opacity:1;transform:translateY(0);}
+/* 📋 «내 업무» 첫 안내 — 로그인하면 머리줄 «내 업무» 단추 바로 아래에 뜬다 (대표 지시 2026-11-22, 자세히 JS 「내 업무 첫 안내」)
+   자리(left·top·화살표)는 JS 가 단추를 재서 정한다 — 화면 양옆 8px 안. 확인 창(z 80)보다 아래(z 60)라 겹치면 확인 창이 위다. */
+.mw-tip{position:absolute;z-index:60;box-sizing:border-box;background:#1e293b;color:#fff;border-radius:12px;
+  padding:12px 14px 10px;box-shadow:0 10px 28px rgba(15,23,42,.32);font-size:.78rem;font-weight:500;line-height:1.6;
+  text-align:left;letter-spacing:0;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;animation:mwTipIn .3s ease-out;}
+.mw-tip .mw-ar{position:absolute;top:-6px;left:24px;width:12px;height:12px;background:#1e293b;transform:rotate(45deg);}
+.mw-tip .mw-t{display:block;font-size:.88rem;font-weight:800;margin:0 26px 6px 0;}
+.mw-tip ul{margin:0;padding:0 0 0 17px;}
+.mw-tip li{margin:3px 0;color:#e2e8f0;}
+.mw-tip li b{color:#fff;font-weight:800;}
+.mw-tip .mw-x{position:absolute;top:6px;right:6px;width:30px;height:30px;border:0;border-radius:8px;background:transparent;
+  color:#cbd5e1;font-size:14px;line-height:1;cursor:pointer;}
+.mw-tip .mw-x:hover{background:rgba(255,255,255,.12);color:#fff;}
+.mw-tip .mw-ft{display:flex;gap:6px;margin-top:10px;}
+.mw-tip .mw-ft button{flex:1;min-height:36px;border-radius:9px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.mw-tip .mw-go{background:#2563eb;color:#fff;border:0;}
+.mw-tip .mw-go:hover{background:#1e40af;}
+.mw-tip .mw-ok{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);}
+.mw-tip .mw-ok:hover{background:rgba(255,255,255,.1);}
+.mw-tip small{display:block;margin-top:6px;font-size:.68rem;color:#94a3b8;}
+.mw-tip button:focus-visible{outline:2px solid #60a5fa;outline-offset:2px;}
+@keyframes mwTipIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){ .mw-tip{animation:none;} }
+.mw-tip:focus{outline:none;}   /* 뜰 때 상자 자체가 초점을 받는다(화면읽기용) — 테두리는 안의 단추에만 */
+/* 폰 — 누르는 자리 44px(손가락 권장 크기) */
+@media(max-width:520px){ .mw-tip{font-size:.8rem;} .mw-tip .mw-t{margin-right:44px;} .mw-tip .mw-ft button{min-height:44px;}
+  .mw-tip .mw-x{width:44px;height:44px;top:2px;right:2px;} }
 /* 버튼 숫자 배지: admin=미처리 건수 / 일반=내 미확인 해결 건수 */
 .sg-fabbadge{position:absolute;top:-7px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#fff;color:#dc2626;border:1.5px solid #fecaca;font-size:.62rem;font-weight:800;display:none;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.15);}
 /* 해결 알림 팝업 (로그인 직후 자동) */
@@ -1396,7 +1469,7 @@ body.portal-mode #moreFab{display:flex;}
         kb.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
         kb.onclick=function(){ location.replace(location.pathname + '?v=' + Date.now()); };
         ks.appendChild(kb);
-      }, 25000);
+      }, 10000);
       return;
     }
     if(typeof firebase === 'undefined' || !firebase.auth){ s2.remove(); return; }
@@ -1410,7 +1483,7 @@ body.portal-mode #moreFab{display:flex;}
     /* 자동 제한시간으로 걷지 않는다. 인증이 40초 넘게 걸리는 폰에서 노란 로그인 화면이
        잠깐 보였다가 같은 계정으로 다시 들어가는 문제가 바로 이 제한시간 때문에 생겼다.
        실제 미로그인은 onAuthStateChanged가 즉시 걷고, SDK가 멎으면 위 단추로 직접 열 수 있다. */
-  }, kk ? 20000 : 8000);
+  }, kk ? 10000 : 8000);
 })();
 </script>
 <div class="mesh"></div>
@@ -1523,7 +1596,7 @@ body.portal-mode #moreFab{display:flex;}
         b.setAttribute('aria-expanded', 'false');
       })();
       </script>
-      <div class="err" id="errMsg"></div>
+      <div class="err" id="errMsg" role="alert" aria-live="assertive"></div>
       </form>
     </div>
     <!-- 지난번에 왜 풀렸나 — 다시 생기면 이 줄을 찍어 보내 주시면 원인을 바로 짚는다 -->
@@ -1546,6 +1619,12 @@ body.portal-mode #moreFab{display:flex;}
       <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 대화형 개선요청·승인">🤖 <span class="chat-lb">길잡이 챗봇</span><span class="sg-fabbadge" id="chatFabBadge"></span></button>
       <!-- 📅 머리줄 앱 단추 — APPS 의 head:true 앱(지금은 푸른 캘린더)이 줄 타일 대신 여기 선다 (대표 지시 2026-11-14, 목업 A안).
            처음엔 감춰 두고 portalHeadAppPaint 가 «볼 수 있는 사람»에게만 켠다. 건의하기(order:4) 바로 왼쪽. -->
+      <!-- 📋 내 업무 = 업무관리(work.html)의 「내 업무」 — 로그인한 사람이 «자기 업무»를 한 번에 연다 (대표 지시 2026-11-21).
+           자료함 타일 대신 머리줄 맨 앞 단추. 숫자는 업무관리가 적어 둔 그 사람 몫 한 줄(work_erp/mysum)만 읽는다. -->
+      <a id="headApp_work" class="hd-app" data-head-app="1" data-name="내 업무" data-count="myWork" href="work.html?sso=1" hidden>
+        <span class="hd-ico hd-ico-w" aria-hidden="true">📋</span>
+        <span class="hd-tx"><b>내 업무</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl hd-wl"></span><span class="hd-nv"></span></small></span>
+      </a>
       <a id="headApp_cal" class="hd-app" data-head-app="1" data-name="푸른 캘린더" href="pu-cal.html?sso=1" hidden>
         <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
         <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
@@ -1615,8 +1694,6 @@ body.portal-mode #moreFab{display:flex;}
            긴 안내는 단추 말풍선으로 옮겼다(대표 2026-10-24 윗줄 정리 안 1) — 화면읽기는 그대로 읽는다 -->
       <button id="layoutEditBtn" type="button" aria-describedby="tileHint" hidden></button>
       <span id="tileHint" hidden>관리자는 앱을 마우스로 바로 끌거나 Alt+←/→ 키로 순서를 바꿀 수 있습니다(같은 영역 안). 다른 영역으로도 끌어 옮길 수 있고, 줄 오른쪽 끝의 «📌 이 줄 고정»을 누르면 그 줄 앱이 줄 밖으로 못 나갑니다. 틀 고정한 앱은 자기 영역 안에서만 움직입니다. 바꾼 배치는 모든 직원 화면에 같이 반영됩니다.</span>
-      <!-- 🔄 오케스트레이션 — 넓은 상단 고정 창 대신 작은 알약 단추만 두고, 클릭하면 컴팩트 팝업(#orchModal)을 띄운다 -->
-      <button id="orchFab" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="orchModal" title="업무 오케스트레이션 팝업 열기" hidden>🔄 오케스트레이션<span id="orchFabBadge" hidden>0</span></button>
     </div>
     <!-- 편집 중 안내 줄(관리자·PC) — 목록으로 편집(폰과 같은 창) · 처음 자리로 · 끝내기 -->
     <div id="layoutBar" role="group" aria-label="앱 배치 편집" hidden>
@@ -1770,8 +1847,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 메일 계약·견적 검토 하루 7번(평일 09~18·24시, 주말·공휴일은 24시만 일하고 낮엔 바로 끝냄, AI 정리) · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
-        — 하루 <b>546번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 정부사업 카톡 요약 하루 한 번(대표 «나에게 보내기», 새 것이 있을 때만) · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 강의자료 메일 정리 하루 한 번 · 메일 계약·견적 검토 하루 7번(평일 09~18·24시, 주말·공휴일은 24시만 일하고 낮엔 바로 끝냄, AI 정리) · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번 · 데이터관리 현황판 집계 1시간마다(대표 전용, 건수·비율만)
+        — 하루 <b>572번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -1799,13 +1876,13 @@ body.portal-mode #moreFab{display:flex;}
 
       <!-- ── 시스템 장애 알림 ────────────────────────────────────────
            왼쪽 아래에 «늘» 떠 있던 「장애 알림」 단추를 치웠다(대표 지시 2026-08-23).
-           장애가 실제로 있을 때만 그 자리에 빨갛게 뜬다 — 없으면 어느 화면에도 없다.
+           (2026-11-22) 이제는 장애가 나도 빨간 단추가 뜨지 않는다 — 알림은 저절로 «처리 완료»로 정리된다(js/pu-health.js).
            대신 평소에 들여다보는 문을 여기 하나 남긴다. 서랍 안이라 화면을
            차지하지 않고, 이미 총괄관리자만 여는 곳이라 권한도 그대로다. -->
       <div class="cfg-tool">
         <div>
           <b>시스템 장애 알림</b>
-          <span>장애가 생기면 화면 왼쪽 아래에 빨갛게 뜹니다. 평소에 지난 것까지 보려면 여기서 여세요.</span>
+          <span>장애 알림은 화면에 뜨지 않고 저절로 «처리 완료»로 정리됩니다(기록은 남습니다). 정리되기 전에 남은 것이 있으면 여기서 열어 보세요.</span>
         </div>
         <button type="button" id="cfgHealth">열어보기</button>
       </div>
@@ -2226,8 +2303,9 @@ body.portal-mode #moreFab{display:flex;}
     { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
     { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
     { key:'jobtrans', name:'산업일자리전환',  desc:'능률협회·충경진 메일·보고서·HWPX', icon:'⚡', url:'jobtrans.html',       roles:null, row:'client' },
-    { key:'orch',    name:'오케스트레이션',   desc:'메일·계약·ERP·정산 흐름연결', icon:'🔄', url:'pu-orchestrator.html', roles:null, row:'store', popup:true },
-    { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
+    { key:'safety',   name:'안전보건체계구축', desc:'과거이력·업종별체크·위험성·HWPX', icon:'🦺', url:'safety.html',         roles:null, row:'client' },
+    { key:'orch',    name:'오케스트레이션',   desc:'메일·계약·ERP·정산 흐름연결', icon:'🔄', url:'pu-orchestrator.html', roles:null, row:'inside', popup:true },
+    { key:'work',    name:'업무관리',     desc:'내가 맡은 업무 · 주간 기록', icon:'📋', url:'work.html',  roles:null, row:'store', head:true, count:'myWork' },   /* head — 자료함 타일 대신 머리줄 «📋 내 업무» 단추(#headApp_work)로 선다 (대표 지시 2026-11-21 「로그인하면 자기 업무 위주로 · 한 번에 보고 클릭」). count — 진행·임박·할 일(work_erp/mysum, 업무관리가 적는다) */
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
        ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
          창(pureun-hr·pureun-fin)·탭 이름·왼쪽 메뉴·환경설정 탭이 따로다(pu-erp.html PU_APPS 머리글).
@@ -2242,6 +2320,9 @@ body.portal-mode #moreFab{display:flex;}
        대표·위임관리인만 — perm 'deungi' 는 아무에게도 주지 않은 깃발이라 관리자·위임관리인에게만 보인다(규칙 deungi 와 같은 사람). */
     { key:'deungi',  name:'푸른등기',     desc:'변경등기 서류·체크', icon:'🖋', url:'pu-deungi.html',      roles:null, perm:'deungi', row:'inside' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inside' },
+    /* 데이터관리(2026-11-21 대표 「한번에 모든 것 다해고 내부관리에 넣어달라」) — 입금·업무량 3D·현황판·연결 지도·다년 대조.
+       대표 한 사람만: 이 타일(adminOnly) · 앱 안 대표 표지(app_owner/uid) 확인 · 서버 규칙 — 문 세 겹. 계획서 docs/superpowers/plans/2026-11-18-데이터관리-계획서.md */
+    { key:'datahub', name:'데이터관리',   desc:'입금·업무량 3D·현황판', icon:'📊', url:'pu-datahub.html',    roles:null, adminOnly:true, row:'inside' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
          이쪽은 «아직 안 한» 공고를 찾는 곳이다. 이름이 비슷하니 설명으로 갈라 준다.
@@ -2270,6 +2351,7 @@ body.portal-mode #moreFab{display:flex;}
        문(pu-cards.html 의 soonUnlessAdmin)은 «짝»이라 둘을 함께 뺐다. */
     { key:'mail',    name:'푸른 메일',     desc:'메일 쓰기·보낸 메일·자료함', icon:'📧', url:'pu-cards.html?view=mail', roles:null, row:'store' },
     { key:'cards',   name:'기업정보함',    desc:'사업자·명함·계약서', icon:'📇', url:'pu-cards.html',       roles:null, row:'store' },
+    { key:'pubsearch', name:'공공 기업검색', desc:'금융위·재무·국세청·고용·연금·DART', icon:'🔍', url:'pu-pubsearch.html', roles:null, row:'store' },
     { key:'photos',  name:'사진첩',       desc:'사진·서류',        icon:'🖼️', url:'pu-photos.html',      roles:null, row:'store' },
     { key:'fund',    name:'기금관리',     desc:'근로복지기금 운영', icon:'🪙', url:'fund.html',           roles:null, row:'client' },
     /* 취업규칙 — 타일은 «하나»(대표 결정 2026-10-04 두 앱 합치기).
@@ -2282,6 +2364,7 @@ body.portal-mode #moreFab{display:flex;}
        PuGate.soonUnlessAdmin)을 «짝으로 함께» 걷었다 — 직원도 연다(푸른 메일·문서관리와 같다. tests/app-soon-gate.test.js ⑩). */
     { key:'rules',   name:'기업규정집',    desc:'취업규칙·노사협의회·단체협약', icon:'📜', url:'rules-v2.html', roles:null, row:'client' },
     { key:'docs',    name:'계약서등관리',  desc:'사건 위임장 · 계약서 양식',  icon:'📤', url:'docs-esign.html',     roles:null, row:'store' },  /* 2026-10-04 직원에게 엶 · 2026-10-05 대표 «자료함으로» */
+    { key:'edulib',  name:'강의자료', desc:'종류·강의일별 · 나란히 비교', icon:'🎓', url:'pu-edulib.html',      roles:null, row:'store' },  /* 2026-11-19 대표 «새앱으로 만들고 자료함으로» — 재직 직원 모두 */
     { key:'aliounion', name:'공공임단협', desc:'알리오 노조·임금·단체협약 API 통합비교', icon:'🤝', url:'pu-alio-union.html', roles:null, row:'store' },
     /* 한글 편집기 — 한글(.hwp/.hwpx) 문서를 «브라우저 안에서» 열고 고치고 저장한다(대표 지시 2026-10-31 「의뢰인 업무에 넣어라」).
        ⚠ 자료가 서버로 가지 않는다 — 파일은 이 PC 에서만 열린다(주민번호가 든 서식). 파이어베이스를 쓰지 않아 저장 규칙이 필요 없다. */
@@ -2373,7 +2456,7 @@ body.portal-mode #moreFab{display:flex;}
      옮기기 전에 한 번이라도 끌었던 사람은 옛 줄이 남아, 앱의 row 를 바꿔도 화면이 그대로였다
      (대표 보고 2026-10-10 「계약서등관리 자료함으로 옮겨줘」 — 10-05 에 row 를 바꿨는데 의뢰인 업무 줄에 남음).
      ⚠ 줄 사이 옮기기는 원래 막혀 있어(관리자가 풀어야 한다) 옛 줄 값은 «일부러 둔 자리»가 아니다. */
-  var ROW_MOVED_FROM = { docs:'client', govaid:'sales', pbox:'client' };
+  var ROW_MOVED_FROM = { docs:'client', govaid:'sales', pbox:'client', orch:'store' };
   function savedRowOf(key, dflt){
     var r = tilePrefs && tilePrefs.rows && tilePrefs.rows[key];
     if(ROW_MOVED_FROM[key] && r === ROW_MOVED_FROM[key]) return dflt;
@@ -2679,6 +2762,8 @@ body.portal-mode #moreFab{display:flex;}
         if(!_handled && !window.__kkReturning && !_kkLoginStarting){ _handled = true; enterPortal(user); }
         else if(_handled && _portalReady && _portalUid === user.uid){ _rmBootSplash(); if(window._fastRestored){ window._fastRestored = false; enterPortal(user); } }
       } else if(_handled){
+        // 방금 signInWithCustomToken 등으로 로그인 완료된 직후 비동기 null 이 뒤늦게 도착한 경우 무시한다.
+        if(auth.currentUser && auth.currentUser.uid === _portalUid){ if(_portalReady) _rmBootSplash(); return; }
         // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
         // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
         // 실제 로그아웃 신호가 있으면 기다리지 않는다.
@@ -2710,6 +2795,8 @@ body.portal-mode #moreFab{display:flex;}
         try { var _lw=$('logoutWhy'), _lt=window.PuLogoutWhy?PuLogoutWhy.text():''; if(_lw&&_lt){ _lw.textContent=_lt; _lw.style.display=''; } } catch(_w){}
         // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
         try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
+        // 모바일 또는 카카오 사용 기기는 인가 주소도 미리 받아 두어 단추 클릭 시 0ms 로 즉시 이동한다.
+        try { if(!window.__kkReturning && window.PuKakao && PuKakao.prefetchLogin && (isMobile() || localStorage.getItem('pu_kakao_used') === '1')) PuKakao.prefetchLogin({ ask: !isMobile() }); } catch(_p){}
       }
   });
 
@@ -2756,11 +2843,21 @@ body.portal-mode #moreFab{display:flex;}
     clearTimeout(t._kkT);
     t._kkT = setTimeout(function(){ t.style.display = 'none'; }, ms || 4000);
   }
+  function kkResetBtn(){
+    _kkLoginStarting = false;
+    var btn = $('kkLoginBtn');
+    if(btn){ btn.disabled = false; btn.textContent = '💬 카카오로 로그인'; }
+  }
+  /* 모바일 브라우저에서 카카오 화면으로 갔다가 뒤로가기(bfcache)로 돌아오면
+     버튼이 비활성·이동 중 상태로 굳어 먹통이 되는 것을 막는다. */
+  window.addEventListener('pageshow', function(e){
+    if(e && e.persisted && !window.__kkReturning) kkResetBtn();
+  });
   function kkLogin(){
     if(_kkLoginStarting) return;   // 한 번 누른 요청이 끝나기 전 중복 이동을 만들지 않는다
     _kkLoginStarting = true;
     var btn = $('kkLoginBtn');
-    if(btn) btn.disabled = true;
+    if(btn){ btn.disabled = true; btn.textContent = '💬 카카오로 이동 중…'; }
     showErr('');
     /* 「이 기기에서 로그인 유지」 를 카카오도 따른다 (2026-09-29) — 전에는 무조건 유지(LOCAL)였다.
        ⚠ 여기서 고른 값을 «기록만» 해 둔다: 화면이 카카오로 떠났다 돌아오면 새 페이지라, 여기서 정한
@@ -2789,7 +2886,7 @@ body.portal-mode #moreFab{display:flex;}
       var restored = auth.currentUser;
       if(restored && restored.email && !_handled){ _handled = true; enterPortal(restored); return; }
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
-      if(btn) btn.disabled = false;
+      if(btn){ btn.disabled = false; btn.textContent = '💬 카카오로 로그인'; }
     });
   }
   /* 카카오가 돌려보낸 뒤 — 로그인 화면이든 포털이든, 뜨자마자 한 번 확인한다.
@@ -2850,6 +2947,7 @@ body.portal-mode #moreFab{display:flex;}
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
+        window._puAuthAt = Date.now();
         // 카카오 로그인 → 자동 로그아웃 3시간 (대표 지시 2026-11-18). 인증표의 kakao 표시로 다시 확인된다(js/pu-active.js).
         try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', PuActive.signInAt(cred.user)); } catch(_v){}
         try {
@@ -3474,6 +3572,15 @@ body.portal-mode #moreFab{display:flex;}
     var dir = location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1);
     if(to.origin !== location.origin || to.pathname.indexOf(dir) !== 0
        || !/\.html$/i.test(to.pathname) || /\/enter\.html$/i.test(to.pathname)) return false;
+    /* ★ 포털 ↔ 앱 무한 창 반복(핑퐁 루프) 차단 — 20초 안에 같은 앱으로 2번 이상 튕겨 돌아오면
+       앱으로 다시 보내지 않고 포털에 안전하게 멈춘다. */
+    try {
+      var loopKey = 'pu_return_loop', now = Date.now();
+      var prev = JSON.parse(sessionStorage.getItem(loopKey) || 'null');
+      var cnt = (prev && prev.to === to.pathname && (now - Number(prev.at || 0)) < 20000) ? (Number(prev.n || 0) + 1) : 1;
+      sessionStorage.setItem(loopKey, JSON.stringify({ to: to.pathname, n: cnt, at: now }));
+      if(cnt >= 2) return false;
+    } catch(_lp){}
     function go(){
       try { if(/^(pureun-|pu_)[\w-]+$/.test(String(t.name || ''))) window.name = t.name; } catch(e){}
       try { _loginGuard.cover(); } catch(e){}      // 떠나는 동안 로그인 화면이 비치지 않게
@@ -4154,15 +4261,14 @@ body.portal-mode #moreFab{display:flex;}
     }
     portalOrchLimit = 60;
     portalOrchSel = Object.create(null);
+    var orchTile = document.querySelector('#appRows .tile[data-key="orch"]') || document.querySelector('.tile[data-key="orch"]');
     if(triggerEl && triggerEl.id === 'portalOrchBadge'){
-      portalOrchLastTrigger = document.querySelector('#appRows .tile[data-key="orch"]') || $('orchFab');
+      portalOrchLastTrigger = orchTile;
     } else {
-      portalOrchLastTrigger = triggerEl || document.activeElement || $('orchFab');
+      portalOrchLastTrigger = triggerEl || document.activeElement || orchTile;
     }
     if(_orchDrag) _orchDrag.reset();
     modal.hidden = false;
-    var fab = $('orchFab');
-    if(fab) fab.setAttribute('aria-expanded', 'true');
     portalOrchPaintModal();
     if(!window.PuOrchestratorCore){
       portalOrchErr = '흐름 분석 모듈을 불러오지 못했습니다.';
@@ -4187,12 +4293,10 @@ body.portal-mode #moreFab{display:flex;}
     if(!modal || modal.hidden) return;
     modal.hidden = true;
     portalOrchSel = Object.create(null);
-    var fab = $('orchFab');
-    if(fab) fab.setAttribute('aria-expanded', 'false');
     if(!skipFocus){
       var target = (portalOrchLastTrigger && document.contains(portalOrchLastTrigger))
         ? portalOrchLastTrigger
-        : (document.querySelector('#appRows .tile[data-key="orch"]') || fab);
+        : (document.querySelector('#appRows .tile[data-key="orch"]') || document.querySelector('.tile[data-key="orch"]'));
       if(target && typeof target.focus === 'function'){
         try{ target.focus(); }catch(e){}
       }
@@ -4551,39 +4655,13 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   function portalOrchPaint(){
-    var fab = $('orchFab');
-    var fabBadge = $('orchFabBadge');
     portalOrchRemoveBadge(true);
-    if(fab){
-      fab.hidden = !(portalOrchUid && portalOrchRole !== 'reviewer');
-    }
     if(!portalOrchReport){
-      if(fab) fab.removeAttribute('data-tone');
-      if(fabBadge) fabBadge.hidden = true;
       portalOrchSyncPins('');
       portalOrchPaintModal();
       return;
     }
     var active = (portalOrchReport.batons || []).filter(function(x){ return !x.checked && !x.snoozed; });
-    var hasUrg = active.some(function(x){ return x.severity === 'urgent'; });
-    var hasWarn = active.some(function(x){ return x.severity === 'warn'; });
-    if(fab){
-      if(hasUrg) fab.setAttribute('data-tone', 'urgent');
-      else if(hasWarn) fab.setAttribute('data-tone', 'warn');
-      else fab.removeAttribute('data-tone');
-      fab.title = active.length > 0
-        ? ('업무 오케스트레이션 — 대기 바통 ' + active.length + '건 (클릭 시 팝업 열기)')
-        : '업무 오케스트레이션 팝업 열기';
-    }
-    if(fabBadge){
-      if(active.length > 0){
-        fabBadge.hidden = false;
-        fabBadge.textContent = String(active.length);
-      } else {
-        fabBadge.hidden = true;
-      }
-    }
-
     if(active.length > 0){
       var tile = document.querySelector('.tile[data-key="orch"]');
       if(tile){
@@ -4592,7 +4670,12 @@ body.portal-mode #moreFab{display:flex;}
         tb.className = 'tile-alert';
         tb.textContent = '바통 ' + active.length;
         tb.title = '🔄 대기 바통 ' + active.length + '건 — 눌러서 작은 팝업으로 바로 확인';
+        tb.setAttribute('role', 'button');
+        tb.tabIndex = 0;
         tb.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); portalOrchOpenPopup('', tb); };
+        tb.addEventListener('keydown', function(ev){
+          if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); ev.stopPropagation(); portalOrchOpenPopup('', tb); }
+        });
         tile.appendChild(tb);
         portalOrchSyncPins(active.length + '|' + (active[0] ? active[0].id : ''));
       }
@@ -4603,11 +4686,6 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   function portalOrchWireStatic(){
-    var fab = $('orchFab');
-    if(fab && !fab._wired){
-      fab._wired = true;
-      fab.addEventListener('click', function(){ portalOrchOpenPopup('', fab); });
-    }
     var modal = $('orchModal');
     if(modal && !modal._wired){
       modal._wired = true;
@@ -4817,8 +4895,6 @@ body.portal-mode #moreFab{display:flex;}
     if(portalOrchVis){ document.removeEventListener('visibilitychange', portalOrchVis); portalOrchVis = null; }
     try{ localStorage.removeItem('pu_orch_baton_v1'); }catch(_){}
     try{ sessionStorage.removeItem('pu_orch_baton_v1'); }catch(_){}
-    var fab = $('orchFab'); if(fab){ fab.hidden = true; fab.removeAttribute('data-tone'); }
-    var fabBadge = $('orchFabBadge'); if(fabBadge) fabBadge.hidden = true;
     var qInp = $('orchModalQ'); if(qInp) qInp.value = '';
     var stBox = $('orchModalStages'); if(stBox) stBox.innerHTML = '';
     var lsBox = $('orchModalList'); if(lsBox) lsBox.innerHTML = '';
@@ -4880,6 +4956,7 @@ body.portal-mode #moreFab{display:flex;}
     var role = acct ? acct.role : 'member';
     _curRole = role;   // 바로가기(홈 앱) 권한 판정용
     _curName = name || '';
+    _curUid = (auth.currentUser && auth.currentUser.uid) || '';   // 📋 머리줄 «내 업무» 숫자를 누구 몫으로 읽을지 (아래 portalHeadAppPaint 가 곧 센다)
     if(role === 'reviewer'){
       var _kr = $('kkRegRow');
       if(_kr) _kr.style.display = 'none';
@@ -5101,6 +5178,8 @@ body.portal-mode #moreFab{display:flex;}
       try { cfgShowFab(); } catch(e){}
     } else {
       if(window.sgSetUser) window.sgSetUser(acct);
+      mwTipWire();                                               // 📋 단추 누름 = «앎» — 안내가 뜨기 전에 눌러도 기억하게 지금 붙인다
+      setTimeout(function(){ portalMyWorkTip(false); }, 600);   // 📋 내 업무 첫 안내 — 머리줄이 자리 잡은 뒤(대표 지시 2026-11-22)
       initPortalHanaAlerts(role);
       initPortalExpAlerts();
       portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
@@ -5127,6 +5206,7 @@ body.portal-mode #moreFab{display:flex;}
      ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
      ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
   function portalHeadAppsHide(){
+    mwTipRedraw();            // 📋 내 업무 첫 안내도 함께 걷는다 — 앞사람 안내가 남지 않게(같은 사람이면 다시 그린 뒤 또 뜬다)
     var els = document.querySelectorAll('[data-head-app]');
     for(var i = 0; i < els.length; i++) els[i].hidden = true;
   }
@@ -5140,6 +5220,7 @@ body.portal-mode #moreFab{display:flex;}
   }
   /* 접근성 이름·말풍선 — 날짜는 항상, 「오늘 N건」은 «받았을 때만». 숫자가 무슨 뜻인지(구글 공용 달력만)도 말풍선에 밝힌다. */
   function portalHeadAppLabel(el){
+    if(el.getAttribute('data-count') === 'myWork'){ portalMyWorkLabel(el); return; }   // 📋 내 업무 — 날짜가 아니라 업무 숫자를 말한다
     var name = el.getAttribute('data-name') || '', day = el.getAttribute('data-today') || '';
     var n = el.getAttribute('data-n');
     var cnt = (n !== null && n !== '') ? ' · 오늘 구글 공용 달력 일정 ' + n + '건' : '';
@@ -5224,7 +5305,8 @@ body.portal-mode #moreFab{display:flex;}
     c.pending = p;
     return p;
   }
-  var PORTAL_HEAD_COUNTERS = { gcalToday: portalCalTodayCount };
+  /* myWork(📋 내 업무)는 아래 «내 업무 숫자» 구역이 센다 — 여기서는 «부르기만» 한다(이 구역은 서버 자료를 안 읽는다) */
+  var PORTAL_HEAD_COUNTERS = { gcalToday: portalCalTodayCount, myWork: function(){ return portalMyWorkCount(); } };
   function portalHeadAppCountApply(el, n, ymd){
     var box = el.querySelector('.hd-n'), v = el.querySelector('.hd-nv');
     if(n === null || n === undefined){
@@ -5247,10 +5329,189 @@ body.portal-mode #moreFab{display:flex;}
     p.then(function(n){
       if(el.hidden) return;                              // 그 사이 감춰졌다(다른 사람으로 바뀜)
       if(portalYmdOf(new Date()) !== ymd) return;        // 받는 사이 자정을 넘겼다 — 다음에 다시 센다
+      if(n && typeof n === 'object'){ portalMyWorkApply(el, n, ymd); return; }   // 📋 내 업무 — 숫자 여럿
       portalHeadAppCountApply(el, n, ymd);
     }, function(){});
   }
   /* ── 오늘 N건 끝 ── */
+
+  /* ── 📋 내 업무 숫자 (머리줄 «내 업무» 단추) ── 대표 지시 2026-11-21
+     「이 화면에서 로그인하면 대부분 자기 업무 위주로 봐야 되는데 … 개별 로그인했던 사람이 정확하게 한 번에 보고 클릭해서 자기 업무만 확인」
+     ★ 무엇을 읽나: work_erp/mysum/{내 로그인 UID} «한 줄»뿐 — 업무관리가 「내 업무」를 그릴 때 적어 둔 진행 건수·기한 날짜들(js/pu-mywork.js 머리글).
+       열쇠가 사번이 아니라 UID 인 까닭: 규칙이 «본인 UID 자리만 쓰기»로 막아 남이 내 숫자를 못 덮는다.
+       업무 목록 통째(work_erp/items)는 안 읽는다 — 포털을 열 때마다 모든 직원이 목록 전체를 내려받지 않게.
+     ★ 임박·할 일은 «오늘» 기준으로 여기서 다시 센다 — 업무관리를 어제 열었어도 오늘 날짜로 맞다(PuMyWork.counts).
+     ★ 못 읽었거나 오래된 값(PuMyWork.STALE_DAYS)이면 숫자를 «안 보인다» — 단추는 그대로 선다(못 받음 ≠ 0건).
+     ★ 2분 안에는 다시 안 읽는다. 다시 볼 때(visibilitychange)는 위 처리가 이 함수를 또 부른다 — 업무관리에서 돌아오면 새 숫자.
+     ⚠ 사람이 바뀌면(로그아웃·다른 계정) 앞사람 숫자를 버린다 — 캐시를 UID 로 묶는다. */
+  var _curUid = '';
+  var PORTAL_MYWORK_FRESH_MS = 2 * 60 * 1000;
+  var portalMyWorkCache = { sid: '', at: 0, sum: undefined, pending: null };
+  function portalMyWorkCount(){
+    var M = window.PuMyWork, sid = _curUid, c = portalMyWorkCache;   // sid = 이 캐시의 «누구» (로그인 UID)
+    if(!M || !sid || typeof db === 'undefined' || !db) return Promise.resolve(null);
+    var today = portalYmdOf(new Date());
+    if(c.sid === sid && c.sum !== undefined && Date.now() - c.at < PORTAL_MYWORK_FRESH_MS)
+      return Promise.resolve(M.counts(c.sum, today, Date.now()));
+    if(c.sid === sid && c.pending) return c.pending;
+    var path = M.pathOf(sid);
+    if(!path) return Promise.resolve(null);
+    if(c.sid !== sid){ c.sid = sid; c.sum = undefined; c.at = 0; }
+    var p = db.ref(path).once('value')
+      .then(function(s){ return s ? s.val() : null; }, function(){ return undefined; })
+      .then(function(v){
+        if(portalMyWorkCache.sid !== sid) return null;        // 받는 사이 다른 사람으로 바뀌었다
+        c.pending = null;
+        if(v === undefined) return null;                      // 못 읽음 — 다음에 다시(캐시에 안 담는다)
+        c.sum = v; c.at = Date.now();
+        return M.counts(v, portalYmdOf(new Date()), Date.now());
+      });
+    c.pending = p;
+    return p;
+  }
+  /* 숫자를 단추에 — PC 는 «진행 N · 임박 N · 할 일 N», 폰 딱지(.hd-nv)는 급한 것(임박+할 일)만 */
+  function portalMyWorkApply(el, cnt, ymd){
+    var box = el.querySelector('.hd-n'), v = el.querySelector('.hd-nv'), l = el.querySelector('.hd-wl');
+    var urgent = (cnt.due || 0) + (cnt.next || 0);
+    el.setAttribute('data-n', String(cnt.open)); el.setAttribute('data-n-ymd', ymd || '');
+    el.setAttribute('data-line', window.PuMyWork ? window.PuMyWork.line(cnt) : ('진행 ' + cnt.open));
+    el.setAttribute('data-at', String(cnt.at || ''));
+    if(l) l.textContent = el.getAttribute('data-line');
+    if(v) v.textContent = String(urgent);
+    if(box){ box.hidden = false; box.classList.toggle('is-zero', urgent === 0); }
+    portalHeadAppLabel(el);
+    if($('mwTip')) mwTipPlace();   // 숫자가 붙어 단추 폭이 바뀌었다 — 첫 안내의 화살표를 다시 맞춘다
+  }
+  /* 접근성 이름·말풍선 — 숫자는 «받았을 때만», 언제 기준인지도 밝힌다(업무관리를 마지막으로 연 때) */
+  function portalMyWorkLabel(el){
+    var name = el.getAttribute('data-name') || '내 업무';
+    var line = el.getAttribute('data-n') !== null ? (el.getAttribute('data-line') || '') : '';
+    var at = el.getAttribute('data-at'), st = (line && at && window.PuMyWork) ? window.PuMyWork.stamp(+at) : '';
+    el.setAttribute('aria-label', name + ' — 업무관리에서 내가 맡은 업무 열기' + (line ? ' · ' + line : ''));
+    el.title = '📋 ' + name + ' — 업무관리에서 내가 맡은 업무만 엽니다'
+      + (line ? '\n' + line + (st ? ' (업무관리 ' + st + ' 기준)' : '') : '\n숫자는 업무관리를 한 번 열면 나옵니다');
+  }
+  /* ── 내 업무 숫자 끝 ── */
+
+  /* ══ 📋 내 업무 첫 안내 — 로그인하면 «내 업무» 단추 바로 아래에 안내 상자 (대표 지시 2026-11-22) ══
+     대표 말씀: 「로그인하면 내 업무 현재 진행 상황은 어디다라고 하고 팝업창으로, 내 업무 박스 옆에 여기를 누르면
+       본인 지금 현재 업무를 입력하거나 ERP 진행 상황 등을 확인할 수 있다, 여기에 데이터를 넣을 수 있다, 관리가 가능하다」.
+     ★ 언제: 포털이 그려진 뒤(renderPortal) 사람마다 — «알겠어요»를 누르거나 «내 업무» 단추를 한 번 누를 때까지 로그인마다 뜬다.
+       ✕·Esc 는 «이번만» 닫는다(다음 로그인 때 다시) — 닫은 뒤 같은 창에서 포털을 다시 그려도 또 뜨지 않는다(_mwTipSession).
+       떠 있는 채로 다시 그려지면(같은 사람) 다시 뜬다(mwTipRedraw). 단추 누름은 포털을 그리자마자 듣는다(mwTipWire).
+     ★ 초점: 뜰 때 아무것도 안 잡고 있고 확인 창도 없으면 안내 상자로(화면읽기가 제목을 읽는다), 키보드로 닫으면 «내 업무» 단추로.
+     ★ «알겠어요»는 이 기기 브라우저에만 적는다(localStorage, 열쇠에 로그인 UID — 한 PC 를 여럿이 써도 사람마다).
+       못 적는 브라우저(사생활 보호 창 등)면 다음 로그인에 또 뜰 뿐 — 막히거나 오류가 나지 않는다.
+     ★ 창(모달)이 아니라 말풍선이다 — 포털을 막지 않는다. 확인 창(z 80)이 뜨면 그 아래로 간다. Esc 로 닫힌다.
+     ★ 건의하기 말풍선(sgShowTip)과 자리가 겹친다 — 이 안내가 뜰 차례이거나 떠 있으면 그쪽이 쉰다(portalMyWorkTipDue).
+     ⚠ 심사 전용 계정(reviewer)에는 안 띄운다 — renderPortal 의 직원 갈래에서만 부른다. */
+  var MWTIP_KEY = 'pu_mywork_tip_ok:';
+  var _mwTipSession = {};
+  function mwTipSeen(uid){ try { return localStorage.getItem(MWTIP_KEY + uid) === '1'; } catch(e){ return false; } }
+  function mwTipAck(uid){ try { localStorage.setItem(MWTIP_KEY + uid, '1'); } catch(e){} }
+  function mwTipBtn(){ var b = $('headApp_work'); return (b && !b.hidden) ? b : null; }
+  /* 지금 이 사람에게 안내가 떠 있거나 곧 뜰 차례인가 — 건의하기 말풍선이 묻는다 */
+  function portalMyWorkTipDue(){
+    if($('mwTip')) return true;
+    var uid = _curUid;
+    return !!(uid && mwTipBtn() && !_mwTipSession[uid] && !mwTipSeen(uid));
+  }
+  function mwTipKey(e){ if(e.key === 'Escape') mwTipClose(false); }
+  function mwTipClose(ack){
+    var t = $('mwTip');
+    if(!t) return;
+    if(ack && t.getAttribute('data-uid')) mwTipAck(t.getAttribute('data-uid'));
+    window.removeEventListener('resize', mwTipPlace);
+    document.removeEventListener('keydown', mwTipKey);
+    /* 초점이 안내 안에 있었으면(키보드로 닫음) «내 업무» 단추로 돌려준다 — 안 그러면 초점이 문서 맨 앞(BODY)으로 사라진다 */
+    var ae = document.activeElement, had = !!ae && (ae === t || t.contains(ae));
+    t.remove();
+    var btn = mwTipBtn();
+    if(had && btn){ try { btn.focus(); } catch(e){} }
+  }
+  /* 포털을 다시 그릴 때(portalHeadAppsHide) — 떠 있던 안내는 걷되(앞사람 것이 남지 않게),
+     같은 사람이 다시 그려지면 또 뜨게 «이번 창에서 띄웠음» 표시를 푼다. ✕ 로 닫은 것은 이미 없으니 그대로 «닫음»이다. */
+  function mwTipRedraw(){
+    var t = $('mwTip');
+    if(!t) return;
+    delete _mwTipSession[t.getAttribute('data-uid')];
+    mwTipClose(false);
+  }
+  /* «내 업무» 단추를 누르면 — 안내를 봤든 안 봤든 — 어디인지 아는 것이다. 포털을 그리자마자 붙인다(안내가 뜨기 전 0.6초 사이에 눌러도). */
+  function mwTipWire(){
+    var btn = mwTipBtn();
+    if(!btn || btn.getAttribute('data-tip-wired') === '1') return;
+    btn.setAttribute('data-tip-wired', '1');
+    btn.addEventListener('click', function(){ if($('mwTip')) mwTipClose(true); else if(_curUid) mwTipAck(_curUid); });
+  }
+  /* 확인 창(해결 확인·처리할 건의·오케스트레이션 따위 aria-modal)이 떠 있나 — 그러면 안내로 초점을 빼앗지 않는다 */
+  function mwTipBusy(){
+    var ids = ['sgDoneModal', 'sgPendModal'], i, m;
+    for(i = 0; i < ids.length; i++){ m = $(ids[i]); if(m && !m.hidden && m.getClientRects().length) return true; }
+    var am = document.querySelectorAll('[aria-modal="true"]');
+    for(i = 0; i < am.length; i++){ if(!am[i].hidden && am[i].getClientRects().length) return true; }
+    return false;
+  }
+  /* 단추를 재서 바로 아래에 — 가운데를 단추에 맞추되 화면 양옆 8px 안으로, 화살표는 단추 가운데를 가리킨다 */
+  function mwTipPlace(){
+    var t = $('mwTip'), btn = mwTipBtn(), bar = t && t.parentNode;
+    if(!t || !btn || !bar){ mwTipClose(false); return; }
+    var b = btn.getBoundingClientRect(), p = bar.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth || window.innerWidth || 360;
+    var w = Math.min(340, vw - 16);
+    var cx = b.left + b.width / 2;
+    var left = Math.max(8, Math.min(cx - w / 2, vw - 8 - w));
+    t.style.width = w + 'px';
+    t.style.left = (left - p.left) + 'px';
+    t.style.top = (b.bottom - p.top + 10) + 'px';
+    var ar = t.querySelector('.mw-ar');
+    if(ar) ar.style.left = Math.max(14, Math.min(cx - left - 6, w - 26)) + 'px';
+  }
+  function portalMyWorkTip(force){
+    var uid = _curUid, btn = mwTipBtn();
+    if(!uid || !btn) return;
+    mwTipWire();
+    if(!force && (_mwTipSession[uid] || mwTipSeen(uid))) return;
+    _mwTipSession[uid] = 1;
+    mwTipClose(false);
+    var olds = document.querySelectorAll('.sg-tip');                 // 먼저 떠 있던 건의하기 말풍선은 걷는다(같은 자리)
+    for(var i = 0; i < olds.length; i++) olds[i].remove();
+    var bar = btn.parentNode;
+    var t = document.createElement('div');
+    t.id = 'mwTip';
+    t.className = 'mw-tip';
+    t.setAttribute('role', 'dialog');
+    t.setAttribute('aria-modal', 'false');
+    t.setAttribute('aria-labelledby', 'mwTipT');
+    t.setAttribute('tabindex', '-1');   // 뜰 때 초점을 받아 화면읽기가 «내 업무는 여기서 봅니다»를 읽는다(아래)
+    t.setAttribute('data-uid', uid);
+    /* 고정 글자만 넣는다(이름·숫자 같은 바깥 값 없음) */
+    t.innerHTML =
+      '<span class="mw-ar" aria-hidden="true"></span>'
+      + '<button type="button" class="mw-x" aria-label="안내 닫기" title="닫기 — 다음에 로그인하면 다시 안내합니다">✕</button>'
+      + '<b class="mw-t" id="mwTipT">📋 내 업무는 여기서 봅니다</b>'
+      + '<ul>'
+      + '<li>이 단추에 <b>내가 맡은 업무의 지금 진행 상황</b>(진행·임박·할 일 건수)이 보입니다.</li>'
+      + '<li>누르면 업무관리 「내 업무」가 열립니다 — <b>지금 하는 업무를 입력</b>하고 진행 기록을 남깁니다.</li>'
+      + '<li>이알피(계약·사건·컨설팅)에서 내가 담당인 업무도 여기로 들어와 <b>진행 상황을 함께 확인</b>합니다.</li>'
+      + '<li>새 업무 추가·고치기·끝내기까지 <b>내 업무 자료는 여기에 넣고 관리</b>합니다.</li>'
+      + '</ul>'
+      + '<div class="mw-ft"><button type="button" class="mw-go">📋 내 업무 열기</button><button type="button" class="mw-ok">알겠어요</button></div>'
+      + '<small>«알겠어요»를 누르면 이 기기에서는 다시 뜨지 않습니다.</small>';
+    t.querySelector('.mw-x').addEventListener('click', function(){ mwTipClose(false); });
+    t.querySelector('.mw-ok').addEventListener('click', function(){ mwTipClose(true); });
+    t.querySelector('.mw-go').addEventListener('click', function(){ mwTipClose(true); btn.click(); });   // 단추를 누른 것과 똑같이 연다(PC 새 창·폰 이동)
+    bar.appendChild(t);
+    mwTipPlace();
+    window.addEventListener('resize', mwTipPlace);
+    document.addEventListener('keydown', mwTipKey);
+    /* 초점 — 아무것도 안 잡고 있을 때(문서 맨 앞)만 안내로 옮긴다. 사람이 무엇을 누르거나 적는 중이거나,
+       확인 창이 떠 있으면 빼앗지 않는다(그 창이 먼저다). */
+    var ae = document.activeElement;
+    if((!ae || ae === document.body) && !mwTipBusy()){ try { t.focus({ preventScroll: true }); } catch(e){} }
+  }
+  window.portalMyWorkTip = portalMyWorkTip;   // 점검 도구(tools/phone-audit 씨앗 portal 의 'mywork-tip' 화면)가 다시 띄운다
+  /* ── 내 업무 첫 안내 끝 ── */
   document.addEventListener('visibilitychange', function(){
     if(document.hidden) return;
     var els = document.querySelectorAll('[data-head-app]');
@@ -6946,7 +7207,7 @@ body.portal-mode #moreFab{display:flex;}
     try { if(window.caches && caches.delete) caches.delete('pucards-share'); } catch(_cd){}
     try {
       if(window.indexedDB && indexedDB.deleteDatabase){
-        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
+        ['pu-photos-share','pu-paydata-share','pu-viewer-share','pu-handoff','pu_pbox_workspace_v1','pu_fast_boot_v1'].forEach(function(n){ try { indexedDB.deleteDatabase(n); } catch(_){} });
         if(typeof indexedDB.databases === 'function'){
           indexedDB.databases().then(function(ls){
             (ls || []).forEach(function(it){
@@ -7076,7 +7337,7 @@ body.portal-mode #moreFab{display:flex;}
     { g:'misc',   label:'기타 건의' }
   ];
   var SG_STATUS = { new:{t:'접수',c:'sg-st-new'}, ing:{t:'검토중',c:'sg-st-ing'}, done:{t:'완료',c:'sg-st-done'} };
-  var SG = { uid:'', name:'', email:'', role:'member', draftCat:'erp', draftImgs:[], _all:[], listStatus:'open', listQ:'', replyDraftImgs:[] };
+  var SG = { uid:'', name:'', email:'', role:'member', draftCat:'erp', draftImgs:[], _all:[], listStatus:'open', listQ:'', replyDraftImgs:[], ack:{} };
 
   window.sgSetUser = function(acct){
     SG.uid = (auth.currentUser && auth.currentUser.uid) || '';
@@ -7100,7 +7361,10 @@ body.portal-mode #moreFab{display:flex;}
   // ── 안내 말풍선: 포털 진입 시 1회, 5초 뒤 자동 소멸 ──
   var _sgTipShown = false;
   function sgShowTip(){
-    if(_sgTipShown) return; _sgTipShown = true;
+    if(_sgTipShown) return;
+    /* 📋 내 업무 첫 안내가 떠 있거나 뜰 차례면 쉰다 — 머리줄 바로 아래 같은 자리라 겹친다 (2026-11-22) */
+    if(typeof portalMyWorkTipDue === 'function' && portalMyWorkTipDue()) return;
+    _sgTipShown = true;
     var tip = document.createElement('span');
     tip.className = 'sg-tip';
     tip.textContent = '프로그램 오류·불편한 점·개선 아이디어를 남겨주세요. 처리되면 결과를 알려드립니다.';
@@ -7878,7 +8142,9 @@ body.portal-mode #moreFab{display:flex;}
       arr.reverse();
       SG._all = arr;
       SG.listShown = 30; SG.listPeriod = 'all';
+      SG.ack = {};
       sgRenderList();
+      sgLoadAckStates();     // 완료한 건 중 «건의자가 최종 확인했는지» 를 뒤따라 채운다 (관리자만)
       // 예전 건의(sg_meta 없던 시절) 백필 — 관리자가 목록을 열 때 조용히 보충
       if(sgIsAdmin()){
         db.ref(SG_META_PRIVATE_PATH).once('value').then(function(ms){
@@ -7898,6 +8164,46 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
 
+  /* ── 최종 확정 표시 (대표 지시 2026-11-11 「담당자에게 최종확정되었는지 확인 답변까지 받게」) ──
+     «완료» 는 우리가 고쳤다는 말이고, «확정» 은 건의한 담당자가 「해결됐어요」 로 답한 것(resolvedOk:true)이다.
+     그 답은 건의자 진행함(suggestions_resolved_private/{uid}/{id})에 있어 목록(suggestions_private)만 봐서는 안 보였다 —
+     그래서 완료한 건이 «확인을 받았는지» 를 상세를 열어 보기 전엔 몰랐다.
+       ok   = 건의자가 해결을 확인함     no   = 아직 안 됐다고 회신함(재요청이 따로 접수됨)
+       wait = 확인 대기 — 답이 없고 확인 팝업이 아직 «안 본» 상태(seen:false)
+       그 밖 = 확인 칸이 없던 때 마감된 예전 건 — 아무 표시도 하지 않는다
+     ⚠ 읽기만 한다. 관리자만 읽을 수 있는 자리라 일반 직원 화면에서는 부르지 않는다. 실패해도 목록은 그대로다. */
+  function sgLoadAckStates(){
+    if(!sgIsAdmin()) return;
+    /* 건의자(uid)마다 진행함을 «한 번씩» 읽어 그 사람의 완료 건을 모두 판정한다 — 건수·나이로 자르지 않는다.
+       (예전엔 건마다 두 번씩 읽으며 «최근 60건» 으로 잘라, 완료가 많아지면 가장 오래 답 없는 건이 다시 빠졌다 — 외부 검토 지적.)
+       읽는 양의 한도는 «사람 수»(100명, 오래된 건을 가진 사람부터)다. */
+    var byUid = {};
+    (SG._all||[]).forEach(function(s){
+      if(s.status==='done' && s.authorUid && SG.ack[s._id]===undefined){ (byUid[s.authorUid] = byUid[s.authorUid] || []).push(s); }
+    });
+    /* 가장 오래된 완료 건을 가진 사람부터 읽는다 — 한도에 걸려도 «가장 오래 답 없는 건» 쪽이 먼저 보이게 */
+    function oldest(list){ return list.reduce(function(m,s){ return Math.min(m, s.repliedAt||s.createdAt||0); }, Infinity); }
+    var uids = Object.keys(byUid).sort(function(a,b){ return oldest(byUid[a]) - oldest(byUid[b]); }).slice(0, 100);
+    if(!uids.length) return;
+    function repaint(){
+      /* 목록 화면을 떠났으면 그만. 검색창에 글자를 치는 중이면 «포커스가 빠질 때까지» 미룬다 — 다시 그리면 입력 칸이 새로 만들어져 포커스·한글 조합이 끊긴다 */
+      var d = (typeof document !== 'undefined') ? document : null;
+      if(d && d.getElementById && !d.getElementById('sgListWrap')) return;
+      var ae = d ? d.activeElement : null;
+      if(ae && ae.id==='sgListSearch'){ setTimeout(repaint, 1200); return; }
+      sgRenderList();
+    }
+    return Promise.all(uids.map(function(uid){
+      return db.ref(sgResolvedUidPath(uid)).once('value').then(function(snap){
+        var recs = snap.val() || {};
+        byUid[uid].forEach(function(s){
+          var r = recs[s._id]; if(!r || typeof r!=='object') return;     // 진행함에 줄이 없으면 모른다 — «대기» 로 단정하지 않는다
+          SG.ack[s._id] = r.resolvedOk===true ? 'ok' : (r.resolvedOk===false ? 'no' : (r.seen===false ? 'wait' : 'old'));
+        });
+      }).catch(function(){});
+    })).then(repaint).catch(function(){});
+  }
+
   // 목록 렌더 (상태 필터 + 검색) — SG._all 기준, 재조회 없음
   function sgRenderList(){
     var wrap = $('sgListWrap'); if(!wrap) return;
@@ -7913,10 +8219,14 @@ body.portal-mode #moreFab{display:flex;}
        두 숫자를 한 곳에서 낸다. 이러면 어긋날 수가 없다.
        ⚠ 관리자만이다 — 일반 직원 배지는 「내 건의가 해결됐다」를 세는 다른 수다. */
     if(sgIsAdmin()) sgSetBadge(totalOpen);
-    var FILTERS = [['open','미처리 '+totalOpen],['done','완료 '+totalDone],['all','전체 '+arr.length]];
+    var nWait = sgIsAdmin() ? arr.filter(function(s){ return s.status==='done' && SG.ack[s._id]==='wait'; }).length : 0;
+    if(!nWait && SG.listStatus==='ack') SG.listStatus = 'done';     // 대기가 다 풀렸는데 그 칩에 머물지 않게
+    var FILTERS = [['open','미처리 '+totalOpen],['done','완료 '+totalDone]];
+    if(nWait) FILTERS.push(['ack','⏳ 대기 '+nWait,'건의자 확인 대기']);     // 좁은 폰(375px)에서도 탭이 한 줄이도록 짧게
+    FILTERS.push(['all','전체 '+arr.length]);
     var chips = '<div class="sg-list-tabs" role="tablist" aria-label="건의 상태">' + FILTERS.map(function(f){
       var on = SG.listStatus === f[0];
-      return '<button data-f="'+f[0]+'" class="sg-flt'+(on?' on':'')+'" role="tab" aria-selected="'+(on?'true':'false')+'">'+f[1]+'</button>';
+      return '<button data-f="'+f[0]+'" class="sg-flt'+(on?' on':'')+'" role="tab" aria-selected="'+(on?'true':'false')+'"'+(f[2]?' title="'+f[2]+'"':'')+'>'+f[1]+'</button>';
     }).join('') + '</div>';
     if(!SG.listPeriod) SG.listPeriod='all';
     var periodSelect = '<select id="sgPeriodSelect" aria-label="조회 기간">'
@@ -7940,12 +8250,14 @@ body.portal-mode #moreFab{display:flex;}
     var list = arr.filter(function(s){
       if(SG.listStatus==='open' && s.status==='done') return false;
       if(SG.listStatus==='done' && s.status!=='done') return false;
+      if(SG.listStatus==='ack' && !(s.status==='done' && SG.ack[s._id]==='wait')) return false;
       if(!_inPeriod(s)) return false;
       if(q){ var hay = ((s.title||'')+' '+(s.content||'')+' '+(s.author||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
       return true;
     });
     // 완료 탭은 완료(답변)일 최신순, 그 외는 등록일 최신순(arr 기본 순서 유지)
-    if(SG.listStatus==='done'){ list.sort(function(a,b){ return (b.repliedAt||b.createdAt||0)-(a.repliedAt||a.createdAt||0); }); }
+    var _byDone = SG.listStatus==='done' || SG.listStatus==='ack';
+    if(_byDone){ list.sort(function(a,b){ return (b.repliedAt||b.createdAt||0)-(a.repliedAt||a.createdAt||0); }); }
     // 더 보기(30개씩) — 완료가 아무리 많아도 가볍게
     var PAGE = 30;
     var shown = SG.listShown || PAGE;
@@ -7954,12 +8266,17 @@ body.portal-mode #moreFab{display:flex;}
       var st = SG_STATUS[s.status] || SG_STATUS.new;
       var shots = (s.images && s.images.length) ? ' · 📎 '+s.images.length : '';
       var rep = s.reply ? ' · 답변 ✔' : '';
-      var when = (SG.listStatus==='done' && s.repliedAt) ? ('완료 '+sgFmt(s.repliedAt)) : sgFmt(s.createdAt);
+      var when = (_byDone && s.repliedAt) ? ('완료 '+sgFmt(s.repliedAt)) : sgFmt(s.createdAt);
+      // 완료한 건이 «건의자 최종 확인» 을 받았는지 — 확정 ✅ · 미해결 회신 🙅 · 확인 대기 ⏳ (예전 건은 표시 없음)
+      var _ak = s.status==='done' ? SG.ack[s._id] : '';
+      var ackT = _ak==='ok' ? ' · <span style="color:#166534;font-weight:700">✅ 건의자 확인</span>'
+        : _ak==='no' ? ' · <span style="color:#991b1b;font-weight:700">🙅 미해결 회신</span>'
+        : _ak==='wait' ? ' · <span style="color:#854d0e;font-weight:700">⏳ 확인 대기</span>' : '';
       // 재요청(미해결 회신)은 목록에서도 바로 보이게 — 새 건의로 오해하지 않게
       var reReq = s.relatedId ? '<span style="color:#991b1b;font-weight:700"> · ↩ 재요청</span>' : '';
-      return '<div class="sg-item" data-id="'+s._id+'">'
+      return '<div class="sg-item" data-id="'+sgEsc(s._id)+'">'
         + '<div class="sg-itl">'+sgEsc(s.title)+'</div>'
-        + '<div class="sg-meta"><span class="sg-badge sg-b-'+sgCatClass(s.cat)+'">'+sgEsc(sgCatName(s.cat))+'</span> · '+sgEsc(sgWho(s.author))+' · '+when+shots+rep+reReq+'</div></div>';
+        + '<div class="sg-meta"><span class="sg-badge sg-b-'+sgCatClass(s.cat)+'">'+sgEsc(sgCatName(s.cat))+'</span>'+ackT+' · '+sgEsc(sgWho(s.author))+' · '+when+shots+rep+reReq+'</div></div>';
     }).join('') : '<div class="sg-empty">'+(arr.length? '조건에 맞는 건의가 없습니다.' : '아직 등록된 건의가 없습니다.<br>불편한 점을 자유롭게 남겨주세요.')+'</div>';
     var moreBtn = (list.length > shown)
       ? '<button id="sgMore" class="sg-btn ghost" style="margin-top:8px">더 보기 ('+(list.length-shown)+'건 남음)</button>' : '';
@@ -8058,7 +8375,7 @@ body.portal-mode #moreFab{display:flex;}
     box.innerHTML = '<div style="border:1px solid #fde68a;background:#fffbeb;border-radius:9px;padding:8px 10px;margin:8px 0">'
       + '<div style="font-size:.76rem;font-weight:800;color:#854d0e;margin-bottom:5px">💡 비슷한 지난 건의 '+scored.length+'건 — 이미 접수·처리된 내용인지 확인해보세요</div>'
       + scored.map(function(x){ var st=SG_STATUS[x.s.status]||SG_STATUS.new;
-          return '<div class="sgSimIt" data-id="'+x.s._id+'" style="cursor:pointer;font-size:.8rem;padding:3px 0;color:#1e293b"><span class="sg-st '+st.c+'" style="font-size:.68rem">'+st.t+'</span> '+sgEsc(x.s.title||'')+'</div>';
+          return '<div class="sgSimIt" data-id="'+sgEsc(x.s._id)+'" style="cursor:pointer;font-size:.8rem;padding:3px 0;color:#1e293b"><span class="sg-st '+st.c+'" style="font-size:.68rem">'+st.t+'</span> '+sgEsc(x.s.title||'')+'</div>';
         }).join('')
       + '</div>';
     Array.prototype.forEach.call(box.querySelectorAll('.sgSimIt'), function(el){
@@ -8414,6 +8731,8 @@ body.portal-mode #moreFab{display:flex;}
           else if(rv.resolvedOk === false)
             el.innerHTML = '<div style="background:#f8fafc;border:1px solid #fecaca;border-radius:8px;padding:7px 10px;margin:8px 0;font-size:.72rem;color:#991b1b"><b>🙅 건의자가 미해결로 회신했습니다</b>'+(rv.feedbackAt?' · '+sgFmt(rv.feedbackAt):'')
               +(rv.feedback?'<div style="margin-top:4px;color:#991b1b">'+sgEsc(rv.feedback)+'</div>':'')+'</div>';
+          else if(s.status==='done' && rv.seen===false)
+            el.innerHTML = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;margin:8px 0;font-size:.72rem;color:#854d0e"><b>⏳ 건의자 확인을 기다리는 중입니다</b> · 건의자가 포털에 로그인하면 「해결됐어요 / 아직 안 됐어요」 확인 창이 뜹니다</div>';
         }).catch(function(){});
       }
       if(sgIsAdmin()){
@@ -8643,9 +8962,9 @@ body.portal-mode #moreFab{display:flex;}
   //    대신 그 파일들이 만들어 놓은 단추를 여기서 데려온다. 만들어지는 시점이 제각각이라
   //    (로그인·권한 확인 뒤) 새로 생기는지 지켜보다가 잡는다.
   (function(){
-    // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 둘만
-    /* ✨ TypeSafe(pu-typesafe-review-button)는 PC 에선 「업무 시스템」 줄에 서지만, 폰에서는 여기로 */
-    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'pu-typesafe-review-button', 'appInstallFab'];
+    // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 것만
+    /* (✨ TypeSafe 검토 단추는 2026-11-22 대표 지시 「필요 없으면 완전히 덜어내라」로 걷어냈다) */
+    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'appInstallFab'];
     /* 아래 한 줄 바(#fabBar)에 세우는 것 — 자주 쓰거나(백업·복구),
        바로 눈에 띄어야 하는 것(장애 알림·연결 경고).
        이 셋은 각자 파일이 left/right:12px, bottom:12px 를 쓰고 있어 서로, 그리고
@@ -8683,8 +9002,6 @@ body.portal-mode #moreFab{display:flex;}
       });
       openDock(false);
     }
-    /* ⚠ 차례가 중요하다 — PC 로 돌아갈 땐 «로그인 후 바로가기»를 먼저 제자리에 돌려놓아야
-       그 바로 왼쪽이 자리인 ✨ TypeSafe 단추가 제 옆자리를 찾는다. */
     function sync(){
       if(phone.matches) adopt();
       else release();
@@ -8710,8 +9027,6 @@ body.portal-mode #moreFab{display:flex;}
       new MutationObserver(function(){ if(phone.matches) adopt(); })
         .observe(document.body, { childList:true });
     } catch(_){}
-    /* TypeSafe 단추는 body 가 아니라 「업무 시스템」 줄 안에 생겨 위 지켜보기에 안 걸린다 — 생겼다고 알려 오면 다시 맞춘다 */
-    document.addEventListener('pu-typesafe-mounted', sync);
     sync();
   })();
   // 💳 사용액 — 누르면 항목별 내역 팝업 (설정창과 같은 닫기 방식)
@@ -8824,27 +9139,9 @@ body.portal-mode #moreFab{display:flex;}
 
 })();
 </script>
-<script>
-/* ── ✨ TypeSafe 검토 — 이알피 왼쪽 아래에서 «포털 첫 화면»으로 옮겼다
-   (대표 지시 2026-09-23 「푸른통합시스템 전체로 적용해서 캡쳐3화면으로 옮기고 연결해줘」,
-   목업 ①안 「빼고 포털로만」).
-   ⚠ 포털은 떠 있는 단추 자리를 한 곳에서만 정한다(위 「화면에 떠 있는 단추의 자리」) —
-     그래서 떠 있게 두지 않고 「업무 시스템」 줄 오른쪽 끝에 세운다
-     (옆에 있던 「로그인 후 바로가기」는 2026-09-28 대표 지시 「선택 하느거 필요 없다」로 걷어냈다).
-     ★ 2026-10-24 대표 윗줄 정리 안 1 — 머리 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 나서, 목업대로 «건의하기 왼쪽»에 세운다.
-       폰에서는 ⋯ 안으로 들어간다(DOCK_IDS).
-   관리자만 보이는 것·미국 서버 확인란·하루 한도는 js/pu-typesafe.js 가 그대로 지킨다.
-   포털은 직원·업체 목록을 안 들고 있으므로 가리기용 함수를 넘기지 «않는다» —
-   부품이 「제안 받기」를 누를 때 스스로 목록을 읽어 가린다. */
-window.PU_TYPESAFE_MOUNT = function(){
-  var sg = document.getElementById('sgFab');
-  return sg && sg.parentNode ? { parent: sg.parentNode, before: null } : null;   /* 줄 «끝»에 붙이고 자리는 css order 로 — 남의 요소 앞에 기대지 않는다 */
-};
-</script>
-<script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-orchestrator-core.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=12"></script>
-<script src="js/pu-chatbot.js?v=6"></script>
+<script src="js/pu-chatbot-kb.js?v=19"></script>
+<script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>

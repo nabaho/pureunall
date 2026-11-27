@@ -184,7 +184,9 @@ function classifyFundMailDoc(fileName, mailSubject) {
     ["rel", /주주\s*명부|출자\s*명세|특수\s*관계/],
     ["fin", /재무\s*제표|재무\s*상태표|손익\s*계산서|표준\s*재무/],
     ["ei", /고용\s*보험|가입자\s*명부|4대\s*보험|피보험자/],
-    ["inseal", /인감\s*증명|주민\s*등록|초본|취임\s*승낙/],
+    ["inseal", /인감\s*증명|취임\s*승낙/],
+    ["jumin", /주민\s*등록|초본|등\s*초본/],
+    ["idcard", /신분증|운전\s*면허|여권\s*사본|개인\s*인감\s*도장/],
     ["tax_wh", /원천\s*징수/],
     ["bank_tx", /잔액\s*증명|잔고\s*증명|거래\s*내역|통장|계좌/],
     ["welfare_ev", /수혜자|지급\s*명단|목적\s*사업\s*증빙|대부\s*명세|차용증/],
@@ -221,9 +223,8 @@ function mapSdcKindToDocIds(sdcKind, fundType, isSetup, hasActiveEvent) {
     out.push("inka_wrep");
   } else if (sdcKind === "contrib") {
     if (hasActiveEvent) out.push("chg_contrib");
-    else if (isSetup) out.push("inka_contrib");
-    else if (!isIntra) out.push("sub_contrib");
-    else out.push("chg_contrib");
+    else if (!isIntra && !isSetup) out.push("sub_contrib");
+    else if (isIntra && !isSetup) out.push("chg_contrib");
   } else if (sdcKind === "fin") {
     out.push("ops_fin");
     if (!isIntra) out.push("sub_fin");
@@ -241,6 +242,10 @@ function mapSdcKindToDocIds(sdcKind, fundType, isSetup, hasActiveEvent) {
     out.push("inka_match");
   } else if (sdcKind === "inseal") {
     out.push(isSetup ? "reg_inseal" : "chg_officer");
+  } else if (sdcKind === "jumin") {
+    out.push(isSetup ? "reg_jumin" : "chg_officer");
+  } else if (sdcKind === "idcard") {
+    out.push(isSetup ? "reg_id" : "chg_officer");
   }
   return [...new Set(out)];
 }
@@ -735,7 +740,7 @@ function buildAutoSaveUpdates(params) {
 
     /* 3) 사업장 제출서류 체크리스트 입수 표시:
           allowAutoBlob 가 true 일 때만 반영하며, 기존 확인완료(ok) 또는 기존 trusted:true 참조를 미인증 메일로 덮어쓰지 않음 */
-    if (allowAutoBlob && sid && cls.sdcKind && (!sec.blocked || cls.sdcKind === "inseal")) {
+    if (allowAutoBlob && sid && cls.sdcKind && (!sec.blocked || ["inseal", "jumin", "idcard"].includes(cls.sdcKind))) {
       const sdcIds = mapSdcKindToDocIds(cls.sdcKind, fund && fund.fund_type, isSetup, activeEvList.length > 0);
       sdcIds.forEach((sdcDocId) => {
         const prev = ((existingSiteChk || {})[sid] || {})[sdcDocId] || null;

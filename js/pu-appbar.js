@@ -52,15 +52,19 @@
     { key: 'harass',  row: 'client', name: '괴롭힘·성희롱 조사', icon: '🛡️', url: 'pu-harass.html',      desc: '사건조사·메일수집·보고서' },
     { key: 'ilteo',   row: 'client', name: '일터상생혁신',     icon: '🏭', url: 'ilteo.html',          desc: '메일자료·중간·결과보고·PPT 자동화' },
     { key: 'jobtrans', row: 'client', name: '산업일자리전환',  icon: '⚡', url: 'jobtrans.html',       desc: '능률협회·충경진 메일·보고서·HWPX' },
-    { key: 'orch',    row: 'store',  name: '오케스트레이션',   icon: '🔄', url: 'pu-orchestrator.html', desc: '메일·계약·ERP·정산 흐름연결' },
+    { key: 'safety',   row: 'client', name: '안전보건체계구축', icon: '🦺', url: 'safety.html',         desc: '과거이력·업종별체크·위험성·HWPX' },
+    { key: 'orch',    row: 'inside', name: '오케스트레이션',   icon: '🔄', url: 'pu-orchestrator.html', desc: '메일·계약·ERP·정산 흐름연결' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
+    /* 데이터관리(2026-11-21) — 대표 전용. 포털 타일과 짝(adminOnly) */
+    { key: 'datahub', row: 'inside', name: '데이터관리',   icon: '📊', url: 'pu-datahub.html',     desc: '입금·업무량 3D·현황판', adminOnly: true },
     /* 영업관리 다섯(정부사업신청·회생광고·전광판·홈페이지·뉴스레터) — 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」.
        adminOnly·perm 을 뺐다 — 포털 타일과 짝. */
     { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기' },
     { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송' },
     { key: 'signboard', row: 'sales', name: '전광판',   icon: '📺', url: 'pu-signboard.html', desc: '외부 전광판 광고 바꾸기' },
     { key: 'cards',   row: 'store', name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
+    { key: 'pubsearch', row: 'store', name: '공공 기업검색', icon: '🔍', url: 'pu-pubsearch.html',   desc: '금융위·재무·국세청·고용·연금·DART' },
     /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
        whoAmI() 는 주소 꼬리까지 보고 메일을 먼저 가른다 · go() 는 «&» 로 잇는다(2026-10-04).
        tests/appbar-every-link.test.js 가 모든 줄이 «제 앱»으로 가는지 돌려 본다. */
@@ -73,6 +77,8 @@
        2026-10-24 off 로 감췄다가 2026-10-30 대표 「다시 살려」로 off 를 걷었다 — 포털 타일과 함께. */
     { key: 'rules',   row: 'client', name: '기업규정집',    icon: '📋', url: 'rules-v2.html',       desc: '취업규칙·노사협의회·단체협약' },
     { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
+    /* 강의자료(2026-11-19 · 11-20 «법정교육자료함»에서 이름 바꿈) — 강의자료 종류·강의일별 · 재직 직원 모두 — 포털 타일과 짝 */
+    { key: 'edulib',  row: 'store', name: '강의자료', icon: '🎓', url: 'pu-edulib.html',      desc: '종류·강의일별 · 나란히 비교' },
     { key: 'aliounion', row: 'store', name: '공공임단협', icon: '🤝', url: 'pu-alio-union.html', desc: '알리오 노조·임금·단체협약 API 통합비교' },
     { key: 'hangul',  row: 'client', name: '한글 편집기',  icon: '📝', url: 'hangul.html',   desc: '한글 문서 열기·고치기' },
     { key: 'pbox',    row: 'store',  name: 'P박스',        icon: '📚', url: 'pu-pbox.html',  desc: '전 법령·판례·행정해석·AI 서면' },

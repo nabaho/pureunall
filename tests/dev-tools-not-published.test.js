@@ -40,12 +40,14 @@ function stripScript() {
 const 살아야 = ['js', 'css', 'vendor', 'enter.html', 'fund.html', 'work.html', 'pu-erp.html',
   'manifest.json', 'hwpx_gen.js', 'pu-sw.js', 'hana-bridge.apk',
   'install.html', 'icon-portal-192.png', 'icon-portal-512.png',
-  'index.html', '404.html', '.well-known/assetlinks.json'];
+  'index.html', '404.html', '.well-known/assetlinks.json',
+  'policy/privacy.html', 'policy/terms.html', 'policy/account-deletion.html'];
 /* ⚠ .agents 는 Codex 가 저장소 스킬을 찾는 자리다($REPO_ROOT/.agents/skills).
      아직 비어 있어도 «지우는 목록에 미리» 있어야 한다 — 나중에 스킬을 넣는 사람이
      배포 게이트까지 같이 고칠 것이라고 기대하면 안 된다. 안 지우면 인터넷에 공개된다. */
 const 사라져야 = ['.mcp.json', '.claude', '.agents', 'tests', 'docs', 'scripts', 'functions',
-  'fund-erp', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'README.md', 'firebase.json', '.firebaserc'];
+  'fund-erp', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md', 'README.md', 'firebase.json', '.firebaserc',
+  'pu-payroll-mail-sync.html'];
 
 const 폴더 = new Set(['js', 'css', 'vendor', '.claude', '.agents', 'tests', 'docs', 'scripts',
   'functions', 'fund-erp']);

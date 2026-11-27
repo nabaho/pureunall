@@ -221,7 +221,8 @@ test('직접 고치기 — 고친 칸만 쓰고, 고친 칸에는 fixed 표시 �
   assert.equal(r.update['INBOX~1/updatedAt'], NOW);
   Object.keys(r.update).forEach((k) => assert.ok(!/\/(st|s|f|e|d|an|why|replyTo|slug|uid|createdAt)$/.test(k), k + ' 은 고치지 않는다'));
   const only = Q.editUpdate('INBOX~1', { memo: '메모만' }, NOW);
-  assert.deepEqual(Object.keys(only.update).sort(), ['INBOX~1/memo', 'INBOX~1/updatedAt'], '메모만 고치면 기한·종류에 fixed 가 안 붙는다');
+  assert.deepEqual(Object.keys(only.update).sort(), ['INBOX~1/edited', 'INBOX~1/memo', 'INBOX~1/updatedAt'], '메모만 고치면 기한·종류에 fixed 가 안 붙는다(사람이 고쳤다는 edited 표시만 더 붙는다)');
+  assert.equal(only.update['INBOX~1/edited'], NOW, '어느 칸을 고쳐도 «사람이 열어 보고 고쳤다» 표시가 남는다 — 다시 가르기가 치우지 않게');
 });
 test('직접 고치기 — 기한을 «없음»으로 고칠 수 있고(null) · 없는 날짜·잘못된 시각·빈 종류·긴 메모는 거절한다', () => {
   const none = Q.editUpdate('INBOX~1', { deadline: null }, NOW);
@@ -362,7 +363,8 @@ test('본문 보강 — 사람이 «확인함»으로 바꾼 뒤에 채워도 �
   assert.equal(items(f)[IN + '~101'].st, 'doing'); assert.equal(items(f)[IN + '~101'].deadline.date, '2026-11-16');
 });
 test('본문 보강 — 한 번에 열 건수에 한도가 있고, 열었으면 다시 열지 않는다', async () => {
-  const f = db(); for (let n = 110; n < 118; n++) await f.ref('mailbox/msgs/' + IN + '/' + n).set(row({ s: '동의서 요청 ' + n, d: at(11, 9, 15) }));
+  /* 제목에 «이력·회의·비용» 말(위촉)이 있어야 들어와 본문을 연다 — 그 말이 없는 «동의서 요청»은 걸러져 본문도 안 연다(2026-11-19) */
+  const f = db(); for (let n = 110; n < 118; n++) await f.ref('mailbox/msgs/' + IN + '/' + n).set(row({ s: '평가위원 위촉 동의서 요청 ' + n, d: at(11, 9, 15) }));
   const calls = []; await scan(f, { readBody: read(BODY, calls), bodyMax: 3 });
   assert.equal(calls.length, 3, '한도(bodyMax)만큼만 연다');
   const again = []; await scan(f, { readBody: read(BODY, again), bodyMax: 3 });

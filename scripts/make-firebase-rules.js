@@ -457,7 +457,26 @@ rules.data = {
      담는 것: 업체 id·이름·전/새 담당 사번·요청자·까닭 한 줄 — 금액·개인정보는 없다.
      ⚠ 승인은 앱이 관리자에게만 단추를 준다(일하는 순서의 문). 업체 자료(companies) 자체의 쓰기 권한은
        예전 그대로다 — 이 자리를 좁혀도 담당이 바뀌는 길이 막히지는 않는다. */
-  co_mgr_requests: { '.read': LOGIN, '.write': LOGIN },
+  co_mgr_requests: {
+    '.read': LOGIN,
+    '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
+    v: {
+      '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
+      $id: {
+        '.write': `${LOGIN} && (newData.exists() || ${MGR})`,
+        '.validate': `(${MGR}) || !data.exists() || data.child('status').val() === 'wait'`
+          + ` || (newData.child('status').val() === data.child('status').val()`
+          + ` && newData.child('coId').val() === data.child('coId').val()`
+          + ` && newData.child('from').val() === data.child('from').val()`
+          + ` && newData.child('to').val() === data.child('to').val())`,
+        status: {
+          '.validate': `newData.isString() && (newData.val() === 'wait' || newData.val() === 'cancel'`
+            + ` || (data.exists() && newData.val() === data.val())`
+            + ` || ((newData.val() === 'ok' || newData.val() === 'no') && (${MGR})))`
+        }
+      }
+    }
+  },
 
   /* 💬 누구 입금인가요? (대표 「시안대로」 2026-10-24) — 재무가 «후보 없는 입금»을 묻고, 담당 직원이 어느 건인지 답한다.
      담는 것: 날짜·금액·보낸 사람 이름(통장 적요에서 계좌 끝자리를 뺀 것)·답(건 번호·고른 사람)뿐 —
@@ -544,7 +563,33 @@ rules.payroll_os = workspace({
   }
 });
 rules.fund_erp = workspace();
-rules.work_erp = workspace();
+/* 업무관리. ★ mysum/{로그인 UID} = «내 업무 숫자» 한 줄(2026-11-21 — 포털 머리줄 «📋 내 업무» 단추·이알피 나의 업무가 읽는다).
+   «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
+   이름 붙은 자리가 $k 보다 먼저 잡힌다. 읽기는 work_erp 전체와 같다(로그인 직원) — 날짜·건수뿐이라 더 넓어지지 않는다.
+   ⚠ 관리자 쓰기는 위(work_erp .write)에서 그대로 내려온다. */
+/* ★ 모양도 좁힌다(2회차 보안 검토 «중간» — n·at 만 보면 본인 자리에 아무 큰 자료나 쌓을 수 있었다):
+     아는 칸만(v·n·at·dd·nx·nl·ws·we, 나머지 $other 거부) · 건수는 0~10만 · 날짜 목록은 «0~999 번째»까지 «YYYY-MM-DD» 글자만
+     (js/pu-mywork.js MAX_DATES 400 보다 넉넉히) · 통짜 값(글자 하나)은 $uid·dd·nx 의 hasChildren 로 막는다(자식 규칙이 안 도는 함정). */
+const 날짜칸 = "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)";
+const 날짜목록 = { '.validate': 'newData.hasChildren()', $i: { '.validate': `$i.matches(/^[0-9]{1,3}$/) && ${날짜칸}` } };
+const 건수 = (hi) => `newData.isNumber() && newData.val() >= 0 && newData.val() <= ${hi}`;
+rules.work_erp = workspace({
+  mysum: {
+    $uid: {
+      '.write': `(${LOGIN}) && auth.uid === $uid`,
+      '.validate': "newData.hasChildren(['n','at'])",
+      v: { '.validate': 'newData.isNumber()' },
+      n: { '.validate': 건수(100000) },
+      at: { '.validate': 'newData.isNumber()' },
+      nl: { '.validate': 건수(100000) },
+      ws: { '.validate': 날짜칸 },
+      we: { '.validate': 날짜칸 },
+      dd: 날짜목록,
+      nx: 날짜목록,
+      $other: { '.validate': false }
+    }
+  }
+});
 rules.chwieop  = workspace();
 rules.companies = workspace({ '.indexOn': ['folder', 'updatedAt'] });
 rules.improve_requests = workspace({ '.indexOn': ['authorSid', 'done'] });
@@ -916,6 +961,9 @@ rules.pucards = {
   /* 🔎 명함 «이름으로 묻기» — 번호가 빈 명함의 둘째 중복 열쇠(이름+회사/이메일)가 같은 이름 몇 줄만 받는다 (2026-10-30).
      쓰기·읽기는 위 $k 와 «똑같이» 옮긴다 — idx 를 이름 붙은 칸으로 빼면 $k 가 주던 쓰기 허락이 사라진다. */
   idx: { '.write': pucardsWrite, '.indexOn': ['n'], $k2: { '.write': LOGIN } },
+  /* 🔀 사업장별 담당 분리·제외 규칙(pucards/mailCoSplit)은 정식 담당·알림 대상을 바꾸므로 관리자·위임관리인(MGR)만 쓴다 (2026-11-22).
+     ⚠ config 아래에 두지 않고 pucards 바로 아래 이름 붙은 칸으로 두어 config(견적 자동 감지 ADMIN 잠금 등)와 섞이지 않게 한다. */
+  mailCoSplit: { '.write': MGR },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
@@ -1157,32 +1205,96 @@ rules.paydata = {
 
 /* ══ 건의함 ════════════════════════════════════════════════════════════ */
 const sugWrite = `(${LOGIN}) && (${ADMIN} || (!data.exists() && newData.child('authorUid').val() === auth.uid && newData.child('status').val() === 'new'))`;
+/* ★ 번호(키)·칸의 «모양과 크기» (2026-11-11 외부 보안 검토 «높음» → 대표 요청 «건의함 보안규칙: 키 모양·크기 검사 추가»)
+   건의함 세 자리는 «직원이 쓸 수 있는 자리» 인데 규칙이 키 모양도 칸도 크기도 안 봤다. 그래서
+     · 번호(키)에 & | ^ % 따옴표 같은 셸 글자를 넣을 수 있었다 — 대표 PC 의 감시 도구가 윈도우에서 firebase 를 cmd.exe 로 부르므로
+       그 번호가 «명령» 으로 읽힐 수 있었다(도구는 2026-11-11 PR #3008 에서 막았다 — 이것은 «두 번째 겹» 이다)
+     · 아무 이름의 칸에 큰 글을 숨겨, 대표가 건의함 목록을 열 때마다 그것을 내려받게 할 수 있었다(진행함 전체를 읽는다)
+   ★ 지킨 것
+     · 번호는 파이어베이스 push() 번호 모양(영문·숫자·-·_)만. 지금 운영의 번호 37개·진행함 uid 5개는 전부 이 모양이다.
+     · «알려진 칸만» — 모르는 칸은 $other 로 거절. 알려진 칸은 화면(enter.html)이 실제로 쓰는 것만 적었다:
+         건의 원문 14칸 · 메타 7칸 · 진행함 13칸. 새 칸이 필요하면 여기와 화면을 «같이» 고친다.
+     · 그림은 줄여 담은 JPEG(가로 1400px·품질 0.7)라 글자 수가 최대 약 33만 자였다 → 한 장 100만 자, 최대 3장.
+   ⚠ 서버(Cloud Functions · 대표 PC 의 감시 도구 = firebase CLI)는 관리자 권한이라 규칙을 «안 탄다». AI 접수 도우미 초안(assist)·감시 알림 칸 처럼
+     «서버가 쓰는 칸» 은 일부러 여기 적지 않았다 — 브라우저에서 직원이 그 칸에 쓰지 못하게(예전엔 새 건의에 함께 담을 수 있었다).
+     (이 칸들을 위한 «새 규칙» 은 여전히 없다 — tests/suggestion-push.test.js 의 약속. «없는 것» 이 곧 거절이다.)
+   ⚠ .validate 는 «새로 쓰는 값» 만 본다 — 이미 있는 자료는 건드리지 않고, 지우는 것(삭제)은 언제나 된다. */
+const SG_KEY_RE = '/^[A-Za-z0-9_-]{1,64}$/';
+const SG_CAT_RE = '/^(erp|consult|work|fund|rules|payroll|cards|docs|portal|bizwork|policy|edu|office|hrwelf|etc)$/';
+const SG_STR = (n) => `newData.isString() && newData.val().length <= ${n}`;
+/* ★ «객체가 아닌 값» 을 막는다 (외부 검토 2026-11-12 «중간» — 실제 엔진에서 재현됨):
+   RTDB 는 노드에 글자·숫자 같은 «통짜 값» 을 쓰면 자식 규칙($i·$id·칸별·$other)을 «평가하지 않는다». 그래서 images 에
+   200만 자짜리 «문자열» 을 직접 쓰면 통과했고, 진행함 $uid·$id 자리에 통짜 글자를 써도 통과했다 — 컨테이너 자리는
+   newData.hasChildren() 로 «객체일 때만» 받는다.
+   그림은 0번부터 «빈틈 없이» 이어져야 한다(1번은 0번이, 2번은 1번이 있을 때만 — 아래 SG_IMG_SEQ) — 빈틈이 있으면 배열이 아닌 객체로 돌아와
+   대표 화면의 images.map 이 죽는다. */
+/* ⚠ 연속성(빈틈 없음)은 «컨테이너(images 자체)» 에서 본다 — 자식($i)에서만 보면 «지울 때» 평가되지 않아, 3장을 쓴 뒤
+   0번·1번만 지우는 부분 삭제로 2번만 남길 수 있었다(외부 재검증 지적, 실제 엔진에서 재현). 컨테이너는 쓰는 값이 «합쳐진 결과» 로 평가된다. */
+const SG_IMG_SEQ = "newData.hasChildren() && (!newData.hasChild('2') || newData.hasChild('1')) && (!newData.hasChild('1') || newData.hasChild('0'))";
+const SG_IMGS = { '.validate': SG_IMG_SEQ, $i: { '.validate': "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().length <= 1000000" } };
+const SG_REL = { '.validate': `newData.isString() && newData.val().matches(${SG_KEY_RE})` };
+const SG_SRC = { '.validate': "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" };
+const SG_STATUS = { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" };
 rules.suggestions_private = {
   '.read': `(${LOGIN}) && ${ADMIN}`,
   '.indexOn': ['createdAt'],
   $id: {
     '.write': sugWrite,
-    '.validate': "!newData.exists() || newData.hasChildren(['cat','title','content','author','authorEmail','authorUid','status','createdAt'])",
-    cat: { '.validate': "newData.isString() && newData.val().matches(/^(erp|consult|work|fund|rules|payroll|cards|docs|portal|bizwork|policy|edu|office|hrwelf|etc)$/)" },
+    '.validate': `!newData.exists() || ($id.matches(${SG_KEY_RE}) && newData.hasChildren(['cat','title','content','author','authorEmail','authorUid','status','createdAt']))`,
+    cat: { '.validate': `newData.isString() && newData.val().matches(${SG_CAT_RE})` },
     title:   { '.validate': 'newData.isString() && newData.val().length > 0 && newData.val().length <= 200' },
     content: { '.validate': 'newData.isString() && newData.val().length > 0 && newData.val().length <= 10000' },
     authorUid: { '.validate': `${ADMIN} || newData.val() === auth.uid` },
-    status: { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" }
+    status: SG_STATUS,
+    author: { '.validate': SG_STR(100) },
+    authorEmail: { '.validate': SG_STR(320) },
+    createdAt: { '.validate': 'newData.isNumber()' },
+    repliedAt: { '.validate': 'newData.isNumber()' },
+    reply: { '.validate': SG_STR(20000) },
+    images: SG_IMGS,
+    replyImages: SG_IMGS,
+    relatedId: SG_REL,
+    source: SG_SRC,
+    $other: { '.validate': false }
   }
 };
 rules.suggestions_meta_private = {
   '.read': `(${LOGIN}) && ${ADMIN}`,
   $id: {
     '.write': sugWrite,
-    '.validate': "!newData.exists() || newData.hasChildren(['author','authorEmail','authorUid','status','cat','title','createdAt'])",
+    '.validate': `!newData.exists() || ($id.matches(${SG_KEY_RE}) && newData.hasChildren(['author','authorEmail','authorUid','status','cat','title','createdAt']))`,
+    author: { '.validate': SG_STR(100) },
+    authorEmail: { '.validate': SG_STR(320) },
     authorUid: { '.validate': `${ADMIN} || newData.val() === auth.uid` },
-    status: { '.validate': "newData.isString() && newData.val().matches(/^(new|ing|done)$/)" }
+    status: SG_STATUS,
+    cat: { '.validate': SG_STR(20) },
+    title: { '.validate': SG_STR(200) },
+    createdAt: { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
   }
 };
 rules.suggestions_resolved_private = {
   $uid: {
     '.read':  `auth != null && (auth.uid === $uid || ${ADMIN})`,
-    '.write': `auth != null && (auth.uid === $uid || ${ADMIN})`
+    '.write': `auth != null && (auth.uid === $uid || ${ADMIN})`,
+    '.validate': `!newData.exists() || ($uid.matches(/^[A-Za-z0-9_-]{1,128}$/) && newData.hasChildren())`,
+    $id: {
+      '.validate': `!newData.exists() || ($id.matches(${SG_KEY_RE}) && newData.hasChildren())`,
+      title: { '.validate': SG_STR(200) },
+      cat: { '.validate': SG_STR(20) },
+      status: SG_STATUS,
+      at: { '.validate': 'newData.isNumber()' },
+      seen: { '.validate': 'newData.isBoolean()' },
+      reply: { '.validate': SG_STR(20000) },
+      replyImages: SG_IMGS,
+      resolvedOk: { '.validate': 'newData.isBoolean()' },
+      resolvedAt: { '.validate': 'newData.isNumber()' },
+      feedback: { '.validate': SG_STR(2000) },
+      feedbackAt: { '.validate': 'newData.isNumber()' },
+      relatedId: SG_REL,
+      source: SG_SRC,
+      $other: { '.validate': false }
+    }
   }
 };
 
@@ -1338,6 +1450,13 @@ rules.gov_watch = { '.read': LOGIN, '.write': false };
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
 rules.gov_feed = { '.read': LOGIN, '.write': false };
 
+/* ══ 📮 정부사업신청 «매일 카톡 요약» 의 공개 요약 (대표 지시 2026-11-22 「카카오톡으로 매일 받고 싶다」 → 「공식 방식으로」) ══
+   서버(govDigestKakao, 08:30)가 «오늘의 요약»(last — 갈래별 줄·새 것·마감 임박)과 «돌린 결과»(status — 모드·보낸 통수·오류 코드)를 쓴다.
+   카톡 «전체 보기» 단추가 정부사업신청(gov.html?digest=1)에서 이것을 읽어 보여 준다. 담기는 것은 gov_feed·gov_watch 와 같은 «공개 공고» 정보뿐이다.
+   ★ 읽기 = 재직 직원(LOGIN, gov_feed 와 같다). ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다).
+   ⚠ 일부러 «여기 없는» 자리: gov_digest_secret(카카오 토큰) · gov_digest_state(보낸 기록·잠금) · gov_digest_cfg(모드) — 규칙에 없어 화면에서는 읽기·쓰기 모두 닫힌다. 서버만 만진다. */
+rules.gov_digest = { '.read': LOGIN, '.write': false };
+
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
    ⚠ 읽기 = 기업정보함(pucards)과 «같은» LOGIN — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 같은 사람이 읽는다.
@@ -1394,6 +1513,39 @@ rules.signboard = { '.read': LOGIN,
   control:   { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === 'control'" },
   log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
   state:     { '.write': false } };
+
+/* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
+   대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
+   ★ 읽기·쓰기 = 재직 직원(LOGIN). 담기는 것: 강의자료 목록(파일 이름·종류·강의일·강의처·원본 창고 경로) · 검토 메모.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식으로만. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ⚠ 메모는 «그 자료의 메모»여야 한다(sourceId = 자료 열쇠). 원본 파일은 창고 규칙(edulib/{id}/…)이 따로 지킨다.
+   ★ 2026-11-21 cats(사람이 더한 강의 종류 — 대표 「새로운 강의가 생길수 있으니 + 추가기능」): 자료와 «같은 사람»(재직 직원)이 읽고 쓴다.
+     이름은 1~40자, 찾을 낱말은 목록(words)으로만. 더 넓게 열리는 칸은 없다(edulib 전체가 이미 재직 직원 읽기).
+   ★ 보낸 메일 자동 정리의 결과는 edulib 아래가 아니라 «edulib_inbox»(아래)에 둔다 — edulib 는 재직 직원 읽기라 아래 칸을 좁힐 수 없다. */
+const EDULIB_W = `(${LOGIN}) && newData.exists()`;
+rules.edulib = { '.read': LOGIN,
+  items: { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduMaterial'" } },
+  notes: { $item: { $id: { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('sourceId').val() === $item && newData.child('entityType').val() === 'EduReviewNote'" } } },
+  cats:  { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduCategory' && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 40" } },
+  /* 2026-11-22 sims(EduSimilarity — 자료의 «내용 지문», 대표 「마지막에 언제 강의랑 유사하다 표시」): 열쇠 = 자료 id(sourceId 도 같아야, sourceKind 는 EduMaterial).
+     지문(mh)은 16진수 숫자 글자만, 길이 상한 — 글(강의 내용) 자체는 담지 못한다. 자료와 «같은 사람»(재직 직원)이 읽고 쓴다(더 넓게 열리는 칸 없음).
+     ★ 칸을 정해 둔다(그 밖의 칸은 $other false) — 지문 자리에 아무 글이나 길게 쌓지 못하게(2026-11-22 보안 검토 «낮음»).
+       칸 목록은 화면 makeSim + 저장 관문(prepareRecord)이 붙이는 칸(contractVersion·revision·createdBy·updatedBy)과 같다. */
+  sims:  { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('sourceId').val() === $id && newData.child('sourceKind').val() === 'EduMaterial' && newData.child('entityType').val() === 'EduSimilarity' && newData.child('mh').isString() && newData.child('mh').val().length <= 512 && newData.child('mh').val().matches(/^[0-9a-f]*$/)",
+    id: { '.validate': true }, entityType: { '.validate': true }, sourceId: { '.validate': true }, sourceKind: { '.validate': true }, mh: { '.validate': true },   /* 위 .validate 가 값을 본다 — 칸 이름만 열어 둔다 */
+    schemaVersion: { '.validate': 'newData.isNumber()' }, contractVersion: { '.validate': 'newData.isNumber()' }, revision: { '.validate': 'newData.isNumber()' },
+    v: { '.validate': 'newData.isNumber()' }, n: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    by: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    why: { '.validate': "newData.isString() && newData.val().length <= 20" },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 64' }, updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    $other: { '.validate': false } } } };
+/* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
+   대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,
+   자료함(재직 직원 모두)에 «넣기»는 관리자가 고른다. 담기는 것: 메일 자리·첨부 이름·가린 메일 제목·추정 종류·내용 요약·지문 — 원본 파일은 없다.
+   ★ 읽기 = 관리자만(메일함 화면과 같은 사람) · 쓰기 = 아무도(서버 관리자 SDK 만 — functions/edulib-mail-sweep.js). */
+rules.edulib_inbox = { '.read': `(${LOGIN}) && ${ADMIN}`, '.write': false };
 
 /* ══ 🧾 컨설팅정산(pu-settle.html) — 개인입금 사업의 주관·담당 정산 (2026-10-31) ══
    설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md §6 · 대표 선택 2026-10-31 「대표·재무권한자만」.
@@ -1816,6 +1968,9 @@ rules.ai_read_tally = {
        ⚠ n 에 합치지 말 것 — Gemini 는 «하루» 몫이고 Vision 은 «달마다» 1,000장이다.
          합치면 어느 쪽이 남았는지 알 수가 없다. */
     vision: { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    /* won = 실제 토큰으로 센 원화 합 · wn = 그렇게 센 판독 수 (2026-11-19) — 달 금액 = (n − wn) × 단가 + won */
+    won:    { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+    wn:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
     $other: { '.validate': false }
   } }
 };
@@ -2301,5 +2456,99 @@ rules.scal_jobtrans = {
   } } },
   $other: { '.validate': false }
 };
+
+/* 🦺 안전보건관리체계 구축 자동화 (safety.html, 2026-11-23)
+   - 과거 수행이력(2022~2026) 비식별 아카이브, 신규 착수 사전 체크(12), 7대 핵심요소(25), 8대 업종별 특화 체크리스트, 위험성평가, 종합·1P 요약보고서.
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$pid/$id 는 보고서 확정 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.scal_safety = {
+  '.read': LOGIN,
+  projects: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project'"
+  } },
+  checks: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  intake: { $pid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  reports: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } },
+  snapshots: { $pid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
+/* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
+   - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
+     (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).
+   - ⚠ ADMIN(isAdmin)·SUB·FIN 으로 열지 않는다 — 이알피는 관리자대행(admin-delegate)에게도 isAdmin 을 적는다.
+     uid_roles/{uid}/role 칸은 본인이 쓸 수 있어 믿지 않는다. 대표만 가리키는 것은 app_owner/uid 뿐이다.
+   - datahub/{uid}/settings = 보기 설정(ViewState). 대표 본인만 읽고 쓴다. 알려진 칸 밖은 막는다.
+     메타 칸은 js/pu-ontology-write.js prepareRecord·tombstone 이 저절로 붙이는 것 전부(하나라도 빠지면 저장이 막힌다).
+     thresholds = 현황판 «주의» 기준(결정 ⑩) — 대표가 정하기 전엔 비어 있고, 비어 있으면 화면은 색을 칠하지 않는다.
+   - datahub_device/{uid} = 승인된 기기 공개 열쇠·지문. 대표 본인만 읽고, 쓰기는 서버·터미널만(.write:false).
+   - datahub_device_req·datahub_nonce·datahub_activity = 서버만 읽고 쓴다(화면은 읽지도 못한다).
+   - datahub_board = 현황판 «건수·비율» — 대표만 읽고, 쓰기는 서버(datahubBoardTally)만.
+   ⚠ 서버(Cloud Functions)·firebase CLI 는 관리자 권한이라 이 규칙을 안 탄다 — 그래서 .write:false 여도 서버는 쓴다. */
+const DATAHUB_IS_OWNER = "auth.uid === root.child('app_owner').child('uid').val()";
+const DATAHUB_OWNER = `(${LOGIN}) && ${DATAHUB_IS_OWNER}`;
+const DATAHUB_SELF = `(${LOGIN}) && auth.uid === $uid && ${DATAHUB_IS_OWNER}`;
+const 짧은글 = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n}` });
+const 시각칸 = { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' };
+const 숫자칸 = { '.validate': 'newData.isNumber()' };
+/* 기준선 묶음 — aLines {goal: A안 달 입금 기준선(만원)} · cLines {warn, over: C안 주당 업무 건수 «많음·넘침»(결정 ④)}.
+   숫자·짧은 글 하나 또는 {이름: 짧은 글·숫자} 묶음 */
+const 줄묶음 = {
+  '.validate': 'newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 400) || newData.hasChildren()',
+  $i: { '.validate': '$i.length <= 64 && (newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 64))' }
+};
+rules.app_owner = { '.read': LOGIN, '.write': false };
+/* ⚠ 쓰기는 settings 자리에만 연다($uid 통째 쓰기 없음). 통째 지우기는 막고(newData.exists — 지우려면 저장 관문의 _deleted 표식),
+     수정차수(revision)는 저장 관문처럼 «전 값 + 1»만 받는다 — 두 기기가 서로를 조용히 덮지 못하게(보안 검토 2026-11-21 «중간»). */
+rules.datahub = { $uid: {
+  '.read': DATAHUB_SELF,
+  settings: {
+    '.write': `${DATAHUB_SELF} && newData.exists()`,
+    '.validate': "newData.hasChildren(['id', 'entityType', 'revision']) && newData.child('entityType').val() === 'ViewState'"
+      + " && newData.child('revision').isNumber()"
+      + " && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    /* 저장 관문 메타 칸 */
+    id: 짧은글(200), entityType: 짧은글(40), schemaVersion: 숫자칸, contractVersion: 숫자칸, revision: 숫자칸,
+    createdAt: 시각칸, updatedAt: 시각칸, createdBy: 짧은글(128), updatedBy: 짧은글(128),
+    _deleted: { '.validate': 'newData.isBoolean()' }, deletedAt: 시각칸, deletedBy: 짧은글(128),
+    /* 보기 설정 */
+    view: 짧은글(40), period: 짧은글(40), basis: 짧은글(40), vmode: 짧은글(40),
+    net: { '.validate': 'newData.isBoolean() || (newData.isString() && newData.val().length <= 20)' },
+    aLines: 줄묶음, cLines: 줄묶음,
+    /* 주의 기준(결정 ⑩) — {앱 key: {w,b}} · _rec(기록률 %) · _recon {w,b}(다년 대조 차이 %). 정하기 전엔 화면이 색을 안 칠한다 */
+    thresholds: {
+      '.validate': 'newData.hasChildren()',
+      $app: {
+        '.validate': '$app.length <= 32 && (newData.isNumber() || newData.hasChildren())',
+        $k: { '.validate': '$k.length <= 32 && (newData.isNumber() || newData.isBoolean() || (newData.isString() && newData.val().length <= 40))' }
+      }
+    },
+    /* 다년 전망 손잡이 기본값 {adv 자문·기금 순증률, case 사건·컨설팅 성장률, cost 원가·판관비율} — 숫자 하나 또는 {이름: 숫자·짧은 글} */
+    baseline: {
+      '.validate': 'newData.isNumber() || newData.hasChildren()',
+      $k: { '.validate': '$k.length <= 32 && (newData.isNumber() || (newData.isString() && newData.val().length <= 40))' }
+    },
+    $other: { '.validate': false }
+  },
+  $other: { '.validate': false }
+} };
+rules.datahub_device = { $uid: { '.read': DATAHUB_SELF, '.write': false } };
+rules.datahub_device_req = { '.read': false, '.write': false };
+rules.datahub_nonce = { '.read': false, '.write': false };
+rules.datahub_activity = { '.read': false, '.write': false };
+rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

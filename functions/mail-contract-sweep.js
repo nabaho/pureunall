@@ -53,11 +53,11 @@ const CONTRACT_EXTRACT_PROMPT =
   "1. isOurEngagementContract (boolean): 푸른노무법인(또는 소속 공인노무사)이 수임인·을·자문노무사·용역수행기관 당사자로 참여하는 사건위임약정서·자문계약서·컨설팅계약서·용역계약서이면 true. " +
   "근로자와 사업주 간 근로계약서/연봉계약서/수습합의서, 고객사 간 도급·외주·프리랜서·공사·물품 계약서, 통신·복합기·호스팅 약정서, 위촉 알림 공문, 상대방 이름이 비어 있는 백지 양식이면 반드시 false.\n" +
   "2. signedByClient (boolean): 의뢰인(갑·위임인)의 직인·도장·서명 날인이 찍혀 있거나 체결 완료본이면 true, 날인 전 초안이면 false.\n" +
-  "3. company (string): 의뢰인(갑·위임인·사업장 또는 사건 의뢰인)의 상호 또는 성명. 절대 '푸른노무법인'을 넣지 마세요.\n" +
-  "4. ceo (string): 의뢰인 대표자 성명 (없으면 '').\n" +
-  "5. bizno (string): 의뢰인 사업자등록번호 또는 고유번호 10자리 (없으면 '').\n" +
-  "6. corpno (string): 법인등록번호 (없으면 '').\n" +
-  "7. address (string): 의뢰인 주소 (없으면 '').\n" +
+  "3. company (string): 의뢰인(갑·위임인·사업장 또는 사건 의뢰인)의 상호 또는 성명. 절대 수임인인 '푸른노무법인'을 넣지 마세요.\n" +
+  "4. ceo (string): 의뢰인(갑·위임인)의 대표자 성명 (없으면 '', 수임인 대표노무사 '권형하'는 절대 넣지 마세요).\n" +
+  "5. bizno (string): 의뢰인(갑·위임인) 사업자등록번호 또는 고유번호 10자리 (없으면 '', 수임인 푸른노무법인 번호는 제외).\n" +
+  "6. corpno (string): 의뢰인 법인등록번호 (없으면 '').\n" +
+  "7. address (string): 의뢰인 주소 (없으면 '', 수임인 푸른노무법인 주소 '원두정8길 6' 등은 절대 넣지 마세요).\n" +
   "8. companyTel (string): 의뢰인 연락처 (없으면 '').\n" +
   "9. docName (string): 문서 제목 그대로 (예: 위임약정서, 노무자문계약서, 위임계약서).\n" +
   "10. scope (string): 위임사무·업무 범위 요약 (예: 체불임금 진정 사건 대리, 2026년 인사노무 진단).\n" +
@@ -68,11 +68,24 @@ const CONTRACT_EXTRACT_PROMPT =
   "15. fee (string): 보수·자문료·용역비 원문 표기 (없으면 '').\n" +
   "16. vat (string): 부가세 별도/포함 표기 (없으면 '').\n" +
   "17. retainer (string): 착수금 원문 표기 (없으면 '').\n" +
-  "18. success (string): 성공보수 원문 표기 (없으면 '').\n" +
+  "18. success (string): 성공보수·성과보수·성공보수율 원문 표기 — % 요율(예: '총 수령금의 15%(부가세포함)', '경제적 이익의 10%', '15%') 또는 금액 표기를 빠짐없이 그대로 적으세요 (없으면 '', 단 연 12% 등 지연이자는 제외).\n" +
   "19. deposit (string): 계약금 원문 표기 (없으면 '').\n" +
   "20. managerName (string): 문서에 담당 노무사 성명이 적혀 있으면 그 성명 (없으면 '').\n" +
   "21. memo (string): 특약사항 한 줄 (없으면 '').\n" +
   "없는 값은 빈 문자열('')로 두고 절대 지어내지 마세요. 마크다운 코드블록 없이 순수 JSON만 출력하세요.";
+
+function isOurFirmToken(s) {
+  return /푸른\s*노무\s*법인|푸른\s*노무사/.test(String(s || ""));
+}
+
+function sanitizeOurFirmParty(ext) {
+  if (!ext || typeof ext !== "object") return ext;
+  const out = Object.assign({}, ext);
+  if (/^권\s*형\s*하(?:\s*대표|\s*노무사)?$/.test(String(out.ceo || "").trim())) out.ceo = "";
+  if (/원두정\s*8길\s*6|두정빌딩\s*301호/.test(String(out.address || ""))) out.address = "";
+  if (/^041[-\s.]?561[-\s.]?3706$/.test(String(out.companyTel || "").trim())) out.companyTel = "";
+  return out;
+}
 
 function asList(v) {
   if (!v) return [];
@@ -142,7 +155,7 @@ function safeRtdbKey(s) {
 function isGenericNonCoToken(s) {
   const v = String(s || "").replace(/^[\s_.\-]+|[\s_.\-]+$/g, "");
   if (!v || v.length < 2) return true;
-  if (/푸른노무법인|^20\d{2}$|^\d+$/.test(v)) return true;
+  if (isOurFirmToken(v) || /^20\d{2}$|^\d+$/.test(v)) return true;
   if (GENERIC_TASK_WORDS_RE.test(v)) return true;
   if (/(?:컨설팅|자문|견적서?|계약서?|약정서?|위임장|진단|조사|교육)$/.test(v) &&
       !/(?:\(주\)|㈜|\(재\)|\(사\)|공단|재단|원|청|시|군|구|회|조합|협회|병원|학교|금고|신협|은행|공사|센터|테크|산업|실업|물류|건설|제철|시스템|컴퍼니|프로헤어|이웃|수산|배터리)/.test(v)) {
@@ -156,18 +169,18 @@ function extractCoFromSubj(s, attNames, peerName) {
   const stripped = t.replace(/^\s*(?:(?:RE|FW|FWD)\s*:\s*)+/i, "").trim();
   if (t) {
     const m1 = /^\[([^\]]{2,35})\]/.exec(stripped);
-    if (m1 && !/푸른노무법인|안내|공지|필독|긴급|재송부|공문|서식/.test(m1[1]) && !isGenericNonCoToken(m1[1])) return m1[1].trim();
-    const m2 = /\(푸른노무법인\)\s*([^\s(\[\]]{2,25})/.exec(t);
+    if (m1 && !isOurFirmToken(m1[1]) && !/안내|공지|필독|긴급|재송부|공문|서식/.test(m1[1]) && !isGenericNonCoToken(m1[1])) return m1[1].trim();
+    const m2 = /\(푸른\s*노무\s*법인\)\s*([^\s(\[\]]{2,25})/.exec(t);
     if (m2 && !/위임|자문|계약|견적|안내|송부/.test(m2[1]) && !isGenericNonCoToken(m2[1])) return m2[1].trim();
     const mLead = /^([가-힣A-Za-z0-9(주)㈜·]{2,30}?)[_\s]+(?:위임\s*계약서|자문\s*계약서|용역\s*계약서|위임\s*약정서|수임\s*약정서|컨설팅\s*계약서|노무\s*자문\s*계약서|견적서)/.exec(stripped);
     if (mLead && !isGenericNonCoToken(mLead[1])) return mLead[1].trim();
-    const m3 = /\[푸른노무법인\]\s*([가-힣A-Za-z0-9(주)㈜]{2,25}?)\s+(?:인사노무|사내근로|공동근로|부당해고|임금체불|근로계약|규정정비|취업규칙|안전교육|중대재해|산업안전|직무분석|직장\s*내|노무|자문|위임|컨설팅|견적)/.exec(t);
-    if (m3 && !/푸른노무법인|년|월|일/.test(m3[1]) && !isGenericNonCoToken(m3[1])) return m3[1].trim();
+    const m3 = /\[푸른\s*노무\s*법인\]\s*([가-힣A-Za-z0-9(주)㈜]{2,25}?)\s+(?:인사노무|사내근로|공동근로|부당해고|임금체불|근로계약|규정정비|취업규칙|안전교육|중대재해|산업안전|직무분석|직장\s*내|노무|자문|위임|컨설팅|견적)/.exec(t);
+    if (m3 && !isOurFirmToken(m3[1]) && !/년|월|일/.test(m3[1]) && !isGenericNonCoToken(m3[1])) return m3[1].trim();
   }
   const atts = Array.isArray(attNames) ? attNames : [];
   for (let i = 0; i < atts.length; i++) {
     const an = String(atts[i] || "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/^\d+\.\s*/, "").trim();
-    if (!an || /사업자등록증_푸른노무법인|통장사본_푸른노무법인|비교\s*견적서/.test(an)) continue;
+    if (!an || /사업자등록증_푸른\s*노무\s*법인|통장사본_푸른\s*노무\s*법인|비교\s*견적서/.test(an)) continue;
     const maLead = /^([가-힣A-Za-z0-9(주)㈜·]{2,30}?)_(?:위임\s*계약서|자문\s*계약서|용역\s*계약서|위임\s*약정서|수임\s*약정서|컨설팅\s*계약서|견적서)/.exec(an);
     if (maLead && !isGenericNonCoToken(maLead[1])) return maLead[1].trim();
     const ma1 = /(?:견적서|계약서|위임약정서)\s*\(([^)]{2,30})\)(?:[_\s]*(?:\d{6,8}|v\d+|날인본|최종))*$/i.exec(an);
@@ -194,9 +207,12 @@ function extractCoFromSubj(s, attNames, peerName) {
     if (mParenSubj && !isGenericNonCoToken(mParenSubj[1])) return mParenSubj[1].trim();
   }
   const pn = String(peerName || "").trim();
-  if (pn && !/@|푸른노무법인/.test(pn)) {
+  if (pn && !/@/.test(pn) && !isOurFirmToken(pn)) {
     const mp = /\(([^)]{2,30})\)/.exec(pn);
     if (mp && !isGenericNonCoToken(mp[1])) return mp[1].trim();
+    if (!isGenericNonCoToken(pn) && /(?:\(주\)|㈜|\(재\)|\(사\)|주식회사|공단|재단|원|조합|협회|병원|학교|금고|신협|공사|센터|테크|산업|실업|물류|건설|제철|시스템|컴퍼니|프로헤어|이웃|수산|배터리)/.test(pn)) {
+      return pn;
+    }
   }
   return "";
 }
@@ -345,6 +361,68 @@ function extractHwpxText(buf) {
     off = dataStart + compSize;
   }
   return chunks.join("\n").slice(0, 24000);
+}
+
+/* 계약서 본문 텍스트에서 비식별 보수(착수금·계약금·성공보수 %/원) 표기를 로컬 정규식으로 보조 추출한다.
+   AI 응답에서 % 가 누락되거나 비식별 보류(pii_hold_meta)로 외부 AI 호출을 생략한 경우에도
+   외부 전송 없이 계약서의 % 요율·보수 숫자만 안전하게 당겨온다 (주민번호·전화·계좌는 절대 포함하지 않음). */
+function extractContractFeesFromText(rawText) {
+  const res = { retainer: "", success: "", deposit: "", vat: "" };
+  const s = String(rawText || "").replace(/\r\n/g, "\n").slice(0, 24000);
+  if (!s) return res;
+  const noLate = s.replace(/(?:지연|연체|미지급|지체)[^\n.]{0,35}?연\s*\d+(?:\.\d+)?\s*[%％]\s*(?:의\s*)?이자/g, " ")
+    .replace(/연\s*\d+(?:\.\d+)?\s*[%％]\s*의?\s*(?:지연\s*|연체\s*)?이자/g, " ");
+
+  /* 1) 성공보수 조항·표 칸에서 % 요율 또는 정액 추출 (백트래킹 방지를 위해 괄호 제목 길이 상한 {0,40} 제한) */
+  const succPatterns = [
+    /제\s*\d+\s*조\s*[\[【(]?\s*(?:성공|성과)\s*보수[^\]】)\n]{0,40}[\]】)]?([\s\S]{0,220}?)(?=\n\s*제\s*\d+\s*조|\n\s*20\d{2}\s*[.년]|$)/,
+    /(?:성공\s*보수(?:율)?|성과\s*보수(?:율)?|승소\s*보수)\s*[:：]?\s*([^\n]{1,120})/,
+  ];
+  for (let i = 0; i < succPatterns.length; i++) {
+    const m = succPatterns[i].exec(noLate);
+    if (!m || !m[1]) continue;
+    const seg = m[1].replace(/\s+/g, " ").trim();
+    const noVatPct = seg.replace(/부가(?:가치)?세\s*\d+(?:\.\d+)?\s*[%％]/g, " ");
+    const mPct = /(\d{1,2}(?:\.\d+)?)\s*(?:[%％]|퍼센트)|백분의\s*(\d{1,2}(?:\.\d+)?)/.exec(noVatPct);
+    const vatMatch = /부가(?:가치)?세\s*(포함|별도)/.exec(seg);
+    if (mPct) {
+      const rate = mPct[1] || mPct[2];
+      if (Number(rate) > 0 && Number(rate) <= 100) {
+        res.success = rate + "%" + (vatMatch ? " (부가세 " + vatMatch[1] + ")" : "");
+        if (!res.vat && vatMatch) res.vat = "부가세 " + vatMatch[1];
+        break;
+      }
+    }
+    const mAmt = /(?:금\s*)?(\d{1,3}(?:,\d{3})+\s*원|\d+(?:,\d{3})*(?:\.\d+)?\s*만\s*원?)/.exec(seg);
+    if (mAmt && !res.success) {
+      res.success = mAmt[1].replace(/\s+/g, "") + (vatMatch ? " (부가세 " + vatMatch[1] + ")" : "");
+      if (!res.vat && vatMatch) res.vat = "부가세 " + vatMatch[1];
+      break;
+    }
+  }
+
+  /* 2) 착수금·계약금 조항 추출 */
+  const mRet = /(?:착수\s*(?:금|보수)|선지급금)\s*(?:으로|은|:|：)?\s*(?:일금\s*[가-힣\s]+원정\s*\(?\s*)?(?:금\s*|[₩￦]\s*)?(\d{1,3}(?:,\d{3})+\s*원?|\d+(?:,\d{3})*(?:\.\d+)?\s*만\s*원?)(\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?/.exec(noLate);
+  if (mRet && mRet[1]) {
+    const rawR = mRet[1].replace(/\s+/g, "");
+    res.retainer = (/원$|만$/.test(rawR) ? rawR : rawR + "원") + (mRet[2] ? " " + mRet[2].trim() : "");
+    const rv = /부가(?:가치)?세\s*(포함|별도)/.exec(mRet[2] || "");
+    if (!res.vat && rv) res.vat = "부가세 " + rv[1];
+  }
+  const mDep = /(?:계약\s*(?:금|금액)|위탁\s*보수|용역\s*보수)\s*(?:으로|은|:|：)?\s*(?:일금\s*[가-힣\s]+원정\s*\(?\s*)?(?:금\s*|[₩￦]\s*)?(\d{1,3}(?:,\d{3})+\s*원?|\d+(?:,\d{3})*(?:\.\d+)?\s*만\s*원?)(\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?/.exec(noLate);
+  if (mDep && mDep[1]) {
+    const rawD = mDep[1].replace(/\s+/g, "");
+    res.deposit = (/원$|만$/.test(rawD) ? rawD : rawD + "원") + (mDep[2] ? " " + mDep[2].trim() : "");
+    const dv = /부가(?:가치)?세\s*(포함|별도)/.exec(mDep[2] || "");
+    if (!res.vat && dv) res.vat = "부가세 " + dv[1];
+  }
+  /* 출력값 화이트리스트 검증 — 숫자·단위(%·원·만원) 및 고정 부가세 표기 외에는 절대 반출하지 않는다 */
+  const SAFE_FEE_OUT_RE = /^\d[\d.,]*\s*(?:%|원|만원?)(?:\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?$/;
+  if (res.success && !SAFE_FEE_OUT_RE.test(res.success)) res.success = "";
+  if (res.retainer && !SAFE_FEE_OUT_RE.test(res.retainer)) res.retainer = "";
+  if (res.deposit && !SAFE_FEE_OUT_RE.test(res.deposit)) res.deposit = "";
+  if (res.vat && !/^부가세 (?:포함|별도)$/.test(res.vat)) res.vat = "";
+  return res;
 }
 
 /* 외부 AI 호출 전 주민번호·계좌·신분증 비식별화(AGENTS.md · rules-collect-redact 단일 관문 원칙 준수).
@@ -746,9 +824,9 @@ async function runSweep(deps, opts) {
   const mailWhoMsg = whoSnap.val() || {};
   const coInfoMap = coInfoSnap.val() || {};
 
-  const coById = {};
-  const coByBiz = {};
-  const coByNameKey = {};
+  const coById = Object.create(null);
+  const coByBiz = Object.create(null);
+  const coByNameKey = Object.create(null);
   cos.forEach((co) => {
     if (!co || !co.id || co._deleted) return;
     coById[String(co.id)] = co;
@@ -922,14 +1000,108 @@ async function runSweep(deps, opts) {
     }
   }
 
-  /* 최신 메일부터 처리하되, 같은 사업장에 견적→계약이 이어질 때를 위해 견적은 시간순 정렬 */
+  /* 최신 메일부터 처리하되, 같은 사업장에 견적→계약이 이어질 때를 위해 견적은 시간순 정렬.
+     계약서는 업무폴더(custom)·내게쓴메일함(tome) → 받은메일함(inbox) → 보낸메일함(sent) 순으로 두어,
+     받은메일함에서 업무폴더로 옮겨진 체결본이 INBOX 빈 거울보다 먼저 정확히 읽히게 한다. */
   quoteCandidates.sort((a, b) => a.dMs - b.dMs);
+  const folderRank = (x) => (x.isSent ? 3 : (x.fKind === "inbox" ? 2 : 1));
   contractCandidates.sort((a, b) => {
-    if (a.isSent !== b.isSent) return a.isSent ? 1 : -1; /* 내게쓴메일·받은메일(체결본 가능성 높음) 우선 */
+    const ra = folderRank(a), rb = folderRank(b);
+    if (ra !== rb) return ra - rb;
     return b.dMs - a.dMs;
   });
 
+  /* 진행 중(상담접수·계약협의) 계약 카드 및 우리 발송 메일 기반 상대방 회신 교차검증 색인 구축
+     — 객체 내장 프로퍼티(constructor 등) 충돌 방지를 위해 null 프로토타입 맵 사용,
+     — 동일 도메인의 타인 사칭 방지를 위해 정확한 발신 이메일 주소 일치만 허용 */
+  const openCtsByCk = Object.create(null);
+  const openPeerAddrsByCk = Object.create(null);
+  const sentDraftByCk = Object.create(null);
+  const addVerifiedPeerForCk = (ck, addr) => {
+    const a = String(addr || "").trim().toLowerCase();
+    if (!ck || !a || selfSet[a] || !a.includes("@")) return;
+    if (!openPeerAddrsByCk[ck]) openPeerAddrsByCk[ck] = new Set();
+    openPeerAddrsByCk[ck].add(a);
+  };
+  const openCtBySrcCanon = Object.create(null);
+  liveCts.forEach((c) => {
+    if (!c || (c.status !== "consult" && c.status !== "review")) return;
+    const ck = coNameKey(c.companyName || (c.company && c.company.name) || "");
+    if (!ck) return;
+    (openCtsByCk[ck] = openCtsByCk[ck] || []).push(c);
+    if (c.status === "review") sentDraftByCk[ck] = true;
+    const coObj = c.company || {};
+    const cList = Array.isArray(coObj.contacts) ? coObj.contacts : Object.values(coObj.contacts || {});
+    [coObj.email, coObj.primaryContactEmail, coObj.contactEmail, c.email]
+      .concat(cList.map((ct) => ct && ct.email))
+      .forEach((em) => addVerifiedPeerForCk(ck, em));
+    if (Array.isArray(c.srcMails)) {
+      c.srcMails.forEach((sk) => {
+        const can = canonSrcMailKey(sk);
+        if (can) openCtBySrcCanon[can] = ck;
+      });
+    }
+  });
+  folderPayloads.forEach((fp) => {
+    if (String((fp.meta && fp.meta.kind) || "") !== "sent") return;
+    const msgs = fp.msgs || {};
+    Object.keys(msgs).forEach((uidKey) => {
+      const sm = msgs[uidKey];
+      if (!sm) return;
+      const toAddrs = DETECT.addrsOf(sm.t || "").filter((a) => !selfSet[a]);
+      if (!toAddrs.length) return;
+      const sSubj = String(sm.s || "").trim();
+      const sAn = DETECT.namesOf(sm.an);
+      const sCanon = canonSrcMailKey(fp.slug + "|" + String(sm.u || uidKey));
+      let sCk = openCtBySrcCanon[sCanon] || "";
+      if (!sCk) {
+        const sCo = extractCoFromSubj(sSubj, sAn, String(sm.tn || ""));
+        if (sCo && !isOurFirmToken(sCo)) sCk = coNameKey(sCo);
+      }
+      if (!sCk) return;
+      toAddrs.forEach((a) => addVerifiedPeerForCk(sCk, a));
+      if (isContractCandidateMail(sm, sSubj, sAn)) sentDraftByCk[sCk] = true;
+    });
+  });
+
+  function evaluateOpenContractReply(cc, targetCk, peerAddrs, extracted) {
+    if (!cc || cc.isInternal || !targetCk) return { verified: false, signed: false, openCts: [] };
+    const matchedOpen = openCtsByCk[targetCk] || [];
+    if (!matchedOpen.length && !sentDraftByCk[targetCk]) return { verified: false, signed: false, openCts: [] };
+    const addrSet = openPeerAddrsByCk[targetCk];
+    const peerVerified = !!(addrSet && (peerAddrs || []).some((a) => addrSet.has(String(a || "").trim().toLowerCase())));
+    if (!peerVerified) return { verified: false, signed: false, openCts: matchedOpen };
+
+    const realContractAtts = (cc.an || []).filter((nm) => {
+      const s = String(nm || "");
+      if (!ATT_CONTRACT_EXT_RE.test(s)) return false;
+      if (/사업자등록증|고유번호증|통장사본|등기부|명함|견적서|과업지시서|제출서류\s*목록/.test(s)) return false;
+      if (/\(\s*서식\s*\)|표준\s*계약서\s*서식|서식\s*\)|백지\s*양식|초안|\(\s*안\s*\)/.test(s)) return false;
+      return /(?:계약서|위임계약서|자문계약서|용역계약서|위임약정서|수임약정서|약정서)/.test(s);
+    });
+    const leadBody = (String(cc.bodyPreview || "").split(/-----Original Message-----|보낸사람\s*:|From\s*:/i)[0] || "").replace(/^\s*>.*$/gm, "");
+    const asksUsToSignOrRevise = /(?:서식|표준계약서)[^\n]{0,30}보내드립|스캔본으로\s*넣어주시|날인하여\s*(?:회신|보내)|작성하시어\s*회신|수정\s*(?:요청|부탁|검토|안)|검토\s*(?:요청|부탁)|초안|\(\s*안\s*\)/.test(String(cc.subj || "") + " " + leadBody);
+    if (!realContractAtts.length || asksUsToSignOrRevise) {
+      return { verified: true, signed: false, openCts: matchedOpen };
+    }
+    if (extracted && extracted.signedByClient === false && !DETECT.isSignedContract(cc.subj, cc.an)) {
+      const explicitSignedReturn = /(?:날인|직인|서명\s*완료|체결본)/.test(String(cc.subj || "") + " " + leadBody);
+      if (!explicitSignedReturn) return { verified: true, signed: false, openCts: matchedOpen };
+    }
+
+    const isReplyToDraft = /^\s*(?:RE|회신)\s*[:：]/i.test(String(cc.subj || "")) && !!sentDraftByCk[targetCk];
+    const hasReturnCue = /(?:계약서|약정서)[^\n]{0,25}(?:송부|보내|회신|첨부|전달|제출|드립)|날인|직인|서명\s*완료|체결본/.test(String(cc.subj || "") + " " + leadBody);
+    const signed = !!(
+      (extracted && extracted.signedByClient === true) ||
+      DETECT.isSignedContract(cc.subj, cc.an) ||
+      (isReplyToDraft && hasReturnCue) ||
+      (sentDraftByCk[targetCk] && hasReturnCue)
+    );
+    return { verified: true, signed, openCts: matchedOpen };
+  }
+
   const reqUpdates = {};
+  const handledContractMsgFps = new Set();
 
   /* ── A. 견적서 후보 처리 (보낸메일함·내게쓴메일함·관련 스레드 + 견적 송부 내용 자동 정리) ── */
   let quoteAttReads = 0;
@@ -1073,13 +1245,30 @@ async function runSweep(deps, opts) {
   for (const cc of contractCandidates) {
     if (contractProcessed >= MAX_CONTRACT_READS_PER_RUN) break;
 
+    const msgFp = cc.dMs + "|" + cc.subj + "|" + cc.an.slice().sort().join("|");
+    if (handledContractMsgFps.has(msgFp)) {
+      seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "dup_folder_mirror" };
+      out.skippedDup++;
+      continue;
+    }
+
     const peerAddrs = cc.isSent
       ? DETECT.addrsOf(cc.m.t || "").filter((a) => !selfSet[a])
       : (cc.isTome ? [] : DETECT.addrsOf(cc.m.e || "").filter((a) => !selfSet[a]));
     const peerName = cc.isSent ? String(cc.m.tn || "") : String(cc.m.f || "");
     const emailMatch = matchCompanyByEmail(peerAddrs, byDom, byAddr, coById, cc.isInternal);
-    const preCoName = (emailMatch && emailMatch.co && emailMatch.co.name) || extractCoFromSubj(cc.subj, cc.an, peerName);
+    let preCoName = (emailMatch && emailMatch.co && emailMatch.co.name) || extractCoFromSubj(cc.subj, cc.an, peerName);
+    if ((!preCoName || isOurFirmToken(preCoName)) && !cc.isInternal && peerAddrs.length) {
+      /* 제목에 상호가 생략된 회신 메일이라도 기존 진행 중 카드의 검증된 상대방 이메일이 유일하게 매칭되면 그 사업장으로 잇는다 */
+      const matchedCks = Object.keys(openPeerAddrsByCk).filter((k) =>
+        peerAddrs.some((a) => openPeerAddrsByCk[k] && openPeerAddrsByCk[k].has(String(a || "").trim().toLowerCase()))
+      );
+      if (matchedCks.length === 1 && openCtsByCk[matchedCks[0]] && openCtsByCk[matchedCks[0]][0]) {
+        preCoName = openCtsByCk[matchedCks[0]][0].companyName || "";
+      }
+    }
     const preCk = coNameKey(preCoName);
+    const preOpenReply = evaluateOpenContractReply(cc, preCk, peerAddrs, null);
 
     if (preCk && isCompanyTerminatedOrClosed(emailMatch && emailMatch.co, preCk)) {
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "closed_co" };
@@ -1112,9 +1301,11 @@ async function runSweep(deps, opts) {
       }
     }
 
-    function queueMetaFallbackContract(outCode, checkNote) {
-      const canFallback = (cc.isInternal || (emailMatch && emailMatch.exactEmail && emailMatch.co))
-        && preCoName && !/푸른노무법인/.test(preCoName);
+    function queueMetaFallbackContract(outCode, checkNote, localFeeHints) {
+      const feeHints = localFeeHints || {};
+      const isReplySigned = !!(preOpenReply && preOpenReply.verified && preOpenReply.signed);
+      const canFallback = (cc.isInternal || (emailMatch && emailMatch.exactEmail && emailMatch.co) || isReplySigned)
+        && preCoName && !isOurFirmToken(preCoName);
       if (!canFallback) return false;
       const reqKey = "mcsc-" + cc.sKey;
       if (existingReqs[reqKey]) {
@@ -1122,7 +1313,10 @@ async function runSweep(deps, opts) {
         out.skippedDup++;
         return true;
       }
-      const fbKind = inferMailWorkKind(cc.subj + " " + cc.an.join(" "));
+      const openList = (preOpenReply && preOpenReply.openCts) || openCtsByCk[preCk] || [];
+      const richOpen = openList.find((c) => c && c.status === "review") || openList[0] || null;
+      const openFirstKind = richOpen && Array.isArray(richOpen.kinds) ? richOpen.kinds.find((k) => k && k !== "consult") : "";
+      const fbKind = openFirstKind || inferMailWorkKind(cc.subj + " " + cc.an.join(" "));
       const fbRefCo = (emailMatch && emailMatch.co) || ((coByNameKey[preCk] && coByNameKey[preCk].length === 1) ? coByNameKey[preCk][0] : null);
       if (fbKind === "company" && isAlreadyActiveMonthlyCompany(fbRefCo, preCk)) {
         seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "active_monthly_co" };
@@ -1134,7 +1328,7 @@ async function runSweep(deps, opts) {
         out.skippedDup++;
         return true;
       }
-      const fbStaff = resolveStaffForMail({
+      let fbStaff = resolveStaffForMail({
         slugUid: cc.slug + "_" + cc.uid,
         matchedCo: fbRefCo,
         subj: cc.subj,
@@ -1143,27 +1337,37 @@ async function runSweep(deps, opts) {
         staffList,
         mailWhoMsg,
       });
+      if ((!fbStaff.sid || !fbStaff.explicit) && richOpen && richOpen.managerMain) {
+        const openSt = staffList.find((u) => String(u.sid) === String(richOpen.managerMain));
+        if (openSt) fbStaff = { sid: String(openSt.sid), name: String(openSt.name), explicit: true };
+      }
       if (!fbStaff.sid) return false;
       const ymd = ymdKst(cc.dMs);
-      const verifiedCoId = emailMatch && emailMatch.co ? String(emailMatch.co.id) : "";
+      const verifiedCoId = emailMatch && emailMatch.co ? String(emailMatch.co.id) : (richOpen && richOpen.companyId ? String(richOpen.companyId) : "");
       const folderLabel = cc.isTome ? "내게쓴메일함" : (cc.isSent ? "보낸메일함" : (cc.fKind === "inbox" ? "받은메일함" : String((fpLabelOf(folders, cc.slug)) || "업무메일함")));
+      const fbTargetStatus = isReplySigned ? "signed" : "review";
+      const fbSenderVerified = !!(cc.isInternal || verifiedCoId || isReplySigned);
       const metaReq = {
         source: "photo_contract",
         state: "pending",
         at: now,
         by: fbStaff.name || "자동검토",
-        targetStatus: "review",
-        senderVerified: !!(cc.isInternal || verifiedCoId),
-        signedByClient: false,
+        targetStatus: fbTargetStatus,
+        senderVerified: fbSenderVerified,
+        openContractVerified: isReplySigned,
+        mergeEmptyOpen: true,
+        signedByClient: isReplySigned,
         managerMain: fbStaff.sid,
         companyId: verifiedCoId,
         srcKey: cc.srcKey,
         srcMails: [cc.srcKey],
-        synthesizedNote: "[메일자동검토 · " + folderLabel + "] " + cc.subj.slice(0, 50),
+        synthesizedNote: isReplySigned
+          ? ("[메일자동검토 · " + folderLabel + " · 상대방 계약서 회신 → 계약확정] " + cc.subj.slice(0, 50))
+          : ("[메일자동검토 · " + folderLabel + "] " + cc.subj.slice(0, 50)),
         inferredKind: fbKind,
         company: {
-          name: preCoName,
-          bizNo: verifiedCoId && emailMatch.co.bizNo ? String(emailMatch.co.bizNo) : "",
+          name: (richOpen && richOpen.companyName) || preCoName,
+          bizNo: verifiedCoId && emailMatch && emailMatch.co && emailMatch.co.bizNo ? String(emailMatch.co.bizNo) : "",
           ceo: "",
           corpRegNo: "",
           address: "",
@@ -1171,34 +1375,42 @@ async function runSweep(deps, opts) {
         },
         contractFields: {
           docName: cc.an[0] || "계약서",
-          scope: cc.subj.slice(0, 60),
+          scope: cc.subj.replace(/^\s*(?:(?:RE|FW|FWD)\s*[:：]\s*)+/i, "").slice(0, 60),
           signDate: ymd,
           startDate: "",
           endDate: "",
           term: "",
           fee: "",
-          vat: "",
-          retainer: "",
-          success: "",
-          deposit: "",
+          vat: String(feeHints.vat || ""),
+          retainer: String(feeHints.retainer || ""),
+          success: String(feeHints.success || ""),
+          deposit: String(feeHints.deposit || ""),
           memo: "",
         },
         mailMeta: {
           dir: cc.isTome ? "tome" : (cc.isSent ? "sent" : "recv"),
-          senderVerified: !!(cc.isInternal || verifiedCoId),
+          senderVerified: fbSenderVerified,
+          openContractVerified: isReplySigned,
           slug: cc.slug,
           uid: cc.uid,
           srcKey: cc.srcKey,
           subject: cc.subj,
           date: cc.dMs,
           dateYmd: ymd,
-          companyName: preCoName,
+          companyName: (richOpen && richOpen.companyName) || preCoName,
           companyId: verifiedCoId,
           managerSid: fbStaff.sid,
           managerName: fbStaff.name,
+          lifecycle: {
+            srcMails: [cc.srcKey],
+            synthesizedNote: "[메일자동검토 · " + folderLabel + "] " + cc.subj.slice(0, 50),
+            inferredKind: fbKind,
+            targetStage: fbTargetStatus,
+            senderVerified: fbSenderVerified,
+          },
         },
       };
-      if (checkNote || !fbStaff.explicit) {
+      if (!isReplySigned && (checkNote || !fbStaff.explicit)) {
         metaReq.checkReq = {
           at: new Date(now).toISOString(),
           by: "시스템(메일 자동검토)",
@@ -1206,15 +1418,18 @@ async function runSweep(deps, opts) {
         };
       }
       reqUpdates[REQ_ROOT + "/" + reqKey] = metaReq;
-      seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: outCode || "contract_meta" };
+      seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: isReplySigned ? "contract_reply_signed" : (outCode || "contract_meta"), st: fbTargetStatus };
       knownMailKeys.add(cc.srcKey);
       knownMailKeys.add(cc.cKey);
+      handledContractMsgFps.add(msgFp);
       out.contractQueued++;
       return true;
     }
 
     if (!downloaded || !downloaded.buf) {
-      if (queueMetaFallbackContract("contract_meta", "")) continue;
+      /* 같은 메일이 다른 폴더(업무폴더 등) 후보에 살아 있으면 빈 거울에서 성급히 메타 폴백하지 않고 다음 폴더 후보에 맡긴다 */
+      const hasOtherFolderCopy = contractCandidates.some((other) => other !== cc && !seenUpdates[SEEN_ROOT + "/" + other.sKey] && (other.dMs + "|" + other.subj + "|" + other.an.slice().sort().join("|")) === msgFp);
+      if (!hasOtherFolderCopy && queueMetaFallbackContract("contract_meta", "")) continue;
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "no_supported_att" };
       out.skippedNonTarget++;
       continue;
@@ -1254,9 +1469,10 @@ async function runSweep(deps, opts) {
       continue;
     }
 
+    const localFeeHints = extractContractFeesFromText(textHint);
     const scrubbed = await scrubContractTextForAi(textHint);
     if (!scrubbed.ok || !scrubbed.text) {
-      if (queueMetaFallbackContract("pii_hold_meta", "첨부 계약서에 비식별 후에도 민감정보 패턴이 남아 외부 AI 전송을 차단하고 제목·첨부명만 반영했습니다 — 첨부 원문을 직접 확인해 주세요.")) {
+      if (queueMetaFallbackContract("pii_hold_meta", "첨부 계약서에 비식별 후에도 민감정보 패턴이 남아 외부 AI 전송을 차단하고 제목·첨부명 및 로컬 보수 표기만 반영했습니다 — 첨부 원문을 직접 확인해 주세요.", localFeeHints)) {
         continue;
       }
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: scrubbed.residualPii ? "residual_pii_blocked" : "scrub_failed" };
@@ -1286,7 +1502,7 @@ async function runSweep(deps, opts) {
     }
 
     if (!extracted) {
-      if (queueMetaFallbackContract("ai_empty_meta", "")) continue;
+      if (queueMetaFallbackContract("ai_empty_meta", "", localFeeHints)) continue;
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "unreadable" };
       out.skippedNonTarget++;
       continue;
@@ -1298,25 +1514,42 @@ async function runSweep(deps, opts) {
       continue;
     }
 
+    extracted = sanitizeOurFirmParty(extracted);
+    /* AI 가 성공보수 % 또는 착수금을 빠뜨렸거나 숫자만 남긴 경우 로컬 계약 본문에서 % 표기를 보강 */
+    if (localFeeHints.success && (!String(extracted.success || "").trim() || (/^\d+(?:\.\d+)?$/.test(String(extracted.success || "").trim()) && /%/.test(localFeeHints.success)))) {
+      extracted.success = localFeeHints.success;
+    }
+    if (localFeeHints.retainer && !String(extracted.retainer || "").trim()) {
+      extracted.retainer = localFeeHints.retainer;
+    }
+    if (localFeeHints.deposit && !String(extracted.deposit || "").trim() && !String(extracted.fee || "").trim()) {
+      extracted.deposit = localFeeHints.deposit;
+    }
+    if (localFeeHints.vat && !String(extracted.vat || "").trim()) {
+      extracted.vat = localFeeHints.vat;
+    }
+
     let compName = String(extracted.company || "").trim();
-    if (!compName || /푸른노무법인/.test(compName)) compName = preCoName;
-    if (!compName || /푸른노무법인/.test(compName)) {
+    if (!compName || isOurFirmToken(compName)) compName = preCoName;
+    if (!compName || isOurFirmToken(compName)) {
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "no_company" };
       out.skippedNonTarget++;
       continue;
     }
 
     const ck = coNameKey(compName);
+    const openReply = evaluateOpenContractReply(cc, ck, peerAddrs, extracted);
+    const openReplySigned = !!(openReply && openReply.verified && openReply.signed);
     const validBiz = bizNoValid(extracted.bizno) ? fmtBizNo(extracted.bizno) : "";
     const bizDigits = digits(validBiz);
     const bizMatchedCo = (bizDigits.length === 10 && coByBiz[bizDigits] && coByBiz[bizDigits].length === 1 && coNameKey(coByBiz[bizDigits][0].name) === ck)
       ? coByBiz[bizDigits][0]
       : null;
 
-    /* 외부 수신(recv) 발신 검증: 정확히 등록된 업체 이메일과 대상 업체가 일치하는지 확인 (사칭·타사 교차 차단) */
+    /* 외부 수신(recv) 발신 검증: ① 업체관리 등록 이메일과 일치하거나 ② 진행 중(상담접수·계약협의) 계약 및 발송 메일의 상대방 이메일과 교차 검증된 경우 허용 */
     const recvSenderVerified = cc.isInternal
       ? true
-      : !!(emailMatch && emailMatch.exactEmail && emailMatch.co && coNameKey(emailMatch.co.name) === ck);
+      : !!((emailMatch && emailMatch.exactEmail && emailMatch.co && coNameKey(emailMatch.co.name) === ck) || openReply.verified);
 
     const refCo = recvSenderVerified
       ? (bizMatchedCo || (emailMatch && emailMatch.co && coNameKey(emailMatch.co.name) === ck ? emailMatch.co : null))
@@ -1330,7 +1563,11 @@ async function runSweep(deps, opts) {
     }
 
     const docScopeTxt = [extracted.docName, extracted.scope, cc.subj, fName].filter(Boolean).join(" ");
-    const workKind = inferMailWorkKind(docScopeTxt);
+    const richOpen = (openReply && openReply.openCts && (openReply.openCts.find((c) => c && c.status === "review") || openReply.openCts[0])) || null;
+    const openFirstKind = richOpen && Array.isArray(richOpen.kinds) ? richOpen.kinds.find((k) => k && k !== "consult") : "";
+    const workKind = inferMailWorkKind(docScopeTxt) !== "consult"
+      ? inferMailWorkKind(docScopeTxt)
+      : (openFirstKind || "consult");
     const approxAmt = parseMoneyApprox(extracted.retainer || extracted.deposit || extracted.fee);
 
     if (workKind === "company" && isAlreadyActiveMonthlyCompany(nameOnlyCo, ck)) {
@@ -1344,16 +1581,16 @@ async function runSweep(deps, opts) {
       continue;
     }
 
-    const signedByClient = extracted.signedByClient === true || DETECT.isSignedContract(cc.subj, cc.an);
+    const signedByClient = extracted.signedByClient === true || DETECT.isSignedContract(cc.subj, cc.an) || openReplySigned;
     let targetStatus = "review";
     if (cc.isSent || cc.isTome) {
       /* 당사자 확인 원칙: 등록 업체(refCo) 또는 체크섬 통과 사업자번호(10자리)가 확인된 서명본만 계약확정(signed)으로 직행 */
       targetStatus = signedByClient && (refCo || bizDigits.length === 10) ? "signed" : "review";
     } else {
-      targetStatus = (recvSenderVerified && signedByClient && refCo) ? "signed" : "review";
+      targetStatus = (recvSenderVerified && signedByClient && (refCo || openReplySigned || bizDigits.length === 10)) ? "signed" : "review";
     }
 
-    const staff = resolveStaffForMail({
+    let staff = resolveStaffForMail({
       slugUid: cc.slug + "_" + cc.uid,
       matchedCo: nameOnlyCo,
       subj: cc.subj,
@@ -1362,14 +1599,18 @@ async function runSweep(deps, opts) {
       staffList,
       mailWhoMsg,
     });
+    if ((!staff.sid || !staff.explicit) && richOpen && richOpen.managerMain) {
+      const openSt = staffList.find((u) => String(u.sid) === String(richOpen.managerMain));
+      if (openSt) staff = { sid: String(openSt.sid), name: String(openSt.name), explicit: true };
+    }
     if (!staff.sid) continue;
 
     const ymd = ymdKst(cc.dMs);
-    const verifiedCoId = refCo ? String(refCo.id) : "";
+    const verifiedCoId = refCo ? String(refCo.id) : (openReplySigned && richOpen && richOpen.companyId ? String(richOpen.companyId) : "");
     const effectiveBizNo = recvSenderVerified ? (validBiz || (refCo && refCo.bizNo ? String(refCo.bizNo) : "")) : "";
     const folderLabel = cc.isTome ? "내게쓴메일함" : (cc.isSent ? "보낸메일함" : (cc.fKind === "inbox" ? "받은메일함" : String((fpLabelOf(folders, cc.slug)) || "업무메일함")));
 
-    const needManagerCheck = (!cc.isInternal && !recvSenderVerified) || (!staff.explicit);
+    const needManagerCheck = (!cc.isInternal && !recvSenderVerified) || (!staff.explicit && !openReplySigned);
     const checkReq = needManagerCheck
       ? {
           at: new Date(now).toISOString(),
@@ -1387,12 +1628,16 @@ async function runSweep(deps, opts) {
       by: staff.name || "자동검토",
       targetStatus,
       senderVerified: recvSenderVerified,
+      openContractVerified: !!(openReply.verified || cc.isSent),
+      mergeEmptyOpen: true,
       signedByClient: !!signedByClient,
       managerMain: staff.sid,
       companyId: verifiedCoId,
       srcKey: cc.srcKey,
       srcMails: [cc.srcKey],
-      synthesizedNote: "[메일자동검토 · " + folderLabel + "] " + cc.subj.slice(0, 50),
+      synthesizedNote: openReplySigned
+        ? ("[메일자동검토 · " + folderLabel + " · 상대방 계약서 회신 → 계약확정] " + cc.subj.slice(0, 50))
+        : ("[메일자동검토 · " + folderLabel + "] " + cc.subj.slice(0, 50)),
       inferredKind: workKind,
       company: {
         name: compName,
@@ -1419,6 +1664,7 @@ async function runSweep(deps, opts) {
       mailMeta: {
         dir: cc.isTome ? "tome" : (cc.isSent ? "sent" : "recv"),
         senderVerified: recvSenderVerified,
+        openContractVerified: !!(openReply.verified || cc.isSent),
         slug: cc.slug,
         uid: cc.uid,
         srcKey: cc.srcKey,
@@ -1447,9 +1693,10 @@ async function runSweep(deps, opts) {
       continue;
     }
     reqUpdates[REQ_ROOT + "/" + reqKeyC] = reqObj;
-    seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "contract", st: targetStatus };
+    seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: openReplySigned ? "contract_reply_signed" : "contract", st: targetStatus };
     knownMailKeys.add(cc.srcKey);
     knownMailKeys.add(cc.cKey);
+    handledContractMsgFps.add(msgFp);
     out.contractQueued++;
   }
 
@@ -1481,6 +1728,7 @@ module.exports = {
   normSrcMailKey,
   extractCoFromSubj,
   extractHwpxText,
+  extractContractFeesFromText,
   scrubContractTextForAi,
   parseAiJson,
   bizNoValid,

@@ -4,4 +4,6 @@
     <color name="portal_primary">#2563EB</color>
     <color name="portal_surface">#F8FAFC</color>
     <color name="portal_dark_bg">#1E293B</color>
+    <color name="widget_header_text">#FFFFFF</color>
+    <color name="widget_header_sub">#BFDBFE</color>
 </resources>

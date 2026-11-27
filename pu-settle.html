@@ -168,6 +168,15 @@ main{padding:12px 16px 40px}
 .kroom input{width:200px;min-width:0}
 .kdet{padding:2px 8px 10px 14px}
 /* 월별 정산 한 화면 — 설명 줄을 없앤 만큼 여백·줄 높이도 줄인다(대표 2026-11-12 「화면 아래까지 안 내려오게」) */
+/* 함께 정산 — 사업별 차액 열 + 합계·정산(대표 2026-11-22). 금액은 +초록(주관이 줄 돈) · −주황(주관이 받을 돈) */
+.t.kc th .cn{display:block;font-weight:700}
+.t.kc th .cm{display:block;font-weight:400;font-size:11.5px;color:var(--mute)}
+.t.kc td.cv{font-variant-numeric:tabular-nums}
+.t.kc td.pos{color:var(--green)}
+.t.kc td.neg{color:var(--amber)}
+.t.kc tr.sum td{background:var(--bg);border-top:2px solid var(--line2)}
+.t.kc td.ti{max-width:160px}
+.mrun-h .ck{margin-right:2px}
 #pane-month .card{margin-bottom:8px}
 #pane-month .stephd{padding:6px 12px}
 #pane-month .mrun-h{padding:5px 12px}
@@ -322,6 +331,22 @@ details.dep textarea{min-height:64px}
   .mtr-r .co{max-width:100%}
   .kmsgs{padding:0 4px 4px}
   .kroom input{width:100%;flex:1 1 140px}
+  /* 함께 정산 표 — 폰에서는 사람마다 카드: 1줄 이름·합계·방향·복사, 아래에 사업별 차액(이름표 + 금액)을 한 줄씩. 합계·방향이 옆으로 밀려 가려지지 않게 */
+  .t.kc,.t.kc tbody,.t.kc tfoot{display:block;width:100%}
+  .t.kc thead{display:none}
+  .t.kc tr{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .t.kc td{border:0;padding:0;max-width:none}
+  .t.kc td.ti{order:1;flex:1 1 0;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .t.kc td.cl{order:2;font-size:12px}
+  .t.kc td.ct{order:3}
+  .t.kc td.cd{order:4}
+  .t.kc td.cx{order:5}
+  .t.kc td.cp{order:6;flex:0 0 100%;display:flex;justify-content:space-between;gap:8px;font-size:12px}
+  .t.kc td.cp::before{content:attr(data-lb);color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .t.kc td.cp.none{display:none}
+  .t.kc tr.sum td{background:none}
+  .t.kc tr.sum{background:var(--bg)}
+  .mrun-h .ck input{width:22px;height:22px}
   .subtabs{padding:0 10px}
   .t[data-name=auto] tbody td[data-k="pick"]{order:7;flex:0 0 100%}
   .t[data-name=auto] tbody td[data-k="exp"]::before{content:'예상 '}
@@ -334,8 +359,10 @@ details.dep textarea{min-height:64px}
 #sub-calc{max-width:920px}
 .tr-list{flex-direction:column;align-items:flex-start}
 </style>
+<!-- 제미나이 판 «모양 값» 시범(대표 「추천대로 시작」 2026-11-19) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a">
 <div id="head">
   <div class="top">
     <h1>🧾 컨설팅정산</h1>
@@ -368,6 +395,7 @@ details.dep textarea{min-height:64px}
     <div class="mhead" id="monthHead"></div>
     <div class="card" id="step1"></div>
     <div class="card" id="step2"></div>
+    <div class="card" id="stepC" style="display:none"></div>
     <div class="card" id="step3"></div>
   </section>
   <section class="pane" id="pane-year">
@@ -394,13 +422,13 @@ details.dep textarea{min-height:64px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=51"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -409,8 +437,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=13"></script>
-<script src="js/pu-settle-view.js?v=18"></script>
+<script src="js/pu-settle-core.js?v=14"></script>
+<script src="js/pu-settle-view.js?v=19"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -419,7 +447,7 @@ var D={ rules:{}, links:{ company:{}, person:{} }, notices:{}, runs:{}, adjusts:
 var ERP={ biz:[], consultings:[], people:[] };
 /* 사번 → 이름 — 기록은 사번으로 저장돼 있어 «보일 때» 이름으로 바꾼다. 사번은 화면에 안 낸다(대표 결정 2026-10-25) */
 var NAMES={};
-var TAB='month', CUR_RUN='', CUR_NOTICE='', CUR_MONTH='', SUB='rules', MSG_OPEN='';   /* MSG_OPEN = ③에서 보낼 문구를 펼친 줄('정산표|번호') — 하나만 */
+var TAB='month', CUR_RUN='', CUR_NOTICE='', CUR_MONTH='', SUB='rules', MSG_OPEN='', COMB={};   /* MSG_OPEN = ③에서 보낼 문구를 펼친 줄('정산표|번호') — 하나만 */
 /* 자료 넣기 상자(안내 파일 올리기·직접 입력·안내 파일 목록) — 월별 정산 위에 접었다 편다 */
 var INBOX={ open:false };
 /* 입금 자동 검토(대표 지시 2026-11-07 「입금된 내역 자료만 넣으면 자동으로 검토하고 정리」) — 재무관리 거래내역은 «읽기만» 한 번 읽어 두고(batches)
@@ -588,12 +616,43 @@ function drawMonth(){
   ['step1','step2','step3'].forEach(function(id){ $(id).style.display=runs.length?'':'none'; });
   if(runs.length){
     drawAuto(runs);
-    var cur=CUR_RUN && runs.some(function(r){ return r.id===CUR_RUN; }) ? C.normalizeRun(D.runs[CUR_RUN]) : null;
-    $('step2').innerHTML=V.monthRuns(runs, { names:NAMES, biz:biz, cur:cur?cur.id:'', detail:cur
-      ? V.runDetail(cur, NAMES, Object.assign({}, SEL.members, SEL.transfers), { biz:bizName(cur.typeCode), pend:cur.status==='draft'?(PEND[cur.id]||{}):{} })+(cur.status==='draft'?V.depositBox(depState(cur)):'') : '' });
+    drawRunsBox(runs);
     drawSend(runs);
   }
+  drawComb();
   drawBulks();
+}
+/* ② 정산 확인 — 정산표마다 한 덩이(☐ 는 «함께 정산»에 넣을 사업 고르기) */
+function drawRunsBox(runs){
+  var biz=bizNames();
+  var cur=CUR_RUN && runs.some(function(r){ return r.id===CUR_RUN; }) ? C.normalizeRun(D.runs[CUR_RUN]) : null;
+  $('step2').innerHTML=V.monthRuns(runs, { names:NAMES, biz:biz, cur:cur?cur.id:'', comb:COMB, combN:combRuns().length, detail:cur
+    ? V.runDetail(cur, NAMES, Object.assign({}, SEL.members, SEL.transfers), { biz:bizName(cur.typeCode), pend:cur.status==='draft'?(PEND[cur.id]||{}):{} })+(cur.status==='draft'?V.depositBox(depState(cur)):'') : '' });
+}
+/* ═══ 함께 정산 — 대표 지시 2026-11-22 「여러 사업이 동시에 들어오면 … 클릭해서 이 사업 함께 정산」
+   고른 정산표(COMB, 달이 달라도 된다)의 사람별 차액을 더해 플러스·마이너스를 상계해 «보여 준다». ⚠ 읽기만 — 정산표·송금·카톡 기록은 바꾸지 않는다(서버에 쓰지 않는다). ═══ */
+function combRuns(){
+  return Object.keys(COMB).map(function(rid){ var r=D.runs[rid]; return (r && !r._deleted && (r.status==='draft' || r.status==='confirmed')) ? C.normalizeRun(r) : null; })
+    .filter(Boolean).sort(function(a,b){ return a.monthKey<b.monthKey?-1:a.monthKey>b.monthKey?1:(bizName(a.typeCode)<bizName(b.typeCode)?-1:1); });
+}
+function combTitles(rs){ var t={}; rs.forEach(function(r){ t[r.id]=bizName(r.typeCode); }); return t; }
+function drawComb(){
+  var rs=combRuns(), box=$('stepC');
+  Object.keys(COMB).forEach(function(rid){ if(!rs.some(function(r){ return r.id===rid; })) delete COMB[rid]; });   // 지워지거나 기록만이 된 것은 뺀다
+  if(rs.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display=''; box.innerHTML=V.combBox(C.combineRuns(rs, NAMES), { title:combTitles(rs) });
+}
+function copyCombined(key){
+  var rs=combRuns();
+  if(rs.length<2) return;
+  if(rs.some(function(r){ return r.status!=='confirmed'; })){ toast('확정한 정산표만 복사할 수 있습니다'); return; }
+  var comb=C.combineRuns(rs, NAMES), kp=String(key||'').split('|');
+  var row=comb.rows.filter(function(r){ return r.sid===kp[0] && r.leadSid===(kp[1]||''); })[0]; if(!row) return;
+  var months=[]; rs.forEach(function(r){ var m=r.label||r.monthKey; if(months.indexOf(m)<0) months.push(m); });
+  var text=C.combinedMessage(comb, row, { title:combTitles(rs), label:months.join(' · ') });
+  var done=function(){ toast(row.name+' 함께 정산 문구를 복사했습니다 — 카톡에 붙여 넣으세요'); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+  else fallbackCopy(text, done);
 }
 /* ① 입금 확인 — 그 달에 임시저장 정산표가 있으면 재무관리 거래내역을 (한 번) 읽어 주관 몫과 맞춘다 */
 function leadMap(){ var o={}; ruleTypes().forEach(function(k){ if(D.rules[k].leadSid) o[k]=String(D.rules[k].leadSid); }); return o; }
@@ -1018,7 +1077,7 @@ function setTab(t){ TAB=t; lsSet('tab', t); Object.keys(SEL).forEach(function(k)
 function setYear(y){
   if(!/^\d{4}$/.test(y||'')) return;
   YEAR=y; lsSet('year', YEAR); if(CUR_RUN && D.runs[CUR_RUN] && C.yearOf(D.runs[CUR_RUN].monthKey)!==YEAR) CUR_RUN='';
-  MANUAL.open=false; SEL.notices={}; CALC.siteId=''; AUTO.primed=''; draw();
+  MANUAL.open=false; SEL.notices={}; CALC.siteId=''; AUTO.primed=''; COMB={}; draw();
 }
 
 /* ═══ 저장 — 모두 관문(gate)으로. 지우기는 _deleted 표식을 gate.save 한다 ═══
@@ -1390,6 +1449,9 @@ document.addEventListener('click', async function(ev){
     if(sr0[q[1]]){ delete sr0[q[1]][q[2]]; if(!Object.keys(sr0[q[1]]).length) delete sr0[q[1]]; } WORK.open=q[0]; markDirty(); drawRules(); return; }
   if(t.closest('#a_add')){ await addAdjust(); return; }
   if((b=t.closest('[data-adj-del]'))){ var aid=b.getAttribute('data-adj-del'); if(!window.confirm('이 이월·조정을 지울까요?')) return; try{ await softDelete('settle/adjusts/'+aid, 'SettleAdjust', D.adjusts[aid]); }catch(e){ toast('지우지 못했습니다: '+errMsg(e)); } await reload(); return; }
+  if(t.closest('[data-comb-all]')){ monthRunsOf(CUR_MONTH).forEach(function(r){ if(!r._deleted && (r.status==='draft' || r.status==='confirmed')) COMB[r.id]=1; }); drawRunsBox(monthRunsOf(CUR_MONTH)); drawComb(); return; }
+  if(t.closest('[data-comb-clear]')){ COMB={}; drawRunsBox(monthRunsOf(CUR_MONTH)); drawComb(); return; }
+  if((b=t.closest('[data-comb-copy]'))){ copyCombined(b.getAttribute('data-comb-copy')); return; }
   if((b=t.closest('[data-msg-open]'))){ var mo=b.getAttribute('data-msg-open'); MSG_OPEN=(MSG_OPEN===mo)?'':mo; drawSend(monthRunsOf(CUR_MONTH)); return; }
   if((b=t.closest('[data-copy]'))){ copyMsg(b.getAttribute('data-copy')); return; }
   if((b=t.closest('[data-kq]'))){ await kqSend([refPick(b.getAttribute('data-kq'))]); return; }
@@ -1397,6 +1459,8 @@ document.addEventListener('click', async function(ev){
   if((b=t.closest('[data-room-save]'))){ var rb=b.closest('.kroom')||b.closest('tr'); await saveRoom(b.getAttribute('data-room-save'), rb&&rb.querySelector('input[data-room]')); return; }
 });
 document.addEventListener('change', async function(ev){
+  var ct=ev.target;
+  if(ct && ct.matches && ct.matches('input[data-comb]')){ var crid=ct.getAttribute('data-comb'); if(ct.checked) COMB[crid]=1; else delete COMB[crid]; drawRunsBox(monthRunsOf(CUR_MONTH)); drawComb(); return; }
   var t=ev.target;
   if(t.matches('input[data-all]')){ var k=t.getAttribute('data-all'); [].forEach.call(t.closest('table').querySelectorAll('input[data-ck]'), function(c){ c.checked=t.checked; var id=c.getAttribute('data-ck'); if(t.checked) SEL[k][id]=1; else delete SEL[k][id]; }); drawBulks(); return; }
   if(t.id==='dep_sid'){ var ds=curDraft(); DEP.sid=t.value; DEP.open=true; if(ds) depRematch(ds); drawMonth(); return; }

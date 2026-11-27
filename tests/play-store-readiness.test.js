@@ -285,3 +285,114 @@ test('스토어 그래픽 생성기와 설정 도우미가 정상 동작하고 �
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('Google Play 앱(TWA·WebView) 내부에서는 외부 APK 다운로드 링크를 숨기고 배포 게이트가 정책·미인증 파일을 통제한다', () => {
+  const vm = require('node:vm');
+  const erp = readUtf8('pu-erp.html');
+  const enter = readUtf8('enter.html');
+  const deployYml = readUtf8('.github/workflows/deploy-pages.yml');
+
+  // 1. enter.html 에서 TWA 진입 세션을 sessionStorage('pu_play_twa')에 기록한다
+  assert.match(enter, /android-app:\/\/kr\.pureun\.portal/, 'enter.html 에 Play TWA referrer 감지가 있어야 합니다');
+  assert.match(enter, /sessionStorage\.setItem\(['"]pu_play_twa['"]/, 'enter.html 에 pu_play_twa 세션 저장이 있어야 합니다');
+
+  // 2. pu-erp.html hanaApkBlock() 이 Play 앱 환경(TWA referrer·세션·Android WebView)에서 .apk 링크를 노출하지 않는다
+  function cutBlock(src, header) {
+    const i = src.indexOf(header);
+    assert.ok(i >= 0, '못 찾음: ' + header);
+    let d = 0;
+    for (let k = src.indexOf('{', i); k < src.length; k++) {
+      if (src[k] === '{') d++;
+      else if (src[k] === '}') { d--; if (d === 0) return src.slice(i, k + 1); }
+    }
+    throw new Error('닫는 괄호 없음: ' + header);
+  }
+  function hasApkLink(node) {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some(hasApkLink);
+    if (typeof node !== 'object') return false;
+    if (node.tag === 'a' && node.props && /hana-bridge\.apk/.test(String(node.props.href || ''))) return true;
+    return hasApkLink(node.kids);
+  }
+  function evalHanaBlock(env) {
+    const ctx = Object.assign({
+      HANA_APK_VER: '9.9.9',
+      location: { protocol: 'https:', origin: 'https://erp.pureunlabor.co.kr', pathname: '/pu-erp.html' },
+      h: (tag, props, ...kids) => ({ tag, props: props || {}, kids }),
+    }, env || {});
+    vm.createContext(ctx);
+    vm.runInContext(cutBlock(erp, 'function hanaApkUrl(){'), ctx);
+    vm.runInContext(cutBlock(erp, '  function hanaApkBlock(){'), ctx);
+    return ctx.hanaApkBlock();
+  }
+
+  assert.equal(
+    hasApkLink(evalHanaBlock({ document: { referrer: 'android-app://kr.pureun.portal/' } })),
+    false,
+    'TWA referrer 환경에서는 외부 APK 다운로드 링크를 숨겨야 합니다'
+  );
+  assert.equal(
+    hasApkLink(evalHanaBlock({ sessionStorage: { getItem: (k) => (k === 'pu_play_twa' ? '1' : null) } })),
+    false,
+    'TWA 세션(pu_play_twa=1)에서는 외부 APK 다운로드 링크를 숨겨야 합니다'
+  );
+  assert.equal(
+    hasApkLink(evalHanaBlock({ navigator: { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP1A; wv) AppleWebKit/537.36' } })),
+    false,
+    'Android WebView 폴백 환경에서는 외부 APK 다운로드 링크를 숨겨야 합니다'
+  );
+  assert.equal(
+    hasApkLink(evalHanaBlock({ navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0' } })),
+    true,
+    '일반 PC 브라우저에서는 기존 하나문자 APK 다운로드 링크가 유지되어야 합니다'
+  );
+
+  // 3. 배포 게이트가 Play 필수 정책 문서 3종을 유지하고 미인증 프로토타입(pu-payroll-mail-sync.html)을 제외한다
+  for (const keepPolicy of ['policy/privacy.html', 'policy/terms.html', 'policy/account-deletion.html']) {
+    assert.ok(deployYml.includes(keepPolicy), 'deploy-pages.yml keep 목록에 누락됨: ' + keepPolicy);
+  }
+  assert.match(deployYml, /test -f "\$pdoc" && test -s "\$pdoc"/, '정책 문서 3종은 비어 있지 않은 일반 파일인지 검증해야 합니다');
+  assert.match(deployYml, /rm -f --[^\n]*pu-payroll-mail-sync\.html/, '미인증 시안 파일이 배포 제외 목록에 있어야 합니다');
+  assert.match(deployYml, /for gone in[\s\S]*?pu-payroll-mail-sync\.html/, '미인증 시안 파일이 gone 검증 목록에 있어야 합니다');
+
+  // 4. 네이티브 TWA 딥링크(PortalLauncherActivity.java)에서 .apk 직접 경로를 차단한다
+  const launcherJava = readUtf8('android/portal-twa/app/src/main/java/kr/pureun/portal/PortalLauncherActivity.java');
+  assert.match(launcherJava, /endsWith\("\.apk"\)/, '네이티브 딥링크에서 .apk 경로를 차단해야 합니다');
+});
+
+test('안드로이드 홈 화면 위젯과 Digital Asset Links SHA-256 지문이 안전하게 구성되어 있다', () => {
+  const manifest = readUtf8('android/portal-twa/app/src/main/AndroidManifest.xml');
+  const widgetJava = readUtf8('android/portal-twa/app/src/main/java/kr/pureun/portal/PortalWidgetProvider.java');
+  const widgetInfo = readUtf8('android/portal-twa/app/src/main/res/xml/portal_widget_info.xml');
+  const widgetLayout = readUtf8('android/portal-twa/app/src/main/res/layout/widget_portal_quick.xml');
+  const strings = readUtf8('android/portal-twa/app/src/main/res/values/strings.xml');
+  const assetlinks = JSON.parse(readUtf8('.well-known/assetlinks.json'));
+
+  // 1. Digital Asset Links 업로드 키 SHA-256 지문이 최소 1개 이상 유효한 형식으로 등록되어 있어야 한다
+  const fps = assetlinks[0] && assetlinks[0].target && assetlinks[0].target.sha256_cert_fingerprints;
+  assert.ok(Array.isArray(fps) && fps.length >= 1, 'assetlinks.json 에 최소 1개의 SHA-256 인증서 지문이 등록되어 있어야 합니다');
+  for (const fp of fps) {
+    assert.match(fp, /^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/, '잘못된 SHA-256 지문 형식: ' + fp);
+  }
+
+  // 2. 홈 화면 위젯 리시버·메타데이터·레이아웃·FLAG_IMMUTABLE 보안 검증
+  assert.match(manifest, /android:name="\.PortalWidgetProvider"/);
+  assert.match(manifest, /android\.appwidget\.action\.APPWIDGET_UPDATE/);
+  assert.match(manifest, /@xml\/portal_widget_info/);
+  assert.match(widgetInfo, /@layout\/widget_portal_quick/);
+  assert.match(widgetJava, /PendingIntent\.FLAG_IMMUTABLE/, 'Android 12+ 보안 정책상 PendingIntent.FLAG_IMMUTABLE 이 필수입니다');
+  assert.match(widgetJava, /PortalLauncherActivity\.class/, '위젯은 명시적으로 PortalLauncherActivity 를 통해 검증된 주소만 열어야 합니다');
+
+  // 3. 위젯의 6개 핵심 앱 바로가기 버튼과 URL 이 모두 ERP 정식 출처를 가리킨다
+  const { ERP_LINK_BASE } = require('../functions/erp-origins.js');
+  for (const id of ['widget_header', 'widget_btn_erp', 'widget_btn_cal', 'widget_btn_cards', 'widget_btn_mail', 'widget_btn_photos', 'widget_btn_work']) {
+    assert.ok(widgetLayout.includes('@+id/' + id), '위젯 레이아웃에 버튼이 누락됨: ' + id);
+    assert.ok(widgetJava.includes('R.id.' + id), '위젯 Provider에 클릭 핸들러가 누락됨: ' + id);
+  }
+  for (const key of ['widget_url_portal', 'widget_url_erp', 'widget_url_cal', 'widget_url_cards', 'widget_url_mail', 'widget_url_photos', 'widget_url_work']) {
+    assert.ok(
+      strings.includes('name="' + key + '" translatable="false">' + ERP_LINK_BASE + '/'),
+      '위젯 URL이 ERP 정식 출처(' + ERP_LINK_BASE + ')와 다릅니다: ' + key
+    );
+  }
+});

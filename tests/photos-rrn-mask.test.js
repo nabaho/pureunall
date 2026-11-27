@@ -159,6 +159,8 @@ function runReadPhoto(masked, opts) {
     cutFn(app, 'function freeOcrPref('),
     cutFn(app, 'function freeReadTry('),
     cutFn(app, 'function freeReadAsk('),
+    /* 2026-11-19 — 무료 판독이 이미 Vision 에 보낸 사진은 서버 «무료 글자 먼저»를 끈다(같은 사진 두 번 막기) */
+    cutFn(app, 'function freeOcrRan('),
     /* 가리지 못했을 때의 답 — 문 셋이 «값»으로 쥐고 있어 없으면 ReferenceError 다 */
     cutFn(app, 'function rrnFail('),
     cutFn(app, 'function markFree('),

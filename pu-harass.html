@@ -45,7 +45,7 @@
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
 button:hover{border-color:var(--mute)}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible,.kpi[role="button"]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible,.kpi[role="button"]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 button:disabled{opacity:.45;cursor:default}
 button.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:600}
 button.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff;font-weight:600}
@@ -112,7 +112,8 @@ table.t[data-name^="yr_"] td{max-width:200px}
 table.t[data-name^="yr_"] td.ti{max-width:220px}
 table.t td.wide{max-width:360px}
 table.t td[data-k="act"]{max-width:none;overflow:visible;text-overflow:clip}
-.ws-split:not(.focus-doc) table.t[data-name="issues"] td.ti,.ws-split:not(.focus-doc) table.t[data-name="evidences"] td.ti{max-width:165px}
+.ws-split:not(.focus-doc) table.t th,.ws-split:not(.focus-doc) table.t td{padding:6px 5px}
+.ws-split:not(.focus-doc) table.t[data-name="issues"] td.ti,.ws-split:not(.focus-doc) table.t[data-name="evidences"] td.ti{max-width:142px}
 table.t th.c,table.t td.c{width:34px;text-align:center}
 input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
@@ -146,17 +147,27 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .mhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-weight:700}
 .mbd{padding:12px 14px;max-height:76vh;overflow:auto}
 .mft{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
-/* ── 사건 통합 작업실 (상단 8단계 스텝바 · 좌우 대조 2단 스플릿 · 녹취/전자서명 원스톱 카드) ── */
-.ws-steps{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;padding:8px 12px;background:var(--bg);border-top:1px solid var(--line)}
-.ws-step{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);text-align:left;min-width:0;font-size:11.5px;white-space:normal}
-.ws-step b{font-size:12px;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ws-step span{font-size:11px;color:var(--mute);display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ── 사건 상단 1줄 진행흐름 · 보조메뉴(act-menu) · 선택접기(sub-fold) · 좌우 2단 작업실 ── */
+.ws-steps{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;padding:7px 12px;background:var(--bg);border-top:1px solid var(--line)}
+.ws-step{display:flex;align-items:center;justify-content:center;gap:4px;min-height:32px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--mute);text-align:center;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-step b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ws-step.done{background:var(--green-bg);border-color:var(--green-line);color:var(--green)}
-.ws-step.done span{color:var(--green)}
-.ws-step.cur{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
-.ws-step.cur span{color:var(--blue-d)}
-.ws-modes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);background:var(--card)}
-.ws-modes button.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.ws-step.cur{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.act-menu{position:relative;display:inline-block}
+.act-menu>summary{list-style:none;display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:5px 10px;font-size:12px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);cursor:pointer;user-select:none;white-space:nowrap}
+.act-menu>summary::-webkit-details-marker{display:none}
+.act-menu>summary:hover{border-color:var(--mute)}
+.act-menu[open]>summary{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-d)}
+.act-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:35;min-width:205px;max-width:calc(100vw - 24px);background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:5px;display:flex;flex-direction:column;gap:3px}
+.act-pop button,.act-pop a{width:100%;text-align:left;justify-content:flex-start;border-color:transparent;background:transparent;padding:6px 10px;min-height:32px;font-size:12.5px;border-radius:7px;color:var(--ink);display:flex;align-items:center;gap:6px}
+.act-pop button:hover,.act-pop a:hover{background:var(--bg);border-color:var(--line)}
+.sub-fold{border-top:1px solid var(--line);background:var(--bg)}
+.sub-fold>summary{list-style:none;display:flex;align-items:center;gap:6px;min-height:34px;padding:7px 12px;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer;user-select:none}
+.sub-fold>summary::-webkit-details-marker{display:none}
+.sub-fold>summary::before{content:'▸';font-size:11px;color:var(--mute)}
+.sub-fold[open]>summary::before{content:'▾'}
+.sub-fold>summary:hover{color:var(--ink)}
+.sub-fold-bd{padding:8px 12px 10px;background:var(--card);border-top:1px solid var(--line)}
 .yr-pills{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
 .yr-pills:empty{display:none}
 .yr-pills button{font-size:12px;padding:4px 10px;border-radius:16px;min-height:30px;background:var(--card);border:1px solid var(--line2);color:var(--ink2)}
@@ -182,10 +193,8 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t td[data-k="act"]{max-width:none}
   .ws-split:not(.focus-doc) table.t[data-name="issues"] td.ti{max-width:250px}
 }
-.drop-zone{border:1.5px dashed var(--blue-line);background:var(--blue-bg);color:var(--blue-d);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:border-color .15s}
-.drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--card)}
-.drop-zone b{display:block;font-size:13px;margin-bottom:3px}
-.drop-zone span{font-size:11.5px;color:var(--ink2)}
+.drop-zone{border:1px dashed var(--line2);background:var(--bg);color:var(--ink2);border-radius:8px;padding:7px 12px;text-align:center;cursor:pointer;font-size:12px;transition:border-color .15s}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-d)}
 .iv-list{display:flex;flex-direction:column;gap:8px;padding:10px 12px}
 .iv-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);display:flex;flex-direction:column;gap:7px}
 .iv-card.signed{border-color:var(--green-line)}
@@ -237,7 +246,8 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 }
 /* ── 폰 화면: 가로 밀기 없이 2줄 카드 (docs/규칙/폰화면.md · 고르기칸-번호.md) ── */
 @media (max-width:768px){
-  button.sm{min-height:36px;padding:6px 11px}
+  button.sm,.act-menu>summary,.sub-fold>summary{min-height:36px;padding:6px 11px}
+  .act-pop button,.act-pop a{min-height:36px}
   input,select,textarea,.rpt-paper textarea{font-size:16px}
   input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;vertical-align:middle}
   .modal{padding:0}
@@ -268,7 +278,9 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   .bar{padding:7px 10px;gap:5px}
   .bar input[type="search"]{flex:1 1 100% !important;max-width:none !important;min-width:0 !important}
   .bar select{flex:1 1 calc(50% - 4px);min-width:0}
-  .ws-steps{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 10px}
+  .ws-steps{display:flex;overflow-x:auto;scrollbar-width:none;gap:5px;padding:7px 10px}
+  .ws-steps::-webkit-scrollbar{display:none}
+  .ws-step{flex:0 0 auto;min-height:36px;padding:5px 10px}
   .ws-split,.studio-grid{grid-template-columns:1fr;gap:8px}
   .iv-list{padding:8px 10px}
   .rpt-grid{grid-template-columns:1fr;padding:8px 10px}
@@ -305,24 +317,26 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   #printArea{display:block !important;padding:12mm 14mm;white-space:pre-wrap;font-size:11.5pt;line-height:1.75;color:#000000}
 }
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design pu-frame-a pu-dark-auto">
 <div id="head">
   <div class="top">
     <h1>🛡️ 괴롭힘·성희롱 조사</h1>
-    <span class="sub">공문 자동수집 · 직접수행·결과보고 구분 · 이알피·계약·기타·업무관리 자동분류 · 녹취·전자서명 · 한글(.hwpx)</span>
     <span id="who"></span>
+    <span class="chip c-blue wide-only" id="syncStateChip" style="display:none" aria-live="polite"></span>
     <span class="sp"></span>
-    <button class="sm" id="syncAllBtn" title="메일함에서 사건별 공문을 수집하고 진행단계를 푸른이알피에 동기화합니다">🔄 <span class="wide-only">메일 자동수집 · 이알피 동기화</span><span class="phone-only">자동수집</span></button>
+    <button class="sm" id="syncAllBtn" title="메일함에서 사건별 공문을 수집하고 진행단계를 푸른이알피에 동기화합니다">🔄 <span class="wide-only">자동수집 · 동기화</span><span class="phone-only">동기화</span></button>
     <button class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
   <div class="tabs" id="tabs">
-    <button data-tab="cases" class="on">📂 조사 사건 현황 <span class="chip c-blue" id="nCases">0</span></button>
-    <button data-tab="inbox">📥 메일 자동수집 · 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
-    <button data-tab="yearly">📅 연도별 전체 자료함 <span class="chip c-blue" id="nYearly">0</span></button>
-    <button data-tab="detail">📋 공문함 · 8단계 관리</button>
-    <button data-tab="report">🔒 녹취·전자서명 · 3요건·보고서(.hwpx)</button>
+    <button data-tab="cases" class="on">📂 사건 현황 <span class="chip c-blue" id="nCases">0</span></button>
+    <button data-tab="inbox">📥 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
+    <button data-tab="yearly">📅 연도별 자료함 <span class="chip c-blue" id="nYearly">0</span></button>
+    <button data-tab="detail">📋 진행 · 공문</button>
+    <button data-tab="report">⚖️ 진술 · 판단 · 보고서</button>
   </div>
 </div>
 
@@ -369,30 +383,31 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
         <select id="caseMgr" aria-label="담당 노무사 필터"><option value="">담당 노무사 전체</option></select>
         <button class="sm" id="caseResetBtn" style="display:none" title="검색어·연도·필터 조건을 모두 초기화합니다">↺ 초기화</button>
         <span class="sp"></span>
-        <button class="sm" id="caseCsvBtn" title="현재 필터된 조사 사건 현황 목록을 CSV(엑셀) 파일로 내려받습니다">📥 현황 CSV</button>
-        <button class="sm warn-btn" id="erpBatchBtn" title="이알피 사건번호를 비워둔 과거·보류 사건을 모아 한 번에 채번·연결합니다">🏢 이알피 공란 일괄정리</button>
-        <button class="sm" id="imapScanBtn" title="다음메일 서버 전체 폴더에서 지난 괴롭힘·성희롱 공문까지 심층 검색합니다">🔍 과거 메일 심층검색</button>
+        <details class="act-menu">
+          <summary>⋯ 도구</summary>
+          <div class="act-pop">
+            <button type="button" id="erpBatchBtn" title="이알피 사건번호를 비워둔 과거·보류 사건을 모아 한 번에 채번·연결합니다">🏢 이알피 공란 일괄정리</button>
+            <button type="button" id="imapScanBtn" title="다음메일 서버 전체 폴더에서 지난 괴롭힘·성희롱 공문까지 심층 검색합니다">🔍 과거 메일 심층검색</button>
+            <button type="button" id="caseCsvBtn" title="현재 필터된 조사 사건 현황 목록을 CSV(엑셀) 파일로 내려받습니다">📥 사건 현황 CSV 내려받기</button>
+          </div>
+        </details>
         <button class="sm pri" id="newCaseBtn">+ 새 조사 사건</button>
       </div>
       <div id="casesBox"></div>
     </div>
   </section>
 
-  <!-- 탭 2: 메일 자동수집 · 미등록 후보 -->
+  <!-- 탭 2: 미등록 후보 -->
   <section class="pane" id="p-inbox">
-    <div class="note">
-      푸른 메일함(최근 메일 + 2021년~현재 지난메일 전체)에서 <b>직장 내 괴롭힘·성희롱 조사 관련 견적·계약·공문·진술서·보고서</b>를 자동 감지해 의뢰처·연도별로 묶었습니다.
-      과거 자료는 <b>⏸ 이알피 번호 공란(추후 일괄정리)</b> 상태로 좌·우 보고서 창까지 자동 채워 편입하거나, 즉시 푸른이알피에 동기화할 수 있습니다.
-    </div>
     <div class="card">
       <div class="yr-pills" id="inboxYrBar"></div>
       <div class="bar">
         <input id="inQ" type="search" aria-label="미등록 후보 검색" placeholder="의뢰처·메일 제목·첨부파일 찾기" style="flex:1;min-width:175px;max-width:300px">
         <button class="sm" id="inResetBtn" style="display:none" title="검색어 및 연도 필터를 초기화합니다">↺ 초기화</button>
-        <button class="sm" id="imapInboxBtn">🔍 키워드 지정 메일함 심층검색</button>
-        <button class="sm pri" id="importAllDeferBtn" title="미등록 메일 묶음 전체를 이알피 번호 공란 상태로 사건 현황에 편입하고 좌·우 작업실을 자동 채웁니다">📥 미등록 전체 편입(번호공란)</button>
-        <span class="sp"></span>
         <span class="hint" id="mailStat"></span>
+        <span class="sp"></span>
+        <button class="sm" id="imapInboxBtn">🔍 메일함 심층검색</button>
+        <button class="sm pri" id="importAllDeferBtn" title="미등록 메일 묶음 전체를 이알피 번호 공란 상태로 사건 현황에 편입합니다">📥 전체 편입(번호공란)</button>
       </div>
       <div id="inboxBox"></div>
     </div>
@@ -451,12 +466,12 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, harass 는 유예 목록에 없으므로 강제(enforce) 모드로 동작합니다 -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=51"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -465,18 +480,16 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script src="js/pu-fast-boot.js?v=1"></script>
 <script src="hangul/js/zip.js?v=1"></script>
-<script src="hangul/js/hwpx.js?v=1"></script>
-<script src="hangul/js/hwp.js?v=1"></script>
-<script src="vendor/pdf.min.js?v=1"></script>
-<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
+<script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-harass-core.js?v=14"></script>
+<script src="js/pu-harass-core.js?v=15"></script>
 <script src="js/pu-harass-sign.js?v=4"></script>
-<script src="js/pu-harass-hwpx.js?v=8"></script>
-<script src="js/pu-harass-view.js?v=19"></script>
+<script src="js/pu-harass-hwpx.js?v=9"></script>
+<script src="js/pu-harass-view.js?v=21"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};

@@ -778,6 +778,8 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .mr-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .mr-pill{cursor:pointer;font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--text-sub);white-space:nowrap}
 .mr-pill.on{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:700}   /* --ink 는 어두운 판에서 밝게 뒤집힌다 — var(--navy) 는 묻힌다 */
+.mr-pill.quiet:not(.on){background:transparent;border-style:dashed;color:var(--text-mute)}   /* 걸러낸 메일 — 목록이 아니라 «되돌리러 가는 곳»이라 조용히 (2026-11-19) */
+#mrBody .dt.mr-act1 thead th:last-child{width:auto;min-width:96px}   /* 단추 하나(↩ 되돌림)뿐인 탭 — 공용 200px 가 표를 가로로 밀지 않게 */
 .mr-st{font-size:11.5px;color:var(--text-mute);margin:0 0 8px;word-break:keep-all}
 .mr-note{font-size:11.5px;color:var(--text-mute);line-height:1.6;margin-top:10px;word-break:keep-all}
 .mr-open{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
@@ -830,14 +832,17 @@ body.kc-staff #hcOpenBtn{display:none!important}
 /* 증명서 보관함 표(#cdBody)의 첫 칸은 이제 ☐ + № 칸이다 — 직원 «보기 전용»에서는 다른 표처럼 감춘다(위 337~338줄). 종류·발급번호는 둘째 칸이라 남는다 */
 #cdBody .dt thead th{white-space:nowrap}   /* 머리글도 한 줄 — 칸이 좁을 때 「증명기간」이 한 글자씩 쌓이지 않게 */
 #cdBody .dt thead th:last-child{width:auto;min-width:0}   /* 공용 표는 끝 칸(관리)을 200px 로 잡는다 — 여기는 작은 단추 서넛이라 좁게(태블릿 폭에서 발급기관 칸이 짓눌리지 않게) */
-/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표 834~913px 대 상자 681px) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게(2026-11-15).
+/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표가 상자보다 넓어 `main` 이 좌우로 구른다) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게.
+   증명서 표(#cdBody)에 먼저 넣었던 것(2026-11-15)을 «☐ 칸이 있는 모든 공용 표(.dt)»로 넓혔다(2026-11-22) — 경력·실적(위촉장·자격·수료·표창·교육·경력·사업·자문)·사업 목록·제출서류 등. 가짜 환경 실측: 1024px 위촉장 표는 `main` 이 127px 구르면 ☐ 가 왼쪽 -90px(화면 밖)이었다.
+   ⚠ «☐ 가 든 칸»에만 건다(:has(input[type=checkbox])) — № 만 있는 보기용 표(설정의 계좌·법인 서류 등)는 그대로 둔다. :has 를 모르는 브라우저는 이 규칙을 통째로 건너뛸 뿐 표는 예전 그대로다.
+   ⚠ 머리줄 칸은 «그 표의 줄에 ☐ 가 있는가»로 정한다(머리 칸 자신이 아니라) — 사업 서류 찾기·프로필 고르기 창의 머리 칸은 ☐ 없이 글자(「☐ №」)만 있어도 줄 칸이 붙들리면 머리 칸도 같이 붙들려야 열 머리글이 어긋나지 않는다(자동 검증 2026-11-23).
    ⚠ 이 폭 띠에서만: 폰 카드(≤520px)는 줄을 카드로 접어 스크롤이 없고, 1280px 를 넘는 PC 는 그대로다(표가 상자 안에 들어와 스크롤이 없다 — 고정해도 안 보이는 «그대로»를 건드리지 않는다). 칸 바탕은 표 바탕과 같아(var(--card)) 스크롤이 없으면 보이는 모양은 같다 */
 @media (min-width:521px) and (max-width:1280px){
-  #cdBody .dt thead th:first-child,#cdBody .dt tbody td:first-child{position:sticky;left:0}
-  #cdBody .dt thead th:first-child{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
-  #cdBody .dt tbody td:first-child{z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
-  #cdBody .dt tbody tr:hover>td:first-child,#cdBody .dt tbody tr.sel-on>td:first-child{background:inherit}   /* 지나가는 줄·고른 줄의 바탕을 그대로 따른다 */
-  html.dark #cdBody .dt tbody tr.sel-on>td:first-child{box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
+  .dt:has(tbody td.rownum input[type=checkbox]) thead th.rownum-h,.dt tbody td.rownum:has(input[type=checkbox]){position:sticky;left:0}
+  .dt:has(tbody td.rownum input[type=checkbox]) thead th.rownum-h{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
+  .dt tbody td.rownum:has(input[type=checkbox]){z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
+  .dt tbody tr:hover>td.rownum:has(input[type=checkbox]),.dt tbody tr.sel-on>td.rownum:has(input[type=checkbox]),.dt tbody tr.row-warn>td.rownum:has(input[type=checkbox]),.dt tbody tr.kc-dying>td.rownum:has(input[type=checkbox]){background:inherit}   /* 지나가는 줄·고른 줄·살필 줄·지우려고 묻는 중인 줄(.kc-dying)의 바탕을 그대로 따른다(줄에 바탕이 없는 보통 줄은 위 var(--card) 가 그대로) */
+  html.dark .dt tbody tr.sel-on>td.rownum:has(input[type=checkbox]){box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
 }
 #hcBody tr.hc-gone td{opacity:.75}
 /* ☑ 고르기 창(#p1PickTbl)의 표는 «끝 칸이 관리 단추»가 아니다. 폰 카드(공용 .dt)가 끝 칸을 오른쪽 단추 열로 세우면 긴 기관명 줄에서 일자 칸이 0px 로 눌려 가려진다
@@ -1099,6 +1104,14 @@ h2,.page-title,.brand b,.brand-title,.g-title{font-family:'Noto Serif KR','Noto 
 .modal-ov.as-drawer .form-split{flex-direction:row;gap:16px}
 .modal-ov.as-drawer .fs-prev{max-height:calc(100vh - 110px);overflow:auto;position:sticky;top:0}
 @media(max-width:900px){ .modal-ov.as-drawer .modal{width:100%!important} .modal-ov.as-drawer .form-split{flex-direction:column} .modal-ov.as-drawer .fs-prev{max-height:46vh;position:static} }
+/* ☁ 앱 안 원본 창(imgModal) — 폰에서는 화면 폭을 거의 다 쓴다 (대표 지시 2026-11-22 「핸드폰에서도 위촉장 원본을 간단하게 잠깐」).
+   기본은 창 92%·안쪽 여백 20px·쪽 둘레 12px 라 A4 한 장이 화면 폭의 70% 만 차지해 글자가 작았다. 폰 구간에서만 — PC 는 그대로. */
+@media(max-width:520px){
+  #imgModal{padding:8px}
+  #imgModal .modal{width:100%!important;max-width:none!important}
+  #imgModal .modal-b{padding:8px}
+  #imgBody_pg{padding:6px!important}
+}
 /* 페이지 진입 페이드 */
 .page-view.active .page{animation:fadein .22s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -1247,6 +1260,36 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
 .sel-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8fafc;
   border:1px solid #bfdbfe;border-radius:9px;padding:8px 12px;margin-bottom:10px;font-size:12.5px;
   position:sticky;top:var(--tbH,0px);z-index:11}
+/* ── 👁 작성 중 서류 «한꺼번에 보기» 창(#modalDraftMulti) (대표 지시 2026-11-24) ──
+   한 장이 한 칸 — 칸 폭은 «고른 크기»(--dm-min)가 정하고, 창이 넓으면 여러 장이 나란히, 좁으면 한 줄에 한 장. 쪽 그림은 칸 폭에 맞춰 그려진다.
+   ⚠ 폰 구간에서만 한 줄에 한 장으로 — PC 는 그대로. */
+#modalDraftMulti .modal{width:min(1480px,98vw)}
+/* 「닫기」는 왼쪽 — 오른쪽 아래에는 «새 버전 있음» 떠 있는 단추가 앉는다(1366×800 에서 겹침, 2026-11-24 검증). 폰은 왼쪽 아래에 홈 단추가 있어 오른쪽 */
+#modalDraftMulti .modal-foot{justify-content:flex-start}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--dm-min,300px)),1fr));gap:12px;align-items:start}
+.dm-card{border:1px solid var(--border);border-radius:9px;background:#fff;min-width:0;overflow:hidden}
+.dm-cap{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border);background:#f8fafc;min-width:0}
+.dm-cap .dm-n{flex:none;font-variant-numeric:tabular-nums;color:var(--text-mute)}
+.dm-cap .dm-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dm-cap .dm-p{flex:none;font-size:11px;font-weight:400;color:var(--text-mute);white-space:nowrap}
+.dm-card .dm-fail{padding:14px 10px;font-size:12px;color:var(--red)}
+html.dark .dm-card{background:var(--soft);border-color:var(--border)}
+html.dark .dm-cap{background:var(--hover);border-color:var(--border);color:var(--text)}
+@media (max-width:520px){
+  #modalDraftMulti.modal-ov{padding:8px}
+  #modalDraftMulti .modal{width:100%;max-height:calc(100vh - 16px);display:flex;flex-direction:column}
+  #modalDraftMulti .modal-b{overflow:auto;min-height:0;flex:1 1 auto;padding:10px 8px}
+  #modalDraftMulti .modal-h{padding:10px 12px;font-size:14px}
+  #modalDraftMulti .modal-foot{justify-content:flex-end}
+  .dm-grid{grid-template-columns:minmax(0,1fr)}
+  /* 폰: 상자는 «한 겹» — 칸 테두리·이름줄 바탕·쪽 둘레의 회색 바탕을 걷고 쪽 그림만 남긴다(양옆을 다 쓴다) */
+  .dm-card{border:0;border-radius:0;background:transparent}
+  .dm-cap{background:transparent;border-bottom:0;padding:6px 2px}
+  .dm-card .dm-pg{padding:4px 0!important;background:transparent!important}
+}
+/* 폰: 작성 중 서류 목록 — 표(최소 620px)가 «격자 칸»을 밀어 화면 옆으로 넘쳤다(2026-11-24 폰 점검: 375px 에서 275px 넘침 — 새 기능 이전부터).
+   칸이 줄 수 있게 하면 표는 제 상자(overflow-x:auto) 안에서만 좌우로 민다 — 이 표가 처음부터 의도한 모양이다. PC 는 그대로. */
+@media (max-width:520px){ #rhDraftPanel{min-width:0} }
 /* ── 탭줄 + 「양식 올리기」를 한 줄로 (대표 지시 2026-08-30) ──
    화면 위쪽을 두 줄이 먹고 있었다. 좁아지면 알아서 다음 줄로 내려간다. */
 .rh-topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
@@ -1616,6 +1659,29 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   .toolbar{padding:6px 7px!important}
   .sel-bar,.dup-badge-bar{padding-left:7px!important;padding-right:7px!important}
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 옆줄 메뉴·아래 탭·표·단추는 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 이 앱은 이미 «디자인 업그레이드»(둥근 카드·옅은 그림자·알약 아래 탭)를 입고 있다 — 거기 없는 모양 값만 더한다.
+     옆줄 남색·청록 단추·금빛 표시는 그대로(계획서 Ⓒ 와 같은 뜻).
+   ⚠ 어두운 판(html.dark — 🌙 단추)이 있다. 색은 하나도 안 바꾸고 둥글기·굵기·그림자만 쓴다 — 어두운 판에서도 글자가 그대로 읽힌다.
+   ⚠ <body> 의 pu-dark-auto: 이 앱 <head> 는 사업관리 비교 색(--bzc-*)에서 기기 어두운 모드를 따른다(tests/pu-design.test.js ⑥-2 짝).
+     공용 어두운 값(--pu-card·--pu-ink 등)은 여기서 쓰지 않으므로 기기만 어두울 때 밝은 화면에 어두운 값이 얹히는 일이 없다.
+   ⚠ 이 덩어리는 바로 아래 어두운 판 «공용 표면» 묶음 «앞»에 둔다 — 그 묶음이 <style> 끝까지 html.dark 뿐이어야 한다(tests/kcareer-dark-surfaces.test.js ①).
+     (그 묶음의 머리 글귀를 여기 그대로 적지 않는다 — 검사가 그 글귀의 첫 자리부터 묶음으로 읽는다) */
+/* 숫자 카드 — 작은 카드 둥글기(목업 .kpi). 위 금빛 띠·눌러 가기는 그대로 */
+:where(body.pu-design) .kpi{border-radius:var(--pu-r-sm)}
+/* 표 머리 — 굵게(목업 table.t th 800). 색·붙박이는 앱 값 그대로 */
+:where(body.pu-design) .dt thead th{font-weight:800}
+/* 옆줄 메뉴 칸 — 둥글기만(목업 .side button 12px 에 가깝게) */
+:where(body.pu-design) .nav-item{border-radius:10px}
+/* 아래 탭(알약) — 고른 탭에 옅은 그림자 */
+:where(body.pu-design) #groupTabs .gtab.active{box-shadow:var(--pu-sh-sm)}
+/* 화면 제목 굵게(목업 제목 800) · 끌어다 놓는 칸은 카드 둥글기 */
+:where(body.pu-design) .page-title{font-weight:800}
+:where(body.pu-design) .dropzone{border-radius:var(--pu-r)}
+/* ══ pu-design 끝 ══ */
 /* ===== 어두운 테마 — 공용 표면 (대표 지시 2026-11-15 「경력관리 다른 화면의 어두운 테마도 고쳐 주세요」) =====
    원칙: 어두운 판에서는 «바탕은 어둡게, 글자는 밝게»가 한 벌이어야 한다. 밝은 바탕을 하드코딩하고 글자색은 안 박거나 var(--text)(어두운 판에선 밝은색)로 두면
    글자만 밝아져 1.2:1 이 된다(실측 28개 화면·창 39개에서 948건). 종이(흰 바탕+짙은 글자)는 일부러 흰색으로 두고 «안쪽 변수»를 밝은 판 값으로 되돌린다.
@@ -1670,6 +1736,8 @@ html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="co
 /* ⑧ 화면에 «직접 박힌» 밝은 바탕(글자색 안 박은 것) → 어두운 바탕. 글자색을 같이 박은 밝은 칩·종이·프로필 1장 안내 상자는 뺀다 */
 html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"],[style*="background: rgb(239, 246, 255)"],[style*="background:#e2e8f0" i],[style*="background: rgb(226, 232, 240)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -1680,19 +1748,19 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=3"></script>
 <script src="js/kcareer-scan.js?v=3"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=9"></script>
+<script src="js/kcareer-biz.js?v=10"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=2"></script>
 <script src="js/kcareer-profile1.js?v=17"></script>
@@ -1705,7 +1773,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
-<script src="js/pu-doc-read.js?v=53"></script>
+<script src="js/pu-doc-read.js?v=54"></script>
 <script src="js/kcareer-hwpxfill.js?v=43"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
@@ -1721,7 +1789,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=3"></script>
+<script src="js/kcareer-mailreq.js?v=7"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -1750,11 +1818,11 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=51"></script>
+  <script src="js/pu-appbar.js?v=55"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script>
+  <script src="js/pu-authsync.js?v=7"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <script>
@@ -1771,7 +1839,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
     })();
   </script>
 </head>
-<body>
+<body class="pu-design pu-dark-auto">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>
@@ -1931,6 +1999,8 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
                 <button class="btn sm" type="button" onclick="rhDraftSelAll(true)">전체 선택</button>
                 <button class="btn sm" type="button" onclick="rhDraftSelAll(false)">선택 해제</button>
                 <span style="flex:1"></span>
+                <!-- 👁 고른 서류를 «한 화면에» 모두 펼친다(대표 지시 2026-11-24) — 장마다 따로 열어 보지 않게 -->
+                <button class="btn sm" type="button" onclick="rhDraftViewSel()" title="고른 서류를 한 화면에 모두 펼쳐 봅니다 — 장마다 쪽 그대로">👁 한꺼번에 보기</button>
                 <button class="btn sm" type="button" style="color:var(--red)" onclick="rhDraftTrashSel(this)">🗑 선택 버리기</button>
               </div>
               <!-- ⚠ table-layout:fixed — 이름 칸이 «남는 폭을 다 쓰되» 표를 밀지 않게 한다.
@@ -1954,6 +2024,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
               <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                 <span id="rhDraftRoom" style="font-size:11px;color:var(--text-mute)"></span>
                 <span style="margin-left:auto"></span>
+                <button class="btn sm" type="button" onclick="rhDraftViewAll()" title="작성 중인 서류를 모두 한 화면에 펼쳐 봅니다 — 고르지 않아도 됩니다">👁 전부 한꺼번에 보기</button>
                 <button class="btn sm" type="button" onclick="rhOpenTrash()">🗑 버린 것 보기</button>
               </div>
             </div>
@@ -3272,6 +3343,23 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
       <span id="hwpViewFootRead"><button class="btn" onclick="closeHwpView()">닫기</button><button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 이 서식의 빈 칸에 넣습니다">✨ 내 정보로 채우기</button><button class="btn" onclick="hwpViewEdit()" title="한글 프로그램처럼 이 문서를 직접 고칩니다 — 글자를 치고 지우고 표를 손봅니다">✏️ 한글로 고치기</button><button class="btn" id="hwpViewToLib" style="display:none" onclick="hwpViewSaveToLib()" title="고친 서식을 양식 보관함에 «새 줄»로 담습니다 — 원본은 그대로 남습니다">📥 보관함에 담기</button><button class="btn" onclick="hwpViewPdfFile()" title="곧바로 .pdf 파일로 내려받습니다 — 다만 그림이라 글자 복사·검색은 안 됩니다">⬇ PDF 바로받기(그림)</button><button class="btn primary" onclick="hwpViewPdf()" title="인쇄창에서 「PDF로 저장」을 고르면 글자가 살아 있는 PDF가 됩니다 — 복사·검색이 됩니다">🖨 인쇄 · PDF(글자 살아 있음)</button><button class="btn" onclick="hwpViewDownload()">⬇ 파일로 저장</button></span>
       <span id="hwpViewFootEdit" style="display:none"><button class="btn" onclick="hwpViewEditCancel()" title="고친 것을 버리고 보기로 돌아갑니다">↩ 그만두기</button><button class="btn primary" onclick="hwpViewEditDone()" title="고친 내용을 이 창으로 가져옵니다 — 그 다음 인쇄하거나 파일로 저장하세요">✔ 다 고쳤습니다</button></span>
     </div>
+  </div>
+</div>
+<!-- 👁 작성 중 서류 «한꺼번에 보기» (대표 지시 2026-11-24 「서류가 여러장인 경우 한번에 모두 볼 수 있게」)
+     고른 서류(또는 작성 중 전부)의 쪽을 한 화면에 펼친다. 그리는 일은 «한글 문서 보기»와 같은 엔진(PureunHwp.renderPreview) 하나다.
+     ⚠ 이 창은 «보기 전용» — 고치려면 장마다 「이어서」(작성 중 서류 한 건 열기)로 들어간다. -->
+<div class="modal-ov" id="modalDraftMulti">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
+    <div class="modal-h" id="dmTitle">👁 한꺼번에 보기 — 고른 서류를 한 화면에</div>
+    <div class="modal-b">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div id="dmInfo" style="font-size:12px;color:var(--text-mute);flex:1 1 220px;min-width:0"></div>
+        <button class="btn sm" type="button" id="dmSizeS" onclick="rhDraftViewManyRedraw('s')" title="작게 — 여러 장을 한눈에">▦ 작게 모아 보기</button>
+        <button class="btn sm" type="button" id="dmSizeL" onclick="rhDraftViewManyRedraw('l')" title="크게 — 글자를 읽을 만큼">▢ 크게 보기</button>
+      </div>
+      <div id="dmBody" class="dm-grid"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" type="button" onclick="rhDraftViewManyClose()">닫기</button></div>
   </div>
 </div>
 <!-- 📚 지난 지원 건 모두 넣기 — 연도별로 골라 (2026-10-05) -->
@@ -5050,21 +5138,50 @@ async function recFileAsync(rec, id){
   return await getFileAsync(id || (rec && rec.id));
 }
 
+/* ☁ 클라우드 사본을 «앱 안 창»에서 잠깐 본다 (대표 지시 2026-11-22 「핸드폰에서도 위촉장 원본을 간단하게 잠깐 볼 수 있어야」).
+   ⚠ 새 탭으로 열지 않는다 — 폰 Chrome 은 PDF 를 탭에서 못 그려 «내려받기»만 하고, 사본을 받은 «뒤»(await) 여는 새 탭은
+     팝업으로 막힌다. 그래서 사본이 폰에서는 열리지 않는 것처럼 보였다. 앱 안 원본 창(imgModal)에 그린다.
+   ⚠ PDF 그리개는 showPDFInline «한 벌»만 쓴다 — 따로 만들지 말 것(두 벌이 되면 한쪽만 고쳐진다).
+   ⚠ 「↗ 새 탭」 단추는 사본을 받아 둔 «그 자리»에서 주소를 만들어 둔다 — 눌렀을 때 바로 열려야 팝업으로 안 막힌다. */
+var _peekUrl=null;
+function _peekCloudCopy(cf){
+  var nm=cf.name||'원본', ext=(nm.split('.').pop()||'').toLowerCase();
+  var box=document.getElementById('imgBody'), ov=document.getElementById('imgModal');
+  if(!box||!ov||!(ext==='pdf'||/^(png|jpg|jpeg|gif|webp)$/.test(ext))) return false;
+  if(_peekUrl){ try{ URL.revokeObjectURL(_peekUrl); }catch(e){} _peekUrl=null; }
+  _peekUrl=URL.createObjectURL(new Blob([cf.buf],{type:_kcFormMime(ext)}));
+  var 딱지='<span style="color:#cbd5e1;font-size:12px;white-space:nowrap" title="클라우드에 보관한 사본">☁ 사본</span>';
+  ov.classList.add('open');
+  if(ext==='pdf'){
+    box.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-mute)">⏳ PDF 그리는 중…</div>';
+    showPDFInline(null,'imgBody',{ file:{ name:nm, ext:'pdf', base64:abToB64(cf.buf) },
+      bar:'<button class="btn primary" onclick="window.open(_peekUrl,\'_blank\')">↗ 새 탭</button>'+딱지 });
+    return true;
+  }
+  box.innerHTML='<div style="margin-bottom:6px;font-size:12px;color:var(--text-mute)">☁ 클라우드 사본 · '+escapeHtml(nm)+'</div>'
+    +'<img src="'+_peekUrl+'" alt="'+escapeHtml(nm)+'" style="max-width:100%;max-height:82vh;display:block;margin:auto">';
+  return true;
+}
 async function openLocalOriginal(relPath){
   try{
     var f = null; try{ f = await _fsFileOf(relPath); }catch(e0){ f = null; }
     if(!f){
       /* ☁ 이 기기에 폴더가 없거나 파일이 옮겨졌으면 클라우드 사본으로 연다 (2026-10-10) */
+      toast('원본 사본을 찾는 중…', 2500);
       var cf = await _fsCloudFile(relPath);
       if(cf){
         if(_isHwpName(cf.name)){ try{ openHwpViewer(cf.buf, cf.name); return; }catch(e3){ console.warn('한글 뷰어', e3); } }
+        /* PDF·그림은 앱 안 창에서 — 폰에서도 열린다(위 머리말). 그 밖의 형식만 옛 길(새 탭) */
+        if(_peekCloudCopy(cf)){ toast('☁ 클라우드에 보관한 사본으로 열었습니다', 3000); return; }
         var cu = URL.createObjectURL(new Blob([cf.buf], { type:/\.pdf$/i.test(cf.name)?'application/pdf':(/\.(jpe?g)$/i.test(cf.name)?'image/jpeg':(/\.png$/i.test(cf.name)?'image/png':'application/octet-stream')) }));
         window.open(cu, '_blank'); setTimeout(function(){ URL.revokeObjectURL(cu); }, 60000);
         toast('☁ 클라우드에 보관한 사본으로 열었습니다', 3000);
         return;
       }
+      /* 폰은 폴더 연결 자체가 안 된다 — «더보기 › 폴더 연결»만 알리면 막다른 길이라, 사본이 올라가는 길(PC 에서 연결)을 알린다 */
       toast(_fsRoot ? '원본을 못 찾았습니다 — 파일이 이동·삭제되었을 수 있습니다. 다시 스캔하세요'
-                    : '이 기기에는 서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'); return;
+                    : (fsSupported() ? '이 기기에는 서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'
+                                     : '이 기기에서는 서류 폴더를 연결할 수 없고 클라우드 사본도 아직 없습니다 — PC에서 서류 폴더를 연결하면 사본이 올라가 여기서도 열립니다'), 6000); return;
     }
     /* ★★ 한글 문서는 브라우저가 못 연다 — 새 탭에 «날것»(PK…mimetypeapplication/hwp+zip)으로
        뜬다(대표 제보 2026-09-12). 앱 안의 한글 뷰어로 보낸다.
@@ -7130,6 +7247,7 @@ function kcOpenFromUrl(tries){
       return;
     }
     if(/[?&]go=add(?:&|$)/.test(location.search)) return kcAddFromHandoff(tries);
+    if(/[?&]go=biz(?:&|$)/.test(location.search)) return kcBizFromGov(tries);
     if(!/[?&]go=form/.test(location.search)) return;
     var lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
     if(lk!=='owner'){
@@ -7164,6 +7282,40 @@ function kcAddFromHandoff(tries){
   var v=KC_HANDOFF_FILL[h.page](h);
   Object.keys(v).forEach(function(id){ var el=document.getElementById(id); if(el && v[id]!=null && v[id]!=='' && !el.value) el.value=String(v[id]); });
   toast('정부사업신청 지원서에서 넘긴 내용입니다 — 확인하고 저장을 눌러 주세요');
+}
+/* ★ 정부사업신청 「🏢 푸른노무법인 사업으로 진행」 받는 문 (대표 지시 2026-11-22 — «기존 사업관리에» 담는다)
+   ⚠ 사업 창을 «채워서 열기만» 한다 — 저장은 대표가 누른다. 넘길 내용은 같은 사이트 localStorage(pu_kc_biz_handoff)로 받고,
+     «자기 것»만 쓰고 지운다 · 10분 넘은 것은 안 쓴다. 칸 짝은 KcareerBiz.fromGov 한 곳.
+   ⚠ 보낸 계정(uid)과 일회용 표(주소 ?t=)가 이 탭과 맞아야 쓴다(KcareerBiz.govCheck — 보안 검토 2026-11-22).
+     다른 계정·다른 탭의 넘김은 건드리지 않는다(그 탭이 쓸 수 있게). 낡은 것만 지운다.
+   ⚠ 같은 공고는 govRef(정부사업신청 기록의 영구 id)로 찾는다 — 사업명으로 찾지 않는다. 이미 담았으면 그 사업을 열고
+     «새로 모은 서식 링크»만 더해 보인다(이때도 저장은 사람이 — 닫으면 아무것도 안 바뀐다). */
+function kcBizFromGov(tries){
+  var lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
+  if(lk!=='owner'){ if((tries||0)<20) setTimeout(function(){ kcOpenFromUrl((tries||0)+1); },400); return; }
+  var tok='', me=(typeof fbUid!=='undefined'&&fbUid)?fbUid:((typeof _kcUid==='function'&&_kcUid())||''), h=null;
+  try{ tok=(new URLSearchParams(location.search).get('t')||'').slice(0,80); }catch(e){}
+  try{ h=JSON.parse(localStorage.getItem('pu_kc_biz_handoff')||'null'); }catch(e){ h=null; }
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  var ck=KcareerBiz.govCheck(h, Date.now(), me, tok);
+  if(ck==='stale'){ try{ localStorage.removeItem('pu_kc_biz_handoff'); }catch(e){} }
+  if(ck!=='ok'){ toast(ck==='other' ? '이 탭에 넘긴 공고가 아닙니다(다른 계정이거나 다른 창에서 넘긴 것) — 정부사업신청에서 다시 눌러 주세요'
+      : '넘겨받은 공고가 없거나 오래됐습니다 — 정부사업신청 「🏢 푸른 지원사업」에서 다시 눌러 주세요'); return; }
+  try{ localStorage.removeItem('pu_kc_biz_handoff'); }catch(e){}
+  navTile('page-bizlist');
+  var v=KcareerBiz.fromGov(h), had=bizAll().filter(function(r){ return r.govRef && r.govRef===v.govRef; })[0];
+  if(had){
+    bizOpen(had.id);
+    var n=KcareerBiz.mergeGovFiles(_bizCur, v.govFiles);
+    if(!_bizCur.govUrl && v.govUrl) _bizCur.govUrl=v.govUrl;
+    bizDraw();
+    toast('이미 담은 사업입니다'+(n?' — 새 서식 링크 '+n+'개를 더해 보입니다. 남기려면 「저장」을 누르세요':' — 그대로 엽니다'), 6000);
+    return;
+  }
+  bizOpen();
+  Object.keys(v).forEach(function(k){ _bizCur[k]=v[k]; });
+  bizDraw();
+  toast('정부사업신청에서 넘긴 공고입니다 — 사업명·발주기관·마감·서식 링크를 채웠습니다. 확인하고 「저장」을 누르세요', 6000);
 }
 function renderHomeYr(){ const yrMap=_homeYr||{}; const selEl=document.getElementById('homeYrSel'); const f=selEl?selEl.value:'';
   let yrs=Object.keys(yrMap).sort().reverse(); if(f) yrs=yrs.filter(y=>y===f);
@@ -9758,16 +9910,9 @@ function _docTrashIds(domain, ids, btn, 제목, 덧말){
       var es=kcTrashPutMany(D.store, '', 줄들, D.label||'서류');
       set(D.store, 남길);
       renderDocStore(domain);
-      var 알림='🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다';
-      if(es.length<=1){ kcTrashDone(es[0], 알림); return; }
-      /* ★ 여러 건이면 «되돌리기»가 «전부» 되살린다 — 마지막 한 건의 번호(tid)만 쥐고 있으면 「N건」이라 알려 놓고 1건만 돌아온다(2026-11-14 검토).
-         옛 순서로 놓이도록 거꾸로 되살린다(되살린 줄은 맨 앞에 놓인다) */
-      kcUndoBar(알림+' · '+TRASH_DAYS+'일 보관', null, async function(){
-        var 됨=0, 건너뜀=0;
-        for(var i=es.length-1;i>=0;i--){ var r=await kcTrashRestore(es[i].tid, true); if(r && r.skipped) 건너뜀++; else if(r) 됨++; }
-        /* 같은 발급번호가 그새 보관함에 생긴 줄은 되살리지 않고 휴지통에 둔다 — 몇 건인지 밝힌다 */
-        toast('↩ '+됨+'건을 되살렸습니다'+(건너뜀?' — '+건너뜀+'건은 같은 발급번호가 이미 보관함에 있어 휴지통에 그대로 두었습니다':''), 건너뜀?9000:undefined);
-      });
+      /* ★ «되돌리기»는 담은 «전부»를 되살린다(kcTrashDoneMany) — 마지막 한 건의 번호(tid)만 쥐고 있으면 「N건」이라 알려 놓고 1건만 돌아온다(2026-11-14 검토).
+         옛 순서로 놓이도록 거꾸로 되살리고, 같은 발급번호가 그새 보관함에 생긴 줄은 되살리지 않고 휴지통에 둔 채 몇 건인지 밝힌다 */
+      kcTrashDoneMany(es, '🗑 '+줄들.length+'건을 휴지통으로 옮겼습니다');
     });
 }
 function initDocStore(domain){ const D=DOMAINS[domain]; const s=document.getElementById(D.search); if(!s) return;
@@ -10672,7 +10817,11 @@ function _renderFormPreview(id, rec){
 
 /* ★★ 서류 폴더에 있는 원본을 편집창 왼쪽에 그린다 (대표 제보 2026-09-12).
    ⚠ 막히면 «왜 막혔는지»와 «원본 열기» 길을 함께 준다 — 빈 칸은 고장으로 읽힌다.
-   ⚠ 한글 문서는 브라우저가 못 그린다. 앱 안 한글 뷰어로 보낸다(날것 바이트 금지). */
+   ⚠ 한글 문서는 브라우저가 못 그린다. 앱 안 한글 뷰어로 보낸다(날것 바이트 금지).
+   ★★ 서류 폴더에 원본이 «없을 때»(이 기기에 폴더가 없거나 파일이 옮겨졌을 때)는 ☁ 클라우드 사본으로 그린다
+      (대표 제보 2026-11-22 「위촉장 원문이 다 사라졌다」 — 주소 이사로 폴더 연결이 새 주소에서 끊긴 PC·폰).
+      원본 열기(openLocalOriginal)·서식 채우기(recFileAsync)는 전부터 사본으로 넘어갔는데 «여기만» 빠져
+      사본이 있어도 「폴더 연결 안 됨」만 떴다. 폴더 원본이 «먼저», 사본은 폴더에 없을 때만. */
 let _fsPrevUrl=null;
 async function _renderFsFormPreview(rec){
   const box=document.getElementById('fsPrevBox'); if(!box) return;
@@ -10680,19 +10829,31 @@ async function _renderFsFormPreview(rec){
   const 알림=function(icon,msg){ box.innerHTML='<div class="empty" style="padding:18px;text-align:center">'+icon+' '+msg
       +'<div style="margin-top:10px">'+열기+'</div></div>'; };
   try{
-    const lf=await _fsFileOf(rec.relPath);
-    if(!lf){ box.innerHTML='<div class="empty" style="padding:14px">이 기기에는 서류 폴더가 연결돼 있지 않습니다<br>위촉장 › ⋯ 더보기 › 서류 폴더 연결</div>'; return; }
-    const nm=lf.name||String(rec.relPath).split('/').pop(), ext=(nm.split('.').pop()||'').toLowerCase();
-    if(_isHwpName(nm)){ 알림('📄', escapeHtml(nm)+'<div style="font-size:12px;color:var(--text-mute);margin-top:4px">한글 문서는 원본 열기로 봅니다</div>'); return; }
+    let lf=null, 못찾음=false;
+    try{ lf=await _fsFileOf(rec.relPath); }catch(e0){ lf=null; 못찾음=true; console.warn('_renderFsFormPreview', rec.relPath, e0); }
+    /* ☁ 폴더에 없을 때만 사본 — 사본을 못 받아도(없거나 오프라인) 아래 «까닭 말하기»로 이어진다 */
+    let cf=null;
+    if(!lf){ try{ cf=await _fsCloudFile(rec.relPath); }catch(e1){ cf=null; } }
+    if(!lf && !cf){
+      if(못찾음){ 알림('⚠', '원본을 불러올 수 없습니다 — 파일이 옮겨졌거나 이름이 바뀌었을 수 있습니다'); return; }
+      /* 폰·모바일 브라우저는 폴더 연결 자체가 안 된다 — «더보기 › 폴더 연결»을 안내하면 막다른 길이다 */
+      const 안내=(typeof fsSupported==='function' && !fsSupported())
+        ? 'PC(Chrome·Edge)에서 서류 폴더를 연결하면 원본 사본이 클라우드에 올라가 이 기기에서도 볼 수 있습니다'
+        : '위촉장 › ⋯ 더보기 › 서류 폴더 연결 — 연결하면 원본 사본이 클라우드에도 올라갑니다';
+      box.innerHTML='<div class="empty" style="padding:14px">이 기기에는 서류 폴더가 연결돼 있지 않습니다<br>클라우드 사본도 아직 없거나 받지 못했습니다<br>'+안내+'</div>'; return;
+    }
+    const nm=lf?(lf.name||String(rec.relPath).split('/').pop()):(cf.name||String(rec.relPath).split('/').pop()), ext=(nm.split('.').pop()||'').toLowerCase();
+    const 사본줄=cf?'<div style="font-size:11.5px;color:var(--text-mute);margin:0 0 6px">☁ 클라우드에 보관한 사본으로 보여 드립니다 — 이 기기에서 서류 폴더 원본을 못 찾았습니다</div>':'';
+    if(_isHwpName(nm)){ 알림('📄', escapeHtml(nm)+'<div style="font-size:12px;color:var(--text-mute);margin-top:4px">한글 문서는 원본 열기로 봅니다'+(cf?' (☁ 클라우드 사본)':'')+'</div>'); return; }
     if(ext==='pdf'){
-      box.innerHTML='<div id="splitPdfBox" style="height:78vh;border-radius:8px;overflow:hidden;background:#475569"><div style="text-align:center;padding:30px;color:#cbd5e1">⏳ PDF 로딩 중...</div></div>';
-      showPDFInline(null,'splitPdfBox',{ file:{ name:nm, ext:'pdf', base64:abToB64(await lf.arrayBuffer()) }, bar:열기 });
+      box.innerHTML=사본줄+'<div id="splitPdfBox" style="height:78vh;border-radius:8px;overflow:hidden;background:#475569"><div style="text-align:center;padding:30px;color:#cbd5e1">⏳ PDF 로딩 중...</div></div>';
+      showPDFInline(null,'splitPdfBox',{ file:{ name:nm, ext:'pdf', base64:abToB64(lf?await lf.arrayBuffer():cf.buf) }, bar:열기 });
       return;
     }
     if(/^(png|jpg|jpeg|gif|webp)$/.test(ext)){
       if(_fsPrevUrl){ try{ URL.revokeObjectURL(_fsPrevUrl); }catch(e){} }
-      _fsPrevUrl=URL.createObjectURL(lf);
-      box.innerHTML='<img src="'+_fsPrevUrl+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px">';
+      _fsPrevUrl=URL.createObjectURL(lf||new Blob([cf.buf],{type:_kcFormMime(ext)}));
+      box.innerHTML=사본줄+'<img src="'+_fsPrevUrl+'" alt="'+escapeHtml(nm)+'" style="width:100%;max-height:66vh;object-fit:contain;display:block;border:1px solid var(--border);border-radius:8px">';
       return;
     }
     알림('📎', escapeHtml(nm)+' (미리보기 미지원 형식)');
@@ -11043,7 +11204,7 @@ function rowActions(id,store,label,page,rec){ const isFs=!!(rec&&rec.src==='fs'&
          앞으로 원본을 «모두» 폴더 경로로 붙일 계획이라 모든 줄이 그렇게 될 참이었다.
        ⚠ 「⬇ 저장」은 일부러 안 붙인다 — 그 파일은 «이미 서류 폴더에 있다». 넣으면 죽은 단추가 된다.
        ⚠ 편집 서랍(openForm)은 첨부와 상관없이 열린다 — 그래서 폴더 줄에도 안전하다. */
-    (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="폴더에서 바로 열기">📄 원본</button>`
+    (isFs?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" onclick="openLocalOriginal('${_jsAttr(rec.relPath)}')" title="${rec.fsCloud?'폴더에서 바로 열기 — 폴더가 없으면 ☁ 클라우드 사본으로':'폴더에서 바로 열기'}">📄 원본${rec.fsCloud?'☁':''}</button>`
       :has?`<button class="btn sm" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="openEditDrawer('${page}','${id}')">📄 보기·편집</button><button class="btn sm" style="background:var(--teal);color:#fff;border-color:var(--teal)" onclick="downloadToFolder('${id}','${store}','${_jsAttr((rec&&rec.type)||'')}',_dlRec('${store}','${id}'))" title="서류 폴더의 제자리에 저장 (안 되면 내려받기 폴더로)">⬇ 저장</button><button class="btn sm" onclick="deleteAttach('${id}','${page}',this)" title="원본만 삭제 후 재업로드" style="color:var(--red);font-size:11px">🗑원본</button>`
         :`<button class="btn sm" onclick="attachRec('${id}','${store}','${page}')">📎 첨부</button>`)+
     /* 🔎(이알피 현재 값)는 번호 칸의 관리번호를 누르면 뜨는 창으로 옮겼다 — puNoPop */
@@ -11309,9 +11470,10 @@ function careerDelAll(name, btn){
         +남을것.length+'건은 그대로 둡니다.</span>':'') },
     function(){
       /* ★ 휴지통에는 «한 번 읽고 한 번» 쓴다(kcTrashPutMany) — 수백 건을 건마다 쓰면 N번 저장하고, 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-16) */
-      kcTrashPutMany(cfg.store, name, 갈것, '전체 삭제');
+      var es=kcTrashPutMany(cfg.store, name, 갈것, '전체 삭제');
       set(cfg.store, 남을것); renderCareer(name);
-      kcUndoBar('🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다 · '+TRASH_DAYS+'일 보관 (환경설정 › 휴지통)', null);
+      /* ★ «되살리기»는 담은 «전부»를 되살린다(kcTrashDoneMany) — 예전엔 번호(tid)도 fn 도 안 줘서 눌러도 «휴지통에서 찾지 못했습니다»만 떴다(2026-11-22) */
+      kcTrashDoneMany(es, '🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다', ' (환경설정 › 휴지통)');
     });
 }
 function careerDelSelected(name, btn){
@@ -11329,10 +11491,10 @@ function careerDelSelected(name, btn){
     function(){
       /* ⚠ 첨부 원본을 여기서 지우지 않는다 — 전에는 지웠고, 확인창에 스스로
          「되돌릴 수 없습니다」라고 적어 두었다. 이제 휴지통이 들고 있는다. */
-      kcTrashPutMany(cfg.store, name, 갈것, '경력·실적');   /* 한 번에 담는다 — 건마다 쓰지 않는다(2026-11-16) */
+      var es=kcTrashPutMany(cfg.store, name, 갈것, '경력·실적');   /* 한 번에 담는다 — 건마다 쓰지 않는다(2026-11-16) */
       set(cfg.store, get(cfg.store).filter(function(r){ return !keep[r.id]; }));
       renderCareer(name);
-      kcUndoBar('🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다 · '+TRASH_DAYS+'일 보관 (환경설정 › 휴지통)', null);
+      kcTrashDoneMany(es, '🗑 '+갈것.length+'건을 휴지통으로 옮겼습니다', ' (환경설정 › 휴지통)');   /* 되살리기 = 담은 전부(2026-11-22) */
     });
 }
 
@@ -11769,7 +11931,7 @@ async function showPDFInline(id,containerId,alt){
     const n=pdf.numPages;
     box.innerHTML='<div style="background:#1e293b;padding:6px 10px;border-radius:8px 8px 0 0;display:flex;gap:8px;align-items:center">'
       +bar
-      +'<span style="color:#cbd5e1;font-size:12px">'+f.name+'  ('+n+'p)</span></div>'
+      +'<span style="color:#cbd5e1;font-size:12px">'+escapeHtml(f.name||'')+'  ('+n+'p)</span></div>'
       +'<div id="'+containerId+'_pg" style="overflow:auto;height:74vh;background:#475569;padding:12px;display:flex;flex-direction:column;gap:10px;align-items:center"></div>';
     const pg=document.getElementById(containerId+'_pg');
     for(let i=1;i<=Math.min(n,20);i++){
@@ -12320,8 +12482,9 @@ function kcFreeId(store, id){
   var k=2; while(used[id+'-'+k]) k++; return id+'-'+k;
 }
 
-/* 되살린다. 번호가 겹치면 새 번호로 넣고, 첨부 원본도 새 번호로 옮긴다. */
-async function kcTrashRestore(tid, quiet){
+/* 되살린다. 번호가 겹치면 새 번호로 넣고, 첨부 원본도 새 번호로 옮긴다.
+   noRedraw: 화면을 «지금» 다시 그리지 않는다 — 여러 건을 잇달아 되살릴 때 부르는 쪽(kcTrashRestoreEntries)이 끝에 한 번만 그린다(건마다 그리면 수백 건에서 표를 수백 번 다시 그린다). */
+async function kcTrashRestore(tid, quiet, noRedraw){
   var t=kcTrashList(), e=null;
   var rest=t.filter(function(x){ if(x.tid===tid){ e=x; return false; } return true; });
   if(!e){ toast('휴지통에서 찾지 못했습니다'); return null; }
@@ -12355,16 +12518,25 @@ async function kcTrashRestore(tid, quiet){
   }
   var newId=kcFreeId(e.store, oldId);
   if(newId!==oldId){
-    rec=Object.assign({}, rec, { id:newId, restoredFrom:oldId });
-    /* 첨부 원본을 새 번호로 옮긴다 — 안 옮기면 되살린 레코드에 원본이 없다 */
-    try{
-      var f=await getFileAsync(oldId);
-      if(f) saveFileUnified(newId, f);
-    }catch(err){ console.warn('휴지통 원본 옮기기', err); }
+    /* 첨부 원본을 새 번호로 옮긴다 — 안 옮기면 되살린 레코드에 원본이 없다. 여기서는 «가져오기만» 하고(기다리는 곳), 쓰는 일은 기다림이 끝난 뒤에 한다 */
+    var f=null;
+    try{ f=await getFileAsync(oldId); }catch(err){ console.warn('휴지통 원본 옮기기', err); }
+    /* ⚠ 기다린 «뒤에» 다시 확인한다 — 그사이 다른 곳에서 담음·되살림·완전삭제·같은 번호 쓰기가 끼어들 수 있다(2026-11-22 자동 검증 지적).
+       ① 맨 위에서 읽어 둔 휴지통 목록(rest)을 그대로 쓰면 그새 담긴 줄이 사라지고 이미 꺼낸 줄이 되살아난다 → 다시 읽고, 그 줄이 아직 있을 때만 되살린다
+       ② 기다리기 전에 정한 새 번호는 그새 다른 줄이 썼을 수 있다 → 다시 정한다
+       ③ 첨부를 쓰는 것도 «확인한 뒤에» — 완전삭제된 줄의 첨부 사본이 남지 않게. 이 아래로는 await 가 없다(확인한 것이 그대로 쓰인다) */
+    var 지금=kcTrashList();
+    if(!지금.some(function(x){ return x.tid===tid; })){ if(!quiet) toast('휴지통에서 이미 꺼냈거나 지워진 줄입니다 — 되살리지 않았습니다'); return null; }
+    rest=지금.filter(function(x){ return x.tid!==tid; });
+    newId=kcFreeId(e.store, oldId);
+    if(newId!==oldId){
+      rec=Object.assign({}, rec, { id:newId, restoredFrom:oldId });
+      try{ if(f) saveFileUnified(newId, f); }catch(err){ console.warn('휴지통 원본 옮기기', err); }
+    }
   }
   var arr=get(e.store); arr.unshift(rec); set(e.store, arr);
   set(TRASH_STORE, rest);
-  kcTrashRedraw(e);
+  if(!noRedraw) kcTrashRedraw(e);
   if(!quiet){
     toast(newId!==oldId
       ? '되살렸습니다 — 번호 ' + oldId + ' 가 이미 쓰이고 있어 ' + newId + ' 로 넣었습니다'
@@ -12747,6 +12919,36 @@ function kcUndoBar(msg, tid, fn){
 function kcTrashDone(e, msg){
   if(!e) return;
   kcUndoBar((msg||'🗑 휴지통으로 옮겼습니다')+' · '+TRASH_DAYS+'일 보관', e.tid);
+}
+/* ★ 방금 휴지통에 담은 «여러 건(es)»을 «전부» 되살린다 (2026-11-22) — 일괄 삭제 넷이 같은 길을 쓴다(증명서 표·전체 삭제·골라 삭제·사업).
+   옛 순서로 놓이도록 «거꾸로» 되살린다(되살린 줄은 맨 앞에 놓인다). 건너뛴 줄(같은 발급번호 — 휴지통에 그대로)과 번호가 바뀐 줄을 세어 밝힌다.
+   ⚠ 화면은 «끝에 한 번만» 다시 그린다(noRedraw) — 건마다 그리면 수백 건 «전체 삭제»를 되살릴 때 표를 수백 번 그린다. 저장은 건마다(kcTrashRestore) 그대로다.
+   돌려주는 것: { 됨, 건너뜀, 이름바뀜 } */
+async function kcTrashRestoreEntries(es){
+  var 됨=0, 건너뜀=0, 이름바뀜=0, 마지막=null;
+  for(var i=(es||[]).length-1;i>=0;i--){
+    if(!es[i]) continue;
+    var r=null;
+    try{ r=await kcTrashRestore(es[i].tid, true, true); }catch(err){ console.warn('휴지통 되살리기', es[i].tid, err); }
+    if(r && r.skipped) 건너뜀++;
+    else if(r){ 됨++; if(r.renamed) 이름바뀜++; 마지막=es[i]; }
+  }
+  if(마지막){ try{ kcTrashRedraw(마지막); }catch(err){ console.warn('휴지통 다시 그리기', err); } }
+  return { 됨:됨, 건너뜀:건너뜀, 이름바뀜:이름바뀜 };
+}
+/* 여러 건을 담은 뒤 알리고 «되돌리기» 손잡이까지 — 한 건이면 kcTrashDone 과 같고, 여러 건이면 «전부» 되살린다.
+   알림 문구: 알림 + ' · N일 보관' + 꼬리. 담은 줄이 없으면 아무것도 띄우지 않는다. */
+function kcTrashDoneMany(es, 알림, 꼬리){
+  es=(es||[]).filter(Boolean);
+  if(!es.length) return;
+  var 문구=(알림||'🗑 휴지통으로 옮겼습니다')+' · '+TRASH_DAYS+'일 보관'+(꼬리||'');
+  if(es.length===1){ kcUndoBar(문구, es[0].tid); return; }
+  kcUndoBar(문구, null, async function(){
+    var 결과=await kcTrashRestoreEntries(es);
+    toast('↩ '+결과.됨+'건을 되살렸습니다'
+      +(결과.이름바뀜?' — 그중 '+결과.이름바뀜+'건은 번호가 이미 쓰이고 있어 새 번호로 넣었습니다':'')
+      +(결과.건너뜀?' — '+결과.건너뜀+'건은 같은 발급번호가 이미 보관함에 있어 휴지통에 그대로 두었습니다':''), 결과.건너뜀?9000:undefined);
+  });
 }
 
 function delRec(store,id,page,btn){
@@ -14115,7 +14317,8 @@ async function ocrDrop(files,page){ files=[...files]; if(!files.length) return;
       continue;
     }
     if(!parsed && aiReady()){ const gj=await _geminiOCR(prompt,sendB64,mt,pay.pages); if(gj){ if(gj.parsed) parsed=gj.parsed; else if(gj.err) apiErr=gj.err; } }
-    if(gvKey&&!isPDF){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
+    /* ⚠ Vision·Claude 는 Gemini 가 «못 읽었을 때만» 부른다(2026-11-19 비용 점검) — 예전에는 Gemini 가 읽은 뒤에도 열쇠만 있으면 둘 다 또 불러 요금이 두세 번 나갔다 */
+    if(gvKey&&!isPDF&&!_ocrGot(parsed)){ try{ const r=await kcFetch(`https://vision.googleapis.com/v1/images:annotate?key=${gvKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requests:[{image:{content:b64},features:[{type:'DOCUMENT_TEXT_DETECTION'}]}]})});
       if(r.ok){ const d=await r.json(); const text=d.responses?.[0]?.fullTextAnnotation?.text||d.responses?.[0]?.textAnnotations?.[0]?.description||'';
         if(text&&apiKey){ const resp=await kcFetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content:`다음 OCR 텍스트를 분석하세요:\n${text.slice(0,2000)}\n\n${prompt}`}]})});
           if(resp.ok){ const rd=await resp.json(); const raw=rd.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim(); const m=raw.match(/\{[\s\S]*\}/); if(m) parsed=JSON.parse(m[0]); }
@@ -15971,7 +16174,7 @@ function renderFeeSettle(){
    ⚠ 보내거나 채우지 않는다. 메일을 «읽기만»(peek) 한다. 상태(확인함·처리 완료·요청 아님)는 사람이 누른다.
    ⚠ 저장 자리는 kcareer/{uid}/mailreq — 자료 통(ls)과 «따로»다. at 을 안 건드려 다른 기기에 «새 저장» 띠가 안 뜬다. 보안규칙은 그대로.
    ⚠ 기기마다 다른 설정(알림 켬·띠 닫음)은 localStorage 에 직접 둔다 — LS(cm3_*)에 두면 자료 통에 실려 클라우드로 간다. */
-var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0, detId:'', detFrom:null };
+var _mr={ items:{}, ready:false, tab:'open', sel:{}, busy:false, last:0, lastRes:null, timer:0, ref:null, fn:null, seen:null, tries:0, err:'', started:false, freshQ:[], freshT:0, detId:'', detFrom:null, layaMsg:'' };
 function mrBase(){ return 'kcareer/'+fbUid+'/mailreq'; }
 function mrLocal(k, v){ try{ if(v===undefined) return localStorage.getItem('kc_mr_'+k); if(v===null) localStorage.removeItem('kc_mr_'+k); else localStorage.setItem('kc_mr_'+k, v); }catch(e){} return null; }
 function mrNavCount(){ return _mr.ready ? KcareerMailReq.summary(_mr.items, Date.now()).open : null; }
@@ -16014,7 +16217,7 @@ function mrOnData(v){
   if(_mr.detId && !v[_mr.detId]) mrDetClose();      /* 보던 건이 사라졌다(다른 곳에서 지움) — 팝업을 닫는다 */
   /* 처음 받은 판은 «조용히» — 열 때마다 알림이 쏟아지면 안 된다. 그 몫은 띠가 말한다 */
   /* 건이 하나씩 들어와도(건마다 저장) 알림은 «한 번에 모아» — 처음 훑을 때 알림이 건수만큼 깜박이지 않게 */
-  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ.map(function(x){ return (_mr.items&&_mr.items[x.id])||x; }).filter(function(x){ return x.st==='new'; }); _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }   /* 알리는 «그 순간»의 상태를 다시 본다 — 그 사이 Jev·규칙이 업무로 치운 건은 알리지 않는다 */
+  if(prev){ var fresh=list.filter(function(x){ return !prev[x.id] && x.st==='new'; }); if(fresh.length){ _mr.freshQ=_mr.freshQ.concat(fresh); if(_mr.freshT) clearTimeout(_mr.freshT); _mr.freshT=setTimeout(function(){ var q=_mr.freshQ.map(function(x){ return (_mr.items&&_mr.items[x.id])||x; }).filter(function(x){ return x.st==='new'; }); _mr.freshQ=[]; _mr.freshT=0; if(q.length) mrAnnounce(q); }, 1500); } }   /* 알리는 «그 순간»의 상태를 다시 본다 — 그 사이 규칙이 걸러 둔 건은 알리지 않는다 */
   _mr.seen=ids;
   mrPaint(); mrRender();
 }
@@ -16043,41 +16246,48 @@ async function mrScan(quiet){
     var r=await KcareerMailReq.scan({ db:fbDb, uid:fbUid, readBody:KcareerMailReq.makeReadBody(_bizMbCall) });
     _mr.last=Date.now(); _mr.lastRes={ folders:r.folders, scanned:r.scanned, found:r.found, errors:r.errors.length, autoIgnored:(r.autoIgnored||0) };
     if(r.errors.length) console.warn('[요청 메일] 훑기', r.errors);
-    await mrJevRun();     /* 규칙이 못 가른 «애매한 건»만 Jev 에게 — 실패해도 훑기는 끝난 것이다(안에서 삼킨다) */
     /* 찾았으면 «새 요청» 알림(mrAnnounce)이 이미 말했다 — 같은 자리 알림이라 덮어쓰지 않는다 */
     if(!quiet && (r.errors.length || !r.created.length)) toast(r.errors.length ? ('⚠ 일부 폴더를 읽지 못했습니다 ('+r.errors.length+'곳)') : '새 요청 메일이 없습니다', 5000);
   }catch(e){ console.warn('[요청 메일] 훑기 실패', e); _mr.err='메일함을 읽지 못했습니다 — '+String((e&&e.message)||e).slice(0,60); if(!quiet) toast('⚠ '+_mr.err, 6000); }
   finally{ _mr.busy=false; mrRender(); }
+  /* 🧠 이 PC 의 Laya 에게 «의견»만 — 훑기가 «끝난 뒤» 따로 돈다(한 건 1~3초라 기다리게 하면 «지금 확인» 단추가 묶인다). 켠 기기에서만, 실패는 안에서 삼킨다 */
+  mrLayaRun().then(function(r){ if(r && r.asked) mrRender(); });
 }
 function mrScanNow(){ mrScan(false); }
-/* ── 🤖 Jev 범위 분류 — «이력서·경력·회의·비용»만 남기고 «업무»는 뺀다 (대표 지시 2026-11-15) ──
-   1차는 모듈의 말 목록(scopeOf — 밖으로 안 나간다). 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 서버 함수 mailReqScope 가
-   이름을 가려 Jev 에게 묻는다(본문·보낸이는 안 보낸다 · 관리자만 · 하루 한도). 켜짐이 기본 — 이 기기에서 끌 수 있다(mrLocal 'jev').
-   ⚠ 못 물으면(열쇠·한도·서버 함수 미배포·업체 오류) 던지지 않는다 — 30분 쉬고 «규칙 결과 그대로»다. 자동 제외는 «새 요청»만(모듈 scopeAsk). */
-function mrJevOn(){ return mrLocal('jev')!=='0'; }
-function mrJevPaused(){ var t=Number(mrLocal('jevPause'))||0; return t>Date.now() ? t : 0; }
-async function mrJevCall(items){
-  var u=firebase.auth().currentUser; if(!u) throw new Error('로그인이 필요합니다');
-  var tok=await u.getIdToken(), r;
-  try{ r=await kcFetch(BIZ_MB_FN+'mailReqScope', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:JSON.stringify({ items:items }) }, 60000); }
-  catch(e){ throw new Error('Jev 분류 서버에 닿지 못했습니다 — 서버 함수가 아직 배포 전일 수 있습니다'); }
+/* ── 🧠 Laya 의견 — 이 PC 에 깐 무료 판단 모델(tools/laya-judge · http://127.0.0.1:LAYA_PORT)에게 «이력·회의·비용인가 업무인가»를 묻는다 (대표 지시 2026-11-19
+      「laya 라는 프로그램 사용해서 설치하고 판단하는 기능 넣어서 만들어 달라」) ──
+   ★ 보내는 것은 제목·첨부 이름뿐이고(모듈 layaPayload), 받는 곳은 이 PC 안(127.0.0.1)이다 — 밖으로 안 나간다.
+   ★ «의견»만 적는다(모듈 layaAsk → laya 칸). 상태를 바꾸지 않는다 — 실제 64건에서 Laya 의견대로 치웠다면 진짜 요청 6건 중 3건이 사라졌다.
+     대표 판단과 맞는 비율(layaAgree)을 상태줄에 센다.
+   ★ 이 기기에서 «켤 때만» 부른다(꺼짐이 기본, mrLocal 'laya') — 판단기가 없는 폰·다른 PC 에서 브라우저가 «이 기기의 다른 앱 접근» 허락을 묻지 않게.
+   ⚠ 못 닿으면(판단기 꺼짐·응답 없음) 던지지 않고 10분 쉰다. (2026-11-15 의 Jev 단계는 부르지 않는다 — 애매한 건은 처음부터 걸러진다) */
+function mrLayaUrl(){ return 'http://127.0.0.1:'+((typeof KcareerMailReq!=='undefined' && KcareerMailReq.LAYA_PORT)||18766); }   /* 18765 는 이 PC 의 한글편집기 자리 — 판단기는 18766(2026-11-21) */
+function mrLayaOn(){ return mrLocal('laya')==='1'; }
+function mrLayaPaused(){ var t=Number(mrLocal('layaPause'))||0; return t>Date.now() ? t : 0; }
+async function mrLayaCall(list){
+  var r;
+  try{ r=await kcFetch(mrLayaUrl()+'/judge', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ items:list }) }, 90000); }
+  catch(e){ throw new Error('이 PC 의 Laya 판단기에 닿지 못했습니다 — 판단기가 켜져 있는지 보세요'); }
   var j=await r.json().catch(function(){ return {}; });
-  if(!j.ok) throw new Error(j.error||('Jev 분류를 받지 못했습니다 ('+r.status+')'));
+  if(!j.ok) throw new Error(j.error||('Laya 의견을 받지 못했습니다 ('+r.status+')'));
   return j;
 }
-async function mrJevRun(){
-  if(!mrJevOn() || mrJevPaused() || !fbDb || !fbUid) return null;
+async function mrLayaRun(){
+  if(_mr.layaBusy || !mrLayaOn() || mrLayaPaused() || !fbDb || !fbUid) return null;   /* 겹쳐 돌지 않는다(켜기 단추·5분 훑기가 겹쳐도 한 번만) */
+  _mr.layaBusy=true;
   try{
-    var r=await KcareerMailReq.scopeAsk({ db:fbDb, uid:fbUid, ask:mrJevCall });
-    if(r.errors.length){ mrLocal('jevPause', String(Date.now()+30*60*1000)); _mr.jevMsg=r.errors[0]; console.warn('[요청 메일] Jev 분류', r.errors); }
-    else{ _mr.jevMsg=''; if(r.work) toast('🤖 Jev 가 업무 관련 메일 '+r.work+'건을 «요청 아님»으로 치웠습니다 — «요청 아님» 탭에서 되돌릴 수 있습니다', 7000); }
+    var r=await KcareerMailReq.layaAsk({ db:fbDb, uid:fbUid, ask:mrLayaCall });
+    if(r.errors.length){ mrLocal('layaPause', String(Date.now()+10*60*1000)); _mr.layaMsg=r.errors[0]; console.warn('[요청 메일] Laya 의견', r.errors); }
+    else _mr.layaMsg='';
     return r;
-  }catch(e){ mrLocal('jevPause', String(Date.now()+30*60*1000)); _mr.jevMsg=String((e&&e.message)||e).slice(0,80); return null; }
+  }catch(e){ mrLocal('layaPause', String(Date.now()+10*60*1000)); _mr.layaMsg=String((e&&e.message)||e).slice(0,80); return null; }
+  finally{ _mr.layaBusy=false; }
 }
-function mrJevToggle(){
-  var on=!mrJevOn(); mrLocal('jev', on?'1':'0'); if(on) mrLocal('jevPause', null);
-  toast(on?'🤖 Jev 분류를 켰습니다 — 규칙이 못 가른 메일의 제목·첨부 이름만(이름 가림) 물어봅니다':'🤖 Jev 분류를 껐습니다 — 규칙으로만 가릅니다', 5000);
+function mrLayaToggle(){
+  var on=!mrLayaOn(); mrLocal('laya', on?'1':null); mrLocal('layaPause', null); _mr.layaMsg='';
+  toast(on?'🧠 이 PC 의 Laya 판단기에게 제목·첨부 이름만 물어 «의견»을 적습니다 — 의견일 뿐 메일을 옮기지 않습니다':'🧠 Laya 의견을 껐습니다 — 규칙으로만 가립니다', 6000);
   mrRender();
+  if(on) mrLayaRun().then(function(){ mrRender(); });
 }
 /* 푸른메일함 열기 — 앱끼리 여는 공용 길(같은 창을 다시 쓴다). «이름 없는 새 탭»은 누를 때마다 탭이 쌓인다(tests/one-window-per-app) */
 function mrOpenMail(){ var u='pu-cards.html?sso=1&view=mail'; if(window.PuAppBar && PuAppBar.goApp) PuAppBar.goApp(u); else window.open(u,'pu_pu_cards'); }
@@ -16127,16 +16337,16 @@ function mrStatusLine(){
   if(!_mr.ready) return '불러오는 중…';
   var r=_mr.lastRes, 때=_mr.last?mrWhen(_mr.last):'';
   return (때?'마지막 확인 '+때:'아직 메일함을 확인하지 않았습니다')+(r?(' · 폴더 '+r.folders+'곳'+(r.scanned?' · 새로 읽은 메일 '+r.scanned+'통':'')+(r.errors?' · <span style="color:var(--red)">못 읽은 폴더 '+r.errors+'곳</span>':'')):'')
-    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다'+mrJevLine();
+    +' · 화면을 켜 둔 동안 '+Math.round(KcareerMailReq.POLL_MS/60000)+'분마다 새로 온 메일을 확인합니다'+mrLayaLine();
 }
-/* 상태줄 끝 — 자동으로 치운 건수 · Jev 분류가 켜져 있는지/쉬는지(쉬는 까닭은 마우스를 올리면) */
-function mrJevLine(){
-  var n=KcareerMailReq.toList(_mr.items).filter(function(x){ return x.autoIgnored && x.st==='ignored'; }).length;   /* 지금도 «기계가 치운 채»인 건만 — 되돌린 건은 안 센다 */
-  var 말=(n?' · 🤖 업무 관련 '+n+'건 자동 제외(«요청 아님» 탭)':'');
-  if(!mrJevOn()) return 말+' · Jev 분류 꺼짐(규칙으로만 가름)';
-  var p=mrJevPaused();
-  /* 쉬는 까닭은 «글자»로 보인다 — 마우스를 올려야만 보이면 폰·키보드에서는 못 본다 */
-  return 말+(p?' · <span title="'+escapeHtml(_mr.jevMsg||'')+'">Jev 분류 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로'+(_mr.jevMsg?' · <span style="color:var(--text-mute)">'+escapeHtml(String(_mr.jevMsg).slice(0,60))+'</span>':'')+'</span>':' · Jev 분류 켜짐');
+/* 상태줄 끝 — 자동으로 걸러 둔 건수 · 🧠 Laya 의견이 켜져 있는지/쉬는지 · 대표 판단과 맞는 비율(쉬는 까닭은 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게) */
+function mrLayaLine(){
+  var Q=KcareerMailReq, n=Q.toList(_mr.items).filter(function(x){ return x.autoIgnored && x.st==='ignored'; }).length;   /* 지금도 «기계가 거른 채»인 건만 — 되돌린 건은 안 센다 */
+  var 말=(n?' · 🤖 이력·회의·비용이 아닌 메일 '+n+'건은 걸러 둠(«🚫 걸러낸 메일»)':'');
+  if(!mrLayaOn()) return 말+' · 🧠 Laya 의견 꺼짐(규칙으로만 가름)';
+  var p=mrLayaPaused(), a=Q.layaAgree(_mr.items);
+  var 셈=a.n?(' · 대표 판단과 같음 '+a.same+'/'+a.n+'건 — 진짜 요청 '+a.keepSame+'/'+a.keepN+'건'):' · 아직 견줄 대표 판단 없음';
+  return 말+(p?' · <span title="'+escapeHtml(_mr.layaMsg||'')+'">🧠 Laya 쉬는 중('+mrWhen(p)+'까지) — 규칙 결과 그대로'+(_mr.layaMsg?' · <span style="color:var(--text-mute)">'+escapeHtml(String(_mr.layaMsg).slice(0,60))+'</span>':'')+'</span>':(' · 🧠 Laya 의견 켜짐(의견만)'+셈));
 }
 function mrRowHtml(x, i, now){
   var Q=KcareerMailReq, u=Q.urgency(x, now), dd=Q.ddayOf(x.deadline, now), 종류=(x.kinds||[]).map(Q.kindMeta).filter(Boolean), st=Q.STATES[x.st]?x.st:'new';   /* 아는 상태만 — 클래스에 DB 값이 그대로 들어가지 않게 */
@@ -16147,7 +16357,7 @@ function mrRowHtml(x, i, now){
     +(dd.label&&(x.st==='new'||x.st==='doing')?'<span class="mr-chip '+(u==='overdue'?'red':(u==='soon'?'new':'ignored'))+'">'+dd.label+'</span>':'');
   else 기한='<span style="color:var(--text-mute)" title="'+(x.bodyAt?'본문에서 기한 말과 가까운 날짜를 찾지 못했습니다 — 메일을 열어 확인해 주세요':((Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'본문을 열지 못했습니다 — 메일을 열어 확인해 주세요':'본문을 읽는 중입니다'))+'">'+(x.bodyAt||(Number(x.bodyTry)||0)>=KcareerMailReq.BODY_TRY?'기한 모름':'읽는 중…')+'</span>';
   var id=_jsAttr(x.id);
-  var 단추=function(st, 그림, 글, 설명){ return '<button class="btn sm" type="button" title="'+설명+'" onclick="mrOne(\''+id+'\',\''+st+'\')">'+그림+'<span class="mr-btx"> '+글+'</span></button>'; };
+  var 단추=function(st, 그림, 글, 설명){ return '<button class="btn sm" type="button" title="'+설명+'" aria-label="'+글+'" onclick="mrOne(\''+id+'\',\''+st+'\')">'+그림+'<span class="mr-btx"> '+글+'</span></button>'; };   /* 폰에서 글자가 숨어도 이름이 남게(aria-label) */
   var 관리=(st==='new'?단추('doing','👀','확인','확인함으로 표시 — 아직 처리 전입니다')+' ':'')
     +(st==='new'||st==='doing'?단추('done','✔','완료','처리 완료로 표시')+' '+단추('ignored','🚫','아님','요청이 아닌 메일입니다 — 목록에서 치웁니다'):단추('doing','↩','되돌림','진행 중으로 되돌립니다'));
   return '<tr class="'+(u==='overdue'?'mr-over':(u==='soon'?'mr-soon':''))+'">'
@@ -16157,8 +16367,11 @@ function mrRowHtml(x, i, now){
     +'<td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(보낸전체)+'">'+escapeHtml(보낸)+'</td>'
     +'<td style="white-space:nowrap">'+mrWhen(x.d)+'</td>'
     +'<td style="white-space:nowrap">'+기한+'</td>'
-    +'<td style="white-space:nowrap"><span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span>'
-      +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? ' <span class="mr-chip ignored" title="'+escapeHtml(sm.title)+'">'+escapeHtml(sm.text)+'</span>' : ''; })()+'</td>'
+    /* 상태 칸 — 자동으로 거른 줄은 «요청 아님»과 «🤖 자동으로 걸러냄»이 겹치므로 🤖 딱지 하나로(칸이 넘쳐 표가 가로로 밀리지 않게, 2026-11-19) */
+    +'<td style="white-space:nowrap">'+(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? '<span class="mr-chip ignored" title="'+escapeHtml(sm.title)+'">'+escapeHtml(sm.text)+'</span>' : '<span class="mr-chip '+st+'">'+escapeHtml(Q.STATES[st])+'</span>'; })()
+      /* 🧠 Laya 의견 — 지금 자리와 «다를 때만» 짧게(진행 중인데 업무로 봄 · 걸렀는데 이력으로 봄 — 대표가 볼 만한 것만). 같은 의견은 팝업에만 */
+      +(function(){ var lm=Q.layaMark(x); if(!lm) return ''; var 다름=(x.st==='ignored') ? x.laya.v==='personal' : x.laya.v==='work';
+        return 다름 ? ' <span class="mr-chip" title="'+escapeHtml(lm.title+' — 지금 자리와 의견이 다릅니다')+'">'+escapeHtml(lm.short)+'?</span>' : ''; })()+'</td>'
     +'<td onclick="event.stopPropagation()" style="white-space:nowrap"><span style="display:inline-flex;gap:4px;flex-wrap:nowrap">'+관리+'</span></td></tr>';
 }
 /* 지금 탭에서 «보이는» 줄 — 그리기와 「전체 선택」이 같은 목록을 본다. 줄이 한없이 쌓이지 않게 한도를 둔다(오래 쓰면 완료 탭이 길어진다) */
@@ -16170,12 +16383,13 @@ function mrRender(){
   var ml=mrList(now), list=ml.rows;
   var vis={}; list.forEach(function(x){ vis[x.id]=1; }); Object.keys(_mr.sel).forEach(function(k){ if(!vis[k]) delete _mr.sel[k]; });   /* 안 보이게 된 건은 선택에서 뺀다 */
   var cnt={ open:sm.open, done:sm.done, ignored:sm.ignored, all:sm.total };
-  var h='<div class="toolbar mr-top">'+Q.TABS.map(function(t){ return '<button type="button" class="mr-pill'+(_mr.tab===t.key?' on':'')+'" aria-pressed="'+(_mr.tab===t.key)+'" onclick="mrTab(\''+t.key+'\')">'+t.label+' '+cnt[t.key]+'</button>'; }).join('')
+  /* 걸러낸 메일(quiet)은 «조용한» 단추 — 숫자를 키워 보이지 않게(대표 지시 2026-11-19 «아예 안 들임») */
+  var h='<div class="toolbar mr-top">'+Q.TABS.map(function(t){ return '<button type="button" class="mr-pill'+(t.quiet?' quiet':'')+(_mr.tab===t.key?' on':'')+'" aria-pressed="'+(_mr.tab===t.key)+'" onclick="mrTab(\''+t.key+'\')"'+(t.quiet?' title="이력·회의·비용이 아니라서 자동으로 걸러 둔 메일과 🚫 로 치운 메일 — 잘못 걸렀으면 ↩ 로 되돌립니다"':'')+'>'+t.label+' '+cnt[t.key]+'</button>'; }).join('')
     +'<div class="tb-spacer"></div>'
-    +'<button class="btn" type="button" onclick="mrScanNow()"'+(_mr.busy||!_mr.started?' disabled':'')+' title="법인 메일함에 새로 온 메일을 지금 확인합니다">'+(_mr.busy?'⏳<span class="mr-btx"> 확인 중…</span>':'🔄<span class="mr-btx"> 지금 확인</span>')+'</button>'
-    +'<button class="btn" type="button" onclick="mrJevToggle()" aria-pressed="'+mrJevOn()+'" title="규칙이 못 가른 애매한 메일의 제목·첨부 이름만(이름 가림, 본문·보낸이는 안 보냄) Jev 에게 물어 업무 관련인지 가립니다 — 끄면 규칙으로만 가릅니다">'+(mrJevOn()?'🤖<span class="mr-btx"> Jev 분류 켜짐</span>':'🤖<span class="mr-btx"> Jev 분류 꺼짐</span>')+'</button>'
-    +(typeof Notification!=='undefined'?'<button class="btn" type="button" onclick="mrNotifyToggle()" title="다른 탭을 보고 있을 때도 새 요청이 오면 브라우저 알림으로 알립니다(이 경력관리 탭을 열어 둔 동안)">'+(mrNotifyOn()?'🔔<span class="mr-btx"> 브라우저 알림 켜짐</span>':'🔕<span class="mr-btx"> 브라우저 알림 켜기</span>')+'</button>':'')
-    +'<button class="btn" type="button" onclick="mrOpenMail()" title="푸른메일함을 엽니다 — 답장·첨부 받기는 거기서 합니다">📬<span class="mr-btx"> 메일함 열기</span></button></div>'
+    +'<button class="btn" type="button" onclick="mrScanNow()" aria-label="메일함 지금 확인"'+(_mr.busy||!_mr.started?' disabled':'')+' title="법인 메일함에 새로 온 메일을 지금 확인합니다">'+(_mr.busy?'⏳<span class="mr-btx"> 확인 중…</span>':'🔄<span class="mr-btx"> 지금 확인</span>')+'</button>'
+    +'<button class="btn" type="button" onclick="mrLayaToggle()" aria-label="Laya 의견" aria-pressed="'+mrLayaOn()+'" title="이 PC 에 깐 Laya 판단기에게 제목·첨부 이름만 물어(밖으로 안 나감) «이력·회의·비용인가 업무인가» 의견을 적습니다 — 의견일 뿐 메일을 옮기지 않습니다. 판단기를 깐 PC 에서만 켜 주세요">'+(mrLayaOn()?'🧠<span class="mr-btx"> Laya 의견 켜짐</span>':'🧠<span class="mr-btx"> Laya 의견 켜기</span>')+'</button>'
+    +(typeof Notification!=='undefined'?'<button class="btn" type="button" onclick="mrNotifyToggle()" aria-label="브라우저 알림" aria-pressed="'+mrNotifyOn()+'" title="다른 탭을 보고 있을 때도 새 요청이 오면 브라우저 알림으로 알립니다(이 경력관리 탭을 열어 둔 동안)">'+(mrNotifyOn()?'🔔<span class="mr-btx"> 브라우저 알림 켜짐</span>':'🔕<span class="mr-btx"> 브라우저 알림 켜기</span>')+'</button>':'')
+    +'<button class="btn" type="button" onclick="mrOpenMail()" aria-label="메일함 열기" title="푸른메일함을 엽니다 — 답장·첨부 받기는 거기서 합니다">📬<span class="mr-btx"> 메일함 열기</span></button></div>'
     +'<div class="mr-st">'+mrStatusLine()+'</div>';
   var n=Object.keys(_mr.sel).length;
   h+='<div class="sel-bar" id="mrSel"'+(n?'':' style="display:none"')+'><b><span id="mrSelCnt">'+n+'</span>건 선택</b>'
@@ -16188,12 +16402,13 @@ function mrRender(){
       +(all.length?'이 탭에는 건이 없습니다.':'아직 알아본 요청 메일이 없습니다.<br>법인 메일함에 «동의서·경력 확인·이력서 제출» 같은 요청 메일이 오면 몇 분 안에 여기 올라오고, 위에 알림 띠가 뜹니다. 처음에는 최근 '+KcareerMailReq.WINDOW_DAYS+'일 안의 메일을 훑습니다.')
       +'</div></div>';
   }else{
-    h+='<div class="dt" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="mrAll" onclick="mrPickAll(this.checked)" title="지금 보이는 줄 전체 선택"> №</th>'
+    /* 단추가 하나(↩ 되돌림)뿐인 탭은 «관리» 칸을 좁힌다 — 공용 규칙(.dt 마지막 칸 200px)이 걸러낸 메일 탭에서 표를 가로로 밀었다(1280px, 2026-11-19 검토) */
+    h+='<div class="dt'+(_mr.tab==='open'?'':' mr-act1')+'" style="overflow-x:auto"><table><thead><tr><th class="rownum-h"><input type="checkbox" id="mrAll" onclick="mrPickAll(this.checked)" title="지금 보이는 줄 전체 선택"> №</th>'
       +'<th>종류</th><th>제목</th><th>보낸이</th><th>받은 날</th><th>기한</th><th>상태</th><th>관리</th></tr></thead><tbody>'
       +list.map(function(x,i){ return mrRowHtml(x, i, now); }).join('')+'</tbody></table></div>'
       +(ml.all>list.length?'<div class="mr-st">앞의 '+list.length+'건만 보입니다 — 전체 '+ml.all+'건</div>':'');
   }
-  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.<br>이 화면은 <b>이력서·경력·회의·비용</b> 서류만 다룹니다 — 고객 업무(노동청 사건·컨설팅 수행·급여·근로계약서 등)로 보이는 메일은 자동으로 «🚫 요청 아님»으로 치우고(🤖 표시), 애매한 것만 Jev 에게 제목·첨부 이름(이름 가림)을 물어봅니다. 잘못 치웠으면 «요청 아님» 탭에서 ↩ 되돌려 주세요.</div>';
+  h+='<div class="mr-note">제목·첨부 이름·본문에서 «동의서·경력 확인·이력서·제출·회신» 같은 말과 기한을 보고 고릅니다 — <b>틀릴 수 있으니</b> 요청이 아니면 «🚫 요청 아님»으로 치워 주세요. 기한은 본문에서 «기한·마감·까지» 가까이 적힌 날짜만 읽고, 못 찾으면 «기한 모름»입니다. 이 화면은 메일을 보내거나 서식을 채우지 않습니다.<br>이 화면은 <b>이력서·경력·회의·비용</b> 메일만 들입니다 — 제목·첨부 이름에 이력·위원·회의·수당 같은 말이 없거나 고객 업무(노동청 사건·컨설팅 수행·급여·근로계약서 등)로 보이는 메일은 목록에 올리지 않고 걸러 둡니다(🤖 표시). 잘못 걸렀으면 «🚫 걸러낸 메일»에서 ↩ 되돌려 주세요. 🧠 Laya 의견은 이 PC 안에서만 매기는 참고 의견이고 메일을 옮기지 않습니다.</div>';
   box.innerHTML=h;
   try{ stampCellLabels(box); }catch(e){}
   mrSelSync();
@@ -16225,7 +16440,7 @@ function mrBatch(btn, st){
   if(!건.length){ toast('ℹ 고른 건이 이미 그 상태입니다'); return; }
   kcAskDelete(btn, { title:'📬 요청 메일 '+건.length+'건을 «'+이름+'»'+으로+' 바꿉니다',
       detail:건.slice(0,4).map(function(x){ return escapeHtml(String(x.s).slice(0,34)); }).join('<br>')+(건.length>4?'<br>… 외 '+(건.length-4)+'건':'')
-        +(st==='ignored'?'<br>목록의 «요청 아님» 탭에서 되돌릴 수 있습니다.':'')+(st==='done'?'<br>«처리 완료» 탭에서 되돌릴 수 있습니다.':''),
+        +(st==='ignored'?'<br>«🚫 걸러낸 메일»에서 되돌릴 수 있습니다.':'')+(st==='done'?'<br>«처리 완료» 탭에서 되돌릴 수 있습니다.':''),
       yes:'«'+이름+'»'+으로+' 바꾸기' },
     function(){ mrSet(건.map(function(x){ return x.id; }), st).then(function(){ _mr.sel={}; mrRender(); }); });
 }
@@ -16288,9 +16503,10 @@ function mrDetRender(x){
     +(x.an&&x.an.length?행('첨부', x.an.map(function(n){ return '📎 '+escapeHtml(n); }).join('<br>')):'')
     +(x.replyTo?행('회신 주소', escapeHtml(x.replyTo)):'')
     +(x.why&&x.why.length?행('알아본 까닭', x.why.map(escapeHtml).join(' · ')):'')
-    +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? 행('자동 제외', escapeHtml(sm.title)) : ''; })()     /* 딱지의 까닭을 팝업에도 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게 */
+    +(function(){ var sm=Q.scopeMark(x); return (sm && x.st==='ignored') ? 행('자동 걸러냄', escapeHtml(sm.title)) : ''; })()     /* 딱지의 까닭을 팝업에도 «글자»로 — 마우스를 못 올리는 폰·키보드에서도 보게 */
+    +(function(){ var lm=Q.layaMark(x); return lm ? 행('Laya 의견', escapeHtml(lm.text)+'<div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">'+escapeHtml(lm.title)+'</div>') : ''; })()
     +행('메모', '<textarea id="mrDetMemo" maxlength="'+Q.MEMO_MAX+'" placeholder="예) 담당자에게 전화함 · 서류는 11월 둘째 주에 보냄" aria-label="메모">'+escapeHtml(x.memo||'')+'</textarea>')
-    +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><b style="font-size:13px">메일 내용</b>'
+    +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:13px;white-space:nowrap">메일 내용</b>'   /* 폰(375)에서 «메일 / 내용» 두 줄로 접히지 않게(2026-11-19 검토) */
     +'<button class="btn sm" type="button" onclick="mrDetLoadBody(_mr.items[_mr.detId], true)" title="메일 내용을 다시 읽습니다">↻ 다시 읽기</button>'
     +'<span style="font-size:11.5px;color:var(--text-mute)">읽기만 합니다 — 읽음 표시·저장은 안 합니다</span></div>'
     +'<div class="mr-det-mail" id="mrDetMail" tabindex="0" aria-label="메일 내용"></div></div>';
@@ -18213,11 +18429,10 @@ function bizSelDel(btn){
   kcAskDelete(btn, { detail:'고른 사업 <b>'+ids.length+'건</b>과 그 서류를 휴지통으로 보냅니다.<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다.</b>' }, function(){
     var arr=get(BIZ_STORE)||[];
     /* ★ 한 번에 담는다(kcTrashPutMany) — 건마다 쓰면 N번 저장하고 중간에 걸리면 «휴지통에도 있고 원 자료에도 남는» 반쪽이 된다(2026-11-16).
-       «되살리기» 손잡이는 예전과 같이 마지막으로 담은 줄이다 */
+       «되살리기»는 담은 «전부»를 되살린다(kcTrashDoneMany) — 예전엔 마지막 한 건의 번호만 쥐어 「사업 N건」이라 알려 놓고 1건만 돌아왔다(2026-11-22) */
     var es=kcTrashPutMany(BIZ_STORE,'page-bizlist',arr.filter(function(r){ return r && ids.indexOf(r.id)>=0; }),'사업');
-    var last=es.length?es[es.length-1]:null;
     set(BIZ_STORE, arr.filter(function(r){ return !(r && ids.indexOf(r.id)>=0); }));
-    renderBizList(); kcTrashDone(last, '🗑 사업 '+ids.length+'건을 휴지통으로 옮겼습니다');
+    renderBizList(); kcTrashDoneMany(es, '🗑 사업 '+ids.length+'건을 휴지통으로 옮겼습니다');
   });
 }
 
@@ -18251,6 +18466,22 @@ function bizDraw(){
     +cell('메모','<textarea class="tb-input" id="bzf-memo" style="width:100%;min-height:46px">'+escapeHtml(r.memo||'')+'</textarea>',true)
     +'</div>'
     +(r.caseDir?'<div style="font-size:11px;color:var(--text-mute);margin-top:6px;word-break:break-all">📂 '+escapeHtml(r.caseDir)+'</div>':'');
+  /* 🔗 정부사업신청에서 모은 공고 첨부 서식 «링크» (대표 지시 2026-11-22 「사업 신청서·관련 서식을 다 끌어오고 모으고」)
+     ⚠ 링크일 뿐 파일이 아니다 — 내려받아 아래 「＋ 파일 올리기」로 담아야 비교·다시 쓰기·서류 찾기에 든다.
+     ⚠ 그릴 때 주소를 다시 거른다(http(s)만) — 저장된 값을 그대로 href 에 넣지 않는다. 한 줄씩 · 넘치면 … + title */
+  var gf=(r.govFiles||[]).filter(function(f){ return f && KcareerBiz.govUrl(f.url); }), gu=KcareerBiz.govUrl(r.govUrl);
+  if(gf.length || gu){
+    /* 테두리·링크 색은 어두운 화면에서도 보이게(--border 는 어두운 화면에서 판과 같은 색이라 --text-mute · 링크는 --blue — 검증 2026-11-22) */
+    html+='<div style="margin-top:10px;padding:8px 10px;border:1px dashed var(--text-mute);border-radius:8px;font-size:12px">'
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>🔗 공고 첨부 서식 '+gf.length+'개</b>'
+      +'<span style="color:var(--text-mute)">정부사업신청에서 모은 링크 — 내려받아 아래 「＋ 파일 올리기」로 담으면 다음 입찰 때 비교·다시 쓰기가 됩니다</span><span style="flex:1"></span>'
+      +(gu?'<a class="btn sm" href="'+escapeHtml(gu)+'" target="_blank" rel="noopener noreferrer">🔗 원문 공고</a>':'')+'</div>'
+      +(gf.length?'<div style="margin-top:6px">'+gf.map(function(f,i){
+        return '<div style="display:flex;gap:8px;align-items:center;padding:3px 0;min-width:0"><span style="flex:0 0 22px;color:var(--text-mute);font-variant-numeric:tabular-nums">'+(i+1)+'</span>'
+          +'<span class="tag" style="flex:none">'+escapeHtml(f.kind||KcareerBiz.guessDocKind(f.name))+'</span>'
+          +'<a href="'+escapeHtml(KcareerBiz.govUrl(f.url))+'" target="_blank" rel="noopener noreferrer" style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--blue)" title="'+escapeHtml(f.name||'')+'">📄 '+escapeHtml(f.name||'')+'</a></div>'; }).join('')+'</div>':'')
+      +'</div>';
+  }
   /* 같은 건 폴더가 제출서류에도 있으면 바로 가기 — 열쇠는 caseDir 하나(_subOfCase) */
   var 제출=_subOfCase(r.caseDir);
   if(제출) html+='<div style="margin-top:6px"><button class="btn sm" type="button" onclick="bizClose();openSubmissionFiles(\''+_jsAttr(제출.id)+'\')" title="같은 건 폴더가 제출서류(개인 지원 기록)에도 있습니다">📥 제출서류에 있음 — '+escapeHtml(제출.id)+'</button></div>';
@@ -21563,6 +21794,102 @@ function rhDraftTrashSel(btn){
   rhDraftPut(rhDraftAll().filter(function(x){ return !갈것[x.id]; }));
   rhDraftDraw(); rhDraftCheck();
   toast('🗑 '+됨+'건을 휴지통으로 보냈습니다 — 환경설정 › 🗑 휴지통에서 '+TRASH_DAYS+'일 안에 되살릴 수 있습니다', 6000);
+}
+
+/* ── 👁 작성 중 서류 «한꺼번에 보기» (대표 지시 2026-11-24 「서류가 여러장인 경우 한번에 모두 볼 수 있게」) ──
+   ■ 왜: 한 건이 여러 장(공적조서 앞·뒤·이력서·동의서)인데 목록에서 장마다 「이어서」를 눌러 열어야 했다 —
+     서로 맞는지(이름·날짜·도장) 견주려면 한 화면에 모두 있어야 한다.
+   ■ 무엇을: 고른 서류(없으면 「전부」)를 «담겨 있는 그대로»(저장된 한글 문서) 쪽 그림으로 펼친다.
+     그리는 일은 「한글 문서 보기」와 같은 엔진 하나(PureunHwp.renderPreview)다 — 따로 그리개를 만들지 않는다.
+   ⚠ 보기 전용이다. 고치려면 장마다 「↩ 이어서」. 입력판에서 친 값(저장 «옆칸»)은 그 서류를 열어야 보인다 —
+     여기는 문서 파일에 «이미 들어 있는 것»만 그린다(한글 편집 안에서 고친 것·도장·사진은 들어 있다).
+   ⚠ 지금 열어 둔 서류가 고른 것에 들었으면 먼저 담는다(rhDraftNow) — 방금 고친 것이 빠지면 안 된다.
+   ⚠ 한 장이 못 그려져도 나머지는 그린다(장마다 까닭을 그 칸에 적는다). 닫으면 그림을 비운다(A4 한 쪽이 크다).
+   ⚠ «보는 번호»(№)는 이 창의 차례일 뿐이다 — 저장하지 않고 열쇠로 쓰지 않는다. */
+var DM_MIN = { s:300, l:560 };     /* 칸 최소 폭(px) — 작게 모으면 넓은 창에서 4장이 나란히, 크게는 글자가 읽힌다 */
+var _dmSize = 's';
+var _dmIds = [];
+var _dmRun = 0;                    /* 그리는 도중에 다시 누르거나 닫아도 «뒤 요청»만 남게 하는 번호 */
+var _dmKeyBound = false;
+function rhDraftViewSel(){ return rhDraftViewMany(rhDraftSelIds()); }
+function rhDraftViewAll(){
+  return rhDraftViewMany(rhDraftAll().filter(function(d){ return !d.done; }).map(function(d){ return d.id; }));
+}
+function rhDraftViewManyRedraw(size){ return rhDraftViewMany(_dmIds, size); }
+function rhDraftViewManyClose(){
+  _dmRun++;
+  var ov=document.getElementById('modalDraftMulti'); if(ov) ov.classList.remove('open');
+  var box=document.getElementById('dmBody');
+  if(box){ box.innerHTML=''; box.removeAttribute('style'); }
+}
+async function rhDraftViewMany(ids, size){
+  ids=(ids||[]).filter(function(id){ return !!rhDraftFind(id); });
+  if(!ids.length){ toast('볼 서류가 없습니다 — ☐ 로 고르거나 「👁 전부 한꺼번에 보기」를 누르세요'); return; }
+  if(!window.PureunHwp){ toast('한글 문서 도구를 불러오지 못했습니다'); return; }
+  var ov=document.getElementById('modalDraftMulti'), box=document.getElementById('dmBody'), info=document.getElementById('dmInfo');
+  if(!ov || !box || !info) return;
+  if(size && DM_MIN[size]) _dmSize=size;
+  _dmIds=ids.slice();
+  var 번호=++_dmRun;
+  if(!_dmKeyBound){
+    _dmKeyBound=true;
+    document.addEventListener('keydown', function(e){
+      var o=document.getElementById('modalDraftMulti');
+      if(e.key==='Escape' && o && o.classList.contains('open')) rhDraftViewManyClose();
+    });
+  }
+  /* 지금 열어 둔 서류의 «방금 고친 것»까지 보이게 — 담지 못해도 보기는 계속한다 */
+  if(_rhDraftId && ids.indexOf(_rhDraftId)>=0 && _rhDoc){ try{ await rhDraftNow(true); }catch(e){} }
+  if(번호!==_dmRun) return;
+  box.innerHTML='';
+  box.style.setProperty('--dm-min', DM_MIN[_dmSize]+'px');
+  ['s','l'].forEach(function(k){
+    var b=document.getElementById(k==='s'?'dmSizeS':'dmSizeL'); if(!b) return;
+    b.classList.toggle('primary', k===_dmSize);
+    b.setAttribute('aria-pressed', k===_dmSize?'true':'false');
+  });
+  ov.classList.add('open');
+  /* 열리면 「닫기」에 초점 — 키보드·화면 읽기 도구가 이 창 안에서 시작하게(Esc 로도 닫힌다) */
+  try{ var 닫기=ov.querySelector('.modal-foot button'); if(닫기 && 닫기.focus) 닫기.focus(); }catch(e){}
+  info.textContent=_hwpEngineReady
+    ? '한글 엔진으로 '+ids.length+'건을 그리는 중…'
+    : '한글 엔진을 처음 한 번만 받아옵니다(약 7MB) — 다음부터는 바로 열립니다…';
+  var 쪽합=0, 못=[];
+  for(var i=0;i<ids.length;i++){
+    if(번호!==_dmRun) return;                       /* 닫았거나 다시 눌렀다 — 그리던 것은 버린다 */
+    var id=ids[i], d=rhDraftFind(id)||{};
+    var 이름=d.title||d.name||'(이름 없음)';
+    var card=document.createElement('div'); card.className='dm-card';
+    card.innerHTML='<div class="dm-cap"><span class="dm-n">№ '+(i+1)+'</span>'
+      +'<span class="dm-t" title="'+escapeHtml(이름)+'">'+escapeHtml(이름)+'</span>'
+      +'<span class="dm-p"></span>'
+      +'<button class="btn sm" type="button" onclick="rhDraftViewManyClose();rhDraftResume(\''+_jsAttr(id)+'\')" title="이 서류를 열어 이어서 고칩니다">↩ 이어서</button></div>'
+      +'<div class="dm-pg"></div>';
+    box.appendChild(card);
+    var body=card.querySelector('.dm-pg'), 쪽=card.querySelector('.dm-p');
+    try{
+      var f=await getFileAsync(id);
+      if(번호!==_dmRun) return;                    /* 파일을 받는 사이에 닫았다 — 무거운 그리기를 하지 않는다 */
+      if(!f || !f.base64) throw new Error('서식 파일이 이 기기에 없습니다');
+      var u8=new Uint8Array(b64ToAb(f.base64));
+      var nm=_hwpFixName(u8, f.name||d.name||'문서.hwpx');
+      if(!_isHwpName(nm)) throw new Error('한글 문서가 아니라 여기서는 그리지 못합니다 — 「이어서」로 여세요');
+      /* dpr 1 — 여러 장이라 한 쪽을 크게(화면 배율대로) 그리면 메모리가 한없이 든다. 칸 폭에 맞춰 줄여 보인다 */
+      var r=await PureunHwp.renderPreview(body, u8, nm, { dpr:1 });
+      if(번호!==_dmRun) return;
+      _hwpEngineReady=true;
+      var n=(r && r.pageCount) || 0;
+      쪽합+=n; 쪽.textContent=n+'쪽';
+    }catch(e){
+      못.push(이름);
+      body.removeAttribute('style');
+      body.innerHTML='<div class="dm-fail">⚠ 그리지 못했습니다 — '+escapeHtml((e && e.message) || '알 수 없는 오류')+'</div>';
+    }
+  }
+  if(번호!==_dmRun) return;
+  info.innerHTML='<b style="color:var(--navy)">'+ids.length+'건 · 총 '+쪽합+'쪽</b>'
+    +' — 저장되어 있는 그대로입니다(보기 전용). 고치려면 «↩ 이어서».'
+    +(못.length?' <span style="color:var(--red)">⚠ '+못.length+'건은 그리지 못했습니다.</span>':'');
 }
 
 /* ↩ 이어서 — 그 자리를 열고, 친 값·짝 지정도 되살린다 */

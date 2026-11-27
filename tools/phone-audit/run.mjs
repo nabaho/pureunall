@@ -8,6 +8,9 @@
  *   node tools/phone-audit/run.mjs --full          # 페이지 전체 갈무리도 남긴다
  *   node tools/phone-audit/run.mjs gov --view=feed # 그 앱의 views 가운데 하나만
  *   node tools/phone-audit/run.mjs erp --font=1.4  # 폰 «글자 크게» 흉내 (글자만 1.4배)
+ *   node tools/phone-audit/run.mjs settle --design # 공용 디자인(css/pu-design.css) 켜기 전·뒤 «보이는 누를 것» 대조
+ *                                                  # (줄거나 새로 화면 밖으로 나간 것이 있으면 끝 코드 1 — design-diff.js)
+ *   node tools/phone-audit/run.mjs harass --dark   # 기기 «어두운 모드»로 그린다(prefers-color-scheme: dark 를 따르는 앱)
  *
  * 앱마다 자료·화면 열기: tools/phone-audit/seeds/<key>.js — { data, views:[{name, run(page)}], url?, localStorage? }
  *
@@ -57,13 +60,17 @@ const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter(a => a.startsWith('--')).map(a => { const [k, v] = a.slice(2).split('='); return [k, v ?? true]; }));
 const only = args.filter(a => !a.startsWith('--'));
 const widths = String(opt.widths || '360,411').split(',').map(Number);
-const outDir = path.resolve(opt.out || path.join(here, 'out'));
+/* --dark · --dark=1 만 켠다(--dark=false·0 은 끔). 결과 자리를 안 주면 밝은 판 갈무리를 덮지 않게 out/dark 에 둔다 */
+const dark = opt.dark === true || /^(1|true|yes|on)$/i.test(String(opt.dark || ''));
+const outDir = path.resolve(opt.out || path.join(here, 'out', dark ? 'dark' : ''));
 const waitMs = Number(opt.wait || 6000);
 const onlyView = opt.view || '';
 
 const seed = require('./seed.js');
 const fakeSrc = fs.readFileSync(path.join(here, 'fake-firebase.js'), 'utf8');
 const measureSrc = fs.readFileSync(path.join(here, 'measure.js'), 'utf8');
+const designSrc = opt.design ? fs.readFileSync(path.join(here, 'design-diff.js'), 'utf8') : '';
+let designBad = 0;
 
 function deepMerge(a, b) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) return b;
@@ -84,7 +91,16 @@ function serve() {
       const host = String(req.headers.host || '').toLowerCase();
       if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
       const sfs = String(req.headers['sec-fetch-site'] || '').toLowerCase();
-      if (sfs && sfs !== 'same-origin' && sfs !== 'none') { res.writeHead(403); return res.end(); }
+      /* 예외 하나 — 화면 안의 «격리 칸»(sandbox iframe, 출처 없음)이 스크립트를 부를 때(2026-11-22 슬라이드 미리보기 칸).
+         출처가 없어 cross-site 로 오고 보낸 곳(referer)도 비어 있다. 그래서 «스크립트 요청 · Origin 없음 · 격리 칸이 싣는 그 파일들»일 때만.
+         ★ 파일을 «정확히» 적는다(폴더째 열지 않는다) — 새 격리 칸이 생기면 여기에 그 파일을 더한다. 그 밖의 cross-site 요청은 그대로 막는다 */
+      const SANDBOX_SCRIPTS = ['/vendor/jszip.min.js', '/js/pu-pptx-render.js', '/js/pu-slides-frame.js'];
+      const sandboxScript = sfs === 'cross-site' && String(req.headers['sec-fetch-dest'] || '') === 'script' && !req.headers.origin &&
+        SANDBOX_SCRIPTS.indexOf(String(req.url || '').split('?')[0]) >= 0;
+      if (sfs && sfs !== 'same-origin' && sfs !== 'none' && !sandboxScript) {
+        if (process.env.PA_CONSOLE) console.log('[막음]', req.url, JSON.stringify({ sfs, dest: req.headers['sec-fetch-dest'] || '', origin: req.headers.origin || '', ref: req.headers.referer || '' }));
+        res.writeHead(403); return res.end();
+      }
       const origin = req.headers.origin;
       if (origin && origin !== `http://127.0.0.1:${port}` && origin !== `http://localhost:${port}`) { res.writeHead(403); return res.end(); }
       let u;
@@ -138,6 +154,14 @@ async function snapOne(page, key, view, width) {
   const shot = path.join(outDir, name + '.png');
   try { await page.screenshot({ path: shot, fullPage: false }); } catch (e) {}
   if (opt.full) { try { await page.screenshot({ path: path.join(outDir, name + '-full.png'), fullPage: true }); } catch (e) {} }
+  /* --design — 공용 디자인을 잠깐 떼어 «켜기 전»과 견준다(design-diff.js). 갈무리를 «먼저» 찍고 잰다 — 화면은 바로 되돌린다 */
+  if (designSrc && m) {
+    try {
+      await page.addScriptTag({ content: designSrc });
+      m.design = await page.evaluate((w) => __paDesignDiff({ width: w }), width);
+      if (m.design && !m.design.skipped && (m.design.lostN || m.design.newOffN)) designBad++;
+    } catch (e) { err = err || String(e.message).slice(0, 200); }
+  }
   return { m, err, shot: path.relative(root, shot) };
 }
 
@@ -147,6 +171,7 @@ async function auditOne(browser, base, app, width) {
     viewport: { width, height: 800 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true,
     userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
     locale: 'ko-KR', timezoneId: 'Asia/Seoul',
+    colorScheme: dark ? 'dark' : 'light',
   });
   const extra = seed.apps[app.key] || {};
   const data = deepMerge(seed.base, extra.data || {});
@@ -163,12 +188,22 @@ async function auditOne(browser, base, app, width) {
     } catch (e) {}
     window.alert = () => {}; window.confirm = () => false; window.prompt = () => null;
   }, { data, uid: seed.UID, sid: seed.SID, email: seed.EMAIL, ls: extra.localStorage || {} });
+  /* 시드가 «지어낸 창고 파일»(seeds/<key>.js 의 storageFiles)을 주면 창고 주소 요청에 그것을 내준다 — 진짜 창고에는 나가지 않는다(2026-11-22 강의자료 슬라이드 미리보기 점검) */
+  const files = typeof extra.storageFiles === 'function' ? await extra.storageFiles() : null;
   await ctx.route('**/*', (route) => {
     const u = route.request().url();
     if (u.startsWith('data:') || u.startsWith('blob:')) return route.continue();
     let parsed = null;
     try { parsed = new URL(u); } catch (e) { return route.abort(); }
     if (parsed.origin === base) return route.continue();
+    if (files && parsed.protocol === 'https:' && parsed.hostname === 'firebasestorage.googleapis.com') {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Range', 'Access-Control-Allow-Methods': 'GET' };
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
+      const m = parsed.pathname.match(/\/o\/(.+)$/);
+      const key = m ? decodeURIComponent(m[1]) : '';
+      if (files[key]) return route.fulfill({ status: 200, headers: Object.assign({ 'Content-Type': 'application/octet-stream' }, cors), body: files[key] });
+      return route.fulfill({ status: 404, headers: cors, body: '' });
+    }
     if (parsed.protocol === 'https:' && (parsed.hostname === 'www.gstatic.com' || parsed.hostname === 'gstatic.com') && parsed.pathname.startsWith('/firebasejs/')) {
       return route.fulfill({ status: 200, contentType: 'text/javascript', body: fakeSrc });
     }
@@ -180,6 +215,8 @@ async function auditOne(browser, base, app, width) {
   });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 200)));
+  /* PA_CONSOLE=1 — 칸(iframe)까지 콘솔 오류·경고를 찍는다(CSP 막힘 같은 것은 pageerror 에 안 잡힌다) */
+  if (process.env.PA_CONSOLE) page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('[콘솔]', m.type(), m.text().slice(0, 240)); });
   let navErr = null;
   try {
     /* 이알피는 폰에서 포털 타일을 거쳐 온 것(sso=1)이 아니면 포털로 돌려보낸다 */
@@ -207,7 +244,10 @@ async function auditOne(browser, base, app, width) {
 function line(r) {
   const m = r.m || {};
   const n = (v, w) => String(v ?? '?').padStart(w);
-  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${m.gate ? ' · ⚠잠금화면' : ''}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
+  const d = m.design;
+  const dz = !d ? '' : d.skipped ? ' · 디자인 안 켬' : ` · 디자인 ${d.offN}→${d.onN} 잃음 ${d.lostN} 밖 ${d.newOffN}` +
+    (d.lostN || d.newOffN ? ' ⚠ ' + [...d.lost, ...d.newOff].slice(0, 4).map(x => x.key).join(' | ') : '');
+  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${m.gate ? ' · ⚠잠금화면' : ''}${dz}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
 }
 
 async function main() {
@@ -239,6 +279,7 @@ async function main() {
   const file = path.join(outDir, only.length ? `result-${only.join('-')}.json` : 'result.json');
   fs.writeFileSync(file, JSON.stringify(results, null, 1));
   await browser.close(); srv.close();
+  if (designBad) { console.log(`⚠ 디자인을 켜자 줄거나 화면 밖으로 나간 것이 있는 화면 ${designBad}개 — 값만 바꿔야 한다(design-diff.js)`); process.exitCode = 1; }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e); process.exit(1); });

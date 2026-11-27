@@ -123,7 +123,7 @@ final class VisitSmsSender {
         return null;
     }
 
-    private static void sendOne(Context context, String to, String text) {
+    static void sendOne(Context context, String to, String text) {   // 통화 후 명함 문자(CardSms)도 이 길을 쓴다
         SmsManager manager = Build.VERSION.SDK_INT >= 31
                 ? context.getSystemService(SmsManager.class)
                 : SmsManager.getDefault();

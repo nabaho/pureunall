@@ -162,11 +162,24 @@ function buildSandbox(overrides = {}) {
 test('1. 공동기금·사내기금 단계별 필요서류 구성 및 간략 체크리스트 메일 생성', () => {
   const { ctx } = buildSandbox();
 
-  /* 공동기금 vs 사내기금 항목 구분 확인 */
+  /* 공동기금 vs 사내기금 항목 구분 · 3단계(설립준비·인가·등기) 구성 · 등기자 딱 2명 인감 명시 · 기금출연확인서 제외 확인 */
   const coopInka = ctx.sdcDocsFor('inka', '공동');
   const intraInka = ctx.sdcDocsFor('inka', '사내');
   assert.ok(coopInka.some((d) => d.id === 'inka_match'), '공동기금은 참여신청서 항목 포함');
-  assert.ok(!intraInka.some((d) => d.id === 'inka_match'), '사내기금은 공동기금 전용 참여신청서 제외');
+  assert.ok(coopInka.some((d) => d.id === 'prep_smecert') && coopInka.some((d) => d.id === 'prep_ei'), '공동기금 설립 시 중기확인서·고용보험명부 함께 요청');
+  assert.ok(!intraInka.some((d) => d.id === 'inka_match' || d.id === 'prep_smecert' || d.id === 'prep_ei' || d.id === 'prep_fin'), '사내기금은 공동기금 전용 서류(참여신청서·중기확인서·고용보험명부·손익계산서) 제외');
+  assert.ok(!coopInka.some((d) => /기금출연확인서/.test(d.title)), '설립·인가 요청서류에서 기금출연확인서 제외');
+  assert.ok(coopInka.some((d) => d.title === '[근로자측·사용자측 위원] 설립준비위원 재직증명서 (노 1부, 사 1부)'), '위원 재직증명서 노 1부·사 1부 명시');
+  assert.ok(coopInka.some((d) => d.title === '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 개인인감증명서 각 1부 (발급 3개월 이내 · 나머지 인원은 인감증명 불필요)'), '등기자 딱 2명만 인감증명서 필요 명시');
+  assert.ok(coopInka.some((d) => d.title === '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 주민등록등본 또는 초본 각 1부 (주소변동 포함·발급 3개월 이내 · 등기자 딱 2명만 필요)'), '등기자 딱 2명만 등·초본 필요 명시');
+  assert.ok(coopInka.some((d) => d.title === '[등기자 딱 2명만 — 사용자 1명, 근로자 1명] 신분증 사본 및 개인인감도장 각 1부 (나머지 인원은 인감도장 불필요)'), '등기자 딱 2명만 인감도장 필요 명시');
+  assert.ok(intraInka.some((d) => d.title === '[설립기업(회사)] 사업자등록증 사본 1부'), '사내기금은 설립기업(회사)으로 표기');
+
+  const inkaMail = ctx.sdcMailText(ctx.funds.F_COOP, { sid: 'S_A', name: '(주)가상테크' }, { phase: 'inka', docs: coopInka });
+  assert.match(inkaMail.body, /■ 1\. 기업 설립 시 준비서류/);
+  assert.match(inkaMail.body, /■ 2\. 노동부 설립인가 필요서류/);
+  assert.match(inkaMail.body, /■ 3\. 법인 설립등기 필요서류 — 등기자 딱 2명\(사용자 1명, 근로자 1명\)만 필요/);
+  assert.match(inkaMail.body, /※ 인감증명서·개인인감도장은 등기할 사람 딱 2명\(사용자 1명, 근로자 1명\)만 필요합니다\. 나머지 인원은 인감증명·인감도장이 필요 없습니다\./);
 
   const docs = ctx.sdcDocsFor('subsidy', '공동');
   const f = ctx.funds.F_COOP;
@@ -196,9 +209,9 @@ test('1. 공동기금·사내기금 단계별 필요서류 구성 및 간략 체
 
   assert.match(mail.subject, /보완·필요서류 요청/, '보완필요 항목이 있으면 제목에 보완 표시');
   assert.match(mail.body, /최담당 과장님 안녕하세요\./);
-  assert.match(mail.body, /\[ \] 1\. 중소기업확인서 \[보완요청: 유효기간 만료 \(2026-03-31\)\]/, '부연 설명 없이 제목과 보완 사유만 간결 반영');
-  assert.ok(!mail.body.includes('[ ] 1. 사업자등록증 사본'), '기업정보함 보유 사업자등록증은 요청 목록에서 기본 제외');
-  assert.ok(!mail.body.includes('법인등기부등본(말소사항 포함)'), '이미 확인완료된 등기부등본은 미제출 목록에서 제외');
+  assert.match(mail.body, /\[ \] 1\. \[참여기업\(회사\)\] 중소기업확인서 1부 \(유효기간 내\) \[보완요청: 유효기간 만료 \(2026-03-31\)\]/, '누구 서류인지 명시하고 보완 사유만 간결 반영');
+  assert.ok(!mail.body.includes('사업자등록증 사본'), '기업정보함 보유 사업자등록증은 요청 목록에서 기본 제외');
+  assert.ok(!mail.body.includes('법인등기부등본 1부'), '이미 확인완료된 등기부등본은 미제출 목록에서 제외');
   assert.ok(!mail.body.includes(' — '), '각 항목 뒤에 장황한 설명을 붙이지 않음');
   assert.match(mail.body, /확인 완료\(제출 불필요\): 사업자등록증, 법인등기부등본/, '제외된 기확인 서류 한 줄 안내');
   assert.match(mail.body, /요청 기한: 2026-11-28까지/);
@@ -225,6 +238,14 @@ test('2. 첨부파일명·메일제목 분류 및 공동·사내기금 사업장
   assert.equal(ctx.sdcClassifyKind('등기사항전부증명서(말소포함).pdf', ''), 'corpreg');
   assert.equal(ctx.sdcClassifyKind('기금출연확인서_직인날인.hwp', ''), 'contrib');
   assert.equal(ctx.sdcClassifyKind('scan001.pdf', '[회신] 사업자등록증 사본 송부'), 'bizreg');
+  assert.equal(ctx.sdcClassifyKind('이사_주민등록초본.pdf', ''), 'jumin');
+  assert.equal(ctx.sdcClassifyKind('이사_주민등록등본.pdf', ''), 'jumin');
+  assert.equal(ctx.sdcClassifyKind('건축물대장등본.pdf', ''), '', '건축물대장등본 등 단독 등본은 이사 주민등록등·초본으로 오분류하지 않음');
+  assert.equal(ctx.sdcClassifyKind('이사_신분증사본.jpg', ''), 'idcard');
+  assert.equal(ctx.sdcMapKindToDocId('inseal', 'inka', '공동'), 'reg_inseal');
+  assert.equal(ctx.sdcMapKindToDocId('jumin', 'inka', '공동'), 'reg_jumin', '설립 단계에서 주민등록초본은 reg_inseal이 아닌 reg_jumin으로 정확히 매핑');
+  assert.equal(ctx.sdcMapKindToDocId('idcard', 'inka', '공동'), 'reg_id', '설립 단계에서 신분증은 reg_id로 정확히 매핑');
+  assert.equal(ctx.sdcMapKindToDocId('jumin', 'chg', '공동'), 'chg_officer', '임원변경 단계에서는 통합 칸 chg_officer로 폴백 매핑');
 
   /* 이메일 · 사업자번호 · 상호 매칭 */
   assert.equal(ctx.sdcGuessSite('scan.pdf', '서류 제출', 'choi@vtech-test.kr', '최담당', sites, true), 'S_A');
@@ -418,7 +439,7 @@ test('4. 푸른메일함 스캔 → 자동 입수 체크 → 신뢰 발신자 �
   const sentDraft = sb.getOpenedMail();
   assert.ok(sentDraft, '푸른메일함 쓰기 창 호출');
   assert.equal(sentDraft.to, 'jung@haneul-test.kr');
-  assert.ok(!sentDraft.body.includes('사업자등록증 사본 —'), '방금 수동 확인한 사업자등록증은 재요청 체크리스트에서 제외');
+  assert.ok(!sentDraft.body.includes('사업자등록증 사본'), '방금 수동 확인한 사업자등록증은 재요청 체크리스트에서 제외');
 
   /* XSS 위험 키 거부 검증 */
   assert.equal(sb.ctx._sdcSafeKey("bad'key"), false);

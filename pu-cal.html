@@ -17,13 +17,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-back.js?v=5"></script>
 <script src="js/pu-work-core.js?v=1"></script>
@@ -4596,7 +4596,9 @@ var GIC = {
    ⚠ «새 일정»에만 둔다. 이미 있는 일정에서 바꾸면 반복 일정의 «이 날 것만» 고치는 것과 부딪히고,
      이알피에서 고친 줄이 구글로 따라갈 때(syncEdit) 반복 규칙을 잘못 덮을 수 있다 — 고치기는 구글에서.
    ⚠ 알림은 시간 일정에만(종일의 「몇 분 전」은 뜻이 없다). 「매주 (수요일)」처럼 고른 날을 글자에 보여 준다. */
-function 반복글(ymd){
+/* ⚠ 이름이 «반복고르기글» 인 까닭 — 위쪽 반복글(규칙)(RRULE → 「매주 월·수요일 반복」)과 같은 이름이면 «뒤에 온 이 함수가 이겨»
+     구글 반복 일정 상세의 「🔁」 줄이 [object Object] 로 나왔다(2026-11-22 고침). 같은 이름 함수를 다시 만들지 않는다 — tests/cal-no-duplicate-functions.test.js */
+function 반복고르기글(ymd){
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
   if(!m) return { D:"매일", W:"매주", M:"매월", Y:"매년" };
   var 요 = ["일","월","화","수","목","금","토"][new Date(+m[1], +m[2] - 1, +m[3]).getDay()];
@@ -4604,7 +4606,7 @@ function 반복글(ymd){
 }
 var 알림들 = [["", "알림 추가"], ["10", "10분 전"], ["30", "30분 전"], ["60", "1시간 전"], ["120", "2시간 전"], ["1440", "1일 전"]];
 function 반복알림줄(m){
-  var 글 = 반복글(m.date);
+  var 글 = 반복고르기글(m.date);
   var 반복 = '<select data-m="repeat" title="반복">'
     + [["", (typeof 폰 === "function" && 폰()) ? "반복 안함" : "반복 안 함"], ["DAILY", 글.D], ["WEEKLY", 글.W], ["MONTHLY", 글.M], ["YEARLY", 글.Y]].map(function(o){
         return '<option value="' + o[0] + '"' + (String(m.repeat || "") === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join("")
@@ -6692,7 +6694,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=51"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script>try{

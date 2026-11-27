@@ -13,7 +13,7 @@
 
   var CORPUS_DB = 'pu_pbox_corpus_v1';
   var WORKSPACE_DB = 'pu_pbox_workspace_v1';
-  var WORKSPACE_DB_VERSION = 2;
+  var WORKSPACE_DB_VERSION = 3;
   var RAW_LAW_BASE = 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/main/kr/';
   var PBOX_API_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/pboxApi';
   var CFG_LS_KEY = 'pu_pbox_sync_cfg_v1';
@@ -132,7 +132,8 @@
       privateDocs: mem.privateDocs.slice(),
       projects: mem.projects.slice(),
       threads: mem.threads.slice(),
-      recents: mem.recents.slice()
+      recents: mem.recents.slice(),
+      alerts: mem.alerts.slice()
     });
   }
 
@@ -232,7 +233,8 @@
       { name: 'private_docs', keyPath: 'id' },
       { name: 'projects', keyPath: 'id' },
       { name: 'threads', keyPath: 'id' },
-      { name: 'recents', keyPath: 'id' }
+      { name: 'recents', keyPath: 'id' },
+      { name: 'alerts', keyPath: 'id' }
     ], WORKSPACE_DB_VERSION);
   }
 
@@ -403,18 +405,42 @@
     return false;
   }
 
+  /* ── 타 계정(다른 직원) 소유·수집·업로드 사건 문서 원천 차단 가드 ── */
+  var SYSTEM_PUBLIC_OWNERS = new Set(['', 'system', 'system_sync', 'official', 'official_auto', 'builtin', 'seed', 'auto_sync', 'pbox_auto']);
+  function normStaffOwner(v) {
+    var s = String(v || '').trim();
+    return (!s || s === 'guest') ? '' : s;
+  }
+  function isForeignUserDoc(doc, activeUid) {
+    if (!doc || typeof doc !== 'object') return true;
+    var uid = normStaffOwner(activeUid);
+    var own = normStaffOwner(doc.ownerUid);
+    var ing = normStaffOwner(doc.ingestedBy);
+    if (own && !SYSTEM_PUBLIC_OWNERS.has(own) && own !== uid) return true;
+    if (ing && !SYSTEM_PUBLIC_OWNERS.has(ing) && ing !== uid) return true;
+    if (doc.userIngested === true || doc.docType === 'internal_case') {
+      if (!uid) return true;
+      if (own && own !== uid) return true;
+    }
+    return false;
+  }
+
   function rebuildEffectiveDocs() {
     var E = global.PuPBoxEngine;
     var C = global.PuPBoxCorpus;
     var seedDocs = (C && C.SEED_DOCS) ? C.SEED_DOCS : [];
     var basePub = mem.publicDocs.length ? mem.publicDocs : seedDocs;
-    var cleanPub = basePub.filter(function (d) { return !isDocTombstoned(d); });
-    var cleanPriv = mem.privateDocs.filter(function (d) { return !isDocTombstoned(d); });
+    var cleanPub = basePub.filter(function (d) {
+      return !isDocTombstoned(d) && !isForeignUserDoc(d, mem.uid);
+    });
+    var cleanPriv = mem.privateDocs.filter(function (d) {
+      return !isDocTombstoned(d) && !isForeignUserDoc(d, mem.uid);
+    });
     mem.docs = E ? E.deduplicateDocs(cleanPub, cleanPriv).docs : cleanPub.concat(cleanPriv);
     return mem.docs;
   }
 
-  /* ── 초기 부팅 및 계정 전환: 세션 세대(sessionGen) 보호 + UID별 개인 수집문서/작업공간 완전 분리 ── */
+  /* ── 초기 부팅 및 계정 전환: 세션 세대(sessionGen) 보호 + UID별 개인 수집문서/작업공간/알림 완전 분리 ── */
   function init(uid) {
     var myGen = ++sessionGen;
     var prevUid = mem.uid;
@@ -426,6 +452,7 @@
       mem.projects = [];
       mem.threads = [];
       mem.recents = [];
+      mem.alerts = [];
     }
     mem.uid = nextUid;
 
@@ -448,7 +475,8 @@
       cleanUid ? idbGetAll(wsDbPromise, 'private_docs') : Promise.resolve([]),
       cleanUid ? idbGetAll(wsDbPromise, 'projects') : Promise.resolve([]),
       cleanUid ? idbGetAll(wsDbPromise, 'threads') : Promise.resolve([]),
-      cleanUid ? idbGetAll(wsDbPromise, 'recents') : Promise.resolve([])
+      cleanUid ? idbGetAll(wsDbPromise, 'recents') : Promise.resolve([]),
+      cleanUid ? idbGetAll(wsDbPromise, 'alerts') : Promise.resolve([])
     ]).then(function (res) {
       /* 복원 도중 다른 계정으로 바뀌었거나 로그아웃되었다면 지연된 복원 결과를 즉시 폐기 */
       if (myGen !== sessionGen || mem.uid !== nextUid) {
@@ -462,6 +490,7 @@
       var savedProjects = res[4] || [];
       var savedThreads = res[5] || [];
       var savedRecents = res[6] || [];
+      var savedAlerts = res[7] || [];
 
       if (!hasIdb && cleanUid && memByUid.has(cleanUid)) {
         var snap = memByUid.get(cleanUid);
@@ -469,17 +498,21 @@
         savedProjects = (snap.projects || []).slice();
         savedThreads = (snap.threads || []).slice();
         savedRecents = (snap.recents || []).slice();
+        savedAlerts = (snap.alerts || []).slice();
       }
 
       for (var m = 0; m < savedMeta.length; m++) {
         if (savedMeta[m].key === 'syncMeta') {
           mem.syncMeta = Object.assign({}, mem.syncMeta, savedMeta[m].value || {});
-        } else if (savedMeta[m].key === 'alerts') {
-          mem.alerts = Array.isArray(savedMeta[m].value) ? savedMeta[m].value : [];
         } else if (savedMeta[m].key === 'deletedDocKeys' && Array.isArray(savedMeta[m].value)) {
           savedMeta[m].value.forEach(function (k) { mem.deletedDocKeys.add(k); });
         }
       }
+      mem.alerts = cleanUid
+        ? savedAlerts.filter(function (al) { return al && (!al.ownerUid || al.ownerUid === nextUid); })
+            .sort(function (a, b) { return (b.at || 0) - (a.at || 0); })
+            .slice(0, 40)
+        : [];
 
       if (hasIdb) {
         mem.laws.clear();
@@ -490,33 +523,38 @@
         }
       }
 
-      /* 과거 버전에 corpus DB로 잘못 들어간 로컬 개인 수집문서(userIngested) 및 구버전 가공·요약 시드 캐시는 공통 코퍼스·IndexedDB에서 즉시 영구 정화 */
+      /* 과거 버전에 corpus DB로 잘못 들어간 공용 알림('alerts')·로컬 개인 수집문서(userIngested)·타 직원 문서 및 구버전 가공·요약 시드 캐시는 공통 코퍼스·IndexedDB에서 즉시 영구 정화 */
       var cDb = getCorpusDb();
+      idbDelete(cDb, 'meta', 'alerts');
       var cleanSavedPublic = savedPublicDocs.filter(function (d) {
-        if (!d || d.userIngested || isDocTombstoned(d)) return false;
-        if (E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) {
+        if (!d) return false;
+        if (d.userIngested || isForeignUserDoc(d, nextUid) || (E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d))) {
           if (d.id) idbDelete(cDb, 'docs', d.id);
           return false;
         }
+        if (isDocTombstoned(d)) return false;
         return true;
       });
       var basePublic = !hasIdb && mem.publicDocs.length
         ? mem.publicDocs.filter(function (d) {
-            return !d.userIngested && !isDocTombstoned(d) && !(E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d));
+            return !d.userIngested && !isDocTombstoned(d) && !isForeignUserDoc(d, nextUid) && !(E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d));
           })
         : cleanSavedPublic;
 
       mem.publicDocs = E.deduplicateDocs(seedDocs, basePublic).docs;
       mem.privateDocs = cleanUid
-        ? savedPrivateDocs.filter(function (d) { return !isDocTombstoned(d); })
+        ? savedPrivateDocs.filter(function (d) { return !isDocTombstoned(d) && !isForeignUserDoc(d, nextUid); })
         : [];
       rebuildEffectiveDocs();
 
       mem.projects = cleanUid
-        ? savedProjects.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })
+        ? savedProjects.filter(function (p) { return p && (!p.ownerUid || p.ownerUid === nextUid); })
+            .sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })
         : [];
       if (cleanUid) {
-        var sortedInitThreads = savedThreads.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+        var sortedInitThreads = savedThreads
+          .filter(function (t) { return t && (!t.ownerUid || t.ownerUid === nextUid); })
+          .sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
         mem.threads = sortedInitThreads.slice(0, 60);
         if (sortedInitThreads.length > 60) {
           var initWsDb = getWorkspaceDb();
@@ -658,6 +696,94 @@
 
       mem.laws.set(cacheKey, parsed);
       idbPut(getCorpusDb(), 'laws', parsed);
+      return parsed;
+    });
+  }
+
+  var lawHistoryCache = new Map();
+  var lawRevisionCache = new Map();
+  var SAFE_GIT_SHA_RE = /^[0-9a-f]{7,40}$/i;
+
+  /* ── 과거 법령(구법·연혁) 개정 이력 조회 (legalize-kr GitHub 커밋 히스토리) ── */
+  function fetchLawHistory(dir, fileName) {
+    var d = String(dir || '').trim();
+    if (!d) return Promise.reject(new Error('법령명이 비어 있습니다.'));
+    var fName = fileName || '법률.md';
+    if (!/\.md$/.test(fName)) fName += '.md';
+    var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (x) { return x.dir === d; }) || null;
+    if (!fileName && fam && fam.primaryFile) fName = fam.primaryFile;
+    var histKey = d + '/' + fName;
+    if (lawHistoryCache.has(histKey)) {
+      return Promise.resolve(lawHistoryCache.get(histKey));
+    }
+    var relPath = 'kr/' + d + '/' + fName;
+    var apiUrl = 'https://api.github.com/repos/legalize-kr/legalize-kr/commits?path=' +
+      encodeURIComponent(relPath) + '&per_page=30';
+    return fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' } }).then(function (res) {
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 429) {
+          throw new Error('GitHub 연혁 조회 한도 초과 — 아래 법제처 공식 연혁 바로가기를 이용해 주세요.');
+        }
+        throw new Error('구법 이력 조회 실패 (HTTP ' + res.status + ')');
+      }
+      return res.json();
+    }).then(function (commits) {
+      if (!Array.isArray(commits)) return [];
+      var list = commits.filter(function (c) {
+        return c && typeof c.sha === 'string' && SAFE_GIT_SHA_RE.test(c.sha);
+      }).map(function (c, i) {
+        var rawDate = (c.commit && c.commit.author && c.commit.author.date) ||
+                      (c.commit && c.commit.committer && c.commit.committer.date) || '';
+        var ymd = rawDate ? String(rawDate).slice(0, 10) : '';
+        var firstLine = String((c.commit && c.commit.message) || '').split('\n')[0].trim();
+        return {
+          sha: c.sha,
+          shortSha: c.sha.slice(0, 8),
+          date: ymd,
+          isLatest: i === 0,
+          label: (ymd || '연혁') + (firstLine ? ' · ' + firstLine : '')
+        };
+      });
+      lawHistoryCache.set(histKey, list);
+      return list;
+    });
+  }
+
+  /* ── 특정 시점 과거 법령(구법) 원문 가져오기 (현행 법령 캐시와 완전 분리) ── */
+  function fetchLawRevision(dir, fileName, sha, revMeta) {
+    var d = String(dir || '').trim();
+    var cleanSha = String(sha || '').trim();
+    if (!d) return Promise.reject(new Error('법령명이 비어 있습니다.'));
+    if (!SAFE_GIT_SHA_RE.test(cleanSha)) return Promise.reject(new Error('유효하지 않은 법령 개정 식별자입니다.'));
+    var fName = fileName || '법률.md';
+    if (!/\.md$/.test(fName)) fName += '.md';
+    var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (x) { return x.dir === d; }) || null;
+    if (!fileName && fam && fam.primaryFile) fName = fam.primaryFile;
+    var revKey = cleanSha + ':' + d + '/' + fName;
+    if (lawRevisionCache.has(revKey)) {
+      return Promise.resolve(lawRevisionCache.get(revKey));
+    }
+    var url = 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/' +
+      encodeURIComponent(cleanSha) + '/kr/' + encodeURIComponent(d) + '/' + encodeURIComponent(fName);
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error('과거 구법 원문 호출 실패 (HTTP ' + res.status + ')');
+      return res.text();
+    }).then(function (mdText) {
+      var parsed = global.PuPBoxEngine.parseLawMarkdown(mdText, {
+        dir: d,
+        fileName: fName,
+        title: fam ? fam.title : d,
+        dept: fam ? fam.dept : ''
+      });
+      parsed.cacheKey = revKey;
+      parsed.isHistorical = true;
+      parsed.revisionSha = cleanSha;
+      parsed.revisionDate = (revMeta && revMeta.date) || parsed.effectiveDate || '';
+      parsed.revisionLabel = (revMeta && revMeta.label) || (parsed.revisionDate + ' 개정본');
+      parsed.fetchedAt = new Date().toISOString();
+      lawRevisionCache.set(revKey, parsed);
       return parsed;
     });
   }
@@ -884,6 +1010,7 @@
       if (!d || typeof d !== 'object') return false;
       if (String(d.body || '').trim().length < 20) return false;
       if (isPublicScope && isMemberOnlyClientDoc(d)) return false;
+      if (isPublicScope && isForeignUserDoc(d, activeOwner)) return false;
       if (isPublicScope && E.isDeprecatedSyntheticDoc && E.isDeprecatedSyntheticDoc(d)) return false;
       if (opts.overrideDeleted) {
         if (d.id) mem.deletedDocKeys.delete(String(d.id));
@@ -1643,7 +1770,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -1752,7 +1879,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -1851,7 +1978,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -2029,7 +2156,7 @@
           var merged = 0;
           if (mapped.length) {
             var st = addDocuments(mapped, {
-              scope: 'public',
+              scope: 'private',
               shareConfirmed: false,
               expectedGen: startGen,
               expectedUid: startUid
@@ -2160,7 +2287,7 @@
         var merged = 0;
         if (mapped.length) {
           var st = addDocuments(mapped, {
-            scope: 'public',
+            scope: 'private',
             shareConfirmed: false,
             expectedGen: startGen,
             expectedUid: startUid
@@ -2363,11 +2490,14 @@
       });
     var rawStyle = String(clean.workflowStyle || (prev && prev.workflowStyle) || 'lbox');
     var safeStyle = (rawStyle === 'pureun' || rawStyle === 'lbox') ? rawStyle : 'lbox';
+    var rawStance = String(clean.stance !== undefined ? clean.stance : ((prev && prev.stance) || 'neutral'));
+    var safeStance = (rawStance === 'worker' || rawStance === 'employer') ? rawStance : 'neutral';
     var th = {
       id: String(clean.id || ('th-' + now + '-' + Math.random().toString(36).slice(2, 7))),
       ownerUid: mem.uid,
       title: scrubThreadField(rawTitleForNames || '법률 리서치 작업') || '법률 리서치 작업',
       mode: String(clean.mode || (prev && prev.mode) || 'auto'),
+      stance: safeStance,
       query: scrubThreadField(rawQueryForNames),
       answer: scrubThreadField(clean.answer !== undefined ? clean.answer : ((prev && prev.answer) || '')),
       sourceText: scrubThreadField(rawSrcForNames),
@@ -2376,6 +2506,7 @@
       workflowStyle: safeStyle,
       engineLabel: String(clean.engineLabel || (prev && prev.engineLabel) || 'P박스 하이브리드 엔진'),
       verification: safeVf,
+      hallucinationBlockedCount: Number(clean.hallucinationBlockedCount !== undefined ? clean.hallucinationBlockedCount : ((prev && prev.hallucinationBlockedCount) || 0)) || 0,
       attachedTitles: safeAttached,
       retrievedDocIds: safeRetrievedIds,
       history: safeHistory,
@@ -2518,15 +2649,29 @@
   }
 
   function addAlert(al) {
+    var now = Date.now();
     var item = {
-      id: 'al-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      id: 'al-' + now + '-' + Math.random().toString(36).slice(2, 7),
+      ownerUid: mem.uid,
+      at: now,
       date: global.PuPBoxEngine.todayKstYmd(),
       kind: al.kind || 'info',
       title: al.title || '',
       detail: al.detail || ''
     };
-    mem.alerts = [item].concat(mem.alerts).slice(0, 40);
-    idbPut(getCorpusDb(), 'meta', { key: 'alerts', value: mem.alerts });
+    var allNext = [item].concat(mem.alerts);
+    var evictedAlerts = allNext.slice(40);
+    mem.alerts = allNext.slice(0, 40);
+    saveUidSnapshot();
+    if (sanitizeUid(mem.uid)) {
+      var wsDbAl = getWorkspaceDb();
+      idbPut(wsDbAl, 'alerts', item);
+      for (var ea = 0; ea < evictedAlerts.length; ea++) {
+        if (evictedAlerts[ea] && evictedAlerts[ea].id) {
+          idbDelete(wsDbAl, 'alerts', evictedAlerts[ea].id);
+        }
+      }
+    }
     return item;
   }
 
@@ -2534,7 +2679,7 @@
     if (skipAutoFetch || typeof fetch !== 'function') return Promise.resolve();
     var E = global.PuPBoxEngine;
     if (!E || typeof E.extractCitedLawTargets !== 'function') return Promise.resolve();
-    var targets = E.extractCitedLawTargets(answerText, idxList).slice(0, 4);
+    var targets = E.extractCitedLawTargets(answerText, idxList).slice(0, 16);
     var missing = targets.filter(function (t) { return !mem.laws.has(t.dir + '/' + t.fileName); });
     if (!missing.length) return Promise.resolve();
     return Promise.all(missing.map(function (t) {
@@ -2593,11 +2738,14 @@
         kind: 'doc',
         title: safeSourceFileName || '검토 대상 문서 원문',
         caseNo: '검토원문',
-        body: safeSourceText.slice(0, 5000)
+        body: safeSourceText.slice(0, 40000)
       });
     }
 
-    var searchSeed = safeSourceText ? (query + ' ' + safeSourceText.slice(0, 600)) : query;
+    var searchSeedExcerpt = (safeSourceText && E && typeof E.extractLegalEvidenceExcerpt === 'function')
+      ? E.extractLegalEvidenceExcerpt(safeSourceText, { query: query, maxChars: 800, docKind: 'attachment', multiline: false })
+      : safeSourceText.slice(0, 600);
+    var searchSeed = safeSourceText ? (query + ' ' + searchSeedExcerpt) : query;
     var searchFn = (E && typeof E.searchUnifiedAllInOne === 'function') ? E.searchUnifiedAllInOne : E.searchCorpus;
     var searchRes = searchFn(searchSeed, {
       docs: snapshotDocs,
@@ -2610,9 +2758,12 @@
       ? searchRes.balancedDocs
       : searchRes.docs;
 
+    var rawReqStance = String(params.stance || 'neutral');
+    var reqStance = (rawReqStance === 'worker' || rawReqStance === 'employer') ? rawReqStance : 'neutral';
     var prompt = scrubText(E.buildRagPrompt({
       query: query,
       mode: params.mode || 'auto',
+      stance: reqStance,
       workflow: wfObj,
       attached: attached,
       retrievedDocs: ragDocs,
@@ -2634,16 +2785,33 @@
       }
     }
 
-    function finalizeWithVerification(answerText, engineLabel) {
+    function finalizeWithVerification(answerText, engineLabel, isCloudAi) {
       assertSameSession();
       var safeAnswer = scrubText(answerText);
       return preloadCitedLawsIfNeeded(safeAnswer, idxList, params.forceOffline === true).then(function () {
         assertSameSession();
-        var verification = E.verifyCitations(safeAnswer, {
-          docs: snapshotDocs,
-          loadedLaws: Array.from(mem.laws.values()),
-          lawIndex: idxList
-        });
+        var loadedNow = Array.from(mem.laws.values());
+        var verification;
+        var hallucinationBlockedCount = 0;
+        if (isCloudAi) {
+          if (!E || typeof E.enforceZeroHallucinationGuard !== 'function') {
+            throw new Error('할루시네이션 차단 관문 모듈이 로드되지 않아 클라우드 AI 응답을 안전하게 검증할 수 없습니다.');
+          }
+          var guard = E.enforceZeroHallucinationGuard(safeAnswer, {
+            docs: snapshotDocs,
+            loadedLaws: loadedNow,
+            lawIndex: idxList
+          });
+          safeAnswer = guard.text;
+          verification = guard.verification;
+          hallucinationBlockedCount = guard.blockedCount || 0;
+        } else {
+          verification = E.verifyCitations(safeAnswer, {
+            docs: snapshotDocs,
+            loadedLaws: loadedNow,
+            lawIndex: idxList
+          });
+        }
         var existingTh = params.threadId
           ? mem.threads.find(function (x) { return x.id === String(params.threadId); })
           : null;
@@ -2667,10 +2835,12 @@
           ownerUid: reqUid,
           title: computedTitle,
           mode: params.mode || 'auto',
+          stance: reqStance,
           query: query,
           answer: safeAnswer,
           engineLabel: engineLabel,
           verification: verification,
+          hallucinationBlockedCount: hallucinationBlockedCount,
           attachedTitles: attached.map(function (a) { return a.title || a.caseNo; }),
           retrievedDocIds: ragDocs.slice(0, 8).map(function (d) { return d.id; }),
           history: prevHistory
@@ -2684,7 +2854,8 @@
         return {
           thread: saved,
           searchRes: searchRes,
-          verification: verification
+          verification: verification,
+          hallucinationBlockedCount: hallucinationBlockedCount
         };
       });
     }
@@ -2693,13 +2864,14 @@
       var offlineAns = E.synthesizeOfflineAnswer({
         query: query,
         mode: params.mode || 'auto',
+        stance: reqStance,
         workflow: wfObj,
         attached: attached,
         retrievedDocs: ragDocs,
         retrievedArticles: searchRes.articles,
         retrievedLawFamilies: searchRes.lawFamilies
       });
-      return finalizeWithVerification(offlineAns, '무료 내장 법률합성 엔진 (₩0 · 원문 기반)');
+      return finalizeWithVerification(offlineAns, '무료 내장 법률합성 엔진 (₩0 · 원문 기반)', false);
     }
 
     return global.PuAiCall.ask([{ text: prompt }], {
@@ -2711,13 +2883,14 @@
       assertSameSession();
       var txt = global.PuAiCall.textOf(reply);
       if (!txt) throw new Error('빈 응답');
-      return finalizeWithVerification(txt, '푸른 AI 대리인 + P박스 인용검증 (원문 RAG)');
+      return finalizeWithVerification(txt, '푸른 AI 대리인 + P박스 할루시네이션 차단관문 (원문 RAG)', true);
     }).catch(function (err) {
       if (err && err.staleSession) throw err;
       assertSameSession();
       var fallbackAns = E.synthesizeOfflineAnswer({
         query: query,
         mode: params.mode || 'auto',
+        stance: reqStance,
         workflow: wfObj,
         attached: attached,
         retrievedDocs: ragDocs,
@@ -2727,7 +2900,7 @@
       var label = err && err.overBudget
         ? '무료 내장 법률합성 엔진 (월 AI 한도 보호 모드 · ₩0)'
         : '무료 내장 법률합성 엔진 (오프라인 자동전환 · ₩0)';
-      return finalizeWithVerification(fallbackAns, label);
+      return finalizeWithVerification(fallbackAns, label, false);
     });
   }
 
@@ -2742,6 +2915,7 @@
     mem.projects = [];
     mem.threads = [];
     mem.recents = [];
+    mem.alerts = [];
     mem.serverSharedState = { connected: false, backend: '', totalSharedActive: 0, lastAutoSyncAt: '', lastSyncAttemptAt: '' };
     rebuildEffectiveDocs();
   }
@@ -2758,6 +2932,7 @@
     mem.projects = [];
     mem.threads = [];
     mem.recents = [];
+    mem.alerts = [];
     mem.serverSharedState = { connected: false, backend: '', totalSharedActive: 0, lastAutoSyncAt: '', lastSyncAttemptAt: '' };
     rebuildEffectiveDocs();
 
@@ -2802,6 +2977,7 @@
     hasSupabase: hasSupabase,
     getStateSummary: getStateSummary,
     getDocs: function () { return mem.docs.slice(); },
+    getPrivateDocs: function () { return mem.privateDocs.slice(); },
     getDocById: function (id) { return mem.docs.find(function (d) { return d.id === id; }) || null; },
     getLoadedLaws: function () { return Array.from(mem.laws.values()); },
     getCachedLaw: function (dir, fileName) { return mem.laws.get(dir + '/' + (fileName || '법률.md')) || null; },
@@ -2810,6 +2986,14 @@
     getRecents: function () { return mem.recents.slice(); },
     getAlerts: function () { return mem.alerts.slice(); },
     fetchLaw: fetchLaw,
+    fetchLawHistory: fetchLawHistory,
+    fetchLawRevision: fetchLawRevision,
+    preloadCitedLaws: function (text, offlineOnly) {
+      var idxList = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
+        ? global.PuPBoxLawIndex.list()
+        : [];
+      return preloadCitedLawsIfNeeded(String(text || ''), idxList, offlineOnly === true);
+    },
     syncCoreLaborLaws: syncCoreLaborLaws,
     runIncrementalSync: runIncrementalSync,
     addDocuments: addDocuments,

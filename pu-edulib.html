@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>강의자료</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🎓</text></svg>">
+<!-- ═══════════════════════════════════════════════════════
+     강의자료 (pu-edulib.html) — 2026-11-19 · 11-20 «법정교육자료함»에서 이름 바꿈(대표 「법정교육 제목을 강의자료로」)
+     대표 지시 「내컴퓨터 및 푸른메일함 전체 찾아서 강의 종류별로 대시보드 만들고 강의종류 및 날짜별로 정리해줘.
+       강의자료 및 종류 등 처리된것 보고 다른노무사가 참고할 수 있게 한번에 여러종류 보고 창을보고 비교하고 검토해서
+       추가할수 있게 가급적 원본을 유지해라. 새앱으로 만들고 자료함으로 만들어라」
+
+     ★ 하는 일: 강의자료(성희롱 예방·장애인 인식개선·개인정보·산업안전보건·퇴직연금 등)를 «종류 × 강의일»로 모아 보고,
+       여러 건을 골라 «나란히» 또는 «새 창으로 각각» 열어 비교하고, 검토 메모를 남기고, 새 자료를 더한다.
+     ★ 원본은 바꾸지 않는다 — 올린 파일은 받은 바이트 그대로 창고(Storage edulib/{id}/{원래 이름})에 둔다.
+       변환·압축·이름 바꾸기를 하지 않는다. 창고 규칙도 «새로 쓰기만», 지우기 금지다.
+     ★ 원본이 어디 있나(store): cloud = 자료함 창고 · pc = 아직 PC 에만(목록만 먼저) · mail = 메일함 첨부(관리자만)
+     ★ 쓰는 자리(관문 강제 모드, PROGRAMS.edulib.writeContracts): edulib/items/{id} · edulib/notes/{itemId}/{id} · edulib/cats/{id}(사람이 더한 강의 종류)
+     ★ 2026-11-21 대표 「대시보드로 넣어달라. 이부분도 데시보드로 해달라. 그리고 새로운 강의가 생길수 있으니 + 추가기능도 만들어달라.
+       또한 메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게 해달라」 → 대표 선택 «한 화면 대시보드»:
+       · 한눈에 — 종류 × 연도 표(종류를 줄로, 연도를 칸으로 · 옛날 해는 한 칸)라 옆으로 넘치지 않는다 · 끝에 «＋ 새 강의 종류» 카드
+       · 자료 — 종류별 카드 대시보드가 기본(«☰ 표»로 지금 표 그대로) · 줄마다 ☐ + 번호
+       · 메일에서 찾기 — 서버가 매일 보낸 메일의 강의자료를 넣은 상태(edulib/sweep, 서버만 쓴다)와 «지금 정리»
+     ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 대표·관리자 화면에서만)
+     ⚠ 재직 직원 모두 연다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만.
+     ⚠ 메일 찾기는 관리자만 — 메일함(?view=mail)이 2026-09-23 부터 관리자 전용이라 그 뜻을 따른다.
+       메일은 «읽음» 표시를 건드리지 않고(peek) 고른 첨부만 자료함으로 «복사»한다. 메일 자체는 그대로 둔다.
+     ⚠ 강의일은 «추정»일 수 있다 — 이름·폴더에서 찾은 것(추정)과 사람이 정한 것(확정)을 화면에서 가른다.
+     ═══════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca;
+}
+*{box-sizing:border-box}
+body{word-break:keep-all;overflow-wrap:anywhere;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--mute)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--blue);border-color:var(--blue);color:#ffffff}
+button.sm{padding:3px 9px;font-size:12px}
+button.dng{color:var(--red);border-color:var(--red-line)}
+input,select,textarea{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+textarea{width:100%;resize:vertical}
+input[type=checkbox]{width:18px;height:18px;margin:0;vertical-align:middle;cursor:pointer}
+a{color:var(--blue-d);text-decoration:none}
+.sp{flex:1 1 auto}
+.hint{color:var(--mute);font-size:12px}
+.chip{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--line);color:var(--ink2);font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
+
+#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+#head .top{display:flex;align-items:center;gap:10px;padding:8px 16px}
+#head h1{margin:0;font-size:17px;white-space:nowrap}
+#head .sub{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:4px;padding:0 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--ink2)}
+.tabs button.on{border-bottom-color:var(--blue);color:var(--blue-d);font-weight:700}
+#lock{display:none;max-width:520px;margin:60px auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center}
+main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
+.pane{display:none}
+.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.sec{font-weight:700;margin:0 0 8px;font-size:14px}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ── 한눈에(대시보드) ── */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;white-space:normal;color:var(--ink)}
+.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--mute);font-size:12px;white-space:nowrap}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.cat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;white-space:normal}
+.cat:hover{border-color:var(--blue-line);background:var(--blue-bg)}
+.cat.legal{border-left:4px solid var(--blue)}
+.cat .nm{display:flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap;min-width:0}
+.cat .nm>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.cat .nm .tag{flex:0 0 auto}
+.cat .nm .n{margin-left:auto;flex:0 0 auto;font-size:18px;font-variant-numeric:tabular-nums}
+.cat .ln{display:flex;gap:10px;color:var(--mute);font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat.zero .nm .n{color:var(--mute)}
+.tag{display:inline-block;padding:0 6px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;line-height:18px}
+.tag.legal{background:var(--blue);color:#ffffff;border:1px solid var(--blue)}
+.tag.review{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line)}
+.tag.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.tag.old{background:var(--line);color:var(--ink2)}
+.tag.pc{background:var(--bg);color:var(--ink2);border:1px solid var(--line2)}
+.tag.cloud{background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
+.tag.mail{background:var(--card);color:var(--ink2);border:1px dashed var(--mute)}
+.tag.pii{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.tag.est{background:none;color:var(--mute);border:1px dashed var(--line2)}
+/* 종류 카드 — 단추 노릇 칸(role=button). 사람이 더한 종류는 점선 테두리 + ✎ · «＋ 새 강의 종류»는 점선 빈 카드 */
+.cat:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.cat.mine{border-style:dashed}
+.cat.mine .ln:last-child{padding-right:30px}
+/* 사람이 더한 종류 — ✎ 는 카드(단추 노릇 칸) «밖»의 형제 단추, 카드 오른쪽 아래에 얹는다 */
+.catw{position:relative;display:grid;grid-template-columns:minmax(0,1fr);min-width:0}   /* 칸이 이름 길이만큼 벌어지지 않게(폰 두 칸) */
+.catw>.cat{height:100%}
+.catw>.ced{position:absolute;right:8px;bottom:6px;padding:1px 7px;font-size:12px;line-height:18px;border-radius:6px}
+.cat.add{border:2px dashed var(--line2);background:var(--bg);color:var(--blue-d);font-weight:700;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.cat.add .ln{font-weight:400}
+.cat.add:hover{border-color:var(--blue);background:var(--blue-bg)}
+/* 종류 × 연도 — 칸 너비를 표 안에서 나눠 옆으로 넘치지 않는다(폰에서만 옆으로 민다) · 진할수록 많다 */
+.mx{overflow-x:auto}
+.mx table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%;table-layout:fixed}
+.mx col.mk{width:190px}
+.mx col.ms{width:56px}
+.mx col.mo{width:56px}   /* «~2016»(그 이전을 모은 칸)은 다섯 글자 — 짓눌리지 않게 */
+.mx th,.mx td{border:1px solid var(--line);padding:4px 4px;white-space:nowrap;text-align:center;overflow:hidden;text-overflow:ellipsis}
+.mx th{background:var(--bg);color:var(--ink2);font-weight:600}
+.mx th.mk{text-align:left;padding:4px 8px}
+.mx th.mk .one{display:flex;align-items:center;gap:6px;min-width:0}
+.mx th.mk .one>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mx td.c{cursor:pointer}
+.mx td.h1{background:var(--blue-bg)}
+.mx td.h2{background:var(--blue-line)}
+.mx td.h3{background:var(--blue);color:#ffffff;font-weight:700}
+.mx td.c:hover{outline:2px solid var(--blue-d);outline-offset:-2px}
+.mx td.z{color:var(--mute)}
+.mx td.ms{font-weight:600}
+.mx tr.mt th,.mx tr.mt td{background:var(--bg);font-weight:600}
+/* 법정교육 자료 / 법정교육 외 자료 (2026-11-22) — 한눈에는 종류 카드(두 덩어리) 다음 종류 × 연도. 자료함도 같은 두 덩어리.
+   «왼쪽»은 이알피 왼쪽 메뉴 모양의 .sb 가 맡는다(아래 «왼쪽 메뉴») — 카드 칸은 본문 너비를 다 쓴다 */
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.dgrid>.card{margin-bottom:0;min-width:0}
+.lgrp{border-radius:10px;padding:8px}
+.lgrp+.lgrp{margin-top:10px}
+.lgrp.legal{background:var(--blue-bg)}
+.lgrp.other{background:var(--bg)}
+.lgh{display:flex;align-items:center;gap:8px;margin:0 0 6px;white-space:nowrap;min-width:0}
+.lgh .lgt{font-weight:700;flex:0 0 auto}
+.lgrp.legal .lgt{color:var(--blue-d)}
+.lgh .lgm{color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lgh .sm{margin-left:auto;flex:0 0 auto}
+.dcat .cats{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.dcat .cat .ln{gap:8px}
+.mx tr.mg th{background:var(--card);text-align:left;padding:6px 8px;font-weight:700;color:var(--ink2)}
+.mx tr.mg.legal th{color:var(--blue-d)}
+.mx tr.mg th .hint{font-weight:400;margin-left:6px}
+.lsec{display:flex;align-items:center;gap:8px;margin:14px 0 8px;padding:6px 10px;border-radius:8px;white-space:nowrap;font-weight:700;min-width:0}
+.lsec.legal{background:var(--blue-bg);color:var(--blue-d)}
+.lsec.other{background:var(--bg);color:var(--ink2)}
+.lsec .lgm{font-weight:400;color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#list>.lsec:first-child,#list>label.phone-only+.lsec{margin-top:0}
+/* 비슷한 강의(내용 지문) — 목록 ↺ · 자세히 칸 · 관리자 일괄 만들기 (2026-11-22) */
+.simb{color:var(--blue-d);font-weight:700;margin-right:4px;cursor:help}
+.simsec{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line)}
+.simlast{margin:2px 0 6px;padding:6px 8px;border-radius:8px;background:var(--blue-bg);color:var(--ink);line-height:1.5}   /* 한 문장 안내 — 표 칸이 아니라 줄을 넘겨도 된다(몇 % 가 잘리지 않게) */
+.simr{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0;padding:3px 2px;border-radius:6px}
+.simr.on{background:var(--blue-bg)}
+.simr .sd{flex:0 0 auto;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+.simr .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.simr .sp2{flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink2)}
+.simrun{display:flex;align-items:center;gap:10px;margin-top:8px;white-space:nowrap;min-width:0}
+.simrun .hint{overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* ══ 왼쪽 메뉴 — 이알피 왼쪽 메뉴(css/pu-erp.css 의 .sb·.sb-grp-h·.sb-menu-item)와 «같은 모양값» (대표 지시 2026-11-22 「대시보드 캡쳐처럼 만들어라」) ══
+   ★ PC(769px~)에서만 왼쪽에 붙는다 — 폰은 그대로(한눈에 종류 카드가 같은 일을 한다).
+   ★ 한눈에 · 전체 자료 · ⚖ 법정교육 자료 ▾ · 📘 법정교육 외 자료 ▾ · ＋ 새 강의 종류 — 종류를 누르면 자료함에서 그 종류만, 묶음 이름을 누르면 그 묶음만, ▾ 는 접기.
+   ★ 색은 이알피와 같은 짙은 남색 바탕(밝은·어두운 화면 모두). 이알피 메뉴 색 가운데 팔레트(5계열 27색) 밖인 것은 «팔레트 안 가장 가까운 색»으로 —
+     tests/color-palette-apps.test.js 예외 목록은 늘리지 않는다. 글자 대비는 모두 4.5:1 넘음 */
+.sb{display:none}
+/* has-sb 는 «재직 직원으로 들어온 뒤»에만 붙는다(js: sbOn) — 로그인 전·잠금 화면에는 빈 메뉴를 띄우지 않는다 */
+@media (min-width:769px){
+  body.has-sb{padding-left:230px}
+  body.has-sb .sb{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;width:230px;z-index:30;background:#1e293b;color:#cbd5e1;overflow:hidden}
+}
+.sb-logo{padding:12px 16px 10px;border-bottom:1px solid #475569;color:#ffffff;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #475569;min-width:0}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0}
+.sb-user-info{min-width:0}
+.sb-user-info .n{color:#ffffff;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-info .r{color:#60a5fa;font-size:11px;white-space:nowrap}
+.sb-nav{flex:1;overflow-y:auto;padding:6px 0}
+.sb-nav::-webkit-scrollbar{width:4px}
+.sb-nav::-webkit-scrollbar-thumb{background:#475569;border-radius:2px}
+.sb-sep{height:1px;background:#475569;margin:6px 12px}
+.sb-grp-h{display:flex;align-items:center;padding:10px 12px 8px 6px;min-width:0}
+.sb-grp-h:hover,.sb-grp-h.on{background:#475569}
+.sb-grp-h.on{box-shadow:inset 3px 0 0 #60a5fa}
+.sb-grp-h .arrow{width:24px;height:24px;flex:0 0 auto;color:#94a3b8;font-size:10px;background:none;border:0;padding:0;cursor:pointer;border-radius:4px}
+.sb-gname{flex:1;display:flex;align-items:center;min-width:0;background:none;border:0;padding:0;cursor:pointer;text-align:left;font-family:inherit;color:inherit}
+.sb-gname .icon{font-size:15px;margin:0 8px 0 2px;flex:0 0 auto}
+.sb-gname .name{flex:1;min-width:0;color:#bfdbfe;font-size:14px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-gname .count{background:#475569;color:#e2e8f0;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.sb-grp-h.on .sb-gname .count,.sb-grp-h:hover .sb-gname .count{background:#1e293b}
+.sb-menu{padding:0 8px 4px}
+.sb-row{position:relative}
+.sb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px 7px 22px;border-radius:4px;cursor:pointer;font-size:12px;color:#f8fafc;margin:1px 0;background:none;border:0;text-align:left;font-family:inherit;white-space:nowrap;min-width:0}
+.sb-menu.top .sb-menu-item{padding-left:12px;font-size:13px;font-weight:600}
+.sb-menu-item:hover{background:#475569;color:#ffffff}
+.sb-menu-item:focus-visible,.sb-gname:focus-visible,.sb-grp-h .arrow:focus-visible,.sb-ed:focus-visible{outline:none;background:#1e40af;color:#ffffff;box-shadow:inset 2px 0 0 #60a5fa}
+.sb-menu-item.active{background:#2563eb;color:#ffffff;position:relative}
+.sb-menu-item.active::before{content:'';position:absolute;left:-8px;top:0;bottom:0;width:3px;background:#60a5fa}
+.sb-menu-item .mi-icon{width:16px;font-size:13px;flex:0 0 auto;text-align:center}
+.sb-menu-item .mi-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.sb-menu-item .mi-n{color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.sb-menu-item.active .mi-n{color:#ffffff}
+.sb-menu-item:hover .mi-n,.sb-grp-h:hover .arrow,.sb-grp-h.on .arrow,.sb-row:hover .sb-ed{color:#e2e8f0}   /* 밝은 칸(#475569) 위에서도 4.5:1 넘게 */
+.sb-menu-item.zero .mi-text{color:#cbd5e1}   /* 0건은 흐리게 — 투명도 대신 색으로(대비를 지킨다) */
+.sb-menu-item.active .mi-text{color:#ffffff}   /* 0건 종류를 눌러 파란 칸이 되어도 흰 글자(4.5:1 넘게) */
+.sb-menu-item.add{color:#bfdbfe}
+.sb-row.mine .sb-menu-item{padding-right:30px}
+.sb-ed{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:#94a3b8;cursor:pointer;font-size:12px;padding:3px 6px;border-radius:4px}
+.sb-ed:hover{color:#ffffff;background:#475569}
+
+/* ── 자료 목록 — 한 칸은 한 줄(넘치면 … + title 에 전문) ── */
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.filters input[type=search]{min-width:220px;flex:1 1 220px}
+.selbar{display:none;position:sticky;top:var(--headH,84px);z-index:15;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px}
+.selbar.on{display:flex}
+.selbar b{white-space:nowrap}
+.grp{margin:14px 0 6px;font-weight:700;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.grp .chip{font-weight:400}
+table.lst{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;table-layout:fixed}
+table.lst th,table.lst td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;vertical-align:middle}
+table.lst th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
+table.lst tr:hover td{background:var(--bg)}
+table.lst tr.picked td{background:var(--blue-bg)}
+table.lst .ck{width:28px;text-align:center;padding:6px 4px}
+table.lst .no{width:36px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+table.lst .dt{width:134px;font-variant-numeric:tabular-nums}
+table.lst .ct{width:196px}
+table.lst .vn{width:150px}
+table.lst .fm{width:124px;color:var(--mute);font-variant-numeric:tabular-nums}
+table.lst .st{width:210px}
+table.lst .ac{width:112px;text-align:right}
+table.lst .att{width:220px}
+table.lst .who{width:140px}
+table.lst td .one{display:flex;align-items:center;gap:6px;min-width:0}
+table.lst td .one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.lst td .one>.tag{flex:0 0 auto}
+.ttl{cursor:pointer;color:var(--ink);font-weight:600;background:none;border:0;padding:0;font:inherit;font-weight:600;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[role=button]:focus-visible,button:focus-visible,.ttl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.ttl:hover{color:var(--blue-d);text-decoration:underline}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+/* 보기 바꾸기 — ▦ 카드(기본) · ☰ 표 */
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;flex:0 0 auto}
+.seg button{border:0;border-radius:0;padding:4px 10px;background:var(--card);color:var(--ink2)}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:var(--blue);color:#ffffff}
+.idchip{display:inline-flex;align-items:center;gap:6px;padding:2px 4px 2px 10px;border-radius:14px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);font-size:12px;white-space:nowrap}
+/* ── 자료 카드 대시보드 — 묶음마다 카드 한 장, 줄은 한 줄(☐ · № · 강의일 · 제목 · 형식 · 상태 점) ── */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px;align-items:start}
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.gcard.legal{border-left:4px solid var(--blue)}
+.gcard.open{grid-column:1/-1}
+.gcard.add{border:2px dashed var(--line2);background:var(--bg);color:var(--blue-d);font-weight:700;min-height:64px;align-self:stretch}
+.gcard.add:hover{border-color:var(--blue);background:var(--blue-bg)}
+.gh{display:flex;align-items:center;gap:6px;min-width:0;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.gh .gn{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gh .tag,.gh .chip{flex:0 0 auto}
+.gh .gm{margin-left:auto;color:var(--mute);font-size:12px;white-space:nowrap;flex:0 0 auto}
+.gl{display:block}
+.gcard.open .gl{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));column-gap:18px}
+.gr{display:grid;grid-template-columns:22px 26px 80px minmax(0,1fr) 40px 10px;align-items:center;column-gap:6px;padding:3px 2px;border-radius:6px;min-width:0}
+.gr:hover{background:var(--bg)}
+.gr.picked{background:var(--blue-bg)}
+.gr .no{text-align:right;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+.gr .gd{font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gr .gd.est{color:var(--mute);font-style:italic;padding-right:2px}   /* 기운 글자 끝이 잘리지 않게 */
+.gr .ttl{font-weight:500}
+.gr .ge{color:var(--mute);font-size:11px;text-align:right;white-space:nowrap;overflow:hidden}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line2)}
+.dot.review{background:var(--amber-m)}
+.dot.ok{background:var(--green-m)}
+.dot.old{background:var(--mute)}
+.gmore{display:block;margin:6px auto 0}
+.chipb{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.sumx{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.sumx p{margin:2px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink2);white-space:pre-wrap;word-break:keep-all;max-height:160px;overflow:auto}
+.more{display:block;margin:10px auto}
+
+/* ── 넣기 ── */
+.drop{border:2px dashed var(--line2);border-radius:12px;padding:22px;text-align:center;color:var(--ink2);background:var(--card)}
+.drop.over{border-color:var(--blue);background:var(--blue-bg)}
+.drop .bar{justify-content:center;margin-top:10px}
+.prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px}
+.prog>i{display:block;height:100%;background:var(--blue);width:0}
+table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6px;font-size:12px}
+
+/* ── 나란히 보기 / 자세히 ── */
+#cmp{display:none;position:fixed;inset:0;z-index:60;background:var(--ink2);flex-direction:column}
+#cmp.on{display:flex}
+#cmp .ch{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ink);color:var(--line)}
+#cmp .ch b{white-space:nowrap}
+#cmp .ch button{background:var(--ink2);color:var(--line);border-color:var(--mute)}
+/* 오른쪽 26px 은 공용 앱바의 «즐겨찾기» 손잡이 자리 — 오른쪽 칸의 단추를 덮지 않게(손잡이는 숨기지 않는다) */
+#cmpGrid{flex:1 1 auto;display:grid;gap:6px;padding:6px 26px 6px 6px;min-height:0}
+.pn{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--card);border-radius:8px;overflow:hidden}
+.pn .ph{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);min-width:0}
+.pn .ph .t{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn .ph .m{color:var(--mute);font-size:12px;white-space:nowrap}
+.pn .pb{flex:1 1 auto;min-height:0;overflow:auto;background:var(--line);position:relative}
+.pn .pb iframe{width:100%;height:100%;border:0;display:block;background:var(--line)}
+.pn .pb video,.pn .pb img{max-width:100%;max-height:100%;display:block;margin:0 auto;background:#000}
+.pn .pb .msg{padding:18px;color:var(--ink2);font-size:13px;line-height:1.6}
+.pn .pb .msg code{word-break:break-all;background:var(--card);padding:1px 4px;border-radius:4px}
+.slides{padding:8px}
+.slide{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.slide .sn{color:var(--mute);font-size:11px}
+.slide .st1{font-weight:700;margin:2px 0 4px}
+.slide p{margin:2px 0;font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:keep-all}
+.pn .pf{display:flex;gap:6px;align-items:center;padding:6px 8px;border-top:1px solid var(--line);flex-wrap:wrap}
+.modal{position:fixed;inset:0;z-index:70;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px}
+.mbox{background:var(--card);border-radius:12px;width:min(1100px,100%);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.mhead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.mhead h3{margin:0;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbody{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px;padding:12px 14px}
+.mview{height:62vh;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.mview .pn{border-radius:0;height:100%}
+.form{display:grid;grid-template-columns:84px minmax(0,1fr);gap:6px 8px;align-items:center}
+.form label{color:var(--ink2);font-size:12px;white-space:nowrap}
+.form input[type=text],.form select{width:100%}
+.kv{display:flex;gap:8px;font-size:12px;color:var(--ink2);padding:2px 0;min-width:0}
+.kv>span{flex:0 0 72px;color:var(--mute)}
+.kv>b{font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notes{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.note{padding:6px 0;border-bottom:1px dashed var(--line)}
+.note .w{color:var(--mute);font-size:11px}
+.note p{margin:2px 0 0;white-space:pre-wrap;word-break:keep-all}
+.mfoot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;padding:9px 16px;border-radius:9px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:90;max-width:92vw}
+#toast.on{opacity:1}
+.phone-only{display:none}
+
+/* ── 폰 — PC 는 그대로, 여기서만 바꾼다 ── */
+@media (max-width:768px){
+  input,select,textarea{font-size:16px}
+  .phone-only{display:inline}
+  .wide-only{display:none}
+  #head .top{padding:6px 10px;gap:8px}
+  #head .sub{display:none}
+  .tabs{padding:0 6px}
+  main{padding:8px 6px 80px}
+  .card{padding:8px 7px}
+  table.lst tr{padding:6px 6px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .kpi{padding:8px 10px}
+  .kpi b{font-size:20px}
+  /* 종류 카드 — 폰에서는 두 칸, 근거 조문 줄은 접는다(법정 표시는 그대로) */
+  .cats,.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .lgrp{padding:6px}
+  .lgh{gap:6px}
+  .lgh .lgm{display:none}   /* 폰에서는 «N건»만 — 종 수·용량은 PC 에서 */
+  .simrun{flex-wrap:wrap;gap:6px 10px}   /* 비슷한 강의 찾기 — 폰에서는 글과 단추가 줄을 나눈다(옆으로 넘치지 않게) */
+  .simrun .hint{flex-basis:100%}
+  #simCard .bar .hint{white-space:normal}
+  .cat{padding:8px 9px}
+  .cat .ln+.ln{display:none}
+  .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
+  .cat .nm .tag{display:none}   /* 폰에서는 왼쪽 파란 띠가 «법정»을 말한다(안내줄에 적어 둠) — 이름 자리를 남긴다 */
+  .cat .nm .n{font-size:16px}
+  .cat.add .ln{display:none}
+  .mx col.mk{width:112px} .mx col.ms{width:40px}
+  .mx table{min-width:560px}
+  .cgrid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .gcard{padding:7px 8px}
+  .gcard.open .gl{display:block}
+  /* 폰 줄 — ☐ · № · 제목 · 강의일 · 상태 점(형식은 숨긴다). 칸 자리를 못 박는다(마크업 순서는 PC 와 같다) */
+  .gr{grid-template-columns:28px 24px minmax(0,1fr) auto 10px;padding:5px 2px}
+  .gr>*{grid-row:1}
+  .gr>input{grid-column:1} .gr .no{grid-column:2} .gr .ttl{grid-column:3} .gr .gd{grid-column:4} .gr .dot{grid-column:5}
+  .gr input[type=checkbox],.gh input[type=checkbox]{width:24px;height:24px}
+  .gr .ge{display:none}
+  .gh .gm{display:none}
+  .filters input[type=search]{min-width:0;flex:1 1 100%}
+  /* 거르개 — 자주 안 쓰는 것은 «⋯ 더» 안으로 */
+  .filters .fx{display:none}
+  .filters.open .fx{display:inline-block}
+  .filters select{flex:1 1 40%;min-width:0}
+  /* 넓은 표 → 줄마다 두 줄 카드(☐·№ 는 왼쪽 끝 그대로) */
+  table.lst,table.lst tbody{display:block;border:0;background:none}
+  table.lst thead{display:none}
+  table.lst tr{display:grid;grid-template-columns:30px 30px minmax(0,1fr) auto;grid-template-areas:"ck no ttl ac" "ck no meta meta";align-items:center;column-gap:4px;row-gap:2px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:6px;padding:6px 6px}
+  table.lst td{border:0;padding:0;display:block}
+  table.lst td.ck{grid-area:ck;width:auto;padding:0}
+  table.lst td.ck input{width:24px;height:24px}
+  table.lst td.no{grid-area:no;width:auto}
+  table.lst td.tt{grid-area:ttl}
+  table.lst td.ac{grid-area:ac;width:auto}
+  table.lst td.meta{grid-area:meta;display:block;color:var(--mute);font-size:12px}
+  #list table.lst td.dt,#list table.lst td.ct,#list table.lst td.vn,#list table.lst td.fm,#list table.lst td.st{display:none}
+  table.lst tr.picked{background:var(--blue-bg)}
+  table.lst tr.picked td,table.lst tr:hover td{background:none}
+  /* 넣기 — 종류·강의일·강의처를 폰에서도 고친다 */
+  table.stg tr{grid-template-columns:30px 30px minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ck no ttl ttl" "ck no ct dt" "ck no vn fm" "ck no st st"}
+  table.stg td.ct{grid-area:ct;width:auto} table.stg td.dt{grid-area:dt;width:auto} table.stg td.vn{grid-area:vn;width:auto}
+  table.stg td.fm{grid-area:fm;width:auto;align-self:center} table.stg td.st{grid-area:st;width:auto} table.stg td.meta{display:none}
+  table.stg select,table.stg input[type=text]{font-size:16px;padding:5px 6px}
+  /* 메일 — 첨부·추정 종류·알림(이미 가져옴·개인정보?·못 한 까닭)을 폰에서도 보인다 */
+  table.ml tr{grid-template-columns:30px 30px minmax(0,1fr) minmax(0,1fr);grid-template-areas:"ck no ttl ttl" "ck no att ct" "ck no dt st"}
+  table.ml td.att{grid-area:att;width:auto} table.ml td.ct{grid-area:ct;width:auto} table.ml td.dt{grid-area:dt;width:auto}
+  table.ml td.st{grid-area:st;width:auto} table.ml td.who,table.ml td.meta{display:none}
+  .card.flat{padding:0;border:0;background:none}
+  .mbody{grid-template-columns:minmax(0,1fr)}
+  .mview{height:48vh}
+  .modal{padding:0}
+  .mbox{border-radius:0;min-height:100%}
+  #cmpGrid{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:none!important;grid-auto-rows:minmax(60vh,1fr);overflow:auto;padding:6px 14px 6px 6px}
+}
+@media (min-width:769px){ table.lst td.meta{display:none} }
+@media (min-width:769px) and (max-width:1180px){
+  #list table.lst .vn,table.lst .fm{display:none}
+  table.lst .ct{width:150px} table.lst .st{width:210px} table.lst .ac{width:92px}
+  table.ml .who{display:none} table.stg .st{width:120px} table.stg .vn{width:130px}
+}
+/* 769~960px — 종류 칸도 접는다(종류는 묶음 머리줄·«법정» 딱지로 보인다). 강의일·상태 딱지가 잘리지 않게 */
+@media (min-width:769px) and (max-width:960px){ #list table.lst .ct{display:none} }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ 이 앱은 작은 새 앱들의 «A 틀»(#head .top .tabs · main .pane · .card · .kpis/.kpi · .chip · #toast · .modal)을 그대로 쓴다
+     → <body class="pu-design pu-frame-a"> 로 공용 A 틀 모양을 받고, 여기에는 이 앱에만 있는 이름표(목록 표·종류 카드·딱지·창)만 잇는다.
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 탭·거르개·☐·№·칸·줄은 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다). */
+/* 목록 표 — 머리줄 굵게·읽히는 회색(목업 table.t th), 표 상자는 작은 카드 둥글기 */
+:where(body.pu-design) table.lst{border-radius:var(--pu-r-sm)}
+:where(body.pu-design) table.lst th{color:var(--pu-sub);font-weight:800}
+:where(body.pu-design) .mx th{color:var(--pu-sub);font-weight:800}
+/* 숫자 카드 — 공용 A 틀은 숫자를 19px(폰 16px)로 줄이지만, 이 앱 숫자는 원래 22px(폰 20px) — 목업 «큰 숫자 22px» 와 같다.
+   앱 값을 지킨다. 공용 파일이 이 파일 «뒤»에 실려 같은 세기면 지므로 .kpis 를 붙여 한 단계 세게 */
+:where(body.pu-design) .kpis .kpi b{font-size:22px}
+/* 종류 카드 — 작은 카드 둥글기 + 옅은 그림자(왼쪽 파란 «법정» 띠는 그대로) */
+:where(body.pu-design) .cat{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+/* 상태·원본 딱지 — 알약(색 짝은 그대로) */
+:where(body.pu-design) .tag{border-radius:var(--pu-r-pill)}
+/* 고른 것 띠·자세히 창 */
+:where(body.pu-design) .selbar{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .mbox{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .pn,:where(body.pu-design) .mview{border-radius:var(--pu-r-sm)}
+/* 폰 — 앱 폰 구간 값을 다시 맞춘다: 자세히 창은 화면 가득(둥근 모서리 없음) */
+@media (max-width:768px){
+  :where(body.pu-design) .mbox{border-radius:0}
+  :where(body.pu-design) .kpis .kpi b{font-size:20px}
+}
+/* ══ pu-design 끝 ══ */
+</style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
+</head>
+<body class="pu-design pu-frame-a">
+<aside class="sb" id="sb" aria-label="강의자료 메뉴">
+  <div class="sb-logo">🎓 강의자료</div>
+  <div class="sb-user"><div class="sb-avatar" id="sbAv" aria-hidden="true"></div><div class="sb-user-info"><div class="n" id="sbName"></div><div class="r" id="sbRole"></div></div></div>
+  <nav class="sb-nav" id="sbNav" aria-label="강의 종류"></nav>
+</aside>
+<div id="head">
+  <div class="top">
+    <h1>🎓 강의자료</h1>
+    <span class="sub">강의자료를 종류·강의일로 모아 보고, 나란히 비교하고, 검토해 더합니다 — 원본은 그대로 둡니다</span>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <button class="sm" id="reBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
+    <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="dash">📊 한눈에</button>
+    <button data-tab="list">📚 자료 <span class="chip" id="nItems">0</span></button>
+    <button data-tab="add">＋ 넣기</button>
+    <button data-tab="mail" id="mailTab" style="display:none">✉ 메일에서 찾기</button>
+  </div>
+</div>
+<div id="lock"><h2>🎓 강의자료</h2><div id="lockWhy"></div><p>재직 직원만 열 수 있습니다.</p></div>
+<main id="app" style="display:none">
+  <section class="pane" id="pane-dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="dgrid">
+      <div class="card dcat"><div class="bar"><div class="sec" style="margin:0">강의 종류</div><span class="hint">법정교육 자료 · 법정교육 외 자료 · 누르면 그 종류만 · 점선 = 직접 더한 종류</span></div><div id="cats" style="margin-top:8px"></div></div>
+      <div class="card" id="simCard" style="display:none"></div>
+      <div class="card dmx"><div class="bar"><div class="sec" style="margin:0">종류 × 연도</div><span class="hint">진할수록 많음 · 칸을 누르면 그 종류·연도만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
+    </div>
+  </section>
+
+  <section class="pane" id="pane-list">
+    <div class="card">
+      <div class="filters">
+        <input type="search" id="fQ" placeholder="찾기 — 제목·파일 이름·강의처·메모·경로" aria-label="자료 찾기">
+        <select id="fCat" aria-label="강의 종류"></select>
+        <select id="fYear" aria-label="강의 연도"></select>
+        <button class="sm phone-only fmore-btn" id="fMore" title="거르개 더 보기">⋯ 더</button>
+        <select id="fKind" class="fx" aria-label="형식"><option value="">형식 전체</option><option value="doc">문서</option><option value="video">영상</option><option value="archive">압축</option><option value="image">그림</option><option value="audio">소리</option></select>
+        <select id="fStatus" class="fx" aria-label="상태"><option value="">상태 전체</option><option value="review">검토 대기</option><option value="ok">참고 가능</option><option value="old">옛 자료</option></select>
+        <select id="fStore" class="fx" aria-label="원본 위치"><option value="">원본 위치 전체</option><option value="cloud">자료함에 있음</option><option value="pc">PC에만</option><option value="mail">메일함</option></select>
+        <select id="fLegal" class="fx" aria-label="법정교육 구분" title="법정교육 자료 / 법정교육 외 자료"><option value="">법정·법정 외 모두</option><option value="legal">법정교육 자료</option><option value="other">법정교육 외 자료</option></select>
+        <select id="fGroup" title="묶어 보기" aria-label="묶어 보기"><option value="cat">종류별로 묶기</option><option value="year">연도별로 묶기</option><option value="">묶지 않기</option></select>
+        <label class="hint fx" style="white-space:nowrap"><input type="checkbox" id="fTrash"> 휴지통</label>
+        <button class="sm fx" id="fClr">거르개 비우기</button>
+        <span class="idchip" id="fIds" style="display:none"></span>
+        <span class="seg" id="vSeg" role="group" aria-label="보기 바꾸기"><button type="button" data-view="card" title="종류별 카드로 보기" aria-pressed="true">▦<span class="wide-only"> 카드</span></button><button type="button" data-view="table" title="표로 보기" aria-pressed="false">☰<span class="wide-only"> 표</span></button></span>
+      </div>
+    </div>
+    <div class="selbar" id="selbar">
+      <b id="selN">0건 선택</b>
+      <button class="sm pri" id="sCmp" title="고른 것을 한 화면에 나란히(4건까지)">⧉ 나란히<span class="wide-only"> 보기</span></button>
+      <button class="sm" id="sWin" title="고른 것을 새 창으로 하나씩 — 창을 옮겨 놓고 비교">🪟<span class="wide-only"> 새 창으로 각각</span></button>
+      <button class="sm" id="sCat" title="종류 바꾸기">🏷<span class="wide-only"> 종류 바꾸기</span></button>
+      <button class="sm" id="sOk" title="«참고 가능»으로">✔<span class="wide-only"> 참고 가능으로</span></button>
+      <button class="sm dng" id="sDel" title="휴지통으로(원본은 지우지 않습니다)">🗑<span class="wide-only"> 휴지통으로</span></button>
+      <button class="sm" id="sRestore" style="display:none" title="되살리기">↩<span class="wide-only"> 되살리기</span></button>
+      <span class="sp"></span>
+      <button class="sm" id="sClr" title="고르기 해제">✕<span class="wide-only"> 고르기 해제</span></button>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <section class="pane" id="pane-add">
+    <div class="card">
+      <div class="sec">새 자료 넣기 — 파일을 끌어다 놓거나 고르세요</div>
+      <div class="drop" id="drop" role="region" aria-label="파일을 끌어다 놓는 자리">
+        <div>여기에 파일·폴더를 끌어다 놓으면 이름과 폴더를 보고 <b>강의 종류·강의일</b>을 미리 채웁니다. 확인한 뒤 저장하세요.</div>
+        <div class="hint" style="margin-top:4px">원본은 받은 그대로 올립니다(바꾸거나 줄이지 않습니다) · 같은 파일이 이미 있으면 알려 드립니다 · 한 파일 1GB 까지</div>
+        <div class="bar"><button class="pri" id="pickF">📄 파일 고르기</button><button id="pickD">📁 폴더 통째로</button><button id="pickJ" title="scripts/edulib-scan.js 가 만든 PC 목록(JSON)">📥 PC 목록 가져오기</button></div>
+        <input type="file" id="inF" multiple style="display:none">
+        <input type="file" id="inD" webkitdirectory multiple style="display:none">
+        <input type="file" id="inJ" accept=".json,application/json" style="display:none">
+      </div>
+    </div>
+    <div class="card flat" id="stageCard" style="display:none">
+      <div class="bar"><div class="sec" style="margin:0" id="stageTitle">넣을 자료</div><span class="hint" id="stageHint"></span><span class="sp"></span>
+        <button class="sm" id="stAllA" title="강의 폴더 안(A)에 있고 개인정보 표시가 없는 것만">추천만 고르기</button>
+        <button class="sm" id="stClr">비우기</button>
+        <button class="pri" id="stSave">고른 것 저장</button></div>
+      <div class="prog" id="stProg" style="display:none"><i></i></div>
+      <div id="stage" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section class="pane" id="pane-mail">
+    <div class="card">
+      <div class="bar"><div class="sec" style="margin:0">푸른 메일함에서 강의자료 찾기</div><span class="sp"></span><button class="pri" id="mScan">🔎 메일함 전체 훑기</button></div>
+      <p class="hint" style="margin:6px 0 0">제목·첨부 이름에 강의·교육자료·교안 같은 말이 있는 메일을 찾습니다. 메일은 «읽음» 표시를 바꾸지 않고, 고른 첨부만 원본 그대로 자료함에 복사합니다(메일은 그대로 둡니다).
+        지난 메일(옛 보관함)은 첨부 이름이 없어 제목으로만 찾습니다 — 가져올 때 첨부를 확인합니다. 관리자만 보이는 칸입니다.</p>
+    </div>
+    <div class="card" id="mAutoCard">
+      <div class="bar"><div class="sec" style="margin:0">🤖 보낸 메일 자동 정리</div><span class="hint" id="mAutoSt">불러오는 중…</span><span class="sp"></span>
+        <select id="mAutoDays" aria-label="얼마나 지난 메일까지 정리할지"><option value="14">최근 14일</option><option value="30" selected>최근 30일</option><option value="90">최근 90일</option><option value="365">최근 1년</option></select>
+        <button id="mAutoRun" title="서버가 지금 바로 한 번 정리합니다(몇 분 걸릴 수 있습니다)">지금 정리</button></div>
+      <p class="hint" style="margin:6px 0 0">매일 19:30 에 서버가 보낸편지함·내게쓴편지함의 강의자료 첨부를 읽어(pptx·docx·hwpx·글자 있는 pdf) 종류·강의일을 짐작하고
+        문서의 목차·첫 글을 «자동 정리 내용»으로 만들어 아래 <b>자동 정리함</b>에 쌓습니다(관리자만 봅니다). 고른 것만 «자료함에 넣기»로 원본 그대로 들어가고(«검토 대기»), 그때부터 재직 직원 모두가 봅니다.
+        옛 형식(ppt·hwp)·압축·스캔 pdf 는 «사람 확인 필요»로만 셉니다(아래 «메일함 전체 훑기»로 골라 가져오세요) —
+        받은 메일, 명단·서명·급여 같은 이름, 주민번호 꼴이 보이는 문서, 이미 있는 같은 파일은 정리함에도 올리지 않습니다. 메일은 읽기만 합니다.</p>
+      <div id="mAutoList"></div>
+    </div>
+    <div class="card flat" id="mCard" style="display:none">
+      <div class="bar"><b id="mN"></b><span class="sp"></span><input type="search" id="mQ" placeholder="찾기" aria-label="찾은 메일 거르기" style="min-width:160px"><button class="pri" id="mImp">고른 첨부 가져오기</button></div>
+      <div class="prog" id="mProg" style="display:none"><i></i></div>
+      <div id="mList" style="margin-top:8px"></div>
+    </div>
+  </section>
+</main>
+
+<div id="cmp" role="dialog" aria-modal="true" aria-labelledby="cmpT"><div class="ch"><b id="cmpT">나란히 보기</b><span class="hint" style="color:var(--line2)" id="cmpH"></span><span class="sp"></span>
+  <button class="sm" id="cmpCols" title="한 줄에 몇 칸">칸 나누기</button><button class="sm" id="cmpX">닫기</button></div><div id="cmpGrid"></div></div>
+<div class="modal" id="modal" style="display:none" role="dialog" aria-modal="true" aria-label="자세히·검토"><div class="mbox" id="mbox"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
+     (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 gate(createGateway enforce)로만 한다. -->
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=55"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-back.js?v=5"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal') || PuBack.closeTopVisible('#cmp'); }); }catch(e){}</script>
+<script>
+/* 로그인 관문 — 공용 화면(PuGate)을 이 화면이 직접 부른다. 로그인이 풀리면 말없이 튕기지 않고 공용 로그인 창을 띄운다
+   (tests/logout-gate.test.js). 화면 코드(js/pu-edulib-app.js)는 이 두 길만 쓴다. */
+window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ PuGate.hide(); } };
+</script>
+<script src="js/pu-viewer-kind.js?v=1"></script>
+<script src="js/pu-edulib-classify.js?v=4"></script>
+<script src="js/pu-edulib-core.js?v=5"></script>
+<script src="js/pu-edulib-preview.js?v=4"></script>
+<script src="js/pu-edulib-app.js?v=12"></script>
+</body>
+</html>

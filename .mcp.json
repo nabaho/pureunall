@@ -55,7 +55,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "korean-dart-mcp@0.10.1"
+        "korean-dart-mcp@0.10.3"
       ],
       "env": {
         "DART_API_KEY": "${DART_API_KEY:-}"

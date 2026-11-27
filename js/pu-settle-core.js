@@ -691,6 +691,68 @@
     return order.map(function (sid) { return by[sid]; });
   }
 
+  /* 여러 정산표 «함께 정산» — 대표 지시 2026-11-22 「산업일자리전환·일터혁신 등 여러 사업이 동시에 들어오면 … 전체적으로 플러스 마이너스 정산을 체크 … 사업들 클릭해서 이 사업 함께 정산」
+     사람마다(그 사람의 주관 기준) 정산표별 차액(settle)을 더해 «상계»한 결과를 낸다. 읽기만 한다 — 정산표·송금·카톡 기록은 바꾸지 않는다.
+     · 합치는 것 = «같은 주관»과 오가는 차액만. 주관이 다르면 사람이 같아도 줄이 따로다(서로 다른 사람 사이를 맞바꿔 줄 수 없다).
+     · 기록만(manual)·지운 정산표는 뺀다. 확정 전(draft)도 미리보기로 넣는다(복사는 모두 확정일 때만 — 화면이 가른다).
+     · col.sent = 이미 «보냄 표시»한 송금이 있는 확정 정산표 — 합계에 넣으면 이중 지급이 될 수 있어 화면이 경고한다.
+     runs = 정산표 배열(normalizeRun 한 것). 차액 + = 주관이 줄 돈(추가 지급), − = 주관이 받을 돈(반환).
+     돌려주는 것 = { cols:[{rid,typeCode,monthKey,label,status,sent}], rows:[{sid,name,leadSid,leadName,parts:{rid:차액},net}],
+                    leads:[{leadSid,leadName,pay,back,net,parts:{rid:합}}], mixed(주관이 둘 이상) } */
+  function combineRuns(runs, names) {
+    names = names || {};
+    var cols = [], rowBy = {}, rowOrder = [];
+    (runs || []).forEach(function (run) {
+      if (!run || run._deleted || (run.status !== 'draft' && run.status !== 'confirmed')) return;
+      var col = { rid: run.id, typeCode: run.typeCode || '', monthKey: run.monthKey || '', label: run.label || '', status: run.status,
+        sent: run.status === 'confirmed' && (run.transfers || []).some(function (t) { return t && t.paid; }) };
+      cols.push(col);
+      (run.sites || []).forEach(function (s) {
+        var lead = (s.members || []).filter(function (x) { return x.role === 'lead'; })[0];
+        var leadSid = (lead && lead.sid) || '';
+        (s.members || []).forEach(function (m) {
+          if (m.role !== 'staff' || !m.sid || m.settle == null) return;
+          var key = m.sid + '|' + leadSid;
+          if (!rowBy[key]) { rowBy[key] = { sid: m.sid, name: names[m.sid] || m.name || '', leadSid: leadSid, leadName: names[leadSid] || (lead && lead.name) || '', parts: {}, net: 0 }; rowOrder.push(key); }
+          var row = rowBy[key], v = Number(m.settle) || 0;
+          row.parts[run.id] = (row.parts[run.id] || 0) + v;
+          row.net += v;
+        });
+      });
+    });
+    var rows = rowOrder.map(function (k) { return rowBy[k]; }).sort(function (a, b) {
+      return a.leadName < b.leadName ? -1 : a.leadName > b.leadName ? 1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+    });
+    var leads = [], leadBy = {};
+    rows.forEach(function (r) {
+      var L = leadBy[r.leadSid];
+      if (!L) { L = leadBy[r.leadSid] = { leadSid: r.leadSid, leadName: r.leadName, pay: 0, back: 0, net: 0, parts: {} }; leads.push(L); }
+      if (r.net > 0) L.pay += r.net; else if (r.net < 0) L.back += -r.net;
+      L.net += r.net;
+      Object.keys(r.parts).forEach(function (rid) { L.parts[rid] = (L.parts[rid] || 0) + r.parts[rid]; });
+    });
+    return { cols: cols, rows: rows, leads: leads, mixed: leads.length > 1 };
+  }
+  /* 한 사람의 «함께 정산» 카톡 문구 — 사업별 차액 + 합계 한 줄(▶ 반환/추가 지급). opt = {title:{rid:사업 이름}, label:'2026년 11월'}
+     ⚠ 확정한 정산표만 복사한다(화면이 거른다) — 문구는 합계만 주고받는다고 밝힌다 */
+  function combinedMessage(comb, row, opt) {
+    opt = opt || {};
+    var titles = opt.title || {};
+    var cols = (comb.cols || []).filter(function (c) { return row.parts[c.rid] != null; });
+    var biz = cols.map(function (c) { return titles[c.rid] || c.typeCode; });
+    var L = [DEFAULT_HEAD.split('{사업}').join(biz.join(' + ')).split('{지급월}').join(opt.label || ''), row.name + '님 함께 정산 내역입니다. (+ 추가 지급 · − 반환)', ''];
+    cols.forEach(function (c) {
+      var v = row.parts[c.rid];
+      L.push('■ ' + (titles[c.rid] || c.typeCode) + (c.label ? ' (' + c.label + ')' : '') + ' 차액 ' + (v > 0 ? '+' : '') + fmt(v) + '원');
+    });
+    L.push('');
+    L.push(settleLine('■ 합계 ', row.net, row.name, row.leadName || '주관'));
+    L.push('(사업별로 따로 보내지 않고 위 합계만 주고받습니다)');
+    L.push('');
+    L.push(DEFAULT_FOOT);
+    return L.join('\n');
+  }
+
   return {
     DEFAULT_HEAD: DEFAULT_HEAD, DEFAULT_FOOT: DEFAULT_FOOT,
     won: won, withholding: withholding, linkKey: linkKey, monthKeyOf: monthKeyOf, fmt: fmt,
@@ -701,6 +763,6 @@
     shareOf: shareOf, calcSite: calcSite, DIR_KO: DIR_KO, dirOf: dirOf,
     manualAdd: manualAdd, manualRemove: manualRemove, manualEntries: manualEntries,
     TAX_KO: TAX_KO, taxOf: taxOf, preFromNet: preFromNet, yearOf: yearOf, yearSummary: yearSummary, existingRate: existingRate,
-    monthState: monthState, reviewMonth: reviewMonth, personalTypes: personalTypes, personTotals: personTotals
+    monthState: monthState, reviewMonth: reviewMonth, personalTypes: personalTypes, personTotals: personTotals, combineRuns: combineRuns, combinedMessage: combinedMessage
   };
 });

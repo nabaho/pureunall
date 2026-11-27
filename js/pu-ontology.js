@@ -26,6 +26,12 @@
       SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
+      /* 법정교육자료함(2026-11-19) — 강의자료 파일 한 건(원본은 창고에 받은 그대로) · 그 자료를 본 노무사의 검토 메모 */
+      EduMaterial:'강의자료', EduReviewNote:'강의자료 검토 메모',
+      /* 강의자료(2026-11-21) — 사람이 더한 강의 종류 하나(이름·법정 여부·찾을 낱말). 그 id 가 자료 기록의 cat 칸이 된다 */
+      EduCategory:'강의 종류',
+      /* 강의자료(2026-11-22) — 자료 한 건의 «내용 지문»(슬라이드·문서 글로 만든 숫자 MinHash). 비슷한 강의(고쳐 쓴 판)를 잇는 데만 쓴다 — 글 자체는 담지 않는다 */
+      EduSimilarity:'강의 내용 지문',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
@@ -231,7 +237,7 @@
        빌려 읽는 곳: data/user_dir(대표인지 확인) · uid_roles(권한). 쓰지는 않는다. */
     /* ⚠ kcareer/{uid}/ls 는 «읽기만» 한다 — 원본은 경력관리다(2026-09-10 「신청 재료」 탭).
        ⚠ 노드를 통째로 읽지 않는다: 밑에 API 열쇠(_secrets)와 첨부 조각(수 MB)이 있다. */
-    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */,'gov_feed' /* 공고 받은 함(서버 govFeedCollect 가 매일 모음) — 2026-10-12 */],
+    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */,'gov_feed' /* 공고 받은 함(서버 govFeedCollect 가 매일 모음) — 2026-10-12 */,'gov_digest' /* 오늘의 요약(서버 govDigestKakao 가 매일 08:30 에 쓰는 공개 요약·돌린 결과) — 2026-11-22 */],
       sharedRoots:['data/user_dir','uid_roles','kcareer/{uid}/ls'],
       entityTypes:['Organization','Project','Document'] },
     /* 회생광고 — 법원 회생 공고(법인회생 «포괄적 금지명령»)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
@@ -275,6 +281,20 @@
                       {path:'signboard/control',entityType:'SignboardControl'},
                       {path:'signboard/log/{id}',entityType:'SignboardLog'}],
       entityTypes:['SignboardAd','SignboardPublish','SignboardControl','SignboardLog'] },
+    /* 법정교육자료함 — 강의자료를 종류·강의일로 모아 보고·나란히 비교하고·검토해 더한다(대표 지시 2026-11-19).
+       ★ 쓰는 것: items(EduMaterial — 파일 한 건) · notes(EduReviewNote — 검토 메모) · cats(EduCategory — 사람이 더한 강의 종류, 2026-11-21)
+         · sims(EduSimilarity — 자료의 내용 지문, 열쇠 = 자료 id, 2026-11-22 «마지막에 언제 강의랑 유사» 표시용).
+         원본 파일은 창고 edulib/{id}/ 에 받은 그대로.
+       ★ 서버 자동 정리(functions/edulib-mail-sweep.js, 2026-11-21)는 보낸 메일의 강의자료를 «정리»만 해 관리자 전용 자동 정리함
+         edulib_inbox(레코드 아닌 대기열·상태 — 서버만 쓴다)에 쌓는다. 자료함 기록(items)은 관리자가 골라 «넣기»할 때 화면 관문이 만든다.
+       ★ 읽기만: uid_roles(권한·사번) · data/user_dir(사번→이름) · mailbox(메일 찾기 — 관리자 화면에서만, 머리글·첨부 이름만)
+       ⚠ 재직 직원 모두 읽고 쓴다(규칙 edulib = LOGIN) — 「다른 노무사가 참고할 수 있게」. 지우기는 _deleted 표식만. */
+    edulib:{ name:'강의자료', file:'pu-edulib.html', primaryRoots:['edulib','edulib_inbox'], sharedRoots:['uid_roles','data/user_dir','mailbox'],
+      writeContracts:[{path:'edulib/items/{id}',entityType:'EduMaterial'},
+                      {path:'edulib/notes/{itemId}/{id}',entityType:'EduReviewNote'},
+                      {path:'edulib/cats/{id}',entityType:'EduCategory'},
+                      {path:'edulib/sims/{id}',entityType:'EduSimilarity'}],
+      entityTypes:['EduMaterial','EduReviewNote','EduCategory','EduSimilarity'] },
     /* 컨설팅정산 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 사이 차액을 정산한다(대표 지시 2026-10-31).
        설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md.
        ★ 쓰는 것: rules(SettleRule) · links(SettleLink — 사람이 확정한 연결만) · notices(SettleNotice) · runs(SettleRun) · adjusts(SettleAdjust).
@@ -292,10 +312,11 @@
       entityTypes:['SettleRule','SettleLink','SettleNotice','SettleRun','SettleAdjust','SettleRoom','SettleKakao'] },
     /* 푸른등기 — 노무법인 변경등기(사원 입사·퇴사·지분 양도, 대표사원 취임·사임, 주소변경, 분사무소 설치·이전·폐지) 서류를 한글로 만든다(대표 지시 2026-11-14).
        ★ 쓰는 것: base(DeungiBase — 지금 등기부 현황 하나) · cases(DeungiCase — 등기 건) · archive(DeungiArchive — 지난 등기 원본 서류 묶음, 2026-11-14).
+       ★ 읽기만: uid_roles(권한) · data/user_accounts(인사관리 직원명부 — 사원 입사·퇴사·주소변경 입력 보조, 원본 수정 없음 · 이름으로 추정한 sid 저장 없음) · data/user_dir(폴백).
        ★ 원본 파일은 원본 보관함(pu_docs, 공용 층 js/pu-office-store.js)의 🔒 자리에 올린다(from.kind 'deungi') — 묶음에는 파일 번호만.
        ★ 사람은 «등기 현황 안의 사원 줄»(id m1…)로만 가리킨다 — 직원 명부(sid)와 이름으로 잇지 않는다(사원이 퇴사·입사해도 명부와 따로 간다).
        ⚠ 주민등록번호 뒷자리는 저장하지 않는다(생년월일만). 대표·위임관리인만(규칙 deungi). */
-    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles','pu_docs'],
+    deungi:{ name:'푸른등기', file:'pu-deungi.html', primaryRoots:['deungi'], sharedRoots:['uid_roles','pu_docs','data/user_accounts','data/user_dir'],
       writeContracts:[{path:'deungi/base',entityType:'DeungiBase'},
                       {path:'deungi/cases/{id}',entityType:'DeungiCase'},
                       {path:'deungi/archive/{id}',entityType:'DeungiArchive'}],
@@ -305,6 +326,9 @@
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
     mail:{ name:'푸른 메일', file:'pu-cards.html?view=mail', primaryRoots:['pucards/mailbox','pucards/sentBox','pucards/scheduled','mailbox'],
       entityTypes:['Person','Organization','Message','Document'] },
+    pubsearch:{ name:'공공 기업검색', file:'pu-pubsearch.html', primaryRoots:[],
+      sharedRoots:['pucards/coInfo','pubdata','data/companies'], entityTypes:['Organization','Document'], localOnly:true,
+      note:'금융위·재무·국세청·고용산재·국민연금·DART 무료 공공 기업검색 독립 프로그램 — 조회 결과를 기업정보함(pucards/coInfo) 빈 칸에만 반영한다' },
     cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies','worker_secret'],
       entityTypes:['Organization','Person','Document','MediaAsset','Message'] },
     photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'],
@@ -398,7 +422,25 @@
                       {path:'scal_jobtrans/mid/{id}',entityType:'Document'},
                       {path:'scal_jobtrans/final/{id}',entityType:'Document'},
                       {path:'scal_jobtrans/snapshots/{pid}/{id}',entityType:'Document'}],
-      entityTypes:['Organization','Person','Project','Document','Task','Message'] }
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 안전보건체계구축(safety.html) — 과거 수행이력 비식별 아카이브 · 신규 착수 체크 · 8대 업종별 특화 체크리스트 · 위험성평가 · 종합/1P 보고서(.hwpx) */
+    safety:{ name:'안전보건체계구축', file:'safety.html', primaryRoots:['scal_safety'],
+      sharedRoots:['uid_roles','data/companies','data/consultings','data/biz_cons_types','scal_cos','scal_types','mailbox'],
+      writeContracts:[{path:'scal_safety/projects/{id}',entityType:'Project'},
+                      {path:'scal_safety/checks/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_safety/intake/{pid}/{id}',entityType:'Document'},
+                      {path:'scal_safety/reports/{id}',entityType:'Document'},
+                      {path:'scal_safety/snapshots/{pid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Project','Document','Task','Message'] },
+    /* 데이터관리(2026-11-21) — 대표 전용. 원본(입금·명부·업체·업무·관계망)은 «읽기만» 하고 화면 안에서 센다.
+       제 자리는 보기 설정(datahub/{uid}/settings)뿐 — 기기·일회용 문제·현황판 숫자는 서버 함수만 쓴다(INFRA_ROOTS).
+       ⚠ 사람 이름·업체명을 관계 열쇠로 쓰지 않는다(sid·companyId). 채팅으로는 가명 숫자만 나간다. */
+    datahub:{ name:'데이터관리', file:'pu-datahub.html', primaryRoots:['datahub/{uid}'],
+      sharedRoots:['uid_roles','app_owner','data/finance_income','data/user_dir','data/companies','work_erp/items','work_erp/logs',
+        'ontology/v1','datahub_device/{uid}','datahub_board'],
+      entityTypes:['ViewState'], sourceMutation:'never',
+      writeContracts:[{path:'datahub/{uid}/settings',entityType:'ViewState'}],
+      note:'대표 전용 3D·현황판·연결 지도·다년 대조 — 원본은 읽기만, 자기 자리는 보기 설정뿐' }
   };
 
   /* ══ 업체 고유번호 — 「머리 + 몸통」 (대표 지시 2026-09-03) ══════════════
@@ -530,7 +572,10 @@
        (ref( 호출 없음, 브라우저 localStorage 의 화면 상태뿐). 공개 저장소로 마스터를 보내는 단추는 막았다. 포털 타일 없음 */
     'pu-payroll-mail-sync.html':'급여 메일연동 — 가린 예시 자료만, 서버 저장 자리 없음(포털 비연결)',
     'pu-viewer.html':'문서뷰어 — 이 기기의 파일을 보기만 한다. 서버·저장 자리 없음',
-    'pu-viewer-frame.html':'문서뷰어의 격리된 칸(sandbox iframe) — 부모가 바이트를 건네 주면 그리기만 한다. 저장 자리 없음'
+    'pu-viewer-frame.html':'문서뷰어의 격리된 칸(sandbox iframe) — 부모가 바이트를 건네 주면 그리기만 한다. 저장 자리 없음',
+    /* 강의자료 슬라이드 미리보기 칸 (2026-11-22) — pu-edulib.html 이 sandbox="allow-scripts" 로만 연다. pptx 바이트를 받아 SVG 로 그리기만 하고
+       ref(·fetch·localStorage 가 없다(CSP connect-src 'none'). 강의자료의 딸린 화면이지만 저장 자리가 없어 SATELLITES 가 아니라 여기 */
+    'pu-slides-frame.html':'강의자료의 슬라이드 미리보기 격리 칸(sandbox iframe) — 부모가 pptx 바이트를 건네 주면 그리기만 한다. 저장 자리 없음'
     /* fund-poc.html(기금관리 실험 화면)은 2026-10-09 지웠다 — 운영에 쓰지 않았다(대표 「지워」) */
   };
 
@@ -588,7 +633,17 @@
     login_countries:'계정별 알려진 접속 국가', login_fail_burst:'짧은 시간 비밀번호 반복실패 셈',
     /* 2026-09-27 카카오 로그인 — 「연결됨」 표시만. 카카오 회원번호(누구 것인지 찾는 표)는
        서버 전용 자리(kakao_links)에 있어 화면이 아예 안 읽는다. */
-    uid_kakao:'계정별 카카오 로그인 연결 표시'
+    uid_kakao:'계정별 카카오 로그인 연결 표시',
+    /* 데이터관리(2026-11-21) — 업무 자료가 아니라 «문·기기·살림 숫자»다. 사람이 화면에서 쓰지 않는다(규칙 .write:false — 서버 함수·터미널만). */
+    app_owner:'대표 표지 — 대표 uid 하나(화면에서 아무도 못 씀, 터미널 scripts/datahub-owner.js)',
+    datahub_device:'데이터관리 채팅 기기 — 승인된 공개 열쇠·지문(서버·터미널만 씀)',
+    datahub_device_req:'데이터관리 채팅 기기 등록 요청 — 승인되면 지움(서버만)',
+    datahub_nonce:'데이터관리 채팅 일회용 문제 — 쓰면 지움(서버만)',
+    datahub_activity:'데이터관리 채팅 마지막 질문 시각 — 15분 재인증용(서버만)',
+    datahub_board:'데이터관리 현황판 — 앱별 건수·비율만(서버가 한 시간마다 씀, 대표만 읽음)',
+    /* 관계망 판(ontology/v1) — 원본이 아니라 원본에서 «파생»한 관계층이다. 이알피 «온톨로지 진단»의 관계망 올리기가 쓰고(관리자),
+       데이터관리 연결 지도가 읽기만 한다. 쓰는 쪽은 변수(ONT_ROOT)로 불러 검사의 눈에 안 띄었고, 2026-11-21 데이터관리가 글자로 읽으면서 여기 밝힌다 */
+    ontology:'온톨로지 관계망 판 — 확정 관계만, 이름·본문 없음(이알피 온톨로지 진단이 올림, 데이터관리는 읽기만)'
   };
 
   /* ── 사전에만 있고 아직 만들지 않는 관계어 ──
@@ -660,6 +715,9 @@
     /* 전광판 — 광고 문구·올린 판이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     signboard_core:{program:'signboard',strategy:'in_app',path:'signboard',parser:'coverage',
       gives:'전광판 광고·올린 판·올린 기록·심부름꾼 상태 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 법정교육자료함 — 강의처(고객사 이름)·검토 메모가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
+    edulib_core:{program:'edulib',strategy:'in_app',path:'edulib',parser:'coverage',
+      gives:'강의자료 목록·종류·강의일·검토 메모 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     /* 컨설팅정산 — 사람별 금액·요율·송금이 든 재무 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     settle_core:{program:'settle',strategy:'in_app',path:'settle',parser:'coverage',
       gives:'컨설팅정산 규칙·연결·안내 파일·정산표·이월 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
@@ -675,6 +733,9 @@
     /* 산업일자리전환 — 능률협회·충남경제진흥원 사업장 비식별 요약 및 중간·최종보고서 원고가 든 자리라 앱 안에서만 본다. */
     jobtrans_core:{program:'jobtrans',strategy:'in_app',path:'scal_jobtrans',parser:'coverage',
       gives:'산업일자리전환 사업장 워크스페이스·비식별 분석 카드·기관별 중간·최종보고 원고 (앱 안에서만 본다)'},
+    /* 안전보건체계구축 — 과거 수행이력 비식별 아카이브 및 업종별 체크리스트·위험성평가·보고서 원고가 든 자리라 앱 안에서만 본다. */
+    safety_core:{program:'safety',strategy:'in_app',path:'scal_safety',parser:'coverage',
+      gives:'안전보건체계구축 사업장 워크스페이스·착수/업종별 체크리스트·위험성평가·종합/1P 보고서 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.
@@ -716,7 +777,9 @@
     fin_private:{program:'fin',strategy:'in_app',parser:'finMetadata'},
     rules_documents:{program:'rules',strategy:'in_app',parser:'ruleMetadata'},
     esign_cases:{program:'docs',strategy:'in_app',parser:'esignMetadata'},
-    newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'}
+    newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'},
+    /* 데이터관리 — 돈·사람별 실적이라 통합 화면에서 따로 열지 않는다. 앱 안에서만(대표 전용) */
+    datahub_view:{program:'datahub',strategy:'in_app',path:'datahub/{uid}',parser:'coverage',gives:'대표 보기 설정만 — 집계는 화면 안에서 하고 저장하지 않는다'}
   };
 
   function arr(v){

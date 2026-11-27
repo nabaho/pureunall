@@ -193,8 +193,11 @@
       }
     }
 
-    /* 2) .hwp (한글 5.0 OLE 복합문서) */
+    /* 2) .hwp (한글 5.0 OLE 복합문서 — 필요 시점에 hwp.js 지연 적재) */
     if (/\.hwp$/.test(lower) || isOle) {
+      if (!root.PureunHwp && root.PuFastBoot && typeof root.PuFastBoot.ensureHwpLibs === 'function') {
+        try { await root.PuFastBoot.ensureHwpLibs(); } catch (e) {}
+      }
       if (root.PureunHwp && typeof root.PureunHwp.readHwp === 'function') {
         try {
           var hwpDoc = await root.PureunHwp.readHwp(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
@@ -235,8 +238,11 @@
       } catch (e) {}
     }
 
-    /* 5) 텍스트형 PDF 브라우저 로컬 추출 (원본 외부 전송 없이 로컬 추출 즉시 주민번호 가림) */
+    /* 5) 텍스트형 PDF 브라우저 로컬 추출 (필요 시점에 pdf.min.js 지연 적재 · 로컬 추출 즉시 주민번호 가림) */
     var isPdf = /\.pdf$/i.test(lower) || (u8.length >= 5 && u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46);
+    if (isPdf && !root.pdfjsLib && root.PuFastBoot && typeof root.PuFastBoot.ensurePdfJs === 'function') {
+      try { await root.PuFastBoot.ensurePdfJs(); } catch (e) {}
+    }
     if (isPdf && root.pdfjsLib && typeof root.pdfjsLib.getDocument === 'function') {
       try {
         var pdfDoc = await root.pdfjsLib.getDocument({ data: u8.slice(0), isEvalSupported: false }).promise;

@@ -44,6 +44,27 @@ function run(mk, status) {
 const runs = {};
 [['2026-07', 'manual'], ['2026-09', 'confirmed'], ['2026-10', 'draft']].forEach(([mk, st]) => { const r = run(mk, st); runs[r.id] = r; });
 
+/* 같은 10월에 두 번째 사업(현장클리닉)이 동시에 들어온 경우 — «함께 정산»(사람마다 차액을 더해 플러스·마이너스 상계)을 보려는 가짜 자료.
+   점검노무: 일터상생혁신은 반환(−), 현장클리닉은 추가 지급(+) 이라 합치면 상계된다. */
+const TYPE2 = 'cons-clinic', 업체2 = '(주)점검개인입금';
+company[C.linkKey(업체2)] = { id: C.linkKey(업체2), entityType: 'SettleLink', kind: 'company', text: 업체2, consultingId: 'CS-P1', companyId: 'CO-P1' };
+ctx.companyLinks[C.linkKey(업체2)] = { consultingId: 'CS-P1', companyId: 'CO-P1' };
+const rule2 = { id: TYPE2, entityType: 'SettleRule', typeCode: TYPE2, mode: 'pool', title: '현장클리닉', leadSid: 'P001', rates: { P002: 40, P003: 15 }, siteRates: {},
+  msgHead: '', msgFoot: '', active: true, revision: 1, createdAt: T0, updatedAt: T0 };
+const notice2 = { id: 'N-0002', entityType: 'SettleNotice', typeCode: TYPE2, fileName: '비용지급 안내_점검클리닉(~10월).xlsx', receivedAt: T0 + 29 * 864e5,
+  source: 'upload', months: [{ key: '2026-10', label: '10월', col: 22 }], revision: 1, createdAt: T0, updatedAt: T0,
+  rows: [
+    { line: 7, name: '점검대표', company: 업체2, totalPre: 6000000, amounts: { '2026-10': 3000000 } },
+    { line: 8, name: '점검노무', company: 업체2, totalPre: 2000000, amounts: { '2026-10': 1000000 } },
+    { line: 9, name: '점검사무장', company: 업체2, totalPre: 600000, amounts: { '2026-10': 300000 } },
+  ] };
+notice2.hash = C.noticeHash(notice2.rows);
+{
+  const res2 = C.settleMonth(notice2, '2026-10', rule2, ctx), rid2 = C.runId(TYPE2, '2026-10');
+  runs[rid2] = { id: rid2, entityType: 'SettleRun', typeCode: TYPE2, monthKey: '2026-10', label: '2026년 10월', noticeId: notice2.id, status: 'draft',
+    sites: res2.sites, issues: res2.issues, actuals: {}, changed: false, transfers: [], revision: 2, createdAt: T0, updatedAt: T0 + 30 * 864e5 };
+}
+
 /* 재무관리 거래내역(입금 대조 «당겨오기») — 10월 사업장 주관 세후와 같은 금액 둘 + 가까운 금액 하나 + 관계없는 입금·지출 */
 const net = (pre) => pre - C.withholding(pre).total;
 const ledger_batches = { v: [{ id: 'lb-pa1', by: 'P001', at: '2026-10-31T01:00:00Z', fileName: '점검 거래문자', src: 'hana-sms', rows: [
@@ -75,7 +96,7 @@ module.exports = {
       consultings: { v: consultings.concat([{ id: 'CS-P1', typeCode: 'cons-clinic', personalDepositMode: 'on', companyName: '(주)점검개인입금', companyId: 'CO-P1', no: '클릭-2026-001', startDate: '2026-05-01', endDate: '2026-12-01' }]) },
     },
     /* rooms — 한 사람만 카톡 방이 있다(사람 줄의 «💬 방» 칩과 «방 없음» 등록 칸을 둘 다 본다) */
-    settle: { rules: { [TYPE]: rule }, links: { company, person }, notices: { [notice.id]: notice }, runs, adjusts, rooms: { P002: { sid: 'P002', room: '점검노무 노무사(점검)' } } },
+    settle: { rules: { [TYPE]: rule, [TYPE2]: rule2 }, links: { company, person }, notices: { [notice.id]: notice, [notice2.id]: notice2 }, runs, adjusts, rooms: { P002: { sid: 'P002', room: '점검노무 노무사(점검)' } } },
   },
   views: [
     { name: 'run', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step2 [data-run]'); } },
@@ -84,7 +105,8 @@ module.exports = {
     { name: 'inbox', run: async (p) => { await p.click('#inboxBtn'); } },
     { name: 'link', run: async (p) => { await p.click('#noticesBox [data-notice]'); } },
     { name: 'year', run: async (p) => { await p.click('#tabs button[data-tab=year]'); } },
-    { name: 'msg', run: async (p) => { await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step3 .kchip'); } },
+    { name: 'comb', run: async (p) => { await p.click('#tabs button[data-tab=month]'); await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step2 [data-comb-all]'); } },
+    { name: 'msg', run: async (p) => { await p.click('#tabs button[data-tab=month]'); await p.click('#monthStrip [data-month="2026-10"]'); await p.click('#step3 .kchip'); } },
     { name: 'rules', run: async (p) => { await p.click('#tabs button[data-tab=setup]'); } },
     { name: 'kakao', run: async (p) => { await p.click('#subtabs button[data-sub=kakao]'); } },
   ],

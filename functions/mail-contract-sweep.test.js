@@ -402,3 +402,146 @@ test("⑤ 평일 09~18·24시 및 주말·공휴일 24시 전용 스케줄 가�
   assert.ok(qSummary.summary.includes("2026-11-20"));
   assert.ok(!/3,300,000|3300000|2000만원|2000|15%|hr@gana\.example/.test(qSummary.summary), "견적 금액(2000만원 포함)·요율·원문 이메일은 요약 기록으로 새지 않는다");
 });
+
+test("⑥ 계약협의·상담접수 진행 중 상대방 작성 계약서 회신(스캔본 PDF 포함)은 계약확정(signed)으로 올리고 빈 서식 안내는 제외한다", async () => {
+  assert.equal(
+    MCS.extractCoFromSubj("RE: [푸른노무법인] 사내근로복지기금 설립 위임계약서 송부의 건", ["계약서_가나테크_푸른 노무법인.pdf"], "가나테크"),
+    "가나테크",
+    "첨부파일명에 띄어쓰기가 있는 수임인 표기(푸른 노무법인)는 제외하고 의뢰인 상호를 정확히 추출한다"
+  );
+
+  const { rawDb, wrappedDb } = makeFakeDb({
+    mailbox: {
+      folders: {
+        "INBOX-4a1e411c": { kind: "inbox", name: "INBOX" },
+        "8_기금함-e74c6afc": { kind: "custom", name: "8.기금함" },
+        "Sent Messages-6d8c6b35": { kind: "sent", name: "Sent Messages" },
+      },
+      msgs: {
+        "Sent Messages-6d8c6b35": {
+          "910": {
+            u: "910",
+            d: NOW - 86400e3,
+            t: "ganatech@hanmail.example",
+            tn: "가나테크",
+            s: "[푸른노무법인] 사내근로복지기금 설립 위임계약서 송부의 건",
+            a: 1,
+            an: ["위임계약서_(주)가나테크.pdf"],
+          },
+        },
+        "8_기금함-e74c6afc": {
+          "911": {
+            u: "911",
+            d: NOW - 1800e3,
+            e: "ganatech@hanmail.example",
+            f: "가나테크",
+            s: "RE: [푸른노무법인] 사내근로복지기금 설립 위임계약서 송부의 건",
+            b: "안녕하세요 노무사님 계약서 송부드립니다. 감사합니다.",
+            a: 1,
+            an: ["계약서_가나테크_푸른 노무법인.pdf"],
+          },
+        },
+        "INBOX-4a1e411c": {
+          "911": {
+            u: "911",
+            d: NOW - 1800e3,
+            e: "ganatech@hanmail.example",
+            f: "가나테크",
+            s: "RE: [푸른노무법인] 사내근로복지기금 설립 위임계약서 송부의 건",
+            b: "안녕하세요 노무사님 계약서 송부드립니다. 감사합니다.",
+            a: 1,
+            an: ["계약서_가나테크_푸른 노무법인.pdf"],
+          },
+          "912": {
+            u: "912",
+            d: NOW - 1200e3,
+            e: "mgr@daraorg.example",
+            f: "다라기관",
+            s: "[다라기관] 용역 계약 안내",
+            b: "계약체결 서류 목록과 서식 보내드립니다. 계약서는 스캔본으로 넣어주시고 착수 진행 바랍니다.",
+            a: 1,
+            an: ["3.(서식)용역표준계약서.hwp"],
+          },
+        },
+      },
+    },
+    data: {
+      user_dir: {
+        v: [{ sid: "P-001", name: "김대표", role: "admin", status: "active" }],
+      },
+      companies: { v: {} },
+      contracts: {
+        v: {
+          ctConsultEmpty: {
+            id: "ctConsultEmpty",
+            contractNo: "계약-2026-206",
+            companyName: "가나테크",
+            status: "consult",
+            kinds: ["fund"],
+            amounts: { fund: 0 },
+            managerMain: "P-001",
+            company: { name: "가나테크", email: "master@ganatech.example" },
+            srcMails: ["Sent Messages-6d8c6b35|910"],
+          },
+          ctDaraReview: {
+            id: "ctDaraReview",
+            contractNo: "계약-2026-208",
+            companyName: "다라기관",
+            status: "review",
+            kinds: ["consulting"],
+            amounts: { consulting: 1230000 },
+            managerMain: "P-001",
+            company: { name: "다라기관", email: "mgr@daraorg.example" },
+          },
+        },
+      },
+      cases: { v: {} },
+      consultings: { v: {} },
+      funds: { v: {} },
+      other_projects: { v: {} },
+      finance_income: { v: {} },
+      contract_requests: {},
+    },
+    pucards: { config: { mailWhoMsg: {} }, coInfo: {} },
+  });
+
+  await MCS.runSweep(
+    {
+      getDatabase: () => wrappedDb,
+      getSelfEmail: async () => "self@pureun.example",
+      downloadContractAttachment: async (slug, uid) => {
+        if (slug === "INBOX-4a1e411c" && uid === "911") return null; /* 업무폴더로 이동되어 INBOX 거울은 비어 있는 상태 */
+        if (slug === "8_기금함-e74c6afc" && uid === "911") {
+          return { name: "계약서_가나테크_푸른 노무법인.pdf", mime: "application/pdf", buf: Buffer.from("SCANNED-IMAGE-PDF") };
+        }
+        return { name: "3.(서식)용역표준계약서.hwp", mime: "application/octet-stream", buf: Buffer.from("BLANK-FORM") };
+      },
+      extractPdfText: async () => "", /* 스캔본 PDF라 추출 텍스트 없음 */
+      callContractAi: async () => ({
+        text: JSON.stringify({
+          isOurEngagementContract: true,
+          signedByClient: false,
+          company: "다라기관",
+          docName: "(서식)용역표준계약서",
+          scope: "용역 서식 안내",
+        }),
+      }),
+    },
+    { now: NOW, days: 30, skipSync: true }
+  );
+
+  const reqs = rawDb.tree.data.contract_requests;
+  const replyReq = reqs["mcsc-8_기금함-e74c6afc_911"];
+  assert.ok(replyReq, "스캔본 PDF 회신이라도 진행 중 계약 상대방 이메일이 검증되면 누락 없이 요청 생성");
+  assert.equal(replyReq.targetStatus, "signed", "상대방 작성 계약서 회신은 계약확정(signed)으로 승격 요청");
+  assert.equal(replyReq.openContractVerified, true);
+  assert.equal(replyReq.mergeEmptyOpen, true);
+  assert.equal(replyReq.signedByClient, true);
+  assert.equal(replyReq.inferredKind, "fund");
+  assert.equal(reqs["mcsc-INBOX-4a1e411c_911"], undefined, "동일 메일의 INBOX 빈 거울은 중복 요청을 만들지 않는다");
+
+  const blankFormReq = reqs["mcsc-INBOX-4a1e411c_912"];
+  if (blankFormReq) {
+    assert.notEqual(blankFormReq.targetStatus, "signed", "고객사가 빈 서식을 보내며 날인을 요청한 메일은 계약확정으로 올리지 않는다");
+  }
+});

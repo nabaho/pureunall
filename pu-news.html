@@ -36,13 +36,13 @@
 <!-- ★ 창고 — 명절 인사 사진을 올린다(2026-09-23 「창고 + 함수」). 얼굴이 들어가서
      공개 저장소(img/)에 못 둔다. 올리는 자리는 newsletter_img/ 하나뿐이다. -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-whoami.js?v=4"></script>
-<script src="js/pu-appbar.js?v=51"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=2"></script>
 <script>
@@ -1551,9 +1551,32 @@ table.list tr:hover td{background:#fcfcfd}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 모서리·그림자. 색은 그대로 — 갈색(--brown)은 «고른 거르개·보내기» 표시라 건드리지 않고, 여기는 팔레트 안 값만 쓴다.
+   ★ 탭은 밑줄 그대로 둔다(대표 2026-10-11 — 탭은 밑줄, 알약은 거르개뿐. 둘 다 알약이면 눈이 못 가른다). */
+/* 상자 — 둥근 카드 16px + 옅은 그림자(목업 .card) */
+:where(body.pu-design) .hdbar,:where(body.pu-design) .box{border-radius:var(--pu-r);box-shadow:var(--pu-sh-sm)}
+/* 회차 머리는 «폴더 탭» 한 상자(윗줄 .hdbar + 아랫줄 .ways, 앱 규칙이 모서리를 위·아래로 나눈다) — 그림자를 윗줄에만 주면 상자가 갈라져 보인다.
+   → 윗줄 그림자는 빼고 두 줄을 감싼 .nowtop 에 같은 모서리(12px)로 준다 */
+:where(body.pu-design) .nowtop .hdbar{box-shadow:none}
+:where(body.pu-design) .nowtop{border-radius:12px;box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) #gate{border-radius:var(--pu-r);box-shadow:var(--pu-sh-md)}
+/* 단추 — 둥글기, 보내기(갈색) 단추는 옅은 그림자 */
+:where(body.pu-design) .btn{border-radius:10px}
+:where(body.pu-design) .btn.pri{box-shadow:var(--pu-sh-sm)}
+/* 내보내기 ▾ 등 떠 있는 칸 — 둥근 모서리 + 목업 그림자 */
+:where(body.pu-design) .menu .pop{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-md)}
+/* 폰 — 상자는 한 겹: 그림자를 걷는다(모서리는 앱 폰 차림 그대로 둥글다) */
+@media (max-width:760px){
+  :where(body.pu-design) .hdbar,:where(body.pu-design) .box,:where(body.pu-design) .nowtop{box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 </head>
-<body>
+<body class="pu-design">
 
 <!-- ★ #shell / #top — 넓은 화면에서 위를 얼리기 위한 껍데기 (CSS 맨 아래 참고).
      ⚠ #toast·#big 은 이 밖에 둔다. 둘은 position:fixed 라 껍데기 안에 넣으면
@@ -7809,11 +7832,11 @@ function 설정화면(){
         <div class="w2">
          <label class="f">로고 그림 <span style="font-weight:400">(비우면 이름만)</span> ${도움(
            '편지 머리의 법인 이름 «앞»에 작게 들어갑니다.<br>'
-           + '⚠ <b>우리 홈페이지에 올린 그림만</b> 나갑니다 (nabaho.github.io/pureunall/).<br>'
+           + '⚠ <b>우리 홈페이지에 올린 그림만</b> 나갑니다 (erp.pureunlabor.co.kr/).<br>'
            + '남의 서버 그림은 발송기가 버립니다 — 받는 쪽이 열 때 '
            + '「언제 읽었나」가 새 나가는 것을 막습니다.')}</label>
          <input type="text" id="cfgLogo" value="${esc(s.로고그림||'')}"
-           placeholder="https://nabaho.github.io/pureunall/img/…" onchange="설정저장()">
+           placeholder="https://erp.pureunlabor.co.kr/img/…" onchange="설정저장()">
         </div>
         <div class="w2">
          <label class="f">주간노동뉴스 옆 사진 <span style="font-weight:400">(비우면 글만)</span> ${도움(
@@ -7821,7 +7844,7 @@ function 설정화면(){
            + '주소를 넣으면 그 모양이 됩니다 — 비우면 예전처럼 줄만 나갑니다.<br>'
            + '⚠ 배너와 같은 규칙: <b>우리 홈페이지에 올린 그림만</b> 나갑니다.')}</label>
          <input type="text" id="cfgNews" value="${esc(s.뉴스그림||'')}"
-           placeholder="https://nabaho.github.io/pureunall/img/…" onchange="설정저장()">
+           placeholder="https://erp.pureunlabor.co.kr/img/…" onchange="설정저장()">
         </div>
         <div class="w2">
          <label class="f">열람 추적 밑주소

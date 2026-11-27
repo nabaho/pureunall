@@ -2,7 +2,7 @@
 
 푸른노무법인의 ERP — 인사노무 업무 자동화 플랫폼. 한국어 주석, 노무 용어를 지킨다(급여→임금, 직원→근로자).
 
-**대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어. 설정 `.claude/settings.json` 의 `"language": "korean"` 과 함께 간다. Gemini·Antigravity 는 `GEMINI.md`, 내 컴퓨터 개인설정은 `node scripts/korean-everywhere.js --apply` · 지킴: `tests/korean-everywhere.test.js` · 자세히: `docs/규칙/한국어로-대답.md`
+**대답은 늘 한국어로 한다 (Always respond in Korean).** 영어로 묻거나 영어 자료를 읽어도 대답·보고·PR 설명은 한국어. 어떤 질문이든, 긴 대화가 요약된 뒤나 영어 알림·도구 결과를 읽은 뒤에도 영어 문장으로 답하지 않는다. 설정 `.claude/settings.json` 의 `"language": "korean"` 과 함께 간다. Gemini·Antigravity 는 `GEMINI.md`, 내 컴퓨터 개인설정은 `node scripts/korean-everywhere.js --apply` · 지킴: `tests/korean-everywhere.test.js` · 자세히: `docs/규칙/한국어로-대답.md`
 
 ## 이 파일은 짧게 둔다 — 방마다 «통째로» 실린다 (대표 지시 2026-11-07 「토큰 아껴쓰기」)
 
@@ -48,8 +48,10 @@
 
 - 코드를 고칠 건은 읽고·고치고·검사·PR 뒤 답변까지 넣는다. 설명만 필요한 건은 답 + `ing`, 돈·정책은 대표에게 묻고 `ing`. 안 고친 것을 `done` 으로 두지 않는다.
 - 읽기·답변은 `node scripts/suggestion-watch.js`(pending · show · reply · notify)로 — 답은 세 자리에 한 번에, 왜·어떻게·건의자가 할 일까지.
+- 건의함 세 자리(`suggestions_*_private`)의 보안규칙은 «번호는 push 번호 모양만 · 알려진 칸만 · 칸마다 길이 한도» — 이 자리에 **새 칸**을 쓰려면 `scripts/make-firebase-rules.js` 건의함 절과 화면을 «같이» 고친다(안 그러면 접수가 막힌다). 지킴: `tests/suggestion-rules.test.js` · 진짜 엔진 확인 `tests/suggestion-rules.emulator.mjs`(수동)
 - 고친 뒤 같은 화면의 다른 길을 한 번 더 본다. 직접 고쳐도 돈 자동 변경·보안규칙·살아 있는 자료 쓰기·외부 발송의 안전장치는 그대로다.
-- 자세히(읽는 법·답변 세 자리·자동 감시·알림): `docs/규칙/건의함.md`
+- «완료»(`done`)는 최종이 아니다 — 건의자가 확인 창에서 ☑ 「해결됐어요」를 눌러야 최종 확정. 도구가 대신 찍지 않는다. `scan`·`ack` 으로 확인 대기를 보고 3일 넘게 답이 없으면 대표에게 알린다(대표 지시 2026-11-11). 지킴: `tests/suggestion-ack.test.js`
+- 자세히(읽는 법·답변 세 자리·자동 감시·알림·감시 지시문 원본): `docs/규칙/건의함.md` · `docs/규칙/건의함-감시-지시문.md`
 
 ## 만들기 전에 «이미 있는 것»부터 찾는다 (대표 승인 2026-10-18)
 
@@ -121,6 +123,12 @@
 - 코딩·데이터 검토 모두 종결·이관·취소(`closed`·`transferred`·`cancelled`)·마감월(`locked_*`)·휴지통(`_deleted`)·확정 되돌림(`undoneDate`) 건의 번호·상태를 자동 변경하거나 통째 덮어쓰기(`data/<표>`)·물리 삭제로 되살리지 않는다.
 - 입금·성과 조회는 `erpIncomeLive`·`erpPerfCounts` 거르개를 반드시 거치고, 데이터 정리 전후에는 `node scripts/erp-integrity-audit.js` 로 불변성을 검증한다.
 - 지킴: `tests/anti-resurrection-guards.test.js` · 자세히: `docs/규칙/종료-삭제-되돌림-불변.md`
+
+## 시스템 장애 알림은 화면에 띄우지 않고 저절로 «처리 완료»로 정리한다 — 모든 프로그램 (대표 지시 2026-11-22)
+
+- 어느 프로그램에도 장애 알림용 떠 있는 단추·창을 만들지 않는다(앱바와 겹친다). 오류는 `js/pu-health.js` 가 «처음부터 처리 완료»로 적고, 서버가 적은 알림·쌓인 것은 총괄관리자 화면이 열릴 때 조용히 정리한다. 기록은 지우지 않는다.
+- 창은 포털 [⚙ 설정] 「열어보기」를 사람이 눌렀을 때만 뜬다. 새 프로그램은 `pu-health.js?v=` 한 벌만 싣는다 — 따로 만들지 않는다.
+- 지킴: `tests/health-auto-settle.test.js` · 자세히: `docs/규칙/장애알림-자동정리.md`
 
 ## 어느 방이든 — 공용 상태 파일 `STATUS.md`
 
