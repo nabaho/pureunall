@@ -2508,6 +2508,24 @@
   var MAIL_READ_ATT_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/readMailAttachment';
   var PUB_DOMAINS = { 'naver.com': 1, 'daum.net': 1, 'hanmail.net': 1, 'gmail.com': 1, 'kakao.com': 1, 'nate.com': 1, 'yahoo.com': 1, 'hotmail.com': 1, 'outlook.com': 1 };
 
+  /* 메일 첨부 목록에서 «계약서로 읽을» 첨부의 번호를 고른다. 못 고르면 -1.
+     ① 사업자등록증·고유번호증·통장사본·등기부·명함·견적서는 건너뛴다 — «첫 번째 첨부»로 때우지 않는다(2026-11-27).
+        계약서 메일에는 대개 통장사본이 함께 붙고 맨 앞에 오기 때문에, 이 거름이 없으면 통장사본이 «계약서»로 읽힌다.
+     ② 이름이 계약서 갈래이거나 계약·약정·위임 말이 있으면 바로 그것.
+     ③ 없으면 읽을 수 있는 첫 서류. DP(PuDocPick)가 없어도 돈다. */
+  function pickContractAttIndex(atts, DP) {
+    var list = Array.isArray(atts) ? atts : [];
+    var atIdx = -1;
+    for (var k = 0; k < list.length; k++) {
+      var nm = String((list[k] && list[k].name) || '');
+      if (!/\.(pdf|jpe?g|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(nm)) continue;
+      if (/사업자등록증|고유번호증|통장사본|등기부|명함|견적서/.test(nm)) continue;
+      if ((DP && DP.이름갈래(nm) === '계약서') || /계약|약정|위임/.test(nm)) return k;
+      if (atIdx < 0) atIdx = k;
+    }
+    return atIdx;
+  }
+
   function pullMailContracts(opts) {
     opts = opts || {};
     if (!deps.db) return Promise.resolve({ pulled: [], quoteReqsCreated: 0 });
@@ -2828,13 +2846,7 @@
             .then(function (j) {
               if (!j || !j.ok) return pullNext(idx + 1);
               var atts = j.atts || [];
-              var atIdx = -1;
-              for (var k = 0; k < atts.length; k++) {
-                var nm = String((atts[k] && atts[k].name) || '');
-                if (!/\.(pdf|jpe?g|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(nm)) continue;
-                if ((DP && DP.이름갈래(nm) === '계약서') || /계약|약정|위임/.test(nm)) { atIdx = k; break; }
-                if (atIdx < 0) atIdx = k;
-              }
+              var atIdx = pickContractAttIndex(atts, DP);
               if (atIdx < 0) {
                 return deps.db.ref(CT_REQ + '/' + c.mpKey).set({
                   id: c.mpKey, state: 'skipped_ext', srcKey: c.srcKey, at: Date.now()
@@ -2897,6 +2909,7 @@
     guessConsType: guessConsType,
     requestContract: requestContract,
     autoRequestContractFromPhoto: autoRequestContractFromPhoto,
+    pickContractAttIndex: pickContractAttIndex,
     pullMailContracts: pullMailContracts,
     markMailContractPulled: markMailContractPulled,
     synthesizeMailLifecycle: synthesizeMailLifecycle,

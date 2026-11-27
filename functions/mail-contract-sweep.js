@@ -35,6 +35,8 @@ const CLOSED_CO_FOLDER_ID = "imt7309g57mtle";
 const DEFAULT_LOOKBACK_DAYS = 45;
 const MAX_CONTRACT_READS_PER_RUN = 12;
 const MAX_QUOTE_REQS_PER_RUN = 40;
+/* AI 판독이 «비어 돌아왔을» 때 같은 메일을 다시 읽는 한도(2026-11-27). 한 번 실패로 곧장 «제목·첨부명 카드»로 굳히지 않는다. */
+const MAX_AI_TRIES = 3;
 const MAX_QUOTE_ATT_READS_PER_RUN = 8;
 const MAX_ATT_BYTES = 15 * 1024 * 1024;
 const MAX_HWPX_SECTIONS = 25;
@@ -367,7 +369,7 @@ function extractHwpxText(buf) {
    AI 응답에서 % 가 누락되거나 비식별 보류(pii_hold_meta)로 외부 AI 호출을 생략한 경우에도
    외부 전송 없이 계약서의 % 요율·보수 숫자만 안전하게 당겨온다 (주민번호·전화·계좌는 절대 포함하지 않음). */
 function extractContractFeesFromText(rawText) {
-  const res = { retainer: "", success: "", deposit: "", vat: "" };
+  const res = { retainer: "", success: "", deposit: "", vat: "", fee: "" };
   const s = String(rawText || "").replace(/\r\n/g, "\n").slice(0, 24000);
   if (!s) return res;
   const noLate = s.replace(/(?:지연|연체|미지급|지체)[^\n.]{0,35}?연\s*\d+(?:\.\d+)?\s*[%％]\s*(?:의\s*)?이자/g, " ")
@@ -416,7 +418,19 @@ function extractContractFeesFromText(rawText) {
     const dv = /부가(?:가치)?세\s*(포함|별도)/.exec(mDep[2] || "");
     if (!res.vat && dv) res.vat = "부가세 " + dv[1];
   }
+  /* 3) 컨설팅 수수료·용역대금처럼 «착수금·계약금»이라 부르지 않는 총액(2026-11-27)
+     — 컨설팅 위임계약서는 흔히 «컨설팅 수수료는 금 ○○원(부가세 별도)» 으로 쓴다. 위 둘만 보면 금액이 통째로 빈다.
+     숫자 뒤에 «원» 이 붙어야만 잡고, 지연이자(연 %)는 위에서 이미 걷어 냈다. 한글 숫자(일금 삼백만원정)는 앞의 «(₩숫자)» 병기만 읽는다. */
+  const mFee = /(?:컨설팅\s*(?:수수료|비용|비|료)|수수료|용역\s*(?:대금|비|료)|(?:총\s*)?계약\s*금액|총\s*금액|보수\s*총액|위임\s*보수)\s*(?:총액)?\s*(?:으로|은|는|이|가|:|：|\|)?\s*(?:일금\s*[가-힣\s]+원정\s*\(?\s*)?(?:금\s*|[₩￦]\s*)?(\d{1,3}(?:,\d{3})+\s*원|\d[\d,]*(?:\.\d+)?\s*만\s*원|\d{1,3}(?:,\d{3})+(?=\s*\)))(\s*\(?\s*(?:부가(?:가치)?세|VAT)\s*(?:포함|별도)\s*\)?)?/i.exec(noLate);
+  if (mFee && mFee[1]) {
+    const rawF0 = mFee[1].replace(/\s+/g, "");
+    const rawF = /원$/.test(rawF0) ? rawF0 : rawF0 + "원";
+    const fv = /(포함|별도)/.exec(mFee[2] || "");
+    res.fee = rawF + (fv ? " (부가세 " + fv[1] + ")" : "");
+    if (!res.vat && fv) res.vat = "부가세 " + fv[1];
+  }
   /* 출력값 화이트리스트 검증 — 숫자·단위(%·원·만원) 및 고정 부가세 표기 외에는 절대 반출하지 않는다 */
+  if (res.fee && !/^\d[\d.,]*(?:원|만원)(?:\s*\(\s*부가세\s*(?:포함|별도)\s*\))?$/.test(res.fee)) res.fee = "";
   const SAFE_FEE_OUT_RE = /^\d[\d.,]*\s*(?:%|원|만원?)(?:\s*\(\s*부가(?:가치)?세\s*(?:포함|별도)\s*\))?$/;
   if (res.success && !SAFE_FEE_OUT_RE.test(res.success)) res.success = "";
   if (res.retainer && !SAFE_FEE_OUT_RE.test(res.retainer)) res.retainer = "";
@@ -431,19 +445,37 @@ async function scrubContractTextForAi(rawText) {
   return REDACT.scrubContractText(rawText);
 }
 
+/* AI 답이 글자 수 한도에서 끊겨 닫는 중괄호가 없을 때, 끝까지 읽힌 «"칸": 값» 만 살린다(2026-11-27).
+   전에는 끊기면 통째로 버려 «판독 비어 있음» 이 되었다. 살린 객체에는 _partial:true 를 달아 부르는 쪽이 «일부만 읽음» 을 알린다.
+   칸이 3개 미만이면 믿지 않는다. 안 읽힌 칸은 지어내지 않는다. */
+function salvageTruncatedJson(text) {
+  const body = String(text || "");
+  const re = /"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*("(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?)\s*(?=,|\}|$)/g;
+  const obj = {};
+  let n = 0;
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    try { obj[m[1]] = JSON.parse(m[2]); n++; } catch (_) { /* 이 칸만 버린다 */ }
+  }
+  if (n < 3) return null;
+  Object.defineProperty(obj, "_partial", { value: true, enumerable: true });
+  return obj;
+}
+
 function parseAiJson(rawText) {
   const s = String(rawText || "").trim();
   if (!s) return null;
   const cleaned = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   const first = cleaned.indexOf("{");
+  if (first < 0) return null;
   const last = cleaned.lastIndexOf("}");
-  if (first < 0 || last <= first) return null;
-  try {
-    const obj = JSON.parse(cleaned.slice(first, last + 1));
-    return obj && typeof obj === "object" && !Array.isArray(obj) ? obj : null;
-  } catch (_) {
-    return null;
+  if (last > first) {
+    try {
+      const obj = JSON.parse(cleaned.slice(first, last + 1));
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) return obj;
+    } catch (_) { /* 아래에서 읽힌 만큼 살린다 */ }
   }
+  return salvageTruncatedJson(cleaned.slice(first));
 }
 
 function isContractCandidateMail(row, subj, attNames) {
@@ -471,6 +503,35 @@ function pickBestContractAttachment(atts) {
     if (!fallback) fallback = { att: a, index: i };
   }
   return fallback;
+}
+
+/* 첨부 «이름 목록»만 있을 때(내려받기·판독이 안 된 메일) 계약서 파일 이름을 고른다.
+   pickBestContractAttachment 와 같은 잣대다 — 통장사본·사업자등록증·견적서는 계약서가 아니다.
+   ⚠ 첫 번째 첨부를 그냥 쓰지 않는다(2026-11-27: 첫 첨부가 통장사본이라 «통장사본»이 계약서 이름으로 적혀,
+     유형이 첫 번째 유형으로 찍히고 금액이 비었다). 못 고르면 빈 글자 — 부르는 쪽이 «계약서»로 둔다. */
+const NON_CONTRACT_ATT_NAME_RE = /사업자등록증|고유번호증|통장사본|등기부|명함|견적서/;
+function pickBestContractAttachmentName(names) {
+  const list = Array.isArray(names) ? names : [];
+  let fallback = "";
+  for (let i = 0; i < list.length; i++) {
+    const nm = String(list[i] || "").trim();
+    if (!nm || NON_CONTRACT_ATT_NAME_RE.test(nm)) continue;
+    if (/(?:계약|약정|위임)/.test(nm)) return nm;
+    if (!fallback && ATT_CONTRACT_EXT_RE.test(nm)) fallback = nm;
+  }
+  return fallback;
+}
+
+/* 계약서 원문을 못 읽고 제목·첨부명으로 만든 카드에 다는 «확인 필요» 문구 — 무엇을 못 읽었는지 말한다. */
+function metaFallbackNote(outCode, folderLabel) {
+  const where = "푸른메일함(" + String(folderLabel || "메일함") + ")";
+  if (outCode === "ai_empty_meta") {
+    return where + " 계약서 첨부는 열었지만 AI 판독이 되지 않아 금액·유형·기간을 비워 두었습니다 — 첨부 계약서에서 직접 확인해 채워 주세요.";
+  }
+  if (outCode === "contract_meta") {
+    return where + " 계약서 첨부 원문을 내려받지 못해 제목·첨부명으로만 등록했습니다 — 첨부 계약서에서 금액·유형·기간·당사자를 확인해 주세요.";
+  }
+  return where + "에서 제목·첨부명으로 등록된 계약서입니다 — 첨부 원문 금액·유형·당사자 정보를 확인해 주세요.";
 }
 
 function pickBestQuoteAttachment(atts) {
@@ -961,7 +1022,7 @@ async function runSweep(deps, opts) {
       const srcKey = slug + "|" + uid;
       const cKey = canonSrcMailKey(srcKey);
       const sKey = safeRtdbKey(srcKey);
-      if (seenMap[sKey]) continue;
+      if (seenMap[sKey] && seenMap[sKey].out !== "ai_retry") continue;
       if (knownMailKeys.has(srcKey) || knownMailKeys.has(cKey)) {
         seenUpdates[SEEN_ROOT + "/" + sKey] = { at: now, out: "dup_src" };
         out.skippedDup++;
@@ -1301,8 +1362,10 @@ async function runSweep(deps, opts) {
       }
     }
 
-    function queueMetaFallbackContract(outCode, checkNote, localFeeHints) {
+    function queueMetaFallbackContract(outCode, checkNote, localFeeHints, readInfo) {
       const feeHints = localFeeHints || {};
+      /* 서류 이름 — 첫 번째 첨부가 아니라 «계약서로 읽은(읽을) 첨부»의 이름. 통장사본이 계약서 이름이 되지 않게(2026-11-27) */
+      const fbDocName = String((readInfo && readInfo.docName) || "").trim() || pickBestContractAttachmentName(cc.an) || "계약서";
       const isReplySigned = !!(preOpenReply && preOpenReply.verified && preOpenReply.signed);
       const canFallback = (cc.isInternal || (emailMatch && emailMatch.exactEmail && emailMatch.co) || isReplySigned)
         && preCoName && !isOurFirmToken(preCoName);
@@ -1374,13 +1437,14 @@ async function runSweep(deps, opts) {
           phone: "",
         },
         contractFields: {
-          docName: cc.an[0] || "계약서",
+          docName: fbDocName,
+          fileName: fbDocName.replace(/\.[a-z0-9]{2,5}$/i, "").trim(),
           scope: cc.subj.replace(/^\s*(?:(?:RE|FW|FWD)\s*[:：]\s*)+/i, "").slice(0, 60),
           signDate: ymd,
           startDate: "",
           endDate: "",
           term: "",
-          fee: "",
+          fee: String(feeHints.fee || ""),
           vat: String(feeHints.vat || ""),
           retainer: String(feeHints.retainer || ""),
           success: String(feeHints.success || ""),
@@ -1410,11 +1474,14 @@ async function runSweep(deps, opts) {
           },
         },
       };
-      if (!isReplySigned && (checkNote || !fbStaff.explicit)) {
+      /* ⚠ 계약서 «원문을 못 읽고» 제목·첨부명으로만 만든 카드는 항상 «확인 필요»를 단다(2026-11-27).
+         전에는 AI 판독이 비어도(ai_empty_meta) 표시가 없어, 금액·유형이 빈 카드가 멀쩡해 보였다.
+         계약서를 체결본으로 읽은 경우(isReplySigned)만 뺀다. */
+      if (!isReplySigned) {
         metaReq.checkReq = {
           at: new Date(now).toISOString(),
           by: "시스템(메일 자동검토)",
-          note: checkNote || ("푸른메일함(" + folderLabel + ")에서 제목·첨부명으로 등록된 계약서입니다 — 첨부 원문 금액·당사자 정보를 확인해 주세요."),
+          note: checkNote || metaFallbackNote(outCode, folderLabel),
         };
       }
       reqUpdates[REQ_ROOT + "/" + reqKey] = metaReq;
@@ -1461,7 +1528,7 @@ async function runSweep(deps, opts) {
 
     if (!textHint || textHint.replace(/\s/g, "").length < 20) {
       /* 스캔본 PDF 등 텍스트가 없는 첨부는 외부 AI에 원본 이미지를 보내지 않고 메타 기반 계약협의 카드로 올린다 */
-      if (queueMetaFallbackContract("scanned_meta", "첨부 계약서가 스캔본(이미지)이어서 개인정보 보호 원칙에 따라 외부 AI 원문 전송을 생략했습니다 — 첨부 계약서의 금액·당사자를 확인해 주세요.")) {
+      if (queueMetaFallbackContract("scanned_meta", "첨부 계약서가 스캔본(이미지)이어서 개인정보 보호 원칙에 따라 외부 AI 원문 전송을 생략했습니다 — 첨부 계약서의 금액·당사자를 확인해 주세요.", undefined, { docName: fName })) {
         continue;
       }
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "scanned_unreadable" };
@@ -1472,7 +1539,7 @@ async function runSweep(deps, opts) {
     const localFeeHints = extractContractFeesFromText(textHint);
     const scrubbed = await scrubContractTextForAi(textHint);
     if (!scrubbed.ok || !scrubbed.text) {
-      if (queueMetaFallbackContract("pii_hold_meta", "첨부 계약서에 비식별 후에도 민감정보 패턴이 남아 외부 AI 전송을 차단하고 제목·첨부명 및 로컬 보수 표기만 반영했습니다 — 첨부 원문을 직접 확인해 주세요.", localFeeHints)) {
+      if (queueMetaFallbackContract("pii_hold_meta", "첨부 계약서에 비식별 후에도 민감정보 패턴이 남아 외부 AI 전송을 차단하고 제목·첨부명 및 로컬 보수 표기만 반영했습니다 — 첨부 원문을 직접 확인해 주세요.", localFeeHints, { docName: fName })) {
         continue;
       }
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: scrubbed.residualPii ? "residual_pii_blocked" : "scrub_failed" };
@@ -1502,7 +1569,15 @@ async function runSweep(deps, opts) {
     }
 
     if (!extracted) {
-      if (queueMetaFallbackContract("ai_empty_meta", "", localFeeHints)) continue;
+      const prevSeen = seenMap[cc.sKey];
+      const prevTries = prevSeen && prevSeen.out === "ai_retry" ? (Number(prevSeen.n) || 1) : 0;
+      if (prevTries + 1 < MAX_AI_TRIES) {
+        /* 일시적 AI 실패일 수 있다 — 다음 회차에 다시 읽는다(knownMailKeys 에 넣지 않는다) */
+        seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "ai_retry", n: prevTries + 1 };
+        out.aiRetry = (out.aiRetry || 0) + 1;
+        continue;
+      }
+      if (queueMetaFallbackContract("ai_empty_meta", "", localFeeHints, { docName: fName })) continue;
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "unreadable" };
       out.skippedNonTarget++;
       continue;
@@ -1524,6 +1599,10 @@ async function runSweep(deps, opts) {
     }
     if (localFeeHints.deposit && !String(extracted.deposit || "").trim() && !String(extracted.fee || "").trim()) {
       extracted.deposit = localFeeHints.deposit;
+    }
+    /* 컨설팅 수수료·용역대금처럼 «착수금·계약금» 말이 아닌 총액 — AI 가 비웠으면 본문에서 읽은 것으로 채운다(2026-11-27) */
+    if (localFeeHints.fee && !String(extracted.fee || "").trim() && !String(extracted.deposit || "").trim() && !String(extracted.retainer || "").trim()) {
+      extracted.fee = localFeeHints.fee;
     }
     if (localFeeHints.vat && !String(extracted.vat || "").trim()) {
       extracted.vat = localFeeHints.vat;
@@ -1611,7 +1690,7 @@ async function runSweep(deps, opts) {
     const folderLabel = cc.isTome ? "내게쓴메일함" : (cc.isSent ? "보낸메일함" : (cc.fKind === "inbox" ? "받은메일함" : String((fpLabelOf(folders, cc.slug)) || "업무메일함")));
 
     const needManagerCheck = (!cc.isInternal && !recvSenderVerified) || (!staff.explicit && !openReplySigned);
-    const checkReq = needManagerCheck
+    let checkReq = needManagerCheck
       ? {
           at: new Date(now).toISOString(),
           by: "시스템(메일 자동검토)",
@@ -1649,6 +1728,8 @@ async function runSweep(deps, opts) {
       },
       contractFields: {
         docName: String(extracted.docName || fName.replace(/\.[a-z0-9]{2,5}$/i, "") || "계약서").trim(),
+        /* 읽은 첨부의 «파일 이름» — 문서 제목(위임계약서)만으로는 유형을 못 가를 때 이름에 든 사업 이름(산업안전컨설팅 등)을 본다 */
+        fileName: fName.replace(/\.[a-z0-9]{2,5}$/i, "").trim(),
         scope: String(extracted.scope || "").trim(),
         signDate: /^\d{4}-\d{2}-\d{2}$/.test(String(extracted.signDate || "")) ? String(extracted.signDate) : ymd,
         startDate: /^\d{4}-\d{2}-\d{2}$/.test(String(extracted.startDate || "")) ? String(extracted.startDate) : "",
@@ -1684,6 +1765,13 @@ async function runSweep(deps, opts) {
         },
       },
     };
+    /* AI 답이 끊겨 «읽힌 만큼»만 살린 경우 — 빠진 칸이 있을 수 있음을 카드에 알린다(2026-11-27) */
+    if (extracted._partial && !openReplySigned) {
+      const partialNote = "AI 가 계약서를 일부만 읽었습니다 — 비어 있는 항목(금액·기간·유형)을 첨부 계약서에서 확인해 주세요.";
+      checkReq = checkReq
+        ? Object.assign({}, checkReq, { note: String(checkReq.note || "") + " / " + partialNote })
+        : { at: new Date(now).toISOString(), by: "시스템(메일 자동검토)", note: "푸른메일함(" + folderLabel + ") " + partialNote };
+    }
     if (checkReq) reqObj.checkReq = checkReq;
 
     const reqKeyC = "mcsc-" + cc.sKey;
@@ -1736,6 +1824,9 @@ module.exports = {
   isSelfMailRow,
   isContractCandidateMail,
   pickBestContractAttachment,
+  pickBestContractAttachmentName,
+  metaFallbackNote,
+  salvageTruncatedJson,
   pickBestQuoteAttachment,
   getKstClock,
   loadKoreanHolidayMap,

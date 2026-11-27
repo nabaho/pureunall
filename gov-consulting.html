@@ -1539,12 +1539,60 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21 · ④ 무리) ══
+   계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
+   ★ body.pu-design 일 때만 먹는다 — <body> 의 pu-design 한 단어를 빼면 옛 모양 그대로다.
+   ★ 값만 바꾼다: 머리 탭·대시보드·거르개·칸·줄은 하나도 숨기거나 옮기지 않는다(display·order·position 을 쓰지 않는다).
+   ★ 구글 캘린더에 맞춘 곳은 손대지 않는다 — 달력 격자(.mg·.wg)·일정 칩(.chip)·숫자 띠(.sum-card)는
+     대표 지시 2026-08-25 «구글 캘린더와 같은 색·글자» 값 그대로다.
+   ★ 머리줄 남색·왼쪽 대시보드 밝은 톤도 그대로 — 모서리·그림자·고른 표시만 맞춘다. */
+/* 상자 둥글기 — 앱 변수(--r: 설정 카드·종료 카드·보고서 칸)를 목업 카드 값으로 */
+:where(body.pu-design){--r:var(--pu-r)}
+/* 머리줄 — 탭·단추는 알약(자리·글자·색 그대로) */
+:where(body.pu-design) .hdr-tab,:where(body.pu-design) .hdr-btn,:where(body.pu-design) .notif-btn,
+:where(body.pu-design) .logout-btn,:where(body.pu-design) .user-badge,:where(body.pu-design) .zip-btn{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .mode-toggle,:where(body.pu-design) .mode-btn{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .user-sel,:where(body.pu-design) .att-filter,:where(body.pu-design) .tl-filter-input{border-radius:10px}
+/* 왼쪽 대시보드 — 둥근 카드 + 옅은 그림자(목업 .card). 「내 담당·기한 위험」 색 막대(.is-mine·.is-risk)는 더 센 규칙이라 그대로 */
+:where(body.pu-design) .dcard{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .dash-search{border-radius:10px}
+:where(body.pu-design) .dash-icon-btn,:where(body.pu-design) .dash-add{border-radius:10px}
+:where(body.pu-design) .dash-icon-btn.primary,:where(body.pu-design) .dash-add{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .dash-groupby{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .att-label,:where(body.pu-design) .ph-badge,:where(body.pu-design) .new-badge{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .dcard-open-btn{border-radius:8px}
+/* 달력 위 ◀ ▶ 오늘 — 단추 둥글기만(달력 격자·숫자 띠는 구글 값 그대로) */
+:where(body.pu-design) .cal-nav,:where(body.pu-design) .cal-today-btn{border-radius:10px}
+/* 창·단추·입력칸 */
+:where(body.pu-design) .modal{box-shadow:var(--pu-sh-md)}
+:where(body.pu-design) .btn{border-radius:10px}
+:where(body.pu-design) .btn-p{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .fi,:where(body.pu-design) .fsel,:where(body.pu-design) .topt{border-radius:10px}
+:where(body.pu-design) .toast{border-radius:12px;box-shadow:0 8px 24px rgba(30,41,59,.28)}
+/* 설정 표 머리 — 파란 글자를 읽히는 회색으로, 굵기 그대로 */
+:where(body.pu-design) .set-tbl th{color:var(--pu-sub)}
+/* 종료 사업장·타임라인 — 작은 고르개는 알약, 카드는 옅은 그림자 */
+:where(body.pu-design) .tl-toggle,:where(body.pu-design) .ended-pbtn{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .ended-card,:where(body.pu-design) .ended-card2{box-shadow:var(--pu-sh-sm)}
+:where(body.pu-design) .ended-search input{border-radius:10px}
+/* 폰 «회차 진행 보기» — 탭은 알약, 고른 탭은 파랑 그림자, 숫자 칸·줄은 작은 카드 둥글기 */
+:where(body.pu-design) .mp-tab{border-radius:var(--pu-r-pill)}
+:where(body.pu-design) .mp-tab.on{box-shadow:var(--pu-sh-acc)}
+:where(body.pu-design) .mp-sum div,:where(body.pu-design) .mp-row{border-radius:var(--pu-r-sm)}
+:where(body.pu-design) .mp-sel{border-radius:10px}
+/* 폰 — 상자는 한 겹(폰 화면 규칙). 바탕을 걷은 종료 카드에 그림자가 상자를 다시 만들지 않게 뺀다 */
+@media (max-width:768px){
+  :where(body.pu-design) .ended-card,:where(body.pu-design) .ended-card2{box-shadow:none}
+}
+/* ══ pu-design 끝 ══ */
 </style>
+<!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=2">
 <!-- Firebase SDK (compat 버전: 단일 HTML에서 간편) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=104"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-staff-label.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -1552,7 +1600,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-visit-sms.js?v=2"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=3"></script>
@@ -1565,12 +1613,12 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
      다시 내려받지 않아 더 싸다(한 장 830KB).
      ⚠ ?v= 는 사진첩(pu-photos.html)의 것과 **같이** 올린다 — 한쪽만 올리면 이 앱만
        옛 판 판독기로 읽어, 같은 캡처가 앱마다 다른 결과를 낸다. -->
-<script src="js/pu-doc-read.js?v=53"></script>
-<script src="js/pu-doc-file.js?v=45"></script>
+<script src="js/pu-doc-read.js?v=54"></script>
+<script src="js/pu-doc-file.js?v=46"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=51"></script>
+  <script src="js/pu-appbar.js?v=55"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=6"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
+  <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
@@ -1592,7 +1640,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
     if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } })();
   </script>
 </head>
-<body>
+<body class="pu-design">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
   <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>
 </div>
@@ -3051,12 +3099,24 @@ function _fetchRoster(){
   }).catch(()=>_fbDB.ref('data/user_accounts').once('value').then(s2=>norm(s2.val())||[]).catch(()=>[]));
 }
 
-// 시작 시 Firebase → localStorage (서버 우선)
+// 시작 시 Firebase → localStorage (서버 우선 · 직렬 대기 없이 전체 노드 병렬 수신)
 async function fbSyncDown(){
   const failed=[];
-  for(const[lsKey,node]of Object.entries(FB_NODES)){
+  const entries=Object.entries(FB_NODES);
+  const settled=await Promise.allSettled(entries.map(([,node])=>_fbDB.ref(node).get()));
+  for(let i=0;i<entries.length;i++){
+    const[lsKey,node]=entries[i];
+    const item=settled[i];
+    if(!item||item.status!=='fulfilled'){
+      const e=item?item.reason:new Error('network');
+      /* ★ 예전에는 여기가 «빈 catch» 였다. 권한에 막힌 것과 자료가 없는 것이
+         화면에서 똑같아 보여, 로그인이 안 먹었다는 사실을 아무도 몰랐다. */
+      failed.push({node:node, e:e});
+      console.warn('[내려받기 실패]', node, e);
+      continue;
+    }
     try{
-      const snap=await _fbDB.ref(node).get();
+      const snap=item.value;
       if(snap.exists()){
         const inc=snap.val();
         /* 내가 올리는 중인 칸은 덮지 않는다 — 올리기가 끝나면 그쪽이 새 값을 받아 온다 */
@@ -3072,8 +3132,6 @@ async function fbSyncDown(){
         finally{ _fbSuppress=false; }
       }
     }catch(e){
-      /* ★ 예전에는 여기가 «빈 catch» 였다. 권한에 막힌 것과 자료가 없는 것이
-         화면에서 똑같아 보여, 로그인이 안 먹었다는 사실을 아무도 몰랐다. */
       failed.push({node:node, e:e});
       console.warn('[내려받기 실패]', node, e);
     }
