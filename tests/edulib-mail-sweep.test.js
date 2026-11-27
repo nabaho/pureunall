@@ -50,12 +50,14 @@ function makeZip(files) {
   const locals = [], centrals = [];
   let off = 0;
   files.forEach(([name, text]) => {
-    const nb = Buffer.from(name, 'utf8'), data = Buffer.isBuffer(text) ? text : Buffer.from(text, 'utf8'), crc = crc32(data);
+    /* 이름을 바이트(Buffer)로 주면 UTF-8 표시(0x800) 없이 — 윈도 탐색기·알집처럼 CP949 이름 */
+    const utf = !Buffer.isBuffer(name), gp = utf ? 0x800 : 0;
+    const nb = utf ? Buffer.from(name, 'utf8') : name, data = Buffer.isBuffer(text) ? text : Buffer.from(text, 'utf8'), crc = crc32(data);
     const lh = Buffer.alloc(30);
-    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x800, 6); lh.writeUInt16LE(0, 8);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(gp, 6); lh.writeUInt16LE(0, 8);
     lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(nb.length, 26);
     const ch = Buffer.alloc(46);
-    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0x800, 8); ch.writeUInt16LE(0, 10);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(gp, 8); ch.writeUInt16LE(0, 10);
     ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(data.length, 20); ch.writeUInt32LE(data.length, 24); ch.writeUInt16LE(nb.length, 28);
     ch.writeUInt32LE(off, 42);
     locals.push(lh, nb, data); centrals.push(ch, nb);
@@ -546,6 +548,42 @@ test('★★★ «못 보면 남긴다» — zip 안 7z·암호 조각·한글 �
   const docx = makeZip([['word/document.xml', '<w:p><w:r><w:t>' + RRN + '</w:t></w:r></w:p>']]);
   const broken = Buffer.from(docx); broken.writeUInt32LE(broken.readUInt32LE(broken.length - 6) + 3, broken.length - 6);
   assert.notEqual(S.scanPii(broken), '', '목록 자리가 어긋나면 그냥 통과시키지 않는다');
+  assert.equal(S.scanPii(makeCfb([])), 'unread', '흐름이 하나도 없는 묶음 파일');
+});
+
+test('★★★ 재검증 2회차 — 태그로 붙은 숫자 · CP949 이름 zip · PDF 못 읽음/300쪽 넘음 · UTF-8 긴 대시 · 빈 CFB 는 그냥 통과시키지 않는다', async () => {
+  const RRN = '900101-1234567';
+  const TAB = makeZip([['word/document.xml', '<w:p><w:r><w:t>' + RRN + '</w:t><w:tab/><w:t>010-1234-5678</w:t></w:r></w:p>']]);
+  assert.equal(S.scanPii(TAB), 'rrn', '<w:tab/> 로 붙은 뒤 숫자 때문에 꼴이 깨지지 않는다');
+  const cp949 = makeZip([[Buffer.from([0xB8, 0xED, 0xB4, 0xDC, 0x2E, 0x74, 0x78, 0x74]), '이름 목록'], ['강의안.pptx', 'x']]);   /* «명단.txt»(CP949) */
+  assert.equal(S.zipRisk(cp949), true, 'UTF-8 표시 없는 한글 이름도 «명단»으로 읽는다');
+  assert.equal(S.rawRrn(Buffer.from('수강생 900101–1234567', 'utf8')), true, 'UTF-8 글 속 긴 대시');
+  assert.equal(S.scanPii(makeZip([['목록.csv', '이름,번호\n가,900101–1234567']])), 'rrn', 'zip 안 UTF-8 csv');
+  /* PDF — 못 읽었거나 300쪽 넘어 뒤를 못 봤으면 남긴다 */
+  const tree = mailTree();
+  tree.mailbox.msgs['Sent-1'] = { 401: { u: 401, s: '강의 자료 송부', d: NOW - DAY, an: ['깨진 강의안.pdf', '아주 긴 강의안.pdf', '보통 강의안.pdf'] } };
+  tree.mailbox.msgs['Tome-1'] = {};
+  const db = fakeDb(tree);
+  await S.runSweep(deps(db, {
+    download: async (s, u, name) => ({ name, mime: '', buf: Buffer.from('%PDF-1.4 ' + name) }),
+    pdfText: async (buf) => {
+      const t = buf.toString('utf8');
+      if (/깨진/.test(t)) throw new Error('pdf 못 읽음');
+      if (/아주 긴/.test(t)) return { text: '앞 300쪽만 읽은 강의 글 — 시험용 긴 글자 시험용 긴 글자 시험용 긴 글자', truncated: true };
+      return { text: '근로시간과 휴게 강의 — 시험용 긴 글자 시험용 긴 글자 시험용 긴 글자 시험용' };
+    } }), { days: 14 });
+  assert.deepEqual(items(db).map((it) => it.fileName), ['보통 강의안.pdf']);
+  assert.deepEqual(holds(db).map((q) => q.att + ':' + q.hold).sort(), ['깨진 강의안.pdf:unread', '아주 긴 강의안.pdf:unread']);
+});
+
+test('★★ 강의 이력 규칙 — 칸 묶음은 묶음 꼴만 · 만든/고친/지운 사람은 그대로 두거나 지금 쓰는 사람의 사번만 · 창고 파일 종류는 확장자 허용표', () => {
+  const L2 = require('../docs/rules-paste.json').rules.edulib.lectures.$id;
+  ['cal', 'mail', 'guess', 'itemIds'].forEach((k) => assert.equal(L2[k]['.validate'], 'newData.hasChildren()', k));
+  ['createdBy', 'updatedBy', 'deletedBy', 'confirmedBy'].forEach((k) => assert.ok(L2[k]['.validate'].includes("newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val()"), k));
+  const idx = read(path.join(ROOT, 'functions', 'index.js'));
+  const up = idx.slice(idx.indexOf('upload: async (p, buf)'), idx.indexOf('calEvents: async'));
+  assert.match(up, /EDULIB_TYPES\[ext\.toLowerCase\(\)\] \|\| "application\/octet-stream"/, '메일이 말한 종류를 믿지 않는다');
+  assert.ok(!/contentType: mime/.test(up));
 });
 
 test('★★ 한 번 돌기 — 암호 한글·이름만 pptx 인 암호 파일은 남기고, 주민번호 없는 한글은 «내용 확인 못 함»으로 저장', async () => {

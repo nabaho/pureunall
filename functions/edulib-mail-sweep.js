@@ -199,7 +199,7 @@ function zipWalk(buf, want, onEntry, lim, namesOnly) {
     const cmLen = buf.readUInt16LE(pos + 32);
     const lho = buf.readUInt32LE(pos + 42);
     const rawName = buf.subarray(pos + 46, pos + 46 + fnLen);
-    const name = (flag & 0x800) ? rawName.toString("utf8") : rawName.toString("latin1");
+    const name = (flag & 0x800) ? rawName.toString("utf8") : zipNameOf(rawName, buf.subarray(pos + 46 + fnLen, pos + 46 + fnLen + exLen));
     pos += 46 + fnLen + exLen + cmLen;
     if (!want(name)) continue;
     if (namesOnly) { onEntry(name, null, {}); continue; }
@@ -219,6 +219,18 @@ function zipWalk(buf, want, onEntry, lim, namesOnly) {
   }
   if (seen < Math.min(total, maxEntries)) st.truncated = true;    /* 목록 자리가 틀렸거나 중간에 어긋났다 — 다 본 것이 아니다 */
   return st;
+}
+/* UTF-8 표시가 없는 zip 이름 — 윈도 탐색기·알집은 CP949(euc-kr)로 쓴다. 유니코드 경로 덧칸(0x7075)이 있으면 그것을, 없으면 euc-kr 로 푼다.
+   (latin1 로 풀면 «명단»·«서명» 같은 이름 잣대가 통째로 빠진다 — 2026-11-27 보안 재검증) */
+let EUCKR = null;
+function zipNameOf(raw, extra) {
+  for (let p = 0; p + 4 <= extra.length;) {
+    const id = extra.readUInt16LE(p), sz = extra.readUInt16LE(p + 2);
+    if (id === 0x7075 && sz >= 5 && p + 4 + sz <= extra.length) return extra.subarray(p + 9, p + 4 + sz).toString("utf8");
+    p += 4 + sz;
+  }
+  if (!raw.some((b) => b >= 0x80)) return raw.toString("latin1");
+  try { EUCKR = EUCKR || new TextDecoder("euc-kr"); return EUCKR.decode(raw); } catch (_) { return raw.toString("latin1"); }
 }
 function zipEntries(buf, want, namesOnly, lim) {
   const out = [];
@@ -280,9 +292,12 @@ async function extractContent(name, buf, deps) {
     if (ext === "pdf" && deps && typeof deps.pdfText === "function") {
       const r = await deps.pdfText(buf);
       const text = str(r && r.text);
-      return { lines: text.split(/\n+/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean), text };
+      return { lines: text.split(/\n+/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean), text, truncated: !!(r && r.truncated) };
     }
-  } catch (_) { /* 못 읽으면 글자 없음 — «내용 자동 확인 못 함»으로 저장한다 */ }
+  } catch (_) {
+    /* 못 읽었다 — PDF 는 글자 검사를 이 길 하나에 기대므로 «다 못 봄»(남김, 2026-11-27 보안 재검증). 그 밖(zip 꼴)은 저장 전 검사가 이미 XML 을 다 봤다 */
+    return { text: "", failed: true };
+  }
   return { text: "" };
 }
 /* ── 저장 전 «한 번 더» — 파일 전체에서 주민번호 꼴 찾기 (2026-11-27 보안 검토 «중간» — 1차·재검증) ──
@@ -298,6 +313,7 @@ function rawRrn(buf) {
   if (!Buffer.isBuffer(buf) || !buf.length) return false;
   try {
     if (RRN_RX.test(buf.toString("latin1"))) return true;
+    if (hasRrn(buf.toString("utf8"))) return true;
     if (hasRrn(buf.toString("utf16le"))) return true;
     if (buf.length > 1 && hasRrn(buf.subarray(1).toString("utf16le"))) return true;
   } catch (_) { /* 못 읽으면 못 찾은 것 */ }
@@ -305,7 +321,7 @@ function rawRrn(buf) {
 }
 function isZipBuf(b) { return Buffer.isBuffer(b) && b.length >= 4 && b.readUInt32LE(0) === 0x04034b50; }
 function isCfbBuf(b) { return Buffer.isBuffer(b) && b.length >= 512 && b.readUInt32LE(0) === 0xE011CFD0 && b.readUInt32LE(4) === 0xE11AB1A1; }
-function xmlPlain(s) { return xmlText(String(s).replace(/<\/(a:p|w:p|hp:p|text:p|si|c|row|w:tc|a:tc)>/g, "\n").replace(/<[^>]+>/g, "")); }
+function xmlPlain(s) { return xmlText(String(s).replace(/<[^>]*\/>/g, "\n").replace(/<\/(a:p|w:p|hp:p|text:p|si|c|row|w:tc|a:tc)>/g, "\n").replace(/<[^>]+>/g, "")); }
 /* CFB(복합 문서) 흐름 꺼내기 — 머리(512바이트) · FAT · 목록 · 작은 흐름(mini stream). 못 읽으면 null(깨짐) · 흐름이 모자라면 data null */
 function cfbStreams(buf) {
   if (!isCfbBuf(buf)) return null;
@@ -365,13 +381,13 @@ function cfbStreams(buf) {
     return b.length >= size ? b.subarray(0, size) : null;
   }
   const streams = ents.filter((e) => e.type === 2).map((e) => ({ name: e.name, data: e.size < cutoff ? readMini(e.start, e.size) : readBig(e.start, e.size) }));
-  return { streams, names: ents.map((e) => e.name) };
+  return { streams, names: ents.map((e) => e.name), capped: ents.length >= 20000 };
 }
 function cfbScan(buf) {
   let cf = null;
   try { cf = cfbStreams(buf); } catch (_) { cf = null; }
   if (!cf) return rawRrn(buf) ? "rrn" : "unread";      /* 묶음을 못 풀었다 — 바이트로만 훑고, 못 찾아도 «다 못 봄» */
-  let unread = false;
+  let unread = !cf.streams.length || !!cf.capped;      /* 흐름이 하나도 없거나 목록이 너무 길다 — 다 본 것이 아니다 */
   if (cf.names.some((n) => /^(EncryptedPackage|EncryptionInfo|EncryptedSummary|ViewText)$/.test(n))) unread = true;   /* 암호 오피스·한글 배포용 */
   const fh = cf.streams.find((s) => s.name === "FileHeader");
   let hwpZip = false;
@@ -400,14 +416,14 @@ function scanPii(buf, depth) {
   let unread = false, found = false;
   const st = zipWalk(buf, (n) => !/\/$/.test(n) && !MEDIA_RX.test(n), (name, data, info) => {
     const n = name.toLowerCase();
-    if (info.enc || !data) { unread = true; return; }  /* 암호 조각·한도 넘음·깨진 조각 */
-    if (OPAQUE_RX.test(n)) { unread = true; return; }  /* 안을 볼 수 없는 압축·형식(zip 으로 한 번 싸도 마찬가지) */
+    if (info.enc || !data) { unread = true; return "stop"; }  /* 암호 조각·한도 넘음·깨진 조각 — 어차피 남기므로 더 풀지 않는다 */
+    if (OPAQUE_RX.test(n)) { unread = true; return "stop"; }  /* 안을 볼 수 없는 압축·형식(zip 으로 한 번 싸도 마찬가지) */
     let r;
-    if (/\.(xml|rels|svg|html?|xhtml)$/.test(n)) r = hasRrn(xmlPlain(data.toString("utf8"))) ? "rrn" : "";
+    if (/\.(xml|rels|svg|html?|xhtml)$/.test(n)) { const u = data.toString("utf8"); r = hasRrn(xmlPlain(u)) || hasRrn(u) ? "rrn" : ""; }
     else if (isZipBuf(data)) r = depth >= 1 ? (rawRrn(data) ? "rrn" : "unread") : scanPii(data, depth + 1);
     else r = scanPii(data, depth + 1);                 /* CFB 는 cfbScan, 그 밖은 바이트 훑기 */
     if (r === "rrn") { found = true; return "stop"; }
-    if (r === "unread") unread = true;
+    if (r === "unread") { unread = true; return "stop"; }
   }, SCAN_LIM);
   if (found) return "rrn";
   if (st.bad) return rawRrn(buf) ? "rrn" : "unread";   /* 깨진 zip — 바이트로만 훑고, 못 찾아도 «다 못 봄» */
@@ -654,6 +670,7 @@ async function runSweep(deps, opts) {
       if (deep === "rrn") { skipped.pii++; await hold(c, "pii-text", got, sha256); continue; }
       if (deep === "unread") { skipped.pii++; await hold(c, "unread", got, sha256); continue; }
       const ex = DOC_AUTO[ext] ? await extractContent(name, buf, deps) : { text: "" };
+      if (ext === "pdf" && (ex.failed || ex.truncated)) { skipped.pii++; await hold(c, "unread", got, sha256); continue; }
       /* 주민번호 꼴이 보이면 저장하지 않고 남긴다(글자가 적어도) */
       if (hasRrn(ex.text)) { skipped.pii++; await hold(c, "pii-text", got, sha256); continue; }
       const textLen = str(ex.text).replace(/\s+/g, "").length;

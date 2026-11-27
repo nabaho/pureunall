@@ -2175,11 +2175,13 @@
             ".validate": "newData.val() === 'auto' || newData.val() === 'ok'"
           },
           "itemIds": {
+            ".validate": "newData.hasChildren()",
             "$item": {
               ".validate": "newData.val() === true && $item.matches(/^[A-Za-z0-9_-]{1,60}$/)"
             }
           },
           "cal": {
+            ".validate": "newData.hasChildren()",
             "id": {
               ".validate": "newData.isString() && newData.val().length <= 200"
             },
@@ -2200,6 +2202,7 @@
             }
           },
           "mail": {
+            ".validate": "newData.hasChildren()",
             "id": {
               ".validate": "newData.isString() && newData.val().length <= 200"
             },
@@ -2214,6 +2217,7 @@
             }
           },
           "guess": {
+            ".validate": "newData.hasChildren()",
             "date": {
               ".validate": "newData.isString() && newData.val().length <= 20"
             },
@@ -2237,10 +2241,10 @@
             ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
           },
           "createdBy": {
-            ".validate": "newData.isString() && newData.val().length <= 64"
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
           },
           "updatedBy": {
-            ".validate": "newData.isString() && newData.val().length <= 64"
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
           },
           "createdAt": {
             ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
@@ -2252,7 +2256,7 @@
             ".validate": "newData.isBoolean()"
           },
           "deletedBy": {
-            ".validate": "newData.isString() && newData.val().length <= 64"
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
           },
           "deletedAt": {
             ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"

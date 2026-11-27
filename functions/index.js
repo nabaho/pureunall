@@ -8016,6 +8016,10 @@ exports.edulibTokenStrip = functions
    ⚠ 배포는 «이름 찍어서» — functions:edulibMailSweep,functions:runEdulibMailSweep (index.js 를 고치고 합쳐도 저절로 안 올라간다)
    ★ 매일 밤 메일 정리 뒤에 강의자료 토큰 정리(runEdulibTokenSweepOnce, 바로 위)도 돈다 — 메일 쪽이 잠금·실패여도 따로 돈다. */
 const EdulibMailSweep = require("./edulib-mail-sweep");
+const EDULIB_TYPES = { pdf: "application/pdf", ppt: "application/vnd.ms-powerpoint", pps: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", ppsx: "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+  doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  hwp: "application/x-hwp", hwpx: "application/hwp+zip", odp: "application/vnd.oasis.opendocument.presentation", zip: "application/zip" };
 async function runEdulibMailSweepOnce(trigger, opts) {
   const MS = require("./mail-sync");
   return EdulibMailSweep.runSweep({
@@ -8033,10 +8037,13 @@ async function runEdulibMailSweepOnce(trigger, opts) {
       return { name: a.name, mime: a.mime || "", buf };
     }),
     /* 원본을 창고에 «새로 쓰기만» — 같은 자리에 이미 있으면(지난번에 올리고 기록 전에 끊긴 것) 그대로 둔다(412) */
-    upload: async (p, buf, mime) => {
+    upload: async (p, buf) => {
       if (!/^edulib\/edu_m[0-9a-z]+\/[^/]+$/.test(String(p))) throw new Error("강의자료 창고 자리가 아닙니다");
+      /* 파일 종류는 메일이 말한 것을 믿지 않고 확장자 허용표로만 — 모르는 것은 octet-stream(2026-11-27 보안 재검증) */
+      const ext = (String(p).match(/\.([0-9a-z]{1,6})$/i) || [])[1] || "";
+      const contentType = EDULIB_TYPES[ext.toLowerCase()] || "application/octet-stream";
       try {
-        await getStorage().bucket(PHOTO_BUCKET).file(p).save(buf, { resumable: false, contentType: mime || "application/octet-stream",
+        await getStorage().bucket(PHOTO_BUCKET).file(p).save(buf, { resumable: false, contentType,
           preconditionOpts: { ifGenerationMatch: 0 }, metadata: { metadata: { by: "edulibMailSweep" } } });
         return { created: true };
       } catch (e) {
