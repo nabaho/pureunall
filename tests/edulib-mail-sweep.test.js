@@ -476,6 +476,91 @@ test('★★★ 저장 전 «파일 전체» 검사 — 슬라이드 노트·머
   assert.deepEqual(hs, ['노트 강의안.pptx:pii-text', '머리글 강의안.docx:pii-text', '묶음 강의자료.7z:archive', '옛 강의안.ppt:pii-text', '포함 강의안.pptx:pii-text'].sort());
 });
 
+/* ── 작은 CFB(옛 오피스·한글 묶음 파일) — 흐름을 모두 큰 섹터에(작은 흐름 한도 0) 둔다. 시험 자료를 손으로 만든다 ── */
+function makeCfb(streams) {
+  const SEC = 512, FREE = 0xFFFFFFFF, END = 0xFFFFFFFE, FATS = 0xFFFFFFFD;
+  const dirSecs = Math.ceil((streams.length + 1) / 4);
+  const fat = [FATS];
+  const body = [];
+  let next = 1;
+  const dirStart = next;
+  for (let i = 0; i < dirSecs; i++) { fat.push(i === dirSecs - 1 ? END : next + 1); next++; }
+  const starts = streams.map((s) => {
+    const n = Math.max(1, Math.ceil(s.data.length / SEC)); const st = next;
+    for (let i = 0; i < n; i++) { fat.push(i === n - 1 ? END : next + 1); next++; }
+    body.push(Buffer.concat([s.data, Buffer.alloc(n * SEC - s.data.length)]));
+    return st;
+  });
+  while (fat.length < 128) fat.push(FREE);
+  const head = Buffer.alloc(512, 0);
+  head.writeUInt32LE(0xE011CFD0, 0); head.writeUInt32LE(0xE11AB1A1, 4);
+  head.writeUInt16LE(0x3E, 24); head.writeUInt16LE(3, 26); head.writeUInt16LE(0xFFFE, 28); head.writeUInt16LE(9, 30); head.writeUInt16LE(6, 32);
+  head.writeUInt32LE(1, 44); head.writeUInt32LE(dirStart, 48); head.writeUInt32LE(0, 56);
+  head.writeUInt32LE(END, 60); head.writeUInt32LE(0, 64); head.writeUInt32LE(END, 68); head.writeUInt32LE(0, 72);
+  for (let i = 0; i < 109; i++) head.writeUInt32LE(i === 0 ? 0 : FREE, 76 + i * 4);
+  const fatBuf = Buffer.alloc(SEC); fat.slice(0, 128).forEach((v, i) => fatBuf.writeUInt32LE(v >>> 0, i * 4));
+  const dir = Buffer.alloc(dirSecs * SEC);
+  const ent = (i, name, type, start, size) => {
+    const o = i * 128; const nb = Buffer.from(name + '\0', 'utf16le'); nb.copy(dir, o);
+    dir.writeUInt16LE(nb.length, o + 64); dir[o + 66] = type; dir[o + 67] = 1;
+    dir.writeUInt32LE(FREE, o + 68); dir.writeUInt32LE(FREE, o + 72); dir.writeUInt32LE(FREE, o + 76);
+    dir.writeUInt32LE(start >>> 0, o + 116); dir.writeUInt32LE(size, o + 120);
+  };
+  ent(0, 'Root Entry', 5, END, 0);
+  streams.forEach((s, i) => ent(i + 1, s.name, 2, starts[i], s.data.length));
+  return Buffer.concat([head, fatBuf, dir].concat(body));
+}
+function hwpFile(text, prop) {
+  const fh = Buffer.alloc(256); fh.write('HWP Document File', 0, 'latin1'); fh.writeUInt32LE(0x05000000, 32); fh.writeUInt32LE(prop, 36);
+  return makeCfb([{ name: 'FileHeader', data: fh }, { name: 'PrvText', data: Buffer.from('강의 미리보기', 'utf16le') },
+    { name: 'Section0', data: require('node:zlib').deflateRawSync(Buffer.from(text, 'utf16le')) }]);
+}
+/* zip 조각 하나를 «암호 걸림»(flag 1)으로 바꾼다 */
+function encZip(buf) {
+  const b = Buffer.from(buf);
+  for (let i = 0; i + 4 <= b.length; i++) {
+    const sig = b.readUInt32LE(i);
+    if (sig === 0x04034b50) b.writeUInt16LE(b.readUInt16LE(i + 6) | 1, i + 6);
+    if (sig === 0x02014b50) b.writeUInt16LE(b.readUInt16LE(i + 8) | 1, i + 8);
+  }
+  return b;
+}
+
+test('★★★ «못 보면 남긴다» — zip 안 7z·암호 조각·한글 압축 본문·암호/배포용 한글·암호 오피스·깨진 목록(2026-11-27 보안 재검증)', () => {
+  const RRN = '900101-1234567';
+  /* 한글(hwp) — 압축된 본문까지 풀어서 본다 */
+  assert.equal(S.scanPii(hwpFile('직장 내 괴롭힘 예방 강의 본문입니다. 시험용 긴 글자', 1)), '', '주민번호 없는 한글 강의안은 그대로(저장)');
+  assert.equal(S.scanPii(hwpFile('수강생 ' + RRN, 1)), 'rrn', '압축된 한글 본문 속 주민번호 꼴');
+  assert.equal(S.scanPii(hwpFile('본문', 1 | 2)), 'unread', '암호 걸린 한글');
+  assert.equal(S.scanPii(hwpFile('본문', 1 | 4)), 'unread', '배포용 한글');
+  /* 암호 오피스(EncryptedPackage) · 옛 워드 */
+  assert.equal(S.scanPii(makeCfb([{ name: 'EncryptionInfo', data: Buffer.alloc(64) }, { name: 'EncryptedPackage', data: Buffer.alloc(600, 7) }])), 'unread');
+  assert.equal(S.scanPii(makeCfb([{ name: 'PowerPoint Document', data: Buffer.from('슬라이드 ' + RRN, 'utf16le') }])), 'rrn', '옛 ppt 흐름의 UTF-16 글');
+  /* zip 안 — 볼 수 없는 압축·암호 조각·낯선 글 파일 */
+  assert.equal(S.scanPii(makeZip([['강의/자료.7z', 'x'], ['강의/표지.png', 'y']])), 'unread', 'zip 으로 싼 7z 도 남긴다');
+  assert.equal(S.scanPii(makeZip([['메모.rtf', '{\\rtf1 수강생 ' + RRN + '}']])), 'rrn', 'zip 안 rtf 글');
+  assert.equal(S.scanPii(makeZip([['목록.json', '{"a":"' + RRN + '"}']])), 'rrn', 'zip 안 json 글');
+  assert.equal(S.scanPii(encZip(makeZip([['강의안.pptx', 'x']]))), 'unread', '암호 걸린 조각');
+  assert.equal(S.scanPii(makeZip([['교안/표지.png', 'PNG'], ['교안/강의.mp4', 'MP4']])), '', '그림·영상만 든 묶음은 그대로');
+  /* 목록 자리가 틀린 docx — 다 못 봄 */
+  const docx = makeZip([['word/document.xml', '<w:p><w:r><w:t>' + RRN + '</w:t></w:r></w:p>']]);
+  const broken = Buffer.from(docx); broken.writeUInt32LE(broken.readUInt32LE(broken.length - 6) + 3, broken.length - 6);
+  assert.notEqual(S.scanPii(broken), '', '목록 자리가 어긋나면 그냥 통과시키지 않는다');
+});
+
+test('★★ 한 번 돌기 — 암호 한글·이름만 pptx 인 암호 파일은 남기고, 주민번호 없는 한글은 «내용 확인 못 함»으로 저장', async () => {
+  const tree = mailTree();
+  tree.mailbox.msgs['Sent-1'] = { 301: { u: 301, s: '강의 자료 송부', d: NOW - DAY, an: ['암호 강의안.hwp', '괜찮은 강의안.hwp', '암호 강의안.pptx', '암호 강의안.pdf'] } };
+  tree.mailbox.msgs['Tome-1'] = {};
+  const files = { '암호 강의안.hwp': hwpFile('본문', 3), '괜찮은 강의안.hwp': hwpFile('근로시간과 휴게 강의 본문', 1),
+    '암호 강의안.pptx': makeCfb([{ name: 'EncryptedPackage', data: Buffer.alloc(600, 1) }]), '암호 강의안.pdf': Buffer.from('%PDF-1.7 trailer << /Encrypt 5 0 R >>') };
+  const db = fakeDb(tree);
+  await S.runSweep(deps(db, { download: async (s, u, name) => (files[name] ? { name, mime: '', buf: files[name] } : { gone: true }) }), { days: 14 });
+  assert.deepEqual(items(db).map((it) => it.fileName), ['괜찮은 강의안.hwp']);
+  assert.equal(byFile(db, '괜찮은 강의안.hwp').auto.check, 'none');
+  assert.deepEqual(holds(db).map((q) => q.att + ':' + q.hold).sort(), ['암호 강의안.hwp:unread', '암호 강의안.pdf:unread', '암호 강의안.pptx:unread']);
+});
+
 test('★★ 지난번 정리함 줄도 지금 잣대로 이름을 다시 본다 · 문단 읽기는 닫힘 없는 태그가 많아도 금방 끝난다', async () => {
   const tree = mailTree();
   tree.mailbox.msgs['Sent-1'] = {}; tree.mailbox.msgs['Tome-1'] = {};

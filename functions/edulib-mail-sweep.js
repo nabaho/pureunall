@@ -74,12 +74,13 @@ const DOC_HUMAN = { ppt: 1, pps: 1, hwp: 1, doc: 1, show: 1, odp: 1, key: 1, zip
 const ARCHIVE = { zip: 1, '7z': 1, alz: 1, egg: 1, rar: 1 };
 const MIN_TEXT = 40;                            /* 이만큼도 글자가 안 나오면(스캔 pdf 등) 내용을 확인 못 한 것으로 본다 */
 /* 안을 볼 수 없는 압축 — 저장하지 않고 남긴다(zip 만 안을 본다) */
-const ARCHIVE_OPAQUE = { '7z': 1, alz: 1, egg: 1, rar: 1 };
+const ARCHIVE_OPAQUE = { '7z': 1, alz: 1, egg: 1, rar: 1, show: 1, key: 1 };   /* show·key 는 안의 글을 풀어 볼 수 없는 발표 형식(재검증) */
+const ZIP_LIKE = { pptx: 1, ppsx: 1, docx: 1, hwpx: 1, odp: 1, zip: 1 };
 /* 강의 말이 있어도 «서류»일 수 있는 이름 — 사람이 고르기 전에 걸러 두는 길이라 화면 «가져오기»보다 넓게 뺀다 */
 const SERVER_EXCLUDE_RX = /급여|임금\s?대장|명세서|원천\s?징수|통장|계좌|이력서|주민\s?등록|등본|초본|신분증|가족\s?관계|진단서|건강\s?검진|연봉|인사\s?기록|평가표|성적|합격|채점/;
 /* 주민번호(외국인등록번호) 꼴 — 앞 6자리가 «날짜 꼴»이고 뒤 7자리가 1~8로 시작. 사이는 없음·빈칸·여러 대시(‐‑‒–—―−﹣－)·점 모두.
    글자는 먼저 NFKC 로 다듬는다(전각 숫자·전각 대시 → 보통 글자). 막기(test)와 가리기(scrub)가 «같은 꼴»을 쓴다. */
-const RRN_SRC = "(?<!\\d)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\s*[-\\u2010-\\u2015\\u2212\\uFE58\\uFE63\\uFF0D.]?\\s*[1-8]\\d{6}(?!\\d)";
+const RRN_SRC = "(?<!\\d)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])[ \\t\\r\\n]{0,3}[-\\u2010-\\u2015\\u2212\\uFE58\\uFE63\\uFF0D.]?[ \\t\\r\\n]{0,3}[1-8]\\d{6}(?!\\d)";
 const RRN_RX = new RegExp(RRN_SRC);
 const RRN_G = new RegExp(RRN_SRC, "g");
 function norm(s) { s = s == null ? "" : String(s); try { return s.normalize("NFKC"); } catch (_) { return s; } }
@@ -167,25 +168,29 @@ function pickCandidates(folders, msgsBySlug, o) {
 }
 
 /* ── 문서 글자 읽기 — pptx·docx·hwpx 는 zip 안 XML, pdf 는 pdfjs(deps.pdfText). 옛 형식(ppt·doc·hwp)은 글자 없이 넣는다 ──
-   namesOnly — 압축을 풀지 않고 안의 파일 이름만(압축 첨부 검사용) */
-/* lim — 저장 전 검사(scanPii)는 한도를 넓혀 쓴다(큰 발표자료도 끝까지 보게). 한도에 걸려 다 못 본 것은 out.truncated = true */
-const SCAN_LIM = { entries: 4000, total: 64 * 1024 * 1024 };
-function zipEntries(buf, want, namesOnly, lim) {
-  const out = [];
+   zipWalk: zip 중앙 목록을 차례로 보며 want 에 맞는 조각을 «하나씩» 풀어 onEntry(이름, 데이터|null, {enc, big})에 넘긴다(모아 쥐지 않는다).
+     onEntry 가 "stop" 을 돌려주면 그만. 돌려줌 { bad 목록을 못 찾음(깨짐), truncated 한도·목록 어긋남으로 다 못 봄 }
+   zipEntries: zipWalk 로 모아 배열로(요약·지문용 — 작은 한도) · namesOnly — 풀지 않고 이름만(압축 첨부 이름 검사)
+   SCAN_LIM — 저장 전 검사(scanPii)는 한도를 넓혀 쓴다(큰 발표자료도 끝까지). 조각 하나는 24MB 까지(넘으면 «다 못 봄») */
+const SCAN_LIM = { entries: 4000, total: 64 * 1024 * 1024, entry: 24 * 1024 * 1024 };
+function zipWalk(buf, want, onEntry, lim, namesOnly) {
+  const st = { bad: false, truncated: false };
   const maxEntries = (lim && lim.entries) || MAX_ZIP_ENTRIES;
   const maxTotal = (lim && lim.total) || MAX_ZIP_TOTAL_OUT;
-  if (!Buffer.isBuffer(buf) || buf.length < 22) { out.bad = true; return out; }
+  const maxEntry = (lim && lim.entry) || MAX_ZIP_ENTRY_OUT;
+  if (!Buffer.isBuffer(buf) || buf.length < 22) { st.bad = true; return st; }
   let eocd = -1;
   for (let i = buf.length - 22, lo = Math.max(0, buf.length - 65557); i >= lo; i--) {
     if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
   }
-  if (eocd < 0) { out.bad = true; return out; }       /* zip 꼴인데 목록을 못 찾음(깨짐) */
+  if (eocd < 0) { st.bad = true; return st; }         /* zip 꼴인데 목록을 못 찾음(깨짐) */
   const total = buf.readUInt16LE(eocd + 10);
   let pos = buf.readUInt32LE(eocd + 16);
-  let used = 0;
-  if (total > maxEntries) out.truncated = true;
-  for (let n = 0; n < Math.min(total, maxEntries) && pos + 46 <= buf.length; n++) {
-    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+  let used = 0, seen = 0;
+  if (total > maxEntries) st.truncated = true;
+  for (let n = 0; n < Math.min(total, maxEntries); n++) {
+    if (pos + 46 > buf.length || buf.readUInt32LE(pos) !== 0x02014b50) break;
+    seen++;
     const flag = buf.readUInt16LE(pos + 8);
     const method = buf.readUInt16LE(pos + 10);
     const comp = buf.readUInt32LE(pos + 20);
@@ -197,18 +202,29 @@ function zipEntries(buf, want, namesOnly, lim) {
     const name = (flag & 0x800) ? rawName.toString("utf8") : rawName.toString("latin1");
     pos += 46 + fnLen + exLen + cmLen;
     if (!want(name)) continue;
-    const entry = { name, data: null };
-    out.push(entry);
-    if (namesOnly) continue;
-    if (lho + 30 > buf.length || buf.readUInt32LE(lho) !== 0x04034b50) continue;
-    const start = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28);
-    if (start + comp > buf.length || comp > maxTotal) continue;
-    try {
-      const slice = buf.subarray(start, start + comp);
-      const data = method === 0 ? Buffer.from(slice) : method === 8 ? zlib.inflateRawSync(slice, { maxOutputLength: lim ? maxTotal : MAX_ZIP_ENTRY_OUT }) : null;
-      if (data) { used += data.length; if (used > maxTotal) { out.truncated = true; break; } entry.data = data; }
-    } catch (_) { /* 깨진 조각·너무 큰 조각은 건너뛴다(data 없음) */ }
+    if (namesOnly) { onEntry(name, null, {}); continue; }
+    if (flag & 1) { if (onEntry(name, null, { enc: true }) === "stop") return st; continue; }   /* 암호 걸린 조각 — 풀어 볼 수 없다 */
+    let data = null;
+    if (lho + 30 <= buf.length && buf.readUInt32LE(lho) === 0x04034b50) {
+      const start = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28);
+      if (start + comp <= buf.length && comp <= maxTotal) {
+        try {
+          const slice = buf.subarray(start, start + comp);
+          data = method === 0 ? Buffer.from(slice) : method === 8 ? zlib.inflateRawSync(slice, { maxOutputLength: maxEntry }) : null;
+        } catch (_) { data = null; /* 깨진 조각·너무 큰 조각 */ }
+      }
+    }
+    if (data) { used += data.length; if (used > maxTotal) { st.truncated = true; break; } }
+    if (onEntry(name, data, {}) === "stop") return st;
   }
+  if (seen < Math.min(total, maxEntries)) st.truncated = true;    /* 목록 자리가 틀렸거나 중간에 어긋났다 — 다 본 것이 아니다 */
+  return st;
+}
+function zipEntries(buf, want, namesOnly, lim) {
+  const out = [];
+  const st = zipWalk(buf, want, (name, data) => { out.push({ name, data }); }, lim, namesOnly);
+  if (st.bad) out.bad = true;
+  if (st.truncated) out.truncated = true;
   return out;
 }
 /* 압축 첨부 안 파일 이름 가운데 «서류·명단»·개인정보 글자 꼴이 있나 — 있으면 저장하지 않고 정리함에 남긴다 */
@@ -269,10 +285,15 @@ async function extractContent(name, buf, deps) {
   } catch (_) { /* 못 읽으면 글자 없음 — «내용 자동 확인 못 함»으로 저장한다 */ }
   return { text: "" };
 }
-/* ── 저장 전 «한 번 더» — 파일 전체에서 주민번호 꼴 찾기 (2026-11-27 보안 검토 «중간») ──
-   rawRrn: 원본 바이트를 latin1·UTF-16LE(두 정렬)로 읽어 본다 — 옛 ppt·doc 글(UTF-16·8비트), 한글 PrvText, 압축 안 된 PDF 글
-   scanPii: zip 꼴이면 모든 XML(문단·칸 끝은 줄바꿈, 나머지 태그는 지움 — 조각난 숫자도 잇는다)과 포함 개체(한 겹 더)까지, 아니면 rawRrn.
-   돌려줌: 'rrn' 주민번호 꼴 · 'unread' 안을 다 풀지 못함(한도·깨짐) · '' 못 찾음 */
+/* ── 저장 전 «한 번 더» — 파일 전체에서 주민번호 꼴 찾기 (2026-11-27 보안 검토 «중간» — 1차·재검증) ──
+   ★ 원칙: «못 보면 남긴다»(fail-closed). 볼 수 없는 것(암호·안을 못 푸는 압축·한도 넘음·깨짐)은 'unread' 로 남기고, 그림·소리·글꼴만 건너뛴다.
+   rawRrn  — 바이트를 latin1·UTF-16LE(두 정렬)로 읽어 본다(옛 ppt·doc 글, 압축 안 된 PDF 글, 그 밖의 글 파일)
+   cfbScan — 옛 오피스·한글(OLE 묶음 파일 CFB): 흐름(stream)을 다시 이어 붙여 하나씩 본다. 한글 본문(Section·DocInfo)은 압축을 풀어서.
+             암호(EncryptedPackage·EncryptionInfo·EncryptedSummary·워드 암호 표시)·한글 암호/배포용(ViewText·머리 표시)은 'unread'
+   scanPii — zip 꼴이면 조각마다(XML 은 문단·칸 끝을 줄바꿈으로 잇고 태그를 지워서, 안의 zip·CFB 는 한 겹 더), CFB 면 cfbScan, 그 밖은 rawRrn.
+   돌려줌: 'rrn' 주민번호 꼴 · 'unread' 다 보지 못함 · '' 못 찾음 */
+const MEDIA_RX = /\.(png|jpe?g|jfif|gif|bmp|tiff?|emf|wmf|wdp|ico|heic|webp|mp3|mp4|m4a|m4v|wav|wma|wmv|avi|mov|mpe?g|ogg|webm|mkv|flv|3gp|ttf|otf|fntdata|odttf|woff2?|eot)$/i;
+const OPAQUE_RX = /\.(7z|rar|alz|egg|cab|gz|tgz|bz2|xz|show|key)$/i;   /* 안을 볼 수 없는 압축·형식 */
 function rawRrn(buf) {
   if (!Buffer.isBuffer(buf) || !buf.length) return false;
   try {
@@ -283,28 +304,114 @@ function rawRrn(buf) {
   return false;
 }
 function isZipBuf(b) { return Buffer.isBuffer(b) && b.length >= 4 && b.readUInt32LE(0) === 0x04034b50; }
+function isCfbBuf(b) { return Buffer.isBuffer(b) && b.length >= 512 && b.readUInt32LE(0) === 0xE011CFD0 && b.readUInt32LE(4) === 0xE11AB1A1; }
 function xmlPlain(s) { return xmlText(String(s).replace(/<\/(a:p|w:p|hp:p|text:p|si|c|row|w:tc|a:tc)>/g, "\n").replace(/<[^>]+>/g, "")); }
+/* CFB(복합 문서) 흐름 꺼내기 — 머리(512바이트) · FAT · 목록 · 작은 흐름(mini stream). 못 읽으면 null(깨짐) · 흐름이 모자라면 data null */
+function cfbStreams(buf) {
+  if (!isCfbBuf(buf)) return null;
+  const sec = 1 << buf.readUInt16LE(30), mini = 1 << buf.readUInt16LE(32);
+  if ((sec !== 512 && sec !== 4096) || mini !== 64) return null;
+  const nFat = buf.readUInt32LE(44), dirStart = buf.readUInt32LE(48), cutoff = buf.readUInt32LE(56);
+  const miniFatStart = buf.readUInt32LE(60), nMiniFat = buf.readUInt32LE(64), difStart = buf.readUInt32LE(68);
+  const END = 0xFFFFFFFA, per = sec / 4, maxSecs = Math.ceil(buf.length / sec) + 1;
+  if (nFat > maxSecs) return null;
+  const off = (s) => (s + 1) * sec;
+  const fatSecs = [];
+  for (let i = 0; i < 109 && fatSecs.length < nFat; i++) fatSecs.push(buf.readUInt32LE(76 + i * 4));
+  for (let d = difStart, g = 0; fatSecs.length < nFat && d < END && g <= maxSecs; g++) {
+    const o = off(d); if (o + sec > buf.length) return null;
+    for (let i = 0; i < per - 1 && fatSecs.length < nFat; i++) fatSecs.push(buf.readUInt32LE(o + i * 4));
+    d = buf.readUInt32LE(o + sec - 4);
+  }
+  if (fatSecs.length < nFat) return null;
+  const fat = new Uint32Array(nFat * per);
+  for (let k = 0; k < fatSecs.length; k++) {
+    const o = off(fatSecs[k]); if (o + sec > buf.length) return null;
+    for (let i = 0; i < per; i++) fat[k * per + i] = buf.readUInt32LE(o + i * 4);
+  }
+  /* 큰 흐름 — FAT 사슬을 따라 이어 붙인다(size<0 이면 사슬 끝까지). 모자라면 null */
+  function readBig(start, size) {
+    const parts = []; let got = 0;
+    for (let s = start, g = 0; s < END && g <= maxSecs && (size < 0 || got < size); g++) {
+      const o = off(s); if (o >= buf.length) break;
+      const p = buf.subarray(o, Math.min(o + sec, buf.length)); parts.push(p); got += p.length;
+      s = s < fat.length ? fat[s] : END;
+    }
+    const b = Buffer.concat(parts);
+    return size < 0 ? b : (b.length >= size ? b.subarray(0, size) : null);
+  }
+  const dir = readBig(dirStart, -1);
+  const ents = [];
+  for (let o = 0; o + 128 <= dir.length && ents.length < 20000; o += 128) {
+    const type = dir[o + 66];
+    if (type !== 1 && type !== 2 && type !== 5) continue;
+    const nl = Math.min(64, dir.readUInt16LE(o + 64));
+    ents.push({ name: dir.toString("utf16le", o, o + Math.max(0, nl - 2)), type, start: dir.readUInt32LE(o + 116), size: dir.readUInt32LE(o + 120) });
+  }
+  const root = ents.find((e) => e.type === 5);
+  const ministream = root && root.size ? readBig(root.start, root.size) : Buffer.alloc(0);
+  const minifatBuf = nMiniFat ? readBig(miniFatStart, nMiniFat * sec) : Buffer.alloc(0);
+  const minifat = [];
+  if (minifatBuf) for (let i = 0; i + 4 <= minifatBuf.length; i += 4) minifat.push(minifatBuf.readUInt32LE(i));
+  function readMini(start, size) {
+    if (!ministream) return null;
+    const parts = []; let got = 0;
+    for (let s = start, g = 0; s < END && g <= minifat.length + 1 && got < size; g++) {
+      const o = s * mini; if (o + mini > ministream.length) return null;
+      parts.push(ministream.subarray(o, o + mini)); got += mini;
+      s = s < minifat.length ? minifat[s] : END;
+    }
+    const b = Buffer.concat(parts);
+    return b.length >= size ? b.subarray(0, size) : null;
+  }
+  const streams = ents.filter((e) => e.type === 2).map((e) => ({ name: e.name, data: e.size < cutoff ? readMini(e.start, e.size) : readBig(e.start, e.size) }));
+  return { streams, names: ents.map((e) => e.name) };
+}
+function cfbScan(buf) {
+  let cf = null;
+  try { cf = cfbStreams(buf); } catch (_) { cf = null; }
+  if (!cf) return rawRrn(buf) ? "rrn" : "unread";      /* 묶음을 못 풀었다 — 바이트로만 훑고, 못 찾아도 «다 못 봄» */
+  let unread = false;
+  if (cf.names.some((n) => /^(EncryptedPackage|EncryptionInfo|EncryptedSummary|ViewText)$/.test(n))) unread = true;   /* 암호 오피스·한글 배포용 */
+  const fh = cf.streams.find((s) => s.name === "FileHeader");
+  let hwpZip = false;
+  if (fh && fh.data && fh.data.length >= 40 && fh.data.toString("latin1", 0, 17) === "HWP Document File") {
+    const prop = fh.data.readUInt32LE(36);
+    hwpZip = !!(prop & 1);
+    if (prop & 6) unread = true;                       /* 한글 암호(2)·배포용(4) */
+  }
+  const wd = cf.streams.find((s) => s.name === "WordDocument");
+  if (wd && wd.data && wd.data.length > 12 && (wd.data.readUInt16LE(10) & 0x0100)) unread = true;   /* 워드 암호(fEncrypted) */
+  for (const s of cf.streams) {
+    if (!s.data) { unread = true; continue; }
+    let d = s.data;
+    if (hwpZip && s.name !== "FileHeader" && s.name.charCodeAt(0) > 31) {
+      try { d = zlib.inflateRawSync(s.data, { maxOutputLength: SCAN_LIM.entry }); }
+      catch (_) { if (/^(Section\d+|DocInfo)$/.test(s.name)) { unread = true; continue; } d = s.data; }   /* 본문을 못 풀면 «다 못 봄» */
+    }
+    if (rawRrn(d)) return "rrn";
+  }
+  return unread ? "unread" : "";
+}
 function scanPii(buf, depth) {
   depth = depth || 0;
+  if (isCfbBuf(buf)) return depth >= 2 ? (rawRrn(buf) ? "rrn" : "unread") : cfbScan(buf);
   if (!isZipBuf(buf)) return rawRrn(buf) ? "rrn" : "";
-  let unread = false;
-  const want = (n) => { n = n.toLowerCase(); return /\.(xml|rels)$/.test(n) || /(^|\/)(embeddings|objectdata|bindata)\//.test(n) || /\.(xlsx|xlsm|xls|docx|doc|pptx|ppt|hwp|hwpx|zip|bin|pdf|txt|csv)$/.test(n); };
-  const ents = zipEntries(buf, want, false, SCAN_LIM);
-  if (ents.bad) return rawRrn(buf) ? "rrn" : "unread";  /* 깨진 zip — 바이트로만 훑고, 못 찾아도 «다 못 봄» */
-  if (ents.truncated) unread = true;                   /* 한도에 걸려 뒤쪽을 다 못 봤다 */
-  for (const e of ents) {
-    const n = e.name.toLowerCase();
-    const isXml = /\.(xml|rels)$/.test(n);
-    /* 그림·소리·글꼴은 want 에서 이미 뺐다 — 남은 것은 XML 아니면 포함 개체·안의 문서 */
-    if (!e.data) { unread = true; continue; }           /* 한도를 넘었거나 깨진 조각 — 안을 다 본 것이 아니다 */
-    if (isXml) { if (hasRrn(xmlPlain(e.data.toString("utf8")))) return "rrn"; continue; }
-    if (isZipBuf(e.data)) {
-      if (depth >= 1) { unread = true; continue; }      /* 두 겹 넘게 든 것은 보지 않고 «다 못 봄» */
-      const r = scanPii(e.data, depth + 1);
-      if (r === "rrn") return "rrn";
-      if (r === "unread") unread = true;
-    } else if (rawRrn(e.data)) return "rrn";
-  }
+  let unread = false, found = false;
+  const st = zipWalk(buf, (n) => !/\/$/.test(n) && !MEDIA_RX.test(n), (name, data, info) => {
+    const n = name.toLowerCase();
+    if (info.enc || !data) { unread = true; return; }  /* 암호 조각·한도 넘음·깨진 조각 */
+    if (OPAQUE_RX.test(n)) { unread = true; return; }  /* 안을 볼 수 없는 압축·형식(zip 으로 한 번 싸도 마찬가지) */
+    let r;
+    if (/\.(xml|rels|svg|html?|xhtml)$/.test(n)) r = hasRrn(xmlPlain(data.toString("utf8"))) ? "rrn" : "";
+    else if (isZipBuf(data)) r = depth >= 1 ? (rawRrn(data) ? "rrn" : "unread") : scanPii(data, depth + 1);
+    else r = scanPii(data, depth + 1);                 /* CFB 는 cfbScan, 그 밖은 바이트 훑기 */
+    if (r === "rrn") { found = true; return "stop"; }
+    if (r === "unread") unread = true;
+  }, SCAN_LIM);
+  if (found) return "rrn";
+  if (st.bad) return rawRrn(buf) ? "rrn" : "unread";   /* 깨진 zip — 바이트로만 훑고, 못 찾아도 «다 못 봄» */
+  if (st.truncated) unread = true;                     /* 한도·목록 어긋남으로 뒤쪽을 다 못 봤다 */
   return unread ? "unread" : "";
 }
 function scrub(s) { return norm(s).replace(RRN_G, "[주민번호]").replace(MAIL_RX, "[메일]").replace(PHONE_RX, "[전화]"); }
@@ -537,6 +644,9 @@ async function runSweep(deps, opts) {
       const ext = C.extOf(name);
       /* 안을 볼 수 없는 압축(7z·rar·alz·egg)은 남긴다 */
       if (ARCHIVE_OPAQUE[ext]) { skipped.pii++; await hold(c, "archive", got, sha256); continue; }
+      /* zip 꼴이어야 할 문서(pptx·docx·hwpx·zip…)인데 zip 이 아니면(암호 오피스 등) 남긴다 · 암호 PDF 도 남긴다 */
+      if (ZIP_LIKE[ext] && !isZipBuf(buf)) { skipped.pii++; await hold(c, "unread", got, sha256); continue; }
+      if (ext === "pdf" && /\/Encrypt\b/.test(buf.toString("latin1"))) { skipped.pii++; await hold(c, "unread", got, sha256); continue; }
       /* 압축 — 안의 파일 이름이 명단·서류 같으면 남긴다(풀지 않고 이름만 본다) */
       if (ext === "zip" && zipRisk(buf)) { skipped.pii++; await hold(c, "zip-name", got, sha256); continue; }
       /* 파일 전체 — 노트·머리글·포함 개체·옛 형식 글까지 주민번호 꼴을 찾는다. 안을 다 풀지 못했으면 남긴다 */
@@ -584,7 +694,7 @@ async function runSweep(deps, opts) {
 }
 
 module.exports = {
-  runSweep, pickCandidates, judgeAttachment, folderMode, extractContent, summarize, zipEntries, zipRisk, xmlLines, rawRrn, scanPii,
+  runSweep, pickCandidates, judgeAttachment, folderMode, extractContent, summarize, zipEntries, zipWalk, zipRisk, xmlLines, rawRrn, scanPii, cfbScan, cfbStreams,
   queueEntry, buildItem, indexItems, seenKeyOf, itemIdOf, ymdSeoul, scrub, hasRrn, stamp, simLines,
   INBOX_ROOT, Q_ROOT, STATE_PATH, SEEN_ROOT, ITEMS_ROOT, SIMS_ROOT, LECT_ROOT, CAL_MAP_PATH, AUTO_BY, ONTOLOGY_SCHEMA, CONTRACT_VERSION,
   DEFAULT_DAYS, MAX_DAYS, MAX_FILES_PER_RUN, MAX_ATT_BYTES, MIN_TEXT, DOC_AUTO, DOC_HUMAN
