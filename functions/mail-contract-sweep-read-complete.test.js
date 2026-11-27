@@ -160,6 +160,7 @@ test("⑤ AI 판독이 비어도 서류 이름·금액·확인 표시를 지킨�
   assert.equal(req.contractFields.fileName, ATT_NAMES[2].replace(/\.pdf$/, ""));
   assert.equal(req.contractFields.fee, "3,300,000원 (부가세 포함)", "본문에서 읽은 금액을 비워 두지 않는다");
   assert.ok(req.checkReq && /AI 판독이 되지 않아/.test(req.checkReq.note), "읽지 못한 카드는 «확인 필요»");
+  assert.equal(req.readNote, req.checkReq.note, "읽기 품질 문구를 readNote 로도 싣는다");
   assert.equal(rawDb.tree.data.app_config.mailContractSweepSeen[SEEN_KEY].out, "ai_empty_meta");
 
   const before = downloads.n;
@@ -178,7 +179,9 @@ test("⑥ AI 가 성공해도 금액을 비웠으면 본문에서 읽은 금액�
   assert.equal(req.contractFields.fee, "3,300,000원 (부가세 포함)");
   assert.equal(req.contractFields.docName, "위임계약서");
   assert.equal(req.contractFields.fileName, ATT_NAMES[2].replace(/\.pdf$/, ""), "문서 제목이 «위임계약서» 뿐이어도 파일 이름의 사업 이름을 유형 판단에 쓸 수 있게");
-  assert.doesNotMatch(String((req.checkReq && req.checkReq.note) || ""), /일부만|AI 판독|내려받지/, "충분히 읽었으면 «못 읽음» 문구를 달지 않는다(담당 확인 문구는 별개)");
+  assert.match(String((req.checkReq && req.checkReq.note) || ""), /본문에서 대신 읽었습니다/, "AI 가 아니라 정규식이 읽은 금액이므로 맞는지 확인하라고 알린다");
+  assert.match(String(req.readNote || ""), /본문에서 대신 읽었습니다/, "기존 카드에 합칠 때 옮길 읽기 품질 문구는 readNote 로도 싣는다");
+  assert.doesNotMatch(String(req.readNote || ""), /일부만|AI 판독이 되지|내려받지/);
 });
 
 test("⑦ AI 답이 끊겨 일부만 읽힌 경우 — 읽힌 칸은 살리고 «일부만 읽음» 확인 표시를 단다", async () => {
@@ -208,4 +211,71 @@ test("⑧ 계약서 원문을 못 내려받아도 서류 이름은 계약서 첨
   assert.ok(req, "내려받기 실패 메일은 제목·첨부명 카드");
   assert.equal(req.contractFields.docName, ATT_NAMES[2]);
   assert.ok(req.checkReq && /내려받지 못해/.test(req.checkReq.note));
+});
+
+/* ── 독립 검토 지적(2026-11-27) 보강 ── */
+test("⑨ 역추적 폭주 막기 — 공백·줄바꿈이 수만 자 이어져도 자동검토가 멈추지 않는다", () => {
+  const t0 = Date.now();
+  ["수수료", "컨설팅 수수료", "용역대금", "총 금액", "착수금", "계약금", "성공보수", "착수금은 일금"].forEach((k) => {
+    MCS.extractContractFeesFromText(k + " ".repeat(24000) + "x");
+    MCS.extractContractFeesFromText(k + "\t \n".repeat(8000) + "x");
+  });
+  MCS.extractContractFeesFromText("용역대금 일금".repeat(2000));
+  const ms = Date.now() - t0;
+  assert.ok(ms < 1500, "수만 자 공백 입력 열여덟 번이 1.5초 안에 끝나야 한다(걸린 시간 " + ms + "ms)");
+});
+
+test("⑩ 수수료 총액 오인 막기 — 송금·중개·인지 수수료, 월 보수, 기준액은 잡지 않고, 서로 다른 금액이 둘이면 비운다", () => {
+  const fee = (s) => MCS.extractContractFeesFromText(s).fee;
+  assert.equal(fee("송금 수수료는 금 5,500원을 의뢰인이 부담한다"), "");
+  assert.equal(fee("부동산 중개수수료 1,000,000원"), "");
+  assert.equal(fee("중개 용역비는 1,000,000원"), "", "앞에 중개·송금·이체가 붙은 용역비는 안 잡는다");
+  assert.equal(fee("월 컨설팅 수수료는 금 330,000원"), "", "앞에 «월» 이 붙으면 월 보수");
+  assert.equal(fee("인지세 등 수수료 3,000원은 갑이 부담한다. 컨설팅 수수료는 금 3,300,000원(부가세 별도)"), "3,300,000원 (부가세 별도)", "앞의 엉뚱한 수수료에 가려 진짜 총액을 놓치지 않는다");
+  assert.equal(fee("컨설팅 수수료는 금 330,000원(월, 부가세 포함)"), "", "월 보수를 총액으로 읽지 않는다");
+  assert.equal(fee("자문료는 월 금 330,000원"), "");
+  assert.equal(fee("계약금액이 금 50,000,000원 이상인 경우"), "", "기준액(이상·이하)을 총액으로 읽지 않는다");
+  assert.equal(fee("컨설팅 수수료는 3,300,000원. 용역대금은 5,000,000원."), "", "서로 다른 금액이 둘이면 하나를 찍지 않는다");
+  assert.equal(fee("컨설팅 수수료는 3,300,000원(부가세 포함). 용역대금은 3,300,000원."), "3,300,000원 (부가세 포함)", "같은 금액이 반복되면 그대로");
+});
+
+test("⑪ 끊긴 AI 답 살리기 보강 — 끊긴 숫자·위험한 열쇠·«우리 계약서인지» 없는 답은 받지 않는다", () => {
+  const head = '{"isOurEngagementContract": true, "company": "가나상사", "docName": "위임계약서", ';
+  assert.equal(MCS.parseAiJson(head + '"fee": 33').fee, undefined, "끊긴 숫자(33 ← 3,300,000)를 받지 않는다");
+  assert.equal(MCS.parseAiJson(head + '"fee": "3,300,000원", "scope": "컨').fee, "3,300,000원", "닫힌 글자 칸은 받는다");
+  const evil = MCS.parseAiJson(head + '"__proto__": "x", "constructor": "y", "scope": "컨');
+  assert.equal(Object.prototype.hasOwnProperty.call(evil, "__proto__"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(evil, "constructor"), false);
+  assert.equal(({}).polluted, undefined);
+  assert.equal(MCS.parseAiJson('{"company": "가나상사", "docName": "위임계약서", "scope": "컨설팅", "fee": "1원", "x'), null, "우리 계약서인지(isOurEngagementContract) 칸이 없으면 믿지 않는다");
+});
+
+test("⑫ 첨부 고르기 — «견적서_및_계약서» 같은 진짜 계약서는 건너뛰지 않는다(통장사본만 있으면 건너뜀)", () => {
+  assert.equal(MCS.pickBestContractAttachmentName(["견적서_및_계약서_가나상사.pdf"]), "견적서_및_계약서_가나상사.pdf");
+  assert.equal(MCS.pickBestContractAttachmentName(["통장사본.pdf", "계약서_사업자등록증사본포함.pdf"]), "계약서_사업자등록증사본포함.pdf");
+  assert.equal(MCS.pickBestContractAttachmentName(["통장사본_계약금입금용.pdf"]), "", "«계약금» 은 계약서가 아니다");
+  assert.equal(MCS.pickBestContractAttachment([{ name: "견적서_및_계약서.pdf", part: "1" }]).index, 0);
+  assert.equal(MCS.pickBestContractAttachment([{ name: "견적서_가나상사.pdf", part: "1" }]), null, "견적서만 있으면 계약서로 안 읽는다");
+});
+
+test("⑬ AI 재시도 중에는 같은 메일의 다른 폴더 사본이 곧장 폴백 카드를 만들지 않는다 — 끝내 카드는 하나", async () => {
+  const TOME = "내게쓴편지함-1a83d1bc";
+  const { rawDb, wrappedDb } = freshDb();
+  rawDb.tree.mailbox.folders[TOME] = { kind: "tome", name: "내게쓴편지함" };
+  const row = rawDb.tree.mailbox.msgs[SLUG]["177"];
+  rawDb.tree.mailbox.msgs[TOME] = { "9": Object.assign({}, row, { u: "9" }) };
+  const deps = {
+    getDatabase: () => wrappedDb,
+    getSelfEmail: async () => "self@pureun.example",
+    /* 내게쓴메일함 사본만 내려받아지고, 보낸메일함 거울은 비어 있다 */
+    downloadContractAttachment: async (slug) => (slug === TOME ? { name: ATT_NAMES[2], mime: "application/pdf", buf: Buffer.from("PDF") } : null),
+    extractPdfText: async () => CONTRACT_TEXT,
+    callContractAi: async () => null,
+  };
+  await MCS.runSweep(deps, OPTS);
+  assert.deepEqual(Object.keys(rawDb.tree.data.contract_requests || {}), [], "1회차: 어느 사본도 폴백 카드를 만들지 않는다");
+  await MCS.runSweep(deps, OPTS);
+  await MCS.runSweep(deps, OPTS);
+  const keys = Object.keys(rawDb.tree.data.contract_requests || {});
+  assert.equal(keys.length, 1, "끝내 요청은 하나뿐(" + keys.join(",") + ")");
 });

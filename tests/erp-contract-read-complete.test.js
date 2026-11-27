@@ -227,3 +227,52 @@ test('④ 메일 첨부 고르기 — 통장사본·사업자등록증·견적�
   assert.equal(PDF.pickContractAttIndex(null), -1);
   assert.equal(PDF.pickContractAttIndex(A('서류.pdf', '위임약정서_가나.pdf')), 1, '계약·약정·위임 말이 있는 것이 먼저');
 });
+
+/* ── 독립 검토 지적(2026-11-27) 보강 ── */
+test('⑤ 사건 위임이 파일 이름의 상호·낱말(컨설팅·규정·진단) 때문에 컨설팅으로 바뀌지 않는다 — 파일 이름이 «유형 이름»을 말할 때만 컨설팅 단서', () => {
+  const caseCf = { docName: '위임계약서', scope: '근로자 해고 구제 대리' };
+  assert.equal(guess(Object.assign({ fileName: '위임계약서_한빛컨설팅_부당해고' }, caseCf)).kind, 'case', '상호의 «컨설팅» 낱말은 단서가 아니다');
+  assert.equal(guess(Object.assign({ fileName: '위임계약서_가나상사_취업규칙' }, caseCf)).kind, 'case', '«규정·취업규칙» 낱말도');
+  assert.equal(guess({ docName: '위임계약서', scope: '', fileName: '위임계약서_산업안전컨설팅_가나상사' }).kind, 'consulting', '유형 이름(산업안전컨설팅)을 말하면 컨설팅');
+});
+
+test('⑤ 종류만 따라가는 길(inferredKind)에서도 유형을 «목록 첫 번째»로 찍지 않는다 — 파일 이름이 유형을 말하면 그 유형', async () => {
+  /* 서류 이름·범위에 단서가 없고 서버가 종류(consulting)만 알려 준 경우 — 옛 길은 목록 첫 번째(현장클리닉)를 찍었다 */
+  const noType = await laneRun(REQ({ docName: '위임계약서', fileName: '위임계약서_가나상사', scope: '작업중지명령 해제 대응', fee: '3,300,000원' }, { inferredKind: 'consulting' }));
+  assert.ok(noType.r.made, JSON.stringify(noType.r));
+  assert.equal(noType.saved[0].kinds[0], 'consulting');
+  assert.equal(noType.saved[0].typeCodes.consulting, '', '첫 번째(' + CLINIC.name + ')를 찍지 않는다');
+  assert.match(noType.saved[0].checkReq.note, /유형/, '유형이 비었으니 확인 필요가 울린다');
+  const named = await laneRun(REQ({ docName: '위임계약서', fileName: '위임계약서_산업안전컨설팅_가나상사', scope: '작업중지명령 해제 대응', fee: '3,300,000원' }, { inferredKind: 'consulting' }));
+  assert.equal(named.saved[0].typeCodes.consulting, SAFETY.code, '파일 이름이 유형을 말하면 그 유형');
+});
+
+test('⑤ 기존 카드에 합칠 때 — 사람이 고른 유형을 «업무 범위» 문장이 덮지 않는다(서류 이름·파일 이름이 말할 때만 바로잡는다)', async () => {
+  const cur = { id: 'ct-4', contractNo: '계약-2026-103', status: 'review', kinds: ['consulting'], companyName: '가나상사', bizNo: '1234567890',
+    company: { name: '가나상사', bizNo: '1234567890' }, amounts: { consulting: 0 }, typeCodes: { consulting: SAFETY.code }, briefs: {}, srcMails: ['메일함|100'] };
+  /* 서류 이름 «위임계약서»·파일 이름에 사업 이름 없음 — 범위 문장에만 «위험성평가» (유일하게 겹침) */
+  const r = await laneRun(REQ({ docName: '위임계약서', fileName: '위임계약서_가나상사', scope: '위험성평가 컨설팅', fee: '3,300,000원' }, MERGE), { contracts: [cur] });
+  assert.equal(r.saved[0].id, 'ct-4');
+  assert.equal(r.saved[0].typeCodes.consulting, SAFETY.code, '사람이 고른 유형은 범위 문장 때문에 바뀌지 않는다');
+  /* 대조군 — 카드 유형이 비어 있으면 범위에서라도 채운다 */
+  const empty = await laneRun(REQ({ docName: '위임계약서', fileName: '위임계약서_가나상사', scope: '위험성평가 컨설팅', fee: '3,300,000원' }, MERGE), { contracts: [Object.assign({}, cur, { typeCodes: { consulting: '' } })] });
+  assert.equal(empty.saved[0].typeCodes.consulting, RISK.code);
+});
+
+test('⑤ 기존 카드에 합칠 때는 «읽기 품질» 문구(readNote)만 옮기고 담당 확인 문구(checkReq)는 옮기지 않는다', async () => {
+  const cur = { id: 'ct-5', contractNo: '계약-2026-104', status: 'review', kinds: ['consulting'], companyName: '가나상사', bizNo: '1234567890',
+    company: { name: '가나상사', bizNo: '1234567890' }, amounts: { consulting: 1200000 }, typeCodes: { consulting: SAFETY.code }, briefs: {}, srcMails: ['메일함|100'] };
+  const mgrOnly = await laneRun(REQ({ fee: '' }, Object.assign({}, MERGE, { checkReq: { at: '2026-11-26T00:00:00.000Z', by: '시스템(메일 자동검토)', note: '담당 노무사를 확인해 주세요' } })), { contracts: [cur] });
+  assert.equal(mgrOnly.saved[0].id, 'ct-5');
+  assert.equal(mgrOnly.saved[0].checkReq, undefined, '금액·유형이 이미 찬 카드에 담당 확인 문구만 있으면 새 확인 표시를 달지 않는다(옛 동작 그대로)');
+  const withRead = await laneRun(REQ({ fee: '' }, Object.assign({}, MERGE, { readNote: '금액은 AI 가 못 읽어 본문에서 대신 읽었습니다', checkReq: { at: '2026-11-26T00:00:00.000Z', by: '시스템(메일 자동검토)', note: '담당 노무사를 확인해 주세요' } })), { contracts: [cur] });
+  assert.match(withRead.saved[0].checkReq.note, /본문에서 대신 읽었습니다/);
+  assert.doesNotMatch(withRead.saved[0].checkReq.note, /담당 노무사/);
+});
+
+test('④ 첨부 고르기 — «견적서_및_계약서» 같은 진짜 계약서는 건너뛰지 않는다', () => {
+  assert.equal(PDF.pickContractAttIndex(A('견적서_및_계약서.pdf')), 0);
+  assert.equal(PDF.pickContractAttIndex(A('통장사본.pdf', '계약서_사업자등록증사본포함.pdf')), 1);
+  assert.equal(PDF.pickContractAttIndex(A('통장사본_계약금입금용.pdf')), -1, '«계약금» 은 계약서가 아니다');
+  assert.equal(PDF.pickContractAttIndex(A('견적서_가나상사.pdf')), -1);
+});

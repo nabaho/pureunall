@@ -2519,7 +2519,8 @@
     for (var k = 0; k < list.length; k++) {
       var nm = String((list[k] && list[k].name) || '');
       if (!/\.(pdf|jpe?g|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(nm)) continue;
-      if (/사업자등록증|고유번호증|통장사본|등기부|명함|견적서/.test(nm)) continue;
+      /* 이름에 «계약서·약정서·위임계약» 말이 함께 있으면 계약서다(견적서_및_계약서.pdf) */
+      if (/사업자등록증|고유번호증|통장사본|등기부|명함|견적서/.test(nm) && !/계약서|약정서|위임\s*약정|위임\s*계약/.test(nm)) continue;
       if ((DP && DP.이름갈래(nm) === '계약서') || /계약|약정|위임/.test(nm)) return k;
       if (atIdx < 0) atIdx = k;
     }

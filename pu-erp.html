@@ -22176,9 +22176,10 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   /* 읽은 첨부의 파일 이름(예: 위임계약서_산업안전컨설팅_○○_261125) — 서류 제목이 «위임계약서» 뿐일 때 사업 이름을 여기서 본다 */
   var fileName = String(f.fileName || '').trim();
   var text = [docName, scope].filter(Boolean).join(' ');
-  var textAll = [text, fileName].filter(Boolean).join(' ');
+  /* 파일 이름이 «컨설팅 유형 이름»을 말할 때만 컨설팅 단서로 쓴다 — 상호의 «컨설팅»·«규정» 같은 낱말이 사건 위임을 컨설팅으로 바꾸지 않게 */
+  var fileTypeHit = fileName ? erpConsTypeByDocName(fileName, consTypes || []) : null;
   if(/부당해고|부당징계|부당전보|구제신청|노동위원회|\d{4}\s*부해|임금\s*체불|퇴직금|체당금|대지급금|산재|요양\s*신청|장해\s*급여|유족\s*급여|직장\s*내\s*(괴롭힘|성희롱)|행정심판|진정\s*사건|사건\s*처리|위임\s*약정|약정서\s*및\s*위임장/.test(text)
-    || (/위임\s*(계약|약정)/.test(docName) && !/급여|자문|기금|컨설팅|진단|취업규칙|규정|직무|의견서/.test(textAll))){
+    || (/위임\s*(계약|약정)/.test(docName) && !/급여|자문|기금|컨설팅|진단|취업규칙|규정|직무|의견서/.test(text) && !(fileTypeHit && fileTypeHit.code))){
     var cList = caseTypes || [];
     var pickCase = function(rx, fallback){
       var hit = cList.find(function(t){ return t && (rx.test(t.name || '') || rx.test(t.short || '')); });
@@ -22222,7 +22223,7 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   var ty = null;
   [docName, fileName, scope].some(function(nm){ ty = nm ? erpConsTypeByDocName(nm, consTypes || []) : null; return !!(ty && ty.code); });
   if(ty && ty.code) return { kind:'consulting', typeCode:ty.code };
-  if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(textAll)){
+  if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(text)){
     /* ⚠ 유형을 못 골랐으면 «안 고른다» — 목록 첫 번째를 그냥 찍으면 «인사노무 컨설팅» 위임계약서도
        현장클리닉이 된다(2026-11-16 점검: 계약 6건이 그렇게 잘못 찍혀 있었다). 사업 이름이 글에 나오고
        그 이름을 가진 유형이 «딱 하나»일 때만 고른다. 둘 이상이거나 없으면 비워 두어 사람이 고른다
@@ -28302,11 +28303,13 @@ function ContractManagement(props){
       getKindTypes('fund')
     );
     var kv = guessed.kind;
-    var _hasExplicitKindCue = /기금|근로복지|부당해고|구제신청|노동위원회|임금|퇴직금|체불|산재|괴롭힘|성희롱|징계|행정심판|컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무|자문\s*계약|급여/.test(String(cf.docName || '') + ' ' + String(cf.scope || ''));
+    var _hasExplicitKindCue = /기금|근로복지|부당해고|구제신청|노동위원회|임금|퇴직금|체불|산재|괴롭힘|성희롱|징계|행정심판|컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무|자문\s*계약|급여/.test(String(cf.docName || '') + ' ' + String(cf.scope || ''))
+      || !!(cf.fileName && erpConsTypeByDocName(String(cf.fileName), getKindTypes('consulting') || []));
     if(!_hasExplicitKindCue && req && req.inferredKind && ['company','case','consulting','fund','other'].indexOf(req.inferredKind) >= 0){
       kv = req.inferredKind;
       var _infList = getKindTypes(kv) || [];
-      guessed = { kind: kv, typeCode: (_infList[0] && _infList[0].code) || '' };
+      /* ⚠ 종류만 따르고 유형은 비운다 — 목록 첫 번째를 찍으면 «현장클리닉» 같은 엉뚱한 유형이 되고 «유형 비었음» 확인 필요도 못 울린다(2026-11-27) */
+      guessed = { kind: kv, typeCode: '' };
     }
     var amt = erpParseContractMoney(cf.retainer || cf.deposit || cf.fee);
     var rawCfSuccess = String(cf.success || '').trim();
@@ -28594,7 +28597,7 @@ function ContractManagement(props){
       if(nextKinds.indexOf(kv) < 0) nextKinds.push(kv);
       var nextTc = Object.assign({}, cur.typeCodes || {});
       var _hasSpecificSubtype = /사내\s*근로\s*복지\s*기금|사내\s*근복|지역\s*공동|공동\s*근로\s*복지\s*기금|공동\s*기금|부당해고|구제신청|노동위원회|대지급금|체당금|임금|퇴직금|체불|산재|괴롭힘|성희롱|징계|행정심판|자문\s*계약|노무\s*자문|급여\s*(?:관리|대행|아웃소싱)/.test(String(cf.docName || '') + ' ' + String(cf.scope || ''))
-        || !!(kv === 'consulting' && [cf.docName, cf.fileName, cf.scope].some(function(nm){ return !!(nm && erpConsTypeByDocName(nm, getKindTypes('consulting') || [])); }));
+        || !!(kv === 'consulting' && [cf.docName || cf.scope, cf.fileName].some(function(nm){ return !!(nm && erpConsTypeByDocName(nm, getKindTypes('consulting') || [])); }));
       if(guessed.typeCode && (!nextTc[kv] || _hasSpecificSubtype)) nextTc[kv] = guessed.typeCode;
       var nextAmts = Object.assign({}, cur.amounts || {});
       var hadExistingMoney = (Number(nextAmts[kv]) > 0) || (Number(cur.successFee) > 0);
@@ -28643,7 +28646,7 @@ function ContractManagement(props){
       if(!upd.companyId) upd = erpDeferCoLinkIfNew(upd) || upd;
       /* 읽지 못한 칸이 있으면 «확인 필요» — 담당자가 이미 단 확인 표시는 그대로 두고, 요청이 들고 온 문구(서버 자동검토)도 잇는다 */
       if(updStatus !== 'signed'){
-        var _gapU = [req && req.checkReq && req.checkReq.note, _gapNoteOf((upd.amounts || {})[kv], upd.successFee, (upd.typeCodes || {})[kv])].filter(Boolean).join(' / ');
+        var _gapU = [req && req.readNote, _gapNoteOf((upd.amounts || {})[kv], upd.successFee, (upd.typeCodes || {})[kv])].filter(Boolean).join(' / ');
         if(_gapU && !(cur.checkReq && !cur.checkReq.resolvedAt && String(cur.checkReq.note || '').trim())){
           upd.checkReq = { at:(new Date()).toISOString(), by:'시스템(계약서 자동 읽기)', note:_gapU };
         }
@@ -28723,7 +28726,7 @@ function ContractManagement(props){
           : { at:(new Date()).toISOString(), by:'시스템(계약서 자동 읽기)', note:_gapN };
       }
     }
-    var boxOrigin =isTomeDir ? '내게쓴메일함' : (hasMailMeta ? '푸른메일함' : '사진첩·메일함');
+    var boxOrigin = isTomeDir ? '내게쓴메일함' : (hasMailMeta ? '푸른메일함' : '사진첩·메일함');
     form.note = '📄 ' + boxOrigin + '에서 계약서 자동 정리 (' + (cf.docName || '계약서') + ')'
       + succNoteTag
       + (briefText ? '\n업무: ' + briefText : '')

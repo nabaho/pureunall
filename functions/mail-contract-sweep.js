@@ -370,7 +370,9 @@ function extractHwpxText(buf) {
    외부 전송 없이 계약서의 % 요율·보수 숫자만 안전하게 당겨온다 (주민번호·전화·계좌는 절대 포함하지 않음). */
 function extractContractFeesFromText(rawText) {
   const res = { retainer: "", success: "", deposit: "", vat: "", fee: "" };
-  const s = String(rawText || "").replace(/\r\n/g, "\n").slice(0, 24000);
+  /* 공백 덩어리는 «한 칸»으로 줄이고 빈 줄은 버린다(줄바꿈은 조항 경계라 남긴다). 아래 정규식들은 \s* 가 이어져 있어
+     공백 수천 자가 이어진 입력 한 통이 자동검토 전체를 멈출 수 있다(역추적 폭주, 2026-11-27 독립 검토). 이 정리는 선형이다. */
+  const s = String(rawText || "").replace(/\r\n/g, "\n").slice(0, 24000).split("\n").map((ln) => ln.replace(/[^\S\n]+/g, " ").trim()).filter(Boolean).join("\n");
   if (!s) return res;
   const noLate = s.replace(/(?:지연|연체|미지급|지체)[^\n.]{0,35}?연\s*\d+(?:\.\d+)?\s*[%％]\s*(?:의\s*)?이자/g, " ")
     .replace(/연\s*\d+(?:\.\d+)?\s*[%％]\s*의?\s*(?:지연\s*|연체\s*)?이자/g, " ");
@@ -420,14 +422,26 @@ function extractContractFeesFromText(rawText) {
   }
   /* 3) 컨설팅 수수료·용역대금처럼 «착수금·계약금»이라 부르지 않는 총액(2026-11-27)
      — 컨설팅 위임계약서는 흔히 «컨설팅 수수료는 금 ○○원(부가세 별도)» 으로 쓴다. 위 둘만 보면 금액이 통째로 빈다.
-     숫자 뒤에 «원» 이 붙어야만 잡고, 지연이자(연 %)는 위에서 이미 걷어 냈다. 한글 숫자(일금 삼백만원정)는 앞의 «(₩숫자)» 병기만 읽는다. */
-  const mFee = /(?:컨설팅\s*(?:수수료|비용|비|료)|수수료|용역\s*(?:대금|비|료)|(?:총\s*)?계약\s*금액|총\s*금액|보수\s*총액|위임\s*보수)\s*(?:총액)?\s*(?:으로|은|는|이|가|:|：|\|)?\s*(?:일금\s*[가-힣\s]+원정\s*\(?\s*)?(?:금\s*|[₩￦]\s*)?(\d{1,3}(?:,\d{3})+\s*원|\d[\d,]*(?:\.\d+)?\s*만\s*원|\d{1,3}(?:,\d{3})+(?=\s*\)))(\s*\(?\s*(?:부가(?:가치)?세|VAT)\s*(?:포함|별도)\s*\)?)?/i.exec(noLate);
-  if (mFee && mFee[1]) {
-    const rawF0 = mFee[1].replace(/\s+/g, "");
-    const rawF = /원$/.test(rawF0) ? rawF0 : rawF0 + "원";
-    const fv = /(포함|별도)/.exec(mFee[2] || "");
-    res.fee = rawF + (fv ? " (부가세 " + fv[1] + ")" : "");
-    if (!res.vat && fv) res.vat = "부가세 " + fv[1];
+     ⚠ 엉뚱한 금액을 «사실처럼» 채우지 않는다(독립 검토 지적): 일반어 «수수료» 단독은 안 잡고(송금·중개·인지 수수료),
+       앞에 송금·이체·중개·인지·지연·연체·월이 붙거나 뒤에 이상·이하·초과·미만·월(월 보수)이 붙으면 안 잡으며,
+       서로 다른 금액이 둘 이상 걸리면 하나를 찍지 않고 비운다(사람이 본다).
+     숫자 뒤에 «원» 이 붙어야만 잡는다. 한글 숫자(일금 삼백만원정)는 앞의 «(₩숫자)» 병기만 읽는다.
+     공백은 위에서 한 칸으로 줄였고, 선택 조각 사이의 공백은 «하나»만 둔다(\s? — 역추적 폭주 방지). */
+  const FEE_TOTAL_RE = /(?<!(?:송금|이체|중개|인지|지연|연체|환전|카드|월)\s?)(?:(?:컨설팅|용역|위임|자문|업무\s?대행|대행)\s?(?:수수료|비용|대금|보수|비|료)|총\s?(?:계약\s?)?금액|보수\s?총액)(?:\s?총액)?(?:\s?(?:으로|은|는|이|가|:|：|\|))?\s?(?:일금\s?[가-힣\s]{1,40}원정\s?\(?\s?)?(?:금\s?|[₩￦]\s?)?(\d{1,3}(?:,\d{3})+\s?원|\d[\d,]{0,12}(?:\.\d+)?\s?만\s?원|\d{1,3}(?:,\d{3})+(?=\s?\)))(?!\s?(?:이상|이하|초과|미만|\(?\s?월|\/\s?월|매\s?월))(\s?\(?\s?(?:부가(?:가치)?세|VAT)\s?(?:포함|별도)\s?\)?)?/gi;
+  const feeHits = [];
+  let feeN = 0;
+  for (const mf of noLate.matchAll(FEE_TOTAL_RE)) {
+    if (++feeN > 20) break;
+    const rawF0 = String(mf[1] || "").replace(/\s+/g, "");
+    if (!rawF0) continue;
+    const fv = /(포함|별도)/.exec(mf[2] || "");
+    feeHits.push({ amt: /원$/.test(rawF0) ? rawF0 : rawF0 + "원", vat: fv ? fv[1] : "" });
+  }
+  const feeAmts = Array.from(new Set(feeHits.map((h) => h.amt)));
+  if (feeAmts.length === 1) {
+    const hv = feeHits.find((h) => h.vat);
+    res.fee = feeAmts[0] + (hv ? " (부가세 " + hv.vat + ")" : "");
+    if (!res.vat && hv) res.vat = "부가세 " + hv.vat;
   }
   /* 출력값 화이트리스트 검증 — 숫자·단위(%·원·만원) 및 고정 부가세 표기 외에는 절대 반출하지 않는다 */
   if (res.fee && !/^\d[\d.,]*(?:원|만원)(?:\s*\(\s*부가세\s*(?:포함|별도)\s*\))?$/.test(res.fee)) res.fee = "";
@@ -450,16 +464,22 @@ async function scrubContractTextForAi(rawText) {
    칸이 3개 미만이면 믿지 않는다. 안 읽힌 칸은 지어내지 않는다. */
 function salvageTruncatedJson(text) {
   const body = String(text || "");
-  const re = /"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*("(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?)\s*(?=,|\}|$)/g;
-  const obj = {};
+  /* 글자 칸은 닫는 따옴표가 있어야 하고, 숫자·불리언은 «뒤에 쉼표나 닫는 중괄호가 있어야» 받는다 — 끊긴 숫자(33 ← 3,300,000)를 안 받는다 */
+  const re = /"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*(?:("(?:[^"\\]|\\.)*")\s*(?=,|\}|$)|(true|false|null|-?\d+(?:\.\d+)?)\s*(?=,|\}))/g;
+  const obj = Object.create(null);
   let n = 0;
   let m;
   while ((m = re.exec(body)) !== null) {
-    try { obj[m[1]] = JSON.parse(m[2]); n++; } catch (_) { /* 이 칸만 버린다 */ }
+    /* 객체 모양을 건드리는 열쇠는 받지 않는다 */
+    if (/^(?:__proto__|constructor|prototype)$/.test(m[1])) continue;
+    try { obj[m[1]] = JSON.parse(m[2] !== undefined ? m[2] : m[3]); n++; } catch (_) { /* 이 칸만 버린다 */ }
   }
   if (n < 3) return null;
-  Object.defineProperty(obj, "_partial", { value: true, enumerable: true });
-  return obj;
+  /* 우리 수임 계약서인지(첫 칸)를 못 읽었으면 믿지 않는다 — 근로계약서 같은 것이 계약 카드로 올라오지 않게 */
+  if (!("isOurEngagementContract" in obj)) return null;
+  const out = Object.assign({}, obj);
+  Object.defineProperty(out, "_partial", { value: true, enumerable: true });
+  return out;
 }
 
 function parseAiJson(rawText) {
@@ -498,24 +518,32 @@ function pickBestContractAttachment(atts) {
     const a = list[i];
     const nm = String((a && a.name) || "").trim();
     if (!nm || !TEXT_EXTRACTABLE_EXT_RE.test(nm)) continue;
-    if (/사업자등록증|고유번호증|통장사본|등기부|명함|견적서/.test(nm)) continue;
+    if (isNonContractAttName(nm)) continue;
     if (/(?:계약|약정|위임)/.test(nm)) return { att: a, index: i };
     if (!fallback) fallback = { att: a, index: i };
   }
   return fallback;
 }
 
+/* 계약서가 아닌 첨부(통장사본·사업자등록증·견적서…)인가. ⚠ 이름에 «계약서·약정서·위임계약» 말이 함께 있으면
+   계약서로 본다 — «견적서_및_계약서.pdf»·«계약서_사업자등록증사본포함.pdf» 같은 진짜 계약서를 건너뛰지 않게(독립 검토 지적 2026-11-27). */
+const NON_CONTRACT_ATT_NAME_RE = /사업자등록증|고유번호증|통장사본|등기부|명함|견적서/;
+const CONTRACT_DOC_NAME_RE = /계약서|약정서|위임\s*약정|위임\s*계약/;
+function isNonContractAttName(nm) {
+  const s = String(nm || "");
+  return NON_CONTRACT_ATT_NAME_RE.test(s) && !CONTRACT_DOC_NAME_RE.test(s);
+}
+
 /* 첨부 «이름 목록»만 있을 때(내려받기·판독이 안 된 메일) 계약서 파일 이름을 고른다.
    pickBestContractAttachment 와 같은 잣대다 — 통장사본·사업자등록증·견적서는 계약서가 아니다.
    ⚠ 첫 번째 첨부를 그냥 쓰지 않는다(2026-11-27: 첫 첨부가 통장사본이라 «통장사본»이 계약서 이름으로 적혀,
      유형이 첫 번째 유형으로 찍히고 금액이 비었다). 못 고르면 빈 글자 — 부르는 쪽이 «계약서»로 둔다. */
-const NON_CONTRACT_ATT_NAME_RE = /사업자등록증|고유번호증|통장사본|등기부|명함|견적서/;
 function pickBestContractAttachmentName(names) {
   const list = Array.isArray(names) ? names : [];
   let fallback = "";
   for (let i = 0; i < list.length; i++) {
     const nm = String(list[i] || "").trim();
-    if (!nm || NON_CONTRACT_ATT_NAME_RE.test(nm)) continue;
+    if (!nm || isNonContractAttName(nm)) continue;
     if (/(?:계약|약정|위임)/.test(nm)) return nm;
     if (!fallback && ATT_CONTRACT_EXT_RE.test(nm)) fallback = nm;
   }
@@ -1483,6 +1511,8 @@ async function runSweep(deps, opts) {
           by: "시스템(메일 자동검토)",
           note: checkNote || metaFallbackNote(outCode, folderLabel),
         };
+        /* 읽기 품질 문구는 따로도 싣는다 — 이알피가 «기존 카드에 합칠 때» 담당 확인 문구(checkReq)는 안 옮기지만 이것은 옮긴다 */
+        metaReq.readNote = metaReq.checkReq.note;
       }
       reqUpdates[REQ_ROOT + "/" + reqKey] = metaReq;
       seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: isReplySigned ? "contract_reply_signed" : (outCode || "contract_meta"), st: fbTargetStatus };
@@ -1575,6 +1605,8 @@ async function runSweep(deps, opts) {
         /* 일시적 AI 실패일 수 있다 — 다음 회차에 다시 읽는다(knownMailKeys 에 넣지 않는다) */
         seenUpdates[SEEN_ROOT + "/" + cc.sKey] = { at: now, out: "ai_retry", n: prevTries + 1 };
         out.aiRetry = (out.aiRetry || 0) + 1;
+        /* 같은 메일의 다른 폴더 사본이 «이 회차에» 곧장 폴백 카드를 만들지 않게 — 재시도 중에도 «처리 중»으로 센다(독립 검토 지적) */
+        handledContractMsgFps.add(msgFp);
         continue;
       }
       if (queueMetaFallbackContract("ai_empty_meta", "", localFeeHints, { docName: fName })) continue;
@@ -1600,9 +1632,12 @@ async function runSweep(deps, opts) {
     if (localFeeHints.deposit && !String(extracted.deposit || "").trim() && !String(extracted.fee || "").trim()) {
       extracted.deposit = localFeeHints.deposit;
     }
-    /* 컨설팅 수수료·용역대금처럼 «착수금·계약금» 말이 아닌 총액 — AI 가 비웠으면 본문에서 읽은 것으로 채운다(2026-11-27) */
+    /* 컨설팅 수수료·용역대금처럼 «착수금·계약금» 말이 아닌 총액 — AI 가 비웠으면 본문에서 읽은 것으로 채운다(2026-11-27).
+       ⚠ AI 가 아니라 정규식이 읽은 금액이므로 카드에 «맞는지 확인» 문구를 단다(아래 feeFromText). */
+    let feeFromText = false;
     if (localFeeHints.fee && !String(extracted.fee || "").trim() && !String(extracted.deposit || "").trim() && !String(extracted.retainer || "").trim()) {
       extracted.fee = localFeeHints.fee;
+      feeFromText = true;
     }
     if (localFeeHints.vat && !String(extracted.vat || "").trim()) {
       extracted.vat = localFeeHints.vat;
@@ -1766,11 +1801,15 @@ async function runSweep(deps, opts) {
       },
     };
     /* AI 답이 끊겨 «읽힌 만큼»만 살린 경우 — 빠진 칸이 있을 수 있음을 카드에 알린다(2026-11-27) */
-    if (extracted._partial && !openReplySigned) {
-      const partialNote = "AI 가 계약서를 일부만 읽었습니다 — 비어 있는 항목(금액·기간·유형)을 첨부 계약서에서 확인해 주세요.";
+    const readNotes = [];
+    if (extracted._partial) readNotes.push("AI 가 계약서를 일부만 읽었습니다 — 비어 있는 항목(금액·기간·유형)을 첨부 계약서에서 확인해 주세요.");
+    if (feeFromText) readNotes.push("금액은 AI 가 못 읽어 본문에서 대신 읽었습니다 — 계약서의 금액과 맞는지 확인해 주세요.");
+    if (readNotes.length && !openReplySigned) {
+      const readNoteText = readNotes.join(" / ");
       checkReq = checkReq
-        ? Object.assign({}, checkReq, { note: String(checkReq.note || "") + " / " + partialNote })
-        : { at: new Date(now).toISOString(), by: "시스템(메일 자동검토)", note: "푸른메일함(" + folderLabel + ") " + partialNote };
+        ? Object.assign({}, checkReq, { note: String(checkReq.note || "") + " / " + readNoteText })
+        : { at: new Date(now).toISOString(), by: "시스템(메일 자동검토)", note: "푸른메일함(" + folderLabel + ") " + readNoteText };
+      reqObj.readNote = readNoteText;
     }
     if (checkReq) reqObj.checkReq = checkReq;
 
@@ -1798,6 +1837,7 @@ async function runSweep(deps, opts) {
     quoteQueued: out.quoteQueued,
     contractQueued: out.contractQueued,
     aiReads: out.aiReads,
+    aiRetry: out.aiRetry || 0,
     skippedDup: out.skippedDup,
     skippedClosed: out.skippedClosed,
   };
