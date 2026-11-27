@@ -3716,6 +3716,61 @@
       #drivingHud.walk-mode-on #bottomContextActionDock { display: flex !important; bottom: 98px !important; }
     }
 
+
+    /* =========================================================================
+       v48 EFFORTLESS STEER-BY-WIRE PAD ([◀] + [Tesla Yoke] + [▶])
+       ========================================================================= */
+    .ts-easy-steer-pad {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(10, 14, 22, 0.50);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 999px;
+      padding: 4px 6px;
+      touch-action: none;
+      user-select: none;
+    }
+    .ts-steer-wing-btn {
+      width: 40px;
+      height: 54px;
+      border-radius: 999px;
+      border: 1.5px solid rgba(148, 163, 184, 0.35);
+      background: rgba(30, 41, 59, 0.78);
+      color: #f8fafc;
+      font-size: 16px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      touch-action: none;
+      user-select: none;
+      transition: transform 0.08s, background 0.1s, border-color 0.1s;
+    }
+    .ts-steer-wing-btn:active,
+    .ts-steer-wing-btn.pressed {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-color: #93c5fd;
+      color: #ffffff;
+      transform: scale(0.94);
+      box-shadow: 0 0 14px rgba(37, 99, 235, 0.7);
+    }
+    #dcWheelCorner .wheel-container {
+      width: 82px !important;
+      height: 68px !important;
+      touch-action: none;
+    }
+    @media (max-width: 640px) {
+      #dcWheelCorner { left: 8px !important; bottom: 12px !important; }
+      .ts-easy-steer-pad { padding: 3px 5px; gap: 3px; }
+      .ts-steer-wing-btn { width: 36px; height: 48px; font-size: 14px; }
+      #dcWheelCorner .wheel-container { width: 68px !important; height: 56px !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -4579,7 +4634,7 @@
         <button type="button" class="board-npc-hud-btn" id="mainBoardNpcFastBtn" onclick="boardNearestVehicle()">🚘 앞의 차 바로 타기</button>
       </div>
 
-      <!-- 6. BOTTOM-LEFT: Authentic Tesla Plaid Yoke / Scroll-Wheel Steering (Auto-rotates on FSD v15, Drag to Manual Takeover!) -->
+      <!-- 6. BOTTOM-LEFT: Easy Steer-by-Wire Pad — Tap [◀ / ▶] OR Touch/Slide [Tesla Yoke] Effortlessly! -->
       <div class="left-drive-cluster pointer-auto" id="dcWheelCorner">
         <div id="frontWheelMiniViz" style="display:none;">
           <svg width="46" height="24" viewBox="0 0 46 24">
@@ -4587,7 +4642,12 @@
             <g id="vizTireR" transform="translate(36,12) rotate(0)"><rect x="-3" y="-7" width="6" height="14"/></g>
           </svg>
         </div>
-        <div class="wheel-container" id="steeringWheelArea" title="드래그하여 수동 조향 인수 (FSD 작동 중에는 스스로 회전합니다)">
+        <div class="ts-easy-steer-pad">
+          <button type="button" class="ts-steer-wing-btn" id="easySteerLeftBtn"
+            onpointerdown="event.preventDefault();setButtonSteer(-1)"
+            onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)" onpointercancel="setButtonSteer(0)"
+            title="좌회전 (A / ◀)">◀</button>
+        <div class="wheel-container" id="steeringWheelArea" title="왼쪽·오른쪽 터치 또는 가볍게 슬라이드하여 조향">
           <svg id="steeringWheelSvg" width="100%" height="100%" viewBox="0 0 140 140">
             <defs>
               <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -4617,6 +4677,11 @@
             <path d="M 60 66 Q 70 63 80 66 L 78 68.5 Q 70 66.5 62 68.5 Z" fill="#e2e8f0"/>
             <path d="M 68.2 68 L 71.8 68 L 70 82 Z" fill="#e2e8f0"/>
           </svg>
+        </div>
+          <button type="button" class="ts-steer-wing-btn" id="easySteerRightBtn"
+            onpointerdown="event.preventDefault();setButtonSteer(1)"
+            onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)" onpointercancel="setButtonSteer(0)"
+            title="우회전 (D / ▶)">▶</button>
         </div>
         <div class="desktop-steer-arrows" style="display:none;">
           <button type="button" class="hud-btn" onpointerdown="setButtonSteer(-1)" onpointerup="setButtonSteer(0)" onpointerleave="setButtonSteer(0)">◀</button>
@@ -10200,11 +10265,16 @@
     }
 
     function setButtonSteer(dir) {
+      if (dir !== 0) ensureContinuousEngineAudio();
       if (dir !== 0 && state.autopilot && state.mode === 'autonomous') {
         state.autopilot = false;
         syncAutopilotButton();
       }
       state.buttonSteer = dir;
+      const lb = document.getElementById('easySteerLeftBtn');
+      const rb = document.getElementById('easySteerRightBtn');
+      if (lb) lb.classList.toggle('pressed', dir < 0);
+      if (rb) rb.classList.toggle('pressed', dir > 0);
     }
 
     function resetVehiclePosition() {
@@ -14375,35 +14445,56 @@
       const curAbsKmh = Math.abs(state.speed) * 3.6;
       const effectiveMaxMps = Math.min(maxMps, (state.speedCapKmh >= 215 ? car.maxSpeed : state.speedCapKmh) / 3.6);
 
-      // v12 Weighted Realistic MDPS Steering Ratio (Calm & precise at city/highway speed, full lock when parking!)
-      const speedSteerScale = 1 / (1 + curAbsKmh * 0.038);
-      const maxLock = 0.42 * speedSteerScale * state.steerSensitivity;
+      // v48 Effortless Tesla Steer-by-Wire Ratio (Light, crisp, zero understeer at all speeds + Smart Curve Assist!)
+      const speedSteerScale = 1 / (1 + curAbsKmh * 0.011);
+      const maxLock = 0.52 * speedSteerScale * state.steerSensitivity;
 
       let throttle = 0, brake = 0;
       if (state.autopilot && !state.examFinished) {
         const ai = computeAutopilotCommands();
-        state.steerAngle = dampVal(state.steerAngle, ai.steer, 7.2, dt);
+        state.steerAngle = dampVal(state.steerAngle, ai.steer, 8.5, dt);
         throttle = (state.accelPressed || keyAccel) ? Math.max(ai.throttle, 0.92) : ai.throttle;
         brake = (state.accelPressed || keyAccel) ? 0 : ai.brake;
       } else {
         let rawSteerCmd = 0; // -1 .. +1
-        if (Math.abs(state.wheelDragSteer) > 0.005) {
+        if (Math.abs(state.wheelDragSteer) > 0.003) {
           const normAbs = Math.min(1, Math.abs(state.wheelDragSteer) / 0.55);
-          // 6% center deadzone + progressive non-linear curve for fine lane-keeping!
-          const adj = normAbs <= 0.06 ? 0 : (normAbs - 0.06) / 0.94;
-          rawSteerCmd = Math.sign(state.wheelDragSteer) * Math.pow(adj, 1.65);
-          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 6.8, dt);
+          // Crisp near-linear Steer-by-Wire response (zero sluggish deadness!)
+          const adj = normAbs <= 0.04 ? 0 : (normAbs - 0.04) / 0.96;
+          rawSteerCmd = Math.sign(state.wheelDragSteer) * Math.pow(adj, 1.08);
+          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 15.0, dt);
         } else if (state.buttonSteer !== 0 || keyLeft || keyRight) {
           rawSteerCmd = state.buttonSteer !== 0 ? state.buttonSteer : ((keyRight ? 1 : 0) - (keyLeft ? 1 : 0));
-          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 4.2, dt);
+          // Progressive ramp: light tap = gentle lane tweak, hold = full smooth cornering!
+          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 8.8, dt);
         } else {
-          // Gentle natural self-centering return-to-center torque
-          const returnRate = 5.2 + curAbsKmh * 0.045;
-          state.smoothSteerInput = dampVal(state.smoothSteerInput, 0, returnRate, dt);
-          if (Math.abs(state.smoothSteerInput) < 0.002) state.smoothSteerInput = 0;
+          // Fast, clean self-centering return-to-zero (zero fishtailing overshoot!)
+          state.smoothSteerInput = dampVal(state.smoothSteerInput, 0, 15.5, dt);
+          if (Math.abs(state.smoothSteerInput) < 0.003) state.smoothSteerInput = 0;
         }
 
-        state.steerAngle = dampVal(state.steerAngle, state.smoothSteerInput * maxLock, 7.2, dt);
+        // Gentle Lane-Preserving Smart Road-Curve Assist when hands are resting (stays right in your chosen lane around curves!)
+        let curveAssistAngle = 0;
+        if (rawSteerCmd === 0 && state.scenicTourActive && scenicRoadSamples && scenicRoadSamples.length && state.speed > 1.2 && !state.carFlightMode) {
+          const nearA = findNearestScenicSample(state.x, state.z);
+          const sp0 = nearA.sample;
+          const curLat = Math.max(-4.8, Math.min(4.8, (state.x - sp0.x) * sp0.nx + (state.z - sp0.z) * sp0.nz));
+          const sLook = scenicRoadSamples[((nearA.idx ?? 0) + 5) % SCENIC_SEGMENTS];
+          const txA = sLook.x + sLook.nx * curLat;
+          const tzA = sLook.z + sLook.nz * curLat;
+          const wantH = Math.atan2(txA - state.x, tzA - state.z);
+          let hDiff = wantH - state.heading;
+          while (hDiff > Math.PI) hDiff -= Math.PI * 2;
+          while (hDiff < -Math.PI) hDiff += Math.PI * 2;
+          if (Math.abs(hDiff) < 0.85) {
+            curveAssistAngle = Math.max(-0.34, Math.min(0.34, -hDiff * 0.85));
+          }
+        }
+
+        const targetSteerRad = (rawSteerCmd !== 0 || Math.abs(state.smoothSteerInput) > 0.02)
+          ? (state.smoothSteerInput * maxLock)
+          : curveAssistAngle;
+        state.steerAngle = dampVal(state.steerAngle, targetSteerRad, 14.5, dt);
 
         const rawPedal = state.accelPressed ? state.analogThrottle : (keyAccel ? 1.0 : 0);
         brake = (state.brakePressed || keyBrake) ? 1 : 0;
@@ -16337,19 +16428,20 @@
       });
       window.addEventListener('pointerup', () => { state.isDraggingOrbit = false; });
 
-      // v17 Intuitive Mobile Relative Horizontal Thumb-Slide Steering (Zero grab-jump, NEVER reverses direction!)
+      // v48 Effortless Center-Referenced Direct Touch & Short-Throw Steer-by-Wire (Tap left/right of Yoke OR slide ±28px = full lock!)
       const wheelEl = document.getElementById('steeringWheelArea');
       let activeWheelPointerId = null;
-      let wheelAnchorX = 0;
-      const FULL_SLIDE_PX = 68; // Smooth 68px thumb slide = full steering lock
 
       function updateWheelFromEvent(e) {
-        const dx = e.clientX - wheelAnchorX;
-        // 4px center deadzone so resting thumb drives dead-straight
-        const deadDx = Math.abs(dx) <= 4 ? 0 : (Math.sign(dx) * (Math.abs(dx) - 4));
-        const norm = Math.max(-1, Math.min(1, deadDx / FULL_SLIDE_PX));
+        const rect = wheelEl.getBoundingClientRect();
+        const centerX = rect.left + rect.width * 0.5;
+        const maxRadiusPx = Math.max(22, rect.width * 0.36); // Just ~28px from center = 100% lock (never hits screen bezel!)
+        const dx = e.clientX - centerX;
+        const deadPx = 3.0;
+        const adjDx = Math.abs(dx) <= deadPx ? 0 : (Math.sign(dx) * (Math.abs(dx) - deadPx));
+        const norm = Math.max(-1, Math.min(1, adjDx / maxRadiusPx));
         state.wheelDragSteer = norm * 0.55;
-        if (state.autopilot && state.mode === 'autonomous') {
+        if (Math.abs(norm) > 0.08 && state.autopilot && state.mode === 'autonomous') {
           state.autopilot = false;
           syncAutopilotButton();
         }
@@ -16359,9 +16451,7 @@
         activeWheelPointerId = e.pointerId;
         ensureContinuousEngineAudio();
         try { wheelEl.setPointerCapture(e.pointerId); } catch (_) {}
-        // Anchor directly at touch point so touching anywhere on the wheel starts smoothly at 0!
-        wheelAnchorX = e.clientX;
-        state.wheelDragSteer = 0;
+        updateWheelFromEvent(e); // Instant response on touch!
       });
       wheelEl.addEventListener('pointermove', e => {
         if (activeWheelPointerId === e.pointerId) updateWheelFromEvent(e);
