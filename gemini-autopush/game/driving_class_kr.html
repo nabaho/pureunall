@@ -3771,6 +3771,150 @@
       #dcWheelCorner .wheel-container { width: 68px !important; height: 56px !important; }
     }
 
+
+    /* =========================================================================
+       v49 COMPACT ALWAYS-ON LIVE MOVING GPS MAP + SKY-FLIGHT QUICK PILLS
+       ========================================================================= */
+    #tsSkyActionStrip {
+      position: absolute;
+      left: 8px;
+      top: 44px;
+      z-index: 44;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #airKillBadge {
+      font-size: 10px !important;
+      padding: 3px 9px !important;
+      white-space: nowrap !important;
+      border-radius: 999px !important;
+    }
+    @media (max-width: 640px) {
+      #tsSkyActionStrip {
+        left: 6px;
+        top: 38px;
+        gap: 3px;
+      }
+      #dcFloatingActiveBars {
+        top: 70px !important;
+        left: 6px !important;
+        transform: none !important;
+        align-items: flex-start !important;
+        max-width: calc(100vw - 132px) !important;
+      }
+      #airKillBadge {
+        font-size: 9px !important;
+        padding: 2.5px 7px !important;
+      }
+      #carFlightPad {
+        gap: 3px !important;
+        padding: 4px 6px !important;
+      }
+      #carFlightPad .flt-btn {
+        padding: 4px 6px !important;
+        font-size: 9.5px !important;
+        white-space: nowrap !important;
+      }
+    }
+
+    .ts-fly-pill {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.85), rgba(37, 99, 235, 0.85)) !important;
+      border-color: #7dd3fc !important;
+      color: #ffffff !important;
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.45);
+    }
+    .ts-fly-pill.flying-on {
+      background: linear-gradient(135deg, #f97316, #ef4444) !important;
+      border-color: #fed7aa !important;
+      box-shadow: 0 0 14px rgba(249, 115, 22, 0.75);
+    }
+    .ts-walk-pill {
+      border-color: rgba(110, 231, 183, 0.55) !important;
+      color: #a7f3d0 !important;
+    }
+    .ts-boss-pill {
+      border-color: rgba(244, 114, 182, 0.6) !important;
+      color: #fbcfe8 !important;
+    }
+
+    /* Compact Translucent Live Moving GPS Map Always Visible at Top-Right! */
+    #dcRightClusterStack {
+      right: 8px !important;
+      top: 40px !important;
+      z-index: 44 !important;
+    }
+    #teslaNavCard {
+      display: block !important;
+      width: 168px !important;
+      background: rgba(9, 14, 24, 0.66) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      border: 1px solid rgba(125, 211, 252, 0.30) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.42) !important;
+    }
+    #drivingHud.hide-mini-map #teslaNavCard {
+      display: none !important;
+    }
+    #drivingHud.ts-fullscreen-map #teslaNavCard {
+      width: min(52vw, 480px) !important;
+    }
+    #teslaNavCard .ts-nav-turn-banner {
+      padding: 4px 7px !important;
+      background: rgba(15, 23, 42, 0.78) !important;
+      border-bottom: 1px solid rgba(125, 211, 252, 0.18);
+    }
+    #teslaNavCard .ts-nav-arrow { font-size: 13px !important; color: #38bdf8; }
+    #teslaNavCard .ts-nav-turn-info strong { font-size: 10.5px !important; }
+    #teslaNavCard .ts-nav-turn-info span { font-size: 8.5px !important; color: #cbd5e1; }
+    #teslaNavCard #liveMinimapWidget {
+      height: 108px !important;
+    }
+    #drivingHud.ts-fullscreen-map #teslaNavCard #liveMinimapWidget {
+      height: 250px !important;
+    }
+    #teslaNavCard .ts-nav-eta-foot {
+      padding: 3px 7px !important;
+      font-size: 8.5px !important;
+      background: rgba(9, 13, 22, 0.72) !important;
+    }
+
+    /* Mobile Portrait: Sleek 114x82px Live Moving Map at Top-Right (Never Blocks Sky/Road!) */
+    @media (max-width: 640px) {
+      #dcTopRightIcons {
+        right: 5px !important;
+        top: 5px !important;
+        gap: 2.5px !important;
+      }
+      .ts-clean-top-ico {
+        height: 24px !important;
+        padding: 0 5.5px !important;
+        font-size: 9px !important;
+      }
+      #dcRightClusterStack {
+        right: 6px !important;
+        top: 34px !important;
+      }
+      #teslaNavCard {
+        width: 114px !important;
+        border-radius: 10px !important;
+      }
+      #teslaNavCard .ts-nav-turn-banner { padding: 3px 5px !important; }
+      #teslaNavCard .ts-nav-arrow { display: none !important; }
+      #teslaNavCard .ts-nav-turn-info strong { font-size: 9px !important; }
+      #teslaNavCard .ts-nav-turn-info span { font-size: 7.8px !important; }
+      #teslaFullMapBtn { font-size: 7.8px !important; padding: 1px 4px !important; }
+      #teslaNavCard #liveMinimapWidget { height: 78px !important; }
+      #drivingHud.ts-fullscreen-map #teslaNavCard {
+        width: calc(100vw - 12px) !important;
+      }
+      #drivingHud.ts-fullscreen-map #teslaNavCard #liveMinimapWidget {
+        height: 205px !important;
+      }
+      #teslaNavCard .ts-nav-eta-foot { display: none !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -4424,6 +4568,11 @@
             <button type="button" class="ts-mini-chip" id="tsAutoParkBtn" onclick="triggerFsdTapToPark();closeTeslaFsdFoldDrawer();">🅿️ 탭파킹 &gt;&gt;&gt;</button>
           </div>
 
+          <div class="ts-v15-toggles" id="tsSteerSensRow">
+            <button type="button" class="ts-mini-chip" data-sens="0.72" onclick="setQuickSteerFeel(0.72)">조향 부드럽게</button>
+            <button type="button" class="ts-mini-chip on" data-sens="1.0" onclick="setQuickSteerFeel(1.0)">조향 표준</button>
+            <button type="button" class="ts-mini-chip" data-sens="1.32" onclick="setQuickSteerFeel(1.32)">조향 민첩</button>
+          </div>
           <div id="teslaNeuralStatusBox">
             <span class="ts-pulse-dot" id="teslaNeuralDot"></span>
             <span id="teslaNeuralText">Reality View · 차로 중앙 유지</span>
@@ -4431,11 +4580,18 @@
         </div>
       </div>
 
-      <!-- 3. ULTRA-CLEAN TOP-RIGHT PILL ROW: Car Switch · Course · Map Toggle · Menu (Zero Giant Boxes!) -->
+      <!-- 2B. DEDICATED SKY-FLIGHT & WALK-FLY QUICK PILL STRIP (Always Visible, Zero Overlap on 360px Mobile!) -->
+      <div id="tsSkyActionStrip" class="pointer-auto">
+        <button type="button" class="ts-clean-top-ico ts-fly-pill" id="mainSkyFlightPill" onclick="toggleCarFlightMode()" title="자동차 제트 날개 변신 · 하늘 비행 ON/OFF">✈️하늘비행</button>
+        <button type="button" class="ts-clean-top-ico ts-walk-pill" id="mainWalkFlyPill" onclick="toggleWalkMode()" title="사람 내리기 · 하늘 플라이(🪽) · 스마트호출">🚶하차·날기</button>
+        <button type="button" class="ts-clean-top-ico ts-boss-pill" id="mainSkyBossPill" onclick="summonSkyBossNow()" title="하늘 거대 보스 비행선 출격">👾보스</button>
+      </div>
+
+      <!-- 3. CLEAN TOP-RIGHT ACTION ROW: Car · Course · Menu -->
       <div id="dcTopRightIcons" class="pointer-auto">
         <button type="button" class="ts-clean-top-ico" onclick="cycleTeslaModelQuick()" title="테슬라 차량 바로 바꾸기">⚡차종</button>
         <button type="button" class="ts-clean-top-ico" onclick="openCoursePickerModal()" title="8종 도로 코스 선택">🛣️코스</button>
-        <button type="button" class="ts-clean-top-ico" id="tsQuickMapBtn" onclick="toggleCleanMiniMap(event)" title="미니 내비게이션 지도 켜기/끄기">🗺️</button>
+        <button type="button" class="ts-clean-top-ico" id="tsQuickMapBtn" onclick="toggleCleanMiniMap(event)" style="display:none;" title="미니 내비게이션 지도 켜기/끄기">🗺️</button>
         <button type="button" class="ts-top-action-btn" id="tsDashcamMirrorBtn" onclick="toggleCleanMirrorsHud()" style="display:none;">🪞 리어캠</button>
         <button type="button" class="dc-top-cam-btn" onclick="cycleCameraMode()" style="display:none;" title="카메라 시점 전환 (C)">
           <svg viewBox="0 0 32 24" width="18" height="14"><rect x="3" y="5" width="22" height="15" rx="3.5" fill="#cbd5e1"/></svg>
@@ -8505,7 +8661,7 @@
       updateKoreaGpsHud(dt);
       updateSkyCombat(dt);
       state._mmTick = (state._mmTick || 0) + dt;
-      if (state._mmTick >= 0.065) { state._mmTick = 0; drawLiveGpsMinimap(); updateStageGoalSystem(); }
+      if (state._mmTick >= 0.032) { state._mmTick = 0; drawLiveGpsMinimap(); updateStageGoalSystem(); }
       // 4. Active Seoul Mission Tracker & Reward
       if (state.activeMission) {
         const m = state.activeMission;
@@ -8744,10 +8900,14 @@
     }
 
     function toggleCarFlightMode(forceVal) {
+      if (state.isWalking) toggleWalkMode();
       const next = (typeof forceVal === 'boolean') ? forceVal : !state.carFlightMode;
       state.carFlightMode = next;
       state.carFlightClimb = 0;
       if (state.carFlightMode) {
+        state._fsdBeforeFlight = state.autopilot;
+        state.autopilot = false;
+        syncAutopilotButton();
         if (state.airHp <= 0) state.airHp = 100;
         state.isShotDownFalling = false;
         state.engineOn = true;
@@ -14445,41 +14605,41 @@
       const curAbsKmh = Math.abs(state.speed) * 3.6;
       const effectiveMaxMps = Math.min(maxMps, (state.speedCapKmh >= 215 ? car.maxSpeed : state.speedCapKmh) / 3.6);
 
-      // v48 Effortless Tesla Steer-by-Wire Ratio (Light, crisp, zero understeer at all speeds + Smart Curve Assist!)
-      const speedSteerScale = 1 / (1 + curAbsKmh * 0.011);
-      const maxLock = 0.52 * speedSteerScale * state.steerSensitivity;
+      // v49 Silky-Smooth Cushioned Steering (Gentle progressive lane changes, never jerks abruptly!)
+      const speedSteerScale = 1 / (1 + curAbsKmh * 0.024);
+      const maxLock = 0.28 * speedSteerScale * state.steerSensitivity;
 
       let throttle = 0, brake = 0;
-      if (state.autopilot && !state.examFinished) {
+      if (state.autopilot && !state.examFinished && !state.carFlightMode) {
         const ai = computeAutopilotCommands();
-        state.steerAngle = dampVal(state.steerAngle, ai.steer, 8.5, dt);
+        state.steerAngle = dampVal(state.steerAngle, ai.steer, 7.5, dt);
         throttle = (state.accelPressed || keyAccel) ? Math.max(ai.throttle, 0.92) : ai.throttle;
         brake = (state.accelPressed || keyAccel) ? 0 : ai.brake;
       } else {
         let rawSteerCmd = 0; // -1 .. +1
         if (Math.abs(state.wheelDragSteer) > 0.003) {
           const normAbs = Math.min(1, Math.abs(state.wheelDragSteer) / 0.55);
-          // Crisp near-linear Steer-by-Wire response (zero sluggish deadness!)
-          const adj = normAbs <= 0.04 ? 0 : (normAbs - 0.04) / 0.96;
-          rawSteerCmd = Math.sign(state.wheelDragSteer) * Math.pow(adj, 1.08);
-          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 15.0, dt);
+          // Smooth progressive exponent (1.45) so light touches glide softly without sudden jerks!
+          const adj = normAbs <= 0.06 ? 0 : (normAbs - 0.06) / 0.94;
+          rawSteerCmd = Math.sign(state.wheelDragSteer) * Math.pow(adj, 1.45);
+          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 6.2, dt);
         } else if (state.buttonSteer !== 0 || keyLeft || keyRight) {
-          rawSteerCmd = state.buttonSteer !== 0 ? state.buttonSteer : ((keyRight ? 1 : 0) - (keyLeft ? 1 : 0));
-          // Progressive ramp: light tap = gentle lane tweak, hold = full smooth cornering!
-          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 8.8, dt);
+          rawSteerCmd = (state.buttonSteer !== 0 ? state.buttonSteer : ((keyRight ? 1 : 0) - (keyLeft ? 1 : 0))) * 0.85;
+          // Soft cushioned ramp (4.3): short tap = gentle 3~5 deg lane adjustment, hold = smooth cornering!
+          state.smoothSteerInput = dampVal(state.smoothSteerInput, rawSteerCmd, 4.3, dt);
         } else {
-          // Fast, clean self-centering return-to-zero (zero fishtailing overshoot!)
-          state.smoothSteerInput = dampVal(state.smoothSteerInput, 0, 15.5, dt);
+          // Smooth cushioned return-to-center (9.0)
+          state.smoothSteerInput = dampVal(state.smoothSteerInput, 0, 9.0, dt);
           if (Math.abs(state.smoothSteerInput) < 0.003) state.smoothSteerInput = 0;
         }
 
-        // Gentle Lane-Preserving Smart Road-Curve Assist when hands are resting (stays right in your chosen lane around curves!)
+        // Gentle Lane-Preserving Smart Road-Curve Assist when hands are resting
         let curveAssistAngle = 0;
         if (rawSteerCmd === 0 && state.scenicTourActive && scenicRoadSamples && scenicRoadSamples.length && state.speed > 1.2 && !state.carFlightMode) {
           const nearA = findNearestScenicSample(state.x, state.z);
           const sp0 = nearA.sample;
           const curLat = Math.max(-4.8, Math.min(4.8, (state.x - sp0.x) * sp0.nx + (state.z - sp0.z) * sp0.nz));
-          const sLook = scenicRoadSamples[((nearA.idx ?? 0) + 5) % SCENIC_SEGMENTS];
+          const sLook = scenicRoadSamples[((nearA.idx ?? 0) + 6) % SCENIC_SEGMENTS];
           const txA = sLook.x + sLook.nx * curLat;
           const tzA = sLook.z + sLook.nz * curLat;
           const wantH = Math.atan2(txA - state.x, tzA - state.z);
@@ -14487,14 +14647,14 @@
           while (hDiff > Math.PI) hDiff -= Math.PI * 2;
           while (hDiff < -Math.PI) hDiff += Math.PI * 2;
           if (Math.abs(hDiff) < 0.85) {
-            curveAssistAngle = Math.max(-0.34, Math.min(0.34, -hDiff * 0.85));
+            curveAssistAngle = Math.max(-0.24, Math.min(0.24, -hDiff * 0.68));
           }
         }
 
         const targetSteerRad = (rawSteerCmd !== 0 || Math.abs(state.smoothSteerInput) > 0.02)
           ? (state.smoothSteerInput * maxLock)
           : curveAssistAngle;
-        state.steerAngle = dampVal(state.steerAngle, targetSteerRad, 14.5, dt);
+        state.steerAngle = dampVal(state.steerAngle, targetSteerRad, 7.8, dt);
 
         const rawPedal = state.accelPressed ? state.analogThrottle : (keyAccel ? 1.0 : 0);
         brake = (state.brakePressed || keyBrake) ? 1 : 0;
@@ -16435,9 +16595,9 @@
       function updateWheelFromEvent(e) {
         const rect = wheelEl.getBoundingClientRect();
         const centerX = rect.left + rect.width * 0.5;
-        const maxRadiusPx = Math.max(22, rect.width * 0.36); // Just ~28px from center = 100% lock (never hits screen bezel!)
+        const maxRadiusPx = Math.max(34, rect.width * 0.48); // Wider smooth travel so wheel never jerks abruptly!
         const dx = e.clientX - centerX;
-        const deadPx = 3.0;
+        const deadPx = 5.0;
         const adjDx = Math.abs(dx) <= deadPx ? 0 : (Math.sign(dx) * (Math.abs(dx) - deadPx));
         const norm = Math.max(-1, Math.min(1, adjDx / maxRadiusPx));
         state.wheelDragSteer = norm * 0.55;
@@ -17955,6 +18115,31 @@
           if (lm) lm.style.opacity = '';
           if (rm) rm.style.opacity = '';
         }
+      }
+    };
+
+
+    function setQuickSteerFeel(val) {
+      state.steerSensitivity = val;
+      document.querySelectorAll('#tsSteerSensRow .ts-mini-chip').forEach(b => {
+        b.classList.toggle('on', parseFloat(b.getAttribute('data-sens')) === val);
+      });
+      const lbl = val < 0.85 ? '부드럽게' : (val > 1.15 ? '민첩' : '표준');
+      showToast(`🎡 핸들 조향 감도: [${lbl}] 적용 완료`);
+    }
+
+    // Sync ✈️비행 / 🚶하차 pill states every frame
+    const _v48SyncWidgets = syncTeslaFsdHudWidgets;
+    syncTeslaFsdHudWidgets = function() {
+      _v48SyncWidgets();
+      const flyPill = document.getElementById('mainSkyFlightPill');
+      if (flyPill) {
+        flyPill.classList.toggle('flying-on', !!state.carFlightMode);
+        flyPill.textContent = state.carFlightMode ? '🛬착륙하기' : '✈️하늘비행';
+      }
+      const walkPill = document.getElementById('mainWalkFlyPill');
+      if (walkPill) {
+        walkPill.textContent = state.isWalking ? '🚘차타기' : '🚶하차·날기';
       }
     };
 
