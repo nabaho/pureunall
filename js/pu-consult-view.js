@@ -169,10 +169,25 @@
   }
 
   function projectsList() {
+    // 이 프로그램에 담지 않는 트랙(excludeTrackIds)의 사업은 목록·집계에서 뺀다 — 자료는 지우지 않는다.
+    var excl = getAppCat().excludeTrackIds || [];
+    var splitCols = getAppCat().listCols === 'split';
+    var trackOrder = Object.create(null);
+    (getAppCat().tracks || []).forEach(function (t, i) { trackOrder[t.id] = i; });
     return Object.keys(D.projects || {}).map(function (k) {
       return Object.assign({ id: k }, D.projects[k]);
-    }).filter(function (p) { return p && !p._deleted; })
-      .sort(function (a, b) { return (num(b.year, 0) - num(a.year, 0)) || (num(b.updatedAt, 0) - num(a.updatedAt, 0)) || str(a.companyName).localeCompare(str(b.companyName), 'ko'); });
+    }).filter(function (p) { return p && !p._deleted && excl.indexOf(str(p.trackId)) < 0; })
+      .sort(function (a, b) {
+        var byYear = num(b.year, 0) - num(a.year, 0);
+        if (byYear) return byYear;
+        if (splitCols) { // 같은 연도 안에서는 지역(충남·세종·충북) → 사업장명 순으로 세로줄이 가지런하게
+          var ta = trackOrder[str(a.trackId)], tb = trackOrder[str(b.trackId)];
+          var byReg = (ta == null ? 99 : ta) - (tb == null ? 99 : tb);
+          if (byReg) return byReg;
+          return str(a.companyName).localeCompare(str(b.companyName), 'ko') || (num(b.updatedAt, 0) - num(a.updatedAt, 0));
+        }
+        return (num(b.updatedAt, 0) - num(a.updatedAt, 0)) || str(a.companyName).localeCompare(str(b.companyName), 'ko');
+      });
   }
   function projectById(pid) {
     if (!pid || !D.projects || !D.projects[pid] || D.projects[pid]._deleted) return null;
@@ -524,10 +539,10 @@
     if (!el) return;
     var cat = getAppCat();
     var isLeft = !!$('leftDash');
-    var badge = isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리';
-    var msg = isLeft
+    var badge = cat.diffBadge || (isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리');
+    var msg = cat.diffMsg || (isLeft
       ? '북부상의 · 서산상의 · 당진상의 왼쪽 대시보드 분리 + 새 지역 상공회의소 추가 + 연도별 관리'
-      : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용';
+      : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용');
     el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
       '<span class="chip c-blue">' + esc(badge) + '</span>' +
       '<b>' + esc(cat.icon + ' ' + cat.name) + ':</b>' +
@@ -556,6 +571,7 @@
     var cands = (D.discover && D.discover.bundles) || [];
 
     aside.className = 'left-dash' + (DIFF_HIGHLIGHT ? ' code-diff-box' : '');
+    var LD = cat.leftDash || {};
 
     var statsMap = Object.create(null);
     tracks.forEach(function (t) {
@@ -586,7 +602,7 @@
 
     var cardsHtml = '<div class="ld-item' + (!TRACK_FILTER ? ' on' : '') + '">' +
       '<button type="button" class="ld-item-btn" data-ld-track="" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '">' +
-        '<span class="ld-item-name">🏬 전체 상공회의소</span>' +
+        '<span class="ld-item-name">' + esc(LD.allLabel || '🏬 전체 상공회의소') + '</span>' +
         '<span class="chip c-blue">' + allProjs.length + '건</span>' +
       '</button>' +
       '<div class="ld-sub"><span>진행 ' + allActive + '</span><span>완료 ' + allDone + '</span>' +
@@ -609,7 +625,7 @@
             var on = TRACK_FILTER === t.id && YEAR_FILTER === yr;
             return '<button type="button" class="ld-yr-btn' + (on ? ' on' : '') + '" data-ld-track="' + esc(t.id) + '" data-ld-year="' + esc(yr) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(yr) + '(' + st.yrs[yr] + ')</button>';
           }).join('') + '</div>')
-        : '<div class="ld-sub"><span>등록 대기 (신규 지역 준비)</span></div>';
+        : '<div class="ld-sub"><span>' + esc(LD.emptyLabel || '등록 대기 (신규 지역 준비)') + '</span></div>';
 
       cardsHtml += '<div class="ld-item' + (TRACK_FILTER === t.id ? ' on' : '') + '">' +
         '<button type="button" class="ld-item-btn" data-ld-track="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-pressed="' + (TRACK_FILTER === t.id ? 'true' : 'false') + '">' +
@@ -631,12 +647,12 @@
     });
     var scopeYrs = Object.keys(scopeYrsMap).sort(function (a, b) { return Number(b) - Number(a); });
     var actObj = activeTrackObj();
-    var scopeTitle = actObj ? trackShortLabel(actObj) : '전체 상의';
+    var scopeTitle = actObj ? trackShortLabel(actObj) : (LD.scopeAll || '전체 상의');
 
     aside.innerHTML =
-      '<div class="ld-hd"><span>🏬 지역별 대시보드</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + tracks.length + '곳</span>') + '</div>' +
+      '<div class="ld-hd"><span>' + esc(LD.headLabel || '🏬 지역별 대시보드') + '</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + tracks.length + '곳</span>') + '</div>' +
       '<div class="ld-list">' + cardsHtml + '</div>' +
-      '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">+ 새 지역 상공회의소 추가</button>' +
+      (cat.regionManageable === false ? '' : '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">+ 새 지역 상공회의소 추가</button>') +
       '<div class="ld-year-box">' +
         '<div class="ld-year-hd">📅 연도별 관리 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
         '<div class="ld-yrs">' +
@@ -822,6 +838,7 @@
     var allProjs = projectsList();
     var cands = (D.discover && D.discover.bundles) || [];
     var hwpx = Hwpx();
+    var splitCols = cat.listCols === 'split';
 
     // 트랙 바 (#projTrackBar)
     var trackBar = $('projTrackBar');
@@ -902,7 +919,7 @@
 
     // 필터 셀렉트 동기화
     fillSelectKeepingValue($('projTrackSel'),
-      '<option value="">트랙 전체</option>' + tracks.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(trackShortLabel(t)) + '</option>'; }).join(''),
+      '<option value="">' + esc(cat.listCols === 'split' ? ((cat.regionLabel || '트랙') + ' 전체') : '트랙 전체') + '</option>' + tracks.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(trackShortLabel(t)) + '</option>'; }).join(''),
       TRACK_FILTER);
     var yrsSet = Object.create(null);
     allProjs.forEach(function (p) { yrsSet[String(num(p.year, 2026))] = 1; });
@@ -949,6 +966,22 @@
       var trObj = tracks.find(function (t) { return t.id === p.trackId; });
       var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
       var caseTag = p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '';
+      if (splitCols) {
+        // 연도 · 사업장명 · 지역 · 진행상태를 각각 독립 열로 — 세로줄이 일직선 (서류-목록-표준형태 ②)
+        return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
+          '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
+          '<td class="n">' + (i + 1) + '</td>' +
+          '<td class="yr" title="' + esc(String(p.year || 2026)) + '년">' + esc(String(p.year || 2026)) + '</td>' +
+          '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + caseTag + '</td>' +
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
+          '<td data-k="st">' + stChip + '</td>' +
+          '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
+          '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
+          '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
+        '</tr>';
+      }
       return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
         '<td class="n">' + (i + 1) + '</td>' +
@@ -966,8 +999,11 @@
       ? ('<div class="bar"><span class="hint">총 ' + filtered.length + '건 중 ' + shown.length + '건 표시</span><button type="button" class="sm pri" id="showAllProjBtn">전체 ' + filtered.length + '건 모두 보기 (+' + (filtered.length - shown.length) + ')</button></div>')
       : '';
 
+    var headCols = splitCols
+      ? '<th class="yr">연도</th><th>사업장명</th><th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th><th data-k="st">진행상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'
+      : '<th>사업장 · 연도</th><th>트랙 · 상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>';
     box.innerHTML = bulkHtml + '<div class="scroll"><table class="t" data-name="cases">' +
-      '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th><th>사업장 · 연도</th><th>트랙 · 상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th></tr></thead>' +
+      '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th>' + headCols + '</tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>' + moreHtml;
 
     refreshProjBulkUi();

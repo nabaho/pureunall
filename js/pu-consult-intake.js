@@ -464,11 +464,14 @@
 
     // 3) 타 사업 공통 트랙 규칙 (키워드 매칭 → 기본 첫 트랙)
     if (appKey === 'sixthind') {
-      if (/인증\s*(?:지원|현장\s*평가)|상생프로젝트/i.test(hay)) return baseTracks[3] || baseTracks[0];
-      if (/충북|충청북도/i.test(hay)) return baseTracks[2] || baseTracks[0];
-      if (/충남|충청남도/i.test(hay)) return baseTracks[1] || baseTracks[0];
-      if (/경기|경기도/i.test(hay)) return baseTracks[4] || baseTracks[0];
-      if (/세종/i.test(hay)) return baseTracks[0];
+      // 충남·세종·충북 센터만 담는다(2026-11-28). 지역 글자가 먼저 — 충남센터의 '인증지원'은 충남에 남는다.
+      var sxById = function (tid) { return baseTracks.find(function (t) { return t.id === tid; }); };
+      if (/충북|충청북도/i.test(hay)) return sxById('sx_chungbuk') || baseTracks[0];
+      if (/충남|충청남도/i.test(hay)) return sxById('sx_chungnam') || baseTracks[0];
+      if (/세종/i.test(hay)) return sxById('sx_sejong') || baseTracks[0];
+      // 지역이 없는 인증지원 현장평가·상생프로젝트, 경기·기타 광역은 이 프로그램에 담지 않는다.
+      if (/인증\s*(?:지원|현장\s*평가)|상생프로젝트|경기|경기도/i.test(hay)) return { id: 'sx_excluded', name: '제외(인증 현장평가·경기)', excluded: true };
+      return sxById('sx_sejong') || baseTracks[0];
     } else if (appKey === 'specialcons') {
       if (/삼성/i.test(hay)) return baseTracks[1] || baseTracks[0];
       if (/경비원|감단/i.test(hay)) return baseTracks[2] || baseTracks[0];
@@ -574,6 +577,7 @@
         item.maskedPreview
       ].filter(Boolean).join(' ');
       var tr = inferTrackForApp(appKey, trackSeedText, customTracks);
+      if (tr && tr.excluded && !mMeta.trackId) return; // 이 프로그램에 담지 않는 트랙(6차산업: 인증 현장평가·경기)
       var trId = str(mMeta.trackId || (tr && tr.id) || 'default');
       var trName = str(mMeta.trackName || (tr && tr.name) || cat.shortName);
       var caseNo = str(mMeta.caseNo);
