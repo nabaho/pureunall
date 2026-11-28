@@ -1435,6 +1435,37 @@
       "mailCoSplit": {
         ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
       },
+      "mailAck": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        "$msgKey": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && (newData.exists() || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && (!data.exists() || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true) || newData.child('at').val() >= data.child('at').val())",
+          ".validate": "!newData.exists() || newData.hasChildren(['kind','by','uid','at'])",
+          "kind": {
+            ".validate": "newData.isString() && (newData.val() === 'received' || newData.val() === 'reviewed')"
+          },
+          "by": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+          },
+          "uid": {
+            ".validate": "newData.isString() && (newData.val() === auth.uid || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true))"
+          },
+          "coId": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "coName": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "attCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$k": {
         ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {

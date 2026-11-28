@@ -970,6 +970,24 @@ rules.pucards = {
   /* 🔀 사업장별 담당 분리·제외 규칙(pucards/mailCoSplit)은 정식 담당·알림 대상을 바꾸므로 관리자·위임관리인(MGR)만 쓴다 (2026-11-22).
      ⚠ config 아래에 두지 않고 pucards 바로 아래 이름 붙은 칸으로 두어 config(견적 자동 감지 ADMIN 잠금 등)와 섞이지 않게 한다. */
   mailCoSplit: { '.write': MGR },
+  /* 📨 자문사·거래처 서류 «받았습니다 · 검토했습니다» 확인 답메일 발송 기록(pucards/mailAck) (2026-11-28).
+     재직 직원이 함께 읽어 중복 발송을 막고, 통째 비우기·개별 삭제는 관리자·위임관리인(MGR/ADMIN)만 허용한다.
+     공동 담당 노무사가 「받았습니다」 뒤에 「검토했습니다」를 이어 보낼 수 있도록 재직자의 정방향 갱신(at >= 기존 at, 본인 uid)을 허용한다. */
+  mailAck: {
+    '.write': ADMIN,
+    $msgKey: {
+      '.write': `${LOGIN} && (newData.exists() || ${MGR}) && (!data.exists() || ${MGR} || newData.child('at').val() >= data.child('at').val())`,
+      '.validate': "!newData.exists() || newData.hasChildren(['kind','by','uid','at'])",
+      kind:     { '.validate': "newData.isString() && (newData.val() === 'received' || newData.val() === 'reviewed')" },
+      by:       { '.validate': 'newData.isString() && newData.val().length > 0 && newData.val().length <= 40' },
+      uid:      { '.validate': `newData.isString() && (newData.val() === auth.uid || ${MGR})` },
+      coId:     { '.validate': 'newData.isString() && newData.val().length <= 80' },
+      coName:   { '.validate': 'newData.isString() && newData.val().length <= 120' },
+      attCount: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 200' },
+      at:       { '.validate': 'newData.isNumber()' },
+      $other:   { '.validate': false }
+    }
+  },
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
