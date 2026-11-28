@@ -1,14 +1,16 @@
 'use strict';
-// 🖥 포털 머리줄 «맞춤» — PC(태블릿보다 넓은 폭)에서 머리줄 오른쪽 끝(로그아웃·내 메뉴)이 화면 밖으로 밀리지 않는다 (2026-11-28)
+// 🖥 포털 머리줄 «맞춤» — 태블릿·PC(폰보다 넓은 폭)에서 머리줄 오른쪽 끝(로그아웃·내 메뉴)이 화면 밖으로 밀리지 않는다 (2026-11-28)
 // node --test tests/portal-pbar-fit.test.js
 //
 // ■ 무엇이 나빴나 (tools/phone-audit portal 실측)
 //   11-21 «📋 내 업무» 단추(#3228)가 머리줄에 들어온 뒤 1024px 에서 로그아웃·내 메뉴가 화면 밖으로 나갔다(화면밖 2).
 //   11-22 TypeSafe 단추를 걷어 지어낸 자료로는 잠시 들어왔지만, 대표 PC 처럼 내 메뉴 단추 안에 «₩000,000 이번 달»이 붙으면
 //   1100·1024·960·920·901px 에서 다시 넘쳤다. 머리줄은 «한 줄»(대표 2026-08-20)이라 접히지 않고 옆으로 넘친다.
+//   태블릿도 768px 에서 사용액 + «○ 서버 연결 끊김»이 함께 뜨면 로그아웃이 화면 밖으로 밀렸다(외부 점검 지적).
 //
 // ■ 이 검사가 지키는 것 — «규칙»이지 지금 px 값이 아니다
-//   ① 맞춤 단계 CSS 는 PC 구간 안에만 있다 — 폰·태블릿 모양을 바꾸지 않는다. PC 구간의 경계는 태블릿 규칙의 경계와 맞물린다(JS 도 같은 경계)
+//   ① 맞춤 단계 CSS 는 폰보다 넓은 구간(min-width)에만 있다 — 줄이 접히는 폰 머리줄은 안 바꾼다. JS 도 같은 경계.
+//      태블릿에 닿는 맞춤 규칙은 «감추기»만 — 틈·여백을 PC 값으로 덮으면 태블릿이 오히려 넓어진다. PC 구간 경계는 태블릿 규칙과 맞물린다
 //   ② 마지막 단계의 머리줄 단추 모양은 태블릿과 «같다» — 두 벌로 갈라져 한쪽만 고쳐지지 않게
 //   ③ 접는 것은 «다른 데 같은 말이 있는 글자»뿐 — 로그아웃·내 메뉴·이름·건의하기·챗봇 단추·금액은 어느 단계에서도 안 감춘다
 //   ④ 맞춤은 «재서» 고른다 — 머리줄의 보이는 직계 자식 전부(목록을 박지 않는다)를 화면 오른쪽 끝과 견준다 · 바뀔 때마다 다시 잰다
@@ -48,13 +50,24 @@ function rules(css) {
 const norm = (s) => String(s).replace(/\s+/g, '').replace(/;+$/, '').toLowerCase();
 const declSet = (body) => body.split(';').map(norm).filter(Boolean).sort().join(';');
 
-/* 맞춤 단계 CSS 를 담은 PC 구간 */
-const FIT = (() => {
+/* 맞춤 단계 CSS 를 담은 구간들 — 모두 «min-width 하나» 조건이어야 한다 */
+const FITS = (() => {
   const bs = BLOCKS.filter((b) => /\[data-fit/.test(b.body));
-  assert.equal(bs.length, 1, '맞춤 단계(.pbar[data-fit…]) CSS 를 담은 @media 가 하나여야 합니다 — 지금 ' + bs.length + '개');
-  const m = bs[0].cond.replace(/\s+/g, '').match(/^\(min-width:(\d+)px\)$/);
-  assert.ok(m, '★ 맞춤 단계 CSS 가 «PC 구간(min-width 하나)» 이 아닌 조건 안에 있습니다: ' + bs[0].cond);
-  return { min: +m[1], rules: rules(bs[0].body) };
+  assert.ok(bs.length > 0, '맞춤 단계(.pbar[data-fit…]) CSS 를 담은 @media 가 없습니다');
+  return bs.map((b) => {
+    const m = b.cond.replace(/\s+/g, '').match(/^\(min-width:(\d+)px\)$/);
+    assert.ok(m, '★ 맞춤 단계 CSS 가 «min-width 하나» 가 아닌 조건 안에 있습니다(폰까지 닿을 수 있음): ' + b.cond);
+    return { min: +m[1], rules: rules(b.body) };
+  });
+})();
+const FIT_RULES = FITS.flatMap((f) => f.rules.map((r) => Object.assign({ min: f.min }, r)));
+/* 폰 머리줄 — 줄이 접히는 구간(.pbar{flex-wrap:wrap}). 맞춤은 여기에 닿지 않는다 */
+const PHONE = (() => {
+  const bs = BLOCKS.filter((b) => rules(b.body).some((r) => r.sel === '.pbar' && /flex-wrap:\s*wrap/.test(r.body)));
+  assert.equal(bs.length, 1, '폰 머리줄이 줄을 접는 @media(.pbar{flex-wrap:wrap})를 하나로 못 찾았습니다');
+  const m = bs[0].cond.replace(/\s+/g, '').match(/^\(max-width:(\d+)px\)$/);
+  assert.ok(m, '폰 머리줄 구간의 조건을 못 읽었습니다: ' + bs[0].cond);
+  return { max: +m[1] };
 })();
 /* 태블릿(폰 포함) 머리줄 단추를 그림만 남기는 규칙 — 이름 글자(.hd-tx b)를 감추는 그 구간 */
 const TAB = (() => {
@@ -85,23 +98,29 @@ function fnBody(name) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-test('①★ 맞춤 단계 CSS 는 PC 구간 안에만 — 폰·태블릿 모양을 안 바꾼다 · 경계는 태블릿 규칙과 맞물린다(JS 도 같은 경계)', () => {
+test('①★ 맞춤 단계 CSS 는 폰보다 넓은 구간에만 — 줄이 접히는 폰 머리줄은 안 바꾼다 · JS 도 같은 경계 · 태블릿에 닿는 규칙은 감추기만', () => {
   assert.deepEqual(rules(OUTSIDE).filter((r) => /\[data-fit/.test(r.sel)).map((r) => r.sel), [],
-    '★ 맞춤 단계 CSS 가 @media 밖에 있습니다 — 폰·태블릿 머리줄까지 바뀝니다');
-  assert.equal(FIT.min, TAB.max + 1,
-    '★ PC 맞춤 구간(min-width:' + FIT.min + 'px)과 태블릿 머리줄 구간(max-width:' + TAB.max + 'px)이 맞물리지 않습니다 — 사이 폭에서 어느 규칙도 안 타거나 둘 다 탑니다');
+    '★ 맞춤 단계 CSS 가 @media 밖에 있습니다 — 폰 머리줄까지 바뀝니다');
+  const 폰에닿음 = FITS.filter((f) => f.min <= PHONE.max).map((f) => f.min);
+  assert.deepEqual(폰에닿음, [], '★ 맞춤 구간(min-width)이 폰 머리줄 구간(max-width:' + PHONE.max + 'px)까지 닿습니다 — 폰 411·360px 모양이 바뀝니다');
   const q = FIT_JS.match(/matchMedia\('\(min-width:\s*(\d+)px\)'\)/);
-  assert.ok(q, '★ 맞춤 함수가 PC 판정을 matchMedia(min-width) 로 하지 않습니다');
-  assert.equal(+q[1], FIT.min, '★ 맞춤 함수의 PC 경계(' + q[1] + 'px)가 CSS 맞춤 구간(' + FIT.min + 'px)과 다릅니다');
-  assert.ok(FIT.rules.length > 0 && FIT.rules.every((r) => /^\.pbar\[data-fit~="[^"]+"\]/.test(r.sel)),
-    '맞춤 구간 안 규칙은 모두 .pbar[data-fit~="단계"] 로 시작해야 합니다 — 단계를 안 탄 규칙은 1366px 모양까지 바꿉니다');
+  assert.ok(q, '★ 맞춤 함수가 폭 판정을 matchMedia(min-width) 로 하지 않습니다');
+  assert.equal(+q[1], PHONE.max + 1, '★ 맞춤 함수의 경계(' + q[1] + 'px)가 폰 머리줄 구간(≤' + PHONE.max + 'px) 바로 위가 아닙니다 — 폰에서 재거나, 태블릿 일부를 빠뜨립니다');
+  assert.ok(FITS.every((f) => f.min >= +q[1]), '★ CSS 맞춤 구간이 JS 가 재는 폭보다 좁은 데까지 닿습니다 — 남은 data-fit 가 그 폭에 먹습니다');
+  assert.ok(FITS.some((f) => f.min === TAB.max + 1),
+    '★ PC 맞춤 구간(min-width:' + (TAB.max + 1) + 'px)이 없습니다 — 태블릿 머리줄 구간(max-width:' + TAB.max + 'px)과 맞물리는 PC 단계(머리줄 단추 접기)를 둘 곳');
+  assert.ok(FIT_RULES.length > 0 && FIT_RULES.every((r) => /^\.pbar\[data-fit~="[^"]+"\]/.test(r.sel)),
+    '맞춤 구간 안 규칙은 모두 .pbar[data-fit~="단계"] 로 시작해야 합니다 — 단계를 안 탄 규칙은 넘치지 않는 화면 모양까지 바꿉니다');
+  const 태블릿덮음 = FIT_RULES.filter((r) => r.min <= TAB.max && declSet(r.body) !== 'display:none');
+  assert.deepEqual(태블릿덮음.map((r) => r.sel + '{' + r.body.trim() + '}'), [],
+    '★ 태블릿까지 닿는 맞춤 규칙이 감추기(display:none) 말고 다른 값을 덮습니다 — 태블릿은 이미 틈·여백이 더 좁아 PC 값을 덮으면 오히려 넓어집니다');
 });
 
 test('②★ 마지막 단계의 머리줄 단추 모양은 태블릿과 «같다» — 두 벌이 갈라지지 않게', () => {
   const last = STEPS[STEPS.length - 1].split(/\s+/).filter(Boolean);
   assert.ok(last.length > 0, '맞춤 단계가 하나도 없습니다');
   assert.ok(TAB.rules.length > 0, '태블릿 머리줄 단추 규칙을 못 읽었습니다');
-  const 빠짐 = TAB.rules.filter((t) => !FIT.rules.some((f) => {
+  const 빠짐 = TAB.rules.filter((t) => !FIT_RULES.some((f) => {
     const m = f.sel.match(/^\.pbar\[data-fit~="([^"]+)"\] (.+)$/);
     return m && last.includes(m[1]) && ('.pbar ' + m[2]) === t.sel && declSet(f.body) === declSet(t.body);
   }));
@@ -111,7 +130,7 @@ test('②★ 마지막 단계의 머리줄 단추 모양은 태블릿과 «같�
 
 test('③★ 접는 것은 «다른 데 같은 말이 있는 글자»뿐 — 로그아웃·내 메뉴·이름·건의하기·챗봇 단추·금액은 안 감춘다', () => {
   const 남길것 = ['#logoutBtn', '#meBtn', '.pmeta', '#userName', '#sgFab', '#chatFab', '.hd-app', '.hd-ico', '#meMoneyAmt', '.me-money b', '.logout'];
-  const 감춤 = FIT.rules.filter((r) => /display:\s*none/.test(r.body)).map((r) => r.sel);
+  const 감춤 = FIT_RULES.filter((r) => /display:\s*none/.test(r.body)).map((r) => r.sel);
   assert.ok(감춤.length > 0, '맞춤 단계가 아무것도 접지 않습니다');
   const 잘못 = 감춤.filter((s) => {
     const parts = s.split(' '), tail1 = parts[parts.length - 1], tail2 = parts.slice(-2).join(' ');
@@ -181,7 +200,7 @@ function 돌리기({ vw, rightBy, hidden = false, tip = false, start = '' }) {
 
 test('⑤★ 넘치지 않으면 아무것도 안 바꾼다 · 넘치면 «가장 덜 접는» 단계 · 다 접어도 넘치면 가장 좁은 단계', () => {
   assert.ok(STEPS[0] === '' && STEPS.length >= 2, '맞춤 단계는 «안 접음»부터 시작해 하나 이상 접어야 합니다');
-  const PC = FIT.min + 400;
+  const PC = TAB.max + 400;
   const by = (...r) => Object.fromEntries(STEPS.map((s, i) => [s, r[Math.min(i, r.length - 1)]]));
   const E = 돌리기({ vw: PC, rightBy: by(0) }).EDGE;
   assert.ok(E >= 0 && E < 40, '화면 끝 여유(PBAR_FIT_EDGE)가 엉뚱합니다: ' + E);
@@ -196,8 +215,12 @@ test('⑤★ 넘치지 않으면 아무것도 안 바꾼다 · 넘치면 «가�
   assert.equal(돌리기({ vw: PC, rightBy: by(PC + 300, PC + 200, PC + 100) }).fit, STEPS[STEPS.length - 1], '★ 다 접어도 넘치는데 가장 좁은 모양으로 두지 않습니다');
   /* 접혀 있던 것도 자리가 나면 푼다(창을 넓힘·사용액이 사라짐) */
   assert.equal(돌리기({ vw: PC, rightBy: by(PC - E - 1), start: STEPS[STEPS.length - 1] }).fit, '', '★ 자리가 났는데 접힌 채로 남습니다');
-  /* 태블릿·폰 — 맞춤을 지우고 손대지 않는다(CSS 가 따로 접는다) */
-  assert.equal(돌리기({ vw: FIT.min - 1, rightBy: by(FIT.min * 3), start: STEPS[1] }).fit, '', '★ 태블릿·폰 폭에서 맞춤 단계가 남습니다');
+  /* 태블릿도 넘치면 접는다(768px 연결 끊김 + 사용액) */
+  const TB = TAB.max - 100;
+  assert.equal(돌리기({ vw: TB, rightBy: by(TB + 30, TB - E - 1) }).fit, STEPS[1], '★ 태블릿에서 머리줄이 넘치는데 접지 않습니다');
+  assert.equal(돌리기({ vw: TB, rightBy: by(TB - E - 1) }).fit, '', '★ 태블릿에서 넘치지 않는데 접습니다 — 태블릿 기본 모양이 바뀝니다');
+  /* 폰 — 맞춤을 지우고 손대지 않는다(폰 머리줄은 줄이 접힌다) */
+  assert.equal(돌리기({ vw: PHONE.max, rightBy: by(PHONE.max * 3), start: STEPS[1] }).fit, '', '★ 폰 폭에서 맞춤 단계가 남습니다');
   /* 포털이 감춰져 있으면(로그인 화면) 재지 않고 그대로 둔다 */
   assert.equal(돌리기({ vw: PC, rightBy: by(PC * 2), hidden: true, start: '' }).fit, '', '★ 감춰진 머리줄을 재서 접습니다(폭 0 으로 잼)');
   /* 첫 안내가 떠 있으면 — 단계가 바뀔 때만 화살표를 다시 맞춘다 */
