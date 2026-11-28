@@ -200,13 +200,41 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t td[data-k="act"]{max-width:none}
 }
 @media (max-width:1180px){.guide-grid{grid-template-columns:1fr}}
+/* ── 왼쪽 상공회의소 지역별 대시보드 (.dash-shell) ── */
+.dash-shell{display:grid;grid-template-columns:256px minmax(0,1fr);gap:12px;align-items:start}
+.dash-main{min-width:0}
+.left-dash{position:sticky;top:82px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;max-height:calc(100vh - 96px);overflow:auto}
+.ld-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-bottom:6px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.ld-list{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ld-item{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:7px 9px;display:flex;flex-direction:column;gap:5px;min-width:0;transition:border-color .15s,background .15s}
+.ld-item:hover{border-color:var(--blue)}
+.ld-item.on{border-color:var(--blue);background:var(--blue-bg)}
+.ld-item-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px;background:transparent;border:0;padding:0;text-align:left;color:var(--ink);font-weight:700;font-size:12.5px;white-space:normal;min-width:0}
+.ld-item.on .ld-item-btn{color:var(--blue-d)}
+.ld-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.ld-sub{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:11px;color:var(--mute)}
+.ld-yrs{display:flex;flex-wrap:wrap;gap:4px}
+.ld-yr-btn{padding:2px 7px;min-height:24px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid var(--line2);background:var(--card);color:var(--ink2)}
+.ld-yr-btn:hover{border-color:var(--blue);color:var(--blue-d)}
+.ld-yr-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
+.ld-add-btn{width:100%;justify-content:center;font-weight:600;border-style:dashed;border-color:var(--blue-line);color:var(--blue-d);background:var(--blue-bg)}
+.ld-year-box{border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px}
+.ld-year-hd{font-size:11.5px;font-weight:700;color:var(--ink2)}
 @media (max-width:1024px){
   .ws-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ws-split{grid-template-columns:1fr}
 }
+@media (max-width:960px){
+  .dash-shell{display:block}
+  .left-dash{position:static;max-height:none;margin-bottom:8px}
+  .ld-list{flex-direction:row;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .ld-list::-webkit-scrollbar{display:none}
+  .ld-item{flex:0 0 auto;min-width:210px;max-width:240px}
+}
 /* ── 폰 화면: 가로 밀기 없이 2줄 카드 (docs/규칙/폰화면.md · 고르기칸-번호.md) ── */
 @media (max-width:768px){
-  button.sm,#head .top button.sm,.hi-top-strip .scope-btn,.hi-top-strip .kpi[role="button"],.act-menu>summary,.sub-fold>summary{min-height:36px;padding:6px 10px}
+  button.sm,#head .top button.sm,.hi-top-strip .scope-btn,.hi-top-strip .kpi[role="button"],.act-menu>summary,.sub-fold>summary,.ld-item-btn,.ld-yr-btn,.ld-add-btn{min-height:36px;padding:6px 10px}
+  .left-dash{border-left:0;border-right:0;border-radius:0;padding:8px 10px}
   .act-pop button,.act-pop a{min-height:36px}
   input,select,textarea,.rpt-paper textarea,.rpt-sec-body textarea{font-size:16px}
   input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;vertical-align:middle}
@@ -302,11 +330,15 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <main id="app" style="display:none">
   <div id="recentDiffBarWrap"></div>
   <div class="warn" id="loadNote" style="display:none"></div>
+  <div class="dash-shell">
+    <aside id="leftDash" class="left-dash" aria-label="지역 상공회의소 대시보드"></aside>
+    <div class="dash-main">
 
   <!-- 탭 1: 사업 현황 -->
   <section class="pane on" id="p-projects">
     <div class="card hi-top-strip">
       <div class="scope-bar" id="projTrackBar" role="region" aria-label="세부 트랙 필터"></div>
+      <div class="scope-bar" id="projYrBar" role="region" aria-label="연도별 필터"></div>
       <div class="kpis" id="kpiBox"></div>
     </div>
     <div class="card">
@@ -392,6 +424,8 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   <section class="pane" id="p-report">
     <div id="reportBox"></div>
   </section>
+    </div>
+  </div>
 </main>
 
 <div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox" role="dialog" aria-modal="true" aria-labelledby="mhdTitle" tabindex="-1"></div></div>
@@ -420,13 +454,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-consult-catalogs-a.js?v=1"></script>
-<script src="js/pu-consult-catalogs-b.js?v=1"></script>
-<script src="js/pu-consult-catalogs.js?v=1"></script>
-<script src="js/pu-consult-intake.js?v=2"></script>
+<script src="js/pu-consult-catalogs-a.js?v=2"></script>
+<script src="js/pu-consult-catalogs-b.js?v=2"></script>
+<script src="js/pu-consult-catalogs.js?v=2"></script>
+<script src="js/pu-consult-intake.js?v=3"></script>
 <script src="js/pu-consult-rag.js?v=2"></script>
 <script src="js/pu-consult-hwpx.js?v=2"></script>
-<script src="js/pu-consult-view.js?v=3"></script>
+<script src="js/pu-consult-view.js?v=4"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var isPv = (location.hostname==='localhost' || location.hostname==='127.0.0.1' || location.hostname.endsWith('.localhost')) && location.search.indexOf('preview=1')>=0;

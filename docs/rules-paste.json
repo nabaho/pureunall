@@ -3963,6 +3963,9 @@
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
           },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
           "year": {
             ".validate": "newData.isNumber()"
           },
@@ -4218,6 +4221,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -4272,6 +4335,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -4528,6 +4594,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -4582,6 +4708,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -4838,6 +4967,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -4892,6 +5081,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -5148,6 +5340,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -5202,6 +5454,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -5458,6 +5713,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -5512,6 +5827,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -5768,6 +6086,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -5822,6 +6200,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -6078,6 +6459,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -6132,6 +6573,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -6388,6 +6832,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -6442,6 +6946,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -6698,6 +7205,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -6752,6 +7319,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -7008,6 +7578,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -7062,6 +7692,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -7318,6 +7951,66 @@
           }
         }
       },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$other": {
         ".validate": false
       }
@@ -7372,6 +8065,9 @@
           },
           "bizNo": {
             ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "caseNo": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
           },
           "year": {
             ".validate": "newData.isNumber()"
@@ -7622,6 +8318,66 @@
             "$sec": {
               ".validate": "$sec.length <= 64 && newData.isString() && newData.val().length <= 20000"
             }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "regions": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))))",
+          ".validate": "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "shortName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "agency": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "keywords": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "sortOrder": {
+            ".validate": "newData.isNumber()"
           },
           "$other": {
             ".validate": false
@@ -8010,6 +8766,15 @@
     "datahub_board": {
       ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && auth.uid === root.child('app_owner').child('uid').val()",
       ".write": false
+    },
+    "govlinks": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "sets": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60"
+        }
+      }
     }
   }
 }

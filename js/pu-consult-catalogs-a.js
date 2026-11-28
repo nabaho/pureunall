@@ -218,14 +218,18 @@
       shortName: '상공회의소',
       icon: '🏬',
       htmlFile: 'chamber.html',
-      agency: '충남북부상공회의소 · 서산상공회의소 · 대한상의',
-      desc: '충남북부·서산·대한상의 인사노무',
-      erpTypeKeywords: ['인사노무컨설팅충남북부상의', '인사노무컨설팅서산', '상공회의소'],
-      excelTypeKeywords: ['상공회의소', '북부상의', '서산상의'],
+      agency: '충남북부상공회의소 · 서산상공회의소 · 당진상공회의소 · 대한상의',
+      desc: '충남북부·서산·당진·대한상의 인사노무',
+      erpTypeKeywords: ['인사노무컨설팅충남북부상의', '인사노무컨설팅서산', '인사노무컨설팅당진', '상공회의소'],
+      excelTypeKeywords: ['상공회의소', '북부상의', '서산상의', '당진상의'],
+      hasLeftDashboard: true,
+      regionManageable: true,
+      regionLabel: '지역 상공회의소',
       tracks: [
-        { id: 'ch_chungnam', name: '충남북부상공회의소 인사노무컨설팅' },
-        { id: 'ch_seosan',   name: '서산상공회의소 인사노무컨설팅' },
-        { id: 'ch_korcham',  name: '대한상공회의소·기타 지역상의 컨설팅' }
+        { id: 'ch_chungnam', name: '충남북부상공회의소 인사노무컨설팅', shortName: '충남북부상공회의소', badge: '북부상의', icon: '🏛️', keywords: '충남북부상의,충남북부상공회의소,북부상의,북부상공회의소,인사충남' },
+        { id: 'ch_seosan',   name: '서산상공회의소 인사노무컨설팅',     shortName: '서산상공회의소',     badge: '서산상의', icon: '⚓',  keywords: '서산상의,서산상공회의소,인사서산' },
+        { id: 'ch_dangjin',  name: '당진상공회의소 인사노무컨설팅',     shortName: '당진상공회의소',     badge: '당진상의', icon: '🌊',  keywords: '당진상의,당진상공회의소,인사당진' },
+        { id: 'ch_korcham',  name: '대한상공회의소·기타 지역상의 컨설팅', shortName: '대한상의 · 기타 지역상의', badge: '기타상의', icon: '🏢', keywords: '대한상의,대한상공회의소,상공회의소' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [

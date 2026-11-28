@@ -2680,6 +2680,7 @@ for (const rootName of CONSULT_APP_ROOTS) {
       companyId: CS_STR(128),
       companyName: CS_STR(200),
       bizNo: CS_STR(32),
+      caseNo: CS_STR(64),
       year: CS_NUM,
       trackId: CS_STR(64),
       trackName: CS_STR(120),
@@ -2723,6 +2724,17 @@ for (const rootName of CONSULT_APP_ROOTS) {
         '.validate': 'newData.hasChildren()',
         $sec: { '.validate': '$sec.length <= 64 && newData.isString() && newData.val().length <= 20000' }
       },
+      $other: { '.validate': false }
+    } },
+    regions: { $id: {
+      '.write': `(${LOGIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || ${ADMIN})))))`,
+      '.validate': "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+      ...CS_BASE_META('Document'),
+      name: CS_STR(80),
+      shortName: CS_STR(40),
+      agency: CS_STR(80),
+      keywords: CS_STR(300),
+      sortOrder: CS_NUM,
       $other: { '.validate': false }
     } },
     $other: { '.validate': false }
@@ -2884,5 +2896,16 @@ rules.datahub_device_req = { '.read': false, '.write': false };
 rules.datahub_nonce = { '.read': false, '.write': false };
 rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
+
+/* 🔗 정부사업 링크 모음(라이브 콘솔 적용분 동기화, 2026-11-28) */
+rules.govlinks = {
+  '.read': LOGIN,
+  sets: {
+    $id: {
+      '.write': `(${LOGIN}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60"
+    }
+  }
+};
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');
