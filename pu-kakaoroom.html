@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>법인 카카오톡 방</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>💬</text></svg>">
+<!-- ═══════════════════════════════════════════════════════════════════════
+     법인 카카오톡 방 (pu-kakaoroom.html) — 2026-11-28 자료함 신규 앱
+     ★ 약관 무위반 안전수집(하나문자 공식 알림 · 카톡 공식 .txt 내보내기 · 공식 붙여넣기)
+     ★ OTP·인증번호 자동 차단 · 주민번호·카드·계좌·비밀번호 3중 마스킹
+     ★ 비식별 업무 내용만 자료함(kakao_room)에 영구 보관하고 업무관리·기업정보함과 연결
+     ═══════════════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-btn:#2563eb; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-btn:#166534; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-m:#dc2626; --red-bg:#fef2f2; --red-line:#fecaca;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+    --blue:#60a5fa; --blue-d:#bfdbfe; --blue-btn:#2563eb; --blue-bg:#1e293b; --blue-line:#2563eb;
+    --green:#4ade80; --green-m:#16a34a; --green-btn:#166534; --green-bg:#1e293b; --green-line:#16a34a;
+    --amber:#fde68a; --amber-m:#d97706; --amber-bg:#1e293b; --amber-line:#d97706;
+    --red:#fecaca; --red-m:#dc2626; --red-bg:#1e293b; --red-line:#dc2626;
+  }
+}
+html[data-theme="dark"]{
+  --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+  --blue:#60a5fa; --blue-d:#bfdbfe; --blue-btn:#2563eb; --blue-bg:#1e293b; --blue-line:#2563eb;
+  --green:#4ade80; --green-m:#16a34a; --green-btn:#166534; --green-bg:#1e293b; --green-line:#16a34a;
+  --amber:#fde68a; --amber-m:#d97706; --amber-bg:#1e293b; --amber-line:#d97706;
+  --red:#fecaca; --red-m:#dc2626; --red-bg:#1e293b; --red-line:#dc2626;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:anywhere}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--blue)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--blue-btn);border-color:var(--blue-btn);color:#ffffff;font-weight:700}
+button.ok{background:var(--green-btn);border-color:var(--green-btn);color:#ffffff;font-weight:700}
+button.dng{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
+button.sm{padding:3px 9px;font-size:12px;min-height:28px}
+a{color:var(--blue-d);text-decoration:none}
+a:hover{text-decoration:underline}
+input,select,textarea{font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+textarea{width:100%;resize:vertical;line-height:1.55}
+input[type=checkbox]{width:18px;height:18px;margin:0;vertical-align:middle;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.drop-zone:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.sp{flex:1 1 auto}
+.hint{color:var(--mute);font-size:12px}
+
+#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+#head .top{display:flex;align-items:center;gap:10px;padding:8px 16px;flex-wrap:wrap}
+#head h1{margin:0;font-size:17px;white-space:nowrap}
+#head .sub{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#who{font-size:12px;color:var(--mute)}
+.tabs{display:flex;gap:4px;padding:0 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--ink2);font-size:13px}
+.tabs button.on{border-bottom-color:var(--blue);color:var(--blue-d);font-weight:700}
+
+#lock{display:none;max-width:480px;margin:64px auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center}
+main{padding:10px 16px 84px;max-width:1540px;margin:0 auto}
+.pane{display:none}
+.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.sec{font-weight:700;margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.hi-top-strip{padding:8px 12px;margin-bottom:10px}
+.kpis{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.kpi{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
+.kpi span{font-size:11.5px;font-weight:700;color:var(--mute);white-space:nowrap}
+.kpi b{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kpi.b b{color:var(--blue-d)}
+.kpi.g b{color:var(--green)}
+.kpi.a b{color:var(--amber)}
+.kpi.r b{color:var(--red)}
+
+.tag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--ink2)}
+.tag.blue{background:var(--blue-bg);color:var(--blue-d);border-color:var(--blue-line)}
+.tag.green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+.tag.amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+.tag.red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+
+.note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.55}
+.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.55}
+.danger-box{background:var(--red-bg);border:1px solid var(--red-line);color:var(--red);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.55}
+
+/* 최근 코딩 변경점 시각 표시 */
+#recent-diff-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;border-radius:10px;background:var(--blue-bg);border:1px solid var(--blue-line);font-size:12px}
+#recent-diff-bar b{color:var(--blue-d);white-space:nowrap}
+.diff-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:var(--card);border:1px solid var(--blue-line);color:var(--blue-d);font-size:11.5px;font-weight:700;cursor:pointer}
+.diff-pill:hover{background:var(--blue-btn);color:#ffffff}
+.diff-badge{display:inline-block;padding:1px 6px;border-radius:6px;background:var(--blue-btn);color:#ffffff;font-size:10.5px;font-weight:700;margin-left:4px}
+.code-diff-box{outline:2px solid var(--blue);box-shadow:0 0 0 3px var(--blue-bg)}
+
+.drop-zone{border:1.5px dashed var(--blue-line);background:var(--blue-bg);color:var(--blue-d);border-radius:10px;padding:14px 12px;text-align:center;cursor:pointer;line-height:1.6}
+.drop-zone.over{border-color:var(--blue);background:var(--card)}
+
+.scroll{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;table-layout:fixed}
+@media (min-width:769px){
+  .scroll table.t{min-width:1180px}
+  table.t .ti{min-width:220px}
+}
+table.t th,table.t td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;vertical-align:middle}
+table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:700}
+table.t tr:hover td{background:var(--bg)}
+table.t tr.picked td{background:var(--blue-bg)}
+table.t th.ck,table.t td.ck{width:30px;text-align:center;padding:6px 4px}
+table.t th.no,table.t td.no{width:38px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+table.t .w-day{width:96px;font-variant-numeric:tabular-nums}
+table.t .w-dom{width:128px}
+table.t .w-saf{width:98px}
+table.t .w-who{width:120px}
+table.t .w-rel{width:190px}
+table.t .w-st{width:110px}
+table.t .w-act{width:136px;text-align:right}
+table.t td .one{display:flex;align-items:center;gap:5px;min-width:0}
+table.t td .one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.t td .one>.tag{flex:0 0 auto}
+.ttl{background:none;border:0;padding:0;margin:0;font:inherit;font-weight:700;color:var(--ink);text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.ttl:hover{color:var(--blue-d);text-decoration:underline}
+
+.selbar{display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:8px;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px}
+.selbar.on{display:flex}
+
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grp-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.grp-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.tl-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);min-width:0}
+.tl-row:last-child{border-bottom:0}
+.tl-row .tl-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{padding:26px 12px;text-align:center;color:var(--mute)}
+
+.modal{position:fixed;inset:0;z-index:50;background:rgba(30,41,59,.55);display:none;align-items:center;justify-content:center;padding:14px}
+.modal.on{display:flex}
+.mbox{width:100%;max-width:720px;max-height:90vh;overflow-y:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:0 16px 40px rgba(30,41,59,.22)}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 10px;font-size:13px;margin:8px 0}
+.kv b{color:var(--ink2)}
+
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70;max-width:88vw}
+#toast.on{opacity:1}
+
+.wide-only{display:inline}
+@media (max-width:768px){
+  input,select,textarea{font-size:16px}
+  input[type=checkbox]{width:24px;height:24px}
+  .wide-only{display:none}
+  #head .top{padding:7px 8px;gap:6px}
+  #head h1{font-size:15.5px}
+  main{padding:6px 4px 72px}
+  .card,.grp-card,.hi-top-strip,#recent-diff-bar,.note,.warn,.danger-box{padding:8px 8px}
+  .grid-2{grid-template-columns:1fr}
+  table.t,table.t thead,table.t tbody{display:block;width:100%;min-width:0}
+  table.t thead tr{display:flex;align-items:center;gap:6px;padding:4px 6px;background:var(--bg);border-bottom:1px solid var(--line)}
+  table.t thead th{display:none;border:0;padding:4px 0}
+  table.t thead th.ck,table.t thead th.no{display:block;width:auto}
+  table.t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;position:relative;padding:8px 4px 8px 64px;border-bottom:1px solid var(--line)}
+  table.t tbody td{display:inline-flex;align-items:center;border:0;padding:0;width:auto !important;max-width:100%;font-size:12.5px}
+  table.t tbody td.ck{position:absolute;left:4px;top:9px;width:26px !important}
+  table.t tbody td.no{position:absolute;left:32px;top:11px;width:28px !important}
+  table.t tbody td.ti{flex:1 1 100%;font-size:13.5px;white-space:normal;word-break:break-word}
+  table.t tbody td.w-rel{flex:1 1 100%;white-space:normal;word-break:break-word}
+  table.t tbody td.w-act{flex:1 1 100%;justify-content:flex-start;padding-top:2px}
+}
+</style>
+<link rel="stylesheet" href="css/pu-design.css?v=2">
+</head>
+<body class="pu-design pu-frame-a pu-dark-auto">
+<header id="head">
+  <div class="top">
+    <h1>💬 법인 카카오톡 방</h1>
+    <span class="sub wide-only">약관 무위반 안전수집 · 비식별 업무 영구보관 · 업무관리·기업정보함 연결</span>
+    <span class="sp"></span>
+    <span id="who"></span>
+    <button type="button" class="sm" id="diffToggleBtn" title="이번 작업에서 새로 추가·변경된 기능 강조 표시 켜고 끄기">✨ 변경점</button>
+    <a class="sm" href="work.html" style="padding:4px 9px;border:1px solid var(--line2);border-radius:8px;font-size:12px">📋 업무관리 ↗</a>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-archive" aria-controls="p-archive" aria-selected="true" class="on" data-tab="archive">📊 현황·진행추적</button>
+    <button type="button" role="tab" id="tab-collect" aria-controls="p-collect" aria-selected="false" tabindex="-1" data-tab="collect">🤖 자동수집·안전판별</button>
+    <button type="button" role="tab" id="tab-files" aria-controls="p-files" aria-selected="false" tabindex="-1" data-tab="files">📎 첨부자료 보관함</button>
+    <button type="button" role="tab" id="tab-groups" aria-controls="p-groups" aria-selected="false" tabindex="-1" data-tab="groups">🏢 업체·업무별 보기</button>
+    <button type="button" role="tab" id="tab-safety" aria-controls="p-safety" aria-selected="false" tabindex="-1" data-tab="safety">🛡️ 안전·법령 가이드</button>
+  </nav>
+</header>
+
+<div id="lock">
+  <h2>💬 법인 카카오톡 방</h2>
+  <p id="lockWhy" class="hint">재직 직원 계정으로 로그인하면 열립니다.</p>
+</div>
+
+<main id="app" style="display:none">
+  <div id="recent-diff-bar"></div>
+  <div class="card hi-top-strip"><div class="kpis" id="kpiRow"></div></div>
+
+  <!-- 1. 현황·진행추적 -->
+  <section class="pane on" id="p-archive" role="tabpanel" aria-labelledby="tab-archive">
+    <div class="card" id="archiveFilterCard">
+      <div class="bar">
+        <input type="search" id="qArchive" placeholder="업무내용 · 사건번호 · 발신자 · 업체 힌트 검색" aria-label="보관된 카톡 업무 검색" style="flex:1 1 220px;min-width:180px">
+        <select id="fDomain" aria-label="업무 영역 필터">
+          <option value="">전체 영역</option>
+        </select>
+        <select id="fLink" aria-label="연결 상태 필터">
+          <option value="">연결 전체</option>
+          <option value="linked">업무 연결됨</option>
+          <option value="unlinked">미연결 확인 필요</option>
+        </select>
+        <select id="fStatus" aria-label="진행 상태 필터">
+          <option value="">상태 전체</option>
+          <option value="open">접수·대기</option>
+          <option value="tracking">진행추적중</option>
+          <option value="done">처리완료</option>
+        </select>
+        <button type="button" class="sm" id="btnReloadAll">↻ 새로고침</button>
+        <button type="button" class="pri sm" id="btnGoCollect">＋ 새 대화 수집·판별</button>
+      </div>
+    </div>
+    <div class="selbar" id="archiveSelBar">
+      <b id="archiveSelCount">0건 선택</b>
+      <button type="button" class="sm" data-bulk-st="tracking">진행추적중으로</button>
+      <button type="button" class="sm ok" data-bulk-st="done">처리완료로</button>
+      <button type="button" class="sm dng" id="btnBulkDelete">선택 삭제</button>
+      <button type="button" class="sm" id="btnBulkClear">선택 해제</button>
+    </div>
+    <div class="card" id="archiveTableCard">
+      <div class="scroll" id="archiveTableBox"></div>
+    </div>
+  </section>
+
+  <!-- 2. 자동수집·안전판별 -->
+  <section class="pane" id="p-collect" role="tabpanel" aria-labelledby="tab-collect" hidden>
+    <div class="card" id="phoneDiagCard">
+      <div class="sec">
+        <span>📱 폰 자동수집 상태 (약관 무위반 공식 알림 경로)</span>
+        <span class="sp"></span>
+        <button type="button" class="sm" id="btnManageRooms">⚙ 받을 법인 방 설정</button>
+        <button type="button" class="pri sm" id="btnPullServer">🔄 서버 자동수집 불러오기</button>
+      </div>
+      <div id="phoneDiagBody" class="hint">불러오는 중…</div>
+    </div>
+
+    <div class="card" id="collectInputCard">
+      <div class="sec">
+        <span>📥 공식 대화 내보내기(.txt) 또는 대화 복사 붙여넣기</span>
+        <span class="sp"></span>
+        <button type="button" class="sm" id="btnConnectFolder">📂 카톡 받은 파일 폴더 연결</button>
+      </div>
+      <div class="drop-zone" id="txtDropZone" role="button" tabindex="0" aria-label="PC 카카오톡 대화 내보내기 파일 올리기">
+        <b>PC 카카오톡 «대화 내보내기 → 텍스트만(.txt)» 파일을 끌어다 놓거나 클릭하세요</b><br>
+        <span class="hint">읽기는 이 브라우저 안에서만 동작하며, OTP 차단·주민번호/계좌/비밀번호 3중 가림 후 안전 판별된 업무만 저장됩니다.</span>
+        <input type="file" id="txtFileInput" accept=".txt,.csv" style="display:none" aria-label="대화 내보내기 파일 선택">
+      </div>
+      <div class="bar" style="margin-top:8px">
+        <input type="text" id="collectRoomInput" placeholder="법인 카톡 방 이름 (예: 푸른노무법인 업무채팅방)" aria-label="법인 카톡 방 이름" style="flex:1 1 240px">
+        <button type="button" class="pri" id="btnRunSafety">🛡️ 안전판별·자동분류 미리보기</button>
+        <button type="button" class="sm" id="btnLoadSamplePaste" title="안전판별 규칙 동작을 바로 테스트하는 예시 문장 채우기">테스트 예시 채우기</button>
+      </div>
+      <textarea id="pasteInput" rows="5" style="margin-top:8px" aria-label="카카오톡 대화 복사 붙여넣기 입력" placeholder="카톡 대화를 복사해 붙여넣거나 .txt 파일을 올리세요. 인증번호·OTP·단순 잡담은 자동 제외되고, 주민번호·계좌·비밀번호는 자동 가림 처리됩니다."></textarea>
+      <div id="rrnGuardWarn" class="danger-box" style="display:none;margin-top:8px">⚠ 주민번호 지우개 모듈(PuRrnMask)이 로드되지 않아 저장을 차단했습니다. 페이지를 새로고침해 주세요.</div>
+    </div>
+
+    <div class="card" id="collectPreviewCard">
+      <div class="sec">
+        <span>🔎 안전판별 · 업무연결 미리보기</span>
+        <span class="sp"></span>
+        <span id="safetyStatsChips" class="kpis"></span>
+      </div>
+      <div id="blockedDrawer" style="margin-bottom:8px"></div>
+      <div class="bar" style="margin-bottom:8px">
+        <button type="button" class="pri" id="btnSaveArchiveAndWork" disabled>🗄️ 자료함 영구 보관 + 📋 업무관리 동시 반영</button>
+        <button type="button" class="sm" id="btnSaveArchiveOnly" disabled>🗄️ 자료함에만 영구 보관</button>
+        <button type="button" class="sm" id="btnPushServerNotes" disabled>☁️ 30일 원문 서버 보관(kakaoImport)</button>
+      </div>
+      <div class="scroll" id="collectPreviewBox"><div class="empty">위에서 서버 자동수집을 불러오거나 .txt / 대화 내용을 입력해 안전판별 미리보기를 실행하세요.</div></div>
+    </div>
+  </section>
+
+  <!-- 3. 첨부자료 보관함 -->
+  <section class="pane" id="p-files" role="tabpanel" aria-labelledby="tab-files" hidden>
+    <div class="card" id="filesHeaderCard">
+      <div class="bar">
+        <span><b>📎 톡서랍 첨부자료 보관함</b> <span class="hint" id="folderStateHint">PC 카톡 받은 파일 폴더 미연결</span></span>
+        <span class="sp"></span>
+        <button type="button" class="sm" id="btnFilesFolder">📂 받은 파일 폴더 연결·스캔</button>
+        <button type="button" class="sm" id="btnFilesReload">↻ 목록 새로고침</button>
+      </div>
+      <div class="warn" style="margin-top:8px;margin-bottom:0">
+        <b>개인정보 보호 원칙:</b> 신분증·주민등록등본·통장사본·급여대장·근로계약서 등 민감 첨부는 서버나 사진첩으로 올리지 않고 <b>💻 PC에만 보관</b>으로 자동 지정됩니다. 카톡 파일은 약 14일 뒤 만료되므로 D-day 전에 PC에 저장하세요.
+      </div>
+    </div>
+    <div class="selbar" id="filesSelBar">
+      <b id="filesSelCount">0건 선택</b>
+      <button type="button" class="pri sm" id="btnFilesSend">확인하고 선택한 곳으로 보내기</button>
+      <button type="button" class="sm" id="btnFilesPcDone">💻 PC 보관 완료 표시</button>
+    </div>
+    <div class="card" id="filesTableCard">
+      <div class="scroll" id="filesTableBox"></div>
+    </div>
+  </section>
+
+  <!-- 4. 업체·업무별 보기 -->
+  <section class="pane" id="p-groups" role="tabpanel" aria-labelledby="tab-groups" hidden>
+    <div class="card">
+      <div class="bar">
+        <span><b>묶기 기준:</b></span>
+        <select id="groupBySel" aria-label="묶기 기준">
+          <option value="work">연결된 업무별</option>
+          <option value="company">연결된 업체별</option>
+          <option value="domain">업무 영역별</option>
+          <option value="room">카톡 방별</option>
+        </select>
+        <span class="sp"></span>
+        <button type="button" class="sm" id="btnObsidianExport">🪨 옵시디언 일지 내보내기</button>
+      </div>
+    </div>
+    <div id="groupsBox"></div>
+  </section>
+
+  <!-- 5. 안전·법령 가이드 -->
+  <section class="pane" id="p-safety" role="tabpanel" aria-labelledby="tab-safety" hidden>
+    <div id="safetyGuideBox"></div>
+  </section>
+</main>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="상세 정보 및 업무 연결">
+  <div class="mbox" id="mbox"></div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=112"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=56"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){
+  function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go);
+})();
+</script>
+<script src="js/pu-back.js?v=5"></script>
+<script>
+try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}
+window.PuKakaoRoomGate = { show: function(){ PuGate.show(); }, hide: function(){ PuGate.hide(); } };
+</script>
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-handoff.js?v=2"></script>
+<script src="js/pu-kakao-work.js?v=4"></script>
+<script src="js/pu-kakao-export.js?v=2"></script>
+<script src="js/pu-kakaoroom-core.js?v=1"></script>
+<script src="js/pu-kakaoroom-app.js?v=1"></script>
+</body>
+</html>

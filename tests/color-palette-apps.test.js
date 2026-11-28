@@ -63,6 +63,7 @@ const DONE = [
   ['pu-edulib.html', '강의자료'],
   ['pu-alio-union.html', '공공임단협'],
   ['pu-datahub.html', '데이터관리'],
+  ['pu-kakaoroom.html', '법인카카오톡방'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */

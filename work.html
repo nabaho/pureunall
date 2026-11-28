@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ontology.js?v=112"></script>
 <script src="js/pu-kakao-work.js?v=4"></script>
 <script src="js/pu-kakao-export.js?v=2"></script>
 <!-- 📋 내 업무 숫자 한 줄(work_erp/mysum/{사번}) — 포털 머리줄 «내 업무» 단추·이알피 「나의 업무」가 읽는다(2026-11-21) -->
@@ -1493,7 +1493,7 @@
 </style>
 <link rel="stylesheet" href="css/pu-design.css?v=2">
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=55"></script>
+  <script src="js/pu-appbar.js?v=56"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -3349,7 +3349,8 @@ function renderKakao(){
   var app=$('app'); if(!app) return;
   var nf=kkFileCounts();
   var h='<div class="row" style="flex-wrap:wrap;margin-bottom:10px;gap:8px"><h1>💬 카톡정리</h1>'
-    +'<span class="statbar" style="margin:0">업무방 글을 <b>누가 · 언제 · 무엇을</b>로 묶고, <b>받아야 할 파일</b>을 따로 챙깁니다.</span></div>'
+    +'<span class="statbar" style="margin:0">업무방 글을 <b>누가 · 언제 · 무엇을</b>로 묶고, <b>받아야 할 파일</b>을 따로 챙깁니다.</span>'
+    +'<a href="pu-kakaoroom.html" target="_blank" style="margin-left:auto;padding:5px 11px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">💬 법인 카카오톡 방(자료함)에서 열기 ↗</a></div>'
     +'<div class="row" style="gap:6px;margin:0 0 10px">'
     +'<span class="chipbtn'+(KK.tab==='talk'?' on':'')+'" onclick="kkTab(\'talk\')">💬 대화</span>'
     +'<span class="chipbtn'+(KK.tab==='files'?' on':'')+'" onclick="kkTab(\'files\')">📎 받을 파일'+(nf.open?' <b>'+nf.open+'</b>':'')+'</span>'

@@ -2371,6 +2371,8 @@ body.portal-mode #moreFab{display:flex;}
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
     /* P박스 — 대한민국 전 법령·판례·행정해석·AI 서면(대표 지시 2026-11-15 「다 만들면 자료함에 연결시켜 달라」). */
     { key:'pbox',    name:'P박스',        desc:'전 법령·판례·행정해석·AI 서면', icon:'📚', url:'pu-pbox.html', roles:null, row:'store' },
+    /* 법인 카카오톡 방 — 약관 무위반 안전수집 · 비식별 업무 영구보관 · 업무/자료함 연결(2026-11-28). */
+    { key:'kakaoroom', name:'법인 카카오톡 방', desc:'업무방 자동수집·업무·자료함 영구보관', icon:'💬', url:'pu-kakaoroom.html', roles:null, row:'store' },
     /* 급여아웃소싱 — 2026-10-20 준비중으로 닫았다가 2026-11-02 off 걷고 이름 변경, 2026-11-18 대표 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」로
        포털 준비중 딱지(soon)와 안쪽 문(payroll-os.html 의 PuGate.soonUnlessAdmin)·실시간DB 규칙(payroll_os → 재직 직원 LOGIN)을 함께 열었다(tests/app-soon-gate.test.js ⑨). */
     { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, row:'client' },
@@ -9141,7 +9143,7 @@ body.portal-mode #moreFab{display:flex;}
 </script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-orchestrator-core.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=19"></script>
+<script src="js/pu-chatbot-kb.js?v=20"></script>
 <script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>
