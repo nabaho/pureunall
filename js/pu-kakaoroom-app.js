@@ -37,7 +37,14 @@
   var SERVER_FILES = [];
   var ROOMS = ['푸른노무법인 업무채팅방'];
   var PHONE_DEV = null;
+  var WATCHER = null;
   var TAB = 'archive';
+  var DASH_VIEW = 'person';   /* person | case | topic | table */
+  var TOPIC_FILTER = '';
+  var PENDING_AUTO = null;    /* { rows, room, checkedAt } */
+  var AUTO_PULL_ON = true;
+  var RT_REFS = [];
+  var AUTO_PULL_TIMER = null;
   var ARCH_PICK = {};
   var FILE_PICK = {};
   var FILE_DEST = {};
@@ -47,11 +54,16 @@
   var DIFF_ON = false;
   var PREV_MODAL_FOCUS = null;
 
+  try {
+    var savedAutoPull = localStorage.getItem('pu_kakaoroom_autopull');
+    if (savedAutoPull === '0') AUTO_PULL_ON = false;
+  } catch (e) {}
+
   var RECENT_CODE_CHANGES = [
-    { id: 'diff-collect', tab: 'collect', targetId: 'collectInputCard', label: '신규 · 약관 무위반 수집·안전판별', desc: 'OTP 차단 · 주민번호/계좌/비번 3중 가림 · 잡담 제외' },
-    { id: 'diff-archive', tab: 'archive', targetId: 'archiveTableCard', label: '신규 · 자료함 영구보관·진행추적', desc: '원문 30일 파기 한계 해소 · 실시간 업무상태 조인' },
-    { id: 'diff-files', tab: 'files', targetId: 'filesTableCard', label: '강화 · 민감 첨부 PC전용·만료 D-day', desc: '신분증/통장/급여 서버전송 차단 · 사진첩/기업정보함 연계' },
-    { id: 'diff-safety', tab: 'safety', targetId: 'safetyGuideBox', label: '신규 · 계정정지 방지·법령 가이드', desc: '공식 3대 수집 경로 vs 금지 방식 한눈에 확인' }
+    { id: 'diff-dash', tab: 'archive', targetId: 'dashViewBar', label: '신규 · 사람별·사건별·공유건별 자동 대시보드', desc: '사람/사건/공유건 3축으로 자동 분류·집계' },
+    { id: 'diff-sync', tab: 'archive', targetId: 'autoSyncBanner', label: '신규 · 실시간 자동 당겨오기·동기화', desc: '새 카톡 수집 즉시 반영 & 미정리 대화 자동 정리' },
+    { id: 'diff-watcher', tab: 'collect', targetId: 'pcWatcherCard', label: '신규 · PC 화면·하단알림 자동 캡처', desc: '읽기 전용 오프라인 OCR로 열린 법인방·하단 알림 자동 수집' },
+    { id: 'diff-cards', tab: 'archive', targetId: 'dashContentBox', label: '신규 · 시정지시·기한·첨부 공유건 자동 묶기', desc: 'D-day 기한·시정지시서·업무 진행상태 카드 한눈에 확인' }
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -104,13 +116,14 @@
   /* ── 최근 변경점 안내 바 & 강조 표시 ── */
   function renderDiffBar() {
     var bar = $('recent-diff-bar'); if (!bar) return;
+    if ($('diffToggleBtn')) $('diffToggleBtn').setAttribute('aria-pressed', DIFF_ON ? 'true' : 'false');
     if (!DIFF_ON) {
       bar.style.display = 'none';
       clearDiffHighlights();
       return;
     }
     bar.style.display = 'flex';
-    bar.innerHTML = '<b>✨ 이번 작업 변경점 (자료함 신규 앱)</b>' +
+    bar.innerHTML = '<b>✨ 이번 작업 변경점 (자동 대시보드 · PC 자동 캡처)</b>' +
       RECENT_CODE_CHANGES.map(function (c) {
         return '<button type="button" class="diff-pill" data-diff-id="' + esc(c.id) + '" title="' + esc(c.desc) + '">' +
           esc(c.label) + '<span class="diff-badge">NEW</span></button>';
@@ -158,11 +171,13 @@
     ME = { uid: 'preview-admin', sid: 'P-001', name: '미리보기 관리자', admin: true };
     COMPANIES = {
       'co_sample_1': { id: 'co_sample_1', name: '한빛제조(주)' },
-      'co_sample_2': { id: 'co_sample_2', name: '푸른물류(주)' }
+      'co_sample_2': { id: 'co_sample_2', name: '푸른물류(주)' },
+      'co_sample_3': { id: 'co_sample_3', name: '해솔식품(주)' }
     };
     WORK_ITEMS = {
       'wk_sample_1': { id: 'wk_sample_1', no: '경기2026부해3347', title: '한빛제조 부당해고 구제신청 대응', status: '진행중', co_id: 'co_sample_1', company: '한빛제조(주)', mgr_main: { name: '김노무사' }, last: { d: '2026-11-27', t: '답변서 1차 초안 검토 완료' } },
-      'wk_sample_2': { id: 'wk_sample_2', no: '자문-2026-019', title: '푸른물류 근로복지기금 설립 및 정관 인가', status: '대기중', co_id: 'co_sample_2', company: '푸른물류(주)', mgr_main: { name: '이노무사' }, last: { d: '2026-11-26', t: '정관 초안 송부' } }
+      'wk_sample_2': { id: 'wk_sample_2', no: '자문-2026-019', title: '푸른물류 근로복지기금 설립 및 정관 인가', status: '대기중', co_id: 'co_sample_2', company: '푸른물류(주)', mgr_main: { name: '이노무사' }, last: { d: '2026-11-26', t: '정관 초안 송부' } },
+      'wk_sample_3': { id: 'wk_sample_3', no: '서산2026시정108', title: '해솔식품 근로감독 시정지시 대응', status: '진행중', co_id: 'co_sample_3', company: '해솔식품(주)', mgr_main: { name: '박담당' }, last: { d: '2026-11-28', t: '시정지시서 수령 및 감독관 연락중' } }
     };
     ARCHIVE = {
       'kr_seed0001a1b2c3': {
@@ -183,6 +198,26 @@
         summary: '💬 카톡 · 이노무사 — 푸른물류 근로복지기금 출연 계좌(●●●-계좌-●●●) 확인 및 정관 수정본 공유',
         caseNos: [], due: '', fileNames: [], matchBasis: 'guess', workItemId: '', workLogId: '',
         companyId: '', companyLinkStatus: 'pending', companyHint: '푸른물류(주)', status: 'open', note: ''
+      },
+      'kr_seed0003c7d8e9': {
+        id: 'kr_seed0003c7d8e9', entityType: K.ENTITY_ARCHIVE, schemaVersion: 3, contractVersion: 1, revision: 1,
+        createdAt: now - 1800000, updatedAt: now - 600000, createdBy: 'WATCH-PC', updatedBy: 'WATCH-PC',
+        originSystem: 'kakaotalk', originId: 'kr_seed0003c7d8e9', room: '푸른노무법인 업무채팅방', day: K.kstDay(now),
+        senders: ['박담당'], msgCount: 2, domain: 'case', safety: 'safe', redactedCount: 0,
+        summary: '💬 카톡 · 박담당 — 서산2026시정108 노동지청 시정지시 결과 보고 기한 임박 · 담당감독관 통화 부재중 확인중 · [이미지 공유: 시정지시서]',
+        caseNos: ['서산2026시정108'], due: K.kstDay(now + 4 * 86400000), fileNames: ['시정지시서(이미지)'],
+        matchBasis: 'sure', workItemId: 'wk_sample_3', workLogId: '', companyId: 'co_sample_3', companyLinkStatus: 'linked',
+        companyHint: '해솔식품(주)', status: 'open', note: 'PC 화면 자동 캡처 OCR 수집'
+      },
+      'kr_seed0004f0a1b2': {
+        id: 'kr_seed0004f0a1b2', entityType: K.ENTITY_ARCHIVE, schemaVersion: 3, contractVersion: 1, revision: 1,
+        createdAt: now - 2500000, updatedAt: now - 900000, createdBy: 'P-001', updatedBy: 'P-001',
+        originSystem: 'kakaotalk', originId: 'kr_seed0004f0a1b2', room: '푸른노무법인 업무채팅방', day: K.kstDay(now),
+        senders: ['김노무사'], msgCount: 1, domain: 'admin', safety: 'safe', redactedCount: 0,
+        summary: '💬 카톡 · 김노무사 — [공지] 법인 AI 유료 구독 계정 및 공용 업무폴더 안내 공유',
+        caseNos: [], due: '', fileNames: [],
+        matchBasis: 'none', workItemId: '', workLogId: '', companyId: '', companyLinkStatus: 'pending',
+        companyHint: '', status: 'done', note: ''
       }
     };
     SERVER_FILES = [
@@ -190,6 +225,42 @@
       { id: 'eeff001122334455', room: '푸른노무법인 업무채팅방', sender: '박담당', name: '근로자_신분증_통장사본.pdf', sentAt: now - 11 * 86400000, status: 'todo', dest: 'pc' }
     ];
     PHONE_DEV = { deviceName: '대표님 폰 (미리보기)', appVersion: '2.6.1', lastSweepAt: now - 300000, lastTalkAt: now - 300000, kakaoLastAt: now - 3600000, kakaoSeen: 12, kakaoListed: 5 };
+    WATCHER = {
+      mode: 'live',
+      status: 'running',
+      lastSeenAt: now - 15000,
+      lastCaptureAt: now - 600000,
+      todayCount: 3,
+      popupCount: 1,
+      roomCount: 2,
+      watchPopup: true,
+      watchOpenRoom: true,
+      ocrAvailable: true,
+      rooms: ['푸른노무법인 업무채팅방'],
+      message: '하단 알림 + 열린 법인방 감시중'
+    };
+    PENDING_AUTO = {
+      checkedAt: now,
+      room: '푸른노무법인 업무채팅방',
+      rows: [
+        {
+          archiveId: 'kr_autopreview001',
+          room: '푸른노무법인 업무채팅방',
+          day: K.kstDay(now),
+          d: { who: ['이노무사'], text: '자문-2026-019 푸른물류 기금 정관 인가 보완서류 금일 발송 완료', n: 1 },
+          g: { day: K.kstDay(now), who: ['이노무사'], caseNos: ['자문-2026-019'], files: [], msgs: [{ at: now, sender: '이노무사', text: '자문-2026-019 푸른물류 기금 정관 인가 보완서류 금일 발송 완료' }] },
+          m: { basis: 'sure', itemId: 'wk_sample_2', caseNo: '자문-2026-019' },
+          domain: 'fund',
+          domainLabel: '근로복지기금',
+          safety: 'safe',
+          redactedCount: 0,
+          due: '',
+          itemId: 'wk_sample_2',
+          companyHint: '푸른물류(주)',
+          on: true
+        }
+      ]
+    };
     if (window.PuOntologyWrite) {
       gate = window.PuOntologyWrite.createGateway({ mode: 'enforce', actor: ME.sid });
     }
@@ -275,6 +346,44 @@
     }).catch(function () {});
   }
 
+  function detachRealtimeListeners() {
+    while (RT_REFS.length) {
+      var pair = RT_REFS.pop();
+      try { pair.ref.off('value', pair.fn); } catch (e) {}
+    }
+    if (AUTO_PULL_TIMER) { clearInterval(AUTO_PULL_TIMER); AUTO_PULL_TIMER = null; }
+  }
+
+  function attachRealtimeListeners() {
+    if (isLocalPreview() || !fbDb) return;
+    detachRealtimeListeners();
+    var itemRef = fbDb.ref('kakao_room/items');
+    var onItems = function (s) {
+      ARCHIVE = s.val() || {};
+      renderAll();
+    };
+    itemRef.on('value', onItems);
+    RT_REFS.push({ ref: itemRef, fn: onItems });
+
+    var fileRef = fbDb.ref('kakao_room/files');
+    var onFiles = function (s) {
+      FILE_ARCHIVE = s.val() || {};
+      renderAll();
+    };
+    fileRef.on('value', onFiles);
+    RT_REFS.push({ ref: fileRef, fn: onFiles });
+
+    var watchRef = fbDb.ref('kakao_room/watcher');
+    var onWatch = function (s) {
+      WATCHER = s.val() || null;
+      renderAutoSyncBanner();
+      renderPcWatcherCard();
+      renderKpis();
+    };
+    watchRef.on('value', onWatch);
+    RT_REFS.push({ ref: watchRef, fn: onWatch });
+  }
+
   function loadFirebaseData() {
     if (isLocalPreview()) {
       renderAll();
@@ -283,6 +392,7 @@
     var reads = [
       fbDb.ref('kakao_room/items').once('value').then(function (s) { ARCHIVE = s.val() || {}; }).catch(function () { ARCHIVE = {}; }),
       fbDb.ref('kakao_room/files').once('value').then(function (s) { FILE_ARCHIVE = s.val() || {}; }).catch(function () { FILE_ARCHIVE = {}; }),
+      fbDb.ref('kakao_room/watcher').once('value').then(function (s) { WATCHER = s.val() || null; }).catch(function () { WATCHER = null; }),
       fbDb.ref('work_erp/items').once('value').then(function (s) { WORK_ITEMS = s.val() || {}; }).catch(function () { WORK_ITEMS = {}; }),
       fbDb.ref('data/companies').once('value').then(function (s) { COMPANIES = s.val() || {}; }).catch(function () { COMPANIES = {}; }),
       tryRestoreDlFolder()
@@ -295,31 +405,191 @@
       );
     }
     return Promise.all(reads).then(function () {
+      attachRealtimeListeners();
       renderAll();
+      if (ME.admin) {
+        checkServerAutoPull(AUTO_PULL_ON);
+        if (!AUTO_PULL_TIMER) {
+          AUTO_PULL_TIMER = setInterval(function () {
+            if (ME.admin) checkServerAutoPull(AUTO_PULL_ON);
+          }, 120000);
+        }
+      }
     });
   }
 
-  /* ── KPI · 탭 ── */
+  /* ── 서버 미정리 대화 자동 당겨오기 ── */
+  function commitAutoPullRows(newRows, sourceRoom, quiet) {
+    if (!newRows || !newRows.length) return Promise.resolve(0);
+    if (!checkRrnGuardUI()) {
+      if (!quiet) toast('주민번호 지우개가 없어 자동 보관을 중단했습니다');
+      return Promise.resolve(0);
+    }
+    var now = Date.now();
+    var tasks = [];
+    var savedList = [];
+    newRows.forEach(function (r) {
+      var itemObj = (r.m && r.m.basis === 'sure' && r.itemId && WORK_ITEMS[r.itemId] && !WORK_ITEMS[r.itemId]._deleted) ? WORK_ITEMS[r.itemId] : null;
+      var rawCoId = itemObj && itemObj.co_id ? String(itemObj.co_id) : '';
+      var companyId = (rawCoId && (!COMPANIES[rawCoId] || !COMPANIES[rawCoId]._deleted)) ? rawCoId : '';
+      var rec = K.buildArchiveRecord(Object.assign({}, r, { itemId: itemObj ? itemObj.id : '' }), {
+        now: now,
+        actor: ME.sid || 'AUTO-SYNC',
+        room: r.room || sourceRoom || '푸른노무법인 업무채팅방',
+        companyId: companyId,
+        maskSensitive: KW ? KW.maskSensitive : null,
+        maskRrn: RM ? RM.maskRrnInText : null
+      });
+      var prev = ARCHIVE[rec.id];
+      if (prev && prev._deleted) return;
+      if (!isLocalPreview() && gate && fbDb) {
+        tasks.push(gate.save(fbDb.ref('kakao_room/items/' + rec.id), function (serverPrev) {
+          if (serverPrev) return null; /* 이미 있거나 _deleted 면 건드리지 않음 */
+          return rec;
+        }, { entityType: K.ENTITY_ARCHIVE, expectedRevision: -1 }).then(function (res) {
+          var val = res && res.snapshot && typeof res.snapshot.val === 'function' ? res.snapshot.val() : null;
+          if (val && !val._deleted) savedList.push(val);
+          else if (!val) savedList.push(rec);
+        }).catch(function () {}));
+      } else {
+        savedList.push(rec);
+      }
+    });
+    return Promise.all(tasks).then(function () {
+      savedList.forEach(function (rec) {
+        ARCHIVE[rec.id] = rec;
+      });
+      PENDING_AUTO = { checkedAt: Date.now(), room: sourceRoom || '', rows: [] };
+      renderAll();
+      if (!quiet && savedList.length) toast('새 카톡 업무 ' + savedList.length + '건을 대시보드에 자동 정리했습니다');
+      return savedList.length;
+    });
+  }
+
+  function checkServerAutoPull(autoCommit) {
+    if (!ME.admin || !KE || !KW) return Promise.resolve();
+    return Promise.all([
+      callBridge('kakaoList', { days: KW.KEEP_DAYS || 30 }),
+      callBridge('kakaoFiles').catch(function () { return { items: SERVER_FILES }; })
+    ]).then(function (res) {
+      var notes = res[0].items || [];
+      if (res[1] && res[1].items) SERVER_FILES = res[1].items;
+      var since = Date.now() - (KW.KEEP_DAYS || 30) * 86400000;
+      var workList = buildMatchWorkList();
+      var companies = buildMatchCompanyList();
+      var roomList = ROOMS && ROOMS.length ? ROOMS.slice() : ['푸른노무법인 업무채팅방'];
+      var collected = [];
+      var seenIds = {};
+      roomList.forEach(function (rm) {
+        var srv = KE.fromServer(notes, SERVER_FILES, {
+          room: rm,
+          since: since,
+          isMedia: function (t) { return KW.classify(t).kind === 'media'; }
+        });
+        var lines = KE.fromLines(srv.lines, srv.files);
+        if (!lines.length) return;
+        var analyzed = K.analyzeMessages(lines, {
+          room: rm,
+          workItems: workList,
+          companies: companies,
+          maskSensitive: KW ? KW.maskSensitive : null,
+          maskRrn: RM ? RM.maskRrnInText : null
+        });
+        (analyzed.rows || []).forEach(function (r) {
+          var rec = K.buildArchiveRecord(r, {
+            now: Date.now(),
+            actor: ME.sid,
+            room: rm,
+            maskSensitive: KW ? KW.maskSensitive : null,
+            maskRrn: RM ? RM.maskRrnInText : null
+          });
+          if (ARCHIVE[rec.id] || seenIds[rec.id]) return; /* 기존 보관 건·_deleted(tombstone)·중복 방 모두 제외 */
+          seenIds[rec.id] = 1;
+          collected.push(Object.assign({}, r, { archiveId: rec.id, room: rm }));
+        });
+      });
+      PENDING_AUTO = { checkedAt: Date.now(), room: roomList[0] || '', rows: collected };
+      if (autoCommit && collected.length && checkRrnGuardUI()) {
+        return commitAutoPullRows(collected, roomList[0], true);
+      }
+      renderAutoSyncBanner();
+    }).catch(function () {
+      renderAutoSyncBanner();
+    });
+  }
+
+  /* ── KPI · 탭 · 실시간 자동정리 배너 ── */
   function joinedArchive() {
     return K.joinWorkProgress(ARCHIVE, WORK_ITEMS, COMPANIES);
   }
+  function fmtAgo(ms) {
+    var n = Number(ms);
+    if (!isFinite(n) || n <= 0) return '기록 없음';
+    var diffMin = Math.max(0, Math.floor((Date.now() - n) / 60000));
+    if (diffMin < 1) return '방금 전';
+    if (diffMin < 60) return diffMin + '분 전';
+    var h = Math.floor(diffMin / 60);
+    if (h < 24) return h + '시간 전';
+    return Math.floor(h / 24) + '일 전';
+  }
+  function watcherStatusInfo() {
+    if (!WATCHER || !WATCHER.lastSeenAt) {
+      return { level: 'none', badge: '<span class="tag">🖥️ PC 캡처 미실행</span>', text: 'PC 화면·하단알림 자동 캡처 도우미 대기전' };
+    }
+    var age = Date.now() - Number(WATCHER.lastSeenAt || 0);
+    if (WATCHER.locked) {
+      return { level: 'warn', badge: '<span class="tag amber">🖥️ PC 화면 잠김</span>', text: 'PC 화면이 잠겨 있어 해제 후 자동 재개됩니다' };
+    }
+    if (age <= 10 * 60 * 1000) {
+      var modeTxt = WATCHER.mode === 'dry-run' ? '시험모드' : '실전감시';
+      return {
+        level: 'ok',
+        badge: '<span class="tag green">🖥️ PC 자동캡처 ' + esc(modeTxt) + ' (' + fmtAgo(WATCHER.lastSeenAt) + ')</span>',
+        text: '하단 알림 + 열린 법인방 자동 감지중 · 오늘 ' + Number(WATCHER.todayCount || 0) + '건'
+      };
+    }
+    return {
+      level: 'warn',
+      badge: '<span class="tag amber">🖥️ PC 캡처 멈춤 (' + fmtAgo(WATCHER.lastSeenAt) + ')</span>',
+      text: '마지막 응답 ' + fmtAgo(WATCHER.lastSeenAt)
+    };
+  }
+  function renderAutoSyncBanner() {
+    var box = $('autoSyncBody'); if (!box) return;
+    var wInfo = watcherStatusInfo();
+    var phoneSt = ME.admin ? (KW && PHONE_DEV ? KW.phoneDiagnosis(PHONE_DEV).level : (PHONE_DEV ? 'ok' : 'none')) : 'staff';
+    var phoneBadge = phoneSt === 'ok'
+      ? '<span class="tag green">📱 폰 자동수집 정상</span>'
+      : (phoneSt === 'staff' ? '<span class="tag">📱 관리자 연동</span>' : '<span class="tag amber">📱 폰 수집 점검필요</span>');
+    var pendCount = (PENDING_AUTO && PENDING_AUTO.rows) ? PENDING_AUTO.rows.length : 0;
+    var pendHtml = pendCount > 0
+      ? '<span class="tag red">미정리 서버 대화 ' + pendCount + '건</span><button type="button" class="pri sm" id="btnAutoPullNow">⚡ 지금 자동 정리·당겨오기 (' + pendCount + '건)</button>'
+      : '<span class="tag green">⚡ 실시간 동기화 최신</span>' +
+        (ME.admin ? '<button type="button" class="sm" id="btnCheckAutoNow">🔄 새 카톡 확인</button>' : '');
+    var toggleHtml = ME.admin
+      ? '<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="chkAutoPull"' + (AUTO_PULL_ON ? ' checked' : '') + '> 로그인시 자동 당겨오기</label>'
+      : '';
+    box.innerHTML = wInfo.badge + ' ' + phoneBadge + ' ' + pendHtml + '<span class="sp"></span>' + toggleHtml +
+      '<button type="button" class="sm" id="btnGoPcWatcher">🖥️ PC 자동캡처 설정</button>';
+  }
   function renderKpis() {
     var rows = joinedArchive();
-    var linked = rows.filter(function (r) { return !!r.workItemId; }).length;
-    var unlinked = rows.length - linked;
-    var activeWork = rows.filter(function (r) { return r.workLinked && r.workState !== '종결' && r.workState !== '완료'; }).length;
+    var summary = K.buildDashboardSummary(rows, WORK_ITEMS, COMPANIES);
+    var t = summary.totals;
     var expSoon = combinedFiles().filter(function (f) { return f.status !== 'done' && KW && KW.fileLeft(f.sentAt) <= 3; }).length;
-    var phoneSt = ME.admin ? (KW && PHONE_DEV ? KW.phoneDiagnosis(PHONE_DEV).level : (PHONE_DEV ? 'ok' : 'none')) : 'staff';
-    var phoneLabel = phoneSt === 'ok' ? '정상 수집' : (phoneSt === 'staff' ? '관리자 연동' : (phoneSt === 'bad' ? '점검 필요' : (phoneSt === 'warn' ? '설정 확인' : '미연결')));
-    var phoneCls = phoneSt === 'ok' ? 'g' : (phoneSt === 'bad' ? 'r' : 'a');
+    var wInfo = watcherStatusInfo();
+    var wCls = wInfo.level === 'ok' ? 'g' : (wInfo.level === 'warn' ? 'a' : '');
+    var wLabel = wInfo.level === 'ok' ? ('가동중 · 오늘 ' + Number((WATCHER && WATCHER.todayCount) || 0) + '건') : (wInfo.level === 'warn' ? '확인필요' : '대기');
 
     $('kpiRow').innerHTML =
-      '<div class="kpi b"><span>영구보관 업무</span><b>' + rows.length + '건</b></div>' +
-      '<div class="kpi g"><span>업무 연결됨</span><b>' + linked + '건</b></div>' +
-      '<div class="kpi a"><span>미연결 확인</span><b>' + unlinked + '건</b></div>' +
-      '<div class="kpi b"><span>연결업무 진행중</span><b>' + activeWork + '건</b></div>' +
+      '<div class="kpi b"><span>영구보관 업무</span><b>' + t.totalRows + '건</b></div>' +
+      '<div class="kpi b"><span>참여 인원</span><b>' + t.personCount + '명</b></div>' +
+      '<div class="kpi g"><span>사건·업무 묶음</span><b>' + t.caseCount + '건</b></div>' +
+      '<div class="kpi b"><span>공유 안건</span><b>' + t.topicCount + '건</b></div>' +
+      '<div class="kpi ' + (t.dueSoonCount ? 'r' : '') + '"><span>기한임박 (7일내)</span><b>' + t.dueSoonCount + '건</b></div>' +
+      '<div class="kpi a"><span>미연결 확인</span><b>' + t.unlinkedCount + '건</b></div>' +
       '<div class="kpi ' + (expSoon ? 'r' : '') + '"><span>만료임박 파일</span><b>' + expSoon + '건</b></div>' +
-      '<div class="kpi ' + phoneCls + '"><span>폰 자동수집</span><b>' + esc(phoneLabel) + '</b></div>';
+      '<div class="kpi ' + wCls + '"><span>PC 자동캡처</span><b>' + esc(wLabel) + '</b></div>';
   }
 
   function setTab(t) {
@@ -366,6 +636,183 @@
       }
       return true;
     });
+  }
+
+  function formatDueTag(due, left) {
+    if (!due) return '';
+    if (left == null) return '<span class="tag blue">기한 ' + esc(due) + '</span>';
+    if (left < 0) return '<span class="tag red">기한지남 (' + esc(due) + ')</span>';
+    if (left === 0) return '<span class="tag red">오늘마감 (' + esc(due) + ')</span>';
+    if (left <= 7) return '<span class="tag red">D-' + left + ' (' + esc(due) + ')</span>';
+    return '<span class="tag blue">D-' + left + ' (' + esc(due) + ')</span>';
+  }
+
+  function renderTimelineRowHtml(r) {
+    return '<div class="dash-row">' +
+      '<span class="tag">' + esc(r.day) + '</span>' +
+      '<span class="tag blue">' + esc((r.shareIcon || '💬') + ' ' + (r.shareLabel || '')) + '</span>' +
+      '<button type="button" class="ttl dash-txt" data-open-arch="' + esc(r.id) + '" title="' + esc(r.summary) + '">' + esc(r.summary) + '</button>' +
+      statusBadge(r.status) +
+      '</div>';
+  }
+
+  function renderDashboard() {
+    fillDomainOptions();
+    renderAutoSyncBanner();
+    var dashBox = $('dashContentBox');
+    var tableCard = $('archiveTableCard');
+    var selBar = $('archiveSelBar');
+
+    [].forEach.call(document.querySelectorAll('#dashViewTabs button[data-dash-view]'), function (b) {
+      var isOn = b.getAttribute('data-dash-view') === DASH_VIEW;
+      b.classList.toggle('on', isOn);
+      b.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+    });
+
+    if (DASH_VIEW === 'table') {
+      if (dashBox) { dashBox.style.display = 'none'; dashBox.innerHTML = ''; }
+      if (tableCard) tableCard.style.display = '';
+      renderArchive();
+      return;
+    }
+
+    if (dashBox) dashBox.style.display = '';
+    if (tableCard) tableCard.style.display = 'none';
+    if (selBar) selBar.classList.remove('on');
+
+    var rows = filteredArchive();
+    if (!rows.length) {
+      dashBox.innerHTML = '<div class="card"><div class="empty">조건에 맞는 비식별 카톡 업무가 없습니다. «🤖 자동수집·안전판별» 탭이나 상단 «⚡ 지금 자동 정리·당겨오기»로 대화를 불러와 보세요.</div></div>';
+      return;
+    }
+
+    var summary = K.buildDashboardSummary(rows, WORK_ITEMS, COMPANIES);
+
+    if (DASH_VIEW === 'person') {
+      dashBox.innerHTML = '<div class="dash-grid">' + summary.byPerson.map(function (p) {
+        var isHot = p.dueSoonCount > 0;
+        var domBadges = Object.keys(p.domains || {}).map(function (dk) {
+          var di = K.domainInfo(dk);
+          return '<span class="tag">' + esc(di.icon + ' ' + di.label + ' ' + p.domains[dk]) + '</span>';
+        }).join(' ');
+        var caseLine = p.cases.length
+          ? ('<b>관련 사건:</b> ' + p.cases.slice(0, 3).map(function (c) { return esc(c.label); }).join(', ') + (p.cases.length > 3 ? ' 외 ' + (p.cases.length - 3) + '건' : ''))
+          : '<b>관련 사건:</b> 미연결 건 포함 (' + p.unlinkedCount + '건)';
+        var listHtml = p.items.slice(0, 4).map(renderTimelineRowHtml).join('');
+        var moreHtml = p.items.length > 4 ? '<div class="hint" style="padding-top:4px">… 외 ' + (p.items.length - 4) + '건 (검색 또는 전체 표에서 확인)</div>' : '';
+        return '<article class="dash-card' + (isHot ? ' urgent' : '') + '">' +
+          '<div class="dash-card-hd"><div>' +
+            '<div class="dash-card-ttl">👤 ' + esc(p.name) + '</div>' +
+            '<div class="hint">최근 공유 ' + esc(p.latestDay || '-') + '</div>' +
+          '</div><div class="dash-badges">' +
+            '<span class="tag blue">총 ' + p.total + '건</span>' +
+            (p.openCount + p.trackingCount ? '<span class="tag amber">진행·대기 ' + (p.openCount + p.trackingCount) + '</span>' : '<span class="tag green">모두 완료</span>') +
+            (p.dueSoonCount ? '<span class="tag red">기한임박 ' + p.dueSoonCount + '</span>' : '') +
+          '</div></div>' +
+          '<div class="dash-badges">' + domBadges + '</div>' +
+          '<div class="dash-meta">' + caseLine + '</div>' +
+          '<div class="dash-list">' + listHtml + moreHtml + '</div>' +
+          '<div class="dash-ft">' +
+            '<span class="hint">미연결 ' + p.unlinkedCount + '건 · 완료 ' + p.doneCount + '건</span>' +
+            '<span class="sp"></span>' +
+            '<button type="button" class="sm" data-filter-person="' + esc(p.name) + '">이 사람만 보기</button>' +
+          '</div></article>';
+      }).join('') + '</div>';
+      return;
+    }
+
+    if (DASH_VIEW === 'case') {
+      dashBox.innerHTML = '<div class="dash-grid">' + summary.byCase.map(function (c) {
+        var isHot = c.dueDaysLeft !== null && c.dueDaysLeft <= 7 && (c.openCount + c.trackingCount) > 0;
+        var stateTag = c.kind === 'work'
+          ? '<span class="tag green">업무연결 · ' + esc(c.workState || '진행중') + '</span>'
+          : (c.kind === 'caseno' ? '<span class="tag red">미등록 사건번호</span>' : '<span class="tag amber">사건 연결 필요</span>');
+        var dueTag = formatDueTag(c.nearestDue, c.dueDaysLeft);
+        var metaParts = [];
+        if (c.companyLabel) metaParts.push('🏢 ' + esc(c.companyLabel));
+        if (c.workManager) metaParts.push('담당 ' + esc(c.workManager));
+        if (c.people.length) metaParts.push('참여: ' + esc(c.people.join('·')));
+        var fileTag = c.files.length ? '<span class="tag blue">📎 파일 ' + c.files.length + '개</span>' : '';
+        var firstId = c.items[0] ? c.items[0].id : '';
+        return '<article class="dash-card' + (isHot ? ' urgent' : '') + '">' +
+          '<div class="dash-card-hd"><div>' +
+            '<div class="dash-card-ttl">⚖️ ' + esc(c.title) + '</div>' +
+            '<div class="hint">' + metaParts.join(' · ') + '</div>' +
+          '</div><div class="dash-badges">' + stateTag + dueTag + '<span class="tag blue">' + c.total + '건</span>' + fileTag + '</div></div>' +
+          (c.workLastText ? '<div class="dash-meta"><b>업무관리 최근:</b> [' + esc(c.workLastDate || '-') + '] ' + esc(c.workLastText) + '</div>' : '') +
+          '<div class="dash-list">' + c.items.slice(0, 4).map(renderTimelineRowHtml).join('') +
+            (c.items.length > 4 ? '<div class="hint">… 외 ' + (c.items.length - 4) + '건</div>' : '') +
+          '</div>' +
+          '<div class="dash-ft">' +
+            '<span class="hint">최근 공유 ' + esc(c.latestDay || '-') + '</span><span class="sp"></span>' +
+            (firstId ? '<button type="button" class="sm" data-open-arch="' + esc(firstId) + '">연결·상세</button>' : '') +
+            (c.workItemId ? '<a class="sm" href="work.html" style="padding:3px 9px;border:1px solid var(--line2);border-radius:8px;font-size:12px">업무관리 ↗</a>' : '') +
+          '</div></article>';
+      }).join('') + '</div>';
+      return;
+    }
+
+    /* 공유 건별 정리 (topic) */
+    var typeCounts = {};
+    summary.byTopic.forEach(function (tp) {
+      typeCounts[tp.shareType] = (typeCounts[tp.shareType] || 0) + 1;
+    });
+    var chipsHtml = '<div class="share-chips" id="topicTypeChips" role="group" aria-label="공유 건 유형 필터">' +
+      '<button type="button" class="dash-tab' + (!TOPIC_FILTER ? ' on' : '') + '" aria-pressed="' + (!TOPIC_FILTER ? 'true' : 'false') + '" data-topic-type="">전체 (' + summary.byTopic.length + ')</button>' +
+      (K.SHARE_TYPES || []).filter(function (st) { return typeCounts[st.key]; }).map(function (st) {
+        var on = TOPIC_FILTER === st.key;
+        return '<button type="button" class="dash-tab' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-topic-type="' + esc(st.key) + '">' +
+          esc(st.icon + ' ' + st.label + ' (' + typeCounts[st.key] + ')') + '</button>';
+      }).join('') +
+      '</div>';
+
+    var topics = summary.byTopic.filter(function (tp) {
+      return !TOPIC_FILTER || tp.shareType === TOPIC_FILTER;
+    });
+
+    dashBox.innerHTML = chipsHtml + '<div class="dash-grid">' + topics.map(function (tp) {
+      var isHot = tp.dueDaysLeft !== null && tp.dueDaysLeft <= 7 && tp.status !== 'done';
+      var dueTag = formatDueTag(tp.due, tp.dueDaysLeft);
+      var firstId = tp.items[0] ? tp.items[0].id : '';
+      var idsCsv = tp.items.map(function (x) { return x.id; }).join(',');
+      return '<article class="dash-card' + (isHot ? ' urgent' : '') + '">' +
+        '<div class="dash-card-hd"><div>' +
+          '<div class="dash-card-ttl">' + esc(tp.shareIcon + ' ' + tp.title) + '</div>' +
+          '<div class="hint">' + esc(tp.domainIcon + ' ' + tp.domainLabel) + (tp.companyLabel ? ' · 🏢 ' + esc(tp.companyLabel) : '') + ' · ' + esc(tp.latestDay || '-') + '</div>' +
+        '</div><div class="dash-badges">' +
+          '<span class="tag blue">' + esc(tp.shareLabel) + '</span>' +
+          dueTag +
+          statusBadge(tp.status) +
+          (tp.hasRedacted ? '<span class="tag amber">🛡 가림포함</span>' : '') +
+        '</div></div>' +
+        '<div class="dash-meta"><b>공유 인원:</b> ' + esc(tp.people.join(' · ') || '-') +
+          (tp.workLabel ? '<br><b>연결 업무:</b> ' + esc(tp.workLabel) : '<br><b>연결 업무:</b> 미연결 확인 필요') +
+          (tp.files.length ? '<br><b>첨부·문서:</b> ' + esc(tp.files.join(', ')) : '') +
+        '</div>' +
+        '<div class="dash-list">' + tp.items.slice(0, 3).map(renderTimelineRowHtml).join('') + '</div>' +
+        '<div class="dash-ft">' +
+          '<span class="hint">묶음 ' + tp.count + '건</span><span class="sp"></span>' +
+          (tp.status !== 'done' && idsCsv ? '<button type="button" class="sm ok" data-topic-done="' + esc(idsCsv) + '">✓ 처리완료</button>' : '') +
+          (firstId ? '<button type="button" class="sm" data-open-arch="' + esc(firstId) + '">상세·연결</button>' : '') +
+        '</div></article>';
+    }).join('') + '</div>';
+  }
+
+  function renderPcWatcherCard() {
+    var box = $('pcWatcherBody'); if (!box) return;
+    var wInfo = watcherStatusInfo();
+    var cls = wInfo.level === 'ok' ? 'note' : (wInfo.level === 'warn' ? 'warn' : 'note');
+    var extra = '';
+    if (WATCHER && WATCHER.lastSeenAt) {
+      extra = '<br>감시 대상: ' +
+        (WATCHER.watchPopup !== false ? '✅ 하단 알림 팝업 ' : '') +
+        (WATCHER.watchOpenRoom !== false ? '✅ 열린 등록 법인방 화면' : '') +
+        (WATCHER.ocrAvailable === false ? '<br><span style="color:var(--red)">⚠ Windows 한국어 OCR 팩 확인 필요</span>' : '') +
+        '<br><span class="hint">오늘 자동 캡처 ' + Number(WATCHER.todayCount || 0) + '건 (팝업 ' + Number(WATCHER.popupCount || 0) + ' · 열린방 ' + Number(WATCHER.roomCount || 0) + ') · 등록 방: ' + esc(((WATCHER.rooms && WATCHER.rooms.length ? WATCHER.rooms : ROOMS) || []).join(', ')) + '</span>';
+    } else {
+      extra = '<br><span class="hint">아래 «PC 자동 캡처 수집기 실행 방법»을 따라 대표님 PC에서 켜 두면 카톡 하단 팝업·열린 법인방 내용을 오프라인 OCR로 자동 수집합니다.</span>';
+    }
+    box.innerHTML = '<div class="' + cls + '" style="margin:0">' + wInfo.badge + ' <b>' + esc(wInfo.text) + '</b>' + extra + '</div>';
   }
 
   function renderArchive() {
@@ -436,6 +883,7 @@
 
   function renderCollectPreview() {
     checkRrnGuardUI();
+    renderPcWatcherCard();
     renderPhoneDiag();
     var statsBox = $('safetyStatsChips');
     var drawer = $('blockedDrawer');
@@ -1235,7 +1683,7 @@
       '<div class="bar" style="margin-bottom:8px"><h2 style="margin:0;font-size:16px">⚙ 받을 법인 카카오톡 방 설정</h2><span class="sp"></span>' +
       '<button type="button" class="sm" id="mClose">닫기</button></div>' +
       '<p class="hint">한 줄에 방 이름 하나를 적습니다. 카톡 방 이름과 <b>글자 그대로 일치</b>하는 방의 알림만 수집합니다. (개인 대화 혼입 원천 차단)</p>' +
-      '<textarea id="mRoomsTa" rows="5">' + esc(ROOMS.join('\n')) + '</textarea>' +
+      '<textarea id="mRoomsTa" rows="5" aria-label="받을 법인 카카오톡 방 목록 (한 줄에 하나)">' + esc(ROOMS.join('\n')) + '</textarea>' +
       '<div class="bar" style="justify-content:flex-end;margin-top:10px">' +
       '<button type="button" class="pri" id="mRoomsSave">저장</button></div>';
     if (!PREV_MODAL_FOCUS && document.activeElement) PREV_MODAL_FOCUS = document.activeElement;
@@ -1262,10 +1710,32 @@
     PREV_MODAL_FOCUS = null;
   }
 
+  function updateArchiveStatusIds(ids, st, okMsg, clearPick) {
+    return Promise.all(ids.map(function (id) {
+      var cur = ARCHIVE[id];
+      var next = Object.assign({}, cur, { status: st, updatedAt: Date.now(), updatedBy: ME.sid });
+      var p = (!isLocalPreview() && gate && fbDb)
+        ? gate.save(fbDb.ref('kakao_room/items/' + id), function (serverPrev) {
+            if (serverPrev && serverPrev._deleted) return null;
+            return next;
+          }, { entityType: K.ENTITY_ARCHIVE, expectedRevision: Number(cur.revision || 0) })
+        : Promise.resolve();
+      return p.then(function (res) {
+        var saved = res && res.snapshot && typeof res.snapshot.val === 'function' ? res.snapshot.val() : null;
+        next.revision = saved && saved.revision ? saved.revision : Number(cur.revision || 0) + 1;
+        ARCHIVE[id] = saved || next;
+      });
+    })).then(function () {
+      if (clearPick) ARCH_PICK = {};
+      renderAll();
+      toast(okMsg);
+    }).catch(function (err) { toast('변경 실패: ' + ((err && err.message) || err)); });
+  }
+
   function renderAll() {
     renderDiffBar();
     renderKpis();
-    if (TAB === 'archive') renderArchive();
+    if (TAB === 'archive') renderDashboard();
     else if (TAB === 'collect') renderCollectPreview();
     else if (TAB === 'files') renderFiles();
     else if (TAB === 'groups') renderGroups();
@@ -1313,8 +1783,96 @@
       }
     });
 
+    if ($('dashViewTabs')) {
+      $('dashViewTabs').addEventListener('click', function (e) {
+        var b = e.target && e.target.closest && e.target.closest('button[data-dash-view]');
+        if (!b) return;
+        DASH_VIEW = b.getAttribute('data-dash-view') || 'person';
+        renderDashboard();
+      });
+    }
+
+    if ($('autoSyncBanner')) {
+      $('autoSyncBanner').addEventListener('click', function (e) {
+        var id = e.target && e.target.id;
+        if (id === 'btnGoPcWatcher') {
+          setTab('collect');
+          if ($('pcWatcherDetails')) $('pcWatcherDetails').open = true;
+        } else if (id === 'btnCheckAutoNow') {
+          checkServerAutoPull(false).then(function () {
+            var n = (PENDING_AUTO && PENDING_AUTO.rows) ? PENDING_AUTO.rows.length : 0;
+            toast(n ? ('미정리 새 카톡 ' + n + '건을 찾았습니다') : '서버에 새로 들어온 미정리 카톡이 없습니다');
+          });
+        } else if (id === 'btnAutoPullNow') {
+          if (PENDING_AUTO && PENDING_AUTO.rows && PENDING_AUTO.rows.length) {
+            commitAutoPullRows(PENDING_AUTO.rows, PENDING_AUTO.room, false);
+          } else {
+            checkServerAutoPull(true);
+          }
+        }
+      });
+      $('autoSyncBanner').addEventListener('change', function (e) {
+        if (e.target && e.target.id === 'chkAutoPull') {
+          AUTO_PULL_ON = !!e.target.checked;
+          try { localStorage.setItem('pu_kakaoroom_autopull', AUTO_PULL_ON ? '1' : '0'); } catch (err) {}
+          toast(AUTO_PULL_ON ? '로그인 시 새 카톡을 자동으로 당겨옵니다' : '자동 당겨오기를 껐습니다');
+          if (AUTO_PULL_ON && PENDING_AUTO && PENDING_AUTO.rows && PENDING_AUTO.rows.length) {
+            commitAutoPullRows(PENDING_AUTO.rows, PENDING_AUTO.room, false);
+          }
+        }
+      });
+    }
+
+    if ($('dashContentBox')) {
+      $('dashContentBox').addEventListener('click', function (e) {
+        var t = e.target;
+        var openBtn = t && t.closest && t.closest('[data-open-arch]');
+        if (openBtn) { openArchiveModal(openBtn.getAttribute('data-open-arch')); return; }
+        var topicBtn = t && t.closest && t.closest('button[data-topic-type]');
+        if (topicBtn) {
+          TOPIC_FILTER = topicBtn.getAttribute('data-topic-type') || '';
+          renderDashboard();
+          return;
+        }
+        var personBtn = t && t.closest && t.closest('button[data-filter-person]');
+        if (personBtn) {
+          $('qArchive').value = personBtn.getAttribute('data-filter-person') || '';
+          DASH_VIEW = 'table';
+          renderDashboard();
+          return;
+        }
+        var doneBtn = t && t.closest && t.closest('button[data-topic-done]');
+        if (doneBtn) {
+          var ids = (doneBtn.getAttribute('data-topic-done') || '').split(',').filter(function (id) { return ARCHIVE[id] && !ARCHIVE[id]._deleted; });
+          if (!ids.length) return;
+          if (ids.length > 1 && !confirm('선택한 공유 건 ' + ids.length + '건을 모두 처리완료로 바꿀까요?')) return;
+          updateArchiveStatusIds(ids, 'done', '공유 건 ' + ids.length + '건을 처리완료로 바꿨습니다');
+        }
+      });
+    }
+
+    if ($('btnWatcherGuideToggle')) {
+      $('btnWatcherGuideToggle').addEventListener('click', function () {
+        if ($('pcWatcherDetails')) $('pcWatcherDetails').open = !$('pcWatcherDetails').open;
+      });
+    }
+    if ($('pcWatcherCard')) {
+      $('pcWatcherCard').addEventListener('click', function (e) {
+        var b = e.target && e.target.closest && e.target.closest('button[data-copy-cmd]');
+        if (!b) return;
+        var el = $(b.getAttribute('data-copy-cmd'));
+        var txt = el ? (el.textContent || '').trim() : '';
+        if (!txt) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(function () { toast('명령어를 복사했습니다'); }).catch(function () { toast(txt); });
+        } else {
+          toast(txt);
+        }
+      });
+    }
+
     ['qArchive', 'fDomain', 'fLink', 'fStatus'].forEach(function (id) {
-      $(id).addEventListener(id === 'qArchive' ? 'input' : 'change', renderArchive);
+      $(id).addEventListener(id === 'qArchive' ? 'input' : 'change', renderDashboard);
     });
     $('btnReloadAll').addEventListener('click', loadFirebaseData);
     $('btnGoCollect').addEventListener('click', function () { setTab('collect'); });
@@ -1340,25 +1898,9 @@
       var st = b.getAttribute('data-bulk-st');
       var ids = Object.keys(ARCH_PICK).filter(function (id) { return ARCH_PICK[id] && ARCHIVE[id] && !ARCHIVE[id]._deleted; });
       if (!ids.length) return;
-      Promise.all(ids.map(function (id) {
-        var cur = ARCHIVE[id];
-        var next = Object.assign({}, cur, { status: st, updatedAt: Date.now(), updatedBy: ME.sid });
-        var p = (!isLocalPreview() && gate && fbDb)
-          ? gate.save(fbDb.ref('kakao_room/items/' + id), function (serverPrev) {
-              if (serverPrev && serverPrev._deleted) return null;
-              return next;
-            }, { entityType: K.ENTITY_ARCHIVE, expectedRevision: Number(cur.revision || 0) })
-          : Promise.resolve();
-        return p.then(function (res) {
-          var saved = res && res.snapshot && typeof res.snapshot.val === 'function' ? res.snapshot.val() : null;
-          next.revision = saved && saved.revision ? saved.revision : Number(cur.revision || 0) + 1;
-          ARCHIVE[id] = saved || next;
-        });
-      })).then(function () {
-        ARCH_PICK = {};
-        renderAll();
-        toast(ids.length + '건의 상태를 변경했습니다');
-      }).catch(function (err) { toast('일괄 변경 실패: ' + ((err && err.message) || err)); });
+      var stLabel = st === 'done' ? '처리완료' : (st === 'tracking' ? '진행추적중' : '접수·대기');
+      if (ids.length > 1 && !confirm('선택한 ' + ids.length + '건을 ' + stLabel + ' 상태로 일괄 변경할까요?')) return;
+      updateArchiveStatusIds(ids, st, ids.length + '건의 상태를 변경했습니다', true);
     });
     $('btnBulkClear').addEventListener('click', function () { ARCH_PICK = {}; renderArchive(); });
     $('btnBulkDelete').addEventListener('click', function () {
@@ -1536,6 +2078,7 @@
 
     fbAuth.onAuthStateChanged(function (user) {
       if (!user) {
+        detachRealtimeListeners();
         $('app').style.display = 'none';
         $('lock').style.display = 'block';
         $('lockWhy').textContent = '재직 직원 계정으로 로그인하면 열립니다.';
@@ -1545,6 +2088,7 @@
       fbDb.ref('uid_roles/' + user.uid).once('value').then(function (s) {
         var r = s.val();
         if (!r || r.status !== 'active') {
+          detachRealtimeListeners();
           $('app').style.display = 'none';
           $('lock').style.display = 'block';
           $('lockWhy').textContent = '재직 직원만 접근할 수 있습니다.';

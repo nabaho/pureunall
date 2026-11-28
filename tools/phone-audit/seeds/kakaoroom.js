@@ -29,6 +29,16 @@ const workItems = {
     mgr_main: { name: '점검대표' },
     last: { d: '2026-11-26', t: '정관 초안 송부' },
   },
+  wk_seed_3: {
+    id: 'wk_seed_3',
+    no: '서산2026시정108',
+    title: '다라물류 근로감독 시정지시 대응',
+    status: '진행중',
+    co_id: 'co_seed_2',
+    company: '(주)다라물류',
+    mgr_main: { name: '점검사무장' },
+    last: { d: '2026-11-28', t: '시정지시서 수령 및 감독관 연락중' },
+  },
 };
 
 const kakaoRoomItems = {
@@ -96,6 +106,38 @@ const kakaoRoomItems = {
     status: 'open',
     note: '',
   },
+  kr_seed0003g7h8i9: {
+    id: 'kr_seed0003g7h8i9',
+    entityType: 'KakaoWorkArchive',
+    schemaVersion: 3,
+    contractVersion: 1,
+    revision: 1,
+    createdAt: NOW - 3600000,
+    updatedAt: NOW - 600000,
+    createdBy: 'WATCH-PC',
+    updatedBy: 'WATCH-PC',
+    originSystem: 'kakaotalk',
+    originId: 'kr_seed0003g7h8i9',
+    room: '푸른노무법인 업무채팅방',
+    day: '2026-11-28',
+    senders: ['점검사무장'],
+    msgCount: 2,
+    domain: 'case',
+    safety: 'safe',
+    redactedCount: 0,
+    summary: '💬 카톡 · 점검사무장 — 서산2026시정108 노동지청 시정지시 결과 제출기한 임박 · [이미지 공유: 시정지시서]',
+    caseNos: ['서산2026시정108'],
+    due: '2026-12-02',
+    fileNames: ['시정지시서(이미지)'],
+    matchBasis: 'sure',
+    workItemId: 'wk_seed_3',
+    workLogId: '',
+    companyId: 'co_seed_2',
+    companyLinkStatus: 'linked',
+    companyHint: '(주)다라물류',
+    status: 'open',
+    note: 'PC 화면 자동 캡처',
+  },
 };
 
 const kakaoRoomFiles = {
@@ -147,18 +189,42 @@ const kakaoRoomFiles = {
 
 module.exports = {
   data: {
-    kakao_room: { items: kakaoRoomItems, files: kakaoRoomFiles },
+    kakao_room: {
+      items: kakaoRoomItems,
+      files: kakaoRoomFiles,
+      watcher: {
+        mode: 'live',
+        status: 'running',
+        lastSeenAt: NOW - 15000,
+        lastCaptureAt: NOW - 600000,
+        todayCount: 3,
+        popupCount: 1,
+        roomCount: 2,
+        watchPopup: true,
+        watchOpenRoom: true,
+        ocrAvailable: true,
+        rooms: ['푸른노무법인 업무채팅방'],
+        message: '하단 알림 + 열린 법인방 감시중',
+      },
+    },
     work_erp: { items: workItems },
     data: { companies },
   },
   views: [
+    { name: 'dash-case', run: async (p) => { await p.click('#dashViewTabs button[data-dash-view=case]'); } },
+    { name: 'dash-topic', run: async (p) => { await p.click('#dashViewTabs button[data-dash-view=topic]'); } },
+    { name: 'dash-table', run: async (p) => { await p.click('#dashViewTabs button[data-dash-view=table]'); } },
     { name: 'collect', run: async (p) => { await p.click('#tabs button[data-tab=collect]'); await p.click('#btnLoadSamplePaste'); } },
     { name: 'files', run: async (p) => { await p.click('#tabs button[data-tab=files]'); } },
     { name: 'groups', run: async (p) => { await p.click('#tabs button[data-tab=groups]'); } },
     { name: 'safety', run: async (p) => { await p.click('#tabs button[data-tab=safety]'); } },
     {
       name: 'detail',
-      run: async (p) => { await p.click('#tabs button[data-tab=archive]'); await p.click('[data-open-arch]'); },
+      run: async (p) => {
+        await p.click('#tabs button[data-tab=archive]');
+        await p.click('#dashViewTabs button[data-dash-view=person]');
+        await p.click('[data-open-arch]');
+      },
       back: async (p) => { await p.click('#mClose'); },
     },
   ],

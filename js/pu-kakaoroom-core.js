@@ -85,6 +85,11 @@
         id: 'paste',
         title: '공식 수동 붙여넣기 (단건·요약 입력)',
         desc: '직원이 복사해 붙여넣은 업무 대화를 즉시 OTP 차단·민감정보 가림·업무영역 분류를 거쳐 영구 보관합니다.'
+      },
+      {
+        id: 'pc-ocr',
+        title: '④ PC 화면·하단 알림 읽기 전용 자동 캡처 (오프라인 OCR)',
+        desc: '카톡 앱을 클릭·조작·복호화하지 않고 화면에 뜬 등록 법인방·하단 알림 픽셀만 읽어 PC 내장 오프라인 OCR로 텍스트화 후 5중 안전판별을 거쳐 비식별 업무만 저장합니다. 원본 이미지는 즉시 삭제됩니다.'
       }
     ],
     forbidden: [
@@ -483,12 +488,15 @@
       }
       if (res.verdict === 'redacted') redactedMsgCount++;
       else safeMsgCount++;
+      var cleanFiles = Array.isArray(m.files) ? m.files.map(function (fn) {
+        return stripSecrets(fn, opts.maskSensitive, opts.maskRrn).text;
+      }).filter(Boolean) : [];
       kept.push(Object.assign({}, m, {
         at: at,
         day: m.day || kstDay(at),
         sender: cleanStr(m.sender),
         text: res.safeText,
-        files: Array.isArray(m.files) ? m.files.slice() : [],
+        files: cleanFiles,
         media: Number(m.media || 0),
         _safety: res.verdict,
         _redactedCount: res.redactedCount,
@@ -590,8 +598,21 @@
     var d = (row && row.d) || {};
     var g = (row && row.g) || {};
     var m = (row && row.m) || {};
-    var summaryRaw = cleanStr(row && row.summary ? row.summary : d.text).slice(0, SUMMARY_MAX);
-    var reMasked = stripSecrets(summaryRaw, ctx.maskSensitive, ctx.maskRrn).text.slice(0, SUMMARY_MAX);
+    var maskStr = function (v, maxLen) {
+      var st = stripSecrets(cleanStr(v), ctx.maskSensitive, ctx.maskRrn);
+      return { text: st.text.slice(0, maxLen), hadSecret: st.hadSecret, count: st.redactedCount };
+    };
+    var summaryRes = maskStr(row && row.summary ? row.summary : d.text, SUMMARY_MAX);
+    var reMasked = summaryRes.text;
+    var hintRes = maskStr(row && row.companyHint, 120);
+    var noteRes = maskStr(row && row.note, 1000);
+    var maskedFileRed = 0;
+    var cleanFileNames = Array.isArray(g.files) ? g.files.slice(0, 20).map(function (s) {
+      var fr = maskStr(s, 240);
+      if (fr.hadSecret) maskedFileRed += Math.max(1, fr.count);
+      return fr.text;
+    }).filter(Boolean) : [];
+    var extraRed = (hintRes.hadSecret ? Math.max(1, hintRes.count) : 0) + (noteRes.hadSecret ? Math.max(1, noteRes.count) : 0) + maskedFileRed;
     var workItemId = cleanStr((row && row.itemId) || ctx.workItemId || '');
     var companyId = cleanStr((row && row.companyId) || ctx.companyId || '');
     var archiveId = cleanStr((row && row.archiveId) || ('kr_' + hash32([row && row.room, row && row.day, reMasked].join('|'))));
@@ -616,20 +637,20 @@
       senders: Array.isArray(d.who) ? d.who.slice(0, 12).map(function (s) { return cleanStr(s).slice(0, 80); }).filter(Boolean) : [],
       msgCount: Math.max(1, Number(d.n || (g.msgs && g.msgs.length) || 1)),
       domain: cleanStr((row && row.domain) || 'admin').slice(0, 30),
-      safety: (row && row.safety) === 'redacted' ? 'redacted' : 'safe',
-      redactedCount: Math.max(0, Number((row && row.redactedCount) || 0)),
+      safety: ((row && row.safety) === 'redacted' || extraRed > 0 || summaryRes.hadSecret) ? 'redacted' : 'safe',
+      redactedCount: Math.max(0, Number((row && row.redactedCount) || 0) + extraRed),
       summary: reMasked,
       caseNos: Array.isArray(g.caseNos) ? g.caseNos.slice(0, 10).map(function (s) { return cleanStr(s).slice(0, 80); }).filter(Boolean) : [],
       due: cleanStr(row && row.due).slice(0, 20),
-      fileNames: Array.isArray(g.files) ? g.files.slice(0, 20).map(function (s) { return cleanStr(s).slice(0, 240); }).filter(Boolean) : [],
+      fileNames: cleanFileNames,
       matchBasis: cleanStr(m.basis || 'none').slice(0, 20),
       workItemId: workItemId.slice(0, 80),
       workLogId: cleanStr((row && row.lid) || '').slice(0, 100),
       companyId: companyId.slice(0, 80),
       companyLinkStatus: companyId ? 'linked' : 'pending',
-      companyHint: cleanStr(row && row.companyHint).slice(0, 120),
+      companyHint: hintRes.text,
       status: cleanStr((row && row.status) || 'open').slice(0, 20),
-      note: cleanStr(row && row.note).slice(0, 1000)
+      note: noteRes.text
     };
     return rec;
   }
@@ -693,15 +714,16 @@
   function buildFileRecord(file, ctx) {
     ctx = ctx || {};
     var now = ctx.now == null ? Date.now() : Number(ctx.now);
-    var name = cleanStr(file && file.name);
+    var rawName = cleanStr(file && file.name);
+    var name = stripSecrets(rawName, ctx.maskSensitive, ctx.maskRrn).text;
     var sender = cleanStr(file && file.sender);
     var sentAt = Number((file && file.sentAt) || now);
     var room = cleanStr((file && file.room) || ctx.room || '푸른노무법인 업무채팅방');
     var rawId = cleanStr(file && file.id);
     var fid = /^kf_[a-z0-9_]{6,48}$/.test(rawId)
       ? rawId
-      : ('kf_' + hash32([room, sender, sentAt, name].join('\u0001')));
-    var sensitive = isSensitiveFileName(name);
+      : ('kf_' + hash32([room, sender, sentAt, rawName].join('\u0001')));
+    var sensitive = isSensitiveFileName(rawName) || isSensitiveFileName(name);
     var rawDest = cleanStr((file && file.dest) || (KW && typeof KW.guessDest === 'function' ? KW.guessDest(name) : 'photo'));
     var dest = sensitive ? 'pc' : (['photo', 'co', 'pc'].indexOf(rawDest) >= 0 ? rawDest : 'photo');
 
@@ -729,8 +751,57 @@
     };
   }
 
-  /* ── 실시간 업무·업체 영구 ID 기반 읽기 전용 조인 ── */
-  function joinWorkProgress(archiveItems, workItemsMap, companiesMap) {
+  /* ── 실시간 업무·업체 영구 ID 기반 읽기 전용 조인 + 대시보드 3축(사람·사건·공유건) 분류 ── */
+  var SHARE_TYPES = [
+    { key: 'directive', icon: '🚨', label: '시정지시·감독' },
+    { key: 'submission', icon: '📄', label: '서면·제출' },
+    { key: 'document', icon: '🖼️', label: '문서·이미지공유' },
+    { key: 'notice', icon: '📢', label: '공지·안내' },
+    { key: 'progress', icon: '🔎', label: '진행·확인보고' },
+    { key: 'request', icon: '📌', label: '요청·문의' },
+    { key: 'general', icon: '💬', label: '일반 업무공유' }
+  ];
+
+  function shareTypeInfo(key) {
+    for (var i = 0; i < SHARE_TYPES.length; i++) if (SHARE_TYPES[i].key === key) return SHARE_TYPES[i];
+    return SHARE_TYPES[SHARE_TYPES.length - 1];
+  }
+
+  function classifyShareType(text, fileNames) {
+    var s = cleanStr(text);
+    var hasFiles = Array.isArray(fileNames) && fileNames.length > 0;
+    if (/(시정지시|근로감독|고용노동청|노동지청|노동청|출석요구|과태료|감독관|시정기한)/.test(s)) return shareTypeInfo('directive');
+    if (/(답변서|이유서|진정서|신청서|보정서|제출기한|제출하시기|연장\s*신청|심문회의|조사\s*일정)/.test(s)) return shareTypeInfo('submission');
+    if (hasFiles || /(\[이미지\s*공유|시정지시서|정관|계약서|급여대장|명세서|확인서|보고서|등본)/.test(s)) return shareTypeInfo('document');
+    if (/(안내드립니다|공지|계정\s*안내|회의\s*일정|공유드립니다|필독)/.test(s)) return shareTypeInfo('notice');
+    if (/(조회\s*안|부재중|통화|전화해보고|확인되면|완료했습니다|송부|접수\s*완료|진행중|확인했습니다)/.test(s)) return shareTypeInfo('progress');
+    if (/(요청|확인\s*부탁|검토\s*부탁|문의|질문|회신\s*부탁)/.test(s)) return shareTypeInfo('request');
+    return shareTypeInfo('general');
+  }
+
+  function extractShareTitle(row) {
+    var raw = cleanStr(row && (row.summary || row.title));
+    raw = raw.replace(/^💬\s*카톡\s*·\s*[^—]+—\s*/, '');
+    raw = raw.replace(/\s*·\s*📎\s*[^·]+$/, '').trim();
+    if (!raw && Array.isArray(row && row.fileNames) && row.fileNames.length) {
+      raw = '첨부 공유: ' + cleanStr(row.fileNames[0]);
+    }
+    return cleanStr(raw).slice(0, 56) || '업무 공유 건';
+  }
+
+  function daysUntilDue(dueStr, nowMs) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(cleanStr(dueStr));
+    if (!m) return null;
+    var today = kstDay(nowMs == null ? Date.now() : Number(nowMs));
+    var tp = today.split('-').map(Number);
+    var tUtc = Date.UTC(tp[0], tp[1] - 1, tp[2]);
+    var dUtc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Math.round((dUtc - tUtc) / 86400000);
+  }
+
+  function joinWorkProgress(archiveItems, workItemsMap, companiesMap, opts) {
+    opts = opts || {};
+    var nowMs = opts.now == null ? Date.now() : Number(opts.now);
     var wMap = workItemsMap || {};
     var cMap = companiesMap || {};
     var list = Array.isArray(archiveItems) ? archiveItems : Object.keys(archiveItems || {}).map(function (k) {
@@ -740,13 +811,23 @@
     return list.filter(function (x) { return x && !x._deleted; }).map(function (rec) {
       var wRaw = rec.workItemId ? wMap[rec.workItemId] : null;
       var w = (wRaw && !wRaw._deleted) ? wRaw : null;
+      var effWorkId = (wRaw && wRaw._deleted) ? '' : cleanStr(rec.workItemId);
       var coId = rec.companyId || (w && w.co_id) || '';
       var coRaw = coId ? cMap[coId] : null;
       var co = (coRaw && !coRaw._deleted) ? coRaw : null;
+      var effCoId = (coRaw && coRaw._deleted) ? '' : cleanStr(coId);
       var mgr = w ? ((w.mgr_main && w.mgr_main.name) || w.mgr || '') : '';
+      var stInfo = classifyShareType(rec.summary, rec.fileNames);
       return Object.assign({}, rec, {
+        workItemId: effWorkId,
+        companyId: effCoId,
         domainLabel: domainInfo(rec.domain).label,
         domainIcon: domainInfo(rec.domain).icon,
+        shareType: stInfo.key,
+        shareLabel: stInfo.label,
+        shareIcon: stInfo.icon,
+        shareTitle: extractShareTitle(rec),
+        dueDaysLeft: daysUntilDue(rec.due, nowMs),
         workLinked: !!w,
         workTitle: w ? cleanStr(w.title) : '',
         workNo: w ? cleanStr(w.no) : '',
@@ -762,11 +843,631 @@
     });
   }
 
+  function addUniqueStr(arr, s) {
+    var v = cleanStr(s);
+    if (v && arr.indexOf(v) < 0) arr.push(v);
+  }
+
+  function pickMoreUrgentDue(curDue, curLeft, nextDue, nextLeft) {
+    if (!nextDue) return { due: curDue, left: curLeft };
+    if (!curDue) return { due: nextDue, left: nextLeft };
+    if (nextLeft != null && (curLeft == null || nextLeft < curLeft)) return { due: nextDue, left: nextLeft };
+    return { due: curDue, left: curLeft };
+  }
+
+  function buildDashboardSummary(joinedRows, workItemsMap, companiesMap, opts) {
+    opts = opts || {};
+    var nowMs = opts.now == null ? Date.now() : Number(opts.now);
+    var todayStr = kstDay(nowMs);
+    var rows = Array.isArray(joinedRows) ? joinedRows : joinWorkProgress(joinedRows || {}, workItemsMap, companiesMap, { now: nowMs });
+
+    var personMap = {};
+    var caseMap = {};
+    var topicMap = {};
+    var unlinkedCount = 0;
+    var dueSoonCount = 0;
+    var todayCount = 0;
+
+    rows.forEach(function (r) {
+      if (!r || r._deleted) return;
+      var stInfo = r.shareType ? shareTypeInfo(r.shareType) : classifyShareType(r.summary, r.fileNames);
+      var dueLeft = r.dueDaysLeft !== undefined ? r.dueDaysLeft : daysUntilDue(r.due, nowMs);
+      var isDueSoon = dueLeft !== null && dueLeft <= 7;
+      var isDone = r.status === 'done';
+      var isTracking = r.status === 'tracking';
+      var isOpen = !isDone && !isTracking;
+      var upAt = Number(r.updatedAt || r.createdAt || 0);
+      if (!r.workItemId) unlinkedCount++;
+      if (isDueSoon && !isDone) dueSoonCount++;
+      if (r.day === todayStr) todayCount++;
+
+      /* 1. 사람별 집계 */
+      var senders = Array.isArray(r.senders) && r.senders.length ? r.senders : ['발신자 미상'];
+      var seenSenders = {};
+      senders.forEach(function (rawName) {
+        var name = cleanStr(rawName) || '발신자 미상';
+        if (seenSenders[name]) return;
+        seenSenders[name] = 1;
+        if (!personMap[name]) {
+          personMap[name] = {
+            name: name,
+            total: 0,
+            openCount: 0,
+            trackingCount: 0,
+            doneCount: 0,
+            unlinkedCount: 0,
+            dueSoonCount: 0,
+            latestDay: '',
+            latestUpdatedAt: 0,
+            latestSummary: '',
+            domains: {},
+            cases: [],
+            _caseKeys: {},
+            items: []
+          };
+        }
+        var p = personMap[name];
+        p.total++;
+        if (isOpen) p.openCount++;
+        else if (isTracking) p.trackingCount++;
+        else p.doneCount++;
+        if (!r.workItemId) p.unlinkedCount++;
+        if (isDueSoon && !isDone) p.dueSoonCount++;
+        var dom = r.domain || 'admin';
+        p.domains[dom] = (p.domains[dom] || 0) + 1;
+        if (String(r.day || '') > p.latestDay || (String(r.day || '') === p.latestDay && upAt >= p.latestUpdatedAt)) {
+          p.latestDay = cleanStr(r.day);
+          p.latestUpdatedAt = upAt;
+          p.latestSummary = cleanStr(r.summary);
+        }
+        if (r.workItemId && !p._caseKeys[r.workItemId]) {
+          p._caseKeys[r.workItemId] = 1;
+          p.cases.push({
+            workItemId: r.workItemId,
+            label: (r.workNo ? '[' + r.workNo + '] ' : '') + (r.workTitle || r.workItemId),
+            state: r.workState || ''
+          });
+        }
+        p.items.push(r);
+      });
+
+      /* 2. 사건·업무별 집계 */
+      var cKey = '__unlinked';
+      var cKind = 'unlinked';
+      var cTitle = '업무·사건 미연결 (연결 확인 필요)';
+      if (r.workItemId) {
+        cKey = 'work:' + r.workItemId;
+        cKind = 'work';
+        cTitle = (r.workNo ? '[' + r.workNo + '] ' : '') + (r.workTitle || r.workItemId);
+      } else if (Array.isArray(r.caseNos) && r.caseNos.length && cleanStr(r.caseNos[0])) {
+        cKey = 'caseno:' + cleanStr(r.caseNos[0]);
+        cKind = 'caseno';
+        cTitle = '미등록 사건번호 · ' + cleanStr(r.caseNos[0]);
+      } else if (r.companyId || r.companyHint) {
+        cKey = 'company:' + cleanStr(r.companyId || r.companyHint);
+        cKind = 'company';
+        cTitle = '업체 건 · ' + cleanStr(r.companyLabel || r.companyHint);
+      }
+      if (!caseMap[cKey]) {
+        caseMap[cKey] = {
+          key: cKey,
+          kind: cKind,
+          title: cTitle,
+          workItemId: cleanStr(r.workItemId),
+          workNo: cleanStr(r.workNo),
+          workState: cleanStr(r.workState),
+          workManager: cleanStr(r.workManager),
+          workLastDate: cleanStr(r.workLastDate),
+          workLastText: cleanStr(r.workLastText),
+          companyLabel: cleanStr(r.companyLabel),
+          total: 0,
+          openCount: 0,
+          trackingCount: 0,
+          doneCount: 0,
+          nearestDue: '',
+          dueDaysLeft: null,
+          latestDay: '',
+          latestUpdatedAt: 0,
+          people: [],
+          files: [],
+          shareTypes: {},
+          items: []
+        };
+      }
+      var cs = caseMap[cKey];
+      cs.total++;
+      if (isOpen) cs.openCount++;
+      else if (isTracking) cs.trackingCount++;
+      else cs.doneCount++;
+      if (!cs.companyLabel && r.companyLabel) cs.companyLabel = cleanStr(r.companyLabel);
+      if (!cs.workManager && r.workManager) cs.workManager = cleanStr(r.workManager);
+      if (String(r.day || '') > cs.latestDay || (String(r.day || '') === cs.latestDay && upAt >= cs.latestUpdatedAt)) {
+        cs.latestDay = cleanStr(r.day);
+        cs.latestUpdatedAt = upAt;
+      }
+      if (!isDone) {
+        var pickedDue = pickMoreUrgentDue(cs.nearestDue, cs.dueDaysLeft, cleanStr(r.due), dueLeft);
+        cs.nearestDue = pickedDue.due;
+        cs.dueDaysLeft = pickedDue.left;
+      }
+      senders.forEach(function (nm) { addUniqueStr(cs.people, nm); });
+      (r.fileNames || []).forEach(function (fn) { addUniqueStr(cs.files, fn); });
+      cs.shareTypes[stInfo.key] = (cs.shareTypes[stInfo.key] || 0) + 1;
+      cs.items.push(r);
+
+      /* 3. 공유 건별 집계 */
+      var tKey = '';
+      if (r.workItemId) tKey = 'topic:w:' + r.workItemId + ':' + stInfo.key;
+      else if (Array.isArray(r.caseNos) && r.caseNos.length && cleanStr(r.caseNos[0])) tKey = 'topic:c:' + cleanStr(r.caseNos[0]) + ':' + stInfo.key;
+      else if (Array.isArray(r.fileNames) && r.fileNames.length && cleanStr(r.fileNames[0])) tKey = 'topic:f:' + cleanStr(r.fileNames[0]);
+      else tKey = 'topic:m:' + cleanStr(r.companyLabel || r.domain || 'admin') + ':' + stInfo.key + ':' + cleanStr(r.day);
+
+      if (!topicMap[tKey]) {
+        topicMap[tKey] = {
+          key: tKey,
+          title: r.shareTitle || extractShareTitle(r),
+          shareType: stInfo.key,
+          shareIcon: stInfo.icon,
+          shareLabel: stInfo.label,
+          domain: r.domain || 'admin',
+          domainLabel: r.domainLabel || domainInfo(r.domain).label,
+          domainIcon: r.domainIcon || domainInfo(r.domain).icon,
+          due: '',
+          dueDaysLeft: null,
+          people: [],
+          files: [],
+          workLinked: !!r.workLinked,
+          workItemId: cleanStr(r.workItemId),
+          workLabel: r.workLinked ? ((r.workNo ? '[' + r.workNo + '] ' : '') + (r.workTitle || '')) : '',
+          companyLabel: cleanStr(r.companyLabel),
+          status: r.status || 'open',
+          hasRedacted: false,
+          count: 0,
+          latestDay: '',
+          latestUpdatedAt: 0,
+          items: []
+        };
+      }
+      var tp = topicMap[tKey];
+      tp.count++;
+      if (r.safety === 'redacted' || Number(r.redactedCount || 0) > 0) tp.hasRedacted = true;
+      if (r.workLinked && !tp.workLinked) {
+        tp.workLinked = true;
+        tp.workItemId = cleanStr(r.workItemId);
+        tp.workLabel = (r.workNo ? '[' + r.workNo + '] ' : '') + (r.workTitle || '');
+      }
+      if (!tp.companyLabel && r.companyLabel) tp.companyLabel = cleanStr(r.companyLabel);
+      if (r.status === 'open' || (r.status === 'tracking' && tp.status === 'done')) tp.status = r.status;
+      if (!isDone) {
+        var pickedTopicDue = pickMoreUrgentDue(tp.due, tp.dueDaysLeft, cleanStr(r.due), dueLeft);
+        tp.due = pickedTopicDue.due;
+        tp.dueDaysLeft = pickedTopicDue.left;
+      }
+      if (String(r.day || '') > tp.latestDay || (String(r.day || '') === tp.latestDay && upAt >= tp.latestUpdatedAt)) {
+        tp.latestDay = cleanStr(r.day);
+        tp.latestUpdatedAt = upAt;
+      }
+      senders.forEach(function (nm) { addUniqueStr(tp.people, nm); });
+      (r.fileNames || []).forEach(function (fn) { addUniqueStr(tp.files, fn); });
+      tp.items.push(r);
+    });
+
+    var byPerson = Object.keys(personMap).map(function (k) {
+      var p = personMap[k];
+      delete p._caseKeys;
+      return p;
+    }).sort(function (a, b) {
+      return ((b.openCount + b.trackingCount) - (a.openCount + a.trackingCount)) ||
+        (b.total - a.total) ||
+        (b.latestUpdatedAt - a.latestUpdatedAt);
+    });
+
+    var byCase = Object.keys(caseMap).map(function (k) { return caseMap[k]; }).sort(function (a, b) {
+      var aUrg = a.dueDaysLeft !== null ? a.dueDaysLeft : 99999;
+      var bUrg = b.dueDaysLeft !== null ? b.dueDaysLeft : 99999;
+      if (aUrg !== bUrg) return aUrg - bUrg;
+      if ((a.kind === 'work') !== (b.kind === 'work')) return a.kind === 'work' ? -1 : 1;
+      return (b.total - a.total) || (b.latestUpdatedAt - a.latestUpdatedAt);
+    });
+
+    var byTopic = Object.keys(topicMap).map(function (k) { return topicMap[k]; }).sort(function (a, b) {
+      var aUrg = (a.dueDaysLeft !== null && a.status !== 'done') ? a.dueDaysLeft : 99999;
+      var bUrg = (b.dueDaysLeft !== null && b.status !== 'done') ? b.dueDaysLeft : 99999;
+      var aHot = aUrg <= 7 ? 1 : 0;
+      var bHot = bUrg <= 7 ? 1 : 0;
+      if (aHot !== bHot) return bHot - aHot;
+      if (aHot && aUrg !== bUrg) return aUrg - bUrg;
+      return String(b.latestDay || '').localeCompare(String(a.latestDay || '')) || (b.latestUpdatedAt - a.latestUpdatedAt);
+    });
+
+    return {
+      byPerson: byPerson,
+      byCase: byCase,
+      byTopic: byTopic,
+      totals: {
+        totalRows: rows.length,
+        personCount: byPerson.length,
+        caseCount: byCase.length,
+        linkedCaseCount: byCase.filter(function (c) { return c.kind === 'work'; }).length,
+        topicCount: byTopic.length,
+        dueSoonCount: dueSoonCount,
+        todayCount: todayCount,
+        unlinkedCount: unlinkedCount
+      }
+    };
+  }
+
+  /* ── PC 화면·하단알림 오프라인 OCR 결과 파서 (읽기 전용 캡처 후 구조화) ── */
+  function normRoomKey(s) {
+    return cleanStr(s).replace(/\s+/g, '');
+  }
+
+  function ocrRoomKey(s) {
+    return normRoomKey(s).replace(/大H|치\||대H|ㅐH/g, '채');
+  }
+
+  function levenshteinDist(a, b) {
+    var m = a.length, n = b.length;
+    if (a === b) return 0;
+    if (!m) return n;
+    if (!n) return m;
+    var dp = new Array(n + 1);
+    for (var j = 0; j <= n; j++) dp[j] = j;
+    for (var i = 1; i <= m; i++) {
+      var prev = dp[0];
+      dp[0] = i;
+      for (var k = 1; k <= n; k++) {
+        var tmp = dp[k];
+        var cost = a.charAt(i - 1) === b.charAt(k - 1) ? 0 : 1;
+        dp[k] = Math.min(dp[k] + 1, dp[k - 1] + 1, prev + cost);
+        prev = tmp;
+      }
+    }
+    return dp[n];
+  }
+
+  function matchAllowedRoom(candidate, allowedRooms, opts) {
+    opts = opts || {};
+    var list = Array.isArray(allowedRooms) ? allowedRooms : [];
+    var normCand = normRoomKey(candidate);
+    if (!normCand) return '';
+    for (var i = 0; i < list.length; i++) {
+      if (normRoomKey(list[i]) === normCand) return cleanStr(list[i]);
+    }
+    if (opts.strict) return '';
+
+    var ocrCand = ocrRoomKey(candidate);
+    for (var oi = 0; oi < list.length; oi++) {
+      if (normRoomKey(list[oi]) === ocrCand) return cleanStr(list[oi]);
+    }
+
+    var maxDist = opts.maxDist != null ? Number(opts.maxDist) : 1;
+    var best = '', bestDist = maxDist + 1;
+    for (var j = 0; j < list.length; j++) {
+      var r = cleanStr(list[j]);
+      var nr = normRoomKey(r);
+      if (nr.length < 6 || ocrCand.length < 6) continue;
+      if (Math.abs(nr.length - ocrCand.length) > maxDist) continue;
+      var dist = levenshteinDist(nr, ocrCand);
+      if (dist <= maxDist && dist < bestDist) {
+        bestDist = dist;
+        best = r;
+      }
+    }
+    return best;
+  }
+
+  function normalizeOcrText(text) {
+    var s = cleanStr(text);
+    if (!s) return '';
+    s = s.replace(/시\s*정\s*지\s*시\s*서/g, '시정지시서');
+    s = s.replace(/출\s*석\s*요\s*구\s*서/g, '출석요구서');
+    s = s.replace(/진\s*정\s*서/g, '진정서');
+    s = s.replace(/답\s*변\s*서/g, '답변서');
+    s = s.replace(/근\s*로\s*계\s*약\s*서/g, '근로계약서');
+    s = s.replace(/고용노동정/g, '고용노동청');
+    s = s.replace(/지\s*청\s*노\s*동\s*기\s*준/g, '지청 노동기준');
+    s = s.replace(/서\s*산\s*지\s*정/g, '서산지청');
+    s = s.replace(/지\s*정\s*노\s*동\s*기준/g, '지청 노동기준');
+    s = s.replace(/담당감독과/g, '담당감독관');
+    s = s.replace(/근로감독과/g, '근로감독관');
+    s = s.replace(/노동프털/g, '노동포털');
+    s = s.replace(/내용\s*탇씀/g, '내용 말씀');
+    return cleanStr(s);
+  }
+
+  function isOcrUiNoise(text) {
+    var t = cleanStr(text);
+    if (!t) return true;
+    if (/^[0O口X十@•·\s\-_\|\\\/`'".,:;~!?]+$/.test(t)) return true;
+    if (/^(메시지|에시지|예시지)\s*(입력|일력)$/.test(t)) return true;
+    if (/^전송$/.test(t)) return true;
+    if (/^Q\s*\d*/.test(t) && t.length <= 6) return true;
+    if (/^`?주%글$/.test(t) || /^`?卜후들/.test(t)) return true;
+    if (/^[0-9]{1,2}$/.test(t)) return true;
+    return false;
+  }
+
+  var OCR_TIME_RE = /^(오전|오후)\s*(\d{1,2})\s*:?\s*(\d{2})$/;
+  var OCR_DOC_ONLY_RE = /^(시정지시서|출석요구서|진정서|답변서|근로계약서|급여명세서)$/;
+  var OCR_DAY_YMD_RE = /^-*\s*(20\d{2})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})\s*일?(?:\s*[월화수목금토일]요일)?\s*\.?\s*-*$/;
+  var OCR_REL_DAY_RE = /^-*\s*(오늘|어제)\s*-*$/;
+
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
+  function parseOcrDayLine(text, nowMs) {
+    var t = cleanStr(text);
+    var ym = OCR_DAY_YMD_RE.exec(t);
+    if (ym) {
+      var mo = Number(ym[2]), da = Number(ym[3]);
+      if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+        return ym[1] + '-' + pad2(mo) + '-' + pad2(da);
+      }
+    }
+    var rm = OCR_REL_DAY_RE.exec(t);
+    if (rm) {
+      return kstDay(rm[1] === '어제' ? (nowMs - 86400000) : nowMs);
+    }
+    return '';
+  }
+
+  function enrichPartialDueYear(text, nowMs) {
+    var s = cleanStr(text);
+    var yr = kstDay(nowMs).slice(0, 4);
+    /* 잘린 윗줄 ".12.11. 까지 제출" 등을 KST 연도로 보정해 KW.findDue가 날짜를 잡을 수 있게 한다 */
+    s = s.replace(/(^|\s)\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s*(까지|제출|마감)/g, '$1' + yr + '.$2.$3. $4');
+    return s;
+  }
+
+  function parseOcrChatLines(ocrLines, opts) {
+    opts = opts || {};
+    var surface = opts.surface === 'popup' ? 'popup' : 'room';
+    var nowMs = opts.nowMs == null ? Date.now() : Number(opts.nowMs);
+    var day = kstDay(nowMs);
+    var imgH = Number(opts.imageHeight || 650);
+    var allowed = Array.isArray(opts.allowedRooms) && opts.allowedRooms.length
+      ? opts.allowedRooms
+      : (cleanStr(opts.room) ? [cleanStr(opts.room)] : []);
+
+    var rawLines = Array.isArray(ocrLines) ? ocrLines : (ocrLines && typeof ocrLines === 'object' ? [ocrLines] : []);
+    var items = rawLines.map(function (ln, idx) {
+      if (typeof ln === 'string') return { x: 72, y: idx * 20, text: ln };
+      return {
+        x: Number((ln && ln.x) || 0),
+        y: Number((ln && ln.y) || 0),
+        text: cleanStr(ln && ln.text)
+      };
+    }).filter(function (ln) {
+      return cleanStr(ln.text).length > 0;
+    }).sort(function (a, b) {
+      return (a.y - b.y) || (a.x - b.x);
+    });
+
+    if (surface === 'popup') {
+      var cleanPop = [];
+      items.forEach(function (it) {
+        var t = normalizeOcrText(it.text);
+        if (t && !isOcrUiNoise(t)) cleanPop.push(t);
+      });
+      if (!cleanPop.length) return { ok: false, reason: 'empty', room: '', surface: 'popup', messages: [], files: [], hasExplicitDay: true };
+
+      var matchedRoom = cleanStr(opts.room) ? matchAllowedRoom(opts.room, allowed, { strict: true }) : '';
+      var bodyIdx = 0;
+      /* 하단 알림 팝업 방 이름은 항상 맨 첫 줄만 검사해 본문(2번째 줄)이 방 이름으로 오인되지 않게 한다 */
+      if (cleanPop.length) {
+        var firstCand = matchAllowedRoom(cleanPop[0], matchedRoom ? [matchedRoom] : allowed, { maxDist: 1 });
+        if (firstCand) {
+          matchedRoom = firstCand;
+          bodyIdx = 1;
+        }
+      }
+      if (!matchedRoom) {
+        return { ok: false, reason: 'room-not-allowed', room: '', surface: 'popup', messages: [], files: [], hasExplicitDay: true };
+      }
+
+      var rest = cleanPop.slice(bodyIdx);
+      if (!rest.length) return { ok: false, reason: 'empty', room: matchedRoom, surface: 'popup', messages: [], files: [], hasExplicitDay: true };
+      var popSender = '카톡알림';
+      if (rest.length >= 2 && rest[0].length >= 2 && rest[0].length <= 12 && !/[.!?]$/.test(rest[0])) {
+        popSender = rest.shift();
+      }
+      var popText = enrichPartialDueYear(rest.join(' '), nowMs);
+      if (!cleanStr(popText)) return { ok: false, reason: 'empty', room: matchedRoom, surface: 'popup', messages: [], files: [], hasExplicitDay: true };
+      return {
+        ok: true,
+        room: matchedRoom,
+        surface: 'popup',
+        hasExplicitDay: true,
+        messages: [{
+          room: matchedRoom,
+          sender: popSender,
+          text: popText,
+          sentAt: nowMs,
+          day: day,
+          dayInferred: false,
+          source: 'pc-popup'
+        }],
+        files: []
+      };
+    }
+
+    /* 열린 등록 법인방 창 OCR 구조화 — OS 창 제목은 완전 일치 우선, OCR 헤더는 엄격 편집거리(<=1) */
+    var headerRoom = cleanStr(opts.room);
+    var roomName = headerRoom ? (allowed.length ? matchAllowedRoom(headerRoom, allowed, { strict: true }) : headerRoom) : '';
+    if (!roomName) {
+      for (var hi = 0; hi < items.length; hi++) {
+        if (items[hi].y >= 35 && items[hi].y <= 85) {
+          var hCand = matchAllowedRoom(items[hi].text, allowed, { maxDist: 1 });
+          if (hCand) { roomName = hCand; break; }
+        }
+      }
+    }
+    if (!roomName) {
+      return { ok: false, reason: 'room-not-allowed', room: '', surface: 'room', messages: [], files: [], hasExplicitDay: false };
+    }
+
+    var noticeLines = [];
+    var chatLines = [];
+    var maxBodyY = imgH > 260 ? imgH - 122 : imgH;
+
+    items.forEach(function (it) {
+      if (it.y < 82 || it.y > maxBodyY) return;
+      var t = normalizeOcrText(it.text);
+      if (!t || isOcrUiNoise(t)) return;
+      /* 공지 배너 줄이 겹쳤을 때 방 공지만 따로 빼고 말풍선과 섞이지 않게 한다 */
+      if (it.y < 142 && /(안내드립니다|공지|동시\s*로|다시\s*보지)/.test(t)) {
+        t = t.replace(/^[0-9,\s]+/, '');
+        if (t) noticeLines.push(t);
+        return;
+      }
+      /* 왼쪽 프로필 장식 노이즈 + 이름 붙은 줄("`卜후들 김보람") 정리 */
+      t = t.replace(/^`?[가-힣]{0,2}[%들]+\s+([가-힣]{2,6})$/, '$1');
+      chatLines.push({ x: it.x, y: it.y, text: t });
+    });
+
+    var msgs = [];
+    var files = [];
+    var cur = null;
+    var curDay = day;
+    var curDayExplicit = false;
+
+    function baseDayMs(dayStr) {
+      return parseHmToMs(dayStr, '오전', 12, 0);
+    }
+
+    function flushCur(sentMs, msgDay, isExplicitDay) {
+      if (!cur || !cur.lines.length) { cur = null; return; }
+      var joined = enrichPartialDueYear(cur.lines.join(' ').replace(/\s+/g, ' ').trim(), nowMs);
+      if (joined) {
+        msgs.push({
+          room: roomName,
+          sender: cur.sender || '방 참여자',
+          text: joined,
+          sentAt: sentMs,
+          day: msgDay,
+          dayInferred: !isExplicitDay,
+          source: 'pc-room'
+        });
+      }
+      cur = null;
+    }
+
+    for (var i = 0; i < chatLines.length; i++) {
+      var ln = chatLines[i];
+      var parsedDayLine = parseOcrDayLine(ln.text, nowMs);
+      if (parsedDayLine) {
+        if (cur && cur.lines.length) {
+          flushCur(curDayExplicit ? baseDayMs(curDay) : nowMs, curDay, curDayExplicit);
+        }
+        curDay = parsedDayLine;
+        curDayExplicit = true;
+        cur = null;
+        continue;
+      }
+
+      var tm = OCR_TIME_RE.exec(ln.text);
+      if (tm) {
+        var sentMs = parseHmToMs(curDay, tm[1], tm[2], tm[3]);
+        flushCur(sentMs, curDay, curDayExplicit);
+        continue;
+      }
+
+      if (OCR_DOC_ONLY_RE.test(ln.text)) {
+        var docName = ln.text;
+        var docSender = (cur && cur.sender) ? cur.sender : '방 참여자';
+        var docText = '[이미지 공유: ' + docName + ']';
+        var fallbackMs = (curDayExplicit ? baseDayMs(curDay) : nowMs) - (chatLines.length - i) * 1000;
+        if (cur && cur.lines.length) {
+          flushCur(fallbackMs, curDay, curDayExplicit);
+        }
+        var docMs = (curDayExplicit ? baseDayMs(curDay) : nowMs) + i * 1000;
+        msgs.push({
+          room: roomName,
+          sender: docSender,
+          text: docText,
+          sentAt: docMs,
+          day: curDay,
+          dayInferred: !curDayExplicit,
+          source: 'pc-room'
+        });
+        files.push({ sender: docSender, sentAt: docMs, day: curDay, dayInferred: !curDayExplicit, name: docName + '(이미지)' });
+        cur = null;
+        continue;
+      }
+
+      var nextLn = chatLines[i + 1];
+      var looksLikeName = ln.x <= 70 &&
+        ln.text.length >= 2 && ln.text.length <= 10 &&
+        /^[가-힣A-Za-z0-9()·]+$/.test(ln.text) &&
+        !/:|\d{2,}|까지|바랍니다|습니다$/.test(ln.text) &&
+        nextLn && (nextLn.y - ln.y) <= 65;
+
+      if (looksLikeName) {
+        if (cur && cur.lines.length) {
+          flushCur((curDayExplicit ? baseDayMs(curDay) : nowMs) - (chatLines.length - i) * 1000, curDay, curDayExplicit);
+        }
+        cur = { sender: ln.text, lines: [] };
+        continue;
+      }
+
+      if (!cur) cur = { sender: '방 참여자', lines: [] };
+      cur.lines.push(ln.text);
+    }
+    if (cur && cur.lines.length) flushCur(curDayExplicit ? baseDayMs(curDay) : nowMs, curDay, curDayExplicit);
+
+    var dueRe = /(20\d{2})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})\.?\s*(?:까지|제출|마감)/;
+    for (var mi = 0; mi < msgs.length; mi++) {
+      var dm = dueRe.exec(msgs[mi].text);
+      if (dm && !/\d{1,2}\s*[./]\s*\d{1,2}\s*(?:까지|마감)/.test(msgs[mi].text)) {
+        msgs[mi].text = msgs[mi].text + ' (' + dm[2] + '/' + dm[3] + '까지)';
+      }
+    }
+
+    if (noticeLines.length) {
+      var noticeText = '[공지] ' + noticeLines.join(' ').trim();
+      if (!isNoiseMessage(noticeText)) {
+        msgs.unshift({
+          room: roomName,
+          sender: '방 공지',
+          text: noticeText,
+          sentAt: nowMs - 60000,
+          day: day,
+          dayInferred: true,
+          source: 'pc-room'
+        });
+      }
+    }
+
+    var docRe = /(시정지시서|출석요구서|진정서|답변서|근로계약서|급여명세서|자문계약서)/g;
+    var foundDocs = {};
+    for (var fi = 0; fi < msgs.length; fi++) {
+      var mMatch;
+      docRe.lastIndex = 0;
+      while ((mMatch = docRe.exec(msgs[fi].text))) {
+        foundDocs[mMatch[1]] = {
+          sender: msgs[fi].sender,
+          sentAt: msgs[fi].sentAt,
+          day: msgs[fi].day,
+          dayInferred: msgs[fi].dayInferred,
+          name: mMatch[1] + '(문서·이미지)'
+        };
+      }
+    }
+    var knownFileNames = {};
+    files.forEach(function (f) { knownFileNames[f.name.replace(/\(이미지\)$/, '')] = 1; });
+    Object.keys(foundDocs).forEach(function (dk) {
+      if (!knownFileNames[dk]) files.push(foundDocs[dk]);
+    });
+
+    return { ok: msgs.length > 0 || files.length > 0, room: roomName, surface: 'room', hasExplicitDay: curDayExplicit, messages: msgs, files: files };
+  }
+
   return {
     ENTITY_ARCHIVE: ENTITY_ARCHIVE,
     ENTITY_FILE: ENTITY_FILE,
     ENTITY_MESSAGE: ENTITY_MESSAGE,
     DOMAINS: DOMAINS,
+    SHARE_TYPES: SHARE_TYPES,
     SAFETY_POLICY: SAFETY_POLICY,
     isOtpOrSecret: isOtpOrSecret,
     stripSecrets: stripSecrets,
@@ -774,14 +1475,21 @@
     isSensitiveFileName: isSensitiveFileName,
     classifyDomain: classifyDomain,
     domainInfo: domainInfo,
+    classifyShareType: classifyShareType,
+    extractShareTitle: extractShareTitle,
+    daysUntilDue: daysUntilDue,
     assessSafety: assessSafety,
     prepareServerImport: prepareServerImport,
     parseQuickPaste: parseQuickPaste,
+    parseOcrChatLines: parseOcrChatLines,
+    matchAllowedRoom: matchAllowedRoom,
+    hash32: hash32,
     analyzeMessages: analyzeMessages,
     buildArchiveRecord: buildArchiveRecord,
     buildWorkLogPayload: buildWorkLogPayload,
     buildFileRecord: buildFileRecord,
     joinWorkProgress: joinWorkProgress,
+    buildDashboardSummary: buildDashboardSummary,
     weekKeyOfDate: weekKeyOfDate,
     kstDay: kstDay
   };

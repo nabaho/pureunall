@@ -148,6 +148,27 @@ table.t td .one>.tag{flex:0 0 auto}
 #toast.on{opacity:1}
 
 .wide-only{display:inline}
+
+/* 대시보드 3축(사람·사건·공유건) & 실시간 자동수집 배너 */
+.sync-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px}
+.dash-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dash-tab{border:1px solid var(--line2);background:var(--bg);color:var(--ink2);border-radius:999px;padding:6px 13px;min-height:36px;font-size:12.5px;font-weight:700}
+.dash-tab.on{background:var(--blue-btn);border-color:var(--blue-btn);color:#ffffff}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
+.dash-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dash-card.urgent{border-color:var(--red-line);box-shadow:0 0 0 2px var(--red-bg)}
+.dash-card-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.dash-card-ttl{font-weight:800;font-size:14.5px;line-height:1.35;min-width:0;word-break:break-word}
+.dash-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.dash-meta{font-size:12px;color:var(--ink2);line-height:1.5}
+.dash-list{display:flex;flex-direction:column;gap:4px}
+.dash-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dashed var(--line);min-width:0}
+.dash-row:last-child{border-bottom:0}
+.dash-row .dash-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash-ft{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--line);margin-top:auto}
+.share-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.cmd-box{font-family:Consolas,ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:6px 0}
+
 @media (max-width:768px){
   input,select,textarea{font-size:16px}
   input[type=checkbox]{width:24px;height:24px}
@@ -155,8 +176,8 @@ table.t td .one>.tag{flex:0 0 auto}
   #head .top{padding:7px 8px;gap:6px}
   #head h1{font-size:15.5px}
   main{padding:6px 4px 72px}
-  .card,.grp-card,.hi-top-strip,#recent-diff-bar,.note,.warn,.danger-box{padding:8px 8px}
-  .grid-2{grid-template-columns:1fr}
+  .card,.grp-card,.hi-top-strip,#recent-diff-bar,.note,.warn,.danger-box,.dash-card{padding:8px 8px}
+  .grid-2,.dash-grid{grid-template-columns:1fr}
   table.t,table.t thead,table.t tbody{display:block;width:100%;min-width:0}
   table.t thead tr{display:flex;align-items:center;gap:6px;padding:4px 6px;background:var(--bg);border-bottom:1px solid var(--line)}
   table.t thead th{display:none;border:0;padding:4px 0}
@@ -179,11 +200,11 @@ table.t td .one>.tag{flex:0 0 auto}
     <span class="sub wide-only">약관 무위반 안전수집 · 비식별 업무 영구보관 · 업무관리·기업정보함 연결</span>
     <span class="sp"></span>
     <span id="who"></span>
-    <button type="button" class="sm" id="diffToggleBtn" title="이번 작업에서 새로 추가·변경된 기능 강조 표시 켜고 끄기">✨ 변경점</button>
+    <button type="button" class="sm" id="diffToggleBtn" aria-pressed="false" title="이번 작업에서 새로 추가·변경된 기능 강조 표시 켜고 끄기">✨ 변경점</button>
     <a class="sm" href="work.html" style="padding:4px 9px;border:1px solid var(--line2);border-radius:8px;font-size:12px">📋 업무관리 ↗</a>
   </div>
   <nav class="tabs" id="tabs" role="tablist">
-    <button type="button" role="tab" id="tab-archive" aria-controls="p-archive" aria-selected="true" class="on" data-tab="archive">📊 현황·진행추적</button>
+    <button type="button" role="tab" id="tab-archive" aria-controls="p-archive" aria-selected="true" class="on" data-tab="archive">📊 자동정리 대시보드</button>
     <button type="button" role="tab" id="tab-collect" aria-controls="p-collect" aria-selected="false" tabindex="-1" data-tab="collect">🤖 자동수집·안전판별</button>
     <button type="button" role="tab" id="tab-files" aria-controls="p-files" aria-selected="false" tabindex="-1" data-tab="files">📎 첨부자료 보관함</button>
     <button type="button" role="tab" id="tab-groups" aria-controls="p-groups" aria-selected="false" tabindex="-1" data-tab="groups">🏢 업체·업무별 보기</button>
@@ -200,11 +221,28 @@ table.t td .one>.tag{flex:0 0 auto}
   <div id="recent-diff-bar"></div>
   <div class="card hi-top-strip"><div class="kpis" id="kpiRow"></div></div>
 
-  <!-- 1. 현황·진행추적 -->
+  <!-- 1. 사람별·사건별·공유건별 자동정리 대시보드 -->
   <section class="pane on" id="p-archive" role="tabpanel" aria-labelledby="tab-archive">
+    <div class="card sync-strip" id="autoSyncBanner">
+      <div id="autoSyncBody" class="bar" style="width:100%">
+        <span class="tag blue">⚡ 실시간 자동수집·정리 대기중…</span>
+      </div>
+    </div>
     <div class="card" id="archiveFilterCard">
+      <div id="dashViewBar" class="bar" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line)">
+        <span style="font-weight:700;font-size:12.5px;color:var(--ink2)">정리 기준</span>
+        <div class="dash-tabs" id="dashViewTabs" role="group" aria-label="대시보드 정리 기준 선택">
+          <button type="button" class="dash-tab on" aria-pressed="true" data-dash-view="person">👤 사람별 정리</button>
+          <button type="button" class="dash-tab" aria-pressed="false" data-dash-view="case">⚖️ 사건·업무별 정리</button>
+          <button type="button" class="dash-tab" aria-pressed="false" data-dash-view="topic">📌 공유 건별 정리</button>
+          <button type="button" class="dash-tab" aria-pressed="false" data-dash-view="table">📋 전체 표</button>
+        </div>
+        <span class="sp"></span>
+        <button type="button" class="sm" id="btnReloadAll">↻ 새로고침</button>
+        <button type="button" class="pri sm" id="btnGoCollect">＋ 수동·PC캡처 수집</button>
+      </div>
       <div class="bar">
-        <input type="search" id="qArchive" placeholder="업무내용 · 사건번호 · 발신자 · 업체 힌트 검색" aria-label="보관된 카톡 업무 검색" style="flex:1 1 220px;min-width:180px">
+        <input type="search" id="qArchive" placeholder="사람 · 사건번호 · 시정지시 · 공유내용 · 업체 힌트 검색" aria-label="보관된 카톡 업무 검색" style="flex:1 1 220px;min-width:180px">
         <select id="fDomain" aria-label="업무 영역 필터">
           <option value="">전체 영역</option>
         </select>
@@ -219,10 +257,9 @@ table.t td .one>.tag{flex:0 0 auto}
           <option value="tracking">진행추적중</option>
           <option value="done">처리완료</option>
         </select>
-        <button type="button" class="sm" id="btnReloadAll">↻ 새로고침</button>
-        <button type="button" class="pri sm" id="btnGoCollect">＋ 새 대화 수집·판별</button>
       </div>
     </div>
+    <div id="dashContentBox"></div>
     <div class="selbar" id="archiveSelBar">
       <b id="archiveSelCount">0건 선택</b>
       <button type="button" class="sm" data-bulk-st="tracking">진행추적중으로</button>
@@ -230,21 +267,44 @@ table.t td .one>.tag{flex:0 0 auto}
       <button type="button" class="sm dng" id="btnBulkDelete">선택 삭제</button>
       <button type="button" class="sm" id="btnBulkClear">선택 해제</button>
     </div>
-    <div class="card" id="archiveTableCard">
+    <div class="card" id="archiveTableCard" style="display:none">
       <div class="scroll" id="archiveTableBox"></div>
     </div>
   </section>
 
   <!-- 2. 자동수집·안전판별 -->
   <section class="pane" id="p-collect" role="tabpanel" aria-labelledby="tab-collect" hidden>
-    <div class="card" id="phoneDiagCard">
-      <div class="sec">
-        <span>📱 폰 자동수집 상태 (약관 무위반 공식 알림 경로)</span>
-        <span class="sp"></span>
-        <button type="button" class="sm" id="btnManageRooms">⚙ 받을 법인 방 설정</button>
-        <button type="button" class="pri sm" id="btnPullServer">🔄 서버 자동수집 불러오기</button>
+    <div class="grid-2">
+      <div class="card" id="pcWatcherCard">
+        <div class="sec">
+          <span>🖥️ PC 화면·하단알림 자동 캡처 (오프라인 OCR)</span>
+          <span class="sp"></span>
+          <button type="button" class="sm" id="btnWatcherGuideToggle">⚙ 실행 명령</button>
+        </div>
+        <div id="pcWatcherBody" class="hint">상태 확인 중…</div>
+        <details id="pcWatcherDetails" style="margin-top:8px">
+          <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--blue-d)">PC 자동 캡처 수집기 실행 · 자동시작 등록 방법</summary>
+          <div style="margin-top:6px;font-size:12px;line-height:1.55">
+            카톡 창을 조작하지 않고 <b>하단 카톡 알림 팝업</b>과 <b>열린 등록 법인방 화면</b>만 읽기 전용 캡처 → PC 내장 Windows 한국어 OCR → 5중 안전판별 후 자동 반영합니다.
+            <div class="cmd-box" id="cmdWatcherDry">node scripts/kakao-watch-agent/main.js --once --dry-run</div>
+            <button type="button" class="sm" data-copy-cmd="cmdWatcherDry">📋 시험 실행 명령 복사</button>
+            <div class="cmd-box" id="cmdWatcherLive">node scripts/kakao-watch-agent/main.js</div>
+            <button type="button" class="sm" data-copy-cmd="cmdWatcherLive">📋 상주 감시 명령 복사</button>
+            <div class="cmd-box" id="cmdWatcherTask">powershell -ExecutionPolicy Bypass -File scripts/kakao-watch-agent/install-task.ps1</div>
+            <button type="button" class="sm" data-copy-cmd="cmdWatcherTask">📋 부팅 자동시작 스크립트 복사</button>
+          </div>
+        </details>
       </div>
-      <div id="phoneDiagBody" class="hint">불러오는 중…</div>
+
+      <div class="card" id="phoneDiagCard">
+        <div class="sec">
+          <span>📱 폰 자동수집 상태 (하나문자 공식 알림)</span>
+          <span class="sp"></span>
+          <button type="button" class="sm" id="btnManageRooms">⚙ 받을 방 설정</button>
+          <button type="button" class="pri sm" id="btnPullServer">🔄 서버 불러오기</button>
+        </div>
+        <div id="phoneDiagBody" class="hint">불러오는 중…</div>
+      </div>
     </div>
 
     <div class="card" id="collectInputCard">
@@ -361,7 +421,7 @@ window.PuKakaoRoomGate = { show: function(){ PuGate.show(); }, hide: function(){
 <script src="js/pu-handoff.js?v=2"></script>
 <script src="js/pu-kakao-work.js?v=4"></script>
 <script src="js/pu-kakao-export.js?v=2"></script>
-<script src="js/pu-kakaoroom-core.js?v=2"></script>
-<script src="js/pu-kakaoroom-app.js?v=2"></script>
+<script src="js/pu-kakaoroom-core.js?v=4"></script>
+<script src="js/pu-kakaoroom-app.js?v=4"></script>
 </body>
 </html>

@@ -1669,7 +1669,8 @@ rules.kakao_room = { '.read': LOGIN,
     _deleted: { '.validate': 'newData.isBoolean()' },
     deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
     deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
-    $other: { '.validate': false } } } };
+    $other: { '.validate': false } } },
+  watcher: { '.write': false } };
 
 /* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
    대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,

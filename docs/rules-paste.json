@@ -2516,6 +2516,9 @@
             ".validate": false
           }
         }
+      },
+      "watcher": {
+        ".write": false
       }
     },
     "edulib_inbox": {
