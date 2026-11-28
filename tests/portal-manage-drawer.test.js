@@ -166,6 +166,8 @@ test('⑤ 닫는 길 — ✕ · Esc · 서랍 밖 누르기(배치 편집 중에
   assert.match(wire, /e\.key !== 'Escape'/, '★ Esc 로 닫혀야 한다');
   assert.match(wire, /lay-editing/, '★ 앱을 끌어 옮기는 중(배치 편집)에는 밖을 눌러도 서랍을 닫지 않는다');
   assert.match(wire, /layoutPanel/, '★ 배치 목록 창이 떠 있으면 Esc 는 그 창을 먼저 닫는다');
+  assert.match(wire, /mgOtherModalOpen\(\)/, '★ 서랍 앱이 띄운 창(aria-modal)이 떠 있으면 그 창의 누르기·Esc 가 서랍까지 닫으면 안 된다(검증 작업자 지적)');
+  assert.doesNotMatch(E, /body\.lay-admin \.mg-zone/, '★ body.lay-admin 은 없는 클래스다 — 관리자 줄 고정 단추 자리는 «단추가 켜진 줄»(:has)로 건다');
   assert.match(E, /<button id="mgBtn"[^>]* hidden>/, '★ 관리실 단추는 «감춘 채»로 시작해 JS 가 켠다');
   assert.match(E, /function initFold\(\)\{\s*mgWire\(\);/, '★ 서랍 연결(mgWire)은 initFold 에서 한 번 건다');
 });
