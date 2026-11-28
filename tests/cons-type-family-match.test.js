@@ -33,7 +33,8 @@ function load(extra) {
   const ctx = Object.assign({ console }, extra || {});
   vm.createContext(ctx);
   vm.runInContext(FN + '\nthis.api={erpConsFamilyOfType,erpConsFamiliesInText,erpConsTypeByCues,erpConsWorkTexts,erpConsTypeGuessForRec,'
-    + 'erpConsTypeCheck,erpContractConsTypeCheck,erpConsTypeCheckMsg,erpConsTypeAudit,erpGuessContractFromFields,erpXferConsTypeMissing,contractFormSubtypeFill};', ctx);
+    + 'erpConsTypeCheck,erpContractConsTypeCheck,erpConsTypeCheckMsg,erpConsTypeAudit,erpGuessContractFromFields,erpXferConsTypeMissing,contractFormSubtypeFill,'
+    + 'erpConsCueIsConsulting,erpConsRecDone};', ctx);
   return ctx.api;
 }
 const A = load();
@@ -101,6 +102,20 @@ test('② 애매하면 안 고른다 — 갈래가 둘, 같은 갈래 유형이 
     '숨긴 유형은 고르지 않는다');
   assert.deepEqual(out(A.erpGuessContractFromFields({ docName: '인사노무 컨설팅 위임계약서' }, TYPES, [], [], [])),
     { kind: 'consulting', typeCode: '' }, '하는 일 낱말이 없으면 비운다');
+});
+
+test('② ★ 사건 위임은 갈래 낱말이 있어도 사건이다 — «중대재해 사고 대응 약정서» 를 컨설팅으로 돌리지 않는다', () => {
+  /* 2026-11-28 2단계 점검이 잡은 회귀: 갈래 낱말만 보고 컨설팅으로 잡았다(예전엔 사건) */
+  const caseTypes = [{ code: 'case-safety', name: '산업안전사건', short: '산안' }, { code: 'case-wage', name: '임금체불', short: '임금' }];
+  ['산안법 위반 형사사건 변론 약정', '육아휴직 거부 진정 약정', '중대재해 사고 대응 약정서'].forEach((d) => {
+    assert.equal(out(A.erpGuessContractFromFields({ docName: d }, TYPES, caseTypes, [], [])).kind, 'case', d + ' 은 사건 위임입니다');
+    assert.equal(A.erpConsCueIsConsulting(d), false, d + ' — 사건 단서가 있으면 갈래 낱말만으로 컨설팅이라 하지 않는다');
+  });
+  assert.equal(A.erpConsCueIsConsulting('위험성평가 지원 계약서'), true, '사건 단서가 없으면 하는 일 낱말로 컨설팅');
+  /* «컨설팅»이라는 말이 따로 있으면 사건 단서와 상관없이 컨설팅이다(대표님이 짚은 그 계약) */
+  assert.equal(out(A.erpGuessContractFromFields({ docName: '위임계약서', scope: BRIEF }, TYPES, caseTypes, [], [])).typeCode, SAFETY.code);
+  /* 서버가 «사건»으로 본 요청을 갈래 낱말이 가로채지 않는다 — processPhotoContractRequest 의 종류 단서도 같은 잣대 */
+  assert.ok(/_hasExplicitKindCue[\s\S]{0,700}erpConsCueIsConsulting\(/.test(SRC), '종류 단서가 사건 단서를 보는 잣대(erpConsCueIsConsulting)를 써야 합니다');
 });
 
 /* ══════ ③ 확인 — 어긋나면 알리고, 맞으면 조용하다 ══════ */
@@ -177,7 +192,6 @@ test('⑤ 계약창 저장 보완(fixTypeCodes)은 컨설팅을 첫 번째로 �
     assert.ok(!run({ kinds: ['consulting'], typeCodes: {} }, list).consulting, '첫 번째(' + list[0].name + ')로 채우면 안 됩니다');
     assert.equal(run({ kinds: ['consulting'], typeCodes: {}, briefs: { consulting: BRIEF } }, list).consulting, SAFETY.code);
   });
-  assert.equal(run({ kinds: ['consulting'], typeCodes: {}, briefs: { consulting: BRIEF } }).consulting, SAFETY.code);
   assert.equal(run({ kinds: ['fund'], typeCodes: {} }).fund, 'f1', '다른 갈래는 예전처럼 채운다');
 });
 
@@ -198,11 +212,14 @@ test('⑥ 유형 점검은 진행 중인 계약·컨설팅만 훑는다 — 이�
   const recs = [live,
     Object.assign({}, CT, { id: 'ct-2', status: 'transferred' }),
     Object.assign({}, CT, { id: 'ct-3', status: 'closed' }),
-    Object.assign({}, CT, { id: 'ct-4', _deleted: true })];
+    Object.assign({}, CT, { id: 'ct-4', _deleted: true }),
+    Object.assign({}, CT, { id: 'ct-5', status: 'cancelled' }),
+    Object.assign({}, CT, { id: 'ct-6', closedDate: '2026-11-20' })];
   const cons = [
     { id: 'cs-1', no: '클릭-2026-001', typeCode: CLINIC.code, brief: '중대재해 예방 안전보건관리체계', status: 'progress' },
     { id: 'cs-2', no: '클릭-2026-002', typeCode: CLINIC.code, brief: '중대재해 예방 안전보건관리체계', status: 'closed' },
-    { id: 'cs-3', no: '산안-2026-001', typeCode: SAFETY.code, brief: '위험성평가', status: 'progress' }];
+    { id: 'cs-3', no: '산안-2026-001', typeCode: SAFETY.code, brief: '위험성평가', status: 'progress' },
+    { id: 'cs-4', no: '클릭-2026-003', typeCode: CLINIC.code, brief: '중대재해 예방', status: 'progress', permanentArchived: true }];
   const rows = A.erpConsTypeAudit(recs, cons, TYPES);
   assert.deepEqual(out(rows.map((r) => r.src + ':' + r.rec.id)), ['contract:ct-1', 'consulting:cs-1']);
   const onlyReview = A.erpConsTypeAudit(recs, [], TYPES, (c) => c.status === 'signed');
@@ -215,8 +232,11 @@ test('화면 배선 — 계약창 경고 줄·카드 꼬리표·점검 창·컨�
   assert.ok(nCheck >= 3, '계약창·꼬리표에서 판정을 써야 합니다(' + nCheck + '곳)');
   assert.ok(SRC.split('erpConsTypeCkTag(c, openEdit').length - 1 >= 2, '계약 카드에 꼬리표가 붙어야 합니다');
   assert.ok(/h\(ConsTypeAuditModal,/.test(SRC), '점검 창을 그려야 합니다');
-  assert.ok(/storageKey === 'consultings'[^\n]*erpConsTypeCheck|storageKey === 'consultings' && f\.status !== 'closed'/.test(SRC),
-    '컨설팅관리 편집창에도 확인이 떠야 합니다(종료 건 제외)');
+  assert.ok(/storageKey === 'consultings' && !erpConsRecDone\(f\)[\s\S]{0,200}erpConsTypeCheck\(/.test(SRC),
+    '컨설팅관리 편집창에도 확인이 떠야 합니다(끝난 건 제외)');
+  /* 계약 창도 끝난 계약(이관·종료·취소)을 열면 «바꾸라»고 이끌지 않는다 */
+  assert.ok(/var _typeCk\s*=[^;]*!erpConsRecDone\(f\)[^;]*erpContractConsTypeCheck\(/.test(SRC), '계약 창 경고가 끝난 계약을 걸러야 합니다');
+  assert.ok(/function erpConsTypeCkTag\([^)]*\)\{\s*if\(erpConsRecDone\(c\)\) return null;/.test(SRC), '카드 꼬리표도 끝난 계약을 걸러야 합니다');
   const modal = cutFn(SRC, 'function ConsTypeAuditModal(');
   assert.ok(/type:'checkbox'/.test(modal) && /tyau-no/.test(modal), '목록 맨 왼쪽은 ☐ 고르기 칸 + 번호');
   assert.ok(/건 선택/.test(modal), '고르면 「N건 선택」 띠가 뜬다');

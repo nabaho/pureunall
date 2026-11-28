@@ -185,7 +185,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=47">
+<link rel="stylesheet" href="css/pu-erp.css?v=48">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -17677,6 +17677,7 @@ function clinicPerfTag(rec, code){
    계약의 «하는 일»(업무 요약·견적 범위·메모)과 컨설팅 유형이 다른 사업 갈래면 카드에 «⚠ 유형?»을 단다.
    누르면 계약 창이 열리고, 유형 칸 바로 아래 안내에서 한 번에 바꾼다. 맞거나 판단할 근거가 없으면 null(아무것도 안 그린다). */
 function erpConsTypeCkTag(c, onOpen, small){
+  if(erpConsRecDone(c)) return null;          // 끝난 계약 카드에는 안 단다(종료·삭제·되돌림 불변)
   var ck = erpContractConsTypeCheck(c, getKindTypes('consulting', true));
   if(!ck) return null;
   return h('button', { type:'button',
@@ -17684,7 +17685,8 @@ function erpConsTypeCkTag(c, onOpen, small){
     onClick:function(e){ e.stopPropagation(); if(onOpen) onOpen(c); },
     style:{ marginLeft:'4px', fontSize: small ? '9.5px' : '10px', fontWeight:800, color:'#854d0e', background:'#fffbeb', border:'1px solid #fbbf24',
       borderRadius:'8px', padding: small ? '1px 5px' : '0 6px', whiteSpace:'nowrap', flexShrink:0, cursor:'pointer' } },
-    ck.cur ? '⚠ 유형?' : '⚠ 유형 비었음');
+    /* 폰 카드(small)는 자리가 좁아 짧게 — 「⚠ 유형 비었음」이 옆 메모 칸을 20px 로 짓눌렀다(2단계 점검) */
+    small ? '⚠유형' : (ck.cur ? '⚠ 유형?' : '⚠ 유형 비었음'));
 }
 /* ⚠ 컨설팅 유형 점검 창 (대표 지시 2026-11-28 「유사한 것들 체크를 다 하고 거기에 맞게 매칭을 해라」)
    진행 중인 계약·컨설팅관리 건 가운데 «하는 일»과 유형이 어긋난 것을 한 목록으로 보여 준다(erpConsTypeAudit).
@@ -17706,6 +17708,7 @@ function ConsTypeAuditModal(props){
   function toggleOne(r){ setSel(function(p){ var nx = Object.assign({}, p), k = keyOf(r); if(nx[k]) delete nx[k]; else nx[k] = true; return nx; }); }
   var types = props.types || [];
   var applyList = selRows.filter(function(r){ return r.src === 'contract' && toOf(r); });
+  var ackList = selRows.filter(function(r){ return !!r.ck.cur; });   // 비어 있는 유형은 «맞음»이 될 수 없다 — 골라야 한다
   async function run(fn, list){
     if(busy || !list.length) return;
     setBusy(true);
@@ -17719,7 +17722,7 @@ function ConsTypeAuditModal(props){
     return opts;
   }
   return h('div', { className:'tyau-back', onClick:props.onClose },
-    h('div', { className:'tyau', role:'dialog', 'aria-label':'컨설팅 유형 점검', onClick:function(e){ e.stopPropagation(); } },
+    h('div', { className:'tyau', role:'dialog', 'aria-modal':'true', 'aria-label':'컨설팅 유형 점검', onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'tyau-h' },
         h('div', { className:'tyau-ttl' }, '⚠ 컨설팅 유형 점검 — 하는 일과 유형이 다른 것 ' + rows.length + '건'),
         h('div', { className:'tyau-sub', title:'업무 요약 → 견적 범위 → 메모 차례로 «하는 일» 낱말(위험성평가·작업중지·안전보건·중대재해 → 산업안전, 클리닉, 기술보호, 일터혁신, 바우처 …)을 찾아 유형의 갈래와 견줍니다.\n진행 중인 건만 봅니다(이관·종료·취소된 건은 바꾸지 않습니다).' },
@@ -17730,14 +17733,14 @@ function ConsTypeAuditModal(props){
           title:'고른 계약의 컨설팅 유형을 오른쪽 «바꿀 유형»으로 바꿉니다(건수와 바뀌는 것을 먼저 묻습니다). 컨설팅관리 건은 건너뜁니다 — 열어서 바꿔 주세요',
           onClick:function(){ run(props.onApply, applyList.map(function(r){ return { rec:r.rec, code:toOf(r) }; })); } },
           '유형 바꾸기 (' + applyList.length + ')'),
-        h('button', { type:'button', className:'tyau-btn', disabled:busy,
-          title:'지금 유형이 맞다고 표시합니다 — 그 유형으로는 다시 묻지 않습니다(유형을 바꾸면 다시 봅니다)',
-          onClick:function(){ run(props.onAck, selRows); } }, '이대로 맞음'),
+        h('button', { type:'button', className:'tyau-btn', disabled:busy || !ackList.length,
+          title:'지금 유형이 맞다고 표시합니다 — 그 유형으로는 다시 묻지 않습니다(유형을 바꾸면 다시 봅니다). 유형이 빈 줄은 건너뜁니다',
+          onClick:function(){ run(props.onAck, ackList); } }, '이대로 맞음 (' + ackList.length + ')'),
         h('button', { type:'button', className:'tyau-btn', onClick:function(){ setSel({}); } }, '선택 풀기')),
       h('div', { className:'tyau-body' },
         rows.length === 0 && h('div', { className:'tyau-empty' }, '✓ 하는 일과 유형이 어긋난 진행 건이 없습니다.'),
         rows.length > 0 && h('div', { className:'tyau-row tyau-th' },
-          h('span', { className:'tyau-ck' }, h('input', { type:'checkbox', checked:allOn, onChange:toggleAll, title:'지금 보이는 줄 모두 고르기' })),
+          h('span', { className:'tyau-ck' }, h('input', { type:'checkbox', checked:allOn, onChange:toggleAll, title:'지금 보이는 줄 모두 고르기', 'aria-label':'지금 보이는 줄 모두 고르기' })),
           h('span', { className:'tyau-no' }, '№'),
           h('span', { className:'tyau-cno' }, '번호'),
           h('span', { className:'tyau-co' }, '업체'),
@@ -17749,8 +17752,9 @@ function ConsTypeAuditModal(props){
           var rec = r.rec, k = keyOf(r), isCt = r.src === 'contract';
           var no = isCt ? (rec.contractNo || '') : (rec.no || '');
           var msg = erpConsTypeCheckMsg(r.ck);
-          return h('div', { key:k, className:'tyau-row', title:msg },
-            h('span', { className:'tyau-ck' }, h('input', { type:'checkbox', checked:!!sel[k], onChange:function(){ toggleOne(r); }, title:'고르기' })),
+          return h('div', { key:k, className:'tyau-row', title:(no ? no + ' · ' : '') + msg },
+            h('span', { className:'tyau-ck' }, h('input', { type:'checkbox', checked:!!sel[k], onChange:function(){ toggleOne(r); }, title:'고르기',
+              'aria-label':(i + 1) + '번 ' + String(rec.companyName || '') + ' 고르기' })),
             h('span', { className:'tyau-no' }, i + 1),
             h('span', { className:'tyau-cno', title:(isCt ? '계약관리 ' : '컨설팅관리 ') + no }, (isCt ? '' : '컨설팅 ') + no),
             h('span', { className:'tyau-co', title:String(rec.companyName || '') }, String(rec.companyName || '-')),
@@ -19329,6 +19333,20 @@ function erpConsFamiliesInText(text){
   });
   return out;
 }
+/* 하는 일 낱말«만»으로 컨설팅이라 해도 되나 — 갈래 낱말이 있고 «사건 단서»(약정·사건·진정·변론·고소 …)가 없을 때만.
+   ★ «중대재해 사고 대응 약정서»·«산안법 위반 형사사건 변론 약정»·«육아휴직 거부 진정 약정»은 사건 위임이다 — 갈래 낱말(중대재해·산안법·
+     육아휴직)이 들었다고 컨설팅으로 돌리면 안 된다(2026-11-28 2단계 점검 지적). «컨설팅»이라는 말이 따로 있으면 이 잣대와 상관없이 컨설팅이다. */
+function erpConsCueIsConsulting(text){
+  var s = String(text == null ? '' : text);
+  if(/약정|사건|진정|변론|고소|고발|소송|형사|재판|심판|구제/.test(s)) return false;
+  return erpConsFamiliesInText(s).length > 0;
+}
+/* 끝난 기록인가 — 이관·종료·취소·삭제·종결일·영구보관. 끝난 건의 유형·번호는 바꾸지 않으므로 «확인»도 띄우지 않는다(종료·삭제·되돌림 불변) */
+function erpConsRecDone(r){
+  if(!r) return true;
+  return !!(r._deleted || r.closedDate || r.permanentArchived
+    || r.status === 'transferred' || r.status === 'closed' || r.status === 'cancelled');
+}
 /* 갈래 하나에 드는 유형 — 숨긴 유형은 고를 거리로 안 낸다 */
 function erpConsTypesOfFamily(key, types){
   return (types || []).filter(function(t){ return t && t.code && !t.hidden && erpConsFamilyOfType(t) === key; });
@@ -19430,15 +19448,14 @@ function erpConsTypeCheckShort(ck){
    돌려주는 것: [{ src:'contract'|'consulting', rec, ck }] — 계약 먼저, 그다음 컨설팅관리 건. 읽기만 한다. */
 function erpConsTypeAudit(contracts, consultings, types, isLiveContract){
   var out = [];
-  var DONE = ['transferred', 'closed', 'cancelled'];
   (contracts || []).forEach(function(c){
-    if(!c || c._deleted) return;
-    if(isLiveContract ? !isLiveContract(c) : (DONE.indexOf(c.status) >= 0)) return;
+    if(erpConsRecDone(c)) return;
+    if(isLiveContract && !isLiveContract(c)) return;
     var ck = erpContractConsTypeCheck(c, types);
     if(ck) out.push({ src:'contract', rec:c, ck:ck });
   });
   (consultings || []).forEach(function(r){
-    if(!r || r._deleted || DONE.indexOf(r.status) >= 0) return;
+    if(erpConsRecDone(r)) return;
     var ck = erpConsTypeCheck(r.typeCode, erpConsWorkTexts(r), types, r.typeCheckOk);
     if(ck) out.push({ src:'consulting', rec:r, ck:ck });
   });
@@ -22527,8 +22544,9 @@ function erpGuessContractFromFields(cf, consTypes, caseTypes, compTypes, fundTyp
   var ty = null;
   [docName, fileName, scope].some(function(nm){ ty = nm ? erpConsTypeByDocName(nm, consTypes || []) : null; return !!(ty && ty.code); });
   if(ty && ty.code) return { kind:'consulting', typeCode:ty.code };
-  /* «위험성평가 지원 계약서»처럼 컨설팅이라는 말 없이 하는 일만 적힌 계약서도 컨설팅이다 — 사업 갈래 낱말로 본다(2026-11-28) */
-  if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(text) || erpConsFamiliesInText(text).length > 0){
+  /* «위험성평가 지원 계약서»처럼 컨설팅이라는 말 없이 하는 일만 적힌 계약서도 컨설팅이다 — 사업 갈래 낱말로 본다(2026-11-28).
+     ⚠ 단, 사건 단서(약정·사건·진정·변론·고소 …)가 함께 있으면 아니다 — «중대재해 사고 대응 약정서»는 아래 위임·약정(사건)으로 간다. */
+  if(/컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무\s*분석|의견서/.test(text) || erpConsCueIsConsulting(text)){
     /* ⚠ 유형을 못 골랐으면 «안 고른다» — 목록 첫 번째를 그냥 찍으면 «인사노무 컨설팅» 위임계약서도
        현장클리닉이 된다(2026-11-16 점검: 계약 6건이 그렇게 잘못 찍혀 있었다).
        ★ 사업 «갈래» 낱말로 고른다(2026-11-28) — 클리닉·일터혁신·기술보호 셋만 보던 것을 넓혀, 위험성평가·작업중지·
@@ -24176,9 +24194,10 @@ function ContractModal(props){
       });
       saveData.typeCodes = tc;
     })();
-    /* 컨설팅 유형이 끝내 비었으면 저장 전에 묻는다 — 비운 채 저장할 수는 있다(상담 단계에서 아직 모를 수 있다).
+    /* 컨설팅 유형이 끝내 비었으면 저장 전에 묻는다 — 비운 채 저장할 수는 있다.
+       ⚠ 상담접수(consult) 단계는 묻지 않는다 — 아직 모를 수 있고, 저장할 때마다 같은 창이 뜨면 눈에서 지워진다(칸은 빨간 «유형을 골라 주세요»로 보인다).
        ⚠ 이관(사건·컨설팅관리로 넘기기)은 유형이 없으면 막는다(erpPrepareContractTransfer) — 그때 «첫 번째»로 대신하지 않는다. */
-    if((saveData.kinds || []).indexOf('consulting') >= 0 && !((saveData.typeCodes || {}).consulting)){
+    if((saveData.kinds || []).indexOf('consulting') >= 0 && !((saveData.typeCodes || {}).consulting) && saveData.status !== 'consult'){
       if(!(await popConfirm('컨설팅 유형을 고르지 않았습니다.\n\n→ 유형 없이 저장할 수는 있지만, 컨설팅관리로 «이관»하기 전에는 꼭 골라야 합니다.\n→ 「유형 고르러 가기」를 누르면 계약정보 탭으로 돌아갑니다.\n\n유형 없이 저장할까요?',
         { okText:'유형 없이 저장', cancelText:'유형 고르러 가기' }))){ setTab('contract'); return; }
     }
@@ -25747,8 +25766,10 @@ function ContractModal(props){
           var _optTypes = (_curCode && !typesArr.some(function(t){ return t.code === _curCode; }))
             ? typesArr.concat(getKindTypes(kindV, true).filter(function(t){ return t.code === _curCode; }))
             : typesArr;
-          /* typeof — 이 «종류별 세부설정» 덩어리를 떠서 돌리는 검사들(clinic-days-fee 등)에는 판정 함수가 없다 */
-          var _typeCk   = (isConsulting && typeof erpContractConsTypeCheck === 'function') ? erpContractConsTypeCheck(f, getKindTypes('consulting', true)) : null;
+          /* typeof — 이 «종류별 세부설정» 덩어리를 떠서 돌리는 검사들(clinic-days-fee 등)에는 판정 함수가 없다.
+             ⚠ 이관·종료·취소된 계약을 열었을 때는 띄우지 않는다 — 끝난 건의 유형을 바꾸라고 이끌면 안 된다(종료·삭제·되돌림 불변) */
+          var _typeCk   = (isConsulting && typeof erpContractConsTypeCheck === 'function' && !erpConsRecDone(f))
+            ? erpContractConsTypeCheck(f, getKindTypes('consulting', true)) : null;
           var _dayFee   = isConsulting ? consTypeDayFee(_selType) : 0;
           /* 단위(일/회)·부가세 여부 — 현장클리닉은 일·부가세 별도(지금 그대로), 기술보호는 회·부가세 없음(2026-10-04).
              ⚠ 단가가 있을 때만 읽는다(없으면 칸 자체가 안 뜬다). */
@@ -28663,8 +28684,8 @@ function ContractManagement(props){
     var kv = guessed.kind;
     var _hasExplicitKindCue = /기금|근로복지|부당해고|구제신청|노동위원회|임금|퇴직금|체불|산재|괴롭힘|성희롱|징계|행정심판|컨설팅|용역|클리닉|일터혁신|기술보호|진단|취업규칙|규정|직무|자문\s*계약|급여/.test(String(cf.docName || '') + ' ' + String(cf.scope || ''))
       || !!(cf.fileName && erpConsTypeByDocName(String(cf.fileName), getKindTypes('consulting') || []))
-      /* 하는 일(위험성평가·작업중지 …)만 적혀 있어도 컨설팅 단서다(2026-11-28 사업 갈래) */
-      || !!(typeof erpConsFamiliesInText === 'function' && erpConsFamiliesInText(String(cf.docName || '') + ' ' + String(cf.scope || '')).length);
+      /* 하는 일(위험성평가·작업중지 …)만 적혀 있어도 컨설팅 단서다(2026-11-28 사업 갈래) — 사건 단서(약정·진정·변론 …)가 함께면 아니다 */
+      || !!(typeof erpConsCueIsConsulting === 'function' && erpConsCueIsConsulting(String(cf.docName || '') + ' ' + String(cf.scope || '')));
     if(!_hasExplicitKindCue && req && req.inferredKind && ['company','case','consulting','fund','other'].indexOf(req.inferredKind) >= 0){
       kv = req.inferredKind;
       var _infList = getKindTypes(kv) || [];
@@ -30087,6 +30108,12 @@ function ContractManagement(props){
     return erpConsTypeAudit(contracts, dbGet('consultings', []) || [], getKindTypes('consulting', true), isActiveContract);
   }
   var tyAuditCount = tyAuditScan().length;
+  /* 바꾼 «직후»에는 화면 상태(contracts)가 아직 옛것이라 저장소에서 다시 읽어 훑는다 */
+  function tyAuditScanFresh(){
+    return erpConsTypeAudit(dbGet('contracts', []) || [], dbGet('consultings', []) || [], getKindTypes('consulting', true), isActiveContract);
+  }
+  /* 잠긴 달인가 — lockGuard 와 같은 잣대지만 «알림 없이» 본다(여러 건을 한 번에 할 때 알림이 겹쳐 뜨지 않게, 건너뛴 수는 끝에 한 번 말한다) */
+  function tyLocked(c){ var ym = ((c && c.signDate) || '').slice(0, 7); return !!(ym && isContractLocked(ym)); }
   function tyTypeName(code){
     var t = getKindTypes('consulting', true).find(function(x){ return x && x.code === code; });
     return t ? String(t.name || '') : (code ? code : '(비었음)');
@@ -30101,9 +30128,11 @@ function ContractManagement(props){
       { okText:list.length + '건 바꾸기', cancelText:'취소' }))) return false;
     var done = 0, skip = 0;
     var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '';
+    /* ⚠ 저장은 건마다 dbPatch(칸만 고치는 쓰기)다 — 통째 덮어쓰기(data/contracts)는 하지 않는다(종료·삭제·되돌림 불변).
+         묻기는 한 번, 알림도 끝에 한 번이다. */
     list.forEach(function(x){
       var cur = (dbGet('contracts', []) || []).find(function(c){ return c && c.id === x.rec.id; });
-      if(!cur || !isActiveContract(cur) || !lockGuard(cur)){ skip++; return; }
+      if(!cur || !isActiveContract(cur) || erpConsRecDone(cur) || tyLocked(cur)){ skip++; return; }
       var old = contractSubtypeCode(cur, 'consulting');
       if(!x.code || old === x.code){ skip++; return; }
       var nt = Object.assign({}, cur.typeCodes || {}); nt.consulting = x.code;
@@ -30112,7 +30141,7 @@ function ContractManagement(props){
       else skip++;
     });
     refreshContracts();
-    setTyAudit(erpConsTypeAudit(dbGet('contracts', []) || [], dbGet('consultings', []) || [], getKindTypes('consulting', true), isActiveContract));
+    setTyAudit(tyAuditScanFresh());
     showToast('✅ 컨설팅 유형 ' + done + '건을 바꿨습니다' + (skip ? ' · ' + skip + '건 건너뜀(잠긴 달·이관·이미 바뀜)' : ''));
     return true;
   }
@@ -30124,14 +30153,14 @@ function ContractManagement(props){
     rows.forEach(function(r){
       var store = r.src === 'contract' ? 'contracts' : 'consultings';
       var cur = (dbGet(store, []) || []).find(function(x){ return x && x.id === r.rec.id; });
-      if(!cur) return;
-      if(store === 'contracts' && !lockGuard(cur)) return;
+      if(!cur || erpConsRecDone(cur)) return;
+      if(store === 'contracts' && tyLocked(cur)) return;
       var code = store === 'contracts' ? contractSubtypeCode(cur, 'consulting') : String(cur.typeCode || '');
       if(!code) return;                    // 비어 있는 유형은 «맞음»이 될 수 없다 — 골라야 한다
       if(dbPatch(store, cur.id, { typeCheckOk:code })) done++;
     });
     refreshContracts();
-    setTyAudit(erpConsTypeAudit(dbGet('contracts', []) || [], dbGet('consultings', []) || [], getKindTypes('consulting', true), isActiveContract));
+    setTyAudit(tyAuditScanFresh());
     showToast('✓ ' + done + '건을 «이대로 맞음»으로 표시했습니다' + (done < rows.length ? ' · ' + (rows.length - done) + '건은 유형이 비었거나 잠겨 건너뜀' : ''));
     return true;
   }
@@ -30507,6 +30536,8 @@ function ContractManagement(props){
           kindsArr.length > 0 && h('span', { style:{ background:mk0.bg||'#f8fafc', color:mk0.color, fontSize:'9.5px', padding:'1px 6px', borderRadius:'9px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, border:'1px solid '+mk0.color+'33' } },
             mk0.label + (kindsArr.length>1 ? ' +'+(kindsArr.length-1) : '')),
           h('span', { style:{ flex:1, minWidth:0, fontSize:'12.5px', fontWeight:700, color:'#1e293b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }, title:c.companyName }, coDisplayName(c.companyName)),
+          /* ⚠ 유형 확인 — 둘째 줄은 단추가 많아 메모 칸이 27px 로 짓눌렸다(360px 실측) — 회사명 옆에 두고 회사명이 줄어든다 */
+          erpConsTypeCkTag(c, openEdit, true),
           c.successFeeType === 'percent' && c.successFee > 0 && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'0 5px', borderRadius:'5px', fontWeight:700, flexShrink:0 } }, '성공'+c.successFee+'%'),
           totalAmount > 0 && h('span', { style:{ fontFamily:'monospace', fontSize:'10.5px', color:'#475569', fontWeight:700, flexShrink:0 }, title: totalAmount.toLocaleString()+'원' }, fmtManExact(totalAmount))
         ),
@@ -30522,7 +30553,6 @@ function ContractManagement(props){
             onClick:function(e){ e.stopPropagation(); openCheckReq(c); },
             title:'담당자 진행확인: ' + c.checkReq.note,
             style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fbbf24', borderRadius:'8px', padding:'1px 5px', fontSize:'9.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } }, '❓확인'),
-          erpConsTypeCkTag(c, openEdit, true),
           h('span', { style:{ flex:1, minWidth:0, fontSize:'10px', color:'#94a3b8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
             [mSub, c.note].filter(Boolean).join(' · ') || c.contractNo),
           mBtns
@@ -78577,10 +78607,11 @@ function ProjectEditModal(props){
           /* ⚠ 컨설팅 유형 확인 (대표 지시 2026-11-28) — 업무 요약·메모의 «하는 일»과 유형이 다른 갈래면 알린다.
              «→» 단추는 위 유형 칸을 고른 것과 «같은 길»(setTypeCode)이라 관리번호도 함께 바뀐다. 종료된 건에는 띄우지 않는다
              (끝난 건의 번호는 바꾸지 않는다 — 종료·삭제·되돌림 불변). */
-          props.storageKey === 'consultings' && f.status !== 'closed' && (function(){
+          props.storageKey === 'consultings' && !erpConsRecDone(f) && (function(){
             var ck = erpConsTypeCheck(f.typeCode, erpConsWorkTexts(f), props.types, f.typeCheckOk);
             if(!ck) return null;
-            return h('div', { className:'fld pu-tyck', role:'alert', style:{ gridColumn:'1 / -1', display:'flex', alignItems:'center', gap:'7px', flexWrap:'nowrap' },
+            /* ⚠ 줄바꿈(flex-wrap)은 CSS(.pu-tyck)가 정한다 — PC 한 줄, 폰은 문구·단추 두 줄. 여기 인라인으로 박으면 폰 규칙을 이긴다 */
+            return h('div', { className:'fld pu-tyck', role:'alert', style:{ gridColumn:'1 / -1', display:'flex', alignItems:'center', gap:'7px' },
                 title:erpConsTypeCheckMsg(ck) + '\n찾은 말: ' + ck.words.join(', ') },
               h('span', { className:'pu-tyck-t' }, '⚠ ' + erpConsTypeCheckShort(ck)),
               (ck.want ? [ck.want] : ck.wants.slice(0, 3)).map(function(t){

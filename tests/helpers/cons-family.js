@@ -4,6 +4,7 @@
    한 곳에 두어, 갈래 함수가 늘어도 검사마다 목록을 고치지 않게 한다(검사 도구 — 검사 파일이 아니다). */
 const CONS_FAMILY_FNS = [
   'function erpConsFamilyList(', 'function erpConsFamilyOfType(', 'function erpConsFamiliesInText(',
+  'function erpConsCueIsConsulting(', 'function erpConsRecDone(',
   'function erpConsTypesOfFamily(', 'function erpConsTypeByCues(', 'function erpConsWorkTexts(',
   'function erpConsTypeGuessForRec(', 'function erpConsTypeCheck(', 'function erpContractConsTypeCheck(',
   'function erpConsTypeCheckMsg(', 'function erpConsTypeCheckShort(', 'function erpConsTypeAudit('

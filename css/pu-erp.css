@@ -253,12 +253,15 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .pu-tyck { flex-wrap: nowrap; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 6px; padding: 5px 8px; }
 .pu-tyck-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 11.5px; font-weight: 700; color: #854d0e; }
-.pu-tyck-go { flex: none; max-width: 210px; overflow: hidden; text-overflow: ellipsis; background: #d97706; color: #fff; border: 0;
-  border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+/* 단추 바탕은 흰 글자와 대비 4.5:1 이상(#b45309 ≈ 5.0:1) — 더 옅은 주황(#d97706)은 3.2:1 이라 읽기 어렵다(2단계 점검 지적) */
+.pu-tyck-go { flex: none; max-width: 210px; overflow: hidden; text-overflow: ellipsis; background: #b45309; color: #fff; border: 0;
+  border-radius: 5px; padding: 6px 10px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .pu-tyck-ok { flex: none; background: #fff; color: #854d0e; border: 1px solid #fbbf24; border-radius: 5px;
-  padding: 4px 9px; font-size: 10.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .pu-krow select.pu-w-type-empty { border-color: #f87171; background: #fef2f2; color: #991b1b; font-weight: 700; }
 .pu-krow select.pu-w-type-warn { border-color: #f59e0b; background: #fffbeb; }
+/* 비었음·어긋남 색이 포커스 테두리를 덮지 않게 — 키보드로 들어와도 «지금 여기» 가 보여야 한다 */
+.pu-krow select.pu-w-type-empty:focus, .pu-krow select.pu-w-type-warn:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.25); }
 /* ⚠ 컨설팅 유형 점검 창 (2026-11-28) — 맨 왼쪽 ☐(28px)·№(36px), 칸은 한 줄(넘치면 … + title). 폰은 두 줄 카드. */
 .tyau-back { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 9300; display: flex;
   align-items: center; justify-content: center; padding: 16px; }
@@ -274,7 +277,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 .tyau-th { font-size: 11px; font-weight: 800; color: #64748b; background: #f8fafc; position: sticky; top: 0; z-index: 1; }
 .tyau-ck { flex: 0 0 28px; text-align: center; }
 .tyau-ck input { margin: 0; }
-.tyau-no { flex: 0 0 36px; text-align: right; font-variant-numeric: tabular-nums; color: #94a3b8; }
+.tyau-no { flex: 0 0 36px; text-align: right; font-variant-numeric: tabular-nums; color: #64748b; }
 .tyau-cno { flex: 0 0 118px; font-family: ui-monospace, monospace; font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tyau-co { flex: 0 0 170px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tyau-cur { flex: 0 0 130px; color: #991b1b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -300,8 +303,10 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   .tyau-cur { order: 4; flex: 0 1 auto; max-width: 40%; }
   .tyau-br { display: block; order: 5; flex-basis: 100%; height: 0; }
   .tyau-why { display: none; }
-  .tyau-cno { order: 6; flex: 0 0 auto; max-width: 30%; margin-left: 72px; }
-  .tyau-to { order: 7; flex: 1 1 0; }
+  /* 계약번호는 폰에서 접는다(줄에 마우스·길게 누르면 title 로 보인다) — 남기면 «바꿀 유형» 칸이 «★ 산업안…» 으로 잘렸다(360px 실측) */
+  .tyau-cno { display: none; }
+  .tyau-to { order: 7; flex: 1 1 0; margin-left: 72px; }
+  .tyau-bulk { flex-wrap: wrap; row-gap: 6px; overflow-x: visible; }
   .tyau-act { order: 8; }
   .tyau-to select { font-size: 16px; }
 }

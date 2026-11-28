@@ -315,7 +315,8 @@ module.exports = {
     { name: 'contract-typeck', wait: 1500,
       run: async (page) => {
         await page.evaluate(() => window.navigateTo('biz/contract')); await page.waitForTimeout(2500);
-        await page.locator('main button', { hasText: '⚠ 유형?' }).first().click({ timeout: 5000 });
+        /* 카드 꼬리표만 — 「⚠ 유형?」·「⚠ 유형 비었음」, 폰 카드는 「⚠유형」(도구줄 「⚠ 유형 확인 N건」은 안 집는다) */
+        await page.locator('main button', { hasText: /^⚠\s?유형(\?| 비었음)?$/ }).first().click({ timeout: 5000 });
         await page.waitForTimeout(1500);
         await page.evaluate(() => {
           const b = [...document.querySelectorAll('button')].find(x => /^\s*📄\s*계약정보\s*$/.test(x.textContent));
