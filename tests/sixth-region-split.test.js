@@ -65,8 +65,8 @@ test('④ 화면: 왼쪽 지역 대시보드 틀과 독립 열(연도·사업장
 test('⑤ 다른 앱(상공회의소)의 왼쪽 대시보드 문구·지역 추가는 그대로다', () => {
   const ch = Cats.get('chamber');
   assert.equal(ch.hasLeftDashboard, true);
-  assert.notEqual(ch.regionManageable, false, '상공회의소는 새 지역 추가가 계속 된다');
-  assert.ok(!ch.leftDash, '상공회의소는 기본 문구를 쓴다');
-  const view = read('js/pu-consult-view.js');
-  assert.ok(view.indexOf('전체 상공회의소') >= 0 && view.indexOf('새 지역 상공회의소 추가') >= 0);
+  assert.equal(ch.regionManageable, true, '상공회의소는 새 지역 추가가 계속 된다(12개 앱 공통 틀에서 «추가»는 regionManageable:true 만)');
+  // 2026-11-28 왼쪽 대시보드를 12개 앱 공통으로 바꾸며 상공회의소 문구는 엔진 기본값에서 카탈로그로 옮겼다
+  assert.ok(ch.leftDash && /상공회의소/.test(ch.leftDash.allLabel) && /지역/.test(ch.leftDash.headLabel), '상공회의소 대시보드 문구');
+  assert.ok(/상공회의소/.test(ch.regionLabel), '«+ 새 지역 상공회의소 추가» 단추 이름은 regionLabel 에서 온다');
 });

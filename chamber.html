@@ -115,6 +115,8 @@ table.t th.c,table.t td.c{width:34px;text-align:center}
 input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t input[type=checkbox]{width:24px;height:24px;margin:0;cursor:pointer;vertical-align:middle}
 table.t th.n,table.t td.n{width:38px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+table.t th.yr,table.t td.yr{width:58px;text-align:center;font-variant-numeric:tabular-nums}
+table.t td[data-k="badge"],table.t td[data-k="st"]{max-width:none;overflow:visible;text-overflow:clip}
 table.t tr[data-row]{cursor:pointer}
 table.t tr[data-row]:hover>td{background:var(--bg)}
 table.t tr.cur>td{background:var(--blue-bg)}
@@ -200,8 +202,10 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t td[data-k="act"]{max-width:none}
 }
 @media (max-width:1180px){.guide-grid{grid-template-columns:1fr}}
-/* ── 왼쪽 상공회의소 지역별 대시보드 (.dash-shell) ── */
+/* ── 왼쪽 대시보드 (.dash-shell) — 12개 앱 공통 틀. 사업이 든 세부 트랙이 둘 이상일 때만 켜지고, 아니면 .no-left 로 한 단 (대표 지시 2026-11-28) ── */
 .dash-shell{display:grid;grid-template-columns:256px minmax(0,1fr);gap:12px;align-items:start}
+.dash-shell.no-left{display:block}
+.dash-shell.no-left>.left-dash{display:none}
 .dash-main{min-width:0}
 .left-dash{position:sticky;top:82px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;max-height:calc(100vh - 96px);overflow:auto}
 .ld-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-bottom:6px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
@@ -219,7 +223,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .ld-yr-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
 .ld-add-btn{width:100%;justify-content:center;font-weight:600;border-style:dashed;border-color:var(--blue-line);color:var(--blue-d);background:var(--blue-bg)}
 .ld-year-box{border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px}
-.ld-year-hd{font-size:11.5px;font-weight:700;color:var(--ink2)}
+.ld-year-hd{font-size:11.5px;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1024px){
   .ws-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ws-split{grid-template-columns:1fr}
@@ -283,6 +287,9 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:24px;text-align:right;order:0}
   table.t[data-name] tbody td.ti{order:1;flex:1 1 0;font-size:13.5px;font-weight:600;color:var(--ink)}
   table.t[data-name] tbody td[data-k="badge"]{order:2;color:var(--ink)}
+  table.t[data-name] tbody td.yr{order:2;width:auto;color:var(--ink);font-variant-numeric:tabular-nums}
+  table.t[data-name] tbody td[data-k="st"]{order:2;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="rd"]{order:2;color:var(--ink)}
   table.t[data-name="chk_pre"] tbody td.wide,table.t[data-name="chk_domain"] tbody td.wide,table.t[data-name="chk_docs"] tbody td.wide{flex:0 0 100%;width:100%}
   table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px;overflow:visible;white-space:normal}
   table.t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
@@ -291,6 +298,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] tbody td.ti{flex:1 1 100%}
   table.t[data-name] tbody tr::after{order:2}
   table.t[data-name] tbody td[data-k="badge"]{order:3}
+  table.t[data-name] tbody td[data-k="rd"]{order:3}
 }
 @media (max-width:520px){#who{display:none}}
 @media print{
@@ -316,7 +324,6 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   <div class="tabs" id="tabs" role="tablist" aria-label="상공회의소컨설팅 작업 화면">
     <button type="button" role="tab" aria-selected="true" data-tab="projects" class="on">📂 사업 현황 <span class="chip c-blue" id="nProjects">0</span></button>
     <button type="button" role="tab" aria-selected="false" data-tab="inbox">📥 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
-    <button type="button" role="tab" aria-selected="false" data-tab="yearly">📅 연도별 자료함 <span class="chip c-blue" id="nYearly">0</span></button>
     <button type="button" role="tab" aria-selected="false" data-tab="detail">📋 진행 · 체크 · 자료</button>
     <button type="button" role="tab" aria-selected="false" data-tab="report">⚖️ 보고서 · RAG 코치</button>
   </div>
@@ -345,25 +352,15 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <div class="card">
       <div class="bar">
         <input id="projQ" type="search" aria-label="사업장·트랙·메모 검색" placeholder="사업장·트랙·메모 검색" style="flex:1;min-width:165px;max-width:235px">
-        <select id="projTrackSel" aria-label="세부 트랙 필터"></select>
-        <select id="projSt" aria-label="진행상태 필터">
-          <option value="">진행상태 전체</option>
-          <option value="active">진행 중</option>
-          <option value="done">완료</option>
-        </select>
-        <select id="projYrSel" aria-label="연도 필터">
-          <option value="">연도 전체</option>
-        </select>
         <select id="projMgr" aria-label="담당 노무사 필터"><option value="">담당 노무사 전체</option></select>
         <button type="button" class="sm" id="projResetBtn" style="display:none" title="검색어·연도·필터 조건을 모두 초기화합니다">↺ 초기화</button>
         <span class="sp"></span>
-        <button type="button" class="sm ok" id="openCoachQuickBtn" title="수습·주니어 노무사용 RAG 행동가이드 및 실무 코치 화면으로 이동합니다">🧠 RAG 실무코치</button>
         <button type="button" class="sm pri" id="newProjBtn">+ 새 사업 등록</button>
         <details class="act-menu">
           <summary>⋯ 도구</summary>
           <div class="act-pop">
-            <button type="button" id="scanAllBtn" title="푸른메일함(IMAP+POP3)·카톡·ERP에서 상공회의소 관련 자료를 재스캔합니다">🔄 메일·카톡 재스캔</button>
             <button type="button" id="projCsvBtn" title="현재 필터된 수행 사업 현황 목록을 CSV(엑셀) 파일로 내려받습니다">📥 사업 현황 CSV 내려받기</button>
+            <button type="button" id="allCsvBtn" title="미등록 후보까지 포함한 연도별 전체 목록을 CSV(엑셀) 파일로 내려받습니다">📥 후보 포함 전체 CSV</button>
             <a href="pu-msg-intake.html" target="_blank" rel="noopener">💬 카톡·문자 자료수집 허브 ↗</a>
             <a href="pu-coach.html?app=chamber" target="_blank" rel="noopener">🧠 전 사업 RAG 학습허브 ↗</a>
           </div>
@@ -391,29 +388,6 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
       </div>
     </div>
     <div class="card"><div id="inboxBox"></div></div>
-  </section>
-
-  <!-- 탭 3: 연도별 자료함 -->
-  <section class="pane" id="p-yearly">
-    <div class="card hi-top-strip">
-      <div class="scope-bar" id="yrPillsBar" role="region" aria-label="연도별 필터"></div>
-      <div class="kpis" id="yrKpiBox"></div>
-    </div>
-    <div class="card">
-      <div class="bar">
-        <input id="yrQ" type="search" aria-label="연도별 자료 검색" placeholder="연도·기업명·트랙·제목·첨부 검색" style="flex:1;min-width:170px;max-width:260px">
-        <select id="yrTrackSel" aria-label="연도별 세부 트랙 필터"></select>
-        <select id="yrKind" aria-label="등록 상태 필터">
-          <option value="">등록 + 미등록 전체</option>
-          <option value="project">등록 사업만</option>
-          <option value="bundle">미등록 후보만</option>
-        </select>
-        <button type="button" class="sm" id="yrResetBtn" style="display:none" title="연도·검색어·필터 조건을 모두 초기화합니다">↺ 초기화</button>
-        <span class="sp"></span>
-        <button type="button" class="sm ok" id="yrCsvBtn" title="연도별 전체 수행 사업 및 메일·카톡 후보 목록을 CSV(엑셀) 파일로 내려받습니다">📥 연도별 목록 CSV</button>
-      </div>
-    </div>
-    <div id="yearlyBox"></div>
   </section>
 
   <!-- 탭 4: 진행 · 체크 · 자료 -->
@@ -455,13 +429,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-consult-catalogs-a.js?v=4"></script>
-<script src="js/pu-consult-catalogs-b.js?v=4"></script>
+<script src="js/pu-consult-catalogs-a.js?v=5"></script>
+<script src="js/pu-consult-catalogs-b.js?v=5"></script>
 <script src="js/pu-consult-catalogs.js?v=2"></script>
 <script src="js/pu-consult-intake.js?v=5"></script>
 <script src="js/pu-consult-rag.js?v=2"></script>
 <script src="js/pu-consult-hwpx.js?v=2"></script>
-<script src="js/pu-consult-view.js?v=10"></script>
+<script src="js/pu-consult-view.js?v=12"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var isPv = (location.hostname==='localhost' || location.hostname==='127.0.0.1' || location.hostname.endsWith('.localhost')) && location.search.indexOf('preview=1')>=0;

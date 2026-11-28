@@ -36,7 +36,8 @@
       shortName: '기술보호',
       icon: '🔐',
       htmlFile: 'techprotect.html',
-      slimUi: true,            // 이중 표시(변경점 띠·연도 드롭다운·연도별 자료함 탭 등)를 걷은 가벼운 화면 (대표 지시 2026-11-28)
+      leftDash: { by: '과정' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
+      govReportForm: true,     // 기관 제출 서식이 컨설팅보고서(gov-report)에 있다 — 보고서 탭의 일반 원고는 접어 둔다
       roundUnit: '회',         // 이알피 계약의 일수/회수 단위 — 기술보호는 «회» (3회 = 3회차)
       govTypeKeywords: ['기술보호'], // 정부사업일정(scal_types) 종류 이름에 들어 있는 글자
       agency: '대·중소기업·농어업협력재단',
@@ -132,7 +133,8 @@
       shortName: '현장클리닉',
       icon: '🩺',
       htmlFile: 'clinic.html',
-      slimUi: true,            // 이중 표시를 걷은 가벼운 화면 (대표 지시 2026-11-28)
+      leftDash: { by: '사업' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
+      govReportForm: true,     // 기관 제출 서식이 컨설팅보고서(gov-report)에 있다 — 보고서 탭의 일반 원고는 접어 둔다
       roundUnit: '일',         // 현장클리닉은 «일» 로 적는다 (3일 = 3회차)
       govTypeKeywords: ['현장클리닉'],
       agency: '중소벤처기업청 비즈니스지원단',
@@ -224,6 +226,8 @@
       shortName: '상공회의소',
       icon: '🏬',
       htmlFile: 'chamber.html',
+      leftDash: { headLabel: '🏬 지역별 대시보드', allLabel: '🏬 전체 상공회의소', scopeAll: '전체 상의', emptyLabel: '등록 대기 (신규 지역 준비)' },
+      govReportForm: true,     // 기관 제출 서식이 컨설팅보고서(gov-report)에 있다 — 보고서 탭의 일반 원고는 접어 둔다
       agency: '충남북부상공회의소 · 서산상공회의소 · 당진상공회의소 · 대한상의',
       desc: '충남북부·서산·당진·대한상의 인사노무',
       erpTypeKeywords: ['인사노무컨설팅충남북부상의', '인사노무컨설팅서산', '인사노무컨설팅당진', '상공회의소'],
@@ -309,6 +313,7 @@
       shortName: '기초인사노무',
       icon: '🗂️',
       htmlFile: 'hrconsult.html',
+      leftDash: { by: '업무' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
       agency: '푸른노무법인 (민간·자문사 제도정비)',
       desc: '근로계약서·취업규칙연계·급여설계',
       erpTypeKeywords: ['기초컨설팅푸른법인', '기초컨설팅', '인사노무'],
@@ -401,6 +406,7 @@
       shortName: '평가보상',
       icon: '📈',
       htmlFile: 'evalcomp.html',
+      leftDash: { by: '업무' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
       agency: '푸른노무법인 (인사조직·보상 컨설팅)',
       desc: '직무분석·직무급·KPI·성과급·PIP',
       erpTypeKeywords: ['평가보상', '임금체계', '직무분석', '조직진단'],
@@ -491,6 +497,7 @@
       shortName: '공공기관',
       icon: '🏤',
       htmlFile: 'pubconsult.html',
+      leftDash: { by: '기관' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
       agency: '충남·세종사회서비스원 · 지자체 · 지방공기업 · 대학',
       desc: '사회서비스원·지자체·공무직·처우',
       erpTypeKeywords: ['공공기관', '사회서비스원', '지자체', '공무직'],
