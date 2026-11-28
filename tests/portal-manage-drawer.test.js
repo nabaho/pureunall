@@ -9,6 +9,8 @@
       앱이 없는 구역 탭은 감춘다. 지금 탭이 감춰지면 보이는 탭으로 옮긴다. 아무것도 없으면 열린 서랍도 닫는다.
    ④ 서랍 줄은 접히지 않는다(머리가 감춰져 한 번 접히면 못 편다).
    ⑤ 닫기: ✕ · Esc · 서랍 밖 누르기 — 단, 관리자가 앱을 끌어 옮기는 중(lay-editing)에는 열어 둔다.
+   ⑥ 서랍 맨 아래에 «백업·복구 · 설정» 줄이 있다(대표 지시 2026-11-28). 떠 있는 두 단추를 «대신 눌러 준다» — 원본이 있고 켜져 있을 때(= 관리자)만 보이고,
+      누르면 서랍을 먼저 닫은 뒤 원본 단추를 누른다.
    ⚠ 글자만 찾는 검사가 아니다 — 원본의 함수를 «떠서» 가짜 화면 위에서 돌려 본다. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -26,7 +28,7 @@ function sliceBlock(from, endMarker) {
 }
 const ROWS_SRC = sliceBlock('var APP_ROWS = [', '\n  ];');
 const MG_SRC = sliceBlock('var MG_ZONES = [', '\n  ];');
-const FUNCS_SRC = ['function mgInDrawer(', 'function mgDrawerHtml(', 'function buildAppRows(', 'function mgSelect(', 'function mgSync(', 'function mgOpen(', 'function mgClose(']
+const FUNCS_SRC = ['function mgInDrawer(', 'function mgDrawerHtml(', 'function buildAppRows(', 'function mgSelect(', 'function mgFootSrc(', 'function mgFootSync(', 'function mgFootClick(', 'function mgSync(', 'function mgOpen(', 'function mgClose(']
   .map((d) => cutFn(E, d)).join('\n');
 
 function fakeEl(extra) {
@@ -170,4 +172,69 @@ test('⑤ 닫는 길 — ✕ · Esc · 서랍 밖 누르기(배치 편집 중에
   assert.doesNotMatch(E, /body\.lay-admin \.mg-zone/, '★ body.lay-admin 은 없는 클래스다 — 관리자 줄 고정 단추 자리는 «단추가 켜진 줄»(:has)로 건다');
   assert.match(E, /<button id="mgBtn"[^>]* hidden>/, '★ 관리실 단추는 «감춘 채»로 시작해 JS 가 켠다');
   assert.match(E, /function initFold\(\)\{\s*mgWire\(\);/, '★ 서랍 연결(mgWire)은 initFold 에서 한 번 건다');
+});
+
+/* ⑥ 서랍 맨 아래 «백업·복구 · 설정» */
+function footWorld(srcs) {
+  const w = drawerWorld({ sales: [{}], inside: [] });
+  const clicks = [];
+  const mk = (id, src) => fakeEl({ _id: id, hidden: !!(src && src.hidden), style: { display: src && src.off ? 'none' : '' }, click() { clicks.push(id); } });
+  const srcEls = {};
+  if (srcs.backup) srcEls['pu-backup-admin-button'] = mk('backup', srcs.backup);
+  if (srcs.cfg) srcEls.cfgFab = mk('cfg', srcs.cfg);
+  w.document = { getElementById: (id) => srcEls[id] || null };
+  w.clicks = clicks;
+  w.els.mgFt = fakeEl({ hidden: true });
+  w.els.mgFtBackup = fakeEl({ hidden: true, _attrs: { 'data-src': 'pu-backup-admin-button' } });
+  w.els.mgFtCfg = fakeEl({ hidden: true, _attrs: { 'data-src': 'cfgFab' } });
+  w.els.mgFt.querySelectorAll = () => [w.els.mgFtBackup, w.els.mgFtCfg];
+  return w;
+}
+
+test('⑥ 맨 아래 줄은 원본 단추가 «있고 켜져 있을 때»만 보인다 — 직원(원본 없음)에게는 줄째 감춘다', () => {
+  const none = footWorld({});
+  vm.runInContext('mgSync()', none);
+  assert.equal(none.els.mgFt.hidden, true, '★ 원본 단추가 없으면(직원) 줄도 감춘다');
+  const both = footWorld({ backup: {}, cfg: {} });
+  vm.runInContext('mgSync()', both);
+  assert.equal(both.els.mgFt.hidden, false);
+  assert.equal(both.els.mgFtBackup.hidden, false);
+  assert.equal(both.els.mgFtCfg.hidden, false);
+  const half = footWorld({ backup: {}, cfg: { off: true } });
+  vm.runInContext('mgSync()', half);
+  assert.equal(half.els.mgFtBackup.hidden, false, '★ 백업·복구만 켜져 있으면 그것만 보인다');
+  assert.equal(half.els.mgFtCfg.hidden, true, '★ 설정 원본이 display:none 이면 설정 단추는 감춘다');
+  assert.equal(half.els.mgFt.hidden, false);
+});
+
+test('⑥ 누르면 서랍을 «먼저» 닫고 원본 단추를 누른다 — 원본이 없으면 아무 일도 안 한다', () => {
+  const w = footWorld({ backup: {}, cfg: {} });
+  w.els.mgDrawer.classList.add('open');
+  const order = [];
+  const closeOrig = vm.runInContext('mgClose', w);
+  w.mgClose = function () { order.push('close:' + w.els.mgDrawer.classList.contains('open')); return closeOrig.apply(this, arguments); };
+  const origClick = w.document.getElementById('cfgFab').click;
+  w.document.getElementById('cfgFab').click = function () { order.push('click:' + w.els.mgDrawer.classList.contains('open')); return origClick.apply(this, arguments); };
+  vm.runInContext('mgFootClick(els.mgFtCfg)', w);
+  assert.deepEqual(w.clicks, ['cfg'], '★ 설정 원본 단추가 눌려야 한다');
+  assert.deepEqual(order, ['close:true', 'click:false'], '★ 서랍을 «먼저» 닫고(close) 그 다음에 원본을 눌러야 한다(열려 있으면 뜨는 창이 가려진다)');
+  const none = footWorld({});
+  vm.runInContext('mgFootClick(els.mgFtBackup)', none);
+  assert.deepEqual(none.clicks, [], '★ 원본이 없으면 누를 것이 없다');
+});
+
+test('⑥ 서랍 틀에 맨 아래 줄이 있고, 서랍 안 누르기가 그 단추를 원본으로 넘긴다', () => {
+  const w = world();
+  const host = fakeEl({ innerHTML: '' });
+  w.els.appRows = host;
+  vm.runInContext('buildAppRows()', w);
+  const h = host.innerHTML;
+  const end = h.indexOf('</aside>');
+  const ft = h.indexOf('id="mgFt"');
+  assert.ok(ft > h.indexOf('id="mgPane_inside"') && ft < end, '★ 줄은 구역들 «뒤», 서랍 맨 끝에 있어야 «맨 아래»다');
+  assert.match(h, /id="mgFtBackup"[^>]*data-src="pu-backup-admin-button"[^>]* hidden>/, '★ 백업·복구 단추는 감춘 채로 시작해 원본을 따라 켠다');
+  assert.match(h, /id="mgFtCfg"[^>]*data-src="cfgFab"[^>]* hidden>/, '★ 설정 단추도 감춘 채로 시작한다');
+  assert.match(cutFn(E, 'function mgWire('), /\.mg-ft button[\s\S]*mgFootClick\(ft\)/, '★ 서랍 안 누르기가 맨 아래 단추를 mgFootClick 으로 넘겨야 한다');
+  assert.match(E, /body:has\(#mgDrawer\.open\) #cfgFab,body:has\(#mgDrawer\.open\) #pu-backup-admin-button\{visibility:hidden;\}/, '★ 서랍이 열려 있는 동안 떠 있는 두 알약이 맨 아래 줄 위에 겹치지 않게 감춘다');
+  assert.match(E, /\.mg-ft\{[^}]*flex:none;/, '★ 줄은 구역이 길어져도 밀려나지 않게 고정 높이(flex:none)다');
 });
