@@ -2105,6 +2105,15 @@
         ".write": false
       }
     },
+    "govlinks": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "sets": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60"
+        }
+      }
+    },
     "edulib": {
       ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       "items": {

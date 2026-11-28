@@ -55,6 +55,13 @@ main{padding:12px 16px 40px;max-width:1280px;margin:0 auto}
 .pane{display:none}
 .pane.on{display:block}
 .hint{font-size:12px;color:var(--mute)}
+/* 1줄 균등 셀 KPI 바 — 모든 칸이 같은 폭·같은 높이, 칸 안은 «이름 · 수» 한 줄 */
+.kpis{display:flex;flex-wrap:nowrap;gap:6px;width:100%;margin:0 0 8px}
+.kpis .k{flex:1 1 0;min-width:0;min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.kpis .k span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.kpis .k b{font-variant-numeric:tabular-nums;color:var(--ink)}
+.kpis .k.k-on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-d)}
+.kpis .k.k-on b{color:var(--blue-d)}
 .tool{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 #q{flex:1 1 auto;min-width:0;padding:8px 11px;font-size:14px}
 #cnt{font-size:12px;color:var(--mute);white-space:nowrap}
@@ -153,8 +160,10 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
   .lrow .ln{grid-area:n} .lrow .lu{grid-area:u} .lrow .ckl{grid-area:l} .lrow .lx{grid-area:x}
   /* 「최근」·「푸른 안에서」 알약 줄은 한 줄로 두고 옆으로 민다(두 줄로 접혀 첫 화면을 먹지 않게) */
   #recent,#inner{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .kpis{overflow-x:auto;scrollbar-width:none}
+  .kpis .k{flex:0 0 auto;min-height:36px}
   .pill{flex:0 0 auto;padding:6px 11px}
-  .mt input[type=checkbox]{width:20px;height:20px}
+  .mt input[type=checkbox]{width:24px;height:24px;margin:0}
   /* 목록 관리 표 → 줄마다 두 줄 카드(☐·№ 는 왼쪽 끝 그대로) */
   .mt thead{display:none}
   .mt tr{display:grid;grid-template-columns:28px 32px minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--line);padding:4px 0}
@@ -188,8 +197,11 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
 <div id="lock"><h2>🔗 정부사업 바로가기</h2><div id="lockWhy"></div><p>재직 직원만 열 수 있습니다.</p></div>
 <main id="app">
   <section class="pane" id="pane-go">
+    <!-- 1줄 균등 셀 KPI 바(표준 형태 docs/규칙/서류-목록-표준형태.md ①) — 누르면 거르기·토글 -->
+    <div class="kpis" id="kpis" role="toolbar" aria-label="바로가기 요약"></div>
     <div class="tool">
       <input id="q" type="search" autocomplete="off" aria-label="사이트·사업·기관·업체 찾기" placeholder="사이트·사업·기관·업체 찾기 ( / 키로 바로 입력 · Enter 로 첫 사이트 열기 )">
+      <button class="sm" id="resetBtn" data-act="reset" style="display:none" title="찾기·거르기를 모두 풉니다">↺ 초기화</button>
       <span id="cnt" aria-live="polite"></span>
     </div>
     <div class="strip" id="recent"></div>
@@ -224,13 +236,15 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ontology.js?v=112"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=55"></script>
+<!-- 장애 알림 — 공용 한 벌(화면에 단추·창을 만들지 않고 «처리 완료»로 적는다, 대표 지시 2026-11-22) -->
+<script src="js/pu-health.js?v=8"></script>
+<script src="js/pu-appbar.js?v=56"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -254,7 +268,7 @@ var GL_NODES={sets:L.ROOT+'/'+L.SETS};
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_…') 를 쓰면 등록부 검사가 주인 없는 자리로 잡는다 */
 var GL_ERP={biz:'data/biz_cons_types',tmap:'scal_erpTypeMap',cos:'scal_cos',types:'scal_types',scheds:'scal_scheds',staff:'scal_staff',state:'scal_bizState',order:'scal_bizOrder'};
 var D={raw:null,loaded:false,err:'',empty:false,sets:[],deleted:[],erp:null,erpErr:false,erpLoading:false,board:null,seq:0};
-var TAB='go', Q='', SEL={}, EDIT=null, MORE={}, BUSY=false;
+var TAB='go', Q='', KF='', SEL={}, EDIT=null, MORE={}, BUSY=false;   // KF = KPI 바 거르기('' · 'login' · 'cos')
 var CO_SHOW=8;   // 카드 한 사업에 먼저 보이는 업체 수 — 넘으면 «+N곳»
 
 function $(id){ return document.getElementById(id); }
@@ -384,10 +398,38 @@ function cardHtml(c, links){
   }
   return h+'</section>';
 }
+/* 1줄 균등 셀 KPI 바 — 묶음·사이트·로그인·이어 둔 사업·올해 업체·카드 없는 진행 사업.
+   «로그인»·«올해 업체»는 누르면 그것만 거른다(다시 누르면 풂) · «카드 없는 진행 사업»은 그 칸으로 내려간다 */
+function renderKpis(b){
+  var cards=b.cards||[], sites=0, login=0, progs=0, cos=0;
+  cards.forEach(function(c){
+    sites+=c.set.links.length;
+    login+=c.set.links.filter(function(l){ return l.login; }).length;
+    progs+=c.programs.filter(function(p){ return !p.missing&&!p.closed; }).length;
+    cos+=c.companyCount;
+  });
+  var cell=function(k,label,n,tip){
+    return '<button type="button" class="k'+(k&&KF===k?' k-on':'')+'" data-act="kpi" data-k="'+k+'" title="'+esc(tip)+'"><span>'+label+'</span><b>'+n+'</b></button>';
+  };
+  $('kpis').innerHTML=cell('all','사업 묶음',cards.length,'거르기를 풀고 모두 봅니다')
+    +cell('all','사이트',sites,'거르기를 풀고 모두 봅니다')
+    +cell('login','로그인',login,'로그인이 필요한 사이트만 봅니다(다시 누르면 풂)')
+    +cell('cos','이어 둔 사업',progs,'이알피 사업이 이어진(올해 업체가 있는) 카드만 봅니다')
+    +cell('cos',kstYear()+'년 업체',cos,'이알피 사업이 이어진(올해 업체가 있는) 카드만 봅니다')
+    +cell('bare','카드 없는 진행 사업',(b.bare||[]).length,'바로가기가 아직 없는 진행 사업으로 내려갑니다');
+  $('resetBtn').style.display=(Q||KF)?'':'none';
+}
+function kpiFilter(rows){
+  if(KF==='login') return rows.map(function(r){ return {card:r.card,links:r.links.filter(function(l){ return l.login; }),hit:true}; })
+    .filter(function(r){ return r.links.length>0; });
+  if(KF==='cos') return rows.filter(function(r){ return r.card.companyCount>0; });
+  return rows;
+}
 function renderGo(){
   renderNotes(); renderRecent();
   var b=D.board||{cards:[],bare:[],closed:[]};
-  var rows=L.filterCards(b.cards,Q);
+  renderKpis(b);
+  var rows=kpiFilter(L.filterCards(b.cards,Q));
   var total=b.cards.reduce(function(n,c){ return n+c.set.links.length; },0);
   var shown=rows.reduce(function(n,r){ return n+r.links.length; },0);
   $('cnt').textContent=Q?(shown+' / '+total+'곳'):(total+'곳');
@@ -594,6 +636,12 @@ document.addEventListener('click', function(ev){
   if(a==='reload') return glReload();
   if(a==='logout') return firebase.auth().signOut();
   if(a==='more'){ MORE[el.dataset.key]=!MORE[el.dataset.key]; return renderGo(); }
+  if(a==='kpi'){
+    var k=el.dataset.k;
+    if(k==='bare'){ var bx=$('bareBox'); if(bx&&bx.firstChild) bx.scrollIntoView({behavior:'smooth',block:'start'}); return; }
+    KF=(k==='all'||KF===k)?'':k; return renderGo();
+  }
+  if(a==='reset'){ Q=''; KF=''; $('q').value=''; return renderGo(); }
   if(a==='copy'){ var s=findSet(id); if(s&&s.folders[+el.dataset.i]) copyText(s.folders[+el.dataset.i], el); return; }
   if(a==='edit'){ var s2=findSet(id); if(s2) openEdit(s2); return; }
   if(a==='new') return openEdit(newSet());
