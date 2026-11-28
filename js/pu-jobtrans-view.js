@@ -43,10 +43,13 @@
     scalDocs: {},
     mailFolders: {},
     mailMsgs: {},
-    flatMails: []
+    flatMails: [],
+    oldMails: []
   };
 
   var SCAN_CACHE = {};
+  /* 최종보고서 «메일 근거» — { 사업장 id: Intake().findFinalReportEvidence 결과 } · 화면 계산만, 저장하지 않는다 */
+  var FINAL_EV = {};
   var DISCOVER_LIST = [];
   var FOLDER_STATE = {
     rootName: '',
@@ -63,6 +66,7 @@
   };
   var TAB = 'projects';
   var AGENCY_SCOPE = '';
+  var YEAR_FILTER = '';
   var CUR_PID = '';
   var SEL = {};
   var DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
@@ -186,10 +190,12 @@
     ME = { uid: '', sid: '', name: '', email: '', isAdmin: false, isSubAdmin: false };
     TAB = 'projects';
     AGENCY_SCOPE = '';
+    YEAR_FILTER = '';
     CUR_PID = '';
     SEL = {};
     DRAG_SEL = { active: false, listName: '', targetVal: false, startKey: '', moved: false };
     SCAN_CACHE = {};
+    FINAL_EV = {};
     DISCOVER_LIST = [];
     MAIL_VIEW_CACHE = Object.create(null);
     setSyncStateText('');
@@ -204,7 +210,7 @@
       projects: {}, intake: {}, mid: {}, final: {}, snapshots: {},
       companies: [], consultings: [], bizTypes: [],
       scalCos: {}, scalTypes: {}, scalScheds: {}, scalDocs: {},
-      mailFolders: {}, mailMsgs: {}, flatMails: []
+      mailFolders: {}, mailMsgs: {}, flatMails: [], oldMails: []
     };
     closeModal();
     ['agencyScopeBar', 'kpiBox', 'projectsBox', 'folderSyncBox', 'discoverBox', 'intakeBox', 'midBox', 'finalBox', 'formsBox'].forEach(function (id) {
@@ -249,6 +255,7 @@
         consultantName: str(p.consultantName),
         midConfirmedAt: Number(p.midConfirmedAt) || 0,
         finalConfirmedAt: Number(p.finalConfirmedAt) || 0,
+        finalMail: p.finalMail && typeof p.finalMail === 'object' ? { date: str(p.finalMail.date), kind: str(p.finalMail.kind), label: str(p.finalMail.label) } : null,
         status: str(p.status),
         revision: Number(p.revision) || 0,
         createdAt: Number(p.createdAt) || 0,
@@ -351,7 +358,9 @@
     var pMail = Promise.all([
       safeVal('scal_docs'),
       safeVal('mailbox/folders'),
-      safeVal('mailbox/msgs')
+      safeVal('mailbox/msgs'),
+      /* POP3 지난 메일(받은 메일·머리글만) — 2024·2025년 최종보고서 승인·회신 메일을 찾는 데 쓴다(일터혁신·컨설팅 화면과 같은 자리) */
+      safeVal('mailbox/old/msgs')
     ]);
     var pFolder = tryRestoreSavedFolderHandle(reqEpoch, reqUid).catch(function () {});
     var allDone = false;
@@ -399,6 +408,7 @@
     D.mailFolders = mResFinal[1] || {};
     D.mailMsgs = mResFinal[2] || {};
     D.flatMails = Intake().flattenMailboxRows(D.mailFolders, D.mailMsgs);
+    D.oldMails = Intake().flattenOldMailRows(mResFinal[3] || {});
     setSyncStateText('');
 
     rebuildScanAndDiscover();
@@ -466,6 +476,8 @@
         p, D.flatMails, null, D.companies, D.consultings, D.intake[p.id] || {}
       );
     });
+
+    FINAL_EV = Intake().findFinalReportEvidence(projs, D.flatMails.concat(D.oldMails || []), D.companies, D.consultings);
 
     if (!CUR_PID && projs.length) CUR_PID = projs[0].id;
     if (CUR_PID && !projectById(CUR_PID)) CUR_PID = projs[0] ? projs[0].id : '';
@@ -1033,7 +1045,10 @@
 
     rows.forEach(function (r, idx) {
       var ckKey = name + '|' + r.id;
-      var trCls = (curId && r.id === curId) ? ' class="cur"' : '';
+      var trClsList = [];
+      if (curId && r.id === curId) trClsList.push('cur');
+      if (r.cls) trClsList.push(r.cls);
+      var trCls = trClsList.length ? ' class="' + esc(trClsList.join(' ')) + '"' : '';
       html += '<tr data-row="' + esc(r.id) + '" data-tname="' + esc(name) + '"' + trCls + '>' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + (idx + 1) + '번 선택"></td>' +
         '<td class="n">' + (idx + 1) + '</td>' +
@@ -1127,7 +1142,10 @@
       if (!n) { el.innerHTML = ''; return; }
       var btns = '';
       if (nm === 'projects' || nm === 'projectsKmac' || nm === 'projectsCepa') {
-        btns = '<button class="sm danger" data-bulkact="' + nm + ':del">선택 숨김(삭제)</button>';
+        btns = '<button class="sm ok" data-bulkact="' + nm + ':finalok" title="고른 사업장 중 메일 근거가 있고 아직 완료가 아닌 곳만 «최종 완료»로 적습니다">✅ 메일 근거로 완료 확정</button>' +
+          '<button class="sm danger" data-bulkact="' + nm + ':del">선택 숨김(삭제)</button>';
+      } else if (nm === 'projMails') {
+        btns = '<button class="sm pri" data-bulkact="projMails:copy">📋 선택 기록 복사</button>';
       } else if (nm === 'formReviewKmac' || nm === 'formReviewCepa') {
         btns = '<button class="sm ok" data-bulkact="' + nm + ':hwpx">📥 선택 사업장 최종 .hwpx 다운로드</button>';
       } else if (nm === 'midReview' || nm === 'finalReview') {
@@ -1169,6 +1187,50 @@
       }
       el.innerHTML = '<b>' + n + '건 선택됨</b>' + btns + '<button class="sm" data-bulkact="' + nm + ':clear">선택 해제</button>';
     });
+  }
+
+  /* ══ 연도별 정리 · 최종보고서 진행 상태 (대표 지시 2026-11-28 「연도별로 정리 · 메일로 들어간 최종보고서 찾아 완료 표시 · 눌러서 진행 확인」) ══ */
+  function yearOf(p) { var y = Number(p && p.year); return isFinite(y) && y > 0 ? y : 0; }
+  /* 같은 기관 안에서 연도 내림차순 → 사업장명 가나다 */
+  function sortByYearName(list) {
+    return list.slice().sort(function (a, b) {
+      return (yearOf(b) - yearOf(a)) || str(a.companyName).localeCompare(str(b.companyName), 'ko');
+    });
+  }
+  function yearsOfProjects(projs) {
+    var seen = {};
+    projs.forEach(function (p) { var y = yearOf(p); if (y) seen[y] = 1; });
+    return Object.keys(seen).map(Number).sort(function (a, b) { return b - a; });
+  }
+  function dayOfMs(ms) { var s = fmtDateTime(ms); return s === '-' ? '' : s.slice(0, 10); }
+  function finalEvOf(p) {
+    return (p && FINAL_EV[p.id]) || { status: 'none', done: false, label: '', doneAt: 0, doneDate: '', doneKey: '', lastDate: '', mails: [] };
+  }
+  /* 목록 한 칸(한 줄)에 보일 진행 상태 — 사람이 확정한 기록이 먼저, 그다음 메일 근거 */
+  function progressStateOf(p) {
+    var ev = finalEvOf(p);
+    var saved = p && p.finalMail && typeof p.finalMail === 'object' ? p.finalMail : null;
+    if (p && p.finalConfirmedAt) {
+      var how = saved ? str(saved.label) : (ev.done ? ev.label : '');
+      return {
+        code: 'done', cls: 'c-green', icon: '✅',
+        text: '완료' + (how ? ' · ' + how : ''),
+        date: (saved && str(saved.date)) || ev.doneDate || dayOfMs(p.finalConfirmedAt),
+        title: how ? '최종 완료 — 메일 근거: ' + how : '최종 완료로 기록돼 있으나 메일함 거울에서 근거 메일을 찾지 못했습니다(오래전에 보낸 메일일 수 있습니다)'
+      };
+    }
+    if (ev.done) {
+      return { code: 'wait', cls: 'c-amber', icon: '📤', text: ev.label + ' · 완료 확정 대기', date: ev.doneDate, title: '메일 근거가 있습니다 — 사업장을 눌러 메일을 확인한 뒤 «완료로 확정»을 누르세요' };
+    }
+    if (ev.mails.length) {
+      return { code: 'review', cls: 'c-blue', icon: '📝', text: ev.status === 'review' ? '최종보고 검토·수정 중' : '최종보고 메일 오감', date: ev.lastDate, title: '최종보고서 메일이 오가고 있습니다(완료 근거는 아직 없음)' };
+    }
+    if (p && p.midConfirmedAt) return { code: 'mid', cls: 'c-blue', icon: '📌', text: '중간 확정 · 최종 준비', date: dayOfMs(p.midConfirmedAt), title: '중간보고 기준선이 확정됐습니다' };
+    return { code: 'pre', cls: '', icon: '⏳', text: '착수 · 기초자료', date: '', title: '중간보고 전 단계입니다' };
+  }
+  function progressChipHtml(st) {
+    return '<span class="chip ' + st.cls + '" title="' + esc(st.title || '') + '">' + st.icon + ' ' + esc(st.text) + '</span>' +
+      (st.date ? ' <span class="hint">' + esc(st.date) + '</span>' : '');
   }
 
   function agencyChipHtml(agencyCode) {
@@ -1233,6 +1295,7 @@
     });
 
     drawAgencyScopeBar(projs, kmacCnt, cepaCnt);
+    if ($('agencyScopeBar') && $('agencyScopeBar').style) $('agencyScopeBar').style.display = (TAB === 'projects' || TAB === 'forms') ? '' : 'none';
     drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen, kmacCnt, cepaCnt);
     drawIntakePane();
     drawMidPane();
@@ -1263,56 +1326,54 @@
     var tasks = (proj.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : c; });
     var curOrder = proj.finalConfirmedAt ? 6 : (proj.midConfirmedAt ? 4 : (activeIntakeCount(proj.id) ? 2 : 1));
 
-    var kmacProjs = projs.filter(function (p) { return p.agency !== 'cepa'; });
-    var cepaProjs = projs.filter(function (p) { return p.agency === 'cepa'; });
-    function buildOptItems(list, prefix) {
-      return list.map(function (p) {
-        var pm = projectParallelMeta(p);
-        var ctag = pm.contractNo ? (' · ' + pm.contractNo) : '';
+    /* 사업장 고르기 — 기관은 묶음 이름(optgroup)이 말해 주므로 줄에는 «연도 · 사업장명»만. 위 기관 보기와 상관없이 늘 두 기관 다 */
+    function buildOptItems(list) {
+      return sortByYearName(list).map(function (p) {
         return '<option value="' + esc(p.id) + '"' + (p.id === proj.id ? ' selected' : '') + '>' +
-          esc('[' + prefix + '] ' + p.companyName + ' (' + (p.year || 2026) + ctag + ')') + '</option>';
+          esc((yearOf(p) || '연도?') + ' · ' + p.companyName) + '</option>';
       }).join('');
     }
+    var kmacProjs = projs.filter(function (p) { return p.agency !== 'cepa'; });
+    var cepaProjs = projs.filter(function (p) { return p.agency === 'cepa'; });
     var opts = '';
-    if (AGENCY_SCOPE === 'kmac' && proj.agency !== 'cepa') {
-      opts = '<optgroup label="🔵 한국능률협회컨설팅 (KMAC · 산일능률)">' + buildOptItems(kmacProjs, '능률협회') + '</optgroup>';
-    } else if (AGENCY_SCOPE === 'cepa' && proj.agency === 'cepa') {
-      opts = '<optgroup label="🟢 충남경제진흥원 (CEPA · 산일충남)">' + buildOptItems(cepaProjs, '충경진') + '</optgroup>';
-    } else {
-      if (kmacProjs.length) opts += '<optgroup label="🔵 한국능률협회컨설팅 (KMAC · 산일능률)">' + buildOptItems(kmacProjs, '능률협회') + '</optgroup>';
-      if (cepaProjs.length) opts += '<optgroup label="🟢 충남경제진흥원 (CEPA · 산일충남)">' + buildOptItems(cepaProjs, '충경진') + '</optgroup>';
-    }
+    if (kmacProjs.length) opts += '<optgroup label="🔵 능률협회 (KMAC · 산일능률)">' + buildOptItems(kmacProjs) + '</optgroup>';
+    if (cepaProjs.length) opts += '<optgroup label="🟢 충남경제진흥원 (CEPA · 산일충남)">' + buildOptItems(cepaProjs) + '</optgroup>';
 
-    var contractChip = pMeta.contractNo
-      ? ' <span class="chip ' + (ag.code === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(pMeta.contractNo) + '</span>'
-      : ' <span class="chip">' + esc(ag.code === 'cepa' ? '산일충남' : '산일능률') + '</span>';
     var ilteoGuardChip = pMeta.hasIlteoSangsaeng
       ? ' <span class="chip c-amber" title="동일 사업장의 일터혁신 상생컨설팅(' + esc(pMeta.ilteoLabels.join(', ')) + ') 계약·서류·메일은 본 화면에서 자동 분리·배제됩니다">일터상생 별도수행(자동분리)</span>'
       : '';
     var formChipLabel = spec ? (TAB === 'mid' ? spec.midFormTitle : spec.finalFormTitle) : (ag.short + ' 전용 양식');
+    var aboutTitle = '적용 양식: ' + formChipLabel + (tasks.length ? ' · 중점과제: ' + tasks.join(', ') : ' · 중점과제 미선택');
+    var st = progressStateOf(proj);
+    var baseChip = proj.midConfirmedAt
+      ? '<span class="chip c-green">중간확정 ' + esc(dayOfMs(proj.midConfirmedAt)) + '</span>'
+      : '<span class="chip c-amber">기초진단중</span>';
 
     return '<div class="card">' +
       '<div class="prof">' +
-      '<span><b>소속기관·사업장</b><select data-proj-sel="1" aria-label="작업 사업장 전환">' + opts + '</select></span>' +
-      '<span><b>기관 구분</b>' + agencyChipHtml(ag.code) + contractChip + ' <span class="chip">' + esc(tr.short) + '</span>' + ilteoGuardChip + '</span>' +
-      '<span title="' + esc(formChipLabel) + '"><b>적용 양식</b><span class="chip ' + (ag.code === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(formChipLabel) + '</span></span>' +
-      '<span title="' + esc(tasks.join(', ')) + '"><b>중점과제</b>' + esc(tasks.join(' · ') || '미선택') + '</span>' +
-      '<span><b>기준선</b>' + (proj.midConfirmedAt ? '<span class="chip c-green">중간확정 (' + esc(fmtDateTime(proj.midConfirmedAt).slice(0, 10)) + ')</span>' : '<span class="chip c-amber">기초진단중</span>') + '</span>' +
+      '<span><b>사업장</b><select data-proj-sel="1" aria-label="작업 사업장 전환">' + opts + '</select></span>' +
+      '<span title="' + esc(aboutTitle) + '">' + agencyChipHtml(ag.code) +
+      (pMeta.contractNo ? ' <span class="chip">' + esc(pMeta.contractNo) + '</span>' : '') +
+      ' <span class="chip">' + esc(tr.short) + '</span>' + ilteoGuardChip + '</span>' +
+      '<span>' + baseChip + (st.code === 'done' || st.code === 'wait' || st.code === 'review' ? ' ' + progressChipHtml(st) : '') + '</span>' +
       '<span class="sp"></span>' +
-      '<button class="sm" data-act="open-task-modal">🎯 기관·트랙·과제 설정</button>' +
+      '<button class="sm" data-open-detail="' + esc(proj.id) + '" title="메일로 오간 최종보고서·완료 근거와 진행 단계를 한 화면에서 봅니다">📁 진행 기록·완료보고서</button>' +
+      '<button class="sm" data-act="open-task-modal" title="' + esc(aboutTitle) + '">🎯 기관·트랙·과제 설정</button>' +
       '</div>' +
       '<div class="ws-steps">' +
-      Cat().STAGES.map(function (st) {
-        var cls = st.order < curOrder ? ' done' : (st.order === curOrder ? ' cur' : '');
-        var targetTab = st.phase === 'post_mid' ? 'final' : (st.code === 'mid_rpt' ? 'mid' : 'intake');
-        return '<button type="button" class="ws-step' + cls + '" data-goto-tab="' + targetTab + '" title="' + esc(st.desc) + '">' +
-          '<b>' + st.order + '. ' + esc(st.short) + '</b>' +
+      Cat().STAGES.map(function (stg) {
+        var cls = stg.order < curOrder ? ' done' : (stg.order === curOrder ? ' cur' : '');
+        var targetTab = stg.phase === 'post_mid' ? 'final' : (stg.code === 'mid_rpt' ? 'mid' : 'intake');
+        return '<button type="button" class="ws-step' + cls + '" data-goto-tab="' + targetTab + '" title="' + esc(stg.desc) + '">' +
+          '<b>' + stg.order + '. ' + esc(stg.short) + '</b>' +
           '</button>';
       }).join('') +
       '</div></div>';
   }
 
-  function buildProjectRowForAgencyTable(p) {
+  var PROJECT_TABLE_HEADS = ['연도', '사업장명', '트랙 · 단계', '진행 상태 (최종보고)', '기초 · 검수 · 메일', '바로가기'];
+
+  function buildProjectRowForAgencyTable(p, idx, list) {
     var sc = SCAN_CACHE[p.id] || { matched: [], unseenPreCount: 0, unseenPostCount: 0, totalInCount: 0 };
     var chkPre = Intake().summarizeChecklistProgress('pre_mid', p.agency, p.track, p.selectedTasks, D.intake[p.id] || {}, sc.matched, manualChecksOf(p, 'pre_mid'));
     var tr = Cat().getTrack(p.track, p.agency);
@@ -1329,21 +1390,25 @@
     if (sc.unseenPostCount > 0) mailBadges.push('<span class="chip c-green" title="후속 미확인 메일 ' + sc.unseenPostCount + '건">📬' + sc.unseenPostCount + '</span>');
     if (!mailBadges.length && sc.totalInCount > 0) mailBadges.push('<span class="chip" title="수신 확인된 메일 ' + sc.totalInCount + '건">✓' + sc.totalInCount + '</span>');
 
-    var contractChip = pMeta.contractNo
-      ? ' <span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(pMeta.contractNo) + '</span>'
-      : '';
     var ilteoChip = pMeta.hasIlteoSangsaeng
       ? ' <span class="chip c-amber" title="일터혁신 상생컨설팅(' + esc(pMeta.ilteoLabels.join(', ')) + ') 별도 계약은 본 워크스페이스에서 자동 분리됨">일터별도</span>'
       : '';
     var revChipCls = rev.allPassed ? 'c-green' : 'c-amber';
     var compactTrackLabel = str(tr.short).replace(/^(?:KMAC|CEPA)\s+/i, '');
+    var st = progressStateOf(p);
+    var y = yearOf(p);
+    var prevY = (Array.isArray(list) && idx > 0) ? yearOf(list[idx - 1]) : y;
+    /* 계약번호·전환목표·중점과제는 줄마다 되풀이하지 않고 풀이(title)와 «진행 기록» 창으로 */
+    var nameTitle = [p.companyName, pMeta.contractNo, str(p.transGoal) || taskNames].filter(Boolean).join(' · ');
 
     return {
       id: p.id,
+      cls: (Array.isArray(list) && idx > 0 && prevY !== y) ? 'yr-break' : '',
       cells: [
-        { cls: 'ti', title: p.companyName + (pMeta.contractNo ? ' (' + pMeta.contractNo + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc(String(p.year || 2026).slice(-2) + '년') + '</span>' + contractChip + ilteoChip },
+        { k: 'yr', cls: 'yr', title: y ? y + '년 사업' : '연도 미입력', html: '<b>' + esc(y ? String(y) : '-') + '</b>' },
+        { cls: 'ti', title: nameTitle, html: esc(p.companyName) + ilteoChip },
         { k: 'badge', title: tr.name, html: '<span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(compactTrackLabel) + '</span> ' + stageDotsHtml(p) },
-        { cls: 'wide', title: str(p.transGoal) || taskNames, html: esc(str(p.transGoal) || taskNames || '과제 선택 필요') },
+        { cls: 'wide', k: 'prog', title: st.title, html: progressChipHtml(st) },
         { html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
         {
           k: 'act',
@@ -1357,42 +1422,62 @@
 
   /* ── 탭 1: 사업장 현황 · 소속기관별(KMAC vs CEPA) 완전 분리 보기 ── */
   function drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen, kmacCnt, cepaCnt) {
-    if ($('kpiBox')) {
-      $('kpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>전체 산업·일자리전환 (중복제거)</span><b>' + projs.length + '개사</b></div>' +
-        '<div class="kpi k-blue"><span>🔵 한국능률협회컨설팅 (산일능률)</span><b>' + kmacCnt + '개사</b></div>' +
-        '<div class="kpi k-green"><span>🟢 충남경제진흥원 (산일충남)</span><b>' + cepaCnt + '개사</b></div>' +
-        '<div class="kpi k-amber"><span>📩 미확인 메일 (기초 ' + totalPreUnseen + ' · 후속 ' + totalPostUnseen + ')</span><b>' + (totalPreUnseen + totalPostUnseen) + '건</b></div>' +
-        '<div class="kpi k-green"><span>📌 중간보고 기준선 확정</span><b>' + midDoneCnt + '개사</b></div>';
-    }
-
     var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var rawScope = AGENCY_SCOPE || str($('projAgency') && $('projAgency').value);
+    var rawScope = AGENCY_SCOPE;
     var agFilter = (rawScope === 'kmac' || rawScope === 'cepa') ? rawScope : '';
-    var yr = str($('projYear') && $('projYear').value);
+    var yrs = yearsOfProjects(projs);
+    if (YEAR_FILTER && yrs.indexOf(Number(YEAR_FILTER)) < 0) YEAR_FILTER = '';
+    var yr = YEAR_FILTER;
     var stFilter = str($('projStage') && $('projStage').value);
+
+    if ($('kpiBox')) {
+      var scopeList = projs.filter(function (p) { return !agFilter || (p.agency === 'cepa' ? 'cepa' : 'kmac') === agFilter; });
+      var doneCnt = 0, waitCnt = 0;
+      scopeList.forEach(function (p) {
+        var c = progressStateOf(p).code;
+        if (c === 'done') doneCnt++;
+        else if (c === 'wait') waitCnt++;
+      });
+      var yrTiles = yrs.map(function (y) {
+        var inY = scopeList.filter(function (p) { return yearOf(p) === y; });
+        if (!inY.length) return '';
+        var dn = inY.filter(function (p) { return progressStateOf(p).code === 'done'; }).length;
+        var on = yr === String(y);
+        return '<button type="button" class="kpi kpi-yr' + (on ? ' on' : '') + '" data-set-year="' + y + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + y + '년 사업만 보기">' +
+          '<span>' + y + '년 · 완료 ' + dn + (inY.length - dn ? ' · 진행 ' + (inY.length - dn) : '') + '</span><b>' + inY.length + '개사</b></button>';
+      }).join('');
+      $('kpiBox').innerHTML =
+        '<button type="button" class="kpi kpi-yr' + (!yr ? ' on' : '') + '" data-set-year="" aria-pressed="' + (!yr ? 'true' : 'false') + '" title="모든 연도 보기"><span>전체 연도</span><b>' + scopeList.length + '개사</b></button>' +
+        yrTiles +
+        '<div class="kpi k-green" title="최종 완료로 기록된 사업장(메일 근거가 있으면 줄에 함께 보입니다)"><span>✅ 최종 완료</span><b>' + doneCnt + '개사</b></div>' +
+        '<div class="kpi k-amber" title="메일에 최종 승인·완료계·결과보고서 송부 근거가 있으나 아직 완료로 확정하지 않은 사업장"><span>📤 완료 확정 대기</span><b>' + waitCnt + '개사</b></div>' +
+        '<div class="kpi k-amber"><span>📩 미확인 메일 (기초 ' + totalPreUnseen + ' · 후속 ' + totalPostUnseen + ')</span><b>' + (totalPreUnseen + totalPostUnseen) + '건</b></div>';
+    }
 
     var filtered = projs.filter(function (p) {
       var pAg = p.agency === 'cepa' ? 'cepa' : 'kmac';
       if (agFilter && pAg !== agFilter) return false;
-      if (yr && String(p.year || '') !== yr) return false;
+      if (yr && String(yearOf(p)) !== yr) return false;
       var sc = SCAN_CACHE[p.id] || { unseenPreCount: 0, unseenPostCount: 0 };
+      var pcode = progressStateOf(p).code;
       if (stFilter === 'pre_mid' && p.midConfirmedAt) return false;
-      if (stFilter === 'post_mid' && !p.midConfirmedAt) return false;
+      if (stFilter === 'post_mid' && (!p.midConfirmedAt || pcode === 'done')) return false;
+      if (stFilter === 'final_wait' && pcode !== 'wait') return false;
+      if (stFilter === 'final_done' && pcode !== 'done') return false;
       if (stFilter === 'unseen' && (sc.unseenPreCount + sc.unseenPostCount) === 0) return false;
       if (q) {
         var taskStr = (p.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : ''; }).join(' ');
         var agObj = Cat().getAgency(pAg);
         var trObj = Cat().getTrack(p.track, pAg);
         var pm = projectParallelMeta(p);
-        var hay = (str(p.companyName) + ' ' + str(pm.contractNo) + ' ' + str(p.industry) + ' ' + str(p.transGoal) + ' ' + str(p.consultantName) + ' ' + agObj.name + ' ' + trObj.name + ' ' + taskStr).toLowerCase();
+        var hay = (str(p.companyName) + ' ' + str(pm.contractNo) + ' ' + str(p.industry) + ' ' + str(p.transGoal) + ' ' + str(p.consultantName) + ' ' + agObj.name + ' ' + trObj.name + ' ' + taskStr + ' ' + yearOf(p)).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
     });
 
-    var kmacRows = filtered.filter(function (p) { return p.agency !== 'cepa'; }).map(buildProjectRowForAgencyTable);
-    var cepaRows = filtered.filter(function (p) { return p.agency === 'cepa'; }).map(buildProjectRowForAgencyTable);
+    var kmacRows = sortByYearName(filtered.filter(function (p) { return p.agency !== 'cepa'; })).map(buildProjectRowForAgencyTable);
+    var cepaRows = sortByYearName(filtered.filter(function (p) { return p.agency === 'cepa'; })).map(buildProjectRowForAgencyTable);
 
     var kmacCardHtml =
       '<div class="agency-col-card kmac">' +
@@ -1400,16 +1485,9 @@
       '<span>🔵 한국능률협회컨설팅(KMAC) — 구조혁신(산업·일자리전환)</span>' +
       '<span class="chip c-blue">' + kmacRows.length + '개사</span>' +
       '<span class="sp"></span>' +
-      '<button type="button" class="sm" data-goto-tab="forms" data-set-agency-scope="kmac">📋 KMAC 양식·검수기준</button>' +
+      '<button type="button" class="sm" data-goto-tab="forms" data-set-agency-scope="kmac" title="ERP 계약구분 산일능률 · 전용 양식: 착수PPT(1MD) → 중간 7장 → 2026년형 결과보고서 8장(KPI 4+·지원사업 2+) → 완료보고서·정책매니저">📋 KMAC 양식·검수기준</button>' +
       '</div>' +
-      '<div class="agency-col-sub">' +
-      '<span><b>ERP 계약구분:</b> 산일능률</span>' +
-      '<span>·</span>' +
-      '<span><b>전용 양식:</b> 착수PPT(1MD) → 중간 7장 → 2026년형 결과보고서 8장(KPI 4+·지원사업 2+) → 완료보고서·정책매니저</span>' +
-      '</div>' +
-      renderTable('projectsKmac',
-        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 검수 · 메일', '분리 검토·보고서'],
-        kmacRows, CUR_PID) +
+      renderTable('projectsKmac', PROJECT_TABLE_HEADS, kmacRows, CUR_PID) +
       '</div>';
 
     var cepaCardHtml =
@@ -1418,16 +1496,9 @@
       '<span>🟢 충남경제진흥원(CEPA) — 충남 산업일자리전환지원센터</span>' +
       '<span class="chip c-green">' + cepaRows.length + '개사</span>' +
       '<span class="sp"></span>' +
-      '<button type="button" class="sm" data-goto-tab="forms" data-set-agency-scope="cepa">📋 CEPA 양식·검수기준</button>' +
+      '<button type="button" class="sm" data-goto-tab="forms" data-set-agency-scope="cepa" title="ERP 계약구분 산일충남 · 전용 양식: 지원신청서 → [진단 3회 / 전문 6회·월별실적] → 결과보고서 8장 → 완료계(갑지 대표자 날인) · 충남장려금">📋 CEPA 양식·검수기준</button>' +
       '</div>' +
-      '<div class="agency-col-sub">' +
-      '<span><b>ERP 계약구분:</b> 산일충남</span>' +
-      '<span>·</span>' +
-      '<span><b>전용 양식:</b> 지원신청서 → [진단 3회 / 전문 6회·월별실적] → 결과보고서 8장 → 완료계(갑지 대표자 날인) · 충남장려금</span>' +
-      '</div>' +
-      renderTable('projectsCepa',
-        ['사업장명 · 계약구분', '트랙 · 단계', '전환목표 · 중점과제', '기초 · 검수 · 메일', '분리 검토·보고서'],
-        cepaRows, CUR_PID) +
+      renderTable('projectsCepa', PROJECT_TABLE_HEADS, cepaRows, CUR_PID) +
       '</div>';
 
     if ($('projectsBox')) {
@@ -3356,6 +3427,277 @@
     }
   }
 
+  /* ══ 사업장 진행 기록 · 완료보고서 보기 (대표 지시 2026-11-28 「사업장 클릭하면 완료보고서까지 보고, 어떻게 진행됐는지 확인」) ══
+   * 읽기만 한다 — 메일 본문·첨부는 서버에서 «미리 보기(peek)»로 받아 이 탭 메모리에서만 연다(읽음 표시·저장 없음).
+   * «완료로 확정»만 쓰기다: 사람이 근거 메일을 보고 누르면 프로젝트에 finalConfirmedAt·finalMail(열쇠·날짜·종류)을 적는다. */
+  var DETAIL_PID = '';
+  var PD_ATT_STATE = null;
+
+  function firstIntakeDateOf(pid) {
+    var map = D.intake[pid] || {};
+    var min = 0;
+    Object.keys(map).forEach(function (k) {
+      var c = map[k];
+      if (!c || c._deleted) return;
+      var t = Number(c.checkedAt || c.createdAt || c.analyzedAt) || 0;
+      if (t > 0 && (!min || t < min)) min = t;
+    });
+    return min ? dayOfMs(min) : '';
+  }
+
+  /* 보낸메일 거울이 담고 있는 가장 이른 날 — «이보다 전에 보낸 메일은 안 보인다»를 밝히는 데 쓴다 */
+  function sentMirrorFromDate() {
+    var min = 0;
+    (D.flatMails || []).forEach(function (m) {
+      if (m && m.folderKind === 'sent' && m.ts > 0 && (!min || m.ts < min)) min = m.ts;
+    });
+    return min ? dayOfMs(min) : '';
+  }
+
+  /* 창의 메일 기록 줄 — 최종보고 근거(지난 메일 포함) + 이 사업장으로 확정 귀속된 메일(최근 거울·지난 메일) */
+  function detailTimelineRows(p) {
+    if (!p) return [];
+    var ev = finalEvOf(p);
+    var seen = {}, rows = [];
+    function add(m, kindLabel, kindCls, isFinal) {
+      if (!m || !m.key || seen[m.key]) return;
+      seen[m.key] = 1;
+      rows.push({ id: m.key, m: m, kindLabel: kindLabel, kindCls: kindCls, isFinal: isFinal });
+    }
+    ev.mails.forEach(function (e) { add(e, e.kindLabel, e.done ? 'c-green' : 'c-blue', true); });
+    var sc = SCAN_CACHE[p.id] || { matched: [] };
+    (sc.matched || []).forEach(function (m) { add(m, m.docKindName || '메일', '', false); });
+    if ((D.oldMails || []).length) {
+      var oldScan = Intake().scanProjectMails(p, D.oldMails, null, D.companies, D.consultings, D.intake[p.id] || {});
+      (oldScan.matched || []).forEach(function (m) { add(m, m.docKindName || '메일', '', false); });
+    }
+    rows.sort(function (a, b) { return ((Number(b.m.ts) || 0) - (Number(a.m.ts) || 0)) || (a.id < b.id ? -1 : 1); });
+    return rows;
+  }
+
+  function openProjectDetailModal(pid) {
+    var p = projectById(pid);
+    if (!p) { toast('사업장을 찾을 수 없습니다.'); return; }
+    CUR_PID = p.id;
+    DETAIL_PID = p.id;
+    PD_ATT_STATE = null;
+    clearSel('projMails');
+    var ag = Cat().getAgency(p.agency);
+    var tr = Cat().getTrack(p.track, ag.code);
+    var pMeta = projectParallelMeta(p);
+    var ev = finalEvOf(p);
+    var st = progressStateOf(p);
+    var saved = p.finalMail && typeof p.finalMail === 'object' ? p.finalMail : null;
+    var tasks = (p.selectedTasks || []).map(function (c) { var t = Cat().getTask(c); return t ? t.name : c; });
+    var y = yearOf(p);
+
+    var steps = [
+      { name: '사업 등록', date: dayOfMs(p.createdAt), done: true },
+      { name: '기초자료 수령', date: firstIntakeDateOf(p.id), done: activeIntakeCount(p.id) > 0 },
+      { name: '중간보고 확정', date: dayOfMs(p.midConfirmedAt), done: !!p.midConfirmedAt },
+      { name: '최종보고 메일', date: ev.done ? ev.doneDate : ev.lastDate, done: ev.done, sub: ev.label },
+      { name: '최종 완료', date: p.finalConfirmedAt ? ((saved && str(saved.date)) || dayOfMs(p.finalConfirmedAt)) : '', done: !!p.finalConfirmedAt }
+    ];
+    var stepsHtml = '<div class="ws-steps pd-steps">' + steps.map(function (sp, i) {
+      var cls = sp.done ? ' done' : '';
+      var tip = sp.name + (sp.sub ? ' — ' + sp.sub : '') + (sp.date ? ' (' + sp.date + ')' : '');
+      return '<div class="ws-step' + cls + '" title="' + esc(tip) + '"><b>' + (i + 1) + '. ' + esc(sp.name) + (sp.date ? ' · ' + esc(sp.date.slice(2)) : '') + '</b></div>';
+    }).join('') + '</div>';
+
+    var profHtml = '<div class="prof">' +
+      '<span><b>연도</b>' + esc(y ? y + '년' : '미입력') + '</span>' +
+      '<span><b>기관</b>' + agencyChipHtml(ag.code) + ' <span class="chip">' + esc(tr.short) + '</span></span>' +
+      (pMeta.contractNo ? '<span><b>계약</b>' + esc(pMeta.contractNo) + '</span>' : '') +
+      (str(p.consultantName) ? '<span><b>담당</b>' + esc(p.consultantName) + '</span>' : '') +
+      (str(p.transGoal) ? '<span title="' + esc(p.transGoal) + '"><b>전환목표</b>' + esc(p.transGoal) + '</span>' : '') +
+      '<span title="' + esc(tasks.join(', ')) + '"><b>중점과제</b>' + esc(tasks.join(' · ') || '미선택') + '</span>' +
+      '</div>';
+
+    var finalBar = '<div class="bar">' + progressChipHtml(st) +
+      '<span class="hint">최종보고 메일 근거 ' + ev.mails.length + '통</span>' +
+      (st.code === 'wait'
+        ? '<span class="sp"></span><button class="sm ok" data-final-ok="' + esc(p.id) + '" title="근거 메일(' + esc(ev.doneDate) + ' · ' + esc(ev.label) + ')을 확인했으면 누르세요 — 이 사업장을 최종 완료로 적습니다">✅ 완료로 확정 (' + esc(ev.doneDate || '날짜 미상') + ' 근거)</button>'
+        : '') +
+      '</div>';
+    var gapNote = '';
+    if (!ev.mails.length) {
+      var sentFrom = sentMirrorFromDate();
+      gapNote = '<div class="hint pd-gap">메일함 거울에서 이 사업장의 최종보고서 메일을 찾지 못했습니다 — 보낸메일 거울은 최근 메일' +
+        (sentFrom ? '(' + esc(sentFrom) + ' 이후)' : '') + '만 담고, 지난 메일은 «받은 메일»만 있어 오래전에 보낸 보고서는 상대 기관의 회신·승인 메일이 없으면 보이지 않습니다. 원본은 다음메일 보낸편지함·컨설팅 폴더에서 확인해 주세요.</div>';
+    }
+
+    var tl = detailTimelineRows(p);
+    var shown = tl.slice(0, 80);
+    var tRows = shown.map(function (r) {
+      var m = r.m;
+      var isOld = m.src === 'pop3' || !!m.old;
+      var atts = Array.isArray(m.attNames) ? m.attNames : [];
+      var repAtts = Array.isArray(m.reportAtts) ? m.reportAtts : [];
+      var subjTitle = str(m.subject) + (atts.length ? ' · 첨부: ' + atts.join(', ') : '');
+      return {
+        id: r.id,
+        cells: [
+          { k: 'yr', html: esc(m.date || dayOfMs(m.ts) || '-') },
+          { html: (m.dir === 'out' ? '📤 보냄' : '📥 받음') + (isOld ? ' <span class="chip" title="POP3 지난 메일 보관분 — 첨부 이름은 열어야 보입니다">지난메일</span>' : '') },
+          { k: 'badge', html: '<span class="chip ' + r.kindCls + '">' + esc(r.kindLabel) + '</span>' },
+          { cls: 'wide', title: subjTitle, html: esc(m.subject || '(제목 없음)') + (repAtts.length ? ' <span class="chip c-green" title="' + esc(repAtts.join(', ')) + '">📎 보고서 ' + repAtts.length + '</span>' : (atts.length ? ' <span class="hint">📎' + atts.length + '</span>' : '')) },
+          { k: 'act', html: '<button class="sm" data-pd-att="' + esc(r.id) + '" title="이 메일의 첨부 목록을 불러옵니다(읽음 표시 안 바뀜)">📎 첨부 보기</button>' }
+        ]
+      };
+    });
+
+    var body = stepsHtml + profHtml +
+      '<div class="sec"><span>📄 최종보고서 · 완료 근거</span></div>' + finalBar + gapNote +
+      '<div class="sec"><span>✉️ 메일로 본 진행 기록 (최신순)</span><span class="chip">' + tl.length + '통</span>' +
+      (tl.length > shown.length ? '<span class="hint">최근 ' + shown.length + '통만 보입니다</span>' : '') + '</div>' +
+      renderTable('projMails', ['날짜', '구분', '종류', '제목 · 첨부', '열기'], tRows, '') +
+      '<div id="pdAttBox" class="pd-att-box" aria-live="polite"></div>';
+    var foot = '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초자료</button>' +
+      '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간보고</button>' +
+      '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 최종·완료계</button>' +
+      '<button class="sm" data-close-modal="1">닫기</button>';
+    openModal('📁 ' + (y ? y + '년 · ' : '') + p.companyName + ' — 진행 기록·완료보고서', body, foot, 'xwide');
+    drawBulks();
+  }
+
+  function attExtOf(name) {
+    var m = /\.([A-Za-z0-9]{1,6})$/.exec(str(name));
+    return m ? m[1].toLowerCase() : '';
+  }
+  var ATT_VIEW_EXT = { pdf: 1, hwp: 1, hwpx: 1, png: 1, jpg: 1, jpeg: 1, gif: 1, webp: 1 };
+
+  async function showDetailMailAtts(mailKey) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    var p = projectById(DETAIL_PID);
+    if (!p) return;
+    var row = detailTimelineRows(p).find(function (r) { return r.id === mailKey; });
+    if (!row) { toast('메일 정보를 찾을 수 없습니다.'); return; }
+    var m = row.m;
+    var box = $('pdAttBox');
+    if (box) box.innerHTML = '<div class="hint">첨부 목록을 불러오는 중… (읽음 표시는 바뀌지 않습니다)</div>';
+    try {
+      var isOld = m.src === 'pop3' || !!m.old || String(m.key).indexOf('o:') === 0;
+      var cacheKey = isOld ? ('old:' + str(m.popKey)) : ('imap:' + str(m.slug) + ':' + str(m.uid));
+      var msg = MAIL_VIEW_CACHE[cacheKey];
+      if (!msg) {
+        msg = isOld
+          ? await callMailFn('readOldMail', { key: str(m.popKey), full: 1 }, reqEpoch, reqUid)
+          : await callMailFn('readMailMessage', { slug: str(m.slug), uid: str(m.uid), peek: 1 }, reqEpoch, reqUid);
+        if (!isSessionCurrent(reqEpoch, reqUid)) return;
+        if (msg) MAIL_VIEW_CACHE[cacheKey] = msg;
+      }
+      if (DETAIL_PID !== p.id || !$('pdAttBox')) return;
+      var atts = Array.isArray(msg && msg.atts) ? msg.atts : [];
+      PD_ATT_STATE = { key: mailKey, m: m, isOld: isOld, atts: atts };
+      var head = '<div class="sec"><span>📎 ' + esc(m.date || '') + ' · ' + esc(str(m.subject).slice(0, 80)) + '</span><span class="chip">' + atts.length + '개</span></div>';
+      if (!atts.length) {
+        $('pdAttBox').innerHTML = head + '<div class="empty">이 메일에는 첨부가 없습니다' + (isOld ? ' (회신 메일은 보통 원래 첨부를 다시 싣지 않습니다)' : '') + '.</div>';
+        return;
+      }
+      $('pdAttBox').innerHTML = head + '<div class="pd-att-list">' + atts.map(function (a, i) {
+        var nm = str(a && a.name) || ('첨부 ' + (i + 1));
+        var ext = attExtOf(nm);
+        var kb = Number(a && a.size) > 0 ? Math.max(1, Math.round(Number(a.size) / 1024)) : 0;
+        var isRep = /결과\s*보고|최종\s*보고|완료\s*보고|완료계|최종\s*본|정책\s*매니저|사후\s*관리/.test(nm);
+        return '<div class="pd-att' + (isRep ? ' rep' : '') + '">' +
+          '<span class="pd-att-no">' + (i + 1) + '</span>' +
+          '<span class="pd-att-nm" title="' + esc(nm) + '">' + (isRep ? '📄 ' : '') + esc(nm) + '</span>' +
+          (kb ? '<span class="hint">' + kb.toLocaleString() + 'KB</span>' : '') +
+          (ATT_VIEW_EXT[ext] ? '<button class="sm pri" data-pd-open="view:' + i + '" title="' + (ext === 'pdf' ? '새 탭에서 PDF로 봅니다' : (ext === 'hwp' || ext === 'hwpx' ? '푸른한글 새 탭에서 엽니다' : '새 탭에서 봅니다')) + '">보기</button>' : '') +
+          '<button class="sm" data-pd-open="save:' + i + '">받기</button>' +
+          '</div>';
+      }).join('') + '</div>';
+    } catch (err) {
+      if (!isSessionCurrent(reqEpoch, reqUid)) return;
+      if ($('pdAttBox')) $('pdAttBox').innerHTML = '<div class="warn">첨부를 불러오지 못했습니다 — ' + esc((err && err.message) || err) + '</div>';
+    }
+  }
+
+  /* 보기: 누른 순간 빈 창을 먼저 연다(받는 동안 기다리면 팝업 차단) — pdf·그림은 그 창에, 한글은 푸른한글로 */
+  async function openDetailAtt(spec, preWin) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    var st = PD_ATT_STATE;
+    var parts = String(spec || '').split(':');
+    var mode = parts[0], idx = Number(parts[1]);
+    var a = st && st.atts[idx];
+    function closePre() { try { if (preWin && !preWin.closed) preWin.close(); } catch (e) {} }
+    if (!st || !a) { closePre(); return; }
+    var nm = str(a.name) || ('첨부_' + (idx + 1));
+    if (Number(a.size) > 20 * 1024 * 1024) { closePre(); toast('20MB가 넘어 앱에서 열 수 없습니다 — 메일함에서 받아 주세요.'); return; }
+    try {
+      var got = st.isOld
+        ? await callMailFn('readOldMail', { key: str(st.m.popKey), index: a.i == null ? idx : a.i }, reqEpoch, reqUid)
+        : await callMailFn('readMailAttachment', { slug: str(st.m.slug), uid: str(st.m.uid), index: a.i == null ? idx : a.i, part: a.part || '' }, reqEpoch, reqUid);
+      if (!isSessionCurrent(reqEpoch, reqUid)) { closePre(); return; }
+      if (!got || !got.b64 || !global.PuRulesMailOrig) throw new Error('첨부 내용을 받지 못했습니다');
+      var bytes = global.PuRulesMailOrig.b64ToBytes(got.b64);
+      var ext = attExtOf(nm);
+      if (mode === 'view' && (ext === 'hwp' || ext === 'hwpx') && Hwpx() && typeof Hwpx().openBytesInHangulEditor === 'function') {
+        Hwpx().openBytesInHangulEditor(bytes, nm, ext, preWin);
+        return;
+      }
+      if (mode === 'view' && ATT_VIEW_EXT[ext]) {
+        var mime = ext === 'pdf' ? 'application/pdf' : ('image/' + (ext === 'jpg' ? 'jpeg' : ext));
+        var url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+        if (preWin && !preWin.closed) preWin.location.href = url;
+        else global.open(url, '_blank');
+        setTimeout(function () { URL.revokeObjectURL(url); }, 120000);
+        return;
+      }
+      closePre();
+      downloadRawBytes(bytes, nm);
+    } catch (err) {
+      closePre();
+      if (isSessionCurrent(reqEpoch, reqUid)) toast('첨부를 열지 못했습니다 — ' + ((err && err.message) || err));
+    }
+  }
+
+  function finalMailRecordOf(p) {
+    var ev = finalEvOf(p);
+    if (!ev.done) return null;
+    var e = ev.mails.find(function (x) { return x.key === ev.doneKey; }) || null;
+    return {
+      key: str(ev.doneKey).slice(0, 120),
+      date: str(ev.doneDate),
+      kind: str(ev.status),
+      label: str(ev.label),
+      subject: e ? sanitizeMetaLabel(str(e.subject).slice(0, 120), p) : '',
+      confirmedBy: str(ME && ME.sid),
+      confirmedAt: Date.now()
+    };
+  }
+
+  /* 완료 확정 — 사람이 근거를 보고 누를 때만. 이미 완료로 적힌 사업장은 건드리지 않는다(종료 건 불변) */
+  async function confirmFinalFromMail(pids) {
+    var reqEpoch = SESSION_EPOCH;
+    var reqUid = ME && ME.uid ? String(ME.uid) : '';
+    var targets = pids.map(projectById).filter(function (p) { return p && !p.finalConfirmedAt && finalEvOf(p).done; });
+    var skipped = pids.length - targets.length;
+    if (!targets.length) { toast('완료로 확정할 수 있는 사업장이 없습니다 (이미 완료이거나 메일 근거가 없습니다).'); return false; }
+    var lines = targets.slice(0, 8).map(function (p) { var ev = finalEvOf(p); return '· ' + (yearOf(p) || '') + ' ' + p.companyName + ' — ' + ev.label + ' ' + (ev.doneDate || ''); }).join('\n');
+    if (!askConfirm('메일 근거로 ' + targets.length + '개 사업장을 «최종 완료»로 적습니다.' + (skipped ? ' (이미 완료이거나 근거가 없는 ' + skipped + '곳은 건너뜀)' : '') + '\n\n' + lines + (targets.length > 8 ? '\n…' : '') + '\n\n계속할까요?')) return false;
+    var entries = targets.map(function (p) {
+      var fm = finalMailRecordOf(p);
+      return {
+        path: 'scal_jobtrans/projects/' + p.id,
+        previous: p,
+        record: Object.assign({}, p, { finalConfirmedAt: Number(finalEvOf(p).doneAt) || Date.now(), stage: 'followup', finalMail: fm }),
+        entityType: 'Project'
+      };
+    });
+    var saved = await atomicMultiRecordUpdate(entries, reqEpoch, reqUid);
+    if (!saved || !isSessionCurrent(reqEpoch, reqUid)) return false;
+    Object.keys(saved).forEach(function (pathKey) {
+      var val = saved[pathKey];
+      if (val && val.id) D.projects[val.id] = val;
+    });
+    rebuildScanAndDiscover();
+    toast(targets.length + '개 사업장을 메일 근거로 최종 완료 확정했습니다.');
+    return true;
+  }
+
   function openReportPreviewModal(proj, kind) {
     if (!Hwpx()) { toast('보고서 출력 엔진이 준비되지 않았습니다.'); return; }
     var live = buildLiveReportsForExport(proj);
@@ -3970,6 +4312,48 @@
     });
 
     document.addEventListener('click', async function (e) {
+      var yearBtn = e.target.closest('[data-set-year]');
+      if (yearBtn) {
+        YEAR_FILTER = yearBtn.getAttribute('data-set-year') || '';
+        clearSel();
+        draw();
+        return;
+      }
+
+      var detailBtn = e.target.closest('[data-open-detail]');
+      if (detailBtn) {
+        openProjectDetailModal(detailBtn.getAttribute('data-open-detail'));
+        return;
+      }
+
+      var pdAttBtn = e.target.closest('[data-pd-att]');
+      if (pdAttBtn) {
+        await withBusy(pdAttBtn, function () { return showDetailMailAtts(pdAttBtn.getAttribute('data-pd-att')); });
+        return;
+      }
+
+      var pdOpenBtn = e.target.closest('[data-pd-open]');
+      if (pdOpenBtn) {
+        var pdSpec = pdOpenBtn.getAttribute('data-pd-open') || '';
+        /* «보기»는 누른 그 순간 빈 창을 연다 — 첨부를 받은 뒤에 열면 팝업 차단에 걸린다 */
+        var preWin = null;
+        if (pdSpec.indexOf('view:') === 0) {
+          try { preWin = global.open('about:blank', '_blank'); } catch (eWin) { preWin = null; }
+        }
+        await withBusy(pdOpenBtn, function () { return openDetailAtt(pdSpec, preWin); });
+        return;
+      }
+
+      var finalOkBtn = e.target.closest('[data-final-ok]');
+      if (finalOkBtn) {
+        var okPid = finalOkBtn.getAttribute('data-final-ok');
+        await withBusy(finalOkBtn, async function () {
+          var okDone = await confirmFinalFromMail([okPid]);
+          if (okDone) { closeModal(true); draw(); openProjectDetailModal(okPid); }
+        });
+        return;
+      }
+
       var scopeBtn = e.target.closest('[data-set-agency-scope]');
       if (scopeBtn) {
         applyAgencyScope(scopeBtn.getAttribute('data-set-agency-scope') || '');
@@ -3990,6 +4374,7 @@
 
       var openProjBtn = e.target.closest('[data-open-proj]');
       if (openProjBtn) {
+        if ($('modal') && $('modal').style && $('modal').style.display !== 'none') closeModal(true);
         CUR_PID = openProjBtn.getAttribute('data-open-proj');
         TAB = openProjBtn.getAttribute('data-open-tab') || 'intake';
         clearSel();
@@ -4192,10 +4577,8 @@
       if (!e.target.closest('input,button,select,a,label,textarea')) {
         var tr = e.target.closest('tr[data-row][data-tname="projects"], tr[data-row][data-tname="projectsKmac"], tr[data-row][data-tname="projectsCepa"]');
         if (tr) {
-          CUR_PID = tr.getAttribute('data-row');
-          TAB = 'intake';
-          clearSel();
-          draw();
+          /* 줄을 누르면 진행 기록·완료보고서 창 — 단계 탭으로는 줄 끝 ①②③ 단추로 간다 */
+          openProjectDetailModal(tr.getAttribute('data-row'));
         }
       }
     });
@@ -4250,6 +4633,22 @@
       rebuildScanAndDiscover();
       draw();
       toast(actEntries.length + '개 사업장 워크스페이스 활성화 완료');
+    } else if ((nm === 'projects' || nm === 'projectsKmac' || nm === 'projectsCepa') && op === 'finalok') {
+      var finOk = await confirmFinalFromMail(ids);
+      if (!finOk || !isSessionCurrent(reqEpoch, reqUid)) return;
+      clearSel(nm);
+      draw();
+    } else if (nm === 'projMails' && op === 'copy') {
+      var pdProj = projectById(DETAIL_PID);
+      var pickSet = {};
+      ids.forEach(function (k) { pickSet[k] = 1; });
+      var copyLines = detailTimelineRows(pdProj).filter(function (r) { return pickSet[r.id]; }).map(function (r) {
+        return [r.m.date || '', r.m.dir === 'out' ? '보냄' : '받음', r.kindLabel, str(r.m.subject)].join('	');
+      });
+      copyTextToClipboard(copyLines.join('\n'));
+      toast('진행 기록 ' + copyLines.length + '줄을 복사했습니다.');
+      clearSel(nm);
+      drawBulks();
     } else if ((nm === 'projects' || nm === 'projectsKmac' || nm === 'projectsCepa') && op === 'del') {
       if (typeof global.confirm === 'function' && !global.confirm('선택한 사업장 ' + ids.length + '건을 목록에서 숨김(소프트 삭제) 처리하시겠습니까?')) return;
       var delProjEntries = [];

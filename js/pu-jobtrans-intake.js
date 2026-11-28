@@ -501,6 +501,255 @@
     };
   }
 
+  /* ══ 2-A2. 최종보고서 «메일 근거» 찾기 (대표 지시 2026-11-28 「메일로 들어간 최종보고서 싹 다 찾아서 완료 표시 · 사업장 눌러 완료보고서까지 보기」) ══
+   * ⚠ 읽기만 — 메일함 거울 두 곳(IMAP 최근 거울 mailbox/msgs · POP3 지난 메일 mailbox/old/msgs)의 머리글(제목·첨부 이름·날짜)만 본다.
+   * ⚠ 저장하지 않는다 — 결과는 화면에 «근거»로만 보인다. 프로젝트에 «완료»를 적는 것은 사람이 근거를 보고 누를 때뿐이다
+   *   (온톨로지: 이름으로 추정한 관계를 자동 저장하지 않는다).
+   * 귀속: ① 사업장 이름(괄호 속 옛 상호·영문 약칭 포함)이 제목·첨부 이름에 있다 → 그 사업장만.
+   *       ② 이름이 어느 사업장에도 안 맞을 때만 업체 주소·도메인(buildCompanyMailProfile)으로.
+   * 거르기: 산업일자리 신호 필수(구조혁신·정책매니저·표준결과보고서·능률협회·충남경제진흥원 등) · 다른 사업(유연근무·기술보호·일터혁신·
+   *         직장문화·역량평가·위험성평가 …) 낱말이 있으면 제외 · 상대 기관 표식만 있으면 제외 · 사업 연도와 다른 연도만 적혀 있으면 제외
+   *         · 날짜는 사업 연도 1월 1일 ~ 이듬해 6월 30일.
+   * 알려진 빈틈: 보낸메일 거울은 «폴더마다 최근 메일»만 담고, 지난 메일(POP3)은 «받은 메일»만 있다 — 오래전에 보낸 결과보고서는
+   *   상대 기관의 회신·승인 메일이 없으면 찾지 못한다(화면이 그렇게 밝힌다). */
+  var FINAL_DOC_RE = /결과\s*보고|최종\s*보고|완료\s*보고|완료계|정책\s*매니저|사후\s*관리\s*보고/;
+  var FINAL_JT_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신|능률\s*협회|kmac|충남\s*경제\s*진흥원|충경진|cepa|석탄\s*화력|정의로운\s*전환|산일\s*충남|산일\s*능률|정책\s*매니저|표준\s*결과\s*보고서|일자리\s*전환\s*지원\s*센터/i;
+  var FINAL_OTHER_PROGRAM_RE = /유연\s*근무|기술\s*보호|일터\s*혁신|일터\s*상생|상생\s*컨설팅|상생\s*혁신|직장\s*문화|역량\s*평가|위험성\s*평가|노사\s*발전|공정\s*채용|근로\s*시간\s*단축|안전\s*보건|산업\s*안전|중대\s*재해|현장\s*클리닉|혁신\s*바우처|비정규직|석유\s*화학|노동\s*전환\s*지원\s*센터/;
+  var FINAL_KMAC_MARK_RE = /한국\s*능률\s*협회|능률\s*협회|kmac|중진공|구조\s*혁신|산일\s*능률|정책\s*매니저|표준\s*결과\s*보고서/i;
+  var FINAL_CEPA_MARK_RE = /충남\s*경제\s*진흥원|충경진|cepa|산일\s*충남|완료계|석탄\s*화력/i;
+  var FINAL_REPORT_ATT_RE = /결과\s*보고|최종\s*보고|완료\s*보고|완료계|최종\s*본|정책\s*매니저|사후\s*관리\s*보고/;
+  /* 위에서부터 처음 맞는 것 — «완료 근거(done)»는 최종 승인 · 완료계/완료보고 · 결과보고서 송부 · 정책매니저(사후관리 = 최종 뒤 단계) */
+  var FINAL_KINDS = [
+    { code: 'approved', label: '최종 승인', done: true, re: /검수\s*승인|최종\s*승인|승인\s*완료|업로드\s*안내/ },
+    { code: 'post', label: '사후관리(정책매니저)', done: true, re: /정책\s*매니저|사후\s*관리/ },
+    { code: 'completion', label: '완료계·완료보고', done: true, re: /완료계|완료\s*보고서?\s*(?:송부|제출|서명|발송|전달)|서명본/ },
+    { code: 'review', label: '검토·수정', done: false, re: /검토\s*의견|수정\s*(?:요청|사항|의견|안)|피드백|보완\s*요청/ },
+    { code: 'submitted', label: '결과보고서 송부', done: true, re: /(?:결과|최종)\s*보고서?[^\n]{0,40}(?:송부|제출|발송|전달)|(?:송부|제출)[^\n]{0,8}(?:결과|최종)\s*보고/ },
+    { code: 'report', label: '보고서 메일', done: false, re: /[\s\S]/ }
+  ];
+  /* «완료한 날»로 볼 차례 — 최종 승인 > 완료계 > 결과보고서 송부 > 사후관리 */
+  var FINAL_DONE_ORDER = ['approved', 'completion', 'submitted', 'post'];
+
+  /* POP3 지난 메일 거울(mailbox/old/msgs, 받은 메일·머리글만·첨부 이름 없음)을 IMAP 줄과 같은 꼴로 — 열쇠 'o:<popKey>'(pu-ilteo-intake 와 같다) */
+  function flattenOldMailRows(oldMsgs) {
+    var out = [];
+    if (!oldMsgs || typeof oldMsgs !== 'object') return out;
+    Object.keys(oldMsgs).forEach(function (popKey) {
+      var r = oldMsgs[popKey];
+      if (!r || typeof r !== 'object') return;
+      var fromAddr = mailOf(r.e || r.from);
+      var ts = Number(r.d || r.at) || 0;
+      out.push({
+        key: 'o:' + popKey,
+        src: 'pop3',
+        old: true,
+        popKey: String(popKey),
+        slug: '',
+        uid: '',
+        folderKind: 'old',
+        dir: (fromAddr && OWN_MAIL_RE.test(fromAddr)) ? 'out' : 'in',
+        from: fromAddr,
+        fromLabel: str(r.f) || fromAddr,
+        to: str(r.t || r.to).split(/[,;]+/).map(mailOf).filter(Boolean),
+        toLabel: str(r.tn) || str(r.t),
+        subject: str(r.s || r.subject),
+        /* 본문 첫머리(거울이 담은 짧은 미리보기) — 회신 제목에 업체 이름이 없을 때 서명·인용에서 이름을 찾는 데만 쓴다. 복사하지 않고 그대로 가리킨다 */
+        preview: typeof r.p === 'string' ? r.p : '',
+        ts: ts,
+        date: dayOf(ts),
+        attCount: Number(r.a) || 0,
+        attNames: Array.isArray(r.an) ? r.an.map(str).filter(Boolean) : []
+      });
+    });
+    out.sort(function (a, b) { return (b.ts - a.ts) || (a.key < b.key ? -1 : 1); });
+    return out;
+  }
+
+  /* 사업장 이름의 «맞춰 볼 꼴» — 괄호 밖 본이름 + 괄호 속 옛 상호·영문 약칭(두 글자 이하 괄호 글은 지명·법인표시라 뺀다) */
+  function companyNameAliases(name) {
+    var raw = str(name).normalize('NFC');
+    if (!raw) return [];
+    var parts = [raw.replace(/\([^)]*\)|（[^）]*）|\[[^\]]*\]/g, ' ')];
+    var re = /\(([^)]*)\)/g, m;
+    while ((m = re.exec(raw))) {
+      var inner = str(m[1]).replace(/^(?:구|舊|前|전)[\s.:：]+/, '');
+      if (normCorpName(inner).length >= 3) parts.push(inner);
+    }
+    var seen = {}, out = [];
+    parts.forEach(function (p) {
+      var n = normCorpName(p);
+      if (n.length >= 2 && !seen[n]) { seen[n] = 1; out.push(n); }
+    });
+    return out;
+  }
+
+  /* 이름 맞추기 — 세 글자 이상은 붙여 쓴 꼴·발음 꼴(플렌트=플랜트) 어느 쪽이든, 두 글자는 앞뒤가 끊긴 자리만(onlyLong 이면 두 글자는 안 본다) */
+  function finalNameHit(aliases, rawHay, normHay, onlyLong) {
+    var phonHay = null;
+    return aliases.some(function (al) {
+      if (al.length >= 3) {
+        if (normHay.indexOf(al) >= 0) return true;
+        if (phonHay === null) phonHay = normCorpPhonetic(normHay);
+        return phonHay.indexOf(normCorpPhonetic(al)) >= 0;
+      }
+      if (onlyLong) return false;
+      /* 두 글자 이름은 앞뒤가 다른 글자로 끊겨야 한다(«수성» ≠ «수성구») */
+      var esc = al.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp('(^|[^가-힣A-Za-z0-9])' + esc + '(?=$|[^가-힣A-Za-z0-9])', 'i').test(rawHay);
+    });
+  }
+
+  /* 제목·첨부에 적힌 연도(2019~2030) — «2026년»·«26년»·«2026_» 꼴. 날짜 숫자(20231204)는 연도로 보지 않는다 */
+  function explicitYearsOf(text) {
+    var s = String(text == null ? '' : text), out = {}, m;
+    var re4 = /(?:^|[^\d])(20[1-3]\d)(?=\s*년|[^\d]|$)/g;
+    while ((m = re4.exec(s))) { var y4 = Number(m[1]); if (y4 >= 2019 && y4 <= 2030) out[y4] = 1; }
+    var re2 = /(?:^|[^\d])([12]\d)\s*년(?!\s*\d)/g;
+    while ((m = re2.exec(s))) { var y2 = 2000 + Number(m[1]); if (y2 >= 2019 && y2 <= 2030) out[y2] = 1; }
+    return Object.keys(out).map(Number);
+  }
+
+  function finalYearOk(year, m) {
+    if (!(year >= 2019)) return true;
+    var subjYears = explicitYearsOf(m.subject);
+    var years = subjYears.length ? subjYears : explicitYearsOf((m.attNames || []).join(' '));
+    if (years.length && years.indexOf(year) < 0) return false;
+    if (Number(m.ts) > 0) {
+      var from = Date.UTC(year, 0, 1) - 9 * 3600e3;
+      var to = Date.UTC(year + 1, 6, 1) - 9 * 3600e3;
+      if (m.ts < from || m.ts >= to) return false;
+    }
+    return true;
+  }
+
+  function finalKindOf(m) {
+    var hay = str(m.subject) + ' ' + (m.attNames || []).join(' ');
+    var subj = str(m.subject);
+    for (var i = 0; i < FINAL_KINDS.length; i++) {
+      /* 종류는 제목으로 먼저 가린다 — 제목에 없을 때만 첨부 이름까지 본다 */
+      if (FINAL_KINDS[i].code !== 'report' && FINAL_KINDS[i].re.test(subj)) return FINAL_KINDS[i];
+    }
+    for (var j = 0; j < FINAL_KINDS.length; j++) {
+      if (FINAL_KINDS[j].re.test(hay)) return FINAL_KINDS[j];
+    }
+    return FINAL_KINDS[FINAL_KINDS.length - 1];
+  }
+
+  /* 최종보고서 메일 «후보» — 사업장과 상관없는 거르기(한 번만 돈다) */
+  function isFinalReportMail(m) {
+    if (!m || typeof m !== 'object') return false;
+    var combined = str(m.subject) + ' ' + (Array.isArray(m.attNames) ? m.attNames.join(' ') : '');
+    if (!FINAL_DOC_RE.test(combined)) return false;
+    if (FINAL_OTHER_PROGRAM_RE.test(combined)) return false;
+    if (!FINAL_JT_RE.test(combined)) return false;
+    return !getJtMailMemo(m).hardBlocked;
+  }
+
+  /* 모든 사업장의 최종보고서 메일 근거를 한 번에 — { 사업장 id: { status, label, done, doneAt, doneDate, mails:[…] } }
+   * mailRows: flattenMailboxRows(…) 와 flattenOldMailRows(…) 를 이어 붙인 줄(또는 isFinalReportMail 로 미리 거른 줄) */
+  function findFinalReportEvidence(projects, mailRows, companies, consultings) {
+    var projs = (Array.isArray(projects) ? projects : rowsOf(projects)).filter(function (p) { return p && p.id && !p._deleted; });
+    var rows = (Array.isArray(mailRows) ? mailRows : []).filter(isFinalReportMail);
+    var metas = projs.map(function (p) {
+      var prof = buildCompanyMailProfile(p, companies, consultings);
+      return {
+        p: p,
+        year: Number(p.year) || 0,
+        agency: str(p.agency).toLowerCase() === 'cepa' ? 'cepa' : 'kmac',
+        aliases: companyNameAliases(p.companyName),
+        prof: prof
+      };
+    });
+    var byPid = {};
+    projs.forEach(function (p) { byPid[p.id] = []; });
+
+    rows.forEach(function (m) {
+      var rawHay = str(m.subject) + ' ' + (m.attNames || []).join(' ');
+      var normHay = normCorpName(rawHay);
+      var isKmac = FINAL_KMAC_MARK_RE.test(rawHay), isCepa = FINAL_CEPA_MARK_RE.test(rawHay);
+      var allowed = metas.filter(function (x) {
+        if (x.agency === 'kmac' && isCepa && !isKmac) return false;
+        if (x.agency === 'cepa' && isKmac && !isCepa) return false;
+        return finalYearOk(x.year, m);
+      });
+      if (!allowed.length) return;
+      var hits = allowed.filter(function (x) { return x.aliases.length && finalNameHit(x.aliases, rawHay, normHay); });
+      var matchBy = 'name';
+      if (!hits.length) {
+        /* 회신 제목엔 이름이 없을 때가 많다(«RE: [푸른노무법인] 결과보고서 송부의 건») — 보낸·받는 사람 이름·본문 첫머리에서
+           세 글자 이상 이름이 «한 사업장에만» 맞을 때만 그 사업장으로 본다 */
+        var senderHay = str(m.fromLabel) + ' ' + str(m.toLabel) + ' ' + str(m.preview).slice(0, 600);
+        var senderNorm = normCorpName(senderHay);
+        var bySender = allowed.filter(function (x) { return x.aliases.length && finalNameHit(x.aliases, senderHay, senderNorm, true); });
+        if (bySender.length === 1) { hits = bySender; matchBy = 'sender'; }
+      }
+      if (!hits.length) {
+        var peers = m.dir === 'out' ? (m.to || []) : [m.from];
+        hits = allowed.filter(function (x) {
+          return peers.some(function (em) {
+            if (!em) return false;
+            if (x.prof.addrs[em]) return true;
+            var dom = domainOf(em);
+            return !!(dom && x.prof.domains[dom]);
+          });
+        });
+        matchBy = 'addr';
+      }
+      if (!hits.length) return;
+      /* 같은 업체의 여러 해 사업에 걸리면 메일 연도(없으면 이듬해 초 제출로 보아 −1년) 쪽 하나로 */
+      if (hits.length > 1) {
+        var mailYr = Number(m.ts) > 0 ? new Date(Number(m.ts) + 9 * 3600e3).getUTCFullYear() : 0;
+        var sameYr = hits.filter(function (x) { return x.year === mailYr; });
+        var prevYr = hits.filter(function (x) { return x.year === mailYr - 1; });
+        if (sameYr.length) hits = sameYr;
+        else if (prevYr.length) hits = prevYr;
+      }
+      var kind = finalKindOf(m);
+      var ev = {
+        key: m.key,
+        src: m.src === 'pop3' || m.old ? 'pop3' : 'imap',
+        slug: str(m.slug),
+        uid: str(m.uid),
+        popKey: str(m.popKey),
+        dir: m.dir === 'out' ? 'out' : 'in',
+        ts: Number(m.ts) || 0,
+        date: str(m.date) || dayOf(m.ts),
+        subject: str(m.subject),
+        attNames: (m.attNames || []).slice(),
+        reportAtts: (m.attNames || []).filter(function (n) { return FINAL_REPORT_ATT_RE.test(n) && !FINAL_OTHER_PROGRAM_RE.test(n); }),
+        kind: kind.code,
+        kindLabel: kind.label,
+        done: !!kind.done,
+        matchBy: matchBy
+      };
+      hits.forEach(function (x) { byPid[x.p.id].push(ev); });
+    });
+
+    var out = {};
+    projs.forEach(function (p) {
+      var list = byPid[p.id].sort(function (a, b) { return (b.ts - a.ts) || (a.key < b.key ? -1 : 1); });
+      var doneEv = null;
+      for (var i = 0; i < FINAL_DONE_ORDER.length && !doneEv; i++) {
+        var code = FINAL_DONE_ORDER[i];
+        var cands = list.filter(function (e) { return e.kind === code; });
+        if (cands.length) doneEv = cands[cands.length - 1]; /* 그 종류의 «가장 이른» 메일 */
+      }
+      var latest = list[0] || null;
+      var status = doneEv ? doneEv.kind : (latest ? latest.kind : 'none');
+      out[p.id] = {
+        status: status,
+        done: !!doneEv,
+        label: doneEv ? doneEv.kindLabel : (latest ? latest.kindLabel : ''),
+        doneAt: doneEv ? doneEv.ts : 0,
+        doneDate: doneEv ? doneEv.date : '',
+        doneKey: doneEv ? doneEv.key : '',
+        lastDate: latest ? latest.date : '',
+        mails: list
+      };
+    });
+    return out;
+  }
+
   /* ══ 2-B. ERP·일정 산업일자리전환 후보 발견 & 로컬 컨설팅업체 폴더 선택 연결 엔진 ══ */
   var JOBTRANS_BIZ_STRICT_RE = /산업\s*[·ㆍ.]?\s*일자리|일자리\s*전환|구조\s*혁신|산일\s*충남|산일\s*능률/i;
   var NON_JOBTRANS_BIZ_RE = /일터\s*혁신|일터\s*상생|상생\s*컨설팅|상생\s*혁신|노사\s*발전|에프엠\s*어소시에이션|기술\s*보호|현장\s*클리닉|혁신\s*바우처|비정규직|안전\s*보건|공공\s*기관|상공\s*회의소|인사\s*충남|인사\s*서산|출산\s*육아|통상\s*경영|농촌\s*융복합|삼성\s*컨설|삼성\s*협력|비즈니스\s*지원단|비지니스\s*지원단|근로자\s*이음|노동\s*전환\s*지원\s*센터|충남\s*노동\s*전환|석유\s*화학|^노동전환-/i;
@@ -2106,6 +2355,11 @@
     resolvePhase: resolvePhase,
     flattenMailboxRows: flattenMailboxRows,
     scanProjectMails: scanProjectMails,
+    FINAL_KINDS: FINAL_KINDS,
+    flattenOldMailRows: flattenOldMailRows,
+    companyNameAliases: companyNameAliases,
+    isFinalReportMail: isFinalReportMail,
+    findFinalReportEvidence: findFinalReportEvidence,
     discoverJobtransCandidates: discoverJobtransCandidates,
     detectParallelConsultings: detectParallelConsultings,
     inspectConsultingSubdir: inspectConsultingSubdir,
