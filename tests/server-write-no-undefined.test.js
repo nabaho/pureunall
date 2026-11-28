@@ -43,9 +43,16 @@ function oneLine(re, what) {
   return m[0];
 }
 
-/* 실시간DB 처럼 깐깐하게 — 값 «어디에든» undefined 가 있으면 그 자리를 돌려준다(없으면 빈 글) */
+/* 실시간DB 처럼 깐깐하게 — 값 «어디에든» undefined(희소 배열 빈 자리 포함)가 있으면 그 자리를 돌려준다(없으면 빈 글) */
 function undefinedAt(v, where) {
   if (v === undefined) return where;
+  if (Array.isArray(v)) {
+    for (let i = 0; i < v.length; i++) {
+      const hit = undefinedAt(v[i], where + '.' + i);
+      if (hit) return hit;
+    }
+    return '';
+  }
   if (v && typeof v === 'object') {
     for (const k of Object.keys(v)) {
       const hit = undefinedAt(v[k], where + '.' + k);
@@ -87,6 +94,8 @@ function directWorld(store) {
     _recLocalSave: (k, next) => { box.store[k] = JSON.parse(J(next)); return true; },  /* 이 PC 사본은 JSON 으로 적힌다 */
     _recStamp: (x) => x,
     _conflictNet() {},
+    _conflictFind: () => null,
+    _conflictTell() {},
     coIsTomb: () => false,
     showToast() {},
     fbSyncFail: (e) => { box.fails.push(String(e && e.message || e)); }
@@ -94,9 +103,18 @@ function directWorld(store) {
   box.fbDb = fakeFbDb(box);
   box.window = box;
   vm.createContext(box);
-  vm.runInContext(oneLine(/var _REC_BADKEY = [^\n]*/, '_REC_BADKEY'), box);
-  vm.runInContext(between('function _recServerWrite(', '\nfunction _recCanDirect('), box);
-  vm.runInContext(between('var _FIELD_BADKEY = ', '// 여러 건 삭제 — 한 번의 요청에 건별 null'), box);
+  vm.runInContext([
+    oneLine(/var _REC_BADKEY = [^\n]*/, '_REC_BADKEY'),
+    oneLine(/var _FIELD_BADKEY = [^\n]*/, '_FIELD_BADKEY'),
+    oneLine(/var ATTEND_LOCK_TABLES = [^\n]*/, 'ATTEND_LOCK_TABLES'),
+    /* 걷개의 «이름»은 박지 않는다 — 서버로 보내는 함수와 그 바로 뒤(_recCanDirect 앞)까지를 통째로 싣는다.
+       고치기 전 코드로 돌리면 «이름이 없다»가 아니라 «undefined 가 실렸다»로 실패해야 검사가 규칙을 본다. */
+    between('function _recServerWrite(', '\nfunction _recCanDirect('),
+    cutFn(SRC, 'function _recFieldPaths('),
+    cutFn(SRC, 'function dbUpsert('),
+    cutFn(SRC, 'function dbPatch('),
+    cutFn(SRC, 'function dbUpsertMany(')
+  ].join('\n'), box);
   return box;
 }
 function mine(box, k, id) {
@@ -143,8 +161,8 @@ test('★★ dbPatch — 고친 칸의 값이 객체이고 그 안에 undefined 
     '★ 맨 위 칸의 undefined 는 예전처럼 null(지우기)로 가야 한다');
 });
 
-test('★ dbUpsertMany — 여러 건을 통째로 보낼 때도', async () => {
-  const B = directWorld({ cases: [] });
+test('★ dbUpsertMany — 여러 건(기존 건 수정 + 새 건)을 통째로 보낼 때도', async () => {
+  const B = directWorld({ cases: [{ id: 'c-1', name: '옛사건' }] });
   assert.equal(B.dbUpsertMany('cases', [
     { id: 'c-1', name: '예시사건', managerSubs: undefined, fee: { retainer: 100, memo: undefined } },
     { id: 'c-2', name: '예시사건2', tags: ['a', undefined] }
@@ -159,14 +177,18 @@ test('★ dbUpsertMany — 여러 건을 통째로 보낼 때도', async () => {
   });
 });
 
-test('★ 배열 안의 undefined 는 null — 자리를 잃지 않는다 (이 PC 사본과 같은 모양)', async () => {
+test('★ 배열 안의 undefined(희소 배열 빈 자리 포함)는 null — 자리를 잃지 않는다 (이 PC 사본과 같은 모양)', async () => {
   const B = directWorld({ finance_income: [] });
-  const months = ['2026-10', undefined, '2026-12'];
+  // eslint-disable-next-line no-sparse-arrays
+  const months = ['2026-10', undefined, , '2026-12'];
   assert.equal(B.dbUpsert('finance_income', { id: 'fi-9', months }), true);
   await tick();
+  assert.equal(undefinedAt(B.sent[0], 'values argument'), '');
   const sentMonths = B.sent[0]['data/finance_income/v/fi-9'].months;
   assert.equal(sentMonths.length, months.length, '★ 자리가 밀리면 몇 번째 달인지로 이어 둔 것이 어긋난다');
-  assert.equal(sentMonths[months.indexOf(undefined)], null, '빈 자리는 null 로 남아야 한다');
+  for (let i = 0; i < months.length; i++) {
+    if (months[i] === undefined) assert.equal(sentMonths[i], null, '빈 자리는 null 로 남아야 한다');
+  }
   assert.equal(J(sentMonths), J(mine(B, 'finance_income', 'fi-9').months));
 });
 
@@ -198,7 +220,6 @@ function dbSetWorld(prevArr) {
   const store = { finance_income: J(prevArr) };
   const box = {
     console: { log() {}, warn() {}, error() {} },
-    JSON, Object, Array, String, Number, Date, Math, parseInt, RegExp, Promise,
     KEY: 'pureun_v6_',
     localStorage: { getItem: () => '0', setItem() {} },
     _erpStoreGet: (k) => (k in store ? store[k] : null),
