@@ -124,7 +124,7 @@
       /* site_secret — 사업장 포털(비즈니스지원단·현장클리닉 등) 접속 비번. 그 건의 담당자와 대표만(2026-11-15) */
       /* staff_secret — 직원 주민번호·계좌·예금주 금고. 대표만(대표 승인 2026-11-01, 개인정보 2단계) */
       primaryRoots:['data','improve_requests','ieum_public','worker_secret','site_secret','staff_secret'],
-      sharedRoots:['harass_invest'],
+      sharedRoots:['harass_invest','sanjae_cases','labor_cases'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document','SanjaeKit'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
@@ -403,6 +403,27 @@
                       {path:'harass_sign/req/{cid}/{id}',entityType:'Submission'},
                       {path:'harass_sign/open/{id}',entityType:'Submission'}],
       entityTypes:['Organization','Person','Case','Document','Task','Message','Submission'] },
+    /* 산재사건관리(pu-sanjae.html) — 산재보상·질판위·심사/재심사(90일)·산안사건 4축 정리 및 상대방↔당사 공방 대조(2026-11-28).
+       ★ 비밀금고 분리: sanjae_cases(사건·단계·공방문서·보관함 상대경로·ERP동기화)는 재직 직원 공유,
+         sanjae_secret(대응전략·민감진술·의뢰인연락처)은 주·부담당 노무사 및 대표만 읽고 쓴다. */
+    sanjae:{ name:'산재사건관리', file:'pu-sanjae.html', primaryRoots:['sanjae_cases','sanjae_secret'],
+      sharedRoots:['uid_roles','data/companies','data/cases','data/biz_case_types','data/user_dir','mailbox'],
+      writeContracts:[{path:'sanjae_cases/cases/{id}',entityType:'Case'},
+                      {path:'sanjae_cases/erp_sync/{id}',entityType:'Task'},
+                      {path:'sanjae_cases/erp_ack/{id}',entityType:'Task'},
+                      {path:'sanjae_cases/dismissed/{id}',entityType:'Task'},
+                      {path:'sanjae_secret/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Case','Document','Task','Message'] },
+    /* 부당해고·노동사건관리(pu-case.html) — 노동위원회 구제(부당해고·징계·부노) + 노동청 진정·체불·대지급금 공방 대조(2026-11-28).
+       ★ 비밀금고 분리: labor_cases 는 재직 직원 공유, labor_secret(전략·화해하한·진술요지)은 주·부담당 노무사 및 대표만 읽고 쓴다. */
+    laborcase:{ name:'부당해고·노동사건', file:'pu-case.html', primaryRoots:['labor_cases','labor_secret'],
+      sharedRoots:['uid_roles','data/companies','data/cases','data/biz_case_types','data/user_dir','harass_invest','mailbox'],
+      writeContracts:[{path:'labor_cases/cases/{id}',entityType:'Case'},
+                      {path:'labor_cases/erp_sync/{id}',entityType:'Task'},
+                      {path:'labor_cases/erp_ack/{id}',entityType:'Task'},
+                      {path:'labor_cases/dismissed/{id}',entityType:'Task'},
+                      {path:'labor_secret/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Case','Document','Task','Message'] },
     /* 일터상생혁신(ilteo.html) — 노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 비식별 진단 요약, 중간보고서·최종결과보고서·PPTX 자동화(2026-11-15).
        ★ 임금대장·근태·명부 원본은 브라우저 로컬 비식별 통계만 산출하고 DB·외부 AI 로 전송하지 않는다. 확정 스냅샷(snapshots)은 불변으로 보관한다. */
     ilteo:{ name:'일터상생혁신', file:'ilteo.html', primaryRoots:['scal_ilteo'],
@@ -736,6 +757,10 @@
     /* 안전보건체계구축 — 과거 수행이력 비식별 아카이브 및 업종별 체크리스트·위험성평가·보고서 원고가 든 자리라 앱 안에서만 본다. */
     safety_core:{program:'safety',strategy:'in_app',path:'scal_safety',parser:'coverage',
       gives:'안전보건체계구축 사업장 워크스페이스·착수/업종별 체크리스트·위험성평가·종합/1P 보고서 (앱 안에서만 본다)'},
+    sanjae_core:{program:'sanjae',strategy:'in_app',path:'sanjae_cases',parser:'coverage',
+      gives:'산재사건 4축 정리·상대방↔당사 공방 대조·90일 제척기간·표준 보관함 상대경로 (비밀금고는 사건 담당자·대표 전용)'},
+    laborcase_core:{program:'laborcase',strategy:'in_app',path:'labor_cases',parser:'coverage',
+      gives:'부당해고·징계·노동청 진정·임금체불 2트랙 진행 및 상대방↔당사 공방 대조 (비밀금고는 사건 담당자·대표 전용)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

@@ -189,7 +189,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=55"></script>
+  <script src="js/pu-appbar.js?v=56"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -272,7 +272,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 사업장 포털(비즈니스지원단·현장클리닉 등) 비번 — 담당자·관리자만 + 보기 클릭 열람 (2026-11-15) -->
 <script src="js/pu-site-secret.js?v=1"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ontology.js?v=112"></script>
 <!-- 📋 「나의 업무」의 업무관리 숫자 한 줄(work_erp/mysum) — 포털 머리줄 «내 업무» 단추와 같은 숫자 (2026-11-21) -->
 <script src="js/pu-mywork.js?v=1"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
@@ -40175,7 +40175,17 @@ function CaseDetailModal(props){
       (window.PuHarassCore && window.PuHarassCore.isErpInvestigateCase(c, caseTypes)) ? ['조사실·보고서', h('a', {
         href:'pu-harass.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
         style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
-      }, '🛡️ 조사실·보고서 열기 ›')] : null
+      }, '🛡️ 조사실·보고서 열기 ›')] : null,
+      /* 🏥 산재사건관리 전용 연동 — 산재 사건일 때 4축·공방대조 사건실 바로가기 */
+      erpIsInjuryCase(c, t) ? ['산재사건관리', h('a', {
+        href:'pu-sanjae.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
+      }, '🏥 산재사건실 열기 ›')] : null,
+      /* ⚖️ 부당해고·노동사건관리 전용 연동 — 노동위·체불·진정·대지급금 사건 바로가기 */
+      (!erpIsInjuryCase(c, t) && t && /(해고|징계|정직|전보|부노|노동위|체불|진정|대지급금|고소|감독관|권리구제)/.test([c.type, c.typeCode, t.name, t.label, c.title, c.caseName].join(' '))) ? ['노동사건관리', h('a', {
+        href:'pu-case.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
+      }, '🔨 노동사건실 열기 ›')] : null
     ].filter(function(x){ return x; })
   };
 
