@@ -119,6 +119,8 @@ test('★ 연결 제안은 «보이기만» 한다 — 판을 만들어도 묶�
   assert.equal(JSON.stringify(s), before, '판 만들기가 묶음을 바꿨습니다');
   assert.ok(b.cards[0].suggest.indexOf('c-a') >= 0, '낱말이 맞는 사업을 제안하지 않았습니다');
   assert.deepEqual(b.cards[0].programs, [], '제안한 사업이 이어진 것처럼 업체가 붙었습니다');
+  const closedBoard = L.board({ sets: [s], biz, tmap: {}, input: {}, state: { 'c-a': { closedFrom: '2000' } }, year: YEAR });
+  assert.deepEqual(closedBoard.cards[0].suggest, [], '이미 종결된 사업은 연결 제안에 나오면 안 됩니다');
 });
 
 /* ── ③④ 판 ── */
@@ -192,6 +194,16 @@ test('★ 화면은 공용 관문(enforce)으로만 쓴다 — 직접 set·updat
   assert.ok(!/ref\('govlinks/.test(code), '자리를 글자 그대로 부릅니다 — 이름 표(GL_NODES)로 부릅니다');
   assert.ok(!/ref\('scal_/.test(code), '빌려 읽는 자리를 글자 그대로 부릅니다 — 이름 표(GL_ERP)로 부릅니다');
   assert.ok(!/\sonclick=/.test(code), '인라인 onclick 이 있습니다 — data-act 한 곳에서 받습니다');
+});
+
+test('★ 고친 것은 «고치기 시작한 때»의 수정차수로 저장한다 — 그 사이 남이 고친 것을 새로 읽은 판으로 덮지 않는다', () => {
+  const code = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const fn = /async function saveSet\(value, base\)\{[\s\S]*?\n\}/.exec(code);
+  assert.ok(fn, 'saveSet(value, base) 를 못 찾았습니다 — 저장이 «시작한 때의 차수»를 받아야 합니다');
+  assert.ok(!/D\.raw/.test(fn[0]), '저장 직전에 새로 읽은 판(D.raw)의 차수를 쓰면 남의 수정을 조용히 덮습니다');
+  assert.match(fn[0], /expectedRevision:exp/);
+  /* 고치기 창 저장은 창을 연 때의 차수를 넘긴다 */
+  assert.match(code, /saveSet\(s, base\)/);
 });
 
 test('★ 사이트 주소는 «다듬은 묶음»에서만 그린다 — 화면이 바깥 값을 href 에 바로 넣지 않는다', () => {

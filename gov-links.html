@@ -148,9 +148,9 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
   .top{padding:8px 10px;gap:6px}
   .top .sub{display:none}
   .tabs{padding:0 6px}
-  main{padding:8px 10px 40px}
+  main{padding:8px 5px 40px}   /* 양옆 = 5 + 카드 테두리 1 + 카드 안 8 = 14px(폰 규칙 8~14px) */
   .grid{grid-template-columns:minmax(0,1fr);gap:10px}
-  .gcard{padding:10px 12px 8px}
+  .gcard{padding:10px 8px 8px}
   .links .host{display:none}
   .links a{padding:7px 8px;min-height:36px}
   button{min-height:32px}
@@ -166,7 +166,7 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
   .mt input[type=checkbox]{width:24px;height:24px;margin:0}
   /* 목록 관리 표 → 줄마다 두 줄 카드(☐·№ 는 왼쪽 끝 그대로) */
   .mt thead{display:none}
-  .mt tr{display:grid;grid-template-columns:28px 32px minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--line);padding:4px 0}
+  .mt tr{display:grid;grid-template-columns:28px 32px minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--line);padding:4px 3px}
   .mt td{border-bottom:none;padding:3px 4px}
   .mt td.ck{grid-column:1;grid-row:1 / 3}
   .mt td.no{grid-column:2;grid-row:1 / 3;width:auto}
@@ -226,10 +226,12 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
       <div class="selbar" id="selBar"><b id="selTxt"></b><button class="sm del" data-act="bulkDel">선택 지우기</button><button class="sm" data-act="selClear">선택 해제</button></div>
       <div class="scroll" id="mgBox"></div>
     </div>
-    <details class="closed" id="delWrap"><summary>🗑 지운 묶음 <span class="chip" id="nDel">0</span></summary><div class="box scroll" id="delBox"></div></details>
+    <details class="closed" id="delWrap"><summary>🗑 지운 묶음 <span class="chip" id="nDel">0</span></summary><div class="box">
+      <div class="selbar" id="delSelBar"><b id="delSelTxt"></b><button class="sm" data-act="bulkRestore">선택 되살리기</button><button class="sm" data-act="delSelClear">선택 해제</button></div>
+      <div class="scroll" id="delBox"></div></div></details>
   </section>
 </main>
-<div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox"></div></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle" style="display:none"><div class="mbox" id="mbox"></div></div>
 <div id="toast" role="status"></div>
 
 <script src="js/pu-sid-guard.js?v=1"></script>
@@ -257,7 +259,7 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
 <script src="js/pu-gov-report-track.js?v=8"></script>
 <script src="js/pu-gov-report-docs.js?v=13"></script>
 <script src="js/pu-gov-report-nav.js?v=3"></script>
-<script src="js/pu-gov-links.js?v=1"></script>
+<script src="js/pu-gov-links.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -268,7 +270,7 @@ var GL_NODES={sets:L.ROOT+'/'+L.SETS};
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_…') 를 쓰면 등록부 검사가 주인 없는 자리로 잡는다 */
 var GL_ERP={biz:'data/biz_cons_types',tmap:'scal_erpTypeMap',cos:'scal_cos',types:'scal_types',scheds:'scal_scheds',staff:'scal_staff',state:'scal_bizState',order:'scal_bizOrder'};
 var D={raw:null,loaded:false,err:'',empty:false,sets:[],deleted:[],erp:null,erpErr:false,erpLoading:false,board:null,seq:0};
-var TAB='go', Q='', KF='', SEL={}, EDIT=null, MORE={}, BUSY=false;   // KF = KPI 바 거르기('' · 'login' · 'cos')
+var TAB='go', Q='', KF='', SEL={}, DSEL={}, EDIT=null, MORE={}, BUSY=false;   // KF = KPI 바 거르기('' · 'login' · 'progs' · 'cos') · DSEL = 지운 묶음 고르기
 var CO_SHOW=8;   // 카드 한 사업에 먼저 보이는 업체 수 — 넘으면 «+N곳»
 
 function $(id){ return document.getElementById(id); }
@@ -409,19 +411,21 @@ function renderKpis(b){
     cos+=c.companyCount;
   });
   var cell=function(k,label,n,tip){
-    return '<button type="button" class="k'+(k&&KF===k?' k-on':'')+'" data-act="kpi" data-k="'+k+'" title="'+esc(tip)+'"><span>'+label+'</span><b>'+n+'</b></button>';
+    var on=!!(k&&KF===k), toggle=(k==='login'||k==='progs'||k==='cos');   /* aria-pressed 는 «켜고 끄는» 칸에만 — 모두 보기·내려가기는 그냥 단추 */
+    return '<button type="button" class="k'+(on?' k-on':'')+'" data-act="kpi" data-k="'+k+'"'+(toggle?' aria-pressed="'+(on?'true':'false')+'"':'')+' title="'+esc(tip)+'"><span>'+label+'</span><b>'+n+'</b></button>';
   };
   $('kpis').innerHTML=cell('all','사업 묶음',cards.length,'거르기를 풀고 모두 봅니다')
     +cell('all','사이트',sites,'거르기를 풀고 모두 봅니다')
     +cell('login','로그인',login,'로그인이 필요한 사이트만 봅니다(다시 누르면 풂)')
-    +cell('cos','이어 둔 사업',progs,'이알피 사업이 이어진(올해 업체가 있는) 카드만 봅니다')
-    +cell('cos',kstYear()+'년 업체',cos,'이알피 사업이 이어진(올해 업체가 있는) 카드만 봅니다')
+    +cell('progs','이어 둔 사업',progs,'이알피 사업이 이어진 카드만 봅니다(다시 누르면 풂)')
+    +cell('cos',kstYear()+'년 업체',cos,'올해 업체가 있는 카드만 봅니다(다시 누르면 풂)')
     +cell('bare','카드 없는 진행 사업',(b.bare||[]).length,'바로가기가 아직 없는 진행 사업으로 내려갑니다');
   $('resetBtn').style.display=(Q||KF)?'':'none';
 }
 function kpiFilter(rows){
   if(KF==='login') return rows.map(function(r){ return {card:r.card,links:r.links.filter(function(l){ return l.login; }),hit:true}; })
     .filter(function(r){ return r.links.length>0; });
+  if(KF==='progs') return rows.filter(function(r){ return r.card.programs.some(function(p){ return !p.missing&&!p.closed; }); });
   if(KF==='cos') return rows.filter(function(r){ return r.card.companyCount>0; });
   return rows;
 }
@@ -429,12 +433,12 @@ function renderGo(){
   renderNotes(); renderRecent();
   var b=D.board||{cards:[],bare:[],closed:[]};
   renderKpis(b);
-  var rows=kpiFilter(L.filterCards(b.cards,Q));
+  var rows=kpiFilter(L.filterCards(b.cards,Q)), filtered=!!(Q||KF);
   var total=b.cards.reduce(function(n,c){ return n+c.set.links.length; },0);
   var shown=rows.reduce(function(n,r){ return n+r.links.length; },0);
-  $('cnt').textContent=Q?(shown+' / '+total+'곳'):(total+'곳');
+  $('cnt').textContent=filtered?(shown+' / '+total+'곳'):(total+'곳');
   $('grid').innerHTML=rows.length?rows.map(function(r){ return cardHtml(r.card,r.links); }).join('')
-    :'<div class="empty">'+(Q?'찾는 사이트·사업이 없습니다.':'바로가기 묶음이 없습니다 — 「목록 관리」에서 더하세요.')+'</div>';
+    :'<div class="empty">'+(filtered?'찾는 사이트·사업이 없습니다.':'바로가기 묶음이 없습니다 — 「목록 관리」에서 더하세요.')+'</div>';
   /* 바로가기 없는 진행 사업 — 이알피에서 진행 중인데 카드가 없는 것(새 사업이 생기면 저절로 여기 나온다) */
   var q=String(Q||'').trim().toLowerCase();
   var bare=(b.bare||[]).filter(function(p){ return !q||(p.label+' '+p.companies.map(function(c){ return c.coName; }).join(' ')).toLowerCase().indexOf(q)>=0; });
@@ -443,11 +447,11 @@ function renderGo(){
       return '<div class="row">'+progHtml(p,'bare|'+p.code)
         +'<div><button class="sm" data-act="newFor" data-code="'+esc(p.code)+'">＋ 이 사업 바로가기 만들기</button></div></div>';
     }).join('')+'</div>':'';
-  var closed=L.filterCards(b.closed||[],Q);
+  var closed=kpiFilter(L.filterCards(b.closed||[],Q));
   $('closedBox').innerHTML=closed.length?'<details class="closed"><summary>🔒 종결된 사업 '+closed.length+'곳 — 이어 둔 이알피 사업이 모두 종결</summary><div class="grid">'
     +closed.map(function(r){ return cardHtml(r.card,r.links); }).join('')+'</div></details>':'';
 }
-function selIds(){ return Object.keys(SEL).filter(function(id){ return SEL[id]; }); }
+function selIds(){ return D.sets.filter(function(s){ return SEL[s.id]; }).map(function(s){ return s.id; }); }
 function renderManage(){
   var sets=D.sets, ids=selIds();
   var allOn=sets.length>0&&sets.every(function(s){ return SEL[s.id]; });
@@ -469,25 +473,38 @@ function renderManage(){
       +'<td class="sub" title="'+esc(sub)+'">'+esc(sub)+'</td></tr>';
   });
   $('mgBox').innerHTML=h+'</tbody></table>';
-  $('delBox').innerHTML=D.deleted.length?'<table class="mt"><tbody>'+D.deleted.map(function(s,i){
-    return '<tr><td class="no">'+(i+1)+'</td><td class="nm" title="'+esc(s.title)+'">'+esc(s.title)+'</td><td class="at">'+esc(day(s.deletedAt))+' 지움</td>'
-      +'<td class="ac"><button class="sm" data-act="restore" data-id="'+esc(s.id)+'">되살리기</button></td></tr>';
+  /* 지운 묶음 — 이것도 «정리하는 목록»이라 맨 왼쪽 ☐·№(고르기만으로는 아무것도 안 바뀐다 — 「선택 되살리기」를 눌러야) */
+  var dids=dselIds(), dAll=D.deleted.length>0&&D.deleted.every(function(s){ return DSEL[s.id]; });
+  $('delSelBar').classList.toggle('on', dids.length>0);
+  $('delSelTxt').textContent=dids.length+'건 선택';
+  $('delBox').innerHTML=D.deleted.length?'<table class="mt"><thead><tr><th class="ck"><input type="checkbox" data-act="dselAll" '+(dAll?'checked':'')+' aria-label="지운 묶음 모두 고르기"></th>'
+    +'<th class="no">№</th><th>사업(묶음)</th><th>지운 날</th><th></th></tr></thead><tbody>'+D.deleted.map(function(s,i){
+    var dAt=day(s.deletedAt), dSub=(dAt?dAt+' ':'')+'지움';
+    return '<tr'+(DSEL[s.id]?' class="sel"':'')+'><td class="ck"><input type="checkbox" data-act="dsel" data-id="'+esc(s.id)+'" '+(DSEL[s.id]?'checked':'')+' aria-label="고르기"></td>'
+      +'<td class="no">'+(i+1)+'</td><td class="nm" title="'+esc(s.title)+'">'+esc(s.title)+'</td><td class="at">'+esc(dSub)+'</td>'
+      +'<td class="ac"><button class="sm" data-act="restore" data-id="'+esc(s.id)+'">되살리기</button></td><td class="sub">'+esc(dSub)+'</td></tr>';
   }).join('')+'</tbody></table>':'<div class="empty">지운 묶음이 없습니다.</div>';
 }
+function dselIds(){ return D.deleted.filter(function(s){ return DSEL[s.id]; }).map(function(s){ return s.id; }); }
 
 /* ═══ 고치기 창 ═══ */
 function findSet(id){ return D.sets.filter(function(s){ return s.id===id; })[0]||null; }
 function openEdit(set){
-  EDIT={ id:set.id, isNew:!!set.isNew, set:JSON.parse(JSON.stringify(set)), errs:[] };
+  EDIT={ id:set.id, isNew:!!set.isNew, set:JSON.parse(JSON.stringify(set)), errs:[], back:document.activeElement };
   if(!EDIT.set.links.length) EDIT.set.links=[{name:'',url:'',login:false}];
   drawEdit(); $('modal').style.display='';
   setTimeout(function(){ var t=$('fTitle'); if(t) t.focus(); },30);
 }
-function closeEdit(){ EDIT=null; $('modal').style.display='none'; $('mbox').innerHTML=''; }
+/* 닫으면 연 단추로 초점을 돌려준다(그 단추가 다시 그려져 없어졌으면 그대로) */
+function closeEdit(){
+  var back=EDIT&&EDIT.back;
+  EDIT=null; $('modal').style.display='none'; $('mbox').innerHTML='';
+  try{ if(back&&back.isConnected&&back.focus) back.focus(); }catch(e){}
+}
 function drawEdit(){
   var s=EDIT.set, types=(D.board&&D.board.types)||[];
   var st=(D.erp&&D.erp.state)||{}, yr=kstYear();
-  var h='<h3>'+(EDIT.isNew?'새 바로가기 묶음':'바로가기 묶음 고치기')+'</h3>'
+  var h='<h3 id="mTitle">'+(EDIT.isNew?'새 바로가기 묶음':'바로가기 묶음 고치기')+'</h3>'
     +'<div class="fv"><label for="fTitle">사업(묶음) 이름 *</label><input id="fTitle" maxlength="'+L.LIMIT.title+'" value="'+esc(s.title)+'" placeholder="예: 일터혁신 상생컨설팅"></div>'
     +'<div class="fv"><label for="fOrg">기관</label><input id="fOrg" maxlength="'+L.LIMIT.org+'" value="'+esc(s.org)+'" placeholder="예: 노사발전재단"></div>'
     +'<div class="fv"><label for="fNote">할 일 메모 (어디에 무엇을 올리나)</label><textarea id="fNote" rows="2" maxlength="'+L.LIMIT.note+'">'+esc(s.note)+'</textarea></div>'
@@ -514,8 +531,8 @@ function drawEdit(){
     var on=s.bizCodes.indexOf(t.code)>=0, closed=PuGovReportNav.closedFor(st,t.code,yr), lb=PuGovReportNav.label(t).text;
     return '<label><input type="checkbox" data-f="biz" value="'+esc(t.code)+'"'+(on?' checked':'')+'><span title="'+esc(lb)+'">'+esc(lb)+'</span>'+(closed?'<span class="badge m">종결</span>':'')+'</label>';
   }).join('')+'</div>';
-  h+='</div><div class="errs" id="fErrs">'+EDIT.errs.map(esc).join('<br>')+'</div>'
-    +'<div class="mfoot"><button class="pri" data-act="save"'+(BUSY?' disabled':'')+'>저장</button><button data-act="close">닫기</button><span class="sp"></span>'
+  h+='</div><div class="errs" id="fErrs" role="alert">'+EDIT.errs.map(esc).join('<br>')+'</div>'
+    +'<div class="mfoot"><button class="pri" data-act="save"'+(BUSY?' disabled':'')+'>저장</button><button data-act="close"'+(BUSY?' disabled':'')+'>닫기</button><span class="sp"></span>'
     +(EDIT.isNew?'':'<button class="del" data-act="delOne" data-id="'+esc(EDIT.id)+'"'+(BUSY?' disabled':'')+'>이 묶음 지우기</button>')+'</div>';
   $('mbox').innerHTML=h;
 }
@@ -542,19 +559,25 @@ function setRef(id){ return fbDb.ref(GL_NODES.sets+'/'+id); }
 async function ensureSeeded(){
   if(!D.empty) return;
   var defs=L.defaultSets();
+  D.seededByMe={};   /* «내가 방금 넣은» 기본 묶음 — 아래 saveSet 이 «남이 먼저 넣고 고친 것»과 가른다 */
   for(var i=0;i<defs.length;i++){
     var v=L.cleanSet(defs[i]).value;
-    try{ await gate.save(setRef(v.id), v, {entityType:L.ENTITY, expectedRevision:-1}); }
+    try{ await gate.save(setRef(v.id), v, {entityType:L.ENTITY, expectedRevision:-1}); D.seededByMe[v.id]=true; }
     catch(e){ if(!/먼저 수정/.test(errMsg(e))) throw e; }
   }
   await loadSets();
 }
-/* 한 묶음 저장 — prev 가 있으면 그 수정차수여야 한다(남이 먼저 고쳤으면 거절하고 새로 읽는다) */
-async function saveSet(value){
+/* 한 묶음 저장 — base = «고치기 시작한 때»의 수정차수(2단계 점검 2026-11-28 지적 반영).
+   · 1 이상: 서버가 그 차수여야 한다 — 그 사이 남이 고쳤으면 거절한다(새로 읽은 판으로 조용히 덮지 않는다).
+   · 0(아직 저장 안 된 기본 묶음): 방금 «내가» 넣은 것일 때만 1 로 본다 — 남이 먼저 넣고 고쳤으면 거절.
+   · 없음(새 묶음): 서버에 없어야 한다. */
+async function saveSet(value, base){
   var c=L.cleanSet(value);
   if(!c.ok) throw new Error(c.errors.join(' · '));
-  var prev=D.raw&&Object.prototype.hasOwnProperty.call(D.raw,c.value.id)?D.raw[c.value.id]:null;
-  await gate.save(setRef(c.value.id), c.value, {entityType:L.ENTITY, expectedRevision:prev?Number(prev.revision||0):-1});
+  var id=c.value.id, exp=-1;
+  if(Number(base)>0) exp=Number(base);
+  else if(base===0 && D.seededByMe && D.seededByMe[id]) exp=1;
+  await gate.save(setRef(id), c.value, {entityType:L.ENTITY, expectedRevision:exp});
 }
 async function run(label, fn){
   if(BUSY) return;
@@ -562,15 +585,17 @@ async function run(label, fn){
   BUSY=true; if(EDIT) drawEdit();
   try{ await ensureSeeded(); await fn(); await reloadSets(); if(label) toast(label); return true; }
   catch(e){ toast('저장하지 못했습니다 — '+errMsg(e)); try{ await reloadSets(); }catch(_e){} return false; }
-  finally{ BUSY=false; if(EDIT) drawEdit(); }
+  finally{ BUSY=false; }
 }
 async function doSave(){
   pullForm();
   var s=EDIT.set, c=L.cleanSet(s);
-  if(!c.ok){ EDIT.errs=c.errors; drawEdit(); return; }
+  EDIT.errs=c.errors;
+  if(!c.ok){ drawEdit(); return; }
   if(EDIT.isNew) s.order=L.nextOrder(D.sets);
-  var ok=await run(EDIT.isNew?'새 묶음을 더했습니다':'고쳤습니다', function(){ return saveSet(s); });
-  if(ok) closeEdit();
+  var base=EDIT.isNew?undefined:Number(s.revision||0);
+  var ok=await run(EDIT.isNew?'새 묶음을 더했습니다':'고쳤습니다', function(){ return saveSet(s, base); });
+  if(ok) closeEdit(); else if(EDIT) drawEdit();
 }
 async function doDelete(ids){
   var n=ids.length;
@@ -578,17 +603,28 @@ async function doDelete(ids){
   if(!confirm(n+'건을 지울까요?\n지운 묶음은 「목록 관리 › 지운 묶음」에서 되살릴 수 있습니다.')) return;
   var ok=await run(n+'건을 지웠습니다', async function(){
     for(var i=0;i<ids.length;i++){
-      var prev=D.raw&&D.raw[ids[i]];
+      var prev=D.raw&&Object.prototype.hasOwnProperty.call(D.raw,ids[i])?D.raw[ids[i]]:null;
       if(!prev) continue;
       await gate.remove(setRef(ids[i]), prev, {entityType:L.ENTITY});
     }
   });
-  if(ok){ SEL={}; if(EDIT) closeEdit(); }
+  if(ok){ SEL={}; if(EDIT) closeEdit(); } else if(EDIT) drawEdit();
 }
-async function doRestore(id){
-  var prev=D.raw&&D.raw[id]; if(!prev) return;
-  var v=L.cleanSet(prev).value; v.order=L.nextOrder(D.sets);
-  await run('되살렸습니다', function(){ return saveSet(v); });
+/* 되살리기 — 하나든 여럿이든 한 번에(지운 묶음 표의 ☐ 고르기). 순서는 맨 뒤로 차례대로 */
+async function doRestore(ids){
+  ids=(ids||[]).filter(function(id){ return D.raw&&Object.prototype.hasOwnProperty.call(D.raw,id); });
+  if(!ids.length) return;
+  if(ids.length>1 && !confirm(ids.length+'건을 되살릴까요?')) return;
+  var ok=await run(ids.length+'건을 되살렸습니다', async function(){
+    var order=L.nextOrder(D.sets);
+    for(var i=0;i<ids.length;i++){
+      var prev=D.raw[ids[i]];
+      if(!prev||!prev._deleted) continue;
+      var v=L.cleanSet(prev).value; v.order=order; order+=10;
+      await saveSet(v, Number(prev.revision||0));
+    }
+  });
+  if(ok) DSEL={};
 }
 async function doMove(id, dir){
   var ch=L.moveOrder(D.sets,id,dir);
@@ -597,7 +633,7 @@ async function doMove(id, dir){
     for(var i=0;i<ch.length;i++){
       var s=findSet(ch[i].id);   /* 처음 쓰는 목록이었으면 ensureSeeded 가 D.sets 를 새로 읽었다 — 그 판으로 */
       if(!s) continue;
-      await saveSet(Object.assign({},s,{order:ch[i].order}));
+      await saveSet(Object.assign({},s,{order:ch[i].order}), s.revision);
     }
   });
 }
@@ -606,7 +642,7 @@ async function doLink(id, code){
   if(s.bizCodes.indexOf(code)>=0) return;
   await run('이었습니다 — 올해 업체가 붙습니다', function(){
     var cur=findSet(id)||s;
-    return saveSet(Object.assign({},cur,{bizCodes:cur.bizCodes.concat([code])}));
+    return saveSet(Object.assign({},cur,{bizCodes:cur.bizCodes.concat([code])}), cur.revision);
   });
 }
 function newSet(pre){
@@ -625,14 +661,14 @@ async function copyText(text, btn){
   toast(ok?'폴더 경로를 복사했습니다 — 파일 선택 창 주소줄에 붙여 넣으세요':'경로를 복사하지 못했습니다');
   if(btn){ btn.textContent=ok?'복사됨':'복사 실패'; setTimeout(function(){ btn.textContent='경로 복사'; },1200); }
 }
-function setTab(t){ if(t!==TAB) SEL={}; TAB=t; lsSet('tab',t); render(); }
+function setTab(t){ if(t!==TAB){ SEL={}; DSEL={}; } TAB=t; lsSet('tab',t); render(); }
 document.addEventListener('click', function(ev){
   var site=ev.target.closest('a.site');
   if(site){ lsSet('recent', L.pushRecent(lsGet('recent'), site.getAttribute('href'), 6)); setTimeout(renderRecent,0); return; }
   var tb=ev.target.closest('#tabs button'); if(tb){ setTab(tb.dataset.tab); return; }
   var el=ev.target.closest('[data-act]'); if(!el) return;
   var a=el.dataset.act, id=el.dataset.id;
-  if(a==='sel'||a==='selAll') return;   /* 고르기 칸은 change 에서 */
+  if(a==='sel'||a==='selAll'||a==='dsel'||a==='dselAll') return;   /* 고르기 칸은 change 에서 */
   if(a==='reload') return glReload();
   if(a==='logout') return firebase.auth().signOut();
   if(a==='more'){ MORE[el.dataset.key]=!MORE[el.dataset.key]; return renderGo(); }
@@ -651,7 +687,9 @@ document.addEventListener('click', function(ev){
   }
   if(a==='link') return doLink(id, el.dataset.code);
   if(a==='up'||a==='down') return doMove(id, a==='up'?-1:1);
-  if(a==='restore') return doRestore(id);
+  if(a==='restore') return doRestore([id]);
+  if(a==='bulkRestore') return doRestore(dselIds());
+  if(a==='delSelClear'){ DSEL={}; return renderManage(); }
   if(a==='bulkDel') return doDelete(selIds());
   if(a==='selClear'){ SEL={}; return renderManage(); }
   if(!EDIT) return;
@@ -669,14 +707,17 @@ document.addEventListener('change', function(ev){
   var el=ev.target; if(!el.dataset) return;
   if(el.dataset.act==='sel'){ SEL[el.dataset.id]=el.checked; renderManage(); }
   else if(el.dataset.act==='selAll'){ var on=el.checked; SEL={}; if(on) D.sets.forEach(function(s){ SEL[s.id]=true; }); renderManage(); }
+  else if(el.dataset.act==='dsel'){ DSEL[el.dataset.id]=el.checked; renderManage(); }
+  else if(el.dataset.act==='dselAll'){ var don=el.checked; DSEL={}; if(don) D.deleted.forEach(function(s){ DSEL[s.id]=true; }); renderManage(); }
 });
-$('modal').addEventListener('click', function(ev){ if(ev.target===$('modal')) closeEdit(); });
+$('modal').addEventListener('click', function(ev){ if(ev.target===$('modal')&&!BUSY) closeEdit(); });
 $('q').addEventListener('input', function(){ Q=$('q').value; renderGo(); });
 $('q').addEventListener('keydown', function(ev){
   if(ev.key==='Enter'){ var a=document.querySelector('#grid a.site'); if(a) a.click(); }
   else if(ev.key==='Escape'){ $('q').value=''; Q=''; renderGo(); }
 });
 document.addEventListener('keydown', function(ev){
+  if(ev.key==='Escape' && EDIT && !BUSY){ ev.preventDefault(); closeEdit(); return; }
   if(ev.key==='/' && TAB==='go' && !EDIT && !/^(input|textarea|select)$/i.test((document.activeElement||{}).tagName||'')){ ev.preventDefault(); $('q').focus(); }
 });
 

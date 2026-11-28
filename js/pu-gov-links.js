@@ -276,17 +276,18 @@
       return { code: code, missing: false, label: Nav.label(t).text, closed: Nav.closedFor(o.state, code, year),
         typeId: typeId, companies: cos };
     }
+    var activeTypes = types.filter(function (t) { return !Nav.closedFor(o.state, t.code, year); });
     var used = {}, cards = [], closed = [];
     (o.sets || []).forEach(function (s) {
       var progs = (s.bizCodes || []).map(program);
       progs.forEach(function (p) { used[p.code] = 1; });
-      var card = { set: s, programs: progs, suggest: suggestCodes(s, types),
+      var card = { set: s, programs: progs, suggest: suggestCodes(s, activeTypes),
         companyCount: progs.reduce(function (n, p) { return n + (p.closed ? 0 : p.companies.length); }, 0) };
       var known = progs.filter(function (p) { return !p.missing; });
       if (known.length && known.every(function (p) { return p.closed; })) closed.push(card);
       else cards.push(card);
     });
-    var bare = types.filter(function (t) { return !used[t.code] && !Nav.closedFor(o.state, t.code, year); })
+    var bare = activeTypes.filter(function (t) { return !used[t.code]; })
       .map(function (t) { return program(t.code); })
       .sort(function (a, b) { return (rank[a.code] || 0) - (rank[b.code] || 0); });
     return { cards: cards, bare: bare, closed: closed, types: types, year: year };
