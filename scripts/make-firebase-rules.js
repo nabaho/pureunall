@@ -1547,9 +1547,16 @@ rules.signboard = { '.read': LOGIN,
    ⚠ 이름(title)은 1~60자 — 화면(js/pu-gov-links.js LIMIT.title)과 같은 한도다. 한쪽만 바꾸면 화면이 만든 묶음을 규칙이 거절한다.
      주소가 http(s) 인지는 화면이 저장 직전·그리기 직전 두 번 본다(safeUrl) — 규칙은 배열 안을 못 본다. */
 const GOVLINKS_W = `(${LOGIN}) && newData.exists()`;
+/* ★ 즐겨찾기(2026-11-28 대시보드 판, 대표 지시 「대시보드에다가 별표 표시해서 상단에 자주 하는 거」) — 사람마다 govlinks/stars/{사번}.
+   «쓰기»는 본인만(사번은 uid_roles 로 맞춘다). 담기는 것: ★ 한 사업 id 목록 · ★ 한 사이트 주소 목록뿐(민감한 값 없음).
+   ⚠ 읽기는 뿌리(govlinks)의 재직 직원 읽기를 그대로 받는다 — 뿌리 읽기를 sets 로 내리면 rules-deploy 가 «사라지는 규칙»으로 멈춘다
+     (2026-11-28 tests/rules-deploy-guards 로 확인). 남의 ★ 가 읽혀도 사업 번호·공개 기관 주소뿐이라 그대로 둔다. 화면은 제 칸만 읽는다. */
+const GOVLINKS_ME = "root.child('uid_roles').child(auth.uid).child('sid').val() === $sid";
 rules.govlinks = { '.read': LOGIN,
   sets: { $id: { '.write': GOVLINKS_W,
-    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } } };
+    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } },
+  stars: { $sid: { '.write': `(${LOGIN}) && ${GOVLINKS_ME} && newData.exists()`,
+    '.validate': "newData.child('id').val() === $sid" } } };
 
 /* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
    대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.

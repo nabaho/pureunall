@@ -25,7 +25,7 @@
       /* 정부지원금(2026-10-11) — 지원사업 사전 한 건 · (회사, 사업) 한 쌍에 대한 노무사의 검토 결정 */
       SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
       /* 정부사업 바로가기(2026-11-28) — 사업 하나의 기관 시스템 주소·메모·폴더 경로·이어 둔 이알피 사업 code 묶음 */
-      GovLinkSet:'정부사업 바로가기 묶음',
+      GovLinkSet:'정부사업 바로가기 묶음', GovLinkStar:'정부사업 바로가기 즐겨찾기(사람별)',
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
       /* 법정교육자료함(2026-11-19) — 강의자료 파일 한 건(원본은 창고에 받은 그대로) · 그 자료를 본 노무사의 검토 메모 */
@@ -278,8 +278,10 @@
        ⚠ 이알피 사업과의 연결(bizCodes)은 사람이 고른 것만 저장한다 — 이름이 비슷해 보이는 사업은 «연결 제안»으로만 보인다(저장 안 함). */
     govlinks:{ name:'정부사업 바로가기', file:'gov-links.html', primaryRoots:['govlinks'],
       sharedRoots:['data/biz_cons_types','scal_erpTypeMap','scal_cos','scal_types','scal_scheds','scal_staff','scal_bizState','scal_bizOrder','uid_roles'],
-      writeContracts:[{path:'govlinks/sets/{id}',entityType:'GovLinkSet'}],
-      entityTypes:['GovLinkSet'] },
+      writeContracts:[{path:'govlinks/sets/{id}',entityType:'GovLinkSet'},
+                      /* ★ 즐겨찾기(2026-11-28 대시보드 판) — 사람마다 한 칸, 본인만 읽고 쓴다(규칙 govlinks.stars) */
+                      {path:'govlinks/stars/{sid}',entityType:'GovLinkStar'}],
+      entityTypes:['GovLinkSet','GovLinkStar'] },
     /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
        ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).
