@@ -63,5 +63,5 @@ test('★ 배포 목록에 올라 있다 — 업무 시간 10분마다', () => {
   assert.match(idx, /exports\.mgrWatch = MGRW\.mgrWatch;/, '★ index.js 에 안 적으면 함수가 아예 안 올라간다');
   const src = 읽기(path.join(뿌리, 'functions', 'mgr-watch.js'));
   assert.match(src, /require\("\.\/mgr-watch-core\/pu-mgr-watch-core\.js"\)/, '서버는 사본(한 벌)을 써야 한다 — 셈을 베껴 넣지 않는다');
-  assert.match(src, /pubsub\.schedule\("\*\/10 7-21 \* \* \*"\)/);
+  assert.match(src, /pubsub\.schedule\("2-59\/10 7-21 \* \* \*"\)/); // 검사고정-허용: 업무 시간 10분마다(정각 분산 2분 시작) 스케줄 확인
 });

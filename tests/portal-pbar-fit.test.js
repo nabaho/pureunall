@@ -7,15 +7,21 @@
 //   11-22 TypeSafe 단추를 걷어 지어낸 자료로는 잠시 들어왔지만, 대표 PC 처럼 내 메뉴 단추 안에 «₩000,000 이번 달»이 붙으면
 //   1100·1024·960·920·901px 에서 다시 넘쳤다. 머리줄은 «한 줄»(대표 2026-08-20)이라 접히지 않고 옆으로 넘친다.
 //   태블릿도 768px 에서 사용액 + «○ 서버 연결 끊김»이 함께 뜨면 로그아웃이 화면 밖으로 밀렸다(외부 점검 지적).
+//   그 뒤에도 600·521px(작은 태블릿·나눈 창)은 접을 것이 모자라 로그아웃·내 메뉴가 화면 밖이었다 →
+//   대표 2026-11-28 「후보 2 — 한 줄, 브랜드 글자부터」: 브랜드 글자 → 건의하기 글자 → (마지막) 로그아웃을 내 메뉴로.
 //
 // ■ 이 검사가 지키는 것 — «규칙»이지 지금 px 값이 아니다
 //   ① 맞춤 단계 CSS 는 폰보다 넓은 구간(min-width)에만 있다 — 줄이 접히는 폰 머리줄은 안 바꾼다. JS 도 같은 경계.
-//      태블릿에 닿는 맞춤 규칙은 «감추기»만 — 틈·여백을 PC 값으로 덮으면 태블릿이 오히려 넓어진다. PC 구간 경계는 태블릿 규칙과 맞물린다
+//      태블릿에 닿는 맞춤 규칙은 «감추기» · «평소 감춰 둔 대역 꺼내기»(display 만) · «접은 칸의 빈 자리 밀개 넘겨받기»만 —
+//      틈·여백을 PC 값으로 덮으면 태블릿이 오히려 넓어진다. PC 구간 경계는 태블릿 규칙과 맞물린다
 //   ② 마지막 단계의 머리줄 단추 모양은 태블릿과 «같다» — 두 벌로 갈라져 한쪽만 고쳐지지 않게
-//   ③ 접는 것은 «다른 데 같은 말이 있는 글자»뿐 — 로그아웃·내 메뉴·이름·건의하기·챗봇 단추·금액은 어느 단계에서도 안 감춘다
+//   ③ 접는 것은 «다른 데 같은 말이 있는 글자»뿐 — 내 메뉴·이름·건의하기·챗봇 단추·금액·로고는 어느 단계에서도 안 감춘다.
+//      로그아웃은 «같은 단계에서 내 메뉴 안 로그아웃이 보일 때»만 머리줄에서 빠진다(폰과 같은 자리) — 로그아웃이 안 닿는 순간이 없게.
+//      글자를 접은 단추는 이름(aria-label)이 남는다 · 건의하기는 «💬 건의하기» 한 흐름을 감추고 이름 있는 💬 대역을 꺼낸다(안을 쪼개면 기본 모양이 바뀐다)
 //   ④ 맞춤은 «재서» 고른다 — 머리줄의 보이는 직계 자식 전부(목록을 박지 않는다)를 화면 오른쪽 끝과 견준다 · 바뀔 때마다 다시 잰다
 //   ⑤ 실제로 돌려 본다 — 가짜 머리줄로 «넘치지 않으면 그대로 · 넘치면 가장 덜 접는 단계 · 다 접어도 넘치면 가장 좁은 단계»
 //   ⑥ 점검 씨앗은 «가장 넓은 머리줄»로 잰다 — 사용액이 붙고, 연결이 끊긴 화면도 잰다
+//   ⑦ 접는 차례(대표 2026-11-28 후보 2) — 기능 없는 브랜드 글자가 건의하기 글자보다 먼저 · 로그아웃은 맨 마지막 단계에서만
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -69,6 +75,14 @@ const PHONE = (() => {
   assert.ok(m, '폰 머리줄 구간의 조건을 못 읽었습니다: ' + bs[0].cond);
   return { max: +m[1] };
 })();
+/* 맞춤 규칙을 «단계 · 나머지 고르개»로 가른다 — .pbar[data-fit~="3"] .nm → { step:'3', rest:'.pbar .nm' } */
+function fitParts(sel) {
+  const m = sel.match(/^\.pbar\[data-fit~="([^"]+)"\]\s*(.*)$/);
+  return m ? { step: m[1], rest: ('.pbar ' + m[2]).trim() } : null;
+}
+const isHide = (r) => declSet(r.body) === 'display:none';
+/* 빈 자리 밀개 — 머리줄을 오른쪽으로 미는 margin-right:auto 를 가진 기본 칸(지금은 브랜드 .nm) */
+const SPRINGS = rules(OUTSIDE).filter((r) => /^\.pbar /.test(r.sel) && /margin-right:\s*auto/.test(r.body)).map((r) => r.sel);
 /* 태블릿(폰 포함) 머리줄 단추를 그림만 남기는 규칙 — 이름 글자(.hd-tx b)를 감추는 그 구간 */
 const TAB = (() => {
   const bs = BLOCKS.filter((b) => rules(b.body).some((r) => r.sel === '.pbar .hd-tx b' && /display:\s*none/.test(r.body)));
@@ -98,7 +112,7 @@ function fnBody(name) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-test('①★ 맞춤 단계 CSS 는 폰보다 넓은 구간에만 — 줄이 접히는 폰 머리줄은 안 바꾼다 · JS 도 같은 경계 · 태블릿에 닿는 규칙은 감추기만', () => {
+test('①★ 맞춤 단계 CSS 는 폰보다 넓은 구간에만 — 줄이 접히는 폰 머리줄은 안 바꾼다 · JS 도 같은 경계 · 태블릿에 닿는 규칙은 감추기·대역 꺼내기·밀개 넘겨받기만', () => {
   assert.deepEqual(rules(OUTSIDE).filter((r) => /\[data-fit/.test(r.sel)).map((r) => r.sel), [],
     '★ 맞춤 단계 CSS 가 @media 밖에 있습니다 — 폰 머리줄까지 바뀝니다');
   const 폰에닿음 = FITS.filter((f) => f.min <= PHONE.max).map((f) => f.min);
@@ -111,9 +125,24 @@ test('①★ 맞춤 단계 CSS 는 폰보다 넓은 구간에만 — 줄이 접�
     '★ PC 맞춤 구간(min-width:' + (TAB.max + 1) + 'px)이 없습니다 — 태블릿 머리줄 구간(max-width:' + TAB.max + 'px)과 맞물리는 PC 단계(머리줄 단추 접기)를 둘 곳');
   assert.ok(FIT_RULES.length > 0 && FIT_RULES.every((r) => /^\.pbar\[data-fit~="[^"]+"\]/.test(r.sel)),
     '맞춤 구간 안 규칙은 모두 .pbar[data-fit~="단계"] 로 시작해야 합니다 — 단계를 안 탄 규칙은 넘치지 않는 화면 모양까지 바꿉니다');
-  const 태블릿덮음 = FIT_RULES.filter((r) => r.min <= TAB.max && declSet(r.body) !== 'display:none');
+  /* 태블릿에 닿아도 되는 것: ㉠ 감추기
+     ㉡ 평소(맞춤 밖 CSS) display:none 으로 감춰 둔 대역을 display 값 하나로 꺼내기 — 내 메뉴 안 로그아웃(폰이 쓰는 자리)·건의하기 💬 대역
+     ㉢ 같은 단계에서 접은 밀개 칸(.nm)의 margin-right:auto 를 다른 칸이 넘겨받기(안 그러면 단추들이 왼쪽으로 쏠린다) */
+  const 평소감춤 = rules(OUTSIDE).filter(isHide).map((r) => r.sel);
+  const 대역꺼냄 = (r) => {
+    const p = fitParts(r.sel), d = declSet(r.body);
+    if (!p || !/^display:[a-z-]+$/.test(d) || d === 'display:none') return false;
+    return 평소감춤.some((b) => p.rest === b || p.rest.endsWith(' ' + b));
+  };
+  const 밀개넘김 = (r) => {
+    const p = fitParts(r.sel);
+    if (!p || declSet(r.body) !== 'margin-right:auto') return false;
+    return FIT_RULES.some((h) => { const q = fitParts(h.sel); return q && q.step === p.step && isHide(h) && SPRINGS.includes(q.rest); });
+  };
+  assert.ok(SPRINGS.length > 0, '머리줄 빈 자리 밀개(.pbar … {margin-right:auto})를 못 찾았습니다');
+  const 태블릿덮음 = FIT_RULES.filter((r) => r.min <= TAB.max && !isHide(r) && !대역꺼냄(r) && !밀개넘김(r));
   assert.deepEqual(태블릿덮음.map((r) => r.sel + '{' + r.body.trim() + '}'), [],
-    '★ 태블릿까지 닿는 맞춤 규칙이 감추기(display:none) 말고 다른 값을 덮습니다 — 태블릿은 이미 틈·여백이 더 좁아 PC 값을 덮으면 오히려 넓어집니다');
+    '★ 태블릿까지 닿는 맞춤 규칙이 감추기·평소 감춰 둔 대역 꺼내기·밀개 넘겨받기 말고 다른 값을 덮습니다 — 태블릿은 이미 틈·여백이 더 좁아 PC 값을 덮으면 오히려 넓어집니다');
 });
 
 test('②★ 마지막 단계의 머리줄 단추 모양은 태블릿과 «같다» — 두 벌이 갈라지지 않게', () => {
@@ -128,18 +157,47 @@ test('②★ 마지막 단계의 머리줄 단추 모양은 태블릿과 «같�
     '★ 태블릿(≤' + TAB.max + 'px) 머리줄 단추 규칙과 같은 것이 마지막 맞춤 단계에 없습니다(또는 값이 다릅니다) — 한쪽만 고치면 PC 를 좁혔을 때 모양이 갈라집니다');
 });
 
-test('③★ 접는 것은 «다른 데 같은 말이 있는 글자»뿐 — 로그아웃·내 메뉴·이름·건의하기·챗봇 단추·금액은 안 감춘다', () => {
-  const 남길것 = ['#logoutBtn', '#meBtn', '.pmeta', '#userName', '#sgFab', '#chatFab', '.hd-app', '.hd-ico', '#meMoneyAmt', '.me-money b', '.logout'];
-  const 감춤 = FIT_RULES.filter((r) => /display:\s*none/.test(r.body)).map((r) => r.sel);
+test('③★ 접는 것은 «다른 데 같은 말이 있는 글자»뿐 — 내 메뉴·이름·건의하기·챗봇 단추·금액·로고는 안 감추고, 로그아웃은 내 메뉴 안 것이 보일 때만 빠진다', () => {
+  const 남길것 = ['#meBtn', '.pmeta', '#userName', '#sgFab', '#chatFab', '.hd-app', '.hd-ico', '#meMoneyAmt', '.me-money b', '.logo'];
+  const 로그아웃 = ['#logoutBtn', '.logout'];
+  const 꼬리 = (s) => { const parts = s.split(' '); return [parts[parts.length - 1], parts.slice(-2).join(' ')]; };
+  const 감춤규칙 = FIT_RULES.filter((r) => /display:\s*none/.test(r.body));
+  const 감춤 = 감춤규칙.map((r) => r.sel);
   assert.ok(감춤.length > 0, '맞춤 단계가 아무것도 접지 않습니다');
-  const 잘못 = 감춤.filter((s) => {
-    const parts = s.split(' '), tail1 = parts[parts.length - 1], tail2 = parts.slice(-2).join(' ');
-    return 남길것.includes(tail1) || 남길것.includes(tail2);
-  });
+  const 잘못 = 감춤.filter((s) => 꼬리(s).some((t) => 남길것.includes(t)));
   assert.deepEqual(잘못, [], '★ 맞춤 단계가 눌러야 하는 것·읽어야 하는 것을 감춥니다 — 글자만 접으세요');
+  /* 로그아웃 — 머리줄에서 빼는 단계는 «같은 단계»에서 내 메뉴 맨 아래 로그아웃(#meLogout)을 보여야 한다(폰과 같은 자리) */
+  const 로그아웃감춤 = 감춤규칙.filter((r) => 꼬리(r.sel).some((t) => 로그아웃.includes(t)));
+  const 메뉴로안감 = 로그아웃감춤.filter((r) => {
+    const p = fitParts(r.sel);
+    return !p || !FIT_RULES.some((q) => { const qp = fitParts(q.sel); return qp && qp.step === p.step && /\.me-menu \.me-logout$/.test(qp.rest) && declSet(q.body) === 'display:block'; });
+  });
+  assert.deepEqual(메뉴로안감.map((r) => r.sel), [],
+    '★ 머리줄 로그아웃을 감추는데 같은 단계에서 내 메뉴 안 로그아웃을 보이지 않습니다 — 로그아웃을 누를 곳이 사라집니다');
+  if (로그아웃감춤.length) {
+    assert.match(ENTER, /<button[^>]*class="logout me-logout"[^>]*id="meLogout"/, '★ 내 메뉴 안 로그아웃(#meLogout)이 없습니다');
+    assert.match(ENTER, /\$\('meLogout'\)[\s\S]{0,120}\$\('logoutBtn'\)\.click\(\)/, '★ 내 메뉴 안 로그아웃이 머리줄 로그아웃과 같은 일을 하지 않습니다');
+  }
   /* 이름 글자를 접으면 이름은 «접근성 이름·말풍선»에 남아야 한다 */
   if (감춤.some((s) => /#chatFab \.chat-lb$/.test(s))) {
     assert.match(ENTER, /<button id="chatFab"[^>]*aria-label="[^"]+"/, '★ 챗봇 글자를 접는데 단추에 aria-label 이 없습니다');
+  }
+  /* 건의하기 글자를 접으면 — «💬 건의하기» 한 흐름(.sg-tx)을 감추고 «같은 단계»에서 이름 있는 💬 대역(.sg-ico)을 꺼낸다.
+     ⚠ 글자만 span 으로 쪼개 접지 않는다 — 글자 흐름이 끊겨 넘치지 않는 기본 화면(411·360·768px)까지 몇 점씩 바뀌었다(2026-11-28 갈무리 대조) */
+  const 건의감춤 = 감춤규칙.filter((r) => /#sgFab \.sg-tx$/.test(r.sel));
+  if (건의감춤.length) {
+    const btn = ENTER.match(/<button id="sgFab"[^>]*>([\s\S]*?)<\/button>/);
+    assert.ok(btn, '건의하기 단추(#sgFab)를 못 찾았습니다');
+    const tx = btn[1].match(/<span class="sg-tx">([\s\S]*?)<\/span>/);
+    assert.ok(tx && /💬/.test(tx[1]) && /건의하기/.test(tx[1]), '★ 건의하기 글자 칸(.sg-tx)에 «💬 건의하기»가 다 들어 있지 않습니다');
+    assert.ok(!/</.test(tx[1]), '★ «💬 건의하기» 칸 안을 다시 쪼갰습니다 — 글자 흐름이 끊겨 넘치지 않는 화면 모양까지 바뀝니다');
+    assert.match(btn[1], /<span class="sg-ico"[^>]*aria-label="[^"]+"[^>]*>💬<\/span>/,
+      '★ 건의하기 글자를 접는데 이름(aria-label) 있는 💬 대역(.sg-ico)이 없습니다 — 💬 만 읽힙니다');
+    const 대역없음 = 건의감춤.filter((r) => {
+      const p = fitParts(r.sel);
+      return !FIT_RULES.some((q) => { const qp = fitParts(q.sel); return qp && qp.step === p.step && /#sgFab \.sg-ico$/.test(qp.rest) && /^display:[a-z-]+$/.test(declSet(q.body)) && !isHide(q); });
+    });
+    assert.deepEqual(대역없음.map((r) => r.sel), [], '★ 건의하기 글자를 감추는 단계가 💬 대역을 꺼내지 않습니다 — 단추가 빈 알약이 됩니다');
   }
   if (감춤.some((s) => /\.hd-tx b$/.test(s))) {
     assert.match(fnBody('portalHeadAppLabel'), /setAttribute\('aria-label'/, '★ 머리줄 단추 이름을 접는데 aria-label 을 안 붙입니다');
@@ -233,4 +291,25 @@ test('⑥ 점검 씨앗은 «가장 넓은 머리줄»로 잰다 — 사용액�
     '★ 포털 점검 씨앗에 이번 달 사용액이 없습니다 — 대표 머리줄(내 메뉴 단추 안 «₩… 이번 달»)보다 좁게 재어 넘침을 못 봅니다');
   assert.match(SEED, /statusDot[\s\S]{0,200}dataset\.state\s*=\s*'offline'/,
     '★ 연결이 끊긴 머리줄(«서버 연결 끊김» 글자) 화면이 없습니다 — 가장 넓은 머리줄을 못 잽니다');
+});
+
+test('⑦★ 접는 차례(대표 2026-11-28 후보 2) — 단계는 앞 단계를 다 품고 · 브랜드 글자가 건의하기 글자보다 먼저 · 로그아웃은 맨 마지막 단계에서만', () => {
+  /* 단계는 «하나씩 더» 접는다 — 뒤 단계가 앞 단계에서 접은 것을 다시 펴면 재기(가장 덜 접는 단계부터)가 엉킨다 */
+  for (let i = 1; i < STEPS.length; i++) {
+    const prev = STEPS[i - 1].split(/\s+/).filter(Boolean), cur = STEPS[i].split(/\s+/).filter(Boolean);
+    assert.ok(prev.every((t) => cur.includes(t)) && cur.length > prev.length,
+      '★ 맞춤 단계 «' + STEPS[i] + '» 가 앞 단계 «' + STEPS[i - 1] + '» 를 다 품고 하나 이상 더 접지 않습니다');
+  }
+  const 단계 = (re) => {
+    const r = FIT_RULES.find((x) => { const p = fitParts(x.sel); return p && isHide(x) && re.test(p.rest); });
+    return r ? fitParts(r.sel).step : null;
+  };
+  const 처음 = (tok) => STEPS.findIndex((s) => s.split(/\s+/).includes(tok));
+  const 브랜드 = 단계(/^\.pbar \.nm$/), 건의 = 단계(/#sgFab \.sg-tx$/), 로그아웃 = 단계(/#logoutBtn$/);
+  assert.ok(브랜드 && 건의 && 로그아웃,
+    '★ 600·521px 을 위한 접기(브랜드 글자 · 건의하기 글자 · 로그아웃을 내 메뉴로)가 빠졌습니다 — 작은 태블릿·나눈 창에서 로그아웃·내 메뉴가 다시 화면 밖으로 나갑니다');
+  assert.ok(처음(브랜드) > 0 && 처음(건의) > 0 && 처음(로그아웃) > 0, '★ 접기 단계가 맞춤 단계 목록(PBAR_FIT_STEPS)에 없습니다');
+  assert.ok(처음(브랜드) < 처음(건의), '★ 건의하기 글자를 브랜드 글자보다 먼저 접습니다 — 기능 없는 글자(브랜드)부터 접기로 했습니다(대표 2026-11-28 후보 2)');
+  assert.ok(처음(건의) < 처음(로그아웃), '★ 로그아웃을 건의하기 글자보다 먼저 내 메뉴로 넣습니다 — 로그아웃은 맨 나중(대표 2026-11-28 후보 2)');
+  assert.equal(처음(로그아웃), STEPS.length - 1, '★ 로그아웃이 마지막 단계가 아닌데 머리줄에서 빠집니다 — PC·태블릿은 로그아웃이 머리줄 맨 오른쪽에 늘 보이는 것이 먼저입니다');
 });

@@ -563,6 +563,9 @@ rules.payroll_os = workspace({
     }
   }
 });
+// 서버(collectFundMailOnNew/drainFundMailQueue) 전용 큐 — 상위 workspace 규칙을 상속받지 않는 최상위 루트로 클라이언트 읽기·쓰기 완전 차단
+rules.fund_mail_queue = { '.read': false, '.write': false };
+// 하위 호환 잠금 자리 (실사용 큐는 최상위 fund_mail_queue 로 이전됨)
 rules.fund_erp = workspace({
   mail_queue: {
     '.read': false,
@@ -2945,21 +2948,20 @@ rules.datahub_nonce = { '.read': false, '.write': false };
 rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
 
-/* 라이브 콘솔 동기화 규칙 (fund_mail_queue · puwiki) */
-rules.fund_mail_queue = { '.read': false, '.write': false };
+/* 콘솔 동기화 — puwiki (사라짐 방지 및 라이브 콘솔 일치 유지, 2026-11-28) */
 rules.puwiki = {
   '.read': LOGIN,
   articles: {
     $id: {
       '.write': `(${LOGIN}) && newData.exists()`,
-      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120"
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 12000"
     }
   },
   reviews: {
     $art: {
       $id: {
-        '.write': `(${LOGIN}) && newData.exists()`,
-        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag')"
+        '.write': `(${LOGIN}) && newData.exists() && ((!data.exists() && newData.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.exists() && newData.child('actorSid').val() === data.child('actorSid').val() && newData.child('kind').val() === data.child('kind').val() && newData.child('createdAt').val() === data.child('createdAt').val() && ((newData.child('_deleted').val() === true && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) || (newData.child('_deleted').val() !== true && ((data.child('kind').val() === 'verify' && data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.child('kind').val() === 'flag' && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('note').val() === data.child('note').val()) && (newData.child('status').val() === 'open' || newData.child('resolvedBySid').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))))))`,
+        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag') && newData.child('actorSid').isString() && newData.child('actorSid').val().length > 0 && newData.child('actorSid').val().length <= 64 && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 800"
       }
     }
   }

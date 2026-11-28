@@ -225,7 +225,7 @@
   }
 
   /* ── 읽기 전용 병렬 수집 (각 경로별 권한 분리 격리) ── */
-  function readNodeOnce(key, path, allowed) {
+  function readNodeOnce(key, path, allowed, optional) {
     if (!allowed) {
       COVERAGE[key] = 'perm_skip';
       return Promise.resolve(null);
@@ -237,7 +237,12 @@
     return fbDb.ref(path).once('value').then(function (snap) {
       COVERAGE[key] = 'ready';
       return snap ? snap.val() : null;
-    }).catch(function () {
+    }).catch(function (err) {
+      var code = String((err && (err.code || err.message)) || '');
+      if (optional && /permission/i.test(code)) {
+        COVERAGE[key] = 'perm_skip';
+        return null;
+      }
       COVERAGE[key] = 'denied';
       return null;
     });
@@ -251,6 +256,7 @@
     setLoadingUi(true);
     COVERAGE = {};
     var canCareer = C.appCanAccess('career', ME);
+    var isAdminOnly = ME.role === 'admin' || !!ME.isAdmin;
 
     var jobs = [
       ['companies',        'data/companies/v',             true],
@@ -262,7 +268,11 @@
       ['funds',            'data/funds/v',                 true],
       ['workItems',        'work_erp/items',               true],
       ['quotes',           'pu_quotes',                    true],
-      ['cardsOntIdx',      'pucards/ontIdx',               true]
+      ['cardsOntIdx',      'pucards/ontIdx',               true],
+      ['paydataArrivals',  'paydata/arrivals',             true],
+      ['payrollInbox',     'payroll_os/inbox',             true],
+      ['edulibInbox',      'edulib_inbox',                 isAdminOnly, true],
+      ['datahubBoard',     'datahub_board',                isAdminOnly, true]
     ];
 
     if (canCareer && ME.uid) {
@@ -270,7 +280,7 @@
     }
 
     return Promise.all(jobs.map(function (j) {
-      return readNodeOnce(j[0], j[1], j[2]).then(function (val) {
+      return readNodeOnce(j[0], j[1], j[2], !!j[3]).then(function (val) {
         return [j[0], val];
       });
     })).then(function (pairs) {
@@ -431,7 +441,7 @@
     if (appSel && appSel.options.length <= 1) {
       Object.keys(C.APP_META).forEach(function (k) {
         var m = C.APP_META[k];
-        if (m.off) return;
+        if (m.off || m.aliasOf) return;
         var opt = document.createElement('option');
         opt.value = m.key;
         opt.textContent = m.icon + ' ' + m.name;
@@ -667,7 +677,7 @@
     ];
     var matrixHtml = rowGroups.map(function (rg) {
       var apps = Object.keys(C.APP_META).map(function (k) { return C.APP_META[k]; }).filter(function (a) {
-        return !a.off && a.row === rg.id;
+        return !a.off && !a.aliasOf && a.row === rg.id;
       });
       var pills = apps.map(function (a) {
         var can = C.appCanAccess(a.key, ME);

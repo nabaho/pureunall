@@ -1770,7 +1770,7 @@ module.exports = function build(deps) {
     mailKeepWarm: F
       .region(REGION)
       .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 60, memory: '256MB' })
-      .pubsub.schedule('*/3 8-19 * * 1-6')
+      .pubsub.schedule('1-59/3 8-19 * * 1-6')
       .timeZone('Asia/Seoul')
       .onRun(async () => {
         const sig = warmSig();

@@ -67,7 +67,7 @@ function make(deps) {
     if (r === 'granted' || r === 'revoked') console.log('staff-claim', r);
     return null;
   });
-  const staffClaimSweep = fn.pubsub.schedule('every 60 minutes').onRun(async () => {
+  const staffClaimSweep = fn.pubsub.schedule('37 * * * *').timeZone('Asia/Seoul').onRun(async () => {
     const snap = await deps.getDatabase().ref('uid_roles').once('value');
     const out = await sweep(getAuth(), snap.val() || {});
     console.log('staff-claim sweep', JSON.stringify(out));
