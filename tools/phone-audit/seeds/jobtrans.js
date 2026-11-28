@@ -238,6 +238,8 @@ module.exports = {
     },
   },
   views: [
+    // 사업장 줄을 누르면 «진행 기록·완료보고서» 창(대표 지시 2026-11-28)
+    { name: 'detail', run: async (p) => { await p.click('tr[data-row][data-tname="projectsKmac"] td.ti'); } },
     { name: 'intake', run: async (p) => { await p.click('#tabs button[data-tab="intake"]'); } },
     { name: 'mid',    run: async (p) => { await p.click('#tabs button[data-tab="mid"]'); } },
     { name: 'final',  run: async (p) => { await p.click('#tabs button[data-tab="final"]'); } },

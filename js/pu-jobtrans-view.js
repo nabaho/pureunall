@@ -1429,6 +1429,12 @@
     if (YEAR_FILTER && yrs.indexOf(Number(YEAR_FILTER)) < 0) YEAR_FILTER = '';
     var yr = YEAR_FILTER;
     var stFilter = str($('projStage') && $('projStage').value);
+    // 폰 연도 드롭다운(.pu-phone-yr-sel) — 위 숫자판과 같은 연도 목록·같은 상태(YEAR_FILTER). PC 에서는 CSS 가 숨긴다.
+    var yrSelEl = $('projYear');
+    if (yrSelEl) {
+      yrSelEl.innerHTML = '<option value="">연도 전체</option>' + yrs.map(function (y) { return '<option value="' + y + '">' + y + '년</option>'; }).join('');
+      yrSelEl.value = yr;
+    }
 
     if ($('kpiBox')) {
       var scopeList = projs.filter(function (p) { return !agFilter || (p.agency === 'cepa' ? 'cepa' : 'kmac') === agFilter; });
@@ -4234,6 +4240,7 @@
       if (!el) return;
       el.addEventListener(id === 'projQ' ? 'input' : 'change', function () {
         if (id === 'projAgency') applyAgencyScope(el.value);
+        if (id === 'projYear') YEAR_FILTER = str(el.value);
         clearSel('projects');
         clearSel('projectsKmac');
         clearSel('projectsCepa');
