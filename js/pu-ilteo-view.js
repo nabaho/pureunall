@@ -977,10 +977,10 @@
       var minYr = yearGroups.length ? yearGroups[yearGroups.length - 1].year : '2026';
       var maxYr = yearGroups.length ? yearGroups[0].year : '2026';
       $('kpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>일터혁신 컨설팅 (' + esc(maxYr + '~' + minYr + '년') + ')</span><b>' + projs.length + '건 (' + yearGroups.length + '개 연도)</b></div>' +
-        '<div class="kpi k-green"><span>📌 중간·최종보고서 수록</span><b>중간 ' + midStoredCnt + ' · 최종 ' + finDoneCnt + '건</b></div>' +
-        '<div class="kpi k-amber"><span>📩 기초자료 메일 미확인</span><b>' + totalPreUnseen + '건</b></div>' +
-        '<div class="kpi k-blue"><span>📬 후속·결과 메일 미확인</span><b>' + totalPostUnseen + '건</b></div>';
+        '<div class="kpi k-blue"><span><span class="wide-only">일터혁신 컨설팅 (' + esc(maxYr + '~' + minYr + '년') + ')</span><span class="phone-only">전체 사업</span></span><b>' + projs.length + '건 <span class="wide-only">(' + yearGroups.length + '개 연도)</span></b></div>' +
+        '<div class="kpi k-green"><span><span class="wide-only">📌 중간·최종보고서 수록</span><span class="phone-only">보고서</span></span><b>중간 ' + midStoredCnt + ' · 최종 ' + finDoneCnt + '건</b></div>' +
+        '<div class="kpi k-amber"><span><span class="wide-only">📩 기초자료 메일 </span><span class="phone-only">기초</span>미확인</span><b>' + totalPreUnseen + '건</b></div>' +
+        '<div class="kpi k-blue"><span><span class="wide-only">📬 후속·결과 메일 </span><span class="phone-only">후속</span>미확인</span><b>' + totalPostUnseen + '건</b></div>';
     }
 
     var yrSel = $('projYear');
@@ -993,9 +993,9 @@
       for (var y = 2026; y >= 2015; y--) yrMap[String(y)] = 1;
       projs.forEach(function (p) { yrMap[String(safeYearNum(p.year))] = 1; });
       var sortedYrs = Object.keys(yrMap).sort(function (a, b) { return Number(b) - Number(a); });
-      yrSel.innerHTML = '<option value="">연도 전체 (' + projs.length + '건)</option>' + sortedYrs.map(function (yv) {
+      yrSel.innerHTML = '<option value="">연도 전체</option>' + sortedYrs.map(function (yv) {
         var cnt = yrCountMap[yv] || 0;
-        return '<option value="' + esc(yv) + '"' + (yv === curYrVal ? ' selected' : '') + '>' + esc(yv) + '년 (' + cnt + '건)</option>';
+        return '<option value="' + esc(yv) + '"' + (yv === curYrVal ? ' selected' : '') + '>' + esc(yv) + '년 (' + cnt + ')</option>';
       }).join('');
     }
 
@@ -1083,11 +1083,11 @@
           { cls: 'ti', title: p.companyName + ' (' + safeYearNum(p.year) + '년 일터혁신 상생컨설팅)', html: esc(p.companyName) },
           { k: 'badge', html: '<span class="chip c-blue">' + esc(lv.short) + '</span> ' + stageDotsHtml(p) },
           { cls: 'wide', title: taskNames, html: esc(taskNames || '과제 선택 필요') },
-          { html: mailBadges.join(' ') },
+          { k: 'pc-only', html: mailBadges.join(' ') },
           {
             k: 'act',
             html: '<button class="sm" data-select-proj="' + esc(p.id) + '" title="우측 검토 패널에서 보고서와 수집자료를 바로 검토합니다">검토</button>' +
-              '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">① 기초</button>' +
+              '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="intake" data-pm-act="1">① 기초</button>' +
               '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">② 중간</button>' +
               '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final">③ 결과</button>'
           }
@@ -1114,9 +1114,9 @@
             { cls: 'yr-col', k: 'yr', html: '<span class="chip c-blue">' + esc((c.year || 2026) + '년') + '</span>' },
             { cls: 'ti', title: c.companyName, html: esc(c.companyName) },
             { k: 'badge', html: '<span class="chip c-blue">' + esc(c.source) + '</span>' },
-            { html: esc(c.bizNo || '-') },
-            { html: esc(c.contactEmail || '이메일 미등록') },
-            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
+            { k: 'pc-only', html: esc(c.bizNo || '-') },
+            { cls: 'wide', html: esc(c.contactEmail || '이메일 미등록') },
+            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '" data-pm-act="1">⚡ 활성화</button>' }
           ]
         };
       });
@@ -3662,6 +3662,7 @@
         var tr = e.target.closest('tr[data-row][data-tname="projects"]');
         if (tr) {
           CUR_PID = tr.getAttribute('data-row');
+          if (typeof global.innerWidth === 'number' && global.innerWidth <= 768) TAB = 'intake';
           clearSel('projects');
           draw();
         }
