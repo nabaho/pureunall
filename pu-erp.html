@@ -40677,7 +40677,17 @@ function CaseDetailModal(props){
       (window.PuHarassCore && window.PuHarassCore.isErpInvestigateCase(c, caseTypes)) ? ['조사실·보고서', h('a', {
         href:'pu-harass.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
         style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
-      }, '🛡️ 조사실·보고서 열기 ›')] : null
+      }, '🛡️ 조사실·보고서 열기 ›')] : null,
+      /* 🏥 산재사건관리 전용 연동 — 산재 사건일 때 4축·공방대조 사건실 바로가기 */
+      erpIsInjuryCase(c, t) ? ['산재사건관리', h('a', {
+        href:'pu-sanjae.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
+      }, '🏥 산재사건실 열기 ›')] : null,
+      /* ⚖️ 부당해고·노동사건관리 전용 연동 — 노동위·체불·진정·대지급금 사건 바로가기 */
+      (!erpIsInjuryCase(c, t) && t && /(해고|징계|정직|전보|부노|노동위|체불|진정|대지급금|고소|감독관|권리구제)/.test([c.type, c.typeCode, t.name, t.label, c.title, c.caseName].join(' '))) ? ['노동사건관리', h('a', {
+        href:'pu-case.html?erp=' + encodeURIComponent(c.id), target:'_blank', rel:'noopener',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, textDecoration:'none', display:'inline-block' }
+      }, '🔨 노동사건실 열기 ›')] : null
     ].filter(function(x){ return x; })
   };
 

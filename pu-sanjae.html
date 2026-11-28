@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#166534">
+<title>산재사건관리 — 푸른노무법인</title>
+<link rel="manifest" href="pu-sanjae-manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏥</text></svg>">
+<link rel="apple-touch-icon" href="icon-sanjae-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="산재사건">
+<style>
+:root{
+  --bg:#f8fafc;--card:#ffffff;--ink:#1e293b;--ink2:#475569;--mute:#475569;
+  --line:#cbd5e1;--line2:#94a3b8;--soft:#e2e8f0;
+  --pri-bg:#1e40af;--pri-h:#2563eb;--blue:#2563eb;--blue-d:#1e40af;--blue-l:#eff6ff;--blue-b:#bfdbfe;
+  --ok-bg:#166534;--green:#16a34a;--green-d:#166534;--green-bg:#f0fdf4;--green-m:#4ade80;--green-b:#bbf7d0;
+  --amber:#d97706;--amber-d:#854d0e;--amber-bg:#fffbeb;--amber-b:#fde68a;
+  --red:#dc2626;--red-d:#991b1b;--red-bg:#fef2f2;--red-b:#fecaca;
+}
+body.dark{
+  --bg:#000000;--card:#1e293b;--ink:#f8fafc;--ink2:#cbd5e1;--mute:#cbd5e1;
+  --line:#475569;--line2:#64748b;--soft:#1e293b;
+  --blue-d:#bfdbfe;--blue-l:#1e293b;--green-d:#bbf7d0;--green-bg:#1e293b;--amber-d:#fde68a;--amber-bg:#1e293b;--red-d:#fecaca;--red-bg:#1e293b;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#000000;--card:#1e293b;--ink:#f8fafc;--ink2:#cbd5e1;--mute:#cbd5e1;
+    --line:#475569;--line2:#64748b;--soft:#1e293b;
+    --blue-d:#bfdbfe;--blue-l:#1e293b;--green-d:#bbf7d0;--green-bg:#1e293b;--amber-d:#fde68a;--amber-bg:#1e293b;--red-d:#fecaca;--red-bg:#1e293b;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;word-break:keep-all;overflow-wrap:break-word}
+#lock{max-width:460px;margin:64px auto;padding:28px 24px;background:var(--card);border:1px solid var(--line);border-radius:14px;text-align:center}
+#lock h2{margin:0 0 8px;font-size:19px}
+#lock p{margin:0 0 16px;color:var(--ink2);font-size:13px}
+#app{display:none;max-width:1420px;margin:0 auto;padding:10px 14px 64px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+#head{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:10px;padding:9px 14px;margin-bottom:8px}
+#head .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#head .ttl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#head h1{margin:0;font-size:17px;font-weight:800;color:var(--ink)}
+#head .sub{font-size:12px;color:var(--mute)}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
+#who{min-height:28px;display:inline-flex;align-items:center}
+#recent-diff-bar{background:var(--blue-l);border:1px solid var(--blue-b);border-radius:9px;padding:6px 10px;margin-bottom:8px}
+.diff-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.diff-title{font-size:12px;font-weight:800;color:var(--blue-d)}
+.diff-pills{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.diff-pill,.diff-toggle{background:var(--card);border:1px solid var(--blue-b);border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700;color:var(--blue-d);cursor:pointer;white-space:nowrap}
+.diff-badge{background:var(--blue);color:#ffffff;border-radius:4px;padding:1px 5px;font-size:10.5px;margin-right:3px}
+.code-diff-box{outline:2px solid var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
+.hi-top-strip{display:flex;flex-direction:column;gap:6px;padding:8px 11px;margin-bottom:8px}
+.scope-bar{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.scope-lbl{font-weight:700;font-size:12px;color:var(--ink2);white-space:nowrap;margin-right:3px}
+.scope-btn{padding:4px 10px;min-height:30px;border-radius:8px;font-weight:600;font-size:12px;border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer}
+.scope-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
+.scope-btn.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff}
+.kpis{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.kpi{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:var(--card);border:1px solid var(--line);cursor:pointer}
+.kpi span{font-size:12px;font-weight:700;color:var(--mute)}
+.kpi b{font-size:13px;font-weight:800;color:var(--ink)}
+.kpi.k-blue b{color:var(--blue-d)}
+.kpi.k-green b{color:var(--green-d)}
+.kpi.k-amber b{color:var(--amber-d)}
+.kpi.k-red b{color:var(--red-d)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.tab-btn{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font-weight:700;font-size:13px;cursor:pointer}
+.tab-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
+.flt-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.flt-bar input[type=search],.flt-bar select{min-height:34px;padding:4px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);font-size:13px}
+.flt-bar input[type=search]{flex:1;min-width:210px}
+.btn{padding:6px 12px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.btn.sm{padding:4px 10px;min-height:32px;font-size:12px}
+.btn.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
+.btn.red{background:var(--red-bg);border-color:var(--red-b);color:var(--red-d)}
+.btn.amber{background:var(--amber-bg);border-color:var(--amber-b);color:var(--amber-d)}
+.tbl-wrap{overflow-x:auto;padding:0}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th,table.t td{border-bottom:1px solid var(--soft);padding:7px 8px;text-align:left;white-space:nowrap}
+table.t th{background:var(--bg);font-weight:700;color:var(--ink2);position:sticky;top:0}
+table.t tr:hover{background:var(--blue-l);cursor:pointer}
+table.t tr.sel{background:var(--blue-l)}
+#chkAll,.row-chk{width:18px;height:18px;cursor:pointer;vertical-align:middle}
+.num{font-variant-numeric:tabular-nums;color:var(--mute)}
+.muted{color:var(--mute);font-size:12px}
+.th-flt-btn{border:0;background:transparent;font:inherit;font-weight:700;color:var(--ink2);cursor:pointer;padding:2px 4px}
+.empty-td{text-align:center;color:var(--mute);padding:26px}
+.bd{display:inline-block;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid var(--line)}
+.bd-blue,.bd-ours{background:var(--blue-l);color:var(--blue-d);border-color:var(--blue-b)}
+.bd-red,.bd-opponent{background:var(--red-bg);color:var(--red-d);border-color:var(--red-b)}
+.bd-green,.bd-agency,.bd-ok{background:var(--green-bg);color:var(--green-d);border-color:var(--green-b)}
+.bd-amber,.bd-evidence{background:var(--amber-bg);color:var(--amber-d);border-color:var(--amber-b)}
+.bd-gray,.bd-contract{background:var(--bg);color:var(--ink2);border-color:var(--line)}
+.axis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:8px}
+.axis-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px}
+.axis-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.axis-list li{display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;background:var(--bg);cursor:pointer;font-size:12.5px}
+.axis-list li:hover{background:var(--blue-l)}
+.axis-sub,.axis-due{font-size:12px;color:var(--ink2);margin-top:4px}
+.split-2{display:grid;grid-template-columns:minmax(320px,1fr) minmax(360px,1.25fr);gap:10px;align-items:start}
+.split-right{position:sticky;top:10px;min-height:420px}
+.yr-hd{font-weight:800;font-size:14px;padding:4px 6px;color:var(--blue-d);margin:6px 0 4px}
+.yr-case-hd{font-size:13px;padding-bottom:6px;border-bottom:1px solid var(--soft);margin-bottom:6px;cursor:pointer}
+.yr-docs{display:flex;flex-direction:column;gap:4px}
+.doc-row{display:flex;align-items:center;gap:6px;width:100%;text-align:left;padding:5px 8px;border:1px solid var(--soft);border-radius:7px;background:var(--bg);color:var(--ink);cursor:pointer;font-size:12.5px}
+.doc-row.on{border-color:var(--blue);background:var(--blue-l)}
+.doc-nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.doc-meta{font-size:11px;color:var(--mute)}
+.pv-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.pv-head{border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:8px}
+.pv-title{font-weight:800;font-size:14px}
+.pv-meta{font-size:11.5px;color:var(--mute);margin-top:3px;word-break:break-all}
+.pv-toolbar{margin-bottom:8px}
+.pv-pdf{width:100%;height:540px;border:1px solid var(--line);border-radius:6px}
+.pv-img-wrap img{max-width:100%;max-height:540px;border-radius:6px}
+.pv-pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--soft);border-radius:7px;padding:10px;max-height:520px;overflow:auto;font:12.5px/1.55 ui-monospace,Consolas,monospace}
+.pv-empty,.pv-loading,.pv-warn{padding:18px;border-radius:8px;font-size:13px;line-height:1.5}
+.pv-empty{background:var(--bg);color:var(--mute);text-align:center}
+.pv-warn{background:var(--amber-bg);color:var(--amber-d);border:1px solid var(--amber-b)}
+.cm-kpis{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.cm-list{display:flex;flex-direction:column;gap:8px}
+.cm-row{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card)}
+.cm-row.cm-red{border-color:var(--red-b);background:var(--red-bg)}
+.cm-round{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12.5px}
+.cm-no{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:99px;background:var(--soft);font-size:11px;font-weight:800}
+.cm-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.cm-col{background:var(--bg);border:1px solid var(--soft);border-radius:7px;padding:6px 8px}
+.cm-col-hd{font-size:11px;font-weight:700;color:var(--mute);margin-bottom:3px}
+.cm-arrow{font-weight:800;color:var(--mute)}
+.link-btn{border:0;background:transparent;color:var(--blue-d);font-weight:700;font-size:12.5px;text-align:left;cursor:pointer;padding:0;text-decoration:underline}
+.mail-bundle .mb-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.mail-item{font-size:12.5px;padding:4px 0;border-top:1px solid var(--soft);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.detail-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.detail-hd h2{margin:0 0 2px;font-size:17px}
+.ws-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px;margin-bottom:12px}
+.step-box{display:flex;flex-direction:column;gap:2px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer;font-size:12px}
+.step-box.done{border-color:var(--green-m);background:var(--green-bg)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:10px}
+.form-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:var(--ink2)}
+.form-grid input,.form-grid select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;line-height:1.4}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,[data-cid]:focus-visible,[data-act]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.55;cursor:not-allowed}
+.guide-strip,.alert-strip,.secret-wrap{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--soft);font-size:12.5px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:2000}
+.mbox{background:var(--card);border:1px solid var(--line);border-radius:12px;max-width:780px;width:100%;max-height:88vh;overflow:auto;padding:14px 16px}
+.mhd{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--soft);padding-bottom:8px;margin-bottom:10px}
+.mhd h3{margin:0;font-size:15px}
+.mv-meta{font-size:12.5px;color:var(--ink2);margin-bottom:8px}
+.mv-atts{margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1e293b;color:#ffffff;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:700;display:none;z-index:3000}
+#toast.show{display:block}
+#toast.err{background:#991b1b;color:#ffffff}
+#thFltPop{position:fixed;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px;z-index:2100}
+@media (max-width:768px){
+  input,select,textarea,.flt-bar input[type=search],.flt-bar select,.form-grid input,.form-grid select{font-size:16px}
+  #chkAll,.row-chk{min-width:24px;min-height:24px}
+  #app{padding:8px 8px 72px}
+  .tbl-wrap{overflow-x:visible;border:0;background:transparent}
+  table.t thead{display:none}
+  table.t tbody{display:flex;flex-direction:column;gap:6px;padding:6px 0}
+  table.t tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card)}
+  table.t td{border:0;padding:1px 0;white-space:normal}
+  table.t td:first-child,table.t td.num{flex:0 0 auto}
+  table.t td:nth-child(n+6){font-size:12px;color:var(--ink2)}
+  table.t td.empty-td{width:100%}
+  .split-2{grid-template-columns:1fr}
+  .split-right{position:static}
+  .cm-pair{grid-template-columns:1fr}
+  .cm-arrow{text-align:center}
+  .btn.sm,.scope-btn,.tab-btn{min-height:36px}
+}
+@media (min-width:769px){
+  table.t td.one-line{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+}
+.tbl-more-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-top:1px solid var(--soft);background:var(--bg);font-size:12.5px}
+@media print{#head,.tabs,#recent-diff-bar,.flt-bar,#toast{display:none!important}}
+</style>
+</head>
+<body>
+<div id="lock">
+  <h2>🏥 산재사건관리</h2>
+  <p id="lockWhy">푸른노무법인 재직 직원 로그인 후 산재·질판위·심사/재심사 사건 원장을 열람합니다.</p>
+  <button type="button" class="btn pri" id="btnGateLogin" onclick="puSanjaeGateShow()">푸른 계정으로 로그인</button>
+</div>
+
+<div id="app">
+  <header id="head">
+    <div class="top">
+      <div class="ttl">
+        <h1>🏥 산재사건관리</h1>
+        <span class="sub">업무상사고 · 질판위 · 심사/재심사(90일) · 산안사건 · 공방대조</span>
+      </div>
+      <div class="hdr-right">
+        <a href="work.html#sanjae" class="btn sm" id="btnGoWork" title="푸른업무관리 산재사건 뷰로 이동">📋 업무관리로</a>
+        <div id="who"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="recent-diff-bar"></div>
+  <div class="kpis" id="kpiStrip"></div>
+  <nav class="tabs" id="tabNav" aria-label="산재사건 탭"></nav>
+  <main id="tabBody"></main>
+</div>
+
+<div id="thFltPop" class="th-pop" role="dialog" aria-label="열 정렬 및 필터" style="display:none"></div>
+<div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox" role="dialog" aria-modal="true" aria-labelledby="mhdTitle" tabindex="-1"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="printArea"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<!-- Firebase 9.23.0 CDN (phone-audit fake-firebase 모킹 호환을 위해 타 앱과 동일하게 SRI 미적용) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=115"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=59"></script>
+<script src="js/pu-active.js?v=2"></script>
+<script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-authsync.js?v=8"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-back.js?v=5"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal') || PuBack.closeTopVisible('#thFltPop'); }); }catch(e){}</script>
+<script src="js/pu-fast-boot.js?v=1"></script>
+<script src="hangul/js/zip.js?v=1"></script>
+<script src="hangul/js/hwpx.js?v=2"></script>
+<script src="js/pu-hwp-engine.js?v=22"></script>
+<script src="js/pu-hwp-preview.js?v=2"></script>
+<script src="js/pu-kordoc-text.js?v=3"></script>
+<script src="js/pu-rrn-mask.js?v=5"></script>
+<script src="js/pu-sanjae-kit.js?v=1"></script>
+<script src="js/pu-case-archive-core.js?v=1"></script>
+<script src="js/pu-sanjae-core.js?v=2"></script>
+<script src="js/pu-case-archive-view-kit.js?v=1"></script>
+<script src="js/pu-sanjae-view.js?v=2"></script>
+<script>
+window.puSanjaeGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+if(location.protocol==='file:'){
+  document.getElementById('lock').style.display='block';
+  document.getElementById('lockWhy').textContent='file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요';
+} else if(typeof firebase==='undefined'){
+  document.getElementById('lock').style.display='block';
+  document.getElementById('lockWhy').textContent='인터넷 연결이 필요합니다';
+} else {
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  PuSanjaeView.boot(firebase);
+}
+</script>
+</body>
+</html>

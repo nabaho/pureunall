@@ -1,0 +1,27 @@
+{
+  "name": "부당해고·노동사건관리",
+  "short_name": "노동사건",
+  "description": "푸른노무법인 부당해고·노동사건관리 — 노동위·진정·체불·상대방대응",
+  "id": "/pureunall/pu-case.html",
+  "start_url": "./pu-case.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "lang": "ko-KR",
+  "icons": [
+    {
+      "src": "icon-laborcase-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-laborcase-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

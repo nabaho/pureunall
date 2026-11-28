@@ -2475,6 +2475,64 @@ rules.harass_secret = {
   }
 };
 
+/* ══ 🏥 산재사건관리(sanjae_cases · sanjae_secret) & ⚖️ 부당해고·노동사건관리(labor_cases · labor_secret, 2026-11-28)
+   - 공유 원장(*_cases)은 재직 직원(LOGIN) 공유 읽기, 물리 삭제 금지(newData.exists()),
+     ADMIN 또는 이미 배정된 주·부담당 노무사만 수정 가능(부담당의 담당자 변조 및 비밀금고 선점 우회 차단).
+   - 비밀금고(*_secret/$cid)는 루트 읽기·쓰기를 두지 않고, 해당 사건의 주·부담당 노무사 또는 ADMIN 만 열람·저장한다. */
+const 사건2단규칙생성 = (caseRoot, secretRoot) => {
+  const 사건조회 = (keyVar) => `root.child('${caseRoot}').child('cases').child(${keyVar})`;
+  const 기존담당 = 조사담당식('data');
+  const CASE_WRITE = `(${LOGIN}) && newData.exists() && (!data.exists()`
+    + ` ? (${ADMIN} || (!root.child('${secretRoot}').child($id).exists() && ${조사담당식('newData')}))`
+    + ` : (${ADMIN} || (${기존담당} && ((${내사번} != null && data.child('managerMain').val() === ${내사번}) || (${담당자불변})))))`;
+  const SYNC_OWNER = `(${LOGIN}) && (${ADMIN} || ${조사담당식(사건조회('$id'))})`;
+  const SECRET_OWNER = `(${LOGIN}) && (${ADMIN} || ${조사담당식(사건조회('$cid'))})`;
+  return {
+    casesRoot: {
+      '.read': LOGIN,
+      cases: { $id: {
+        '.write': CASE_WRITE,
+        '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'",
+        managerMain: {
+          '.validate': "newData.isString() && newData.val().length <= 20 && (newData.val() === '' || newData.val().matches(/^[A-Za-z0-9_-]+$/))"
+        },
+        managerSubs: {
+          $subIdx: {
+            '.validate': "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+          }
+        }
+      } },
+      erp_sync: { $id: {
+        '.write': `(${SYNC_OWNER}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+      } },
+      erp_ack: { $id: {
+        '.write': `(${SYNC_OWNER}) && newData.exists() && root.child('${caseRoot}').child('erp_sync').child($id).exists()`
+          + ` && newData.child('syncedRevision').val() === root.child('${caseRoot}').child('erp_sync').child($id).child('revision').val()`,
+        '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+      } },
+      dismissed: { $id: {
+        '.write': `(${LOGIN}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+      } },
+      $other: { '.validate': false }
+    },
+    secretRoot: {
+      $cid: {
+        '.read': SECRET_OWNER,
+        '.write': `(${SECRET_OWNER}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $cid && newData.child('entityType').val() === 'Document'"
+      }
+    }
+  };
+};
+const _sanjaeRules = 사건2단규칙생성('sanjae_cases', 'sanjae_secret');
+rules.sanjae_cases = _sanjaeRules.casesRoot;
+rules.sanjae_secret = _sanjaeRules.secretRoot;
+const _laborRules = 사건2단규칙생성('labor_cases', 'labor_secret');
+rules.labor_cases = _laborRules.casesRoot;
+rules.labor_secret = _laborRules.secretRoot;
+
 /* 🛡️ 괴롭힘·성희롱 조사 전용 비밀 전자서명 (sign-harass.html, 2026-11-12)
    - req/$cid/$r : 사건 주·부담당 노무사 및 대표(HARASS_SECRET_OWNER)만 열람·생성(일반 직원 열람 차단).
    - open/$t     : 128비트 열쇠를 아는 사람만 단일 슬롯 읽기(목록 열람 차단). 내부에는 AES-256-GCM 암호문만 담기며 평문 진술·성명·사업장명·연락처 없음.

@@ -51,6 +51,8 @@
     { key: 'govlinks', row: 'client', name: '정부사업 바로가기', icon: '🔗', url: 'gov-links.html',  desc: '기관 시스템·업체 바로 열기' },
     { key: 'govaid',  row: 'client', name: '기업정부지원금',   icon: '🎯', url: 'pu-govaid.html',      desc: '지원사업 찾기·검토' },
     { key: 'harass',  row: 'client', name: '괴롭힘·성희롱 조사', icon: '🛡️', url: 'pu-harass.html',      desc: '사건조사·메일수집·보고서' },
+    { key: 'sanjae',  row: 'client', name: '산재사건관리',       icon: '🏥', url: 'pu-sanjae.html',      desc: '요양·질판위·심사90일·공방대조' },
+    { key: 'laborcase', row: 'client', name: '부당해고·노동사건', icon: '🔨', url: 'pu-case.html',       desc: '노동위·진정·체불·상대방대응' },
     { key: 'ilteo',   row: 'client', name: '일터상생혁신',     icon: '🏭', url: 'ilteo.html',          desc: '메일자료·중간·결과보고·PPT 자동화' },
     { key: 'jobtrans', row: 'client', name: '산업일자리전환',  icon: '⚡', url: 'jobtrans.html',       desc: '능률협회·충경진 메일·보고서·HWPX' },
     { key: 'safety',   row: 'client', name: '안전보건체계구축', icon: '🦺', url: 'safety.html',         desc: '과거이력·업종별체크·위험성·HWPX' },
