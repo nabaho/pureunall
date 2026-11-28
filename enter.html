@@ -2323,6 +2323,10 @@ body.portal-mode #moreFab{display:flex;}
        ⚠ 이 앱은 «보고 건너가는 곳»이다 — 초안·AI·HWPX·확정은 정부사업일정의 보고서 창이 한다(#rpt= 로 건너감).
        직원 모두 본다(adminOnly 아님). 앱 막대(js/pu-appbar.js)와 짝이다. */
     { key:'govreport', name:'컨설팅보고서', desc:'보고서 현황·작성', icon:'📑', url:'gov-report.html',     roles:null, row:'client' },
+    /* 정부사업 바로가기 — 사업마다 기관 시스템 주소(로그인 표시)·할 일 메모·폴더 경로·올해 업체를 한 화면에
+       (대표 지시 2026-11-28 「정부 지원 사업 바로 가기 앱을 하나 만들어줘 … 그 사업 바로 사업 보고나 시스템 들어갈 수 있게」).
+       바탕화면 «정부지원사업_바로가기.html»·북마크 «컨설팅 기관등» 을 옮겼다. 재직 직원 모두 보고 고친다(규칙 govlinks). */
+    { key:'govlinks', name:'정부사업 바로가기', desc:'기관 시스템·업체 바로 열기', icon:'🔗', url:'gov-links.html', roles:null, row:'client' },
     /* 정부지원금 — 지원사업 사전 + 기존·예비 고객사 후보 + 노무사 검토(대표 지시 2026-10-11). 재직 직원 전원(규칙 govaid).
        2026-10-12 「의뢰인 업무로 넣어달라」 — 영업관리에서 옮김(옛 줄은 ROW_MOVED_FROM 이 없던 일로 친다). */
     { key:'govaid',  name:'기업정부지원금',   desc:'지원사업 찾기·검토', icon:'🎯', url:'pu-govaid.html',      roles:null, row:'client' },

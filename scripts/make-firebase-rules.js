@@ -1538,6 +1538,19 @@ rules.signboard = { '.read': LOGIN,
   log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
   state:     { '.write': false } };
 
+/* ══ 🔗 정부사업 바로가기(gov-links.html) — 사업마다 기관 시스템 주소·메모·폴더 경로 (2026-11-28) ══
+   대표 지시 「정부 지원 사업 바로 가기 앱을 하나 만들어줘 … 나중에 더 늘 수도 있고 빠질 수도 있는데」.
+   ★ 읽기·쓰기 = 재직 직원(LOGIN) — 정부사업일정·컨설팅보고서와 같은 사람(사업을 맡는 노무사·직원이 함께 고친다).
+     담기는 것: 사업 이름·기관·할 일 메모·기관 시스템 주소(로그인 표시)·이 PC 폴더 경로·이어 둔 이알피 사업 code·푸른 앱 열쇠.
+     아이디·비밀번호 칸은 없다. 업체 이름은 담지 않는다(화면이 정부사업일정 자리에서 빌려 본다).
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식(공용 관문 tombstone)으로만. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ⚠ 이름(title)은 1~60자 — 화면(js/pu-gov-links.js LIMIT.title)과 같은 한도다. 한쪽만 바꾸면 화면이 만든 묶음을 규칙이 거절한다.
+     주소가 http(s) 인지는 화면이 저장 직전·그리기 직전 두 번 본다(safeUrl) — 규칙은 배열 안을 못 본다. */
+const GOVLINKS_W = `(${LOGIN}) && newData.exists()`;
+rules.govlinks = { '.read': LOGIN,
+  sets: { $id: { '.write': GOVLINKS_W,
+    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } } };
+
 /* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
    대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
    ★ 읽기·쓰기 = 재직 직원(LOGIN). 담기는 것: 강의자료 목록(파일 이름·종류·강의일·강의처·원본 창고 경로) · 검토 메모.

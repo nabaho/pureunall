@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 정부사업 바로가기</title>
+<!-- ═══════════════════════════════════════════════════════
+     푸른노무법인 정부사업 바로가기 (gov-links.html) — 2026-11-28
+     대표 지시 「정부 지원 사업 바로 가기 앱을 차라리 하나 만들어줘 … 누르면 지금 진행하고 있는 모든 사업들, 기업 연결 다 시켜주고 …
+       나중에 더 늘 수도 있고 빠질 수도 있는데 … 그 사업 바로 사업 보고나 시스템 들어갈 수 있게」
+       (바탕화면 컨설팅업체\정부지원사업_바로가기.html · 북마크 «컨설팅 기관등» 을 앱으로 옮김)
+
+     ★ 하는 일: 사업마다 카드 하나 — 기관 시스템 주소(로그인 표시) · 할 일 메모 · 이 PC 폴더 경로 복사 ·
+       이어 둔 이알피 컨설팅 사업의 «올해 업체»(누르면 정부사업일정 보고서 창 #rpt=업체|사업).
+       이알피에서 진행 중인데 카드가 없는 사업은 «바로가기 없는 진행 사업»에 저절로 나온다. 종결(scal_bizState)되면 «종결된 사업»으로 내려간다.
+     ★ 쓰는 자리(관문 강제 모드, PROGRAMS.govlinks.writeContracts): govlinks/sets/{id} (GovLinkSet) 하나뿐.
+       지우기는 _deleted 표식(공용 관문 tombstone) — «지운 묶음»에서 되살린다.
+     ★ 읽기만: 이알피 컨설팅 사업(data/biz_cons_types) · 사업 이음표(scal_erpTypeMap) · 정부사업일정 업체·사업·일정·담당(scal_cos·scal_types·scal_scheds·scal_staff)
+       · 사업 종결·순서(scal_bizState·scal_bizOrder) · uid_roles. 컨설팅보고서(gov-report.html)와 같은 모듈(PuGovReportDocs·Nav)로 묶는다.
+     ⚠ 재직 직원 모두 열고 고친다(규칙 govlinks = LOGIN). 주소는 http(s) 만 저장·표시한다(js/pu-gov-links.js safeUrl).
+     ⚠ 아이디·비밀번호 칸은 없다 — 넣지 않는다. 폴더 경로는 «복사»만(브라우저는 내 PC 폴더를 직접 못 연다).
+     ═══════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--mute)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--blue);border-color:var(--blue);color:#ffffff}
+button.del{color:var(--red);border-color:var(--red-line)}
+button.sm{padding:3px 9px;font-size:12px}
+button.ic{padding:2px 7px;font-size:12px;color:var(--mute)}
+input,select,textarea{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+input:focus,textarea:focus{outline:2px solid var(--blue-line);border-color:var(--blue)}
+textarea{width:100%;resize:vertical}
+a{color:var(--blue-d);text-decoration:none}
+#head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0;white-space:nowrap}
+.top .sub{font-size:12px;color:var(--mute)}
+.sp{flex:1}
+#who{font-size:13px;color:var(--mute)}
+.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
+.tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
+.chip{display:inline-block;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
+main{padding:12px 16px 40px;max-width:1280px;margin:0 auto}
+.pane{display:none}
+.pane.on{display:block}
+.hint{font-size:12px;color:var(--mute)}
+.tool{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+#q{flex:1 1 auto;min-width:0;padding:8px 11px;font-size:14px}
+#cnt{font-size:12px;color:var(--mute);white-space:nowrap}
+.strip{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.strip .lb{font-size:12px;color:var(--mute);margin-right:2px;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;padding:4px 11px;border-radius:999px;background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill:hover{border-color:var(--blue)}
+.pill.in{background:var(--card);color:var(--ink2);border-color:var(--line2)}
+.banner{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-radius:9px;margin:8px 0;font-size:12.5px}
+.banner.info{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d)}
+.banner.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber)}
+.banner.err{background:var(--red-bg);border:1px solid var(--red-line);color:var(--red)}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));margin-top:8px}
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px 10px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.gh{display:flex;align-items:center;gap:6px;min-width:0}
+.gh h2{font-size:15.5px;margin:0;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org{font-size:12px;color:var(--mute);margin-top:-4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.memo{font-size:12.5px;color:var(--ink2);border-left:3px solid var(--line2);padding-left:8px}
+.links{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.links a{display:flex;align-items:center;gap:8px;padding:5px 8px;margin:0 -8px;border-radius:7px;color:var(--ink);min-width:0}
+.links a:hover,.links a:focus-visible{background:var(--blue-bg)}
+.links .nm{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.links .host{color:var(--mute);font-size:11.5px;white-space:nowrap}
+.badge{font-size:11px;padding:1px 6px;border-radius:5px;white-space:nowrap;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-line)}
+.badge.g{color:var(--green);background:var(--green-bg);border-color:var(--green-line)}
+.badge.m{color:var(--mute);background:var(--bg);border-color:var(--line2)}
+.prog{border-top:1px dashed var(--line);padding-top:7px;display:flex;flex-direction:column;gap:5px}
+.pl{display:flex;align-items:center;gap:6px;font-size:12.5px;min-width:0}
+.pl .t{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+.cos{display:flex;flex-wrap:wrap;gap:5px}
+.co{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 9px;border-radius:7px;border:1px solid var(--green-line);background:var(--green-bg);color:var(--green);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.co:hover{border-color:var(--green-m)}
+.co small{color:var(--mute);font-size:11px}
+.sug{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+.folders{border-top:1px dashed var(--line);padding-top:7px;display:flex;flex-direction:column;gap:4px}
+.folder{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);min-width:0}
+.folder span{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sec{font-size:14px;font-weight:700;margin:18px 0 6px;display:flex;align-items:center;gap:8px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px}
+.bare{display:flex;flex-direction:column}
+.bare .row{display:flex;flex-direction:column;gap:5px;padding:9px 12px;border-bottom:1px solid var(--line)}
+.bare .row:last-child{border-bottom:none}
+details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px 0 6px;color:var(--ink2)}
+.empty{color:var(--mute);padding:26px 0;text-align:center}
+.bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:8px 10px}
+.selbar{display:none;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 10px;background:var(--blue-bg);border-bottom:1px solid var(--blue-line);color:var(--blue-d);font-size:12.5px}
+.selbar.on{display:flex}
+.scroll{overflow:auto}
+.mt{border-collapse:collapse;width:100%}
+.mt th,.mt td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+.mt th{font-size:12px;color:var(--mute);font-weight:600;background:var(--bg)}
+.mt td.ck,.mt th.ck{width:28px;text-align:center;padding:6px 4px}
+.mt td.no,.mt th.no{width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+.mt td.nm{max-width:260px;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.mt td.org,.mt td.bz{max-width:220px;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+.mt td.num{text-align:right;font-variant-numeric:tabular-nums}
+.mt td.sub{display:none}
+.mt tr.sel td{background:var(--blue-bg)}
+.act{display:flex;gap:4px;align-items:center}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto}
+.mbox{background:var(--card);border-radius:12px;width:100%;max-width:720px;padding:16px 18px;box-shadow:0 12px 40px rgba(15,23,42,.25)}
+.mbox h3{margin:0 0 10px;font-size:16px}
+.fv{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fv>label{font-size:12px;color:var(--mute);font-weight:600}
+.fv input[type=text],.fv input:not([type]){width:100%}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) auto auto;gap:6px;align-items:center;margin-bottom:5px}
+.frow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;margin-bottom:5px}
+.ckl{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--ink2);white-space:nowrap}
+.bzl{display:flex;flex-direction:column;gap:3px;max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.bzl label{display:flex;align-items:center;gap:6px;font-size:12.5px;min-width:0}
+.bzl label span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.errs{color:var(--red);font-size:12.5px;margin:6px 0}
+.mfoot{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+#lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:90vw}
+#toast.on{opacity:1}
+.phone-only{display:none}
+/* ── 폰 — 이 구간에서만 바꾼다. PC 는 위 그대로(대표 지시 2026-10-18 「폰에서 한 화면에」) ── */
+@media (max-width:768px){
+  input,select,textarea{font-size:16px}
+  #q{font-size:16px}
+  .phone-only{display:inline}
+  .wide-only{display:none}
+  .top{padding:8px 10px;gap:6px}
+  .top .sub{display:none}
+  .tabs{padding:0 6px}
+  main{padding:8px 10px 40px}
+  .grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .gcard{padding:10px 12px 8px}
+  .links .host{display:none}
+  .links a{padding:7px 8px;min-height:36px}
+  button{min-height:32px}
+  .mbox{padding:14px 12px}
+  .modal{padding:0}
+  .lrow{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:'n l x' 'u u u'}
+  .lrow .ln{grid-area:n} .lrow .lu{grid-area:u} .lrow .ckl{grid-area:l} .lrow .lx{grid-area:x}
+  /* 「최근」·「푸른 안에서」 알약 줄은 한 줄로 두고 옆으로 민다(두 줄로 접혀 첫 화면을 먹지 않게) */
+  #recent,#inner{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .pill{flex:0 0 auto;padding:6px 11px}
+  .mt input[type=checkbox]{width:20px;height:20px}
+  /* 목록 관리 표 → 줄마다 두 줄 카드(☐·№ 는 왼쪽 끝 그대로) */
+  .mt thead{display:none}
+  .mt tr{display:grid;grid-template-columns:28px 32px minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--line);padding:4px 0}
+  .mt td{border-bottom:none;padding:3px 4px}
+  .mt td.ck{grid-column:1;grid-row:1 / 3}
+  .mt td.no{grid-column:2;grid-row:1 / 3;width:auto}
+  .mt td.nm{grid-column:3;grid-row:1;max-width:none}
+  .mt td.ac{grid-column:4;grid-row:1}
+  .mt td.sub{display:block;grid-column:3 / 5;grid-row:2;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--mute)}
+  .mt td.org,.mt td.bz,.mt td.num,.mt td.at{display:none}
+}
+</style>
+<!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
+<link rel="stylesheet" href="css/pu-design.css?v=3">
+</head>
+<body class="pu-design pu-frame-a">
+<div id="head">
+  <div class="top">
+    <h1>🔗 정부사업 바로가기</h1>
+    <span class="sub">사업마다 기관 시스템 · 올해 업체 · 폴더를 한 화면에</span>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <button class="sm" data-act="reload" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
+    <button class="sm" id="outBtn" style="display:none" data-act="logout">로그아웃</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="go">🔗 바로가기 <span class="chip" id="nSites">0</span></button>
+    <button data-tab="manage">⚙ 목록 관리 <span class="chip" id="nSets">0</span></button>
+  </div>
+</div>
+<div id="lock"><h2>🔗 정부사업 바로가기</h2><div id="lockWhy"></div><p>재직 직원만 열 수 있습니다.</p></div>
+<main id="app">
+  <section class="pane" id="pane-go">
+    <div class="tool">
+      <input id="q" type="search" autocomplete="off" aria-label="사이트·사업·기관·업체 찾기" placeholder="사이트·사업·기관·업체 찾기 ( / 키로 바로 입력 · Enter 로 첫 사이트 열기 )">
+      <span id="cnt" aria-live="polite"></span>
+    </div>
+    <div class="strip" id="recent"></div>
+    <div class="strip" id="inner">
+      <span class="lb">푸른 안에서:</span>
+      <a class="pill in" href="gov-consulting.html" title="사업장 일정·사진·보고서 창">📅 정부사업일정</a>
+      <a class="pill in" href="gov-report.html" title="모든 사업장·사업의 보고서 상태">📑 컨설팅보고서</a>
+      <a class="pill in" href="pu-govaid.html" title="지원사업 찾기·검토">🎯 기업정부지원금</a>
+      <a class="pill in" href="gov.html" title="나라장터·알리오·기업마당 공고">🏛 정부사업신청</a>
+    </div>
+    <div id="notes"></div>
+    <div class="grid" id="grid"></div>
+    <div id="bareBox"></div>
+    <div id="closedBox"></div>
+  </section>
+  <section class="pane" id="pane-manage">
+    <div class="box">
+      <div class="bar">
+        <button class="pri" data-act="new">+ 새 묶음(사업)</button>
+        <span class="hint">카드 하나 = 사업 하나. 고치면 모든 직원 화면에 같이 바뀝니다. 지운 묶음은 아래에서 되살릴 수 있습니다.</span>
+      </div>
+      <div class="selbar" id="selBar"><b id="selTxt"></b><button class="sm del" data-act="bulkDel">선택 지우기</button><button class="sm" data-act="selClear">선택 해제</button></div>
+      <div class="scroll" id="mgBox"></div>
+    </div>
+    <details class="closed" id="delWrap"><summary>🗑 지운 묶음 <span class="chip" id="nDel">0</span></summary><div class="box scroll" id="delBox"></div></details>
+  </section>
+</main>
+<div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox"></div></div>
+<div id="toast" role="status"></div>
+
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
+     (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=55"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-back.js?v=5"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<!-- 사업 목록·업체 묶기 — 컨설팅보고서와 같은 모듈(읽기만). track → docs → nav 차례가 뜻이다(docs 가 track 을, nav 가 docs 를 부른다) -->
+<script src="js/pu-gov-report-track.js?v=8"></script>
+<script src="js/pu-gov-report-docs.js?v=13"></script>
+<script src="js/pu-gov-report-nav.js?v=3"></script>
+<script src="js/pu-gov-links.js?v=1"></script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+var fbDb=null, gate=null, ME={sid:''};
+var L=PuGovLinks;
+/* 이 앱의 자리 — 이름 표로 부른다(글자 그대로 ref('govlinks…') 를 흩뿌리지 않는다) */
+var GL_NODES={sets:L.ROOT+'/'+L.SETS};
+/* 빌려 읽는 자리 — 컨설팅보고서(GR_NODES·GR_DOC_NODES·GR_BIZ)와 같은 곳. 읽기만, 한 번씩.
+   ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_…') 를 쓰면 등록부 검사가 주인 없는 자리로 잡는다 */
+var GL_ERP={biz:'data/biz_cons_types',tmap:'scal_erpTypeMap',cos:'scal_cos',types:'scal_types',scheds:'scal_scheds',staff:'scal_staff',state:'scal_bizState',order:'scal_bizOrder'};
+var D={raw:null,loaded:false,err:'',empty:false,sets:[],deleted:[],erp:null,erpErr:false,erpLoading:false,board:null,seq:0};
+var TAB='go', Q='', SEL={}, EDIT=null, MORE={}, BUSY=false;
+var CO_SHOW=8;   // 카드 한 사업에 먼저 보이는 업체 수 — 넘으면 «+N곳»
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return '&#'+c.charCodeAt(0)+';'; }); }
+function lsGet(k){ try{ return localStorage.getItem('pu_govlinks_'+k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem('pu_govlinks_'+k, v); }catch(e){} }
+function toast(m){ var t=$('toast'); t.textContent=m; t.className='on'; clearTimeout(toast._t); toast._t=setTimeout(function(){ t.className=''; }, 4200); }
+function errMsg(e){ return String((e&&e.message)||e); }
+function who(){ var w=(window.PuWhoami&&PuWhoami.get&&PuWhoami.get())||{}; return w.name||''; }
+function kstYear(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,4); }
+function day(t){ if(!t) return ''; var d=new Date(typeof t==='number'?t+9*3600e3:t); return isFinite(d.getTime())?d.toISOString().slice(0,10):''; }
+
+/* ═══ 읽기 ═══ */
+async function loadSets(){
+  var raw=(await fbDb.ref(GL_NODES.sets).once('value')).val();
+  D.raw=(raw&&typeof raw==='object')?raw:{};
+  D.empty=L.isEmpty(D.raw);
+  D.sets=D.empty?L.defaultSets():L.liveSets(D.raw);
+  D.deleted=L.deletedSets(D.raw);
+}
+/* 이알피·정부사업일정 자료 — 하나라도 못 읽어도 카드(사이트)는 그대로 돈다. 사업 목록을 못 읽은 것만 «못 읽음»으로 알린다 */
+async function loadErp(){
+  var keys=Object.keys(GL_ERP);
+  var got=await Promise.all(keys.map(function(k){
+    return fbDb.ref(GL_ERP[k]).once('value').then(function(s){ return {ok:true,v:s.val()}; },
+      function(e){ console.warn('[정부사업 바로가기] 못 읽음 '+GL_ERP[k],e); return {ok:false,v:null}; });
+  }));
+  var v={}; keys.forEach(function(k,i){ v[k]=got[i].v; });
+  D.erpErr=!got[keys.indexOf('biz')].ok;
+  var st=(v.state&&typeof v.state==='object'&&!Array.isArray(v.state))?v.state:{};
+  D.erp={biz:v.biz,tmap:v.tmap,input:{cos:v.cos,types:v.types,scheds:v.scheds,staff:v.staff},state:st,
+    order:PuGovReportNav.parseOrder(v.order&&v.order.main)};
+}
+function build(){
+  var e=D.erp||{};
+  D.board=L.board({sets:D.sets,biz:e.biz,tmap:e.tmap,input:e.input||{},state:e.state||{},order:e.order||[],year:kstYear()});
+}
+async function glReload(){
+  var seq=++D.seq;
+  D.err='';
+  try{ await loadSets(); }
+  catch(e){ if(seq!==D.seq) return; D.err=errMsg(e); D.sets=L.defaultSets(); D.deleted=[]; D.empty=true; }
+  if(seq!==D.seq) return;
+  D.loaded=true; build(); render();
+  if(!D.erp){ D.erpLoading=true; render(); }
+  try{ await loadErp(); }catch(e){ D.erpErr=true; }
+  if(seq!==D.seq) return;
+  D.erpLoading=false; build(); render();
+}
+/* 묶음만 다시 — 저장 뒤. 이알피 자료는 그대로 둔다 */
+async function reloadSets(){
+  try{ await loadSets(); }catch(e){ D.err=errMsg(e); }
+  build(); render();
+}
+
+/* ═══ 그리기 ═══ */
+function render(){
+  document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===TAB); });
+  $('pane-go').classList.toggle('on', TAB==='go');
+  $('pane-manage').classList.toggle('on', TAB==='manage');
+  var sites=D.sets.reduce(function(n,s){ return n+s.links.length; },0);
+  $('nSites').textContent=sites; $('nSets').textContent=D.sets.length; $('nDel').textContent=D.deleted.length;
+  if(TAB==='go') renderGo(); else renderManage();
+}
+function renderNotes(){
+  var h='';
+  if(D.err) h+='<div class="banner err">바로가기 목록을 읽지 못했습니다 — 기본 목록을 보여 드립니다. ('+esc(D.err)+') <button class="sm" data-act="reload">다시 읽기</button></div>';
+  else if(D.empty) h+='<div class="banner info">처음 쓰는 목록입니다 — 바탕화면 «정부지원사업 바로가기»의 22곳을 기본으로 보여 드립니다. 처음 고치거나 더할 때 모든 직원이 함께 쓰는 목록으로 저장됩니다.</div>';
+  if(D.erpLoading) h+='<div class="banner info">이알피 사업·올해 업체를 불러오는 중입니다…</div>';
+  else if(D.erpErr) h+='<div class="banner warn">이알피 컨설팅 사업 목록을 읽지 못해 업체 연결은 빠졌습니다 — 사이트 바로가기는 그대로 쓸 수 있습니다. <button class="sm" data-act="reload">다시 읽기</button></div>';
+  $('notes').innerHTML=h;
+}
+function renderRecent(){
+  var list=L.recentList(lsGet('recent'),D.sets,6);
+  $('recent').innerHTML=list.length?'<span class="lb">최근:</span>'+list.map(function(r){
+    return '<a class="pill site" href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(r.url)+'">'+esc(r.name)+'</a>';
+  }).join(''):'';
+}
+function linkHtml(l){
+  return '<li><a class="site" href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(l.name+' — '+l.url)+'">'
+    +'<span class="nm">'+esc(l.name)+'</span>'+(l.login?'<span class="badge">로그인</span>':'')
+    +'<span class="host">'+esc(L.hostOf(l.url))+'</span></a></li>';
+}
+/* 이어 둔 사업 한 줄 + 올해 업체 칩(누르면 정부사업일정 보고서 창) */
+function progHtml(p, key){
+  var yr=kstYear(), n=p.companies.length;
+  var tag=p.missing?'<span class="badge m">이알피에 없음</span>':p.closed?'<span class="badge m">종결</span>':!p.typeId?'<span class="badge m">정부사업일정에 사업 없음</span>':'<span class="badge g">'+yr+'년 '+n+'곳</span>';
+  var h='<div class="pl"><span class="t" title="'+esc(p.label)+'">🏢 '+esc(p.label)+'</span>'+tag+'</div>';
+  if(n && !p.closed){
+    var all=!!MORE[key], show=all?p.companies:p.companies.slice(0,CO_SHOW);
+    h+='<div class="cos">'+show.map(function(c){
+      return '<a class="co" href="'+esc(c.href)+'" title="'+esc(c.coName)+' — 정부사업일정 보고서 창 열기 ('+c.rounds+'회'+(c.planned?' / '+c.planned+'회':'')+')">'+esc(c.coName)+'</a>';
+    }).join('')+(n>CO_SHOW?'<button class="sm" data-act="more" data-key="'+esc(key)+'">'+(all?'접기':'+'+(n-CO_SHOW)+'곳')+'</button>':'')+'</div>';
+  }
+  return h;
+}
+function typeLabel(code){
+  var t=(D.board&&D.board.types||[]).filter(function(x){ return x.code===code; })[0];
+  return t?PuGovReportNav.label(t).text:code;
+}
+function cardHtml(c, links){
+  var s=c.set;
+  var h='<section class="gcard" data-id="'+esc(s.id)+'"><div class="gh"><h2 title="'+esc(s.title)+'">'+esc(s.title)+'</h2>'
+    +'<button class="ic" data-act="edit" data-id="'+esc(s.id)+'" title="이 묶음 고치기">✎</button></div>';
+  if(s.org) h+='<div class="org" title="'+esc(s.org)+'">'+esc(s.org)+'</div>';
+  if(s.note) h+='<div class="memo">'+esc(s.note)+'</div>';
+  h+=links.length?'<ul class="links">'+links.map(linkHtml).join('')+'</ul>':'<div class="hint">사이트가 아직 없습니다 — ✎ 로 더하세요.</div>';
+  var apps=L.innerApps(s);
+  if(apps.length){
+    h+='<div class="strip"><span class="lb">푸른 앱:</span>'+apps.map(function(a){
+      return '<a class="pill in" href="'+esc(a.url)+'" title="푸른 '+esc(a.name)+' 열기">'+esc(a.icon)+' '+esc(a.name)+'</a>';
+    }).join('')+'</div>';
+  }
+  if(c.programs.length){
+    h+='<div class="prog">'+c.programs.map(function(p){ return progHtml(p, s.id+'|'+p.code); }).join('')+'</div>';
+  }
+  if(c.suggest.length){
+    h+='<div class="sug">연결 제안:'+c.suggest.map(function(code){
+      return '<button class="sm" data-act="link" data-id="'+esc(s.id)+'" data-code="'+esc(code)+'" title="이 이알피 사업을 카드에 잇습니다 — 그 사업의 올해 업체가 붙습니다">🏢 '+esc(typeLabel(code))+' 잇기</button>';
+    }).join('')+'</div>';
+  }
+  if(s.folders.length){
+    h+='<div class="folders">'+s.folders.map(function(f,i){
+      return '<div class="folder"><span title="'+esc(f)+'">📁 '+esc(L.folderName(f))+'</span>'
+        +'<button class="sm" data-act="copy" data-id="'+esc(s.id)+'" data-i="'+i+'" title="파일 선택 창 주소줄에 붙여 넣으면 이 폴더로 바로 갑니다">경로 복사</button></div>';
+    }).join('')+'</div>';
+  }
+  return h+'</section>';
+}
+function renderGo(){
+  renderNotes(); renderRecent();
+  var b=D.board||{cards:[],bare:[],closed:[]};
+  var rows=L.filterCards(b.cards,Q);
+  var total=b.cards.reduce(function(n,c){ return n+c.set.links.length; },0);
+  var shown=rows.reduce(function(n,r){ return n+r.links.length; },0);
+  $('cnt').textContent=Q?(shown+' / '+total+'곳'):(total+'곳');
+  $('grid').innerHTML=rows.length?rows.map(function(r){ return cardHtml(r.card,r.links); }).join('')
+    :'<div class="empty">'+(Q?'찾는 사이트·사업이 없습니다.':'바로가기 묶음이 없습니다 — 「목록 관리」에서 더하세요.')+'</div>';
+  /* 바로가기 없는 진행 사업 — 이알피에서 진행 중인데 카드가 없는 것(새 사업이 생기면 저절로 여기 나온다) */
+  var q=String(Q||'').trim().toLowerCase();
+  var bare=(b.bare||[]).filter(function(p){ return !q||(p.label+' '+p.companies.map(function(c){ return c.coName; }).join(' ')).toLowerCase().indexOf(q)>=0; });
+  $('bareBox').innerHTML=bare.length?'<div class="sec">🧩 바로가기가 아직 없는 진행 사업 <span class="chip">'+bare.length+'</span><span class="hint" style="font-weight:400">이알피 컨설팅 사업 중 종결되지 않은 것</span></div>'
+    +'<div class="box bare">'+bare.map(function(p){
+      return '<div class="row">'+progHtml(p,'bare|'+p.code)
+        +'<div><button class="sm" data-act="newFor" data-code="'+esc(p.code)+'">＋ 이 사업 바로가기 만들기</button></div></div>';
+    }).join('')+'</div>':'';
+  var closed=L.filterCards(b.closed||[],Q);
+  $('closedBox').innerHTML=closed.length?'<details class="closed"><summary>🔒 종결된 사업 '+closed.length+'곳 — 이어 둔 이알피 사업이 모두 종결</summary><div class="grid">'
+    +closed.map(function(r){ return cardHtml(r.card,r.links); }).join('')+'</div></details>':'';
+}
+function selIds(){ return Object.keys(SEL).filter(function(id){ return SEL[id]; }); }
+function renderManage(){
+  var sets=D.sets, ids=selIds();
+  var allOn=sets.length>0&&sets.every(function(s){ return SEL[s.id]; });
+  $('selBar').classList.toggle('on', ids.length>0);
+  $('selTxt').textContent=ids.length+'건 선택';
+  var h='<table class="mt"><thead><tr><th class="ck"><input type="checkbox" data-act="selAll" '+(allOn?'checked':'')+' aria-label="보이는 줄 모두 고르기"></th><th class="no">№</th>'
+    +'<th>사업(묶음)</th><th>기관</th><th>이어 둔 이알피 사업</th><th class="num">사이트</th><th class="num">폴더</th><th>고친 날</th><th></th></tr></thead><tbody>';
+  if(!sets.length) h+='<tr><td colspan="9" class="empty">묶음이 없습니다 — 「+ 새 묶음(사업)」으로 더하세요.</td></tr>';
+  sets.forEach(function(s,i){
+    var bz=s.bizCodes.map(typeLabel).join(', ');
+    var sub=[s.org,bz,'사이트 '+s.links.length,s.folders.length?'폴더 '+s.folders.length:''].filter(Boolean).join(' · ');
+    h+='<tr'+(SEL[s.id]?' class="sel"':'')+'><td class="ck"><input type="checkbox" data-act="sel" data-id="'+esc(s.id)+'" '+(SEL[s.id]?'checked':'')+' aria-label="고르기"></td>'
+      +'<td class="no">'+(i+1)+'</td><td class="nm" title="'+esc(s.title)+'">'+esc(s.title)+'</td>'
+      +'<td class="org" title="'+esc(s.org)+'">'+esc(s.org)+'</td><td class="bz" title="'+esc(bz)+'">'+esc(bz)+'</td>'
+      +'<td class="num">'+s.links.length+'</td><td class="num">'+s.folders.length+'</td><td class="at">'+esc(day(s.updatedAt))+'</td>'
+      +'<td class="ac"><span class="act"><button class="ic" data-act="up" data-id="'+esc(s.id)+'" title="위로"'+(i===0?' disabled':'')+'>▲</button>'
+      +'<button class="ic" data-act="down" data-id="'+esc(s.id)+'" title="아래로"'+(i===sets.length-1?' disabled':'')+'>▼</button>'
+      +'<button class="sm" data-act="edit" data-id="'+esc(s.id)+'">고치기</button></span></td>'
+      +'<td class="sub" title="'+esc(sub)+'">'+esc(sub)+'</td></tr>';
+  });
+  $('mgBox').innerHTML=h+'</tbody></table>';
+  $('delBox').innerHTML=D.deleted.length?'<table class="mt"><tbody>'+D.deleted.map(function(s,i){
+    return '<tr><td class="no">'+(i+1)+'</td><td class="nm" title="'+esc(s.title)+'">'+esc(s.title)+'</td><td class="at">'+esc(day(s.deletedAt))+' 지움</td>'
+      +'<td class="ac"><button class="sm" data-act="restore" data-id="'+esc(s.id)+'">되살리기</button></td></tr>';
+  }).join('')+'</tbody></table>':'<div class="empty">지운 묶음이 없습니다.</div>';
+}
+
+/* ═══ 고치기 창 ═══ */
+function findSet(id){ return D.sets.filter(function(s){ return s.id===id; })[0]||null; }
+function openEdit(set){
+  EDIT={ id:set.id, isNew:!!set.isNew, set:JSON.parse(JSON.stringify(set)), errs:[] };
+  if(!EDIT.set.links.length) EDIT.set.links=[{name:'',url:'',login:false}];
+  drawEdit(); $('modal').style.display='';
+  setTimeout(function(){ var t=$('fTitle'); if(t) t.focus(); },30);
+}
+function closeEdit(){ EDIT=null; $('modal').style.display='none'; $('mbox').innerHTML=''; }
+function drawEdit(){
+  var s=EDIT.set, types=(D.board&&D.board.types)||[];
+  var st=(D.erp&&D.erp.state)||{}, yr=kstYear();
+  var h='<h3>'+(EDIT.isNew?'새 바로가기 묶음':'바로가기 묶음 고치기')+'</h3>'
+    +'<div class="fv"><label for="fTitle">사업(묶음) 이름 *</label><input id="fTitle" maxlength="'+L.LIMIT.title+'" value="'+esc(s.title)+'" placeholder="예: 일터혁신 상생컨설팅"></div>'
+    +'<div class="fv"><label for="fOrg">기관</label><input id="fOrg" maxlength="'+L.LIMIT.org+'" value="'+esc(s.org)+'" placeholder="예: 노사발전재단"></div>'
+    +'<div class="fv"><label for="fNote">할 일 메모 (어디에 무엇을 올리나)</label><textarea id="fNote" rows="2" maxlength="'+L.LIMIT.note+'">'+esc(s.note)+'</textarea></div>'
+    +'<div class="fv"><label>사이트 — 주소는 http:// · https:// 만 · 아이디·비밀번호는 적지 마세요</label><div id="fLinks">';
+  s.links.forEach(function(l,i){
+    h+='<div class="lrow"><input class="ln" data-f="name" data-i="'+i+'" value="'+esc(l.name)+'" maxlength="'+L.LIMIT.linkName+'" placeholder="이름" aria-label="사이트 이름">'
+      +'<input class="lu" data-f="url" data-i="'+i+'" value="'+esc(l.url)+'" maxlength="'+L.LIMIT.url+'" placeholder="https://…" inputmode="url" aria-label="사이트 주소">'
+      +'<label class="ckl"><input type="checkbox" data-f="login" data-i="'+i+'"'+(l.login?' checked':'')+'>로그인</label>'
+      +'<button class="ic lx" data-act="rmLink" data-i="'+i+'" title="이 사이트 빼기">✕</button></div>';
+  });
+  h+='</div><div><button class="sm" data-act="addLink"'+(s.links.length>=L.LIMIT.links?' disabled':'')+'>+ 사이트 추가</button></div></div>'
+    +'<div class="fv"><label>이 PC 폴더 경로 (경로 복사용)</label><div id="fFolders">';
+  s.folders.forEach(function(f,i){
+    h+='<div class="frow"><input data-f="folder" data-i="'+i+'" value="'+esc(f)+'" maxlength="'+L.LIMIT.folder+'" placeholder="C:\\…" aria-label="폴더 경로"><button class="ic" data-act="rmFolder" data-i="'+i+'" title="이 폴더 빼기">✕</button></div>';
+  });
+  h+='</div><div><button class="sm" data-act="addFolder"'+(s.folders.length>=L.LIMIT.folders?' disabled':'')+'>+ 폴더 추가</button></div></div>'
+    +'<div class="fv"><label>함께 열 푸른 앱 (보고서·자동화 화면)</label><div class="strip">'+L.INNER_KEYS.map(function(k){
+      var a=L.INNER[k];
+      return '<label class="ckl"><input type="checkbox" data-f="app" value="'+esc(k)+'"'+(s.apps.indexOf(k)>=0?' checked':'')+'>'+esc(a.icon)+' '+esc(a.name)+'</label>';
+    }).join('')+'</div></div>'
+    +'<div class="fv"><label>이어 둘 이알피 컨설팅 사업 — 고르면 그 사업의 올해 업체가 카드에 붙습니다</label>';
+  if(!types.length) h+='<div class="hint">'+(D.erpErr?'이알피 사업 목록을 읽지 못했습니다.':D.erpLoading?'불러오는 중…':'이알피 컨설팅 사업이 없습니다.')+'</div>';
+  else h+='<div class="bzl">'+types.map(function(t){
+    var on=s.bizCodes.indexOf(t.code)>=0, closed=PuGovReportNav.closedFor(st,t.code,yr), lb=PuGovReportNav.label(t).text;
+    return '<label><input type="checkbox" data-f="biz" value="'+esc(t.code)+'"'+(on?' checked':'')+'><span title="'+esc(lb)+'">'+esc(lb)+'</span>'+(closed?'<span class="badge m">종결</span>':'')+'</label>';
+  }).join('')+'</div>';
+  h+='</div><div class="errs" id="fErrs">'+EDIT.errs.map(esc).join('<br>')+'</div>'
+    +'<div class="mfoot"><button class="pri" data-act="save"'+(BUSY?' disabled':'')+'>저장</button><button data-act="close">닫기</button><span class="sp"></span>'
+    +(EDIT.isNew?'':'<button class="del" data-act="delOne" data-id="'+esc(EDIT.id)+'"'+(BUSY?' disabled':'')+'>이 묶음 지우기</button>')+'</div>';
+  $('mbox').innerHTML=h;
+}
+/* 창의 입력값을 EDIT.set 으로 옮긴다 — 줄 더하기·빼기 전에도 불러 쓴 글을 잃지 않는다 */
+function pullForm(){
+  if(!EDIT) return;
+  var s=EDIT.set, box=$('mbox');
+  s.title=$('fTitle').value; s.org=$('fOrg').value; s.note=$('fNote').value;
+  box.querySelectorAll('[data-f]').forEach(function(el){
+    var f=el.dataset.f, i=+el.dataset.i;
+    if(f==='name') s.links[i].name=el.value;
+    else if(f==='url') s.links[i].url=el.value;
+    else if(f==='login') s.links[i].login=el.checked;
+    else if(f==='folder') s.folders[i]=el.value;
+  });
+  s.bizCodes=[].slice.call(box.querySelectorAll('[data-f="biz"]')).filter(function(el){ return el.checked; }).map(function(el){ return el.value; });
+  s.apps=[].slice.call(box.querySelectorAll('[data-f="app"]')).filter(function(el){ return el.checked; }).map(function(el){ return el.value; });
+}
+
+/* ═══ 쓰기 — 모두 공용 관문(gate, enforce)으로. 지우기는 _deleted 표식 ═══ */
+function setRef(id){ return fbDb.ref(GL_NODES.sets+'/'+id); }
+/* 처음 쓰는 목록이면 기본 묶음을 먼저 저장한다 — 그래야 고친 하나 말고 나머지 21곳도 함께 남는다.
+   ⚠ 남이 먼저 넣었으면(이미 있음) 그 묶음은 건너뛴다 — 덮지 않는다 */
+async function ensureSeeded(){
+  if(!D.empty) return;
+  var defs=L.defaultSets();
+  for(var i=0;i<defs.length;i++){
+    var v=L.cleanSet(defs[i]).value;
+    try{ await gate.save(setRef(v.id), v, {entityType:L.ENTITY, expectedRevision:-1}); }
+    catch(e){ if(!/먼저 수정/.test(errMsg(e))) throw e; }
+  }
+  await loadSets();
+}
+/* 한 묶음 저장 — prev 가 있으면 그 수정차수여야 한다(남이 먼저 고쳤으면 거절하고 새로 읽는다) */
+async function saveSet(value){
+  var c=L.cleanSet(value);
+  if(!c.ok) throw new Error(c.errors.join(' · '));
+  var prev=D.raw&&Object.prototype.hasOwnProperty.call(D.raw,c.value.id)?D.raw[c.value.id]:null;
+  await gate.save(setRef(c.value.id), c.value, {entityType:L.ENTITY, expectedRevision:prev?Number(prev.revision||0):-1});
+}
+async function run(label, fn){
+  if(BUSY) return;
+  if(!gate){ toast('로그인한 뒤에 고칠 수 있습니다'); return; }
+  BUSY=true; if(EDIT) drawEdit();
+  try{ await ensureSeeded(); await fn(); await reloadSets(); if(label) toast(label); return true; }
+  catch(e){ toast('저장하지 못했습니다 — '+errMsg(e)); try{ await reloadSets(); }catch(_e){} return false; }
+  finally{ BUSY=false; if(EDIT) drawEdit(); }
+}
+async function doSave(){
+  pullForm();
+  var s=EDIT.set, c=L.cleanSet(s);
+  if(!c.ok){ EDIT.errs=c.errors; drawEdit(); return; }
+  if(EDIT.isNew) s.order=L.nextOrder(D.sets);
+  var ok=await run(EDIT.isNew?'새 묶음을 더했습니다':'고쳤습니다', function(){ return saveSet(s); });
+  if(ok) closeEdit();
+}
+async function doDelete(ids){
+  var n=ids.length;
+  if(!n) return;
+  if(!confirm(n+'건을 지울까요?\n지운 묶음은 「목록 관리 › 지운 묶음」에서 되살릴 수 있습니다.')) return;
+  var ok=await run(n+'건을 지웠습니다', async function(){
+    for(var i=0;i<ids.length;i++){
+      var prev=D.raw&&D.raw[ids[i]];
+      if(!prev) continue;
+      await gate.remove(setRef(ids[i]), prev, {entityType:L.ENTITY});
+    }
+  });
+  if(ok){ SEL={}; if(EDIT) closeEdit(); }
+}
+async function doRestore(id){
+  var prev=D.raw&&D.raw[id]; if(!prev) return;
+  var v=L.cleanSet(prev).value; v.order=L.nextOrder(D.sets);
+  await run('되살렸습니다', function(){ return saveSet(v); });
+}
+async function doMove(id, dir){
+  var ch=L.moveOrder(D.sets,id,dir);
+  if(!ch.length) return;
+  await run('', async function(){
+    for(var i=0;i<ch.length;i++){
+      var s=findSet(ch[i].id);   /* 처음 쓰는 목록이었으면 ensureSeeded 가 D.sets 를 새로 읽었다 — 그 판으로 */
+      if(!s) continue;
+      await saveSet(Object.assign({},s,{order:ch[i].order}));
+    }
+  });
+}
+async function doLink(id, code){
+  var s=findSet(id); if(!s) return;
+  if(s.bizCodes.indexOf(code)>=0) return;
+  await run('이었습니다 — 올해 업체가 붙습니다', function(){
+    var cur=findSet(id)||s;
+    return saveSet(Object.assign({},cur,{bizCodes:cur.bizCodes.concat([code])}));
+  });
+}
+function newSet(pre){
+  return Object.assign({ id:L.newId(Date.now()), isNew:true, title:'', org:'', note:'', links:[], folders:[], bizCodes:[], apps:[], order:0 }, pre||{});
+}
+
+/* ═══ 누르기 — 한 곳에서 받는다 ═══ */
+async function copyText(text, btn){
+  var ok=false;
+  try{ await navigator.clipboard.writeText(text); ok=true; }
+  catch(e){
+    var ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:0;left:0;opacity:0;pointer-events:none'; document.body.appendChild(ta); ta.select();
+    try{ ok=document.execCommand('copy'); }catch(_e){ ok=false; } ta.remove();
+  }
+  toast(ok?'폴더 경로를 복사했습니다 — 파일 선택 창 주소줄에 붙여 넣으세요':'경로를 복사하지 못했습니다');
+  if(btn){ btn.textContent=ok?'복사됨':'복사 실패'; setTimeout(function(){ btn.textContent='경로 복사'; },1200); }
+}
+function setTab(t){ if(t!==TAB) SEL={}; TAB=t; lsSet('tab',t); render(); }
+document.addEventListener('click', function(ev){
+  var site=ev.target.closest('a.site');
+  if(site){ lsSet('recent', L.pushRecent(lsGet('recent'), site.getAttribute('href'), 6)); setTimeout(renderRecent,0); return; }
+  var tb=ev.target.closest('#tabs button'); if(tb){ setTab(tb.dataset.tab); return; }
+  var el=ev.target.closest('[data-act]'); if(!el) return;
+  var a=el.dataset.act, id=el.dataset.id;
+  if(a==='sel'||a==='selAll') return;   /* 고르기 칸은 change 에서 */
+  if(a==='reload') return glReload();
+  if(a==='logout') return firebase.auth().signOut();
+  if(a==='more'){ MORE[el.dataset.key]=!MORE[el.dataset.key]; return renderGo(); }
+  if(a==='copy'){ var s=findSet(id); if(s&&s.folders[+el.dataset.i]) copyText(s.folders[+el.dataset.i], el); return; }
+  if(a==='edit'){ var s2=findSet(id); if(s2) openEdit(s2); return; }
+  if(a==='new') return openEdit(newSet());
+  if(a==='newFor'){
+    var t=((D.board&&D.board.types)||[]).filter(function(x){ return x.code===el.dataset.code; })[0];
+    return openEdit(newSet(t?{title:t.name,org:t.agency,bizCodes:[t.code]}:{}));
+  }
+  if(a==='link') return doLink(id, el.dataset.code);
+  if(a==='up'||a==='down') return doMove(id, a==='up'?-1:1);
+  if(a==='restore') return doRestore(id);
+  if(a==='bulkDel') return doDelete(selIds());
+  if(a==='selClear'){ SEL={}; return renderManage(); }
+  if(!EDIT) return;
+  if(a==='close') return closeEdit();
+  if(a==='save') return doSave();
+  if(a==='delOne') return doDelete([EDIT.id]);
+  pullForm();
+  if(a==='addLink') EDIT.set.links.push({name:'',url:'',login:false});
+  else if(a==='rmLink') EDIT.set.links.splice(+el.dataset.i,1);
+  else if(a==='addFolder') EDIT.set.folders.push('');
+  else if(a==='rmFolder') EDIT.set.folders.splice(+el.dataset.i,1);
+  drawEdit();
+});
+document.addEventListener('change', function(ev){
+  var el=ev.target; if(!el.dataset) return;
+  if(el.dataset.act==='sel'){ SEL[el.dataset.id]=el.checked; renderManage(); }
+  else if(el.dataset.act==='selAll'){ var on=el.checked; SEL={}; if(on) D.sets.forEach(function(s){ SEL[s.id]=true; }); renderManage(); }
+});
+$('modal').addEventListener('click', function(ev){ if(ev.target===$('modal')) closeEdit(); });
+$('q').addEventListener('input', function(){ Q=$('q').value; renderGo(); });
+$('q').addEventListener('keydown', function(ev){
+  if(ev.key==='Enter'){ var a=document.querySelector('#grid a.site'); if(a) a.click(); }
+  else if(ev.key==='Escape'){ $('q').value=''; Q=''; renderGo(); }
+});
+document.addEventListener('keydown', function(ev){
+  if(ev.key==='/' && TAB==='go' && !EDIT && !/^(input|textarea|select)$/i.test((document.activeElement||{}).tagName||'')){ ev.preventDefault(); $('q').focus(); }
+});
+
+/* ═══ 로그인·잠금 — 모르면 잠근다 ═══
+   재직 직원(status==='active' + sid)이면 연다. 로그인 안 함·퇴사·못 읽음은 잠근다. */
+function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+async function staffSid(u){
+  try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{};
+    return v.status==='active' && v.sid ? String(v.sid) : '';
+  }catch(e){ return ''; }
+}
+function boot(){
+  var t=lsGet('tab'); if(t==='go'||t==='manage') TAB=t;
+  if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
+  if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  fbDb=firebase.database();
+  try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
+  firebase.auth().onAuthStateChanged(async function(u){
+    $('outBtn').style.display=u?'':'none';
+    if(!u){ PuGate.show(); return; }
+    PuGate.hide();
+    var sid=await staffSid(u);
+    /* 이름만 — 로그인 이메일·사번을 잠금 화면에 적지 않는다(대표 결정 2026-10-25) */
+    if(!sid){ lock((who()?'접속: '+who()+' — ':'')+'재직 중인 직원 계정이 아닙니다'); return; }
+    ME.sid=sid; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
+    $('lock').style.display='none'; $('app').style.display='';
+    await glReload();
+  });
+}
+boot();
+</script>
+</body>
+</html>

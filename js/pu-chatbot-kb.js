@@ -137,13 +137,14 @@
   var PORTAL_ROWS_GUIDE = [
     {
       id: 'client',
-      title: '① 의뢰인 업무 (12개 앱)',
+      title: '① 의뢰인 업무 (13개 앱)',
       badge: '고객사 직접 수행 업무',
       summary: '자문사·사건 의뢰인·조사·컨설팅·기금 등 고객사 업무를 직접 처리하는 핵심 줄입니다. 모든 업체·계약·사건의 뿌리는 [푸른이알피]입니다.',
       apps: [
         { key: 'erp',       icon: '🏢', name: '푸른이알피',     when: '신규 거래처 등록, 자문·컨설팅 계약, 부당해고·체불·산재 사건 관리', from: '기업정보함(사업자·대표자), 사진첩(판독 서류·통장), 계약서등관리', to: '업무관리, 재무관리, 뉴스레터, 기업정부지원금, 정부사업일정, 경력관리 전 앱의 원본', ask: '푸른이알피는 어떻게 쓰고 다른 앱들과 어떻게 연결되나요?' },
         { key: 'fund',      icon: '🪙', name: '기금관리',       when: '사내·공동근로복지기금 설립, 회계·결산, 별지 서식 자동채움, 기금 법령챗봇', from: '기업정보함(사업자·명함·기업상세), 푸른이알피(참여사업장 연결)', to: '푸른 메일(설립 준비서류 안내 메일 자동 채움)', ask: '기금관리 앱의 주요 기능과 기업정보함·메일 연결 방법을 알려줘' },
         { key: 'govreport', icon: '📑', name: '컨설팅보고서',   when: '전 사업장 컨설팅 보고서 진행률, ③서명본·④별첨·⑤제출 체크, 받은 서류함·한글 미리보기', from: '정부사업일정(보고서·일정 읽기), 푸른이알피(컨설팅 사업), 푸른 메일(첨부 서류 후보)', to: '정부사업일정 보고서 작성 창(#rpt=)으로 바로 점프', ask: '컨설팅보고서 앱은 정부사업일정·푸른 메일과 어떻게 연결되나요?' },
+        { key: 'govlinks',  icon: '🔗', name: '정부사업 바로가기', when: '구조혁신·일터혁신·현장클리닉·기술보호·소상공인 등 사업마다 기관 시스템(로그인)·할 일 메모·폴더 경로를 한 화면에서 열고, 이어 둔 이알피 사업의 올해 업체로 바로 건너갈 때', from: '푸른이알피(컨설팅 사업), 정부사업일정(업체·일정), 컨설팅보고서(사업 종결·순서)', to: '기관 시스템 사이트(새 탭) · 정부사업일정 보고서 창(#rpt=) · 일터상생혁신·산업일자리전환·안전보건체계구축 앱', ask: '정부사업 바로가기 앱에 새 사업이나 사이트는 어떻게 더하고, 업체는 어떻게 연결되나요?' },
         { key: 'consult',   icon: '📅', name: '정부사업일정',   when: '수임한 컨설팅(일터혁신·산업일자리·상의·기술보호 등) 회차 일정·현장사진·보고서 초안/HWPX 작성', from: '푸른이알피(수임 컨설팅), 사진첩(현장사진)', to: '컨설팅보고서 현황판 및 HWPX 보고서 파일 생성', ask: '정부사업일정 앱에서는 어떤 순서로 업무를 처리하나요?' },
         { key: 'govaid',    icon: '🎯', name: '기업정부지원금', when: '고용장려금·지원사업 사전 검색, 기존·예비 고객사 수급 가능성 매칭 및 노무사 검토', from: '푸른이알피(업체 원장), 고용보험 피보험자수 공시(사업자번호 기준)', to: '업무관리(신청 대행 확정 시 할 일 자동 생성)', ask: '기업정부지원금 앱 사용법과 업무관리 자동 연결 흐름을 알려줘' },
         { key: 'harass',    icon: '🛡️', name: '괴롭힘·성희롱 조사', when: '직장 내 괴롭힘·성희롱 사건 공문 메일 자동수집, 8단계 표준 조사 진행, 암호화 비밀 전자서명 및 조사결과보고서(.hwpx) 작성', from: '푸른 메일(조사 공문·진술·증거 후보 묶음), 푸른이알피(업체·사건 원장)', to: '푸른이알피 사건관리·업무 메모 자동 반영 및 진술확인서·조사결과보고서(.hwpx) 출력', ask: '괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?' },
@@ -1246,7 +1247,7 @@
 
   /* ── Ⅳ. 신규 프로그램 무보수 자동 감지 · 온톨로지 연결도 · 화면 HTML 파서 엔진 ── */
   var STATIC_COVERED_APPS = {
-    erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1, safety: 1,
+    erp: 1, fund: 1, consult: 1, govreport: 1, govlinks: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1, safety: 1,
     techprotect: 1, clinic: 1, chamber: 1, hrconsult: 1, evalcomp: 1, pubconsult: 1,
     familywork: 1, socialent: 1, sixthind: 1, laboraudit: 1, unionneg: 1, specialcons: 1,
     msgintake: 1, coach: 1,
@@ -1531,7 +1532,7 @@
   function inferAutoFlowId(key, app, relApps) {
     var row = (app && app.row) || '';
     var joined = ([key].concat(relApps || [])).join(',');
-    if (/consult|govreport|ilteo|jobtrans|safety|settle|techprotect|clinic|chamber|hrconsult|evalcomp|pubconsult|familywork|socialent|sixthind|laboraudit|unionneg|specialcons|coach/.test(joined)) return 'flow-gov';
+    if (/consult|govreport|govlinks|ilteo|jobtrans|safety|settle|techprotect|clinic|chamber|hrconsult|evalcomp|pubconsult|familywork|socialent|sixthind|laboraudit|unionneg|specialcons|coach/.test(joined)) return 'flow-gov';
     if (/govaid/.test(joined)) return 'flow-govaid';
     if (/fund|rules|hangul/.test(joined)) return 'flow-fund-rules';
     if (row === 'sales') return 'flow-sales';
@@ -2143,7 +2144,7 @@
   };
   var APP_TO_SG_CAT = {
     erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', datahub: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
-    consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult', safety: 'consult',
+    consult: 'consult', govreport: 'consult', govlinks: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult', safety: 'consult',
     techprotect: 'consult', clinic: 'consult', chamber: 'consult', hrconsult: 'consult', evalcomp: 'consult', pubconsult: 'consult',
     familywork: 'consult', socialent: 'consult', sixthind: 'consult', laboraudit: 'consult', unionneg: 'consult', specialcons: 'consult',
     coach: 'consult',
