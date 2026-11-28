@@ -257,9 +257,11 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-ws-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;flex-wrap:wrap}
 @media (min-width:768px){
   .pbox-ws-head{position:sticky;top:0;z-index:18}
+  .pbox-ws-head::before{content:'';position:absolute;left:-2px;right:-2px;top:-22px;height:21px;background:#f8fafc;pointer-events:none}
 }
 @media (min-width:769px){
   .pbox-filter-card{position:sticky;top:0;z-index:16}
+  .pbox-filter-card::before{content:'';position:absolute;left:-2px;right:-2px;top:-22px;height:21px;background:#f8fafc;pointer-events:none}
 }
 .pbox-auth-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .pbox-auth-tab{min-height:30px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#f8fafc;color:#475569;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
@@ -492,10 +494,10 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 /* 오른쪽 원문 분할 리더창 (#pboxReader — PC 화면 절반 폭 · 3단 비교 시 78vw 확장 · 접기 레일 44px) */
 .pbox-reader{width:50vw;min-width:520px;max-width:960px;background:#ffffff;border-left:1px solid #cbd5e1;display:flex;flex-direction:column;height:100%;z-index:25;flex-shrink:0}
 .pbox-reader.wide-3dan{width:78vw;min-width:760px;max-width:1440px}
-.pbox-reader.collapsed{width:44px;min-width:44px;max-width:44px;background:#f8fafc;align-items:center;padding:8px 4px;gap:8px}
+.pbox-reader.collapsed{width:44px;min-width:44px;max-width:44px;background:#f8fafc;align-items:center;justify-content:flex-start;padding:8px 4px;gap:8px}
 .pbox-reader-rail-btn{width:34px;min-height:34px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .pbox-reader-rail-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
-.pbox-reader-rail-title{flex:1;min-height:0;writing-mode:vertical-rl;text-orientation:mixed;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:800;color:#1e293b;cursor:pointer;padding:6px 2px;letter-spacing:.02em}
+.pbox-reader-rail-title{flex:0 1 auto;max-height:34vh;min-height:0;writing-mode:vertical-rl;text-orientation:mixed;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:800;color:#1e293b;cursor:pointer;padding:6px 2px;letter-spacing:.02em}
 .pbox-reader-rail-title:hover{color:#2563eb}
 .pbox-3dan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
 .pbox-3dan-col{min-width:0;display:flex;flex-direction:column;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px}
@@ -745,6 +747,7 @@ html[data-theme="dark"] .pbox-reader.collapsed{background:#1e293b;border-color:#
 html[data-theme="dark"] .pbox-reader-rail-btn{background:#000000;color:#60a5fa;border-color:#475569}
 html[data-theme="dark"] .pbox-reader-rail-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
 html[data-theme="dark"] .pbox-reader-rail-title{color:#f8fafc}
+html[data-theme="dark"] .pbox-ws-head::before,html[data-theme="dark"] .pbox-filter-card::before{background:#000000}
 /* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
    ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
    ★ 값만 바꾼다: 모서리·그림자·굵기. 색은 건드리지 않는다 — 자기 어두운 판(html[data-theme="dark"])이 바탕·글자·테두리 색을
@@ -803,9 +806,9 @@ html[data-theme="dark"] .pbox-reader-rail-title{color:#f8fafc}
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-pbox-lawindex.js?v=2"></script>
 <script src="js/pu-pbox-corpus.js?v=10"></script>
-<script src="js/pu-pbox-engine.js?v=28"></script>
-<script src="js/pu-pbox-store.js?v=34"></script>
-<script src="js/pu-pbox-app.js?v=41"></script>
+<script src="js/pu-pbox-engine.js?v=29"></script>
+<script src="js/pu-pbox-store.js?v=35"></script>
+<script src="js/pu-pbox-app.js?v=42"></script>
 <script>
 try {
   PuBack.guard(function () {
