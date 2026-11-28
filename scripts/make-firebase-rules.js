@@ -1605,6 +1605,72 @@ rules.edulib = { '.read': LOGIN,
     deletedBy: { '.validate': "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())" },
     deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
     $other: { '.validate': false } } } };
+/* ══ 💬 법인 카카오톡 방(pu-kakaoroom.html) — 비식별 업무 대화 영구보관 · 첨부파일 이력 (2026-11-28) ══
+   읽기·쓰기 = 재직 직원(LOGIN). 지우기는 _deleted 표식만(물리 삭제 금지).
+   companyId 없이 companyName 으로 저장하는 온톨로지 위반은 규칙에서도 막는다(!hasChild('companyName')). */
+const KAKAOROOM_W = `(${LOGIN}) && newData.exists()`;
+rules.kakao_room = { '.read': LOGIN,
+  items: { $id: { '.write': KAKAOROOM_W,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoWorkArchive' && $id.matches(/^kr_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('summary').isString() && newData.child('summary').val().length <= 400 && newData.child('msgCount').isNumber() && newData.child('redactedCount').isNumber() && newData.child('revision').isNumber() && (data.child('_deleted').val() !== true || newData.child('_deleted').val() === true)",
+    id: { '.validate': true }, entityType: { '.validate': true },
+    schemaVersion: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 10' },
+    contractVersion: { '.validate': 'newData.isNumber() && newData.val() === 1' },
+    revision: { '.validate': 'newData.isNumber() && newData.val() >= 1' },
+    createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    originSystem: { '.validate': 'newData.isString() && newData.val().length <= 32' },
+    originId: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    room: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    day: { '.validate': "newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/)" },
+    senders: { '.validate': 'newData.hasChildren()', $i: { '.validate': '$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 80' } },
+    msgCount: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 10000' },
+    domain: { '.validate': "newData.val() === 'case' || newData.val() === 'fund' || newData.val() === 'consult' || newData.val() === 'payroll' || newData.val() === 'advisory' || newData.val() === 'admin'" },
+    safety: { '.validate': "newData.val() === 'safe' || newData.val() === 'redacted'" },
+    redactedCount: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000' },
+    summary: { '.validate': 'newData.isString() && newData.val().length <= 400' },
+    caseNos: { '.validate': 'newData.hasChildren()', $i: { '.validate': '$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 80' } },
+    due: { '.validate': 'newData.isString() && newData.val().length <= 20' },
+    fileNames: { '.validate': 'newData.hasChildren()', $i: { '.validate': '$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 240' } },
+    matchBasis: { '.validate': "newData.val() === 'sure' || newData.val() === 'guess' || newData.val() === 'newno' || newData.val() === 'none' || newData.val() === ''" },
+    workItemId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    workLogId: { '.validate': 'newData.isString() && newData.val().length <= 100' },
+    companyId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    companyLinkStatus: { '.validate': "newData.val() === 'linked' || newData.val() === 'pending'" },
+    companyHint: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    status: { '.validate': "newData.val() === 'open' || newData.val() === 'tracking' || newData.val() === 'done'" },
+    note: { '.validate': 'newData.isString() && newData.val().length <= 1000' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    $other: { '.validate': false } } },
+  files: { $id: { '.write': KAKAOROOM_W,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoFileRecord' && $id.matches(/^kf_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('name').isString() && newData.child('name').val().length <= 240 && newData.child('revision').isNumber() && (data.child('_deleted').val() !== true || newData.child('_deleted').val() === true)",
+    id: { '.validate': true }, entityType: { '.validate': true },
+    schemaVersion: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 10' },
+    contractVersion: { '.validate': 'newData.isNumber() && newData.val() === 1' },
+    revision: { '.validate': 'newData.isNumber() && newData.val() >= 1' },
+    createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    originSystem: { '.validate': 'newData.isString() && newData.val().length <= 32' },
+    originId: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    room: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    name: { '.validate': 'newData.isString() && newData.val().length <= 240' },
+    sender: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    sentAt: { '.validate': 'newData.isNumber()' },
+    sensitive: { '.validate': 'newData.isBoolean()' },
+    dest: { '.validate': "newData.val() === 'photo' || newData.val() === 'co' || newData.val() === 'pc'" },
+    status: { '.validate': "newData.val() === 'todo' || newData.val() === 'got' || newData.val() === 'done' || newData.val() === 'hidden'" },
+    workItemId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    companyId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    $other: { '.validate': false } } } };
+
 /* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
    대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,
    자료함(재직 직원 모두)에 «넣기»는 관리자가 고른다. 담기는 것: 메일 자리·첨부 이름·가린 메일 제목·추정 종류·내용 요약·지문 — 원본 파일은 없다.
@@ -2703,23 +2769,6 @@ rules.coach_rag = {
     '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
   } } },
   $other: { '.validate': false }
-};
-
-/* 💬 사내 카톡 업무방 아카이브(라이브 콘솔 적용분 동기화, 2026-11-28) */
-rules.kakao_room = {
-  '.read': LOGIN,
-  items: {
-    $id: {
-      '.write': `(${LOGIN}) && newData.exists()`,
-      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoWorkArchive' && $id.matches(/^kr_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('summary').isString() && newData.child('summary').val().length <= 400"
-    }
-  },
-  files: {
-    $id: {
-      '.write': `(${LOGIN}) && newData.exists()`,
-      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoFileRecord' && $id.matches(/^kf_[a-z0-9_]{6,48}$/) && newData.child('name').isString() && newData.child('name').val().length <= 240"
-    }
-  }
 };
 
 /* ⚖️ 노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화, 2026-11-28) — harass_invest/harass_secret 동일 규격 */

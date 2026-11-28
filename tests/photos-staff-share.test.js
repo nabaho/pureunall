@@ -406,7 +406,35 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-28 — 병목 해소 1단계 RTDB 인덱스 4곳(/data/finance_income/v, /hanaSmsBridge/inbox, /pucards/scheduled/.indexOn/2, /work_erp/items) 추가 및 기존 콘솔 /edulib/lectures 규칙 보존 배포 완료(사라짐 0 · 바뀜 0).
        다시 읽어 «콘솔이 올린 것과 같음» 확인 후 새 기준 docs/firebase-rules-콘솔원문-2026-11-28.json 으로 갱신 — 목록을 비운다. */
   /* ★ 2026-11-28 — 컨설팅 전용 앱 12종(scal_*), msg_intake, coach_rag 신규 14개 루트 및 콘솔 동기화 5종(kakao_room, labor_cases, labor_secret, sanjae_cases, sanjae_secret) 배포 완료(새로 14 · 바뀜 0 · 사라짐 0 · 문법 통과 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
-  const PENDING = [];
+  /* ★ 2026-11-28 게시 대기 — 법인 카카오톡 방(/kakao_room) 2단계 보안 검토 강화분 60항목(새로 58 · 조임 2 · 헐거워짐 0).
+       1차 /kakao_room 기본 규칙은 이미 라이브 콘솔에 게시 완료되어(docs/firebase-rules-콘솔원문-2026-11-28.json 반영) 앱이 정상 동작한다.
+       2단계 보안 강화판(redactedCount·msgCount 숫자 강제, _deleted 부활 차단, 전 칸 길이/형식 검증, $other: false)은
+       라이브 콘솔에 타 세션의 /govlinks 규칙이 먼저 올라가 있어 rules-deploy.js 가 덮어쓰기를 막고 안전 정지함.
+       /govlinks 가 main 의 scripts/make-firebase-rules.js 에 합쳐진 뒤 node scripts/rules-deploy.js --deploy 를 실행해
+       콘솔 원문을 갱신하고 아래 PENDING 목록을 비울 것. */
+  const PENDING = [
+    '/kakao_room/files/$id/$other', '/kakao_room/files/$id/.validate', '/kakao_room/files/$id/_deleted',
+    '/kakao_room/files/$id/companyId', '/kakao_room/files/$id/contractVersion', '/kakao_room/files/$id/createdAt',
+    '/kakao_room/files/$id/createdBy', '/kakao_room/files/$id/deletedAt', '/kakao_room/files/$id/deletedBy',
+    '/kakao_room/files/$id/dest', '/kakao_room/files/$id/entityType', '/kakao_room/files/$id/id',
+    '/kakao_room/files/$id/name', '/kakao_room/files/$id/originId', '/kakao_room/files/$id/originSystem',
+    '/kakao_room/files/$id/revision', '/kakao_room/files/$id/room', '/kakao_room/files/$id/schemaVersion',
+    '/kakao_room/files/$id/sender', '/kakao_room/files/$id/sensitive', '/kakao_room/files/$id/sentAt',
+    '/kakao_room/files/$id/status', '/kakao_room/files/$id/updatedAt', '/kakao_room/files/$id/updatedBy',
+    '/kakao_room/files/$id/workItemId',
+    '/kakao_room/items/$id/$other', '/kakao_room/items/$id/.validate', '/kakao_room/items/$id/_deleted',
+    '/kakao_room/items/$id/caseNos', '/kakao_room/items/$id/companyHint', '/kakao_room/items/$id/companyId',
+    '/kakao_room/items/$id/companyLinkStatus', '/kakao_room/items/$id/contractVersion', '/kakao_room/items/$id/createdAt',
+    '/kakao_room/items/$id/createdBy', '/kakao_room/items/$id/day', '/kakao_room/items/$id/deletedAt',
+    '/kakao_room/items/$id/deletedBy', '/kakao_room/items/$id/domain', '/kakao_room/items/$id/due',
+    '/kakao_room/items/$id/entityType', '/kakao_room/items/$id/fileNames', '/kakao_room/items/$id/id',
+    '/kakao_room/items/$id/matchBasis', '/kakao_room/items/$id/msgCount', '/kakao_room/items/$id/note',
+    '/kakao_room/items/$id/originId', '/kakao_room/items/$id/originSystem', '/kakao_room/items/$id/redactedCount',
+    '/kakao_room/items/$id/revision', '/kakao_room/items/$id/room', '/kakao_room/items/$id/safety',
+    '/kakao_room/items/$id/schemaVersion', '/kakao_room/items/$id/senders', '/kakao_room/items/$id/status',
+    '/kakao_room/items/$id/summary', '/kakao_room/items/$id/updatedAt', '/kakao_room/items/$id/updatedBy',
+    '/kakao_room/items/$id/workItemId', '/kakao_room/items/$id/workLogId',
+  ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

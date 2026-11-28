@@ -2320,6 +2320,21 @@
         }
       }
     },
+    "kakao_room": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "items": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoWorkArchive' && $id.matches(/^kr_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('summary').isString() && newData.child('summary').val().length <= 400"
+        }
+      },
+      "files": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoFileRecord' && $id.matches(/^kf_[a-z0-9_]{6,48}$/) && newData.child('name').isString() && newData.child('name').val().length <= 240"
+        }
+      }
+    },
     "edulib_inbox": {
       ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       ".write": false

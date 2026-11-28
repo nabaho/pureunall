@@ -63,6 +63,7 @@ const DONE = [
   ['pu-edulib.html', '강의자료'],
   ['pu-alio-union.html', '공공임단협'],
   ['pu-datahub.html', '데이터관리'],
+  ['pu-kakaoroom.html', '법인카카오톡방'],
   ['techprotect.html', '기술보호컨설팅'],
   ['clinic.html', '현장클리닉'],
   ['chamber.html', '상공회의소컨설팅'],
