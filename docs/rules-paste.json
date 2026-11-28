@@ -602,6 +602,11 @@
         "$k2": {
           ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
         }
+      },
+      "mail_queue": {
+        ".read": false,
+        ".write": false,
+        ".validate": false
       }
     },
     "work_erp": {
@@ -4002,6 +4007,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -4374,6 +4394,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -4748,6 +4783,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -5120,6 +5170,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -5494,6 +5559,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -5866,6 +5946,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -6240,6 +6335,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -6612,6 +6722,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -6986,6 +7111,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -7358,6 +7498,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -7732,6 +7887,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -8104,6 +8274,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false

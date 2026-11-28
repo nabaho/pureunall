@@ -381,3 +381,75 @@ test('⑧ UI 구조·아카이브 스캔: 전 12앱 #projYrBar · chamber 왼쪽
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('⑨ 정화·근로감독 전용·단일주사업: invalid 라벨 차단 · 자율점검/노무진단 배제 · 감독메타 추출 · 상의 공지 제외', () => {
+  // 1) 따옴표·호칭·이메일ID·순수성명·일반명 차단 & 정상 법인/특정금고 허용
+  assert.equal(Intake.cleanCompanyLabel('"최가상"'), '최가상');
+  assert.equal(Intake.cleanCompanyLabel('김예시 팀장님'), '김예시');
+  for (const bad of ['"최가상"', '이가상', 'user9901', '새마을금고', '웅천', 'sample.co.kr', '미확인 사업장']) {
+    assert.equal(Intake.isInvalidCompanyLabel(bad), true, '차단되어야 할 라벨: ' + bad);
+  }
+  for (const good of ['보령새마을금고', '(주)가상제조', '가상테크솔루션', '한식당']) {
+    assert.equal(Intake.isInvalidCompanyLabel(good), false, '유효해야 할 라벨: ' + good);
+  }
+
+  // 2) 근로감독 전용 분류 및 자율점검·노무진단·진정 배제 + 상의 일반행사 공지 차단
+  const pureInsp = {
+    s: '[대전청 천안지청] (주)가상정밀 정기 근로감독 수검 및 시정지시서',
+    p: '감독기간 2026-11-10 ~ 2026-11-21 연장수당 미지급 지적 시정기한 2026-12-15까지 제출',
+    f: 'inspector@moel.example',
+    d: Date.UTC(2026, 10, 12)
+  };
+  const clsPure = Intake.classifyRecord(pureInsp, { includeExisting: true });
+  assert.equal(clsPure.primaryApp, 'laboraudit');
+
+  const clsSelf = Intake.classifyRecord({ s: '2025 기초노동질서 자율점검표 제출 안내', p: '근로감독 대비 자율점검' }, { includeExisting: true });
+  assert.ok(!clsSelf.allMatchedApps || !clsSelf.allMatchedApps.includes('laboraudit'), '자율점검 메일이 laboraudit로 들어가면 안 됨');
+
+  const clsDiag = Intake.classifyRecord({ s: '[노무진단] 가상새마을금고 MG맞춤 노무진단 점검', p: '근로감독 수준 HR Audit 점검' }, { includeExisting: true });
+  assert.equal(clsDiag.primaryApp, 'specialcons');
+  assert.ok(!clsDiag.allMatchedApps.includes('laboraudit'), '노무진단(MG맞춤)은 laboraudit에서 배제되어야 함');
+
+  const clsPetition = Intake.classifyRecord({ s: '임금체불 진정사건 대지급금(체당금) 출석요구', p: '근로감독관 출석 안내' }, { includeExisting: true });
+  assert.ok(!clsPetition.allMatchedApps || !clsPetition.allMatchedApps.includes('laboraudit'), '체당금·진정사건은 laboraudit에서 배제되어야 함');
+
+  const clsChamberNotice = Intake.classifyRecord({ s: '[충남북부상공회의소] 2026 FTA 실무교육 및 조찬간담회 안내', p: '회원사 대상 무료 교육' }, { includeExisting: true });
+  assert.ok(!clsChamberNotice.allMatchedApps || !clsChamberNotice.allMatchedApps.includes('chamber'), '상의 일반 행사·교육 공지는 chamber로 분류되면 안 됨');
+
+  // 3) 1메일=1주사업(중복배정 차단) + extractInspectionMeta + 트랙 판별
+  const flat = Intake.flattenMailbox({ f1: { kind: 'custom', name: '1.자문사답변' } }, { f1: { m1: pureInsp } }, {});
+  const discLa = Intake.discoverForApp('laboraudit', { flatMails: flat, companies: [] });
+  const discHr = Intake.discoverForApp('hrconsult', { flatMails: flat, companies: [] });
+  assert.equal(discLa.bundles.length, 1);
+  assert.equal(discHr.bundles.length, 0, '근로감독 주사업 메일이 hrconsult로 중복 복제되면 안 됨');
+  assert.ok(discLa.bundles[0].inspMeta && discLa.bundles[0].inspMeta.inspOffice.includes('천안지청'));
+  assert.match(discLa.bundles[0].inspMeta.inspPeriod, /2026-11-10/);
+  assert.match(discLa.bundles[0].inspMeta.inspIssues, /연장/);
+  assert.equal(discLa.bundles[0].inspMeta.inspDue, '2026-12-15');
+  assert.equal(discLa.bundles[0].inspMeta.inspResult, '시정지시 대응중');
+  assert.equal(Intake.inferTrackForApp('laboraudit', '시정지시서 제출 완료').id, 'la_remedy');
+  assert.equal(Intake.inferTrackForApp('laboraudit', '수시 근로감독 긴급 대응').id, 'la_special');
+  assert.equal(Intake.inferTrackForApp('laboraudit', '사전 모의감독 점검').id, 'la_mock');
+  assert.equal(Intake.inferTrackForApp('specialcons', '새마을금고 MG맞춤 노무진단').id, 'sp_audit');
+  assert.equal(Intake.extractInspectionMeta([{ subject: '[중부지방고용노동청] 서산출장소 정기감독' }]).inspOffice, '중부지방고용노동청');
+
+  const Backfill = require(path.join(ROOT, 'scripts', 'backfill-consult-suite.js'));
+  const { execFileSync } = require('node:child_process');
+
+  // 4) 동명·이종 companyId 비병합 및 모호한 로컬/미매칭 건 보류
+  const homonymRes = Backfill.mergeAppRecords(
+    Cats.get('laboraudit'),
+    [{ id: 'co_h1', name: '주식회사 동명가상' }, { id: 'co_h2', name: '(주)동명가상' }],
+    [
+      { companyId: 'co_h1', companyName: '주식회사 동명가상', year: 2026, erpCount: 1, mailCount: 0, msgCount: 0, suggestedTrackId: 'la_regular', suggestedTrackName: '정기근로감독', items: [] },
+      { companyId: 'co_h2', companyName: '(주)동명가상', year: 2026, erpCount: 1, mailCount: 0, msgCount: 0, suggestedTrackId: 'la_remedy', suggestedTrackName: '시정지시', items: [] }
+    ],
+    [{ companyName: '동명가상', year: 2026, trackId: 'la_regular', trackName: '정기근로감독', stage: 'collect', status: 'active', tag: '2026 로컬', docCount: 1, docNames: ['a.hwp'] }]
+  );
+  const homRows = Object.values(homonymRes.mergedMap);
+  assert.equal(homRows.length, 3, '서로 다른 companyId 동명 사업장과 모호한 로컬 건은 병합되면 안 됨');
+
+  // 5) fund_erp.mail_queue .validate=false 서버 규칙 검증
+  const rulesJson = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-firebase-rules.js')], { encoding: 'utf8' }));
+  assert.equal(rulesJson.rules.fund_erp.mail_queue['.validate'], false, 'fund_erp.mail_queue 는 .validate: false 로 클라이언트 쓰기를 차단해야 함');
+});

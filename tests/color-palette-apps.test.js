@@ -74,7 +74,7 @@ const DONE = [
   ['familywork.html', '출산육아·유연근무'],
   ['socialent.html', '사회적기업·씨앗'],
   ['sixthind.html', '6차산업컨설팅'],
-  ['laboraudit.html', '자율점검·근로감독'],
+  ['laboraudit.html', '근로감독 대응·이력'],
   ['unionneg.html', '민간노조·단체교섭'],
   ['specialcons.html', '특화·위탁컨설팅'],
   ['pu-msg-intake.html', '카톡·문자 자료수집'],

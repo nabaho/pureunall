@@ -201,6 +201,18 @@
     return out;
   }
 
+  function isExcludedForApp(appKey, mr, subject, textAll) {
+    if (!mr || !mr.excludeRe || !mr.excludeRe.test(textAll)) return false;
+    if (appKey === 'laboraudit') {
+      if (/자율\s*점검|자체\s*점검|노무\s*진단|MG\s*맞춤|새마을금고|체당금|대지급금|진정\s*사건/i.test(subject)) return true;
+      return !/(?:정기|수시|특별|기획|청원)\s*(?:근로\s*)?감독|시정\s*지시(?:서|사항)|시정\s*완료\s*보고/i.test(subject);
+    }
+    if (appKey === 'chamber') {
+      return !/업체\s*방문\s*확인서|상담\s*및\s*자문\s*결과\s*보고서|인사노무\s*컨설팅\s*결과/i.test(subject);
+    }
+    return !(mr.strongSubjectRe && mr.strongSubjectRe.test(subject));
+  }
+
   /* ══ 3. 전 사업 다중 라벨 자동분류기 ═════════════════════════════════ */
   function classifyRecord(rec, opts) {
     var o = opts || {};
@@ -215,7 +227,7 @@
     var toDom = domainOf(toEmail);
 
     if (HARD_NOISE_FOLDER_RE.test(folderName) || HARD_NOISE_SUBJ_RE.test(subject)) {
-      if (!/컨설팅|6차산업|농촌융복합|기술보호|현장클리닉|취업규칙|근로계약|평가보상|자율점검|단체교섭/.test(subject)) {
+      if (!/컨설팅|6차산업|농촌융복합|기술보호|현장클리닉|취업규칙|근로계약|평가보상|근로감독|시정지시|단체교섭/.test(subject)) {
         return { ok: false, noise: true, primaryApp: '', secondaryApps: [], scores: [], matchedReasons: ['광고/뉴스레터/세금계산서 제외'] };
       }
     }
@@ -226,18 +238,25 @@
     }
 
     var catalogMap = includeExisting ? Cat.getAllWithExisting() : Cat.NEW_APPS;
+    var hasSpecialSubjectHit = Object.keys(catalogMap).some(function (k) {
+      if (k === 'hrconsult') return false;
+      var kmr = catalogMap[k] && catalogMap[k].mailRules;
+      if (!kmr || !kmr.strongSubjectRe || !kmr.strongSubjectRe.test(subject)) return false;
+      return !isExcludedForApp(k, kmr, subject, textAll);
+    });
     var scores = [];
 
     Object.keys(catalogMap).forEach(function (appKey) {
       var app = catalogMap[appKey];
       var mr = app && app.mailRules;
       if (!mr) return;
-      if (mr.excludeRe && mr.excludeRe.test(textAll) && !(mr.strongSubjectRe && mr.strongSubjectRe.test(subject))) {
+      if (isExcludedForApp(appKey, mr, subject, textAll)) {
         return;
       }
 
       var sc = 0;
       var reasons = [];
+      var suppressGenericBody = (appKey === 'hrconsult' && hasSpecialSubjectHit && !(mr.strongSubjectRe && mr.strongSubjectRe.test(subject)));
 
       if (mr.strongSubjectRe && mr.strongSubjectRe.test(subject)) {
         sc += 50;
@@ -252,7 +271,7 @@
           sc += 30;
           reasons.push('첨부파일명 키워드');
         }
-        if (mr.includeRe.test(body)) {
+        if (!suppressGenericBody && mr.includeRe.test(body)) {
           sc += 20;
           reasons.push('본문/미리보기 키워드');
         }
@@ -267,7 +286,7 @@
           }
         }
       }
-      if (Array.isArray(mr.folderHints) && folderName) {
+      if (!suppressGenericBody && Array.isArray(mr.folderHints) && folderName) {
         for (var fh = 0; fh < mr.folderHints.length; fh++) {
           if (folderName.indexOf(mr.folderHints[fh]) >= 0) {
             sc += 8;
@@ -286,7 +305,10 @@
       }
     });
 
-    scores.sort(function (a, b) { return b.score - a.score; });
+    scores.sort(function (a, b) {
+      return (b.score - a.score) ||
+        ((a.appKey === 'hrconsult' ? 1 : 0) - (b.appKey === 'hrconsult' ? 1 : 0));
+    });
 
     var primaryApp = scores.length ? scores[0].appKey : '';
     var secondaryApps = scores.slice(1).filter(function (x) { return x.score >= 30; }).map(function (x) { return x.appKey; });
@@ -370,8 +392,12 @@
     return { company: null, via: '' };
   }
 
-  var BRACKET_AGENCY_RE = /푸른노무법인|권형하|광고|공고|필수|정정|재안내|안내|공문|중요|RE|FW|보안메일|보안메일\s*암호|문자|카톡(?:대화)?|Web\s*발신|파일|보관자료|ERP\s*수임|가림|로컬경로가림|상생협력재단|대중소기업|농어업협력재단|충남중기청|중소벤처|충남북부상의|서산상의|당진상의|충남경제진흥원|노사발전재단|한국능률협회|충남농업6차|충북농촌융복합|세종농촌융복합|충남사회적경제|충남사경|컨설턴트\s*모집|Reminder/i;
+  var BRACKET_AGENCY_RE = /푸른노무법인|권형하|광고|공고|필수|정정|재안내|안내|공문|중요|RE|FW|보안메일|보안메일\s*암호|문자|카톡(?:대화)?|Web\s*발신|파일|보관자료|ERP\s*수임|가림|로컬경로가림|상생협력재단|대중소기업|농어업협력재단|충남중기청|중소벤처|충남북부상의|서산상의|당진상의|충남경제진흥원|노사발전재단|한국능률협회|충남농업6차|충북농촌융복합|세종농촌융복합|충남사회적경제|충남사경|컨설턴트\s*모집|Reminder|근로감독|정기감독|수시감독|특별감독|시정지시|노무진단|자율점검|취업규칙|근로계약|인사노무|컨설팅|긴급|요청|회신|답변|공유|참고|자료|제출|검토|세미나|교육|일정|협조/i;
   var AGENCY_NOTICE_LABEL_RE = /(?:상생협력재단|대중소기업|농어업협력재단|충남중기청|중소벤처24|충남북부상의|충남북부상공회의소|서산상의|서산상공회의소|당진상의|당진상공회의소|충남경제진흥원|경제진흥원|노사발전재단|한국능률협회|푸른노무법인|농촌융복합(?:산업)?(?:지원센터)?|6차산업(?:지원)?센터|사회적경제지원센터|현장코칭담당|회신요청|농림축산식품|보안메일(?:\s*암호)?|컨설턴트\s*모집|전문가\s*모집|만족도\s*조사|근무\s*일정|Reminder|운영지침|사전교육|간담회|모니터링|안내서?|공고)/i;
+  var SURNAME_1CHAR_RE = /^[김이박최정강조윤장임한오서신권황안송류유홍전고문양손배백허남심노하곽성차주우구이나민진지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용][가-힣]{2}$/;
+  var SURNAME_2CHAR_RE = /^(?:남궁|황보|제갈|선우|사공|독고|서문)[가-힣]{1,2}$/;
+  var BIZ_WORD_RE = /(?:금고|병원|의원|약국|마트|식당|산업|테크|건설|식품|유리|정공|전자|개발|물산|상사|농산|농원|축산|조합|법인|학교|학원|호텔|리조트|센터|공단|공사|협회|학회|재단|지회|지부|연구소|한의원|치과|복지관|요양원|어린이집|유치원|고속|운수|물류|항공|관광|인쇄|출판|화훼|목장|양식|수산|임업|기계|금속|철강|화학|섬유|제지|가구|시멘트|환경|에너지|시스템|솔루션|컴퍼니|브라더스|엔지니어링|모터스)/;
+  var GENERIC_LABEL_RE = /^(?:새마을금고|신협|농협|수협|축협|산림조합|사회적기업|협동조합|주식회사|유한회사|미확인\s*사업장|담당자|노무사|근로자|직원|신청자|수강생|문의|질문|답변|요청|확인|자료|첨부|보고서|체크리스트|근로감독|자율점검|노무진단|컨설팅|인사노무|근로계약서|취업규칙|웅천|보령|서산|당진|천안|아산|홍성|예산|태안|논산|공주|부여|청양|금산|계룡)$/;
 
   function isAgencyNoticeLabel(label) {
     var s = str(label);
@@ -381,10 +407,30 @@
 
   function cleanCompanyLabel(raw) {
     return str(raw)
+      .replace(/^\s*["'“”‘’]+|["'“”‘’]+\s*$/g, '')
       .replace(/^\d{1,3}[.\-_)\s]+(?=[가-힣A-Za-z㈜(])/, '')
       .replace(/[-–_(\[]\s*(?:종료|완료|중간종료|진행중?)\s*[)\]]?$/i, '')
+      .replace(/\s+(?:대표(?:이사)?님?|이사님?|팀장님?|과장님?|부장님?|차장님?|실장님?|대리님?|주임님?|매니저님?|담당자님?|선생님|교수님?|노무사님?|변호사님?|님)$/, '')
+      .replace(/^\s*["'“”‘’]+|["'“”‘’]+\s*$/g, '')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  function isInvalidCompanyLabel(label) {
+    var s = cleanCompanyLabel(label);
+    if (!s || s.length < 2 || s.length > 48) return true;
+    if (/^\d+$/.test(s) || !/[가-힣A-Za-z0-9]/.test(s)) return true;
+    if (isAgencyNoticeLabel(s) || GENERIC_LABEL_RE.test(s)) return true;
+    if (/@/.test(s) || /\.(?:com|net|org|co\.kr|or\.kr|go\.kr|ac\.kr|ne\.kr|re\.kr|pe\.kr|kr|biz|info|io|example)$/i.test(s)) return true;
+    if (!/[가-힣]/.test(s)) {
+      if (/^[a-z0-9._-]{2,24}$/.test(s) || /^[A-Za-z]{2,12}\d{2,}$/.test(s)) return true;
+      if (/^(?:admin|info|mail|master|hr|cs|help|support|noreply|no-reply|manager|staff|user|test|guest|contact|webmaster)$/i.test(s)) return true;
+    }
+    if (/^[가-힣]{2}$/.test(s)) return true;
+    if (/^[가-힣]{3,4}$/.test(s) && !BIZ_WORD_RE.test(s)) {
+      if (SURNAME_1CHAR_RE.test(s) || SURNAME_2CHAR_RE.test(s)) return true;
+    }
+    return false;
   }
 
   function extractCompanyFromSubject(subj) {
@@ -395,22 +441,22 @@
     while ((m = brkRe.exec(s)) !== null) {
       var rawBrk = str(m[1]).replace(/^카톡\s*[:：]\s*/i, '');
       var cand = cleanCompanyLabel(rawBrk);
-      if (cand && cand.length >= 2 && !BRACKET_AGENCY_RE.test(cand) && !/^20\d{2}/.test(cand)) {
+      if (cand && cand.length >= 2 && !BRACKET_AGENCY_RE.test(cand) && !/^20\d{2}/.test(cand) && !isInvalidCompanyLabel(cand)) {
         return cand;
       }
     }
     // 2) 사업명-기업명 패턴 (예: 인사노무컨설팅-동원유리, 현장클리닉-○○)
-    var hy = s.match(/(?:인사노무\s*컨설팅|현장클리닉|기술보호(?:\s*컨설팅)?|현장코칭|자율점검|씨앗컨설팅|결과물|보고서)\s*[-–_:：]\s*([가-힣A-Za-z0-9㈜()·\s]{2,26})/);
+    var hy = s.match(/(?:인사노무\s*컨설팅|현장클리닉|기술보호(?:\s*컨설팅)?|현장코칭|자율점검|근로감독|씨앗컨설팅|결과물|보고서)\s*[-–_:：]\s*([가-힣A-Za-z0-9㈜()·\s]{2,26})/);
     if (hy) {
       var hCand = cleanCompanyLabel(hy[1].split(/[(\[|]/)[0]);
-      if (hCand && hCand.length >= 2 && !isAgencyNoticeLabel(hCand)) return hCand;
+      if (hCand && hCand.length >= 2 && !isInvalidCompanyLabel(hCand)) return hCand;
     }
     // 3) 괄호·접미사 있는 법인명 (예: (주)OOO, OOO주식회사, 농업/영농조합/협동조합)
     var corpRe = /((?:주식회사|㈜|\(주\)|유한회사|\(유\)|농업\s*회사법인|영농조합법인|사회적협동조합)\s*[가-힣A-Za-z0-9·]{2,20}|[가-힣A-Za-z0-9]{2,18}(?:주식회사|㈜|\(주\)|협동조합|영농조합법인|엔지니어링|테크날리지|테크놀로지|테크|산업|식품|케미칼|글라스|스틸|솔루션|전자|정공|유리|보일러|금고|병원|의원))/;
     var cm = s.match(corpRe);
     if (cm) {
       var cCand = cleanCompanyLabel(cm[1]);
-      if (cCand && cCand.length >= 2 && !isAgencyNoticeLabel(cCand)) return cCand;
+      if (cCand && cCand.length >= 2 && !isInvalidCompanyLabel(cCand)) return cCand;
     }
     return '';
   }
@@ -420,16 +466,104 @@
     var subj = str(rec.subject);
     var fromSubj = extractCompanyFromSubject(subj);
     if (fromSubj) return fromSubj;
-    var em = mailOf(rec.fromEmail);
-    if (OWN_MAIL_RE.test(em)) em = mailOf(rec.toEmail);
+    var attsArr = Array.isArray(rec.atts) ? rec.atts : (rec.atts ? [rec.atts] : []);
+    for (var ai = 0; ai < attsArr.length; ai++) {
+      var fromAtt = extractCompanyFromSubject(str(attsArr[ai]).replace(/\.[a-z0-9]{2,5}$/i, ''));
+      if (fromAtt) return fromAtt;
+    }
     var fn = OWN_MAIL_RE.test(mailOf(rec.fromEmail)) ? str(rec.toName) : str(rec.fromName);
     if (fn && !/푸른|권형하/.test(fn)) {
       var cleanFn = cleanCompanyLabel(fn.replace(/<[^>]+>/g, '').replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, ''));
-      if (cleanFn && cleanFn.length >= 2 && !isAgencyNoticeLabel(cleanFn)) return cleanFn.slice(0, 24);
+      if (cleanFn && !isInvalidCompanyLabel(cleanFn)) return cleanFn.slice(0, 24);
     }
-    var dom = domainOf(em);
-    if (dom && !PUBLIC_DOMAINS[dom]) return dom;
-    return subj.replace(/^(re|fw|fwd)\s*[:：]\s*/ig, '').slice(0, 24) || '미확인 사업장';
+    return '미확인 사업장';
+  }
+
+  function pickTrack(baseTracks, tid, fallbackIdx) {
+    for (var i = 0; i < baseTracks.length; i++) {
+      if (baseTracks[i] && baseTracks[i].id === tid) return baseTracks[i];
+    }
+    return baseTracks[fallbackIdx || 0] || baseTracks[0];
+  }
+
+  function extractInspectionMeta(items) {
+    var arr = Array.isArray(items) ? items : (items ? [items] : []);
+    var texts = [];
+    var dates = [];
+    for (var i = 0; i < arr.length; i++) {
+      var it = arr[i];
+      if (!it || typeof it !== 'object') continue;
+      if (it.date && /^\d{4}-\d{2}-\d{2}/.test(str(it.date))) dates.push(str(it.date).slice(0, 10));
+      texts.push([it.subject, it.maskedPreview || it.preview, it.folderName, Array.isArray(it.atts) ? it.atts.join(' ') : str(it.atts)].filter(Boolean).join(' '));
+    }
+    var full = texts.join('\n');
+
+    var inspPeriod = '';
+    var rngM = full.match(/(20\d{2}[./년-]\s*\d{1,2}[./월-]\s*\d{1,2}일?\s*[~～\-]\s*(?:20\d{2}[./년-]\s*)?\d{1,2}[./월-]\s*\d{1,2}일?)/);
+    if (rngM) {
+      inspPeriod = rngM[1].replace(/\s+/g, ' ').trim();
+    } else {
+      var lblM = full.match(/(?:감독\s*(?:일시|일자|기간|예정일?|실시일?)|수검\s*(?:일자|기간)|방문\s*(?:일시|일자))\s*[:：]?\s*([^\n,;()]{4,36})/);
+      if (lblM) inspPeriod = lblM[1].trim();
+      else {
+        var oneDateM = full.match(/(?:감독|점검|수검|시정지시)[^.\n]{0,20}(20\d{2}[./년-]\s*\d{1,2}[./월-]\s*\d{1,2}일?)/);
+        if (oneDateM) inspPeriod = oneDateM[1].trim();
+      }
+    }
+    if (!inspPeriod && dates.length) {
+      dates.sort();
+      inspPeriod = dates[0] === dates[dates.length - 1] ? dates[0] : (dates[0] + ' ~ ' + dates[dates.length - 1]);
+    }
+
+    var inspOffice = '';
+    var offM = full.match(/((?:고용\s*노동부\s*)?(?:(?:서울|중부|부산|대구|광주|대전)(?:지방)?(?:고용노동)?청\s*)?(?:서울|중부|부산|대구|인천|광주|대전|울산|세종|수원|성남|안양|안산|평택|고양|부천|의정부|춘천|원주|강릉|영월|태백|청주|충주|천안|아산|보령|서산|당진|전주|군산|익산|목포|여수|순천|포항|구미|영주|안동|창원|진주|통영|양산|제주)(?:[가-힣]{0,4}(?:지방)?고용노동(?:청|지청|출장소)|(?:노동)?(?:지청|출장소))(?:\s*[가-힣0-9]{2,10}(?:과|팀))?)/);
+    if (offM) inspOffice = offM[1].replace(/\s+/g, ' ').trim();
+
+    var issueMap = [
+      [/연장[·ㆍ,\s]*야간[·ㆍ,\s]*휴일\s*수당|포괄\s*임금|임금\s*(?:체불|미지급|과소)|수당\s*(?:미지급|누락)/i, '연장·야간·휴일수당 및 임금 지급'],
+      [/임금\s*명세서|급여\s*명세서/i, '임금명세서 교부 의무'],
+      [/근로\s*계약서|근로조건\s*서면\s*명시/i, '근로계약서 작성·교부'],
+      [/취업규칙(?:\s*(?:신고|불이익|미제출|정비))?/i, '취업규칙 작성·신고'],
+      [/최저\s*임금/i, '최저임금 준수'],
+      [/연장\s*근로(?:\s*한도)?|52\s*시간|근로시간\s*(?:한도|위반)|휴게\s*시간/i, '근로·휴게시간 및 연장한도'],
+      [/연차(?:\s*(?:유급)?휴가|\s*수당|\s*촉진)?/i, '연차유급휴가 및 미사용수당'],
+      [/퇴직\s*금|퇴직\s*연금/i, '퇴직급여 지급·적립'],
+      [/직장\s*내\s*괴롭힘|성희롱\s*예방\s*교육|법정의무교육/i, '성희롱·괴롭힘 예방교육'],
+      [/노사협의회|고충처리/i, '노사협의회 설치·운영'],
+      [/모성보호|출산휴가|육아휴직|임산부/i, '모성보호 및 육아지원'],
+      [/파견|도급|기간제|차별\s*시정|단시간/i, '비정규직·파견·차별 금지'],
+      [/서류\s*보존|근로자\s*명부|임금대장/i, '근로자명부·임금대장 보존']
+    ];
+    var issues = [];
+    var explicitIssueM = full.match(/(?:지적\s*사항|시정\s*지시(?:\s*내용|\s*사항)?|법\s*위반\s*사항)\s*[:：]\s*([^\n]{4,140})/);
+    if (explicitIssueM) issues.push(explicitIssueM[1].trim());
+    for (var im = 0; im < issueMap.length; im++) {
+      if (issueMap[im][0].test(full) && issues.indexOf(issueMap[im][1]) < 0) issues.push(issueMap[im][1]);
+    }
+
+    var inspDue = '';
+    var dueM = full.match(/(?:시정\s*기한|제출\s*기한|조치\s*기한|회신\s*기한|완료\s*기한)\s*[:：]?\s*((?:20\d{2}[./년-]\s*)?\d{1,2}[./월-]\s*\d{1,2}일?)/);
+    if (!dueM) dueM = full.match(/((?:20\d{2}[./년-]\s*)?\d{1,2}[./월-]\s*\d{1,2}일?)\s*까지\s*(?:시정|결과\s*제출|보고)/);
+    if (dueM) {
+      inspDue = dueM[1].replace(/\s+/g, ' ').trim();
+      var isoDue = inspDue.match(/(20\d{2})[./년\s-]+(\d{1,2})[./월\s-]+(\d{1,2})일?/);
+      if (isoDue) inspDue = isoDue[1] + '-' + String(isoDue[2]).padStart(2, '0') + '-' + String(isoDue[3]).padStart(2, '0');
+    }
+
+    var inspResult = '';
+    if (/사법\s*처리|형사\s*입건|검찰\s*송치/.test(full)) inspResult = '과태료·사법조치 병행';
+    else if (/과태료\s*(?:부과|처분)/.test(full)) inspResult = '과태료 부과 후 시정';
+    else if (/시정\s*완료|종결\s*(?:통보|확인|처리)|시정\s*결과\s*(?:보고|제출)\s*완료/.test(full)) inspResult = '시정완료·종결';
+    else if (/무혐의|혐의\s*없음|지적\s*없음/.test(full)) inspResult = '위반없음·종결';
+    else if (/시정\s*지시(?:서)?|시정\s*명령|시정\s*조치/.test(full)) inspResult = '시정지시 대응중';
+
+    return {
+      inspPeriod: sanitizeText(inspPeriod).slice(0, 80),
+      inspOffice: sanitizeText(inspOffice).slice(0, 60),
+      inspIssues: sanitizeText(issues.join(', ')).slice(0, 480),
+      inspDue: sanitizeText(inspDue).slice(0, 32),
+      inspResult: sanitizeText(inspResult).slice(0, 40)
+    };
   }
 
   function inferTrackForApp(appKey, text, customTracks) {
@@ -470,17 +604,20 @@
       if (/경기|경기도/i.test(hay)) return baseTracks[4] || baseTracks[0];
       if (/세종/i.test(hay)) return baseTracks[0];
     } else if (appKey === 'specialcons') {
-      if (/삼성/i.test(hay)) return baseTracks[1] || baseTracks[0];
-      if (/경비원|감단/i.test(hay)) return baseTracks[2] || baseTracks[0];
-      if (/고용\s*구조\s*개선|비정규직|외투\s*기업|기술\s*닥터/i.test(hay)) return baseTracks[3] || baseTracks[0];
-      if (/이음\s*센터|프리랜서|직업계고|공정\s*채용|NCS/i.test(hay)) return baseTracks[4] || baseTracks[0];
+      if (/새마을금고|MG\s*맞춤|노무\s*진단|HR\s*Audit|인사노무\s*오딧/i.test(hay)) return pickTrack(baseTracks, 'sp_audit', 5);
+      if (/삼성/i.test(hay)) return pickTrack(baseTracks, 'sp_samsung', 1);
+      if (/경비원|감단/i.test(hay)) return pickTrack(baseTracks, 'sp_guard', 2);
+      if (/고용\s*구조\s*개선|비정규직|외투\s*기업|기술\s*닥터/i.test(hay)) return pickTrack(baseTracks, 'sp_nonreg', 3);
+      if (/이음\s*센터|프리랜서|직업계고|공정\s*채용|NCS/i.test(hay)) return pickTrack(baseTracks, 'sp_public', 4);
     } else if (appKey === 'familywork') {
       if (/가족\s*친화/i.test(hay)) return baseTracks[1] || baseTracks[0];
       if (/재택|유연|시차|일생활/i.test(hay)) return baseTracks[2] || baseTracks[0];
       if (/근로시간\s*단축|단축근무/i.test(hay)) return baseTracks[3] || baseTracks[0];
     } else if (appKey === 'laboraudit') {
-      if (/새마을금고|노무진단|오딧|audit/i.test(hay)) return baseTracks[2] || baseTracks[0];
-      if (/감독|시정지시/i.test(hay)) return baseTracks[1] || baseTracks[0];
+      if (/(?:수시|특별|청원|불시)\s*(?:근로\s*)?감독|중대\s*(?:재해|체불)/i.test(hay)) return pickTrack(baseTracks, 'la_special', 1);
+      if (/시정\s*지시|시정\s*완료|시정\s*명령|과태료|이행\s*점검|시정\s*결과/i.test(hay)) return pickTrack(baseTracks, 'la_remedy', 2);
+      if (/모의\s*(?:수검|점검|(?:근로\s*)?감독)|사전\s*수검|수검\s*대비|방문\s*대비/i.test(hay)) return pickTrack(baseTracks, 'la_mock', 3);
+      return pickTrack(baseTracks, 'la_regular', 0);
     } else if (appKey === 'evalcomp') {
       if (/PIP|저성과/i.test(hay)) return baseTracks[3] || baseTracks[0];
       if (/성과급|인센티브/i.test(hay)) return baseTracks[2] || baseTracks[0];
@@ -606,7 +743,7 @@
           suggestedCompanyId: str(mMeta.suggestedCompanyId),
           companyName: label,
           matchVia: coMatch.via || 'keyword',
-          isAgencyNotice: !cid && !caseNo && isAgencyNoticeLabel(label),
+          isAgencyNotice: !cid && !caseNo && (isAgencyNoticeLabel(label) || isInvalidCompanyLabel(label)),
           year: yrKey,
           suggestedTrackId: trId,
           suggestedTrackName: trName,
@@ -625,6 +762,10 @@
         if (!bundlePrimaryByCoYrTr[coYrTrKey]) bundlePrimaryByCoYrTr[coYrTrKey] = bKey;
       }
       var b = bundleMap[bKey];
+      if (!mMeta.trackId && appKey === 'laboraudit' && b.suggestedTrackId === 'la_regular' && trId !== 'la_regular') {
+        b.suggestedTrackId = trId;
+        b.suggestedTrackName = trName;
+      }
       if (!b.suggestedCompanyId && mMeta.suggestedCompanyId) b.suggestedCompanyId = str(mMeta.suggestedCompanyId);
       if (kind === 'mail') b.mailCount++;
       else if (kind === 'msg') b.msgCount++;
@@ -675,12 +816,12 @@
       });
     });
 
-    // 2) 메일함 전수(IMAP + POP3) 자동 분류
+    // 2) 메일함 전수(IMAP + POP3) 자동 분류 (1통당 주사업 1개만 배정하여 이중·삼중 복제 차단)
     for (var i = 0; i < flatMails.length; i++) {
       var m = flatMails[i];
       var cls = classifyRecord(m, { includeExisting: true });
       if (!cls.ok) continue;
-      if (cls.allMatchedApps.indexOf(appKey) < 0) continue;
+      if (cls.primaryApp !== appKey) continue;
       mailHits++;
       var coMatch = matchCompanyForRecord(m, lookup);
       addBundleRecord('mail', {
@@ -724,6 +865,7 @@
       var b = bundleMap[k];
       b.reasonsList = Object.keys(b.reasons);
       b.totalCount = b.mailCount + b.msgCount + b.erpCount;
+      if (appKey === 'laboraudit') b.inspMeta = extractInspectionMeta(b.items);
       return b;
     }).sort(function (a, b) {
       return (Number(!!a.isAgencyNotice) - Number(!!b.isAgencyNotice)) ||
@@ -845,7 +987,7 @@
         summary: maskedBody.slice(0, 240),
         attNames: atts,
         targetApp: cls.primaryApp || 'hrconsult',
-        targetApps: cls.allMatchedApps.length ? cls.allMatchedApps : ['hrconsult'],
+        targetApps: [cls.primaryApp || 'hrconsult'],
         confidence: cls.confidence,
         matchedReasons: cls.matchedReasons.length ? cls.matchedReasons : ['미분류(기초인사노무 후보)'],
         status: 'pending'
@@ -887,7 +1029,7 @@
         summary: maskedBody.slice(0, 240),
         attNames: atts,
         targetApp: cls.primaryApp || 'hrconsult',
-        targetApps: cls.allMatchedApps.length ? cls.allMatchedApps : ['hrconsult'],
+        targetApps: [cls.primaryApp || 'hrconsult'],
         confidence: cls.confidence,
         matchedReasons: cls.matchedReasons.length ? cls.matchedReasons : ['미분류(기초인사노무 후보)'],
         status: 'pending'
@@ -905,6 +1047,8 @@
     normCorpName: normCorpName,
     cleanCompanyLabel: cleanCompanyLabel,
     isAgencyNoticeLabel: isAgencyNoticeLabel,
+    isInvalidCompanyLabel: isInvalidCompanyLabel,
+    extractInspectionMeta: extractInspectionMeta,
     inferTrackForApp: inferTrackForApp,
     flattenMailbox: flattenMailbox,
     classifyRecord: classifyRecord,

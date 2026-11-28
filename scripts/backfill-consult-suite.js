@@ -99,6 +99,84 @@ function rtdbGet(dbPath, token) {
   });
 }
 
+function rtdbGetWithEtag(dbPath, token) {
+  const reqPath = `${encodeDbPath(dbPath)}.json`;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: DB_HOST,
+      path: reqPath,
+      method: 'GET',
+      headers: {
+        'X-Firebase-ETag': 'true',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (d) => chunks.push(d));
+      res.on('end', () => {
+        const txt = Buffer.concat(chunks).toString('utf8');
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode}: ${txt.slice(0, 120)}`));
+        try {
+          resolve({ data: JSON.parse(txt), etag: String(res.headers.etag || '') });
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function rtdbPutIfMatch(dbPath, value, etag, token) {
+  const reqPath = `${encodeDbPath(dbPath)}.json`;
+  const body = JSON.stringify(value);
+  return new Promise((resolve, reject) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    };
+    if (etag) headers['If-Match'] = etag;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const req = https.request({
+      hostname: DB_HOST,
+      path: reqPath,
+      method: 'PUT',
+      headers
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (d) => chunks.push(d));
+      res.on('end', () => {
+        const txt = Buffer.concat(chunks).toString('utf8');
+        if (res.statusCode === 412) return resolve({ ok: false, conflict: true });
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode} PUT ${dbPath}: ${txt.slice(0, 160)}`));
+        resolve({ ok: true, data: txt ? JSON.parse(txt) : value });
+      });
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+async function writeProjectIfUnchanged(rootName, pid, expectedPrev, buildPayload, token) {
+  const fullPath = `/${rootName}/projects/${pid}`;
+  const fresh = await rtdbGetWithEtag(fullPath, token);
+  const live = fresh && fresh.data && typeof fresh.data === 'object' ? fresh.data : null;
+  if (live && (live._deleted === true || live.status === 'done' || (str(live.updatedBy) && live.updatedBy !== 'backfill-script'))) {
+    return { ok: false, skipped: 'protected' };
+  }
+  if (expectedPrev) {
+    if (!live || Number(live.revision || 0) !== Number(expectedPrev.revision || 0)) {
+      return { ok: false, skipped: 'revision_changed' };
+    }
+  } else if (live) {
+    return { ok: false, skipped: 'already_exists' };
+  }
+  const nextPayload = buildPayload(live);
+  if (!nextPayload) return { ok: false, skipped: 'cancelled' };
+  const etag = fresh.etag || (live ? '*' : 'null_etag');
+  const res = await rtdbPutIfMatch(fullPath, nextPayload, etag, token);
+  return res.ok ? { ok: true, data: nextPayload } : { ok: false, skipped: 'etag_conflict' };
+}
+
 function rtdbPatch(dbPath, value, token) {
   const reqPath = `${encodeDbPath(dbPath)}.json`;
   const body = JSON.stringify(value);
@@ -405,14 +483,10 @@ function scanLocalConsultingArchive(excelDir) {
     if (!ent.isDirectory()) continue;
     if (/MG맞춤/.test(ent.name)) {
       for (const k of listDirSafe(p)) {
-        if (k.isDirectory()) pushLocal('laboraudit', k.name, 2025, path.join(p, k.name), { trackHint: '새마을금고 노무진단', tag: '2025 노무진단' });
+        if (k.isDirectory()) pushLocal('specialcons', k.name, 2025, path.join(p, k.name), { trackHint: '새마을금고 노무진단', tag: '2025 노무진단' });
       }
     } else if (/자율점검/.test(ent.name)) {
-      const doneDir = path.join(p, '2. 점검종료 사업장');
-      for (const fEnt of listDirSafe(doneDir)) {
-        const m = fEnt.name.match(/점검표_(.+)\.pdf$/i);
-        if (m) pushLocal('laboraudit', m[1], 2025, doneDir, { trackHint: '자율점검', docCount: 1, docNames: [Intake.sanitizeText(fEnt.name)], tag: '2025 기초노동질서 자율점검' });
-      }
+      continue;
     } else if (/서산비정규직/.test(ent.name)) {
       pushLocal('specialcons', '서산비정규직상담센터', 2025, p, { trackHint: '비정규직 고용구조개선', tag: '2025 고용구조개선' });
     }
@@ -424,11 +498,17 @@ function scanLocalConsultingArchive(excelDir) {
       if (k.isDirectory()) pushLocal('clinic', k.name, 2023, path.join(dir2023, '2023 비즈,일반 컨설팅', k.name), { trackHint: '비즈니스지원단', tag: '2023 비즈컨설팅' });
     }
   }
-  const dirKowin = path.join(dir2023, '2023조직진단(코윈테크)');
-  if (fs.existsSync(dirKowin)) {
-    pushLocal('evalcomp', '코윈테크', 2023, dirKowin, { trackHint: '조직진단 직무', tag: '2023 조직진단' });
-    if (fs.existsSync(path.join(dirKowin, '스테코_승격실시기준_230511'))) {
-      pushLocal('evalcomp', '스테코', 2023, path.join(dirKowin, '스테코_승격실시기준_230511'), { trackHint: '임금·승격평가', tag: '2023 평가보상' });
+  for (const k23 of listDirSafe(dir2023)) {
+    if (!k23.isDirectory()) continue;
+    const orgM = k23.name.match(/^20\d{2}\s*조직진단\(([^)]+)\)/);
+    if (orgM) {
+      const orgPath = path.join(dir2023, k23.name);
+      pushLocal('evalcomp', orgM[1], 2023, orgPath, { trackHint: '조직진단 직무', tag: '2023 조직진단' });
+      for (const subEnt of listDirSafe(orgPath)) {
+        if (!subEnt.isDirectory()) continue;
+        const subM = subEnt.name.match(/^([가-힣A-Za-z0-9㈜()]+)_승격실시기준/);
+        if (subM) pushLocal('evalcomp', subM[1], 2023, path.join(orgPath, subEnt.name), { trackHint: '임금·승격평가', tag: '2023 평가보상' });
+      }
     }
   }
 
@@ -473,9 +553,10 @@ function scanLocalConsultingArchive(excelDir) {
     const yr = inferYearFromDirAndFiles(full, 2021);
     let appK = 'hrconsult';
     if (/비즈니스지원단|비즈콜|-비즈(?=$|[\s_.-])/.test(comb)) appK = 'clinic';
-    else if (/사내하도급|공정채용|혁신바우처|이음센터|외투/.test(comb)) appK = 'specialcons';
+    else if (/사내하도급|공정채용|혁신바우처|이음센터|외투|새마을금고|MG맞춤|노무진단|HR\s*Audit/i.test(comb)) appK = 'specialcons';
     else if (/평가|KPI|승격|호봉|조직진단|직무급/.test(comb)) appK = 'evalcomp';
-    else if (/시정지시|자율점검|노무진단|감독/.test(comb)) appK = 'laboraudit';
+    else if (/근로감독|정기감독|수시감독|특별감독|시정지시/.test(comb) && !/자율점검/.test(comb)) appK = 'laboraudit';
+    else if (/자율점검/.test(comb)) continue;
     else if (/단체교섭|임단협|노사협의회\s*설치|노동조합/.test(comb)) appK = 'unionneg';
     else if (/청소년상담|복지센터|문화센터/.test(comb)) appK = 'pubconsult';
     pushLocal(appK, topEnt.name, yr, full, { trackHint: comb, tag: `${yr} 로컬 수행이력` });
@@ -535,17 +616,24 @@ function buildStaffMaps(scalStaffRaw, uidRolesRaw) {
   return { sidToName, sidToUid, adminUid, hasRealAdmin: !!adminUid, adminName };
 }
 
+const CORP_MARKER_RE = /(?:주식회사|㈜|\(주\)|유한회사|\(유\)|협동조합|영농조합|농업회사법인|새마을금고|신협|농협|수협|공사|공단|재단|센터|복지관|병원|의원|학교|대학|연구소|산업|테크|솔루션|시스템|엔지니어링|모터스|건설|식품|유리|정공|전자|금속|화학|물류|운수)/;
+
 function isGoodMailOnlyCandidate(appKey, b) {
   if (!b || b.isAgencyNotice) return false;
   if (b.companyId || b.erpCount > 0 || b.msgCount > 0) return true;
   const nm = str(b.companyName);
   if (!nm || nm.length < 2 || nm === '미확인 사업장') return false;
+  if (Intake.isInvalidCompanyLabel(nm)) return false;
   if (/^(?:re|fw|fwd|회신|문의|답변|자료|안내|요청|공고|공지|제목없음)$/i.test(nm)) return false;
   if (/^\d+(?:년|월|일|$)/.test(nm)) return false;
-  // 소규모 전문 사업(6차산업·상공회의소·기술보호·사회적기업·평가보상·노사교섭)은 핵심어 >=50 이상 실건 편입,
-  // 초대형 메일함(기초인사노무·자율점검·현장클리닉·공공기관)은 원장 일치 또는 다중 메일/법인 표기/핵심점수 >=70 선별
+  if (appKey === 'laboraudit') {
+    return b.topScore >= (b.mailCount < 2 ? 70 : 65) && (b.mailCount >= 2 || CORP_MARKER_RE.test(nm));
+  }
+  if (b.mailCount < 2) {
+    return CORP_MARKER_RE.test(nm) && b.topScore >= 70;
+  }
   if (['chamber', 'techprotect', 'sixthind', 'socialent', 'unionneg', 'evalcomp', 'familywork'].includes(appKey)) {
-    return b.topScore >= 50 || b.mailCount >= 2 || /(?:주식회사|㈜|\(주\)|협동조합|영농조합|농원|농장|공사|공단|재단|센터|복지관)/.test(nm);
+    return b.topScore >= 50 || b.mailCount >= 2 || CORP_MARKER_RE.test(nm);
   }
   return b.topScore >= 70 || (b.topScore >= 50 && b.mailCount >= 2);
 }
@@ -556,6 +644,7 @@ function isCleanForRtdb(obj) {
   // ID/타임스탬프(createdAt/id/companyId) 오탐을 피하고 모든 사용자 가시 문자열만 PII 검증
   const textParts = [
     obj.companyName, obj.caseNo, obj.trackName, obj.summaryNote, obj.consultantName,
+    obj.inspPeriod, obj.inspOffice, obj.inspIssues, obj.inspDue, obj.inspResult,
     obj.subject, obj.maskedPreview,
     Array.isArray(obj.atts) ? obj.atts.join(' ') : '',
     Array.isArray(obj.matchedReasons) ? obj.matchedReasons.join(' ') : ''
@@ -567,6 +656,7 @@ async function main() {
   const args = process.argv.slice(2);
   const doApply = args.includes('--apply');
   const doPruneStale = args.includes('--prune-stale');
+  const doRecleanBackfill = args.includes('--reclean-backfill');
   const doAudit = args.includes('--audit');
   const appArg = (args.find((a) => a.startsWith('--app=')) || '').slice(6);
   const excelDir = process.env.PUREUN_CONSULT_DIR || path.join(os.homedir(), 'Desktop', '컨설팅업체');
@@ -655,132 +745,8 @@ async function main() {
       msgIntake
     });
 
-    // 2) 병합 테이블: key = (coId || normName) | year | (chamber ? trackId : *) | (caseNo || *)
-    const mergedMap = Object.create(null);
-    const primaryKeyByCoYrTr = Object.create(null);
-
-    function upsertTarget(srcKind, rec) {
-      const cleanName = Intake.sanitizeText(rec.companyName);
-      const normNm = Intake.normCorpName(cleanName);
-      // 온톨로지 규칙: 이름 일치만으로 companyId 를 자동 대입하지 않고 명시적 ID 가 있을 때만 연결한다.
-      const coObj = rec.companyId
-        ? lookup.list.find((c) => str(c.id) === str(rec.companyId))
-        : null;
-      const cid = coObj ? str(coObj.id) : str(rec.companyId);
-      const yr = Number(rec.year || CUR_YEAR);
-      const trId = str(rec.trackId || (cat.tracks && cat.tracks[0] && cat.tracks[0].id) || 'default');
-      const trName = str(rec.trackName || (cat.tracks && cat.tracks[0] && cat.tracks[0].name) || cat.shortName);
-      const caseNo = str(rec.caseNo);
-      const baseCoKey = cid ? `co_${cid}` : `nm_${normNm || safeHashId('co', cleanName)}`;
-      const coYrTr = `${baseCoKey}|${yr}|${cat.key === 'chamber' ? trId : '*'}`;
-
-      let mKey;
-      if (caseNo) {
-        mKey = `${coYrTr}|${caseNo}`;
-        if (!primaryKeyByCoYrTr[coYrTr]) primaryKeyByCoYrTr[coYrTr] = mKey;
-      } else if (primaryKeyByCoYrTr[coYrTr]) {
-        mKey = primaryKeyByCoYrTr[coYrTr];
-      } else {
-        mKey = coYrTr;
-        primaryKeyByCoYrTr[coYrTr] = mKey;
-      }
-
-      if (!mergedMap[mKey]) {
-        mergedMap[mKey] = {
-          seedKey: mKey,
-          companyId: cid,
-          companyName: cleanName,
-          bizNo: coObj ? str(coObj.bizNo).replace(/[^0-9-]/g, '') : '',
-          caseNo,
-          year: yr,
-          trackId: trId,
-          trackName: trName,
-          stage: yr < CUR_YEAR ? 'followup' : (rec.stage || 'collect'),
-          status: yr < CUR_YEAR ? 'done' : (rec.status || 'active'),
-          consultantSid: str(rec.consultantSid),
-          workerCount: numOrZero(coObj && coObj.workers),
-          sources: {},
-          notes: [],
-          comms: []
-        };
-      }
-      const cur = mergedMap[mKey];
-      cur.sources[srcKind] = 1;
-      if (cid && !cur.companyId) cur.companyId = cid;
-      if (caseNo && !cur.caseNo) cur.caseNo = caseNo;
-      if (rec.consultantSid && !cur.consultantSid) cur.consultantSid = str(rec.consultantSid);
-      if (rec.status === 'done') { cur.status = 'done'; cur.stage = 'followup'; }
-      if (rec.note && cur.notes.indexOf(rec.note) < 0) cur.notes.push(rec.note);
-      if (Array.isArray(rec.comms)) {
-        for (const cm of rec.comms) {
-          if (cur.comms.length < 15) cur.comms.push(cm);
-        }
-      }
-    }
-
-    // 2a) 원천 1: ERP·원장일치·카톡·고신뢰 메일 번들 먼저 반영 (ERP가 caseNo·trackId 우선권 보유)
-    const sortedBundles = [...res.bundles].sort((a, b) => (b.erpCount - a.erpCount) || (Number(!!b.companyId) - Number(!!a.companyId)));
-    for (const b of sortedBundles) {
-      if (b.erpCount > 0 || b.msgCount > 0 || b.companyId) {
-        const isCancelledOrMoved = /^(?:cancelled|canceled|transferred|취소|이관|해지)$/i.test(str(b.erpStatus));
-        if (isCancelledOrMoved && b.mailCount === 0 && b.msgCount === 0) continue;
-        const isDone = isCancelledOrMoved || (b.erpStatus === 'closed' || b.erpStatus === 'done') || Number(b.year) < CUR_YEAR;
-        upsertTarget(b.erpCount > 0 ? 'ERP' : (b.msgCount > 0 ? '카톡·문자' : '메일'), {
-          companyId: b.companyId,
-          companyName: b.companyName,
-          caseNo: b.caseNo,
-          year: b.year,
-          trackId: b.suggestedTrackId,
-          trackName: b.suggestedTrackName,
-          stage: isDone ? 'followup' : (b.erpCount > 0 ? 'visit' : 'collect'),
-          status: isDone ? 'done' : 'active',
-          consultantSid: b.consultantSid,
-          note: b.erpCount > 0 ? `ERP 수임(${b.caseNo || b.year})` : `메일 ${b.mailCount}통 연계`,
-          comms: b.items || []
-        });
-      }
-    }
-
-    // 2b) 원천 2: 로컬 컨설팅 폴더 아카이브 반영
-    const appLocals = localRecords.filter((r) => r.appKey === cat.key);
-    for (const lr of appLocals) {
-      const localComm = lr.docNames.length ? [{
-        source: 'local_archive',
-        id: safeHashId('loc', `${lr.year}|${lr.companyName}|${lr.trackId}`),
-        date: `${lr.year}-06-30`,
-        subject: `[보관자료 ${lr.year}] ${Intake.sanitizeText(lr.companyName)} (${lr.docCount}개 파일)`,
-        maskedPreview: Intake.sanitizeText(`확인된 비식별 산출물/서식: ${lr.docNames.join(', ')}`).slice(0, 800),
-        atts: lr.docNames.slice(0, 6)
-      }] : [];
-      upsertTarget('로컬', {
-        companyId: '',
-        companyName: lr.companyName,
-        year: lr.year,
-        trackId: lr.trackId,
-        trackName: lr.trackName,
-        stage: lr.stage,
-        status: lr.status,
-        note: `${lr.tag} (${lr.docCount}파일)`,
-        comms: localComm
-      });
-    }
-
-    // 2c) 원천 3: 미등록 고신뢰 메일 단독 실사건 보완 반영
-    for (const b of sortedBundles) {
-      if (b.erpCount > 0 || b.msgCount > 0 || b.companyId) continue;
-      if (!isGoodMailOnlyCandidate(cat.key, b)) continue;
-      upsertTarget('메일', {
-        companyId: '',
-        companyName: b.companyName,
-        year: b.year,
-        trackId: b.suggestedTrackId,
-        trackName: b.suggestedTrackName,
-        stage: Number(b.year) < CUR_YEAR ? 'followup' : 'collect',
-        status: Number(b.year) < CUR_YEAR ? 'done' : 'active',
-        note: `메일 ${b.mailCount}통 자동분류`,
-        comms: b.items || []
-      });
-    }
+    // 2) 병합 테이블 (이종 companyId 충돌 시 병합 차단)
+    const { mergedMap } = mergeAppRecords(cat, lookup.list, res.bundles, localRecords.filter((r) => r.appKey === cat.key));
 
     // 3) 기존 수동 등록 프로젝트와 충돌 시 제외, 보관삭제(_deleted) 레코드 부활 금지, 결정적 ID(bf_{app}_{yr}_{hash}) 부여
     const manualSet = new Set(manualProjects.map((p) => `${Intake.normCorpName(p.companyName)}|${numOrZero(p.year)}`));
@@ -819,11 +785,11 @@ async function main() {
       `  ${cat.icon} ${cat.key.padEnd(12)} (${cat.shortName.padEnd(8)}): ` +
       `실저장대상 ${String(finalList.length).padStart(3)}건 (연계자료 ${String(commSum).padStart(4)}건)`
     );
-    if (doAudit || cat.key === 'chamber' || cat.key === 'sixthind') {
+    if (doAudit || cat.key === 'chamber' || cat.key === 'sixthind' || cat.key === 'laboraudit') {
       console.log(`     연도별: ${JSON.stringify(byYr)} | 트랙별: ${JSON.stringify(byTr)}`);
     }
 
-    if (doApply && token && finalList.length && piiLeakCount === 0) {
+    if (doApply && token && piiLeakCount === 0) {
       if (!staffMaps.hasRealAdmin) {
         throw new Error('uid_roles에서 활성 관리자 UID를 찾지 못해 백필 --apply를 중단합니다.');
       }
@@ -842,6 +808,14 @@ async function main() {
       for (const r of finalList) {
         const pid = safeHashId(`bf_${cat.key}_${r.year}`, r.seedKey);
         const prev = existingProjectsMap[pid] || null;
+        const isPureBackfill = !!(
+          prev &&
+          String(prev.id || '').startsWith('bf_') &&
+          prev.updatedBy === 'backfill-script' &&
+          !existingChecksMap[pid] &&
+          !existingReportsMap[pid] &&
+          !Object.values(existingCommsMap[pid] || {}).some((cm) => cm && cm.updatedBy && cm.updatedBy !== 'backfill-script')
+        );
         const isHumanEdited = prev && str(prev.updatedBy) && prev.updatedBy !== 'backfill-script';
         const cSid = r.consultantSid || 'P-001';
         const cName = staffMaps.sidToName[cSid] || staffMaps.adminName || '전담 노무사';
@@ -850,7 +824,9 @@ async function main() {
         const summary = Intake.sanitizeText(`[${srcTag}] ${r.notes.join(' · ')}`).slice(0, 1900);
 
         const isPrevDone = !!(prev && prev.status === 'done');
+        const allowRecleanOverwrite = !!(doRecleanBackfill && isPureBackfill && !isPrevDone);
         const skipProjWrite = isHumanEdited || isPrevDone;
+        const keepPrevFields = isPrevDone;
         const effectiveStatus = (isPrevDone || r.status === 'done') ? 'done' : 'active';
         const effectiveStage = isPrevDone ? str(prev.stage || 'followup') : r.stage;
         const projPayload = {
@@ -865,9 +841,9 @@ async function main() {
           updatedBy: 'backfill-script',
           companyId: str(r.companyId),
           companyName: r.companyName.slice(0, 190),
-          year: isPrevDone ? Number(prev.year || r.year) : Number(r.year),
-          trackId: (isPrevDone && prev.trackId) ? prev.trackId : r.trackId.slice(0, 60),
-          trackName: (isPrevDone && prev.trackName) ? prev.trackName : r.trackName.slice(0, 115),
+          year: keepPrevFields ? Number(prev.year || r.year) : Number(r.year),
+          trackId: (keepPrevFields && prev.trackId) ? prev.trackId : r.trackId.slice(0, 60),
+          trackName: (keepPrevFields && prev.trackName) ? prev.trackName : r.trackName.slice(0, 115),
           stage: effectiveStage,
           workerCount: Number(r.workerCount || (prev && prev.workerCount) || 0),
           consultantName: cName.slice(0, 75),
@@ -877,27 +853,59 @@ async function main() {
         };
         const effBizNo = str((prev && prev.bizNo) || r.bizNo);
         if (effBizNo) projPayload.bizNo = effBizNo.slice(0, 30);
-        const effCaseNo = str((isPrevDone && prev && prev.caseNo) || r.caseNo || (prev && prev.caseNo));
+        const effCaseNo = str((keepPrevFields && prev && prev.caseNo) || r.caseNo || (prev && prev.caseNo));
         if (effCaseNo) projPayload.caseNo = Intake.sanitizeText(effCaseNo).slice(0, 60);
+        if (cat.key === 'laboraudit') {
+          const inspMeta = Intake.extractInspectionMeta(r.comms);
+          const pickInsp = (k, maxLen) => {
+            const fresh = str(inspMeta[k]);
+            const oldV = str(prev && prev[k]);
+            const chosen = allowRecleanOverwrite ? (fresh || oldV) : (oldV || fresh);
+            return chosen ? Intake.sanitizeText(chosen).slice(0, maxLen) : '';
+          };
+          const pPeriod = pickInsp('inspPeriod', 80);
+          const pOffice = pickInsp('inspOffice', 60);
+          const pIssues = pickInsp('inspIssues', 480);
+          const pDue = pickInsp('inspDue', 32);
+          const pResult = pickInsp('inspResult', 40);
+          if (pPeriod) projPayload.inspPeriod = pPeriod;
+          if (pOffice) projPayload.inspOffice = pOffice;
+          if (pIssues) projPayload.inspIssues = pIssues;
+          if (pDue) projPayload.inspDue = pDue;
+          if (pResult) projPayload.inspResult = pResult;
+        }
 
         if (!isCleanForRtdb(projPayload)) {
           piiLeakCount++;
           continue;
         }
-        // 사람 수정 레코드(updatedBy !== 'backfill-script') 및 종결(done) 레코드는 재실행 시 덮어쓰지 않는다.
+        // 사람 수정 레코드(updatedBy !== 'backfill-script') 및 종결(done) 레코드는 재실행 시 절대 덮어쓰지 않는다.
         const needWriteProj = !skipProjWrite && (
           !prev
           || prev.trackId !== projPayload.trackId
+          || str(prev.trackName) !== str(projPayload.trackName)
           || prev.year !== projPayload.year
           || prev.companyName !== projPayload.companyName
           || str(prev.companyId) !== str(projPayload.companyId)
           || prev.status !== projPayload.status
           || str(prev.caseNo) !== str(projPayload.caseNo)
           || prev.summaryNote !== projPayload.summaryNote
+          || str(prev.inspPeriod) !== str(projPayload.inspPeriod)
+          || str(prev.inspOffice) !== str(projPayload.inspOffice)
+          || str(prev.inspIssues) !== str(projPayload.inspIssues)
+          || str(prev.inspDue) !== str(projPayload.inspDue)
+          || str(prev.inspResult) !== str(projPayload.inspResult)
         );
         if (needWriteProj) {
-          patchBatch[`projects/${pid}`] = projPayload;
-          batchCount++;
+          const projWriteRes = await writeProjectIfUnchanged(cat.rtdbRoot, pid, prev, (live) => {
+            if (!live) return projPayload;
+            return Object.assign({}, projPayload, {
+              revision: Number(live.revision || 0) + 1,
+              createdAt: live.createdAt || projPayload.createdAt,
+              createdBy: live.createdBy || projPayload.createdBy
+            });
+          }, token);
+          if (!projWriteRes.ok) continue;
           writtenP++;
         }
 
@@ -940,7 +948,7 @@ async function main() {
         if (batchCount >= 180) await flushPatch();
       }
       let pruned = 0;
-      if (doPruneStale) {
+      if (doPruneStale || doRecleanBackfill) {
         const activePidSet = new Set(finalList.map((r) => safeHashId(`bf_${cat.key}_${r.year}`, r.seedKey)));
         for (const [oldPid, oldRec] of Object.entries(existingProjectsMap)) {
           if (!oldPid.startsWith('bf_')) continue;
@@ -951,32 +959,226 @@ async function main() {
           if (existingChecksMap[oldPid] || existingReportsMap[oldPid]) continue;
           const oldComms = Object.values(existingCommsMap[oldPid] || {});
           if (oldComms.some((cm) => cm && cm.updatedBy && cm.updatedBy !== 'backfill-script')) continue;
-          // 온톨로지 규칙: 물리 삭제 대신 _deleted 표식(tombstone)으로 전환하고 comms 원문은 보존한다.
-          patchBatch[`projects/${oldPid}`] = Object.assign({}, oldRec, {
+          // 온톨로지 규칙: 물리 삭제 대신 ETag 검증 후 _deleted 표식(tombstone)으로 전환하고 comms 원문은 보존한다.
+          const pruneRes = await writeProjectIfUnchanged(cat.rtdbRoot, oldPid, oldRec, (live) => Object.assign({}, live, {
             _deleted: true,
             deletedAt: now,
             deletedBy: staffMaps.adminUid,
             updatedAt: now,
             updatedBy: 'backfill-script',
-            revision: Number(oldRec.revision || 0) + 1
-          });
-          batchCount++;
-          pruned++;
-          if (batchCount >= 180) await flushPatch();
+            revision: Number(live.revision || 0) + 1
+          }), token);
+          if (pruneRes.ok) pruned++;
         }
       }
       await flushPatch();
       totalWrittenProj += writtenP;
       totalWrittenComm += writtenC;
       totalPrunedProj += pruned;
-      console.log(`     -> --apply 기록: 프로젝트 ${writtenP}건 · 수신자료 ${writtenC}건` + (pruned ? ` · 고아중복 정리 ${pruned}건` : ''));
+      console.log(`     -> --apply 기록: 프로젝트 ${writtenP}건 · 수신자료 ${writtenC}건` + (pruned ? ` · 고아·오분류 정리 ${pruned}건` : ''));
     }
   }
 
-  console.log(`\n- 합계: 12개 앱 대상 ${totalProjectsPlanned}건 (연계자료 ${totalCommsPlanned}건)` + (doApply ? ` / 실DB 기록: 프로젝트 ${totalWrittenProj}건 · 수신자료 ${totalWrittenComm}건` + (doPruneStale ? ` · 고아중복 정리 ${totalPrunedProj}건` : '') : ''));
+  console.log(`\n- 합계: 12개 앱 대상 ${totalProjectsPlanned}건 (연계자료 ${totalCommsPlanned}건)` + (doApply ? ` / 실DB 기록: 프로젝트 ${totalWrittenProj}건 · 수신자료 ${totalWrittenComm}건` + ((doPruneStale || doRecleanBackfill) ? ` · 고아·오분류 정리 ${totalPrunedProj}건` : '') : ''));
   console.log(`- 엑셀 원천 파일: ${excelSummary.files}파일`);
   console.log(`- 비식별·로컬경로 누출 검사: ${piiLeakCount === 0 ? '통과 (0건)' : `주의 (${piiLeakCount}건)`}`);
   if (piiLeakCount > 0) process.exitCode = 1;
+}
+
+const AMBIGUOUS_KEY = '__AMBIGUOUS__';
+
+function mergeAppRecords(cat, lookupList, rawBundles, appLocals) {
+  const mergedMap = Object.create(null);
+  const primaryKeyByCoYrTr = Object.create(null);
+  const primaryKeyByNormYrTr = Object.create(null);
+
+  function canShareNormCandidate(cid, candKey) {
+    if (!candKey || candKey === AMBIGUOUS_KEY) return false;
+    const cand = mergedMap[candKey];
+    if (!cand) return false;
+    return !(cid && cand.companyId && cid !== cand.companyId);
+  }
+
+  function registerNormKey(normYrTr, mKey, cid) {
+    const curKey = primaryKeyByNormYrTr[normYrTr];
+    if (!curKey) {
+      primaryKeyByNormYrTr[normYrTr] = mKey;
+      return;
+    }
+    if (curKey === AMBIGUOUS_KEY || curKey === mKey) return;
+    const curRec = mergedMap[curKey];
+    if (cid && curRec && curRec.companyId && cid !== curRec.companyId) {
+      primaryKeyByNormYrTr[normYrTr] = AMBIGUOUS_KEY;
+    }
+  }
+
+  function upsertTarget(srcKind, rec) {
+    const cleanName = Intake.sanitizeText(rec.companyName);
+    const normNm = Intake.normCorpName(cleanName);
+    // 온톨로지 규칙: 이름 일치만으로 companyId 를 자동 대입하지 않고 명시적 ID 가 있을 때만 연결한다.
+    const coObj = rec.companyId
+      ? (lookupList || []).find((c) => str(c.id) === str(rec.companyId))
+      : null;
+    const cid = coObj ? str(coObj.id) : str(rec.companyId);
+    const yr = Number(rec.year || CUR_YEAR);
+    const trId = str(rec.trackId || (cat.tracks && cat.tracks[0] && cat.tracks[0].id) || 'default');
+    const trName = str(rec.trackName || (cat.tracks && cat.tracks[0] && cat.tracks[0].name) || cat.shortName);
+    const caseNo = str(rec.caseNo);
+    const baseCoKey = cid ? `co_${cid}` : `nm_${normNm || safeHashId('co', cleanName)}`;
+    const coYrTr = `${baseCoKey}|${yr}|${cat.key === 'chamber' ? trId : '*'}`;
+    const normYrTr = `${normNm}|${yr}|${cat.key === 'chamber' ? trId : '*'}`;
+
+    let mKey;
+    if (caseNo) {
+      mKey = `${coYrTr}|${caseNo}`;
+      if (!primaryKeyByCoYrTr[coYrTr]) primaryKeyByCoYrTr[coYrTr] = mKey;
+      if (normNm) registerNormKey(normYrTr, mKey, cid);
+    } else if (primaryKeyByCoYrTr[coYrTr]) {
+      mKey = primaryKeyByCoYrTr[coYrTr];
+    } else if (normNm && canShareNormCandidate(cid, primaryKeyByNormYrTr[normYrTr])) {
+      mKey = primaryKeyByNormYrTr[normYrTr];
+      if (cid) primaryKeyByCoYrTr[coYrTr] = mKey;
+    } else {
+      mKey = coYrTr;
+      primaryKeyByCoYrTr[coYrTr] = mKey;
+      if (normNm) registerNormKey(normYrTr, mKey, cid);
+    }
+
+    if (!mergedMap[mKey]) {
+      mergedMap[mKey] = {
+        seedKey: mKey,
+        companyId: cid,
+        companyName: cleanName,
+        bizNo: coObj ? str(coObj.bizNo).replace(/[^0-9-]/g, '') : '',
+        caseNo,
+        year: yr,
+        trackId: trId,
+        trackName: trName,
+        stage: yr < CUR_YEAR ? 'followup' : (rec.stage || 'collect'),
+        status: yr < CUR_YEAR ? 'done' : (rec.status || 'active'),
+        consultantSid: str(rec.consultantSid),
+        workerCount: numOrZero(coObj && coObj.workers),
+        sources: {},
+        notes: [],
+        comms: []
+      };
+    }
+    const cur = mergedMap[mKey];
+    cur.sources[srcKind] = 1;
+    if (cid && !cur.companyId) cur.companyId = cid;
+    if (caseNo && !cur.caseNo) cur.caseNo = caseNo;
+    if (rec.consultantSid && !cur.consultantSid) cur.consultantSid = str(rec.consultantSid);
+    if (rec.status === 'done') { cur.status = 'done'; cur.stage = 'followup'; }
+    if (rec.note && cur.notes.indexOf(rec.note) < 0) cur.notes.push(rec.note);
+    if (Array.isArray(rec.comms)) {
+      for (const cm of rec.comms) {
+        if (cur.comms.length < 15) cur.comms.push(cm);
+      }
+    }
+  }
+
+  // 2a) 원천 1: ERP·원장일치·카톡·고신뢰 메일 번들 먼저 반영
+  const sortedBundles = [...(rawBundles || [])].sort((a, b) => (b.erpCount - a.erpCount) || (Number(!!b.companyId) - Number(!!a.companyId)));
+  for (const b of sortedBundles) {
+    if (b.erpCount > 0 || b.msgCount > 0 || b.companyId) {
+      if (cat.key === 'laboraudit' && b.erpCount === 0 && b.msgCount === 0 && Number(b.topScore || 0) < 50) continue;
+      const isCancelledOrMoved = /^(?:cancelled|canceled|transferred|취소|이관|해지)$/i.test(str(b.erpStatus));
+      if (isCancelledOrMoved && b.mailCount === 0 && b.msgCount === 0) continue;
+      const isDone = isCancelledOrMoved || (b.erpStatus === 'closed' || b.erpStatus === 'done') || Number(b.year) < CUR_YEAR;
+      upsertTarget(b.erpCount > 0 ? 'ERP' : (b.msgCount > 0 ? '카톡·문자' : '메일'), {
+        companyId: b.companyId,
+        companyName: b.companyName,
+        caseNo: b.caseNo,
+        year: b.year,
+        trackId: b.suggestedTrackId,
+        trackName: b.suggestedTrackName,
+        stage: isDone ? 'followup' : (b.erpCount > 0 ? 'visit' : 'collect'),
+        status: isDone ? 'done' : 'active',
+        consultantSid: b.consultantSid,
+        note: b.erpCount > 0 ? `ERP 수임(${b.caseNo || b.year})` : (b.mailCount > 0 ? `메일 ${b.mailCount}통 연계` : `카톡·문자 ${b.msgCount}건 연계`),
+        comms: b.items || []
+      });
+    }
+  }
+
+  // 2b) 원천 2: 로컬 컨설팅 폴더 아카이브 반영
+  for (const lr of (appLocals || [])) {
+    const localComm = lr.docNames && lr.docNames.length ? [{
+      source: 'local_archive',
+      id: safeHashId('loc', `${lr.year}|${lr.companyName}|${lr.trackId}`),
+      date: `${lr.year}-06-30`,
+      subject: `[보관자료 ${lr.year}] ${Intake.sanitizeText(lr.companyName)} (${lr.docCount}개 파일)`,
+      maskedPreview: Intake.sanitizeText(`확인된 비식별 산출물/서식: ${lr.docNames.join(', ')}`).slice(0, 800),
+      atts: lr.docNames.slice(0, 6)
+    }] : [];
+    upsertTarget('로컬', {
+      companyId: '',
+      companyName: lr.companyName,
+      year: lr.year,
+      trackId: lr.trackId,
+      trackName: lr.trackName,
+      stage: lr.stage,
+      status: lr.status,
+      note: `${lr.tag} (${lr.docCount}파일)`,
+      comms: localComm
+    });
+  }
+
+  // 2c) 원천 3: 미등록 고신뢰 메일 단독 실사건 보완 반영
+  for (const b of sortedBundles) {
+    if (b.erpCount > 0 || b.msgCount > 0 || b.companyId) continue;
+    if (!isGoodMailOnlyCandidate(cat.key, b)) continue;
+    upsertTarget('메일', {
+      companyId: '',
+      companyName: b.companyName,
+      year: b.year,
+      trackId: b.suggestedTrackId,
+      trackName: b.suggestedTrackName,
+      stage: Number(b.year) < CUR_YEAR ? 'followup' : 'collect',
+      status: Number(b.year) < CUR_YEAR ? 'done' : 'active',
+      note: `메일 ${b.mailCount}통 자동분류`,
+      comms: b.items || []
+    });
+  }
+
+  // 2d) 상공회의소 구체지역 vs 기타(ch_korcham) 동사·동년도 병합 (이종 companyId · 모호 일치 제외)
+  if (cat.key === 'chamber') {
+    const specifics = Object.values(mergedMap).filter((r) => r.trackId && r.trackId !== 'ch_korcham');
+    const specByCoYr = Object.create(null);
+    const specByNormYr = Object.create(null);
+    for (const r of specifics) {
+      const kCo = r.companyId ? `co_${r.companyId}|${r.year}` : '';
+      const nmKey = Intake.normCorpName(r.companyName);
+      const kNm = nmKey ? `nm_${nmKey}|${r.year}` : '';
+      if (kCo && !specByCoYr[kCo]) specByCoYr[kCo] = r;
+      if (kNm) {
+        const prevSpec = specByNormYr[kNm];
+        if (!prevSpec) specByNormYr[kNm] = r;
+        else if (prevSpec !== AMBIGUOUS_KEY && r.companyId && prevSpec.companyId && r.companyId !== prevSpec.companyId) {
+          specByNormYr[kNm] = AMBIGUOUS_KEY;
+        }
+      }
+    }
+    for (const [mKey, r] of Object.entries(mergedMap)) {
+      if (r.trackId !== 'ch_korcham') continue;
+      const kCo = r.companyId ? `co_${r.companyId}|${r.year}` : '';
+      const nmKey = Intake.normCorpName(r.companyName);
+      const kNm = nmKey ? `nm_${nmKey}|${r.year}` : '';
+      let tgt = kCo ? specByCoYr[kCo] : null;
+      if (!tgt && kNm && specByNormYr[kNm] && specByNormYr[kNm] !== AMBIGUOUS_KEY) {
+        const nmTgt = specByNormYr[kNm];
+        if (!r.companyId || !nmTgt.companyId) tgt = nmTgt;
+      }
+      if (tgt && tgt !== r) {
+        Object.assign(tgt.sources, r.sources);
+        for (const n of r.notes) { if (tgt.notes.indexOf(n) < 0) tgt.notes.push(n); }
+        for (const cm of r.comms) { if (tgt.comms.length < 15) tgt.comms.push(cm); }
+        delete mergedMap[mKey];
+      }
+    }
+  }
+
+  return { mergedMap };
 }
 
 function numOrZero(v) {
@@ -991,4 +1193,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { scanLocalExcelMasters, scanLocalConsultingArchive };
+module.exports = { scanLocalExcelMasters, scanLocalConsultingArchive, mergeAppRecords };

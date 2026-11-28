@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>푸른노무법인 자율점검·근로감독</title>
+<title>푸른노무법인 근로감독 대응·이력</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🧭</text></svg>">
 <style>
 :root{
@@ -276,15 +276,15 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <body class="pu-design pu-frame-a pu-dark-auto">
 <div id="head">
   <div class="top">
-    <h1>🧭 자율점검·근로감독</h1>
+    <h1>🧭 근로감독 대응·이력</h1>
     <span id="who"></span>
     <span class="chip c-blue wide-only" id="syncStateChip" style="display:none" aria-live="polite"></span>
     <span class="sp"></span>
-    <button type="button" class="sm" id="syncAllBtn" title="푸른메일함(IMAP+POP3)·카톡·ERP에서 자율점검 자료를 다시 스캔해 동기화합니다">🔄 <span class="wide-only">자동수집 · 동기화</span><span class="phone-only">동기화</span></button>
+    <button type="button" class="sm" id="syncAllBtn" title="푸른메일함(IMAP+POP3)·카톡·ERP에서 근로감독 자료를 다시 스캔해 동기화합니다">🔄 <span class="wide-only">자동수집 · 동기화</span><span class="phone-only">동기화</span></button>
     <button type="button" class="sm" id="reloadBtn" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button type="button" class="sm" id="outBtn" style="display:none">로그아웃</button>
   </div>
-  <div class="tabs" id="tabs" role="tablist" aria-label="자율점검·근로감독 작업 화면">
+  <div class="tabs" id="tabs" role="tablist" aria-label="근로감독 대응·이력 작업 화면">
     <button type="button" role="tab" aria-selected="true" data-tab="projects" class="on">📂 사업 현황 <span class="chip c-blue" id="nProjects">0</span></button>
     <button type="button" role="tab" aria-selected="false" data-tab="inbox">📥 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
     <button type="button" role="tab" aria-selected="false" data-tab="yearly">📅 연도별 자료함 <span class="chip c-blue" id="nYearly">0</span></button>
@@ -294,7 +294,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 </div>
 
 <div id="lock">
-  <h2>🧭 자율점검·근로감독</h2>
+  <h2>🧭 근로감독 대응·이력</h2>
   <p id="lockWhy"></p>
   <p>재직 중인 직원 계정으로 열 수 있습니다.</p>
 </div>
@@ -330,7 +330,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
         <details class="act-menu">
           <summary>⋯ 도구</summary>
           <div class="act-pop">
-            <button type="button" id="scanAllBtn" title="푸른메일함(IMAP+POP3)·카톡·ERP에서 자율점검 관련 자료를 재스캔합니다">🔄 메일·카톡 재스캔</button>
+            <button type="button" id="scanAllBtn" title="푸른메일함(IMAP+POP3)·카톡·ERP에서 근로감독 관련 자료를 재스캔합니다">🔄 메일·카톡 재스캔</button>
             <button type="button" id="projCsvBtn" title="현재 필터된 수행 사업 현황 목록을 CSV(엑셀) 파일로 내려받습니다">📥 사업 현황 CSV 내려받기</button>
             <a href="pu-msg-intake.html" target="_blank" rel="noopener">💬 카톡·문자 자료수집 허브 ↗</a>
             <a href="pu-coach.html?app=laboraudit" target="_blank" rel="noopener">🧠 전 사업 RAG 학습허브 ↗</a>
@@ -403,12 +403,12 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=114"></script>
+<script src="js/pu-ontology.js?v=115"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, 실제 실행은 enforce 모드로 동작합니다 -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=59"></script>
+<script src="js/pu-appbar.js?v=60"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -421,13 +421,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-consult-catalogs-a.js?v=2"></script>
-<script src="js/pu-consult-catalogs-b.js?v=2"></script>
+<script src="js/pu-consult-catalogs-a.js?v=3"></script>
+<script src="js/pu-consult-catalogs-b.js?v=3"></script>
 <script src="js/pu-consult-catalogs.js?v=2"></script>
-<script src="js/pu-consult-intake.js?v=3"></script>
+<script src="js/pu-consult-intake.js?v=4"></script>
 <script src="js/pu-consult-rag.js?v=2"></script>
 <script src="js/pu-consult-hwpx.js?v=2"></script>
-<script src="js/pu-consult-view.js?v=4"></script>
+<script src="js/pu-consult-view.js?v=6"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var isPv = (location.hostname==='localhost' || location.hostname==='127.0.0.1' || location.hostname.endsWith('.localhost')) && location.search.indexOf('preview=1')>=0;

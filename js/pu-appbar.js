@@ -63,7 +63,7 @@
     { key: 'familywork', row: 'client', name: '출산육아·유연근무', icon: '🏡', url: 'familywork.html',  desc: '육아지원3법·가족친화·유연근무 도입' },
     { key: 'socialent', row: 'client', name: '사회적기업·씨앗', icon: '🌱', url: 'socialent.html',    desc: 'SVI·예비사회적기업 인증·취약계층 노무' },
     { key: 'sixthind', row: 'client', name: '6차산업컨설팅',   icon: '🌾', url: 'sixthind.html',     desc: '농촌융복합 현장코칭·인증·근기법63조' },
-    { key: 'laboraudit', row: 'client', name: '자율점검·근로감독', icon: '🧭', url: 'laboraudit.html',  desc: '기초노동질서·모의감독·서류보존 진단' },
+    { key: 'laboraudit', row: 'client', name: '근로감독 대응·이력', icon: '🧭', url: 'laboraudit.html',  desc: '정기·수시·특별 근로감독 · 시정지시 이력' },
     { key: 'unionneg', row: 'client', name: '민간노조·단체교섭', icon: '🫂', url: 'unionneg.html',    desc: '창구단일화·교섭대표·타임오프·임단협' },
     { key: 'specialcons', row: 'client', name: '특화·위탁컨설팅', icon: '🧩', url: 'specialcons.html',  desc: '혁신바우처·통상·삼성협력·경비·이음' },
     { key: 'msgintake', row: 'store',  name: '카톡·문자 자료수집', icon: '💬', url: 'pu-msg-intake.html', desc: '카카오톡·문자 자동분류·2중 비식별' },

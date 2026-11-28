@@ -563,7 +563,13 @@ rules.payroll_os = workspace({
     }
   }
 });
-rules.fund_erp = workspace();
+rules.fund_erp = workspace({
+  mail_queue: {
+    '.read': false,
+    '.write': false,
+    '.validate': false
+  }
+});
 /* 업무관리. ★ mysum/{로그인 UID} = «내 업무 숫자» 한 줄(2026-11-21 — 포털 머리줄 «📋 내 업무» 단추·이알피 나의 업무가 읽는다).
    «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
    이름 붙은 자리가 $k 보다 먼저 잡힌다. 읽기는 work_erp 전체와 같다(로그인 직원) — 날짜·건수뿐이라 더 넓어지지 않는다.
@@ -2703,6 +2709,11 @@ for (const rootName of CONSULT_APP_ROOTS) {
       consultantUid: CS_STR(128),
       status: { '.validate': "newData.val() === 'active' || newData.val() === 'done'" },
       summaryNote: CS_STR(2000),
+      inspPeriod: CS_STR(80),
+      inspOffice: CS_STR(60),
+      inspIssues: CS_STR(500),
+      inspDue: CS_STR(32),
+      inspResult: CS_STR(40),
       $other: { '.validate': false }
     } },
     checks: { $pid: { $id: {
