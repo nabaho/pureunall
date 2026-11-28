@@ -8,9 +8,15 @@
 ## 바꾼 파일
 - `pu-deungi.html`:
   - **CSS (`.hd-*` 대시보드 레이아웃)**: 기존 `.arcgrid`/`.arcg`/`.hcols` 레이아웃을 2단 분할 대시보드(`.hd-wrap`)로 개편. `:root` 팔레트 CSS 변수와 `#ffffff`만 사용해 `color-palette-apps`·`pu-design` 규칙 준수.
-    - 데스크톱(`body:not(.slim)`)에서는 왼쪽 타임라인(`340px`) + 오른쪽 상세(상단 요약 카드 `.hd-sum` + 하단 `.hd-split`: 서류 목록 `370px` + 인라인 미리보기 `#arcPvPanel`).
-    - 서류 목록 테이블(`.hd-doccol .t.arct`)에 `table-layout: fixed` 적용(분할 모드에서 날짜 열 `.dt` 숨김, 긴 파일명은 한 줄 말줄임).
+    - `@container (min-width:820px)` 이상에서 왼쪽 연도 타임라인(`clamp(240px,27%,330px)`, `position:sticky`) + 오른쪽 상세 좌우 2단 배치(좁은 오른쪽 미리보기 창에서도 2단 유지).
+    - `@container (min-width:1080px)` 이상에서 오른쪽 하단 `.hd-split` 좌우 2단(`clamp(290px,33%,360px)` sticky 서류 목록 + 인라인 미리보기 `#arcPvPanel`), 날짜 열 `.dt` 대신 파일명 아래 컴팩트 `.hd-fdt` 표시.
+    - `#arcPvBody`의 `max-height` 스크롤 제한을 제거(`overflow-y:visible`, PDF `iframe` `height:max(680px,76vh)`)하여 클릭한 서류 전체 내용이 잘리지 않고 펼쳐지도록 개선.
     - 모바일(`@media (max-width:768px)`)에서는 `[data-act="histListToggle"]` 숨김, `.hd-split.collapsed .hd-doccol` 강제 표시, `.hd-sum-hd` 세로 배치, 입력·선택 `16px` 유지(폰 확대 방지).
+  - **즉시 자동 미리보기 (`arcAutoLoad`) 및 탭·상세 패널 개선**:
+    - `setTab('hist')` 시 `등기 건`용 `doc` `#side` 패널을 자동으로 닫아 대시보드 폭 확보, `?tab=hist` URL 쿼리 진입 지원.
+    - `setTab('hist')`, `reload()`, `histTab`, `histYear`, `histReset`, `histPick`, `histKind` 실행 시 `arcAutoLoad()`로 선택된 묶음의 첫 서류를 오른쪽 인라인 뷰어에 즉시 자동 로드(검색 입력 `data-hist-q` 중에는 `puDocSecret` 감사 로그 과다 기록을 막기 위해 자동 호출 생략).
+    - `drawHist()` 재렌더링 시 포커스(`histFocusMark`/`histFocusRestore`)뿐 아니라 `#arcPvBody` 기존 DOM 노드·내부 `scrollTop` 및 페이지 스크롤(`window.scrollX/scrollY`)까지 보존.
+    - `끝난`(`histPickDone`)·`기록`(`histPickLog`) 탭도 왼쪽 카드 클릭 시 오른쪽 패널에 해당 등기 건·반영 기록의 전체 내용(변경 목적·변경 항목·등기할 사항·변경 사유·요약·등기 건 열기 버튼)을 표시하도록 개선.
   - **왼쪽 패널 (`drawArchive`)**:
     - 상단 세그먼트 전환기(`등기 N / 끝난 M / 기록 K`, ARIA `role="tablist"` ↔ `id="hdLeftPanel" role="tabpanel"`) 및 `＋ 묶음` 버튼.
     - 실시간 검색 입력(`data-hist-q="1"`, `HIST_UI.q !== el.value` 가드로 모바일 `blur` 시 재진입 `innerHTML` `NotFoundError` 방지) 및 연도 필터 칩(`전체`, `2026`, `2019`…).
@@ -36,12 +42,14 @@
    - **기능 (`antigravity:gemini-4-argon-high`)**: `FAILED` 8건 → 필터 동기화, `arcInlineHidden()` 가시성 판정, 포커스·`#arcPvBody` DOM/스크롤 보존, 정적 `끝난/기록` 카드, `tablist`/`tabpanel` ARIA, `th.c` 헤더 체크박스 클릭 등 **8건 모두 수정 반영**.
 2. **2차 기능 재검증 (`run_d27b095d0e1d`, `--only verify --ui`)**:
    - UI 8개 항목 통과, `[높음]` `arcSetKind` 내 `C.ARC_KIND_KEYS` 미정의(핵심 모듈 미내보내기) 1건 발견 → `C.ARC_KINDS.some(...)`으로 수정 및 `seeds/deungi.js`에 `#arcPvKind` 실시간 변경·복원 검증 추가.
-3. **최종 기능 재검증 (`run_6a8ea12f929e`, `antigravity:gemini-4-argon-high`, `--only verify --ui`)**:
+3. **3차 기능 재검증 (`run_6a8ea12f929e`, `antigravity:gemini-4-argon-high`, `--only verify --ui`)**:
    - **통과** (발견 문제 0건; 밝은 테마 고정 화면이므로 다크 테마 대비만 N/A 분류).
+4. **4차 개선분 UI·기능 검증 (`run_b6eddf486591`, `antigravity:gemini-4-argon-high`, `--only verify --ui`)**:
+   - **통과** (`낮음~중간 보완 2건`: ① 검색창 `data-hist-q` 입력 중 감사 로그 적재 방지를 위해 의도적으로 `arcAutoLoad()` 미호출, ② `arcUpload`/`arcSelOut`/`sideClose` 뒤 자동 로드 권고). UI 8항목 및 360·375·411·768·860·1280px 실측 모두 통과.
 
 ## 검증
 - `node scripts/check-cache-version.js --all`: 통과 (종료 코드 0)
 - `node --test tests/deungi-core.test.js tests/deungi-docs.test.js tests/deungi-html.test.js tests/ontology-contract.test.js tests/ontology-write-gate.test.js tests/color-palette-apps.test.js tests/phone-screen-rules.test.js tests/phone-input-zoom.test.js tests/test-pin-guard.test.js tests/one-line-cells.test.js tests/pu-design.test.js`: **217 통과 / 0 실패**
 - `node tools/phone-audit/run.mjs deungi --widths=360,411,1366`: **42건 모두** `errors: []`, `navErr: null`, `overflowX: 0`, `squeezedN: 0`, `offscreenN: 0`, `verticalN: 0`, `wrapBtnN: 0`
-- `node tools/phone-audit/run.mjs deungi --widths=375,768,900,1440 --view=histdash`: **8건 모두** `errors: []`, `navErr: null`, `overflowX: 0` (768px 폰 창 분리 및 900px 태블릿 인라인 미리보기 확인)
-- 로컬 미리보기 서버(`http://127.0.0.1:4335/pu-deungi.html`, `1440×900`): `.hwp`/`.png` 인라인 미리보기, `#arcPvKind` 변경/복원, `◀ 목록 접기`/`▶ 서류 목록`, `기록`↔`등기` 전환 및 콘솔·페이지 오류 **0건** 확인
+- `node tools/phone-audit/run.mjs deungi --widths=375,768,900,1440 --view=histdash`: **8건 모두** `errors: []`, `navErr: null`, `overflowX: 0` (768px 폰 분리·900px/1440px 2단 좌우 배치·묶음 클릭 즉시 자동 미리보기·`window.scrollY` 보존·`기록` 오른쪽 상세 확인)
+- 로컬 미리보기 서버(`http://127.0.0.1:4335/pu-deungi.html?tab=hist`, 6개년 가상 아카이브·`960×820` & `1440×900`): 최초 진입 자동 렌더링(401 `0건`), `№ 2`/`№ 4`/`.png` 즉시 전환, 전체 펼침(620px 스크롤 잘림 없음), `끝난`/`기록` 오른쪽 전체 상세, 콘솔·페이지 오류 **0건** 확인

@@ -340,10 +340,13 @@ main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
 .card.fc.open>.fh .car{transform:rotate(90deg)}
 /* 지난 기록 AB-1 대시보드 (왼쪽 연도 타임라인 + 오른쪽 요약·서류리스트·미리보기) */
 .hd-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
-@container (min-width:1120px){
-  :where(body:not(.slim)) .hd-wrap{grid-template-columns:330px minmax(0,1fr)}
+@container (min-width:820px){
+  :where(body:not(.slim)) .hd-wrap{grid-template-columns:clamp(240px,27%,330px) minmax(0,1fr)}
+  :where(body:not(.slim)) .hd-left{position:sticky;top:68px;max-height:calc(100vh - 84px);display:flex;flex-direction:column}
+  :where(body:not(.slim)) .hd-left .hd-tl-list{max-height:none;flex:1;min-height:0;overflow-y:auto}
 }
-.hd-left,.hd-right{margin-bottom:0;overflow:hidden;min-width:0}
+.hd-left{margin-bottom:0;overflow:hidden;min-width:0}
+.hd-right{margin-bottom:0;overflow:clip;min-width:0}
 .hd-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 11px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
 .hd-seg{display:inline-flex;padding:2px;border-radius:8px;background:var(--bg);border:1px solid var(--line);gap:2px}
 .hd-seg button{border:none;background:transparent;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;color:var(--mute)}
@@ -373,6 +376,8 @@ main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
 .hd-done-list{padding:8px 10px;display:flex;flex-direction:column;gap:7px}
 .hd-done-card{width:100%;text-align:left;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;gap:4px;white-space:normal}
 .hd-done-card:hover{border-color:var(--blue-line);background:var(--blue-bg)}
+.hd-done-card.on{border-color:var(--blue);background:var(--blue-bg);box-shadow:0 0 0 1px var(--blue)}
+.hd-done-card.on .hd-no{background:var(--blue);border-color:var(--blue);color:#ffffff}
 .hd-done-card.static{cursor:default}
 .hd-done-card.static:hover{border-color:var(--line);background:var(--card)}
 .hd-log-desc{font-size:12px;color:var(--ink2);line-height:1.45;white-space:normal}
@@ -385,15 +390,18 @@ main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
 .hd-sum-body{padding:9px 14px;border-bottom:1px solid var(--line);background:var(--bg);font-size:12.5px;color:var(--ink);line-height:1.55;white-space:pre-line}
 .hd-split{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch}
 .hd-doccol{display:flex;flex-direction:column;min-width:0;border-bottom:1px solid var(--line);background:var(--card)}
-@container (min-width:1180px){
-  :where(body:not(.slim)) .hd-split:not(.collapsed){grid-template-columns:370px minmax(0,1fr)}
-  :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol{border-bottom:none;border-right:1px solid var(--line)}
+.hd-fdt{display:none;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;margin-top:1px}
+@container (min-width:1080px){
+  :where(body:not(.slim)) .hd-split:not(.collapsed){grid-template-columns:clamp(290px,33%,360px) minmax(0,1fr)}
+  :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol{border-bottom:none;border-right:1px solid var(--line);position:sticky;top:68px;align-self:start;max-height:calc(100vh - 84px)}
+  :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .hd-docscroll{max-height:none}
   :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .arct .dt,
   :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .arct col.hd-dtcol{display:none}
+  :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .hd-fdt{display:block}
 }
 .hd-dochd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--card)}
 .hd-kbar{display:flex;gap:4px;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--bg)}
-.hd-docscroll{max-height:480px;overflow:auto;flex:1}
+.hd-docscroll{max-height:360px;overflow:auto;flex:1;min-height:0}
 @media (min-width:769px){
   .hd-split.collapsed .hd-doccol{display:none}
   :where(body:not(.slim)) .hd-doccol .t.arct{table-layout:fixed;width:100%}
@@ -409,12 +417,17 @@ main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
 .hd-pvh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
 .hd-pvh-l,.hd-pvh-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
 .hd-pvh-name{font-weight:700;font-size:13px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hd-pv-body{background:var(--line);min-height:440px;max-height:620px;overflow:auto;scrollbar-gutter:stable;padding:14px;display:flex;flex-direction:column;align-items:center;flex:1}
+.hd-pv-body{background:var(--line);min-height:520px;overflow-x:auto;overflow-y:visible;padding:14px;display:flex;flex-direction:column;align-items:center;flex:1}
 .hd-pv-body .pvi{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px}
 .hd-pv-body canvas{max-width:100% !important;height:auto !important;background:#ffffff;border:1px solid var(--line2);border-radius:4px;box-shadow:var(--shadow)}
-.hd-pv-body iframe{width:100%;height:560px;border:1px solid var(--line2);border-radius:6px;background:#ffffff}
+.hd-pv-body iframe{width:100%;height:max(680px,76vh);border:1px solid var(--line2);border-radius:6px;background:#ffffff}
 .hd-pv-body img{max-width:100%;border-radius:6px;border:1px solid var(--line2);background:#ffffff}
 .hd-pv-card{max-width:460px;width:100%;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:9px;box-shadow:var(--shadow)}
+.hd-det{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.hd-det-sec{border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--card)}
+.hd-det-sec h4{margin:0 0 6px;font-size:12.5px;color:var(--ink2)}
+.hd-det-ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:13px;line-height:1.5}
+.hd-det-txt{font-size:13px;line-height:1.65;color:var(--ink);white-space:pre-line}
 @media (max-width:768px){
   .top{padding:6px 10px;gap:6px 8px}
   .tabs{order:5;flex:1 1 100%;margin-left:0;overflow-x:auto;gap:2px}
@@ -546,7 +559,7 @@ var RRN={};
 var SEL={ cases:{}, docs:{}, mem:{}, br:{}, arc:{} };
 /* 지난 등기 원본 서류 묶음(deungi/archive) · 올리는 중 · 미리보기 주소 · AB-1 대시보드 상태(이 창 메모리) */
 var ARCH={}, ARC_EV='', ARC_BUSY=false, PV_URL='', PV_SEQ=0;
-function histUiInit(){ return { tab:'archive', year:'ALL', kind:'ALL', q:'', sel:'', fid:'', loaded:'', listOff:false }; }
+function histUiInit(){ return { tab:'archive', year:'ALL', kind:'ALL', q:'', sel:'', fid:'', loaded:'', listOff:false, doneId:'', logIdx:0 }; }
 var HIST_UI=histUiInit(), ARC_PV_URL='', ARC_PV_SEQ=0, ARC_PV_BYTES=null, ARC_PV_RW=0, ARC_PV_T=null;
 /* 오른쪽 보기 칸 — 지금 보는 것 {kind:'arc',ev,fid} 또는 {kind:'doc',key,cid}(새로 만든 서류) · 마지막으로 본 것(원본·새 서류 각각) · 한글 바이트(너비가 바뀌면 다시 그림) ·
    닫으면 돌아갈 자리 · 다시 그리기 타이머(너비·서류) · 그려 둔 새 서류 · 사용자가 닫은 건(자동으로 다시 열지 않는다) */
@@ -638,11 +651,12 @@ function reload(){
     Object.keys(v.archive||{}).forEach(function(k){ var x=v.archive[k]; if(x&&x.id===k) ARCH[k]=x; });
     if(CUR && !CASES[CUR]) CUR='';
     draw();
+    if(TAB==='hist') arcAutoLoad();
   }).catch(function(e){ lock('등기 자료를 읽을 권한이 없습니다 — '+((e&&e.message)||'')); });
 }
 
 /* ═══ 그리기 ═══ */
-function setTab(t){ TAB=t; lsSet('tab', t); draw(); }
+function setTab(t){ if(t==='hist' && SIDE && SIDE.kind==='doc') sideClose(); TAB=t; lsSet('tab', t); draw(); if(t==='hist') arcAutoLoad(); }
 function draw(){
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.classList.toggle('on', b.dataset.tab===TAB); b.setAttribute('aria-selected', b.dataset.tab===TAB ? 'true' : 'false'); });
   ['case','base','hist'].forEach(function(k){ $('pane-'+k).classList.toggle('on', TAB===k); });
@@ -1425,6 +1439,13 @@ function arcPvRedraw(){
     arcPvRestore(HIST_UI.sel, HIST_UI.fid);
   }, 250);
 }
+function arcAutoLoad(){
+  if(TAB!=='hist' || HIST_UI.tab!=='archive' || !ME.isAdmin || arcInlineHidden() || (SIDE && SIDE.kind==='arc')) return;
+  if(!HIST_UI.sel || !HIST_UI.fid) return;
+  var key=HIST_UI.sel+'|'+HIST_UI.fid;
+  if(HIST_UI.loaded===key && (ARC_PV_BYTES || ARC_PV_URL)) return;
+  arcInlineLoad(HIST_UI.sel, HIST_UI.fid);
+}
 function drawArchive(done, hi){
   var rows=arcRows(), noMap={}, years=[], ySeen={};
   rows.forEach(function(a, i){
@@ -1482,6 +1503,7 @@ function drawArchive(done, hi){
       +'<button type="button" class="sm pri" data-act="arcNew">＋ 묶음</button>'
     +'</div>';
 
+  var selDone=null, selLog=null, selLogIdx=0;
   if(HIST_UI.tab==='archive'){
     leftHtml+='<div class="hd-filter">'
       +'<div class="hd-search"><input type="search" data-hist-q="1" placeholder="제목·내용·서류명 검색" value="'+esc(HIST_UI.q)+'" aria-label="지난 등기 검색"></div>'
@@ -1515,11 +1537,13 @@ function drawArchive(done, hi){
     }
     leftHtml+='</div>';
   } else if(HIST_UI.tab==='done'){
+    selDone=done.filter(function(c){ return c.id===HIST_UI.doneId; })[0]||done[0]||null;
+    HIST_UI.doneId=selDone?selDone.id:'';
     leftHtml+='<div class="hd-tl-list" id="hdLeftPanel" role="tabpanel" aria-labelledby="hdTab-done"><div class="hd-done-list">';
     if(!done.length) leftHtml+='<div class="empty">끝나거나 취소한 등기 건이 아직 없습니다.</div>';
     else done.forEach(function(c, i){
-      var a=C.applyChanges(baseOf(c), c), st=C.normCase(c).status;
-      leftHtml+='<button type="button" class="hd-done-card" data-act="openDoneCase" data-id="'+esc(c.id)+'">'
+      var a=C.applyChanges(baseOf(c), c), st=C.normCase(c).status, isOn=!!selDone && selDone.id===c.id;
+      leftHtml+='<button type="button" class="hd-done-card'+(isOn?' on':'')+'" data-act="histPickDone" data-id="'+esc(c.id)+'" aria-pressed="'+(isOn?'true':'false')+'">'
         +'<span class="hd-c-top"><span class="hd-c-topl"><span class="hd-no">№ '+(i+1)+'</span><span class="hd-dt">'+esc((c.dates&&c.dates.done)||(c.meeting&&c.meeting.date)||'날짜 없음')+'</span></span>'+stChip(st)+'</span>'
         +'<span class="hd-ttl">'+esc(c.title)+'</span>'
         +'<span class="hd-desc">'+esc(C.summary(a)||'변경 내용 없음')+'</span>'
@@ -1527,24 +1551,80 @@ function drawArchive(done, hi){
     });
     leftHtml+='</div></div>';
   } else {
+    selLogIdx=(hi.length && HIST_UI.logIdx>=0 && HIST_UI.logIdx<hi.length)?HIST_UI.logIdx:0;
+    HIST_UI.logIdx=selLogIdx;
+    selLog=hi[selLogIdx]||null;
     leftHtml+='<div class="hd-tl-list" id="hdLeftPanel" role="tabpanel" aria-labelledby="hdTab-logs"><div class="hd-done-list">';
     if(!hi.length) leftHtml+='<div class="empty">등기 현황이 바뀐 기록이 아직 없습니다.</div>';
     else hi.forEach(function(x, i){
-      leftHtml+='<div class="hd-done-card static">'
+      var isOn=(i===selLogIdx);
+      leftHtml+='<button type="button" class="hd-done-card'+(isOn?' on':'')+'" data-act="histPickLog" data-i="'+i+'" aria-pressed="'+(isOn?'true':'false')+'">'
         +'<span class="hd-c-top"><span class="hd-c-topl"><span class="hd-no">#'+(i+1)+'</span><span class="hd-dt">'+esc(x.at||'')+'</span></span></span>'
         +'<span class="hd-ttl">'+esc(x.title||'')+'</span>'
         +(x.summary?'<span class="hd-log-desc" title="'+esc(x.summary)+'">'+esc(x.summary)+'</span>':'')
-        +'</div>';
+        +'</button>';
     });
     leftHtml+='</div></div>';
   }
   leftHtml+='</section>';
 
-  /* ── 오른쪽 AB-1: 상단 묶음 요약 + 하단 좌우 [B안 서류 리스트 | 인라인 미리보기] ── */
+  /* ── 오른쪽 AB-1: 등기(묶음 요약 + 서류 리스트·인라인 미리보기) / 끝난 건 상세 / 바뀐 기록 상세 ── */
   var rightHtml='';
-  if(!sel){
+  if(HIST_UI.tab==='done'){
+    if(!selDone){
+      rightHtml='<section class="card hd-right" aria-label="끝난 등기 건 상세"><div class="empty">끝나거나 취소한 등기 건이 아직 없습니다.<br>진행 중인 등기 건을 끝내고 «등기 현황에 반영»하면 이곳에 남습니다.</div></section>';
+    } else {
+      var da=C.applyChanges(baseOf(selDone), selDone), dst=C.normCase(selDone).status, dIdx=done.indexOf(selDone)+1, dpr=C.checkProgress(da, today());
+      var dPurp=C.purpose(da), dRegs=C.regItems(da), dReas=da.c.changes.length?C.reason(da):'';
+      var dChgs=da.c.changes.map(function(ch){ return '<li>'+esc(C.describe(ch, baseOf(selDone), da)||'(변경 항목)')+'</li>'; }).join('');
+      var dRegHtml=dRegs.map(function(rg){ return '<li><b>'+esc(rg.group)+':</b> '+rg.lines.map(esc).join(' · ')+'</li>'; }).join('');
+      rightHtml='<section class="card hd-right" aria-label="끝난 등기 건 전체 내용">'
+        +'<div class="hd-sum-hd">'
+          +'<div class="hd-sum-info">'
+            +'<div class="hd-sum-meta">'
+              +'<span class="hd-no pri">№ '+dIdx+'</span>'
+              +stChip(dst)
+              +(selDone.meeting&&selDone.meeting.date?'<span class="chip m">총회 '+esc(selDone.meeting.date)+'</span>':'')
+              +(selDone.dates&&selDone.dates.done?'<span class="hd-dt">등기 '+esc(selDone.dates.done)+'</span>':'')
+            +'</div>'
+            +'<h3 class="hd-sum-ttl">'+esc(selDone.title||'(제목 없음)')+'</h3>'
+            +'<div class="hd-sum-sub">'+esc(dPurp||C.summary(da)||'변경 내용 없음')+'</div>'
+          +'</div>'
+          +'<div class="hd-sum-acts"><button type="button" class="sm pri" data-act="openDoneCase" data-id="'+esc(selDone.id)+'">📝 등기 건 화면에서 열기</button></div>'
+        +'</div>'
+        +'<div class="hd-det">'
+          +'<div class="hd-det-sec"><h4>바뀐 내용 ('+da.c.changes.length+'건)</h4>'+(dChgs?'<ul class="hd-det-ul">'+dChgs+'</ul>':'<div class="hint">등록된 변경 항목이 없습니다.</div>')+'</div>'
+          +(dRegHtml?'<div class="hd-det-sec"><h4>등기할 사항</h4><ul class="hd-det-ul">'+dRegHtml+'</ul></div>':'')
+          +(dReas?'<div class="hd-det-sec"><h4>변경 사유</h4><div class="hd-det-txt">'+esc(dReas)+'</div></div>':'')
+          +'<div class="hd-det-sec"><h4>필요서류 확인</h4><div class="hd-det-txt">'+dpr.done+' / '+dpr.total+'건 확인'+(dpr.stale?' · 발급 3개월 경과 '+dpr.stale+'건':'')+'</div></div>'
+        +'</div>'
+        +'</section>';
+    }
+  } else if(HIST_UI.tab==='logs'){
+    if(!selLog){
+      rightHtml='<section class="card hd-right" aria-label="바뀐 기록 상세"><div class="empty">등기 현황이 바뀐 기록이 아직 없습니다.<br>완료된 등기 건을 «등기 현황에 반영»하면 이력이 여기에 남습니다.</div></section>';
+    } else {
+      var hasCase=!!(selLog.caseId && CASES[selLog.caseId]);
+      rightHtml='<section class="card hd-right" aria-label="바뀐 기록 전체 내용">'
+        +'<div class="hd-sum-hd">'
+          +'<div class="hd-sum-info">'
+            +'<div class="hd-sum-meta">'
+              +'<span class="hd-no pri">#'+(selLogIdx+1)+'</span>'
+              +(selLog.at?'<span class="hd-dt">'+esc(selLog.at)+'</span>':'')
+              +'<span class="chip g">현황 반영 완료</span>'
+            +'</div>'
+            +'<h3 class="hd-sum-ttl">'+esc(selLog.title||'(기록 제목 없음)')+'</h3>'
+          +'</div>'
+          +(hasCase?'<div class="hd-sum-acts"><button type="button" class="sm pri" data-act="openDoneCase" data-id="'+esc(selLog.caseId)+'">📝 해당 등기 건 열기</button></div>':'')
+        +'</div>'
+        +'<div class="hd-det">'
+          +'<div class="hd-det-sec"><h4>반영된 등기 현황 내용</h4><div class="hd-det-txt">'+esc(selLog.summary||'기록된 요약 내용이 없습니다.')+'</div></div>'
+        +'</div>'
+        +'</section>';
+    }
+  } else if(!sel){
     rightHtml='<section class="card hd-right"><div class="empty">'
-      +(rows.length && HIST_UI.tab==='archive'
+      +(rows.length
         ? '조건에 맞는 등기 묶음이 없습니다.<br><br><button type="button" class="sm" data-act="histReset">전체 연도 보기</button>'
         : '왼쪽에서 지난 등기를 고르거나 «＋ 묶음»으로 새로 만드십시오.')
       +'</div></section>';
@@ -1573,7 +1653,7 @@ function drawArchive(done, hi){
         docTable+='<tr class="click" data-arcf="'+esc(x.fileId)+'">'
           +'<td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td>'
           +'<td class="n">'+realNo+'</td>'
-          +'<td class="ti" title="'+esc(x.name)+'"><button type="button" class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+(ME.isAdmin?'':' title="🔒 열람은 총괄관리자만 · 누르면 정보/종류를 선택합니다"')+'>'+esc(x.name)+'</button></td>'
+          +'<td class="ti" title="'+esc(x.name)+'"><button type="button" class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+(ME.isAdmin?'':' title="🔒 열람은 총괄관리자만 · 누르면 정보/종류를 선택합니다"')+'>'+esc(x.name)+'</button>'+(x.date?'<span class="hd-fdt">'+esc(x.date)+'</span>':'')+'</td>'
           +'<td class="kd"><span class="chip '+arcKindChipCls(x.kind)+'" title="'+esc(C.arcKindLabel(x.kind))+'">'+esc(C.arcKindLabel(x.kind))+'</span></td>'
           +'<td class="dt">'+esc(x.date||'')+'</td>'
           +'<td class="ac"><button type="button" class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기" title="받기"'+arcLockAttr()+'>⬇</button></td>'
@@ -1987,6 +2067,8 @@ function histFocusMark(){
   if(ae.dataset && ae.dataset.sel) return { type:'sel', sel:ae.dataset.sel, id:ae.dataset.id };
   if(ae.dataset && ae.dataset.act==='arcView'){ var tr=ae.closest('tr[data-arcf]'); if(tr) return { type:'arcv', fid:tr.dataset.arcf }; }
   if(ae.dataset && ae.dataset.act==='histPick' && ae.dataset.arc) return { type:'pick', arc:ae.dataset.arc };
+  if(ae.dataset && ae.dataset.act==='histPickDone' && ae.dataset.id) return { type:'pickDone', id:ae.dataset.id };
+  if(ae.dataset && ae.dataset.act==='histPickLog' && ae.dataset.i!=null) return { type:'pickLog', i:ae.dataset.i };
   if(ae.dataset && ae.dataset.act) return { type:'act', act:ae.dataset.act, v:ae.dataset.v||'', d:ae.dataset.d||'' };
   return null;
 }
@@ -1999,6 +2081,8 @@ function histFocusRestore(fk){
   else if(fk.type==='sel') Array.prototype.some.call(hb.querySelectorAll('[data-sel]'), function(x){ if(x.dataset.sel===fk.sel && x.dataset.id===fk.id){ tg=x; return true; } return false; });
   else if(fk.type==='arcv') Array.prototype.some.call(hb.querySelectorAll('tr[data-arcf] [data-act="arcView"]'), function(x){ var r=x.closest('tr[data-arcf]'); if(r && r.dataset.arcf===fk.fid){ tg=x; return true; } return false; });
   else if(fk.type==='pick') Array.prototype.some.call(hb.querySelectorAll('[data-act="histPick"]'), function(x){ if(x.dataset.arc===fk.arc){ tg=x; return true; } return false; });
+  else if(fk.type==='pickDone') Array.prototype.some.call(hb.querySelectorAll('[data-act="histPickDone"]'), function(x){ if(x.dataset.id===fk.id){ tg=x; return true; } return false; });
+  else if(fk.type==='pickLog') Array.prototype.some.call(hb.querySelectorAll('[data-act="histPickLog"]'), function(x){ if(x.dataset.i===fk.i){ tg=x; return true; } return false; });
   else if(fk.type==='act' && fk.act==='histListToggle') Array.prototype.some.call(hb.querySelectorAll('[data-act="histListToggle"]'), function(x){ if(x.offsetParent){ tg=x; return true; } return false; });
   else if(fk.type==='act') Array.prototype.some.call(hb.querySelectorAll('[data-act]'), function(x){ if(x.dataset.act===fk.act && (x.dataset.v||'')===fk.v && (x.dataset.d||'')===fk.d){ tg=x; return true; } return false; });
   if(tg && tg.focus){ try{ tg.focus({ preventScroll:true }); if(fk.type==='q' && fk.s!=null) tg.setSelectionRange(fk.s, fk.e); }catch(e){} }
@@ -2006,10 +2090,10 @@ function histFocusRestore(fk){
 function drawHist(){
   var done=caseRows().filter(function(c){ return c.status==='cancelled' || (c.status==='done' && c.applied); });
   var hi=(BASE.history||[]).slice().reverse();
-  var fk=histFocusMark(), oldPb=$('arcPvBody'), keepKey=HIST_UI.loaded, kept=(keepKey && oldPb && (ARC_PV_BYTES||ARC_PV_URL))?oldPb:null, oldTop=kept?kept.scrollTop:0;
+  var fk=histFocusMark(), oldPb=$('arcPvBody'), keepKey=HIST_UI.loaded, kept=(keepKey && oldPb && (ARC_PV_BYTES||ARC_PV_URL))?oldPb:null, oldTop=kept?kept.scrollTop:0, oldWinX=window.scrollX||0, oldWinY=window.scrollY||0;
   if(kept && kept.parentNode) kept.remove();
   $('histBox').innerHTML=drawArchive(done, hi);
-  if(kept && HIST_UI.loaded===keepKey){ var npb=$('arcPvBody'); if(npb){ npb.replaceWith(kept); kept.scrollTop=oldTop; if(ARC_PV_BYTES && kept.clientWidth && Math.abs(kept.clientWidth-ARC_PV_RW)>=8) arcPvRedraw(); } }
+  if(kept && HIST_UI.loaded===keepKey){ var npb=$('arcPvBody'); if(npb){ npb.replaceWith(kept); kept.scrollTop=oldTop; if(oldWinY || window.scrollY) window.scrollTo(oldWinX, oldWinY); if(ARC_PV_BYTES && kept.clientWidth && Math.abs(kept.clientWidth-ARC_PV_RW)>=8) arcPvRedraw(); } }
   histFocusRestore(fk);
   sideMark(); sideHead();
 }
@@ -2356,11 +2440,13 @@ document.addEventListener('click', function(ev){
     else if(act==='arcSelOut') arcSelOut();
     else if(act==='arcSelClear'){ SEL.arc={}; drawHist(); }
     else if(act==='fold'){ var fk=el.dataset.k, fo=el.getAttribute('aria-expanded')==='true'; setFold(fk, !fo); foldKeyDraw(fk); foldFocus(fk); }
-    else if(act==='histTab'){ HIST_UI.tab=el.dataset.v||'archive'; drawHist(); }
-    else if(act==='histYear'){ HIST_UI.year=el.dataset.v||'ALL'; drawHist(); }
-    else if(act==='histReset'){ HIST_UI.year='ALL'; HIST_UI.q=''; drawHist(); }
-    else if(act==='histPick'){ var evp=el.dataset.arc; if(evp && evp!==HIST_UI.sel){ arcPvRevoke(); HIST_UI.sel=evp; HIST_UI.kind='ALL'; HIST_UI.fid=''; HIST_UI.loaded=''; } drawHist(); }
-    else if(act==='histKind'){ HIST_UI.kind=el.dataset.v||'ALL'; drawHist(); }
+    else if(act==='histTab'){ HIST_UI.tab=el.dataset.v||'archive'; drawHist(); if(HIST_UI.tab==='archive') arcAutoLoad(); }
+    else if(act==='histYear'){ HIST_UI.year=el.dataset.v||'ALL'; drawHist(); arcAutoLoad(); }
+    else if(act==='histReset'){ HIST_UI.year='ALL'; HIST_UI.q=''; drawHist(); arcAutoLoad(); }
+    else if(act==='histPick'){ var evp=el.dataset.arc; if(evp && evp!==HIST_UI.sel){ arcPvRevoke(); HIST_UI.sel=evp; HIST_UI.kind='ALL'; HIST_UI.fid=''; HIST_UI.loaded=''; } drawHist(); arcAutoLoad(); }
+    else if(act==='histKind'){ HIST_UI.kind=el.dataset.v||'ALL'; drawHist(); arcAutoLoad(); }
+    else if(act==='histPickDone'){ HIST_UI.doneId=el.dataset.id||''; drawHist(); }
+    else if(act==='histPickLog'){ HIST_UI.logIdx=Number(el.dataset.i)||0; drawHist(); }
     else if(act==='histListToggle'){ if(arcInlineHidden()) return; HIST_UI.listOff=!HIST_UI.listOff; drawHist(); }
     else if(act==='arcPvLoad'){ if(HIST_UI.sel && HIST_UI.fid) arcInlineLoad(HIST_UI.sel, HIST_UI.fid); }
     else if(act==='arcPvNav'){ arcPvNav(Number(el.dataset.d)||0); }
@@ -2522,6 +2608,7 @@ function canOpen(role){ return !!role && role.status==='active' && !!role.sid &&
 async function staffRole(u){ try{ return (await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||null; }catch(e){ return null; } }
 function boot(){
   var t=lsGet('tab'); if(['case','base','hist'].indexOf(t)>=0) TAB=t;
+  var qt=/[?&]tab=(case|base|hist)\b/.exec(location.search||''); if(qt) TAB=qt[1];
   if(lsGet('mode')==='full') MODE='full';
   var cu=lsGet('cur'); if(cu) CUR=cu;
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여십시오'); return; }

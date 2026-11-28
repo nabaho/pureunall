@@ -386,7 +386,9 @@ test('★ 접고 펴기·지사장 번호·지난 기록 AB-1 대시보드(연�
 
   /* 지난 기록 AB-1 대시보드 — 왼쪽 연도 타임라인·넘버링 + 오른쪽 요약 + 하단 좌우 [서류 리스트 | 미리보기] */
   assert.match(html, /\.hd-wrap\{display:grid;/);
+  assert.match(html, /@container \(min-width:820px\)/);
   assert.match(html, /\.hd-split\{display:grid;/);
+  assert.match(html, /overflow-y:visible/);
   assert.match(html, /\.hd-doccol \.t\.arct\{table-layout:fixed;width:100%\}/);
   assert.match(html, /\[data-act="histListToggle"\]\{display:none\}/);
   const ar = 본문.slice(본문.indexOf('function drawArchive('), 본문.indexOf('/* 묶음 하나 고치기'));
@@ -396,6 +398,8 @@ test('★ 접고 펴기·지사장 번호·지난 기록 AB-1 대시보드(연�
   assert.match(ar, /data-act="histYear"/);
   assert.match(ar, /data-act="histTab"/);
   assert.match(ar, /data-act="histKind"/);
+  assert.match(ar, /data-act="histPickDone"/);
+  assert.match(ar, /data-act="histPickLog"/);
   assert.match(ar, /data-act="histListToggle"/);
   assert.match(ar, /id="arcPvPanel"/);
   assert.match(ar, /id="arcPvKind"/);
@@ -403,7 +407,9 @@ test('★ 접고 펴기·지사장 번호·지난 기록 AB-1 대시보드(연�
   assert.match(ar, /arcKindSummary\(sel\)/);
   assert.match(ar, /data-act="arcEdit"/);
 
-  /* 인라인 미리보기 — 총괄관리자 전용, 세대·순서 가드, 확장자 MIME 고정, 종류 허용 목록, 포커스·DOM 보존, 로그아웃 시 정리 */
+  /* 인라인 미리보기 — 총괄관리자 전용, 자동 즉시 불러오기, 세대·순서 가드, 확장자 MIME 고정, 종류 허용 목록, 포커스·DOM 보존, 로그아웃 시 정리 */
+  assert.match(본문, /function arcAutoLoad\(/);
+  assert.match(본문, /if\(t==='hist' && SIDE && SIDE\.kind==='doc'\) sideClose\(\);/);
   const il = 본문.slice(본문.indexOf('function arcInlineLoad('), 본문.indexOf('function arcPvNav('));
   assert.match(il, /if\(!ME\.isAdmin\) return toast\('🔒 총괄관리자만 엽니다'\)/);
   assert.match(il, /if\(arcInlineHidden\(\)\)/);

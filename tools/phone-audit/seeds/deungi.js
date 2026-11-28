@@ -56,6 +56,30 @@ const ar2 = Object.assign(meta('ARtest2017b', 'DeungiArchive'), { title: '2017-1
 
 /* 앞 화면(자세히·지난 기록·덮는 칸)이 남긴 것을 치우고 «등기 건 탭 · 쉬운 진행»에서 시작 */
 const toEasy = async (p) => { await p.evaluate(() => window.sideClose && window.sideClose()); await p.click('#tabs button[data-tab=case]'); await p.waitForTimeout(300); const r = await p.$('#caseList tr[data-open]'); if (r && !(await p.$('#editor .card'))) { await r.click(); await p.waitForTimeout(600); } const e = await p.$('[data-act=mode][data-m=easy]'); if (e) { await e.click(); await p.waitForTimeout(500); } };
+const stubArcPreview = () => {
+  const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+  const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  const map = {};
+  Object.values(window.ARCH || {}).forEach((a) => Object.values((a && a.files) || {}).forEach((f) => { map[f.fileId] = f.name || ''; }));
+  PuOfficeStore.secretBlob = (fid) => {
+    const nm = map[fid] || '';
+    if (/\.pdf$/i.test(nm)) return Promise.resolve(new Blob(['%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF'], { type: 'application/pdf' }));
+    if (/\.(hwp|hwpx)$/i.test(nm)) return Promise.resolve(new Blob([new Uint8Array([80, 75])], { type: 'application/octet-stream' }));
+    return Promise.resolve(new Blob([u], { type: 'image/png' }));
+  };
+  if (window.PureunHwp && !window.PureunHwp.__paStub) {
+    const orig = window.PureunHwp.renderPreview;
+    window.PureunHwp.renderPreview = (el, u8, nm) => {
+      if (u8 && u8.length === 2 && u8[0] === 80 && u8[1] === 75) {
+        const cv = document.createElement('canvas'); cv.width = 400; cv.height = 120;
+        el.innerHTML = ''; el.appendChild(cv);
+        return Promise.resolve();
+      }
+      return orig(el, u8, nm);
+    };
+    window.PureunHwp.__paStub = true;
+  }
+};
 
 /* 푸른통합시스템 직원명부(지어낸 자료 — 주민번호·전화번호 꼴 없음) */
 const staffAccounts = [
@@ -83,29 +107,39 @@ module.exports = {
     { name: 'docs', run: async (p) => { await p.click('[data-act=mode][data-m=full]'); await p.click('#edDocs input[data-doc]'); } },
     { name: 'base', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); window.DOC_NO_AUTO = window.CUR; }); await p.click('#tabs button[data-tab=base]'); await p.waitForTimeout(300); } },
     /* 지난 기록 — AB-1 대시보드(왼쪽 연도 타임라인 + 오른쪽 요약·서류 리스트·인라인 미리보기) */
-    { name: 'hist', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; }); await p.click('#tabs button[data-tab=hist]'); await p.waitForTimeout(200); } },
-    /* 지난 기록 AB-1 동작 — 연도 넘버링(№1~№3) · 연도 필터 · 묶음 클릭 → 서류 리스트(4) · 종류 필터 · 서류 클릭(미리보기) · 목록 접기/펴기 · 바뀐 기록 탭 */
+    { name: 'hist', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; }); await p.evaluate(stubArcPreview); await p.click('#tabs button[data-tab=hist]'); await p.waitForTimeout(350); } },
+    /* 지난 기록 AB-1 동작 — 연도 넘버링(№1~№3) · 820px+ 2단 배치 · 묶음 클릭 즉시 자동 미리보기 · 종류 필터 · 전체 펼침 DOM·스크롤 보존 · 목록 접기/펴기 · 바뀐 기록 오른쪽 상세 */
     { name: 'histdash', run: async (p) => {
       const must = (ok, why) => { if (!ok) throw new Error('histdash: ' + why); };
       const w = (ms) => p.waitForTimeout(ms);
       await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; });
-      await p.click('#tabs button[data-tab=hist]'); await w(300);
+      await p.evaluate(stubArcPreview);
+      await p.click('#tabs button[data-tab=hist]'); await w(350);
       const init = await p.evaluate(() => ({
         cards: document.querySelectorAll('#histBox .hd-card').length,
         yrs: [...document.querySelectorAll('#histBox .hd-yr')].map((e) => e.textContent.trim()),
         nos: [...document.querySelectorAll('#histBox .hd-left .hd-no')].map((e) => e.textContent.trim()),
       }));
       must(init.cards === 3 && init.yrs.length === 3 && init.nos.join(',') === '№ 1,№ 2,№ 3', '연도별 넘버링 카드 3건 필요 ' + JSON.stringify(init));
-      await p.click('#histBox [data-act="histYear"][data-v="2019"]'); await w(200);
+      if (p.viewportSize().width >= 860) {
+        must(await p.evaluate(() => {
+          const l = document.querySelector('#histBox .hd-left').getBoundingClientRect();
+          const r = document.querySelector('#histBox .hd-right').getBoundingClientRect();
+          return l.right <= r.left + 2 && Math.abs(l.top - r.top) < 20;
+        }), '860px 이상에서는 왼쪽 연도 타임라인과 오른쪽 상세가 좌우 나란히 배치되어야 함');
+      }
+      await p.click('#histBox [data-act="histYear"][data-v="2019"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 1), '2019 필터 시 1건');
-      await p.click('#histBox [data-act="histYear"][data-v="ALL"]'); await w(200);
+      await p.click('#histBox [data-act="histYear"][data-v="ALL"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 3), '전체 복원 시 3건');
-      await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await w(250);
+      await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await w(350);
       must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4 && /나무분사무소/.test((document.querySelector('#histBox .hd-sum-ttl') || {}).textContent || '')), '2019 묶음 서류 4개 표시');
-      await p.click('#histBox [data-act="histKind"][data-v="approval"]'); await w(200);
+      if (p.viewportSize().width > 768) {
+        must(await p.evaluate(() => window.HIST_UI.loaded === 'ARtest2019a|fake_file_id_0001' && !document.querySelector('#arcPvBody [data-act="arcPvLoad"]') && !!document.querySelector('#arcPvBody canvas')), '묶음 클릭 직후 첫 번째 서류 자동 인라인 미리보기 표시 필요');
+      }
+      await p.click('#histBox [data-act="histKind"][data-v="approval"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 1 && (document.getElementById('arcPvKind') || {}).value === 'approval'), '종류 필터(인가증) 1건 및 미리보기 대상 일치');
-      await p.click('#histBox [data-act="histKind"][data-v="ALL"]'); await w(200);
-      await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); });
+      await p.click('#histBox [data-act="histKind"][data-v="ALL"]'); await w(250);
       await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act="arcView"]'); await w(450);
       if (p.viewportSize().width > 768) {
         const pvBefore = await p.evaluate(() => document.querySelector('#arcPvBody img') && document.querySelector('#arcPvBody img').src);
@@ -120,17 +154,17 @@ module.exports = {
         }), '서류 목록 헤더(종류·받기)가 가로 스크롤로 잘리지 않아야 함');
         await p.evaluate(() => {
           const img = document.querySelector('#arcPvBody img');
-          const body = document.getElementById('arcPvBody');
           window.__pvRef = img;
-          img.style.height = '1200px';
-          body.scrollTop = 45;
+          img.style.height = '1800px';
+          window.scrollTo(0, 45);
         });
         await p.click('#histBox tr[data-arcf="fake_file_id_0004"] input[data-sel="arc"]'); await w(150);
-        must(await p.evaluate(() => document.querySelector('#arcPvBody img') === window.__pvRef && document.getElementById('arcPvBody').scrollTop === 45), '체크박스 선택 시 인라인 미리보기 DOM·scrollTop 보존');
+        must(await p.evaluate(() => document.querySelector('#arcPvBody img') === window.__pvRef && Math.abs(window.scrollY - 45) <= 2), '체크박스 선택 시 인라인 미리보기 DOM·스크롤 보존');
         await p.click('#histBox tr[data-arcf="fake_file_id_0004"] input[data-sel="arc"]'); await w(150);
         await p.evaluate(() => {
           const img = document.querySelector('#arcPvBody img');
           if (img) img.style.height = '';
+          window.scrollTo(0, 0);
           delete window.__pvRef;
         });
         await p.selectOption('#arcPvKind', 'etc'); await w(250);
@@ -148,11 +182,15 @@ module.exports = {
       }
       await p.fill('#histBox [data-hist-q="1"]', '존재하지않는검색어'); await w(200);
       must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 0 && !document.querySelector('#histBox .hd-sum-ttl')), '검색 0건 시 오른쪽 패널도 비움 안내로 전환');
-      await p.click('#histBox .hd-right [data-act="histReset"]'); await w(200);
+      await p.click('#histBox .hd-right [data-act="histReset"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 3), '전체 연도 보기 복원');
       await p.click('#histBox [data-act="histTab"][data-v="logs"]'); await w(200);
-      must(await p.evaluate(() => /2026 09 등기 반영/.test((document.querySelector('#histBox .hd-done-list') || {}).textContent || '')), '바뀐 기록 탭 표시 필요');
-      await p.click('#histBox [data-act="histTab"][data-v="archive"]'); await w(200);
+      must(await p.evaluate(() => {
+        const ltxt = (document.querySelector('#histBox .hd-done-list') || {}).textContent || '';
+        const rtxt = (document.querySelector('#histBox .hd-right') || {}).textContent || '';
+        return /2026 09 등기 반영/.test(ltxt) && /2026 09 등기 반영/.test(rtxt) && /사원 4명 현행화/.test(rtxt);
+      }), '바뀐 기록 탭 선택 시 왼쪽 목록과 오른쪽 전체 내용 모두 표시 필요');
+      await p.click('#histBox [data-act="histTab"][data-v="archive"]'); await w(250);
     } },
     /* 등기 현황 — 지사장 짝: 처음엔 한 곳 미정 → 사원을 고르면 띠·직책이 바뀜 → 사원 이름을 고치면 따라옴 → 미정으로 되돌림. 어긋나면 throw → 결과 json 의 navErr */
     { name: 'basehead', run: async (p) => {
@@ -185,7 +223,7 @@ module.exports = {
       await p.evaluate(() => { window.BASE_DRAFT = null; window.drawBase(); });
     } },
     /* 오른쪽 보기 칸(폰에서는 전체를 덮는 창) — 파일 받기는 가짜(작은 그림)로 */
-    { name: 'side', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#tabs button[data-tab=hist]'); await p.waitForTimeout(200); await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await p.waitForTimeout(200); if (p.viewportSize().width >= 1080) { await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); await p.waitForTimeout(250); await p.click('#histBox [data-act="arcPopSide"]'); } else { await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } await p.waitForTimeout(300); } },
+    { name: 'side', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; }); await p.evaluate(stubArcPreview); await p.click('#tabs button[data-tab=hist]'); await p.waitForTimeout(250); await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await p.waitForTimeout(250); if (p.viewportSize().width > 768) { await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); await p.waitForTimeout(250); await p.click('#histBox [data-act="arcPopSide"]'); } else { await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } await p.waitForTimeout(300); } },
     /* 새 서류 보기 칸 — ② 에서 저절로 열림 · 이전/다음 · 줄 누르기 · 새 서류↔지난 원본 · ①에서 고치면 다시 그림 · Esc 뒤엔 저절로 다시 열지 않음 · 건을 닫으면 칸도 닫힘.
        어긋나면 throw → 결과 json 의 navErr 에 나온다 */
     { name: 'docflow', wait: 800, run: async (p) => {
