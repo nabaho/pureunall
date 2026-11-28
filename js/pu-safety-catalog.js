@@ -498,17 +498,17 @@
     { code: 'risk_proc', name: '3. 위험성평가 절차서·지침 및 실시 결과표', essential: true, refExample: '10.위험성평가 관련 절차서·유해위험요인 평가표' },
     { code: 'inspect_list', name: '4. 내부 안전보건점검 절차·자율점검 체크리스트', essential: true, refExample: '14.내부 안전보건점검 절차 및 반기 점검 체크리스트' },
     { code: 'edu_record', name: '5. 안전보건교육 계획 및 이수 일지(정기·신규·특수)', essential: true, refExample: '16.안전보건교육계획 및 서명부' },
-    { code: 'health_exam', code: 'health_exam', name: '6. 건강검진(일반·특수·야간) 명단·수검률 관리', essential: false, refExample: '17.사업장 건강검진 대상자명단 기준 수검률' },
+    { code: 'health_exam', name: '6. 건강검진(일반·특수·야간) 명단·수검률 관리', essential: false, refExample: '17.사업장 건강검진 대상자명단 기준 수검률' },
     { code: 'msds_list', name: '7. 취급 화학물질(MSDS) 리스트 및 경고표지', essential: false, refExample: '19.사용 또는 소지하는 MSDS 리스트·보관소 현황' },
     { code: 'emergency', name: '8. 비상대응계획·조직도·행동요령·비상연락망·훈련', essential: true, refExample: '22~26.비상대응 계획·조직도·행동요령·연락망' },
     { code: 'subcontract', name: '9. 도급·용역·위탁 적격 수급업체 선정·수준평가', essential: false, refExample: '적격 수급업체 안전보건 수준 평가 지침·협의체 회의록' },
-    { code: 'worker_voice', code: 'worker_voice', name: '10. 근로자 의견청취·제안·산보위/노사협의회 기록', essential: true, refExample: '근로자 안전보건 의견청취함·개선처리 결과표' },
-    { code: 'accident_near', code: 'accident_near', name: '11. 산업재해·아차사고 조사 및 재발방지 대책', essential: false, refExample: '최근 3년 산재·아차사고 발굴대장 및 개선조치' },
-    { code: 'rules_hr', code: 'rules_hr', name: '12. 안전보건관리규정 · 취업규칙 안전보건 조항', essential: false, refExample: '취업규칙·안전보건관리규정 정비 및 작업중지권 조항' },
-    { code: 'round_log', code: 'round_log', name: '13. 컨설팅 회차별 수행보고서 · 면담 · 현장사진', essential: true, refExample: '1~5회차 수행 결과 보고서·CEO/근로자 면담 기록' },
-    { code: 'summary_rpt', code: 'summary_rpt', name: '14. 종합보고서 · 핵심 개선사항 1P 요약보고서', essential: true, refExample: '최종 회차 사업주 제공 종합보고서 및 1P 요약 강평본' },
+    { code: 'worker_voice', name: '10. 근로자 의견청취·제안·산보위/노사협의회 기록', essential: true, refExample: '근로자 안전보건 의견청취함·개선처리 결과표' },
+    { code: 'accident_near', name: '11. 산업재해·아차사고 조사 및 재발방지 대책', essential: false, refExample: '최근 3년 산재·아차사고 발굴대장 및 개선조치' },
+    { code: 'rules_hr', name: '12. 안전보건관리규정 · 취업규칙 안전보건 조항', essential: false, refExample: '취업규칙·안전보건관리규정 정비 및 작업중지권 조항' },
+    { code: 'round_log', name: '13. 컨설팅 회차별 수행보고서 · 면담 · 현장사진', essential: true, refExample: '1~5회차 수행 결과 보고서·CEO/근로자 면담 기록' },
+    { code: 'summary_rpt', name: '14. 종합보고서 · 핵심 개선사항 1P 요약보고서', essential: true, refExample: '최종 회차 사업주 제공 종합보고서 및 1P 요약 강평본' },
     { code: 'permit_loto', name: '15. 안전작업허가서(화기·밀폐·고소) 및 LOTO 절차', essential: false, refExample: '비일상작업 운전정지(LOTO) 및 안전작업허가서' },
-    { code: 'gov_aid_link', code: 'gov_aid_link', name: '16. 정부 재정지원사업 연계 검토·신청 자료', essential: false, refExample: '클린사업장·안전일터·안전동행·융자 연계 검토서' }
+    { code: 'gov_aid_link', name: '16. 정부 재정지원사업 연계 검토·신청 자료', essential: false, refExample: '클린사업장·안전일터·안전동행·융자 연계 검토서' }
   ];
 
   /* ══ 8. 2026 공단 연계 정부 재정지원사업 7종 (설명회 공식 안내 기준) ══ */
