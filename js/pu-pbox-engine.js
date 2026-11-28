@@ -1453,9 +1453,15 @@
   var DEFAULT_LAW_ABBREV_MAP = {
     '근기법': '근로기준법',
     '근기': '근로기준법',
+    '산재': '산업재해보상보험법',
     '산재법': '산업재해보상보험법',
     '산재보험법': '산업재해보상보험법',
+    '산안': '산업안전보건법',
     '산안법': '산업안전보건법',
+    '고보': '고용보험법',
+    '최임': '최저임금법',
+    '임채': '임금채권보장법',
+    '퇴직급여': '근로자퇴직급여보장법',
     '중처법': '중대재해처벌등에관한법률',
     '중대재해처벌법': '중대재해처벌등에관한법률',
     '중대재해법': '중대재해처벌등에관한법률',
@@ -1729,10 +1735,11 @@
     var combined = [ops.baseQuery, String(subQuery || '').trim()].filter(Boolean).join(' ');
     if (!combined) return [];
     var rawList = ops.phrases.slice();
-    var splitWords = combined.split(/[\s,·/()[\]"'“”‘’?!+-]+/).filter(Boolean);
+    var splitWords = combined.split(/[\s,·./()[\]"'“”‘’?!+-]+/).filter(Boolean);
     for (var i = 0; i < splitWords.length; i++) {
       var w0 = splitWords[i].replace(/(?:은|는|이|가|을|를|의|에|에서|으로|로|과|와|도|만)$/, '');
       var w = stripQueryMetaSuffix(w0);
+      if (/(?:았는데|었는데|했는데|였는데|렸는데|쳤는데|됐는데|되나요|하나요|인가요|할까요|있나요|없나요|어떻게|해야하나|해야하나요|싶은데|같아요|입니다|합니다|됩니다|습니다)$/.test(w)) continue;
       if (w.length >= 2 && !LOW_INFO_QUERY_TOKENS.has(w.toLowerCase()) && rawList.indexOf(w) < 0) rawList.push(w);
     }
     return rawList.slice(0, 8);
