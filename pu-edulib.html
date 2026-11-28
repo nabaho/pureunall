@@ -53,11 +53,11 @@ a{color:var(--blue-d);text-decoration:none}
 .chip{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--line);color:var(--ink2);font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
 
 #head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
-#head .top{display:flex;align-items:center;gap:10px;padding:8px 16px}
-#head h1{margin:0;font-size:17px;white-space:nowrap}
-#head .sub{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tabs{display:flex;gap:4px;padding:0 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
-.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--ink2)}
+#head .top{display:flex;align-items:center;gap:8px;padding:5px 12px}
+#head h1{margin:0;font-size:15px;white-space:nowrap}
+#head .sub{color:var(--mute);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:3px;padding:0 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:5px 10px;font-size:12px;color:var(--ink2)}
 .tabs button.on{border-bottom-color:var(--blue);color:var(--blue-d);font-weight:700}
 #lock{display:none;max-width:520px;margin:60px auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center}
 main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
@@ -68,10 +68,10 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 /* ── 한눈에(대시보드) ── */
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;white-space:normal;color:var(--ink)}
-.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
-.kpi span{color:var(--mute);font-size:12px;white-space:nowrap}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:7px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 9px;text-align:left;white-space:normal;color:var(--ink);display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:5px;min-width:0}
+.kpi b{display:inline;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kpi span{color:var(--mute);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .cat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;white-space:normal}
 .cat:hover{border-color:var(--blue-line);background:var(--blue-bg)}
@@ -337,9 +337,9 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   main{padding:8px 6px 80px}
   .card{padding:8px 7px}
   table.lst tr{padding:6px 6px}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .kpi{padding:8px 10px}
-  .kpi b{font-size:20px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .kpi{padding:4px 8px}
+  .kpi b{font-size:13px}
   /* 종류 카드 — 폰에서는 두 칸, 근거 조문 줄은 접는다(법정 표시는 그대로) */
   .cats,.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .lgrp{padding:6px}
@@ -421,7 +421,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 :where(body.pu-design) .mx th{color:var(--pu-sub);font-weight:800}
 /* 숫자 카드 — 공용 A 틀은 숫자를 19px(폰 16px)로 줄이지만, 이 앱 숫자는 원래 22px(폰 20px) — 목업 «큰 숫자 22px» 와 같다.
    앱 값을 지킨다. 공용 파일이 이 파일 «뒤»에 실려 같은 세기면 지므로 .kpis 를 붙여 한 단계 세게 */
-:where(body.pu-design) .kpis .kpi b{font-size:22px}
+:where(body.pu-design) .kpis .kpi b{font-size:13.5px}
 /* 종류 카드 — 작은 카드 둥글기 + 옅은 그림자(왼쪽 파란 «법정» 띠는 그대로) */
 :where(body.pu-design) .cat{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
 /* 상태·원본 딱지 — 알약(색 짝은 그대로) */
@@ -433,12 +433,12 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 /* 폰 — 앱 폰 구간 값을 다시 맞춘다: 자세히 창은 화면 가득(둥근 모서리 없음) */
 @media (max-width:768px){
   :where(body.pu-design) .mbox{border-radius:0}
-  :where(body.pu-design) .kpis .kpi b{font-size:20px}
+  :where(body.pu-design) .kpis .kpi b{font-size:13px}
 }
 /* ══ pu-design 끝 ══ */
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design pu-frame-a">
 <aside class="sb" id="sb" aria-label="강의자료 메뉴">

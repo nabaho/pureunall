@@ -34,6 +34,7 @@
     snapshots: {},
     companies: [],
     consultings: [],
+    contracts: [],
     bizTypes: [],
     scalCos: {},
     scalTypes: {},
@@ -234,6 +235,7 @@
         return { id: str(c.id), name: str(c.name), bizNo: str(c.bizNo), bizType: str(c.bizType), bizItem: str(c.bizItem), managerMain: str(c.managerMain) };
       }),
       consultings: D.consultings.slice(0, 1000),
+      contracts: D.contracts.slice(0, 1000),
       bizTypes: D.bizTypes,
       scalCos: D.scalCos,
       scalTypes: D.scalTypes
@@ -247,6 +249,7 @@
     D.checks = snap.checks || {};
     D.companies = Array.isArray(snap.companies) ? snap.companies : [];
     D.consultings = Array.isArray(snap.consultings) ? snap.consultings : [];
+    D.contracts = Array.isArray(snap.contracts) ? snap.contracts : [];
     D.bizTypes = Array.isArray(snap.bizTypes) ? snap.bizTypes : [];
     D.scalCos = snap.scalCos || {};
     D.scalTypes = snap.scalTypes || {};
@@ -266,7 +269,7 @@
     DISCOVER_LIST = [];
     MAIL_VIEW_CACHE = Object.create(null);
     FOLDER_STATE = { rootName: '', handle: null, needsPerm: false, rawEntries: [], groups: [], guideFileCount: 0, totalAcceptedFiles: 0, skippedNonSafety: 0, skippedPersonal: 0 };
-    D = { projects: {}, checks: {}, intake: {}, reports: {}, snapshots: {}, companies: [], consultings: [], bizTypes: [], scalCos: {}, scalTypes: {}, mailFolders: {}, mailMsgs: {}, flatMails: [] };
+    D = { projects: {}, checks: {}, intake: {}, reports: {}, snapshots: {}, companies: [], consultings: [], contracts: [], bizTypes: [], scalCos: {}, scalTypes: {}, mailFolders: {}, mailMsgs: {}, flatMails: [] };
     setSyncStateText('');
     if (global.PuFastBoot && typeof global.PuFastBoot.clearAll === 'function') {
       try { global.PuFastBoot.clearAll(); } catch (e) {}
@@ -291,7 +294,8 @@
       safeVal('data/consultings'),
       safeVal('data/biz_cons_types'),
       safeVal('scal_cos'),
-      safeVal('scal_types')
+      safeVal('scal_types'),
+      safeVal('data/contracts')
     ]);
     var pMail = Promise.all([
       safeVal('mailbox/folders'),
@@ -314,6 +318,7 @@
       D.bizTypes = rowsOf(cRes[3]);
       D.scalCos = cRes[4] || {};
       D.scalTypes = cRes[5] || {};
+      D.contracts = rowsOf(cRes[6]);
       rebuildScanAndDiscover();
       applyHashTarget();
       if (!isUiBusyForBgRedraw()) draw();
@@ -336,6 +341,7 @@
     D.bizTypes = rowsOf(cFinal[3]);
     D.scalCos = cFinal[4] || {};
     D.scalTypes = cFinal[5] || {};
+    D.contracts = rowsOf(cFinal[6]);
     D.mailFolders = mFinal[0] || {};
     D.mailMsgs = mFinal[1] || {};
     D.flatMails = Intake().flattenMailboxRows(D.mailFolders, D.mailMsgs);
@@ -383,12 +389,13 @@
     SCAN_CACHE = {};
     var projs = activeProjects();
     projs.forEach(function (p) {
-      SCAN_CACHE[p.id] = Intake().scanProjectMails(p, D.flatMails, null, D.companies, D.consultings, D.intake[p.id] || {});
+      SCAN_CACHE[p.id] = Intake().scanProjectMails(p, D.flatMails, null, D.companies, D.consultings, D.intake[p.id] || {}, D.contracts);
     });
 
     DISCOVER_LIST = Intake().discoverSafetyCandidates({
       companies: D.companies,
       consultings: D.consultings,
+      contracts: D.contracts,
       bizTypes: D.bizTypes,
       scalCos: D.scalCos,
       scalTypes: D.scalTypes,
@@ -1015,6 +1022,8 @@
       '<span><b>상시근로자</b>' + (proj.workerCount ? proj.workerCount + '명 (' + esc(scales.scaleBand) + ')' : '미입력') + '</span>' +
       '<span><b>체계 수준</b><b>' + esc(sum.grade) + ' (' + sum.overallPct + '%)</b></span>' +
       '<span class="sp"></span>' +
+      '<a class="act-link" href="pu-erp.html?sso=1" target="_blank" rel="noopener">🏢 ERP</a>' +
+      '<a class="act-link" href="pu-cards.html?sso=1&q=' + encodeURIComponent(proj.companyName || '') + '" target="_blank" rel="noopener">📇 기업정보함</a>' +
       '<button class="sm pri" data-act="open-config-modal">🏭 업종·트랙·규모·기인물 설정</button>' +
       '</div>' +
       '<div class="note" style="margin:8px 12px 0"><b>규모별 핵심 법적의무:</b> ' +
@@ -1056,7 +1065,10 @@
     var totalMailHits = 0;
     projs.forEach(function (p) {
       var sc = SCAN_CACHE[p.id];
-      if (sc) { totalMailHits += sc.matched.length; preAlertCount += sc.unseenCount; }
+      if (sc) {
+        totalMailHits += sc.matched.length + (sc.nameCandidates ? sc.nameCandidates.length : 0);
+        preAlertCount += sc.unseenCount;
+      }
     });
     if ($('nProjects')) $('nProjects').textContent = String(projs.length);
     if ($('nChkAlerts')) $('nChkAlerts').textContent = String(projs.length ? activeCount : 0);
@@ -1090,17 +1102,18 @@
   }
 
   function drawProjectsPane(projs, archiveCount, activeCount) {
-    var avgPct = projs.length
-      ? Math.round(projs.reduce(function (acc, p) { return acc + Report().computeCheckSummary(p, checkDocOf(p.id)).overallPct; }, 0) / projs.length)
+    var activeProjs = projs.filter(function (p) { return !(p.status === 'archive' || num(p.year, 2026) < 2026); });
+    var activeAvgPct = activeProjs.length
+      ? Math.round(activeProjs.reduce(function (acc, p) { return acc + Report().computeCheckSummary(p, checkDocOf(p.id)).overallPct; }, 0) / activeProjs.length)
       : 0;
     var indCoverage = Object.keys(projs.reduce(function (m, p) { m[p.industryCode || 'mfg_general'] = 1; return m; }, {})).length;
 
     $('kpiBox').innerHTML =
-      '<div class="kpi k-blue"><span>총 안전보건 사업장</span><b>' + projs.length + '개소</b></div>' +
-      '<div class="kpi k-green"><span>📚 과거 수행이력(완료)</span><b>' + archiveCount + '개소</b></div>' +
-      '<div class="kpi k-amber"><span>🚀 2026·신규 진행</span><b>' + activeCount + '개소</b></div>' +
-      '<div class="kpi"><span>등록 업종 스펙트럼</span><b>' + indCoverage + ' / 8개 업종</b></div>' +
-      '<div class="kpi k-blue"><span>평균 체계구축 충족률</span><b>' + avgPct + '%</b></div>';
+      '<div class="kpi k-blue"><span>총 사업장</span><b>' + projs.length + '곳</b></div>' +
+      '<div class="kpi k-green"><span>완료</span><b>' + archiveCount + '곳</b></div>' +
+      '<div class="kpi k-amber"><span>진행</span><b>' + activeCount + '곳</b></div>' +
+      '<div class="kpi"><span>업종</span><b>' + indCoverage + '/8</b></div>' +
+      '<div class="kpi k-blue"><span>진행 충족</span><b>' + activeAvgPct + '%</b></div>';
 
     var q = str($('projQ') && $('projQ').value).toLowerCase();
     var stFilter = $('projStatus') ? $('projStatus').value : '';
@@ -1128,10 +1141,15 @@
       var cd = checkDocOf(p.id);
       var sum = Report().computeCheckSummary(p, cd);
       var sc = SCAN_CACHE[p.id] || { matched: [] };
+      var mailCnt = sc.matched.length + (sc.nameCandidates ? sc.nameCandidates.length : 0);
       var intakeCnt = Object.keys(D.intake[p.id] || {}).filter(function (k) { return D.intake[p.id][k] && !D.intake[p.id][k]._deleted; }).length;
-      var archChip = (p.status === 'archive' || num(p.year, 2026) < 2026)
+      var isArch = p.status === 'archive' || num(p.year, 2026) < 2026;
+      var archChip = isArch
         ? '<span class="chip c-green">과거이력</span>'
         : '<span class="chip c-blue">진행중</span>';
+      var rateHtml = (isArch && sum.overallPct === 0 && sum.preDone === 0)
+        ? '<span class="chip c-green">수행완료</span>'
+        : '<span class="chip">' + esc(sum.grade) + ' ' + sum.overallPct + '%</span> 사전 ' + sum.preDone + '/' + sum.preTotal;
 
       return {
         id: p.id,
@@ -1139,8 +1157,8 @@
           { cls: 'ti', title: p.companyName, html: esc(p.companyName) + ' <span class="chip">' + esc(p.year || 2026) + '</span> ' + archChip },
           { k: 'badge', html: '<span class="chip ' + esc(ind.badgeCls) + '">' + esc(ind.short) + '</span> <span class="chip ' + esc(tr.badgeCls) + '">' + esc(tr.short) + '</span>' },
           { html: esc(p.workerCount ? p.workerCount + '명' : '-') + (p.roundCount ? ' · ' + p.roundCount + '회' : '') },
-          { html: '<span class="chip">' + esc(sum.grade) + ' ' + sum.overallPct + '%</span> 사전 ' + sum.preDone + '/' + sum.preTotal },
-          { html: '메일 ' + sc.matched.length + ' · 자료 ' + intakeCnt },
+          { html: rateHtml },
+          { html: '메일 ' + mailCnt + ' · 자료 ' + intakeCnt },
           { cls: 'wide', title: p.summaryNote, html: esc(p.summaryNote || ind.approach) },
           {
             k: 'act',
@@ -1182,6 +1200,7 @@
     }
 
     /* 자동 발견 후보 카드 */
+    if ($('discoverCard')) $('discoverCard').style.display = DISCOVER_LIST.length ? '' : 'none';
     var dRows = DISCOVER_LIST.slice(0, 60).map(function (c) {
       var ind = Cat().getIndustry(c.industryCode);
       var tr = Cat().getTrack(c.track);
