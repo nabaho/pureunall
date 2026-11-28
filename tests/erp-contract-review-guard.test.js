@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
+const { CONS_FAMILY_FNS } = require('./helpers/cons-family.js');   // 사업 갈래 함수(2026-11-28)
 const PuQuoteDetect = require('../js/pu-quote-detect.js');
 const PuCaseStage = require('../js/pu-case-stage.js');
 
@@ -40,7 +41,7 @@ test('② PuQuoteDetect — 수습평가기간 연장합의서·양식 검토 �
 test('③ 해지 통보 메일·기이관 업무·활성 자문업체·구분자(:) 메일은 중복 계약 카드로 생성되지 않는다', async () => {
   const FN = [
     'function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
-    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(',
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(', ...CONS_FAMILY_FNS,
     'function erpVatTextToFlag(', 'function erpDocText(', 'function erpCmsFromDoc(',
     'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
     'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('
@@ -263,7 +264,7 @@ test('⑥ 상담접수 및 견적서 송부 라벨 적용 + 견적서 송부 내
 test('⑦ 상대방 계약서 회신 시 기존 빈 내용 상담접수·계약협의 중복 카드를 정본 1장으로 합쳐 계약확정(signed)으로 올린다', async () => {
   const FN = [
     'function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
-    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(',
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(', ...CONS_FAMILY_FNS,
     'function erpVatTextToFlag(', 'function erpDocText(', 'function erpCmsFromDoc(',
     'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
     'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('

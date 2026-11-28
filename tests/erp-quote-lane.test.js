@@ -19,6 +19,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn.js');
+const { CONS_FAMILY_FNS } = require('./helpers/cons-family.js');   // 사업 갈래 함수(2026-11-28)
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 
@@ -298,7 +299,7 @@ test('⑳ 걸린 요청 창 — 견적 길 요청은 담당자 고르기·연결
 
 test('㉑ 사진첩·메일함 계약서(photo_contract) — 금액·성공보수·사건/자문 종류 판별', () => {
   const FN = ['function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
-    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName('].map((d) => cutFn(SRC, d)).join('\n');
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(', ...CONS_FAMILY_FNS].map((d) => cutFn(SRC, d)).join('\n');
   const ctx = { console, Date, Object, Array, String, Number, JSON, Math, parseInt, parseFloat };
   vm.createContext(ctx);
   vm.runInContext(FN + '\nthis.api={erpParseContractMoney,erpParseSuccessFee,erpGuessContractFromFields};', ctx);
@@ -322,7 +323,7 @@ test('㉑ 사진첩·메일함 계약서(photo_contract) — 금액·성공보�
 test('㉒ processPhotoContractRequest — 계약서 판독 값으로 계약 내용을 채우고 계약확정(signed)으로 배치·이동한다', async () => {
   const FN = [
     'function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
-    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(',
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(', ...CONS_FAMILY_FNS,
     'function erpVatTextToFlag(', 'function erpDocText(', 'function erpCmsFromDoc(',
     'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
     'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('

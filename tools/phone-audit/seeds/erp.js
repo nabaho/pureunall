@@ -111,6 +111,42 @@ for (let i = 0; i < 30; i++) {
   }, x.extra || {}));
 });
 
+/* ── ⚠ 컨설팅 유형 확인 (2026-11-28) — 모두 지어낸 것
+   ① 계약협의 · 업무 요약은 «위험성평가·작업중지명령 해제 대응»인데 유형이 현장클리닉 → 카드 «⚠ 유형?» · 계약창 안내 줄 · 점검 창
+   ② 상담접수 · 유형 비었음 · 견적 범위에 «중대재해 예방 안전보건관리체계» → «⚠ 유형 비었음» */
+/* ⚠ 앱 씨앗(BIZ_CONS_SEED 13가지)보다 적게 심으면 «데이터 급감 차단» 창이 뜬다 — 씨앗 코드를 다 담고 산업안전 하나를 더한다 */
+const 컨설팅유형 = [
+  { code: 'cons-clinic', short: '현장클리', name: '현장클리닉', dayFee: 350000, sortOrder: 5 },
+  { code: 'cons-ilteo', short: '일혁', name: '일터상생혁신컨설팅', agency: '노사발전재단', sortOrder: 10 },
+  { code: 'cons-job-neung', short: '산능', name: '산업일자리전환컨설팅능률', agency: '한국능률협회', sortOrder: 20 },
+  { code: 'cons-job-chung', short: '산충', name: '산업일자리전환컨설팅충남', agency: '충남기업혁신협회', sortOrder: 30 },
+  { code: 'cons-voucher', short: '바우', name: '혁신바우처컨설팅', agency: '중소벤처기업진흥공단', sortOrder: 40 },
+  { code: 'cons-safety', short: '산안', name: '산업안전컨설팅', sortOrder: 55 },
+  { code: 'cons-techguard', short: '기보', name: '통합기술보호지원단', dayFee: 300000, dayUnit: '회', dayVat: 'none', sortOrder: 60 },
+  { code: 'cons-hr', short: '인노', name: '인사노무컨설팅서산', sortOrder: 70 },
+  { code: 'cons-fund', short: '복기', name: '사내,공동근로복지기금설립컨설팅', sortOrder: 80 },
+  { code: 'cons-seed', short: '씨앗', name: '기초컨설팅푸른법인', sortOrder: 90 },
+  { code: 'cons-cci', short: '상공', name: '인사노무컨설팅충남북부상의', agency: '상공회의소', sortOrder: 100 },
+  { code: 'cons-edu', short: '교육', name: '교육컨설팅', sortOrder: 110 },
+  { code: 'cons-middle-age', short: '중사', name: '중장년사업담당자 인사노무', agency: '고용노동부', sortOrder: 115 },
+  { code: 'cons-other', short: '기타', name: '기타', sortOrder: 999 },
+];
+[
+  { id: 'ct-pa-ty1', no: 97, st: 'review', i: 24, tc: 'cons-clinic', brief: '[푸른노무법인] 위험성평가 및 작업중지명령 해제 대응 컨설팅' },
+  { id: 'ct-pa-ty2', no: 98, st: 'consult', i: 23, tc: '', brief: '', quote: '중대재해 예방 안전보건관리체계 구축 컨설팅' },
+].forEach((x) => {
+  계약.push({
+    id: x.id, entityType: 'contract', contractNo: `계약-2026-${String(100 + x.no)}`,
+    companyName: 업체명(x.i), clientName: 업체명(x.i), bizNo: 사업자(x.i), companyId: 'co-pa' + (x.i % 32),
+    managerMain: 담당(x.i), managerSubs: [], kind: 'consulting', kinds: ['consulting'],
+    typeCodes: { consulting: x.tc }, amounts: { consulting: 0 }, briefs: { consulting: x.brief },
+    quoteLogs: x.quote ? [{ date: 날(11, 20), folderLabel: '보낸메일함', scope: x.quote, subject: '견적서 송부' }] : undefined,
+    company: { name: 업체명(x.i), bizNo: 사업자(x.i), ceo: '점검대표자' + x.i, address: '', phone: '', email: '', fax: '', contacts: [{ name: '점검담당' + x.i }] },
+    status: x.st, consultDate: 날(11, 25), contractDate: 날(11, 25), note: '📄 푸른메일함에서 계약서 자동 정리 (위임계약서)',
+    createdAt: '2026-11-25T01:00:00.000Z', regAt: '2026-11-25T01:00:00.000Z',
+  });
+});
+
 /* ── 사건 28 ── */
 const 사건 = [];
 for (let i = 0; i < 28; i++) {
@@ -211,6 +247,7 @@ const data = {
     user_dir: { u: U, v: 사람 },
     companies: { u: U, v: 지도(업체) },
     contracts: { u: U, v: 지도(계약) },
+    biz_cons_types: { u: U, v: 컨설팅유형 },
     cases: { u: U, v: 지도(사건) },
     consultings: { u: U, v: 지도(사업('consulting', 'cn', 26, 5)) },
     funds: { u: U, v: 지도(사업('fund', 'fd', 26, 7)) },
@@ -273,6 +310,33 @@ module.exports = {
         await page.getByText('CMS 자동이체', { exact: false }).last().scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
       },
       back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
+    },
+    /* ⚠ 컨설팅 유형 확인 (2026-11-28) — 카드 «⚠ 유형?» 을 누르면 계약 창이 열리고, 계약정보 탭 유형 칸 바로 아래 안내 줄이 보인다 */
+    { name: 'contract-typeck', wait: 1500,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/contract')); await page.waitForTimeout(2500);
+        await page.locator('main button', { hasText: '⚠ 유형?' }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(1500);
+        await page.evaluate(() => {
+          const b = [...document.querySelectorAll('button')].find(x => /^\s*📄\s*계약정보\s*$/.test(x.textContent));
+          if (!b) throw new Error('계약정보 탭을 못 찾았습니다'); b.click();
+        });
+        await page.waitForTimeout(500);
+        await page.locator('.pu-tyck').first().scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
+    },
+    /* ⚠ 유형 점검 창 — PC 는 도구줄 단추, 폰은 «⋯ 더보기»에서 고른다. ☐ 하나를 눌러 「N건 선택」 띠까지 본다(고르기만으로는 안 바뀐다) */
+    { name: 'contract-typeaudit', wait: 1200,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/contract')); await page.waitForTimeout(2500);
+        const btn = page.locator('button', { hasText: '⚠ 유형 확인' }).first();
+        if (await btn.count()) await btn.click({ timeout: 5000 });
+        else await page.locator('select[aria-label="계약관리 더보기"]').selectOption('tyau');
+        await page.waitForTimeout(800);
+        await page.locator('.tyau-row:not(.tyau-th) input[type=checkbox]').first().click({ timeout: 3000 });
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); },
     },
     /* 계약 창의 세 탭 — 폰에서 칸이 세로로 깨지던 자리(대표 갈무리 2026-10-22) */
     ...['기업정보', '계약정보', '담당자'].map((tab, i) => ({

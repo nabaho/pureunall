@@ -326,11 +326,14 @@ test('⑫ 저장을 막는 잣대(erpContractDupBlock) — 성과추적 ↔ 원�
   assert.equal(D.erpContractDupBlock(KC({}), [perf]).length, 0, '원래 현장클리닉을 성과추적 계약 때문에 막습니다');
   assert.equal(D.erpContractDupBlock(KC({}), [regular]).length, 1, '★ 같은 원래 현장클리닉 둘은 여전히 묻는다');
   assert.equal(D.erpContractDupBlock(KC({ perfTrack: true }), [perf]).length, 1, '★ 성과추적 둘은 여전히 묻는다');
-  /* 유형을 안 건드려 드롭다운 첫 항목이 골라진 채로 저장해도(typeCodes 빔) 같은 판정 */
+  /* 유형을 안 고르고(typeCodes 빔) 저장하면 — 2026-11-28 부터 «첫 항목(현장클리닉)»으로 보지 않는다
+     (대표 지시 「위험성평가·작업중지 해제 대응인데 왜 현장클리닉이냐」 — 첫 항목으로 보던 것이 그 잘못의 뿌리였다).
+     세부 종류를 모르니 같은 사업장 컨설팅이면 묻는다(contractDupVerdict 의 unknown). 화면도 «유형을 골라 주세요»로 보인다. */
   D.__store.biz_cons_types = [{ code: 'cons-clinic', short: '클릭', name: '현장클리닉' }, { code: 'cons-hr', short: '인노', name: '인사노무' }];
-  assert.equal(D.erpContractDupBlock({ kinds: ['consulting'], typeCodes: {}, company: CO, perfTrack: true }, [regular]).length, 0,
-    '화면에 골라져 있는 유형(첫 항목)으로 판정하지 않습니다');
-  delete D.__store.biz_cons_types;
+  try {
+    assert.equal(D.erpContractDupBlock({ kinds: ['consulting'], typeCodes: {}, company: CO, perfTrack: true }, [regular]).length, 1,
+      '유형을 안 골랐는데 첫 항목(현장클리닉)으로 보아 묻지 않습니다');
+  } finally { delete D.__store.biz_cons_types; }
 });
 
 test('⑫ 「지난 중복 훑기」 — 성과추적은 원래 현장클리닉과 «다른 묶음»이고 이름표에 성과추적이 붙는다', () => {
