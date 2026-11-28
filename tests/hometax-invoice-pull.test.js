@@ -118,7 +118,7 @@ test('③ 보관함에 더하기 — 새 줄·합침·이미 있음', () => {
   const b = HT.mapRow(prow({ ntsconfirmNum: 'B0000000000000000000000b', invoiceeCorpNum: '3330000000', invoiceeCorpName: '다라', supplyCostTotal: '300000' }));
   const c = HT.mapRow(prow({ ntsconfirmNum: 'C0000000000000000000000c', invoiceeCorpNum: '4440000000', invoiceeCorpName: '마바', supplyCostTotal: '400000' }));
   const ex = {
-    old1: { _id: '(주)가나상사|2026-11-10|200000|자문료#1', company: '(주)가나상사', biznum: '220-88-00000', date: '2026-11-10', supply: 200000, t: 1 },
+    old1: { _id: '(주)가나상사|2026-11-10|200000|자문료#1', company: '(주)가나상사', biznum: '123-88-00000', date: '2026-11-10', supply: 200000, t: 1 },
     old2: { _id: '다라|2026-11-10|300000|#1', company: '주식회사 다라', date: '2026-11-10', supply: 300000, t: 1 },
     old3: { _id: '마바|2026-11-10|400000|#1', company: '마바', biznum: '9990000000', date: '2026-11-10', supply: 400000, t: 1 }
   };
