@@ -910,7 +910,7 @@ test('★★ 도약 잣대 — 참여기업 모집·양식·설명회는 잡고,
 });
 
 test('★★ 모집공고 목록 — 제목 링크의 «;jsessionid=…» 를 떼어 다음 날에도 열리는 주소를 남긴다', () => {
-  const html = '<table><tbody><tr><td>2</td><td>일반</td><td><a href="/portal/board/recrtView;jsessionid=B2AD77D404477C1B56DD181A380620C4?noticeSeq=4&amp;pageNo=1">2027년 도약(Jump-Up)프로그램 참여기업 모집</a></td><td>2026-10-15 13:00 ~ 2026-11-13 17:00</td></tr></tbody></table>';
+  const html = '<table><tbody><tr><td>2</td><td>일반</td><td><a href="/portal/board/recrtView;jsessionid=TESTSESSION0000000000000000000000?noticeSeq=4&amp;pageNo=1">2027년 도약(Jump-Up)프로그램 참여기업 모집</a></td><td>2026-10-15 13:00 ~ 2026-11-13 17:00</td></tr></tbody></table>';
   const rows = W.parseRows(html, 'https://jumpup.or.kr/portal/board/recrtList', W.BOARDS.find((x) => x.id === 'jumpup_recrt'));
   assert.equal(rows.length, 1);
   assert.equal(rows[0].href, 'https://jumpup.or.kr/portal/board/recrtView?noticeSeq=4&pageNo=1');
@@ -929,4 +929,25 @@ test('★★ 도약 공지 — 제목 링크가 javascript:void(0) 여도 글은
   const have = {}; r.hits.forEach((h) => { have[h.key] = h; });
   const again = await W.run({ boards: W.BOARDS.filter((b) => b.id === 'jumpup'), fetchText: () => Promise.resolve(html), today: '2026-11-29', nowIso: 'T', existing: have });
   assert.equal(again.hits.length, 0);
+});
+
+test('★★ 도약 잣대 — 「인력풀·전문가 풀·pool」은 잡고, 「풀타임」 같은 말은 안 잡는다(한글 뒤 \b 는 안 먹는다)', () => {
+  const b = W.BOARDS.find((x) => x.id === 'jumpup');
+  assert.equal(W.pass(b, '도약 프로그램 전문가 풀 안내'), true);
+  assert.equal(W.pass(b, '도약프로그램 인력풀 구성 안내'), true);
+  assert.equal(W.pass(b, '도약 프로그램 Pool 구성'), true);
+  assert.equal(W.pass(b, '도약 프로그램 풀타임 근무 안내'), false);
+});
+
+test('★★ 도약 게시판은 글 링크가 «다른 호스트»면 링크를 비운다 — 서버가 남의 주소를 따라가 열지 않는다(검토 2026-11-28)', () => {
+  const b = W.BOARDS.find((x) => x.id === 'jumpup_recrt');
+  assert.equal(b.sameHost, true);
+  const html = '<table><tbody>'
+    + '<tr><td><a href="https://evil.example/x">2027년 도약 참여기업 모집 안내 외부</a></td><td>2026-11-20</td></tr>'
+    + '<tr><td><a href="/portal/board/recrtView?noticeSeq=9">2027년 도약 참여기업 모집 안내 내부</a></td><td>2026-11-21</td></tr></tbody></table>';
+  const rows = W.parseRows(html, b.url, b);
+  assert.equal(rows.find((r) => /외부/.test(r.title)).href, '');
+  assert.equal(rows.find((r) => /내부/.test(r.title)).href, 'https://jumpup.or.kr/portal/board/recrtView?noticeSeq=9');
+  /* 호스트가 다른 링크는 본문을 열 대상이 아니다 — 그 글은 게시판 주소로 간다 */
+  assert.equal(W.hasDetail({ href: rows.find((r) => /외부/.test(r.title)).href || b.url }, b), false);
 });

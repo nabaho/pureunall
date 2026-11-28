@@ -179,9 +179,11 @@ const BOARDS = [
        컨설턴트·전문가 + 모집)로는 「참여기업 모집공고」를 놓친다 → 전용 잣대(rule:'jumpup' → isJumpup)를 쓴다.
        수행기관·서포터·평가위원 모집이 올라오면 같은 잣대가 잡는다.
      ⚠ 공지 목록의 제목 링크는 javascript:void(0) 라 주소를 비운다 — 화면은 게시판 주소로 보낸다(막다른 링크 아님).
-     ⚠ 읽기만 한다 — 로그인·가입·신청 없음. */
-  { id: 'jumpup',        org: 'jumpup', name: '도약(Jump-Up) 프로그램 공지',     url: 'https://jumpup.or.kr/portal/board/BoardList?bbsId=1', rule: 'jumpup' },
-  { id: 'jumpup_recrt',  org: 'jumpup', name: '도약(Jump-Up) 프로그램 모집공고', url: 'https://jumpup.or.kr/portal/board/recrtList', rule: 'jumpup' }
+     ⚠ 읽기만 한다 — 로그인·가입·신청 없음.
+     ⚠ sameHost — 글 링크가 «이 게시판과 같은 호스트»일 때만 서버가 본문을 연다(검토 2026-11-28: 다른 호스트 링크를 서버가 따라가
+       열면 안 된다). 다른 호스트면 링크를 비우고 화면은 게시판 주소로 보낸다. */
+  { id: 'jumpup',        org: 'jumpup', name: '도약(Jump-Up) 프로그램 공지',     url: 'https://jumpup.or.kr/portal/board/BoardList?bbsId=1', rule: 'jumpup', sameHost: true },
+  { id: 'jumpup_recrt',  org: 'jumpup', name: '도약(Jump-Up) 프로그램 모집공고', url: 'https://jumpup.or.kr/portal/board/recrtList', rule: 'jumpup', sameHost: true }
 ];
 
 /* 여러 기관 글이 섞인 게시판(org 가 빈 것)에서 제목으로 기관을 정한다.
@@ -249,6 +251,7 @@ function parseRows(html, base, board) {
     const h = /href\s*=\s*["']([^"']*)["']/i.exec(best.attrs);
     /* ⚠ 「;jsessionid=…」(도약 모집공고 목록 실측)는 그날 접속의 임시 번호다 — 메일·화면에 남으면 다음 날 죽은 링크가 된다. 뗀다. */
     if (h && h[1] && !/^\s*(javascript:|#)/i.test(h[1])) { try { href = new URL(h[1].replace(/&amp;/g, '&'), base).href.replace(/;jsessionid=[^?#]*/i, ''); } catch (e) { href = ''; } }
+    if (href && board && board.sameHost) { try { if (new URL(href).host !== new URL(base).host) href = ''; } catch (e) { href = ''; } }
     if (!href && board && board.js) { const j = board.js.re.exec(best.attrs); if (j) href = board.js.url.replace('{id}', j[1]); }
     const date = d[1] + '-' + pad(mo) + '-' + pad(da);
     const k = best.t + '|' + date; if (seen[k]) return; seen[k] = 1;
@@ -286,7 +289,8 @@ function isKcplaa(title) {
 /* 도약(Jump-Up) 프로그램 잣대 — «기업이든 기관이든 사람이든» 새로 열리는 접수·설명회·양식 글이면 통과.
    ⚠ 이 게시판은 글이 적고(공지 38건) 거의 다 사업 안내라, 일반 잣대의 「누구(WHO)」 조건을 걸지 않는다.
    ⚠ 끝난 글(결과·명단·최종선정)과 보안 안내(사칭·해킹메일)는 뺀다. 「개최」(사업설명회 개최)는 일부러 안 뺀다. */
-const JU_PICK = /모집|공고|공모|신청|접수|설명회|수행기관|서포터|디렉터|평가위원|위촉|풀\b|양식|추천/;
+/* ⚠ 「풀」은 «인력풀·전문가풀·pool» 꼴만 — 한글 뒤에서 \b(ASCII 단어 경계)는 동작하지 않고, 맨 「풀」은 「풀타임」 같은 말에도 걸린다 */
+const JU_PICK = /모집|공고|공모|신청|접수|설명회|수행기관|서포터|디렉터|평가위원|위촉|인력\s*풀|전문가\s*풀|\bpool\b|양식|추천/i;
 const JU_NOT = /결과|명단|합격|최종\s*선정|사칭|해킹/;
 function isJumpup(title) {
   const t = String(title || '');
