@@ -51,7 +51,7 @@ function make(deps) {
   const mgrWatch = deps.functions
     .region(deps.MAIL_REGION)
     .runWith({ timeoutSeconds: 120, memory: "256MB" })
-    .pubsub.schedule("*/10 7-21 * * *")
+    .pubsub.schedule("2-59/10 7-21 * * *")
     .timeZone("Asia/Seoul")
     .onRun(async () => { await watchOnce(); return null; });
 

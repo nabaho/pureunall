@@ -224,7 +224,7 @@ test('★★★ mailKeepWarm 은 서명을 붙여 readMailMessage 를 두드린�
 test('★★ 두드리는 사이가 «붙어 둔 연결을 버리는 잣대»보다 짧다 — 길면 매번 새로 붙는다', () => {
   const idle = Number((MS.match(/const WARM_IDLE_MS = (\d+) \* 60 \* 1000/) || [])[1]);
   const sched = (MS.match(/mailKeepWarm: F[\s\S]{0,400}\.pubsub\.schedule\('([^']+)'\)/) || [])[1] || '';
-  const every = Number((sched.match(/^\*\/(\d+) /) || [])[1]);
+  const every = Number((sched.match(/^(?:\*|\d+-\d+)\/(\d+) /) || [])[1]);
   assert.ok(idle > 0 && every > 0, '두 값을 못 찾았습니다: ' + sched);
   assert.ok(every < idle, '★★ ' + every + '분마다 두드리는데 연결은 ' + idle + '분 놀면 버립니다');
   assert.match(sched, / (\d+)-(\d+) \* \* /, '★ 밤에도 두드립니다 — 업무 시간만 두드릴 것');
