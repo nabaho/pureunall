@@ -150,6 +150,18 @@
         { key: 'ilteo',     icon: '🏭', name: '일터상생혁신',   when: '노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 로컬 비식별 정량 진단, 중간·최종 결과보고서(.pptx) 및 사후 이행관리 자동화', from: '푸른이알피·정부사업일정(참여 사업장), 푸른 메일(기초자료·후속 피드백 메일)', to: '중간·최종보고서(.pptx)·별첨 규정(.docx)·모의계산(.xlsx)·통합 패키지(.zip) 생성', ask: '일터상생혁신 앱의 단계별 사용법과 메일·비식별 진단 연결 방식을 알려줘' },
         { key: 'jobtrans',  icon: '⚡', name: '산업일자리전환', when: '능률협회(KMAC 구조혁신)·충남경제진흥원(CEPA 산업일자리전환) 맞춤 중간·최종보고서·완료계(.hwpx) 자동 작성 및 비식별 재무·인력 집계', from: '푸른이알피·정부사업일정(계약 확정 사업장), 푸른 메일(기초자료 메일 거울)', to: '운영기관별 정식 한글(.hwpx) 보고서·완료계 내려받기 및 한글 편집기 바로 열기', ask: '산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?' },
         { key: 'safety',    icon: '🦺', name: '안전보건체계구축', when: '과거 안전보건컨설팅 수행이력 비식별 통합, 신규 사업장 착수 사전체크(12)·7대 핵심요소·8대 업종별 특화 체크리스트·고위험 기인물 24종·위험성평가 및 종합/1P 요약보고서(.hwpx)', from: '푸른이알피·정부사업일정·푸른 메일(안전보건컨설팅 자료)·로컬 컨설팅 폴더', to: '종합보고서(7장)·핵심 개선사항 1P 요약보고서·업종별 체크리스트(.hwpx/.xlsx/.zip) 및 한글 편집기 연동', ask: '안전보건체계구축 앱은 어떻게 사용하고 업종별 체크리스트와 1P 요약보고서는 어떻게 만드나요?' },
+        { key: 'techprotect', icon: '🔐', name: '기술보호컨설팅', when: '대·중소기업·농어업협력재단 통합 기술보호지원반 영업비밀·비밀유지서약·경업금지·직무발명보상 자문 및 결과보고서(.hwpx)', from: '푸른 메일(IMAP+POP3)·카톡/문자 수집함·푸른이알피', to: '비밀유지/경업 서식·자문보고서(.hwpx) 및 수습 RAG 행동가이드', ask: '기술보호컨설팅 앱에서 영업비밀·경업금지 자문은 어떻게 진행하나요?' },
+        { key: 'clinic',      icon: '🩺', name: '현장클리닉',     when: '중소벤처기업청 비즈니스지원단 현장클리닉 상담위원 배정·현장방문확인서·사후자문 및 결과보고서(.hwpx)', from: '푸른 메일·카톡/문자 수집함·푸른이알피', to: '클리닉 상담일지·확인서·결과보고서(.hwpx)', ask: '현장클리닉 앱은 어떻게 사용하나요?' },
+        { key: 'chamber',     icon: '🏬', name: '상공회의소컨설팅', when: '충남북부상의·서산상의·대한상의 회원사 인사노무 현장자문 및 방문확인서/자문결과보고서(.hwpx)', from: '푸른 메일·카톡/문자 수집함·푸른이알피', to: '상의 자문보고서(.hwpx)·체크리스트', ask: '상공회의소컨설팅 앱 사용법을 알려줘' },
+        { key: 'hrconsult',   icon: '🗂️', name: '기초인사노무',   when: '민간 기업 근로계약서·연봉계약서·포괄임금/통상임금 임금설계 및 취업규칙 연계 자문', from: '푸른 메일·카톡/문자·기존 계약서 업로드', to: '계약·임금 설계 보고서(.hwpx)·수습 체크포인트', ask: '기초인사노무 앱은 언제 쓰나요?' },
+        { key: 'evalcomp',    icon: '📈', name: '평가보상·임금체계', when: '성과·역량평가, 직무분석·직무급, KPI/MBO, 성과급 및 PIP 성과관리제도 컨설팅', from: '푸른 메일·카톡/문자·인사제도 자료', to: '평가보상 설계보고서(.hwpx)·체크리스트', ask: '평가보상·임금체계 앱에서 불이익변경 절차는 어떻게 점검하나요?' },
+        { key: 'pubconsult',  icon: '🏤', name: '공공기관컨설팅', when: '공공기관·사회서비스원·지자체·공무직/돌봄종사자 인사제도 및 용역원가 컨설팅', from: '푸른 메일·카톡/문자·입찰/제안 자료', to: '공공기관 진단·결과보고서(.hwpx)', ask: '공공기관컨설팅 앱은 어떻게 쓰나요?' },
+        { key: 'familywork',  icon: '🏡', name: '출산육아·유연근무', when: '육아지원 3법·유연근무제·가족친화인증 인사제도 설계 및 장려금 연계', from: '푸른 메일·카톡/문자·근태/규정 자료', to: '가족친화·유연근무 규정·보고서(.hwpx)', ask: '출산육아·유연근무 컨설팅 앱 사용법을 알려줘' },
+        { key: 'socialent',   icon: '🌱', name: '사회적기업·씨앗', when: '예비사회적기업·사회적기업 인증 요건, SVI 지표 및 취약계층 노무관리 자문', from: '푸른 메일·카톡/문자·인증 증빙자료', to: 'SVI·인사노무 진단보고서(.hwpx)', ask: '사회적기업·씨앗 컨설팅 앱은 어떻게 쓰나요?' },
+        { key: 'sixthind',    icon: '🌾', name: '6차산업컨설팅', when: '농촌융복합산업(6차산업) 현장코칭·인증·전문상담 및 농업법인 근기법 제63조 구분 점검', from: '푸른 메일(현장코칭 공문/질의)·카톡/문자·로컬 자료', to: '현장코칭 결과보고서(.hwpx)·수습 RAG 실무 코치', ask: '6차산업컨설팅 앱에서 현장코칭과 근기법 63조 점검은 어떻게 하나요?' },
+        { key: 'laboraudit',  icon: '🧭', name: '자율점검·근로감독', when: '고용노동부 기초노동질서 자율점검·모의근로감독·서류보존 및 시정대응 자문', from: '푸른 메일·카톡/문자·노무진단 체크표', to: '자율점검 결과보고서(.hwpx)·개선로드맵', ask: '자율점검·근로감독 앱은 어떻게 활용하나요?' },
+        { key: 'unionneg',    icon: '🫂', name: '민간노조·단체교섭', when: '복수노조 창구단일화 공고 일정·타임오프·단체교섭 및 임단협 전략 자문', from: '푸른 메일·카톡/문자·교섭요구 자료', to: '교섭 절차 체크·결과보고서(.hwpx)', ask: '민간노조·단체교섭 앱에서 창구단일화 일정은 어떻게 확인하나요?' },
+        { key: 'specialcons', icon: '🧩', name: '특화·위탁컨설팅', when: '중진공 혁신바우처·통상변화대응·삼성협력사·경비(감단직)·이음센터·공정채용 위탁 컨설팅', from: '푸른 메일·카톡/문자·위탁사업 자료', to: '트랙별 결과보고서(.hwpx)·체크리스트', ask: '특화·위탁컨설팅 앱에는 어떤 사업이 포함되나요?' },
         { key: 'hangul',    icon: '📝', name: '한글 편집기',     when: '한글 프로그램 없는 PC나 민감정보(주민번호)가 든 .hwp/.hwpx 문서를 바로 열고 고칠 때', from: '내 PC 파일 (서버·파이어베이스로 전송하지 않음)', to: '수정한 .hwpx 파일 내 PC 즉시 저장', ask: '한글 편집기는 어떤 상황에서 쓰면 좋나요?' },
         { key: 'rules',     icon: '📜', name: '기업규정집',     when: '취업규칙·노사협의회·단체협약 법령 위반 검토, 회차별 개정·신구대조표, 문서 내 AI 질문', from: '푸른 메일(취업규칙 첨부 자동 수집), 푸른이알피(업체 목록)', to: '기업정보함(업체 상세 업무 이력에 완료 회차 표시), 업무관리(이력 조회)', ask: '기업규정집은 메일·기업정보함·업무관리와 어떻게 이어지나요?' },
         { key: 'payroll',   icon: '💰', name: '급여아웃소싱',   when: '고객사 임금 대행·근태·임금명세서·연차 정산 (우리 법인 내부 급여인 인사관리와 별개)', from: '고객사 급여·근태 기초자료', to: '임금대장·임금명세서 산출', ask: '급여아웃소싱과 내부관리의 인사관리는 무엇이 다른가요?' }
@@ -171,7 +183,9 @@
         { key: 'mail',      icon: '📧', name: '푸른 메일',       when: '다음메일 수발신 동기화, 사업장별 오간 메일 한 줄기 보기, 견적·안내 메일 발송·열람확인', from: '다음메일(IMAP·POP3), 사진첩·기금관리·뉴스레터 발송 연동', to: '기업정보함(사업장별 스레드), 업무관리(메일 줄 표시), 컨설팅보고서(받은 서류 후보)', ask: '푸른 메일은 기업정보함·업무관리·컨설팅보고서와 어떻게 연결되나요?' },
         { key: 'aliounion', icon: '🤝', name: '공공임단협',     when: '공공기관(ALIO) 노조 현황·타임오프·직종별 임금·복리후생·단체협약 13대 쟁점 비교', from: '알리오 공공기관 공시 데이터 및 단협·규정 원문', to: '기관별 종합 상세 팝업 및 비교표 CSV(엑셀) 내려받기', ask: '공공임단협 앱은 언제 어떻게 활용하나요?' },
         { key: 'pbox',      icon: '📚', name: 'P박스',          when: '대한민국 현행 전 법령(5,773편)·대법원/하급심 판례·위원회 결정·행정해석 통합 검색 및 계약서·서면 조항별 위험 진단·AI 초안 작성', from: '국가법령 전수 색인·공식 판례/유권해석 수집 및 내 PC 문서(.pdf/.txt/.md/.json, 자동 비식별)', to: '조항별 노무 위험 진단·기계적 인용 검증 의견서 및 사건별 통합 패킷(.md) 내보내기', ask: 'P박스로 법령·판례 검색과 계약서·서면 내용 검토는 어떻게 하나요?' },
-        { key: 'kakaoroom', icon: '💬', name: '법인 카카오톡 방', when: '법인 카카오톡 업무방 대화를 약관 무위반 방식(공식 알림·.txt 내보내기·붙여넣기)으로 수집해 OTP·잡담은 거르고 비식별 업무만 자료함에 영구 보관하며 업무·업체 진행을 추적할 때', from: '하나문자 공식 폰 알림(kakaoWork/notes)·PC 카톡 공식 내보내기(.txt)·톡서랍 받은 파일 폴더', to: '자료함 영구 보관(kakao_room)·업무관리 진행기록(work_erp)·사진첩/기업정보함 첨부 이관·옵시디언 일지', ask: '법인 카카오톡 방 앱에서 대화를 안전하게 수집하고 업무·자료함으로 연결하려면 어떻게 하나요?' }
+        { key: 'kakaoroom', icon: '💬', name: '법인 카카오톡 방', when: '법인 카카오톡 업무방 대화를 약관 무위반 방식(공식 알림·.txt 내보내기·붙여넣기)으로 수집해 OTP·잡담은 거르고 비식별 업무만 자료함에 영구 보관하며 업무·업체 진행을 추적할 때', from: '하나문자 공식 폰 알림(kakaoWork/notes)·PC 카톡 공식 내보내기(.txt)·톡서랍 받은 파일 폴더', to: '자료함 영구 보관(kakao_room)·업무관리 진행기록(work_erp)·사진첩/기업정보함 첨부 이관·옵시디언 일지', ask: '법인 카카오톡 방 앱에서 대화를 안전하게 수집하고 업무·자료함으로 연결하려면 어떻게 하나요?' },
+        { key: 'msgintake', icon: '💬', name: '카톡·문자 자료수집', when: 'PC 카카오톡 대화 내보내기(.txt)·수신 문자(SMS)·웹훅을 2중 비식별 처리하고 18개 컨설팅 사업으로 자동 분류·배정', from: '카톡 대화(.txt)·문자 붙여넣기·휴대폰 브리지 웹훅(consultMsgIngest)', to: '각 컨설팅 전용 앱 인박스(comms) 자동 연계 배정', ask: '카카오톡 대화나 문자로 온 컨설팅 자료는 어떻게 자동으로 모으나요?' },
+        { key: 'coach',     icon: '🧠', name: '실무코치·RAG학습', when: '수습·주니어 노무사가 18개 컨설팅 사업 플레이북·과거 비식별 사례·법령근거를 하이브리드 RAG 검색해 다음 행동을 확인', from: '18대 사업 표준 플레이북·수행사례·수습 실무노트·메일/톡 요약', to: '단계별 Next Action 추천 · 근거 기반 AI 코칭 · RAG JSONL 내보내기', ask: '수습 노무사가 컨설팅 절차와 해야 할 일을 RAG로 검색하려면 어느 앱을 쓰나요?' }
       ]
     },
     {
@@ -281,7 +295,7 @@
         '기업정부지원금에서 신청 대행을 누르면 업무관리에 어떻게 나타나?'
       ],
       tags: ['의뢰인업무', '의뢰인 업무', '첫번째줄', '1번째줄', '고객사업무', '컨설팅연결', '의뢰인업무사용법', '의뢰인업무연결도', '괴롭힘성희롱조사', '일터상생혁신', '산업일자리전환'],
-      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'safety', 'hangul']
+      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'safety', 'techprotect', 'clinic', 'chamber', 'hrconsult', 'evalcomp', 'pubconsult', 'familywork', 'socialent', 'sixthind', 'laboraudit', 'unionneg', 'specialcons', 'hangul']
     },
     {
       id: 'SYS-row-store',
@@ -303,7 +317,7 @@
         '계약서등관리와 사진첩의 계약서 등록은 무엇이 달라?'
       ],
       tags: ['자료함', '두번째줄', '2번째줄', '자료함사용법', '자료함연결도', '서류연결', '메일연결', '허브', '드래그', '드래그앤드롭', '첨부', '다운받', 'P박스', '피박스', '법인카카오톡방', '카카오톡', '카톡정리'],
-      apps: ['photos', 'cards', 'mail', 'work', 'docs', 'cal', 'aliounion', 'pbox', 'edulib', 'kakaoroom']
+      apps: ['photos', 'cards', 'mail', 'work', 'docs', 'cal', 'aliounion', 'pbox', 'edulib', 'kakaoroom', 'msgintake', 'coach']
     },
     {
       id: 'SYS-row-sales',
@@ -511,6 +525,54 @@
       ],
       tags: ['안전보건체계구축', 'safety', '안전보건관리체계', '중대재해처벌법', '위험성평가', '업종별체크리스트', '7대핵심요소', '고위험기인물', '1P요약보고서'],
       apps: ['safety', 'consult', 'govreport', 'hangul', 'mail']
+    },
+    {
+      id: 'SYS-sixthind-01',
+      cat: 'system',
+      flowId: 'flow-gov',
+      source: '푸른포털 앱 사용법',
+      docNo: '의뢰인 업무 · 6차산업컨설팅 사용법',
+      law: '농촌융복합산업(6차산업) 현장코칭·인증·전문상담 ➔ 근로기준법 제63조 적용제외 vs 가공/체험/판매 분리 점검 ➔ 결과보고서(.hwpx)',
+      title: '[6차산업컨설팅] 농촌융복합산업 현장코칭 · 인증 · 근기법 제63조 · 수습 RAG 행동가이드',
+      q: '6차산업컨설팅(농촌융복합) 앱은 어떻게 사용하고 현장코칭·인증은 무엇을 점검하나요?',
+      a: '[6차산업컨설팅]은 농업회사법인·영농조합·6차산업 인증경영체의 현장코칭·전문상담·인증을 수행하는 전용 앱입니다.\n① [메일·카톡 자동감지]: 6차산업지원센터·농촌융복합 공문 메일과 카톡/문자 자료를 자동 수집해 수진기업 후보로 묶습니다.\n② [핵심 점검]: 1차 영농 인력과 2차 가공·3차 체험·판매 인력을 분리해 근로기준법 제63조 적용제외 오남용을 막고, 계절근로자·일용직 계약서·임금명세서를 점검합니다.\n③ [HWPX·RAG 코치]: 현장코칭 결과보고서·1P 요약을 .hwpx로 생성하고 수습 노무사 RAG 코치 탭에서 지금 할 일을 바로 확인합니다.',
+      points: [
+        '농촌융복합 경영체라도 가공공장·카페·체험장 근로자에게는 일반 근로시간·휴게·가산수당이 적용됩니다',
+        '수습·주니어 노무사는 [실무코치·RAG학습] 또는 앱 내 5번째 [수습 RAG 코치] 탭에서 단계별 필수 서류를 즉시 확인할 수 있습니다'
+      ],
+      followUps: ['수습 노무사가 컨설팅 절차와 해야 할 일을 RAG로 검색하려면 어느 앱을 쓰나요?'],
+      tags: ['6차산업', '6차산업컨설팅', '농촌융복합', '현장코칭', 'sixthind', '근기법63조', '농업' + '회사법인'],
+      apps: ['sixthind', 'coach', 'msgintake', 'mail']
+    },
+    {
+      id: 'SYS-msgintake-01',
+      cat: 'system',
+      flowId: 'flow-core',
+      source: '푸른포털 앱 사용법',
+      docNo: '자료함 · 카톡·문자 자료수집 사용법',
+      law: '카톡 내보내기(.txt) · 문자 붙여넣기 · consultMsgIngest 웹훅 ➔ 2중 비식별 & OTP 차단 ➔ 18개 사업 앱 배정',
+      title: '[카톡·문자 자료수집] 카카오톡·문자 자동분류 및 2중 비식별 연계 허브',
+      q: '카카오톡 대화나 문자로 온 컨설팅 자료는 어떻게 자동으로 모으나요?',
+      a: '[카톡·문자 자료수집]은 카톡과 문자로 들어오는 컨설팅 자료를 메일함과 함께 관리하는 허브입니다.\n① [파일/붙여넣기]: PC 카톡방에서 내보낸 .txt 파일을 끌어다 놓거나 문자 내용을 붙여넣으면 즉시 주민번호·전화·계좌·PC경로를 [가림] 처리하고 OTP/인증번호는 차단합니다.\n② [자동분류 · 배정]: 18개 컨설팅 사업 중 해당 사업으로 자동 라벨링되며 버튼 한 번으로 해당 전용 앱 인박스(comms)로 보냅니다.',
+      points: ['각 컨설팅 전용 앱 안에서도 ③ [메일·카톡·자료수집] 탭으로 바로 카톡·문자 붙여넣기 저장이 가능합니다'],
+      followUps: ['수습 노무사가 컨설팅 절차와 해야 할 일을 RAG로 검색하려면 어느 앱을 쓰나요?'],
+      tags: ['카톡', '카카오톡', '문자', 'SMS', '자료수집', 'msgintake', '자동분류'],
+      apps: ['msgintake', 'coach', 'sixthind']
+    },
+    {
+      id: 'SYS-coach-01',
+      cat: 'system',
+      flowId: 'flow-gov',
+      source: '푸른포털 앱 사용법',
+      docNo: '자료함 · 실무코치·RAG학습 사용법',
+      law: '18개 사업 플레이북 · 단계별 필수행동 · 비식별 수행사례 · 하이브리드 RAG 검색 · 수습노트',
+      title: '[실무코치·RAG학습] 수습·주니어 노무사용 컨설팅 행동가이드 & RAG 지식허브',
+      q: '수습 노무사가 컨설팅 절차와 해야 할 일을 RAG로 검색하려면 어느 앱을 쓰나요?',
+      a: '[실무코치·RAG학습]은 수습·경력이 적은 노무사가 컨설팅 실무를 혼자서도 정확히 검토하고 다음 행동을 알 수 있게 만든 RAG 학습 허브입니다.\n① [RAG 행동검색]: 유의어+BM25 검색과 근거 기반 AI 코치로 "6차산업 63조", "평가보상 불이익변경", "경업금지 요건", "창구단일화 기한"을 즉시 찾아 근거(#)와 함께 답을 봅니다.\n② [18대 표준 플레이북 · 퀴즈]: 전 사업의 단계별 필수 서류·자주 하는 실수·셀프 퀴즈를 학습하고 [수습노트]에 팁을 축적합니다.',
+      points: ['각 12개 컨설팅 앱 안에서도 5번째 [수습 RAG 코치] 탭을 누르면 현재 사업장 단계에 맞는 "지금 할 일 TOP 6"가 자동으로 뜹니다'],
+      followUps: ['6차산업컨설팅 앱은 어떻게 사용하고 현장코칭·인증은 무엇을 점검하나요?'],
+      tags: ['RAG', '실무코치', '수습노무사', '학습', '행동가이드', '플레이북', 'coach'],
+      apps: ['coach', 'sixthind', 'msgintake']
     },
     {
       id: 'SYS-onboard-newco',
@@ -1206,6 +1268,9 @@
   /* ── Ⅳ. 신규 프로그램 무보수 자동 감지 · 온톨로지 연결도 · 화면 HTML 파서 엔진 ── */
   var STATIC_COVERED_APPS = {
     erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1, safety: 1,
+    techprotect: 1, clinic: 1, chamber: 1, hrconsult: 1, evalcomp: 1, pubconsult: 1,
+    familywork: 1, socialent: 1, sixthind: 1, laboraudit: 1, unionneg: 1, specialcons: 1,
+    msgintake: 1, coach: 1,
     hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
     aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1, pubsearch: 1,
     hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1, datahub: 1, kakaoroom: 1
@@ -1220,7 +1285,10 @@
     ilteo: 'SYS-ilteo-01',
     jobtrans: 'SYS-jobtrans-01',
     safety: 'SYS-safety-01',
-    kakaoroom: 'SYS-kakaoroom-01'
+    kakaoroom: 'SYS-kakaoroom-01',
+    sixthind: 'SYS-sixthind-01',
+    msgintake: 'SYS-msgintake-01',
+    coach: 'SYS-coach-01'
   };
   var ROW_LABELS = {
     client: '의뢰인 업무',
@@ -1256,6 +1324,20 @@
     { prefix: 'scal_ilteo', label: '일터상생혁신(전용 작업공간)', app: 'ilteo' },
     { prefix: 'scal_jobtrans', label: '산업일자리전환(전용 작업공간)', app: 'jobtrans' },
     { prefix: 'scal_safety', label: '안전보건체계구축(전용 작업공간)', app: 'safety' },
+    { prefix: 'scal_techprotect', label: '기술보호컨설팅(전용 작업공간)', app: 'techprotect' },
+    { prefix: 'scal_clinic', label: '현장클리닉(전용 작업공간)', app: 'clinic' },
+    { prefix: 'scal_chamber', label: '상공회의소컨설팅(전용 작업공간)', app: 'chamber' },
+    { prefix: 'scal_hrconsult', label: '기초인사노무(전용 작업공간)', app: 'hrconsult' },
+    { prefix: 'scal_evalcomp', label: '평가보상·임금체계(전용 작업공간)', app: 'evalcomp' },
+    { prefix: 'scal_pubconsult', label: '공공기관컨설팅(전용 작업공간)', app: 'pubconsult' },
+    { prefix: 'scal_familywork', label: '출산육아·유연근무(전용 작업공간)', app: 'familywork' },
+    { prefix: 'scal_socialent', label: '사회적기업·씨앗(전용 작업공간)', app: 'socialent' },
+    { prefix: 'scal_sixthind', label: '6차산업컨설팅(전용 작업공간)', app: 'sixthind' },
+    { prefix: 'scal_laboraudit', label: '자율점검·근로감독(전용 작업공간)', app: 'laboraudit' },
+    { prefix: 'scal_unionneg', label: '민간노조·단체교섭(전용 작업공간)', app: 'unionneg' },
+    { prefix: 'scal_specialcons', label: '특화·위탁컨설팅(전용 작업공간)', app: 'specialcons' },
+    { prefix: 'msg_intake', label: '카톡·문자 자료수집(자동분류 대기함)', app: 'msgintake' },
+    { prefix: 'coach_rag', label: '실무코치·RAG학습(수습 실무노트)', app: 'coach' },
     { prefix: 'scal_', label: '정부사업일정(회차·보고서)', app: 'consult' },
     { prefix: 'govaid', label: '기업정부지원금(지원사업 매칭)', app: 'govaid' },
     { prefix: 'harass_', label: '괴롭힘·성희롱 조사(보안 사건함)', app: 'harass' },
@@ -1471,7 +1553,7 @@
   function inferAutoFlowId(key, app, relApps) {
     var row = (app && app.row) || '';
     var joined = ([key].concat(relApps || [])).join(',');
-    if (/consult|govreport|ilteo|jobtrans|safety|settle/.test(joined)) return 'flow-gov';
+    if (/consult|govreport|ilteo|jobtrans|safety|settle|techprotect|clinic|chamber|hrconsult|evalcomp|pubconsult|familywork|socialent|sixthind|laboraudit|unionneg|specialcons|coach/.test(joined)) return 'flow-gov';
     if (/govaid/.test(joined)) return 'flow-govaid';
     if (/fund|rules|hangul/.test(joined)) return 'flow-fund-rules';
     if (row === 'sales') return 'flow-sales';
@@ -1931,6 +2013,9 @@
     if (/일터상생혁신|\bilteo\b/i.test(q) && it.id === 'SYS-ilteo-01') score += 48;
     if (/산업일자리전환|\bjobtrans\b/i.test(q) && !/무료.*컨설팅.*종류/.test(q) && it.id === 'SYS-jobtrans-01') score += 48;
     if (/안전보건체계구축|안전보건\s*관리\s*체계|안전보건\s*컨설팅|\bsafety\b/i.test(q) && it.id === 'SYS-safety-01') score += 48;
+    if (/6차\s*산업|농촌\s*융복합|\bsixthind\b/i.test(q) && it.id === 'SYS-sixthind-01') score += 48;
+    if (/카톡.*수집|문자.*수집|\bmsgintake\b/i.test(q) && it.id === 'SYS-msgintake-01') score += 48;
+    if (/실무\s*코치|수습.*rag|\bcoach\b/i.test(q) && it.id === 'SYS-coach-01') score += 48;
     if (it._autoKey) {
       var mentionedAuto = detectMentionedApps(q);
       if (mentionedAuto.indexOf(it._autoKey) >= 0) {
@@ -2081,7 +2166,10 @@
   var APP_TO_SG_CAT = {
     erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', datahub: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
     consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult', safety: 'consult',
-    work: 'work', mail: 'work', cal: 'work',
+    techprotect: 'consult', clinic: 'consult', chamber: 'consult', hrconsult: 'consult', evalcomp: 'consult', pubconsult: 'consult',
+    familywork: 'consult', socialent: 'consult', sixthind: 'consult', laboraudit: 'consult', unionneg: 'consult', specialcons: 'consult',
+    coach: 'consult',
+    work: 'work', mail: 'work', cal: 'work', msgintake: 'work',
     fund: 'fund',
     rules: 'rules',
     payroll: 'payroll', paydata: 'payroll',
@@ -2093,8 +2181,8 @@
   function matchExplicitImproveCat(text) {
     var hay = String(text || '');
     if (/기금관리|사내기금|공동기금|복지기금/.test(hay)) return 'fund';
-    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|안전보건체계구축|\bilteo\b|\bjobtrans\b|\bsafety\b/i.test(hay)) return 'consult';
-    if (/업무관리|푸른\s*메일|메일함|캘린더/.test(hay)) return 'work';
+    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|안전보건체계구축|기술보호컨설팅|현장클리닉|상공회의소컨설팅|기초인사노무|평가보상|공공기관컨설팅|출산육아|사회적기업|6차산업|자율점검|민간노조|특화.*위탁|실무코치|\bilteo\b|\bjobtrans\b|\bsafety\b|\bsixthind\b|\bcoach\b/i.test(hay)) return 'consult';
+    if (/업무관리|푸른\s*메일|메일함|캘린더|카톡·문자|\bmsgintake\b/i.test(hay)) return 'work';
     if (/기업정보함|사진첩|푸른카메라|카메라|명함/.test(hay)) return 'cards';
     if (/계약서등관리|한글\s*편집|전자서명|위임장/.test(hay)) return 'docs';
     if (/기업규정집|취업규칙/.test(hay)) return 'rules';
@@ -2247,7 +2335,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:자율점검·근로감독, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];
