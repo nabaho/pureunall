@@ -580,6 +580,9 @@
               return false;
             }
           }
+          if (r.kind === 'law' && typeof r.title === 'string' && /\([^()]*\([^()]*\)\)/.test(r.title)) {
+            r.title = r.title.replace(/\(([^()]+)\([^)]*\)\)/g, '($1)');
+          }
           return true;
         });
         mem.recents = filteredRecents.sort(function (a, b) { return (b.viewedAt || 0) - (a.viewedAt || 0); }).slice(0, 30);
@@ -650,6 +653,10 @@
     var ms = Date.parse(String(isoStr));
     if (!Number.isFinite(ms)) return '';
     return new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
+  }
+
+  function getDocById(id) {
+    return mem.docs.find(function (d) { return d.id === id; }) || null;
   }
 
   /* ── 실시간 법령 전문 가져오기 (무료·무인증 CDN + IndexedDB 영구 캐시 + 개정 감지) ── */
@@ -2972,7 +2979,7 @@
     getStateSummary: getStateSummary,
     getDocs: function () { return mem.docs.slice(); },
     getPrivateDocs: function () { return mem.privateDocs.slice(); },
-    getDocById: function (id) { return mem.docs.find(function (d) { return d.id === id; }) || null; },
+    getDocById: getDocById,
     getLoadedLaws: function () { return Array.from(mem.laws.values()); },
     getCachedLaw: function (dir, fileName) { return mem.laws.get(dir + '/' + (fileName || '법률.md')) || null; },
     getProjects: function () { return mem.projects.slice(); },
