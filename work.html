@@ -2208,10 +2208,11 @@ function loadCompanies(){
 }
 
 /* ── 공통 편의 ── */
-function toast(msg,type){
+function toast(msg,type,ms){
   var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
   t.textContent=msg; t.className='show'+(type==='err'?' err':(type==='warn'?' warn':''));
-  clearTimeout(window._toastT); window._toastT=setTimeout(function(){ t.className=''; }, type==='err'?3200:1600);
+  /* ms: 긴 안내(휴지통 따라가기 같은)는 더 오래 둔다 — 안 주면 예전 그대로 */
+  clearTimeout(window._toastT); window._toastT=setTimeout(function(){ t.className=''; }, ms||(type==='err'?3200:1600));
 }
 function showModal(html){
   closeM();
@@ -6357,7 +6358,8 @@ function mailFlag(it){
 // 푸른이알피 연동 이상만 표시한다 (정상 연동은 종료 버튼의 🔗로 이미 드러난다)
 function peFlag(it){
   var h='';
-  if(it.pe_gone) h+=' <span style="color:var(--danger);font-weight:800;font-size:10px" title="푸른이알피에서 원본이 삭제되었습니다. 이 업무와 기록은 그대로 보존됩니다.">⚠ 원본 없음</span>';
+  if(it.pe_gone&&it.pe_trash) h+=' <span style="color:var(--danger);font-weight:800;font-size:10px" title="푸른이알피 휴지통에 든 계약입니다. 휴지통에서 되살리면 이 업무가 그대로 이어집니다. 기록·담당이 있어 자동으로 닫지 않았습니다 — 🧹 치울 것에서 끝내세요.">⚠ 이알피 휴지통</span>';
+  else if(it.pe_gone) h+=' <span style="color:var(--danger);font-weight:800;font-size:10px" title="푸른이알피에서 원본이 삭제되었습니다. 이 업무와 기록은 그대로 보존됩니다.">⚠ 원본 없음</span>';
   if(it.pe_nomgr) h+=' <span style="color:var(--warn);font-weight:800;font-size:10px" title="'+(it.src==='govaid'?'기업정부지원금에서 넘길 때 담당을 정하지 않았습니다. ✏️ 수정에서 담당을 정하세요.':'푸른이알피에 주담당이 없어 대표에게 배치했습니다. 푸른이알피에서 담당을 지정하면 자동으로 옮겨집니다.')+'">담당 미지정</span>';
   /* 기업정부지원금 «진행 카드»의 단계·다음 할 일(2026-11-01) — 그쪽에서 단계가 바뀌면 여기 칸(ga_stage·ga_next)과 마감이 같이 바뀐다 */
   if(it.src==='govaid'&&it.ga_stage) h+=' <span style="color:#1e40af;font-weight:800;font-size:10px" title="'+esc('기업정부지원금 진행 — 다음: '+(it.ga_next||'—'))+'">🎯 '+esc(it.ga_stage)+'</span>';
@@ -13821,7 +13823,8 @@ function renderArchive(){
         +'<td class="itc" '+op+'><span class="cut co">'+esc(it.company||it.client||'—')+'</span></td>'
         +'<td class="itc" '+op+'><span class="cut kind">'+esc(itemName(it)||'—')+'</span></td>'
         +'<td><span class="cut no">'+esc(it.no||'—')
-        +(endWay(it)==='transfer'&&it.end_to?' <span class="to">→ '+esc(shortRef(it.end_to))+'</span>':'')+'</span></td>'
+        +(endWay(it)==='transfer'&&it.end_to?' <span class="to">→ '+esc(shortRef(it.end_to))+'</span>':'')
+        +(it.pe_trash_closed&&endWay(it)==='cancel'?' <span class="to" title="푸른이알피 휴지통에 든 계약이라 자동으로 취소 종료했습니다. 휴지통에서 되살리면 다시 열립니다.">🗑 이알피 휴지통</span>':'')+'</span></td>'
         +(showMgr?'<td style="font-size:12.5px">'+esc(_mgrOf(it))+'</td>':'')
         +'<td style="font-size:12.5px;font-variant-numeric:tabular-nums">'+esc(it.done_date||'—')+'</td>'
         +'<td>'+(peSyncBadge(it)||'<span class="muted" style="font-size:11px">—</span>')+'</td>'
@@ -14236,6 +14239,9 @@ function briefFillSave(){
   }).catch(function(e){ if(msg)msg.textContent='실패: '+e.message; });
 }
 var peMaster={};                                   // {유형:[레코드]} — 읽기 실패한 유형은 키가 없다
+/* 푸른이알피 «휴지통»에 든 줄 — {유형:{열쇠:{at,by}}}. peMaster 는 이들을 뺀 «살아 있는» 줄만 담으므로
+   「지워졌다」와 「휴지통에 있다」를 가르려면 따로 적어 둬야 한다(2026-11-22). 읽어낸 유형만 키가 있다. */
+var peTrash={};
 var peState={since:null,at:null,n:0,err:''};
 var _peU2N=null, _peT=null, _peBusy=false, _peWatching=false;
 
@@ -14245,6 +14251,18 @@ function _peArr(v){
 }
 /* 이알피 휴지통에 든 것(_deleted)을 뺀 «살아 있는» 줄만 */
 function _peLive(a){ return Array.isArray(a)?a.filter(function(x){ return x && !x._deleted; }):a; }
+/* 휴지통에 든 줄을 peTrash 에 적고 목록은 «그대로» 돌려준다 — _peLive 앞에서 부른다.
+   읽기에 실패한 유형(배열이 아님)은 건드리지 않는다: 못 읽은 것을 「휴지통이 비었다」로 적으면
+   되살아난 것으로 읽혀 자동으로 닫은 업무가 도로 열린다. */
+function _peTrashNote(t,a){
+  if(!Array.isArray(a)) return a;
+  var m={};
+  a.forEach(function(x){
+    if(x&&x._deleted&&x.id!=null) m[safeKey(String(x.id))]={at:String(x.deletedAt||''),by:String(x.deletedBy||'')};
+  });
+  peTrash[t]=m;
+  return a;
+}
 // 이름 해석용 sid→이름 (퇴직자 포함 — loadStaff는 재직자만 주므로 따로 읽는다)
 /* 사번 → 이름 표를 «정말로» 만들어 냈는가.
    ★ 2026-09-05 대표 보고: 사무장(A-001) 「내 업무」에 부담당 업무가 한 건도 안 나왔다.
@@ -14285,12 +14303,15 @@ function peLoadAll(){
   return tload.then(function(){
     return Promise.all(PE_DEF.map(function(d){
       /* 업체 명단은 업체 잇기용으로 이미 읽어 두었다(coSrc) — 같은 자리를 두 번 읽지 않는다 */
-      if(d[0]==='companies'&&coSrc&&coSrc.length) return Promise.resolve([d[0],coSrc]);
+      /* ⚠ 사본(coSrc)은 휴지통 업체가 섞인 «날것»이다 — 그대로 넘기면 휴지통 업체가 살아 있는 줄로 읽히고
+         peTrash 에도 안 적혀, 다른 갈래와 판단이 갈린다(2026-11-22 외부 검토 · 실측 5곳). 같은 길(_peTrashNote→_peLive)을 지난다.
+         ⚠ coSrc 자체는 건드리지 않는다 — _peLive 는 새 배열을 돌려준다(업체 잇기용 사본은 그대로). */
+      if(d[0]==='companies'&&coSrc&&coSrc.length) return Promise.resolve([d[0],_peLive(_peTrashNote(d[0],coSrc))]);
       return fbDb.ref('data/'+PE_KEYS[d[0]]+'/v').once('value')
         /* ★ 휴지통에 든 것(_deleted)은 뺀다 (2026-10-01) — 이알피에서 중복 사건을 휴지통으로 보냈는데
              업무관리에는 그대로 «진행중»으로 남았다. 이알피 휴지통은 딱지만 붙이고 지우지 않는다(TrashBin). */
-        .then(function(s){ return [d[0],_peLive(_peArr(s.val()))]; })
-        .catch(function(){ return _lsWarm([PE_KEYS[d[0]]]).then(function(){ return [d[0],_peLive(_ls(PE_KEYS[d[0]]))]; }); });   // 권한/네트워크 실패 → 캐시 폴백
+        .then(function(s){ return [d[0],_peLive(_peTrashNote(d[0],_peArr(s.val())))]; })
+        .catch(function(){ return _lsWarm([PE_KEYS[d[0]]]).then(function(){ return [d[0],_peLive(_peTrashNote(d[0],_ls(PE_KEYS[d[0]])))]; }); });   // 권한/네트워크 실패 → 캐시 폴백
     }));
   }).then(function(rows){
     rows.forEach(function(r){ if(r[1]) peMaster[r[0]]=r[1]; });
@@ -14343,6 +14364,52 @@ function puerpCandidates(){
 }
 // 마스터 + 사용자 준비
 function peReady(){ return Promise.all([peLoadAll(),peUsers()]); }
+
+/* ── 푸른이알피 «휴지통»을 따라간다 (대표 지시 2026-11-22) ─────────────────────
+   「푸른이알피와 동기화가 제대로 안 됐다 — 상담인데 노동부 대리·의견서 제출로, 내부 컨설팅인데
+    현장클리닉으로 떠 있다」. 실측(같은 날, 읽기만): 살아 있는 계약 14건은 값이 이알피와 «한 건도 안 틀렸고»,
+   틀려 보인 줄은 전부 이알피 «휴지통»에 든 계약이었다. 11-16 점검에서 계약서 자동 정리가 잘못 만든 카드
+   (유형 첫 번째 찍기)를 이알피에서는 한꺼번에 휴지통으로 보냈는데, 업무관리는 그 줄을 «진행중»에
+   둔 채 「원본 없음」 배지만 달았다 — 진행 중 25건 가운데 11건.
+   ⚠ 이알피 휴지통은 «되돌릴 수 있는» 지움이다(딱지만 붙고 지우지 않는다). 그래서
+     ① 닫는 것도 되돌릴 수 있게 닫고(취소 종료 · ↩ 재개 가능) ② 휴지통에서 되살아나면 «도로 연다».
+   ⚠ 사람이 맡았거나 쓴 흔적이 있으면 건드리지 않는다 — 이알피가 자동 생성한 빈 업무(pe_auto, 사람 기록
+     last 없음, 인수인계 노트 없음)만 닫는다. 나머지는 🧹 치울 것 ③ 에서 사람이 정한다.
+   ⚠ 한 번 닫은 뒤(pe_trash_closed) 사람이 ↩ 재개했으면 다시 안 닫는다 — 그러지 않으면 열 때마다 되닫힌다.
+   ⚠ 이알피에는 안 민다(pe_nosync) — 휴지통 계약에 종료를 써 넣지 않는다.
+   it=업무 · tr=휴지통 기록({at}) 또는 null · live=원본이 «살아 있는» 줄에 있나 · now=ISO 시각
+   → {kind:'close'|'reopen', patch} 또는 null. 순수 함수 — 쓰기는 부르는 쪽이 한다. */
+function peTrashPlan(it,tr,live,now,erpClosed){
+  if(!it||!peLinked(it)) return null;
+  var mk=String(it.pe_trash_closed||'');
+  if(tr){
+    /* 같은 번호가 «살아 있는 줄»에도 있으면(중복 번호·낡은 사본) 닫지 않는다 — 살아 있는 건을 닫는 쪽이 더 나쁘다 */
+    if(live) return null;
+    if(it.state==='done'||mk) return null;
+    /* «사람이 손댄 흔적» — 기록(last)·인수인계 노트·다음 할 일(next)·고친 적(up_at: patchItem 이 찍는다).
+       이알피가 자동으로 만든 빈 업무에는 이 넷이 없다(2026-11-22 실측 11건 모두 없음). */
+    if(!it.pe_auto||it.last||noteDone(it)||it.up_at||(it.next&&(it.next.text||it.next.date))) return null;
+    var at=String(tr.at||'');
+    if(at&&it.state_at&&String(it.state_at)>at) return null;       // 지운 «뒤에» 사람이 손댔다
+    /* end_to·end_result 는 안 건드린다 — 빈 자동 업무에는 없고, 있다면 사람이 적은 것이다 */
+    return { kind:'close', patch:{ state:'done', done_date:(at.slice(0,10)||todayStr()),
+      status:END_BY_KEY.cancel[1], end_way:'cancel',
+      state_at:now, pe_nosync:true, pe_trash_closed:now } };
+  }
+  if(mk&&live){                                                     // 휴지통에서 되살아났다
+    var p={ pe_trash_closed:null };
+    var untouched=it.state==='done'&&String(it.state_at||'')===mk;  // 닫은 뒤로 아무도 안 만졌다
+    if(untouched&&!erpClosed){                                      // → 도로 연다
+      p.state=null; p.done_date=null; p.status='진행중'; p.end_way=null; p.state_at=now; p.pe_nosync=null;
+    }else if(it.state!=='done'||erpClosed){
+      /* 사람이 먼저 ↩ 재개했거나(restoreItem 은 연동 제외 업무를 그냥 열어 우리가 건 pe_nosync 가 남는다),
+         되살아난 원본이 이미 «종료» 상태다 — 열지는 않고 이알피와의 연결만 도로 켠다(종료는 pesync 가 맞춘다) */
+      p.pe_nosync=null;
+    }
+    return { kind:'reopen', patch:p };
+  }
+  return null;
+}
 
 /* ── 자동 연동 엔진 ─────────────────────────────────────────────────
    ① 기준일(config/pe_since)이 없으면 = 최초 실행. 현재 있는 모든 건을
@@ -14441,7 +14508,7 @@ function peAutoSync(){
     }
 
     // ② 기존 연동건: 원본 존재 여부 + 소유 필드 미러 + 저쪽에서 끝난 건 닫기
-    var closed=0;
+    var closed=0, trashClosed=0, trashOpened=0;
     var byRef={}, candByRef={};
     allItems().forEach(function(it){ if(peLinked(it)) byRef[it.ref.type+'|'+safeKey(it.ref.id)]=it; });
     cand.forEach(function(c){ candByRef[c.ref.type+'|'+safeKey(c.ref.id)]=c; });
@@ -14452,6 +14519,10 @@ function peAutoSync(){
         var gone=!live[it.ref.type][safeKey(it.ref.id)];
         if(gone&&!it.pe_gone) up[P+'pe_gone']=true;
         if(!gone&&it.pe_gone) up[P+'pe_gone']=null;
+        /* 「지워졌다」와 「휴지통에 있다」를 가른다 — 휴지통은 되살릴 수 있다(peTrashPlan) */
+        var _inTr=gone&&!!(peTrash[it.ref.type]&&peTrash[it.ref.type][safeKey(it.ref.id)]);
+        if(_inTr&&!it.pe_trash) up[P+'pe_trash']=true;
+        if(!_inTr&&it.pe_trash) up[P+'pe_trash']=null;
       }
       /* ── 푸른이알피에서 끝난 건은 여기서도 닫는다 (대표 지시 2026-09-05) ──
          「계약관리에서 종료했는데 업무관리에 그대로 남아 있다」.
@@ -14519,6 +14590,15 @@ function peAutoSync(){
           if(!it.end_result){ var rr=peResult(rec); if(rr) up[P+'end_result']=rr; }
         }
       }
+      /* 푸른이알피 «휴지통»을 따라간다(peTrashPlan). 위에서 이미 닫은 건은 그 방식(종료·이관)을 그대로 둔다. */
+      if(up[P+'state']!=='done'){
+        var _tk=safeKey(it.ref.id), _rcT=peRec(it), _tp=peTrashPlan(it,(peTrash[it.ref.type]||{})[_tk]||null,
+          !!(live[it.ref.type]&&live[it.ref.type][_tk]),new Date().toISOString(),!!(_rcT&&_peClosed(_rcT,it.ref.type)));
+        if(_tp){
+          Object.keys(_tp.patch).forEach(function(f){ up[P+f]=_tp.patch[f]; });
+          if(_tp.kind==='close') trashClosed++; else if(_tp.patch.state===null) trashOpened++;
+        }
+      }
       var c=candByRef[k]; if(!c) return;            // 종료된 건 → 미러 안 함(종료는 pesync 담당)
       var m=it.pe_m||{}, nm={};
       PE_MIRROR.forEach(function(f){
@@ -14574,6 +14654,8 @@ function peAutoSync(){
       /* ⚠ 조용히 지우지 않는다. 목록에서 갑자기 여든 건이 사라지면
          「내 업무가 왜 줄었지」가 된다 — 무엇이 왜 빠졌는지 말해 준다. */
       if(closed) toast('✅ 푸른이알피에서 끝난 '+closed+'건을 종료로 옮겼습니다 — 종료 화면에서 볼 수 있습니다');
+      if(trashClosed) toast('🗑 푸른이알피 휴지통에 든 '+trashClosed+'건을 취소로 옮겼습니다 — 종료 화면에서 볼 수 있고, 휴지통에서 되살리면 다시 열립니다',undefined,7000);
+      if(trashOpened) toast('↩ 푸른이알피 휴지통에서 되살아난 '+trashOpened+'건을 다시 열었습니다',undefined,5000);
     });
   }).catch(function(e){ peState.err=e&&e.message||'동기화 실패'; console.warn('[peAutoSync]',e); })
     .then(function(){ _peBusy=false; });
