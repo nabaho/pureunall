@@ -255,6 +255,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:24px;text-align:right;order:0}
   table.t[data-name] tbody td.ti{order:1;flex:1 1 0;font-size:13.5px;font-weight:600;color:var(--ink)}
   table.t[data-name] tbody td[data-k="badge"]{order:2;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="rd"]{order:2;color:var(--ink)}
   table.t[data-name="chk_pre"] tbody td.wide,table.t[data-name="chk_domain"] tbody td.wide,table.t[data-name="chk_docs"] tbody td.wide{flex:0 0 100%;width:100%}
   table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px;overflow:visible;white-space:normal}
   table.t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
@@ -263,6 +264,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] tbody td.ti{flex:1 1 100%}
   table.t[data-name] tbody tr::after{order:2}
   table.t[data-name] tbody td[data-k="badge"]{order:3}
+  table.t[data-name] tbody td[data-k="rd"]{order:3}
 }
 @media (max-width:520px){#who{display:none}}
 @media print{
@@ -287,7 +289,6 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   <div class="tabs" id="tabs" role="tablist" aria-label="기술보호컨설팅 작업 화면">
     <button type="button" role="tab" aria-selected="true" data-tab="projects" class="on">📂 사업 현황 <span class="chip c-blue" id="nProjects">0</span></button>
     <button type="button" role="tab" aria-selected="false" data-tab="inbox">📥 미등록 후보 <span class="chip c-amber" id="nInbox">0</span></button>
-    <button type="button" role="tab" aria-selected="false" data-tab="yearly">📅 연도별 자료함 <span class="chip c-blue" id="nYearly">0</span></button>
     <button type="button" role="tab" aria-selected="false" data-tab="detail">📋 진행 · 체크 · 자료</button>
     <button type="button" role="tab" aria-selected="false" data-tab="report">⚖️ 보고서 · RAG 코치</button>
   </div>
@@ -313,25 +314,15 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <div class="card">
       <div class="bar">
         <input id="projQ" type="search" aria-label="사업장·트랙·메모 검색" placeholder="사업장·트랙·메모 검색" style="flex:1;min-width:165px;max-width:235px">
-        <select id="projTrackSel" aria-label="세부 트랙 필터"></select>
-        <select id="projSt" aria-label="진행상태 필터">
-          <option value="">진행상태 전체</option>
-          <option value="active">진행 중</option>
-          <option value="done">완료</option>
-        </select>
-        <select id="projYrSel" aria-label="연도 필터">
-          <option value="">연도 전체</option>
-        </select>
         <select id="projMgr" aria-label="담당 노무사 필터"><option value="">담당 노무사 전체</option></select>
         <button type="button" class="sm" id="projResetBtn" style="display:none" title="검색어·연도·필터 조건을 모두 초기화합니다">↺ 초기화</button>
         <span class="sp"></span>
-        <button type="button" class="sm ok" id="openCoachQuickBtn" title="수습·주니어 노무사용 RAG 행동가이드 및 실무 코치 화면으로 이동합니다">🧠 RAG 실무코치</button>
         <button type="button" class="sm pri" id="newProjBtn">+ 새 사업 등록</button>
         <details class="act-menu">
           <summary>⋯ 도구</summary>
           <div class="act-pop">
-            <button type="button" id="scanAllBtn" title="푸른메일함(IMAP+POP3)·카톡·ERP에서 기술보호 관련 자료를 재스캔합니다">🔄 메일·카톡 재스캔</button>
             <button type="button" id="projCsvBtn" title="현재 필터된 수행 사업 현황 목록을 CSV(엑셀) 파일로 내려받습니다">📥 사업 현황 CSV 내려받기</button>
+            <button type="button" id="allCsvBtn" title="미등록 후보까지 포함한 연도별 전체 목록을 CSV(엑셀) 파일로 내려받습니다">📥 후보 포함 전체 CSV</button>
             <a href="pu-msg-intake.html" target="_blank" rel="noopener">💬 카톡·문자 자료수집 허브 ↗</a>
             <a href="pu-coach.html?app=techprotect" target="_blank" rel="noopener">🧠 전 사업 RAG 학습허브 ↗</a>
           </div>
@@ -361,29 +352,6 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
     <div class="card"><div id="inboxBox"></div></div>
   </section>
 
-  <!-- 탭 3: 연도별 자료함 -->
-  <section class="pane" id="p-yearly">
-    <div class="card hi-top-strip">
-      <div class="scope-bar" id="yrPillsBar" role="region" aria-label="연도별 필터"></div>
-      <div class="kpis" id="yrKpiBox"></div>
-    </div>
-    <div class="card">
-      <div class="bar">
-        <input id="yrQ" type="search" aria-label="연도별 자료 검색" placeholder="연도·기업명·트랙·제목·첨부 검색" style="flex:1;min-width:170px;max-width:260px">
-        <select id="yrTrackSel" aria-label="연도별 세부 트랙 필터"></select>
-        <select id="yrKind" aria-label="등록 상태 필터">
-          <option value="">등록 + 미등록 전체</option>
-          <option value="project">등록 사업만</option>
-          <option value="bundle">미등록 후보만</option>
-        </select>
-        <button type="button" class="sm" id="yrResetBtn" style="display:none" title="연도·검색어·필터 조건을 모두 초기화합니다">↺ 초기화</button>
-        <span class="sp"></span>
-        <button type="button" class="sm ok" id="yrCsvBtn" title="연도별 전체 수행 사업 및 메일·카톡 후보 목록을 CSV(엑셀) 파일로 내려받습니다">📥 연도별 목록 CSV</button>
-      </div>
-    </div>
-    <div id="yearlyBox"></div>
-  </section>
-
   <!-- 탭 4: 진행 · 체크 · 자료 -->
   <section class="pane" id="p-detail">
     <div id="detailBox"></div>
@@ -403,7 +371,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=114"></script>
+<script src="js/pu-ontology.js?v=115"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, 실제 실행은 enforce 모드로 동작합니다 -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
@@ -421,13 +389,13 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-consult-catalogs-a.js?v=2"></script>
-<script src="js/pu-consult-catalogs-b.js?v=2"></script>
+<script src="js/pu-consult-catalogs-a.js?v=3"></script>
+<script src="js/pu-consult-catalogs-b.js?v=3"></script>
 <script src="js/pu-consult-catalogs.js?v=2"></script>
-<script src="js/pu-consult-intake.js?v=3"></script>
+<script src="js/pu-consult-intake.js?v=4"></script>
 <script src="js/pu-consult-rag.js?v=2"></script>
 <script src="js/pu-consult-hwpx.js?v=2"></script>
-<script src="js/pu-consult-view.js?v=4"></script>
+<script src="js/pu-consult-view.js?v=6"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var isPv = (location.hostname==='localhost' || location.hostname==='127.0.0.1' || location.hostname.endsWith('.localhost')) && location.search.indexOf('preview=1')>=0;

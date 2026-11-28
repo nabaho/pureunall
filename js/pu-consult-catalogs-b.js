@@ -198,20 +198,29 @@
       shortName: '6차산업',
       icon: '🌾',
       htmlFile: 'sixthind.html',
-      agency: '충남·충북·세종·경기 농촌융복합산업지원센터',
-      desc: '농촌융복합 현장코칭·인증·전문상담',
+      agency: '충남·세종·충북 농촌융복합산업지원센터',
+      desc: '충남·세종·충북 센터 현장코칭·전문상담',
       erpTypeKeywords: ['농촌융복합6차산업현장코칭', '농촌융복합', '6차산업', '현장코칭'],
       excelTypeKeywords: ['농촌융복합', '6차산업', '현장코칭', '육차산업'],
+      // 지역(충남·세종·충북)을 왼쪽 대시보드로 가른다 — 상공회의소와 같은 방식 (대표 지시 2026-11-28)
+      hasLeftDashboard: true,
+      regionManageable: false,
+      regionLabel: '지역 센터',
+      leftDash: { allLabel: '🌾 전체 센터', headLabel: '🌾 지역별 대시보드', scopeAll: '전체 센터', emptyLabel: '등록된 사업 없음' },
+      diffBadge: '변경됨 · 충남·세종·충북 지역 분리',
+      diffMsg: '충남 · 세종 · 충북 센터만 이 프로그램에 담고, 지역 대시보드와 연도·사업장명·진행상태 열을 따로 세웠습니다',
+      // 표 열: 연도 · 사업장명 · 지역 · 진행상태를 각각 독립 열로 (docs/규칙/서류-목록-표준형태.md)
+      listCols: 'split',
+      // 이 프로그램에 담지 않는 옛 트랙 — 자료는 지우지 않고 목록·집계에서만 뺀다
+      excludeTrackIds: ['sx_cert', 'sx_gyeonggi'],
       tracks: [
-        { id: 'sx_sejong', name: '세종 농촌융복합(6차)산업지원센터 현장코칭·전문상담' },
-        { id: 'sx_chungnam', name: '충남 농촌융복합산업지원센터 현장코칭·인증지원' },
-        { id: 'sx_chungbuk', name: '충북 농촌융복합산업지원센터 전문상담·현장코칭' },
-        { id: 'sx_cert',   name: '6차산업(농촌융복합) 인증지원 현장평가 · 상생프로젝트' },
-        { id: 'sx_gyeonggi', name: '경기·기타 광역 6차산업 지원센터' }
+        { id: 'sx_chungnam', region: '충남', name: '충남 농촌융복합산업지원센터 현장코칭·인증지원', shortName: '충남', badge: '충남', icon: '🌾', keywords: '충남,충청남도,충남농촌융복합,cn6cha' },
+        { id: 'sx_sejong',   region: '세종', name: '세종 농촌융복합(6차)산업지원센터 현장코칭·전문상담', shortName: '세종', badge: '세종', icon: '🏛️', keywords: '세종,세종농촌융복합,sejong6cha' },
+        { id: 'sx_chungbuk', region: '충북', name: '충북 농촌융복합산업지원센터 전문상담·현장코칭', shortName: '충북', badge: '충북', icon: '⛰️', keywords: '충북,충청북도,충북농촌융복합,cb6cha' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
-        { id: 'sx_pre_1', title: '광역 지원센터(세종·충남·충북·경기) 전문위원 위촉 및 관리카드·신분증/계좌 등록 확인', critical: true },
+        { id: 'sx_pre_1', title: '광역 지원센터(충남·세종·충북) 전문위원 위촉 및 관리카드·신분증/계좌 등록 확인', critical: true },
         { id: 'sx_pre_2', title: '수진 경영체(농업회사법인·영농조합·농가)의 1차(생산)·2차(가공)·3차(체험/유통) 비중 파악', critical: true },
         { id: 'sx_pre_3', title: '근로기준법 제63조 제1·2호(농림·축산·양잠·수산업) 근로시간·휴게·휴일 적용제외 한계 판별', critical: true },
         { id: 'sx_pre_4', title: '외국인 근로자(E-9 농축산업 고용허가제) · 계절근로자 · 일용직 숙식비 공제 적법성 확인', critical: false },

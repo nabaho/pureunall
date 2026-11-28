@@ -29,7 +29,12 @@
   var ROOT = 'govlinks';
   var SETS = 'sets';
   var ENTITY = 'GovLinkSet';
-  var LIMIT = { title: 60, org: 80, note: 300, linkName: 80, url: 600, folder: 260, links: 30, folders: 10, biz: 10 };
+  /* note = 사업의 «할 일·순서»(여러 줄, 2026-11-28 대시보드 판에서 300 → 1000) · linkMemo = 사이트마다 «여기서 무엇을» 한 줄 · stars = 사람마다 ★ 수 */
+  var LIMIT = { title: 60, org: 80, note: 1000, linkName: 80, linkMemo: 200, url: 600, folder: 260, links: 30, folders: 10, biz: 10, stars: 80 };
+  /* 사람마다 ★ 즐겨찾기 — govlinks/stars/{sid} (entityType 'GovLinkStar'). items = 사업(묶음 id 또는 'erp:이알피 사업 code') · links = 사이트 주소 */
+  var STARS = 'stars';
+  var STAR_ENTITY = 'GovLinkStar';
+  var ERP_KEY_RE = /^erp:[A-Za-z0-9_-]{1,40}$/;
   var CODE_RE = /^[A-Za-z0-9_-]{1,40}$/;
   var ID_RE = /^[A-Za-z0-9_-]{1,60}$/;
   function badKey(k) { return k === '__proto__' || k === 'constructor' || k === 'prototype'; }
@@ -122,6 +127,11 @@
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function cut(v, n) { return str(v).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, n).trim(); }
+  /* 여러 줄 글(할 일·순서) — 줄바꿈만 살리고 다른 제어 글자는 지운다. 빈 줄은 둘까지 */
+  function cutText(v, n) {
+    return str(v).replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ')
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').slice(0, n).trim();
+  }
   function squash(v) { return str(v).replace(/\s+/g, ''); }
   function own(o, k) { return o !== null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k); }
   function rows(v) {
@@ -177,7 +187,10 @@
       var url = safeUrl(l.url), name = cut(l.name, LIMIT.linkName);
       if (!str(l.url) && !name) return;            // 빈 줄은 조용히 버린다
       if (!url) { badUrl++; return; }
-      links.push({ name: name || hostOf(url) || url, url: url, login: l.login === true });
+      var link = { name: name || hostOf(url) || url, url: url, login: l.login === true };
+      var memo = cut(l.memo, LIMIT.linkMemo);
+      if (memo) link.memo = memo;   // 빈 메모는 칸째 안 둔다
+      links.push(link);
     });
     if (badUrl) errors.push('쓸 수 없는 주소 ' + badUrl + '개 — http:// 또는 https:// 로 시작하는 주소만 넣을 수 있습니다');
     var folders = [];
@@ -196,7 +209,7 @@
       if (own(INNER, k) && apps.indexOf(k) < 0) apps.push(k);   // 정해 둔 앱 열쇠만 — 모르는 것은 버린다
     });
     var order = Number(raw.order);
-    var value = { id: id, title: title, org: cut(raw.org, LIMIT.org), note: cut(raw.note, LIMIT.note),
+    var value = { id: id, title: title, org: cut(raw.org, LIMIT.org), note: cutText(raw.note, LIMIT.note),
       links: links, folders: folders, bizCodes: bizCodes, apps: apps, order: isFinite(order) ? order : 0 };
     return { ok: errors.length === 0, value: value, errors: errors };
   }
@@ -362,7 +375,119 @@
       .map(function (k) { return { key: k, name: INNER[k].name, icon: INNER[k].icon, url: INNER[k].url }; });
   }
 
-  var api = { ROOT: ROOT, SETS: SETS, ENTITY: ENTITY, LIMIT: LIMIT, DEFAULTS: DEFAULTS, INNER: INNER, INNER_KEYS: INNER_KEYS, innerApps: innerApps,
+  /* ── ★ 즐겨찾기 (대표 지시 2026-11-28 「대시보드에다가 별표 표시해서 상단에 자주 하는 거 빨리 클릭할 수 있게」) ──
+     사람마다 따로 — govlinks/stars/{sid} 한 칸에 { items:[묶음 id · 'erp:code'], links:[사이트 주소] }.
+     ★ 누른 차례를 지킨다(먼저 누른 것이 위). 저장값을 믿지 않고 읽을 때마다 다시 거른다(주소는 safeUrl). */
+  function okStarItem(k) { return okId(k) || (typeof k === 'string' && ERP_KEY_RE.test(k)); }
+  function cleanStars(raw) {
+    raw = raw || {};
+    var items = [], links = [];
+    rows(raw.items).forEach(function (k) {
+      k = str(k);
+      if (okStarItem(k) && items.indexOf(k) < 0 && items.length < LIMIT.stars) items.push(k);
+    });
+    rows(raw.links).forEach(function (u) {
+      u = safeUrl(u);
+      if (u && links.indexOf(u) < 0 && links.length < LIMIT.stars) links.push(u);
+    });
+    return { items: items, links: links };
+  }
+  /* kind 'items' | 'links' 에서 key 를 on(참)이면 맨 뒤에 더하고, 거짓이면 뺀다 — 새 값을 돌려준다(받은 것은 안 바꾼다) */
+  function setStar(stars, kind, key, on) {
+    var s = cleanStars(stars);
+    if (kind !== 'items' && kind !== 'links') return s;
+    var k = kind === 'links' ? safeUrl(key) : str(key);
+    if (!k || (kind === 'items' && !okStarItem(k))) return s;
+    var list = s[kind].filter(function (x) { return x !== k; });
+    if (on) list.push(k);
+    s[kind] = list.slice(0, LIMIT.stars);
+    return s;
+  }
+  function isStarred(stars, kind, key) {
+    return !!(stars && Array.isArray(stars[kind]) && stars[kind].indexOf(kind === 'links' ? safeUrl(key) : str(key)) >= 0);
+  }
+
+  /* ── 왼쪽 대시보드 모델 (대표 지시 2026-11-28 「왼쪽에 대시보드 … 사업 이름과 기관 이름 … 클릭하면 오른쪽 메인 화면에
+        도메인 주소하고 어떻게 해야 되는지」) ──
+     o = { board(위 board() 결과), stars, q(찾기), kf('' · 'login' · 'progs' · 'cos') }
+     돌려주는 것:
+       fav      — ★ 한 사업 줄(누른 차례)
+       favLinks — ★ 한 사이트 { url, name, login, setId, setTitle } (지금 목록에 있는 주소만 — 없어진 주소는 안 보인다)
+       sets     — 바로가기 묶음 줄 { kind:'set', key, title, org, sites, login, cos, starred, card }
+       bare     — 묶음 없는 이알피 진행 사업 줄 { kind:'erp', key:'erp:code', title, org, cos, starred, program }
+       closed   — 이어 둔 사업이 모두 종결된 묶음 줄
+       found    — 찾기 글이 있을 때 맞는 사이트(바로 열기용)
+     ★ 거르기(q·kf)는 sets·bare·closed·found 에만 — ★ 즐겨찾기는 늘 다 보인다(빨리 누르는 자리라 숨기지 않는다). */
+  function dashModel(o) {
+    o = o || {};
+    var b = o.board || { cards: [], bare: [], closed: [], types: [] };
+    var stars = cleanStars(o.stars);
+    var q = str(o.q).toLowerCase(), kf = str(o.kf);
+    var typeBy = {};
+    (b.types || []).forEach(function (t) { typeBy[t.code] = t; });
+    function setRow(c, closed) {
+      var s = c.set;
+      return { kind: 'set', key: s.id, title: s.title, org: s.org, sites: s.links.length,
+        login: s.links.filter(function (l) { return l.login; }).length, cos: c.companyCount,
+        progs: c.programs.filter(function (p) { return !p.missing && !p.closed; }).length,
+        starred: stars.items.indexOf(s.id) >= 0, closed: !!closed, card: c };
+    }
+    function erpRow(p) {
+      var t = typeBy[p.code] || {};
+      var k = 'erp:' + p.code;
+      return { kind: 'erp', key: k, code: p.code, title: str(t.name) || p.label, org: str(t.agency), sites: 0, login: 0,
+        cos: p.closed ? 0 : p.companies.length, progs: 0, starred: stars.items.indexOf(k) >= 0, closed: !!p.closed, program: p };
+    }
+    function kfOk(r) {
+      if (kf === 'login') return r.login > 0;
+      if (kf === 'progs') return r.progs > 0;
+      if (kf === 'cos') return r.cos > 0;
+      return true;
+    }
+    var hitSet = {};
+    filterCards(b.cards || [], q).forEach(function (x) { hitSet[x.card.set.id] = 1; });
+    var hitClosed = {};
+    filterCards(b.closed || [], q).forEach(function (x) { hitClosed[x.card.set.id] = 1; });
+    var allSets = (b.cards || []).map(function (c) { return setRow(c, false); });
+    var allClosed = (b.closed || []).map(function (c) { return setRow(c, true); });
+    var allBare = (b.bare || []).map(erpRow);
+    var bareText = function (r) { return (r.title + ' ' + r.org + ' ' + r.program.companies.map(function (c) { return c.coName; }).join(' ')).toLowerCase(); };
+    var byKey = {};
+    allSets.concat(allClosed, allBare).forEach(function (r) { byKey[r.key] = r; });
+    var fav = stars.items.map(function (k) { return byKey[k]; }).filter(Boolean);
+    var linkBy = {};
+    (b.cards || []).concat(b.closed || []).forEach(function (c) {
+      c.set.links.forEach(function (l) {
+        if (!own(linkBy, l.url)) linkBy[l.url] = { url: l.url, name: l.name, login: l.login, memo: l.memo || '', setId: c.set.id, setTitle: c.set.title };
+      });
+    });
+    var favLinks = stars.links.map(function (u) { return own(linkBy, u) ? Object.assign({ starred: true }, linkBy[u]) : null; }).filter(Boolean);
+    var found = [];
+    if (q) {
+      Object.keys(linkBy).forEach(function (u) {
+        var l = linkBy[u];
+        if ((l.name + ' ' + l.url + ' ' + l.memo + ' ' + l.setTitle).toLowerCase().indexOf(q) >= 0)
+          found.push(Object.assign({ starred: stars.links.indexOf(u) >= 0 }, l));
+      });
+    }
+    return {
+      fav: fav, favLinks: favLinks, found: found,
+      sets: allSets.filter(function (r) { return hitSet[r.key] && kfOk(r); }),
+      bare: allBare.filter(function (r) { return (!q || bareText(r).indexOf(q) >= 0) && kfOk(r); }),
+      closed: allClosed.filter(function (r) { return hitClosed[r.key] && kfOk(r); }),
+      total: { sets: allSets.length, bare: allBare.length, closed: allClosed.length }
+    };
+  }
+  /* 처음 보일 사업 — 전에 보던 것 → ★ 첫 사업 → 첫 묶음 → 첫 이알피 사업. 없으면 '' */
+  function pickDefault(model, last) {
+    var all = (model.fav || []).concat(model.sets || [], model.bare || [], model.closed || []);
+    var keys = all.map(function (r) { return r.key; });
+    if (last && keys.indexOf(last) >= 0) return last;
+    return keys[0] || '';
+  }
+
+  var api = { ROOT: ROOT, SETS: SETS, ENTITY: ENTITY, STARS: STARS, STAR_ENTITY: STAR_ENTITY, LIMIT: LIMIT, DEFAULTS: DEFAULTS, INNER: INNER, INNER_KEYS: INNER_KEYS, innerApps: innerApps,
+    cleanStars: cleanStars, setStar: setStar, isStarred: isStarred, dashModel: dashModel, pickDefault: pickDefault, cutText: cutText,
     safeUrl: safeUrl, hostOf: hostOf, folderName: folderName, cleanSet: cleanSet, okCode: okCode, okId: okId,
     liveSets: liveSets, deletedSets: deletedSets, isEmpty: isEmpty, defaultSets: defaultSets, suggestCodes: suggestCodes,
     reportHref: reportHref, board: board, cardText: cardText, filterCards: filterCards,

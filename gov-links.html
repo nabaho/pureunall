@@ -51,7 +51,8 @@ a{color:var(--blue-d);text-decoration:none}
 .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
 .tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
 .chip{display:inline-block;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
-main{padding:12px 16px 40px;max-width:1280px;margin:0 auto}
+/* 한 번에 전체 화면에서 빨리 누르게 — 폭을 막지 않는다(대표 지시 2026-11-28) */
+main{padding:10px 14px 40px}
 .pane{display:none}
 .pane.on{display:block}
 .hint{font-size:12px;color:var(--mute)}
@@ -74,17 +75,54 @@ main{padding:12px 16px 40px;max-width:1280px;margin:0 auto}
 .banner.info{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d)}
 .banner.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber)}
 .banner.err{background:var(--red-bg);border:1px solid var(--red-line);color:var(--red)}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));margin-top:8px}
-.gcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px 10px;display:flex;flex-direction:column;gap:7px;min-width:0}
-.gh{display:flex;align-items:center;gap:6px;min-width:0}
-.gh h2{font-size:15.5px;margin:0;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.org{font-size:12px;color:var(--mute);margin-top:-4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.memo{font-size:12.5px;color:var(--ink2);border-left:3px solid var(--line2);padding-left:8px}
-.links{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
-.links a{display:flex;align-items:center;gap:8px;padding:5px 8px;margin:0 -8px;border-radius:7px;color:var(--ink);min-width:0}
-.links a:hover,.links a:focus-visible{background:var(--blue-bg)}
-.links .nm{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.links .host{color:var(--mute);font-size:11.5px;white-space:nowrap}
+/* ── 왼쪽 대시보드 · 오른쪽 상세 (대표 지시 2026-11-28 「왼쪽에 대시보드 … 클릭하면 오른쪽 메인 화면에 도메인 주소하고 어떻게 해야 되는지」) ── */
+.gl-split{display:grid;grid-template-columns:340px minmax(0,1fr);gap:12px;align-items:start}
+.dash{position:sticky;top:96px;max-height:calc(100vh - 106px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.dash-top{display:flex;gap:6px;align-items:center;position:sticky;top:-8px;background:var(--card);padding:2px 0 6px;z-index:1}
+.dash-top #q{flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13.5px}
+.dhd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--mute);padding:8px 4px 3px;white-space:nowrap}
+.dhd .sp{flex:1}
+.drow{display:flex;align-items:center;gap:4px;border-radius:8px;min-width:0}
+.drow:hover{background:var(--bg)}
+.drow.on{background:var(--blue-bg);box-shadow:inset 3px 0 0 var(--blue)}
+.drow .pick{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:6px;border:none;background:none;border-radius:8px;padding:6px 4px;text-align:left;cursor:pointer;color:var(--ink)}
+.drow .pick .t{min-width:0;flex:1 1 auto;display:flex;align-items:baseline;gap:6px;overflow:hidden;white-space:nowrap}
+.drow .pick .t b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
+.drow .pick .t i{font-style:normal;font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
+.drow .pick .n{font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.star{border:none;background:none;padding:4px 5px;font-size:15px;line-height:1;color:var(--line2);cursor:pointer;border-radius:6px;flex:0 0 auto;min-width:26px;min-height:26px}
+.star.on{color:var(--amber-m)}
+.star:hover{color:var(--amber-m)}
+.caret{border:none;background:none;padding:4px 5px;font-size:11px;color:var(--mute);cursor:pointer;flex:0 0 auto;border-radius:6px;min-width:26px;min-height:26px}
+.dsub{display:flex;flex-direction:column;margin:0 0 4px 30px;border-left:2px solid var(--line);padding-left:4px}
+.dlink{display:flex;align-items:center;gap:4px;min-width:0;border-radius:7px}
+.dlink:hover{background:var(--blue-bg)}
+.dlink a{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 4px;color:var(--ink);font-size:12.5px;white-space:nowrap;overflow:hidden}
+.dlink a span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dlink a .h{color:var(--mute);font-size:11px;flex:0 0 auto}
+.dempty{font-size:12px;color:var(--mute);padding:4px 6px}
+/* 오른쪽 상세 */
+.detail{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px 18px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.dh{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.dh h2{font-size:19px;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dh .org{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dh .star{font-size:20px}
+.how{background:var(--bg);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:10px 14px;font-size:13.5px;color:var(--ink);white-space:pre-wrap;line-height:1.6}
+.how .lbl{display:block;font-size:12px;font-weight:700;color:var(--blue-d);margin-bottom:2px;white-space:normal}
+.how.none{border-left-color:var(--line2);color:var(--mute)}
+.sites{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.srow{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:4px 6px 4px 2px;min-width:0}
+.srow:hover{border-color:var(--blue-line);background:var(--blue-bg)}
+.srow a.go{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:minmax(0,auto) auto minmax(0,1fr);align-items:center;column-gap:10px;padding:7px 4px;color:var(--ink)}
+.srow a.go .nm{font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow a.go .dom{font-size:12.5px;color:var(--blue-d);font-family:Consolas,'Malgun Gothic',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow a.go .mm{grid-column:1 / -1;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .open{flex:0 0 auto}
+.opmode{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.opmode button{border:none;border-radius:0;padding:3px 10px;font-size:12px;background:var(--card);color:var(--mute)}
+.opmode button.on{background:var(--blue);color:#ffffff}
+.dsec{display:flex;flex-direction:column;gap:6px}
+.dsec>.lbl{font-size:12px;font-weight:700;color:var(--mute)}
 .badge{font-size:11px;padding:1px 6px;border-radius:5px;white-space:nowrap;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-line)}
 .badge.g{color:var(--green);background:var(--green-bg);border-color:var(--green-line)}
 .badge.m{color:var(--mute);background:var(--bg);border-color:var(--line2)}
@@ -101,9 +139,6 @@ main{padding:12px 16px 40px;max-width:1280px;margin:0 auto}
 .folder span{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sec{font-size:14px;font-weight:700;margin:18px 0 6px;display:flex;align-items:center;gap:8px}
 .box{background:var(--card);border:1px solid var(--line);border-radius:12px}
-.bare{display:flex;flex-direction:column}
-.bare .row{display:flex;flex-direction:column;gap:5px;padding:9px 12px;border-bottom:1px solid var(--line)}
-.bare .row:last-child{border-bottom:none}
 details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px 0 6px;color:var(--ink2)}
 .empty{color:var(--mute);padding:26px 0;text-align:center}
 .bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:8px 10px}
@@ -127,7 +162,8 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
 .fv{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .fv>label{font-size:12px;color:var(--mute);font-weight:600}
 .fv input[type=text],.fv input:not([type]){width:100%}
-.lrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) auto auto;gap:6px;align-items:center;margin-bottom:5px}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) auto auto;gap:6px;align-items:center;margin-bottom:8px}
+.lrow .lm{grid-column:1 / -1;font-size:12.5px}
 .frow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;margin-bottom:5px}
 .ckl{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--ink2);white-space:nowrap}
 .bzl{display:flex;flex-direction:column;gap:3px;max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
@@ -148,18 +184,26 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
   .top{padding:8px 10px;gap:6px}
   .top .sub{display:none}
   .tabs{padding:0 6px}
-  main{padding:8px 5px 40px}   /* 양옆 = 5 + 카드 테두리 1 + 카드 안 8 = 14px(폰 규칙 8~14px) */
-  .grid{grid-template-columns:minmax(0,1fr);gap:10px}
-  .gcard{padding:10px 8px 8px}
-  .links .host{display:none}
-  .links a{padding:7px 8px;min-height:36px}
+  main{padding:8px 5px 40px}   /* 양옆 = 5 + 상자 테두리 1 + 상자 안 8 = 14px(폰 규칙 8~14px) */
   button{min-height:32px}
+  /* 폰 — 대시보드 한 화면 → 사업을 누르면 상세 한 화면(「← 목록」·뒤로가기로 돌아온다) */
+  .gl-split{display:block}
+  .dash{position:static;max-height:none;padding:6px 8px}
+  .dash-top{position:static}
+  .dash-top #q{font-size:16px}
+  .detail{display:none;padding:10px 8px 14px}
+  .gl-split.show-detail .dash{display:none}
+  .gl-split.show-detail .detail{display:flex}
+  .drow .pick{min-height:40px}
+  .star,.caret{min-width:32px;min-height:32px}
+  .dlink a{min-height:36px}
+  .srow a.go{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
+  .srow a.go .dom{grid-column:1 / -1}
+  .dh h2{font-size:17px;white-space:normal}
   .mbox{padding:14px 12px}
   .modal{padding:0}
-  .lrow{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:'n l x' 'u u u'}
-  .lrow .ln{grid-area:n} .lrow .lu{grid-area:u} .lrow .ckl{grid-area:l} .lrow .lx{grid-area:x}
-  /* 「최근」·「푸른 안에서」 알약 줄은 한 줄로 두고 옆으로 민다(두 줄로 접혀 첫 화면을 먹지 않게) */
-  #recent,#inner{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .lrow{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:'n l x' 'u u u' 'm m m'}
+  .lrow .ln{grid-area:n} .lrow .lu{grid-area:u} .lrow .ckl{grid-area:l} .lrow .lx{grid-area:x} .lrow .lm{grid-area:m;font-size:16px}
   .kpis{overflow-x:auto;scrollbar-width:none}
   .kpis .k{flex:0 0 auto;min-height:36px}
   .pill{flex:0 0 auto;padding:6px 11px}
@@ -199,23 +243,18 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
   <section class="pane" id="pane-go">
     <!-- 1줄 균등 셀 KPI 바(표준 형태 docs/규칙/서류-목록-표준형태.md ①) — 누르면 거르기·토글 -->
     <div class="kpis" id="kpis" role="toolbar" aria-label="바로가기 요약"></div>
-    <div class="tool">
-      <input id="q" type="search" autocomplete="off" aria-label="사이트·사업·기관·업체 찾기" placeholder="사이트·사업·기관·업체 찾기 ( / 키로 바로 입력 · Enter 로 첫 사이트 열기 )">
-      <button class="sm" id="resetBtn" data-act="reset" style="display:none" title="찾기·거르기를 모두 풉니다">↺ 초기화</button>
-      <span id="cnt" aria-live="polite"></span>
-    </div>
-    <div class="strip" id="recent"></div>
-    <div class="strip" id="inner">
-      <span class="lb">푸른 안에서:</span>
-      <a class="pill in" href="gov-consulting.html" title="사업장 일정·사진·보고서 창">📅 정부사업일정</a>
-      <a class="pill in" href="gov-report.html" title="모든 사업장·사업의 보고서 상태">📑 컨설팅보고서</a>
-      <a class="pill in" href="pu-govaid.html" title="지원사업 찾기·검토">🎯 기업정부지원금</a>
-      <a class="pill in" href="gov.html" title="나라장터·알리오·기업마당 공고">🏛 정부사업신청</a>
-    </div>
     <div id="notes"></div>
-    <div class="grid" id="grid"></div>
-    <div id="bareBox"></div>
-    <div id="closedBox"></div>
+    <!-- 왼쪽 대시보드(★ 즐겨찾기 · 사업 · 이알피 진행 사업) · 오른쪽 상세(할 일·순서 · 도메인 주소 · 바로 열기) -->
+    <div class="gl-split" id="split">
+      <aside class="dash" id="dash" aria-label="사업 대시보드">
+        <div class="dash-top">
+          <input id="q" type="search" autocomplete="off" aria-label="사업·기관·사이트·업체 찾기" placeholder="찾기 ( / 키 · Enter 로 첫 사이트 열기 )">
+          <button class="sm" id="resetBtn" data-act="reset" style="display:none" title="찾기·거르기를 모두 풉니다">↺ 초기화</button>
+        </div>
+        <div id="dashList"></div>
+      </aside>
+      <section class="detail" id="detail" aria-live="polite"></section>
+    </div>
   </section>
   <section class="pane" id="pane-manage">
     <div class="box">
@@ -238,7 +277,7 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=114"></script>
+<script src="js/pu-ontology.js?v=115"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -255,23 +294,59 @@ details.closed>summary{cursor:pointer;font-size:14px;font-weight:700;margin:18px
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<!-- 폰 «사업 상세» 한 화면은 PuBack.open/close 로 한 걸음 심는다(showDetail) — 뒤로가기가 대시보드로 돌아온다 -->
+
 <!-- 사업 목록·업체 묶기 — 컨설팅보고서와 같은 모듈(읽기만). track → docs → nav 차례가 뜻이다(docs 가 track 을, nav 가 docs 를 부른다) -->
 <script src="js/pu-gov-report-track.js?v=8"></script>
 <script src="js/pu-gov-report-docs.js?v=13"></script>
 <script src="js/pu-gov-report-nav.js?v=3"></script>
-<script src="js/pu-gov-links.js?v=2"></script>
+<script src="js/pu-gov-links.js?v=3"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
 var L=PuGovLinks;
 /* 이 앱의 자리 — 이름 표로 부른다(글자 그대로 ref('govlinks…') 를 흩뿌리지 않는다) */
-var GL_NODES={sets:L.ROOT+'/'+L.SETS};
+var GL_NODES={sets:L.ROOT+'/'+L.SETS, stars:L.ROOT+'/'+L.STARS};   // stars/{사번} = 그 사람의 ★ 즐겨찾기
 /* 빌려 읽는 자리 — 컨설팅보고서(GR_NODES·GR_DOC_NODES·GR_BIZ)와 같은 곳. 읽기만, 한 번씩.
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_…') 를 쓰면 등록부 검사가 주인 없는 자리로 잡는다 */
 var GL_ERP={biz:'data/biz_cons_types',tmap:'scal_erpTypeMap',cos:'scal_cos',types:'scal_types',scheds:'scal_scheds',staff:'scal_staff',state:'scal_bizState',order:'scal_bizOrder'};
 var D={raw:null,loaded:false,err:'',empty:false,sets:[],deleted:[],erp:null,erpErr:false,erpLoading:false,board:null,seq:0};
 var TAB='go', Q='', KF='', SEL={}, DSEL={}, EDIT=null, MORE={}, BUSY=false;   // KF = KPI 바 거르기('' · 'login' · 'progs' · 'cos') · DSEL = 지운 묶음 고르기
-var CO_SHOW=8;   // 카드 한 사업에 먼저 보이는 업체 수 — 넘으면 «+N곳»
+var CO_SHOW=8;   // 한 사업에 먼저 보이는 업체 수 — 넘으면 «+N곳»
+/* 대시보드 상태 — PICK 고른 사업(묶음 id · 'erp:code') · STARS 내 ★ · OPEN ▸ 펼친 사업 · OPMODE 사이트 여는 방식(pop·tab, 이 기기만) */
+var PICK='', STARS={items:[],links:[]}, OPEN={}, OPMODE='pop';
+(function(){ var m=lsGet('opmode'); if(m==='tab'||m==='pop') OPMODE=m;
+  try{ var o=JSON.parse(lsGet('open')||'{}'); if(o&&typeof o==='object'&&!Array.isArray(o)) Object.keys(o).forEach(function(k){ if(o[k]===true) OPEN[k]=true; }); }catch(e){} })();
+
+/* ★ 즐겨찾기 — 사람마다 govlinks/stars/{사번}. 이 기기에도 사본을 둬 바로 그린다(서버를 못 읽으면 사본으로).
+   ★ 누르면 화면을 먼저 바꾸고 서버에는 «지금 서버 판 위에 이것 하나만» 얹는다(다른 기기에서 누른 ★ 를 지우지 않게) */
+function starRef(){ return fbDb.ref(GL_NODES.stars+'/'+ME.sid); }
+function starCacheKey(){ return 'stars_'+ME.sid; }
+async function loadStars(){
+  try{ var c=lsGet(starCacheKey()); if(c) STARS=L.cleanStars(JSON.parse(c)); }catch(e){}
+  try{
+    var v=(await starRef().once('value')).val();
+    if(v&&typeof v==='object'){ STARS=L.cleanStars(v); lsSet(starCacheKey(), JSON.stringify(STARS)); }
+    D.starErr=false;
+  }catch(e){ D.starErr=true; console.warn('[정부사업 바로가기] ★ 못 읽음',e); }
+}
+async function toggleStar(kind, key){
+  if(!ME.sid) return;
+  var on=!L.isStarred(STARS,kind,key);
+  STARS=L.setStar(STARS,kind,key,on); lsSet(starCacheKey(), JSON.stringify(STARS));
+  renderGo();
+  if(!gate) return;
+  try{
+    await gate.save(starRef(), function(prev){
+      var next=L.setStar(L.cleanStars(prev),kind,key,on);
+      return { id:ME.sid, items:next.items, links:next.links };
+    }, {entityType:L.STAR_ENTITY});
+  }catch(e){
+    /* 서버 저장이 막혀도(규칙 게시 전·연결 끊김) ★ 는 이 기기에 남는다 — 알림은 한 번만(누를 때마다 뜨면 성가시다) */
+    if(!D.starWarned){ D.starWarned=true; toast('즐겨찾기를 서버에 저장하지 못해 이 기기에만 남겼습니다 — 다른 기기에는 아직 안 보입니다'); }
+    console.warn('[정부사업 바로가기] ★ 저장 못 함',e);
+  }
+}
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return '&#'+c.charCodeAt(0)+';'; }); }
@@ -343,16 +418,108 @@ function renderNotes(){
   else if(D.erpErr) h+='<div class="banner warn">이알피 컨설팅 사업 목록을 읽지 못해 업체 연결은 빠졌습니다 — 사이트 바로가기는 그대로 쓸 수 있습니다. <button class="sm" data-act="reload">다시 읽기</button></div>';
   $('notes').innerHTML=h;
 }
-function renderRecent(){
-  var list=L.recentList(lsGet('recent'),D.sets,6);
-  $('recent').innerHTML=list.length?'<span class="lb">최근:</span>'+list.map(function(r){
-    return '<a class="pill site" href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(r.url)+'">'+esc(r.name)+'</a>';
-  }).join(''):'';
+/* ═══ 왼쪽 대시보드 · 오른쪽 상세 (대표 지시 2026-11-28) ═══
+   「왼쪽에 대시보드 만들고 … 사업 이름과 기관 이름 넣고 그걸 클릭하면 오른쪽 메인 화면에 도메인 주소하고 어떻게 해야 되는지 쭉 나와 있으면
+     그것만 클릭해서 바로 들어갈 수 있게 … 팝업창으로 바로 열리게 … 대시보드에다가 별표 표시해서 상단에 자주 하는 거 빨리 클릭할 수 있게」
+   ★ 왼쪽: ★ 즐겨찾기(사이트·사업) → 찾은 사이트 → 최근 연 사이트 → 사업(▸ 로 펼치면 그 자리에서 사이트 열기) → 이알피 진행 사업(바로가기 없음) → 종결
+   ★ 오른쪽: 할 일·순서 → 사이트(전체 주소, 누르면 팝업창·새 탭) → 푸른 앱 → 이어 둔 이알피 사업·올해 업체 → 연결 제안 → 폴더
+   ⚠ ★ 은 사람마다 따로(govlinks/stars/{사번}). 거르기(찾기·KPI)를 걸어도 ★ 즐겨찾기는 늘 다 보인다. */
+var INNER_TOP=['consult','govreport','govaid','govbid'];   // 대시보드 아래 «푸른 안에서»
+function isPhone(){ try{ return window.matchMedia('(max-width:768px)').matches; }catch(e){ return false; } }
+function starBtn(kind,key,on,big){
+  return '<button class="star'+(on?' on':'')+'" data-act="'+(kind==='links'?'starLink':'starItem')+'" data-key="'+esc(key)+'" aria-pressed="'+(on?'true':'false')+'" title="'+(on?'즐겨찾기에서 빼기':'즐겨찾기(★) — 대시보드 맨 위에 둡니다')+'">'+(on?'★':'☆')+'</button>';
 }
-function linkHtml(l){
-  return '<li><a class="site" href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(l.name+' — '+l.url)+'">'
-    +'<span class="nm">'+esc(l.name)+'</span>'+(l.login?'<span class="badge">로그인</span>':'')
-    +'<span class="host">'+esc(L.hostOf(l.url))+'</span></a></li>';
+/* 대시보드 안 사이트 한 줄 — 누르면 바로 열린다(열기 방식은 위 «팝업창 · 새 탭») */
+function dlinkHtml(l){
+  var on=L.isStarred(STARS,'links',l.url);
+  return '<div class="dlink"><a class="site" href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(l.name+' — '+l.url+(l.memo?' · '+l.memo:''))+'">'
+    +'<span>↗ '+esc(l.name)+'</span>'+(l.login?'<span class="badge">로그인</span>':'')+'</a>'   /* 주소는 title·오른쪽 상세에 — 좁은 대시보드에서는 이름을 다 보이게 */
+    +starBtn('links',l.url,on)+'</div>';
+}
+/* 대시보드 사업 한 줄 — ☆ · 사업 이름 + 기관 · 수 · ▸(사이트 펼치기) */
+function drowHtml(r){
+  var on=r.key===PICK, links=r.kind==='set'?r.card.set.links:[], open=!!OPEN[r.key]&&links.length>0;
+  var n=r.kind==='set'?(r.sites+'곳'+(r.cos?' · 업체 '+r.cos:'')):(r.cos?'업체 '+r.cos:'사이트 없음');
+  var h='<div class="drow'+(on?' on':'')+'">'+starBtn('items',r.key,r.starred)
+    +'<button class="pick" data-act="pick" data-key="'+esc(r.key)+'" title="'+esc(r.title+(r.org?' — '+r.org:''))+'"'+(on?' aria-current="true"':'')+'>'
+    +'<span class="t"><b>'+esc(r.title)+'</b>'+(r.org?'<i>'+esc(r.org)+'</i>':'')+'</span><span class="n">'+esc(n)+'</span></button>'
+    +(links.length?'<button class="caret" data-act="caret" data-key="'+esc(r.key)+'" aria-expanded="'+(open?'true':'false')+'" title="'+(open?'사이트 접기':'사이트 펼치기 — 여기서 바로 엽니다')+'">'+(open?'▾':'▸')+'</button>':'')
+    +'</div>';
+  if(open) h+='<div class="dsub">'+links.map(dlinkHtml).join('')+'</div>';
+  return h;
+}
+function renderDash(m){
+  var h='<div class="dhd">★ 즐겨찾기<span class="sp"></span>'+opmodeHtml()+'</div>';
+  if(m.favLinks.length||m.fav.length) h+=m.favLinks.map(dlinkHtml).join('')+m.fav.map(drowHtml).join('');
+  else h+='<div class="dempty">사업·사이트 옆 ☆ 를 누르면 여기 맨 위에 모입니다.</div>';
+  if(Q){
+    h+='<div class="dhd">🔎 찾은 사이트 <span class="chip">'+m.found.length+'</span></div>'
+      +(m.found.length?m.found.map(dlinkHtml).join(''):'<div class="dempty">맞는 사이트가 없습니다.</div>');
+  } else {
+    var recent=L.recentList(lsGet('recent'),D.sets,5);
+    if(recent.length) h+='<div class="dhd">🕘 최근 연 사이트</div>'+recent.map(dlinkHtml).join('');
+  }
+  var allOpen=m.sets.length>0&&m.sets.every(function(r){ return !r.sites||OPEN[r.key]; });
+  h+='<div class="dhd">📂 사업 <span class="chip">'+m.sets.length+'</span><span class="sp"></span>'
+    +(m.sets.length?'<button class="sm" data-act="openAll" data-on="'+(allOpen?'0':'1')+'">'+(allOpen?'모두 접기':'모두 펼치기')+'</button>':'')+'</div>';
+  h+=m.sets.length?m.sets.map(drowHtml).join(''):'<div class="dempty">'+((Q||KF)?'맞는 사업이 없습니다.':'바로가기 묶음이 없습니다 — 「목록 관리」에서 더하세요.')+'</div>';
+  if(m.bare.length) h+='<div class="dhd" id="bareHd">🧩 이알피 진행 사업 · 바로가기 없음 <span class="chip">'+m.bare.length+'</span></div>'+m.bare.map(drowHtml).join('');
+  if(m.closed.length) h+='<details class="closed"><summary class="dhd">🔒 종결된 사업 '+m.closed.length+'</summary>'+m.closed.map(drowHtml).join('')+'</details>';
+  h+='<div class="dhd">푸른 안에서</div><div class="strip">'+INNER_TOP.map(function(k){
+    var a=L.INNER[k]; return '<a class="pill in" href="'+esc(a.url)+'">'+esc(a.icon)+' '+esc(a.name)+'</a>';
+  }).join('')+'</div>';
+  $('dashList').innerHTML=h;
+}
+/* 열기 방식 — 팝업창(사이트마다 창 하나를 다시 씀) · 새 탭. 이 기기에만 기억한다 */
+function opmodeHtml(){
+  return '<span class="opmode" role="group" aria-label="사이트 여는 방식">'
+    +'<button type="button" data-act="opmode" data-m="pop" class="'+(OPMODE==='pop'?'on':'')+'" aria-pressed="'+(OPMODE==='pop')+'" title="사이트를 따로 뜨는 창(팝업)으로 엽니다">팝업창</button>'
+    +'<button type="button" data-act="opmode" data-m="tab" class="'+(OPMODE==='tab'?'on':'')+'" aria-pressed="'+(OPMODE==='tab')+'" title="사이트를 새 탭으로 엽니다">새 탭</button></span>';
+}
+/* 상세의 사이트 한 줄 — 이름 · 로그인 · 전체 주소(도메인) · 메모, 누르면 바로 열림. 옆 단추는 «다른 방식»으로 열기 */
+function srowHtml(l){
+  var on=L.isStarred(STARS,'links',l.url), other=OPMODE==='pop'?'tab':'pop';
+  return '<li class="srow">'+starBtn('links',l.url,on)
+    +'<a class="go site" href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(l.name+' 열기 — '+l.url)+'">'
+    +'<span class="nm">'+esc(l.name)+'</span>'+(l.login?'<span class="badge">로그인</span>':'<span></span>')
+    +'<span class="dom">'+esc(l.url)+'</span>'+(l.memo?'<span class="mm">'+esc(l.memo)+'</span>':'')+'</a>'
+    +'<button class="sm open" data-act="openOther" data-url="'+esc(l.url)+'" data-m="'+other+'" title="'+(other==='pop'?'팝업창으로 열기':'새 탭으로 열기')+'">'+(other==='pop'?'⧉ 팝업':'↗ 새 탭')+'</button></li>';
+}
+function findRow(key){
+  var m=D.mall; if(!m||!key) return null;
+  return [].concat(m.sets,m.closed,m.bare).filter(function(r){ return r.key===key; })[0]||null;
+}
+function renderDetail(){
+  var r=findRow(PICK), back='<button class="sm phone-only" data-act="back">← 목록</button>';
+  if(!r){ $('detail').innerHTML=back+'<div class="empty">왼쪽 대시보드에서 사업을 고르세요.</div>'; return; }
+  var h='<div class="dh">'+back+starBtn('items',r.key,L.isStarred(STARS,'items',r.key))+'<h2 title="'+esc(r.title)+'">'+esc(r.title)+'</h2>'
+    +(r.org?'<span class="org" title="'+esc(r.org)+'">'+esc(r.org)+'</span>':'')+'<span class="sp"></span>'
+    +(r.kind==='set'?'<button class="sm" data-act="edit" data-id="'+esc(r.key)+'">✎ 고치기</button>':'')+'</div>';
+  if(r.kind==='erp'){
+    h+='<div class="how none"><span class="lbl">📝 할 일 · 순서</span>이 사업에는 아직 바로가기(기관 사이트·할 일)가 없습니다. 만들어 두면 다음부터 여기서 바로 들어갑니다.</div>'
+      +'<div><button class="pri" data-act="newFor" data-code="'+esc(r.code)+'">＋ 이 사업 바로가기 만들기</button></div>'
+      +'<div class="dsec"><span class="lbl">🏢 이알피 사업 · 올해 업체 — 업체를 누르면 정부사업일정 보고서 창</span><div class="prog">'+progHtml(r.program,'erp|'+r.code)+'</div></div>';
+    $('detail').innerHTML=h; return;
+  }
+  var s=r.card.set, c=r.card;
+  h+=s.note?'<div class="how"><span class="lbl">📝 할 일 · 순서</span>'+esc(s.note)+'</div>'
+    :'<div class="how none"><span class="lbl">📝 할 일 · 순서</span>아직 적지 않았습니다 — ✎ 고치기에서 적어 두면 여기 늘 보입니다.</div>';
+  h+='<div class="dsec"><span class="lbl">🌐 사이트 '+s.links.length+'곳 — 누르면 '+(OPMODE==='pop'?'팝업창':'새 탭')+'으로 바로 열립니다 · 열기 방식은 대시보드 맨 위에서 바꿉니다</span>'
+    +(s.links.length?'<ul class="sites">'+s.links.map(srowHtml).join('')+'</ul>':'<div class="hint">사이트가 아직 없습니다 — ✎ 고치기에서 더하세요.</div>')+'</div>';
+  var apps=L.innerApps(s);
+  if(apps.length) h+='<div class="dsec"><span class="lbl">🧰 푸른 앱 — 보고서·자동화 화면</span><div class="strip">'+apps.map(function(a){
+    return '<a class="pill in" href="'+esc(a.url)+'" title="푸른 '+esc(a.name)+' 열기">'+esc(a.icon)+' '+esc(a.name)+'</a>';
+  }).join('')+'</div></div>';
+  if(c.programs.length) h+='<div class="dsec"><span class="lbl">🏢 이어 둔 이알피 사업 · 올해 업체 — 업체를 누르면 정부사업일정 보고서 창</span><div class="prog">'
+    +c.programs.map(function(p){ return progHtml(p, s.id+'|'+p.code); }).join('')+'</div></div>';
+  if(c.suggest.length) h+='<div class="sug">연결 제안:'+c.suggest.map(function(code){
+    return '<button class="sm" data-act="link" data-id="'+esc(s.id)+'" data-code="'+esc(code)+'" title="이 이알피 사업을 잇습니다 — 그 사업의 올해 업체가 붙습니다">🏢 '+esc(typeLabel(code))+' 잇기</button>';
+  }).join('')+'</div>';
+  if(s.folders.length) h+='<div class="dsec"><span class="lbl">📁 이 PC 폴더</span><div class="folders">'+s.folders.map(function(f,i){
+    return '<div class="folder"><span title="'+esc(f)+'">📁 '+esc(L.folderName(f))+'</span>'
+      +'<button class="sm" data-act="copy" data-id="'+esc(s.id)+'" data-i="'+i+'" title="파일 선택 창 주소줄에 붙여 넣으면 이 폴더로 바로 갑니다">경로 복사</button></div>';
+  }).join('')+'</div></div>';
+  $('detail').innerHTML=h;
 }
 /* 이어 둔 사업 한 줄 + 올해 업체 칩(누르면 정부사업일정 보고서 창) */
 function progHtml(p, key){
@@ -371,37 +538,8 @@ function typeLabel(code){
   var t=(D.board&&D.board.types||[]).filter(function(x){ return x.code===code; })[0];
   return t?PuGovReportNav.label(t).text:code;
 }
-function cardHtml(c, links){
-  var s=c.set;
-  var h='<section class="gcard" data-id="'+esc(s.id)+'"><div class="gh"><h2 title="'+esc(s.title)+'">'+esc(s.title)+'</h2>'
-    +'<button class="ic" data-act="edit" data-id="'+esc(s.id)+'" title="이 묶음 고치기">✎</button></div>';
-  if(s.org) h+='<div class="org" title="'+esc(s.org)+'">'+esc(s.org)+'</div>';
-  if(s.note) h+='<div class="memo">'+esc(s.note)+'</div>';
-  h+=links.length?'<ul class="links">'+links.map(linkHtml).join('')+'</ul>':'<div class="hint">사이트가 아직 없습니다 — ✎ 로 더하세요.</div>';
-  var apps=L.innerApps(s);
-  if(apps.length){
-    h+='<div class="strip"><span class="lb">푸른 앱:</span>'+apps.map(function(a){
-      return '<a class="pill in" href="'+esc(a.url)+'" title="푸른 '+esc(a.name)+' 열기">'+esc(a.icon)+' '+esc(a.name)+'</a>';
-    }).join('')+'</div>';
-  }
-  if(c.programs.length){
-    h+='<div class="prog">'+c.programs.map(function(p){ return progHtml(p, s.id+'|'+p.code); }).join('')+'</div>';
-  }
-  if(c.suggest.length){
-    h+='<div class="sug">연결 제안:'+c.suggest.map(function(code){
-      return '<button class="sm" data-act="link" data-id="'+esc(s.id)+'" data-code="'+esc(code)+'" title="이 이알피 사업을 카드에 잇습니다 — 그 사업의 올해 업체가 붙습니다">🏢 '+esc(typeLabel(code))+' 잇기</button>';
-    }).join('')+'</div>';
-  }
-  if(s.folders.length){
-    h+='<div class="folders">'+s.folders.map(function(f,i){
-      return '<div class="folder"><span title="'+esc(f)+'">📁 '+esc(L.folderName(f))+'</span>'
-        +'<button class="sm" data-act="copy" data-id="'+esc(s.id)+'" data-i="'+i+'" title="파일 선택 창 주소줄에 붙여 넣으면 이 폴더로 바로 갑니다">경로 복사</button></div>';
-    }).join('')+'</div>';
-  }
-  return h+'</section>';
-}
-/* 1줄 균등 셀 KPI 바 — 묶음·사이트·로그인·이어 둔 사업·올해 업체·카드 없는 진행 사업.
-   «로그인»·«올해 업체»는 누르면 그것만 거른다(다시 누르면 풂) · «카드 없는 진행 사업»은 그 칸으로 내려간다 */
+/* 1줄 균등 셀 KPI 바 — 묶음·사이트·로그인·이어 둔 사업·올해 업체·바로가기 없는 진행 사업.
+   «로그인»·«이어 둔 사업»·«올해 업체»는 누르면 대시보드를 그것만 거른다(다시 누르면 풂) · «바로가기 없는 진행 사업»은 그 칸으로 간다 */
 function renderKpis(b){
   var cards=b.cards||[], sites=0, login=0, progs=0, cos=0;
   cards.forEach(function(c){
@@ -416,40 +554,49 @@ function renderKpis(b){
   };
   $('kpis').innerHTML=cell('all','사업 묶음',cards.length,'거르기를 풀고 모두 봅니다')
     +cell('all','사이트',sites,'거르기를 풀고 모두 봅니다')
-    +cell('login','로그인',login,'로그인이 필요한 사이트만 봅니다(다시 누르면 풂)')
-    +cell('progs','이어 둔 사업',progs,'이알피 사업이 이어진 카드만 봅니다(다시 누르면 풂)')
-    +cell('cos',kstYear()+'년 업체',cos,'올해 업체가 있는 카드만 봅니다(다시 누르면 풂)')
-    +cell('bare','카드 없는 진행 사업',(b.bare||[]).length,'바로가기가 아직 없는 진행 사업으로 내려갑니다');
+    +cell('login','로그인',login,'로그인이 필요한 사이트가 있는 사업만 봅니다(다시 누르면 풂)')
+    +cell('progs','이어 둔 사업',progs,'이알피 사업이 이어진 사업만 봅니다(다시 누르면 풂)')
+    +cell('cos',kstYear()+'년 업체',cos,'올해 업체가 있는 사업만 봅니다(다시 누르면 풂)')
+    +cell('bare','바로가기 없는 진행 사업',(b.bare||[]).length,'바로가기가 아직 없는 이알피 진행 사업으로 갑니다');
   $('resetBtn').style.display=(Q||KF)?'':'none';
 }
-function kpiFilter(rows){
-  if(KF==='login') return rows.map(function(r){ return {card:r.card,links:r.links.filter(function(l){ return l.login; }),hit:true}; })
-    .filter(function(r){ return r.links.length>0; });
-  if(KF==='progs') return rows.filter(function(r){ return r.card.programs.some(function(p){ return !p.missing&&!p.closed; }); });
-  if(KF==='cos') return rows.filter(function(r){ return r.card.companyCount>0; });
-  return rows;
-}
 function renderGo(){
-  renderNotes(); renderRecent();
-  var b=D.board||{cards:[],bare:[],closed:[]};
+  renderNotes();
+  var b=D.board||{cards:[],bare:[],closed:[],types:[]};
   renderKpis(b);
-  var rows=kpiFilter(L.filterCards(b.cards,Q)), filtered=!!(Q||KF);
-  var total=b.cards.reduce(function(n,c){ return n+c.set.links.length; },0);
-  var shown=rows.reduce(function(n,r){ return n+r.links.length; },0);
-  $('cnt').textContent=filtered?(shown+' / '+total+'곳'):(total+'곳');
-  $('grid').innerHTML=rows.length?rows.map(function(r){ return cardHtml(r.card,r.links); }).join('')
-    :'<div class="empty">'+(filtered?'찾는 사이트·사업이 없습니다.':'바로가기 묶음이 없습니다 — 「목록 관리」에서 더하세요.')+'</div>';
-  /* 바로가기 없는 진행 사업 — 이알피에서 진행 중인데 카드가 없는 것(새 사업이 생기면 저절로 여기 나온다) */
-  var q=String(Q||'').trim().toLowerCase();
-  var bare=(b.bare||[]).filter(function(p){ return !q||(p.label+' '+p.companies.map(function(c){ return c.coName; }).join(' ')).toLowerCase().indexOf(q)>=0; });
-  $('bareBox').innerHTML=bare.length?'<div class="sec">🧩 바로가기가 아직 없는 진행 사업 <span class="chip">'+bare.length+'</span><span class="hint" style="font-weight:400">이알피 컨설팅 사업 중 종결되지 않은 것</span></div>'
-    +'<div class="box bare">'+bare.map(function(p){
-      return '<div class="row">'+progHtml(p,'bare|'+p.code)
-        +'<div><button class="sm" data-act="newFor" data-code="'+esc(p.code)+'">＋ 이 사업 바로가기 만들기</button></div></div>';
-    }).join('')+'</div>':'';
-  var closed=kpiFilter(L.filterCards(b.closed||[],Q));
-  $('closedBox').innerHTML=closed.length?'<details class="closed"><summary>🔒 종결된 사업 '+closed.length+'곳 — 이어 둔 이알피 사업이 모두 종결</summary><div class="grid">'
-    +closed.map(function(r){ return cardHtml(r.card,r.links); }).join('')+'</div></details>':'';
+  var m=L.dashModel({board:b,stars:STARS,q:Q,kf:KF});
+  D.mall=L.dashModel({board:b,stars:STARS});
+  if(!PICK||!findRow(PICK)) PICK=L.pickDefault(D.mall,lsGet('pick'));
+  renderDash(m); renderDetail();
+}
+/* 사업 고르기 — 폰에서는 상세 한 화면으로 넘어가고 «← 목록»·뒤로가기로 돌아온다 */
+var BACKH=null;
+function pick(key){
+  PICK=key; lsSet('pick',key);
+  renderGo();
+  if(isPhone()){ showDetail(true); try{ window.scrollTo(0,0); }catch(e){} }
+  else{ try{ $('detail').scrollIntoView({block:'nearest'}); }catch(e){} }
+}
+function showDetail(on, fromBack){
+  $('split').classList.toggle('show-detail', !!on);
+  if(on){ if(BACKH==null&&window.PuBack) BACKH=PuBack.open('사업 상세', function(){ showDetail(false,true); }); }
+  else{ if(!fromBack&&BACKH!=null&&window.PuBack) PuBack.close(BACKH); BACKH=null; }
+}
+/* 사이트 열기 — 팝업창: 사이트마다 창 이름 하나(다시 누르면 그 창을 다시 쓴다). 빈 창을 먼저 열어 opener 를 끊고 나서 주소로 보낸다
+   (직원 누구나 고치는 목록이라, 열린 사이트가 이 화면을 몰래 다른 주소로 바꾸지 못하게). 팝업이 막히면 새 탭으로 */
+function popName(url){ var h=L.hostOf(url)||'site'; return 'gl_'+h.replace(/[^A-Za-z0-9]/g,'_').slice(0,40); }
+function openSite(url, mode){
+  url=L.safeUrl(url); if(!url) return;
+  lsSet('recent', L.pushRecent(lsGet('recent'), url, 6));
+  if(mode!=='pop'){ var t=window.open(url,'_blank','noopener,noreferrer'); if(!t){} return; }
+  var aw=(screen&&screen.availWidth)||1366, ah=(screen&&screen.availHeight)||800;
+  var w=Math.min(1440,Math.round(aw*0.86)), hh=Math.min(1000,Math.round(ah*0.9));
+  var win=null;
+  try{ win=window.open('about:blank',popName(url),'popup=yes,width='+w+',height='+hh+',left='+Math.round((aw-w)/2)+',top='+Math.round((ah-hh)/2)+',resizable=yes,scrollbars=yes'); }catch(e){ win=null; }
+  if(!win){ toast('팝업이 막혀 새 탭으로 엽니다 — 주소줄 오른쪽 «팝업 차단» 표시에서 이 주소를 허용하면 다음부터 팝업창으로 열립니다'); window.open(url,'_blank','noopener,noreferrer'); return; }
+  try{ win.opener=null; }catch(e){}
+  try{ win.location.replace(url); }catch(e){ try{ win.location.href=url; }catch(_e){} }
+  try{ win.focus(); }catch(e){}
 }
 function selIds(){ return D.sets.filter(function(s){ return SEL[s.id]; }).map(function(s){ return s.id; }); }
 function renderManage(){
@@ -507,13 +654,14 @@ function drawEdit(){
   var h='<h3 id="mTitle">'+(EDIT.isNew?'새 바로가기 묶음':'바로가기 묶음 고치기')+'</h3>'
     +'<div class="fv"><label for="fTitle">사업(묶음) 이름 *</label><input id="fTitle" maxlength="'+L.LIMIT.title+'" value="'+esc(s.title)+'" placeholder="예: 일터혁신 상생컨설팅"></div>'
     +'<div class="fv"><label for="fOrg">기관</label><input id="fOrg" maxlength="'+L.LIMIT.org+'" value="'+esc(s.org)+'" placeholder="예: 노사발전재단"></div>'
-    +'<div class="fv"><label for="fNote">할 일 메모 (어디에 무엇을 올리나)</label><textarea id="fNote" rows="2" maxlength="'+L.LIMIT.note+'">'+esc(s.note)+'</textarea></div>'
+    +'<div class="fv"><label for="fNote">할 일 · 순서 (오른쪽 화면 맨 위에 늘 보입니다 · 줄을 바꿔 차례대로 적으세요)</label><textarea id="fNote" rows="4" maxlength="'+L.LIMIT.note+'" placeholder="예: ① 플랫폼 로그인 → ② 수행일지 등록 → ③ 사진·서명지 올리기">'+esc(s.note)+'</textarea></div>'
     +'<div class="fv"><label>사이트 — 주소는 http:// · https:// 만 · 아이디·비밀번호는 적지 마세요</label><div id="fLinks">';
   s.links.forEach(function(l,i){
     h+='<div class="lrow"><input class="ln" data-f="name" data-i="'+i+'" value="'+esc(l.name)+'" maxlength="'+L.LIMIT.linkName+'" placeholder="이름" aria-label="사이트 이름">'
       +'<input class="lu" data-f="url" data-i="'+i+'" value="'+esc(l.url)+'" maxlength="'+L.LIMIT.url+'" placeholder="https://…" inputmode="url" aria-label="사이트 주소">'
       +'<label class="ckl"><input type="checkbox" data-f="login" data-i="'+i+'"'+(l.login?' checked':'')+'>로그인</label>'
-      +'<button class="ic lx" data-act="rmLink" data-i="'+i+'" title="이 사이트 빼기">✕</button></div>';
+      +'<button class="ic lx" data-act="rmLink" data-i="'+i+'" title="이 사이트 빼기">✕</button>'
+      +'<input class="lm" data-f="memo" data-i="'+i+'" value="'+esc(l.memo||'')+'" maxlength="'+L.LIMIT.linkMemo+'" placeholder="여기서 하는 일 (예: 수행일지·사진 올리는 곳)" aria-label="이 사이트에서 하는 일"></div>';
   });
   h+='</div><div><button class="sm" data-act="addLink"'+(s.links.length>=L.LIMIT.links?' disabled':'')+'>+ 사이트 추가</button></div></div>'
     +'<div class="fv"><label>이 PC 폴더 경로 (경로 복사용)</label><div id="fFolders">';
@@ -525,7 +673,7 @@ function drawEdit(){
       var a=L.INNER[k];
       return '<label class="ckl"><input type="checkbox" data-f="app" value="'+esc(k)+'"'+(s.apps.indexOf(k)>=0?' checked':'')+'>'+esc(a.icon)+' '+esc(a.name)+'</label>';
     }).join('')+'</div></div>'
-    +'<div class="fv"><label>이어 둘 이알피 컨설팅 사업 — 고르면 그 사업의 올해 업체가 카드에 붙습니다</label>';
+    +'<div class="fv"><label>이어 둘 이알피 컨설팅 사업 — 고르면 그 사업의 올해 업체가 오른쪽 화면에 붙습니다</label>';
   if(!types.length) h+='<div class="hint">'+(D.erpErr?'이알피 사업 목록을 읽지 못했습니다.':D.erpLoading?'불러오는 중…':'이알피 컨설팅 사업이 없습니다.')+'</div>';
   else h+='<div class="bzl">'+types.map(function(t){
     var on=s.bizCodes.indexOf(t.code)>=0, closed=PuGovReportNav.closedFor(st,t.code,yr), lb=PuGovReportNav.label(t).text;
@@ -546,6 +694,7 @@ function pullForm(){
     if(f==='name') s.links[i].name=el.value;
     else if(f==='url') s.links[i].url=el.value;
     else if(f==='login') s.links[i].login=el.checked;
+    else if(f==='memo') s.links[i].memo=el.value;
     else if(f==='folder') s.folders[i]=el.value;
   });
   s.bizCodes=[].slice.call(box.querySelectorAll('[data-f="biz"]')).filter(function(el){ return el.checked; }).map(function(el){ return el.value; });
@@ -663,8 +812,15 @@ async function copyText(text, btn){
 }
 function setTab(t){ if(t!==TAB){ SEL={}; DSEL={}; } TAB=t; lsSet('tab',t); render(); }
 document.addEventListener('click', function(ev){
+  /* 사이트 — 그냥 누르면 고른 방식(팝업창·새 탭)으로 연다. Ctrl·가운데 단추 등 브라우저 자기 열기는 그대로 둔다 */
   var site=ev.target.closest('a.site');
-  if(site){ lsSet('recent', L.pushRecent(lsGet('recent'), site.getAttribute('href'), 6)); setTimeout(renderRecent,0); return; }
+  if(site){
+    var plain=ev.button===0&&!ev.ctrlKey&&!ev.metaKey&&!ev.shiftKey&&!ev.altKey;
+    if(plain){ ev.preventDefault(); openSite(site.getAttribute('href'), OPMODE); }
+    else lsSet('recent', L.pushRecent(lsGet('recent'), site.getAttribute('href'), 6));
+    setTimeout(function(){ if(TAB==='go') renderGo(); },0);
+    return;
+  }
   var tb=ev.target.closest('#tabs button'); if(tb){ setTab(tb.dataset.tab); return; }
   var el=ev.target.closest('[data-act]'); if(!el) return;
   var a=el.dataset.act, id=el.dataset.id;
@@ -672,9 +828,22 @@ document.addEventListener('click', function(ev){
   if(a==='reload') return glReload();
   if(a==='logout') return firebase.auth().signOut();
   if(a==='more'){ MORE[el.dataset.key]=!MORE[el.dataset.key]; return renderGo(); }
+  /* 대시보드 */
+  if(a==='pick') return pick(el.dataset.key);
+  if(a==='back') return showDetail(false);
+  if(a==='starItem') return toggleStar('items', el.dataset.key);
+  if(a==='starLink') return toggleStar('links', el.dataset.key);
+  if(a==='caret'){ var ck=el.dataset.key; if(OPEN[ck]) delete OPEN[ck]; else OPEN[ck]=true; lsSet('open', JSON.stringify(OPEN)); return renderGo(); }
+  if(a==='openAll'){
+    var want=el.dataset.on==='1';
+    D.sets.forEach(function(s){ if(want&&s.links.length) OPEN[s.id]=true; else delete OPEN[s.id]; });
+    lsSet('open', JSON.stringify(OPEN)); return renderGo();
+  }
+  if(a==='opmode'){ OPMODE=el.dataset.m==='tab'?'tab':'pop'; lsSet('opmode',OPMODE); return renderGo(); }
+  if(a==='openOther'){ openSite(el.dataset.url, el.dataset.m); setTimeout(renderGo,0); return; }
   if(a==='kpi'){
     var k=el.dataset.k;
-    if(k==='bare'){ var bx=$('bareBox'); if(bx&&bx.firstChild) bx.scrollIntoView({behavior:'smooth',block:'start'}); return; }
+    if(k==='bare'){ var bh=$('bareHd'); if(bh){ if(isPhone()) showDetail(false); bh.scrollIntoView({behavior:'smooth',block:'start'}); } return; }
     KF=(k==='all'||KF===k)?'':k; return renderGo();
   }
   if(a==='reset'){ Q=''; KF=''; $('q').value=''; return renderGo(); }
@@ -713,7 +882,7 @@ document.addEventListener('change', function(ev){
 $('modal').addEventListener('click', function(ev){ if(ev.target===$('modal')&&!BUSY) closeEdit(); });
 $('q').addEventListener('input', function(){ Q=$('q').value; renderGo(); });
 $('q').addEventListener('keydown', function(ev){
-  if(ev.key==='Enter'){ var a=document.querySelector('#grid a.site'); if(a) a.click(); }
+  if(ev.key==='Enter'){ var a=document.querySelector('#dashList a.site'); if(a) openSite(a.getAttribute('href'), OPMODE); }
   else if(ev.key==='Escape'){ $('q').value=''; Q=''; renderGo(); }
 });
 document.addEventListener('keydown', function(ev){
@@ -745,6 +914,7 @@ function boot(){
     if(!sid){ lock((who()?'접속: '+who()+' — ':'')+'재직 중인 직원 계정이 아닙니다'); return; }
     ME.sid=sid; gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:sid });
     $('lock').style.display='none'; $('app').style.display='';
+    await loadStars();
     await glReload();
   });
 }
