@@ -92,7 +92,7 @@ test('④ 대시보드 문구는 카탈로그에서 오고, «새 지역 추가�
 
 test('⑤ 대시보드가 켜지면 위쪽 트랙·연도 알약줄을 숨기고, 목록 화면(사업 현황·미등록 후보)에서만 보인다', () => {
   const v = read('js/pu-consult-view.js');
-  assert.ok(/trackBar\.style\.display = \(\(oneTrackSlim && !TRACK_FILTER\) \|\| ldSlim\)/.test(v), '트랙 알약줄 숨김');
+  assert.ok(/trackBar\.style\.display = \(\(oneTrackSlim && !TRACK_FILTER\) \|\| ldSlim/.test(v), '트랙 알약줄 숨김');
   assert.ok(/\$\('projYrBar'\)\.style\.display = ldSlim \? 'none' : ''/.test(v), '연도 알약줄 숨김');
   assert.ok(/CUR_TAB === 'projects' \|\| CUR_TAB === 'inbox'/.test(v), '진행·체크·보고서 작업실은 넓게');
   assert.ok(/classList\.toggle\('no-left'/.test(v), '꺼질 때 한 단으로');

@@ -2741,6 +2741,12 @@ for (const rootName of CONSULT_APP_ROOTS) {
       inspIssues: CS_STR(500),
       inspDue: CS_STR(32),
       inspResult: CS_STR(40),
+      /* 컨설팅 «수행» / «안내·기타» 구분과 신청 안내 발송·회신 기록 (2026-11-28) — 모두 선택 칸, 없으면 summaryNote 꼬리표로 추정 */
+      kind: { '.validate': "newData.val() === 'perf' || newData.val() === 'guide' || newData.val() === 'other'" },
+      guideSentAt: CS_DATE,
+      guideRespondedAt: CS_DATE,
+      guideResponse: { '.validate': "newData.isString() && (newData.val() === '' || newData.val() === 'apply' || newData.val() === 'othercons' || newData.val() === 'hold' || newData.val() === 'decline' || newData.val() === 'noreply')" },
+      guideNote: CS_STR(1000),
       $other: { '.validate': false }
     } },
     checks: { $pid: { $id: {
