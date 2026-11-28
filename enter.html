@@ -645,6 +645,17 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
 .mg-tab[data-zone="sales"][aria-selected="true"]{border-color:#d97706;background:#fffbeb;color:#854d0e;}
 .mg-tab[data-zone="inside"][aria-selected="true"]{border-color:#16a34a;background:#f0fdf4;color:#166534;}
 .mg-tab:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
+/* 서랍 맨 아래 «백업·복구 · 설정» — 떠 있는 단추를 가리지 않고도 눌러 쓰게 (대표 지시 2026-11-28). 관리자에게만 보인다 */
+.mg-ft{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #e2e8f0;background:#f8fafc;flex:none;}
+.mg-ft[hidden]{display:none;}
+.mg-ft button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;
+  background:#fff;color:#475569;font:inherit;font-size:.82rem;font-weight:700;white-space:nowrap;cursor:pointer;}
+.mg-ft button:hover{border-color:#2563eb;color:#2563eb;}
+.mg-ft button:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
+.mg-ft button[hidden]{display:none;}
+/* 서랍이 열려 있는 동안은 떠 있는 «백업·복구»·«⚙ 설정» 알약을 감춘다 — 서랍 맨 아래에 같은 단추가 있고, 알약이 그 위에 겹쳐 눌린다 */
+body:has(#mgDrawer.open) #cfgFab,body:has(#mgDrawer.open) #pu-backup-admin-button{visibility:hidden;}
+@media(max-width:520px){ body.portal-mode .mg-ft{padding-bottom:calc(66px + env(safe-area-inset-bottom));} }   /* 하단 막대에 안 깔리게 */
 .mg-zone{flex:1;min-height:0;overflow:auto;padding:16px 16px 28px;border-top:5px solid var(--mg-c);background:var(--mg-bg);}
 .mg-zone[hidden]{display:none;}
 .mg-zone[data-zone="sales"]{--mg-c:#d97706;--mg-bg:#fffbeb;--mg-ink:#854d0e;}
@@ -667,7 +678,7 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
 .mg-zone .tile b{font-size:.92rem;font-weight:700;margin:0;}
 .mg-zone .tile .tx span{display:block;font-size:.75rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mg-zone .tile .ic{position:static;backdrop-filter:none;}   /* backdrop-filter 가 있으면 ☆·딱지의 «기준 상자»가 아이콘으로 바뀐다 */
-.mg-zone .tile .pin-star{right:10px;bottom:auto;top:50%;margin-top:-10px;}
+.mg-zone .tile .pin-star{right:8px;bottom:auto;top:50%;width:28px;height:28px;margin-top:-14px;}   /* 누를 곳 24px 이상 */
 .mg-zone .tile .tile-alert{left:auto;right:40px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
 .mg-zone .tile .nl-warn{top:50%;right:40px;margin-top:-10px;}
 .mg-zone .tile .tile-soon-pill{left:auto;right:40px;top:50%;margin-top:-9px;transform:none;}
@@ -5899,7 +5910,32 @@ body.portal-mode #moreFab{display:flex;}
             + '<div class="mg-zone-h"><span class="mg-zone-t"><i class="mg-dot" aria-hidden="true"></i><b>' + z.label + ' 구역</b></span><small>' + z.hint + '</small></div>'
             + (row ? rowBox(row) : '') + '</section>';
         }).join('')
+      + '<div class="mg-ft" id="mgFt" hidden>'
+      + '<button type="button" id="mgFtBackup" data-src="pu-backup-admin-button" hidden>💾 백업·복구</button>'
+      + '<button type="button" id="mgFtCfg" data-src="cfgFab" hidden>⚙ 설정</button>'
+      + '</div>'
       + '</aside>';
+  }
+  /* 서랍 맨 아래 단추 — 떠 있는 «백업·복구»(js/pu-backup.js)·«⚙ 설정»(#cfgFab)을 «대신 눌러 준다». 두 단추는 관리자에게만 생기므로
+     원본이 있고 켜져 있을 때만 보인다(없으면 줄째 감춘다). 서랍이 열릴 때마다 mgSync 가 맞춘다. */
+  function mgFootSrc(btn){
+    var el = btn && document.getElementById(btn.getAttribute('data-src'));
+    if(!el || el.hidden || el.style.display === 'none') return null;
+    return el;
+  }
+  function mgFootSync(){
+    var ft = $('mgFt'); if(!ft) return;
+    var n = 0;
+    Array.prototype.forEach.call(ft.querySelectorAll('button'), function(b){
+      var on = !!mgFootSrc(b); if(b.hidden === on) b.hidden = !on;
+      if(on) n++;
+    });
+    if(ft.hidden === (n > 0)) ft.hidden = !(n > 0);
+  }
+  function mgFootClick(b){
+    var src = mgFootSrc(b); if(!src) return;
+    mgClose();                       // 서랍을 먼저 닫는다 — 열려 있으면 뜨는 창이 서랍 뒤로 가려질 수 있다
+    src.click();
   }
   function mgSelect(z){
     _mgTab = z;
@@ -5945,6 +5981,7 @@ body.portal-mode #moreFab{display:flex;}
     if(btn.title !== tt) btn.title = tt;
     if(any) mgSelect(curVis ? _mgTab : firstVis);
     else if(drawer.classList.contains('open')) mgClose();
+    mgFootSync();
   }
   function mgOpen(z){
     var d = $('mgDrawer'), b = $('mgBtn'); if(!d) return;
@@ -5977,6 +6014,7 @@ body.portal-mode #moreFab{display:flex;}
     b.addEventListener('click', function(){ if(d.classList.contains('open')) mgClose(); else mgOpen(); });
     $('mgClose').addEventListener('click', function(){ mgClose(true); });
     d.addEventListener('click', function(e){
+      var ft = e.target.closest && e.target.closest('.mg-ft button'); if(ft){ mgFootClick(ft); return; }   // 맨 아래 «백업·복구 · 설정»
       var tab = e.target.closest && e.target.closest('.mg-tab'); if(!tab || tab.hidden) return;
       mgSelect(tab.dataset.zone);
     });
