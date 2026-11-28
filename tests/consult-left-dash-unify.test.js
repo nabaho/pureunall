@@ -90,12 +90,60 @@ test('④ 대시보드 문구는 카탈로그에서 오고, «새 지역 추가�
   for (const k of ALL.filter((x) => x !== 'chamber')) assert.notEqual(Cats.get(k).regionManageable, true, k + ': 지역 추가 단추가 생긴다');
 });
 
-test('⑤ 대시보드가 켜지면 위쪽 트랙·연도 알약줄을 숨기고, 목록 화면(사업 현황·미등록 후보)에서만 보인다', () => {
+test('⑤ 왼쪽 대시보드는 «이름만»(건수는 title) — 연도는 위쪽 알약 한 곳, 위쪽 트랙 알약은 숨김, 목록 화면에서만', () => {
+  // 대표 지시 2026-11-28 상공회의소 «왼쪽 대시보드에는 지역 상공회의소 이름만 있으면 된다»
   const v = read('js/pu-consult-view.js');
-  assert.ok(/trackBar\.style\.display = \(\(oneTrackSlim && !TRACK_FILTER\) \|\| ldSlim/.test(v), '트랙 알약줄 숨김');
-  assert.ok(/\$\('projYrBar'\)\.style\.display = ldSlim \? 'none' : ''/.test(v), '연도 알약줄 숨김');
+  const s = v.indexOf('function renderLeftDash()');
+  const ld = v.slice(s, v.indexOf('\n  }\n', s) > 0 ? v.indexOf('\n  }\n', s) : v.indexOf('\r\n  }\r\n', s));
+  assert.ok(!/ld-yr-btn|ld-year-box|ld-sub/.test(ld), '왼쪽에 연도 단추·연도 상자·숫자 줄이 남아 있다');
+  assert.ok(/title="' \+ esc\(title\)/.test(ld), '건수는 이름에 마우스를 올리면(title) 보인다');
+  assert.ok(/trackBar\.style\.display = \(\(oneTrackSlim && !TRACK_FILTER\) \|\| ldSlim/.test(v), '위쪽 트랙 알약줄 숨김(같은 고르기 두 곳 금지)');
+  assert.ok(!/\$\('projYrBar'\)\.style\.display = ldSlim/.test(v), '연도 알약은 대시보드가 켜져도 위쪽 한 곳에 남아야 한다');
   assert.ok(/CUR_TAB === 'projects' \|\| CUR_TAB === 'inbox'/.test(v), '진행·체크·보고서 작업실은 넓게');
   assert.ok(/classList\.toggle\('no-left'/.test(v), '꺼질 때 한 단으로');
+  for (const k of ALL) assert.ok(!/\.ld-year-box\{|\.ld-yr-btn\{/.test(read(k + '.html')), k + ': 안 쓰는 연도 상자 CSS');
+});
+
+test('⑦ 표는 12개 앱 공통 «독립 열» — 연도·사업장명·ERP 번호·진행상태가 각자 열이고, 사업장명 옆에 연도·번호 칩을 붙이지 않는다', () => {
+  const v = read('js/pu-consult-view.js');
+  assert.ok(/'<td class="yr" title="' \+ esc\(yr\)/.test(v), '연도 독립 열');
+  assert.ok(/'<td class="ti" title="' \+ esc\(p\.companyName\) \+ '">' \+ esc\(p\.companyName\) \+ '<\/td>'/.test(v), '사업장명 칸에는 이름만');
+  assert.ok(/<td data-k="erp">' \+ erpCellHtml\(p, audit\)/.test(v), 'ERP 번호 독립 열');
+  assert.ok(/var clsList = \['split-row'\]/.test(v), '폰 카드도 모든 앱이 같은 독립 열 배치(split-row)');
+  assert.ok(/<th data-k="erp">ERP 번호<\/th>/.test(v));
+});
+
+test('⑧ ERP 사건번호 연결 점검 — 이름만 닮았다고 붙이지 않고, 후보가 정확히 하나일 때만 사람이 [연결]', () => {
+  const I = require(path.join(ROOT, 'js', 'pu-consult-intake.js'));
+  const typeName = Cats.get('chamber').erpTypeKeywords[0];
+  const consultings = [
+    { id: 'e1', no: 'CH-2026-001', companyName: '(합성)가나산업', consultingType: typeName, year: 2026, status: 'progress' },
+    { id: 'e2', no: 'CH-2026-002', companyName: '(합성)다라정밀', consultingType: typeName, year: 2026, status: 'progress' },
+    { id: 'e3', no: 'CH-2026-003', companyName: '(합성)다라정밀', consultingType: typeName, year: 2026, status: 'progress' },
+    { id: 'e9', no: 'CH-2026-009', companyName: '(합성)취소건', consultingType: typeName, year: 2026, status: 'cancelled' }
+  ];
+  const projects = [
+    { id: 'p1', companyName: '(합성)가나산업', year: 2026, trackId: 't' },              // 후보 1건
+    { id: 'p2', companyName: '(합성)다라정밀', year: 2026, trackId: 't' },              // 후보 여럿
+    { id: 'p3', companyName: '(합성)마바물산', year: 2026, trackId: 't' },              // 못 찾음
+    { id: 'p4', companyName: '(합성)사아상사', year: 2021, trackId: 't' },              // 원장에 그 연도 없음
+    { id: 'p5', companyName: '(합성)지역상공회의소', year: 2026, trackId: 't' },        // 기관명
+    { id: 'p6', companyName: '(합성)가나산업', year: 2026, trackId: 't', caseNo: 'CH-2026-001' } // 같은 사업장이 번호를 가진 줄로 이미 있다
+  ];
+  const a = I.auditErpLinks('chamber', projects, { consultings });
+  assert.equal(a.byPid.p6.state, 'linked');
+  assert.equal(a.byPid.p1.reason, 'twin', '번호가 이미 다른 줄에 붙었으면(같은 이름) 중복으로 본다 — 자동 연결하지 않는다');
+  assert.equal(a.byPid.p2.reason, 'ambiguous', '후보가 여럿이면 고르지 않는다');
+  assert.equal(a.byPid.p3.reason, 'none');
+  assert.equal(a.byPid.p4.reason, 'noyear');
+  assert.equal(a.byPid.p5.reason, 'agency');
+  const a2 = I.auditErpLinks('chamber', projects.filter((p) => p.id !== 'p6'), { consultings });
+  assert.equal(a2.byPid.p1.reason, 'candidate', '쓰이지 않은 번호가 정확히 하나면 «후보 1건»');
+  assert.ok(!a2.byPid.p1.cands.some((c) => c.no === 'CH-2026-009'), '취소 건은 후보가 아니다');
+  const v = read('js/pu-consult-view.js');
+  assert.ok(/a\.reason === 'candidate' && a\.cands && a\.cands\[0\]/.test(v), '[연결] 단추는 후보 1건일 때만');
+  assert.ok(/global\.confirm\(p\.companyName \+ ' 에 ERP 사건번호 '/.test(v), '연결은 사람이 확인한 뒤에만 저장');
+  assert.ok(/saveProjectPatch\(pid, \{ caseNo: no \}\)/.test(v), '저장은 caseNo 한 칸만');
 });
 
 test('⑥ 가벼운 화면은 12개 앱 공통, 보고서 일반 원고 접기는 기관 서식이 컨설팅보고서에 있는 앱만', () => {

@@ -634,6 +634,99 @@
     return baseTracks[0] || extraTracks[0] || { id: 'default', name: (cat && cat.name) || '기본' };
   }
 
+  /* ══ 4-2. ERP 수임 원장 중 «이 프로그램 몫» 고르기 — 후보 찾기와 번호 연결 점검이 같은 기준을 쓴다 ═══ */
+  function erpRowsOfApp(appKey, env) {
+    var e = env || {};
+    var consTypeMap = Object.create(null);
+    rowsOf(e.consTypes || e.bizConsTypes || e.consultingTypes).forEach(function (t) {
+      if (!t || t._deleted) return;
+      var lbl = str(t.name || t.label || t.title) + (t.agency ? (' ' + str(t.agency)) : '');
+      if (t.id != null && str(t.id)) consTypeMap[str(t.id)] = lbl;
+      if (t.code != null && str(t.code)) consTypeMap[str(t.code)] = lbl;
+    });
+    var out = [];
+    rowsOf(e.consultings).forEach(function (c) {
+      if (!c || c._deleted) return;
+      if (/^(?:cancelled|canceled|transferred|취소|이관|해지)$/i.test(str(c.status))) return;
+      var tCode = str((c.typeCodes && c.typeCodes.consulting) || c.typeCode || c.typeId);
+      var typeTxt = str(c.consultingType || c.typeName || c.programName || (tCode && consTypeMap[tCode]) || c.title || '');
+      if (Cat.findByErpType(typeTxt) !== appKey) return;
+      var yrMatch = String(c.year || c.startDate || c.signDate || c.endDate || c.no || '').match(/(20\d{2})/);
+      out.push({ c: c, typeTxt: typeTxt, year: Number((yrMatch && yrMatch[1]) || CUR_YEAR) });
+    });
+    return out;
+  }
+
+  /* ══ 4-3. ERP 사건번호 연결 점검 — «왜 번호가 비었나»를 줄마다 말해 준다 (읽기만 한다, 저장은 사람이 누른 뒤 화면에서) ═══
+   * 상태: linked(원장 번호와 일치) · manual(원장에 없는 번호를 직접 넣음) · unlinked(번호 없음) · na(이 프로그램은 ERP 번호를 안 씀)
+   * 미연결 사유(reason): candidate(후보 1건) · ambiguous(후보 여럿) · twin(번호 붙은 같은 사업장이 이미 있음) ·
+   *                    agency(회사가 아닌 기관·공지 이름) · noyear(원장에 그 연도 건이 없음) · none(원장에서 못 찾음)
+   * 이름만 닮았다는 이유로 번호를 자동으로 붙이지 않는다 — 온톨로지 규칙(이름은 후보일 뿐). */
+  var AGENCY_LIKE_NAME_RE = /상공회의소|대한상의|상의$|회원서비스|충청남도|산업통상|산업부|고용노동|노동청|경제진흥원|지원단|협회|재단/;
+  function relatedCorpNorm(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    var s = a.length <= b.length ? a : b;
+    var l = s === a ? b : a;
+    return s.length >= 3 && l.indexOf(s) >= 0;
+  }
+  function auditErpLinks(appKey, projects, env) {
+    var rows = erpRowsOfApp(appKey, env).map(function (r) {
+      var nm = str(r.c.companyName || r.c.company);
+      return { id: str(r.c.id), no: str(r.c.no), year: r.year, name: nm, norm: normCorpName(nm), status: str(r.c.status) };
+    }).filter(function (r) { return r.no; });
+    var minY = 0, maxY = 0;
+    rows.forEach(function (r) {
+      if (!minY || r.year < minY) minY = r.year;
+      if (r.year > maxY) maxY = r.year;
+    });
+    var live = rowsOf(projects).filter(function (p) { return p && !p._deleted; });
+    var rowByNo = Object.create(null);
+    rows.forEach(function (r) { rowByNo[r.no] = r; });
+    var used = Object.create(null);
+    live.forEach(function (p) { if (str(p.caseNo)) used[str(p.caseNo)] = str(p.id); });
+
+    var byPid = Object.create(null);
+    var counts = { linked: 0, manual: 0, unlinked: 0, na: 0 };
+    live.forEach(function (p) {
+      var pid = str(p.id);
+      var no = str(p.caseNo);
+      var yr = Number(p.year) || 0;
+      var pn = normCorpName(p.companyName);
+      var res;
+      if (no) {
+        res = rowByNo[no] ? { state: 'linked', no: no } : { state: (rows.length ? 'manual' : 'na'), no: no };
+      } else if (!rows.length) {
+        res = { state: 'na' };
+      } else {
+        var cands = rows.filter(function (r) { return !used[r.no] && r.year === yr && relatedCorpNorm(pn, r.norm); });
+        var twin = null;
+        for (var i = 0; i < live.length; i++) {
+          var q = live[i];
+          if (str(q.id) === pid || !str(q.caseNo)) continue;
+          if (Number(q.year) !== yr || str(q.trackId) !== str(p.trackId)) continue;
+          if (relatedCorpNorm(pn, normCorpName(q.companyName))) { twin = q; break; }
+        }
+        if (cands.length === 1) {
+          res = { state: 'unlinked', reason: 'candidate', cands: cands, text: 'ERP 수임 ' + cands[0].no + '(' + cands[0].name + ')와 연도·이름이 같습니다 — 맞으면 [연결]을 누르세요' };
+        } else if (cands.length > 1) {
+          res = { state: 'unlinked', reason: 'ambiguous', cands: cands, text: 'ERP 수임 후보가 ' + cands.length + '건이라 자동으로 고르지 않습니다 — 사건번호를 직접 넣으세요' };
+        } else if (twin) {
+          res = { state: 'unlinked', reason: 'twin', twinPid: str(twin.id), text: '같은 사업장이 ERP 번호(' + str(twin.caseNo) + ')가 붙은 행으로 이미 있습니다 — 중복이니 정리 대상입니다' };
+        } else if (AGENCY_LIKE_NAME_RE.test(str(p.companyName))) {
+          res = { state: 'unlinked', reason: 'agency', text: '회사가 아니라 기관·공지 이름으로 보입니다 — 사업장이 아니면 보관삭제하세요' };
+        } else if (!rows.some(function (r) { return r.year === yr; })) {
+          res = { state: 'unlinked', reason: 'noyear', text: 'ERP 수임 원장에 ' + yr + '년 건이 없습니다(원장 ' + minY + '~' + maxY + '년) — 연결할 번호가 없습니다' };
+        } else {
+          res = { state: 'unlinked', reason: 'none', text: 'ERP 수임 원장에서 같은 연도·비슷한 이름을 찾지 못했습니다 — 수임 등록 또는 사건번호 직접 입력' };
+        }
+      }
+      counts[res.state]++;
+      byPid[pid] = res;
+    });
+    return { byPid: byPid, counts: counts, ledger: { count: rows.length, minYear: minY, maxYear: maxY } };
+  }
+
   /* ══ 5. 특정 사업 앱용 자동감지 후보 + 기존 프로젝트 수신자료 연결 ═══════ */
   function discoverForApp(appKey, env) {
     var cat = Cat.get(appKey);
@@ -646,14 +739,7 @@
       : flattenMailbox(e.mailFolders || e.mailboxFolders, e.mailMsgs || e.mailboxMsgs, e.mailOldMsgs || e.mailboxOldMsgs);
     var msgItems = rowsOf(e.msgIntakeItems || e.msgIntake);
     var existingProjects = rowsOf(e.projects).filter(function (p) { return !p._deleted; });
-    var erpConsultings = rowsOf(e.consultings).filter(function (c) { return !c._deleted; });
-    var consTypeMap = Object.create(null);
-    rowsOf(e.consTypes || e.bizConsTypes || e.consultingTypes).forEach(function (t) {
-      if (!t || t._deleted) return;
-      var lbl = str(t.name || t.label || t.title) + (t.agency ? (' ' + str(t.agency)) : '');
-      if (t.id != null && str(t.id)) consTypeMap[str(t.id)] = lbl;
-      if (t.code != null && str(t.code)) consTypeMap[str(t.code)] = lbl;
-    });
+    var erpConsultings = erpRowsOfApp(appKey, e);
 
     // 연도 보존! 기존 CID|'*' 폴백 제거하여 2021~2026 다년도 건이 겹쳐 사라지지 않게 함
     var existingByCaseNo = Object.create(null);
@@ -786,16 +872,11 @@
     }
 
     // 1) ERP 컨설팅 원장(typeId · typeCode · consultingType)에서 해당 사업 유형 자동 감지
-    erpConsultings.forEach(function (c) {
-      if (!c || c._deleted) return;
-      if (/^(?:cancelled|canceled|transferred|취소|이관|해지)$/i.test(str(c.status))) return;
-      var tCode = str((c.typeCodes && c.typeCodes.consulting) || c.typeCode || c.typeId);
-      var typeTxt = str(c.consultingType || c.typeName || c.programName || (tCode && consTypeMap[tCode]) || c.title || '');
-      var hitKey = Cat.findByErpType(typeTxt);
-      if (hitKey !== appKey) return;
+    erpConsultings.forEach(function (erpRow) {
+      var c = erpRow.c;
+      var typeTxt = erpRow.typeTxt;
+      var yr = erpRow.year;
       erpHits++;
-      var yrMatch = String(c.year || c.startDate || c.signDate || c.endDate || c.no || '').match(/(20\d{2})/);
-      var yr = Number((yrMatch && yrMatch[1]) || CUR_YEAR);
       var cid = str(c.companyId);
       var rawCoName = str(c.companyName || c.company);
       var coObj = cid ? lookup.list.find(function (x) { return str(x.id) === cid; }) : null;
@@ -1059,6 +1140,8 @@
     buildCompanyLookup: buildCompanyLookup,
     matchCompanyForRecord: matchCompanyForRecord,
     discoverForApp: discoverForApp,
+    erpRowsOfApp: erpRowsOfApp,
+    auditErpLinks: auditErpLinks,
     parseKakaoExport: parseKakaoExport,
     parseSmsPaste: parseSmsPaste,
     extractAttNames: extractAttNames

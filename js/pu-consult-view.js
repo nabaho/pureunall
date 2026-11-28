@@ -33,6 +33,7 @@
   var YEAR_FILTER = '';
   var TRACK_FILTER = '';
   var SHOW_ALL_ROWS = false;
+  var ERP_FILTER = ''; // '' | 'unlinked' — ERP 사건번호가 비어 있는 줄만 보기(KPI «ERP 미연결» 단추)
   var ST_FILTER = ''; // '' | 'active' | 'done' — 진행상태 거르기. 위쪽 KPI 알약이 눌러 바꾼다(드롭다운이 없는 화면에서도 동작)
   var WS_FOCUS = ''; // '' | 'coach' | 'doc'
   var CUR_REPORT_KIND = 'comprehensive';
@@ -180,7 +181,7 @@
   function projectsList() {
     // 이 프로그램에 담지 않는 트랙(excludeTrackIds)의 사업은 목록·집계에서 뺀다 — 자료는 지우지 않는다.
     var excl = getAppCat().excludeTrackIds || [];
-    var splitCols = getAppCat().listCols === 'split';
+    var splitCols = getAppCat().listCols !== 'merged'; // 12개 앱 공통 독립 열 — 같은 연도 안에서 트랙 → 사업장명
     var trackOrder = Object.create(null);
     (getAppCat().tracks || []).forEach(function (t, i) { trackOrder[t.id] = i; });
     return Object.keys(D.projects || {}).map(function (k) {
@@ -895,138 +896,58 @@
     if (shell && shell.classList) shell.classList.toggle('no-left', !shown);
     if (!shown) { aside.innerHTML = ''; return; }
 
+    /* 왼쪽에는 «이름만» 둔다 (대표 지시 2026-11-28 상공회의소 「왼쪽 대시보드에는 지역 상공회의소 이름만 있으면 된다.
+       클릭하면 지역별로 사업장들 나오고 체크를 하면 된다」). 연도 단추·진행/완료/후보 숫자·연도 상자는 두지 않는다 —
+       연도는 위쪽 연도 알약 한 곳, 숫자는 KPI 한 줄. 건수는 이름에 마우스를 올리면(title) 보인다. */
     var cat = getAppCat();
     var tracks = getEffectiveTracks();
     var allProjs = mainProjects(); // kindSplit 앱은 «수행»만 센다(안내·기타는 따로 탭)
     var cands = (D.discover && D.discover.bundles) || [];
-    var slim = isSlim();
     var L = leftDashLabels();
-
     aside.className = 'left-dash' + (DIFF_HIGHLIGHT ? ' code-diff-box' : '');
 
-    var statsMap = Object.create(null);
-    tracks.forEach(function (t) {
-      statsMap[t.id] = { total: 0, active: 0, done: 0, cand: 0, yrs: Object.create(null) };
-    });
-    var unmappedIds = [];
+    var cnt = Object.create(null), yrsOf = Object.create(null), candCnt = Object.create(null);
+    var unmapped = [];
     allProjs.forEach(function (p) {
       var tid = str(p.trackId);
-      var st = statsMap[tid];
-      if (!st) {
-        st = { total: 0, active: 0, done: 0, cand: 0, yrs: Object.create(null) };
-        statsMap[tid] = st;
-        unmappedIds.push(tid);
-      }
-      st.total++;
-      if (p.status === 'done') st.done++;
-      else st.active++;
-      var y = String(num(p.year, CUR_YEAR));
-      st.yrs[y] = (st.yrs[y] || 0) + 1;
+      cnt[tid] = (cnt[tid] || 0) + 1;
+      (yrsOf[tid] = yrsOf[tid] || Object.create(null))[String(num(p.year, CUR_YEAR))] = 1;
+      if (tid && !tracks.some(function (t) { return t.id === tid; }) && unmapped.indexOf(tid) < 0) unmapped.push(tid);
     });
-    cands.forEach(function (b) {
-      var tid = str(b.suggestedTrackId);
-      if (tid && statsMap[tid]) statsMap[tid].cand++;
-    });
-
-    var allDone = allProjs.filter(function (p) { return p.status === 'done'; }).length;
-    var allActive = allProjs.length - allDone;
-
-    var cardsHtml = '<div class="ld-item' + (!TRACK_FILTER ? ' on' : '') + '">' +
-      '<button type="button" class="ld-item-btn" data-ld-track="" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '">' +
-        '<span class="ld-item-name">' + esc(L.all) + '</span>' +
-        '<span class="chip c-blue">' + allProjs.length + '건</span>' +
-      '</button>' +
-      '<div class="ld-sub"><span>진행 ' + allActive + '</span><span>완료 ' + allDone + '</span>' +
-        (cands.length ? ('<span>후보 ' + cands.length + '</span>') : '') +
-      '</div>' +
-    '</div>';
-
+    cands.forEach(function (b) { var tid = str(b.suggestedTrackId); if (tid) candCnt[tid] = (candCnt[tid] || 0) + 1; });
     var renderTracks = tracks.slice();
-    unmappedIds.forEach(function (uid) {
-      if (uid && !renderTracks.some(function (t) { return t.id === uid; })) {
-        renderTracks.push({ id: uid, name: uid + ' (기타)', shortName: uid, icon: '🧩' });
-      }
-    });
-    // 가벼운 화면: 사업도 후보도 없는 트랙은 올리지 않는다(«0건» 줄 되풀이 금지). 사람이 새로 추가한 지역·지금 고른 트랙은 남긴다.
-    if (slim) {
-      renderTracks = renderTracks.filter(function (t) {
-        var st = statsMap[t.id];
-        return (st && (st.total > 0 || st.cand > 0)) || t.custom || TRACK_FILTER === t.id;
-      });
+    unmapped.forEach(function (uid) { renderTracks.push({ id: uid, name: uid + ' (기타)', shortName: uid, icon: '🧩' }); });
+    // 자료로 켜진 앱은 사업도 후보도 없는 트랙을 올리지 않는다(«0건» 이름 되풀이 금지).
+    // 늘 켜는 앱(상공회의소·6차산업 — 정해진 지역 목록)은 지역 이름을 다 보인다. 사람이 추가한 지역·지금 고른 트랙은 늘 남긴다.
+    if (!cat.hasLeftDashboard) {
+      renderTracks = renderTracks.filter(function (t) { return cnt[t.id] || candCnt[t.id] || t.custom || TRACK_FILTER === t.id; });
     }
-
-    renderTracks.forEach(function (t) {
-      var st = statsMap[t.id] || { total: 0, active: 0, done: 0, cand: 0, yrs: {} };
-      var yrs = Object.keys(st.yrs).sort(function (a, b) { return Number(b) - Number(a); });
-      // 가벼운 화면: 연도는 아래 «연도별» 한 곳에서만 고른다(트랙마다 연도 칩을 또 늘어놓지 않는다)
-      var yrsHtml = slim ? '' : (yrs.length
-        ? ('<div class="ld-yrs">' + yrs.slice(0, 6).map(function (yr) {
-            var on = TRACK_FILTER === t.id && YEAR_FILTER === yr;
-            return '<button type="button" class="ld-yr-btn' + (on ? ' on' : '') + '" data-ld-track="' + esc(t.id) + '" data-ld-year="' + esc(yr) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(yr) + '(' + st.yrs[yr] + ')</button>';
-          }).join('') + '</div>')
-        : '<div class="ld-sub"><span>' + esc((cat.leftDash && cat.leftDash.emptyLabel) || '등록 대기') + '</span></div>');
-
-      cardsHtml += '<div class="ld-item' + (TRACK_FILTER === t.id ? ' on' : '') + '">' +
-        '<button type="button" class="ld-item-btn" data-ld-track="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-pressed="' + (TRACK_FILTER === t.id ? 'true' : 'false') + '">' +
-          '<span class="ld-item-name">' + esc((t.icon || '🏛️') + ' ' + trackShortLabel(t)) + '</span>' +
-          '<span class="chip ' + (st.total > 0 ? 'c-blue' : '') + '">' + st.total + '건</span>' +
+    function itemHtml(tid, label, title, on) {
+      return '<div class="ld-item' + (on ? ' on' : '') + '">' +
+        '<button type="button" class="ld-item-btn" data-ld-track="' + esc(tid) + '" title="' + esc(title) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+          '<span class="ld-item-name">' + esc(label) + '</span>' +
         '</button>' +
-        '<div class="ld-sub"><span>진행 ' + st.active + '</span><span>완료 ' + st.done + '</span>' +
-          (st.cand ? ('<span class="chip c-amber">후보 ' + st.cand + '</span>') : '') +
-        '</div>' +
-        yrsHtml +
       '</div>';
+    }
+    var cardsHtml = itemHtml('', L.all, L.all + ' · ' + allProjs.length + '건' + (cands.length ? (' · 후보 ' + cands.length) : ''), !TRACK_FILTER);
+    renderTracks.forEach(function (t) {
+      var tip = str(t.name) + ' · ' + (cnt[t.id] || 0) + '건' + (candCnt[t.id] ? (' · 후보 ' + candCnt[t.id]) : '');
+      cardsHtml += itemHtml(t.id, (t.icon || '🏛️') + ' ' + trackShortLabel(t), tip, TRACK_FILTER === t.id);
     });
-
-    var scopeProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
-    var scopeYrsMap = Object.create(null);
-    scopeProjs.forEach(function (p) {
-      var y = String(num(p.year, CUR_YEAR));
-      scopeYrsMap[y] = (scopeYrsMap[y] || 0) + 1;
-    });
-    var scopeYrs = Object.keys(scopeYrsMap).sort(function (a, b) { return Number(b) - Number(a); });
-    var actObj = activeTrackObj();
-    var scopeTitle = actObj ? trackShortLabel(actObj) : L.scopeAll;
-    // 미등록 후보 탭은 후보의 수신 연도 알약이 따로 있다 — 등록 사업 연도 상자를 함께 두면 숫자가 어긋나 보여 숨긴다
-    var yearBoxHtml = CUR_TAB === 'inbox' ? '' : (
-      '<div class="ld-year-box">' +
-        '<div class="ld-year-hd" title="' + esc(scopeTitle + ' · ' + scopeProjs.length + '건') + '">📅 연도별 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
-        '<div class="ld-yrs">' +
-          '<button type="button" class="ld-yr-btn' + (!YEAR_FILTER ? ' on' : '') + '" data-ld-yronly="" aria-pressed="' + (!YEAR_FILTER ? 'true' : 'false') + '">전체(' + scopeProjs.length + ')</button>' +
-          scopeYrs.map(function (yr) {
-            var yOn = YEAR_FILTER === yr;
-            return '<button type="button" class="ld-yr-btn' + (yOn ? ' on' : '') + '" data-ld-yronly="' + esc(yr) + '" aria-pressed="' + (yOn ? 'true' : 'false') + '">' + esc(yr) + '(' + scopeYrsMap[yr] + ')</button>';
-          }).join('') +
-        '</div>' +
-      '</div>');
 
     aside.innerHTML =
-      '<div class="ld-hd"><span>' + esc(L.head) + '</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + renderTracks.length + '곳</span>') + '</div>' +
+      '<div class="ld-hd"><span>' + esc(L.head) + '</span></div>' +
       '<div class="ld-list">' + cardsHtml + '</div>' +
       // 새 지역 추가는 카탈로그가 «사람이 지역을 더하는 앱»이라고 한 곳(regionManageable:true — 상공회의소)만
-      (cat.regionManageable === true ? '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">' + esc(L.add) + '</button>' : '') +
-      yearBoxHtml;
+      (cat.regionManageable === true ? '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">' + esc(L.add) + '</button>' : '');
 
     aside.querySelectorAll('[data-ld-track]').forEach(function (btn) {
       btn.onclick = function () {
         var tid = btn.getAttribute('data-ld-track') || '';
-        var yrAttr = btn.getAttribute('data-ld-year');
-        if (yrAttr !== null) YEAR_FILTER = yrAttr;
-        else if (!tid || TRACK_FILTER === tid || !(statsMap[tid] && statsMap[tid].yrs[YEAR_FILTER])) YEAR_FILTER = '';
+        // «전체»를 누르거나, 고른 연도에 사업이 없는 트랙으로 바꾸면 연도 거르기를 비운다(0건 빈 화면 방지)
+        if (!tid || (YEAR_FILTER && !(yrsOf[tid] && yrsOf[tid][YEAR_FILTER]))) YEAR_FILTER = '';
         TRACK_FILTER = tid;
         SHOW_ALL_ROWS = false;
-        if ($('projTrackSel')) $('projTrackSel').value = TRACK_FILTER;
-        if ($('yrTrackSel')) $('yrTrackSel').value = TRACK_FILTER;
-        if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
-        if (CUR_TAB === 'detail' || CUR_TAB === 'report') switchTab('projects');
-        else draw();
-      };
-    });
-    aside.querySelectorAll('[data-ld-yronly]').forEach(function (btn) {
-      btn.onclick = function () {
-        YEAR_FILTER = btn.getAttribute('data-ld-yronly') || '';
-        SHOW_ALL_ROWS = false;
-        if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
         if (CUR_TAB === 'detail' || CUR_TAB === 'report') switchTab('projects');
         else draw();
       };
@@ -1195,8 +1116,10 @@
     var q = str($('projQ') && $('projQ').value).toLowerCase();
     var st = stFilter();
     var mgr = str($('projMgr') && $('projMgr').value);
+    var erpAud = ERP_FILTER ? erpAudit() : null;
     return mainProjects().filter(function (p) {
       if (TRACK_FILTER && p.trackId !== TRACK_FILTER) return false;
+      if (erpAud) { var ea = erpAud.byPid[p.id]; if (!ea || ea.state !== 'unlinked') return false; }
       if (YEAR_FILTER && String(num(p.year, 2026)) !== YEAR_FILTER) return false;
       if (st === 'done' && p.status !== 'done') return false;
       if (st === 'active' && p.status === 'done') return false;
@@ -1210,10 +1133,50 @@
   }
 
   function hasProjFilterActive() {
-    return !!(TRACK_FILTER || YEAR_FILTER ||
+    return !!(TRACK_FILTER || YEAR_FILTER || ERP_FILTER ||
       str($('projQ') && $('projQ').value) ||
       stFilter() ||
       str($('projMgr') && $('projMgr').value));
+  }
+
+  /* ── ERP 사건번호 연결 점검(읽기만) · 번호 칸 · [연결] 한 건 (대표 지시 2026-11-28 상공회의소 「ERP 번호가 왜 안 붙었는지 체크하고 연결」) ──
+     ⚠ 이름이 닮았다고 번호를 자동으로 붙이지 않는다(온톨로지 규칙) — 후보가 정확히 하나일 때 사람이 [연결]을 눌러야만 저장한다.
+     ⚠ 한 번호는 한 사업장에만 — 이미 다른 줄에 붙은 번호는 막는다. 저장은 caseNo 한 칸만(patch). */
+  function erpAudit() {
+    var I = Intake();
+    if (!I || typeof I.auditErpLinks !== 'function') {
+      return { byPid: Object.create(null), counts: { linked: 0, manual: 0, unlinked: 0, na: 0 }, ledger: { count: 0, minYear: 0, maxYear: 0 } };
+    }
+    return I.auditErpLinks(APP_KEY, projectsList(), { consultings: D.consultings, consTypes: D.consTypes });
+  }
+  var ERP_SHORT = { candidate: '후보 1건', ambiguous: '후보 여럿', twin: '중복', agency: '기관명', noyear: '원장에 없음', none: '못 찾음' };
+  function erpCellHtml(p, audit) {
+    var a = audit && audit.byPid && audit.byPid[p.id];
+    var no = str(p.caseNo);
+    if (no) {
+      return '<span class="chip c-blue" title="ERP 수임 사건번호">' + esc(no) + '</span>' +
+        ((a && a.state === 'manual') ? ' <span class="chip c-amber" title="ERP 수임 원장에서 이 번호를 찾지 못했습니다 — 번호를 확인하세요">원장 확인</span>' : '');
+    }
+    if (!a || a.state !== 'unlinked') return '<span class="hint" title="이 프로그램은 ERP 수임 원장에 같은 유형이 없어 번호를 쓰지 않습니다">-</span>';
+    var btn = (a.reason === 'candidate' && a.cands && a.cands[0])
+      ? ' <button type="button" class="sm ok" data-erp-link="' + esc(p.id) + '" data-erp-no="' + esc(a.cands[0].no) + '" title="' + esc(a.text) + '">연결 ' + esc(a.cands[0].no) + '</button>'
+      : '';
+    return '<span class="chip c-amber" title="' + esc(a.text) + '">미연결 · ' + esc(ERP_SHORT[a.reason] || '확인') + '</span>' + btn;
+  }
+  async function connectErpNo(pid, no) {
+    var p = projectById(pid);
+    no = cleanText(no).slice(0, 60);
+    if (!p || !no) return;
+    if (str(p.caseNo)) { toast('이미 사건번호가 있습니다: ' + p.caseNo); return; }
+    var dup = projectsList().find(function (q) { return q.id !== pid && str(q.caseNo) === no; });
+    if (dup) { toast('이 번호는 이미 다른 사업장(' + dup.companyName + ')에 연결돼 있습니다.'); return; }
+    if (PREVIEW_MODE) { toast('미리보기 모드에서는 저장하지 않습니다.'); return; }
+    if (!global.confirm(p.companyName + ' 에 ERP 사건번호 ' + no + ' 를 연결할까요?')) return;
+    if (await saveProjectPatch(pid, { caseNo: no })) {
+      rebuildDiscoverAndRag();
+      draw();
+      toast('ERP 사건번호 ' + no + ' 를 연결했습니다.');
+    }
   }
 
   function renderProjectsPane() {
@@ -1223,7 +1186,7 @@
     var lean = isLean();
     var cands = (D.discover && D.discover.bundles) || [];
     var hwpx = Hwpx();
-    var splitCols = cat.listCols === 'split';
+    var audit = erpAudit();
     // 가벼운 화면 + 사업이 한 트랙에만 있으면: 트랙 알약·줄마다 같은 트랙 칩은 되풀이라 걷는다
     var oneTrackSlim = isSlim() && Object.keys(usedTrackIds()).length <= 1;
     // 왼쪽 대시보드가 켜지면 트랙·연도 고르기는 왼쪽 한 곳 — 위쪽 알약줄은 숨기고, 한 트랙을 고른 동안은 줄마다 같은 트랙 칩도 걷는다
@@ -1271,7 +1234,6 @@
     // 연도별 빠른 필터 바 (#projYrBar — 전 12개 앱 연도별 관리)
     var trackScopedProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
     renderYearButtonsBar('projYrBar', 'all', trackScopedProjs);
-    if ($('projYrBar')) $('projYrBar').style.display = ldSlim ? 'none' : '';
 
     // 초소형 1줄 KPI 배지 (#kpiBox — 선택된 지역/연도 범위 기준)
     var kpiBox = $('kpiBox');
@@ -1300,6 +1262,10 @@
         '<div class="kpi k-amber' + (activeOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="active" role="button" tabindex="0" aria-pressed="' + (activeOn ? 'true' : 'false') + '"><span>진행중</span><b>' + activeCnt + '건</b></div>' +
         (lean ? '' : '<div class="kpi k-blue"><span>수집자료</span><b>' + totalComms + '건</b></div>') +
         roundKpiHtml(kpiScope) +
+        (function () {
+          var erpUnl = kpiScope.filter(function (p) { var ea = audit.byPid[p.id]; return ea && ea.state === 'unlinked'; }).length;
+          return (erpUnl || ERP_FILTER) ? ('<div class="kpi k-amber' + (ERP_FILTER === 'unlinked' ? ' k-on' : '') + '" data-act="kpiErp" role="button" tabindex="0" aria-pressed="' + (ERP_FILTER === 'unlinked' ? 'true' : 'false') + '" title="ERP 사건번호가 비어 있는 줄만 봅니다 — 이유는 표의 ERP 번호 칸에 있습니다"><span>ERP 미연결</span><b>' + erpUnl + '건</b></div>') : '';
+        })() +
         // 미등록 후보는 «📥 미등록 후보» 탭 이름표에 이미 건수가 있다 — 되풀이하지 않는다
         ((!lean && !isSlim() && scopedCands.length > 0) ? '<div class="kpi k-amber" data-act="goInbox" role="button" tabindex="0" title="미등록 후보 탭으로 이동"><span>미등록후보</span><b>' + scopedCands.length + '곳</b></div>' : '');
       kpiBox.querySelectorAll('[data-act="kpiSt"]').forEach(function (k) {
@@ -1310,6 +1276,10 @@
         k.onkeydown = function (e) {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); k.click(); }
         };
+      });
+      kpiBox.querySelectorAll('[data-act="kpiErp"]').forEach(function (k) {
+        k.onclick = function () { ERP_FILTER = ERP_FILTER === 'unlinked' ? '' : 'unlinked'; SHOW_ALL_ROWS = false; renderProjectsPane(); };
+        k.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); k.click(); } };
       });
       kpiBox.querySelectorAll('[data-act="goInbox"]').forEach(function (k) {
         k.onclick = function () { switchTab('inbox'); };
@@ -1344,7 +1314,7 @@
     if (!box) return;
     var filtered = getFilteredProjects();
     if (!filtered.length) {
-      box.innerHTML = '<div class="empty">조건에 맞는 ' + esc(cat.name) + ' 사업장이 없습니다. ' +
+      box.innerHTML = '<div class="empty">' + (ERP_FILTER ? 'ERP 사건번호가 비어 있는 사업장이 없습니다. ' : ('조건에 맞는 ' + esc(cat.name) + ' 사업장이 없습니다. ')) +
         (cands.length ? ('<b>📥 미등록 후보(' + cands.length + '곳)</b>에서 1클릭 등록하거나 ') : '') +
         '<b>[+ 새 사업 등록]</b>을 눌러 추가하세요.</div>';
       return;
@@ -1363,40 +1333,35 @@
       '</div>';
 
     var isInsp = (APP_KEY === 'laboraudit');
+    /* ══ 표 줄 — 12개 앱 공통 «독립 열» (대표 지시 2026-11-28 상공회의소 「사업장과 연도, ERP 번호」 · 6차산업 「연도/사업장명/진행상태 열 분리」)
+       ☐ · № · 연도 · 사업장명 · [세부 트랙] · ERP 번호 · 진행상태 · [회차] · [감독 기간·지적사항] · 담당 · 6단계 · 자료·점검 · [요약 메모] · 열기
+       · 세부 트랙 열은 사업이 한 트랙뿐이거나 왼쪽 대시보드에서 한 트랙을 고른 동안 «같은 값 되풀이»라 열째 뺀다.
+       · ERP 번호 칸은 비어 있으면 «미연결 · 사유»(PuConsultIntake.auditErpLinks)와, 후보가 정확히 하나일 때만 [연결] 단추.
+       · 폰 카드 표식(split-row·pc-only·pm-st·pm-tr·data-pm-act)은 css/pu-consult-phone.css 와 짝이다. */
+    var showTrackCol = !hideTrackChip;
     var trs = shown.map(function (p, i) {
       var ckKey = 'p:' + p.id;
-      var clsList = [];
-      if (splitCols) clsList.push('split-row');
+      var clsList = ['split-row'];
       if (p.id === CUR_PID) clsList.push('cur');
       if (p.status === 'done') clsList.push('perf-direct');
-      var trAttr = clsList.length ? (' class="' + clsList.join(' ') + '"') : '';
+      var trAttr = ' class="' + clsList.join(' ') + '"';
       var commCnt = getProjectComms(p.id).length;
       var sum = hwpx ? hwpx.buildSummary(APP_KEY, p, getCheckDoc(p.id), []) : { overallPct: 0 };
       var stChip = p.status === 'done' ? '<span class="chip c-green pm-st">완료</span>' : '<span class="chip c-amber pm-st">진행중</span>';
       var trObj = tracks.find(function (t) { return t.id === p.trackId; });
       var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
-      var caseTag = p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '';
       var hasCk = !!(D.checks && D.checks[p.id]);
       var ckChip = (lean && !hasCk) ? '' : (' <span class="chip">' + sum.overallPct + '%</span>'); // 점검을 안 한 건에 0% 를 찍지 않는다
-      var memoHtml = lean ? (sourceChipsHtml(p) + ' ' + esc(noteWithoutTag(p))) : esc(p.summaryNote || '-');
-      var trChip = (lean && visTrackCount < 2) ? '' : ('<span class="chip c-blue">' + esc(trLbl) + '</span> ');
-      if (splitCols) {
-        // 연도 · 사업장명 · 지역 · 진행상태를 각각 독립 열로 — 세로줄이 일직선 (서류-목록-표준형태 ②)
-        return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
-          '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
-          '<td class="n">' + (i + 1) + '</td>' +
-          '<td class="yr" title="' + esc(String(p.year || 2026)) + '년">' + esc(String(p.year || 2026)) + '</td>' +
-          '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + caseTag + '</td>' +
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
-          '<td data-k="st">' + stChip + '</td>' +
-          '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
-          '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>' +
-          '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
-        '</tr>';
-      }
-      var rowBodyCols;
+      var memoTxt = memoShown(p);
+      var memoHtml = lean ? (sourceChipsHtml(p) + ' ' + esc(memoTxt ? noteWithoutTag({ summaryNote: memoTxt }) : '')) : esc(memoTxt || '-');
+      var yr = String(p.year || 2026);
+      var cells =
+        '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
+        '<td class="n">' + (i + 1) + '</td>' +
+        '<td class="yr" title="' + esc(yr) + '년">' + esc(yr) + '</td>' +
+        '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + '</td>' +
+        (showTrackCol ? '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue pm-tr">' + esc(trLbl) + '</span></td>' : '') +
+        '<td data-k="erp">' + erpCellHtml(p, audit) + '</td>';
       if (isInsp) {
         // 감독 결과가 진행상태 칩과 같은 말(진행중·완료)이면 두 번 적지 않는다
         var stLbl = p.status === 'done' ? '완료' : '진행중';
@@ -1406,26 +1371,22 @@
         var issuesTxt = p.inspIssues || p.summaryNote || '-';
         var dueHtml = p.inspDue ? (' <span class="hint">· 기한 ' + esc(p.inspDue) + '</span>') : '';
         var issuesTitle = p.inspDue ? (issuesTxt + ' (시정기한: ' + p.inspDue + ')') : issuesTxt;
-        rowBodyCols =
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue pm-tr">' + esc(trLbl) + '</span> ') + stChip + resChip + '</td>' +
+        cells +=
+          '<td data-k="st">' + stChip + resChip + '</td>' +
           '<td data-k="pc-only" title="' + esc([p.inspPeriod, p.inspOffice].filter(Boolean).join(' · ')) + '">' + periodHtml + officeHtml + '</td>' +
           '<td class="wide" title="' + esc(issuesTitle) + '">' + esc(issuesTxt) + dueHtml + '</td>' +
           '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>';
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span>' + ckChip + '</td>';
       } else {
-        rowBodyCols =
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue pm-tr">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
+        cells +=
+          '<td data-k="st">' + stChip + '</td>' +
           (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
           '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
           '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
-          '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>';
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span>' + ckChip + '</td>' +
+          '<td class="wide" title="' + esc(memoTxt || '-') + '">' + memoHtml + '</td>';
       }
-      return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
-        '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
-        '<td class="n">' + (i + 1) + '</td>' +
-        '<td class="ti" title="' + esc(p.companyName) + '"><span class="chip">' + esc(String(p.year || 2026)) + '</span> ' + esc(p.companyName) + caseTag + '</td>' +
-        rowBodyCols +
+      return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' + cells +
         '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
       '</tr>';
     }).join('');
@@ -1435,11 +1396,13 @@
       : '';
 
     var diffMark = (isInsp && DIFF_HIGHLIGHT) ? (' ' + diffBadge('개편')) : '';
-    var headCols = splitCols
-      ? '<th class="yr">연도</th><th>사업장명</th><th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th><th data-k="st">진행상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'
-      : (isInsp
-        ? ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '감독 결과' : '감독 유형 · 결과') + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th><th data-k="act">열기</th>')
-        : ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'));
+    var headCols = '<th class="yr">연도</th><th>사업장명</th>' +
+      (showTrackCol ? '<th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th>' : '') +
+      '<th data-k="erp">ERP 번호</th>' +
+      (isInsp
+        ? ('<th data-k="st">진행 · 감독 결과' + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th>')
+        : ('<th data-k="st">진행상태</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th>')) +
+      '<th data-k="act">열기</th>';
     box.innerHTML = bulkHtml + '<div class="scroll' + (isInsp ? diffCls(true) : '') + '"><table class="t" data-name="cases">' +
       '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th>' + headCols + '</tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>' + moreHtml;
@@ -1447,6 +1410,9 @@
     refreshProjBulkUi();
     if ($('showAllProjBtn')) $('showAllProjBtn').onclick = function () { SHOW_ALL_ROWS = true; renderProjectsPane(); };
 
+    box.querySelectorAll('[data-erp-link]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); connectErpNo(b.getAttribute('data-erp-link'), b.getAttribute('data-erp-no')); };
+    });
     box.querySelectorAll('[data-pick]').forEach(function (b) {
       b.onclick = function (e) { e.stopPropagation(); CUR_PID = b.getAttribute('data-pick'); switchTab('detail'); };
     });
@@ -3140,7 +3106,7 @@
     };
     if ($('projMgr')) $('projMgr').onchange = function () { SHOW_ALL_ROWS = false; renderProjectsPane(); };
     if ($('projResetBtn')) $('projResetBtn').onclick = function () {
-      TRACK_FILTER = ''; YEAR_FILTER = ''; SHOW_ALL_ROWS = false;
+      TRACK_FILTER = ''; YEAR_FILTER = ''; ERP_FILTER = ''; SHOW_ALL_ROWS = false;
       if ($('projQ')) $('projQ').value = '';
       setStFilter('');
       if ($('projMgr')) $('projMgr').value = '';
