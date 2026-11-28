@@ -149,7 +149,8 @@
                       {path:dataRoots(['attendance_records'], '/v/{id}')[0],entityType:'ScheduleEvent'},
                       {path:dataRoots(['user_accounts'])[0],entityType:'Person'}] },
     fin:{ name:'재무관리', file:'pu-erp.html?app=fin',
-      primaryRoots:dataRoots(FIN_DATA_KEYS).concat(['hanaSmsBridge']),
+      /* hometax_pull — 홈택스 매출 세금계산서 자동 수집의 스위치·결과(2026-11-28). 계산서 줄은 invoice_arc 에 쌓인다 */
+      primaryRoots:dataRoots(FIN_DATA_KEYS).concat(['hanaSmsBridge','hometax_pull']),
       sharedRoots:dataRoots(['companies','contracts','cases','consultings','funds','other_projects','payroll_monthly',
         'user_accounts','mgr_rates','policy_perf','locked_payroll_months','locked_attend_months','locked_irregular_months',
         'locked_contract_months','app_settings']),
