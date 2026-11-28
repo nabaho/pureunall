@@ -18,6 +18,7 @@ test('_peLive 는 휴지통에 든 줄을 뺀다', () => {
   assert.equal(ctx._peLive(null), null, '읽기 실패(null)는 그대로');
 });
 test('★ 이알피 원본을 읽는 두 길(서버·캐시) 모두 _peLive 를 지난다', () => {
-  assert.match(src, /return \[d\[0\],_peLive\(_peArr\(s\.val\(\)\)\)\];/);
-  assert.match(src, /return \[d\[0\],_peLive\(_ls\(PE_KEYS\[d\[0\]\]\)\)\];/);
+  /* 2026-11-22: 휴지통 줄을 따로 적어 두려고 _peLive 앞에 _peTrashNote(목록을 그대로 돌려줌)가 낀다 */
+  assert.match(src, /return \[d\[0\],_peLive\(_peTrashNote\(d\[0\],_peArr\(s\.val\(\)\)\)\)\];/);
+  assert.match(src, /return \[d\[0\],_peLive\(_peTrashNote\(d\[0\],_ls\(PE_KEYS\[d\[0\]\]\)\)\)\];/);
 });
