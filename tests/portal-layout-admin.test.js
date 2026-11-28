@@ -40,7 +40,7 @@ const FN = [
   'function soonToEnd(', 'function savedRowOf(', 'function applyTileOrder(', 'function persistOrderFromDom(',
   'function updateLockUi(', 'function onTileDragStart(', 'function onTileDragEnd(', 'function onTileDragOver(',
   'function rowExists(', 'function appRowOf(',
-  'function layoutRowFreezeToggle(', 'function layoutRowBtnPaint(', 'function buildAppRows(',
+  'function layoutRowFreezeToggle(', 'function layoutRowBtnPaint(', 'function buildAppRows(', 'function mgInDrawer(', 'function mgDrawerHtml(',
   'function lpEsc(', 'function lpApp(', 'function lpRowLabel(', 'function lpPicked(', 'function lpRender(',
   'function lpBodyClick(', 'function lpBodyChange(', 'function lpBulk(',
 ];
@@ -51,6 +51,7 @@ function sliceBlock(from, endMarker) {
 }
 const APPS_SRC = sliceBlock('var APPS = [', '\n  ];');
 const ROWS_SRC = sliceBlock('var APP_ROWS = [', '\n  ];');
+const MG_SRC = sliceBlock('var MG_ZONES = [', '\n  ];');   // 관리실 서랍 구역(영업·내부) — buildAppRows 가 서랍 줄을 짓는 데 쓴다
 const MOVED_SRC = E.match(/var ROW_MOVED_FROM = [^;]+;/)[0];
 const PATH_SRC = E.match(/var LAYOUT_PATH = [^;]+;/)[0];
 const CACHE_SRC = E.match(/var LAYOUT_CACHE = [^;]+;/)[0];
@@ -82,7 +83,7 @@ function world(spec, opts) {
     auth: { currentUser: { uid: 'u1' } },
   };
   vm.createContext(ctx);
-  vm.runInContext(APPS_SRC + '\n' + ROWS_SRC + '\n' + MOVED_SRC + '\n' + PATH_SRC + '\n' + CACHE_SRC, ctx);
+  vm.runInContext(APPS_SRC + '\n' + ROWS_SRC + '\n' + MG_SRC + '\n' + MOVED_SRC + '\n' + PATH_SRC + '\n' + CACHE_SRC, ctx);
   vm.runInContext('var tilePrefs = { order: null, rows: null }; var _layout = null, _layoutAdmin = false, _layoutEdit = false,'
     + ' _layoutWriting = 0, _layoutSayT = 0, _dragBefore = null, _dragWarned = false, _dragEl = null, _lpSel = {}, _lpBulkRow = "";', ctx);
   const ids = JSON.parse(vm.runInContext('JSON.stringify(APP_ROWS.map(function(r){ return r.id; }))', ctx));

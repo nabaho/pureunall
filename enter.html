@@ -585,6 +585,68 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
 .tile:not(.lock)[draggable="true"]:active{cursor:grabbing;}
 .tiles{display:flex;flex-wrap:wrap;gap:8px 4px;justify-content:flex-start;}
 .tilerow{margin-bottom:6px;position:relative;}
+/* ══ 🗂 관리실 서랍 (대표 지시 2026-11-28) — 영업관리·내부관리를 «왼쪽 서랍» 으로. 영업=호박(amber) · 내부=초록(green)으로 공간을 가른다. ══ */
+.pbar #mgBtn{order:0;margin:0 auto 0 6px;display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border:0;border-radius:999px;background:#1e293b;color:#fff;
+  font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+.pbar #mgBtn[hidden]{display:none;}
+.pbar #mgBtn:hover{background:#475569;}
+.pbar #mgBtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.pbar:has(#mgBtn:not([hidden])) .nm{margin-right:0;}
+.mg-n{background:#dc2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:.68rem;font-weight:800;line-height:1.4;}
+.mg-n[hidden]{display:none;}
+.mg-drawer{position:fixed;top:0;bottom:0;left:0;width:400px;max-width:92vw;z-index:70;display:flex;flex-direction:column;background:#fff;
+  border-right:1px solid #e2e8f0;box-shadow:16px 0 40px rgba(15,23,42,.14);transform:translateX(-104%);visibility:hidden;
+  transition:transform .25s,visibility 0s linear .25s;}
+.mg-drawer.open{transform:none;visibility:visible;transition:transform .25s,visibility 0s;}
+.mg-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 18px 12px;}
+.mg-hd b{display:block;font-size:1.1rem;color:#1e293b;}
+.mg-hd small{display:block;font-size:.72rem;color:#64748b;margin-top:1px;}
+.mg-x{width:32px;height:32px;border:0;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.9rem;cursor:pointer;flex:none;}
+.mg-x:hover{background:#e2e8f0;}
+.mg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px;}
+.mg-tab{position:relative;display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:11px 12px 10px;border:2px solid #e2e8f0;border-radius:14px;
+  background:#fff;color:#475569;font:inherit;cursor:pointer;min-width:0;}
+.mg-tab[hidden]{display:none;}
+.mg-tab-t{display:flex;align-items:center;gap:7px;font-size:.95rem;font-weight:800;white-space:nowrap;}
+.mg-tab-n{font-style:normal;font-size:.72rem;font-weight:600;color:#64748b;}
+.mg-tab-s{font-size:.7rem;color:#64748b;line-height:1.3;}
+.mg-tab-b{margin-top:2px;background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:.68rem;font-weight:800;}
+.mg-tab-b[hidden]{display:none;}
+.mg-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;}
+.mg-tab[data-zone="sales"] .mg-dot,.mg-zone[data-zone="sales"] .mg-dot{background:#d97706;}
+.mg-tab[data-zone="inside"] .mg-dot,.mg-zone[data-zone="inside"] .mg-dot{background:#16a34a;}
+.mg-tab[data-zone="sales"][aria-selected="true"]{border-color:#d97706;background:#fffbeb;color:#854d0e;}
+.mg-tab[data-zone="inside"][aria-selected="true"]{border-color:#16a34a;background:#f0fdf4;color:#166534;}
+.mg-tab:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
+.mg-zone{flex:1;min-height:0;overflow:auto;padding:16px 16px 28px;border-top:5px solid var(--mg-c);background:var(--mg-bg);}
+.mg-zone[hidden]{display:none;}
+.mg-zone[data-zone="sales"]{--mg-c:#d97706;--mg-bg:#fffbeb;--mg-ink:#854d0e;}
+.mg-zone[data-zone="inside"]{--mg-c:#16a34a;--mg-bg:#f0fdf4;--mg-ink:#166534;}
+.mg-zone-h{display:flex;flex-direction:column;gap:2px;margin:0 2px 10px;}
+.mg-zone-t{display:flex;align-items:center;gap:8px;font-size:1rem;color:var(--mg-ink);}
+.mg-zone-h small{font-size:.74rem;color:#64748b;}
+/* 서랍 안 줄 — 머리(접기 단추)는 감춘다(탭·구역 머리가 대신한다). 앱은 «아이콘 + 이름 + 설명» 한 줄씩 */
+.mg-zone .tilerow{margin:0;}
+.mg-zone .tilerow-h{display:none;}
+body.lay-admin .mg-zone .tilerow{padding-top:30px;}
+.mg-zone .tiles{display:flex;flex-direction:column;flex-wrap:nowrap;gap:2px;padding:0;}
+.mg-zone .tile{flex-direction:row;align-items:center;width:100%;max-width:none;min-width:0;padding:10px 12px;gap:13px;text-align:left;border-radius:12px;}
+.mg-zone .tile:hover{background:rgba(255,255,255,.8);}
+.mg-zone .tile:hover .ic{transform:none;box-shadow:none;}
+.mg-zone .tile .ic{width:38px;height:38px;margin:0;flex:none;font-size:1.15rem;}
+.mg-zone .tile .tx{min-width:0;flex:1;}
+.mg-zone .tile b{font-size:.92rem;font-weight:700;margin:0;}
+.mg-zone .tile .tx span{display:block;font-size:.75rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mg-zone .tile .ic{position:static;backdrop-filter:none;}   /* backdrop-filter 가 있으면 ☆·딱지의 «기준 상자»가 아이콘으로 바뀐다 */
+.mg-zone .tile .pin-star{right:10px;bottom:auto;top:50%;margin-top:-10px;}
+.mg-zone .tile .tile-alert{left:auto;right:40px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
+.mg-zone .tile .nl-warn{top:50%;right:40px;margin-top:-10px;}
+.mg-zone .tile .tile-soon-pill{left:auto;right:40px;top:50%;margin-top:-9px;transform:none;}
+@media(max-width:520px){
+  .pbar #mgBtn{padding:5px 11px;font-size:.74rem;}
+  .mg-drawer{width:92vw;}
+  .mg-tabs{gap:8px;padding:0 10px 12px;}
+}
 .tilerow-h{display:flex;align-items:center;gap:6px;padding:3px 6px 4px;border-radius:8px;}
 .tilerow-t{font-size:12px;font-weight:700;color:#1e293b;letter-spacing:-.2px;}
 /* ══ 접었다 펴는 줄 · 자주 쓰는 앱 (대표 2026-10-24 시안 2 「추천대로」) ══
@@ -1616,6 +1678,8 @@ body.portal-mode #moreFab{display:flex;}
     <div class="pbar">
       <div class="logo">푸</div>
       <div class="nm"><b>푸른노무법인</b><small>PUREUN · LLF</small></div>
+      <!-- 🗂 관리실 — 영업관리·내부관리 앱이 사는 왼쪽 서랍을 연다(대표 지시 2026-11-28). 앱이 하나라도 보일 때만 JS(mgSync)가 켠다. 숫자 = 확인할 앱 수 -->
+      <button id="mgBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mgDrawer" hidden>🗂 관리실<span class="mg-n" id="mgBadge" hidden></span></button>
       <button id="chatFab" type="button" aria-label="푸른 시스템 길잡이 챗봇" aria-haspopup="dialog" aria-expanded="false" title="의뢰인 업무·자료함·영업관리 사용법 &amp; 연결도 채팅방 · 대화형 개선요청·승인">🤖 <span class="chat-lb">길잡이 챗봇</span><span class="sg-fabbadge" id="chatFabBadge"></span></button>
       <!-- 📅 머리줄 앱 단추 — APPS 의 head:true 앱(지금은 푸른 캘린더)이 줄 타일 대신 여기 선다 (대표 지시 2026-11-14, 목업 A안).
            처음엔 감춰 두고 portalHeadAppPaint 가 «볼 수 있는 사람»에게만 켠다. 건의하기(order:4) 바로 왼쪽. -->
@@ -2432,8 +2496,8 @@ body.portal-mode #moreFab{display:flex;}
        타일이 일곱으로 늘어 한 줄에 섞여 있었다 — 밖으로 향하는 것(홈페이지·뉴스레터·정부사업신청·회생광고)은
        «영업관리», 안살림(경력·재무·인사)은 아래 «내부관리».
        ⚠ 옛 id 'inout' 은 일부러 없앴다 — 옛 id 가 저장된 사람은 savedRowOf 가 «없던 일»로 쳐서 앱의 제자리로 간다. */
-    { id:'sales',  label:'영업관리' },
-    { id:'inside', label:'내부관리' }
+    { id:'sales',  label:'영업관리', drawer:true },
+    { id:'inside', label:'내부관리', drawer:true }
   ];
   /* ── 줄 다루기 ────────────────────────────────────────────────
      ⚠★ 줄 이름은 바뀐다(2026-08-29 에 둘 → 넷). 그때 «옛 이름이 저장된»
@@ -5524,7 +5588,7 @@ body.portal-mode #moreFab{display:flex;}
   /* 줄 뼈대를 APP_ROWS 대로 만든다 — 한 번만. */
   function buildAppRows(){
     var host = $('appRows'); if(!host || host.dataset.built) return;
-    host.innerHTML = APP_ROWS.map(function(r){
+    var rowBox = function(r){
       return '<div class="tilerow">'
         /* 설명(hint)은 안 그린다 — 대표 지시 2026-08-29.
            줄 머리는 누르면 접히고 펴지는 단추다(대표 2026-10-24 시안 2) — 화살표·개수는 applyFold 가 채운다. */
@@ -5535,13 +5599,153 @@ body.portal-mode #moreFab{display:flex;}
         + '<button type="button" class="row-freeze" data-row-freeze="' + r.id + '" hidden></button>'
         + '<div class="tiles" id="appTiles_' + r.id + '" data-row="' + r.id + '"'
         + ' aria-label="' + r.label + ' 목록"></div></div>';
-    }).join('');
+    };
+    host.innerHTML = APP_ROWS.filter(function(r){ return !mgInDrawer(r); }).map(rowBox).join('') + mgDrawerHtml(rowBox);
     host.dataset.built = '1';
   }
   /* ⚠ 없는 줄을 부르면 첫 줄로 보낸다 — 어디에도 못 들어가면 타일이 사라진다. */
   function tileCont(row){
     buildAppRows();
     return $('appTiles_' + row) || $('appTiles_' + (APP_ROWS[0] ? APP_ROWS[0].id : ''));
+  }
+  /* ══ 🗂 관리실 서랍 (대표 지시 2026-11-28 「5번 시안으로 · 관리실은 왼쪽 · 영업관리/내부관리는 공간으로 확 구분 · 표기도」) ══
+     영업관리·내부관리 두 줄을 포털 첫 화면에서 빼 «왼쪽 서랍» 안에 둔다. 줄 틀(APP_ROWS · appTiles_<id> · 끌기 · 📌 · 권한 감춤)은 그대로고
+     «자리»만 서랍이다. ⚠ 서랍을 #appRows «안에» 짓는다 — 줄 고정 단추·꾹 눌러 ★ 넣기·끌기가 #appRows 에 붙어 있어 밖에 두면 서랍에서만 안 된다.
+     ★ 두 구역은 «다른 방»처럼 가른다 — 영업=호박(amber) · 내부=초록(green), 탭마다 이름·누가 쓰는 일·앱 개수·확인할 앱 수를 적는다.
+     ⚠ 길이 숨지 않게 — 머리줄 「관리실」 단추는 앱이 하나라도 보이면 늘 켜지고, 서랍 줄은 접히지 않는다.
+     ⚠ 알림 딱지(뉴스레터 ⚠·입금·바톤)는 서랍을 닫아도 단추·탭에 «몇 곳 확인할 일이 있는지» 로 올라온다. */
+  var MG_ZONES = [
+    { id:'sales',  label:'영업관리', who:'밖으로 향하는 일', hint:'홈페이지·뉴스레터·회생광고처럼 밖에 보이는 일' },
+    { id:'inside', label:'내부관리', who:'안살림 · 권한 있는 앱만', hint:'경력·재무·인사처럼 사무실 안에서 하는 일' }
+  ];
+  var _mgTab = 'sales', _mgWired = false;
+  try { var _mgSaved = localStorage.getItem('pu_mg_tab'); if(_mgSaved === 'sales' || _mgSaved === 'inside') _mgTab = _mgSaved; } catch(_mgE){}
+  function mgInDrawer(r){
+    return !!(r && r.drawer && MG_ZONES.some(function(z){ return z.id === r.id; }));
+  }
+  function mgDrawerHtml(rowBox){
+    return '<aside id="mgDrawer" class="mg-drawer" role="dialog" aria-modal="false" aria-labelledby="mgTitle" aria-hidden="true">'
+      + '<div class="mg-hd"><div><b id="mgTitle">관리실</b><small>영업·내부 업무를 따로 모아 둔 곳</small></div>'
+      + '<button type="button" id="mgClose" class="mg-x" aria-label="관리실 닫기" title="닫기">✕</button></div>'
+      + '<div class="mg-tabs" role="tablist" aria-label="관리실 구역">'
+      + MG_ZONES.map(function(z){
+          return '<button type="button" role="tab" class="mg-tab" id="mgTab_' + z.id + '" data-zone="' + z.id + '" aria-selected="false" aria-controls="mgPane_' + z.id + '">'
+            + '<span class="mg-tab-t"><i class="mg-dot" aria-hidden="true"></i>' + z.label + '<em class="mg-tab-n" id="mgCnt_' + z.id + '"></em></span>'
+            + '<span class="mg-tab-s">' + z.who + '</span>'
+            + '<span class="mg-tab-b" id="mgBadge_' + z.id + '" hidden></span></button>';
+        }).join('')
+      + '</div>'
+      + MG_ZONES.map(function(z){
+          var row = APP_ROWS.filter(function(r){ return r.id === z.id; })[0];
+          return '<section class="mg-zone" id="mgPane_' + z.id + '" role="tabpanel" data-zone="' + z.id + '" aria-labelledby="mgTab_' + z.id + '" hidden>'
+            + '<div class="mg-zone-h"><span class="mg-zone-t"><i class="mg-dot" aria-hidden="true"></i><b>' + z.label + ' 구역</b></span><small>' + z.hint + '</small></div>'
+            + (row ? rowBox(row) : '') + '</section>';
+        }).join('')
+      + '</aside>';
+  }
+  function mgSelect(z){
+    _mgTab = z;
+    MG_ZONES.forEach(function(zz){
+      var tab = $('mgTab_' + zz.id), pane = $('mgPane_' + zz.id), on = zz.id === z;
+      if(tab){
+        var sel = on ? 'true' : 'false';
+        if(tab.getAttribute('aria-selected') !== sel) tab.setAttribute('aria-selected', sel);
+        tab.tabIndex = on ? 0 : -1;
+      }
+      if(pane && pane.hidden === on) pane.hidden = !on;
+    });
+    try { localStorage.setItem('pu_mg_tab', z); } catch(_e){}
+  }
+  /* 단추·탭을 지금 형편에 맞춘다 — 화면을 새로 그리지 않고 글자·보임만 바꾼다(타일 쪽은 건드리지 않는다) */
+  function mgSync(){
+    var drawer = $('mgDrawer'), btn = $('mgBtn'); if(!drawer || !btn) return;
+    var canEdit = (typeof layoutCanDrag === 'function' && layoutCanDrag()) || (typeof layoutEditing === 'function' && layoutEditing());
+    var alertsAll = 0, firstVis = '', curVis = false;
+    MG_ZONES.forEach(function(z){
+      var c = $('appTiles_' + z.id), shown = 0, alerts = 0;
+      if(c) Array.prototype.forEach.call(c.children, function(t){
+        if(!tileShown(t)) return;
+        shown++;
+        var a = t.querySelector('.nl-warn, .tile-alert');
+        if(a && !a.hidden && a.style.display !== 'none') alerts++;
+      });
+      var vis = shown > 0 || canEdit;
+      var tab = $('mgTab_' + z.id), cnt = $('mgCnt_' + z.id), bd = $('mgBadge_' + z.id);
+      if(tab && tab.hidden === vis) tab.hidden = !vis;
+      var nt = shown + '개';
+      if(cnt && cnt.textContent !== nt) cnt.textContent = nt;
+      var bt = alerts ? ('확인할 앱 ' + alerts) : '';
+      if(bd){ if(bd.textContent !== bt) bd.textContent = bt; if(bd.hidden === !!alerts) bd.hidden = !alerts; }
+      if(vis){ if(!firstVis) firstVis = z.id; if(z.id === _mgTab) curVis = true; }
+      alertsAll += alerts;
+    });
+    var any = !!firstVis;
+    if(btn.hidden === any) btn.hidden = !any;
+    var nb = $('mgBadge');
+    if(nb){ var t2 = alertsAll ? String(alertsAll) : ''; if(nb.textContent !== t2) nb.textContent = t2; if(nb.hidden === !!alertsAll) nb.hidden = !alertsAll; }
+    var tt = alertsAll ? ('관리실 — 확인할 앱 ' + alertsAll + '곳') : '관리실 — 영업관리·내부관리 앱';
+    if(btn.title !== tt) btn.title = tt;
+    if(any) mgSelect(curVis ? _mgTab : firstVis);
+    else if(drawer.classList.contains('open')) mgClose();
+  }
+  function mgOpen(z){
+    var d = $('mgDrawer'), b = $('mgBtn'); if(!d) return;
+    mgSync();
+    if(z) mgSelect(z);
+    d.classList.add('open'); d.setAttribute('aria-hidden', 'false');
+    if(b) b.setAttribute('aria-expanded', 'true');
+    var t = $('mgTab_' + _mgTab); if(t && !t.hidden){ try { t.focus({ preventScroll: true }); } catch(_f){} }
+  }
+  function mgClose(back){
+    var d = $('mgDrawer'), b = $('mgBtn'); if(!d || !d.classList.contains('open')) return;
+    d.classList.remove('open'); d.setAttribute('aria-hidden', 'true');
+    if(b){ b.setAttribute('aria-expanded', 'false'); if(back){ try { b.focus({ preventScroll: true }); } catch(_f){} } }
+  }
+  function mgWire(){
+    if(_mgWired) return;
+    var d = $('mgDrawer'), b = $('mgBtn'); if(!d || !b) return;
+    _mgWired = true;
+    b.addEventListener('click', function(){ if(d.classList.contains('open')) mgClose(); else mgOpen(); });
+    $('mgClose').addEventListener('click', function(){ mgClose(true); });
+    d.addEventListener('click', function(e){
+      var tab = e.target.closest && e.target.closest('.mg-tab'); if(!tab || tab.hidden) return;
+      mgSelect(tab.dataset.zone);
+    });
+    d.addEventListener('keydown', function(e){
+      if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var tab = e.target.closest && e.target.closest('.mg-tab'); if(!tab) return;
+      var vis = MG_ZONES.filter(function(z){ var t = $('mgTab_' + z.id); return t && !t.hidden; });
+      var i = vis.map(function(z){ return z.id; }).indexOf(tab.dataset.zone); if(i < 0 || vis.length < 2) return;
+      e.preventDefault();
+      var nx = vis[(i + (e.key === 'ArrowRight' ? 1 : vis.length - 1)) % vis.length].id;
+      mgSelect(nx); var nt = $('mgTab_' + nx); if(nt) nt.focus();
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key !== 'Escape' || !d.classList.contains('open')) return;
+      var lp = $('layoutPanel'); if(lp && !lp.hidden) return;   // 배치 목록 창이 떠 있으면 그 창이 먼저 닫힌다
+      mgClose(true);
+    });
+    /* 서랍 밖을 누르면 닫는다 — 단, 관리자가 앱을 끌어 옮기는 중(배치 편집)에는 열어 둔다 */
+    document.addEventListener('click', function(e){
+      if(!d.classList.contains('open')) return;
+      var t = e.target; if(!t || !t.closest) return;
+      if(d.contains(t) || b.contains(t) || t.closest('#layoutPanel, #layoutBar, #layoutEditBtn, #meMenu')) return;
+      if(document.body.classList.contains('lay-editing')) return;
+      mgClose();
+    });
+    if(window.MutationObserver){
+      var sched = 0;
+      var mo = new MutationObserver(function(){
+        if(sched) return;
+        sched = requestAnimationFrame(function(){ sched = 0; mgSync(); });
+      });
+      MG_ZONES.forEach(function(z){
+        var c = $('appTiles_' + z.id);
+        if(c) mo.observe(c, { childList:true, subtree:true, attributes:true, attributeFilter:['style', 'hidden'], characterData:true });
+      });
+    }
+    mgSelect(_mgTab);
+    mgSync();
   }
   /* 타일이 없는 줄은 안 보이게 — 제목만 남으면 「여기 뭐가 있어야 하나」로 읽힌다.
      (역할 때문에 비거나, 앱이 아직 없는 줄) */
@@ -5554,6 +5758,7 @@ body.portal-mode #moreFab{display:flex;}
       /* 끌어 옮길 수 있는 관리자 화면에는 빈 영역도 보인다 — 비었다고 감추면 그 영역으로 앱을 옮길 수 없다 */
       if(box) box.style.display = (shown || layoutCanDrag() || layoutEditing()) ? '' : 'none';
     });
+    mgSync();
   }
 
   /* ── 직원 인사·재무 타일 — 서버 권한표 uid_roles/{uid}.hr·fin (이알피가 로그인 때 적는다) ──
@@ -6969,20 +7174,21 @@ body.portal-mode #moreFab{display:flex;}
       var head = box && box.querySelector('[data-fold-row]');
       if(!box || !head) return;
       var folded = rowFolded(r.id), shown = rowTilesShown(c);
-      box.classList.toggle('fold', folded);
+      box.classList.toggle('fold', folded && !r.drawer);
       var exp = folded ? 'false' : 'true';
       if(head.getAttribute('aria-expanded') !== exp) head.setAttribute('aria-expanded', exp);
       var chev = head.querySelector('.fold-chev'), arrow = folded ? '▸' : '▾';
       if(chev && chev.textContent !== arrow) chev.textContent = arrow;
       var cnt = head.querySelector('.tilerow-n'), n = shown + '개';
       if(cnt && cnt.textContent !== n) cnt.textContent = n;
-      if(folded && box.style.display !== 'none') anyFold = true;
+      if(folded && !r.drawer && box.style.display !== 'none') anyFold = true;
     });
     var btn = $('foldAllBtn');
     if(btn){
       var lb = anyFold ? '모두 펴기' : '모두 접기';
       if(btn.textContent !== lb) btn.textContent = lb;
     }
+    mgSync();
   }
   function toggleRowFold(id){
     var now = rowFolded(id);
@@ -6995,7 +7201,7 @@ body.portal-mode #moreFab{display:flex;}
   function foldAllToggle(){
     var anyFold = APP_ROWS.some(function(r){
       var c = $('appTiles_' + r.id), b = c && c.closest ? c.closest('.tilerow') : null;
-      return !!b && b.style.display !== 'none' && rowFolded(r.id);
+      return !!b && !r.drawer && b.style.display !== 'none' && rowFolded(r.id);
     });
     tilePrefs.fold = tilePrefs.fold || {};
     APP_ROWS.forEach(function(r){ tilePrefs.fold[r.id] = !anyFold; });
@@ -7029,6 +7235,7 @@ body.portal-mode #moreFab{display:flex;}
   function refreshFoldUi(){ ensurePinStars(); paintPins(); applyFold(); }
 
   function initFold(){
+    mgWire();
     if(!_foldWired){
       _foldWired = true;
       var host = $('appRows');
