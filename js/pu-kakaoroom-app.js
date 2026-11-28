@@ -35,12 +35,17 @@
   var WORK_ITEMS = {};
   var COMPANIES = {};
   var SERVER_FILES = [];
+  var HR_STAFF = [];
+  var SENT_MAILS = [];
   var ROOMS = ['푸른노무법인 업무채팅방'];
   var PHONE_DEV = null;
   var WATCHER = null;
   var TAB = 'archive';
   var DASH_VIEW = 'person';   /* person | case | topic | table */
   var TOPIC_FILTER = '';
+  var ONLY_ACTIVE_STAFF = false;
+  var EXPANDED_STAFF = {};
+  var EXPAND_ALL_STAFF = false;
   var PENDING_AUTO = null;    /* { rows, room, checkedAt } */
   var AUTO_PULL_ON = true;
   var RT_REFS = [];
@@ -60,10 +65,10 @@
   } catch (e) {}
 
   var RECENT_CODE_CHANGES = [
-    { id: 'diff-dash', tab: 'archive', targetId: 'dashViewBar', label: '신규 · 사람별·사건별·공유건별 자동 대시보드', desc: '사람/사건/공유건 3축으로 자동 분류·집계' },
+    { id: 'diff-hr-table', tab: 'archive', targetId: 'dashContentBox', label: '개편 · 사번순 세로 1줄 대시보드', desc: '푸른인사관리 사번 순 정렬 + 사람별 1줄 요약·펼치기 표' },
+    { id: 'diff-att-mail', tab: 'archive', targetId: 'dashViewBar', label: '신규 · 첨부서류·푸른메일 발송시각 대조', desc: '카톡·톡서랍 첨부서류 전수집계 및 메일 발송일시 자동 표시' },
     { id: 'diff-sync', tab: 'archive', targetId: 'autoSyncBanner', label: '신규 · 실시간 자동 당겨오기·동기화', desc: '새 카톡 수집 즉시 반영 & 미정리 대화 자동 정리' },
-    { id: 'diff-watcher', tab: 'collect', targetId: 'pcWatcherCard', label: '신규 · PC 화면·하단알림 자동 캡처', desc: '읽기 전용 오프라인 OCR로 열린 법인방·하단 알림 자동 수집' },
-    { id: 'diff-cards', tab: 'archive', targetId: 'dashContentBox', label: '신규 · 시정지시·기한·첨부 공유건 자동 묶기', desc: 'D-day 기한·시정지시서·업무 진행상태 카드 한눈에 확인' }
+    { id: 'diff-watcher', tab: 'collect', targetId: 'pcWatcherCard', label: '신규 · PC 화면·하단알림 자동 캡처', desc: '읽기 전용 오프라인 OCR로 열린 법인방·하단 알림 자동 수집' }
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -224,6 +229,38 @@
       { id: 'aabbccdd11223344', room: '푸른노무법인 업무채팅방', sender: '김노무사', name: '답변서_연장신청서.hwpx', sentAt: now - 2 * 86400000, status: 'todo', dest: 'photo' },
       { id: 'eeff001122334455', room: '푸른노무법인 업무채팅방', sender: '박담당', name: '근로자_신분증_통장사본.pdf', sentAt: now - 11 * 86400000, status: 'todo', dest: 'pc' }
     ];
+    HR_STAFF = K.normalizeHrStaff({
+      P001: { sid: 'P001', name: '김노무사', pos: '대표노무사', dept: '노무총괄', status: 'active' },
+      P002: { sid: 'P002', name: '이노무사', pos: '공인노무사', dept: '기금·자문', status: 'active' },
+      P003: { sid: 'P003', name: '박담당', pos: '팀장', dept: '사건대응', status: 'active' },
+      P004: { sid: 'P004', name: '정주임', pos: '주임', dept: '급여관리', status: 'active' },
+      P005: { sid: 'P005', name: '최사원', pos: '사원', dept: '지원팀', status: 'active' },
+      P099: { sid: 'P099', name: '퇴사자', pos: '사원', dept: '지원팀', status: 'retired' }
+    }, null);
+    SENT_MAILS = K.extractSentMails(
+      { sent_preview: { kind: 'sent', name: '보낸편지함' } },
+      {
+        sent_preview: {
+          m_prev_1: {
+            d: now - 5 * 3600000,
+            f: '김노무사 <p001@example.com>',
+            t: '담당조사관 <gov1@example.com>',
+            s: '[경기2026부해3347] 한빛제조 답변서_연장신청서 제출',
+            a: 1,
+            an: ['답변서_연장신청서.hwpx']
+          },
+          m_prev_2: {
+            d: now - 300000,
+            f: '박담당 <p003@example.com>',
+            t: '서산지청 감독과 <gov2@example.com>',
+            s: '[서산2026시정108] 해솔식품 시정지시서 확인 회신',
+            a: 1,
+            an: ['시정지시서.pdf']
+          }
+        }
+      },
+      { now: now, days: 180 }
+    );
     PHONE_DEV = { deviceName: '대표님 폰 (미리보기)', appVersion: '2.6.1', lastSweepAt: now - 300000, lastTalkAt: now - 300000, kakaoLastAt: now - 3600000, kakaoSeen: 12, kakaoListed: 5 };
     WATCHER = {
       mode: 'live',
@@ -384,6 +421,36 @@
     RT_REFS.push({ ref: watchRef, fn: onWatch });
   }
 
+  function loadHrAndMailData() {
+    var since = Date.now() - 180 * 86400000;
+    var userDirP = fbDb.ref('data/user_dir').once('value').then(function (s) { return s.val(); }).catch(function () { return null; });
+    var mailP = fbDb.ref('mailbox/folders').once('value').then(function (s) {
+      var folders = s.val() || {};
+      var slugs = Object.keys(folders).filter(function (slug) {
+        var meta = folders[slug];
+        var kind = meta && meta.kind ? String(meta.kind).toLowerCase() : '';
+        return kind === 'sent' && !/[.#$\[\]\/]/.test(slug);
+      });
+      var msgsBySlug = {};
+      return Promise.all(slugs.map(function (slug) {
+        return fbDb.ref('mailbox/msgs/' + slug).orderByChild('d').startAt(since).limitToLast(300).once('value')
+          .then(function (ms) { msgsBySlug[slug] = ms.val() || {}; })
+          .catch(function () {
+            return fbDb.ref('mailbox/msgs/' + slug).limitToLast(200).once('value')
+              .then(function (ms2) { msgsBySlug[slug] = ms2.val() || {}; })
+              .catch(function () { msgsBySlug[slug] = {}; });
+          });
+      })).then(function () {
+        SENT_MAILS = K.extractSentMails(folders, msgsBySlug, { days: 180 });
+      });
+    }).catch(function () {
+      SENT_MAILS = [];
+    });
+    return Promise.all([userDirP, mailP]).then(function (res) {
+      HR_STAFF = K.normalizeHrStaff(res[0]);
+    });
+  }
+
   function loadFirebaseData() {
     if (isLocalPreview()) {
       renderAll();
@@ -395,6 +462,7 @@
       fbDb.ref('kakao_room/watcher').once('value').then(function (s) { WATCHER = s.val() || null; }).catch(function () { WATCHER = null; }),
       fbDb.ref('work_erp/items').once('value').then(function (s) { WORK_ITEMS = s.val() || {}; }).catch(function () { WORK_ITEMS = {}; }),
       fbDb.ref('data/companies').once('value').then(function (s) { COMPANIES = s.val() || {}; }).catch(function () { COMPANIES = {}; }),
+      loadHrAndMailData(),
       tryRestoreDlFolder()
     ];
     if (ME.admin) {
@@ -574,18 +642,18 @@
   }
   function renderKpis() {
     var rows = joinedArchive();
-    var summary = K.buildDashboardSummary(rows, WORK_ITEMS, COMPANIES);
-    var t = summary.totals;
+    var staffDash = K.buildStaffRowsDashboard(rows, HR_STAFF, combinedFiles(), SENT_MAILS);
+    var t = staffDash.totals;
     var expSoon = combinedFiles().filter(function (f) { return f.status !== 'done' && KW && KW.fileLeft(f.sentAt) <= 3; }).length;
     var wInfo = watcherStatusInfo();
     var wCls = wInfo.level === 'ok' ? 'g' : (wInfo.level === 'warn' ? 'a' : '');
     var wLabel = wInfo.level === 'ok' ? ('가동중 · 오늘 ' + Number((WATCHER && WATCHER.todayCount) || 0) + '건') : (wInfo.level === 'warn' ? '확인필요' : '대기');
 
     $('kpiRow').innerHTML =
+      '<div class="kpi b"><span>푸른인사 인원</span><b>' + t.staffTotal + '명 (카톡 ' + t.activeChatStaff + ')</b></div>' +
       '<div class="kpi b"><span>영구보관 업무</span><b>' + t.totalRows + '건</b></div>' +
-      '<div class="kpi b"><span>참여 인원</span><b>' + t.personCount + '명</b></div>' +
-      '<div class="kpi g"><span>사건·업무 묶음</span><b>' + t.caseCount + '건</b></div>' +
-      '<div class="kpi b"><span>공유 안건</span><b>' + t.topicCount + '건</b></div>' +
+      '<div class="kpi b"><span>집계 첨부서류</span><b>' + t.totalAttachments + '건</b></div>' +
+      '<div class="kpi g"><span>메일 발송 대조</span><b>' + t.mailSentCount + '건</b></div>' +
       '<div class="kpi ' + (t.dueSoonCount ? 'r' : '') + '"><span>기한임박 (7일내)</span><b>' + t.dueSoonCount + '건</b></div>' +
       '<div class="kpi a"><span>미연결 확인</span><b>' + t.unlinkedCount + '건</b></div>' +
       '<div class="kpi ' + (expSoon ? 'r' : '') + '"><span>만료임박 파일</span><b>' + expSoon + '건</b></div>' +
@@ -593,6 +661,7 @@
   }
 
   function setTab(t) {
+    if (TAB !== t) { ARCH_PICK = {}; FILE_PICK = {}; }
     TAB = t;
     [].forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       var isOn = b.getAttribute('data-tab') === t;
@@ -620,18 +689,59 @@
     });
   }
 
-  function filteredArchive() {
+  function staffInfoForSender(name) {
+    return K.matchStaffByName ? K.matchStaffByName(name, HR_STAFF) : null;
+  }
+
+  function staffSidForSender(name) {
+    var st = staffInfoForSender(name);
+    return st ? st.sid : '';
+  }
+
+  function formatPeopleWithSid(names) {
+    return (names || []).map(function (nm) {
+      var sid = staffSidForSender(nm);
+      return sid ? (sid + ' ' + nm) : nm;
+    }).join(' · ');
+  }
+
+  function fullStaffDashboard() {
+    return K.buildStaffRowsDashboard(joinedArchive(), HR_STAFF, combinedFiles(), SENT_MAILS);
+  }
+
+  function enrichedJoinedArchive() {
+    return fullStaffDashboard().enrichedRows;
+  }
+
+  function rowContentHaystack(r) {
+    var attNames = (r.attachments || []).map(function (a) { return a.name; }).join(' ');
+    var mailTxt = (r.mailEvents || []).map(function (m) {
+      return [m.shortLabel, m.day, m.subject, m.to, m.matchedAtt].join(' ');
+    }).join(' ');
+    return [
+      r.summary, r.companyHint, r.companyLabel, r.workTitle, r.workNo,
+      (r.caseNos || []).join(' '), (r.senders || []).join(' '),
+      (r.fileNames || []).join(' '), attNames, mailTxt, r.room, r.note
+    ].join(' ').toLowerCase();
+  }
+
+  function filteredArchive(baseRows) {
     var q = ($('qArchive') && $('qArchive').value || '').trim().toLowerCase();
     var dom = ($('fDomain') && $('fDomain').value) || '';
     var lnk = ($('fLink') && $('fLink').value) || '';
     var st = ($('fStatus') && $('fStatus').value) || '';
-    return joinedArchive().filter(function (r) {
+    var list = Array.isArray(baseRows) ? baseRows : enrichedJoinedArchive();
+    return list.filter(function (r) {
       if (dom && r.domain !== dom) return false;
       if (lnk === 'linked' && !r.workItemId) return false;
       if (lnk === 'unlinked' && r.workItemId) return false;
       if (st && r.status !== st) return false;
       if (q) {
-        var hay = [r.summary, r.companyHint, r.companyLabel, r.workTitle, r.workNo, (r.caseNos || []).join(' '), (r.senders || []).join(' '), r.room, r.note].join(' ').toLowerCase();
+        var staffMeta = (r.senders || []).map(function (nm) {
+          var s = staffInfoForSender(nm);
+          return s ? [s.sid, s.name, s.title, s.dept].join(' ') : '';
+        }).filter(Boolean).join(' ');
+        var hay = (rowContentHaystack(r) + ' ' + staffMeta).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -647,13 +757,96 @@
     return '<span class="tag blue">D-' + left + ' (' + esc(due) + ')</span>';
   }
 
-  function renderTimelineRowHtml(r) {
-    return '<div class="dash-row">' +
-      '<span class="tag">' + esc(r.day) + '</span>' +
-      '<span class="tag blue">' + esc((r.shareIcon || '💬') + ' ' + (r.shareLabel || '')) + '</span>' +
-      '<button type="button" class="ttl dash-txt" data-open-arch="' + esc(r.id) + '" title="' + esc(r.summary) + '">' + esc(r.summary) + '</button>' +
-      statusBadge(r.status) +
-      '</div>';
+  function shortDay(dayStr, updatedAt) {
+    var d = String(dayStr || '');
+    var base = d.length === 10 ? d.slice(5).replace('-', '/') : d;
+    if (updatedAt && d && K.kstDay(updatedAt) === d) {
+      var hm = K.kstHm(updatedAt);
+      if (hm) return base + ' ' + hm;
+    }
+    return base || '-';
+  }
+
+  function stripSenderPrefix(summary) {
+    return String(summary || '').replace(/^💬\s*카톡\s*·\s*[^—\n]+—\s*/, '');
+  }
+
+  function rowDueLeft(r) {
+    if (!r || !r.due) return null;
+    if (r.dueDaysLeft !== undefined) return r.dueDaysLeft;
+    return K.daysUntilDue ? K.daysUntilDue(r.due) : null;
+  }
+
+  function fmtAttCell(attachments) {
+    var list = Array.isArray(attachments) ? attachments : [];
+    if (!list.length) return '<span style="color:var(--mute)">없음</span>';
+    var first = list[0];
+    var allTip = list.map(function (a) {
+      return (a.sensitive ? '[민감·PC] ' : '') + a.name + (a.source === 'files' ? ' (톡서랍)' : '');
+    }).join(', ');
+    var hasSens = list.some(function (a) { return a.sensitive; });
+    var suffix = list.length > 1 ? (' 외 ' + (list.length - 1) + '건') : '';
+    var badge = hasSens ? '<span class="tag red">🔒 ' + list.length + '</span>' : '<span class="tag blue">📎 ' + list.length + '</span>';
+    return '<span class="one" title="' + esc(allTip) + '">' + badge + '<span>' + esc(first.name + suffix) + '</span></span>';
+  }
+
+  function fmtMailCell(mailEvents, attCount) {
+    var list = Array.isArray(mailEvents) ? mailEvents : [];
+    if (list.length) {
+      var m0 = list[0];
+      var tip = list.map(function (m) {
+        return '[' + (m.day || '') + (m.hm ? ' ' + m.hm : '') + '] ' + (m.subject || '') + (m.to ? ' → ' + m.to : '') + (m.matchedAtt ? ' (' + m.matchedAtt + ')' : '');
+      }).join(' / ');
+      var extra = list.length > 1 ? '<span class="tag">외 ' + (list.length - 1) + '</span>' : '';
+      return '<span class="one" title="' + esc(tip) + '"><span class="tag green">✉ ' + esc(m0.shortLabel || m0.day) + ' 발송</span>' + extra + '</span>';
+    }
+    if (attCount > 0) {
+      return '<span class="one" title="푸른메일 보낸편지함에서 일치하는 발송 이력을 찾지 못했습니다"><span class="tag amber">미확인</span><span>발송대기</span></span>';
+    }
+    return '<span style="color:var(--mute)">-</span>';
+  }
+
+  function collectGroupAttsAndMails(items) {
+    var attMap = {}, atts = [], mailMap = {}, mails = [];
+    (items || []).forEach(function (it) {
+      (it.attachments || []).forEach(function (a) {
+        var ak = a.key || a.name;
+        if (!attMap[ak]) { attMap[ak] = a; atts.push(a); }
+      });
+      (it.mailEvents || []).forEach(function (m) {
+        var mk = String(m.at) + '|' + (m.subject || '');
+        if (!mailMap[mk]) { mailMap[mk] = m; mails.push(m); }
+      });
+    });
+    mails.sort(function (a, b) { return b.at - a.at; });
+    return { attachments: atts, mailEvents: mails };
+  }
+
+  function fmtStaffSummaryCell(sl) {
+    if (!sl.rows.length && !sl.attachments.length) {
+      return '<span style="color:var(--mute)">수집된 카톡 내역 없음</span>';
+    }
+    if (!sl.rows.length && sl.attachments.length) {
+      return '<span class="one" title="톡서랍 첨부자료에서 수집된 서류가 있습니다"><span class="tag blue">📎 톡서랍</span><span>미연결 첨부파일 ' + sl.attachments.length + '건 보관</span></span>';
+    }
+    var r = sl.rows[0];
+    var dInfo = K.domainInfo(r.domain);
+    var extra = sl.rows.length > 1 ? '<span class="tag">외 ' + (sl.rows.length - 1) + '건</span>' : '';
+    var dueHtml = r.status !== 'done' ? formatDueTag(r.due, rowDueLeft(r)) : '';
+    return '<span class="one" title="' + esc(r.summary) + '">' +
+      '<span class="tag blue">' + esc((r.domainIcon || dInfo.icon) + ' ' + (r.domainLabel || dInfo.label)) + '</span>' +
+      '<button type="button" class="ttl" data-open-arch="' + esc(r.id) + '">' + esc(stripSenderPrefix(r.summary)) + '</button>' +
+      dueHtml + extra +
+      '</span>';
+  }
+
+  function aggregateSlotStatusHtml(sl) {
+    if (!sl.rows.length) {
+      return sl.attachments.length ? '<span class="tag blue">첨부보관</span>' : '<span style="color:var(--mute)">-</span>';
+    }
+    if (sl.openCount > 0) return statusBadge('open');
+    if (sl.trackingCount > 0) return statusBadge('tracking');
+    return statusBadge('done');
   }
 
   function renderDashboard() {
@@ -662,12 +855,21 @@
     var dashBox = $('dashContentBox');
     var tableCard = $('archiveTableCard');
     var selBar = $('archiveSelBar');
+    var onlyLbl = $('lblOnlyActiveStaff');
+    var expBtn = $('btnToggleExpandAll');
 
     [].forEach.call(document.querySelectorAll('#dashViewTabs button[data-dash-view]'), function (b) {
       var isOn = b.getAttribute('data-dash-view') === DASH_VIEW;
       b.classList.toggle('on', isOn);
       b.setAttribute('aria-pressed', isOn ? 'true' : 'false');
     });
+
+    if (onlyLbl) onlyLbl.style.display = DASH_VIEW === 'person' ? 'inline-flex' : 'none';
+    if (expBtn) {
+      expBtn.style.display = DASH_VIEW === 'person' ? '' : 'none';
+      expBtn.textContent = EXPAND_ALL_STAFF ? '▲ 모두 접기' : '▼ 모두 펼치기';
+      expBtn.setAttribute('aria-pressed', EXPAND_ALL_STAFF ? 'true' : 'false');
+    }
 
     if (DASH_VIEW === 'table') {
       if (dashBox) { dashBox.style.display = 'none'; dashBox.innerHTML = ''; }
@@ -680,89 +882,179 @@
     if (tableCard) tableCard.style.display = 'none';
     if (selBar) selBar.classList.remove('on');
 
-    var rows = filteredArchive();
-    if (!rows.length) {
+    var q = ($('qArchive') && $('qArchive').value || '').trim().toLowerCase();
+    var dom = ($('fDomain') && $('fDomain').value) || '';
+    var lnk = ($('fLink') && $('fLink').value) || '';
+    var st = ($('fStatus') && $('fStatus').value) || '';
+    var hasStrictFilter = !!(dom || lnk || st);
+    var fullDash = fullStaffDashboard();
+    var rows = filteredArchive(fullDash.enrichedRows);
+
+    if (DASH_VIEW !== 'person' && !rows.length) {
       dashBox.innerHTML = '<div class="card"><div class="empty">조건에 맞는 비식별 카톡 업무가 없습니다. «🤖 자동수집·안전판별» 탭이나 상단 «⚡ 지금 자동 정리·당겨오기»로 대화를 불러와 보세요.</div></div>';
+      return;
+    }
+
+    if (DASH_VIEW === 'person') {
+      var staffDash = fullDash;
+      if (q || hasStrictFilter) {
+        var linkedFileNames = {};
+        fullDash.enrichedRows.forEach(function (er) {
+          (er.attachments || []).forEach(function (a) {
+            if (a && a.name) linkedFileNames[a.name.toLowerCase()] = 1;
+          });
+        });
+        var orphanFiles = hasStrictFilter ? [] : combinedFiles().filter(function (f) {
+          return f && f.name && !linkedFileNames[String(f.name).trim().toLowerCase()];
+        });
+        staffDash = K.buildStaffRowsDashboard(rows, HR_STAFF, orphanFiles, SENT_MAILS);
+      }
+      var staffList = staffDash.staffRows.filter(function (sl) {
+        if (ONLY_ACTIVE_STAFF && sl.total === 0 && sl.attachments.length === 0) return false;
+        if (hasStrictFilter && sl.total === 0) return false;
+        if (q) {
+          var selfHay = [
+            sl.sid, sl.name, sl.title, sl.dept,
+            sl.attachments.map(function (a) { return a.name; }).join(' '),
+            sl.mailEvents.map(function (m) { return [m.subject, m.to, m.shortLabel].join(' '); }).join(' ')
+          ].join(' ').toLowerCase();
+          if (selfHay.indexOf(q) >= 0) return true;
+          return sl.rows.some(function (r) {
+            return rowContentHaystack(r).indexOf(q) >= 0;
+          });
+        }
+        return true;
+      });
+
+      if (!staffList.length) {
+        dashBox.innerHTML = '<div class="card"><div class="empty">조건에 맞는 사번·직원 카톡 내역이 없습니다. 검색어 또는 «카톡 있는 사람만» 선택을 확인해 주세요.</div></div>';
+        return;
+      }
+
+      var h = '<div class="card"><div class="scroll"><table class="t hr-dash"><thead><tr>' +
+        '<th class="w-sid">사번</th>' +
+        '<th class="w-staff">성명 · 직책</th>' +
+        '<th class="w-room">최근 일시</th>' +
+        '<th>카톡 내용 · 업무 요약</th>' +
+        '<th class="w-att">첨부 서류</th>' +
+        '<th class="w-mail">메일 발송</th>' +
+        '<th class="w-st">진행상태</th>' +
+        '<th class="w-act">관리</th>' +
+        '</tr></thead><tbody>';
+
+      staffList.forEach(function (sl) {
+        sl.rows.sort(function (a, b) {
+          if (a.day !== b.day) return a.day < b.day ? 1 : -1;
+          return Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0);
+        });
+        var hasContent = sl.rows.length > 0 || sl.attachments.length > 0;
+        var canExpand = sl.rows.length > 1;
+        var isExp = canExpand && (Object.prototype.hasOwnProperty.call(EXPANDED_STAFF, sl.key) ? !!EXPANDED_STAFF[sl.key] : EXPAND_ALL_STAFF);
+        var trCls = 'staff-row' + (!hasContent ? ' staff-zero' : '') + (sl.dueSoonCount > 0 ? ' staff-urgent' : '');
+        var sidHtml = sl.sid ? esc(sl.sid) : '<span class="tag">미등록</span>';
+        var togHtml = canExpand
+          ? '<button type="button" class="hr-tog' + (isExp ? ' on' : '') + '" data-toggle-staff="' + esc(sl.key) + '" aria-expanded="' + (isExp ? 'true' : 'false') + '" title="' + (isExp ? '목록 접기' : '카톡 ' + sl.rows.length + '건 펼쳐 보기') + '">' + (isExp ? '▼' : '▶') + '</button>'
+          : '';
+        var staffTip = [sl.sid || '미등록', sl.name, sl.title, sl.dept].filter(Boolean).join(' · ');
+        var roleTag = sl.title ? '<span class="tag">' + esc(sl.title) + '</span>' : '';
+        var cntTag = sl.rows.length > 0 ? '<span class="tag blue">' + sl.rows.length + '건</span>' : '';
+        var whenTxt = sl.latestDay ? shortDay(sl.latestDay, sl.latestUpdatedAt) : '-';
+        var actHtml = sl.rows[0]
+          ? '<button type="button" class="sm" data-open-arch="' + esc(sl.rows[0].id) + '">상세</button>'
+          : '';
+
+        h += '<tr class="' + trCls + '">' +
+          '<td class="w-sid">' + sidHtml + '</td>' +
+          '<td class="w-staff" title="' + esc(staffTip) + '"><span class="one">' + togHtml + '<b>' + esc(sl.name) + '</b>' + roleTag + cntTag + '</span></td>' +
+          '<td class="w-room" title="' + esc(sl.latestRoom || '') + '">' + esc(whenTxt) + '</td>' +
+          '<td class="ti">' + fmtStaffSummaryCell(sl) + '</td>' +
+          '<td class="w-att">' + fmtAttCell(sl.attachments) + '</td>' +
+          '<td class="w-mail">' + fmtMailCell(sl.mailEvents, sl.attachments.length) + '</td>' +
+          '<td class="w-st">' + aggregateSlotStatusHtml(sl) + '</td>' +
+          '<td class="w-act">' + actHtml + '</td>' +
+          '</tr>';
+
+        if (isExp) {
+          sl.rows.forEach(function (r, idx) {
+            var stInfo = r.shareLabel ? { icon: r.shareIcon || '💬', label: r.shareLabel } : (K.classifyShareType ? K.classifyShareType(r.summary, r.fileNames) : { icon: '💬', label: '업무' });
+            var dInfo = K.domainInfo(r.domain);
+            var dueHtml = r.status !== 'done' ? formatDueTag(r.due, rowDueLeft(r)) : '';
+            h += '<tr class="sub-row">' +
+              '<td class="w-sid">↳</td>' +
+              '<td class="w-staff"><span class="one"><span class="tag">' + (idx + 1) + '/' + sl.rows.length + '</span><span>' + esc(stInfo.icon + ' ' + stInfo.label) + '</span></span></td>' +
+              '<td class="w-room" title="' + esc(r.day + ' · ' + (r.room || '')) + '">' + esc(shortDay(r.day, r.updatedAt)) + '</td>' +
+              '<td class="ti"><span class="one" title="' + esc(r.summary) + '"><span class="tag blue">' + esc((r.domainIcon || dInfo.icon) + ' ' + (r.domainLabel || dInfo.label)) + '</span><button type="button" class="ttl" data-open-arch="' + esc(r.id) + '">' + esc(stripSenderPrefix(r.summary)) + '</button>' + dueHtml + '</span></td>' +
+              '<td class="w-att">' + fmtAttCell(r.attachments) + '</td>' +
+              '<td class="w-mail">' + fmtMailCell(r.mailEvents, (r.attachments || []).length) + '</td>' +
+              '<td class="w-st">' + statusBadge(r.status) + '</td>' +
+              '<td class="w-act"><button type="button" class="sm" data-open-arch="' + esc(r.id) + '">상세</button></td>' +
+              '</tr>';
+          });
+        }
+      });
+
+      dashBox.innerHTML = h + '</tbody></table></div></div>';
       return;
     }
 
     var summary = K.buildDashboardSummary(rows, WORK_ITEMS, COMPANIES);
 
-    if (DASH_VIEW === 'person') {
-      dashBox.innerHTML = '<div class="dash-grid">' + summary.byPerson.map(function (p) {
-        var isHot = p.dueSoonCount > 0;
-        var domBadges = Object.keys(p.domains || {}).map(function (dk) {
-          var di = K.domainInfo(dk);
-          return '<span class="tag">' + esc(di.icon + ' ' + di.label + ' ' + p.domains[dk]) + '</span>';
-        }).join(' ');
-        var caseLine = p.cases.length
-          ? ('<b>관련 사건:</b> ' + p.cases.slice(0, 3).map(function (c) { return esc(c.label); }).join(', ') + (p.cases.length > 3 ? ' 외 ' + (p.cases.length - 3) + '건' : ''))
-          : '<b>관련 사건:</b> 미연결 건 포함 (' + p.unlinkedCount + '건)';
-        var listHtml = p.items.slice(0, 4).map(renderTimelineRowHtml).join('');
-        var moreHtml = p.items.length > 4 ? '<div class="hint" style="padding-top:4px">… 외 ' + (p.items.length - 4) + '건 (검색 또는 전체 표에서 확인)</div>' : '';
-        return '<article class="dash-card' + (isHot ? ' urgent' : '') + '">' +
-          '<div class="dash-card-hd"><div>' +
-            '<div class="dash-card-ttl">👤 ' + esc(p.name) + '</div>' +
-            '<div class="hint">최근 공유 ' + esc(p.latestDay || '-') + '</div>' +
-          '</div><div class="dash-badges">' +
-            '<span class="tag blue">총 ' + p.total + '건</span>' +
-            (p.openCount + p.trackingCount ? '<span class="tag amber">진행·대기 ' + (p.openCount + p.trackingCount) + '</span>' : '<span class="tag green">모두 완료</span>') +
-            (p.dueSoonCount ? '<span class="tag red">기한임박 ' + p.dueSoonCount + '</span>' : '') +
-          '</div></div>' +
-          '<div class="dash-badges">' + domBadges + '</div>' +
-          '<div class="dash-meta">' + caseLine + '</div>' +
-          '<div class="dash-list">' + listHtml + moreHtml + '</div>' +
-          '<div class="dash-ft">' +
-            '<span class="hint">미연결 ' + p.unlinkedCount + '건 · 완료 ' + p.doneCount + '건</span>' +
-            '<span class="sp"></span>' +
-            '<button type="button" class="sm" data-filter-person="' + esc(p.name) + '">이 사람만 보기</button>' +
-          '</div></article>';
-      }).join('') + '</div>';
-      return;
-    }
-
     if (DASH_VIEW === 'case') {
-      dashBox.innerHTML = '<div class="dash-grid">' + summary.byCase.map(function (c) {
+      var hc = '<div class="card"><div class="scroll"><table class="t hr-dash"><thead><tr>' +
+        '<th class="no">№</th>' +
+        '<th class="w-case">사건 · 업무</th>' +
+        '<th class="w-staff">참여 (사번·성명)</th>' +
+        '<th class="w-room">기한 · 최근</th>' +
+        '<th>최근 카톡 내용</th>' +
+        '<th class="w-att">첨부 서류</th>' +
+        '<th class="w-mail">메일 발송</th>' +
+        '<th class="w-st">진행상태</th>' +
+        '<th class="w-act">관리</th>' +
+        '</tr></thead><tbody>';
+
+      summary.byCase.forEach(function (c, i) {
+        var am = collectGroupAttsAndMails(c.items);
+        var firstItem = c.items[0] || null;
+        var firstId = firstItem ? firstItem.id : '';
         var isHot = c.dueDaysLeft !== null && c.dueDaysLeft <= 7 && (c.openCount + c.trackingCount) > 0;
+        var whoLine = formatPeopleWithSid(c.people) || '-';
+        var duePrefix = c.dueDaysLeft == null ? '' : (c.dueDaysLeft < 0 ? '기한지남 ' : (c.dueDaysLeft === 0 ? '오늘마감 ' : (c.dueDaysLeft <= 7 ? 'D-' + c.dueDaysLeft + ' ' : '')));
+        var dueTxt = c.nearestDue ? (duePrefix + shortDay(c.nearestDue)) : shortDay(c.latestDay, c.latestUpdatedAt);
         var stateTag = c.kind === 'work'
-          ? '<span class="tag green">업무연결 · ' + esc(c.workState || '진행중') + '</span>'
-          : (c.kind === 'caseno' ? '<span class="tag red">미등록 사건번호</span>' : '<span class="tag amber">사건 연결 필요</span>');
-        var dueTag = formatDueTag(c.nearestDue, c.dueDaysLeft);
-        var metaParts = [];
-        if (c.companyLabel) metaParts.push('🏢 ' + esc(c.companyLabel));
-        if (c.workManager) metaParts.push('담당 ' + esc(c.workManager));
-        if (c.people.length) metaParts.push('참여: ' + esc(c.people.join('·')));
-        var fileTag = c.files.length ? '<span class="tag blue">📎 파일 ' + c.files.length + '개</span>' : '';
-        var firstId = c.items[0] ? c.items[0].id : '';
-        return '<article class="dash-card' + (isHot ? ' urgent' : '') + '">' +
-          '<div class="dash-card-hd"><div>' +
-            '<div class="dash-card-ttl">⚖️ ' + esc(c.title) + '</div>' +
-            '<div class="hint">' + metaParts.join(' · ') + '</div>' +
-          '</div><div class="dash-badges">' + stateTag + dueTag + '<span class="tag blue">' + c.total + '건</span>' + fileTag + '</div></div>' +
-          (c.workLastText ? '<div class="dash-meta"><b>업무관리 최근:</b> [' + esc(c.workLastDate || '-') + '] ' + esc(c.workLastText) + '</div>' : '') +
-          '<div class="dash-list">' + c.items.slice(0, 4).map(renderTimelineRowHtml).join('') +
-            (c.items.length > 4 ? '<div class="hint">… 외 ' + (c.items.length - 4) + '건</div>' : '') +
-          '</div>' +
-          '<div class="dash-ft">' +
-            '<span class="hint">최근 공유 ' + esc(c.latestDay || '-') + '</span><span class="sp"></span>' +
-            (firstId ? '<button type="button" class="sm" data-open-arch="' + esc(firstId) + '">연결·상세</button>' : '') +
-            (c.workItemId ? '<a class="sm" href="work.html" style="padding:3px 9px;border:1px solid var(--line2);border-radius:8px;font-size:12px">업무관리 ↗</a>' : '') +
-          '</div></article>';
-      }).join('') + '</div>';
+          ? '<span class="tag green">' + esc(c.workState || '연결됨') + '</span>'
+          : (c.kind === 'caseno' ? '<span class="tag red">미등록</span>' : '<span class="tag amber">확인필요</span>');
+        var msgTxt = firstItem ? stripSenderPrefix(firstItem.summary) : (c.workLastText || '-');
+        var actBtns = (firstId ? '<button type="button" class="sm" data-open-arch="' + esc(firstId) + '">상세</button>' : '') +
+          (c.workItemId ? ' <a class="sm" href="work.html" style="padding:3px 7px;border:1px solid var(--line2);border-radius:7px;font-size:12px">업무↗</a>' : '');
+
+        hc += '<tr class="' + (isHot ? 'staff-urgent' : '') + '">' +
+          '<td class="no">' + (i + 1) + '</td>' +
+          '<td class="w-case" title="' + esc(c.title + (c.companyLabel ? ' (' + c.companyLabel + ')' : '')) + '"><span class="one"><span class="tag blue">' + c.total + '건</span>' + (firstId ? '<button type="button" class="ttl" data-open-arch="' + esc(firstId) + '">' + esc(c.title) + '</button>' : '<b>' + esc(c.title) + '</b>') + '</span></td>' +
+          '<td class="w-staff" title="' + esc(whoLine) + '">' + esc(whoLine) + '</td>' +
+          '<td class="w-room" title="' + esc((c.nearestDue ? '기한 ' + c.nearestDue + ' · ' : '') + '최근 ' + (c.latestDay || '-')) + '">' + (isHot ? '<span class="tag red">' + esc(dueTxt) + '</span>' : esc(dueTxt)) + '</td>' +
+          '<td class="ti" title="' + esc(msgTxt) + '">' + esc(msgTxt) + '</td>' +
+          '<td class="w-att">' + fmtAttCell(am.attachments) + '</td>' +
+          '<td class="w-mail">' + fmtMailCell(am.mailEvents, am.attachments.length) + '</td>' +
+          '<td class="w-st">' + stateTag + '</td>' +
+          '<td class="w-act">' + actBtns + '</td>' +
+          '</tr>';
+      });
+
+      dashBox.innerHTML = hc + '</tbody></table></div></div>';
       return;
     }
 
-    /* 공유 건별 정리 (topic) */
+    /* 공유 건별 정리 (topic) — 1줄 표 */
     var typeCounts = {};
     summary.byTopic.forEach(function (tp) {
       typeCounts[tp.shareType] = (typeCounts[tp.shareType] || 0) + 1;
     });
     var chipsHtml = '<div class="share-chips" id="topicTypeChips" role="group" aria-label="공유 건 유형 필터">' +
       '<button type="button" class="dash-tab' + (!TOPIC_FILTER ? ' on' : '') + '" aria-pressed="' + (!TOPIC_FILTER ? 'true' : 'false') + '" data-topic-type="">전체 (' + summary.byTopic.length + ')</button>' +
-      (K.SHARE_TYPES || []).filter(function (st) { return typeCounts[st.key]; }).map(function (st) {
-        var on = TOPIC_FILTER === st.key;
-        return '<button type="button" class="dash-tab' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-topic-type="' + esc(st.key) + '">' +
-          esc(st.icon + ' ' + st.label + ' (' + typeCounts[st.key] + ')') + '</button>';
+      (K.SHARE_TYPES || []).filter(function (stItem) { return typeCounts[stItem.key]; }).map(function (stItem) {
+        var on = TOPIC_FILTER === stItem.key;
+        return '<button type="button" class="dash-tab' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-topic-type="' + esc(stItem.key) + '">' +
+          esc(stItem.icon + ' ' + stItem.label + ' (' + typeCounts[stItem.key] + ')') + '</button>';
       }).join('') +
       '</div>';
 
@@ -770,32 +1062,46 @@
       return !TOPIC_FILTER || tp.shareType === TOPIC_FILTER;
     });
 
-    dashBox.innerHTML = chipsHtml + '<div class="dash-grid">' + topics.map(function (tp) {
-      var isHot = tp.dueDaysLeft !== null && tp.dueDaysLeft <= 7 && tp.status !== 'done';
-      var dueTag = formatDueTag(tp.due, tp.dueDaysLeft);
+    var ht = '<div class="card"><div class="scroll"><table class="t hr-dash"><thead><tr>' +
+      '<th class="no">№</th>' +
+      '<th class="w-dom">유형</th>' +
+      '<th class="w-staff">공유 인원</th>' +
+      '<th class="w-room">기한 · 최근</th>' +
+      '<th>공유 건 · 업무 내용</th>' +
+      '<th class="w-att">첨부 서류</th>' +
+      '<th class="w-mail">메일 발송</th>' +
+      '<th class="w-st">상태</th>' +
+      '<th class="w-act">관리</th>' +
+      '</tr></thead><tbody>';
+
+    topics.forEach(function (tp, i) {
+      var am = collectGroupAttsAndMails(tp.items);
       var firstId = tp.items[0] ? tp.items[0].id : '';
       var idsCsv = tp.items.map(function (x) { return x.id; }).join(',');
-      return '<article class="dash-card' + (isHot ? ' urgent' : '') + '">' +
-        '<div class="dash-card-hd"><div>' +
-          '<div class="dash-card-ttl">' + esc(tp.shareIcon + ' ' + tp.title) + '</div>' +
-          '<div class="hint">' + esc(tp.domainIcon + ' ' + tp.domainLabel) + (tp.companyLabel ? ' · 🏢 ' + esc(tp.companyLabel) : '') + ' · ' + esc(tp.latestDay || '-') + '</div>' +
-        '</div><div class="dash-badges">' +
-          '<span class="tag blue">' + esc(tp.shareLabel) + '</span>' +
-          dueTag +
-          statusBadge(tp.status) +
-          (tp.hasRedacted ? '<span class="tag amber">🛡 가림포함</span>' : '') +
-        '</div></div>' +
-        '<div class="dash-meta"><b>공유 인원:</b> ' + esc(tp.people.join(' · ') || '-') +
-          (tp.workLabel ? '<br><b>연결 업무:</b> ' + esc(tp.workLabel) : '<br><b>연결 업무:</b> 미연결 확인 필요') +
-          (tp.files.length ? '<br><b>첨부·문서:</b> ' + esc(tp.files.join(', ')) : '') +
-        '</div>' +
-        '<div class="dash-list">' + tp.items.slice(0, 3).map(renderTimelineRowHtml).join('') + '</div>' +
-        '<div class="dash-ft">' +
-          '<span class="hint">묶음 ' + tp.count + '건</span><span class="sp"></span>' +
-          (tp.status !== 'done' && idsCsv ? '<button type="button" class="sm ok" data-topic-done="' + esc(idsCsv) + '">✓ 처리완료</button>' : '') +
-          (firstId ? '<button type="button" class="sm" data-open-arch="' + esc(firstId) + '">상세·연결</button>' : '') +
-        '</div></article>';
-    }).join('') + '</div>';
+      var isHot = tp.dueDaysLeft !== null && tp.dueDaysLeft <= 7 && tp.status !== 'done';
+      var whoLine = formatPeopleWithSid(tp.people) || '-';
+      var whenTxt = tp.due ? shortDay(tp.due) : shortDay(tp.latestDay, tp.latestUpdatedAt);
+      var dueTag = tp.status !== 'done' ? formatDueTag(tp.due, tp.dueDaysLeft) : '';
+      var actHtml = (tp.status !== 'done' && idsCsv ? '<button type="button" class="sm ok" data-topic-done="' + esc(idsCsv) + '">✓완료</button> ' : '') +
+        (firstId ? '<button type="button" class="sm" data-open-arch="' + esc(firstId) + '">상세</button>' : '');
+
+      ht += '<tr class="' + (isHot ? 'staff-urgent' : '') + '">' +
+        '<td class="no">' + (i + 1) + '</td>' +
+        '<td class="w-dom" title="' + esc(tp.shareLabel) + '"><span class="one"><span class="tag blue">' + esc(tp.shareIcon + ' ' + tp.shareLabel) + '</span></span></td>' +
+        '<td class="w-staff" title="' + esc(whoLine) + '">' + esc(whoLine) + '</td>' +
+        '<td class="w-room" title="' + esc((tp.due ? '기한 ' + tp.due + ' · ' : '') + '최근 ' + (tp.latestDay || '-')) + '">' + esc(whenTxt) + '</td>' +
+        '<td class="ti" title="' + esc(tp.title + (tp.workLabel ? ' — ' + tp.workLabel : '')) + '"><span class="one">' +
+          (firstId ? '<button type="button" class="ttl" data-open-arch="' + esc(firstId) + '">' + esc(tp.title) + '</button>' : '<b>' + esc(tp.title) + '</b>') + dueTag +
+          (tp.hasRedacted ? '<span class="tag amber">🛡</span>' : '') +
+        '</span></td>' +
+        '<td class="w-att">' + fmtAttCell(am.attachments) + '</td>' +
+        '<td class="w-mail">' + fmtMailCell(am.mailEvents, am.attachments.length) + '</td>' +
+        '<td class="w-st">' + statusBadge(tp.status) + '</td>' +
+        '<td class="w-act">' + actHtml + '</td>' +
+        '</tr>';
+    });
+
+    dashBox.innerHTML = chipsHtml + ht + '</tbody></table></div></div>';
   }
 
   function renderPcWatcherCard() {
@@ -818,7 +1124,7 @@
   function renderArchive() {
     fillDomainOptions();
     var rows = filteredArchive();
-    var selIds = Object.keys(ARCH_PICK).filter(function (id) { return ARCH_PICK[id]; });
+    var selIds = Object.keys(ARCH_PICK).filter(function (id) { return ARCH_PICK[id] && ARCHIVE[id] && !ARCHIVE[id]._deleted; });
     $('archiveSelCount').textContent = selIds.length + '건 선택';
     $('archiveSelBar').classList.toggle('on', selIds.length > 0);
 
@@ -828,14 +1134,15 @@
     }
 
     var allPicked = rows.length > 0 && rows.every(function (r) { return !!ARCH_PICK[r.id]; });
-    var h = '<table class="t"><thead><tr>' +
+    var h = '<table class="t hr-dash hr-wide"><thead><tr>' +
       '<th class="ck"><input type="checkbox" id="archPickAll" aria-label="보이는 항목 모두 선택"' + (allPicked ? ' checked' : '') + '></th>' +
       '<th class="no">№</th>' +
       '<th class="w-day">날짜</th>' +
+      '<th class="w-staff">참여 (사번·성명)</th>' +
       '<th class="w-dom">영역</th>' +
-      '<th class="w-saf">안전판별</th>' +
       '<th>비식별 업무 요약</th>' +
-      '<th class="w-who">참여자</th>' +
+      '<th class="w-att">첨부 서류</th>' +
+      '<th class="w-mail">메일 발송</th>' +
       '<th class="w-rel">연결 업무 · 실시간 진행</th>' +
       '<th class="w-st">상태</th>' +
       '<th class="w-act">관리</th>' +
@@ -846,15 +1153,16 @@
       var relText = r.workLinked
         ? (r.workNo ? r.workNo + ' · ' : '') + r.workTitle + ' [' + r.workState + (r.workManager ? '·' + r.workManager : '') + ']'
         : (r.companyLinked ? r.companyLabel + ' (업무 미연결)' : (r.companyHint ? '힌트: ' + r.companyHint : '미연결'));
-      var senders = (r.senders || []).join('·') || '-';
+      var senders = formatPeopleWithSid(r.senders) || '-';
       h += '<tr class="' + (picked ? 'picked' : '') + '" data-arch-id="' + esc(r.id) + '">' +
         '<td class="ck"><input type="checkbox" class="arch-ck" data-id="' + esc(r.id) + '"' + (picked ? ' checked' : '') + ' aria-label="선택"></td>' +
         '<td class="no">' + (idx + 1) + '</td>' +
-        '<td class="w-day" title="' + esc(r.day) + '">' + esc(r.day) + '</td>' +
+        '<td class="w-day" title="' + esc(r.day) + '">' + esc(shortDay(r.day, r.updatedAt)) + '</td>' +
+        '<td class="w-staff" title="' + esc(senders) + '">' + esc(senders) + '</td>' +
         '<td class="w-dom" title="' + esc(r.domainLabel) + '"><span class="one"><span class="tag blue">' + esc(r.domainIcon + ' ' + r.domainLabel) + '</span></span></td>' +
-        '<td class="w-saf">' + safetyBadge(r.safety, r.redactedCount) + '</td>' +
-        '<td class="ti" title="' + esc(r.summary) + '"><button type="button" class="ttl" data-open-arch="' + esc(r.id) + '">' + esc(r.summary) + '</button></td>' +
-        '<td class="w-who" title="' + esc(senders) + '">' + esc(senders) + '</td>' +
+        '<td class="ti" title="' + esc(r.summary) + '"><span class="one">' + safetyBadge(r.safety, r.redactedCount) + '<button type="button" class="ttl" data-open-arch="' + esc(r.id) + '">' + esc(stripSenderPrefix(r.summary)) + '</button></span></td>' +
+        '<td class="w-att">' + fmtAttCell(r.attachments) + '</td>' +
+        '<td class="w-mail">' + fmtMailCell(r.mailEvents, (r.attachments || []).length) + '</td>' +
         '<td class="w-rel" title="' + esc(relText) + '">' + (r.workLinked ? '<span class="tag green">연결</span> ' : '<span class="tag">확인</span> ') + esc(relText) + '</td>' +
         '<td class="w-st">' + statusBadge(r.status) + '</td>' +
         '<td class="w-act"><button type="button" class="sm" data-open-arch="' + esc(r.id) + '">연결·상세</button></td>' +
@@ -1211,7 +1519,7 @@
   function renderFiles() {
     var files = combinedFiles();
     var box = $('filesTableBox');
-    var selIds = Object.keys(FILE_PICK).filter(function (id) { return FILE_PICK[id]; });
+    var selIds = files.filter(function (f) { return !!FILE_PICK[f.id]; }).map(function (f) { return f.id; });
     $('filesSelCount').textContent = selIds.length + '건 선택';
     $('filesSelBar').classList.toggle('on', selIds.length > 0);
     $('folderStateHint').textContent = FOLDER_H
@@ -1565,7 +1873,7 @@
 
   /* ── 모달 (상세·연결 / 받을 방 설정) ── */
   function openArchiveModal(id) {
-    var rows = joinedArchive();
+    var rows = enrichedJoinedArchive();
     var r = null;
     for (var i = 0; i < rows.length; i++) if (rows[i].id === id) r = rows[i];
     if (!r) return;
@@ -1580,6 +1888,16 @@
     var cOpts = '<option value="">연결 안 함</option>' + coList.map(function (c) {
       return '<option value="' + esc(c.id) + '"' + (r.companyId === c.id ? ' selected' : '') + '>' + esc(c.label) + '</option>';
     }).join('');
+    var sendersTxt = formatPeopleWithSid(r.senders) || '-';
+    var attHtml = (r.attachments && r.attachments.length)
+      ? r.attachments.map(function (att) {
+          var mailPart = att.mailSent
+            ? (' · <span class="tag green">✉ ' + esc((att.mailSent.day || '') + (att.mailSent.hm ? ' ' + att.mailSent.hm : '') + ' 메일발송') + '</span>' +
+              (att.mailSent.subject ? ' <span class="hint">(' + esc(att.mailSent.subject) + (att.mailSent.to ? ' → ' + esc(att.mailSent.to) : '') + ')</span>' : ''))
+            : ' · <span class="tag amber">메일 발송 미확인</span>';
+          return (att.sensitive ? '<span class="tag red">🔒 민감·PC</span> ' : '📎 ') + '<b>' + esc(att.name) + '</b>' + mailPart;
+        }).join('<br>')
+      : '-';
 
     $('mbox').innerHTML =
       '<div class="bar" style="margin-bottom:8px"><h2 style="margin:0;font-size:16px">💬 카톡 업무 상세 · 영구 연결</h2><span class="sp"></span>' +
@@ -1588,9 +1906,9 @@
       '<div class="kv">' +
       '<b>날짜 · 방</b><span>' + esc(r.day + ' · ' + r.room) + '</span>' +
       '<b>영역 · 판별</b><span>' + esc(r.domainIcon + ' ' + r.domainLabel) + ' · ' + safetyBadge(r.safety, r.redactedCount) + '</span>' +
-      '<b>참여자</b><span>' + esc((r.senders || []).join(' · ') || '-') + '</span>' +
+      '<b>참여자 (사번)</b><span>' + esc(sendersTxt) + '</span>' +
       '<b>사건번호 · 기한</b><span>' + esc(((r.caseNos || []).join(', ') || '-') + (r.due ? ' · 기한 ' + r.due : '')) + '</span>' +
-      '<b>첨부 파일명</b><span>' + esc((r.fileNames || []).join(', ') || '-') + '</span>' +
+      '<b>첨부 · 메일발송</b><span>' + attHtml + '</span>' +
       '<b>실시간 업무상태</b><span>' + (r.workLinked ? esc(r.workState + ' · 담당 ' + (r.workManager || '-') + (r.workLastDate ? ' · 최근기록 ' + r.workLastDate : '')) : '연결된 업무 없음') + '</span>' +
       '</div>' +
       '<div class="card" style="margin:10px 0">' +
@@ -1826,18 +2144,19 @@
     if ($('dashContentBox')) {
       $('dashContentBox').addEventListener('click', function (e) {
         var t = e.target;
+        var togBtn = t && t.closest && t.closest('button[data-toggle-staff]');
+        if (togBtn) {
+          var sKey = togBtn.getAttribute('data-toggle-staff') || '';
+          var cur = Object.prototype.hasOwnProperty.call(EXPANDED_STAFF, sKey) ? !!EXPANDED_STAFF[sKey] : EXPAND_ALL_STAFF;
+          EXPANDED_STAFF[sKey] = !cur;
+          renderDashboard();
+          return;
+        }
         var openBtn = t && t.closest && t.closest('[data-open-arch]');
         if (openBtn) { openArchiveModal(openBtn.getAttribute('data-open-arch')); return; }
         var topicBtn = t && t.closest && t.closest('button[data-topic-type]');
         if (topicBtn) {
           TOPIC_FILTER = topicBtn.getAttribute('data-topic-type') || '';
-          renderDashboard();
-          return;
-        }
-        var personBtn = t && t.closest && t.closest('button[data-filter-person]');
-        if (personBtn) {
-          $('qArchive').value = personBtn.getAttribute('data-filter-person') || '';
-          DASH_VIEW = 'table';
           renderDashboard();
           return;
         }
@@ -1874,6 +2193,19 @@
     ['qArchive', 'fDomain', 'fLink', 'fStatus'].forEach(function (id) {
       $(id).addEventListener(id === 'qArchive' ? 'input' : 'change', renderDashboard);
     });
+    if ($('chkOnlyActiveStaff')) {
+      $('chkOnlyActiveStaff').addEventListener('change', function (e) {
+        ONLY_ACTIVE_STAFF = !!e.target.checked;
+        renderDashboard();
+      });
+    }
+    if ($('btnToggleExpandAll')) {
+      $('btnToggleExpandAll').addEventListener('click', function () {
+        EXPAND_ALL_STAFF = !EXPAND_ALL_STAFF;
+        EXPANDED_STAFF = {};
+        renderDashboard();
+      });
+    }
     $('btnReloadAll').addEventListener('click', loadFirebaseData);
     $('btnGoCollect').addEventListener('click', function () { setTab('collect'); });
 

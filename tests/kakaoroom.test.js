@@ -386,3 +386,136 @@ test('PC 화면·하단알림 OCR 파서가 등록 방의 말풍선·시정지�
   assert.equal(daySplit.messages[1].day, '2026-11-27');
   assert.equal(daySplit.messages[1].dayInferred, false);
 });
+
+test('푸른인사관리 사번 기준 1줄 표 집계 및 첨부서류·푸른메일 발송일시 대조가 누락 없이 동작한다', () => {
+  const now = Date.UTC(2026, 10, 28, 5, 0, 0); /* 14:00 KST */
+
+  assert.ok(Core.compareSid('P001', 'P002') < 0);
+  assert.ok(Core.compareSid('P002', 'P010') < 0);
+  assert.ok(Core.compareSid('P001', '') < 0);
+
+  const staff = Core.normalizeHrStaff(
+    {
+      v: {
+        P010: { sid: 'P010', name: '점검주임', pos: '주임', dept: '지원', status: 'active' },
+        P001: { sid: 'P001', name: '점검노무', pos: '대표', dept: '총괄' },
+        P002: { sid: 'P002', name: '점검대리', pos: '대리', dept: '기금', status: 'active' },
+        P005: { sid: 'P005', name: '점검동명', pos: '노무사', dept: '자문', status: 'active' },
+        P007: { sid: 'P007', name: '점검동명', pos: '주임', dept: '지원', status: 'active' },
+        P099: { sid: 'P099', name: '퇴사점검', pos: '사원', dept: '지원' },
+      },
+    },
+    {
+      P001: { sid: 'P001', name: '점검노무', status: 'active' },
+      P003: { sid: 'P003', name: '점검사무', roleTitle: '팀장', status: 'active' },
+      P099: { sid: 'P099', name: '퇴사점검', status: 'retired' },
+    }
+  );
+  assert.deepEqual(staff.map((s) => s.sid), ['P001', 'P002', 'P003', 'P005', 'P007', 'P010']);
+  assert.equal(staff.find((s) => s.sid === 'P001').title, '대표', 'user_dir 에 status 가 없어도 병합 시 pos/dept 가 유지됩니다');
+  assert.equal(staff.find((s) => s.sid === 'P001').dept, '총괄');
+  assert.equal(Core.matchStaffByName('점검노무 대표노무사님', staff).sid, 'P001');
+  assert.equal(Core.matchStaffByName('P003', staff).name, '점검사무');
+  assert.equal(Core.matchStaffByName('점검동명', staff), null, '동명이인은 첫 번째 사번으로 추측 귀속하지 않습니다');
+
+  const mails = Core.extractSentMails(
+    {
+      sent_a: { kind: 'sent', name: '보낸편지함' },
+      tome_a: { kind: 'tome', name: '내게쓴메일함' },
+      inbox_a: { kind: 'inbox', name: '받은편지함' },
+    },
+    {
+      sent_a: {
+        m1: { d: now - 3600000, f: '점검노무', tn: '기관담당', t: 'gov@example.com', s: '[경기2026부해3347] 답변서_연장신청서 제출', a: 1, an: ['답변서_연장신청서.hwpx'] },
+        m2: { d: now - 600000, f: '점검대리', t: '감독관', s: '[서산2026시정108] 시정지시서 회신', a: 1, an: ['시정지시서.pdf'] },
+        m_old_generic: { d: now - 150 * 86400000, f: '점검노무', t: '타사', s: '타사 위임장 송부', a: 1, an: ['위임장.pdf'] },
+        m_other_co: { d: now - 500000, f: '점검노무', t: '타사', s: '[타사주식회사] 10월 급여 안내', a: 1, an: ['임금명세서_2026_10_타사.xlsx'] },
+        m_before_chat: { d: now - 20 * 86400000, f: '점검노무', t: '가나제조', s: '사전 위임장 초안', a: 1, an: ['사전합의안_2026_1108.hwpx'] },
+        m_old: { d: now - 220 * 86400000, f: '점검노무', t: '기관', s: '오래된 메일', a: 1, an: ['옛문서.pdf'] },
+      },
+      tome_a: {
+        m_tome: { d: now - 1000, f: '점검노무', t: '점검노무', s: '내게쓴 메모 위임장', a: 1, an: ['위임장.pdf'] },
+      },
+      inbox_a: {
+        m_in: { d: now - 1000, f: '외부', t: '점검노무', s: '답변서_연장신청서 수신', a: 1, an: ['답변서_연장신청서.hwpx'] },
+      },
+    },
+    { now, days: 180 }
+  );
+  assert.equal(mails.length, 5);
+  assert.equal(mails.some((m) => m.uid === 'm_tome' || m.uid === 'm_in'), false, '내게쓴메일함·받은편지함은 대외 발송 메일에서 제외합니다');
+  assert.equal(mails.find((m) => m.uid === 'm1').to, '기관담당 <gov@example.com>');
+
+  /* 오매칭 방어: 과거 일반문서명, 타사 부분일치, 카톡 이전 메일 */
+  const guardRow = { day: '2026-11-28', caseNos: ['경기2026부해3347'], companyHint: '(주)가나제조' };
+  assert.equal(Core.matchAttachmentMailSent('위임장.pdf', guardRow, mails), null);
+  assert.equal(Core.matchAttachmentMailSent('임금명세서.xlsx', guardRow, mails), null);
+  assert.equal(Core.matchAttachmentMailSent('사전합의안_2026_1108.hwpx', guardRow, mails), null);
+
+  const workItems = {
+    wk1: { id: 'wk1', no: '경기2026부해3347', title: '가나제조 부당해고', status: '진행중', co_id: 'co1' },
+  };
+  const companies = { co1: { id: 'co1', name: '가나제조(주)' } };
+  const archive = {
+    kr_a: {
+      id: 'kr_a', room: '푸른노무법인 업무채팅방', day: '2026-11-28',
+      senders: ['점검노무'], domain: 'case', safety: 'safe', redactedCount: 0,
+      summary: '💬 카톡 · 점검노무 — 답변서 연장신청 제출 · 📎 답변서_연장신청서.hwpx',
+      caseNos: ['경기2026부해3347'], due: '2026-12-04', fileNames: [],
+      workItemId: 'wk1', companyId: 'co1', status: 'tracking', updatedAt: now - 2000,
+    },
+    kr_b: {
+      id: 'kr_b', room: '푸른노무법인 업무채팅방', day: '2026-11-28',
+      senders: ['점검대리'], domain: 'case', safety: 'safe', redactedCount: 0,
+      summary: '💬 카톡 · 점검대리 — 서산2026시정108 시정지시 확인 · [이미지 공유: 시정지시서]',
+      caseNos: ['서산2026시정108'], due: '2026-12-02', fileNames: [],
+      workItemId: '', companyId: '', status: 'open', updatedAt: now - 1000,
+    },
+    kr_ext: {
+      id: 'kr_ext', room: '푸른노무법인 업무채팅방', day: '2026-11-28',
+      senders: ['외부게스트'], domain: 'admin', safety: 'safe', redactedCount: 0,
+      summary: '💬 카톡 · 외부게스트 — 안내 확인',
+      caseNos: [], due: '', fileNames: [],
+      workItemId: '', companyId: '', status: 'done', updatedAt: now - 3000,
+    },
+  };
+  const linkedFile = { id: 'f_linked', room: '푸른노무법인 업무채팅방', name: '톡서랍_추가제출본.pdf', sender: '점검대리', sentAt: now, status: 'todo', dest: 'photo' };
+  const orphanFile = { id: 'f_orphan', room: '푸른노무법인 업무채팅방', name: '근로자_신분증_사본.pdf', sender: '점검사무', sentAt: now - 10 * 86400000, status: 'todo', dest: 'pc' };
+
+  const joined = Core.joinWorkProgress(archive, workItems, companies, { now });
+  const dash = Core.buildStaffRowsDashboard(joined, staff, [linkedFile, orphanFile], mails, { now });
+
+  assert.deepEqual(dash.staffRows.map((sl) => sl.sid || sl.name), ['P001', 'P002', 'P003', 'P005', 'P007', 'P010', '외부게스트']);
+  const p1 = dash.staffRows.find((sl) => sl.sid === 'P001');
+  assert.equal(p1.attachments.length, 1);
+  assert.equal(p1.attachments[0].name, '답변서_연장신청서.hwpx');
+  assert.ok(p1.attachments[0].mailSent);
+  assert.equal(p1.attachments[0].mailSent.day, '2026-11-28');
+
+  const p2 = dash.staffRows.find((sl) => sl.sid === 'P002');
+  assert.equal(p2.attachments.length, 2);
+  assert.ok(p2.attachments.find((a) => a.name === '시정지시서(이미지)').mailSent, '일반 문서명(시정지시서)도 사건번호 문맥이 맞으면 메일 발송과 연결됩니다');
+
+  /* 필터 시 orphanFiles=[] 로 재호출해도 이미 연결된 톡서랍 첨부파일과 메일 발송 정보가 보존되어야 함 */
+  const filteredDash = Core.buildStaffRowsDashboard([dash.enrichedRows.find((r) => r.id === 'kr_b')], staff, [], mails, { now });
+  const p2Filtered = filteredDash.staffRows.find((sl) => sl.sid === 'P002');
+  assert.equal(p2Filtered.attachments.length, 2, '검색·필터 중에도 행에 연결된 톡서랍 첨부서류가 유지되어야 합니다');
+
+  const p3 = dash.staffRows.find((sl) => sl.sid === 'P003');
+  assert.equal(p3.rows.length, 0);
+  assert.equal(p3.attachments.length, 1, '대화 미연결 톡서랍 파일도 사번 직원 행에 누락 없이 집계됩니다');
+  assert.equal(p3.attachments[0].sensitive, true);
+
+  const p10 = dash.staffRows.find((sl) => sl.sid === 'P010');
+  assert.equal(p10.rows.length, 0);
+
+  const html = read('pu-kakaoroom.html');
+  const appJs = read('js/pu-kakaoroom-app.js');
+  assert.match(html, /id="chkOnlyActiveStaff"/);
+  assert.match(html, /id="btnToggleExpandAll"/);
+  assert.match(appJs, /buildStaffRowsDashboard/);
+  assert.match(appJs, /loadHrAndMailData/);
+  assert.ok(!/ref\(\s*['"]sid_roles/.test(appJs), '온톨로지 미등록 루트 sid_roles 를 직접 읽지 않아야 합니다');
+  assert.ok(!/user_accounts/.test(appJs), '최소 권한 원칙상 finOnly data/user_accounts 를 읽지 않아야 합니다');
+  assert.ok(!/class="dash-grid"|class="dash-card/.test(appJs), '대시보드 박스 카드를 사용하지 않아야 합니다');
+});

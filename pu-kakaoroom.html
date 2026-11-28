@@ -106,6 +106,8 @@ main{padding:10px 16px 84px;max-width:1540px;margin:0 auto}
 table.t{width:100%;border-collapse:collapse;table-layout:fixed}
 @media (min-width:769px){
   .scroll table.t{min-width:1180px}
+  .scroll table.t.hr-dash{min-width:1280px}
+  .scroll table.t.hr-dash.hr-wide{min-width:1420px}
   table.t .ti{min-width:220px}
 }
 table.t th,table.t td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;vertical-align:middle}
@@ -121,10 +123,10 @@ table.t .w-who{width:120px}
 table.t .w-rel{width:190px}
 table.t .w-st{width:110px}
 table.t .w-act{width:136px;text-align:right}
-table.t td .one{display:flex;align-items:center;gap:5px;min-width:0}
+table.t td .one{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
 table.t td .one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 table.t td .one>.tag{flex:0 0 auto}
-.ttl{background:none;border:0;padding:0;margin:0;font:inherit;font-weight:700;color:var(--ink);text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.ttl{background:none;border:0;padding:0;margin:0;font:inherit;font-weight:700;color:var(--ink);text-align:left;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .ttl:hover{color:var(--blue-d);text-decoration:underline}
 
 .selbar{display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:8px;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px}
@@ -154,18 +156,24 @@ table.t td .one>.tag{flex:0 0 auto}
 .dash-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .dash-tab{border:1px solid var(--line2);background:var(--bg);color:var(--ink2);border-radius:999px;padding:6px 13px;min-height:36px;font-size:12.5px;font-weight:700}
 .dash-tab.on{background:var(--blue-btn);border-color:var(--blue-btn);color:#ffffff}
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
-.dash-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.dash-card.urgent{border-color:var(--red-line);box-shadow:0 0 0 2px var(--red-bg)}
-.dash-card-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.dash-card-ttl{font-weight:800;font-size:14.5px;line-height:1.35;min-width:0;word-break:break-word}
-.dash-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.dash-meta{font-size:12px;color:var(--ink2);line-height:1.5}
-.dash-list{display:flex;flex-direction:column;gap:4px}
-.dash-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dashed var(--line);min-width:0}
-.dash-row:last-child{border-bottom:0}
-.dash-row .dash-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dash-ft{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--line);margin-top:auto}
+table.t.hr-dash .w-sid{width:76px;font-family:Consolas,ui-monospace,monospace;font-variant-numeric:tabular-nums;font-weight:700}
+table.t.hr-dash .w-staff{width:155px}
+table.t.hr-dash .w-room{width:114px;font-variant-numeric:tabular-nums}
+table.t.hr-dash .w-case{width:185px}
+table.t.hr-dash .w-att{width:185px}
+table.t.hr-dash .w-mail{width:160px;font-variant-numeric:tabular-nums}
+table.t.hr-dash .w-dom{width:112px}
+table.t.hr-dash .w-rel{width:165px}
+table.t.hr-dash .w-st{width:90px}
+table.t.hr-dash .w-act{width:112px}
+table.t.hr-dash tr.staff-zero td{color:var(--mute)}
+table.t.hr-dash tr.staff-urgent td:first-child{box-shadow:inset 3px 0 0 var(--red-m)}
+table.t.hr-dash tr.sub-row td{background:var(--bg);font-size:12.5px}
+table.t.hr-dash tr.sub-row td.w-sid{color:var(--mute);font-weight:400;text-align:right}
+table.t.hr-dash tr.sub-row td.w-staff{padding-left:18px;color:var(--ink2)}
+.hr-tog{border:1px solid var(--line2);background:var(--card);color:var(--ink2);border-radius:6px;padding:2px 7px;min-width:28px;min-height:28px;font-size:11.5px;font-weight:700;cursor:pointer;flex:0 0 auto}
+.hr-tog:hover{border-color:var(--blue-btn);color:var(--blue-d)}
+.hr-tog.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d)}
 .share-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .cmd-box{font-family:Consolas,ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin:6px 0}
 
@@ -176,19 +184,23 @@ table.t td .one>.tag{flex:0 0 auto}
   #head .top{padding:7px 8px;gap:6px}
   #head h1{font-size:15.5px}
   main{padding:6px 4px 72px}
-  .card,.grp-card,.hi-top-strip,#recent-diff-bar,.note,.warn,.danger-box,.dash-card{padding:8px 8px}
-  .grid-2,.dash-grid{grid-template-columns:1fr}
+  .card,.grp-card,.hi-top-strip,#recent-diff-bar,.note,.warn,.danger-box{padding:8px 8px}
+  .grid-2{grid-template-columns:1fr}
   table.t,table.t thead,table.t tbody{display:block;width:100%;min-width:0}
   table.t thead tr{display:flex;align-items:center;gap:6px;padding:4px 6px;background:var(--bg);border-bottom:1px solid var(--line)}
   table.t thead th{display:none;border:0;padding:4px 0}
-  table.t thead th.ck,table.t thead th.no{display:block;width:auto}
+  table.t thead th.ck,table.t thead th.no,table.t.hr-dash thead th.w-sid,table.t.hr-dash thead th.w-staff{display:block;width:auto}
   table.t tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;position:relative;padding:8px 4px 8px 64px;border-bottom:1px solid var(--line)}
+  table.t.hr-dash:not(.hr-wide) tbody tr{padding:8px 6px}
+  table.t.hr-dash:not(.hr-wide) tbody tr.sub-row{padding:7px 6px 7px 16px}
   table.t tbody td{display:inline-flex;align-items:center;border:0;padding:0;width:auto !important;max-width:100%;font-size:12.5px}
   table.t tbody td.ck{position:absolute;left:4px;top:9px;width:26px !important}
   table.t tbody td.no{position:absolute;left:32px;top:11px;width:28px !important}
+  table.t.hr-dash:not(.hr-wide) tbody td.no{position:static;width:auto !important}
   table.t tbody td.ti{flex:1 1 100%;font-size:13.5px;white-space:normal;word-break:break-word}
   table.t tbody td.w-rel{flex:1 1 100%;white-space:normal;word-break:break-word}
   table.t tbody td.w-act{flex:1 1 100%;justify-content:flex-start;padding-top:2px}
+  .hr-tog{min-width:36px;min-height:36px}
 }
 </style>
 <link rel="stylesheet" href="css/pu-design.css?v=3">
@@ -232,7 +244,7 @@ table.t td .one>.tag{flex:0 0 auto}
       <div id="dashViewBar" class="bar" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line)">
         <span style="font-weight:700;font-size:12.5px;color:var(--ink2)">정리 기준</span>
         <div class="dash-tabs" id="dashViewTabs" role="group" aria-label="대시보드 정리 기준 선택">
-          <button type="button" class="dash-tab on" aria-pressed="true" data-dash-view="person">👤 사람별 정리</button>
+          <button type="button" class="dash-tab on" aria-pressed="true" data-dash-view="person">👤 사번·사람별 정리</button>
           <button type="button" class="dash-tab" aria-pressed="false" data-dash-view="case">⚖️ 사건·업무별 정리</button>
           <button type="button" class="dash-tab" aria-pressed="false" data-dash-view="topic">📌 공유 건별 정리</button>
           <button type="button" class="dash-tab" aria-pressed="false" data-dash-view="table">📋 전체 표</button>
@@ -242,7 +254,7 @@ table.t td .one>.tag{flex:0 0 auto}
         <button type="button" class="pri sm" id="btnGoCollect">＋ 수동·PC캡처 수집</button>
       </div>
       <div class="bar">
-        <input type="search" id="qArchive" placeholder="사람 · 사건번호 · 시정지시 · 공유내용 · 업체 힌트 검색" aria-label="보관된 카톡 업무 검색" style="flex:1 1 220px;min-width:180px">
+        <input type="search" id="qArchive" placeholder="사번 · 이름 · 사건번호 · 시정지시 · 첨부서류 · 메일제목 검색" aria-label="보관된 카톡 업무 검색" style="flex:1 1 220px;min-width:180px">
         <select id="fDomain" aria-label="업무 영역 필터">
           <option value="">전체 영역</option>
         </select>
@@ -257,6 +269,10 @@ table.t td .one>.tag{flex:0 0 auto}
           <option value="tracking">진행추적중</option>
           <option value="done">처리완료</option>
         </select>
+        <label id="lblOnlyActiveStaff" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--card);cursor:pointer;min-height:36px;font-size:12.5px">
+          <input type="checkbox" id="chkOnlyActiveStaff"> 카톡 있는 사람만
+        </label>
+        <button type="button" class="sm" id="btnToggleExpandAll" aria-pressed="false">▼ 모두 펼치기</button>
       </div>
     </div>
     <div id="dashContentBox"></div>
@@ -421,7 +437,7 @@ window.PuKakaoRoomGate = { show: function(){ PuGate.show(); }, hide: function(){
 <script src="js/pu-handoff.js?v=2"></script>
 <script src="js/pu-kakao-work.js?v=4"></script>
 <script src="js/pu-kakao-export.js?v=2"></script>
-<script src="js/pu-kakaoroom-core.js?v=4"></script>
-<script src="js/pu-kakaoroom-app.js?v=4"></script>
+<script src="js/pu-kakaoroom-core.js?v=5"></script>
+<script src="js/pu-kakaoroom-app.js?v=5"></script>
 </body>
 </html>
