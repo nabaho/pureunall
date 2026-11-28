@@ -16,7 +16,10 @@ function body(name, next) {
 
 test('예약 발송은 시각 색인으로 기한이 된 줄만 읽는다', () => {
   assert.match(body('sendScheduledMail'), /orderByChild\("at"\)\.endAt\(now\)\.limitToFirst\(/);
-  assert.deepEqual(rules.pucards.scheduled['.indexOn'], ['at', 'bulk']);
+  assert.ok(Array.isArray(rules.pucards.scheduled['.indexOn']), '예약 대기열 색인이 배열이어야 합니다');
+  ['at', 'bulk', 'priorityAt'].forEach((k) => {
+    assert.ok(rules.pucards.scheduled['.indexOn'].includes(k), '예약 대기열 색인 누락: ' + k);
+  });
   assert.equal(rules.pucards.scheduled['.write'], rules.pucards.items['.write'], '이름 붙인 칸의 기존 쓰기 권한을 유지한다');
   assert.deepEqual(rules.pucards.scheduled.$k2, rules.pucards.items.$k2, '예약줄 하위 쓰기 권한을 유지한다');
 });

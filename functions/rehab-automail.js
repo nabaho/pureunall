@@ -105,7 +105,7 @@ function plan(a) {
 function queueRow(c, nowMs, sendAt) {
   const mail = L.buildAdMail({ debtorName: c.name, ceoName: c.ceo, kind: c.kind }, { ceo: c.ceo });
   return {
-    at: sendAt, by: "rehab-auto", madeAt: nowMs, state: "waiting", fromWish: "",
+    at: sendAt, priorityAt: sendAt, by: "rehab-auto", madeAt: nowMs, state: "waiting", fromWish: "",
     payload: { to: c.email, toName: c.toName, cardCompany: c.toName, subject: mail.subject, body: mail.text, html: "", matIds: [], files: [] }
   };
 }

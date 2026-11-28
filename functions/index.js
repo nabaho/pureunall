@@ -710,6 +710,7 @@ exports.sendMaterialMail = functions
       try {
         const ref = await db.ref(MD.CARDS_ROOT + "/scheduled").push({
           at: at,
+          priorityAt: at,
           by: sender.email || "",
           payload: MD.slimPayload(body),
           madeAt: Date.now(),
@@ -996,10 +997,15 @@ exports.sendScheduledMail = functions
   .onRun(async () => {
     const db = getDatabase();
     const now = Date.now();
-    const snap = await db.ref(MD.CARDS_ROOT + "/scheduled")
-      .orderByChild("at").endAt(now).limitToFirst(20).once("value");
-    const all = snap.val() || {};
-    const ids = Object.keys(all);
+    const [snap, prioSnap] = await Promise.all([
+      db.ref(MD.CARDS_ROOT + "/scheduled")
+        .orderByChild("at").endAt(now).limitToFirst(20).once("value"),
+      db.ref(MD.CARDS_ROOT + "/scheduled")
+        .orderByChild("priorityAt").startAt(1).endAt(now).limitToFirst(MB.PRIORITY_BATCH).once("value"),
+    ]);
+    const merged = MB.mergeScheduledBatch(prioSnap.val() || {}, snap.val() || {});
+    const all = merged.rowsById;
+    const ids = merged.ids;
     if (!ids.length) return null;
 
     const from = await mailUserAsync();
@@ -1010,7 +1016,7 @@ exports.sendScheduledMail = functions
       const ref = db.ref(MD.CARDS_ROOT + "/scheduled/" + id);
       /* 이 고침보다 먼저 생긴 실패 줄도 지난 시각에 남아 있다. 새 실패만 치우면
          옛 실패 20건이 쌓인 날 다시 같은 막힘이 생기므로 한 번 만나면 함께 치운다. */
-      if (row.state === "failed" && Number(row.at) !== MB.PARKED_AT) {
+      if (row.state === "failed" && (Number(row.at) !== MB.PARKED_AT || (row.priorityAt != null && Number(row.priorityAt) !== MB.PARKED_AT))) {
         await ref.update(MB.parkOldFailure(row, now));
         continue;
       }
@@ -8285,6 +8291,7 @@ exports.collectRulesMail = functions
     return null;
   });
 exports.collectRulesMailAsk = functions
+  .region(MAIL_REGION)
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
   .database.ref("/rules_mgmt/library/ask/{id}")
   .onCreate(async (snap) => {

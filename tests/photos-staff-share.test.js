@@ -403,6 +403,8 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
        더 넓게 보이게 된 칸 없음. 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-22.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
   /* ★ 2026-11-22 — 같은 날 /edulib/sims 를 «조임»(보안 검토 낮음 — 칸을 정해 두기): 칸별 규칙 새로 16 · 바뀜 1(sourceKind 도 확인 — 조임) · 사라짐 0 · 헐거워짐 0.
        그 밖의 칸은 $other false. 다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-22.json — 목록을 비운다. */
+  /* ★ 2026-11-28 — 병목 해소 1단계 RTDB 인덱스 4곳(/data/finance_income/v, /hanaSmsBridge/inbox, /pucards/scheduled/.indexOn/2, /work_erp/items) 추가 및 기존 콘솔 /edulib/lectures 규칙 보존 배포 완료(사라짐 0 · 바뀜 0).
+       다시 읽어 «콘솔이 올린 것과 같음» 확인 후 새 기준 docs/firebase-rules-콘솔원문-2026-11-28.json 으로 갱신 — 목록을 비운다. */
   const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
