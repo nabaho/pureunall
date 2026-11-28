@@ -3711,6 +3711,575 @@
         ".validate": false
       }
     },
+    "scal_techprotect": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_clinic": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_chamber": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_hrconsult": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_evalcomp": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_pubconsult": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_familywork": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_socialent": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_sixthind": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_laboraudit": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_unionneg": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "scal_specialcons": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "projects": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "checks": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "comms": {
+        "$pid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+          }
+        }
+      },
+      "reports": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "msg_intake": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "items": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (!newData.child('_deleted').exists() && newData.child('maskedBody').val() === data.child('maskedBody').val() && newData.child('summary').val() === data.child('summary').val() && newData.child('title').val() === data.child('title').val() && newData.child('channel').val() === data.child('channel').val() && newData.child('msgDate').val() === data.child('msgDate').val() && newData.child('createdBy').val() === data.child('createdBy').val()))))",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "channel": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "roomName": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "msgDate": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "title": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "maskedBody": {
+            ".validate": "newData.isString() && newData.val().length <= 3000"
+          },
+          "summary": {
+            ".validate": "newData.isString() && newData.val().length <= 600"
+          },
+          "attNames": {
+            ".validate": "newData.hasChildren() || newData.isString()"
+          },
+          "targetApp": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "targetApps": {
+            ".validate": "newData.hasChildren() || newData.isString()"
+          },
+          "confidence": {
+            ".validate": "newData.isString() && newData.val().length <= 24"
+          },
+          "matchedReasons": {
+            ".validate": "newData.hasChildren() || newData.isString()"
+          },
+          "status": {
+            ".validate": "newData.val() === 'pending' || newData.val() === 'assigned'"
+          },
+          "companyId": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "coach_rag": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "notes": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true) && ((!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('createdBy').val() === auth.uid || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)))",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "entityType": {
+            ".validate": "newData.val() === 'Document'"
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedAt": {
+            ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 40)"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "appKey": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "title": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "tags": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "body": {
+            ".validate": "newData.isString() && newData.val().length <= 4000"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "quizzes": {
+        "$uid": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && auth.uid === $uid && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+            ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+          }
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
     "app_owner": {
       ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": false

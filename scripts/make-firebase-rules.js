@@ -2550,6 +2550,100 @@ rules.scal_safety = {
   $other: { '.validate': false }
 };
 
+/* ══ 📊 신규 12개 컨설팅 전용 앱(scal_*) 및 카톡/문자 수집함(msg_intake)·수습 RAG 코치(coach_rag) (2026-11-28) ══ */
+const CONSULT_APP_ROOTS = [
+  'scal_techprotect', 'scal_clinic', 'scal_chamber', 'scal_hrconsult',
+  'scal_evalcomp', 'scal_pubconsult', 'scal_familywork', 'scal_socialent',
+  'scal_sixthind', 'scal_laboraudit', 'scal_unionneg', 'scal_specialcons'
+];
+for (const rootName of CONSULT_APP_ROOTS) {
+  rules[rootName] = {
+    '.read': LOGIN,
+    projects: { $id: {
+      '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+    } },
+    checks: { $pid: { $id: {
+      '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+    } } },
+    comms: { $pid: { $id: {
+      '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+    } } },
+    reports: { $id: {
+      '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)"
+    } },
+    $other: { '.validate': false }
+  };
+}
+
+rules.msg_intake = {
+  '.read': LOGIN,
+  items: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN}) && ((!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('createdBy').val() === auth.uid || ${ADMIN} || (!newData.child('_deleted').exists() && newData.child('maskedBody').val() === data.child('maskedBody').val() && newData.child('summary').val() === data.child('summary').val() && newData.child('title').val() === data.child('title').val() && newData.child('channel').val() === data.child('channel').val() && newData.child('msgDate').val() === data.child('msgDate').val() && newData.child('createdBy').val() === data.child('createdBy').val()))))`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    id: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    entityType: { '.validate': "newData.val() === 'Document'" },
+    schemaVersion: { '.validate': 'newData.isNumber()' },
+    contractVersion: { '.validate': 'newData.isNumber()' },
+    revision: { '.validate': 'newData.isNumber()' },
+    createdAt: { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' },
+    updatedAt: { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedAt: { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' },
+    deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    channel: { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    roomName: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    msgDate: { '.validate': 'newData.isString() && newData.val().length <= 32' },
+    title: { '.validate': 'newData.isString() && newData.val().length <= 300' },
+    maskedBody: { '.validate': 'newData.isString() && newData.val().length <= 3000' },
+    summary: { '.validate': 'newData.isString() && newData.val().length <= 600' },
+    attNames: { '.validate': 'newData.hasChildren() || newData.isString()' },
+    targetApp: { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    targetApps: { '.validate': 'newData.hasChildren() || newData.isString()' },
+    confidence: { '.validate': 'newData.isString() && newData.val().length <= 24' },
+    matchedReasons: { '.validate': 'newData.hasChildren() || newData.isString()' },
+    status: { '.validate': "newData.val() === 'pending' || newData.val() === 'assigned'" },
+    companyId: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    $other: { '.validate': false }
+  } },
+  $other: { '.validate': false }
+};
+
+rules.coach_rag = {
+  '.read': LOGIN,
+  notes: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN}) && ((!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('createdBy').val() === auth.uid || ${ADMIN})))`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    id: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    entityType: { '.validate': "newData.val() === 'Document'" },
+    schemaVersion: { '.validate': 'newData.isNumber()' },
+    contractVersion: { '.validate': 'newData.isNumber()' },
+    revision: { '.validate': 'newData.isNumber()' },
+    createdAt: { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' },
+    updatedAt: { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedAt: { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' },
+    deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 128' },
+    appKey: { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    title: { '.validate': 'newData.isString() && newData.val().length <= 200' },
+    tags: { '.validate': 'newData.isString() && newData.val().length <= 200' },
+    body: { '.validate': 'newData.isString() && newData.val().length <= 4000' },
+    $other: { '.validate': false }
+  } },
+  quizzes: { $uid: { $id: {
+    '.write': `(${LOGIN}) && auth.uid === $uid && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
 /* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
    - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
      (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).

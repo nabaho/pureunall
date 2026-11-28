@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 카톡·문자 자료수집</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>💬</text></svg>">
+<style>
+:root{
+  --ink:#1e293b; --ink2:#475569; --mute:#475569; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-m:#16a34a; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-m:#d97706; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-m:#dc2626; --red-bg:#fef2f2; --red-line:#fecaca;
+  --pri-bg:#1e40af; --ok-bg:#166534;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#f8fafc; --ink2:#e2e8f0; --mute:#cbd5e1; --line:#475569; --line2:#64748b; --bg:#000000; --card:#1e293b;
+    --blue:#60a5fa; --blue-d:#bfdbfe; --blue-bg:#1e293b; --blue-line:#2563eb;
+    --green:#4ade80; --green-m:#16a34a; --green-bg:#1e293b; --green-line:#16a34a;
+    --amber:#fde68a; --amber-m:#d97706; --amber-bg:#1e293b; --amber-line:#d97706;
+    --red:#fecaca; --red-m:#dc2626; --red-bg:#1e293b; --red-line:#dc2626;
+    --pri-bg:#2563eb; --ok-bg:#166534;
+  }
+}
+*{box-sizing:border-box}
+html,body{width:100%;max-width:none;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;word-break:keep-all;overflow-wrap:break-word}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 11px;line-height:1.3;white-space:nowrap}
+button:hover{border-color:var(--mute)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.drop-zone:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+code{overflow-wrap:anywhere;word-break:break-all;max-width:100%}
+.wrap-chip{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;max-width:100%}
+button.pri{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:600}
+button.ok{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff;font-weight:600}
+button.danger{background:var(--red-bg);border-color:var(--red-line);color:var(--red)}
+button.sm{padding:5px 10px;min-height:32px;font-size:12px}
+input,select,textarea{font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink)}
+textarea{width:100%;resize:vertical;font-family:inherit;line-height:1.55}
+.code-diff-box{border:2px solid var(--blue);background:var(--blue-bg)}
+#head{position:sticky;top:0;z-index:20;width:100%;background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0}
+.top .sub{font-size:12px;color:var(--mute)}
+.sp{flex:1}
+#who{font-size:13px;color:var(--mute)}
+.tabs{display:flex;gap:4px;padding:0 12px;flex-wrap:wrap;align-items:center}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
+.tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
+.chip{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--ink2)}
+.c-blue{background:var(--blue-bg);color:var(--blue-d);border-color:var(--blue-line)}
+.c-green{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+.c-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+.chip.wrap-chip,.wrap-chip{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;max-width:100%;text-align:left}
+main{display:block;padding:10px 26px 56px 12px;width:100%;max-width:none}
+.pane{display:none}
+.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:10px;min-width:0;max-width:100%}
+.bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 12px;min-width:0;max-width:100%}
+.bar>*{min-width:0;max-width:100%}
+.sec{padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0;max-width:100%}
+.card>.sec:first-child{border-top:0;border-radius:10px 10px 0 0}
+.note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;min-width:0;max-width:100%;overflow-wrap:anywhere}
+.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;min-width:0;max-width:100%;overflow-wrap:anywhere}
+pre{min-width:0;max-width:100%;overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin:0}
+.hint{font-size:12px;color:var(--mute);min-width:0;max-width:100%;overflow-wrap:anywhere}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;flex-direction:column;gap:3px;min-width:0}
+.kpi span{font-size:12px;color:var(--mute)}
+.kpi b{font-size:17px;font-variant-numeric:tabular-nums}
+.kpi.k-blue b{color:var(--blue-d)}
+.kpi.k-green b{color:var(--green)}
+.kpi.k-amber b{color:var(--amber)}
+.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+@media (max-width:1180px){.guide-grid{grid-template-columns:1fr}}
+.ind-card{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:11px 13px;display:flex;flex-direction:column;gap:6px}
+.ind-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.drop-zone{border:1.5px dashed var(--blue-line);background:var(--blue-bg);color:var(--blue-d);border-radius:10px;padding:14px 12px;text-align:center;cursor:pointer;margin:6px 0}
+.scroll{overflow:auto}
+table.t{width:100%;max-width:none;border-collapse:collapse}
+table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
+table.t td{overflow:hidden;text-overflow:ellipsis;max-width:480px}
+table.t td.ti{font-weight:600;max-width:340px}
+table.t td.wide{max-width:760px}
+table.t th.c,table.t td.c{width:38px;text-align:center}
+input[type=checkbox]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;cursor:pointer;vertical-align:middle}
+table.t th.n,table.t td.n{width:38px;text-align:right;color:var(--mute)}
+@media (min-width:769px){
+  table.t td.wide{width:100%;max-width:0}
+  table.t td[data-k="act"]{width:1%;white-space:nowrap;max-width:none}
+  table.t td[data-k="act"] button.sm{margin-left:3px}
+}
+.empty{padding:24px 12px;text-align:center;color:var(--mute)}
+.hint{font-size:12px;color:var(--mute)}
+#lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70}
+#toast.on{opacity:1}
+.wide-only{display:inline}
+@media (max-width:768px){
+  button.sm{min-height:36px;padding:6px 9px}
+  input,select,textarea{font-size:16px}
+  .wide-only{display:none}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
+  .tabs button{flex:0 0 auto;padding:8px 8px;font-size:13px}
+  main{padding:8px 0 64px}
+  .card,.ind-card{border-left:0;border-right:0;border-radius:0}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 10px}
+  table.t[data-name],table.t[data-name] thead,table.t[data-name] tbody{display:block;width:100%}
+  table.t[data-name] thead tr{display:flex;align-items:center}
+  table.t[data-name] thead th{display:none}
+  table.t[data-name] thead th.c{display:block;width:40px;padding:6px 0;margin-left:4px}
+  table.t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0}
+  table.t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;position:relative;padding:8px 10px 8px 76px;min-height:46px;border-bottom:1px solid var(--line)}
+  table.t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
+  table.t[data-name] tbody td{border:0;padding:0;max-width:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;order:6;color:var(--ink2);font-size:12.5px}
+  table.t[data-name] tbody td.c{position:absolute;left:4px;top:8px;width:40px;text-align:center;order:0}
+  table.t[data-name] tbody td.n{position:absolute;left:44px;top:11px;width:26px;text-align:right;order:0}
+  table.t[data-name] tbody td.ti{order:1;flex:1 1 130px;min-width:130px;font-size:13.5px;font-weight:600;color:var(--ink)}
+  table.t[data-name] tbody td[data-k="badge"]{order:2}
+  table.t[data-name] tbody td[data-k="act"]{order:7;flex:0 0 100%;display:flex;gap:5px;flex-wrap:wrap;padding-top:2px}
+}
+@media (max-width:520px){#who{display:none}}
+</style>
+<link rel="stylesheet" href="css/pu-design.css?v=2">
+</head>
+<body class="pu-design pu-frame-a pu-dark-auto">
+<div id="lock"><h2>💬 카톡·문자 자료수집</h2><p id="lockWhy">직원 계정으로 로그인하면 열립니다.</p></div>
+<div id="app" style="display:none">
+<header id="head">
+  <div class="top">
+    <h1>💬 카톡·문자 자료수집<span class="wide-only"> 통합허브</span></h1>
+    <span class="sub">카카오톡 내보내기(.txt)·문자(SMS)·웹훅 자동분류 → 18개 컨설팅 앱 연계</span>
+    <span class="sp"></span>
+    <span id="who"></span>
+    <span class="chip c-blue wide-only" id="syncStateChip" style="display:none"></span>
+    <button type="button" class="sm" id="outBtn" style="display:none">로그아웃</button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button type="button" role="tab" aria-selected="true" class="on" data-t="input">📥 카톡·문자 입력</button>
+    <button type="button" role="tab" aria-selected="false" data-t="queue">📋 자동배정 대기함</button>
+    <button type="button" role="tab" aria-selected="false" data-t="channels">🔗 사내채널 현황</button>
+    <button type="button" role="tab" aria-selected="false" data-t="bridge">📱 폰·PC 연동규격</button>
+  </nav>
+</header>
+<main>
+  <div id="recentDiffBarWrap"></div>
+  <div class="kpis" id="kpiRow"></div>
+
+  <section class="pane on" id="p-input">
+    <div class="card">
+      <div class="sec"><span>📥 카카오톡 대화(.txt) 업로드 또는 문자(SMS) 붙여넣기</span></div>
+      <div class="bar" style="flex-direction:column;align-items:stretch">
+        <div class="drop-zone" id="kakaoTxtDropZone" role="button" tabindex="0" aria-label="PC 카카오톡 대화 내보내기 파일 업로드"><b>PC 카카오톡 대화 내보내기(.txt) 파일을 끌어다 놓거나 클릭</b><span>저장 전 브라우저에서 주민번호·전화·계좌·PC경로를 자동 가림([가림]) 처리합니다.</span><input type="file" id="kakaoTxtFileInput" accept=".txt,.csv,.log" aria-label="카톡 대화 파일 선택" style="display:none"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="msgChannelSel" aria-label="수집 채널"><option value="kakao_export">카카오톡 대화</option><option value="sms_paste">문자(SMS/LMS)</option></select>
+          <input type="text" id="roomNameInput" aria-label="대화방 또는 기업명 힌트" placeholder="대화방·기업명 힌트 (선택)" style="flex:1;min-width:180px">
+          <button type="button" class="pri" id="parsePreviewBtn">비식별·자동분류 미리보기</button>
+        </div>
+        <textarea id="rawMsgInput" rows="6" aria-label="카카오톡 대화 또는 문자 원문 입력" placeholder="카카오톡 대화 내용이나 수신 문자를 붙여넣으세요. OTP·인증번호는 자동 차단됩니다."></textarea>
+      </div>
+    </div>
+    <div class="card"><div class="sec"><span>🔎 자동분류 · 비식별화 미리보기 결과</span></div><div id="parsePreviewBox"></div></div>
+  </section>
+
+  <section class="pane" id="p-queue">
+    <div class="card">
+      <div class="bar">
+        <input type="text" id="queueSearch" aria-label="수집함 검색 필터" placeholder="제목 · 내용 · 사업명 필터" style="flex:1;min-width:180px">
+        <button type="button" class="sm" id="reloadBtn">새로고침</button>
+      </div>
+      <div id="queueBox"></div>
+    </div>
+  </section>
+
+  <section class="pane" id="p-channels"><div id="channelsBox"></div></section>
+  <section class="pane" id="p-bridge"><div id="bridgeBox"></div></section>
+</main>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="js/pu-sid-guard.js?v=1"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=55"></script>
+<script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=4"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  if(!go()) document.addEventListener('DOMContentLoaded', go); })();
+</script>
+<script src="js/pu-back.js?v=5"></script>
+<script src="js/pu-consult-catalogs-a.js?v=1"></script>
+<script src="js/pu-consult-catalogs-b.js?v=1"></script>
+<script src="js/pu-consult-catalogs.js?v=1"></script>
+<script src="js/pu-consult-intake.js?v=1"></script>
+<script src="js/pu-msg-intake-view.js?v=1"></script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+var isPv = (location.hostname==='localhost' || location.hostname==='127.0.0.1' || location.hostname.endsWith('.localhost')) && location.search.indexOf('preview=1')>=0;
+if(isPv && window.PuMsgIntakeView){
+  PuMsgIntakeView.boot(null);
+} else if(typeof firebase==='undefined'){
+  document.getElementById('lock').style.display='block';
+} else {
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  PuMsgIntakeView.boot(firebase);
+}
+</script>
+</body>
+</html>
