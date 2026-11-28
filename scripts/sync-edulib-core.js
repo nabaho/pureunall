@@ -13,7 +13,8 @@ const fs = require('fs');
 const path = require('path');
 
 const 뿌리 = path.join(__dirname, '..');
-const 옮길것 = ['pu-edulib-classify.js', 'pu-edulib-core.js'];
+/* pu-edulib-lecture.js — 강의 이력(EduLecture) 셈·캘린더 맞추기(2026-11-27 «누가 언제 강의했는지») */
+const 옮길것 = ['pu-edulib-classify.js', 'pu-edulib-core.js', 'pu-edulib-lecture.js'];
 const 밖 = path.join(뿌리, 'functions', 'edulib-core');
 
 function 옮기기() {

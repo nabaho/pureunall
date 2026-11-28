@@ -18,10 +18,11 @@
   var MAX_WIN = 6;                              /* 새 창으로 한 번에 여는 최대 수 */
   var PAGE = 400;                               /* 목록 한 번에 그리는 줄 수 */
 
-  var C = window.PuEduLibClassify, K = window.PuEduLibCore, P = window.PuEduLibPreview;
+  var C = window.PuEduLibClassify, K = window.PuEduLibCore, P = window.PuEduLibPreview, L = window.PuEduLibLecture;
   var fbDb = null, gate = null, bucket = null;
   var ME = { sid: '', uid: '', admin: false };
   var ITEMS = {}, NAMES = {}, LOADED = false;
+  var PEOPLE = [];                              /* 명부(data/user_dir) — {sid,name,status}. 강의 이력의 강의자 고르기는 재직 직원만 */
   var TAB = 'dash', PICK = {}, SHOWN = PAGE;
   var F = { q: '', cat: '', year: '', kind: '', status: '', store: '', legal: '', trash: false };   /* legal: '' · 'legal' · 'other' */
   var GROUP = 'cat';
@@ -68,18 +69,24 @@
     var est = it.dateFrom && it.dateFrom !== 'manual';
     return '<span class="one"><span>' + esc(it.lectureDate) + '</span>' + (est ? '<span class="tag est" title="' + esc(estWhy(it.dateFrom)) + '">추정</span>' : '') + '</span>';
   }
+  function autoWhy(a) {
+    var w = a && a.why === 'old-format' ? '옛 형식(ppt·hwp·doc)' : a && a.why === 'archive' ? '압축 파일' : a && a.why === 'little-text' ? '글자를 거의 못 읽은 파일(스캔 PDF 등)' : '읽지 못한 파일';
+    return '보낸 메일에서 저절로 넣은 ' + w + ' — 서버가 내용을 자동으로 확인하지 못했습니다. 열어 보고 검토해 주세요';
+  }
   function estWhy(f) { return f === 'name' ? '파일 이름에서 찾은 날짜' : f === 'folder' ? '폴더 이름에서 찾은 날짜' : f === 'mail' ? '메일 보낸 날 — 강의일과 다를 수 있습니다' : '추정'; }
   function statusTags(it) {
     var s = '<span class="tag ' + esc(it.status) + '">' + esc(K.STATUS[it.status] || it.status) + '</span>';
     s += '<span class="tag ' + esc(it.store) + '">' + esc(K.STORE[it.store] || it.store) + '</span>';
     if (it.pii) s += '<span class="tag pii" title="사람 이름·서명이 들어 있을 수 있습니다">개인정보</span>';
+    /* 보낸 메일 자동 저장(2026-11-27) 가운데 서버가 내용을 읽지 못한 것 — 옛 형식·압축·글자 없는 PDF */
+    if (it.auto && it.auto.check === 'none') s += '<span class="tag est" title="' + esc(autoWhy(it.auto)) + '">내용 확인 못 함</span>';
     return s;
   }
 
   /* ───────── 탭 ───────── */
   function setTab(t) {
     if (t === 'mail' && !ME.admin) t = 'dash';
-    if (TAB !== t) { PICK = {}; MPICK = {}; IPICK = {}; if (TAB === 'add') ADD_CAT = ''; }   /* 화면을 떠나면 고른 것을 비운다 */
+    if (TAB !== t) { PICK = {}; MPICK = {}; IPICK = {}; LPICK = {}; if (TAB === 'add') ADD_CAT = ''; }   /* 화면을 떠나면 고른 것을 비운다 */
     TAB = t; lsSet('tab', t);
     [].forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
     [].forEach.call(document.querySelectorAll('.pane'), function (p) { p.classList.toggle('on', p.id === 'pane-' + t); });
@@ -87,10 +94,12 @@
   }
   function draw() {
     $('nItems').textContent = K.live(list()).length;
+    $('nLect').textContent = L.live(lectList()).length;
     if (TAB === 'dash') drawDash();
     else if (TAB === 'list') drawList();
     else if (TAB === 'add') drawStage();
     else if (TAB === 'mail') { drawMail(); drawSweep(); }
+    else if (TAB === 'lect') drawLect();
     if (TAB !== 'list') drawSb();               /* 자료 탭은 drawList 가 그린다(두 번 그리지 않게) */
   }
 
@@ -110,6 +119,7 @@
     var h = '<div class="sb-menu top">' +
       '<button type="button" class="sb-menu-item' + (TAB === 'dash' ? ' active" aria-current="page' : '') + '" data-sb="dash"><span class="mi-icon">📊</span><span class="mi-text">한눈에</span></button>' +
       '<button type="button" class="sb-menu-item' + (onList && !F.cat && !F.legal ? ' active" aria-current="page' : '') + '" data-sb="all" title="모든 강의자료 ' + d.total + '건"><span class="mi-icon">📚</span><span class="mi-text">전체 자료</span><span class="mi-n">' + d.total + '</span></button>' +
+      lectSbItem() +
       '</div><div class="sb-sep"></div>';
     K.splitLegal(d.cats).forEach(function (s) {
       var fold = !!SB_FOLD[s.key];
@@ -132,6 +142,12 @@
     });
     h += '<div class="sb-sep"></div><div class="sb-menu top"><button type="button" class="sb-menu-item add" data-catnew title="새로 생긴 강의를 종류로 더합니다 — 이름·찾을 낱말·법정 여부"><span class="mi-icon">＋</span><span class="mi-text">새 강의 종류</span></button></div>';
     nav.innerHTML = h;
+  }
+  /* 왼쪽 메뉴 «🗓 강의 이력» — 숫자는 지운 것 빼고, 확인 필요(추정)가 있으면 title 에 */
+  function lectSbItem() {
+    var all = L.live(lectList()), nAuto = all.filter(function (r) { return r.status === 'auto'; }).length;
+    return '<button type="button" class="sb-menu-item' + (TAB === 'lect' ? ' active" aria-current="page' : '') + '" data-sb="lect" title="' + esc('강의 이력 ' + all.length + '건' + (nAuto ? ' · 확인 필요(추정) ' + nAuto + '건' : '') + ' — 누가·언제·어디서·무슨 강의') + '">' +
+      '<span class="mi-icon">🗓</span><span class="mi-text">강의 이력</span><span class="mi-n">' + all.length + '</span></button>';
   }
   /* 왼쪽 메뉴는 재직 직원으로 들어온 뒤에만(PC) — 로그인 전·잠금·로그아웃이면 걷는다 */
   function sbOn(on) { document.body.classList.toggle('has-sb', !!on); }
@@ -924,10 +940,12 @@
       (src.path ? kv('원래 자리', src.path) : '') + (src.mailSubject ? kv('메일', src.mailSubject + (src.mailDate ? ' (' + src.mailDate + ')' : '')) : '') +
       (src.mtime ? kv('파일 수정일', src.mtime + ' (강의일 아님)') : '') +
       kv('넣은 사람', nameOf(it.createdBy) + ' · ' + fmtTime(it.createdAt)) + kv('고친 때', fmtTime(it.updatedAt)) +
+      (it.auto ? kv('자동 저장', '보낸 메일에서 저절로 넣음 · ' + (it.auto.check === 'text' ? '내용을 읽어 확인함' : '내용 자동 확인 못 함 — 열어 보고 검토해 주세요')) : '') +
       (it.sha256 ? kv('지문', it.sha256.slice(0, 16) + '…') : '') +
       '</div>' +
       (it.summary ? '<div class="sumx"><div class="sec" style="font-size:13px">자동 정리 내용 <span class="hint">문서의 목차·첫 글을 그대로 옮긴 것</span></div><p>' + esc(it.summary) + '</p></div>' : '') +
       '<div class="simsec" id="dSim"></div>' +
+      '<div class="lecsec" id="dLec"></div>' +
       '<div class="notes"><div class="sec" style="font-size:13px">검토 메모</div><div id="dNotes" class="hint">불러오는 중…</div>' +
       '<textarea id="dNoteNew" rows="2" placeholder="이 자료를 본 의견 — 예) 2026 개정 반영 필요 · 3쪽 사례 좋음"></textarea>' +
       '<div class="bar" style="margin-top:4px"><span class="sp"></span><button class="sm" id="dNoteAdd">메모 남기기</button></div></div>' +
@@ -943,6 +961,7 @@
     makePane($('dView'), it, { inDetail: true });
     loadNotes(id);
     drawSim();
+    drawItemLects();
   }
   /* 같은 창(#modal)을 여러 일에 쓴다 — 열 때마다 대화상자 이름을 그 일로 바꾸고 첫 칸에 초점을 준다 */
   function openModal(label, focusId) {
@@ -953,7 +972,7 @@
   function kv(k, v) { return '<div class="kv"><span>' + esc(k) + '</span><b title="' + esc(v) + '">' + esc(v) + '</b></div>'; }
   function closeDetail() {
     if ($('modal').style.display === 'none') return;
-    closeFrames($('mbox')); $('modal').style.display = 'none'; $('mbox').innerHTML = ''; DETAIL = '';
+    closeFrames($('mbox')); $('modal').style.display = 'none'; $('mbox').innerHTML = ''; DETAIL = ''; LDETAIL = ''; LNEW_ITEMS = [];
   }
   function saveDetail() {
     var it = ITEMS[DETAIL]; if (!it) return;
@@ -1270,6 +1289,9 @@
   /* 고른 줄을 자료함으로 — 메일 찾기(MAIL 줄)와 자동 정리함(INBOX 줄)이 같은 길(importMailRow)을 탄다. 건수를 묻고 끝까지 한 번에 */
   function importRows(rows, btn, bar, pick, redraw) {
     if (!rows.length) { toast('고른 첨부가 없습니다'); return; }
+    /* 서버가 «남긴»(명단·서류 이름·주민번호 꼴) 첨부는 한 번 더 묻는다 — 넣으면 재직 직원 모두가 본다 */
+    var nHold = rows.filter(function (r) { return r.hold; }).length;
+    if (nHold && !window.confirm('고른 것 가운데 ' + nHold + '건은 명단·서류 같은 이름이거나 주민번호 꼴이 보여 서버가 자동으로 넣지 않고 남긴 첨부입니다.\n메일에서 열어 개인정보가 없는 것을 확인하셨나요? (넣으면 재직 직원 모두가 봅니다)')) return;
     if (!window.confirm(rows.length + '건을 자료함으로 가져올까요?\n· 메일은 그대로 두고(읽음 표시도 그대로) 첨부만 원본 그대로 복사합니다.\n· 가져온 자료는 재직 직원 모두가 봅니다.')) return;
     bar.style.display = ''; var fill = bar.firstElementChild;
     var done = 0, fail = 0;
@@ -1291,11 +1313,11 @@
     var listP = r.old ? callFn('readOldMail', { key: r.key }) : callFn('readMailMessage', { slug: r.slug, uid: r.uid, peek: true });
     return listP.then(function (j) {
       var atts = (j.atts || []).map(function (a, i) { return { i: i, part: String(a.part || ''), name: String(a.name || ''), size: +a.size || 0 }; });
-      /* 자동 정리함 줄(qsha 있음)은 «정리한 바로 그 첨부» 한 건만 — 이름이 정확히 같아야 하고, 받은 뒤 지문(sha256)도 같아야 올린다 */
-      var want = r.att ? atts.filter(function (a) { return a.name === r.att || (!r.qsha && a.name.slice(0, 60) === r.att); })
+      /* 자동 정리함 줄(exact)은 «정리한 바로 그 첨부» 한 건만 — 이름이 정확히 같아야 하고, 서버가 받아 본 지문(qsha)이 있으면 받은 뒤 지문도 같아야 올린다 */
+      var want = r.att ? atts.filter(function (a) { return a.name === r.att || (!r.exact && a.name.slice(0, 60) === r.att); })
         : atts.filter(function (a) { var k = C.kindOf(C.extOf(a.name)); return (k === 'doc' || k === 'video' || k === 'archive') && C.classifyMail(r.s, a.name, ''); });
-      if (r.qsha) want = want.slice(0, 1);
-      if (!want.length) throw new Error(r.qsha ? '정리할 때의 첨부를 찾지 못했습니다(이름이 다릅니다)' : '강의자료로 보이는 첨부를 못 찾았습니다');
+      if (r.exact) want = want.slice(0, 1);
+      if (!want.length) throw new Error(r.exact ? '정리할 때의 첨부를 찾지 못했습니다(이름이 다릅니다)' : '강의자료로 보이는 첨부를 못 찾았습니다');
       return want.reduce(function (p, a) {
         return p.then(function (n) {
           if (a.size > 20 * 1024 * 1024) throw new Error(a.name + ' — 20MB 가 넘어 메일 서버에서 직접 내려받아 «＋ 넣기»로 올려 주세요');
@@ -1410,8 +1432,13 @@
   }
 
   /* ───────── 보낸 메일 자동 정리 (대표 지시 2026-11-21 「메일로 보낸 강의 자료 … 자동으로 정리해서 내용 넣을 수 있게」) ─────────
-     서버(functions/edulib-mail-sweep.js)가 매일 19:30 에 한다. 여기서는 그 상태를 보여 주고, 관리자가 «지금 정리»로 바로 돌린다. */
-  /* 자동 정리함 줄 — 이미 자료함에 있는 것(같은 메일·같은 첨부, 같은 지문 — 휴지통 포함)과 오래된 줄은 안 보인다 */
+     서버(functions/edulib-mail-sweep.js)가 매일 19:30 에 한다. 여기서는 그 상태를 보여 주고, 관리자가 «지금 정리»로 바로 돌린다.
+     ★ 2026-11-27 「새로운 강의 자료 같은 경우는 강의 자료함에 반드시 저장해 달라」(선택 «모두 저장, 위험한 것만 뺌») — 서버가 자료함에 바로 저장하고,
+       여기 정리함에는 «남긴 것»(명단·서류 이름·주민번호 꼴)만 보인다. 관리자가 메일에서 확인한 뒤에만 «넣기»(한 번 더 묻는다). */
+  /* 자동 정리함 줄 — 이미 자료함에 있는 것(같은 메일·같은 첨부, 같은 지문 — 휴지통 포함)·서버가 저장한 줄(saved·same)·오래된 줄은 안 보인다.
+     2026-11-27 부터 서버가 강의자료를 바로 저장하므로 여기 남는 것은 «남김(hold)» — 명단·서류 이름·문서 안 주민번호 꼴·압축 안 명단 등 */
+  var HOLD_WHY = { name: '명단·서류 같은 이름', 'pii-text': '파일 안에 주민번호 꼴', 'zip-name': '압축 안에 명단·서류', archive: '안을 볼 수 없는 압축·형식(7z·rar·show 등)',
+    unread: '안을 다 보지 못한 파일(암호·깨짐·한도 넘음)', diff: '정리 때와 다른 파일', gone: '메일에서 못 찾음', big: '20MB 넘음' };
   var INB_ROWS = [];
   function inboxRows() {
     var have = {}, sha = {};
@@ -1422,30 +1449,31 @@
     });
     var since = Date.now() - INBOX_DAYS * 864e5;
     return Object.keys(INBOX).map(function (k) { return INBOX[k]; })
-      .filter(function (q) { return q && q.key && q.att && (+q.d || 0) >= since && !have[q.mailId + '|' + q.att] && !(q.sha256 && sha[q.sha256]); })
+      .filter(function (q) { return q && q.key && q.att && !q.saved && !q.same && (+q.d || 0) >= since && !have[q.mailId + '|' + q.att] && !(q.sha256 && sha[q.sha256]); })
       .sort(function (a, b) { return (+b.d || 0) - (+a.d || 0); }).slice(0, 300)
       .map(function (q) {
-        return { id: 'q#' + q.key, qsha: String(q.sha256 || '') || 'none', slug: String(q.slug || ''), uid: String(q.uid || ''), key: String(q.mailKey || ''), mailId: String(q.mailId || ''),
+        return { id: 'q#' + q.key, exact: true, qsha: String(q.sha256 || ''), hold: String(q.hold || ''), slug: String(q.slug || ''), uid: String(q.uid || ''), key: String(q.mailKey || ''), mailId: String(q.mailId || ''),
           s: String(q.subject || ''), d: +q.d || 0, att: String(q.att), cat: q.cat, lectureDate: q.lectureDate || '', summary: String(q.summary || ''),
           old: false, have: false, state: '' };
       });
   }
   function drawInbox() {
     INB_ROWS = inboxRows();
-    if (!INB_ROWS.length) { $('mAutoList').innerHTML = '<p class="hint" style="margin:6px 0 0">자동 정리함이 비었습니다 — 새로 정리된 강의자료가 생기면 여기에 쌓입니다.</p>'; return; }
+    if (!INB_ROWS.length) { $('mAutoList').innerHTML = '<p class="hint" style="margin:6px 0 0">남긴 것이 없습니다 — 강의자료는 저녁마다 자료함에 바로 들어갑니다(«검토 대기»).</p>'; return; }
     var nPick = INB_ROWS.filter(function (r) { return IPICK[r.id]; }).length;
     var allOn = INB_ROWS.every(function (r) { return !!IPICK[r.id]; }) ? ' checked' : '';
-    var h = '<div class="bar" style="margin-top:8px"><b>🗂 자동 정리함 ' + INB_ROWS.length + '건</b><span class="hint">넣을 것을 고르세요 — 넣은 것만 재직 직원 모두가 봅니다</span><span class="sp"></span>' +
+    var h = '<div class="bar" style="margin-top:8px"><b>🗂 남긴 것 ' + INB_ROWS.length + '건</b><span class="hint">자동으로 넣지 않은 첨부 — 메일에서 열어 확인한 뒤에만 고르세요(넣으면 재직 직원 모두가 봅니다)</span><span class="sp"></span>' +
       '<button class="pri" id="mInbImp"' + (nPick ? '' : ' disabled') + '>고른 ' + nPick + '건 자료함에 넣기</button></div>' +
       '<div class="prog" id="mInbProg" style="display:none"><i></i></div>' +
       '<label class="phone-only hint" style="margin:6px 0"><input type="checkbox" id="mInbAllP"' + allOn + '> 보이는 줄 모두 고르기</label>' +
       '<table class="lst ml" style="margin-top:6px"><thead><tr><th class="ck"><input type="checkbox" id="mInbAll"' + allOn + ' title="보이는 줄 모두 고르기" aria-label="자동 정리함 보이는 줄 모두 고르기"></th><th class="no">№</th>' +
-      '<th class="dt">메일 날짜</th><th class="tt">자동 정리 내용</th><th class="att">첨부</th><th class="ct">추정 종류</th><th class="st">강의일(추정)</th></tr></thead><tbody>';
+      '<th class="dt">메일 날짜</th><th class="tt">남긴 까닭·내용</th><th class="att">첨부</th><th class="ct">추정 종류</th><th class="st">강의일(추정)</th></tr></thead><tbody>';
     INB_ROWS.forEach(function (r, i) {
       var on = !!IPICK[r.id];
       h += '<tr' + (on ? ' class="picked"' : '') + '><td class="ck"><input type="checkbox" aria-label="' + esc(r.att) + ' 고르기" data-ipick="' + esc(r.id) + '"' + (on ? ' checked' : '') + '></td>' +
         '<td class="no">' + (i + 1) + '</td><td class="dt">' + esc(ymd(r.d)) + '</td>' +
-        '<td class="tt" title="' + esc(r.summary || '(내용 없음)') + '">' + esc(r.summary || '—') + '</td>' +
+        '<td class="tt" title="' + esc(r.hold ? (HOLD_WHY[r.hold] || r.hold) + ' — 자동으로 넣지 않았습니다' : (r.summary || '(내용 없음)')) + '">' +
+          (r.hold ? '<span class="one"><span class="tag pii">남김</span><span>' + esc(HOLD_WHY[r.hold] || r.hold) + '</span></span>' : esc(r.summary || '—')) + '</td>' +
         '<td class="att" title="' + esc(r.att + (r.s ? ' — 메일: ' + r.s : '')) + '">' + esc(r.att) + '</td>' +
         '<td class="ct">' + esc(catLabel(r.cat)) + '</td>' +
         '<td class="st"><span class="one">' + (r.state === 'err' ? '<span class="tag pii" title="' + esc(r.err) + '">못 함</span>' : '') + '<span>' + esc(r.lectureDate || '—') + '</span></span></td></tr>';
@@ -1461,28 +1489,351 @@
     drawInbox();
     if (!s.lastRunAt) { $('mAutoSt').textContent = '아직 한 번도 돌지 않았습니다'; return; }
     var k = s.skipped || {};
-    var bits = ['마지막 ' + fmtTime(s.lastRunAt) + (s.trigger === 'manual' ? '(손으로)' : ''), '새로 정리 ' + (+s.queued || 0) + '건'];
+    var bits = ['마지막 ' + fmtTime(s.lastRunAt) + (s.trigger === 'manual' ? '(손으로)' : '')];
+    /* 2026-11-27 부터 서버가 바로 저장한다(saved) — 그 전 판 상태(queued 만)도 읽는다 */
+    if (s.saved != null) {
+      bits.push('자료함에 저장 ' + (+s.saved || 0) + '건');
+      if (s.unchecked) bits.push('내용 확인 못 함 ' + s.unchecked);
+      if (s.held) bits.push('남김 ' + s.held);
+      if (s.lectures) bits.push('강의 이력 ' + s.lectures);
+    } else bits.push('새로 정리 ' + (+s.queued || 0) + '건');
     if (k.same) bits.push('이미 있음 ' + k.same);
-    if (k.pii) bits.push('개인정보로 뺌 ' + k.pii);
+    if (k.pii) bits.push('개인정보로 뺌·남김 ' + k.pii);
     if (k.big) bits.push('너무 큼 ' + k.big);
     if (k.human) bits.push('사람 확인 필요 ' + k.human);
     if (k.err) bits.push('못 함 ' + k.err);
     $('mAutoSt').textContent = bits.join(' · ');
-    $('mAutoSt').title = '사람 확인 필요 = 옛 형식(ppt·hwp)·압축·글자 없는 PDF — 아래 «메일함 전체 훑기»로 골라 가져오세요';
+    $('mAutoSt').title = '내용 확인 못 함 = 옛 형식(ppt·hwp)·압축·글자 없는 PDF — 저장은 했고 자료에 «내용 확인 못 함» 꼬리표가 붙습니다';
   }
   function runSweep() {
     var days = +$('mAutoDays').value || 30;
-    if (!window.confirm('최근 ' + days + '일 보낸 메일의 강의자료를 지금 정리할까요?\n· 메일은 읽기만 합니다 · 정리한 것은 «자동 정리함»에 쌓이고, 자료함에는 고른 것만 넣습니다 · 몇 분 걸릴 수 있습니다')) return;
+    if (!window.confirm('최근 ' + days + '일 보낸 메일의 강의자료를 지금 자료함에 넣을까요?\n· 메일은 읽기만 합니다 · 강의자료는 «검토 대기»로 바로 들어가 재직 직원 모두가 봅니다\n· 명단·서류 이름·주민번호 꼴이 보이는 것은 넣지 않고 아래 «남긴 것»에 둡니다 · 캘린더 일정과 맞춰 강의 이력(추정)도 적습니다\n· 몇 분 걸릴 수 있습니다')) return;
     $('mAutoRun').disabled = true; $('mAutoRun').textContent = '정리 중…';
     callFn('runEdulibMailSweep', { days: days }).then(function (j) {
       var r = j.result || {};
-      toast('메일 자동 정리 — 새로 정리 ' + (+r.queued || 0) + '건(자동 정리함)' + (r.more ? ' · 남은 것은 다음에 이어서' : ''), 8000);
+      toast(r.saved != null ? '메일 자동 저장 — 자료함에 ' + (+r.saved || 0) + '건' + (r.held ? ' · 남김 ' + r.held + '건' : '') + (r.lectures ? ' · 강의 이력 ' + r.lectures + '건' : '') + (r.more ? ' · 남은 것은 다음에 이어서' : '')
+        : '메일 자동 정리 — 새로 정리 ' + (+r.queued || 0) + '건(자동 정리함)' + (r.more ? ' · 남은 것은 다음에 이어서' : ''), 8000);
     }).catch(function (e) { toast('정리하지 못했습니다 — ' + errMsg(e), 8000); })
       .then(function () { $('mAutoRun').disabled = false; $('mAutoRun').textContent = '지금 정리'; });
   }
 
+  /* ───────── 🗓 강의 이력 (대표 지시 2026-11-27 「특정 일에 누가 강의를 했다, 어디서 강의를 한지 … 누가 언제 강의했는지만 간략하게
+     어떤 강의 내용으로 체크하게 해달라. 그리고 어떤 강의인지 그 관련돼서는 캘린더에서도 찾아도 된다」 → 대표 선택 «추정으로 두고 확인») ─────────
+     ★ 강의 한 번 = edulib/lectures/{id}(EduLecture — 셈은 js/pu-edulib-lecture.js). 서버 메일 자동 저장·관리자 «캘린더에서 가져오기»가
+       만든 것은 «추정» — 무엇을 보고 짐작했는지(캘린더 일정·메일 제목)를 함께 보여 주고, 사람이 «확인»을 누른다.
+     ★ 강의자는 사번 — 고르는 목록은 재직 직원만(명부 status). 일정 글에 직원 이름이 보이면 «고르기 단추»로만 내민다(저절로 넣지 않는다).
+     ★ 장소는 글 — 사업장 열쇠(companyId)를 이름으로 짐작해 넣지 않는다.
+     ★ 지우기는 휴지통(_deleted)만 · 사람이 확인한 기록은 서버·일괄 가져오기가 다시 고치지 않는다(L.linkItem). */
+  var LECTS = {}, LPICK = {}, LF = { q: '', st: '', year: '', trash: false }, LRENDER = [], LDETAIL = '', LNEW_ITEMS = [], LSHOWN = PAGE, LCALRUN = null;
+  var GUESS_WHY = { cal: '캘린더 일정의 날짜', mail: '메일 보낸 날 — 강의일과 다를 수 있습니다', name: '파일 이름의 날짜',
+    'cal-creator': '캘린더 일정을 만든 사람(관리자가 이어 둔 메일)', 'cal-location': '캘린더 일정의 장소', 'cal-summary': '캘린더 일정 제목의 첫 낱말' };
+  function lectRef(id) { return fbDb.ref('edulib/lectures/' + id); }
+  function lectList() { return Object.keys(LECTS).map(function (k) { return LECTS[k]; }); }
+  function lectWho(r) { return r && r.lecturerSid ? (NAMES[r.lecturerSid] || '직원') : ''; }
+  function lectSrc(r) { return r.cal ? '🗓 캘린더' : r.mail ? '✉ 메일' : '✍ 직접'; }
+  function lectItems(r) { return L.itemIdsOf(r).filter(function (id) { return ITEMS[id]; }); }
+  /* 짐작한 칸 — 아직 «추정»이고 그 칸을 사람이 고치지 않았을 때만 «추정» 꼬리표 */
+  function lectGuess(r, k) { var g = r && r.status === 'auto' && r.guess ? r.guess[k] : ''; return GUESS_WHY[g] ? g : ''; }
+  function lectEst(r, k) { var g = lectGuess(r, k); return g ? '<span class="tag est" title="' + esc('추정 — ' + GUESS_WHY[g]) + '">추정</span>' : ''; }
+  function lectStatusTag(r) {
+    return r.status === 'ok' ? '<span class="tag ok" title="' + esc((r.confirmedBy ? nameOf(r.confirmedBy) + ' 확인' : '확인') + (r.confirmedAt ? ' · ' + fmtTime(r.confirmedAt) : '')) + '">확인</span>'
+      : '<span class="tag review" title="저절로 채운 기록 — 근거를 보고 «확인»을 눌러 주세요">추정</span>';
+  }
+  function lectVisible() {
+    var q = LF.q.trim().toLowerCase();
+    var arr = lectList().filter(function (r) { return LF.trash ? !!r._deleted : !r._deleted; });
+    if (LF.st) arr = arr.filter(function (r) { return r.status === LF.st; });
+    if (LF.year) arr = arr.filter(function (r) { return LF.year === 'none' ? !r.date : String(r.date || '').slice(0, 4) === LF.year; });
+    if (q) arr = arr.filter(function (r) {
+      return [r.title, r.venue, lectWho(r), r.note, catLabel(r.cat), r.cal && r.cal.summary, r.cal && r.cal.location, r.mail && r.mail.subject].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    return L.sortLectures(arr);
+  }
+  function fillLectYears() {
+    var ys = {}; L.live(lectList()).forEach(function (r) { ys[String(r.date || '').slice(0, 4) || 'none'] = 1; });
+    var keys = Object.keys(ys).sort(function (a, b) { if (a === 'none') return 1; if (b === 'none') return -1; return a < b ? 1 : -1; });
+    if (LF.year && !ys[LF.year]) keys.unshift(LF.year);
+    $('lYear').innerHTML = '<option value="">연도 전체</option>' + keys.map(function (y) { return '<option value="' + esc(y) + '"' + (y === LF.year ? ' selected' : '') + '>' + (y === 'none' ? '날짜 모름' : esc(y) + '년') + '</option>'; }).join('');
+  }
+  function drawLect() {
+    fillLectYears();
+    $('lCal').style.display = ME.admin ? '' : 'none';
+    var rows = lectVisible();
+    var all = L.live(lectList());
+    var nAuto = all.filter(function (r) { return r.status === 'auto'; }).length;
+    $('lInfo').textContent = '강의 ' + all.length + '건' + (nAuto ? ' · 확인 필요(추정) ' + nAuto + '건' : '');
+    LRENDER = [];
+    if (!rows.length) {
+      $('lecList').innerHTML = '<div class="empty">' + (LF.trash ? '휴지통이 비었습니다.' : (LF.q || LF.st || LF.year) ? '거르개에 맞는 강의 이력이 없습니다.'
+        : '아직 강의 이력이 없습니다 — 보낸 메일의 강의자료를 저녁마다 자료함에 넣으면서 함께 채웁니다' + (ME.admin ? ' · 지난 강의는 «캘린더에서 가져오기»로 한 번에 채울 수 있습니다' : '') + '.') + '</div>';
+      drawLSel(); return;
+    }
+    var shown = rows.slice(0, LSHOWN);
+    shown.forEach(function (r) { LRENDER.push(r.id); });
+    var allOn = LRENDER.every(function (id) { return !!LPICK[id]; });
+    var h = '<label class="phone-only hint" style="margin:2px 0 6px"><input type="checkbox" data-lallv' + (allOn ? ' checked' : '') + '> 보이는 ' + LRENDER.length + '줄 모두 고르기</label>' +
+      '<table class="lst lec"><thead><tr><th class="ck"><input type="checkbox" data-lall title="보이는 줄 모두 고르기" aria-label="강의 이력 보이는 줄 모두 고르기"' + (allOn ? ' checked' : '') + '></th><th class="no">№</th>' +
+      '<th class="dt">날짜</th><th class="who">강의자</th><th class="vn">장소</th><th class="tt">강의 내용</th><th class="fm">자료</th><th class="st">근거·상태</th><th class="ac"></th></tr></thead><tbody>';
+    shown.forEach(function (r, i) {
+      var on = !!LPICK[r.id];
+      var nIt = lectItems(r).length;
+      var when = (r.date || '') + (r.time ? ' ' + r.time : '');
+      var who = lectWho(r);
+      var tip = [r.title, r.cal && r.cal.summary ? '일정: ' + r.cal.summary : '', r.mail && r.mail.subject ? '메일: ' + r.mail.subject : '', r.note].filter(Boolean).join(' · ');
+      h += '<tr data-lid="' + esc(r.id) + '"' + (on ? ' class="picked"' : '') + '>' +
+        '<td class="ck"><input type="checkbox" aria-label="' + esc((r.date || '') + ' ' + (r.title || '강의')) + ' 고르기" data-lpick="' + esc(r.id) + '"' + (on ? ' checked' : '') + '></td>' +
+        '<td class="no">' + (i + 1) + '</td>' +
+        '<td class="dt"><span class="one"><span>' + esc(when || '모름') + '</span>' + lectEst(r, 'date') + '</span></td>' +
+        '<td class="who"><span class="one"><span title="' + esc(who || '강의자 모름') + '">' + esc(who || '—') + '</span>' + lectEst(r, 'lecturer') + '</span></td>' +
+        '<td class="vn"><span class="one"><span title="' + esc(r.venue || '') + '">' + esc(r.venue || '—') + '</span>' + lectEst(r, 'venue') + '</span></td>' +
+        '<td class="tt"><span class="one"><button type="button" class="ttl" data-lopen="' + esc(r.id) + '" title="' + esc(tip || '강의 내용') + '">' + esc(r.title || '(강의 내용 없음)') + '</button></span></td>' +
+        '<td class="fm" title="' + esc(nIt ? '이 강의에 쓴 자료 ' + nIt + '건' : '이은 자료 없음') + '">' + (nIt ? '📎 ' + nIt : '—') + '</td>' +
+        '<td class="st"><span class="one">' + lectStatusTag(r) + '<span>' + esc(lectSrc(r)) + '</span></span></td>' +
+        '<td class="ac">' + (r._deleted ? '<span class="hint">' + esc(ymd(r.deletedAt)) + ' 지움</span>' : '<button class="sm" data-lopen="' + esc(r.id) + '" title="근거 보기·고치기·확인">✎</button>') + '</td>' +
+        '<td class="meta"><span class="one"><span>' + esc([when || '날짜 모름', who || '강의자 모름', r.venue || '장소 모름'].join(' · ') + (nIt ? ' · 📎' + nIt : '')) + '</span>' + lectStatusTag(r) + '</span></td>' +
+        '</tr>';
+    });
+    h += '</tbody></table>';
+    if (rows.length > LSHOWN) h += '<button class="more" id="lMore">더 보기 (' + (rows.length - LSHOWN) + '건 남음)</button>';
+    $('lecList').innerHTML = h;
+    drawLSel();
+  }
+  function lpicked() { return Object.keys(LPICK).filter(function (id) { return LPICK[id] && LECTS[id]; }); }
+  function drawLSel() {
+    var ids = lpicked();
+    $('lSelbar').classList.toggle('on', ids.length > 0);
+    $('lSelN').textContent = ids.length + '건 선택';
+    $('lRestore').style.display = LF.trash ? '' : 'none';
+    ['lOkAll', 'lDelAll'].forEach(function (b) { $(b).style.display = LF.trash ? 'none' : ''; });
+    var hd = document.querySelector('#lecList [data-lall]'), av = document.querySelector('#lecList [data-lallv]');
+    var allOn = LRENDER.length > 0 && LRENDER.every(function (id) { return !!LPICK[id]; });
+    if (hd) hd.checked = allOn; if (av) av.checked = allOn;
+  }
+  /* 재직 직원(명부 status) — 강의자 고르는 목록은 «현직만» */
+  function activePeople() {
+    return PEOPLE.filter(function (p) { return p.status === 'active' || !p.status; })
+      .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+  function openLect(id, pre) {
+    var r = id ? LECTS[id] : null; if (id && !r) return;
+    closeFrames($('mbox'));
+    DETAIL = ''; LDETAIL = id || '';
+    LNEW_ITEMS = id ? [] : ((pre && pre.itemIds) || []).slice(0, L.MAX.items);
+    var base = r || L.makeLecture(Object.assign({ status: 'ok' }, pre || {}), { uid: ME.sid });
+    var ppl = activePeople();
+    var whoOpts = '<option value="">모름·외부 강사</option>' + ppl.map(function (p) { return '<option value="' + esc(p.sid) + '"' + (p.sid === base.lecturerSid ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') +
+      (base.lecturerSid && !ppl.some(function (p) { return p.sid === base.lecturerSid; }) ? '<option value="' + esc(base.lecturerSid) + '" selected>' + esc(lectWho(base)) + ' (지금 재직 명부에 없음)</option>' : '');
+    var catOpts = C.CATS.map(function (c) { return '<option value="' + esc(c.key) + '"' + (c.key === base.cat ? ' selected' : '') + '>' + esc(c.label) + (c.legal ? ' (법정)' : '') + '</option>'; }).join('');
+    /* 일정 글에 보이는 직원 이름 — 고르기 단추로만(누르는 것은 사람) */
+    var hints = r && r.cal && !r.lecturerSid ? L.namesInText((r.cal.summary || '') + ' ' + (r.cal.location || ''), ppl) : [];
+    var its = (r ? L.itemIdsOf(r) : LNEW_ITEMS).map(function (iid) { return ITEMS[iid] ? ITEMS[iid] : { id: iid, title: '(찾지 못한 자료)', _missing: true }; });
+    var g = (r && r.guess) || {};
+    var ev = '';
+    if (r) {
+      if (r.cal) ev += kv('캘린더 일정', [r.cal.date, r.cal.time, r.cal.summary].filter(Boolean).join(' ')) + (r.cal.location ? kv('일정 장소', r.cal.location) : '');
+      if (r.mail) ev += kv('메일', (r.mail.subject || '') + (r.mail.date ? ' (' + r.mail.date + ')' : ''));
+      var gs = ['date', 'lecturer', 'venue'].map(function (k) { return GUESS_WHY[g[k]] ? ({ date: '날짜', lecturer: '강의자', venue: '장소' })[k] + ' ← ' + GUESS_WHY[g[k]] : ''; }).filter(Boolean);
+      if (gs.length) ev += kv('짐작한 것', gs.join(' · '));
+      ev += kv('적은 사람', nameOf(r.createdBy) + ' · ' + fmtTime(r.createdAt));
+      if (r.status === 'ok' && r.confirmedBy) ev += kv('확인', nameOf(r.confirmedBy) + ' · ' + fmtTime(r.confirmedAt));
+    }
+    $('mbox').innerHTML = '<div class="mhead"><h3 title="' + esc(base.title || '강의 이력') + '">🗓 ' + esc(r ? (base.title || '강의 이력') : '새 강의 기록') + '</h3>' + (r ? lectStatusTag(r) : '') +
+      '<span class="sp"></span><button class="sm" id="dX">닫기</button></div>' +
+      '<div style="padding:14px"><div class="form">' +
+      '<label for="lDate">날짜</label><span class="one" style="display:flex;gap:6px;min-width:0"><input type="date" id="lDate" value="' + esc(base.date) + '" style="flex:1;min-width:0">' +
+      '<input type="time" id="lTime" value="' + esc(base.time) + '" aria-label="시각" style="flex:0 0 auto"></span>' +
+      '<label for="lWho">강의자</label><select id="lWho">' + whoOpts + '</select>' +
+      (hints.length ? '<span></span><span class="hint" style="white-space:normal">일정 글에 보이는 이름: ' + hints.map(function (p) { return '<button type="button" class="sm" data-lwho="' + esc(p.sid) + '">' + esc(p.name) + ' 고르기</button>'; }).join(' ') + '</span>' : '') +
+      '<label for="lVenue">장소</label><input type="text" id="lVenue" maxlength="' + L.MAX.venue + '" value="' + esc(base.venue) + '" placeholder="강의한 곳(사업장·기관)">' +
+      '<label for="lTitle">강의 내용</label><input type="text" id="lTitle" maxlength="' + L.MAX.title + '" value="' + esc(base.title) + '" placeholder="예) 직장 내 괴롭힘 예방교육 2시간">' +
+      '<label for="lCat">강의 종류</label><select id="lCat">' + catOpts + '</select>' +
+      '<label for="lNote">메모</label><input type="text" id="lNote" maxlength="' + L.MAX.note + '" value="' + esc(base.note) + '">' +
+      '</div>' +
+      (r && r.status === 'auto' ? '<p class="hint" style="margin:8px 0 0;white-space:normal">저절로 채운 «추정» 기록입니다 — 아래 근거를 보고 맞으면 «✔ 확인», 다르면 고친 뒤 «✔ 확인»을 눌러 주세요. 강의가 아니면 휴지통으로 옮기세요.</p>' : '') +
+      (ev ? '<div style="margin-top:10px">' + ev + '</div>' : '') +
+      '<div class="sec" style="font-size:13px;margin-top:10px">쓴 자료 <span class="hint">' + its.length + '건</span></div>' +
+      (its.length ? '<div class="lecits">' + its.map(function (it) {
+        return '<div class="one" style="display:flex;gap:6px;align-items:center;min-width:0">' +
+          (it._missing ? '<span class="hint">' + esc(it.title) + '</span>' : '<button type="button" class="ttl" data-lopenitem="' + esc(it.id) + '" title="' + esc(it.fileName || it.title) + '">' + esc(it.title) + '</button>' +
+            '<span class="hint" style="flex:0 0 auto">' + esc(it.lectureDate || '') + (it._deleted ? ' · 휴지통' : '') + '</span>') + '</div>';
+      }).join('') + '</div>' : '<p class="hint" style="margin:4px 0 0">이은 자료가 없습니다 — 자료의 자세히에서 «＋ 이 자료로 강의 기록»을 누르면 이어집니다.</p>') +
+      '</div>' +
+      '<div class="mfoot">' +
+      (r && r._deleted ? '<span class="tag old">' + esc(ymd(r.deletedAt)) + ' ' + esc(nameOf(r.deletedBy)) + ' 지움</span><span class="sp"></span><button id="dCancel">닫기</button><button class="pri" id="lRestoreOne">↩ 되살리기</button>'
+        : (r ? '<button class="dng" id="lDel">🗑 휴지통으로</button>' : '') + '<span class="sp"></span><button id="dCancel">닫기</button>' +
+          (r && r.status === 'auto' ? '<button id="lSave">저장</button><button class="pri" id="lOk">✔ 확인</button>' : '<button class="pri" id="lSave">저장</button>')) + '</div>';
+    openModal(r ? '강의 이력 — ' + (base.title || base.date || '') : '새 강의 기록', r && r._deleted ? 'dX' : 'lDate');
+  }
+  /* 사람이 고친 칸은 «짐작» 표시를 걷는다 — 다시 «추정» 꼬리표가 붙지 않게 */
+  var GUESS_OF = { date: 'date', lecturerSid: 'lecturer', venue: 'venue' };
+  function saveLect(confirm) {
+    var id = LDETAIL;
+    var ch = { date: $('lDate').value, time: $('lTime').value, lecturerSid: $('lWho').value, venue: $('lVenue').value, title: $('lTitle').value, cat: $('lCat').value, note: $('lNote').value };
+    if (ch.date && !L.okYmd(ch.date)) { toast('날짜를 골라 주세요'); return; }
+    var btn = $(confirm ? 'lOk' : 'lSave'); if (btn) btn.disabled = true;
+    var p;
+    if (!id) {
+      if (!ch.date && !ch.title.trim()) { toast('날짜나 강의 내용을 적어 주세요'); if (btn) btn.disabled = false; return; }
+      var rec = L.makeLecture(Object.assign({}, ch, { status: 'ok', itemIds: LNEW_ITEMS, guess: {} }), { uid: ME.sid });
+      rec.confirmedBy = ME.sid; rec.confirmedAt = Date.now();
+      p = gate.save(lectRef(rec.id), rec, { entityType: L.ENTITY, expectedRevision: -1 }).then(function () { return '적었습니다'; });
+    } else {
+      var cur = LECTS[id];
+      if (!ch.date && !ch.title.trim()) { toast('날짜나 강의 내용을 적어 주세요(둘 다 비울 수는 없습니다)'); if (btn) btn.disabled = false; return; }
+      var pt = L.patchOf(cur, ch) || {};
+      if (confirm && cur.status !== 'ok') pt.status = 'ok';
+      if (!Object.keys(pt).length) { toast('바뀐 것이 없습니다'); closeDetail(); return; }
+      p = gate.save(lectRef(id), function (prev) {
+        var next = Object.assign({}, prev || cur);
+        Object.keys(pt).forEach(function (k) { next[k] = pt[k]; });
+        var gg = Object.assign({ date: '', lecturer: '', venue: '', score: 0 }, next.guess || {});
+        Object.keys(GUESS_OF).forEach(function (k) { if (k in pt) gg[GUESS_OF[k]] = 'manual'; });
+        next.guess = gg;
+        if (pt.status === 'ok') { next.confirmedBy = ME.sid; next.confirmedAt = Date.now(); }
+        return next;
+      }, { entityType: L.ENTITY }).then(function () { return pt.status === 'ok' ? '확인했습니다' : '저장했습니다'; });
+    }
+    p.then(function (msg) { toast(msg); closeDetail(); }, function (e) { if (btn) btn.disabled = false; toast('저장하지 못했습니다 — ' + errMsg(e), 7000); });
+  }
+  function confirmLect(id) {
+    var cur = LECTS[id]; if (!cur || cur._deleted || cur.status === 'ok') return Promise.resolve();
+    return gate.save(lectRef(id), function (prev) {
+      var next = Object.assign({}, prev || cur);
+      next.status = 'ok'; next.confirmedBy = ME.sid; next.confirmedAt = Date.now();
+      return next;
+    }, { entityType: L.ENTITY });
+  }
+  function trashLect(id) { var cur = LECTS[id]; if (!cur) return Promise.resolve(); return gate.remove(lectRef(id), cur, { entityType: L.ENTITY }); }
+  function restoreLect(id) {
+    var cur = LECTS[id]; if (!cur) return Promise.resolve();
+    return gate.save(lectRef(id), function (prev) { var next = Object.assign({}, prev || cur); delete next._deleted; delete next.deletedAt; delete next.deletedBy; return next; }, { entityType: L.ENTITY });
+  }
+  function lbulk(ids, label, fn) {
+    if (!ids.length) return;
+    if (!window.confirm(ids.length + '건을 ' + label + ' 할까요?')) return;
+    var ok = 0, bad = 0;
+    return ids.reduce(function (p, id) {
+      return p.then(function () { return fn(id).then(function () { ok++; }, function () { bad++; }); });
+    }, Promise.resolve()).then(function () {
+      LPICK = {};
+      toast(label + ' — ' + ok + '건' + (bad ? ' · 못 한 것 ' + bad + '건' : ''));
+      drawLect();
+    });
+  }
+  /* 자료 자세히의 «이 자료로 한 강의» 칸 */
+  function drawItemLects() {
+    var box = $('dLec'); if (!box || !DETAIL) return;
+    var it = ITEMS[DETAIL]; if (!it) return;
+    var ls = L.lecturesOfItem(DETAIL, lectList());
+    box.innerHTML = '<div class="sec" style="font-size:13px">🗓 이 자료로 한 강의 <span class="hint">' + (ls.length ? ls.length + '번' : '아직 없음') + '</span></div>' +
+      ls.slice(0, 8).map(function (r) {
+        return '<div class="one" style="display:flex;gap:6px;align-items:center;min-width:0"><button type="button" class="ttl" data-lopen="' + esc(r.id) + '" title="' + esc(r.title || '') + '">' +
+          esc([r.date || '날짜 모름', lectWho(r) || '강의자 모름', r.venue || ''].filter(Boolean).join(' · ')) + '</button>' + lectStatusTag(r) + '</div>';
+      }).join('') +
+      (it._deleted ? '' : '<div class="bar" style="margin-top:4px"><span class="sp"></span><button class="sm" data-lnewfor="' + esc(DETAIL) + '">＋ 이 자료로 강의 기록</button></div>');
+  }
+  /* 관리자 — 캘린더 보관함(2017~)의 강의·교육 일정을 «추정» 강의 이력으로 한 번에(대표 선택 «관리자 단추로 가져오기»).
+     열쇠가 일정 id 에서 정해져 몇 번 눌러도 겹치지 않는다. 이미 있는 기록은 새로 쓰지 않고, 자료 잇기도 «추정» 기록에만 한다. */
+  function importCalendar() {
+    if (!ME.admin) return;
+    if (LCALRUN) { LCALRUN.stop = true; $('lCal').disabled = true; return; }
+    var from = window.prompt('몇 년 일정부터 가져올까요? (캘린더 보관함은 2017년부터 있습니다)', '2017');
+    if (from == null) return;
+    from = String(from).trim();
+    if (!/^20\d{2}$/.test(from)) { toast('네 자리 연도로 적어 주세요(예: 2017)'); return; }
+    toast('캘린더 보관함을 읽는 중…', 8000);
+    Promise.all([fbDb.ref('data/gcal_archive').orderByChild('date').startAt(from + '-01-01').once('value'), fbDb.ref('data/gcal_mail_sid').once('value')]).then(function (rs) {
+      var v = rs[0].val() || {}, mailMap = rs[1].val() || {};
+      var evs = Object.keys(v).map(function (k) { return v[k]; }).filter(L.isLectureEvent);
+      var links = {};
+      K.live(list()).forEach(function (it) { var m = L.matchEvent(evs, L.ctxOfItem(it)); if (m) (links[m.ev.id] = links[m.ev.id] || []).push(it.id); });
+      var fresh = evs.filter(function (ev) { return !LECTS[L.idOfCal(ev.id)]; });
+      var relink = Object.keys(links).filter(function (eid) {
+        var cur = LECTS[L.idOfCal(eid)];
+        return cur && !cur._deleted && cur.status === 'auto' && links[eid].some(function (iid) { return !(cur.itemIds || {})[iid]; });
+      });
+      /* 메일로만 짐작했던 «추정» 기록(lec_m…) 가운데 그 자료가 모두 캘린더 강의에 이어지는 것 — 같은 강의가 두 줄이 되지 않게 휴지통으로(되살릴 수 있다) */
+      var calItems = {};
+      Object.keys(links).forEach(function (eid) { links[eid].forEach(function (iid) { calItems[iid] = 1; }); });
+      var merged = L.live(lectList()).filter(function (r) {
+        if (r.status !== 'auto' || r.cal || !/^lec_m/.test(r.id)) return false;
+        var ids = L.itemIdsOf(r);
+        return ids.length > 0 && ids.every(function (iid) { return calItems[iid]; });
+      });
+      if (!fresh.length && !relink.length && !merged.length) { toast('새로 가져올 강의 일정이 없습니다 — 캘린더의 강의·교육 일정 ' + evs.length + '건이 모두 들어 있습니다', 8000); return; }
+      if (!window.confirm('캘린더 보관함(' + from + '년~)에서 강의·교육 일정 ' + evs.length + '건을 찾았습니다.\n' +
+        '· 새로 «추정» 강의 이력으로 적을 것 ' + fresh.length + '건' + (relink.length ? ' · 자료를 이어 줄 것 ' + relink.length + '건' : '') + '\n' +
+        (merged.length ? '· 메일로만 짐작했던 추정 기록 ' + merged.length + '건은 같은 자료의 캘린더 기록이 생겨 휴지통으로 옮깁니다(되살릴 수 있음)\n' : '') +
+        '· 강의자는 일정을 만든 사람(관리자가 이어 둔 메일)으로만 채우고, 장소는 일정의 장소 글을 씁니다\n' +
+        '· 이미 있는 기록·사람이 확인한 기록은 고치지 않습니다 · «수강»·교육청·휴가 같은 일정은 뺐습니다\n가져올까요?')) return;
+      var jobs = fresh.map(function (ev) { return { kind: 'new', ev: ev }; }).concat(relink.map(function (eid) { return { kind: 'link', eid: eid }; }))
+        .concat(merged.map(function (r) { return { kind: 'merge', id: r.id }; }));
+      var run = LCALRUN = { stop: false };
+      var done = 0, skip = 0, bad = 0;
+      var bar = $('lProg'), fill = bar.firstElementChild;
+      bar.style.display = ''; $('lCal').innerHTML = '■<span class="wide-only"> 멈추기</span>';
+      return jobs.reduce(function (p, j, i) {
+        return p.then(function () {
+          if (run.stop) return;
+          var w;
+          if (j.kind === 'new') {
+            var rec = L.fromEvent(j.ev, { mailMap: mailMap, itemIds: links[j.ev.id] || [], who: { uid: ME.sid }, now: Date.now() });
+            w = gate.save(lectRef(rec.id), rec, { entityType: L.ENTITY, expectedRevision: -1 });
+          } else if (j.kind === 'merge') {
+            var mr = LECTS[j.id];
+            w = mr && !mr._deleted && mr.status === 'auto' ? gate.remove(lectRef(j.id), mr, { entityType: L.ENTITY }) : Promise.resolve();
+          } else {
+            var lid = L.idOfCal(j.eid);
+            w = gate.save(lectRef(lid), function (prev) {
+              var nx = prev || LECTS[lid];
+              links[j.eid].forEach(function (iid) { nx = L.linkItem(nx, iid, { uid: ME.sid }, Date.now()) || nx; });
+              return nx;
+            }, { entityType: L.ENTITY });
+          }
+          return w.then(function () { done++; }, function (e) { if (/revision|먼저/.test(errMsg(e))) skip++; else bad++; })
+            .then(function () { fill.style.width = Math.round(((i + 1) / jobs.length) * 100) + '%'; });
+        });
+      }, Promise.resolve()).then(function () {
+        LCALRUN = null; bar.style.display = 'none'; $('lCal').disabled = false; $('lCal').innerHTML = '🗓<span class="wide-only"> 캘린더에서 가져오기</span>';
+        toast('캘린더에서 가져오기 — ' + done + '건' + (skip ? ' · 이미 있음 ' + skip : '') + (bad ? ' · 못 한 것 ' + bad : '') + (run.stop ? ' · 멈춤(다시 누르면 남은 것만)' : ''), 9000);
+        drawLect();
+      });
+    }).catch(function (e) {
+      LCALRUN = null; $('lCal').disabled = false; $('lProg').style.display = 'none';
+      $('lCal').innerHTML = '🗓<span class="wide-only"> 캘린더에서 가져오기</span>';
+      toast('캘린더에서 가져오지 못했습니다 — ' + errMsg(e), 8000);
+    });
+  }
+  function wireLect() {
+    var lq = null;
+    $('lQ').addEventListener('input', function () { clearTimeout(lq); lq = setTimeout(function () { LF.q = $('lQ').value; LSHOWN = PAGE; LPICK = {}; drawLect(); }, 200); });
+    $('lSt').addEventListener('change', function () { LF.st = $('lSt').value; LSHOWN = PAGE; LPICK = {}; drawLect(); });
+    $('lYear').addEventListener('change', function () { LF.year = $('lYear').value; LSHOWN = PAGE; LPICK = {}; drawLect(); });
+    $('lTrash').addEventListener('change', function () { LF.trash = $('lTrash').checked; LPICK = {}; drawLect(); });
+    $('lNew').addEventListener('click', function () { openLect('', {}); });
+    $('lCal').addEventListener('click', importCalendar);
+    $('lecList').addEventListener('change', function (e) {
+      var c = e.target;
+      if (c.hasAttribute('data-lpick')) { LPICK[c.getAttribute('data-lpick')] = c.checked; var rw = c.closest('[data-lid]'); if (rw) rw.classList.toggle('picked', c.checked); drawLSel(); }
+      else if (c.hasAttribute('data-lall') || c.hasAttribute('data-lallv')) { LRENDER.forEach(function (id) { LPICK[id] = c.checked; }); drawLect(); }
+    });
+    $('lecList').addEventListener('click', function (e) {
+      var o = e.target.closest('[data-lopen]'); if (o) { openLect(o.getAttribute('data-lopen')); return; }
+      if (e.target.id === 'lMore') { LSHOWN += PAGE; drawLect(); }
+    });
+    $('lClr').addEventListener('click', function () { LPICK = {}; drawLect(); });
+    $('lOkAll').addEventListener('click', function () {
+      var ids = lpicked().filter(function (id) { return LECTS[id].status !== 'ok'; });
+      if (!ids.length) { toast('고른 기록은 모두 이미 «확인»입니다'); return; }
+      lbulk(ids, '«확인»', confirmLect);
+    });
+    $('lDelAll').addEventListener('click', function () { lbulk(lpicked(), '휴지통으로', trashLect); });
+    $('lRestore').addEventListener('click', function () { lbulk(lpicked(), '되살리기', restoreLect); });
+  }
+
   /* ───────── 사건 연결 ───────── */
   function wire() {
+    wireLect();
     $('tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) setTab(b.getAttribute('data-tab')); });
     $('reBtn').addEventListener('click', function () { draw(); toast('최신 자료입니다(바뀌면 저절로 다시 그립니다)'); });
     /* 메뉴 위 이름 — 머리 칸(#who)과 같은 PuWhoami 에서, 이름이 늦게 와도 바뀌면 다시 쓴다 */
@@ -1500,6 +1851,7 @@
       }
       var b = e.target.closest('[data-sb],[data-sbcat],[data-sblegal]'); if (!b) return;
       if (b.getAttribute('data-sb') === 'dash') { setTab('dash'); return; }
+      if (b.getAttribute('data-sb') === 'lect') { setTab('lect'); return; }
       resetFilters();
       if (b.hasAttribute('data-sbcat')) F.cat = b.getAttribute('data-sbcat');
       else if (b.hasAttribute('data-sblegal')) F.legal = b.getAttribute('data-sblegal');
@@ -1580,6 +1932,16 @@
     $('modal').addEventListener('click', function (e) {
       if (e.target === $('modal')) { closeDetail(); return; }
       var so = e.target.closest('[data-simopen]'); if (so) { openDetail(so.getAttribute('data-simopen')); return; }
+      /* 강의 이력 — 자료 자세히의 «이 자료로 한 강의» ↔ 강의 이력 창의 «쓴 자료» */
+      var lo = e.target.closest('[data-lopen]'); if (lo) { openLect(lo.getAttribute('data-lopen')); return; }
+      var loi = e.target.closest('[data-lopenitem]'); if (loi) { openDetail(loi.getAttribute('data-lopenitem')); return; }
+      var lnf = e.target.closest('[data-lnewfor]');
+      if (lnf) {
+        var it0 = ITEMS[lnf.getAttribute('data-lnewfor')];
+        if (it0) openLect('', { itemIds: [it0.id], date: L.okYmd(it0.lectureDate) ? it0.lectureDate : '', title: it0.title, cat: it0.cat, venue: it0.venue });
+        return;
+      }
+      var lw = e.target.closest('[data-lwho]'); if (lw) { $('lWho').value = lw.getAttribute('data-lwho'); return; }
       var scm = e.target.closest('[data-simcmp]');
       if (scm) { var a0 = DETAIL, b0 = scm.getAttribute('data-simcmp'); closeDetail(); openCompare([a0, b0], '나란히 — 비슷한 강의'); return; }
       var id = e.target.id;
@@ -1592,6 +1954,10 @@
       else if (id === 'dWin') openWin(DETAIL);
       else if (id === 'dUp') detailUpload();
       else if (id === 'dRestore') { var rd = DETAIL; restoreItem(rd).then(function () { toast('되살렸습니다'); closeDetail(); }, function (er) { toast('되살리지 못했습니다 — ' + errMsg(er), 7000); }); }
+      else if (id === 'lSave') saveLect(false);
+      else if (id === 'lOk') saveLect(true);
+      else if (id === 'lDel') { var ld = LDETAIL; if (window.confirm('이 강의 이력을 휴지통으로 옮길까요? (자료는 그대로 둡니다 · 휴지통에서 되살릴 수 있습니다)')) trashLect(ld).then(function () { toast('휴지통으로 옮겼습니다'); closeDetail(); }, function (er) { toast('옮기지 못했습니다 — ' + errMsg(er), 7000); }); }
+      else if (id === 'lRestoreOne') { restoreLect(LDETAIL).then(function () { toast('되살렸습니다'); closeDetail(); }, function (er) { toast('되살리지 못했습니다 — ' + errMsg(er), 7000); }); }
       else if (id === 'dDel') { var d = DETAIL; if (window.confirm('휴지통으로 옮길까요? (원본은 지우지 않습니다 · 휴지통에서 되살릴 수 있습니다)')) trashItem(d).then(function () { toast('휴지통으로 옮겼습니다'); closeDetail(); }, function (er) { toast('옮기지 못했습니다 — ' + errMsg(er), 7000); }); }
     });
     $('cmpX').addEventListener('click', closeCompare);
@@ -1706,6 +2072,19 @@
     }, function () {});
     /* 내용 지문(비슷한 강의) — 바뀌면 목록 ↺ 셈을 비우고 다시 그린다(자세히가 열려 있으면 그 칸도) */
     var drawS = null;
+    /* 강의 이력 — 바뀌면 그 탭·왼쪽 메뉴 숫자·자료 자세히의 «이 자료로 한 강의»를 다시 그린다 */
+    var drawL = null;
+    fbDb.ref('edulib/lectures').on('value', function (s) {
+      var v = s.val() || {};
+      LECTS = {};
+      Object.keys(v).forEach(function (k) { var x = v[k]; if (x && typeof x === 'object' && x.id === k && x.entityType === L.ENTITY) LECTS[k] = x; });
+      clearTimeout(drawL); drawL = setTimeout(function () {
+        $('nLect').textContent = L.live(lectList()).length;
+        if (TAB === 'lect') drawLect();
+        drawSb();
+        if (DETAIL) drawItemLects();
+      }, 120);
+    }, function () {});
     fbDb.ref('edulib/sims').on('value', function (s) {
       var v = s.val() || {};
       SIMS = {};
@@ -1722,7 +2101,8 @@
     return fbDb.ref('data/user_dir').once('value').then(function (snap) {
       var v = snap.val(); if (v && v.v !== undefined) v = v.v;
       var arr = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []);
-      arr.forEach(function (r) { if (r && r.sid && r.name) NAMES[r.sid] = String(r.name); });
+      PEOPLE = [];
+      arr.forEach(function (r) { if (r && r.sid && r.name) { NAMES[r.sid] = String(r.name); PEOPLE.push({ sid: String(r.sid), name: String(r.name), status: String(r.status || '') }); } });
     }).catch(function () {});
   }
 
@@ -1740,7 +2120,7 @@
   function boot() {
     var m = location.search.match(/[?&]view=([^&]+)/);
     VIEW_ID = m ? decodeURIComponent(m[1]) : '';
-    var t = lsGet('tab'); if (['dash', 'list', 'add', 'mail'].indexOf(t) >= 0) TAB = t;
+    var t = lsGet('tab'); if (['dash', 'list', 'add', 'mail', 'lect'].indexOf(t) >= 0) TAB = t;
     var g = lsGet('group'); if (g === 'cat' || g === 'year' || g === '') GROUP = g;
     var vw = lsGet('view'); if (vw === 'card' || vw === 'table') VIEW = vw;
     if (location.protocol === 'file:') { lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }

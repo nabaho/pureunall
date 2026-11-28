@@ -64,7 +64,32 @@ const cats = { cat_seed1: { id: 'cat_seed1', entityType: 'EduCategory', schemaVe
 items.edu_mseed01 = Object.assign({}, items.edu_seed0002, { id: 'edu_mseed01', title: '보낸 메일로 들어온 점검 강의안', fileName: '보낸 메일로 들어온 점검 강의안.pptx',
   ext: 'pptx', kind: 'doc', store: 'cloud', storagePath: 'edulib/edu_mseed01/보낸 메일로 들어온 점검 강의안.pptx', status: 'review', dateFrom: 'mail', lectureDate: '2026-11-20',
   summary: '목차(12장): 점검 강의 시작 · 근로시간 기본 · 휴게시간 · 연차 계산 · 가나다라마바사아자차카타파하 아주 긴 목차 줄 — [메일] 로 문의',
-  source: { kind: 'mail', path: '', mailId: 'sent_seed/7001', mailSubject: '[점검상사] 강의자료 송부', mailDate: '2026-11-20', mtime: '' }, createdBy: 'AI-메일자동정리' });
+  source: { kind: 'mail', path: '', mailId: 'sent_seed/7001', mailSubject: '[점검상사] 강의자료 송부', mailDate: '2026-11-20', mtime: '' }, createdBy: 'AI-메일자동정리',
+  auto: { by: 'mail', at: T0, check: 'text', why: '' } });
+/* 2026-11-27 — 보낸 메일 자동 저장 가운데 «내용 확인 못 함»(옛 형식) 한 건 */
+items.edu_mseed02 = Object.assign({}, items.edu_mseed01, { id: 'edu_mseed02', title: '점검 옛 형식 성희롱 예방 강의안', fileName: '점검 옛 형식 성희롱 예방 강의안.ppt', ext: 'ppt',
+  cat: 'sexual', storagePath: 'edulib/edu_mseed02/점검 옛 형식 성희롱 예방 강의안.ppt', summary: '', lectureDate: '2026-11-18',
+  source: { kind: 'mail', path: '', mailId: 'sent_seed/7002', mailSubject: '[가나다상사] 성희롱 예방교육 자료', mailDate: '2026-11-18', mtime: '' },
+  auto: { by: 'mail', at: T0, check: 'none', why: 'old-format' } });
+/* 2026-11-27 — 강의 이력(지어낸 것): 캘린더와 맞춘 추정 · 메일만 있는 추정 · 사람이 확인한 것 · 직접 적은 것 · 휴지통 · 아주 긴 글 */
+const lectures = {};
+const lec = (id, o) => { lectures[id] = Object.assign({ id, entityType: 'EduLecture', schemaVersion: 3, contractVersion: 1, date: '', time: '', lecturerSid: '', venue: '', title: '', cat: 'etc', note: '',
+  itemIds: {}, status: 'auto', guess: { date: '', lecturer: '', venue: '', score: 0 }, createdAt: T0, updatedAt: T0, createdBy: 'AI-메일자동정리', updatedBy: 'AI-메일자동정리', revision: 1 }, o); };
+lec('lec_c0000000000000a01', { date: '2026-11-24', time: '14:00', lecturerSid: 'P002', venue: '점검상사 본사 3층 대회의실', title: '점검상사 근로시간·휴게 교육', cat: 'hours',
+  itemIds: { edu_mseed01: true }, guess: { date: 'cal', lecturer: 'cal-creator', venue: 'cal-location', score: 9 },
+  cal: { id: 'ev_seed1', summary: '점검상사 근로시간 교육 (점검노무)', location: '점검상사 본사 3층 대회의실', date: '2026-11-24', time: '14:00' },
+  mail: { id: 'sent_seed/7001', subject: '[점검상사] 강의자료 송부', date: '2026-11-20' } });
+lec('lec_m0000000000000b02', { date: '2026-11-18', title: '점검 옛 형식 성희롱 예방 강의안', cat: 'sexual', itemIds: { edu_mseed02: true }, guess: { date: 'mail', lecturer: '', venue: '', score: 0 },
+  mail: { id: 'sent_seed/7002', subject: '[가나다상사] 성희롱 예방교육 자료', date: '2026-11-18' } });
+lec('lec_c0000000000000c03', { date: '2026-10-07', time: '10:00', lecturerSid: 'P001', venue: '시험복지관', title: '장애인 인식개선 교육', cat: 'disability', status: 'ok',
+  itemIds: { edu_seed0002: true, edu_seed0014: true }, confirmedBy: 'P001', confirmedAt: T0 + 864e5, createdBy: 'P001', updatedBy: 'P001',
+  cal: { id: 'ev_seed3', summary: '시험복지관 장애인 인식개선 교육', location: '시험복지관', date: '2026-10-07', time: '10:00' } });
+lec('lec_h0seed0004', { date: '2026-09-15', lecturerSid: 'P003', venue: '라마바 산업', title: '현장실습생 노동인권 강의 가나다라마바사아자차카타파하 아주 긴 강의 내용 제목 줄', cat: 'youth', status: 'ok',
+  note: '질문 많았음 — 다음엔 사례 더하기', confirmedBy: 'P003', confirmedAt: T0, createdBy: 'P003', updatedBy: 'P003' });
+lec('lec_c0000000000000e05', { date: '2026-08-20', venue: '점검시청 가나다라마바사아자차카타파하 아주 긴 장소 이름', title: '점검시청 직장 내 괴롭힘 예방교육', cat: 'bullying',
+  guess: { date: 'cal', lecturer: '', venue: 'cal-summary', score: 0 }, cal: { id: 'ev_seed5', summary: '점검시청 직장 내 괴롭힘 예방교육(점검노무 강사)', location: '', date: '2026-08-20', time: '' } });
+lec('lec_c0000000000000f06', { date: '2026-07-01', title: '휴지통에 간 강의', _deleted: true, deletedAt: T0, deletedBy: 'P001',
+  cal: { id: 'ev_seed6', summary: '취소된 교육', location: '', date: '2026-07-01', time: '' } });
 /* 내용 지문(비슷한 강의) — 지어낸 숫자. 자료를 다 만든 «뒤»에 — 성희롱 예방 자료끼리 «고쳐 쓴 판»처럼 겹친다(앞 넷은 많이, 뒤로 갈수록 덜) */
 const sims = {};
 (function () {
@@ -75,27 +100,40 @@ const sims = {};
     sims[id] = { id, entityType: 'EduSimilarity', schemaVersion: 3, sourceId: id, v: 1, mh, n: 60, by: 'P001', createdAt: T0, updatedAt: T0 };
   });
 })();
-/* 자동 정리함(관리자만) — 서버가 정리해 둔 줄 두 개(지어낸 것). 넣기 전이라 자료함에는 없다 */
+/* 자동 정리함(관리자만) — 2026-11-27 부터는 «남긴 것»(명단·주민번호 꼴)과 «저장함» 표시가 붙은 옛 줄(안 보인다)이 남는다(지어낸 것) */
 const NOWISH = Date.now();
 const inbox = {
-  state: { lastRunAt: NOWISH - 3600e3, trigger: 'schedule', by: 'schedule', days: 14, mails: 9, candidates: 4, tried: 3, queued: 2, more: false,
-    skipped: { seen: 0, same: 1, pii: 1, big: 0, gone: 0, type: 2, human: 2, err: 0 }, ms: 4200 },
+  state: { lastRunAt: NOWISH - 3600e3, trigger: 'schedule', by: 'schedule', days: 14, mails: 9, candidates: 4, tried: 3, saved: 2, unchecked: 1, held: 2, lectures: 2, queued: 2, more: false,
+    skipped: { seen: 0, same: 1, pii: 2, big: 0, gone: 0, type: 2, err: 0 }, ms: 4200 },
   q: {
     qseed1: { key: 'qseed1', slug: 'sent_seed', uid: '7101', mailKey: '7101', mailId: 'sent_seed/7101', att: '점검상사 산업안전보건 정기교육 교안 가나다라마바사.pptx',
       subject: '[점검상사] 안전보건교육 자료 송부', d: NOWISH - 2 * 864e5, cat: 'safety', lectureDate: '2026-11', dateFrom: 'name',
       summary: '목차(18장): 산업안전보건 정기교육 · 위험성평가 이해 · 아차사고 사례 · 보호구 착용 · 가나다라마바사아자차카타파하 아주 긴 목차 줄', sha256: 'seedsha1', size: 1820000, at: NOWISH - 3600e3 },
     qseed2: { key: 'qseed2', slug: 'tome_seed', uid: '7102', mailKey: '7102', mailId: 'tome_seed/7102', att: '점검 노동법 기초 강의안.pdf',
       subject: '강의안(내게)', d: NOWISH - 5 * 864e5, cat: 'labor_law', lectureDate: '2026-11-16', dateFrom: 'mail',
-      summary: '노동법 기초 — 근로계약·근로시간·휴일·임금 지급 원칙', sha256: 'seedsha2', size: 640000, at: NOWISH - 3600e3 }
+      summary: '노동법 기초 — 근로계약·근로시간·휴일·임금 지급 원칙', sha256: 'seedsha2', size: 640000, at: NOWISH - 3600e3, saved: 'edu_mseed01', savedAt: NOWISH - 3600e3 },
+    qseed3: { key: 'qseed3', slug: 'sent_seed', uid: '7103', mailKey: '7103', mailId: 'sent_seed/7103', att: '점검 교육 참석자 명단 가나다라마바사아자차카타파하.pdf',
+      subject: '[점검상사] 교육 자료', d: NOWISH - 1 * 864e5, cat: 'etc', lectureDate: '2026-11', dateFrom: 'mail', summary: '', sha256: '', size: 0, at: NOWISH - 3600e3, hold: 'name' },
+    qseed4: { key: 'qseed4', slug: 'sent_seed', uid: '7104', mailKey: '7104', mailId: 'sent_seed/7104', att: '점검 노동법 강의.docx',
+      subject: '강의안 송부', d: NOWISH - 1 * 864e5, cat: 'labor_law', lectureDate: '2026-11-26', dateFrom: 'mail', summary: '', sha256: 'seedsha4', size: 120000, at: NOWISH - 3600e3, hold: 'pii-text' }
   }
 };
 module.exports = {
   /* 지어낸 창고 파일 — run.mjs 가 창고 주소 요청에 내준다(진짜 창고에는 안 나간다) */
   storageFiles: async () => ({ 'edulib/edu_mseed01/보낸 메일로 들어온 점검 강의안.pptx': await fakePptx() }),
   data: {
-    edulib: { items, notes, cats, sims },
+    edulib: { items, notes, cats, sims, lectures },
     edulib_inbox: inbox,
     mailbox: { folders: { inbox_seed: { path: 'INBOX', name: '받은편지함', kind: 'inbox', order: 1, total: 14, unseen: 0 } }, msgs: { inbox_seed: msgs }, old: { msgs: {} } },
+    /* 2026-11-27 «캘린더에서 가져오기» 점검용 — 지어낸 일정(가나다상사 교육은 메일 자료 edu_mseed02 와 맞는다 · «수강»은 빠져야) */
+    data: {
+      gcal_archive: {
+        ev_seed20: { id: 'ev_seed20', entityType: 'ScheduleEvent', date: '2026-11-19', time: '10:00', allDay: false, summary: '가나다상사 성희롱 예방교육', location: '가나다상사 2층', creator: 'tester@example.com' },
+        ev_seed21: { id: 'ev_seed21', entityType: 'ScheduleEvent', date: '2025-05-02', time: '', allDay: true, summary: '점검복지관 장애인 인식개선 특강', location: '', creator: 'nobody@example.com' },
+        ev_seed22: { id: 'ev_seed22', entityType: 'ScheduleEvent', date: '2026-11-10', time: '', allDay: true, summary: '노무사 보수교육 수강', location: '', creator: 'tester@example.com' },
+      },
+      gcal_mail_sid: { 'tester@example,com': 'P002' },
+    },
   },
   views: [
     { name: 'list', run: async (p) => { await p.click('#tabs button[data-tab=list]'); } },
@@ -118,5 +156,15 @@ module.exports = {
       back: async (p) => { await p.click('#dX'); } },
     { name: 'add', run: async (p) => { await p.click('#tabs button[data-tab=add]'); } },
     { name: 'mail', run: async (p) => { await p.click('#tabs button[data-tab=mail]'); await p.click('#mScan'); } },
+    /* 2026-11-27 강의 이력 — 목록 · 고르기(선택 줄) · 추정 기록 창(근거·확인) · 자료 자세히의 «이 자료로 한 강의» */
+    { name: 'lect', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); } },
+    { name: 'lectsel', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); const c = await p.$$('#lecList input[data-lpick]'); for (const x of c.slice(0, 2)) await x.click(); } },
+    { name: 'lectopen', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); await p.click('#lecList [data-lopen=lec_c0000000000000e05]'); }, back: async (p) => { await p.click('#dX'); } },
+    { name: 'lectnew', run: async (p) => { await p.click('#tabs button[data-tab=lect]'); await p.click('#lNew'); }, back: async (p) => { await p.click('#dX'); } },
+    /* 관리자 «캘린더에서 가져오기» — 묻는 창은 «2017»·«예»로 답한다(점검 도구는 기본으로 아니오). 맨 끝에 둔다(가짜 자료가 바뀐다) */
+    { name: 'lectcal', run: async (p) => {
+        await p.click('#tabs button[data-tab=lect]');
+        await p.evaluate(() => { window.prompt = () => '2017'; window.confirm = () => true; });
+        await p.click('#lCal'); await p.waitForTimeout(2500); } },
   ],
 };
