@@ -1341,13 +1341,13 @@
     return {
       id: p.id,
       cells: [
-        { cls: 'ti', title: p.companyName + (pMeta.contractNo ? ' (' + pMeta.contractNo + ')' : ''), html: esc(p.companyName) + ' <span class="chip">' + esc(String(p.year || 2026).slice(-2) + '년') + '</span>' + contractChip + ilteoChip },
+        { cls: 'ti', title: p.companyName + (pMeta.contractNo ? ' (' + pMeta.contractNo + ')' : ''), html: '<span class="pm-co">' + esc(p.companyName) + '</span> <span class="chip pm-yr">' + esc(String(p.year || 2026).slice(-2) + '년') + '</span>' + contractChip + ilteoChip },
         { k: 'badge', title: tr.name, html: '<span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(compactTrackLabel) + '</span> ' + stageDotsHtml(p) },
         { cls: 'wide', title: str(p.transGoal) || taskNames, html: esc(str(p.transGoal) || taskNames || '과제 선택 필요') },
-        { html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
+        { k: 'pc-only', html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
         {
           k: 'act',
-          html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">①기초</button>' +
+          html: '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="intake" data-pm-act="1">①기초</button>' +
             '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">②중간</button>' +
             '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final" title="' + esc(p.agency === 'cepa' ? '충남경제진흥원 결과보고서·완료계 검토' : '능률협회 최종보고서·정책매니저 검토') + '">③' + (p.agency === 'cepa' ? '완료계' : '최종') + '</button>'
         }
@@ -1359,11 +1359,28 @@
   function drawProjectsPane(projs, totalPreUnseen, midDoneCnt, totalPostUnseen, kmacCnt, cepaCnt) {
     if ($('kpiBox')) {
       $('kpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>전체 산업·일자리전환 (중복제거)</span><b>' + projs.length + '개사</b></div>' +
-        '<div class="kpi k-blue"><span>🔵 한국능률협회컨설팅 (산일능률)</span><b>' + kmacCnt + '개사</b></div>' +
-        '<div class="kpi k-green"><span>🟢 충남경제진흥원 (산일충남)</span><b>' + cepaCnt + '개사</b></div>' +
-        '<div class="kpi k-amber"><span>📩 미확인 메일 (기초 ' + totalPreUnseen + ' · 후속 ' + totalPostUnseen + ')</span><b>' + (totalPreUnseen + totalPostUnseen) + '건</b></div>' +
-        '<div class="kpi k-green"><span>📌 중간보고 기준선 확정</span><b>' + midDoneCnt + '개사</b></div>';
+        '<div class="kpi k-blue"><span><span class="wide-only">전체 산업·일자리전환 (중복제거)</span><span class="phone-only">전체</span></span><b>' + projs.length + '개사</b></div>' +
+        '<div class="kpi k-blue"><span>🔵 <span class="wide-only">한국능률협회컨설팅 (산일능률)</span><span class="phone-only">KMAC</span></span><b>' + kmacCnt + '개사</b></div>' +
+        '<div class="kpi k-green"><span>🟢 <span class="wide-only">충남경제진흥원 (산일충남)</span><span class="phone-only">CEPA</span></span><b>' + cepaCnt + '개사</b></div>' +
+        '<div class="kpi k-amber"><span>📩 미확인<span class="wide-only"> 메일 (기초 ' + totalPreUnseen + ' · 후속 ' + totalPostUnseen + ')</span></span><b>' + (totalPreUnseen + totalPostUnseen) + '건</b></div>' +
+        '<div class="kpi k-green"><span>📌 <span class="wide-only">중간보고 기준선 확정</span><span class="phone-only">중간확정</span></span><b>' + midDoneCnt + '개사</b></div>';
+    }
+
+    var yrSelEl = $('projYear');
+    var curYrSelVal = str(yrSelEl && yrSelEl.value);
+    if (yrSelEl) {
+      var yrCntMap = Object.create(null);
+      ['2026', '2025', '2024'].forEach(function (yy) { yrCntMap[yy] = yrCntMap[yy] || 0; });
+      projs.forEach(function (p) {
+        var yy = String(Number(p.year) || 2026);
+        yrCntMap[yy] = (yrCntMap[yy] || 0) + 1;
+      });
+      var sortedYrs = Object.keys(yrCntMap).sort(function (a, b) { return Number(b) - Number(a); });
+      yrSelEl.innerHTML = '<option value="">연도 전체</option>' + sortedYrs.map(function (yy) {
+        return '<option value="' + esc(yy) + '">' + esc(yy) + '년 (' + yrCntMap[yy] + ')</option>';
+      }).join('');
+      yrSelEl.value = curYrSelVal;
+      if (yrSelEl.value !== curYrSelVal) yrSelEl.value = '';
     }
 
     var q = str($('projQ') && $('projQ').value).toLowerCase();
@@ -1375,7 +1392,7 @@
     var filtered = projs.filter(function (p) {
       var pAg = p.agency === 'cepa' ? 'cepa' : 'kmac';
       if (agFilter && pAg !== agFilter) return false;
-      if (yr && String(p.year || '') !== yr) return false;
+      if (yr && String(Number(p.year) || 2026) !== yr) return false;
       var sc = SCAN_CACHE[p.id] || { unseenPreCount: 0, unseenPostCount: 0 };
       if (stFilter === 'pre_mid' && p.midConfirmedAt) return false;
       if (stFilter === 'post_mid' && !p.midConfirmedAt) return false;
@@ -1479,7 +1496,7 @@
                 { cls: 'ti', title: safeDispCo, html: esc(safeDispCo) + ' <span class="chip">' + esc(g.year + '년') + '</span>' },
                 { k: 'badge', html: agencyChipHtml(g.agency) + ' <span class="chip">' + esc(tr.short) + '</span> ' + linkedBadge },
                 { cls: 'wide', title: kindTags, html: '파일 <b>' + g.fileCount + '건</b>' + (kindTags ? ' (' + esc(kindTags) + ')' : '') },
-                { k: 'act', html: '<button class="sm pri" data-import-fgrp="' + esc(g.groupKey) + '" data-boundary-hash="' + esc(g.boundaryHash || '') + '">📥 자료 반영</button>' }
+                { k: 'act', html: '<button class="sm pri" data-import-fgrp="' + esc(g.groupKey) + '" data-boundary-hash="' + esc(g.boundaryHash || '') + '" data-pm-act="1">📥 자료 반영</button>' }
               ]
             };
           });
@@ -1500,8 +1517,8 @@
             { cls: 'ti', title: c.companyName, html: esc(c.companyName) + ' <span class="chip">' + esc(c.year + '년') + '</span>' },
             { k: 'badge', html: agencyChipHtml(c.agency) + ' <span class="chip">' + esc(tr.short) + '</span>' },
             { cls: 'wide', title: c.source + (c.bizLabel ? ' · ' + c.bizLabel : ''), html: esc(c.source + (c.bizLabel ? ' · ' + c.bizLabel : '')) },
-            { html: esc(c.contactEmail || '이메일 미등록') },
-            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
+            { k: 'pc-only', html: esc(c.contactEmail || '이메일 미등록') },
+            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '" data-pm-act="1">⚡ 활성화</button>' }
           ]
         };
       });
@@ -4189,7 +4206,7 @@
         return;
       }
 
-      if (!e.target.closest('input,button,select,a,label,textarea')) {
+      if (!e.target.closest('input,button,select,a,label,textarea,td.c,th.c')) {
         var tr = e.target.closest('tr[data-row][data-tname="projects"], tr[data-row][data-tname="projectsKmac"], tr[data-row][data-tname="projectsCepa"]');
         if (tr) {
           CUR_PID = tr.getAttribute('data-row');

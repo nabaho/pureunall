@@ -991,6 +991,7 @@
       var yr = String(num(x.year, 2026));
       map[yr] = (map[yr] || 0) + 1;
     });
+    if (YEAR_FILTER && !map[YEAR_FILTER]) map[YEAR_FILTER] = 0;
     var yrs = Object.keys(map).sort(function (a, b) { return Number(b) - Number(a); });
     var lbl = mode === 'inbox' ? '수신 연도:' : '연도별 필터:';
     var allOn = YEAR_FILTER === '';
@@ -1003,10 +1004,36 @@
     bar.querySelectorAll('[data-yr-set]').forEach(function (b) {
       b.onclick = function () {
         YEAR_FILTER = b.getAttribute('data-yr-set') || '';
+        SHOW_ALL_ROWS = false;
         if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
         draw();
       };
     });
+    // 폰 화면 연도 드롭다운 통일: 같은 .pane > .card .bar 에 #projYrSel 이 없으면 동적 연도 드롭다운을 동기화
+    var pane = bar.closest ? bar.closest('.pane') : null;
+    var toolBar = pane && pane.querySelector('.card:not(.hi-top-strip) .bar');
+    if (toolBar && !toolBar.querySelector('#projYrSel') && typeof document !== 'undefined') {
+      var phoneSel = toolBar.querySelector('.pu-phone-yr-sel[data-phone-yr-for="' + elId + '"]');
+      if (!phoneSel) {
+        phoneSel = document.createElement('select');
+        phoneSel.className = 'pu-phone-yr-sel';
+        phoneSel.setAttribute('data-phone-yr-for', elId);
+        phoneSel.setAttribute('aria-label', lbl.replace(/[:：\s]+$/, ''));
+        var qInp = toolBar.querySelector('input[type="search"], input[type="text"]');
+        if (qInp && qInp.nextSibling) toolBar.insertBefore(phoneSel, qInp.nextSibling);
+        else toolBar.insertBefore(phoneSel, toolBar.firstChild);
+      }
+      var selOpts = '<option value="">연도 전체</option>' + yrs.map(function (yr) {
+        return '<option value="' + esc(yr) + '">' + esc(yr) + '년 (' + map[yr] + ')</option>';
+      }).join('');
+      fillSelectKeepingValue(phoneSel, selOpts, YEAR_FILTER);
+      phoneSel.onchange = function () {
+        YEAR_FILTER = phoneSel.value || '';
+        SHOW_ALL_ROWS = false;
+        if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
+        draw();
+      };
+    }
   }
 
   function stepsRibbonHtml(proj) {
@@ -1220,10 +1247,14 @@
     fillSelectKeepingValue($('projTrackSel'),
       '<option value="">' + esc(cat.listCols === 'split' ? ((cat.regionLabel || '트랙') + ' 전체') : '트랙 전체') + '</option>' + tracks.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(trackShortLabel(t)) + '</option>'; }).join(''),
       TRACK_FILTER);
-    var yrsSet = Object.create(null);
-    allProjs.forEach(function (p) { yrsSet[String(num(p.year, 2026))] = 1; });
+    var yrsCount = Object.create(null);
+    allProjs.forEach(function (p) {
+      var yk = String(num(p.year, 2026));
+      yrsCount[yk] = (yrsCount[yk] || 0) + 1;
+    });
+    if (YEAR_FILTER && !yrsCount[YEAR_FILTER]) yrsCount[YEAR_FILTER] = 0;
     fillSelectKeepingValue($('projYrSel'),
-      '<option value="">연도 전체</option>' + Object.keys(yrsSet).sort(function (a, b) { return Number(b) - Number(a); }).map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '년</option>'; }).join(''),
+      '<option value="">연도 전체</option>' + Object.keys(yrsCount).sort(function (a, b) { return Number(b) - Number(a); }).map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '년 (' + yrsCount[y] + ')</option>'; }).join(''),
       YEAR_FILTER);
     var mgrs = Object.create(null);
     allProjs.forEach(function (p) { if (p.consultantName) mgrs[p.consultantName] = 1; });
@@ -1257,12 +1288,13 @@
     var trs = shown.map(function (p, i) {
       var ckKey = 'p:' + p.id;
       var clsList = [];
+      if (splitCols) clsList.push('split-row');
       if (p.id === CUR_PID) clsList.push('cur');
       if (p.status === 'done') clsList.push('perf-direct');
       var trAttr = clsList.length ? (' class="' + clsList.join(' ') + '"') : '';
       var commCnt = getProjectComms(p.id).length;
       var sum = hwpx ? hwpx.buildSummary(APP_KEY, p, getCheckDoc(p.id), []) : { overallPct: 0 };
-      var stChip = p.status === 'done' ? '<span class="chip c-green">완료</span>' : '<span class="chip c-amber">진행중</span>';
+      var stChip = p.status === 'done' ? '<span class="chip c-green pm-st">완료</span>' : '<span class="chip c-amber pm-st">진행중</span>';
       var trObj = tracks.find(function (t) { return t.id === p.trackId; });
       var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
       var caseTag = p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '';
@@ -1275,11 +1307,11 @@
           '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + caseTag + '</td>' +
           '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
           '<td data-k="st">' + stChip + '</td>' +
-          '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
+          '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
           '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>' +
-          '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
+          '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
         '</tr>';
       }
       var rowBodyCols;
@@ -1293,18 +1325,18 @@
         var dueHtml = p.inspDue ? (' <span class="hint">· 기한 ' + esc(p.inspDue) + '</span>') : '';
         var issuesTitle = p.inspDue ? (issuesTxt + ' (시정기한: ' + p.inspDue + ')') : issuesTxt;
         rowBodyCols =
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + resChip + '</td>' +
-          '<td title="' + esc([p.inspPeriod, p.inspOffice].filter(Boolean).join(' · ')) + '">' + periodHtml + officeHtml + '</td>' +
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue pm-tr">' + esc(trLbl) + '</span> ') + stChip + resChip + '</td>' +
+          '<td data-k="pc-only" title="' + esc([p.inspPeriod, p.inspOffice].filter(Boolean).join(' · ')) + '">' + periodHtml + officeHtml + '</td>' +
           '<td class="wide" title="' + esc(issuesTitle) + '">' + esc(issuesTxt) + dueHtml + '</td>' +
-          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>';
+          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>';
       } else {
         rowBodyCols =
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue pm-tr">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
           (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
-          '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
+          '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
           '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>';
       }
       return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
@@ -1312,7 +1344,7 @@
         '<td class="n">' + (i + 1) + '</td>' +
         '<td class="ti" title="' + esc(p.companyName) + '"><span class="chip">' + esc(String(p.year || 2026)) + '</span> ' + esc(p.companyName) + caseTag + '</td>' +
         rowBodyCols +
-        '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
+        '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
       '</tr>';
     }).join('');
 
@@ -1341,8 +1373,9 @@
     });
     box.querySelectorAll('tr[data-row]').forEach(function (tr) {
       tr.onclick = function (e) {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A')) return;
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || (e.target.closest && e.target.closest('input,button,select,a,label,textarea,td.c,th.c')))) return;
         CUR_PID = tr.getAttribute('data-row');
+        if (typeof window !== 'undefined' && window.innerWidth <= 768) { switchTab('detail'); return; }
         renderProjectsPane();
       };
     });
@@ -1449,9 +1482,9 @@
         '<td class="n">' + (i + 1) + '</td>' +
         '<td class="ti" title="' + esc(b.companyName) + '"><span class="chip">' + esc(String(b.year || 2026)) + '</span> ' + coBadge + esc(b.companyName) + '</td>' +
         '<td data-k="badge" title="' + esc(badgeTxt) + '">' + trTag + '<span class="chip c-blue">' + esc(badgeTxt) + '</span></td>' +
-        '<td title="' + esc(b.latestDate || '-') + '">' + esc(b.latestDate || '-') + '</td>' +
+        '<td data-k="pc-only" title="' + esc(b.latestDate || '-') + '">' + esc(b.latestDate || '-') + '</td>' +
         '<td class="wide" title="' + esc(sampleTxt) + '">' + esc(sampleTxt) + '</td>' +
-        '<td data-k="act"><button type="button" class="sm pri" data-import-cand="' + esc(b.key) + '">📥 1클릭 등록</button> <button type="button" class="sm" data-preview-cand="' + esc(b.key) + '">👁 미리보기</button></td>' +
+        '<td data-k="act"><button type="button" class="sm pri" data-import-cand="' + esc(b.key) + '" data-pm-act="1">📥 1클릭 등록</button> <button type="button" class="sm" data-preview-cand="' + esc(b.key) + '">👁 미리보기</button></td>' +
       '</tr>';
     }).join('');
 
@@ -1465,6 +1498,12 @@
     });
     box.querySelectorAll('[data-preview-cand]').forEach(function (b) {
       b.onclick = function () { openBundlePreviewModal(b.getAttribute('data-preview-cand')); };
+    });
+    box.querySelectorAll('tr[data-cand]').forEach(function (tr) {
+      tr.onclick = function (e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || (e.target.closest && e.target.closest('input,button,select,a,label,textarea,td.c,th.c')))) return;
+        if (typeof window !== 'undefined' && window.innerWidth <= 768) openBundlePreviewModal(tr.getAttribute('data-cand'));
+      };
     });
   }
 
@@ -1559,10 +1598,10 @@
             '<td class="n">' + (idx + 1) + '</td>' +
             '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + (p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '') + '</td>' +
             '<td data-k="badge"><span class="chip c-green">등록 사업</span> <span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
-            '<td>' + stepDotsHtml(p.stage, p.status) + '</td>' +
-            '<td>' + esc(safeDate(p.updatedAt)) + '</td>' +
+            '<td data-k="pc-only">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+            '<td data-k="pc-only">' + esc(safeDate(p.updatedAt)) + '</td>' +
             '<td class="wide" title="' + esc(yrNote) + '">' + esc(yrNote) + '</td>' +
-            '<td data-k="act"><button type="button" class="sm pri" data-yr-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-yr-rpt="' + esc(p.id) + '">보고서</button></td>' +
+            '<td data-k="act"><button type="button" class="sm pri" data-yr-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-yr-rpt="' + esc(p.id) + '">보고서</button></td>' +
           '</tr>';
         }
         var b = ent.item;
@@ -1572,10 +1611,10 @@
           '<td class="n">' + (idx + 1) + '</td>' +
           '<td class="ti" title="' + esc(b.companyName) + '">' + esc(b.companyName) + '</td>' +
           '<td data-k="badge"><span class="chip c-amber">미등록 후보</span>' + (b.suggestedTrackName ? (' <span class="chip">' + esc(b.suggestedTrackName) + '</span>') : '') + '</td>' +
-          '<td>메일 ' + b.mailCount + ' · 톡 ' + b.msgCount + '</td>' +
-          '<td>' + esc(b.latestDate || '-') + '</td>' +
+          '<td data-k="pc-only">메일 ' + b.mailCount + ' · 톡 ' + b.msgCount + '</td>' +
+          '<td data-k="pc-only">' + esc(b.latestDate || '-') + '</td>' +
           '<td class="wide" title="' + esc(sample) + '">' + esc(sample) + '</td>' +
-          '<td data-k="act"><button type="button" class="sm ok" data-yr-import="' + esc(b.key) + '">1클릭 등록</button></td>' +
+          '<td data-k="act"><button type="button" class="sm ok" data-yr-import="' + esc(b.key) + '" data-pm-act="1">1클릭 등록</button></td>' +
         '</tr>';
       }).join('');
       return '<div class="card">' +
