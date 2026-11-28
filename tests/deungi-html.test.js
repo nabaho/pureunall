@@ -454,3 +454,79 @@ test('★ 푸른통합시스템 직원명부 연결 — 읽기 전용, 세대 �
   assert.match(본문, /BASE_REV/);
   assert.doesNotMatch(읽기('js/pu-deungi-core.js').slice(읽기('js/pu-deungi-core.js').indexOf('function normStaff('), 읽기('js/pu-deungi-core.js').indexOf('function normStaffList(')), /raw\.rrn/);
 });
+
+/* 2026-11-28 지난 기록 풀폭 3단·1줄 연도 타임라인·50% 한글 쪽넘기기·점진 렌더/캐시 가속·직전 개정 승계 */
+test('★ 지난 기록 풀폭 3단·1줄 연도·50%+ 한글 쪽넘기기·점진 렌더·직전 개정 승계', () => {
+  assert.match(html, /body\.tab-hist main\{max-width:none;width:100%;margin:0;padding:8px 10px 20px\}/);
+  assert.match(html, /\.hd-card\{[^}]*display:flex;align-items:center;gap:5px;white-space:nowrap/);
+  assert.match(html, /@container \(min-width:1080px\)[\s\S]*minmax\(260px,36%\) minmax\(50%,1fr\)/);
+  assert.match(html, /\.hd-pv-body\.single-page canvas\.pg-cur\{display:block !important;/);
+  assert.match(본문, /var ARC_CACHE=\{\}, ARC_CACHE_KEYS=\[\], ARC_CACHE_BYTES=0, ARC_CACHE_FN=null, CHARTER_PULL=null;/);
+  const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
+  assert.match(wipe, /arcCacheClear\(\)/);
+  assert.match(wipe, /CHARTER_PULL=null/);
+  const rd = 본문.slice(본문.indexOf('function reload('), 본문.indexOf('function setTab('));
+  assert.match(rd, /PureunHwp\.loadCore\(\)/);
+  const st = 본문.slice(본문.indexOf('function setTab('), 본문.indexOf('function draw('));
+  assert.match(st, /PureunHwp\.loadCore\(\)/);
+  assert.match(st, /if\(t!=='hist'\)/);
+  const rf = 본문.slice(본문.indexOf('function renderHwpPaged('), 본문.indexOf('function prevArchiveOf('));
+  assert.match(rf, /requestAnimationFrame/);
+  assert.match(rf, /freeDoc/);
+  assert.match(rf, /doc\.free\(\)/);
+  assert.match(rf, /Number\.isFinite/);
+  assert.match(rf, /MAX_RAM_PIX/);
+  assert.match(rf, /pg-blank/);
+  assert.match(rf, /function sideRenderHwpFast\(/);
+  assert.doesNotMatch(rf, /convertToEditable|getPageTextLayout/);
+  assert.match(본문, /function prevBarHtml\(/);
+  assert.match(본문.slice(본문.indexOf('function drawEditor('), 본문.indexOf('function fld(')), /prevBarHtml\(\)/);
+  assert.match(본문, /id="arcPvPageBar"/);
+  assert.match(본문, /id="arcPvBody"[^>]*aria-label=/);
+  assert.match(본문, /data-act="arcPageNav"/);
+  assert.match(본문, /data-act="arcPageMode"/);
+  assert.match(본문, /data-act="newCaseFromArc"/);
+  assert.match(본문, /data-act="openPrevCharter"/);
+  assert.match(본문, /data-act="pullPrevCharter"/);
+  assert.match(본문, /data-act="reviewPulledCharter"/);
+  assert.match(본문, /data-act="applyPulledCharter"/);
+  assert.match(본문, /arcCacheKey\(g, who, fid\)/);
+  assert.match(본문, /BASE_DRAFT_REV/);
+  const mk = 본문.slice(본문.indexOf('function maskRrnText('), 본문.indexOf('function saveBase('));
+  assert.match(mk, /function sanitizeCharterExtract\(/);
+  assert.match(본문, /function purgeAdminPreview\(/);
+  assert.match(본문.slice(본문.indexOf('function saveBase('), 본문.indexOf('function arcRows(')), /sanitizeCharterExtract\(/);
+  const pc = 본문.slice(본문.indexOf('function pullCharterFromArc('), 본문.indexOf('function arcPvRestore('));
+  assert.match(pc, /sanitizeCharterExtract/);
+  assert.doesNotMatch(pc, /save\('deungi\/base'/);
+  const cb = 본문.slice(본문.indexOf('function commitCharterToBase('), 본문.indexOf('function pullCharterFromArc('));
+  assert.match(cb, /typeof expectedRev==='number' && typeof prev\.revision==='number' && prev\.revision!==expectedRev/);
+  assert.match(cb, /#editor \.prev-bar/);
+  assert.match(cb, /CHARTER_PULL\.baseRev/);
+  assert.match(cb, /uid_roles/);
+  const fnSan = new Function(mk + '\nreturn { maskRrnText, sanitizeCharterExtract };')();
+  const sampleRaw = [
+    '주민 ' + '70' + '0101-\n' + '123' + '4567',
+    '무하이픈 ' + '80' + '0202' + '234' + '5678',
+    '유선 (041) ' + '665-' + '1234',
+    '괄호무구분 (031)' + '1234' + '5678',
+    '줄바꿈 02)\n' + '1234-\n' + '5678',
+    '붙여씀10 031' + '234' + '5678',
+    '붙여씀11 031' + '1234' + '5678',
+    '가상번호 0505' + '123' + '4567',
+    '국제 +82-10-' + '0000-' + '1234',
+    '메일 user@example.com',
+  ].join(' | ');
+  const cleaned = fnSan.sanitizeCharterExtract(sampleRaw);
+  ['123' + '4567', '234' + '5678', '665-' + '1234', '5678', 'user@example.com'].forEach((s) => assert.ok(!cleaned.includes(s), '가림 누락: ' + s));
+  assert.match(cleaned, /010-\*\*\*\*-\*\*\*\*/);
+  assert.match(cleaned, /\[연락처 가림\]/);
+  assert.match(cleaned, /\[이메일 가림\]/);
+  const sb = 본문.slice(본문.indexOf('function saveBase('), 본문.indexOf('function arcRows('));
+  assert.match(sb, /typeof expectedRev==='number' && typeof prev\.revision==='number' && prev\.revision!==expectedRev/);
+  const nc = 본문.slice(본문.indexOf('function newCase('), 본문.indexOf('function openCase('));
+  assert.match(nc, /if\(SAVE\.dirty\) saveCase\(\)/);
+  assert.match(nc, /prevArchiveOf\(/);
+  assert.match(nc, /arcCharterFile\(/);
+  assert.match(nc, /pullCharterFromArc\(/);
+});

@@ -71,12 +71,22 @@ const stubArcPreview = () => {
     const orig = window.PureunHwp.renderPreview;
     window.PureunHwp.renderPreview = (el, u8, nm) => {
       if (u8 && u8.length === 2 && u8[0] === 80 && u8[1] === 75) {
-        const cv = document.createElement('canvas'); cv.width = 400; cv.height = 120;
-        el.innerHTML = ''; el.appendChild(cv);
+        el.innerHTML = '';
+        [1, 2].forEach((pg) => {
+          const cv = document.createElement('canvas'); cv.width = 400; cv.height = 520; cv.dataset.pg = String(pg);
+          el.appendChild(cv);
+        });
         return Promise.resolve();
       }
       return orig(el, u8, nm);
     };
+    window.PureunHwp.extractText = () => [
+      '정 관',
+      '(2026. 09. 03. 개정)',
+      '제3조【사무소의 소재지】 점검시 나무로 1',
+      '사원 점검대표 ' + '70' + '0101-' + '123' + '4567 · ' + '80' + '0202' + '234' + '5678',
+      '연락처 010-0000-1234 · 041-665-1234 · sample@example.com',
+    ].join('\n');
     window.PureunHwp.__paStub = true;
   }
 };
@@ -128,6 +138,18 @@ module.exports = {
           return l.right <= r.left + 2 && Math.abs(l.top - r.top) < 20;
         }), '860px 이상에서는 왼쪽 연도 타임라인과 오른쪽 상세가 좌우 나란히 배치되어야 함');
       }
+      if (p.viewportSize().width >= 1080) {
+        must(await p.evaluate(() => [...document.querySelectorAll('#histBox .hd-card')].every((c) => {
+          const r = c.getBoundingClientRect();
+          return r.height >= 24 && r.height <= 48;
+        })), '1080px 이상에서 왼쪽 연도 카드는 1줄 콤팩트 높이(48px 이하)여야 함');
+      }
+      if (p.viewportSize().width >= 1366) {
+        must(await p.evaluate(() => {
+          const pv = document.getElementById('arcPvPanel');
+          return pv && pv.getBoundingClientRect().width >= window.innerWidth * 0.48;
+        }), '1366px 이상에서 한글 뷰어(#arcPvPanel)는 화면 절반(48%+) 이상 차지해야 함');
+      }
       await p.click('#histBox [data-act="histYear"][data-v="2019"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 1), '2019 필터 시 1건');
       await p.click('#histBox [data-act="histYear"][data-v="ALL"]'); await w(250);
@@ -135,7 +157,24 @@ module.exports = {
       await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await w(350);
       must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4 && /나무분사무소/.test((document.querySelector('#histBox .hd-sum-ttl') || {}).textContent || '')), '2019 묶음 서류 4개 표시');
       if (p.viewportSize().width > 768) {
-        must(await p.evaluate(() => window.HIST_UI.loaded === 'ARtest2019a|fake_file_id_0001' && !document.querySelector('#arcPvBody [data-act="arcPvLoad"]') && !!document.querySelector('#arcPvBody canvas')), '묶음 클릭 직후 첫 번째 서류 자동 인라인 미리보기 표시 필요');
+        must(await p.evaluate(() => window.HIST_UI.loaded === 'ARtest2019a|fake_file_id_0001' && !document.querySelector('#arcPvBody [data-act="arcPvLoad"]') && document.querySelectorAll('#arcPvBody canvas').length === 2), '묶음 클릭 직후 첫 번째 서류 자동 인라인 2쪽 미리보기 표시 필요');
+        must(await p.evaluate(() => {
+          const bar = document.getElementById('arcPvPageBar'), pos = document.getElementById('arcPvPagePos');
+          return bar && !bar.hidden && pos && pos.textContent.trim() === '1 / 2쪽';
+        }), '한글 미리보기 쪽 표시(1 / 2쪽) 필요');
+        await p.click('#arcPgNext'); await w(150);
+        must(await p.evaluate(() => (document.getElementById('arcPvPagePos') || {}).textContent.trim() === '2 / 2쪽'), '다음 쪽 클릭 시 2 / 2쪽 이동 필요');
+        await p.click('#arcPgMode'); await w(150);
+        must(await p.evaluate(() => {
+          const pb = document.getElementById('arcPvBody'), md = document.getElementById('arcPgMode');
+          const vis = [...document.querySelectorAll('#arcPvBody canvas')].filter((c) => getComputedStyle(c).display !== 'none');
+          return pb && pb.classList.contains('single-page') && md && md.textContent.trim() === '연속 보기' && vis.length === 1 && vis[0].dataset.pg === '2';
+        }), '한 쪽씩 보기 시 2쪽 1장만 표시되어야 함');
+        await p.click('#arcPgMode'); await w(150);
+        must(await p.evaluate(() => {
+          const pb = document.getElementById('arcPvBody');
+          return pb && !pb.classList.contains('single-page');
+        }), '연속 보기 복원 필요');
       }
       await p.click('#histBox [data-act="histKind"][data-v="approval"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 1 && (document.getElementById('arcPvKind') || {}).value === 'approval'), '종류 필터(인가증) 1건 및 미리보기 대상 일치');
@@ -152,18 +191,25 @@ module.exports = {
             return r.left >= sc.left - 1 && r.right <= sc.right + 2;
           });
         }), '서류 목록 헤더(종류·받기)가 가로 스크롤로 잘리지 않아야 함');
-        await p.evaluate(() => {
-          const img = document.querySelector('#arcPvBody img');
+        const scMode = await p.evaluate(() => {
+          const pb = document.getElementById('arcPvBody'), img = pb.querySelector('img');
           window.__pvRef = img;
           img.style.height = '1800px';
-          window.scrollTo(0, 45);
+          if (pb.scrollHeight > pb.clientHeight + 20) { pb.scrollTop = 45; return 'inner'; }
+          window.scrollTo(0, 45); return 'win';
         });
         await p.click('#histBox tr[data-arcf="fake_file_id_0004"] input[data-sel="arc"]'); await w(150);
-        must(await p.evaluate(() => document.querySelector('#arcPvBody img') === window.__pvRef && Math.abs(window.scrollY - 45) <= 2), '체크박스 선택 시 인라인 미리보기 DOM·스크롤 보존');
+        must(await p.evaluate((mode) => {
+          const pb = document.getElementById('arcPvBody');
+          const kept = pb.querySelector('img') === window.__pvRef;
+          const scOk = mode === 'inner' ? Math.abs(pb.scrollTop - 45) <= 2 : Math.abs(window.scrollY - 45) <= 2;
+          return kept && scOk;
+        }, scMode), '체크박스 선택 시 인라인 미리보기 DOM·스크롤 보존');
         await p.click('#histBox tr[data-arcf="fake_file_id_0004"] input[data-sel="arc"]'); await w(150);
         await p.evaluate(() => {
-          const img = document.querySelector('#arcPvBody img');
+          const pb = document.getElementById('arcPvBody'), img = pb && pb.querySelector('img');
           if (img) img.style.height = '';
+          if (pb) pb.scrollTop = 0;
           window.scrollTo(0, 0);
           delete window.__pvRef;
         });
@@ -191,6 +237,43 @@ module.exports = {
         return /2026 09 등기 반영/.test(ltxt) && /2026 09 등기 반영/.test(rtxt) && /사원 4명 현행화/.test(rtxt);
       }), '바뀐 기록 탭 선택 시 왼쪽 목록과 오른쪽 전체 내용 모두 표시 필요');
       await p.click('#histBox [data-act="histTab"][data-v="archive"]'); await w(250);
+      const prevSt = await p.evaluate(() => ({ cur: window.CUR, ch: window.BASE.charter, cases: Object.keys(window.CASES || {}) }));
+      try {
+        await p.click('#histBox .hd-card[data-arc="ARtest2026c"]'); await w(250);
+        await p.click('#histBox [data-act="newCaseFromArc"][data-arc="ARtest2026c"]'); await w(450);
+        const nc = await p.evaluate(() => ({
+          tab: window.TAB,
+          cur: window.CUR,
+          memo: (window.CASES[window.CUR] || {}).memo || '',
+          baseCh: window.BASE.charter || '',
+          pullTxt: (window.CHARTER_PULL && window.CHARTER_PULL.text) || '',
+          hasBtn: !!document.querySelector('#editor [data-act="reviewPulledCharter"]'),
+        }));
+        must(
+          nc.tab === 'case' && nc.cur !== prevSt.cur && /2026-09-03|ARtest2026c/.test(nc.memo)
+          && nc.baseCh === prevSt.ch && nc.hasBtn
+          && /제3조/.test(nc.pullTxt)
+          && !nc.pullTxt.includes('123' + '4567') && !nc.pullTxt.includes('234' + '5678')
+          && !nc.pullTxt.includes('041-665-1234')
+          && nc.pullTxt.includes('700101-_______') && nc.pullTxt.includes('800202_______')
+          && nc.pullTxt.includes('010-****-****') && nc.pullTxt.includes('[연락처 가림]') && nc.pullTxt.includes('[이메일 가림]'),
+          '직전 개정 승계·비식별 추출·무확인 덮어쓰기 방지 확인 필요 ' + JSON.stringify(nc)
+        );
+        await p.click('#editor [data-act="reviewPulledCharter"]'); await w(250);
+        must(await p.evaluate(() => !!document.getElementById('charterPullTxt') && !!document.querySelector('#modal [data-act="applyPulledCharter"]')), '정관 검토 모달 표시 필요');
+        await p.click('#modal [data-act="applyPulledCharter"]'); await w(250);
+        must(await p.evaluate(() => /제3조/.test(window.BASE.charter || '') && !document.getElementById('charterPullTxt')), '검토 완료 후 기준 정관 반영 및 모달 닫힘 필요');
+      } finally {
+        await p.evaluate((st) => {
+          if (window.closeModal) window.closeModal();
+          window.CHARTER_PULL = null;
+          if (window.CASES && window.CUR && st.cases.indexOf(window.CUR) < 0) delete window.CASES[window.CUR];
+          window.CUR = st.cur; window.lsSet('cur', st.cur);
+          window.BASE.charter = st.ch; window.BASE_DRAFT = null;
+          window.setTab('hist');
+        }, prevSt);
+        await w(250);
+      }
     } },
     /* 등기 현황 — 지사장 짝: 처음엔 한 곳 미정 → 사원을 고르면 띠·직책이 바뀜 → 사원 이름을 고치면 따라옴 → 미정으로 되돌림. 어긋나면 throw → 결과 json 의 navErr */
     { name: 'basehead', run: async (p) => {
