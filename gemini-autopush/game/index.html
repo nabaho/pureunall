@@ -3950,10 +3950,14 @@
       width: 100% !important;
       height: 100% !important;
     }
-    html.force-landscape-90 #drivingHud,
-    html.force-landscape-90 #outdoorShowroomModal {
+    html.force-landscape-90 #drivingHud {
       width: 100vh !important;
       height: calc(100vw - 28px) !important;
+    }
+    html.force-landscape-90 #outdoorShowroomModal {
+      top: 38px !important;
+      width: 100vh !important;
+      height: calc(100vw - 38px) !important;
     }
     html.force-landscape-90 #tsSkyActionStrip {
       max-width: 460px !important;
@@ -4029,7 +4033,7 @@
     /* Authentic 3D운전게임 4.0 Outdoor Intersection Car Selection Showroom (1000025339.jpg & 1000025341.jpg!) */
     #outdoorShowroomModal {
       position: fixed;
-      inset: 28px 0 0 0;
+      inset: 38px 0 0 0;
       z-index: 88;
       display: none;
       flex-direction: column;
@@ -4038,55 +4042,58 @@
     }
     .osr-top-banner {
       pointer-events: auto;
-      margin: 6px 10px 0;
-      background: rgba(30, 34, 42, 0.84);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 16px;
-      padding: 8px 12px;
+      margin: 6px 8px 0;
+      background: rgba(24, 28, 36, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.20);
+      border-radius: 14px;
+      padding: 6px 10px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.48);
+      gap: 4px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.42);
     }
     .osr-top-main {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 6px;
+      min-width: 0;
     }
     .osr-check-box {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
+      gap: 5px;
       background: transparent;
       border: none;
       color: #ffffff;
-      font-size: 16px;
+      font-size: 13.5px;
       font-weight: 900;
       cursor: pointer;
       flex-shrink: 0;
+      padding: 0;
     }
     .osr-sq {
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       border-radius: 5px;
       background: #ffffff;
       color: #0f172a;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 900;
     }
     .osr-banner-center {
       flex: 1;
       min-width: 0;
-      text-align: center;
+      text-align: left;
+      overflow: hidden;
     }
     .osr-sub-guide {
-      font-size: 11px;
+      font-size: 10.5px;
       color: #e2e8f0;
       font-weight: 700;
       white-space: nowrap;
@@ -4095,45 +4102,66 @@
     }
     .osr-cur-car-line {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 2px;
+      align-items: baseline;
+      gap: 6px;
+      flex-wrap: nowrap;
+      min-width: 0;
+      overflow: hidden;
     }
     #osrCarTitle {
-      font-size: 14.5px;
+      font-size: 13.5px;
       font-weight: 900;
       color: #fde047;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
     #osrCarMeta {
-      font-size: 11px;
+      font-size: 10.5px;
       color: #bae6fd;
       font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
     }
     .osr-banner-actions {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       flex-shrink: 0;
+    }
+    .osr-banner-actions .pv-chip {
+      padding: 3px 7px !important;
+      font-size: 10.5px !important;
     }
     .osr-word-bar {
       display: flex;
       align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
+      gap: 5px;
+      flex-wrap: nowrap;
+      min-width: 0;
     }
     #osrWordSearchInput {
-      width: 220px;
-      max-width: 100%;
-      background: rgba(9, 13, 22, 0.85);
-      border: 1px solid rgba(125, 211, 252, 0.45);
+      width: 118px;
+      min-width: 96px;
+      max-width: 42%;
+      flex-shrink: 0;
+      background: rgba(9, 13, 22, 0.88);
+      border: 1px solid rgba(125, 211, 252, 0.48);
       border-radius: 999px;
-      padding: 4px 11px;
+      padding: 3px 9px;
       color: #ffffff;
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
       outline: none;
+    }
+    @media (min-width: 560px) {
+      #osrWordSearchInput { width: 205px; }
+    }
+    html.force-landscape-90 #osrWordSearchInput {
+      width: 195px !important;
     }
     .osr-word-chips {
       display: flex;
@@ -5318,22 +5346,23 @@
             <span>선택</span>
           </button>
           <div class="osr-banner-center">
-            <div class="osr-sub-guide">원하시는 차를 자유롭게 선택하세요! 승용차·버스·탑차트럭·소방·경찰·테슬라 로드스터 등 <strong>총 <span id="osrTotalCount">96</span>종</strong> 즉시 운전 가능!</div>
             <div class="osr-cur-car-line">
               <strong id="osrCarTitle">신형 테슬라 로드스터 SpaceX 에어 스러스터</strong>
-              <span id="osrCarMeta">테슬라 · 하부 콜드가스 에어부양 · 최고 385km/h</span>
             </div>
           </div>
+          <button type="button" class="tsd-close-x" onclick="closeOutdoor3DCarShowroom()">✕</button>
+        </div>
+        <div class="osr-top-main" style="gap:6px;">
+          <span id="osrCarMeta" style="flex:1;min-width:0;">테슬라 · 하부 콜드가스 에어부양 · 최고 385km/h (<span id="osrTotalCount">97</span>종)</span>
           <div class="osr-banner-actions">
             <button type="button" class="pv-chip" onclick="toggleForceLandscapeMode()" title="가로/세로 화면 전환">🔄 가로/세로</button>
-            <button type="button" class="pv-chip" onclick="closeOutdoor3DCarShowroom();openCarSelector()" title="96종 전체 카드 표로 한눈에 보기">📋 전체표</button>
-            <button type="button" class="tsd-close-x" onclick="closeOutdoor3DCarShowroom()">✕</button>
+            <button type="button" class="pv-chip" onclick="closeOutdoor3DCarShowroom();openCarSelector()" title="전체 차량 카드 표 보기">📋 전체표</button>
           </div>
         </div>
 
         <!-- Instant Vehicle Word Search + Category & Popular Vehicle Word Chips! -->
         <div class="osr-word-bar">
-          <input type="search" id="osrWordSearchInput" placeholder="🔍 차량 단어 검색 (예: 로드스터, 사이버트럭, 버스, 트럭, 탑차, 카마로, 소방, 경찰, 택시, 다마스...)"
+          <input type="search" id="osrWordSearchInput" placeholder="🔍 단어검색 (버스·트럭·로드스터...)"
             oninput="onShowroomWordSearch(this.value)" />
           <div class="osr-word-chips" id="osrWordChipsWrap"></div>
         </div>
@@ -13438,6 +13467,7 @@
 
     function buildKoreanVehicleMesh(carSpec, overrideHex, plateStr, isPlayer) {
       if (carSpec && carSpec.brand === '테슬라' && typeof buildTeslaFsd3DMesh === 'function') return buildTeslaFsd3DMesh(carSpec, overrideHex, isPlayer);
+      if (carSpec && carSpec.profile === 'city_bus' && typeof buildAuthenticBus3DMesh === 'function') return buildAuthenticBus3DMesh(carSpec, overrideHex, plateStr, isPlayer);
       if (carSpec && (carSpec.hasCargoBox || carSpec.hasFireLadder) && typeof buildBoxOrLadderTruck3DMesh === 'function') return buildBoxOrLadderTruck3DMesh(carSpec, overrideHex, isPlayer);
       if (carSpec && (carSpec.id === 'mustang_gt_blue' || carSpec.profile === 'mustang_s650')) return buildExactMustangGtd3DMesh(carSpec, overrideHex, isPlayer);
       const root = new THREE.Group();
@@ -13581,7 +13611,7 @@
       }
 
       for (const wz of [wheelZFront, wheelZRear]) {
-        const well = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 1.10, wheelR * 1.10, W * 0.98, 20), trimBlack);
+        const well = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 1.06, wheelR * 1.06, W * 0.80, 20), trimBlack);
         well.rotation.z = Math.PI / 2;
         well.position.set(0, wheelR, wz);
         bodyGroup.add(well);
@@ -14071,6 +14101,7 @@
     function rebuildPlayer3DCar() {
       if (!useWebGL || !playerCarGroup) return;
       while (playerCarGroup.children.length > 0) playerCarGroup.remove(playerCarGroup.children[0]);
+      playerCarWingsGroup = null;
       sirenLightL = null; sirenLightR = null; sirenPointLight3D = null; waterCannonTurret3D = null; cockpitWheelMesh = null;
       const built = buildKoreanVehicleMesh(getCurrentCar(), state.customColor, state.customPlate, true);
       playerCarGroup.add(built.root);
@@ -14101,6 +14132,98 @@
       }
 
       while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children[0]);
+
+      if (envType === 'outdoor_showroom') {
+        // Authentic DRIVING GAME 4.0 Sunlit Korean 4-Way Asphalt Intersection Showroom (1000025339.jpg & 1000025341.jpg!)
+        if (skyDomeMesh) skyDomeMesh.visible = false;
+        if (cloudGroup3D) cloudGroup3D.visible = false;
+        scene.background = new THREE.Color(0x9ec5eb);
+        scene.fog = new THREE.Fog(0xcce2f7, 65, 210);
+        if (hemiLight3D) {
+          hemiLight3D.color.set(0xe0f2fe);
+          hemiLight3D.groundColor.set(0x64748b);
+          hemiLight3D.intensity = 1.15;
+        }
+        if (keyLight3D) {
+          keyLight3D.color.set(0xfffbeb);
+          keyLight3D.intensity = 1.42;
+          keyLight3D.position.set(18, 30, 24);
+        }
+        if (renderer && renderer.toneMappingExposure !== undefined) {
+          renderer.toneMappingExposure = 1.08;
+        }
+
+        // Wide Realistic Grey Asphalt Intersection Surface
+        const asphalt = new THREE.Mesh(
+          new THREE.PlaneGeometry(180, 180),
+          new THREE.MeshStandardMaterial({ color: 0x565d68, roughness: 0.86, metalness: 0.06 })
+        );
+        asphalt.rotation.x = -Math.PI / 2;
+        asphalt.receiveShadow = true;
+        worldGroup.add(asphalt);
+
+        const whiteStripeMat = new THREE.MeshBasicMaterial({ color: 0xf1f5f9 });
+        const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.90 });
+        const bldgGlassMat = new THREE.MeshPhongMaterial({ color: 0x1e293b, specular: 0x93c5fd, shininess: 180 });
+        const bldgFrameMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.55 });
+        const treeMat = new THREE.MeshLambertMaterial({ color: 0x2f6f3e });
+        const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4b3621 });
+
+        // 4 White Pedestrian Crosswalks (횡단보도) Around the Central Plaza!
+        for (const [cx, cz, rotY] of [[0, -18, 0], [0, 18, 0], [-18, 0, Math.PI / 2], [18, 0, Math.PI / 2]]) {
+          for (let k = -6; k <= 6; k++) {
+            const zebra = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 4.2), whiteStripeMat);
+            zebra.rotation.x = -Math.PI / 2;
+            zebra.rotation.z = rotY;
+            if (rotY === 0) zebra.position.set(k * 1.7, 0.02, cz);
+            else zebra.position.set(cx, 0.02, k * 1.7);
+            worldGroup.add(zebra);
+          }
+        }
+        // Dashed Lane Dividers Extending Beyond Intersection
+        for (const sign of [-1, 1]) {
+          for (let d = 24; d <= 72; d += 7) {
+            for (const lx of [-7, -3.5, 3.5, 7]) {
+              const dashZ = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 3.2), whiteStripeMat);
+              dashZ.rotation.x = -Math.PI / 2;
+              dashZ.position.set(lx, 0.018, sign * d);
+              const dashX = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.18), whiteStripeMat);
+              dashX.rotation.x = -Math.PI / 2;
+              dashX.position.set(sign * d, 0.018, lx);
+              worldGroup.add(dashZ, dashX);
+            }
+          }
+        }
+
+        // Corner Sidewalks, Modern Glass Commercial Buildings, Street Trees & Traffic Signal Gantries!
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            const curb = new THREE.Mesh(new THREE.BoxGeometry(36, 0.22, 36), sidewalkMat);
+            curb.position.set(sx * 34, 0.11, sz * 34);
+            const bldg = new THREE.Mesh(new THREE.BoxGeometry(22, 16, 22), bldgGlassMat);
+            bldg.position.set(sx * 35, 8.1, sz * 35);
+            const roofBand = new THREE.Mesh(new THREE.BoxGeometry(22.6, 1.1, 22.6), bldgFrameMat);
+            roofBand.position.set(sx * 35, 16.2, sz * 35);
+            worldGroup.add(curb, bldg, roofBand);
+            for (let ti = 0; ti < 3; ti++) {
+              const tx = sx * (20 + ti * 6), tz = sz * 19.5;
+              const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8), trunkMat);
+              trunk.position.set(tx, 1.1, tz);
+              const crown = new THREE.Mesh(new THREE.SphereGeometry(1.55, 10, 8), treeMat);
+              crown.position.set(tx, 3.1, tz);
+              worldGroup.add(trunk, crown);
+            }
+          }
+        }
+
+        // Iconic 3D [DRIVING GAME 4.0] Monument Sign in the Background!
+        const dgTex = makeSignTexture('#f8fafc', '#0f172a', 'DRIVING GAME 4.0', '97 VEHICLES · KOREA', '#0f172a');
+        const dgSign = new THREE.Mesh(new THREE.BoxGeometry(11.5, 4.2, 0.45), new THREE.MeshBasicMaterial({ map: dgTex }));
+        dgSign.position.set(-10.5, 2.3, -24.5);
+        dgSign.rotation.y = 0.28;
+        worldGroup.add(dgSign);
+        return;
+      }
 
       if (envType === 'lobby') {
         // Sleek Hyundai Motorstudio / Kia360 Architectural Dark Slate Studio & Horizon!
@@ -14845,10 +14968,10 @@
       if (spoilerPivot) spoilerPivot.position.y = getCurrentCar().dims[1] * 0.64 + state.spoilerAnim * 0.13;
 
       if (state.stage === 'lobby') {
-        if (!state.isDraggingOrbit) state.lobbyYaw += dt * 0.24;
+        if (!state.isDraggingOrbit && !state.showroomOpen) state.lobbyYaw += dt * 0.24;
         if (playerCarGroup) {
-          playerCarGroup.position.set(0, (state.hoverMode ? 1.15 + Math.sin(performance.now() * 0.003) * 0.14 : 0.04), 0);
-          playerCarGroup.rotation.set(state.bodyPitch, state.heading, state.bodyRoll);
+          playerCarGroup.position.set(0, (state.hoverMode && !state.showroomOpen ? 1.15 + Math.sin(performance.now() * 0.003) * 0.14 : 0.04), 0);
+          playerCarGroup.rotation.set(0, state.showroomOpen ? 0 : state.heading, 0);
         }
         return;
       }
@@ -15435,14 +15558,34 @@
         const isBus = car.profile === 'city_bus';
 
         if (state.stage === 'lobby') {
-          const dist = isBus ? 10.8 : 6.15;
-          const cx = Math.sin(state.lobbyYaw) * Math.cos(state.lobbyPitch) * dist;
-          const cy = Math.max(1.05, Math.sin(state.lobbyPitch) * dist + 0.72);
-          const cz = Math.cos(state.lobbyYaw) * Math.cos(state.lobbyPitch) * dist;
+          const [cW, cH, cL] = car.dims || [1.90, 1.50, 4.85];
+          const camAspect = Math.max(0.38, camera.aspect || (window.innerWidth / Math.max(1, window.innerHeight)));
+          const wantFov = (state.showroomOpen && camAspect < 0.85) ? 55 : 50;
+          if (Math.abs(camera.fov - wantFov) > 0.2) {
+            camera.fov = wantFov;
+            camera.updateProjectionMatrix();
+          }
+          const yaw = state.lobbyYaw;
+          const pitch = state.lobbyPitch;
+          // Exact projected bounding half-width & half-depth of [cW, cL] at azimuth yaw:
+          const projHalfW = (cL * 0.5) * Math.abs(Math.sin(yaw)) + (cW * 0.5) * Math.abs(Math.cos(yaw));
+          const projHalfD = (cL * 0.5) * Math.abs(Math.cos(yaw)) + (cW * 0.5) * Math.abs(Math.sin(yaw));
+          const tanV = Math.tan((camera.fov * Math.PI / 180) * 0.5);
+          const tanH = Math.max(0.20, tanV * camAspect);
+          const fillW = state.showroomOpen ? (camAspect < 0.85 ? 0.62 : 0.52) : (camAspect < 0.85 ? 0.72 : 0.62);
+          const fillH = state.showroomOpen ? (camAspect < 0.85 ? 0.42 : 0.42) : 0.56;
+          const distW = (projHalfW / fillW) / tanH + projHalfD * 0.82;
+          const distH = ((cH * 0.64) / fillH) / tanV + projHalfD * 0.95;
+          const dist = Math.max(6.8, distW, distH);
+
+          const cx = Math.sin(yaw) * Math.cos(pitch) * dist;
+          const cy = Math.max(1.35, Math.sin(pitch) * dist + cH * 0.44);
+          const cz = Math.cos(yaw) * Math.cos(pitch) * dist;
           camera.position.set(cx, cy, cz);
-          // Frame car slightly higher when configurator sheet is open so car stays centered above sheet!
           const drawerOpen = document.getElementById('carSelectorDrawer').style.display === 'flex';
-          const lookY = (drawerOpen ? 0.42 : 0.72) + (state.hoverMode ? 1.0 : 0);
+          const lookY = state.showroomOpen
+            ? (cH * 0.44 + (camAspect < 0.85 ? cH * 0.06 : -0.12))
+            : ((drawerOpen ? 0.42 : cH * 0.46) + (state.hoverMode ? 1.0 : 0));
           camera.lookAt(0, lookY, 0);
         } else if (state.stage === 'driving' && state.activeZone === 'subway') {
           if (state.cameraMode === 1) {
@@ -15482,15 +15625,21 @@
             const cSin = Math.sin(orbitAngle);
             const cCos = Math.cos(orbitAngle);
             const fltCam = state.flightMorph || 0;
+            if (Math.abs(camera.fov - 52) > 0.5) { camera.fov = 52; camera.updateProjectionMatrix(); }
+            const [cW, cH, cL] = car.dims || [1.90, 1.50, 4.85];
+            const extraLen = Math.max(0, cL - 4.95);
+            const extraH = Math.max(0, cH - 1.62);
             const camAspect = (camera && camera.aspect) ? camera.aspect : (window.innerWidth / Math.max(1, window.innerHeight));
             const portBack = camAspect < 0.85 ? (3.85 / Math.max(0.46, camAspect * 0.92)) : 4.25;
-            const backDist = isBus ? 12.0 : (portBack + fltCam * 4.8 + Math.min(0.75, Math.abs(state.speed) * 0.020));
-            const upH = isBus ? 4.2 : ((camAspect < 0.85 ? 2.08 : 1.78) + fltCam * 1.45);
+            const portHeavyScale = camAspect < 0.85 ? 1.26 : 1.0;
+            const backDist = (portBack + extraLen * 1.05 * portHeavyScale + fltCam * 4.8 + Math.min(0.75, Math.abs(state.speed) * 0.020));
+            const upH = (camAspect < 0.85 ? 2.08 : 1.78) + extraH * 1.08 + fltCam * 1.45;
+            const lookAhead = 6.5 + extraLen * 0.85;
             const goalX = state.x - cSin * backDist;
             const goalY = state.y + upH;
             const goalZ = state.z - cCos * backDist;
-            const goalLX = state.x + sinH * 6.5;
-            const goalLZ = state.z + cosH * 6.5;
+            const goalLX = state.x + sinH * lookAhead;
+            const goalLZ = state.z + cosH * lookAhead;
             if (!state.camPosInit || Math.hypot(goalX - state.camX, goalZ - state.camZ) > 25) {
               state.camX = goalX; state.camY = goalY; state.camZ = goalZ;
               state.camLookX = goalLX; state.camLookZ = goalLZ;
@@ -15504,28 +15653,34 @@
               state.camLookZ = dampVal(state.camLookZ, goalLZ, 9.5, cDt);
             }
             const jolt = state.crashShake > 0 ? (Math.sin(performance.now() * 0.09) * state.crashShake * 0.65) : 0;
+            const lookUpY = state.y + 0.92 + Math.max(0, ((car.dims ? car.dims[1] : 1.5) - 1.62) * 0.65);
             camera.position.set(state.camX + jolt, state.camY + Math.abs(jolt) * 0.4, state.camZ);
-            camera.lookAt(state.camLookX, state.y + 0.92, state.camLookZ);
+            camera.lookAt(state.camLookX, lookUpY, state.camLookZ);
           } else if (state.cameraMode === 1) {
-            const seatUp = isBus ? 2.1 : (car.dims[1] * 0.76);
-            const seatFwd = isBus ? 3.2 : 0.22;
+            const [cW, cH, cL] = car.dims || [1.9, 1.5, 4.8];
+            const isCabOver = Boolean(isBus || car.hasCargoBox || car.hasFireLadder);
+            const seatUp = isCabOver ? Math.min(2.45, cH * 0.66) : (cH * 0.76);
+            const seatFwd = isCabOver ? (cL * 0.36) : 0.22;
             const leftOff = -0.36;
             camera.position.set(
-              state.x - sinH * seatFwd + cosH * leftOff,
+              state.x + sinH * seatFwd - cosH * leftOff,
               state.y + seatUp,
               state.z + cosH * seatFwd + sinH * leftOff
             );
             camera.lookAt(
-              state.x - sinH * 18 + cosH * leftOff,
-              state.y + seatUp - 0.30,
-              state.z + cosH * 18 + sinH * leftOff
+              state.x + sinH * 24 - cosH * leftOff,
+              state.y + seatUp - 0.32,
+              state.z + cosH * 24 + sinH * leftOff
             );
           } else if (state.cameraMode === 2) {
-            camera.position.set(state.x + sinH * 3, state.y + 21, state.z - cosH * 3);
-            camera.lookAt(state.x, state.y, state.z + 0.01);
+            const topH = Math.max(21, (car.dims ? car.dims[2] : 4.8) * 2.4);
+            camera.position.set(state.x - sinH * 3, state.y + topH, state.z - cosH * 3);
+            camera.lookAt(state.x + sinH * 2, state.y, state.z + cosH * 2);
           } else {
-            camera.position.set(state.x - cosH * 4.4, state.y + 1.9, state.z - sinH * 4.4);
-            camera.lookAt(state.x, state.y + 0.9, state.z);
+            const sideDist = Math.max(5.0, (car.dims ? car.dims[2] : 4.8) * 0.95);
+            const sideUp = Math.max(1.9, (car.dims ? car.dims[1] : 1.5) * 0.72);
+            camera.position.set(state.x + cosH * sideDist, state.y + sideUp, state.z - sinH * sideDist);
+            camera.lookAt(state.x, state.y + sideUp * 0.52, state.z);
           }
         }
 
@@ -15560,6 +15715,24 @@
       const car = getCurrentCar();
       const paint = state.customColor || car.color;
 
+      if (state.stage === 'lobby' && state.showroomOpen) {
+        // Daylight Asphalt Intersection Showroom Backdrop (2D Fallback)
+        const hz = Math.floor(h * 0.44);
+        const skyG = ctx.createLinearGradient(0, 0, 0, hz);
+        skyG.addColorStop(0, '#7dd3fc');
+        skyG.addColorStop(1, '#dbeafe');
+        ctx.fillStyle = skyG;
+        ctx.fillRect(0, 0, w, hz);
+        ctx.fillStyle = '#525b66';
+        ctx.fillRect(0, hz, w, h - hz);
+        ctx.fillStyle = 'rgba(241,245,249,0.78)';
+        for (let k = -5; k <= 5; k++) {
+          ctx.fillRect(w * 0.5 + k * 28 - 9, hz + 18, 16, 8);
+        }
+        const scaleFit = Math.min(0.95, (w * 0.56) / 220);
+        drawSleekVectorCar3Q(ctx, w * 0.5, h * 0.58, scaleFit, car, paint);
+        return;
+      }
       if (state.stage === 'lobby') {
         // Dark Architectural Showroom Backdrop
         const bg = ctx.createRadialGradient(w * 0.5, h * 0.42, 40, w * 0.5, h * 0.48, Math.max(w, h) * 0.72);
@@ -16569,6 +16742,48 @@
       ctx.translate(cx, cy);
       ctx.scale(sc, sc);
 
+      if (car.profile === 'city_bus' || car.hasCargoBox || car.hasFireLadder || car.id === 'cybertruck') {
+        ctx.fillStyle = 'rgba(0,0,0,0.48)';
+        ctx.beginPath(); ctx.ellipse(0, 44, 178, 18, 0, 0, Math.PI * 2); ctx.fill();
+        if (car.profile === 'city_bus') {
+          const isDbl = car.id === 'man_double_decker';
+          const topY = isDbl ? -104 : -78;
+          ctx.fillStyle = paint || '#f8fafc';
+          ctx.strokeStyle = 'rgba(15,23,42,0.35)';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.roundRect(-162, topY, 324, 28 - topY, 12); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath(); ctx.roundRect(-150, topY + 12, 296, isDbl ? 36 : 44, 6); ctx.fill();
+          if (isDbl) { ctx.beginPath(); ctx.roundRect(-146, topY + 58, 288, 34, 6); ctx.fill(); }
+          ctx.fillStyle = '#fde047';
+          ctx.fillRect(-160, 8, 22, 10);
+        } else if (car.id === 'cybertruck') {
+          ctx.fillStyle = '#aeb6c2';
+          ctx.beginPath();
+          ctx.moveTo(-164, 24); ctx.lineTo(-156, -12); ctx.lineTo(-12, -66); ctx.lineTo(158, -26); ctx.lineTo(160, 24); ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath(); ctx.moveTo(-98, -14); ctx.lineTo(-12, -58); ctx.lineTo(68, -38); ctx.lineTo(68, -14); ctx.closePath(); ctx.fill();
+        } else {
+          ctx.fillStyle = paint || '#f8fafc';
+          ctx.beginPath(); ctx.roundRect(-154, -52, 92, 78, 8); ctx.fill();
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath(); ctx.roundRect(-144, -42, 66, 30, 5); ctx.fill();
+          ctx.fillStyle = car.hasFireLadder ? '#dc2626' : '#f8fafc';
+          ctx.beginPath(); ctx.roundRect(-56, car.hasFireLadder ? -36 : -76, 212, car.hasFireLadder ? 62 : 102, 6); ctx.fill();
+          if (car.hasFireLadder) {
+            ctx.fillStyle = '#e2e8f0';
+            ctx.save(); ctx.translate(40, -56); ctx.rotate(-0.08); ctx.fillRect(-110, -10, 220, 16); ctx.restore();
+          }
+        }
+        for (const wx of [-102, 104]) {
+          ctx.fillStyle = '#111827'; ctx.beginPath(); ctx.arc(wx, 28, 25, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#cbd5e1'; ctx.beginPath(); ctx.arc(wx, 28, 14, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        return;
+      }
+
       const isSuv = car.profile.includes('suv') || car.profile.includes('cuv') || car.profile.includes('mpv') || car.profile === 'grand_minivan' || car.profile === 'kei_box';
       const isPickup = car.profile === 'pickup_tasman';
 
@@ -17040,18 +17255,22 @@
       const worldWrap = document.getElementById('worldCanvasWrap');
       worldWrap.addEventListener('pointerdown', e => {
         if (state.stage !== 'lobby') return;
+        const isRot90 = document.documentElement.classList.contains('force-landscape-90');
         state.isDraggingOrbit = true;
-        state.lastPointerX = e.clientX;
-        state.lastPointerY = e.clientY;
+        state.lastPointerX = isRot90 ? e.clientY : e.clientX;
+        state.lastPointerY = isRot90 ? (window.innerWidth - e.clientX) : e.clientY;
       });
       window.addEventListener('pointermove', e => {
         if (!state.isDraggingOrbit) return;
-        const dx = e.clientX - state.lastPointerX;
-        const dy = e.clientY - state.lastPointerY;
-        state.lastPointerX = e.clientX;
-        state.lastPointerY = e.clientY;
+        const isRot90 = document.documentElement.classList.contains('force-landscape-90');
+        const curX = isRot90 ? e.clientY : e.clientX;
+        const curY = isRot90 ? (window.innerWidth - e.clientX) : e.clientY;
+        const dx = curX - state.lastPointerX;
+        const dy = curY - state.lastPointerY;
+        state.lastPointerX = curX;
+        state.lastPointerY = curY;
         state.lobbyYaw -= dx * 0.0085;
-        state.lobbyPitch = Math.max(0.05, Math.min(0.78, state.lobbyPitch + dy * 0.0055));
+        state.lobbyPitch = Math.max(0.06, Math.min(0.58, state.lobbyPitch + dy * 0.006));
       });
       window.addEventListener('pointerup', () => { state.isDraggingOrbit = false; });
 
@@ -17975,7 +18194,53 @@
         root.add(playerHeadlightGroup);
       }
 
-      if (isCybertruck) {
+      const isRoadsterRocket = carSpec.id === 'tesla_roadster_rocket' || carSpec.id === 'tesla_roadster';
+      if (isRoadsterRocket) {
+        // Authentic 2026 New Tesla Roadster (SpaceX Cold-Gas Thruster Wedge — 1000025333.jpg!)
+        const aeroWedgeGeo = createSculptedChassisGeometry('supercar_wedge', W, H, L, wheelR);
+        const wedgeShell = new THREE.Mesh(aeroWedgeGeo, paintMat);
+        wedgeShell.castShadow = true;
+        wedgeShell.receiveShadow = true;
+        bodyGroup.add(wedgeShell);
+
+        // Smoked Aerospace Bubble Glass Canopy + Scissor-Door Seam
+        const canopy = new THREE.Mesh(new THREE.BoxGeometry(W * 0.74, H * 0.30, L * 0.44), glassRoofMat);
+        canopy.position.set(0, H * 0.80, -0.06);
+        const fWind = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.72, H * 0.48), glassRoofMat);
+        fWind.rotation.x = -1.16;
+        fWind.position.set(0, H * 0.74, hl * 0.34);
+        bodyGroup.add(canopy, fWind);
+
+        // Signature Crimson SpaceX Perimeter Aero Stripe & Carbon Splitter
+        const redStripeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        const splitter = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, 0.04, L * 0.96), trimDarkMat);
+        splitter.position.set(0, wheelR * 0.44, 0);
+        const redTrim = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, 0.028, L * 0.97), redStripeMat);
+        redTrim.position.set(0, wheelR * 0.50, 0);
+        bodyGroup.add(splitter, redTrim);
+
+        // Sharp LED Laser Headlamps + Rear Full-Width Crimson Diffuser Blade + 4 SpaceX Cold-Gas Nozzles!
+        [-1, 1].forEach(side => {
+          const fBlade = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.036, 0.08), frontLaserMat);
+          fBlade.position.set(side * (hw * 0.66), H * 0.43, hl - 0.03);
+          fBlade.rotation.z = side * -0.14;
+          bodyGroup.add(fBlade);
+        });
+        const rBlade = new THREE.Mesh(new THREE.BoxGeometry(W * 0.90, 0.045, 0.06), tailRedMat);
+        rBlade.position.set(0, H * 0.56, -hl + 0.01);
+        bodyGroup.add(rBlade);
+        const nozzleMetal = new THREE.MeshPhongMaterial({ color: 0x94a3b8, shininess: 220 });
+        const nozzleCore = new THREE.MeshBasicMaterial({ color: 0x7dd3fc });
+        [-0.42, -0.15, 0.15, 0.42].forEach(nx => {
+          const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.072, 0.16, 14), nozzleMetal);
+          noz.rotation.x = Math.PI / 2;
+          noz.position.set(nx, wheelR * 0.62, -hl - 0.02);
+          const core = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.17, 12), nozzleCore);
+          core.rotation.x = Math.PI / 2;
+          core.position.set(nx, wheelR * 0.62, -hl - 0.025);
+          bodyGroup.add(noz, core);
+        });
+      } else if (isCybertruck) {
         // Sharp Planar Stainless-Steel Exoskeleton Wedge!
         const sideShape = new THREE.Shape();
         sideShape.moveTo(-hl, wheelR * 0.55);
@@ -18975,31 +19240,185 @@
     }
 
     // Bespoke 3D WebGL Mesh Builder for White Box Cargo Trucks & 119 Aerial Ladder Firetrucks
+    function buildAuthenticBus3DMesh(carSpec, overrideHex, plateStr, isPlayer) {
+      // Crisp Authentic Korean Express Coach / City Bus / MAN 2-Story Double-Decker (Matches 1000025341.jpg!)
+      const root = new THREE.Group();
+      const bodyHex = overrideHex || carSpec.color || '#f8fafc';
+      const [W, H, L] = carSpec.dims || [2.49, 3.35, 11.8];
+      const hw = W / 2, hl = L / 2;
+      const isDoubleDecker = carSpec.id === 'man_double_decker' || H > 3.75;
+      const wheelR = 0.48;
+      const envTex = getCarEnvMap();
+
+      const paintMat = new THREE.MeshPhongMaterial({ color: bodyHex, specular: 0xffffff, shininess: 190, envMap: envTex, reflectivity: 0.42, combine: THREE.MixOperation });
+      const roofWhiteMat = new THREE.MeshPhongMaterial({ color: bodyHex === '#16a34a' ? 0xf8fafc : bodyHex, shininess: 160 });
+      const darkGlassMat = new THREE.MeshPhongMaterial({ color: 0x09101d, specular: 0xe2e8f0, shininess: 250, envMap: envTex, reflectivity: 0.78 });
+      const trimBlack = new THREE.MeshPhongMaterial({ color: 0x111827, shininess: 70 });
+      const alcoaSilver = new THREE.MeshPhongMaterial({ color: 0xe2e8f0, specular: 0xffffff, shininess: 240 });
+      const headLed = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
+      const amberFog = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+      const tailRed = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+
+      // Soft ground shadow
+      const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(W * 1.24, L * 1.08),
+        new THREE.MeshBasicMaterial({ map: getContactShadowTexture(), transparent: true, depthWrite: false })
+      );
+      shadowPlane.rotation.x = -Math.PI / 2;
+      shadowPlane.position.y = 0.025;
+      root.add(shadowPlane);
+
+      const bodyH = H - wheelR * 0.52;
+      const bodyCenterY = wheelR * 0.52 + bodyH * 0.5;
+
+      // Main Coach Shell + Rounded Roof Crown + Front/Rear Bumpers
+      const mainShell = new THREE.Mesh(new THREE.BoxGeometry(W * 0.98, bodyH * 0.94, L * 0.97), paintMat);
+      mainShell.position.set(0, bodyCenterY, 0);
+      mainShell.castShadow = true;
+      mainShell.receiveShadow = true;
+      const roofCrown = new THREE.Mesh(new THREE.BoxGeometry(W * 0.90, bodyH * 0.08, L * 0.93), roofWhiteMat);
+      roofCrown.position.set(0, H - bodyH * 0.02, 0);
+      const lowSkirt = new THREE.Mesh(new THREE.BoxGeometry(W * 0.99, 0.18, L * 0.98), trimBlack);
+      lowSkirt.position.set(0, wheelR * 0.56, 0);
+      root.add(mainShell, roofCrown, lowSkirt);
+
+      // Panoramic Tinted Side Windows (2 Distinct Floors for MAN 2-Story Double-Decker!)
+      if (isDoubleDecker) {
+        const lowerWin = new THREE.Mesh(new THREE.BoxGeometry(W * 0.995, H * 0.23, L * 0.84), darkGlassMat);
+        lowerWin.position.set(0, H * 0.44, -L * 0.02);
+        const upperWin = new THREE.Mesh(new THREE.BoxGeometry(W * 0.995, H * 0.24, L * 0.88), darkGlassMat);
+        upperWin.position.set(0, H * 0.79, 0.01);
+        const upperFrontGlass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.90, H * 0.23, 0.06), darkGlassMat);
+        upperFrontGlass.position.set(0, H * 0.79, hl * 0.97);
+        root.add(lowerWin, upperWin, upperFrontGlass);
+      } else {
+        const sideWin = new THREE.Mesh(new THREE.BoxGeometry(W * 0.995, H * 0.36, L * 0.86), darkGlassMat);
+        sideWin.position.set(0, H * 0.67, 0.01);
+        root.add(sideWin);
+      }
+
+      // Tall Front Panoramic Coach Windshield + Black Pillar Frame + Twin Wipers (1000025341.jpg!)
+      const fWindH = isDoubleDecker ? H * 0.34 : H * 0.44;
+      const fWindY = isDoubleDecker ? H * 0.43 : H * 0.63;
+      const frontWind = new THREE.Mesh(new THREE.BoxGeometry(W * 0.91, fWindH, 0.06), darkGlassMat);
+      frontWind.position.set(0, fWindY, hl * 0.97);
+      const rearWind = new THREE.Mesh(new THREE.BoxGeometry(W * 0.86, H * 0.24, 0.06), darkGlassMat);
+      rearWind.position.set(0, H * 0.68, -hl * 0.97);
+      root.add(frontWind, rearWind);
+
+      // Twin Diagonal Windshield Wipers
+      [-0.36, 0.36].forEach(wx => {
+        const wiper = new THREE.Mesh(new THREE.BoxGeometry(0.035, fWindH * 0.55, 0.04), trimBlack);
+        wiper.position.set(wx, fWindY - fWindH * 0.16, hl * 0.99);
+        wiper.rotation.z = -0.20;
+        root.add(wiper);
+      });
+
+      // Top Illuminated Destination LED Board
+      const routeTitle = isDoubleDecker ? '2층 광역 시티투어' : (carSpec.id === 'daewoo_fx116' || carSpec.id === 'kia_granbird_gold' ? 'EXPRESS 고속' : '서울 간선 버스');
+      const rTex = makeSignTexture('#090d16', '#fde047', routeTitle, carSpec.name.slice(0, 12), '#38bdf8');
+      const rBoard = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.62, 0.26), new THREE.MeshBasicMaterial({ map: rTex }));
+      rBoard.position.set(0, isDoubleDecker ? H * 0.61 : H * 0.88, hl * 0.995);
+      root.add(rBoard);
+
+      // Forward-Cantilevered Bunny-Ear Coach Mirrors (Iconic in 1000025341.jpg!)
+      [-1, 1].forEach(side => {
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.42), trimBlack);
+        arm.position.set(side * (hw * 0.98), H * (isDoubleDecker ? 0.56 : 0.76), hl * 0.98);
+        const pod = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.34, 0.10), trimBlack);
+        pod.position.set(side * (hw * 1.04), H * (isDoubleDecker ? 0.50 : 0.70), hl * 1.04);
+        root.add(arm, pod);
+      });
+
+      // Projector Coach Headlamps + Amber Fog Lights + Rear Tall Bus Taillamps + Commercial Plate
+      [-1, 1].forEach(side => {
+        const hLamp = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.13, 0.06), headLed);
+        hLamp.position.set(side * (hw * 0.68), wheelR * 0.95, hl * 0.98);
+        const fog = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.07, 0.06), amberFog);
+        fog.position.set(side * (hw * 0.70), wheelR * 0.66, hl * 0.98);
+        const tLamp = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.48, 0.06), tailRed);
+        tLamp.position.set(side * (hw * 0.76), wheelR * 1.28, -hl * 0.98);
+        root.add(hLamp, fog, tLamp);
+      });
+      const pTex = makePlateTexture(plateStr || carSpec.plate, 'yellow');
+      const fPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.13), new THREE.MeshBasicMaterial({ map: pTex }));
+      fPlate.position.set(0, wheelR * 0.72, hl * 0.995);
+      const rPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.13), new THREE.MeshBasicMaterial({ map: pTex }));
+      rPlate.rotation.y = Math.PI;
+      rPlate.position.set(0, wheelR * 0.90, -hl * 0.995);
+      root.add(fPlate, rPlate);
+
+      // Rooftop HVAC Air-Conditioner Pod (Single-deck coaches)
+      if (!isDoubleDecker) {
+        const acPod = new THREE.Mesh(new THREE.BoxGeometry(W * 0.64, 0.16, L * 0.32), roofWhiteMat);
+        acPod.position.set(0, H + 0.06, -0.2);
+        root.add(acPod);
+      }
+
+      // Clean Tucked Heavy-Duty Alcoa Commercial Bus Wheels (6x2 Tag Axle on 12m Double-Decker!)
+      const tireMat = new THREE.MeshStandardMaterial({ color: 0x12161f, roughness: 0.82 });
+      const axleZs = isDoubleDecker ? [[L * 0.30, true], [-L * 0.24, false], [-L * 0.35, false]] : [[L * 0.29, true], [-L * 0.29, false]];
+      const localWheels = [];
+      axleZs.forEach(([wz, isFront]) => {
+        [-1, 1].forEach(side => {
+          const pivot = new THREE.Group();
+          pivot.position.set(side * (hw * 0.88), wheelR, wz);
+          const tire = new THREE.Mesh(new THREE.CylinderGeometry(wheelR, wheelR, 0.28, 22), tireMat);
+          tire.rotation.z = Math.PI * 0.5;
+          const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.62, wheelR * 0.62, 0.29, 16), alcoaSilver);
+          rim.rotation.z = Math.PI * 0.5;
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(wheelR * 0.22, wheelR * 0.22, 0.30, 12), trimBlack);
+          hub.rotation.z = Math.PI * 0.5;
+          pivot.add(tire, rim, hub);
+          root.add(pivot);
+          localWheels.push({ pivot, tire, isFront });
+        });
+      });
+
+      if (isPlayer) {
+        brakeLampMaterials = [tailRed];
+        reverseLampMaterials = [];
+        blinkerMeshesL = []; blinkerMeshesR = [];
+        playerWheels = localWheels;
+      }
+      return { root, wheels: localWheels, blinkL: [], blinkR: [] };
+    }
+
     function buildBoxOrLadderTruck3DMesh(carSpec, overrideHex, isPlayer) {
       const root = new THREE.Group();
       const cabHex = overrideHex || carSpec.color || '#f8fafc';
       const [W, H, L] = carSpec.dims || [1.9, 2.5, 5.4];
       const hw = W / 2, hl = L / 2;
       const wheelR = L > 7 ? 0.46 : 0.36;
-      const cabMat = new THREE.MeshPhongMaterial({ color: cabHex, shininess: 140 });
-      const whiteBoxMat = new THREE.MeshPhongMaterial({ color: 0xf8fafc, shininess: 110 });
-      const silverMat = new THREE.MeshPhongMaterial({ color: 0xe2e8f0, shininess: 200 });
+      const cabMat = new THREE.MeshPhongMaterial({ color: cabHex, shininess: 150 });
+      const whiteBoxMat = new THREE.MeshPhongMaterial({ color: 0xf8fafc, shininess: 115 });
+      const silverMat = new THREE.MeshPhongMaterial({ color: 0xe2e8f0, shininess: 210 });
       const darkMat = new THREE.MeshPhongMaterial({ color: 0x111827 });
-      const glassMat = new THREE.MeshPhongMaterial({ color: 0x0f172a, shininess: 220 });
+      const glassMat = new THREE.MeshPhongMaterial({ color: 0x0b1220, shininess: 240 });
       const tailMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
       const headMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
 
-      const chassis = new THREE.Mesh(new THREE.BoxGeometry(W * 0.90, 0.22, L * 0.96), darkMat);
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, 0.22, L * 0.95), darkMat);
       chassis.position.set(0, wheelR * 0.95, 0);
       root.add(chassis);
 
-      // Front Cab
-      const cabLen = L * 0.28;
+      // Front Cab + Side Windows + Front Windshield + Grille + Side Mirrors!
+      const cabLen = L * 0.27;
+      const cabZ = hl - cabLen * 0.51;
       const cab = new THREE.Mesh(new THREE.BoxGeometry(W * 0.94, H * 0.66, cabLen), cabMat);
-      cab.position.set(0, wheelR + H * 0.33, hl - cabLen * 0.52);
-      const wind = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.84, H * 0.28), glassMat);
-      wind.position.set(0, wheelR + H * 0.46, hl + 0.01);
-      root.add(cab, wind);
+      cab.position.set(0, wheelR + H * 0.33, cabZ);
+      const wind = new THREE.Mesh(new THREE.BoxGeometry(W * 0.84, H * 0.27, 0.05), glassMat);
+      wind.position.set(0, wheelR + H * 0.47, hl - 0.01);
+      const sideCabGlass = new THREE.Mesh(new THREE.BoxGeometry(W * 0.96, H * 0.24, cabLen * 0.66), glassMat);
+      sideCabGlass.position.set(0, wheelR + H * 0.47, cabZ + 0.04);
+      const grille = new THREE.Mesh(new THREE.BoxGeometry(W * 0.72, H * 0.18, 0.05), darkMat);
+      grille.position.set(0, wheelR + H * 0.20, hl - 0.005);
+      root.add(cab, wind, sideCabGlass, grille);
+      [-1, 1].forEach(side => {
+        const mir = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 0.08), darkMat);
+        mir.position.set(side * (hw * 0.99), wheelR + H * 0.45, hl - 0.14);
+        root.add(mir);
+      });
 
       if (carSpec.hasFireLadder) {
         // Red Fire Pump Body + Silver Extending Aerial Ladder Boom on Roof (1000025331.jpg!)
@@ -19139,16 +19558,35 @@
     function openOutdoor3DCarShowroom() {
       closeCarSelector();
       closeDcPauseDrawer();
+      if (state.isWalking) toggleWalkMode();
+      if (state.carFlightMode) toggleCarFlightMode(false);
+      state.flightMorph = 0;
+      state.airThrusterMode = false;
+      state.airThrusterAlt = 0;
+      state.airKickFlipAngle = 0;
+      state.airKickFlipActive = false;
       state.showroomOpen = true;
       state.autopilot = false;
       state.speed = 0;
+      state.x = 0;
+      state.y = 0;
+      state.z = 0;
+      state.heading = 0;
+      state.steerAngle = 0;
+      state.bodyPitch = 0;
+      state.bodyRoll = 0;
       state.stage = 'lobby';
-      state.lobbyYaw = 0.62;
-      state.lobbyPitch = 0.20;
+      state.lobbyYaw = 0.48;
+      state.lobbyPitch = 0.21;
       document.getElementById('launcherScreen').style.display = 'none';
       document.getElementById('lobbyOverlay').style.display = 'none';
       document.getElementById('drivingHud').style.display = 'none';
+      rebuildWorldEnvironment('outdoor_showroom');
       rebuildPlayer3DCar();
+      if (playerCarGroup) {
+        playerCarGroup.position.set(0, 0.04, 0);
+        playerCarGroup.rotation.set(0, 0, 0);
+      }
       const modal = document.getElementById('outdoorShowroomModal');
       if (modal) modal.style.display = 'flex';
       syncOutdoorShowroomUi();
@@ -19166,13 +19604,19 @@
       const n = KOREAN_CARS.length;
       const curIdx = Math.max(0, KOREAN_CARS.findIndex(c => c.id === state.selectedCarId));
       const nextCar = KOREAN_CARS[(curIdx + delta + n) % n];
+      state.lobbyYaw = 0.48;
+      state.lobbyPitch = 0.21;
       selectKoreanCar(nextCar.id);
       syncOutdoorShowroomUi();
+      updateCameraAndRender();
     }
 
     function pickShowroomVehicleById(carId) {
+      state.lobbyYaw = 0.48;
+      state.lobbyPitch = 0.21;
       selectKoreanCar(carId);
       syncOutdoorShowroomUi();
+      updateCameraAndRender();
     }
 
     function onShowroomWordSearch(val) {
