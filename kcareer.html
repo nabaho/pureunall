@@ -1758,6 +1758,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=3"></script>
 <script src="js/kcareer-scan.js?v=3"></script>
+<script src="js/kcareer-scaninbox.js?v=1"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
 <script src="js/kcareer-biz.js?v=10"></script>
@@ -1931,6 +1932,8 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
         <div class="kpi-grid" id="homeKpi"></div>
         <!-- ⏰ 마감 다가오는 사업 (2026-10-05) — 7일 안에 마감인 사업이 있을 때만 그린다(없으면 빈 자리도 없다) -->
         <div id="homeBizDue"></div>
+        <!-- 📥 스캔 가져오기 (2026-11-28) — 폴더 열기가 되는 PC 브라우저에서만 그린다(renderHomeScanInbox) -->
+        <div id="homeScanInbox"></div>
         <div id="homeTiles"></div>
         <div class="card" style="margin-top:18px">
           <div style="font-weight:600;color:var(--navy);margin-bottom:10px">연도별 실적 요약</div>
@@ -7175,6 +7178,7 @@ function renderHome(){
   if(typeof renderCvRecent==='function') renderCvRecent();
   if(typeof renderHomeTiles==='function') renderHomeTiles();
   _safe(renderHomeBizDue);
+  _safe(function(){ renderHomeScanInbox().catch(function(e){ console.warn('[스캔 가져오기]', e); }); });
 }
 /* ⏰ 홈 — 7일 안에 마감인 사업 (대표 지시 2026-10-05). 셈은 KcareerBiz.summary 한 곳(사업관리 한눈에와 같은 수).
    ⚠ 없으면 아무것도 안 그린다 — 「0건」 띠가 늘 떠 있으면 잔소리다. 금액은 안 보인다(홈은 처음 뜨는 화면이다). */
@@ -7191,6 +7195,100 @@ function renderHomeBizDue(){
         +'<span class="c" title="'+escapeHtml(d.title||'')+'">'+escapeHtml(d.title||'-')+'</span>'
         +'<span style="color:var(--text-mute)">'+escapeHtml(d.org||'')+'</span><span class="tag navy">'+escapeHtml(d.stage||'')+'</span></div>'; }).join('')
     +'</div>';
+}
+/* 📥 스캔 가져오기 (대표 지시 2026-11-28 「경력 관리 앱 스캔하면 가져오기도 만들어줘」).
+   PC 의 «푸른 스캔 도우미»가 바탕화면 Scan\경력관리_권형하\<갈래>\ 에 모아 둔 대표 경력 서류를
+   갈래마다 «이미 있는» OCR 등록(ocrDrop — 끌어다 놓기와 같은 길·같은 중복 막이)으로 넣는다. 갈래→쪽은 js/kcareer-scaninbox.js 한 곳.
+   ⚠ 폴더는 읽기 전용으로만 연다 — 파일을 고치거나 지우지 않는다. 가져온 것은 이 브라우저에만 적는다(폴더도 이 PC 에만 있다).
+   ⚠ 저절로 넣지 않는다 — 단추를 눌러야 들어간다. 브라우저가 폴더 권한을 «누른 순간»에만 묻고, 넣는 일은 AI 판독·실제 저장이다.
+   ⚠ 판독을 못 하는 상태(로그인·열쇠 없음)면 «가져옴»으로 적지 않는다 — 적으면 그 서류는 영영 다시 안 뜬다.
+   ⚠ 폰·사파리처럼 폴더 열기가 없는 브라우저에서는 띠를 그리지 않는다. */
+var _scanInboxDir=null, _scanInboxBusy=false;
+function _scanKnownKey(){ return NS+'scaninbox_known'; }
+function scanInboxKnown(){ try{ return JSON.parse(localStorage.getItem(_scanKnownKey())||'{}')||{}; }catch(e){ return {}; } }
+function scanInboxMark(files){ var k=scanInboxKnown(); files.forEach(function(f){ k[KcareerScanInbox.keyOf(f)]=Date.now(); });
+  try{ localStorage.setItem(_scanKnownKey(), JSON.stringify(k)); }catch(e){ console.warn('[스캔 가져오기] 가져온 목록을 적지 못했습니다', e); } }
+async function scanInboxGetDir(){
+  if(_scanInboxDir) return _scanInboxDir;
+  try{ var db=await _openFsDB();
+    _scanInboxDir=await new Promise(function(res){ var rq=db.transaction('handles','readonly').objectStore('handles').get('scanInbox');
+      rq.onsuccess=function(){ res(rq.result?rq.result.handle:null); }; rq.onerror=function(){ res(null); }; });
+  }catch(e){ _scanInboxDir=null; }
+  return _scanInboxDir;
+}
+async function scanInboxPutDir(h){
+  _scanInboxDir=h;
+  try{ var db=await _openFsDB();
+    await new Promise(function(res){ var tx=db.transaction('handles','readwrite');   /* IndexedDB 쓰기 — 스캔 폴더가 아니다 */
+      tx.objectStore('handles').put({key:'scanInbox', handle:h}); tx.oncomplete=function(){ res(true); }; tx.onerror=function(){ res(false); }; });
+  }catch(e){ console.warn('[스캔 가져오기] 폴더를 기억하지 못했습니다', e); }
+}
+async function scanInboxPick(){
+  if(!fsSupported()){ toast('이 브라우저는 폴더 열기를 지원하지 않습니다 — PC 의 Chrome 또는 Edge 에서 열어 주세요'); return null; }
+  try{
+    var h=await window.showDirectoryPicker({id:'kcareer-scaninbox', mode:'read'});
+    var names=[]; for await (var e of h.values()){ if(e.kind==='directory') names.push(e.name); }
+    var sub=KcareerScanInbox.resolveInbox(h.name, names);
+    if(sub===null){ toast('이 폴더에서 «경력관리_…» 폴더를 찾지 못했습니다 — 바탕화면 Scan 폴더(또는 그 안의 경력관리_권형하)를 골라 주세요', 6000); return null; }
+    if(sub.length) h=await _fsDir(h, sub[0]);   /* 폴더를 이름으로 찾는 곳은 _fsDir 한 곳 */
+    await scanInboxPutDir(h);
+    toast('✅ 스캔 폴더 지정: '+h.name, 3000);
+    _safe(function(){ renderHomeScanInbox().catch(function(){}); });
+    return h;
+  }catch(e){ if(e&&e.name==='AbortError') return null; toast('폴더 지정 실패: '+(e&&e.message||e)); return null; }
+}
+/* 갈래 폴더(한 단계)만 읽어 File 목록으로 — 더 깊이는 보지 않는다 */
+async function scanInboxList(h){
+  var out=[];
+  for(var i=0;i<KcareerScanInbox.CATEGORIES.length;i++){ var cat=KcareerScanInbox.CATEGORIES[i], d=null;
+    try{ d=await _fsDir(h, cat); }catch(e){ continue; }
+    for await (var ent of d.values()){ if(ent.kind!=='file') continue;
+      try{ var f=await ent.getFile(); out.push({category:cat, name:f.name, size:f.size, lastModified:f.lastModified, file:f}); }catch(e){} }
+  }
+  return out;
+}
+async function scanInboxImport(){
+  if(_scanInboxBusy){ toast('⏳ 가져오는 중입니다'); return; }
+  var h=await scanInboxGetDir();
+  if(!h){ h=await scanInboxPick(); if(!h) return; }
+  if(!(await fsEnsurePermission(h))){ toast('폴더 읽기 권한이 없어 가져오지 못했습니다 — 다시 눌러 «허용»해 주세요', 5000); return; }
+  if(typeof ocrDrop!=='function'){ toast('OCR 등록 기능을 찾지 못했습니다'); return; }
+  if(!getApiKey() && !getGVisionKey() && !aiReady()){ toast('로그인이 필요합니다 — 로그인한 뒤 다시 눌러 주세요'); return; }
+  _scanInboxBusy=true;
+  try{
+    var fresh=KcareerScanInbox.pickNew(await scanInboxList(h), scanInboxKnown());
+    if(!fresh.length){ toast('새로 들어온 스캔이 없습니다'); return; }
+    var groups=KcareerScanInbox.groupByPage(fresh), cert=[];
+    for(var g=0; g<groups.length; g++){ var G=groups[g];
+      if(G.page==='certdoc'){ cert=G.files; continue; }
+      await ocrDrop(G.files.map(function(f){ return f.file; }), G.page);
+      scanInboxMark(G.files);
+    }
+    /* 경력증명서는 OCR 쪽이 아니라 서류 보관함이다 — 보관 창을 «한 건씩» 띄운다(종류·연도는 사람이 확인) */
+    if(cert.length && typeof openDocSaveModal==='function'){
+      scanInboxMark([cert[0]]);
+      openDocSaveModal('certdoc','existing',cert[0].file);
+      if(cert.length>1) toast('경력증명서가 '+cert.length+'건입니다 — 보관한 뒤 «📥 가져오기»를 다시 누르면 다음 것이 뜹니다', 6000);
+    }
+  } finally { _scanInboxBusy=false; _safe(function(){ renderHomeScanInbox().catch(function(){}); }); }
+}
+async function renderHomeScanInbox(){
+  var box=document.getElementById('homeScanInbox'); if(!box) return;
+  if(!fsSupported() || typeof KcareerScanInbox==='undefined'){ box.innerHTML=''; return; }
+  var h=await scanInboxGetDir(), msg, tip;
+  if(!h){ tip='바탕화면 Scan 폴더를 한 번 지정해 두면, 스캔한 위촉장·수료증·실적·회의 서류를 여기서 한 번에 가져옵니다'; msg=escapeHtml(tip); }
+  else{
+    var n=null;
+    try{ if(await h.queryPermission({mode:'read'})==='granted') n=KcareerScanInbox.pickNew(await scanInboxList(h), scanInboxKnown()).length; }catch(e){}
+    tip=h.name+' · '+(n==null?'새 스캔은 «가져오기»를 누르면 확인합니다':(n?'새 스캔 '+n+'건':'새 스캔 없음'));
+    msg=escapeHtml(h.name)+' · '+(n==null?'새 스캔은 «가져오기»를 누르면 확인합니다':(n?'<b style="color:var(--red)">새 스캔 '+n+'건</b>':'새 스캔 없음'));
+  }
+  box.innerHTML='<div class="card" style="margin-top:12px;padding:8px 14px"><div style="display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden">'
+    +'<b style="font-size:13px;color:var(--ink)">📥 스캔 가져오기</b>'
+    +'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--text-mute)" title="'+escapeHtml(tip)+'">'+msg+'</span>'
+    +(h?'<button class="btn sm primary" type="button" onclick="scanInboxImport()">📥 가져오기</button>':'')
+    +'<button class="btn sm" type="button" onclick="scanInboxPick()" title="스캔 폴더 지정·바꾸기">'+(h?'📁':'📁 폴더 지정')+'</button>'
+    +'</div></div>';
 }
 function navTile(id){ const inf=(typeof navInfo==='function')?navInfo(id):{label:id,grp:null}; nav_to(id, inf.label, inf.grp); }
 function renderHomeTiles(){ const box=document.getElementById('homeTiles'); if(!box||typeof NAV==='undefined') return;
