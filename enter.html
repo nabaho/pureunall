@@ -633,72 +633,71 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
 .pbar:has(#mgBtn:not([hidden])) .nm{margin-right:0;}
 .mg-n{background:#dc2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:.68rem;font-weight:800;line-height:1.4;}
 .mg-n[hidden]{display:none;}
-.mg-drawer{position:fixed;top:0;bottom:0;left:0;width:400px;max-width:92vw;z-index:70;display:flex;flex-direction:column;background:#fff;
+.mg-drawer{position:fixed;top:0;bottom:0;left:0;width:min(320px,86vw);z-index:70;display:flex;flex-direction:column;background:#fff;
   border-right:1px solid #e2e8f0;box-shadow:16px 0 40px rgba(15,23,42,.14);transform:translateX(-104%);visibility:hidden;
   transition:transform .25s,visibility 0s linear .25s;}
 .mg-drawer.open{transform:none;visibility:visible;transition:transform .25s,visibility 0s;}
-.mg-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 18px 12px;}
-.mg-hd b{display:block;font-size:1.1rem;color:#1e293b;}
-.mg-hd small{display:block;font-size:.72rem;color:#64748b;margin-top:1px;}
-.mg-x{width:32px;height:32px;border:0;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.9rem;cursor:pointer;flex:none;}
+.mg-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 8px;}
+.mg-hd b{display:block;font-size:.98rem;color:#1e293b;}
+.mg-hd small{display:block;font-size:.68rem;color:#64748b;margin-top:1px;}
+.mg-x{width:28px;height:28px;border:0;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.9rem;cursor:pointer;flex:none;}
 .mg-x:hover{background:#cbd5e1;}
 .mg-x:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
-.mg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px;}
-.mg-tab{position:relative;display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:11px 12px 10px;border:2px solid #e2e8f0;border-radius:14px;
+.mg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 10px 10px;}
+.mg-tab{position:relative;display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:7px 9px 7px;border:2px solid #e2e8f0;border-radius:12px;
   background:#fff;color:#475569;font:inherit;cursor:pointer;min-width:0;}
 .mg-tab[hidden]{display:none;}
-.mg-tab-t{display:flex;align-items:center;gap:7px;font-size:.95rem;font-weight:800;white-space:nowrap;}
-.mg-tab-n{font-style:normal;font-size:.72rem;font-weight:600;color:#64748b;}
-.mg-tab-s{font-size:.7rem;color:#64748b;line-height:1.3;}
-.mg-tab-b{margin-top:2px;background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:.68rem;font-weight:800;}
+.mg-tab-t{display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:800;white-space:nowrap;}
+.mg-tab-n{font-style:normal;font-size:.68rem;font-weight:600;color:#64748b;}
+.mg-tab-s{font-size:.64rem;color:#64748b;line-height:1.25;}
+.mg-tab-b{margin-top:1px;background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:.64rem;font-weight:800;}
 .mg-tab-b[hidden]{display:none;}
-.mg-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;}
+.mg-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;}
 .mg-tab[data-zone="sales"] .mg-dot,.mg-zone[data-zone="sales"] .mg-dot{background:#d97706;}
 .mg-tab[data-zone="inside"] .mg-dot,.mg-zone[data-zone="inside"] .mg-dot{background:#16a34a;}
 .mg-tab[data-zone="sales"][aria-selected="true"]{border-color:#d97706;background:#fffbeb;color:#854d0e;}
 .mg-tab[data-zone="inside"][aria-selected="true"]{border-color:#16a34a;background:#f0fdf4;color:#166534;}
 .mg-tab:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
 /* 서랍 맨 아래 «백업·복구 · 설정» — 떠 있는 단추를 가리지 않고도 눌러 쓰게 (대표 지시 2026-11-28). 관리자에게만 보인다 */
-.mg-ft{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #e2e8f0;background:#f8fafc;flex:none;}
+.mg-ft{display:flex;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid #e2e8f0;background:#f8fafc;flex:none;}
 .mg-ft[hidden]{display:none;}
-.mg-ft button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;
-  background:#fff;color:#475569;font:inherit;font-size:.82rem;font-weight:700;white-space:nowrap;cursor:pointer;}
+.mg-ft button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:9px;
+  background:#fff;color:#475569;font:inherit;font-size:.76rem;font-weight:700;white-space:nowrap;cursor:pointer;}
 .mg-ft button:hover{border-color:#2563eb;color:#2563eb;}
 .mg-ft button:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
 .mg-ft button[hidden]{display:none;}
 /* 서랍이 열려 있는 동안은 떠 있는 «백업·복구»·«⚙ 설정» 알약을 감춘다 — 서랍 맨 아래에 같은 단추가 있고, 알약이 그 위에 겹쳐 눌린다 */
 body:has(#mgDrawer.open) #cfgFab,body:has(#mgDrawer.open) #pu-backup-admin-button{visibility:hidden;}
 @media(max-width:520px){ body.portal-mode .mg-ft{padding-bottom:calc(66px + env(safe-area-inset-bottom));} }   /* 하단 막대에 안 깔리게 */
-.mg-zone{flex:1;min-height:0;overflow:auto;padding:16px 16px 28px;border-top:5px solid var(--mg-c);background:var(--mg-bg);}
+.mg-zone{flex:1;min-height:0;overflow:auto;padding:10px 10px 16px;border-top:5px solid var(--mg-c);background:var(--mg-bg);}
 .mg-zone[hidden]{display:none;}
 .mg-zone[data-zone="sales"]{--mg-c:#d97706;--mg-bg:#fffbeb;--mg-ink:#854d0e;}
 .mg-zone[data-zone="inside"]{--mg-c:#16a34a;--mg-bg:#f0fdf4;--mg-ink:#166534;}
-.mg-zone-h{display:flex;flex-direction:column;gap:2px;margin:0 2px 10px;}
-.mg-zone-t{display:flex;align-items:center;gap:8px;font-size:1rem;color:var(--mg-ink);}
-.mg-zone-h small{font-size:.74rem;color:#64748b;}
+.mg-zone-h{display:flex;flex-direction:column;gap:1px;margin:0 2px 6px;}
+.mg-zone-t{display:flex;align-items:center;gap:7px;font-size:.88rem;color:var(--mg-ink);}
+.mg-zone-h small{font-size:.66rem;color:#64748b;}
 /* 서랍 안 줄 — 머리(접기 단추)는 감춘다(탭·구역 머리가 대신한다). 앱은 «아이콘 + 이름 + 설명» 한 줄씩 */
 .mg-zone .tilerow{margin:0;}
 .mg-zone .tilerow-h{display:none;}
 .mg-zone .tilerow:has(> .row-freeze:not([hidden])){padding-top:30px;}   /* 관리자 화면의 «📌 이 줄 고정» 이 첫 앱과 안 겹치게 */
 .mg-zone .tiles{display:flex;flex-direction:column;flex-wrap:nowrap;gap:2px;padding:0;}
-.mg-zone .tile{flex-direction:row;align-items:center;width:100%;max-width:none;min-width:0;padding:10px 12px;gap:13px;text-align:left;border-radius:12px;}
+.mg-zone .tile{flex-direction:row;align-items:center;width:100%;max-width:none;min-width:0;padding:6px 8px;gap:9px;text-align:left;border-radius:10px;}
 .mg-zone .tile:hover{background:rgba(255,255,255,.8);}
 .mg-zone .tile:hover .ic{transform:none;box-shadow:none;}
-.mg-zone .tile .ic{width:38px;height:38px;margin:0;flex:none;font-size:1.15rem;}
+.mg-zone .tile .ic{width:30px;height:30px;margin:0;flex:none;font-size:.95rem;}
 .mg-zone .tile .tx{min-width:0;flex:1;}
 .mg-zone .tile:has(.tile-alert,.nl-warn,.tile-soon-pill) .tx{padding-right:84px;}
-.mg-zone .tile{padding-right:40px;}
-.mg-zone .tile b{font-size:.92rem;font-weight:700;margin:0;}
-.mg-zone .tile .tx span{display:block;font-size:.75rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mg-zone .tile{padding-right:36px;}
+.mg-zone .tile b{font-size:.82rem;font-weight:700;margin:0;}
+.mg-zone .tile .tx span{display:block;font-size:.66rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mg-zone .tile .ic{position:static;backdrop-filter:none;}   /* backdrop-filter 가 있으면 ☆·딱지의 «기준 상자»가 아이콘으로 바뀐다 */
-.mg-zone .tile .pin-star{right:8px;bottom:auto;top:50%;width:28px;height:28px;margin-top:-14px;}   /* 누를 곳 24px 이상 */
-.mg-zone .tile .tile-alert{left:auto;right:40px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
-.mg-zone .tile .nl-warn{top:50%;right:40px;margin-top:-10px;}
-.mg-zone .tile .tile-soon-pill{left:auto;right:40px;top:50%;margin-top:-9px;transform:none;}
+.mg-zone .tile .pin-star{right:4px;bottom:auto;top:50%;width:28px;height:28px;margin-top:-14px;}   /* 누를 곳 24px 이상 */
+.mg-zone .tile .tile-alert{left:auto;right:36px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
+.mg-zone .tile .nl-warn{top:50%;right:36px;margin-top:-10px;}
+.mg-zone .tile .tile-soon-pill{left:auto;right:36px;top:50%;margin-top:-9px;transform:none;}
 @media(max-width:520px){
   .pbar #mgBtn{padding:5px 11px;font-size:.74rem;}
-  .mg-drawer{width:92vw;}
-  .mg-tabs{gap:8px;padding:0 10px 12px;}
+  .mg-drawer{width:min(290px,80vw);}   /* 폰 — 화면의 약 4/5 이하. 뒤 화면이 보여야 «서랍»으로 읽힌다 */
 }
 .tilerow-h{display:flex;align-items:center;gap:6px;padding:3px 6px 4px;border-radius:8px;}
 .tilerow-t{font-size:12px;font-weight:700;color:#1e293b;letter-spacing:-.2px;}
