@@ -346,15 +346,53 @@ test('입금 자동 검토(①) — 재무관리 거래내역은 «읽기만», 
   assert.match(ld, /fbDb\.ref\('data\/ledger_batches'\)\.once\('value'\)/);
   assert.doesNotMatch(ld, /save\(|patchRecord\(/);
   const da = fnBody('function drawAuto(');
-  assert.match(da, /C\.reviewMonth\(drafts, lead, found\)/);
-  assert.match(da, /if\(r\.kind==='exact'\) SEL\.auto\[r\.id\]=1;/);
+  assert.match(da, /C\.reviewMonth\(drafts, lead, found[,)]/);
+  /* 미리 ☐ 는 «같은 금액» 또는 «사람이 지정한 줄»만 — 가까운 금액(△)은 저절로 ☐ 하지 않는다 */
+  assert.match(da, /if\(r\.kind==='exact'( \|\| r\.assigned)?\) SEL\.auto\[r\.id\]=1;/);
+  assert.doesNotMatch(da, /kind==='near'/);
   assert.doesNotMatch(da, /save\(|patchRecord\(/, '그리기는 저장하지 않는다');
   const sa = fnBody('async function saveAuto(');
   assert.match(sa, /known\.status!=='draft'\) continue;/, '임시저장 정산표만');
   assert.equal((sa.match(/patchRecord\(/g) || []).length, 1);
   assert.match(sa, /patchRecord\('settle\/runs\/'\+rid/);
   assert.match(NOC, /if\(t\.closest\('#auto_save'\)\)\{ await saveAuto\(\); return; \}/);
-  assert.match(NOC, /AUTO\.pasted=C\.parseDepositText\(AUTO\.text\)/);
+  assert.match(NOC, /addExtra\(C\.parseDepositText\(AUTO\.text\), 'paste'\)/, '붙여 넣은 글은 계산 모듈로 읽는다');
+});
+
+/* 대표 지시 2026-11-28 「카톡으로 입금된 내역을 받거나 화면 캡처하거나 통장으로 입금된 거 화면 캡처했을 때 … 사업장 관련돼서 지정해 주면 그 금액만큼 체크해서 월별 정산 표시」 */
+test('카톡·캡처로 입금 넣기 — 재무관리 입금에 «더하고», 사진은 이 기기 안 글자읽기로, 지정한 줄은 ☐, 저장은 «체크한 줄 저장» 한 길', () => {
+  /* 더한다 — 재무관리 입금을 바꿔 끼우지 않는다 */
+  const af = fnBody('function autoFound(');
+  assert.match(af, /AUTO\.extra/);
+  assert.match(af, /C\.ledgerDeposits\(/);
+  assert.doesNotMatch(NOC, /AUTO\.src='paste'/, '옛 붙여넣기처럼 재무관리 입금을 갈아 끼우지 않는다');
+  /* 사람이 고른 사업장을 계산 모듈에 넘기고, 지정한 줄은 금액이 달라도 ☐ */
+  const da = fnBody('function drawAuto(');
+  assert.match(da, /C\.reviewMonth\(drafts, lead, found, AUTO\.assign\)/);
+  assert.match(da, /r\.kind==='exact' \|\| r\.assigned\) SEL\.auto\[r\.id\]=1/);
+  assert.match(da, /targets:rev\.targets/);
+  /* 사진은 이 기기 안 한국어 글자읽기(js/pu-ocr-kr.js)를 누를 때만 싣고, 읽은 글은 같은 계산 모듈로 — 저장·바깥 전송 없음 */
+  const rc = fnBody('async function readCaptures(');
+  assert.match(rc, /loadOcrKr\(\)/);
+  assert.match(rc, /addExtra\(C\.parseDepositText\(text\), 'capture'\)/);
+  assert.doesNotMatch(rc + fnBody('function addExtra(') + fnBody('function imageCanvas('), /save\(|patchRecord\(|fetch\(|\.ref\(|storage\(/, '캡처 읽기는 아무 데도 쓰거나 보내지 않는다');
+  assert.doesNotMatch(NOC, /<script[^>]*src="js\/pu-ocr-kr/, '글자읽기는 처음부터 싣지 않는다(무겁다)');
+  const fund = fs.readFileSync(path.join(__dirname, '..', 'fund.html'), 'utf8');
+  const v = (fund.match(/js\/pu-ocr-kr\.js\?v=(\d+)/) || [])[1];
+  assert.ok(v && NOC.includes("s.src='js/pu-ocr-kr.js?v=" + v + "'"), '글자읽기 모듈 판이 fund.html 과 같다');
+  /* 붙여 넣기(Ctrl+V)는 «사진»만 가로챈다 — 글은 그대로 칸에 붙는다 */
+  const ps = NOC.slice(NOC.indexOf("document.addEventListener('paste'"));
+  assert.match(ps.slice(0, 600), /\^image\\\//);
+  assert.ok(ps.indexOf('if(!files.length) return;') < ps.indexOf('ev.preventDefault()'), '사진이 없으면 막지 않는다');
+  /* 고르기·지정·금액 고치기는 화면에만 */
+  ['function setAssign(', 'function dropExtra('].forEach((h) => assert.doesNotMatch(fnBody(h), /save\(|patchRecord\(/, h));
+  assert.match(NOC, /select\[data-cap-to\]'\)\)\{ setAssign\(/);
+  /* 저장한 카톡·캡처 입금은 목록에서 뺀다(같은 입금을 또 잡지 않게) — 저장은 여전히 patchRecord 한 번 */
+  const sa = fnBody('async function saveAuto(');
+  assert.ok(sa.indexOf('dropExtra(') > sa.indexOf('patchRecord('), '저장한 «뒤에» 뺀다');
+  /* 고르기 칸 일괄 — «고른 입금 빼기» */
+  assert.match(fnBody('function bulkHtml('), /cap:'<button class="sm" data-bulk-do="capDel"/);
+  assert.match(NOC, /cap:'cap' \}\[kind\]/);
 });
 
 test('한꺼번에(③ 머리 단추) — 확정할 수 있는 정산표만, 확인 창 한 번(되돌릴 수 없다는 말) 뒤에 확정 → 대표면 카톡 대기열', () => {

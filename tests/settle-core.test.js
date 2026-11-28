@@ -493,6 +493,55 @@ test('입금 자동 검토 — 임시저장 정산표들의 주관 몫만 한꺼
   assert.deepEqual(C.reviewMonth([mk('2026-10', 'draft')], lead, [{ id: 'y', amount: 2483000 }]).rows.map((x) => [x.kind, x.diff]), [['near', -442]]);
 });
 
+/* ── 카톡·캡처로 입금 넣기 (대표 지시 2026-11-28 「카톡으로 입금된 내역 … 화면 캡처 … 통장 캡처 … 사업장 지정해 주면 그 금액만큼 체크」) ── */
+test('캡처 글자읽기·카톡 글 — 잔액·출금 이름표가 다른 줄로 갈려도 빼고, 점으로 읽힌 금액은 고치고, 금액만 있는 줄에는 보낸 분을 붙인다', () => {
+  const ocr = ['입출금내역', '11.27 14:22', '가나재단', '+6.759.330원', '잔액', '12,345,678원', '관리비', '-330,000원', '다라협회', '977,273원', '출금', '50,000원'].join('\n');
+  const f = C.parseDepositText(ocr), amounts = f.map((x) => x.amount);
+  assert.ok(amounts.indexOf(6759330) >= 0, JSON.stringify(amounts));
+  assert.ok(amounts.indexOf(977273) >= 0);
+  assert.equal(amounts.indexOf(12345678), -1, '«잔액» 다음 줄 금액은 잔액이다');
+  assert.equal(amounts.indexOf(330000), -1, '−금액은 나간 돈');
+  assert.equal(amounts.indexOf(50000), -1, '«출금» 다음 줄 금액은 나간 돈');
+  assert.match(f.find((x) => x.amount === 6759330).memo, /가나재단/);
+  /* 카톡 글 — «지급 … 받았습니다» 는 받은 돈, 그냥 «지급» 은 나간 돈 */
+  const k = C.parseDepositText('능률협회 지급분 675,933원 받았습니다\n비용 지급 120,000').map((x) => x.amount);
+  assert.ok(k.indexOf(675933) >= 0);
+  assert.equal(k.indexOf(120000), -1);
+});
+
+test('입금 지정 — 사람이 고른 줄에 그 입금이 먼저 붙고(금액이 달라도), 자동 맞추기에서 빠지며, 담당 줄은 지정했을 때만 보인다', () => {
+  const n = notice();
+  const mk = (key, actuals) => ({ id: 'cons-test_' + key, typeCode: 'cons-test', monthKey: key, status: 'draft', sites: C.settleMonth(n, key, RULE, ctx({ actuals: actuals || {} })).sites });
+  const lead = { 'cons-test': 'T-LEAD' }, run = mk('2026-10');
+  const staff = run.sites[0].members.find((m) => m.sid !== 'T-LEAD' && m.pre > 0);
+  assert.ok(staff, '지어낸 안내에 담당이 있다');
+  const sKey = run.sites[0].consultingId + '|' + staff.sid, sId = run.id + '::' + sKey, lId = run.id + '::C-1|T-LEAD';
+  const found = [{ id: 'x1', amount: 2483442 }, { id: 'c1', amount: staff.net, source: 'capture' }, { id: 'c2', amount: 2483442, source: 'capture' }];
+  /* 지정 없음 — 담당 줄 없음, 주관은 같은 금액 하나(재무관리 x1) */
+  const r0 = C.reviewMonth([run], lead, found);
+  assert.equal(r0.rows.some((x) => x.role === 'staff'), false);
+  /* 고를 수 있는 줄(targets)은 주관·담당 모두 */
+  assert.ok(r0.targets.some((t) => t.id === sId && t.role === 'staff') && r0.targets.some((t) => t.id === lId && t.role === 'lead'));
+  /* 담당 줄에 캡처 c1 지정 → 담당 줄이 생기고 맞음, 주관 줄에 c2 지정 → 재무관리 x1 대신 c2 */
+  const r1 = C.reviewMonth([run], lead, found, { c1: sId, c2: lId });
+  const s1 = r1.rows.find((x) => x.id === sId), l1 = r1.rows.find((x) => x.id === lId);
+  assert.deepEqual([s1.role, s1.assigned, s1.kind, s1.found.id], ['staff', true, 'exact', 'c1']);
+  assert.deepEqual([l1.assigned, l1.found.id], [true, 'c2']);
+  assert.equal(r1.counts.other, 1, '지정에 밀린 재무관리 입금은 남는다');
+  /* 금액이 달라도 지정한 줄에 붙는다(△) */
+  const r2 = C.reviewMonth([run], lead, [{ id: 'c9', amount: 100000 }], { c9: lId });
+  assert.deepEqual(r2.rows.map((x) => [x.kind, x.diff, x.assigned]), [['near', 100000 - 2483442, true]]);
+  /* 다른 달 줄에 지정한 입금은 이 달 자동 맞추기에 안 잡힌다 */
+  const r3 = C.reviewMonth([run], lead, [{ id: 'c3', amount: 2483442 }], { c3: 'cons-test_2026-09::C-2|T-LEAD' });
+  assert.deepEqual(r3.rows.map((x) => [x.kind, x.found]), [['none', null]]);
+  /* 이미 넣은 줄도 지정하면 다시 맞춘다(고쳐 넣기) · 담당 실입금이 있으면 «넣음»으로 보이되 대표 통장 입금을 쓰지 않는다 */
+  const saved = mk('2026-10', { 'C-1|T-LEAD': 2400000, [sKey]: staff.net });
+  const r4 = C.reviewMonth([saved], lead, [{ id: 'c4', amount: 2483442 }], { c4: lId });
+  assert.deepEqual(r4.rows.map((x) => [x.role, x.kind, x.assigned]), [['lead', 'exact', true], ['staff', 'saved', false]]);
+  const r5 = C.reviewMonth([saved], lead, [{ id: 'y', amount: staff.net }]);
+  assert.equal(r5.counts.other, 1, '담당 실입금과 같은 금액의 대표 통장 입금은 «쓴 것»이 아니다');
+});
+
 /* ── 개인입금 사업 자동 연결 — 이알피 «같은 잣대»(유형 스위치 · 컨설팅 한 건의 on/off · 옛 personalDeposit) ── */
 test('개인입금 사업 종류 — 유형 스위치가 켜진 종류는 늘, 컨설팅 한 건이 개인입금이면 그 종류도 올린다(biz 순서)', () => {
   const biz = [{ code: 'T-A', personal: true }, { code: 'T-B', personal: false }, { code: 'T-C', personal: false }, { code: 'T-D', personal: false }];

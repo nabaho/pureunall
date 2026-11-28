@@ -67,6 +67,57 @@ test('입금 확인 상자 — ☐·번호, 같은 금액은 ✓ 맞음, 고른 
   assert.match(visible(V.reviewBox({ rows: [] }, {})), /맞출 입금이 없습니다/);
 });
 
+/* 대표 지시 2026-11-28 「카톡으로 입금된 내역 … 화면 캡처 … 통장 캡처 … 사업장 지정해 주면 그 금액만큼 체크해서 월별 정산 표시」 */
+test('카톡·캡처로 입금 넣기 — 붙여 넣기 상자, 넣은 입금마다 ☐·번호·금액 고치기·«어느 사업장»(사업별 묶음), 자동·다른 달 딱지, 담당 줄은 받는 사람 칸', () => {
+  const targets = [
+    { id: 'r1::C-1|T-LEAD', typeCode: 'cons-test', company: '<b>가나</b>상사', round: 1, sid: 'T-LEAD', role: 'lead', expected: 2483442 },
+    { id: 'r1::C-1|T-A', typeCode: 'cons-test', company: '<b>가나</b>상사', round: 1, sid: 'T-A', role: 'staff', expected: 733000 }];
+  const rev = { rows: [
+    { id: 'r1::C-1|T-LEAD', runId: 'r1', typeCode: 'cons-test', key: 'C-1|T-LEAD', company: '<b>가나</b>상사', round: 1, sid: 'T-LEAD', role: 'lead', expected: 2483442, actual: null, kind: 'exact' },
+    { id: 'r1::C-1|T-A', runId: 'r1', typeCode: 'cons-test', key: 'C-1|T-A', company: '<b>가나</b>상사', round: 1, sid: 'T-A', role: 'staff', expected: 733000, actual: null, kind: 'near', assigned: true }], targets };
+  const extra = [{ id: 'c1', source: 'capture', amount: 2483442, date: '11-27', memo: '<img>가나재단' }, { id: 'c2', source: 'paste', amount: 730000, date: '', memo: '카톡' },
+    { id: 'c3', source: 'capture', amount: 5000, date: '', memo: '' }];
+  const h = V.reviewBox(rev, { biz: { 'cons-test': '테스트사업' }, names: NAMES, found: extra, extra, targets, pasteOpen: true,
+    pick: { 'r1::C-1|T-LEAD': 'c1', 'r1::C-1|T-A': 'c2' }, assign: { c2: 'r1::C-1|T-A', c3: 'r9::C-9|T-LEAD' }, sel: {}, capSel: { c1: 1 } });
+  const v = visible(h);
+  /* 붙여 넣기·끌어 놓기·사진 고르기 상자, 글 읽기 */
+  assert.match(h, /id="cap_drop"/);
+  assert.match(h, /<input type="file" id="cap_file" accept="image\/\*" multiple/);
+  assert.match(h, /id="auto_read"/);
+  assert.match(h, /title="[^"]*밖으로 보내지도, 저장하지도 않습니다/, '사진이 어디로 가는지 마우스를 올리면 보인다');
+  /* 넣은 입금 표 — ☐·번호가 맨 왼쪽, 고른 것 ☐, 일괄 자리 */
+  const t = h.slice(h.indexOf('data-name="cap"'));
+  const ths = [...t.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => m[0]);
+  assert.match(ths[0], /data-all="cap"/);
+  assert.match(ths[1], /번호/);
+  assert.match(h, /data-ck="c1" checked/);
+  assert.match(h, /data-bulk="cap"/);
+  assert.match(h, /data-cap-amt="c1" value="2,483,442"/);
+  /* 어느 사업장 — 사업마다 묶고, 사람 이름·주관/담당·예상 세후. 사번은 화면에 없다 */
+  assert.match(h, /<optgroup label="테스트사업">/);
+  assert.match(h, /<option value="r1::C-1\|T-A" selected>&lt;b&gt;가나&lt;\/b&gt;상사 1차 · &lt;b&gt;김가나&lt;\/b&gt; 담당 · 예상 733,000<\/option>/);
+  assert.doesNotMatch(v, /T-[A-Z]/);
+  /* 자동으로 고른 것(같은 금액)은 «자동», 다른 달 줄에 지정한 것은 «다른 달» */
+  const row = (id) => t.slice(t.indexOf('data-ck="' + id + '"'), t.indexOf('</tr>', t.indexOf('data-ck="' + id + '"')));
+  assert.match(visible(row('c1')), /자동/);
+  assert.doesNotMatch(visible(row('c2')), /자동/);
+  assert.match(visible(row('c3')), /다른 달/);
+  /* 사람이 적은 글·읽은 글은 글자로 */
+  assert.doesNotMatch(h, /<img>|<b>가나/);
+  /* 위 입금 확인 표 — 담당 줄이 있으면 «받는 사람» 칸, 지정한 줄은 «지정», 찾은 입금 고르기에 [캡처]·[글] */
+  const a = h.slice(h.indexOf('data-name="auto"'));
+  assert.match(a, /<th>받는 사람<\/th>/);
+  assert.match(visible(a), /△ −3,000원 다름 · 지정/);
+  assert.match(a, />\[캡처\] 2,483,442원/);
+  assert.match(a, />\[글\] 730,000원/);
+  /* 담당 줄이 없으면 받는 사람 칸을 늘어놓지 않는다 */
+  const lone = V.reviewBox({ rows: [rev.rows[0]], targets }, { found: [], targets });
+  assert.doesNotMatch(lone, /받는 사람/);
+  /* 넣은 입금이 없으면 표 없이 상자만 */
+  assert.doesNotMatch(lone, /data-name="cap"/);
+  assert.match(lone, /id="cap_drop"/);
+});
+
 test('정산 확인 상자 — 정산표마다 사업 이름·상태·송금 줄(반환/추가 지급·누가 누구에게·사업장), 임시저장은 «확정»·«확정하면 송금», 확정은 «보냄 표시»', () => {
   const d = V.monthRuns([fakeRun('draft')], { names: NAMES, biz: { 'cons-test': '테스트사업 (테스트재단)' } });
   const v = visible(d);
