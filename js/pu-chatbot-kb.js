@@ -160,7 +160,7 @@
         { key: 'familywork',  icon: '🏡', name: '출산육아·유연근무', when: '육아지원 3법·유연근무제·가족친화인증 인사제도 설계 및 장려금 연계', from: '푸른 메일·카톡/문자·근태/규정 자료', to: '가족친화·유연근무 규정·보고서(.hwpx)', ask: '출산육아·유연근무 컨설팅 앱 사용법을 알려줘' },
         { key: 'socialent',   icon: '🌱', name: '사회적기업·씨앗', when: '예비사회적기업·사회적기업 인증 요건, SVI 지표 및 취약계층 노무관리 자문', from: '푸른 메일·카톡/문자·인증 증빙자료', to: 'SVI·인사노무 진단보고서(.hwpx)', ask: '사회적기업·씨앗 컨설팅 앱은 어떻게 쓰나요?' },
         { key: 'sixthind',    icon: '🌾', name: '6차산업컨설팅', when: '농촌융복합산업(6차산업) 현장코칭·인증·전문상담 및 농업법인 근기법 제63조 구분 점검', from: '푸른 메일(현장코칭 공문/질의)·카톡/문자·로컬 자료', to: '현장코칭 결과보고서(.hwpx)·수습 RAG 실무 코치', ask: '6차산업컨설팅 앱에서 현장코칭과 근기법 63조 점검은 어떻게 하나요?' },
-        { key: 'laboraudit',  icon: '🧭', name: '자율점검·근로감독', when: '고용노동부 기초노동질서 자율점검·모의근로감독·서류보존 및 시정대응 자문', from: '푸른 메일·카톡/문자·노무진단 체크표', to: '자율점검 결과보고서(.hwpx)·개선로드맵', ask: '자율점검·근로감독 앱은 어떻게 활용하나요?' },
+        { key: 'laboraudit',  icon: '🧭', name: '근로감독 대응·이력', when: '고용노동부 정기·수시·특별 근로감독 수검, 시정지시 대응 및 연도·지청·지적사항 이력 관리', from: '푸른 메일(감독 통지·시정지시서)·카톡/문자', to: '시정완료 보고서(.hwpx)·감독 지적사항 이력', ask: '근로감독 대응·이력 앱은 어떻게 활용하나요?' },
         { key: 'unionneg',    icon: '🫂', name: '민간노조·단체교섭', when: '복수노조 창구단일화 공고 일정·타임오프·단체교섭 및 임단협 전략 자문', from: '푸른 메일·카톡/문자·교섭요구 자료', to: '교섭 절차 체크·결과보고서(.hwpx)', ask: '민간노조·단체교섭 앱에서 창구단일화 일정은 어떻게 확인하나요?' },
         { key: 'specialcons', icon: '🧩', name: '특화·위탁컨설팅', when: '중진공 혁신바우처·통상변화대응·삼성협력사·경비(감단직)·이음센터·공정채용 위탁 컨설팅', from: '푸른 메일·카톡/문자·위탁사업 자료', to: '트랙별 결과보고서(.hwpx)·체크리스트', ask: '특화·위탁컨설팅 앱에는 어떤 사업이 포함되나요?' },
         { key: 'hangul',    icon: '📝', name: '한글 편집기',     when: '한글 프로그램 없는 PC나 민감정보(주민번호)가 든 .hwp/.hwpx 문서를 바로 열고 고칠 때', from: '내 PC 파일 (서버·파이어베이스로 전송하지 않음)', to: '수정한 .hwpx 파일 내 PC 즉시 저장', ask: '한글 편집기는 어떤 상황에서 쓰면 좋나요?' },
@@ -1334,7 +1334,7 @@
     { prefix: 'scal_familywork', label: '출산육아·유연근무(전용 작업공간)', app: 'familywork' },
     { prefix: 'scal_socialent', label: '사회적기업·씨앗(전용 작업공간)', app: 'socialent' },
     { prefix: 'scal_sixthind', label: '6차산업컨설팅(전용 작업공간)', app: 'sixthind' },
-    { prefix: 'scal_laboraudit', label: '자율점검·근로감독(전용 작업공간)', app: 'laboraudit' },
+    { prefix: 'scal_laboraudit', label: '근로감독 대응·이력(전용 작업공간)', app: 'laboraudit' },
     { prefix: 'scal_unionneg', label: '민간노조·단체교섭(전용 작업공간)', app: 'unionneg' },
     { prefix: 'scal_specialcons', label: '특화·위탁컨설팅(전용 작업공간)', app: 'specialcons' },
     { prefix: 'msg_intake', label: '카톡·문자 자료수집(자동분류 대기함)', app: 'msgintake' },
@@ -2182,7 +2182,7 @@
   function matchExplicitImproveCat(text) {
     var hay = String(text || '');
     if (/기금관리|사내기금|공동기금|복지기금/.test(hay)) return 'fund';
-    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|안전보건체계구축|기술보호컨설팅|현장클리닉|상공회의소컨설팅|기초인사노무|평가보상|공공기관컨설팅|출산육아|사회적기업|6차산업|자율점검|민간노조|특화.*위탁|실무코치|\bilteo\b|\bjobtrans\b|\bsafety\b|\bsixthind\b|\bcoach\b/i.test(hay)) return 'consult';
+    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|안전보건체계구축|기술보호컨설팅|현장클리닉|상공회의소컨설팅|기초인사노무|평가보상|공공기관컨설팅|출산육아|사회적기업|6차산업|근로감독|자율점검|민간노조|특화.*위탁|실무코치|\bilteo\b|\bjobtrans\b|\bsafety\b|\bsixthind\b|\blaboraudit\b|\bcoach\b/i.test(hay)) return 'consult';
     if (/업무관리|푸른\s*메일|메일함|캘린더|카톡·문자|\bmsgintake\b/i.test(hay)) return 'work';
     if (/기업정보함|사진첩|푸른카메라|카메라|명함/.test(hay)) return 'cards';
     if (/계약서등관리|한글\s*편집|전자서명|위임장/.test(hay)) return 'docs';
@@ -2336,7 +2336,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:자율점검·근로감독, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:근로감독대응·이력, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];

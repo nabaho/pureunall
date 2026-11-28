@@ -14,7 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=114"></script>
+<script src="js/pu-ontology.js?v=117"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
@@ -371,7 +371,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 }
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
-<script src="js/pu-appbar.js?v=59"></script>
+<script src="js/pu-appbar.js?v=60"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
@@ -523,7 +523,8 @@ function afterLogin(){
     fbDb.ref(ROOT+'/work_rules').once('value'),
     fbDb.ref(ROOT+'/compliance_checks').once('value'),
     fbDb.ref(ROOT+'/mail_digest_2026').once('value'),
-    fbDb.ref(ROOT+'/emp_evidence').once('value')
+    fbDb.ref(ROOT+'/emp_evidence').once('value'),
+    fbDb.ref('paydata/arrivals').once('value').catch(function(){ return null; })
   ]).then(function(r){
     cache.site_cards=r[0].val()||[];
     cache.payroll_locked=r[1].val()||{};
@@ -543,6 +544,7 @@ function afterLogin(){
     cache.compliance_checks=r[17].val()||{};
     cache.mail_digest_2026=r[18].val()||{};
     cache.emp_evidence=(r[19]&&r[19].val())||{};
+    cache.pdArrivals=(r[20]&&r[20].val())||{};
     payIdx=r[2].val()||null;
     payOld=r[4].val()||null;
     ready=true; navSeed(); render();
@@ -1976,20 +1978,113 @@ function arrivalFor(site, mLabel){
 function delArrival(id){ var map=inboxLog(); if(!map[id]||!confirm('이 수신 기록을 삭제할까요?')) return;
   fbDb.ref(ROOT+'/inbox/'+id).remove().catch(function(e){ alert('삭제 실패: '+((e&&e.code)||e)); }); }
 window.delArrival=delArrival;   /* 등록·수정은 급여데이터함에서 — 여기선 잘못 온 알림 치우기만 */
+var pdArrBusy=false, pdArrErr='';
+function pdArrivalMonthParts(mLabel){
+  var s=String(mLabel==null?'':mLabel).trim();
+  if(!s) return null;
+  var ym=s.match(/^(\d{4})\s*(?:[.\-\/]|년)?\s*(\d{1,2})\s*월?$/);
+  if(ym){
+    var m1=parseInt(ym[2],10);
+    return (m1>=1&&m1<=12)?{y:Number(ym[1]),m:m1}:null;
+  }
+  var mn=monthNum(s);
+  return mn?{y:null,m:mn}:null;
+}
+function pdArrSlotCount(slotNode){
+  var byKind={contract:0,attend:0,ledger:0,output:0,etc:0}, total=0;
+  if(!slotNode||typeof slotNode!=='object') return {total:0,byKind:byKind,last:0};
+  ['contract','attend','ledger','output','etc'].forEach(function(k){
+    var b=Object.prototype.hasOwnProperty.call(slotNode,k)?slotNode[k]:null;
+    if(!b||typeof b!=='object') return;
+    var n=Object.keys(b).filter(function(id){
+      var v=b[id];
+      return id!=='__proto__'&&id!=='constructor'&&id!=='prototype'&&typeof v==='number'&&isFinite(v)&&v>0;
+    }).length;
+    byKind[k]=n; total+=n;
+  });
+  return {total:total,byKind:byKind,last:Number(slotNode.last)||0};
+}
+function pdCoIdForSite(site, links){
+  var lk=(links&&Object.prototype.hasOwnProperty.call(links,site))?links[site]:null;
+  if(lk&&lk.none) return '';
+  if(lk&&lk.coId) return String(lk.coId);
+  if(typeof PuSiteStaff!=='undefined'&&PuSiteStaff.staffFor&&typeof coData!=='undefined'&&coData&&coData.companies){
+    var st=PuSiteStaff.staffFor(site,{companies:coData.companies,dir:coData.dir,links:links||{}});
+    if(st&&!st.업체아님&&!st.경고&&st.정확&&st.coId) return String(st.coId);
+  }
+  return '';
+}
+function pdPickSlotForCo(coSlots, mParts){
+  if(!coSlots||typeof coSlots!=='object'||!mParts) return '';
+  var mm=('0'+mParts.m).slice(-2);
+  var targetYear=mParts.y||((new Date()).getFullYear());
+  var exact=String(targetYear)+mm;
+  return (Object.prototype.hasOwnProperty.call(coSlots,exact)&&pdArrSlotCount(coSlots[exact]).total>0)?exact:'';
+}
+function pdArrivalInfo(site, mLabel){
+  var mp=pdArrivalMonthParts(mLabel); if(!mp) return null;
+  var map=dbGet('pdArrivals',{});
+  if(!map||typeof map!=='object'||Array.isArray(map)) return null;
+  var links=lmap('site_co_link');
+  var coId=pdCoIdForSite(site,links);
+  if(!coId||!Object.prototype.hasOwnProperty.call(map,coId)) return null;
+  var coSlots=map[coId];
+  var slot=pdPickSlotForCo(coSlots,mp);
+  if(!slot) return null;
+  var cnt=pdArrSlotCount(coSlots[slot]);
+  if(!cnt.total) return null;
+  return {total:cnt.total,byKind:cnt.byKind,last:cnt.last,coId:coId,slot:slot};
+}
+function pdArrivalTotals(mLabel){
+  var out={sites:0,total:0,attend:0,ledger:0,contract:0,output:0,etc:0};
+  var mp=pdArrivalMonthParts(mLabel); if(!mp) return out;
+  var map=dbGet('pdArrivals',{});
+  if(!map||typeof map!=='object'||Array.isArray(map)) return out;
+  Object.keys(map).forEach(function(coId){
+    if(coId==='__proto__'||coId==='constructor'||coId==='prototype') return;
+    var coSlots=map[coId];
+    var slot=pdPickSlotForCo(coSlots,mp);
+    if(!slot) return;
+    var c=pdArrSlotCount(coSlots[slot]);
+    if(!c.total) return;
+    out.sites++;
+    out.total+=c.total;
+    out.attend+=c.byKind.attend;
+    out.ledger+=c.byKind.ledger;
+    out.contract+=c.byKind.contract;
+    out.output+=c.byKind.output;
+    out.etc+=c.byKind.etc;
+  });
+  return out;
+}
+function refreshPdArrivals(){
+  if(typeof fbDb==='undefined'||!fbDb||pdArrBusy) return Promise.resolve();
+  pdArrBusy=true; pdArrErr=''; render();
+  return fbDb.ref('paydata/arrivals').once('value').then(function(s){
+    cache.pdArrivals=(s&&s.val&&s.val())||{};
+    pdArrBusy=false; pdArrErr=''; render();
+  }).catch(function(e){
+    pdArrBusy=false;
+    pdArrErr='도착자료를 새로고침하지 못했습니다 ('+((e&&e.code)||'네트워크·권한 확인')+')';
+    console.warn('[급여데이터함 도착 조회]', e&&e.code);
+    render();
+  });
+}
+window.refreshPdArrivals=refreshPdArrivals;
 function screenInbox(){
   var now=new Date();
   if(!App.inboxMonth) App.inboxMonth=(now.getMonth()+1)+'월';
   var mnum=monthNum(App.inboxMonth);
-  var h='<h1>수신함</h1><div class="sub">사업장 자료 준비 현황 — 푸른 메일(2.급여+사무대행)·카톡·급여데이터함 실시간 연동 및 입퇴사·근로시간 자동 정리</div>';
+  var h='<h1>수신함</h1><div class="sub">사업장 자료 준비 현황 — 푸른 메일(2.급여+사무대행)·카톡·급여데이터함 자동 연동 및 입퇴사·근로시간 자동 정리</div>';
   h+=inboxBridgeHtml(App.inboxMonth);
-  h+='<div class="noprint" style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">기준 월 <input value="'+App.inboxMonth.replace(/"/g,'')+'" style="width:80px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:inherit" onchange="App.inboxMonth=this.value;render()"><span style="font-size:12px;color:var(--sub)">예: 7월</span></div>';
+  h+='<div class="noprint" style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">기준 월 <input aria-label="수신함 기준 월" value="'+App.inboxMonth.replace(/"/g,'')+'" style="width:80px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:inherit" onchange="App.inboxMonth=this.value;render()"><span style="font-size:12px;color:var(--sub)">예: 7월</span></div>';
   /* ⚠ 급여 데이터가 없어도 수신함은 열려야 한다 — 자료가 막 도착한 때는 아직 급여를
      처리하기 **전**이고, 바로 그때 「무엇이 왔나」를 보는 곳이 여기다. 예전엔 급여
      데이터를 요구해 급여데이터함이 알려도 화면이 비었다(2026-09에 고침).
      볼 명단조차 없을 때(카드도 급여도 없음)만 안내한다. */
-  if(!inboxRoster(null).length && !Object.keys(inboxLog()).length){
+  if(!inboxRoster(null).length && !Object.keys(inboxLog()).length && !Object.keys(dbGet('pdArrivals',{})||{}).length){
     h+='<div class="empty">아직 볼 것이 없습니다. 설정 카드를 올리면 사업장별 현황이, '
-      +'💼 급여데이터함에서 「📤 급여관리에 알리기」를 누르면 도착 알림이 여기 나타납니다.</div>'; return h; }
+      +'💼 급여데이터함에 자료가 도착하거나 「📤 급여관리에 알리기」를 누르면 도착 상태가 여기 나타납니다.</div>'; return h; }
   var C={정상:SIG.green,도착:'#1e40af',미도착:SIG.orange,지연:SIG.red,오류:SIG.red};
   var roster=inboxRoster(null), cnt={정상:0,도착:0,미도착:0,지연:0,오류:0}, rows='';
   roster.forEach(function(o, idx){
@@ -2000,22 +2095,26 @@ function screenInbox(){
       dday=Math.round((new Date(y,mo,dd)-new Date(y,mo,now.getDate()))/86400000);
       dueTxt=(due==='last'?'말일':due+'일')+(dday>=0?' (D-'+dday+')':' (지남)');
     }
+    var manualArr=arrivalFor(o.site,App.inboxMonth);
+    var pdArr=pdArrivalInfo(o.site,App.inboxMonth);
     var status;
     if(rec){ status=(rec.sig==='green')?'정상':'오류'; }
-    else if(arrivalFor(o.site,App.inboxMonth)){ status='도착'; }   // 자료 왔고 처리 대기
+    else if(manualArr||(pdArr&&pdArr.total>0)){ status='도착'; }   // 자료 왔고 처리 대기 (알림 또는 급여데이터함 도착)
     else { status=(dday!=null&&dday<0)?'지연':'미도착'; }
     cnt[status]++;
     var urge=(status==='지연')||(status==='미도착'&&dday!=null&&dday<=7);
+    var pdTag=(pdArr&&pdArr.total>0)?(' <span class="badge" style="background:#eff6ff;color:#1e40af" title="급여데이터함 도착 칸(paydata/arrivals) 자동 연동">데이터함 자동감지 '+pdArr.total+'건</span>'):'';
     rows+='<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)">'+
       '<span style="width:60px;font-size:11.5px;color:#fff;background:'+C[status]+';border-radius:99px;padding:3px 0;text-align:center;flex-shrink:0">'+status+'</span>'+
-      '<div style="flex:1">'+rowMarkBox('site:'+o.site, idx+1)+' <b>'+o.site+'</b> <span style="font-size:12px;color:var(--sub)">'+(o.담당자?o.담당자+' · ':'')+(o.급여일?'급여일 '+dueTxt:'급여일 미지정')+'</span></div>'+
+      '<div style="flex:1">'+rowMarkBox('site:'+o.site, idx+1)+' <b>'+o.site+'</b>'+pdTag+' <span style="font-size:12px;color:var(--sub)">'+(o.담당자?o.담당자+' · ':'')+(o.급여일?'급여일 '+dueTxt:'급여일 미지정')+'</span></div>'+
       (urge?'<span class="badge warn" title="독촉 문구는 💼 급여데이터함 → 사업장 목록에서 만듭니다">독촉 필요</span>':'')+
       '</div>';
   });
   h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+
      [['정상','#e2e8f0'],['도착','#e2e8f0'],['미도착','#fffbeb'],['지연','#fef2f2'],['오류','#fef2f2']].map(function(k){
        return '<span class="badge" style="background:'+k[1]+'">'+k[0]+' '+cnt[k[0]]+'</span>';}).join('')+'</div>';
-  h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">'+rows+'</div>';
+  h+=rows ? '<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">'+rows+'</div>'
+          : '<div class="empty">등록된 사업장 카드가 없습니다. 설정 카드를 올리고 이름표를 연결하면 도착 현황이 사업장 줄에 함께 표시됩니다.</div>';
   // 최근 수신 기록(자동 태깅 결과) — 웹훅/수동 등록분
   var map=inboxLog(), ids=Object.keys(map).sort(function(a,b){return (map[b].ts||0)-(map[a].ts||0);});
   if(ids.length){
@@ -2029,8 +2128,8 @@ function screenInbox(){
     });
     h+='</div>';
   }
-  h+='<div class="note">판정: 급여데이터 있으면 정상(문제 시 오류), 자료만 도착=도착(처리대기), 없으면 미도착·급여일 지나면 지연. '+
-     '<b>자료는 어디서 오나</b>: 💼 급여데이터함에서 메일·카톡·업로드로 모아 사업장·귀속월을 확정한 뒤 「📤 급여관리에 알리기」를 누르면 이 목록에 나타납니다. 급여관리는 자료를 직접 모으지 않습니다 — 잘못 온 알림은 급여데이터함에서 고쳐 다시 넘기세요.</div>';
+  h+='<div class="note">판정: 급여데이터 있으면 정상(문제 시 오류), 자료만 도착(급여데이터함 도착 자동감지 또는 수동 알림)=도착(처리대기), 없으면 미도착·급여일 지나면 지연. '+
+     '<b>자료는 어디서 오나</b>: 💼 급여데이터함 도착 칸(<code>paydata/arrivals</code>)에 자료가 들어오면 별도 알리기 단추 없이도 자동 표시되며, 「📤 급여관리에 알리기」 알림도 함께 반영됩니다. 잘못 온 알림은 급여데이터함에서 고치세요.</div>';
   return h;
 }
 function screenCards(){
@@ -2410,18 +2509,23 @@ function inboxBridgeHtml(mLabel){
     else if(/출근|근태|시간|카톡|연차/.test(k)) cnt.att++;
     else cnt.pay++;
   });
+  var pdTot=pdArrivalTotals(mLabel);
+  var pdSub=(pdTot.total>0)?(' (근태 '+pdTot.attend+' · 대장 '+pdTot.ledger+' · 계약 '+pdTot.contract+' · 기타 '+(pdTot.output+pdTot.etc)+')'):'';
   return '<div class="noprint" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
-    '<div><b style="color:var(--navy)">📬 푸른메일(2.급여+사무대행) · 급여데이터함 · 기업정보함 실시간 연동</b>' +
-    '<div style="font-size:12px;color:var(--sub);margin-top:2px">메일·카톡으로 들어온 입퇴사·급여·근로시간 자료를 자동 분류하고 기업정보(소정근로시간·급여일)와 연결합니다.</div></div>' +
+    '<div><b style="color:var(--navy)">📬 푸른메일(2.급여+사무대행) · 급여데이터함 · 기업정보함 연동</b>' +
+    '<div style="font-size:12px;color:var(--sub);margin-top:2px">급여데이터함 도착 칸(paydata/arrivals)을 자동으로 함께 읽고 입퇴사·급여·근로시간 현황을 연결합니다.</div></div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-    '<button class="btn" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'mail\',\'pu-cards.html?view=mail\')">✉️ 푸른 메일 (2.급여+사무대행)</button>' +
-    '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'paydata\',\'pu-paydata.html\')">💼 급여데이터함 (입퇴사·급여정리)</button>' +
-    '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="openExtApp(\'cards\',\'pu-cards.html\')">📇 기업정보함 (기업·근로시간)</button>' +
-    '<button class="btn sec" style="padding:6px 11px;font-size:12px" onclick="navTo({screen:\'report\',reportKind:\'hire\',site:null,month:null})">📋 입퇴사 자동정리 ('+(cnt.hire+cnt.leave)+'건)</button>' +
-    '<button class="btn" style="padding:6px 11px;font-size:12px" onclick="autoSync2026FromMail()" title="메일 제목·건수 요약만 모읍니다. 급여 자료는 넣지 않습니다.">📬 푸른메일 수신·발신 요약 다시 모으기</button>' +
+    '<button class="btn" style="padding:8px 12px;min-height:36px;font-size:12px" onclick="openExtApp(\'mail\',\'pu-cards.html?view=mail\')">✉️ 푸른 메일 (2.급여+사무대행)</button>' +
+    '<button class="btn sec" style="padding:8px 12px;min-height:36px;font-size:12px" onclick="openExtApp(\'paydata\',\'pu-paydata.html\')">💼 급여데이터함 (입퇴사·급여정리)</button>' +
+    '<button class="btn sec" style="padding:8px 12px;min-height:36px;font-size:12px" onclick="openExtApp(\'cards\',\'pu-cards.html\')">📇 기업정보함 (기업·근로시간)</button>' +
+    '<button class="btn sec" style="padding:8px 12px;min-height:36px;font-size:12px" onclick="refreshPdArrivals()"'+(pdArrBusy?' disabled':'')+'>'+(pdArrBusy?'도착자료 조회 중…':'🔄 도착자료 새로고침')+'</button>' +
+    '<button class="btn sec" style="padding:8px 12px;min-height:36px;font-size:12px" onclick="navTo({screen:\'report\',reportKind:\'hire\',site:null,month:null})">📋 입퇴사 자동정리 ('+(cnt.hire+cnt.leave)+'건)</button>' +
+    '<button class="btn" style="padding:8px 12px;min-height:36px;font-size:12px" onclick="autoSync2026FromMail()" title="메일 제목·건수 요약만 모읍니다. 급여 자료는 넣지 않습니다.">📬 푸른메일 수신·발신 요약 다시 모으기</button>' +
     '</div></div>' +
+    (pdArrErr?'<div role="alert" style="color:var(--warn);font-size:12px;margin-top:6px">'+esc(pdArrErr)+'</div>':'') +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px">' +
+    '<span class="badge" style="background:#eff6ff;color:#1e40af">데이터함 자동도착 '+pdTot.sites+'곳 · '+pdTot.total+'건'+pdSub+'</span>' +
     '<span class="badge" style="background:#eff6ff;color:#1e40af">급여대장·변동 '+cnt.pay+'건</span>' +
     '<span class="badge" style="background:#f0fdf4;color:#166534">입사·취득 '+cnt.hire+'건</span>' +
     '<span class="badge" style="background:#fef2f2;color:#dc2626">퇴사·상실 '+cnt.leave+'건</span>' +

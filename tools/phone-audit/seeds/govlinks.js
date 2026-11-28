@@ -40,11 +40,20 @@ const SETS = {
 
 module.exports = {
   data: Object.assign({}, D, {
-    govlinks: { sets: SETS },
+    govlinks: { sets: SETS,
+      /* 점검 대표(P001)의 ★ 즐겨찾기 — 사업 하나 · 사이트 하나 · 이알피 사업 하나 */
+      stars: { P001: { id: 'P001', entityType: 'GovLinkStar', schemaVersion: 1, contractVersion: 1, revision: 1, createdAt: NOW, updatedAt: NOW,
+        items: ['gl-b', 'erp:consulting-01'], links: ['https://www.ilteo-check.invalid/home/main'] } } },
     /* 셋째 사업(통합기술보호지원단)은 올해 종결 — 종결 표시가 이 앱에서 어떻게 보이는지(카드가 없으니 진행 사업 칸에서 빠진다) */
     scal_bizState: { 'consulting-03': { closedFrom: '2000', closedAt: '2026-11-01', reason: '사업 기간 끝남', by: '점검대표', at: NOW } },
   }),
   views: [
+    /* 폰에서는 사업을 누르면 상세 한 화면 — PC 에서는 오른쪽 칸이 바뀐다 */
+    { name: 'detail', run: async (p) => { await p.evaluate(() => pick('gl-a')); },
+      back: async (p) => { await p.evaluate(() => { showDetail(false); }); } },
+    { name: 'erp', run: async (p) => { await p.evaluate(() => pick('erp:consulting-01')); },
+      back: async (p) => { await p.evaluate(() => { showDetail(false); pick('gl-a'); showDetail(false); }); } },
+    { name: 'open', run: async (p) => { await p.evaluate(() => { OPEN={'gl-a':true,'gl-b':true}; renderGo(); }); } },
     { name: 'search', run: async (p) => { await p.fill('#q', '점검'); }, back: async (p) => { await p.fill('#q', ''); } },
     { name: 'manage', run: async (p) => { await p.evaluate(() => setTab('manage')); },
       back: async (p) => { await p.evaluate(() => setTab('go')); } },

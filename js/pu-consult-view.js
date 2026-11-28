@@ -29,6 +29,7 @@
   var YEAR_FILTER = '';
   var TRACK_FILTER = '';
   var SHOW_ALL_ROWS = false;
+  var ST_FILTER = ''; // '' | 'active' | 'done' — 진행상태 거르기. 위쪽 KPI 알약이 눌러 바꾼다(드롭다운이 없는 화면에서도 동작)
   var WS_FOCUS = ''; // '' | 'coach' | 'doc'
   var CUR_REPORT_KIND = 'comprehensive';
   var CUR_COACH_ANSWER = null;
@@ -71,6 +72,9 @@
     mailboxMsgs: {},
     mailboxOldMsgs: {},
     ragNotes: {},
+    govCos: null,    // 정부사업일정 사업장(scal_cos) — 회차 표시용, 읽기만 한다(roundUnit 이 있는 앱만 읽음)
+    govScheds: null, // 정부사업일정 일정(scal_scheds)
+    govTypes: null,  // 정부사업일정 종류(scal_types)
     discover: { bundles: [], matchedCommsByPid: {}, stats: { mailHits: 0, msgHits: 0, erpHits: 0 } },
     ragIndex: null
   };
@@ -210,6 +214,156 @@
     });
     merged.sort(function (a, b) { return str(b.date).localeCompare(str(a.date)); });
     return merged;
+  }
+
+  /* ══ 회차 — 이알피 계약의 일수(현장클리닉 3일 = 3회차 · 기술보호 3회 = 3회차)와 정부사업일정의 방문 일정을
+       «읽기만» 해서 사업장 줄마다 보여 준다 (대표 지시 2026-11-28 「3회차도 2회차도 있다 — 다시 다 표시」).
+     ⚠ 새로 저장하지 않는다(파생 표시). 이어 붙이기는 «번호»로만 — 사건번호(caseNo = 이알피 컨설팅 번호) → 이알피 컨설팅 →
+       정부사업일정 사업장(scal_cos.erpId · co_id). 상호 이름으로는 잇지 않는다(온톨로지 규칙).
+     ⚠ 계획 회차는 이알피 계약에 «사람이 적은» 일수가 기준이다. 정부사업일정의 방문 일정은 «참고»일 뿐 셈에 넣지 않는다
+       (일정·사진을 안 넣고 진행하는 일이 많다 — status/2026-10-04-gisul-round-count.md).
+     ⚠ 성과추적관리(perfTrack)는 연간 수행일수에서 빠지는 건이라 합계에서 따로 센다. */
+  /* 기술보호컨설팅을 고친 «가벼운 화면»이 12개 앱 공통 기본이다 (대표 지시 2026-11-28 「기술보호 고친 걸 기준으로 전체 일치」).
+     처음엔 기술보호·현장클리닉만 켰다(slimUi:true). 이제 꺼야 할 앱만 카탈로그에 slimUi:false 를 적는다. */
+  function isSlim() { return getAppCat().slimUi !== false; }
+  // 보고서 탭의 일반 원고를 접는 것은 «기관 제출 서식이 컨설팅보고서(gov-report)에 있는 앱»만이다 —
+  // 기초인사·평가보상처럼 기관 서식이 없는 앱은 이 탭의 원고가 곧 산출물이라 접지 않는다.
+  function reportFolded() { return isSlim() && !!getAppCat().govReportForm; }
+  function roundUnit() { return str(getAppCat().roundUnit); }
+  function govRows(v) {
+    if (!v) return [];
+    if (Array.isArray(v)) return v.filter(Boolean);
+    return Object.keys(v).map(function (k) { return v[k]; }).filter(Boolean);
+  }
+  function erpConsultingOf(p) {
+    var no = str(p && p.caseNo);
+    if (!no) return null;
+    var list = D.consultings || [];
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (!c || c._deleted || str(c.no) !== no) continue;
+      if (/^(?:cancelled|canceled|취소|해지)$/i.test(str(c.status))) continue; // 취소·해지 건의 일수는 회차로 세지 않는다
+      return c;
+    }
+    return null;
+  }
+  function erpRoundDays(c) {
+    if (!c) return 0;
+    var d = parseInt(c.consultDays, 10) || 0;
+    return d || (parseInt(c.dayCalc && c.dayCalc.days, 10) || 0);
+  }
+  var _roundCache = { key: '', map: null };
+  function roundsOf(p) {
+    if (!roundUnit()) return null;
+    // 같은 자료로 줄마다 되풀이해서 훑지 않게 한 번 만든 표를 돌려 쓴다(자료가 바뀌면 열쇠가 바뀐다).
+    var ck = [(D.consultings || []).length, (D.govCos && Object.keys(D.govCos).length) || 0, (D.govScheds && Object.keys(D.govScheds).length) || 0, APP_KEY].join('|');
+    if (_roundCache.key !== ck || !_roundCache.map) {
+      var kw = getAppCat().govTypeKeywords || [];
+      var typeIds = Object.create(null);
+      govRows(D.govTypes).forEach(function (t) {
+        var nm = str(t.name) + ' ' + str(t.fullName);
+        if (t.id != null && kw.some(function (k) { return nm.indexOf(k) >= 0; })) typeIds[str(t.id)] = t;
+      });
+      var cosByErp = Object.create(null), cosByCo = Object.create(null);
+      govRows(D.govCos).forEach(function (c) {
+        if (!c || c._deleted || !str(c.id)) return;
+        if (str(c.erpId)) (cosByErp[str(c.erpId)] = cosByErp[str(c.erpId)] || []).push(c);
+        if (str(c.co_id)) (cosByCo[str(c.co_id)] = cosByCo[str(c.co_id)] || []).push(c);
+      });
+      var schedsByCo = Object.create(null);
+      govRows(D.govScheds).forEach(function (s) {
+        if (!s || !s.date || !str(s.coId) || !typeIds[str(s.typeId)]) return;
+        (schedsByCo[str(s.coId)] = schedsByCo[str(s.coId)] || []).push(s);
+      });
+      _roundCache = { key: ck, map: { cosByErp: cosByErp, cosByCo: cosByCo, schedsByCo: schedsByCo } };
+    }
+    var m = _roundCache.map;
+    var erp = erpConsultingOf(p);
+    var planned = erpRoundDays(erp);
+    var coList = [];
+    var seenCo = Object.create(null);
+    function addCos(arr) { (arr || []).forEach(function (c) { if (!seenCo[c.id]) { seenCo[c.id] = 1; coList.push(c); } }); }
+    if (erp && str(erp.id)) addCos(m.cosByErp[str(erp.id)]);
+    if (!coList.length && str(p.companyId)) addCos(m.cosByCo[str(p.companyId)]);
+    var yr = String(num(p.year, CUR_YEAR));
+    var today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    var items = [];
+    coList.forEach(function (c) {
+      (m.schedsByCo[str(c.id)] || []).forEach(function (s) {
+        if (String(s.date).slice(0, 4) !== yr) return; // 사업장·연도 한 건 = 그 해 일정만
+        items.push({ round: num(s.round, 0), date: String(s.date).slice(0, 10), field: s.isField !== false });
+      });
+    });
+    items.sort(function (a, b) { return a.date.localeCompare(b.date) || (a.round - b.round); });
+    var seenDate = Object.create(null), uniq = [];
+    items.forEach(function (it) { var k = it.date + '|' + it.round; if (!seenDate[k]) { seenDate[k] = 1; uniq.push(it); } });
+    var past = uniq.filter(function (it) { return it.date <= today; });
+    return {
+      planned: planned,                 // 이알피 계약의 일수/회수 (0 = 적혀 있지 않음)
+      erpNo: erp ? str(erp.no) : '',
+      perf: !!(erp && erp.perfTrack),   // 📈 성과추적관리 — 연간 셈 제외
+      items: uniq,                      // 정부사업일정의 그 해 방문 일정(참고)
+      visited: past.length,
+      upcoming: uniq.length - past.length,
+      linked: !!erp
+    };
+  }
+  function roundChipsHtml(p) {
+    var r = roundsOf(p);
+    if (!r) return '';
+    if (!r.planned && !r.items.length) {
+      return '<span class="hint" title="이알피 계약에 일수가 적혀 있지 않고 정부사업일정에도 이 해 일정이 이어져 있지 않습니다">-</span>';
+    }
+    var u = roundUnit();
+    var tip = [];
+    if (r.planned) tip.push('이알피 계약 ' + r.planned + u + ' = ' + r.planned + '회차');
+    r.items.forEach(function (it) { tip.push((it.round ? it.round + '회차 ' : '') + it.date + (it.date > new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) ? ' (예정)' : '')); });
+    if (r.perf) tip.push('📈 성과추적관리 — 연간 수행일수 셈에서 제외');
+    var main = r.planned
+      ? '<span class="chip c-blue">' + r.planned + '회차</span>'
+      : '<span class="chip">일정 ' + r.items.length + '건</span>';
+    var sub = (r.planned && r.items.length)
+      ? ' <span class="chip" title="정부사업일정에 잡힌 방문 — 참고">방문 ' + r.visited + (r.upcoming ? '+' + r.upcoming : '') + '</span>'
+      : '';
+    return '<span class="rd-cell" title="' + esc(tip.join('\n')) + '">' + main + sub + (r.perf ? ' <span class="chip c-amber">📈 성과추적</span>' : '') + '</span>';
+  }
+  // 위쪽 KPI 줄의 «계획 회차» 합계 — 성과추적관리는 연간 수행일수에서 빠지는 건이라 따로 센다
+  function roundKpiHtml(list) {
+    if (!roundUnit()) return '';
+    var sum = 0, perfN = 0, noInfo = 0;
+    (list || []).forEach(function (p) {
+      var r = roundsOf(p);
+      if (!r || !r.planned) { noInfo++; return; }
+      if (r.perf) perfN++; else sum += r.planned;
+    });
+    return '<div class="kpi k-blue" title="이알피 계약의 일수(현장클리닉 3일 = 3회차)·회수 합계 — 성과추적관리 건은 연간 셈에서 빠지므로 제외"><span>계획 회차</span><b>' + sum + '회차</b></div>' +
+      (perfN ? '<div class="kpi k-amber" title="성과추적관리 — 연간 수행일수 셈에서 제외"><span>📈 성과추적</span><b>' + perfN + '건</b></div>' : '') +
+      (noInfo ? '<div class="kpi" title="이알피 계약에 일수가 적혀 있지 않거나 번호로 이어지지 않아 회차를 알 수 없는 건 — 합계에서 빠짐"><span>회차 미확인</span><b>' + noInfo + '건</b></div>' : '');
+  }
+  // 한 사업장의 회차별 줄(진행·체크 탭 머리에 붙인다): 1회차·2회차·3회차 … 날짜가 있으면 날짜, 없으면 «미정»
+  function roundsPanelHtml(p) {
+    var r = roundsOf(p);
+    if (!r) return '';
+    var u = roundUnit();
+    var n = Math.max(r.planned, r.items.length);
+    var head = '<div class="sec"><span>🗓 회차 현황</span>' +
+      (r.planned ? '<span class="chip c-blue">이알피 계약 ' + r.planned + u + ' = ' + r.planned + '회차</span>' : '<span class="chip c-amber">이알피 계약에 일수가 적혀 있지 않음</span>') +
+      (r.perf ? '<span class="chip c-amber">📈 성과추적관리 · 연간 수행일수 제외</span>' : '') +
+      '<span class="sp"></span><a class="act-link" href="gov-consulting.html" target="_blank" rel="noopener">정부사업일정 ↗</a></div>';
+    if (!n) {
+      return '<div class="card">' + head + '<div class="empty">이어진 회차 자료가 없습니다 — 이알피 계약의 일수 또는 정부사업일정 방문 일정이 이 사업장(번호 기준)에 이어지면 여기에 나옵니다.</div></div>';
+    }
+    var today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    var rows = '';
+    for (var i = 0; i < n; i++) {
+      var it = r.items[i];
+      var st = !it ? '<span class="chip">일정 미정</span>' : (it.date > today ? '<span class="chip c-amber">예정</span>' : '<span class="chip c-green">방문 완료</span>');
+      rows += '<tr><td class="n">' + (i + 1) + '</td><td class="ti">' + (i + 1) + '회차</td><td>' + esc(it ? it.date : '-') + '</td><td>' + st + '</td></tr>';
+    }
+    return '<div class="card">' + head +
+      '<div class="scroll"><table class="t" data-name="rounds"><thead><tr><th class="n">№</th><th>회차</th><th>방문일</th><th>상태</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="hint" style="padding:4px 12px 8px">방문일은 정부사업일정에 잡힌 일정을 날짜 순으로 놓은 «참고» 표시입니다(저장 안 함). 계획 회차는 이알피 계약의 일수가 기준입니다.</div>' +
+    '</div>';
   }
 
   function stepDotsHtml(stageId, status) {
@@ -377,6 +531,44 @@
         summaryNote: '2024 충남북부상의 수행 완료 (과거 이력 아카이브)'
       };
       D.regions = {};
+    } else if (APP_KEY === 'laboraudit') {
+      var trReg = tracks[0] || t0;
+      var trSp = tracks[1] || t1;
+      var trRem = tracks[2] || t1;
+      D.projects[p1Id] = {
+        id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
+        createdAt: now - 864e5 * 14, updatedAt: now - 3600e3,
+        companyId: 'co_pv_1', companyName: '(주)가나정밀', bizNo: '123-81-51001',
+        year: 2026, trackId: trReg.id, trackName: trReg.name, stage: 'visit',
+        workerCount: 42, consultantName: '점검노무사', status: 'active',
+        inspPeriod: '2026-11-18 ~ 2026-11-29', inspOffice: '대전청 천안지청 근로개선지도과',
+        inspIssues: '연장·야간·휴일수당 산정 및 근로계약서 교부 점검', inspDue: '2026-12-15',
+        inspResult: '시정지시 대응중',
+        summaryNote: '정기 근로감독 수검 · 지적사항 시정안 작성'
+      };
+      D.projects[p2Id] = {
+        id: p2Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 380, updatedAt: now - 864e5 * 340,
+        companyId: 'co_pv_2', companyName: '(주)다라산업', bizNo: '123-81-51002',
+        year: 2025, trackId: trRem.id, trackName: trRem.name, stage: 'followup',
+        workerCount: 68, consultantName: '점검노무사', status: 'done',
+        inspPeriod: '2025-05-12 ~ 2025-05-23', inspOffice: '대전청 서산지청',
+        inspIssues: '임금명세서 기재누락, 연차휴가 미사용수당 시정', inspDue: '2025-06-20',
+        inspResult: '시정완료·종결',
+        summaryNote: '시정완료 보고서 제출 및 종결'
+      };
+      D.projects['pv_' + APP_KEY + '_3'] = {
+        id: 'pv_' + APP_KEY + '_3', entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 740, updatedAt: now - 864e5 * 700,
+        companyId: 'co_pv_3', companyName: '(주)마바물류', bizNo: '123-81-51003',
+        year: 2024, trackId: trSp.id, trackName: trSp.name, stage: 'followup',
+        workerCount: 55, consultantName: '점검노무사', status: 'done',
+        inspPeriod: '2024-09-02 ~ 2024-09-13', inspOffice: '중부지방고용노동청',
+        inspIssues: '근로시간 한도(52시간) 초과 및 휴게시간 부여 개선', inspDue: '2024-10-10',
+        inspResult: '시정완료·종결',
+        summaryNote: '특별감독 시정지시 2건 완료 · 취업규칙 정비'
+      };
+      D.regions = {};
     } else {
       D.projects[p1Id] = {
         id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
@@ -403,6 +595,22 @@
         summaryNote: '2024년 ' + cat.shortName + ' 과거 수행이력 (미리보기 합성)'
       };
       D.regions = {};
+    }
+    // 회차 표시(현장클리닉·기술보호) 미리보기용 합성 자료 — 번호로 이어진 이알피 계약 일수와 정부사업일정 방문
+    if (roundUnit() && D.projects[p1Id] && D.projects[p2Id]) {
+      D.projects[p1Id].caseNo = '미리보기-001';
+      D.projects[p2Id].caseNo = '미리보기-002';
+      D.consultings = [
+        { id: 'pvc1', no: '미리보기-001', consultDays: 3, perfTrack: false, status: 'progress' },
+        { id: 'pvc2', no: '미리보기-002', consultDays: 2, perfTrack: true, status: 'closed' }
+      ];
+      D.govTypes = { t1: { id: 't1', name: cat.shortName, rounds: 3 } };
+      D.govCos = { c1: { id: 'c1', erpId: 'pvc1', name: '(합성)' } };
+      D.govScheds = {
+        s1: { id: 's1', coId: 'c1', typeId: 't1', round: 1, date: '2026-03-10', isField: true },
+        s2: { id: 's2', coId: 'c1', typeId: 't1', round: 2, date: '2026-04-14', isField: true },
+        s3: { id: 's3', coId: 'c1', typeId: 't1', round: 3, date: '2026-12-15', isField: true }
+      };
     }
     D.checks = {};
     D.checks[p1Id] = { main: { id: 'main', projectId: p1Id, entityType: 'Document', schemaVersion: 1, contractVersion: 1, revision: 1, pre: preSample, domain: domSample, docs: docSample } };
@@ -511,7 +719,11 @@
       safeVal('mailbox/folders'),
       safeVal('mailbox/msgs'),
       safeVal('mailbox/old/msgs'),
-      safeVal(basePath + '/regions')
+      safeVal(basePath + '/regions'),
+      // 회차 표시용 정부사업일정 — 읽기만. roundUnit 이 있는 앱(현장클리닉·기술보호)만 읽는다.
+      roundUnit() ? safeVal('scal_cos') : Promise.resolve(null),
+      roundUnit() ? safeVal('scal_scheds') : Promise.resolve(null),
+      roundUnit() ? safeVal('scal_types') : Promise.resolve(null)
     ]);
     if (epoch !== SESSION_EPOCH || (ME && ME.uid !== uid)) return;
     D.projects = res[0] || {};
@@ -527,6 +739,9 @@
     D.mailboxMsgs = res[10] || {};
     D.mailboxOldMsgs = res[11] || {};
     D.regions = res[12] || {};
+    D.govCos = res[13] || null;
+    D.govScheds = res[14] || null;
+    D.govTypes = res[15] || null;
 
     rebuildDiscoverAndRag();
     if ($('syncStateChip')) $('syncStateChip').textContent = '최신 동기화 완료';
@@ -538,11 +753,18 @@
     var el = $('recentDiffBarWrap');
     if (!el) return;
     var cat = getAppCat();
-    var isLeft = !!$('leftDash');
-    var badge = cat.diffBadge || (isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리');
-    var msg = cat.diffMsg || (isLeft
-      ? '북부상의 · 서산상의 · 당진상의 왼쪽 대시보드 분리 + 새 지역 상공회의소 추가 + 연도별 관리'
-      : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용');
+    // 가벼운 화면은 이 띠를 그리지 않는다 — 탭과 똑같은 이동 단추(사업 현황·미등록 후보·보고서)를 한 번 더 늘어놓던 자리였다.
+    if (isSlim()) { el.innerHTML = ''; return; }
+    var isLeft = leftDashOn();
+    var isInsp = (APP_KEY === 'laboraudit');
+    var badge = isInsp
+      ? '변경됨 · 자율점검·노무진단 완전 분리'
+      : (cat.diffBadge || (isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리'));
+    var msg = isInsp
+      ? '순수 고용노동부 근로감독(정기/수시·특별·시정지시·모의수검)만 관리 · 감독기간·관할지청·지적사항·결과 표시'
+      : (cat.diffMsg || (isLeft
+        ? '북부상의 · 서산상의 · 당진상의 왼쪽 대시보드 분리 + 새 지역 상공회의소 추가 + 연도별 관리'
+        : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용'));
     el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
       '<span class="chip c-blue">' + esc(badge) + '</span>' +
       '<b>' + esc(cat.icon + ' ' + cat.name) + ':</b>' +
@@ -562,16 +784,57 @@
     }
   }
 
+  /* ══ 왼쪽 대시보드 — 12개 앱 공통 (대표 지시 2026-11-28) ═══════════════════
+     「상공회의소처럼 기관이 여러 개로 나뉘거나 비슷한 컨설팅을 몇 회 나눠 한 경우는 왼쪽 대시보드로 정리하고 나머지는 다 일치하게」.
+     ★ 켜는 잣대는 «자료»다 — 사업이 실제로 들어 있는 세부 트랙(기관·지역·갈래)이 둘 이상일 때만 켠다.
+       하나뿐이면(기술보호처럼) 왼쪽 칸을 접고 한 단 화면으로 둔다. 카탈로그 hasLeftDashboard 는 «늘 켬»(상공회의소·6차산업),
+       leftDash:false 는 «늘 끔».
+     ★ 켜지면 위쪽 트랙 알약줄·연도 알약줄을 숨긴다 — 같은 고르기를 두 군데서 보이지 않는다(가벼운 화면 원칙).
+     ★ 목록 화면(사업 현황·미등록 후보)에서만 보인다. 진행·체크·보고서 작업실은 넓게 쓴다. */
+  function usedTrackIds() {
+    var used = Object.create(null);
+    projectsList().forEach(function (p) { var t = str(p.trackId); if (t) used[t] = 1; });
+    return used;
+  }
+  // 자료로 보아 왼쪽 대시보드가 «필요한가» (화면 틀과 상관없이 — 검사도 이것을 본다)
+  function leftDashWanted() {
+    var cat = getAppCat();
+    if (cat.leftDash === false) return false;
+    if (cat.hasLeftDashboard) return true;
+    return Object.keys(usedTrackIds()).length >= 2 || !!TRACK_FILTER;
+  }
+  function leftDashOn() { return !!$('leftDash') && leftDashWanted(); }
+  function leftDashShown() { return leftDashOn() && (CUR_TAB === 'projects' || CUR_TAB === 'inbox'); }
+  function leftDashLabels() {
+    var cat = getAppCat();
+    var LD = cat.leftDash || {};
+    var icon = cat.icon || '📂';
+    var by = str(LD.by) || '세부 트랙';
+    return {
+      head: LD.headLabel || (icon + ' ' + by + '별 현황'),
+      all: LD.allLabel || (icon + ' 전체 ' + by),
+      scopeAll: LD.scopeAll || ('전체 ' + by),
+      add: LD.addLabel || ('+ 새 ' + (cat.regionLabel || by) + ' 추가')
+    };
+  }
+
   function renderLeftDash() {
     var aside = $('leftDash');
     if (!aside) return;
+    var shell = aside.parentNode;
+    var shown = leftDashShown();
+    aside.style.display = shown ? '' : 'none';
+    if (shell && shell.classList) shell.classList.toggle('no-left', !shown);
+    if (!shown) { aside.innerHTML = ''; return; }
+
     var cat = getAppCat();
     var tracks = getEffectiveTracks();
     var allProjs = projectsList();
     var cands = (D.discover && D.discover.bundles) || [];
+    var slim = isSlim();
+    var L = leftDashLabels();
 
     aside.className = 'left-dash' + (DIFF_HIGHLIGHT ? ' code-diff-box' : '');
-    var LD = cat.leftDash || {};
 
     var statsMap = Object.create(null);
     tracks.forEach(function (t) {
@@ -602,7 +865,7 @@
 
     var cardsHtml = '<div class="ld-item' + (!TRACK_FILTER ? ' on' : '') + '">' +
       '<button type="button" class="ld-item-btn" data-ld-track="" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '">' +
-        '<span class="ld-item-name">' + esc(LD.allLabel || '🏬 전체 상공회의소') + '</span>' +
+        '<span class="ld-item-name">' + esc(L.all) + '</span>' +
         '<span class="chip c-blue">' + allProjs.length + '건</span>' +
       '</button>' +
       '<div class="ld-sub"><span>진행 ' + allActive + '</span><span>완료 ' + allDone + '</span>' +
@@ -616,16 +879,24 @@
         renderTracks.push({ id: uid, name: uid + ' (기타)', shortName: uid, icon: '🧩' });
       }
     });
+    // 가벼운 화면: 사업도 후보도 없는 트랙은 올리지 않는다(«0건» 줄 되풀이 금지). 사람이 새로 추가한 지역·지금 고른 트랙은 남긴다.
+    if (slim) {
+      renderTracks = renderTracks.filter(function (t) {
+        var st = statsMap[t.id];
+        return (st && (st.total > 0 || st.cand > 0)) || t.custom || TRACK_FILTER === t.id;
+      });
+    }
 
     renderTracks.forEach(function (t) {
       var st = statsMap[t.id] || { total: 0, active: 0, done: 0, cand: 0, yrs: {} };
       var yrs = Object.keys(st.yrs).sort(function (a, b) { return Number(b) - Number(a); });
-      var yrsHtml = yrs.length
+      // 가벼운 화면: 연도는 아래 «연도별» 한 곳에서만 고른다(트랙마다 연도 칩을 또 늘어놓지 않는다)
+      var yrsHtml = slim ? '' : (yrs.length
         ? ('<div class="ld-yrs">' + yrs.slice(0, 6).map(function (yr) {
             var on = TRACK_FILTER === t.id && YEAR_FILTER === yr;
             return '<button type="button" class="ld-yr-btn' + (on ? ' on' : '') + '" data-ld-track="' + esc(t.id) + '" data-ld-year="' + esc(yr) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(yr) + '(' + st.yrs[yr] + ')</button>';
           }).join('') + '</div>')
-        : '<div class="ld-sub"><span>' + esc(LD.emptyLabel || '등록 대기 (신규 지역 준비)') + '</span></div>';
+        : '<div class="ld-sub"><span>' + esc((cat.leftDash && cat.leftDash.emptyLabel) || '등록 대기') + '</span></div>');
 
       cardsHtml += '<div class="ld-item' + (TRACK_FILTER === t.id ? ' on' : '') + '">' +
         '<button type="button" class="ld-item-btn" data-ld-track="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-pressed="' + (TRACK_FILTER === t.id ? 'true' : 'false') + '">' +
@@ -647,14 +918,11 @@
     });
     var scopeYrs = Object.keys(scopeYrsMap).sort(function (a, b) { return Number(b) - Number(a); });
     var actObj = activeTrackObj();
-    var scopeTitle = actObj ? trackShortLabel(actObj) : (LD.scopeAll || '전체 상의');
-
-    aside.innerHTML =
-      '<div class="ld-hd"><span>' + esc(LD.headLabel || '🏬 지역별 대시보드') + '</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + tracks.length + '곳</span>') + '</div>' +
-      '<div class="ld-list">' + cardsHtml + '</div>' +
-      (cat.regionManageable === false ? '' : '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">+ 새 지역 상공회의소 추가</button>') +
+    var scopeTitle = actObj ? trackShortLabel(actObj) : L.scopeAll;
+    // 미등록 후보 탭은 후보의 수신 연도 알약이 따로 있다 — 등록 사업 연도 상자를 함께 두면 숫자가 어긋나 보여 숨긴다
+    var yearBoxHtml = CUR_TAB === 'inbox' ? '' : (
       '<div class="ld-year-box">' +
-        '<div class="ld-year-hd">📅 연도별 관리 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
+        '<div class="ld-year-hd" title="' + esc(scopeTitle + ' · ' + scopeProjs.length + '건') + '">📅 연도별 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
         '<div class="ld-yrs">' +
           '<button type="button" class="ld-yr-btn' + (!YEAR_FILTER ? ' on' : '') + '" data-ld-yronly="" aria-pressed="' + (!YEAR_FILTER ? 'true' : 'false') + '">전체(' + scopeProjs.length + ')</button>' +
           scopeYrs.map(function (yr) {
@@ -662,14 +930,21 @@
             return '<button type="button" class="ld-yr-btn' + (yOn ? ' on' : '') + '" data-ld-yronly="' + esc(yr) + '" aria-pressed="' + (yOn ? 'true' : 'false') + '">' + esc(yr) + '(' + scopeYrsMap[yr] + ')</button>';
           }).join('') +
         '</div>' +
-      '</div>';
+      '</div>');
+
+    aside.innerHTML =
+      '<div class="ld-hd"><span>' + esc(L.head) + '</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + renderTracks.length + '곳</span>') + '</div>' +
+      '<div class="ld-list">' + cardsHtml + '</div>' +
+      // 새 지역 추가는 카탈로그가 «사람이 지역을 더하는 앱»이라고 한 곳(regionManageable:true — 상공회의소)만
+      (cat.regionManageable === true ? '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">' + esc(L.add) + '</button>' : '') +
+      yearBoxHtml;
 
     aside.querySelectorAll('[data-ld-track]').forEach(function (btn) {
       btn.onclick = function () {
         var tid = btn.getAttribute('data-ld-track') || '';
         var yrAttr = btn.getAttribute('data-ld-year');
         if (yrAttr !== null) YEAR_FILTER = yrAttr;
-        else if (!tid || TRACK_FILTER === tid) YEAR_FILTER = '';
+        else if (!tid || TRACK_FILTER === tid || !(statsMap[tid] && statsMap[tid].yrs[YEAR_FILTER])) YEAR_FILTER = '';
         TRACK_FILTER = tid;
         SHOW_ALL_ROWS = false;
         if ($('projTrackSel')) $('projTrackSel').value = TRACK_FILTER;
@@ -689,7 +964,6 @@
       };
     });
     if ($('ldAddRegionBtn')) $('ldAddRegionBtn').onclick = openAddRegionModal;
-    void cat;
   }
   function diffCls(on) { return (DIFF_HIGHLIGHT && on) ? ' code-diff-box' : ''; }
   function diffBadge(label) { return DIFF_HIGHLIGHT ? ' <span class="chip c-blue">' + esc(label || '변경됨') + '</span>' : ''; }
@@ -717,6 +991,7 @@
       var yr = String(num(x.year, 2026));
       map[yr] = (map[yr] || 0) + 1;
     });
+    if (YEAR_FILTER && !map[YEAR_FILTER]) map[YEAR_FILTER] = 0;
     var yrs = Object.keys(map).sort(function (a, b) { return Number(b) - Number(a); });
     var lbl = mode === 'inbox' ? '수신 연도:' : '연도별 필터:';
     var allOn = YEAR_FILTER === '';
@@ -729,10 +1004,36 @@
     bar.querySelectorAll('[data-yr-set]').forEach(function (b) {
       b.onclick = function () {
         YEAR_FILTER = b.getAttribute('data-yr-set') || '';
+        SHOW_ALL_ROWS = false;
         if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
         draw();
       };
     });
+    // 폰 화면 연도 드롭다운 통일: 같은 .pane > .card .bar 에 #projYrSel 이 없으면 동적 연도 드롭다운을 동기화
+    var pane = bar.closest ? bar.closest('.pane') : null;
+    var toolBar = pane && pane.querySelector('.card:not(.hi-top-strip) .bar');
+    if (toolBar && !toolBar.querySelector('#projYrSel') && typeof document !== 'undefined') {
+      var phoneSel = toolBar.querySelector('.pu-phone-yr-sel[data-phone-yr-for="' + elId + '"]');
+      if (!phoneSel) {
+        phoneSel = document.createElement('select');
+        phoneSel.className = 'pu-phone-yr-sel';
+        phoneSel.setAttribute('data-phone-yr-for', elId);
+        phoneSel.setAttribute('aria-label', lbl.replace(/[:：\s]+$/, ''));
+        var qInp = toolBar.querySelector('input[type="search"], input[type="text"]');
+        if (qInp && qInp.nextSibling) toolBar.insertBefore(phoneSel, qInp.nextSibling);
+        else toolBar.insertBefore(phoneSel, toolBar.firstChild);
+      }
+      var selOpts = '<option value="">연도 전체</option>' + yrs.map(function (yr) {
+        return '<option value="' + esc(yr) + '">' + esc(yr) + '년 (' + map[yr] + ')</option>';
+      }).join('');
+      fillSelectKeepingValue(phoneSel, selOpts, YEAR_FILTER);
+      phoneSel.onchange = function () {
+        YEAR_FILTER = phoneSel.value || '';
+        SHOW_ALL_ROWS = false;
+        if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
+        draw();
+      };
+    }
   }
 
   function stepsRibbonHtml(proj) {
@@ -755,7 +1056,8 @@
     var switchBtn = mode === 'report'
       ? '<button type="button" class="sm" data-ws-nav="detail">📋 진행·체크·자료 (' + getProjectComms(proj.id).length + ')</button>'
       : '<button type="button" class="sm pri" data-ws-nav="report">⚖️ 보고서 · RAG 코치</button>';
-    var focusBtns = mode === 'report'
+    // 가벼운 화면은 일반 보고서 원고를 접어 두므로 «좌우 2단 · 코치 집중 · 보고서 집중» 전환 단추도 두지 않는다
+    var focusBtns = (mode === 'report' && !reportFolded())
       ? ('<button type="button" class="sm' + (!WS_FOCUS ? ' pri' : '') + '" data-focus="" title="RAG 코치(왼쪽)와 보고서(오른쪽)를 나란히 봅니다">좌우 2단</button>' +
          '<button type="button" class="sm' + (WS_FOCUS === 'coach' ? ' pri' : '') + '" data-focus="coach" title="RAG 코치·플레이북만 크게 봅니다">🧠 코치 집중</button>' +
          '<button type="button" class="sm' + (WS_FOCUS === 'doc' ? ' pri' : '') + '" data-focus="doc" title="보고서 편집·A4 미리보기만 크게 봅니다">📄 보고서 집중</button>')
@@ -807,9 +1109,19 @@
   }
 
   /* ══ 4. 탭 1: 📂 사업 현황 (pu-harass drawCasesPane 규격) ══════════════ */
+  // 진행상태 거르기 — 드롭다운이 있으면 그 값, 없으면(가벼운 화면) KPI 알약이 정한 값
+  function stFilter() { var el = $('projSt'); return el ? str(el.value) : ST_FILTER; }
+  function setStFilter(v) { ST_FILTER = str(v); var el = $('projSt'); if (el) el.value = ST_FILTER; }
+  // 자동으로 만들어진 메모(「[ERP] ERP 수임(번호)」·「[메일] 메일 N통 자동분류」)는 번호 칩·자료 칸과 같은 말이라 비워 보인다
+  function memoShown(p) {
+    var s = str(p && p.summaryNote);
+    if (isSlim() && /^\[(ERP|메일|카톡)\]\s*(ERP 수임|(메일|카톡)\s*\d+\s*(통|건)\s*(자동분류|연결))/.test(s)) return '';
+    return s;
+  }
+
   function getFilteredProjects() {
     var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var st = str($('projSt') && $('projSt').value);
+    var st = stFilter();
     var mgr = str($('projMgr') && $('projMgr').value);
     return projectsList().filter(function (p) {
       if (TRACK_FILTER && p.trackId !== TRACK_FILTER) return false;
@@ -818,7 +1130,7 @@
       if (st === 'active' && p.status === 'done') return false;
       if (mgr && str(p.consultantName) !== mgr) return false;
       if (q) {
-        var hay = [p.year, p.companyName, p.trackName, p.consultantName, p.summaryNote].join(' ').toLowerCase();
+        var hay = [p.year, p.companyName, p.caseNo, p.trackName, p.consultantName, p.summaryNote, p.inspPeriod, p.inspOffice, p.inspIssues, p.inspDue, p.inspResult].join(' ').toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -828,7 +1140,7 @@
   function hasProjFilterActive() {
     return !!(TRACK_FILTER || YEAR_FILTER ||
       str($('projQ') && $('projQ').value) ||
-      str($('projSt') && $('projSt').value) ||
+      stFilter() ||
       str($('projMgr') && $('projMgr').value));
   }
 
@@ -839,6 +1151,13 @@
     var cands = (D.discover && D.discover.bundles) || [];
     var hwpx = Hwpx();
     var splitCols = cat.listCols === 'split';
+    // 가벼운 화면 + 사업이 한 트랙에만 있으면: 트랙 알약·줄마다 같은 트랙 칩은 되풀이라 걷는다
+    var oneTrackSlim = isSlim() && Object.keys(usedTrackIds()).length <= 1;
+    // 왼쪽 대시보드가 켜지면 트랙·연도 고르기는 왼쪽 한 곳 — 위쪽 알약줄은 숨기고, 한 트랙을 고른 동안은 줄마다 같은 트랙 칩도 걷는다
+    var ldOn = leftDashOn();
+    var ldSlim = ldOn && isSlim();
+    var hideTrackChip = oneTrackSlim || (ldSlim && !!TRACK_FILTER);
+    var showRounds = !!roundUnit();
 
     // 트랙 바 (#projTrackBar)
     var trackBar = $('projTrackBar');
@@ -859,6 +1178,9 @@
         btns.push('<button type="button" class="scope-btn' + (on ? ' on' : (cnt > 0 ? ' ok' : '')) + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-track-set="' + esc(t.id) + '" title="' + esc(t.name) + '">' + esc(trackShortLabel(t)) + ' (' + cnt + ')</button>');
       });
       trackBar.innerHTML = btns.join('');
+      // 가벼운 화면: 사업이 한 트랙에만 있으면 «전체(108) · 그 트랙(108) · 빈 트랙(0)…» 알약은 같은 말의 되풀이라 감춘다.
+      // (트랙은 [+ 새 사업 등록] 창에서 그대로 고를 수 있다)
+      trackBar.style.display = ((oneTrackSlim && !TRACK_FILTER) || ldSlim) ? 'none' : '';
       trackBar.querySelectorAll('[data-track-set]').forEach(function (b) {
         b.onclick = function () {
           TRACK_FILTER = b.getAttribute('data-track-set') || '';
@@ -873,6 +1195,7 @@
     // 연도별 빠른 필터 바 (#projYrBar — 전 12개 앱 연도별 관리)
     var trackScopedProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
     renderYearButtonsBar('projYrBar', 'all', trackScopedProjs);
+    if ($('projYrBar')) $('projYrBar').style.display = ldSlim ? 'none' : '';
 
     // 초소형 1줄 KPI 배지 (#kpiBox — 선택된 지역/연도 범위 기준)
     var kpiBox = $('kpiBox');
@@ -883,15 +1206,16 @@
       var doneCnt = kpiScope.filter(function (x) { return x.status === 'done'; }).length;
       var activeCnt = kpiScope.length - doneCnt;
       var totalComms = kpiScope.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0);
-      var scopedCands = TRACK_FILTER && $('leftDash')
+      var scopedCands = TRACK_FILTER && ldOn
         ? cands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
         : cands;
-      var stVal = str($('projSt') && $('projSt').value);
+      var stVal = stFilter();
       var allOn = !stVal;
       var doneOn = stVal === 'done';
       var activeOn = stVal === 'active';
       var actTrack = activeTrackObj();
-      var scopeTag = (actTrack || YEAR_FILTER)
+      // 가벼운 화면: 바로 위(또는 왼쪽)에서 이미 «고른 것»으로 보이는 트랙·연도를 KPI 앞에 또 적지 않는다
+      var scopeTag = (!isSlim() && (actTrack || YEAR_FILTER))
         ? ('<span class="chip c-blue">' + esc((actTrack ? trackShortLabel(actTrack) : '전체') + (YEAR_FILTER ? (' · ' + YEAR_FILTER + '년') : '')) + '</span>')
         : '';
       kpiBox.innerHTML = scopeTag +
@@ -899,10 +1223,12 @@
         '<div class="kpi k-green' + (doneOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="done" role="button" tabindex="0" aria-pressed="' + (doneOn ? 'true' : 'false') + '"><span>완료</span><b>' + doneCnt + '건</b></div>' +
         '<div class="kpi k-amber' + (activeOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="active" role="button" tabindex="0" aria-pressed="' + (activeOn ? 'true' : 'false') + '"><span>진행중</span><b>' + activeCnt + '건</b></div>' +
         '<div class="kpi k-blue"><span>수집자료</span><b>' + totalComms + '건</b></div>' +
-        (scopedCands.length > 0 ? '<div class="kpi k-amber" data-act="goInbox" role="button" tabindex="0" title="미등록 후보 탭으로 이동"><span>미등록후보</span><b>' + scopedCands.length + '곳</b></div>' : '');
+        roundKpiHtml(kpiScope) +
+        // 미등록 후보는 «📥 미등록 후보» 탭 이름표에 이미 건수가 있다 — 가벼운 화면은 되풀이하지 않는다
+        ((!isSlim() && scopedCands.length > 0) ? '<div class="kpi k-amber" data-act="goInbox" role="button" tabindex="0" title="미등록 후보 탭으로 이동"><span>미등록후보</span><b>' + scopedCands.length + '곳</b></div>' : '');
       kpiBox.querySelectorAll('[data-act="kpiSt"]').forEach(function (k) {
         k.onclick = function () {
-          if ($('projSt')) $('projSt').value = k.getAttribute('data-id') || '';
+          setStFilter(k.getAttribute('data-id') || '');
           renderProjectsPane();
         };
         k.onkeydown = function (e) {
@@ -921,10 +1247,14 @@
     fillSelectKeepingValue($('projTrackSel'),
       '<option value="">' + esc(cat.listCols === 'split' ? ((cat.regionLabel || '트랙') + ' 전체') : '트랙 전체') + '</option>' + tracks.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(trackShortLabel(t)) + '</option>'; }).join(''),
       TRACK_FILTER);
-    var yrsSet = Object.create(null);
-    allProjs.forEach(function (p) { yrsSet[String(num(p.year, 2026))] = 1; });
+    var yrsCount = Object.create(null);
+    allProjs.forEach(function (p) {
+      var yk = String(num(p.year, 2026));
+      yrsCount[yk] = (yrsCount[yk] || 0) + 1;
+    });
+    if (YEAR_FILTER && !yrsCount[YEAR_FILTER]) yrsCount[YEAR_FILTER] = 0;
     fillSelectKeepingValue($('projYrSel'),
-      '<option value="">연도 전체</option>' + Object.keys(yrsSet).sort(function (a, b) { return Number(b) - Number(a); }).map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '년</option>'; }).join(''),
+      '<option value="">연도 전체</option>' + Object.keys(yrsCount).sort(function (a, b) { return Number(b) - Number(a); }).map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '년 (' + yrsCount[y] + ')</option>'; }).join(''),
       YEAR_FILTER);
     var mgrs = Object.create(null);
     allProjs.forEach(function (p) { if (p.consultantName) mgrs[p.consultantName] = 1; });
@@ -954,15 +1284,17 @@
       '<button type="button" class="sm" id="bulkClearProjBtn">해제</button>' +
       '</div>';
 
+    var isInsp = (APP_KEY === 'laboraudit');
     var trs = shown.map(function (p, i) {
       var ckKey = 'p:' + p.id;
       var clsList = [];
+      if (splitCols) clsList.push('split-row');
       if (p.id === CUR_PID) clsList.push('cur');
       if (p.status === 'done') clsList.push('perf-direct');
       var trAttr = clsList.length ? (' class="' + clsList.join(' ') + '"') : '';
       var commCnt = getProjectComms(p.id).length;
       var sum = hwpx ? hwpx.buildSummary(APP_KEY, p, getCheckDoc(p.id), []) : { overallPct: 0 };
-      var stChip = p.status === 'done' ? '<span class="chip c-green">완료</span>' : '<span class="chip c-amber">진행중</span>';
+      var stChip = p.status === 'done' ? '<span class="chip c-green pm-st">완료</span>' : '<span class="chip c-amber pm-st">진행중</span>';
       var trObj = tracks.find(function (t) { return t.id === p.trackId; });
       var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
       var caseTag = p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '';
@@ -975,23 +1307,44 @@
           '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + caseTag + '</td>' +
           '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
           '<td data-k="st">' + stChip + '</td>' +
-          '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
-          '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
-          '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
+          '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
+          '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>' +
+          '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
         '</tr>';
+      }
+      var rowBodyCols;
+      if (isInsp) {
+        // 감독 결과가 진행상태 칩과 같은 말(진행중·완료)이면 두 번 적지 않는다
+        var stLbl = p.status === 'done' ? '완료' : '진행중';
+        var resChip = (p.inspResult && str(p.inspResult) !== stLbl) ? (' <span class="chip ' + (p.inspResult.indexOf('완료') >= 0 || p.inspResult.indexOf('없음') >= 0 ? 'c-green' : 'c-amber') + '">' + esc(p.inspResult) + '</span>') : '';
+        var periodHtml = p.inspPeriod ? esc(p.inspPeriod) : '<span class="hint">기간 미입력</span>';
+        var officeHtml = p.inspOffice ? (' <span class="hint">· ' + esc(p.inspOffice) + '</span>') : '';
+        var issuesTxt = p.inspIssues || p.summaryNote || '-';
+        var dueHtml = p.inspDue ? (' <span class="hint">· 기한 ' + esc(p.inspDue) + '</span>') : '';
+        var issuesTitle = p.inspDue ? (issuesTxt + ' (시정기한: ' + p.inspDue + ')') : issuesTxt;
+        rowBodyCols =
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue pm-tr">' + esc(trLbl) + '</span> ') + stChip + resChip + '</td>' +
+          '<td data-k="pc-only" title="' + esc([p.inspPeriod, p.inspOffice].filter(Boolean).join(' · ')) + '">' + periodHtml + officeHtml + '</td>' +
+          '<td class="wide" title="' + esc(issuesTitle) + '">' + esc(issuesTxt) + dueHtml + '</td>' +
+          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>';
+      } else {
+        rowBodyCols =
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue pm-tr">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
+          (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
+          '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+          '<td data-k="pc-only" title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
+          '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>';
       }
       return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
         '<td class="n">' + (i + 1) + '</td>' +
         '<td class="ti" title="' + esc(p.companyName) + '"><span class="chip">' + esc(String(p.year || 2026)) + '</span> ' + esc(p.companyName) + caseTag + '</td>' +
-        '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span> ' + stChip + '</td>' +
-        '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-        '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-        '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
-        '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
-        '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
+        rowBodyCols +
+        '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
       '</tr>';
     }).join('');
 
@@ -999,10 +1352,13 @@
       ? ('<div class="bar"><span class="hint">총 ' + filtered.length + '건 중 ' + shown.length + '건 표시</span><button type="button" class="sm pri" id="showAllProjBtn">전체 ' + filtered.length + '건 모두 보기 (+' + (filtered.length - shown.length) + ')</button></div>')
       : '';
 
+    var diffMark = (isInsp && DIFF_HIGHLIGHT) ? (' ' + diffBadge('개편')) : '';
     var headCols = splitCols
       ? '<th class="yr">연도</th><th>사업장명</th><th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th><th data-k="st">진행상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'
-      : '<th>사업장 · 연도</th><th>트랙 · 상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>';
-    box.innerHTML = bulkHtml + '<div class="scroll"><table class="t" data-name="cases">' +
+      : (isInsp
+        ? ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '감독 결과' : '감독 유형 · 결과') + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th><th data-k="act">열기</th>')
+        : ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'));
+    box.innerHTML = bulkHtml + '<div class="scroll' + (isInsp ? diffCls(true) : '') + '"><table class="t" data-name="cases">' +
       '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th>' + headCols + '</tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>' + moreHtml;
 
@@ -1017,8 +1373,9 @@
     });
     box.querySelectorAll('tr[data-row]').forEach(function (tr) {
       tr.onclick = function (e) {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A')) return;
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || (e.target.closest && e.target.closest('input,button,select,a,label,textarea,td.c,th.c')))) return;
         CUR_PID = tr.getAttribute('data-row');
+        if (typeof window !== 'undefined' && window.innerWidth <= 768) { switchTab('detail'); return; }
         renderProjectsPane();
       };
     });
@@ -1057,7 +1414,7 @@
   /* ══ 5. 탭 2: 📥 미등록 후보 (pu-harass drawInboxPane 규격) ══════════════ */
   function getFilteredInboxBundles() {
     var allCands = (D.discover && D.discover.bundles) || [];
-    var hasLeft = !!$('leftDash');
+    var hasLeft = leftDashOn();
     var trackCands = (hasLeft && TRACK_FILTER)
       ? allCands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
       : allCands;
@@ -1097,7 +1454,7 @@
 
     if ($('inboxKpiBox')) {
       var actObj = activeTrackObj();
-      var trTag = (hasLeft && actObj) ? ('<span class="chip c-blue">' + esc(trackShortLabel(actObj)) + '</span>') : '';
+      var trTag = (hasLeft && actObj && !isSlim()) ? ('<span class="chip c-blue">' + esc(trackShortLabel(actObj)) + '</span>') : '';
       $('inboxKpiBox').innerHTML = trTag +
         '<div class="kpi k-amber"><span>미등록 후보</span><b>' + trackCands.length + '묶음</b></div>' +
         ((YEAR_FILTER || q) ? '<div class="kpi k-blue"><span>필터 결과</span><b>' + list.length + '묶음</b></div>' : '') +
@@ -1125,9 +1482,9 @@
         '<td class="n">' + (i + 1) + '</td>' +
         '<td class="ti" title="' + esc(b.companyName) + '"><span class="chip">' + esc(String(b.year || 2026)) + '</span> ' + coBadge + esc(b.companyName) + '</td>' +
         '<td data-k="badge" title="' + esc(badgeTxt) + '">' + trTag + '<span class="chip c-blue">' + esc(badgeTxt) + '</span></td>' +
-        '<td title="' + esc(b.latestDate || '-') + '">' + esc(b.latestDate || '-') + '</td>' +
+        '<td data-k="pc-only" title="' + esc(b.latestDate || '-') + '">' + esc(b.latestDate || '-') + '</td>' +
         '<td class="wide" title="' + esc(sampleTxt) + '">' + esc(sampleTxt) + '</td>' +
-        '<td data-k="act"><button type="button" class="sm pri" data-import-cand="' + esc(b.key) + '">📥 1클릭 등록</button> <button type="button" class="sm" data-preview-cand="' + esc(b.key) + '">👁 미리보기</button></td>' +
+        '<td data-k="act"><button type="button" class="sm pri" data-import-cand="' + esc(b.key) + '" data-pm-act="1">📥 1클릭 등록</button> <button type="button" class="sm" data-preview-cand="' + esc(b.key) + '">👁 미리보기</button></td>' +
       '</tr>';
     }).join('');
 
@@ -1141,6 +1498,12 @@
     });
     box.querySelectorAll('[data-preview-cand]').forEach(function (b) {
       b.onclick = function () { openBundlePreviewModal(b.getAttribute('data-preview-cand')); };
+    });
+    box.querySelectorAll('tr[data-cand]').forEach(function (tr) {
+      tr.onclick = function (e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || (e.target.closest && e.target.closest('input,button,select,a,label,textarea,td.c,th.c')))) return;
+        if (typeof window !== 'undefined' && window.innerWidth <= 768) openBundlePreviewModal(tr.getAttribute('data-cand'));
+      };
     });
   }
 
@@ -1191,7 +1554,7 @@
       if (ent.kind === 'project') {
         var p = ent.item;
         if (yrQ) {
-          var hayP = [ent.year, p.companyName, p.trackName, p.caseNo, p.summaryNote].join(' ').toLowerCase();
+          var hayP = [ent.year, p.companyName, p.trackName, p.caseNo, p.summaryNote, p.inspPeriod, p.inspOffice, p.inspIssues, p.inspDue, p.inspResult].join(' ').toLowerCase();
           if (hayP.indexOf(yrQ) < 0) return false;
         }
       } else {
@@ -1229,15 +1592,16 @@
           var cls = p.status === 'done' ? ' class="perf-direct"' : '';
           var trObj = tracks.find(function (t) { return t.id === p.trackId; });
           var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
+          var yrNote = p.summaryNote || p.inspIssues || '-';
           return '<tr' + cls + '>' +
             '<td class="c"><input type="checkbox" data-ck="yrp:' + esc(p.id) + '" data-list="yr_' + esc(yr) + '" aria-label="선택"></td>' +
             '<td class="n">' + (idx + 1) + '</td>' +
             '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + (p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '') + '</td>' +
             '<td data-k="badge"><span class="chip c-green">등록 사업</span> <span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
-            '<td>' + stepDotsHtml(p.stage, p.status) + '</td>' +
-            '<td>' + esc(safeDate(p.updatedAt)) + '</td>' +
-            '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
-            '<td data-k="act"><button type="button" class="sm pri" data-yr-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-yr-rpt="' + esc(p.id) + '">보고서</button></td>' +
+            '<td data-k="pc-only">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+            '<td data-k="pc-only">' + esc(safeDate(p.updatedAt)) + '</td>' +
+            '<td class="wide" title="' + esc(yrNote) + '">' + esc(yrNote) + '</td>' +
+            '<td data-k="act"><button type="button" class="sm pri" data-yr-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-yr-rpt="' + esc(p.id) + '">보고서</button></td>' +
           '</tr>';
         }
         var b = ent.item;
@@ -1247,10 +1611,10 @@
           '<td class="n">' + (idx + 1) + '</td>' +
           '<td class="ti" title="' + esc(b.companyName) + '">' + esc(b.companyName) + '</td>' +
           '<td data-k="badge"><span class="chip c-amber">미등록 후보</span>' + (b.suggestedTrackName ? (' <span class="chip">' + esc(b.suggestedTrackName) + '</span>') : '') + '</td>' +
-          '<td>메일 ' + b.mailCount + ' · 톡 ' + b.msgCount + '</td>' +
-          '<td>' + esc(b.latestDate || '-') + '</td>' +
+          '<td data-k="pc-only">메일 ' + b.mailCount + ' · 톡 ' + b.msgCount + '</td>' +
+          '<td data-k="pc-only">' + esc(b.latestDate || '-') + '</td>' +
           '<td class="wide" title="' + esc(sample) + '">' + esc(sample) + '</td>' +
-          '<td data-k="act"><button type="button" class="sm ok" data-yr-import="' + esc(b.key) + '">1클릭 등록</button></td>' +
+          '<td data-k="act"><button type="button" class="sm ok" data-yr-import="' + esc(b.key) + '" data-pm-act="1">1클릭 등록</button></td>' +
         '</tr>';
       }).join('');
       return '<div class="card">' +
@@ -1337,13 +1701,20 @@
           '<span><b>사업장</b>' + esc(proj.companyName) + (proj.bizNo ? ' (' + esc(proj.bizNo) + ')' : '') + '</span>' +
           (proj.caseNo ? '<span><b>사건번호</b><span class="chip">' + esc(proj.caseNo) + '</span></span>' : '') +
           '<span><b>트랙</b><span class="chip c-blue">' + esc(proj.trackName || cat.shortName) + '</span></span>' +
-          '<span><b>수행연도</b>' + esc(String(proj.year || 2026)) + '년</span>' +
-          '<span><b>근로자</b>' + num(proj.workerCount, 0) + '명</span>' +
+          '<span><b>수행연도</b>' + esc(String(proj.year || 2026)) + '년</span>' +          '<span><b>근로자</b>' + num(proj.workerCount, 0) + '명</span>' +
           '<span><b>담당</b>' + esc(proj.consultantName || '전담 노무사') + '</span>' +
           '<span><b>점검 준비도</b>' + sum.overallPct + '%</span>' +
           '<span><b>수집자료</b>' + comms.length + '건</span>' +
+          (APP_KEY === 'laboraudit'
+            ? ('<span><b>감독 기간</b>' + esc(proj.inspPeriod || '미입력') + '</span>' +
+               '<span><b>관할 지청</b>' + esc(proj.inspOffice || '미입력') + '</span>' +
+               '<span><b>시정 기한</b>' + esc(proj.inspDue || '-') + '</span>' +
+               '<span><b>처리 결과</b><span class="chip ' + ((str(proj.inspResult).indexOf('완료') >= 0 || str(proj.inspResult).indexOf('없음') >= 0) ? 'c-green' : 'c-amber') + '">' + esc(proj.inspResult || '미정') + '</span></span>' +
+               '<span style="flex-basis:100%"><b>지적·시정지시</b>' + esc(proj.inspIssues || '상단 수정 버튼을 눌러 지적사항을 입력하세요') + '</span>')
+            : '') +
         '</div>' +
       '</div>' +
+      roundsPanelHtml(proj) +
       '<div class="card">' +
         '<div class="sec"><span>① ' + esc(cat.shortName) + ' 체크리스트 (착수 사전 · 실무 핵심 · 필수 산출서류)</span>' + diffBadge('6단계 연동') +
           '<span class="sp"></span>' +
@@ -1538,6 +1909,16 @@
     var topCardHtml = proj
       ? ('<div class="card">' + projectPickerBarHtml(proj, 'report') + '</div>')
       : ('<div class="note"><b>' + esc(cat.name) + '</b> 실무 RAG 코치 — 왼쪽에서 플레이북·법령 근거를 바로 검색할 수 있으며, 사업장을 선택하면 오른쪽 보고서 작업실도 함께 활성화됩니다.</div>');
+
+    // 기관 서식이 컨설팅보고서에 있는 앱(govReportForm — 기술보호·현장클리닉·상공회의소): 기관에 내는 서식은 «컨설팅보고서»가 실제 서식(별지)에 채워 출력한다.
+    // 여기의 일반 보고서 원고(최종결과보고서·1P·체크리스트)는 기관 서식이 아닌 내부 참고용이라 «접어 둔다»(지우지 않음).
+    if (reportFolded()) {
+      topCardHtml += '<div class="note" id="govReportNote">📑 <b>기관 제출용 서식</b>(' + esc(cat.shortName) + ' 기관 양식)은 <a class="act-link" href="gov-report.html" target="_blank" rel="noopener">컨설팅보고서 ↗</a>에서 실제 서식에 채워 출력합니다. ' +
+        '이 탭의 일반 보고서 원고는 내부 참고용이라 오른쪽에 접어 두었습니다.</div>';
+      rightColHtml = '<div class="ws-col-right"><details class="sub-fold" id="genRptFold"><summary>📄 일반 보고서 원고 · HWPX (내부 참고용 — 기관 서식 아님)</summary><div class="sub-fold-bd">' +
+        rightColHtml.replace(/^<div class="ws-col-right">/, '').replace(/<\/div>$/, '') +
+        '</div></details></div>';
+    }
 
     box.innerHTML = topCardHtml +
       '<div class="ws-split' + (WS_FOCUS ? (' focus-' + WS_FOCUS) : '') + '">' + leftColHtml + rightColHtml + '</div>';
@@ -1789,6 +2170,13 @@
       summaryNote: '자동 감지 등록 (메일 ' + bundle.mailCount + ' / 톡 ' + bundle.msgCount + ')'
     };
     if (str(bundle.caseNo)) rec.caseNo = cleanText(bundle.caseNo).slice(0, 60);
+    if (APP_KEY === 'laboraudit' && bundle.inspMeta) {
+      if (str(bundle.inspMeta.inspPeriod)) rec.inspPeriod = cleanText(bundle.inspMeta.inspPeriod).slice(0, 80);
+      if (str(bundle.inspMeta.inspOffice)) rec.inspOffice = cleanText(bundle.inspMeta.inspOffice).slice(0, 60);
+      if (str(bundle.inspMeta.inspIssues)) rec.inspIssues = cleanText(bundle.inspMeta.inspIssues).slice(0, 480);
+      if (str(bundle.inspMeta.inspDue)) rec.inspDue = cleanText(bundle.inspMeta.inspDue).slice(0, 32);
+      if (str(bundle.inspMeta.inspResult)) rec.inspResult = cleanText(bundle.inspMeta.inspResult).slice(0, 40);
+    }
     D.projects[pid] = await saveRecord('projects/' + pid, pid, rec, 'Project');
     if (Array.isArray(bundle.comms)) {
       D.comms[pid] = D.comms[pid] || {};
@@ -1921,7 +2309,7 @@
     var rows = [['구분', '연도', '사업장명', '트랙', '단계/출처', '담당/최근일', '요약·제목']];
     if (!includeBundles) {
       getFilteredProjects().forEach(function (p) {
-        rows.push(['등록사업', p.year || 2026, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
+        rows.push(['등록사업', p.year || 2026, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || p.inspIssues || '-']);
       });
     } else {
       var yrQ = str($('yrQ') && $('yrQ').value).toLowerCase();
@@ -1931,8 +2319,8 @@
           var yr = num(p.year, 2026);
           if (TRACK_FILTER && p.trackId !== TRACK_FILTER) return;
           if (YEAR_FILTER && String(yr) !== YEAR_FILTER) return;
-          if (yrQ && ([yr, p.companyName, p.trackName, p.caseNo, p.summaryNote].join(' ').toLowerCase()).indexOf(yrQ) < 0) return;
-          rows.push(['등록사업', yr, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
+          if (yrQ && ([yr, p.companyName, p.trackName, p.caseNo, p.summaryNote, p.inspPeriod, p.inspOffice, p.inspIssues, p.inspDue, p.inspResult].join(' ').toLowerCase()).indexOf(yrQ) < 0) return;
+          rows.push(['등록사업', yr, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || p.inspIssues || '-']);
         });
       }
       if (yrKind !== 'project') {
@@ -1987,6 +2375,45 @@
     });
   }
 
+  var INSP_RESULT_OPTS = ['미정/수검중', '시정지시 대응중', '시정완료·종결', '위반없음·종결', '과태료 부과 후 시정', '과태료·사법조치 병행'];
+  function inspFormRowsHtml(prefix, src) {
+    if (APP_KEY !== 'laboraudit') return '';
+    var p = src || {};
+    var curRes = str(p.inspResult);
+    var optsList = INSP_RESULT_OPTS.slice();
+    if (curRes && optsList.slice(1).indexOf(curRes) < 0) optsList.push(curRes);
+    var resOpts = optsList.map(function (label, idx) {
+      var val = idx === 0 ? '' : label;
+      return '<option value="' + esc(val) + '"' + (curRes === val ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+    return '<div class="fr"><label for="' + prefix + 'InspPeriod">감독 일시·기간</label><div class="fv"><input type="text" id="' + prefix + 'InspPeriod" value="' + esc(p.inspPeriod || '') + '" placeholder="예: 2026-11-10 ~ 2026-11-21"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspOffice">관할 노동지청</label><div class="fv"><input type="text" id="' + prefix + 'InspOffice" value="' + esc(p.inspOffice || '') + '" placeholder="예: 대전청 천안지청 근로개선지도과"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspIssues">지적·시정지시 사항</label><div class="fv"><input type="text" id="' + prefix + 'InspIssues" value="' + esc(p.inspIssues || '') + '" placeholder="예: 연장수당 산정 누락, 근로계약서 미교부"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspDue">시정기한</label><div class="fv"><input type="text" id="' + prefix + 'InspDue" value="' + esc(p.inspDue || '') + '" placeholder="예: 2026-12-15"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspResult">처리 결과</label><div class="fv"><select id="' + prefix + 'InspResult">' + resOpts + '</select></div></div>';
+  }
+  function readInspFormValues(prefix, origProj) {
+    if (APP_KEY !== 'laboraudit') return { values: {}, clearKeys: [] };
+    var defs = [
+      ['inspPeriod', prefix + 'InspPeriod', 80],
+      ['inspOffice', prefix + 'InspOffice', 60],
+      ['inspIssues', prefix + 'InspIssues', 480],
+      ['inspDue', prefix + 'InspDue', 32],
+      ['inspResult', prefix + 'InspResult', 40]
+    ];
+    var values = {};
+    var clearKeys = [];
+    defs.forEach(function (d) {
+      var el = $(d[1]);
+      var rawVal = el ? str(el.value) : '';
+      if (origProj && rawVal === str(origProj[d[0]])) return;
+      var v = el ? cleanText(rawVal).slice(0, d[2]) : '';
+      if (v) values[d[0]] = v;
+      else clearKeys.push(d[0]);
+    });
+    return { values: values, clearKeys: clearKeys };
+  }
+
   function openNewProjectModal() {
     var m = $('modal'), box = $('mbox');
     if (!m || !box) return;
@@ -2004,6 +2431,7 @@
         '<div class="fr"><label for="npTrack">' + esc(cat.regionLabel || '세부 트랙') + '</label><div class="fv"><select id="npTrack">' + opts + '</select></div></div>' +
         '<div class="fr"><label for="npYear">수행연도</label><div class="fv"><input type="number" id="npYear" value="' + esc(String(defYr)) + '"></div></div>' +
         '<div class="fr"><label for="npCaseNo">사건번호(선택)</label><div class="fv"><input type="text" id="npCaseNo" placeholder="예: 인사서산-2026-001"></div></div>' +
+        inspFormRowsHtml('np', {}) +
         '<div class="fr"><label for="npWorkers">상시근로자수</label><div class="fv"><input type="number" id="npWorkers" value="20"></div></div>' +
         '<div class="fr"><label for="npNote">핵심 과업 메모</label><div class="fv"><input type="text" id="npNote" placeholder="현장 방문 일정·주력 과제(비식별)"></div></div>' +
       '</div>' +
@@ -2033,6 +2461,8 @@
       };
       var cno = cleanText($('npCaseNo') && $('npCaseNo').value).slice(0, 60);
       if (cno) rec.caseNo = cno;
+      var inspData = readInspFormValues('np');
+      Object.assign(rec, inspData.values);
       try {
         D.projects[pid] = await saveRecord('projects/' + pid, pid, rec, 'Project');
         CUR_PID = pid;
@@ -2064,8 +2494,9 @@
         '<div class="fr"><label for="epTrack">' + esc(cat.regionLabel || '세부 트랙') + '</label><div class="fv"><select id="epTrack">' + opts + '</select></div></div>' +
         '<div class="fr"><label for="epYear">수행연도</label><div class="fv"><input type="number" id="epYear" value="' + esc(String(num(proj.year, CUR_YEAR))) + '"></div></div>' +
         '<div class="fr"><label for="epCaseNo">사건번호</label><div class="fv"><input type="text" id="epCaseNo" value="' + esc(proj.caseNo || '') + '" placeholder="예: 인사서산-2026-001"></div></div>' +
+        inspFormRowsHtml('ep', proj) +
         '<div class="fr"><label for="epMgr">담당 노무사</label><div class="fv"><input type="text" id="epMgr" value="' + esc(proj.consultantName || '') + '"></div></div>' +
-        '<div class="fr"><label for="epStatus">진행상태</label><div class="fv"><select id="epStatus"><option value="active"' + (proj.status !== 'done' ? ' selected' : '') + '>진행 중</option><option value="done"' + (proj.status === 'done' ? ' selected' : '') + '>수행 완료</option></select></div></div>' +
+        (function () { var st = String(proj.status || 'active').trim(); var safeSt = st.slice(0, 40).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); var std = st === 'active' || st === 'done'; var extra = !std && safeSt ? '<option value="' + safeSt + '" selected>기존 상태 유지 (' + safeSt + ')</option>' : ''; return '<div class="fr"><label for="epStatus">진행상태</label><div class="fv"><select id="epStatus">' + extra + '<option value="active"' + (st === 'active' || (!std && !safeSt) ? ' selected' : '') + '>진행 중</option><option value="done"' + (st === 'done' ? ' selected' : '') + '>수행 완료</option></select></div></div>'; })() +
         '<div class="fr"><label for="epNote">요약 메모</label><div class="fv"><input type="text" id="epNote" value="' + esc(proj.summaryNote || '') + '"></div></div>' +
       '</div>' +
       '<div class="mft"><button type="button" class="sm" id="mCancelBtn">취소</button><button type="button" class="pri" id="mEditSaveBtn">수정 저장</button></div>';
@@ -2080,23 +2511,32 @@
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중…'; }
       var trId = $('epTrack').value;
       var trObj = tracks.find(function (t) { return t.id === trId; }) || { id: trId, name: cat.shortName };
+      var origSt = String(proj.status || 'active').trim();
+      var selSt = String($('epStatus').value || 'active').trim();
       var patch = {
         companyName: co.slice(0, 190),
         trackId: trObj.id,
         trackName: trObj.name,
         year: num($('epYear').value, CUR_YEAR),
         consultantName: cleanText($('epMgr').value).slice(0, 70) || proj.consultantName || '전담 노무사',
-        status: $('epStatus').value === 'done' ? 'done' : 'active',
         summaryNote: cleanText($('epNote').value).slice(0, 1900)
       };
+      if (selSt !== origSt || !proj.status) patch.status = selSt === 'done' ? 'done' : 'active';
       var cno = cleanText($('epCaseNo').value).slice(0, 60);
       if (cno) patch.caseNo = cno;
+      var inspData = readInspFormValues('ep', proj);
+      Object.assign(patch, inspData.values);
       var nextRec = Object.assign({}, proj, patch);
       if (!cno) delete nextRec.caseNo;
+      var clearKeys = (cno ? [] : (Object.prototype.hasOwnProperty.call(proj, 'caseNo') ? ['caseNo'] : []))
+        .concat(inspData.clearKeys.filter(function (k) {
+          delete nextRec[k];
+          return Object.prototype.hasOwnProperty.call(proj, k);
+        }));
       try {
         D.projects[proj.id] = await saveRecord('projects/' + proj.id, proj.id, nextRec, 'Project', {
           patch: patch,
-          clearKeys: cno ? [] : ['caseNo']
+          clearKeys: clearKeys
         });
         closeModal();
         rebuildDiscoverAndRag();
@@ -2219,6 +2659,8 @@
     var t = str(tab) || 'projects';
     if (t === 'check' || t === 'intake') return 'detail';
     if (t === 'coach') return 'report';
+    // 연도별 자료함 탭이 없는 화면(가벼운 화면)에서 옛 주소(?tab=yearly)·옛 단추가 오면 사업 현황으로 — 연도 알약이 거기 있다
+    if (t === 'yearly' && !$('p-yearly')) return 'projects';
     return t;
   }
 
@@ -2268,7 +2710,7 @@
     if ($('projResetBtn')) $('projResetBtn').onclick = function () {
       TRACK_FILTER = ''; YEAR_FILTER = ''; SHOW_ALL_ROWS = false;
       if ($('projQ')) $('projQ').value = '';
-      if ($('projSt')) $('projSt').value = '';
+      setStFilter('');
       if ($('projMgr')) $('projMgr').value = '';
       draw();
     };
@@ -2281,13 +2723,14 @@
     };
     if ($('reloadBtn')) $('reloadBtn').onclick = function () { reload(SESSION_EPOCH, ME && ME.uid); };
     if ($('projCsvBtn')) $('projCsvBtn').onclick = function () { downloadStatusCsv(false); };
+    if ($('allCsvBtn')) $('allCsvBtn').onclick = function () { downloadStatusCsv(true); }; // 미등록 후보까지 연도별 전체(옛 «연도별 자료함» CSV)
     if ($('outBtn')) $('outBtn').onclick = function () { if (fb && fb.auth) fb.auth().signOut(); };
 
     // 탭 2 (미등록 후보)
     if ($('inQ')) $('inQ').oninput = function () { if (CUR_TAB === 'inbox') renderInboxPane(); };
     if ($('inResetBtn')) $('inResetBtn').onclick = function () {
       YEAR_FILTER = '';
-      if ($('leftDash')) TRACK_FILTER = '';
+      if (leftDashOn()) TRACK_FILTER = '';
       if ($('inQ')) $('inQ').value = '';
       draw();
     };
@@ -2359,6 +2802,8 @@
 
   function boot(firebaseInstance, appKey) {
     APP_KEY = str(appKey) || 'sixthind';
+    // 가벼운 화면(12개 앱 공통 기본)은 «변경됨» 표시·강조 상자를 쓰지 않는다 — 탭과 같은 단추를 되풀이하던 띠도 함께 걷는다.
+    DIFF_HIGHLIGHT = !isSlim();
     fb = firebaseInstance;
     fbDb = fb && fb.database ? fb.database() : null;
     bindEvents();
@@ -2411,6 +2856,27 @@
   global.PuConsultView = {
     boot: boot,
     reload: reload,
-    switchTab: switchTab
+    switchTab: switchTab,
+    // 검사 전용 — 화면 없이 회차 셈·메모 거르기만 돌려 본다(자료를 받아 읽기만 하고 아무것도 저장하지 않는다)
+    __test: {
+      use: function (appKey, data) {
+        APP_KEY = appKey;
+        D.consultings = (data && data.consultings) || [];
+        D.govCos = (data && data.govCos) || null;
+        D.govScheds = (data && data.govScheds) || null;
+        D.govTypes = (data && data.govTypes) || null;
+        _roundCache = { key: '', map: null };
+      },
+      roundsOf: function (p) { return roundsOf(p); },
+      roundChipsHtml: function (p) { return roundChipsHtml(p); },
+      roundsPanelHtml: function (p) { return roundsPanelHtml(p); },
+      roundKpiHtml: function (list) { return roundKpiHtml(list); },
+      memoShown: function (p) { return memoShown(p); },
+      setProjects: function (obj) { D.projects = obj || {}; TRACK_FILTER = ''; },
+      leftDashWanted: function () { return leftDashWanted(); },
+      leftDashLabels: function () { return leftDashLabels(); },
+      isSlim: function () { return isSlim(); },
+      reportFolded: function () { return reportFolded(); }
+    }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

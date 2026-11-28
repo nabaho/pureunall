@@ -341,6 +341,12 @@
     return new Date(base + 9 * 3600 * 1000).toISOString().slice(0, 10);
   }
 
+  function kstHm(ms) {
+    var n = Number(ms);
+    if (!isFinite(n) || n <= 0) return '';
+    return new Date(n + 9 * 3600 * 1000).toISOString().slice(11, 16);
+  }
+
   function weekKeyOfDate(dayStr) {
     var d = new Date(String(dayStr || '') + 'T00:00:00');
     if (isNaN(d.getTime())) d = new Date();
@@ -1097,6 +1103,595 @@
     };
   }
 
+  /* ── 푸른인사관리 사번 기준 사람별 1줄 정리 & 첨부서류·메일 발송 대조 (2026-11-28) ── */
+  function unwrapErpList(raw) {
+    var v = (raw && typeof raw === 'object' && raw.v !== undefined) ? raw.v : raw;
+    if (Array.isArray(v)) return v.filter(function (x) { return x && typeof x === 'object'; });
+    if (v && typeof v === 'object') {
+      return Object.keys(v).map(function (k) {
+        var item = v[k];
+        return (item && typeof item === 'object') ? Object.assign({ _key: k }, item) : null;
+      }).filter(Boolean);
+    }
+    return [];
+  }
+
+  function compareSid(a, b) {
+    var sa = cleanStr(a).toUpperCase();
+    var sb = cleanStr(b).toUpperCase();
+    if (!sa && !sb) return 0;
+    if (!sa) return 1;
+    if (!sb) return -1;
+    var re = /^([A-Z가-힣\-_]*)(\d+)(.*)$/;
+    var ma = re.exec(sa);
+    var mb = re.exec(sb);
+    if (ma && mb) {
+      if (ma[1] !== mb[1]) return ma[1] < mb[1] ? -1 : 1;
+      var na = Number(ma[2]), nb = Number(mb[2]);
+      if (na !== nb) return na - nb;
+      if (ma[3] !== mb[3]) return ma[3] < mb[3] ? -1 : 1;
+      return 0;
+    }
+    return sa < sb ? -1 : (sa > sb ? 1 : 0);
+  }
+
+  function isInactiveStatus(st) {
+    var s = cleanStr(st).toLowerCase();
+    return s === 'retired' || s === 'resigned' || s === 'inactive' || s === '퇴사' || s === '퇴직';
+  }
+
+  function normalizeHrStaff(userDirRaw, userAccountsRaw) {
+    var combined = unwrapErpList(userDirRaw).concat(unwrapErpList(userAccountsRaw));
+    var rawMap = {};
+
+    combined.forEach(function (u) {
+      if (!u || typeof u !== 'object') return;
+      var sid = cleanStr(u.sid || u._key);
+      var name = cleanStr(u.name || u.displayName);
+      if (!sid || !name) return;
+      var st = cleanStr(u.status).toLowerCase();
+      if (!rawMap[sid]) {
+        rawMap[sid] = {
+          sid: sid,
+          name: name,
+          title: cleanStr(u.pos || u.title || u.rank || u.roleTitle),
+          dept: cleanStr(u.dept),
+          branch: cleanStr(u.branch),
+          status: st,
+          email: cleanStr(u.loginEmail || u.email),
+          _inactive: isInactiveStatus(st)
+        };
+      } else {
+        var cur = rawMap[sid];
+        if (isInactiveStatus(st)) cur._inactive = true;
+        if (st === 'active') cur.status = 'active';
+        else if (!cur.status && st) cur.status = st;
+        if (!cur.title) cur.title = cleanStr(u.pos || u.title || u.rank || u.roleTitle);
+        if (!cur.dept) cur.dept = cleanStr(u.dept);
+        if (!cur.branch) cur.branch = cleanStr(u.branch);
+        if (!cur.email) cur.email = cleanStr(u.loginEmail || u.email);
+      }
+    });
+
+    var sids = Object.keys(rawMap);
+    var hasAnyActive = sids.some(function (k) {
+      return !rawMap[k]._inactive && rawMap[k].status === 'active';
+    });
+
+    return sids.map(function (k) { return rawMap[k]; })
+      .filter(function (s) {
+        if (s._inactive) return false;
+        if (hasAnyActive) return s.status === 'active';
+        return true;
+      })
+      .map(function (s) {
+        return {
+          sid: s.sid,
+          name: s.name,
+          title: s.title,
+          dept: s.dept,
+          branch: s.branch,
+          status: s.status || 'active',
+          email: s.email
+        };
+      })
+      .sort(function (a, b) {
+        return compareSid(a.sid, b.sid) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+      });
+  }
+
+  function matchStaffByName(senderName, staffList) {
+    var raw = cleanStr(senderName);
+    var bare = raw.replace(/\s+/g, '');
+    if (!bare || !Array.isArray(staffList) || !staffList.length) return null;
+
+    for (var i = 0; i < staffList.length; i++) {
+      if (cleanStr(staffList[i].sid).toUpperCase() === bare.toUpperCase()) return staffList[i];
+    }
+    var exact = staffList.filter(function (s) {
+      return cleanStr(s.name).replace(/\s+/g, '') === bare;
+    });
+    if (exact.length === 1) return exact[0];
+    if (exact.length > 1) return null;
+
+    var noHonor = bare.replace(/님$/, '');
+    if (noHonor !== bare && noHonor.length >= 2) {
+      var honorHits = staffList.filter(function (s) {
+        return cleanStr(s.name).replace(/\s+/g, '') === noHonor;
+      });
+      if (honorHits.length === 1) return honorHits[0];
+    }
+
+    var stripped = noHonor.replace(/(대표노무사|공인노무사|노무사|사무장|팀장|실장|과장|대리|주임|사원|연구원|컨설턴트|선생)$/, '');
+    if (stripped.length >= 2) {
+      var hits = staffList.filter(function (s) {
+        return cleanStr(s.name).replace(/\s+/g, '') === stripped;
+      });
+      if (hits.length === 1) return hits[0];
+    }
+    return null;
+  }
+
+  function extractSentMails(foldersRaw, msgsBySlugRaw, opts) {
+    opts = opts || {};
+    var nowMs = opts.now == null ? Date.now() : Number(opts.now);
+    var days = Number(opts.days) > 0 ? Number(opts.days) : 180;
+    var since = opts.allDays ? 0 : (nowMs - days * 86400000);
+    var folders = (foldersRaw && typeof foldersRaw === 'object') ? foldersRaw : {};
+    var msgsBySlug = (msgsBySlugRaw && typeof msgsBySlugRaw === 'object') ? msgsBySlugRaw : {};
+    var out = [];
+
+    var includeTome = !!opts.includeTome;
+    Object.keys(folders).forEach(function (slug) {
+      var meta = folders[slug];
+      if (!meta || typeof meta !== 'object') return;
+      var kind = cleanStr(meta.kind).toLowerCase();
+      if (kind !== 'sent' && !(includeTome && kind === 'tome')) return;
+      var box = msgsBySlug[slug];
+      if (!box || typeof box !== 'object') return;
+
+      Object.keys(box).forEach(function (k) {
+        var r = box[k];
+        if (!r || typeof r !== 'object') return;
+        var d = Number(r.d || 0);
+        if (!isFinite(d) || d <= 0 || d < since) return;
+        var rawAn = Array.isArray(r.an) ? r.an : (Array.isArray(r.attNames) ? r.attNames : []);
+        var attNames = rawAn.map(function (an) {
+          return stripSecrets(cleanStr(an)).text.slice(0, 240);
+        }).filter(Boolean);
+        var tn = cleanStr(r.tn);
+        var t = cleanStr(r.t || r.to);
+        var rawTo = (tn && t && tn !== t) ? (tn + ' <' + t + '>') : (tn || t);
+        out.push({
+          slug: slug,
+          folderKind: kind,
+          uid: String(k),
+          d: d,
+          day: kstDay(d),
+          hm: kstHm(d),
+          from: stripSecrets(cleanStr(r.f || r.from)).text.slice(0, 120),
+          to: stripSecrets(rawTo).text.slice(0, 200),
+          subject: stripSecrets(cleanStr(r.s || r.subject)).text.slice(0, 300),
+          attCount: Math.max(attNames.length, Number(r.a || r.attCount || 0)),
+          attNames: attNames
+        });
+      });
+    });
+
+    return out.sort(function (a, b) { return b.d - a.d; });
+  }
+
+  function normDocKey(name) {
+    var s = stripSecrets(cleanStr(name)).text;
+    s = s.replace(/\((?:이미지|문서·이미지|문서|스캔)\)/g, '');
+    s = s.replace(/\.(?:hwpx|hwp|pdf|docx|doc|xlsx|xls|pptx|ppt|jpg|jpeg|png|gif|webp|zip|7z|csv|txt)$/i, '');
+    return s.replace(/[\s_\-·.,()\[\]<>'"]+/g, '').toLowerCase();
+  }
+
+  function extractInlineAttachmentsFromSummary(summary) {
+    var out = [];
+    var s = cleanStr(summary);
+    if (!s) return out;
+    var reClip = /📎\s*([^·\n]+)/g;
+    var m1;
+    while ((m1 = reClip.exec(s))) {
+      m1[1].split(',').forEach(function (part) {
+        var p = cleanStr(part);
+        if (p) out.push(p);
+      });
+    }
+    var reImg = /\[이미지\s*공유:\s*([^\]]+)\]/g;
+    var m2;
+    while ((m2 = reImg.exec(s))) {
+      var nm = cleanStr(m2[1]);
+      if (nm) out.push(nm + '(이미지)');
+    }
+    return out;
+  }
+
+  function collectRowAttachments(row, allFiles) {
+    var seen = {};
+    var out = [];
+
+    function pushAtt(rawName, meta) {
+      var safeName = stripSecrets(cleanStr(rawName)).text.slice(0, 240);
+      if (!safeName) return;
+      var k = normDocKey(safeName) || safeName.toLowerCase();
+      if (seen[k]) {
+        var prev = seen[k];
+        if (!prev.status && meta && meta.status) prev.status = meta.status;
+        if (!prev.dest && meta && meta.dest) prev.dest = meta.dest;
+        if (!prev.sensitive && (isSensitiveFileName(safeName) || (meta && meta.sensitive))) prev.sensitive = true;
+        if (!prev.sentAt && meta && meta.sentAt) prev.sentAt = Number(meta.sentAt) || 0;
+        return;
+      }
+      var item = {
+        name: safeName,
+        key: k,
+        sensitive: !!(isSensitiveFileName(safeName) || (meta && meta.sensitive)),
+        dest: cleanStr(meta && meta.dest) || (isSensitiveFileName(safeName) ? 'pc' : ''),
+        status: cleanStr(meta && meta.status),
+        sentAt: Number((meta && meta.sentAt) || 0),
+        source: cleanStr((meta && meta.source) || 'chat')
+      };
+      seen[k] = item;
+      out.push(item);
+    }
+
+    (row && Array.isArray(row.fileNames) ? row.fileNames : []).forEach(function (fn) {
+      pushAtt(fn, { source: 'chat' });
+    });
+    extractInlineAttachmentsFromSummary(row && row.summary).forEach(function (fn) {
+      pushAtt(fn, { source: 'summary' });
+    });
+
+    var senders = row && Array.isArray(row.senders) ? row.senders : [];
+    var rowDay = cleanStr(row && row.day);
+    var workId = cleanStr(row && row.workItemId);
+    var rowRoom = cleanStr(row && row.room);
+    (allFiles || []).forEach(function (f) {
+      if (!f || f._deleted || !f.name) return;
+      var fWorkId = cleanStr(f.workItemId);
+      var fRoom = cleanStr(f.room);
+      var sameWork = !!(workId && fWorkId === workId);
+      var roomOk = !rowRoom || !fRoom || rowRoom === fRoom;
+      var workConflict = !!(fWorkId && fWorkId !== workId);
+      var sameSenderDay = !workConflict && roomOk && rowDay && senders.indexOf(cleanStr(f.sender)) >= 0 && Number(f.sentAt) > 0 && kstDay(f.sentAt) === rowDay;
+      if (sameWork || sameSenderDay) {
+        pushAtt(f.name, {
+          sensitive: !!f.sensitive,
+          dest: f.dest,
+          status: f.status,
+          sentAt: f.sentAt,
+          source: 'files'
+        });
+      }
+    });
+
+    return out;
+  }
+
+  var GENERIC_DOC_RE = /^(시정지시서|답변서|계약서|자문계약서|근로계약서|정관|확인서|보고서|신청서|명세서|급여명세서|급여대장|진정서|이유서|등본|신분증|통장사본|위임장|임금명세서|근로자명부|재직증명서|경력증명서|해고통지서|사유서|동의서|내역서|첨부파일|문서|자료)$/;
+
+  function contextTokensOfRow(row) {
+    var tokens = [];
+    (row && Array.isArray(row.caseNos) ? row.caseNos : []).forEach(function (cn) {
+      var c = cleanStr(cn).replace(/\s+/g, '').toLowerCase();
+      if (c.length >= 4) tokens.push(c);
+    });
+    var co = cleanStr((row && (row.companyLabel || row.companyHint)) || '')
+      .replace(/\(주\)|㈜|주식회사/g, '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+    if (co.length >= 2) tokens.push(co);
+    return tokens;
+  }
+
+  function hasRowContextInMail(mail, row) {
+    var tokens = contextTokensOfRow(row);
+    var hay = (cleanStr(mail.subject) + ' ' + (mail.attNames || []).join(' ') + ' ' + cleanStr(mail.to)).replace(/\s+/g, '').toLowerCase();
+    for (var i = 0; i < tokens.length; i++) {
+      if (hay.indexOf(tokens[i]) >= 0) return true;
+    }
+    return false;
+  }
+
+  function matchAttachmentMailSent(attName, row, sentMails) {
+    var attKey = normDocKey(attName);
+    if (attKey.length < 3 || !Array.isArray(sentMails) || !sentMails.length) return null;
+    var isGeneric = GENERIC_DOC_RE.test(attKey);
+    var rowDay = cleanStr(row && row.day);
+    var hasValidRowDay = /^\d{4}-\d{2}-\d{2}$/.test(rowDay);
+    var rowDayMs = hasValidRowDay ? new Date(rowDay + 'T00:00:00Z').getTime() : NaN;
+
+    /* 1순위: 보낸편지함 첨부파일명 일치 (카톡 날짜 이전 발송 및 문맥 없는 일반·부분일치 차단) */
+    for (var i = 0; i < sentMails.length; i++) {
+      var m = sentMails[i];
+      var ctxHit = hasRowContextInMail(m, row);
+      var dayDiff = (hasValidRowDay && m.day) ? daysUntilDue(m.day, rowDayMs) : null;
+      if (hasValidRowDay && (dayDiff === null || dayDiff < 0)) continue;
+      var windowCtxOk = !hasValidRowDay || (dayDiff >= 0 && dayDiff <= 30);
+      var windowUniqueOk = hasValidRowDay && (ctxHit ? dayDiff <= 60 : dayDiff <= 14);
+      var anList = Array.isArray(m.attNames) ? m.attNames : [];
+      for (var j = 0; j < anList.length; j++) {
+        var anKey = normDocKey(anList[j]);
+        if (anKey.length < 3) continue;
+        var exact = anKey === attKey;
+        var fuzzy = !exact && anKey.length >= 4 && attKey.length >= 4 && (anKey.indexOf(attKey) >= 0 || attKey.indexOf(anKey) >= 0);
+        if (exact && (isGeneric ? (ctxHit && windowCtxOk) : (hasValidRowDay ? windowUniqueOk : ctxHit))) {
+          return {
+            at: m.d,
+            day: m.day,
+            hm: m.hm,
+            shortLabel: m.day.slice(5).replace('-', '/') + (m.hm ? ' ' + m.hm : ''),
+            subject: m.subject,
+            to: m.to,
+            matchedAtt: anList[j],
+            kind: 'att'
+          };
+        }
+        if (fuzzy && ctxHit && windowCtxOk) {
+          return {
+            at: m.d,
+            day: m.day,
+            hm: m.hm,
+            shortLabel: m.day.slice(5).replace('-', '/') + (m.hm ? ' ' + m.hm : ''),
+            subject: m.subject,
+            to: m.to,
+            matchedAtt: anList[j],
+            kind: 'att'
+          };
+        }
+      }
+    }
+
+    /* 2순위: 첨부가 있는 보낸 메일 제목에 동일 사건번호 + 문서명이 함께 등장 (카톡 날짜 이후 ~ 30일 이내) */
+    var caseNos = (row && Array.isArray(row.caseNos)) ? row.caseNos.map(function (c) { return cleanStr(c).replace(/\s+/g, '').toLowerCase(); }).filter(function (c) { return c.length >= 4; }) : [];
+    if (caseNos.length) {
+      for (var k = 0; k < sentMails.length; k++) {
+        var m2 = sentMails[k];
+        if (!Number(m2.attCount || 0)) continue;
+        var dayDiff2 = (hasValidRowDay && m2.day) ? daysUntilDue(m2.day, rowDayMs) : null;
+        if (hasValidRowDay && (dayDiff2 === null || dayDiff2 < 0 || dayDiff2 > 30)) continue;
+        var subjNorm = cleanStr(m2.subject).replace(/\s+/g, '').toLowerCase();
+        var hasCase = caseNos.some(function (cn) { return subjNorm.indexOf(cn) >= 0; });
+        if (hasCase && subjNorm.indexOf(attKey) >= 0) {
+          return {
+            at: m2.d,
+            day: m2.day,
+            hm: m2.hm,
+            shortLabel: m2.day.slice(5).replace('-', '/') + (m2.hm ? ' ' + m2.hm : ''),
+            subject: m2.subject,
+            to: m2.to,
+            matchedAtt: (m2.attNames && m2.attNames[0]) || m2.subject,
+            kind: 'subject'
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function makeStaffSlot(meta) {
+    return {
+      key: meta.sid ? ('sid:' + meta.sid) : ('ext:' + meta.name),
+      sid: meta.sid || '',
+      name: meta.name || '발신자 미상',
+      title: meta.title || '',
+      dept: meta.dept || '',
+      isRegisteredStaff: !!meta.isRegisteredStaff,
+      total: 0,
+      openCount: 0,
+      trackingCount: 0,
+      doneCount: 0,
+      dueSoonCount: 0,
+      unlinkedCount: 0,
+      latestDay: '',
+      latestUpdatedAt: 0,
+      latestRoom: '',
+      latestSummary: '',
+      rows: [],
+      attachments: [],
+      _attSeen: {},
+      mailEvents: [],
+      _mailSeen: {},
+      cases: [],
+      _caseKeys: {}
+    };
+  }
+
+  function pushSlotAttachment(slot, att) {
+    if (!att || !att.name) return;
+    var k = att.key || normDocKey(att.name) || att.name;
+    if (!slot._attSeen[k]) {
+      slot._attSeen[k] = Object.assign({}, att);
+      slot.attachments.push(slot._attSeen[k]);
+    } else if (att.mailSent && !slot._attSeen[k].mailSent) {
+      slot._attSeen[k].mailSent = att.mailSent;
+    }
+    if (att.mailSent) {
+      var mk = String(att.mailSent.at) + '|' + cleanStr(att.mailSent.subject);
+      if (!slot._mailSeen[mk]) {
+        slot._mailSeen[mk] = att.mailSent;
+        slot.mailEvents.push(att.mailSent);
+      }
+    }
+  }
+
+  function buildStaffRowsDashboard(joinedRows, staffList, allFiles, sentMails, opts) {
+    opts = opts || {};
+    var nowMs = opts.now == null ? Date.now() : Number(opts.now);
+    var rows = Array.isArray(joinedRows) ? joinedRows : [];
+    var filesList = Array.isArray(allFiles) ? allFiles : [];
+    var mails = Array.isArray(sentMails) ? sentMails : [];
+    var staff = Array.isArray(staffList) ? staffList : [];
+
+    var bySid = {};
+    var regSlots = [];
+    staff.forEach(function (st) {
+      if (!st || !st.sid) return;
+      var slot = makeStaffSlot({ sid: st.sid, name: st.name, title: st.title, dept: st.dept, isRegisteredStaff: true });
+      bySid[st.sid] = slot;
+      regSlots.push(slot);
+    });
+    var extMap = {};
+
+    function getOrCreateExt(name) {
+      var nm = cleanStr(name) || '발신자 미상';
+      if (!extMap[nm]) {
+        extMap[nm] = makeStaffSlot({ sid: '', name: nm, title: '외부·미등록', dept: '', isRegisteredStaff: false });
+      }
+      return extMap[nm];
+    }
+
+    var uniqueAttKeys = {};
+    var uniqueMailKeys = {};
+    var dueSoonCount = 0;
+    var unlinkedCount = 0;
+
+    var enrichedRows = rows.filter(function (r) { return r && !r._deleted; }).map(function (r) {
+      var hasPrecomputed = !opts.recompute && Array.isArray(r.attachments) && Array.isArray(r.mailEvents);
+      var atts = hasPrecomputed
+        ? r.attachments.map(function (att) {
+            uniqueAttKeys[att.key || att.name] = 1;
+            if (att.mailSent) uniqueMailKeys[String(att.mailSent.at) + '|' + (att.key || att.name)] = att.mailSent;
+            return att;
+          })
+        : collectRowAttachments(r, filesList).map(function (att) {
+            var mailSent = matchAttachmentMailSent(att.name, r, mails);
+            var copy = Object.assign({}, att, { mailSent: mailSent });
+            uniqueAttKeys[att.key || att.name] = 1;
+            if (mailSent) uniqueMailKeys[String(mailSent.at) + '|' + (att.key || att.name)] = mailSent;
+            return copy;
+          });
+      var rowMails = hasPrecomputed ? r.mailEvents.slice() : (function () {
+        var list = [];
+        var rmSeen = {};
+        atts.forEach(function (a) {
+          if (a.mailSent) {
+            var mk = String(a.mailSent.at) + '|' + a.mailSent.subject;
+            if (!rmSeen[mk]) { rmSeen[mk] = 1; list.push(a.mailSent); }
+          }
+        });
+        return list.sort(function (a, b) { return b.at - a.at; });
+      })();
+
+      var enriched = hasPrecomputed ? r : Object.assign({}, r, {
+        attachments: atts,
+        mailEvents: rowMails,
+        latestMailSent: rowMails[0] || null
+      });
+
+      var dueLeft = enriched.dueDaysLeft !== undefined ? enriched.dueDaysLeft : daysUntilDue(enriched.due, nowMs);
+      var isDone = enriched.status === 'done';
+      var isTracking = enriched.status === 'tracking';
+      var isOpen = !isDone && !isTracking;
+      var isDueSoon = dueLeft !== null && dueLeft <= 7 && !isDone;
+      if (!enriched.workItemId) unlinkedCount++;
+      if (isDueSoon) dueSoonCount++;
+
+      var senders = Array.isArray(enriched.senders) && enriched.senders.length ? enriched.senders : ['발신자 미상'];
+      var seenSlotKeys = {};
+      senders.forEach(function (senderName) {
+        var matched = matchStaffByName(senderName, staff);
+        var slot = matched ? bySid[matched.sid] : getOrCreateExt(senderName);
+        if (!slot || seenSlotKeys[slot.key]) return;
+        seenSlotKeys[slot.key] = 1;
+
+        slot.total++;
+        if (isOpen) slot.openCount++;
+        else if (isTracking) slot.trackingCount++;
+        else slot.doneCount++;
+        if (!enriched.workItemId) slot.unlinkedCount++;
+        if (isDueSoon) slot.dueSoonCount++;
+
+        var upAt = Number(enriched.updatedAt || enriched.createdAt || 0);
+        if (String(enriched.day || '') > slot.latestDay || (String(enriched.day || '') === slot.latestDay && upAt >= slot.latestUpdatedAt)) {
+          slot.latestDay = cleanStr(enriched.day);
+          slot.latestUpdatedAt = upAt;
+          slot.latestRoom = cleanStr(enriched.room);
+          slot.latestSummary = cleanStr(enriched.summary);
+        }
+        if (enriched.workItemId && !slot._caseKeys[enriched.workItemId]) {
+          slot._caseKeys[enriched.workItemId] = 1;
+          slot.cases.push({
+            workItemId: enriched.workItemId,
+            label: (enriched.workNo ? '[' + enriched.workNo + '] ' : '') + (enriched.workTitle || enriched.workItemId),
+            state: enriched.workState || ''
+          });
+        }
+        atts.forEach(function (a) { pushSlotAttachment(slot, a); });
+        slot.rows.push(enriched);
+      });
+
+      return enriched;
+    });
+
+    /* 카톡 대화 행에 아직 연결 안 된 톡서랍 단독 첨부파일도 해당 사번 직원 행에 누락 없이 보충 */
+    filesList.forEach(function (f) {
+      if (!f || f._deleted || !f.name) return;
+      var fn = stripSecrets(cleanStr(f.name)).text.slice(0, 240);
+      if (!fn) return;
+      var k = normDocKey(fn) || fn.toLowerCase();
+      if (uniqueAttKeys[k]) return;
+      var matched = matchStaffByName(f.sender, staff);
+      var slot = matched ? bySid[matched.sid] : (cleanStr(f.sender) ? getOrCreateExt(f.sender) : null);
+      if (!slot) return;
+      var fSentAt = Number(f.sentAt || 0);
+      var fDay = fSentAt > 0 ? kstDay(fSentAt) : '';
+      var pseudoRow = { day: fDay, caseNos: [], companyHint: '', senders: [cleanStr(f.sender)] };
+      var mailSent = matchAttachmentMailSent(fn, pseudoRow, mails);
+      var att = {
+        name: fn,
+        key: k,
+        sensitive: !!(f.sensitive || isSensitiveFileName(fn)),
+        dest: cleanStr(f.dest) || (isSensitiveFileName(fn) ? 'pc' : ''),
+        status: cleanStr(f.status),
+        sentAt: fSentAt,
+        source: 'files',
+        mailSent: mailSent
+      };
+      if (fDay && (fDay > slot.latestDay || (fDay === slot.latestDay && fSentAt > slot.latestUpdatedAt))) {
+        slot.latestDay = fDay;
+        slot.latestUpdatedAt = fSentAt;
+        if (!slot.latestRoom && f.room) slot.latestRoom = cleanStr(f.room);
+      }
+      uniqueAttKeys[k] = 1;
+      if (mailSent) uniqueMailKeys[String(mailSent.at) + '|' + (k || fn)] = mailSent;
+      pushSlotAttachment(slot, att);
+    });
+
+    regSlots.sort(function (a, b) {
+      return compareSid(a.sid, b.sid) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+    var extSlots = Object.keys(extMap).map(function (k) { return extMap[k]; }).sort(function (a, b) {
+      return (b.total - a.total) || (b.latestUpdatedAt - a.latestUpdatedAt) || (a.name < b.name ? -1 : 1);
+    });
+
+    var allSlots = regSlots.concat(extSlots).map(function (sl) {
+      sl.mailEvents.sort(function (a, b) { return b.at - a.at; });
+      delete sl._attSeen;
+      delete sl._mailSeen;
+      delete sl._caseKeys;
+      return sl;
+    });
+
+    return {
+      staffRows: allSlots,
+      enrichedRows: enrichedRows,
+      totals: {
+        staffTotal: regSlots.length,
+        activeChatStaff: allSlots.filter(function (s) { return s.total > 0 || s.attachments.length > 0; }).length,
+        totalRows: enrichedRows.length,
+        totalAttachments: Object.keys(uniqueAttKeys).length,
+        mailSentCount: Object.keys(uniqueMailKeys).length,
+        dueSoonCount: dueSoonCount,
+        unlinkedCount: unlinkedCount
+      }
+    };
+  }
+
   /* ── PC 화면·하단알림 오프라인 OCR 결과 파서 (읽기 전용 캡처 후 구조화) ── */
   function normRoomKey(s) {
     return cleanStr(s).replace(/\s+/g, '');
@@ -1490,7 +2085,16 @@
     buildFileRecord: buildFileRecord,
     joinWorkProgress: joinWorkProgress,
     buildDashboardSummary: buildDashboardSummary,
+    unwrapErpList: unwrapErpList,
+    compareSid: compareSid,
+    normalizeHrStaff: normalizeHrStaff,
+    matchStaffByName: matchStaffByName,
+    extractSentMails: extractSentMails,
+    collectRowAttachments: collectRowAttachments,
+    matchAttachmentMailSent: matchAttachmentMailSent,
+    buildStaffRowsDashboard: buildStaffRowsDashboard,
     weekKeyOfDate: weekKeyOfDate,
-    kstDay: kstDay
+    kstDay: kstDay,
+    kstHm: kstHm
   };
 });

@@ -594,6 +594,10 @@
         }
       }
     },
+    "fund_mail_queue": {
+      ".read": false,
+      ".write": false
+    },
     "fund_erp": {
       ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
@@ -602,6 +606,11 @@
         "$k2": {
           ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
         }
+      },
+      "mail_queue": {
+        ".read": false,
+        ".write": false,
+        ".validate": false
       }
     },
     "work_erp": {
@@ -1701,7 +1710,47 @@
       },
       "arrivals": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        "$coId": {
+          ".validate": "newData.hasChildren()",
+          "$slot": {
+            ".validate": "newData.hasChildren()",
+            "contract": {
+              "$id": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              }
+            },
+            "attend": {
+              "$id": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              }
+            },
+            "ledger": {
+              "$id": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              }
+            },
+            "output": {
+              "$id": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              }
+            },
+            "etc": {
+              "$id": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              }
+            },
+            "last": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "vals": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
       },
       "shares": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
@@ -2111,6 +2160,12 @@
         "$id": {
           ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
           ".validate": "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60"
+        }
+      },
+      "stars": {
+        "$sid": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('sid').val() === $sid && newData.exists()",
+          ".validate": "newData.child('id').val() === $sid"
         }
       }
     },
@@ -4002,6 +4057,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -4374,6 +4444,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -4748,6 +4833,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -5120,6 +5220,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -5494,6 +5609,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -5866,6 +5996,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -6240,6 +6385,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -6612,6 +6772,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -6986,6 +7161,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -7358,6 +7548,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -7732,6 +7937,21 @@
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
           },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
           "$other": {
             ".validate": false
           }
@@ -8104,6 +8324,21 @@
           },
           "summaryNote": {
             ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          "inspPeriod": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "inspOffice": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "inspIssues": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "inspDue": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "inspResult": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
           },
           "$other": {
             ".validate": false
@@ -8775,6 +9010,23 @@
     "datahub_board": {
       ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && auth.uid === root.child('app_owner').child('uid').val()",
       ".write": false
+    },
+    "puwiki": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "articles": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 12000"
+        }
+      },
+      "reviews": {
+        "$art": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists() && ((!data.exists() && newData.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.exists() && newData.child('actorSid').val() === data.child('actorSid').val() && newData.child('kind').val() === data.child('kind').val() && newData.child('createdAt').val() === data.child('createdAt').val() && ((newData.child('_deleted').val() === true && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) || (newData.child('_deleted').val() !== true && ((data.child('kind').val() === 'verify' && data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.child('kind').val() === 'flag' && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('note').val() === data.child('note').val()) && (newData.child('status').val() === 'open' || newData.child('resolvedBySid').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))))))",
+            ".validate": "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag') && newData.child('actorSid').isString() && newData.child('actorSid').val().length > 0 && newData.child('actorSid').val().length <= 64 && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 800"
+          }
+        }
+      }
     }
   }
 }

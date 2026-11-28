@@ -127,14 +127,14 @@ test('정적 — 서버 코드는 사본 폴더의 모듈을 쓰고, 읽고 쓰�
   assert.equal(R.LOG_MAX, 200);
   assert.deepEqual([R.HOUR_FROM, R.HOUR_TO], [7, 20]);
 });
-test('정적 — index.js 에 예약 함수 govReportAuto: MAIL_REGION · 300초 · 512MB · every 60 minutes · Asia/Seoul · 실행기 run 을 부른다', () => {
+test('정적 — index.js 에 예약 함수 govReportAuto: MAIL_REGION · 300초 · 512MB · 매시 13분(정각 분산) · Asia/Seoul · 실행기 run 을 부른다', () => {
   const src = fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
   const i = src.indexOf('exports.govReportAuto = functions');
   assert.ok(i > 0, 'exports.govReportAuto 가 없다');
   const blk = src.slice(i, src.indexOf('\n  });', i) + 6);
   assert.match(blk, /\.region\(MAIL_REGION\)/);
   assert.match(blk, /\.runWith\(\{ timeoutSeconds: 300, memory: "512MB" \}\)/);
-  assert.match(blk, /\.pubsub\.schedule\("every 60 minutes"\)/);
+  assert.match(blk, /\.pubsub\.schedule\("13 \* \* \* \*"\)/); // 검사고정-허용: 정각 크론 분산(13분) 고정 확인
   assert.match(blk, /\.timeZone\("Asia\/Seoul"\)/);
   assert.match(blk, /gov-report-auto"\)\.run\(/, '실행기를 부른다');
   assert.match(blk, /db: getDatabase\(\)/);

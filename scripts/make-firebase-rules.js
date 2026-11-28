@@ -563,7 +563,16 @@ rules.payroll_os = workspace({
     }
   }
 });
-rules.fund_erp = workspace();
+// 서버(collectFundMailOnNew/drainFundMailQueue) 전용 큐 — 상위 workspace 규칙을 상속받지 않는 최상위 루트로 클라이언트 읽기·쓰기 완전 차단
+rules.fund_mail_queue = { '.read': false, '.write': false };
+// 하위 호환 잠금 자리 (실사용 큐는 최상위 fund_mail_queue 로 이전됨)
+rules.fund_erp = workspace({
+  mail_queue: {
+    '.read': false,
+    '.write': false,
+    '.validate': false
+  }
+});
 /* 업무관리. ★ mysum/{로그인 UID} = «내 업무 숫자» 한 줄(2026-11-21 — 포털 머리줄 «📋 내 업무» 단추·이알피 나의 업무가 읽는다).
    «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
    이름 붙은 자리가 $k 보다 먼저 잡힌다. 읽기는 work_erp 전체와 같다(로그인 직원) — 날짜·건수뿐이라 더 넓어지지 않는다.
@@ -1207,7 +1216,24 @@ rules.paydata = {
   } },
   pending_shared: { '.read': LOGIN, '.write': LOGIN },
   owners: { '.read': LOGIN, $uid: { '.write': `(${LOGIN}) && $uid === auth.uid` } },
-  arrivals: { '.read': LOGIN, '.write': LOGIN },
+  arrivals: {
+    '.read': LOGIN,
+    '.write': LOGIN,
+    $coId: {
+      '.validate': 'newData.hasChildren()',
+      $slot: {
+        '.validate': 'newData.hasChildren()',
+        contract: { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        attend:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        ledger:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        output:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        etc:      { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        last:     { '.validate': 'newData.isNumber() && newData.val() > 0' },
+        vals:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+        $other:   { '.validate': false }
+      }
+    }
+  },
   shares:   { '.read': LOGIN, '.write': LOGIN },
   /* 열람 기록은 «덧붙이기만» 된다 — 한 번 적힌 줄은 아무도 못 고친다(!data.exists()).
      기록을 고칠 수 있으면 기록이 아니다. */
@@ -1547,9 +1573,16 @@ rules.signboard = { '.read': LOGIN,
    ⚠ 이름(title)은 1~60자 — 화면(js/pu-gov-links.js LIMIT.title)과 같은 한도다. 한쪽만 바꾸면 화면이 만든 묶음을 규칙이 거절한다.
      주소가 http(s) 인지는 화면이 저장 직전·그리기 직전 두 번 본다(safeUrl) — 규칙은 배열 안을 못 본다. */
 const GOVLINKS_W = `(${LOGIN}) && newData.exists()`;
+/* ★ 즐겨찾기(2026-11-28 대시보드 판, 대표 지시 「대시보드에다가 별표 표시해서 상단에 자주 하는 거」) — 사람마다 govlinks/stars/{사번}.
+   «쓰기»는 본인만(사번은 uid_roles 로 맞춘다). 담기는 것: ★ 한 사업 id 목록 · ★ 한 사이트 주소 목록뿐(민감한 값 없음).
+   ⚠ 읽기는 뿌리(govlinks)의 재직 직원 읽기를 그대로 받는다 — 뿌리 읽기를 sets 로 내리면 rules-deploy 가 «사라지는 규칙»으로 멈춘다
+     (2026-11-28 tests/rules-deploy-guards 로 확인). 남의 ★ 가 읽혀도 사업 번호·공개 기관 주소뿐이라 그대로 둔다. 화면은 제 칸만 읽는다. */
+const GOVLINKS_ME = "root.child('uid_roles').child(auth.uid).child('sid').val() === $sid";
 rules.govlinks = { '.read': LOGIN,
   sets: { $id: { '.write': GOVLINKS_W,
-    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } } };
+    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } },
+  stars: { $sid: { '.write': `(${LOGIN}) && ${GOVLINKS_ME} && newData.exists()`,
+    '.validate': "newData.child('id').val() === $sid" } } };
 
 /* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
    대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
@@ -2703,6 +2736,11 @@ for (const rootName of CONSULT_APP_ROOTS) {
       consultantUid: CS_STR(128),
       status: { '.validate': "newData.val() === 'active' || newData.val() === 'done'" },
       summaryNote: CS_STR(2000),
+      inspPeriod: CS_STR(80),
+      inspOffice: CS_STR(60),
+      inspIssues: CS_STR(500),
+      inspDue: CS_STR(32),
+      inspResult: CS_STR(40),
       $other: { '.validate': false }
     } },
     checks: { $pid: { $id: {
@@ -2909,6 +2947,25 @@ rules.datahub_device_req = { '.read': false, '.write': false };
 rules.datahub_nonce = { '.read': false, '.write': false };
 rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
+
+/* 콘솔 동기화 — puwiki (사라짐 방지 및 라이브 콘솔 일치 유지, 2026-11-28) */
+rules.puwiki = {
+  '.read': LOGIN,
+  articles: {
+    $id: {
+      '.write': `(${LOGIN}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 12000"
+    }
+  },
+  reviews: {
+    $art: {
+      $id: {
+        '.write': `(${LOGIN}) && newData.exists() && ((!data.exists() && newData.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.exists() && newData.child('actorSid').val() === data.child('actorSid').val() && newData.child('kind').val() === data.child('kind').val() && newData.child('createdAt').val() === data.child('createdAt').val() && ((newData.child('_deleted').val() === true && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) || (newData.child('_deleted').val() !== true && ((data.child('kind').val() === 'verify' && data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.child('kind').val() === 'flag' && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('note').val() === data.child('note').val()) && (newData.child('status').val() === 'open' || newData.child('resolvedBySid').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))))))`,
+        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag') && newData.child('actorSid').isString() && newData.child('actorSid').val().length > 0 && newData.child('actorSid').val().length <= 64 && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 800"
+      }
+    }
+  }
+};
 
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

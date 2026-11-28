@@ -1037,13 +1037,269 @@ async function collectSingleMail(deps, slug, uid, msg) {
   }
 }
 
+const MAIL_QUEUE_PATH = "fund_mail_queue";
+const MAX_QUEUE_BATCH = 25;
+const MAX_QUEUE_ATTEMPTS = 3;
+const MAX_FAILED_QUEUE_AGE_MS = 7 * 24 * 3600 * 1000;
+
+function makeMailQueueTicket(slug, uid, msg, now) {
+  const m = (msg && typeof msg === "object") ? msg : {};
+  return {
+    slug: String(slug || ""),
+    uid: String(uid || ""),
+    msg: {
+      s: String(m.s || "").slice(0, 200),
+      f: String(m.f || "").slice(0, 120),
+      e: String(m.e || "").slice(0, 160),
+      p: String(m.p || "").slice(0, 120),
+      d: m.d || 0,
+      a: Number(m.a) || 0
+    },
+    queuedAt: Number(now) || Date.now(),
+    attempts: 0
+  };
+}
+
+function groupQueueByFolder(queueMap, now, maxBatch) {
+  const tsNow = Number(now) || Date.now();
+  const limit = Math.max(1, Number(maxBatch) || MAX_QUEUE_BATCH);
+  const src = (queueMap && typeof queueMap === "object") ? queueMap : {};
+  const list = [];
+  Object.keys(src).forEach((key) => {
+    const t = src[key];
+    if (!t || typeof t !== "object") return;
+    if (t.st === "failed") return;
+    if (Number(t.retryAfter || 0) > tsNow) return;
+    const slug = String(t.slug || "");
+    const uid = String(t.uid || "");
+    if (!slug || !uid) return;
+    list.push({
+      key,
+      slug,
+      uid,
+      msg: t.msg || {},
+      queuedAt: Number(t.queuedAt || 0),
+      attempts: Number(t.attempts || 0)
+    });
+  });
+  list.sort((a, b) => a.queuedAt - b.queuedAt || a.key.localeCompare(b.key));
+  const picked = list.slice(0, limit);
+  const byFolder = Object.create(null);
+  const folderOrder = [];
+  picked.forEach((item) => {
+    if (!byFolder[item.slug]) {
+      byFolder[item.slug] = [];
+      folderOrder.push(item.slug);
+    }
+    byFolder[item.slug].push(item);
+  });
+  return { folderOrder, byFolder, count: picked.length };
+}
+
+async function fetchAttachmentsWithClient(client, mailUid, pickPartsFn, drainFn, limits) {
+  const maxAtts = (limits && limits.maxAttCount) || MAX_ATT_COUNT;
+  const maxRaw = (limits && limits.maxRawAttBytes) || MAX_RAW_ATT_BYTES;
+  const maxTotal = (limits && limits.maxTotalAttBytes) || MAX_TOTAL_ATT_BYTES;
+  const head = await client.fetchOne(
+    String(mailUid),
+    { uid: true, bodyStructure: true, headers: ["authentication-results"] },
+    { uid: true }
+  );
+  if (!head) return { atts: [], authResults: "" };
+  const authResults = head.headers ? head.headers.toString("utf8") : "";
+  const parts = pickPartsFn(head.bodyStructure, null, 0);
+  const out = [];
+  let totalBytes = 0;
+  for (const att of (parts.atts || []).slice(0, maxAtts)) {
+    const sz = Number(att && att.size) || 0;
+    if (!att || !att.part || sz > maxRaw) continue;
+    if (totalBytes + sz > maxTotal) break;
+    try {
+      const d = await client.download(String(mailUid), att.part, { uid: true });
+      const buf = await drainFn(d.content, Math.min(maxRaw, maxTotal - totalBytes));
+      totalBytes += buf.length;
+      out.push({ name: att.name || "", part: att.part, mime: att.mime || "", buf });
+    } catch (_) {
+      continue;
+    }
+    if (totalBytes >= maxTotal) break;
+  }
+  return { atts: out, authResults };
+}
+
+/* 큐 배치 직렬 처리기:
+   - 큐가 비어 있으면 IMAP 연결 없이 즉시 반환한다.
+   - 폴더(slug)마다 실제로 첨부 다운로드가 필요한 첫 건에서만 withFolder 세션을 지연 오픈해
+     동일 폴더 내 나머지 티켓을 단일 IMAP 세션으로 순차 처리한다. */
+async function drainFundMailQueueBatch(deps, opts) {
+  const db = deps && deps.db;
+  const tsNow = (opts && Number(opts.now)) || (deps && typeof deps.now === "function" && deps.now()) || Date.now();
+  const maxBatch = (opts && Number(opts.maxBatch)) || MAX_QUEUE_BATCH;
+  const fetchLimit = maxBatch * 2;
+  const queueSnap = await db.ref(MAIL_QUEUE_PATH).orderByKey().limitToFirst(fetchLimit).once("value");
+  let queueMap = (queueSnap && queueSnap.val && queueSnap.val()) || null;
+  let grouped = groupQueueByFolder(queueMap, tsNow, maxBatch);
+  if (grouped.count < maxBatch && queueMap && Object.keys(queueMap).length >= fetchLimit) {
+    const fullSnap = await db.ref(MAIL_QUEUE_PATH).once("value");
+    queueMap = (fullSnap && fullSnap.val && fullSnap.val()) || null;
+    grouped = groupQueueByFolder(queueMap, tsNow, maxBatch);
+  }
+  if (queueMap && typeof queueMap === "object") {
+    const expiredFailed = Object.keys(queueMap).filter((k) => {
+      const t = queueMap[k];
+      if (!t || typeof t !== "object" || t.st !== "failed") return false;
+      const failTs = Number(t.failedAt || t.queuedAt || 0);
+      return failTs > 0 && (tsNow - failTs) > MAX_FAILED_QUEUE_AGE_MS;
+    });
+    if (expiredFailed.length) {
+      await Promise.all(expiredFailed.slice(0, 20).map((k) => db.ref(MAIL_QUEUE_PATH + "/" + k).set(null).catch(() => null)));
+    }
+  }
+  if (!grouped.count) {
+    return { processed: 0, saved: 0, errors: 0, failed: 0, imapSessions: 0, folders: 0 };
+  }
+
+  let processed = 0;
+  let saved = 0;
+  let errors = 0;
+  let failed = 0;
+  let imapSessions = 0;
+
+  for (const slug of grouped.folderOrder) {
+    const tickets = grouped.byFolder[slug] || [];
+    let activeClient = null;
+    let doneQueue = null;
+    let sessionPromise = null;
+    let readyPromise = null;
+    let imapError = null;
+
+    const releaseFolderSession = () => {
+      if (doneQueue) {
+        const fn = doneQueue;
+        doneQueue = null;
+        fn();
+      }
+      activeClient = null;
+    };
+
+    const getClient = async () => {
+      if (activeClient) return activeClient;
+      if (imapError) throw imapError;
+      if (!sessionPromise) {
+        imapSessions += 1;
+        let settled = false;
+        let resolveReady;
+        let rejectReady;
+        readyPromise = new Promise((res, rej) => { resolveReady = res; rejectReady = rej; });
+        const closed = new Promise((res) => { doneQueue = res; });
+        sessionPromise = Promise.resolve()
+          .then(() => deps.withFolder(slug, async (client) => {
+            settled = true;
+            activeClient = client;
+            resolveReady(client);
+            await closed;
+          }))
+          .then(() => {
+            if (!settled) {
+              const err = new Error("IMAP folder session not opened: " + slug);
+              imapError = err;
+              rejectReady(err);
+            }
+          })
+          .catch((err) => {
+            imapError = err;
+            rejectReady(err);
+            throw err;
+          })
+          .finally(() => {
+            activeClient = null;
+          });
+      }
+      return readyPromise;
+    };
+
+    const fetchWithSession = async (folderSlug, mailUid) => {
+      const client = await getClient();
+      if (typeof deps.fetchWithClient === "function") {
+        return deps.fetchWithClient(client, folderSlug, mailUid);
+      }
+      return fetchAttachmentsWithClient(client, mailUid, deps.pickParts, deps.drain, opts);
+    };
+
+    try {
+      for (const ticket of tickets) {
+        const ticketRef = db.ref(MAIL_QUEUE_PATH + "/" + ticket.key);
+        try {
+          const res = await collectSingleMail(
+            {
+              db,
+              getSelfEmail: deps.getSelfEmail,
+              pdfExtractor: deps.pdfExtractor,
+              authServRe: deps.authServRe,
+              fetchAttachments: fetchWithSession
+            },
+            ticket.slug,
+            ticket.uid,
+            ticket.msg
+          );
+          if (res && (res.status === "cooldown_after_error" || res.status === "already_claimed")) {
+            continue;
+          }
+          await ticketRef.set(null);
+          processed += 1;
+          if (res && res.status === "saved") saved += 1;
+        } catch (err) {
+          errors += 1;
+          const nextAttempts = Number(ticket.attempts || 0) + 1;
+          const errText = String((err && err.message) || err).slice(0, 160);
+          if (nextAttempts >= MAX_QUEUE_ATTEMPTS) {
+            failed += 1;
+            await ticketRef.update({
+              attempts: nextAttempts,
+              st: "failed",
+              retryAfter: null,
+              failedAt: tsNow,
+              lastErr: errText
+            }).catch(() => null);
+          } else {
+            await ticketRef.update({
+              attempts: nextAttempts,
+              retryAfter: tsNow + ERROR_RETRY_COOLDOWN_MS,
+              lastErr: errText
+            }).catch(() => null);
+          }
+        }
+      }
+    } finally {
+      releaseFolderSession();
+      if (sessionPromise) await sessionPromise.catch(() => null);
+    }
+  }
+
+  return {
+    processed,
+    saved,
+    errors,
+    failed,
+    imapSessions,
+    folders: grouped.folderOrder.length
+  };
+}
+
 module.exports = {
+  MAIL_QUEUE_PATH,
+  MAX_QUEUE_BATCH,
+  MAX_QUEUE_ATTEMPTS,
+  MAX_FAILED_QUEUE_AGE_MS,
   MAX_DOC_BYTES,
   MAX_RAW_ATT_BYTES,
   MAX_TOTAL_ATT_BYTES,
   MAX_ATT_COUNT,
   makeMailSeenKey,
   makeMailArchiveId,
+  makeMailQueueTicket,
+  groupQueueByFolder,
+  fetchAttachmentsWithClient,
   isFundCollectableFolder,
   isDedicatedFundFolder,
   isSensitiveIdentityDoc,
@@ -1057,5 +1313,6 @@ module.exports = {
   extractZipEntries,
   extractDocTextSample,
   buildAutoSaveUpdates,
-  collectSingleMail
+  collectSingleMail,
+  drainFundMailQueueBatch
 };

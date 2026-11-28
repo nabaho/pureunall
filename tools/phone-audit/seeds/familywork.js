@@ -23,6 +23,24 @@ module.exports = {
           consultantName: '점검노무사',
           status: 'active',
           summaryNote: '출산육아·유연근무 현장 점검 진행 중 (연락처 010-0000-1001)'
+        },
+        'pr_familywork_2': {
+          id: 'pr_familywork_2',
+          entityType: 'Project',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 400,
+          updatedAt: NOW - 864e5 * 300,
+          revision: 1,
+          companyName: '(주)다라가족친화샘플',
+          year: 2025,
+          trackId: 'fw_cert',
+          trackName: '가족친화인증 심사대비 · 인증 컨설팅',
+          stage: 'followup',
+          workerCount: 40,
+          consultantName: '점검노무사',
+          status: 'done',
+          summaryNote: '다른 기관(세부 트랙) 사업 — 왼쪽 대시보드 점검용 지어낸 자료'
         }
       },
       checks: {

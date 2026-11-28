@@ -1,3 +1,10 @@
+## ⛔ [필수 최우선 규칙] AI 중복 작업 방지 — Claude 자동 중단 잠금 확인
+
+- **모든 코딩·수정·커밋·푸시·PR 작업을 시작하거나(5시간 한도 해제 후 재개 포함) 이어서 하기 전에 반드시 `gemini-autopush/AI_HANDOFF_LOCK.json`(및 `gemini-autopush/AI_HANDOFF_STATUS.md`)을 먼저 읽고 `git fetch origin`으로 최신 상태를 확인한다.**
+- 작업 대상 PR 번호, 브랜치 이름, 또는 파일 경로가 `AI_HANDOFF_LOCK.json`의 `locked_items` 안에 `"stop_claude": true`로 등록되어 있으면(상태가 `COMPLETED_BY_GEMINI`, `COMPLETED_MERGED`, `HANDED_OVER_TO_GEMINI_ANTIGRAVITY` 등인 경우):
+  1. **절대 파일 수정·커밋·푸시·리베이스·덮어쓰기를 실행하지 말고 즉시 작업을 중단한다.**
+  2. 사용자에게 `⛔ [자동 중단] 이 작업은 Gemini/Antigravity에서 이미 종료(또는 인계)되어 잠금 처리되었습니다. 계속 진행하려면 사용자의 명시적 재승인이 필요합니다.`라고 알림을 표시하고 종료한다.
+
 # 푸른노무법인 ERP 시스템 - Claude Code 가이드
 
 푸른노무법인의 ERP — 인사노무 업무 자동화 플랫폼. 한국어 주석, 노무 용어를 지킨다(급여→임금, 직원→근로자).

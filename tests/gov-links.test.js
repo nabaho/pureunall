@@ -219,6 +219,12 @@ test('★ 규칙 — 재직 직원 읽기·쓰기 · 빈 값 쓰기(지우기) �
   assert.ok(r, 'govlinks 규칙이 없습니다');
   assert.match(r['.read'], /status'\)\.val\(\) === 'active'/, '읽기가 재직 직원이 아닙니다');
   assert.ok(!('.write' in r), '뿌리째 쓰기를 열었습니다 — 통째 덮어쓰기를 막아야 합니다');
+  /* ★ 즐겨찾기 — 쓰기는 본인(사번)만. 읽기는 뿌리의 직원 읽기(뿌리 읽기를 걷으면 rules-deploy 가 «사라지는 규칙»으로 멈춘다) */
+  const st = r.stars && r.stars.$sid;
+  assert.ok(st, '★ 즐겨찾기 자리(stars/$sid) 규칙이 없습니다');
+  assert.match(st['.write'], /child\('sid'\)\.val\(\) === \$sid/, '★ 쓰기가 «본인 사번»으로 막혀 있지 않습니다');
+  assert.match(st['.write'], /newData\.exists\(\)/);
+  assert.match(st['.validate'], /newData\.child\('id'\)\.val\(\) === \$sid/);
   const w = r.sets.$id['.write'], v = r.sets.$id['.validate'];
   assert.match(w, /newData\.exists\(\)/, '빈 값 쓰기(물리 삭제)를 막지 않습니다');
   assert.match(v, /newData\.child\('id'\)\.val\(\) === \$id/);
@@ -235,4 +241,64 @@ test('포털·앱 막대·온톨로지에 같은 열쇠로 올라 있다', () =>
   assert.ok(P, '온톨로지 PROGRAMS 에 govlinks 가 없습니다');
   assert.equal(P.file, 'gov-links.html');
   assert.ok(P.writeContracts.some((c) => c.path === 'govlinks/sets/{id}' && c.entityType === L.ENTITY));
+  assert.ok(P.writeContracts.some((c) => c.path === 'govlinks/stars/{sid}' && c.entityType === L.STAR_ENTITY), '★ 즐겨찾기 쓰기 계약이 없습니다');
+  assert.ok(O.TERMS && Object.keys(O.TERMS).some((k) => /GovLinkStar/.test(k) || (O.TERMS[k] && O.TERMS[k].GovLinkStar)), '온톨로지 낱말에 GovLinkStar 가 없습니다');
+});
+
+/* ── 대시보드 판(대표 지시 2026-11-28 「왼쪽에 대시보드 … 별표 표시해서 상단에 자주 하는 거」) ── */
+test('★ 즐겨찾기는 사업·사이트 둘 다 — 누른 차례를 지키고, 못 쓰는 주소·모르는 열쇠는 버린다', () => {
+  let s = L.setStar({}, 'items', 'gl-b', true);
+  s = L.setStar(s, 'items', 'erp:c-a', true);
+  s = L.setStar(s, 'items', 'gl-a', true);
+  assert.deepEqual(s.items, ['gl-b', 'erp:c-a', 'gl-a'], '누른 차례가 아닙니다');
+  assert.deepEqual(L.setStar(s, 'items', 'erp:c-a', false).items, ['gl-b', 'gl-a']);
+  assert.deepEqual(L.setStar({}, 'links', 'javascript:alert(1)', true).links, [], '못 쓰는 주소를 ★ 로 받았습니다');
+  assert.deepEqual(L.cleanStars({ items: ['__proto__', 'erp:../x', 'gl-a', 'gl-a'], links: ['https://a.invalid/', 'data:x'] }),
+    { items: ['gl-a'], links: ['https://a.invalid/'] });
+  const before = JSON.stringify(s);
+  L.setStar(s, 'items', 'gl-z', true);
+  assert.equal(JSON.stringify(s), before, '받은 ★ 값을 바꿨습니다');
+});
+
+test('★ 대시보드 — ★ 은 거르기(찾기·KPI)와 상관없이 늘 맨 위, 지금 목록에 없는 ★ 사이트는 안 보인다', () => {
+  const sets = [set({ id: 'gl-a', title: '점검 가', bizCodes: ['c-a'], links: [{ name: '가 로그인', url: 'https://a.invalid/', login: true }] }),
+    set({ id: 'gl-b', title: '점검 나', links: [{ name: '나 홈', url: 'https://b.invalid/' }] })];
+  const b = L.board({ sets, biz: BIZ, tmap: TMAP, input: INPUT, state: {}, year: YEAR });
+  const stars = { items: ['gl-b', 'erp:c-b'], links: ['https://b.invalid/', 'https://없어진.invalid/'] };
+  const m = L.dashModel({ board: b, stars, q: '없는낱말', kf: 'login' });
+  assert.deepEqual(m.fav.map((r) => r.key), ['gl-b', 'erp:c-b'], '찾기·거르기가 ★ 사업을 숨겼습니다');
+  assert.deepEqual(m.favLinks.map((l) => l.url), ['https://b.invalid/'], '없어진 주소가 ★ 에 남았거나 있는 것이 빠졌습니다');
+  assert.equal(m.sets.length, 0, '찾기 글에 안 맞는 사업이 남았습니다');
+  const all = L.dashModel({ board: b, stars });
+  assert.deepEqual(all.sets.map((r) => r.key), ['gl-a', 'gl-b']);
+  assert.ok(all.bare.some((r) => r.key === 'erp:c-b' && r.title && r.org !== undefined), '바로가기 없는 이알피 사업이 대시보드에 없습니다');
+  assert.equal(L.dashModel({ board: b, stars: {}, kf: 'login' }).sets.map((r) => r.key).join(), 'gl-a', '«로그인» 거르기가 안 걸렸습니다');
+  const found = L.dashModel({ board: b, stars: {}, q: '로그인' }).found;
+  assert.deepEqual(found.map((l) => l.url), ['https://a.invalid/'], '찾은 사이트가 맞지 않습니다');
+});
+
+test('처음 보일 사업 — 전에 보던 것 → ★ 첫 사업 → 첫 묶음', () => {
+  const b = L.board({ sets: [set({ id: 'gl-a' }), set({ id: 'gl-b' })], biz: null, input: {}, state: {}, year: YEAR });
+  assert.equal(L.pickDefault(L.dashModel({ board: b, stars: {} }), 'gl-b'), 'gl-b');
+  assert.equal(L.pickDefault(L.dashModel({ board: b, stars: { items: ['gl-b'] } }), '없는것'), 'gl-b');
+  assert.equal(L.pickDefault(L.dashModel({ board: b, stars: {} }), ''), 'gl-a');
+});
+
+test('할 일·순서는 줄바꿈을 살리고, 사이트마다 «여기서 하는 일» 한 줄을 둔다', () => {
+  const v = set({ note: '① 로그인\r\n② 수행일지\u0007 올리기', links: [{ name: '가', url: 'https://a.invalid/', memo: '수행일지 올리는 곳' }, { name: '나', url: 'https://b.invalid/', memo: '   ' }] });
+  assert.equal(v.note, '① 로그인\n② 수행일지  올리기', '줄바꿈은 살리고 다른 제어 글자는 빈칸으로 바꿔야 합니다');
+  assert.equal(v.links[0].memo, '수행일지 올리는 곳');
+  assert.ok(!('memo' in v.links[1]), '빈 메모를 칸째 남겼습니다');
+});
+
+test('★ 사이트는 «한 번 누르면 바로» — 팝업창은 opener 를 끊고 주소로 보낸다, 막히면 새 탭', () => {
+  const code = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const fn = /function openSite\(url, mode\)\{[\s\S]*?\n\}/.exec(code);
+  assert.ok(fn, 'openSite 를 못 찾았습니다');
+  assert.match(fn[0], /L\.safeUrl\(url\)/, '열기 직전에 주소를 다시 거르지 않습니다');
+  assert.match(fn[0], /window\.open\('about:blank'/, '팝업창을 빈 창으로 먼저 열지 않습니다(opener 를 끊기 전에 사이트가 뜬다)');
+  assert.match(fn[0], /win\.opener=null/);
+  assert.match(fn[0], /noopener/, '새 탭(또는 막혔을 때)은 noopener 로 열어야 합니다');
+  /* 사이트를 누르면 고른 방식으로 바로 연다 — Ctrl·가운데 단추는 브라우저 그대로 */
+  assert.match(code, /openSite\(site\.getAttribute\('href'\), OPMODE\)/);
 });

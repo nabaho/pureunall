@@ -336,11 +336,24 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
      1단계: 아바타·«이번 달» 글자를 접는다 — 폰이 이미 접는 것들이다(이름·금액은 그대로 남는다). PC 는 챗봇 글자도 접고(태블릿·폰이 이미 접음, 이름은 aria-label·title) 사이를 좁힌다.
      2단계(PC): 머리줄 단추(내 업무·캘린더)도 그림 + 딱지 — 태블릿(≤900px, 위 규칙)과 «같은» 모양(이름은 aria-label·title 에 그대로). 태블릿은 이미 이 모양이다.
      태블릿은 768px 에서 사용액 + «○ 서버 연결 끊김»이 함께 뜨면 로그아웃이 화면 밖으로 밀렸다(2026-11-28 외부 점검 지적·phone-audit pbar-offline 화면).
+     3~5단계(대표 2026-11-28 「후보 2 — 한 줄, 브랜드 글자부터」): 600·521px(작은 태블릿·나눈 창)은 1·2단계로도 모자랐다(로그아웃·내 메뉴가 화면 밖).
+       머리줄은 한 줄 그대로 두고 «기능 없는 글자»부터 접는다 — 3단계 브랜드 글자(로고 «푸»는 남는다) → 4단계 «건의하기» 글자(💬 그림만)
+       → 5단계(마지막) 로그아웃을 내 메뉴 맨 아래로(폰과 같은 자리 #meLogout). 로그아웃이 머리줄에서 빠지는 것은 가장 좁을 때뿐이다.
    ⚠ 폰(≤520px)은 이 규칙을 안 탄다 — 폰 머리줄은 줄이 접힌다(flex-wrap). @media 로 막고, pbarFit 도 그 폭에서는 data-fit 를 지운다.
-   ⚠ 틈·챗봇 여백은 PC 만 — 태블릿은 이미 더 좁다(위 521~900px 규칙). 태블릿에 PC 값을 덮으면 오히려 넓어진다. */
+   ⚠ 틈·챗봇 여백은 PC 만 — 태블릿은 이미 더 좁다(위 521~900px 규칙). 태블릿에 PC 값을 덮으면 오히려 넓어진다.
+   ⚠ 태블릿에 닿는 단계는 «감추기» · «평소 감춰 둔 대역 꺼내기»(내 메뉴 안 로그아웃·💬) · «빈 자리 밀개 넘겨받기»만 쓴다(tests/portal-pbar-fit.test.js ①). */
 @media(min-width:521px){
   .pbar[data-fit~="1"] .pmeta .avatar{display:none;}
   .pbar[data-fit~="1"] .pmeta .me-money small{display:none;}
+  /* 3단계: 브랜드 글자 — 오른쪽으로 미는 빈 자리(.nm 의 margin-right:auto)는 로고가 넘겨받는다(안 그러면 단추들이 왼쪽으로 쏠린다) */
+  .pbar[data-fit~="3"] .nm{display:none;}
+  .pbar[data-fit~="3"] .logo{margin-right:auto;}
+  /* 4단계: «💬 건의하기» 대신 평소 감춰 둔 💬 대역(.sg-ico — 이름은 aria-label)을 꺼낸다 */
+  .pbar[data-fit~="4"] #sgFab .sg-tx{display:none;}
+  .pbar[data-fit~="4"] #sgFab .sg-ico{display:inline;}
+  /* 5단계(마지막): 로그아웃은 내 메뉴 맨 아래로 — 폰과 같은 규칙(아래 ≤520px 구간) */
+  .pbar[data-fit~="5"] > #logoutBtn{display:none;}
+  .pbar[data-fit~="5"] .me-menu .me-logout{display:block;}
 }
 @media(min-width:901px){
   .pbar[data-fit~="1"]{gap:8px;}
@@ -370,7 +383,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .me-money small{font-size:.68rem;color:var(--mute);margin-left:3px;}
 .me-money[data-tone="warn"] b{color:#d97706;}
 .me-money[data-tone="over"] b{color:#dc2626;}
-.pbar > .logout{order:6;padding:6px 4px;}    /* 로그아웃은 맨 오른쪽에 «늘» 보인다(PC) — 폰은 내 메뉴 맨 아래 */
+.pbar > .logout{order:6;padding:6px 4px;}    /* 로그아웃은 맨 오른쪽에 «늘» 보인다(PC) — 폰·머리줄 맞춤 마지막 단계는 내 메뉴 맨 아래 */
 .pbar .pmeta:focus-visible{outline:2px solid #1e40af;outline-offset:2px;}
 .pbar .pmeta .un-title{display:none;}    /* 직책은 내 메뉴 맨 위에 — 머리줄에는 이름만 */
 .pbar .connection-status[data-state="online"] .cs-lb{display:none;}   /* 잘 될 때는 점 하나 · 끊기면 말 그대로 */
@@ -448,7 +461,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .me-go{margin-left:auto;font-size:.72rem;font-weight:700;color:var(--accent);}
 .pbar .me-menu .logout{display:block;width:100%;margin:6px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:9px;
   background:#ffffff;font-size:.8rem;text-align:center;}
-.pbar .me-menu .me-logout{display:none;}     /* PC 는 머리줄에 로그아웃이 있다 — 메뉴 안 것은 폰에서만 */
+.pbar .me-menu .me-logout{display:none;}     /* PC 는 머리줄에 로그아웃이 있다 — 메뉴 안 것은 폰·머리줄 맞춤 마지막 단계(5)에서만 */
 /* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
    ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
 #appInstallFab{display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;border:none;
@@ -620,61 +633,88 @@ body.lay-editing .tilerow .tiles{outline:1.5px dashed rgba(30,64,175,.3);outline
 .pbar:has(#mgBtn:not([hidden])) .nm{margin-right:0;}
 .mg-n{background:#dc2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:.68rem;font-weight:800;line-height:1.4;}
 .mg-n[hidden]{display:none;}
-.mg-drawer{position:fixed;top:0;bottom:0;left:0;width:400px;max-width:92vw;z-index:70;display:flex;flex-direction:column;background:#fff;
+.mg-drawer{position:fixed;top:0;bottom:0;left:0;width:min(320px,86vw);z-index:70;display:flex;flex-direction:column;background:#fff;
   border-right:1px solid #e2e8f0;box-shadow:16px 0 40px rgba(15,23,42,.14);transform:translateX(-104%);visibility:hidden;
   transition:transform .25s,visibility 0s linear .25s;}
 .mg-drawer.open{transform:none;visibility:visible;transition:transform .25s,visibility 0s;}
-.mg-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 18px 12px;}
-.mg-hd b{display:block;font-size:1.1rem;color:#1e293b;}
-.mg-hd small{display:block;font-size:.72rem;color:#64748b;margin-top:1px;}
-.mg-x{width:32px;height:32px;border:0;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.9rem;cursor:pointer;flex:none;}
+.mg-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 8px;}
+.mg-hd b{display:block;font-size:.98rem;color:#1e293b;}
+.mg-hd small{display:block;font-size:.68rem;color:#64748b;margin-top:1px;}
+.mg-x{width:28px;height:28px;border:0;border-radius:50%;background:#e2e8f0;color:#475569;font-size:.9rem;cursor:pointer;flex:none;}
 .mg-x:hover{background:#cbd5e1;}
 .mg-x:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
-.mg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px;}
-.mg-tab{position:relative;display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:11px 12px 10px;border:2px solid #e2e8f0;border-radius:14px;
+.mg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 10px 10px;}
+.mg-tab{position:relative;display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:7px 9px 7px;border:2px solid #e2e8f0;border-radius:12px;
   background:#fff;color:#475569;font:inherit;cursor:pointer;min-width:0;}
 .mg-tab[hidden]{display:none;}
-.mg-tab-t{display:flex;align-items:center;gap:7px;font-size:.95rem;font-weight:800;white-space:nowrap;}
-.mg-tab-n{font-style:normal;font-size:.72rem;font-weight:600;color:#64748b;}
-.mg-tab-s{font-size:.7rem;color:#64748b;line-height:1.3;}
-.mg-tab-b{margin-top:2px;background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:.68rem;font-weight:800;}
+.mg-tab-t{display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:800;white-space:nowrap;}
+.mg-tab-n{font-style:normal;font-size:.68rem;font-weight:600;color:#64748b;}
+.mg-tab-s{font-size:.64rem;color:#64748b;line-height:1.25;}
+.mg-tab-b{margin-top:1px;background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:.64rem;font-weight:800;}
 .mg-tab-b[hidden]{display:none;}
-.mg-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;}
+.mg-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;}
 .mg-tab[data-zone="sales"] .mg-dot,.mg-zone[data-zone="sales"] .mg-dot{background:#d97706;}
 .mg-tab[data-zone="inside"] .mg-dot,.mg-zone[data-zone="inside"] .mg-dot{background:#16a34a;}
 .mg-tab[data-zone="sales"][aria-selected="true"]{border-color:#d97706;background:#fffbeb;color:#854d0e;}
 .mg-tab[data-zone="inside"][aria-selected="true"]{border-color:#16a34a;background:#f0fdf4;color:#166534;}
 .mg-tab:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
-.mg-zone{flex:1;min-height:0;overflow:auto;padding:16px 16px 28px;border-top:5px solid var(--mg-c);background:var(--mg-bg);}
+/* 서랍 맨 아래 «백업·복구 · 설정» — 떠 있는 단추를 가리지 않고도 눌러 쓰게 (대표 지시 2026-11-28). 관리자에게만 보인다 */
+.mg-ft{display:flex;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid #e2e8f0;background:#f8fafc;flex:none;}
+.mg-ft[hidden]{display:none;}
+.mg-ft button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:9px;
+  background:#fff;color:#475569;font:inherit;font-size:.76rem;font-weight:700;white-space:nowrap;cursor:pointer;}
+.mg-ft button:hover{border-color:#2563eb;color:#2563eb;}
+.mg-ft button:focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
+.mg-ft button[hidden]{display:none;}
+/* 서랍이 열려 있는 동안은 떠 있는 «백업·복구»·«⚙ 설정» 알약을 감춘다 — 서랍 맨 아래에 같은 단추가 있고, 알약이 그 위에 겹쳐 눌린다 */
+body:has(#mgDrawer.open) #cfgFab,body:has(#mgDrawer.open) #pu-backup-admin-button{visibility:hidden;}
+@media(max-width:520px){ body.portal-mode .mg-ft{padding-bottom:calc(66px + env(safe-area-inset-bottom));} }   /* 하단 막대에 안 깔리게 */
+.mg-zone{flex:1;min-height:0;overflow:auto;padding:10px 10px 16px;border-top:5px solid var(--mg-c);background:var(--mg-bg);}
 .mg-zone[hidden]{display:none;}
 .mg-zone[data-zone="sales"]{--mg-c:#d97706;--mg-bg:#fffbeb;--mg-ink:#854d0e;}
 .mg-zone[data-zone="inside"]{--mg-c:#16a34a;--mg-bg:#f0fdf4;--mg-ink:#166534;}
-.mg-zone-h{display:flex;flex-direction:column;gap:2px;margin:0 2px 10px;}
-.mg-zone-t{display:flex;align-items:center;gap:8px;font-size:1rem;color:var(--mg-ink);}
-.mg-zone-h small{font-size:.74rem;color:#64748b;}
+.mg-zone-h{display:flex;flex-direction:column;gap:1px;margin:0 2px 6px;}
+.mg-zone-t{display:flex;align-items:center;gap:7px;font-size:.88rem;color:var(--mg-ink);}
+.mg-zone-h small{font-size:.66rem;color:#64748b;}
 /* 서랍 안 줄 — 머리(접기 단추)는 감춘다(탭·구역 머리가 대신한다). 앱은 «아이콘 + 이름 + 설명» 한 줄씩 */
 .mg-zone .tilerow{margin:0;}
 .mg-zone .tilerow-h{display:none;}
 .mg-zone .tilerow:has(> .row-freeze:not([hidden])){padding-top:30px;}   /* 관리자 화면의 «📌 이 줄 고정» 이 첫 앱과 안 겹치게 */
 .mg-zone .tiles{display:flex;flex-direction:column;flex-wrap:nowrap;gap:2px;padding:0;}
-.mg-zone .tile{flex-direction:row;align-items:center;width:100%;max-width:none;min-width:0;padding:10px 12px;gap:13px;text-align:left;border-radius:12px;}
+.mg-zone .tile{flex-direction:row;align-items:center;width:100%;max-width:none;min-width:0;padding:6px 8px;gap:9px;text-align:left;border-radius:10px;}
 .mg-zone .tile:hover{background:rgba(255,255,255,.8);}
 .mg-zone .tile:hover .ic{transform:none;box-shadow:none;}
-.mg-zone .tile .ic{width:38px;height:38px;margin:0;flex:none;font-size:1.15rem;}
+.mg-zone .tile .ic{width:30px;height:30px;margin:0;flex:none;font-size:.95rem;}
 .mg-zone .tile .tx{min-width:0;flex:1;}
 .mg-zone .tile:has(.tile-alert,.nl-warn,.tile-soon-pill) .tx{padding-right:84px;}
-.mg-zone .tile{padding-right:40px;}
-.mg-zone .tile b{font-size:.92rem;font-weight:700;margin:0;}
-.mg-zone .tile .tx span{display:block;font-size:.75rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mg-zone .tile{padding-right:36px;}
+.mg-zone .tile b{font-size:.82rem;font-weight:700;margin:0;}
+.mg-zone .tile .tx span{display:block;font-size:.66rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mg-zone .tile .ic{position:static;backdrop-filter:none;}   /* backdrop-filter 가 있으면 ☆·딱지의 «기준 상자»가 아이콘으로 바뀐다 */
-.mg-zone .tile .pin-star{right:10px;bottom:auto;top:50%;margin-top:-10px;}
-.mg-zone .tile .tile-alert{left:auto;right:40px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
-.mg-zone .tile .nl-warn{top:50%;right:40px;margin-top:-10px;}
-.mg-zone .tile .tile-soon-pill{left:auto;right:40px;top:50%;margin-top:-9px;transform:none;}
+.mg-zone .tile .pin-star{right:4px;bottom:auto;top:50%;width:28px;height:28px;line-height:28px;margin-top:-14px;}   /* 누를 곳 24px 이상 */
+.mg-zone .tile .tile-alert{left:auto;right:36px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
+.mg-zone .tile .nl-warn{top:50%;right:36px;margin-top:-10px;}
+.mg-zone .tile .tile-soon-pill{left:auto;right:36px;top:50%;margin-top:-9px;transform:none;}
 @media(max-width:520px){
   .pbar #mgBtn{padding:5px 11px;font-size:.74rem;}
-  .mg-drawer{width:92vw;}
-  .mg-tabs{gap:8px;padding:0 10px 12px;}
+  .mg-drawer{width:min(250px,72vw);}   /* 폰 — 화면의 약 7/10 이하. 뒤 화면이 보여야 «서랍»으로 읽힌다 (대표 2026-11-29 「폰에서 아직 크다」) */
+  .mg-hd{padding:9px 12px 6px;}
+  .mg-hd b{font-size:.9rem;}
+  .mg-hd small,.mg-zone-h small{display:none;}   /* 폰은 탭의 «누가 쓰는 일»이 대신한다 — 설명 줄을 걷어 세로를 아낀다 */
+  .mg-tabs{gap:6px;padding:0 8px 8px;}
+  .mg-tab{padding:6px 7px;border-radius:10px;}
+  .mg-tab-t{font-size:.78rem;gap:5px;}
+  .mg-tab-n{font-size:.62rem;}
+  .mg-tab-s{font-size:.58rem;}
+  .mg-tab-b{font-size:.58rem;padding:0 6px;}
+  .mg-zone{padding:8px 8px 12px;}
+  .mg-zone-t{font-size:.8rem;}
+  .mg-zone .tile{padding:4px 6px;gap:8px;}
+  .mg-zone .tile .ic{width:26px;height:26px;font-size:.85rem;}
+  .mg-zone .tile b{font-size:.76rem;}
+  .mg-zone .tile .tx span{font-size:.6rem;}
+  .mg-ft{padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
+  .mg-ft button{min-height:32px;font-size:.7rem;}
 }
 .tilerow-h{display:flex;align-items:center;gap:6px;padding:3px 6px 4px;border-radius:8px;}
 .tilerow-t{font-size:12px;font-weight:700;color:#1e293b;letter-spacing:-.2px;}
@@ -1076,6 +1116,7 @@ body.portal-mode #camFab{display:flex;}
 .sgd-warn-bar .sg-btn{width:auto;min-height:36px;margin:0;padding:8px 14px;font-size:.76rem;background:#991b1b;flex:none;}
 @media(max-width:520px){#sgDoneModal .sgd-warn{margin:10px 14px 0;padding:8px 10px;font-size:.74rem;line-height:1.5;}#sgDoneModal .sgd-warn .sub{display:none;}}
 .sg-fabwarn{display:none;}
+#sgFab .sg-ico{display:none;}   /* 💬 대역 — 머리줄 맞춤 4단계(태블릿·나눈 창이 좁을 때)에만 «💬 건의하기» 대신 꺼낸다 */
 #sgFab.sg-need .sg-fabwarn{display:inline;}
 #sgFab.sg-need{background:#991b1b;animation:sgNeedPulse 1.8s ease-in-out infinite;}
 @keyframes sgNeedPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55);}50%{box-shadow:0 0 0 8px rgba(220,38,38,0);}}
@@ -1722,7 +1763,10 @@ body.portal-mode #moreFab{display:flex;}
         <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
         <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
       </a>
-      <button id="sgFab" type="button"><span class="sg-fabwarn" id="sgFabWarn" aria-hidden="true">⚠ </span>💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
+      <!-- «💬 건의하기»는 «한 칸·한 흐름»(.sg-tx)으로 둔다 — 안을 더 나누면(글자만 span) 글자 흐름이 끊겨 기본 모양이 몇 점씩 바뀌고,
+           칸을 따로 세우면 inline-flex 틈이 끼어 폭이 넓어진다(2026-11-28 갈무리로 확인). 머리줄이 모자라면 맞춤 4단계가 이 칸을 감추고
+           평소 감춰 둔 💬 대역(.sg-ico)을 꺼낸다 — 그때 단추 이름은 대역의 aria-label(건의하기)이 맡는다. -->
+      <button id="sgFab" type="button"><span class="sg-fabwarn" id="sgFabWarn" aria-hidden="true">⚠ </span><span class="sg-tx">💬 건의하기</span><span class="sg-ico" role="img" aria-label="건의하기">💬</span><span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
       <div class="me-menu" id="meMenu" role="menu" aria-label="내 메뉴" hidden>
@@ -1752,7 +1796,8 @@ body.portal-mode #moreFab{display:flex;}
       <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결<span class="me-go" aria-hidden="true">열기 ›</span></button>
       <button type="button" class="logout me-logout" id="meLogout">로그아웃</button>
       </div>
-      <!-- 로그아웃은 머리줄 맨 오른쪽에 늘 보인다(PC, order:6). 폰은 좁아서 숨기고 내 메뉴 맨 아래 #meLogout 이 대신 누른다. -->
+      <!-- 로그아웃은 머리줄 맨 오른쪽에 늘 보인다(PC, order:6). 폰은 좁아서 숨기고 내 메뉴 맨 아래 #meLogout 이 대신 누른다.
+           태블릿·나눈 창에서 다 접어도 모자라면(머리줄 맞춤 5단계) 폰처럼 내 메뉴 맨 아래로 간다. -->
       <button class="logout" id="logoutBtn">로그아웃</button>
       <div class="pmeta" id="meBtn" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="meMenu" title="내 메뉴">
         <span id="statusDot" class="connection-status" data-state="checking" role="status" aria-live="polite">○ 연결 확인 중</span>
@@ -1940,8 +1985,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 정부사업 카톡 요약 하루 한 번(대표 «나에게 보내기», 새 것이 있을 때만) · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 강의자료 메일 정리 하루 한 번 · 메일 계약·견적 검토 하루 7번(평일 09~18·24시, 주말·공휴일은 24시만 일하고 낮엔 바로 끝냄, AI 정리) · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번 · 데이터관리 현황판 집계 1시간마다(대표 전용, 건수·비율만)
-        — 하루 <b>572번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 정부사업 카톡 요약 하루 한 번(대표 «나에게 보내기», 새 것이 있을 때만) · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 새 사이트 열쇠 점검 하루 한 번 · P박스 법령·판례 동기화 하루 한 번 · 강의자료 메일 정리 하루 한 번 · 메일 계약·견적 검토 하루 7번(평일 09~18·24시, 주말·공휴일은 24시만 일하고 낮엔 바로 끝냄, AI 정리) · 메일 서류 자동 처리 1시간마다(서울 07~20시만 일하고 나머지는 바로 끝냄) · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번 · 데이터관리 현황판 집계 1시간마다(대표 전용, 건수·비율만) · 기금 메일 큐 처리 10분마다(큐 비면 IMAP 없이 바로 끝냄)
+        — 하루 <b>716번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -2422,7 +2467,7 @@ body.portal-mode #moreFab{display:flex;}
     { key:'familywork', name:'출산육아·유연근무', desc:'육아지원3법·가족친화·유연근무 도입', icon:'🏡', url:'familywork.html',    roles:null, row:'client' },
     { key:'socialent', name:'사회적기업·씨앗', desc:'SVI·예비사회적기업 인증·취약계층 노무', icon:'🌱', url:'socialent.html',     roles:null, row:'client' },
     { key:'sixthind', name:'6차산업컨설팅',   desc:'농촌융복합 현장코칭·인증·근기법63조', icon:'🌾', url:'sixthind.html',      roles:null, row:'client' },
-    { key:'laboraudit', name:'자율점검·근로감독', desc:'기초노동질서·모의감독·서류보존 진단', icon:'🧭', url:'laboraudit.html',    roles:null, row:'client' },
+    { key:'laboraudit', name:'근로감독 대응·이력', desc:'정기·수시·특별 근로감독 · 시정지시 이력', icon:'🧭', url:'laboraudit.html',    roles:null, row:'client' },
     { key:'unionneg', name:'민간노조·단체교섭', desc:'창구단일화·교섭대표·타임오프·임단협', icon:'🫂', url:'unionneg.html',      roles:null, row:'client' },
     { key:'specialcons', name:'특화·위탁컨설팅', desc:'혁신바우처·통상·삼성협력·경비·이음', icon:'🧩', url:'specialcons.html',   roles:null, row:'client' },
     { key:'msgintake', name:'카톡·문자 자료수집', desc:'카카오톡·문자 자동분류·2중 비식별', icon:'💬', url:'pu-msg-intake.html', roles:null, row:'store' },
@@ -5094,9 +5139,15 @@ body.portal-mode #moreFab{display:flex;}
     portalOrchPaintModal();
     var ep = portalOrchEpoch;
     var myUid = u.uid;
+    var isAdm = portalOrchRole === 'admin' || (typeof sgIsAdmin === 'function' && sgIsAdmin());
     var failCnt = 0;
-    function rd(p){
-      return db.ref(p).once('value').then(function(s){ return s ? s.val() : null; }).catch(function(){ failCnt++; return null; });
+    function rd(p, adminOnly){
+      if(adminOnly && !isAdm) return Promise.resolve(null);
+      return db.ref(p).once('value').then(function(s){ return s ? s.val() : null; }).catch(function(err){
+        var code = String((err && (err.code || err.message)) || '');
+        if((p === 'edulib_inbox' || p === 'datahub_board') && /permission/i.test(code)) return null;
+        failCnt++; return null;
+      });
     }
     /* READ_ADAPTERS 의 in_app 민감 경로(harass_invest·scal_*·rules_mgmt·govaid·settle·rehab_ad·pu_sign/open·data/finance_income)는 절대 읽지 않는다 */
     Promise.all([
@@ -5108,11 +5159,15 @@ body.portal-mode #moreFab{display:flex;}
       rd('data/consultings/v'),
       rd('work_erp/items'),
       rd('pu_quotes'),
-      rd('pucards/ontIdx')
+      rd('pucards/ontIdx'),
+      rd('paydata/arrivals'),
+      rd('payroll_os/inbox'),
+      rd('edulib_inbox', true),
+      rd('datahub_board', true)
     ]).then(function(res){
       if(ep !== portalOrchEpoch || !auth.currentUser || auth.currentUser.uid !== myUid) return;
       portalOrchFullBusy = false;
-      if(failCnt >= 9){
+      if(failCnt >= 11){
         portalOrchErr = '데이터 읽기 오류 · ↻ 새로고침으로 다시 시도해 주세요';
         portalOrchPaintModal();
         return;
@@ -5129,7 +5184,11 @@ body.portal-mode #moreFab{display:flex;}
         consultings: res[5],
         workItems: res[6],
         quotes: res[7],
-        cardsOntIdx: res[8]
+        cardsOntIdx: res[8],
+        paydataArrivals: res[9],
+        payrollInbox: res[10],
+        edulibInbox: res[11],
+        datahubBoard: res[12]
       };
       portalOrchRecompute();
       portalOrchPaint();
@@ -5782,7 +5841,9 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 폰(≤520px)은 머리줄이 줄을 접는다(CSS flex-wrap) — 여기서는 data-fit 를 지우고 손대지 않는다.
      ⚠ 떠 있는 창(내 메뉴·첫 안내) 안의 바뀜은 무시한다 — 첫 안내 자리 맞춤(style)이 다시 맞춤을 부르는 되풀이를 막는다. */
   var PBAR_FIT_EDGE = 8;
-  var PBAR_FIT_STEPS = ['', '1', '1 2'];
+  /* 단계는 앞에서부터 하나씩 더 접는다 — 1 아바타·이번 달 · 2 머리줄 단추 그림만(PC) · 3 브랜드 글자 · 4 건의하기 글자 · 5 로그아웃을 내 메뉴로(마지막).
+     뒤 셋은 대표 2026-11-28 「후보 2」 — 로그아웃은 맨 나중(머리줄 CSS 「머리줄 맞춤」 풀이). */
+  var PBAR_FIT_STEPS = ['', '1', '1 2', '1 2 3', '1 2 3 4', '1 2 3 4 5'];
   var _pbarFitQ = 0, _pbarFitMo = null;
   function pbarFitRight(bar){
     var r = 0, kids = bar.children;
@@ -5899,7 +5960,32 @@ body.portal-mode #moreFab{display:flex;}
             + '<div class="mg-zone-h"><span class="mg-zone-t"><i class="mg-dot" aria-hidden="true"></i><b>' + z.label + ' 구역</b></span><small>' + z.hint + '</small></div>'
             + (row ? rowBox(row) : '') + '</section>';
         }).join('')
+      + '<div class="mg-ft" id="mgFt" hidden>'
+      + '<button type="button" id="mgFtBackup" data-src="pu-backup-admin-button" hidden>💾 백업·복구</button>'
+      + '<button type="button" id="mgFtCfg" data-src="cfgFab" hidden>⚙ 설정</button>'
+      + '</div>'
       + '</aside>';
+  }
+  /* 서랍 맨 아래 단추 — 떠 있는 «백업·복구»(js/pu-backup.js)·«⚙ 설정»(#cfgFab)을 «대신 눌러 준다». 두 단추는 관리자에게만 생기므로
+     원본이 있고 켜져 있을 때만 보인다(없으면 줄째 감춘다). 서랍이 열릴 때마다 mgSync 가 맞춘다. */
+  function mgFootSrc(btn){
+    var el = btn && document.getElementById(btn.getAttribute('data-src'));
+    if(!el || el.hidden || el.style.display === 'none') return null;
+    return el;
+  }
+  function mgFootSync(){
+    var ft = $('mgFt'); if(!ft) return;
+    var n = 0;
+    Array.prototype.forEach.call(ft.querySelectorAll('button'), function(b){
+      var on = !!mgFootSrc(b); if(b.hidden === on) b.hidden = !on;
+      if(on) n++;
+    });
+    if(ft.hidden === (n > 0)) ft.hidden = !(n > 0);
+  }
+  function mgFootClick(b){
+    var src = mgFootSrc(b); if(!src) return;
+    mgClose();                       // 서랍을 먼저 닫는다 — 열려 있으면 뜨는 창이 서랍 뒤로 가려질 수 있다
+    src.click();
   }
   function mgSelect(z){
     _mgTab = z;
@@ -5945,6 +6031,7 @@ body.portal-mode #moreFab{display:flex;}
     if(btn.title !== tt) btn.title = tt;
     if(any) mgSelect(curVis ? _mgTab : firstVis);
     else if(drawer.classList.contains('open')) mgClose();
+    mgFootSync();
   }
   function mgOpen(z){
     var d = $('mgDrawer'), b = $('mgBtn'); if(!d) return;
@@ -5977,6 +6064,7 @@ body.portal-mode #moreFab{display:flex;}
     b.addEventListener('click', function(){ if(d.classList.contains('open')) mgClose(); else mgOpen(); });
     $('mgClose').addEventListener('click', function(){ mgClose(true); });
     d.addEventListener('click', function(e){
+      var ft = e.target.closest && e.target.closest('.mg-ft button'); if(ft){ mgFootClick(ft); return; }   // 맨 아래 «백업·복구 · 설정»
       var tab = e.target.closest && e.target.closest('.mg-tab'); if(!tab || tab.hidden) return;
       mgSelect(tab.dataset.zone);
     });
@@ -9618,8 +9706,8 @@ body.portal-mode #moreFab{display:flex;}
 })();
 </script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-orchestrator-core.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=23"></script>
+<script src="js/pu-orchestrator-core.js?v=6"></script>
+<script src="js/pu-chatbot-kb.js?v=24"></script>
 <script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>

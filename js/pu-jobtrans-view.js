@@ -1406,13 +1406,13 @@
       cls: (Array.isArray(list) && idx > 0 && prevY !== y) ? 'yr-break' : '',
       cells: [
         { k: 'yr', cls: 'yr', title: y ? y + '년 사업' : '연도 미입력', html: '<b>' + esc(y ? String(y) : '-') + '</b>' },
-        { cls: 'ti', title: nameTitle, html: esc(p.companyName) + ilteoChip },
+        { cls: 'ti', title: nameTitle, html: '<span class="pm-co">' + esc(p.companyName) + '</span>' + ilteoChip },
         { k: 'badge', title: tr.name, html: '<span class="chip ' + (p.agency === 'cepa' ? 'c-green' : 'c-blue') + '">' + esc(compactTrackLabel) + '</span> ' + stageDotsHtml(p) },
         { cls: 'wide', k: 'prog', title: st.title, html: progressChipHtml(st) },
-        { html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
+        { k: 'pc-only', html: '<b>' + chkPre.pct + '%</b> <span class="chip ' + revChipCls + '" title="기관 전용 양식 검수 통과 항목">검수 ' + rev.passCount + '/' + rev.totalCount + '</span>' + (mailBadges.length ? ' ' + mailBadges.join(' ') : '') },
         {
           k: 'act',
-          html: '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="intake">①기초</button>' +
+          html: '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="intake" data-pm-act="1">①기초</button>' +
             '<button class="sm" data-open-proj="' + esc(p.id) + '" data-open-tab="mid">②중간</button>' +
             '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-open-tab="final" title="' + esc(p.agency === 'cepa' ? '충남경제진흥원 결과보고서·완료계 검토' : '능률협회 최종보고서·정책매니저 검토') + '">③' + (p.agency === 'cepa' ? '완료계' : '최종') + '</button>'
         }
@@ -1550,7 +1550,7 @@
                 { cls: 'ti', title: safeDispCo, html: esc(safeDispCo) + ' <span class="chip">' + esc(g.year + '년') + '</span>' },
                 { k: 'badge', html: agencyChipHtml(g.agency) + ' <span class="chip">' + esc(tr.short) + '</span> ' + linkedBadge },
                 { cls: 'wide', title: kindTags, html: '파일 <b>' + g.fileCount + '건</b>' + (kindTags ? ' (' + esc(kindTags) + ')' : '') },
-                { k: 'act', html: '<button class="sm pri" data-import-fgrp="' + esc(g.groupKey) + '" data-boundary-hash="' + esc(g.boundaryHash || '') + '">📥 자료 반영</button>' }
+                { k: 'act', html: '<button class="sm pri" data-import-fgrp="' + esc(g.groupKey) + '" data-boundary-hash="' + esc(g.boundaryHash || '') + '" data-pm-act="1">📥 자료 반영</button>' }
               ]
             };
           });
@@ -1571,8 +1571,8 @@
             { cls: 'ti', title: c.companyName, html: esc(c.companyName) + ' <span class="chip">' + esc(c.year + '년') + '</span>' },
             { k: 'badge', html: agencyChipHtml(c.agency) + ' <span class="chip">' + esc(tr.short) + '</span>' },
             { cls: 'wide', title: c.source + (c.bizLabel ? ' · ' + c.bizLabel : ''), html: esc(c.source + (c.bizLabel ? ' · ' + c.bizLabel : '')) },
-            { html: esc(c.contactEmail || '이메일 미등록') },
-            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
+            { k: 'pc-only', html: esc(c.contactEmail || '이메일 미등록') },
+            { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '" data-pm-act="1">⚡ 활성화</button>' }
           ]
         };
       });
@@ -4574,7 +4574,7 @@
         return;
       }
 
-      if (!e.target.closest('input,button,select,a,label,textarea')) {
+      if (!e.target.closest('input,button,select,a,label,textarea,td.c,th.c')) {
         var tr = e.target.closest('tr[data-row][data-tname="projects"], tr[data-row][data-tname="projectsKmac"], tr[data-row][data-tname="projectsCepa"]');
         if (tr) {
           /* 줄을 누르면 진행 기록·완료보고서 창 — 단계 탭으로는 줄 끝 ①②③ 단추로 간다 */

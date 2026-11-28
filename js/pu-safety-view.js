@@ -1306,7 +1306,23 @@
     var q = str($('projQ') && $('projQ').value).toLowerCase();
     var stFilter = $('projStatus') ? $('projStatus').value : '';
     var indFilter = $('projIndustry') ? $('projIndustry').value : '';
-    var yrFilter = $('projYear') ? $('projYear').value : '';
+    var yrSelEl = $('projYear');
+    var yrFilter = yrSelEl ? yrSelEl.value : '';
+    if (yrSelEl) {
+      var yrCntMap = Object.create(null);
+      ['2026', '2025', '2024', '2023', '2022'].forEach(function (yy) { yrCntMap[yy] = yrCntMap[yy] || 0; });
+      projs.forEach(function (p) {
+        var yy = String(num(p.year, 2026));
+        yrCntMap[yy] = (yrCntMap[yy] || 0) + 1;
+      });
+      var sortedYrs = Object.keys(yrCntMap).sort(function (a, b) { return Number(b) - Number(a); });
+      yrSelEl.innerHTML = '<option value="">연도 전체</option>' + sortedYrs.map(function (yy) {
+        return '<option value="' + esc(yy) + '">' + esc(yy) + '년 (' + yrCntMap[yy] + ')</option>';
+      }).join('');
+      yrSelEl.value = yrFilter;
+      if (yrSelEl.value !== yrFilter) yrSelEl.value = '';
+      yrFilter = yrSelEl.value || '';
+    }
 
     var koshaCnt = projs.filter(function (p) { return /^kosha_/.test(str(p.track)); }).length;
     var isAllSafetyOn = !stFilter && !TRACK_SCOPE;
@@ -1332,7 +1348,7 @@
       if (stFilter === 'archive' && !isArch) return false;
       if (stFilter === 'active' && isArch) return false;
       if (indFilter && p.industryCode !== indFilter && (!Array.isArray(p.extraIndustries) || p.extraIndustries.indexOf(indFilter) < 0)) return false;
-      if (yrFilter && String(p.year || '') !== yrFilter) return false;
+      if (yrFilter && String(num(p.year, 2026)) !== yrFilter) return false;
       if (q) {
         var ind = Cat().getIndustry(p.industryCode);
         var hay = [p.companyName, ind.name, p.summaryNote, p.source, p.consultantName].join(' ').toLowerCase();
@@ -1370,13 +1386,13 @@
           { cls: 'yr', html: '<span class="chip">' + esc(yrVal) + '</span>' },
           { cls: 'ti', title: p.companyName, html: esc(p.companyName) },
           { cls: 'st', html: statusBadge },
-          { k: 'badge', html: '<span class="chip ' + esc(ind.badgeCls) + '">' + esc(ind.short) + '</span> <span class="chip ' + esc(tr.badgeCls) + '">' + esc(tr.short) + '</span>' },
-          { html: progressHtml },
-          { html: mailIntakeHtml },
+          { k: 'pc-only', html: '<span class="chip ' + esc(ind.badgeCls) + '">' + esc(ind.short) + '</span> <span class="chip ' + esc(tr.badgeCls) + '">' + esc(tr.short) + '</span>' },
+          { k: 'pc-only', html: progressHtml },
+          { k: 'pc-only', html: mailIntakeHtml },
           { cls: 'wide', title: p.summaryNote || ind.approach, html: esc(p.summaryNote || ind.approach) },
           {
             k: 'act',
-            html: '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-go="check">☑️ 체크</button>' +
+            html: '<button class="sm pri" data-open-proj="' + esc(p.id) + '" data-go="check" data-pm-act="1">☑️ 체크</button>' +
               '<button class="sm" data-open-proj="' + esc(p.id) + '" data-go="intake">📩 자료·위평</button>' +
               '<button class="sm ok" data-open-proj="' + esc(p.id) + '" data-go="report">📑 보고서</button>'
           }
@@ -1410,8 +1426,8 @@
             cells: [
               { cls: 'ti', html: esc(g.companyName) + ' <span class="chip">' + g.year + '</span>' },
               { k: 'badge', html: '<span class="chip ' + esc(ind.badgeCls) + '">' + esc(ind.short) + '</span>' },
-              { html: g.fileCount + '개 파일' },
-              { k: 'act', html: '<button class="sm pri" data-import-folder="' + esc(g.groupKey) + '">📥 비식별 반영</button>' }
+              { cls: 'wide', html: g.fileCount + '개 파일' },
+              { k: 'act', html: '<button class="sm pri" data-import-folder="' + esc(g.groupKey) + '" data-pm-act="1">📥 비식별 반영</button>' }
             ]
           };
         });
@@ -1431,9 +1447,9 @@
         cells: [
           { cls: 'ti', title: c.companyName, html: esc(c.companyName) + ' <span class="chip">' + esc(c.year) + '</span>' },
           { k: 'badge', html: '<span class="chip c-blue">' + esc(c.source) + '</span> <span class="chip ' + esc(ind.badgeCls) + '">' + esc(ind.short) + '</span>' },
-          { html: '<span class="chip ' + esc(tr.badgeCls) + '">' + esc(tr.short) + '</span>' },
+          { k: 'pc-only', html: '<span class="chip ' + esc(tr.badgeCls) + '">' + esc(tr.short) + '</span>' },
           { cls: 'wide', title: c.bizLabel, html: esc(c.bizLabel) },
-          { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '">⚡ 활성화</button>' }
+          { k: 'act', html: '<button class="sm pri" data-activate-cand="' + esc(c.candKey) + '" data-pm-act="1">⚡ 활성화</button>' }
         ]
       };
     });
@@ -3232,7 +3248,17 @@
       var stIndBtn = t.closest('[data-start-ind-proj]');
       if (stIndBtn) { openNewProjectModal(stIndBtn.getAttribute('data-start-ind-proj')); return; }
 
-      if (t.id === 'pickFilesBtn' && $('fileUploadInput')) { $('fileUploadInput').value = ''; $('fileUploadInput').click(); }
+      if (t.id === 'pickFilesBtn' && $('fileUploadInput')) { $('fileUploadInput').value = ''; $('fileUploadInput').click(); return; }
+
+      if (typeof global.innerWidth === 'number' && global.innerWidth <= 768 && !t.closest('input,button,select,a,label,textarea,td.c,th.c')) {
+        var trRow = t.closest('tr[data-row][data-tname="projects"]');
+        if (trRow) {
+          CUR_PID = trRow.getAttribute('data-row');
+          TAB = 'check';
+          clearSel('projects');
+          draw();
+        }
+      }
     });
 
     document.addEventListener('change', async function (e) {
