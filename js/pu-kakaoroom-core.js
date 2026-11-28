@@ -119,7 +119,7 @@
   var WEB_SMS_RE = /^\s*\[?\s*Web발신\s*\]?/i;
   var OTP_DIGITS_RE = /(?:\b\d{4,8}\b|\[\d{4,8}\])/;
   var SECRET_LEAK_RE = /(?:API[\s_-]?KEY|SECRET[\s_-]?KEY|ACCESS[\s_-]?TOKEN|PRIVATE[\s_-]?KEY|인증키\s*[:：=])\s*[A-Za-z0-9_\-.+/=]{10,}/i;
-  var PASSWORD_PHRASE_RE = /((?:^|[^\w\[])(?:비밀번호|비번|패스워드|\b(?:pw|pin)\b)\s*(?:는|은|:|：|=)?\s*)(?!\[비밀번호\s*가림\])([^\s,;'"`]{3,32})/gi;
+  var PASSWORD_PHRASE_RE = /((?:^|[^\w\[])(?:비밀번호|비번|패스워드|\b(?:pw|pin)\b)(?!\s*(?:는|은|:|：|=)?\s*\[비밀번호\s*가림\])\s*(?:는|은|:|：|=)?\s*)(?!\[비밀번호\s*가림\])([^\s,;'"`]{3,32})/gi;
 
   /* ── 단순 응답·잡담·알맹이 없는 미디어 판별 ── */
   var NOISE_EXACT_RE = /^(?:(?:네+|넵+|예+|네네|ㅇㅋ|ㅇㅇ)[!.~,]*)?(?:알겠습니다|알겠어요|확인했습니다|확인했어요|확인완료|확인요|확인|감사합니다|감사해요|고맙습니다|수고하셨습니다|수고하세요|고생하셨습니다|좋습니다|알겠슴다|네+|넵+|예+|네네|ㅇㅋ|ㅇㅇ|ㄱㅅ|ㄴㄴ|ㅎ+|ㅋ+|\^+|[!?.~]+|이모티콘|이모티콘입니다\.?)$/;
@@ -331,7 +331,9 @@
 
   /* ── 빠른 붙여넣기 · 내보내기 겸용 파서 ── */
   function kstDay(ms) {
-    return new Date(Number(ms) + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    var n = Number(ms);
+    var base = isFinite(n) && n > 0 ? n : Date.now();
+    return new Date(base + 9 * 3600 * 1000).toISOString().slice(0, 10);
   }
 
   function weekKeyOfDate(dayStr) {
@@ -605,8 +607,8 @@
       revision: 1,
       createdAt: now,
       updatedAt: now,
-      createdBy: cleanStr(ctx.actor || ''),
-      updatedBy: cleanStr(ctx.actor || ''),
+      createdBy: cleanStr(ctx.actor || '').slice(0, 64),
+      updatedBy: cleanStr(ctx.actor || '').slice(0, 64),
       originSystem: 'kakaotalk',
       originId: archiveId,
       room: cleanStr((row && row.room) || ctx.room || '푸른노무법인 업무채팅방').slice(0, 120),
@@ -695,7 +697,10 @@
     var sender = cleanStr(file && file.sender);
     var sentAt = Number((file && file.sentAt) || now);
     var room = cleanStr((file && file.room) || ctx.room || '푸른노무법인 업무채팅방');
-    var fid = 'kf_' + hash32([room, sender, sentAt, name].join('\u0001'));
+    var rawId = cleanStr(file && file.id);
+    var fid = /^kf_[a-z0-9_]{6,48}$/.test(rawId)
+      ? rawId
+      : ('kf_' + hash32([room, sender, sentAt, name].join('\u0001')));
     var sensitive = isSensitiveFileName(name);
     var rawDest = cleanStr((file && file.dest) || (KW && typeof KW.guessDest === 'function' ? KW.guessDest(name) : 'photo'));
     var dest = sensitive ? 'pc' : (['photo', 'co', 'pc'].indexOf(rawDest) >= 0 ? rawDest : 'photo');
@@ -733,9 +738,11 @@
     });
 
     return list.filter(function (x) { return x && !x._deleted; }).map(function (rec) {
-      var w = rec.workItemId ? wMap[rec.workItemId] : null;
+      var wRaw = rec.workItemId ? wMap[rec.workItemId] : null;
+      var w = (wRaw && !wRaw._deleted) ? wRaw : null;
       var coId = rec.companyId || (w && w.co_id) || '';
-      var co = coId ? cMap[coId] : null;
+      var coRaw = coId ? cMap[coId] : null;
+      var co = (coRaw && !coRaw._deleted) ? coRaw : null;
       var mgr = w ? ((w.mgr_main && w.mgr_main.name) || w.mgr || '') : '';
       return Object.assign({}, rec, {
         domainLabel: domainInfo(rec.domain).label,

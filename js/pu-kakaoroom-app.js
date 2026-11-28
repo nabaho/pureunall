@@ -308,7 +308,7 @@
     var linked = rows.filter(function (r) { return !!r.workItemId; }).length;
     var unlinked = rows.length - linked;
     var activeWork = rows.filter(function (r) { return r.workLinked && r.workState !== '종결' && r.workState !== '완료'; }).length;
-    var expSoon = SERVER_FILES.filter(function (f) { return f.status !== 'done' && KW && KW.fileLeft(f.sentAt) <= 3; }).length;
+    var expSoon = combinedFiles().filter(function (f) { return f.status !== 'done' && KW && KW.fileLeft(f.sentAt) <= 3; }).length;
     var phoneSt = ME.admin ? (KW && PHONE_DEV ? KW.phoneDiagnosis(PHONE_DEV).level : (PHONE_DEV ? 'ok' : 'none')) : 'staff';
     var phoneLabel = phoneSt === 'ok' ? '정상 수집' : (phoneSt === 'staff' ? '관리자 연동' : (phoneSt === 'bad' ? '점검 필요' : (phoneSt === 'warn' ? '설정 확인' : '미연결')));
     var phoneCls = phoneSt === 'ok' ? 'g' : (phoneSt === 'bad' ? 'r' : 'a');
@@ -659,8 +659,9 @@
     var savedRecords = [];
 
     picked.forEach(function (r) {
-      var itemObj = r.itemId ? WORK_ITEMS[r.itemId] : null;
-      var companyId = itemObj && itemObj.co_id ? String(itemObj.co_id) : '';
+      var itemObj = (r.itemId && WORK_ITEMS[r.itemId] && !WORK_ITEMS[r.itemId]._deleted) ? WORK_ITEMS[r.itemId] : null;
+      var rawCoId = itemObj && itemObj.co_id ? String(itemObj.co_id) : '';
+      var companyId = (rawCoId && (!COMPANIES[rawCoId] || !COMPANIES[rawCoId]._deleted)) ? rawCoId : '';
       var rec = K.buildArchiveRecord(r, {
         now: now,
         actor: ME.sid,
@@ -681,7 +682,7 @@
         rec.note = prev.note || rec.note;
         rec.status = prev.status || rec.status;
       }
-      if (alsoWriteWorkLog && r.itemId) {
+      if (alsoWriteWorkLog && r.itemId && (!WORK_ITEMS[r.itemId] || !WORK_ITEMS[r.itemId]._deleted)) {
         var wp = K.buildWorkLogPayload(r, r.itemId, { sid: ME.sid, name: ME.name }, now);
         if (wp) {
           rec.workLogId = wp.lid;
@@ -699,7 +700,7 @@
           expectedRevision: prev ? Number(prev.revision || 0) : -1
         }).then(function (res) {
           var val = res && res.snapshot && typeof res.snapshot.val === 'function' ? res.snapshot.val() : null;
-          if (val) ARCHIVE[rec.id] = val;
+          if (val) rec._saved = val;
         }));
       }
     });
@@ -711,7 +712,8 @@
 
     Promise.all(tasks).then(function () {
       savedRecords.forEach(function (rec) {
-        if (!ARCHIVE[rec.id] || isLocalPreview()) ARCHIVE[rec.id] = rec;
+        ARCHIVE[rec.id] = rec._saved || rec;
+        delete rec._saved;
       });
       var msg = '자료함 ' + savedRecords.length + '건 영구 보관 완료' +
         (workWriteCount ? ' (업무관리 진행기록 ' + workWriteCount + '건 동시 반영)' : '') +
@@ -737,13 +739,22 @@
   function combinedFiles() {
     var map = {};
     SERVER_FILES.forEach(function (f) {
-      if (!f || !f.name) return;
-      map[f.id] = Object.assign({ source: 'server' }, f);
+      if (!f || !f.name || f._deleted) return;
+      var archId = K.buildFileRecord(f, { room: f.room }).id;
+      var archived = FILE_ARCHIVE[archId];
+      if (archived && archived._deleted) return;
+      map[archId] = Object.assign({ source: 'server' }, f, archived ? {
+        status: archived.status || f.status,
+        dest: archived.dest || f.dest
+      } : {}, {
+        id: archId,
+        serverId: f.id
+      });
     });
     Object.keys(FILE_ARCHIVE).forEach(function (id) {
       var f = FILE_ARCHIVE[id];
       if (!f || f._deleted) return;
-      if (!map[id]) map[id] = Object.assign({ source: 'archive' }, f);
+      if (!map[id]) map[id] = Object.assign({ source: 'archive' }, f, { id: id });
     });
     return Object.keys(map).map(function (k) { return map[k]; })
       .sort(function (a, b) { return Number(b.sentAt || 0) - Number(a.sentAt || 0); });
@@ -778,7 +789,8 @@
       '</tr></thead><tbody>';
 
     files.forEach(function (f, i) {
-      var left = KW ? KW.fileLeft(f.sentAt) : 14;
+      var rawLeft = KW ? KW.fileLeft(f.sentAt) : 14;
+      var left = isFinite(rawLeft) ? Math.floor(rawLeft) : 14;
       var sensitive = K.isSensitiveFileName(f.name);
       var defaultDest = sensitive ? 'pc' : (FILE_DEST[f.id] || f.dest || (KW ? KW.guessDest(f.name) : 'photo'));
       FILE_DEST[f.id] = defaultDest;
@@ -959,7 +971,7 @@
         return Promise.all(['pc', 'photo', 'co'].map(function (dKey) {
           if (!by[dKey].length) return Promise.resolve();
           return callBridge('kakaoFileSet', {
-            ids: by[dKey].map(function (x) { return x.id; }),
+            ids: by[dKey].map(function (x) { return x.serverId || x.id; }),
             status: 'done',
             dest: dKey
           }).catch(function () {});
@@ -970,8 +982,13 @@
       built.forEach(function (b) {
         FILE_ARCHIVE[b.rec.id] = b.rec._saved || b.rec;
         delete b.rec._saved;
-        b.f.status = 'done';
-        b.f.dest = b.dest;
+        var sid = b.f.serverId || b.f.id;
+        SERVER_FILES.forEach(function (sf) {
+          if (sf && (sf.id === sid || sf.id === b.rec.id)) {
+            sf.status = 'done';
+            sf.dest = b.dest;
+          }
+        });
       });
       return handoffChain;
     }).then(function () {
@@ -1135,14 +1152,14 @@
       '<option value="open"' + (r.status === 'open' ? ' selected' : '') + '>접수·대기</option>' +
       '<option value="tracking"' + (r.status === 'tracking' ? ' selected' : '') + '>진행추적중</option>' +
       '<option value="done"' + (r.status === 'done' ? ' selected' : '') + '>처리완료</option></select></div>' +
-      '<div><label class="hint" for="mNote">후속 진행 메모</label><textarea id="mNote" rows="3" style="margin-top:4px">' + esc(r.note || '') + '</textarea></div>' +
+      '<div><label class="hint" for="mNote">후속 진행 메모</label><textarea id="mNote" rows="3" maxlength="1000" style="margin-top:4px">' + esc(r.note || '') + '</textarea></div>' +
       '</div>' +
       '<div class="bar">' +
       '<button type="button" class="pri" id="mSave">저장</button>' +
       '<button type="button" class="sm" id="mPushWorkLog">📋 업무관리 진행기록에도 남기기</button>' +
       '<button type="button" class="sm dng" id="mDelete">삭제</button>' +
       '<span class="sp"></span>' +
-      (r.workItemId ? '<a class="sm" href="work.html" target="_blank">업무관리 열기 ↗</a>' : '') +
+      (r.workItemId ? '<a class="sm" href="work.html" target="_blank" rel="noopener">업무관리 열기 ↗</a>' : '') +
       '</div>';
     if (!PREV_MODAL_FOCUS && document.activeElement) PREV_MODAL_FOCUS = document.activeElement;
     $('modal').classList.add('on');
@@ -1154,7 +1171,7 @@
       var rawRec = ARCHIVE[r.id]; if (!rawRec || rawRec._deleted) return;
       var wid = $('mWorkSel').value;
       var cid = $('mCoSel').value;
-      var noteMasked = maskRrnStr($('mNote').value || '');
+      var noteMasked = K.stripSecrets($('mNote').value || '', KW ? KW.maskSensitive : null, RM ? RM.maskRrnInText : null).text.slice(0, 1000);
       var next = Object.assign({}, rawRec, {
         workItemId: wid,
         companyId: cid,
@@ -1321,13 +1338,16 @@
       var b = e.target && e.target.closest && e.target.closest('button[data-bulk-st]');
       if (!b) return;
       var st = b.getAttribute('data-bulk-st');
-      var ids = Object.keys(ARCH_PICK).filter(function (id) { return ARCH_PICK[id] && ARCHIVE[id]; });
+      var ids = Object.keys(ARCH_PICK).filter(function (id) { return ARCH_PICK[id] && ARCHIVE[id] && !ARCHIVE[id]._deleted; });
       if (!ids.length) return;
       Promise.all(ids.map(function (id) {
         var cur = ARCHIVE[id];
         var next = Object.assign({}, cur, { status: st, updatedAt: Date.now(), updatedBy: ME.sid });
         var p = (!isLocalPreview() && gate && fbDb)
-          ? gate.save(fbDb.ref('kakao_room/items/' + id), next, { entityType: K.ENTITY_ARCHIVE, expectedRevision: Number(cur.revision || 0) })
+          ? gate.save(fbDb.ref('kakao_room/items/' + id), function (serverPrev) {
+              if (serverPrev && serverPrev._deleted) return null;
+              return next;
+            }, { entityType: K.ENTITY_ARCHIVE, expectedRevision: Number(cur.revision || 0) })
           : Promise.resolve();
         return p.then(function (res) {
           var saved = res && res.snapshot && typeof res.snapshot.val === 'function' ? res.snapshot.val() : null;
