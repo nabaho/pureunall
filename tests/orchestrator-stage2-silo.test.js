@@ -48,8 +48,8 @@ test('② 안전보건 수임 · 급여도착타임스탬프 · 강의정리함 
   const now = Date.UTC(2026, 10, 28, 3, 0, 0);
   const raw = {
     companies: [
-      { id: 'co-1', name: '(주)한빛테크', bizNo: '111-81-00001', puNo: 10501, status: 'active', managerMain: 'P-010' },
-      { id: 'co-closed', name: '(주)종료기업', bizNo: '111-81-00002', puNo: 10502, status: 'closed', managerMain: 'P-010' }
+      { id: 'co-1', name: '(주)한빛테크', bizNo: '123-81-40001', puNo: 10501, status: 'active', managerMain: 'P-010' },
+      { id: 'co-closed', name: '(주)종료기업', bizNo: '123-81-40002', puNo: 10502, status: 'closed', managerMain: 'P-010' }
     ],
     userDir: [{ sid: 'P-010', name: '이노무', status: 'active' }],
     consultings: [
