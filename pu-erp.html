@@ -241,7 +241,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 /* ══ pu-design 끝 ══ */
 </style>
 <!-- 제미나이 판 «모양 값»(대표 «한번에 모든 것 다해» 2026-11-21) — 위 style «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design">
 <div id="pu-boot-splash" style="position:fixed;inset:0;z-index:2147483000;background:#f8fafc;display:flex;align-items:center;justify-content:center">
@@ -36878,6 +36878,12 @@ var OA_APPS = [
     text:function(x){ return (x.name || x.site_name || '기금')
       + (x.status === 'active' ? ' · 운영중' : (x.status ? ' · ' + x.status : '')); },
     open:function(){ return 'fund.html?sso=1'; } },
+  { key:'safety', label:'안전보건체계', path:'scal_safety/projects', color:'#166534', bg:'#f0fdf4',
+    idKeys:['companyId','erpCompanyId'], bizKeys:['bizNo'],
+    nameKeys:['companyName','name'],
+    keep:function(x){ return x && !x._deleted; },
+    text:function(x){ return (x.companyName || '사업장') + ' (' + (x.year || '') + ' · ' + (x.status === 'archive' ? '완료' : '진행중') + ')'; },
+    open:function(x){ return 'safety.html?sso=1#proj=' + encodeURIComponent(x.id || x._k || ''); } },
   // 기업정보함은 카드 전체(수천 장)를 받지 않는다. 로그인할 때 이미 받아 둔 경량 색인(pucards/idx)을 쓴다.
   // 색인 레코드: {k:'card'|'biz', c:회사명, n:이름, ti:직책, bz:사업자번호}
   { key:'cards', label:'기업정보함',     path:null, color:'#991b1b', bg:'#fef2f2',
