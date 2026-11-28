@@ -38,16 +38,25 @@
       shortName: '출산육아',
       icon: '🏡',
       htmlFile: 'familywork.html',
-      leftDash: { by: '사업' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
-      agency: '충남경제진흥원 · 여가부(가족친화인증) · 고용노동부',
+      // 사업별 다섯 갈래를 왼쪽 대시보드에 늘 둔다(대표 지시 2026-11-28 「출산·육아휴직 우수기업, 가족친화인증, 일생활균형, 근로시간 단축, 재택근무 — 왼쪽 대시보드로 사업별로 나누고 분류」)
+      hasLeftDashboard: true,
+      regionManageable: false,
+      regionLabel: '사업',
+      leftDash: { by: '사업', headLabel: '🏡 사업별 대시보드', allLabel: '🏡 전체 사업' },
+      // 근거로 분류를 다시 본다(읽을 때만 — 저장은 «🔎 분류 점검» 창에서 사람이 누를 때만). 옛 갈래(fw_flex·fw_archive)는 자료를 지우지 않고 근거로 다섯 갈래에 다시 놓는다.
+      trackAudit: true,
+      legacyTrackIds: ['fw_flex', 'fw_archive'],
+      legacyTrackNames: { fw_flex: '일생활·유연(옛 갈래)', fw_archive: '과거 이력(옛 갈래)' },
+      agency: '충남경제진흥원 · 여가부(가족친화인증) · 한국공인노무사회 · 고용노동부',
       desc: '출산육아우수·가족친화·유연근로',
       erpTypeKeywords: ['출산육아휴직우수기업컨설팅', '출산육아', '가족친화', '일생활균형', '유연근로', '재택근무'],
       excelTypeKeywords: ['출산육아', '가족친화', '유연근로', '재택근무', '일생활균형', '근로시간단축'],
       tracks: [
-        { id: 'fw_maternity', shortName: '출산·육아휴직', name: '출산·육아휴직 우수기업 컨설팅 (충남경제진흥원 등)' },
-        { id: 'fw_cert',      shortName: '가족친화인증', name: '가족친화인증 심사대비 · 인증 컨설팅' },
-        { id: 'fw_flex',      shortName: '일생활·유연', name: '일생활균형 · 유연/재택/시차출퇴근 컨설팅' },
-        { id: 'fw_archive',   shortName: '과거 이력', name: '과거 근로시간단축 · 재택/유연근무 이력 아카이브' }
+        { id: 'fw_maternity', shortName: '출산·육아휴직', icon: '👶', name: '출산·육아휴직 우수기업 컨설팅 (충남경제진흥원 등)' },
+        { id: 'fw_cert',      shortName: '가족친화인증', icon: '🏅', name: '가족친화인증 심사대비 · 인증 컨설팅' },
+        { id: 'fw_balance',   shortName: '일생활균형',   icon: '⚖️', name: '일생활균형 · 유연근무(시차·선택근무) · 근무혁신 컨설팅' },
+        { id: 'fw_cut',       shortName: '근로시간 단축', icon: '⏱️', name: '노동(근로)시간 단축 컨설팅 (한국공인노무사회 등)' },
+        { id: 'fw_remote',    shortName: '재택근무',     icon: '🏠', name: '재택·원격근무 도입 컨설팅' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [

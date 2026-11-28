@@ -121,6 +121,12 @@
   }
   function getEffectiveTracks() {
     var base = (getAppCat().tracks || []).slice();
+    var audit = trackAuditMap();
+    if (audit) {
+      var used = Object.create(null);
+      Object.keys(audit).forEach(function (k) { used[audit[k].to] = 1; });
+      Object.keys(VIRTUAL_TRACKS).forEach(function (id) { if (used[id]) base.push(VIRTUAL_TRACKS[id]); });
+    }
     var seen = Object.create(null);
     base.forEach(function (t) { if (t && t.id) seen[t.id] = 1; });
     getCustomRegionsList().forEach(function (r) {
@@ -178,14 +184,60 @@
     return str(v).slice(0, 10) || '-';
   }
 
+  /* ══ 분류 다시 보기 (카탈로그 trackAudit — 출산육아·유연근무, 대표 지시 2026-11-28 「사업별로 나누고 정확하게 다시 분류」) ══
+     ★ «읽을 때만» 근거로 권장 갈래를 정해 «사본»에 얹는다(_storedTrackId 에 원래 값). 서버 자료는 «🔎 분류 점검» 창에서 사람이 누를 때만 바뀐다.
+     ★ saveRecord 가 _storedTrackId 를 보면 원래 갈래로 되돌려 저장한다 — 다른 저장 길로 보정값이 새지 않게.
+     ★ 근거 글: 사업장명 · 요약 · 사건번호 · 지금 갈래 이름 · 붙은 메일·카톡 제목. 비기면 «분류 확인», 다른 사업이면 «관련 없음». */
+  var _auditCache = { key: '', map: null };
+  function trackAuditMap() {
+    var cat = getAppCat();
+    var I = Intake();
+    if (!cat.trackAudit || !I || typeof I.classifyFamilywork !== 'function') return null;
+    var ids = Object.keys(D.projects || {});
+    var ck = APP_KEY + '|' + ids.length + '|' + Object.keys(D.comms || {}).length + '|' + ((D.discover && D.discover.matchedCommsByPid) ? Object.keys(D.discover.matchedCommsByPid).length : 0) + '|' + ids.reduce(function (s, k) { var p = D.projects[k]; return s + num(p && p.revision, 0); }, 0);
+    if (_auditCache.key === ck && _auditCache.map) return _auditCache.map;
+    var known = Object.create(null);
+    (cat.tracks || []).forEach(function (t) { known[t.id] = t; });
+    var legacy = cat.legacyTrackIds || [];
+    var map = Object.create(null);
+    ids.forEach(function (k) {
+      var p = D.projects[k];
+      if (!p || p._deleted) return;
+      var stored = str(p.trackId);
+      var subjects = getProjectComms(k).slice(0, 12).map(function (c) { return str(c.subject || c.title); }).join(' ');
+      var text = [p.companyName, p.summaryNote, p.caseNo, p.trackName, subjects].join(' ');
+      var r = I.classifyFamilywork(text);
+      var to = stored;
+      if (r && r.id === 'fw_offtopic') to = 'fw_offtopic';
+      else if (r && r.level === 'tie') to = (known[stored] && r.counts[stored]) ? stored : 'fw_check';
+      else if (r) to = r.id;
+      else if (!known[stored] || legacy.indexOf(stored) >= 0) to = 'fw_check';
+      var ev = r ? Object.keys(r.evidence || {}).map(function (id) { return (r.evidence[id] || []).join('·'); }).filter(Boolean).join(' / ') : '';
+      map[k] = { from: stored, to: to, level: r ? r.level : 'none', evidence: ev, changed: to !== stored };
+    });
+    _auditCache = { key: ck, map: map };
+    return map;
+  }
+  var VIRTUAL_TRACKS = {
+    fw_check: { id: 'fw_check', name: '분류 확인 — 근거가 비기거나 없어 사람이 정할 건', shortName: '분류 확인', icon: '🔎', virtual: true },
+    fw_offtopic: { id: 'fw_offtopic', name: '관련 없음 — 다른 사업(산업일자리전환 등) 글만 있는 건', shortName: '관련 없음', icon: '🚫', virtual: true }
+  };
+
   function projectsList() {
     // 이 프로그램에 담지 않는 트랙(excludeTrackIds)의 사업은 목록·집계에서 뺀다 — 자료는 지우지 않는다.
     var excl = getAppCat().excludeTrackIds || [];
     var splitCols = getAppCat().listCols !== 'merged'; // 12개 앱 공통 독립 열 — 같은 연도 안에서 트랙 → 사업장명
     var trackOrder = Object.create(null);
     (getAppCat().tracks || []).forEach(function (t, i) { trackOrder[t.id] = i; });
+    var audit = trackAuditMap();
+    var trackNames = Object.create(null);
+    (getAppCat().tracks || []).forEach(function (t) { trackNames[t.id] = t.name; });
+    Object.keys(VIRTUAL_TRACKS).forEach(function (id) { trackNames[id] = VIRTUAL_TRACKS[id].name; });
     return Object.keys(D.projects || {}).map(function (k) {
-      return Object.assign({ id: k }, D.projects[k]);
+      var p = Object.assign({ id: k }, D.projects[k]);
+      var a = audit && audit[k];
+      if (a && a.changed) { p._storedTrackId = a.from; p._storedTrackName = str(p.trackName); p._audit = a; p.trackId = a.to; p.trackName = trackNames[a.to] || p.trackName; }
+      return p;
     }).filter(function (p) { return p && !p._deleted && excl.indexOf(str(p.trackId)) < 0; })
       .sort(function (a, b) {
         var byYear = num(b.year, 0) - num(a.year, 0);
@@ -493,6 +545,12 @@
   async function saveRecord(subPath, id, record, entityType, opts) {
     opts = opts || {};
     var rec = Object.assign({ id: id, entityType: entityType || 'Document', schemaVersion: 1, contractVersion: 1 }, record);
+    // 분류 다시 보기(trackAudit)가 사본에 얹은 권장 갈래는 화면 전용 — 원래 갈래로 되돌려 저장한다(사람이 «분류 바꾸기»로 고른 patch 만 예외)
+    if (Object.prototype.hasOwnProperty.call(rec, '_storedTrackId')) {
+      var pt = opts.patch || {};
+      if (!Object.prototype.hasOwnProperty.call(pt, 'trackId')) { rec.trackId = rec._storedTrackId; rec.trackName = rec._storedTrackName; }
+      delete rec._storedTrackId; delete rec._storedTrackName; delete rec._audit;
+    }
     if (!str(rec.createdBy)) rec.createdBy = str((ME && ME.uid) || 'preview');
     var curRev = num(rec.revision, 0);
     var clears = Array.isArray(opts.clearKeys) ? opts.clearKeys : [];
@@ -1319,6 +1377,12 @@
         (lean ? '' : '<div class="kpi k-blue"><span>수집자료</span><b>' + totalComms + '건</b></div>') +
         roundKpiHtml(kpiScope) +
         (function () {
+          var au = trackAuditMap();
+          if (!au) return '';
+          var n = Object.keys(au).filter(function (k) { return au[k].changed; }).length;
+          return n ? ('<div class="kpi k-amber" data-act="trackAudit" role="button" tabindex="0" title="근거로 다시 본 사업 갈래가 저장된 갈래와 다른 건 — 눌러서 확인하고 바꿉니다(사람이 누를 때만 저장)"><span>🔎 분류 점검</span><b>' + n + '건</b></div>') : '';
+        })() +
+        (function () {
           var erpUnl = kpiScope.filter(function (p) { var ea = audit.byPid[p.id]; return ea && ea.state === 'unlinked'; }).length;
           return (erpUnl || ERP_FILTER) ? ('<div class="kpi k-amber' + (ERP_FILTER === 'unlinked' ? ' k-on' : '') + '" data-act="kpiErp" role="button" tabindex="0" aria-pressed="' + (ERP_FILTER === 'unlinked' ? 'true' : 'false') + '" title="ERP 사건번호가 비어 있는 줄만 봅니다 — 이유는 표의 ERP 번호 칸에 있습니다"><span>ERP 미연결</span><b>' + erpUnl + '건</b></div>') : '';
         })() +
@@ -1332,6 +1396,10 @@
         k.onkeydown = function (e) {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); k.click(); }
         };
+      });
+      kpiBox.querySelectorAll('[data-act="trackAudit"]').forEach(function (k) {
+        k.onclick = openTrackAuditModal;
+        k.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); k.click(); } };
       });
       kpiBox.querySelectorAll('[data-act="kpiErp"]').forEach(function (k) {
         k.onclick = function () { ERP_FILTER = ERP_FILTER === 'unlinked' ? '' : 'unlinked'; SHOW_ALL_ROWS = false; renderProjectsPane(); };
@@ -2632,7 +2700,8 @@
       for (var i = 0; i < list.length; i++) {
         var p = list[i];
         if (p.status === 'done') continue;
-        D.projects[p.id] = await saveRecord('projects/' + p.id, p.id, Object.assign({}, p, { status: 'done' }), 'Project');
+        var rawDone = projectById(p.id) || p; // 목록 사본(화면 보정 갈래가 얹힘)이 아니라 원본에 «바꾼 칸만»
+        D.projects[p.id] = await saveRecord('projects/' + p.id, p.id, Object.assign({}, rawDone, { status: 'done' }), 'Project', { patch: { status: 'done' } });
       }
       SEL = Object.create(null);
       draw();
@@ -2648,8 +2717,9 @@
     try {
       for (var i = 0; i < list.length; i++) {
         var p = list[i];
-        await softDeleteRecord('projects/' + p.id, p, 'Project');
-        D.projects[p.id] = Object.assign({}, p, { _deleted: true });
+        var rawDel = projectById(p.id) || p;
+        await softDeleteRecord('projects/' + p.id, rawDel, 'Project');
+        D.projects[p.id] = Object.assign({}, rawDel, { _deleted: true });
       }
       SEL = Object.create(null);
       rebuildDiscoverAndRag();
@@ -3064,6 +3134,79 @@
     };
   }
 
+  /* «🔎 분류 점검» 창 — 지금(저장) → 권장, 근거, ☐ + №. 확실한 것만 미리 고른다. «분류 바꾸기»는 건수를 묻고 trackId·trackName 만 patch.
+     «관련 없음»은 휴지통(보관삭제 _deleted — 되살릴 수 있음)으로만. 아무것도 자동으로 바꾸지 않는다. */
+  function openTrackAuditModal() {
+    var m = $('modal'), box = $('mbox');
+    var au = trackAuditMap();
+    if (!m || !box || !au) return;
+    LAST_FOCUS_EL = document.activeElement;
+    var cat = getAppCat();
+    var names = Object.create(null);
+    (cat.tracks || []).forEach(function (t) { names[t.id] = t.shortName || t.name; });
+    Object.keys(VIRTUAL_TRACKS).forEach(function (id) { names[id] = VIRTUAL_TRACKS[id].shortName; });
+    Object.keys(cat.legacyTrackNames || {}).forEach(function (id) { names[id] = cat.legacyTrackNames[id]; });
+    var LV = { sure: '확실', likely: '유력', tie: '비김', none: '근거 없음' };
+    var rows = Object.keys(au).filter(function (k) { return au[k].changed; }).map(function (k) { return Object.assign({ pid: k, p: projectById(k) }, au[k]); })
+      .filter(function (r) { return r.p; })
+      .sort(function (a, b) { return num(b.p.year, 0) - num(a.p.year, 0) || str(a.p.companyName).localeCompare(str(b.p.companyName), 'ko'); });
+    var pick = Object.create(null);
+    rows.forEach(function (r) { if (r.level === 'sure' && !VIRTUAL_TRACKS[r.to]) pick[r.pid] = 1; });
+    function body() {
+      var nPick = Object.keys(pick).length;
+      return '<div class="note">근거(제목·사업장명·요약·사건번호·메일 제목)로 다시 본 갈래입니다. <b>확실</b>한 것만 미리 골랐습니다. «분류 바꾸기»는 고른 줄의 <b>갈래 한 칸</b>만 저장합니다. «관련 없음»은 휴지통(되살릴 수 있음)으로만 옮깁니다.</div>' +
+        '<div class="bulk on"><b>' + nPick + '건 선택</b>' +
+          '<button type="button" class="sm ok" id="taApplyBtn"' + (nPick ? '' : ' disabled') + '>선택한 ' + nPick + '건 분류 바꾸기</button>' +
+          '<button type="button" class="sm danger" id="taTrashBtn">«관련 없음» 고른 줄 휴지통으로</button></div>' +
+        '<div class="scroll"><table class="t" data-name="trackAudit"><thead><tr><th class="c"><input type="checkbox" id="taAll" aria-label="전체 선택"></th><th class="n">№</th><th class="yr">연도</th><th>사업장명</th><th>지금(저장)</th><th>권장</th><th>확실도</th><th class="wide">근거</th></tr></thead><tbody>' +
+        rows.map(function (r, i) {
+          return '<tr><td class="c"><input type="checkbox" data-ta="' + esc(r.pid) + '"' + (pick[r.pid] ? ' checked' : '') + ' aria-label="' + esc(r.p.companyName) + ' 선택"></td>' +
+            '<td class="n">' + (i + 1) + '</td><td class="yr">' + esc(String(r.p.year || '')) + '</td>' +
+            '<td class="ti" title="' + esc(r.p.companyName) + '">' + esc(r.p.companyName) + '</td>' +
+            '<td><span class="chip">' + esc(names[r.from] || r.from || '-') + '</span></td>' +
+            '<td><span class="chip ' + (VIRTUAL_TRACKS[r.to] ? 'c-amber' : 'c-blue') + '">' + esc(names[r.to] || r.to) + '</span></td>' +
+            '<td>' + esc(LV[r.level] || r.level) + '</td>' +
+            '<td class="wide" title="' + esc(r.evidence || '-') + '">' + esc(r.evidence || '-') + '</td></tr>';
+        }).join('') +
+        (rows.length ? '' : '<tr><td colspan="8" class="empty">다시 볼 건이 없습니다.</td></tr>') +
+        '</tbody></table></div>';
+    }
+    function bind() {
+      box.querySelectorAll('[data-ta]').forEach(function (cb) {
+        cb.onchange = function () { var id = cb.getAttribute('data-ta'); if (cb.checked) pick[id] = 1; else delete pick[id]; redraw(); };
+      });
+      if ($('taAll')) $('taAll').onchange = function () { var on = $('taAll').checked; rows.forEach(function (r) { if (on) pick[r.pid] = 1; else delete pick[r.pid]; }); redraw(); };
+      if ($('taApplyBtn')) $('taApplyBtn').onclick = async function () {
+        var list = rows.filter(function (r) { return pick[r.pid] && !VIRTUAL_TRACKS[r.to]; });
+        var skipped = Object.keys(pick).length - list.length;
+        if (!list.length) { toast('바꿀 수 있는 줄(분류 확인·관련 없음이 아닌 줄)을 골라 주세요.'); return; }
+        if (!global.confirm(list.length + '건의 사업 갈래를 권장 갈래로 바꿀까요?' + (skipped ? (' («분류 확인»·«관련 없음» ' + skipped + '건은 갈래가 정해지지 않아 건너뜁니다)') : ''))) return;
+        var ok = 0;
+        for (var i = 0; i < list.length; i++) {
+          var r = list[i];
+          var tObj = (cat.tracks || []).find(function (t) { return t.id === r.to; });
+          if (await saveProjectPatch(r.pid, { trackId: r.to, trackName: tObj ? tObj.name : r.to })) ok++;
+        }
+        closeModal(); rebuildDiscoverAndRag(); draw();
+        toast(ok + '건의 갈래를 바꿨습니다.');
+      };
+      if ($('taTrashBtn')) $('taTrashBtn').onclick = async function () {
+        var list = rows.filter(function (r) { return pick[r.pid] && r.to === 'fw_offtopic'; }).map(function (r) { return r.p; });
+        if (!list.length) { toast('«관련 없음» 줄을 골라 주세요.'); return; }
+        if (!global.confirm(list.length + '건을 휴지통(보관삭제)으로 옮길까요? 자료는 지워지지 않고 되살릴 수 있습니다.')) return;
+        closeModal();
+        await bulkDeleteProjects(list);
+      };
+      if ($('mCloseBtn')) $('mCloseBtn').onclick = closeModal;
+    }
+    function redraw() { if ($('taBody')) { $('taBody').innerHTML = body(); bind(); } }
+    box.innerHTML = '<div class="mhd"><b id="mhdTitle">🔎 분류 점검 — ' + esc(cat.name) + '</b><span class="sp"></span><button type="button" class="sm" id="mCloseBtn">닫기</button></div>' +
+      '<div class="mbd" id="taBody">' + body() + '</div>';
+    box.classList.add('wide');
+    m.style.display = 'flex';
+    bind();
+  }
+
   function openAddRegionModal() {
     var m = $('modal'), box = $('mbox');
     if (!m || !box) return;
@@ -3423,7 +3566,9 @@
       isSlim: function () { return isSlim(); },
       reportFolded: function () { return reportFolded(); },
       groupProjects: function (list) { return groupProjects(list); },
-      isGrouped: function () { return isGrouped(); }
+      isGrouped: function () { return isGrouped(); },
+      trackAuditMap: function () { _auditCache = { key: '', map: null }; return trackAuditMap(); },
+      setComms: function (obj) { D.comms = obj || {}; }
     },
     projectKind: projectKind,
     guideState: guideState

@@ -22,6 +22,7 @@ function loadView() {
   ctx.window = ctx; ctx.globalThis = ctx;
   ctx.document = { getElementById: () => null, querySelectorAll: () => [], addEventListener() {}, createElement: () => ({}) };
   ctx.PuConsultCatalogs = Cats;
+  ctx.PuConsultIntake = require(path.join(ROOT, 'js', 'pu-consult-intake.js'));
   vm.createContext(ctx);
   vm.runInContext(read('js/pu-consult-view.js'), ctx);
   return ctx.PuConsultView.__test;
@@ -175,4 +176,42 @@ test('⑨ 사업장 단위 묶어 보기(기초인사노무만) — 같은 사�
   assert.ok(/<td class="yr g"/.test(v) && /data-pick-yr=/.test(v), '연도 칸에 연도 칩(누르면 그 해 건)');
   assert.ok(/function confirmGroupedBulk\(list, verb\)/.test(v) && /if \(!confirmGroupedBulk\(list, '보관삭제'\)\) return;/.test(v), '여러 연도 건을 한꺼번에 지울 때는 건수를 말하고 다시 묻는다');
   assert.ok(!/groupProjects[\s\S]{0,400}saveRecord/.test(v.slice(v.indexOf('function groupProjects'), v.indexOf('function groupProjects') + 900)), '묶음은 보기 전용 — 저장하지 않는다');
+});
+
+test('⑩ 출산육아·유연근무 — 사업별 다섯 갈래 · 근거 분류 · 저장은 사람이 «분류 바꾸기»를 누를 때만', () => {
+  // 대표 지시 2026-11-28 «출산·육아휴직 우수기업, 가족친화인증, 일생활균형, 근로시간 단축, 재택근무 — 왼쪽 대시보드로 사업별로 나누고 정확하게 다시 분류,
+  // 전혀 상관없는 컨설팅 확인»
+  const fw = Cats.get('familywork');
+  assert.deepEqual(fw.tracks.map((t) => t.id).sort(), ['fw_balance', 'fw_cert', 'fw_cut', 'fw_maternity', 'fw_remote'].sort());
+  assert.equal(fw.hasLeftDashboard, true);
+  assert.ok(fw.trackAudit && fw.legacyTrackIds.indexOf('fw_flex') >= 0, '옛 갈래는 자료를 지우지 않고 근거로 다시 놓는다');
+  const I = require(path.join(ROOT, 'js', 'pu-consult-intake.js'));
+  const C = (t) => (I.classifyFamilywork(t) || {}).id;
+  assert.equal(C('(합성) 노동시간 단축 컨설팅 결과보고'), 'fw_cut', '«노동시간 단축»(노무사회 사업명)을 안다');
+  assert.equal(C('육아기 근로시간 단축 규정 정비'), 'fw_maternity', '육아기 단축은 출산·육아 제도');
+  assert.equal(C('가족친화인증 심사 대비'), 'fw_cert');
+  assert.equal(C('재택근무 도입'), 'fw_remote');
+  assert.equal(C('근무혁신 유연근무'), 'fw_balance');
+  assert.equal(C('산업일자리전환 컨설팅 착수'), 'fw_offtopic', '다른 사업 글만 있으면 «관련 없음»');
+  assert.equal(I.classifyFamilywork('사규 송부'), null, '근거가 없으면 분류를 지어내지 않는다');
+  assert.equal(C('가족친화 재택'), 'fw_check', '비기면 사람이 정할 «분류 확인»');
+  // 화면: 읽을 때만 사본에 얹고, 저장 관문이 원래 갈래로 되돌린다
+  const V = loadView();
+  V.use('familywork', {});
+  V.setProjects({
+    a: { companyName: '(합성)가', year: 2023, trackId: 'fw_maternity', summaryNote: '노동시간 단축 컨설팅' },
+    b: { companyName: '(합성)나', year: 2026, trackId: 'fw_flex', summaryNote: '재택근무 컨설팅' },
+    c: { companyName: '(합성)다', year: 2026, trackId: 'fw_maternity', summaryNote: '산업일자리전환 착수' },
+    d: { companyName: '(합성)라', year: 2026, trackId: 'fw_cert', summaryNote: '가족친화인증' }
+  });
+  const au = V.trackAuditMap();
+  assert.equal(au.a.to, 'fw_cut');
+  assert.equal(au.b.to, 'fw_remote', '옛 갈래(fw_flex)는 근거로 다섯 갈래에');
+  assert.equal(au.c.to, 'fw_offtopic');
+  assert.equal(au.d.changed, false, '맞게 들어간 건은 그대로');
+  const v = read('js/pu-consult-view.js');
+  assert.ok(/if \(!Object\.prototype\.hasOwnProperty\.call\(pt, 'trackId'\)\) \{ rec\.trackId = rec\._storedTrackId;/.test(v), '저장 관문이 화면 보정 갈래를 서버로 보내지 않는다');
+  assert.ok(/saveProjectPatch\(r\.pid, \{ trackId: r\.to, trackName:/.test(v), '«분류 바꾸기»는 갈래 두 칸만 patch');
+  assert.ok(/global\.confirm\(list\.length \+ '건의 사업 갈래를 권장 갈래로 바꿀까요\?'/.test(v), '건수를 묻는다');
+  assert.ok(/var rawDone = projectById\(p\.id\) \|\| p;/.test(v) && /\{ patch: \{ status: 'done' \} \}/.test(v), '일괄 완료도 원본에 «바꾼 칸만»');
 });

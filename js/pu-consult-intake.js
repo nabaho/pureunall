@@ -566,6 +566,41 @@
     };
   }
 
+  /* ══ 출산육아·유연근무 근거 분류 (대표 지시 2026-11-28) ══════════════════════════════
+   * 글(제목·사업장명·요약·사건번호)에서 사업별 «근거 낱말 개수»를 센다. 하나뿐이면 확실, 1위가 2위의 2배 이상이면 유력,
+   * 비기면 «분류 확인», 다른 사업 낱말만 있으면 «관련 없음». 근거가 하나도 없으면 null(지금 분류를 그대로 둔다).
+   * ★ 한국공인노무사회 사업명 «노동시간 단축»을 안다(옛 규칙은 «근로시간 단축»만 알아 모두 출산·육아로 떨어졌다).
+   * ★ 육아기·임신기 «근로시간 단축»은 출산·육아 제도다 — 근로시간 단축 사업으로 세지 않는다. */
+  var FW_RULES = [
+    { id: 'fw_maternity', re: [/출산\s*육아|육아\s*휴직|출산\s*전후|우수\s*기업|모성\s*보호|배우자\s*출산|(?:육아기|임신기)\s*(?:근로|노동)?\s*시간\s*단축|출산육아-/g] },
+    { id: 'fw_cert', re: [/가족\s*친화/g] },
+    { id: 'fw_balance', re: [/일\s*[·ㆍ]?\s*생활\s*균형|근무\s*혁신|유연\s*근무|유연\s*근로|시차\s*출[퇴근]*|선택적\s*근로|탄력\s*근무/g] },
+    { id: 'fw_cut', re: [/(?:노동|근로|실근로)\s*시간\s*단축|주\s*52\s*시간|단축\s*근무/g] },
+    { id: 'fw_remote', re: [/재택|원격\s*근무|스마트\s*워크/g] }
+  ];
+  var FW_OFFTOPIC_RE = /산업\s*일자리\s*전환|산일[충능]|외국인\s*(?:정책|근로자|고용)|기술\s*보호|현장\s*클리닉|상공회의소|농촌\s*융복합|6차\s*산업|근로\s*감독/;
+  function classifyFamilywork(text) {
+    var hay = str(text);
+    // 육아기·임신기 단축은 출산·육아로만 센다 — 근로시간 단축 사업 근거에서 빼고 본다
+    var hayCut = hay.replace(/(?:육아기|임신기)\s*(?:근로|노동)?\s*시간\s*단축/g, ' ');
+    var counts = {};
+    var evidence = {};
+    FW_RULES.forEach(function (r) {
+      var src = r.id === 'fw_cut' ? hayCut : hay;
+      var n = 0, ev = [];
+      r.re.forEach(function (re) { (src.match(re) || []).forEach(function (m) { n++; if (ev.indexOf(m) < 0 && ev.length < 3) ev.push(m); }); });
+      if (n) { counts[r.id] = n; evidence[r.id] = ev; }
+    });
+    var ids = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    if (!ids.length) {
+      if (FW_OFFTOPIC_RE.test(hay)) return { id: 'fw_offtopic', level: 'sure', counts: counts, evidence: { fw_offtopic: [(hay.match(FW_OFFTOPIC_RE) || [''])[0]] } };
+      return null;
+    }
+    var top = ids[0], second = ids[1];
+    var level = !second ? 'sure' : (counts[top] >= counts[second] * 2 ? 'likely' : 'tie');
+    return { id: level === 'tie' ? 'fw_check' : top, best: top, level: level, counts: counts, evidence: evidence };
+  }
+
   function inferTrackForApp(appKey, text, customTracks) {
     var cat = Cat.get(appKey);
     var baseTracks = (cat && Array.isArray(cat.tracks)) ? cat.tracks : [];
@@ -613,9 +648,10 @@
       if (/고용\s*구조\s*개선|비정규직|외투\s*기업|기술\s*닥터/i.test(hay)) return pickTrack(baseTracks, 'sp_nonreg', 3);
       if (/이음\s*센터|프리랜서|직업계고|공정\s*채용|NCS/i.test(hay)) return pickTrack(baseTracks, 'sp_public', 4);
     } else if (appKey === 'familywork') {
-      if (/가족\s*친화/i.test(hay)) return baseTracks[1] || baseTracks[0];
-      if (/재택|유연|시차|일생활/i.test(hay)) return baseTracks[2] || baseTracks[0];
-      if (/근로시간\s*단축|단축근무/i.test(hay)) return baseTracks[3] || baseTracks[0];
+      var fw = classifyFamilywork(hay);
+      // 다른 사업(산업일자리전환·외국인 정책 등) 글만 있으면 이 프로그램 후보에서 뺀다(6차산업과 같은 방식)
+      if (fw && fw.id === 'fw_offtopic') return { id: 'fw_offtopic', name: '관련 없음(다른 사업)', excluded: true };
+      if (fw) return pickTrack(baseTracks, fw.best || fw.id, 0);
     } else if (appKey === 'laboraudit') {
       if (/(?:수시|특별|청원|불시)\s*(?:근로\s*)?감독|중대\s*(?:재해|체불)/i.test(hay)) return pickTrack(baseTracks, 'la_special', 1);
       if (/시정\s*지시|시정\s*완료|시정\s*명령|과태료|이행\s*점검|시정\s*결과/i.test(hay)) return pickTrack(baseTracks, 'la_remedy', 2);
@@ -1176,6 +1212,7 @@
     matchCompanyForRecord: matchCompanyForRecord,
     discoverForApp: discoverForApp,
     erpRowsOfApp: erpRowsOfApp,
+    classifyFamilywork: classifyFamilywork,
     auditErpLinks: auditErpLinks,
     parseKakaoExport: parseKakaoExport,
     parseSmsPaste: parseSmsPaste,

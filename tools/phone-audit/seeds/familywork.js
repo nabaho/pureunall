@@ -41,6 +41,38 @@ module.exports = {
           consultantName: '점검노무사',
           status: 'done',
           summaryNote: '다른 기관(세부 트랙) 사업 — 왼쪽 대시보드 점검용 지어낸 자료'
+        },
+        'pr_familywork_3': {
+          id: 'pr_familywork_3',
+          entityType: 'Project',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 500,
+          updatedAt: NOW - 864e5 * 400,
+          revision: 1,
+          companyName: '(주)마바단축샘플',
+          year: 2022,
+          trackId: 'fw_flex',
+          stage: 'followup',
+          consultantName: '점검노무사',
+          status: 'done',
+          summaryNote: '노동시간 단축 컨설팅 결과보고 (지어낸 값)'
+        },
+        'pr_familywork_4': {
+          id: 'pr_familywork_4',
+          entityType: 'Project',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 500,
+          updatedAt: NOW - 864e5 * 400,
+          revision: 1,
+          companyName: '(주)사아무관샘플',
+          year: 2026,
+          trackId: 'fw_maternity',
+          stage: 'followup',
+          consultantName: '점검노무사',
+          status: 'done',
+          summaryNote: '산업일자리전환 컨설팅 착수 메일 (지어낸 값)'
         }
       },
       checks: {
@@ -81,5 +113,9 @@ module.exports = {
       },
       reports: {}
     }
-  }
+  },
+  // 사업별 다섯 갈래 + «🔎 분류 점검» 창(근거로 다시 본 갈래 — 사람이 누를 때만 저장) — 2026-11-28
+  views: [
+    { name: 'audit', run: async (p) => { await p.click('#kpiBox [data-act="trackAudit"]'); } }
+  ]
 };
