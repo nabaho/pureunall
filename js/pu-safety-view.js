@@ -1096,12 +1096,24 @@
   }
 
   function drawScopeBar(projs) {
-    var box = $('scopeBar');
-    if (!box) return;
     var counts = { '': projs.length };
     Object.keys(Cat().TRACKS).forEach(function (k) { counts[k] = 0; });
     projs.forEach(function (p) { counts[p.track] = (counts[p.track] || 0) + 1; });
 
+    var koshaAllCnt = projs.filter(function (p) { return /^kosha_/.test(str(p.track)); }).length;
+    var trSel = $('projTrack');
+    if (trSel) {
+      trSel.innerHTML = '<option value="">트랙 전체 (' + projs.length + ')</option>' +
+        '<option value="__kosha__">공단 트랙 전체 (' + koshaAllCnt + ')</option>' +
+        Object.keys(Cat().TRACKS).map(function (k) {
+          var tr = Cat().TRACKS[k];
+          return '<option value="' + esc(k) + '">' + esc(tr.short) + ' (' + (counts[k] || 0) + ')</option>';
+        }).join('');
+      trSel.value = TRACK_SCOPE || '';
+    }
+
+    var box = $('scopeBar');
+    if (!box) return;
     box.innerHTML = '<span class="scope-lbl">수행 트랙:</span>' +
       '<button class="scope-btn' + (TRACK_SCOPE === '' ? ' on' : '') + '" data-scope="">전체 (' + projs.length + ')</button>' +
       Object.keys(Cat().TRACKS).map(function (k) {
@@ -1137,21 +1149,26 @@
     var indFilter = $('projIndustry') ? $('projIndustry').value : '';
     var yrFilter = $('projYear') ? $('projYear').value : '';
 
+    var koshaCnt = projs.filter(function (p) { return /^kosha_/.test(str(p.track)); }).length;
+    var isAllSafetyOn = !stFilter && !TRACK_SCOPE;
     $('kpiBox').innerHTML =
-      '<div class="kpi k-blue" data-kpi-status="" role="button" tabindex="0" aria-pressed="' + (!stFilter ? 'true' : 'false') + '" title="전체 수행 사업장 보기"><span>총 사업장</span><b>' + projs.length + '곳</b></div>' +
-      '<div class="kpi k-green' + (stFilter === 'archive' ? ' k-on' : '') + '" data-kpi-status="archive" role="button" tabindex="0" aria-pressed="' + (stFilter === 'archive' ? 'true' : 'false') + '" title="과거 수행완료 사업장만 보기"><span>과거 완료</span><b>' + archiveCount + '곳</b></div>' +
-      '<div class="kpi k-amber' + (stFilter === 'active' ? ' k-on' : '') + '" data-kpi-status="active" role="button" tabindex="0" aria-pressed="' + (stFilter === 'active' ? 'true' : 'false') + '" title="진행·신규 사업장만 보기"><span>진행중</span><b>' + activeCount + '곳</b></div>' +
-      '<div class="kpi" title="등록된 8대 업종 스펙트럼"><span>업종</span><b>' + indCoverage + '/8</b></div>' +
-      '<div class="kpi k-blue" title="진행 중 사업장 평균 체계구축 충족률"><span>진행 충족</span><b>' + activeAvgPct + '%</b></div>' +
-      '<div class="kpi" title="누적 수집·분석 안전보건 자료카드"><span>수집자료</span><b>' + totalIntakeCards + '건</b></div>' +
-      (DISCOVER_LIST.length > 0 ? '<div class="kpi k-amber" title="푸른이알피·계약·메일 자동 감지 후보"><span>미등록후보</span><b>' + DISCOVER_LIST.length + '건</b></div>' : '');
+      '<div class="kpi k-blue' + (isAllSafetyOn ? ' k-on' : '') + '" data-kpi-status="" role="button" tabindex="0" aria-pressed="' + (isAllSafetyOn ? 'true' : 'false') + '" title="전체 수행 사업장 보기"><span>전체 사업장</span><b>' + projs.length + '곳</b></div>' +
+      '<div class="kpi k-green k-direct' + (stFilter === 'archive' ? ' k-on' : '') + '" data-kpi-status="archive" role="button" tabindex="0" aria-pressed="' + (stFilter === 'archive' ? 'true' : 'false') + '" title="과거 수행완료 사업장만 보기"><span>과거 완료</span><b>' + archiveCount + '곳</b></div>' +
+      '<div class="kpi k-amber' + (stFilter === 'active' ? ' k-on' : '') + '" data-kpi-status="active" role="button" tabindex="0" aria-pressed="' + (stFilter === 'active' ? 'true' : 'false') + '" title="진행·신규 사업장만 보기"><span>진행 사업장</span><b>' + activeCount + '곳</b></div>' +
+      '<div class="kpi k-green' + (TRACK_SCOPE === '__kosha__' ? ' k-on' : '') + '" data-kpi-kosha="1" role="button" tabindex="0" aria-pressed="' + (TRACK_SCOPE === '__kosha__' ? 'true' : 'false') + '" title="클릭하여 안전보건공단 수행 트랙 사업장만 보기"><span>공단 트랙</span><b>' + koshaCnt + '곳</b></div>' +
+      '<div class="kpi" title="등록된 8대 업종 스펙트럼"><span>업종 범위</span><b>' + indCoverage + '/8</b></div>' +
+      '<div class="kpi k-blue" title="진행 중 사업장 평균 체계구축 충족률"><span>진행 충족률</span><b>' + activeAvgPct + '%</b></div>' +
+      '<div class="kpi" title="수집·분석 안전보건 자료 ' + totalIntakeCards + '건 · 자동감지 후보 ' + DISCOVER_LIST.length + '건"><span>자료 · 후보</span><b>' + (totalIntakeCards + DISCOVER_LIST.length) + '건</b></div>';
 
     if ($('projResetBtn')) {
       $('projResetBtn').style.display = (TRACK_SCOPE || q || stFilter || indFilter || yrFilter) ? '' : 'none';
     }
 
     var filtered = projs.filter(function (p) {
-      if (TRACK_SCOPE && p.track !== TRACK_SCOPE) return false;
+      if (TRACK_SCOPE) {
+        if (TRACK_SCOPE === '__kosha__') { if (!/^kosha_/.test(str(p.track))) return false; }
+        else if (p.track !== TRACK_SCOPE) return false;
+      }
       var isArch = p.status === 'archive' || num(p.year, 2026) < 2026;
       if (stFilter === 'archive' && !isArch) return false;
       if (stFilter === 'active' && isArch) return false;
@@ -1298,11 +1315,13 @@
     ];
 
     var html = renderProjectHeaderBar(proj) +
-      '<div class="card"><div class="pill-row">' +
+      '<div class="card"><div class="pill-row uniform-row" style="border-bottom:1px solid var(--line)">' +
       layerTabs.map(function (lt) {
-        return '<button class="scope-btn' + (CHECK_LAYER === lt.k ? ' on' : '') + '" data-chk-layer="' + lt.k + '">' + esc(lt.lbl) + '</button>';
+        var isLayerOn = CHECK_LAYER === lt.k;
+        return '<button class="scope-btn' + (isLayerOn ? ' on' : '') + '" aria-pressed="' + (isLayerOn ? 'true' : 'false') + '" data-chk-layer="' + lt.k + '">' + esc(lt.lbl) + '</button>';
       }).join('') +
-      '<span class="sp"></span>' +
+      '</div><div class="bar">' +
+      '<span class="hint">선택한 계층의 점검 항목을 즉시 판정·내보내기합니다</span><span class="sp"></span>' +
       '<button class="sm pri" data-hwpx-dl="checklist">📥 업종 체크리스트 (.hwpx)</button>' +
       '<button class="sm" data-hangul-open="checklist">📝 푸른한글 편집</button>' +
       '<button class="sm" data-pdf-print="checklist">🖨️ 인쇄/PDF</button>' +
@@ -1361,7 +1380,7 @@
           var indObj = Cat().INDUSTRIES[ic];
           var isPrimary = sum.industry.code === ic;
           var isOn = sum.allIndustryCodes.indexOf(ic) >= 0;
-          return '<button class="scope-btn' + (isOn ? ' on' : '') + '" data-toggle-extra-ind="' + esc(ic) + '"' + (isPrimary ? ' disabled title="주업종(업종 설정에서 변경)"' : '') + '>' +
+          return '<button class="scope-btn' + (isOn ? ' on' : '') + '" aria-pressed="' + (isOn ? 'true' : 'false') + '" data-toggle-extra-ind="' + esc(ic) + '"' + (isPrimary ? ' disabled title="주업종(업종 설정에서 변경)"' : '') + '>' +
             esc(indObj.short) + (isPrimary ? ' ★주' : '') + '</button>';
         }).join('') + '</div>';
 
@@ -1390,7 +1409,7 @@
         Object.keys(Cat().HAZARD_AGENTS).map(function (hc) {
           var ha = Cat().HAZARD_AGENTS[hc];
           var isOn = sum.hazardCodes.indexOf(hc) >= 0;
-          return '<button class="scope-btn' + (ha.group === 'const' ? ' ok' : '') + (isOn ? ' on' : '') + '" data-toggle-hazard="' + esc(hc) + '" title="' + esc(ha.deathsStat) + '">' +
+          return '<button class="scope-btn' + (ha.group === 'const' ? ' ok' : '') + (isOn ? ' on' : '') + '" aria-pressed="' + (isOn ? 'true' : 'false') + '" data-toggle-hazard="' + esc(hc) + '" title="' + esc(ha.deathsStat) + '">' +
             esc(ha.short) + '</button>';
         }).join('') + '</div>';
 
@@ -1612,9 +1631,9 @@
     var rightHtml = '<div class="card report-side-sticky">' +
       '<div class="pill-row">' +
       '<span class="scope-lbl">미리보기 양식:</span>' +
-      '<button class="scope-btn' + (PREVIEW_KIND === 'summary1p' ? ' on' : '') + '" data-pv-kind="summary1p">핵심 개선사항 1P 요약</button>' +
-      '<button class="scope-btn' + (PREVIEW_KIND === 'comprehensive' ? ' on' : '') + '" data-pv-kind="comprehensive">종합보고서 (7장)</button>' +
-      '<button class="scope-btn' + (PREVIEW_KIND === 'checklist' ? ' on' : '') + '" data-pv-kind="checklist">업종 체크리스트</button>' +
+      '<button class="scope-btn' + (PREVIEW_KIND === 'summary1p' ? ' on' : '') + '" aria-pressed="' + (PREVIEW_KIND === 'summary1p' ? 'true' : 'false') + '" data-pv-kind="summary1p">핵심 개선사항 1P 요약</button>' +
+      '<button class="scope-btn' + (PREVIEW_KIND === 'comprehensive' ? ' on' : '') + '" aria-pressed="' + (PREVIEW_KIND === 'comprehensive' ? 'true' : 'false') + '" data-pv-kind="comprehensive">종합보고서 (7장)</button>' +
+      '<button class="scope-btn' + (PREVIEW_KIND === 'checklist' ? ' on' : '') + '" aria-pressed="' + (PREVIEW_KIND === 'checklist' ? 'true' : 'false') + '" data-pv-kind="checklist">업종 체크리스트</button>' +
       '</div>' +
       '<div style="padding:10px">' + Hwpx().buildPreviewHtml(PREVIEW_KIND, proj, cd, D.intake[proj.id] || {}, rep) + '</div>' +
       snapHtml +
@@ -2035,10 +2054,24 @@
       var scopeBtn = t.closest('[data-scope]');
       if (scopeBtn) { TRACK_SCOPE = scopeBtn.getAttribute('data-scope'); draw(); return; }
 
+      var koshaKpiBtn = t.closest('[data-kpi-kosha]');
+      if (koshaKpiBtn) {
+        TRACK_SCOPE = TRACK_SCOPE === '__kosha__' ? '' : '__kosha__';
+        if ($('projTrack')) $('projTrack').value = TRACK_SCOPE;
+        draw();
+        return;
+      }
+
       var kpiBtn = t.closest('[data-kpi-status]');
       if (kpiBtn && $('projStatus')) {
         var nextSt = kpiBtn.getAttribute('data-kpi-status') || '';
-        $('projStatus').value = nextSt ? ($('projStatus').value === nextSt ? '' : nextSt) : '';
+        if (!nextSt) {
+          TRACK_SCOPE = '';
+          if ($('projTrack')) $('projTrack').value = '';
+          $('projStatus').value = '';
+        } else {
+          $('projStatus').value = $('projStatus').value === nextSt ? '' : nextSt;
+        }
         draw();
         return;
       }
@@ -2396,7 +2429,7 @@
         if ($('fileUploadInput')) { $('fileUploadInput').value = ''; $('fileUploadInput').click(); }
         return;
       }
-      var kpiKeyEl = e.target && e.target.closest ? e.target.closest('[data-kpi-status]') : null;
+      var kpiKeyEl = e.target && e.target.closest ? e.target.closest('[data-kpi-status], [data-kpi-kosha]') : null;
       if (kpiKeyEl && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
         kpiKeyEl.click();
@@ -2430,12 +2463,13 @@
 
     /* 상단 헤더 버튼 & 필터 */
     if ($('projQ')) $('projQ').oninput = function () { draw(); };
+    if ($('projTrack')) $('projTrack').onchange = function () { TRACK_SCOPE = $('projTrack').value || ''; draw(); };
     if ($('projStatus')) $('projStatus').onchange = function () { draw(); };
     if ($('projIndustry')) $('projIndustry').onchange = function () { draw(); };
     if ($('projYear')) $('projYear').onchange = function () { draw(); };
     if ($('projResetBtn')) $('projResetBtn').onclick = function () {
       TRACK_SCOPE = '';
-      ['projQ', 'projStatus', 'projIndustry', 'projYear'].forEach(function (id) { if ($(id)) $(id).value = ''; });
+      ['projQ', 'projTrack', 'projStatus', 'projIndustry', 'projYear'].forEach(function (id) { if ($(id)) $(id).value = ''; });
       clearSel('projects');
       draw();
     };
