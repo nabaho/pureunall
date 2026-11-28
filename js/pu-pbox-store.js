@@ -73,6 +73,7 @@
   var sessionJwtByUid = new Map();// 직원 선택적 JWT는 localStorage에 절대 영구 저장하지 않고 현재 UID 세션 메모리에만 보관
   var lastDeleteSyncPromise = Promise.resolve({ ok: true, skipped: true });
   var sessionGen = 0;             // 계정 전환·로그아웃 시 진행 중인 비동기 init/AI 응답이 타 계정에 섞이는 것을 차단
+  var lastAuthUid = '';           // clearMemoryOnSignOut 직후 clearWorkspaceOnLogout 호출 시 직전 로그인 UID 파기용
 
   var mem = {
     uid: 'guest',
@@ -455,6 +456,7 @@
       mem.alerts = [];
     }
     mem.uid = nextUid;
+    if (nextUid && nextUid !== 'guest') lastAuthUid = nextUid;
 
     var E = global.PuPBoxEngine;
     var C = global.PuPBoxCorpus;
@@ -2920,13 +2922,18 @@
     rebuildEffectiveDocs();
   }
 
-  /* ── 명시적 로그아웃 시 모든 열려 있는 핸들을 닫고 개인 작업공간(로컬 수집문서·세션JWT 포함) 완전 파기 ── */
+  /* ── 명시적 로그아웃 시 현재 로그인한 본인 UID의 개인 작업공간만 안전하게 파기 (같은 브라우저의 타 직원 DB 보존) ── */
   function clearWorkspaceOnLogout() {
     ++sessionGen;
-    var activeDbName = workspaceDbNameFor(mem.uid);
+    var rawUid = (mem.uid && mem.uid !== 'guest') ? mem.uid : lastAuthUid;
+    var activeUid = (rawUid && rawUid !== 'guest') ? sanitizeUid(rawUid) : '';
+    var activeDbName = activeUid ? workspaceDbNameFor(activeUid) : '';
+    lastAuthUid = '';
     closeAllWorkspaceHandles();
     sessionJwtByUid.clear();
-    memByUid.clear();
+    if (activeUid) {
+      memByUid.delete(activeUid);
+    }
     mem.uid = 'guest';
     mem.privateDocs = [];
     mem.projects = [];
@@ -2937,21 +2944,8 @@
     rebuildEffectiveDocs();
 
     var targets = [WORKSPACE_DB];
-    if (activeDbName) targets.push(activeDbName);
-
-    var pEnum = (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function')
-      ? indexedDB.databases().then(function (list) {
-          (list || []).forEach(function (info) {
-            if (info && info.name && (info.name === WORKSPACE_DB || info.name.indexOf(WORKSPACE_DB + '_') === 0)) {
-              if (targets.indexOf(info.name) < 0) targets.push(info.name);
-            }
-          });
-        }).catch(function () {})
-      : Promise.resolve();
-
-    return pEnum.then(function () {
-      return Promise.all(targets.map(deleteDbSafe));
-    });
+    if (activeDbName && targets.indexOf(activeDbName) < 0) targets.push(activeDbName);
+    return Promise.all(targets.map(deleteDbSafe));
   }
 
   if (typeof global.addEventListener === 'function') {
