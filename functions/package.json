@@ -15,6 +15,7 @@
     "mailparser": "3.12.4",
     "nodemailer": "7.0.3",
     "pdfjs-dist": "4.10.38",
+    "popbill": "1.64.2",
     "resend": "6.18.1"
   },
   "overrides": {

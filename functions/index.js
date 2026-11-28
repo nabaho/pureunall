@@ -8118,6 +8118,13 @@ exports.mgrWatch = MGRW.mgrWatch;
 const NTSM = require("./nts-monthly")({ functions, getDatabase, MAIL_REGION });
 exports.ntsMonthly = NTSM.ntsMonthly;
 
+/* 🏛 홈택스 매출 세금계산서 자동 수집 — 팝빌 홈택스수집(세금) (2026-11-28 대표 「테스트로 시작」)
+   실제 코드는 hometax-invoice.js · 설정 안내 docs/재무/홈택스-자동수집.md.
+   ⚠ 비밀값 POPBILL_LINK_ID·POPBILL_SECRET_KEY 를 넣기 «전»에는 이 두 이름을 배포하지 말 것 — 없는 비밀을 적은 함수는 배포가 멈춘다. */
+const HTINV = require("./hometax-invoice")({ functions, getDatabase, MAIL_REGION, setCors, requireStaff, STAFF_GATE });
+exports.hometaxInvoicePull = HTINV.hometaxInvoicePull;
+exports.hometaxInvoicePullNow = HTINV.hometaxInvoicePullNow;
+
 /* 👥 국민연금 가입자 — 매달 2일 07시, 기업 상세에서 «고른» 사업장의 숫자를 새로 받는다(대표 「진행」 2026-10-11).
    실제 코드는 nps-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
 const NPSM = require("./nps-monthly")({ functions, getDatabase, MAIL_REGION });

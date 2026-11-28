@@ -17,6 +17,12 @@ const _now = new Date(Date.now() + 9 * 3600e3), _ym = _now.toISOString().slice(0
 [['점검임대인', 3300000, 'exp-rent'], ['(주)마바정밀기계공업점검거래처', 1280000, 'exp-misc']].forEach(([n, a, c], i) => {
   data.data.finance_expense.v['fe-now' + i] = { id: 'fe-now' + i, date: _ym + '-0' + (2 + i), amount: a, category: c, payee: n, memo: '점검출금', createdAt: _ym + '-01T00:00:00.000Z' };
 });
+/* 🏛 홈택스 자동 수집 띠(세금계산서 › 업체별 아카이브 맨 위, 2026-11-28) — 시험 모드로 한 번 돈 모습. 번호·건수는 지어낸 것 */
+data.hometax_pull = {
+  cfg: { on: true, test: true, corpNum: '1234567890', by: 'P001', at: Date.now() - 864e5 },
+  status: { lastRunAt: Date.now() - 3600e3, lastOkAt: Date.now() - 3600e3, state: 'test', test: true, by: 'schedule',
+    read: 12, added: 0, merged: 0, same: 0, range: '2026-11-22~2026-11-28', error: '' }
+};
 /* 스크롤 — 목록이 «본문 상자 안»에서 구르므로 그 상자를 내려 아래쪽 줄도 갈무리한다 */
 function 내리기(name, px) {
   return { name, wait: 700, run: async (page) => { await page.evaluate((d) => {

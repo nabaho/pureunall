@@ -563,6 +563,37 @@
         ]
       }
     },
+    "hometax_pull": {
+      ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+      "cfg": {
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        ".validate": "newData.hasChildren(['on', 'test'])",
+        "on": {
+          ".validate": "newData.isBoolean()"
+        },
+        "test": {
+          ".validate": "newData.isBoolean()"
+        },
+        "corpNum": {
+          ".validate": "newData.isString() && newData.val().matches(/^([0-9]{10})?$/)"
+        },
+        "by": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "status": {
+        ".write": false
+      },
+      "lock": {
+        ".write": false
+      }
+    },
     "payroll_os": {
       ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",

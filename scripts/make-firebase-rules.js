@@ -538,6 +538,28 @@ rules.invoice_arc = {
   h: { '.indexOn': ['t'] }
 };
 
+/* ══ 홈택스 매출 세금계산서 자동 수집 — 스위치·상태 (2026-11-28 대표 「테스트로 시작」) ══════
+   서버(functions/hometax-invoice.js)가 매일 팝빌로 받아 위 invoice_arc 에 더한다. 여기는 그 «스위치와 결과»뿐.
+   ★ 읽기 = invoice_arc 와 같은 문(재직 중인 재무 권한자) — 결과에 읽은 건수·기간·실패 까닭이 있다.
+   ★ cfg(매일 자동·시험/운영·법인 사업자번호)는 «관리자»만 쓴다 — 운영으로 바꾸면 실제 계산서가 보관함에 들어간다.
+   ★ status·lock 은 서버만 쓴다(관리자 SDK 는 규칙을 건너뛴다) — 화면이 결과를 꾸며 적지 못하게 닫는다.
+   ⚠ invoice_arc 밑에 두지 않았다 — 보관함 「전체 삭제」(erpInvArcClearAll)가 뿌리를 통째로 갈아 끼운다. */
+rules.hometax_pull = {
+  '.read': `(${LOGIN}) && ${FIN}`,
+  cfg: {
+    '.write': `(${LOGIN}) && ${ADMIN}`,
+    '.validate': "newData.hasChildren(['on', 'test'])",
+    on: { '.validate': 'newData.isBoolean()' },
+    test: { '.validate': 'newData.isBoolean()' },
+    corpNum: { '.validate': "newData.isString() && newData.val().matches(/^([0-9]{10})?$/)" },
+    by: { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    at: { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  },
+  status: { '.write': false },
+  lock: { '.write': false }
+};
+
 /* ══ 다른 앱들 ═════════════════════════════════════════════════════════ */
 /* 급여아웃소싱 — 대표 지시 2026-11-18 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」
    재직 직원(LOGIN) 모두가 읽고 처리할 수 있는 업무 칸(workspace)으로 연다.

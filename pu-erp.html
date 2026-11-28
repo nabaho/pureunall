@@ -70941,6 +70941,124 @@ if(typeof window !== 'undefined'){
   window.erpInvPeriodRange = erpInvPeriodRange; window.erpInvHtRow = erpInvHtRow;
 }
 
+/* 🏛 홈택스 자동 수집 띠 — 세금계산서 › 업체별 아카이브 맨 위 한 줄 (2026-11-28 대표 「테스트로 시작」)
+   서버(functions/hometax-invoice.js)가 매일 07:10 팝빌로 홈택스 «매출» 계산서를 받아 보관함(invoice_arc)에 더한다.
+   · 띠 — 꺼짐/시험/운영 · 마지막 수집 결과(새로·합침·이미 있음) 또는 실패 까닭
+   · [지금 받기] — 재무 권한자(서버가 uid_roles.fin 을 다시 본다) · 지난 7일
+   · [⚙] — 관리자만. 매일 자동 켜기·시험/운영·법인 사업자번호 → hometax_pull/cfg (규칙도 관리자만 쓴다)
+   ⚠ 시험은 보관함에 «넣지 않는다» — 팝빌 시험 환경 자료는 가짜다. 운영으로 바꿀 때 한 번 묻는다.
+   설정 안내: docs/재무/홈택스-자동수집.md */
+var HOMETAX_PULL_FN = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/hometaxInvoicePullNow';
+function _htpTime(t){
+  if(!t) return '';
+  var d = new Date(Number(t) + 9 * 3600e3).toISOString();
+  return d.slice(5, 10) + ' ' + d.slice(11, 16);
+}
+/* 띠에 쓸 글자 — 화면 없이 돌려 보는 순수 함수(tests/hometax-invoice-pull.test.js) */
+function erpHometaxPullLine(cfg, st){
+  cfg = cfg || {}; st = st || {};
+  var test = cfg.test !== false;
+  var on = cfg.on === true;
+  var out = { chip:'꺼짐', chipBg:'#f1f5f9', chipFg:'#64748b', text:'', tone:'muted' };
+  if(on && test){ out.chip = '시험 · 매일'; out.chipBg = '#fef9c3'; out.chipFg = '#854d0e'; }
+  else if(on){ out.chip = '매일 07:10'; out.chipBg = '#dcfce7'; out.chipFg = '#166534'; }
+  else if(!test){ out.chip = '꺼짐 · 운영'; }
+  if(!st.lastRunAt){
+    out.text = '아직 한 번도 돌지 않았습니다 — 팝빌 연동 키·법인 사업자번호를 넣은 뒤 켭니다';
+  } else if(st.state === 'error'){
+    out.text = '⚠ ' + _htpTime(st.lastRunAt) + ' 실패 — ' + (st.error || '까닭을 받지 못했습니다');
+    out.tone = 'bad';
+  } else if(st.state === 'off'){
+    out.text = _htpTime(st.lastRunAt) + ' 꺼져 있어 건너뜀' + (st.lastOkAt ? ' · 마지막 수집 ' + _htpTime(st.lastOkAt) : '');
+  } else if(st.state === 'test'){
+    out.text = '🧪 ' + _htpTime(st.lastOkAt || st.lastRunAt) + ' 시험 수집 ' + (Number(st.read) || 0) + '건 읽음 — 보관함에는 넣지 않음';
+  } else {
+    out.text = _htpTime(st.lastOkAt || st.lastRunAt) + ' · 새로 ' + (Number(st.added) || 0) + ' · 합침 ' + (Number(st.merged) || 0)
+      + ' · 이미 있음 ' + (Number(st.same) || 0);
+    out.tone = 'ok';
+  }
+  if(st.range && st.lastRunAt && st.state !== 'off') out.text += ' (' + st.range + ')';
+  return out;
+}
+function HometaxPullStrip(props){
+  var isAdm = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && isAdminByUser(CURRENT_USER);
+  var dS = useState({ cfg:{}, st:{}, err:'' }); var d = dS[0], setD = dS[1];
+  var bS = useState(false); var busy = bS[0], setBusy = bS[1];
+  var fS = useState(null); var form = fS[0], setForm = fS[1];
+  useEffect(function(){
+    if(typeof fbDb === 'undefined' || !fbDb) return;
+    var ref = fbDb.ref('hometax_pull');
+    var cb = ref.on('value', function(snap){
+      var v = snap.val() || {};
+      setD({ cfg:v.cfg || {}, st:v.status || {}, err:'' });
+    }, function(e){ setD({ cfg:{}, st:{}, err:(e && (e.code || e.message)) || '읽지 못함' }); });
+    return function(){ try { ref.off('value', cb); } catch(_){} };
+  }, []);
+  var cfg = d.cfg || {};
+  var line = erpHometaxPullLine(cfg, d.st);
+  if(d.err) line = Object.assign({}, line, { text:'상태를 읽지 못했습니다(' + d.err + ') — 서버 규칙을 올리기 전이면 정상입니다', tone:'muted' });
+  async function pullNow(){
+    if(busy) return;
+    var u = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+    if(!u){ showToast('⚠ 로그인 상태를 확인해 주세요'); return; }
+    setBusy(true);
+    showToast('🏛 홈택스 매출 세금계산서를 받는 중입니다 (1~2분)…', 8000);
+    try {
+      var tok = await u.getIdToken();
+      var res = await fetchT(HOMETAX_PULL_FN, {
+        method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + tok },
+        body:JSON.stringify({ days:7 })
+      }, 540000);
+      var j = await res.json().catch(function(){ return {}; });
+      if(!res.ok || !j.ok){ showToast('❌ 홈택스 수집 실패: ' + (j.error || ('상태 ' + res.status)), 9000); return; }
+      showToast(j.test ? ('🧪 시험 수집 ' + (j.read || 0) + '건 읽음 — 보관함에는 넣지 않았습니다')
+        : ('✅ 홈택스 수집 — 새로 ' + (j.added || 0) + '건 · 합침 ' + (j.merged || 0) + '건 · 이미 있음 ' + (j.same || 0) + '건'), 9000);
+      if(!j.test && (j.added || j.merged) && props.onPulled) props.onPulled();
+    } catch(e){
+      showToast('❌ 홈택스 수집 호출 오류: ' + ((e && e.message) || e), 9000);
+    } finally { setBusy(false); }
+  }
+  function openCfg(){ setForm({ on:cfg.on === true, test:cfg.test !== false, corpNum:String(cfg.corpNum || '') }); }
+  function saveCfg(){
+    var cn = String(form.corpNum || '').replace(/[^0-9]/g, '');
+    if(cn && cn.length !== 10){ showToast('⚠ 법인 사업자번호는 숫자 10자리입니다'); return; }
+    if(form.on && !cn){ showToast('⚠ 매일 자동을 켜려면 법인 사업자번호가 필요합니다'); return; }
+    if(!form.test && cfg.test !== false && !confirm('운영으로 바꾸면 실제 홈택스 매출 계산서가 세금계산서 보관함에 더해집니다.\n팝빌 운영 전환·부서사용자 등록을 마친 뒤에 바꾸세요.\n\n운영으로 바꿀까요?')) return;
+    fbDb.ref('hometax_pull/cfg').update({ on:!!form.on, test:!!form.test, corpNum:cn,
+      by:String((CURRENT_USER && CURRENT_USER.sid) || ''), at:Date.now() })
+      .then(function(){ setForm(null); showToast('✅ 홈택스 자동 수집 설정을 저장했습니다'); })
+      .catch(function(e){ showToast('❌ 저장 실패: ' + ((e && e.message) || e)); });
+  }
+  var fg = line.tone === 'bad' ? '#b91c1c' : (line.tone === 'ok' ? '#166534' : '#64748b');
+  var btn = { padding:'3px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', cursor:'pointer', fontSize:'12.5px', fontWeight:600, flexShrink:0 };
+  return h('div', null,
+    h('div', { style:{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'3px 8px', marginBottom:'6px',
+        display:'flex', alignItems:'center', gap:'8px', whiteSpace:'nowrap', overflow:'hidden', minHeight:'34px' } },
+      h('span', { style:{ fontSize:'12.5px', fontWeight:700, color:'#1e293b', flexShrink:0 } }, '🏛 홈택스 자동 수집'),
+      h('span', { style:{ fontSize:'11.5px', fontWeight:700, padding:'1px 7px', borderRadius:'9px', background:line.chipBg, color:line.chipFg, flexShrink:0 } }, line.chip),
+      h('span', { title:line.text, style:{ fontSize:'12px', color:fg, overflow:'hidden', textOverflow:'ellipsis', minWidth:0, flex:1 } }, line.text),
+      h('button', { onClick:pullNow, disabled:busy, title:'지난 7일 매출 세금계산서를 지금 받습니다(재무 권한)',
+        style:Object.assign({}, btn, busy ? { opacity:0.6, cursor:'wait' } : null) }, busy ? '⏳ 받는 중' : '⟳ 지금 받기'),
+      isAdm && h('button', { onClick:function(){ form ? setForm(null) : openCfg(); }, title:'설정 — 매일 자동·시험/운영·법인 사업자번호(관리자)',
+        style:btn }, '⚙')),
+    isAdm && form && h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap', padding:'6px 8px', marginBottom:'6px',
+        background:'#fff', border:'1px dashed #cbd5e1', borderRadius:'6px', fontSize:'12.5px' } },
+      h('label', { style:{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer' } },
+        h('input', { type:'checkbox', checked:!!form.on, onChange:function(e){ setForm(Object.assign({}, form, { on:e.target.checked })); } }),
+        '매일 07:10 자동'),
+      h('select', { value:form.test ? 'test' : 'live', onChange:function(e){ setForm(Object.assign({}, form, { test:e.target.value === 'test' })); },
+        style:{ padding:'3px 6px', border:'1px solid #cbd5e1', borderRadius:'4px' } },
+        h('option', { value:'test' }, '🧪 시험 (보관함에 안 넣음)'),
+        h('option', { value:'live' }, '운영 (보관함에 넣음)')),
+      h('input', { value:form.corpNum, placeholder:'법인 사업자번호 10자리', inputMode:'numeric', maxLength:12,
+        onChange:function(e){ setForm(Object.assign({}, form, { corpNum:e.target.value })); },
+        style:{ width:'170px', padding:'3px 6px', border:'1px solid #cbd5e1', borderRadius:'4px' } }),
+      h('button', { onClick:saveCfg, style:Object.assign({}, btn, { background:'#1e40af', color:'#fff', borderColor:'#1e40af' }) }, '저장'),
+      h('button', { onClick:function(){ setForm(null); }, style:btn }, '닫기'),
+      h('span', { style:{ color:'#64748b', fontSize:'12px' } }, '팝빌 연동 키는 서버 비밀값으로 따로 넣습니다 — docs/재무/홈택스-자동수집.md')));
+}
+window.erpHometaxPullLine = erpHometaxPullLine;
+
 function FinanceInvoice(){
   var _fill5 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 380px)
   var _fillArc = useFillHeight(240, 0, true);   // 업체별 아카이브 두 목록도 창 바닥까지 (전: 600px·560px 고정 — 2026-10-24)
@@ -71431,9 +71549,15 @@ function FinanceInvoice(){
     );
     /* 진행·결과 안내는 이 상자 밖 «탭 위» 로 옮겼다 — 어느 탭에서 올려도 보여야 한다.
        여기 두었더니 발행관리 탭에서 올릴 때 아무것도 안 보였다(김보람 제보). */
+    /* 🏛 홈택스 자동 수집 띠(2026-11-28) — 서버가 넣은 줄을 받은 뒤 업체 목록을 다시 읽는다 */
+    var pullStrip = h(HometaxPullStrip, { onPulled:function(){
+      erpInvArcPull().catch(function(){ return 0; }).then(function(){ return idbGetAll('invoice_companies'); })
+        .then(function(list){ setInvoiceCompanies(list || []); }).catch(function(){});
+    } });
 
     if(invoiceCompanies.length === 0){
       return h('div', null,
+        pullStrip,
         uploadArea,
         h('div', { style:{ padding:'40px', textAlign:'center', color:'#94a3b8', fontSize:'12px', background:'#f8fafc', borderRadius:'8px' } },
           h('div', { style:{ fontSize:'40px', marginBottom:'10px' } }, '📭'),
@@ -71460,6 +71584,7 @@ function FinanceInvoice(){
     var totalAmt = arcFiltered.reduce(function(s,c){return s+(c.totalSupply||0);}, 0);
 
     return h('div', null,
+      pullStrip,
       uploadArea,
       // 검색·기간 필터 + 합계 — 한 줄(2026-10-24 — 위가 덜 밀리게)
       h('div', { style:{ display:'flex', gap:'8px', marginBottom:'6px', flexWrap:'wrap', alignItems:'center' } },
