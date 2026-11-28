@@ -1411,6 +1411,110 @@ body.portal-mode #moreFab{display:flex;}
   .sg-detail{padding:12px;}
   body.sg-modal-open{overflow:hidden;}
 }
+/* ══ 폰 홈 (대표 확정 2026-11-28 ★ 추천안: 최근 4 + 핵심 8·편집 + 5폴더 서랍) ══
+   PC(>640px)는 #phoneHome 을 아예 숨기고, 폰(≤640px)에서 #appRows 가 그려져 pm-phone-on 이 켜질 때만
+   32개 세로 나열 대신 첫 화면 스크롤 최소 구성으로 전환한다(공식 27색 팔레트만 사용). */
+#phoneHome{display:none;}
+.pm-sheet-bg[hidden],#pmToast[hidden]{display:none!important;}
+@media (max-width:640px){
+  body.pm-phone-on #phoneHome{display:block;padding-top:2px;}
+  body.pm-phone-on #pinRow,body.pm-phone-on #appRows{display:none;}
+}
+.pm-sec{margin-bottom:8px;}
+.pm-hd-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;padding:0 2px;}
+.pm-sec-t{font-size:12px;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.pm-sec-s{font-size:11px;font-weight:600;color:#475569;white-space:nowrap;}
+.pm-edit-btn{border:1px solid #bfdbfe;background:#ffffff;color:#1e40af;border-radius:99px;min-height:28px;padding:4px 10px;
+  font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none;}
+.pm-edit-btn:hover{background:#eff6ff;border-color:#2563eb;}
+.pm-recent-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;}
+.pm-rc-btn{display:flex;align-items:center;gap:3px;min-width:0;min-height:32px;padding:4px 6px;border-radius:99px;
+  background:#ffffff;border:1px solid #bfdbfe;box-shadow:0 1px 3px rgba(30,41,59,.06);
+  cursor:pointer;font-family:inherit;color:#1e293b;font-size:11px;font-weight:700;white-space:nowrap;}
+.pm-rc-btn:active{transform:scale(.97);}
+.pm-rc-btn.is-dim .pm-rc-ic{opacity:.48;}
+.pm-rc-ic{display:block;font-size:12px;line-height:1;flex:none;}
+.pm-rc-ic svg{width:13px;height:13px;display:block;}
+.pm-rc-nm{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.pm-core-box{background:rgba(255,255,255,.78);border:1px solid #ffffff;border-radius:16px;padding:8px 8px 9px;
+  box-shadow:0 4px 14px rgba(30,41,59,.06);}
+.pm-core-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 4px;}
+.pm-tile-wrap{position:relative;min-width:0;}
+.pm-tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;width:100%;min-width:0;min-height:66px;
+  padding:5px 2px 3px;border:0;border-radius:12px;background:transparent;cursor:pointer;font-family:inherit;color:#1e293b;}
+.pm-tile:active{transform:scale(.96);}
+.pm-tile.is-dim .pm-tile-ic{opacity:.48;}
+.pm-tile-ic{width:44px;height:44px;border-radius:14px;background:#ffffff;border:1px solid #cbd5e1;
+  box-shadow:0 2px 7px rgba(30,41,59,.08);display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;}
+.pm-tile-ic svg{width:26px;height:26px;display:block;}
+.pm-tile-nm{display:block;font-size:11px;font-weight:700;line-height:1.18;color:#1e293b;width:100%;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pm-tile-tag{display:block;font-size:9.5px;font-weight:700;color:#475569;line-height:1.1;white-space:nowrap;}
+.pm-alert-pill{position:absolute;left:2px;top:0;z-index:2;box-sizing:border-box;min-width:26px;min-height:24px;height:24px;padding:0 7px;border-radius:99px;
+  border:2px solid #ffffff;background:#dc2626;color:#ffffff;font-size:10px;font-weight:800;line-height:20px;
+  cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(220,38,38,.35);}
+.pm-folder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+.pm-folder{position:relative;display:flex;align-items:center;gap:7px;min-width:0;min-height:48px;padding:7px 8px;
+  border-radius:13px;background:#ffffff;border:1px solid #cbd5e1;box-shadow:0 2px 6px rgba(30,41,59,.05);
+  cursor:pointer;text-align:left;font-family:inherit;color:#1e293b;}
+.pm-folder:hover{border-color:#2563eb;background:#f8fafc;}
+.pm-folder.pm-all{background:#eff6ff;border-color:#60a5fa;color:#1e40af;}
+.pm-ft-ic{width:30px;height:30px;border-radius:9px;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none;}
+.pm-folder.pm-all .pm-ft-ic{background:#bfdbfe;}
+.pm-ft-tx{display:block;min-width:0;flex:1;}
+.pm-ft-tx b{display:block;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pm-ft-tx small{display:block;font-size:10.5px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pm-ft-cnt{display:block;font-size:11px;font-weight:800;color:#1e40af;background:#eff6ff;padding:2px 7px;border-radius:99px;flex:none;white-space:nowrap;}
+.pm-folder.pm-all .pm-ft-cnt{background:#1e40af;color:#ffffff;}
+.pm-fdot{position:absolute;top:-5px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#dc2626;color:#ffffff;
+  font-size:10px;font-weight:800;line-height:18px;text-align:center;box-shadow:0 0 0 2px #ffffff;}
+.pm-empty{grid-column:1/-1;text-align:center;font-size:12px;color:#475569;padding:16px 8px;}
+
+/* ── 바텀시트 & 토스트 ── */
+.pm-sheet-bg{position:fixed;inset:0;background:rgba(30,41,59,.48);z-index:85;display:flex;flex-direction:column;justify-content:flex-end;}
+.pm-sheet{background:#ffffff;border-radius:18px 18px 0 0;max-height:84dvh;width:100%;max-width:540px;margin:0 auto;
+  display:flex;flex-direction:column;box-shadow:0 -10px 30px rgba(30,41,59,.24);overflow:hidden;}
+.pm-grip{width:36px;height:4px;border-radius:99px;background:#94a3b8;margin:8px auto 2px;flex:none;}
+.pm-sheet-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px 10px;border-bottom:1px solid #e2e8f0;flex:none;}
+.pm-sheet-hd b{font-size:14.5px;color:#1e293b;}
+.pm-close{border:1px solid #94a3b8;background:#ffffff;color:#1e293b;border-radius:8px;min-height:32px;padding:4px 12px;
+  font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.pm-sheet-tools{padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;gap:6px;flex-wrap:wrap;flex:none;}
+.pm-fchip{border:1px solid #94a3b8;background:#ffffff;color:#475569;border-radius:99px;min-height:30px;padding:4px 11px;
+  font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.pm-fchip.on{background:#1e40af;border-color:#1e40af;color:#ffffff;}
+.pm-sheet-bd{flex:1;min-height:0;overflow-y:auto;padding:10px 12px calc(16px + env(safe-area-inset-bottom));}
+.pm-sheet-sec{font-size:11.5px;font-weight:800;color:#475569;margin:10px 0 6px;display:flex;align-items:center;justify-content:space-between;}
+.pm-sheet-sec:first-child{margin-top:0;}
+.pm-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px 6px;}
+.pm-c3{position:relative;border-radius:12px;background:#ffffff;border:1px solid #cbd5e1;min-width:0;overflow:hidden;}
+.pm-c3-main{width:100%;height:100%;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;text-align:center;
+  gap:4px;padding:11px 5px 8px;cursor:pointer;font-family:inherit;color:#1e293b;min-width:0;}
+.pm-c3-main.is-dim .pm-c3-ic{opacity:.48;}
+.pm-c3-ic{width:40px;height:40px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;}
+.pm-c3-ic svg{width:24px;height:24px;display:block;}
+.pm-c3-nm{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:11.5px;font-weight:800;color:#1e293b;
+  line-height:1.22;width:100%;max-width:100%;overflow:hidden;overflow-wrap:anywhere;word-break:keep-all;}
+.pm-c3-ds{display:block;font-size:10.5px;color:#475569;line-height:1.2;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pm-pc-pill{display:block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:99px;background:#e2e8f0;color:#1e293b;white-space:nowrap;}
+.pm-pin-btn{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;background:#ffffff;border:1px solid #94a3b8;
+  color:#475569;font-size:13px;line-height:26px;text-align:center;padding:0;cursor:pointer;z-index:2;font-family:inherit;}
+.pm-pin-btn.on{background:#fffbeb;border-color:#d97706;color:#854d0e;}
+.pm-edit-row{display:flex;align-items:center;gap:9px;min-height:44px;padding:8px;border-bottom:1px solid #e2e8f0;cursor:pointer;}
+.pm-edit-row input{width:20px;height:20px;accent-color:#1e40af;flex:none;}
+.pm-edit-ic{font-size:18px;width:26px;text-align:center;flex:none;display:flex;align-items:center;justify-content:center;}
+.pm-edit-ic svg{width:20px;height:20px;display:block;}
+.pm-edit-tx{min-width:0;flex:1;word-break:keep-all;overflow-wrap:anywhere;}
+.pm-edit-tx b{display:block;font-size:13px;color:#1e293b;}
+.pm-edit-tx small{display:block;font-size:11px;color:#475569;}
+.pm-sheet-ft{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  border-top:1px solid #e2e8f0;background:#f8fafc;flex:none;}
+.pm-pri{border:0;background:#1e40af;color:#ffffff;border-radius:9px;min-height:34px;padding:7px 16px;font-size:12.5px;
+  font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.pm-toast{position:fixed;left:12px;right:12px;bottom:calc(74px + env(safe-area-inset-bottom));z-index:90;max-width:480px;margin:0 auto;
+  background:#1e293b;color:#ffffff;border-radius:12px;padding:10px 14px;font-size:12.5px;font-weight:700;text-align:center;
+  box-shadow:0 8px 24px rgba(30,41,59,.35);}
+#phoneHome button:focus-visible,.pm-sheet-bg button:focus-visible,.pm-sheet-bg input:focus-visible{outline:2px solid #1e40af;outline-offset:2px;}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -1725,6 +1829,7 @@ body.portal-mode #moreFab{display:flex;}
       <div class="tiles" id="pinTiles" aria-label="자주 쓰는 앱 목록"></div>
     </div>
     <div id="appRows"></div>
+    <div id="phoneHome" aria-label="폰 홈 앱 모음"></div>
   </section>
 
 </main>
@@ -2010,6 +2115,40 @@ body.portal-mode #moreFab{display:flex;}
   </div>
 </div>
 
+<!-- ── 폰 홈 바텀시트 (폴더 서랍 · 핵심 앱 편집 · 토스트) ── -->
+<div id="pmFolderSheet" class="pm-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="pmFolderTitle" hidden>
+  <div class="pm-sheet">
+    <div class="pm-grip"></div>
+    <div class="pm-sheet-hd">
+      <b id="pmFolderTitle">폴더</b>
+      <button type="button" class="pm-close" data-pm-close="pmFolderSheet">닫기</button>
+    </div>
+    <div id="pmAllFilterBar" class="pm-sheet-tools" role="group" aria-label="앱 필터" hidden>
+      <button type="button" class="pm-fchip on" data-pm-filter="all" aria-pressed="true">전체</button>
+      <button type="button" class="pm-fchip" data-pm-filter="phone" aria-pressed="false">폰 추천</button>
+      <button type="button" class="pm-fchip" data-pm-filter="pc" aria-pressed="false">PC 위주</button>
+    </div>
+    <div id="pmFolderBody" class="pm-sheet-bd"></div>
+  </div>
+</div>
+
+<div id="pmEditSheet" class="pm-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="pmEditTitle" hidden>
+  <div class="pm-sheet">
+    <div class="pm-grip"></div>
+    <div class="pm-sheet-hd">
+      <b id="pmEditTitle">내 폰 핵심 앱 편집</b>
+      <button type="button" class="pm-close" data-pm-close="pmEditSheet">닫기</button>
+    </div>
+    <div id="pmEditBody" class="pm-sheet-bd"></div>
+    <div class="pm-sheet-ft">
+      <button type="button" class="pm-close" id="pmEditReset">기본값 복원</button>
+      <button type="button" class="pm-pri" id="pmEditDone">완료</button>
+    </div>
+  </div>
+</div>
+
+<div id="pmToast" class="pm-toast" role="status" aria-live="polite" hidden></div>
+
 <!-- ── 프로그램 건의함 ── -->
 <div id="sgModal" role="dialog" aria-modal="true" aria-labelledby="sgTitle">
   <div class="box">
@@ -2256,7 +2395,7 @@ body.portal-mode #moreFab{display:flex;}
       var v = s.val() || {};
       var n = Number(v.경고수) || 0;
       var old = t.querySelector('.nl-warn'); if(old) old.remove();
-      if(!n){ delete t.dataset.warnTab; return; }
+      if(!n){ delete t.dataset.warnTab; try{ if(typeof pmRender === 'function') pmRender(); }catch(e){} return; }
       var b = document.createElement('span');
       b.className = 'nl-warn';
       b.textContent = '⚠ ' + n;
@@ -2272,6 +2411,7 @@ body.portal-mode #moreFab{display:flex;}
       t.dataset.warnTab = v.탭 === 'bounce' ? 'bounce' : 'watch';   /* 반송만 있으면 받는 곳 › 반송·거부로 */
       t.title = '⚠ 뉴스레터 — 확인할 것 ' + n + '건\n· ' + 뉴스레터경고목록(v.말들).join('\n· ') + '\n\n⚠ 를 누르면 까닭이 보입니다 · 타일을 누르면 ' + (v.탭 === 'bounce' ? '「반송·거부」' : '「자동화 점검」') + '으로 갑니다';
       if(t.href && t.href.indexOf('tab=') < 0 && t.href.slice(-1) !== '#') t.href += '&tab=' + t.dataset.warnTab;
+      try{ if(typeof pmRender === 'function') pmRender(); }catch(e){}
     }).catch(function(){});
   }
   /* 📥 연락처 정리 «할 일» 숫자 배지(2026-10-04)는 걷었다 — 대표 지시 2026-10-09 「숫자 안보이게 정리해달라」.
@@ -3893,7 +4033,10 @@ body.portal-mode #moreFab{display:flex;}
   /* 지금 아는 입금 알림 — 타일이 다시 그려질 때 표시를 되살리려면 들고 있어야 한다.
      (조회는 3분마다인데 타일은 그 사이에도 다시 그려질 수 있다) */
   var portalHanaItems = [];
-  function portalHanaRemoveBadge(){ var b = $('portalHanaBadge'); if(b) b.remove(); }
+  function portalHanaRemoveBadge(){
+    var b = $('portalHanaBadge');
+    if(b){ b.remove(); try{ if(typeof pmRender === 'function') pmRender(); }catch(e){} }
+  }
   /* 푸른이알피 타일에 표시를 붙인다 — 없으면 만들고, 0건이면 뗀다.
      ⚠ 타일을 누르면 이알피가 열린다. 표시를 누른 것은 «타일을 누른 것이 아니므로»
        stopPropagation·preventDefault 로 끊어 준다. 안 끊으면 확인 창이 뜨는 동시에
@@ -3920,6 +4063,7 @@ body.portal-mode #moreFab{display:flex;}
       showPortalHanaModal(portalHanaItems);
     };
     tile.appendChild(b);
+    try{ if(typeof pmRender === 'function') pmRender(); }catch(e){}
   }
   function portalHanaRemoveUi(){
     portalHanaItems = [];
@@ -4060,6 +4204,7 @@ body.portal-mode #moreFab{display:flex;}
     if(key === portalMrPinKey) return;
     portalMrPinKey = key;
     try{ if(typeof paintPins === 'function') paintPins(); }catch(e){}
+    try{ if(typeof pmRender === 'function') pmRender(); }catch(e){}
   }
   function portalMrRemoveBadge(silent){ var b = $('portalMrBadge'); if(b) b.remove(); if(!silent) portalMrSyncPins(''); }
   /* 딱지 — 알릴 것이 «있을 때만» 만든다(늘 켜진 등은 아무것도 알려 주지 못한다). 타일이 다시 그려지면 다시 붙인다 */
@@ -4373,6 +4518,7 @@ body.portal-mode #moreFab{display:flex;}
     if(key === portalOrchPinKey) return;
     portalOrchPinKey = key;
     try{ if(typeof paintPins === 'function') paintPins(); }catch(e){}
+    try{ if(typeof pmRender === 'function') pmRender(); }catch(e){}
   }
 
   function portalOrchRemoveBadge(silent){
@@ -7030,7 +7176,7 @@ body.portal-mode #moreFab{display:flex;}
     applyFold();
   }
 
-  function refreshFoldUi(){ ensurePinStars(); paintPins(); applyFold(); }
+  function refreshFoldUi(){ ensurePinStars(); paintPins(); applyFold(); if(typeof pmRender === 'function') pmRender(); }
 
   function initFold(){
     if(!_foldWired){
@@ -7186,6 +7332,457 @@ body.portal-mode #moreFab{display:flex;}
     refreshFoldUi();
   }
 
+  /* ══ 폰 홈 (대표 확정 2026-11-28 ★ 추천안: 최근 4 + 핵심 8·편집 + 5폴더 서랍) ══
+     ★ 단일 진실 공급원: 권한·준비중·PC전용·알림 딱지·열기 동작을 #appRows 의 원본 타일에 위임한다.
+     ⚠ #phoneHome·시트 안에는 data-key 를 쓰지 않는다(data-pm-key 사용) —
+       알림 딱지(portalHanaPaintBadge·뉴스레터경고달기)의 .tile[data-key="…"] 가 원본만 찾게 한다. */
+  var PM_CORE_MAX = 8, PM_RECENT_MAX = 4;
+  var PM_DEFAULT_CORE = ['erp', 'cards', 'mail', 'photos', 'consult', 'pbox', 'payroll', 'harass'];
+  var PM_DEFAULT_RECENT = ['cards', 'mail', 'erp', 'photos'];
+  var PM_FOLDERS = [
+    { id:'f_client', name:'의뢰인·급여', icon:'🏢', desc:'ERP·급여·조사·규정' },
+    { id:'f_gov',    name:'정부컨설팅',  icon:'📑', desc:'일정·보고서·지원금' },
+    { id:'f_store',  name:'자료·명함',   icon:'📇', desc:'명함·메일·사진·법령' },
+    { id:'f_sales',  name:'영업·홍보',   icon:'📢', desc:'공고·회생·전광판·뉴스' },
+    { id:'f_inside', name:'내부·경영',   icon:'⚙️', desc:'인사·재무·정산·통계' }
+  ];
+  var PM_FOLDER_MAP = {
+    erp:'f_client', payroll:'f_client', harass:'f_client', fund:'f_client', rules:'f_client', hangul:'f_client',
+    consult:'f_gov', govreport:'f_gov', govaid:'f_gov', ilteo:'f_gov', jobtrans:'f_gov', safety:'f_gov',
+    cards:'f_store', mail:'f_store', photos:'f_store', pbox:'f_store', docs:'f_store', pubsearch:'f_store', aliounion:'f_store', edulib:'f_store', paydata:'f_store',
+    govbid:'f_sales', rehabad:'f_sales', signboard:'f_sales', home:'f_sales', news:'f_sales',
+    orch:'f_inside', hr:'f_inside', fin:'f_inside', settle:'f_inside', deungi:'f_inside', career:'f_inside', datahub:'f_inside'
+  };
+  var PM_PC_MAIN = { hangul:1, govreport:1, ilteo:1, jobtrans:1, safety:1, aliounion:1, rehabad:1, home:1, news:1, deungi:1, career:1, datahub:1 };
+  var _pmWired = false, _pmState = { folderId:'', filter:'all', lastFocus:null, lastMeta:null, toastTimer:0 };
+
+  function pmEsc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function pmUserKey(){ return (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.uid) ? String(auth.currentUser.uid) : '_'; }
+  function pmCoreKey(){ return 'pu_phone_core_v1_' + pmUserKey(); }
+  function pmRecentKey(){ return 'pu_phone_recent_v1_' + pmUserKey(); }
+  function pmKnownApp(key){
+    for(var i = 0; i < APPS.length; i++){ if(APPS[i] && APPS[i].key === key && !APPS[i].off && !APPS[i].head) return APPS[i]; }
+    return null;
+  }
+  function pmFolderOf(app){
+    if(app && PM_FOLDER_MAP[app.key]) return PM_FOLDER_MAP[app.key];
+    var r = typeof appRowOf === 'function' ? appRowOf(app) : (app && app.row);
+    if(r === 'store') return 'f_store';
+    if(r === 'sales') return 'f_sales';
+    if(r === 'inside') return 'f_inside';
+    return 'f_client';
+  }
+  function pmReadList(lsKey, fallback, maxLen, allowEmpty){
+    try {
+      var raw = localStorage.getItem(lsKey);
+      if(raw !== null){
+        var parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)){
+          var seen = {}, clean = [];
+          parsed.forEach(function(k){
+            if(typeof k !== 'string' || seen[k] || !pmKnownApp(k)) return;
+            seen[k] = 1; clean.push(k);
+          });
+          if(clean.length || allowEmpty) return clean.slice(0, maxLen);
+        }
+      }
+    } catch(e){}
+    return (fallback || []).filter(function(k){ return !!pmKnownApp(k); }).slice(0, maxLen);
+  }
+  function pmWriteList(lsKey, list){
+    try { localStorage.setItem(lsKey, JSON.stringify(list)); } catch(e){}
+  }
+  function pmIconHtml(app){
+    var ic = String((app && app.icon) || '');
+    return ic.indexOf('<svg') === 0 ? ic : pmEsc(ic);
+  }
+  function pmVisibleApps(){
+    return APPS.filter(function(a){
+      if(!a || a.off || a.head) return false;
+      var t = origTile(a.key);
+      return !!t && tileShown(t);
+    });
+  }
+  function pmTileFlags(key){
+    var t = origTile(key);
+    if(!t) return { dim:false, disabled:false, tag:'', title:'', alertEl:null, alertText:'' };
+    var disabled = t.getAttribute('aria-disabled') === 'true';
+    var span = t.querySelector('.tx > span');
+    var tag = span ? String(span.textContent || '').trim() : '';
+    var alertEl = t.querySelector('.tile-alert, .nl-warn');
+    return {
+      dim: disabled || tag === 'PC 전용',
+      disabled: disabled,
+      tag: tag,
+      title: String(t.getAttribute('title') || '').trim(),
+      alertEl: alertEl,
+      alertText: alertEl ? String(alertEl.textContent || '').trim() : ''
+    };
+  }
+  function pmShowToast(msg){
+    var el = $('pmToast'); if(!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    if(_pmState.toastTimer) clearTimeout(_pmState.toastTimer);
+    _pmState.toastTimer = setTimeout(function(){ el.hidden = true; }, 2600);
+  }
+  function pmActiveSheet(){
+    var f = $('pmFolderSheet'), e = $('pmEditSheet');
+    if(e && !e.hidden) return e;
+    if(f && !f.hidden) return f;
+    return null;
+  }
+  function pmSyncInert(){
+    var open = !!pmActiveSheet();
+    ['mainContent', 'fabBar', 'camFab', 'cfgFab', 'moreDock'].forEach(function(id){
+      var el = $(id);
+      if(el) el.inert = open;
+    });
+  }
+  function pmCaptureMeta(el, root){
+    if(!el || (root && !root.contains(el))) return null;
+    if(el.id) return { type:'id', val:el.id };
+    var d = el.dataset || {};
+    if(d.pmFolder) return { type:'attr', attr:'data-pm-folder', val:d.pmFolder };
+    if(d.pmPin) return { type:'attr', attr:'data-pm-pin', val:d.pmPin };
+    if(d.pmEdit) return { type:'attr', attr:'data-pm-edit', val:d.pmEdit };
+    if(d.pmOpen) return { type:'attr', attr:'data-pm-open', val:d.pmOpen };
+    if(d.pmAlert) return { type:'attr', attr:'data-pm-alert', val:d.pmAlert };
+    if(d.pmFilter) return { type:'attr', attr:'data-pm-filter', val:d.pmFilter };
+    return null;
+  }
+  function pmResolveMeta(meta, root){
+    if(!meta) return null;
+    if(meta.type === 'id') return $(meta.val);
+    var scope = root || $('phoneHome') || document;
+    if(meta.type === 'folder') return scope.querySelector('[data-pm-folder="' + meta.val.replace(/"/g, '') + '"]');
+    if(meta.type === 'attr') return scope.querySelector('[' + meta.attr + '="' + meta.val.replace(/"/g, '') + '"]');
+    return null;
+  }
+  function pmRestoreFocusIn(root, meta){
+    if(!meta) return;
+    var next = pmResolveMeta(meta, root);
+    if(next && next.focus) next.focus();
+  }
+  function pmOpenSheet(id, focusSel){
+    var el = $(id); if(!el) return;
+    if(el.hidden){
+      _pmState.lastFocus = document.activeElement;
+      _pmState.lastMeta = pmCaptureMeta(document.activeElement);
+    }
+    el.hidden = false;
+    if(id === 'pmFolderSheet') pmRenderFolderSheet();
+    else if(id === 'pmEditSheet') pmRenderEditSheet();
+    pmSyncInert();
+    requestAnimationFrame(function(){
+      var target = focusSel ? el.querySelector(focusSel) : null;
+      if(!target || target.closest('[hidden]')) target = el.querySelector('.pm-close, button, input');
+      if(target && target.focus) target.focus();
+    });
+  }
+  function pmCloseSheet(id){
+    var el = $(id); if(!el || el.hidden) return;
+    el.hidden = true;
+    pmSyncInert();
+    var restore = (_pmState.lastFocus && document.contains(_pmState.lastFocus))
+      ? _pmState.lastFocus : pmResolveMeta(_pmState.lastMeta);
+    if(!restore || !document.contains(restore)) restore = $('pmEditBtn') || $('phoneHome');
+    if(restore && restore.focus) restore.focus();
+    _pmState.lastFocus = null;
+    _pmState.lastMeta = null;
+  }
+  function pmRecordRecent(key){
+    if(!pmKnownApp(key)) return;
+    var cur = pmReadList(pmRecentKey(), PM_DEFAULT_RECENT, PM_RECENT_MAX, false);
+    var next = [key].concat(cur.filter(function(k){ return k !== key; })).slice(0, PM_RECENT_MAX);
+    pmWriteList(pmRecentKey(), next);
+  }
+  function pmOpenApp(key){
+    var t = origTile(key); if(!t) return;
+    var fl = pmTileFlags(key);
+    if(!fl.dim) pmRecordRecent(key);
+    pmCloseSheet('pmFolderSheet');
+    pmCloseSheet('pmEditSheet');
+    pmRender();
+    t.click();
+  }
+  function pmClickAlert(key){
+    var fl = pmTileFlags(key);
+    if(!fl.alertEl) return;
+    pmCloseSheet('pmFolderSheet');
+    pmCloseSheet('pmEditSheet');
+    fl.alertEl.click();
+  }
+  function pmVisMap(visible){
+    if(!visible || !visible.length) return null;
+    var map = {};
+    visible.forEach(function(a){ map[a.key] = a; });
+    return map;
+  }
+  function pmCoreSplit(visMap){
+    var all = pmReadList(pmCoreKey(), PM_DEFAULT_CORE, APPS.length, true);
+    if(!visMap) return { vis: all.slice(0, PM_CORE_MAX), hid: [] };
+    return {
+      vis: all.filter(function(k){ return !!visMap[k]; }).slice(0, PM_CORE_MAX),
+      hid: all.filter(function(k){ return !visMap[k]; })
+    };
+  }
+  function pmToggleCore(key){
+    var app = pmKnownApp(key); if(!app) return false;
+    var visMap = pmVisMap(pmVisibleApps());
+    var sp = pmCoreSplit(visMap), core = sp.vis;
+    var idx = core.indexOf(key);
+    if(idx >= 0){
+      core.splice(idx, 1);
+      pmWriteList(pmCoreKey(), core.concat(sp.hid));
+      pmRender();
+      pmShowToast('"' + app.name + '" 핵심 앱에서 뺐습니다.');
+      return true;
+    }
+    if(core.length >= PM_CORE_MAX){
+      pmShowToast('핵심 앱은 최대 ' + PM_CORE_MAX + '개까지 둘 수 있습니다. 하나를 빼고 추가해 주세요.');
+      return false;
+    }
+    core.push(key);
+    pmWriteList(pmCoreKey(), core.concat(sp.hid));
+    pmRender();
+    pmShowToast('"' + app.name + '" 핵심 앱에 넣었습니다.');
+    return true;
+  }
+  function pmGrid3Html(app, coreSet){
+    var pinned = !!coreSet[app.key], fl = pmTileFlags(app.key);
+    var pinTxt = pmEsc(app.name) + (pinned ? ' 핵심 앱에서 빼기' : ' 핵심 앱에 넣기');
+    var ttl = fl.title || (app.name + (app.desc ? ' — ' + app.desc : ''));
+    var subTag = fl.tag ? '<span class="pm-pc-pill">' + pmEsc(fl.tag) + '</span>'
+      : (PM_PC_MAIN[app.key] ? '<span class="pm-pc-pill">PC 위주</span>' : '');
+    return '<div class="pm-c3">' +
+      '<button type="button" class="pm-c3-main' + (fl.dim ? ' is-dim' : '') + '" data-pm-open="' + pmEsc(app.key) + '" title="' + pmEsc(ttl) + '"' + (fl.disabled ? ' aria-disabled="true"' : '') + '>' +
+        '<span class="pm-c3-ic" aria-hidden="true">' + pmIconHtml(app) + '</span>' +
+        '<span class="pm-c3-nm">' + pmEsc(app.name) + '</span>' +
+        '<span class="pm-c3-ds">' + pmEsc(app.desc || '') + '</span>' +
+        subTag +
+      '</button>' +
+      (fl.alertEl ? '<button type="button" class="pm-alert-pill" data-pm-alert="' + pmEsc(app.key) + '" aria-label="' + pmEsc(app.name + ' 알림 ' + fl.alertText) + '">' + pmEsc(fl.alertText) + '</button>' : '') +
+      '<button type="button" class="pm-pin-btn' + (pinned ? ' on' : '') + '" data-pm-pin="' + pmEsc(app.key) + '" aria-pressed="' + (pinned ? 'true' : 'false') + '" aria-label="' + pinTxt + '">' + (pinned ? '★' : '☆') + '</button>' +
+    '</div>';
+  }
+  function pmRenderFolderSheet(){
+    var fEl = $('pmFolderSheet'); if(!fEl || fEl.hidden) return;
+    var focusMeta = pmCaptureMeta(document.activeElement, fEl);
+    var id = _pmState.folderId, visible = pmVisibleApps();
+    var visMap = pmVisMap(visible) || {};
+    var coreSet = {}; pmCoreSplit(visMap).vis.forEach(function(k){ coreSet[k] = 1; });
+    var filterBar = $('pmAllFilterBar'), title = $('pmFolderTitle'), body = $('pmFolderBody');
+    if(id === 'all'){
+      title.textContent = '📂 전체 앱 보기 (' + visible.length + '개)';
+      filterBar.hidden = false;
+      Array.prototype.forEach.call(filterBar.querySelectorAll('[data-pm-filter]'), function(x){
+        var on = x.dataset.pmFilter === _pmState.filter;
+        x.classList.toggle('on', on);
+        x.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      var html = APP_ROWS.map(function(r){
+        var list = visible.filter(function(a){
+          if(appRowOf(a) !== r.id) return false;
+          if(_pmState.filter === 'phone' && PM_PC_MAIN[a.key]) return false;
+          if(_pmState.filter === 'pc' && !PM_PC_MAIN[a.key]) return false;
+          return true;
+        });
+        if(!list.length) return '';
+        return '<div class="pm-sheet-sec"><span>' + pmEsc(r.label) + '</span><span>' + list.length + '개</span></div>' +
+          '<div class="pm-grid-3">' + list.map(function(a){ return pmGrid3Html(a, coreSet); }).join('') + '</div>';
+      }).join('');
+      body.innerHTML = html || '<div class="pm-empty">표시할 앱이 없습니다.</div>';
+      pmRestoreFocusIn(fEl, focusMeta);
+      return;
+    }
+    filterBar.hidden = true;
+    var fMeta = PM_FOLDERS.filter(function(f){ return f.id === id; })[0] || PM_FOLDERS[0];
+    var list = visible.filter(function(a){ return pmFolderOf(a) === fMeta.id; });
+    title.textContent = fMeta.icon + ' ' + fMeta.name + ' (' + list.length + '개)';
+    body.innerHTML = '<div style="font-size:11.5px;color:#475569;margin-bottom:8px;">앱을 누르면 바로 열고, 오른쪽 <b>☆/★</b>로 핵심 앱에 추가·해제할 수 있습니다.</div>' +
+      (list.length ? '<div class="pm-grid-3">' + list.map(function(a){ return pmGrid3Html(a, coreSet); }).join('') + '</div>' : '<div class="pm-empty">이 폴더에 표시할 앱이 없습니다.</div>');
+    pmRestoreFocusIn(fEl, focusMeta);
+  }
+  function pmRenderEditSheet(){
+    var eEl = $('pmEditSheet'); if(!eEl || eEl.hidden) return;
+    var focusMeta = pmCaptureMeta(document.activeElement, eEl);
+    var visible = pmVisibleApps(), visMap = pmVisMap(visible) || {};
+    var core = pmCoreSplit(visMap).vis;
+    var coreSet = {}; core.forEach(function(k){ coreSet[k] = 1; });
+    $('pmEditTitle').textContent = '내 폰 핵심 앱 편집 (' + core.length + '/' + PM_CORE_MAX + ')';
+    var html = PM_FOLDERS.map(function(f){
+      var list = visible.filter(function(a){ return pmFolderOf(a) === f.id; });
+      if(!list.length) return '';
+      return '<div class="pm-sheet-sec"><span>' + pmEsc(f.icon + ' ' + f.name) + '</span><span>' + list.length + '개</span></div>' +
+        list.map(function(a){
+          var ck = coreSet[a.key] ? ' checked' : '';
+          return '<label class="pm-edit-row">' +
+            '<input type="checkbox" data-pm-edit="' + pmEsc(a.key) + '"' + ck + '>' +
+            '<span class="pm-edit-ic" aria-hidden="true">' + pmIconHtml(a) + '</span>' +
+            '<span class="pm-edit-tx"><b>' + pmEsc(a.name) + (PM_PC_MAIN[a.key] ? ' <span class="pm-pc-pill" style="display:inline;margin-left:4px;">PC 위주</span>' : '') + '</b><small>' + pmEsc(a.desc || '') + '</small></span>' +
+          '</label>';
+        }).join('');
+    }).join('');
+    $('pmEditBody').innerHTML = html || '<div class="pm-empty">편집할 앱이 없습니다.</div>';
+    pmRestoreFocusIn(eEl, focusMeta);
+  }
+  function pmWire(){
+    if(_pmWired) return;
+    _pmWired = true;
+    var home = $('phoneHome'), fs = $('pmFolderSheet'), es = $('pmEditSheet');
+    if(home){
+      home.addEventListener('click', function(e){
+        var al = e.target.closest('[data-pm-alert]'); if(al){ e.stopPropagation(); pmClickAlert(al.dataset.pmAlert); return; }
+        var op = e.target.closest('[data-pm-open]'); if(op){ pmOpenApp(op.dataset.pmOpen); return; }
+        var fl = e.target.closest('[data-pm-folder]'); if(fl){ _pmState.folderId = fl.dataset.pmFolder; pmOpenSheet('pmFolderSheet', '.pm-close'); return; }
+        if(e.target.closest('#pmEditBtn')){ pmOpenSheet('pmEditSheet', 'input[data-pm-edit]'); }
+      });
+    }
+    if(fs){
+      fs.addEventListener('click', function(e){
+        var al = e.target.closest('[data-pm-alert]'); if(al){ e.stopPropagation(); pmClickAlert(al.dataset.pmAlert); return; }
+        var pb = e.target.closest('[data-pm-pin]');
+        if(pb){
+          e.stopPropagation();
+          pmToggleCore(pb.dataset.pmPin);
+          return;
+        }
+        var op = e.target.closest('[data-pm-open]'); if(op){ pmOpenApp(op.dataset.pmOpen); return; }
+        var fb = e.target.closest('[data-pm-filter]');
+        if(fb){
+          _pmState.filter = fb.dataset.pmFilter;
+          pmRenderFolderSheet();
+          return;
+        }
+        var cl = e.target.closest('[data-pm-close]'); if(cl){ pmCloseSheet(cl.dataset.pmClose); return; }
+        if(e.target === fs) pmCloseSheet('pmFolderSheet');
+      });
+    }
+    if(es){
+      es.addEventListener('change', function(e){
+        var cb = e.target.closest('input[data-pm-edit]'); if(!cb) return;
+        if(!pmToggleCore(cb.dataset.pmEdit)) cb.checked = false;
+      });
+      es.addEventListener('click', function(e){
+        if(e.target.closest('#pmEditReset')){
+          var visMap = pmVisMap(pmVisibleApps()), sp = pmCoreSplit(visMap);
+          var next = PM_DEFAULT_CORE.filter(function(k){ return !visMap || !!visMap[k]; }).concat(sp.hid);
+          pmWriteList(pmCoreKey(), next);
+          pmRender();
+          pmShowToast('기본 핵심 8개로 복원했습니다.');
+          return;
+        }
+        if(e.target.closest('#pmEditDone')){ pmCloseSheet('pmEditSheet'); return; }
+        var cl = e.target.closest('[data-pm-close]'); if(cl){ pmCloseSheet(cl.dataset.pmClose); return; }
+        if(e.target === es) pmCloseSheet('pmEditSheet');
+      });
+    }
+    document.addEventListener('keydown', function(e){
+      var sh = pmActiveSheet(); if(!sh) return;
+      if(e.key === 'Escape'){ e.preventDefault(); pmCloseSheet(sh.id); return; }
+      if(e.key === 'Tab'){
+        var list = Array.prototype.filter.call(
+          sh.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'),
+          function(el){ return !el.closest('[hidden]') && el.offsetParent !== null; }
+        );
+        if(!list.length) return;
+        var first = list[0], last = list[list.length - 1];
+        if(!sh.contains(document.activeElement)){ e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+        else if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      }
+    });
+  }
+  function pmRender(){
+    var host = $('phoneHome'); if(!host) return;
+    pmWire();
+    var visible = pmVisibleApps();
+    if(!visible.length){
+      pmCloseSheet('pmFolderSheet');
+      pmCloseSheet('pmEditSheet');
+      document.body.classList.remove('pm-phone-on');
+      host.innerHTML = '';
+      return;
+    }
+    var homeFocusMeta = pmCaptureMeta(document.activeElement, host);
+    document.body.classList.add('pm-phone-on');
+    var visMap = pmVisMap(visible) || {};
+    var recent = pmReadList(pmRecentKey(), PM_DEFAULT_RECENT, APPS.length, false)
+      .filter(function(k){ return !!visMap[k]; }).slice(0, PM_RECENT_MAX).map(function(k){ return visMap[k]; });
+    var core = pmCoreSplit(visMap).vis.map(function(k){ return visMap[k]; }).filter(Boolean);
+
+    var recentSection = recent.length ? ('<section class="pm-sec" aria-label="최근 쓴 앱">' +
+      '<div class="pm-hd-row"><span class="pm-sec-t">🕘 최근 쓴 앱</span><span class="pm-sec-s">최근 실행 순</span></div>' +
+      '<div class="pm-recent-strip">' + recent.map(function(a){
+        var fl = pmTileFlags(a.key);
+        var ttl = fl.title || (a.name + (a.desc ? ' — ' + a.desc : ''));
+        return '<button type="button" class="pm-rc-btn' + (fl.dim ? ' is-dim' : '') + '" data-pm-open="' + pmEsc(a.key) + '" title="' + pmEsc(ttl) + '"' + (fl.disabled ? ' aria-disabled="true"' : '') + '>' +
+          '<span class="pm-rc-ic" aria-hidden="true">' + pmIconHtml(a) + '</span>' +
+          '<span class="pm-rc-nm">' + pmEsc(a.name) + '</span></button>';
+      }).join('') + '</div></section>') : '';
+
+    var coreTiles = core.length ? core.map(function(a){
+      var fl = pmTileFlags(a.key);
+      var ttl = fl.title || (a.name + (a.desc ? ' — ' + a.desc : ''));
+      return '<div class="pm-tile-wrap">' +
+        '<button type="button" class="pm-tile' + (fl.dim ? ' is-dim' : '') + '" data-pm-open="' + pmEsc(a.key) + '" title="' + pmEsc(ttl) + '"' + (fl.disabled ? ' aria-disabled="true"' : '') + '>' +
+          '<span class="pm-tile-ic" aria-hidden="true">' + pmIconHtml(a) + '</span>' +
+          '<span class="pm-tile-nm">' + pmEsc(a.name) + '</span>' +
+          (fl.tag ? '<span class="pm-tile-tag">' + pmEsc(fl.tag) + '</span>' : '') +
+        '</button>' +
+        (fl.alertEl ? '<button type="button" class="pm-alert-pill" data-pm-alert="' + pmEsc(a.key) + '" aria-label="' + pmEsc(a.name + ' 알림 ' + fl.alertText) + '">' + pmEsc(fl.alertText) + '</button>' : '') +
+      '</div>';
+    }).join('') : '<div class="pm-empty">핵심 앱이 비어 있습니다. <b>✏️ 편집</b>에서 자주 쓰는 앱을 최대 8개 담아 주세요.</div>';
+
+    var folderTiles = PM_FOLDERS.map(function(f){
+      var items = visible.filter(function(a){ return pmFolderOf(a) === f.id; });
+      if(!items.length) return '';
+      var alerts = items.filter(function(a){ return !!pmTileFlags(a.key).alertEl; }).length;
+      return '<button type="button" class="pm-folder" data-pm-folder="' + pmEsc(f.id) + '" aria-haspopup="dialog">' +
+        '<span class="pm-ft-ic" aria-hidden="true">' + pmEsc(f.icon) + '</span>' +
+        '<span class="pm-ft-tx"><b>' + pmEsc(f.name) + '</b><small>' + pmEsc(f.desc) + '</small></span>' +
+        '<span class="pm-ft-cnt">' + items.length + '</span>' +
+        (alerts ? '<span class="pm-fdot" aria-label="알림 ' + alerts + '건">' + alerts + '</span>' : '') +
+      '</button>';
+    }).join('');
+    folderTiles += '<button type="button" class="pm-folder pm-all" data-pm-folder="all" aria-haspopup="dialog">' +
+      '<span class="pm-ft-ic" aria-hidden="true">📂</span>' +
+      '<span class="pm-ft-tx"><b>전체 앱 보기</b><small>영역별 · 필터</small></span>' +
+      '<span class="pm-ft-cnt">' + visible.length + '</span>' +
+    '</button>';
+
+    host.innerHTML = recentSection +
+      '<section class="pm-sec pm-core-box" aria-label="내 폰 핵심 앱">' +
+        '<div class="pm-hd-row">' +
+          '<span class="pm-sec-t">★ 내 폰 핵심 앱 (' + core.length + '/' + PM_CORE_MAX + ')</span>' +
+          '<button type="button" class="pm-edit-btn" id="pmEditBtn" aria-haspopup="dialog">✏️ 편집</button>' +
+        '</div>' +
+        '<div class="pm-core-grid">' + coreTiles + '</div>' +
+      '</section>' +
+      '<section class="pm-sec" aria-label="업무 폴더">' +
+        '<div class="pm-hd-row"><span class="pm-sec-t">📁 5개 업무 폴더 (' + visible.length + '개 전체)</span><span class="pm-sec-s">누르면 위로 열림</span></div>' +
+        '<div class="pm-folder-grid">' + folderTiles + '</div>' +
+      '</section>';
+
+    pmRestoreFocusIn(host, homeFocusMeta);
+    pmRenderFolderSheet();
+    pmRenderEditSheet();
+  }
+  function pmResetOnLogout(){
+    pmCloseSheet('pmFolderSheet');
+    pmCloseSheet('pmEditSheet');
+    _pmState.folderId = '';
+    _pmState.filter = 'all';
+    if(_pmState.toastTimer){ clearTimeout(_pmState.toastTimer); _pmState.toastTimer = 0; }
+    if($('pmToast')) $('pmToast').hidden = true;
+    document.body.classList.remove('pm-phone-on');
+  }
+
   // ── 로그아웃 ──
   /* ★ «전체» 로그아웃 (대표 보고 2026-09-14 「로그아웃 했는데 전체로그아웃이 잘 안되고 다시 로그인 되어 있다」)
      종전에는 auth.signOut() 하나였다. 파이어베이스는 끊기지만
@@ -7196,6 +7793,7 @@ body.portal-mode #moreFab{display:flex;}
      그 시각을 보고 스스로 끊는다(js/pu-authsync.js). 포털은 authsync 를 안 싣으므로 같은 열쇠를 직접 적는다.
      ⚠ 열쇠 이름은 pu-authsync.js 의 LOGOUT_KEY 와 «같아야» 한다 — tests/authsync-global-logout.test.js 가 견준다. */
   function broadcastLogout(){
+    if(typeof pmResetOnLogout === 'function') pmResetOnLogout();
     try { if(window.PuChatbotUI) window.PuChatbotUI.resetOnLogout(); } catch(_c){}
     try {
       localStorage.setItem('pu_auth_logout_at', String(Date.now()));
