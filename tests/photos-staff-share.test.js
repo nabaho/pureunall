@@ -406,6 +406,7 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-28 — 병목 해소 1단계 RTDB 인덱스 4곳(/data/finance_income/v, /hanaSmsBridge/inbox, /pucards/scheduled/.indexOn/2, /work_erp/items) 추가 및 기존 콘솔 /edulib/lectures 규칙 보존 배포 완료(사라짐 0 · 바뀜 0).
        다시 읽어 «콘솔이 올린 것과 같음» 확인 후 새 기준 docs/firebase-rules-콘솔원문-2026-11-28.json 으로 갱신 — 목록을 비운다. */
   /* ★ 2026-11-28 — 컨설팅 전용 앱 12종(scal_*), msg_intake, coach_rag 신규 14개 루트 및 콘솔 동기화 5종(kakao_room, labor_cases, labor_secret, sanjae_cases, sanjae_secret) 배포 완료(새로 14 · 바뀜 0 · 사라짐 0 · 문법 통과 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
+  /* ★ 2026-11-28 — /govlinks 콘솔 동기화, /kakao_room 2단계 강화분, 컨설팅 12종(scal_* projects/caseNo · regions) 규칙 배포 완료(사라짐 0 · 헐거워짐 0 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
   const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +

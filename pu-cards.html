@@ -46,7 +46,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=112"></script>
+<script src="js/pu-ontology.js?v=114"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-pub-search.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -57,7 +57,7 @@
 <script src="js/pu-mail-fill-core.js?v=2"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=8"></script>
-<script src="js/pu-version.js?v=12"></script>
+<script src="js/pu-version.js?v=13"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <!-- 사건 근로자 주민번호 — 그 사건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
@@ -4218,11 +4218,11 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=56"></script>
+  <script src="js/pu-appbar.js?v=59"></script>
   <script src="js/pu-handoff.js?v=2"></script>
   <script src="js/pu-doc-pick.js?v=2"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
+  <script src="js/pu-authsync.js?v=8"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -48407,12 +48407,14 @@ document.addEventListener('keydown', e=>{
   function doAutoLogout(){
     try{
       var _so=null;
+      try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃(기업정보함)'); }catch(_w){}
+      try{ window.PuAuthSync&&PuAuthSync.broadcastLogout&&PuAuthSync.broadcastLogout(); }catch(_b){}
       try{ _so=firebase.auth().signOut(); }catch(_){}
       var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(ov);
       /* ★ 로그아웃이 «끝난 뒤에» 포털로 간다 (2026-09-30). 전에는 시작만 하고 0.2초 뒤에 떠났다 —
          덜 끝난 채 포털이 열리면 포털은 남은 로그인을 보고 다시 들여보냈다(「로그아웃된 것 같다가 앱으로 넘어간다」).
          3초 안에 안 끝나면 그래도 간다(멎어 보이면 안 된다). */
-      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ location.replace('enter.html?v='+now()); }, 200); }
+      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ try{ sessionStorage.setItem('pu_boot_self_nav', String(now())); localStorage.setItem('pu_auth_redirect_at', String(now())); }catch(_){} location.replace('enter.html?v='+now()); }, 200); }
       if(_so && _so.then) _so.then(_leave, _leave); else _leave();
       setTimeout(_leave, 3000);
     }catch(_){ location.replace('enter.html'); }

@@ -1,0 +1,11 @@
+{
+  "liveEnabled": false,
+  "project": "pureun-erp",
+  "pollSec": 3,
+  "watchPopup": true,
+  "watchOpenRoom": true,
+  "rooms": [
+    "푸른노무법인 업무채팅방"
+  ],
+  "actorSid": "WATCH-PC"
+}

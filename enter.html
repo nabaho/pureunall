@@ -201,7 +201,7 @@ try {
   }
 } catch (_twaErr) {}
 </script>
-<script src="js/pu-version.js?v=12"></script>
+<script src="js/pu-version.js?v=13"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-pw-policy.js?v=1"></script>
 <script src="js/pu-backup.js?v=3"></script>
@@ -1493,7 +1493,7 @@ body.portal-mode #moreFab{display:flex;}
         var kb=document.createElement('button');
         kb.type='button'; kb.id='pu-kakao-restart'; kb.textContent='로그인 다시 시작';
         kb.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
-        kb.onclick=function(){ location.replace(location.pathname + '?v=' + Date.now()); };
+        kb.onclick=function(){ try{sessionStorage.setItem('pu_boot_self_nav',String(Date.now()));localStorage.setItem('pu_auth_redirect_at',String(Date.now()));}catch(_){} location.replace(location.pathname + '?v=' + Date.now()); };
         ks.appendChild(kb);
       }, 10000);
       return;
@@ -1504,7 +1504,7 @@ body.portal-mode #moreFab{display:flex;}
     var b=document.createElement('button');
     b.type='button'; b.id='pu-boot-skip'; b.textContent='기다리지 않고 로그인 화면 보기';
     b.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
-    b.onclick=function(){ var s3=document.getElementById('pu-boot-splash'); if(s3) s3.remove(); };
+    b.onclick=function(){ if(typeof window.__puForceShowLogin==='function'){ window.__puForceShowLogin(); return; } var s3=document.getElementById('pu-boot-splash'); if(s3) s3.remove(); };
     s2.appendChild(b);
     /* 자동 제한시간으로 걷지 않는다. 인증이 40초 넘게 걸리는 폰에서 노란 로그인 화면이
        잠깐 보였다가 같은 계정으로 다시 들어가는 문제가 바로 이 제한시간 때문에 생겼다.
@@ -2155,6 +2155,18 @@ body.portal-mode #moreFab{display:flex;}
     appId: '1:936817166182:web:9bd31f70d0afdf5fca2aa7',
     messagingSenderId: '936817166182'
   };
+  if (typeof firebase === 'undefined' || !firebase.auth || !firebase.database) {
+    try { var _sp0 = document.getElementById('pu-boot-splash'); if (_sp0) _sp0.remove(); } catch(_){}
+    try {
+      var _em0 = document.getElementById('errMsg');
+      if (_em0) _em0.textContent = '인증 서버 연결이 지연되고 있습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.';
+    } catch(_){}
+    return;
+  }
+  function _markSelfAuthNav(){
+    try { sessionStorage.setItem('pu_boot_self_nav', String(Date.now())); } catch(_){}
+    try { localStorage.setItem('pu_auth_redirect_at', String(Date.now())); } catch(_){}
+  }
   firebase.initializeApp(FB_CONFIG);
   var auth = firebase.auth();
   var db = firebase.database();
@@ -2336,7 +2348,7 @@ body.portal-mode #moreFab{display:flex;}
     { key:'safety',   name:'안전보건체계구축', desc:'과거이력·업종별체크·위험성·HWPX', icon:'🦺', url:'safety.html',         roles:null, row:'client' },
     { key:'techprotect', name:'기술보호컨설팅', desc:'대중소협력재단·영업비밀·비밀유지·HWPX', icon:'🔐', url:'techprotect.html', roles:null, row:'client' },
     { key:'clinic',   name:'현장클리닉',      desc:'중기청 비즈니스지원단·상담·방문·HWPX', icon:'🩺', url:'clinic.html',        roles:null, row:'client' },
-    { key:'chamber',  name:'상공회의소컨설팅', desc:'충남북부·서산·대한상의 인사노무 자문', icon:'🏬', url:'chamber.html',       roles:null, row:'client' },
+    { key:'chamber',  name:'상공회의소컨설팅', desc:'충남북부·서산·당진·대한상의 인사노무 자문', icon:'🏬', url:'chamber.html',       roles:null, row:'client' },
     { key:'hrconsult', name:'기초인사노무',    desc:'근로계약서·취업규칙연계·급여설계', icon:'🗂️', url:'hrconsult.html',     roles:null, row:'client' },
     { key:'evalcomp', name:'평가보상·임금체계', desc:'성과평가·직무급·KPI·성과급·PIP', icon:'📈', url:'evalcomp.html',      roles:null, row:'client' },
     { key:'pubconsult', name:'공공기관컨설팅', desc:'사회서비스원·지자체·공무직·용역 진단', icon:'🏤', url:'pubconsult.html',    roles:null, row:'client' },
@@ -2415,6 +2427,8 @@ body.portal-mode #moreFab{display:flex;}
     { key:'hangul',  name:'한글 편집기',   desc:'한글 문서 열기·고치기', icon:'📝', url:'hangul.html',   roles:null, row:'client' },
     /* P박스 — 대한민국 전 법령·판례·행정해석·AI 서면(대표 지시 2026-11-15 「다 만들면 자료함에 연결시켜 달라」). */
     { key:'pbox',    name:'P박스',        desc:'전 법령·판례·행정해석·AI 서면', icon:'📚', url:'pu-pbox.html', roles:null, row:'store' },
+    /* 법인 카카오톡 방 — 약관 무위반 안전수집 · 비식별 업무 영구보관 · 업무/자료함 연결(2026-11-28). */
+    { key:'kakaoroom', name:'법인 카카오톡 방', desc:'업무방 자동수집·업무·자료함 영구보관', icon:'🗨️', url:'pu-kakaoroom.html', roles:null, row:'store' },
     /* 급여아웃소싱 — 2026-10-20 준비중으로 닫았다가 2026-11-02 off 걷고 이름 변경, 2026-11-18 대표 「급여아웃소싱 준비중을 풀어달라 다른직원이 모두 접근가능하게」로
        포털 준비중 딱지(soon)와 안쪽 문(payroll-os.html 의 PuGate.soonUnlessAdmin)·실시간DB 규칙(payroll_os → 재직 직원 LOGIN)을 함께 열었다(tests/app-soon-gate.test.js ⑨). */
     { key:'payroll', name:'급여아웃소싱', desc:'급여·근태·명세서·연차', icon:'💰', url:'payroll-os.html', roles:null, row:'client' },
@@ -2712,7 +2726,11 @@ body.portal-mode #moreFab{display:flex;}
      포털이 말없이 열리면, 본인은 자기가 로그인한 줄 안다. */
   var _freshLogin = false;
   window._puAuthAt = 0;   // 이 탭이 마지막으로 로그인한 사람을 본 때 — 다른 탭의 «지금 나갔다»와 견준다 (스코프에 안 매이게 window 에)
-  function _rmBootSplash(){ try { var s=document.getElementById('pu-boot-splash'); if(s) s.remove(); } catch(_e){} }
+  window.__puAuthConfirmedUid = '';
+  function _rmBootSplash(){
+    try { if(typeof _loginGuard !== 'undefined' && _loginGuard && _loginGuard.clearEscape) _loginGuard.clearEscape(); } catch(_ce){}
+    try { var s=document.getElementById('pu-boot-splash'); if(s) s.remove(); } catch(_e){}
+  }
   /* ══ 로그인 화면은 «지금 이 순간 로그인이 없다»를 확인한 뒤에만 보인다 (대표 지시 2026-10-09
        「앱을 클릭하면 아주 잠깐 카카오톡 로그인 화면이 팝업처럼 나온다 — 완전히 안 나오게 해라.
          모든 앱들에서 계속 한 번씩 나온다」) ══
@@ -2731,8 +2749,8 @@ body.portal-mode #moreFab{display:flex;}
      ★ 그래도 번쩍이면 «어느 길이었는지» 이 기기에 남긴다(pu_login_flash_log · 최근 20건 · 이름·주소 없음).
        다음에는 추측하지 않고 그것을 읽는다. */
   var _loginGuard = (function(){
-    var RECHECK_MS = 2000, FLASH_MS = 20000, LOG_KEY = 'pu_login_flash_log';
-    var lastShownAt = 0, lastWhy = '', lastHidden = false, covered = false, recheckT = 0;
+    var RECHECK_MS = 2000, FLASH_MS = 20000, COVER_ESCAPE_MS = 8000, LOG_KEY = 'pu_login_flash_log';
+    var lastShownAt = 0, lastWhy = '', lastHidden = false, covered = false, recheckT = 0, escapeT = 0;
     function signedIn(){ try { var u = auth.currentUser; return !!(u && u.email); } catch(e){ return false; } }
     function typing(){ var i = $('loginId'), p = $('loginPw'); return !!((i && i.value) || (p && p.value)); }
     function loginOnTop(){
@@ -2740,16 +2758,35 @@ body.portal-mode #moreFab{display:flex;}
       return !_handled && !window.__kkReturning && !!lv && lv.style.display !== 'none'
         && !document.getElementById('pu-boot-splash');
     }
+    function clearEscape(){ if(escapeT){ clearTimeout(escapeT); escapeT = 0; } }
     function cover(){
       if(document.getElementById('pu-boot-splash')) return;
+      clearEscape();
       var s = document.createElement('div');
       s.id = 'pu-boot-splash';
       s.setAttribute('role', 'status');
       s.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px';
       s.innerHTML = '<div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>'
-        + '<div style="font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">로그인 상태 확인 중…</div>';
+        + '<div id="pu-boot-msg" style="display:block;font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">로그인 상태 확인 중…</div>';
       document.body.appendChild(s);
       covered = true;
+      escapeT = setTimeout(function(){
+        escapeT = 0;
+        var cur = document.getElementById('pu-boot-splash');
+        if(!cur || cur !== s) return;
+        var m = document.getElementById('pu-boot-msg');
+        if(m) m.textContent = '연결이 느려 로그인 확인이 늦어지고 있습니다…';
+        if(!document.getElementById('pu-boot-skip') && s.appendChild){
+          var b = document.createElement('button');
+          b.type = 'button'; b.id = 'pu-boot-skip'; b.textContent = '기다리지 않고 로그인 화면 보기';
+          b.style.cssText = 'margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
+          b.onclick = function(){
+            if(typeof window.__puForceShowLogin === 'function'){ window.__puForceShowLogin(); return; }
+            _rmBootSplash();
+          };
+          s.appendChild(b);
+        }
+      }, COVER_ESCAPE_MS);
     }
     function hide(){ if(loginOnTop() && !typing()) cover(); }
     /* 다시 보일 때 — 곧바로 걷지 않고 다른 탭의 로그인이 들어올 틈을 준다 */
@@ -2759,6 +2796,7 @@ body.portal-mode #moreFab{display:flex;}
       recheckT = setTimeout(function(){
         if(!covered) return;
         covered = false;
+        if(_handled && typeof _portalReady !== 'undefined' && _portalReady){ _rmBootSplash(); return; }
         if(_handled || signedIn()) return;          // 그새 들어왔다 — 포털이 다 그린 뒤 걷는다
         _rmBootSplash();
         shown('다시 보임');
@@ -2771,7 +2809,7 @@ body.portal-mode #moreFab{display:flex;}
     }
     /* 로그인이 들어왔다 — 방금 로그인 화면을 드러냈었다면 «번쩍였다»로 적는다 */
     function userSeen(){
-      covered = false; clearTimeout(recheckT);
+      covered = false; clearTimeout(recheckT); clearEscape();
       if(lastShownAt && Date.now() - lastShownAt < FLASH_MS){
         try {
           var a = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); if(!Array.isArray(a)) a = [];
@@ -2785,18 +2823,41 @@ body.portal-mode #moreFab{display:flex;}
     document.addEventListener('visibilitychange', function(){ if(document.hidden) hide(); else show(); });
     window.addEventListener('pagehide', hide);
     window.addEventListener('pageshow', function(e){ if(e && e.persisted && !document.hidden) show(); });
-    return { shown: shown, userSeen: userSeen, cover: cover, _hide: hide, _show: show };
+    return { shown: shown, userSeen: userSeen, cover: cover, clearEscape: clearEscape, _hide: hide, _show: show };
   })();
+  window.__puForceShowLogin = function(){
+    try { if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; } } catch(_e){}
+    _handled = false;
+    _portalUid = '';
+    _portalReady = false;
+    window._fastRestored = false;
+    window.__kkReturning = false;
+    window.__puPortalEntering = false;
+    window.__puAuthConfirmedUid = '';
+    _kkLoginStarting = false;
+    try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
+    try { if($('portalView')) $('portalView').style.display = 'none'; } catch(_e){}
+    try { document.body.classList.remove('portal-mode'); } catch(_e){}
+    try { var tf = $('topfix'); if(tf) tf.style.display = ''; } catch(_e){}
+    try { if($('loginView')) $('loginView').style.display = ''; } catch(_e){}
+    try { if($('loginBtn')) $('loginBtn').disabled = false; } catch(_e){}
+    try { if(typeof kkResetBtn === 'function') kkResetBtn(); } catch(_e){}
+    _rmBootSplash();
+    try { _loginGuard.shown('수동 열기'); } catch(_e){}
+  };
   auth.onAuthStateChanged(function(user){
       if(!window.__puAuthObservedAt) window.__puAuthObservedAt = Date.now();
       if(user && user.email){
         if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
+        window.__puAuthConfirmedUid = user.uid || '';
+        try { localStorage.setItem('pu_auth_uid', user.uid || ''); } catch(_u){}
         if(_handled && _portalUid && user.uid !== _portalUid){
           // 다른 사람이 들어온 경우 이전 사람의 타일·빠른 복원 캐시를 지우고 다시 그리지 않는다.
           try { sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_fc0){}
           _loginGuard.cover();
+          try { if(typeof _markSelfAuthNav === 'function') _markSelfAuthNav(); } catch(_m){}
           location.replace(location.pathname + '?v=' + Date.now()); return;
-          /* 서버 명부도 뒤에서 다시 확인해 권한·재직 변경을 반영한다 */
+          /* 서버 명부도 뒤이어 다시 확인해 권한·재직 변경을 반영한다 */
         }
         try { _loginGuard.userSeen(); } catch(_g){}
         window._puAuthAt = Date.now(); /* 뒤이어 onAuthStateChanged 가 서버 명부를 재확인한다 */
@@ -2816,16 +2877,23 @@ body.portal-mode #moreFab{display:flex;}
         if(_authRecheckTimer) clearTimeout(_authRecheckTimer);
         var logoutAt = 0;
         try { logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0); } catch(_e){}
+        var explicitOut = !!(logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt);
+        var unconfirmedFast = !!(window._fastRestored && !window.__puAuthConfirmedUid);
+        var waitMs = explicitOut ? 0 : (unconfirmedFast ? 3000 : AUTH_RECOVERY_MS);
         _authRecheckTimer = setTimeout(function(){
           _authRecheckTimer = null;
           if(auth.currentUser && auth.currentUser.uid === _portalUid){ if(_portalReady) _rmBootSplash(); return; }
+          if(unconfirmedFast && typeof window.__puForceShowLogin === 'function'){ window.__puForceShowLogin(); return; }
           _handled = false;
           _portalUid = '';
           _portalReady = false;
+          window._fastRestored = false;
+          window.__puAuthConfirmedUid = '';
           try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
+          try { if(typeof _markSelfAuthNav === 'function') _markSelfAuthNav(); } catch(_m){}
           try { location.replace(location.pathname + '?v=' + Date.now()); }
           catch(_) { location.reload(); }
-        }, logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt ? 0 : AUTH_RECOVERY_MS);
+        }, waitMs);
       } else {
         // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시 (빠른 복원 캐시도 비움)
         try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); sessionStorage.removeItem('pu_portal_fast_acct'); localStorage.removeItem('pu_portal_fast_acct'); } catch(_e){}
@@ -2887,19 +2955,29 @@ body.portal-mode #moreFab{display:flex;}
     clearTimeout(t._kkT);
     t._kkT = setTimeout(function(){ t.style.display = 'none'; }, ms || 4000);
   }
+  var _kkLoginStartedAt = 0;
   function kkResetBtn(){
     _kkLoginStarting = false;
+    _kkLoginStartedAt = 0;
     var btn = $('kkLoginBtn');
     if(btn){ btn.disabled = false; btn.textContent = '💬 카카오로 로그인'; }
   }
-  /* 모바일 브라우저에서 카카오 화면으로 갔다가 뒤로가기(bfcache)로 돌아오면
+  /* 모바일 브라우저에서 카카오 화면으로 갔다가 뒤로가기(bfcache·일반 복귀)로 돌아오면
      버튼이 비활성·이동 중 상태로 굳어 먹통이 되는 것을 막는다. */
   window.addEventListener('pageshow', function(e){
     if(e && e.persisted && !window.__kkReturning) kkResetBtn();
   });
+  if(document && document.addEventListener){
+    document.addEventListener('visibilitychange', function(){
+      if(!document.hidden && _kkLoginStarting && !window.__kkReturning && _kkLoginStartedAt && (Date.now() - _kkLoginStartedAt > 3000)){
+        kkResetBtn();
+      }
+    });
+  }
   function kkLogin(){
     if(_kkLoginStarting) return;   // 한 번 누른 요청이 끝나기 전 중복 이동을 만들지 않는다
     _kkLoginStarting = true;
+    _kkLoginStartedAt = Date.now();
     var btn = $('kkLoginBtn');
     if(btn){ btn.disabled = true; btn.textContent = '💬 카카오로 이동 중…'; }
     showErr('');
@@ -2925,6 +3003,7 @@ body.portal-mode #moreFab{display:flex;}
     try { sessionStorage.setItem('pu_kakao_login_tap_at', String(Date.now())); } catch(_t){}
     PuKakao.goLogin({ ask: askKakaoAccount }).catch(function(err){
       _kkLoginStarting = false;
+      _kkLoginStartedAt = 0;
       /* 카카오 주소 요청이 실패했는데 그 사이 저장된 로그인이 복원됐다면
          비활성 로그인 폼에 오류만 남기지 말고 정상 포털을 한 번 연다. */
       var restored = auth.currentUser;
@@ -2957,7 +3036,7 @@ body.portal-mode #moreFab{display:flex;}
       var kkFirebaseStarted = 0, kkFirebaseMs = 0, kkFirebasePerfAt = 0;
       var kkFirebaseNetworkMs = 0, kkFirebaseNetworkCount = 0, kkFirebaseHidden = false;
       var kkAuthReadyBeforeSignIn = false;
-      var persist = Promise.resolve().then(function(){
+      var persistWork = Promise.resolve().then(function(){
         if(!keep) return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function(){
           try { localStorage.setItem('pu_portal_persistence_applied', 'session'); } catch(_e){}
         });
@@ -2971,6 +3050,18 @@ body.portal-mode #moreFab{display:flex;}
             localStorage.setItem('pu_portal_persistence_applied', 'local');
             sessionStorage.removeItem('pu_kakao_force_local');
           } catch(_e){}
+        });
+      });
+      var persist = new Promise(function(resolve, reject){
+        var done = false;
+        var pt = setTimeout(function(){
+          if(done) return; done = true;
+          reject(new Error('이 기기의 로그인 저장소 응답이 지연되고 있습니다.'));
+        }, 16000);
+        persistWork.then(function(v){
+          if(done) return; done = true; clearTimeout(pt); resolve(v);
+        }, function(err){
+          if(done) return; done = true; clearTimeout(pt); reject(err);
         });
       }).then(function(){ kkStoreMs = Date.now() - kkStarted; }).catch(function(err){
         if(err && typeof err === 'object') err.puPersistence = true;
@@ -2988,10 +3079,25 @@ body.portal-mode #moreFab{display:flex;}
           kkFirebasePerfAt = window.performance.now();
           kkFirebaseHidden = !!document.hidden;
         } catch(_t){}
-        return auth.signInWithCustomToken(ready[0]);
+        return new Promise(function(resolve, reject){
+          var done = false;
+          var ft = setTimeout(function(){
+            if(done) return; done = true;
+            reject(new Error('로그인 마무리 응답이 지연되고 있습니다 — 다시 시도해 주세요'));
+          }, 20000);
+          Promise.resolve(auth.signInWithCustomToken(ready[0])).then(function(cred){
+            if(done) return; done = true; clearTimeout(ft); resolve(cred);
+          }, function(err){
+            if(done) return; done = true; clearTimeout(ft); reject(err);
+          });
+        });
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
         window._puAuthAt = Date.now();
+        if(cred && cred.user && cred.user.uid){
+          window.__puAuthConfirmedUid = cred.user.uid;
+          try { localStorage.setItem('pu_auth_uid', cred.user.uid); } catch(_u){}
+        }
         // 카카오 로그인 → 자동 로그아웃 3시간 (대표 지시 2026-11-18). 인증표의 kakao 표시로 다시 확인된다(js/pu-active.js).
         try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'kakao', PuActive.signInAt(cred.user)); } catch(_v){}
         try {
@@ -3383,6 +3489,7 @@ body.portal-mode #moreFab{display:flex;}
     } catch(e){}
   }
 
+  var _loginReqSeq = 0;
   function doLogin(){
     var id = ($('loginId').value || '').trim();
     var pw = $('loginPw').value || '';
@@ -3394,6 +3501,7 @@ body.portal-mode #moreFab{display:flex;}
               : (/^[A-Za-z]+-?\d+$/.test(id) ? sidToEmail(id) : '');
     if(!email){ showErr('이메일 형식으로 입력하세요.'); return; }
 
+    var _reqId = ++_loginReqSeq;
     $('loginBtn').disabled = true;
     showErr('');
     _freshLogin = true;                        // 이번 진입은 「방금 아이디를 친」 로그인이다
@@ -3404,17 +3512,42 @@ body.portal-mode #moreFab{display:flex;}
       ? firebase.auth.Auth.Persistence.LOCAL
       : firebase.auth.Auth.Persistence.SESSION;
 
-    // 응답 감시: 얼어있던 탭에서 인증 모듈이 응답을 못 하면 버튼이 비활성으로
-    // 영원히 멈춤 — 12초 내 결과가 없으면 새로고침으로 깨운다.
+    // 응답 감시: 얼어있던 탭이나 느린 망에서 인증 모듈이 지연돼도 입력 값을 날리며 강제 새로고침하지 않고
+    // 버튼만 복구해 재시도할 수 있게 둔다(이미 복원된 계정이 있으면 즉시 포털 진입).
     var _settled = false;
     var _watchdog = setTimeout(function(){
-      if(_settled) return;
-      showErr('응답이 없어 화면을 새로 고칩니다. 잠시 후 다시 로그인해 주세요.');
-      // 12초~12.9초 사이 로그인 성공 시 새로고침 취소 (이중 실행 방지)
-      setTimeout(function(){ if(_settled) return; location.replace(location.pathname + '?v=' + Date.now()); }, 900);
-    }, 12000);
+      if(_settled || _reqId !== _loginReqSeq) return;
+      $('loginBtn').disabled = false;
+      var restored = null;
+      try { restored = auth.currentUser; } catch(_u){}
+      if(restored && restored.email && !_handled){
+        _settled = true; _handled = true; enterPortal(restored); return;
+      }
+      showErr('로그인 응답이 지연되고 있습니다. 다시 한 번 누르거나 잠시 후 새로고침해 주세요.');
+    }, 15000);
 
-    auth.setPersistence(persistence).catch(function(err){
+    var alreadyLocal = false;
+    try { alreadyLocal = wantsAutoLogin && localStorage.getItem('pu_portal_persistence_applied') === 'local'; } catch(_p){}
+    var _persistPromise = alreadyLocal
+      ? Promise.resolve()
+      : new Promise(function(resolve, reject){
+          var done = false;
+          var pt = setTimeout(function(){
+            if(done) return; done = true;
+            var te = new Error('로그인 저장소 준비 시간이 초과되었습니다.');
+            te.puPersistence = true;
+            reject(te);
+          }, 7000);
+          Promise.resolve().then(function(){
+            return auth.setPersistence(persistence);
+          }).then(function(){
+            if(done) return; done = true; clearTimeout(pt); resolve();
+          }, function(err){
+            if(done) return; done = true; clearTimeout(pt); reject(err);
+          });
+        });
+
+    _persistPromise.catch(function(err){
       // 자동로그인이 저장되지 않았는데 성공한 것처럼 로그인시키지 않는다.
       if(err && typeof err === 'object') err.puPersistence = true;
       throw err;
@@ -3422,6 +3555,11 @@ body.portal-mode #moreFab{display:flex;}
       return auth.signInWithEmailAndPassword(email, pw);
     }).then(function(cred){
       _settled = true; clearTimeout(_watchdog);
+      window._puAuthAt = Date.now();
+      if(cred && cred.user && cred.user.uid){
+        window.__puAuthConfirmedUid = cred.user.uid;
+        try { localStorage.setItem('pu_auth_uid', cred.user.uid); } catch(_u){}
+      }
       // 아이디·비번 로그인 → 자동 로그아웃은 포털 설정 시간(기본 1시간) (대표 지시 2026-11-18)
       try { if(window.PuActive && cred && cred.user) PuActive.noteVia(cred.user.uid, 'password', PuActive.signInAt(cred.user)); } catch(_v){}
       // ⚠ 증표를 «기다리지 않는다» — 아래 아이디 저장도 enterPortal 도 이 약속과 무관하게
@@ -3458,7 +3596,7 @@ body.portal-mode #moreFab{display:flex;}
       if(!_handled){ _handled = true; enterPortal(cred.user); }
     }).catch(function(err){
       _settled = true; clearTimeout(_watchdog);
-      $('loginBtn').disabled = false;
+      if(_reqId === _loginReqSeq) $('loginBtn').disabled = false;
       var code = (err && err.code) || '';
       if(code === 'auth/multi-factor-auth-required'){
         mfaOpenLogin(email, pw, wantsAutoLogin);
@@ -3548,6 +3686,7 @@ body.portal-mode #moreFab{display:flex;}
       if(auth.currentUser) return;                        // 로그인 상태면 포털 로직이 담당
       if(Date.now() - loadedAt < STALE) return;
       var pw = $('loginPw'); if(pw && pw.value) return;   // 입력하던 값이 있으면 유지
+      try { if(typeof _markSelfAuthNav === 'function') _markSelfAuthNav(); } catch(_m){}
       location.replace(location.pathname + '?v=' + Date.now());
     }
     document.addEventListener('visibilitychange', freshen);
@@ -3638,7 +3777,7 @@ body.portal-mode #moreFab{display:flex;}
         document.removeEventListener('visibilitychange', once);
         var u = auth.currentUser;
         if(u && u.uid === t.uid) go();
-        else location.replace(location.pathname + '?v=' + Date.now());   // 그새 나갔다 — 포털을 새로
+        else { try { if(typeof _markSelfAuthNav === 'function') _markSelfAuthNav(); } catch(_m){} location.replace(location.pathname + '?v=' + Date.now()); }   // 그새 나갔다 — 포털을 새로
       });
     } else go();
     return true;
@@ -3678,51 +3817,59 @@ body.portal-mode #moreFab{display:flex;}
     _freshLogin = false;
     // 직원명부에서 이 사용자(이메일 매칭) 찾아 이름·역할 확정 → 그 후에 한 번에 표시
     function _show(m, fromCache){
-      renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
-      $('portalView').style.display = 'block';
-      _portalReady = true;
-      armKakaoPortalHistory();
+      if(!_handled || _portalUid !== (user.uid || '')){ _rmBootSplash(); window.__puPortalEntering = false; return; }
       try {
-        if(m && m.acct && !fromCache){
-          /* 빠른 복원 사본은 현재 탭(sessionStorage)에만 두고 영구 localStorage 에는 남기지 않는다(사번 이메일·프로필 잔류 차단) */
-          var _fastAcct = JSON.stringify({ uid:user.uid||'', acct:m.acct, all:m.all||[], at:Date.now() });
-          sessionStorage.setItem('pu_portal_fast_acct', _fastAcct);
-          localStorage.removeItem('pu_portal_fast_acct');
+        renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
+        $('portalView').style.display = 'block';
+        _portalReady = true;
+        armKakaoPortalHistory();
+        try {
+          if(m && m.acct && !fromCache){
+            /* 빠른 복원 사본은 현재 탭(sessionStorage)에만 두고 영구 localStorage 에는 남기지 않는다(사번 이메일·프로필 잔류 차단) */
+            var _fastAcct = JSON.stringify({ uid:user.uid||'', acct:m.acct, all:m.all||[], at:Date.now() });
+            sessionStorage.setItem('pu_portal_fast_acct', _fastAcct);
+            localStorage.removeItem('pu_portal_fast_acct');
+          }
+        } catch(_fc){}
+        try {
+          if(!auth.currentUser && auth.onAuthStateChanged){
+            var _unFast = auth.onAuthStateChanged(function(u){
+              if(!u || u.uid !== _portalUid) return;
+              try { if(typeof _unFast === 'function') _unFast(); } catch(_){}
+              try { renderPortal(m.acct, { email:(u.email||''), all:m.all, via:_via }); } catch(_){}
+            });
+          }
+        } catch(_fa){}
+        try {
+          var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
+          if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
+            timing.portalMs = timing.at ? Date.now() - timing.at : timing.totalMs;
+            timing.fastProfile = !!(verifiedProfile && verifiedProfile.acct && m === verifiedProfile);
+            var tapAt = Number(sessionStorage.getItem('pu_kakao_login_tap_at') || 0);
+            if(tapAt && Date.now() - tapAt < 600000) timing.fromTapMs = Date.now() - tapAt;
+            sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify(timing));
+            puLoginTimingSave({mode:'kakao', savedAt:Date.now(), callbackBootMs:timing.callbackBootMs,
+              serverMs:timing.serverMs, storeMs:timing.storeMs, firebaseMs:timing.firebaseMs,
+              firebaseNetworkMs:timing.firebaseNetworkMs, firebaseNetworkCount:timing.firebaseNetworkCount,
+              firebaseHidden:timing.firebaseHidden, authReadyBeforeSignIn:timing.authReadyBeforeSignIn,
+              portalMs:Math.max(0, timing.portalMs - timing.totalMs), callbackToPortalMs:timing.portalMs,
+              fromTapMs:timing.fromTapMs});
+            sessionStorage.removeItem('pu_kakao_login_tap_at');
+          }
+        } catch(_t){}
+        if(_via === 'auto'){
+          var navAt = window.__puLoginNavAt || portalEntryAt;
+          puLoginTimingSave({mode:'session', savedAt:Date.now(), authRestoreMs:Math.max(0, portalEntryAt-navAt),
+            profileAndTilesMs:Date.now()-portalEntryAt, totalMs:Date.now()-navAt});
         }
-      } catch(_fc){}
-      try {
-        if(!auth.currentUser && auth.onAuthStateChanged){
-          var _unFast = auth.onAuthStateChanged(function(u){
-            if(!u || u.uid !== _portalUid) return;
-            try { if(typeof _unFast === 'function') _unFast(); } catch(_){}
-            try { renderPortal(m.acct, { email:(u.email||''), all:m.all, via:_via }); } catch(_){}
-          });
-        }
-      } catch(_fa){}
-      try {
-        var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
-        if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
-          timing.portalMs = timing.at ? Date.now() - timing.at : timing.totalMs;
-          timing.fastProfile = !!(verifiedProfile && verifiedProfile.acct && m === verifiedProfile);
-          var tapAt = Number(sessionStorage.getItem('pu_kakao_login_tap_at') || 0);
-          if(tapAt && Date.now() - tapAt < 600000) timing.fromTapMs = Date.now() - tapAt;
-          sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify(timing));
-          puLoginTimingSave({mode:'kakao', savedAt:Date.now(), callbackBootMs:timing.callbackBootMs,
-            serverMs:timing.serverMs, storeMs:timing.storeMs, firebaseMs:timing.firebaseMs,
-            firebaseNetworkMs:timing.firebaseNetworkMs, firebaseNetworkCount:timing.firebaseNetworkCount,
-            firebaseHidden:timing.firebaseHidden, authReadyBeforeSignIn:timing.authReadyBeforeSignIn,
-            portalMs:Math.max(0, timing.portalMs - timing.totalMs), callbackToPortalMs:timing.portalMs,
-            fromTapMs:timing.fromTapMs});
-          sessionStorage.removeItem('pu_kakao_login_tap_at');
-        }
-      } catch(_t){}
-      if(_via === 'auto'){
-        var navAt = window.__puLoginNavAt || portalEntryAt;
-        puLoginTimingSave({mode:'session', savedAt:Date.now(), authRestoreMs:Math.max(0, portalEntryAt-navAt),
-          profileAndTilesMs:Date.now()-portalEntryAt, totalMs:Date.now()-navAt});
+      } catch(_rpErr) {
+        try { if(window.console && console.error) console.error('[포털 표시 오류]', _rpErr); } catch(_ce){}
+        try { if($('portalView')) $('portalView').style.display = 'block'; } catch(_pv){}
+        _portalReady = true;
+      } finally {
+        _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
+        window.__puPortalEntering = false;
       }
-      _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
-      window.__puPortalEntering = false;
     }
     var _revAcct = puPlayReviewerAcct(user && user.email);
     if(_revAcct){
@@ -3793,7 +3940,8 @@ body.portal-mode #moreFab{display:flex;}
       .catch(function(){
         return _readRoster('data/user_accounts').then(_match).catch(function(){ return { acct:null, all:[] }; });
       })
-      .then(function(m){ _show((m && m.acct) ? m : _matchLocal()); });
+      .then(function(m){ _show((m && m.acct) ? m : _matchLocal()); })
+      .catch(function(){ _show(_matchLocal()); });
   }
 
   // ── 프로그램 창 관리자 ──
@@ -9248,7 +9396,7 @@ body.portal-mode #moreFab{display:flex;}
 </script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-orchestrator-core.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=21"></script>
+<script src="js/pu-chatbot-kb.js?v=23"></script>
 <script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>

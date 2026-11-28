@@ -14,7 +14,8 @@ module.exports = {
           createdAt: NOW - 864e5 * 10,
           updatedAt: NOW - 3600e3,
           revision: 1,
-          companyName: '(주)가나상공회의소샘플',
+          companyName: '(주)가나북부상공회의소샘플',
+          caseNo: '인사충남-2026-001',
           year: 2026,
           trackId: 'ch_chungnam',
           trackName: '충남북부상공회의소 인사노무컨설팅',
@@ -22,7 +23,60 @@ module.exports = {
           workerCount: 25,
           consultantName: '점검노무사',
           status: 'active',
-          summaryNote: '상공회의소컨설팅 현장 점검 진행 중 (연락처 010-0000-1001)'
+          summaryNote: '충남북부상의 회원사 현장 점검 진행 중'
+        },
+        'pr_chamber_2': {
+          id: 'pr_chamber_2',
+          entityType: 'Project',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 20,
+          updatedAt: NOW - 864e5 * 2,
+          revision: 1,
+          companyName: '(주)다라서산상공회의소샘플',
+          caseNo: '인사서산-2026-001',
+          year: 2026,
+          trackId: 'ch_seosan',
+          trackName: '서산상공회의소 인사노무컨설팅',
+          stage: 'design',
+          workerCount: 30,
+          consultantName: '점검노무사',
+          status: 'active',
+          summaryNote: '서산상의 회원사 근로계약·임금 정비 중'
+        },
+        'pr_chamber_3': {
+          id: 'pr_chamber_3',
+          entityType: 'Project',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 400,
+          updatedAt: NOW - 864e5 * 365,
+          revision: 1,
+          companyName: '(주)마바과거북부샘플',
+          year: 2025,
+          trackId: 'ch_chungnam',
+          trackName: '충남북부상공회의소 인사노무컨설팅',
+          stage: 'followup',
+          workerCount: 40,
+          consultantName: '점검노무사',
+          status: 'done',
+          summaryNote: '2025 충남북부상의 결과보고 완료 (과거이력)'
+        }
+      },
+      regions: {
+        'ch_reg_demo': {
+          id: 'ch_reg_demo',
+          entityType: 'Document',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 5,
+          updatedAt: NOW - 864e5 * 5,
+          revision: 1,
+          name: '천안아산상공회의소 인사노무컨설팅',
+          shortName: '천안아산상의',
+          agency: '상공회의소',
+          keywords: '천안상의,아산상의',
+          sortOrder: 101
         }
       },
       checks: {

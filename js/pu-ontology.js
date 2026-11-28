@@ -34,6 +34,8 @@
       EduCategory:'강의 종류',
       /* 강의자료(2026-11-22) — 자료 한 건의 «내용 지문»(슬라이드·문서 글로 만든 숫자 MinHash). 비슷한 강의(고쳐 쓴 판)를 잇는 데만 쓴다 — 글 자체는 담지 않는다 */
       EduSimilarity:'강의 내용 지문',
+      /* 법인 카카오톡 방(2026-11-28) — 약관 무위반 안전판별을 통과한 비식별 업무 대화 보관 · 카톡 첨부파일 영구 이력 */
+      KakaoWorkArchive:'법인 카톡 업무기록', KakaoFileRecord:'법인 카톡 파일이력',
       /* 컨설팅정산(2026-10-31) — 사업 종류별 규칙 · 안내 글↔원본 ID 연결 · 읽은 비용지급 안내 · 지급월 정산표 · 이월·조정 */
       SettleRule:'컨설팅정산 규칙', SettleLink:'컨설팅정산 연결', SettleNotice:'컨설팅정산 안내 파일', SettleRun:'컨설팅정산 정산표', SettleAdjust:'컨설팅정산 이월·조정', SettleRoom:'컨설팅정산 카톡 방', SettleKakao:'컨설팅정산 카톡 발송',
       /* 푸른등기(2026-11-14) — 지금 등기부 현황(사원·출자·대표사원·분사무소) 하나 · 변경등기 한 건(바뀌는 것·서류 고르기·필요서류 확인·일정) */
@@ -305,6 +307,14 @@
                       {path:'edulib/cats/{id}',entityType:'EduCategory'},
                       {path:'edulib/sims/{id}',entityType:'EduSimilarity'}],
       entityTypes:['EduMaterial','EduReviewNote','EduCategory','EduSimilarity'] },
+    /* 법인 카카오톡 방(2026-11-28) — 자료함 독립 앱. 약관 무위반 안전수집(알림·내보내기·붙여넣기) 후 OTP 차단·민감정보 가림·업무/기업 연결 영구보관. */
+    kakaoroom:{ name:'법인 카카오톡 방', file:'pu-kakaoroom.html', primaryRoots:['kakao_room'],
+      sharedRoots:['kakaoWork','work_erp','data/companies','data/cases','data/user_dir','uid_roles'],
+      writeContracts:[{path:'kakao_room/items/{id}',entityType:'KakaoWorkArchive'},
+                      {path:'kakao_room/files/{id}',entityType:'KakaoFileRecord'},
+                      {path:'work_erp/logs/{year}/{week}/{itemId}/{id}',entityType:'Message'},
+                      {path:'work_erp/itemlogs/{itemId}/{id}',entityType:'Message'}],
+      entityTypes:['KakaoWorkArchive','KakaoFileRecord','Message','Document','Task','Organization'] },
     /* 컨설팅정산 — 개인 통장으로 들어오는 정부사업 지급액을 사업장별로 모아 주관·담당 사이 차액을 정산한다(대표 지시 2026-10-31).
        설계 docs/superpowers/specs/2026-10-31-consult-settle-design.md.
        ★ 쓰는 것: rules(SettleRule) · links(SettleLink — 사람이 확정한 연결만) · notices(SettleNotice) · runs(SettleRun) · adjusts(SettleAdjust).
@@ -824,6 +834,9 @@
     /* 법정교육자료함 — 강의처(고객사 이름)·검토 메모가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     edulib_core:{program:'edulib',strategy:'in_app',path:'edulib',parser:'coverage',
       gives:'강의자료 목록·종류·강의일·검토 메모 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 법인 카카오톡 방 — 비식별 업무 대화 영구보관 및 첨부 이력(원문·OTP 제외, 통합 진단에서는 앱 안에서만 본다). */
+    kakaoroom_core:{program:'kakaoroom',strategy:'in_app',path:'kakao_room',parser:'coverage',
+      gives:'법인 카톡 업무기록·파일이력 및 업무관리 연결 추적 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     /* 컨설팅정산 — 사람별 금액·요율·송금이 든 재무 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     settle_core:{program:'settle',strategy:'in_app',path:'settle',parser:'coverage',
       gives:'컨설팅정산 규칙·연결·안내 파일·정산표·이월 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
