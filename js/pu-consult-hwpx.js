@@ -481,7 +481,7 @@
     var bytes = generateHwpxBytes(kind, appKey, project, checkDoc, comms, customSections);
     var fileName = suggestedFileName(kind, appKey, project);
     return {
-      bridgeId: 'cs_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      bridgeId: 'consult_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
       source: 'consult_' + cat.key,
       sourceLabel: cat.name,
       format: 'hwpx',
@@ -495,57 +495,55 @@
   function openInHangulEditor(kind, appKey, project, checkDoc, comms, customSections) {
     var cat = getCat(appKey);
     var payload = buildHangulBridgePayload(kind, appKey, project, checkDoc, comms, customSections);
-    if (typeof localStorage !== 'undefined') {
-      try {
-        var oldRaw = localStorage.getItem('pureun_hangul_bridge');
-        if (oldRaw) {
-          try {
-            var oldObj = JSON.parse(oldRaw);
-            if (!oldObj || (Date.now() - Number(oldObj.sentAt || 0) > 60000)) {
-              localStorage.removeItem('pureun_hangul_bridge');
-            }
-          } catch (_) { localStorage.removeItem('pureun_hangul_bridge'); }
-        }
-        var serialized = JSON.stringify(payload);
-        if (serialized.length < 95000) localStorage.setItem('pureun_hangul_bridge', serialized);
-      } catch (e) {}
-    }
+    var meta = {
+      bridgeId: payload.bridgeId,
+      source: payload.source,
+      sourceLabel: payload.sourceLabel,
+      format: payload.format,
+      name: payload.name
+    };
     if (typeof window !== 'undefined') {
-      var win = window.open('hangul.html?from=' + encodeURIComponent('consult_' + cat.key), '_blank');
-      var sendPayload = function () {
-        try {
-          if (win && !win.closed) win.postMessage({ type: 'pureun_hangul_open', payload: payload }, location.origin);
-        } catch (e) {}
-        try {
-          if (typeof BroadcastChannel !== 'undefined') {
-            var ch = new BroadcastChannel('pureun_hangul_channel');
-            ch.postMessage({ type: 'pureun_hangul_open', payload: payload });
-            ch.close();
-          }
-        } catch (e) {}
+      var bid = payload.bridgeId;
+      var fromParam = 'consult_' + cat.key;
+      var win = null;
+      var sent = false;
+      var cleaned = false;
+      var timer = null;
+      var cleanup = function () {
+        if (cleaned) return;
+        cleaned = true;
+        payload.b64 = '';
+        if (timer) { clearTimeout(timer); timer = null; }
+        window.removeEventListener('message', onMsg);
+        window.removeEventListener('pagehide', cleanup);
       };
-      var clearBridge = function () {
-        if (typeof localStorage !== 'undefined') {
-          try { localStorage.removeItem('pureun_hangul_bridge'); } catch (e) {}
+      var onMsg = function (ev) {
+        if (!ev || ev.origin !== location.origin || !ev.data) return;
+        if (win && ev.source !== win) return;
+        if (ev.data.type === 'pureun_hangul_ready') {
+          if (sent || ev.data.from !== fromParam || ev.data.bid !== bid) return;
+          try {
+            if (win && !win.closed && payload.b64) {
+              win.postMessage({ type: 'pureun_hangul_open', payload: payload }, location.origin);
+              sent = true;
+            }
+          } catch (e) {}
+          return;
+        }
+        if (ev.data.type === 'pureun_hangul_ack' && ev.data.bridgeId === bid) {
+          cleanup();
         }
       };
-      var onReady = function (ev) {
-        if (!ev || ev.origin !== location.origin) return;
-        if (ev.data && ev.data.type === 'pureun_hangul_ready') {
-          sendPayload();
-          clearBridge();
-        }
-      };
-      window.addEventListener('message', onReady);
-      window.addEventListener('pagehide', clearBridge, { once: true });
-      setTimeout(sendPayload, 450);
-      setTimeout(sendPayload, 1300);
-      setTimeout(function () {
-        window.removeEventListener('message', onReady);
-        clearBridge();
-      }, 15000);
+      window.addEventListener('message', onMsg);
+      window.addEventListener('pagehide', cleanup, { once: true });
+      timer = setTimeout(cleanup, 15000);
+      win = window.open(
+        'hangul.html?from=' + encodeURIComponent(fromParam) + '&bid=' + encodeURIComponent(bid),
+        '_blank'
+      );
+      if (!win) cleanup();
     }
-    return payload;
+    return meta;
   }
 
   /* ══ 4. 웹 A4 미리보기 HTML · 인쇄 · CSV ═══════════════════════════════ */
@@ -703,6 +701,7 @@
     buildPreviewHtml: buildPreviewHtml,
     buildFullPrintDocument: buildFullPrintDocument,
     openPrintWindow: openPrintWindow,
+    safeCsvCell: safeCsvCell,
     buildCsvExport: buildCsvExport,
     downloadCsv: downloadCsv
   };

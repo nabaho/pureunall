@@ -386,6 +386,13 @@
     var msgItems = rowsOf(e.msgIntakeItems || e.msgIntake);
     var existingProjects = rowsOf(e.projects).filter(function (p) { return !p._deleted; });
     var erpConsultings = rowsOf(e.consultings).filter(function (c) { return !c._deleted; });
+    var consTypeMap = Object.create(null);
+    rowsOf(e.consTypes || e.bizConsTypes || e.consultingTypes).forEach(function (t) {
+      if (!t || t._deleted) return;
+      var lbl = str(t.name || t.label || t.title) + (t.agency ? (' ' + str(t.agency)) : '');
+      if (t.id != null && str(t.id)) consTypeMap[str(t.id)] = lbl;
+      if (t.code != null && str(t.code)) consTypeMap[str(t.code)] = lbl;
+    });
 
     var existingByCoYr = Object.create(null);
     var existingByPid = Object.create(null);
@@ -444,9 +451,10 @@
       b.comms = b.items;
     }
 
-    // 1) ERP 컨설팅 원장에서 해당 사업 유형 자동 감지
+    // 1) ERP 컨설팅 원장(typeId · typeCode · consultingType)에서 해당 사업 유형 자동 감지
     erpConsultings.forEach(function (c) {
-      var typeTxt = str(c.consultingType || c.typeName || '');
+      var tCode = str((c.typeCodes && c.typeCodes.consulting) || c.typeCode || c.typeId);
+      var typeTxt = str(c.consultingType || c.typeName || c.programName || (tCode && consTypeMap[tCode]) || c.title || '');
       var hitKey = Cat.findByErpType(typeTxt);
       if (hitKey !== appKey) return;
       erpHits++;
@@ -457,7 +465,7 @@
         source: 'erp',
         id: str(c.id),
         date: str(c.startDate || c.signDate || '').slice(0, 10),
-        subject: '[ERP 수임] ' + typeTxt + ' (' + str(c.no || '') + ')',
+        subject: '[ERP 수임] ' + typeTxt + (c.no ? (' (' + str(c.no) + ')') : ''),
         maskedPreview: sanitizeText(str(c.note || typeTxt)),
         atts: []
       }, { company: coObj || (cid ? { id: cid, name: str(c.companyName || c.company) } : null), via: 'erp' }, { matchedReasons: ['ERP 수임원장 일치'] }, yr);

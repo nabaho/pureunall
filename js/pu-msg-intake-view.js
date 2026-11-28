@@ -91,7 +91,9 @@
   }
 
   async function ingestViaServerIfPossible(rec) {
-    if (!fb || !fb.auth || !fb.auth().currentUser || typeof fetch !== 'function') return null;
+    if (!fb || !fb.auth || !fb.auth().currentUser || typeof fetch !== 'function') {
+      return { ok: false, error: '로그인 사용자 토큰이 필요합니다.' };
+    }
     try {
       var tok = await fb.auth().currentUser.getIdToken();
       var resp = await fetch('https://asia-southeast1-pureun-erp.cloudfunctions.net/consultMsgIngest', {
@@ -105,9 +107,15 @@
           attNames: Array.isArray(rec.attNames) ? rec.attNames : []
         })
       });
-      if (!resp.ok) return null;
-      return await resp.json();
-    } catch (_) { return null; }
+      var data = null;
+      try { data = await resp.json(); } catch (_) {}
+      if (!resp.ok) {
+        return { ok: false, status: resp.status, error: (data && data.error) || ('서버 수집 오류 (HTTP ' + resp.status + ')') };
+      }
+      return data || { ok: false, error: '서버 응답 형식이 올바르지 않습니다.' };
+    } catch (e) {
+      return { ok: false, error: (e && e.message) || '서버 메시지 수집 통신 오류' };
+    }
   }
 
   async function saveMsgItem(id, rec) {
@@ -115,12 +123,16 @@
     if (I && I.isSecretMessage(str(rec.title) + '\n' + str(rec.maskedBody || rec.summary))) {
       throw new Error('인증번호·OTP 포함 메시지는 저장할 수 없습니다.');
     }
-    var safeTitle = cleanText(cleanText(rec.title));
-    var safeBody = cleanText(cleanText(rec.maskedBody || rec.summary));
+    var isExisting = num(rec.revision, 0) > 0;
+    var safeTitle = isExisting && rec.title != null ? String(rec.title) : cleanText(cleanText(rec.title));
+    var safeBody = isExisting && (rec.maskedBody != null || rec.summary != null)
+      ? String(rec.maskedBody != null ? rec.maskedBody : rec.summary)
+      : cleanText(cleanText(rec.maskedBody || rec.summary));
+    var safeSummary = isExisting && rec.summary != null ? String(rec.summary) : safeBody.slice(0, 240);
     var doc = Object.assign({ id: id, entityType: 'Document', schemaVersion: 1, contractVersion: 1 }, rec, {
       title: safeTitle,
       maskedBody: safeBody,
-      summary: safeBody.slice(0, 240),
+      summary: safeSummary,
       createdBy: str(rec.createdBy || (ME && ME.uid) || 'bridge')
     });
     if (PREVIEW_MODE || !fbDb || !gate) {
@@ -132,10 +144,16 @@
     }
     if (!num(rec.revision, 0)) {
       var srvRes = await ingestViaServerIfPossible(doc);
-      if (srvRes && srvRes.ok && srvRes.id) {
-        var srvSnap = await safeVal('msg_intake/items/' + srvRes.id);
-        if (srvSnap) { D.items[srvRes.id] = srvSnap; return srvSnap; }
+      if (srvRes && srvRes.ignored) {
+        throw new Error('보안 정책상 인증번호·OTP·비밀번호 포함 메시지는 저장하지 않습니다.');
       }
+      if (!srvRes || !srvRes.ok || !srvRes.id) {
+        throw new Error((srvRes && srvRes.error) || '서버 메시지 수집(consultMsgIngest) 실패 — 직접 저장은 허용되지 않습니다.');
+      }
+      var srvSnap = await safeVal('msg_intake/items/' + srvRes.id);
+      var finalRec = srvSnap || Object.assign({}, doc, { id: srvRes.id, revision: 1 });
+      D.items[srvRes.id] = finalRec;
+      return finalRec;
     }
     var ref = fbDb.ref('msg_intake/items/' + id);
     var res = await gate.save(ref, doc, { entityType: 'Document', expectedRevision: num(doc.revision, 0), allowPendingCompany: true });
@@ -165,6 +183,7 @@
         var pid = 'inbox_msg';
         var commDoc = {
           id: cid, projectId: pid, entityType: 'Document', schemaVersion: 1, contractVersion: 1, revision: 0,
+          createdBy: str((ME && ME.uid) || 'bridge'),
           source: str(it.channel || 'msg_intake'),
           date: str(it.msgDate || ''),
           subject: cleanText(it.title || '카톡·문자 수취자료'),
@@ -234,15 +253,15 @@
   function renderRecentDiffBar() {
     var el = $('recentDiffBarWrap');
     if (!el) return;
-    el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-      '<span class="chip c-blue">변경됨 · NEW</span>' +
-      '<b>💬 카톡·문자 자료수집 허브 신규 구축:</b>' +
-      '<span class="hint">카톡 대화 내보내기(.txt)·문자 붙여넣기·휴대폰 웹훅(consultMsgIngest)을 2중 비식별화해 18개 사업 앱으로 자동 배정합니다.</span>' +
+    el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+      '<span class="chip c-blue">변경됨 · UI 통일</span>' +
+      '<b>💬 카톡·문자 자료수집:</b>' +
+      '<span class="hint">괴롭힘 조사 동일 슬림 UI · 카톡(.txt)·문자·웹훅 2중 비식별화 및 18개 사업 자동 배정</span>' +
       '<span class="sp"></span>' +
-      '<button type="button" class="sm" data-diff-tab="input">카톡·문자 즉시분류</button>' +
+      '<button type="button" class="sm" data-diff-tab="input">카톡·문자 입력</button>' +
       '<button type="button" class="sm pri" data-diff-tab="queue">자동배정 대기함</button>' +
-      '<button type="button" class="sm" data-diff-tab="bridge">폰·PC 연동규격</button>' +
-      '<button type="button" class="sm" id="toggleDiffBtn">' + (DIFF_HIGHLIGHT ? '변경 강조 끄기' : '변경 강조 켜기') + '</button>' +
+      '<button type="button" class="sm" data-diff-tab="bridge">연동규격</button>' +
+      '<button type="button" class="sm" id="toggleDiffBtn">' + (DIFF_HIGHLIGHT ? '표시 끄기' : '표시 켜기') + '</button>' +
       '</div>';
     el.querySelectorAll('[data-diff-tab]').forEach(function (b) {
       b.onclick = function () { switchTab(b.getAttribute('data-diff-tab')); };
@@ -375,6 +394,7 @@
       b.onclick = async function () {
         var id = b.getAttribute('data-assign-btn');
         var it = D.items[id];
+        if (!it) return;
         var sel = box.querySelector('[data-assign-sel="' + cssEsc(id) + '"]');
         var appKey = sel ? sel.value : it.targetApp;
         b.disabled = true;
@@ -391,9 +411,13 @@
     box.querySelectorAll('[data-del-msg]').forEach(function (b) {
       b.onclick = async function () {
         var id = b.getAttribute('data-del-msg');
-        await softDeleteMsgItem(D.items[id]);
-        draw();
-        toast('보관삭제(_deleted) 처리했습니다.');
+        try {
+          await softDeleteMsgItem(D.items[id]);
+          draw();
+          toast('보관삭제(_deleted) 처리했습니다.');
+        } catch (err) {
+          toast('삭제 오류: ' + (err && err.message || err));
+        }
       };
     });
   }
@@ -491,7 +515,7 @@
       if (!t || t.type !== 'checkbox') return;
       var allList = t.getAttribute('data-ckall');
       if (allList) {
-        document.querySelectorAll('input[type="checkbox"][data-list="' + allList + '"]').forEach(function (cb) {
+        document.querySelectorAll('input[type="checkbox"][data-list="' + cssEsc(allList) + '"]').forEach(function (cb) {
           cb.checked = t.checked;
           var k = cb.getAttribute('data-ck');
           if (k) SEL[k] = t.checked;
@@ -525,10 +549,18 @@
     if (!fb || !fb.auth) { lockScreen('Firebase 인증을 초기화할 수 없습니다.'); return; }
     try { fb.auth().setPersistence(fb.auth.Auth.Persistence.LOCAL); } catch (e) {}
     fb.auth().onAuthStateChanged(async function (u) {
+      var epoch = ++SESSION_EPOCH;
       var authUid = (u && u.uid) ? String(u.uid) : '';
       if ($('outBtn')) $('outBtn').style.display = authUid ? '' : 'none';
-      if (!authUid) { if (global.PuGate) global.PuGate.show(); return; }
-      var epoch = ++SESSION_EPOCH;
+      if (!authUid) {
+        ME = null;
+        gate = null;
+        D = { items: {}, companies: [] };
+        if ($('lock')) $('lock').style.display = 'none';
+        if ($('app')) $('app').style.display = 'none';
+        if (global.PuGate) global.PuGate.show();
+        return;
+      }
       if (global.PuGate) global.PuGate.hide();
       var roleVal = {};
       try { roleVal = (await fbDb.ref('uid_roles/' + authUid).once('value')).val() || {}; } catch (e) {}

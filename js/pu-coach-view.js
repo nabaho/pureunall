@@ -25,6 +25,7 @@
     notes: {},
     msgIntake: {},
     projectsByApp: {},
+    companies: [],
     ragIndex: null
   };
   var SEL = Object.create(null);
@@ -36,6 +37,11 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+  function cssEsc(v) {
+    var s = String(v == null ? '' : v);
+    if (global.CSS && typeof global.CSS.escape === 'function') return global.CSS.escape(s);
+    return s.replace(/["\\\]\[]/g, '\\$&');
   }
   function Cat() { return global.PuConsultCatalogs; }
   function Intake() { return global.PuConsultIntake; }
@@ -132,16 +138,20 @@
     if ($('syncStateChip')) { $('syncStateChip').style.display = ''; $('syncStateChip').textContent = '지식고 색인 중…'; }
     var res = await Promise.all([
       safeVal('coach_rag/notes'),
-      safeVal('msg_intake/items')
+      safeVal('msg_intake/items'),
+      safeVal('data/companies')
     ]);
     if (epoch !== SESSION_EPOCH || (ME && ME.uid !== uid)) return;
     D.notes = res[0] || {};
     D.msgIntake = res[1] || {};
+    var co = res[2] && res[2].v !== undefined ? res[2].v : res[2];
+    D.companies = Array.isArray(co) ? co : (co && typeof co === 'object' ? Object.values(co) : []);
     var C = Cat();
     var apps = C ? C.listNew12() : [];
     var projResults = await Promise.all(apps.map(function (a) {
       return safeVal(a.rtdbRoot + '/projects').then(function (v) { return [a.key, v || {}]; });
     }));
+    if (epoch !== SESSION_EPOCH || (ME && ME.uid !== uid)) return;
     D.projectsByApp = {};
     projResults.forEach(function (pair) { D.projectsByApp[pair[0]] = pair[1]; });
     rebuildIndex();
@@ -152,15 +162,15 @@
   function renderRecentDiffBar() {
     var el = $('recentDiffBarWrap');
     if (!el) return;
-    el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-      '<span class="chip c-blue">변경됨 · NEW</span>' +
-      '<b>🧠 수습 노무사 RAG 실무코치 신규 구축:</b>' +
-      '<span class="hint">18개 컨설팅 사업의 단계별 필수 행동·주의사항·과거 수행사례·법령근거를 즉시 검색해 다음 행동을 확인합니다.</span>' +
+    el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+      '<span class="chip c-blue">변경됨 · UI 통일</span>' +
+      '<b>🧠 실무코치·RAG학습:</b>' +
+      '<span class="hint">괴롭힘 조사 동일 슬림 UI · 18개 컨설팅 플레이북·수행사례·법령근거 하이브리드 RAG 검색</span>' +
       '<span class="sp"></span>' +
-      '<button type="button" class="sm pri" data-diff-tab="search">RAG 행동검색</button>' +
+      '<button type="button" class="sm pri" data-diff-tab="search">RAG 검색</button>' +
       '<button type="button" class="sm" data-diff-tab="playbooks">18대 플레이북</button>' +
-      '<button type="button" class="sm" data-diff-tab="cases">수행사례·퀴즈</button>' +
-      '<button type="button" class="sm" id="toggleDiffBtn">' + (DIFF_HIGHLIGHT ? '변경 강조 끄기' : '변경 강조 켜기') + '</button>' +
+      '<button type="button" class="sm" data-diff-tab="cases">사례·퀴즈</button>' +
+      '<button type="button" class="sm" id="toggleDiffBtn">' + (DIFF_HIGHLIGHT ? '표시 끄기' : '표시 켜기') + '</button>' +
       '</div>';
     el.querySelectorAll('[data-diff-tab]').forEach(function (b) {
       b.onclick = function () { switchTab(b.getAttribute('data-diff-tab')); };
@@ -194,12 +204,20 @@
     if (!R || !D.ragIndex) return;
     var aiBtn = $('ragAiBtn');
     if (useAi && aiBtn) { aiBtn.disabled = true; aiBtn.textContent = 'AI 코칭 조회 중…'; }
+    var redactions = [];
+    Object.keys(D.projectsByApp || {}).forEach(function (ak) {
+      var raw = D.projectsByApp[ak];
+      var list = Array.isArray(raw) ? raw : Object.values(raw || {});
+      list.forEach(function (p) { if (p && !p._deleted && p.companyName) redactions.push(p.companyName); });
+    });
+    (D.companies || []).forEach(function (c) { if (c && c.name) redactions.push(c.name); });
     R.askGroundedCoach(D.ragIndex, q, {
       appKey: CUR_APP_FILTER,
       useAi: !!useAi && !PREVIEW_MODE,
       auth: fb ? fb.auth() : null,
       manual: true,
-      limit: 6
+      limit: 6,
+      redactTerms: redactions
     }).then(function (res) {
       if (aiBtn) { aiBtn.disabled = false; aiBtn.textContent = 'AI 선임노무사 코칭(비식별)'; }
       CUR_ANSWER = res;
@@ -257,6 +275,7 @@
     var apps = C ? C.listAll() : [];
     var caseRows = [];
     Object.keys(D.projectsByApp || {}).forEach(function (ak) {
+      if (CUR_APP_FILTER && CUR_APP_FILTER !== 'all' && ak !== CUR_APP_FILTER) return;
       var app = C && C.get(ak);
       var raw = D.projectsByApp[ak];
       var list = Array.isArray(raw) ? raw : Object.values(raw || {});
@@ -281,6 +300,7 @@
 
     var quizzes = [];
     apps.forEach(function (a) {
+      if (CUR_APP_FILTER && CUR_APP_FILTER !== 'all' && a.key !== CUR_APP_FILTER) return;
       var qs = (a.ragPlaybook && a.ragPlaybook.quizzes) || [];
       qs.forEach(function (q, i) { quizzes.push({ app: a, q: q, qid: a.key + '_' + i }); });
     });
@@ -321,7 +341,9 @@
   function renderNotesTab() {
     var box = $('notesBox');
     if (!box) return;
-    var list = notesList();
+    var list = notesList().filter(function (n) {
+      return !CUR_APP_FILTER || CUR_APP_FILTER === 'all' || str(n.appKey) === CUR_APP_FILTER;
+    });
     var trs = list.map(function (n, i) {
       return '<tr>' +
         '<td class="c"><input type="checkbox" data-ck="nt:' + esc(n.id) + '" data-list="notes" aria-label="선택"></td>' +
@@ -362,15 +384,19 @@
         var id = b.getAttribute('data-del-note');
         var prev = D.notes[id];
         if (!prev) return;
-        if (PREVIEW_MODE || !fbDb || !gate) {
-          D.notes[id] = Object.assign({}, prev, { _deleted: true });
-        } else {
-          await gate.remove(fbDb.ref('coach_rag/notes/' + id), prev, { entityType: 'Document' });
-          D.notes[id] = Object.assign({}, prev, { _deleted: true });
+        try {
+          if (PREVIEW_MODE || !fbDb || !gate) {
+            D.notes[id] = Object.assign({}, prev, { _deleted: true });
+          } else {
+            await gate.remove(fbDb.ref('coach_rag/notes/' + id), prev, { entityType: 'Document' });
+            D.notes[id] = Object.assign({}, prev, { _deleted: true });
+          }
+          rebuildIndex();
+          draw();
+          toast('학습 노트를 보관삭제했습니다.');
+        } catch (err) {
+          toast('노트 삭제 오류: ' + (err && err.message || err));
         }
-        rebuildIndex();
-        draw();
-        toast('학습 노트를 보관삭제했습니다.');
       };
     });
   }
@@ -460,6 +486,21 @@
     if ($('saveNoteBtn')) $('saveNoteBtn').onclick = saveNewNote;
     if ($('reloadBtn')) $('reloadBtn').onclick = function () { reload(SESSION_EPOCH, ME && ME.uid); };
     if ($('outBtn')) $('outBtn').onclick = function () { if (fb && fb.auth) fb.auth().signOut(); };
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || t.type !== 'checkbox') return;
+      var allList = t.getAttribute('data-ckall');
+      if (allList) {
+        document.querySelectorAll('input[type="checkbox"][data-list="' + cssEsc(allList) + '"]').forEach(function (cb) {
+          cb.checked = t.checked;
+          var k = cb.getAttribute('data-ck');
+          if (k) SEL[k] = t.checked;
+        });
+        return;
+      }
+      var k = t.getAttribute('data-ck');
+      if (k) SEL[k] = t.checked;
+    });
     populateAppSelects();
   }
 
@@ -489,10 +530,18 @@
     if (!fb || !fb.auth) { lockScreen('Firebase 인증을 초기화할 수 없습니다.'); return; }
     try { fb.auth().setPersistence(fb.auth.Auth.Persistence.LOCAL); } catch (e) {}
     fb.auth().onAuthStateChanged(async function (u) {
+      var epoch = ++SESSION_EPOCH;
       var authUid = (u && u.uid) ? String(u.uid) : '';
       if ($('outBtn')) $('outBtn').style.display = authUid ? '' : 'none';
-      if (!authUid) { if (global.PuGate) global.PuGate.show(); return; }
-      var epoch = ++SESSION_EPOCH;
+      if (!authUid) {
+        ME = null;
+        gate = null;
+        D = { notes: {}, msgIntake: {}, projectsByApp: {}, companies: [], ragIndex: null };
+        if ($('lock')) $('lock').style.display = 'none';
+        if ($('app')) $('app').style.display = 'none';
+        if (global.PuGate) global.PuGate.show();
+        return;
+      }
       if (global.PuGate) global.PuGate.hide();
       var roleVal = {};
       try { roleVal = (await fbDb.ref('uid_roles/' + authUid).once('value')).val() || {}; } catch (e) {}
