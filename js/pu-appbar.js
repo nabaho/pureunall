@@ -96,7 +96,7 @@
     { key: 'aliounion', row: 'store', name: '공공임단협', icon: '🤝', url: 'pu-alio-union.html', desc: '알리오 노조·임금·단체협약 API 통합비교' },
     { key: 'hangul',  row: 'client', name: '한글 편집기',  icon: '📝', url: 'hangul.html',   desc: '한글 문서 열기·고치기' },
     { key: 'pbox',    row: 'store',  name: 'P박스',        icon: '📚', url: 'pu-pbox.html',  desc: '전 법령·판례·행정해석·AI 서면' },
-    { key: 'kakaoroom', row: 'store', name: '법인 카카오톡 방', icon: '💬', url: 'pu-kakaoroom.html', desc: '업무방 자동수집·업무·자료함 영구보관' },
+    { key: 'kakaoroom', row: 'store', name: '법인 카카오톡 방', icon: '🗨️', url: 'pu-kakaoroom.html', desc: '업무방 자동수집·업무·자료함 영구보관' },
     { key: 'payroll', row: 'client', name: '급여아웃소싱', icon: '💰', url: 'payroll-os.html',     desc: '급여·근태·명세서·연차' },
     /* 홈페이지·뉴스레터 — 예전엔 총괄관리자 전용이었다가 대표 지시 2026-10-30 「영업관리 … 모든 직원들에게 공개」 로 재직 직원 모두.
        포털 타일(enter.html)과 잣대를 맞춘다 — 한쪽만 보이면 눌러도 막히는 문이 된다. */
