@@ -238,8 +238,57 @@ test('③ 사람이 다시 닫아 둔 것(연동 제외 포함)은 표만 걷고
   assert.deepEqual(Object.keys(r.patch), ['pe_trash_closed']);
 });
 
+/* peLoadAll 을 «진짜로» 여러 번 돌린다(가짜 DB) — 사본(coSrc)이 두 모양(날것 · 이미 거른 것)일 때 모두 */
+function loadBox(rawCompanies, coSrcStart) {
+  const ctx = { String, Array, Object, JSON, Promise };
+  vm.createContext(ctx);
+  const DATA = { 'data/companies/v': rawCompanies, 'data/contracts/v': [{ id: 'c1' }] };
+  ctx.fbDb = { ref: (p) => ({ once: () => Promise.resolve({ val: () => DATA[p] }) }) };
+  vm.runInContext([
+    grab('safeKey'), grab('_peArr'), grab('_peLive'),
+    'var peTrash={}, _coSrcPe=null, peMaster={}, peTypes={}, coSrc=null;',
+    "var PE_TKEY={}; var PE_KEYS={contract:'contracts',companies:'companies'}; var PE_DEF=[['contract'],['companies']];",
+    'function _lsWarm(){ return Promise.resolve(); } function _ls(){ return null; }',
+    grab('_peTrashNote'), grab('_peCoFromSrc'), grab('peLoadAll'),
+  ].join('\n'), ctx);
+  if (coSrcStart) ctx.coSrc = coSrcStart;
+  return ctx;
+}
+const RAW_CO = () => [{ id: 'k1' }, { id: 'k2', _deleted: true, deletedAt: TR.at }];
+
+test('★★ 자문 사본이 «없을 때»(서버에서 읽고 그것을 사본으로 삼음) 몇 번을 읽어도 휴지통 표가 남는다', async () => {
+  const c = loadBox(RAW_CO());
+  for (let i = 1; i <= 6; i++) {
+    await c.peLoadAll();
+    assert.ok(c.peTrash.companies && c.peTrash.companies.k2, i + '번째 읽기에서 휴지통 표가 사라졌다 — peBump 는 다른 갈래가 바뀔 때마다 다시 읽는다');
+    assert.equal(c.peMaster.companies.length, 1, i + '번째 읽기에서 휴지통 업체가 살아 있는 줄로 읽혔다');
+  }
+});
+test('★★ 자문 사본이 «날것»일 때(업체 잇기가 먼저 읽어 둠)도 몇 번을 읽어도 휴지통 표가 남고 사본은 그대로다', async () => {
+  const raw = RAW_CO();
+  const c = loadBox(RAW_CO(), raw);
+  for (let i = 1; i <= 6; i++) {
+    await c.peLoadAll();
+    assert.ok(c.peTrash.companies.k2, i + '번째 읽기');
+    assert.equal(c.peMaster.companies.length, 1);
+  }
+  assert.equal(c.coSrc, raw, '업체 잇기용 날것 사본을 바꾸지 않는다');
+  assert.equal(raw.length, 2);
+});
+test('자문 사본을 비우면(업체가 바뀐 신호) 서버에서 다시 읽고 되살아난 업체는 휴지통 표에서 빠진다', async () => {
+  const c = loadBox(RAW_CO());
+  await c.peLoadAll(); await c.peLoadAll();
+  assert.ok(c.peTrash.companies.k2);
+  c.coSrc = null;                                                 // peWatch 가 업체 u 변화에 하는 일
+  vm.runInContext("fbDb = { ref: function(p){ return { once: function(){ return Promise.resolve({ val: function(){ return p==='data/companies/v' ? [{id:'k1'},{id:'k2'}] : [{id:'c1'}]; } }); } }; } };", c);
+  await c.peLoadAll();
+  assert.equal(Object.keys(c.peTrash.companies).length, 0, '휴지통에서 되살렸으면 표에서 빠진다 → 닫았던 업무가 도로 열린다');
+  assert.equal(c.peMaster.companies.length, 2);
+});
+
 test('★ 자문(업체) 사본(coSrc)도 같은 길을 지난다 — 휴지통 업체가 «살아 있는 줄»로 읽히지 않게', () => {
-  assert.match(W, /return Promise\.resolve\(\[d\[0\],_peLive\(_peTrashNote\(d\[0\],coSrc\)\)\]\);/);
+  assert.match(W, /return Promise\.resolve\(\[d\[0\],_peCoFromSrc\(coSrc\)\]\);/);
+  assert.match(W, /coSrc=peMaster\.companies; _coSrcPe=coSrc; \}/);
   /* 실제로 돌려 본다: 사본은 그대로, 걸러진 목록·휴지통 표만 달라진다 */
   const c = box();
   const coSrc = [{ id: 'k1' }, { id: 'k2', _deleted: true, deletedAt: TR.at }];

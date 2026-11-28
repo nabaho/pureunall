@@ -14242,6 +14242,7 @@ var peMaster={};                                   // {유형:[레코드]} — �
 /* 푸른이알피 «휴지통»에 든 줄 — {유형:{열쇠:{at,by}}}. peMaster 는 이들을 뺀 «살아 있는» 줄만 담으므로
    「지워졌다」와 「휴지통에 있다」를 가르려면 따로 적어 둬야 한다(2026-11-22). 읽어낸 유형만 키가 있다. */
 var peTrash={};
+var _coSrcPe=null;       // 업체 사본(coSrc)으로 삼은 «이미 걸러진» peMaster.companies 배열 — _peCoFromSrc
 var peState={since:null,at:null,n:0,err:''};
 var _peU2N=null, _peT=null, _peBusy=false, _peWatching=false;
 
@@ -14263,6 +14264,14 @@ function _peTrashNote(t,a){
   peTrash[t]=m;
   return a;
 }
+/* 업체(자문) 갈래를 «사본(coSrc)»에서 만든다. 사본은 두 모양일 수 있다.
+   ① 업체 잇기(coLoad)가 읽어 둔 «날것» — 휴지통 업체가 섞여 있다 → 휴지통을 적고 거른다.
+   ② 아래 peLoadAll 이 «이미 거른» peMaster.companies 를 사본으로 삼은 것(_coSrcPe) → 날것이 아니다.
+      여기에 휴지통을 «다시 적으면» 빈 표로 덮여 휴지통 배지·자동 취소가 멈춘다 → 그대로 돌려준다.
+   ⚠ ②인지는 «사본(coSrc)이 채택된 바로 그 배열인가»(_coSrcPe)로 가른다 — peMaster.companies 와 견주지 않는다.
+     (2026-11-22 외부 검토 2단계: peMaster 와 견주면 두 번째 읽기에서 peMaster 가 새 배열로 바뀌어
+      세 번째 읽기부터 표가 비워졌다 — peBump 는 계약·사건 등 다른 갈래가 바뀔 때마다 peLoadAll 을 다시 돌린다.) */
+function _peCoFromSrc(src){ return src===_coSrcPe ? src : _peLive(_peTrashNote('companies',src)); }
 // 이름 해석용 sid→이름 (퇴직자 포함 — loadStaff는 재직자만 주므로 따로 읽는다)
 /* 사번 → 이름 표를 «정말로» 만들어 냈는가.
    ★ 2026-09-05 대표 보고: 사무장(A-001) 「내 업무」에 부담당 업무가 한 건도 안 나왔다.
@@ -14306,7 +14315,7 @@ function peLoadAll(){
       /* ⚠ 사본(coSrc)은 휴지통 업체가 섞인 «날것»이다 — 그대로 넘기면 휴지통 업체가 살아 있는 줄로 읽히고
          peTrash 에도 안 적혀, 다른 갈래와 판단이 갈린다(2026-11-22 외부 검토 · 실측 5곳). 같은 길(_peTrashNote→_peLive)을 지난다.
          ⚠ coSrc 자체는 건드리지 않는다 — _peLive 는 새 배열을 돌려준다(업체 잇기용 사본은 그대로). */
-      if(d[0]==='companies'&&coSrc&&coSrc.length) return Promise.resolve([d[0],_peLive(_peTrashNote(d[0],coSrc))]);
+      if(d[0]==='companies'&&coSrc&&coSrc.length) return Promise.resolve([d[0],_peCoFromSrc(coSrc)]);
       return fbDb.ref('data/'+PE_KEYS[d[0]]+'/v').once('value')
         /* ★ 휴지통에 든 것(_deleted)은 뺀다 (2026-10-01) — 이알피에서 중복 사건을 휴지통으로 보냈는데
              업무관리에는 그대로 «진행중»으로 남았다. 이알피 휴지통은 딱지만 붙이고 지우지 않는다(TrashBin). */
@@ -14316,7 +14325,7 @@ function peLoadAll(){
   }).then(function(rows){
     rows.forEach(function(r){ if(r[1]) peMaster[r[0]]=r[1]; });
     // 거꾸로도 나눠 쓴다 — 여기서 먼저 읽었으면 업체 잇기가 다시 안 읽는다
-    if((!coSrc||!coSrc.length)&&peMaster.companies) coSrc=peMaster.companies;
+    if((!coSrc||!coSrc.length)&&peMaster.companies){ coSrc=peMaster.companies; _coSrcPe=coSrc; }   // 이미 걸러진 배열이라고 표시 — _peCoFromSrc
     return peMaster;
   });
 }

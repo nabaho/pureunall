@@ -395,9 +395,10 @@ test('★ 바뀜 구독(peWatch)도 같은 목록을 쓴다 — 빠지면 새로
 test('★ 업체 명단을 두 번 읽지 않는다 — 업체 잇기와 나눠 쓴다', () => {
   const F = code(grab('peLoadAll'));
   /* 2026-11-22: 사본을 «그대로» 넘기면 휴지통 업체가 살아 있는 줄로 읽혀 다른 갈래와 판단이 갈린다 —
-     사본은 다시 읽지 않고 «한 번 걸러서» 쓴다(_peTrashNote→_peLive). 두 번 읽지 않는다는 규칙은 같다. */
-  assert.match(F, /if\(d\[0\]==='companies'&&coSrc&&coSrc\.length\) return Promise\.resolve\(\[d\[0\],_peLive\(_peTrashNote\(d\[0\],coSrc\)\)\]\);/);
-  assert.match(F, /if\(\(!coSrc\|\|!coSrc\.length\)&&peMaster\.companies\) coSrc=peMaster\.companies;/);
+     사본은 다시 읽지 않고 «걸러서» 쓴다(_peCoFromSrc: 날것이면 휴지통을 적고 거르고, 이미 거른 것이면 그대로).
+     두 번 읽지 않는다는 규칙은 같다. */
+  assert.match(F, /if\(d\[0\]==='companies'&&coSrc&&coSrc\.length\) return Promise\.resolve\(\[d\[0\],_peCoFromSrc\(coSrc\)\]\);/);
+  assert.match(F, /if\(\(!coSrc\|\|!coSrc\.length\)&&peMaster\.companies\)\{ coSrc=peMaster\.companies; _coSrcPe=coSrc; \}/);
 });
 
 test('★★ 자문 업무명에 내부 번호가 안 나온다 — 유형 마스터 열쇠는 company(홑)다', () => {
