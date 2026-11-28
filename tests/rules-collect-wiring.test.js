@@ -19,6 +19,7 @@ test('30분마다 깨움(서울), 메일 비밀번호, 9분·1GB', () => {
 
 test('관리자 「지금 더 모으기」는 DB 신호 — 새 공개 HTTPS 함수가 아니다', () => {
   const f = fnOf('collectRulesMailAsk');
+  assert.match(f, /\.region\(MAIL_REGION\)/);
   assert.match(f, /\.database\s*\.ref\(["']\/rules_mgmt\/library\/ask\/\{id\}["']\)\s*\.onCreate/);
   assert.doesNotMatch(f, /onRequest/);
 });
