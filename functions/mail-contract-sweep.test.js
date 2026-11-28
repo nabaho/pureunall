@@ -54,11 +54,11 @@ function makeFakeDb(initial) {
   return { rawDb, wrappedDb: OntologyServerWrite.wrapDatabase(rawDb, { program: "functions-test" }) };
 }
 
-test("① 스케줄 및 서버 함수 배선 — 매일 09·11·13·15·17·18시(Asia/Seoul) + 수동 즉시 실행 등록", () => {
+test("① 스케줄 및 서버 함수 배선 — 매일 00·09·11·13·15·17·18시 07분(Asia/Seoul) + 수동 즉시 실행 등록", () => {
   const idx = fs.readFileSync(path.join(__dirname, "index.js"), "utf8");
   assert.match(idx, /exports\.mailContractSweep\s*=/);
   assert.match(idx, /exports\.runMailContractSweep\s*=/);
-  assert.match(idx, /\.pubsub\.schedule\(["']0 0,9,11,13,15,17,18 \* \* \*["']\)/); // 검사고정-허용: 대표 지시 평일 09~18시+24시(00시) 및 주말·공휴일 24시 전용 스케줄 규칙 검증
+  assert.match(idx, /\.pubsub\.schedule\(["']7 0,9,11,13,15,17,18 \* \* \*["']\)/); // 검사고정-허용: 평일 09~18시+24시(00시) 및 주말·공휴일 24시 전용 스케줄(정각 분산 07분) 검증
   assert.match(idx, /\.timeZone\(["']Asia\/Seoul["']\)/);
 });
 

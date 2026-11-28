@@ -227,7 +227,7 @@
     orch:{ name:'오케스트레이션', file:'pu-orchestrator.html', primaryRoots:[],
       sharedRoots:['uid_roles','data/companies','data/user_dir','data/contracts','data/contract_requests',
         'data/cases','data/consultings','data/funds','work_erp/items','pu_quotes','pucards/ontIdx',
-        'kcareer/{uid}/counts'],
+        'paydata/arrivals','payroll_os/inbox','edulib_inbox','datahub_board','kcareer/{uid}/counts'],
       entityTypes:['Organization','Person','Contract','Case','Project','Task','Document'], localOnly:true,
       note:'전 프로그램 업무 바통 감지·360° 생애주기 연결 지휘소 — in_app 민감 본문은 읽지 않고 허용된 경량 원장·거울만 읽기 전용으로 조립한다' },
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
@@ -387,7 +387,7 @@
            ⚠ 금액은 관계 색인에 넣지 않는다(financial 권한 칸 — 원본보다 넓게 공개 금지). */
       sharedRoots:['data/contract_forms','data/contract_forms_removed','worker_secret'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
-    payroll:{ name:'급여아웃소싱', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
+    payroll:{ name:'급여아웃소싱', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir','paydata/arrivals'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },
     /* Task — 「입퇴사 할 일」(paydata/hrtask, 2026-10-03). 메일에서 매번 다시 세고 «사람이 누른 상태»만 적는다. */
     paydata:{ name:'급여데이터함', file:'pu-paydata.html', primaryRoots:['paydata'],

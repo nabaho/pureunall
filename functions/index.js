@@ -1357,7 +1357,7 @@ exports.govDigestKakao = functions
 exports.govReportAuto = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 300, memory: "512MB" })
-  .pubsub.schedule("every 60 minutes")
+  .pubsub.schedule("13 * * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const now = Date.now();
@@ -6280,7 +6280,7 @@ async function 자료판례모아담기(옵션) {
 exports.dailyDocsCollect = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 540, memory: "512MB" })
-  .pubsub.schedule("every day 07:10")
+  .pubsub.schedule("every day 07:14")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const 설정 = (await getDatabase().ref("homepage/newsDocs").once("value")).val() || {};
@@ -6850,7 +6850,7 @@ exports.ilaborPull = functions
 exports.dailyIlaborCollect = functions
   .region(MAIL_REGION)
   .runWith({ secrets: ["ILABOR_ID", "ILABOR_PW"], timeoutSeconds: 540, memory: "512MB" })
-  .pubsub.schedule("every day 07:20")
+  .pubsub.schedule("every day 07:26")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     try {
@@ -7919,7 +7919,7 @@ async function acquireMailSweepLock(opts) {
 exports.mailContractSweep = functions
   .region(MAIL_REGION)
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD", "GEMINI_KEY", "TYPESAFE_API_KEY"], timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("0 0,9,11,13,15,17,18 * * *")
+  .pubsub.schedule("7 0,9,11,13,15,17,18 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     let release = null;
@@ -8645,7 +8645,7 @@ exports.puDocSecretMove = functions
 exports.visitSmsPrepare = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 120, memory: "256MB" })
-  .pubsub.schedule("every day 09:00")
+  .pubsub.schedule("every day 09:05")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const VS = require("./visit-sms");
@@ -8803,12 +8803,12 @@ exports.pboxApi = functions
     }
   });
 
-/* 📬 푸른메일함 기금 서류 상시 자동 수집 → 관리기금 자동 적재 (대표 지시 2026-11-18)
-   새 수신 메일이 /mailbox/msgs/{slug}/{uid} 에 들어오는 즉시 관리기금과 매칭해
-   회계·결산 백업 보관함 · 변경 이벤트 · 사업장 제출서류 체크리스트 · 기금 자동보관함에 적재한다. */
+/* 📬 푸른메일함 기금 서류 상시 자동 수집 → 큐 적재 / 배치 직렬 소비 (2026-11-28 2단계 IMAP 직렬화)
+   새 수신 메일이 /mailbox/msgs/{slug}/{uid} 에 들어오면 IMAP 에 즉시 동시 접속하지 않고
+   /fund_mail_queue 에 얇은 티켓만 남긴 뒤, drainFundMailQueue 가 10분마다 폴더당 1세션으로 처리한다. */
 exports.collectFundMailOnNew = functions
   .region(MAIL_REGION)
-  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 180, memory: "512MB" })
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
   .database.ref("/mailbox/msgs/{slug}/{uid}")
   .onCreate(async (snap, ctx) => {
     const msg = (snap && snap.val && snap.val()) || null;
@@ -8817,49 +8817,37 @@ exports.collectFundMailOnNew = functions
     const uid = String((ctx && ctx.params && ctx.params.uid) || "");
     const FMC = require("./fund-mail-collect");
     if (!FMC.isFundCollectableFolder(slug)) return null;
-    const MS = require("./mail-sync");
     try {
-      return await FMC.collectSingleMail(
-        {
-          db: getDatabase(),
-          getSelfEmail: mailUserAsync,
-          fetchAttachments: (folderSlug, mailUid) =>
-            MS.withFolder(MAIL_DEPS, folderSlug, async (client) => {
-              const head = await client.fetchOne(
-                String(mailUid),
-                { uid: true, bodyStructure: true, headers: ["authentication-results"] },
-                { uid: true }
-              );
-              if (!head) return { atts: [], authResults: "" };
-              const authResults = head.headers ? head.headers.toString("utf8") : "";
-              const parts = MS.pickParts(head.bodyStructure, null, 0);
-              const out = [];
-              let totalBytes = 0;
-              for (const att of (parts.atts || []).slice(0, FMC.MAX_ATT_COUNT)) {
-                const sz = Number(att && att.size) || 0;
-                if (!att || !att.part || sz > FMC.MAX_RAW_ATT_BYTES) continue;
-                if (totalBytes + sz > FMC.MAX_TOTAL_ATT_BYTES) break;
-                try {
-                  const d = await client.download(String(mailUid), att.part, { uid: true });
-                  const buf = await MS.drain(d.content, Math.min(FMC.MAX_RAW_ATT_BYTES, FMC.MAX_TOTAL_ATT_BYTES - totalBytes));
-                  totalBytes += buf.length;
-                  out.push({ name: att.name || "", part: att.part, mime: att.mime || "", buf });
-                } catch (_) {
-                  continue;
-                }
-                if (totalBytes >= FMC.MAX_TOTAL_ATT_BYTES) break;
-              }
-              return { atts: out, authResults };
-            })
-        },
-        slug,
-        uid,
-        msg
-      );
+      const key = FMC.makeMailSeenKey(slug, uid);
+      await getDatabase().ref(FMC.MAIL_QUEUE_PATH + "/" + key).set(FMC.makeMailQueueTicket(slug, uid, msg));
+      return { queued: key };
     } catch (e) {
       console.error("[collectFundMailOnNew]", slug, uid, e && (e.stack || e.message || e));
       return null;
     }
+  });
+
+exports.drainFundMailQueue = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 300, memory: "512MB" })
+  .pubsub.schedule("4-59/10 * * * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const FMC = require("./fund-mail-collect");
+    const MS = require("./mail-sync");
+    try {
+      const r = await FMC.drainFundMailQueueBatch({
+        db: getDatabase(),
+        getSelfEmail: mailUserAsync,
+        withFolder: (folderSlug, fn) => MS.withFolder(MAIL_DEPS, folderSlug, fn),
+        pickParts: MS.pickParts,
+        drain: MS.drain
+      });
+      if (r.processed || r.errors) console.log("[drainFundMailQueue]", JSON.stringify(r));
+    } catch (e) {
+      console.error("[drainFundMailQueue]", e && (e.stack || e.message || e));
+    }
+    return null;
   });
 
 /* 📊 데이터관리(대표 전용, pu-datahub.html) — 서버 쪽은 functions/datahub.js 한 곳 (2026-11-21, 계획서 4·5·3-5절)
@@ -8890,7 +8878,7 @@ exports.datahubAsk = functions
 exports.datahubBoardTally = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 300, memory: "1GB" })
-  .pubsub.schedule("every 60 minutes")
+  .pubsub.schedule("23 * * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const r = await Datahub.boardTally({ getDatabase: getDatabase, log: (m, o) => console.log(m, o || "") });

@@ -563,7 +563,12 @@ rules.payroll_os = workspace({
     }
   }
 });
-rules.fund_erp = workspace();
+// 서버(collectFundMailOnNew/drainFundMailQueue) 전용 큐 — 상위 workspace 규칙을 상속받지 않는 최상위 루트로 클라이언트 읽기·쓰기 완전 차단
+rules.fund_mail_queue = { '.read': false, '.write': false };
+// 하위 호환 잠금 자리 (실사용 큐는 최상위 fund_mail_queue 로 이전됨)
+rules.fund_erp = workspace({
+  mail_queue: { '.read': false, '.write': false }
+});
 /* 업무관리. ★ mysum/{로그인 UID} = «내 업무 숫자» 한 줄(2026-11-21 — 포털 머리줄 «📋 내 업무» 단추·이알피 나의 업무가 읽는다).
    «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
    이름 붙은 자리가 $k 보다 먼저 잡힌다. 읽기는 work_erp 전체와 같다(로그인 직원) — 날짜·건수뿐이라 더 넓어지지 않는다.
@@ -1207,7 +1212,24 @@ rules.paydata = {
   } },
   pending_shared: { '.read': LOGIN, '.write': LOGIN },
   owners: { '.read': LOGIN, $uid: { '.write': `(${LOGIN}) && $uid === auth.uid` } },
-  arrivals: { '.read': LOGIN, '.write': LOGIN },
+  arrivals: {
+    '.read': LOGIN,
+    '.write': LOGIN,
+    $coId: {
+      '.validate': 'newData.hasChildren()',
+      $slot: {
+        '.validate': 'newData.hasChildren()',
+        contract: { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        attend:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        ledger:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        output:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        etc:      { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        last:     { '.validate': 'newData.isNumber() && newData.val() > 0' },
+        vals:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+        $other:   { '.validate': false }
+      }
+    }
+  },
   shares:   { '.read': LOGIN, '.write': LOGIN },
   /* 열람 기록은 «덧붙이기만» 된다 — 한 번 적힌 줄은 아무도 못 고친다(!data.exists()).
      기록을 고칠 수 있으면 기록이 아니다. */
@@ -2703,6 +2725,11 @@ for (const rootName of CONSULT_APP_ROOTS) {
       consultantUid: CS_STR(128),
       status: { '.validate': "newData.val() === 'active' || newData.val() === 'done'" },
       summaryNote: CS_STR(2000),
+      inspDue: CS_STR(32),
+      inspIssues: CS_STR(500),
+      inspOffice: CS_STR(60),
+      inspPeriod: CS_STR(80),
+      inspResult: CS_STR(40),
       $other: { '.validate': false }
     } },
     checks: { $pid: { $id: {
@@ -2909,6 +2936,25 @@ rules.datahub_device_req = { '.read': false, '.write': false };
 rules.datahub_nonce = { '.read': false, '.write': false };
 rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
+
+/* 콘솔 동기화 — puwiki (사라짐 방지 및 라이브 콘솔 일치 유지, 2026-11-28) */
+rules.puwiki = {
+  '.read': LOGIN,
+  articles: {
+    $id: {
+      '.write': `(${LOGIN}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120"
+    }
+  },
+  reviews: {
+    $art: {
+      $id: {
+        '.write': `(${LOGIN}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag')"
+      }
+    }
+  }
+};
 
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

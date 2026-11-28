@@ -30,7 +30,7 @@
       short: '① 유입·계약',
       title: '① 유입 · 견적 · 계약 · 원장 개시',
       desc: '메일·사진첩·명함·견적·전자서명에서 들어온 의뢰를 푸른이알피 업체·계약 원장으로 연결합니다.',
-      apps: ['mail', 'photos', 'cards', 'docs', 'erp']
+      apps: ['mail', 'photos', 'cards', 'pubsearch', 'docs', 'erp']
     },
     {
       id: 'case_rules',
@@ -38,15 +38,15 @@
       short: '② 사건·조사·규정',
       title: '② 노동사건 · 괴롭힘조사 · 취업규칙 · 법리 서면',
       desc: '노동사건 불변기한, 직장 내 괴롭힘 8단계 조사↔이알피 동기화, 취업규칙 개정·신고, P박스·한글 편집을 잇습니다.',
-      apps: ['erp', 'harass', 'rules', 'pbox', 'aliounion', 'hangul']
+      apps: ['erp', 'harass', 'rules', 'rulesv2', 'pbox', 'aliounion', 'hangul', 'edulib']
     },
     {
       id: 'consulting_fund',
       no: 3,
       short: '③ 컨설팅·기금·지원금',
       title: '③ 공고 발굴 · 컨설팅 일정/보고서 · 기금 · 지원금',
-      desc: '입찰공고 탐색부터 컨설팅 수임·현장회차·보고서(일터상생·산업일자리)·복지기금·고용지원금 대행까지 이어 줍니다.',
-      apps: ['govbid', 'consult', 'govreport', 'ilteo', 'jobtrans', 'fund', 'govaid']
+      desc: '입찰공고 탐색부터 컨설팅 수임·현장회차·보고서(일터상생·산업일자리·안전보건)·복지기금·고용지원금 대행까지 이어 줍니다.',
+      apps: ['govbid', 'consult', 'govreport', 'ilteo', 'jobtrans', 'safety', 'fund', 'govaid']
     },
     {
       id: 'work_payroll',
@@ -61,8 +61,8 @@
       no: 5,
       short: '⑤ 입금·정산·환류',
       title: '⑤ 입금 매칭 · 세금계산서 · 컨설팅정산 · 실적/영업 환류',
-      desc: '계좌 입금·청구 매칭, 개인입금 컨설팅 차액 정산, 수행 경력 축적 및 뉴스레터·홈페이지·회생광고로 환류합니다.',
-      apps: ['fin', 'settle', 'hr', 'deungi', 'career', 'news', 'home', 'rehabad', 'signboard']
+      desc: '계좌 입금·청구 매칭, 개인입금 컨설팅 차액 정산, 수행 경력 축적·전사 현황판 및 뉴스레터·홈페이지·회생광고로 환류합니다.',
+      apps: ['fin', 'settle', 'hr', 'deungi', 'career', 'datahub', 'news', 'home', 'rehabad', 'signboard']
     }
   ];
 
@@ -98,7 +98,12 @@
     fin:       { key: 'fin',       name: '재무관리',           icon: '📒', row: 'inside', stage: 'finance_settle',  url: 'pu-erp.html?app=fin',      role: '계좌 입출금 알림·청구 매칭·세금계산서·월 마감', perm: 'fin' },
     settle:    { key: 'settle',    name: '컨설팅정산',         icon: '🧾', row: 'inside', stage: 'finance_settle',  url: 'pu-settle.html',           role: '개인입금 정부컨설팅 주관·담당 노무사 차액 정산', perm: 'fin' },
     deungi:    { key: 'deungi',    name: '푸른등기',           icon: '🖋', row: 'inside', stage: 'finance_settle',  url: 'pu-deungi.html',           role: '노무법인 사원·정관·분사무소 변경등기 HWPX 자동화', perm: 'deungi' },
-    career:    { key: 'career',    name: '경력관리',           icon: '👤', row: 'inside', stage: 'finance_settle',  url: 'kcareer.html',             role: '이알피 수행실적 파생 경력카드·지원서 HWPX·요청메일', adminOnly: true }
+    career:    { key: 'career',    name: '경력관리',           icon: '👤', row: 'inside', stage: 'finance_settle',  url: 'kcareer.html',             role: '이알피 수행실적 파생 경력카드·지원서 HWPX·요청메일', adminOnly: true },
+    safety:    { key: 'safety',    name: '안전보건체계구축',   icon: '🦺', row: 'client', stage: 'consulting_fund', url: 'safety.html',              role: '과거 수행이력·업종별 체크리스트·위험성평가·보고서 HWPX' },
+    rulesv2:   { key: 'rulesv2',   name: '기업규정집(새)',     icon: '📜', row: 'client', stage: 'case_rules',      url: 'rules-v2.html',            role: '사업장별 취업규칙 15일 자동수집·개정회차·AI 비교', aliasOf: 'rules' },
+    edulib:    { key: 'edulib',    name: '강의자료',           icon: '🎓', row: 'store',  stage: 'case_rules',      url: 'pu-edulib.html',           role: '강의안·법정교육 자료 정리·강의일별 비교' },
+    pubsearch: { key: 'pubsearch', name: '공공 기업검색',      icon: '🔍', row: 'store',  stage: 'intake',          url: 'pu-pubsearch.html',        role: '금융위·재무·국세청·고용산재·국민연금·DART 기업 조회' },
+    datahub:   { key: 'datahub',   name: '데이터관리',         icon: '📊', row: 'inside', stage: 'finance_settle',  url: 'pu-datahub.html',          role: '전사 입금·업무량 3D·앱별 현황판 및 관계망 진단', adminOnly: true }
   };
 
   /* ── Ⅲ. 실무 표준 오케스트레이션 런북 8선 ── */
@@ -968,6 +973,27 @@
         });
       }
 
+      // 안전보건관리체계 수임 ➔ 안전보건체계구축 워크스페이스 연동
+      if (/안전\s*보건|위험성|산재\s*예방/.test(bizLabel) && m.companyId && !cs.safetyLinked) {
+        pushBaton({
+          id: 'cons-safety:' + str(cs.id),
+          ruleCode: 'consulting_to_safety',
+          stage: 'consulting_fund',
+          severity: 'warn',
+          fromApp: 'erp',
+          toApp: 'safety',
+          companyId: m.companyId,
+          companyLabel: (m.org && m.org.name) || rawCoNm || '안전보건 사업장',
+          puLabel: (m.org && m.org.puLabel) || '',
+          linkConfidence: m.confidence,
+          title: '안전보건 수임 사업장 ➔ 체크리스트·위험성평가 연동 점검',
+          reason: '수임 확정된 안전보건 관련 사업장입니다 — 안전보건체계구축 앱에서 착수 체크 및 위험성평가 진도를 확인하세요',
+          actionLabel: '안전보건 열기',
+          ownerSid: ownerSid,
+          targetUrl: 'safety.html'
+        });
+      }
+
       // 컨설팅 마감기한 임박 점검
       var cDueMs = parseDateMs(cs.deadline || cs.dueDate || cs.endDate);
       var cLeft = cDueMs ? daysBetween(cDueMs, now) : null;
@@ -1188,6 +1214,173 @@
         ownerSid: '',
         targetUrl: 'pu-news.html'
       });
+    }
+
+    /* 11) 비-in_app 경량 거울 연동 (급여데이터함 도착타임스탬프·급여수신함·강의자료 정리함·데이터관리 현황판) */
+    function isSafeKey(k) {
+      return !!k && k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
+    }
+    var arrKinds = ['contract', 'attend', 'ledger', 'output', 'etc'];
+    function countArrivalDocs(slotObj) {
+      if (!slotObj || typeof slotObj !== 'object') return 0;
+      var total = 0;
+      for (var ai = 0; ai < arrKinds.length; ai++) {
+        var bucket = slotObj[arrKinds[ai]];
+        if (bucket && typeof bucket === 'object') {
+          var bKeys = Object.keys(bucket);
+          for (var bi = 0; bi < bKeys.length; bi++) {
+            var bVal = bucket[bKeys[bi]];
+            if (isSafeKey(bKeys[bi]) && typeof bVal === 'number' && isFinite(bVal) && bVal > 0) total++;
+          }
+        }
+      }
+      return total;
+    }
+    function normInboxSlot(monthVal, tsVal) {
+      var s = str(monthVal);
+      var mFull = /^(\d{4})\s*(?:[.\-/]|년)\s*(\d{1,2})\s*월?$/.exec(s);
+      if (mFull) {
+        var mm = Number(mFull[2]);
+        return (mm >= 1 && mm <= 12) ? (mFull[1] + ('0' + mm).slice(-2)) : '';
+      }
+      var mMon = /^(\d{1,2})\s*월$/.exec(s);
+      if (mMon) {
+        var mn = Number(mMon[1]);
+        if (mn < 1 || mn > 12) return '';
+        var yr = new Date((Number(tsVal) || now) + 9 * 3600000).getUTCFullYear();
+        return String(yr) + ('0' + mn).slice(-2);
+      }
+      return /^\d{6}$/.test(s) ? s : '';
+    }
+    var inboxByCoSlot = bareMap();
+    if (raw.payrollInbox && typeof raw.payrollInbox === 'object') {
+      Object.keys(raw.payrollInbox).forEach(function (ik) {
+        if (!isSafeKey(ik)) return;
+        var a = raw.payrollInbox[ik];
+        if (!a || typeof a !== 'object') return;
+        var aCid = str(a.companyId || a.coId);
+        var aSlot = normInboxSlot(a['월'] || a.month, a.ts);
+        if (aCid && aSlot) inboxByCoSlot[aCid + '|' + aSlot] = true;
+      });
+    }
+    if (raw.paydataArrivals && typeof raw.paydataArrivals === 'object') {
+      var kstNow = new Date(now + 9 * 3600000);
+      var curSlot = String(kstNow.getUTCFullYear()) + ('0' + (kstNow.getUTCMonth() + 1)).slice(-2);
+      var prevDate = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth() - 1, 1));
+      var prevSlot = String(prevDate.getUTCFullYear()) + ('0' + (prevDate.getUTCMonth() + 1)).slice(-2);
+      Object.keys(raw.paydataArrivals).forEach(function (cid) {
+        if (!isSafeKey(cid)) return;
+        var coSlots = raw.paydataArrivals[cid];
+        if (!coSlots || typeof coSlots !== 'object') return;
+        var org = hasOwn.call(orgDir.byId, cid) ? orgDir.byId[cid] : null;
+        if (org && isClosedStatus(org.status)) return;
+        Object.keys(coSlots).forEach(function (slot) {
+          if (!isSafeKey(slot)) return;
+          var slotObj = coSlots[slot];
+          var docCnt = countArrivalDocs(slotObj);
+          if (docCnt <= 0) return;
+          var lastTs = Number(slotObj.last) || 0;
+          var recentByTime = lastTs > 0 && (now - lastTs) <= 21 * DAY_MS;
+          var isRecentSlot = (slot === curSlot || slot === prevSlot || recentByTime);
+          if (!isRecentSlot) return;
+          var hasInboxNotice = !!(inboxByCoSlot[cid + '|' + slot]);
+          var slotLabel = /^\d{6}$/.test(slot)
+            ? (slot.slice(0, 4) + '-' + slot.slice(4))
+            : (slot === 'keep' ? '근로계약서(상시)' : slot);
+          if (org) {
+            var pdStat = ensureCoStat(org.id, org.name, org);
+            markStage(pdStat, 'work_payroll', hasInboxNotice ? 'active' : 'warn', 'payroll');
+          }
+          pushBaton({
+            id: 'paydata-arr:' + cid + ':' + slot,
+            ruleCode: 'paydata_arrival_ready',
+            stage: 'work_payroll',
+            severity: hasInboxNotice ? 'normal' : 'warn',
+            fromApp: 'paydata',
+            toApp: 'payroll',
+            companyId: org ? org.id : cid,
+            companyLabel: (org && org.name) || '급여 도착 사업장',
+            puLabel: (org && org.puLabel) || '',
+            linkConfidence: org ? 'confirmed' : 'none',
+            bindCompany: !!org,
+            title: (hasInboxNotice ? '급여 기초자료 수신 확인 · ' : '급여데이터함 새 도착 자료 · ') + slotLabel + ' (' + docCnt + '건)',
+            reason: hasInboxNotice
+              ? '급여데이터함 도착 자료와 급여관리 수신함이 연결되어 있습니다 — 급여아웃소싱에서 확인·처리하세요'
+              : '급여데이터함 도착 칸에 자료가 들어와 있습니다 — 급여아웃소싱 수신함에서도 자동으로 함께 표시됩니다',
+            actionLabel: '급여 수신함 열기',
+            ownerSid: (org && org.managerSid) || '',
+            targetUrl: 'payroll-os.html'
+          });
+        });
+      });
+    }
+
+    var isAdminCtx = str(userCtx && userCtx.role) === 'admin' || !!(userCtx && userCtx.isAdmin);
+    if (isAdminCtx && appCanAccess('edulib', userCtx) && raw.edulibInbox && typeof raw.edulibInbox === 'object') {
+      var eq = raw.edulibInbox.q;
+      var qCnt = 0;
+      if (eq && typeof eq === 'object') {
+        Object.keys(eq).forEach(function (qk) {
+          if (!isSafeKey(qk)) return;
+          var qv = eq[qk];
+          if (qv && typeof qv === 'object' && !qv._deleted) qCnt++;
+        });
+      }
+      if (qCnt > 0) {
+        pushBaton({
+          id: 'edulib-inbox-q',
+          ruleCode: 'edulib_inbox_pending',
+          stage: 'case_rules',
+          severity: 'warn',
+          fromApp: 'mail',
+          toApp: 'edulib',
+          companyId: '',
+          companyLabel: '강의자료 자동 정리함',
+          linkConfidence: 'none',
+          bindCompany: false,
+          title: '강의자료 메일 자동 정리 대기 ' + qCnt + '건',
+          reason: '보낸 메일에서 추출된 강의자료 후보가 자동 정리함(edulib_inbox)에 쌓여 있습니다 — 검토 후 자료함에 편입하세요',
+          actionLabel: '강의자료 열기',
+          ownerSid: '',
+          targetUrl: 'pu-edulib.html'
+        });
+      }
+    }
+
+    if (appCanAccess('datahub', userCtx) && raw.datahubBoard && typeof raw.datahubBoard === 'object') {
+      var dhTotal = 0;
+      var dhNa = 0;
+      var dhLatest = 0;
+      Object.keys(raw.datahubBoard).forEach(function (dk) {
+        if (!isSafeKey(dk)) return;
+        var card = raw.datahubBoard[dk];
+        if (!card || typeof card !== 'object') return;
+        dhTotal++;
+        if (card.state === 'na') dhNa++;
+        if (typeof card.at === 'number' && card.at > dhLatest) dhLatest = card.at;
+      });
+      var dhStale = dhLatest > 0 && (now - dhLatest) > 6 * 3600000;
+      if (dhTotal > 0 && (dhNa > 0 || dhStale)) {
+        pushBaton({
+          id: 'datahub-board-check',
+          ruleCode: 'datahub_board_alert',
+          stage: 'finance_settle',
+          severity: 'normal',
+          fromApp: 'datahub',
+          toApp: 'datahub',
+          companyId: '',
+          companyLabel: '전사 현황판(datahub_board)',
+          linkConfidence: 'none',
+          bindCompany: false,
+          title: dhNa > 0
+            ? ('데이터관리 현황판 확인 필요 ' + dhNa + '개 앱 (전체 ' + dhTotal + '개)')
+            : ('데이터관리 현황판 집계 지연 점검 (' + dhTotal + '개 앱)'),
+          reason: '시간별 집계(datahub_board) 중 미집계 또는 지연 상태 카드가 감지되었습니다 — 데이터관리에서 현황을 확인하세요',
+          actionLabel: '데이터관리 열기',
+          ownerSid: '',
+          targetUrl: 'pu-datahub.html'
+        });
+      }
     }
 
     /* ── 정렬: 미보류·미확인 우선 ➔ 긴급(urgent:0) ➔ 주의(warn:1) ➔ 일반(normal:2) ➔ 기한 임박 순 ── */

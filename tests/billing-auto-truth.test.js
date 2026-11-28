@@ -29,7 +29,11 @@ function scheduleOf(src, exportName) {
   const seg = src.slice(i, i + 900);
   const every = seg.match(/\.pubsub\.schedule\(['"]every (\d+) minutes['"]\)/);
   if (every) return { every: parseInt(every[1], 10), hours: 24 };
-  const daytime = seg.match(/\.pubsub\.schedule\(['"]\*\/(\d+) (\d+)-(\d+) \* \* \*['"]\)/);
+  const stepAll = seg.match(/\.pubsub\.schedule\(['"](?:\*|\d+-\d+)\/(\d+) \* \* \* \*['"]\)/);
+  if (stepAll) return { every: parseInt(stepAll[1], 10), hours: 24 };
+  const hourly = seg.match(/\.pubsub\.schedule\(['"]\d+ \* \* \* \*['"]\)/);
+  if (hourly) return { every: 60, hours: 24 };
+  const daytime = seg.match(/\.pubsub\.schedule\(['"](?:\*|\d+-\d+)\/(\d+) (\d+)-(\d+) \* \* \*['"]\)/);
   assert.ok(daytime, exportName + ' 의 주기를 못 읽음');
   return { every: +daytime[1], hours: +daytime[3] - +daytime[2] + 1,
     first: +daytime[2], last: +daytime[3] };
@@ -101,14 +105,15 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
   /* 2026-11-21 데이터관리 현황판 집계(1시간마다, datahubBoardTally)가 늘어 서른둘 — 대표 「한번에 모든 것 다해고 내부관리에 넣어달라」. 앱별 건수·비율만 datahub_board 에 쓴다. 하루 셈 +24(코드에서 읽은 주기) */
   /* 2026-11-21 강의자료 메일 정리(저녁 7:30, edulibMailSweep)가 늘어 서른셋 — 대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」. 메일 거울을 읽고 보낸 메일의 강의자료 첨부만 받는다(AI 안 씀). 하루 셈 +1 */
   /* 2026-11-22 정부사업신청 매일 카톡 요약(아침 8:30, govDigestKakao)이 늘어 서른넷 — 대표 지시 「카카오톡으로 매일 받고 싶다」 → 「공식 방식으로」. 공개 공고·모집 글을 읽어 «나에게 보내기»로 보낸다(카카오 호출은 새 것이 있을 때만). 하루 셈 +1 */
-  assert.strictEqual(all.length, 34,'스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
+  /* 2026-11-28 기금 메일 큐 직렬 처리(10분마다, drainFundMailQueue)가 늘어 서른다섯 — 큐가 비면 IMAP 없이 바로 끝남. 하루 셈 +144 */
+  assert.strictEqual(all.length, 35,'스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
     '금요일 준비가 화면 설명에 없거나, AI 를 쓴다는 말이 빠졌다');
   /* ☕ 따뜻하게 두기 — 화면에 적힌 «언제·몇 분마다·하루 몇 번»이 코드와 같아야 한다 */
   const kw = FSYNC.slice(FSYNC.indexOf('mailKeepWarm: F'), FSYNC.indexOf('mailKeepWarm: F') + 900);
-  const cron = (kw.match(/\.pubsub\.schedule\('(\*\/(\d+) (\d+)-(\d+) \* \* 1-6)'\)/) || []);
+  const cron = (kw.match(/\.pubsub\.schedule\('((?:\*|\d+-\d+)\/(\d+) (\d+)-(\d+) \* \* 1-6)'\)/) || []);
   assert.ok(cron[1], '따뜻하게 두기 주기를 못 읽음: ' + kw.slice(0, 200));
   const every = +cron[2], h0 = +cron[3], h1 = +cron[4];
   const perDayWarm = Math.round(60 / every) * (h1 - h0 + 1);
@@ -156,6 +161,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '데이터관리 현황판 집계 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.govDigestKakao') >= 0 && ENTER.indexOf('정부사업 카톡 요약 하루 한 번') >= 0,
     '정부사업 카톡 요약 일정이 화면 설명에 없습니다');
+  assert.ok(FIDX.indexOf('exports.drainFundMailQueue') >= 0 && ENTER.indexOf('기금 메일 큐 처리 10분마다') >= 0,
+    '기금 메일 큐 처리 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -218,8 +225,9 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const rules = scheduleOf(FIDX, 'collectRulesMail ');
   const gra = scheduleOf(FIDX, 'govReportAuto');
   const dhb = scheduleOf(FIDX, 'datahubBoardTally');
+  const dqf = scheduleOf(FIDX, 'drainFundMailQueue');
   const mcsSeg = FIDX.slice(FIDX.indexOf('exports.mailContractSweep'), FIDX.indexOf('exports.mailContractSweep') + 500);
-  const mcsHours = ((mcsSeg.match(/\.pubsub\.schedule\(["']0 ([0-9,]+) \* \* \*["']\)/) || [])[1] || '').split(',').filter(Boolean).length;
+  const mcsHours = ((mcsSeg.match(/\.pubsub\.schedule\(["']\d+ ([0-9,]+) \* \* \*["']\)/) || [])[1] || '').split(',').filter(Boolean).length;
   assert.ok(mcsHours > 0, 'mailContractSweep 시각 목록을 못 읽음');
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
@@ -229,6 +237,7 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
     + Math.round(60 / rules.every) * rules.hours   // 취업규칙 모으기 — 30분마다 깨움(2026-10-05)
     + Math.round(60 / dhb.every) * dhb.hours   // 데이터관리 현황판 집계 — 1시간마다(2026-11-21)
     + Math.round(60 / gra.every) * gra.hours   // 메일 서류 자동 처리 — 1시간마다 깨움(2026-10-22), 서울 07~20시 밖은 읽기 0 으로 바로 끝난다
+    + Math.round(60 / dqf.every) * dqf.hours   // 기금 메일 큐 처리 — 10분마다(2026-11-28, 큐 비면 IMAP 없이 바로 끝남)
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
   /* ⚠ 숫자를 박지 않는다 — 코드에서 셈한 값이 화면에 그대로 있는가만 본다 */
