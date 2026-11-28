@@ -21437,6 +21437,9 @@ function mbSeedRefresh(){
   const fin = ()=>{
     if(--left) return;
     _mbSeeded = false;
+    /* 폴더 목록(없어진 폴더 표시)과 칸별 읽기가 «어느 쪽이 먼저 끝나든» 마지막에 한 번 더 걷는다 — 목록이 먼저 끝나 걷은 뒤
+       칸 읽기가 옛 폴더를 다시 채우는 경주를 막는다(자동 검토 재검증 지적) */
+    mbDropGoneRows();
     /* 씨앗 뒤에 새로 생긴 칸이 있으면 마저 받는다 */
     if(state.view==='mail' && state.mailSent==='box' && !state.mbOpen) mbFillNeed(mbNow());
     again();
@@ -21599,7 +21602,10 @@ function mbFolderBy(slug){ return (_mbFolders||{})[slug] || null; }
      한쪽만 고쳐 놓고 다 고친 줄 안다(🚫 스팸 거르기가 쓰는 그 목록이다). */
 function mbGotFolder(f){
   if(!f) return false;
-  return !MB_SENT_KINDS[f.kind] && f.kind !== 'trash';
+  /* ⚠ 다음메일에서 «없어진»(gone) 폴더는 받은 메일 폴더가 아니다 — 사람이 만든 칸이 이어 읽어 둔 표에 남아 있어도
+       전체메일·새 연락처·메일 셈에 섞이지 않는다(같은 메일이 이름 바꾼 새 폴더와 두 번 보이는 것을 막는다.
+       대표 지시 2026-11-28 「숨기기로 진행」 · 자동 검토 지적). 그 칸 «자체»에서는 mbRowFits 가 따로 본다. */
+  return !MB_SENT_KINDS[f.kind] && f.kind !== 'trash' && !f.gone;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

@@ -335,8 +335,20 @@ test('★★ 어떤 오류도 던지지 않는다 — 폴더 목록 읽는 길 �
   assert.doesNotThrow(() => c.mbDropGoneRows());
 });
 
-test('★★ 폴더 목록·씨앗·칸 읽기가 끝날 때마다 걷는다 — 세 길 모두에 이어져 있다', () => {
-  ['loadMailFolders', 'mbSeedApply', 'mbEnsureBins'].forEach((n) => {
+test('★★★ 없어진 폴더는 「받은 메일 폴더」가 아니다 — 읽어 둔 표에 남아 있어도(쪽지·사람이 만든 칸 때문에) 전체메일에 안 섞인다', () => {
+  const ctx = { Object, String };
+  vm.createContext(ctx);
+  const sent = app.match(/const MB_SENT_KINDS = [^;]*;/);
+  assert.ok(sent, 'MB_SENT_KINDS 를 앱에서 찾지 못했습니다');
+  vm.runInContext('var ' + sent[0].slice('const '.length) + '\n' + sliceFn(app, 'function mbGotFolder('), ctx);
+  assert.equal(ctx.mbGotFolder({ kind: 'custom' }), true, '있는 업무 폴더가 받은 메일 폴더에서 빠졌다');
+  assert.equal(ctx.mbGotFolder({ kind: 'inbox' }), true);
+  assert.equal(ctx.mbGotFolder({ kind: 'custom', gone: 1700000000000 }), false, '없어진 폴더가 받은 메일 폴더로 셈에 든다 — 이름 바꾼 폴더의 같은 메일이 전체메일에 두 번 보인다');
+  assert.equal(ctx.mbGotFolder(null), false);
+});
+
+test('★★ 폴더 목록·씨앗·씨앗 새로고침·칸 읽기가 끝날 때마다 걷는다 — 네 길 모두에 이어져 있다', () => {
+  ['loadMailFolders', 'mbSeedApply', 'mbEnsureBins', 'mbSeedRefresh'].forEach((n) => {
     assert.match(sliceFn(app, 'function ' + n + '('), /mbDropGoneRows\(\)/,
       n + ' 가 없어진 폴더의 메일을 걷지 않는다 — 그 길로 들어온 옛 메일이 전체메일에 남는다');
   });
