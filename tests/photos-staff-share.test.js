@@ -408,10 +408,8 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-28 — 컨설팅 전용 앱 12종(scal_*), msg_intake, coach_rag 신규 14개 루트 및 콘솔 동기화 5종(kakao_room, labor_cases, labor_secret, sanjae_cases, sanjae_secret) 배포 완료(새로 14 · 바뀜 0 · 사라짐 0 · 문법 통과 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
   /* ★ 2026-11-28 — /govlinks 콘솔 동기화, /kakao_room 2단계 강화분, 컨설팅 12종(scal_* projects/caseNo · regions) 규칙 배포 완료(사라짐 0 · 헐거워짐 0 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
   /* ★ 2026-11-28 — 병목 해소 2단계 /fund_mail_queue 최상위 서버 전용 잠금 · /paydata/arrivals/$coId 숫자 검증 및 콘솔 동기화(/puwiki · scal_* insp*) 배포 완료(새로 2 · 바뀜 0 · 사라짐 0 · 문법 통과 · 콘솔 일치 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). */
-  /* ⏳ 2026-11-28 — 정부사업 바로가기 ★ 즐겨찾기(govlinks/stars/{사번}, 쓰기는 본인만) — «배포 대기».
-     rules-deploy 가 멈췄다: 콘솔에 만들개에 없는 규칙 62개(scal_ 컨설팅 12종의 projects/$id 아래 insp 로 시작하는 칸)가 있어 올리면 지워진다(어느 가지에도 없음 — 올린 방이 저장소에 넣으면 그때 함께 올린다).
-     올린 뒤 새 기준을 받으면 이 자리를 지운다. 그 전까지 화면의 ★ 는 «이 기기»에만 남는다(gov-links.html toggleStar). */
-  const PENDING = ['/govlinks/stars'];
+  /* ★ 2026-11-28 — 컨설팅 12종 근로감독 5필드(insp*), /govlinks/stars, /fund_erp/mail_queue/.validate 및 콘솔 신규 3규칙(fund_mail_queue, puwiki, paydata/arrivals/$coId) 통합 배포 완료(사라짐 0 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

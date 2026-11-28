@@ -567,7 +567,11 @@ rules.payroll_os = workspace({
 rules.fund_mail_queue = { '.read': false, '.write': false };
 // 하위 호환 잠금 자리 (실사용 큐는 최상위 fund_mail_queue 로 이전됨)
 rules.fund_erp = workspace({
-  mail_queue: { '.read': false, '.write': false }
+  mail_queue: {
+    '.read': false,
+    '.write': false,
+    '.validate': false
+  }
 });
 /* 업무관리. ★ mysum/{로그인 UID} = «내 업무 숫자» 한 줄(2026-11-21 — 포털 머리줄 «📋 내 업무» 단추·이알피 나의 업무가 읽는다).
    «본인 UID 자리만» 쓴다 — 아래 $k(로그인 직원 누구나 쓰기)에 떨어지면 남이 내 숫자를 덮을 수 있었다(보안 검토 지적).
@@ -2732,10 +2736,10 @@ for (const rootName of CONSULT_APP_ROOTS) {
       consultantUid: CS_STR(128),
       status: { '.validate': "newData.val() === 'active' || newData.val() === 'done'" },
       summaryNote: CS_STR(2000),
-      inspDue: CS_STR(32),
-      inspIssues: CS_STR(500),
-      inspOffice: CS_STR(60),
       inspPeriod: CS_STR(80),
+      inspOffice: CS_STR(60),
+      inspIssues: CS_STR(500),
+      inspDue: CS_STR(32),
       inspResult: CS_STR(40),
       $other: { '.validate': false }
     } },
@@ -2950,14 +2954,14 @@ rules.puwiki = {
   articles: {
     $id: {
       '.write': `(${LOGIN}) && newData.exists()`,
-      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120"
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 12000"
     }
   },
   reviews: {
     $art: {
       $id: {
-        '.write': `(${LOGIN}) && newData.exists()`,
-        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag')"
+        '.write': `(${LOGIN}) && newData.exists() && ((!data.exists() && newData.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.exists() && newData.child('actorSid').val() === data.child('actorSid').val() && newData.child('kind').val() === data.child('kind').val() && newData.child('createdAt').val() === data.child('createdAt').val() && ((newData.child('_deleted').val() === true && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) || (newData.child('_deleted').val() !== true && ((data.child('kind').val() === 'verify' && data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.child('kind').val() === 'flag' && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('note').val() === data.child('note').val()) && (newData.child('status').val() === 'open' || newData.child('resolvedBySid').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))))))`,
+        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag') && newData.child('actorSid').isString() && newData.child('actorSid').val().length > 0 && newData.child('actorSid').val().length <= 64 && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 800"
       }
     }
   }

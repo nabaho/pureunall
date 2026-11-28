@@ -526,6 +526,44 @@
         summaryNote: '2024 충남북부상의 수행 완료 (과거 이력 아카이브)'
       };
       D.regions = {};
+    } else if (APP_KEY === 'laboraudit') {
+      var trReg = tracks[0] || t0;
+      var trSp = tracks[1] || t1;
+      var trRem = tracks[2] || t1;
+      D.projects[p1Id] = {
+        id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
+        createdAt: now - 864e5 * 14, updatedAt: now - 3600e3,
+        companyId: 'co_pv_1', companyName: '(주)가나정밀', bizNo: '123-81-51001',
+        year: 2026, trackId: trReg.id, trackName: trReg.name, stage: 'visit',
+        workerCount: 42, consultantName: '점검노무사', status: 'active',
+        inspPeriod: '2026-11-18 ~ 2026-11-29', inspOffice: '대전청 천안지청 근로개선지도과',
+        inspIssues: '연장·야간·휴일수당 산정 및 근로계약서 교부 점검', inspDue: '2026-12-15',
+        inspResult: '시정지시 대응중',
+        summaryNote: '정기 근로감독 수검 · 지적사항 시정안 작성'
+      };
+      D.projects[p2Id] = {
+        id: p2Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 380, updatedAt: now - 864e5 * 340,
+        companyId: 'co_pv_2', companyName: '(주)다라산업', bizNo: '123-81-51002',
+        year: 2025, trackId: trRem.id, trackName: trRem.name, stage: 'followup',
+        workerCount: 68, consultantName: '점검노무사', status: 'done',
+        inspPeriod: '2025-05-12 ~ 2025-05-23', inspOffice: '대전청 서산지청',
+        inspIssues: '임금명세서 기재누락, 연차휴가 미사용수당 시정', inspDue: '2025-06-20',
+        inspResult: '시정완료·종결',
+        summaryNote: '시정완료 보고서 제출 및 종결'
+      };
+      D.projects['pv_' + APP_KEY + '_3'] = {
+        id: 'pv_' + APP_KEY + '_3', entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 740, updatedAt: now - 864e5 * 700,
+        companyId: 'co_pv_3', companyName: '(주)마바물류', bizNo: '123-81-51003',
+        year: 2024, trackId: trSp.id, trackName: trSp.name, stage: 'followup',
+        workerCount: 55, consultantName: '점검노무사', status: 'done',
+        inspPeriod: '2024-09-02 ~ 2024-09-13', inspOffice: '중부지방고용노동청',
+        inspIssues: '근로시간 한도(52시간) 초과 및 휴게시간 부여 개선', inspDue: '2024-10-10',
+        inspResult: '시정완료·종결',
+        summaryNote: '특별감독 시정지시 2건 완료 · 취업규칙 정비'
+      };
+      D.regions = {};
     } else {
       D.projects[p1Id] = {
         id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
@@ -713,10 +751,15 @@
     // 가벼운 화면은 이 띠를 그리지 않는다 — 탭과 똑같은 이동 단추(사업 현황·미등록 후보·보고서)를 한 번 더 늘어놓던 자리였다.
     if (cat.slimUi) { el.innerHTML = ''; return; }
     var isLeft = !!$('leftDash');
-    var badge = cat.diffBadge || (isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리');
-    var msg = cat.diffMsg || (isLeft
-      ? '북부상의 · 서산상의 · 당진상의 왼쪽 대시보드 분리 + 새 지역 상공회의소 추가 + 연도별 관리'
-      : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용');
+    var isInsp = (APP_KEY === 'laboraudit');
+    var badge = isInsp
+      ? '변경됨 · 자율점검·노무진단 완전 분리'
+      : (cat.diffBadge || (isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리'));
+    var msg = isInsp
+      ? '순수 고용노동부 근로감독(정기/수시·특별·시정지시·모의수검)만 관리 · 감독기간·관할지청·지적사항·결과 표시'
+      : (cat.diffMsg || (isLeft
+        ? '북부상의 · 서산상의 · 당진상의 왼쪽 대시보드 분리 + 새 지역 상공회의소 추가 + 연도별 관리'
+        : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용'));
     el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
       '<span class="chip c-blue">' + esc(badge) + '</span>' +
       '<b>' + esc(cat.icon + ' ' + cat.name) + ':</b>' +
@@ -1003,7 +1046,7 @@
       if (st === 'active' && p.status === 'done') return false;
       if (mgr && str(p.consultantName) !== mgr) return false;
       if (q) {
-        var hay = [p.year, p.companyName, p.trackName, p.consultantName, p.summaryNote].join(' ').toLowerCase();
+        var hay = [p.year, p.companyName, p.caseNo, p.trackName, p.consultantName, p.summaryNote, p.inspPeriod, p.inspOffice, p.inspIssues, p.inspDue, p.inspResult].join(' ').toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -1149,6 +1192,7 @@
       '<button type="button" class="sm" id="bulkClearProjBtn">해제</button>' +
       '</div>';
 
+    var isInsp = (APP_KEY === 'laboraudit');
     var trs = shown.map(function (p, i) {
       var ckKey = 'p:' + p.id;
       var clsList = [];
@@ -1177,16 +1221,34 @@
           '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
         '</tr>';
       }
+      var rowBodyCols;
+      if (isInsp) {
+        var resChip = p.inspResult ? (' <span class="chip ' + (p.inspResult.indexOf('완료') >= 0 || p.inspResult.indexOf('없음') >= 0 ? 'c-green' : 'c-amber') + '">' + esc(p.inspResult) + '</span>') : '';
+        var periodHtml = p.inspPeriod ? esc(p.inspPeriod) : '<span class="hint">기간 미입력</span>';
+        var officeHtml = p.inspOffice ? (' <span class="hint">· ' + esc(p.inspOffice) + '</span>') : '';
+        var issuesTxt = p.inspIssues || p.summaryNote || '-';
+        var dueHtml = p.inspDue ? (' <span class="hint">· 기한 ' + esc(p.inspDue) + '</span>') : '';
+        var issuesTitle = p.inspDue ? (issuesTxt + ' (시정기한: ' + p.inspDue + ')') : issuesTxt;
+        rowBodyCols =
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span> ' + stChip + resChip + '</td>' +
+          '<td title="' + esc([p.inspPeriod, p.inspOffice].filter(Boolean).join(' · ')) + '">' + periodHtml + officeHtml + '</td>' +
+          '<td class="wide" title="' + esc(issuesTitle) + '">' + esc(issuesTxt) + dueHtml + '</td>' +
+          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>';
+      } else {
+        rowBodyCols =
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (oneTrackSlim ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
+          (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
+          '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+          '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+          '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
+          '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>';
+      }
       return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
         '<td class="n">' + (i + 1) + '</td>' +
         '<td class="ti" title="' + esc(p.companyName) + '"><span class="chip">' + esc(String(p.year || 2026)) + '</span> ' + esc(p.companyName) + caseTag + '</td>' +
-        '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (oneTrackSlim ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
-        (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
-        '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-        '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
-        '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
-        '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>' +
+        rowBodyCols +
         '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
       '</tr>';
     }).join('');
@@ -1195,10 +1257,13 @@
       ? ('<div class="bar"><span class="hint">총 ' + filtered.length + '건 중 ' + shown.length + '건 표시</span><button type="button" class="sm pri" id="showAllProjBtn">전체 ' + filtered.length + '건 모두 보기 (+' + (filtered.length - shown.length) + ')</button></div>')
       : '';
 
+    var diffMark = (isInsp && DIFF_HIGHLIGHT) ? (' ' + diffBadge('개편')) : '';
     var headCols = splitCols
       ? '<th class="yr">연도</th><th>사업장명</th><th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th><th data-k="st">진행상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'
-      : '<th>사업장 · 연도</th><th>' + (oneTrackSlim ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>';
-    box.innerHTML = bulkHtml + '<div class="scroll"><table class="t" data-name="cases">' +
+      : (isInsp
+        ? ('<th>사업장 · 연도</th><th>감독 유형 · 결과' + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th><th data-k="act">열기</th>')
+        : ('<th>사업장 · 연도</th><th>' + (oneTrackSlim ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'));
+    box.innerHTML = bulkHtml + '<div class="scroll' + (isInsp ? diffCls(true) : '') + '"><table class="t" data-name="cases">' +
       '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th>' + headCols + '</tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>' + moreHtml;
 
@@ -1387,7 +1452,7 @@
       if (ent.kind === 'project') {
         var p = ent.item;
         if (yrQ) {
-          var hayP = [ent.year, p.companyName, p.trackName, p.caseNo, p.summaryNote].join(' ').toLowerCase();
+          var hayP = [ent.year, p.companyName, p.trackName, p.caseNo, p.summaryNote, p.inspPeriod, p.inspOffice, p.inspIssues, p.inspDue, p.inspResult].join(' ').toLowerCase();
           if (hayP.indexOf(yrQ) < 0) return false;
         }
       } else {
@@ -1425,6 +1490,7 @@
           var cls = p.status === 'done' ? ' class="perf-direct"' : '';
           var trObj = tracks.find(function (t) { return t.id === p.trackId; });
           var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
+          var yrNote = p.summaryNote || p.inspIssues || '-';
           return '<tr' + cls + '>' +
             '<td class="c"><input type="checkbox" data-ck="yrp:' + esc(p.id) + '" data-list="yr_' + esc(yr) + '" aria-label="선택"></td>' +
             '<td class="n">' + (idx + 1) + '</td>' +
@@ -1432,7 +1498,7 @@
             '<td data-k="badge"><span class="chip c-green">등록 사업</span> <span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
             '<td>' + stepDotsHtml(p.stage, p.status) + '</td>' +
             '<td>' + esc(safeDate(p.updatedAt)) + '</td>' +
-            '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
+            '<td class="wide" title="' + esc(yrNote) + '">' + esc(yrNote) + '</td>' +
             '<td data-k="act"><button type="button" class="sm pri" data-yr-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-yr-rpt="' + esc(p.id) + '">보고서</button></td>' +
           '</tr>';
         }
@@ -1537,6 +1603,13 @@
           '<span><b>담당</b>' + esc(proj.consultantName || '전담 노무사') + '</span>' +
           '<span><b>점검 준비도</b>' + sum.overallPct + '%</span>' +
           '<span><b>수집자료</b>' + comms.length + '건</span>' +
+          (APP_KEY === 'laboraudit'
+            ? ('<span><b>감독 기간</b>' + esc(proj.inspPeriod || '미입력') + '</span>' +
+               '<span><b>관할 지청</b>' + esc(proj.inspOffice || '미입력') + '</span>' +
+               '<span><b>시정 기한</b>' + esc(proj.inspDue || '-') + '</span>' +
+               '<span><b>처리 결과</b><span class="chip ' + ((str(proj.inspResult).indexOf('완료') >= 0 || str(proj.inspResult).indexOf('없음') >= 0) ? 'c-green' : 'c-amber') + '">' + esc(proj.inspResult || '미정') + '</span></span>' +
+               '<span style="flex-basis:100%"><b>지적·시정지시</b>' + esc(proj.inspIssues || '상단 수정 버튼을 눌러 지적사항을 입력하세요') + '</span>')
+            : '') +
         '</div>' +
       '</div>' +
       roundsPanelHtml(proj) +
@@ -1995,6 +2068,13 @@
       summaryNote: '자동 감지 등록 (메일 ' + bundle.mailCount + ' / 톡 ' + bundle.msgCount + ')'
     };
     if (str(bundle.caseNo)) rec.caseNo = cleanText(bundle.caseNo).slice(0, 60);
+    if (APP_KEY === 'laboraudit' && bundle.inspMeta) {
+      if (str(bundle.inspMeta.inspPeriod)) rec.inspPeriod = cleanText(bundle.inspMeta.inspPeriod).slice(0, 80);
+      if (str(bundle.inspMeta.inspOffice)) rec.inspOffice = cleanText(bundle.inspMeta.inspOffice).slice(0, 60);
+      if (str(bundle.inspMeta.inspIssues)) rec.inspIssues = cleanText(bundle.inspMeta.inspIssues).slice(0, 480);
+      if (str(bundle.inspMeta.inspDue)) rec.inspDue = cleanText(bundle.inspMeta.inspDue).slice(0, 32);
+      if (str(bundle.inspMeta.inspResult)) rec.inspResult = cleanText(bundle.inspMeta.inspResult).slice(0, 40);
+    }
     D.projects[pid] = await saveRecord('projects/' + pid, pid, rec, 'Project');
     if (Array.isArray(bundle.comms)) {
       D.comms[pid] = D.comms[pid] || {};
@@ -2127,7 +2207,7 @@
     var rows = [['구분', '연도', '사업장명', '트랙', '단계/출처', '담당/최근일', '요약·제목']];
     if (!includeBundles) {
       getFilteredProjects().forEach(function (p) {
-        rows.push(['등록사업', p.year || 2026, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
+        rows.push(['등록사업', p.year || 2026, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || p.inspIssues || '-']);
       });
     } else {
       var yrQ = str($('yrQ') && $('yrQ').value).toLowerCase();
@@ -2137,8 +2217,8 @@
           var yr = num(p.year, 2026);
           if (TRACK_FILTER && p.trackId !== TRACK_FILTER) return;
           if (YEAR_FILTER && String(yr) !== YEAR_FILTER) return;
-          if (yrQ && ([yr, p.companyName, p.trackName, p.caseNo, p.summaryNote].join(' ').toLowerCase()).indexOf(yrQ) < 0) return;
-          rows.push(['등록사업', yr, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
+          if (yrQ && ([yr, p.companyName, p.trackName, p.caseNo, p.summaryNote, p.inspPeriod, p.inspOffice, p.inspIssues, p.inspDue, p.inspResult].join(' ').toLowerCase()).indexOf(yrQ) < 0) return;
+          rows.push(['등록사업', yr, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || p.inspIssues || '-']);
         });
       }
       if (yrKind !== 'project') {
@@ -2193,6 +2273,45 @@
     });
   }
 
+  var INSP_RESULT_OPTS = ['미정/수검중', '시정지시 대응중', '시정완료·종결', '위반없음·종결', '과태료 부과 후 시정', '과태료·사법조치 병행'];
+  function inspFormRowsHtml(prefix, src) {
+    if (APP_KEY !== 'laboraudit') return '';
+    var p = src || {};
+    var curRes = str(p.inspResult);
+    var optsList = INSP_RESULT_OPTS.slice();
+    if (curRes && optsList.slice(1).indexOf(curRes) < 0) optsList.push(curRes);
+    var resOpts = optsList.map(function (label, idx) {
+      var val = idx === 0 ? '' : label;
+      return '<option value="' + esc(val) + '"' + (curRes === val ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+    return '<div class="fr"><label for="' + prefix + 'InspPeriod">감독 일시·기간</label><div class="fv"><input type="text" id="' + prefix + 'InspPeriod" value="' + esc(p.inspPeriod || '') + '" placeholder="예: 2026-11-10 ~ 2026-11-21"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspOffice">관할 노동지청</label><div class="fv"><input type="text" id="' + prefix + 'InspOffice" value="' + esc(p.inspOffice || '') + '" placeholder="예: 대전청 천안지청 근로개선지도과"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspIssues">지적·시정지시 사항</label><div class="fv"><input type="text" id="' + prefix + 'InspIssues" value="' + esc(p.inspIssues || '') + '" placeholder="예: 연장수당 산정 누락, 근로계약서 미교부"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspDue">시정기한</label><div class="fv"><input type="text" id="' + prefix + 'InspDue" value="' + esc(p.inspDue || '') + '" placeholder="예: 2026-12-15"></div></div>' +
+      '<div class="fr"><label for="' + prefix + 'InspResult">처리 결과</label><div class="fv"><select id="' + prefix + 'InspResult">' + resOpts + '</select></div></div>';
+  }
+  function readInspFormValues(prefix, origProj) {
+    if (APP_KEY !== 'laboraudit') return { values: {}, clearKeys: [] };
+    var defs = [
+      ['inspPeriod', prefix + 'InspPeriod', 80],
+      ['inspOffice', prefix + 'InspOffice', 60],
+      ['inspIssues', prefix + 'InspIssues', 480],
+      ['inspDue', prefix + 'InspDue', 32],
+      ['inspResult', prefix + 'InspResult', 40]
+    ];
+    var values = {};
+    var clearKeys = [];
+    defs.forEach(function (d) {
+      var el = $(d[1]);
+      var rawVal = el ? str(el.value) : '';
+      if (origProj && rawVal === str(origProj[d[0]])) return;
+      var v = el ? cleanText(rawVal).slice(0, d[2]) : '';
+      if (v) values[d[0]] = v;
+      else clearKeys.push(d[0]);
+    });
+    return { values: values, clearKeys: clearKeys };
+  }
+
   function openNewProjectModal() {
     var m = $('modal'), box = $('mbox');
     if (!m || !box) return;
@@ -2210,6 +2329,7 @@
         '<div class="fr"><label for="npTrack">' + esc(cat.regionLabel || '세부 트랙') + '</label><div class="fv"><select id="npTrack">' + opts + '</select></div></div>' +
         '<div class="fr"><label for="npYear">수행연도</label><div class="fv"><input type="number" id="npYear" value="' + esc(String(defYr)) + '"></div></div>' +
         '<div class="fr"><label for="npCaseNo">사건번호(선택)</label><div class="fv"><input type="text" id="npCaseNo" placeholder="예: 인사서산-2026-001"></div></div>' +
+        inspFormRowsHtml('np', {}) +
         '<div class="fr"><label for="npWorkers">상시근로자수</label><div class="fv"><input type="number" id="npWorkers" value="20"></div></div>' +
         '<div class="fr"><label for="npNote">핵심 과업 메모</label><div class="fv"><input type="text" id="npNote" placeholder="현장 방문 일정·주력 과제(비식별)"></div></div>' +
       '</div>' +
@@ -2239,6 +2359,8 @@
       };
       var cno = cleanText($('npCaseNo') && $('npCaseNo').value).slice(0, 60);
       if (cno) rec.caseNo = cno;
+      var inspData = readInspFormValues('np');
+      Object.assign(rec, inspData.values);
       try {
         D.projects[pid] = await saveRecord('projects/' + pid, pid, rec, 'Project');
         CUR_PID = pid;
@@ -2270,8 +2392,9 @@
         '<div class="fr"><label for="epTrack">' + esc(cat.regionLabel || '세부 트랙') + '</label><div class="fv"><select id="epTrack">' + opts + '</select></div></div>' +
         '<div class="fr"><label for="epYear">수행연도</label><div class="fv"><input type="number" id="epYear" value="' + esc(String(num(proj.year, CUR_YEAR))) + '"></div></div>' +
         '<div class="fr"><label for="epCaseNo">사건번호</label><div class="fv"><input type="text" id="epCaseNo" value="' + esc(proj.caseNo || '') + '" placeholder="예: 인사서산-2026-001"></div></div>' +
+        inspFormRowsHtml('ep', proj) +
         '<div class="fr"><label for="epMgr">담당 노무사</label><div class="fv"><input type="text" id="epMgr" value="' + esc(proj.consultantName || '') + '"></div></div>' +
-        '<div class="fr"><label for="epStatus">진행상태</label><div class="fv"><select id="epStatus"><option value="active"' + (proj.status !== 'done' ? ' selected' : '') + '>진행 중</option><option value="done"' + (proj.status === 'done' ? ' selected' : '') + '>수행 완료</option></select></div></div>' +
+        (function () { var st = String(proj.status || 'active').trim(); var safeSt = st.slice(0, 40).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); var std = st === 'active' || st === 'done'; var extra = !std && safeSt ? '<option value="' + safeSt + '" selected>기존 상태 유지 (' + safeSt + ')</option>' : ''; return '<div class="fr"><label for="epStatus">진행상태</label><div class="fv"><select id="epStatus">' + extra + '<option value="active"' + (st === 'active' || (!std && !safeSt) ? ' selected' : '') + '>진행 중</option><option value="done"' + (st === 'done' ? ' selected' : '') + '>수행 완료</option></select></div></div>'; })() +
         '<div class="fr"><label for="epNote">요약 메모</label><div class="fv"><input type="text" id="epNote" value="' + esc(proj.summaryNote || '') + '"></div></div>' +
       '</div>' +
       '<div class="mft"><button type="button" class="sm" id="mCancelBtn">취소</button><button type="button" class="pri" id="mEditSaveBtn">수정 저장</button></div>';
@@ -2286,23 +2409,32 @@
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중…'; }
       var trId = $('epTrack').value;
       var trObj = tracks.find(function (t) { return t.id === trId; }) || { id: trId, name: cat.shortName };
+      var origSt = String(proj.status || 'active').trim();
+      var selSt = String($('epStatus').value || 'active').trim();
       var patch = {
         companyName: co.slice(0, 190),
         trackId: trObj.id,
         trackName: trObj.name,
         year: num($('epYear').value, CUR_YEAR),
         consultantName: cleanText($('epMgr').value).slice(0, 70) || proj.consultantName || '전담 노무사',
-        status: $('epStatus').value === 'done' ? 'done' : 'active',
         summaryNote: cleanText($('epNote').value).slice(0, 1900)
       };
+      if (selSt !== origSt || !proj.status) patch.status = selSt === 'done' ? 'done' : 'active';
       var cno = cleanText($('epCaseNo').value).slice(0, 60);
       if (cno) patch.caseNo = cno;
+      var inspData = readInspFormValues('ep', proj);
+      Object.assign(patch, inspData.values);
       var nextRec = Object.assign({}, proj, patch);
       if (!cno) delete nextRec.caseNo;
+      var clearKeys = (cno ? [] : (Object.prototype.hasOwnProperty.call(proj, 'caseNo') ? ['caseNo'] : []))
+        .concat(inspData.clearKeys.filter(function (k) {
+          delete nextRec[k];
+          return Object.prototype.hasOwnProperty.call(proj, k);
+        }));
       try {
         D.projects[proj.id] = await saveRecord('projects/' + proj.id, proj.id, nextRec, 'Project', {
           patch: patch,
-          clearKeys: cno ? [] : ['caseNo']
+          clearKeys: clearKeys
         });
         closeModal();
         rebuildDiscoverAndRag();

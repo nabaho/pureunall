@@ -189,7 +189,7 @@ const allowTop = ['fund_mail_queue' /* 기금 메일 큐 — 서버(collectFundM
   'scal_techprotect','scal_clinic','scal_chamber','scal_hrconsult','scal_evalcomp','scal_pubconsult',
   'scal_familywork','scal_socialent','scal_sixthind','scal_laboraudit','scal_unionneg','scal_specialcons',
   'msg_intake','coach_rag',
-  /* 2026-11-28 사내 카톡 업무방 아카이브·노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화) */
+  /* 2026-11-28 사내 카톡 업무방 아카이브·노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화; fund_mail_queue·puwiki는 상단에 기재) */
   'kakao_room','labor_cases','labor_secret','sanjae_cases','sanjae_secret'];
 
 const keys = Object.keys(R);
