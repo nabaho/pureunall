@@ -1898,6 +1898,17 @@
 
   var SKIP_CUSTOM_SLUG_RE = /^(?:기타광고|뉴스레터 발송분|쇼핑|소셜|프로모션|카페편지함|이력서|13_ 경조사)/;
 
+  /* 사진첩 길 전용 — 제목·서류 이름이 «종료·해지 통보»인가.
+     isTerminatedMailText 는 «자문계약 종료» 만으로도 걸려 「자문계약 종료 후 신규 계약서 송부」 같은
+     갱신 계약서 메일까지 막는다. 여기서는 통보 낱말(통보·요청·통지·안내·의 건·합의·확인)이 붙었거나
+     계약서 낱말(계약서·약정서·위임장·서명본·날인본)이 없을 때만 통보로 본다(2026-11-16 검토 지적). */
+  function isTerminationNoticeTitle(t) {
+    var s = String(t == null ? '' : t);
+    if (!isTerminatedMailText(s, '')) return false;
+    if (/(?:해지|종료)\s*(?:통보|요청|통지|안내|의\s*건|합의|확인)/.test(s)) return true;
+    return !/계약서|약정서|위임장|서명본|날인본/.test(s);
+  }
+
   function isDraftOrReviewRequest(subj, attNames, bodyTxt) {
     var head = String(subj || '') + ' ' + (Array.isArray(attNames) ? attNames.join(' ') : '');
     if (!/계약서|약정서|합의서|협약서|규정/.test(head)) return false;
@@ -2350,7 +2361,10 @@
     o = o || {};
     var f = o.fields || {};
     var mm = o.mailMeta || {};
-    if (mm && isTerminatedMailText(mm.subject || '', mm.body || '')) {
+    /* 종료·해지 «통보»(메일 제목·본문·서류 이름)는 새 계약이 아니다 — 요청을 안 만든다(아무것도 지우지 않는다).
+       제목은 «통보»일 때만 건다(isTerminationNoticeTitle) — 「자문계약 종료 후 신규 계약서 송부」 같은 갱신 계약서는 통과.
+       본문은 isTerminatedMailText 의 본문 갈래 그대로, 서류 이름(날인본 파일명 따위)도 본다(2026-11-16 점검). */
+    if ((mm && (isTerminationNoticeTitle(mm.subject) || isTerminatedMailText('', mm.body || ''))) || isTerminationNoticeTitle(f.docName)) {
       return Promise.resolve({ ok: false, reason: 'terminated_mail' });
     }
     var compName = String(f.company || '').trim();
@@ -2493,6 +2507,25 @@
   var MAIL_READ_MSG_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/readMailMessage';
   var MAIL_READ_ATT_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/readMailAttachment';
   var PUB_DOMAINS = { 'naver.com': 1, 'daum.net': 1, 'hanmail.net': 1, 'gmail.com': 1, 'kakao.com': 1, 'nate.com': 1, 'yahoo.com': 1, 'hotmail.com': 1, 'outlook.com': 1 };
+
+  /* 메일 첨부 목록에서 «계약서로 읽을» 첨부의 번호를 고른다. 못 고르면 -1.
+     ① 사업자등록증·고유번호증·통장사본·등기부·명함·견적서는 건너뛴다 — «첫 번째 첨부»로 때우지 않는다(2026-11-27).
+        계약서 메일에는 대개 통장사본이 함께 붙고 맨 앞에 오기 때문에, 이 거름이 없으면 통장사본이 «계약서»로 읽힌다.
+     ② 이름이 계약서 갈래이거나 계약·약정·위임 말이 있으면 바로 그것.
+     ③ 없으면 읽을 수 있는 첫 서류. DP(PuDocPick)가 없어도 돈다. */
+  function pickContractAttIndex(atts, DP) {
+    var list = Array.isArray(atts) ? atts : [];
+    var atIdx = -1;
+    for (var k = 0; k < list.length; k++) {
+      var nm = String((list[k] && list[k].name) || '');
+      if (!/\.(pdf|jpe?g|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(nm)) continue;
+      /* 이름에 «계약서·약정서·위임계약» 말이 함께 있으면 계약서다(견적서_및_계약서.pdf) */
+      if (/사업자등록증|고유번호증|통장사본|등기부|명함|견적서/.test(nm) && !/계약서|약정서|위임\s*약정|위임\s*계약/.test(nm)) continue;
+      if ((DP && DP.이름갈래(nm) === '계약서') || /계약|약정|위임/.test(nm)) return k;
+      if (atIdx < 0) atIdx = k;
+    }
+    return atIdx;
+  }
 
   function pullMailContracts(opts) {
     opts = opts || {};
@@ -2814,13 +2847,7 @@
             .then(function (j) {
               if (!j || !j.ok) return pullNext(idx + 1);
               var atts = j.atts || [];
-              var atIdx = -1;
-              for (var k = 0; k < atts.length; k++) {
-                var nm = String((atts[k] && atts[k].name) || '');
-                if (!/\.(pdf|jpe?g|png|gif|bmp|webp|heic|heif|tiff?)$/i.test(nm)) continue;
-                if ((DP && DP.이름갈래(nm) === '계약서') || /계약|약정|위임/.test(nm)) { atIdx = k; break; }
-                if (atIdx < 0) atIdx = k;
-              }
+              var atIdx = pickContractAttIndex(atts, DP);
               if (atIdx < 0) {
                 return deps.db.ref(CT_REQ + '/' + c.mpKey).set({
                   id: c.mpKey, state: 'skipped_ext', srcKey: c.srcKey, at: Date.now()
@@ -2883,6 +2910,7 @@
     guessConsType: guessConsType,
     requestContract: requestContract,
     autoRequestContractFromPhoto: autoRequestContractFromPhoto,
+    pickContractAttIndex: pickContractAttIndex,
     pullMailContracts: pullMailContracts,
     markMailContractPulled: markMailContractPulled,
     synthesizeMailLifecycle: synthesizeMailLifecycle,
