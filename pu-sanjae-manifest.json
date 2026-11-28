@@ -1,0 +1,27 @@
+{
+  "name": "산재사건관리",
+  "short_name": "산재사건",
+  "description": "푸른노무법인 산재사건관리 — 요양·질판위·심사90일·공방대조",
+  "id": "/pureunall/pu-sanjae.html",
+  "start_url": "./pu-sanjae.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#166534",
+  "lang": "ko-KR",
+  "icons": [
+    {
+      "src": "icon-sanjae-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-sanjae-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

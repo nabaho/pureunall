@@ -50,6 +50,48 @@
     return [];
   }
 
+  function normalizeUserDir(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    rowsOf(raw).forEach(function (u) {
+      var sid = clean(u && (u.sid || u.id));
+      if (!sid || (u.status && u.status !== 'active')) return;
+      out[sid] = u;
+    });
+    Object.keys(raw).forEach(function (k) {
+      if (k === 'u' || k === 'v') return;
+      var u = raw[k];
+      if (u && typeof u === 'object' && !Array.isArray(u)) {
+        if (u.status && u.status !== 'active') return;
+        out[clean(u.sid || k)] = u;
+      } else if (typeof u === 'string' && clean(u)) {
+        out[k] = { sid: k, name: clean(u) };
+      }
+    });
+    return out;
+  }
+
+  function selectCase(cid) {
+    var nextId = clean(cid);
+    if (STATE.curId !== nextId) {
+      STATE.curId = nextId;
+      STATE.curDocId = '';
+      STATE.secretUnlockedId = '';
+      STATE.secretData = null;
+    }
+  }
+
+  function closeModal() {
+    var modal = el('modal');
+    if (!modal || modal.style.display === 'none') return;
+    modal.style.display = 'none';
+    var pf = modal._prevFocus;
+    modal._prevFocus = null;
+    if (pf && typeof pf.focus === 'function') {
+      try { pf.focus(); } catch (_) {}
+    }
+  }
+
   function purgeSessionState() {
     STATE.me = null;
     STATE.gw = null;
@@ -99,8 +141,8 @@
     });
     rows.sort(function (a, b) {
       var k = STATE.sortCol || 'receiveDate';
-      var va = clean(a[k]);
-      var vb = clean(b[k]);
+      var va = k === 'year' ? String(a.year || clean(a.receiveDate).slice(0, 4)) : clean(a[k]);
+      var vb = k === 'year' ? String(b.year || clean(b.receiveDate).slice(0, 4)) : clean(b[k]);
       var cmp = va < vb ? -1 : (va > vb ? 1 : 0);
       return STATE.sortDir === 'asc' ? cmp : -cmp;
     });
@@ -177,11 +219,12 @@
           + '<button type="button" class="btn sm" id="btnMoreRows">더 보기 (+100건)</button>'
           + '<button type="button" class="btn sm" id="btnAllRows">전체 보기</button></div>')
         : '';
+      var sortMark = function (col) { return STATE.sortCol === col ? (STATE.sortDir === 'asc' ? ' ▲' : ' ▼') : ''; };
       return '<div class="card tbl-wrap"><table class="t"><thead><tr>'
         + '<th><input type="checkbox" id="chkAll" aria-label="전체 선택"' + (allChecked ? ' checked' : '') + '></th><th>№</th>'
-        + '<th><button type="button" class="th-flt-btn" data-sort="year">연도</button></th>'
-        + '<th><button type="button" class="th-flt-btn" data-sort="companyName">기업명</button></th>'
-        + '<th><button type="button" class="th-flt-btn" data-sort="claimantName">재해자</button></th>'
+        + '<th><button type="button" class="th-flt-btn" data-sort="year">연도' + sortMark('year') + '</button></th>'
+        + '<th><button type="button" class="th-flt-btn" data-sort="companyName">기업명' + sortMark('companyName') + '</button></th>'
+        + '<th><button type="button" class="th-flt-btn" data-sort="claimantName">재해자' + sortMark('claimantName') + '</button></th>'
         + '<th>산재 갈래</th><th>진행 단계</th><th>대응 공방</th><th>판정·90일 기한</th><th>담당 노무사</th>'
         + '</tr></thead><tbody>' + (trs || '<tr><td colspan="10" class="empty-td">조건에 맞는 산재 사건이 없습니다.</td></tr>') + '</tbody></table>' + moreBar + '</div>';
     }
@@ -379,7 +422,7 @@
       + '<small>원천: ' + esc(c.sourceKind || '직접등록') + ' · 관할: ' + esc(c.jurisdiction || '근로복지공단') + '</small></div>'
       + '<div class="detail-acts">'
       + (root.PuSanjaeKit ? '<button type="button" class="btn sm" id="btnOpenSanjaeKit">🧰 산재 묶음(급여·기한·유족) 열기</button>' : '')
-      + (canEdit ? ' <button type="button" class="btn sm" id="btnSyncErp">🔄 ERP 동기화</button> <button type="button" class="btn sm pri" id="btnSaveDetail">💾 저장</button> <button type="button" class="btn sm red" id="btnDeleteCase">종결·삭제</button>' : '')
+      + (canEdit ? ' <button type="button" class="btn sm code-diff-target" id="btnSendWork" title="업무관리 할 일로 등록 또는 진행 단계 갱신">📋 업무관리로 보내기</button> <button type="button" class="btn sm" id="btnSyncErp">🔄 ERP 동기화</button> <button type="button" class="btn sm pri" id="btnSaveDetail">💾 저장</button> <button type="button" class="btn sm red" id="btnDeleteCase">종결·삭제</button>' : '')
       + '</div></div>'
       + '<div class="ws-steps">' + stepsHtml + '</div>'
       + '<div class="form-grid">'
@@ -402,7 +445,8 @@
       + '</div>'
       + '<div class="guide-strip"><b>필수 서류 체크(' + esc(guide.label) + '):</b> ' + guide.need.map(esc).join(' · ') + '</div>'
       + (alerts.length ? '<div class="alert-strip">' + alerts.map(function (a) {
-        return '<span class="bd bd-' + (a.urgent ? 'red' : 'amber') + '">' + esc(a.label + ': ' + a.dueDate + ' (' + (a.daysLeft >= 0 ? 'D-' + a.daysLeft : 'D+' + Math.abs(a.daysLeft)) + ')') + '</span>';
+        var dTxt = a.daysLeft != null ? ' (' + (a.daysLeft >= 0 ? 'D-' + a.daysLeft : 'D+' + Math.abs(a.daysLeft)) + ')' : '';
+        return '<span class="bd bd-' + (a.urgent ? 'red' : 'amber') + '">' + esc(a.label + ': ' + a.dueDate + dTxt) + '</span>';
       }).join(' ') + '</div>' : '')
       + '<div class="secret-wrap">' + secretHtml + '</div>'
       + '</div>'
@@ -463,21 +507,17 @@
   function openAddDocModal(c) {
     var modal = el('modal'), mbox = el('mbox');
     if (!modal || !mbox || !c) return;
-    var prevFocus = document.activeElement;
-    function closeDocModal() {
-      modal.style.display = 'none';
-      if (prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus();
-    }
+    modal._prevFocus = document.activeElement;
     modal.style.display = 'flex';
     mbox.innerHTML = '<div class="mhd"><h3 id="mhdTitle">+ 서류 추가 (상대방↔당사 자동분류)</h3><button type="button" class="btn sm" id="mClose">닫기</button></div>'
       + '<div class="mbd"><div class="form-grid">'
       + '<label>서류 파일명/제목<input type="text" id="dName" placeholder="예: 질판위 의견서_푸른.hwpx / 불승인통지서.pdf"></label>'
       + '<label>서류 역할<select id="dSide"><option value="auto">자동 판별</option><option value="ours">당사 대응서류</option><option value="opponent">상대방 서류</option><option value="agency">공단·질판위 판정</option><option value="evidence">입증·의무기록</option></select></label>'
-      + '<label>제출·수령일<input type="date" id="dDate" value="' + new Date().toISOString().slice(0, 10) + '"></label>'
+      + '<label>제출·수령일<input type="date" id="dDate" value="' + esc(Core.todayKst()) + '"></label>'
       + '<label>보관함 상대경로<input type="text" id="dRel" placeholder="예: 2025/기업명/산재/01_당사제출/의견서.pdf"></label>'
       + '</div><div class="flt-bar"><button type="button" class="btn pri sm" id="dSave">서류 추가</button></div></div>';
     mbox.focus();
-    el('mClose').onclick = closeDocModal;
+    el('mClose').onclick = closeModal;
     el('dSave').onclick = async function () {
       try {
         var nm = clean(el('dName').value);
@@ -503,7 +543,7 @@
         var next = Object.assign({}, c, { docs: arr(c.docs).concat([doc]) });
         next.steps = Core.inferStepsFromDocs(next.docs, next.steps);
         await saveCaseRecord(next);
-        closeDocModal();
+        closeModal();
       } catch (err) {
         Kit.toast('서류 추가 실패: ' + (err && err.message || err), true);
       }
@@ -515,7 +555,7 @@
       if (e.key === 'Escape') {
         var modal = el('modal');
         if (modal && modal.style.display && modal.style.display !== 'none') {
-          modal.style.display = 'none';
+          closeModal();
           return;
         }
       }
@@ -530,7 +570,7 @@
     });
     document.addEventListener('click', async function (e) {
       try {
-      if (e.target.id === 'modal') { e.target.style.display = 'none'; return; }
+      if (e.target.id === 'modal') { closeModal(); return; }
       if (e.target.id === 'btnClearSel') { STATE.selectedIds = {}; render(); return; }
       if (e.target.id === 'btnMoreRows') {
         STATE.pageLimit = (STATE.pageLimit || 100) + 100;
@@ -597,7 +637,7 @@
       var docBtn = e.target.closest('[data-open-doc]');
       if (docBtn) {
         var sp = docBtn.getAttribute('data-open-doc').split('|');
-        STATE.curId = sp[0]; STATE.curDocId = sp[1]; render(); return;
+        selectCase(sp[0]); STATE.curDocId = sp[1]; render(); return;
       }
 
       var pvDoc = e.target.closest('[data-pv-doc]');
@@ -620,7 +660,7 @@
         if (bd) {
           var rec = Core.buildCaseFromMailBundle(bd, { managerMain: STATE.me && STATE.me.sid, ourRole: 'worker' });
           var saved = await saveCaseRecord(rec);
-          STATE.curId = saved.id;
+          selectCase(saved.id);
           STATE.bundles = Core.discoverSanjaeFromMail(STATE.mails, allCasesRaw()).filter(function (b) {
             return !STATE.dismissedMap[b.bundleKey];
           });
@@ -643,7 +683,7 @@
         var newRec = await saveCaseRecord(Core.buildCaseFromMailBundle({
           companyName: '신규 산재 사업장', year: new Date().getFullYear(), mails: []
         }, { managerMain: STATE.me && STATE.me.sid }));
-        STATE.curId = newRec.id; STATE.tab = 'detail'; render(); return;
+        selectCase(newRec.id); STATE.tab = 'detail'; render(); return;
       }
 
       if (e.target.id === 'btnMountArchive') {
@@ -662,6 +702,9 @@
         var sub = el('fSubType').value;
         var rcvDate = el('fReceiveDate').value;
         var nextYear = /^20\d{2}/.test(rcvDate) ? Number(rcvDate.slice(0, 4)) : c.year;
+        var rulVal = el('fRulingResult').value;
+        var stVal = clean(el('fStatus').value) || '진행중';
+        if (stVal === '진행중' && rulVal === '취하·종결') stVal = '종결';
         await saveCaseRecord(Object.assign({}, c, {
           title: el('fTitle').value,
           companyName: el('fCompany').value,
@@ -673,9 +716,9 @@
           year: nextYear,
           disapprovalDate: el('fDisapprovalDate').value,
           reviewDecisionDate: el('fReviewDate').value,
-          rulingResult: el('fRulingResult').value,
+          rulingResult: rulVal,
           managerMain: el('fMgrMain').value,
-          status: el('fStatus').value,
+          status: stVal,
           caseNo: el('fCaseNo').value,
           steps: nextSteps
         }));
@@ -686,7 +729,18 @@
         var dc = currentCase(); if (!dc) return;
         if (typeof root.confirm === 'function' && !root.confirm('이 사건을 삭제(휴지통 이동)하시겠습니까? 단순히 사건이 끝난 경우에는 진행 상태를 "종결"로 저장하세요.')) return;
         await STATE.gw.remove(STATE.db.ref('sanjae_cases/cases/' + dc.id), dc, { entityType: 'Case' });
-        delete STATE.casesMap[dc.id]; STATE.curId = ''; STATE.tab = 'board'; render(); return;
+        delete STATE.casesMap[dc.id]; selectCase(''); STATE.tab = 'board'; render(); return;
+      }
+
+      if (e.target.id === 'btnSendWork') {
+        var wc = currentCase(); if (!wc) return;
+        if (!Core.canEditCase(wc, STATE.me)) return Kit.toast('사건 담당자·대표만 업무관리 할 일로 등록·갱신할 수 있습니다.', true);
+        var today = Core.todayKst();
+        var wid = Core.buildWorkItemPayload(wc, STATE.userDir, today).id;
+        await STATE.gw.save(STATE.db.ref('work_erp/items/' + wid), function (prev) {
+          return Core.buildWorkItemPayload(wc, STATE.userDir, today, prev);
+        }, { entityType: 'Task', allowPendingCompany: true });
+        Kit.toast('업무관리 할 일(' + wid + ')에 등록·갱신되었습니다.'); return;
       }
 
       if (e.target.id === 'btnSyncErp') {
@@ -724,7 +778,7 @@
 
       var rowTr = e.target.closest('tr[data-cid], li[data-cid], .axis-card[data-cid], .yr-case-hd[data-cid]');
       if (rowTr && !e.target.matches('input,button')) {
-        STATE.curId = rowTr.getAttribute('data-cid');
+        selectCase(rowTr.getAttribute('data-cid'));
         STATE.tab = 'detail';
         render();
       }
@@ -735,7 +789,7 @@
 
     document.addEventListener('change', function (e) {
       if (e.target.id === 'fltSub') { STATE.fltSubType = e.target.value; STATE.pageLimit = 100; render(); }
-      if (e.target.id === 'selCounterCase') { STATE.curId = e.target.value; STATE.curDocId = ''; render(); }
+      if (e.target.id === 'selCounterCase') { selectCase(e.target.value); render(); }
       if (e.target.id === 'selOurRole') {
         var c = currentCase();
         if (c) {
@@ -756,11 +810,16 @@
       }
       if (e.target.id === 'chkAll') {
         var on = e.target.checked;
-        filteredCases().forEach(function (c) { STATE.selectedIds[c.id] = on; });
+        filteredCases().slice(0, STATE.pageLimit || 100).forEach(function (c) {
+          if (on) STATE.selectedIds[c.id] = true;
+          else delete STATE.selectedIds[c.id];
+        });
         render();
       }
       if (e.target.matches('[data-chk]')) {
-        STATE.selectedIds[e.target.getAttribute('data-chk')] = e.target.checked;
+        var chkId = e.target.getAttribute('data-chk');
+        if (e.target.checked) STATE.selectedIds[chkId] = true;
+        else delete STATE.selectedIds[chkId];
         render();
       }
     });
@@ -827,7 +886,7 @@
     ]);
     STATE.casesMap = snaps[0].val() || {};
     STATE.dismissedMap = snaps[1].val() || {};
-    STATE.userDir = snaps[2].val() || {};
+    STATE.userDir = normalizeUserDir(snaps[2].val());
     STATE.companies = rowsOf(snaps[3].val());
     STATE.erpCases = rowsOf(snaps[4].val());
     STATE.mails = Archive.flattenMailbox(snaps[5].val() || {});
@@ -836,8 +895,18 @@
     });
     var qp = new URLSearchParams(root.location.search || '');
     if (qp.get('tab')) STATE.tab = qp.get('tab');
+    var qpCo = clean(qp.get('co') || qp.get('company'));
     if (qp.get('erp')) await applyErpDeepLink(clean(qp.get('erp')));
     else if (qp.get('cid')) { STATE.curId = qp.get('cid'); STATE.tab = 'detail'; }
+    else if (qpCo) {
+      var coMatch = STATE.companies.find(function (co) {
+        return co.id === qpCo || Archive.normalizeCompanyName(co.name) === Archive.normalizeCompanyName(qpCo);
+      });
+      STATE.searchQ = coMatch ? coMatch.name : qpCo;
+      if (!qp.get('tab')) STATE.tab = 'board';
+    }
+    var goWorkBtn = el('btnGoWork');
+    if (goWorkBtn) goWorkBtn.classList.add('code-diff-target');
     render();
     Kit.initRecentDiffBar({
       programKey: 'sanjae',
@@ -845,7 +914,8 @@
       changes: [
         { label: '4축 분류 현황', target: '#secAxisBoard', desc: '연도별·기업중심·재해자중심·판정추적 전환' },
         { label: '연도별·보관함 연결', target: '#secYearlyArchive', desc: 'D/NAS 표준보관함 연결 및 실시간 미리보기' },
-        { label: '상대방↔당사 공방 대조', target: '#secCounterMatrix', desc: '1:1 상대방 서류 vs 당사 대응 매칭' }
+        { label: '상대방↔당사 공방 대조', target: '#secCounterMatrix', desc: '1:1 상대방 서류 vs 당사 대응 매칭' },
+        { label: '업무관리 연계 & PWA', target: '#btnGoWork', desc: '독립 PWA 아이콘 및 업무관리 할 일 보내기·양방향 이동' }
       ],
       onJump: function (sel) {
         if (sel === '#secYearlyArchive') STATE.tab = 'yearly';

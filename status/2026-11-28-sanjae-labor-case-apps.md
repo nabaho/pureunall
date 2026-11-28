@@ -35,3 +35,18 @@
 - **Orca 2단계 검증 및 최종 재검토**:
   - 1차 파이프라인(`ow-fix-20261128-172649-Xl7ytd`, Gemini 점검·수정 + Claude 재검토) 및 1차 재검토(`run_69ae57ea777a`) 지적사항(기능 중간 1 · 보안 중간 3 · 낮음 4) 전부 반영.
   - 최종 재검토(`run_70b44e2d7c39`): 기능·UI 검증(`antigravity:gemini-4-argon-high`) **높음 0 · 중간 0 · 낮음 3** (단, 작업자가 보고 출력 후 `worker_done` 호출을 누락해 수동 확인·정리), 보안 검증(`claude`, `codex` 사용률 92% 초과로 자동 전환) **높음 0 · 중간 0 · 낮음 4**.
+
+## 5. 독립 PWA 완결 · 업무관리(`work.html`) 3중 통합 · 교차검토 고도화 (2026-11-28 2차)
+- **`origin/main` 최신 병합 (`963c86e30`)**: 최신 포털(`govlinks` · 컨설팅 12종 · `msgintake` · `coach` · `kakaoroom` · 로그인 안정화 `#3320`)을 무손실 병합하고 규칙 생성기(`make-firebase-rules.js`) 중복 제거.
+- **독립 설치형 PWA 2종 완결**:
+  - `scripts/make-sanjae-case-icons.js` 로 고유 PNG(`icon-sanjae-192/512.png`, `icon-laborcase-192/512.png`) 및 `pu-sanjae-manifest.json` / `pu-case-manifest.json` 생성, `pu-sanjae.html` (`🏥`, 초록 좌측 강조선) · `pu-case.html` (`🔨`, 파랑 좌측 강조선) 헤더 `#btnGoWork`(`📋 업무관리로`) 및 `<head>` 매니페스트·홈화면 아이콘 배선, `tests/app-icons.test.js` 51/51 통과.
+- **양방향 할 일(`SJ-` / `LC-`) 및 `work.html` 3중 통합**:
+  - `PuSanjaeCore` / `PuLaborCaseCore` `buildWorkItemPayload`: `SJ-`/`LC-` 키(금지문자 치환 시 해시 접미사로 충돌 차단 · 다른 사건 `sc.cid` 덮어쓰기 거부), `cat` (`산재` · `부해` · `체불`), `src` (`sanjae` · `laborcase`), `prevItem` 기존 필드 보존, `ref` 미포함(`wsSyncRun` 간섭 차단), 상세 화면 `📋 업무관리로 보내기`(`canEditCase` 권한 확인) 및 `?co=` 초기 필터 구현.
+  - `work.html`: ① 왼쪽 메뉴 `🏥 산재사건`(`#nav-sanjae`) · `🔨 부당해고·노동사건`(`#nav-labor`), `renderCaseHub`(1줄 콤팩트 KPI · 번호 컬럼 · IME 보존 부분갱신 · `#sanjae`/`#labor` 해시 진입), ② 사업장 서랍 `dSanjaeLaborHTML(it)` (`co_id`/`sc.cid` 우선, 없을 때만 `scNormCo` 추측 표시, 비밀금고 미접근, `scSendToWork` `+할일 등록`), ③ `hasResult` · `peFlag` 배지 · `dmore` 앱 열기 · `HELP.sc` 통합.
+  - `js/pu-ontology.js` (`v=115`) `work.sharedRoots` 및 `sanjae`/`laborcase` `work_erp/items` 쓰기 계약 반영, `js/pu-chatbot-kb.js` (`v=24`) 갱신 및 60개 HTML 캐시버전 동기화.
+- **검증 및 교차검토 경위 (마지막 수정 후 기준)**:
+  - **Orca 파이프라인 경위**: `ow.bat pipeline --ui` 실행(`ow-fix-20261128-201149-aIKfPj`, `203653-qZtnE9`, `204750-0u7riM`) 중 호스트의 `Orca.exe` 부재 및 Antigravity CLI 백엔드 일시 오류(`empty conversation id`)로 1·2단계가 모두 `0/1건 [시간 초과]`로 완료되지 못함.
+  - **Claude & Codex 읽기 전용 교차 검토**: `claude` (2.1.317) · `codex` (0.166.0) 직접 교차 검토 지적사항(KST 오늘 날짜 `todayKst`, 엄격한 달력일 검증 `addDaysIso`/`scAddDays`, `btnSendWork` `canEditCase` 권한 제한, `safeWorkId` 해시 충돌 방지 및 `prev.sc.cid` 가드, `work.html` `correctionDueDate`·한글 IME 보존·`escJ` 줄바꿈 이스케이프·1줄 KPI) 전부 반영 및 `work.html` `SC` 블록을 `openFromHash` 직전으로 이동해 `work-paydata-arrivals`/`work-visits` 충돌 해소.
+  - `node --test tests/*.test.js`: **31,457건 중 31,385건 통과 · 1건 실패 · 71건 스킵** (`fail 1`은 `tests/photos-staff-share.test.js:117` — `origin/main`의 `/kakao_room` 규칙이 최신 `docs/firebase-rules-콘솔원문-2026-11-28.json`과 미동기화된 기존 상태이며 `sanjae_*`/`labor_*` 및 본 작업 관련 테스트는 0건 실패).
+  - `node tools/phone-audit/run.mjs work sanjae laborcase --widths=360,411`: `sanjae`·`laborcase`·`work:sanjae`·`work:labor` 포함 전 52개 모바일 뷰 **옆넘침 0 · 화면밖 0 · 세로깨짐 0 · 짓눌림 0 · 두줄단추 0 · 작은입력 0** (exit 0).
+  - `node scripts/check-cache-version.js --all` (exit 0), `node scripts/erp-integrity-audit.js` (`ok: true`, `blockerCount: 0`), 민감정보 diff 스캔 (`rrnCount: 0`, `emailHits: []`, `unexpectedOsPaths: 0`).

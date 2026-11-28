@@ -33,10 +33,16 @@
     safety_accident: { label: '산안·중대재해처벌법', need: ['작업중지/시정명령서', '위험성평가/교육이력', '감독관 조사 의견서', '개선결과보고서'] }
   };
 
+  function todayKst() {
+    return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  }
+
   function addDaysIso(dateStr, days) {
-    var m = clean(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    var m = clean(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m) return '';
-    var dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    var y = Number(m[1]), mo = Number(m[2]) - 1, da = Number(m[3]);
+    var dt = new Date(Date.UTC(y, mo, da));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo || dt.getUTCDate() !== da) return '';
     dt.setUTCDate(dt.getUTCDate() + Number(days || 0));
     return dt.toISOString().slice(0, 10);
   }
@@ -51,47 +57,53 @@
   function calcAppealDeadline(caseObj, todayIso) {
     caseObj = caseObj || {};
     var alerts = [];
-    var baseToday = clean(todayIso) || new Date().toISOString().slice(0, 10);
+    var baseToday = clean(todayIso) || todayKst();
 
     var origServed = clean(caseObj.disapprovalDate || caseObj.rulingServedDate);
     var resStr = clean(caseObj.rulingResult);
     var isApproved = !/(불승인|미승인|기각|각하)/.test(resStr) && /(승인|인용|종결)/.test(resStr);
     if (origServed && !isApproved) {
       var due90 = addDaysIso(origServed, 90);
-      var left = diffDays(due90, baseToday);
-      alerts.push({
-        kind: 'appeal_90',
-        label: '산재 심사청구 기한(90일)',
-        baseDate: origServed,
-        dueDate: due90,
-        daysLeft: left,
-        urgent: left !== null && left <= 14
-      });
+      var left = due90 ? diffDays(due90, baseToday) : null;
+      if (due90 && left !== null) {
+        alerts.push({
+          kind: 'appeal_90',
+          label: '산재 심사청구 기한(90일)',
+          baseDate: origServed,
+          dueDate: due90,
+          daysLeft: left,
+          urgent: left <= 14
+        });
+      }
     }
     var reviewServed = clean(caseObj.reviewDecisionDate);
     if (reviewServed && /기각|불승인/.test(clean(caseObj.reviewResult || caseObj.rulingResult))) {
       var dueRe90 = addDaysIso(reviewServed, 90);
-      var leftRe = diffDays(dueRe90, baseToday);
-      alerts.push({
-        kind: 'rereview_90',
-        label: '재심사청구·행정소송 기한(90일)',
-        baseDate: reviewServed,
-        dueDate: dueRe90,
-        daysLeft: leftRe,
-        urgent: leftRe !== null && leftRe <= 14
-      });
+      var leftRe = dueRe90 ? diffDays(dueRe90, baseToday) : null;
+      if (dueRe90 && leftRe !== null) {
+        alerts.push({
+          kind: 'rereview_90',
+          label: '재심사청구·행정소송 기한(90일)',
+          baseDate: reviewServed,
+          dueDate: dueRe90,
+          daysLeft: leftRe,
+          urgent: leftRe <= 14
+        });
+      }
     }
     var supDue = clean(caseObj.supplementDueDate || caseObj.dueDate);
     if (supDue) {
       var leftSup = diffDays(supDue, baseToday);
-      alerts.push({
-        kind: 'due',
-        label: '보완·의견서 제출 기한',
-        baseDate: clean(caseObj.receiveDate),
-        dueDate: supDue,
-        daysLeft: leftSup,
-        urgent: leftSup !== null && leftSup <= 7
-      });
+      if (leftSup !== null) {
+        alerts.push({
+          kind: 'due',
+          label: '보완·의견서 제출 기한',
+          baseDate: clean(caseObj.receiveDate),
+          dueDate: supDue,
+          daysLeft: leftSup,
+          urgent: leftSup <= 7
+        });
+      }
     }
     alerts.sort(function (a, b) {
       if (a.dueDate === b.dueDate) return 0;
@@ -248,7 +260,7 @@
       caseNo: clean(bundle.primaryCaseNo),
       jurisdiction: clean(bundle.jurisdiction),
       year: Number(bundle.year) || new Date().getFullYear(),
-      receiveDate: firstDate || new Date().toISOString().slice(0, 10),
+      receiveDate: firstDate || todayKst(),
       status: '진행중',
       rulingResult: '',
       managerMain: clean(opts.managerMain),
@@ -283,6 +295,98 @@
     };
   }
 
+  function shortHash(str) {
+    var h = 5381;
+    for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+    return h.toString(36).slice(-4);
+  }
+
+  function safeWorkId(raw) {
+    var s0 = clean(raw);
+    if (!s0) return 'case';
+    var rep = s0.replace(/[.#$\[\]\/]/g, '_');
+    return rep === s0 ? rep : (rep + '_' + shortHash(s0));
+  }
+
+  function resolveStaffName(sid, userDir) {
+    var k = clean(sid);
+    if (!k || !userDir || typeof userDir !== 'object') return '';
+    var u = userDir[k];
+    if (!u && Array.isArray(userDir.v)) {
+      u = userDir.v.find(function (x) { return x && clean(x.sid || x.id) === k; });
+    } else if (!u && Array.isArray(userDir)) {
+      u = userDir.find(function (x) { return x && clean(x.sid || x.id) === k; });
+    }
+    if (u && typeof u === 'object') return clean(u.name || u.displayName);
+    if (typeof u === 'string' && clean(u)) return clean(u);
+    return '';
+  }
+
+  function buildWorkItemPayload(caseObj, userDir, todayIso, prevItem) {
+    var c = Archive.sanitizeForSave(caseObj || {});
+    var today = clean(todayIso) || todayKst();
+    var prev = (prevItem && typeof prevItem === 'object') ? prevItem : null;
+    var curCid = clean(c.id);
+    if (prev && prev.sc && clean(prev.sc.cid) && curCid && clean(prev.sc.cid) !== curCid) {
+      throw new Error('같은 업무 ID가 다른 사건(' + clean(prev.sc.cid) + ')에 연결되어 있어 덮어쓸 수 없습니다.');
+    }
+    var st = countDoneSteps(c.steps);
+    var stage = currentStageTitle(c.steps);
+    var alerts = calcAppealDeadline(c, today);
+    var dueDate = alerts.length ? clean(alerts[0].dueDate) : clean(prev && prev.due);
+    var prevSid = clean(prev && prev.mgr_main && prev.mgr_main.sid);
+    var mgrSid = clean(c.managerMain) || prevSid;
+    var sameMgr = mgrSid && mgrSid === prevSid;
+    var mgrMain = mgrSid
+      ? { sid: mgrSid, name: resolveStaffName(mgrSid, userDir) || (sameMgr ? clean(prev && prev.mgr_main && prev.mgr_main.name) : '') }
+      : { sid: '', name: '' };
+    var prevSubs = arr(prev && prev.mgr_subs);
+    var cSubs = arr(c.managerSubs).map(clean).filter(Boolean);
+    var mgrSubs = cSubs.length ? cSubs.map(function (sid) {
+      var oldSub = prevSubs.find(function (x) { return x && clean(x.sid) === sid && clean(x.name); });
+      return { sid: sid, name: resolveStaffName(sid, userDir) || (oldSub ? clean(oldSub.name) : '') };
+    }) : prevSubs;
+    var wid = 'SJ-' + safeWorkId(c.id || c.caseNo || c.title);
+    var yr = clean(c.year) || clean(c.receiveDate).slice(0, 4) || today.slice(0, 4);
+    var isClosed = /(종결|확정|승인완료|취하)/.test(clean(c.status) + ' ' + clean(c.rulingResult));
+    var out = {
+      id: wid,
+      entityType: 'Task',
+      no: clean(prev && prev.no) || (yr + '-산재-' + safeWorkId(c.caseNo || c.id).slice(-8)),
+      cat: '산재',
+      company: clean(c.companyName),
+      co_id: clean(c.companyId),
+      title: clean(c.title || [c.companyName, c.claimantName, c.subTypeLabel || '산재'].filter(Boolean).join(' ')).slice(0, 200),
+      status: (prev && prev.state === 'done') ? (clean(prev.status) || '완료') : (isClosed ? '완료' : (clean(prev && prev.status) || '진행중')),
+      start: clean(c.receiveDate) || clean(prev && prev.start) || today,
+      due: dueDate,
+      brief: [
+        stage ? ('단계: ' + stage) : '',
+        clean(c.claimantName) ? ('재해자: ' + clean(c.claimantName)) : '',
+        clean(c.subTypeLabel || c.subType),
+        '🏥 산재사건관리에서 연결'
+      ].filter(Boolean).join(' · ').slice(0, 300),
+      mgr_main: mgrMain,
+      mgr_subs: mgrSubs,
+      pe_nomgr: !mgrMain.sid,
+      src: 'sanjae',
+      sc: {
+        kind: 'sanjae',
+        cid: clean(c.id),
+        stage: stage,
+        progressPct: st.pct,
+        subType: clean(c.subTypeLabel || c.subType),
+        claimant: clean(c.claimantName),
+        due: dueDate
+      },
+      created_at: clean(prev && prev.created_at) || new Date().toISOString()
+    };
+    if (clean(c.companyId)) out.companyId = clean(c.companyId);
+    var merged = Object.assign({}, prev || {}, out);
+    delete merged.ref;
+    return merged;
+  }
+
   return {
     STEPS: STEPS,
     BRANCH_GUIDES: BRANCH_GUIDES,
@@ -296,6 +400,8 @@
     isErpSanjaeCase: isErpSanjaeCase,
     discoverSanjaeFromMail: discoverSanjaeFromMail,
     buildCaseFromMailBundle: buildCaseFromMailBundle,
-    buildErpSyncPayload: buildErpSyncPayload
+    buildErpSyncPayload: buildErpSyncPayload,
+    buildWorkItemPayload: buildWorkItemPayload,
+    todayKst: todayKst
   };
 });

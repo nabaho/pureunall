@@ -38,7 +38,9 @@ const APPS = [
   ['pu-camera.html',  'pu-camera-manifest.json',  'camera',  null],
   ['pu-paydata.html', 'pu-paydata-manifest.json', 'paydata', 'paydata'],
   ['work.html',       'work-manifest.json',       'work',    'work'],
-  ['pu-cal.html',     'pu-cal-manifest.json',     'cal',     'cal'],
+  ['pu-cal.html',     'pu-cal-manifest.json',     'cal',       'cal'],
+  ['pu-sanjae.html',  'pu-sanjae-manifest.json',  'sanjae',    'sanjae'],
+  ['pu-case.html',    'pu-case-manifest.json',    'laborcase', 'laborcase'],
 ];
 const MAIL = ['pu-mail-manifest.json', 'mail', 'mail'];   // 주소로 갈라 쓰는 것
 

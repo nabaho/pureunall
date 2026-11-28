@@ -49,10 +49,16 @@
     return TRACKS.nlrc.steps;
   }
 
+  function todayKst() {
+    return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  }
+
   function addDaysIso(dateStr, days) {
-    var m = clean(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    var m = clean(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m) return '';
-    var dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    var y = Number(m[1]), mo = Number(m[2]) - 1, da = Number(m[3]);
+    var dt = new Date(Date.UTC(y, mo, da));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo || dt.getUTCDate() !== da) return '';
     dt.setUTCDate(dt.getUTCDate() + Number(days || 0));
     return dt.toISOString().slice(0, 10);
   }
@@ -67,35 +73,45 @@
   function calcLaborDeadlines(caseObj, todayIso) {
     caseObj = caseObj || {};
     var alerts = [];
-    var baseToday = clean(todayIso) || new Date().toISOString().slice(0, 10);
+    var baseToday = clean(todayIso) || todayKst();
 
     var actDate = clean(caseObj.actionDate); /* 해고일·징계처분일 */
     if (actDate && !clean(caseObj.caseNo)) {
       var d90 = addDaysIso(actDate, 90);
-      var l90 = diffDays(d90, baseToday);
-      alerts.push({ kind: 'relief_90', label: '부당해고 구제신청 제척기간(3개월)', dueDate: d90, daysLeft: l90, urgent: l90 !== null && l90 <= 14 });
+      var l90 = d90 ? diffDays(d90, baseToday) : null;
+      if (d90 && l90 !== null) {
+        alerts.push({ kind: 'relief_90', label: '부당해고 구제신청 제척기간(3개월)', dueDate: d90, daysLeft: l90, urgent: l90 <= 14 });
+      }
     }
     var initServed = clean(caseObj.initialServedDate || caseObj.rulingServedDate);
     if (initServed && !clean(caseObj.reAppealDate)) {
       var d10 = addDaysIso(initServed, 10);
-      var l10 = diffDays(d10, baseToday);
-      alerts.push({ kind: 'reappeal_10', label: '★ 중노위 재심신청 마감(송달+10일)', dueDate: d10, daysLeft: l10, urgent: l10 !== null && l10 <= 5 });
+      var l10 = d10 ? diffDays(d10, baseToday) : null;
+      if (d10 && l10 !== null) {
+        alerts.push({ kind: 'reappeal_10', label: '★ 중노위 재심신청 마감(송달+10일)', dueDate: d10, daysLeft: l10, urgent: l10 <= 5 });
+      }
     }
     var reServed = clean(caseObj.reServedDate);
     if (reServed && !clean(caseObj.courtFiledDate)) {
       var d15 = addDaysIso(reServed, 15);
-      var l15 = diffDays(d15, baseToday);
-      alerts.push({ kind: 'court_15', label: '★ 행정소송 제소기한 마감(송달+15일)', dueDate: d15, daysLeft: l15, urgent: l15 !== null && l15 <= 7 });
+      var l15 = d15 ? diffDays(d15, baseToday) : null;
+      if (d15 && l15 !== null) {
+        alerts.push({ kind: 'court_15', label: '★ 행정소송 제소기한 마감(송달+15일)', dueDate: d15, daysLeft: l15, urgent: l15 <= 7 });
+      }
     }
     var hearingDate = clean(caseObj.hearingDate);
     if (hearingDate) {
       var lh = diffDays(hearingDate, baseToday);
-      alerts.push({ kind: 'hearing', label: '심문회의·조사 출석일', dueDate: hearingDate, daysLeft: lh, urgent: lh !== null && lh <= 7 });
+      if (lh !== null) {
+        alerts.push({ kind: 'hearing', label: '심문회의·조사 출석일', dueDate: hearingDate, daysLeft: lh, urgent: lh <= 7 });
+      }
     }
     var corrDue = clean(caseObj.correctionDueDate || caseObj.dueDate);
     if (corrDue) {
       var lc = diffDays(corrDue, baseToday);
-      alerts.push({ kind: 'correction_due', label: '서면·시정지시 제출 기한', dueDate: corrDue, daysLeft: lc, urgent: lc !== null && lc <= 7 });
+      if (lc !== null) {
+        alerts.push({ kind: 'correction_due', label: '서면·시정지시 제출 기한', dueDate: corrDue, daysLeft: lc, urgent: lc <= 7 });
+      }
     }
     alerts.sort(function (a, b) { return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0; });
     return alerts;
@@ -309,7 +325,7 @@
       caseNo: clean(bundle.primaryCaseNo),
       jurisdiction: clean(bundle.jurisdiction),
       year: Number(bundle.year) || new Date().getFullYear(),
-      receiveDate: firstDate || new Date().toISOString().slice(0, 10),
+      receiveDate: firstDate || todayKst(),
       status: '진행중',
       rulingResult: '',
       managerMain: clean(opts.managerMain),
@@ -344,6 +360,102 @@
     };
   }
 
+  function shortHash(str) {
+    var h = 5381;
+    for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+    return h.toString(36).slice(-4);
+  }
+
+  function safeWorkId(raw) {
+    var s0 = clean(raw);
+    if (!s0) return 'case';
+    var rep = s0.replace(/[.#$\[\]\/]/g, '_');
+    return rep === s0 ? rep : (rep + '_' + shortHash(s0));
+  }
+
+  function resolveStaffName(sid, userDir) {
+    var k = clean(sid);
+    if (!k || !userDir || typeof userDir !== 'object') return '';
+    var u = userDir[k];
+    if (!u && Array.isArray(userDir.v)) {
+      u = userDir.v.find(function (x) { return x && clean(x.sid || x.id) === k; });
+    } else if (!u && Array.isArray(userDir)) {
+      u = userDir.find(function (x) { return x && clean(x.sid || x.id) === k; });
+    }
+    if (u && typeof u === 'object') return clean(u.name || u.displayName);
+    if (typeof u === 'string' && clean(u)) return clean(u);
+    return '';
+  }
+
+  function buildWorkItemPayload(caseObj, userDir, todayIso, prevItem) {
+    var c = Archive.sanitizeForSave(caseObj || {});
+    var today = clean(todayIso) || todayKst();
+    var prev = (prevItem && typeof prevItem === 'object') ? prevItem : null;
+    var curCid = clean(c.id);
+    if (prev && prev.sc && clean(prev.sc.cid) && curCid && clean(prev.sc.cid) !== curCid) {
+      throw new Error('같은 업무 ID가 다른 사건(' + clean(prev.sc.cid) + ')에 연결되어 있어 덮어쓸 수 없습니다.');
+    }
+    var st = countDoneSteps(c);
+    var stage = currentStageTitle(c);
+    var alerts = calcLaborDeadlines(c, today);
+    var dueDate = alerts.length ? clean(alerts[0].dueDate) : clean(prev && prev.due);
+    var isWage = c.track === 'molab' || c.domain === 'labor_wage' || /체불|대지급금|진정/.test(clean(c.subTypeLabel || c.subType));
+    var cat = isWage ? '체불' : '부해';
+    var prevSid = clean(prev && prev.mgr_main && prev.mgr_main.sid);
+    var mgrSid = clean(c.managerMain) || prevSid;
+    var sameMgr = mgrSid && mgrSid === prevSid;
+    var mgrMain = mgrSid
+      ? { sid: mgrSid, name: resolveStaffName(mgrSid, userDir) || (sameMgr ? clean(prev && prev.mgr_main && prev.mgr_main.name) : '') }
+      : { sid: '', name: '' };
+    var prevSubs = arr(prev && prev.mgr_subs);
+    var cSubs = arr(c.managerSubs).map(clean).filter(Boolean);
+    var mgrSubs = cSubs.length ? cSubs.map(function (sid) {
+      var oldSub = prevSubs.find(function (x) { return x && clean(x.sid) === sid && clean(x.name); });
+      return { sid: sid, name: resolveStaffName(sid, userDir) || (oldSub ? clean(oldSub.name) : '') };
+    }) : prevSubs;
+    var wid = 'LC-' + safeWorkId(c.id || c.caseNo || c.title);
+    var yr = clean(c.year) || clean(c.receiveDate).slice(0, 4) || today.slice(0, 4);
+    var isClosed = /(종결|확정|화해성립|취하|합의|시정완료|불송치)/.test(clean(c.status) + ' ' + clean(c.rulingResult));
+    var out = {
+      id: wid,
+      entityType: 'Task',
+      no: clean(prev && prev.no) || (yr + '-' + cat + '-' + safeWorkId(c.caseNo || c.id).slice(-8)),
+      cat: cat,
+      company: clean(c.companyName),
+      co_id: clean(c.companyId),
+      title: clean(c.title || [c.companyName, c.claimantName, c.caseNo || c.subTypeLabel || '노동사건'].filter(Boolean).join(' ')).slice(0, 200),
+      status: (prev && prev.state === 'done') ? (clean(prev.status) || '완료') : (isClosed ? '완료' : (clean(prev && prev.status) || '진행중')),
+      start: clean(c.receiveDate) || clean(prev && prev.start) || today,
+      due: dueDate,
+      brief: [
+        stage ? ('단계: ' + stage) : '',
+        clean(c.caseNo) ? ('사건번호: ' + clean(c.caseNo)) : '',
+        clean(c.claimantName) ? ('진정·신청인: ' + clean(c.claimantName)) : '',
+        '🔨 부당해고·노동사건에서 연결'
+      ].filter(Boolean).join(' · ').slice(0, 300),
+      mgr_main: mgrMain,
+      mgr_subs: mgrSubs,
+      pe_nomgr: !mgrMain.sid,
+      src: 'laborcase',
+      sc: {
+        kind: 'laborcase',
+        cid: clean(c.id),
+        track: clean(c.track || 'nlrc'),
+        stage: stage,
+        progressPct: st.pct,
+        caseNo: clean(c.caseNo),
+        subType: clean(c.subTypeLabel || c.subType),
+        claimant: clean(c.claimantName),
+        due: dueDate
+      },
+      created_at: clean(prev && prev.created_at) || new Date().toISOString()
+    };
+    if (clean(c.companyId)) out.companyId = clean(c.companyId);
+    var merged = Object.assign({}, prev || {}, out);
+    delete merged.ref;
+    return merged;
+  }
+
   return {
     TRACKS: TRACKS,
     getStepsForCase: getStepsForCase,
@@ -359,6 +471,8 @@
     isErpLaborCase: isErpLaborCase,
     discoverLaborFromMail: discoverLaborFromMail,
     buildCaseFromMailBundle: buildCaseFromMailBundle,
-    buildErpSyncPayload: buildErpSyncPayload
+    buildErpSyncPayload: buildErpSyncPayload,
+    buildWorkItemPayload: buildWorkItemPayload,
+    todayKst: todayKst
   };
 });

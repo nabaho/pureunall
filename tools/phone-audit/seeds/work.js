@@ -116,12 +116,60 @@ const 옮길케이스 = [
   { id: 'bc-pa1', managerMain: 'P001', caseType: 'labor-office', title: '임금체불 진정 대응', companyName: '(주)점검제조', companyId: 'co-pa1', status: 'open', dueDate: inDays(2) },
 ];
 
+const 산재시드 = {
+  sj_pa_01: {
+    id: 'sj_pa_01', entityType: 'Case', companyId: 'CO_PA1', companyName: '(주)가나다라마바사아자차카타파하종합건설',
+    claimantName: '점검근로자', subType: 'injury_review', subTypeLabel: '산재 심사·재심사',
+    disapprovalDate: inDays(-79), rulingResult: '불승인', status: '진행중',
+    managerMain: 'P001', year: new Date().getFullYear(), receiveDate: inDays(-95),
+    steps: { intake: { done: true }, facts: { done: true }, claim: { done: true }, decision: { done: true } }
+  },
+  sj_pa_02: {
+    id: 'sj_pa_02', entityType: 'Case', companyId: 'CO_PA2', companyName: '나다라 의료법인 점검병원',
+    claimantName: '점검간호', subType: 'injury_disease', subTypeLabel: '업무상 질병·질판위',
+    status: '진행중', managerMain: 'P002', year: new Date().getFullYear(), receiveDate: inDays(-25),
+    steps: { intake: { done: true }, facts: { done: true } }
+  }
+};
+const 노동시드 = {
+  lc_pa_01: {
+    id: 'lc_pa_01', entityType: 'Case', track: 'nlrc', companyId: 'CO_PA1', companyName: '(주)가나다라마바사아자차카타파하종합건설',
+    claimantName: '점검해고자', caseNo: '서울2026부해991', subType: 'dismissal', subTypeLabel: '부당해고 구제',
+    initialServedDate: inDays(-6), status: '진행중', managerMain: 'P001',
+    year: new Date().getFullYear(), receiveDate: inDays(-60),
+    steps: { intake: { done: true }, petition_reason: { done: true }, answer_brief: { done: true } }
+  },
+  lc_pa_02: {
+    id: 'lc_pa_02', entityType: 'Case', track: 'molab', domain: 'labor_wage', companyId: 'CO_PA3', companyName: '가나상사',
+    claimantName: '점검진정인', subType: 'wage', subTypeLabel: '임금·퇴직금 체불',
+    dueDate: inDays(3), status: '진행중', managerMain: 'P001',
+    year: new Date().getFullYear(), receiveDate: inDays(-14),
+    steps: { intake: { done: true }, petition_notice: { done: true } }
+  }
+};
+items['SJ-sj_pa_01'] = {
+  id: 'SJ-sj_pa_01', cat: '산재', no: '2026-산재-001', company: '(주)가나다라마바사아자차카타파하종합건설',
+  co_id: 'CO_PA1', title: '근골격계 불승인 심사청구 (점검근로자)', status: '진행중',
+  start: inDays(-30), due: inDays(11), mgr_main: me, mgr_subs: [],
+  src: 'sanjae', sc: { kind: 'sanjae', cid: 'sj_pa_01', stage: '원처분 (4/7)', claimant: '점검근로자', due: inDays(11) },
+  created_at: new Date(NOW - 30 * DAY).toISOString()
+};
+items['LC-lc_pa_01'] = {
+  id: 'LC-lc_pa_01', cat: '부해', no: '2026-부해-991', company: '(주)가나다라마바사아자차카타파하종합건설',
+  co_id: 'CO_PA1', title: '부당해고 구제 재심 대응 (점검해고자)', status: '진행중',
+  start: inDays(-20), due: inDays(4), mgr_main: me, mgr_subs: [],
+  src: 'laborcase', sc: { kind: 'laborcase', cid: 'lc_pa_01', track: 'nlrc', stage: '서면공방 (3/7)', caseNo: '서울2026부해991', claimant: '점검해고자', due: inDays(4) },
+  created_at: new Date(NOW - 20 * DAY).toISOString()
+};
+
 module.exports = {
   data: {
     work_erp: {
       items,
       logs: { [wk.y]: { [wk.wk]: logs } },
     },
+    sanjae_cases: { cases: 산재시드 },
+    labor_cases: { cases: 노동시드 },
     data: {
       my_work_items: { u: Date.now(), v: 옮길일반 },
       biz_cases: { u: Date.now(), v: 옮길케이스 },
@@ -134,6 +182,8 @@ module.exports = {
     { name: 'drawer', run: go(`S.view='my';route();openDrawer(document.querySelector('.phr').getAttribute('data-i'))`), wait: 2500 },
     { name: 'menu', run: go(`sideDrawer(true)`) },
     { name: 'team', run: go(`go('team')`), wait: 2500 },
+    { name: 'sanjae', run: go(`go('sanjae')`), wait: 2500 },
+    { name: 'labor', run: go(`go('labor')`), wait: 2500 },
     { name: 'stats', run: go(`go('stats')`), wait: 2500 },
     { name: 'clean', run: go(`go('clean')`), wait: 2500 },
     { name: 'archive', run: go(`go('archive')`), wait: 2500 },

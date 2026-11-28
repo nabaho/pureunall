@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=114"></script>
+<script src="js/pu-ontology.js?v=115"></script>
 <script src="js/pu-kakao-work.js?v=4"></script>
 <script src="js/pu-kakao-export.js?v=2"></script>
 <!-- 📋 내 업무 숫자 한 줄(work_erp/mysum/{사번}) — 포털 머리줄 «내 업무» 단추·이알피 「나의 업무」가 읽는다(2026-11-21) -->
@@ -248,6 +248,18 @@
   .fdc{font-size:10.5px;border-radius:5px;padding:1px 6px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
   .fdc.ok{background:#f0fdf4;color:#166534;border-color:transparent}
   .fdgo{color:var(--acc);cursor:pointer;margin-left:6px}
+  /* 🏥·🔨 산재·부당해고 연동 허브 및 변경점 안내 바 */
+  .sc-diffbar{background:var(--acc-soft);border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+  .sc-diff-tag{background:var(--acc2);color:#ffffff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:99px}
+  .sc-diff-target.code-diff-box{outline:2px solid var(--acc);outline-offset:2px;border-radius:8px}
+  .sc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+  .sc-kpi{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px 11px;min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer}
+  .sc-kpi span{font-size:11.5px;color:var(--sub);font-weight:700}
+  .sc-kpi b{font-size:14.5px;color:var(--ink)}
+  .sc-btn-sm{padding:4px 9px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .sc-btn-sm.pri{background:var(--acc);border-color:var(--acc);color:#ffffff}
+  .sc-tbl td{white-space:nowrap}
+  .sc-tbl td.sc-co{max-width:220px;overflow:hidden;text-overflow:ellipsis}
   .ml1 .ck{flex:0 0 auto;width:13px;height:13px;border:1.5px solid var(--faint);
     border-radius:4px;cursor:pointer;position:relative}
   .ml1 .ck:hover{border-color:var(--acc)}
@@ -1452,6 +1464,8 @@
    ⚠ 지우면 그 증상이 그대로 돌아온다 — tests/phone-input-zoom.test.js 가 지킨다. */
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
+  .sc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sc-btn-sm{min-height:36px}
 }
 /* ══ pu-design 시작 — 제미나이 판 «모양 값» 시범 (대표 「추천대로 시작」 2026-11-19) ══
    계획서 docs/superpowers/plans/2026-11-19-제미나이-디자인-다른앱-계획서.md · 공용 값은 css/pu-design.css
@@ -1612,7 +1626,8 @@ var CASE_RESULTS=[
 var RES_BY_KEY={}; CASE_RESULTS.forEach(function(r){ RES_BY_KEY[r[0]]=r; });
 // 결과를 물을 업무인가 — 푸른이알피 사건이거나 구분이 사건인 건
 function hasResult(it){
-  return !!it&&((it.ref&&it.ref.type==='case')||String(it.cat||'')==='사건');
+  var cat=String((it&&it.cat)||'');
+  return !!it&&((it.ref&&it.ref.type==='case')||cat==='사건'||cat==='산재'||cat==='부해'||cat==='체불'||it.src==='sanjae'||it.src==='laborcase');
 }
 function resBadge(it){
   var r=RES_BY_KEY[it&&it.end_result]; if(!r) return '';
@@ -1674,7 +1689,7 @@ var _staffCache=null,_coCache=null,_watchWkRef=null,_watchWkKey=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 // 인라인 핸들러의 JS 문자열 리터럴에 값을 넣을 때 — JS 이스케이프 후 HTML 이스케이프.
 // esc()만 쓰면 작은따옴표가 안 막혀서 이름에 ' 이 있으면 핸들러가 깨진다.
-function escJ(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));}
+function escJ(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n'));}
 // Firebase 키 금지문자 + 인라인 핸들러를 깨뜨리는 문자를 근원에서 제거
 function safeKey(s){return String(s==null?'':s).replace(/[.#$/\[\]\u0000-\u001F\u007F'"`\\\s]/g,'_');}
 function $(id){return document.getElementById(id);}
@@ -1836,6 +1851,7 @@ function start(){
        ⚠ 재무·관리자가 아니면 payroll_os 를 못 읽어 그냥 안 돈다(고장이 아니다).
          만들어진 기록은 work_erp 에 있으므로 전 직원이 그대로 본다. */
     setTimeout(function(){ try{ paySync(); }catch(e){} }, 3000);
+    scLoad();                                    // 🏥·🔨 산재·부당해고 사건 요약 1회 로드 (비차단)
     calLoadPrefs().then(function(){ route(); }); // 캘린더 개인 설정(보임·보기·레이어)
   });
   document.addEventListener('focusout',function(){ setTimeout(function(){
@@ -1871,6 +1887,8 @@ function shell(){
     +'<div class="sitem" id="nav-my" onclick="go(\'my\')">📝 내 업무 <span class="cnt" id="cnt-my"></span></div>'
     +'<div class="sitem" id="nav-visits" onclick="go(\'visits\')" title="정부사업일정에 담긴 내 방문과 사진 등록 시각 — 여기서는 보기만 합니다">🚩 내 현장 방문 <span class="cnt" id="cnt-visits"></span></div>'
     +'<div class="sitem" id="nav-team" onclick="go(\'team\')">👥 팀 전체</div>'
+    +'<div class="sitem" id="nav-sanjae" onclick="go(\'sanjae\')" title="산재사건관리(pu-sanjae.html) 연동 — 요양·질판위·심사90일">🏥 산재사건 <span class="cnt" id="cnt-sanjae"></span></div>'
+    +'<div class="sitem" id="nav-labor" onclick="go(\'labor\')" title="부당해고·노동사건(pu-case.html) 연동 — 노동위·진정·체불">🔨 부당해고·노동사건 <span class="cnt" id="cnt-labor"></span></div>'
     +'<div class="sitem" id="nav-stats" onclick="go(\'stats\')">📊 업무량</div>'
     +'<div class="sitem" id="nav-mlk" onclick="go(\'mlk\')" title="기계가 어느 사업장인지 못 정한 메일 — 담당자가 짚어 주면 그 업무에 붙습니다">📬 이어 줄 메일 <span class="cnt" id="cnt-mlk"></span></div>'
     +'<div class="sitem" id="nav-kakao" style="display:none" onclick="go(\'kakao\')" title="카톡 업무방 알림을 누가·언제·무엇을로 묶어 봅니다 — 총괄관리자만">💬 카톡정리</div>'
@@ -3988,8 +4006,8 @@ function go(v){ S.view=v; S.f=null; S.q=''; sideDrawer(false);
 function goBack(){ if(history.length>1) history.back(); else { S.view='my'; route(); } }
 window.addEventListener('popstate',function(ev){ try{ window.__puBackNav = true; }catch(e){}  /* 이 걸음은 우리가 썼다 — 공통 뒤로가기는 비켜선다 */ var st=ev.state; S.view=(st&&st.view)||'my'; route(); });
 function route(){
-  ['my','visits','team','stats','mlk','kakao','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
-  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',kakao:'카톡정리',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
+  ['my','visits','team','sanjae','labor','stats','mlk','kakao','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
+  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',sanjae:'산재사건',labor:'부당해고·노동사건',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',kakao:'카톡정리',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
   var c=$('crumb'); if(c)c.textContent=crumbs[S.view]||'업무관리';
   var qw=$('qwrap'); if(qw)qw.style.display=(S.view==='my'||S.view==='team')?'':'none';
   var cm=$('cnt-my'); if(cm)cm.textContent=viewOpen().length||'';
@@ -3999,6 +4017,7 @@ function route(){
   var cl=$('cnt-mlk'); if(cl){ var n4=mailSrc?mlkBadge():0;
     cl.textContent=n4||''; cl.style.color=n4?'#dc2626':''; cl.style.fontWeight=n4?'800':''; }
   visBadge();
+  scBadge();
   kkNav();                      /* 💬 카톡정리는 총괄관리자에게만 보인다 */
   if(S.view!=='kakao') kxReset();   /* 읽어 둔 대화 내용은 화면을 떠나면 버린다 */
   if(S.view!=='kakao') KK.phone=undefined;   /* 다시 들어오면 폰 상태를 새로 읽는다 */
@@ -4012,6 +4031,8 @@ function route(){
   pcBand();   /* 화면을 옮길 때마다 띠를 다시 판단한다 (성과급 화면에서는 숨긴다) */
   if(S.view==='visits') renderVisits();
   else if(S.view==='team') renderTeam();
+  else if(S.view==='sanjae') renderCaseHub('sanjae');
+  else if(S.view==='labor') renderCaseHub('labor');
   else if(S.view==='stats') renderStats();
   /* 옛 주소(#kb)로 들어온 사람 — 빈 화면 대신 내 업무로 보낸다.
      ⚠ 지식은 없어진 것이 아니라 «업무 안»으로 들어갔다. */
@@ -6364,6 +6385,8 @@ function peFlag(it){
   if(it.pe_nomgr) h+=' <span style="color:var(--warn);font-weight:800;font-size:10px" title="'+(it.src==='govaid'?'기업정부지원금에서 넘길 때 담당을 정하지 않았습니다. ✏️ 수정에서 담당을 정하세요.':'푸른이알피에 주담당이 없어 대표에게 배치했습니다. 푸른이알피에서 담당을 지정하면 자동으로 옮겨집니다.')+'">담당 미지정</span>';
   /* 기업정부지원금 «진행 카드»의 단계·다음 할 일(2026-11-01) — 그쪽에서 단계가 바뀌면 여기 칸(ga_stage·ga_next)과 마감이 같이 바뀐다 */
   if(it.src==='govaid'&&it.ga_stage) h+=' <span style="color:#1e40af;font-weight:800;font-size:10px" title="'+esc('기업정부지원금 진행 — 다음: '+(it.ga_next||'—'))+'">🎯 '+esc(it.ga_stage)+'</span>';
+  if(it.src==='sanjae'&&it.sc&&it.sc.stage) h+=' <span style="color:#166534;font-weight:800;font-size:10px" title="'+esc('산재사건 진행 — '+(it.sc.claimant||'재해자')+(it.sc.due?' · 기한 '+it.sc.due:''))+'">🏥 '+esc(it.sc.stage)+'</span>';
+  if(it.src==='laborcase'&&it.sc&&it.sc.stage) h+=' <span style="color:#1e40af;font-weight:800;font-size:10px" title="'+esc('부당해고·노동사건 진행 — '+(it.sc.caseNo||it.sc.claimant||'')+(it.sc.due?' · 기한 '+it.sc.due:''))+'">🔨 '+esc(it.sc.stage)+'</span>';
   return h;
 }
 // 읽기용 칩 — 팀 전체·종료 화면에서 쓴다. 그 화면들에서는 상태를 바꾸지 않는다.
@@ -9453,6 +9476,8 @@ function renderDrawer(){
   if(vdNeed()) vdLoad().then(function(){ if(S.drawerId) renderDrawer(); });
   /* 🏦 기금 업무일 때만 — 기금 목록 한 번, 그 기금의 두 해 장부·결산 한 번 */
   if(fdNeed(items[S.drawerId])) fdLoad(items[S.drawerId]).then(function(){ if(S.drawerId) renderDrawer(); });
+  /* 🏥·🔨 산재·부당해고 사건 요약(공개 원장만 비차단 1회 로드, 비밀금고 미접근) */
+  if(scNeed()) scLoad().then(function(){ if(S.drawerId) renderDrawer(); });
   var it=items[S.drawerId]; if(!it){ closeDrawer(); return; }
   var id=S.drawerId;
   var logs=itemLogsCache[id];
@@ -9499,6 +9524,8 @@ function renderDrawer(){
   h+=dVisitsHTML(it);
   /* 🏦 기금 진행 — 기금 업무에서만 뜬다 */
   h+=dFundHTML(it);
+  /* ⚖️ 산재·노동사건 진행 — 업체 ID 우선 / 상호명 추측 표시, 전용 앱 연동 */
+  h+=dSanjaeLaborHTML(it);
   h+='<div id="dvoice">'+dFold('vo',dFoldHead('🎤','말로 기록','말하면 AI 가 정리합니다'),
            dVoiceHTML(id,it), VO.id!==id)+'</div>';
   h+=dFold('st',dFoldHead('✅','진행 단계','아직 없음'),
@@ -9618,6 +9645,8 @@ function wkOpenRuleRev(url){ try{ window.open(url,'_blank'); }catch(e){} }
       +(it.src==='puerp'&&it.ref?'<button onclick="S.dMore=false;openPuerp(\''+escJ(it.ref.type)+'\')" title="푸른이알피 해당 메뉴로 이동">🔗 푸른이알피에서 열기</button>':'')
       /* 정부지원금 «신청 대행»으로 넘어온 줄(2026-11-01) — 그 회사의 정부지원금 화면으로 */
       +(it.src==='govaid'&&it.ga&&it.ga.key?'<button onclick="S.dMore=false;PuAppBar.goApp(\'pu-govaid.html?co='+escJ(encodeURIComponent(it.ga.key))+'\')" title="기업정부지원금에서 이 회사 보기">🎯 기업정부지원금에서 열기</button>':'')
+      +(it.src==='sanjae'&&it.sc&&it.sc.cid?'<button onclick="S.dMore=false;scOpenApp(\'sanjae\',\''+escJ(it.sc.cid)+'\')" title="산재사건관리 앱에서 이 사건 보기">🏥 산재사건관리에서 열기</button>':'')
+      +(it.src==='laborcase'&&it.sc&&it.sc.cid?'<button onclick="S.dMore=false;scOpenApp(\'laborcase\',\''+escJ(it.sc.cid)+'\')" title="부당해고·노동사건 앱에서 이 사건 보기">🔨 부당해고·노동사건에서 열기</button>':'')
       +'<button onclick="S.dMore=false;handoverModal(\''+id+'\')">🔄 담당 변경</button>'
       +'<button class="del" onclick="S.dMore=false;deleteItem(\''+id+'\')">🗑 삭제</button>'
       +'</div>':'')
@@ -11836,7 +11865,11 @@ var HELP={
       +'보낸 것은 <b>이미 한 일</b>이라 <b>안 본 것</b>으로 세지 않습니다.<br>'
       +'<hr><b>✉ 받음 / 📤 보냄</b> 줄은 <b>푸른메일함</b>이 사업장마다 남겨 둔 요약입니다 (회사 메일함 전체를 보고 만든 것이라 훨씬 넓습니다). 사업장마다 <b>최근 30줄</b>까지 남고, 그보다 옛것은 푸른메일함에서 봅니다.<br>'
       +'비어 있으면 아직 안 만든 것입니다 — 푸른메일함 <b>🏢 사업장별</b>에서 <b>[⇪ 업무관리에 연결]</b>을 누르면 사무관리 전체 사업장에 한 번에 만들어집니다.<br>'
-      +'<b>짐작</b>이라고 적힌 줄은 <b>제목에 회사 이름이 있어</b> 걸린 것입니다 — 주소로 맞은 것이 아니라 남의 메일일 수 있으니 눈으로 확인하십시오.'
+      +'<b>짐작</b>이라고 적힌 줄은 <b>제목에 회사 이름이 있어</b> 걸린 것입니다 — 주소로 맞은 것이 아니라 남의 메일일 수 있으니 눈으로 확인하십시오.',
+  sc:'<b>🏥 산재사건관리</b>(<code>pu-sanjae.html</code>)·<b>🔨 부당해고·노동사건</b>(<code>pu-case.html</code>)의 공개 진행 요약입니다.<br>'
+    +'• 같은 <b>업체 번호(co_id)</b>가 있으면 정확히 이어지고, 번호가 없을 때만 상호로 이어 <b>「회사 이름으로 이은 것입니다」</b>를 함께 보여줍니다.<br>'
+    +'• <b>+할일</b>을 누르면 업무관리(<code>work_erp/items</code>)에 <code>SJ-</code>·<code>LC-</code> 할 일로 등록되며 푸른이알피 원본 계약에는 손대지 않습니다.<br>'
+    +'• 전략·진술·합의안이 담긴 <b>비밀금고</b>(<code>sanjae_secret</code>·<code>labor_secret</code>)는 여기서 읽지 않으며 전용 앱의 담당 노무사·대표에게만 열립니다.'
 };
 function hlp(k){
   return '<span class="hlp" onclick="event.stopPropagation();hlpPop(this,\''+k+'\')" title="설명 보기">ⓘ</span>';
@@ -15230,6 +15263,374 @@ function _puerpModal(){
     +'<button class="primary" onclick="runPuerpImport()">선택한 건 가져오기</button></div>';
   showModal(h);
 }
+/* ══════════════════════════════════════════════════════════════════════
+   🏥·🔨 산재·부당해고 노동사건 연동 (독립 앱 pu-sanjae.html · pu-case.html)
+   ⚠ 공개 원장(sanjae_cases/cases · labor_cases/cases)만 읽기 전용 조회.
+     비밀금고(sanjae_secret · labor_secret)는 절대 읽지 않는다.
+   ⚠ 할 일 등록 시 ref 를 넣지 않아 wsSyncRun 이 이알피 원본을 건드리지 않는다.
+   ══════════════════════════════════════════════════════════════════════ */
+var SC_SJ_ROOT='sanjae_cases/cases', SC_LC_ROOT='labor_cases/cases';
+var SC={ sj:null, lc:null, tried:false, loading:null };
+function scNormCo(s){
+  return String(s||'').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\(재\)|재단법인|\(사\)|사단법인/g,'')
+    .replace(/[\s\-·_()\[\].,]/g,'').toLowerCase();
+}
+function scRows(raw){
+  if(!raw||typeof raw!=='object') return [];
+  var list=Array.isArray(raw)?raw:Object.keys(raw).map(function(k){
+    var v=raw[k]; return v&&typeof v==='object'?Object.assign({id:v.id||k},v):null;
+  });
+  return list.filter(function(c){ return c&&typeof c==='object'&&!c._deleted; });
+}
+function scIsOpen(c){
+  return !!(c&&!c._deleted&&!/(종결|확정|승인완료|화해성립|취하|합의|시정완료|불송치)/.test(String(c.status||'')+' '+String(c.rulingResult||'')));
+}
+function scTodayKst(){
+  return new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+}
+function scAddDays(iso,days){
+  var m=String(iso||'').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return '';
+  var y=+m[1], mo=+m[2]-1, da=+m[3];
+  var d=new Date(Date.UTC(y,mo,da));
+  if(d.getUTCFullYear()!==y||d.getUTCMonth()!==mo||d.getUTCDate()!==da) return '';
+  d.setUTCDate(d.getUTCDate()+Number(days||0));
+  return d.toISOString().slice(0,10);
+}
+function scDiffDays(targetIso,baseIso){
+  var t=Date.parse(targetIso), b=baseIso?Date.parse(baseIso):Date.now();
+  if(!isFinite(t)||!isFinite(b)) return null;
+  return Math.ceil((t-b)/86400000);
+}
+function scDueOf(kind,c,todayIso){
+  if(!c) return null;
+  var base=String(todayIso||'').trim()||scTodayKst();
+  var arr=[];
+  if(kind==='sanjae'){
+    var orig=String(c.disapprovalDate||c.rulingServedDate||'').trim();
+    var res=String(c.rulingResult||'').trim();
+    var ok=!/(불승인|미승인|기각|각하)/.test(res)&&/(승인|인용|종결)/.test(res);
+    if(orig&&!ok){ var d90=scAddDays(orig,90); if(d90){ var l90=scDiffDays(d90,base); if(l90!==null) arr.push({date:d90,label:'심사청구 90일',daysLeft:l90,urgent:l90<=14}); } }
+    var rv=String(c.reviewDecisionDate||'').trim();
+    if(rv&&/기각|불승인/.test(String(c.reviewResult||c.rulingResult||''))){ var dr90=scAddDays(rv,90); if(dr90){ var lr90=scDiffDays(dr90,base); if(lr90!==null) arr.push({date:dr90,label:'재심사 90일',daysLeft:lr90,urgent:lr90<=14}); } }
+    var sup=String(c.supplementDueDate||c.dueDate||'').trim();
+    if(sup){ var ls=scDiffDays(sup,base); if(ls!==null) arr.push({date:sup,label:'보완·의견',daysLeft:ls,urgent:ls<=7}); }
+  }else{
+    var act=String(c.actionDate||'').trim();
+    if(act&&!String(c.caseNo||'').trim()){ var da90=scAddDays(act,90); if(da90){ var la90=scDiffDays(da90,base); if(la90!==null) arr.push({date:da90,label:'구제 90일',daysLeft:la90,urgent:la90<=14}); } }
+    var init=String(c.initialServedDate||c.rulingServedDate||'').trim();
+    if(init&&!String(c.reAppealDate||'').trim()){ var d10=scAddDays(init,10); var l10=d10?scDiffDays(d10,base):null; if(d10&&l10!==null) arr.push({date:d10,label:'재심 10일',daysLeft:l10,urgent:l10<=5}); }
+    var rs=String(c.reServedDate||'').trim();
+    if(rs&&!String(c.courtFiledDate||'').trim()){ var d15=scAddDays(rs,15); var l15=d15?scDiffDays(d15,base):null; if(d15&&l15!==null) arr.push({date:d15,label:'행정소송 15일',daysLeft:l15,urgent:l15<=7}); }
+    var hr=String(c.hearingDate||'').trim();
+    if(hr){ var lh=scDiffDays(hr,base); if(lh!==null&&lh>=-3) arr.push({date:hr,label:'심문·조사기일',daysLeft:lh,urgent:lh<=7}); }
+    var du=String(c.correctionDueDate||c.dueDate||'').trim();
+    if(du){ var ld=scDiffDays(du,base); if(ld!==null) arr.push({date:du,label:'서면·시정기한',daysLeft:ld,urgent:ld<=7}); }
+  }
+  if(!arr.length) return null;
+  arr.sort(function(a,b){ return (a.daysLeft==null?9999:a.daysLeft)-(b.daysLeft==null?9999:b.daysLeft); });
+  return arr[0];
+}
+function scStageLabel(kind,c){
+  if(!c||!c.steps||typeof c.steps!=='object') return String(c.status||'진행중');
+  var keys=Object.keys(c.steps), done=0;
+  keys.forEach(function(k){ if(c.steps[k]&&c.steps[k].done) done++; });
+  var total=kind==='sanjae'?7:((c.track==='molab'||c.domain==='labor_wage')?6:7);
+  return String(c.status||'진행중')+' ('+done+'/'+total+')';
+}
+function scNeed(){ return !SC.tried&&!SC.loading; }
+function scLoad(){
+  if(typeof fbDb==='undefined'||!fbDb) return Promise.resolve();
+  if(SC.loading) return SC.loading;
+  if(SC.tried) return Promise.resolve();
+  SC.tried=true;
+  SC.loading=Promise.all([
+    fbDb.ref(SC_SJ_ROOT).once('value').then(function(s){ return scRows(s.val()); }).catch(function(){ return null; }),
+    fbDb.ref(SC_LC_ROOT).once('value').then(function(s){ return scRows(s.val()); }).catch(function(){ return null; })
+  ]).then(function(r){
+    SC.sj=r[0]; SC.lc=r[1]; SC.loading=null;
+    try{ scBadge(); }catch(e){}
+    try{ if(typeof S!=='undefined'&&S&&(S.view==='sanjae'||S.view==='labor')) renderCaseHub(S.view); }catch(e){}
+    try{ if(typeof S!=='undefined'&&S&&S.drawerId&&typeof renderDrawer==='function') renderDrawer(); }catch(e){}
+  },function(){ SC.loading=null; });
+  return SC.loading;
+}
+function scSafePart(raw){
+  var s0=String(raw||'').replace(/\s+/g,' ').trim();
+  if(!s0) return 'case';
+  var rep=s0.replace(/[.#$\[\]\/]/g,'_');
+  if(rep===s0) return rep;
+  var h=5381; for(var i=0;i<s0.length;i++) h=((h<<5)+h+s0.charCodeAt(i))>>>0;
+  return rep+'_'+h.toString(36).slice(-4);
+}
+function scWorkId(kind,cid){
+  return (kind==='sanjae'?'SJ-':'LC-')+scSafePart(cid);
+}
+function scWorkOf(kind,cid){
+  var wid=scWorkId(kind,cid);
+  return (typeof items!=='undefined'&&items&&items[wid])?{id:wid,item:items[wid]}:null;
+}
+function scMatchCases(it){
+  if(!it||(!Array.isArray(SC.sj)&&!Array.isArray(SC.lc))) return {sj:[],lc:[],guess:false,total:0};
+  var sjList=Array.isArray(SC.sj)?SC.sj:[], lcList=Array.isArray(SC.lc)?SC.lc:[];
+  var sc=it.sc&&typeof it.sc==='object'?it.sc:null;
+  var sj=[], lc=[], seenSj={}, seenLc={}, sure=false;
+  if(sc&&sc.cid){
+    if(sc.kind==='sanjae') sjList.forEach(function(c){ if(c.id===sc.cid){ sj.push(c); seenSj[c.id]=1; sure=true; } });
+    if(sc.kind==='laborcase') lcList.forEach(function(c){ if(c.id===sc.cid){ lc.push(c); seenLc[c.id]=1; sure=true; } });
+  }
+  var coId=String(it.co_id||it.companyId||'').trim();
+  if(coId){
+    sjList.forEach(function(c){ if(!seenSj[c.id]&&String(c.companyId||'').trim()===coId){ sj.push(c); seenSj[c.id]=1; sure=true; } });
+    lcList.forEach(function(c){ if(!seenLc[c.id]&&String(c.companyId||'').trim()===coId){ lc.push(c); seenLc[c.id]=1; sure=true; } });
+  }
+  var guess=false;
+  if(!sj.length&&!lc.length){
+    var nk=scNormCo(it.company||it.client);
+    if(nk.length>=2){
+      sjList.forEach(function(c){ if(!seenSj[c.id]&&scNormCo(c.companyName)===nk){ sj.push(c); seenSj[c.id]=1; } });
+      lcList.forEach(function(c){ if(!seenLc[c.id]&&scNormCo(c.companyName)===nk){ lc.push(c); seenLc[c.id]=1; } });
+      if(sj.length||lc.length) guess=true;
+    }
+  }
+  return {sj:sj,lc:lc,guess:guess&&!sure,total:sj.length+lc.length};
+}
+function scBadge(){
+  [['sanjae',SC.sj,'cnt-sanjae'],['labor',SC.lc,'cnt-labor']].forEach(function(cfg){
+    var el=$&&$(cfg[2]); if(!el) return;
+    if(!Array.isArray(cfg[1])){ el.textContent=''; return; }
+    var open=cfg[1].filter(scIsOpen);
+    var urg=open.some(function(c){ var d=scDueOf(cfg[0],c); return d&&d.urgent; });
+    el.textContent=open.length||'';
+    el.style.color=urg?'#dc2626':'';
+    el.style.fontWeight=urg?'800':'';
+  });
+}
+function scOpenApp(kind,cid,co){
+  var base=kind==='sanjae'?'pu-sanjae.html':'pu-case.html';
+  var qs=[];
+  if(cid) qs.push('cid='+encodeURIComponent(cid));
+  else if(co) qs.push('co='+encodeURIComponent(co));
+  var url=base+(qs.length?'?'+qs.join('&'):'');
+  try{ if(typeof PuAppBar!=='undefined'&&PuAppBar.goApp){ PuAppBar.goApp(url); return; } }catch(e){}
+  location.href=url;
+}
+function scStaffName(sid){
+  var k=String(sid||'').trim(); if(!k) return '';
+  if(typeof _peU2N!=='undefined'&&_peU2N&&_peU2N[k]) return String(_peU2N[k]);
+  if(typeof staffBySid==='function'){ var u=staffBySid(k); if(u&&u.name) return String(u.name); }
+  if(typeof S!=='undefined'&&S&&S.me&&S.me.sid===k&&S.me.name) return String(S.me.name);
+  return '';
+}
+function scSendToWork(kind,cid){
+  var list=kind==='sanjae'?(SC.sj||[]):(SC.lc||[]);
+  var c=list.filter(function(x){ return x.id===cid; })[0];
+  if(!c){ toast('사건 정보를 찾지 못했습니다','warn'); return; }
+  var wid=scWorkId(kind,cid);
+  if(typeof items!=='undefined'&&items[wid]){
+    openDrawer(wid);
+    toast('이미 업무관리 할 일로 연결되어 있어 서랍을 열었습니다.');
+    return;
+  }
+  if(typeof fbDb==='undefined'||!fbDb){ toast('데이터베이스 연결을 확인하세요','err'); return; }
+  var today=typeof todayStr==='function'?todayStr():scTodayKst();
+  var nowIso=new Date().toISOString();
+  var dueObj=scDueOf(kind,c,today);
+  var yr=String(c.year||c.receiveDate||today).slice(0,4)||today.slice(0,4);
+  var isWage=kind!=='sanjae'&&(c.track==='molab'||c.domain==='labor_wage'||/체불|대지급금|진정/.test(String(c.subTypeLabel||c.subType||'')));
+  var cat=kind==='sanjae'?'산재':(isWage?'체불':'부해');
+  var mgrSid=String(c.managerMain||'').trim();
+  var mgrName=scStaffName(mgrSid);
+  var mgrSubs=(Array.isArray(c.managerSubs)?c.managerSubs:[]).map(function(s){
+    var sid=String(s||'').trim(); return sid?{sid:sid,name:scStaffName(sid)}:null;
+  }).filter(Boolean);
+  var stage=scStageLabel(kind,c);
+  var srcTag=kind==='sanjae'?'sanjae':'laborcase';
+  var rec={
+    id:wid, entityType:'Task',
+    no:yr+'-'+cat+'-'+scSafePart(c.caseNo||c.id||'case').slice(-8),
+    cat:cat, company:String(c.companyName||''), co_id:String(c.companyId||''),
+    title:String(c.title||[c.companyName,c.claimantName,c.caseNo||c.subTypeLabel||cat].filter(Boolean).join(' ')).slice(0,200),
+    status:scIsOpen(c)?'진행중':'완료', start:String(c.receiveDate||today),
+    due:dueObj?dueObj.date:'',
+    brief:['단계: '+stage, c.claimantName?((kind==='sanjae'?'재해자: ':'진정·신청인: ')+c.claimantName):'', (kind==='sanjae'?'🏥 산재사건에서 연결':'🔨 부당해고·노동사건에서 연결')].filter(Boolean).join(' · ').slice(0,300),
+    mgr_main:{sid:mgrSid,name:mgrName}, mgr_subs:mgrSubs, pe_nomgr:!mgrSid,
+    src:srcTag,
+    sc:{kind:srcTag,cid:String(c.id),stage:stage,claimant:String(c.claimantName||''),caseNo:String(c.caseNo||''),due:dueObj?dueObj.date:''},
+    created_at:nowIso, createdAt:nowIso, updatedAt:nowIso
+  };
+  if(c.companyId) rec.companyId=String(c.companyId);
+  var clash=false;
+  fbDb.ref(NS+'/items/'+wid).transaction(function(cur){
+    if(cur){ if(cur.sc&&cur.sc.cid&&cur.sc.cid!==String(c.id)) clash=true; return undefined; }
+    return rec;
+  })
+    .then(function(r){
+      if(clash){ toast('같은 업무 ID가 다른 사건에 이미 연결되어 있습니다','err'); return; }
+      if(r&&r.committed){
+        items[wid]=rec; toast('✅ 업무관리 할 일('+rec.no+')로 등록했습니다');
+        route(); if(S.drawerId) renderDrawer();
+      }else{
+        return fbDb.ref(NS+'/items/'+wid).once('value').then(function(snap){
+          var sv=snap.val();
+          if(sv&&sv.sc&&sv.sc.cid&&sv.sc.cid!==String(c.id)){ toast('같은 업무 ID가 다른 사건에 연결되어 있습니다','err'); return; }
+          if(sv) items[wid]=sv;
+          openDrawer(wid); toast('이미 다른 창에서 등록되어 해당 업무 서랍을 열었습니다.');
+        });
+      }
+    }).catch(function(e){ toast('할 일 등록 실패: '+(e&&e.message||e),'err'); });
+}
+function scCaseRowHTML(kind,c){
+  var d=scDueOf(kind,c), wk=scWorkOf(kind,c.id);
+  var badge=d?('<span class="vdp '+(d.urgent?'no':'of')+'" title="'+esc(d.label+' · '+d.date)+'">'+(d.daysLeft>=0?'D-'+d.daysLeft:'D+'+Math.abs(d.daysLeft))+'</span>')
+    :('<span class="vdp '+(scIsOpen(c)?'up':'ok')+'">'+esc(c.rulingResult||c.status||'진행')+'</span>');
+  var meta=[c.year||String(c.receiveDate||'').slice(0,4), c.claimantName, c.caseNo||c.subTypeLabel].filter(Boolean).join(' · ');
+  var ico=kind==='sanjae'?'🏥':'🔨';
+  return '<div class="ml1 vd1" onclick="scOpenApp(\''+escJ(kind)+'\',\''+escJ(c.id)+'\')" title="전용 사건 앱에서 상세·서류·공방 대조 열기">'
+    +'<span class="mlkwho">'+ico+'</span>'
+    +'<span class="tx"><b>'+esc(c.title||c.companyName||'사건')+'</b>'+(meta?'<span class="vdw"> · '+esc(meta)+'</span>':'')+'</span>'
+    +badge
+    +(wk?'<span class="vdgo" onclick="event.stopPropagation();openDrawer(\''+escJ(wk.id)+'\')" title="업무관리 서랍 열기">할일 ↗</span>'
+       :'<span class="vdgo" onclick="event.stopPropagation();scSendToWork(\''+escJ(kind)+'\',\''+escJ(c.id)+'\')" title="업무관리 할 일에 추가">+할일</span>')
+    +'</div>';
+}
+function dSanjaeLaborHTML(it){
+  if(!it||(!Array.isArray(SC.sj)&&!Array.isArray(SC.lc))) return '';
+  var m=scMatchCases(it); if(!m.total) return '';
+  var rows=[];
+  m.sj.forEach(function(c){ rows.push({kind:'sanjae',c:c}); });
+  m.lc.forEach(function(c){ rows.push({kind:'labor',c:c}); });
+  var openCnt=rows.filter(function(r){ return scIsOpen(r.c); }).length;
+  var right=(openCnt?('진행 '+openCnt+' / '):'')+'전체 '+rows.length+'건';
+  var head=dFoldHead('⚖️','산재·노동사건',right);
+  var body='<div class="dbox mlbox"><div class="bh">⚖️ 산재·부당해고 사건'+hlp('sc')
+    +'<span class="r">'+esc(right)+'</span></div><div class="bb">'
+    +(m.guess?'<div class="vdguess">회사 이름으로 이은 것입니다 — 사건 앱에서 업체를 연결하면 번호로 정확히 이어집니다</div>':'')
+    +rows.slice(0,8).map(function(r){ return scCaseRowHTML(r.kind,r.c); }).join('')
+    +(rows.length>8?'<div class="kbempty">그 외 '+(rows.length-8)+'건 더 — 왼쪽 메뉴 산재사건·노동사건에서 전체 확인</div>':'')
+    +'</div></div>';
+  return dFold('sc',head,body,false);
+}
+function scFilterRows(kind,raw,today){
+  var isSj=(kind==='sanjae');
+  var q=String(S.scQ||'').trim().toLowerCase(), stF=S.scSt||'open', yrF=S.scYr||'all', trkF=S.scTrk||'all';
+  return (raw||[]).filter(function(c){
+    if(stF==='open'&&!scIsOpen(c)) return false;
+    if(stF==='urgent'){ var d=scDueOf(kind,c,today); if(!d||!d.urgent||!scIsOpen(c)) return false; }
+    if(stF==='closed'&&scIsOpen(c)) return false;
+    if(yrF!=='all'&&String(c.year||String(c.receiveDate||'').slice(0,4))!==yrF) return false;
+    if(!isSj&&trkF!=='all'&&((c.track==='molab'||c.domain==='labor_wage')?'molab':'nlrc')!==trkF) return false;
+    if(q){
+      var hay=[c.title,c.companyName,c.claimantName,c.caseNo,c.jurisdiction,c.subTypeLabel,c.rulingResult].join(' ').toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  }).sort(function(a,b){
+    var da=scDueOf(kind,a,today), db=scDueOf(kind,b,today);
+    if(da&&db&&da.daysLeft!==db.daysLeft) return (da.daysLeft==null?9999:da.daysLeft)-(db.daysLeft==null?9999:db.daysLeft);
+    return String(b.receiveDate||b.year||'').localeCompare(String(a.receiveDate||a.year||''));
+  });
+}
+function scRowsHtml(kind,rows,today){
+  var isSj=(kind==='sanjae');
+  return rows.slice(0,120).map(function(c,idx){
+    var d=scDueOf(kind,c,today), wk=scWorkOf(kind,c.id);
+    var dueTxt=(d&&d.daysLeft!=null)?(d.date+' ('+(d.daysLeft>=0?'D-'+d.daysLeft:'D+'+Math.abs(d.daysLeft))+')'):'—';
+    var coTxt=c.companyName||'미연결';
+    return '<tr style="cursor:pointer" onclick="scOpenApp(\''+escJ(kind)+'\',\''+escJ(c.id)+'\')">'
+      +'<td class="num" style="color:var(--faint);font-size:11.5px">'+(idx+1)+'</td>'
+      +'<td>'+esc(c.year||String(c.receiveDate||'').slice(0,4)||'—')+'</td>'
+      +'<td class="sc-co" title="'+esc(coTxt)+'"><b>'+esc(coTxt)+'</b></td>'
+      +'<td>'+esc(c.claimantName||'—')+'</td>'
+      +'<td>'+esc(isSj?(c.subTypeLabel||c.subType||'산재'):(c.caseNo||c.subTypeLabel||(c.track==='molab'?'노동청':'노동위')))+'</td>'
+      +'<td>'+esc(scStageLabel(kind,c))+(c.rulingResult?' · '+esc(c.rulingResult):'')+'</td>'
+      +'<td>'+(d?'<span class="vdp '+(d.urgent?'no':'of')+'">'+esc(d.label+' · '+dueTxt)+'</span>':'<span class="muted">—</span>')+'</td>'
+      +'<td onclick="event.stopPropagation()">'
+      +(wk?'<button class="sc-btn-sm" onclick="openDrawer(\''+escJ(wk.id)+'\')">서랍 열기</button>'
+         :'<button class="sc-btn-sm pri" onclick="scSendToWork(\''+escJ(kind)+'\',\''+escJ(c.id)+'\')">+할일 등록</button>')
+      +'</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">조건에 맞는 사건이 없습니다.</td></tr>';
+}
+function scUpdateRows(kind){
+  var tb=$('sc-tbody'), mr=$('sc-more');
+  if(!tb){ renderCaseHub(kind); return; }
+  var raw=(kind==='sanjae')?SC.sj:SC.lc;
+  if(!Array.isArray(raw)) return;
+  var today=typeof todayStr==='function'?todayStr():scTodayKst();
+  var rows=scFilterRows(kind,raw,today);
+  tb.innerHTML=scRowsHtml(kind,rows,today);
+  if(mr) mr.textContent=rows.length>120?('상위 120건 표시중 (전체 '+rows.length+'건 — 전체 조회·서류 미리보기는 전용 앱에서 확인)'):'';
+}
+function renderCaseHub(kind){
+  var app=$('app'); if(!app) return;
+  var isSj=(kind==='sanjae');
+  var raw=isSj?SC.sj:SC.lc;
+  if(raw===null&&!SC.tried){
+    app.innerHTML=loadingHTML();
+    scLoad().then(function(){ if(S.view===kind) renderCaseHub(kind); });
+    return;
+  }
+  if(raw===null){
+    app.innerHTML='<div class="panel"><h2>'+(isSj?'🏥 산재사건':'🔨 부당해고·노동사건')+'</h2>'
+      +'<p class="muted">사건 원장을 읽지 못했습니다. 전용 앱을 한 번 열어 로그인/권한을 확인해 주세요.</p>'
+      +'<button class="primary" onclick="scOpenApp(\''+escJ(kind)+'\')">'+(isSj?'🏥 산재사건관리 앱 열기 ↗':'🔨 부당해고·노동사건 앱 열기 ↗')+'</button></div>';
+    return;
+  }
+  var diffOff=false;
+  try{ diffOff=localStorage.getItem('pu_diff_bar_work_case')==='off'; }catch(e){}
+  var stF=S.scSt||'open', yrF=S.scYr||'all', trkF=S.scTrk||'all';
+  var today=typeof todayStr==='function'?todayStr():scTodayKst();
+  var years={};
+  raw.forEach(function(c){ var y=String(c.year||String(c.receiveDate||'').slice(0,4)); if(y) years[y]=1; });
+  var yrList=Object.keys(years).sort().reverse();
+  var openCnt=0, urgCnt=0, linkedCnt=0;
+  raw.forEach(function(c){
+    if(scIsOpen(c)) openCnt++;
+    var d=scDueOf(kind,c,today); if(d&&d.urgent&&scIsOpen(c)) urgCnt++;
+    if(scWorkOf(kind,c.id)) linkedCnt++;
+  });
+  var rows=scFilterRows(kind,raw,today);
+  var h='<div class="panel">'
+    +'<div class="sc-diffbar">'
+    +'<span class="sc-diff-tag">변경됨</span>'
+    +'<span><b>2026-11-28 통합 연동:</b> 산재·노동사건 독립 앱과 업무관리 할 일(SJ-/LC-)·서랍·사건결과가 실시간 연결됩니다.</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="sc-btn-sm" onclick="try{var n=localStorage.getItem(\'pu_diff_bar_work_case\')===\'off\'?\'on\':\'off\';localStorage.setItem(\'pu_diff_bar_work_case\',n);}catch(e){}renderCaseHub(\''+escJ(kind)+'\')">'+(diffOff?'변경 강조 OFF':'변경 강조 ON')+'</button>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<h2 style="margin:0">'+(isSj?'🏥 산재사건 통합관리':'🔨 부당해고·노동사건 통합관리')+'</h2>'
+    +'<span class="muted">공방 대조 · 연도별 보관함 · 비밀금고는 전용 앱에서 열람</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="sc-btn-sm pri sc-diff-target'+(diffOff?'':' code-diff-box')+'" id="sc-go-app" onclick="scOpenApp(\''+escJ(kind)+'\')">'+(isSj?'🏥 산재사건관리 앱 열기 ↗':'🔨 부당해고·노동사건 앱 열기 ↗')+'</button>'
+    +'</div>'
+    +'<div class="sc-kpis">'
+    +'<div class="sc-kpi" onclick="S.scSt=\'all\';renderCaseHub(\''+escJ(kind)+'\')"><span>전체 사건</span><b>'+raw.length+'건</b></div>'
+    +'<div class="sc-kpi" onclick="S.scSt=\'open\';renderCaseHub(\''+escJ(kind)+'\')"><span>진행중</span><b>'+openCnt+'건</b></div>'
+    +'<div class="sc-kpi" onclick="S.scSt=\'urgent\';renderCaseHub(\''+escJ(kind)+'\')"><span>제척·마감 임박</span><b style="color:'+(urgCnt?'#dc2626':'inherit')+'">'+urgCnt+'건</b></div>'
+    +'<div class="sc-kpi" onclick="S.scSt=\'all\';renderCaseHub(\''+escJ(kind)+'\')"><span>업무관리 할 일 연결</span><b>'+linkedCnt+'건</b></div>'
+    +'</div>'
+    +'<div class="fbar">'
+    +'<input id="sc-q" aria-label="사건 검색" value="'+esc(S.scQ||'')+'" placeholder="사업장·재해자·진정인·사건번호 검색" style="min-width:170px;padding:4px 8px;border:1px solid var(--line);border-radius:7px;font-size:12px" oninput="S.scQ=this.value;scUpdateRows(\''+escJ(kind)+'\')">'
+    +'<select aria-label="진행 상태 필터" onchange="S.scSt=this.value;renderCaseHub(\''+escJ(kind)+'\')">'
+    +'<option value="open"'+(stF==='open'?' selected':'')+'>진행중 ('+openCnt+')</option>'
+    +'<option value="urgent"'+(stF==='urgent'?' selected':'')+'>기한 임박 ('+urgCnt+')</option>'
+    +'<option value="all"'+(stF==='all'?' selected':'')+'>전체 ('+raw.length+')</option>'
+    +'<option value="closed"'+(stF==='closed'?' selected':'')+'>종결·완료</option></select>'
+    +(isSj?'':'<select aria-label="사건 트랙 필터" onchange="S.scTrk=this.value;renderCaseHub(\''+escJ(kind)+'\')"><option value="all"'+(trkF==='all'?' selected':'')+'>트랙 전체</option><option value="nlrc"'+(trkF==='nlrc'?' selected':'')+'>노동위(해고·징계)</option><option value="molab"'+(trkF==='molab'?' selected':'')+'>노동청(진정·체불)</option></select>')
+    +'<select aria-label="연도 필터" onchange="S.scYr=this.value;renderCaseHub(\''+escJ(kind)+'\')"><option value="all">연도 전체</option>'
+    +yrList.map(function(y){ return '<option value="'+esc(y)+'"'+(yrF===y?' selected':'')+'>'+esc(y)+'년</option>'; }).join('')
+    +'</select>'
+    +'</div>'
+    +'<div class="panel tbl sc-tbl"><table><thead><tr>'
+    +'<th>№</th><th>연도</th><th>사업장</th><th>'+(isSj?'재해자':'진정·신청인')+'</th><th>'+(isSj?'갈래':'사건번호·트랙')+'</th><th>단계·결과</th><th>기한·제척기간</th><th>업무관리</th>'
+    +'</tr></thead><tbody id="sc-tbody">'
+    +scRowsHtml(kind,rows,today)
+    +'</tbody></table></div>'
+    +'<div id="sc-more" class="muted" style="padding:8px;font-size:12px">'+(rows.length>120?('상위 120건 표시중 (전체 '+rows.length+'건 — 전체 조회·서류 미리보기는 전용 앱에서 확인)'):'')+'</div>'
+    +'</div>';
+  app.innerHTML=h;
+}
+
 // 푸른이알피 나의 업무 → work.html#item=<건ID> 로 들어온 경우 해당 업무 열기
 function openFromHash(){
   try{
@@ -15238,6 +15639,8 @@ function openFromHash(){
     if(hs==='#new'){ itemModal(); return; }
     if(hs==='#erpmove'){ erpMoveModal(); return; }
     if(hs==='#peimport'){ puerpMineModal(); return; }
+    if(hs==='#sanjae'){ go('sanjae'); return; }
+    if(hs==='#labor'){ go('labor'); return; }
     /* 이알피 「나의 업무」의 숫자(임박·할 일·미기록)를 누르면 그 건만 거른 「내 업무」로 */
     var fm=/^#f=(due|next|nolog)$/.exec(hs);
     if(fm){ if(S.view==='my'){ S.f=fm[1]; renderMy(); } return; }
