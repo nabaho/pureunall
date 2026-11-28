@@ -43,6 +43,19 @@ test('주민번호·카드·계좌·비밀번호는 가리고 업무용 전화�
 
   const res = Core.assessSafety({ sender: '박담당', text: raw });
   assert.equal(res.verdict, 'redacted');
+
+  const fileMasked = Core.buildArchiveRecord({
+    room: '푸른노무법인 업무채팅방',
+    day: '2026-11-28',
+    domain: 'case',
+    safety: 'safe',
+    d: { text: '서류 공유', who: ['김보람'], n: 1 },
+    g: { files: ['등본_900101-1234567.pdf'], caseNos: [], msgs: [] },
+    companyHint: '한빛_900101-1234567',
+    note: '900101-1234567 확인',
+  }, { actor: 'P-001' });
+  assert.equal(fileMasked.safety, 'redacted');
+  assert.ok(!/900101-1234567/.test(JSON.stringify(fileMasked)), 'fileNames/companyHint/note에 주민번호가 남으면 안 됩니다');
 });
 
 test('단순 응답·잡담·내용 없는 시스템 알림은 제외(noise)하고 실질 업무 문장은 유지한다', () => {
@@ -206,6 +219,7 @@ test('화면·온톨로지·포털·앱바·보안규칙이 한 벌로 연결되
   assert.equal(kr.items.$id.redactedCount['.validate'], 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000');
   assert.match(kr.files.$id['.validate'], /KakaoFileRecord/);
   assert.equal(kr.files.$id.$other['.validate'], false);
+  assert.equal(kr.watcher['.write'], false);
 });
 
 test('비밀번호 가림이 멱등(2회 적용 안전)이고 spinning 오탐이 없으며 30일 원문 서버 보관 필터가 동작한다', () => {
@@ -237,4 +251,138 @@ test('비밀번호 가림이 멱등(2회 적용 안전)이고 spinning 오탐이
   assert.match(appJs, /prev && prev\._deleted/);
   assert.match(appJs, /prepareServerImport\(/);
   assert.match(appJs, /esc\(String\(n\)\)/);
+});
+
+test('사람별·사건별·공유건별 대시보드 자동 집계와 공유 유형 분류가 정확히 동작한다', () => {
+  const now = Date.UTC(2026, 10, 28, 3, 0, 0);
+  assert.equal(Core.classifyShareType('근로감독관 시정지시 제출 요청', []).key, 'directive');
+  assert.equal(Core.classifyShareType('경기2026부해3347 답변서 연장신청서', []).key, 'submission');
+  assert.equal(Core.classifyShareType('스캔 공유', ['시정지시서(이미지)']).key, 'document');
+  assert.equal(Core.classifyShareType('[공지] 법인 AI 계정 안내드립니다', []).key, 'notice');
+  assert.equal(Core.classifyShareType('방문 확인 결과 전화 부재중 확인되면 말씀드리겠습니다', []).key, 'progress');
+  assert.equal(Core.classifyShareType('담당감독관 전화 부재중 시정지시 확인되면 말씀드리겠습니다', []).key, 'directive');
+
+  const workItems = {
+    wk1: { id: 'wk1', no: '경기2026부해3347', title: '가나제조 부당해고 구제신청', status: '진행중', co_id: 'co1', mgr_main: { name: '점검노무' } },
+  };
+  const companies = { co1: { id: 'co1', name: '가나제조(주)' } };
+  const archive = {
+    kr_001: {
+      id: 'kr_001', room: '푸른노무법인 업무채팅방', day: '2026-11-28',
+      senders: ['김보람', '이노무'], domain: 'case', safety: 'safe', redactedCount: 0,
+      summary: '💬 카톡 · 김보람 — 시정지시서 2026.12.11. 까지 제출 안내',
+      caseNos: ['경기2026부해3347'], due: '2026-12-02', fileNames: ['시정지시서(이미지)'],
+      workItemId: 'wk1', companyId: 'co1', status: 'open', updatedAt: now - 1000,
+    },
+    kr_002: {
+      id: 'kr_002', room: '푸른노무법인 업무채팅방', day: '2026-11-27',
+      senders: ['김보람'], domain: 'case', safety: 'safe', redactedCount: 0,
+      summary: '💬 카톡 · 김보람 — 답변서 초안 검토 요청',
+      caseNos: [], due: '', fileNames: [],
+      workItemId: '', companyId: '', companyHint: '다라물류', status: 'tracking', updatedAt: now - 2000,
+    },
+    kr_deleted: {
+      id: 'kr_deleted', _deleted: true, room: '푸른노무법인 업무채팅방', day: '2026-11-28',
+      senders: ['삭제자'], domain: 'admin', safety: 'safe', redactedCount: 0,
+      summary: '삭제됨', workItemId: '', status: 'open',
+    },
+  };
+
+  const joined = Core.joinWorkProgress(archive, workItems, companies, { now });
+  assert.equal(joined.length, 2);
+  const summary = Core.buildDashboardSummary(joined, workItems, companies, { now });
+
+  assert.equal(summary.totals.totalRows, 2);
+  assert.equal(summary.totals.personCount, 2);
+  assert.equal(summary.totals.caseCount, 2);
+  assert.equal(summary.totals.linkedCaseCount, 1);
+  assert.equal(summary.totals.dueSoonCount, 1);
+  assert.equal(summary.totals.unlinkedCount, 1);
+
+  const boram = summary.byPerson.find((p) => p.name === '김보람');
+  assert.ok(boram);
+  assert.equal(boram.total, 2);
+  assert.equal(boram.unlinkedCount, 1);
+  assert.equal(boram.dueSoonCount, 1);
+
+  const wkCase = summary.byCase.find((c) => c.workItemId === 'wk1');
+  assert.ok(wkCase);
+  assert.equal(wkCase.dueDaysLeft, 4);
+  assert.deepEqual(wkCase.files, ['시정지시서(이미지)']);
+  assert.equal(summary.byTopic[0].shareType, 'directive');
+});
+
+test('PC 화면·하단알림 OCR 파서가 등록 방의 말풍선·시정지시서·기한을 구조화하고 미등록 개인방 팝업을 차단한다', () => {
+  const now = Date.UTC(2026, 10, 28, 3, 0, 0);
+  const ocrLines = [
+    { x: 66, y: 52, text: '푸른노무법인 업무大H팅방' },
+    { x: 256, y: 61, text: 'Q 9' },
+    { x: 29, y: 112, text: '7, 법인 AI 유료 구독 계정 안내드립니다. 동시 로..' },
+    { x: 72, y: 152, text: '.12.11. 까지 제출하시기 바랍니다.' },
+    { x: 73, y: 234, text: '담당감독관: 대전지방고용노동정서산' },
+    { x: 72, y: 252, text: '지정 노동기준감독과 근로감독관 이' },
+    { x: 72, y: 268, text: '수미(0416615645)' },
+    { x: 306, y: 278, text: '오전 1108' },
+    { x: 64, y: 306, text: '김보람' },
+    { x: 72, y: 335, text: '현재 노동포털에 관련 정보 조회 안되' },
+    { x: 72, y: 352, text: '고 담당감독관이 전화 부재중이어서' },
+    { x: 74, y: 368, text: '내용 확인을 하지 못했습니다.' },
+    { x: 306, y: 412, text: '오전 11:14' },
+    { x: 64, y: 440, text: '김보람' },
+    { x: 150, y: 495, text: '시 정 지 시 서' },
+    { x: 14, y: 542, text: '예시지 입력' },
+  ];
+
+  const res = Core.parseOcrChatLines(ocrLines, {
+    surface: 'room',
+    room: '푸른노무법인 업무채팅방',
+    allowedRooms: ['푸른노무법인 업무채팅방'],
+    imageHeight: 650,
+    nowMs: now,
+  });
+  assert.equal(res.ok, true);
+  assert.equal(res.room, '푸른노무법인 업무채팅방');
+  assert.ok(!res.messages.some((m) => /예시지 입력/.test(m.text)), '하단 입력창 글자가 섞이면 안 됩니다');
+  assert.ok(res.messages.some((m) => /2026\.12\.11\. 까지 제출/.test(m.text) && /고용노동청/.test(m.text)));
+  assert.ok(res.messages.some((m) => m.sender === '김보람' && /부재중/.test(m.text)));
+  assert.ok(res.messages.some((m) => m.sender === '김보람' && /\[이미지 공유: 시정지시서\]/.test(m.text)));
+  assert.deepEqual(res.files.map((f) => f.name), ['시정지시서(이미지)']);
+
+  /* 하단 알림 팝업: 미등록 개인방 차단 vs 등록 법인방 허용 */
+  const blockedPop = Core.parseOcrChatLines([
+    { x: 10, y: 10, text: '친구 개인톡방' },
+    { x: 10, y: 30, text: '홍길동' },
+    { x: 10, y: 50, text: '오늘 저녁 7시 약속' },
+  ], { surface: 'popup', allowedRooms: ['푸른노무법인 업무채팅방'], nowMs: now });
+  assert.equal(blockedPop.ok, false);
+  assert.equal(blockedPop.reason, 'room-not-allowed');
+
+  const okPop = Core.parseOcrChatLines([
+    { x: 10, y: 10, text: '푸른노무법인 업무채팅방' },
+    { x: 10, y: 30, text: '김보람' },
+    { x: 10, y: 50, text: '경기2026부해3347 시정지시서 도착했습니다' },
+  ], { surface: 'popup', allowedRooms: ['푸른노무법인 업무채팅방'], nowMs: now });
+  assert.equal(okPop.ok, true);
+  assert.equal(okPop.messages[0].sender, '김보람');
+  assert.match(okPop.messages[0].text, /시정지시서/);
+
+  /* 유사 방 이름·글자 순서 뒤섞기 차단 (단순 문자 주머니 오탐 금지) */
+  assert.equal(Core.matchAllowedRoom('푸른노무법인 업무방', ['푸른노무법인 업무채팅방'], { maxDist: 1 }), '');
+  assert.equal(Core.matchAllowedRoom('방채팅무업법노른푸', ['푸른노무법인 업무채팅방'], { maxDist: 2 }), '');
+  assert.equal(Core.matchAllowedRoom('푸른노무법인 업무大H팅방', ['푸른노무법인 업무채팅방'], { maxDist: 1 }), '푸른노무법인 업무채팅방');
+
+  /* 화면 날짜 구분선 인식 및 구분선 이전 말풍선 dayInferred 표시 */
+  const daySplit = Core.parseOcrChatLines([
+    { x: 64, y: 100, text: '김노무' },
+    { x: 72, y: 120, text: '날짜 구분선 위쪽 보고' },
+    { x: 306, y: 140, text: '오후 5:00' },
+    { x: 120, y: 170, text: '2026년 11월 27일 금요일' },
+    { x: 64, y: 200, text: '김노무' },
+    { x: 72, y: 220, text: '어제 날짜 구분선 아래 보고' },
+    { x: 306, y: 240, text: '오후 6:10' },
+  ], { surface: 'room', room: '푸른노무법인 업무채팅방', allowedRooms: ['푸른노무법인 업무채팅방'], imageHeight: 650, nowMs: now });
+  assert.equal(daySplit.ok, true);
+  assert.equal(daySplit.messages[0].dayInferred, true);
+  assert.equal(daySplit.messages[1].day, '2026-11-27');
+  assert.equal(daySplit.messages[1].dayInferred, false);
 });
