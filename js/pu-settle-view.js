@@ -63,39 +63,89 @@
      ⚠ 판정은 «지금 고른 입금»으로 다시 낸다(고르기를 바꾸면 딱지도 바뀐다). 저장은 «체크한 줄 저장»으로만(화면이 같은 금액만 미리 ☐).
      ⚠ 담당 개인 통장은 대표 통장에 없어 안내 금액으로 계산한다는 말은 «마우스를 올리면» 보인다(2026-11-12 설명 줄 정리 — 화면에는 늘어놓지 않는다) */
   var AUTO_KO = { exact: '✓ 맞음', near: '△ 금액 다름', none: '✕ 못 찾음', saved: '넣음' };
+  var CAP_SRC_KO = { capture: '캡처', paste: '글' };
+  /* 찾은 입금 고르기 칸의 글 — 카톡·캡처로 넣은 입금은 [캡처]·[글] 을 앞에 붙여 재무관리 입금과 가른다 */
+  function depLabel(x) {
+    var tag = x.source === 'capture' ? '[캡처] ' : x.source === 'paste' ? '[글] ' : '';
+    var d = String(x.date || '');
+    d = /^\d{4}-/.test(d) ? d.slice(5, 16) : d.slice(0, 11);   // 재무관리 «2026-10-28 10:12» → «10-28 10:12» · 글에서 읽은 «10-28» 은 그대로
+    return tag + C.fmt(x.amount) + '원' + (d ? ' · ' + d : '') + (x.memo ? ' · ' + x.memo : '');
+  }
+  /* «어느 사업장» 고르기 — 사업마다 묶고(optgroup), 줄마다 «업체 n차 · 이름 주관/담당 · 예상 세후» */
+  function targetOpts(targets, cur, biz, names) {
+    var groups = [], by = {};
+    (targets || []).forEach(function (t) { if (!by[t.typeCode]) { by[t.typeCode] = []; groups.push(t.typeCode); } by[t.typeCode].push(t); });
+    return '<option value="">— 어느 사업장? —</option>' + groups.map(function (g) {
+      return '<optgroup label="' + esc(biz[g] || g) + '">' + by[g].map(function (t) {
+        return '<option value="' + esc(t.id) + '"' + (t.id === cur ? ' selected' : '') + '>' + esc(t.company + ' ' + t.round + '차 · ' + nameOf(names, t.sid) + ' ' + ROLE_KO[t.role] + ' · 예상 ' + C.fmt(t.expected)) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+  }
+  /* 카톡·캡처로 넣기 상자(대표 지시 2026-11-28 「카톡으로 입금된 내역을 받거나 화면 캡처하거나 통장으로 입금된 거 화면 캡처했을 때 … 사업장 관련돼서 지정해 주면
+     그 금액만큼 체크해서 월별 정산 표시」) — 캡처는 이 기기 안에서 글자를 읽고(밖으로 안 보낸다) 금액마다 한 줄. 줄마다 «어느 사업장»을 고르면
+     그 줄에 금액이 붙고 ☐ 가 켜진다. 저장은 위 «체크한 줄 저장» 한 길(고르기만으로는 아무것도 안 바뀐다). 넣은 입금은 화면에만 — 저장하지 않는다. */
+  function captureBox(opt) {
+    var extra = opt.extra || [], assign = opt.assign || {}, pick = opt.pick || {}, csel = opt.capSel || {}, biz = opt.biz || {}, names = opt.names || {}, usedBy = {};
+    Object.keys(pick).forEach(function (rid) { if (pick[rid]) usedBy[pick[rid]] = rid; });
+    var h = '<details class="dep" data-auto-paste' + (opt.pasteOpen ? ' open' : '') + '><summary class="hint">📷 카톡·캡처로 입금 넣기' + (extra.length ? ' <span class="chip">' + extra.length + '</span>' : '') + '</summary>'
+      + '<div class="drop cap" id="cap_drop" tabindex="0" title="캡처는 이 컴퓨터 안에서 글자를 읽습니다 — 사진은 밖으로 보내지도, 저장하지도 않습니다">카톡·통장 캡처를 <b>붙여 넣기(Ctrl+V)</b>·끌어 놓기 '
+      + '<button class="sm" id="cap_pick">사진 고르기</button><input type="file" id="cap_file" accept="image/*" multiple style="display:none"></div>'
+      + '<div class="fr"><textarea id="auto_text" rows="2" placeholder="카톡 입금 알림·인터넷뱅킹 거래내역·엑셀 줄을 복사해 붙여 넣으세요">' + esc(opt.text || '') + '</textarea></div>'
+      + '<div class="bar"><button class="sm" id="auto_read">글 읽기</button>' + (opt.capBusy ? '<span class="hint" id="cap_busy">' + esc(opt.capBusy) + '</span>' : '') + '</div>';
+    if (!extra.length) return h + '</details>';
+    h += '<div class="bulk" data-bulk="cap"></div><div class="scroll"><table class="t" data-name="cap"><thead><tr>' + ckHead('cap', extra.every(function (x) { return csel[x.id]; }))
+      + '<th class="r">금액</th><th>날짜</th><th>내용</th><th>어느 사업장</th><th>출처</th></tr></thead><tbody>';
+    var here = {};
+    (opt.targets || []).forEach(function (t) { here[t.id] = 1; });
+    extra.forEach(function (x, i) {
+      var to = assign[x.id] || usedBy[x.id] || '', auto = !assign[x.id] && !!usedBy[x.id], away = !!assign[x.id] && !here[assign[x.id]];
+      h += '<tr>' + ckCell(x.id, csel[x.id]) + '<td class="n">' + (i + 1) + '</td>'
+        + '<td class="r" data-k="amt"><input type="text" inputmode="numeric" class="amt" data-cap-amt="' + esc(x.id) + '" value="' + esc(C.fmt(x.amount)) + '" title="글자읽기가 틀렸으면 고치세요"></td>'
+        + nw('date', String(x.date || '').slice(0, 16)) + nw('memo', x.memo || '', 'ti')
+        + '<td data-k="to"><select data-cap-to="' + esc(x.id) + '">' + targetOpts(opt.targets, to, biz, names) + '</select>'
+        + (auto ? ' <span class="pill" title="같은 금액이라 저절로 골랐습니다 — 다른 사업장이면 바꾸세요">자동</span>' : '')
+        + (away ? ' <span class="pill st-draft" title="다른 달(또는 확정된) 정산표 줄에 지정해 두었습니다 — 그 달로 가면 보입니다">다른 달</span>' : '') + '</td>'
+        + '<td class="nw" data-k="src"><span class="pill">' + esc(CAP_SRC_KO[x.source] || '글') + '</span></td></tr>';
+    });
+    return h + '</tbody></table></div></details>';
+  }
   function reviewBox(rev, opt) {
     rev = rev || { rows: [] }; opt = opt || {};
-    var rows = rev.rows || [], found = opt.found || [], sel = opt.sel || {}, pick = opt.pick || {}, biz = opt.biz || {}, byId = {};
+    var rows = rev.rows || [], found = opt.found || [], sel = opt.sel || {}, pick = opt.pick || {}, biz = opt.biz || {}, names = opt.names || {}, byId = {};
+    var extraN = (opt.extra || []).length;
     found.forEach(function (f) { byId[f.id] = f; });
-    var kindOf = function (r) { if (r.kind === 'saved') return 'saved'; var f = byId[pick[r.id]]; return !f ? 'none' : f.amount === r.expected ? 'exact' : 'near'; };
+    var kindOf = function (r) { if (r.kind === 'saved' && !r.assigned) return 'saved'; var f = byId[pick[r.id]]; return !f ? 'none' : f.amount === r.expected ? 'exact' : 'near'; };
     var cnt = { exact: 0, near: 0, none: 0, saved: 0 };
     rows.forEach(function (r) { cnt[kindOf(r)]++; });
     var pills = rows.length ? '<span class="pill st-confirmed">✓ 맞음 ' + cnt.exact + '</span><span class="pill st-draft">△ 확인 ' + cnt.near + '</span><span class="pill bad-pill">✕ 못 찾음 ' + cnt.none + '</span>'
       + (cnt.saved ? '<span class="pill">넣음 ' + cnt.saved + '</span>' : '') : '';
     var src = opt.loading ? '재무관리 거래내역을 읽는 중…'
-      : (opt.src === 'paste' ? '붙여 넣은 글' : '재무관리 거래내역 자동 읽음' + (opt.at ? ' · ' + kst(opt.at) : ''))
-        + (opt.win ? ' · 기간 ' + opt.win.from.slice(5) + ' ~ ' + opt.win.to.slice(5) : '') + ' · 입금 ' + found.length + '건';
-    var srcShort = opt.loading ? '읽는 중…' : (opt.src === 'paste' ? '붙여 넣은 글' : (opt.at ? kst(opt.at) : '자동')) + ' · 입금 ' + found.length + '건';
+      : '재무관리 거래내역 자동 읽음' + (opt.at ? ' · ' + kst(opt.at) : '')
+        + (opt.win ? ' · 기간 ' + opt.win.from.slice(5) + ' ~ ' + opt.win.to.slice(5) : '') + ' · 입금 ' + found.length + '건' + (extraN ? ' (카톡·캡처 ' + extraN + '건 포함)' : '');
+    var srcShort = opt.loading ? '읽는 중…' : (opt.at ? kst(opt.at) : '자동') + ' · 입금 ' + found.length + '건';
     var right = pills + '<span class="hint" title="' + esc(src) + '">' + esc(srcShort) + '</span><button class="sm" id="auto_reload">재무관리 다시 읽기</button>'
       + (rows.length ? '<button class="pri sm" id="auto_save">체크한 줄 저장</button>' : '');
-    var h = stepHead(1, '입금 확인', (opt.leadName || '대표') + ' 통장(재무관리)에 들어온 돈을 정산표와 자동으로 맞춥니다 · 담당 개인 통장으로 들어간 돈은 대표 통장에 보이지 않아 안내 파일 금액으로 계산합니다', right);
-    h += (opt.err ? '<div class="warn">' + esc(opt.err) + '</div>' : '')
-      + '<details class="dep" data-auto-paste' + (opt.pasteOpen ? ' open' : '') + '><summary class="hint">통장 글 붙여넣기</summary>'
-      + '<div class="fr"><textarea id="auto_text" rows="3" placeholder="인터넷뱅킹·입금 문자·엑셀 줄을 복사해 붙여 넣으세요">' + esc(opt.text || '') + '</textarea></div>'
-      + '<div class="bar"><button class="sm" id="auto_read">붙여 넣은 글로 맞추기</button></div></details>';
+    var h = stepHead(1, '입금 확인', (opt.leadName || '대표') + ' 통장(재무관리)에 들어온 돈을 정산표와 자동으로 맞춥니다 · 담당 개인 통장으로 들어간 돈은 대표 통장에 보이지 않아 안내 파일 금액으로 계산합니다'
+      + ' · 카톡·통장 캡처로 받은 입금은 «📷 카톡·캡처로 입금 넣기»에서 사업장(사람)을 고르면 그 금액이 그 줄에 붙습니다', right);
+    h += (opt.err ? '<div class="warn">' + esc(opt.err) + '</div>' : '') + captureBox(opt);
     if (!rows.length) return h + '<div class="empty">맞출 입금이 없습니다 — 이 달에 임시저장인 정산표가 없거나, 요율표에 주관이 없습니다.</div>';
-    var open = rows.filter(function (r) { return r.kind !== 'saved'; });
+    var open = rows.filter(function (r) { return kindOf(r) !== 'saved'; });
+    /* 받는 사람 칸은 담당 줄(카톡·캡처로 지정했거나 이미 넣은 것)이 있을 때만 — 주관 줄뿐이면 늘 같은 이름이라 칸을 늘어놓지 않는다 */
+    var who = rows.some(function (r) { return r.role === 'staff'; });
     h += '<div class="scroll"><table class="t" data-name="auto"><thead><tr>' + ckHead('auto', open.length > 0 && open.every(function (r) { return sel[r.id]; }))
-      + '<th>사업</th><th>사업장</th><th class="r">예상 세후</th><th>찾은 입금</th><th>판정</th></tr></thead><tbody>';
+      + '<th>사업</th><th>사업장</th>' + (who ? '<th>받는 사람</th>' : '') + '<th class="r">예상 세후</th><th>찾은 입금</th><th>판정</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
       var k = kindOf(r), f = byId[pick[r.id]];
       var verdict = k === 'near' ? '△ ' + C.fmt(f.amount - r.expected) + '원 다름' : k === 'saved' && r.actual !== r.expected ? '넣음 · 차이 ' + C.fmt(r.actual - r.expected) : AUTO_KO[k];
       h += '<tr>' + (k === 'saved' ? '<td class="c"></td>' : ckCell(r.id, sel[r.id])) + '<td class="n">' + (i + 1) + '</td>'
-        + nw('biz', biz[r.typeCode] || r.typeCode || '') + nw('site', r.company + ' ' + r.round + '차', 'ti') + num('exp', r.expected)
+        + nw('biz', biz[r.typeCode] || r.typeCode || '') + nw('site', r.company + ' ' + r.round + '차', 'ti')
+        + (who ? '<td class="nw" data-k="who">' + esc(nameOf(names, r.sid)) + ' <span class="pill' + (r.role === 'lead' ? ' role-lead' : '') + '">' + ROLE_KO[r.role || 'lead'] + '</span></td>' : '')
+        + num('exp', r.expected)
         + '<td data-k="pick">' + (k === 'saved' ? esc(won(r.actual)) : '<select data-auto-pick="' + esc(r.id) + '"><option value="">— 없음 —</option>'
-          + found.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === pick[r.id] ? ' selected' : '') + '>' + esc(C.fmt(x.amount) + '원 · ' + String(x.date || '').slice(5, 16) + (x.memo ? ' · ' + x.memo : '')) + '</option>'; }).join('')
+          + found.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === pick[r.id] ? ' selected' : '') + '>' + esc(depLabel(x)) + '</option>'; }).join('')
           + '</select>') + '</td>'
-        + '<td class="nw" data-k="st"><span class="pill ' + ({ exact: 'st-confirmed', near: 'st-draft', none: 'bad-pill', saved: '' }[k]) + '">' + esc(verdict) + '</span></td></tr>';
+        + '<td class="nw" data-k="st"><span class="pill ' + ({ exact: 'st-confirmed', near: 'st-draft', none: 'bad-pill', saved: '' }[k]) + '"'
+        + (r.assigned && r.actual != null ? ' title="넣은 값 ' + esc(C.fmt(r.actual)) + '원을 지정한 금액으로 고칩니다(체크한 줄 저장)"' : '') + '>' + esc(verdict + (r.assigned ? ' · 지정' : '')) + '</span></td></tr>';
     });
     return h + '</tbody></table></div>';
   }

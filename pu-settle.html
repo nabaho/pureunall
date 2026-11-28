@@ -27,6 +27,8 @@
      ★ 월별 화면(대표 지시 2026-11-07 「정산표나 카톡문구를 월별 년도별관리 … ui 너무 불편하다 쉽고 직관적으로」 → 목업 「이대로 만들기」):
        탭은 «월별 정산 · 한 해 합계 · 설정» 셋. 월별 정산은 해 넘기기 + 열두 달 줄(할 일 점) + 고른 달의 ① 입금 확인 ② 정산 확인 ③ 카톡 보내기.
        ① 입금 확인은 재무관리 거래내역을 «읽기만» 해서 그 달 임시저장 정산표들의 주관 몫과 자동으로 맞춘다(같은 금액만 미리 ☐, 저장은 «체크한 줄 저장»).
+       «📷 카톡·캡처로 입금 넣기»(대표 지시 2026-11-28): 카톡 글·카톡/통장 캡처에서 입금을 읽어(사진은 이 기기 안 글자읽기 — 밖으로 안 보내고 저장 안 함)
+       줄마다 «어느 사업장(사람)»을 고르면 그 줄에 금액이 붙고 ☐ — 담당 개인 통장 입금도 이 길로 넣는다. 저장은 같은 «체크한 줄 저장».
        ③ «n개 정산표 확정하고 카톡 보내기»는 확인 창 한 번 뒤에 확정 → (대표면) 카톡 대기열. 보낸 카톡은 되돌릴 수 없다는 말을 확인 창에 넣는다.
      ⚠ 대표·위임관리인·재무권한자만 연다(규칙 settle = 같은 사람) — 대표 선택 2026-10-31. 타일 감춤은 화면일 뿐, 진짜 잠금은 규칙이다.
      ⚠ 업체·사람은 «사람이 한 번 확정한 연결»로만 ID 를 붙인다 — 이름이 비슷해도 저절로 잇지 않는다(온톨로지 규칙).
@@ -185,6 +187,11 @@ main{padding:12px 16px 40px}
 #pane-month .t th,#pane-month .t td{padding:4px 9px}
 #pane-month details.dep{margin:2px 10px}
 #pane-month details.dep>summary{padding:4px 8px}
+/* 카톡·캡처로 입금 넣기(대표 2026-11-28) — 붙여 넣기 상자는 낮게, «어느 사업장» 고르기는 긴 이름을 칸 안에 가둔다 */
+#pane-month .drop.cap{margin:6px 10px;padding:10px}
+.t[data-name=cap] select{max-width:380px}
+.t[data-name=auto] select{max-width:340px}
+.t[data-name=cap] td.ti{max-width:240px}
 .msg{background:var(--bg);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.65;white-space:pre-wrap;word-break:break-all}
 details.why>summary{cursor:pointer;font-size:12px;color:var(--mute);padding:6px 2px}
 #inbox{display:none}
@@ -350,6 +357,13 @@ details.dep textarea{min-height:64px}
   .subtabs{padding:0 10px}
   .t[data-name=auto] tbody td[data-k="pick"]{order:7;flex:0 0 100%}
   .t[data-name=auto] tbody td[data-k="exp"]::before{content:'예상 '}
+  .t[data-name=auto] tbody td[data-k="who"]{order:2}
+  .t[data-name=auto] select{max-width:none}
+  /* 카톡·캡처 입금 — 1줄 내용(폭 전체), 2줄 금액·날짜·출처, 3줄 «어느 사업장»(폭 전체) */
+  .t[data-name=cap] tbody td[data-k="amt"]{order:6}
+  .t[data-name=cap] tbody td[data-k="to"]{order:7;flex:0 0 100%;display:flex;gap:6px;align-items:center}
+  .t[data-name=cap] tbody td[data-k="to"] select{flex:1 1 0;min-width:0;max-width:none;width:auto}
+  .t[data-name=cap] tbody td[data-k="amt"] input{width:130px}
   .t[data-name=ymonths] tbody tr{padding-left:10px}
   .t[data-name=ymonths] tbody td[data-k="mon"]{order:1;font-weight:600}
   .t[data-name=ymonths] tbody td[data-k="paid"]:not(:empty)::before{content:'송금 '}
@@ -437,8 +451,8 @@ details.dep textarea{min-height:64px}
 </script>
 <script src="js/pu-back.js?v=5"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-settle-core.js?v=14"></script>
-<script src="js/pu-settle-view.js?v=19"></script>
+<script src="js/pu-settle-core.js?v=15"></script>
+<script src="js/pu-settle-view.js?v=20"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''};
@@ -451,11 +465,14 @@ var TAB='month', CUR_RUN='', CUR_NOTICE='', CUR_MONTH='', SUB='rules', MSG_OPEN=
 /* 자료 넣기 상자(안내 파일 올리기·직접 입력·안내 파일 목록) — 월별 정산 위에 접었다 편다 */
 var INBOX={ open:false };
 /* 입금 자동 검토(대표 지시 2026-11-07 「입금된 내역 자료만 넣으면 자동으로 검토하고 정리」) — 재무관리 거래내역은 «읽기만» 한 번 읽어 두고(batches)
-   고른 달마다 맞춘다. pick(줄마다 고른 입금)·☐ 는 화면에만 — 저장은 «체크한 줄 저장» 한 길. src 'paste' 면 붙여 넣은 글로 맞춘다 */
-var AUTO={ batches:null, at:0, err:'', loading:false, src:'ledger', text:'', pasted:[], pasteOpen:false, pick:{}, primed:'' };
+   고른 달마다 맞춘다. pick(줄마다 고른 입금)·☐ 는 화면에만 — 저장은 «체크한 줄 저장» 한 길.
+   ★ 카톡·캡처로 넣기(대표 지시 2026-11-28 「카톡으로 입금된 내역을 받거나 화면 캡처하거나 통장으로 입금된 거 화면 캡처했을 때 … 사업장 관련돼서 지정해 주면
+     그 금액만큼 체크해서 월별 정산 표시」): extra = 카톡 글·캡처에서 읽은 입금(재무관리 입금에 «더한다» — 옛 붙여넣기처럼 바꿔 끼우지 않는다),
+     assign = {입금 id: 줄 id} 사람이 고른 사업장(사람). 둘 다 화면에만 — 사진·글은 저장하지 않고, 저장은 금액만 «체크한 줄 저장»으로 */
+var AUTO={ batches:null, at:0, ver:0, err:'', loading:false, text:'', extra:[], assign:{}, capBusy:'', pasteOpen:false, pick:{}, primed:'' };
 /* 요율표 — 고치는 중인 사본. 저장하기 전까지는 D.rules(서버)와 따로 둔다. 다시 불러와도 «저장 안 한 변경»은 지키지 않고 버리지 않는다 */
 var WORK=null;
-var SEL={ members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{}, manual:{}, mentries:{}, rooms:{}, kq:{}, auto:{} };
+var SEL={ members:{}, transfers:{}, notices:{}, adjusts:{}, deposits:{}, mxpeople:{}, calc:{}, manual:{}, mentries:{}, rooms:{}, kq:{}, auto:{}, cap:{} };
 /* 계산기 — 저장하지 않는다. 고친 것을 잃지 않게 이 기기(localStorage)에만 기억한다(작은 글 한 덩이) */
 function calcDefault(){ return { type:'', siteId:'', rows:[{ sid:'', role:'lead', pre:'' }, { sid:'', role:'staff', pre:'', rate:'' }] }; }
 var CALC=calcDefault();
@@ -656,39 +673,102 @@ function copyCombined(key){
 }
 /* ① 입금 확인 — 그 달에 임시저장 정산표가 있으면 재무관리 거래내역을 (한 번) 읽어 주관 몫과 맞춘다 */
 function leadMap(){ var o={}; ruleTypes().forEach(function(k){ if(D.rules[k].leadSid) o[k]=String(D.rules[k].leadSid); }); return o; }
+/* 맞출 입금 = 재무관리 거래내역(그 달 기간) + 카톡·캡처로 넣은 입금(기간과 상관없이 — 사람이 넣은 것) */
 function autoFound(){
-  if(AUTO.src==='paste') return AUTO.pasted;
-  if(!AUTO.batches) return [];
-  var w=C.depositWindow(CUR_MONTH); return C.ledgerDeposits(AUTO.batches, w.from, w.to);
+  var w=C.depositWindow(CUR_MONTH), led=AUTO.batches?C.ledgerDeposits(AUTO.batches, w.from, w.to):[];
+  return led.concat(AUTO.extra);
 }
 function drawAuto(runs){
   var drafts=runs.filter(function(r){ return r.status==='draft'; });
   $('step1').style.display=drafts.length?'':'none';
   if(!drafts.length) return;
-  if(AUTO.src==='ledger' && !AUTO.batches && !AUTO.loading && !AUTO.err) loadLedger();
-  var lead=leadMap(), found=autoFound(), rev=C.reviewMonth(drafts, lead, found);
-  /* 고른 달·읽은 자료·넣은 실입금이 바뀌면 «후보»를 다시 고른다 — 같은 금액만 미리 ☐, 저장은 단추로만 */
-  var sig=CUR_MONTH+'|'+AUTO.src+'|'+AUTO.at+'|'+rev.rows.map(function(r){ return r.id+(r.kind==='saved'?'+':''); }).join(',');
+  if(!AUTO.batches && !AUTO.loading && !AUTO.err) loadLedger();
+  var lead=leadMap(), found=autoFound(), rev=C.reviewMonth(drafts, lead, found, AUTO.assign);
+  /* 고른 달·읽은 자료·넣은 실입금·지정이 바뀌면 «후보»를 다시 고른다 — 같은 금액이나 사람이 지정한 줄만 미리 ☐, 저장은 단추로만 */
+  var sig=CUR_MONTH+'|'+AUTO.at+'|'+AUTO.ver+'|'+rev.rows.map(function(r){ return r.id+(r.kind==='saved'?'+':'')+(r.assigned?'@'+r.found.id+':'+r.found.amount:''); }).join(',');
   if(AUTO.primed!==sig){
     AUTO.primed=sig; AUTO.pick={}; SEL.auto={};
-    rev.rows.forEach(function(r){ if(r.found){ AUTO.pick[r.id]=r.found.id; if(r.kind==='exact') SEL.auto[r.id]=1; } });
+    rev.rows.forEach(function(r){ if(r.found){ AUTO.pick[r.id]=r.found.id; if(r.kind==='exact' || r.assigned) SEL.auto[r.id]=1; } });
   }
-  $('step1').innerHTML=V.reviewBox(rev, { biz:bizNames(), found:found, sel:SEL.auto, pick:AUTO.pick, leadName:NAMES[lead[drafts[0].typeCode]]||'',
-    src:AUTO.src, at:AUTO.at, err:AUTO.err, loading:AUTO.loading, win:C.depositWindow(CUR_MONTH), text:AUTO.text, pasteOpen:AUTO.pasteOpen });
+  $('step1').innerHTML=V.reviewBox(rev, { biz:bizNames(), names:NAMES, found:found, sel:SEL.auto, pick:AUTO.pick, leadName:NAMES[lead[drafts[0].typeCode]]||'',
+    at:AUTO.at, err:AUTO.err, loading:AUTO.loading, win:C.depositWindow(CUR_MONTH), text:AUTO.text, pasteOpen:AUTO.pasteOpen,
+    extra:AUTO.extra, assign:AUTO.assign, targets:rev.targets, capSel:SEL.cap, capBusy:AUTO.capBusy });
 }
-/* 재무관리 거래내역 읽기 — 읽기만(쓰지 않는다). 한 번 읽어 두고 «다시 읽기»로만 다시 읽는다. 권한이 없으면 붙여넣기로 */
+/* 재무관리 거래내역 읽기 — 읽기만(쓰지 않는다). 한 번 읽어 두고 «다시 읽기»로만 다시 읽는다. 권한이 없으면 카톡·캡처로 */
 async function loadLedger(){
   AUTO.loading=true; AUTO.err='';
   try{ AUTO.batches=unwrap((await fbDb.ref('data/ledger_batches').once('value')).val()); AUTO.at=Date.now(); }
-  catch(e){ AUTO.batches=null; AUTO.err='재무관리 거래내역을 읽지 못했습니다 — 재무관리 권한이 필요합니다. 아래 «통장 글 붙여넣기»로도 맞출 수 있습니다'; }
+  catch(e){ AUTO.batches=null; AUTO.err='재무관리 거래내역을 읽지 못했습니다 — 재무관리 권한이 필요합니다. 아래 «📷 카톡·캡처로 입금 넣기»로도 맞출 수 있습니다'; }
   AUTO.loading=false; drawMonth();
+}
+/* ═══ 카톡·캡처로 입금 넣기 (대표 지시 2026-11-28) ═══
+   글(카톡 입금 알림·인터넷뱅킹·엑셀 줄)은 계산 모듈(C.parseDepositText)로, 사진은 «이 기기 안» 한국어 글자읽기(js/pu-ocr-kr.js)로 글을 뽑아 같은 길로 읽는다.
+   ⚠ 사진·읽은 글은 밖으로 보내지도 저장하지도 않는다(글자읽기 모델만 처음 한 번 받아 브라우저에 둔다). 금액만 «체크한 줄 저장»으로 정산표에 들어간다. */
+function addExtra(items, source){
+  var stamp=Date.now().toString(36), seen={}, n=0;
+  AUTO.extra.forEach(function(x){ seen[x.amount+'|'+x.date+'|'+x.memo]=1; });
+  items.forEach(function(it, i){ var k=it.amount+'|'+it.date+'|'+it.memo; if(seen[k]) return; seen[k]=1; n++;
+    AUTO.extra.push({ id:'x'+stamp+'_'+i, source:source, amount:it.amount, date:it.date, memo:it.memo }); });
+  if(n){ AUTO.ver++; AUTO.pasteOpen=true; }
+  return n;
+}
+/* 지정 — 입금 하나는 줄 하나에만, 줄 하나에도 입금 하나만(같은 줄에 먼저 지정한 입금은 풀어 준다) */
+function setAssign(depId, rowId){
+  Object.keys(AUTO.assign).forEach(function(d){ if(d===depId || (rowId && AUTO.assign[d]===rowId)) delete AUTO.assign[d]; });
+  if(rowId) AUTO.assign[depId]=rowId;
+  AUTO.ver++;
+}
+function dropExtra(ids){
+  AUTO.extra=AUTO.extra.filter(function(x){ return ids.indexOf(x.id)<0; });
+  ids.forEach(function(id){ delete AUTO.assign[id]; delete SEL.cap[id]; });
+  AUTO.ver++;
+}
+var ocrKrP=null;
+function loadOcrKr(){
+  if(window.PuOcrKr) return Promise.resolve(window.PuOcrKr);
+  if(!ocrKrP) ocrKrP=new Promise(function(ok, no){
+    var s=document.createElement('script'); s.src='js/pu-ocr-kr.js?v=3';
+    s.onload=function(){ if(window.PuOcrKr) ok(window.PuOcrKr); else { ocrKrP=null; no(new Error('한국어 글자 읽기를 불러오지 못했습니다')); } };
+    s.onerror=function(){ ocrKrP=null; no(new Error('한국어 글자 읽기를 내려받지 못했습니다(인터넷 확인)')); };
+    document.head.appendChild(s);
+  });
+  return ocrKrP;
+}
+/* 사진 한 장 → 캔버스(긴 변 2,600px 이하로 — 폰 긴 캡처도 메모리를 넘기지 않게) */
+function imageCanvas(file){
+  return new Promise(function(ok, no){
+    var url=URL.createObjectURL(file), im=new Image();
+    im.onload=function(){ var k=Math.min(1, 2600/Math.max(im.naturalWidth, im.naturalHeight)), cv=document.createElement('canvas');
+      cv.width=Math.max(1, Math.round(im.naturalWidth*k)); cv.height=Math.max(1, Math.round(im.naturalHeight*k));
+      var g=cv.getContext('2d'); g.fillStyle='#ffffff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); ok(cv); };
+    im.onerror=function(){ URL.revokeObjectURL(url); no(new Error('사진을 열지 못했습니다')); };
+    im.src=url;
+  });
+}
+function setCapBusy(m){ AUTO.capBusy=m||''; var el=$('cap_busy'); if(el) el.textContent=AUTO.capBusy; else drawMonth(); }
+async function readCaptures(files){
+  files=[].filter.call(files||[], function(f){ return f && /^image\//.test(f.type||''); });
+  if(!files.length){ toast('사진(캡처) 파일만 읽습니다'); return; }
+  if(AUTO.capBusy){ toast('앞 캡처를 읽는 중입니다 — 끝나면 다시 넣으세요'); return; }
+  AUTO.pasteOpen=true; setCapBusy('글자 읽기 준비 중… (처음 한 번은 모델을 받느라 오래 걸립니다)');
+  var got=0, read=0;
+  try{
+    var O=await loadOcrKr();
+    for(var i=0;i<files.length;i++){
+      var cv=await imageCanvas(files[i]);
+      var text=await O.recognize([cv], function(m){ setCapBusy((files.length>1?(i+1)+'/'+files.length+' · ':'')+m); });
+      read++; got+=addExtra(C.parseDepositText(text), 'capture');
+    }
+  }catch(e){ setCapBusy(''); toast('캡처를 읽지 못했습니다: '+errMsg(e)+(read?' ('+read+'장은 읽음)':'')); drawMonth(); return; }
+  setCapBusy(''); drawMonth();
+  toast(got ? '캡처에서 입금 '+got+'건을 찾았습니다 — 줄마다 «어느 사업장»을 고르고 «체크한 줄 저장»을 누르세요' : '캡처에서 입금 금액을 찾지 못했습니다 — 금액을 아래 칸에 적고 «글 읽기»를 눌러도 됩니다');
 }
 /* «체크한 줄 저장» — 고른 입금 금액을 정산표마다 통장 실입금으로 한 번에 넣고 다시 계산(임시저장인 정산표만) */
 async function saveAuto(){
-  var byId={}, by={}, n=0, done=0;
+  var byId={}, by={}, used={}, n=0, done=0;
   autoFound().forEach(function(f){ byId[f.id]=f; });
   Object.keys(SEL.auto).forEach(function(id){ var f=byId[AUTO.pick[id]], cut=id.indexOf('::'); if(!f || cut<0) return;
-    var rid=id.slice(0,cut); (by[rid]=by[rid]||{})[id.slice(cut+2)]=f.amount; n++; });
+    var rid=id.slice(0,cut); (by[rid]=by[rid]||{})[id.slice(cut+2)]=f.amount; (used[rid]=used[rid]||[]).push(f.id); n++; });
   if(!n){ toast('저장할 줄을 고르세요(☐ 와 «찾은 입금»)'); return; }
   var rids=Object.keys(by);
   for(var i=0;i<rids.length;i++){
@@ -699,8 +779,11 @@ async function saveAuto(){
     catch(e){ toast('저장하지 못했습니다('+done+'건 저장됨): '+errMsg(e)); await reload(); return; }
     /* 같은 칸이 노란 칸(임시저장 안 한 글)으로 남아 있었으면 버린다 — 방금 저장한 입금이 맞는 값이다 */
     Object.keys(by[rid]).forEach(function(k){ if(PEND[rid]) delete PEND[rid][k]; }); done+=Object.keys(by[rid]).length;
+    /* 저장한 카톡·캡처 입금은 목록에서 뺀다 — 정산표에 들어갔으니(남겨 두면 다른 줄이 같은 입금을 또 잡는다) */
+    dropExtra(used[rid].filter(function(fid){ return AUTO.extra.some(function(x){ return x.id===fid; }); }));
   }
-  SEL.auto={}; await reload();
+  SEL.auto={}; if(!AUTO.extra.length) AUTO.pasteOpen=false;   /* 넣은 입금을 다 저장했으면 넣기 상자를 접는다(한 화면에) */
+  await reload();
   toast('통장 실입금 '+done+'건을 저장하고 다시 계산했습니다');
 }
 /* ③ 카톡 보내기 — 확정한 정산표의 문구(보낼 수 있음) 먼저, 임시저장은 미리보기. 기록만은 문구가 없다 */
@@ -947,7 +1030,7 @@ function bulkHtml(kind, n){
     notices:'<button class="sm" data-bulk-do="delNotice">지우기</button>', adjusts:'<button class="sm" data-bulk-do="delAdjust">지우기</button>',
     mxpeople:'<button class="sm" data-bulk-do="mxRemove" title="고른 사람의 요율을 모든 사업에서 뺀다 — «저장»을 눌러야 반영">요율표에서 빼기</button>',
     calc:'<button class="sm" data-bulk-do="calcDel">고른 줄 빼기</button>',
-    manual:'<button class="sm" data-bulk-do="manualDel">고른 줄 빼기</button>', mentries:'<button class="sm" data-bulk-do="mentriesDel">고른 입력 빼기</button>' }[kind]||'';
+    manual:'<button class="sm" data-bulk-do="manualDel">고른 줄 빼기</button>', cap:'<button class="sm" data-bulk-do="capDel" title="목록에서만 뺀다(저장한 것은 그대로)">고른 입금 빼기</button>', mentries:'<button class="sm" data-bulk-do="mentriesDel">고른 입력 빼기</button>' }[kind]||'';
   return '<b>'+n+'건 선택</b> '+b+' <button class="sm" data-bulk-do="clear:'+kind+'">선택 풀기</button>';
 }
 function drawBulks(){
@@ -1371,8 +1454,10 @@ document.addEventListener('click', async function(ev){
   if(t.closest('#inboxClose')){ INBOX.open=false; MANUAL.open=false; drawMonth(); return; }
   /* 입금 자동 검토 — 다시 읽기는 재무관리(읽기만), 붙여넣기는 계산 모듈로 읽고, 저장은 «체크한 줄 저장» 한 길 */
   if(t.closest('#auto_reload')){ AUTO.src='ledger'; AUTO.batches=null; AUTO.err=''; await loadLedger(); return; }
-  if(t.closest('#auto_read')){ AUTO.text=$('auto_text').value; AUTO.pasted=C.parseDepositText(AUTO.text); AUTO.src='paste'; AUTO.at=Date.now(); AUTO.pasteOpen=true; drawMonth();
-    toast('붙여 넣은 글에서 금액 '+AUTO.pasted.length+'개를 찾았습니다'); return; }
+  /* 카톡·캡처로 넣기 — 글은 계산 모듈로 읽어 재무관리 입금에 «더하고»(바꿔 끼우지 않는다), 사진은 이 기기 안 글자읽기로 */
+  if(t.closest('#auto_read')){ AUTO.text=$('auto_text').value; var got=addExtra(C.parseDepositText(AUTO.text), 'paste'); if(got) AUTO.text=''; AUTO.pasteOpen=true; drawMonth();
+    toast(got?'글에서 입금 '+got+'건을 넣었습니다 — 줄마다 «어느 사업장»을 고르세요':'새로 넣을 금액을 찾지 못했습니다(1,000원 이상 · 출금·잔액 줄은 뺍니다)'); return; }
+  if(t.closest('#cap_pick')){ ev.preventDefault(); var cf=$('cap_file'); if(cf) cf.click(); return; }
   if(t.closest('#auto_save')){ await saveAuto(); return; }
   if(t.closest('#monthGo')){ await confirmMonth(); return; }
   if(t.closest('#yearXlsx')){ await exportYear(); return; }
@@ -1403,6 +1488,7 @@ document.addEventListener('click', async function(ev){
     var d=b.getAttribute('data-bulk-do');
     if(d.indexOf('clear:')===0){ SEL[d.slice(6)]={}; draw(); return; }
     if(d==='paidOn'||d==='paidOff'){ await setPaid(CUR_RUN, selectedIdx('t'), d==='paidOn'); return; }
+    if(d==='capDel'){ var cg=Object.keys(SEL.cap); dropExtra(cg); SEL.cap={}; drawMonth(); toast(cg.length+'건을 목록에서 뺐습니다'); return; }
     if(d==='manualDel'){ MANUAL.rows=MANUAL.rows.filter(function(r, i){ return r.role==='lead' || !SEL.manual[i]; }); SEL.manual={}; drawMonth(); return; }
     if(d==='mentriesDel'){ await removeManual(); return; }
     if(d==='calcDel'){ CALC.rows=CALC.rows.filter(function(r, i){ return !SEL.calc[i]; }); SEL.calc={}; saveCalc(); drawCalc(); return; }
@@ -1466,6 +1552,11 @@ document.addEventListener('change', async function(ev){
   if(t.id==='dep_sid'){ var ds=curDraft(); DEP.sid=t.value; DEP.open=true; if(ds) depRematch(ds); drawMonth(); return; }
   if(t.matches('select[data-dep]')){ DEP.pick[t.getAttribute('data-dep')]=t.value; if(!t.value) delete DEP.pick[t.getAttribute('data-dep')]; drawMonth(); return; }
   /* 입금 자동 검토 — 줄마다 고른 입금(화면에만). 고르면 ☐, 비우면 ☐ 뗌 */
+  if(t.id==='cap_file'){ var cfs=[].slice.call(t.files||[]); t.value=''; await readCaptures(cfs); return; }
+  /* 카톡·캡처 입금 — «어느 사업장»을 고르면 그 줄에 붙고 ☐ 가 켜진다(저장은 «체크한 줄 저장»). 비우면 지정을 푼다 */
+  if(t.matches('select[data-cap-to]')){ setAssign(t.getAttribute('data-cap-to'), t.value); drawMonth(); return; }
+  if(t.matches('input[data-cap-amt]')){ var cx=AUTO.extra.filter(function(x){ return x.id===t.getAttribute('data-cap-amt'); })[0], cv=C.won(t.value); if(!cx) return;
+    if(!(cv>0)){ toast('금액을 숫자로 적어 주세요'); t.value=C.fmt(cx.amount); return; } cx.amount=cv; AUTO.ver++; drawMonth(); return; }
   if(t.matches('select[data-auto-pick]')){ var ap=t.getAttribute('data-auto-pick'); if(t.value){ AUTO.pick[ap]=t.value; SEL.auto[ap]=1; } else { delete AUTO.pick[ap]; delete SEL.auto[ap]; } drawMonth(); return; }
   /* 직접 입력 — 종류·사업장을 바꾸면 담당 줄을 이알피 부담당으로 다시 채운다(주관 세전은 지킨다) */
   if(t.id==='m_type'||t.id==='m_site'){ var lp0=(MANUAL.rows[0]||{}).pre; if(t.id==='m_type'){ MANUAL.type=t.value; MANUAL.siteId=''; } else MANUAL.siteId=t.value;
@@ -1481,7 +1572,7 @@ document.addEventListener('change', async function(ev){
   if(t.id==='c_site'){ CALC.siteId=t.value; saveCalc(); return; }
   if(t.matches('select[data-c]')){ var cp=t.getAttribute('data-c').split('|'), cr=CALC.rows[+cp[0]]; if(!cr) return;
     cr[cp[1]]=t.value; if(cp[1]==='role' && t.value==='lead') delete cr.rate; calcPrefill(); saveCalc(); drawCalc(); return; }
-  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc', manual:'manual', mentries:'mentries', rooms:'rooms', kq:'kq', auto:'auto' }[kind]; if(!kind) return;
+  if(t.matches('input[data-ck]')){ var tb=t.closest('table'), kind=tb?(tb.hasAttribute('data-mx-table')?'mx':tb.getAttribute('data-name')):''; kind={ run:'members', transfers:'transfers', notices:'notices', adjusts:'adjusts', deposits:'deposits', mx:'mxpeople', calc:'calc', manual:'manual', mentries:'mentries', rooms:'rooms', kq:'kq', auto:'auto', cap:'cap' }[kind]; if(!kind) return;
     var id=t.getAttribute('data-ck'); if(t.checked) SEL[kind][id]=1; else delete SEL[kind][id]; drawBulks(); return; }
   if(t.id==='file'){ var f=t.files&&t.files[0]; t.value=''; await onFile(f); return; }
   if(t.id==='upType'){ lsSet('upType', t.value); return; }
@@ -1531,6 +1622,19 @@ document.addEventListener('toggle', function(ev){
   ['dragleave','drop'].forEach(function(e){ dz.addEventListener(e, function(ev){ ev.preventDefault(); dz.className='drop'; }); });
   dz.addEventListener('drop', function(ev){ var f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; onFile(f); });
 })();
+/* 카톡·캡처 넣기 — 끌어 놓기(상자는 다시 그려지니 문서에서 듣는다) · 붙여 넣기(Ctrl+V).
+   붙여 넣기는 ① 입금 확인이 보일 때 «사진»만 가로챈다 — 글은 그대로 칸에 붙는다 */
+function capZone(ev){ return ev.target && ev.target.closest ? ev.target.closest('#cap_drop') : null; }
+document.addEventListener('dragover', function(ev){ var z=capZone(ev); if(!z) return; ev.preventDefault(); z.classList.add('on'); });
+document.addEventListener('dragleave', function(ev){ var z=capZone(ev); if(z) z.classList.remove('on'); });
+document.addEventListener('drop', function(ev){ var z=capZone(ev); if(!z) return; ev.preventDefault(); z.classList.remove('on'); readCaptures(ev.dataTransfer && ev.dataTransfer.files); });
+document.addEventListener('paste', function(ev){
+  if(TAB!=='month' || $('step1').style.display==='none' || !$('cap_drop')) return;
+  var files=[];
+  [].forEach.call((ev.clipboardData && ev.clipboardData.items) || [], function(it){ if(it.kind==='file' && /^image\//.test(it.type||'')){ var f=it.getAsFile(); if(f) files.push(f); } });
+  if(!files.length) return;
+  ev.preventDefault(); readCaptures(files);
+});
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══
    대표·위임관리인·재무권한자(재무관리와 같은 사람)만 연다 — 대표 선택 2026-10-31. 로그인 안 함·퇴사·권한 없음은 잠근다. */

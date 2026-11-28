@@ -371,13 +371,30 @@
      ⚠ 금액이 같다는 것은 «후보»일 뿐이다 — 사람이 고르고 «저장»을 눌러야 통장 실입금이 된다(온톨로지: 금액 일치로 ID 를 자동 대입하지 않는다). */
   var MONEY_RE = /(?:^|[^\d,.\-*])(\d{1,3}(?:,\d{3})+|\d{4,9})(?:\s*원)?(?![\d,*\-])/g;
   /* 인터넷뱅킹 거래내역·입금 문자·엑셀에서 복사한 글 → 줄마다 금액 후보.
-     잔액·계좌번호(-·*)·날짜·시각은 금액으로 안 본다. «출금»만 있는 줄은 건너뛴다. */
+     잔액·계좌번호(-·*)·날짜·시각은 금액으로 안 본다. «출금»만 있는 줄은 건너뛴다.
+     ★ 카톡 글·캡처 글자읽기(대표 지시 2026-11-28) 도 이 길로 읽는다 — 그래서 아래를 더 본다:
+       · 글자읽기가 쉼표를 점으로 읽은 «6.759.330» 은 «6,759,330» 으로(세 자리 묶음이 둘 이상일 때만 — 날짜·소수와 헷갈리지 않게)
+       · 은행 앱 캡처는 «잔액»·«출금» 이름표와 금액이 다른 줄로 갈린다 → 이름표만 있는 줄 다음의 «금액만 있는 줄»은 건너뛴다
+       · 금액만 있는 줄은 바로 앞의 «금액 없는 글 줄»(보낸 분 이름 등)을 내용에 붙인다
+       · «지급»은 출금으로 보되 «지급 … 받았다·들어왔다·입금»처럼 받은 말이 함께 있으면 입금으로 본다(카톡 글) */
+  var LABEL_ONLY = /^(?:잔액|잔고|출금|지급|출금\s*가능\s*(?:금액|액)?|이체\s*가능\s*(?:금액|액)?)\s*:?$/;
+  var AMOUNT_ONLY = /^[+\-]?\s*(?:\d{1,3}(?:,\d{3})+|\d{4,9})\s*원?$/;
   function parseDepositText(text) {
-    var out = [];
+    var out = [], skipNext = false, prevText = '';
     String(text == null ? '' : text).split(/\r?\n/).forEach(function (raw, li) {
-      var line = clean(raw.replace(/\t/g, ' '));
+      var line = clean(raw.replace(/\t/g, ' ').replace(/[−–—－]/g, '-')
+        .replace(/(^|[^\d.])(\d{1,3}(?:\.\d{3}){2,})(?![\d.])/g, function (m0, a, b) { return a + b.replace(/\./g, ','); }));
       if (!line) return;
-      if (/출금|이체출금|지급/.test(line) && !/입금/.test(line)) return;
+      if (LABEL_ONLY.test(line)) { skipNext = true; return; }
+      var amountOnly = AMOUNT_ONLY.test(line), skip = skipNext && amountOnly;
+      skipNext = false;
+      if (skip) return;
+      if (/출금|이체출금/.test(line) && !/입금/.test(line)) return;
+      if (/지급/.test(line) && !/입금|들어왔|들어옴|받았|받음|수령/.test(line)) return;
+      if (/^-\s*\d/.test(line)) return;   // 앱 캡처의 «−50,000원» = 나간 돈
+      var ctx = amountOnly && prevText ? prevText + ' ' : '';
+      if (ctx) prevText = '';
+      if (!/\d{4,}|\d{1,3},\d{3}/.test(line) && !/^[\d.\/:\-\s년월일시분]+$/.test(line)) prevText = line.length > 30 ? line.slice(0, 30) : line;
       var date = '', d = /(20\d{2})[.\-\/년]\s*(\d{1,2})[.\-\/월]\s*(\d{1,2})/.exec(line);
       if (d) date = d[1] + '-' + pad2(Number(d[2])) + '-' + pad2(Number(d[3]));
       else if ((d = /(?:^|\s)(\d{1,2})[.\/](\d{1,2})(?:\s|$)/.exec(line))) date = pad2(Number(d[1])) + '-' + pad2(Number(d[2]));
@@ -389,7 +406,8 @@
       while ((m = MONEY_RE.exec(body))) {
         var amount = Number(m[1].replace(/,/g, ''));
         if (amount < 1000) continue;
-        out.push({ id: 'p' + li + '_' + (n++), source: 'paste', amount: amount, date: date, memo: line.length > 60 ? line.slice(0, 60) + '…' : line });
+        var memo = ctx + line;
+        out.push({ id: 'p' + li + '_' + (n++), source: 'paste', amount: amount, date: date, memo: memo.length > 60 ? memo.slice(0, 60) + '…' : memo });
       }
     });
     return out;
@@ -608,24 +626,42 @@
   /* 한 달 입금 자동 검토(대표 지시 2026-11-07 「입금된 내역 자료만 넣으면 자동으로 검토하고 정리」) — 그 달 «임시저장» 정산표들의
      주관 몫(대표 통장으로 들어오는 돈)을 통장 입금과 한꺼번에 맞춘다. 입금 한 줄은 한 번만 쓴다(정산표가 여럿이어도).
      leadOf = {사업 종류: 주관 사번}. ⚠ 담당 개인 통장은 대표 통장 거래내역에 없다 — 주관만 본다.
-     ⚠ 이미 넣은 통장 실입금은 kind 'saved' 로만 보이고 다시 맞추지 않는다. 맞추기만 한다(저장은 화면 단추로만). */
-  function reviewMonth(runs, leadOf, found) {
-    var rows = [], todo = [];
+     ⚠ 이미 넣은 통장 실입금은 kind 'saved' 로만 보이고 다시 맞추지 않는다. 맞추기만 한다(저장은 화면 단추로만).
+     ★ 사람이 지정한 입금(대표 지시 2026-11-28 「카톡으로 입금된 내역·화면 캡처·통장 캡처 … 사업장 지정해 주면 그 금액만큼 체크」):
+       assign = {입금 id: 줄 id(정산표::사업장|사번)}. 지정한 입금은 그 줄에 먼저 붙이고(assigned) 자동 맞추기 후보에서 뺀다.
+       담당 줄은 «지정했거나 이미 넣은 것»만 보인다 — 담당 개인 통장은 대표 통장에 없어 사람이 지정해야만 안다.
+       이미 넣은 줄도 지정하면 다시 맞춘다(새 금액으로 고쳐 넣을 수 있게 — 저장은 여전히 단추로만).
+     돌려주는 것 = {rows, counts, targets} — targets 는 지정할 수 있는 줄 전부(주관·담당, 화면의 «어느 사업장» 고르기). */
+  function reviewMonth(runs, leadOf, found, assign) {
+    var rows = [], todo = [], targets = [], byId = {}, asg = {}, taken = {};
+    (found || []).forEach(function (f) { if (f && f.id) byId[f.id] = f; });
+    /* 줄 하나에는 입금 하나 — 같은 줄에 둘을 지정하면 먼저 것만(화면이 앞 지정을 풀어 준다). 없는 입금 id 는 버린다 */
+    /* 지정한 입금은 그 줄이 이 달에 없어도(다른 달 정산표에 지정) 자동 맞추기 후보에서 뺀다 — 사람이 «여기 돈이 아니다»라고 정한 것 */
+    Object.keys(assign || {}).forEach(function (fid) { var rid = assign[fid]; if (!byId[fid] || !rid) return; taken[fid] = 1; if (!asg[rid]) asg[rid] = byId[fid]; });
     (runs || []).forEach(function (run) {
       if (!run || run._deleted || run.status !== 'draft') return;
       var lead = (leadOf || {})[run.typeCode];
       if (!lead) return;
-      expectedFor(run, lead).forEach(function (e) {
-        var r = { id: run.id + '::' + e.key, runId: run.id, typeCode: run.typeCode, key: e.key, company: e.company, round: e.round, expected: e.amount, actual: e.actual,
-          found: null, kind: e.actual == null ? 'none' : 'saved', diff: null };
-        rows.push(r);
-        if (e.actual == null) todo.push(r);
+      ((run.sites) || []).forEach(function (s) {
+        (s.members || []).forEach(function (m) {
+          if (!m.sid || !(m.pre > 0) || !s.consultingId) return;
+          var key = s.consultingId + '|' + m.sid, id = run.id + '::' + key, role = m.sid === lead ? 'lead' : 'staff', actual = m.actual == null ? null : m.actual;
+          targets.push({ id: id, runId: run.id, typeCode: run.typeCode, key: key, company: s.company, round: s.round, sid: m.sid, role: role, expected: m.net, actual: actual });
+          var a = asg[id];
+          if (role === 'staff' && actual == null && !a) return;
+          var r = { id: id, runId: run.id, typeCode: run.typeCode, key: key, company: s.company, round: s.round, sid: m.sid, role: role, expected: m.net, actual: actual,
+            found: null, kind: actual == null ? 'none' : 'saved', diff: null, assigned: !!a };
+          if (a) { r.found = a; r.diff = a.amount - r.expected; r.kind = r.diff === 0 ? 'exact' : 'near'; }
+          rows.push(r);
+          if (!a && actual == null) todo.push(r);
+        });
       });
     });
-    /* 이미 넣은 실입금과 같은 금액의 입금 한 줄은 «쓴 것»으로 뺀다 — 남은 줄이 같은 입금을 또 잡지 않게 */
-    var pool = (found || []).slice();
+    /* 이미 넣은 실입금과 같은 금액의 입금 한 줄은 «쓴 것»으로 뺀다 — 남은 줄이 같은 입금을 또 잡지 않게.
+       주관 줄만(담당 실입금은 담당 개인 통장 돈이라 대표 통장 입금을 쓰지 않는다). 지정한 입금은 처음부터 뺀다 */
+    var pool = (found || []).filter(function (f) { return f && !taken[f.id]; });
     rows.forEach(function (r) {
-      if (r.kind !== 'saved') return;
+      if (r.kind !== 'saved' || r.role !== 'lead') return;
       for (var i = 0; i < pool.length; i++) if (pool[i].amount === r.actual) { pool.splice(i, 1); return; }
     });
     matchDeposits(todo.map(function (r, i) { return { key: String(i), company: r.company, amount: r.expected }; }), pool).forEach(function (o, i) {
@@ -634,7 +670,7 @@
     var used = {}, counts = { exact: 0, near: 0, none: 0, saved: 0 };
     rows.forEach(function (r) { counts[r.kind]++; if (r.found) used[r.found.id] = 1; });
     counts.other = pool.filter(function (f) { return !used[f.id]; }).length;
-    return { rows: rows, counts: counts };
+    return { rows: rows, counts: counts, targets: targets };
   }
 
   /* 개인입금 사업 종류 — 대표 지시 2026-11-11 「이알피 컨설팅에 개인입금이 있다 … 다른 정부사업 개인입금 사업은 자동으로 여기에 연결」
