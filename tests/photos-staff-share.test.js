@@ -433,7 +433,7 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
     '/kakao_room/items/$id/revision', '/kakao_room/items/$id/room', '/kakao_room/items/$id/safety',
     '/kakao_room/items/$id/schemaVersion', '/kakao_room/items/$id/senders', '/kakao_room/items/$id/status',
     '/kakao_room/items/$id/summary', '/kakao_room/items/$id/updatedAt', '/kakao_room/items/$id/updatedBy',
-    '/kakao_room/items/$id/workItemId', '/kakao_room/items/$id/workLogId',
+    '/kakao_room/items/$id/workItemId', '/kakao_room/items/$id/workLogId', '/kakao_room/watcher',
   ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
