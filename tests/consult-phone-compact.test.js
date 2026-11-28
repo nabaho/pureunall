@@ -82,7 +82,7 @@ test('④ 4개 뷰 JS 가 동적 연도 드롭다운·핵심 단일 버튼(data-
     const src = read(f);
     assert.ok(src.includes('data-pm-act="1"'), f + ': 폰 핵심 단일 버튼 표식(data-pm-act="1")이 없습니다');
     assert.ok(src.includes('pc-only'), f + ': 폰 숨김 부수열(pc-only) 표식이 없습니다');
-    assert.ok(/innerWidth\s*<=\s*768|tr\[data-row\][\s\S]{0,220}TAB\s*=\s*'intake'/.test(src), f + ': 행 탭 시 작업실 진입 처리가 없습니다');
+    assert.ok(/innerWidth\s*<=\s*768|tr\[data-row\][\s\S]{0,220}TAB\s*=\s*'intake'|tr\[data-row\][\s\S]{0,400}openProjectDetailModal\(tr\.getAttribute\('data-row'\)\)/.test(src), f + ': 행 탭 시 작업실(또는 진행 기록·완료보고서 창) 진입 처리가 없습니다');
   }
   assert.match(read('js/pu-consult-view.js'), /pu-phone-yr-sel/, 'pu-consult-view.js 에 동적 연도 드롭다운(.pu-phone-yr-sel) 동기화가 없습니다');
   assert.match(read('js/pu-jobtrans-view.js'), /yrSelEl\s*=\s*\$\('projYear'\)/, 'pu-jobtrans-view.js 에 #projYear 동적 연도 옵션 갱신이 없습니다');

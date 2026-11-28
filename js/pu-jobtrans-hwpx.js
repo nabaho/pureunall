@@ -493,7 +493,27 @@
   }
 
   function openInHangulEditor(kind, project, midReport, finalReport) {
-    var payload = buildHangulBridgePayload(kind, project, midReport, finalReport);
+    return deliverHangulPayload(buildHangulBridgePayload(kind, project, midReport, finalReport));
+  }
+
+  /* 메일 첨부로 받은 한글 파일(.hwp/.hwpx — 기관에 보낸 최종보고서 원본 등)을 푸른한글 새 탭에서 연다 (2026-11-28 사업장 진행 기록 창).
+     existingWin: 누른 그 순간 미리 열어 둔 빈 창(첨부를 받는 동안 기다리면 팝업 차단에 걸린다) — 없으면 여기서 연다 */
+  function openBytesInHangulEditor(bytes, fileName, format, existingWin) {
+    var fmt = String(format || '').toLowerCase() === 'hwp' ? 'hwp' : 'hwpx';
+    var base = String(fileName || '첨부문서').replace(/\.(hwpx|hwp)$/i, '');
+    return deliverHangulPayload({
+      bridgeId: 'jt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      source: 'jobtrans',
+      sourceLabel: '산업일자리전환',
+      format: fmt,
+      name: base,
+      label: base,
+      b64: bytesToB64(bytes),
+      sentAt: Date.now()
+    }, existingWin);
+  }
+
+  function deliverHangulPayload(payload, existingWin) {
     if (typeof localStorage !== 'undefined') {
       try {
         var serialized = JSON.stringify(payload);
@@ -503,7 +523,13 @@
       } catch (e) {}
     }
     if (typeof window !== 'undefined') {
-      var win = window.open('hangul.html?from=jobtrans', '_blank');
+      var win = null;
+      if (existingWin && !existingWin.closed) {
+        win = existingWin;
+        try { win.location.href = 'hangul.html?from=jobtrans'; } catch (e) {}
+      } else {
+        win = window.open('hangul.html?from=jobtrans', '_blank');
+      }
       var sendPayload = function () {
         try {
           if (win && !win.closed) win.postMessage({ type: 'pureun_hangul_open', payload: payload }, location.origin);
@@ -694,6 +720,7 @@
     downloadHwpxBytes: downloadHwpxBytes,
     buildHangulBridgePayload: buildHangulBridgePayload,
     openInHangulEditor: openInHangulEditor,
+    openBytesInHangulEditor: openBytesInHangulEditor,
     buildPreviewHtml: buildPreviewHtml,
     openPrintWindow: openPrintWindow
   };

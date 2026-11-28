@@ -110,6 +110,24 @@ main{display:block;padding:10px 26px 56px 12px;width:100%;max-width:none;margin:
 .kpis .kpi,.kpi{flex:1 1 0;min-width:0;min-height:32px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;background:var(--card);display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:6px}
 .kpis .kpi span,.kpi span{font-size:11.5px;font-weight:700;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .kpis .kpi b,.kpi b{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
+/* 연도 숫자판 단추(누르면 그 해만) · 연도 독립 열 · 진행 기록·완료보고서 창 — 대표 지시 2026-11-28 */
+button.kpi.kpi-yr{font:inherit;color:var(--ink);cursor:pointer;text-align:left}
+button.kpi.kpi-yr:hover{border-color:var(--blue)}
+button.kpi.kpi-yr.on{border-color:var(--blue);background:var(--blue-bg)}
+button.kpi.kpi-yr.on span,button.kpi.kpi-yr.on b{color:var(--blue-d)}
+table.t th.yr,table.t td.yr{width:52px;text-align:center;font-variant-numeric:tabular-nums}
+.pd-gap{display:block;margin:2px 0}
+.pd-att-box{margin-top:8px}
+.pd-att-list{display:flex;flex-direction:column;gap:4px}
+.pd-att{display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;min-width:0}
+.pd-att.rep{border-color:var(--green-line);background:var(--green-bg)}
+.pd-att-no{width:22px;flex:none;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+.pd-att-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:768px){
+  /* 폰 2줄 카드: 연도는 사업장명 옆(1줄째) */
+  table.t[data-name="projectsKmac"] tbody td.yr,table.t[data-name="projectsCepa"] tbody td.yr,table.t[data-name="projects"] tbody td.yr{order:2!important;flex:0 0 auto!important;width:auto!important}
+  .pd-att{min-height:36px}
+}
 .kpi.k-blue b{color:var(--blue-d)}
 .kpi.k-green b{color:var(--green)}
 .kpi.k-amber b{color:var(--amber)}
@@ -328,22 +346,13 @@ table.t tr.cur>td.n{color:var(--ink2)}
     <div class="card">
       <div class="bar">
         <input id="projQ" type="search" aria-label="사업장 검색" placeholder="사업장명·계약번호·전환목표·업종 찾기" style="flex:1;min-width:220px">
-        <select id="projAgency" aria-label="운영기관 필터">
-          <option value="">⚖️ 운영기관 좌우 분리 (전체)</option>
-          <option value="stack">▤ 운영기관 전체폭 상하 분리 (전체)</option>
-          <option value="kmac">🔵 한국능률협회컨설팅 (KMAC) 전용</option>
-          <option value="cepa">🟢 충남경제진흥원 (CEPA) 전용</option>
-        </select>
-        <select id="projYear" aria-label="연도 필터">
-          <option value="">연도 전체</option>
-          <option value="2026">2026년</option>
-          <option value="2025">2025년</option>
-          <option value="2024">2024년</option>
-        </select>
+        <select id="projYear" class="pu-phone-yr-sel" aria-label="연도 필터"><option value="">연도 전체</option></select>
         <select id="projStage" aria-label="진행단계 필터">
           <option value="">진행단계 전체</option>
           <option value="pre_mid">착수~중간보고 전</option>
           <option value="post_mid">중간보고 확정 (최종·완료계)</option>
+          <option value="final_wait">📤 완료 확정 대기 (메일 근거 있음)</option>
+          <option value="final_done">✅ 최종 완료</option>
           <option value="unseen">미확인 메일 있음</option>
         </select>
         <span class="sp"></span>
@@ -426,10 +435,10 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-jobtrans-catalog.js?v=2"></script>
-<script src="js/pu-jobtrans-intake.js?v=4"></script>
+<script src="js/pu-jobtrans-intake.js?v=5"></script>
 <script src="js/pu-jobtrans-report.js?v=2"></script>
-<script src="js/pu-jobtrans-hwpx.js?v=1"></script>
-<script src="js/pu-jobtrans-view.js?v=7"></script>
+<script src="js/pu-jobtrans-hwpx.js?v=2"></script>
+<script src="js/pu-jobtrans-view.js?v=8"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 if(location.protocol==='file:'){

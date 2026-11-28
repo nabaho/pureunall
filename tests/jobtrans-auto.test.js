@@ -1294,6 +1294,7 @@ test('12. 소속기관(KMAC vs CEPA) 분리 · 일터상생/석유화학노동�
   assert.match(html, /main\{[^}]*width:100%;max-width:none/, 'PC 화면에서 좌우 전체 폭을 사용해야 한다');
   assert.match(html, /table\.t td\.wide\{width:100%;max-width:0\}/, '데스크톱 표의 가변 열이 남은 가로폭을 100% 채우고 오른쪽 열 잘림을 막아야 한다');
   assert.match(html, /id="agencyScopeBar"/, '소속기관 구분 스코프 바가 존재해야 한다');
-  assert.match(html, /value="stack"/, '전체폭 상하 분리 옵션이 존재해야 한다');
+  // 운영기관 선택칸은 위쪽 기관 단추줄과 같은 고르기라 걷었다(2026-11-28 상단 중복 정리) — «전체폭 상하 분리»는 단추줄에 있다
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-jobtrans-view.js'), 'utf8'), /data-set-agency-scope="stack"/, '전체폭 상하 분리 단추가 존재해야 한다');
   assert.match(html, /id="p-forms"/, '기관별 양식 분리검토 전용 패널이 존재해야 한다');
 });
