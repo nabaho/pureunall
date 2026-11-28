@@ -141,14 +141,16 @@ module.exports = {
       if (p.viewportSize().width >= 1080) {
         must(await p.evaluate(() => [...document.querySelectorAll('#histBox .hd-card')].every((c) => {
           const r = c.getBoundingClientRect();
-          return r.height >= 24 && r.height <= 48;
-        })), '1080px 이상에서 왼쪽 연도 카드는 1줄 콤팩트 높이(48px 이하)여야 함');
+          return r.height >= 24 && r.height <= 42;
+        }) && !document.querySelector('#histBox .hd-left .hd-card .hd-dt') && !document.querySelector('#histBox .hd-sum-sub')
+          && /^사원 변경·나무분사무소 이전/.test((document.querySelector('#histBox .hd-card .hd-ttl') || {}).textContent || '')),
+          '1080px 이상에서 왼쪽 연도 카드는 중복 날짜/세부내역 없는 핵심 제목 1줄(42px 이하)이어야 함');
       }
       if (p.viewportSize().width >= 1366) {
         must(await p.evaluate(() => {
-          const pv = document.getElementById('arcPvPanel');
-          return pv && pv.getBoundingClientRect().width >= window.innerWidth * 0.48;
-        }), '1366px 이상에서 한글 뷰어(#arcPvPanel)는 화면 절반(48%+) 이상 차지해야 함');
+          const pv = document.getElementById('arcPvPanel'), pb = document.getElementById('arcPvBody');
+          return pv && pb && pv.getBoundingClientRect().width >= window.innerWidth * 0.52 && pb.getBoundingClientRect().top <= 125;
+        }), '1366px 이상에서 한글 뷰어(#arcPvPanel)는 화면 52%+ 너비이고 상단 밀착(top<=125px)이어야 함');
       }
       await p.click('#histBox [data-act="histYear"][data-v="2019"]'); await w(250);
       must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 1), '2019 필터 시 1건');

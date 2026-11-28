@@ -338,33 +338,33 @@ main{padding:12px 16px 40px;max-width:1760px;margin:0 auto}
 .card.fc>.fh .hint{flex:1;min-width:0}
 .card.fc.open>.fh{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
 .card.fc.open>.fh .car{transform:rotate(90deg)}
-body.tab-hist main{max-width:none;width:100%;margin:0;padding:8px 10px 20px}
-/* 지난 기록 AB-1 대시보드 (왼쪽 1줄 연도 타임라인 + 가운데 요약·서류목록 + 오른쪽 절반 이상 풀높이 한글 뷰어) */
-.hd-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
+body.tab-hist main{max-width:none;width:100%;margin:0;padding:4px 6px 8px}
+/* 지난 기록 AB-1 대시보드 (왼쪽 1줄 핵심 제목 + 가운데 중복 없는 요약·서류 + 오른쪽 상단 밀착 풀높이 한글 뷰어) */
+.hd-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;align-items:start}
 @container (min-width:820px){
-  :where(body:not(.slim)) .hd-wrap{grid-template-columns:clamp(210px,22%,260px) minmax(0,1fr)}
-  :where(body:not(.slim)) .hd-left{position:sticky;top:60px;max-height:calc(100vh - 72px);display:flex;flex-direction:column}
+  :where(body:not(.slim)) .hd-wrap{grid-template-columns:clamp(195px,21%,240px) minmax(0,1fr)}
+  :where(body:not(.slim)) .hd-left{position:sticky;top:var(--headH,48px);max-height:calc(100vh - var(--headH,48px) - 8px);display:flex;flex-direction:column}
   :where(body:not(.slim)) .hd-left .hd-tl-list{max-height:none;flex:1;min-height:0;overflow-y:auto}
 }
-@container (min-width:1080px){
-  :where(body:not(.slim)) .hd-wrap{grid-template-columns:clamp(220px,17%,265px) minmax(0,1fr)}
+@container (min-width:1050px){
+  :where(body:not(.slim)) .hd-wrap{grid-template-columns:clamp(200px,15.5%,245px) minmax(0,1fr)}
 }
 .hd-left{margin-bottom:0;overflow:hidden;min-width:0}
 .hd-right{margin-bottom:0;overflow:clip;min-width:0}
-.hd-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 9px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+.hd-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
 .hd-seg{display:inline-flex;padding:2px;border-radius:8px;background:var(--bg);border:1px solid var(--line);gap:2px}
 .hd-seg button{border:none;background:transparent;padding:4px 7px;border-radius:6px;font-size:12px;font-weight:600;color:var(--mute)}
 .hd-seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
-.hd-filter{padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;gap:5px}
+.hd-filter{padding:5px 7px;border-bottom:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;gap:4px}
 .hd-search input{width:100%}
 .hd-years{display:flex;gap:3px;flex-wrap:wrap}
 .hd-years button.on,.hd-kbar button.on{background:var(--blue);border-color:var(--blue);color:#ffffff}
-.hd-tl-list{max-height:700px;overflow-y:auto;padding-bottom:8px}
-.hd-yr{display:flex;align-items:center;gap:6px;padding:6px 10px 2px;font-size:11.5px;font-weight:700;color:var(--blue-d);position:sticky;top:0;background:var(--card);z-index:2}
+.hd-tl-list{max-height:700px;overflow-y:auto;padding-bottom:6px}
+.hd-yr{display:flex;align-items:center;gap:6px;padding:4px 8px 1px;font-size:11px;font-weight:700;color:var(--blue-d);position:sticky;top:0;background:var(--card);z-index:2}
 .hd-yr::after{content:'';flex:1;height:1px;background:var(--line)}
-.hd-tl{padding:0 8px 4px 15px}
-.hd-tl-items{border-left:2px solid var(--line);padding-left:9px;display:flex;flex-direction:column;gap:4px}
-.hd-card{position:relative;width:100%;text-align:left;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.hd-tl{padding:0 6px 3px 14px}
+.hd-tl-items{border-left:2px solid var(--line);padding-left:8px;display:flex;flex-direction:column;gap:3px}
+.hd-card{position:relative;width:100%;text-align:left;padding:5px 7px;border-radius:7px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:5px;white-space:nowrap}
 .hd-card::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--card);border:2px solid var(--mute)}
 .hd-card:hover{border-color:var(--blue-line);background:var(--blue-bg)}
 .hd-card.on{border-color:var(--blue);background:var(--blue-bg);box-shadow:0 0 0 1px var(--blue)}
@@ -386,32 +386,35 @@ body.tab-hist main{max-width:none;width:100%;margin:0;padding:8px 10px 20px}
 .hd-done-card.static:hover{border-color:var(--line);background:var(--card)}
 .hd-log-desc{font-size:12px;color:var(--ink2);line-height:1.45;white-space:normal}
 .hd-sum{border-bottom:1px solid var(--line);background:var(--card)}
-.hd-sum-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
-.hd-sum-info{display:flex;flex-direction:column;gap:4px;min-width:min(100%,220px);flex:1}
+.hd-sum-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:7px 9px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+.hd-sum-info{display:flex;flex-direction:column;gap:3px;min-width:min(100%,180px);flex:1}
 .hd-sum-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.hd-sum-ttl{margin:0;font-size:14px;font-weight:700;color:var(--ink);line-height:1.35}
+.hd-sum-ttl{margin:0;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3}
 .hd-sum-sub{font-size:11.5px;color:var(--mute)}
-.hd-sum-acts{display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0}
-.hd-sum-body{padding:8px 11px;background:var(--bg);font-size:12px;color:var(--ink);line-height:1.5;white-space:pre-line;max-height:112px;overflow-y:auto}
+.hd-sum-acts{display:flex;gap:3px;flex-wrap:wrap;flex-shrink:0}
+.hd-sum-body{padding:6px 9px;background:var(--bg);font-size:12px;color:var(--ink);line-height:1.45;white-space:pre-line;max-height:90px;overflow-y:auto}
 .hd-split{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch}
 .hd-doccol{display:flex;flex-direction:column;min-width:0;border-bottom:1px solid var(--line);background:var(--card)}
 .hd-fdt{display:none;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;margin-top:1px}
-@container (min-width:1080px){
-  :where(body:not(.slim)) .hd-split:not(.collapsed){grid-template-columns:minmax(260px,36%) minmax(50%,1fr)}
-  :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol{border-bottom:none;border-right:1px solid var(--line);position:sticky;top:60px;align-self:start;max-height:calc(100vh - 72px);overflow:hidden}
+@container (min-width:1050px){
+  :where(body:not(.slim)) .hd-split:not(.collapsed){grid-template-columns:minmax(250px,31%) minmax(56%,1fr)}
+  :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol{border-bottom:none;border-right:1px solid var(--line);position:sticky;top:var(--headH,48px);align-self:start;max-height:calc(100vh - var(--headH,48px) - 8px);overflow:hidden}
   :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .hd-docscroll{max-height:none}
   :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .arct .dt,
   :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .arct col.hd-dtcol{display:none}
   :where(body:not(.slim)) .hd-split:not(.collapsed) .hd-doccol .hd-fdt{display:block}
-  :where(body:not(.slim)) .hd-pv{position:sticky;top:60px;align-self:start;height:calc(100vh - 72px);display:flex;flex-direction:column}
+  :where(body:not(.slim)) .hd-pv{position:sticky;top:var(--headH,48px);align-self:start;height:calc(100vh - var(--headH,48px) - 8px);display:flex;flex-direction:column}
   :where(body:not(.slim)) .hd-pv-body{flex:1;min-height:0;overflow-y:auto;overflow-x:auto;max-height:none}
-  :where(body:not(.slim)) .hd-pv-body iframe{height:100%;min-height:calc(100vh - 150px)}
+  :where(body:not(.slim)) .hd-pv-body iframe{height:100%;min-height:calc(100vh - var(--headH,48px) - 60px)}
 }
-.hd-dochd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--card)}
-.hd-kbar{display:flex;gap:3px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--bg)}
+.hd-dochd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 9px;border-bottom:1px solid var(--line);background:var(--card)}
+.hd-kbar{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;border-bottom:1px solid var(--line);background:var(--bg);scrollbar-width:thin}
+.hd-kbar button{flex-shrink:0;white-space:nowrap}
 .hd-docscroll{max-height:360px;overflow:auto;flex:1;min-height:0}
 @media (min-width:769px){
   .hd-split.collapsed .hd-doccol{display:none}
+  .hd-pvh{flex-wrap:nowrap}
+  .hd-pvh-l{flex-wrap:nowrap}
   :where(body:not(.slim)) .hd-doccol .t.arct{table-layout:fixed;width:100%}
   .hd-doccol .t.arct td.ti{max-width:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hd-doccol .t.arct td.kd{white-space:nowrap;overflow:hidden}
@@ -420,20 +423,24 @@ body.tab-hist main{max-width:none;width:100%;margin:0;padding:8px 10px 20px}
   .hd-doccol .t.arct th.n,.hd-doccol .t.arct td.n{padding:4px 4px;text-align:right}
   .hd-doccol .t.arct th.ac-h,.hd-doccol .t.arct td.ac{padding:4px 6px 4px 2px;text-align:right}
 }
-.hd-docfoot{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:7px 10px;border-top:1px solid var(--line);background:var(--bg);font-size:12px}
+.hd-docfoot{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 9px;border-top:1px solid var(--line);background:var(--bg);font-size:12px}
 .hd-pv{display:flex;flex-direction:column;min-width:0;background:var(--card)}
-.hd-pvh{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 11px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
-.hd-pvh-l,.hd-pvh-r{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0}
-.hd-pvh-name{font-weight:700;font-size:13px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hd-pgbar{display:inline-flex;align-items:center;gap:4px}
+.hd-pvh{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 8px;min-height:34px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+.hd-pvh-l{display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex:1;min-width:0}
+.hd-pvh-r{display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-shrink:0}
+.hd-pvh button.sm{padding:2px 6px}
+.hd-pvh .chip{padding:0 5px}
+#arcPvKind{font-size:12px;padding:2px 5px;max-width:112px}
+.hd-pvh-name{font-weight:700;font-size:12.5px;flex:1;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hd-pgbar{display:inline-flex;align-items:center;gap:3px}
 .hd-pgbar[hidden]{display:none}
-.hd-pv-body{background:var(--line);min-height:520px;overflow-x:auto;overflow-y:visible;padding:14px;display:flex;flex-direction:column;align-items:center;flex:1}
+.hd-pv-body{background:var(--line);min-height:520px;overflow-x:auto;overflow-y:visible;padding:4px 8px 14px;display:flex;flex-direction:column;align-items:center;flex:1}
 .hd-pv-body:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
-.hd-pv-body .pvi{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px}
+.hd-pv-body .pvi{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px}
 .hd-pv-body canvas{max-width:100% !important;height:auto !important;background:#ffffff;border:1px solid var(--line2);border-radius:4px;box-shadow:var(--shadow)}
 .hd-pv-body canvas.pg-blank,#spv canvas.pg-blank{height:var(--pg-h,auto) !important;background:#ffffff}
 .hd-pv-body.single-page canvas{display:none !important}
-.hd-pv-body.single-page canvas.pg-cur{display:block !important;max-height:calc(100vh - 165px);width:auto !important;max-width:100% !important;margin:0 auto !important}
+.hd-pv-body.single-page canvas.pg-cur{display:block !important;max-height:calc(100vh - var(--headH,48px) - 52px);width:auto !important;max-width:100% !important;margin:0 auto !important}
 .hd-pv-body iframe{width:100%;height:max(680px,76vh);border:1px solid var(--line2);border-radius:6px;background:#ffffff}
 .hd-pv-body img{max-width:100%;border-radius:6px;border:1px solid var(--line2);background:#ffffff}
 .hd-pv-card{max-width:460px;width:100%;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:9px;box-shadow:var(--shadow)}
@@ -682,6 +689,10 @@ function setTab(t){
   TAB=t; lsSet('tab', t); draw();
   if(t==='hist'){ if(window.PureunHwp && PureunHwp.loadCore) PureunHwp.loadCore().catch(function(){}); arcAutoLoad(); }
 }
+function syncHeadH(){
+  var hd=$('head');
+  if(hd) document.documentElement.style.setProperty('--headH', Math.round(hd.getBoundingClientRect().height)+'px');
+}
 function draw(){
   document.body.classList.toggle('tab-hist', TAB==='hist');
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function(b){ b.classList.toggle('on', b.dataset.tab===TAB); b.setAttribute('aria-selected', b.dataset.tab===TAB ? 'true' : 'false'); });
@@ -689,7 +700,7 @@ function draw(){
   if(TAB==='case'){ drawBaseWarn(); drawCaseList(); drawEditor(); }
   else if(TAB==='base') drawBase();
   else drawHist();
-  drawTabBadges(); sideHead(); sideDocRefresh();
+  drawTabBadges(); sideHead(); sideDocRefresh(); syncHeadH();
 }
 /* 탭 꼬리표 — 진행 중인 건 수 · 지난 기록 묶음 수 */
 function drawTabBadges(){
@@ -1364,7 +1375,7 @@ function saveBase(){
 function arcRows(){ return C.archiveList(ARCH); }
 function arcById(id){ return arcRows().filter(function(a){ return a.id===id; })[0]||null; }
 function extOf(nm){ var m=/\.([A-Za-z0-9]+)$/.exec(String(nm||'')); return m?m[1].toLowerCase():''; }
-function arcLockAttr(){ return ME.isAdmin?'':' disabled title="🔒 총괄관리자만 엽니다"'; }
+function arcLockAttr(ttl){ return ME.isAdmin?(ttl?' title="'+esc(ttl)+'"':''):' disabled title="🔒 총괄관리자만 엽니다"'; }
 /* 묶음 머리에 «정관 2 · 의사록 3 · 증명서» 처럼 어떤 서류가 들었는지 — 펴지 않고도 내용을 가늠한다 */
 function arcKindSummary(a){
   var cnt={}, order=[];
@@ -1374,19 +1385,6 @@ function arcKindSummary(a){
 function arcYear(a){
   var m=/^(\d{4})/.exec(String(a&&a.at||'')); if(m) return m[1];
   var m2=/(19|20)\d{2}/.exec(String(a&&a.title||'')); return m2?m2[0]:'';
-}
-function arcTags(a){
-  var tx=String((a&&a.title)||'')+' '+String((a&&a.summary)||''), out=[];
-  if(/입사/.test(tx)) out.push('사원 입사');
-  if(/퇴사/.test(tx)) out.push('사원 퇴사');
-  if(!/입사|퇴사/.test(tx) && /사원/.test(tx)) out.push('사원 변경');
-  if(/대표사원/.test(tx)) out.push('대표사원');
-  if(/분사무소\s*설치|지사\s*설치|신설/.test(tx)) out.push('분사무소 설치');
-  else if(/분사무소\s*이전|지사\s*이전|이전/.test(tx)) out.push('분사무소 이전');
-  else if(/분사무소\s*폐지|지사\s*폐지/.test(tx)) out.push('분사무소 폐지');
-  if(/주소/.test(tx)) out.push('주소 변경');
-  if(/정관/.test(tx)) out.push('정관');
-  return out.slice(0, 3);
 }
 function arcKindChipCls(kind){
   if(kind==='charter'||kind==='compare') return '';
@@ -1404,7 +1402,7 @@ function arcPvRevoke(){
   if(ARC_PV_URL){ try{ URL.revokeObjectURL(ARC_PV_URL); }catch(e){} ARC_PV_URL=''; }
 }
 function arcPvEmptyHtml(a, f){
-  if(!f) return '<div class="hd-pv-card"><div class="empty">이 묶음에 올라온 파일이 아직 없습니다.<br>왼쪽 위의 «＋ 파일»로 원본 서류를 올리십시오.</div></div>';
+  if(!f) return '<div class="hd-pv-card"><div class="empty">이 묶음에 올라온 파일이 아직 없습니다.<br>위 «＋» 단추로 원본 서류를 올리십시오.</div></div>';
   var kd=C.arcKindLabel(f.kind), cls=arcKindChipCls(f.kind);
   return '<div class="hd-pv-card">'
     +'<span class="chip '+cls+'">'+esc(kd)+'</span>'
@@ -1496,9 +1494,9 @@ function arcFetchBlob(fid){
 function arcPageHtml(){
   var n=HIST_UI.pages||0, p=Math.max(1, Math.min(HIST_UI.page||1, n||1)), sg=HIST_UI.pageMode==='single';
   return '<span class="hd-pgbar" id="arcPvPageBar"'+(n?'':' hidden')+'>'
-    +'<button type="button" class="sm" id="arcPgPrev" data-act="arcPageNav" data-d="-1"'+(p<=1?' disabled':'')+'>▲ 이전 쪽</button>'
+    +'<button type="button" class="sm" id="arcPgPrev" data-act="arcPageNav" data-d="-1" aria-label="이전 쪽"'+(p<=1?' disabled':'')+'>▲</button>'
     +'<span class="chip m" id="arcPvPagePos">'+(n?p+' / '+n+'쪽':'0 / 0쪽')+'</span>'
-    +'<button type="button" class="sm" id="arcPgNext" data-act="arcPageNav" data-d="1"'+(p>=n?' disabled':'')+'>▼ 다음 쪽</button>'
+    +'<button type="button" class="sm" id="arcPgNext" data-act="arcPageNav" data-d="1" aria-label="다음 쪽"'+(p>=n?' disabled':'')+'>▼</button>'
     +'<button type="button" class="sm'+(sg?' pri':'')+'" id="arcPgMode" data-act="arcPageMode" aria-pressed="'+(sg?'true':'false')+'" title="한 쪽씩 보기 / 연속 스크롤 전환">'+(sg?'연속 보기':'한 쪽씩')+'</button>'
     +'</span>';
 }
@@ -1580,16 +1578,15 @@ function arcPvHeaderSync(){
   var a=arcById(HIST_UI.sel), fl=a?C.arcFiles(a):[], shown=fl.filter(function(x){ return HIST_UI.kind==='ALL'||(x.kind||'etc')===HIST_UI.kind; });
   var sIdx=-1; shown.forEach(function(x, i){ if(x.fileId===HIST_UI.fid) sIdx=i; });
   var curF=sIdx>=0?shown[sIdx]:null;
-  var pv=$('arcPvPrev'), pos=$('arcPvPos'), nx=$('arcPvNext'), nm=$('arcPvName'), dt=$('arcPvDate'), kd=$('arcPvKind'), ae=document.activeElement;
+  var pv=$('arcPvPrev'), pos=$('arcPvPos'), nx=$('arcPvNext'), nm=$('arcPvName'), kd=$('arcPvKind'), ae=document.activeElement;
   if(pv) pv.disabled=(sIdx<=0);
-  if(pos) pos.textContent=shown.length?(sIdx+1)+' / '+shown.length:'0 / 0';
+  if(pos) pos.textContent=shown.length?(sIdx+1)+'/'+shown.length:'0/0';
   if(nx) nx.disabled=(sIdx<0||sIdx>=shown.length-1);
   if(ae && ae.disabled && (ae===pv || ae===nx)){
     var alt=(ae===pv?nx:pv), tgt=(alt && !alt.disabled)?alt:$('arcPvBody');
     if(tgt && tgt.focus){ try{ tgt.focus(); }catch(e){} }
   }
   if(nm){ nm.textContent=curF?curF.name:'서류 없음'; nm.title=curF?curF.name:''; }
-  if(dt) dt.textContent=(curF&&curF.date)?curF.date:'';
   if(kd && curF) kd.value=curF.kind||'etc';
   arcPageSync();
 }
@@ -1638,9 +1635,9 @@ function renderHwpPaged(bx, u8, nm, opts){
         var info=JSON.parse(doc.getPageInfo(p)), rw=Number(info&&info.width), rh=Number(info&&info.height);
         var sw=(Number.isFinite(rw)&&rw>0)?Math.max(120, Math.min(4096, rw)):793.7;
         var sh=(Number.isFinite(rh)&&rh>0)?Math.max(120, Math.min(4096, rh)):1122.5;
-        var avail=Math.max(280, Math.min((cw&&cw>32?cw-28:sw), Math.max(sw, opts.maxWidth||860)));
+        var avail=Math.max(280, Math.min((cw&&cw>20?cw-16:sw), Math.max(sw, opts.maxWidth||920)));
         var cssW=Math.round(sw*(avail/sw));
-        var dispW=Math.min((cw&&cw>32?cw-28:cssW), cssW), dispH=Math.max(120, Math.round(sh*(dispW/sw)));
+        var dispW=Math.min((cw&&cw>20?cw-16:cssW), cssW), dispH=Math.max(120, Math.round(sh*(dispW/sw)));
         var maxScale=Math.sqrt(maxPx/Math.max(1, sw*sh));
         var dpr=Math.min(maxScale, Math.max(1, Math.min(1.5, window.devicePixelRatio||1)));
         if(!Number.isFinite(dpr) || dpr<=0) dpr=Math.min(1, maxScale);
@@ -1729,7 +1726,7 @@ function renderHwpPaged(bx, u8, nm, opts){
 function arcRenderHwpFast(bx, u8, nm, evId, fid, seq, g){
   var live=function(){ return g===GEN && seq===ARC_PV_SEQ && TAB==='hist' && HIST_UI.sel===evId && HIST_UI.fid===fid && bx.isConnected; };
   return renderHwpPaged(bx, u8, nm, {
-    isLive:live, maxWidth:860,
+    isLive:live, maxWidth:920,
     getScrollEl:function(){ return $('arcPvBody'); },
     getPage:function(){ return HIST_UI.page||1; },
     getDoc:function(){ return ARC_PV_DOC; }, setDoc:function(d){ ARC_PV_DOC=d; },
@@ -1953,7 +1950,10 @@ function arcSelectFile(evId, fid){
   if(HIST_UI.sel!==evId || HIST_UI.fid!==fid){ arcPvRevoke(); HIST_UI.loaded=''; }
   HIST_UI.sel=evId; HIST_UI.fid=fid;
   var hr=document.querySelector('#histBox .hd-right');
-  if(hr && hr.getAttribute('data-arc')===evId){ arcPvHeaderSync(); sideMark(); }
+  if(hr && hr.getAttribute('data-arc')===evId){
+    var pb0=$('arcPvBody'); if(pb0 && !HIST_UI.loaded) pb0.innerHTML=arcPvEmptyHtml(a, f);
+    arcPvHeaderSync(); sideMark();
+  }
   else drawHist();
 }
 function arcInlineLoad(evId, fid){
@@ -1966,9 +1966,12 @@ function arcInlineLoad(evId, fid){
   var key=evId+'|'+fid;
   if(HIST_UI.loaded===key && (ARC_PV_BYTES || ARC_PV_URL)){ if(sameRight) arcPvHeaderSync(); else drawHist(); return; }
   arcPvRevoke(); HIST_UI.loaded=key;
-  if(sameRight){ arcPvHeaderSync(); sideMark(); } else drawHist();
+  if(sameRight){
+    var pb0=$('arcPvBody'); if(pb0){ pb0.innerHTML='<div class="pvi"><div class="empty">불러오는 중…</div></div>'; pb0.scrollTop=0; }
+    arcPvHeaderSync(); sideMark();
+  } else drawHist();
   var pb=$('arcPvBody'); if(!pb) return;
-  pb.innerHTML='<div class="pvi"><div class="empty">불러오는 중…</div></div>'; pb.scrollTop=0;
+  if(!sameRight){ pb.innerHTML='<div class="pvi"><div class="empty">불러오는 중…</div></div>'; pb.scrollTop=0; }
   var g=GEN, seq=ARC_PV_SEQ, ext=extOf(f.name);
   var live=function(){ return g===GEN && seq===ARC_PV_SEQ && TAB==='hist' && HIST_UI.sel===evId && HIST_UI.fid===fid && !!$('arcPvBody'); };
   if(!window.PuOfficeStore){ HIST_UI.loaded=''; pb.innerHTML='<div class="hd-pv-card"><div class="msg w">원본 보관함 기능을 불러오지 못했습니다.</div></div>'; return; }
@@ -2026,8 +2029,19 @@ function arcAutoLoad(){
   if(TAB!=='hist' || HIST_UI.tab!=='archive' || !ME.isAdmin || arcInlineHidden() || (SIDE && SIDE.kind==='arc')) return;
   if(!HIST_UI.sel || !HIST_UI.fid) return;
   var key=HIST_UI.sel+'|'+HIST_UI.fid;
-  if(HIST_UI.loaded===key && (ARC_PV_BYTES || ARC_PV_URL)) return;
+  if(HIST_UI.loaded===key && (ARC_PV_BYTES || ARC_PV_URL)){
+    if(ARC_PV_BYTES && !ARC_PV_DOC && document.querySelector('#arcPvBody canvas.pg-blank')) arcPvRestore(HIST_UI.sel, HIST_UI.fid);
+    return;
+  }
   arcInlineLoad(HIST_UI.sel, HIST_UI.fid);
+}
+function arcShortTitle(a, yr){
+  var raw=String((a&&a.title)||'').trim();
+  if(!raw) return '(이름 없음)';
+  var y=yr||arcYear(a);
+  var s=raw.replace(/^\s*(?:19|20)\d{2}(?:\s*(?:\.\s*\d{1,2}(?:\s*\.\s*\d{1,2}\.?)?|[-/]\s*\d{1,2}(?:\s*[-/]\s*\d{1,2})?|년(?:\s*\d{1,2}\s*월(?:\s*\d{1,2}\s*일?)?)?|\s+(?:0?[1-9]|1[0-2])(?=\s|[-·:]|$)))?(?:\s*[-·:.])?\s*/, '').trim();
+  if(y && s===raw && raw.indexOf(y)===0) s=raw.slice(y.length).replace(/^\s*[-./·:\s]+/, '').trim();
+  return s || raw;
 }
 function drawArchive(done, hi){
   var rows=arcRows(), noMap={}, years=[], ySeen={};
@@ -2107,13 +2121,11 @@ function drawArchive(done, hi){
       yOrder.forEach(function(y){
         leftHtml+='<div class="hd-yr">'+(y==='미정'?'연도 미정':esc(y)+'년')+' ('+byY[y].length+'건)</div><div class="hd-tl"><div class="hd-tl-items">';
         byY[y].forEach(function(a){
-          var nfl=C.arcFiles(a).length, isOn=!!sel && sel.id===a.id;
-          var dtShort=/^\d{4}-\d{2}-\d{2}$/.test(a.at||'')?a.at.slice(5):(a.at||'미정');
+          var nfl=C.arcFiles(a).length, isOn=!!sel && sel.id===a.id, sttl=arcShortTitle(a, y==='미정'?'':y);
           var tip=esc('№ '+noMap[a.id]+' · '+(a.at||'날짜 없음')+' · '+(a.title||'(이름 없음)')+(a.summary?'\n'+a.summary:''));
           leftHtml+='<button type="button" class="hd-card'+(isOn?' on':'')+'" data-act="histPick" data-arc="'+esc(a.id)+'" aria-pressed="'+(isOn?'true':'false')+'" title="'+tip+'">'
             +'<span class="hd-no">№ '+noMap[a.id]+'</span>'
-            +'<span class="hd-dt">'+esc(dtShort)+'</span>'
-            +'<span class="hd-ttl">'+esc(a.title||'(이름 없음)')+'</span>'
+            +'<span class="hd-ttl">'+esc(sttl)+'</span>'
             +'<span class="chip">'+nfl+'개</span>'
             +'</button>';
         });
@@ -2214,18 +2226,18 @@ function drawArchive(done, hi){
         : '왼쪽에서 지난 등기를 고르거나 «＋ 묶음»으로 새로 만드십시오.')
       +'</div></section>';
   } else {
-    var yr=arcYear(sel), tagsR=arcTags(sel), ks=arcKindSummary(sel);
+    var yr=arcYear(sel), ks=arcKindSummary(sel), sumTtl=arcShortTitle(sel, yr);
     var allChk=shown.length>0 && shown.every(function(x){ return SEL.arc[sel.id+'|'+x.fileId]; });
     var nselAll=arcSelected().length, nselCur=fl.filter(function(x){ return SEL.arc[sel.id+'|'+x.fileId]; }).length;
 
-    var filterBtns='<button type="button" class="sm'+(HIST_UI.kind==='ALL'?' on':'')+'" data-act="histKind" data-v="ALL">전체 ('+fl.length+')</button>'
+    var filterBtns='<button type="button" class="sm'+(HIST_UI.kind==='ALL'?' on':'')+'" data-act="histKind" data-v="ALL">전체 '+fl.length+'</button>'
       +kindOrder.map(function(k){
-        return '<button type="button" class="sm'+(HIST_UI.kind===k?' on':'')+'" data-act="histKind" data-v="'+esc(k)+'">'+esc(C.arcKindLabel(k))+' ('+kindCnt[k]+')</button>';
+        return '<button type="button" class="sm'+(HIST_UI.kind===k?' on':'')+'" data-act="histKind" data-v="'+esc(k)+'">'+esc(C.arcKindLabel(k))+(kindCnt[k]>1?' '+kindCnt[k]:'')+'</button>';
       }).join('');
 
     var docTable='';
     if(!fl.length){
-      docTable='<div class="empty">파일이 없습니다.<br>위 «＋ 파일»로 원본 서류를 올리십시오.</div>';
+      docTable='<div class="empty">파일이 없습니다.<br>위 «＋» 단추로 원본 서류를 올리십시오.</div>';
     } else if(!shown.length){
       docTable='<div class="empty">해당 종류의 서류가 없습니다.</div>';
     } else {
@@ -2235,13 +2247,14 @@ function drawArchive(done, hi){
         +'</tr></thead><tbody>';
       shown.forEach(function(x){
         var k=sel.id+'|'+x.fileId, realNo=fl.indexOf(x)+1;
+        var hasDt=!!(x.date && x.name && (x.name.indexOf(x.date)>=0 || x.name.indexOf(x.date.replace(/-/g,'.'))>=0 || x.name.indexOf(x.date.replace(/-/g,''))>=0));
         docTable+='<tr class="click" data-arcf="'+esc(x.fileId)+'">'
           +'<td class="c tk"><input type="checkbox" aria-label="'+esc(x.name)+' 고르기" data-sel="arc" data-id="'+esc(k)+'"'+(SEL.arc[k]?' checked':'')+'></td>'
           +'<td class="n">'+realNo+'</td>'
-          +'<td class="ti" title="'+esc(x.name)+'"><button type="button" class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+(ME.isAdmin?'':' title="🔒 열람은 총괄관리자만 · 누르면 정보/종류를 선택합니다"')+'>'+esc(x.name)+'</button>'+(x.date?'<span class="hd-fdt">'+esc(x.date)+'</span>':'')+'</td>'
+          +'<td class="ti" title="'+esc(x.name)+'"><button type="button" class="lnk" data-act="arcView" aria-label="'+esc(x.name)+' 보기"'+(ME.isAdmin?'':' title="🔒 열람은 총괄관리자만 · 누르면 정보/종류를 선택합니다"')+'>'+esc(x.name)+'</button>'+(x.date&&!hasDt?'<span class="hd-fdt">'+esc(x.date)+'</span>':'')+'</td>'
           +'<td class="kd"><span class="chip '+arcKindChipCls(x.kind)+'" title="'+esc(C.arcKindLabel(x.kind))+'">'+esc(C.arcKindLabel(x.kind))+'</span></td>'
           +'<td class="dt">'+esc(x.date||'')+'</td>'
-          +'<td class="ac"><button type="button" class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기" title="받기"'+arcLockAttr()+'>⬇</button></td>'
+          +'<td class="ac"><button type="button" class="sm" data-act="arcDl" aria-label="'+esc(x.name)+' 받기"'+arcLockAttr('받기')+'>⬇</button></td>'
           +'</tr>';
       });
       docTable+='</tbody></table>';
@@ -2263,26 +2276,22 @@ function drawArchive(done, hi){
               +'<div class="hd-sum-info">'
                 +'<div class="hd-sum-meta">'
                   +'<span class="hd-no pri">№ '+noMap[sel.id]+'</span>'
-                  +(yr?'<span class="chip">'+esc(yr)+'년</span>':'')
                   +'<span class="hd-dt">'+esc(sel.at||'날짜 없음')+'</span>'
-                  +'<span class="chip m">서류 '+fl.length+'개</span>'
-                  +tagsR.map(function(t){ return '<span class="chip m">'+esc(t)+'</span>'; }).join('')
                 +'</div>'
-                +'<h3 class="hd-sum-ttl">'+esc(sel.title||'(이름 없음)')+'</h3>'
-                +(ks?'<div class="hd-sum-sub">구성: '+esc(ks)+'</div>':'')
+                +'<h3 class="hd-sum-ttl"'+(ks?' title="'+esc('구성: '+ks)+'"':'')+'>'+esc(sumTtl)+'</h3>'
               +'</div>'
               +'<div class="hd-sum-acts">'
-                +'<button type="button" class="sm pri" data-act="newCaseFromArc" data-arc="'+esc(sel.id)+'" title="이 지난 등기와 정관을 참고해 새 등기 건을 시작합니다">📝 이 등기로 새 개정</button>'
+                +'<button type="button" class="sm pri" data-act="newCaseFromArc" data-arc="'+esc(sel.id)+'" title="이 지난 등기와 정관을 참고해 새 등기 건을 시작합니다">📝 새 개정</button>'
                 +'<button type="button" class="sm" data-act="arcEdit">고치기</button>'
-                +'<button type="button" class="sm" data-act="arcUp" aria-label="파일 올리기"'+(ARC_BUSY?' disabled':'')+'>＋ 파일</button>'
-                +'<button type="button" class="sm" data-act="arcAllDl"'+((!fl.length||!ME.isAdmin)?' disabled':'')+(ME.isAdmin?'':' title="🔒 총괄관리자만 엽니다"')+'>⬇ 전체</button>'
+                +'<button type="button" class="sm" data-act="arcUp" aria-label="파일 올리기" title="파일 올리기"'+(ARC_BUSY?' disabled':'')+'>＋</button>'
+                +'<button type="button" class="sm" data-act="arcAllDl" aria-label="전체 받기"'+(ME.isAdmin?' title="전체 받기"':' title="🔒 총괄관리자만 엽니다"')+((!fl.length||!ME.isAdmin)?' disabled':'')+'>⬇</button>'
               +'</div>'
             +'</div>'
             +(sel.summary?'<div class="hd-sum-body">'+esc(sel.summary)+'</div>':'')
           +'</div>'
           +'<div class="hd-dochd">'
-            +'<b>등기 서류 목록 <span class="chip m">'+fl.length+'</span></b>'
-            +'<button type="button" class="sm" data-act="histListToggle" title="서류 목록 접고 미리보기 크게 보기">◀ 목록 접기</button>'
+            +'<b>서류 <span class="chip m">'+fl.length+'</span></b>'
+            +'<button type="button" class="sm" data-act="histListToggle" title="서류 목록 접고 미리보기 크게 보기">◀ 접기</button>'
           +'</div>'
           +(fl.length?'<div class="hd-kbar" role="group" aria-label="서류 종류 걸러보기">'+filterBtns+'</div>':'')
           +'<div class="hd-docscroll">'+docTable+'</div>'
@@ -2298,18 +2307,17 @@ function drawArchive(done, hi){
         +'<div class="hd-pv" id="arcPvPanel" aria-label="서류 미리보기">'
           +'<div class="hd-pvh">'
             +'<div class="hd-pvh-l">'
-              +(HIST_UI.listOff?'<button type="button" class="sm" data-act="histListToggle">▶ 서류 목록 ('+fl.length+')</button>':'')
-              +'<button type="button" class="sm" id="arcPvPrev" data-act="arcPvNav" data-d="-1"'+(sIdx<=0?' disabled':'')+'>◀ 이전</button>'
-              +'<span class="chip m" id="arcPvPos">'+(shown.length?(sIdx+1)+' / '+shown.length:'0 / 0')+'</span>'
-              +'<button type="button" class="sm" id="arcPvNext" data-act="arcPvNav" data-d="1"'+(sIdx<0||sIdx>=shown.length-1?' disabled':'')+'>다음 ▶</button>'
-              +arcPageHtml()
+              +(HIST_UI.listOff?'<button type="button" class="sm" data-act="histListToggle">▶ 목록('+fl.length+')</button>':'')
+              +'<button type="button" class="sm" id="arcPvPrev" data-act="arcPvNav" data-d="-1" aria-label="이전 서류"'+(sIdx<=0?' disabled':'')+'>◀</button>'
+              +'<span class="chip m" id="arcPvPos">'+(shown.length?(sIdx+1)+'/'+shown.length:'0/0')+'</span>'
+              +'<button type="button" class="sm" id="arcPvNext" data-act="arcPvNav" data-d="1" aria-label="다음 서류"'+(sIdx<0||sIdx>=shown.length-1?' disabled':'')+'>▶</button>'
               +'<span class="hd-pvh-name" id="arcPvName" title="'+esc(curF?curF.name:'')+'">'+(curF?esc(curF.name):'서류 없음')+'</span>'
-              +'<span class="hint" id="arcPvDate">'+(curF&&curF.date?esc(curF.date):'')+'</span>'
             +'</div>'
             +'<div class="hd-pvh-r">'
-              +(curF?'<label class="hint" style="display:inline-flex;align-items:center;gap:4px">종류 <select id="arcPvKind" aria-label="이 파일의 종류">'+kindOpts+'</select></label>':'')
-              +(curF?'<button type="button" class="sm" data-act="arcPopSide"'+arcLockAttr()+' title="오른쪽 비교 칸(#side)에 열어 «등기 건»과 나란히 비교">↗ 비교 칸</button>':'')
-              +(curF?'<button type="button" class="sm pri" data-act="arcPvDl"'+arcLockAttr()+'>⬇ 받기</button>':'')
+              +arcPageHtml()
+              +(curF?'<select id="arcPvKind" aria-label="이 파일의 종류">'+kindOpts+'</select>':'')
+              +(curF?'<button type="button" class="sm" data-act="arcPopSide" aria-label="오른쪽 비교 칸에 크게 띄우기"'+arcLockAttr('오른쪽 비교 칸(#side)에 열어 «등기 건»과 나란히 비교')+'>↗</button>':'')
+              +(curF?'<button type="button" class="sm pri" data-act="arcPvDl"'+arcLockAttr('이 파일 내려받기')+'>⬇ 받기</button>':'')
             +'</div>'
           +'</div>'
           +'<div class="hd-pv-body'+(HIST_UI.pageMode==='single'?' single-page':'')+'" id="arcPvBody" tabindex="0" aria-label="선택한 서류 본문 미리보기">'+pvBodyInner+'</div>'
@@ -2642,7 +2650,7 @@ document.addEventListener('pointerdown', function(ev){
   var up=function(){ gr.removeEventListener('pointermove', mv); gr.removeEventListener('pointerup', up); gr.removeEventListener('pointercancel', up); sideSetW(last); };
   gr.addEventListener('pointermove', mv); gr.addEventListener('pointerup', up); gr.addEventListener('pointercancel', up);
 });
-window.addEventListener('resize', function(){ if(SIDE){ sideFit(); sideRedraw(); } if(TAB==='hist' && ARC_PV_BYTES) arcPvRedraw(); });
+window.addEventListener('resize', function(){ syncHeadH(); if(SIDE){ sideFit(); sideRedraw(); } if(TAB==='hist' && ARC_PV_BYTES) arcPvRedraw(); });
 /* 🔒 파일 받기 — 서버 함수 puDocSecret(총괄관리자만, 열람 기록을 남긴다). 문서관리(docs-esign)와 같은 길 */
 function fetchSecret(fileId){
   var u=firebase.auth().currentUser;

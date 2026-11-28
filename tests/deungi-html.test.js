@@ -457,9 +457,12 @@ test('★ 푸른통합시스템 직원명부 연결 — 읽기 전용, 세대 �
 
 /* 2026-11-28 지난 기록 풀폭 3단·1줄 연도 타임라인·50% 한글 쪽넘기기·점진 렌더/캐시 가속·직전 개정 승계 */
 test('★ 지난 기록 풀폭 3단·1줄 연도·50%+ 한글 쪽넘기기·점진 렌더·직전 개정 승계', () => {
-  assert.match(html, /body\.tab-hist main\{max-width:none;width:100%;margin:0;padding:8px 10px 20px\}/);
+  assert.match(html, /body\.tab-hist main\{max-width:none;width:100%;margin:0;padding:4px 6px 8px\}/);
   assert.match(html, /\.hd-card\{[^}]*display:flex;align-items:center;gap:5px;white-space:nowrap/);
-  assert.match(html, /@container \(min-width:1080px\)[\s\S]*minmax\(260px,36%\) minmax\(50%,1fr\)/);
+  assert.match(html, /@container \(min-width:1050px\)[\s\S]*minmax\(250px,31%\) minmax\(56%,1fr\)/);
+  assert.match(본문, /function arcShortTitle\(/);
+  assert.match(본문, /data-act="arcPopSide" aria-label="/);
+  assert.match(본문, /function syncHeadH\(/);
   assert.match(html, /\.hd-pv-body\.single-page canvas\.pg-cur\{display:block !important;/);
   assert.match(본문, /var ARC_CACHE=\{\}, ARC_CACHE_KEYS=\[\], ARC_CACHE_BYTES=0, ARC_CACHE_FN=null, CHARTER_PULL=null;/);
   const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
