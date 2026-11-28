@@ -1868,10 +1868,11 @@
     global.PuPBoxStore.fetchLaw(dir, targetFile).then(function (parsed) {
       if (state._readerReqSeq !== reqSeq) return;
       state.readerLaw = parsed;
+      var cleanRecentSub = targetFile.replace(/\.md$/, '').replace(/\([^)]*\)$/, '').trim() || '법률';
       global.PuPBoxStore.recordRecent({
         id: 'law:' + dir + '/' + targetFile,
         kind: 'law',
-        title: parsed.title + ' (' + targetFile.replace(/\.md$/, '') + ')',
+        title: parsed.title + ' (' + cleanRecentSub + ')',
         sub: parsed.effectiveState ? parsed.effectiveState.label : '국가법령',
         lawDir: dir,
         fileName: targetFile

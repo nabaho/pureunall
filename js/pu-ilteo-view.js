@@ -960,9 +960,8 @@
       Cat().STAGES.map(function (st) {
         var cls = st.order < curOrder ? ' done' : (st.order === curOrder ? ' cur' : '');
         var targetTab = st.phase === 'post_mid' ? 'final' : (st.code === 'mid_rpt' ? 'mid' : 'intake');
-        return '<button type="button" class="ws-step' + cls + '" data-goto-tab="' + targetTab + '">' +
+        return '<button type="button" class="ws-step' + cls + '" data-goto-tab="' + targetTab + '" title="' + esc(st.desc) + '">' +
           '<b>' + st.order + '. ' + esc(st.short) + '</b>' +
-          '<span>' + esc(st.desc) + '</span>' +
           '</button>';
       }).join('') +
       '</div></div>';

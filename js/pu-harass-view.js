@@ -707,7 +707,7 @@
       var el = $(id);
       if (el) el.innerHTML = '';
     });
-    if ($('caseYrSel')) $('caseYrSel').value = '';
+    ['caseYrSel', 'inYrSel', 'yrYearSel'].forEach(function (id) { if ($(id)) $(id).value = ''; });
     if ($('app')) $('app').style.display = 'none';
   }
 
@@ -2314,17 +2314,24 @@
   }
 
   function fillCaseYearSelect(yd) {
-    var sel = $('caseYrSel');
-    if (!sel) return;
     var groups = (yd && Array.isArray(yd.groups)) ? yd.groups : [];
-    var html = '<option value="">연도 전체</option>';
-    groups.forEach(function (g) {
-      if (g.caseCount <= 0 && YEAR_FILTER !== g.year) return;
-      var yrLbl = /^20\d{2}$/.test(g.year) ? (g.year + '년') : g.year;
-      html += '<option value="' + esc(g.year) + '">' + esc(yrLbl) + ' (' + g.caseCount + ')</option>';
+    [
+      { id: 'caseYrSel', cntKey: 'caseCount' },
+      { id: 'inYrSel', cntKey: 'bundleCount' },
+      { id: 'yrYearSel', cntKey: 'totalCount' }
+    ].forEach(function (spec) {
+      var sel = $(spec.id);
+      if (!sel) return;
+      var html = '<option value="">연도 전체</option>';
+      groups.forEach(function (g) {
+        var cnt = Number(g[spec.cntKey] || 0);
+        if (cnt <= 0 && YEAR_FILTER !== g.year) return;
+        var yrLbl = /^20\d{2}$/.test(g.year) ? (g.year + '년') : g.year;
+        html += '<option value="' + esc(g.year) + '">' + esc(yrLbl) + ' (' + cnt + ')</option>';
+      });
+      sel.innerHTML = html;
+      sel.value = YEAR_FILTER || '';
     });
-    sel.innerHTML = html;
-    sel.value = YEAR_FILTER || '';
   }
 
   function renderCaseTrackBarHtml() {
@@ -2562,7 +2569,7 @@
   function drawCasesPane() {
     var openCnt = 0, closedCnt = 0, totalMails = 0, totalAutoLogs = 0;
     var linkedCnt = 0, unlinkedCnt = 0, anyExtLinkedCnt = 0;
-    var directReportCnt = 0, directActiveCnt = 0;
+    var directReportCnt = 0, directActiveCnt = 0, advCnt = 0, colCnt = 0;
     MERGED_CASES.forEach(function (c) {
       if (c.progress.erpStatus === 'closed') closedCnt++; else openCnt++;
       totalMails += (c.mailLinks || []).length;
@@ -2573,19 +2580,26 @@
       var pm = casePerformMode(c);
       if (pm === 'direct_report') directReportCnt++;
       else if (pm === 'direct_active') directActiveCnt++;
+      else if (pm === 'committee_collab') colCnt++;
+      else advCnt++;
     });
     var perfF = C.str($('casePerf') && $('casePerf').value);
+    var stF = C.str($('caseSt') && $('caseSt').value);
+    var erpF = C.str($('caseErp') && $('caseErp').value);
+    var isAllOn = !perfF && !stF && !erpF;
     var isDirectKpiOn = perfF === 'direct_report';
+    var isDirectIngOn = perfF === 'direct_active' || perfF === 'direct_all';
     var yd = YEARLY_DATA || C.buildYearlyArchive(MERGED_CASES, BUNDLES);
     fillCaseYearSelect(yd);
     $('kpiBox').innerHTML =
-      '<div class="kpi k-blue" data-act="quickPerfFilter" data-id="" role="button" tabindex="0" aria-pressed="' + (!perfF ? 'true' : 'false') + '" title="전체 조사·자문 사건 보기"><span>총 사건</span><b>' + MERGED_CASES.length + '건</b></div>' +
-      '<div class="kpi k-green' + (isDirectKpiOn ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_report" role="button" tabindex="0" aria-pressed="' + (isDirectKpiOn ? 'true' : 'false') + '" title="직접수행 · 결과보고 완료 사건만 보기' + (directActiveCnt ? ' (직접조사 진행 ' + directActiveCnt + '건)' : '') + '"><span>직접보고</span><b>' + directReportCnt + '건</b></div>' +
-      '<div class="kpi k-amber"><span>진행</span><b>' + openCnt + '건</b></div>' +
-      '<div class="kpi k-green"><span>종결</span><b>' + closedCnt + '건</b></div>' +
+      '<div class="kpi k-blue' + (isAllOn ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="" role="button" tabindex="0" aria-pressed="' + (isAllOn ? 'true' : 'false') + '" title="전체 조사·자문 사건 보기"><span>전체 사건</span><b>' + MERGED_CASES.length + '건</b></div>' +
+      '<div class="kpi k-green k-direct' + (isDirectKpiOn ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_report" role="button" tabindex="0" aria-pressed="' + (isDirectKpiOn ? 'true' : 'false') + '" title="직접수행 · 결과보고 완료 사건만 보기"><span>직접·보고완료</span><b>' + directReportCnt + '건</b></div>' +
+      '<div class="kpi k-blue' + (isDirectIngOn ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_active" role="button" tabindex="0" aria-pressed="' + (isDirectIngOn ? 'true' : 'false') + '" title="푸른노무법인이 직접 조사를 수행 중인 사건만 보기"><span>직접조사 진행</span><b>' + directActiveCnt + '건</b></div>' +
+      '<div class="kpi' + (perfF === 'advisory_rep' ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="advisory_rep" role="button" tabindex="0" aria-pressed="' + (perfF === 'advisory_rep' ? 'true' : 'false') + '" title="당사자 대리·법률자문·보고서 검토 사건만 보기"><span>대리·자문</span><b>' + advCnt + '건</b></div>' +
+      '<div class="kpi' + (perfF === 'committee_collab' ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="committee_collab" role="button" tabindex="0" aria-pressed="' + (perfF === 'committee_collab' ? 'true' : 'false') + '" title="외부 조사위원 참여 및 타 법인 협업 사건만 보기"><span>외부위원·협업</span><b>' + colCnt + '건</b></div>' +
+      '<div class="kpi k-amber' + (stF ? ' k-on' : '') + '" data-act="quickStatusFilter" role="button" tabindex="0" aria-pressed="' + (stF ? 'true' : 'false') + '" title="클릭하여 진행중(' + openCnt + '건)·종결완료(' + closedCnt + '건) 필터 전환"><span>' + (stF === 'open' ? '진행중만' : stF === 'closed' ? '종결완료만' : '진행 / 종결') + '</span><b>' + openCnt + ' / ' + closedCnt + '</b></div>' +
       '<div class="kpi k-blue" title="메일함 수집 공문 ' + totalMails + '통 + 자동분류 진행기록 ' + totalAutoLogs + '건"><span>수집공문</span><b>' + totalMails + '통</b></div>' +
-      '<div class="kpi" title="푸른이알피 연결 ' + linkedCnt + '건 · 계약·기타사업 연동 포함 ' + anyExtLinkedCnt + '건 · 번호 공란 ' + unlinkedCnt + '건"><span>이알피연동</span><b>' + anyExtLinkedCnt + '건</b></div>' +
-      (BUNDLES.length > 0 ? '<div class="kpi k-amber" title="메일 자동수집 미등록 후보 ' + BUNDLES.length + '묶음"><span>미등록후보</span><b>' + BUNDLES.length + '묶음</b></div>' : '');
+      '<div class="kpi' + (erpF === 'linked' ? ' k-on' : '') + '" data-act="quickErpFilter" role="button" tabindex="0" aria-pressed="' + (erpF === 'linked' ? 'true' : 'false') + '" title="푸른이알피 연결 ' + linkedCnt + '건 · 계약·기타사업 연동 포함 ' + anyExtLinkedCnt + '건 · 번호 공란 ' + unlinkedCnt + '건"><span>이알피연동</span><b>' + anyExtLinkedCnt + '건</b></div>';
 
     if ($('erpBatchBtn')) {
       $('erpBatchBtn').textContent = '🏢 이알피 공란 정리' + (unlinkedCnt ? ' (' + unlinkedCnt + ')' : '');
@@ -2661,9 +2675,14 @@
   }
 
   function drawInboxPane() {
+    var yd = YEARLY_DATA || C.buildYearlyArchive(MERGED_CASES, BUNDLES);
+    fillCaseYearSelect(yd);
     if ($('inboxYrBar')) $('inboxYrBar').innerHTML = renderYearPillsHtml('inbox');
     var q = C.str($('inQ') && $('inQ').value).toLowerCase();
     if ($('inResetBtn')) $('inResetBtn').style.display = (YEAR_FILTER || q) ? '' : 'none';
+    var linkedBundles = 0;
+    BUNDLES.forEach(function (b) { if (b && b.companyId) linkedBundles++; });
+    var newBundles = BUNDLES.length - linkedBundles;
     var list = BUNDLES.filter(function (b) {
       if (YEAR_FILTER && C.bundleYearOf(b) !== YEAR_FILTER) return false;
       if (!q) return true;
@@ -2673,7 +2692,8 @@
     if ($('inboxKpiBox')) {
       $('inboxKpiBox').innerHTML =
         '<div class="kpi k-amber"><span>미등록 후보</span><b>' + BUNDLES.length + '묶음</b></div>' +
-        ((YEAR_FILTER || q) ? '<div class="kpi k-blue"><span>필터 결과</span><b>' + list.length + '묶음</b></div>' : '') +
+        '<div class="kpi k-green"><span>업체원장 일치</span><b>' + linkedBundles + '묶음</b></div>' +
+        '<div class="kpi k-blue"><span>신규·미연결</span><b>' + newBundles + '묶음</b></div>' +
         '<div class="kpi"><span>스캔 메일</span><b>' + MAIL_ROWS.length.toLocaleString() + '통</b></div>';
     }
     if (!list.length) {
@@ -2752,11 +2772,12 @@
     var spanLbl = yrSpan.length ? (yrSpan[yrSpan.length - 1] + '~' + yrSpan[0] + '년 전체') : '전체 사건·자문';
     var yrPerfVal = C.str($('yrPerf') && $('yrPerf').value);
     var directRepTotal = Number(yd.totalDirectReport || 0);
+    fillCaseYearSelect(yd);
     if ($('yrKpiBox')) {
       $('yrKpiBox').innerHTML =
-        '<div class="kpi k-blue" data-act="quickPerfFilter" data-id="" role="button" tabindex="0" aria-pressed="' + (!yrPerfVal ? 'true' : 'false') + '" title="연도별 전체 사건·자문 (' + esc(spanLbl) + ')"><span>총 자료</span><b>' + yd.totalItems + '건</b></div>' +
+        '<div class="kpi k-blue' + (!yrPerfVal ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="" role="button" tabindex="0" aria-pressed="' + (!yrPerfVal ? 'true' : 'false') + '" title="연도별 전체 사건·자문 (' + esc(spanLbl) + ')"><span>전체 자료</span><b>' + yd.totalItems + '건</b></div>' +
         '<div class="kpi"><span>등록사건</span><b>' + yd.totalCases + '건</b></div>' +
-        '<div class="kpi k-green' + (yrPerfVal === 'direct_report' ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_report" role="button" tabindex="0" aria-pressed="' + (yrPerfVal === 'direct_report' ? 'true' : 'false') + '" title="직접수행 · 결과보고 완료 건만 연도별로 모아 봅니다"><span>직접보고</span><b>' + directRepTotal + '건</b></div>' +
+        '<div class="kpi k-green k-direct' + (yrPerfVal === 'direct_report' ? ' k-on' : '') + '" data-act="quickPerfFilter" data-id="direct_report" role="button" tabindex="0" aria-pressed="' + (yrPerfVal === 'direct_report' ? 'true' : 'false') + '" title="직접수행 · 결과보고 완료 건만 연도별로 모아 봅니다"><span>직접·보고완료</span><b>' + directRepTotal + '건</b></div>' +
         '<div class="kpi k-amber"><span>미등록후보</span><b>' + yd.totalBundles + '묶음</b></div>' +
         '<div class="kpi k-blue"><span>수집공문</span><b>' + yd.totalMails.toLocaleString() + '통</b></div>';
     }
@@ -8057,7 +8078,7 @@
     YEAR_FILTER = '';
     closeColFilterPop(false);
     COL_STATE = freshColState();
-    ['caseQ', 'caseCat', 'casePerf', 'caseSt', 'caseYrSel', 'caseErp', 'caseMgr', 'yrPerf'].forEach(function (id) {
+    ['caseQ', 'caseCat', 'casePerf', 'caseSt', 'caseYrSel', 'inYrSel', 'yrYearSel', 'caseErp', 'caseMgr', 'yrPerf'].forEach(function (id) {
       if ($(id)) $(id).value = '';
     });
     clearSel(['cases']);
@@ -8067,14 +8088,14 @@
   function resetInboxFilters() {
     YEAR_FILTER = '';
     if ($('inQ')) $('inQ').value = '';
-    if ($('caseYrSel')) $('caseYrSel').value = '';
+    ['caseYrSel', 'inYrSel', 'yrYearSel'].forEach(function (id) { if ($(id)) $(id).value = ''; });
     clearSel(['bundles']);
     draw();
   }
 
   function resetYearlyFilters() {
     YEAR_FILTER = '';
-    ['yrQ', 'yrCat', 'yrPerf', 'yrKind', 'casePerf', 'caseYrSel'].forEach(function (id) {
+    ['yrQ', 'yrCat', 'yrPerf', 'yrKind', 'casePerf', 'caseYrSel', 'inYrSel', 'yrYearSel'].forEach(function (id) {
       if ($(id)) $(id).value = '';
     });
     clearSel();
@@ -8164,12 +8185,12 @@
       });
     }
     ['caseQ', 'inQ', 'yrQ'].forEach(function (id) { if ($(id)) $(id).addEventListener('input', draw); });
-    ['caseCat', 'casePerf', 'caseSt', 'caseYrSel', 'caseErp', 'caseMgr', 'yrCat', 'yrPerf', 'yrKind'].forEach(function (id) {
+    ['caseCat', 'casePerf', 'caseSt', 'caseYrSel', 'inYrSel', 'yrYearSel', 'caseErp', 'caseMgr', 'yrCat', 'yrPerf', 'yrKind'].forEach(function (id) {
       if (!$(id)) return;
       $(id).addEventListener('change', function () {
-        if (id === 'caseYrSel') {
-          YEAR_FILTER = C.str($('caseYrSel').value);
-          clearSel(['cases']);
+        if (id === 'caseYrSel' || id === 'inYrSel' || id === 'yrYearSel') {
+          YEAR_FILTER = C.str($(id).value);
+          clearSel();
         }
         if (id === 'casePerf' && $('yrPerf')) $('yrPerf').value = C.str($('casePerf').value);
         if (id === 'yrPerf' && $('casePerf')) $('casePerf').value = C.str($('yrPerf').value);
@@ -8508,6 +8529,31 @@
             }
           }
           else if (act === 'goYearly') { YEAR_FILTER = id || ''; TAB = 'yearly'; clearSel(); draw(); }
+          else if (act === 'quickStatusFilter') {
+            var stEl = $('caseSt');
+            if (stEl) {
+              var curSt = C.str(stEl.value);
+              stEl.value = curSt === '' ? 'open' : (curSt === 'open' ? 'closed' : '');
+            }
+            clearSel(['cases']);
+            draw();
+            if ($('kpiBox') && $('kpiBox').querySelector) {
+              var stKpi = $('kpiBox').querySelector('[data-act="quickStatusFilter"]');
+              if (stKpi && typeof stKpi.focus === 'function') { try { stKpi.focus(); } catch (ignoreStF) {} }
+            }
+          }
+          else if (act === 'quickErpFilter') {
+            var erpEl = $('caseErp');
+            if (erpEl) {
+              erpEl.value = C.str(erpEl.value) === 'linked' ? '' : 'linked';
+            }
+            clearSel(['cases']);
+            draw();
+            if ($('kpiBox') && $('kpiBox').querySelector) {
+              var erpKpi = $('kpiBox').querySelector('[data-act="quickErpFilter"]');
+              if (erpKpi && typeof erpKpi.focus === 'function') { try { erpKpi.focus(); } catch (ignoreErpF) {} }
+            }
+          }
           else if (act === 'quickPerfFilter') {
             var qWrap = actBtn.closest ? actBtn.closest('.scope-bar, .kpis') : null;
             var qWrapId = qWrap && qWrap.id ? qWrap.id : '';
@@ -8516,6 +8562,10 @@
               var curV = C.str(selEl.value);
               var nextV = (!id || curV === id) ? '' : id;
               selEl.value = nextV;
+              if (!id) {
+                if ($('caseSt')) $('caseSt').value = '';
+                if ($('caseErp')) $('caseErp').value = '';
+              }
               if (TAB === 'cases' && $('yrPerf')) $('yrPerf').value = nextV;
               if (TAB === 'yearly' && $('casePerf')) $('casePerf').value = nextV;
             }

@@ -6433,4 +6433,15 @@ test('㉛ 상단 필터 틀고정 · 법령 3단 비교(법률/시행령/시행�
   await Store.init('shared-pc-user-B');
   assert.equal(Store.getProjects().length, 1, 'A노무사 로그아웃이 같은 브라우저의 B노무사 로컬 작업을 지우면 안 됩니다');
   assert.equal(Store.getProjects()[0].name, 'B노무사 보존 프로젝트');
+
+  /* 8) 라이브 QA 5건 회귀 방지: '산재' 약칭 매핑 · 서술어 어미('받았는데') 핵심어 제외 · 최근본자료 중복괄호 제거 · getDocById 정상 호출 */
+  const sanjaeJump = Engine.resolveSmartLawJump('산재', loadLawIndex().list());
+  assert.ok(sanjaeJump && sanjaeJump.lawTitle === '산업재해보상보험법', "'산재' 약칭 검색 시 산업재해보상보험법으로 매핑되어야 합니다");
+  const cleanHl = Engine.extractHighlightTerms('수습기간 중 구두로 해고 통보 받았는데 부당해고 구제신청 가능한가요?', '');
+  assert.ok(!cleanHl.includes('받았는데') && !cleanHl.includes('가능한가요'), '서술어 어미(받았는데·가능한가요)는 요청 핵심어 강조에서 제외되어야 합니다');
+  assert.ok(cleanHl.includes('부당해고') && cleanHl.includes('수습기간'), '실질 법률 핵심어(부당해고·수습기간)는 유지되어야 합니다');
+  const recentLawItem = Store.getRecents().find((r) => r.lawDir === '근로기준법');
+  if (recentLawItem) {
+    assert.ok(!recentLawItem.title.includes('(법률(법률))'), '최근 본 자료에 (법률(법률)) 중복 괄호가 표시되면 안 됩니다');
+  }
 });

@@ -238,7 +238,10 @@ async function runSync(deps, opts) {
   }
 
   try {
-    const boxes = (await client.list()).filter(MB.isSyncable).filter(MB.isWanted);
+    /* 거르기 «전» 목록도 남긴다 — «다음메일에 아직 있는 폴더인가»는 거르기 전 목록으로 가려야 한다
+       (스팸·열 수 없는 껍데기도 «있는» 폴더다). 아래 「없어진 폴더 숨기기」가 쓴다. */
+    const listedAll = await client.list();
+    const boxes = listedAll.filter(MB.isSyncable).filter(MB.isWanted);
     const syncSnap = (await db.ref(ROOT + '/sync').once('value')).val() || {};
 
     /* ── 안 가져오기로 한 칸이 이미 담겨 있으면 걷어낸다 (대표 지시 2026-08-26) ──
@@ -247,8 +250,10 @@ async function runSync(deps, opts) {
          그대로 남아 왼쪽에 스팸함 칸으로 계속 보인다. 여기서 한 번 치운다.
        ⚠ 걷어내기에 실패해도 동기화는 이어 간다. 다음 회차에 또 해 본다 — 이것 때문에
          메일 전체가 안 오면 바꾼 보람이 없다. */
+    let knownFolders = {};           // 이번 회차 «시작 때» 우리 폴더 기록 — 아래 없어진 폴더 숨기기가 쓴다
     try {
       const known = (await db.ref(ROOT + '/folders').once('value')).val() || {};
+      knownFolders = known;
       const drop = {};
       Object.keys(known).forEach((slug) => {
         const kind = String((known[slug] || {}).kind || '');
@@ -297,6 +302,35 @@ async function runSync(deps, opts) {
     }
     if (Object.keys(fUp).length) await db.ref().update(fUp);
     out.folders = plan.length;
+
+    /* ── 다음메일에서 «없어진» 폴더는 숨김 표시만 한다 (대표 지시 2026-11-28 「숨기기로 진행」) ──
+       다음메일에서 폴더를 지우거나 이름을 바꾸면 우리 기록에는 옛 폴더가 그대로 남아, 푸른 분류에 옛 칸이
+       계속 보이고 이름을 바꾼 것은 같은 메일이 «옛 이름 칸»과 «새 이름 칸»에 두 번 보였다.
+       ⚠ «숨김 표시(gone)»만 남긴다 — 폴더 기록·담긴 메일·진행 표시는 지우지 않는다(지우는 것은 되돌릴 길이 없다).
+         화면이 이 표시를 보고 업무별 칸·전체메일에서 뺀다. 같은 경로의 폴더가 다시 생기면 위 ① 이 기록을
+         새로 적으면서 표시가 저절로 사라진다(되돌림).
+       ⚠ 이번 목록에 «받은메일함이 있을 때만» 한다(MB.vanishedFolders) — 끊긴 응답으로 옆줄이 통째로 숨겨지면 안 된다.
+       ⚠ 이미 표시한 것은 다시 적지 않는다(회차마다 시각이 바뀌어 화면이 헛으로 다시 읽지 않게).
+       ⚠ 실패해도 던지지 않는다 — 숨기기가 죽어도 동기화는 계속된다. */
+    try {
+      const vanished = MB.vanishedFolders(knownFolders, listedAll);
+      if (vanished.length) {
+        /* ⚠ 적기 «직전에» 다시 읽는다 — 이 회차 도중에 관리자가 앱에서 폴더를 지웠거나 이름을 바꿔(manageMailFolder)
+             기록이 이미 사라졌으면, 그 자리에 표시만 적으면 경로 없는 «찌꺼기 기록»이 생긴다(자동 검토 지적).
+             없어진 폴더가 있을 때만 드물게 읽는다. */
+        const fresh = (await db.ref(ROOT + '/folders').once('value')).val() || {};
+        const toMark = vanished.filter((slug) => fresh[slug] && fresh[slug].path && !fresh[slug].gone);
+        if (toMark.length) {
+          const mark = {};
+          const goneAt = nowMs();
+          toMark.forEach((slug) => { mark[ROOT + '/folders/' + slug + '/gone'] = goneAt; });
+          await db.ref().update(mark);
+          console.log('syncMailbox 다음메일에서 없어진 폴더에 숨김 표시:', toMark.length);
+        }
+      }
+    } catch (e) {
+      console.warn('syncMailbox 없어진 폴더 숨기기 실패(동기화는 계속합니다):', String((e && e.message) || e));
+    }
 
     /* ② 사람이 먼저 보는 폴더부터 — 받은 → 보낸 → 임시 → 손폴더 → 스팸 → 휴지통.
           시간이 모자라 끊기더라도 중요한 것이 먼저 차 있다. */
@@ -2069,9 +2103,7 @@ module.exports = function build(deps) {
         /* 어느 폴더를 뒤질까 — 안 적으면 «우리가 아는 폴더 전부» */
         const fsnap = await deps.getDatabase().ref(ROOT + '/folders').once('value');
         const folders = fsnap.val() || {};
-        const want = Array.isArray(b.slugs) && b.slugs.length
-          ? b.slugs.map(String).filter((s) => folders[s])
-          : Object.keys(folders);
+        const want = MB.searchSlugs(folders, b.slugs);
         if (!want.length) { reply(res, 200, { ok: true, q, hit: {}, n: 0, seen: 0 }); return; }
 
         const hit = {};

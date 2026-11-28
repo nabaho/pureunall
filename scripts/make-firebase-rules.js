@@ -1538,6 +1538,19 @@ rules.signboard = { '.read': LOGIN,
   log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
   state:     { '.write': false } };
 
+/* ══ 🔗 정부사업 바로가기(gov-links.html) — 사업마다 기관 시스템 주소·메모·폴더 경로 (2026-11-28) ══
+   대표 지시 「정부 지원 사업 바로 가기 앱을 하나 만들어줘 … 나중에 더 늘 수도 있고 빠질 수도 있는데」.
+   ★ 읽기·쓰기 = 재직 직원(LOGIN) — 정부사업일정·컨설팅보고서와 같은 사람(사업을 맡는 노무사·직원이 함께 고친다).
+     담기는 것: 사업 이름·기관·할 일 메모·기관 시스템 주소(로그인 표시)·이 PC 폴더 경로·이어 둔 이알피 사업 code·푸른 앱 열쇠.
+     아이디·비밀번호 칸은 없다. 업체 이름은 담지 않는다(화면이 정부사업일정 자리에서 빌려 본다).
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식(공용 관문 tombstone)으로만. 열쇠와 레코드 id 가 어긋나면 막는다.
+   ⚠ 이름(title)은 1~60자 — 화면(js/pu-gov-links.js LIMIT.title)과 같은 한도다. 한쪽만 바꾸면 화면이 만든 묶음을 규칙이 거절한다.
+     주소가 http(s) 인지는 화면이 저장 직전·그리기 직전 두 번 본다(safeUrl) — 규칙은 배열 안을 못 본다. */
+const GOVLINKS_W = `(${LOGIN}) && newData.exists()`;
+rules.govlinks = { '.read': LOGIN,
+  sets: { $id: { '.write': GOVLINKS_W,
+    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } } };
+
 /* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
    대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
    ★ 읽기·쓰기 = 재직 직원(LOGIN). 담기는 것: 강의자료 목록(파일 이름·종류·강의일·강의처·원본 창고 경로) · 검토 메모.
@@ -1605,6 +1618,73 @@ rules.edulib = { '.read': LOGIN,
     deletedBy: { '.validate': "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())" },
     deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
     $other: { '.validate': false } } } };
+/* ══ 💬 법인 카카오톡 방(pu-kakaoroom.html) — 비식별 업무 대화 영구보관 · 첨부파일 이력 (2026-11-28) ══
+   읽기·쓰기 = 재직 직원(LOGIN). 지우기는 _deleted 표식만(물리 삭제 금지).
+   companyId 없이 companyName 으로 저장하는 온톨로지 위반은 규칙에서도 막는다(!hasChild('companyName')). */
+const KAKAOROOM_W = `(${LOGIN}) && newData.exists()`;
+rules.kakao_room = { '.read': LOGIN,
+  items: { $id: { '.write': KAKAOROOM_W,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoWorkArchive' && $id.matches(/^kr_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('summary').isString() && newData.child('summary').val().length <= 400 && newData.child('msgCount').isNumber() && newData.child('redactedCount').isNumber() && newData.child('revision').isNumber() && (data.child('_deleted').val() !== true || newData.child('_deleted').val() === true)",
+    id: { '.validate': true }, entityType: { '.validate': true },
+    schemaVersion: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 10' },
+    contractVersion: { '.validate': 'newData.isNumber() && newData.val() === 1' },
+    revision: { '.validate': 'newData.isNumber() && newData.val() >= 1' },
+    createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    originSystem: { '.validate': 'newData.isString() && newData.val().length <= 32' },
+    originId: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    room: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    day: { '.validate': "newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/)" },
+    senders: { '.validate': 'newData.hasChildren()', $i: { '.validate': '$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 80' } },
+    msgCount: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 10000' },
+    domain: { '.validate': "newData.val() === 'case' || newData.val() === 'fund' || newData.val() === 'consult' || newData.val() === 'payroll' || newData.val() === 'advisory' || newData.val() === 'admin'" },
+    safety: { '.validate': "newData.val() === 'safe' || newData.val() === 'redacted'" },
+    redactedCount: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000' },
+    summary: { '.validate': 'newData.isString() && newData.val().length <= 400' },
+    caseNos: { '.validate': 'newData.hasChildren()', $i: { '.validate': '$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 80' } },
+    due: { '.validate': 'newData.isString() && newData.val().length <= 20' },
+    fileNames: { '.validate': 'newData.hasChildren()', $i: { '.validate': '$i.matches(/^[0-9]{1,2}$/) && newData.isString() && newData.val().length <= 240' } },
+    matchBasis: { '.validate': "newData.val() === 'sure' || newData.val() === 'guess' || newData.val() === 'newno' || newData.val() === 'none' || newData.val() === ''" },
+    workItemId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    workLogId: { '.validate': 'newData.isString() && newData.val().length <= 100' },
+    companyId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    companyLinkStatus: { '.validate': "newData.val() === 'linked' || newData.val() === 'pending'" },
+    companyHint: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    status: { '.validate': "newData.val() === 'open' || newData.val() === 'tracking' || newData.val() === 'done'" },
+    note: { '.validate': 'newData.isString() && newData.val().length <= 1000' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    $other: { '.validate': false } } },
+  files: { $id: { '.write': KAKAOROOM_W,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoFileRecord' && $id.matches(/^kf_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('name').isString() && newData.child('name').val().length <= 240 && newData.child('revision').isNumber() && (data.child('_deleted').val() !== true || newData.child('_deleted').val() === true)",
+    id: { '.validate': true }, entityType: { '.validate': true },
+    schemaVersion: { '.validate': 'newData.isNumber() && newData.val() >= 1 && newData.val() <= 10' },
+    contractVersion: { '.validate': 'newData.isNumber() && newData.val() === 1' },
+    revision: { '.validate': 'newData.isNumber() && newData.val() >= 1' },
+    createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    createdBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    originSystem: { '.validate': 'newData.isString() && newData.val().length <= 32' },
+    originId: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    room: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    name: { '.validate': 'newData.isString() && newData.val().length <= 240' },
+    sender: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    sentAt: { '.validate': 'newData.isNumber()' },
+    sensitive: { '.validate': 'newData.isBoolean()' },
+    dest: { '.validate': "newData.val() === 'photo' || newData.val() === 'co' || newData.val() === 'pc'" },
+    status: { '.validate': "newData.val() === 'todo' || newData.val() === 'got' || newData.val() === 'done' || newData.val() === 'hidden'" },
+    workItemId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    companyId: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
+    deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    $other: { '.validate': false } } },
+  watcher: { '.write': false } };
+
 /* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
    대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,
    자료함(재직 직원 모두)에 «넣기»는 관리자가 고른다. 담기는 것: 메일 자리·첨부 이름·가린 메일 제목·추정 종류·내용 요약·지문 — 원본 파일은 없다.
@@ -2446,19 +2526,6 @@ const _laborRules = 사건2단규칙생성('labor_cases', 'labor_secret');
 rules.labor_cases = _laborRules.casesRoot;
 rules.labor_secret = _laborRules.secretRoot;
 
-/* 2026-11-28 콘솔 기존재 규칙 보존 — rules-deploy.js 안전장치에 따라 원문 그대로 유지 */
-rules.kakao_room = {
-  '.read': LOGIN,
-  items: { $id: {
-    '.write': `(${LOGIN}) && newData.exists()`,
-    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoWorkArchive' && $id.matches(/^kr_[a-z0-9_]{6,48}$/) && !newData.hasChild('companyName') && newData.child('summary').isString() && newData.child('summary').val().length <= 400"
-  } },
-  files: { $id: {
-    '.write': `(${LOGIN}) && newData.exists()`,
-    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'KakaoFileRecord' && $id.matches(/^kf_[a-z0-9_]{6,48}$/) && newData.child('name').isString() && newData.child('name').val().length <= 240"
-  } }
-};
-
 /* 🛡️ 괴롭힘·성희롱 조사 전용 비밀 전자서명 (sign-harass.html, 2026-11-12)
    - req/$cid/$r : 사건 주·부담당 노무사 및 대표(HARASS_SECRET_OWNER)만 열람·생성(일반 직원 열람 차단).
    - open/$t     : 128비트 열쇠를 아는 사람만 단일 슬롯 읽기(목록 열람 차단). 내부에는 AES-256-GCM 암호문만 담기며 평문 진술·성명·사업장명·연락처 없음.
@@ -2621,6 +2688,221 @@ rules.scal_safety = {
   $other: { '.validate': false }
 };
 
+/* ══ 📊 신규 12개 컨설팅 전용 앱(scal_*) 및 카톡/문자 수집함(msg_intake)·수습 RAG 코치(coach_rag) (2026-11-28) ══ */
+const CS_STR = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n}` });
+const CS_TS = { '.validate': 'newData.isNumber() || (newData.isString() && newData.val().length <= 40)' };
+const CS_NUM = { '.validate': 'newData.isNumber()' };
+const CS_BOOL = { '.validate': 'newData.isBoolean()' };
+const CS_DATE = { '.validate': "newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/)" };
+const CS_STR_ARR = (n) => ({
+  '.validate': 'newData.hasChildren()',
+  $idx: { '.validate': `$idx.length <= 20 && newData.isString() && newData.val().length <= ${n}` }
+});
+const CS_IMMUTABLE_ARR = (n, maxKeep) => {
+  const keepCond = Array.from({ length: maxKeep || 5 }, (_, i) => `data.child('${i}').exists() === newData.child('${i}').exists()`).join(' && ');
+  return {
+    '.validate': `newData.hasChildren() && (data.exists() || ${ADMIN}) && (!data.exists() || ${ADMIN} || (${keepCond}))`,
+    $idx: { '.validate': `$idx.length <= 20 && newData.isString() && newData.val().length <= ${n} && ((data.exists() && newData.val() === data.val()) || ${ADMIN})` }
+  };
+};
+const CS_IMMUTABLE_STR = (n) => ({
+  '.validate': `newData.isString() && newData.val().length <= ${n} && (!data.exists() || newData.val() === data.val() || ${ADMIN})`
+});
+const CS_BASE_META = (et) => ({
+  id: CS_STR(128),
+  entityType: { '.validate': `newData.val() === '${et}'` },
+  schemaVersion: CS_NUM,
+  contractVersion: CS_NUM,
+  revision: CS_NUM,
+  createdAt: CS_TS,
+  updatedAt: CS_TS,
+  createdBy: CS_STR(128),
+  updatedBy: CS_STR(128),
+  _deleted: CS_BOOL,
+  deletedAt: CS_TS,
+  deletedBy: CS_STR(128)
+});
+const CS_CHECK_MAP = {
+  '.validate': 'newData.hasChildren()',
+  $item: {
+    '.validate': '$item.length <= 64',
+    status: CS_STR(24),
+    note: CS_STR(1000),
+    $other: { '.validate': false }
+  }
+};
+
+const CONSULT_APP_ROOTS = [
+  'scal_techprotect', 'scal_clinic', 'scal_chamber', 'scal_hrconsult',
+  'scal_evalcomp', 'scal_pubconsult', 'scal_familywork', 'scal_socialent',
+  'scal_sixthind', 'scal_laboraudit', 'scal_unionneg', 'scal_specialcons'
+];
+for (const rootName of CONSULT_APP_ROOTS) {
+  const projOwnerPid = `root.child('${rootName}').child('projects').child($pid).child('createdBy').val() === auth.uid || root.child('${rootName}').child('projects').child($pid).child('consultantUid').val() === auth.uid`;
+  const projOwnerId = `root.child('${rootName}').child('projects').child($id).child('createdBy').val() === auth.uid || root.child('${rootName}').child('projects').child($id).child('consultantUid').val() === auth.uid`;
+  const docValidate = "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)";
+
+  rules[rootName] = {
+    '.read': LOGIN,
+    projects: { $id: {
+      '.write': `(${LOGIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || data.child('consultantUid').val() === auth.uid || ${ADMIN})))))`,
+      '.validate': "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Project' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+      ...CS_BASE_META('Project'),
+      companyId: CS_STR(128),
+      companyName: CS_STR(200),
+      bizNo: CS_STR(32),
+      caseNo: CS_STR(64),
+      year: CS_NUM,
+      trackId: CS_STR(64),
+      trackName: CS_STR(120),
+      stage: CS_STR(32),
+      workerCount: CS_NUM,
+      consultantName: CS_STR(80),
+      consultantUid: CS_STR(128),
+      status: { '.validate': "newData.val() === 'active' || newData.val() === 'done'" },
+      summaryNote: CS_STR(2000),
+      $other: { '.validate': false }
+    } },
+    checks: { $pid: { $id: {
+      '.write': `(${LOGIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid && (${projOwnerPid} || ${ADMIN})) || (data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || ${projOwnerPid} || ${ADMIN})))))`,
+      '.validate': docValidate,
+      ...CS_BASE_META('Document'),
+      projectId: CS_STR(128),
+      pre: CS_CHECK_MAP,
+      domain: CS_CHECK_MAP,
+      docs: CS_CHECK_MAP,
+      $other: { '.validate': false }
+    } } },
+    comms: { $pid: { $id: {
+      '.write': `(${LOGIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid && ($pid === 'inbox_msg' || ${projOwnerPid} || ${ADMIN})) || (data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || ${projOwnerPid} || ${ADMIN})))))`,
+      '.validate': docValidate,
+      ...CS_BASE_META('Document'),
+      projectId: CS_STR(128),
+      source: CS_STR(60),
+      date: CS_DATE,
+      subject: CS_STR(300),
+      maskedPreview: CS_STR(4000),
+      atts: CS_STR_ARR(240),
+      matchedReasons: CS_STR_ARR(200),
+      $other: { '.validate': false }
+    } } },
+    reports: { $id: {
+      '.write': `(${LOGIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid && (${projOwnerId} || ${ADMIN})) || (data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || ${projOwnerId} || ${ADMIN})))))`,
+      '.validate': docValidate,
+      ...CS_BASE_META('Document'),
+      projectId: CS_STR(128),
+      sections: {
+        '.validate': 'newData.hasChildren()',
+        $sec: { '.validate': '$sec.length <= 64 && newData.isString() && newData.val().length <= 20000' }
+      },
+      $other: { '.validate': false }
+    } },
+    regions: { $id: {
+      '.write': `(${LOGIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || ${ADMIN})))))`,
+      '.validate': "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy', 'name']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && $id.matches(/^[a-z0-9_]{3,48}$/) && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+      ...CS_BASE_META('Document'),
+      name: CS_STR(80),
+      shortName: CS_STR(40),
+      agency: CS_STR(80),
+      keywords: CS_STR(300),
+      sortOrder: CS_NUM,
+      $other: { '.validate': false }
+    } },
+    $other: { '.validate': false }
+  };
+}
+
+rules.msg_intake = {
+  '.read': LOGIN,
+  items: { $id: {
+    '.write': `(${LOGIN}) && data.exists() && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!newData.exists() && ${ADMIN}) || (newData.exists() && (data.child('createdBy').val() === auth.uid || ${ADMIN}) && newData.child('createdBy').val() === data.child('createdBy').val() && data.child('attNames').exists() === newData.child('attNames').exists() && data.child('targetApps').exists() === newData.child('targetApps').exists() && data.child('matchedReasons').exists() === newData.child('matchedReasons').exists() && data.child('maskedBody').exists() === newData.child('maskedBody').exists() && data.child('title').exists() === newData.child('title').exists() && data.child('channel').exists() === newData.child('channel').exists()))`,
+    '.validate': "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    ...CS_BASE_META('Document'),
+    channel: CS_IMMUTABLE_STR(60),
+    roomName: CS_IMMUTABLE_STR(120),
+    msgDate: { '.validate': `newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/) && (!data.exists() || newData.val() === data.val() || ${ADMIN})` },
+    title: CS_IMMUTABLE_STR(300),
+    maskedBody: CS_IMMUTABLE_STR(3000),
+    summary: CS_IMMUTABLE_STR(600),
+    attNames: CS_IMMUTABLE_ARR(240, 5),
+    targetApp: CS_STR(40),
+    targetApps: CS_IMMUTABLE_ARR(40, 5),
+    confidence: CS_IMMUTABLE_STR(24),
+    matchedReasons: CS_IMMUTABLE_ARR(200, 5),
+    status: { '.validate': "newData.val() === 'pending' || newData.val() === 'assigned'" },
+    companyId: CS_IMMUTABLE_STR(128),
+    $other: { '.validate': false }
+  } },
+  $other: { '.validate': false }
+};
+
+rules.coach_rag = {
+  '.read': LOGIN,
+  notes: { $id: {
+    '.write': `(${LOGIN}) && (data.child('_deleted').val() !== true || ${ADMIN}) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && ((!newData.exists() && ${ADMIN}) || (newData.exists() && newData.child('createdBy').val() === data.child('createdBy').val() && (data.child('createdBy').val() === auth.uid || ${ADMIN})))))`,
+    '.validate': "newData.hasChildren(['id', 'entityType', 'revision', 'createdBy']) && newData.child('id').val() === $id && newData.child('entityType').val() === 'Document' && newData.child('revision').isNumber() && (!data.exists() || !data.child('revision').exists() || newData.child('revision').val() === data.child('revision').val() + 1)",
+    ...CS_BASE_META('Document'),
+    appKey: CS_STR(40),
+    title: CS_STR(200),
+    tags: CS_STR(200),
+    body: CS_STR(4000),
+    $other: { '.validate': false }
+  } },
+  quizzes: { $uid: { $id: {
+    '.write': `(${LOGIN}) && auth.uid === $uid && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
+/* ⚖️ 노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화, 2026-11-28) — harass_invest/harass_secret 동일 규격 */
+function makeCaseSecretPair(casesRoot, secretRoot) {
+  const caseRec = (keyVar) => `root.child('${casesRoot}').child('cases').child(${keyVar})`;
+  const caseWrite = `(${LOGIN}) && newData.exists() && (!data.exists()`
+    + ` ? (${ADMIN} || (!root.child('${secretRoot}').child($id).exists() && ${조사담당식('newData')}))`
+    + ` : (${ADMIN} || (${기존조사담당} && ((${내사번} != null && data.child('managerMain').val() === ${내사번}) || (${담당자불변})))))`;
+  const syncOwner = `(${LOGIN}) && (${ADMIN} || ${조사담당식(caseRec('$id'))})`;
+  const secretOwner = `(${LOGIN}) && (${ADMIN} || ${조사담당식(caseRec('$cid'))})`;
+  rules[casesRoot] = {
+    '.read': LOGIN,
+    cases: { $id: {
+      '.write': caseWrite,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'",
+      managerMain: {
+        '.validate': "newData.isString() && newData.val().length <= 20 && (newData.val() === '' || newData.val().matches(/^[A-Za-z0-9_-]+$/))"
+      },
+      managerSubs: {
+        $subIdx: {
+          '.validate': "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+        }
+      }
+    } },
+    erp_sync: { $id: {
+      '.write': `(${syncOwner}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+    } },
+    erp_ack: { $id: {
+      '.write': `(${syncOwner}) && newData.exists() && root.child('${casesRoot}').child('erp_sync').child($id).exists()`
+        + ` && newData.child('syncedRevision').val() === root.child('${casesRoot}').child('erp_sync').child($id).child('revision').val()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+    } },
+    dismissed: { $id: {
+      '.write': `(${LOGIN}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+    } },
+    $other: { '.validate': false }
+  };
+  rules[secretRoot] = {
+    $cid: {
+      '.read': secretOwner,
+      '.write': `(${secretOwner}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $cid && newData.child('entityType').val() === 'Document'"
+    }
+  };
+}
+makeCaseSecretPair('labor_cases', 'labor_secret');
+makeCaseSecretPair('sanjae_cases', 'sanjae_secret');
+
 /* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
    - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
      (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).
@@ -2685,5 +2967,6 @@ rules.datahub_device_req = { '.read': false, '.write': false };
 rules.datahub_nonce = { '.read': false, '.write': false };
 rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
+
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

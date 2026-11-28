@@ -12,6 +12,9 @@ module.exports = {
      안내가 열린 모습은 아래 화면 'mywork-tip' 에서 잰다. */
   localStorage: { 'pu_mywork_tip_ok:pa-uid-1': '1' },
   data: {
+    /* 💰 이번 달 사용액(관리자만) — 대표 PC 머리줄의 내 메뉴 단추 안에 «₩000,000 이번 달»이 붙는다(2026-11-28).
+       이것이 없으면 머리줄이 실제보다 좁게 재어져, 1024px 같은 폭에서 로그아웃이 화면 밖으로 밀리는 것을 못 본다. */
+    billing: { current: { total: { cost: 128450, updatedAt: Date.now() - 600000 } } },
     work_erp: {
       mysum: {
         /* 열쇠는 로그인 UID(규칙이 본인 자리만 쓰게 막는다) — 가짜 로그인의 UID(seed.js 의 UID).
@@ -56,6 +59,20 @@ module.exports = {
         await page.evaluate(() => window.portalMyWorkTip && window.portalMyWorkTip(true));
         await page.waitForFunction(() => !!document.getElementById('mwTip'), null, { timeout: 5000 });
         await page.waitForTimeout(400);
+      }
+    },
+    {
+      /* 🔌 연결이 끊긴 머리줄 — 연결 상태가 «○ 서버 연결 끊김» 글자를 그대로 보여 머리줄이 가장 넓어진다(2026-11-28 PC 머리줄 맞춤).
+         1024·901px 에서도 로그아웃·내 메뉴가 화면 안에 남는지 잰다. setConnectionStatus(false) 가 그리는 모양 그대로 바꾼다
+         (그 함수는 화면 스크립트 안에 갇혀 있어 부를 수 없다). 앞 화면의 첫 안내는 걷는다. */
+      name: 'pbar-offline',
+      async run(page) {
+        await page.evaluate(() => {
+          const tip = document.getElementById('mwTip'); if (tip) tip.remove();
+          const s = document.getElementById('statusDot');
+          if (s) { s.innerHTML = '○ <span class="cs-lb">서버 연결 끊김</span>'; s.dataset.state = 'offline'; }
+        });
+        await page.waitForTimeout(300);
       }
     }
   ]

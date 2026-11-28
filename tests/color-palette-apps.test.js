@@ -51,6 +51,7 @@ const DONE = [
   ['gov-report.html', '컨설팅보고서'],
   ['pu-govaid.html', '기업정부지원금'],
   ['pu-signboard.html', '전광판'],
+  ['gov-links.html', '정부사업바로가기'],
   ['pu-settle.html', '컨설팅정산'],
   ['pu-harass.html', '괴롭힘성희롱조사'],
   ['sign-harass.html', '진술비밀서약서명'],
@@ -65,6 +66,21 @@ const DONE = [
   ['pu-datahub.html', '데이터관리'],
   ['pu-sanjae.html', '산재사건관리'],
   ['pu-case.html', '부당해고노동사건'],
+  ['pu-kakaoroom.html', '법인카카오톡방'],
+  ['techprotect.html', '기술보호컨설팅'],
+  ['clinic.html', '현장클리닉'],
+  ['chamber.html', '상공회의소컨설팅'],
+  ['hrconsult.html', '기초인사노무'],
+  ['evalcomp.html', '평가보상·임금체계'],
+  ['pubconsult.html', '공공기관컨설팅'],
+  ['familywork.html', '출산육아·유연근무'],
+  ['socialent.html', '사회적기업·씨앗'],
+  ['sixthind.html', '6차산업컨설팅'],
+  ['laboraudit.html', '자율점검·근로감독'],
+  ['unionneg.html', '민간노조·단체교섭'],
+  ['specialcons.html', '특화·위탁컨설팅'],
+  ['pu-msg-intake.html', '카톡·문자 자료수집'],
+  ['pu-coach.html', '실무코치·RAG학습'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */
@@ -117,6 +133,8 @@ const EXCEPT = {
   'pu-govaid.html': new Set([]),
   /* 전광판(2026-10-12) — 처음부터 팔레트만 쓴다. LED 글자색은 화면 색이 아니라 «장비에 보낼 자료»라 js/pu-signboard-core.js 에 둔다 */
   'pu-signboard.html': new Set([]),
+  /* 정부사업 바로가기(2026-11-28) — 처음부터 팔레트만 쓴다. 예외를 채워 넣지 말 것 */
+  'gov-links.html': new Set([]),
   /* 컨설팅정산(2026-10-31) — 처음부터 팔레트만 쓴다(전광판과 같은 색 변수). 예외를 채워 넣지 말 것 */
   'pu-settle.html': new Set([]),
   /* 괴롭힘·성희롱 조사(2026-11-11) — 처음부터 팔레트만 쓴다. 예외를 채워 넣지 말 것 */

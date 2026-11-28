@@ -51,9 +51,7 @@
   function bootGraceMs() {
     if (CUSTOM_GRACE) return GRACE_MS;
     if (seenUid) return GRACE_MS;
-    var ua = '';
-    try { ua = String((global.navigator && global.navigator.userAgent) || ''); } catch (e) { }
-    return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 12000 : 4000;
+    return 12000;
   }
 
   /* 푸른이알피·포털·카메라가 파이어베이스와 «따로» 들고 있는 열쇠들과 공유 임시함.
@@ -66,6 +64,7 @@
   var handlers = [];
   var started = false;
   var seenUid = '';        // 이 탭이 마지막으로 본 «사람» — 로그아웃으로 밀려날 때 돌아올 표에 적는다
+  var nullTimer = null;    // 부팅/복원 중 잠깐 온 null 대기 타이머 — 사람이 확정되면 즉시 취소한다
 
   /* ── 다시 로그인하면 «하던 앱으로» 돌아오는 표 (대표 결정 2026-10-09 「4」) ──
      로그아웃하면 열린 앱 탭이 모두 포털 로그인 화면으로 밀려나, 앱 다섯 개면 로그인 탭 다섯 개가 남았다.
@@ -161,6 +160,8 @@
       global.document.body.appendChild(ov);
     } catch (e) { }
     setTimeout(function () {
+      try { global.sessionStorage.setItem('pu_boot_self_nav', String(Date.now())); } catch (e) { }
+      try { global.localStorage.setItem('pu_auth_redirect_at', String(Date.now())); } catch (e) { }
       try { global.location.replace('enter.html?v=' + Date.now()); }
       catch (e) { try { global.location.reload(); } catch (e2) { } }
     }, 400);
@@ -173,6 +174,7 @@
     var was = lsGet(KEY);
 
     if (now) {
+      if (nullTimer) { clearTimeout(nullTimer); nullTimer = null; }
       // 다른 사람으로 바뀌었다 — 이 화면은 앞사람 것이다
       if (was && was !== now) { kick('switched'); return; }
       seenUid = now;
@@ -183,8 +185,12 @@
 
     /* 「없음」이 왔다. 부팅 직후에도 한 번 이렇게 오므로 곧바로 믿지 않는다 —
        믿으면 열자마자 로그인 화면으로 튕긴다. 잠깐 기다렸다가 다시 본다. */
-    setTimeout(function () {
+    if (nullTimer) { clearTimeout(nullTimer); nullTimer = null; }
+    nullTimer = setTimeout(function () {
+      nullTimer = null;
       if (curUid()) return;              // 그새 돌아왔다 — 부팅 중이었다
+      var curLs = lsGet(KEY);
+      if (was && curLs && curLs !== was) { kick('switched'); return; }
       lsSet(KEY, '');
       if (was) kick('signedout', seenUid || was);   // 로그인해 있던 화면이었다면 끊는다
     }, bootGraceMs());

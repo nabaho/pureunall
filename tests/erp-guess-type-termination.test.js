@@ -16,12 +16,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { cutFn } = require('./cut-fn.js');
+const { CONS_FAMILY_FNS } = require('./helpers/cons-family.js');   // 사업 갈래 함수(2026-11-28)
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const out = (v) => JSON.parse(JSON.stringify(v));
 
 function guesser() {
-  const FN = ['function erpGuessContractFromFields(', 'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(']
+  const FN = ['function erpGuessContractFromFields(', 'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(', ...CONS_FAMILY_FNS]
     .map((d) => cutFn(SRC, d)).join('\n');
   const ctx = { console, Date, Object, Array, String, Number, JSON, Math, parseInt, parseFloat };
   vm.createContext(ctx);
