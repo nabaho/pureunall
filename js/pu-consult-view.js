@@ -944,7 +944,7 @@
         var tid = btn.getAttribute('data-ld-track') || '';
         var yrAttr = btn.getAttribute('data-ld-year');
         if (yrAttr !== null) YEAR_FILTER = yrAttr;
-        else if (!tid || TRACK_FILTER === tid) YEAR_FILTER = '';
+        else if (!tid || TRACK_FILTER === tid || !(statsMap[tid] && statsMap[tid].yrs[YEAR_FILTER])) YEAR_FILTER = '';
         TRACK_FILTER = tid;
         SHOW_ALL_ROWS = false;
         if ($('projTrackSel')) $('projTrackSel').value = TRACK_FILTER;
@@ -1125,9 +1125,7 @@
     var hwpx = Hwpx();
     var splitCols = cat.listCols === 'split';
     // 가벼운 화면 + 사업이 한 트랙에만 있으면: 트랙 알약·줄마다 같은 트랙 칩은 되풀이라 걷는다
-    var trackIdsAll = Object.create(null);
-    allProjs.forEach(function (p) { trackIdsAll[p.trackId || ''] = 1; });
-    var oneTrackSlim = isSlim() && Object.keys(trackIdsAll).length <= 1;
+    var oneTrackSlim = isSlim() && Object.keys(usedTrackIds()).length <= 1;
     // 왼쪽 대시보드가 켜지면 트랙·연도 고르기는 왼쪽 한 곳 — 위쪽 알약줄은 숨기고, 한 트랙을 고른 동안은 줄마다 같은 트랙 칩도 걷는다
     var ldOn = leftDashOn();
     var ldSlim = ldOn && isSlim();
@@ -1295,7 +1293,7 @@
         var dueHtml = p.inspDue ? (' <span class="hint">· 기한 ' + esc(p.inspDue) + '</span>') : '';
         var issuesTitle = p.inspDue ? (issuesTxt + ' (시정기한: ' + p.inspDue + ')') : issuesTxt;
         rowBodyCols =
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span> ' + stChip + resChip + '</td>' +
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + resChip + '</td>' +
           '<td title="' + esc([p.inspPeriod, p.inspOffice].filter(Boolean).join(' · ')) + '">' + periodHtml + officeHtml + '</td>' +
           '<td class="wide" title="' + esc(issuesTitle) + '">' + esc(issuesTxt) + dueHtml + '</td>' +
           '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
@@ -1326,7 +1324,7 @@
     var headCols = splitCols
       ? '<th class="yr">연도</th><th>사업장명</th><th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th><th data-k="st">진행상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'
       : (isInsp
-        ? ('<th>사업장 · 연도</th><th>감독 유형 · 결과' + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th><th data-k="act">열기</th>')
+        ? ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '감독 결과' : '감독 유형 · 결과') + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th><th data-k="act">열기</th>')
         : ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'));
     box.innerHTML = bulkHtml + '<div class="scroll' + (isInsp ? diffCls(true) : '') + '"><table class="t" data-name="cases">' +
       '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th>' + headCols + '</tr></thead>' +
