@@ -147,21 +147,19 @@ function 바로가기스크립트(종류, 자리) {
     '; $s.Save(); "saved"';
 }
 
-/* 크롬으로 띄웠지만 «크롬 일»과 상관없는 내 프로그램 창 — 제목이 이것으로 시작하면 절대 올리지 않는다.
+/* 에고라이트/크롬으로 띄웠지만 브라우저 자동화 일과 상관없는 내 프로그램 창 — 제목이 이것으로 시작하면 절대 올리지 않는다.
    (2026-11-22 대표 「AI 사용량 현황이 코딩할 때마다 팝업으로 뜬다 — 클릭할 때만 뜨게」)
-   바탕화면 ai-usage-dashboard 의 사용량 막대를 누르면 대시보드가 크롬 «앱 창»(--app)으로 열린다.
-   크롬 창이라 예전처럼 «크롬 프로세스의 주 창»을 올리면, 그 창이 뒤에 깔려 있을 때 크롬 도구를 쓸 때마다
-   대시보드가 되살아나 튀어나왔다(작업표시줄도 빨갛게 깜빡임). 제목은 그 막대의 DASH_TITLE(index.html <title>)과 같다. */
-const 안올릴창 = ['AI 사용량 현황'];
+   바탕화면 ai-usage-dashboard 의 사용량 막대를 누르면 대시보드가 «앱 창»(--app)으로 열린다.
+   푸른 한글 2026(--app) 역시 문서 편집 창이므로 브라우저 작업 훅이 자동으로 끌어올리지 않게 제외한다. */
+const 안올릴창 = ['AI 사용량 현황', '푸른 한글 2026', ' - 한글 2026'];
 
-/* 크롬(없으면 엣지) 창을 맨 앞으로 — 윈도 PowerShell.
-   · 이미 맨 앞이면 건드리지 않는다(크롬 일마다 부르니 깜빡이지 않게) — 사람이 눌러 띄운 대시보드를 보고 있을 때도 그대로 둔다
-   · 고르는 창: 크롬·엣지의 보이는 창을 맨 위부터 훑어, 탭 있는 보통 창(제목 끝 «- Chrome»·«Microsoft Edge»)을 먼저,
-     없으면 다른 창을 고른다. 안올릴창(대시보드)은 어느 경우에도 고르지 않는다 — 그것뿐이면 아무것도 안 올린다.
-     프로세스의 «주 창»(MainWindowHandle)으로 고르면 크롬 앱 창·작은 창이 걸린다 — 크롬 창은 모두 한 프로세스다.
+/* 에고라이트(ego lite) 창을 최우선으로, 미설치·확장 미설치 환경에서만 크롬(없으면 엣지) 창을 맨 앞으로 — 윈도 PowerShell.
+   · 에고라이트가 시스템 경로(Program Files)에 설치되어 있고 프로필에 Claude 확장이 있으면($useEgo) 오직 검증된 ego 프로세스 창만 올리고 크롬·엣지는 절대 건드리거나 실행하지 않는다.
+   · 이미 맨 앞이면 건드리지 않는다(도구 호출마다 부르니 깜빡이지 않게) — 사람이 눌러 띄운 대시보드·한글편집기를 보고 있을 때도 그대로 둔다
+   · 고르는 창: 보이는 창을 맨 위부터 훑어 탭 있는 보통 창을 먼저, 없으면 다른 창을 고른다. 안올릴창(대시보드·한글편집기)은 어느 경우에도 고르지 않으며, 일반 탭 창이 없으면 새로 켠다.
    · 내려가 있으면(최소화) 되살리고, 잠깐 «늘 위»로 올렸다가 바로 푼다 — 윈도는 뒤에서 앞을 빼앗는 것을 막아서
-     SetForegroundWindow 하나로는 작업표시줄만 깜빡일 때가 있다. 푸는 것을 빼먹으면 크롬이 영영 맨 위에 박힌다.
-   · 안 떠 있으면 켠다 — Claude in Chrome 은 크롬이 떠 있어야 붙는다
+     SetForegroundWindow 하나로는 작업표시줄만 깜빡일 때가 있다. 푸는 것을 빼먹으면 창이 영영 맨 위에 박힌다.
+   · 안 떠 있으면 켠다 — 에고라이트 환경이면 ego.exe, 아니면 크롬/엣지
    · 덧.보기만 — 아무것도 켜거나 올리지 않고 «올릴 창의 종류»와 거른 창 수만 찍는다(--dry --front 가 쓴다) */
 function 앞으로스크립트(덧) {
   const 보기만 = !!(덧 && 덧.보기만);
@@ -196,30 +194,59 @@ function 앞으로스크립트(덧) {
     '}',
     '"@',
     '$skip = @(' + 안올릴창.map(ps글).join(', ') + ')',
-    "$pids = [uint32[]]@(Get-Process chrome, msedge | ForEach-Object { [uint32]$_.Id })",
-    "$chromePids = @(Get-Process chrome | ForEach-Object { [uint32]$_.Id })",
-    '$all = @(); $z = 0',
-    'foreach ($w in [PuWin]::TopWindows($pids)) {',
-    '  $t = [PuWin]::Title($w); $z++',
-    '  if (-not $t) { continue }',
-    '  $p = [uint32]0; [void][PuWin]::GetWindowThreadProcessId($w, [ref]$p)',
-    "  $rank = if ($t -match ' - (Google )?Chrome( - .*)?$') { 0 } elseif ($t -match 'Microsoft\\W{0,2}Edge( - .*)?$') { 1 } elseif ($chromePids -contains $p) { 2 } else { 3 }",
-    '  $all += [pscustomobject]@{ H = $w; T = $t; Z = $z; R = $rank; Skip = [bool]($skip | Where-Object { $t.StartsWith($_, [StringComparison]::Ordinal) }) }',
+    "$egoExe = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ } | ForEach-Object { Join-Path $_ 'Citro Labs\\ego lite\\Application\\ego.exe' } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1",
+    "$egoPids = if ($egoExe) { @(Get-Process ego | Where-Object { $_.Path -and ($_.Path -ieq $egoExe) } | ForEach-Object { [uint32]$_.Id }) } else { @() }",
+    '$egoExt = $false',
+    'if ($env:LOCALAPPDATA) {',
+    "  $egoUd = Join-Path $env:LOCALAPPDATA 'Citro Labs\\ego lite\\User Data'",
+    '  if (Test-Path -LiteralPath $egoUd) {',
+    "    $egoExt = [bool](Get-ChildItem -LiteralPath $egoUd -Directory | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'Extensions\\" + 크롬.확장ID + "') } | Select-Object -First 1)",
+    '  }',
     '}',
+    '$useEgo = [bool]$egoExe -and $egoExt',
+    '$all = @(); $z = 0',
+    'if ($useEgo) {',
+    '  $pids = [uint32[]]$egoPids',
+    '  if ($pids.Count -gt 0) {',
+    '    foreach ($w in [PuWin]::TopWindows($pids)) {',
+    '      $t = [PuWin]::Title($w); $z++',
+    '      if (-not $t) { continue }',
+    "      $rank = if ($t -match ' - ego( lite)?( - .*)?$') { 0 } else { 1 }",
+    '      $all += [pscustomobject]@{ H = $w; T = $t; Z = $z; R = $rank; Skip = [bool]($skip | Where-Object { $t.StartsWith($_, [StringComparison]::Ordinal) -or $t.EndsWith($_, [StringComparison]::Ordinal) }) }',
+    '    }',
+    '  }',
+    "  $alreadyMsg = 'already (에고라이트 창이 이미 맨 앞 — 실제로는 아무것도 안 올림)'",
+    "  $kinds = @('보통 에고라이트 창(탭)', '에고라이트의 다른 창')",
+    '} else {',
+    "  $pids = [uint32[]]@(Get-Process chrome, msedge | ForEach-Object { [uint32]$_.Id })",
+    "  $chromePids = @(Get-Process chrome | ForEach-Object { [uint32]$_.Id })",
+    '  if ($pids.Count -gt 0) {',
+    '    foreach ($w in [PuWin]::TopWindows($pids)) {',
+    '      $t = [PuWin]::Title($w); $z++',
+    '      if (-not $t) { continue }',
+    '      $p = [uint32]0; [void][PuWin]::GetWindowThreadProcessId($w, [ref]$p)',
+    "      $rank = if ($t -match ' - (Google )?Chrome( - .*)?$') { 0 } elseif ($t -match 'Microsoft\\W{0,2}Edge( - .*)?$') { 1 } elseif ($chromePids -contains $p) { 2 } else { 3 }",
+    '      $all += [pscustomobject]@{ H = $w; T = $t; Z = $z; R = $rank; Skip = [bool]($skip | Where-Object { $t.StartsWith($_, [StringComparison]::Ordinal) -or $t.EndsWith($_, [StringComparison]::Ordinal) }) }',
+    '    }',
+    '  }',
+    "  $alreadyMsg = 'already (크롬 창이 이미 맨 앞 — 실제로는 아무것도 안 올림)'",
+    "  $kinds = @('보통 크롬 창(탭)', '보통 엣지 창(탭)', '크롬의 다른 창', '엣지의 다른 창')",
+    '}',
+    '$usable = @($all | Where-Object { -not $_.Skip })',
     보기만
-      ? "if ($all.Count -eq 0) { 'would-start'; exit }"
-      : "if ($all.Count -eq 0) { try { Start-Process chrome -ErrorAction Stop } catch { Start-Process msedge }; 'started'; exit }",
+      ? "if ($usable.Count -eq 0) { if ($useEgo) { 'would-start (에고라이트)' } else { 'would-start' }; exit }"
+      : "if ($usable.Count -eq 0) { if ($useEgo) { if ($egoExe) { Start-Process -FilePath $egoExe } } else { try { Start-Process chrome -ErrorAction Stop } catch { Start-Process msedge } }; 'started'; exit }",
     '$fgPid = [uint32]0; [void][PuWin]::GetWindowThreadProcessId([PuWin]::GetForegroundWindow(), [ref]$fgPid)',
     보기만
-      ? "if ($pids -contains $fgPid) { 'already (크롬 창이 이미 맨 앞 — 실제로는 아무것도 안 올림)' }"
+      ? 'if ($pids -contains $fgPid) { $alreadyMsg }'
       : "if ($pids -contains $fgPid) { 'already'; exit }",
-    '$pick = @($all | Where-Object { -not $_.Skip } | Sort-Object R, Z) | Select-Object -First 1',
+    '$pick = @($usable | Sort-Object R, Z) | Select-Object -First 1',
     "if (-not $pick) { 'skipped'; exit }",
     '$h = $pick.H',
   ].concat(보기만 ? [
     /* 창 제목은 웹페이지가 정하는 글(이메일·고객 이름이 들 수 있다)이라 찍지 않고 «종류»만 찍는다 */
-    "$kind = @('보통 크롬 창(탭)', '보통 엣지 창(탭)', '크롬의 다른 창', '엣지의 다른 창')[$pick.R]",
-    "'pick: ' + $kind + ' · 거른 창(대시보드) ' + @($all | Where-Object { $_.Skip }).Count + '개'",
+    '$kind = $kinds[$pick.R]',
+    "'pick: ' + $kind + ' · 거른 창(앱 창) ' + @($all | Where-Object { $_.Skip }).Count + '개'",
   ] : [
     'if ([PuWin]::IsIconic($h)) { [void][PuWin]::ShowWindowAsync($h, 9) }',
     '[void][PuWin]::SetWindowPos($h, [IntPtr](-1), 0, 0, 0, 0, 3)',
@@ -229,11 +256,11 @@ function 앞으로스크립트(덧) {
   ]).join('\n');
 }
 
-/* 훅이 부른다 — 무슨 일이 있어도 0 으로 끝난다(훅이 실패하면 크롬 일 자체가 막힐 수 있다) */
+/* 훅이 부른다 — 무슨 일이 있어도 0 으로 끝난다(훅이 실패하면 브라우저 일 자체가 막힐 수 있다) */
 function 앞으로(마른것) {
   if (process.env.PUREUN_CHROME_FRONT === '0') return 0;
   if (마른것) {
-    console.log('[dry] 크롬 창을 맨 앞으로');
+    console.log('[dry] 에고라이트/크롬 창을 맨 앞으로');
     /* 윈도에서는 «어떤 창을 올릴지»(종류만, 제목은 안 찍음)만 읽어 보인다 — 켜거나 올리지 않는다 */
     if (윈도우) {
       try {
@@ -249,9 +276,13 @@ function 앞으로(마른것) {
       spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', 인코딩(앞으로스크립트())],
         { encoding: 'utf8', windowsHide: true, timeout: 8000 });
     } else if (process.platform === 'darwin') {
-      spawnSync('osascript', ['-e', 'tell application "Google Chrome" to activate'], { timeout: 8000 });
+      if (fs.existsSync('/Applications/ego lite.app')) {
+        spawnSync('osascript', ['-e', 'tell application "ego lite" to activate'], { timeout: 8000 });
+      } else {
+        spawnSync('osascript', ['-e', 'tell application "Google Chrome" to activate'], { timeout: 8000 });
+      }
     }
-  } catch (e) { /* 띄우기는 «덤»이다 — 못 띄워도 크롬 일은 계속한다 */ }
+  } catch (e) { /* 띄우기는 «덤»이다 — 못 띄워도 브라우저 일은 계속한다 */ }
   return 0;
 }
 
@@ -345,23 +376,26 @@ function 점검하기(마른것) {
     적기('크롬·확장 점검', null, '윈도가 아니라 건너뜀', '크롬에 «Claude» 확장을 깔고 claude --chrome 으로 한 번 켜기');
   } else {
     const L = process.env.LOCALAPPDATA || '';
-    const PF = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], L].filter(Boolean);
-    const 크롬실행 = PF.map(function (p) { return path.join(p, 'Google', 'Chrome', 'Application', 'chrome.exe'); })
+    const PF_SYS = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(Boolean);
+    const PF = PF_SYS.concat(L ? [L] : []);
+    const 크롬실행 = PF_SYS.map(function (p) { return path.join(p, 'Citro Labs', 'ego lite', 'Application', 'ego.exe'); })
+      .concat(PF.map(function (p) { return path.join(p, 'Google', 'Chrome', 'Application', 'chrome.exe'); }))
       .concat(PF.map(function (p) { return path.join(p, 'Microsoft', 'Edge', 'Application', 'msedge.exe'); }))
       .filter(function (p) { return fs.existsSync(p); });
-    적기('크롬(또는 엣지)', 크롬실행.length > 0, 크롬실행[0] || '', 'https://www.google.com/chrome 에서 설치');
+    적기('에고라이트(또는 크롬·엣지)', 크롬실행.length > 0, 크롬실행[0] || '', 'https://lite.ego.app 또는 https://www.google.com/chrome 에서 설치');
 
     const 프로필 = 확장찾기([
+      path.join(L, 'Citro Labs', 'ego lite', 'User Data'),
       path.join(L, 'Google', 'Chrome', 'User Data'),
       path.join(L, 'Microsoft', 'Edge', 'User Data'),
     ]);
     적기('Claude in Chrome 확장', !!프로필, 프로필 ? path.basename(프로필) + ' 프로필' : '', 크롬.확장주소 + ' 에서 «Chrome에 추가»');
 
-    const 호스트 = ['Google\\Chrome', 'Microsoft\\Edge'].some(function (b) {
+    const 호스트 = ['Google\\Chrome', 'Chromium', 'Microsoft\\Edge'].some(function (b) {
       return spawnSync('reg', ['query', 'HKCU\\Software\\' + b + '\\NativeMessagingHosts\\' + 크롬.메시지호스트],
         { encoding: 'utf8' }).status === 0;
     });
-    적기('Claude Code ↔ 크롬 연결', 호스트, '', '명령창에서 claude --chrome 을 한 번 켠 뒤 크롬을 껐다 켜기');
+    적기('Claude Code ↔ 브라우저 연결', 호스트, '', '명령창에서 claude --chrome 을 한 번 켠 뒤 브라우저를 껐다 켜기');
 
     const 시작 = path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 바로가기.시작);
     적기('윈도 켤 때 폰 연결(선택)', null, fs.existsSync(시작) ? '켜져 있음' : '꺼져 있음', '쓰려면 3번');

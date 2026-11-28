@@ -242,13 +242,24 @@
      ★ 요청 메일은 «내 이력·위원 활동·비용» 서류를 챙기는 자리다. 고객 업무(컨설팅 수행·노동청 사건·급여 …)는 다른 곳에서 챙긴다.
      ★ 제목·첨부 이름만 본다(본문은 안 본다). 이 말 목록은 밖으로 안 나간다:
          개인(personal) 말만 있다 → 들인다 · 그 밖(업무 말만 · 둘 다 · 둘 다 없음)은 «걸러 둔다»(2026-11-19 «아예 안 들임» — 위 머리말).
-       (2026-11-15 의 «애매한 것만 Jev 에게» 단계는 화면이 더는 부르지 않는다 — 애매한 건이 처음부터 걸러지기 때문. 서버 함수 mail-req-scope.js 는 남아 있다)
+       (2026-11-15 의 «애매한 것만 Jev 에게» 단계는 화면이 더는 부르지 않는다 — 애매한 건이 처음부터 걸러지기 때문. 그 서버 함수 mailReqScope 는 2026-11-22 코드에서 걷어냈다)
      ⚠ 자동으로 거르는 것은 «새 요청»(st:'new')뿐이다 — 사람이 «확인함»·«처리 완료»로 만진 건은 건드리지 않는다. 틀리면 «🚫 걸러낸 메일»에서 ↩ 되돌린다.
      ⚠ 말 목록은 «손으로 정한 것»이다 — 이력·회의·비용 말이 없는 진짜 요청은 걸러진다(조용히 지우지 않는다 — 걸러낸 메일에 남는다).
      ⚠ 기관 이름이 «위원회»·«수당»을 품어도 고객 업무인 것 — 노동위원회·징계위원회·고충처리위원회·산업안전보건위원회, 주휴·연장근로수당 —
        은 개인 말로 치지 않는다(뒤를 보는 조건 (?<!…)). 노동위원회 «공익위원 위촉» 같은 진짜 위원 일은 «위촉»·«공익위원» 말로 들어온다. */
   var SCOPES = ['work', 'personal', 'unsure'];
-  var SCOPE_PERSONAL = /이력\s*(?:서|사항|카드)|프로필|약력|경력\s*(?:증명|확인|사항|서|자료|조회|기술|카드)|재직\s*증명|자격증\s*사본|강사\s*(?:이력|등록|프로필)|실적\s*(?:증명|확인)|위촉|(?<!(?:노동|노사|징계|인사|고충\s*처리|안전\s*보건|재심사)\s*)위원회|(?:평가|자문|심사|전문|심의|운영|외부|공익|조정)\s*위원|위원\s*(?:명단|등록|활동|수당|후보)|인력\s*풀|제척|기피|회피|서약서|심의|활동\s*(?:증빙|확인|내역|실적)|지급\s*확인서|(?<!(?:연장|야간|휴일|주휴|연차|휴업|가족|직책|통상|실업|육아|출산)\s*(?:근로\s*)?)수당|강사료|자문료|심사비|회의비|교통비|사례비|출장비|여비|통장\s*사본|(?:자문|위원|심의|운영|평가)\s*회의/;
+  var SCOPE_TEXT_MAX = 300;   // 범위를 가를 때 보는 제목·첨부 이름의 길이 한도 — 밖에서 오는 글이라 아주 긴 입력으로 느려지지 않게(공백은 oneLine 이 줄인다)
+  /* 말 목록 판 번호 — 건에 적어 둔다(scopeV). 말 목록을 «넓힐 때» 올린다: 옛 판이 «개인»으로 들인 새 요청을 훑을 때 한 번 다시 가른다
+     (2026-11-23 수습노무사 지원 메일 — 이미 «새 요청»으로 들어와 있던 건이 새 규칙으로도 걸러지게). 사람이 만진 건은 다시 안 본다. */
+  var SCOPE_RULE_V = 2;
+  var SCOPE_PERSONAL = /이력\s*(?:서|사항|카드)|프로필|약력|경력\s*(?:증명|확인|사항|서|자료|조회|기술|카드)|재직\s*증명|자격증\s*사본|강사\s*(?:이력|등록|프로필)|실적\s*(?:증명|확인)|위촉|(?<!(?:노동|노사|징계|인사|고충\s*처리|안전\s*보건|재심사)\s*)위원회|(?:평가|자문|심사|전문|심의|운영|외부|공익|조정)\s*위원|위원\s*(?:명단|등록|활동|수당|후보)|인력\s*풀|제척|기피|회피|서약서|심의|활동\s*(?:증빙|확인|내역|실적)|지급\s*확인서|(?<!(?:연장|야간|휴일|주휴|연차|휴업|가족|직책|통상|실업|육아|출산)\s*(?:근로\s*)?)수당|강사료|자문료|심사비|회의비|교통비|사례비|출장비|여비|통장\s*사본|(?:자문|위원|심의|운영|평가)\s*회의|(?:내(?:\s*[·ㆍ・])?\s*)?외부\s*전문가\s*(?:참여(?!\s*(?:세미나|간담회|기업|모집|공고|행사|교육|워크숍|포럼|설명회|형|하에))|동의(?!\s*하에)|등록(?!\s*(?:지원|사업))|위촉|풀(?!이)|명단(?!\s*송부))|전문가\s*(?:\([^)\n]{0,20}\)\s*)?(?:풀(?!이)|등록(?!\s*(?:지원|사업))|위촉|명단(?!\s*송부))|(?:전문가|멘토|인력\s*풀)\s*(?:\([^)\n]{0,20}\)\s*)?(?:(?:참여|활동|사전|위원)\s*){0,2}(?:개인정보[^\n]{0,14}?\s*)?동의서/;
+  /* ★ «전문가 참여동의서» 말 (대표 제보 2026-11-27 「메일함에 참여동의서 작성해야 되는 게 생겼는데 경력관리에 왜 메일을 제대로 안 가져오나」)
+       «[기관] 외부 전문가 참여동의서 요청»·«개인정보수집이용동의서 첨부» 메일이 개인 말(이력·위촉·인력풀 …)도 업무 말도 없어 «애매»로 걸려 자동으로 걸러져 있었다.
+       대표 본인의 전문가 활동 서류만 들인다: «외부 전문가 + 참여·동의·등록·위촉·풀·명단» · «전문가 + 풀·등록·위촉·명단» · «전문가·멘토·인력풀 (+참여·활동·사전·위원 · +개인정보 …) 동의서».
+       뒤를 본다(Orca 재검증 2026-11-27): «참여 세미나·간담회·교육·워크숍·포럼·설명회·기업 모집 공고»·«동의 하에»·«등록 지원사업»·«명단 송부»·«풀이(강의)» 는 서류 요청이 아니다.
+     ⚠ 맨 «동의서»·맨 «전문가»·맨 «참여 동의서»·맨 «사전 동의서»·«위원 동의서»는 넣지 않는다 — 고객사 직원 교육·휴일근무·개인정보 동의서나 노사협의회 위원 동의서 같은 업무 메일까지 들어온다(Orca 검토 2026-11-27).
+       «외부 전문가»도 뒤에 서류 말이 붙을 때만 — «외부 전문가 초청 세미나 안내» 같은 안내 메일이 새 요청이 되지 않게.
+     ⚠ 괄호·공백 말은 길이 한도를 둔다(제목·첨부 이름은 밖에서 오는 글이라 긴 반복 입력으로 느려지지 않게). */
   /* ⚠ «회의 일정»·«참석 요청» 같은 맨 회의 말은 넣지 않는다 — 고객 회의·내부 공유 메일까지 들어온다. 회의는 «위원 활동»과 묶인 말(위원회·자문회의·심의 …)로만 */
   var SCOPE_WORK = /업무\s*협조|보고서|이행\s*관리|인터뷰|수행\s*일지|산출물|신고\s*사건|진정\s*(?:사건|서|건)|노동청|고용노동\s*지청|근로\s*감독|근로자|사업장|취업\s*규칙|급여|임금|퇴직금|4대\s*보험|산재|고용\s*보험|세금\s*계산서|견적|협력\s*업체|(?:컨설팅|자문)\s*(?:진행|결과|일정|자료)|근로\s*계약|용역\s*계약|계약서\s*(?:양식|검토)|양식\s*검토|퇴사자|입\s*퇴사|입사\s*(?:자|서류)|신규\s*(?:직원|입사)|취득\s*신고|상실\s*신고|부양\s*가족|가족\s*관계|근태|노무\s*진단|제도\s*설계|구제\s*신청|부당\s*(?:해고|정직|전보|징계)|이유서|답변서|준비\s*서면|체불|연차\s*(?:휴가|사용)|(?:연장|야간|휴일|주휴|휴업)\s*(?:근로\s*)?수당|킥오프|\[푸른노무법인\]/;
   /* ⚠ 업무 말에 «주제» 말(괴롭힘·징계·고충처리·노사협의·회의록 …)을 넣지 않는다 — 대표가 위원으로 앉는 위원회의 주제이기도 하다
@@ -258,10 +269,24 @@
     for (var i = 0; i < names.length; i++) { m = re.exec(names[i]); if (m) return '첨부 «' + cut(m[0], 12) + '»'; }
     return '';
   }
+  /* ★ 우리 법인에 «지원하는 사람»이 보낸 메일(수습노무사 지원 등) — 요청 메일이 아니다 (대표 지시 2026-11-23
+        「수습노무사 지원 등에 대해서는 특별히 요청메일로 정리할 필요없다」).
+     지원자는 이력서·경력 서류를 첨부해 보내므로 첨부 이름의 «이력서» 말에 개인 말로 들어왔다 — 그래서 «제목»만 보고 개인 말보다 먼저 거른다.
+     ⚠ 제목만 본다(첨부 이름의 «지원서»는 대표 본인이 낸 지원서일 수 있다). 말은 «지원하는 쪽»으로 좁힌다 —
+       «노무사 지원 사업»(지원금·제도)·«상담위원 지원 접수 안내»(대표가 지원하는 쪽)는 걸리지 않는다.
+     ⚠ 더 걸러야 할 지원 메일이 있으면 «이 줄에만» 말을 더한다 — 개인·업무 말 목록에 섞지 않는다. */
+  var SCOPE_RECRUIT = /노무사\s*지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|시스템|기관|접수|안내|공고|모집|설명회|결과|합격|불합격|통보|발표|면접|심사))|지원\s*[\(\[（]\s*(?:수습|인턴|채용|신입)\s*[\)\]）]|(?:수습|인턴)\s*(?:노무사\s*)?(?:채용\s*)?지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|기관|접수|안내|공고|모집|설명회|결과|합격|불합격|통보|발표|면접|심사))|(?:입사|채용)\s*지원(?!\s*(?:사업|제도|센터|금|단|프로그램|서비스|기관|접수|안내|공고|모집|설명회|결과|합격|불합격|통보|발표|면접|심사))/;
+  /* 대표 본인의 «위원 일» 말 — 제목에 이 말이 있으면 지원 말이 있어도 기관이 대표에게 보낸 요청이다(지원자 메일은 «위촉·위원·심의» 말을 안 쓴다).
+     ⚠ 이력서·프로필·경력은 넣지 않는다 — 지원자가 제목에 «이력서»를 적는 일이 흔하다. */
+  var SCOPE_RECRUIT_NOT = /위촉|위원회|(?:평가|자문|심사|전문|심의|운영|외부|공익|조정)\s*위원|위원\s*(?:명단|등록|활동|수당|후보)|심의|인력\s*풀|제척|기피|회피|강사료|자문료|심사비|회의비|교통비|사례비|출장비|지급\s*확인서|(?:자문|운영|평가)\s*회의/;
+  /* ⚠ 이 예외 말은 «위원 일»을 가리키는 구체적인 말로만 좁힌다 — 맨 «위원»·«서약서»는 넣지 않는다(지원자도 «입사 서약서 및 이력서 제출»을 제목에 쓴다.
+       Orca 재검증 2026-11-23: 맨 말을 넣었더니 «수습노무사 지원 서약서 및 이력서 제출» 이 개인으로 남았다) */
   /* row = { s 제목, an 첨부 이름들 } → { scope:'work'|'personal'|'unsure', why:[…] } */
   function scopeOf(row) {
     row = row || {};
-    var subj = oneLine(row.s), names = (Array.isArray(row.an) ? row.an : []).map(str).filter(Boolean);
+    var subj = oneLine(row.s).slice(0, SCOPE_TEXT_MAX), names = (Array.isArray(row.an) ? row.an : []).map(function (n) { return oneLine(n).slice(0, SCOPE_TEXT_MAX); }).filter(Boolean);
+    var rm = SCOPE_RECRUIT.exec(subj);
+    if (rm && !SCOPE_RECRUIT_NOT.test(subj)) return { scope: 'work', why: ['법인에 지원하는 메일(수습·채용) 제목 «' + cut(rm[0], 12) + '»'] };
     var p = scopeHit(SCOPE_PERSONAL, subj, names), w = scopeHit(SCOPE_WORK, subj, names);
     if (p && !w) return { scope: 'personal', why: ['이력·회의·비용 말 ' + p] };
     if (w && !p) return { scope: 'work', why: ['업무 말 ' + w] };
@@ -293,7 +318,7 @@
     /* 범위 — «이력·회의·비용»(personal)이 아니면 처음부터 걸러 둔다(st 'ignored' + autoIgnored). 진행 중·알림·숫자에 안 나오고
        «🚫 걸러낸 메일»에서만 보인다(대표 지시 2026-11-19 «아예 안 들임»). 기록은 남긴다 — 잘못 걸렀으면 ↩ 로 되돌린다 */
     var sc = scopeOf(row);
-    rec.scope = sc.scope; rec.scopeBy = 'rule'; rec.scopeWhy = cut(sc.why.join(' · '), 60);
+    rec.scope = sc.scope; rec.scopeBy = 'rule'; rec.scopeV = SCOPE_RULE_V; rec.scopeWhy = cut(sc.why.join(' · '), 60);
     if (sc.scope !== 'personal') { rec.st = 'ignored'; rec.autoIgnored = now; }
     return rec;
   }
@@ -415,6 +440,7 @@
     }
     if (!Object.keys(u).length) return fail('바뀐 것이 없습니다');
     u[id + '/updatedAt'] = n;
+    u[id + '/edited'] = n;       // 사람이 «열어 보고 고쳤다» 표시 — 상태가 «새 요청»이어도 말 목록이 바뀐 뒤 다시 가르기로 치우지 않는다(rescopable)
     return { ok: true, update: u };
   }
 
@@ -487,20 +513,25 @@
      ⚠ 건마다 transaction — 읽은 뒤 사람이 상태를 바꿨으면 그 최신 값을 보고 정한다. */
   var SCOPE_BACKFILL_MAX = 60;
   function validId(id) { return typeof id === 'string' && /^[^\/.#$\[\]]+~[0-9]{1,12}$/.test(id); }
+  /* 다시 볼 건 — «옛 판 규칙이 개인으로 들인 새 요청»뿐이다. 사람이 만진 건(확인함·완료·요청 아님)·이미 걸러진 건·Jev/Laya 가 아닌 사람이 정한 범위는 안 본다 */
+  /* 사람이 «열어 보고 고친» 흔적 — 이 판부터 남기는 edited, 그 전 판의 직접 고치기가 남긴 fixed(종류·기한)·memo(메모).
+     ⚠ 처음 가르는 건(범위 없음)과 다시 가르는 건 «둘 다» 이것을 본다 — 흔적이 있으면 범위 딱지만 붙이고 상태는 그대로 둔다(Orca 재검증 2026-11-23). */
+  function touched(x) { return !!(obj(x) && (x.edited || x.memo || (obj(x.fixed) && Object.keys(x.fixed).length))); }
+  function rescopable(x) { return obj(x) && x.scope === 'personal' && x.scopeBy === 'rule' && x.st === 'new' && !touched(x) && (Number(x.scopeV) || 0) < SCOPE_RULE_V; }
   async function backfillScope(db, base, now, res) {
     var all = toList((await db.ref(base + '/items').once('value')).val());
-    var todo = all.filter(function (x) { return !x.scope && validId(x.id); }).slice(0, SCOPE_BACKFILL_MAX);
+    var todo = all.filter(function (x) { return validId(x.id) && (!x.scope || rescopable(x)); }).slice(0, SCOPE_BACKFILL_MAX);
     for (var i = 0; i < todo.length; i++) {
-      var x = todo[i], sc = scopeOf({ s: x.s, an: x.an });
+      var x = todo[i], sc = scopeOf({ s: x.s, an: x.an }), fresh = !x.scope;
       var tr = await db.ref(base + '/items/' + x.id).transaction(function (c) {
         if (c === null) return c;
-        if (!obj(c) || c.scope) return;                                  // 그새 정해졌거나 이상한 값 — 건드리지 않는다
-        c.scope = sc.scope; c.scopeBy = 'rule'; c.scopeWhy = cut(sc.why.join(' · '), 60);
-        if (sc.scope !== 'personal' && c.st === 'new') { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
+        if (!obj(c) || (c.scope && !rescopable(c))) return;               // 그새 정해졌거나 이상한 값 — 건드리지 않는다(사람이 만진 건도 여기서 멈춘다)
+        c.scope = sc.scope; c.scopeBy = 'rule'; c.scopeV = SCOPE_RULE_V; c.scopeWhy = cut(sc.why.join(' · '), 60);
+        if (sc.scope !== 'personal' && c.st === 'new' && !touched(c)) { c.st = 'ignored'; c.autoIgnored = now; c.updatedAt = now; }
         return c;
       });
       if (tr && tr.committed && tr.snapshot && tr.snapshot.val() !== null) {
-        res.scoped = (res.scoped || 0) + 1;
+        if (fresh) res.scoped = (res.scoped || 0) + 1;                    // 다시 본 건은 «가른 건수»에 안 센다
         if (sc.scope !== 'personal' && tr.snapshot.val().autoIgnored === now) res.autoIgnored = (res.autoIgnored || 0) + 1;
       }
     }
@@ -619,7 +650,7 @@
     kindMeta: kindMeta, kindsLabel: kindsLabel, idOf: idOf, makeItem: makeItem,
     urgency: urgency, alarmItems: alarmItems, summary: summary, summaryText: summaryText, sortItems: sortItems, filterItems: filterItems, stateUpdate: stateUpdate,
     editUpdate: editUpdate, MEMO_MAX: MEMO_MAX,
-    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK,
+    SCOPES: SCOPES, SCOPE_LABELS: SCOPE_LABELS, SCOPE_PERSONAL: SCOPE_PERSONAL, SCOPE_WORK: SCOPE_WORK, SCOPE_RECRUIT: SCOPE_RECRUIT, SCOPE_RECRUIT_NOT: SCOPE_RECRUIT_NOT, SCOPE_RULE_V: SCOPE_RULE_V,
     scopeOf: scopeOf, scopeMark: scopeMark,
     LAYA_PORT: LAYA_PORT, LAYA_MAX: LAYA_MAX, LAYA_TRY: LAYA_TRY, layaPayload: layaPayload, layaPick: layaPick, layaAsk: layaAsk, layaAgree: layaAgree, layaMark: layaMark,
     boxesOf: boxesOf, scan: scan, makeReadBody: makeReadBody, toList: toList

@@ -73,6 +73,7 @@
   var sessionJwtByUid = new Map();// 직원 선택적 JWT는 localStorage에 절대 영구 저장하지 않고 현재 UID 세션 메모리에만 보관
   var lastDeleteSyncPromise = Promise.resolve({ ok: true, skipped: true });
   var sessionGen = 0;             // 계정 전환·로그아웃 시 진행 중인 비동기 init/AI 응답이 타 계정에 섞이는 것을 차단
+  var lastAuthUid = '';           // clearMemoryOnSignOut 직후 clearWorkspaceOnLogout 호출 시 직전 로그인 UID 파기용
 
   var mem = {
     uid: 'guest',
@@ -455,6 +456,7 @@
       mem.alerts = [];
     }
     mem.uid = nextUid;
+    if (nextUid && nextUid !== 'guest') lastAuthUid = nextUid;
 
     var E = global.PuPBoxEngine;
     var C = global.PuPBoxCorpus;
@@ -696,6 +698,94 @@
 
       mem.laws.set(cacheKey, parsed);
       idbPut(getCorpusDb(), 'laws', parsed);
+      return parsed;
+    });
+  }
+
+  var lawHistoryCache = new Map();
+  var lawRevisionCache = new Map();
+  var SAFE_GIT_SHA_RE = /^[0-9a-f]{7,40}$/i;
+
+  /* ── 과거 법령(구법·연혁) 개정 이력 조회 (legalize-kr GitHub 커밋 히스토리) ── */
+  function fetchLawHistory(dir, fileName) {
+    var d = String(dir || '').trim();
+    if (!d) return Promise.reject(new Error('법령명이 비어 있습니다.'));
+    var fName = fileName || '법률.md';
+    if (!/\.md$/.test(fName)) fName += '.md';
+    var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (x) { return x.dir === d; }) || null;
+    if (!fileName && fam && fam.primaryFile) fName = fam.primaryFile;
+    var histKey = d + '/' + fName;
+    if (lawHistoryCache.has(histKey)) {
+      return Promise.resolve(lawHistoryCache.get(histKey));
+    }
+    var relPath = 'kr/' + d + '/' + fName;
+    var apiUrl = 'https://api.github.com/repos/legalize-kr/legalize-kr/commits?path=' +
+      encodeURIComponent(relPath) + '&per_page=30';
+    return fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' } }).then(function (res) {
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 429) {
+          throw new Error('GitHub 연혁 조회 한도 초과 — 아래 법제처 공식 연혁 바로가기를 이용해 주세요.');
+        }
+        throw new Error('구법 이력 조회 실패 (HTTP ' + res.status + ')');
+      }
+      return res.json();
+    }).then(function (commits) {
+      if (!Array.isArray(commits)) return [];
+      var list = commits.filter(function (c) {
+        return c && typeof c.sha === 'string' && SAFE_GIT_SHA_RE.test(c.sha);
+      }).map(function (c, i) {
+        var rawDate = (c.commit && c.commit.author && c.commit.author.date) ||
+                      (c.commit && c.commit.committer && c.commit.committer.date) || '';
+        var ymd = rawDate ? String(rawDate).slice(0, 10) : '';
+        var firstLine = String((c.commit && c.commit.message) || '').split('\n')[0].trim();
+        return {
+          sha: c.sha,
+          shortSha: c.sha.slice(0, 8),
+          date: ymd,
+          isLatest: i === 0,
+          label: (ymd || '연혁') + (firstLine ? ' · ' + firstLine : '')
+        };
+      });
+      lawHistoryCache.set(histKey, list);
+      return list;
+    });
+  }
+
+  /* ── 특정 시점 과거 법령(구법) 원문 가져오기 (현행 법령 캐시와 완전 분리) ── */
+  function fetchLawRevision(dir, fileName, sha, revMeta) {
+    var d = String(dir || '').trim();
+    var cleanSha = String(sha || '').trim();
+    if (!d) return Promise.reject(new Error('법령명이 비어 있습니다.'));
+    if (!SAFE_GIT_SHA_RE.test(cleanSha)) return Promise.reject(new Error('유효하지 않은 법령 개정 식별자입니다.'));
+    var fName = fileName || '법률.md';
+    if (!/\.md$/.test(fName)) fName += '.md';
+    var idxList = (global.PuPBoxLawIndex && global.PuPBoxLawIndex.list) ? global.PuPBoxLawIndex.list() : [];
+    var fam = idxList.find(function (x) { return x.dir === d; }) || null;
+    if (!fileName && fam && fam.primaryFile) fName = fam.primaryFile;
+    var revKey = cleanSha + ':' + d + '/' + fName;
+    if (lawRevisionCache.has(revKey)) {
+      return Promise.resolve(lawRevisionCache.get(revKey));
+    }
+    var url = 'https://raw.githubusercontent.com/legalize-kr/legalize-kr/' +
+      encodeURIComponent(cleanSha) + '/kr/' + encodeURIComponent(d) + '/' + encodeURIComponent(fName);
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error('과거 구법 원문 호출 실패 (HTTP ' + res.status + ')');
+      return res.text();
+    }).then(function (mdText) {
+      var parsed = global.PuPBoxEngine.parseLawMarkdown(mdText, {
+        dir: d,
+        fileName: fName,
+        title: fam ? fam.title : d,
+        dept: fam ? fam.dept : ''
+      });
+      parsed.cacheKey = revKey;
+      parsed.isHistorical = true;
+      parsed.revisionSha = cleanSha;
+      parsed.revisionDate = (revMeta && revMeta.date) || parsed.effectiveDate || '';
+      parsed.revisionLabel = (revMeta && revMeta.label) || (parsed.revisionDate + ' 개정본');
+      parsed.fetchedAt = new Date().toISOString();
+      lawRevisionCache.set(revKey, parsed);
       return parsed;
     });
   }
@@ -2832,13 +2922,18 @@
     rebuildEffectiveDocs();
   }
 
-  /* ── 명시적 로그아웃 시 모든 열려 있는 핸들을 닫고 개인 작업공간(로컬 수집문서·세션JWT 포함) 완전 파기 ── */
+  /* ── 명시적 로그아웃 시 현재 로그인한 본인 UID의 개인 작업공간만 안전하게 파기 (같은 브라우저의 타 직원 DB 보존) ── */
   function clearWorkspaceOnLogout() {
     ++sessionGen;
-    var activeDbName = workspaceDbNameFor(mem.uid);
+    var rawUid = (mem.uid && mem.uid !== 'guest') ? mem.uid : lastAuthUid;
+    var activeUid = (rawUid && rawUid !== 'guest') ? sanitizeUid(rawUid) : '';
+    var activeDbName = activeUid ? workspaceDbNameFor(activeUid) : '';
+    lastAuthUid = '';
     closeAllWorkspaceHandles();
     sessionJwtByUid.clear();
-    memByUid.clear();
+    if (activeUid) {
+      memByUid.delete(activeUid);
+    }
     mem.uid = 'guest';
     mem.privateDocs = [];
     mem.projects = [];
@@ -2849,21 +2944,8 @@
     rebuildEffectiveDocs();
 
     var targets = [WORKSPACE_DB];
-    if (activeDbName) targets.push(activeDbName);
-
-    var pEnum = (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function')
-      ? indexedDB.databases().then(function (list) {
-          (list || []).forEach(function (info) {
-            if (info && info.name && (info.name === WORKSPACE_DB || info.name.indexOf(WORKSPACE_DB + '_') === 0)) {
-              if (targets.indexOf(info.name) < 0) targets.push(info.name);
-            }
-          });
-        }).catch(function () {})
-      : Promise.resolve();
-
-    return pEnum.then(function () {
-      return Promise.all(targets.map(deleteDbSafe));
-    });
+    if (activeDbName && targets.indexOf(activeDbName) < 0) targets.push(activeDbName);
+    return Promise.all(targets.map(deleteDbSafe));
   }
 
   if (typeof global.addEventListener === 'function') {
@@ -2898,6 +2980,8 @@
     getRecents: function () { return mem.recents.slice(); },
     getAlerts: function () { return mem.alerts.slice(); },
     fetchLaw: fetchLaw,
+    fetchLawHistory: fetchLawHistory,
+    fetchLawRevision: fetchLawRevision,
     preloadCitedLaws: function (text, offlineOnly) {
       var idxList = (global.PuPBoxLawIndex && typeof global.PuPBoxLawIndex.list === 'function')
         ? global.PuPBoxLawIndex.list()

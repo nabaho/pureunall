@@ -52,13 +52,13 @@ textarea{width:100%;resize:vertical;font-family:inherit}
 @media (max-width:768px){ input,select,textarea{font-size:16px} }
 a{color:var(--blue-d);text-decoration:none}
 #head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
-.top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
-.top h1{font-size:17px;margin:0}
-.top .sub{font-size:12px;color:var(--mute)}
+.top{display:flex;align-items:center;gap:8px;padding:5px 12px;flex-wrap:wrap}
+.top h1{font-size:15px;margin:0}
+.top .sub{font-size:11px;color:var(--mute)}
 .sp{flex:1}
-#who{font-size:13px;color:var(--mute)}
-.tabs{display:flex;gap:4px;padding:0 16px;flex-wrap:wrap;align-items:center}
-.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
+#who{font-size:12px;color:var(--mute)}
+.tabs{display:flex;gap:3px;padding:0 12px;flex-wrap:wrap;align-items:center}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:5px 10px;font-size:12px}
 .tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
 .chip{display:inline-block;min-width:18px;text-align:center;border-radius:9px;padding:0 6px;font-size:11px;background:var(--blue-bg);color:var(--blue-d);border:1px solid var(--blue-line)}
 main{padding:12px 16px 40px}
@@ -90,10 +90,10 @@ main{padding:12px 16px 40px}
 .sec{padding:10px 14px 2px;font-weight:700;color:var(--ink2)}
 .warn{margin:8px 10px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);font-size:12.5px}
 .bad{color:var(--red)}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:10px}
-.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);display:flex;flex-direction:column;gap:2px;min-width:0}
-.kpi span{font-size:12px;color:var(--mute)}
-.kpi b{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:6px 10px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:4px 9px;background:var(--bg);display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:5px;min-width:0}
+.kpi span{font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kpi b{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .kpi.bad b{color:var(--red)}
 .fr{display:flex;gap:10px;padding:7px 14px;align-items:center}
 .fr>label{width:110px;flex:none;color:var(--ink2);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -360,7 +360,7 @@ details.dep textarea{min-height:64px}
 .tr-list{flex-direction:column;align-items:flex-start}
 </style>
 <!-- 제미나이 판 «모양 값» 시범(대표 「추천대로 시작」 2026-11-19) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design pu-frame-a">
 <div id="head">
@@ -422,13 +422,13 @@ details.dep textarea{min-height:64px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록에 없으므로
      관문이 «강제»(enforce)로 돈다. 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>

@@ -170,7 +170,8 @@ test('⑥ 화면 이음 — 칸 닫기가 받기를 멈추고, 큰 영상은 눌
   const dl = APP.slice(APP.indexOf('function downloadOriginal('), APP.indexOf('function downloadOriginal(') + 900);
   assert.match(dl, /var uid0 = authUid\(\);[\s\S]*\.then\(function \(blob\) \{\s*if \(authUid\(\) !== uid0\) throw/, '받는 사이 사람이 바뀌면 저장하지 않는다');
   /* 받은 뒤 화면을 고치는 곳(then·catch) — zip 도구를 넘겨받는 중간 단계(Z)만 빼고 모두 live() 를 먼저 본다 */
-  const late = [...fp.matchAll(/\.(then|catch)\(function \((\w*)\) \{([\s\S]{0,140})/g)].filter((m) => m[2] !== 'Z');
+  /* ⚠ 뒤 글자는 앞보기(?=…)로 본다 — 먹어 버리면 바로 다음 then·catch 를 못 센다 */
+  const late = [...fp.matchAll(/\.(then|catch)\(function \((\w*)\) \{(?=([\s\S]{0,140}))/g)].filter((m) => m[2] !== 'Z');
   assert.ok(late.length >= 4, '영상 then·catch, 문서 then·catch 를 찾아야 합니다');
   late.forEach((m) => assert.match(m[3], /live\(\)/, '받은 뒤 화면을 고치기 전에 live() 를 먼저 본다: ' + m[0].slice(0, 70)));
   assert.match(fp, /MEDIA_AUTO_MAX/, '큰 영상·소리 기준이 있어야 합니다');

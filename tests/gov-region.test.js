@@ -200,6 +200,21 @@ test('★★★ 그 지역 공고·모집 글만 한 목록에 — ☐ + 번호�
   assert.match(r.el('rCnt').textContent, /지금 4건 · 공고 2 · 모집 글 2/);
 });
 
+test('★★★ 수의계약 공고는 이 탭에서도 «기본으로» 뺀다 — 몇 건 뺐는지 말하고 · 탭 숫자에도 안 센다 · 「수의계약도 보기」면 돌아온다', () => {
+  /* 대표 지시 2026-11-22 「수의계약은 들어가서 입찰이 되지 않는다 — 표시만 하고 자동으로 빠지게」 — 공고 모아보기와 «한 값»(feed_mthd) */
+  const feed = FEED.concat([{ id: 'G0009', src: '나라장터', type: '새 공고', nm: '공주시 노무 수의 용역', org: '충청남도 공주시', closeDt: '2026-11-26 18:00', savedAt: '2026-11-16T01:00:00Z', mthd: '수의계약' }]);
+  let r = runApp({ feed });
+  r.api.setWatch(WATCH); r.api.setTab('rgn');
+  assert.doesNotMatch(r.el('rgnTb').innerHTML, /공주시 노무 수의 용역/, '기본인데 수의계약이 보인다');
+  assert.match(r.el('rCnt').textContent, /지금 4건 · 공고 2 · 모집 글 2 · 수의계약 1건 뺌/);
+  const badge = (x) => Number((/<span class="tag red"[^>]*>(\d+)<\/span>/.exec(x.el('tbRgn').innerHTML) || [0, 0])[1]);
+  const n0 = badge(r);
+  r = runApp({ feed, feed_mthd: 'all' }); r.el('fMthd').value = 'all';
+  r.api.setWatch(WATCH); r.api.setTab('rgn');
+  assert.match(r.el('rgnTb').innerHTML, /공주시 노무 수의 용역/);
+  assert.doesNotMatch(r.el('rCnt').textContent, /수의계약/);
+  assert.equal(badge(r), n0 + 1, '탭 숫자 — 뺀 수의계약 «새 공고»는 안 센다');
+});
 test('★★ 보기를 넓히면 마감 지난 것이 돌아오고, 지역 칩으로 좁힌다(켜는 길·푸는 길)', () => {
   const r = runApp({ feed: FEED });
   r.api.setWatch(WATCH); r.api.setTab('rgn');

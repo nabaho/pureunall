@@ -259,3 +259,99 @@ test('⑥ 상담접수 및 견적서 송부 라벨 적용 + 견적서 송부 내
   assert.equal(plan.form.journals.length, 1, '활동 일지(journals)에도 견적 송부 자동정리 기록이 함께 남는다');
   assert.match(plan.form.journals[0].content, /견적서 송부 자동정리/);
 });
+
+test('⑦ 상대방 계약서 회신 시 기존 빈 내용 상담접수·계약협의 중복 카드를 정본 1장으로 합쳐 계약확정(signed)으로 올린다', async () => {
+  const FN = [
+    'function erpParseContractMoney(', 'function erpParseSuccessFee(', 'function erpGuessContractFromFields(',
+    'function erpTypeNameTidy(', 'function erpNameRun(', 'function erpConsTypeByDocName(',
+    'function erpVatTextToFlag(', 'function erpDocText(', 'function erpCmsFromDoc(',
+    'function erpBlankContractForm(', 'function erpSameCompany(', 'function erpCoAddrKey(',
+    'function erpCoNameKey(', 'function erpBiznoClash(', 'async function processPhotoContractRequest('
+  ].map((d) => cutFn(ERP_SRC, d)).join('\n') + '\n' + STAGE_SRC;
+
+  const mockCts = [
+    {
+      id: 'ct-empty-consult',
+      contractNo: '계약-2026-206',
+      companyName: '가나테크',
+      status: 'consult',
+      kinds: ['fund'],
+      typeCodes: { fund: 'fund-single' },
+      amounts: { fund: 0 },
+      briefs: { fund: '사내근로복지기금 설립 등 견적서 송부' },
+      managerMain: 'P-001',
+      company: { name: '가나테크', ceo: '김대표자', address: '충남 아산시 음봉면 1', email: 'master@ganatech.example' },
+      quoteLogs: [{ srcKey: 'Sent|601', scope: '사내근로복지기금 설립 등' }],
+      journals: [{ id: 'jn-1', content: '견적서 송부' }],
+      srcMails: ['Sent|601'],
+      checkReq: { note: '견적 회신 대기 중' }
+    },
+    {
+      id: 'ct-draft-review',
+      contractNo: '계약-2026-225',
+      companyName: '(주)가나테크',
+      status: 'review',
+      kinds: ['fund'],
+      typeCodes: { fund: 'fund-mrenh1dvjx2' },
+      amounts: { fund: 3300000 },
+      briefs: { fund: '사내근로복지기금 설립과 관련된 제반사항' },
+      signDate: '2026-11-24',
+      startDate: '2026-11-30',
+      managerMain: 'P-001',
+      company: { name: '(주)가나테크', ceo: '권형하', address: '충남 천안시 서북구 원두정8길 6' },
+      srcMails: ['Sent|602']
+    }
+  ];
+  const saved = [];
+  const trashed = [];
+  const ctx = {
+    console, Date, Object, Array, String, Number, JSON, Math, Promise, parseInt, parseFloat, RegExp,
+    ERP_CMS_WORDS: ['CMS', '자동이체'],
+    todayYMD: () => '2026-11-24',
+    fbDb: { ref: () => ({ remove: () => Promise.resolve(), update: () => Promise.resolve() }) },
+    dbGet: (k, d) => (k === 'contracts' ? mockCts : k === 'companies' ? [] : d),
+    getActiveUsers: () => [{ sid: 'P-001', name: '담당가' }],
+    getKindTypes: (kv) => kv === 'fund'
+      ? [{ code: 'fund-mrenh1dvjx2', name: '지역공동근로복지기금' }, { code: 'fund-single', name: '사내근로복지기금' }]
+      : [],
+    erpDeferCoLinkIfNew: (f) => Object.assign({}, f, { companyLinkStatus: 'pending' }),
+    isContractLocked: () => false,
+    genContractNo: () => '계약-2026-300',
+    persistOne: (o) => { saved.push(o); return true; },
+    TrashBin: { remove: (st, id, reason) => { trashed.push({ st, id, reason }); return true; } },
+    PuCaseStage
+  };
+  ctx.window = ctx; ctx.global = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(DOCREAD_SRC, ctx);
+  vm.runInContext(FN + '\nthis.run = processPhotoContractRequest;', ctx);
+
+  const res = await ctx.run('mcsc-reply', {
+    source: 'photo_contract',
+    state: 'pending',
+    targetStatus: 'signed',
+    senderVerified: true,
+    openContractVerified: true,
+    mergeEmptyOpen: true,
+    signedByClient: true,
+    managerMain: 'P-001',
+    inferredKind: 'fund',
+    srcKey: '8_기금함|911',
+    srcMails: ['8_기금함|911'],
+    company: { name: '가나테크', bizNo: '', ceo: '권형하', address: '충남 천안시 서북구 원두정8길 6' },
+    contractFields: { docName: '계약서_가나테크_푸른 노무법인.pdf', scope: '사내근로복지기금 설립 위임계약서 송부의 건', signDate: '2026-11-24' },
+    mailMeta: { dir: 'recv', senderVerified: true, openContractVerified: true, companyName: '가나테크', srcKey: '8_기금함|911' }
+  });
+
+  assert.ok(res.made, '병합된 정본 카드 반환');
+  assert.equal(res.made.id, 'ct-empty-consult', '견적이력·원본 업체정보가 있는 정본 카드를 살려 계약확정으로 정리한다');
+  assert.equal(res.made.status, 'signed', '계약확정(signed)으로 이동되어 즉시 이관 가능 상태가 된다');
+  assert.equal(res.made.checkReq, null, '계약확정 승격 시 미회신 진행확인 배지를 해제한다');
+  assert.equal(res.made.amounts.fund > 0, true, '초안 계약협의 카드의 계약금액이 정본 카드로 흡수 보존된다');
+  assert.equal(res.made.typeCodes.fund, 'fund-single', '사내근로복지기금 세부유형이 정확히 유지·반영된다');
+  assert.equal(res.made.company.ceo, '김대표자', '수임인 대표자명(권형하)으로 의뢰인 대표자가 오염되지 않는다');
+  assert.ok(!/원두정8길/.test(res.made.company.address), '수임인 본사 주소로 의뢰인 주소가 오염되지 않는다');
+  assert.equal(trashed.length >= 1, true, '나뉘어 있던 중복 계약협의 카드는 휴지통 무덤 표식으로 정리된다');
+  assert.equal(trashed[0].id, 'ct-draft-review');
+  assert.match(ERP_SRC, /function promoteContractToSigned\(/, '수동 계약확정 전환 시에도 빈 진행카드 병합 정리가 배선되어 있다');
+});

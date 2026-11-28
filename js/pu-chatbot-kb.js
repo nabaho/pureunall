@@ -137,7 +137,7 @@
   var PORTAL_ROWS_GUIDE = [
     {
       id: 'client',
-      title: '① 의뢰인 업무 (11개 앱)',
+      title: '① 의뢰인 업무 (12개 앱)',
       badge: '고객사 직접 수행 업무',
       summary: '자문사·사건 의뢰인·조사·컨설팅·기금 등 고객사 업무를 직접 처리하는 핵심 줄입니다. 모든 업체·계약·사건의 뿌리는 [푸른이알피]입니다.',
       apps: [
@@ -149,6 +149,7 @@
         { key: 'harass',    icon: '🛡️', name: '괴롭힘·성희롱 조사', when: '직장 내 괴롭힘·성희롱 사건 공문 메일 자동수집, 8단계 표준 조사 진행, 암호화 비밀 전자서명 및 조사결과보고서(.hwpx) 작성', from: '푸른 메일(조사 공문·진술·증거 후보 묶음), 푸른이알피(업체·사건 원장)', to: '푸른이알피 사건관리·업무 메모 자동 반영 및 진술확인서·조사결과보고서(.hwpx) 출력', ask: '괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?' },
         { key: 'ilteo',     icon: '🏭', name: '일터상생혁신',   when: '노사발전재단 일터혁신 상생컨설팅 기초·후속 메일 체크, 로컬 비식별 정량 진단, 중간·최종 결과보고서(.pptx) 및 사후 이행관리 자동화', from: '푸른이알피·정부사업일정(참여 사업장), 푸른 메일(기초자료·후속 피드백 메일)', to: '중간·최종보고서(.pptx)·별첨 규정(.docx)·모의계산(.xlsx)·통합 패키지(.zip) 생성', ask: '일터상생혁신 앱의 단계별 사용법과 메일·비식별 진단 연결 방식을 알려줘' },
         { key: 'jobtrans',  icon: '⚡', name: '산업일자리전환', when: '능률협회(KMAC 구조혁신)·충남경제진흥원(CEPA 산업일자리전환) 맞춤 중간·최종보고서·완료계(.hwpx) 자동 작성 및 비식별 재무·인력 집계', from: '푸른이알피·정부사업일정(계약 확정 사업장), 푸른 메일(기초자료 메일 거울)', to: '운영기관별 정식 한글(.hwpx) 보고서·완료계 내려받기 및 한글 편집기 바로 열기', ask: '산업일자리전환 앱은 어떻게 사용하고 운영기관별 보고서는 어떻게 만드나요?' },
+        { key: 'safety',    icon: '🦺', name: '안전보건체계구축', when: '과거 안전보건컨설팅 수행이력 비식별 통합, 신규 사업장 착수 사전체크(12)·7대 핵심요소·8대 업종별 특화 체크리스트·고위험 기인물 24종·위험성평가 및 종합/1P 요약보고서(.hwpx)', from: '푸른이알피·정부사업일정·푸른 메일(안전보건컨설팅 자료)·로컬 컨설팅 폴더', to: '종합보고서(7장)·핵심 개선사항 1P 요약보고서·업종별 체크리스트(.hwpx/.xlsx/.zip) 및 한글 편집기 연동', ask: '안전보건체계구축 앱은 어떻게 사용하고 업종별 체크리스트와 1P 요약보고서는 어떻게 만드나요?' },
         { key: 'hangul',    icon: '📝', name: '한글 편집기',     when: '한글 프로그램 없는 PC나 민감정보(주민번호)가 든 .hwp/.hwpx 문서를 바로 열고 고칠 때', from: '내 PC 파일 (서버·파이어베이스로 전송하지 않음)', to: '수정한 .hwpx 파일 내 PC 즉시 저장', ask: '한글 편집기는 어떤 상황에서 쓰면 좋나요?' },
         { key: 'rules',     icon: '📜', name: '기업규정집',     when: '취업규칙·노사협의회·단체협약 법령 위반 검토, 회차별 개정·신구대조표, 문서 내 AI 질문', from: '푸른 메일(취업규칙 첨부 자동 수집), 푸른이알피(업체 목록)', to: '기업정보함(업체 상세 업무 이력에 완료 회차 표시), 업무관리(이력 조회)', ask: '기업규정집은 메일·기업정보함·업무관리와 어떻게 이어지나요?' },
         { key: 'payroll',   icon: '💰', name: '급여아웃소싱',   when: '고객사 임금 대행·근태·임금명세서·연차 정산 (우리 법인 내부 급여인 인사관리와 별개)', from: '고객사 급여·근태 기초자료', to: '임금대장·임금명세서 산출', ask: '급여아웃소싱과 내부관리의 인사관리는 무엇이 다른가요?' }
@@ -163,6 +164,7 @@
         { key: 'cal',       icon: '📅', name: '푸른 캘린더',   when: '법인 전체 방문·재판·상담 일정 공유, 구성원 근태(휴가·외근), 이음센터 확인', from: '푸른이알피 일정·근태 칸 공유, 기업정보함(미팅 시 명함 색인 참조)', to: '푸른이알피·인사관리 근태 기록과 실시간 한 몸으로 반영', ask: '푸른 캘린더에 일정을 넣으면 인사관리·이알피와 어떻게 연동되나요?' },
         { key: 'photos',    icon: '🖼️', name: '사진첩',         when: '사업자등록증·명함·통장·근로계약서·현장사진 촬영(우측하단 📷) 및 주민번호 가림 후 AI 판독', from: '포털 📷 푸른카메라, 휴대폰·PC 사진·PDF·HWP 업로드', to: '기업정보함(사업자·명함), 푸른이알피(업체 채움·계약요청·근로자 통장), 푸른 메일(직접 발송)', ask: '사진첩에서 찍은 서류가 기업정보함·이알피·메일로 나가는 전체 연결도를 알려줘' },
         { key: 'cards',     icon: '📇', name: '기업정보함',     when: '거래처 사업자등록증·담당자 명함 통합 검색, 기업 상세 카드 및 연도별 전체 업무 이력 조회', from: '사진첩(판독 명함·사업자), 푸른이알피(업체·사건·계약), 기업규정집(개정 이력)', to: '푸른이알피·기금관리·푸른 캘린더에 사업자·담당자 정보 공급, 푸른 메일 발송 연동', ask: '기업정보함에서는 어떤 정보를 볼 수 있고 어느 앱들과 연결되나요?' },
+        { key: 'pubsearch', icon: '🔍', name: '공공 기업검색',  when: '회사명·사업자번호로 금융위 기본·재무·국세청·고용산재·국민연금·DART 무료 통합 조회 및 검색 기록 보관', from: '금융위·국세청·근로복지공단·국민연금·DART 공공API', to: '기업정보함 빈 칸 반영 · 폰 파워기업검색 복사 · 나이스비즈라인', ask: '공공 기업검색 사용법을 알려줘' },
         { key: 'docs',      icon: '📤', name: '계약서등관리',   when: '견적서·자문계약서·사건 위임장 양식 작성 및 의뢰인 휴대폰 전자서명 링크 발송·보관', from: '푸른이알피 계약서 양식 공유, 의뢰인 전자서명 수신', to: '기업별 계약서 원본 보관 및 사건·계약 진행 증빙', ask: '계약서등관리에서 전자서명 위임장·계약서는 어떻게 보내고 관리하나요?' },
         { key: 'edulib',    icon: '🎓', name: '강의자료', when: '법정 의무교육(성희롱 예방·장애인 인식개선·개인정보·산업안전보건·퇴직연금)과 노동법·노사관계·청소년 노동인권·AI 등 우리가 했던 강의자료를 종류·강의일로 찾아보고, 여러 건을 나란히·새 창으로 비교하고 검토 메모를 남길 때', from: '내 PC 강의자료(PC 목록 가져오기·폴더 통째 올리기)와 푸른 메일 첨부(관리자 — 읽음 표시 그대로 원본 복사)', to: '종류×연도 대시보드·검토 메모 — 다른 노무사가 원본 그대로 내려받아 참고', ask: '강의자료 앱에서 강의자료를 종류별로 찾고 나란히 비교하려면 어떻게 하나요?' },
         { key: 'work',      icon: '📋', name: '업무관리',       when: '담당 사업장별 주간 한 일·다음 할 일 기록(🎤 말로 기록 포함) 및 거래처 오간 메일 체크', from: '푸른이알피(업체·담당), 푸른 메일(수발신 메일 자동·수동 매칭), 기업정부지원금(신청대행 할 일)', to: '주간 업무 진도 공유 및 메일 확인 체크 기록', ask: '업무관리 앱 사용법과 오간 메일·말로 기록 기능을 자세히 알려줘' },
@@ -265,9 +267,9 @@
       source: '푸른포털 영역별 길잡이',
       docNo: '① 의뢰인 업무 줄 사용법·연결도',
       law: '푸른이알피 · 기금관리 · 컨설팅보고서 · 정부사업일정 · 기업정부지원금 · 괴롭힘·성희롱 조사 · 일터상생혁신 · 산업일자리전환 · 한글 편집기 · 기업규정집 · 급여아웃소싱',
-      title: '[의뢰인 업무] 11개 앱 완벽 가이드 — 언제 무엇을 쓰고 어떻게 연결되나',
+      title: '[의뢰인 업무] 12개 앱 완벽 가이드 — 언제 무엇을 쓰고 어떻게 연결되나',
       q: '의뢰인 업무 줄에 있는 프로그램들은 각각 언제 어떻게 사용하고 서로 어떻게 연결되어 있나요?',
-      a: '[의뢰인 업무] 줄은 고객사 일을 직접 처리하는 11개 앱입니다.\n• [푸른이알피]: 모든 거래처·자문계약·노동사건·컨설팅 수임의 출발점(원본)입니다. 처음 수임하면 여기서 업체를 먼저 세웁니다.\n• [정부사업일정] ➔ [컨설팅보고서] & [일터상생혁신] · [산업일자리전환]: 수임 컨설팅의 회차·방문사진·초안은 [정부사업일정]에서, 전사 진도·③서명본~⑤제출 체크는 [컨설팅보고서]에서 하며, 노사발전재단 일터혁신(.pptx)과 KMAC·CEPA 산업일자리전환(.hwpx)은 각각 전용 워크스페이스에서 비식별 집계·보고서를 자동 생성합니다.\n• [괴롭힘·성희롱 조사]: 조사 공문 메일을 자동 수집해 8단계 표준 조사·종단간 암호화 비밀 전자서명·조사결과보고서(.hwpx)를 작성하고 푸른이알피 사건관리와 동기화합니다.\n• [기업정부지원금] & [기금관리]: 이알피 고객사 수급 가능 지원금을 매칭해 「신청 대행」 시 [업무관리] 할 일을 자동 생성하며, 기금관리는 기업정보함·푸른 메일과 연결해 기금 설립·결산·법령챗봇을 지원합니다.\n• [기업규정집] & [한글 편집기] & [급여아웃소싱]: 각각 취업규칙 개정(기업정보함 이력 연동), 민감 한글파일 로컬 편집(서버 무전송), 고객사 임금 대행을 맡습니다.',
+      a: '[의뢰인 업무] 줄은 고객사 일을 직접 처리하는 12개 앱입니다.\n• [푸른이알피]: 모든 거래처·자문계약·노동사건·컨설팅 수임의 출발점(원본)입니다. 처음 수임하면 여기서 업체를 먼저 세웁니다.\n• [정부사업일정] ➔ [컨설팅보고서] & [일터상생혁신] · [산업일자리전환] · [안전보건체계구축]: 수임 컨설팅의 회차·방문사진·초안은 [정부사업일정]에서, 전사 진도·③서명본~⑤제출 체크는 [컨설팅보고서]에서 하며, 일터혁신(.pptx)·산업일자리전환(.hwpx)·안전보건체계구축(과거이력·다업종 체크리스트·위험성평가·1P/종합 .hwpx)은 각각 전용 워크스페이스에서 비식별 진단·보고서를 자동 생성합니다.\n• [괴롭힘·성희롱 조사]: 조사 공문 메일을 자동 수집해 8단계 표준 조사·종단간 암호화 비밀 전자서명·조사결과보고서(.hwpx)를 작성하고 푸른이알피 사건관리와 동기화합니다.\n• [기업정부지원금] & [기금관리]: 이알피 고객사 수급 가능 지원금을 매칭해 「신청 대행」 시 [업무관리] 할 일을 자동 생성하며, 기금관리는 기업정보함·푸른 메일과 연결해 기금 설립·결산·법령챗봇을 지원합니다.\n• [기업규정집] & [한글 편집기] & [급여아웃소싱]: 각각 취업규칙 개정(기업정보함 이력 연동), 민감 한글파일 로컬 편집(서버 무전송), 고객사 임금 대행을 맡습니다.',
       points: [
         '컨설팅보고서 현황판에서 초안을 고치고 싶을 때 단추를 누르면 `정부사업일정`의 해당 보고서 작성 창으로 바로 건너갑니다',
         '고객사 임금 대행은 [급여아웃소싱], 우리 노무법인 내부 직원 급여는 맨 아랫줄 [인사관리]입니다'
@@ -278,7 +280,7 @@
         '기업정부지원금에서 신청 대행을 누르면 업무관리에 어떻게 나타나?'
       ],
       tags: ['의뢰인업무', '의뢰인 업무', '첫번째줄', '1번째줄', '고객사업무', '컨설팅연결', '의뢰인업무사용법', '의뢰인업무연결도', '괴롭힘성희롱조사', '일터상생혁신', '산업일자리전환'],
-      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'hangul']
+      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'safety', 'hangul']
     },
     {
       id: 'SYS-row-store',
@@ -469,6 +471,27 @@
       apps: ['jobtrans', 'consult', 'hangul', 'mail']
     },
     {
+      id: 'SYS-safety-01',
+      cat: 'system',
+      flowId: 'flow-gov',
+      source: '푸른포털 앱 사용법',
+      docNo: '의뢰인 업무 · 안전보건체계구축 사용법',
+      law: '과거 수행이력(scal_safety) 아카이브 ➔ 착수 사전체크(12)·7대 핵심요소(25)·8대 다업종 특화·고위험 기인물(24종) ➔ 종합보고서·핵심 개선사항 1P 요약(.hwpx)',
+      title: '[안전보건체계구축] 과거 수행이력 아카이브 · 신규 사업장 업종별 체크리스트 · 위험성평가 · 1P/종합 보고서(.hwpx) 사용법',
+      q: '안전보건체계구축 앱은 어떻게 사용하고 업종별 체크리스트와 1P 요약보고서는 어떻게 만드나요?',
+      a: '[안전보건체계구축]은 포털 [의뢰인 업무] 줄에서 공단 안전보건관리체계 구축(일반 제조·고위험 특화·기타업종) 및 중대재해처벌법 컨설팅을 수행하는 전용 앱입니다.\n① [과거 수행이력 아카이브 · 자동 감지]: 과거 수행 사업장 비식별 이력과 [푸른 메일] 안전보건 자료·로컬 컨설팅 폴더를 통합 조회·재활용합니다(개별 산재보상 사건은 자동 제외).\n② [신규 착수 체크 · 8대 업종 특화 점검]: 상시근로자 규모별 법적 의무, 착수 사전체크 12항목, 공식 7대 핵심요소 25문항, 제조(일반·특화)·유통물류·시설서비스·의료복지·숙박외식·교육사무·건설도급 8대 업종 복합 체크리스트 및 고위험 기인물 24종을 점검합니다.\n③ [위험성평가 · 2026 공단 준수감사 · HWPX 출력]: 위험요인 매트릭스·CEO 2회 이상 면담·2인1조 검증과 함께 종합보고서(7장)·사업주 강평용 핵심 개선사항 1P 요약보고서·업종별 체크리스트를 한글(.hwpx)·엑셀(.xlsx)·ZIP으로 내려받거나 [한글 편집기]로 바로 엽니다.',
+      points: [
+        '제조·유통물류·서비스·사회복지 등 업종별로 위험요인과 점검표를 즉시 전환하고 복합 겸영 업종도 동시 체크할 수 있습니다',
+        '개인정보·주민등록번호는 로컬에서 비식별 가림 후 저장소(`scal_safety`)에 보관하며, 1P 요약과 종합보고서(.hwpx)를 한 번에 생성합니다'
+      ],
+      followUps: [
+        '기업정부지원금에서 클린사업장·안전일터 조성지원 사업도 함께 찾을 수 있나요?',
+        '한글 편집기는 어떤 상황에서 쓰면 좋나요?'
+      ],
+      tags: ['안전보건체계구축', 'safety', '안전보건관리체계', '중대재해처벌법', '위험성평가', '업종별체크리스트', '7대핵심요소', '고위험기인물', '1P요약보고서'],
+      apps: ['safety', 'consult', 'govreport', 'hangul', 'mail']
+    },
+    {
       id: 'SYS-onboard-newco',
       cat: 'system',
       flowId: 'flow-core',
@@ -656,7 +679,7 @@
         '푸른포털 4대 영역 전체 구조와 연결도를 보여줘',
         '신규 거래처를 맡았을 때 앱 입력 순서를 알려줘'
       ],
-      tags: ['자주쓰는앱', '별표', '즐겨찾기', '카카오로그인', '건의하기', '건의함', '앱설치', '휴대폰설치', '배치편집', '줄고정', '준비중', '클릭안됨', '경고배지', '발송지연', 'TypeSafe', '새버전'],
+      tags: ['자주쓰는앱', '별표', '즐겨찾기', '카카오로그인', '건의하기', '건의함', '앱설치', '휴대폰설치', '배치편집', '줄고정', '준비중', '클릭안됨', '경고배지', '발송지연', '새버전'],
       apps: []
     },
     {
@@ -1064,7 +1087,7 @@
         '정부사업신청·정부사업일정·컨설팅보고서·컨설팅정산 5단계 연결도를 보여줘'
       ],
       tags: ['일터혁신', '상생컨설팅', '산업일자리전환', '현장클리닉', '기술보호', '기술보호울타리', '무료컨설팅', '정부컨설팅'],
-      apps: ['consult', 'govreport', 'govaid', 'ilteo', 'jobtrans']
+      apps: ['consult', 'govreport', 'govaid', 'ilteo', 'jobtrans', 'safety']
     }
   ];
 
@@ -1161,9 +1184,9 @@
 
   /* ── Ⅳ. 신규 프로그램 무보수 자동 감지 · 온톨로지 연결도 · 화면 HTML 파서 엔진 ── */
   var STATIC_COVERED_APPS = {
-    erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1,
+    erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1, safety: 1,
     hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
-    aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1,
+    aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1, pubsearch: 1,
     hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1, datahub: 1
   };
   var SINGLE_APP_DOC_ID = {
@@ -1174,7 +1197,8 @@
     orch: 'SYS-orch-01',
     harass: 'SYS-harass-01',
     ilteo: 'SYS-ilteo-01',
-    jobtrans: 'SYS-jobtrans-01'
+    jobtrans: 'SYS-jobtrans-01',
+    safety: 'SYS-safety-01'
   };
   var ROW_LABELS = {
     client: '의뢰인 업무',
@@ -1209,6 +1233,7 @@
     { prefix: 'scal_docs', label: '컨설팅보고서(서류 체크표)', app: 'govreport' },
     { prefix: 'scal_ilteo', label: '일터상생혁신(전용 작업공간)', app: 'ilteo' },
     { prefix: 'scal_jobtrans', label: '산업일자리전환(전용 작업공간)', app: 'jobtrans' },
+    { prefix: 'scal_safety', label: '안전보건체계구축(전용 작업공간)', app: 'safety' },
     { prefix: 'scal_', label: '정부사업일정(회차·보고서)', app: 'consult' },
     { prefix: 'govaid', label: '기업정부지원금(지원사업 매칭)', app: 'govaid' },
     { prefix: 'harass_', label: '괴롭힘·성희롱 조사(보안 사건함)', app: 'harass' },
@@ -1424,7 +1449,7 @@
   function inferAutoFlowId(key, app, relApps) {
     var row = (app && app.row) || '';
     var joined = ([key].concat(relApps || [])).join(',');
-    if (/consult|govreport|ilteo|jobtrans|settle/.test(joined)) return 'flow-gov';
+    if (/consult|govreport|ilteo|jobtrans|safety|settle/.test(joined)) return 'flow-gov';
     if (/govaid/.test(joined)) return 'flow-govaid';
     if (/fund|rules|hangul/.test(joined)) return 'flow-fund-rules';
     if (row === 'sales') return 'flow-sales';
@@ -1883,6 +1908,7 @@
     if ((/괴롭힘[·\s]*성희롱\s*조사|\bharass\b/i.test(q) || (/괴롭힘/.test(q) && /앱|프로그램|화면|타일|사용법|어디서|연결도|공문\s*메일|8단계|진술확인서/.test(q))) && it.id === 'SYS-harass-01') score += 48;
     if (/일터상생혁신|\bilteo\b/i.test(q) && it.id === 'SYS-ilteo-01') score += 48;
     if (/산업일자리전환|\bjobtrans\b/i.test(q) && !/무료.*컨설팅.*종류/.test(q) && it.id === 'SYS-jobtrans-01') score += 48;
+    if (/안전보건체계구축|안전보건\s*관리\s*체계|안전보건\s*컨설팅|\bsafety\b/i.test(q) && it.id === 'SYS-safety-01') score += 48;
     if (it._autoKey) {
       var mentionedAuto = detectMentionedApps(q);
       if (mentionedAuto.indexOf(it._autoKey) >= 0) {
@@ -2032,7 +2058,7 @@
   };
   var APP_TO_SG_CAT = {
     erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', datahub: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
-    consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult',
+    consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult', safety: 'consult',
     work: 'work', mail: 'work', cal: 'work',
     fund: 'fund',
     rules: 'rules',
@@ -2045,7 +2071,7 @@
   function matchExplicitImproveCat(text) {
     var hay = String(text || '');
     if (/기금관리|사내기금|공동기금|복지기금/.test(hay)) return 'fund';
-    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|\bilteo\b|\bjobtrans\b/i.test(hay)) return 'consult';
+    if (/정부사업|컨설팅보고서|컨설팅정산|일터상생혁신|산업일자리전환|안전보건체계구축|\bilteo\b|\bjobtrans\b|\bsafety\b/i.test(hay)) return 'consult';
     if (/업무관리|푸른\s*메일|메일함|캘린더/.test(hay)) return 'work';
     if (/기업정보함|사진첩|푸른카메라|카메라|명함/.test(hay)) return 'cards';
     if (/계약서등관리|한글\s*편집|전자서명|위임장/.test(hay)) return 'docs';
@@ -2199,7 +2225,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];

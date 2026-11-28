@@ -58,14 +58,14 @@ textarea{width:100%;resize:vertical;font-family:inherit;line-height:1.55;word-br
 a{color:var(--blue-d);text-decoration:none}
 a.act-link{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--blue-line);border-radius:7px;background:var(--blue-bg);color:var(--blue-d);font-size:12px;font-weight:600;white-space:nowrap}
 #head{position:sticky;top:0;z-index:20;width:100%;max-width:none;background:var(--card);border-bottom:1px solid var(--line)}
-.top{display:flex;align-items:center;gap:10px;padding:8px 12px;width:100%;max-width:none;flex-wrap:wrap}
-.top h1{font-size:17px;margin:0}
-.top .sub{font-size:12px;color:var(--mute)}
+.top{display:flex;align-items:center;gap:8px;padding:5px 12px;width:100%;max-width:none;flex-wrap:wrap}
+.top h1{font-size:15px;margin:0}
+.top .sub{font-size:11px;color:var(--mute)}
 .sp{flex:1}
-#who{font-size:13px;color:var(--mute)}
+#who{font-size:12px;color:var(--mute)}
 #who b{color:var(--ink)!important}
-.tabs{display:flex;gap:4px;padding:0 12px;width:100%;max-width:none;flex-wrap:wrap;align-items:center}
-.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:8px 12px}
+.tabs{display:flex;gap:3px;padding:0 12px;width:100%;max-width:none;flex-wrap:wrap;align-items:center}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mute);padding:5px 10px;font-size:12px}
 .tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--blue)}
 .chip{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--ink2)}
 .c-blue{background:var(--blue-bg);color:var(--blue-d);border-color:var(--blue-line)}
@@ -83,10 +83,10 @@ main{display:block;padding:10px 26px 56px 12px;width:100%;max-width:none;margin:
 .note{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:10px}
 .warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
 .ok-banner{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px}
-.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
-.agency-scope-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;background:var(--card);border:1px solid var(--line);border-radius:10px}
-.agency-scope-lbl{font-weight:700;font-size:12.5px;color:var(--ink2);white-space:nowrap}
-.agency-scope-btn{padding:6px 11px;min-height:34px;border-radius:8px;font-weight:600;font-size:12.5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-bottom:7px}
+.agency-scope-bar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:5px 9px;margin-bottom:6px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.agency-scope-lbl{font-weight:700;font-size:11.5px;color:var(--ink2);white-space:nowrap}
+.agency-scope-btn{padding:3px 8px;min-height:26px;border-radius:7px;font-weight:600;font-size:11.5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
 .agency-scope-btn.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff}
 .agency-scope-btn.cepa.on{background:var(--ok-bg);border-color:var(--ok-bg);color:#ffffff}
 .agency-split-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
@@ -107,9 +107,9 @@ main{display:block;padding:10px 26px 56px 12px;width:100%;max-width:none;margin:
 @media (min-width:1480px){.form-compare-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .form-step-list{margin:0;padding:10px 14px 10px 28px;font-size:12.5px;line-height:1.65;color:var(--ink)}
 .form-step-list li{margin-bottom:3px}
-.kpi{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;flex-direction:column;gap:3px;min-width:0}
-.kpi span{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi b{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:4px 9px;background:var(--card);display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:5px;min-width:0}
+.kpi span{font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kpi b{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi.k-blue b{color:var(--blue-d)}
 .kpi.k-green b{color:var(--green)}
 .kpi.k-amber b{color:var(--amber)}
@@ -283,7 +283,7 @@ table.t tr.cur>td.n{color:var(--ink2)}
 @media (max-width:520px){#who{display:none}}
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「추천대로 시작」 2026-11-19 · ① 무리 「이어서」 2026-11-20) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design pu-frame-a pu-dark-auto">
 <div id="head">
@@ -400,12 +400,12 @@ table.t tr.cur>td.n{color:var(--ink2)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 표시는 관문 장착 검사용이며, jobtrans 는 유예 목록에 없으므로 강제(enforce) 모드로 동작합니다 -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>

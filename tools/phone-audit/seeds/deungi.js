@@ -19,7 +19,7 @@ const base = Object.assign(meta('base', 'DeungiBase'), {
     { id: 'b2', name: '다래분사무소', alias: '다래지사', addr: '점검특별자치시 점검로 312, 502호(점검동, 점검타운)', no: 2, since: '2025-01-01', head: 'm4' },
     { id: 'b3', name: '나무분사무소', alias: '나무지사', addr: '점검도 점검시 점검남1로 37, 2층(점검동, 점검인빌딩)', no: 3, since: '2019-07-24' },
   ],
-  charter: '', history: [],
+  charter: '', history: [{ at: '2026-09-03', caseId: 'DG20260901-demo', title: '2026 09 등기 반영(점검)', summary: '사원 4명 현행화 및 나무지사 이전' }],
 });
 const c1 = Object.assign(meta('DG20261114-test', 'DeungiCase'), {
   title: '2026 사원 변경등기(점검)', status: 'meeting',
@@ -34,7 +34,15 @@ const c1 = Object.assign(meta('DG20261114-test', 'DeungiCase'), {
   dates: { notice: '2026-11-13' }, checks: { corpSeal: { ok: true }, corpCert: { ok: true, issued: '2026-07-01' } }, docsOff: {},
 });
 
-/* 지난 등기 원본 서류 묶음(2026-11-14) — 긴 파일 이름·여러 종류를 섞어 폰 카드가 깨지는지 본다. 파일 번호는 지어낸 것 */
+/* 지난 등기 원본 서류 묶음(2026-11-14) — 연도별 타임라인·긴 파일 이름·여러 종류를 섞어 점검한다. 파일 번호는 지어낸 것 */
+const ar0 = Object.assign(meta('ARtest2026c', 'DeungiArchive'), {
+  title: '2026-09 사원 변경·나무분사무소 이전(점검)', at: '2026-09-03', summary: '사원 1명 퇴사·1명 입사(노무출자) 및 나무분사무소 이전',
+  files: {
+    fake_file_id_0011: { fileId: 'fake_file_id_0011', name: '1. 변경 정관(점검).hwp', kind: 'charter', date: '2026-09-03', note: '', masked: false, addedAt: T0 },
+    fake_file_id_0012: { fileId: 'fake_file_id_0012', name: '2. 정관변경 이유서(점검).hwp', kind: 'reason', date: '2026-08-05', note: '', masked: false, addedAt: T0 },
+    fake_file_id_0013: { fileId: 'fake_file_id_0013', name: '3. 임시사원총회 의사록(점검).hwp', kind: 'minutes', date: '2026-07-22', note: '', masked: false, addedAt: T0 },
+  },
+});
 const ar1 = Object.assign(meta('ARtest2019a', 'DeungiArchive'), {
   title: '2019-07 나무분사무소 설치·정관변경(점검)', at: '2019-07-30', summary: '분사무소 1곳 설치 — 정관 제3조 변경, 인가 뒤 등기',
   files: {
@@ -49,8 +57,23 @@ const ar2 = Object.assign(meta('ARtest2017b', 'DeungiArchive'), { title: '2017-1
 /* 앞 화면(자세히·지난 기록·덮는 칸)이 남긴 것을 치우고 «등기 건 탭 · 쉬운 진행»에서 시작 */
 const toEasy = async (p) => { await p.evaluate(() => window.sideClose && window.sideClose()); await p.click('#tabs button[data-tab=case]'); await p.waitForTimeout(300); const r = await p.$('#caseList tr[data-open]'); if (r && !(await p.$('#editor .card'))) { await r.click(); await p.waitForTimeout(600); } const e = await p.$('[data-act=mode][data-m=easy]'); if (e) { await e.click(); await p.waitForTimeout(500); } };
 
+/* 푸른통합시스템 직원명부(지어낸 자료 — 주민번호·전화번호 꼴 없음) */
+const staffAccounts = [
+  { sid: 'P001', name: '점검대표', title: '대표노무사', role: 'admin', branch: '본점', status: 'active', birthDate: '1970-01-01', address: '점검도 점검시 점검구 가나다라로 20, 103동 1303호(점검동, 가나다라마바사아파트)', hireDate: '2017-11-20', licenseNo: '10001' },
+  { sid: 'P002', name: '점검노무', title: '노무사', role: 'member', branch: '가지지사', status: 'retired', birthDate: '1980-01-01', address: '점검도 점검시 마바로 31, 105동 1201호', hireDate: '2017-11-20', retireDate: '2026-11-18', leaveReason: '자발적 퇴사', licenseNo: '10002' },
+  { sid: 'P003', name: '점검사원', title: '노무사', role: 'member', branch: '본점', status: 'active', birthDate: '1990-01-01', address: '점검도 점검시 바뀐새로 88', addressDetail: '201호', hireDate: '2024-02-28', licenseNo: '10003' },
+  { sid: 'P091', name: '가나다노무', title: '노무사', role: 'member', branch: '본점', status: 'active', birthDate: '1992-05-14', address: '점검도 점검시 푸른로 77', addressDetail: '502호', hireDate: '2026-11-01', licenseNo: '90123' },
+  { sid: 'P092', name: '점검동명', title: '노무사', role: 'member', branch: '본점', status: 'active', birthDate: '1988-03-11', address: '점검시 동명로 1', hireDate: '2025-05-01' },
+  { sid: 'P093', name: '점검동명', title: '노무사', role: 'member', branch: '나무지사', status: 'active', birthDate: '1991-09-22', address: '점검시 동명로 2', hireDate: '2026-01-01' },
+  { sid: 'A010', name: '점검사무', title: '사무직', role: 'staff', branch: '본점', status: 'active', birthDate: '1995-08-08', address: '점검시 사무로 10', hireDate: '2026-03-01' },
+];
+const staffDir = staffAccounts.map((u) => ({ sid: u.sid, name: u.name, role: u.role, title: u.title, branch: u.branch, status: u.status }));
+
 module.exports = {
-  data: { deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar1.id]: ar1, [ar2.id]: ar2 } } },
+  data: {
+    data: { user_accounts: { v: staffAccounts }, user_dir: { v: staffDir } },
+    deungi: { base, cases: { [c1.id]: c1 }, archive: { [ar0.id]: ar0, [ar1.id]: ar1, [ar2.id]: ar2 } },
+  },
   localStorage: { pu_deungi_tab: 'case', pu_deungi_cur: c1.id },
   views: [
     { name: 'easy1', run: async (p) => { await p.click('#wizSteps [data-s="1"]'); } },
@@ -59,9 +82,78 @@ module.exports = {
     { name: 'easy4', run: async (p) => { await p.click('#wizSteps [data-s="4"]'); } },
     { name: 'docs', run: async (p) => { await p.click('[data-act=mode][data-m=full]'); await p.click('#edDocs input[data-doc]'); } },
     { name: 'base', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); window.DOC_NO_AUTO = window.CUR; }); await p.click('#tabs button[data-tab=base]'); await p.waitForTimeout(300); } },
-    /* 지난 기록 — 접힌 모습(기본) · 모두 편 모습 */
-    { name: 'hist', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); window.FOLD = {}; }); await p.click('#tabs button[data-tab=hist]'); } },
-    { name: 'histopen', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); const b = await p.$('[data-act=foldAll][data-v="1"]'); if (b) await b.click(); await p.waitForTimeout(300); } },
+    /* 지난 기록 — AB-1 대시보드(왼쪽 연도 타임라인 + 오른쪽 요약·서류 리스트·인라인 미리보기) */
+    { name: 'hist', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; }); await p.click('#tabs button[data-tab=hist]'); await p.waitForTimeout(200); } },
+    /* 지난 기록 AB-1 동작 — 연도 넘버링(№1~№3) · 연도 필터 · 묶음 클릭 → 서류 리스트(4) · 종류 필터 · 서류 클릭(미리보기) · 목록 접기/펴기 · 바뀐 기록 탭 */
+    { name: 'histdash', run: async (p) => {
+      const must = (ok, why) => { if (!ok) throw new Error('histdash: ' + why); };
+      const w = (ms) => p.waitForTimeout(ms);
+      await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; });
+      await p.click('#tabs button[data-tab=hist]'); await w(300);
+      const init = await p.evaluate(() => ({
+        cards: document.querySelectorAll('#histBox .hd-card').length,
+        yrs: [...document.querySelectorAll('#histBox .hd-yr')].map((e) => e.textContent.trim()),
+        nos: [...document.querySelectorAll('#histBox .hd-left .hd-no')].map((e) => e.textContent.trim()),
+      }));
+      must(init.cards === 3 && init.yrs.length === 3 && init.nos.join(',') === '№ 1,№ 2,№ 3', '연도별 넘버링 카드 3건 필요 ' + JSON.stringify(init));
+      await p.click('#histBox [data-act="histYear"][data-v="2019"]'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 1), '2019 필터 시 1건');
+      await p.click('#histBox [data-act="histYear"][data-v="ALL"]'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 3), '전체 복원 시 3건');
+      await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await w(250);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4 && /나무분사무소/.test((document.querySelector('#histBox .hd-sum-ttl') || {}).textContent || '')), '2019 묶음 서류 4개 표시');
+      await p.click('#histBox [data-act="histKind"][data-v="approval"]'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 1 && (document.getElementById('arcPvKind') || {}).value === 'approval'), '종류 필터(인가증) 1건 및 미리보기 대상 일치');
+      await p.click('#histBox [data-act="histKind"][data-v="ALL"]'); await w(200);
+      await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); });
+      await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act="arcView"]'); await w(450);
+      if (p.viewportSize().width > 768) {
+        const pvBefore = await p.evaluate(() => document.querySelector('#arcPvBody img') && document.querySelector('#arcPvBody img').src);
+        must(!!pvBefore && await p.evaluate(() => !!document.querySelector('#histBox tr[data-arcf="fake_file_id_0004"].cur')), '넓은 화면 인라인 이미지 미리보기 및 행 강조 필요');
+        must(await p.evaluate(() => {
+          const sc = document.querySelector('#histBox .hd-docscroll').getBoundingClientRect();
+          const ths = [...document.querySelectorAll('#histBox .hd-doccol .t.arct thead th')].filter((th) => th.offsetParent !== null);
+          return ths.length >= 4 && ths.every((th) => {
+            const r = th.getBoundingClientRect();
+            return r.left >= sc.left - 1 && r.right <= sc.right + 2;
+          });
+        }), '서류 목록 헤더(종류·받기)가 가로 스크롤로 잘리지 않아야 함');
+        await p.evaluate(() => {
+          const img = document.querySelector('#arcPvBody img');
+          const body = document.getElementById('arcPvBody');
+          window.__pvRef = img;
+          img.style.height = '1200px';
+          body.scrollTop = 45;
+        });
+        await p.click('#histBox tr[data-arcf="fake_file_id_0004"] input[data-sel="arc"]'); await w(150);
+        must(await p.evaluate(() => document.querySelector('#arcPvBody img') === window.__pvRef && document.getElementById('arcPvBody').scrollTop === 45), '체크박스 선택 시 인라인 미리보기 DOM·scrollTop 보존');
+        await p.click('#histBox tr[data-arcf="fake_file_id_0004"] input[data-sel="arc"]'); await w(150);
+        await p.evaluate(() => {
+          const img = document.querySelector('#arcPvBody img');
+          if (img) img.style.height = '';
+          delete window.__pvRef;
+        });
+        await p.selectOption('#arcPvKind', 'etc'); await w(250);
+        must(await p.evaluate(() => (document.getElementById('arcPvKind') || {}).value === 'etc' && /기타/.test((document.querySelector('#histBox tr[data-arcf="fake_file_id_0004"] td.kd') || {}).textContent || '')), '미리보기 종류 변경(arcSetKind) 동작 및 표 갱신 필요');
+        await p.selectOption('#arcPvKind', 'guide'); await w(250);
+        must(await p.evaluate(() => (document.getElementById('arcPvKind') || {}).value === 'guide'), '미리보기 종류 원래값(guide) 복원 필요');
+        await p.click('#histBox .hd-doccol [data-act="histListToggle"]'); await w(200);
+        const pvAfter = await p.evaluate(() => document.querySelector('#arcPvBody img') && document.querySelector('#arcPvBody img').src);
+        must(await p.evaluate(() => !!document.querySelector('#histBox .hd-split.collapsed')) && pvAfter === pvBefore, '목록 접기 후에도 인라인 미리보기 DOM·URL 보존');
+        await p.click('#histBox .hd-pv [data-act="histListToggle"]'); await w(200);
+        must(await p.evaluate(() => !document.querySelector('#histBox .hd-split.collapsed') && document.querySelectorAll('#histBox tr[data-arcf]').length === 4), '목록 펴기 복원');
+      } else {
+        must(await p.evaluate(() => !!document.querySelector('#side.on img') && !document.querySelector('#histBox [data-act="histListToggle"]').offsetParent), '폰에서는 전체 덮는 보기 칸에 열리고 목록 접기 단추는 숨겨져야 함');
+        await p.click('#sdClose'); await w(250);
+      }
+      await p.fill('#histBox [data-hist-q="1"]', '존재하지않는검색어'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 0 && !document.querySelector('#histBox .hd-sum-ttl')), '검색 0건 시 오른쪽 패널도 비움 안내로 전환');
+      await p.click('#histBox .hd-right [data-act="histReset"]'); await w(200);
+      must(await p.evaluate(() => document.querySelectorAll('#histBox .hd-card').length === 3), '전체 연도 보기 복원');
+      await p.click('#histBox [data-act="histTab"][data-v="logs"]'); await w(200);
+      must(await p.evaluate(() => /2026 09 등기 반영/.test((document.querySelector('#histBox .hd-done-list') || {}).textContent || '')), '바뀐 기록 탭 표시 필요');
+      await p.click('#histBox [data-act="histTab"][data-v="archive"]'); await w(200);
+    } },
     /* 등기 현황 — 지사장 짝: 처음엔 한 곳 미정 → 사원을 고르면 띠·직책이 바뀜 → 사원 이름을 고치면 따라옴 → 미정으로 되돌림. 어긋나면 throw → 결과 json 의 navErr */
     { name: 'basehead', run: async (p) => {
       const must = (ok, why) => { if (!ok) throw new Error('basehead: ' + why); };
@@ -92,32 +184,8 @@ module.exports = {
       must(/no/.test(a5.oc[3]) && /지사장 미정 1곳/.test(a5.sum), '새 사원 줄이 옛 지사장 자리를 차지하면 안 됨 ' + JSON.stringify(a5));
       await p.evaluate(() => { window.BASE_DRAFT = null; window.drawBase(); });
     } },
-    /* 지난 기록 접고 펴기 — 처음엔 접힘 → 누르면 펴지고 초점이 단추에 남음 → 다시 그려도 폄 → 접음 → 칸으로 접힌 묶음의 파일을 열면 그 묶음이 펴지고 줄이 칠해짐 → 모두 펴기/접기 */
-    { name: 'histfold', run: async (p) => {
-      const must = (ok, why) => { if (!ok) throw new Error('histfold: ' + why); };
-      const w = (ms) => p.waitForTimeout(ms);
-      await p.evaluate(() => { window.sideClose && window.sideClose(); window.FOLD = {}; });
-      await p.click('#tabs button[data-tab=hist]'); await w(300);
-      must(await p.evaluate(() => document.querySelectorAll('#histBox .arcg.open').length === 0 && document.querySelectorAll('#histBox tr[data-arcf]').length === 0), '처음엔 모두 접혀 있어야 함');
-      await p.click('#histBox .arcg[data-arc="ARtest2019a"] .tg'); await w(300);
-      const st = await p.evaluate(() => ({ open: document.querySelector('#histBox .arcg[data-arc="ARtest2019a"]').classList.contains('open'), rows: document.querySelectorAll('#histBox tr[data-arcf]').length, exp: document.querySelector('#histBox .arcg[data-arc="ARtest2019a"] .tg').getAttribute('aria-expanded'), foc: document.activeElement && document.activeElement.className }));
-      must(st.open && st.rows === 4 && st.exp === 'true' && /tg/.test(st.foc), '누르면 펴지고 초점이 단추에 남아야 함 ' + JSON.stringify(st));
-      await p.evaluate(() => window.drawHist());
-      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4), '다시 그려도 펴져 있어야 함');
-      await p.click('#histBox .arcg[data-arc="ARtest2019a"] .tg'); await w(200);
-      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 0), '다시 누르면 접혀야 함');
-      await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); window.arcView('ARtest2019a', 'fake_file_id_0004'); });
-      await w(700);
-      must(await p.evaluate(() => document.querySelectorAll('#histBox tr[data-arcf]').length === 4 && !!document.querySelector('#histBox tr.cur')), '칸으로 접힌 묶음의 파일을 열면 그 묶음이 펴지고 줄이 칠해져야 함');
-      await p.evaluate(() => window.sideClose()); await w(300);
-      await p.click('[data-act=foldAll][data-v="1"]'); await w(200);
-      must(await p.evaluate(() => document.querySelectorAll('#histBox .arcg.open').length === 2), '모두 펴기');
-      await p.click('[data-act=foldAll][data-v="0"]'); await w(200);
-      must(await p.evaluate(() => document.querySelectorAll('#histBox .arcg.open').length === 0), '모두 접기');
-      await p.evaluate(() => { window.FOLD = {}; window.drawHist(); });
-    } },
     /* 오른쪽 보기 칸(폰에서는 전체를 덮는 창) — 파일 받기는 가짜(작은 그림)로 */
-    { name: 'side', run: async (p) => { await p.click('#tabs button[data-tab=hist]'); const fa = await p.$('[data-act=foldAll][data-v="1"]'); if (fa) await fa.click(); await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } },
+    { name: 'side', run: async (p) => { await p.evaluate(() => { window.sideClose && window.sideClose(); if (window.HIST_UI) window.HIST_UI.listOff = false; const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); }); await p.click('#tabs button[data-tab=hist]'); await p.waitForTimeout(200); await p.click('#histBox .hd-card[data-arc="ARtest2019a"]'); await p.waitForTimeout(200); if (p.viewportSize().width >= 1080) { await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); await p.waitForTimeout(250); await p.click('#histBox [data-act="arcPopSide"]'); } else { await p.click('#histBox tr[data-arcf="fake_file_id_0004"] [data-act=arcView]'); } await p.waitForTimeout(300); } },
     /* 새 서류 보기 칸 — ② 에서 저절로 열림 · 이전/다음 · 줄 누르기 · 새 서류↔지난 원본 · ①에서 고치면 다시 그림 · Esc 뒤엔 저절로 다시 열지 않음 · 건을 닫으면 칸도 닫힘.
        어긋나면 throw → 결과 json 의 navErr 에 나온다 */
     { name: 'docflow', wait: 800, run: async (p) => {
@@ -141,7 +209,7 @@ module.exports = {
       await p.evaluate(() => { const b = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); PuOfficeStore.secretBlob = () => Promise.resolve(new Blob([u], { type: 'image/png' })); });
       await p.click('#sdSrcArc'); await w(1200);
       let s4 = await snap();
-      must(s4.k === 'arc' && /^\d \/ 4$/.test(s4.pos), '지난 원본으로 바꾸기 ' + JSON.stringify(s4));
+      must(s4.k === 'arc' && /^\d+ \/ 7$/.test(s4.pos), '지난 원본으로 바꾸기 ' + JSON.stringify(s4));
       await p.click('#sdSrcDoc'); await w(1800);
       let s5 = await snap();
       must(s5.k === 'doc' && s5.key === k3, '새 서류로 돌아오면 보던 서류 ' + JSON.stringify(s5));
@@ -176,5 +244,67 @@ module.exports = {
     } },
     /* 새 서류 보기 칸(폰에서는 전체를 덮는 창) — 줄을 눌러 연다 */
     { name: 'docside', wait: 2500, run: async (p) => { await toEasy(p); await p.click('#wizSteps [data-s="2"]'); await p.waitForTimeout(800); await p.click('#editor tr[data-dockey] button.lnk'); } },
+    /* 푸른통합시스템 직원명부 자동 당겨오기 — 퇴사 감지 배너 · 사원 입사 드롭다운 · 동명이인 자동 대입 금지 · 주소 변경 자동 채움 */
+    { name: 'staffpull', wait: 500, run: async (p) => {
+      const must = (ok, why) => { if (!ok) throw new Error('staffpull: ' + why); };
+      const w = (ms) => p.waitForTimeout(ms);
+      await p.evaluate(() => { window.sideClose && window.sideClose(); });
+      await p.click('#tabs button[data-tab=case]'); await w(200);
+      await p.click('#newCaseBtn'); await w(400);
+      /* 1. 퇴사 감지 배너가 보이고 한 번 누르면 퇴사일·사유가 자동으로 들어온다 */
+      must(await p.isVisible('#edChanges [data-act="quickLeave"][data-mid="m2"]'), '퇴사 감지 배너가 보여야 함');
+      await p.click('#edChanges [data-act="quickLeave"][data-mid="m2"]'); await w(300);
+      const lv = await p.evaluate(() => {
+        const bx = document.querySelector('#edChanges [data-ch]');
+        return { mem: bx.querySelector('[data-k="member"]').value, dt: bx.querySelector('[data-k="date"]').value, rs: bx.querySelector('[data-k="reason"]').value };
+      });
+      must(lv.mem === 'm2' && lv.dt === '2026-11-18' && lv.rs === '자발적 퇴사', '퇴사 자동 채움 실패 ' + JSON.stringify(lv));
+      /* 2. 사원 입사 — 드롭다운에서 가나다노무 고르면 이름·생년월일·주소·등록번호가 채워진다(입사 연월일은 인가일 보존을 위해 비움 유지) */
+      await p.click('#wizBody [data-add="join"]'); await w(300);
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption('P091'); await w(300);
+      const jv = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[1];
+        return {
+          name: bx.querySelector('[data-k="name"]').value,
+          birth: bx.querySelector('[data-k="birth"]').value,
+          addr: bx.querySelector('[data-k="addr"]').value,
+          lic: bx.querySelector('[data-k="license"]').value,
+          dt: bx.querySelector('[data-k="date"]').value,
+        };
+      });
+      must(jv.name === '가나다노무' && jv.birth === '920514' && jv.addr === '점검도 점검시 푸른로 77 502호' && jv.lic === '90123' && jv.dt === '', '입사 드롭다운 채움 실패 ' + JSON.stringify(jv));
+      /* 2-1. 드롭다운 선택 해제 시 선택 상태 유지 및 이전 자동값 비움 → 이름 변경 시 타인 정보 미혼입 확인 후 다시 P091 선택 */
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption(''); await w(250);
+      const jClr = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[1];
+        return { sel: bx.querySelector('[data-staff-join="1"]').value, birth: bx.querySelector('[data-k="birth"]').value, addr: bx.querySelector('[data-k="addr"]').value };
+      });
+      must(jClr.sel === '' && jClr.birth === '' && jClr.addr === '', '드롭다운 선택 해제 실패 ' + JSON.stringify(jClr));
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption('P091'); await w(250);
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-k="name"]').fill('점검사무'); await w(250);
+      const jSw = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[1];
+        return { birth: bx.querySelector('[data-k="birth"]').value, addr: bx.querySelector('[data-k="addr"]').value, lic: bx.querySelector('[data-k="license"]').value };
+      });
+      must(jSw.birth === '950808' && jSw.addr === '점검시 사무로 10' && jSw.lic === '', '이름 변경 시 이전 직원 정보 미혼입 실패 ' + JSON.stringify(jSw));
+      await p.locator('#edChanges [data-ch]').nth(1).locator('[data-staff-join="1"]').selectOption('P091'); await w(250);
+      /* 3. 사원 입사 — 동명이인(점검동명) 이름만 치면 자동 대입하지 않고 안내만 띄운다 */
+      await p.click('#wizBody [data-add="join"]'); await w(300);
+      await p.locator('#edChanges [data-ch]').nth(2).locator('[data-k="name"]').fill('점검동명'); await w(300);
+      const dv = await p.evaluate(() => {
+        const bx = document.querySelectorAll('#edChanges [data-ch]')[2];
+        return {
+          birth: bx.querySelector('[data-k="birth"]').value,
+          addr: bx.querySelector('[data-k="addr"]').value,
+          warn: (bx.querySelector('.staff-warn') || {}).textContent || '',
+        };
+      });
+      must(dv.birth === '' && dv.addr === '' && /2명/.test(dv.warn), '동명이인 자동 대입 금지 위반 ' + JSON.stringify(dv));
+      /* 4. 사원 주소 변경 — 점검사원 고르면 인사관리 바뀐 주소가 자동으로 들어온다 */
+      await p.click('#wizBody [data-add="addr"]'); await w(300);
+      await p.locator('#edChanges [data-ch]').nth(3).locator('[data-k="member"]').selectOption('m3'); await w(300);
+      const av = await p.evaluate(() => document.querySelectorAll('#edChanges [data-ch]')[3].querySelector('[data-k="addr"]').value);
+      must(av === '점검도 점검시 바뀐새로 88 201호', '주소변경 자동 채움 실패 ' + av);
+    } },
   ],
 };

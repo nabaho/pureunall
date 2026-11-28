@@ -282,6 +282,9 @@ test('★★ 다시 하면 될 실패(연결 끊김)는 «본 것»으로 적지
   const seen = db.tree.edulib_inbox.seen;
   const why = Object.keys(seen).map((k) => seen[k].why);
   assert.ok(why.indexOf('big') >= 0 && why.indexOf('gone') >= 0);
+  /* «본 것»은 레코드가 아니다 — id·entityType 칸이 있으면 서버 저장 감시가 레코드로 보고 경고한다(2026-11-22 첫 밤 기록) */
+  Object.keys(seen).forEach((k) => assert.ok(!('id' in seen[k]) && !('entityType' in seen[k]), '«본 것»에 id·entityType 칸이 없다'));
+  assert.match(read(path.join(ROOT, 'functions', 'edulib-mail-sweep.js')), /if \(id\) v\.item = id;/, '같은 파일의 자료 열쇠는 item 칸에');
   assert.ok(!db.tree.edulib_inbox.q);
   /* 다음 번엔 끊겼던 것만 다시 받는다 */
   const d2 = deps(db);

@@ -10,7 +10,9 @@ for (let i = 0; i < 32; i++) {
   feed.push({ id: 'G' + String(i + 1).padStart(4, '0'), no: 'R26BK' + String(1000000 + i * 37) + '-000', src: ['나라장터', '알리오', '기업마당'][i % 3],
     type: ['새 공고', '관심', '지원함', '지나감', '새 공고'][i % 5], nm: 이름[i % 이름.length] + (i >= 6 ? ' ' + (i + 1) : ''), org: 기관[i % 기관.length], ntce: 기관[(i + 1) % 기관.length],
     openDt: addDays(-10) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: i % 4 === 3 ? 0 : 12000000 * (i + 1) + 3456789, mthd: i % 6 === 2 ? '수의계약' : '일반경쟁', kw: ['노무', '임금', '컨설팅', '조직진단'][i % 4],
-    url: 'https://example.com/g' + i, savedAt: addDays(-(i % 7)) + 'T09:00:00', hidden: i % 11 === 10 });
+    url: 'https://example.com/g' + i, savedAt: addDays(-(i % 7)) + 'T09:00:00', hidden: i % 11 === 10,
+    /* 「계약·제한」 칸(2026-11-22) — 업종제한(이름 있음·이름 모름)이 섞인 줄 */
+    ind: i % 7 === 4 ? '엔지니어링사업(점검 분야)' : undefined, indY: i % 7 === 1 ? 'Y' : undefined });
 }
 /* 📍 대전·세종·충남·충북 탭(2026-11-16, 세종은 11-17)이 «그 지역 것»을 골라 그리는지 보려는 줄 — 기관·참가 가능 지역·제목에 지역이 적힌 것(모두 지어낸 이름).
    「세종문화…」 줄은 세종시가 아니라 빠져야 하는 줄이다. */
@@ -27,7 +29,8 @@ const 지역줄 = [
 지역줄.forEach(([src, org, rgn, nm, d], i) => {
   feed.push({ id: 'G' + String(33 + i).padStart(4, '0'), no: 'R26RG' + String(2000000 + i * 41) + '-000', src, type: d < 0 ? '지나감' : '새 공고', nm, org, ntce: org,
     openDt: addDays(-7) + ' 10:00', closeDt: addDays(d) + ' 18:00', prc: 23000000 + i * 4567891, mthd: '일반경쟁', kw: '노무', rgn: rgn || undefined,
-    url: 'https://example.com/rg' + i, savedAt: addDays(-(i % 4)) + 'T09:00:00', hidden: false });
+    url: 'https://example.com/rg' + i, savedAt: addDays(-(i % 4)) + 'T09:00:00', hidden: false,
+    ind: i === 3 ? '엔지니어링사업(점검 분야)' : undefined });   /* 지역 + 업종 둘 다 — 「계약·제한」 칸에서 가장 긴 줄 */
 });
 /* 🤖 AI 사업 탭(2026-11-19)이 그리는 줄 — 찾는 말에는 안 걸리고 AI 갈래로만 걸린 줄(kw 빔 · ai 표시) + 노무 말에도 걸린 AI 줄.
    「AI 기반 … 감시 구축」은 AI 갈래가 아니라 원래 안 담기는 줄이라 넣지 않는다(모두 지어낸 이름) */
@@ -106,6 +109,11 @@ module.exports = {
     { name:'application-pick',run:async(p)=>{await p.evaluate(()=>pickOpen());},back:async(p)=>{await p.evaluate(()=>popClose());} },
     { name: 'sel', run: async (p) => { for (const k of [1, 2, 3]) await p.click('#tb tr:nth-child(' + k + ') input.row-chk'); } },
     { name: 'pop', run: async (p) => { await p.click('#tb tr:nth-child(2) td.nm'); }, back: async (p) => { await p.evaluate(() => popClose()); } },
+    /* 「수의계약도 보기」 — 기본은 빠지는 수의계약 줄이 「계약·제한」 칸에 딱지와 함께 돌아온다(2026-11-22) */
+    { name: 'soleall', run: async (p) => { await p.evaluate(() => feedMthd('all')); }, back: async (p) => { await p.evaluate(() => feedMthd('nosole')); } },
+    /* 지역 + 업종이 함께 걸린 줄(칸이 가장 넓어지는 줄)만 남겨 본다 */
+    { name: 'limrgn', run: async (p) => { await p.evaluate(() => { document.getElementById('q').value = '지역 제한'; draw(); }); },
+      back: async (p) => { await p.evaluate(() => { document.getElementById('q').value = ''; draw(); }); } },
     { name: 'plan', run: async (p) => { await p.click('#tbPlan'); } },
     { name: 'rec', run: async (p) => { await p.click('#tbRec'); } },
     { name: 'recpub', run: async (p) => { await p.evaluate(() => recSub('pub')); } },

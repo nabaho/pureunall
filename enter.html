@@ -145,7 +145,7 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script>
 /* 카카오 복귀 문서는 이미 인증 중이다. 버전 확인보다 먼저 표시하여 콜백 중 자동 새로고침을 막는다.
    이 문서에서 인증을 마친 직후에도 자동 교체하지 않는다 — 포털→진행 화면→포털 왕복 방지.
@@ -210,7 +210,7 @@ try {
 <script src="js/pu-billing.js?v=13"></script>
 <!-- 📋 머리줄 «내 업무» 단추의 숫자(work_erp/mysum/{사번} 한 줄 — 업무관리가 적는다, 2026-11-21) -->
 <script src="js/pu-mywork.js?v=1"></script>
-<script src="js/kcareer-mailreq.js?v=5"></script>
+<script src="js/kcareer-mailreq.js?v=8"></script>
 <style>
 :root{
   --bg:#e2e8f0; --ink:#1e293b; --sub:#475569; --mute:#64748b;
@@ -296,10 +296,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .pbar .nm b,.pbar .nm small,.pbar .pmeta,.pbar .pmeta span,.pbar .logout{white-space:nowrap;}
 .pbar #chatFab{order:4;}  /* 건의하기 바로 왼쪽 통합 AI 챗봇 */
 .pbar #sgFab{order:4;}   /* 내 메뉴 단추(order:5) 바로 왼쪽 */
-/* ✨ TypeSafe 검토 — 머리줄 «건의하기 왼쪽» (대표 2026-10-24 윗줄 정리 안 1 — js/pu-typesafe.js 가 넣는다).
-   예전(2026-09-23)에는 「업무 시스템」 줄에 두었다 — 그때 머리 카드는 사용액·AI 판독 딱지로 920px 를 다 써서
-   여기 넣으면 163px 넘쳤다. 2026-10-24 에 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 났다. 폰에서는 ⋯ 안(DOCK_IDS). */
-.pbar #pu-typesafe-review-button{order:3;padding:6px 12px!important;box-shadow:none!important;}   /* 건의하기(order:4) 왼쪽 */
 /* 📅 머리줄 앱 단추(.hd-app — APPS 의 head:true, 지금은 푸른 캘린더) — 대표 지시 2026-11-14 목업 A안.
    챗봇(order:4)과 건의하기(order:4) 사이 — 차례가 같으면 HTML 차례를 따른다. 달력 그림 안은 «오늘 날짜».
    ⚠ hidden 속성은 display 를 주면 풀려 버린다 — [hidden] 줄이 따로 있어야 «감춤»이 먹는다.
@@ -927,6 +923,33 @@ body.portal-mode #camFab{display:flex;}
   opacity:0;transform:translateY(-4px);transition:opacity .35s,transform .35s;pointer-events:none;}
 .sg-tip::before{content:'';position:absolute;top:-5px;right:24px;width:10px;height:10px;background:#1e293b;transform:rotate(45deg);}
 .sg-tip.on{opacity:1;transform:translateY(0);}
+/* 📋 «내 업무» 첫 안내 — 로그인하면 머리줄 «내 업무» 단추 바로 아래에 뜬다 (대표 지시 2026-11-22, 자세히 JS 「내 업무 첫 안내」)
+   자리(left·top·화살표)는 JS 가 단추를 재서 정한다 — 화면 양옆 8px 안. 확인 창(z 80)보다 아래(z 60)라 겹치면 확인 창이 위다. */
+.mw-tip{position:absolute;z-index:60;box-sizing:border-box;background:#1e293b;color:#fff;border-radius:12px;
+  padding:12px 14px 10px;box-shadow:0 10px 28px rgba(15,23,42,.32);font-size:.78rem;font-weight:500;line-height:1.6;
+  text-align:left;letter-spacing:0;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;animation:mwTipIn .3s ease-out;}
+.mw-tip .mw-ar{position:absolute;top:-6px;left:24px;width:12px;height:12px;background:#1e293b;transform:rotate(45deg);}
+.mw-tip .mw-t{display:block;font-size:.88rem;font-weight:800;margin:0 26px 6px 0;}
+.mw-tip ul{margin:0;padding:0 0 0 17px;}
+.mw-tip li{margin:3px 0;color:#e2e8f0;}
+.mw-tip li b{color:#fff;font-weight:800;}
+.mw-tip .mw-x{position:absolute;top:6px;right:6px;width:30px;height:30px;border:0;border-radius:8px;background:transparent;
+  color:#cbd5e1;font-size:14px;line-height:1;cursor:pointer;}
+.mw-tip .mw-x:hover{background:rgba(255,255,255,.12);color:#fff;}
+.mw-tip .mw-ft{display:flex;gap:6px;margin-top:10px;}
+.mw-tip .mw-ft button{flex:1;min-height:36px;border-radius:9px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.mw-tip .mw-go{background:#2563eb;color:#fff;border:0;}
+.mw-tip .mw-go:hover{background:#1e40af;}
+.mw-tip .mw-ok{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);}
+.mw-tip .mw-ok:hover{background:rgba(255,255,255,.1);}
+.mw-tip small{display:block;margin-top:6px;font-size:.68rem;color:#94a3b8;}
+.mw-tip button:focus-visible{outline:2px solid #60a5fa;outline-offset:2px;}
+@keyframes mwTipIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){ .mw-tip{animation:none;} }
+.mw-tip:focus{outline:none;}   /* 뜰 때 상자 자체가 초점을 받는다(화면읽기용) — 테두리는 안의 단추에만 */
+/* 폰 — 누르는 자리 44px(손가락 권장 크기) */
+@media(max-width:520px){ .mw-tip{font-size:.8rem;} .mw-tip .mw-t{margin-right:44px;} .mw-tip .mw-ft button{min-height:44px;}
+  .mw-tip .mw-x{width:44px;height:44px;top:2px;right:2px;} }
 /* 버튼 숫자 배지: admin=미처리 건수 / 일반=내 미확인 해결 건수 */
 .sg-fabbadge{position:absolute;top:-7px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#fff;color:#dc2626;border:1.5px solid #fecaca;font-size:.62rem;font-weight:800;display:none;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.15);}
 /* 해결 알림 팝업 (로그인 직후 자동) */
@@ -1853,13 +1876,13 @@ body.portal-mode #moreFab{display:flex;}
 
       <!-- ── 시스템 장애 알림 ────────────────────────────────────────
            왼쪽 아래에 «늘» 떠 있던 「장애 알림」 단추를 치웠다(대표 지시 2026-08-23).
-           장애가 실제로 있을 때만 그 자리에 빨갛게 뜬다 — 없으면 어느 화면에도 없다.
+           (2026-11-22) 이제는 장애가 나도 빨간 단추가 뜨지 않는다 — 알림은 저절로 «처리 완료»로 정리된다(js/pu-health.js).
            대신 평소에 들여다보는 문을 여기 하나 남긴다. 서랍 안이라 화면을
            차지하지 않고, 이미 총괄관리자만 여는 곳이라 권한도 그대로다. -->
       <div class="cfg-tool">
         <div>
           <b>시스템 장애 알림</b>
-          <span>장애가 생기면 화면 왼쪽 아래에 빨갛게 뜹니다. 평소에 지난 것까지 보려면 여기서 여세요.</span>
+          <span>장애 알림은 화면에 뜨지 않고 저절로 «처리 완료»로 정리됩니다(기록은 남습니다). 정리되기 전에 남은 것이 있으면 여기서 열어 보세요.</span>
         </div>
         <button type="button" id="cfgHealth">열어보기</button>
       </div>
@@ -2280,6 +2303,7 @@ body.portal-mode #moreFab{display:flex;}
     { key:'harass',  name:'괴롭힘·성희롱 조사', desc:'사건조사·메일수집·보고서', icon:'🛡️', url:'pu-harass.html',      roles:null, row:'client' },
     { key:'ilteo',   name:'일터상생혁신',     desc:'메일자료·중간·결과보고·PPT 자동화', icon:'🏭', url:'ilteo.html',          roles:null, row:'client' },
     { key:'jobtrans', name:'산업일자리전환',  desc:'능률협회·충경진 메일·보고서·HWPX', icon:'⚡', url:'jobtrans.html',       roles:null, row:'client' },
+    { key:'safety',   name:'안전보건체계구축', desc:'과거이력·업종별체크·위험성·HWPX', icon:'🦺', url:'safety.html',         roles:null, row:'client' },
     { key:'orch',    name:'오케스트레이션',   desc:'메일·계약·ERP·정산 흐름연결', icon:'🔄', url:'pu-orchestrator.html', roles:null, row:'inside', popup:true },
     { key:'work',    name:'업무관리',     desc:'내가 맡은 업무 · 주간 기록', icon:'📋', url:'work.html',  roles:null, row:'store', head:true, count:'myWork' },   /* head — 자료함 타일 대신 머리줄 «📋 내 업무» 단추(#headApp_work)로 선다 (대표 지시 2026-11-21 「로그인하면 자기 업무 위주로 · 한 번에 보고 클릭」). count — 진행·임박·할 일(work_erp/mysum, 업무관리가 적는다) */
     /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
@@ -2327,6 +2351,7 @@ body.portal-mode #moreFab{display:flex;}
        문(pu-cards.html 의 soonUnlessAdmin)은 «짝»이라 둘을 함께 뺐다. */
     { key:'mail',    name:'푸른 메일',     desc:'메일 쓰기·보낸 메일·자료함', icon:'📧', url:'pu-cards.html?view=mail', roles:null, row:'store' },
     { key:'cards',   name:'기업정보함',    desc:'사업자·명함·계약서', icon:'📇', url:'pu-cards.html',       roles:null, row:'store' },
+    { key:'pubsearch', name:'공공 기업검색', desc:'금융위·재무·국세청·고용·연금·DART', icon:'🔍', url:'pu-pubsearch.html', roles:null, row:'store' },
     { key:'photos',  name:'사진첩',       desc:'사진·서류',        icon:'🖼️', url:'pu-photos.html',      roles:null, row:'store' },
     { key:'fund',    name:'기금관리',     desc:'근로복지기금 운영', icon:'🪙', url:'fund.html',           roles:null, row:'client' },
     /* 취업규칙 — 타일은 «하나»(대표 결정 2026-10-04 두 앱 합치기).
@@ -5153,6 +5178,8 @@ body.portal-mode #moreFab{display:flex;}
       try { cfgShowFab(); } catch(e){}
     } else {
       if(window.sgSetUser) window.sgSetUser(acct);
+      mwTipWire();                                               // 📋 단추 누름 = «앎» — 안내가 뜨기 전에 눌러도 기억하게 지금 붙인다
+      setTimeout(function(){ portalMyWorkTip(false); }, 600);   // 📋 내 업무 첫 안내 — 머리줄이 자리 잡은 뒤(대표 지시 2026-11-22)
       initPortalHanaAlerts(role);
       initPortalExpAlerts();
       portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
@@ -5179,6 +5206,7 @@ body.portal-mode #moreFab{display:flex;}
      ★ 단추 안의 달력 그림은 «오늘 날짜»(월·일)다. 자정을 넘겨 열어 둔 포털도 다시 볼 때 맞춘다(visibilitychange).
      ★ 「오늘 N건」(APPS 의 count:'gcalToday')은 아래 «오늘 N건» 구역 — 무엇을 세는지는 거기 적었다. */
   function portalHeadAppsHide(){
+    mwTipRedraw();            // 📋 내 업무 첫 안내도 함께 걷는다 — 앞사람 안내가 남지 않게(같은 사람이면 다시 그린 뒤 또 뜬다)
     var els = document.querySelectorAll('[data-head-app]');
     for(var i = 0; i < els.length; i++) els[i].hidden = true;
   }
@@ -5352,6 +5380,7 @@ body.portal-mode #moreFab{display:flex;}
     if(v) v.textContent = String(urgent);
     if(box){ box.hidden = false; box.classList.toggle('is-zero', urgent === 0); }
     portalHeadAppLabel(el);
+    if($('mwTip')) mwTipPlace();   // 숫자가 붙어 단추 폭이 바뀌었다 — 첫 안내의 화살표를 다시 맞춘다
   }
   /* 접근성 이름·말풍선 — 숫자는 «받았을 때만», 언제 기준인지도 밝힌다(업무관리를 마지막으로 연 때) */
   function portalMyWorkLabel(el){
@@ -5363,6 +5392,126 @@ body.portal-mode #moreFab{display:flex;}
       + (line ? '\n' + line + (st ? ' (업무관리 ' + st + ' 기준)' : '') : '\n숫자는 업무관리를 한 번 열면 나옵니다');
   }
   /* ── 내 업무 숫자 끝 ── */
+
+  /* ══ 📋 내 업무 첫 안내 — 로그인하면 «내 업무» 단추 바로 아래에 안내 상자 (대표 지시 2026-11-22) ══
+     대표 말씀: 「로그인하면 내 업무 현재 진행 상황은 어디다라고 하고 팝업창으로, 내 업무 박스 옆에 여기를 누르면
+       본인 지금 현재 업무를 입력하거나 ERP 진행 상황 등을 확인할 수 있다, 여기에 데이터를 넣을 수 있다, 관리가 가능하다」.
+     ★ 언제: 포털이 그려진 뒤(renderPortal) 사람마다 — «알겠어요»를 누르거나 «내 업무» 단추를 한 번 누를 때까지 로그인마다 뜬다.
+       ✕·Esc 는 «이번만» 닫는다(다음 로그인 때 다시) — 닫은 뒤 같은 창에서 포털을 다시 그려도 또 뜨지 않는다(_mwTipSession).
+       떠 있는 채로 다시 그려지면(같은 사람) 다시 뜬다(mwTipRedraw). 단추 누름은 포털을 그리자마자 듣는다(mwTipWire).
+     ★ 초점: 뜰 때 아무것도 안 잡고 있고 확인 창도 없으면 안내 상자로(화면읽기가 제목을 읽는다), 키보드로 닫으면 «내 업무» 단추로.
+     ★ «알겠어요»는 이 기기 브라우저에만 적는다(localStorage, 열쇠에 로그인 UID — 한 PC 를 여럿이 써도 사람마다).
+       못 적는 브라우저(사생활 보호 창 등)면 다음 로그인에 또 뜰 뿐 — 막히거나 오류가 나지 않는다.
+     ★ 창(모달)이 아니라 말풍선이다 — 포털을 막지 않는다. 확인 창(z 80)이 뜨면 그 아래로 간다. Esc 로 닫힌다.
+     ★ 건의하기 말풍선(sgShowTip)과 자리가 겹친다 — 이 안내가 뜰 차례이거나 떠 있으면 그쪽이 쉰다(portalMyWorkTipDue).
+     ⚠ 심사 전용 계정(reviewer)에는 안 띄운다 — renderPortal 의 직원 갈래에서만 부른다. */
+  var MWTIP_KEY = 'pu_mywork_tip_ok:';
+  var _mwTipSession = {};
+  function mwTipSeen(uid){ try { return localStorage.getItem(MWTIP_KEY + uid) === '1'; } catch(e){ return false; } }
+  function mwTipAck(uid){ try { localStorage.setItem(MWTIP_KEY + uid, '1'); } catch(e){} }
+  function mwTipBtn(){ var b = $('headApp_work'); return (b && !b.hidden) ? b : null; }
+  /* 지금 이 사람에게 안내가 떠 있거나 곧 뜰 차례인가 — 건의하기 말풍선이 묻는다 */
+  function portalMyWorkTipDue(){
+    if($('mwTip')) return true;
+    var uid = _curUid;
+    return !!(uid && mwTipBtn() && !_mwTipSession[uid] && !mwTipSeen(uid));
+  }
+  function mwTipKey(e){ if(e.key === 'Escape') mwTipClose(false); }
+  function mwTipClose(ack){
+    var t = $('mwTip');
+    if(!t) return;
+    if(ack && t.getAttribute('data-uid')) mwTipAck(t.getAttribute('data-uid'));
+    window.removeEventListener('resize', mwTipPlace);
+    document.removeEventListener('keydown', mwTipKey);
+    /* 초점이 안내 안에 있었으면(키보드로 닫음) «내 업무» 단추로 돌려준다 — 안 그러면 초점이 문서 맨 앞(BODY)으로 사라진다 */
+    var ae = document.activeElement, had = !!ae && (ae === t || t.contains(ae));
+    t.remove();
+    var btn = mwTipBtn();
+    if(had && btn){ try { btn.focus(); } catch(e){} }
+  }
+  /* 포털을 다시 그릴 때(portalHeadAppsHide) — 떠 있던 안내는 걷되(앞사람 것이 남지 않게),
+     같은 사람이 다시 그려지면 또 뜨게 «이번 창에서 띄웠음» 표시를 푼다. ✕ 로 닫은 것은 이미 없으니 그대로 «닫음»이다. */
+  function mwTipRedraw(){
+    var t = $('mwTip');
+    if(!t) return;
+    delete _mwTipSession[t.getAttribute('data-uid')];
+    mwTipClose(false);
+  }
+  /* «내 업무» 단추를 누르면 — 안내를 봤든 안 봤든 — 어디인지 아는 것이다. 포털을 그리자마자 붙인다(안내가 뜨기 전 0.6초 사이에 눌러도). */
+  function mwTipWire(){
+    var btn = mwTipBtn();
+    if(!btn || btn.getAttribute('data-tip-wired') === '1') return;
+    btn.setAttribute('data-tip-wired', '1');
+    btn.addEventListener('click', function(){ if($('mwTip')) mwTipClose(true); else if(_curUid) mwTipAck(_curUid); });
+  }
+  /* 확인 창(해결 확인·처리할 건의·오케스트레이션 따위 aria-modal)이 떠 있나 — 그러면 안내로 초점을 빼앗지 않는다 */
+  function mwTipBusy(){
+    var ids = ['sgDoneModal', 'sgPendModal'], i, m;
+    for(i = 0; i < ids.length; i++){ m = $(ids[i]); if(m && !m.hidden && m.getClientRects().length) return true; }
+    var am = document.querySelectorAll('[aria-modal="true"]');
+    for(i = 0; i < am.length; i++){ if(!am[i].hidden && am[i].getClientRects().length) return true; }
+    return false;
+  }
+  /* 단추를 재서 바로 아래에 — 가운데를 단추에 맞추되 화면 양옆 8px 안으로, 화살표는 단추 가운데를 가리킨다 */
+  function mwTipPlace(){
+    var t = $('mwTip'), btn = mwTipBtn(), bar = t && t.parentNode;
+    if(!t || !btn || !bar){ mwTipClose(false); return; }
+    var b = btn.getBoundingClientRect(), p = bar.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth || window.innerWidth || 360;
+    var w = Math.min(340, vw - 16);
+    var cx = b.left + b.width / 2;
+    var left = Math.max(8, Math.min(cx - w / 2, vw - 8 - w));
+    t.style.width = w + 'px';
+    t.style.left = (left - p.left) + 'px';
+    t.style.top = (b.bottom - p.top + 10) + 'px';
+    var ar = t.querySelector('.mw-ar');
+    if(ar) ar.style.left = Math.max(14, Math.min(cx - left - 6, w - 26)) + 'px';
+  }
+  function portalMyWorkTip(force){
+    var uid = _curUid, btn = mwTipBtn();
+    if(!uid || !btn) return;
+    mwTipWire();
+    if(!force && (_mwTipSession[uid] || mwTipSeen(uid))) return;
+    _mwTipSession[uid] = 1;
+    mwTipClose(false);
+    var olds = document.querySelectorAll('.sg-tip');                 // 먼저 떠 있던 건의하기 말풍선은 걷는다(같은 자리)
+    for(var i = 0; i < olds.length; i++) olds[i].remove();
+    var bar = btn.parentNode;
+    var t = document.createElement('div');
+    t.id = 'mwTip';
+    t.className = 'mw-tip';
+    t.setAttribute('role', 'dialog');
+    t.setAttribute('aria-modal', 'false');
+    t.setAttribute('aria-labelledby', 'mwTipT');
+    t.setAttribute('tabindex', '-1');   // 뜰 때 초점을 받아 화면읽기가 «내 업무는 여기서 봅니다»를 읽는다(아래)
+    t.setAttribute('data-uid', uid);
+    /* 고정 글자만 넣는다(이름·숫자 같은 바깥 값 없음) */
+    t.innerHTML =
+      '<span class="mw-ar" aria-hidden="true"></span>'
+      + '<button type="button" class="mw-x" aria-label="안내 닫기" title="닫기 — 다음에 로그인하면 다시 안내합니다">✕</button>'
+      + '<b class="mw-t" id="mwTipT">📋 내 업무는 여기서 봅니다</b>'
+      + '<ul>'
+      + '<li>이 단추에 <b>내가 맡은 업무의 지금 진행 상황</b>(진행·임박·할 일 건수)이 보입니다.</li>'
+      + '<li>누르면 업무관리 「내 업무」가 열립니다 — <b>지금 하는 업무를 입력</b>하고 진행 기록을 남깁니다.</li>'
+      + '<li>이알피(계약·사건·컨설팅)에서 내가 담당인 업무도 여기로 들어와 <b>진행 상황을 함께 확인</b>합니다.</li>'
+      + '<li>새 업무 추가·고치기·끝내기까지 <b>내 업무 자료는 여기에 넣고 관리</b>합니다.</li>'
+      + '</ul>'
+      + '<div class="mw-ft"><button type="button" class="mw-go">📋 내 업무 열기</button><button type="button" class="mw-ok">알겠어요</button></div>'
+      + '<small>«알겠어요»를 누르면 이 기기에서는 다시 뜨지 않습니다.</small>';
+    t.querySelector('.mw-x').addEventListener('click', function(){ mwTipClose(false); });
+    t.querySelector('.mw-ok').addEventListener('click', function(){ mwTipClose(true); });
+    t.querySelector('.mw-go').addEventListener('click', function(){ mwTipClose(true); btn.click(); });   // 단추를 누른 것과 똑같이 연다(PC 새 창·폰 이동)
+    bar.appendChild(t);
+    mwTipPlace();
+    window.addEventListener('resize', mwTipPlace);
+    document.addEventListener('keydown', mwTipKey);
+    /* 초점 — 아무것도 안 잡고 있을 때(문서 맨 앞)만 안내로 옮긴다. 사람이 무엇을 누르거나 적는 중이거나,
+       확인 창이 떠 있으면 빼앗지 않는다(그 창이 먼저다). */
+    var ae = document.activeElement;
+    if((!ae || ae === document.body) && !mwTipBusy()){ try { t.focus({ preventScroll: true }); } catch(e){} }
+  }
+  window.portalMyWorkTip = portalMyWorkTip;   // 점검 도구(tools/phone-audit 씨앗 portal 의 'mywork-tip' 화면)가 다시 띄운다
+  /* ── 내 업무 첫 안내 끝 ── */
   document.addEventListener('visibilitychange', function(){
     if(document.hidden) return;
     var els = document.querySelectorAll('[data-head-app]');
@@ -7212,7 +7361,10 @@ body.portal-mode #moreFab{display:flex;}
   // ── 안내 말풍선: 포털 진입 시 1회, 5초 뒤 자동 소멸 ──
   var _sgTipShown = false;
   function sgShowTip(){
-    if(_sgTipShown) return; _sgTipShown = true;
+    if(_sgTipShown) return;
+    /* 📋 내 업무 첫 안내가 떠 있거나 뜰 차례면 쉰다 — 머리줄 바로 아래 같은 자리라 겹친다 (2026-11-22) */
+    if(typeof portalMyWorkTipDue === 'function' && portalMyWorkTipDue()) return;
+    _sgTipShown = true;
     var tip = document.createElement('span');
     tip.className = 'sg-tip';
     tip.textContent = '프로그램 오류·불편한 점·개선 아이디어를 남겨주세요. 처리되면 결과를 알려드립니다.';
@@ -8810,9 +8962,9 @@ body.portal-mode #moreFab{display:flex;}
   //    대신 그 파일들이 만들어 놓은 단추를 여기서 데려온다. 만들어지는 시점이 제각각이라
   //    (로그인·권한 확인 뒤) 새로 생기는지 지켜보다가 잡는다.
   (function(){
-    // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 둘만
-    /* ✨ TypeSafe(pu-typesafe-review-button)는 PC 에선 「업무 시스템」 줄에 서지만, 폰에서는 여기로 */
-    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'pu-typesafe-review-button', 'appInstallFab'];
+    // ⋯ 안으로 접어 넣는 것 — 자주 안 쓰는 것만
+    /* (✨ TypeSafe 검토 단추는 2026-11-22 대표 지시 「필요 없으면 완전히 덜어내라」로 걷어냈다) */
+    var DOCK_IDS = ['cfgFab', 'pu-version-fab', 'appInstallFab'];
     /* 아래 한 줄 바(#fabBar)에 세우는 것 — 자주 쓰거나(백업·복구),
        바로 눈에 띄어야 하는 것(장애 알림·연결 경고).
        이 셋은 각자 파일이 left/right:12px, bottom:12px 를 쓰고 있어 서로, 그리고
@@ -8850,8 +9002,6 @@ body.portal-mode #moreFab{display:flex;}
       });
       openDock(false);
     }
-    /* ⚠ 차례가 중요하다 — PC 로 돌아갈 땐 «로그인 후 바로가기»를 먼저 제자리에 돌려놓아야
-       그 바로 왼쪽이 자리인 ✨ TypeSafe 단추가 제 옆자리를 찾는다. */
     function sync(){
       if(phone.matches) adopt();
       else release();
@@ -8877,8 +9027,6 @@ body.portal-mode #moreFab{display:flex;}
       new MutationObserver(function(){ if(phone.matches) adopt(); })
         .observe(document.body, { childList:true });
     } catch(_){}
-    /* TypeSafe 단추는 body 가 아니라 「업무 시스템」 줄 안에 생겨 위 지켜보기에 안 걸린다 — 생겼다고 알려 오면 다시 맞춘다 */
-    document.addEventListener('pu-typesafe-mounted', sync);
     sync();
   })();
   // 💳 사용액 — 누르면 항목별 내역 팝업 (설정창과 같은 닫기 방식)
@@ -8991,27 +9139,9 @@ body.portal-mode #moreFab{display:flex;}
 
 })();
 </script>
-<script>
-/* ── ✨ TypeSafe 검토 — 이알피 왼쪽 아래에서 «포털 첫 화면»으로 옮겼다
-   (대표 지시 2026-09-23 「푸른통합시스템 전체로 적용해서 캡쳐3화면으로 옮기고 연결해줘」,
-   목업 ①안 「빼고 포털로만」).
-   ⚠ 포털은 떠 있는 단추 자리를 한 곳에서만 정한다(위 「화면에 떠 있는 단추의 자리」) —
-     그래서 떠 있게 두지 않고 「업무 시스템」 줄 오른쪽 끝에 세운다
-     (옆에 있던 「로그인 후 바로가기」는 2026-09-28 대표 지시 「선택 하느거 필요 없다」로 걷어냈다).
-     ★ 2026-10-24 대표 윗줄 정리 안 1 — 머리 카드를 걷고 딱지를 내 메뉴로 옮겨 자리가 나서, 목업대로 «건의하기 왼쪽»에 세운다.
-       폰에서는 ⋯ 안으로 들어간다(DOCK_IDS).
-   관리자만 보이는 것·미국 서버 확인란·하루 한도는 js/pu-typesafe.js 가 그대로 지킨다.
-   포털은 직원·업체 목록을 안 들고 있으므로 가리기용 함수를 넘기지 «않는다» —
-   부품이 「제안 받기」를 누를 때 스스로 목록을 읽어 가린다. */
-window.PU_TYPESAFE_MOUNT = function(){
-  var sg = document.getElementById('sgFab');
-  return sg && sg.parentNode ? { parent: sg.parentNode, before: null } : null;   /* 줄 «끝»에 붙이고 자리는 css order 로 — 남의 요소 앞에 기대지 않는다 */
-};
-</script>
-<script src="js/pu-typesafe.js?v=6"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-orchestrator-core.js?v=5"></script>
-<script src="js/pu-chatbot-kb.js?v=17"></script>
+<script src="js/pu-chatbot-kb.js?v=19"></script>
 <script src="js/pu-chatbot.js?v=7"></script>
 </body>
 </html>

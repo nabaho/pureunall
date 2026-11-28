@@ -25,9 +25,11 @@
      «한 번도 실제로 불린 적이 없다» — 확인 안 된 미국 업체 연결을, 사람이 한 통씩
      보는 것도 아닌 자동 파이프라인에 처음부터 켜 두지 않는다. 대표가 확인하고
      켜야 돈다.
-   ⚠★ 이름 가림을 못 하면 그 회차는 «건너뛴다»(실패로 열어 두지 않는다). 이알피의
-     TypeSafe 창은 못 가려도 사람이 화면으로 다시 보므로 열어 둬도 된다 — 여기는
-     사람이 한 글자도 안 보고 나가므로 «가려지지 않은 채 보낼 바에는 안 보낸다».
+   ⚠★ 이름 가림을 못 하면 그 회차는 «건너뛴다»(실패로 열어 두지 않는다) — 사람이 한 글자도
+     안 보고 나가므로 «가려지지 않은 채 보낼 바에는 안 보낸다».
+   ★ 2026-10-04 대표 「켜라」로 켜져 실제로 돈다(11-05 실측 236통). 2026-11-22 포털 「✨ TypeSafe 검토」
+     단추는 걷어냈지만 이 자동분류는 «남겼다» — 쓰고 있는 일이고, 이 PC 의 Laya 판단기는 한국어 판단이
+     약하고(경력관리 실제 64건 재 봄) 서버에서 못 돌아 대신할 수 없다.
    ⚠ 한 회차·하루 한도를 둔다 — 어느 날 못 걸러진 메일이 몰리면(스팸 공세 등)
      그날 하루 문 몫을 그 메일들이 다 먹어, 다른 급한 것(대표님 실제 문의)이
      하루 문에 못 들어가는 일이 없게 한다. */
@@ -58,10 +60,10 @@ async function loadGate(db) {
   };
 }
 
-/* ── 우리가 아는 이름을 먼저 가린다 — js/pu-typesafe.js 의 redactNames 와 «한 벌씩 같다» ──
-   ⚠ 두 판을 따로 두지 않는다. 화면 쪽을 고치면 여기가 낡고, 여기를 고치면 화면이
-     낡는다 — 그 어긋남이 곧 「이알피와 같은 기준」이 깨지는 자리다. 알고리즘을
-     바꿀 때는 두 파일을 «함께» 고칠 것(tests/mail-ai-classify.test.js 가 붙잡는다). */
+/* ── 우리가 아는 이름을 먼저 가린다 — 이 함수가 «하나뿐인 원본»이다 ──
+   (2026-11-22 까지는 포털 단추 쪽 js/pu-typesafe.js 에 같은 셈이 한 벌 더 있었다 — 단추와 함께 걷어냈다.)
+   규칙: 긴 이름부터 · 같은 값은 같은 표 · 한 글자 이름은 안 가림 · 목록에 없으면 못 가림
+   (tests/mail-ai-classify.test.js 가 붙잡는다). */
 function redactNames(text, staff, companies) {
   let out = String(text == null ? "" : text);
   const 후보 = [];
@@ -93,7 +95,7 @@ function redactNames(text, staff, companies) {
   return { text: out, localMaskedKinds: kinds };
 }
 
-/* 저장 모양(data/{표}/v)에서 이름만 뽑는다 — js/pu-typesafe.js 의 namesOf 와 같다 */
+/* 저장 모양(data/{표}/v)에서 이름만 뽑는다 */
 function namesOf(v) {
   if (!v || typeof v !== "object") return [];
   return Object.keys(v).map((k) => { const x = v[k]; return x && x.name; })
@@ -137,8 +139,8 @@ function binsOf(mailBins, customFolders) {
 }
 
 /* Jev 에게 물을 모양 — 이름을 그대로 «후보(criteria)」로 준다.
-   ⚠ 업무 검토용 물음(questions())과는 완전히 다른 물음이다 — 「긴급한가」가 아니라
-     「어느 칸인가」다. typesafe-evaluate.evaluate 의 qs 자리에 이것을 끼운다. */
+   ⚠ 「긴급한가」가 아니라 「어느 칸인가」다. typesafe-evaluate.evaluate 의 qs 자리에 이것을 끼운다
+     (qs 없이 부르면 evaluate 가 업체에 보내지 않는다). */
 /* ★ 「해당 없음」 길 (대표 지시 2026-11-05 「받은메일에 업무별·담당자별 분류가 안 된 부분은 받은메일에 남아 있어야 된다」)
      예전에는 «칸 중에 하나»를 «반드시» 고르게 했다 — 분명치 않은 메일도 아무 칸에나 들어가 받은메일함이 통째로 비었다
      (실측 2026-11-05: AI 가 옮긴 236통이 전부, 사람이 정한 것은 0통). 이제 «분명히 맞는 칸이 있을 때만» 옮기고,
@@ -154,8 +156,8 @@ function binQuestion(bins) {
     criteria: criteria } };
 }
 
-/* 하루 문 — 사람 몫(typesafe_tally)과 «다른 자리»에 센다. 사람이 쓰는 하루 30·전체 200을
-   자동 분류가 갉아먹으면, 정작 급한 것을 검토하려는 사람이 하루 문에 못 들어간다. */
+/* 하루 문 — 자기 자리(typesafe_tally_mail)에 센다. 옛 사람 몫(typesafe_tally — 2026-11-22 단추와 함께 없어짐)과
+   경력관리 몫(typesafe_tally_mailreq — 같은 날 없어짐)과는 처음부터 다른 자리였다. */
 function mailTallyPath(ymd) { return "typesafe_tally_mail/" + ymd; }
 
 async function mailDayLeft(db, ymd, dayLimit) {

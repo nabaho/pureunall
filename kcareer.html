@@ -832,14 +832,17 @@ body.kc-staff #hcOpenBtn{display:none!important}
 /* 증명서 보관함 표(#cdBody)의 첫 칸은 이제 ☐ + № 칸이다 — 직원 «보기 전용»에서는 다른 표처럼 감춘다(위 337~338줄). 종류·발급번호는 둘째 칸이라 남는다 */
 #cdBody .dt thead th{white-space:nowrap}   /* 머리글도 한 줄 — 칸이 좁을 때 「증명기간」이 한 글자씩 쌓이지 않게 */
 #cdBody .dt thead th:last-child{width:auto;min-width:0}   /* 공용 표는 끝 칸(관리)을 200px 로 잡는다 — 여기는 작은 단추 서넛이라 좁게(태블릿 폭에서 발급기관 칸이 짓눌리지 않게) */
-/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표 834~913px 대 상자 681px) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게(2026-11-15).
+/* 표가 좌우로 스크롤될 때(태블릿·좁은 노트북 폭 — 표가 상자보다 넓어 `main` 이 좌우로 구른다) 맨 왼쪽 «☐ + №» 칸을 왼쪽에 붙들어 둔다 — 머리줄 «전체 선택 ☐» 와 줄마다 ☐ 가 화면 밖으로 밀려 나가지 않게.
+   증명서 표(#cdBody)에 먼저 넣었던 것(2026-11-15)을 «☐ 칸이 있는 모든 공용 표(.dt)»로 넓혔다(2026-11-22) — 경력·실적(위촉장·자격·수료·표창·교육·경력·사업·자문)·사업 목록·제출서류 등. 가짜 환경 실측: 1024px 위촉장 표는 `main` 이 127px 구르면 ☐ 가 왼쪽 -90px(화면 밖)이었다.
+   ⚠ «☐ 가 든 칸»에만 건다(:has(input[type=checkbox])) — № 만 있는 보기용 표(설정의 계좌·법인 서류 등)는 그대로 둔다. :has 를 모르는 브라우저는 이 규칙을 통째로 건너뛸 뿐 표는 예전 그대로다.
+   ⚠ 머리줄 칸은 «그 표의 줄에 ☐ 가 있는가»로 정한다(머리 칸 자신이 아니라) — 사업 서류 찾기·프로필 고르기 창의 머리 칸은 ☐ 없이 글자(「☐ №」)만 있어도 줄 칸이 붙들리면 머리 칸도 같이 붙들려야 열 머리글이 어긋나지 않는다(자동 검증 2026-11-23).
    ⚠ 이 폭 띠에서만: 폰 카드(≤520px)는 줄을 카드로 접어 스크롤이 없고, 1280px 를 넘는 PC 는 그대로다(표가 상자 안에 들어와 스크롤이 없다 — 고정해도 안 보이는 «그대로»를 건드리지 않는다). 칸 바탕은 표 바탕과 같아(var(--card)) 스크롤이 없으면 보이는 모양은 같다 */
 @media (min-width:521px) and (max-width:1280px){
-  #cdBody .dt thead th:first-child,#cdBody .dt tbody td:first-child{position:sticky;left:0}
-  #cdBody .dt thead th:first-child{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
-  #cdBody .dt tbody td:first-child{z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
-  #cdBody .dt tbody tr:hover>td:first-child,#cdBody .dt tbody tr.sel-on>td:first-child{background:inherit}   /* 지나가는 줄·고른 줄의 바탕을 그대로 따른다 */
-  html.dark #cdBody .dt tbody tr.sel-on>td:first-child{box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
+  .dt:has(tbody td.rownum input[type=checkbox]) thead th.rownum-h,.dt tbody td.rownum:has(input[type=checkbox]){position:sticky;left:0}
+  .dt:has(tbody td.rownum input[type=checkbox]) thead th.rownum-h{z-index:6}   /* 머리줄은 이미 위쪽에 붙어 있다(z-index:5) — 두 방향으로 붙는 모서리 칸이 가장 위 */
+  .dt tbody td.rownum:has(input[type=checkbox]){z-index:2;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}   /* 바탕이 비면 뒤로 지나가는 칸 글자가 비쳐 보인다 */
+  .dt tbody tr:hover>td.rownum:has(input[type=checkbox]),.dt tbody tr.sel-on>td.rownum:has(input[type=checkbox]),.dt tbody tr.row-warn>td.rownum:has(input[type=checkbox]),.dt tbody tr.kc-dying>td.rownum:has(input[type=checkbox]){background:inherit}   /* 지나가는 줄·고른 줄·살필 줄·지우려고 묻는 중인 줄(.kc-dying)의 바탕을 그대로 따른다(줄에 바탕이 없는 보통 줄은 위 var(--card) 가 그대로) */
+  html.dark .dt tbody tr.sel-on>td.rownum:has(input[type=checkbox]){box-shadow:inset 3px 0 0 var(--blue)}   /* 어두운 판의 «고른 줄» 왼쪽 띠가 칸 바탕에 덮이지 않게 */
 }
 #hcBody tr.hc-gone td{opacity:.75}
 /* ☑ 고르기 창(#p1PickTbl)의 표는 «끝 칸이 관리 단추»가 아니다. 폰 카드(공용 .dt)가 끝 칸을 오른쪽 단추 열로 세우면 긴 기관명 줄에서 일자 칸이 0px 로 눌려 가려진다
@@ -1257,6 +1260,36 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
 .sel-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8fafc;
   border:1px solid #bfdbfe;border-radius:9px;padding:8px 12px;margin-bottom:10px;font-size:12.5px;
   position:sticky;top:var(--tbH,0px);z-index:11}
+/* ── 👁 작성 중 서류 «한꺼번에 보기» 창(#modalDraftMulti) (대표 지시 2026-11-24) ──
+   한 장이 한 칸 — 칸 폭은 «고른 크기»(--dm-min)가 정하고, 창이 넓으면 여러 장이 나란히, 좁으면 한 줄에 한 장. 쪽 그림은 칸 폭에 맞춰 그려진다.
+   ⚠ 폰 구간에서만 한 줄에 한 장으로 — PC 는 그대로. */
+#modalDraftMulti .modal{width:min(1480px,98vw)}
+/* 「닫기」는 왼쪽 — 오른쪽 아래에는 «새 버전 있음» 떠 있는 단추가 앉는다(1366×800 에서 겹침, 2026-11-24 검증). 폰은 왼쪽 아래에 홈 단추가 있어 오른쪽 */
+#modalDraftMulti .modal-foot{justify-content:flex-start}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--dm-min,300px)),1fr));gap:12px;align-items:start}
+.dm-card{border:1px solid var(--border);border-radius:9px;background:#fff;min-width:0;overflow:hidden}
+.dm-cap{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--border);background:#f8fafc;min-width:0}
+.dm-cap .dm-n{flex:none;font-variant-numeric:tabular-nums;color:var(--text-mute)}
+.dm-cap .dm-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dm-cap .dm-p{flex:none;font-size:11px;font-weight:400;color:var(--text-mute);white-space:nowrap}
+.dm-card .dm-fail{padding:14px 10px;font-size:12px;color:var(--red)}
+html.dark .dm-card{background:var(--soft);border-color:var(--border)}
+html.dark .dm-cap{background:var(--hover);border-color:var(--border);color:var(--text)}
+@media (max-width:520px){
+  #modalDraftMulti.modal-ov{padding:8px}
+  #modalDraftMulti .modal{width:100%;max-height:calc(100vh - 16px);display:flex;flex-direction:column}
+  #modalDraftMulti .modal-b{overflow:auto;min-height:0;flex:1 1 auto;padding:10px 8px}
+  #modalDraftMulti .modal-h{padding:10px 12px;font-size:14px}
+  #modalDraftMulti .modal-foot{justify-content:flex-end}
+  .dm-grid{grid-template-columns:minmax(0,1fr)}
+  /* 폰: 상자는 «한 겹» — 칸 테두리·이름줄 바탕·쪽 둘레의 회색 바탕을 걷고 쪽 그림만 남긴다(양옆을 다 쓴다) */
+  .dm-card{border:0;border-radius:0;background:transparent}
+  .dm-cap{background:transparent;border-bottom:0;padding:6px 2px}
+  .dm-card .dm-pg{padding:4px 0!important;background:transparent!important}
+}
+/* 폰: 작성 중 서류 목록 — 표(최소 620px)가 «격자 칸»을 밀어 화면 옆으로 넘쳤다(2026-11-24 폰 점검: 375px 에서 275px 넘침 — 새 기능 이전부터).
+   칸이 줄 수 있게 하면 표는 제 상자(overflow-x:auto) 안에서만 좌우로 민다 — 이 표가 처음부터 의도한 모양이다. PC 는 그대로. */
+@media (max-width:520px){ #rhDraftPanel{min-width:0} }
 /* ── 탭줄 + 「양식 올리기」를 한 줄로 (대표 지시 2026-08-30) ──
    화면 위쪽을 두 줄이 먹고 있었다. 좁아지면 알아서 다음 줄로 내려간다. */
 .rh-topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
@@ -1704,7 +1737,7 @@ html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="co
 html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"],[style*="background: rgb(239, 246, 255)"],[style*="background:#e2e8f0" i],[style*="background: rgb(226, 232, 240)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -1715,12 +1748,12 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=3"></script>
@@ -1740,7 +1773,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
-<script src="js/pu-doc-read.js?v=53"></script>
+<script src="js/pu-doc-read.js?v=54"></script>
 <script src="js/kcareer-hwpxfill.js?v=43"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
@@ -1756,7 +1789,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=5"></script>
+<script src="js/kcareer-mailreq.js?v=8"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -1785,7 +1818,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=54"></script>
+  <script src="js/pu-appbar.js?v=55"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -1966,6 +1999,8 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
                 <button class="btn sm" type="button" onclick="rhDraftSelAll(true)">전체 선택</button>
                 <button class="btn sm" type="button" onclick="rhDraftSelAll(false)">선택 해제</button>
                 <span style="flex:1"></span>
+                <!-- 👁 고른 서류를 «한 화면에» 모두 펼친다(대표 지시 2026-11-24) — 장마다 따로 열어 보지 않게 -->
+                <button class="btn sm" type="button" onclick="rhDraftViewSel()" title="고른 서류를 한 화면에 모두 펼쳐 봅니다 — 장마다 쪽 그대로">👁 한꺼번에 보기</button>
                 <button class="btn sm" type="button" style="color:var(--red)" onclick="rhDraftTrashSel(this)">🗑 선택 버리기</button>
               </div>
               <!-- ⚠ table-layout:fixed — 이름 칸이 «남는 폭을 다 쓰되» 표를 밀지 않게 한다.
@@ -1989,6 +2024,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
               <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                 <span id="rhDraftRoom" style="font-size:11px;color:var(--text-mute)"></span>
                 <span style="margin-left:auto"></span>
+                <button class="btn sm" type="button" onclick="rhDraftViewAll()" title="작성 중인 서류를 모두 한 화면에 펼쳐 봅니다 — 고르지 않아도 됩니다">👁 전부 한꺼번에 보기</button>
                 <button class="btn sm" type="button" onclick="rhOpenTrash()">🗑 버린 것 보기</button>
               </div>
             </div>
@@ -3307,6 +3343,23 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
       <span id="hwpViewFootRead"><button class="btn" onclick="closeHwpView()">닫기</button><button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 이 서식의 빈 칸에 넣습니다">✨ 내 정보로 채우기</button><button class="btn" onclick="hwpViewEdit()" title="한글 프로그램처럼 이 문서를 직접 고칩니다 — 글자를 치고 지우고 표를 손봅니다">✏️ 한글로 고치기</button><button class="btn" id="hwpViewToLib" style="display:none" onclick="hwpViewSaveToLib()" title="고친 서식을 양식 보관함에 «새 줄»로 담습니다 — 원본은 그대로 남습니다">📥 보관함에 담기</button><button class="btn" onclick="hwpViewPdfFile()" title="곧바로 .pdf 파일로 내려받습니다 — 다만 그림이라 글자 복사·검색은 안 됩니다">⬇ PDF 바로받기(그림)</button><button class="btn primary" onclick="hwpViewPdf()" title="인쇄창에서 「PDF로 저장」을 고르면 글자가 살아 있는 PDF가 됩니다 — 복사·검색이 됩니다">🖨 인쇄 · PDF(글자 살아 있음)</button><button class="btn" onclick="hwpViewDownload()">⬇ 파일로 저장</button></span>
       <span id="hwpViewFootEdit" style="display:none"><button class="btn" onclick="hwpViewEditCancel()" title="고친 것을 버리고 보기로 돌아갑니다">↩ 그만두기</button><button class="btn primary" onclick="hwpViewEditDone()" title="고친 내용을 이 창으로 가져옵니다 — 그 다음 인쇄하거나 파일로 저장하세요">✔ 다 고쳤습니다</button></span>
     </div>
+  </div>
+</div>
+<!-- 👁 작성 중 서류 «한꺼번에 보기» (대표 지시 2026-11-24 「서류가 여러장인 경우 한번에 모두 볼 수 있게」)
+     고른 서류(또는 작성 중 전부)의 쪽을 한 화면에 펼친다. 그리는 일은 «한글 문서 보기»와 같은 엔진(PureunHwp.renderPreview) 하나다.
+     ⚠ 이 창은 «보기 전용» — 고치려면 장마다 「이어서」(작성 중 서류 한 건 열기)로 들어간다. -->
+<div class="modal-ov" id="modalDraftMulti">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
+    <div class="modal-h" id="dmTitle">👁 한꺼번에 보기 — 고른 서류를 한 화면에</div>
+    <div class="modal-b">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div id="dmInfo" style="font-size:12px;color:var(--text-mute);flex:1 1 220px;min-width:0"></div>
+        <button class="btn sm" type="button" id="dmSizeS" onclick="rhDraftViewManyRedraw('s')" title="작게 — 여러 장을 한눈에">▦ 작게 모아 보기</button>
+        <button class="btn sm" type="button" id="dmSizeL" onclick="rhDraftViewManyRedraw('l')" title="크게 — 글자를 읽을 만큼">▢ 크게 보기</button>
+      </div>
+      <div id="dmBody" class="dm-grid"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" type="button" onclick="rhDraftViewManyClose()">닫기</button></div>
   </div>
 </div>
 <!-- 📚 지난 지원 건 모두 넣기 — 연도별로 골라 (2026-10-05) -->
@@ -21741,6 +21794,102 @@ function rhDraftTrashSel(btn){
   rhDraftPut(rhDraftAll().filter(function(x){ return !갈것[x.id]; }));
   rhDraftDraw(); rhDraftCheck();
   toast('🗑 '+됨+'건을 휴지통으로 보냈습니다 — 환경설정 › 🗑 휴지통에서 '+TRASH_DAYS+'일 안에 되살릴 수 있습니다', 6000);
+}
+
+/* ── 👁 작성 중 서류 «한꺼번에 보기» (대표 지시 2026-11-24 「서류가 여러장인 경우 한번에 모두 볼 수 있게」) ──
+   ■ 왜: 한 건이 여러 장(공적조서 앞·뒤·이력서·동의서)인데 목록에서 장마다 「이어서」를 눌러 열어야 했다 —
+     서로 맞는지(이름·날짜·도장) 견주려면 한 화면에 모두 있어야 한다.
+   ■ 무엇을: 고른 서류(없으면 「전부」)를 «담겨 있는 그대로»(저장된 한글 문서) 쪽 그림으로 펼친다.
+     그리는 일은 「한글 문서 보기」와 같은 엔진 하나(PureunHwp.renderPreview)다 — 따로 그리개를 만들지 않는다.
+   ⚠ 보기 전용이다. 고치려면 장마다 「↩ 이어서」. 입력판에서 친 값(저장 «옆칸»)은 그 서류를 열어야 보인다 —
+     여기는 문서 파일에 «이미 들어 있는 것»만 그린다(한글 편집 안에서 고친 것·도장·사진은 들어 있다).
+   ⚠ 지금 열어 둔 서류가 고른 것에 들었으면 먼저 담는다(rhDraftNow) — 방금 고친 것이 빠지면 안 된다.
+   ⚠ 한 장이 못 그려져도 나머지는 그린다(장마다 까닭을 그 칸에 적는다). 닫으면 그림을 비운다(A4 한 쪽이 크다).
+   ⚠ «보는 번호»(№)는 이 창의 차례일 뿐이다 — 저장하지 않고 열쇠로 쓰지 않는다. */
+var DM_MIN = { s:300, l:560 };     /* 칸 최소 폭(px) — 작게 모으면 넓은 창에서 4장이 나란히, 크게는 글자가 읽힌다 */
+var _dmSize = 's';
+var _dmIds = [];
+var _dmRun = 0;                    /* 그리는 도중에 다시 누르거나 닫아도 «뒤 요청»만 남게 하는 번호 */
+var _dmKeyBound = false;
+function rhDraftViewSel(){ return rhDraftViewMany(rhDraftSelIds()); }
+function rhDraftViewAll(){
+  return rhDraftViewMany(rhDraftAll().filter(function(d){ return !d.done; }).map(function(d){ return d.id; }));
+}
+function rhDraftViewManyRedraw(size){ return rhDraftViewMany(_dmIds, size); }
+function rhDraftViewManyClose(){
+  _dmRun++;
+  var ov=document.getElementById('modalDraftMulti'); if(ov) ov.classList.remove('open');
+  var box=document.getElementById('dmBody');
+  if(box){ box.innerHTML=''; box.removeAttribute('style'); }
+}
+async function rhDraftViewMany(ids, size){
+  ids=(ids||[]).filter(function(id){ return !!rhDraftFind(id); });
+  if(!ids.length){ toast('볼 서류가 없습니다 — ☐ 로 고르거나 「👁 전부 한꺼번에 보기」를 누르세요'); return; }
+  if(!window.PureunHwp){ toast('한글 문서 도구를 불러오지 못했습니다'); return; }
+  var ov=document.getElementById('modalDraftMulti'), box=document.getElementById('dmBody'), info=document.getElementById('dmInfo');
+  if(!ov || !box || !info) return;
+  if(size && DM_MIN[size]) _dmSize=size;
+  _dmIds=ids.slice();
+  var 번호=++_dmRun;
+  if(!_dmKeyBound){
+    _dmKeyBound=true;
+    document.addEventListener('keydown', function(e){
+      var o=document.getElementById('modalDraftMulti');
+      if(e.key==='Escape' && o && o.classList.contains('open')) rhDraftViewManyClose();
+    });
+  }
+  /* 지금 열어 둔 서류의 «방금 고친 것»까지 보이게 — 담지 못해도 보기는 계속한다 */
+  if(_rhDraftId && ids.indexOf(_rhDraftId)>=0 && _rhDoc){ try{ await rhDraftNow(true); }catch(e){} }
+  if(번호!==_dmRun) return;
+  box.innerHTML='';
+  box.style.setProperty('--dm-min', DM_MIN[_dmSize]+'px');
+  ['s','l'].forEach(function(k){
+    var b=document.getElementById(k==='s'?'dmSizeS':'dmSizeL'); if(!b) return;
+    b.classList.toggle('primary', k===_dmSize);
+    b.setAttribute('aria-pressed', k===_dmSize?'true':'false');
+  });
+  ov.classList.add('open');
+  /* 열리면 「닫기」에 초점 — 키보드·화면 읽기 도구가 이 창 안에서 시작하게(Esc 로도 닫힌다) */
+  try{ var 닫기=ov.querySelector('.modal-foot button'); if(닫기 && 닫기.focus) 닫기.focus(); }catch(e){}
+  info.textContent=_hwpEngineReady
+    ? '한글 엔진으로 '+ids.length+'건을 그리는 중…'
+    : '한글 엔진을 처음 한 번만 받아옵니다(약 7MB) — 다음부터는 바로 열립니다…';
+  var 쪽합=0, 못=[];
+  for(var i=0;i<ids.length;i++){
+    if(번호!==_dmRun) return;                       /* 닫았거나 다시 눌렀다 — 그리던 것은 버린다 */
+    var id=ids[i], d=rhDraftFind(id)||{};
+    var 이름=d.title||d.name||'(이름 없음)';
+    var card=document.createElement('div'); card.className='dm-card';
+    card.innerHTML='<div class="dm-cap"><span class="dm-n">№ '+(i+1)+'</span>'
+      +'<span class="dm-t" title="'+escapeHtml(이름)+'">'+escapeHtml(이름)+'</span>'
+      +'<span class="dm-p"></span>'
+      +'<button class="btn sm" type="button" onclick="rhDraftViewManyClose();rhDraftResume(\''+_jsAttr(id)+'\')" title="이 서류를 열어 이어서 고칩니다">↩ 이어서</button></div>'
+      +'<div class="dm-pg"></div>';
+    box.appendChild(card);
+    var body=card.querySelector('.dm-pg'), 쪽=card.querySelector('.dm-p');
+    try{
+      var f=await getFileAsync(id);
+      if(번호!==_dmRun) return;                    /* 파일을 받는 사이에 닫았다 — 무거운 그리기를 하지 않는다 */
+      if(!f || !f.base64) throw new Error('서식 파일이 이 기기에 없습니다');
+      var u8=new Uint8Array(b64ToAb(f.base64));
+      var nm=_hwpFixName(u8, f.name||d.name||'문서.hwpx');
+      if(!_isHwpName(nm)) throw new Error('한글 문서가 아니라 여기서는 그리지 못합니다 — 「이어서」로 여세요');
+      /* dpr 1 — 여러 장이라 한 쪽을 크게(화면 배율대로) 그리면 메모리가 한없이 든다. 칸 폭에 맞춰 줄여 보인다 */
+      var r=await PureunHwp.renderPreview(body, u8, nm, { dpr:1 });
+      if(번호!==_dmRun) return;
+      _hwpEngineReady=true;
+      var n=(r && r.pageCount) || 0;
+      쪽합+=n; 쪽.textContent=n+'쪽';
+    }catch(e){
+      못.push(이름);
+      body.removeAttribute('style');
+      body.innerHTML='<div class="dm-fail">⚠ 그리지 못했습니다 — '+escapeHtml((e && e.message) || '알 수 없는 오류')+'</div>';
+    }
+  }
+  if(번호!==_dmRun) return;
+  info.innerHTML='<b style="color:var(--navy)">'+ids.length+'건 · 총 '+쪽합+'쪽</b>'
+    +' — 저장되어 있는 그대로입니다(보기 전용). 고치려면 «↩ 이어서».'
+    +(못.length?' <span style="color:var(--red)">⚠ '+못.length+'건은 그리지 못했습니다.</span>':'');
 }
 
 /* ↩ 이어서 — 그 자리를 열고, 친 값·짝 지정도 되살린다 */

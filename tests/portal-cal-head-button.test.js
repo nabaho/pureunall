@@ -147,6 +147,7 @@ function 놀이터(상태) {
     Date: 가짜날짜,
     isMobile: () => !!상태.폰,
     portalAppWindowName: (k) => 'pureun-' + k,
+    mwTipRedraw: () => {},  // 📋 내 업무 첫 안내 걷기 — 단추를 감출 때 함께 부른다(검사: tests/portal-mywork-tip.test.js)
     openPortalApp: (app, url) => { 열림.push({ app, url }); },
     fetch: (url) => {
       받음.push(String(url));

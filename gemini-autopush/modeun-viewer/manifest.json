@@ -1,0 +1,9 @@
+{
+  "name": "모든뷰어 (Modeun Viewer)",
+  "short_name": "모든뷰어",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0067b8",
+  "orientation": "any"
+}

@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -27,7 +27,7 @@
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script>
 /* 화면 가르기 — 주소가 #topics 면 「📚 조별 문안」, #lib 면 「📥 모은 자료」, 그 밖(빈 것·#sites)은 「🏢 사업장」.
@@ -624,7 +624,7 @@ button{font:inherit;cursor:pointer}
 </style>
 <link rel="stylesheet" href="css/rules-shell.css?v=5">
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리·머리줄 한 벌 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design">
 <div class="top rs-head">
@@ -643,7 +643,7 @@ button{font:inherit;cursor:pointer}
 <div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>

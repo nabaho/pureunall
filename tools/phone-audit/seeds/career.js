@@ -83,6 +83,38 @@ module.exports = {
     cm3_work: J(work),
   },
   views: [
+    /* 작성 중 서류 «한꺼번에 보기»(2026-11-24) — 지어낸 한글 문서 4장을 «작성 중»에 담아 목록을 연 모습(draft-list),
+       그 4장을 ☐ 로 모두 골라 «한꺼번에 보기» 창을 연 모습(draft-multiview). 앱의 한글 문서 만들개(HWPX)로 그 자리에서 만든다 —
+       실제 서류·이름은 넣지 않는다. */
+    { name: 'draft-list', wait: 150, run: async (page) => {
+      await page.evaluate(async () => {
+        nav_to('page-resume-hub', '이력서 생성·보관', '이력서관리');
+        /* 화면을 여는 길(rhDraftMigrate)이 «잠깐 뒤» 목록을 다시 그리며 고른 것을 지운다 — 그 뒤에 담고 고른다 */
+        await new Promise((r) => setTimeout(r, 500));
+        const 제목 = ['점검 공적조서(앞면)', '점검 공적조서(뒷면)', '점검 이력서', '점검 개인정보 이용 동의서'];
+        const 내용 = [
+          [['성명', '점검가나'], ['소속', '점검노무법인'], ['직위', '대표']],
+          [['년월일', '이력'], ['2020.01.01.', '점검 위원 위촉'], ['2024.03.05.', '점검 표창 수상']],
+          [['기간', '학력·경력'], ['2010~2014', '점검대학교 졸업'], ['2014~현재', '점검노무법인']],
+          [['성명', '점검가나'], ['연락처', '010-0000-0000'], ['동의', '□ 동의함']],
+        ];
+        const 담음 = [];
+        for (let i = 0; i < 제목.length; i++) {
+          const bytes = HWPX.build(HWPX.docTitle(제목[i]) + HWPX.spacer() + HWPX.tablePara(내용[i], HWPX.cols([0.3, 0.7])));
+          const id = rhDraftNewId();
+          const name = '점검서류_' + (i + 1) + '.hwpx';
+          saveFileUnified(id, { id: id, name: name, ext: 'hwpx', size: bytes.length, base64: abToB64(bytes.buffer || bytes), savedAt: new Date().toISOString() });
+          담음.push({ id: id, name: name, ext: 'hwpx', at: Date.now(), cells: { done: 0, total: 0 }, done: false, madeAt: Date.now(), hasBase: false, title: 제목[i] });
+        }
+        rhDraftPut(담음.concat(rhDraftAll()));
+        const panel = document.getElementById('rhDraftPanel');
+        if (panel && panel.classList.contains('hide')) rhDraftPanelToggle(); else rhDraftDraw();
+        rhDraftSelAll(true);                 /* 「N건 선택」 줄(한꺼번에 보기 단추가 있는 줄)이 보이게 */
+      });
+    } },
+    { name: 'draft-multiview', wait: 2500, run: async (page) => {
+      await page.evaluate(async () => { rhDraftSelAll(true); await rhDraftViewSel(); });
+    }, back: async (page) => { await page.evaluate(() => { try { rhDraftViewManyClose(); } catch (e) {} }); } },
     { name: 'application-pack', run: async (page) => {
       const H=require('../../../hwpx_gen.js');
       const asset=Buffer.from(H.build(H.tablePara([['성명',''],['연락처','']],H.cols([0.5,0.5])))).toString('base64');

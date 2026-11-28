@@ -395,6 +395,16 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-21 — 강의자료 «자동 정리함»(/edulib_inbox, 대표 「메일로 보낸 강의 자료 … 자동으로 정리해서 내용 넣을 수 있게」) 게시 완료(rules-deploy.js --deploy, 이 PC):
        새로 1 · 바뀜 0 · 사라짐 0 — 읽기 관리자만(LOGIN + isAdmin, 메일함 화면과 같은 사람)·쓰기 아무도(서버 관리자 SDK 만). 더 넓게 보이게 된 칸 없음.
        문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-21.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
+  /* ★ 2026-11-22 — 건의함 세 자리 «번호 모양 · 알려진 칸 · 길이 한도» 게시 완료(rules-deploy.js --deploy, 이 PC, PR #3016 합친 뒤):
+       새로 18 · 바뀜 2(건의·메타 $id/.validate 에 번호 모양만 더함) · 사라짐 0 · 넓어짐 0, 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인.
+       새 기준 docs/firebase-rules-콘솔원문-2026-11-22.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
+  /* ★ 2026-11-22 — 강의자료 «내용 지문»(/edulib/sims, 대표 「기존 강의를 바꾼 게 있다면 마지막에 언제 강의랑 유사하다 표시」) 게시 완료(rules-deploy.js --deploy, 이 PC):
+       새로 1 · 바뀜 0 · 사라짐 0 — 읽기·쓰기 재직 직원(LOGIN, edulib 와 같은 사람)·지우기 금지·id=sourceId=열쇠·entityType·지문(mh)은 16진수 512자까지.
+       더 넓게 보이게 된 칸 없음. 문법 검사 통과·다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-22.json(같은 날 판을 갈아 끼움) — 목록을 비운다. */
+  /* ★ 2026-11-22 — 같은 날 /edulib/sims 를 «조임»(보안 검토 낮음 — 칸을 정해 두기): 칸별 규칙 새로 16 · 바뀜 1(sourceKind 도 확인 — 조임) · 사라짐 0 · 헐거워짐 0.
+       그 밖의 칸은 $other false. 다시 읽어 «콘솔이 올린 것과 같음» 확인. 새 기준 docs/firebase-rules-콘솔원문-2026-11-22.json — 목록을 비운다. */
+  /* ★ 2026-11-28 — 병목 해소 1단계 RTDB 인덱스 4곳(/data/finance_income/v, /hanaSmsBridge/inbox, /pucards/scheduled/.indexOn/2, /work_erp/items) 추가 및 기존 콘솔 /edulib/lectures 규칙 보존 배포 완료(사라짐 0 · 바뀜 0).
+       다시 읽어 «콘솔이 올린 것과 같음» 확인 후 새 기준 docs/firebase-rules-콘솔원문-2026-11-28.json 으로 갱신 — 목록을 비운다. */
   const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +

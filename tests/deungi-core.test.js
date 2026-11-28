@@ -542,3 +542,96 @@ test('★ 한 사람이 두 곳 이상의 지사장으로 정해지면 알린다
   b.branches[1].head = 'm9';   // 없는 사원 — 중복도 미정도 아니라 «미정» 쪽
   assert.deepEqual(C.headDups(b), []);
 });
+
+/* 2026-11-24 푸른통합시스템 직원명부(data/user_accounts · data/user_dir) 연결 보조 */
+test('직원명부 생년월일·주소 파싱 — 다양한 날짜에서 앞 6자리만 뽑고, 주민번호 뒷자리·계좌·비밀번호는 절대 남기지 않는다', () => {
+  assert.equal(C.staffBirth6('1990-01-05'), '900105');
+  assert.equal(C.staffBirth6('1988.2.3'), '880203');
+  assert.equal(C.staffBirth6('20010912'), '010912');
+  assert.equal(C.staffBirth6('951120'), '951120');
+  assert.equal(C.staffBirth6('', '920315-1234567'), '920315');
+  assert.equal(C.staffBirth6('', 'enc:v1:abc123456'), '');
+  assert.equal(C.staffBirth6('1990-02-30'), '');
+
+  assert.equal(C.staffFullAddr({ address: '점검도 점검시 가로 10', addressDetail: '502호' }), '점검도 점검시 가로 10 502호');
+  assert.equal(C.staffFullAddr({ address: '점검도 점검시 가로 10 502호', addressDetail: '502호' }), '점검도 점검시 가로 10 502호');
+
+  const raw = {
+    v: [
+      { sid: 'P-091', name: '점검노무', title: '노무사', role: 'member', branch: '천안본사', status: 'active',
+        birthDate: '1992-05-14', address: '점검시 푸른로 77', addressDetail: '502호', hireDate: '2026-11-01',
+        licenseNo: '12345', rrn: '920514-1234567', accountNo: '110-123-456789', accountHolder: '점검노무', loginPw: 'secret' },
+      { sid: 'P-099', name: '지운사람', _deleted: true, status: 'active' },
+    ],
+  };
+  const list = C.normStaffList(raw);
+  assert.equal(list.length, 1);
+  const u = list[0];
+  assert.equal(u.birth, '920514');
+  assert.equal(u.addr, '점검시 푸른로 77 502호');
+  assert.equal(u.licenseNo, '12345');
+  assert.equal('rrn' in u, false);
+  assert.equal('accountNo' in u, false);
+  assert.equal('accountHolder' in u, false);
+  assert.equal('loginPw' in u, false);
+  assert.doesNotMatch(JSON.stringify(u), /1234567|110-123-456789|secret/);
+  /* normStaff 는 원본 주민번호(raw.rrn)를 읽지 않는다(birthDate/birth 만 참조) */
+  const legacyOnly = C.normStaff({ sid: 'P-092', name: '옛주민만', rrn: '920514-1234567', status: 'active' });
+  assert.equal(legacyOnly.birth, '');
+  assert.equal('rrn' in legacyOnly, false);
+});
+
+test('★ 동명이인 자동 대입 금지 — 이름+생년월일이 정확히 한 명일 때만 맞춘다', () => {
+  const list = C.normStaffList([
+    { sid: 'P-101', name: '점검동명', birthDate: '1980-01-01', address: '점검시 가로 1', status: 'active' },
+    { sid: 'P-102', name: '점검동명', birthDate: '1990-02-02', address: '점검시 나로 2', status: 'active' },
+    { sid: 'P-103', name: '점검유일', birthDate: '1985-03-03', address: '점검시 다로 3', status: 'active' },
+    { sid: 'P-104', name: '점검재직퇴직', birthDate: '1986-04-04', address: '점검시 라로 4', status: 'retired', retireDate: '2026-10-01' },
+    { sid: 'P-105', name: '점검재직퇴직', birthDate: '1995-05-05', address: '점검시 마로 5', status: 'active' },
+  ]);
+  assert.equal(C.matchStaffByName(list, '점검유일').hit.sid, 'P-103');
+  const dup = C.matchStaffByName(list, '점검동명');
+  assert.equal(dup.hit, null);
+  assert.equal(dup.dup.length, 2);
+  /* 둘 중 한 명이 퇴직이고 재직자가 정확히 한 명이면 입사 이름 매칭은 재직자를 고른다 */
+  assert.equal(C.matchStaffByName(list, '점검재직퇴직').hit.sid, 'P-105');
+  /* 등기 현황 사원 매칭은 생년월일까지 본다 — 불일치면 다른 사람으로 보지 않는다 */
+  assert.equal(C.matchStaffForMember(list, { name: '점검동명', birth: '900202' }).hit.sid, 'P-102');
+  assert.equal(C.matchStaffForMember(list, { name: '점검유일', birth: '999999' }).hit, null);
+});
+
+test('직원명부 입사·퇴사 그룹 분리, 퇴사 감지, 패치 채움 규칙(인가일 보호·이전값 혼입 방지)', () => {
+  const b = 법인();
+  const list = C.normStaffList([
+    { sid: 'P-001', name: '점검대표', title: '대표노무사', birthDate: '1970-01-01', address: '점검시 가로 1', status: 'active' },
+    { sid: 'P-002', name: '점검노무', title: '노무사', birthDate: '1980-01-01', address: '점검시 나로 2', status: 'retired', retireDate: '2026-11-18', leaveReason: '자발적 퇴사' },
+    { sid: 'P-091', name: '새노무사', title: '노무사', birthDate: '1993-07-08', address: '점검시 새로 10', hireDate: '2026-11-01', licenseNo: '55555', status: 'active' },
+    { sid: 'A-010', name: '점검사무', title: '사무직', role: 'staff', birthDate: '1996-01-01', address: '점검시 사무로 1', status: 'active' },
+  ]);
+  const grp = C.staffJoinGroups(list, b, []);
+  assert.deepEqual(grp.unregLabor.map((u) => u.sid), ['P-091']);
+  assert.deepEqual(grp.unregOther.map((u) => u.sid), ['A-010']);
+  assert.equal(grp.others.length, 2);
+
+  const sigs = C.staffLeaveSignals(list, b, []);
+  assert.equal(sigs.length, 1);
+  assert.equal(sigs[0].member.id, 'm2');
+  assert.equal(sigs[0].alreadyInCase, false);
+  const sigs2 = C.staffLeaveSignals(list, b, [{ type: 'leave', member: 'm2' }]);
+  assert.equal(sigs2[0].alreadyInCase, true);
+
+  /* 드롭다운 선택(fromPicker)은 이전 입력이 섞이지 않게 이름·생년월일·주소·등록번호를 새로 맞추되 입사 연월일(date)은 강제 덮어쓰지 않는다 */
+  const jp = C.staffFillJoinPatch(grp.unregLabor[0], { name: '이전사람', birth: '888888', addr: '옛주소', license: '99999', date: '' }, { fromPicker: true });
+  assert.deepEqual(jp.patch, { name: '새노무사', birth: '930708', addr: '점검시 새로 10', license: '55555' });
+  assert.equal('date' in jp.patch, false);
+  /* 이름 타이핑(fromPicker:false)은 이미 채워진 칸을 덮어쓰지 않고 빈 칸만 채운다 */
+  const jp2 = C.staffFillJoinPatch(grp.unregLabor[0], { name: '새노무사', birth: '930101', addr: '' }, { fromPicker: false });
+  assert.equal('birth' in jp2.patch, false);
+  assert.equal(jp2.patch.addr, '점검시 새로 10');
+
+  /* 퇴사 패치 — 기본 사유('개인 사정')·빈 퇴사일만 채우고 직접 적은 것은 지킨다 */
+  const lp = C.staffFillLeavePatch(sigs[0].staff, { reason: '개인 사정', date: '' });
+  assert.deepEqual(lp.patch, { reason: '자발적 퇴사', date: '2026-11-18' });
+  const lpKeep = C.staffFillLeavePatch(sigs[0].staff, { reason: '직접적은사유', date: '2026-11-30' });
+  assert.deepEqual(lpKeep.patch, {});
+});

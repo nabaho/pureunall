@@ -251,8 +251,34 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 @media (max-width:1180px){
   .pbox-ws-grid{grid-template-columns:minmax(0,1fr)}
   .pbox-home-dash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pbox-reader{width:54vw;min-width:420px;max-width:660px}
+  .pbox-reader.wide-3dan{width:92vw;min-width:0;max-width:100vw}
 }
-.pbox-ws-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;margin-bottom:12px;flex-wrap:wrap}
+.pbox-ws-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;flex-wrap:wrap}
+@media (min-width:768px){
+  .pbox-ws-head{position:sticky;top:0;z-index:18}
+}
+@media (min-width:769px){
+  .pbox-filter-card{position:sticky;top:0;z-index:16}
+}
+.pbox-auth-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pbox-auth-tab{min-height:30px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#f8fafc;color:#475569;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.pbox-auth-tab:hover{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+.pbox-auth-tab.active{background:#2563eb;color:#ffffff;border-color:#2563eb}
+.pbox-auth-list{display:flex;flex-direction:column;gap:10px}
+.pbox-auth-sec{display:flex;flex-direction:column;gap:6px}
+.pbox-auth-sec-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 4px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:800;color:#1e293b}
+.pbox-auth-more-btn{border:none;background:transparent;color:#2563eb;font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 4px;white-space:nowrap}
+.pbox-auth-more-btn:hover{text-decoration:underline}
+.pbox-conn-details{margin-bottom:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px}
+.pbox-conn-details>summary{font-size:12px;font-weight:700;color:#475569;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:26px}
+.pbox-conn-details>summary::-webkit-details-marker{display:none}
+.pbox-conn-details[open] .pbox-conn-law-bar{margin-top:8px;margin-bottom:0;border:none;padding:0;background:transparent}
+.pbox-cite-details{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin:0 0 12px}
+.pbox-cite-details>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;list-style:none;min-height:26px}
+.pbox-cite-details>summary::-webkit-details-marker{display:none}
+.pbox-cite-toggle{font-size:11.5px;font-weight:700;color:#2563eb;white-space:nowrap}
+.pbox-cite-details .pbox-cite-chips{margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0}
 .pbox-ws-title-row{display:flex;align-items:center;gap:8px;flex:1;min-width:220px;flex-wrap:wrap}
 .pbox-ws-title-input{flex:1;min-width:180px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:16px;font-weight:800;color:#1e293b;background:#ffffff;font-family:inherit}
 .pbox-ws-tabs-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap}
@@ -305,6 +331,14 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 /* PC 규격 목록표: 슬림 체크박스(34px) + 번호(40px tabular-nums) + 깔끔한 행 간격 */
 .pbox-table-wrap{width:100%;overflow-x:auto}
 .pbox-table{width:100%;min-width:680px;table-layout:fixed;border-collapse:collapse;font-size:12px}
+.pbox-laws-table{min-width:960px}
+.pbox-laws-table .col-law-name{width:auto;min-width:240px}
+.pbox-shell.reader-expanded .pbox-laws-table{min-width:440px;width:100%}
+.pbox-shell.reader-expanded .pbox-laws-table .pbox-col-subfiles,
+.pbox-shell.reader-expanded .pbox-laws-table .pbox-col-dept,
+.pbox-shell.reader-expanded .pbox-laws-table .pbox-col-cache{display:none}
+.pbox-shell.reader-expanded .pbox-laws-table .pbox-col-actions{width:118px!important}
+.pbox-shell.reader-expanded .pbox-laws-table .pbox-col-actions .pbox-act-attach-hide{display:none}
 .pbox-table th{background:#f8fafc;color:#475569;font-weight:700;text-align:left;padding:9px 8px;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pbox-table td{padding:9px 8px;border-bottom:1px solid #e2e8f0;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .pbox-table tbody tr{background:#ffffff}
@@ -315,7 +349,8 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-row-click strong{font-size:13px;letter-spacing:-.01em}
 .pbox-row-click:hover strong{color:#2563eb;text-decoration:underline}
 .pbox-table .pbox-empty-cell{text-align:center;padding:28px 16px;color:#475569;white-space:normal}
-.pbox-hl{background:#fffbeb;color:#854d0e;border-radius:3px;padding:0 2px;font-weight:800}
+.pbox-hl{background:#fffbeb;color:#854d0e;border:1px solid #fde68a;border-radius:4px;padding:0 3px;font-weight:800}
+.pbox-req-kw-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px;font-size:12px;color:#475569}
 
 .pbox-bulk-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 14px;border-radius:10px;background:#1e293b;color:#ffffff;font-size:12px;margin-bottom:10px;flex-wrap:wrap}
 
@@ -333,7 +368,7 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-btn-primary:hover{background:#1e40af}
 .pbox-btn-live{min-height:34px;padding:7px 12px;border:1px solid #bbf7d0;border-radius:8px;background:#f0fdf4;color:#166534;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px}
 .pbox-btn-live:hover{background:#bbf7d0;color:#166534}
-.pbox-btn-sm{min-height:32px;padding:6px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;color:#1e293b;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.pbox-btn-sm{min-height:32px;padding:6px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;color:#1e293b;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px;text-decoration:none}
 .pbox-btn-sm:hover{background:#f8fafc;border-color:#94a3b8}
 .pbox-icon-btn{min-width:30px;min-height:30px;border:1px solid #e2e8f0;background:#ffffff;color:#475569;border-radius:7px;padding:5px 9px;font-size:13px;cursor:pointer;white-space:nowrap}
 .pbox-link-btn{min-height:28px;min-width:28px;display:inline-flex;align-items:center;border:none;background:transparent;color:#1e40af;font-size:12px;font-weight:700;cursor:pointer;padding:2px 6px;border-radius:6px;white-space:nowrap}
@@ -342,6 +377,10 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-mini-act:hover{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
 .pbox-subfile-btn{min-height:28px;min-width:28px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 .pbox-subfile-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
+.pbox-3dan-btn{min-height:28px;min-width:28px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
+.pbox-3dan-btn:hover{background:#166534;color:#ffffff;border-color:#166534}
+.pbox-law-hist-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:12px;color:#475569}
+.pbox-law-hist-date{min-height:32px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;color:#1e293b;background:#ffffff;font-family:inherit}
 .pbox-btn-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 /* 스마트 조문 즉시 점프 · 쟁점 파인더 · 상세필터 · 외부사이트 직행 바 */
@@ -450,8 +489,23 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
 .pbox-empty-mini{padding:10px 6px;color:#475569;font-size:12px}
 .pbox-loading-line{padding:18px;text-align:center;color:#1e40af;font-size:13px;font-weight:600}
 
-/* 오른쪽 원문 분할 리더창 (#pboxReader) */
-.pbox-reader{width:460px;min-width:400px;max-width:50vw;background:#ffffff;border-left:1px solid #cbd5e1;display:flex;flex-direction:column;height:100%;z-index:25}
+/* 오른쪽 원문 분할 리더창 (#pboxReader — PC 화면 절반 폭 · 3단 비교 시 78vw 확장 · 접기 레일 44px) */
+.pbox-reader{width:50vw;min-width:520px;max-width:960px;background:#ffffff;border-left:1px solid #cbd5e1;display:flex;flex-direction:column;height:100%;z-index:25;flex-shrink:0}
+.pbox-reader.wide-3dan{width:78vw;min-width:760px;max-width:1440px}
+.pbox-reader.collapsed{width:44px;min-width:44px;max-width:44px;background:#f8fafc;align-items:center;padding:8px 4px;gap:8px}
+.pbox-reader-rail-btn{width:34px;min-height:34px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.pbox-reader-rail-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
+.pbox-reader-rail-title{flex:1;min-height:0;writing-mode:vertical-rl;text-orientation:mixed;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:800;color:#1e293b;cursor:pointer;padding:6px 2px;letter-spacing:.02em}
+.pbox-reader-rail-title:hover{color:#2563eb}
+.pbox-3dan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+.pbox-3dan-col{min-width:0;display:flex;flex-direction:column;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+.pbox-3dan-col-hd{position:sticky;top:0;z-index:5;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.pbox-history-bar{padding:9px 14px;border-bottom:1px solid #fde68a;background:#fffbeb;color:#854d0e;display:flex;flex-direction:column;gap:7px;font-size:12px}
+.pbox-history-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pbox-history-sel{flex:1;min-width:200px;min-height:32px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#1e293b;font-size:16px;font-family:inherit}
+@media (max-width:960px){
+  .pbox-3dan-grid{grid-template-columns:minmax(0,1fr)}
+}
 .pbox-reader-hd{padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:#f8fafc}
 .pbox-reader-titlewrap{min-width:0}
 .pbox-reader-kicker{font-size:11px;margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -522,11 +576,13 @@ input[type="checkbox"]{width:16px;height:16px;margin:0;cursor:pointer;vertical-a
   .pbox-proj-item{padding:8px 6px}
   .pbox-wf-card{padding:10px 4px}
   .pbox-filter-card,.pbox-list-card,.pbox-flat-m,.pbox-unified-board,.pbox-unified-col,.pbox-live-review-box,.pbox-home-dash-grid>.pbox-lbox-sec{background:transparent;border:none;border-radius:0;padding:0 0 8px;box-shadow:none}
-  .pbox-mini-act,.pbox-subfile-btn,.pbox-btn-sm,.pbox-btn-live,.pbox-icon-btn,.pbox-cat-chip,.pbox-qa-pill,.pbox-mode-btn,.pbox-link-btn,.pbox-plus-btn,.pbox-voice-btn,.pbox-side-newproj-btn,.pbox-ws-tab,.pbox-issue-tab,.pbox-issue-chip,.pbox-ext-pill,.pbox-bundle-btn,.pbox-conn-chip,.pbox-scope-tab,.pbox-kw-chip,.pbox-slim-drawer>summary{min-height:32px;min-width:28px;padding:6px 10px}
+  .pbox-mini-act,.pbox-subfile-btn,.pbox-3dan-btn,.pbox-btn-sm,.pbox-btn-live,.pbox-icon-btn,.pbox-cat-chip,.pbox-qa-pill,.pbox-mode-btn,.pbox-link-btn,.pbox-plus-btn,.pbox-voice-btn,.pbox-side-newproj-btn,.pbox-ws-tab,.pbox-auth-tab,.pbox-auth-more-btn,.pbox-conn-details>summary,.pbox-cite-details>summary,.pbox-issue-tab,.pbox-issue-chip,.pbox-ext-pill,.pbox-bundle-btn,.pbox-conn-chip,.pbox-scope-tab,.pbox-kw-chip,.pbox-slim-drawer>summary{min-height:32px;min-width:28px;padding:6px 10px}
   .pbox-ac-row{min-height:36px;padding:7px 8px}
   .pbox-home-grid,.pbox-home-dash-grid,.pbox-ws-grid,.pbox-unified-grid,.pbox-unified-grid.two-col,.pbox-matched-grid,.pbox-wf-grid,.pbox-proj-layout,.pbox-site-grid{grid-template-columns:minmax(0,1fr)}
   .pbox-op-hint{white-space:normal}
-  .pbox-reader{position:fixed;inset:0;width:100vw;min-width:0;max-width:100vw;z-index:1200}
+  .pbox-reader,.pbox-reader.wide-3dan{position:fixed;inset:0;width:100vw;min-width:0;max-width:100vw;z-index:1200}
+  .pbox-reader.collapsed{position:fixed;inset:auto 8px 16px auto;width:auto;min-width:0;max-width:calc(100vw - 16px);height:auto;flex-direction:row;padding:6px 10px;border:1px solid #bfdbfe;border-radius:999px;box-shadow:0 4px 12px rgba(30,41,59,.15)}
+  .pbox-reader.collapsed .pbox-reader-rail-title{writing-mode:horizontal-tb;padding:0 4px;max-width:160px}
   .pbox-sync-pill,.pbox-top-search-box{display:none}
 
   /* 좁은 화면(360·375px): 머리줄 전체선택 유지 + [체크박스·번호·제목] 1줄 + [기관/사건번호·열람단추] 2줄의 한 겹 카드 */
@@ -592,6 +648,13 @@ html[data-theme="dark"] .pbox-voice-summary-body{color:#f8fafc}
 html[data-theme="dark"] .pbox-voice-stalled{color:#fecaca}
 html[data-theme="dark"] .pbox-voice-mic-ok{color:#4ade80}
 html[data-theme="dark"] .pbox-voice-mic-mute{color:#fffbeb}
+html[data-theme="dark"] .pbox-ws-head{background:#1e293b;border-color:#475569;color:#f8fafc}
+html[data-theme="dark"] .pbox-cite-details,html[data-theme="dark"] .pbox-conn-details{background:#000000;border-color:#475569;color:#cbd5e1}
+html[data-theme="dark"] .pbox-cite-details .pbox-cite-chips,html[data-theme="dark"] .pbox-auth-sec-hd{border-color:#475569;color:#f8fafc}
+html[data-theme="dark"] .pbox-cite-toggle,html[data-theme="dark"] .pbox-auth-more-btn{color:#60a5fa}
+html[data-theme="dark"] .pbox-auth-tab{background:#1e293b;color:#cbd5e1;border-color:#475569}
+html[data-theme="dark"] .pbox-auth-tab.active{background:#2563eb;color:#ffffff;border-color:#2563eb}
+html[data-theme="dark"] .pbox-conn-details>summary,html[data-theme="dark"] .pbox-req-kw-bar{color:#cbd5e1}
 html[data-theme="dark"] .pbox-live-issue-card,html[data-theme="dark"] .pbox-unified-item:hover{background:#000000;color:#f8fafc;border-color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-title{color:#60a5fa}
 html[data-theme="dark"] .pbox-live-issue-body,html[data-theme="dark"] .pbox-unified-title,html[data-theme="dark"] .pbox-unified-col-hd,html[data-theme="dark"] .pbox-unified-item-title{color:#f8fafc;border-color:#475569}
@@ -671,6 +734,17 @@ html[data-theme="dark"] .pbox-art-linked{color:#cbd5e1;border-color:#475569}
 html[data-theme="dark"] .pbox-matrix-table th{background:#1e293b;color:#cbd5e1;border-color:#475569}
 html[data-theme="dark"] .pbox-matrix-table td,html[data-theme="dark"] .pbox-matrix-table tbody tr{background:#1e293b;color:#f8fafc;border-color:#475569}
 html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
+html[data-theme="dark"] .pbox-3dan-btn{background:#166534;color:#ffffff;border-color:#166534}
+html[data-theme="dark"] .pbox-3dan-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
+html[data-theme="dark"] .pbox-3dan-col{background:#000000;border-color:#475569}
+html[data-theme="dark"] .pbox-3dan-col-hd{background:#1e40af;color:#ffffff;border-color:#2563eb}
+html[data-theme="dark"] .pbox-history-bar{background:#1e293b;color:#fbbf24;border-color:#475569}
+html[data-theme="dark"] .pbox-history-sel,html[data-theme="dark"] .pbox-law-hist-date{background:#000000;color:#f8fafc;border-color:#475569}
+html[data-theme="dark"] .pbox-law-hist-row{border-color:#475569;color:#cbd5e1}
+html[data-theme="dark"] .pbox-reader.collapsed{background:#1e293b;border-color:#475569}
+html[data-theme="dark"] .pbox-reader-rail-btn{background:#000000;color:#60a5fa;border-color:#475569}
+html[data-theme="dark"] .pbox-reader-rail-btn:hover{background:#2563eb;color:#ffffff;border-color:#2563eb}
+html[data-theme="dark"] .pbox-reader-rail-title{color:#f8fafc}
 /* ══ pu-design 시작 — 제미나이 판 «모양 값» (대표 「한번에 모든 것 다해」 2026-11-21) · 공용 값은 css/pu-design.css
    ★ body.pu-design 일 때만 먹는다 — body 태그의 pu-design 한 단어를 빼면 옛 모양 그대로다.
    ★ 값만 바꾼다: 모서리·그림자·굵기. 색은 건드리지 않는다 — 자기 어두운 판(html[data-theme="dark"])이 바탕·글자·테두리 색을
@@ -697,7 +771,7 @@ html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
 /* ══ pu-design 끝 ══ */
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 style 덩어리 «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design">
 <div id="pboxRoot"></div>
@@ -711,15 +785,15 @@ html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-authsync.js?v=7"></script>
-<script src="js/pu-health.js?v=7"></script>
+<script src="js/pu-health.js?v=8"></script>
 <script src="js/pu-version.js?v=12"></script>
-<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script>
 <script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
@@ -730,8 +804,8 @@ html[data-theme="dark"] .pbox-matrix-table td[data-label]::before{color:#cbd5e1}
 <script src="js/pu-pbox-lawindex.js?v=2"></script>
 <script src="js/pu-pbox-corpus.js?v=10"></script>
 <script src="js/pu-pbox-engine.js?v=28"></script>
-<script src="js/pu-pbox-store.js?v=32"></script>
-<script src="js/pu-pbox-app.js?v=37"></script>
+<script src="js/pu-pbox-store.js?v=34"></script>
+<script src="js/pu-pbox-app.js?v=41"></script>
 <script>
 try {
   PuBack.guard(function () {

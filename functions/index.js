@@ -58,8 +58,6 @@ function geoip나라(ip) {
   } catch (e) { return ""; }
 }
 const NasBackupExport = require("./nas-backup-export");
-const TypeSafeEvaluate = require("./typesafe-evaluate");
-const MailReqScope = require("./mail-req-scope");   /* 경력관리 «요청 메일» 범위 분류(업무 vs 이력·회의·비용) — 애매한 건만 Jev 에게 */
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
@@ -712,6 +710,7 @@ exports.sendMaterialMail = functions
       try {
         const ref = await db.ref(MD.CARDS_ROOT + "/scheduled").push({
           at: at,
+          priorityAt: at,
           by: sender.email || "",
           payload: MD.slimPayload(body),
           madeAt: Date.now(),
@@ -998,10 +997,15 @@ exports.sendScheduledMail = functions
   .onRun(async () => {
     const db = getDatabase();
     const now = Date.now();
-    const snap = await db.ref(MD.CARDS_ROOT + "/scheduled")
-      .orderByChild("at").endAt(now).limitToFirst(20).once("value");
-    const all = snap.val() || {};
-    const ids = Object.keys(all);
+    const [snap, prioSnap] = await Promise.all([
+      db.ref(MD.CARDS_ROOT + "/scheduled")
+        .orderByChild("at").endAt(now).limitToFirst(20).once("value"),
+      db.ref(MD.CARDS_ROOT + "/scheduled")
+        .orderByChild("priorityAt").startAt(1).endAt(now).limitToFirst(MB.PRIORITY_BATCH).once("value"),
+    ]);
+    const merged = MB.mergeScheduledBatch(prioSnap.val() || {}, snap.val() || {});
+    const all = merged.rowsById;
+    const ids = merged.ids;
     if (!ids.length) return null;
 
     const from = await mailUserAsync();
@@ -1012,7 +1016,7 @@ exports.sendScheduledMail = functions
       const ref = db.ref(MD.CARDS_ROOT + "/scheduled/" + id);
       /* 이 고침보다 먼저 생긴 실패 줄도 지난 시각에 남아 있다. 새 실패만 치우면
          옛 실패 20건이 쌓인 날 다시 같은 막힘이 생기므로 한 번 만나면 함께 치운다. */
-      if (row.state === "failed" && Number(row.at) !== MB.PARKED_AT) {
+      if (row.state === "failed" && (Number(row.at) !== MB.PARKED_AT || (row.priorityAt != null && Number(row.priorityAt) !== MB.PARKED_AT))) {
         await ref.update(MB.parkOldFailure(row, now));
         continue;
       }
@@ -3663,126 +3667,9 @@ async function requireReader(req) {
   return decoded;
 }
 
-/* 오늘 이 사람이 몇 번 썼나 · 사무실 전체가 몇 번 썼나.
-   ⚠ 못 읽으면 «막지 않는다» — 셈이 안 되는 것과 한도를 넘은 것은 다른 일이다.
-     여기서 막으면 실시간DB 가 잠깐 흔들릴 때 기능이 통째로 멎는다(readDoc 과 같은 판단). */
-async function typeSafeDayLeft(uid) {
-  try {
-    const db = getDatabase();
-    const paths = TypeSafeEvaluate.tallyPaths(uid, DR.ymdKST());
-    const [mine, all] = await Promise.all(paths.map((p) => db.ref(p).once("value")));
-    return Object.assign({ known: true }, TypeSafeEvaluate.leftOf(mine.val(), all.val()));
-  } catch (e) {
-    console.warn("Jev 하루 셈 못 읽음(막지 않는다):", String((e && e.message) || e));
-    return { known: false, left: TypeSafeEvaluate.PERSON_DAY_LIMIT, mine: 0, all: 0, over: false };
-  }
-}
-
-/* 관리자만 — 대표 결정 2026-09-20 「관리자만 일단쓴다」.
-   ⚠ 위 하루 문(typeSafeDayLeft)과 «반대 방향»으로 못 읽음을 다룬다.
-     하루 문은 못 읽으면 열어 둬도 사고가 안 난다(한도가 잠깐 없어질 뿐이다).
-     여기서 못 읽고도 열어 두면 «권한 없는 사람에게 권한을 준» 것과 같다.
-     그래서 자격 확인은 실패를 «막힘»으로 다룬다(fail-closed). */
-async function typeSafeIsAdmin(uid) {
-  if (!uid) return false;
-  try {
-    const db = getDatabase();
-    const snap = await db.ref("uid_roles/" + uid).once("value");
-    const role = snap.val() || {};
-    return !!(role.isAdmin || role.isSubAdmin);
-  } catch (e) {
-    console.warn("Jev 관리자 확인 못 함(막는다):", String((e && e.message) || e));
-    return false;
-  }
-}
-
-/* 센다 — «성공한 것만» 센다. 열쇠가 거절당한 부름은 글이 업체에 남지 않았으므로
-   한도를 먹일 까닭이 없다(그것까지 세면 첫 시험 몇 번에 하루 몫이 날아간다).
-   ★ ServerValue.increment 대신 «거래»로 올린다 — 이 파일에 admin 변수가 없다(위 bumpReadTally 참고). */
-async function bumpTypeSafeTally(uid) {
-  try {
-    const db = getDatabase();
-    await Promise.all(TypeSafeEvaluate.tallyPaths(uid, DR.ymdKST()).map(function (p) {
-      return db.ref(p).transaction(function (cur) { return (Number(cur) || 0) + 1; });
-    }));
-  } catch (e) {
-    console.warn("Jev 셈 적기 실패(판단은 이미 끝났다):", String((e && e.message) || e));
-  }
-}
-
-/* Jev 판단 — 첫 판은 화면이 «제안»만 받는다. 저장·발송·상태변경은 이 함수가 하지 않는다. */
-exports.typeSafeEvaluate = functions
-  .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 30, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
-  .https.onRequest(async (req, res) => {
-    setCors(req, res);
-    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
-    let who;
-    try { who = await requireReader(req); }
-    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
-    /* ── 관리자만 (2026-09-20 대표 지시) — 열쇠 유무보다 «먼저» 본다 ──────────────
-       관리자가 아닌 사람에게는 서버 금고 상태(열쇠가 있는지 없는지)조차 알려 줄
-       까닭이 없다. 로그인 확인 다음, 그 무엇보다 먼저 자격을 본다. */
-    if (!(await typeSafeIsAdmin(who && who.uid))) {
-      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
-      return;
-    }
-    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
-    if (!key || key === "unset") {
-      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
-      return;
-    }
-    /* ── 하루 문 — 넘었으면 «부르지 않는다» (2026-09-20 대표 지시 「고쳐라」) ──
-       글이 나가기 «전»에 막아야 뜻이 있다. 부른 뒤에 세면 이미 나간 것이다. */
-    const 몫 = await typeSafeDayLeft(who && who.uid);
-    if (몫.over) { const r = TypeSafeEvaluate.overLimitError(몫); res.status(r.status).json(r); return; }
-    try {
-      const result = await TypeSafeEvaluate.evaluate(fetch, key, req.body && req.body.text);
-      if (result.ok) {
-        await bumpTypeSafeTally(who && who.uid);
-        result.left = Math.max(0, 몫.left - 1);
-        result.dayLimit = TypeSafeEvaluate.PERSON_DAY_LIMIT;
-      }
-      res.status(result.ok ? 200 : result.status).json(result);
-    } catch (e) {
-      console.warn("Jev 판단 실패:", String((e && e.message) || e).slice(0, 300));
-      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
-    }
-  });
-
-/* 📬 경력관리 «요청 메일» 범위 분류 — 규칙이 못 가른 «애매한 건»의 제목·첨부 이름만 Jev 에게 묻는다 (대표 지시 2026-11-15).
-   화면은 «건 번호»만 준다 — 서버가 그 사람의 kcareer/{uid}/mailreq/items 에서 제목·첨부 이름을 직접 읽는다(임의 글 중계 금지).
-   본문·보낸이는 받지도 보내지도 않는다. 이름 가림·하루 한도·건수 한도는 mail-req-scope.js 한 곳.
-   ⚠ 관리자만 · 열쇠 없으면 503 — 둘 다 «다른 무엇보다 먼저» 본다(typeSafeEvaluate 와 같은 순서).
-   ⚠ 이 함수는 분류만 돌려준다 — 상태 바꾸기는 브라우저(kcareer-mailreq.js scopeAsk)가 «새 요청»에만 한다. */
-exports.mailReqScope = functions
-  .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: ["TYPESAFE_API_KEY"] })
-  .https.onRequest(async (req, res) => {
-    setCors(req, res);
-    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
-    let who;
-    try { who = await requireReader(req); }
-    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
-    if (!(await typeSafeIsAdmin(who && who.uid))) {
-      res.status(403).json({ ok: false, why: "adminOnly", error: "지금은 관리자만 쓸 수 있습니다." });
-      return;
-    }
-    const key = String(process.env.TYPESAFE_API_KEY || "").trim();
-    if (!key || key === "unset") {
-      res.status(503).json({ ok: false, why: "noKey", error: "Jev 열쇠가 서버 금고에 설정되지 않았습니다." });
-      return;
-    }
-    try {
-      const out = await MailReqScope.run({ db: getDatabase(), key: key, fetchFn: fetch, ymd: DR.ymdKST(), uid: who.uid }, req.body);
-      res.status(out.status).json(out.body);
-    } catch (e) {
-      console.warn("요청 메일 범위 분류 실패:", String((e && e.message) || e).slice(0, 300));
-      res.status(502).json({ ok: false, why: "server", error: "Jev 판단을 받지 못했습니다." });
-    }
-  });
+/* ✨ TypeSafe(Jev) 검토 단추의 서버 대리인(typeSafeEvaluate)과 경력관리 «요청 메일» Jev 분류(mailReqScope)는
+   2026-11-22 대표 지시 「필요 없으면 완전히 덜어내라」로 걷어냈다(mailReqScope 는 11-19부터 아무도 부르지 않았다).
+   ⚠ 받은메일함 자동분류(mail-ai-classify.js)는 Jev 를 «계속» 쓴다 — functions/typesafe-evaluate.js·TYPESAFE_API_KEY 는 그쪽 몫이다. */
 
 /* 열쇠를 얻는다 — 서버 비밀이 먼저.
    ⚠ 실시간DB 갈래는 **옮기는 동안만** 쓰는 임시 다리다. 네 앱(사진첩·기업정보함·
@@ -8239,6 +8126,62 @@ exports.npsMonthly = NPSM.npsMonthly;
 exports.pubdataAsk = NPSM.pubdataAsk;
 /* 🏛 기업정보함 국세청 상태 → 공용 자리 옮겨 적기 (2026-10-12) */
 exports.pubdataNtsMirror = NPSM.pubdataNtsMirror;
+
+/* 🔍 무료 공공 기업검색 — 기업정보함(pu-cards.html)에서 회사명·사업자번호로 즉시 조회 (functions/pub-company-search.js).
+   금융위 기업기본정보 + 국세청 사업상태 + 근로복지공단 고용·산재 (+ Open DART / NICE BizAPI 슬롯).
+   ⚠ 서울 리전(MAIL_REGION) 필수 — 공공데이터포털은 해외 IP를 차단한다. 재직 직원(STAFF_GATE)만 호출 가능. */
+const PUB_CO_SEARCH = require("./pub-company-search");
+const pubCoRateAllow = PUB_CO_SEARCH.createRateLimiter(20, 60 * 1000);
+exports.pubCompanySearch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", maxInstances: 10 })
+  .https.onRequest(async (req, res) => {
+    setAutomationCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(m[1], true);
+      try { await STAFF_GATE.assertActive(decoded.uid); }
+      catch (e) { res.status(e.status || 403).json({ error: String((e && e.message) || e) }); return; }
+      if (!pubCoRateAllow(decoded.uid)) {
+        res.status(429).json({ ok: false, error: "잠시 후 다시 검색해 주세요 (분당 호출 한도 초과)." });
+        return;
+      }
+      const body = (req.body && typeof req.body === "object") ? req.body : {};
+      const db = getDatabase();
+      if (body.action === "applyToCoInfo") {
+        const applied = await PUB_CO_SEARCH.applyItemToCoInfo(db, body.item || {}, Date.now());
+        res.status(applied.ok ? 200 : 400).json(applied);
+        return;
+      }
+      if (body.action === "init") {
+        const [keys, ourCompanies] = await Promise.all([
+          PUB_CO_SEARCH.readConfigKeys(db),
+          PUB_CO_SEARCH.listOurCompanies(db, 12),
+        ]);
+        const meta = await PUB_CO_SEARCH.searchPublicCompany({ query: "", keys, fetchFn: () => { throw new Error("unused"); } });
+        res.json({ ok: true, integrations: meta.integrations, ourCompanies });
+        return;
+      }
+      const keys = await PUB_CO_SEARCH.readConfigKeys(db);
+      const fetchWithTimeout = (u, opts) => fetch(u, Object.assign({}, opts || {}, { signal: AbortSignal.timeout(15000) }));
+      const result = await PUB_CO_SEARCH.searchPublicCompany({
+        query: body.query,
+        detailBizNo: body.detailBizNo,
+        detailCorpNo: body.detailCorpNo,
+        detailName: body.detailName,
+        keys,
+        fetchFn: fetchWithTimeout,
+        db,
+      });
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      console.error("[pubCompanySearch]", err);
+      res.status(500).json({ ok: false, error: "공공 기업검색 중 오류가 발생했습니다." });
+    }
+  });
 /* 📥 사업자등록증 자동 검토 — 사진첩·메일 첨부·기업정보함 어디로 들어와도 서버가 바로 (2026-10-13, functions/bizreg-review.js) */
 const BIZREG = require("./bizreg-review")({ functions, getDatabase, MAIL_REGION });
 exports.bizregReviewDoc = BIZREG.bizregReviewDoc;
@@ -8348,6 +8291,7 @@ exports.collectRulesMail = functions
     return null;
   });
 exports.collectRulesMailAsk = functions
+  .region(MAIL_REGION)
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
   .database.ref("/rules_mgmt/library/ask/{id}")
   .onCreate(async (snap) => {

@@ -53,11 +53,11 @@ a{color:var(--blue-d);text-decoration:none}
 .chip{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--line);color:var(--ink2);font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
 
 #head{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
-#head .top{display:flex;align-items:center;gap:10px;padding:8px 16px}
-#head h1{margin:0;font-size:17px;white-space:nowrap}
-#head .sub{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tabs{display:flex;gap:4px;padding:0 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
-.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 12px;color:var(--ink2)}
+#head .top{display:flex;align-items:center;gap:8px;padding:5px 12px}
+#head h1{margin:0;font-size:15px;white-space:nowrap}
+#head .sub{color:var(--mute);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:3px;padding:0 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:5px 10px;font-size:12px;color:var(--ink2)}
 .tabs button.on{border-bottom-color:var(--blue);color:var(--blue-d);font-weight:700}
 #lock{display:none;max-width:520px;margin:60px auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center}
 main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
@@ -68,10 +68,10 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 /* ── 한눈에(대시보드) ── */
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;white-space:normal;color:var(--ink)}
-.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
-.kpi span{color:var(--mute);font-size:12px;white-space:nowrap}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:7px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 9px;text-align:left;white-space:normal;color:var(--ink);display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:5px;min-width:0}
+.kpi b{display:inline;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kpi span{color:var(--mute);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .cat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;white-space:normal}
 .cat:hover{border-color:var(--blue-line);background:var(--blue-bg)}
@@ -122,8 +122,9 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .mx td.z{color:var(--mute)}
 .mx td.ms{font-weight:600}
 .mx tr.mt th,.mx tr.mt td{background:var(--bg);font-weight:600}
-/* 법정교육 자료 / 법정교육 외 자료 (2026-11-22) — 한눈에는 왼쪽에 종류 대시보드, 오른쪽에 종류 × 연도. 자료함도 같은 두 덩어리 */
-.dgrid{display:grid;grid-template-columns:minmax(0,600px) minmax(0,1fr);gap:12px;align-items:start}
+/* 법정교육 자료 / 법정교육 외 자료 (2026-11-22) — 한눈에는 종류 카드(두 덩어리) 다음 종류 × 연도. 자료함도 같은 두 덩어리.
+   «왼쪽»은 이알피 왼쪽 메뉴 모양의 .sb 가 맡는다(아래 «왼쪽 메뉴») — 카드 칸은 본문 너비를 다 쓴다 */
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 .dgrid>.card{margin-bottom:0;min-width:0}
 .lgrp{border-radius:10px;padding:8px}
 .lgrp+.lgrp{margin-top:10px}
@@ -134,7 +135,7 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .lgrp.legal .lgt{color:var(--blue-d)}
 .lgh .lgm{color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .lgh .sm{margin-left:auto;flex:0 0 auto}
-.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dcat .cats{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .dcat .cat .ln{gap:8px}
 .mx tr.mg th{background:var(--card);text-align:left;padding:6px 8px;font-weight:700;color:var(--ink2)}
 .mx tr.mg.legal th{color:var(--blue-d)}
@@ -144,10 +145,66 @@ main{padding:12px 16px 80px;max-width:1500px;margin:0 auto}
 .lsec.other{background:var(--bg);color:var(--ink2)}
 .lsec .lgm{font-weight:400;color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #list>.lsec:first-child,#list>label.phone-only+.lsec{margin-top:0}
-@media (max-width:1180px){
-  .dgrid{grid-template-columns:minmax(0,1fr)}
-  .dcat .cats{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+/* 비슷한 강의(내용 지문) — 목록 ↺ · 자세히 칸 · 관리자 일괄 만들기 (2026-11-22) */
+.simb{color:var(--blue-d);font-weight:700;margin-right:4px;cursor:help}
+.simsec{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line)}
+.simlast{margin:2px 0 6px;padding:6px 8px;border-radius:8px;background:var(--blue-bg);color:var(--ink);line-height:1.5}   /* 한 문장 안내 — 표 칸이 아니라 줄을 넘겨도 된다(몇 % 가 잘리지 않게) */
+.simr{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0;padding:3px 2px;border-radius:6px}
+.simr.on{background:var(--blue-bg)}
+.simr .sd{flex:0 0 auto;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+.simr .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.simr .sp2{flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink2)}
+.simrun{display:flex;align-items:center;gap:10px;margin-top:8px;white-space:nowrap;min-width:0}
+.simrun .hint{overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* ══ 왼쪽 메뉴 — 이알피 왼쪽 메뉴(css/pu-erp.css 의 .sb·.sb-grp-h·.sb-menu-item)와 «같은 모양값» (대표 지시 2026-11-22 「대시보드 캡쳐처럼 만들어라」) ══
+   ★ PC(769px~)에서만 왼쪽에 붙는다 — 폰은 그대로(한눈에 종류 카드가 같은 일을 한다).
+   ★ 한눈에 · 전체 자료 · ⚖ 법정교육 자료 ▾ · 📘 법정교육 외 자료 ▾ · ＋ 새 강의 종류 — 종류를 누르면 자료함에서 그 종류만, 묶음 이름을 누르면 그 묶음만, ▾ 는 접기.
+   ★ 색은 이알피와 같은 짙은 남색 바탕(밝은·어두운 화면 모두). 이알피 메뉴 색 가운데 팔레트(5계열 27색) 밖인 것은 «팔레트 안 가장 가까운 색»으로 —
+     tests/color-palette-apps.test.js 예외 목록은 늘리지 않는다. 글자 대비는 모두 4.5:1 넘음 */
+.sb{display:none}
+/* has-sb 는 «재직 직원으로 들어온 뒤»에만 붙는다(js: sbOn) — 로그인 전·잠금 화면에는 빈 메뉴를 띄우지 않는다 */
+@media (min-width:769px){
+  body.has-sb{padding-left:230px}
+  body.has-sb .sb{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;width:230px;z-index:30;background:#1e293b;color:#cbd5e1;overflow:hidden}
 }
+.sb-logo{padding:12px 16px 10px;border-bottom:1px solid #475569;color:#ffffff;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user{padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #475569;min-width:0}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex-shrink:0}
+.sb-user-info{min-width:0}
+.sb-user-info .n{color:#ffffff;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-info .r{color:#60a5fa;font-size:11px;white-space:nowrap}
+.sb-nav{flex:1;overflow-y:auto;padding:6px 0}
+.sb-nav::-webkit-scrollbar{width:4px}
+.sb-nav::-webkit-scrollbar-thumb{background:#475569;border-radius:2px}
+.sb-sep{height:1px;background:#475569;margin:6px 12px}
+.sb-grp-h{display:flex;align-items:center;padding:10px 12px 8px 6px;min-width:0}
+.sb-grp-h:hover,.sb-grp-h.on{background:#475569}
+.sb-grp-h.on{box-shadow:inset 3px 0 0 #60a5fa}
+.sb-grp-h .arrow{width:24px;height:24px;flex:0 0 auto;color:#94a3b8;font-size:10px;background:none;border:0;padding:0;cursor:pointer;border-radius:4px}
+.sb-gname{flex:1;display:flex;align-items:center;min-width:0;background:none;border:0;padding:0;cursor:pointer;text-align:left;font-family:inherit;color:inherit}
+.sb-gname .icon{font-size:15px;margin:0 8px 0 2px;flex:0 0 auto}
+.sb-gname .name{flex:1;min-width:0;color:#bfdbfe;font-size:14px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-gname .count{background:#475569;color:#e2e8f0;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.sb-grp-h.on .sb-gname .count,.sb-grp-h:hover .sb-gname .count{background:#1e293b}
+.sb-menu{padding:0 8px 4px}
+.sb-row{position:relative}
+.sb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px 7px 22px;border-radius:4px;cursor:pointer;font-size:12px;color:#f8fafc;margin:1px 0;background:none;border:0;text-align:left;font-family:inherit;white-space:nowrap;min-width:0}
+.sb-menu.top .sb-menu-item{padding-left:12px;font-size:13px;font-weight:600}
+.sb-menu-item:hover{background:#475569;color:#ffffff}
+.sb-menu-item:focus-visible,.sb-gname:focus-visible,.sb-grp-h .arrow:focus-visible,.sb-ed:focus-visible{outline:none;background:#1e40af;color:#ffffff;box-shadow:inset 2px 0 0 #60a5fa}
+.sb-menu-item.active{background:#2563eb;color:#ffffff;position:relative}
+.sb-menu-item.active::before{content:'';position:absolute;left:-8px;top:0;bottom:0;width:3px;background:#60a5fa}
+.sb-menu-item .mi-icon{width:16px;font-size:13px;flex:0 0 auto;text-align:center}
+.sb-menu-item .mi-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.sb-menu-item .mi-n{color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.sb-menu-item.active .mi-n{color:#ffffff}
+.sb-menu-item:hover .mi-n,.sb-grp-h:hover .arrow,.sb-grp-h.on .arrow,.sb-row:hover .sb-ed{color:#e2e8f0}   /* 밝은 칸(#475569) 위에서도 4.5:1 넘게 */
+.sb-menu-item.zero .mi-text{color:#cbd5e1}   /* 0건은 흐리게 — 투명도 대신 색으로(대비를 지킨다) */
+.sb-menu-item.active .mi-text{color:#ffffff}   /* 0건 종류를 눌러 파란 칸이 되어도 흰 글자(4.5:1 넘게) */
+.sb-menu-item.add{color:#bfdbfe}
+.sb-row.mine .sb-menu-item{padding-right:30px}
+.sb-ed{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:#94a3b8;cursor:pointer;font-size:12px;padding:3px 6px;border-radius:4px}
+.sb-ed:hover{color:#ffffff;background:#475569}
 
 /* ── 자료 목록 — 한 칸은 한 줄(넘치면 … + title 에 전문) ── */
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -280,14 +337,17 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
   main{padding:8px 6px 80px}
   .card{padding:8px 7px}
   table.lst tr{padding:6px 6px}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .kpi{padding:8px 10px}
-  .kpi b{font-size:20px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .kpi{padding:4px 8px}
+  .kpi b{font-size:13px}
   /* 종류 카드 — 폰에서는 두 칸, 근거 조문 줄은 접는다(법정 표시는 그대로) */
   .cats,.dcat .cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .lgrp{padding:6px}
   .lgh{gap:6px}
   .lgh .lgm{display:none}   /* 폰에서는 «N건»만 — 종 수·용량은 PC 에서 */
+  .simrun{flex-wrap:wrap;gap:6px 10px}   /* 비슷한 강의 찾기 — 폰에서는 글과 단추가 줄을 나눈다(옆으로 넘치지 않게) */
+  .simrun .hint{flex-basis:100%}
+  #simCard .bar .hint{white-space:normal}
   .cat{padding:8px 9px}
   .cat .ln+.ln{display:none}
   .cat .ln span:nth-child(n+3){display:none}   /* 폰 카드에는 «최근·원본»만 — 검토·용량은 PC 에서 */
@@ -361,7 +421,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 :where(body.pu-design) .mx th{color:var(--pu-sub);font-weight:800}
 /* 숫자 카드 — 공용 A 틀은 숫자를 19px(폰 16px)로 줄이지만, 이 앱 숫자는 원래 22px(폰 20px) — 목업 «큰 숫자 22px» 와 같다.
    앱 값을 지킨다. 공용 파일이 이 파일 «뒤»에 실려 같은 세기면 지므로 .kpis 를 붙여 한 단계 세게 */
-:where(body.pu-design) .kpis .kpi b{font-size:22px}
+:where(body.pu-design) .kpis .kpi b{font-size:13.5px}
 /* 종류 카드 — 작은 카드 둥글기 + 옅은 그림자(왼쪽 파란 «법정» 띠는 그대로) */
 :where(body.pu-design) .cat{border-radius:var(--pu-r-sm);box-shadow:var(--pu-sh-sm)}
 /* 상태·원본 딱지 — 알약(색 짝은 그대로) */
@@ -373,14 +433,19 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 /* 폰 — 앱 폰 구간 값을 다시 맞춘다: 자세히 창은 화면 가득(둥근 모서리 없음) */
 @media (max-width:768px){
   :where(body.pu-design) .mbox{border-radius:0}
-  :where(body.pu-design) .kpis .kpi b{font-size:20px}
+  :where(body.pu-design) .kpis .kpi b{font-size:13px}
 }
 /* ══ pu-design 끝 ══ */
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 </head>
 <body class="pu-design pu-frame-a">
+<aside class="sb" id="sb" aria-label="강의자료 메뉴">
+  <div class="sb-logo">🎓 강의자료</div>
+  <div class="sb-user"><div class="sb-avatar" id="sbAv" aria-hidden="true"></div><div class="sb-user-info"><div class="n" id="sbName"></div><div class="r" id="sbRole"></div></div></div>
+  <nav class="sb-nav" id="sbNav" aria-label="강의 종류"></nav>
+</aside>
 <div id="head">
   <div class="top">
     <h1>🎓 강의자료</h1>
@@ -403,6 +468,7 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
     <div class="kpis" id="kpis"></div>
     <div class="dgrid">
       <div class="card dcat"><div class="bar"><div class="sec" style="margin:0">강의 종류</div><span class="hint">법정교육 자료 · 법정교육 외 자료 · 누르면 그 종류만 · 점선 = 직접 더한 종류</span></div><div id="cats" style="margin-top:8px"></div></div>
+      <div class="card" id="simCard" style="display:none"></div>
       <div class="card dmx"><div class="bar"><div class="sec" style="margin:0">종류 × 연도</div><span class="hint">진할수록 많음 · 칸을 누르면 그 종류·연도만 · 강의일은 이름·폴더에서 찾은 «추정»이 섞여 있습니다</span></div><div class="mx" id="mx" style="margin-top:8px"></div></div>
     </div>
   </section>
@@ -495,13 +561,13 @@ table.lst select,table.lst input[type=text]{width:100%;min-width:0;padding:3px 6
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=108"></script>
+<script src="js/pu-ontology.js?v=111"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다. 화면 저장은 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=54"></script>
+<script src="js/pu-appbar.js?v=55"></script>
 <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=4"></script>
 <script>
@@ -517,8 +583,8 @@ window.PuEduLibGate = { show: function(){ PuGate.show(); }, hide: function(){ Pu
 </script>
 <script src="js/pu-viewer-kind.js?v=1"></script>
 <script src="js/pu-edulib-classify.js?v=4"></script>
-<script src="js/pu-edulib-core.js?v=4"></script>
-<script src="js/pu-edulib-preview.js?v=2"></script>
-<script src="js/pu-edulib-app.js?v=8"></script>
+<script src="js/pu-edulib-core.js?v=5"></script>
+<script src="js/pu-edulib-preview.js?v=4"></script>
+<script src="js/pu-edulib-app.js?v=12"></script>
 </body>
 </html>

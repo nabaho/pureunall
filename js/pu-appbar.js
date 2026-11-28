@@ -52,6 +52,7 @@
     { key: 'harass',  row: 'client', name: '괴롭힘·성희롱 조사', icon: '🛡️', url: 'pu-harass.html',      desc: '사건조사·메일수집·보고서' },
     { key: 'ilteo',   row: 'client', name: '일터상생혁신',     icon: '🏭', url: 'ilteo.html',          desc: '메일자료·중간·결과보고·PPT 자동화' },
     { key: 'jobtrans', row: 'client', name: '산업일자리전환',  icon: '⚡', url: 'jobtrans.html',       desc: '능률협회·충경진 메일·보고서·HWPX' },
+    { key: 'safety',   row: 'client', name: '안전보건체계구축', icon: '🦺', url: 'safety.html',         desc: '과거이력·업종별체크·위험성·HWPX' },
     { key: 'orch',    row: 'inside', name: '오케스트레이션',   icon: '🔄', url: 'pu-orchestrator.html', desc: '메일·계약·ERP·정산 흐름연결' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
@@ -63,6 +64,7 @@
     { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송' },
     { key: 'signboard', row: 'sales', name: '전광판',   icon: '📺', url: 'pu-signboard.html', desc: '외부 전광판 광고 바꾸기' },
     { key: 'cards',   row: 'store', name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
+    { key: 'pubsearch', row: 'store', name: '공공 기업검색', icon: '🔍', url: 'pu-pubsearch.html',   desc: '금융위·재무·국세청·고용·연금·DART' },
     /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
        whoAmI() 는 주소 꼬리까지 보고 메일을 먼저 가른다 · go() 는 «&» 로 잇는다(2026-10-04).
        tests/appbar-every-link.test.js 가 모든 줄이 «제 앱»으로 가는지 돌려 본다. */

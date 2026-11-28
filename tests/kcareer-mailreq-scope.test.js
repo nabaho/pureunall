@@ -288,3 +288,174 @@ test('사람이 상태를 바꾸면 «기계가 걸렀다» 표시(autoIgnored)�
   assert.equal(x.st, 'ignored'); assert.equal(Q.scopeMark(x), null, '사람이 치운 것에 «자동» 딱지가 다시 붙지 않는다');
   assert.equal(x.scope, 'work', '범위 딱지(왜 업무로 봤는지)는 남는다');
 });
+
+/* ── 법인에 «지원하는 사람»의 메일(수습노무사 지원 등)은 요청 메일이 아니다 (대표 지시 2026-11-23) ──
+   ⚠ 제목·이름은 모두 지어낸 것이다(홍길동·김가나) — 저장소가 공개, 실제 지원자 이름을 넣지 않는다. */
+test('★ 수습노무사 지원 메일은 이력서·경력 서류를 첨부해도 «업무»로 거른다 — 첨부 이름의 «이력서» 말에 개인으로 들어오지 않는다', () => {
+  const 이력 = ['이력서_홍길동.pdf', '자기소개서_홍길동.pdf', '자격증 사본.pdf'];
+  ['노무사 지원(수습)_홍길동', '수습노무사 지원합니다 - 김가나', '[지원] 노무사 수습 채용 지원 건', '입사 지원_홍길동(경력 3년)', '인턴 지원합니다_김가나', '노무사 지원 (수습) 홍길동']
+    .forEach((s) => {
+      const r = Q.scopeOf({ s, an: 이력 });
+      assert.equal(r.scope, 'work', s); assert.ok(r.why.length > 0 && r.why[0].length > 0, '왜 걸렀는지 적는다');
+    });
+  assert.equal(scope('이력서 보냅니다', 이력), 'personal', '제목에 지원 말이 없으면 첨부 이름만으로는 거르지 않는다(규칙은 제목만 본다)');
+});
+test('지원 말은 «지원하는 쪽»으로 좁다 — 지원 사업·대표가 지원하는 쪽·수습 교육 강사 위촉은 그대로 개인 말로 들어온다', () => {
+  assert.equal(scope('노무사 지원 사업 컨설턴트 이력서 제출 안내'), 'personal', '«지원 사업»은 지원금 제도다');
+  assert.equal(scope('노무사 지원센터 자문위원 위촉 안내'), 'personal');
+  assert.equal(scope('[가나재단] 자문위원 지원 접수 안내 — 위촉 신청서 제출'), 'personal', '대표가 지원하는 쪽');
+  assert.equal(scope('수습노무사 직무교육 강사 위촉 안내'), 'personal', '수습 말이 있어도 지원이 아니면 걸리지 않는다');
+  assert.equal(scope('이력서 제출 요청', ['노무사 지원(수습)_홍길동.pdf']), 'personal', '첨부 이름의 지원 말은 안 본다 — 대표 본인이 낸 지원서일 수 있다');
+  const probe = ['이력서', '프로필', '위촉', '심의', '서약서', '지급확인서', '수당', '강사료', '자문회의', '위원회', '경력증명서', '재직증명서'];
+  probe.forEach((w) => assert.ok(!Q.SCOPE_RECRUIT.test(w), '«' + w + '» 가 지원 말에 걸린다'));
+});
+test('새로 온 수습노무사 지원 메일은 처음부터 걸러 둔다 — 진행 중·알림에 안 센다(기록은 남아 걸러낸 메일에서 되돌릴 수 있다)', async () => {
+  const f = dbWith({ 201: mkRow({ s: '노무사 지원(수습)_홍길동', an: ['이력서_홍길동.pdf', '경력기술서.pdf'], p: '안녕하세요 수습노무사로 지원합니다 이력서를 첨부합니다', f: '홍길동', e: 'a@example.org' }) });
+  await scan(f);
+  const x = items(f)[IN + '~201'];
+  assert.ok(x, '기록은 남는다'); assert.equal(x.st, 'ignored'); assert.equal(x.scope, 'work'); assert.ok(x.autoIgnored > 0);
+  assert.equal(x.scopeV, Q.SCOPE_RULE_V, '어느 판 규칙으로 갈랐는지 적는다');
+  const sm = Q.summary(items(f), NOW);
+  assert.equal(sm.open, 0); assert.equal(sm.alarm, 0); assert.equal(sm.ignored, 1);
+});
+test('★ 옛 규칙이 «개인»으로 들인 새 요청도 훑을 때 한 번 다시 가른다 — 이미 목록에 올라와 있던 지원 메일이 치워진다', async () => {
+  const f = dbWith({}, {
+    [IN + '~1']: OLD(IN + '~1', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'rule', an: ['이력서_홍길동.pdf'] }),
+    [IN + '~2']: OLD(IN + '~2', 'new', '위원 활동 확인서 제출 요청', { scope: 'personal', scopeBy: 'rule' }),
+    [IN + '~3']: OLD(IN + '~3', 'doing', '노무사 지원(수습)_김가나', { scope: 'personal', scopeBy: 'rule', an: ['이력서_김가나.pdf'] }),
+    [IN + '~4']: OLD(IN + '~4', 'done', '노무사 지원(수습)_김가나', { scope: 'personal', scopeBy: 'rule' }),
+    [IN + '~5']: OLD(IN + '~5', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'jev' }),
+    [IN + '~6']: OLD(IN + '~6', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'rule', scopeV: Q.SCOPE_RULE_V }),
+  });
+  const r = await scan(f);
+  const it = items(f);
+  assert.equal(it[IN + '~1'].st, 'ignored'); assert.equal(it[IN + '~1'].scope, 'work'); assert.ok(it[IN + '~1'].autoIgnored); assert.equal(it[IN + '~1'].scopeV, Q.SCOPE_RULE_V);
+  assert.equal(it[IN + '~2'].st, 'new', '여전히 개인 말이면 그대로 들인다'); assert.equal(it[IN + '~2'].scopeV, Q.SCOPE_RULE_V, '다시 봤다는 표시만 적는다');
+  assert.equal(it[IN + '~3'].st, 'doing', '사람이 확인함으로 둔 건은 안 건드린다'); assert.equal(it[IN + '~3'].scope, 'personal');
+  assert.equal(it[IN + '~4'].st, 'done'); assert.equal(it[IN + '~4'].scope, 'personal');
+  assert.equal(it[IN + '~5'].st, 'new', 'Jev 가 가른 범위는 규칙이 다시 보지 않는다'); assert.equal(it[IN + '~5'].scopeBy, 'jev');
+  assert.equal(it[IN + '~6'].st, 'new', '이미 이 판 규칙으로 가른 건은 다시 안 본다');
+  assert.equal(r.autoIgnored, 1, '이번에 거른 것은 하나'); assert.equal(r.scoped || 0, 0, '«처음 가른 건수»에는 안 센다');
+  const before = JSON.stringify(items(f));
+  const r2 = await scan(f);
+  assert.equal(JSON.stringify(items(f)), before, '두 번째 훑기는 아무것도 안 바꾼다'); assert.equal(r2.autoIgnored || 0, 0);
+});
+test('다시 가르는 길은 한 번에 한도가 있다 · «개인·규칙·새 요청»만 고른다(사람이 만진 건을 고르지 않는다)', () => {
+  assert.match(mod, /function rescopable\(x\)[\s\S]{0,400}x\.st === 'new'/, '새 요청만');
+  assert.match(mod, /function rescopable\(x\)[\s\S]{0,400}x\.scopeBy === 'rule'/, '규칙이 가른 것만');
+  assert.match(mod, /!x\.scope \|\| rescopable\(x\)\)[\s\S]{0,40}\.slice\(0, SCOPE_BACKFILL_MAX\)/, '한도(SCOPE_BACKFILL_MAX) 안에서');
+  assert.ok(Number(Q.SCOPE_RULE_V) >= 2, '판 번호는 말 목록을 넓힐 때 올린다');
+});
+
+/* ── 검토 지적 반영 (2026-11-23, Orca 보안 검토 중간 2건) ── */
+test('★ 기관이 대표에게 보낸 «위촉·위원» 요청은 지원 말이 있어도 거르지 않는다 — 지원 접수 안내·채용 지원센터 이름에 속지 않는다', () => {
+  assert.equal(scope('공익노무사 지원 접수 안내 및 자문위원 위촉 서류 제출 요청'), 'personal', '기관의 «지원 접수 안내» + 위촉');
+  assert.equal(scope('청년 인턴 채용 지원센터 자문위원 위촉 안내'), 'personal', '«채용 지원센터»는 기관 이름');
+  assert.equal(scope('공익노무사 지원 접수 안내', ['이력서 양식.hwp']), 'personal', '지원 «접수 안내»는 기관이 보낸 안내다 — 첨부 이름의 이력서 말로 들어온다');
+  assert.equal(scope('수습노무사 지원자 평가위원 위촉 안내'), 'personal', '평가위원 일');
+  /* 위원 일 말(예외 말)이 없는 제목에서도 «지원하는 쪽» 말이 아니면 걸리지 않는다 — 예외 말에만 기대지 않는다 */
+  assert.equal(scope('수습노무사 직무교육 강사 이력서 제출 요청'), 'personal', '수습 말만으로는 거르지 않는다(지원 말이 있어야)');
+  assert.equal(scope('청년 인턴 채용 지원센터 이력서 양식 제출 안내'), 'personal', '«채용 지원센터»는 기관 이름');
+  /* 그래도 지원자가 제목에 «이력서»를 적어도(위원 일 말은 안 쓴다) 걸러진다 */
+  assert.equal(scope('노무사 지원(수습)_홍길동 이력서 첨부', ['이력서_홍길동.pdf']), 'work');
+  assert.equal(scope('입사 지원합니다 경력기술서 첨부', ['경력기술서.pdf']), 'work');
+  ['위촉', '위원회', '평가위원', '위원 명단', '심의', '인력풀', '제척', '강사료', '자문료'].forEach((w) => assert.ok(Q.SCOPE_RECRUIT_NOT.test(w), w));
+  ['이력서', '프로필', '경력증명서', '서약서', '위원'].forEach((w) => assert.ok(!Q.SCOPE_RECRUIT_NOT.test(w), '«' + w + '» 는 지원자도 제목에 쓴다(맨 말) — 예외 말에 넣으면 지원 메일이 샌다'));
+  /* Orca 재검증(2026-11-23): 예외 말이 «맨 서약서·맨 위원»까지 넓었더니 지원자 메일이 개인으로 남았다 */
+  assert.equal(scope('수습노무사 지원 서약서 및 이력서 제출', ['이력서_홍길동.pdf']), 'work', '입사 서약서는 지원자도 낸다');
+  assert.equal(scope('입사 지원 서약서 제출_김가나', ['서약서.pdf', '이력서.pdf']), 'work');
+  assert.equal(scope('노무사 지원(수습) 위원 경력 포함 이력서 첨부', ['이력서.pdf']), 'work', '맨 «위원»은 위원 일이 아니다');
+});
+test('★ 사람이 직접 고친 «새 요청»은 다시 가르기로 치우지 않는다 — 종류·기한·메모를 고치면 «고쳤다»(edited) 표시가 남는다', async () => {
+  const f = dbWith({}, { [IN + '~1']: OLD(IN + '~1', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'rule', an: ['이력서_홍길동.pdf'] }),
+                          [IN + '~2']: OLD(IN + '~2', 'new', '노무사 지원(수습)_김가나', { scope: 'personal', scopeBy: 'rule', an: ['이력서_김가나.pdf'] }) });
+  await f.ref('kcareer/U1/mailreq/items').update(Q.editUpdate(IN + '~1', { memo: '이 분은 우리 법인 지원자가 아니라 지인 소개' }, NOW).update);   // 사람이 열어 보고 메모를 적음(상태는 새 요청 그대로)
+  await scan(f);
+  const it = items(f);
+  assert.equal(it[IN + '~1'].st, 'new', '사람이 고친 건은 그대로 둔다'); assert.ok(it[IN + '~1'].edited > 0); assert.equal(it[IN + '~1'].scope, 'personal');
+  assert.equal(it[IN + '~2'].st, 'ignored', '안 만진 건은 걸러진다');
+  assert.match(mod, /function rescopable\(x\)[\s\S]{0,400}!touched\(x\)/, '다시 가르기가 «만진 흔적»(edited 포함)을 본다');
+  assert.match(mod, /function touched\(x\)[\s\S]{0,120}x\.edited/, '«고쳤다» 표시(edited)가 만진 흔적에 든다');
+});
+test('★ 사람이 만진 흔적(edited·옛 판의 fixed·memo)이 있는 «새 요청»은 처음 가를 때도 다시 가를 때도 치우지 않는다 — 범위 딱지만 붙는다', async () => {
+  const f = dbWith({}, {
+    [IN + '~1']: OLD(IN + '~1', 'new', '노무사 지원(수습)_홍길동', { scope: 'personal', scopeBy: 'rule', fixed: { deadline: 1 }, an: ['이력서_홍길동.pdf'] }),   // 이 판 전에 기한을 직접 고친 건
+    [IN + '~2']: OLD(IN + '~2', 'new', '노무사 지원(수습)_김가나', { scope: 'personal', scopeBy: 'rule', memo: '지인 소개', an: ['이력서_김가나.pdf'] }),   // 이 판 전에 메모만 적은 건
+    [IN + '~3']: OLD(IN + '~3', 'new', '고객사 보고서 수정 요청의 건', { memo: '확인 필요' }),                                        // 범위가 아직 없는 옛 건 + 메모
+    [IN + '~4']: OLD(IN + '~4', 'new', '고객사 보고서 수정 요청의 건', { fixed: { kinds: 1 } }),                                    // 범위가 아직 없는 옛 건 + 종류를 고침
+    [IN + '~5']: OLD(IN + '~5', 'new', '고객사 보고서 수정 요청의 건'),                                                            // 안 만진 옛 건 — 걸러진다
+    [IN + '~6']: OLD(IN + '~6', 'new', '노무사 지원(수습)_박다라', { scope: 'personal', scopeBy: 'rule', an: ['이력서_박다라.pdf'] }),   // 안 만진 옛 개인 건 — 걸러진다
+  });
+  await scan(f);
+  const it = items(f);
+  ['1', '2'].forEach((n) => { assert.equal(it[IN + '~' + n].st, 'new', n + ' — 사람이 만진 건은 그대로'); assert.ok(!it[IN + '~' + n].autoIgnored); });
+  ['3', '4'].forEach((n) => { assert.equal(it[IN + '~' + n].st, 'new', n + ' — 처음 가르는 건도 만진 흔적이 있으면 상태를 안 바꾼다'); assert.equal(it[IN + '~' + n].scope, 'work', '딱지는 붙는다'); assert.ok(!it[IN + '~' + n].autoIgnored); });
+  ['5', '6'].forEach((n) => { assert.equal(it[IN + '~' + n].st, 'ignored', n + ' — 안 만진 건은 걸러진다'); assert.ok(it[IN + '~' + n].autoIgnored); });
+  assert.match(mod, /function touched\(x\)[\s\S]{0,300}x\.memo[\s\S]{0,120}x\.fixed/, '«만진 흔적»은 edited·memo·fixed 를 본다');
+  assert.match(mod, /sc\.scope !== 'personal' && c\.st === 'new' && !touched\(c\)/, '처음 가르는 길도 흔적을 본다');
+});
+test('★ 지원 «결과 통지»와 후속 서류 요청은 지원자 메일이 아니다 — 대표가 지원한 쪽에서 온 요청이 걸러지지 않는다(Orca 재검증 2회차)', () => {
+  assert.equal(scope('채용 지원 결과 안내 및 경력증명서 제출 요청'), 'personal', '기관이 보낸 결과 통지 + 서류 요청');
+  assert.equal(scope('인턴 지원 합격 안내 및 재직증명서 제출'), 'personal');
+  assert.equal(scope('입사 지원 면접 일정 안내 및 경력 확인서 제출 요청'), 'personal');
+  assert.equal(scope('노무사 지원(수습)_홍길동', ['이력서_홍길동.pdf']), 'work', '지원자가 보낸 제목은 그대로 걸러진다');
+  assert.equal(scope('노무사 지원 결과 안내 및 경력증명서 제출 요청'), 'personal', '«노무사 지원» 갈래도 같다');
+  ['결과', '합격', '불합격', '통보', '발표', '면접', '심사'].forEach((w) => ['채용 지원 ', '노무사 지원 ', '수습 지원 ', '인턴 지원 '].forEach((앞) => assert.ok(!Q.SCOPE_RECRUIT.test(앞 + w + ' 안내'), 앞 + w)));
+  assert.ok(Q.SCOPE_RECRUIT.test('채용 지원합니다'), '지원자의 «지원합니다»는 걸린다');
+});
+
+/* ── 전문가 참여동의서 메일 (대표 제보 2026-11-27) — 지어낸 제목만 ── */
+test('★ 전문가 참여동의서 메일은 «이력·회의·비용» 말로 들어온다 — 외부 전문가 참여·전문가 풀·멘토 동의서', () => {
+  assert.equal(scope('[가나연구원] 외부 전문가 참여동의서 요청'), 'personal');
+  assert.equal(scope('재송부_개인정보수집이용동의서 첨부 [가나연구원] 외부 전문가 참여동의서 요청'), 'personal', '실제로 걸러져 있던 모양');
+  assert.equal(scope('내·외부 전문가 참여 동의서 제출 안내'), 'personal');
+  assert.equal(scope('[가나재단] 전문가(멘토) 인력풀 참여 사전동의서'), 'personal');
+  assert.equal(scope('서류 제출 부탁드립니다', ['내외부 전문가 참여 동의서.hwp']), 'personal', '제목에 말이 없어도 첨부 이름으로');
+  /* 각 말이 «혼자서도» 걸리는지 — 다른 개인 말에 기대지 않는 제목 */
+  assert.equal(scope('외부 전문가 풀 등록 안내'), 'personal', '«외부 전문가 + 풀·등록» 만으로');
+  assert.equal(scope('[가나재단] 전문가 풀 안내'), 'personal', '«전문가 풀» 만으로');
+  assert.equal(scope('멘토 사전동의서 제출 요청'), 'personal', '«멘토 사전 동의서» 만으로');
+  assert.equal(scope('전문가 참여 동의서 회신'), 'personal', '«전문가 참여 동의서» 만으로');
+  assert.equal(scope('외부 전문가 참여 안내'), 'personal', '«외부 전문가 + 참여» 만으로 — 서류 말이 없어도');
+  /* 꾸밈말이 둘 붙어도(참여 사전동의서) · 개인정보가 끼어도 — 걸러지면 안 되는 진짜 요청(Orca 재검증 2026-11-27) */
+  ['[가나연구원] 전문가 참여 사전동의서 요청', '멘토 참여 사전 동의서', '전문가 위원 참여동의서 회신', '외부 전문가 개인정보 수집·이용 동의서', '전문가 참여 개인정보 동의서 제출']
+    .forEach((t) => assert.equal(scope(t), 'personal', t));
+});
+test('★ 고객사 업무 동의서·안내 메일은 개인 말이 아니다 — 맨 동의서·맨 참여/사전 동의서·위원 동의서·외부 전문가 안내는 걸러진다(Orca 검토 2026-11-27)', () => {
+  ['일터혁신 컨설팅 참여 동의서 제출 요청', '직원 교육 참여 동의서 양식 송부', '휴일근무 사전 동의서 양식 요청', '개인정보 제3자 제공 사전동의서 회신',
+    '노사협의회 위원 동의서 제출', '동의서 서명 요청', '직원 동의서 회수', '개인정보 동의서 회신 요청']
+    .forEach((s) => assert.notEqual(scope(s), 'personal', s));
+  ['외부 전문가 초청 세미나 안내', '외부 전문가 컨설팅 안내', '외부 전문가 활용 지원사업 신청 안내', '전문가 모임 일정 안내', '전문가 참여 세미나 안내',
+    '외부 전문가 참여 세미나 안내', '외부 전문가 참여 간담회 안내', '외부 전문가 참여 기업 모집 공고', '전문가 등록 지원사업 안내', '고객사 전문가 명단 송부', '전문가 풀이 강의 안내',
+    '외부 전문가 명단 송부', '외부 전문가 참여 교육 안내', '외부 전문가 참여 워크숍 안내', '외부 전문가 참여 포럼 안내', '외부 전문가 참여 설명회 안내', '외부 전문가 동의 하에 진행하는 컨설팅 안내']
+    .forEach((s) => assert.notEqual(scope(s), 'personal', '«외부 전문가»·«전문가»는 서류 말이 붙을 때만: ' + s));
+  assert.notEqual(scope('근로자 개인정보 수집·이용 동의서 양식 송부'), 'personal', '업무 말(근로자)');
+  assert.notEqual(scope('근로자 참여 동의서 회수(노사협의회)'), 'personal', '업무 말이 섞이면 «애매» — 걸러 둔다');
+});
+test('새로 온 전문가 참여동의서 메일은 «새 요청»(동의서)으로 들어오고, 외부 전문가 안내 메일은 요청이 되지 않는다', async () => {
+  const f = dbWith({
+    301: mkRow({ s: '[가나연구원] 외부 전문가 참여동의서 요청', an: ['내외부 전문가 참여 동의서.hwp'], p: '아래 서류를 작성하여 회신해 주시기 바랍니다 제출기한 12월 4일' }),
+    302: mkRow({ s: '외부 전문가 초청 세미나 안내', an: [], p: '세미나를 개최하오니 참석 바랍니다' }),
+  });
+  await scan(f);
+  const x = items(f)[IN + '~301'];
+  assert.ok(x, '기록이 생긴다'); assert.equal(x.st, 'new'); assert.equal(x.scope, 'personal'); assert.ok(!x.autoIgnored);
+  assert.ok(x.kinds.indexOf('consent') >= 0, '종류는 동의서');
+  assert.equal(Q.summary(items(f), NOW).alarm, 1, '안내 메일은 알림에 안 센다');
+  const y = items(f)[IN + '~302'];
+  assert.ok(!y || y.st !== 'new', '외부 전문가 초청 세미나 안내는 새 요청이 아니다');
+});
+test('범위를 가르는 글은 길이·공백에 한도가 있다 — 밖에서 오는 긴 반복 입력으로 느려지지 않는다', () => {
+  const t = Date.now();
+  Q.scopeOf({ s: '전문가('.repeat(20000), an: ['내' + ' '.repeat(50000) + '가', '외부' + ' '.repeat(50000) + '전문가'] });
+  assert.ok(Date.now() - t < 1500, '아주 긴 제목·첨부 이름도 한 건 가르는 데 오래 걸리지 않는다(' + (Date.now() - t) + 'ms)');
+  assert.ok(Number(Q.SCOPE_TEXT_MAX) > 0 || /SCOPE_TEXT_MAX/.test(mod), '길이 한도가 있다');
+  /* 말 목록 «자체»도 긴 반복 입력에서 느려지지 않는다(괄호 말에 길이 한도 — 한도가 없으면 8만 자에서 몇 초) */
+  const t2 = Date.now();
+  Q.SCOPE_PERSONAL.test('전문가('.repeat(30000)); Q.SCOPE_WORK.test('전문가('.repeat(30000));
+  Q.SCOPE_PERSONAL.test('내' + ' '.repeat(50000) + '가'); Q.SCOPE_PERSONAL.test('외부' + ' '.repeat(50000) + '가');   // 공백 두 줄이 맞닿는 말(내 [·]? 외부)도 한 번에 끝난다
+  assert.ok(Date.now() - t2 < 800, '말 목록이 긴 반복 입력에서 느리다(' + (Date.now() - t2) + 'ms)');   // 한도가 없던 판은 12만 자에서 2초 안팎
+  /* 한도 밖의 글은 보지 않는다 — 첨부 이름도 제목처럼 길이를 자르고 공백을 줄인다 */
+  assert.equal(scope('서류 요청', ['가'.repeat(400) + ' 이력서.pdf']), 'unsure', '한도(수백 자) 밖의 말은 보지 않는다');
+  assert.equal(scope('서류 요청', ['가'.repeat(20) + ' 이력서.pdf']), 'personal', '한도 안의 말은 본다');
+});

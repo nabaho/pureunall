@@ -29,6 +29,10 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 (`erpNoteWorth`). 한 줄이 두 줄이 되면 300줄짜리 표가 두 배로 길어진다.
 → `tests/one-line-cells.test.js`
 
+### ②-1 서류 · 목록 화면 기본 형태 — 직장 내 괴롭힘(`pu-harass`) 표준 (2026-11-28)
+상단 `트랙+1줄 인라인 KPI` 2단 스트립, 독립 필터(`↺ 초기화`), **`연도`·`사업장명`·`진행상태` 독립 열 분리 정렬 표**, 1줄 `.ws-steps` + `<details class="sub-fold">` 작업실과 상단 커밋 표시를 유지한다.
+→ `docs/규칙/서류-목록-표준형태.md` (`tests/safety-auto.test.js`)
+
 ### ③ 파이어베이스 규칙은 «만들개»에서 고친다
 `scripts/make-firebase-rules.js` 를 고치고 다시 만든다. JSON 을 손으로 고치면
 다음에 만들 때 조용히 사라진다. 올리는 것은 `node scripts/rules-deploy.js --deploy` 다
@@ -97,6 +101,12 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 
 ---
 
+## 시스템 장애 알림은 화면에 띄우지 않고 저절로 «처리 완료»로 정리한다 (2026-11-22)
+
+어느 프로그램에도 장애 알림용 떠 있는 단추·창을 만들지 않는다(앱바와 겹친다). 오류는 `js/pu-health.js` 가 «처음부터 처리 완료»로 적고,
+서버가 적은 알림·쌓인 것은 총괄관리자 화면이 열릴 때 조용히 정리한다 — 기록은 지우지 않는다. 창은 포털 [⚙ 설정] 「열어보기」를 사람이 눌렀을 때만 뜬다.
+새 프로그램은 `pu-health.js?v=` 한 벌만 싣는다. 지킴: `tests/health-auto-settle.test.js` · 자세히: `docs/규칙/장애알림-자동정리.md`
+
 ## ERP 주소 — `https://erp.pureunlabor.co.kr` (2026-11-15 이사)
 
 배포 주소는 `https://erp.pureunlabor.co.kr`, 홈페이지는 `https://pureunlabor.co.kr` 이다. 옛 `https://nabaho.github.io/pureunall/*` 은 GitHub 이 301 로 새 주소에 넘긴다 — «동작은 하지만» 새 코드·문서·안내 글에 쓰지 않는다.
@@ -109,6 +119,7 @@ firebase 로그인이 없는 곳(클라우드 방)에서는 GitHub 작업 「Fir
 - 포털 💬 건의함(`suggestions_private`)의 건 중 코드를 고칠 일은 읽고·고치고·검사하고·PR 로 올린 뒤 답변까지 넣는다.
 - 답변은 세 자리에 함께: `suggestions_private/{id}` · `suggestions_meta_private/{id}` · `suggestions_resolved_private/{authorUid}/{id}`.
   담을 것은 «왜 그랬나 · 어떻게 고쳤나 · 건의자가 할 일». 「처리함」 같은 2~3글자 답은 쓰지 않는다.
+- 건의함 세 자리(`suggestions_*_private`)의 보안규칙은 «번호는 push 번호 모양만 · 알려진 칸만 · 칸마다 길이 한도» 다 — 새 칸을 쓰려면 `scripts/make-firebase-rules.js` 건의함 절과 화면을 같이 고친다(안 그러면 접수가 막힌다). 지킴: `tests/suggestion-rules.test.js`.
 - 고치지 않은 건을 `done` 으로 두지 않는다(`ing`). 돈을 자동으로 바꾸는 일·보안규칙·살아 있는 자료 쓰기는 CLAUDE.md 의 절차를 따른다.
 - 고친 뒤 같은 화면의 다른 길을 한 번 더 본다 — 고침이 다른 곳을 깨 직원이 먼저 발견한 일이 있었다(2026-10-01).
 - 도구: `scripts/suggestion-watch.js` (`pending` · `show` · `reply`) — 답변 세 자리를 한 번에 쓰고 다시 읽어 확인한다. 손으로 세 번 쓰지 않는다.
