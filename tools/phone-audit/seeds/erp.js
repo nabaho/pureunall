@@ -198,6 +198,25 @@ const 기금후보 = {
     erp: { contractId: 'ct-pa0', contractNo: '계약-2026-100', at: '2026-10-14T01:00:00.000Z', bySid: 'P001' } },
 };
 
+/* 🧾 번호·담당 채우기 점검(2026-11-28) — «근거로 채울 수 있는 건»을 지어낸다.
+   번호는 검증숫자를 맞춘 «가짜»(실행 때 만든다 — 소스에 번호 글자를 적지 않는다). 이름은 모두 「점검○○」. */
+function 검증열자리(nine) {
+  const w = [1, 3, 7, 1, 3, 7, 1, 3, 5]; let t = 0;
+  for (let i = 0; i < 9; i++) t += (+nine[i]) * w[i];
+  t += Math.floor((+nine[8]) * 5 / 10);
+  return nine + ((10 - (t % 10)) % 10);
+}
+const 하이픈 = (d) => d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5);
+const BF번호1 = 검증열자리('123450101'), BF번호2 = 검증열자리('123450202');
+const 근거업체 = [{ id: 'co-bf1', entityType: 'company', name: '(주)점검근거산업', bizNo: 하이픈(BF번호1), ceo: '점검대표자', typeCode: '자문', status: 'active',
+  managerMain: 담당(1), managerSubs: [], startDate: 날(3, 1), monthlyAdvisoryFee: 550000, createdAt: '2026-03-01T00:00:00.000Z' }];
+const 근거컨설팅 = [
+  { id: 'cn-bf1', entityType: 'consulting', no: 'CN-2026-901', companyName: '(주)점검근거산업', bizNo: '', managerMain: 담당(1), managerSubs: [], status: 'progress', programName: '점검 컨설팅', createdAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'cn-bf2', entityType: 'consulting', no: 'CN-2026-902', companyName: '점검표기상사', bizNo: BF번호2, managerMain: 담당(2), managerSubs: [], status: 'progress', programName: '점검 컨설팅', createdAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'cn-bf3', entityType: 'consulting', no: 'CN-2026-903', companyName: '점검근거없는상사', bizNo: '', managerMain: 담당(3), managerSubs: [], status: 'progress', programName: '점검 컨설팅', createdAt: '2026-09-01T00:00:00.000Z' },
+];
+const 근거발행 = [{ id: 'fi-bf1', companyName: '(주)점검근거산업', bizNo: 하이픈(BF번호1), issueDate: '2026-09-01', amount: 550000, vatType: 'separate', status: '발행', itemName: '자문료' }];
+
 /* 📋 「나의 업무」의 업무관리 숫자 한 줄(work_erp/mysum/{사번}) — 업무관리가 적는 것을 지어낸다(2026-11-21).
    업무 목록(work_erp/items)은 비워 둔다 — 그러면 «업무관리에 아직 없는 업무»·«옮길 일반업무» 띠가 그려진다(처음 쓰는 날의 모습). */
 const 오늘ms = Date.now();
@@ -209,10 +228,11 @@ const data = {
   data: {
     user_accounts: { u: U, v: 사람 },
     user_dir: { u: U, v: 사람 },
-    companies: { u: U, v: 지도(업체) },
+    companies: { u: U, v: 지도(업체.concat(근거업체)) },
     contracts: { u: U, v: 지도(계약) },
     cases: { u: U, v: 지도(사건) },
-    consultings: { u: U, v: 지도(사업('consulting', 'cn', 26, 5)) },
+    consultings: { u: U, v: 지도(사업('consulting', 'cn', 26, 5).concat(근거컨설팅)) },
+    finance_invoice: { u: U, v: 지도(근거발행) },
     funds: { u: U, v: 지도(사업('fund', 'fd', 26, 7)) },
     other_projects: { u: U, v: 지도(사업('other', 'ot', 26, 9)) },
     ledger_batches: { u: U, v: { 'lb-pa1': 묶음 } },
@@ -311,6 +331,16 @@ module.exports = {
       back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); },
     },
     메뉴('biz/consulting'),
+    /* 🧾 번호·담당 채우기 창(2026-11-28) — 컨설팅 목록에서 창을 연다(PC 는 단추, 폰은 「⋯ 더보기」 고르기). 닫는 것까지. */
+    { name: 'bizfill', wait: 1800,
+      run: async (page) => {
+        await page.evaluate(() => window.navigateTo('biz/consulting')); await page.waitForTimeout(2500);
+        const sel = page.locator('main select[aria-label="목록 더보기"]');
+        if (await sel.count()) await sel.selectOption('bizfill');
+        else await page.locator('main').getByText('🧾 번호 채우기', { exact: false }).first().click({ timeout: 5000 });
+        await page.waitForTimeout(1500);
+      },
+      back: async (page) => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); } },
     메뉴('biz/fund'),
     메뉴('biz/other'),
     /* 재무관리 > 입금관리 — 대표(관리자)만 폰에서 본다. 「입금 리스트」·「업체입금」 두 탭 */
