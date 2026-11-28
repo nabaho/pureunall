@@ -7249,28 +7249,36 @@ async function scanInboxList(h){
 }
 async function scanInboxImport(){
   if(_scanInboxBusy){ toast('⏳ 가져오는 중입니다'); return; }
-  var h=await scanInboxGetDir();
-  if(!h){ h=await scanInboxPick(); if(!h) return; }
-  if(!(await fsEnsurePermission(h))){ toast('폴더 읽기 권한이 없어 가져오지 못했습니다 — 다시 눌러 «허용»해 주세요', 5000); return; }
-  if(typeof ocrDrop!=='function'){ toast('OCR 등록 기능을 찾지 못했습니다'); return; }
-  if(!getApiKey() && !getGVisionKey() && !aiReady()){ toast('로그인이 필요합니다 — 로그인한 뒤 다시 눌러 주세요'); return; }
-  _scanInboxBusy=true;
+  _scanInboxBusy=true;   /* 맨 앞에서 세운다 — 기다리는 사이 두 번 눌러 판독 요금이 두 번 나가지 않게 */
   try{
+    var h=await scanInboxGetDir();
+    if(!h){ h=await scanInboxPick(); if(!h) return; }
+    if(!(await fsEnsurePermission(h))){ toast('폴더 읽기 권한이 없어 가져오지 못했습니다 — 다시 눌러 «허용»해 주세요', 5000); return; }
+    if(typeof ocrDrop!=='function'){ toast('OCR 등록 기능을 찾지 못했습니다'); return; }
+    if(!getApiKey() && !getGVisionKey() && !aiReady()){ toast('로그인이 필요합니다 — 로그인한 뒤 다시 눌러 주세요'); return; }
     var fresh=KcareerScanInbox.pickNew(await scanInboxList(h), scanInboxKnown());
-    if(!fresh.length){ toast('새로 들어온 스캔이 없습니다'); return; }
-    var groups=KcareerScanInbox.groupByPage(fresh), cert=[];
+    /* 경력증명서는 «가져옴»으로 적지 않는다 — 서류 보관함에 같은 이름의 원본이 «실제로 보관됐는지»로 가린다.
+       (보관 창을 닫거나 저장이 실패하면 다음에 다시 뜬다) */
+    var 보관=(get('certdoc')||[]).map(function(r){ return r && r.genName; });   /* «있는 파일 넣기»는 파일 이름을 genName 에 적는다 */
+    var cert=fresh.filter(function(f){ return KcareerScanInbox.pageFor(f.category,f.name)==='certdoc' && 보관.indexOf(f.name)<0; });
+    var rest=fresh.filter(function(f){ return KcareerScanInbox.pageFor(f.category,f.name)!=='certdoc'; });
+    if(!rest.length && !cert.length){ toast('새로 들어온 스캔이 없습니다'); return; }
+    /* 한 건씩 넣고 «들어간 것(done)·이미 있던 것(dup)»만 가져옴으로 적는다 —
+       판독 오류·네트워크 실패로 못 넣은 서류는 다음에 다시 뜬다 */
+    var groups=KcareerScanInbox.groupByPage(rest), 실패=0;
     for(var g=0; g<groups.length; g++){ var G=groups[g];
-      if(G.page==='certdoc'){ cert=G.files; continue; }
-      await ocrDrop(G.files.map(function(f){ return f.file; }), G.page);
-      scanInboxMark(G.files);
+      for(var j=0; j<G.files.length; j++){ var f=G.files[j];
+        var r=await ocrDrop([f.file], G.page);
+        if(r && (r.done+r.dup)>0) scanInboxMark([f]); else 실패++;
+      }
     }
-    /* 경력증명서는 OCR 쪽이 아니라 서류 보관함이다 — 보관 창을 «한 건씩» 띄운다(종류·연도는 사람이 확인) */
+    if(실패) toast('⚠ '+실패+'건은 넣지 못해 «가져옴»으로 적지 않았습니다 — 다시 누르면 다시 시도합니다', 6000);
     if(cert.length && typeof openDocSaveModal==='function'){
-      scanInboxMark([cert[0]]);
       openDocSaveModal('certdoc','existing',cert[0].file);
       if(cert.length>1) toast('경력증명서가 '+cert.length+'건입니다 — 보관한 뒤 «📥 가져오기»를 다시 누르면 다음 것이 뜹니다', 6000);
     }
-  } finally { _scanInboxBusy=false; _safe(function(){ renderHomeScanInbox().catch(function(){}); }); }
+  }catch(e){ console.warn('[스캔 가져오기]', e); toast('스캔을 가져오지 못했습니다 — '+(e&&e.message||e), 6000); }
+  finally{ _scanInboxBusy=false; _safe(function(){ renderHomeScanInbox().catch(function(){}); }); }
 }
 async function renderHomeScanInbox(){
   var box=document.getElementById('homeScanInbox'); if(!box) return;
@@ -7287,7 +7295,7 @@ async function renderHomeScanInbox(){
     +'<b style="font-size:13px;color:var(--ink)">📥 스캔 가져오기</b>'
     +'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--text-mute)" title="'+escapeHtml(tip)+'">'+msg+'</span>'
     +(h?'<button class="btn sm primary" type="button" onclick="scanInboxImport()">📥 가져오기</button>':'')
-    +'<button class="btn sm" type="button" onclick="scanInboxPick()" title="스캔 폴더 지정·바꾸기">'+(h?'📁':'📁 폴더 지정')+'</button>'
+    +'<button class="btn sm" type="button" onclick="scanInboxPick()" title="스캔 폴더 지정·바꾸기" aria-label="스캔 폴더 지정·바꾸기">'+(h?'📁':'📁 폴더 지정')+'</button>'
     +'</div></div>';
 }
 function navTile(id){ const inf=(typeof navInfo==='function')?navInfo(id):{label:id,grp:null}; nav_to(id, inf.label, inf.grp); }
@@ -14437,7 +14445,10 @@ async function ocrDrop(files,page){ files=[...files]; if(!files.length) return;
      조용히 넘기면 「읽었다는데 목록엔 없다」가 된다. */
   if(못담음) toast('⚠ '+못담음+'건은 읽었지만 이 화면에 담지 못했습니다 — 개발자에게 알려 주세요(page='+page+')', 7000);
   if(!done && failed) toast('❌ 한 건도 못 읽었습니다'+(apiErr?' — '+apiErr:' — 로그인·API 키를 확인해 주세요'), 6000);
-  else toast(`OCR 완료: ${done}건${failed?' / 실패 '+failed:''}${apiErr?' · ⚠️ API 오류('+apiErr+') — 키·크레딧 확인 필요, 일부는 파일명으로만 등록됨':''}`); }
+  else toast(`OCR 완료: ${done}건${failed?' / 실패 '+failed:''}${apiErr?' · ⚠️ API 오류('+apiErr+') — 키·크레딧 확인 필요, 일부는 파일명으로만 등록됨':''}`);
+  /* 셈을 돌려준다 — 📥 스캔 가져오기가 «들어간(또는 이미 있던) 서류만» 가져옴으로 적는다(2단계 재검토 2026-11-28).
+     ⚠ 끌어다 놓기·파일 고르기 쪽은 돌려준 값을 쓰지 않는다 — 동작은 그대로다. */
+  return {done:done, dup:dup, failed:failed, missed:못담음}; }
 
 /* ★★ 여러 장 PDF 를 서류마다 갈라 담는다.
    돌려주는 것 = {split:true}  서류마다 담았다(부르는 쪽은 다음 파일로)

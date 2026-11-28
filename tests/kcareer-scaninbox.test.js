@@ -100,6 +100,30 @@ test('판독을 못 하는 상태면 «가져옴»으로 적기 전에 멈춘다
   assert.ok(imp.indexOf('fsEnsurePermission(h)') < mark);
 });
 
+test('들어간 것(done)·이미 있던 것(dup)만 «가져옴» — 판독 실패 서류는 다음에 다시 뜬다', () => {
+  const b = block();
+  const imp = b.slice(b.indexOf('async function scanInboxImport'), b.indexOf('async function renderHomeScanInbox'));
+  assert.match(imp, /var r=await ocrDrop\(\[f\.file\], G\.page\);\s*\n?\s*if\(r && \(r\.done\+r\.dup\)>0\) scanInboxMark\(\[f\]\)/);
+  // ocrDrop 이 셈을 돌려준다
+  const s = html.indexOf('async function ocrDrop(');
+  const e = html.indexOf('async function _ocrSplitPdf(', s);
+  assert.match(html.slice(s, e), /return \{done:done, dup:dup, failed:failed, missed:못담음\}; \}/);
+});
+
+test('경력증명서는 «가져옴»으로 적지 않고 보관함에 실제로 보관됐는지(genName)로 가린다', () => {
+  const b = block();
+  const imp = b.slice(b.indexOf('async function scanInboxImport'), b.indexOf('async function renderHomeScanInbox'));
+  assert.match(imp, /get\('certdoc'\)[^;]*r\.genName/);
+  const certPart = imp.slice(imp.indexOf("openDocSaveModal('certdoc'") - 80);
+  assert.doesNotMatch(certPart, /scanInboxMark/);
+});
+
+test('두 번 눌러도 한 번만 — 바쁨 표시는 기다리기 전에 세운다', () => {
+  const b = block();
+  const imp = b.slice(b.indexOf('async function scanInboxImport'));
+  assert.ok(imp.indexOf('_scanInboxBusy=true') < imp.indexOf('await '), '바쁨 표시가 첫 await 보다 뒤에 있다');
+});
+
 test('폴더 열기가 없는 브라우저(폰)에서는 띠를 그리지 않는다', () => {
   const b = block();
   const r = b.slice(b.indexOf('async function renderHomeScanInbox'));
