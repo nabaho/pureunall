@@ -226,4 +226,9 @@ test('⑥ RAG 프롬프트 경계 격리(<UNTRUSTED_DATA> · 비카탈로그 AI 
   const bp = Hwpx.buildHangulBridgePayload('comprehensive', 'sixthind', proj, { pre: {}, domain: {}, docs: {} }, [], null);
   assert.match(bp.bridgeId, /^consult_/, 'bridgeId는 private prefix(consult_)로 시작해야 함');
   assert.equal(bp.source, 'consult_sixthind');
+
+  // 5) 카톡·문자 수집 함수(consultMsgIngest) 리전 엔드포인트 일치 검증(asia-northeast3)
+  const intakeViewSrc = fs.readFileSync(path.join(ROOT, 'js', 'pu-msg-intake-view.js'), 'utf8');
+  assert.match(intakeViewSrc, /https:\/\/asia-northeast3-pureun-erp\.cloudfunctions\.net\/consultMsgIngest/);
+  assert.doesNotMatch(intakeViewSrc, /asia-southeast1-pureun-erp\.cloudfunctions\.net/);
 });
