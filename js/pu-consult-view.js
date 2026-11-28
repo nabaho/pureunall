@@ -16,6 +16,7 @@
   'use strict';
 
   var SESSION_EPOCH = 0;
+  var CUR_YEAR = new Date().getFullYear();
   var APP_KEY = 'sixthind';
   var fb = null;
   var fbDb = null;
@@ -27,6 +28,7 @@
   var CUR_PID = '';
   var YEAR_FILTER = '';
   var TRACK_FILTER = '';
+  var SHOW_ALL_ROWS = false;
   var WS_FOCUS = ''; // '' | 'coach' | 'doc'
   var CUR_REPORT_KIND = 'comprehensive';
   var CUR_COACH_ANSWER = null;
@@ -64,6 +66,7 @@
     companies: [],
     consultings: [],
     consTypes: [],
+    regions: {},
     mailboxFolders: {},
     mailboxMsgs: {},
     mailboxOldMsgs: {},
@@ -95,6 +98,44 @@
   function getAppCat() {
     var c = Cat();
     return (c && c.get(APP_KEY)) || { key: APP_KEY, rtdbRoot: 'scal_' + APP_KEY, name: '컨설팅', shortName: '컨설팅', icon: '📋', agency: '푸른노무법인', tracks: [], stages: [], preChecks: [], domainChecks: [], requiredDocs: [], reportSchema: [], ragPlaybook: { stageActions: [], commonMistakes: [], legalRefs: [] } };
+  }
+  function getCustomRegionsList() {
+    var regMap = D.regions || {};
+    return Object.keys(regMap).map(function (k) {
+      return Object.assign({ id: k }, regMap[k]);
+    }).filter(function (r) {
+      return r && !r._deleted && str(r.id) && str(r.name);
+    }).sort(function (a, b) {
+      return (num(a.sortOrder, 999) - num(b.sortOrder, 999)) || (num(a.createdAt, 0) - num(b.createdAt, 0));
+    });
+  }
+  function getEffectiveTracks() {
+    var base = (getAppCat().tracks || []).slice();
+    var seen = Object.create(null);
+    base.forEach(function (t) { if (t && t.id) seen[t.id] = 1; });
+    getCustomRegionsList().forEach(function (r) {
+      if (seen[r.id]) return;
+      seen[r.id] = 1;
+      base.push({
+        id: r.id,
+        name: r.name,
+        shortName: r.shortName || r.name,
+        badge: r.shortName || r.name,
+        agency: r.agency || '',
+        icon: '📍',
+        keywords: r.keywords || '',
+        custom: true
+      });
+    });
+    return base;
+  }
+  function trackShortLabel(t) {
+    if (!t) return '';
+    return str(t.shortName || t.badge || t.name);
+  }
+  function activeTrackObj() {
+    if (!TRACK_FILTER) return null;
+    return getEffectiveTracks().find(function (t) { return t.id === TRACK_FILTER; }) || null;
   }
   function rootPath(sub) {
     var r = getAppCat().rtdbRoot || ('scal_' + APP_KEY);
@@ -156,11 +197,13 @@
     return merged;
   }
 
-  function stepDotsHtml(stageId) {
+  function stepDotsHtml(stageId, status) {
     var stages = getAppCat().stages || [];
-    var idx = Math.max(0, stages.findIndex(function (s) { return s.id === (stageId || 'intake'); }));
+    var isDone = status === 'done';
+    var rawIdx = stages.findIndex(function (s) { return s.id === (stageId || 'intake'); });
+    var idx = isDone ? Math.max(0, stages.length - 1) : Math.max(0, rawIdx);
     var dots = stages.map(function (s, i) {
-      var cls = i < idx ? 'done' : (i === idx ? 'cur' : '');
+      var cls = (isDone || i < idx) ? 'done' : (i === idx ? 'cur' : '');
       return '<span class="pdot ' + cls + '" title="' + esc(s.name) + '"></span>';
     }).join('');
     var curStage = stages[idx] || { no: idx + 1, name: '진행' };
@@ -180,33 +223,79 @@
     };
   }
 
-  async function saveRecord(subPath, id, record, entityType) {
+  async function saveRecord(subPath, id, record, entityType, opts) {
+    opts = opts || {};
     var rec = Object.assign({ id: id, entityType: entityType || 'Document', schemaVersion: 1, contractVersion: 1 }, record);
     if (!str(rec.createdBy)) rec.createdBy = str((ME && ME.uid) || 'preview');
+    var curRev = num(rec.revision, 0);
+    var clears = Array.isArray(opts.clearKeys) ? opts.clearKeys : [];
     if (PREVIEW_MODE || !fbDb || !gate) {
       rec.updatedAt = Date.now();
       rec.createdAt = rec.createdAt || rec.updatedAt;
       rec.createdBy = rec.createdBy || str((ME && ME.uid) || 'preview');
       rec.updatedBy = str((ME && ME.uid) || 'preview');
-      rec.revision = num(rec.revision, 0) + 1;
+      rec.revision = curRev + 1;
+      clears.forEach(function (k) { delete rec[k]; });
       return rec;
     }
     var ref = fbDb.ref(rootPath(subPath));
-    var res = await gate.save(ref, rec, {
-      entityType: entityType || 'Document',
-      expectedRevision: num(rec.revision, 0),
-      allowPendingCompany: true
-    });
-    return (res && res.snapshot && typeof res.snapshot.val === 'function') ? res.snapshot.val() : rec;
+    var conflictErr = '';
+    try {
+      var res = await gate.save(ref, function (serverPrev) {
+        // RTDB transaction 은 차가운 자리에서 1회 serverPrev === null 로 호출된 뒤 실제 서버값으로 재호출된다.
+        if (serverPrev && curRev > 0 && num(serverPrev.revision, 0) !== curRev) {
+          conflictErr = '다른 사용자가 먼저 수정했습니다. 최신 자료를 다시 연 뒤 저장하세요.';
+          return undefined;
+        }
+        if (serverPrev && serverPrev._deleted && !rec._deleted) {
+          conflictErr = '이미 삭제된 자료입니다. 목록을 새로 고침하세요.';
+          return undefined;
+        }
+        var patch = opts.patch
+          ? Object.assign({}, opts.patch, { id: rec.id, entityType: rec.entityType, schemaVersion: rec.schemaVersion, contractVersion: rec.contractVersion, revision: rec.revision })
+          : rec;
+        var merged = serverPrev ? Object.assign({}, serverPrev, patch) : Object.assign({}, rec);
+        clears.forEach(function (k) { merged[k] = null; });
+        return merged;
+      }, {
+        entityType: entityType || 'Document',
+        expectedRevision: curRev > 0 ? undefined : -1,
+        allowPendingCompany: true
+      });
+      var val = (res && res.snapshot && typeof res.snapshot.val === 'function') ? res.snapshot.val() : rec;
+      if (val && typeof val === 'object') clears.forEach(function (k) { delete val[k]; });
+      return val;
+    } catch (e) {
+      if (conflictErr) throw new Error(conflictErr);
+      throw e;
+    }
   }
 
   async function softDeleteRecord(subPath, prev, entityType) {
+    if (!prev || typeof prev !== 'object') throw new Error('삭제할 원본을 찾지 못했습니다.');
+    var curRev = num(prev.revision, 0);
+    var delActor = str((ME && ME.uid) || '');
     if (PREVIEW_MODE || !fbDb || !gate) {
-      return Object.assign({}, prev, { _deleted: true, deletedAt: Date.now() });
+      return Object.assign({}, prev, { _deleted: true, deletedAt: Date.now(), deletedBy: delActor || 'preview' });
     }
     var ref = fbDb.ref(rootPath(subPath));
-    await gate.remove(ref, prev, { entityType: entityType || 'Document' });
-    return true;
+    var conflictErr = '';
+    try {
+      var res = await gate.save(ref, function (serverPrev) {
+        if (serverPrev && curRev > 0 && num(serverPrev.revision, 0) !== curRev) {
+          conflictErr = '다른 사용자가 먼저 수정했습니다. 최신 자료를 다시 연 뒤 삭제하세요.';
+          return undefined;
+        }
+        var base = serverPrev ? Object.assign({}, serverPrev) : Object.assign({}, prev);
+        return Object.assign(base, { _deleted: true, deletedAt: Date.now(), deletedBy: delActor });
+      }, { entityType: entityType || 'Document', expectedRevision: undefined, allowPendingCompany: true });
+      return (res && res.snapshot && typeof res.snapshot.val === 'function')
+        ? res.snapshot.val()
+        : Object.assign({}, prev, { _deleted: true, deletedAt: Date.now(), deletedBy: delActor });
+    } catch (e) {
+      if (conflictErr) throw new Error(conflictErr);
+      throw e;
+    }
   }
 
   /* ══ 1. 합성 프리뷰 데이터 (?preview=1 & localhost 전용) ═══════════════ */
@@ -229,22 +318,77 @@
     (cat.requiredDocs || []).slice(0, 2).forEach(function (d) { docSample[d.id] = { status: 'ok', note: '확보' }; });
 
     D.projects = {};
-    D.projects[p1Id] = {
-      id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
-      createdAt: now - 864e5 * 14, updatedAt: now - 3600e3,
-      companyId: 'co_pv_1', companyName: '(주)가나' + cat.shortName + '샘플', bizNo: '123-81-51001',
-      year: 2026, trackId: t0.id, trackName: t0.name, stage: 'visit',
-      workerCount: 28, consultantName: '점검노무사', status: 'active',
-      summaryNote: cat.name + ' 현장 방문·핵심 진단 진행 중 (미리보기 합성 데이터)'
-    };
-    D.projects[p2Id] = {
-      id: p2Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
-      createdAt: now - 864e5 * 90, updatedAt: now - 864e5 * 30,
-      companyId: 'co_pv_2', companyName: '(주)다라산업', bizNo: '123-81-51002',
-      year: 2025, trackId: t1.id, trackName: t1.name, stage: 'followup',
-      workerCount: 45, consultantName: '점검노무사', status: 'done',
-      summaryNote: cat.name + ' 최종 결과보고·산출물 인도 완료 (과거 수행사례)'
-    };
+    if (APP_KEY === 'chamber') {
+      var trC = tracks[0] || { id: 'ch_chungnam', name: '충남북부상공회의소 인사노무컨설팅' };
+      var trS = tracks[1] || { id: 'ch_seosan', name: '서산상공회의소 인사노무컨설팅' };
+      D.projects[p1Id] = {
+        id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
+        createdAt: now - 864e5 * 14, updatedAt: now - 3600e3,
+        companyId: 'co_pv_1', companyName: '(주)가나북부샘플', bizNo: '123-81-51001', caseNo: '인사충남-2026-001',
+        year: 2026, trackId: trC.id, trackName: trC.name, stage: 'visit',
+        workerCount: 28, consultantName: '점검노무사', status: 'active',
+        summaryNote: '충남북부상의 회원사 방문진단·취업규칙 정비 (미리보기 합성)'
+      };
+      D.projects[p2Id] = {
+        id: p2Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 40, updatedAt: now - 864e5 * 10,
+        companyId: 'co_pv_2', companyName: '(주)다라서산샘플', bizNo: '123-81-51002', caseNo: '인사서산-2026-001',
+        year: 2026, trackId: trS.id, trackName: trS.name, stage: 'design',
+        workerCount: 35, consultantName: '점검노무사', status: 'active',
+        summaryNote: '서산상의 회원사 교대제·임금설계 컨설팅 (미리보기 합성)'
+      };
+      D.projects['pv_chamber_3'] = {
+        id: 'pv_chamber_3', entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 390, updatedAt: now - 864e5 * 365,
+        companyId: 'co_pv_3', companyName: '(주)마바북부이력', bizNo: '123-81-51003',
+        year: 2025, trackId: trC.id, trackName: trC.name, stage: 'followup',
+        workerCount: 42, consultantName: '점검노무사', status: 'done',
+        summaryNote: '2025 충남북부상의 최종보고·결과물 인도 완료 (과거 수행사례)'
+      };
+      D.projects['pv_chamber_4'] = {
+        id: 'pv_chamber_4', entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 410, updatedAt: now - 864e5 * 370,
+        companyId: 'co_pv_4', companyName: '(주)사아서산이력', bizNo: '123-81-51004',
+        year: 2025, trackId: trS.id, trackName: trS.name, stage: 'followup',
+        workerCount: 22, consultantName: '점검노무사', status: 'done',
+        summaryNote: '2025 서산상의 최종결과보고·방문확인서 완료 (과거 수행사례)'
+      };
+      D.projects['pv_chamber_5'] = {
+        id: 'pv_chamber_5', entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 740, updatedAt: now - 864e5 * 700,
+        companyId: 'co_pv_5', companyName: '(주)자차북부정밀', bizNo: '123-81-51005',
+        year: 2024, trackId: trC.id, trackName: trC.name, stage: 'followup',
+        workerCount: 60, consultantName: '점검노무사', status: 'done',
+        summaryNote: '2024 충남북부상의 수행 완료 (과거 이력 아카이브)'
+      };
+      D.regions = {};
+    } else {
+      D.projects[p1Id] = {
+        id: p1Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 2,
+        createdAt: now - 864e5 * 14, updatedAt: now - 3600e3,
+        companyId: 'co_pv_1', companyName: '(주)가나' + cat.shortName + '샘플', bizNo: '123-81-51001',
+        year: 2026, trackId: t0.id, trackName: t0.name, stage: 'visit',
+        workerCount: 28, consultantName: '점검노무사', status: 'active',
+        summaryNote: cat.name + ' 현장 방문·핵심 진단 진행 중 (미리보기 합성 데이터)'
+      };
+      D.projects[p2Id] = {
+        id: p2Id, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 380, updatedAt: now - 864e5 * 340,
+        companyId: 'co_pv_2', companyName: '(주)다라산업', bizNo: '123-81-51002',
+        year: 2025, trackId: t1.id, trackName: t1.name, stage: 'followup',
+        workerCount: 45, consultantName: '점검노무사', status: 'done',
+        summaryNote: cat.name + ' 최종 결과보고·산출물 인도 완료 (과거 수행사례)'
+      };
+      D.projects['pv_' + APP_KEY + '_3'] = {
+        id: 'pv_' + APP_KEY + '_3', entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 1,
+        createdAt: now - 864e5 * 740, updatedAt: now - 864e5 * 700,
+        companyId: 'co_pv_3', companyName: '(주)마바제조', bizNo: '123-81-51003',
+        year: 2024, trackId: t0.id, trackName: t0.name, stage: 'followup',
+        workerCount: 32, consultantName: '점검노무사', status: 'done',
+        summaryNote: '2024년 ' + cat.shortName + ' 과거 수행이력 (미리보기 합성)'
+      };
+      D.regions = {};
+    }
     D.checks = {};
     D.checks[p1Id] = { main: { id: 'main', projectId: p1Id, entityType: 'Document', schemaVersion: 1, contractVersion: 1, revision: 1, pre: preSample, domain: domSample, docs: docSample } };
     D.comms = {};
@@ -305,6 +449,7 @@
         companies: D.companies,
         consultings: D.consultings,
         consTypes: D.consTypes,
+        regions: getCustomRegionsList(),
         projects: projs,
         mailboxFolders: D.mailboxFolders,
         mailboxMsgs: D.mailboxMsgs,
@@ -350,7 +495,8 @@
       safeVal('data/biz_cons_types'),
       safeVal('mailbox/folders'),
       safeVal('mailbox/msgs'),
-      safeVal('mailbox/old/msgs')
+      safeVal('mailbox/old/msgs'),
+      safeVal(basePath + '/regions')
     ]);
     if (epoch !== SESSION_EPOCH || (ME && ME.uid !== uid)) return;
     D.projects = res[0] || {};
@@ -365,25 +511,31 @@
     D.mailboxFolders = res[9] || {};
     D.mailboxMsgs = res[10] || {};
     D.mailboxOldMsgs = res[11] || {};
+    D.regions = res[12] || {};
 
     rebuildDiscoverAndRag();
     if ($('syncStateChip')) $('syncStateChip').textContent = '최신 동기화 완료';
     draw();
   }
 
-  /* ══ 3. 상단 변경점 바(#recent-diff-bar) & 공통 헬퍼 ═════════════════ */
+  /* ══ 3. 상단 변경점 바(#recent-diff-bar) · 왼쪽 대시보드 · 공통 헬퍼 ════ */
   function renderRecentDiffBar() {
     var el = $('recentDiffBarWrap');
     if (!el) return;
     var cat = getAppCat();
+    var isLeft = !!$('leftDash');
+    var badge = isLeft ? '변경됨 · 좌측 대시보드 분리 + 전수 적재' : '변경됨 · 전수 이력 적재 + 연도별 관리';
+    var msg = isLeft
+      ? '북부상의 · 서산상의 · 당진상의 왼쪽 대시보드 분리 + 새 지역 상공회의소 추가 + 연도별 관리'
+      : '사업장·사건별 과거이력 일괄 적재 + 상단 연도별 빠른 필터 적용';
     el.innerHTML = '<div id="recent-diff-bar" class="note ' + (DIFF_HIGHLIGHT ? 'code-diff-box' : '') + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
-      '<span class="chip c-blue">변경됨 · UI 통일</span>' +
+      '<span class="chip c-blue">' + esc(badge) + '</span>' +
       '<b>' + esc(cat.icon + ' ' + cat.name) + ':</b>' +
-      '<span class="hint">직장내괴롭힘·성희롱 조사 동일 5탭·슬림 KPI·좌우 2단 작업실 적용 + 포털 실서버 연동</span>' +
+      '<span class="hint">' + esc(msg) + '</span>' +
       '<span class="sp"></span>' +
       '<button type="button" class="sm" data-diff-tab="projects">사업 현황</button>' +
+      '<button type="button" class="sm" data-diff-tab="yearly">연도별 자료함</button>' +
       '<button type="button" class="sm" data-diff-tab="inbox">미등록 후보</button>' +
-      '<button type="button" class="sm" data-diff-tab="detail">진행·체크</button>' +
       '<button type="button" class="sm pri" data-diff-tab="report">보고서·RAG</button>' +
       '<button type="button" class="sm" id="toggleDiffBtn">' + (DIFF_HIGHLIGHT ? '표시 끄기' : '표시 켜기') + '</button>' +
       '</div>';
@@ -393,6 +545,135 @@
     if ($('toggleDiffBtn')) {
       $('toggleDiffBtn').onclick = function () { DIFF_HIGHLIGHT = !DIFF_HIGHLIGHT; draw(); };
     }
+  }
+
+  function renderLeftDash() {
+    var aside = $('leftDash');
+    if (!aside) return;
+    var cat = getAppCat();
+    var tracks = getEffectiveTracks();
+    var allProjs = projectsList();
+    var cands = (D.discover && D.discover.bundles) || [];
+
+    aside.className = 'left-dash' + (DIFF_HIGHLIGHT ? ' code-diff-box' : '');
+
+    var statsMap = Object.create(null);
+    tracks.forEach(function (t) {
+      statsMap[t.id] = { total: 0, active: 0, done: 0, cand: 0, yrs: Object.create(null) };
+    });
+    var unmappedIds = [];
+    allProjs.forEach(function (p) {
+      var tid = str(p.trackId);
+      var st = statsMap[tid];
+      if (!st) {
+        st = { total: 0, active: 0, done: 0, cand: 0, yrs: Object.create(null) };
+        statsMap[tid] = st;
+        unmappedIds.push(tid);
+      }
+      st.total++;
+      if (p.status === 'done') st.done++;
+      else st.active++;
+      var y = String(num(p.year, CUR_YEAR));
+      st.yrs[y] = (st.yrs[y] || 0) + 1;
+    });
+    cands.forEach(function (b) {
+      var tid = str(b.suggestedTrackId);
+      if (tid && statsMap[tid]) statsMap[tid].cand++;
+    });
+
+    var allDone = allProjs.filter(function (p) { return p.status === 'done'; }).length;
+    var allActive = allProjs.length - allDone;
+
+    var cardsHtml = '<div class="ld-item' + (!TRACK_FILTER ? ' on' : '') + '">' +
+      '<button type="button" class="ld-item-btn" data-ld-track="" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '">' +
+        '<span class="ld-item-name">🏬 전체 상공회의소</span>' +
+        '<span class="chip c-blue">' + allProjs.length + '건</span>' +
+      '</button>' +
+      '<div class="ld-sub"><span>진행 ' + allActive + '</span><span>완료 ' + allDone + '</span>' +
+        (cands.length ? ('<span>후보 ' + cands.length + '</span>') : '') +
+      '</div>' +
+    '</div>';
+
+    var renderTracks = tracks.slice();
+    unmappedIds.forEach(function (uid) {
+      if (uid && !renderTracks.some(function (t) { return t.id === uid; })) {
+        renderTracks.push({ id: uid, name: uid + ' (기타)', shortName: uid, icon: '🧩' });
+      }
+    });
+
+    renderTracks.forEach(function (t) {
+      var st = statsMap[t.id] || { total: 0, active: 0, done: 0, cand: 0, yrs: {} };
+      var yrs = Object.keys(st.yrs).sort(function (a, b) { return Number(b) - Number(a); });
+      var yrsHtml = yrs.length
+        ? ('<div class="ld-yrs">' + yrs.slice(0, 6).map(function (yr) {
+            var on = TRACK_FILTER === t.id && YEAR_FILTER === yr;
+            return '<button type="button" class="ld-yr-btn' + (on ? ' on' : '') + '" data-ld-track="' + esc(t.id) + '" data-ld-year="' + esc(yr) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(yr) + '(' + st.yrs[yr] + ')</button>';
+          }).join('') + '</div>')
+        : '<div class="ld-sub"><span>등록 대기 (신규 지역 준비)</span></div>';
+
+      cardsHtml += '<div class="ld-item' + (TRACK_FILTER === t.id ? ' on' : '') + '">' +
+        '<button type="button" class="ld-item-btn" data-ld-track="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-pressed="' + (TRACK_FILTER === t.id ? 'true' : 'false') + '">' +
+          '<span class="ld-item-name">' + esc((t.icon || '🏛️') + ' ' + trackShortLabel(t)) + '</span>' +
+          '<span class="chip ' + (st.total > 0 ? 'c-blue' : '') + '">' + st.total + '건</span>' +
+        '</button>' +
+        '<div class="ld-sub"><span>진행 ' + st.active + '</span><span>완료 ' + st.done + '</span>' +
+          (st.cand ? ('<span class="chip c-amber">후보 ' + st.cand + '</span>') : '') +
+        '</div>' +
+        yrsHtml +
+      '</div>';
+    });
+
+    var scopeProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
+    var scopeYrsMap = Object.create(null);
+    scopeProjs.forEach(function (p) {
+      var y = String(num(p.year, CUR_YEAR));
+      scopeYrsMap[y] = (scopeYrsMap[y] || 0) + 1;
+    });
+    var scopeYrs = Object.keys(scopeYrsMap).sort(function (a, b) { return Number(b) - Number(a); });
+    var actObj = activeTrackObj();
+    var scopeTitle = actObj ? trackShortLabel(actObj) : '전체 상의';
+
+    aside.innerHTML =
+      '<div class="ld-hd"><span>🏬 지역별 대시보드</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + tracks.length + '곳</span>') + '</div>' +
+      '<div class="ld-list">' + cardsHtml + '</div>' +
+      '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">+ 새 지역 상공회의소 추가</button>' +
+      '<div class="ld-year-box">' +
+        '<div class="ld-year-hd">📅 연도별 관리 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
+        '<div class="ld-yrs">' +
+          '<button type="button" class="ld-yr-btn' + (!YEAR_FILTER ? ' on' : '') + '" data-ld-yronly="" aria-pressed="' + (!YEAR_FILTER ? 'true' : 'false') + '">전체(' + scopeProjs.length + ')</button>' +
+          scopeYrs.map(function (yr) {
+            var yOn = YEAR_FILTER === yr;
+            return '<button type="button" class="ld-yr-btn' + (yOn ? ' on' : '') + '" data-ld-yronly="' + esc(yr) + '" aria-pressed="' + (yOn ? 'true' : 'false') + '">' + esc(yr) + '(' + scopeYrsMap[yr] + ')</button>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+
+    aside.querySelectorAll('[data-ld-track]').forEach(function (btn) {
+      btn.onclick = function () {
+        var tid = btn.getAttribute('data-ld-track') || '';
+        var yrAttr = btn.getAttribute('data-ld-year');
+        if (yrAttr !== null) YEAR_FILTER = yrAttr;
+        else if (!tid || TRACK_FILTER === tid) YEAR_FILTER = '';
+        TRACK_FILTER = tid;
+        SHOW_ALL_ROWS = false;
+        if ($('projTrackSel')) $('projTrackSel').value = TRACK_FILTER;
+        if ($('yrTrackSel')) $('yrTrackSel').value = TRACK_FILTER;
+        if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
+        if (CUR_TAB === 'detail' || CUR_TAB === 'report') switchTab('projects');
+        else draw();
+      };
+    });
+    aside.querySelectorAll('[data-ld-yronly]').forEach(function (btn) {
+      btn.onclick = function () {
+        YEAR_FILTER = btn.getAttribute('data-ld-yronly') || '';
+        SHOW_ALL_ROWS = false;
+        if ($('projYrSel')) $('projYrSel').value = YEAR_FILTER;
+        if (CUR_TAB === 'detail' || CUR_TAB === 'report') switchTab('projects');
+        else draw();
+      };
+    });
+    if ($('ldAddRegionBtn')) $('ldAddRegionBtn').onclick = openAddRegionModal;
+    void cat;
   }
   function diffCls(on) { return (DIFF_HIGHLIGHT && on) ? ' code-diff-box' : ''; }
   function diffBadge(label) { return DIFF_HIGHLIGHT ? ' <span class="chip c-blue">' + esc(label || '변경됨') + '</span>' : ''; }
@@ -470,6 +751,7 @@
       focusBtns +
       '<span class="sp"></span>' +
       '<details class="act-menu"><summary>⋯ 도구</summary><div class="act-pop">' +
+        '<button type="button" data-ws-act="editProj">✏️ 사업 정보(연도·지역·사건번호) 수정</button>' +
         '<button type="button" data-ws-act="newProj">+ 새 사업 등록</button>' +
         '<button type="button" data-ws-act="rescan">🔄 메일·카톡 재스캔</button>' +
         '<button type="button" data-ws-act="toggleStatus">' + toggleDoneLbl + '</button>' +
@@ -499,7 +781,8 @@
     container.querySelectorAll('[data-ws-act]').forEach(function (b) {
       b.onclick = function () {
         var act = b.getAttribute('data-ws-act');
-        if (act === 'newProj') openNewProjectModal();
+        if (act === 'editProj') openEditProjectModal(proj);
+        else if (act === 'newProj') openNewProjectModal();
         else if (act === 'rescan') { rebuildDiscoverAndRag(); draw(); toast('메일·카톡 자동분류를 재실행했습니다.'); }
         else if (act === 'toggleStatus') toggleProjectDone(proj.id);
         else if (act === 'deleteProj') handleDeleteProject(proj.id);
@@ -535,53 +818,71 @@
 
   function renderProjectsPane() {
     var cat = getAppCat();
+    var tracks = getEffectiveTracks();
     var allProjs = projectsList();
     var cands = (D.discover && D.discover.bundles) || [];
-    var rag = Rag();
     var hwpx = Hwpx();
 
     // 트랙 바 (#projTrackBar)
     var trackBar = $('projTrackBar');
     if (trackBar) {
       var tCounts = Object.create(null);
+      var tTotalInYear = 0;
       allProjs.forEach(function (p) {
         if (YEAR_FILTER && String(num(p.year, 2026)) !== YEAR_FILTER) return;
+        tTotalInYear++;
         tCounts[p.trackId || ''] = (tCounts[p.trackId || ''] || 0) + 1;
       });
-      var btns = ['<span class="scope-lbl">세부 트랙:</span>',
-        '<button type="button" class="scope-btn' + (!TRACK_FILTER ? ' on' : '') + '" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '" data-track-set="">전체 (' + allProjs.length + ')</button>'
+      var btns = ['<span class="scope-lbl">' + esc(cat.regionLabel || '세부 트랙') + ':</span>',
+        '<button type="button" class="scope-btn' + (!TRACK_FILTER ? ' on' : '') + '" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '" data-track-set="">전체 (' + tTotalInYear + ')</button>'
       ];
-      (cat.tracks || []).forEach(function (t) {
+      tracks.forEach(function (t) {
         var cnt = tCounts[t.id] || 0;
         var on = TRACK_FILTER === t.id;
-        btns.push('<button type="button" class="scope-btn' + (on ? ' on' : (cnt > 0 ? ' ok' : '')) + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-track-set="' + esc(t.id) + '">' + esc(t.name) + ' (' + cnt + ')</button>');
+        btns.push('<button type="button" class="scope-btn' + (on ? ' on' : (cnt > 0 ? ' ok' : '')) + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-track-set="' + esc(t.id) + '" title="' + esc(t.name) + '">' + esc(trackShortLabel(t)) + ' (' + cnt + ')</button>');
       });
       trackBar.innerHTML = btns.join('');
       trackBar.querySelectorAll('[data-track-set]').forEach(function (b) {
         b.onclick = function () {
           TRACK_FILTER = b.getAttribute('data-track-set') || '';
+          SHOW_ALL_ROWS = false;
           if ($('projTrackSel')) $('projTrackSel').value = TRACK_FILTER;
+          if ($('yrTrackSel')) $('yrTrackSel').value = TRACK_FILTER;
           draw();
         };
       });
     }
 
-    // 초소형 1줄 KPI 배지 (#kpiBox)
+    // 연도별 빠른 필터 바 (#projYrBar — 전 12개 앱 연도별 관리)
+    var trackScopedProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
+    renderYearButtonsBar('projYrBar', 'all', trackScopedProjs);
+
+    // 초소형 1줄 KPI 배지 (#kpiBox — 선택된 지역/연도 범위 기준)
     var kpiBox = $('kpiBox');
     if (kpiBox) {
-      var doneCnt = allProjs.filter(function (x) { return x.status === 'done'; }).length;
-      var activeCnt = allProjs.length - doneCnt;
-      var totalComms = allProjs.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0);
+      var kpiScope = trackScopedProjs.filter(function (p) {
+        return !YEAR_FILTER || String(num(p.year, 2026)) === YEAR_FILTER;
+      });
+      var doneCnt = kpiScope.filter(function (x) { return x.status === 'done'; }).length;
+      var activeCnt = kpiScope.length - doneCnt;
+      var totalComms = kpiScope.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0);
+      var scopedCands = TRACK_FILTER && $('leftDash')
+        ? cands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
+        : cands;
       var stVal = str($('projSt') && $('projSt').value);
       var allOn = !stVal;
       var doneOn = stVal === 'done';
       var activeOn = stVal === 'active';
-      kpiBox.innerHTML =
-        '<div class="kpi k-blue' + (allOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="" role="button" tabindex="0" aria-pressed="' + (allOn ? 'true' : 'false') + '"><span>총 사업</span><b>' + allProjs.length + '건</b></div>' +
+      var actTrack = activeTrackObj();
+      var scopeTag = (actTrack || YEAR_FILTER)
+        ? ('<span class="chip c-blue">' + esc((actTrack ? trackShortLabel(actTrack) : '전체') + (YEAR_FILTER ? (' · ' + YEAR_FILTER + '년') : '')) + '</span>')
+        : '';
+      kpiBox.innerHTML = scopeTag +
+        '<div class="kpi k-blue' + (allOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="" role="button" tabindex="0" aria-pressed="' + (allOn ? 'true' : 'false') + '"><span>총 사업</span><b>' + kpiScope.length + '건</b></div>' +
         '<div class="kpi k-green' + (doneOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="done" role="button" tabindex="0" aria-pressed="' + (doneOn ? 'true' : 'false') + '"><span>완료</span><b>' + doneCnt + '건</b></div>' +
         '<div class="kpi k-amber' + (activeOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="active" role="button" tabindex="0" aria-pressed="' + (activeOn ? 'true' : 'false') + '"><span>진행중</span><b>' + activeCnt + '건</b></div>' +
         '<div class="kpi k-blue"><span>수집자료</span><b>' + totalComms + '건</b></div>' +
-        (cands.length > 0 ? '<div class="kpi k-amber" data-act="goInbox" role="button" tabindex="0" title="미등록 후보 탭으로 이동"><span>미등록후보</span><b>' + cands.length + '곳</b></div>' : '');
+        (scopedCands.length > 0 ? '<div class="kpi k-amber" data-act="goInbox" role="button" tabindex="0" title="미등록 후보 탭으로 이동"><span>미등록후보</span><b>' + scopedCands.length + '곳</b></div>' : '');
       kpiBox.querySelectorAll('[data-act="kpiSt"]').forEach(function (k) {
         k.onclick = function () {
           if ($('projSt')) $('projSt').value = k.getAttribute('data-id') || '';
@@ -601,7 +902,7 @@
 
     // 필터 셀렉트 동기화
     fillSelectKeepingValue($('projTrackSel'),
-      '<option value="">트랙 전체</option>' + (cat.tracks || []).map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join(''),
+      '<option value="">트랙 전체</option>' + tracks.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(trackShortLabel(t)) + '</option>'; }).join(''),
       TRACK_FILTER);
     var yrsSet = Object.create(null);
     allProjs.forEach(function (p) { yrsSet[String(num(p.year, 2026))] = 1; });
@@ -625,8 +926,10 @@
       return;
     }
 
-    var selPids = filtered.filter(function (p) { return SEL['p:' + p.id]; });
-    var allProjChecked = filtered.length > 0 && selPids.length === filtered.length;
+    var rowCap = SHOW_ALL_ROWS ? filtered.length : 120;
+    var shown = filtered.slice(0, rowCap);
+    var selPids = shown.filter(function (p) { return SEL['p:' + p.id]; });
+    var allProjChecked = shown.length > 0 && selPids.length === shown.length;
     var bulkHtml = '<div class="bulk' + (selPids.length ? ' on' : '') + '" id="projBulkBar">' +
       '<b id="projBulkCount">' + selPids.length + '건 선택</b>' +
       '<button type="button" class="sm ok" id="bulkDoneProjBtn">✅ 완료 처리</button>' +
@@ -634,7 +937,7 @@
       '<button type="button" class="sm" id="bulkClearProjBtn">해제</button>' +
       '</div>';
 
-    var trs = filtered.map(function (p, i) {
+    var trs = shown.map(function (p, i) {
       var ckKey = 'p:' + p.id;
       var clsList = [];
       if (p.id === CUR_PID) clsList.push('cur');
@@ -643,24 +946,32 @@
       var commCnt = getProjectComms(p.id).length;
       var sum = hwpx ? hwpx.buildSummary(APP_KEY, p, getCheckDoc(p.id), []) : { overallPct: 0 };
       var stChip = p.status === 'done' ? '<span class="chip c-green">완료</span>' : '<span class="chip c-amber">진행중</span>';
+      var trObj = tracks.find(function (t) { return t.id === p.trackId; });
+      var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
+      var caseTag = p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '';
       return '<tr data-row="' + esc(p.id) + '"' + trAttr + '>' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
         '<td class="n">' + (i + 1) + '</td>' +
-        '<td class="ti" title="' + esc(p.companyName) + '"><span class="chip">' + esc(String(p.year || 2026)) + '</span> ' + esc(p.companyName) + '</td>' +
-        '<td data-k="badge" title="' + esc(p.trackName || cat.shortName) + '"><span class="chip c-blue">' + esc(p.trackName || cat.shortName) + '</span> ' + stChip + '</td>' +
+        '<td class="ti" title="' + esc(p.companyName) + '"><span class="chip">' + esc(String(p.year || 2026)) + '</span> ' + esc(p.companyName) + caseTag + '</td>' +
+        '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue">' + esc(trLbl) + '</span> ' + stChip + '</td>' +
         '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
-        '<td title="6단계 진행현황">' + stepDotsHtml(p.stage) + '</td>' +
+        '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
         '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
         '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
         '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
       '</tr>';
     }).join('');
 
+    var moreHtml = filtered.length > shown.length
+      ? ('<div class="bar"><span class="hint">총 ' + filtered.length + '건 중 ' + shown.length + '건 표시</span><button type="button" class="sm pri" id="showAllProjBtn">전체 ' + filtered.length + '건 모두 보기 (+' + (filtered.length - shown.length) + ')</button></div>')
+      : '';
+
     box.innerHTML = bulkHtml + '<div class="scroll"><table class="t" data-name="cases">' +
       '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th><th>사업장 · 연도</th><th>트랙 · 상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th></tr></thead>' +
-      '<tbody>' + trs + '</tbody></table></div>';
+      '<tbody>' + trs + '</tbody></table></div>' + moreHtml;
 
     refreshProjBulkUi();
+    if ($('showAllProjBtn')) $('showAllProjBtn').onclick = function () { SHOW_ALL_ROWS = true; renderProjectsPane(); };
 
     box.querySelectorAll('[data-pick]').forEach(function (b) {
       b.onclick = function (e) { e.stopPropagation(); CUR_PID = b.getAttribute('data-pick'); switchTab('detail'); };
@@ -708,23 +1019,51 @@
   }
 
   /* ══ 5. 탭 2: 📥 미등록 후보 (pu-harass drawInboxPane 규격) ══════════════ */
-  function renderInboxPane() {
+  function getFilteredInboxBundles() {
     var allCands = (D.discover && D.discover.bundles) || [];
-    var stats = (D.discover && D.discover.stats) || { mailHits: 0, msgHits: 0, erpHits: 0 };
-    renderYearButtonsBar('inboxYrBar', 'inbox', allCands);
+    var hasLeft = !!$('leftDash');
+    var trackCands = (hasLeft && TRACK_FILTER)
+      ? allCands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
+      : allCands;
     var q = str($('inQ') && $('inQ').value).toLowerCase();
-    if ($('inResetBtn')) $('inResetBtn').style.display = (YEAR_FILTER || q) ? '' : 'none';
-
-    var list = allCands.filter(function (b) {
+    var list = trackCands.filter(function (b) {
       if (YEAR_FILTER && String(num(b.year, 2026)) !== YEAR_FILTER) return false;
       if (!q) return true;
-      var hay = [b.year, b.companyName].concat(b.sampleSubjects || []).concat(b.reasonsList || []).join(' ').toLowerCase();
+      var hay = [b.year, b.companyName, b.suggestedTrackName, b.caseNo].concat(b.sampleSubjects || []).concat(b.reasonsList || []).join(' ').toLowerCase();
       return hay.indexOf(q) >= 0;
     });
+    return { trackCands: trackCands, list: list, q: q, hasLeft: hasLeft };
+  }
+
+  function refreshCandBulkUi() {
+    var box = $('inboxBox');
+    if (!box) return;
+    var list = box.querySelectorAll('input[type="checkbox"][data-list="cand"]');
+    var checkedCount = 0;
+    list.forEach(function (cb) { if (cb.checked) checkedCount++; });
+    var hdr = box.querySelector('input[type="checkbox"][data-ckall="cand"]');
+    if (hdr) {
+      hdr.checked = list.length > 0 && checkedCount === list.length;
+      hdr.indeterminate = checkedCount > 0 && checkedCount < list.length;
+    }
+  }
+
+  function renderInboxPane() {
+    var tracks = getEffectiveTracks();
+    var stats = (D.discover && D.discover.stats) || { mailHits: 0, msgHits: 0, erpHits: 0 };
+    var f = getFilteredInboxBundles();
+    var trackCands = f.trackCands;
+    var list = f.list;
+    var q = f.q;
+    var hasLeft = f.hasLeft;
+    renderYearButtonsBar('inboxYrBar', 'inbox', trackCands);
+    if ($('inResetBtn')) $('inResetBtn').style.display = (YEAR_FILTER || q || (hasLeft && TRACK_FILTER)) ? '' : 'none';
 
     if ($('inboxKpiBox')) {
-      $('inboxKpiBox').innerHTML =
-        '<div class="kpi k-amber"><span>미등록 후보</span><b>' + allCands.length + '묶음</b></div>' +
+      var actObj = activeTrackObj();
+      var trTag = (hasLeft && actObj) ? ('<span class="chip c-blue">' + esc(trackShortLabel(actObj)) + '</span>') : '';
+      $('inboxKpiBox').innerHTML = trTag +
+        '<div class="kpi k-amber"><span>미등록 후보</span><b>' + trackCands.length + '묶음</b></div>' +
         ((YEAR_FILTER || q) ? '<div class="kpi k-blue"><span>필터 결과</span><b>' + list.length + '묶음</b></div>' : '') +
         '<div class="kpi"><span>감지 메일</span><b>' + num(stats.mailHits, 0).toLocaleString() + '통</b></div>' +
         '<div class="kpi k-blue"><span>카톡·문자</span><b>' + num(stats.msgHits, 0).toLocaleString() + '건</b></div>';
@@ -737,16 +1076,19 @@
       return;
     }
 
-    var trs = list.slice(0, 80).map(function (b, i) {
+    var shown = list.slice(0, 120);
+    var trs = shown.map(function (b, i) {
       var ckKey = 'd:' + b.key;
-      var coBadge = b.companyId ? '<span class="chip c-green">업체원장 일치</span> ' : '<span class="chip c-amber">신규·키워드</span> ';
+      var coBadge = b.companyId ? '<span class="chip c-green">업체원장 일치</span> ' : (b.suggestedCompanyId ? '<span class="chip c-amber">업체명 후보</span> ' : (b.isAgencyNotice ? '<span class="chip">기관공지</span> ' : '<span class="chip c-amber">신규·키워드</span> '));
+      var trObj = tracks.find(function (t) { return t.id === b.suggestedTrackId; });
+      var trTag = trObj ? ('<span class="chip c-blue">' + esc(trackShortLabel(trObj)) + '</span> ') : '';
       var badgeTxt = '메일 ' + b.mailCount + ' · 톡 ' + b.msgCount + (b.erpCount ? (' · ERP ' + b.erpCount) : '');
       var sampleTxt = (b.sampleSubjects || [])[0] || '-';
       return '<tr data-cand="' + esc(b.key) + '">' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="cand"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(b.companyName) + ' 선택"></td>' +
         '<td class="n">' + (i + 1) + '</td>' +
         '<td class="ti" title="' + esc(b.companyName) + '"><span class="chip">' + esc(String(b.year || 2026)) + '</span> ' + coBadge + esc(b.companyName) + '</td>' +
-        '<td data-k="badge" title="' + esc(badgeTxt) + '"><span class="chip c-blue">' + esc(badgeTxt) + '</span></td>' +
+        '<td data-k="badge" title="' + esc(badgeTxt) + '">' + trTag + '<span class="chip c-blue">' + esc(badgeTxt) + '</span></td>' +
         '<td title="' + esc(b.latestDate || '-') + '">' + esc(b.latestDate || '-') + '</td>' +
         '<td class="wide" title="' + esc(sampleTxt) + '">' + esc(sampleTxt) + '</td>' +
         '<td data-k="act"><button type="button" class="sm pri" data-import-cand="' + esc(b.key) + '">📥 1클릭 등록</button> <button type="button" class="sm" data-preview-cand="' + esc(b.key) + '">👁 미리보기</button></td>' +
@@ -754,9 +1096,10 @@
     }).join('');
 
     box.innerHTML = '<div class="scroll"><table class="t" data-name="bundles">' +
-      '<thead><tr><th class="c"><input type="checkbox" data-ckall="cand" aria-label="후보 전체 선택"></th><th class="n">№</th><th>추정 기업 · 연도</th><th>감지 출처</th><th>최근 일자</th><th class="wide">대표 수신 제목</th><th data-k="act">작업</th></tr></thead>' +
+      '<thead><tr><th class="c"><input type="checkbox" data-ckall="cand" aria-label="후보 전체 선택"></th><th class="n">№</th><th>추정 기업 · 연도</th><th>지역 · 감지 출처</th><th>최근 일자</th><th class="wide">대표 수신 제목</th><th data-k="act">작업</th></tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>';
 
+    refreshCandBulkUi();
     box.querySelectorAll('[data-import-cand]').forEach(function (b) {
       b.onclick = function () { importCandidateByKey(b.getAttribute('data-import-cand')); };
     });
@@ -768,49 +1111,57 @@
   /* ══ 6. 탭 3: 📅 연도별 자료함 (pu-harass drawYearlyPane 규격) ═════════ */
   function renderYearlyPane() {
     var cat = getAppCat();
+    var tracks = getEffectiveTracks();
     var allProjs = projectsList();
     var allCands = (D.discover && D.discover.bundles) || [];
-    var combined = allProjs.map(function (p) { return { kind: 'project', year: num(p.year, 2026), item: p }; })
+    var yrTrack = TRACK_FILTER;
+    var combinedAll = allProjs.map(function (p) { return { kind: 'project', year: num(p.year, 2026), item: p }; })
       .concat(allCands.map(function (b) { return { kind: 'bundle', year: num(b.year, 2026), item: b }; }));
+    var combinedScoped = yrTrack
+      ? combinedAll.filter(function (ent) {
+          return ent.kind === 'project' ? (ent.item.trackId === yrTrack) : (str(ent.item.suggestedTrackId) === yrTrack);
+        })
+      : combinedAll;
 
-    renderYearButtonsBar('yrPillsBar', 'all', combined);
+    renderYearButtonsBar('yrPillsBar', 'all', combinedScoped);
 
     var yrQ = str($('yrQ') && $('yrQ').value).toLowerCase();
-    var yrTrack = str($('yrTrackSel') && $('yrTrackSel').value);
     var yrKind = str($('yrKind') && $('yrKind').value);
 
     fillSelectKeepingValue($('yrTrackSel'),
-      '<option value="">트랙 전체</option>' + (cat.tracks || []).map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join(''),
+      '<option value="">트랙 전체</option>' + tracks.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(trackShortLabel(t)) + '</option>'; }).join(''),
       yrTrack);
     if ($('yrResetBtn')) $('yrResetBtn').style.display = (YEAR_FILTER || yrQ || yrTrack || yrKind) ? '' : 'none';
 
-    var doneCnt = allProjs.filter(function (p) { return p.status === 'done'; }).length;
-    var commTotal = allProjs.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0) +
-      allCands.reduce(function (s, b) { return s + num(b.totalCount, 0); }, 0);
+    var scopedProjs = combinedScoped.filter(function (x) { return x.kind === 'project'; }).map(function (x) { return x.item; });
+    var scopedCands = combinedScoped.filter(function (x) { return x.kind === 'bundle'; }).map(function (x) { return x.item; });
+    var doneCnt = scopedProjs.filter(function (p) { return p.status === 'done'; }).length;
+    var commTotal = scopedProjs.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0) +
+      scopedCands.reduce(function (s, b) { return s + num(b.totalCount, 0); }, 0);
     if ($('yrKpiBox')) {
-      $('yrKpiBox').innerHTML =
-        '<div class="kpi k-blue"><span>총 자료</span><b>' + combined.length + '건</b></div>' +
-        '<div class="kpi"><span>등록 사업장</span><b>' + allProjs.length + '건</b></div>' +
+      var actObj = activeTrackObj();
+      var trTag = (yrTrack && actObj) ? ('<span class="chip c-blue">' + esc(trackShortLabel(actObj)) + '</span>') : '';
+      $('yrKpiBox').innerHTML = trTag +
+        '<div class="kpi k-blue"><span>총 자료</span><b>' + combinedScoped.length + '건</b></div>' +
+        '<div class="kpi"><span>등록 사업장</span><b>' + scopedProjs.length + '건</b></div>' +
         '<div class="kpi k-green"><span>수행 완료</span><b>' + doneCnt + '건</b></div>' +
-        '<div class="kpi k-amber"><span>미등록 후보</span><b>' + allCands.length + '묶음</b></div>' +
+        '<div class="kpi k-amber"><span>미등록 후보</span><b>' + scopedCands.length + '묶음</b></div>' +
         '<div class="kpi k-blue"><span>연계 메일·톡</span><b>' + commTotal.toLocaleString() + '건</b></div>';
     }
 
-    var filtered = combined.filter(function (ent) {
+    var filtered = combinedScoped.filter(function (ent) {
       if (YEAR_FILTER && String(ent.year) !== YEAR_FILTER) return false;
       if (yrKind && ent.kind !== yrKind) return false;
       if (ent.kind === 'project') {
         var p = ent.item;
-        if (yrTrack && p.trackId !== yrTrack) return false;
         if (yrQ) {
-          var hayP = [ent.year, p.companyName, p.trackName, p.summaryNote].join(' ').toLowerCase();
+          var hayP = [ent.year, p.companyName, p.trackName, p.caseNo, p.summaryNote].join(' ').toLowerCase();
           if (hayP.indexOf(yrQ) < 0) return false;
         }
       } else {
         var b = ent.item;
-        if (yrTrack) return false;
         if (yrQ) {
-          var hayB = [ent.year, b.companyName].concat(b.sampleSubjects || []).join(' ').toLowerCase();
+          var hayB = [ent.year, b.companyName, b.suggestedTrackName].concat(b.sampleSubjects || []).join(' ').toLowerCase();
           if (hayB.indexOf(yrQ) < 0) return false;
         }
       }
@@ -836,16 +1187,18 @@
       var grp = byYr[yr];
       var regCnt = grp.filter(function (x) { return x.kind === 'project'; }).length;
       var candCnt = grp.length - regCnt;
-      var rowsHtml = grp.slice(0, 80).map(function (ent, idx) {
+      var rowsHtml = grp.slice(0, 200).map(function (ent, idx) {
         if (ent.kind === 'project') {
           var p = ent.item;
           var cls = p.status === 'done' ? ' class="perf-direct"' : '';
+          var trObj = tracks.find(function (t) { return t.id === p.trackId; });
+          var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
           return '<tr' + cls + '>' +
             '<td class="c"><input type="checkbox" data-ck="yrp:' + esc(p.id) + '" data-list="yr_' + esc(yr) + '" aria-label="선택"></td>' +
             '<td class="n">' + (idx + 1) + '</td>' +
-            '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + '</td>' +
-            '<td data-k="badge"><span class="chip c-green">등록 사업</span> <span class="chip c-blue">' + esc(p.trackName || cat.shortName) + '</span></td>' +
-            '<td>' + stepDotsHtml(p.stage) + '</td>' +
+            '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + (p.caseNo ? (' <span class="chip">' + esc(p.caseNo) + '</span>') : '') + '</td>' +
+            '<td data-k="badge"><span class="chip c-green">등록 사업</span> <span class="chip c-blue">' + esc(trLbl) + '</span></td>' +
+            '<td>' + stepDotsHtml(p.stage, p.status) + '</td>' +
             '<td>' + esc(safeDate(p.updatedAt)) + '</td>' +
             '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
             '<td data-k="act"><button type="button" class="sm pri" data-yr-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-yr-rpt="' + esc(p.id) + '">보고서</button></td>' +
@@ -857,7 +1210,7 @@
           '<td class="c"><input type="checkbox" data-ck="yrd:' + esc(b.key) + '" data-list="yr_' + esc(yr) + '" aria-label="선택"></td>' +
           '<td class="n">' + (idx + 1) + '</td>' +
           '<td class="ti" title="' + esc(b.companyName) + '">' + esc(b.companyName) + '</td>' +
-          '<td data-k="badge"><span class="chip c-amber">미등록 후보</span></td>' +
+          '<td data-k="badge"><span class="chip c-amber">미등록 후보</span>' + (b.suggestedTrackName ? (' <span class="chip">' + esc(b.suggestedTrackName) + '</span>') : '') + '</td>' +
           '<td>메일 ' + b.mailCount + ' · 톡 ' + b.msgCount + '</td>' +
           '<td>' + esc(b.latestDate || '-') + '</td>' +
           '<td class="wide" title="' + esc(sample) + '">' + esc(sample) + '</td>' +
@@ -946,6 +1299,7 @@
         projectPickerBarHtml(proj, 'detail') +
         '<div class="prof">' +
           '<span><b>사업장</b>' + esc(proj.companyName) + (proj.bizNo ? ' (' + esc(proj.bizNo) + ')' : '') + '</span>' +
+          (proj.caseNo ? '<span><b>사건번호</b><span class="chip">' + esc(proj.caseNo) + '</span></span>' : '') +
           '<span><b>트랙</b><span class="chip c-blue">' + esc(proj.trackName || cat.shortName) + '</span></span>' +
           '<span><b>수행연도</b>' + esc(String(proj.year || 2026)) + '년</span>' +
           '<span><b>근로자</b>' + num(proj.workerCount, 0) + '명</span>' +
@@ -1271,9 +1625,10 @@
   async function setProjectStage(pid, stageId) {
     var proj = projectById(pid);
     if (!proj) return;
-    var next = Object.assign({}, proj, { stage: stageId, status: stageId === 'followup' ? 'done' : proj.status });
+    var patch = { stage: stageId, status: stageId === 'followup' ? 'done' : proj.status };
+    var next = Object.assign({}, proj, patch);
     try {
-      D.projects[pid] = await saveRecord('projects/' + pid, pid, next, 'Project');
+      D.projects[pid] = await saveRecord('projects/' + pid, pid, next, 'Project', { patch: patch });
       draw();
       toast('진행 단계를 변경했습니다.');
     } catch (e) { toast('단계 저장 오류: ' + e.message); }
@@ -1283,9 +1638,10 @@
     var proj = projectById(pid);
     if (!proj) return;
     var nextSt = proj.status === 'done' ? 'active' : 'done';
-    var next = Object.assign({}, proj, { status: nextSt });
+    var patch = { status: nextSt };
+    var next = Object.assign({}, proj, patch);
     try {
-      D.projects[pid] = await saveRecord('projects/' + pid, pid, next, 'Project');
+      D.projects[pid] = await saveRecord('projects/' + pid, pid, next, 'Project', { patch: patch });
       draw();
       toast(nextSt === 'done' ? '수행 완료 상태로 변경했습니다.' : '진행 중 상태로 되돌렸습니다.');
     } catch (e) { toast('상태 변경 오류: ' + e.message); }
@@ -1378,22 +1734,25 @@
   async function importCandidate(bundle) {
     if (!bundle) return;
     var cat = getAppCat();
-    var tr = (cat.tracks || [])[0] || { id: 'default', name: cat.name };
+    var tracks = getEffectiveTracks();
+    var tr = (bundle.suggestedTrackId && tracks.find(function (t) { return t.id === bundle.suggestedTrackId; })) || tracks[0] || { id: 'default', name: cat.name };
+    var yr = num(bundle.year, CUR_YEAR);
     var pid = 'pr_' + APP_KEY + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     var rec = {
       id: pid, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 0,
       companyId: str(bundle.companyId),
       companyName: cleanText(bundle.companyName) || '수진기업',
-      year: num(bundle.year, 2026),
+      year: yr,
       trackId: tr.id,
       trackName: tr.name,
-      stage: 'collect',
+      stage: yr < CUR_YEAR ? 'followup' : 'collect',
       workerCount: 0,
       consultantName: (ME && ME.name) || '전담 노무사',
       consultantUid: str(ME && ME.uid),
-      status: 'active',
+      status: yr < CUR_YEAR ? 'done' : 'active',
       summaryNote: '자동 감지 등록 (메일 ' + bundle.mailCount + ' / 톡 ' + bundle.msgCount + ')'
     };
+    if (str(bundle.caseNo)) rec.caseNo = cleanText(bundle.caseNo).slice(0, 60);
     D.projects[pid] = await saveRecord('projects/' + pid, pid, rec, 'Project');
     if (Array.isArray(bundle.comms)) {
       D.comms[pid] = D.comms[pid] || {};
@@ -1402,9 +1761,11 @@
         var cid = 'cm_' + Date.now().toString(36) + '_' + i;
         var cRec = {
           id: cid, projectId: pid, entityType: 'Document', schemaVersion: 1, contractVersion: 1, revision: 0,
-          source: str(cm.source || 'mail'), date: str(cm.date), subject: cleanText(cm.subject),
-          maskedPreview: cleanText(cm.maskedPreview), atts: Array.isArray(cm.atts) ? cm.atts : []
+          source: str(cm.source || 'mail'), date: /^\d{4}-\d{2}-\d{2}$/.test(str(cm.date)) ? str(cm.date) : '',
+          subject: cleanText(cm.subject).slice(0, 280),
+          maskedPreview: cleanText(cm.maskedPreview).slice(0, 3800)
         };
+        if (Array.isArray(cm.atts) && cm.atts.length) cRec.atts = cm.atts.slice(0, 12);
         D.comms[pid][cid] = await saveRecord('comms/' + pid + '/' + cid, cid, cRec, 'Document');
       }
     }
@@ -1460,8 +1821,11 @@
         var cid = 'cm_' + it.id;
         var cRec = {
           id: cid, projectId: proj.id, entityType: 'Document', schemaVersion: 1, contractVersion: 1, revision: 0,
-          source: ch, date: it.msgDate, subject: it.title, maskedPreview: it.maskedBody, atts: it.attNames || []
+          source: ch, date: /^\d{4}-\d{2}-\d{2}$/.test(str(it.msgDate)) ? str(it.msgDate) : '',
+          subject: cleanText(it.title).slice(0, 280),
+          maskedPreview: cleanText(it.maskedBody).slice(0, 3800)
         };
+        if (Array.isArray(it.attNames) && it.attNames.length) cRec.atts = it.attNames.slice(0, 12);
         D.comms[proj.id][cid] = await saveRecord('comms/' + proj.id + '/' + cid, cid, cRec, 'Document');
       }
       if (ta) ta.value = '';
@@ -1519,13 +1883,31 @@
       return '"' + s.replace(/"/g, '""') + '"';
     };
     var rows = [['구분', '연도', '사업장명', '트랙', '단계/출처', '담당/최근일', '요약·제목']];
-    getFilteredProjects().forEach(function (p) {
-      rows.push(['등록사업', p.year || 2026, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
-    });
-    if (includeBundles) {
-      ((D.discover && D.discover.bundles) || []).forEach(function (b) {
-        rows.push(['미등록후보', b.year || 2026, b.companyName, cat.shortName, '메일 ' + b.mailCount + '/톡 ' + b.msgCount, b.latestDate || '-', (b.sampleSubjects || [])[0] || '-']);
+    if (!includeBundles) {
+      getFilteredProjects().forEach(function (p) {
+        rows.push(['등록사업', p.year || 2026, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
       });
+    } else {
+      var yrQ = str($('yrQ') && $('yrQ').value).toLowerCase();
+      var yrKind = str($('yrKind') && $('yrKind').value);
+      if (yrKind !== 'bundle') {
+        projectsList().forEach(function (p) {
+          var yr = num(p.year, 2026);
+          if (TRACK_FILTER && p.trackId !== TRACK_FILTER) return;
+          if (YEAR_FILTER && String(yr) !== YEAR_FILTER) return;
+          if (yrQ && ([yr, p.companyName, p.trackName, p.caseNo, p.summaryNote].join(' ').toLowerCase()).indexOf(yrQ) < 0) return;
+          rows.push(['등록사업', yr, p.companyName, p.trackName || cat.shortName, p.stage || 'intake', p.consultantName || '-', p.summaryNote || '-']);
+        });
+      }
+      if (yrKind !== 'project') {
+        ((D.discover && D.discover.bundles) || []).forEach(function (b) {
+          var yr = num(b.year, 2026);
+          if (TRACK_FILTER && str(b.suggestedTrackId) !== TRACK_FILTER) return;
+          if (YEAR_FILTER && String(yr) !== YEAR_FILTER) return;
+          if (yrQ && ([yr, b.companyName, b.suggestedTrackName].concat(b.sampleSubjects || []).join(' ').toLowerCase()).indexOf(yrQ) < 0) return;
+          rows.push(['미등록후보', yr, b.companyName, b.suggestedTrackName || cat.shortName, '메일 ' + b.mailCount + '/톡 ' + b.msgCount, b.latestDate || '-', (b.sampleSubjects || [])[0] || '-']);
+        });
+      }
     }
     var csv = '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -1574,15 +1956,18 @@
     if (!m || !box) return;
     LAST_FOCUS_EL = document.activeElement;
     var cat = getAppCat();
-    var opts = (cat.tracks || []).map(function (t) {
-      return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>';
+    var tracks = getEffectiveTracks();
+    var opts = tracks.map(function (t) {
+      return '<option value="' + esc(t.id) + '"' + (TRACK_FILTER === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>';
     }).join('');
+    var defYr = num(YEAR_FILTER, CUR_YEAR) || CUR_YEAR;
     box.innerHTML =
       '<div class="mhd"><b id="mhdTitle">+ ' + esc(cat.name) + ' 신규 사업장 등록</b><span class="sp"></span><button type="button" class="sm" id="mCloseBtn">닫기</button></div>' +
       '<div class="mbd">' +
         '<div class="fr"><label for="npCoName">수진기업명</label><div class="fv"><input type="text" id="npCoName" placeholder="예: (주)푸른샘식품"></div></div>' +
-        '<div class="fr"><label for="npTrack">세부 트랙</label><div class="fv"><select id="npTrack">' + opts + '</select></div></div>' +
-        '<div class="fr"><label for="npYear">수행연도</label><div class="fv"><input type="number" id="npYear" value="2026"></div></div>' +
+        '<div class="fr"><label for="npTrack">' + esc(cat.regionLabel || '세부 트랙') + '</label><div class="fv"><select id="npTrack">' + opts + '</select></div></div>' +
+        '<div class="fr"><label for="npYear">수행연도</label><div class="fv"><input type="number" id="npYear" value="' + esc(String(defYr)) + '"></div></div>' +
+        '<div class="fr"><label for="npCaseNo">사건번호(선택)</label><div class="fv"><input type="text" id="npCaseNo" placeholder="예: 인사서산-2026-001"></div></div>' +
         '<div class="fr"><label for="npWorkers">상시근로자수</label><div class="fv"><input type="number" id="npWorkers" value="20"></div></div>' +
         '<div class="fr"><label for="npNote">핵심 과업 메모</label><div class="fv"><input type="text" id="npNote" placeholder="현장 방문 일정·주력 과제(비식별)"></div></div>' +
       '</div>' +
@@ -1597,17 +1982,21 @@
       var saveBtn = $('mSaveBtn');
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중…'; }
       var trId = $('npTrack').value;
-      var trObj = (cat.tracks || []).find(function (t) { return t.id === trId; }) || { id: trId, name: cat.shortName };
+      var trObj = tracks.find(function (t) { return t.id === trId; }) || { id: trId, name: cat.shortName };
+      var yrVal = num($('npYear').value, CUR_YEAR);
       var pid = 'pr_' + APP_KEY + '_' + Date.now().toString(36);
       var rec = {
         id: pid, entityType: 'Project', schemaVersion: 1, contractVersion: 1, revision: 0,
-        companyName: co, year: num($('npYear').value, 2026),
-        trackId: trObj.id, trackName: trObj.name, stage: 'intake',
+        companyName: co, year: yrVal,
+        trackId: trObj.id, trackName: trObj.name, stage: yrVal < CUR_YEAR ? 'followup' : 'intake',
         workerCount: num($('npWorkers').value, 0),
         consultantName: (ME && ME.name) || '전담 노무사',
         consultantUid: str(ME && ME.uid),
-        status: 'active', summaryNote: cleanText($('npNote').value)
+        status: yrVal < CUR_YEAR ? 'done' : 'active',
+        summaryNote: cleanText($('npNote').value)
       };
+      var cno = cleanText($('npCaseNo') && $('npCaseNo').value).slice(0, 60);
+      if (cno) rec.caseNo = cno;
       try {
         D.projects[pid] = await saveRecord('projects/' + pid, pid, rec, 'Project');
         CUR_PID = pid;
@@ -1618,6 +2007,126 @@
       } catch (e) {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '등록 저장'; }
         toast('등록 실패: ' + e.message);
+      }
+    };
+  }
+
+  function openEditProjectModal(proj) {
+    if (!proj) return;
+    var m = $('modal'), box = $('mbox');
+    if (!m || !box) return;
+    LAST_FOCUS_EL = document.activeElement;
+    var cat = getAppCat();
+    var tracks = getEffectiveTracks();
+    var opts = tracks.map(function (t) {
+      return '<option value="' + esc(t.id) + '"' + (proj.trackId === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>';
+    }).join('');
+    box.innerHTML =
+      '<div class="mhd"><b id="mhdTitle">✏️ 사업 정보 수정 · ' + esc(proj.companyName) + '</b><span class="sp"></span><button type="button" class="sm" id="mCloseBtn">닫기</button></div>' +
+      '<div class="mbd">' +
+        '<div class="fr"><label for="epCoName">수진기업명</label><div class="fv"><input type="text" id="epCoName" value="' + esc(proj.companyName) + '"></div></div>' +
+        '<div class="fr"><label for="epTrack">' + esc(cat.regionLabel || '세부 트랙') + '</label><div class="fv"><select id="epTrack">' + opts + '</select></div></div>' +
+        '<div class="fr"><label for="epYear">수행연도</label><div class="fv"><input type="number" id="epYear" value="' + esc(String(num(proj.year, CUR_YEAR))) + '"></div></div>' +
+        '<div class="fr"><label for="epCaseNo">사건번호</label><div class="fv"><input type="text" id="epCaseNo" value="' + esc(proj.caseNo || '') + '" placeholder="예: 인사서산-2026-001"></div></div>' +
+        '<div class="fr"><label for="epMgr">담당 노무사</label><div class="fv"><input type="text" id="epMgr" value="' + esc(proj.consultantName || '') + '"></div></div>' +
+        '<div class="fr"><label for="epStatus">진행상태</label><div class="fv"><select id="epStatus"><option value="active"' + (proj.status !== 'done' ? ' selected' : '') + '>진행 중</option><option value="done"' + (proj.status === 'done' ? ' selected' : '') + '>수행 완료</option></select></div></div>' +
+        '<div class="fr"><label for="epNote">요약 메모</label><div class="fv"><input type="text" id="epNote" value="' + esc(proj.summaryNote || '') + '"></div></div>' +
+      '</div>' +
+      '<div class="mft"><button type="button" class="sm" id="mCancelBtn">취소</button><button type="button" class="pri" id="mEditSaveBtn">수정 저장</button></div>';
+    m.style.display = 'flex';
+    if ($('mCloseBtn')) $('mCloseBtn').onclick = closeModal;
+    if ($('mCancelBtn')) $('mCancelBtn').onclick = closeModal;
+    if ($('epCoName')) $('epCoName').focus();
+    if ($('mEditSaveBtn')) $('mEditSaveBtn').onclick = async function () {
+      var co = cleanText($('epCoName').value);
+      if (!co) { toast('수진기업명을 입력하세요.'); return; }
+      var saveBtn = $('mEditSaveBtn');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중…'; }
+      var trId = $('epTrack').value;
+      var trObj = tracks.find(function (t) { return t.id === trId; }) || { id: trId, name: cat.shortName };
+      var patch = {
+        companyName: co.slice(0, 190),
+        trackId: trObj.id,
+        trackName: trObj.name,
+        year: num($('epYear').value, CUR_YEAR),
+        consultantName: cleanText($('epMgr').value).slice(0, 70) || proj.consultantName || '전담 노무사',
+        status: $('epStatus').value === 'done' ? 'done' : 'active',
+        summaryNote: cleanText($('epNote').value).slice(0, 1900)
+      };
+      var cno = cleanText($('epCaseNo').value).slice(0, 60);
+      if (cno) patch.caseNo = cno;
+      var nextRec = Object.assign({}, proj, patch);
+      if (!cno) delete nextRec.caseNo;
+      try {
+        D.projects[proj.id] = await saveRecord('projects/' + proj.id, proj.id, nextRec, 'Project', {
+          patch: patch,
+          clearKeys: cno ? [] : ['caseNo']
+        });
+        closeModal();
+        rebuildDiscoverAndRag();
+        draw();
+        toast('사업 정보를 수정 저장했습니다.');
+      } catch (e) {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '수정 저장'; }
+        toast('수정 실패: ' + e.message);
+      }
+    };
+  }
+
+  function openAddRegionModal() {
+    var m = $('modal'), box = $('mbox');
+    if (!m || !box) return;
+    LAST_FOCUS_EL = document.activeElement;
+    var cat = getAppCat();
+    box.innerHTML =
+      '<div class="mhd"><b id="mhdTitle">+ 새 지역 상공회의소 추가</b><span class="sp"></span><button type="button" class="sm" id="mCloseBtn">닫기</button></div>' +
+      '<div class="mbd">' +
+        '<div class="note">추후 당진·천안·아산·태안·예산·홍성 등 새로운 지역 상공회의소 컨설팅이 들어올 때 왼쪽 대시보드에 바로 분리 항목을 추가합니다.</div>' +
+        '<div class="fr"><label for="rgName">정식 명칭</label><div class="fv"><input type="text" id="rgName" placeholder="예: 천안아산상공회의소 인사노무컨설팅"></div></div>' +
+        '<div class="fr"><label for="rgShort">대시보드 약칭</label><div class="fv"><input type="text" id="rgShort" placeholder="예: 천안상의 (미입력 시 정식 명칭 사용)"></div></div>' +
+        '<div class="fr"><label for="rgKw">자동분류 키워드</label><div class="fv"><input type="text" id="rgKw" placeholder="쉼표 구분 (예: 천안상의,천안상공회의소)"></div></div>' +
+      '</div>' +
+      '<div class="mft"><button type="button" class="sm" id="mCancelBtn">취소</button><button type="button" class="pri" id="mRegSaveBtn">지역 추가 저장</button></div>';
+    m.style.display = 'flex';
+    if ($('mCloseBtn')) $('mCloseBtn').onclick = closeModal;
+    if ($('mCancelBtn')) $('mCancelBtn').onclick = closeModal;
+    if ($('rgName')) $('rgName').focus();
+    if ($('mRegSaveBtn')) $('mRegSaveBtn').onclick = async function () {
+      var nm = cleanText($('rgName').value).slice(0, 76);
+      if (!nm) { toast('지역 상공회의소 명칭을 입력하세요.'); return; }
+      var sn = cleanText($('rgShort').value).slice(0, 36) || nm.slice(0, 36);
+      var dup = getEffectiveTracks().find(function (t) {
+        return str(t.name) === nm || trackShortLabel(t) === sn;
+      });
+      if (dup) { toast('이미 등록된 지역 상공회의소입니다: ' + trackShortLabel(dup)); return; }
+      var saveBtn = $('mRegSaveBtn');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '추가 중…'; }
+      var rid = 'ch_reg_' + Date.now().toString(36);
+      var kw = cleanText($('rgKw').value).slice(0, 280) || sn;
+      var rec = {
+        id: rid,
+        entityType: 'Document',
+        schemaVersion: 1,
+        contractVersion: 1,
+        revision: 0,
+        name: nm,
+        shortName: sn,
+        agency: str(cat.shortName),
+        keywords: kw,
+        sortOrder: 100 + getCustomRegionsList().length
+      };
+      try {
+        D.regions = D.regions || {};
+        D.regions[rid] = await saveRecord('regions/' + rid, rid, rec, 'Document');
+        TRACK_FILTER = rid;
+        YEAR_FILTER = '';
+        closeModal();
+        rebuildDiscoverAndRag();
+        draw();
+        toast('[' + sn + '] 지역 대시보드에 추가되었습니다.');
+      } catch (e) {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '지역 추가 저장'; }
+        toast('지역 추가 실패: ' + e.message);
       }
     };
   }
@@ -1694,6 +2203,7 @@
 
   function draw() {
     renderRecentDiffBar();
+    renderLeftDash();
     updateTabCounts();
     if (CUR_TAB === 'projects') renderProjectsPane();
     else if (CUR_TAB === 'inbox') renderInboxPane();
@@ -1707,16 +2217,24 @@
       b.onclick = function () { switchTab(b.getAttribute('data-tab') || b.getAttribute('data-t')); };
     });
     if ($('projQ')) $('projQ').oninput = function () { if (CUR_TAB === 'projects') renderProjectsPane(); };
-    if ($('projTrackSel')) $('projTrackSel').onchange = function () { TRACK_FILTER = $('projTrackSel').value; renderProjectsPane(); };
-    if ($('projSt')) $('projSt').onchange = function () { renderProjectsPane(); };
-    if ($('projYrSel')) $('projYrSel').onchange = function () { YEAR_FILTER = $('projYrSel').value; renderProjectsPane(); };
-    if ($('projMgr')) $('projMgr').onchange = function () { renderProjectsPane(); };
+    if ($('projTrackSel')) $('projTrackSel').onchange = function () {
+      TRACK_FILTER = $('projTrackSel').value;
+      SHOW_ALL_ROWS = false;
+      draw();
+    };
+    if ($('projSt')) $('projSt').onchange = function () { SHOW_ALL_ROWS = false; renderProjectsPane(); };
+    if ($('projYrSel')) $('projYrSel').onchange = function () {
+      YEAR_FILTER = $('projYrSel').value;
+      SHOW_ALL_ROWS = false;
+      draw();
+    };
+    if ($('projMgr')) $('projMgr').onchange = function () { SHOW_ALL_ROWS = false; renderProjectsPane(); };
     if ($('projResetBtn')) $('projResetBtn').onclick = function () {
-      TRACK_FILTER = ''; YEAR_FILTER = '';
+      TRACK_FILTER = ''; YEAR_FILTER = ''; SHOW_ALL_ROWS = false;
       if ($('projQ')) $('projQ').value = '';
       if ($('projSt')) $('projSt').value = '';
       if ($('projMgr')) $('projMgr').value = '';
-      renderProjectsPane();
+      draw();
     };
     if ($('openCoachQuickBtn')) $('openCoachQuickBtn').onclick = function () { WS_FOCUS = 'coach'; switchTab('report'); };
     if ($('newProjBtn')) $('newProjBtn').onclick = openNewProjectModal;
@@ -1731,33 +2249,39 @@
 
     // 탭 2 (미등록 후보)
     if ($('inQ')) $('inQ').oninput = function () { if (CUR_TAB === 'inbox') renderInboxPane(); };
-    if ($('inResetBtn')) $('inResetBtn').onclick = function () { YEAR_FILTER = ''; if ($('inQ')) $('inQ').value = ''; renderInboxPane(); };
-    if ($('inboxRescanBtn')) $('inboxRescanBtn').onclick = function () { rebuildDiscoverAndRag(); renderInboxPane(); toast('후보를 다시 스캔했습니다.'); };
+    if ($('inResetBtn')) $('inResetBtn').onclick = function () {
+      YEAR_FILTER = '';
+      if ($('leftDash')) TRACK_FILTER = '';
+      if ($('inQ')) $('inQ').value = '';
+      draw();
+    };
+    if ($('inboxRescanBtn')) $('inboxRescanBtn').onclick = function () { rebuildDiscoverAndRag(); draw(); toast('후보를 다시 스캔했습니다.'); };
     if ($('bulkImportCandBtn')) $('bulkImportCandBtn').onclick = function () {
-      var picks = (D.discover.bundles || []).filter(function (b) { return SEL['d:' + b.key]; });
+      var picks = getFilteredInboxBundles().list.filter(function (b) { return SEL['d:' + b.key]; });
       if (!picks.length) { toast('체크박스로 후보를 먼저 선택하세요.'); return; }
       importCandidatesList(picks, $('bulkImportCandBtn'), '☑ 선택 후보 등록');
     };
     if ($('importAllCandBtn')) $('importAllCandBtn').onclick = function () {
-      var q = str($('inQ') && $('inQ').value).toLowerCase();
-      var picks = (D.discover.bundles || []).filter(function (b) {
-        if (YEAR_FILTER && String(num(b.year, 2026)) !== YEAR_FILTER) return false;
-        if (!q) return true;
-        return ([b.companyName].concat(b.sampleSubjects || []).join(' ').toLowerCase()).indexOf(q) >= 0;
-      });
+      var picks = getFilteredInboxBundles().list;
       importCandidatesList(picks, $('importAllCandBtn'), '+ 전체 편입');
     };
 
     // 탭 3 (연도별 자료함)
     if ($('yrQ')) $('yrQ').oninput = function () { if (CUR_TAB === 'yearly') renderYearlyPane(); };
-    if ($('yrTrackSel')) $('yrTrackSel').onchange = function () { if (CUR_TAB === 'yearly') renderYearlyPane(); };
+    if ($('yrTrackSel')) $('yrTrackSel').onchange = function () {
+      TRACK_FILTER = $('yrTrackSel').value;
+      if ($('projTrackSel')) $('projTrackSel').value = TRACK_FILTER;
+      draw();
+    };
     if ($('yrKind')) $('yrKind').onchange = function () { if (CUR_TAB === 'yearly') renderYearlyPane(); };
     if ($('yrResetBtn')) $('yrResetBtn').onclick = function () {
       YEAR_FILTER = '';
+      TRACK_FILTER = '';
       if ($('yrQ')) $('yrQ').value = '';
       if ($('yrTrackSel')) $('yrTrackSel').value = '';
+      if ($('projTrackSel')) $('projTrackSel').value = '';
       if ($('yrKind')) $('yrKind').value = '';
-      renderYearlyPane();
+      draw();
     };
     if ($('yrCsvBtn')) $('yrCsvBtn').onclick = function () { downloadStatusCsv(true); };
 
@@ -1774,12 +2298,15 @@
           if (cb.hasAttribute('data-quick-ok') && typeof cb.onchange === 'function') cb.onchange();
         });
         if (allList === 'proj') refreshProjBulkUi();
+        else if (allList === 'cand') refreshCandBulkUi();
         return;
       }
       var k = t.getAttribute('data-ck');
       if (k) {
         SEL[k] = t.checked;
-        if (t.getAttribute('data-list') === 'proj') refreshProjBulkUi();
+        var listKind = t.getAttribute('data-list');
+        if (listKind === 'proj') refreshProjBulkUi();
+        else if (listKind === 'cand') refreshCandBulkUi();
       }
     });
 
@@ -1823,7 +2350,7 @@
       if (!authUid) {
         ME = null;
         gate = null;
-        D = { companies: [], consultings: [], projects: {}, checks: {}, comms: {}, reports: {}, mailboxFolders: {}, mailboxMsgs: {}, mailboxOldMsgs: {}, msgIntake: {}, discover: null, ragIndex: null };
+        D = { companies: [], consultings: [], consTypes: [], regions: {}, projects: {}, checks: {}, comms: {}, reports: {}, mailboxFolders: {}, mailboxMsgs: {}, mailboxOldMsgs: {}, msgIntake: {}, ragNotes: {}, discover: null, ragIndex: null };
         if ($('lock')) $('lock').style.display = 'none';
         if ($('app')) $('app').style.display = 'none';
         if (global.PuGate) global.PuGate.show();

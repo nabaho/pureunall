@@ -232,3 +232,152 @@ test('⑥ RAG 프롬프트 경계 격리(<UNTRUSTED_DATA> · 비카탈로그 AI 
   assert.match(intakeViewSrc, /https:\/\/asia-northeast3-pureun-erp\.cloudfunctions\.net\/consultMsgIngest/);
   assert.doesNotMatch(intakeViewSrc, /asia-southeast1-pureun-erp\.cloudfunctions\.net/);
 });
+
+test('⑦ 백필·연도별·지역분리: 다년도 비병합 · companyId 공백 회사명 매칭 · caseNo · 이메일 비노출 · 6차산업 숫자보존', () => {
+  const flat = Intake.flattenMailbox(
+    { f1: { kind: 'custom', name: '2. 상공회의소' } },
+    {
+      f1: {
+        m24: { s: '[서산상공회의소] (주)가상제조 인사노무 컨설팅 보고', d: Date.UTC(2024, 4, 10), f: 'hr@virtual-co.example', fn: '서산상의 담당자' },
+        m25: { s: '[서산상공회의소] (주)가상제조 취업규칙 검토', d: Date.UTC(2025, 5, 11), f: 'hr@virtual-co.example', fn: '서산상의 담당자' },
+        m26: { s: '[서산상공회의소] (주)가상제조 근로계약서 자문', d: Date.UTC(2026, 2, 12), f: 'hr@virtual-co.example', fn: '서산상의 담당자' }
+      }
+    },
+    {}
+  );
+
+  const disc = Intake.discoverForApp('chamber', {
+    companies: [{ id: 'co_v1', name: '주식회사 가상제조' }],
+    consultings: [
+      {
+        id: 'erp_c1',
+        companyId: '',
+        companyName: '(주)가상제조',
+        consultingType: '충남북부상공회의소 인사노무 컨설팅',
+        no: 'CH-2026-01',
+        startDate: '2026-03-01',
+        managerMain: 'P-001',
+        status: '진행'
+      },
+      {
+        id: 'erp_c2',
+        companyId: 'co_unlisted',
+        companyName: '(주)가상미조회기업',
+        consultingType: '서산상공회의소 인사노무 컨설팅',
+        no: 'CH-2026-02',
+        startDate: '2026-04-01',
+        managerMain: 'P-001',
+        status: '진행'
+      }
+    ],
+    flatMails: flat
+  });
+
+  // 동일 회사라도 2024·2025·2026 서산상의 메일이 연도별로 분리되고, ERP 충남북부상의 건(caseNo)도 별도 보존된다
+  const yrs = disc.bundles.map((b) => b.year).sort();
+  assert.deepEqual(yrs, [2024, 2025, 2026, 2026, 2026]);
+  const erpB = disc.bundles.find((b) => b.caseNo === 'CH-2026-01');
+  assert.ok(erpB, 'caseNo CH-2026-01 번들이 생성되어야 함');
+  assert.equal(erpB.companyId, '', '온톨로지 규칙: 이름 일치만으로 companyId 를 자동 대입하면 안 됨');
+  assert.equal(erpB.suggestedCompanyId, 'co_v1', '정규화 회사명 일치는 후보 표시(suggestedCompanyId)로만 제공되어야 함');
+  assert.equal(erpB.suggestedTrackId, 'ch_chungnam');
+  const erpB2 = disc.bundles.find((b) => b.caseNo === 'CH-2026-02');
+  assert.ok(erpB2 && erpB2.companyId === 'co_unlisted', '원장에 미조회되어도 명시적 companyId 가 있으면 그대로 보존되어야 함');
+
+  const seosanYrs = disc.bundles.filter((b) => b.suggestedTrackId === 'ch_seosan' && b.caseNo !== 'CH-2026-02').map((b) => b.year).sort();
+  assert.deepEqual(seosanYrs, [2024, 2025, 2026]);
+
+  // meta.rawRec의 원시 이메일이 comms 항목에 노출되지 않아야 함
+  for (const b of disc.bundles) {
+    for (const cm of (b.comms || [])) {
+      const txt = JSON.stringify(cm);
+      assert.doesNotMatch(txt, /virtual-co\.example/);
+      assert.equal(Intake.hasResidualPii(cm.subject || ''), false);
+      assert.equal(Intake.hasResidualPii(cm.maskedPreview || ''), false);
+    }
+  }
+
+  // inferTrackForApp: 기본 3지역 + 사용자 추가 동적 지역(customTracks) 우선 매칭
+  assert.equal(Intake.inferTrackForApp('chamber', '충남북부상공회의소 인사노무컨설팅').id, 'ch_chungnam');
+  assert.equal(Intake.inferTrackForApp('chamber', '서산상공회의소 기업지원').id, 'ch_seosan');
+  assert.equal(Intake.inferTrackForApp('chamber', '당진상공회의소 신규 자문').id, 'ch_dangjin');
+  const customTracks = [{ id: 'ch_reg_asan', name: '아산상공회의소', keywords: ['아산상의', '아산상공회의소'] }];
+  assert.equal(Intake.inferTrackForApp('chamber', '2026 아산상의 인사노무 배정', customTracks).id, 'ch_reg_asan');
+
+  // cleanCompanyLabel 숫자 보존 & 기관 안내 라벨 판별 & [문자]/[카톡:기업명] 태그 기업명 오인 방지
+  assert.equal(Intake.cleanCompanyLabel('6차산업'), '6차산업');
+  assert.equal(Intake.cleanCompanyLabel('1. (주)가상제조'), '(주)가상제조');
+  assert.equal(Intake.isAgencyNoticeLabel('충남북부상의'), true);
+
+  const msgDisc = Intake.discoverForApp('evalcomp', {
+    companies: [
+      { id: 'co_m1', name: '주식회사 가나테크' },
+      { id: 'co_m2', name: '주식회사 다라모터스' }
+    ],
+    msgIntake: {
+      s1: {
+        id: 's1',
+        channel: 'sms_paste',
+        createdAt: Date.UTC(2025, 10, 15),
+        title: '[문자] [Web발신] (주)가나테크 평가보상 직무급 설계 요청',
+        maskedBody: '(주)가나테크 직무급 KPI 설계 자문 요청',
+        targetApp: 'evalcomp',
+        targetApps: ['evalcomp']
+      },
+      k1: {
+        id: 'k1',
+        channel: 'kakao_export',
+        roomName: '(주)다라모터스',
+        msgDate: '2025-09-01',
+        title: '[카톡:(주)다라모터스] 평가보상 호봉표 개편 문의',
+        maskedBody: '호봉표 개편 문의',
+        targetApp: 'evalcomp',
+        targetApps: ['evalcomp']
+      }
+    }
+  });
+  assert.equal(msgDisc.bundles.length, 2);
+  const smsB = msgDisc.bundles.find((b) => b.companyName.includes('가나테크'));
+  const kkB = msgDisc.bundles.find((b) => b.companyName.includes('다라모터스'));
+  assert.ok(smsB && smsB.year === 2025, '[문자]/[Web발신] 태그를 건너뛰고 실제 기업명과 createdAt 연도(2025)를 추출해야 함');
+  assert.ok(kkB && kkB.companyName === '(주)다라모터스', '[카톡:기업명]에서 접두사 없이 기업명을 추출해야 함');
+  assert.equal(kkB.companyId, '', '온톨로지 규칙: 카톡 대화명 일치만으로 companyId 자동 대입 금지');
+  assert.equal(kkB.suggestedCompanyId, 'co_m2', '카톡 대화명 일치 업체는 후보(suggestedCompanyId)로만 표시');
+});
+
+test('⑧ UI 구조·아카이브 스캔: 전 12앱 #projYrBar · chamber 왼쪽 대시보드 · 2021 양식폴더 회귀 방지', () => {
+  const os = require('node:os');
+  const Backfill = require(path.join(ROOT, 'scripts', 'backfill-consult-suite.js'));
+
+  const chHtml = fs.readFileSync(path.join(ROOT, 'chamber.html'), 'utf8');
+  assert.match(chHtml, /id="leftDash"/);
+  assert.match(chHtml, /id="projYrBar"/);
+  assert.match(chHtml, /css\/pu-design\.css\?v=\d+/);
+
+  for (const key of NEW_12_KEYS) {
+    const html = fs.readFileSync(path.join(ROOT, key + '.html'), 'utf8');
+    assert.match(html, /id="projYrBar"/, key + '.html 에 #projYrBar 누락');
+  }
+
+  // 합성 임시 디렉토리로 2021 양식폴더 오판(region bucket 오인) 회귀 방지 검증
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pu-consult-arch-'));
+  try {
+    const base = path.join(tmpDir, '2. 상공회의소 컨설팅');
+    fs.mkdirSync(path.join(base, '2021 상공회의소 컨설팅', '1. 가상기업A'), { recursive: true });
+    fs.mkdirSync(path.join(base, '2021 상공회의소 컨설팅', '2021년 충남북부상의 인사노무컨설팅 결과보고서 양식 송부의 건'), { recursive: true });
+    fs.mkdirSync(path.join(base, '2025 상공회의소 컨설팅', '2025 서산상공회의소', '1. 가상기업B'), { recursive: true });
+    fs.mkdirSync(path.join(base, '2025 상공회의소 컨설팅', '2025 충남북부상공회의소', '2. 가상기업C'), { recursive: true });
+
+    const recs = Backfill.scanLocalConsultingArchive(tmpDir);
+    const yr21 = recs.filter((r) => r.appKey === 'chamber' && r.year === 2021);
+    const yr25 = recs.filter((r) => r.appKey === 'chamber' && r.year === 2025);
+    assert.equal(yr21.length, 1, '2021 양식 폴더 때문에 가상기업A가 누락되면 안 됨');
+    assert.equal(yr21[0].companyName, '가상기업A');
+    assert.equal(yr21[0].trackId, 'ch_chungnam');
+    assert.equal(yr25.length, 2);
+    assert.ok(yr25.some((r) => r.companyName === '가상기업B' && r.trackId === 'ch_seosan'));
+    assert.ok(yr25.some((r) => r.companyName === '가상기업C' && r.trackId === 'ch_chungnam'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

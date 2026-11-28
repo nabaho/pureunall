@@ -19,6 +19,7 @@
   'use strict';
 
   var GARIM = '[가림]';
+  var CUR_YEAR = new Date().getFullYear();
   var PUBLIC_DOMAINS = {
     'naver.com': 1, 'daum.net': 1, 'hanmail.net': 1, 'gmail.com': 1, 'kakao.com': 1,
     'nate.com': 1, 'hotmail.com': 1, 'outlook.com': 1, 'yahoo.com': 1, 'yahoo.co.kr': 1,
@@ -64,7 +65,7 @@
   function normCorpName(v) {
     return str(v).normalize('NFC')
       .replace(/\(\s*구[\s.:：]+[^)]*\)/g, '')
-      .replace(/농업회사법인|사회복지법인|의료법인|재단법인|사단법인|\(주\)|㈜|주식회사|\(유\)|유한회사|유한책임회사|\(사\)|\(재\)/g, '')
+      .replace(/농업회사법인|사회복지법인|의료법인|재단법인|사단법인|\(주\)|주\)|㈜|주식회사|\(유\)|유\)|유한회사|유한책임회사|\(사\)|\(재\)/g, '')
       .replace(/\s+/g, '')
       .replace(/[.,·・\-–—_'"()\[\]]/g, '')
       .toLowerCase();
@@ -119,6 +120,8 @@
     if (LOCAL_PATH_RE.test(s)) return true;
     RRN_TIGHT_RE.lastIndex = 0;
     if (RRN_TIGHT_RE.test(s)) return true;
+    RRN_SPACED_RE.lastIndex = 0;
+    if (RRN_SPACED_RE.test(s)) return true;
     EMAIL_RE.lastIndex = 0;
     if (EMAIL_RE.test(s)) return true;
     TEL_TIGHT_RE.lastIndex = 0;
@@ -148,7 +151,7 @@
       if (!m || typeof m !== 'object') return;
       var d = Number(m.d || 0);
       var s = str(m.s);
-      var e = mailOf(m.e);
+      var e = mailOf(m.e || m.f);
       var fp = Math.floor(d / 60000) + '|' + e + '|' + s.slice(0, 60);
       if (seen[fp]) return;
       seen[fp] = 1;
@@ -165,7 +168,7 @@
         year: yr,
         subject: s,
         preview: str(m.p),
-        fromName: str(m.f),
+        fromName: str(m.fn || (mailOf(m.f) && !m.e ? '' : m.f)),
         fromEmail: e,
         toEmail: mailOf(m.t),
         toName: str(m.tn),
@@ -310,6 +313,8 @@
     var byEmail = Object.create(null);
     var byDomain = Object.create(null);
     var domainDup = Object.create(null);
+    var byNorm = Object.create(null);
+    var normDup = Object.create(null);
     var list = rowsOf(companies);
 
     list.forEach(function (c) {
@@ -318,6 +323,12 @@
       if (!cid) return;
       var bz = str(c.bizNo).replace(/\D/g, '');
       if (bz.length === 10) byBizNo[bz] = c;
+
+      var nn = normCorpName(c.name);
+      if (nn) {
+        if (byNorm[nn] && str(byNorm[nn].id) !== cid) normDup[nn] = 1;
+        else byNorm[nn] = c;
+      }
 
       var emails = [mailOf(c.email)];
       if (Array.isArray(c.contacts)) {
@@ -337,7 +348,8 @@
     });
 
     Object.keys(domainDup).forEach(function (d) { delete byDomain[d]; });
-    return { byBizNo: byBizNo, byEmail: byEmail, byDomain: byDomain, list: list };
+    Object.keys(normDup).forEach(function (n) { delete byNorm[n]; });
+    return { byBizNo: byBizNo, byEmail: byEmail, byDomain: byDomain, byNorm: byNorm, list: list };
   }
 
   function matchCompanyForRecord(rec, lookup) {
@@ -358,20 +370,128 @@
     return { company: null, via: '' };
   }
 
+  var BRACKET_AGENCY_RE = /푸른노무법인|권형하|광고|공고|필수|정정|재안내|안내|공문|중요|RE|FW|보안메일|보안메일\s*암호|문자|카톡(?:대화)?|Web\s*발신|파일|보관자료|ERP\s*수임|가림|로컬경로가림|상생협력재단|대중소기업|농어업협력재단|충남중기청|중소벤처|충남북부상의|서산상의|당진상의|충남경제진흥원|노사발전재단|한국능률협회|충남농업6차|충북농촌융복합|세종농촌융복합|충남사회적경제|충남사경|컨설턴트\s*모집|Reminder/i;
+  var AGENCY_NOTICE_LABEL_RE = /(?:상생협력재단|대중소기업|농어업협력재단|충남중기청|중소벤처24|충남북부상의|충남북부상공회의소|서산상의|서산상공회의소|당진상의|당진상공회의소|충남경제진흥원|경제진흥원|노사발전재단|한국능률협회|푸른노무법인|농촌융복합(?:산업)?(?:지원센터)?|6차산업(?:지원)?센터|사회적경제지원센터|현장코칭담당|회신요청|농림축산식품|보안메일(?:\s*암호)?|컨설턴트\s*모집|전문가\s*모집|만족도\s*조사|근무\s*일정|Reminder|운영지침|사전교육|간담회|모니터링|안내서?|공고)/i;
+
+  function isAgencyNoticeLabel(label) {
+    var s = str(label);
+    if (!s) return true;
+    return AGENCY_NOTICE_LABEL_RE.test(s);
+  }
+
+  function cleanCompanyLabel(raw) {
+    return str(raw)
+      .replace(/^\d{1,3}[.\-_)\s]+(?=[가-힣A-Za-z㈜(])/, '')
+      .replace(/[-–_(\[]\s*(?:종료|완료|중간종료|진행중?)\s*[)\]]?$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function extractCompanyFromSubject(subj) {
+    var s = str(subj).replace(/^(?:re|fw|fwd)\s*[:：]\s*/ig, '');
+    // 1) [브라켓] 중 기관명/일반태그가 아닌 첫 항목 ([카톡:기업명] 접두사 제거 포함)
+    var brkRe = /[\[【]\s*([^\]】]{2,32})\s*[\]】]/g;
+    var m;
+    while ((m = brkRe.exec(s)) !== null) {
+      var rawBrk = str(m[1]).replace(/^카톡\s*[:：]\s*/i, '');
+      var cand = cleanCompanyLabel(rawBrk);
+      if (cand && cand.length >= 2 && !BRACKET_AGENCY_RE.test(cand) && !/^20\d{2}/.test(cand)) {
+        return cand;
+      }
+    }
+    // 2) 사업명-기업명 패턴 (예: 인사노무컨설팅-동원유리, 현장클리닉-○○)
+    var hy = s.match(/(?:인사노무\s*컨설팅|현장클리닉|기술보호(?:\s*컨설팅)?|현장코칭|자율점검|씨앗컨설팅|결과물|보고서)\s*[-–_:：]\s*([가-힣A-Za-z0-9㈜()·\s]{2,26})/);
+    if (hy) {
+      var hCand = cleanCompanyLabel(hy[1].split(/[(\[|]/)[0]);
+      if (hCand && hCand.length >= 2 && !isAgencyNoticeLabel(hCand)) return hCand;
+    }
+    // 3) 괄호·접미사 있는 법인명 (예: (주)OOO, OOO주식회사, 농업/영농조합/협동조합)
+    var corpRe = /((?:주식회사|㈜|\(주\)|유한회사|\(유\)|농업\s*회사법인|영농조합법인|사회적협동조합)\s*[가-힣A-Za-z0-9·]{2,20}|[가-힣A-Za-z0-9]{2,18}(?:주식회사|㈜|\(주\)|협동조합|영농조합법인|엔지니어링|테크날리지|테크놀로지|테크|산업|식품|케미칼|글라스|스틸|솔루션|전자|정공|유리|보일러|금고|병원|의원))/;
+    var cm = s.match(corpRe);
+    if (cm) {
+      var cCand = cleanCompanyLabel(cm[1]);
+      if (cCand && cCand.length >= 2 && !isAgencyNoticeLabel(cCand)) return cCand;
+    }
+    return '';
+  }
+
   function inferGroupLabel(rec, matchedCo) {
     if (matchedCo && matchedCo.name) return str(matchedCo.name);
     var subj = str(rec.subject);
-    var brk = subj.match(/[\[【(]\s*([가-힣A-Za-z0-9㈜()·\s]{2,24})\s*[\]】)]/);
-    if (brk && !/푸른노무법인|광고|공고|필수|정정|재안내|안내|공문|중요|RE|FW/i.test(brk[1])) {
-      return str(brk[1]);
-    }
+    var fromSubj = extractCompanyFromSubject(subj);
+    if (fromSubj) return fromSubj;
     var em = mailOf(rec.fromEmail);
     if (OWN_MAIL_RE.test(em)) em = mailOf(rec.toEmail);
     var fn = OWN_MAIL_RE.test(mailOf(rec.fromEmail)) ? str(rec.toName) : str(rec.fromName);
-    if (fn && !/푸른|권형하/.test(fn)) return fn.slice(0, 24);
+    if (fn && !/푸른|권형하/.test(fn)) {
+      var cleanFn = cleanCompanyLabel(fn.replace(/<[^>]+>/g, '').replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, ''));
+      if (cleanFn && cleanFn.length >= 2 && !isAgencyNoticeLabel(cleanFn)) return cleanFn.slice(0, 24);
+    }
     var dom = domainOf(em);
     if (dom && !PUBLIC_DOMAINS[dom]) return dom;
-    return subj.replace(/^(re|fw|fwd)\s*[:：]\s*/ig, '').slice(0, 22) || '미확인 사업장';
+    return subj.replace(/^(re|fw|fwd)\s*[:：]\s*/ig, '').slice(0, 24) || '미확인 사업장';
+  }
+
+  function inferTrackForApp(appKey, text, customTracks) {
+    var cat = Cat.get(appKey);
+    var baseTracks = (cat && Array.isArray(cat.tracks)) ? cat.tracks : [];
+    var extraTracks = rowsOf(customTracks).filter(function (t) { return t && !t._deleted && str(t.id) && str(t.name); });
+    var hay = str(text);
+    var hayCompact = hay.replace(/\s+/g, '');
+
+    // 1) 사용자 추가(커스텀) 지역/트랙 키워드 최우선 매칭
+    for (var ei = 0; ei < extraTracks.length; ei++) {
+      var et = extraTracks[ei];
+      var kws = Array.isArray(et.keywords) ? et.keywords : str(et.keywords).split(/[,|;\n]/);
+      for (var ek = 0; ek < kws.length; ek++) {
+        var kw = str(kws[ek]).replace(/\s+/g, '');
+        if (kw && hayCompact.indexOf(kw) >= 0) return { id: et.id, name: et.name, shortName: et.shortName || et.name };
+      }
+      var sn = str(et.shortName || et.name).replace(/\s+/g, '');
+      if (sn && sn.length >= 2 && hayCompact.indexOf(sn) >= 0) return { id: et.id, name: et.name, shortName: et.shortName || et.name };
+    }
+
+    // 2) 상공회의소 전용 세부 분류 (당진 / 서산 / 충남북부 / 기타)
+    if (appKey === 'chamber') {
+      var findById = function (tid) {
+        return baseTracks.find(function (t) { return t.id === tid; }) || extraTracks.find(function (t) { return t.id === tid; });
+      };
+      if (/당진\s*(?:상공회의소|상의)|인사당진/i.test(hay)) return findById('ch_dangjin') || { id: 'ch_dangjin', name: '당진상공회의소 인사노무컨설팅' };
+      if (/서산\s*(?:상공회의소|상의)|인사서산/i.test(hay)) return findById('ch_seosan') || { id: 'ch_seosan', name: '서산상공회의소 인사노무컨설팅' };
+      if (/충남\s*북부|북부\s*(?:상공회의소|상의)|인사충남/i.test(hay)) return findById('ch_chungnam') || { id: 'ch_chungnam', name: '충남북부상공회의소 인사노무컨설팅' };
+      return findById('ch_korcham') || baseTracks[baseTracks.length - 1] || { id: 'ch_korcham', name: '대한상공회의소·기타 지역상의 컨설팅' };
+    }
+
+    // 3) 타 사업 공통 트랙 규칙 (키워드 매칭 → 기본 첫 트랙)
+    if (appKey === 'sixthind') {
+      if (/인증\s*(?:지원|현장\s*평가)|상생프로젝트/i.test(hay)) return baseTracks[3] || baseTracks[0];
+      if (/충북|충청북도/i.test(hay)) return baseTracks[2] || baseTracks[0];
+      if (/충남|충청남도/i.test(hay)) return baseTracks[1] || baseTracks[0];
+      if (/경기|경기도/i.test(hay)) return baseTracks[4] || baseTracks[0];
+      if (/세종/i.test(hay)) return baseTracks[0];
+    } else if (appKey === 'specialcons') {
+      if (/삼성/i.test(hay)) return baseTracks[1] || baseTracks[0];
+      if (/경비원|감단/i.test(hay)) return baseTracks[2] || baseTracks[0];
+      if (/고용\s*구조\s*개선|비정규직|외투\s*기업|기술\s*닥터/i.test(hay)) return baseTracks[3] || baseTracks[0];
+      if (/이음\s*센터|프리랜서|직업계고|공정\s*채용|NCS/i.test(hay)) return baseTracks[4] || baseTracks[0];
+    } else if (appKey === 'familywork') {
+      if (/가족\s*친화/i.test(hay)) return baseTracks[1] || baseTracks[0];
+      if (/재택|유연|시차|일생활/i.test(hay)) return baseTracks[2] || baseTracks[0];
+      if (/근로시간\s*단축|단축근무/i.test(hay)) return baseTracks[3] || baseTracks[0];
+    } else if (appKey === 'laboraudit') {
+      if (/새마을금고|노무진단|오딧|audit/i.test(hay)) return baseTracks[2] || baseTracks[0];
+      if (/감독|시정지시/i.test(hay)) return baseTracks[1] || baseTracks[0];
+    } else if (appKey === 'evalcomp') {
+      if (/PIP|저성과/i.test(hay)) return baseTracks[3] || baseTracks[0];
+      if (/성과급|인센티브/i.test(hay)) return baseTracks[2] || baseTracks[0];
+      if (/임금|호봉|연봉|직무급|조직진단/i.test(hay)) return baseTracks[1] || baseTracks[0];
+    } else if (appKey === 'hrconsult') {
+      if (/급여설계|통상임금|포괄임금|교대제/i.test(hay)) return baseTracks[2] || baseTracks[0];
+      if (/취업규칙|인사규정/i.test(hay)) return baseTracks[1] || baseTracks[0];
+      if (/기초컨설팅/i.test(hay)) return baseTracks[3] || baseTracks[0];
+    }
+
+    return baseTracks[0] || extraTracks[0] || { id: 'default', name: (cat && cat.name) || '기본' };
   }
 
   /* ══ 5. 특정 사업 앱용 자동감지 후보 + 기존 프로젝트 수신자료 연결 ═══════ */
@@ -380,6 +500,7 @@
     if (!cat) return { bundles: [], matchedCommsByPid: {}, stats: { mailHits: 0, msgHits: 0, erpHits: 0 } };
     var e = env || {};
     var lookup = buildCompanyLookup(e.companies);
+    var customTracks = e.regions || e.customTracks || [];
     var flatMails = Array.isArray(e.flatMails)
       ? e.flatMails
       : flattenMailbox(e.mailFolders || e.mailboxFolders, e.mailMsgs || e.mailboxMsgs, e.mailOldMsgs || e.mailboxOldMsgs);
@@ -394,33 +515,87 @@
       if (t.code != null && str(t.code)) consTypeMap[str(t.code)] = lbl;
     });
 
+    // 연도 보존! 기존 CID|'*' 폴백 제거하여 2021~2026 다년도 건이 겹쳐 사라지지 않게 함
+    var existingByCaseNo = Object.create(null);
+    var existingByCoYrTr = Object.create(null);
     var existingByCoYr = Object.create(null);
-    var existingByPid = Object.create(null);
+    var existingByNormYrTr = Object.create(null);
+    var existingByNormYr = Object.create(null);
     existingProjects.forEach(function (p) {
-      existingByPid[p.id] = p;
       var cid = str(p.companyId);
-      var yr = Number(p.year || 0) || '';
-      if (cid) existingByCoYr[cid + '|' + yr] = p;
-      if (cid) existingByCoYr[cid + '|*'] = p;
+      var yr = Number(p.year || 0) || CUR_YEAR;
+      var tr = str(p.trackId);
+      var nn = normCorpName(p.companyName);
+      var cno = str(p.caseNo);
+      if (cno) existingByCaseNo[cno] = p;
+      if (cid) {
+        if (tr) existingByCoYrTr[cid + '|' + yr + '|' + tr] = p;
+        existingByCoYr[cid + '|' + yr] = existingByCoYr[cid + '|' + yr] || p;
+      }
+      if (nn) {
+        if (tr) existingByNormYrTr[nn + '|' + yr + '|' + tr] = p;
+        existingByNormYr[nn + '|' + yr] = existingByNormYr[nn + '|' + yr] || p;
+      }
     });
 
     var matchedCommsByPid = Object.create(null);
     var bundleMap = Object.create(null);
+    var bundlePrimaryByCoYrTr = Object.create(null);
     var mailHits = 0, msgHits = 0, erpHits = 0;
 
-    function addBundleRecord(kind, item, coMatch, cls, yr) {
+    function findExistingProject(co, label, yrKey, trId, caseNo) {
+      if (caseNo && existingByCaseNo[caseNo]) return existingByCaseNo[caseNo];
+      var cid = co ? str(co.id) : '';
+      var nn = normCorpName((co && co.name) || label);
+      if (cid) {
+        if (trId && existingByCoYrTr[cid + '|' + yrKey + '|' + trId]) return existingByCoYrTr[cid + '|' + yrKey + '|' + trId];
+        if (appKey !== 'chamber' && existingByCoYr[cid + '|' + yrKey]) return existingByCoYr[cid + '|' + yrKey];
+      }
+      if (nn) {
+        if (trId && existingByNormYrTr[nn + '|' + yrKey + '|' + trId]) return existingByNormYrTr[nn + '|' + yrKey + '|' + trId];
+        if (appKey !== 'chamber' && existingByNormYr[nn + '|' + yrKey]) return existingByNormYr[nn + '|' + yrKey];
+      }
+      return null;
+    }
+
+    function addBundleRecord(kind, item, coMatch, cls, yr, meta) {
+      var mMeta = meta || {};
       var co = coMatch.company;
       var cid = co ? str(co.id) : '';
-      var yrKey = Number(yr || 2026);
-      var existingProj = cid ? (existingByCoYr[cid + '|' + yrKey] || existingByCoYr[cid + '|*']) : null;
+      var yrKey = Number(yr || CUR_YEAR);
+      var labelSrc = mMeta.rawRec || item;
+      var label = cleanCompanyLabel(inferGroupLabel(labelSrc, co));
+      var trackSeedText = [
+        mMeta.trackHint,
+        labelSrc.fromName,
+        labelSrc.toName,
+        item.subject,
+        item.folderName,
+        item.maskedPreview
+      ].filter(Boolean).join(' ');
+      var tr = inferTrackForApp(appKey, trackSeedText, customTracks);
+      var trId = str(mMeta.trackId || (tr && tr.id) || 'default');
+      var trName = str(mMeta.trackName || (tr && tr.name) || cat.shortName);
+      var caseNo = str(mMeta.caseNo);
+
+      var existingProj = findExistingProject(co, label, yrKey, trId, caseNo);
       if (existingProj) {
         if (!matchedCommsByPid[existingProj.id]) matchedCommsByPid[existingProj.id] = [];
         matchedCommsByPid[existingProj.id].push(item);
         return;
       }
 
-      var label = inferGroupLabel(item, co);
-      var bKey = (cid ? ('co_' + cid) : ('lbl_' + normCorpName(label))) + '_' + yrKey;
+      var normCoKey = cid ? ('co_' + cid) : ('lbl_' + (normCorpName(label) || safeHashId('co', label)));
+      var coYrTrKey = normCoKey + '|' + yrKey + '|' + (appKey === 'chamber' ? trId : '*');
+      var bKey;
+      if (caseNo) {
+        bKey = normCoKey + '_' + yrKey + '_' + (appKey === 'chamber' ? trId + '_' : '') + caseNo;
+      } else if (bundlePrimaryByCoYrTr[coYrTrKey]) {
+        bKey = bundlePrimaryByCoYrTr[coYrTrKey];
+      } else {
+        bKey = normCoKey + '_' + yrKey + (appKey === 'chamber' ? ('_' + trId) : '');
+      }
+
       if (!bundleMap[bKey]) {
         var bid = safeHashId('bnd_' + appKey, bKey);
         bundleMap[bKey] = {
@@ -428,24 +603,38 @@
           key: bid,
           appKey: appKey,
           companyId: cid,
+          suggestedCompanyId: str(mMeta.suggestedCompanyId),
           companyName: label,
           matchVia: coMatch.via || 'keyword',
+          isAgencyNotice: !cid && !caseNo && isAgencyNoticeLabel(label),
           year: yrKey,
+          suggestedTrackId: trId,
+          suggestedTrackName: trName,
+          caseNo: caseNo,
+          consultantSid: str(mMeta.consultantSid),
+          erpStatus: str(mMeta.erpStatus),
           mailCount: 0,
           msgCount: 0,
           erpCount: 0,
           reasons: {},
+          topScore: 0,
           latestDate: item.date || '',
           sampleSubjects: [],
           items: []
         };
+        if (!bundlePrimaryByCoYrTr[coYrTrKey]) bundlePrimaryByCoYrTr[coYrTrKey] = bKey;
       }
       var b = bundleMap[bKey];
+      if (!b.suggestedCompanyId && mMeta.suggestedCompanyId) b.suggestedCompanyId = str(mMeta.suggestedCompanyId);
       if (kind === 'mail') b.mailCount++;
       else if (kind === 'msg') b.msgCount++;
       else if (kind === 'erp') b.erpCount++;
+      if (!b.caseNo && caseNo) b.caseNo = caseNo;
+      if (!b.consultantSid && mMeta.consultantSid) b.consultantSid = str(mMeta.consultantSid);
+      if (!b.erpStatus && mMeta.erpStatus) b.erpStatus = str(mMeta.erpStatus);
+      if (cls && Number(cls.score || 0) > b.topScore) b.topScore = Number(cls.score || 0);
       if (item.date && item.date > b.latestDate) b.latestDate = item.date;
-      (cls.matchedReasons || []).forEach(function (r) { b.reasons[r] = 1; });
+      ((cls && cls.matchedReasons) || []).forEach(function (r) { b.reasons[r] = 1; });
       if (item.subject && b.sampleSubjects.length < 3 && b.sampleSubjects.indexOf(item.subject) < 0) b.sampleSubjects.push(item.subject);
       if (b.items.length < 25) b.items.push(item);
       b.comms = b.items;
@@ -453,22 +642,37 @@
 
     // 1) ERP 컨설팅 원장(typeId · typeCode · consultingType)에서 해당 사업 유형 자동 감지
     erpConsultings.forEach(function (c) {
+      if (!c || c._deleted) return;
+      if (/^(?:cancelled|canceled|transferred|취소|이관|해지)$/i.test(str(c.status))) return;
       var tCode = str((c.typeCodes && c.typeCodes.consulting) || c.typeCode || c.typeId);
       var typeTxt = str(c.consultingType || c.typeName || c.programName || (tCode && consTypeMap[tCode]) || c.title || '');
       var hitKey = Cat.findByErpType(typeTxt);
       if (hitKey !== appKey) return;
       erpHits++;
-      var yr = Number(String(c.startDate || c.signDate || '2026').slice(0, 4)) || 2026;
+      var yrMatch = String(c.year || c.startDate || c.signDate || c.endDate || c.no || '').match(/(20\d{2})/);
+      var yr = Number((yrMatch && yrMatch[1]) || CUR_YEAR);
       var cid = str(c.companyId);
+      var rawCoName = str(c.companyName || c.company);
       var coObj = cid ? lookup.list.find(function (x) { return str(x.id) === cid; }) : null;
+      // 온톨로지 규칙(docs/규칙/온톨로지.md): 이름 일치만으로 companyId 를 자동 대입하지 않고 후보(suggestedCompanyId)로만 표시한다.
+      var nameCand = (!cid && rawCoName) ? (lookup.byNorm[normCorpName(rawCoName)] || null) : null;
+      var displayName = (coObj && coObj.name) || (nameCand && nameCand.name) || rawCoName;
+      // 명시적 companyId(cid) 가 있으나 업체원장에서 조회되지 않을 때도 기존 cid 를 버리지 않고 보존한다.
+      var effectiveCo = coObj || (displayName ? { id: cid, name: displayName } : (cid ? { id: cid, name: '기업#' + cid } : null));
       addBundleRecord('erp', {
         source: 'erp',
         id: str(c.id),
-        date: str(c.startDate || c.signDate || '').slice(0, 10),
+        date: str(c.startDate || c.signDate || c.endDate || '').slice(0, 10),
         subject: '[ERP 수임] ' + typeTxt + (c.no ? (' (' + str(c.no) + ')') : ''),
         maskedPreview: sanitizeText(str(c.note || typeTxt)),
         atts: []
-      }, { company: coObj || (cid ? { id: cid, name: str(c.companyName || c.company) } : null), via: 'erp' }, { matchedReasons: ['ERP 수임원장 일치'] }, yr);
+      }, { company: effectiveCo, via: coObj ? 'erp' : (cid ? 'erp_id_raw' : (nameCand ? 'erp_name_cand' : 'erp_name')) }, { matchedReasons: ['ERP 수임원장 일치'], score: 100 }, yr, {
+        trackHint: typeTxt + ' ' + str(c.no) + ' ' + str(c.note),
+        caseNo: str(c.no),
+        consultantSid: str(c.managerMain),
+        erpStatus: str(c.status),
+        suggestedCompanyId: nameCand ? str(nameCand.id) : ''
+      });
     });
 
     // 2) 메일함 전수(IMAP + POP3) 자동 분류
@@ -489,7 +693,7 @@
         subject: sanitizeText(m.subject),
         maskedPreview: sanitizeText(m.preview).slice(0, 260),
         atts: m.atts.map(sanitizeText)
-      }, coMatch, cls, m.year || 2026);
+      }, coMatch, cls, m.year || CUR_YEAR, { rawRec: m });
     }
 
     // 3) 카톡·문자 수집함(msg_intake) 자동 분배 자료
@@ -500,14 +704,20 @@
       if (targets.indexOf(appKey) < 0) continue;
       msgHits++;
       var mCo = msg.companyId ? lookup.list.find(function (x) { return str(x.id) === str(msg.companyId); }) : null;
+      var mCand = (!mCo && msg.roomName) ? (lookup.byNorm[normCorpName(msg.roomName)] || null) : null;
+      var mDate = str(msg.msgDate || dayOf(msg.createdAt));
+      var mYr = Number(mDate.slice(0, 4)) || CUR_YEAR;
       addBundleRecord('msg', {
         source: str(msg.channel || 'msg'),
         id: str(msg.id),
-        date: str(msg.msgDate || dayOf(msg.createdAt)),
+        date: mDate,
         subject: sanitizeText(msg.title || '카톡·문자 수취자료'),
         maskedPreview: sanitizeText(msg.maskedBody || msg.summary || '').slice(0, 280),
         atts: Array.isArray(msg.attNames) ? msg.attNames.map(sanitizeText) : []
-      }, { company: mCo, via: mCo ? 'msg_companyId' : 'msg_intake' }, { matchedReasons: ['카톡·문자 자동분류'] }, Number(String(msg.msgDate || '').slice(0, 4)) || 2026);
+      }, { company: mCo, via: mCo ? 'msg_companyId' : (mCand ? 'msg_name_cand' : 'msg_intake') }, { matchedReasons: ['카톡·문자 자동분류'], score: 60 }, mYr, {
+        rawRec: { subject: str(msg.title), fromName: str(msg.roomName) },
+        suggestedCompanyId: mCand ? str(mCand.id) : ''
+      });
     }
 
     var bundles = Object.keys(bundleMap).map(function (k) {
@@ -516,7 +726,11 @@
       b.totalCount = b.mailCount + b.msgCount + b.erpCount;
       return b;
     }).sort(function (a, b) {
-      return (b.erpCount - a.erpCount) || (b.latestDate.localeCompare(a.latestDate)) || (b.totalCount - a.totalCount);
+      return (Number(!!a.isAgencyNotice) - Number(!!b.isAgencyNotice)) ||
+        (b.erpCount - a.erpCount) ||
+        (Number(!!b.companyId) - Number(!!a.companyId)) ||
+        (b.latestDate.localeCompare(a.latestDate)) ||
+        (b.totalCount - a.totalCount);
     });
 
     return {
@@ -689,6 +903,9 @@
     hasResidualPii: hasResidualPii,
     isSecretMessage: isSecretMessage,
     normCorpName: normCorpName,
+    cleanCompanyLabel: cleanCompanyLabel,
+    isAgencyNoticeLabel: isAgencyNoticeLabel,
+    inferTrackForApp: inferTrackForApp,
     flattenMailbox: flattenMailbox,
     classifyRecord: classifyRecord,
     buildCompanyLookup: buildCompanyLookup,
