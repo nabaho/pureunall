@@ -64,6 +64,26 @@
   var RPT_MODE = 'split';
   var CUR_ID = '';
   var SEL = {};
+  function freshColState() {
+    return {
+      openCol: '',
+      sortCol: '',
+      sortDir: '',
+      qCompany: '',
+      years: Object.create(null),
+      companies: Object.create(null),
+      perfs: Object.create(null),
+      cats: Object.create(null),
+      mgrs: Object.create(null),
+      statuses: Object.create(null),
+      steps: Object.create(null),
+      verdicts: Object.create(null),
+      docs: Object.create(null),
+      erps: Object.create(null)
+    };
+  }
+  var COL_STATE = freshColState();
+  var LAST_TH_ANCHOR = null;
   var SESSION_UNLINKED = {};
   var ACK_WATCHED = false;
   var LIVE_WATCH_REFS = [];
@@ -679,6 +699,9 @@
     }
     cleanupPendingHangulBridges();
     stopActiveLiveCapture();
+    closeColFilterPop(false);
+    COL_STATE = freshColState();
+    LAST_TH_ANCHOR = null;
     closeModal();
     ['kpiBox', 'casesBox', 'inboxKpiBox', 'inboxBox', 'yrKpiBox', 'yearlyBox', 'caseYrBar', 'inboxYrBar', 'yrPillsBar', 'detailBox', 'reportBox', 'printArea'].forEach(function (id) {
       var el = $(id);
@@ -688,14 +711,331 @@
     if ($('app')) $('app').style.display = 'none';
   }
 
+  /* ═══ 표 머리글(컬럼별) 정렬 · 다중 필터 상태 및 팝오버 제어 ═══ */
+  function hasMapKeys(obj) {
+    return !!(obj && Object.keys(obj).some(function (k) { return !!obj[k]; }));
+  }
+
+  function isColSelfFiltered(col) {
+    if (col === 'no') return hasMapKeys(COL_STATE.years);
+    if (col === 'company') return !!C.str(COL_STATE.qCompany) || hasMapKeys(COL_STATE.companies);
+    if (col === 'perfCat') return hasMapKeys(COL_STATE.perfs) || hasMapKeys(COL_STATE.cats);
+    if (col === 'mgr') return hasMapKeys(COL_STATE.mgrs);
+    if (col === 'step') return hasMapKeys(COL_STATE.statuses) || hasMapKeys(COL_STATE.steps) || hasMapKeys(COL_STATE.verdicts);
+    if (col === 'docs') return hasMapKeys(COL_STATE.docs);
+    if (col === 'erp') return hasMapKeys(COL_STATE.erps);
+    return false;
+  }
+
+  function isColHeaderHighlighted(col) {
+    if (isColSelfFiltered(col) || COL_STATE.sortCol === col) return true;
+    if (col === 'no' && YEAR_FILTER) return true;
+    if (col === 'perfCat' && (C.str($('casePerf') && $('casePerf').value) || C.str($('caseCat') && $('caseCat').value))) return true;
+    if (col === 'mgr' && C.str($('caseMgr') && $('caseMgr').value)) return true;
+    if (col === 'step' && C.str($('caseSt') && $('caseSt').value)) return true;
+    if (col === 'erp' && C.str($('caseErp') && $('caseErp').value)) return true;
+    return false;
+  }
+
+  function hasAnyColFilterOrSort() {
+    return !!(COL_STATE.sortCol ||
+      isColSelfFiltered('no') ||
+      isColSelfFiltered('company') ||
+      isColSelfFiltered('perfCat') ||
+      isColSelfFiltered('mgr') ||
+      isColSelfFiltered('step') ||
+      isColSelfFiltered('docs') ||
+      isColSelfFiltered('erp'));
+  }
+
+  function clearSingleColFilter(col) {
+    if (COL_STATE.sortCol === col) { COL_STATE.sortCol = ''; COL_STATE.sortDir = ''; }
+    if (col === 'no') {
+      COL_STATE.years = Object.create(null);
+      YEAR_FILTER = '';
+      if ($('caseYrSel')) $('caseYrSel').value = '';
+    } else if (col === 'company') {
+      COL_STATE.qCompany = '';
+      COL_STATE.companies = Object.create(null);
+    } else if (col === 'perfCat') {
+      COL_STATE.perfs = Object.create(null);
+      COL_STATE.cats = Object.create(null);
+      if ($('casePerf')) $('casePerf').value = '';
+      if ($('yrPerf')) $('yrPerf').value = '';
+      if ($('caseCat')) $('caseCat').value = '';
+    } else if (col === 'mgr') {
+      COL_STATE.mgrs = Object.create(null);
+      if ($('caseMgr')) $('caseMgr').value = '';
+    } else if (col === 'step') {
+      COL_STATE.statuses = Object.create(null);
+      COL_STATE.steps = Object.create(null);
+      COL_STATE.verdicts = Object.create(null);
+      if ($('caseSt')) $('caseSt').value = '';
+    } else if (col === 'docs') {
+      COL_STATE.docs = Object.create(null);
+    } else if (col === 'erp') {
+      COL_STATE.erps = Object.create(null);
+      if ($('caseErp')) $('caseErp').value = '';
+    }
+  }
+
+  function isCaseDueUrgent(c) {
+    if (!c || (c.progress && c.progress.erpStatus === 'closed') || c.closeDate) return false;
+    var due = typeof C.effectiveDueDateOf === 'function' ? C.effectiveDueDateOf(c) : C.str(c.dueDate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return false;
+    var today = C.ymdOf(Date.now());
+    var t0 = Date.parse(today + 'T00:00:00Z');
+    var t1 = Date.parse(due + 'T00:00:00Z');
+    if (isNaN(t0) || isNaN(t1)) return false;
+    return Math.round((t1 - t0) / 86400000) <= 7;
+  }
+
+  function renderThBtnHtml(colKey, label) {
+    var active = isColHeaderHighlighted(colKey);
+    var isOpen = COL_STATE.openCol === colKey;
+    var sortSym = COL_STATE.sortCol === colKey ? (COL_STATE.sortDir === 'asc' ? '↑' : '↓') : '';
+    var fltDot = isColSelfFiltered(colKey) ? '●' : (sortSym ? '' : '▾');
+    var ico = sortSym + fltDot;
+    return '<button type="button" class="th-flt-btn' + (active || isOpen ? ' on' : '') + '" data-thflt="' + esc(colKey) + '" aria-haspopup="dialog" aria-expanded="' + (isOpen ? 'true' : 'false') + '" title="클릭하여 [' + esc(label) + '] 정렬·필터링"><span>' + esc(label) + '</span><span class="th-flt-ico">' + esc(ico) + '</span></button>';
+  }
+
+  function closeColFilterPop(restoreFocus) {
+    var prevCol = COL_STATE.openCol;
+    COL_STATE.openCol = '';
+    var pop = $('thFltPop');
+    if (pop) {
+      pop.style.display = 'none';
+      pop.innerHTML = '';
+    }
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('[data-thflt]').forEach(function (b) {
+        var ck = b.getAttribute('data-thflt') || '';
+        b.setAttribute('aria-expanded', 'false');
+        if (b.classList) b.classList.toggle('on', isColHeaderHighlighted(ck));
+      });
+    }
+    if (restoreFocus && prevCol && typeof document.querySelector === 'function') {
+      var targetBtn = document.querySelector('[data-thflt="' + prevCol + '"]') || LAST_TH_ANCHOR;
+      if (targetBtn && typeof targetBtn.focus === 'function') {
+        try { targetBtn.focus(); } catch (e) {}
+      }
+    }
+    LAST_TH_ANCHOR = null;
+  }
+
+  function renderColCheckGroup(bucket, items) {
+    var map = COL_STATE[bucket] || Object.create(null);
+    if (!items.length) {
+      return '<div class="th-pop-list"><div class="hint">일치하는 항목이 없습니다.</div></div>';
+    }
+    return '<div class="th-pop-list">' + items.map(function (it) {
+      var on = Object.prototype.hasOwnProperty.call(map, it.val) && !!map[it.val];
+      return '<label class="th-pop-item" title="' + esc(it.label) + '"><input type="checkbox" data-thck="' + esc(bucket + ':' + it.val) + '"' + (on ? ' checked' : '') + '><span class="lbl">' + esc(it.label) + '</span>' + (it.cnt !== undefined ? '<span class="cnt">' + it.cnt + '</span>' : '') + '</label>';
+    }).join('') + '</div>';
+  }
+
+  function buildColFilterPopHtml(col) {
+    var titles = {
+      no: '번호 · 연도 필터',
+      company: '사업장 · 사건명 필터',
+      perfCat: '수행구분 · 유형 필터',
+      mgr: '담당 노무사 필터',
+      step: '8단계 진행현황 필터',
+      docs: '공문 · 진행기록 필터',
+      erp: '이알피 · 계약 · 기타 연동 필터'
+    };
+    var sortDefs = {
+      no: [{ d: 'desc', l: '최신순 ↓' }, { d: 'asc', l: '오래된순 ↑' }],
+      company: [{ d: 'asc', l: '가나다순 ↑' }, { d: 'desc', l: '역순 ↓' }],
+      perfCat: [{ d: 'asc', l: '수행구분순 ↑' }, { d: 'desc', l: '역순 ↓' }],
+      mgr: [{ d: 'asc', l: '노무사명 ↑' }, { d: 'desc', l: '역순 ↓' }],
+      step: [{ d: 'desc', l: '진행률 높은순 ↓' }, { d: 'asc', l: '진행률 낮은순 ↑' }],
+      docs: [{ d: 'desc', l: '공문 많은순 ↓' }, { d: 'asc', l: '공문 적은순 ↑' }],
+      erp: [{ d: 'desc', l: '연동 우선순 ↓' }, { d: 'asc', l: '공란 우선순 ↑' }]
+    };
+    var sorts = (sortDefs[col] || []).map(function (s) {
+      var isOn = COL_STATE.sortCol === col && COL_STATE.sortDir === s.d;
+      return '<button type="button" class="' + (isOn ? 'on' : '') + '" aria-pressed="' + (isOn ? 'true' : 'false') + '" data-thsort="' + esc(col + ':' + s.d) + '">' + esc(s.l) + '</button>';
+    }).join('');
+    if (COL_STATE.sortCol === col) {
+      sorts += '<button type="button" aria-pressed="false" data-thsort=":">정렬 해제</button>';
+    }
+
+    var bodySec = '<div><div class="th-pop-lbl">정렬 순서</div><div class="th-pop-sorts">' + sorts + '</div></div>';
+
+    if (col === 'no') {
+      var yrCnt = Object.create(null);
+      MERGED_CASES.forEach(function (c) { var y = C.caseYearOf(c) || '기타'; yrCnt[y] = (yrCnt[y] || 0) + 1; });
+      var yrItems = Object.keys(yrCnt).sort(function (a, b) { return b.localeCompare(a, 'ko'); }).map(function (y) {
+        return { val: y, label: (/^20\d{2}$/.test(y) ? (y + '년') : y), cnt: yrCnt[y] };
+      });
+      bodySec += '<div><div class="th-pop-lbl">사건 연도 선택 (복수 선택 가능)</div>' + renderColCheckGroup('years', yrItems) + '</div>';
+    } else if (col === 'company') {
+      var coCnt = Object.create(null);
+      var qSub = C.str(COL_STATE.qCompany).toLowerCase();
+      MERGED_CASES.forEach(function (c) {
+        var disp = resolveDisplayCompanyAndTitle(c);
+        var nm = disp.companyName || '(미입력)';
+        coCnt[nm] = (coCnt[nm] || 0) + 1;
+      });
+      var coItems = Object.keys(coCnt).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).filter(function (nm) {
+        return !qSub || nm.toLowerCase().indexOf(qSub) >= 0 || !!COL_STATE.companies[nm];
+      }).map(function (nm) {
+        return { val: nm, label: nm, cnt: coCnt[nm] };
+      });
+      bodySec += '<div><div class="th-pop-lbl">빠른 검색 (사업장·사건명)</div><input id="thCoInput" type="search" data-thq="qCompany" aria-label="사업장·사건명 빠른 검색" placeholder="포함 단어 입력 시 즉시 필터" value="' + esc(COL_STATE.qCompany || '') + '" style="width:100%"></div>' +
+        '<div><div class="th-pop-lbl" id="thCoCntLbl">사업장 다중 선택 (' + coItems.length + '곳)</div>' + renderColCheckGroup('companies', coItems) + '</div>';
+    } else if (col === 'perfCat') {
+      var pmCnt = { direct_report: 0, direct_active: 0, advisory_rep: 0, committee_collab: 0 };
+      var ctCnt = { harass: 0, sexual: 0, both: 0 };
+      MERGED_CASES.forEach(function (c) {
+        var pm = casePerformMode(c);
+        pmCnt[pm] = (pmCnt[pm] || 0) + 1;
+        var ck = c.category || 'harass';
+        ctCnt[ck] = (ctCnt[ck] || 0) + 1;
+      });
+      bodySec += '<div><div class="th-pop-lbl">수행 구분</div>' + renderColCheckGroup('perfs', [
+        { val: 'direct_report', label: '🏅 직접수행·결과보고', cnt: pmCnt.direct_report },
+        { val: 'direct_active', label: '🔍 직접조사(진행)', cnt: pmCnt.direct_active },
+        { val: 'advisory_rep', label: '⚖️ 대리·자문·검토', cnt: pmCnt.advisory_rep },
+        { val: 'committee_collab', label: '🤝 외부위원·협업', cnt: pmCnt.committee_collab }
+      ]) + '</div>' +
+      '<div><div class="th-pop-lbl">조사 유형</div>' + renderColCheckGroup('cats', [
+        { val: 'harass', label: '직장 내 괴롭힘', cnt: ctCnt.harass },
+        { val: 'sexual', label: '직장 내 성희롱', cnt: ctCnt.sexual },
+        { val: 'both', label: '괴롭힘·성희롱 복합', cnt: ctCnt.both }
+      ]) + '</div>';
+    } else if (col === 'mgr') {
+      var mCnt = Object.create(null);
+      var noneCnt = 0;
+      MERGED_CASES.forEach(function (c) {
+        var seen = Object.create(null);
+        if (C.str(c.managerMain)) seen[C.str(c.managerMain)] = 1;
+        (c.managerSubs || []).forEach(function (s) { if (C.str(s)) seen[C.str(s)] = 1; });
+        var sids = Object.keys(seen);
+        if (!sids.length) noneCnt++;
+        else sids.forEach(function (s) { mCnt[s] = (mCnt[s] || 0) + 1; });
+      });
+      var mItems = Object.keys(mCnt).map(function (sid) {
+        return { val: sid, label: nameOf(sid), cnt: mCnt[sid] };
+      }).sort(function (a, b) { return a.label.localeCompare(b.label, 'ko'); });
+      if (noneCnt > 0) mItems.push({ val: '__none__', label: '(담당자 미배정)', cnt: noneCnt });
+      bodySec += '<div><div class="th-pop-lbl">담당 노무사 (주·부담당 포함)</div>' + renderColCheckGroup('mgrs', mItems) + '</div>';
+    } else if (col === 'step') {
+      var stOpen = 0, stClosed = 0, stUrgent = 0;
+      var stepCnt = Object.create(null);
+      var vdCnt = Object.create(null);
+      MERGED_CASES.forEach(function (c) {
+        if (c.progress.erpStatus === 'closed') stClosed++; else stOpen++;
+        if (isCaseDueUrgent(c)) stUrgent++;
+        var sc = (c.progress && c.progress.currentStep) || 'intake';
+        stepCnt[sc] = (stepCnt[sc] || 0) + 1;
+        var vk = C.str(c.verdictSummary) || '__pending__';
+        vdCnt[vk] = (vdCnt[vk] || 0) + 1;
+      });
+      var stepItems = C.STEPS.map(function (d, idx) {
+        return { val: d.code, label: (idx + 1) + '. ' + d.short, cnt: stepCnt[d.code] || 0 };
+      });
+      var vdItems = Object.keys(C.VERDICTS || {}).map(function (vk) {
+        var key = vk || '__pending__';
+        var lbl = (C.VERDICTS[vk] && C.VERDICTS[vk].label) || '판단 전·검토 중';
+        return { val: key, label: lbl, cnt: vdCnt[key] || 0 };
+      });
+      bodySec += '<div><div class="th-pop-lbl">진행 상태</div>' + renderColCheckGroup('statuses', [
+        { val: 'open', label: '진행 · 검토 중', cnt: stOpen },
+        { val: 'closed', label: '보고 · 종결 완료', cnt: stClosed },
+        { val: 'urgent', label: '⏰ 기한 임박 · 경과 (7일 이내)', cnt: stUrgent }
+      ]) + '</div>' +
+      '<div><div class="th-pop-lbl">현재 진행단계</div>' + renderColCheckGroup('steps', stepItems) + '</div>' +
+      '<div><div class="th-pop-lbl">종합 판단</div>' + renderColCheckGroup('verdicts', vdItems) + '</div>';
+    } else if (col === 'docs') {
+      var hasM = 0, noM = 0, hasL = 0;
+      MERGED_CASES.forEach(function (c) {
+        if ((c.mailLinks || []).length > 0) hasM++; else noM++;
+        if ((c._autoLogs || []).length > 0) hasL++;
+      });
+      bodySec += '<div><div class="th-pop-lbl">수집 공문 · 진행기록 유무</div>' + renderColCheckGroup('docs', [
+        { val: 'has_mail', label: '📧 수집 공문 있음 (1통 이상)', cnt: hasM },
+        { val: 'no_mail', label: '📭 수집 공문 없음 (0통)', cnt: noM },
+        { val: 'has_log', label: '🗂️ 자동분류 진행기록 있음', cnt: hasL }
+      ]) + '</div>';
+    } else if (col === 'erp') {
+      var eLink = 0, eDefer = 0, eExt = 0;
+      MERGED_CASES.forEach(function (c) {
+        if (isCaseErpLinked(c)) eLink++; else eDefer++;
+        if ((c._linkedSources || []).some(function (s) { return s && s.kind && s.kind !== 'erp'; })) eExt++;
+      });
+      bodySec += '<div><div class="th-pop-lbl">이알피 · 외부 프로그램 연동</div>' + renderColCheckGroup('erps', [
+        { val: 'linked', label: '✓ 푸른이알피 연결됨', cnt: eLink },
+        { val: 'deferred', label: '⏸ 번호 공란 · 미연결', cnt: eDefer },
+        { val: 'has_ext', label: '🔗 계약·기타사업·업무관리 연동', cnt: eExt }
+      ]) + '</div>';
+    }
+
+    return '<div class="th-pop-hd"><span>' + esc(titles[col] || '열 필터') + '</span><span class="sp"></span><button type="button" class="sm" data-thclose="1">닫기</button></div>' +
+      '<div class="th-pop-bd">' + bodySec + '</div>' +
+      '<div class="th-pop-ft"><button type="button" class="sm" data-thclr="' + esc(col) + '">이 열 초기화</button><button type="button" class="sm pri" data-thclose="1">확인</button></div>';
+  }
+
+  function positionColFilterPop(anchorEl) {
+    var pop = $('thFltPop');
+    if (!pop || !pop.style || !anchorEl || typeof anchorEl.getBoundingClientRect !== 'function') return;
+    var r = anchorEl.getBoundingClientRect();
+    var vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1280;
+    var vh = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 800;
+    var pw = pop.offsetWidth || 270;
+    var left = Math.round(r.left);
+    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);
+    if (left < 8) left = 8;
+    var top = Math.round(r.bottom + 4);
+    var ph = pop.offsetHeight || 280;
+    if (top + ph > vh - 8 && r.top > ph + 12) {
+      top = Math.max(8, Math.round(r.top - ph - 4));
+    }
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  function openColFilterPop(col, anchorEl) {
+    var pop = $('thFltPop');
+    if (!pop) return;
+    if (COL_STATE.openCol === col && pop.style.display !== 'none') {
+      closeColFilterPop(true);
+      return;
+    }
+    COL_STATE.openCol = col;
+    LAST_TH_ANCHOR = anchorEl || null;
+    pop.innerHTML = buildColFilterPopHtml(col);
+    pop.style.display = 'flex';
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('[data-thflt]').forEach(function (b) {
+        var ck = b.getAttribute('data-thflt') || '';
+        b.setAttribute('aria-expanded', ck === col ? 'true' : 'false');
+        if (b.classList) b.classList.toggle('on', ck === col || isColHeaderHighlighted(ck));
+      });
+    }
+    positionColFilterPop(anchorEl);
+    var firstFocus = pop.querySelector('input[type="search"], .th-pop-sorts button, input[type="checkbox"], button');
+    if (firstFocus && typeof firstFocus.focus === 'function') {
+      try { firstFocus.focus(); } catch (e) {}
+    }
+  }
+
   /* ═══ 공통 표(맨 왼쪽 ☐ + 순서 번호 + 일괄 실행 바) ═══ */
-  function renderTable(name, heads, rows, curId) {
-    if (!rows.length) return '<div class="empty">표시할 내역이 없습니다.</div>';
-    var allOn = rows.every(function (r) { return !!SEL[name + '|' + r.id]; });
+  function renderTable(name, heads, rows, curId, opts) {
+    var o = opts || {};
+    if (!rows.length && !o.keepHeaderWhenEmpty) return '<div class="empty">표시할 내역이 없습니다.</div>';
+    var allOn = rows.length > 0 && rows.every(function (r) { return !!SEL[name + '|' + r.id]; });
+    var noThInner = (o.noColKey) ? renderThBtnHtml(o.noColKey, '번호') : '번호';
     var html = '<div class="bulk" data-bulk="' + esc(name) + '"></div><div class="scroll"><table class="t" data-name="' + esc(name) + '"><thead><tr>' +
-      '<th class="c"><input type="checkbox" data-all="' + esc(name) + '"' + (allOn ? ' checked' : '') + ' aria-label="전체 선택"></th>' +
-      '<th class="n">번호</th>' +
-      heads.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') +
+      '<th class="c"><input type="checkbox" data-all="' + esc(name) + '"' + (allOn ? ' checked' : '') + (rows.length ? '' : ' disabled') + ' aria-label="전체 선택"></th>' +
+      '<th class="n">' + noThInner + '</th>' +
+      heads.map(function (h, hi) {
+        var spec = o.colHeaders && o.colHeaders[hi];
+        if (spec && spec.colKey) return '<th data-thcell="1">' + renderThBtnHtml(spec.colKey, h) + '</th>';
+        if (spec && spec.rawHtml) return '<th' + (spec.isThBtn ? ' data-thcell="1"' : '') + '>' + spec.rawHtml + '</th>';
+        return '<th>' + esc(h) + '</th>';
+      }).join('') +
       '</tr></thead><tbody>';
     rows.forEach(function (r, idx) {
       var ckKey = name + '|' + r.id;
@@ -714,7 +1054,7 @@
         }).join('') +
         '</tr>';
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table>' + (!rows.length && o.emptyHtml ? o.emptyHtml : '') + '</div>';
     return html;
   }
 
@@ -2085,28 +2425,132 @@
     var st = C.str($('caseSt') && $('caseSt').value);
     var erpF = C.str($('caseErp') && $('caseErp').value);
     var mgr = C.str($('caseMgr') && $('caseMgr').value);
-    return MERGED_CASES.filter(function (c) {
-      if (YEAR_FILTER && C.caseYearOf(c) !== YEAR_FILTER) return false;
+    var qCo = C.str(COL_STATE.qCompany).toLowerCase();
+    var useYears = hasMapKeys(COL_STATE.years);
+    var useCos = hasMapKeys(COL_STATE.companies);
+    var usePerfs = hasMapKeys(COL_STATE.perfs);
+    var useCats = hasMapKeys(COL_STATE.cats);
+    var useMgrs = hasMapKeys(COL_STATE.mgrs);
+    var useStatuses = hasMapKeys(COL_STATE.statuses);
+    var useSteps = hasMapKeys(COL_STATE.steps);
+    var useVerdicts = hasMapKeys(COL_STATE.verdicts);
+    var useDocs = hasMapKeys(COL_STATE.docs);
+    var useErps = hasMapKeys(COL_STATE.erps);
+
+    var out = MERGED_CASES.filter(function (c) {
+      var yr = C.caseYearOf(c) || '기타';
+      if (YEAR_FILTER && yr !== YEAR_FILTER) return false;
+      if (useYears && !COL_STATE.years[yr]) return false;
       if (cat && c.category !== cat) return false;
+      if (useCats && !COL_STATE.cats[c.category || 'harass']) return false;
       if (!matchPerformFilter(c, perfF)) return false;
+      var pm = casePerformMode(c);
+      if (usePerfs && !COL_STATE.perfs[pm]) return false;
       if (st === 'open' && c.progress.erpStatus === 'closed') return false;
       if (st === 'closed' && c.progress.erpStatus !== 'closed') return false;
-      if (erpF === 'linked' && !isCaseErpLinked(c)) return false;
-      if (erpF === 'deferred' && isCaseErpLinked(c)) return false;
+      if (useStatuses) {
+        var stOk = (COL_STATE.statuses.open && c.progress.erpStatus !== 'closed') ||
+          (COL_STATE.statuses.closed && c.progress.erpStatus === 'closed') ||
+          (COL_STATE.statuses.urgent && isCaseDueUrgent(c));
+        if (!stOk) return false;
+      }
+      if (useSteps && !COL_STATE.steps[(c.progress && c.progress.currentStep) || 'intake']) return false;
+      if (useVerdicts && !COL_STATE.verdicts[C.str(c.verdictSummary) || '__pending__']) return false;
+      var linked = isCaseErpLinked(c);
+      if (erpF === 'linked' && !linked) return false;
+      if (erpF === 'deferred' && linked) return false;
+      if (useErps) {
+        var hasExt = (c._linkedSources || []).some(function (s) { return s && s.kind && s.kind !== 'erp'; });
+        var erpOk = (COL_STATE.erps.linked && linked) ||
+          (COL_STATE.erps.deferred && !linked) ||
+          (COL_STATE.erps.has_ext && hasExt);
+        if (!erpOk) return false;
+      }
+      if (useDocs) {
+        var mLen = (c.mailLinks || []).length;
+        var lLen = (c._autoLogs || []).length;
+        var docOk = (COL_STATE.docs.has_mail && mLen > 0) ||
+          (COL_STATE.docs.no_mail && mLen === 0) ||
+          (COL_STATE.docs.has_log && lLen > 0);
+        if (!docOk) return false;
+      }
       if (mgr && c.managerMain !== mgr && (c.managerSubs || []).indexOf(mgr) < 0) return false;
-      if (q) {
+      if (useMgrs) {
+        var mainM = C.str(c.managerMain);
+        var subsM = c.managerSubs || [];
+        var hasAnyMgr = !!mainM || subsM.some(function (s) { return !!C.str(s); });
+        var mgrOk = (!hasAnyMgr && !!COL_STATE.mgrs.__none__) ||
+          (mainM && !!COL_STATE.mgrs[mainM]) ||
+          subsM.some(function (s) { return s && !!COL_STATE.mgrs[s]; });
+        if (!mgrOk) return false;
+      }
+      if (useCos || qCo || q) {
         var dispQ = resolveDisplayCompanyAndTitle(c);
-        var pmMeta = (C.PERFORM_MODES && C.PERFORM_MODES[casePerformMode(c)]) || {};
-        var extTxt = (c._linkedSources || []).map(function (s) { return s.label; }).join(' ');
-        var hay = [dispQ.companyName, dispQ.title, c.companyName, c.title, c.erpCaseNo, extTxt, pmMeta.label, pmMeta.short, nameOf(c.managerMain), C.caseYearOf(c)].join(' ').toLowerCase();
-        if (hay.indexOf(q) < 0) return false;
+        if (useCos && !COL_STATE.companies[dispQ.companyName || '(미입력)']) return false;
+        if (qCo) {
+          var coHay = [dispQ.companyName, dispQ.title, c.companyName, c.title, c.erpCaseNo].join(' ').toLowerCase();
+          if (coHay.indexOf(qCo) < 0) return false;
+        }
+        if (q) {
+          var pmMeta = (C.PERFORM_MODES && C.PERFORM_MODES[pm]) || {};
+          var extTxt = (c._linkedSources || []).map(function (s) { return s.label; }).join(' ');
+          var hay = [dispQ.companyName, dispQ.title, c.companyName, c.title, c.erpCaseNo, extTxt, pmMeta.label, pmMeta.short, nameOf(c.managerMain), yr].join(' ').toLowerCase();
+          if (hay.indexOf(q) < 0) return false;
+        }
       }
       return true;
     });
+
+    if (COL_STATE.sortCol && COL_STATE.sortDir) {
+      var mul = COL_STATE.sortDir === 'asc' ? 1 : -1;
+      var perfRank = { direct_report: 1, direct_active: 2, advisory_rep: 3, committee_collab: 4 };
+      out = out.slice().sort(function (a, b) {
+        var sc = COL_STATE.sortCol;
+        if (sc === 'no') {
+          var da = C.str(a.receiveDate) || (C.caseYearOf(a) + '-01-01');
+          var db = C.str(b.receiveDate) || (C.caseYearOf(b) + '-01-01');
+          return da.localeCompare(db, 'ko') * mul;
+        }
+        if (sc === 'company') {
+          var ca = resolveDisplayCompanyAndTitle(a);
+          var cb = resolveDisplayCompanyAndTitle(b);
+          return (ca.companyName + ' ' + ca.title).localeCompare(cb.companyName + ' ' + cb.title, 'ko') * mul;
+        }
+        if (sc === 'perfCat') {
+          var ra = perfRank[casePerformMode(a)] || 9;
+          var rb = perfRank[casePerformMode(b)] || 9;
+          if (ra !== rb) return (ra - rb) * mul;
+          return C.str(a.category).localeCompare(C.str(b.category), 'ko') * mul;
+        }
+        if (sc === 'mgr') {
+          return mgrText(a).localeCompare(mgrText(b), 'ko') * mul;
+        }
+        if (sc === 'step') {
+          var pa = (a.progress && a.progress.doneCount) || 0;
+          var pb = (b.progress && b.progress.doneCount) || 0;
+          if (pa !== pb) return (pa - pb) * mul;
+          return C.str(a.receiveDate).localeCompare(C.str(b.receiveDate), 'ko') * mul;
+        }
+        if (sc === 'docs') {
+          var ma = (a.mailLinks || []).length * 1000 + (a._autoLogs || []).length;
+          var mb = (b.mailLinks || []).length * 1000 + (b._autoLogs || []).length;
+          return (ma - mb) * mul;
+        }
+        if (sc === 'erp') {
+          var ea = (isCaseErpLinked(a) ? 10000 : 0) + (a._linkedSources || []).length;
+          var eb = (isCaseErpLinked(b) ? 10000 : 0) + (b._linkedSources || []).length;
+          if (ea !== eb) return (ea - eb) * mul;
+          return C.str(a.erpCaseNo).localeCompare(C.str(b.erpCaseNo), 'ko') * mul;
+        }
+        return 0;
+      });
+    }
+    return out;
   }
 
   function hasCaseFilterActive() {
     return !!(YEAR_FILTER ||
+      hasAnyColFilterOrSort() ||
       C.str($('caseQ') && $('caseQ').value) ||
       C.str($('caseCat') && $('caseCat').value) ||
       C.str($('casePerf') && $('casePerf').value) ||
@@ -2152,13 +2596,32 @@
     if ($('caseYrBar')) $('caseYrBar').innerHTML = renderCaseTrackBarHtml();
 
     var filtered = getFilteredCases();
+    var caseHeadSpecs = [
+      { colKey: 'company' },
+      { colKey: 'perfCat' },
+      { colKey: 'mgr' },
+      { colKey: 'step' },
+      { colKey: 'docs' },
+      { colKey: 'erp' },
+      { isThBtn: hasCaseFilterActive(), rawHtml: hasCaseFilterActive()
+          ? '<button type="button" class="th-flt-btn on" data-act="resetCaseFilter" title="적용된 모든 머리글·검색·트랙 필터를 해제합니다"><span>↺ 전체해제</span></button>'
+          : '열기' }
+    ];
 
     if (!filtered.length) {
       var yrB = YEAR_FILTER && YEARLY_DATA && YEARLY_DATA.byYear && YEARLY_DATA.byYear[YEAR_FILTER];
       var extraHint = (yrB && yrB.bundleCount > 0 && !perfF)
         ? ('<br><button class="sm pri" style="margin-top:8px" data-act="goYearly" data-id="' + esc(YEAR_FILTER) + '">📅 ' + esc(YEAR_FILTER) + '년 미등록 메일 묶음(' + yrB.bundleCount + '건) 열람·등록하러 가기</button>')
         : (hasCaseFilterActive() ? '<br><button class="sm" style="margin-top:8px" data-act="resetCaseFilter">↺ 검색·필터 조건 초기화</button>' : '');
-      $('casesBox').innerHTML = '<div class="empty">' + (YEAR_FILTER ? esc(YEAR_FILTER) + '년에 ' : '') + '조건에 맞는 조사 사건이 없습니다.' + extraHint + '</div>';
+      var emptyMsgHtml = '<div class="empty">' + (YEAR_FILTER ? esc(YEAR_FILTER) + '년에 ' : '') + '조건에 맞는 조사 사건이 없습니다.' + extraHint + '</div>';
+      $('casesBox').innerHTML = MERGED_CASES.length > 0
+        ? renderTable('cases', ['사업장 · 사건명', '수행구분 · 유형', '담당 노무사', '8단계 진행현황', '공문·진행', '이알피 · 계약 · 기타 연동', '열기'], [], CUR_ID, {
+            noColKey: 'no',
+            colHeaders: caseHeadSpecs,
+            keepHeaderWhenEmpty: true,
+            emptyHtml: emptyMsgHtml
+          })
+        : emptyMsgHtml;
       return;
     }
 
@@ -2191,7 +2654,10 @@
         ]
       };
     });
-    $('casesBox').innerHTML = renderTable('cases', ['사업장 · 사건명', '수행구분 · 유형', '담당 노무사', '8단계 진행현황', '공문·진행', '이알피 · 계약 · 기타 연동', '열기'], rows, CUR_ID);
+    $('casesBox').innerHTML = renderTable('cases', ['사업장 · 사건명', '수행구분 · 유형', '담당 노무사', '8단계 진행현황', '공문·진행', '이알피 · 계약 · 기타 연동', '열기'], rows, CUR_ID, {
+      noColKey: 'no',
+      colHeaders: caseHeadSpecs
+    });
   }
 
   function drawInboxPane() {
@@ -7589,6 +8055,8 @@
 
   function resetCaseFilters() {
     YEAR_FILTER = '';
+    closeColFilterPop(false);
+    COL_STATE = freshColState();
     ['caseQ', 'caseCat', 'casePerf', 'caseSt', 'caseYrSel', 'caseErp', 'caseMgr', 'yrPerf'].forEach(function (id) {
       if ($(id)) $(id).value = '';
     });
@@ -7635,6 +8103,7 @@
       if (!btn) return;
       var nextTab = btn.getAttribute('data-tab');
       if (nextTab === TAB) return;
+      closeColFilterPop(false);
       var evEpoch = SESSION_EPOCH;
       var evUid = ME && ME.uid ? String(ME.uid) : '';
       TAB = nextTab;
@@ -7719,6 +8188,28 @@
 
     document.addEventListener('input', function (e) {
       markDirtyReportField(e.target);
+      if (e.target && e.target.getAttribute && e.target.getAttribute('data-thq') === 'qCompany') {
+        COL_STATE.qCompany = C.str(e.target.value);
+        clearSel(['cases']);
+        drawCasesPane();
+        drawBulks();
+        var pop = $('thFltPop');
+        if (pop && COL_STATE.openCol === 'company') {
+          var coCnt = Object.create(null);
+          var qSub = COL_STATE.qCompany.toLowerCase();
+          MERGED_CASES.forEach(function (c) {
+            var nm = resolveDisplayCompanyAndTitle(c).companyName || '(미입력)';
+            coCnt[nm] = (coCnt[nm] || 0) + 1;
+          });
+          var coItems = Object.keys(coCnt).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).filter(function (nm) {
+            return !qSub || nm.toLowerCase().indexOf(qSub) >= 0 || !!COL_STATE.companies[nm];
+          }).map(function (nm) { return { val: nm, label: nm, cnt: coCnt[nm] }; });
+          var cntLbl = $('thCoCntLbl');
+          if (cntLbl) cntLbl.textContent = '사업장 다중 선택 (' + coItems.length + '곳)';
+          var listBox = pop.querySelector('.th-pop-list');
+          if (listBox) listBox.outerHTML = renderColCheckGroup('companies', coItems);
+        }
+      }
     });
 
     document.addEventListener('toggle', function (e) {
@@ -7744,6 +8235,27 @@
     document.addEventListener('keydown', function (e) {
       var modal = $('modal');
       if (!modal || modal.style.display === 'none') {
+        if (e.key === 'Escape' && COL_STATE.openCol) {
+          e.preventDefault();
+          closeColFilterPop(true);
+          return;
+        }
+        if (e.key === 'Tab' && COL_STATE.openCol && $('thFltPop') && $('thFltPop').style.display !== 'none') {
+          var thList = modalFocusables($('thFltPop'));
+          if (thList.length) {
+            var thFirst = thList[0], thLast = thList[thList.length - 1];
+            if (e.shiftKey && document.activeElement === thFirst) {
+              e.preventDefault();
+              thLast.focus();
+              return;
+            }
+            if (!e.shiftKey && document.activeElement === thLast) {
+              e.preventDefault();
+              thFirst.focus();
+              return;
+            }
+          }
+        }
         if (e.key === 'Escape' && typeof document.querySelectorAll === 'function') {
           var openMenus = document.querySelectorAll('details.act-menu[open]');
           if (openMenus && openMenus.length) {
@@ -7796,6 +8308,22 @@
           draw();
           return;
         }
+        if (t.matches('[data-thck]')) {
+          var rawCk = C.str(t.getAttribute('data-thck'));
+          var sep = rawCk.indexOf(':');
+          if (sep > 0) {
+            var bkt = rawCk.slice(0, sep);
+            var bVal = rawCk.slice(sep + 1);
+            if (COL_STATE[bkt] && typeof COL_STATE[bkt] === 'object') {
+              if (t.checked) COL_STATE[bkt][bVal] = 1;
+              else delete COL_STATE[bkt][bVal];
+              clearSel(['cases']);
+              drawCasesPane();
+              drawBulks();
+            }
+          }
+          return;
+        }
         if (t.matches('[data-ck]')) {
           var k = t.getAttribute('data-ck');
           if (t.checked) SEL[k] = 1; else delete SEL[k];
@@ -7832,6 +8360,69 @@
             dm.open = false;
           }
         });
+      }
+      if (COL_STATE.openCol && e.target && e.target.closest) {
+        var inPop = e.target.closest('#thFltPop');
+        var onThBtn = e.target.closest('[data-thflt]');
+        if (!inPop && !onThBtn) closeColFilterPop(false);
+      }
+      if (e.target && e.target.closest) {
+        var thClose = e.target.closest('[data-thclose]');
+        if (thClose) {
+          e.stopPropagation();
+          closeColFilterPop(true);
+          return;
+        }
+        var thClr = e.target.closest('[data-thclr]');
+        if (thClr) {
+          e.stopPropagation();
+          var clrCol = thClr.getAttribute('data-thclr') || '';
+          clearSingleColFilter(clrCol);
+          clearSel(['cases']);
+          drawCasesPane();
+          drawBulks();
+          if ($('thFltPop') && COL_STATE.openCol === clrCol) {
+            $('thFltPop').innerHTML = buildColFilterPopHtml(clrCol);
+            var reClrBtn = $('thFltPop').querySelector ? $('thFltPop').querySelector('[data-thclr]') : null;
+            if (reClrBtn && typeof reClrBtn.focus === 'function') { try { reClrBtn.focus(); } catch (ignoreCf) {} }
+          }
+          return;
+        }
+        var thSort = e.target.closest('[data-thsort]');
+        if (thSort) {
+          e.stopPropagation();
+          var rawSort = thSort.getAttribute('data-thsort') || '';
+          var spIdx = rawSort.indexOf(':');
+          var sCol = spIdx >= 0 ? rawSort.slice(0, spIdx) : '';
+          var sDir = spIdx >= 0 ? rawSort.slice(spIdx + 1) : '';
+          if (!sCol || !sDir || (COL_STATE.sortCol === sCol && COL_STATE.sortDir === sDir)) {
+            COL_STATE.sortCol = '';
+            COL_STATE.sortDir = '';
+          } else {
+            COL_STATE.sortCol = sCol;
+            COL_STATE.sortDir = sDir;
+          }
+          drawCasesPane();
+          drawBulks();
+          if ($('thFltPop') && COL_STATE.openCol) {
+            $('thFltPop').innerHTML = buildColFilterPopHtml(COL_STATE.openCol);
+            if ($('thFltPop').querySelectorAll) {
+              var focusSortEl = null;
+              $('thFltPop').querySelectorAll('[data-thsort]').forEach(function (sb) {
+                if (!focusSortEl && sb.getAttribute('data-thsort') === rawSort) focusSortEl = sb;
+              });
+              if (!focusSortEl) focusSortEl = $('thFltPop').querySelector ? $('thFltPop').querySelector('[data-thsort]') : null;
+              if (focusSortEl && typeof focusSortEl.focus === 'function') { try { focusSortEl.focus(); } catch (ignoreSf) {} }
+            }
+          }
+          return;
+        }
+        var thBtn = e.target.closest('[data-thflt]');
+        if (thBtn) {
+          e.stopPropagation();
+          openColFilterPop(thBtn.getAttribute('data-thflt') || '', thBtn);
+          return;
+        }
       }
       if (e.target === $('modal') || e.target.closest('[data-mclose]')) {
         closeModal();

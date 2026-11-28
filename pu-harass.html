@@ -114,9 +114,30 @@ main{padding:8px 24px 48px 12px;width:100%;max-width:none;margin:0}
 table.t{width:100%;border-collapse:collapse}
 table.t th,table.t td{padding:7px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 table.t th{background:var(--bg);color:var(--ink2);font-size:12px;font-weight:600}
+.th-flt-btn{display:inline-flex;align-items:center;gap:3px;min-height:26px;padding:2px 5px;margin:-2px -3px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink2);font-size:12px;font-weight:600;line-height:1.2;cursor:pointer;white-space:nowrap}
+.th-flt-btn:hover{background:var(--card);border-color:var(--line2);color:var(--ink)}
+.th-flt-btn.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:700}
+.th-flt-ico{font-size:10.5px;color:var(--mute);line-height:1}
+.th-flt-btn.on .th-flt-ico{color:var(--blue-d)}
+.th-pop{position:fixed;z-index:45;width:270px;max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line2);border-radius:10px;overflow:hidden}
+.th-pop-hd{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--bg);border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700}
+.th-pop-bd{padding:8px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;max-height:58vh}
+.th-pop-lbl{font-size:11.5px;font-weight:700;color:var(--mute);margin-bottom:3px}
+.th-pop-sorts{display:flex;gap:4px;flex-wrap:wrap}
+.th-pop-sorts button{flex:1 1 auto;padding:4px 8px;min-height:28px;font-size:11.5px;border-radius:7px}
+.th-pop-sorts button.on{background:var(--pri-bg);border-color:var(--pri-bg);color:#ffffff;font-weight:700}
+.th-pop-list{display:flex;flex-direction:column;gap:2px;max-height:195px;overflow-y:auto;padding-right:2px}
+.th-pop-item{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:6px;font-size:12px;color:var(--ink);cursor:pointer;min-width:0}
+.th-pop-item:hover{background:var(--bg)}
+.th-pop-item .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th-pop-item .cnt{margin-left:auto;flex:none;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums}
+.th-pop-ft{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;background:var(--bg);border-top:1px solid var(--line)}
 table.t td{overflow:hidden;text-overflow:ellipsis;max-width:240px}
 table.t td.ti{font-weight:600;max-width:205px}
-table.t[data-name="cases"] td{max-width:215px}
+table.t[data-name="cases"] th,table.t[data-name="cases"] td{padding:6px 5px}
+table.t[data-name="cases"] td{max-width:195px}
+table.t[data-name="cases"] td.ti{max-width:185px}
+table.t[data-name="cases"] td[data-k="act"]{max-width:none}
 table.t[data-name^="yr_"] td{max-width:200px}
 table.t[data-name^="yr_"] td.ti{max-width:220px}
 table.t td.wide{max-width:360px}
@@ -244,6 +265,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 .phone-only{display:none}
 @media (min-width:1520px){
   main{padding:12px 30px 48px 20px}
+  table.t[data-name="cases"] th,table.t[data-name="cases"] td{padding:7px 8px}
   table.t td,table.t[data-name="cases"] td{max-width:340px}
   table.t td.ti,table.t[data-name^="yr_"] td.ti{max-width:370px}
   table.t[data-name^="yr_"] td{max-width:300px}
@@ -255,7 +277,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 }
 /* ── 폰 화면: 가로 밀기 없이 2줄 카드 (docs/규칙/폰화면.md · 고르기칸-번호.md) ── */
 @media (max-width:768px){
-  button.sm,#head .top button.sm,.hi-top-strip .scope-btn,.hi-top-strip .kpi[role="button"],.act-menu>summary,.sub-fold>summary{min-height:36px;padding:6px 10px}
+  button.sm,#head .top button.sm,.hi-top-strip .scope-btn,.hi-top-strip .kpi[role="button"],.th-flt-btn,.th-pop button,.act-menu>summary,.sub-fold>summary{min-height:36px;padding:6px 10px}
   .act-pop button,.act-pop a{min-height:36px}
   input,select,textarea,.rpt-paper textarea{font-size:16px}
   input[type=checkbox],input[type=radio]{width:24px;height:24px;min-width:24px;min-height:24px;margin:0;vertical-align:middle}
@@ -305,6 +327,10 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] thead th{display:none}
   table.t[data-name] thead th.c{display:block;width:40px;padding:6px 0;margin-left:4px}
   table.t[data-name] thead th.n{display:block;width:auto;text-align:left;padding:6px 0;white-space:nowrap}
+  table.t[data-name="cases"] thead tr{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;padding-right:8px}
+  table.t[data-name="cases"] thead tr::-webkit-scrollbar{display:none}
+  table.t[data-name="cases"] thead th.c{flex:0 0 40px}
+  table.t[data-name="cases"] thead th.n,table.t[data-name="cases"] thead th[data-thcell]{display:block;flex:0 0 auto;width:auto;padding:4px 0}
   table.t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;position:relative;padding:8px 10px 8px 74px;min-height:46px;border-bottom:1px solid var(--line)}
   table.t[data-name] tbody tr.perf-direct{box-shadow:inset 3px 0 0 var(--green-m)}
   table.t[data-name] tbody tr.perf-direct>td:first-child{box-shadow:none}
@@ -482,6 +508,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   </section>
 </main>
 
+<div id="thFltPop" class="th-pop" role="dialog" aria-label="열 정렬 및 필터" style="display:none"></div>
 <div class="modal" id="modal" style="display:none"><div class="mbox" id="mbox" role="dialog" aria-modal="true" aria-labelledby="mhdTitle" tabindex="-1"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="printArea"></div>
@@ -503,7 +530,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
 <script src="js/pu-back.js?v=5"></script>
-<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal') || PuBack.closeTopVisible('#thFltPop'); }); }catch(e){}</script>
 <script src="js/pu-fast-boot.js?v=1"></script>
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
@@ -513,7 +540,7 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="js/pu-harass-core.js?v=15"></script>
 <script src="js/pu-harass-sign.js?v=4"></script>
 <script src="js/pu-harass-hwpx.js?v=9"></script>
-<script src="js/pu-harass-view.js?v=22"></script>
+<script src="js/pu-harass-view.js?v=23"></script>
 <script>
 window.puHarassGateShow = function(sub){ if(window.PuGate) PuGate.show(sub ? { sub: sub } : undefined); };
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
