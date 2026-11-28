@@ -253,9 +253,8 @@
   }
 
   /* ══ 2. 8대 업종 · 6대 트랙 자동 추론 ═════════════════════════════════ */
-  function inferIndustryCode(name, bizType, itemText, extraText) {
-    var hay = [str(name), str(bizType), str(itemText), str(extraText)].join(' ').toLowerCase();
-    if (/복지관|요양원|요양병원|노인|장애인|정신건강|사회복지|의료원|치과|병원|의원|의료생협|한의원|약국|사회서비스원|마음터|실버|아동발달/.test(hay)) {
+  function matchIndustryHay(hay, includeGeneral) {
+    if (/복지관|요양원|요양병원|노인|장애인|정신건강|사회복지|의료원|치과|병원|의원|의료생협|한의원|약국|사회서비스원|자활센터|사랑과평화의집|마음터|실버|아동발달/.test(hay)) {
       return 'medical_welfare';
     }
     if (/건설|토건|토목|건축|시공|철골|비계|하우징|크라샤|골재|석산|도장|방수|설비공사|전기공사|냉난방시공/.test(hay)) {
@@ -267,19 +266,27 @@
     if (/물류|유통|도매|소매|운수|운송|택배|창고|이송|화물|공용화물|도소매|마트|상사|테이프\s*유통/.test(hay)) {
       return 'retail_logis';
     }
-    if (/학교|학원|교육|대학|연구소|회계법인|법무법인|소프트웨어|전산|사무|공사$|공단$|진흥원$|센터$/.test(hay) && !/복지|건강|재활/.test(hay)) {
+    if (/학교|학원|교육|대학|연구소|회계법인|법무법인|소프트웨어|전산|미디어|사무|공사$|공단$|진흥원$|센터$/.test(hay) && !/복지|건강|재활|자활/.test(hay)) {
       return 'edu_office';
     }
-    if (/시설관리|경비|미화|청소|용역|인력공급|콜센터|프랜차이즈|서비스(?!.*자동차부품)|세탁|정비센터/.test(hay)) {
+    if (/시설관리|경비|미화|청소|용역|인력공급|콜센터|프랜차이즈|서비스(?!.*자동차부품|.*서비스원)|세탁|정비센터/.test(hay)) {
       return 'service_fac';
     }
     if (/케미칼|화학|고무|플라스틱|디스플레이|금속|기계|철강|정공|엔지니어링|공업|모터스|중공업|오토텍|선박|조선|제지|목재|합판|도료|화성|사출|프레스|메탈|기전|전장/.test(hay)) {
       return 'mfg_high';
     }
-    if (/푸드|식품|김|인삼|음료|제조|테크|산업|전선|전자|디지컴|에스메카|에스앤씨|네오텍|로스윈|에스에프이|이노베이스/.test(hay)) {
+    if (includeGeneral && /푸드|식품|김|인삼|음료|제조|테크|산업|전선|전자|디지컴|에스메카|에스앤씨|네오텍|로스윈|에스에프이|이노베이스/.test(hay)) {
       return 'mfg_general';
     }
-    return 'mfg_general';
+    return '';
+  }
+
+  function inferIndustryCode(name, bizType, itemText, extraText) {
+    var primary = [str(name), str(bizType), str(itemText)].join(' ').toLowerCase();
+    var pHit = matchIndustryHay(primary, true);
+    if (pHit) return pHit;
+    var cleanExtra = str(extraText).toLowerCase().replace(/위험성\s*평가\s*교육\s*일정\s*자료/g, '');
+    return matchIndustryHay(primary + ' ' + cleanExtra, true) || 'mfg_general';
   }
 
   function inferTrackCode(text, industryCode) {
@@ -296,8 +303,10 @@
   }
 
   /* ══ 3. 안전보건체계구축 컨설팅 메일 · 문서 정밀 분류 (개인 산재사건 배제) ══ */
-  var SAFETY_CONSULT_SIGNAL_RE = /안전\s*보건\s*(?:관리\s*)?체계|위험성\s*평가\s*(?:중심|컨설팅|결과|시범|참관|사전|자료|우수|인정)|중대\s*재해\s*(?:예방|처벌법|컨설팅|대응)|안전\s*체계\s*구축|소규모\s*사업장\s*안전\s*보건|어선원\s*안전\s*보건|상생\s*협력\s*사업|안전\s*컨설팅|\bKOSHA\b|적격\s*수급\s*업체\s*선정/i;
+  var SAFETY_CONSULT_SIGNAL_RE = /안전\s*보건\s*(?:관리\s*)?체계|위험성\s*평가\s*(?:중심|컨설팅|결과|시범|참관|사전|자료|우수|인정|및\s*작업중지)|중대\s*재해\s*(?:예방|처벌법|컨설팅|대응)|안전\s*체계\s*구축|소규모\s*사업장\s*안전\s*보건|어선원\s*안전\s*보건|상생\s*협력\s*사업|안전\s*컨설팅|산업\s*안전\s*컨설팅|시설\s*안전\s*지원|\bKOSHA\b|적격\s*수급\s*업체\s*선정/i;
   var INDIVIDUAL_SANJAE_OR_OTHER_RE = /요양\s*(?:급여|보험급여결정)|유족\s*급여|장해\s*급여|휴업\s*급여|장례비|의무\s*기록|질병\s*판정|질판위|심사\s*청구|재심사\s*청구|진료\s*계획서|보험\s*관계\s*(?:성립|변경|소멸)\s*신고|가입자\s*명부|산업재해\s*조사표\s*양식|일터\s*혁신|일터\s*상생|산업\s*[·ㆍ.]?\s*일자리|구조\s*혁신|기술\s*보호|현장\s*클리닉|월분\s*급여|급여\s*대장|세금\s*계산서|자문료\s*청구|부당\s*해고|임금\s*체불/i;
+  var NON_CONSULTING_NOTICE_RE = /양성\s*교육|보수\s*교육|직무.*교육|공급기업\s*교육|전문가\s*과정|특강\s*안내|찾아가는\s*노무교육|발표대회|설명회\s*참석|설명회\s*안내|중처법\s*강의|보수\s*및\s*신규교육|수행기관\s*선정|선정심사|용역계약\s*체결|계약체결\s*및\s*방법|수행기관용|\bK2B\b|업무관리자|선금\s*지급|수수료.*지급|수수료.*확정|수수료.*정산|업무수행능력평가|지역운영위원회|지역운영회|지역운영\s*결과|수시\s*모니터링|신규기관\s*업무지도|인력추가\s*승인|참여\s*여부\s*조사|구축기준\s*개선|우수사례집|우수사례\s*발굴|자율신청\s*접수\s*안내|자율신청서\s*및\s*엑셀양식|사업장\s*명단\s*\(1차\)|사업장\s*선정\s*(?:명단|안내)|선정\s*안내\s*공문|임의선정\s*공문|공문\s*재송부|유의사항\s*안내|신청서류\s*보완|인정심사\s*(?:항목|관련\s*자료)|제공\s*문건\s*목록\s*질문|전체파일\s*송부\s*\(인쇄용\)|사전체크리스트\s*송부|사회복지사\s*안전체계.*노무상담|노무상담.*신청자\s*연계|컨설팅\s*신청\s*안내|컨설팅\s*신청서|지원\s*대상\s*관련\s*건|자율신청\s*보내드립니다|방문\s*일정\s*안내|수행\s*전\s*(?:보유\s*자료|실태)/i;
+  var CONSULTING_PROOF_RE = /(?:결과\s*보고서|결과보고서|컨설팅\s*보고서|보고서공문|결과\s*체크리스트|취합\s*자료|위임\s*계약서|용역\s*계약(?!서\.hwp)|과업\s*지시서|작업중지명령|실적\s*증명서|컨설팅\s*결과\s*공유|강의\s*교안|강의교안|리포트_|_리포트)/i;
   var SAFETY_DOC_SIGNAL_RE = /경영\s*방침|안전\s*보건\s*(?:조직|예산|이행|교육|점검|규정)|위험성\s*평가|유해\s*위험\s*요인|MSDS|물질안전보건|비상\s*대응|비상\s*연락망|수급\s*업체|체크\s*리스트|자율\s*점검|건강\s*검진\s*수검|작업\s*환경\s*측정|아차\s*사고|과업\s*지시서|종합\s*보고서|요약\s*보고서|회차\s*(?:안전|위험성|결과)/i;
 
   var NON_SAFETY_FOLDER_RE = /자문사|급여|사무대행|체불|체당금|노동위원회|부당해고|근로복지기금|세금계산서|경조사|뉴스레터|개인메일|국민건강|기타광고|명함|소셜|쇼핑|이력서|청구서|일터\s*혁신|일터\s*상생|산업\s*[·ㆍ.]?\s*일자리|구조\s*혁신|기술\s*보호|현장\s*클리닉|휴지통|스팸|trash|spam|junk|draft/i;
@@ -313,10 +322,15 @@
   }
 
   function isSafetyConsultingMail(subject, attNames) {
-    var hay = str(subject) + ' ' + (Array.isArray(attNames) ? attNames.join(' ') : str(attNames));
+    var subj = str(subject);
+    var hay = subj + ' ' + (Array.isArray(attNames) ? attNames.join(' ') : str(attNames));
     var hasSig = SAFETY_CONSULT_SIGNAL_RE.test(hay);
     if (!hasSig) return false;
     if (INDIVIDUAL_SANJAE_OR_OTHER_RE.test(hay) && !/안전\s*보건\s*(?:관리\s*)?체계|위험성\s*평가\s*(?:중심|컨설팅)|중대\s*재해\s*(?:예방|처벌법)\s*(?:안전)?\s*컨설팅/i.test(hay)) {
+      return false;
+    }
+    var hasProof = CONSULTING_PROOF_RE.test(hay);
+    if (!hasProof && (NON_CONSULTING_NOTICE_RE.test(hay) || /컨설팅\s*신청\s*$/i.test(subj))) {
       return false;
     }
     return true;
@@ -368,12 +382,14 @@
     return out;
   }
 
-  function buildCompanyMailProfile(project, companies, consultings) {
+  function buildCompanyMailProfile(project, companies, consultings, contracts) {
     var p = project || {};
     var coList = rowsOf(companies);
     var consList = rowsOf(consultings);
+    var ctList = rowsOf(contracts);
     var coId = str(p.companyId);
     var bizDigits = str(p.bizNo).replace(/\D/g, '');
+    var pNorm = normCorpName(p.companyName);
     var addrs = {}, domains = {};
 
     function addAllowed(em) {
@@ -394,6 +410,18 @@
       var match = (coId && csCoId === coId) || (bizDigits.length === 10 && csBiz === bizDigits);
       if (match) Object.keys(collectAddrsFromObj(cs)).forEach(addAllowed);
     });
+    ctList.forEach(function (ct) {
+      if (!ct || ct._deleted || ct.deleted) return;
+      var comp = ct.company && typeof ct.company === 'object' ? ct.company : {};
+      var ctCoId = str(ct.companyId || comp.companyId);
+      var ctBiz = str(ct.bizNo || comp.bizNo).replace(/\D/g, '');
+      var ctNorm = normCorpName(ct.companyName || comp.name);
+      var match = (coId && ctCoId === coId) || (bizDigits.length === 10 && ctBiz === bizDigits) || (pNorm.length >= 2 && ctNorm === pNorm);
+      if (match) {
+        Object.keys(collectAddrsFromObj(ct)).forEach(addAllowed);
+        Object.keys(collectAddrsFromObj(comp)).forEach(addAllowed);
+      }
+    });
     (Array.isArray(p.contactEmails) ? p.contactEmails : str(p.contactEmail).split(/[,;\s]+/)).forEach(function (v) {
       addAllowed(mailOf(v));
     });
@@ -402,7 +430,7 @@
       companyId: coId,
       companyName: str(p.companyName),
       year: Number(p.year) || 0,
-      normName: normCorpName(p.companyName),
+      normName: pNorm,
       addrs: addrs,
       domains: domains
     };
@@ -446,8 +474,8 @@
     return out;
   }
 
-  function scanProjectMails(project, folders, msgs, companies, consultings, intakeMap) {
-    var prof = buildCompanyMailProfile(project, companies, consultings);
+  function scanProjectMails(project, folders, msgs, companies, consultings, intakeMap, contracts) {
+    var prof = buildCompanyMailProfile(project, companies, consultings, contracts);
     var flat = Array.isArray(folders) ? folders : flattenMailboxRows(folders, msgs);
     var existingByMailKey = {};
     Object.keys(intakeMap || {}).forEach(function (id) {
@@ -512,7 +540,7 @@
   /* ══ 4. 로컬 폴더 선별 진입 · 컨설턴트 개인서류/타 컨설팅 100% 차단 ═══ */
   var SAFETY_DIR_ALLOW_RE = /안전\s*보건|중대\s*재해|중처법|위험성\s*평가|산업\s*안전|안전\s*체계/i;
   var SAFETY_DIR_PROBE_RE = /^컨설팅\s*업체$|^1\.\s*공공기관컨설팅$|^202\d\s*공공기관|^9\s*안전보건컨설팅$/i;
-  var NON_SAFETY_DIR_BLOCK_RE = /^(?:[02345678]\s*[.)\s]\s*)?(?:일터\s*혁신|일터\s*상생|상공\s*회의소|비지니스\s*지원단|비즈니스\s*지원단|구조\s*혁신|산업\s*일자리|기술\s*보호|근로자\s*이음|이음\s*센터|혁신\s*바우처|비정규직|자문사|급여|사무\s*대행)/i;
+  var NON_SAFETY_DIR_BLOCK_RE = /^(?:[02345678]\s*[.)\s]\s*)?(?:일터\s*혁신|일터\s*상생|상공\s*회의소|비지니스\s*지원단|비즈니스\s*지원단|구조\s*혁신|산업\s*일자리|기술\s*보호|근로자\s*이음|이음\s*센터|혁신\s*바우처|비정규직|자문사|급여|사무\s*대행)|사회복지사\s*안전체계.*노무상담|노무상담.*연계/i;
   var PERSONAL_DIR_SKIP_RE = /^(?:\.git|node_modules|__MACOSX)$|수행\s*인력별\s*증빙|교육\s*신청\s*서류|인력\s*운영\s*계획/i;
   var PERSONAL_FILE_SKIP_RE = /^(?:~\$|\._|desktop\.ini$|thumbs\.db$)|\.(?:tmp|bak|lnk)$|신분증|주민등록증|운전면허증|개인\s*통장|통장\s*사본|원천세|개인정보\s*제공.*동의서|근로조건\s*보호\s*확약서|경력\s*증명서|자격증|수행\s*인력\s*명단|수행\s*인력\s*경력서|4대\s*보험.*가입자\s*명부|근로\s*계약서/i;
   var SUPPORTED_SAFETY_EXT_RE = /\.(?:xlsx|xls|xlsm|csv|hwpx|hwp|docx|doc|pdf|pptx|ppt|txt|zip|jpg|jpeg|png)$/i;
@@ -599,11 +627,8 @@
       var coSeg = '';
       entry.dirSegs.forEach(function (seg) {
         if (/중처법/.test(seg)) coSeg = seg;
-        else if (/안전체계/.test(seg) && /복지|노무상담/.test(seg)) coSeg = seg;
       });
-      if (/^\d+\.\s*([^_]+)_노무상담/.test(entry.fileName)) {
-        coSeg = /^\d+\.\s*([^_]+)_노무상담/.exec(entry.fileName)[1];
-      } else if (/2022_위험성평가.*_([가-힣A-Za-z0-9]+)/.test(entry.fileName)) {
+      if (/2022_위험성평가.*_([가-힣A-Za-z0-9]+)/.test(entry.fileName)) {
         coSeg = /2022_위험성평가.*_([가-힣A-Za-z0-9]+)/.exec(entry.fileName)[1];
       }
 
@@ -657,6 +682,7 @@
     var opts = input && typeof input === 'object' ? input : {};
     var coList = rowsOf(opts.companies);
     var consList = rowsOf(opts.consultings);
+    var contractList = rowsOf(opts.contracts);
     var bizTypes = rowsOf(opts.bizTypes);
     var scalCos = rowsOf(opts.scalCos);
     var scalTypes = rowsOf(opts.scalTypes);
@@ -682,14 +708,63 @@
 
     var regCoIds = {}, regBiz = {}, regNorms = {};
     regProjs.forEach(function (p) {
-      if (p.companyId) regCoIds[str(p.companyId)] = 1;
+      var py = p.year ? String(p.year) : '';
+      if (p.companyId) regCoIds[str(p.companyId) + ':' + py] = 1;
       var bd = str(p.bizNo).replace(/\D/g, '');
-      if (bd.length === 10) regBiz[bd] = 1;
+      if (bd.length === 10) regBiz[bd + ':' + py] = 1;
       var nn = normCorpName(p.companyName);
-      if (nn) regNorms[nn + ':' + (p.year || '')] = 1;
+      if (nn) regNorms[nn + ':' + py] = 1;
     });
+    function isRegisteredForYear(coId, bizDigits, coName, yr) {
+      var ys = String(yr || '');
+      return !!(
+        (coId && (regCoIds[coId + ':' + ys] || regCoIds[coId + ':'])) ||
+        (bizDigits.length === 10 && (regBiz[bizDigits + ':' + ys] || regBiz[bizDigits + ':'])) ||
+        regNorms[normCorpName(coName) + ':' + ys]
+      );
+    }
 
     var out = [], seen = {};
+    contractList.forEach(function (ct) {
+      if (!ct || ct._deleted || ct.deleted) return;
+      if (/취소|포기|무산|해지|종료|consult/i.test(str(ct.status))) return;
+      var tCode = str((ct.typeCodes && ct.typeCodes.consulting) || ct.typeCode || ct.bizTypeId);
+      var lbl = [
+        str(ct.type), str(ct.consultingType), str(ct.title), str(ct.bizName), str(ct.typeName),
+        str(ct.briefs && ct.briefs.consulting), str(bizTypeMap[tCode] || ''),
+        str(ct.no || ct.contractNo), str(ct.memo), str(ct.note), str(ct.subject)
+      ].join(' ');
+      if (!SAFETY_ERP_RE.test(lbl) || NON_SAFETY_ERP_RE.test(lbl) || /노무상담/.test(lbl)) return;
+
+      var compObj = ct.company && typeof ct.company === 'object' ? ct.company : {};
+      var coRec = (ct.companyId && coById[str(ct.companyId)]) || (compObj.companyId && coById[str(compObj.companyId)]) || null;
+      var bizDigits = str(ct.bizNo || compObj.bizNo || (coRec && coRec.bizNo)).replace(/\D/g, '');
+      if (!coRec && bizDigits.length === 10) coRec = coByBiz[bizDigits] || null;
+      var coId = coRec ? str(coRec.id) : (str(ct.companyId || compObj.companyId) || (bizDigits.length === 10 ? 'biz:' + bizDigits : ''));
+      var coName = str((coRec && coRec.name) || ct.companyName || compObj.name || '사업장');
+      var ym = /(202\d)/.exec(String(ct.year || ct.signDate || ct.startDate || ct.regAt || '2026'));
+      var yr = ym ? Number(ym[1]) : 2026;
+      if (isRegisteredForYear(coId, bizDigits, coName, yr)) return;
+
+      var dedup = (coId || normCorpName(coName)) + ':' + yr;
+      if (seen[dedup]) return;
+      seen[dedup] = 1;
+
+      var indCode = inferIndustryCode(coName, (coRec && coRec.bizType) || compObj.bizType, (coRec && coRec.bizItem) || compObj.bizCategory, lbl);
+      out.push({
+        candKey: 'ct_' + safeIdPart(ct.id || dedup),
+        source: '푸른이알피 계약',
+        companyId: coId,
+        companyName: coName,
+        bizNo: formatBizNo(bizDigits),
+        industryCode: indCode,
+        track: inferTrackCode(lbl, indCode),
+        year: yr,
+        contractId: str(ct.id || ''),
+        bizLabel: str(ct.consultingType || (ct.briefs && ct.briefs.consulting) || bizTypeMap[tCode] || '안전보건컨설팅')
+      });
+    });
+
     consList.forEach(function (cs) {
       if (!cs || cs._deleted || cs.deleted) return;
       if (/취소|포기|무산|해지/.test(str(cs.status))) return;
@@ -704,7 +779,7 @@
       var coName = str((coRec && coRec.name) || cs.companyName || '사업장');
       var ym = /(202\d)/.exec(String(cs.year || cs.startDate || cs.signDate || '2026'));
       var yr = ym ? Number(ym[1]) : 2026;
-      if ((coId && regCoIds[coId]) || (bizDigits.length === 10 && regBiz[bizDigits]) || regNorms[normCorpName(coName) + ':' + yr]) return;
+      if (isRegisteredForYear(coId, bizDigits, coName, yr)) return;
 
       var dedup = (coId || normCorpName(coName)) + ':' + yr;
       if (seen[dedup]) return;
@@ -740,7 +815,7 @@
       var coName = str((coRec && coRec.name) || sc.name || '사업장');
       var ym = /(202\d)/.exec(String(sc.year || sc.createdAt || '2026'));
       var yr = ym ? Number(ym[1]) : 2026;
-      if ((coId && regCoIds[coId]) || (bizDigits.length === 10 && regBiz[bizDigits]) || regNorms[normCorpName(coName) + ':' + yr]) return;
+      if (isRegisteredForYear(coId, bizDigits, coName, yr)) return;
 
       var dedup = (coId || normCorpName(coName)) + ':' + yr;
       if (seen[dedup]) return;

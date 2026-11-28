@@ -12,6 +12,7 @@ const Intake = require(path.join(ROOT, 'js', 'pu-safety-intake.js'));
 const Report = require(path.join(ROOT, 'js', 'pu-safety-report.js'));
 const Hwpx = require(path.join(ROOT, 'js', 'pu-safety-hwpx.js'));
 const DocRead = require(path.join(ROOT, 'functions', 'doc-read.js'));
+const Backfill = require(path.join(ROOT, 'scripts', 'backfill-safety-history.js'));
 
 test('1. 안전보건 카탈로그: 트랙·단계·사전체크·7대 핵심요소·8대 업종·24기인물·표준16대서류 완전성', () => {
   assert.ok(Object.keys(Cat.TRACKS).length >= 6);
@@ -171,4 +172,123 @@ test('5. doc-read 서버 안전보건 AI 요청 2중 비식별 차단 및 HTML �
   assert.match(html, /pu-ontology-write\.js/);
   assert.match(html, /pu-design\.css\?v=\d+/);
   assert.match(html, /class="pu-design pu-frame-a pu-dark-auto"/);
+});
+
+test('6. 메일 필터·계약 후보 발견·취합 연도·회사명 정규화 정합성', () => {
+  assert.equal(Intake.isSafetyConsultingMail('[한국스마트컨설팅협회] 3/4(수) 일반/중대재해 컨설팅 공급기업 교육 안내(온라인)', '교육안내.pdf'), false);
+  assert.equal(Intake.isSafetyConsultingMail('[충청남도사회복지사회] 찾아가는 노무교육 인정 안내', ''), false);
+  assert.equal(Intake.isSafetyConsultingMail('2026사회복지사 협회 노무상담 진행(안)_공문', ''), false);
+  assert.equal(Intake.isSafetyConsultingMail('공단 안전보건관리체계구축 사업장 선정 안내 공문', ''), false);
+
+  assert.equal(Intake.isSafetyConsultingMail('[푸른노무법인] ㈜성창오토텍 안전보건체계구축 위임계약서', ''), true);
+  assert.equal(Intake.isSafetyConsultingMail('RE: [푸른노무법인] 2026년 중대재해예방 안전컨설팅 과업지시서 수정안 회신', ''), true);
+  assert.equal(Intake.isSafetyConsultingMail('[푸른노무법인] 위험성평가 중심 안전보건관리체계 구축 컨설팅 취합 자료 송부의 건', ''), true);
+  assert.equal(Intake.isSafetyConsultingMail('안전보건관리체계구축 컨설팅 실적 증명서 발급 요청', ''), true);
+
+  assert.equal(Intake.inferIndustryCode('두원공업', '제조', '자동차 부품 제조', '위험성평가 교육 일정 자료'), 'mfg_high');
+  assert.equal(Intake.inferIndustryCode('㈜우리미디어'), 'edu_office');
+  assert.equal(Intake.inferIndustryCode('천안지역자활센터'), 'medical_welfare');
+
+  const discovered = Intake.discoverSafetyCandidates({
+    companies: [],
+    consultings: [],
+    contracts: [
+      {
+        id: 'ct_cn_yutong',
+        companyName: '충남유통',
+        status: 'active',
+        year: 2026,
+        briefs: { consulting: '중대재해처벌법 안전보건관리체계구축 컨설팅' },
+        typeCodes: { consulting: 'safety_consulting' },
+      },
+      {
+        id: 'ct_counsel_only',
+        companyName: '노무상담전용',
+        status: 'active',
+        year: 2026,
+        briefs: { consulting: '정기 노무상담 자문계약' },
+      },
+      {
+        id: 'ct_cancelled',
+        companyName: '해지사업장',
+        status: '해지',
+        year: 2026,
+        briefs: { consulting: '안전보건관리체계구축 컨설팅' },
+      },
+    ],
+    bizTypes: [],
+    scalCos: {},
+    scalTypes: {},
+    registeredProjects: [],
+  });
+  assert.ok(discovered.some((c) => c.companyName === '충남유통'));
+  assert.ok(!discovered.some((c) => c.companyName === '노무상담전용'));
+  assert.ok(!discovered.some((c) => c.companyName === '해지사업장'));
+
+  const multiYear = Intake.discoverSafetyCandidates({
+    companies: [],
+    consultings: [],
+    contracts: [
+      { id: 'ct_repeat_2026', companyId: 'co_rep', bizNo: '123-45-67890', companyName: '재계약테스트', status: 'active', year: 2026, briefs: { consulting: '안전보건관리체계구축 컨설팅' } },
+    ],
+    bizTypes: [],
+    scalCos: {},
+    scalTypes: {},
+    registeredProjects: [
+      { id: 'sf_co_rep_2023', companyId: 'co_rep', bizNo: '123-45-67890', companyName: '재계약테스트', year: 2023, status: 'archive' },
+    ],
+  });
+  assert.ok(multiYear.some((c) => c.companyName === '재계약테스트' && c.year === 2026));
+  assert.equal(Backfill.normalizeDisplayCompany('((주)가상기업)'), '㈜가상기업');
+  assert.equal(Backfill.normalizeDisplayCompany('(주)가상기업)'), '㈜가상기업');
+
+  assert.equal(Backfill.resolveMailYear('2024-01-30T10:00:00Z', '[푸른노무법인] 위험성평가 중심 안전보건관리체계 구축 컨설팅 취합 자료 송부의 건'), 2023);
+  assert.equal(Backfill.resolveMailYear('2024-03-10T10:00:00Z', '안전보건관리체계구축 컨설팅 실적 증명서 요청'), 2023);
+  const extracted = Backfill.extractCorpNameFromMail('[푸른노무법인] (주)성창오토텍아산사업장_위험성평가 자료', [], []);
+  assert.ok(extracted && extracted.name.includes('성창오토텍'));
+  assert.equal(Backfill.extractCorpNameFromMail('RE: (수정) 2회차 위험성평가 컨설팅 자료 송부', [], []), null);
+  assert.equal(Backfill.resolveCanonicalCorp('㈜성창오토텍아산산업').name, '㈜성창오토텍아산사업장');
+  assert.equal(Backfill.resolveCanonicalCorp('고산').name, '㈜성창오토텍아산사업장');
+  assert.equal(Backfill.resolveCanonicalCorp('삼익에프앤티').name, '삼익에프앤티㈜');
+  assert.equal(Backfill.resolveCanonicalCorp('세일메카닉스').name, '㈜세일메카닉스');
+  assert.equal(Backfill.resolveCanonicalCorp('CTS').name, 'CTS');
+});
+
+test('7. 푸른 ERP · 장애알림(pu-health) · 인증동기화(pu-authsync) 및 상단 띠 구조 통합', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'safety.html'), 'utf8');
+  assert.match(html, /pu-health\.js/);
+  assert.match(html, /pu-authsync\.js/);
+  assert.match(html, /href="pu-erp\.html\?sso=1"/);
+  const tab1Idx = html.indexOf('id="p-projects"');
+  const scopeIdx = html.indexOf('id="scopeBar"');
+  assert.ok(tab1Idx >= 0 && scopeIdx > tab1Idx, '#scopeBar는 탭 1(#p-projects) 안에 배치되어야 합니다');
+
+  const erpHtml = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
+  assert.match(erpHtml, /key:'safety'[^}]*path:'scal_safety\/projects'/);
+  assert.match(erpHtml, /safety\.html\?sso=1#proj=/);
+});
+
+test('8. 직장 내 괴롭힘 표준 형태(분리된 연도·진행상태 열 · 클릭형 인라인 KPI · 초기화 · 커밋 표시) 및 규칙 문서화', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'safety.html'), 'utf8');
+  assert.match(html, /id="releaseShaChip"/);
+  assert.match(html, /id="projResetBtn"/);
+  assert.match(html, /\.c-direct\b/);
+  assert.match(html, /\.c-direct-ing\b/);
+  assert.match(html, /\.sub-fold/);
+
+  const viewJs = fs.readFileSync(path.join(ROOT, 'js', 'pu-safety-view.js'), 'utf8');
+  assert.match(viewJs, /function mountReleaseShaChip\(/);
+  assert.match(viewJs, /meta\[name="pu-release"\]/);
+  assert.match(viewJs, /data-kpi-status=/);
+  assert.match(viewJs, /text:\s*'연도',\s*cls:\s*'yr'/);
+  assert.match(viewJs, /text:\s*'진행상태',\s*cls:\s*'st'/);
+  assert.match(viewJs, /class="sub-fold"/);
+  assert.match(viewJs, /var workerCnt = num\(proj\.workerCount, 0\)/);
+  assert.match(viewJs, /var roundCnt = num\(p\.roundCount, 0\)/);
+  assert.match(viewJs, /clearSel\('projects'\)/);
+
+  const stdDoc = fs.readFileSync(path.join(ROOT, 'docs', '규칙', '서류-목록-표준형태.md'), 'utf8');
+  assert.match(stdDoc, /pu-harass\.html/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8'), /서류-목록-표준형태\.md/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'AGENTS.md'), 'utf8'), /서류-목록-표준형태\.md/);
 });
