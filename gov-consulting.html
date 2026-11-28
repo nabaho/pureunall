@@ -1601,7 +1601,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-visit-sms.js?v=2"></script>
 <script src="js/pu-health.js?v=8"></script>
-<script src="js/pu-version.js?v=12"></script>
+<script src="js/pu-version.js?v=13"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=3"></script>
 <!-- 푸른사진첩에서 사진을 끌어다 놓을 수 있게 하는 공용 조각 -->
@@ -1618,7 +1618,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=58"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=7"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
+  <script src="js/pu-authsync.js?v=8"></script><script src="js/pu-logout-why.js?v=1"></script><script src="js/pu-active.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
@@ -6321,12 +6321,19 @@ async function doLogin(){
 function doLogout(){
   // 이동 전 화면 번쩍임 방지 민무늬 덮개
   try{ const _ov=document.createElement('div'); _ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(_ov); }catch(e){}
-  sessionStorage.removeItem('p_session');
-  localStorage.removeItem('p_autoSession');
+  try{ sessionStorage.removeItem('p_session'); localStorage.removeItem('p_autoSession'); }catch(e){}
   // 포털(이메일) 세션 → Firebase 로그아웃 후 통합 로그인(포털)으로. 익명(독립 사용) → 자기 로그인 화면
   try{
     const u=firebase.auth().currentUser;
-    if(u&&u.email){firebase.auth().signOut().finally(()=>location.replace('enter.html?v='+Date.now()));return;}
+    if(u&&u.email){
+      try{ window.PuLogoutWhy&&PuLogoutWhy.why('수동 로그아웃(정부사업일정)'); }catch(_w){}
+      try{ window.PuAuthSync&&PuAuthSync.broadcastLogout&&PuAuthSync.broadcastLogout(); }catch(_b){}
+      firebase.auth().signOut().finally(()=>{
+        try{ sessionStorage.setItem('pu_boot_self_nav', String(Date.now())); localStorage.setItem('pu_auth_redirect_at', String(Date.now())); }catch(_){}
+        location.replace('enter.html?v='+Date.now());
+      });
+      return;
+    }
   }catch(e){}
   location.reload();
 }
@@ -15464,13 +15471,13 @@ init();
     try{
       var hadPortal=false;
       var _so=null;
-      try{ var u=firebase.auth().currentUser; hadPortal=!!(u&&u.email); if(hadPortal) _so=firebase.auth().signOut(); }catch(_){}
+      try{ var u=firebase.auth().currentUser; hadPortal=!!(u&&u.email); if(hadPortal){ try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃(정부사업일정)'); }catch(_w){} try{ window.PuAuthSync&&PuAuthSync.broadcastLogout&&PuAuthSync.broadcastLogout(); }catch(_b){} _so=firebase.auth().signOut(); } }catch(_){}
       try{ sessionStorage.removeItem('p_session'); localStorage.removeItem('p_autoSession'); }catch(_){}
       var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(ov);
       /* ★ 로그아웃이 «끝난 뒤에» 포털로 간다 (2026-09-30). 전에는 시작만 하고 0.2초 뒤에 떠났다 —
          덜 끝난 채 포털이 열리면 포털은 남은 로그인을 보고 다시 들여보냈다(「로그아웃된 것 같다가 앱으로 넘어간다」).
          3초 안에 안 끝나면 그래도 간다(멎어 보이면 안 된다). */
-      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ location.replace(hadPortal ? ('enter.html?v='+now()) : (location.pathname+'?v='+now())); }, 200); }
+      var _go=false; function _leave(){ if(_go) return; _go=true; setTimeout(function(){ try{ sessionStorage.setItem('pu_boot_self_nav', String(now())); localStorage.setItem('pu_auth_redirect_at', String(now())); }catch(_){} location.replace(hadPortal ? ('enter.html?v='+now()) : (location.pathname+'?v='+now())); }, 200); }
       if(_so && _so.then) _so.then(_leave, _leave); else _leave();
       setTimeout(_leave, 3000);
     }catch(_){ location.reload(); }
