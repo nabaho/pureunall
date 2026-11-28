@@ -96,11 +96,11 @@ test('임금협상 시뮬레이터: 인원·기본급총액·간접비율 기반
 
 /* ── 4. PII · 로컬경로 · CSV 수식 인젝션 방어 ──────────────────────────── */
 test('PII·로컬경로·CSV 방어: 개인식별정보·이메일·경로를 가리고 수식 문자를 이스케이프한다', () => {
-  const raw = '담당 홍가상 010-0000-1234 hr@alpha-sample.example C:\\local\\secret\\파일.hwpx';
+  const raw = '담당 홍가상 010-0000-1234 hr@alpha-sample.example /mock/local/secret/파일.hwpx';
   const masked = UnionCore.maskPiiStrict(raw, ['홍가상'], { keepBizNo: true });
   assert.equal(masked.includes('010-0000-1234'), false);
   assert.equal(masked.includes('hr@alpha-sample.example'), false);
-  assert.equal(masked.includes('C:\\local\\secret'), false);
+  assert.equal(masked.includes('/mock/local/secret'), false);
   assert.equal(masked.includes('홍가상'), false);
   assert.equal(UnionCore.hasResidualPii(masked), false);
   assert.equal(UnionCore.hasResidualPii('문의 sample-user@corp.example'), true);
