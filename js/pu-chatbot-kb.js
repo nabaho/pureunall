@@ -162,6 +162,7 @@
         { key: 'laboraudit',  icon: '🧭', name: '자율점검·근로감독', when: '고용노동부 기초노동질서 자율점검·모의근로감독·서류보존 및 시정대응 자문', from: '푸른 메일·카톡/문자·노무진단 체크표', to: '자율점검 결과보고서(.hwpx)·개선로드맵', ask: '자율점검·근로감독 앱은 어떻게 활용하나요?' },
         { key: 'unionneg',    icon: '🫂', name: '민간노조·단체교섭', when: '복수노조 창구단일화 공고 일정·타임오프·단체교섭 및 임단협 전략 자문', from: '푸른 메일·카톡/문자·교섭요구 자료', to: '교섭 절차 체크·결과보고서(.hwpx)', ask: '민간노조·단체교섭 앱에서 창구단일화 일정은 어떻게 확인하나요?' },
         { key: 'specialcons', icon: '🧩', name: '특화·위탁컨설팅', when: '중진공 혁신바우처·통상변화대응·삼성협력사·경비(감단직)·이음센터·공정채용 위탁 컨설팅', from: '푸른 메일·카톡/문자·위탁사업 자료', to: '트랙별 결과보고서(.hwpx)·체크리스트', ask: '특화·위탁컨설팅 앱에는 어떤 사업이 포함되나요?' },
+        { key: 'unionrel',  icon: '🗣️', name: '노사관계·단체교섭', when: '단체교섭·임금협상·교섭창구단일화·노동쟁의 조정·노사협의회 사건 관리, 푸른 메일 전수 수집, 사업장·연도별 진행/검토서류 분류 및 단협·임협 신구대비표·임금시뮬레이터(.hwpx)', from: '푸른 메일(교섭·노조 IMAP/POP3 수발신 전체), 푸른이알피(업체·사건 원장), 로컬 교섭 폴더', to: '교섭요구공문·단일화공고·검토의견서·연간종합보고서(.hwpx)·신구대비표(.csv) 및 한글 편집기 연동', ask: '노사관계·단체교섭 앱은 어떻게 사용하고 메일 전수 수집과 연도별·서류별 대시보드는 어떻게 쓰나요?' },
         { key: 'hangul',    icon: '📝', name: '한글 편집기',     when: '한글 프로그램 없는 PC나 민감정보(주민번호)가 든 .hwp/.hwpx 문서를 바로 열고 고칠 때', from: '내 PC 파일 (서버·파이어베이스로 전송하지 않음)', to: '수정한 .hwpx 파일 내 PC 즉시 저장', ask: '한글 편집기는 어떤 상황에서 쓰면 좋나요?' },
         { key: 'rules',     icon: '📜', name: '기업규정집',     when: '취업규칙·노사협의회·단체협약 법령 위반 검토, 회차별 개정·신구대조표, 문서 내 AI 질문', from: '푸른 메일(취업규칙 첨부 자동 수집), 푸른이알피(업체 목록)', to: '기업정보함(업체 상세 업무 이력에 완료 회차 표시), 업무관리(이력 조회)', ask: '기업규정집은 메일·기업정보함·업무관리와 어떻게 이어지나요?' },
         { key: 'payroll',   icon: '💰', name: '급여아웃소싱',   when: '고객사 임금 대행·근태·임금명세서·연차 정산 (우리 법인 내부 급여인 인사관리와 별개)', from: '고객사 급여·근태 기초자료', to: '임금대장·임금명세서 산출', ask: '급여아웃소싱과 내부관리의 인사관리는 무엇이 다른가요?' }
@@ -280,7 +281,7 @@
       flowId: 'flow-gov',
       source: '푸른포털 영역별 길잡이',
       docNo: '① 의뢰인 업무 줄 사용법·연결도',
-      law: '푸른이알피 · 기금관리 · 컨설팅보고서 · 정부사업일정 · 기업정부지원금 · 괴롭힘·성희롱 조사 · 일터상생혁신 · 산업일자리전환 · 한글 편집기 · 기업규정집 · 급여아웃소싱',
+      law: '푸른이알피 · 기금관리 · 컨설팅보고서 · 정부사업일정 · 기업정부지원금 · 괴롭힘·성희롱 조사 · 일터상생혁신 · 산업일자리전환 · 안전보건체계구축 · 노사관계·단체교섭 · 한글 편집기 · 기업규정집 · 급여아웃소싱',
       title: '[의뢰인 업무] 12개 앱 완벽 가이드 — 언제 무엇을 쓰고 어떻게 연결되나',
       q: '의뢰인 업무 줄에 있는 프로그램들은 각각 언제 어떻게 사용하고 서로 어떻게 연결되어 있나요?',
       a: '[의뢰인 업무] 줄은 고객사 일을 직접 처리하는 12개 앱입니다.\n• [푸른이알피]: 모든 거래처·자문계약·노동사건·컨설팅 수임의 출발점(원본)입니다. 처음 수임하면 여기서 업체를 먼저 세웁니다.\n• [정부사업일정] ➔ [컨설팅보고서] & [일터상생혁신] · [산업일자리전환] · [안전보건체계구축]: 수임 컨설팅의 회차·방문사진·초안은 [정부사업일정]에서, 전사 진도·③서명본~⑤제출 체크는 [컨설팅보고서]에서 하며, 일터혁신(.pptx)·산업일자리전환(.hwpx)·안전보건체계구축(과거이력·다업종 체크리스트·위험성평가·1P/종합 .hwpx)은 각각 전용 워크스페이스에서 비식별 진단·보고서를 자동 생성합니다.\n• [괴롭힘·성희롱 조사]: 조사 공문 메일을 자동 수집해 8단계 표준 조사·종단간 암호화 비밀 전자서명·조사결과보고서(.hwpx)를 작성하고 푸른이알피 사건관리와 동기화합니다.\n• [기업정부지원금] & [기금관리]: 이알피 고객사 수급 가능 지원금을 매칭해 「신청 대행」 시 [업무관리] 할 일을 자동 생성하며, 기금관리는 기업정보함·푸른 메일과 연결해 기금 설립·결산·법령챗봇을 지원합니다.\n• [기업규정집] & [한글 편집기] & [급여아웃소싱]: 각각 취업규칙 개정(기업정보함 이력 연동), 민감 한글파일 로컬 편집(서버 무전송), 고객사 임금 대행을 맡습니다.',
@@ -290,11 +291,11 @@
       ],
       followUps: [
         '괴롭힘·성희롱 조사 앱은 어떻게 사용하고 푸른 메일·이알피와 어떻게 연결되나요?',
-        '일터상생혁신 앱과 산업일자리전환 앱은 각각 어떻게 쓰나요?',
+        '노사관계·단체교섭 앱은 어떻게 사용하고 메일 전수 수집과 연도별·서류별 대시보드는 어떻게 쓰나요?',
         '기업정부지원금에서 신청 대행을 누르면 업무관리에 어떻게 나타나?'
       ],
-      tags: ['의뢰인업무', '의뢰인 업무', '첫번째줄', '1번째줄', '고객사업무', '컨설팅연결', '의뢰인업무사용법', '의뢰인업무연결도', '괴롭힘성희롱조사', '일터상생혁신', '산업일자리전환'],
-      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'safety', 'techprotect', 'clinic', 'chamber', 'hrconsult', 'evalcomp', 'pubconsult', 'familywork', 'socialent', 'sixthind', 'laboraudit', 'unionneg', 'specialcons', 'hangul']
+      tags: ['의뢰인업무', '의뢰인 업무', '첫번째줄', '1번째줄', '고객사업무', '컨설팅연결', '의뢰인업무사용법', '의뢰인업무연결도', '괴롭힘성희롱조사', '일터상생혁신', '산업일자리전환', '노사관계단체교섭'],
+      apps: ['erp', 'fund', 'consult', 'govreport', 'govaid', 'harass', 'ilteo', 'jobtrans', 'safety', 'techprotect', 'clinic', 'chamber', 'hrconsult', 'evalcomp', 'pubconsult', 'familywork', 'socialent', 'sixthind', 'laboraudit', 'unionneg', 'specialcons', 'unionrel', 'hangul']
     },
     {
       id: 'SYS-row-store',
@@ -552,6 +553,27 @@
       followUps: ['6차산업컨설팅 앱은 어떻게 사용하고 현장코칭·인증은 무엇을 점검하나요?'],
       tags: ['RAG', '실무코치', '수습노무사', '학습', '행동가이드', '플레이북', 'coach'],
       apps: ['coach', 'sixthind', 'msgintake']
+    },
+    {
+      id: 'SYS-unionrel-01',
+      cat: 'system',
+      flowId: 'flow-core',
+      source: '푸른포털 앱 사용법',
+      docNo: '의뢰인 업무 · 노사관계·단체교섭 사용법',
+      law: '메일 전수 수집(IMAP·POP3) · 로컬 폴더 ➔ 8단계 표준 교섭절차 · 법정기한 계산 ➔ 진행/검토 서류함 · 신구대비표 · 공문(.hwpx)',
+      title: '[노사관계·단체교섭] 이메일 전수 수집 · 사업장/연도별 8단계 절차 · 진행/검토 서류함 · 신구대비표(.hwpx) 사용법',
+      q: '노사관계·단체교섭 앱은 어떻게 사용하고 메일 전수 수집과 연도별·서류별 대시보드는 어떻게 쓰나요?',
+      a: '[노사관계·단체교섭]은 포털 [의뢰인 업무] 줄에서 고객사의 단체교섭·임금협상·교섭창구단일화·노동쟁의 조정·노사협의회 업무를 전담하는 앱입니다(공공기관 ALIO 조회 전용 [공공임단협]과 별개).\n① [이메일 전수 수집 · 로컬 자료 적재]: [푸른 메일] 수발신함·구버전 메일함에서 교섭·임단협·창구단일화 관련 메일을 전수 수집하여 미등록 사업장·연도 묶음을 한 번에 사건으로 가져옵니다(컨설팅 일반 인터뷰 첨부는 자동 제외).\n② [사업장·연도별 8단계 절차 · 법정기한]: 8단계 표준 절차(요구수신~사후이행), 교섭창구단일화 7/5/14일·쟁의조정 10/15일 D-Day 자동 계산, 회차별 교섭 일지를 한 곳에서 관리합니다.\n③ [진행·검토 서류함 · 신구대비 검토실 · HWPX]: 교섭 진행서류와 검토·자문서류를 연도·유형별로 분리 관리하고, 현행 vs 노조안 vs 사측안 신구대비표·임금인상 시뮬레이션 및 공문/보고서(.hwpx)와 [한글 편집기] 연동을 제공합니다.',
+      points: [
+        '공공기관 경영공시 비교용 [공공임단협]과 달리, 실제 수임한 고객사 단체교섭·임금협상 메일·서류·조항 검토에 특화된 전용 작업공간입니다',
+        '개인정보·주민등록번호·로컬PC 경로는 가림 처리 후 전용 저장소(`union_rel`)에 보관합니다'
+      ],
+      followUps: [
+        '이메일 전수 수집에서 일반 컨설팅 메일이 섞이지 않게 하려면 어떻게 걸러지나요?',
+        '한글 편집기는 어떤 상황에서 쓰면 좋나요?'
+      ],
+      tags: ['노사관계', '단체교섭', '임금협상', '임단협', '교섭창구단일화', '노동쟁의', '노사협의회', '신구대비표', 'unionrel'],
+      apps: ['unionrel', 'erp', 'mail', 'hangul', 'rules']
     },
     {
       id: 'SYS-onboard-newco',
@@ -1249,7 +1271,7 @@
     erp: 1, fund: 1, consult: 1, govreport: 1, govaid: 1, harass: 1, ilteo: 1, jobtrans: 1, safety: 1,
     techprotect: 1, clinic: 1, chamber: 1, hrconsult: 1, evalcomp: 1, pubconsult: 1,
     familywork: 1, socialent: 1, sixthind: 1, laboraudit: 1, unionneg: 1, specialcons: 1,
-    msgintake: 1, coach: 1,
+    unionrel: 1, msgintake: 1, coach: 1,
     hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
     aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1, pubsearch: 1,
     hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1, datahub: 1
@@ -1266,7 +1288,8 @@
     safety: 'SYS-safety-01',
     sixthind: 'SYS-sixthind-01',
     msgintake: 'SYS-msgintake-01',
-    coach: 'SYS-coach-01'
+    coach: 'SYS-coach-01',
+    unionrel: 'SYS-unionrel-01'
   };
   var ROW_LABELS = {
     client: '의뢰인 업무',
@@ -1302,20 +1325,9 @@
     { prefix: 'scal_ilteo', label: '일터상생혁신(전용 작업공간)', app: 'ilteo' },
     { prefix: 'scal_jobtrans', label: '산업일자리전환(전용 작업공간)', app: 'jobtrans' },
     { prefix: 'scal_safety', label: '안전보건체계구축(전용 작업공간)', app: 'safety' },
-    { prefix: 'scal_techprotect', label: '기술보호컨설팅(전용 작업공간)', app: 'techprotect' },
-    { prefix: 'scal_clinic', label: '현장클리닉(전용 작업공간)', app: 'clinic' },
-    { prefix: 'scal_chamber', label: '상공회의소컨설팅(전용 작업공간)', app: 'chamber' },
-    { prefix: 'scal_hrconsult', label: '기초인사노무(전용 작업공간)', app: 'hrconsult' },
-    { prefix: 'scal_evalcomp', label: '평가보상·임금체계(전용 작업공간)', app: 'evalcomp' },
-    { prefix: 'scal_pubconsult', label: '공공기관컨설팅(전용 작업공간)', app: 'pubconsult' },
-    { prefix: 'scal_familywork', label: '출산육아·유연근무(전용 작업공간)', app: 'familywork' },
-    { prefix: 'scal_socialent', label: '사회적기업·씨앗(전용 작업공간)', app: 'socialent' },
-    { prefix: 'scal_sixthind', label: '6차산업컨설팅(전용 작업공간)', app: 'sixthind' },
-    { prefix: 'scal_laboraudit', label: '자율점검·근로감독(전용 작업공간)', app: 'laboraudit' },
-    { prefix: 'scal_unionneg', label: '민간노조·단체교섭(전용 작업공간)', app: 'unionneg' },
-    { prefix: 'scal_specialcons', label: '특화·위탁컨설팅(전용 작업공간)', app: 'specialcons' },
     { prefix: 'msg_intake', label: '카톡·문자 자료수집(자동분류 대기함)', app: 'msgintake' },
     { prefix: 'coach_rag', label: '실무코치·RAG학습(수습 실무노트)', app: 'coach' },
+    { prefix: 'union_rel', label: '노사관계·단체교섭(전용 작업공간)', app: 'unionrel' },
     { prefix: 'scal_', label: '정부사업일정(회차·보고서)', app: 'consult' },
     { prefix: 'govaid', label: '기업정부지원금(지원사업 매칭)', app: 'govaid' },
     { prefix: 'harass_', label: '괴롭힘·성희롱 조사(보안 사건함)', app: 'harass' },
@@ -1994,6 +2006,7 @@
     if (/6차\s*산업|농촌\s*융복합|\bsixthind\b/i.test(q) && it.id === 'SYS-sixthind-01') score += 48;
     if (/카톡.*수집|문자.*수집|\bmsgintake\b/i.test(q) && it.id === 'SYS-msgintake-01') score += 48;
     if (/실무\s*코치|수습.*rag|\bcoach\b/i.test(q) && it.id === 'SYS-coach-01') score += 48;
+    if (/노사관계|단체교섭|임금협상|임단협|교섭\s*창구|신구대비표|\bunionrel\b/i.test(q) && it.id === 'SYS-unionrel-01') score += 48;
     if (it._autoKey) {
       var mentionedAuto = detectMentionedApps(q);
       if (mentionedAuto.indexOf(it._autoKey) >= 0) {
@@ -2142,7 +2155,7 @@
     office: 1, hrwelf: 1, etc: 1
   };
   var APP_TO_SG_CAT = {
-    erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', datahub: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp',
+    erp: 'erp', fin: 'erp', hr: 'erp', career: 'erp', datahub: 'erp', govaid: 'erp', deungi: 'erp', harass: 'erp', unionrel: 'erp',
     consult: 'consult', govreport: 'consult', govbid: 'consult', settle: 'consult', ilteo: 'consult', jobtrans: 'consult', safety: 'consult',
     techprotect: 'consult', clinic: 'consult', chamber: 'consult', hrconsult: 'consult', evalcomp: 'consult', pubconsult: 'consult',
     familywork: 'consult', socialent: 'consult', sixthind: 'consult', laboraudit: 'consult', unionneg: 'consult', specialcons: 'consult',
@@ -2165,7 +2178,7 @@
     if (/계약서등관리|한글\s*편집|전자서명|위임장/.test(hay)) return 'docs';
     if (/기업규정집|취업규칙/.test(hay)) return 'rules';
     if (/급여아웃소싱|급여데이터함|\bpaydata\b/i.test(hay)) return 'payroll';
-    if (/푸른이알피|이알피|재무관리|인사관리|경력관리|푸른등기|변경등기|기업정부지원금|괴롭힘[·\s]*성희롱\s*조사|\bharass\b|자문계약|사건관리|업체관리|계약\s*저장/i.test(hay)) return 'erp';
+    if (/푸른이알피|이알피|재무관리|인사관리|경력관리|푸른등기|변경등기|기업정부지원금|괴롭힘[·\s]*성희롱\s*조사|\bharass\b|노사관계|단체교섭|임금협상|임단협|\bunionrel\b|자문계약|사건관리|업체관리|계약\s*저장/i.test(hay)) return 'erp';
     if (/포털|챗봇|길잡이|뉴스레터|홈페이지|회생광고|전광판|공공임단협|오케스트레이션|P박스|p박스|피박스|\bpbox\b|\borch\b/i.test(hay)) return 'portal';
     var dynApps = detectMentionedApps(hay);
     for (var i = 0; i < dynApps.length; i++) {
@@ -2313,7 +2326,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:자율점검·근로감독, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:자율점검·근로감독, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, unionrel:노사관계·단체교섭, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];

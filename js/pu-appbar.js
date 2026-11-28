@@ -65,6 +65,7 @@
     { key: 'laboraudit', row: 'client', name: '자율점검·근로감독', icon: '🧭', url: 'laboraudit.html',  desc: '기초노동질서·모의감독·서류보존 진단' },
     { key: 'unionneg', row: 'client', name: '민간노조·단체교섭', icon: '🫂', url: 'unionneg.html',    desc: '창구단일화·교섭대표·타임오프·임단협' },
     { key: 'specialcons', row: 'client', name: '특화·위탁컨설팅', icon: '🧩', url: 'specialcons.html',  desc: '혁신바우처·통상·삼성협력·경비·이음' },
+    { key: 'unionrel', row: 'client', name: '노사관계·단체교섭', icon: '🗣️', url: 'pu-union.html',       desc: '교섭메일수집·절차·서류·임단협' },
     { key: 'msgintake', row: 'store',  name: '카톡·문자 자료수집', icon: '💬', url: 'pu-msg-intake.html', desc: '카카오톡·문자 자동분류·2중 비식별' },
     { key: 'coach',    row: 'store',  name: '실무코치·RAG학습', icon: '🧠', url: 'pu-coach.html',     desc: '수습·주니어 RAG 행동가이드·학습허브' },
     { key: 'orch',    row: 'inside', name: '오케스트레이션',   icon: '🔄', url: 'pu-orchestrator.html', desc: '메일·계약·ERP·정산 흐름연결' },

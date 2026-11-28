@@ -2705,6 +2705,39 @@ rules.coach_rag = {
   $other: { '.validate': false }
 };
 
+/* 🤝 노사관계·단체교섭(pu-union.html, 2026-11-28)
+   - 단체교섭·임금협상·교섭창구단일화·노동쟁의 조정·노사협의회 사건, 연도/사업장별 진행/검토서류, 단협·임협 신구대비 조항, 이메일 전수 수집 아카이브, 제외 기록, 불변 스냅샷.
+   - 재직 직원(LOGIN) 읽기·쓰기, 물리 삭제 금지(newData.exists() || ADMIN — 소프트 삭제 _deleted 만 허용).
+   - snapshots/$cid/$id 는 확정 스냅샷으로 생성 후 덮어쓰기 불가(!data.exists() || ADMIN). */
+rules.union_rel = {
+  '.read': LOGIN,
+  cases: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'"
+  } },
+  docs: { $cid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  clauses: { $cid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  mails: { $cid: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Message'"
+  } } },
+  dismissed: { $id: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+  } },
+  snapshots: { $cid: { $id: {
+    '.write': `(${LOGIN}) && newData.exists() && (!data.exists() || ${ADMIN})`,
+    '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Document'"
+  } } },
+  $other: { '.validate': false }
+};
+
 /* 💬 사내 카톡 업무방 아카이브(라이브 콘솔 적용분 동기화, 2026-11-28) */
 rules.kakao_room = {
   '.read': LOGIN,
