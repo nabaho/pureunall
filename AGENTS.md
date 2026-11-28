@@ -29,6 +29,10 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 (`erpNoteWorth`). 한 줄이 두 줄이 되면 300줄짜리 표가 두 배로 길어진다.
 → `tests/one-line-cells.test.js`
 
+### ②-1 서류 · 목록 화면 기본 형태 — 직장 내 괴롭힘(`pu-harass`) 표준 (2026-11-28)
+상단 `트랙+1줄 인라인 KPI` 2단 스트립, 독립 필터(`↺ 초기화`), **`연도`·`사업장명`·`진행상태` 독립 열 분리 정렬 표**, 1줄 `.ws-steps` + `<details class="sub-fold">` 작업실과 상단 커밋 표시를 유지한다.
+→ `docs/규칙/서류-목록-표준형태.md` (`tests/safety-auto.test.js`)
+
 ### ③ 파이어베이스 규칙은 «만들개»에서 고친다
 `scripts/make-firebase-rules.js` 를 고치고 다시 만든다. JSON 을 손으로 고치면
 다음에 만들 때 조용히 사라진다. 올리는 것은 `node scripts/rules-deploy.js --deploy` 다

@@ -267,3 +267,28 @@ test('7. 푸른 ERP · 장애알림(pu-health) · 인증동기화(pu-authsync) �
   assert.match(erpHtml, /key:'safety'[^}]*path:'scal_safety\/projects'/);
   assert.match(erpHtml, /safety\.html\?sso=1#proj=/);
 });
+
+test('8. 직장 내 괴롭힘 표준 형태(분리된 연도·진행상태 열 · 클릭형 인라인 KPI · 초기화 · 커밋 표시) 및 규칙 문서화', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'safety.html'), 'utf8');
+  assert.match(html, /id="releaseShaChip"/);
+  assert.match(html, /id="projResetBtn"/);
+  assert.match(html, /\.c-direct\b/);
+  assert.match(html, /\.c-direct-ing\b/);
+  assert.match(html, /\.sub-fold/);
+
+  const viewJs = fs.readFileSync(path.join(ROOT, 'js', 'pu-safety-view.js'), 'utf8');
+  assert.match(viewJs, /function mountReleaseShaChip\(/);
+  assert.match(viewJs, /meta\[name="pu-release"\]/);
+  assert.match(viewJs, /data-kpi-status=/);
+  assert.match(viewJs, /text:\s*'연도',\s*cls:\s*'yr'/);
+  assert.match(viewJs, /text:\s*'진행상태',\s*cls:\s*'st'/);
+  assert.match(viewJs, /class="sub-fold"/);
+  assert.match(viewJs, /var workerCnt = num\(proj\.workerCount, 0\)/);
+  assert.match(viewJs, /var roundCnt = num\(p\.roundCount, 0\)/);
+  assert.match(viewJs, /clearSel\('projects'\)/);
+
+  const stdDoc = fs.readFileSync(path.join(ROOT, 'docs', '규칙', '서류-목록-표준형태.md'), 'utf8');
+  assert.match(stdDoc, /pu-harass\.html/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8'), /서류-목록-표준형태\.md/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'AGENTS.md'), 'utf8'), /서류-목록-표준형태\.md/);
+});
