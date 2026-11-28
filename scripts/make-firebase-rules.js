@@ -179,7 +179,8 @@ rules.data = {
   },
 
   /* 재무 — 돈과 급여. 재무 권한자만. */
-  finance_income: finOnly, finance_expense: finOnly, finance_invoice: finOnly,
+  finance_income: Object.assign({}, finOnly, { v: { '.indexOn': ['sourceKind'] } }),
+  finance_expense: finOnly, finance_invoice: finOnly,
   payroll_monthly: finOnly, payroll_irregular: finOnly, funds: finOnly,
   mgr_rates: finOnly, pay_items: finOnly, dc_contributions: finOnly,
   retirement_settlements: finOnly, recurring_expenses: finOnly,
@@ -588,6 +589,11 @@ rules.work_erp = workspace({
       nx: 날짜목록,
       $other: { '.validate': false }
     }
+  },
+  items: {
+    '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+    '.indexOn': ['coid'],
+    $k2: { '.write': LOGIN }
   }
 });
 rules.chwieop  = workspace();
@@ -952,7 +958,7 @@ rules.pucards = {
   items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': LOGIN } },
   tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': LOGIN } },
   /* 예약 발송과 회차별 결과는 필요한 줄만 읽는다. 이름 붙인 칸이라 $k 쓰기 권한을 그대로 옮긴다. */
-  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': LOGIN } },
+  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk', 'priorityAt'], $k2: { '.write': LOGIN } },
   /* 🧾 사업자등록증 자동 검토 기록(서버 bizreg-review) — 화면은 최근 30일만 at 로 추려 읽는다. 「확인함」은 줄의 done 에 직원이 쓴다 (2026-10-13) */
   bizreg: { '.write': pucardsWrite, '.indexOn': ['at'], $k2: { '.write': LOGIN } },
   /* 📬 메일 서명 → 명함 줄(서버 mail-card) — 받는 탭이 «read» 줄만 st 로 추려 읽는다 (2026-10-24).
@@ -967,7 +973,7 @@ rules.pucards = {
   $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
-rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
+rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] }, inbox: { $uid: { '.indexOn': ['rawHash'] } } };
 /* 푸른 캘린더 «나만 보기» 일정 (대표 지시 2026-09-27 「본인만 확인가능하고 다른사람은 확인안되게」,
    추천대로 «관리자도 못 본다»). ⚠ data 아래가 아니다 — data 는 재무 권한자가 통째로 읽는다.
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
@@ -1521,7 +1527,9 @@ rules.signboard = { '.read': LOGIN,
    ⚠ 메모는 «그 자료의 메모»여야 한다(sourceId = 자료 열쇠). 원본 파일은 창고 규칙(edulib/{id}/…)이 따로 지킨다.
    ★ 2026-11-21 cats(사람이 더한 강의 종류 — 대표 「새로운 강의가 생길수 있으니 + 추가기능」): 자료와 «같은 사람»(재직 직원)이 읽고 쓴다.
      이름은 1~40자, 찾을 낱말은 목록(words)으로만. 더 넓게 열리는 칸은 없다(edulib 전체가 이미 재직 직원 읽기).
-   ★ 보낸 메일 자동 정리의 결과는 edulib 아래가 아니라 «edulib_inbox»(아래)에 둔다 — edulib 는 재직 직원 읽기라 아래 칸을 좁힐 수 없다. */
+   ★ 보낸 메일 자동 정리의 결과는 edulib 아래가 아니라 «edulib_inbox»(아래)에 둔다 — edulib 는 재직 직원 읽기라 아래 칸을 좁힐 수 없다.
+   ★ 2026-11-27 대표 「새로운 강의 자료 같은 경우는 강의 자료함에 반드시 저장해 달라」부터 서버가 강의자료를 items·sims·lectures 에 «바로» 쓴다
+     (관리자 SDK — 같은 칸만, 빈 자리일 때만). 저장하지 않고 남긴 것(명단·주민번호 꼴)만 edulib_inbox 에 남는다. */
 const EDULIB_W = `(${LOGIN}) && newData.exists()`;
 rules.edulib = { '.read': LOGIN,
   items: { $id:   { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduMaterial'" } },
@@ -1540,6 +1548,44 @@ rules.edulib = { '.read': LOGIN,
     createdBy: { '.validate': 'newData.isString() && newData.val().length <= 64' }, updatedBy: { '.validate': 'newData.isString() && newData.val().length <= 64' },
     createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
     updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    $other: { '.validate': false } } },
+  /* 2026-11-27 lectures(EduLecture — «강의 이력», 대표 「누가 언제 강의했는지만 간략하게 어떤 강의 내용으로 … 캘린더에서도 찾아도 된다」):
+     강의 한 번 = 기록 하나(날짜·시각·강의자 사번·장소 글·강의 내용·쓴 자료 id·근거가 된 캘린더 일정/메일 제목·추정/확인).
+     자료와 «같은 사람»(재직 직원)이 읽고 쓴다 — 더 넓게 열리는 칸 없음(캘린더 일정 글은 이미 재직 직원이 읽는 data/gcal_archive 에서 옮긴 것,
+     메일 제목은 주소·전화·주민번호를 가린 것). 만든 사람: 서버 메일 자동 저장(관리자 SDK — 규칙을 거치지 않지만 같은 칸만 쓴다)·화면 관문.
+     ★ 칸을 정해 둔다(그 밖의 칸은 $other false) · 강의자는 «사번 꼴»만(이름 칸 없음 — 이름으로 짐작해 잇지 않는다) · 만든이 메일 주소 칸 없음.
+     ★ 열쇠는 lec_ + 영문 소문자·숫자(캘린더 일정·메일에서 정해지는 열쇠 — js/pu-edulib-lecture.js idOfCal·idOfMail·newId). 지우기는 _deleted 표식만. */
+  lectures: { $id: { '.write': EDULIB_W, '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduLecture' && $id.matches(/^lec_[a-z][0-9a-z]{4,40}$/)",
+    id: { '.validate': true }, entityType: { '.validate': true },   /* 위 .validate 가 값을 본다 — 칸 이름만 열어 둔다 */
+    schemaVersion: { '.validate': 'newData.isNumber()' }, contractVersion: { '.validate': 'newData.isNumber()' }, revision: { '.validate': 'newData.isNumber()' },
+    date: { '.validate': "newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/)" },
+    time: { '.validate': "newData.isString() && newData.val().matches(/^([0-9]{2}:[0-9]{2})?$/)" },
+    lecturerSid: { '.validate': "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{0,40}$/)" },
+    venue: { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    title: { '.validate': 'newData.isString() && newData.val().length <= 200' },
+    cat: { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    note: { '.validate': 'newData.isString() && newData.val().length <= 500' },
+    status: { '.validate': "newData.val() === 'auto' || newData.val() === 'ok'" },
+    itemIds: { '.validate': 'newData.hasChildren()', $item: { '.validate': "newData.val() === true && $item.matches(/^[A-Za-z0-9_-]{1,60}$/)" } },
+    cal: { '.validate': 'newData.hasChildren()', id: { '.validate': 'newData.isString() && newData.val().length <= 200' }, summary: { '.validate': 'newData.isString() && newData.val().length <= 300' },
+      location: { '.validate': 'newData.isString() && newData.val().length <= 300' }, date: { '.validate': 'newData.isString() && newData.val().length <= 10' },
+      time: { '.validate': 'newData.isString() && newData.val().length <= 5' }, $other: { '.validate': false } },
+    mail: { '.validate': 'newData.hasChildren()', id: { '.validate': 'newData.isString() && newData.val().length <= 200' }, subject: { '.validate': 'newData.isString() && newData.val().length <= 300' },
+      date: { '.validate': 'newData.isString() && newData.val().length <= 10' }, $other: { '.validate': false } },
+    guess: { '.validate': 'newData.hasChildren()', date: { '.validate': 'newData.isString() && newData.val().length <= 20' }, lecturer: { '.validate': 'newData.isString() && newData.val().length <= 20' },
+      venue: { '.validate': 'newData.isString() && newData.val().length <= 20' }, score: { '.validate': 'newData.isNumber()' }, $other: { '.validate': false } },
+    /* «확인한 사람»은 그대로 두거나 «지금 쓰는 사람의 사번»으로만 — 남의 이름으로 «확인»을 꾸미지 못하게(2026-11-27 보안 검토 «낮음»). 서버(관리자 SDK)는 이 칸을 쓰지 않는다 */
+    confirmedBy: { '.validate': "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())" },
+    confirmedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    /* 만든 사람·고친 사람·지운 사람 — 그대로 두거나 «지금 쓰는 사람의 사번»만(«자동(메일자동정리)»이나 남의 사번을 꾸미지 못하게, 2026-11-27 보안 재검증).
+       서버 메일 자동 저장(관리자 SDK)은 규칙을 거치지 않고 AI-메일자동정리 로 쓴다 — 사람이 그 기록을 고쳐도 만든 사람은 그대로 남는다 */
+    createdBy: { '.validate': "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())" },
+    updatedBy: { '.validate': "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())" },
+    createdAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    updatedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
+    _deleted: { '.validate': 'newData.isBoolean()' },
+    deletedBy: { '.validate': "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())" },
+    deletedAt: { '.validate': '(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)' },
     $other: { '.validate': false } } } };
 /* ══ 🎓 강의자료 «자동 정리함»(edulib_inbox) — 보낸 메일의 강의자료를 서버가 정리해 둔 대기열 (2026-11-21) ══
    대표 지시 「메일로 보낸 강의 자료나 강의 내용의 경우 자동으로 정리해서 내용 넣을 수 있게」 — 정리(종류·강의일·내용 요약)는 서버가,
