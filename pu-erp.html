@@ -289,6 +289,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=2"></script>
 <script src="js/pu-co-mismatch.js?v=3"></script>
+<script src="js/pu-biz-evidence.js?v=3"></script>
 <script src="js/pu-cms-auto.js?v=3"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
@@ -11346,6 +11347,355 @@ function CoLinkModal(props){
           } }, '↩ 방금 연결한 것 되돌리기'),
         h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'))
     ));
+}
+
+/* ══════ 🧾 사업자번호·담당 «근거로 채우기» (대표 지시 2026-11-28) ══════════════════════════════
+   「최근 계산서 같은 데를 찾아서 사업자 번호가 자동으로 들어가게 … 같은 업체라고 판단되면 끌고 와서 연결」
+   ■ 판정은 js/pu-biz-evidence.js «한 곳»(검사가 그 파일을 돌린다) — 여기는 근거 모으기 · 저장 · 되돌리기 · 창이다.
+   ■ 근거 — 홈택스 세금계산서 아카이브(invoice_history) · 재무 발행분(finance_invoice) · CMS 장부 · 기업정보함 사업자등록증 · 업체관리 · 다른 업무 건.
+     메일 거울(mailbox/msgs)은 머리글 + 140자 미리보기뿐이라 사업자번호가 없다 — 메일 본문 읽기는 사람이 한 통을 골라야 하는 별도 길이다(docs/규칙/사업자번호-근거-채우기.md).
+   ■ 저장은 «번호 칸 하나»뿐이다 — 업체 번호(companyId)·주담당·거래처 담당자는 이 창이 쓰지 않는다(온톨로지: 이름으로 추정한 관계를 저장하지 않는다 / 담당은 mgrHistory 길이 따로 있다).
+   ■ 쓰는 «지금» 다시 고른다 — 창을 연 뒤 자료가 바뀌었으면(번호가 생김·다른 번호가 나옴·종결됨) 건너뛴다. 이미 있는 번호는 덮지 않는다.
+   ■ 채운 줄에는 bizAuto 표시(근거·이전 값·누가·언제)를 남긴다 → 「채운 것」 탭에서 되돌린다. 표시가 있는 값은 다시 근거로 쓰지 않는다.
+   ■ 끝난 건(종결·취소·이관·보관·삭제)·계약(입력 관문 validateCompanyLink 가 따로 있다)에는 쓰지 않는다. */
+var BF_TIP = '사업자번호가 비었거나 표기가 다른 곳을 세금계산서·CMS 장부·등록증 등 근거에서 찾아 채웁니다. 서로 다른 근거 둘 이상이 «꼭 같은 이름»에서 같은 번호를 말할 때만 자동이고, 이미 있는 값은 덮지 않습니다.';
+var BF_APPLY_STORES = { companies:1, consultings:1, funds:1, other_projects:1, cases:1 };
+var BF_ALL_STORES = ['consultings','funds','other_projects','cases','contracts'];
+var BF_REASON = {
+  'format-only':'표기만 다름 — 같은 번호', 'company-id':'업체 번호로 이어진 업체관리의 번호', 'two-kinds':'서로 다른 근거 둘 이상이 일치',
+  'thin-evidence':'근거가 한 곳뿐 — 눈으로 확인 후 적용', 'badsum':'검증숫자가 맞지 않음', 'short':'자릿수가 모자람', 'long':'열한 자리 이상 — 공단 관리번호로 보임',
+  'text':'숫자 사이에 글자가 섞임', 'nodigit':'숫자가 없음', 'evidence-differs':'근거 자료는 다른 번호를 말함', 'differs-from-company':'업체관리와 다른 번호',
+  'same-name-other-number':'같은 이름에 다른 번호가 있음', 'ceo-differs':'대표자가 서로 다름', 'peers-differ':'같은 업체의 다른 건끼리 서로 다름',
+  'multi-signal':'이름 일부 + 금액 + 날짜가 모두 맞는 세금계산서 한 줄 — 눈으로 확인 후 적용', 'source-contract':'이 건을 만든 원본 계약의 번호',
+  'source-auto':'원본 계약의 번호가 자동으로 채운 값 — 눈으로 확인 후 적용',
+  'link-sources-differ':'업체의 번호와 원본 계약의 번호가 서로 다름', 'link-no-name':'이 건에 업체 이름이 없어 이름 근거를 견줄 수 없음 — 눈으로 확인 후 적용',
+  'link-vs-evidence':'번호표로 이어진 업체와 바깥 자료의 번호가 다름', 'company-auto':'업체의 번호가 자동으로 채운 값 — 눈으로 확인 후 적용',
+  'company-main':'같은 업체의 업체관리 주담당', 'peers-agree':'같은 업체의 다른 건들이 같은 사람', 'company-contact':'같은 업체의 업체관리 담당자'
+};
+function bfEvidenceBase(){
+  var ev = { invoices: dbGet('finance_invoice', []) || [], cms: [], regcerts: [], hometax: [], mails: [] };
+  try { var cur = erpCmsLedgerGet(); if(cur && Array.isArray(cur.rows)) ev.cms = cur.rows; } catch(_c){ }
+  try {
+    var pc = ensurePucardsIdx() || {};
+    Object.keys(pc).forEach(function(id){ var r = pc[id]; if(r && r.k === 'biz') ev.regcerts.push({ id:id, name:r.c, bz:r.bz, ceo:r.ceo }); });
+  } catch(_p){ }
+  return ev;
+}
+/* hometax — 홈택스 아카이브 줄(비동기로 읽어 넘긴다). 돌려주는 것: PuBizEvidence.buildPlan 결과 */
+function bfPlanNow(hometax){
+  var ev = bfEvidenceBase(); ev.hometax = hometax || [];
+  var stores = {};
+  BF_ALL_STORES.forEach(function(k){ stores[k] = dbGet(k, []) || []; });
+  return PuBizEvidence.buildPlan({ companies: dbGet('companies', []) || [], stores: stores, evidence: ev }, {
+    isActiveSid: function(sid){ var s = getUserAssignStatus(sid); return !!(s && s.assignable); }
+  });
+}
+function bfLoadHometax(strict){
+  /* strict(자동 연결용): 받기가 실패하거나 한 줄도 없으면 «오류»로 던진다 — 근거가 빠진 채 계획을 세우면 충돌이 사라져 보인다(미룬다). 창은 못 받아도 이 PC 사본으로 보인다. */
+  var pull = (typeof erpInvArcPull === 'function') ? (strict ? erpInvArcPull() : erpInvArcPull().catch(function(){ return 0; })) : Promise.resolve(0);
+  return pull.then(function(){ return idbGetAll('invoice_history'); }).then(function(l){
+    var list = Array.isArray(l) ? l : [];
+    if(strict && !list.length) throw new Error('홈택스 세금계산서가 한 줄도 없음');
+    return list;
+  }).catch(function(e){ if(strict) throw e; return []; });
+}
+function bfRowKey(r){ return r.store + '|' + r.id + '|' + r.field; }
+/* 서버의 «지금» 값 — 쓰기 직전에 다시 읽는다. 이 PC 사본만 보고 쓰면 다른 PC 에서 그사이 고친 번호·끝낸 건을 덮을 수 있다.
+   서버에 못 닿으면 null — 못 읽으면 쓰지 않는다(fail-closed). */
+var BF_SERVER_KEYS = ['id','status','closedAt','closedDate','closeDate','permanentArchived','transferredTo','_deleted','mergedInto','bizNo','bizAuto'];
+function bfServerRec(store, id){
+  try {
+    if(typeof fbDb === 'undefined' || !fbDb) return Promise.resolve(null);
+    /* 경로를 «조립»하는 자리 — 표는 우리가 아는 이름만, id 는 경로 한 칸(슬래시·점·#·$·[·] 없음)일 때만. 아니면 읽지 않는다(못 읽음 = 쓰지 않음) */
+    if(!Object.prototype.hasOwnProperty.call(BF_APPLY_STORES, store)) return Promise.resolve(null);
+    if(typeof id !== 'string' || !id || /[.#$\[\]\/]/.test(id)) return Promise.resolve(null);
+    var base = fbDb.ref('data/' + store + '/v/' + id);
+    /* get() 은 «서버에서 가장 새 값»을 받는다(구독 중인 사본이 아니다 — once('value') 는 구독 사본을 줄 수 있다). 없는 SDK 면 once 로 물러난다. */
+    return Promise.all(BF_SERVER_KEYS.map(function(k){ var r = base.child(k); return (typeof r.get === 'function' ? r.get() : r.once('value')).then(function(s){ return s.val(); }); })).then(function(vals){
+      var o = {}; BF_SERVER_KEYS.forEach(function(k, i){ o[k] = vals[i]; });
+      /* 서버에 그 건이 «없으면» 모든 칸이 비어 온다 — 껍데기를 만들지 않으려고 id 가 맞는 건만 있는 것으로 본다 */
+      return (o.id !== null && String(o.id) === id) ? o : null;
+    }).catch(function(){ return null; });
+  } catch(_e){ return Promise.resolve(null); }
+}
+function bfServerEnded(sv, store){
+  return !!(sv._deleted === true || sv.mergedInto || PuBizEvidence.isTerminal(sv) || (store === 'companies' && String(sv.status || '') === 'closed'));
+}
+/* 번호 칸 채우기 — 선택한 줄을 «지금 자료»로 다시 판정하고, 서버의 지금 값도 확인해서, 같은 답일 때만 쓴다 */
+async function bfApply(rows, hometax, opts){
+  var plan = bfPlanNow(hometax), freshBy = {};
+  plan.rows.forEach(function(r){ freshBy[bfRowKey(r)] = r; });
+  var me = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '';
+  var at = new Date().toISOString();
+  var res = { n:0, skipped:0, why:{} };
+  function skip(why){ res.skipped++; res.why[why] = (res.why[why] || 0) + 1; }
+  rows = rows || [];
+  for(var i = 0; i < rows.length; i++){
+    var r = rows[i];
+    if(!r || r.field !== 'bizNo'){ skip('번호 칸이 아님'); continue; }
+    var f = freshBy[bfRowKey(r)];
+    if(!f){ skip('그사이 자료가 바뀜'); continue; }
+    if(!BF_APPLY_STORES[f.store] || f.readOnlyStore){ skip('이 표는 여기서 쓰지 않음'); continue; }
+    if(f.level !== 'auto' && f.level !== 'ask'){ skip('지금은 확신할 수 없음'); continue; }
+    if(opts && opts.autoOnly && f.level !== 'auto'){ skip('자동 연결은 «자동 채움»만 쓴다'); continue; }
+    if(f.to !== r.to || f.action !== r.action){ skip('그사이 답이 바뀜'); continue; }
+    var cur = (dbGet(f.store, []) || []).filter(function(x){ return x && x.id === f.id; })[0];
+    if(!cur || cur._deleted || PuBizEvidence.isTerminal(cur) || (f.store === 'companies' && String(cur.status || '') === 'closed')){ skip('끝났거나 지워진 건'); continue; }
+    var st = PuBizEvidence.bizStatus(cur.bizNo);
+    if((f.action === 'fill' || f.action === 'suggest') && st.kind !== 'empty'){ skip('그사이 번호가 들어옴'); continue; }
+    if(f.action === 'format' && (st.kind !== 'format' || st.digits !== PuBizEvidence.bizStatus(f.to).digits)){ skip('그사이 값이 바뀜'); continue; }
+    if(String(cur.bizNo || '').trim() !== String(f.from || '').trim()){ skip('그사이 값이 바뀜'); continue; }       // 계획을 세울 때의 원값과 같아야 한다
+    /* 서버의 지금 값 — 이 PC 사본이 낡았을 수 있다(다른 PC 에서 번호를 적었거나 건을 끝냈을 수 있다) */
+    var sv = await bfServerRec(f.store, f.id);
+    if(!sv){ skip('서버에서 지금 값을 못 읽음(또는 서버에 없는 건)'); continue; }
+    if(bfServerEnded(sv, f.store)){ skip('서버에서는 끝났거나 지워진 건'); continue; }
+    if(String(sv.bizNo || '').trim() !== String(cur.bizNo || '').trim() || String(sv.bizNo || '').trim() !== String(f.from || '').trim()){ skip('서버의 번호가 이 PC·계획과 다름'); continue; }
+    var ev = f.evidence || {};
+    var mark = { at:at, by:me, via:f.via, reason:f.reason, before:f.from || '', after:f.to,
+      kinds:(ev.kinds || []).slice(0, 8), rows:ev.rows || 0, last:ev.last || '', pick:(f.level === 'ask' ? 'person' : 'auto') };
+    mark.trigger = (opts && opts.autoOnly) ? 'autorun' : 'manual';                 // 저절로 돈 것과 사람이 창에서 한 것을 가른다
+    if(ev.signals && ev.signals.length) mark.signals = ev.signals.slice(0, 4);
+    if(dbPatch(f.store, f.id, { bizNo:f.to, bizAuto:mark })) res.n++; else skip('저장 실패');
+  }
+  return res;
+}
+/* 채운 것 목록 — bizAuto 표시가 남은 줄. 값이 아직 그대로일 때만 되돌릴 수 있다(그 뒤 사람이 고친 값은 건드리지 않는다) */
+function bfDoneList(){
+  var out = [];
+  ['companies'].concat(BF_ALL_STORES).forEach(function(s){
+    (dbGet(s, []) || []).forEach(function(r){
+      if(!r || r._deleted || !r.bizAuto || typeof r.bizAuto !== 'object') return;
+      var b = r.bizAuto;
+      var nm = s === 'companies' ? r.name : r.companyName;
+      var no = r.no || r.caseNo || r.contractNo || r.consultNo || r.fundNo || r.projectNo || '';
+      out.push({ store:s, storeLabel:PuBizEvidence.STORE_LABEL[s] || s, id:r.id, no:no, name:nm, field:'bizNo',
+        from:String(b.before || ''), to:String(b.after || ''), at:b.at || '', by:b.by || '', via:b.via || '', kinds:b.kinds || [], rows:b.rows || 0,
+        cur:String(r.bizNo || ''), canUndo: !!BF_APPLY_STORES[s] && String(r.bizNo || '') === String(b.after || '')
+          && !PuBizEvidence.isTerminal(r) && !r.mergedInto && !(s === 'companies' && String(r.status || '') === 'closed') });
+    });
+  });
+  out.sort(function(a, b){ return String(b.at).localeCompare(String(a.at)); });
+  return out;
+}
+/* 되돌리기 — «채울 때 남긴 표시와 똑같은 줄»이고 값이 그대로일 때만. 그 뒤 끝낸 건·사람이 고친 값·같은 번호로 새로 처리된 건은 건드리지 않는다. */
+async function bfUndo(rows){
+  var n = 0, skipped = 0;
+  rows = rows || [];
+  for(var i = 0; i < rows.length; i++){
+    var r = rows[i];
+    if(!r){ skipped++; continue; }
+    var cur = (dbGet(r.store, []) || []).filter(function(x){ return x && x.id === r.id; })[0];
+    var m = cur && cur.bizAuto;
+    if(!cur || !m || !BF_APPLY_STORES[r.store] || cur._deleted || PuBizEvidence.isTerminal(cur) || (r.store === 'companies' && String(cur.status || '') === 'closed')){ skipped++; continue; }
+    if(String(cur.bizNo || '') !== String(m.after || '') || String(m.at || '') !== String(r.at || '') || String(m.before || '') !== String(r.from || '') || String(m.after || '') !== String(r.to || '')){ skipped++; continue; }
+    var sv = await bfServerRec(r.store, r.id);
+    var sm = sv && sv.bizAuto;
+    if(!sv || bfServerEnded(sv, r.store) || String(sv.bizNo || '') !== String(m.after || '') || !sm || typeof sm !== 'object'
+       || String(sm.at || '') !== String(m.at || '') || String(sm.before || '') !== String(m.before || '') || String(sm.after || '') !== String(m.after || '')){ skipped++; continue; }
+    /* 이 PC 표시가 아니라 «서버에 남은» 이전 값으로 되돌린다 */
+    if(dbPatch(r.store, r.id, { bizNo:String(sm.before || ''), bizAuto:null })) n++; else skipped++;
+  }
+  return { n:n, skipped:skipped };
+}
+/* ── 자동 연결 (대표 지시 2026-11-28 「항상 연결시켜라, 자동으로」) ─────────────────────────────────
+   대표(총괄, isOwner) PC 가 열리고 30초 뒤, 하루(20시간)에 한 번 — «자동 채움»(level:'auto': 확신 기준을 전부 통과한 것)만 저절로 채운다.
+   ⚠ 제안(ask)·확인 필요·충돌은 절대 저절로 쓰지 않는다. 쓰는 길은 창과 같은 bfApply 하나(서버 재확인·표시·되돌리기 그대로).
+   ⚠ 끄는 칸이 창에 있다(이 PC 만 — localStorage). 기본은 켬. 채운 건수는 화면 위 알림으로 알린다. */
+var BF_AUTO_AT = 'pu_bf_auto_at', BF_AUTO_OFF = 'pu_bf_auto_off', BF_AUTO_GAP = 20 * 3600 * 1000;
+function bfAutoOn(){ try { return localStorage.getItem(BF_AUTO_OFF) !== '1'; } catch(_e){ return true; } }
+function bfAutoSet(on){ try { if(on) localStorage.removeItem(BF_AUTO_OFF); else localStorage.setItem(BF_AUTO_OFF, '1'); } catch(_e){ } }
+function bfWaitPcIdx(ms){
+  return new Promise(function(resolve){
+    var t0 = Date.now();
+    (function tick(){
+      var n = 0;
+      try { ensurePucardsIdx(); n = Object.keys(_pcIdx).length; } catch(_e){ }
+      if(n > 0 || Date.now() - t0 > ms) return resolve(n);
+      setTimeout(tick, 1000);
+    })();
+  });
+}
+async function bfAutoRun(force){
+  try {
+    if(typeof CURRENT_USER === 'undefined' || !CURRENT_USER || CURRENT_USER.isOwner !== true) return null;     // 대표(총괄) PC 만 — 위임관리인·부관리자는 아니다
+    if(typeof fbDb === 'undefined' || !fbDb) return null;
+    if(!force){
+      if(!bfAutoOn()) return null;
+      var last = 0;
+      try { last = parseInt(localStorage.getItem(BF_AUTO_AT) || '0', 10) || 0; } catch(_e){ }
+      if(Date.now() - last < BF_AUTO_GAP) return null;
+    }
+    /* 근거가 다 도착해야 돈다 — 기업정보함 색인(등록증)·홈택스 줄 중 하나라도 빠지면 «충돌»이 사라져 보여 틀린 채움이 «확신»으로 바뀔 수 있다. 미루고, 미룬 날은 «했다»로 치지 않는다. */
+    var pcN = await bfWaitPcIdx(12000);
+    if(!pcN) return { deferred:'기업정보함 색인이 아직 안 왔습니다' };
+    var ht;
+    try { ht = await bfLoadHometax(true); } catch(_he){ return { deferred:'홈택스 세금계산서를 받지 못했습니다' }; }
+    try { localStorage.setItem(BF_AUTO_AT, String(Date.now())); } catch(_e){ }          // 근거가 다 있었던 날만 «오늘 했다»
+    var plan = bfPlanNow(ht);
+    var rows = plan.rows.filter(function(r){ return r.field === 'bizNo' && r.level === 'auto' && !r.readOnlyStore && BF_APPLY_STORES[r.store]; });
+    if(!rows.length) return { n:0, skipped:0 };
+    var res = await bfApply(rows, ht, { autoOnly:true });
+    if(res.n) showToast('🧾 사업자번호 ' + res.n + '건을 근거로 자동 연결했습니다 — 업체관리 › 🧾 번호·담당 채우기 › ↩ 채운 것에서 되돌릴 수 있습니다');
+    return res;
+  } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return null; }
+}
+try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){ bfAutoRun(false); }, 30000); }); } catch(_e){ }
+
+/* 콘솔 확인용 — 읽기만. 건수·갈래만 돌려준다(이름·번호는 안 담는다). */
+window.erpBizFillPlan = function(){
+  return bfLoadHometax().then(function(ht){
+    var p = bfPlanNow(ht), out = { hometax:ht.length, stat:p.stat, counts:p.counts, noEvidence:p.noEvidence, alreadyOk:p.alreadyOk };
+    return out;
+  });
+};
+
+function BizFillModal(props){
+  useEscClose(props.onClose);
+  var phone = window.innerWidth <= 768;
+  var pS = useState(null); var plan = pS[0]; var setPlan = pS[1];
+  var hS = useState(null); var hometax = hS[0]; var setHometax = hS[1];
+  var tS = useState('auto'); var tab = tS[0]; var setTab = tS[1];
+  var sS = useState({}); var sel = sS[0]; var setSel = sS[1];
+  var dS = useState(0); var doneBump = dS[0]; var setDoneBump = dS[1];
+  var stS = useState(props.store || 'all'); var storeF = stS[0]; var setStoreF = stS[1];
+  var htRef = useRef([]);
+  function rescan(ht){ if(ht != null) htRef.current = ht; try { setPlan(bfPlanNow(htRef.current)); } catch(e){ if(window._erpErrLog) window._erpErrLog(e); showToast('❌ 근거를 모으지 못했습니다'); } }
+  useEffect(function(){
+    var live = true, timer = null;
+    ensurePucardsIdx();      // 등록증 색인은 «쓸 때 받는다» — 도착하면 근거에 합쳐 다시 센다(받는 동안 'pucards-idx' 가 여러 번 온다)
+    function onIdx(){ if(timer) clearTimeout(timer); timer = setTimeout(function(){ if(live && htRef.current) rescan(); }, 700); }
+    window.addEventListener('pucards-idx', onIdx);
+    bfLoadHometax().then(function(ht){ if(!live) return; setHometax(ht); rescan(ht); });
+    return function(){ live = false; if(timer) clearTimeout(timer); window.removeEventListener('pucards-idx', onIdx); };
+  }, []);
+  var aoS = useState(bfAutoOn()); var autoOn = aoS[0]; var setAutoOn = aoS[1];
+  var rows = (plan && plan.rows) || [];
+  /* 홈택스 계산서가 «언제까지» 올라와 있나 — 오래되면 최근 계산서가 근거에 없다(올리는 일은 사람이 한다) */
+  var today = new Date().toISOString().slice(0, 10);
+  var htLast = ''; (hometax || []).forEach(function(r){ var d = String((r && r.date) || '').slice(0, 10); if(/^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today && d > htLast) htLast = d; });
+  var htDays = htLast ? Math.floor((Date.now() - Date.parse(htLast)) / 86400000) : null;
+  var htStale = !!hometax && (htLast === '' || (htDays !== null && htDays > 14));
+  var TABS = [
+    { k:'auto',  l:'✅ 자동 채움',   t:function(r){ return r.field === 'bizNo' && r.level === 'auto'; }, tip:'근거가 서로 다른 둘 이상 일치하거나, 표기만 다른 같은 번호입니다. 적용하면 번호 칸만 채웁니다.' },
+    { k:'ask',   l:'🔎 후보 제안',   t:function(r){ return r.field === 'bizNo' && r.level === 'ask'; }, tip:'근거가 한 곳뿐입니다. 눈으로 보고 고른 것만 적용합니다.' },
+    { k:'check', l:'⚠ 확인 필요',   t:function(r){ return r.field === 'bizNo' && r.level === 'check'; }, tip:'이미 값이 있는데 믿기 어렵거나 근거와 다릅니다. 덮어쓰지 않습니다 — 해당 화면에서 확인하세요.' },
+    { k:'conf',  l:'⛔ 충돌',        t:function(r){ return r.level === 'conflict'; }, tip:'같은 이름에 다른 번호가 나오거나 대표자가 다릅니다. 자동으로 채우지 않습니다.' },
+    { k:'mgr',   l:'👤 담당 제안',   t:function(r){ return (r.field === 'managerMain' || r.field === 'contacts') && r.level === 'ask'; }, tip:'같은 업체의 다른 건에서 일관되게 나오는 담당입니다. 제안만 합니다 — 담당 변경 화면에서 사람이 확정합니다.' }
+  ];
+  var doneRows = bfDoneList();
+  var cnt = {}; TABS.forEach(function(x){ cnt[x.k] = rows.filter(function(r){ return x.t(r) && (storeF === 'all' || r.store === storeF); }).length; });
+  var cur = TABS.filter(function(x){ return x.k === tab; })[0];
+  var list = tab === 'done' ? doneRows.filter(function(r){ return storeF === 'all' || r.store === storeF; })
+    : rows.filter(function(r){ return cur && cur.t(r) && (storeF === 'all' || r.store === storeF); });
+  var canPick = function(r){ return tab === 'done' ? !!r.canUndo : (r.field === 'bizNo' && (r.level === 'auto' || r.level === 'ask') && !r.readOnlyStore && !!BF_APPLY_STORES[r.store]); };
+  var shown = list.slice(0, 300);            // 화면에 그리는 줄만 — 머리줄 ☐ 가 안 보이는 줄까지 고르지 않게 같은 범위로 자른다
+  var pickable = shown.filter(canPick);
+  var picked = pickable.filter(function(r){ return sel[bfRowKey(r)]; });
+  function toggle(r){ var k = bfRowKey(r); setSel(function(p){ var n = Object.assign({}, p); if(n[k]) delete n[k]; else n[k] = true; return n; }); }
+  function toggleAll(){
+    var all = pickable.length > 0 && picked.length === pickable.length;
+    setSel(function(p){ var n = Object.assign({}, p); pickable.forEach(function(r){ if(all) delete n[bfRowKey(r)]; else n[bfRowKey(r)] = true; }); return n; });
+  }
+  function nameOfSid(s){ try { return userName(s) || s; } catch(_){ return s; } }
+  async function run(){
+    if(!picked.length) return;
+    if(tab === 'done'){
+      if(!(await popConfirm('채운 번호 ' + picked.length + '건을 이전 값으로 되돌립니다.\n(그 뒤 사람이 고친 값은 건너뜁니다)\n\n진행하시겠습니까?'))) return;
+      var u = await bfUndo(picked); showToast('↩ ' + u.n + '건 되돌림' + (u.skipped ? ' · 건너뜀 ' + u.skipped : ''));
+      setSel({}); setDoneBump(doneBump + 1); rescan(); if(props.onChanged) props.onChanged(); return;
+    }
+    var byStore = {}; picked.forEach(function(r){ byStore[r.storeLabel] = (byStore[r.storeLabel] || 0) + 1; });
+    var nAsk = picked.filter(function(r){ return r.level === 'ask'; }).length;
+    var msg = '사업자번호 칸 ' + picked.length + '건을 채웁니다.\n\n' + Object.keys(byStore).map(function(k){ return '· ' + k + ' ' + byStore[k] + '건'; }).join('\n')
+      + (nAsk ? '\n\n※ 근거가 한 곳뿐인 제안 ' + nAsk + '건이 들어 있습니다 — 눈으로 확인하셨나요?' : '')
+      + '\n\n번호 칸만 바꾸고, 채운 근거와 이전 값을 줄에 남깁니다(「채운 것」 탭에서 되돌릴 수 있습니다).\n진행하시겠습니까?';
+    if(!(await popConfirm(msg))) return;
+    var r = await bfApply(picked, hometax || []);
+    var why = Object.keys(r.why).map(function(k){ return k + ' ' + r.why[k]; }).join(', ');
+    showToast('🧾 ' + r.n + '건 채웠습니다' + (r.skipped ? ' · 건너뜀 ' + r.skipped + (why ? ' (' + why + ')' : '') : ''));
+    setSel({}); setDoneBump(doneBump + 1); rescan(); if(props.onChanged) props.onChanged();
+  }
+  var st = (plan && plan.stat) || {};
+  /* 격자 칸 — 표 칸처럼 maxWidth:0 을 쓰면 격자에서는 칸이 «0 폭»으로 눌려 글이 안 보인다(2026-11-28 그려 보고 알았다). minWidth:0 + … 로 한 줄 */
+  var cell = { padding:'5px 8px', borderBottom:'1px solid #e2e8f0', fontSize:'12px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 };
+  function evText(r){
+    var e = r.evidence || {};
+    if(r.field === 'managerMain') return (r.evidence && r.evidence.master ? '업체관리 주담당' : '다른 건 ' + ((r.evidence && r.evidence.peers) || 0) + '건') + ' · ' + (BF_REASON[r.reason] || r.reason || '');
+    if(r.field === 'contacts') return (r.evidence && r.evidence.master ? '업체관리' : '다른 건 ' + ((r.evidence && r.evidence.peers) || 0) + '건') + ' · ' + (r.contact ? r.contact.name : '');
+    var lb = (e.kinds || []).map(function(k){ return PuBizEvidence.KIND_LABEL[k] || (k === 'link' ? '업체 번호 연결' : (k === 'source' ? '이관 원본 계약' : k)); }).join(' + ');
+    return (lb ? lb + (e.rows ? ' ' + e.rows + '건' : '') + (e.last ? ' · ' + e.last : '') : '') + (e.signals && e.signals.length ? ' · ' + e.signals.join(' · ') : '')
+      + (r.cands && r.cands.length ? (lb ? ' · ' : '') + '후보 ' + r.cands.length + '개' : '');
+  }
+  function valCell(r){
+    if(tab === 'done') return h('span', null, (r.from || '(빈 칸)'), ' → ', h('b', null, r.to), r.canUndo ? '' : '  · 그 뒤 값이 바뀜');
+    if(r.field === 'managerMain') return h('span', null, '(빈 칸) → ', h('b', null, nameOfSid(r.to)));
+    if(r.field === 'contacts') return h('span', null, '(빈 칸) → ', h('b', null, r.contact ? r.contact.name : ''));
+    if(r.level === 'conflict' || (r.level === 'check' && !r.to)) return h('span', { style:{ color:'#991b1b' } }, (r.from || '(빈 칸)') + '  · ' + (BF_REASON[r.reason] || r.reason || ''));
+    return h('span', null, (r.from || '(빈 칸)'), r.to ? ' → ' : '', r.to ? h('b', null, r.to) : '', r.level === 'check' ? '  · ' + (BF_REASON[r.reason] || r.reason) : '');
+  }
+  var storeOpts = [['all', '전체 표'], ['companies', '업체'], ['consultings', '컨설팅'], ['funds', '기금'], ['other_projects', '기타'], ['cases', '사건'], ['contracts', '계약']];
+  var tabBtn = function(k, label, n, tip){
+    var on = tab === k;
+    return h('button', { key:k, type:'button', title:tip || '', onClick:function(){ setTab(k); setSel({}); },
+      style:{ padding:'6px 11px', borderRadius:'16px', fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+        border:'1px solid ' + (on ? '#2563eb' : '#e2e8f0'), background:on ? '#eff6ff' : '#fff', color:on ? '#1e40af' : '#475569' } }, label + ' ', h('span', { style:{ fontVariantNumeric:'tabular-nums' } }, n));
+  };
+  var head = phone ? null : h('div', { style:{ display:'grid', gridTemplateColumns:'28px 36px 56px minmax(120px,1.3fr) minmax(150px,1.6fr) minmax(150px,1.6fr)', gap:0, background:'#f8fafc', borderBottom:'1px solid #e2e8f0', position:'sticky', top:0, zIndex:1 } },
+    h('div', { style:Object.assign({}, cell, { textAlign:'center' }) }, pickable.length ? h('input', { type:'checkbox', checked:picked.length === pickable.length && pickable.length > 0, onChange:toggleAll, 'aria-label':'보이는 줄 모두 고르기' }) : ''),
+    ['№', '표', '업체 · 관리번호', '지금 값 → 채울 값', '근거'].map(function(t, i){ return h('div', { key:i, style:Object.assign({}, cell, { fontSize:'11px', color:'#64748b', fontWeight:700 }) }, t); }));
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target === e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ maxWidth:'1020px', width:'96vw' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '🧾 사업자번호·담당 채우기 ',
+          h('span', { style:{ fontSize:'12px', color:'#64748b', fontWeight:400 } }, plan ? '근거 ' + (st.used || 0).toLocaleString() + '줄 · 홈택스 ' + (hometax ? hometax.length : 0).toLocaleString() + '건' : '근거를 모으는 중…')),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'74vh', overflowY:'auto' } },
+        h('div', { style:{ fontSize:'11.5px', color:'#475569', background:'#f8fafc', borderRadius:'8px', padding:'9px 12px', marginBottom:'10px', lineHeight:1.7 } },
+          '세금계산서(홈택스)·재무 발행분·CMS 장부·기업정보함 등록증·업체관리에서 «꼭 같은 이름»의 사업자번호를 찾아, ',
+          h('b', null, '서로 다른 근거 둘 이상이 일치할 때만'), ' 자동으로 채웁니다. 이름이 닮기만 한 것·같은 이름에 다른 번호가 나온 것·이미 값이 있는 것은 덮어쓰지 않습니다. ',
+          '끝난 건·계약은 건드리지 않고, 채운 줄에는 근거를 남겨 되돌릴 수 있습니다.',
+          plan && h('span', { style:{ color:'#94a3b8' } }, ' (근거가 없어 못 채운 칸 ' + (plan.noEvidence || 0) + '곳 · 이미 정상 ' + (plan.alreadyOk || 0) + '곳)')),
+        h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', alignItems:'center', marginBottom:'10px' } },
+          TABS.map(function(x){ return tabBtn(x.k, x.l, cnt[x.k] || 0, x.tip); }),
+          tabBtn('done', '↩ 채운 것', doneRows.filter(function(r){ return storeF === 'all' || r.store === storeF; }).length, '이 도구가 채운 번호 — 값이 그대로면 이전 값으로 되돌립니다.'),
+          h('select', { value:storeF, onChange:function(e){ setStoreF(e.target.value); setSel({}); }, 'aria-label':'표 거르기',
+            style:{ marginLeft:'auto', padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'16px', fontSize:'12px', fontFamily:'inherit', background:'#fff' } },
+            storeOpts.map(function(o){ return h('option', { key:o[0], value:o[0] }, o[1]); }))),
+        htStale && h('div', { style:{ fontSize:'11.5px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'8px 12px', marginBottom:'8px', lineHeight:1.6 } },
+          htLast ? '⚠ 홈택스 세금계산서가 ' + htLast + ' 까지만 올라와 있습니다(' + htDays + '일 전). 그 뒤 계산서는 근거에 없습니다 — 재무관리 › 세금계산서에서 홈택스 파일을 올려 주세요.'
+                 : '⚠ 올라온 홈택스 세금계산서가 없습니다. 재무관리 › 세금계산서에서 홈택스 파일을 올려야 계산서가 근거가 됩니다.'),
+        h('label', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11.5px', color:'#475569', marginBottom:'8px', cursor:'pointer', lineHeight:1.5 },
+          title:'총괄관리자 PC 가 열리고 30초 뒤, 하루에 한 번 «✅ 자동 채움»(확신 기준을 전부 통과한 것)만 저절로 채웁니다. 제안·확인 필요·충돌은 저절로 쓰지 않습니다. 끄면 이 PC 에서는 돌지 않습니다.' },
+          h('input', { type:'checkbox', checked:autoOn, onChange:function(){ bfAutoSet(!autoOn); setAutoOn(!autoOn); }, 'aria-label':'자동 연결' }),
+          '자동 연결 — 하루 한 번, «자동 채움»만 저절로 (대표 PC)'),
+        cur && h('div', { style:{ fontSize:'11.5px', color:'#64748b', marginBottom:'8px' } }, cur.tip),
+        !plan ? h('div', { style:{ padding:'26px', textAlign:'center', color:'#94a3b8', fontSize:'12.5px' } }, '근거 자료를 읽는 중입니다…')
+        : !list.length ? h('div', { style:{ padding:'26px', textAlign:'center', color:'#64748b', fontSize:'12.5px' } }, tab === 'done' ? '이 도구가 채운 번호가 없습니다.' : '✓ 이 갈래에 해당하는 곳이 없습니다.')
+        : h('div', { style:{ border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'auto', maxHeight:'46vh' } },
+            head,
+            shown.map(function(r, i){
+              var k = bfRowKey(r), can = canPick(r);
+              if(phone){
+                return h('div', { key:k, style:{ padding:'7px 9px', borderBottom:'1px solid #e2e8f0', display:'grid', gridTemplateColumns:'28px 30px 1fr', rowGap:'2px', alignItems:'center' } },
+                  h('div', { style:{ textAlign:'center' } }, can ? h('input', { type:'checkbox', checked:!!sel[k], onChange:function(){ toggle(r); }, 'aria-label':'고르기' }) : ''),
+                  h('div', { style:{ fontSize:'11px', color:'#94a3b8', fontVariantNumeric:'tabular-nums' } }, i + 1),
+                  h('div', { style:{ fontSize:'12.5px', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }, title:r.name }, h('span', { style:{ color:'#64748b', fontWeight:400 } }, r.storeLabel + ' '), r.name),
+                  h('div', { style:{ gridColumn:'1 / -1', paddingLeft:'4px', fontSize:'11.5px', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }, title:evText(r) }, valCell(r)));
+              }
+              return h('div', { key:k, style:{ display:'grid', gridTemplateColumns:'28px 36px 56px minmax(120px,1.3fr) minmax(150px,1.6fr) minmax(150px,1.6fr)', alignItems:'center' } },
+                h('div', { style:Object.assign({}, cell, { textAlign:'center' }) }, can ? h('input', { type:'checkbox', checked:!!sel[k], onChange:function(){ toggle(r); }, 'aria-label':'고르기' }) : ''),
+                h('div', { style:Object.assign({}, cell, { color:'#94a3b8', fontVariantNumeric:'tabular-nums' }) }, i + 1),
+                h('div', { style:Object.assign({}, cell, { color:'#64748b', fontSize:'11px' }) }, r.storeLabel),
+                h('div', { style:Object.assign({}, cell, { fontWeight:600 }), title:(r.no ? r.no + ' · ' : '') + r.name }, (r.no ? r.no + ' · ' : '') + r.name),
+                h('div', { style:cell, title:r.reason ? (BF_REASON[r.reason] || r.reason) : '' }, valCell(r)),
+                h('div', { style:Object.assign({}, cell, { color:'#64748b' }), title:evText(r) }, evText(r)));
+            })),
+        list.length > 300 && h('div', { style:{ fontSize:'11px', color:'#94a3b8', paddingTop:'6px' } }, '앞 300줄만 보여 줍니다 — 처리하면 다음 줄이 나옵니다')),
+      h('div', { className:'modal-f' },
+        h('span', { style:{ fontSize:'11.5px', color:'#475569', marginRight:'auto', minWidth:0 } }, picked.length ? picked.length + '건 선택' : '고르기만으로는 아무것도 바뀌지 않습니다'),
+        pickable.length > 0 && h('button', { className:'btn-primary', disabled:!picked.length, onClick:run,
+          style:{ opacity:picked.length ? 1 : 0.5, whiteSpace:'nowrap', flexShrink:0 } }, tab === 'done' ? '↩ 선택 되돌리기' : '선택 채우기'),
+        h('button', { className:'btn-secondary', onClick:props.onClose, style:{ whiteSpace:'nowrap', flexShrink:0 } }, '닫기'))));
 }
 
 // ============ 중복 업체 정리 화면 ============
@@ -34351,6 +34701,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   // 📍 기업정보함과 주소가 다른 업체 — 색인을 이미 받았을 때만 센다(받게 만들지 않는다)
   var adoS = useState(false); var addrOpen = adoS[0]; var setAddrOpen = adoS[1];
   var misS = useState(false); var misOpen = misS[0]; var setMisOpen = misS[1];   // 🔍 업체 정보 대조(읽기만)
+  var bfS = useState(false); var bfOpen = bfS[0]; var setBfOpen = bfS[1];   // 🧾 번호·담당 채우기(근거로 — 대표 지시 2026-11-28)
   var adtS = useState(0);
   useEffect(function(){
     function on(){ adtS[1](function(n){ return n + 1; }); }
@@ -35165,6 +35516,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               lostSub > 0 && { v:'sub', tip:CO_SUBOFFICE_FIX_TIP, t:'🏛️ 사무대행 복구 ' + lostSub, run:doRepairSub },
               linkCount > 0 && { v:'link', tip:CO_LINK_TIP, t:'🔗 업체 연결 ' + linkCount, run:function(){ setLinkOpen(true); } },
               { v:'mis', tip:CO_MIS_TIP, t:'🔍 정보 대조', run:function(){ setMisOpen(true); } },
+              { v:'bizfill', tip:BF_TIP, t:'🧾 번호·담당 채우기', run:function(){ setBfOpen(true); } },
               addrMisN !== 0 && { v:'addr', tip:CO_ADDR_TIP, t: addrMisN > 0 ? '📍 주소 다름 ' + addrMisN : '📍 주소 대조', run:function(){ setAddrOpen(true); } },
               vatPend.total > 0 && { v:'vat', tip:CO_VAT_ALL_TIP, t:'🧾 부가세 포함 일괄 ' + vatPend.total, run:doVatAll },
               { v:'handover', t:'🔄 담당 전환·중복정리', run:function(){ setHandoverTarget({ coId:'' }); } },
@@ -35390,6 +35742,13 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', cursor:'pointer',
           whiteSpace:'nowrap', marginRight:'6px' } },
         '🔍 정보 대조'),
+      // 사업자번호가 빈·표기가 다른 곳을 세금계산서 등 근거에서 찾아 채운다(근거 둘 이상 일치할 때만)
+      h('button', { onClick:function(){ setBfOpen(true); },
+        className:'erp-tip', 'data-tip':BF_TIP,
+        style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
+          background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', cursor:'pointer',
+          whiteSpace:'nowrap', marginRight:'6px' } },
+        '🧾 번호·담당 채우기'),
       addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
         className:'erp-tip', 'data-tip':CO_ADDR_TIP,
         style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
@@ -35455,7 +35814,10 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           h('button', { onClick:function(){ setMoreMenuOpen(false); setLinkOpen(true); },
             title:'이름으로만 이어진 건 연결 + 바깥 앱(컨설팅일정·기금관리) 연결 고정',
             style:{ background:'#fff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', textAlign:'left' } },
-            '🔗 업체 연결 · 바깥 앱 고정' + (linkCount > 0 ? ' (' + linkCount + ')' : ''))
+            '🔗 업체 연결 · 바깥 앱 고정' + (linkCount > 0 ? ' (' + linkCount + ')' : '')),
+          h('button', { onClick:function(){ setMoreMenuOpen(false); setBfOpen(true); }, title:BF_TIP,
+            style:{ background:'#fff', color:'#166534', border:'1px solid #bbf7d0', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', fontWeight:600, cursor:'pointer', textAlign:'left' } },
+            '🧾 번호·담당 채우기')
         )
       )
     ),
@@ -36132,6 +36494,11 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
     linkOpen && h(CoLinkModal, {
       onChanged: function(){ recountDup(); },
       onClose: function(){ setLinkOpen(false); refreshCompanies(); recountDup(); }
+    }),
+    bfOpen && h(BizFillModal, {
+      store: 'companies',
+      onChanged: function(){ refreshCompanies(); },
+      onClose: function(){ setBfOpen(false); refreshCompanies(); }
     }),
     // 상세보기 모달
     // ★ 일괄 주담당 배정 모달
@@ -77423,6 +77790,7 @@ function ProjectManagementShared(props){
   var gm = useState(false); var gapModal = gm[0]; var setGapModal = gm[1];
   var dsP = useState(null); var dupSweep = dsP[0]; var setDupSweep = dsP[1];
   var dsfP = useState('all'); var dupFilter = dsfP[0]; var setDupFilter = dsfP[1];
+  var bfP = useState(false); var bfOpen = bfP[0]; var setBfOpen = bfP[1];   // 🧾 번호·담당 채우기(근거로 — 대표 지시 2026-11-28)
   function detectGaps(){
     var bySeries = {};
     function isClosedRec(it){ return it.status === 'closed' || it.permanentArchived; }
@@ -77869,6 +78237,7 @@ function ProjectManagementShared(props){
               onChange:function(e){ var v = e.target.value; e.target.value = '';
                 if(v === 'mine') setMineFirst(!mineFirst);
                 else if(v === 'reset') resetProjView();
+                else if(v === 'bizfill') setBfOpen(true);
                 else if(v === 'dup') setDupSweep(dupSweepScan({ kinds:[props.sourceKind] })); },
               style:{ padding:'5px 8px', border:'1px solid '+(mineFirst?'#16a34a':'#cbd5e1'), borderRadius:'20px', fontSize:'11px',
                 fontFamily:'inherit', flex:'1 1 30%', minWidth:0, background: mineFirst?'#f0fdf4':'#fff',
@@ -77876,6 +78245,7 @@ function ProjectManagementShared(props){
             h('option', { value:'' }, mineFirst ? '✓ 내 것 먼저' : '⋯ 더보기'),
             h('option', { value:'mine' }, mineFirst ? '내 담당 먼저 끄기' : '👤 내 담당 먼저'),
             props.sourceKind === 'consulting' && h('option', { value:'reset', title:RESET_VIEW_TIP }, '↺ 기본값'),
+            h('option', { value:'bizfill' }, '🧾 번호 채우기'),
             h('option', { value:'dup' }, '🔎 중복 훑기'))
         )
       )
@@ -77926,6 +78296,8 @@ function ProjectManagementShared(props){
       h('button', { type:'button', onClick:function(){ setDupSweep(dupSweepScan({ kinds:[props.sourceKind] })); },
         title:'이 목록에서 같은 사업장·같은 유형 중복을 훑습니다 (읽기만 함)',
         style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', flexShrink:0 } }, '🔎 중복 훑기'),
+      window.innerWidth > 768 && h('button', { type:'button', onClick:function(){ setBfOpen(true); }, title:BF_TIP,
+        style:{ background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', flexShrink:0 } }, '🧾 번호 채우기'),
       h('div', { style:{ position:'relative' } },
         h('button', { onClick:function(e){ e.stopPropagation(); setColSettings(!colSettings); },
           style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '⚙️ 컬럼'),
@@ -78401,6 +78773,11 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
         )
       );
     })(),
+    bfOpen && h(BizFillModal, {
+      store: ({ consulting:'consultings', fund:'funds', other:'other_projects', 'case':'cases' })[props.sourceKind] || 'all',
+      onChanged: function(){ refreshItems(); },
+      onClose: function(){ setBfOpen(false); refreshItems(); }
+    }),
     dupSweep && h(DupSweepModal, {
       result: dupSweep, filter: dupFilter, onFilter: setDupFilter,
       scopeLabel: (props.sourceKind === 'consulting' ? '컨설팅' : props.sourceKind === 'fund' ? '기금' : '기타사업'),
