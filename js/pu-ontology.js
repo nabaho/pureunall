@@ -525,6 +525,16 @@
       sharedRoots:['uid_roles','msg_intake'],
       writeContracts:[{path:'coach_rag/notes/{id}',entityType:'Document'}],
       entityTypes:['Document'] },
+    /* 노사관계·단체교섭(pu-union.html) — 이메일 전수수집·교섭절차 8단계·법정기한·연도/서류구분 대시보드·단협/임협 신구대비표·임금시뮬레이터 */
+    unionrel:{ name:'노사관계·단체교섭', file:'pu-union.html', primaryRoots:['union_rel'],
+      sharedRoots:['uid_roles','data/companies','data/cases','data/contracts','mailbox'],
+      writeContracts:[{path:'union_rel/cases/{id}',entityType:'Case'},
+                      {path:'union_rel/docs/{cid}/{id}',entityType:'Document'},
+                      {path:'union_rel/clauses/{cid}/{id}',entityType:'Document'},
+                      {path:'union_rel/mails/{cid}/{id}',entityType:'Message'},
+                      {path:'union_rel/dismissed/{id}',entityType:'Task'},
+                      {path:'union_rel/snapshots/{cid}/{id}',entityType:'Document'}],
+      entityTypes:['Organization','Person','Case','Project','Document','Task','Message'] },
     /* 데이터관리(2026-11-21) — 대표 전용. 원본(입금·명부·업체·업무·관계망)은 «읽기만» 하고 화면 안에서 센다.
        제 자리는 보기 설정(datahub/{uid}/settings)뿐 — 기기·일회용 문제·현황판 숫자는 서버 함수만 쓴다(INFRA_ROOTS).
        ⚠ 사람 이름·업체명을 관계 열쇠로 쓰지 않는다(sid·companyId). 채팅으로는 가명 숫자만 나간다. */
@@ -857,6 +867,9 @@
       gives:'카톡·문자 자동분류·비식별 수집함 (앱 안에서만 본다)'},
     coach_core:{program:'coach',strategy:'in_app',path:'coach_rag',parser:'coverage',
       gives:'수습 노무사 RAG 학습노트·퀴즈 (앱 안에서만 본다)'},
+    /* 노사관계·단체교섭 — 교섭 사건·진행/검토서류·신구대비 조항·수집 메일 원문이 든 자리라 앱 안에서만 본다. */
+    unionrel_core:{program:'unionrel',strategy:'in_app',path:'union_rel',parser:'coverage',
+      gives:'노사관계·단체교섭 사업장/연도별 교섭절차·진행/검토서류·신구대비표·이메일 수집 아카이브 (앱 안에서만 본다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

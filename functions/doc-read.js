@@ -216,25 +216,25 @@ function validate(body) {
     "familywork", "socialent", "sixthind", "laboraudit", "unionneg", "specialcons",
     "msgintake", "coach"
   ]);
-  const isStrictTextApp = resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans" || resolvedApp === "safety" || CONSULT_STRICT_APPS.has(resolvedApp);
+  const isStrictTextApp = resolvedApp === "harass" || resolvedApp === "ilteo" || resolvedApp === "jobtrans" || resolvedApp === "safety" || resolvedApp === "unionrel" || CONSULT_STRICT_APPS.has(resolvedApp);
 
   for (const p of parts) {
     if (!p || typeof p !== "object" || Array.isArray(p)) {
       return { ok: false, error: "보낼 내용의 모양이 맞지 않습니다" };
     }
     if (isStrictTextApp) {
-      /* 괴롭힘 조사 · 일터상생혁신 · 산업일자리전환 · 안전보건체계구축 및 신규 14개 컨설팅·허브 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
+      /* 괴롭힘 조사 · 일터상생혁신 · 산업일자리전환 · 안전보건체계구축 · 노사관계단체교섭 및 신규 14개 컨설팅·허브 앱은 inline_data·inlineData·fileData 등 일체의 바이너리·복합 필드를 원천 거부하고
          오직 단일 text 문자열만 허용하여 서버에서 주민등록번호 재가림 후 새 객체로 재조립한다. */
       const keys = Object.keys(p);
       if (keys.length !== 1 || keys[0] !== "text" || typeof p.text !== "string") {
-        const appName = resolvedApp === "safety" ? "안전보건체계구축 앱은 " : (resolvedApp === "jobtrans" ? "산업일자리전환 앱은 " : (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : (resolvedApp === "harass" ? "괴롭힘 조사 앱은 " : "컨설팅 앱은 ")));
+        const appName = resolvedApp === "unionrel" ? "노사관계·단체교섭 앱은 " : (resolvedApp === "safety" ? "안전보건체계구축 앱은 " : (resolvedApp === "jobtrans" ? "산업일자리전환 앱은 " : (resolvedApp === "ilteo" ? "일터상생혁신 앱은 " : (resolvedApp === "harass" ? "괴롭힘 조사 앱은 " : "컨설팅 앱은 "))));
         return { ok: false, error: appName + "주민등록번호 가림이 완료된 글자만 요청할 수 있습니다" };
       }
       let masked = maskHarassRrn(p.text);
       if (findRrnSpans(masked).length > 0) {
         return { ok: false, error: "비식별화되지 않은 주민등록번호가 포함되어 AI 전송을 차단했습니다." };
       }
-      if (resolvedApp === "jobtrans" || resolvedApp === "safety" || CONSULT_STRICT_APPS.has(resolvedApp)) {
+      if (resolvedApp === "jobtrans" || resolvedApp === "safety" || resolvedApp === "unionrel" || CONSULT_STRICT_APPS.has(resolvedApp)) {
         masked = maskJobtransServerPii(masked);
         if (hasJobtransResidualPii(masked)) {
           return { ok: false, error: "비식별화되지 않은 연락처·이메일 등 개인정보가 포함되어 AI 전송을 차단했습니다." };
@@ -299,7 +299,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo", "jobtrans", "safety", "datahub", "techprotect", "clinic", "chamber", "hrconsult", "evalcomp", "pubconsult", "familywork", "socialent", "sixthind", "laboraudit", "unionneg", "specialcons", "msgintake", "coach"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal", "photoedit", "harass", "pbox", "ilteo", "jobtrans", "safety", "unionrel", "datahub", "techprotect", "clinic", "chamber", "hrconsult", "evalcomp", "pubconsult", "familywork", "socialent", "sixthind", "laboraudit", "unionneg", "specialcons", "msgintake", "coach"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";
