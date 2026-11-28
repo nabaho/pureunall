@@ -96,7 +96,7 @@
     }
     try {
       var tok = await fb.auth().currentUser.getIdToken();
-      var resp = await fetch('https://asia-southeast1-pureun-erp.cloudfunctions.net/consultMsgIngest', {
+      var resp = await fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/consultMsgIngest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
         body: JSON.stringify({
@@ -451,7 +451,7 @@
       '<div class="card">' +
         '<div class="sec"><span>📱 안드로이드 · PC 자동수집 웹훅 규격 (consultMsgIngest)</span><span class="chip c-blue">인증 필수</span></div>' +
         '<div class="bar" style="flex-direction:column;align-items:stretch">' +
-          '<div class="note"><b>엔트리포인트:</b> <code>POST https://asia-southeast1-pureun-erp.cloudfunctions.net/consultMsgIngest</code><br><b>인증 헤더:</b> <code>Authorization: Bearer &lt;Firebase ID Token&gt;</code> 또는 <code>Authorization: Device &lt;하나문자 기기 토큰&gt;</code> (미인증 요청 401/403 차단)</div>' +
+          '<div class="note"><b>엔트리포인트:</b> <code>POST https://asia-northeast3-pureun-erp.cloudfunctions.net/consultMsgIngest</code><br><b>인증 헤더:</b> <code>Authorization: Bearer &lt;Firebase ID Token&gt;</code> 또는 <code>Authorization: Device &lt;하나문자 기기 토큰&gt;</code> (미인증 요청 401/403 차단)</div>' +
           '<pre style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);overflow:auto;font-size:12px">' + esc(samplePayload) + '</pre>' +
           '<div class="hint">• PC 카카오톡에서는 대화방 [메뉴 → 대화 내용 내보내기(.txt)] 후 ① 탭 드롭존에 끌어다 놓으면 날짜·발신자별 스레드가 자동 분해·비식별화됩니다.<br>• 휴대폰에서는 푸른 웹앱을 홈화면에 추가하거나 Tasker/MacroDroid HTTP Request로 위 URL을 호출해 문자·알림을 자동 전달할 수 있습니다.</div>' +
         '</div>' +
