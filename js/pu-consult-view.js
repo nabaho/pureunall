@@ -223,7 +223,12 @@
      ⚠ 계획 회차는 이알피 계약에 «사람이 적은» 일수가 기준이다. 정부사업일정의 방문 일정은 «참고»일 뿐 셈에 넣지 않는다
        (일정·사진을 안 넣고 진행하는 일이 많다 — status/2026-10-04-gisul-round-count.md).
      ⚠ 성과추적관리(perfTrack)는 연간 수행일수에서 빠지는 건이라 합계에서 따로 센다. */
-  function isSlim() { return !!getAppCat().slimUi; }
+  /* 기술보호컨설팅을 고친 «가벼운 화면»이 12개 앱 공통 기본이다 (대표 지시 2026-11-28 「기술보호 고친 걸 기준으로 전체 일치」).
+     처음엔 기술보호·현장클리닉만 켰다(slimUi:true). 이제 꺼야 할 앱만 카탈로그에 slimUi:false 를 적는다. */
+  function isSlim() { return getAppCat().slimUi !== false; }
+  // 보고서 탭의 일반 원고를 접는 것은 «기관 제출 서식이 컨설팅보고서(gov-report)에 있는 앱»만이다 —
+  // 기초인사·평가보상처럼 기관 서식이 없는 앱은 이 탭의 원고가 곧 산출물이라 접지 않는다.
+  function reportFolded() { return isSlim() && !!getAppCat().govReportForm; }
   function roundUnit() { return str(getAppCat().roundUnit); }
   function govRows(v) {
     if (!v) return [];
@@ -749,8 +754,8 @@
     if (!el) return;
     var cat = getAppCat();
     // 가벼운 화면은 이 띠를 그리지 않는다 — 탭과 똑같은 이동 단추(사업 현황·미등록 후보·보고서)를 한 번 더 늘어놓던 자리였다.
-    if (cat.slimUi) { el.innerHTML = ''; return; }
-    var isLeft = !!$('leftDash');
+    if (isSlim()) { el.innerHTML = ''; return; }
+    var isLeft = leftDashOn();
     var isInsp = (APP_KEY === 'laboraudit');
     var badge = isInsp
       ? '변경됨 · 자율점검·노무진단 완전 분리'
@@ -779,16 +784,57 @@
     }
   }
 
+  /* ══ 왼쪽 대시보드 — 12개 앱 공통 (대표 지시 2026-11-28) ═══════════════════
+     「상공회의소처럼 기관이 여러 개로 나뉘거나 비슷한 컨설팅을 몇 회 나눠 한 경우는 왼쪽 대시보드로 정리하고 나머지는 다 일치하게」.
+     ★ 켜는 잣대는 «자료»다 — 사업이 실제로 들어 있는 세부 트랙(기관·지역·갈래)이 둘 이상일 때만 켠다.
+       하나뿐이면(기술보호처럼) 왼쪽 칸을 접고 한 단 화면으로 둔다. 카탈로그 hasLeftDashboard 는 «늘 켬»(상공회의소·6차산업),
+       leftDash:false 는 «늘 끔».
+     ★ 켜지면 위쪽 트랙 알약줄·연도 알약줄을 숨긴다 — 같은 고르기를 두 군데서 보이지 않는다(가벼운 화면 원칙).
+     ★ 목록 화면(사업 현황·미등록 후보)에서만 보인다. 진행·체크·보고서 작업실은 넓게 쓴다. */
+  function usedTrackIds() {
+    var used = Object.create(null);
+    projectsList().forEach(function (p) { var t = str(p.trackId); if (t) used[t] = 1; });
+    return used;
+  }
+  // 자료로 보아 왼쪽 대시보드가 «필요한가» (화면 틀과 상관없이 — 검사도 이것을 본다)
+  function leftDashWanted() {
+    var cat = getAppCat();
+    if (cat.leftDash === false) return false;
+    if (cat.hasLeftDashboard) return true;
+    return Object.keys(usedTrackIds()).length >= 2 || !!TRACK_FILTER;
+  }
+  function leftDashOn() { return !!$('leftDash') && leftDashWanted(); }
+  function leftDashShown() { return leftDashOn() && (CUR_TAB === 'projects' || CUR_TAB === 'inbox'); }
+  function leftDashLabels() {
+    var cat = getAppCat();
+    var LD = cat.leftDash || {};
+    var icon = cat.icon || '📂';
+    var by = str(LD.by) || '세부 트랙';
+    return {
+      head: LD.headLabel || (icon + ' ' + by + '별 현황'),
+      all: LD.allLabel || (icon + ' 전체 ' + by),
+      scopeAll: LD.scopeAll || ('전체 ' + by),
+      add: LD.addLabel || ('+ 새 ' + (cat.regionLabel || by) + ' 추가')
+    };
+  }
+
   function renderLeftDash() {
     var aside = $('leftDash');
     if (!aside) return;
+    var shell = aside.parentNode;
+    var shown = leftDashShown();
+    aside.style.display = shown ? '' : 'none';
+    if (shell && shell.classList) shell.classList.toggle('no-left', !shown);
+    if (!shown) { aside.innerHTML = ''; return; }
+
     var cat = getAppCat();
     var tracks = getEffectiveTracks();
     var allProjs = projectsList();
     var cands = (D.discover && D.discover.bundles) || [];
+    var slim = isSlim();
+    var L = leftDashLabels();
 
     aside.className = 'left-dash' + (DIFF_HIGHLIGHT ? ' code-diff-box' : '');
-    var LD = cat.leftDash || {};
 
     var statsMap = Object.create(null);
     tracks.forEach(function (t) {
@@ -819,7 +865,7 @@
 
     var cardsHtml = '<div class="ld-item' + (!TRACK_FILTER ? ' on' : '') + '">' +
       '<button type="button" class="ld-item-btn" data-ld-track="" aria-pressed="' + (!TRACK_FILTER ? 'true' : 'false') + '">' +
-        '<span class="ld-item-name">' + esc(LD.allLabel || '🏬 전체 상공회의소') + '</span>' +
+        '<span class="ld-item-name">' + esc(L.all) + '</span>' +
         '<span class="chip c-blue">' + allProjs.length + '건</span>' +
       '</button>' +
       '<div class="ld-sub"><span>진행 ' + allActive + '</span><span>완료 ' + allDone + '</span>' +
@@ -833,16 +879,24 @@
         renderTracks.push({ id: uid, name: uid + ' (기타)', shortName: uid, icon: '🧩' });
       }
     });
+    // 가벼운 화면: 사업도 후보도 없는 트랙은 올리지 않는다(«0건» 줄 되풀이 금지). 사람이 새로 추가한 지역·지금 고른 트랙은 남긴다.
+    if (slim) {
+      renderTracks = renderTracks.filter(function (t) {
+        var st = statsMap[t.id];
+        return (st && (st.total > 0 || st.cand > 0)) || t.custom || TRACK_FILTER === t.id;
+      });
+    }
 
     renderTracks.forEach(function (t) {
       var st = statsMap[t.id] || { total: 0, active: 0, done: 0, cand: 0, yrs: {} };
       var yrs = Object.keys(st.yrs).sort(function (a, b) { return Number(b) - Number(a); });
-      var yrsHtml = yrs.length
+      // 가벼운 화면: 연도는 아래 «연도별» 한 곳에서만 고른다(트랙마다 연도 칩을 또 늘어놓지 않는다)
+      var yrsHtml = slim ? '' : (yrs.length
         ? ('<div class="ld-yrs">' + yrs.slice(0, 6).map(function (yr) {
             var on = TRACK_FILTER === t.id && YEAR_FILTER === yr;
             return '<button type="button" class="ld-yr-btn' + (on ? ' on' : '') + '" data-ld-track="' + esc(t.id) + '" data-ld-year="' + esc(yr) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(yr) + '(' + st.yrs[yr] + ')</button>';
           }).join('') + '</div>')
-        : '<div class="ld-sub"><span>' + esc(LD.emptyLabel || '등록 대기 (신규 지역 준비)') + '</span></div>';
+        : '<div class="ld-sub"><span>' + esc((cat.leftDash && cat.leftDash.emptyLabel) || '등록 대기') + '</span></div>');
 
       cardsHtml += '<div class="ld-item' + (TRACK_FILTER === t.id ? ' on' : '') + '">' +
         '<button type="button" class="ld-item-btn" data-ld-track="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-pressed="' + (TRACK_FILTER === t.id ? 'true' : 'false') + '">' +
@@ -864,14 +918,11 @@
     });
     var scopeYrs = Object.keys(scopeYrsMap).sort(function (a, b) { return Number(b) - Number(a); });
     var actObj = activeTrackObj();
-    var scopeTitle = actObj ? trackShortLabel(actObj) : (LD.scopeAll || '전체 상의');
-
-    aside.innerHTML =
-      '<div class="ld-hd"><span>' + esc(LD.headLabel || '🏬 지역별 대시보드') + '</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + tracks.length + '곳</span>') + '</div>' +
-      '<div class="ld-list">' + cardsHtml + '</div>' +
-      (cat.regionManageable === false ? '' : '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">+ 새 지역 상공회의소 추가</button>') +
+    var scopeTitle = actObj ? trackShortLabel(actObj) : L.scopeAll;
+    // 미등록 후보 탭은 후보의 수신 연도 알약이 따로 있다 — 등록 사업 연도 상자를 함께 두면 숫자가 어긋나 보여 숨긴다
+    var yearBoxHtml = CUR_TAB === 'inbox' ? '' : (
       '<div class="ld-year-box">' +
-        '<div class="ld-year-hd">📅 연도별 관리 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
+        '<div class="ld-year-hd" title="' + esc(scopeTitle + ' · ' + scopeProjs.length + '건') + '">📅 연도별 · ' + esc(scopeTitle) + ' (' + scopeProjs.length + '건)</div>' +
         '<div class="ld-yrs">' +
           '<button type="button" class="ld-yr-btn' + (!YEAR_FILTER ? ' on' : '') + '" data-ld-yronly="" aria-pressed="' + (!YEAR_FILTER ? 'true' : 'false') + '">전체(' + scopeProjs.length + ')</button>' +
           scopeYrs.map(function (yr) {
@@ -879,7 +930,14 @@
             return '<button type="button" class="ld-yr-btn' + (yOn ? ' on' : '') + '" data-ld-yronly="' + esc(yr) + '" aria-pressed="' + (yOn ? 'true' : 'false') + '">' + esc(yr) + '(' + scopeYrsMap[yr] + ')</button>';
           }).join('') +
         '</div>' +
-      '</div>';
+      '</div>');
+
+    aside.innerHTML =
+      '<div class="ld-hd"><span>' + esc(L.head) + '</span>' + (DIFF_HIGHLIGHT ? '<span class="chip c-blue">분리됨</span>' : '<span class="chip">' + renderTracks.length + '곳</span>') + '</div>' +
+      '<div class="ld-list">' + cardsHtml + '</div>' +
+      // 새 지역 추가는 카탈로그가 «사람이 지역을 더하는 앱»이라고 한 곳(regionManageable:true — 상공회의소)만
+      (cat.regionManageable === true ? '<button type="button" class="sm ld-add-btn" id="ldAddRegionBtn">' + esc(L.add) + '</button>' : '') +
+      yearBoxHtml;
 
     aside.querySelectorAll('[data-ld-track]').forEach(function (btn) {
       btn.onclick = function () {
@@ -906,7 +964,6 @@
       };
     });
     if ($('ldAddRegionBtn')) $('ldAddRegionBtn').onclick = openAddRegionModal;
-    void cat;
   }
   function diffCls(on) { return (DIFF_HIGHLIGHT && on) ? ' code-diff-box' : ''; }
   function diffBadge(label) { return DIFF_HIGHLIGHT ? ' <span class="chip c-blue">' + esc(label || '변경됨') + '</span>' : ''; }
@@ -973,7 +1030,7 @@
       ? '<button type="button" class="sm" data-ws-nav="detail">📋 진행·체크·자료 (' + getProjectComms(proj.id).length + ')</button>'
       : '<button type="button" class="sm pri" data-ws-nav="report">⚖️ 보고서 · RAG 코치</button>';
     // 가벼운 화면은 일반 보고서 원고를 접어 두므로 «좌우 2단 · 코치 집중 · 보고서 집중» 전환 단추도 두지 않는다
-    var focusBtns = (mode === 'report' && !isSlim())
+    var focusBtns = (mode === 'report' && !reportFolded())
       ? ('<button type="button" class="sm' + (!WS_FOCUS ? ' pri' : '') + '" data-focus="" title="RAG 코치(왼쪽)와 보고서(오른쪽)를 나란히 봅니다">좌우 2단</button>' +
          '<button type="button" class="sm' + (WS_FOCUS === 'coach' ? ' pri' : '') + '" data-focus="coach" title="RAG 코치·플레이북만 크게 봅니다">🧠 코치 집중</button>' +
          '<button type="button" class="sm' + (WS_FOCUS === 'doc' ? ' pri' : '') + '" data-focus="doc" title="보고서 편집·A4 미리보기만 크게 봅니다">📄 보고서 집중</button>')
@@ -1071,6 +1128,10 @@
     var trackIdsAll = Object.create(null);
     allProjs.forEach(function (p) { trackIdsAll[p.trackId || ''] = 1; });
     var oneTrackSlim = isSlim() && Object.keys(trackIdsAll).length <= 1;
+    // 왼쪽 대시보드가 켜지면 트랙·연도 고르기는 왼쪽 한 곳 — 위쪽 알약줄은 숨기고, 한 트랙을 고른 동안은 줄마다 같은 트랙 칩도 걷는다
+    var ldOn = leftDashOn();
+    var ldSlim = ldOn && isSlim();
+    var hideTrackChip = oneTrackSlim || (ldSlim && !!TRACK_FILTER);
     var showRounds = !!roundUnit();
 
     // 트랙 바 (#projTrackBar)
@@ -1094,7 +1155,7 @@
       trackBar.innerHTML = btns.join('');
       // 가벼운 화면: 사업이 한 트랙에만 있으면 «전체(108) · 그 트랙(108) · 빈 트랙(0)…» 알약은 같은 말의 되풀이라 감춘다.
       // (트랙은 [+ 새 사업 등록] 창에서 그대로 고를 수 있다)
-      trackBar.style.display = (oneTrackSlim && !TRACK_FILTER) ? 'none' : '';
+      trackBar.style.display = ((oneTrackSlim && !TRACK_FILTER) || ldSlim) ? 'none' : '';
       trackBar.querySelectorAll('[data-track-set]').forEach(function (b) {
         b.onclick = function () {
           TRACK_FILTER = b.getAttribute('data-track-set') || '';
@@ -1109,6 +1170,7 @@
     // 연도별 빠른 필터 바 (#projYrBar — 전 12개 앱 연도별 관리)
     var trackScopedProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
     renderYearButtonsBar('projYrBar', 'all', trackScopedProjs);
+    if ($('projYrBar')) $('projYrBar').style.display = ldSlim ? 'none' : '';
 
     // 초소형 1줄 KPI 배지 (#kpiBox — 선택된 지역/연도 범위 기준)
     var kpiBox = $('kpiBox');
@@ -1119,7 +1181,7 @@
       var doneCnt = kpiScope.filter(function (x) { return x.status === 'done'; }).length;
       var activeCnt = kpiScope.length - doneCnt;
       var totalComms = kpiScope.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0);
-      var scopedCands = TRACK_FILTER && $('leftDash')
+      var scopedCands = TRACK_FILTER && ldOn
         ? cands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
         : cands;
       var stVal = stFilter();
@@ -1127,7 +1189,8 @@
       var doneOn = stVal === 'done';
       var activeOn = stVal === 'active';
       var actTrack = activeTrackObj();
-      var scopeTag = (actTrack || YEAR_FILTER)
+      // 가벼운 화면: 바로 위(또는 왼쪽)에서 이미 «고른 것»으로 보이는 트랙·연도를 KPI 앞에 또 적지 않는다
+      var scopeTag = (!isSlim() && (actTrack || YEAR_FILTER))
         ? ('<span class="chip c-blue">' + esc((actTrack ? trackShortLabel(actTrack) : '전체') + (YEAR_FILTER ? (' · ' + YEAR_FILTER + '년') : '')) + '</span>')
         : '';
       kpiBox.innerHTML = scopeTag +
@@ -1217,13 +1280,15 @@
           '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
           '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
           '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>' +
-          '<td class="wide" title="' + esc(p.summaryNote || '-') + '">' + esc(p.summaryNote || '-') + '</td>' +
+          '<td class="wide" title="' + esc(memoShown(p) || '-') + '">' + esc(memoShown(p) || '-') + '</td>' +
           '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
         '</tr>';
       }
       var rowBodyCols;
       if (isInsp) {
-        var resChip = p.inspResult ? (' <span class="chip ' + (p.inspResult.indexOf('완료') >= 0 || p.inspResult.indexOf('없음') >= 0 ? 'c-green' : 'c-amber') + '">' + esc(p.inspResult) + '</span>') : '';
+        // 감독 결과가 진행상태 칩과 같은 말(진행중·완료)이면 두 번 적지 않는다
+        var stLbl = p.status === 'done' ? '완료' : '진행중';
+        var resChip = (p.inspResult && str(p.inspResult) !== stLbl) ? (' <span class="chip ' + (p.inspResult.indexOf('완료') >= 0 || p.inspResult.indexOf('없음') >= 0 ? 'c-green' : 'c-amber') + '">' + esc(p.inspResult) + '</span>') : '';
         var periodHtml = p.inspPeriod ? esc(p.inspPeriod) : '<span class="hint">기간 미입력</span>';
         var officeHtml = p.inspOffice ? (' <span class="hint">· ' + esc(p.inspOffice) + '</span>') : '';
         var issuesTxt = p.inspIssues || p.summaryNote || '-';
@@ -1237,7 +1302,7 @@
           '<td title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span> <span class="chip">' + sum.overallPct + '%</span></td>';
       } else {
         rowBodyCols =
-          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (oneTrackSlim ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
+          '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '">' + (hideTrackChip ? '' : '<span class="chip c-blue">' + esc(trLbl) + '</span> ') + stChip + '</td>' +
           (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
           '<td title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
           '<td title="6단계 진행현황">' + stepDotsHtml(p.stage, p.status) + '</td>' +
@@ -1262,7 +1327,7 @@
       ? '<th class="yr">연도</th><th>사업장명</th><th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th><th data-k="st">진행상태</th><th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'
       : (isInsp
         ? ('<th>사업장 · 연도</th><th>감독 유형 · 결과' + diffMark + '</th><th>감독 기간 · 관할지청' + diffMark + '</th><th class="wide">지적 · 시정지시 사항' + diffMark + '</th><th>6단계 진행현황</th><th>자료 · 점검</th><th data-k="act">열기</th>')
-        : ('<th>사업장 · 연도</th><th>' + (oneTrackSlim ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'));
+        : ('<th>사업장 · 연도</th><th>' + (hideTrackChip ? '상태' : '트랙 · 상태') + '</th>' + (showRounds ? '<th data-k="rd">회차</th>' : '') + '<th>담당 노무사</th><th>6단계 진행현황</th><th>자료 · 점검</th><th class="wide">요약 메모</th><th data-k="act">열기</th>'));
     box.innerHTML = bulkHtml + '<div class="scroll' + (isInsp ? diffCls(true) : '') + '"><table class="t" data-name="cases">' +
       '<thead><tr><th class="c"><input type="checkbox" data-ckall="proj"' + (allProjChecked ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th>' + headCols + '</tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>' + moreHtml;
@@ -1318,7 +1383,7 @@
   /* ══ 5. 탭 2: 📥 미등록 후보 (pu-harass drawInboxPane 규격) ══════════════ */
   function getFilteredInboxBundles() {
     var allCands = (D.discover && D.discover.bundles) || [];
-    var hasLeft = !!$('leftDash');
+    var hasLeft = leftDashOn();
     var trackCands = (hasLeft && TRACK_FILTER)
       ? allCands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
       : allCands;
@@ -1358,7 +1423,7 @@
 
     if ($('inboxKpiBox')) {
       var actObj = activeTrackObj();
-      var trTag = (hasLeft && actObj) ? ('<span class="chip c-blue">' + esc(trackShortLabel(actObj)) + '</span>') : '';
+      var trTag = (hasLeft && actObj && !isSlim()) ? ('<span class="chip c-blue">' + esc(trackShortLabel(actObj)) + '</span>') : '';
       $('inboxKpiBox').innerHTML = trTag +
         '<div class="kpi k-amber"><span>미등록 후보</span><b>' + trackCands.length + '묶음</b></div>' +
         ((YEAR_FILTER || q) ? '<div class="kpi k-blue"><span>필터 결과</span><b>' + list.length + '묶음</b></div>' : '') +
@@ -1808,9 +1873,9 @@
       ? ('<div class="card">' + projectPickerBarHtml(proj, 'report') + '</div>')
       : ('<div class="note"><b>' + esc(cat.name) + '</b> 실무 RAG 코치 — 왼쪽에서 플레이북·법령 근거를 바로 검색할 수 있으며, 사업장을 선택하면 오른쪽 보고서 작업실도 함께 활성화됩니다.</div>');
 
-    // 가벼운 화면: 기관에 내는 서식은 «컨설팅보고서»가 실제 서식(별지)에 채워 출력한다.
+    // 기관 서식이 컨설팅보고서에 있는 앱(govReportForm — 기술보호·현장클리닉·상공회의소): 기관에 내는 서식은 «컨설팅보고서»가 실제 서식(별지)에 채워 출력한다.
     // 여기의 일반 보고서 원고(최종결과보고서·1P·체크리스트)는 기관 서식이 아닌 내부 참고용이라 «접어 둔다»(지우지 않음).
-    if (isSlim()) {
+    if (reportFolded()) {
       topCardHtml += '<div class="note" id="govReportNote">📑 <b>기관 제출용 서식</b>(' + esc(cat.shortName) + ' 기관 양식)은 <a class="act-link" href="gov-report.html" target="_blank" rel="noopener">컨설팅보고서 ↗</a>에서 실제 서식에 채워 출력합니다. ' +
         '이 탭의 일반 보고서 원고는 내부 참고용이라 오른쪽에 접어 두었습니다.</div>';
       rightColHtml = '<div class="ws-col-right"><details class="sub-fold" id="genRptFold"><summary>📄 일반 보고서 원고 · HWPX (내부 참고용 — 기관 서식 아님)</summary><div class="sub-fold-bd">' +
@@ -2628,7 +2693,7 @@
     if ($('inQ')) $('inQ').oninput = function () { if (CUR_TAB === 'inbox') renderInboxPane(); };
     if ($('inResetBtn')) $('inResetBtn').onclick = function () {
       YEAR_FILTER = '';
-      if ($('leftDash')) TRACK_FILTER = '';
+      if (leftDashOn()) TRACK_FILTER = '';
       if ($('inQ')) $('inQ').value = '';
       draw();
     };
@@ -2700,7 +2765,7 @@
 
   function boot(firebaseInstance, appKey) {
     APP_KEY = str(appKey) || 'sixthind';
-    // 가벼운 화면(slimUi)은 «변경됨» 표시·강조 상자를 쓰지 않는다 — 탭과 같은 단추를 되풀이하던 띠도 함께 걷는다.
+    // 가벼운 화면(12개 앱 공통 기본)은 «변경됨» 표시·강조 상자를 쓰지 않는다 — 탭과 같은 단추를 되풀이하던 띠도 함께 걷는다.
     DIFF_HIGHLIGHT = !isSlim();
     fb = firebaseInstance;
     fbDb = fb && fb.database ? fb.database() : null;
@@ -2769,7 +2834,12 @@
       roundChipsHtml: function (p) { return roundChipsHtml(p); },
       roundsPanelHtml: function (p) { return roundsPanelHtml(p); },
       roundKpiHtml: function (list) { return roundKpiHtml(list); },
-      memoShown: function (p) { return memoShown(p); }
+      memoShown: function (p) { return memoShown(p); },
+      setProjects: function (obj) { D.projects = obj || {}; TRACK_FILTER = ''; },
+      leftDashWanted: function () { return leftDashWanted(); },
+      leftDashLabels: function () { return leftDashLabels(); },
+      isSlim: function () { return isSlim(); },
+      reportFolded: function () { return reportFolded(); }
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

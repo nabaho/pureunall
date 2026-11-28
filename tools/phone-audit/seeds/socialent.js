@@ -23,6 +23,24 @@ module.exports = {
           consultantName: '점검노무사',
           status: 'active',
           summaryNote: '사회적기업·씨앗 현장 점검 진행 중 (연락처 010-0000-1001)'
+        },
+        'pr_socialent_2': {
+          id: 'pr_socialent_2',
+          entityType: 'Project',
+          schemaVersion: 1,
+          contractVersion: 1,
+          createdAt: NOW - 864e5 * 400,
+          updatedAt: NOW - 864e5 * 300,
+          revision: 1,
+          companyName: '(주)다라사회적기업샘플',
+          year: 2025,
+          trackId: 'se_cert',
+          trackName: '(예비)사회적기업 인증·지정 노무요건 정비',
+          stage: 'followup',
+          workerCount: 40,
+          consultantName: '점검노무사',
+          status: 'done',
+          summaryNote: '다른 기관(세부 트랙) 사업 — 왼쪽 대시보드 점검용 지어낸 자료'
         }
       },
       checks: {

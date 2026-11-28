@@ -1,7 +1,8 @@
 'use strict';
 /* 현장클리닉·기술보호 — 이중 표시를 걷고(연도별 자료함 탭·연도/상태/트랙 드롭다운·변경점 띠 등) 회차를 다시 보여 준다
  * (대표 지시 2026-11-28 「3회차도 2회차도 있다 — 회차 정리한 것도 다시 다 표시 · 중복 정리 · 보고서·RAG 코치 범위 검토」).
- * 규칙: ① 가벼운 화면은 두 앱만(나머지 10개 앱은 그대로) ② 회차는 «번호»로만 이어 읽기만 한다 ③ 성과추적은 합계에서 따로. */
+ * 규칙: ① 가벼운 화면은 12개 앱 공통 기본(대표 지시 2026-11-28 「기술보호 고친 걸 기준으로 전체 일치」 — 처음엔 두 앱만이었다)
+ *       ② 회차는 «번호»로만 이어 읽기만 한다 ③ 성과추적은 합계에서 따로. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -56,20 +57,20 @@ const consultings = [
 const data = { consultings, govCos: cos, govScheds: scheds, govTypes: types };
 const P = (no, year, extra) => Object.assign({ id: 'p_' + no, caseNo: no, year, companyName: '(합성)' + no }, extra || {});
 
-test('① 가벼운 화면은 현장클리닉·기술보호 두 앱만이고, 회차 단위(일/회)·정부사업일정 종류 글자가 있다', () => {
+test('① 가벼운 화면은 12개 앱 공통 기본이고, 회차는 현장클리닉·기술보호만(단위 일/회·정부사업일정 종류 글자)', () => {
+  for (const k of ALL) assert.notEqual(Cats.get(k).slimUi, false, k + ': 가벼운 화면을 끈 앱이 있다(12개 앱 공통)');
   for (const k of SLIM) {
     const c = Cats.get(k);
-    assert.equal(c.slimUi, true, k + ': slimUi');
     assert.ok(c.roundUnit, k + ': roundUnit');
     assert.ok(Array.isArray(c.govTypeKeywords) && c.govTypeKeywords.length >= 1, k + ': govTypeKeywords');
   }
   assert.equal(Cats.get('clinic').roundUnit, '일', '현장클리닉은 3일 = 3회차');
   assert.equal(Cats.get('techprotect').roundUnit, '회', '기술보호는 3회 = 3회차');
-  for (const k of OTHERS) assert.ok(!Cats.get(k).slimUi, k + ': 다른 앱은 그대로(slimUi 없음)');
+  for (const k of OTHERS) assert.ok(!Cats.get(k).roundUnit, k + ': 회차 열은 두 앱만');
 });
 
-test('② 두 앱 화면에서 이중으로 있던 것이 걷혔고, 나머지 10개 앱은 그대로다', () => {
-  for (const k of SLIM) {
+test('② 12개 앱 화면 모두 이중으로 있던 것이 걷혔다', () => {
+  for (const k of ALL) {
     const h = read(k + '.html');
     for (const id of ['p-yearly', 'yrPillsBar', 'projSt', 'projYrSel', 'projTrackSel', 'openCoachQuickBtn', 'scanAllBtn']) {
       assert.ok(h.indexOf('id="' + id + '"') < 0, k + ': ' + id + ' 이 아직 남아 있다');
@@ -78,10 +79,6 @@ test('② 두 앱 화면에서 이중으로 있던 것이 걷혔고, 나머지 1
     assert.ok(/id="allCsvBtn"/.test(h), k + ': 옛 연도별 자료함 CSV(후보 포함 전체)는 도구 메뉴에 남는다');
     assert.ok(/id="projYrBar"/.test(h) && /id="kpiBox"/.test(h), k + ': 연도 알약·KPI 는 그대로(진짜 한 벌)');
     for (const keep of ['projQ', 'projMgr', 'newProjBtn', 'projCsvBtn', 'syncAllBtn']) assert.ok(h.indexOf('id="' + keep + '"') >= 0, k + ': ' + keep + ' 는 남아야 한다');
-  }
-  for (const k of OTHERS) {
-    const h = read(k + '.html');
-    assert.ok(/id="p-yearly"/.test(h) && /id="projSt"/.test(h) && /id="projYrSel"/.test(h), k + ': 이 앱은 건드리지 않는다');
   }
 });
 
@@ -132,14 +129,14 @@ test('⑥ 회차 현황 표: 계획 회차만큼 줄을 놓고 방문일이 없�
   assert.ok(/저장 안 함/.test(p), '읽기만 한다는 말이 화면에 있다');
 });
 
-test('⑦ 가벼운 화면이 아닌 앱(상공회의소 등)은 회차 열·합계를 그리지 않는다', () => {
+test('⑦ 회차 단위가 없는 앱(상공회의소 등)은 회차 열·합계를 그리지 않는다', () => {
   const V = loadView(); V.use('chamber', data);
   assert.equal(V.roundsOf(P('CL-1', PAST_YR)), null);
   assert.equal(V.roundChipsHtml(P('CL-1', PAST_YR)), '');
   assert.equal(V.roundKpiHtml([P('CL-1', PAST_YR)]), '');
 });
 
-test('⑧ 자동으로 만들어진 메모는 번호 칩·자료 칸과 같은 말이라 비워 보이고, 사람이 쓴 메모는 그대로다 (가벼운 화면만)', () => {
+test('⑧ 자동으로 만들어진 메모는 번호 칩·자료 칸과 같은 말이라 비워 보이고, 사람이 쓴 메모는 그대로다 (12개 앱 공통)', () => {
   const V = loadView(); V.use('clinic', data);
   assert.equal(V.memoShown({ summaryNote: '[ERP] ERP 수임(현장클리-2026-011)' }), '');
   assert.equal(V.memoShown({ summaryNote: '[메일] 메일 2통 자동분류' }), '');
@@ -147,12 +144,13 @@ test('⑧ 자동으로 만들어진 메모는 번호 칩·자료 칸과 같은 �
   assert.equal(V.memoShown({ summaryNote: '성과추적 건 — 사후 점검 기록' }), '성과추적 건 — 사후 점검 기록');
   assert.equal(V.memoShown({ summaryNote: '[메일] 대표님 요청으로 따로 적은 메모' }), '[메일] 대표님 요청으로 따로 적은 메모');
   V.use('chamber', data);
-  assert.equal(V.memoShown({ summaryNote: '[ERP] ERP 수임(번호)' }), '[ERP] ERP 수임(번호)', '다른 앱 메모는 건드리지 않는다');
+  assert.equal(V.memoShown({ summaryNote: '[ERP] ERP 수임(번호)' }), '', '상공회의소도 같은 기준(가벼운 화면 공통)');
+  assert.equal(V.memoShown({ summaryNote: '사람이 쓴 메모' }), '사람이 쓴 메모');
 });
 
 test('⑨ 화면 코드: 변경점 띠는 가벼운 화면에서 비우고, 연도별 옛 주소는 사업 현황으로, 보고서 탭은 기관 서식 안내 + 일반 원고 접기', () => {
   const v = read('js/pu-consult-view.js');
-  assert.ok(/if \(cat\.slimUi\) \{ el\.innerHTML = ''; return; \}/.test(v), '변경점 띠를 가벼운 화면에서 비운다');
+  assert.ok(/if \(isSlim\(\)\) \{ el\.innerHTML = ''; return; \}/.test(v), '변경점 띠를 가벼운 화면에서 비운다');
   assert.ok(/t === 'yearly' && !\$\('p-yearly'\)\) return 'projects'/.test(v), '?tab=yearly 옛 주소가 빈 화면이 되지 않는다');
   assert.ok(/govReportNote/.test(v) && /genRptFold/.test(v) && /gov-report\.html/.test(v), '기관 서식은 컨설팅보고서로 안내하고 일반 원고는 접는다(지우지 않는다)');
   assert.ok(/safeVal\('scal_cos'\)/.test(v) && !/scal_cos'\)\.(set|update|remove)|ref\('scal_(cos|scheds|types)'\)\.(set|update|remove|push)/.test(v), '정부사업일정은 읽기만 한다');
