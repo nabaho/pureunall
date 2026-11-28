@@ -2722,6 +2722,54 @@ rules.kakao_room = {
   }
 };
 
+/* ⚖️ 노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화, 2026-11-28) — harass_invest/harass_secret 동일 규격 */
+function makeCaseSecretPair(casesRoot, secretRoot) {
+  const caseRec = (keyVar) => `root.child('${casesRoot}').child('cases').child(${keyVar})`;
+  const caseWrite = `(${LOGIN}) && newData.exists() && (!data.exists()`
+    + ` ? (${ADMIN} || (!root.child('${secretRoot}').child($id).exists() && ${조사담당식('newData')}))`
+    + ` : (${ADMIN} || (${기존조사담당} && ((${내사번} != null && data.child('managerMain').val() === ${내사번}) || (${담당자불변})))))`;
+  const syncOwner = `(${LOGIN}) && (${ADMIN} || ${조사담당식(caseRec('$id'))})`;
+  const secretOwner = `(${LOGIN}) && (${ADMIN} || ${조사담당식(caseRec('$cid'))})`;
+  rules[casesRoot] = {
+    '.read': LOGIN,
+    cases: { $id: {
+      '.write': caseWrite,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Case'",
+      managerMain: {
+        '.validate': "newData.isString() && newData.val().length <= 20 && (newData.val() === '' || newData.val().matches(/^[A-Za-z0-9_-]+$/))"
+      },
+      managerSubs: {
+        $subIdx: {
+          '.validate': "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[A-Za-z0-9_-]+$/)"
+        }
+      }
+    } },
+    erp_sync: { $id: {
+      '.write': `(${syncOwner}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+    } },
+    erp_ack: { $id: {
+      '.write': `(${syncOwner}) && newData.exists() && root.child('${casesRoot}').child('erp_sync').child($id).exists()`
+        + ` && newData.child('syncedRevision').val() === root.child('${casesRoot}').child('erp_sync').child($id).child('revision').val()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+    } },
+    dismissed: { $id: {
+      '.write': `(${LOGIN}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'Task'"
+    } },
+    $other: { '.validate': false }
+  };
+  rules[secretRoot] = {
+    $cid: {
+      '.read': secretOwner,
+      '.write': `(${secretOwner}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $cid && newData.child('entityType').val() === 'Document'"
+    }
+  };
+}
+makeCaseSecretPair('labor_cases', 'labor_secret');
+makeCaseSecretPair('sanjae_cases', 'sanjae_secret');
+
 /* 📊 데이터관리(대표 전용, pu-datahub.html, 2026-11-21) — 계획서 4·6절 «문 세 겹»의 셋째 겹
    - 대표 표지 app_owner/uid = 대표 uid 하나. 읽기는 재직 직원(화면이 «내가 대표인가»를 본다), 쓰기는 «아무도»
      (값은 대표 승인 아래 터미널 scripts/datahub-owner.js 로 한 번만 넣는다 — 관리자·관리자대행도 화면에서 못 바꾼다).

@@ -21,3 +21,7 @@
   - `js/pu-consult-catalogs-*.js`, `js/pu-consult-intake.js`, `js/pu-consult-rag.js`, `js/pu-consult-hwpx.js`, `js/pu-consult-view.js`
   - `functions/msg-intake-server.js`, `functions/index.js` (`consultMsgIngest`), `functions/doc-read.js` (14종 앱 엄격 PII 가림)
   - `scripts/make-firebase-rules.js` & `scripts/backfill-consult-suite.js` (`--dry-run` 검증)
+- **후속 UI 통일 및 배포 마무리**:
+  - 12종 전용 앱(`techprotect.html`~`specialcons.html`)·`pu-msg-intake.html`·`pu-coach.html` 상단 슬림 `#head`, 5탭·KPI 1줄·좌우 2단 작업실·모바일 2줄 카드를 `pu-harass.html` 규격과 동일하게 통일하고 최근 변경 안내 바(`#recent-diff-bar`) 탑재
+  - Firebase RTDB 보안 규칙(`scal_*` 12종, `msg_intake`, `coach_rag` 및 콘솔 동기화 루트 포함) `rules-deploy.js --deploy` 반영 완료 (`docs/firebase-rules-콘솔원문-2026-11-28.json` 갱신)
+  - Cloud Functions 2종(`consultMsgIngest`, `readDoc`) 지정 배포 대상 검증 및 반영
