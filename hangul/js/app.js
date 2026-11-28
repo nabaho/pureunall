@@ -1772,9 +1772,12 @@
   const _seenBridgeIds = new Set();
   const _isPrivateBridgeId = id => {
     const s = String(id || '');
-    return s.indexOf('harass_') === 0 || s.indexOf('pbox_') === 0;
+    return s.indexOf('harass_') === 0 || s.indexOf('pbox_') === 0 || s.indexOf('consult_') === 0;
   };
-  const _isPrivateFrom = f => (f === 'harass' || f === 'pbox');
+  const _isPrivateFrom = f => {
+    const s = String(f || '');
+    return s === 'harass' || s === 'pbox' || s.indexOf('consult_') === 0;
+  };
   async function loadFromFundPayload(p) {
     if (!p || typeof p !== 'object') return;
     if (p.bridgeId) {
@@ -1867,8 +1870,8 @@
     if (!d || d.type !== 'pureun_hangul_open' || !d.payload) return;
     const pBid = String(d.payload.bridgeId || '');
     if (_isPrivateBridgeId(pBid) || _isPrivateFrom(_initFrom)) {
-      /* 기밀 조사문서·P박스 의견서는 반드시 해당 bid로 열린 전용 팝업만 opener로부터 수신(다른 탭 유출 원천 차단) */
-      const expectedPrefix = _initFrom === 'pbox' ? 'pbox_' : 'harass_';
+      /* 기밀 조사문서·P박스·컨설팅 서면은 반드시 해당 bid로 열린 전용 팝업만 opener로부터 수신(다른 탭 유출 원천 차단) */
+      const expectedPrefix = _initFrom === 'pbox' ? 'pbox_' : (_initFrom.indexOf('consult_') === 0 ? 'consult_' : 'harass_');
       if (!_isPrivateFrom(_initFrom) || !_initBid || pBid !== _initBid || pBid.indexOf(expectedPrefix) !== 0) return;
       if (!window.opener || e.source !== window.opener) return;
     }

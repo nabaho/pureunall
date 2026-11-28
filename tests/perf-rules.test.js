@@ -183,7 +183,14 @@ const allowTop = ['gov_digest' /* 정부사업신청 오늘의 요약 — 읽기
   'uid_kakao',
   /* 2026-11-12 괴롭힘·성희롱 조사 비밀 전자서명(sign-harass.html).
      사건 기밀(harass_secret)과 격리된 종단간 암호화 단건 서명 슬롯이다. */
-  'harass_sign'];
+  'harass_sign',
+  /* 2026-11-28 신규 컨설팅 전용 앱 12종(scal_*), 카톡·문자 수집함(msg_intake), 수습 RAG 노트(coach_rag) —
+     재직 직원(LOGIN) 전용 격리 루트 · 물리 삭제 금지 · msg_intake/coach_rag 작성자/필드 검증 */
+  'scal_techprotect','scal_clinic','scal_chamber','scal_hrconsult','scal_evalcomp','scal_pubconsult',
+  'scal_familywork','scal_socialent','scal_sixthind','scal_laboraudit','scal_unionneg','scal_specialcons',
+  'msg_intake','coach_rag',
+  /* 2026-11-28 사내 카톡 업무방 아카이브·노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화) */
+  'kakao_room','labor_cases','labor_secret','sanjae_cases','sanjae_secret'];
 
 const keys = Object.keys(R);
 const removed = baseTop.filter(function (k) { return keys.indexOf(k) < 0; });

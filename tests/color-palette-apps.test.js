@@ -63,6 +63,20 @@ const DONE = [
   ['pu-edulib.html', '강의자료'],
   ['pu-alio-union.html', '공공임단협'],
   ['pu-datahub.html', '데이터관리'],
+  ['techprotect.html', '기술보호컨설팅'],
+  ['clinic.html', '현장클리닉'],
+  ['chamber.html', '상공회의소컨설팅'],
+  ['hrconsult.html', '기초인사노무'],
+  ['evalcomp.html', '평가보상·임금체계'],
+  ['pubconsult.html', '공공기관컨설팅'],
+  ['familywork.html', '출산육아·유연근무'],
+  ['socialent.html', '사회적기업·씨앗'],
+  ['sixthind.html', '6차산업컨설팅'],
+  ['laboraudit.html', '자율점검·근로감독'],
+  ['unionneg.html', '민간노조·단체교섭'],
+  ['specialcons.html', '특화·위탁컨설팅'],
+  ['pu-msg-intake.html', '카톡·문자 자료수집'],
+  ['pu-coach.html', '실무코치·RAG학습'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */

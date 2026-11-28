@@ -8897,3 +8897,62 @@ exports.datahubBoardTally = functions
     console.log("[데이터관리 현황판]", r);
     return null;
   });
+
+/* 💬 카톡·문자 컨설팅 자료 실시간 브리지 수신 (consultMsgIngest)
+   - Authorization: Bearer <ID_TOKEN>(재직 직원 requireReader) 또는 Device <HANA_DEVICE_TOKEN>(requireHanaDevice) 필수.
+   - OTP·인증번호 차단 및 2중 PII 마스킹 후 18개 사업 자동분류 라벨을 붙여 msg_intake/items/$id 에 기록한다. */
+const ConsultMsgIntake = require("./msg-intake-server");
+exports.consultMsgIngest = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 30, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { hanaJson(res, 405, { ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    const rawLen = Buffer.byteLength(JSON.stringify(req.body || {}), "utf8");
+    if (rawLen > 32768) { hanaJson(res, 413, { ok: false, error: "요청 크기 한도(32KB)를 초과했습니다." }); return; }
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const authHeader = String(req.headers.authorization || "");
+    try {
+      let actorUid = "";
+      if (/^Device\s+/i.test(authHeader)) {
+        const linked = await requireHanaDevice(req, body);
+        actorUid = linked.uid;
+      } else if (/^Bearer\s+/i.test(authHeader)) {
+        const decoded = await requireReader(req);
+        actorUid = decoded.uid;
+      } else {
+        hanaJson(res, 401, { ok: false, error: "재직 직원 인증 또는 기기 토큰이 필요합니다." }); return;
+      }
+      const built = ConsultMsgIntake.buildIngestItem(body, actorUid, Date.now());
+      if (!built.ok) {
+        hanaJson(res, built.ignored ? 200 : 400, { ok: !!built.ignored, ignored: !!built.ignored, reason: built.reason }); return;
+      }
+      const db = getDatabase();
+      /* 계정별 1분 호출 횟수 제한 (최대 60회) — 대량 스팸 적재 방지 */
+      const nowAt = Date.now();
+      const rateRef = db.ref(`hanaSmsBridge/consultRate/${actorUid}`);
+      const rateTx = await rateRef.transaction((cur) => {
+        const winStart = cur && (nowAt - Number(cur.windowAt || 0) < 60000) ? Number(cur.windowAt) : nowAt;
+        const cnt = cur && (nowAt - Number(cur.windowAt || 0) < 60000) ? Number(cur.count || 0) + 1 : 1;
+        if (cnt > 60) return undefined;
+        return { windowAt: winStart, count: cnt };
+      }).catch(() => ({ committed: true }));
+      if (rateTx && rateTx.committed === false) {
+        hanaJson(res, 429, { ok: false, error: "잠시 후 다시 시도해 주세요(분당 수집 한도 초과)." }); return;
+      }
+      const ref = db.ref(`msg_intake/items/${built.id}`);
+      const txRes = await ref.transaction((cur) => {
+        if (cur !== null && cur !== undefined) return undefined;
+        return built.item;
+      });
+      if (!txRes.committed) {
+        hanaJson(res, 200, { ok: true, duplicate: true, id: built.id, targetApp: built.item.targetApp }); return;
+      }
+      hanaJson(res, 200, { ok: true, id: built.id, targetApp: built.item.targetApp, targetApps: built.item.targetApps });
+    } catch (err) {
+      const status = Number(err && err.status);
+      const safeErr = (status >= 400 && status < 500 && err && err.message) ? String(err.message) : "수집 처리 중 오류가 발생했습니다.";
+      hanaJson(res, status || 500, { ok: false, error: safeErr });
+    }
+  });
