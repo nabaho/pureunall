@@ -2949,22 +2949,63 @@ rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
 
 /* 콘솔 동기화 — puwiki (사라짐 방지 및 라이브 콘솔 일치 유지, 2026-11-28) */
+/* ══ 📖 푸른 지식백과(pu-wiki.html) — 비식별 사내위키 · 법제처 원문 대조 · 교차검증 (2026-11-28) ══
+   ★ 읽기·쓰기 = 재직 직원(LOGIN). 담기는 것: 비식별 정화된 사내 실무 문서(articles) · 노무사/직원 검토 확인 및 오류신고(reviews).
+   ⚠ 물리 삭제(빈 값 쓰기) 금지 — _deleted 표식만 허용.
+   ⚠ 서버 측 필드 허용 목록($other: false) 및 주민등록번호 패턴 직접 쓰기 차단(PW_NO_RRN), 수정차수 단조 증가 강제.
+   ⚠ 검토·신고(reviews) 위조·변조 방지:
+     - 생성 시 actorSid === 본인 사번, revision === 1, verify 는 status === 'active' · flag 는 status === 'open' 및 해결자 빈 값 강제, articleRev 는 현재 문서 revision 이하만 허용.
+     - 수정 시 actorSid·kind·articleRev·createdAt 불변, 지우기(_deleted)는 작성자 또는 관리자만, 신고 해결 전환(open → resolved/dismissed) 시 resolvedBySid === 본인 사번 강제. */
+const PUWIKI_MY_SID = "root.child('uid_roles').child(auth.uid).child('sid').val()";
+const PW_NO_RRN = "!newData.val().matches(/[0-9]{6}[ ]*[-–—][ ]*[0-9]{7}/) && !newData.val().matches(/[0-9]{13}/) && !newData.val().matches(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/) && !newData.val().matches(/[A-Za-z]:\\\\/)";
+const PW_SAFE_STR = (n) => ({ '.validate': `newData.isString() && newData.val().length <= ${n} && ${PW_NO_RRN}` });
+const PW_SAFE_ARR = (n, idxRe) => ({
+  '.validate': 'newData.hasChildren()',
+  $idx: { '.validate': `$idx.matches(${idxRe}) && newData.isString() && newData.val().length <= ${n} && ${PW_NO_RRN}` }
+});
+const PUWIKI_ART_W = `(${LOGIN}) && newData.exists() && ((!data.exists() && newData.child('revision').val() === 1 && newData.child('createdBy').val() === ${PUWIKI_MY_SID} && newData.child('updatedBy').val() === ${PUWIKI_MY_SID}) || (data.exists() && newData.child('revision').val() === data.child('revision').val() + 1 && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === ${PUWIKI_MY_SID} && (newData.child('_deleted').val() !== true || newData.child('deletedBy').val() === ${PUWIKI_MY_SID})))`;
+const PUWIKI_REV_CREATE_OK = `!data.exists() && newData.child('revision').val() === 1 && newData.child('actorSid').val() === ${PUWIKI_MY_SID} && newData.child('createdBy').val() === ${PUWIKI_MY_SID} && newData.child('updatedBy').val() === ${PUWIKI_MY_SID} && newData.child('_deleted').val() !== true && newData.child('resolvedBySid').val() === '' && newData.child('resolvedAt').val() === 0 && newData.child('resolutionNote').val() === '' && ((newData.child('kind').val() === 'verify' && newData.child('status').val() === 'active') || (newData.child('kind').val() === 'flag' && newData.child('status').val() === 'open'))`;
+const PUWIKI_REV_UPDATE_OK = `data.exists() && newData.child('revision').val() === data.child('revision').val() + 1 && newData.child('actorSid').val() === data.child('actorSid').val() && newData.child('kind').val() === data.child('kind').val() && newData.child('articleRev').val() === data.child('articleRev').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === ${PUWIKI_MY_SID} && ((newData.child('_deleted').val() === true && (data.child('actorSid').val() === ${PUWIKI_MY_SID} || ${ADMIN} || ${SUB}) && newData.child('deletedBy').val() === ${PUWIKI_MY_SID} && newData.child('status').val() === data.child('status').val() && newData.child('resolvedBySid').val() === data.child('resolvedBySid').val() && newData.child('resolvedAt').val() === data.child('resolvedAt').val()) || (newData.child('_deleted').val() !== true && ((data.child('kind').val() === 'verify' && data.child('actorSid').val() === ${PUWIKI_MY_SID} && newData.child('status').val() === 'active') || (data.child('kind').val() === 'flag' && (data.child('actorSid').val() === ${PUWIKI_MY_SID} || newData.child('note').val() === data.child('note').val()) && ((data.child('status').val() === 'open' && ((newData.child('status').val() === 'open' && data.child('actorSid').val() === ${PUWIKI_MY_SID}) || ((newData.child('status').val() === 'resolved' || newData.child('status').val() === 'dismissed') && newData.child('resolvedBySid').val() === ${PUWIKI_MY_SID} && newData.child('resolvedAt').val() > 0))) || (data.child('status').val() !== 'open' && (${ADMIN} || ${SUB})))))))`;
 rules.puwiki = {
   '.read': LOGIN,
   articles: {
     $id: {
-      '.write': `(${LOGIN}) && newData.exists()`,
-      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 12000"
+      '.write': PUWIKI_ART_W,
+      '.validate': "newData.hasChildren(['id', 'entityType', 'title', 'body', 'revision', 'createdAt', 'updatedAt']) && newData.child('id').val() === $id && $id.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120 && newData.child('body').isString() && newData.child('body').val().length > 0 && newData.child('body').val().length <= 12000",
+      ...CS_BASE_META('WikiArticle'),
+      title: PW_SAFE_STR(120),
+      category: PW_SAFE_STR(40),
+      summary: PW_SAFE_STR(300),
+      body: PW_SAFE_STR(12000),
+      laws: PW_SAFE_ARR(100, '/^([0-9]|1[0-9]|2[0-4])$/'),
+      wikiTopics: PW_SAFE_ARR(60, '/^[0-7]$/'),
+      apps: PW_SAFE_ARR(40, '/^[0-9]$/'),
+      obsidianNote: PW_SAFE_STR(160),
+      order: CS_NUM,
+      $other: { '.validate': false }
     }
   },
   reviews: {
     $art: {
       $id: {
-        '.write': `(${LOGIN}) && newData.exists() && ((!data.exists() && newData.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.exists() && newData.child('actorSid').val() === data.child('actorSid').val() && newData.child('kind').val() === data.child('kind').val() && newData.child('createdAt').val() === data.child('createdAt').val() && ((newData.child('_deleted').val() === true && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) || (newData.child('_deleted').val() !== true && ((data.child('kind').val() === 'verify' && data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val()) || (data.child('kind').val() === 'flag' && (data.child('actorSid').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || newData.child('note').val() === data.child('note').val()) && (newData.child('status').val() === 'open' || newData.child('resolvedBySid').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))))))`,
-        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag') && newData.child('actorSid').isString() && newData.child('actorSid').val().length > 0 && newData.child('actorSid').val().length <= 64 && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 800"
+        '.write': `(${LOGIN}) && newData.exists() && ((${PUWIKI_REV_CREATE_OK}) || (${PUWIKI_REV_UPDATE_OK}))`,
+        '.validate': "newData.hasChildren(['id', 'articleId', 'entityType', 'kind', 'status', 'actorSid', 'articleRev', 'note', 'revision', 'createdAt', 'updatedAt']) && newData.child('id').val() === $id && $id.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.child('articleId').val() === $art && $art.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag') && newData.child('actorSid').isString() && newData.child('actorSid').val().length > 0 && newData.child('actorSid').val().length <= 64 && newData.child('articleRev').isNumber() && newData.child('articleRev').val() >= 1 && (!root.child('puwiki').child('articles').child($art).child('revision').exists() || newData.child('articleRev').val() <= root.child('puwiki').child('articles').child($art).child('revision').val()) && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 800",
+        ...CS_BASE_META('WikiReview'),
+        articleId: CS_STR(60),
+        kind: { '.validate': "newData.val() === 'verify' || newData.val() === 'flag'" },
+        status: { '.validate': "newData.val() === 'active' || newData.val() === 'open' || newData.val() === 'resolved' || newData.val() === 'dismissed'" },
+        actorSid: CS_STR(64),
+        articleRev: CS_NUM,
+        checkedLawNote: PW_SAFE_STR(200),
+        note: PW_SAFE_STR(800),
+        resolvedBySid: CS_STR(64),
+        resolvedAt: CS_NUM,
+        resolutionNote: PW_SAFE_STR(400),
+        $other: { '.validate': false }
       }
     }
-  }
+  },
+  $other: { '.validate': false }
 };
 
 

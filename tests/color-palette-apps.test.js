@@ -79,6 +79,7 @@ const DONE = [
   ['specialcons.html', '특화·위탁컨설팅'],
   ['pu-msg-intake.html', '카톡·문자 자료수집'],
   ['pu-coach.html', '실무코치·RAG학습'],
+  ['pu-wiki.html', '푸른지식백과'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */

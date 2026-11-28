@@ -184,6 +184,7 @@
         { key: 'mail',      icon: '📧', name: '푸른 메일',       when: '다음메일 수발신 동기화, 사업장별 오간 메일 한 줄기 보기, 견적·안내 메일 발송·열람확인', from: '다음메일(IMAP·POP3), 사진첩·기금관리·뉴스레터 발송 연동', to: '기업정보함(사업장별 스레드), 업무관리(메일 줄 표시), 컨설팅보고서(받은 서류 후보)', ask: '푸른 메일은 기업정보함·업무관리·컨설팅보고서와 어떻게 연결되나요?' },
         { key: 'aliounion', icon: '🤝', name: '공공임단협',     when: '공공기관(ALIO) 노조 현황·타임오프·직종별 임금·복리후생·단체협약 13대 쟁점 비교', from: '알리오 공공기관 공시 데이터 및 단협·규정 원문', to: '기관별 종합 상세 팝업 및 비교표 CSV(엑셀) 내려받기', ask: '공공임단협 앱은 언제 어떻게 활용하나요?' },
         { key: 'pbox',      icon: '📚', name: 'P박스',          when: '대한민국 현행 전 법령(5,773편)·대법원/하급심 판례·위원회 결정·행정해석 통합 검색 및 계약서·서면 조항별 위험 진단·AI 초안 작성', from: '국가법령 전수 색인·공식 판례/유권해석 수집 및 내 PC 문서(.pdf/.txt/.md/.json, 자동 비식별)', to: '조항별 노무 위험 진단·기계적 인용 검증 의견서 및 사건별 통합 패킷(.md) 내보내기', ask: 'P박스로 법령·판례 검색과 계약서·서면 내용 검토는 어떻게 하나요?' },
+        { key: 'puwiki',    icon: '📖', name: '푸른 지식백과',   when: '옵시디언에서 정제한 사내 실무 기준을 국가법령정보센터·P박스 원문 및 한국어 위키백과 참고 배경지식과 3층으로 분리 열람하고 노무사·직원이 교차검증할 때', from: '옵시디언 비식별 배포본(.json/.md), P박스 법령 색인(5,773편), 한국어 위키백과 공식 REST API', to: '노무사 [검토 확인] 실명 서명 · 직원 [오류·개정 신고] 즉시 경고 및 연관 포털 앱 점프', ask: '푸른 지식백과에서 옵시디언 문서와 법령 원문·위키백과는 어떻게 연결·검증하나요?' },
         { key: 'kakaoroom', icon: '🗨️', name: '법인 카카오톡 방', when: '법인 카카오톡 업무방 대화를 약관 무위반 방식(공식 알림·.txt 내보내기·붙여넣기)으로 수집해 OTP·잡담은 거르고 비식별 업무만 자료함에 영구 보관하며 업무·업체 진행을 추적할 때', from: '하나문자 공식 폰 알림(kakaoWork/notes)·PC 카톡 공식 내보내기(.txt)·톡서랍 받은 파일 폴더', to: '자료함 영구 보관(kakao_room)·업무관리 진행기록(work_erp)·사진첩/기업정보함 첨부 이관·옵시디언 일지', ask: '법인 카카오톡 방 앱에서 대화를 안전하게 수집하고 업무·자료함으로 연결하려면 어떻게 하나요?' },
         { key: 'msgintake', icon: '💬', name: '카톡·문자 자료수집', when: 'PC 카카오톡 대화 내보내기(.txt)·수신 문자(SMS)·웹훅을 2중 비식별 처리하고 18개 컨설팅 사업으로 자동 분류·배정', from: '카톡 대화(.txt)·문자 붙여넣기·휴대폰 브리지 웹훅(consultMsgIngest)', to: '각 컨설팅 전용 앱 인박스(comms) 자동 연계 배정', ask: '카카오톡 대화나 문자로 온 컨설팅 자료는 어떻게 자동으로 모으나요?' },
         { key: 'coach',     icon: '🧠', name: '실무코치·RAG학습', when: '수습·주니어 노무사가 18개 컨설팅 사업 플레이북·과거 비식별 사례·법령근거를 하이브리드 RAG 검색해 다음 행동을 확인', from: '18대 사업 표준 플레이북·수행사례·수습 실무노트·메일/톡 요약', to: '단계별 Next Action 추천 · 근거 기반 AI 코칭 · RAG JSONL 내보내기', ask: '수습 노무사가 컨설팅 절차와 해야 할 일을 RAG로 검색하려면 어느 앱을 쓰나요?' }
@@ -317,8 +318,8 @@
         'P박스로 법령·판례 검색과 계약서·서면 내용 검토는 어떻게 하나요?',
         '계약서등관리와 사진첩의 계약서 등록은 무엇이 달라?'
       ],
-      tags: ['자료함', '두번째줄', '2번째줄', '자료함사용법', '자료함연결도', '서류연결', '메일연결', '허브', '드래그', '드래그앤드롭', '첨부', '다운받', 'P박스', '피박스', '법인카카오톡방', '카카오톡', '카톡정리'],
-      apps: ['photos', 'cards', 'mail', 'work', 'docs', 'cal', 'aliounion', 'pbox', 'edulib', 'kakaoroom', 'msgintake', 'coach']
+      tags: ['자료함', '두번째줄', '2번째줄', '자료함사용법', '자료함연결도', '서류연결', '메일연결', '허브', '드래그', '드래그앤드롭', '첨부', '다운받', 'P박스', '피박스', '푸른지식백과', '지식백과', '사내위키', '법인카카오톡방', '카카오톡', '카톡정리'],
+      apps: ['photos', 'cards', 'mail', 'work', 'docs', 'cal', 'aliounion', 'pbox', 'puwiki', 'edulib', 'kakaoroom', 'msgintake', 'coach']
     },
     {
       id: 'SYS-row-sales',
@@ -402,6 +403,26 @@
       ],
       tags: ['P박스', '피박스', 'pbox', '법령전수함', '국가법령', '판례검색', '하급심', '행정해석', '유권해석', '내용검토', '문서작성', '위험진단', '인용검증'],
       apps: ['pbox']
+    },
+    {
+      id: 'SYS-puwiki-01',
+      cat: 'system',
+      flowId: 'flow-core',
+      source: '푸른포털 앱 사용법',
+      docNo: '자료함 · 푸른 지식백과 사용법',
+      law: '1층 옵시디언 비식별 사내위키 · 2층 법제처/P박스 원문 대조 · 3층 한국어 위키백과 참고 분리 · 노무사 교차검증',
+      title: '[푸른 지식백과] 3층 검증형 사내위키(옵시디언·법령원문·위키백과 분리) 및 교차검증 사용법',
+      q: '푸른 지식백과에서 옵시디언 문서와 법령 원문·위키백과는 어떻게 연결·검증하나요?',
+      a: '[푸른 지식백과]는 포털 [자료함] 줄에서 여는 3층 정보 분리·교차검증 사내위키입니다.\n① [1층 사내 실무 지식]: 옵시디언 사내배포 문서(`.json`/`.md`)를 가져올 때 내 PC 로컬 경로(`C:\\`, `file:///`)·폴더 트리·연락처·사업자번호를 자동 제거하고 주민등록번호 패턴이 있으면 원천 차단합니다.\n② [2층 법적 근거 원문]: 본문과 인용 목록의 법령 조문·판례(약칭 포함)를 자동 추출하여 국가법령정보센터(`law.go.kr`) 공식 원문 및 사내 [P박스] 5,773편 법령 색인과 직결합니다.\n③ [3층 위키백과 참고 분리 & 교차검증]: 한국어 위키백과(`ko.wikipedia.org` 공식 API)는 「법적 근거 아님」 참고 상자로만 엄격히 분리하며 개인정보·사건번호 검색어는 외부 전송 전 차단합니다. 담당 노무사·직원이 [✅ 검토 확인] 실명(사번) 서명과 [🚩 오류·개정 신고]로 최신성을 교차검증합니다.',
+      points: [
+        '법적 요건·산정식·기한은 반드시 우측 2층 법제처·P박스 공식 원문으로 대조하고 위키백과는 일반 배경지식 참고로만 씁니다',
+        '직원이 법령 개정·오탈자 신고를 남기면 해결 전까지 문서 상단에 재검토 경고가 표시되어 옛 기준 오용을 막습니다'
+      ],
+      followUps: [
+        'P박스로 법령·판례 검색과 계약서·서면 내용 검토는 어떻게 하나요?'
+      ],
+      tags: ['푸른지식백과', '푸른 지식백과', '지식백과', '사내위키', 'puwiki', '옵시디언', '위키백과', '교차검증', '법령대조'],
+      apps: ['puwiki', 'pbox']
     },
     {
       id: 'SYS-kakaoroom-01',
@@ -1273,7 +1294,7 @@
     familywork: 1, socialent: 1, sixthind: 1, laboraudit: 1, unionneg: 1, specialcons: 1,
     msgintake: 1, coach: 1,
     hangul: 1, rules: 1, payroll: 1, cal: 1, orch: 1, photos: 1, cards: 1, docs: 1, work: 1, mail: 1,
-    aliounion: 1, pbox: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1, pubsearch: 1,
+    aliounion: 1, pbox: 1, puwiki: 1, news: 1, home: 1, rehabad: 1, signboard: 1, govbid: 1, pubsearch: 1,
     hr: 1, fin: 1, settle: 1, deungi: 1, career: 1, edulib: 1, datahub: 1, kakaoroom: 1
   };
   var SINGLE_APP_DOC_ID = {
@@ -1281,6 +1302,7 @@
     fund: 'SYS-fund-01',
     deungi: 'SYS-deungi-01',
     pbox: 'SYS-pbox-01',
+    puwiki: 'SYS-puwiki-01',
     orch: 'SYS-orch-01',
     harass: 'SYS-harass-01',
     ilteo: 'SYS-ilteo-01',
@@ -1356,6 +1378,7 @@
     { prefix: 'gov/', label: '정부사업신청(공고 검토)', app: 'govbid' },
     { prefix: 'settle', label: '컨설팅정산(주관·담당 정산표)', app: 'settle' },
     { prefix: 'deungi', label: '푸른등기(법인 변경등기)', app: 'deungi' },
+    { prefix: 'puwiki', label: '푸른 지식백과(3층 사내위키·검토)', app: 'puwiki' },
     { prefix: 'kcareer', label: '경력관리(수행실적·이력서)', app: 'career' },
     { prefix: 'datahub', label: '데이터관리(대표 보기 설정)', app: 'datahub' },
     { prefix: 'pubdata/co', label: '공공데이터(고용보험·국민연금 인원)', app: '' },
@@ -2009,6 +2032,7 @@
     if (/급여아웃소싱/.test(q) && it.id === 'SYS-row-client') score += 28;
     if (/공공임단협|알리오|타임오프/.test(q) && it.id === 'SYS-work-cal-01') score += 34;
     if (/p박스|피박스|\bpbox\b/i.test(q) && it.id === 'SYS-pbox-01') score += 45;
+    if (/푸른\s*지식백과|지식백과|사내\s*위키|\bpuwiki\b/i.test(q) && it.id === 'SYS-puwiki-01') score += 48;
     if (/오케스트레이션|바통\s*대기열|흐름판|\borch\b/i.test(q) && it.id === 'SYS-orch-01') score += 48;
     if ((/괴롭힘[·\s]*성희롱\s*조사|\bharass\b/i.test(q) || (/괴롭힘/.test(q) && /앱|프로그램|화면|타일|사용법|어디서|연결도|공문\s*메일|8단계|진술확인서/.test(q))) && it.id === 'SYS-harass-01') score += 48;
     if (/일터상생혁신|\bilteo\b/i.test(q) && it.id === 'SYS-ilteo-01') score += 48;
@@ -2176,7 +2200,7 @@
     payroll: 'payroll', paydata: 'payroll',
     cards: 'cards', photos: 'cards',
     docs: 'docs', hangul: 'docs', edulib: 'docs',
-    news: 'portal', home: 'portal', rehabad: 'portal', signboard: 'portal', aliounion: 'portal', pbox: 'portal', orch: 'portal', portal: 'portal'
+    news: 'portal', home: 'portal', rehabad: 'portal', signboard: 'portal', aliounion: 'portal', pbox: 'portal', puwiki: 'portal', orch: 'portal', portal: 'portal'
   };
 
   function matchExplicitImproveCat(text) {
@@ -2189,7 +2213,7 @@
     if (/기업규정집|취업규칙/.test(hay)) return 'rules';
     if (/급여아웃소싱|급여데이터함|\bpaydata\b/i.test(hay)) return 'payroll';
     if (/푸른이알피|이알피|재무관리|인사관리|경력관리|푸른등기|변경등기|기업정부지원금|괴롭힘[·\s]*성희롱\s*조사|\bharass\b|자문계약|사건관리|업체관리|계약\s*저장/i.test(hay)) return 'erp';
-    if (/포털|챗봇|길잡이|뉴스레터|홈페이지|회생광고|전광판|공공임단협|오케스트레이션|P박스|p박스|피박스|\bpbox\b|\borch\b/i.test(hay)) return 'portal';
+    if (/포털|챗봇|길잡이|뉴스레터|홈페이지|회생광고|전광판|공공임단협|오케스트레이션|P박스|p박스|피박스|지식백과|사내위키|\bpbox\b|\bpuwiki\b|\borch\b/i.test(hay)) return 'portal';
     var dynApps = detectMentionedApps(hay);
     for (var i = 0; i < dynApps.length; i++) {
       var mapped = APP_TO_SG_CAT[dynApps[i]];
@@ -2336,7 +2360,7 @@
   }
 
   function defaultAppCatalogString() {
-    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:근로감독대응·이력, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
+    var baseStr = 'erp:푸른이알피, fund:기금관리, consult:정부사업일정, govreport:컨설팅보고서, govaid:기업정부지원금, harass:괴롭힘·성희롱조사, ilteo:일터상생혁신, jobtrans:산업일자리전환, safety:안전보건체계구축, techprotect:기술보호컨설팅, clinic:현장클리닉, chamber:상공회의소컨설팅, hrconsult:기초인사노무, evalcomp:평가보상·임금체계, pubconsult:공공기관컨설팅, familywork:출산육아·유연근무, socialent:사회적기업·씨앗, sixthind:6차산업컨설팅, laboraudit:근로감독대응·이력, unionneg:민간노조·단체교섭, specialcons:특화·위탁컨설팅, msgintake:카톡·문자자료수집, coach:실무코치·RAG학습, hangul:한글편집기, rules:기업규정집, payroll:급여아웃소싱, cal:푸른캘린더, orch:오케스트레이션, photos:사진첩, cards:기업정보함, docs:계약서등관리, work:업무관리, mail:푸른메일, aliounion:공공임단협, pbox:P박스, puwiki:푸른지식백과, news:뉴스레터, home:홈페이지, rehabad:회생광고, signboard:전광판, govbid:정부사업신청, hr:인사관리, fin:재무관리, settle:컨설팅정산, deungi:푸른등기, career:경력관리, edulib:강의자료, datahub:데이터관리';
     var extra = [];
     Object.keys(LIVE_APPS).forEach(function (k) {
       var ap = LIVE_APPS[k];
