@@ -11039,7 +11039,7 @@ const CO_MAIL_PER_FOLDER = 800;
 const CO_MAIL_MAX_ROWS = 30;
 function mbSyncFolders(){
   return Object.keys(_mbFolders || {}).map(k => Object.assign({ slug:k }, _mbFolders[k] || {}))
-    .filter(f => CO_MAIL_KINDS[String(f.kind || '')]);
+    .filter(f => CO_MAIL_KINDS[String(f.kind || '')] && !f.gone);     /* 다음메일에서 없어진 폴더(gone)는 같은 메일이 두 번 셈하지 않게 뺀다 */
 }
 /* 사업장 열쇠 — 기업 상세가 쓰는 «그 잣대» 그대로다(coKeyOf).
    ⚠ 업무관리도 같은 셈으로 열쇠를 만들어 읽는다(work.html coKeysOf).
@@ -21534,9 +21534,12 @@ function mbMemoOf(){ return (_mbMemo = _mbMemo || {}); }
 function mbFolders(){
   const m = mbMemoOf();
   if(m.folders) return m.folders;
+  /* ⚠ 다음메일에서 지우거나 이름을 바꿔 «없어진» 폴더(서버가 gone 표시)는 뺀다 — 업무별 칸·전체메일·통수에서
+       옛 칸이 계속 보이고, 이름을 바꾼 것은 같은 메일이 두 번 보이던 것을 막는다(대표 지시 2026-11-28 「숨기기로 진행」).
+       기록·담긴 메일은 서버에 그대로 있다 — 같은 폴더가 다시 생기면 표시가 사라져 도로 보인다. */
   return (m.folders = Object.entries(_mbFolders||{})
     .map(([slug,v])=>Object.assign({slug}, v||{}))
-    .filter(v=>v.path)
+    .filter(v=>v.path && !v.gone)
     .sort((a,b)=>(a.order||5)-(b.order||5) || String(a.name||'').localeCompare(String(b.name||''),'ko')));
 }
 function mbFolderOf(kind){
@@ -22931,9 +22934,9 @@ function mbBoxTodo(cnt){
   const 볼것 = {};
   /* ⚠ 셈에서 온 칸도 «안 붙임»을 다시 거른다 — 세는 쪽(mbCheckAll)이 이미 걸렀지만,
        거르개가 한 곳에만 있으면 셈을 다른 데서 넘길 때 조용히 새어 들어온다. */
-  Object.keys(cnt || {}).forEach(slug=>{ if(!mbNoWhoBox(slug)) 볼것[slug] = 1; });
+  Object.keys(cnt || {}).forEach(slug=>{ if(!mbNoWhoBox(slug) && !((_mbFolders || {})[slug] || {}).gone) 볼것[slug] = 1; });
   Object.keys(_mbFolders || {}).forEach(slug=>{
-    const f = _mbFolders[slug]; if(!f) return;
+    const f = _mbFolders[slug]; if(!f || f.gone) return;     /* 다음메일에서 없어진 폴더(gone)는 담당자 셈에서 뺀다 */
     if(MB_MINE_KINDS.indexOf(String(f.kind || 'custom')) < 0) return;
     if(mbNoWhoBox(slug)) return;
     볼것[slug] = 1;
