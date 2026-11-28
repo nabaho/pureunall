@@ -409,7 +409,24 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
   /* ★ 2026-11-28 — /govlinks 콘솔 동기화, /kakao_room 2단계 강화분, 컨설팅 12종(scal_* projects/caseNo · regions) 규칙 배포 완료(사라짐 0 · 헐거워짐 0 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
   /* ★ 2026-11-28 — 병목 해소 2단계 /fund_mail_queue 최상위 서버 전용 잠금 · /paydata/arrivals/$coId 숫자 검증 및 콘솔 동기화(/puwiki · scal_* insp*) 배포 완료(새로 2 · 바뀜 0 · 사라짐 0 · 문법 통과 · 콘솔 일치 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). */
   /* ★ 2026-11-28 — 컨설팅 12종 근로감독 5필드(insp*), /govlinks/stars, /fund_erp/mail_queue/.validate 및 콘솔 신규 3규칙(fund_mail_queue, puwiki, paydata/arrivals/$coId) 통합 배포 완료(사라짐 0 · 다시 읽어 콘솔과 같음 확인 → docs/firebase-rules-콘솔원문-2026-11-28.json). 목록을 비운다. */
-  const PENDING = [];
+  /* 2026-11-29 게시 전 — 컨설팅 12종 사업 칸에 «수행/안내·기타 구분·안내 발송·회신» 선택 칸 5개(kind·guideSentAt·guideRespondedAt·guideResponse·guideNote).
+     새로 60 · 바뀜 0 · 사라짐 0 · 넓어짐 0 — 기존 scal_* projects 를 읽고 쓰는 사람 그대로, 칸만 더함(필수 아님).
+     ⚠ 게시가 막힌 까닭: 콘솔에 아직 main 에 없는 지식백과(/puwiki, PR #3338) 규칙이 먼저 올라가 있어 지금 올리면 그 46줄이 사라진다(rules-deploy 안전장치 정지).
+       #3338 이 합쳐진 뒤 rules-deploy.js --deploy 로 게시하고, 콘솔 원문을 새 판으로 갈아 끼운 다음 아래 줄을 뺄 것. */
+  const PENDING = [
+    '/scal_chamber/projects/$id/guideNote', '/scal_chamber/projects/$id/guideRespondedAt', '/scal_chamber/projects/$id/guideResponse', '/scal_chamber/projects/$id/guideSentAt', '/scal_chamber/projects/$id/kind',
+    '/scal_clinic/projects/$id/guideNote', '/scal_clinic/projects/$id/guideRespondedAt', '/scal_clinic/projects/$id/guideResponse', '/scal_clinic/projects/$id/guideSentAt', '/scal_clinic/projects/$id/kind',
+    '/scal_evalcomp/projects/$id/guideNote', '/scal_evalcomp/projects/$id/guideRespondedAt', '/scal_evalcomp/projects/$id/guideResponse', '/scal_evalcomp/projects/$id/guideSentAt', '/scal_evalcomp/projects/$id/kind',
+    '/scal_familywork/projects/$id/guideNote', '/scal_familywork/projects/$id/guideRespondedAt', '/scal_familywork/projects/$id/guideResponse', '/scal_familywork/projects/$id/guideSentAt', '/scal_familywork/projects/$id/kind',
+    '/scal_hrconsult/projects/$id/guideNote', '/scal_hrconsult/projects/$id/guideRespondedAt', '/scal_hrconsult/projects/$id/guideResponse', '/scal_hrconsult/projects/$id/guideSentAt', '/scal_hrconsult/projects/$id/kind',
+    '/scal_laboraudit/projects/$id/guideNote', '/scal_laboraudit/projects/$id/guideRespondedAt', '/scal_laboraudit/projects/$id/guideResponse', '/scal_laboraudit/projects/$id/guideSentAt', '/scal_laboraudit/projects/$id/kind',
+    '/scal_pubconsult/projects/$id/guideNote', '/scal_pubconsult/projects/$id/guideRespondedAt', '/scal_pubconsult/projects/$id/guideResponse', '/scal_pubconsult/projects/$id/guideSentAt', '/scal_pubconsult/projects/$id/kind',
+    '/scal_sixthind/projects/$id/guideNote', '/scal_sixthind/projects/$id/guideRespondedAt', '/scal_sixthind/projects/$id/guideResponse', '/scal_sixthind/projects/$id/guideSentAt', '/scal_sixthind/projects/$id/kind',
+    '/scal_socialent/projects/$id/guideNote', '/scal_socialent/projects/$id/guideRespondedAt', '/scal_socialent/projects/$id/guideResponse', '/scal_socialent/projects/$id/guideSentAt', '/scal_socialent/projects/$id/kind',
+    '/scal_specialcons/projects/$id/guideNote', '/scal_specialcons/projects/$id/guideRespondedAt', '/scal_specialcons/projects/$id/guideResponse', '/scal_specialcons/projects/$id/guideSentAt', '/scal_specialcons/projects/$id/kind',
+    '/scal_techprotect/projects/$id/guideNote', '/scal_techprotect/projects/$id/guideRespondedAt', '/scal_techprotect/projects/$id/guideResponse', '/scal_techprotect/projects/$id/guideSentAt', '/scal_techprotect/projects/$id/kind',
+    '/scal_unionneg/projects/$id/guideNote', '/scal_unionneg/projects/$id/guideRespondedAt', '/scal_unionneg/projects/$id/guideResponse', '/scal_unionneg/projects/$id/guideSentAt', '/scal_unionneg/projects/$id/kind'
+  ];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');

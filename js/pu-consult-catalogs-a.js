@@ -42,13 +42,14 @@
       govTypeKeywords: ['기술보호'], // 정부사업일정(scal_types) 종류 이름에 들어 있는 글자
       agency: '대·중소기업·농어업협력재단',
       desc: '대중소협력재단·영업비밀·비밀유지·HWPX',
+      kindSplit: true,   // «컨설팅 수행» 과 «안내·기타(신청 안내 발송·회신 기록)» 를 두 탭으로 가른다
       erpTypeKeywords: ['통합기술보호지원단', '기술보호', '기술보호울타리'],
       excelTypeKeywords: ['기술보호', '대중소'],
       tracks: [
-        { id: 'tp_basic',   name: '통합 기술보호지원반 (초기·진단)' },
-        { id: 'tp_hr_sec',  name: '인적보안·노무서약 정비(비밀유지·경업금지·직무발명)' },
-        { id: 'tp_nda',     name: '협력사·외주 NDA/기술임치 연계' },
-        { id: 'tp_audit',   name: '제3기 전문가 실무·사후점검' }
+        { id: 'tp_basic',   shortName: '기술보호지원반', name: '통합 기술보호지원반 (초기·진단)' },
+        { id: 'tp_hr_sec',  shortName: '인적보안·서약', name: '인적보안·노무서약 정비(비밀유지·경업금지·직무발명)' },
+        { id: 'tp_nda',     shortName: 'NDA·기술임치', name: '협력사·외주 NDA/기술임치 연계' },
+        { id: 'tp_audit',   shortName: '사후점검', name: '제3기 전문가 실무·사후점검' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -81,9 +82,9 @@
       ],
       reportSchema: [
         { no: 1, title: '기업 일반현황 및 핵심기술·인력 보안 진단 개요', hint: '매출/인력 규모, 핵심 영업비밀 유형, 현행 보안취약점 요약' },
-        { no: 2, title: '영업비밀 비밀관리성 요건 진단 결과', hint: '비공지성·경제적유용성·비밀관리성 3요건 충족 수준' },
-        { no: 3, title: '근로계약서·입사/퇴직 서약서·취업규칙 정비방안', hint: '비밀유지·경업금지·징계조항 신구조문 대비 및 서식' },
-        { no: 4, title: '직무발명보상제도 및 외주·협력사 NDA 개선방안', hint: '발명진흥법 준수 절차, 기술임치·원본증명 연계' },
+        { no: 2, title: '영업비밀 비밀관리성 요건 진단 결과', hint: '비공지성·경제적유용성·비밀관리성 3요건 충족 수준', cats: ['비밀관리성', '접근통제', '증거보전'] },
+        { no: 3, title: '근로계약서·입사/퇴직 서약서·취업규칙 정비방안', hint: '비밀유지·경업금지·징계조항 신구조문 대비 및 서식', cats: ['인적보안', '경업금지', '이직관리', '취업규칙'] },
+        { no: 4, title: '직무발명보상제도 및 외주·협력사 NDA 개선방안', hint: '발명진흥법 준수 절차, 기술임치·원본증명 연계', cats: ['직무발명', '외주용역'] },
         { no: 5, title: '단계별 실행 로드맵 및 만족도·후속지원 안내', hint: '단기(1개월)/중기(3개월) 조치계획 및 재단 연계사업' }
       ],
       mailRules: {
@@ -142,9 +143,9 @@
       erpTypeKeywords: ['현장클리닉', '비즈니스지원단', '비지니스지원단'],
       excelTypeKeywords: ['현장클리닉', '비즈니스지원단', '클리닉'],
       tracks: [
-        { id: 'cl_clinic', name: '비즈니스지원단 현장클리닉 (1~3일/회차)' },
-        { id: 'cl_duty',   name: '지방중기청·창경·TP 상담위원 순회근무' },
-        { id: 'cl_post',   name: '클리닉 후속 심화 자문·계약 연계' }
+        { id: 'cl_clinic', shortName: '현장클리닉', name: '비즈니스지원단 현장클리닉 (1~3일/회차)' },
+        { id: 'cl_duty',   shortName: '순회 상담', name: '지방중기청·창경·TP 상담위원 순회근무' },
+        { id: 'cl_post',   shortName: '후속 자문', name: '클리닉 후속 심화 자문·계약 연계' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -313,16 +314,17 @@
       shortName: '기초인사노무',
       icon: '🗂️',
       htmlFile: 'hrconsult.html',
+      groupByCompany: true,    // 푸른노무법인 직접 계약 — 같은 사업장의 연도별 건을 «사업장 한 줄 + 연도 칩»으로 묶어 보인다(연도별 건·자료는 그대로)
       leftDash: { by: '업무' }, // 왼쪽 대시보드 문구 — 사업이 든 세부 트랙이 둘 이상일 때만 켜진다 (대표 지시 2026-11-28)
       agency: '푸른노무법인 (민간·자문사 제도정비)',
       desc: '근로계약서·취업규칙연계·급여설계',
       erpTypeKeywords: ['기초컨설팅푸른법인', '기초컨설팅', '인사노무'],
       excelTypeKeywords: ['인사노무 규정정비', '인사노무 일반컨설팅', '기초컨설팅'],
       tracks: [
-        { id: 'hr_contract', name: '근로·연봉·단시간·프리랜서/도급계약서 정비 (메일 1,667통)' },
-        { id: 'hr_rules',    name: '취업규칙·인사/복무/보수규정 연계 정비 (기업규정집 연동)' },
-        { id: 'hr_pay',      name: '급여설계·통상/포괄임금·교대제·근로시간 개편 (메일 1,027통)' },
-        { id: 'hr_pkg',      name: '민간 기초인사노무 종합 패키지 (ERP 24건+)' }
+        { id: 'hr_contract', shortName: '계약서 정비', name: '근로·연봉·단시간·프리랜서/도급계약서 정비 (메일 1,667통)' },
+        { id: 'hr_rules',    shortName: '취업규칙·규정', name: '취업규칙·인사/복무/보수규정 연계 정비 (기업규정집 연동)' },
+        { id: 'hr_pay',      shortName: '급여·근로시간', name: '급여설계·통상/포괄임금·교대제·근로시간 개편 (메일 1,027통)' },
+        { id: 'hr_pkg',      shortName: '종합 패키지', name: '민간 기초인사노무 종합 패키지 (ERP 24건+)' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -412,10 +414,10 @@
       erpTypeKeywords: ['평가보상', '임금체계', '직무분석', '조직진단'],
       excelTypeKeywords: ['조직진단·평가보상', '평가보상', '임금체계'],
       tracks: [
-        { id: 'ec_eval',  name: '인사평가(업적 KPI/MBO · 역량 · 다면평가) 설계' },
-        { id: 'ec_wage',  name: '임금·보상체계 개편(직무분석 · 직무급 · 연봉밴드 · 호봉 개편)' },
-        { id: 'ec_bonus', name: '성과급·인센티브·경영성과배분 기준 설계' },
-        { id: 'ec_pip',   name: '저성과자 성과개선계획(PIP) 운영 가이드라인' }
+        { id: 'ec_eval',  shortName: '인사평가', name: '인사평가(업적 KPI/MBO · 역량 · 다면평가) 설계' },
+        { id: 'ec_wage',  shortName: '임금·보상체계', name: '임금·보상체계 개편(직무분석 · 직무급 · 연봉밴드 · 호봉 개편)' },
+        { id: 'ec_bonus', shortName: '성과급', name: '성과급·인센티브·경영성과배분 기준 설계' },
+        { id: 'ec_pip',   shortName: '저성과자 PIP', name: '저성과자 성과개선계획(PIP) 운영 가이드라인' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -503,10 +505,10 @@
       erpTypeKeywords: ['공공기관', '사회서비스원', '지자체', '공무직'],
       excelTypeKeywords: ['공공기관', '사회서비스원', '통합공시'],
       tracks: [
-        { id: 'pub_welfare', name: '사회서비스원·복지시설 품질관리/처우/노무컨설팅' },
-        { id: 'pub_gov',     name: '지자체·공공기관 공무직 규정·용역원가·대행 자문' },
-        { id: 'pub_alio',    name: '공공기관 통합공시(알리오/클린아이)·경영평가 노무점검' },
-        { id: 'pub_univ',    name: '대학·출연연 노무진단 및 인권경영시스템' }
+        { id: 'pub_welfare', shortName: '사회서비스원·복지', name: '사회서비스원·복지시설 품질관리/처우/노무컨설팅' },
+        { id: 'pub_gov',     shortName: '지자체·공무직', name: '지자체·공공기관 공무직 규정·용역원가·대행 자문' },
+        { id: 'pub_alio',    shortName: '알리오·경영평가', name: '공공기관 통합공시(알리오/클린아이)·경영평가 노무점검' },
+        { id: 'pub_univ',    shortName: '대학·출연연', name: '대학·출연연 노무진단 및 인권경영시스템' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [

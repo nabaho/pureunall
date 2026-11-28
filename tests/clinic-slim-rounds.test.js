@@ -151,7 +151,7 @@ test('⑧ 자동으로 만들어진 메모는 번호 칩·자료 칸과 같은 �
 test('⑨ 화면 코드: 변경점 띠는 가벼운 화면에서 비우고, 연도별 옛 주소는 사업 현황으로, 보고서 탭은 기관 서식 안내 + 일반 원고 접기', () => {
   const v = read('js/pu-consult-view.js');
   assert.ok(/if \(isSlim\(\)\) \{ el\.innerHTML = ''; return; \}/.test(v), '변경점 띠를 가벼운 화면에서 비운다');
-  assert.ok(/t === 'yearly' && !\$\('p-yearly'\)\) return 'projects'/.test(v), '?tab=yearly 옛 주소가 빈 화면이 되지 않는다');
+  assert.ok(/if \(!document\.getElementById\('p-' \+ t\)\) return 'projects'/.test(v), '?tab=yearly 옛 주소(없는 탭)가 빈 화면이 되지 않는다');
   assert.ok(/govReportNote/.test(v) && /genRptFold/.test(v) && /gov-report\.html/.test(v), '기관 서식은 컨설팅보고서로 안내하고 일반 원고는 접는다(지우지 않는다)');
   assert.ok(/safeVal\('scal_cos'\)/.test(v) && !/scal_cos'\)\.(set|update|remove)|ref\('scal_(cos|scheds|types)'\)\.(set|update|remove|push)/.test(v), '정부사업일정은 읽기만 한다');
   // 지우지 않는다 — 일반 보고서 원고·RAG 코치 코드는 그대로 있다

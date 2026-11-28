@@ -231,6 +231,12 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
+### 🔐 컨설팅 12종 사업 칸 «수행/안내·회신» 선택 칸 5개 — 게시 대기 (2026-11-29 컨설팅 나머지 마무리 방)
+
+`scal_*/projects/$id` 에 `kind`·`guideSentAt`·`guideRespondedAt`·`guideResponse`·`guideNote`(필수 아님, 추가만 60곳). 만들개·적용본엔 들어갔고 콘솔엔 아직.
+`rules-deploy.js` 가 콘솔의 `/puwiki`(지식백과 PR #3338, main 미합침) 46줄이 사라진다며 멈춘다 — 우회 금지.
+- [ ] #3338 합친 뒤 `node scripts/rules-deploy.js --deploy` → 콘솔 원문 새 판 → `tests/photos-staff-share.test.js` PENDING 비우기. 그 전엔 기술보호 «안내 기록» 저장이 규칙에 막힌다.
+
 ### 🔐 실시간DB 규칙 — 콘솔에만 있고 저장소에 없는 규칙 62개 (2026-11-28 정부사업 바로가기 방에서 발견)
 
 `node scripts/rules-deploy.js` 가 «사라지는 규칙 62개»로 멈춘다 — `/puwiki` · `/fund_erp/mail_queue` · 컨설팅 12종 `scal_*` 의 `projects/$id` 아래 `insp…` 칸(점검 기한·지적·관서·기간·결과).

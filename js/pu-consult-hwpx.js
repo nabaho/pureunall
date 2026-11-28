@@ -130,6 +130,12 @@
     var overallPct = totalItems ? Math.round((doneItems / totalItems) * 100) : 0;
     var grade = overallPct >= 85 ? '우수' : (overallPct >= 60 ? '양호' : (overallPct >= 25 ? '보완필요' : '착수'));
 
+    // 점검 결과가 «한 줄이라도» 입력됐는지 — 하나도 없는데 0% · 미점검을 보고서에 찍지 않으려고 센다
+    var recorded = 0;
+    [[preList, preMap], [domList, domMap], [docList, docMap]].forEach(function (pr) {
+      pr[0].forEach(function (c) { var r = pr[1][c.id]; if (r && str(r.status)) recorded++; });
+    });
+
     var commArr = Array.isArray(comms) ? comms : (comms && typeof comms === 'object' ? Object.values(comms) : []);
     commArr = commArr.filter(function (c) { return c && !c._deleted; });
 
@@ -149,6 +155,7 @@
       docPct: docList.length ? Math.round((docDone / docList.length) * 100) : 0,
       overallPct: overallPct,
       grade: grade,
+      recorded: recorded,
       urgentFixes: urgentFixes,
       commCount: commArr.length,
       commList: commArr
@@ -312,19 +319,40 @@
     return { preRows: preRows, domRows: domRows, docRows: docRows };
   }
 
+  function workersText(p) {
+    var n = Number(p && p.workerCount);
+    return (isFinite(n) && n > 0) ? (n + '명') : '[확인 필요]'; // 입력 안 된 값을 0명으로 쓰지 않는다
+  }
+
+  /* 장마다 겹치지 않게 점검 줄을 나눈다 — 장에 cats(다룰 점검 분류)가 있으면 그 분류만,
+   * 없으면(2·3장 옛 방식) 보완 항목을 앞·뒤 절반으로 갈라 두 장에 같은 줄이 되풀이되지 않게 한다. */
+  function sectionFixLines(sec, sum, cat) {
+    if (!sum.recorded) return '점검 결과가 아직 입력되지 않았습니다. 진행·체크 탭에서 점검한 뒤 반영됩니다.'; // «미점검» 줄만 늘어놓지 않는다
+    var fixes = sum.urgentFixes;
+    var picked;
+    if (sec.cats && sec.cats.length) {
+      picked = fixes.filter(function (f) { return sec.cats.indexOf(f.cat) >= 0; });
+    } else {
+      var half = Math.ceil(fixes.length / 2);
+      picked = sec.no === 2 ? fixes.slice(0, half) : fixes.slice(half);
+    }
+    picked = picked.slice(0, 6);
+    if (!picked.length) {
+      return '이 장에서 다룰 보완 항목이 없습니다(양호).';
+    }
+    return picked.map(function (f, i) { return (i + 1) + '. [' + f.cat + '] ' + f.title + ' (' + f.status + ')'; }).join('\n');
+  }
+
   function defaultSectionText(sec, cat, project, sum) {
     var p = project || {};
     var co = maskText(p.companyName) || '수진기업';
     var base = '[' + co + '] ' + cat.name + ' (' + sum.track.name + ')\n';
     var stageInfo = (cat.ragPlaybook && cat.ragPlaybook.overview) ? cat.ragPlaybook.overview : '';
-    var fixLines = sum.urgentFixes.slice(0, 4).map(function (f, i) {
-      return (i + 1) + '. [' + f.cat + '] ' + f.title + ' (' + f.status + ')';
-    }).join('\n');
     if (sec.no === 1) {
-      return base + '• 주무/연계기관: ' + cat.agency + ' | 수행연도: ' + (p.year || 2026) + '년 | 상시근로자: ' + (p.workerCount || 0) + '명\n• 사업 개요: ' + stageInfo + '\n• 현재 종합 진행률: ' + sum.overallPct + '% (' + sum.grade + ')';
+      return base + '• 주무/연계기관: ' + cat.agency + ' | 수행연도: ' + (p.year || 2026) + '년 | 상시근로자: ' + workersText(p) + '\n• 사업 개요: ' + stageInfo + (sum.recorded ? ('\n• 현재 종합 진행률: ' + sum.overallPct + '% (' + sum.grade + ')') : '');
     }
-    if (sec.no === 2 || sec.no === 3) {
-      return (sec.hint || '') + '\n' + (fixLines || '핵심 진단 항목이 양호하게 관리되고 있습니다.');
+    if ((sec.cats && sec.cats.length) || sec.no === 2 || sec.no === 3) {
+      return (sec.hint || '') + '\n' + sectionFixLines(sec, sum, cat);
     }
     return (sec.hint || '') + '\n• 수집 교신(메일·카톡·문자): ' + sum.commCount + '건 반영\n• 법령·지침 근거: ' + ((cat.ragPlaybook && cat.ragPlaybook.legalRefs) || []).join(', ');
   }
@@ -412,7 +440,7 @@
       ));
       blocks.push(makeKeyValueTable([
         ['수진기업명', coName, '수행연도 · 단계', yr + '년 · ' + str(p.stage || 'intake')],
-        ['상시근로자수', (p.workerCount || 0) + '명', '종합 진행률', sum.grade + ' (' + sum.overallPct + '%)'],
+        ['상시근로자수', workersText(p), '종합 진행률', sum.recorded ? (sum.grade + ' (' + sum.overallPct + '%)') : '점검 전'],
         ['주관·연계기관', cat.agency, '관련 자료(메일·톡)', sum.commCount + '건 반영']
       ], theme));
       res.sections.forEach(function (sec, idx) {
