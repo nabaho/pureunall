@@ -5555,6 +5555,8 @@ function dbSet(k, v){
      그것을 도로 읽어 쓰면 «저장한 것»과 «화면이 든 것»이 정확히 같아지고,
      localStorage·메모리 캐시·서버 셋이 한 값을 보게 된다.
    ⚠ 한 곳(dbSet)에서만 한다 — dbUpsert·dbUpsertMany 도 모두 여기로 온다.
+     ⚠ (2026-11-28 바로잡음) 서버 형식이 정해진 뒤(_recCanDirect)에는 dbUpsert·dbPatch·dbUpsertMany 가
+       이 함수를 거치지 않고 _recServerWrite 로 바로 간다 — 그 길은 _fbNoUndef 가 걷는다.
      칸마다 기본값을 채우는 식으로 막으면 새 칸이 생길 때마다 또 빠뜨린다. */
   try { v = JSON.parse(newJson); }
   catch(e){ if(window._erpErrLog) window._erpErrLog(e); }   /* 못 읽으면 원래 것으로 */
@@ -6849,7 +6851,7 @@ function _recServerWrite(k, childPaths){ // childPaths: { '{id}' 또는 '{id}/{f
   try { localStorage.setItem(KEY+'_meta_'+k, String(ts)); } catch(_){}
   var updates = {};
   Object.keys(childPaths).forEach(function(p){
-    var val = (childPaths[p] === undefined ? null : childPaths[p]);
+    var val = (childPaths[p] === undefined ? null : _fbNoUndef(childPaths[p]));   // 안쪽 칸의 undefined 도 걷는다(_fbNoUndef 머리글)
     /* 거래내역 묶음은 삭제도 기록으로 남긴다. null 로 없애 버리면 오래 닫혀 있던 PC가
        그 묶음을 다시 올렸을 때 「의도한 삭제」인지 「자동삭제 사고」인지 가를 수 없다.
        같은 id 자리에 삭제표시를 남기면 오래된 PC도 child_added 로 받아 로컬에서 지우고,
@@ -6865,6 +6867,33 @@ function _recServerWrite(k, childPaths){ // childPaths: { '{id}' 또는 '{id}/{f
     try { localStorage.setItem(KEY+'_meta_'+k, String(_pre)); } catch(_){}
     fbSyncFail(e);
   });
+}
+/* ★★ 서버로 보내는 값에서 undefined 칸을 걷어낸다 (2026-11-28, 입금확정 두 번째부터 입금 기록이 안 올라가던 사고)
+   실제로 있었던 일 —
+     update failed: values argument contains undefined in property 'data.finance_income.v.<id>.perfSettleType'
+   입금관리 «미입금 대기»에서 확정을 누르면 첫 건은 올라가고 두 번째부터는 입금 기록(finance_income)이
+   서버에 안 올라갔다. 원장의 «받음»·통장 «처리됨»은 올라가서 «받음인데 입금 기록·성과급은 없는» 반쪽이 남았다.
+   ■ 왜 첫 건만 됐나
+     dbSet 은 맨 앞에서 JSON 왕복(v = JSON.parse(newJson))으로 undefined 를 이미 걷는다(첫 저장은 그 길).
+     한 번 저장해 서버 형식이 정해지면(_recCanDirect) dbUpsert·dbPatch·dbUpsertMany 는 dbSet 을 거치지 않고
+     _recServerWrite 로 바로 온다. 그 길은 맨 위 값만 null 로 바꿨다 — 새 레코드를 «통째»(_recFieldPaths)로
+     보낼 때 그 안쪽 칸의 undefined 하나 때문에 Firebase 가 update 전체를 거절했다.
+   ■ 규칙 — 이 PC 사본(_recLocalSave 의 JSON.stringify)과 같은 모양이 되게
+     보통 객체는 undefined 칸을 뺀 사본, 배열의 undefined(빈 자리 포함)는 null(자리를 잃지 않는다),
+     그 밖(글·수·참거짓·null·날짜 같은 특수 객체)은 그대로 둔다.
+   ⚠ undefined 가 없는 값은 내용이 바뀌지 않는다 — 원래 실패하던 저장만 성공하게 한다.
+   ⚠ 칸마다 기본값을 채우는 식으로 막지 말 것 — 새 칸이 생길 때마다 또 빠뜨린다(dbSet 머리글과 같은 까닭).
+   지킴: tests/server-write-no-undefined.test.js */
+function _fbNoUndef(v){
+  if(Array.isArray(v)){
+    var a = new Array(v.length);
+    for(var i = 0; i < v.length; i++) a[i] = (v[i] === undefined ? null : _fbNoUndef(v[i]));
+    return a;
+  }
+  if(!v || typeof v !== 'object' || Object.prototype.toString.call(v) !== '[object Object]') return v;
+  var o = {};
+  Object.keys(v).forEach(function(f){ if(v[f] !== undefined) o[f] = _fbNoUndef(v[f]); });
+  return o;
 }
 function _recCanDirect(k){
   /* ledger_batches 는 이 코드가 만든 id 지도임이 확정돼 있다. 서버형식 표식이 아직 안 온
