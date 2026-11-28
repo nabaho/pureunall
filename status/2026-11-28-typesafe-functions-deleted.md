@@ -16,6 +16,12 @@
 - 지운 뒤: 배포 함수 목록 전후 대조 — 정확히 두 함수만 없어짐. 받은메일함 자동분류가 쓰는 `syncMailbox`·`pullMailbox` 는 그대로.
 - 문서 `docs/kcareer-요청메일.md` 의 «배포본이 남아 있다» 두 곳을 «지웠다»로(코드는 안 바꿈 — `tests/kcareer-mailreq-doc.test.js` 는 문서에 `mailReqScope` 기록이 있는지만 보므로 그대로 통과).
 
+## 옛 사용 횟수 기록도 지웠다 (같은 날 대표 지시 「옛 사용 횟수 기록도 지워라」)
+- 실제로 쓴 횟수(날짜별 숫자만 담긴 자리):
+  - `typesafe_tally/` (포털 «TypeSafe 검토» 단추) — **2026-09-20 하루 2번이 전부**(처음 시험하던 날). 그 뒤로는 한 번도 안 쓰였다.
+  - `typesafe_tally_mailreq/` (경력관리 Jev 분류) — 2026-11-18~19 이틀 4번.
+- 순서: 읽기 → 저장소 밖 백업(`C:\Users\user\서버백업\2026-11-28-typesafe-tally\`) → 지우기 직전 서버 값이 백업과 같은지 대조 → `firebase database:remove` 두 자리 → 다시 읽어 «없음» 확인.
+- `typesafe_tally_mail/`(받은메일함 자동분류의 하루 셈, 53일 치)은 **그대로** — 지금 쓰는 자리다.
+
 ## 그대로 둔 것
 - 서버 금고 `TYPESAFE_API_KEY` — 받은메일함 자동분류(mail-ai-classify)가 쓴다.
-- 실시간DB 의 옛 셈 자리 `typesafe_tally/`·`typesafe_tally_mailreq/`(날짜별 숫자만) — 원본 자료 지우기는 따로 승인받을 일이라 두었다.
