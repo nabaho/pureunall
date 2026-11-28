@@ -76,6 +76,10 @@
      ⚠ 문턱을 5로 둔 까닭 — 포털이 앱 셋을 열거나 사람이 F5 를 몇 번 누르는 것은 폭풍이 아니다.
      ⚠ 화면 «경로별»로 가른다 — 앱 여러 개를 연달아 여는 것은 정상이다. */
   var BOOT_DEV_KEY = 'pu_boot_dev_v1';
+  var BOOT_META_KEY = 'pu_boot_meta_v1';
+  var TAB_ID_KEY = 'pu_boot_tab_id_v1';
+  var SELF_NAV_KEY = 'pu_boot_self_nav';
+  var AUTH_REDIRECT_KEY = 'pu_auth_redirect_at';
   var BOOT_DEV_STORM_N = 5;
   /* ★★ 한 번의 일로 «몰려서» 켜진 것은 한 번으로 센다 (2026-09-18 대표 화면)
      ── 무엇이 있었나
@@ -116,7 +120,30 @@
     var even = gaps.every(function (g) { return Math.abs(g - mid) <= slack; });
     return { every: every, even: even };
   }
-  function noteBootDevice(now) {
+  function getBootTabId() {
+    try {
+      var id = window.sessionStorage && window.sessionStorage.getItem(TAB_ID_KEY);
+      if (id) return id;
+      id = Date.now().toString(36) + '-' + ((typeof Math !== 'undefined' && Math.random) ? Math.random().toString(36).slice(2, 8) : '0');
+      if (window.sessionStorage) window.sessionStorage.setItem(TAB_ID_KEY, id);
+      return id;
+    } catch (_) { return ''; }
+  }
+  function isSelfAuthBoot(nav, now) {
+    try {
+      var p = String(window.location.pathname || '/');
+      var q = String(window.location.search || '');
+      var selfAt = window.sessionStorage ? Number(window.sessionStorage.getItem(SELF_NAV_KEY) || 0) : 0;
+      if (selfAt && now - selfAt >= 0 && now - selfAt <= 15000) {
+        try { window.sessionStorage.removeItem(SELF_NAV_KEY); } catch (_) {}
+        return true;
+      }
+      if (/[?&]code=/.test(q) && /[?&]state=/.test(q)) return true;
+      if (nav === 'navigate' && /(?:^|\/)enter\.html$/i.test(p) && /[?&]v=\d{12,}/.test(q)) return true;
+    } catch (_) {}
+    return false;
+  }
+  function noteBootDevice(now, meta) {
     try {
       var all = {};
       try { all = JSON.parse(window.localStorage.getItem(BOOT_DEV_KEY) || '{}'); } catch (_) { all = {}; }
@@ -133,12 +160,43 @@
         if (a.length) all[k] = a; else delete all[k];
       });
       try { window.localStorage.setItem(BOOT_DEV_KEY, JSON.stringify(all)); } catch (_) {}
+      var selfNow = !!(meta && meta.self);
+      if (!selfNow && /(?:^|\/)enter\.html$/i.test(p)) {
+        try {
+          var rdAt = Number(window.localStorage.getItem(AUTH_REDIRECT_KEY) || 0);
+          if (rdAt && now - rdAt >= 0 && now - rdAt <= 15000) selfNow = true;
+        } catch (_) {}
+      }
+      var tabId = (meta && meta.tabId) || '';
+      var uniqueTabs = 0, selfCount = 0;
+      try {
+        var mall = {};
+        try { mall = JSON.parse(window.localStorage.getItem(BOOT_META_KEY) || '{}'); } catch (_) { mall = {}; }
+        if (!mall || typeof mall !== 'object' || Array.isArray(mall)) mall = {};
+        var marr = Array.isArray(mall[p]) ? mall[p] : [];
+        marr = marr.filter(function (m) { return m && typeof m.t === 'number' && now - m.t < BOOT_STORM_MS; });
+        marr.push({ t: now, tab: tabId, self: selfNow ? 1 : 0 });
+        mall[p] = marr.slice(-12);
+        Object.keys(mall).forEach(function (k) {
+          if (k === p) return;
+          var ma = Array.isArray(mall[k]) ? mall[k].filter(function (m) { return m && typeof m.t === 'number' && now - m.t < BOOT_STORM_MS; }) : [];
+          if (ma.length) mall[k] = ma; else delete mall[k];
+        });
+        try { window.localStorage.setItem(BOOT_META_KEY, JSON.stringify(mall)); } catch (_) {}
+        var seenTabs = {};
+        for (var i = 0; i < mall[p].length; i++) {
+          var item = mall[p][i];
+          if (item.tab) seenTabs[item.tab] = 1;
+          if (item.self) selfCount++;
+        }
+        uniqueTabs = Object.keys(seenTabs).length;
+      } catch (_) {}
       /* 몰려서 켜진 것은 한 번으로 접어 센다 — 로그아웃이 여러 탭을 한꺼번에 보내는 것이
          폭풍으로 보이던 것을 막는다(2026-09-18 대표 화면). 기록은 그대로 다 남는다.
          ⚠ «접고 남은 시각»도 함께 돌려준다 — 간격이 고른지 재려면 접기 전 시각으로는 안 된다. */
       var kept = spreadTimes(arr.slice().sort(function (a, b) { return a - b; }));
-      return { count: kept.length, times: kept };
-    } catch (_) { return { count: 0, times: [] }; }
+      return { count: kept.length, times: kept, uniqueTabs: uniqueTabs, selfCount: selfCount };
+    } catch (_) { return { count: 0, times: [], uniqueTabs: 0, selfCount: 0 }; }
   }
   function bootNavType() {
     try { var e = window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]; return (e && e.type) || ''; } catch (_) { return ''; }
@@ -156,13 +214,15 @@
       all[p] = arr.slice(-12);
       try { window.sessionStorage.setItem(BOOT_KEY, JSON.stringify(all)); } catch (_) {}
       var nav = bootNavType();
+      var tabId = getBootTabId();
+      var selfBoot = isSelfAuthBoot(nav, now);
       var since = prev ? Math.round((now - prev) / 1000) : null;
       var from = '';
       try { from = window.document.referrer ? window.document.referrer.replace(window.location.origin, '') : ''; } catch (_) {}
       /* 탭 눈도 «몰린 것»을 접어 센다 — 기기 눈만 접으면 한 탭 안에서 잇따라 켜진 것이 그대로 센다 */
       var tabTimes = spreadTimes(arr.slice().sort(function (a, b) { return a - b; }));
       var tabCount = tabTimes.length;
-      var dev = noteBootDevice(now);
+      var dev = noteBootDevice(now, { tabId: tabId, self: selfBoot });
       var devCount = dev.count;
       var tabMany = tabCount >= BOOT_STORM_N;
       var devMany = devCount >= BOOT_DEV_STORM_N;
@@ -173,8 +233,10 @@
       var tabStorm = tabMany && stat.even;
       var devStorm = devMany && stat.even;
       var storm = tabStorm || devStorm;
+      var selfAuthLoop = !!(storm && /(?:^|\/)enter\.html$/i.test(p) && dev.selfCount >= 2);
       window.PU_BOOT = { count: tabCount, rawCount: arr.length, devCount: devCount, since: since, type: nav, from: from,
-        storm: storm, tabStorm: tabStorm, devStorm: devStorm, every: stat.every, even: stat.even };
+        storm: storm, tabStorm: tabStorm, devStorm: devStorm, every: stat.every, even: stat.even,
+        uniqueTabs: dev.uniqueTabs, selfCount: dev.selfCount, selfAuthLoop: selfAuthLoop };
       if (window.console && console.info) {
         console.info('[부팅] ' + (nav || '?') + (since != null ? ' · 직전 부팅에서 ' + since + '초' : ' · 이 탭의 첫 부팅')
           + ' · 이 탭에서 3분 안 ' + tabCount + '번 · 이 기기의 이 화면 3분 안 ' + devCount + '번'
@@ -186,15 +248,22 @@
         console.info('[부팅] 여러 번 켜졌지만 간격이 제각각입니다 — 사람이 새로고침한 것으로 보고 알리지 않습니다.');
       }
       if (storm) {
-        /* 탭은 「첫 부팅」인데 기기로는 다섯 번째 = 부팅마다 «새 탭»이 열리고 있다 — 그 말을 그대로 적는다 */
-        var how = (!tabStorm && devStorm) ? '매번 새 탭으로 열림' : (nav === 'reload' ? '브라우저·확장이 새로고침' : nav === 'navigate' ? '주소로 다시 열림' : (nav || '종류 모름'));
+        /* 탭은 「첫 부팅」인데 기기로는 다섯 번째이고 실제로 여러 새 탭이 열렸을 때만 «새 탭»이라 적는다 */
+        var how = (!tabStorm && devStorm)
+          ? (dev.uniqueTabs >= 3 ? '매번 새 탭으로 열림' : '다른 탭에서 반복 새로고침됨')
+          : (nav === 'reload' ? '브라우저·확장이 새로고침' : nav === 'navigate' ? '주소로 다시 열림' : (nav || '종류 모름'));
         var n = tabStorm ? tabCount : devCount;
         if (window.console && console.warn) {
-          console.warn('★★ 이 ' + (tabStorm ? '탭' : '기기의 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 ('
-            + how + ' · 약 ' + stat.every + '초마다 고르게).'
-            + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 자동 새로고침 확장·탭 돌리기를 확인하세요.');
+          if (selfAuthLoop) {
+            console.warn('⚠ 로그인·인증 확인 이동이 3분 안에 ' + n + '번 반복되었습니다 ('
+              + how + (stat.every != null ? ' · 약 ' + stat.every + '초마다' : '') + ').');
+          } else {
+            console.warn('★★ 이 ' + (tabStorm ? '탭' : '기기의 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 ('
+              + how + ' · 약 ' + stat.every + '초마다 고르게).'
+              + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다 — 자동 새로고침 확장·탭 돌리기를 확인하세요.');
+          }
         }
-        mountStormBanner(n, stat.every, how, tabStorm);
+        mountStormBanner(n, stat.every, how, tabStorm, selfAuthLoop);
       }
     } catch (_) {}
   }
@@ -203,7 +272,20 @@
      그것이 정말 있는지 우리는 모른다 — 대표님은 끌 것을 찾다 못 찾고 나에게 시키셨다.
      이제 띠는 «간격이 고를 때만» 뜨므로 그 근거를 그대로 적는다: 「약 20초마다 고르게 —
      사람이 누른 것이 아닙니다」. 그 한 줄이 있어야 「그럼 뭘 끄라는 건가」가 풀린다. */
-  function mountStormBanner(n, every, how, tabStorm) {
+  function resetAuthLoopAndReload() {
+    try {
+      ['pu_portal_fast_acct', 'pu_auth_hint', 'pu_return_app', 'pu_return_loop', BOOT_KEY, SELF_NAV_KEY].forEach(function (k) {
+        if (window.sessionStorage) window.sessionStorage.removeItem(k);
+      });
+    } catch (_) {}
+    try {
+      ['pu_portal_fast_acct', 'pu_auth_hint', BOOT_DEV_KEY, BOOT_META_KEY, AUTH_REDIRECT_KEY].forEach(function (k) {
+        if (window.localStorage) window.localStorage.removeItem(k);
+      });
+    } catch (_) {}
+    try { window.location.replace(window.location.pathname || '/enter.html'); } catch (_) {}
+  }
+  function mountStormBanner(n, every, how, tabStorm, selfAuthLoop) {
     function mount() {
       try {
         if (!window.document.body || window.document.getElementById('pu-boot-storm')) return;
@@ -214,16 +296,33 @@
           'padding:9px 14px;font:700 13px/1.45 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
         var msg = window.document.createElement('span');
         msg.style.cssText = 'flex:1;min-width:0';
-        msg.textContent = '⚠ 이 ' + (tabStorm ? '탭' : '기기에서 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 ('
-          + how + (every != null ? ' · 약 ' + every + '초마다 고르게' : '') + ').'
-          + ' 사람이 누르면 이렇게 고르게 못 누릅니다 — 브라우저의 자동 새로고침 확장·탭 돌리기, 또는 이 화면을 열어 두는 감시 도구를 찾아 꺼 주세요.'
-          + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다.';
+        if (selfAuthLoop) {
+          msg.textContent = '⚠ 로그인·인증 확인 이동이 3분 안에 ' + n + '번 반복되었습니다 ('
+            + (every != null ? '약 ' + every + '초마다 · ' : '') + '내부 로그인 복귀/새로고침).'
+            + ' 브라우저 확장 문제가 아니라 로그인 세션 충돌이나 연결 지연일 수 있습니다.';
+        } else {
+          msg.textContent = '⚠ 이 ' + (tabStorm ? '탭' : '기기에서 이 화면') + '이 3분 안에 ' + n + '번 다시 켜졌습니다 ('
+            + how + (every != null ? ' · 약 ' + every + '초마다 고르게' : '') + ').'
+            + ' 사람이 누르면 이렇게 고르게 못 누릅니다 — 브라우저의 자동 새로고침 확장·탭 돌리기, 또는 이 화면을 열어 두는 감시 도구를 찾아 꺼 주세요.'
+            + ' 켤 때마다 자료를 전부 다시 받아 요금이 나갑니다.';
+        }
+        bar.appendChild(msg);
+        if (selfAuthLoop) {
+          var rst = window.document.createElement('span');
+          rst.setAttribute('role', 'button'); rst.tabIndex = 0;
+          rst.textContent = '로그인 화면 초기화';
+          rst.style.cssText = 'flex:none;cursor:pointer;background:#fff;color:#991b1b;border-radius:6px;padding:4px 10px;font-weight:800;';
+          rst.addEventListener('click', resetAuthLoopAndReload);
+          rst.addEventListener('keydown', function (ev) { if (ev && (ev.key === 'Enter' || ev.key === ' ')) { if (ev.preventDefault) ev.preventDefault(); resetAuthLoopAndReload(); } });
+          bar.appendChild(rst);
+        }
         var x = window.document.createElement('span');
         x.setAttribute('role', 'button'); x.tabIndex = 0;
         x.textContent = '닫기';
         x.style.cssText = 'flex:none;cursor:pointer;background:rgba(255,255,255,.18);border-radius:6px;padding:4px 10px;';
         x.addEventListener('click', function () { if (bar.parentNode) bar.parentNode.removeChild(bar); });
-        bar.appendChild(msg); bar.appendChild(x);
+        x.addEventListener('keydown', function (ev) { if (ev && (ev.key === 'Enter' || ev.key === ' ')) { if (ev.preventDefault) ev.preventDefault(); if (bar.parentNode) bar.parentNode.removeChild(bar); } });
+        bar.appendChild(x);
         window.document.body.appendChild(bar);
       } catch (_) {}
     }
