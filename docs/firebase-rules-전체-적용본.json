@@ -97,7 +97,12 @@
       },
       "finance_income": {
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
-        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        "v": {
+          ".indexOn": [
+            "sourceKind"
+          ]
+        }
       },
       "finance_expense": {
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
@@ -645,6 +650,15 @@
           "$other": {
             ".validate": false
           }
+        }
+      },
+      "items": {
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".indexOn": [
+          "coid"
+        ],
+        "$k2": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
         }
       }
     },
@@ -1384,7 +1398,8 @@
         ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         ".indexOn": [
           "at",
-          "bulk"
+          "bulk",
+          "priorityAt"
         ],
         "$k2": {
           ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
@@ -1420,6 +1435,37 @@
       "mailCoSplit": {
         ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
       },
+      "mailAck": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        "$msgKey": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active' && (newData.exists() || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && (!data.exists() || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true) || newData.child('at').val() >= data.child('at').val())",
+          ".validate": "!newData.exists() || newData.hasChildren(['kind','by','uid','at'])",
+          "kind": {
+            ".validate": "newData.isString() && (newData.val() === 'received' || newData.val() === 'reviewed')"
+          },
+          "by": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+          },
+          "uid": {
+            ".validate": "newData.isString() && (newData.val() === auth.uid || auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true))"
+          },
+          "coId": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "coName": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "attCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "$k": {
         ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
@@ -1432,6 +1478,13 @@
         ".indexOn": [
           "receivedAt"
         ]
+      },
+      "inbox": {
+        "$uid": {
+          ".indexOn": [
+            "rawHash"
+          ]
+        }
       }
     },
     "cal_private": {
@@ -2124,6 +2177,141 @@
             ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
           },
           "updatedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "lectures": {
+        "$id": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && newData.exists()",
+          ".validate": "newData.child('id').val() === $id && newData.child('entityType').val() === 'EduLecture' && $id.matches(/^lec_[a-z][0-9a-z]{4,40}$/)",
+          "id": {
+            ".validate": true
+          },
+          "entityType": {
+            ".validate": true
+          },
+          "schemaVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "contractVersion": {
+            ".validate": "newData.isNumber()"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "date": {
+            ".validate": "newData.isString() && newData.val().matches(/^([0-9]{4}-[0-9]{2}-[0-9]{2})?$/)"
+          },
+          "time": {
+            ".validate": "newData.isString() && newData.val().matches(/^([0-9]{2}:[0-9]{2})?$/)"
+          },
+          "lecturerSid": {
+            ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{0,40}$/)"
+          },
+          "venue": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "title": {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          },
+          "cat": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "note": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "status": {
+            ".validate": "newData.val() === 'auto' || newData.val() === 'ok'"
+          },
+          "itemIds": {
+            ".validate": "newData.hasChildren()",
+            "$item": {
+              ".validate": "newData.val() === true && $item.matches(/^[A-Za-z0-9_-]{1,60}$/)"
+            }
+          },
+          "cal": {
+            ".validate": "newData.hasChildren()",
+            "id": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "summary": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "location": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 10"
+            },
+            "time": {
+              ".validate": "newData.isString() && newData.val().length <= 5"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "mail": {
+            ".validate": "newData.hasChildren()",
+            "id": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "subject": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 10"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "guess": {
+            ".validate": "newData.hasChildren()",
+            "date": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "lecturer": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "venue": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "score": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "confirmedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
+          },
+          "confirmedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
+          },
+          "updatedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
+          },
+          "createdAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "updatedAt": {
+            ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
+          },
+          "_deleted": {
+            ".validate": "newData.isBoolean()"
+          },
+          "deletedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 64 && (newData.val() === data.val() || newData.val() === root.child('uid_roles').child(auth.uid).child('sid').val())"
+          },
+          "deletedAt": {
             ".validate": "(newData.isNumber() || newData.isString()) && (!newData.isString() || newData.val().length <= 40)"
           },
           "$other": {

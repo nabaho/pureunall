@@ -21,7 +21,8 @@ const path = require('node:path');
 const { stripComments, stripJs } = require('./strip-comments');
 
 const ROOT = path.join(__dirname, '..');
-const 안봄 = new Set(['node_modules', '.git', 'docs', 'backups', 'templates', '.claude', 'coverage']);
+// Drive AutoPush 외부 업로드 폴더(gemini-autopush)는 ERP Quality Gate 대상에서 제외한다.
+const 안봄 = new Set(['node_modules', '.git', 'docs', 'backups', 'templates', '.claude', 'coverage', 'gemini-autopush']);
 
 function 파일들(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

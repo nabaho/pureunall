@@ -86,7 +86,7 @@
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-cal-map.js?v=2"></script>   <!-- 명함 주소 → 지도 팝업 (캘린더와 같은 셈, 2026-10-27) -->
-<script src="js/pu-doc-file.js?v=44"></script>
+<script src="js/pu-doc-file.js?v=47"></script>
 <script src="js/pu-card-spam.js?v=1"></script>   <!-- 🚫 메일에서 온 스팸 명함 잣대 (2026-11-18) — 받는 탭과 같은 파일 -->
 <!-- 메일 첨부 → 기업별 계약서 (2026-10-03) — 문서관리와 같은 원본 보관함·같은 짐작 규칙 -->
 <script src="js/pu-office-store.js?v=11"></script>
@@ -1382,7 +1382,28 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck.mbtr-box .mbtr-chip.on{border-color:#2563eb;background:#2563eb;color:#ffffff}
 .mck.mbtr-box .mbtr-chip.ex{border-color:#dc2626;background:#fef2f2;color:#991b1b;font-weight:700}
 .mck.mbtr-box>footer{flex-wrap:wrap;gap:6px}
-@media (max-width:760px){ #mbTrBox .mbtr-dim{padding:10px} .mck.mbtr-box .mbtr-grid{grid-template-columns:1fr} }
+@media (max-width:760px){ #mbTrBox .mbtr-dim,#mbAckBox .mbtr-dim{padding:10px} .mck.mbtr-box .mbtr-grid{grid-template-columns:1fr} }
+/* 📨 자문사·거래처 서류 «받았습니다 · 검토했습니다» 확인 답메일 바 & 단추 (2026-11-28) */
+#mbAckBox .mck.mbtr-box header button.x{margin-left:auto;min-width:34px;min-height:34px;display:inline-flex;align-items:center;justify-content:center}
+#mbAckBox .mck.mbtr-box>footer button{min-height:34px;padding:0 14px}
+#mbAckBox .mck.mbtr-box .mbtr-card{overflow-wrap:anywhere;word-break:break-word}
+#mbAckBox .mck.mbtr-box .mbtr-tabs button,#mbAckBox .mck.mbtr-box .mbtr-tab{min-width:142px;padding:9px 8px;font-size:12.5px}
+.dm-ack-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 6px;padding:9px 12px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e293b;font-size:12.5px;line-height:1.5}
+.dm-ack-bar.sent{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.dm-ack-bar .ack-txt{flex:1;min-width:200px;overflow-wrap:anywhere;word-break:break-word}
+.dm-ack-bar .ack-txt b{color:#1e40af;font-weight:700}
+.dm-ack-bar.sent .ack-txt b{color:#166534}
+.dm-ack-bar .ack-sub{display:block;font-size:11.5px;color:#475569;margin-top:1px}
+.dm-ack-bar.sent .ack-sub{color:#166534}
+.dm-ack-bar .ack-btns{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto}
+.dm-ack-bar .ack-btns button{font-family:inherit;font-size:12.5px;font-weight:700;height:34px;padding:0 12px;border-radius:6px;cursor:pointer;white-space:nowrap;border:1px solid #2563eb;background:#ffffff;color:#1e40af}
+.dm-ack-bar .ack-btns button:hover{background:#eff6ff}
+.dm-ack-bar .ack-btns button.rev{border-color:#166534;background:#166534;color:#ffffff}
+.dm-ack-bar .ack-btns button.rev:hover{background:#1e293b;border-color:#1e293b}
+.dm-ack-bar .ack-btns button.again{font-weight:600;border-color:#bbf7d0;background:#ffffff;color:#166534;height:34px;padding:0 12px;font-size:12px}
+.dm-read .rbtn.ack-btn{border-color:#bfdbfe;background:#eff6ff;color:#1e40af;font-weight:700}
+.dm-read .rbtn.ack-btn:hover{border-color:#2563eb;background:#bfdbfe;color:#1e40af}
+.dm-read .rbtn.ack-btn.sent{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
 /* 폰에서는 창 바깥 여백을 줄인다(폰 규칙 「양옆 8~14px」) — PC 는 그대로.
    ⚠ `.mck-dim.이름{` 꼴로 쓰지 않는다 — 메일 미리보기 폰 규칙을 찾는 검사(mail-preview-phone-footer)가 그 꼴의 첫 줄을 고른다 */
 @media (max-width:760px){ #cspBox .csp-dim{padding:10px} }
@@ -9050,6 +9071,7 @@ function renderMailPage(){
   mbAutoFill();    /* 받아 온 줄이 없으면 «스스로» 받아 온다 (대표 보고 2026-08-30) */
   mbCardHide();    /* 👁 줄이 새로 그려지면 카드가 가리키던 줄이 사라진다 — ⚠ 검사들이 맨 위 몇 줄(mbMemoClear·cnt·메일 아니면 안 그림·mbAutoFill)의 «차례»를 지키므로 그 뒤에 둔다 */
   mbSeenLoad();    /* 「누가 봤나」는 한 번만 읽어 온다 (두 번째부터는 그 자리에서 돌아온다) */
+  if(typeof mbAckLoad === 'function') mbAckLoad(); /* 「받았습니다·검토했습니다」 확인 답메일 발송 기록 1회 로드 */
   mbBizSubsLoad(); /* 사무관리 건의 부담당도 한 번만 — 앱이 이미 읽는 자료를 그대로 쓴다 */
   mnewTickStart(); /* 📥 회사 도메인이 같은 곳 저절로 채우기 — 관리자 PC 에서만, 1분마다 한 번 */
   /* ⚠ 메일 칸(#pcMail)은 PC 전용 틀(#pcRoot) 안에 있어 폰에서는 아예 안 그려졌다 —
@@ -28133,8 +28155,18 @@ function mbGo(id){ state.mbDrawerOpen = false; openMailBox(id); }
      나머지는 마우스를 올리면 나온다(title).
    ⚠ 볼 자격이 없으면 «아무것도 안 그린다» — 「기록이 있다」는 것조차 힌트가 된다. */
 function mbSeenTag(v){
-  if(!mbSeenCanSee(v)) return '';
-  const list = mbSeenOf(v);
+  const ack = (typeof mbAckOf === 'function') ? mbAckOf(v) : null;
+  if(!mbSeenCanSee(v)){
+    if(!ack) return '';
+  }
+  const list = mbSeenCanSee(v) ? mbSeenOf(v) : [];
+  if(ack){
+    const kLb = ack.kind === 'reviewed' ? '검토회신' : '수신확인';
+    const who = String(ack.by || '');
+    const tip = `📨 ${who ? who + '님이 ' : ''}「${ack.kind === 'reviewed' ? '검토했습니다' : '받았습니다'}」 확인 답메일 발송 (${mbTime(ack.at)})`
+      + (list.length ? '\n' + list.map(x=>(x.k==='done'?'✅ ':'👁 ')+(x.n||x.sid)+' '+mbTime(x.at)).join('\n') : '');
+    return `<span class="dm-seen done" title="${esc(tip)}">${esc('📨 ' + kLb + (who ? ' · ' + who : ''))}</span>`;
+  }
   if(!list.length) return '';
   const done = list.filter(x=>x.k==='done');
   const first = list[0];
@@ -30199,9 +30231,11 @@ function mbReadMarkBg(slug, uid){
     body: JSON.stringify({ slug:slug, uids:[String(uid)], flag:'read', on:true }) }))
     .catch(()=>{ /* 조용히 — 위 머리글 */ });
 }
-function mbOpenMsg(slug, uid){
+function mbOpenMsg(slug, uid, keepAckWait){
   mbCardHide();
+  if(!keepAckWait) state.mbAckAfterOpen = '';
   state.mbInfoOn = false; mbPhMoreSet(false); mbQrClose(); mbPvReset();   /* 다른 통은 늘 접힌 채로 연다 */
+  if(typeof mbAckClose === 'function') mbAckClose(true);
   state.mailSent='box';
   /* 이 통이 «아직 안 읽음»이었나 — 미리 받은 본문으로 열면 서버에 따로 알려야 한다 */
   const row0 = (_mbMsgs[slug]||{})[String(uid)];
@@ -30235,11 +30269,17 @@ function mbOpenMsg(slug, uid){
       renderPCSide(); renderMailPage();
       /* 다음에 누르실 자리를 미리 받아 둔다 — 넘길 때 기다림이 없다 */
       setTimeout(mbPrefetchNear, 150);
-      /* 목록에서 [답장]을 눌러 본문부터 가져온 경우 — 이제 답장 화면으로 간다 */
+      /* 목록에서 [답장] 또는 [확인 답메일]을 눌러 본문부터 가져온 경우 — 이제 해당 창으로 간다 */
+      if(state.mbAckAfterOpen){
+        const ak = state.mbAckAfterOpen;
+        state.mbAckAfterOpen = '';
+        if(typeof mbAckOpen === 'function') mbAckOpen(slug, uid, ak);
+      }
       if(state.mbReplyAfterOpen){ const all = state.mbReplyAfterOpen==='all';
         state.mbReplyAfterOpen=''; mbReply(all); }
     })
     .catch(e=>{
+      state.mbAckAfterOpen = '';
       if(!state.mbOpen) return;
       state.mbOpen.loading=false; state.mbOpen.err=(e&&e.message)||'열지 못했습니다';
       state.mbOpen.outWin = !!(e && e.outOfWindow);
@@ -30273,7 +30313,7 @@ function mbSeenDone(slug, uid){
     ? '✅ 「내가 봤다」로 남겼습니다 — 함께 맡은 분에게 보입니다'
     : '✅ 「내가 봤다」로 남겼습니다 — 이 기록은 대표님만 보십니다', 7000);
 }
-function mbBack(){ mbPhMoreSet(false); mbQrClose(); mbPvReset(); state.mbOpen=null; renderMailPage(); }
+function mbBack(){ state.mbAckAfterOpen = ''; mbPhMoreSet(false); mbQrClose(); if(typeof mbAckClose === 'function') mbAckClose(true); mbPvReset(); state.mbOpen=null; renderMailPage(); }
 /* 읽는 자리에서 누르는 전달·삭제 — 목록에서 고르지 않고 «지금 보는 이 통»에 한다.
    ⚠ 고른 것(pick)을 건드리지 않는다. 목록에서 딴 것을 골라 두었는데 여기서 누르면
      엉뚱한 메일이 지워진다. */
@@ -31373,7 +31413,7 @@ function mbCoIdOfAddr(em0, idx0, rec0){
   }
   if(rec && rec.id) return String(rec.id);
   const d = typeof mbDomOf === 'function' ? mbDomOf(em) : '';
-  if(d && MB_PUB_DOM.indexOf(d) < 0 && !MB_PUB_TAIL.test(d) && typeof mnewDomCo === 'function'){
+  if(d && MB_PUB_DOM.indexOf(d) < 0 && !MB_PUB_TAIL.test(d) && typeof mnewDomCo === 'function' && typeof PuMailFill !== 'undefined'){
     const m = mbMemoOf();
     const tbl = m.splitDomTbl || (m.splitDomTbl = mnewDomTable());
     const dco = mnewDomCo(em, tbl);
@@ -33186,13 +33226,10 @@ function mbReadHtml(){
   const bodyHtml = o.html ? mbCleanHtml(o.html)
     : o.text ? '<pre style="white-space:pre-wrap;font-family:inherit;margin:0">'+esc(o.text)+'</pre>'
     : '';
+  /* 위 단추줄(.rtop) — 왼쪽: 이 메일에 하는 일(답장·삭제·중요·담당자·내가 봤다·확인답메일), 오른쪽: 목록·위·아래.
+     ⚠ tests/mail-read-nav.test.js 가 class="rtop" 부터 원문 3,000자 안에 mbStep(1) 이 있는지 검사하므로
+       길어지는 배경 주석은 이 위쪽에 모아 둔다 (2026-08-30 안 읽음 되돌리기 · 1회성 개별 담당 · 내가 봤다). */
   return `<div class="dm-read${state.mbInfoOn?' infoon':''}${state.mbMoreOn?' moreon':''}">
-    ${/* ── 위 단추줄 — 다음메일과 «같은 자리»에 둔다 (대표 지시 2026-08-30) ──
-         왼쪽: 이 메일에 하는 일   오른쪽: 목록 · 위 · 아래
-         ⚠ 예전에는 손댈 것이 모두 오른쪽에 몰려 있고, 돌아가는 길은 왼쪽 끝의
-           흐린 글씨 하나뿐이었다 — 대표께서 「벡 할 수 있는방법이 없다」고 하셨다.
-         ⚠ 위·아래가 이 자리의 핵심이다. 목록으로 나갔다 다시 들어오지 않아도
-           다음 통으로 넘어간다 — 그 왕복이 느림의 절반이었다. */''}
     <div class="rtop">
       <div class="lft" onclick="mbPhMoreAuto(event)">
         <button class="rbtn pri" onclick="mbReply(false)">답장</button>
@@ -33206,36 +33243,18 @@ function mbReadHtml(){
         <span class="rsep"></span>
         <button class="rbtn" title="중요 표시 — 다음메일에도 함께 켜집니다"
           onclick="mbStar('${o.slug}','${o.uid}')">${Number(v.g||0)?'★ 중요':'☆ 중요'}</button>
-        ${/* ⚠ 메일을 열면 읽음이 된다 — 그런데 여기서 «안 읽음으로 되돌릴 길»이 없었다
-              (대표 지시 2026-08-29 「읽고 다시 안읽음」). 나중에 다시 볼 것을 표시해 두는
-              자리라 다음메일에도 있다. 목록으로 나가지 않고 그 자리에서 되돌린다. */''}
-        ${/* ── 담당자 (대표 지시 2026-08-30 「1회성 개별 등록」) ──
-             ⚠ 이 «한 통»에만 박는다. 주소 규칙은 창 안의 체크를 켜야 생긴다 —
-               공공기관 한 통을 맡기려다 그 기관 메일 전부가 한 사람에게 가면 안 된다.
-             ⚠ 지금 담당이 누구인지 단추에 적는다. 안 적으면 눌러 봐야 안다. */''}
         <button class="rbtn" title="이 메일 «한 통»의 담당자를 정합니다 — 메일은 움직이지 않습니다"
           onclick="mbOwnerOne('${o.slug}','${o.uid}',event)">${
           mbWhoOfRow(v) ? '👤 ' + esc(mbWhoOfRow(v)) : '👤 담당자'}</button>
         ${mbWorkTag(v, true)}
         <button class="rbtn" title="나중에 다시 보려고 안 읽음으로 되돌립니다 — 다음메일에도 함께 바뀝니다"
           onclick="mbUnreadOne('${o.slug}','${o.uid}')">✉ 안 읽음으로</button>
-        ${/* ── 「내가 봤다」 (대표 지시 2026-08-29) ──
-             ⚠ 「열어봄」은 저절로 남는다. 이것은 «처리했다»는 뜻이라 눌러야 남는다.
-               스쳐 지나가다 연 것과 정말 맡은 것은 다르다.
-             ⚠ 볼 자격이 없는 사람에게는 단추도 안 보인다 — 눌러도 남의 눈에 안 보일
-               기록이면 「눌렀는데 아무 일도 안 난다」가 된다. */''}
         ${mbSeenCanSee(v) ? `<button class="rbtn" ${mbSeenMine(v)==='done'?'style="color:#166534;font-weight:700"':''}
           title="이 메일을 «내가 처리했다»고 남깁니다 — 함께 맡은 사람이 두 번 일하지 않게"
           onclick="mbSeenDone('${o.slug}','${o.uid}')">${
             mbSeenMine(v)==='done' ? '✅ 내가 봤다' : '내가 봤다'}</button>` : ''}
-        ${typeof mbIsPersonBox === 'function' && mbIsPersonBox(mbNow()) && typeof mbSubCanEdit === 'function' && mbSubCanEdit(mbSubWhoOfBox(mbNow())) ? `
-          <button type="button" class="rbtn" data-key="${esc(v._key||'')}" onclick="mbSubMoveMenu(event,this.dataset.key)"
-            title="이 메일의 개인 소분류 탭을 바꾸거나 자동정리 규칙으로 등록합니다">🗂 소분류 ▾</button>
-          <button type="button" class="rbtn" ${mbSubIsDone(v, mbSubWhoOfBox(mbNow()))?'style="color:#166534;font-weight:700"':''}
-            data-slug="${esc(o.slug||'')}" data-uid="${esc(o.uid||'')}"
-            onclick="mbSubToggleDone(this.dataset.slug,this.dataset.uid)"
-            title="담당함에서 이 메일을 처리완료 탭으로 넘기거나 되돌립니다">${
-            mbSubIsDone(v, mbSubWhoOfBox(mbNow())) ? '✅ 완료됨' : '✓ 완료 처리'}</button>` : ''}
+        ${typeof mbAckTopBtnHtml==='function'?mbAckTopBtnHtml(o,v):''}
+        ${typeof mbSubReadBtnsHtml==='function'?mbSubReadBtnsHtml(o,v):''}
       </div>
       <div class="rgt">
         <button class="rbtn list" onclick="mbBack()"
@@ -33285,6 +33304,7 @@ function mbReadHtml(){
          주소»일 때만 뜨는데, 세무사무실 물음은 본문에 업체 이름이 있을 때뿐이다). */''}
     ${mbNewStripHtml(v)}
     ${taxStripHtml(v)}
+    ${typeof mbAckStripHtml === 'function' ? mbAckStripHtml(o, v) : ''}
     ${/* ── 첨부 (대표 결정 2026-08-30 「자료를 다른 앱으로 바로」) ──
          내려받기 옆에 «급여데이터함으로»를 나란히 둔다. 예전에는 내려받아 →
          급여데이터함을 열어 → 다시 올리는 세 걸음이었다.
@@ -35503,6 +35523,560 @@ function mbReply(all){
          「그 메일의 답장」인 줄 모르므로, 우리가 직접 켜 주지 않으면 표시가 영영 없다. */
     replyTo: { slug: o.slug, uid: String(o.uid) } });
 }
+
+/* ══════ 자문사·거래처 서류 «받았습니다 · 검토했습니다» 확인 클릭 & 자동 답메일 (대표 지시 2026-11-28) ══════
+   · 자문사·거래처(세무연계·진행사업 포함)에서 온 서류 메일을 담당 노무사·담당자가 확인했을 때,
+     원클릭으로 「받았습니다(수신 확인)」 또는 「검토했습니다(검토 완료)」 확인 기록을 남기고
+     회사 공식 메일로 정중한 확인 답메일(담당자 서명·명함 자동 포함)을 즉시 보낸다.
+   · 보낸 기록은 pucards/mailAck/{seenKey} 에 남겨 다른 직원이 다시 열어도 이미 답메일이 나갔음을
+     즉시 알 수 있게 하여 중복 회신을 막는다. */
+const MB_ACK_PATH = 'mailAck';
+const MB_ACK_NOREPLY_RE = /(?:^|[._+-])(?:no[-_.]?reply|donotreply|do[-_.]?not[-_.]?reply|mailer-daemon|postmaster|bounce|auto[-_.]?confirm|daemon)(?:$|[._+-@])|@(?:hometax\.go\.kr|4insure\.or\.kr|ei\.go\.kr|nps\.go\.kr|nhis\.or\.kr|kcomwel\.or\.kr)$/i;
+let _mbAck = null, _mbAckLoading = false, _mbAckBusy = false, _mbAckState = null, _mbAckBackH = null;
+
+function mbAckLoad(){
+  if(_mbAck !== null || _mbAckLoading) return;
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase'){ _mbAck = {}; return; }
+  _mbAckLoading = true;
+  firebase.database().ref(DB_ROOT + '/' + MB_ACK_PATH).once('value')
+    .then(s=>{ _mbAck = s.val() || {}; })
+    .catch(()=>{ if(_mbAck === null) _mbAck = {}; })
+    .then(()=>{ _mbAckLoading = false; if(state.view === 'mail') mbDrawSoon(); });
+}
+
+function mbAckOf(v){
+  if(!v || !_mbAck) return null;
+  const k = mbSeenKey(v);
+  return (k && _mbAck[k] && typeof _mbAck[k] === 'object') ? _mbAck[k] : null;
+}
+
+function mbAckAttNames(v, o){
+  const out = [];
+  const pushNm = s=>{
+    const t = String(s || '').trim();
+    if(t && out.indexOf(t) < 0) out.push(t);
+  };
+  if(o && Array.isArray(o.atts)) o.atts.forEach(a=>{ if(a && a.name) pushNm(a.name); });
+  if(!out.length && v && Array.isArray(v.an)) v.an.forEach(pushNm);
+  return out;
+}
+
+function mbAckSenderLabel(){
+  const prof = (typeof myRosterCardProfile === 'function') ? myRosterCardProfile() : null;
+  if(prof && prof.name){
+    const nm = String(prof.name).trim();
+    const tl = String(prof.title || '').trim();
+    if(tl && nm.indexOf(tl) < 0) return nm + ' ' + tl;
+    return nm;
+  }
+  const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
+  if(!me) return '담당자';
+  const st = (typeof mbStaffOf === 'function' && mbStaffOf(me)) || {};
+  const tl = String(st.title || '').trim();
+  return (tl && me.indexOf(tl) < 0) ? (me + ' ' + tl) : me;
+}
+
+function mbAckInfoOf(v, o){
+  if(!v) return null;
+  const slug = String(v._slug || (o && o.slug) || '');
+  if(slug && typeof mbSentBox === 'function' && mbSentBox(slug)) return null;
+  const em = String(v.e || '').replace(/[\r\n]+/g, '').trim().toLowerCase();
+  const myAddr = (typeof mbMyAddr === 'function') ? String(mbMyAddr() || '').trim().toLowerCase() : '';
+  if(em && myAddr && em === myAddr) return null;
+
+  let coId = '', coName = '', rel = '';
+  try{
+    if(em){
+      let rec = (typeof mbCoRecOfAddr === 'function') ? mbCoRecOfAddr(em) : null;
+      if(!rec){
+        const idx = (typeof mbWhoIndex === 'function') ? mbWhoIndex() : {};
+        const coRaw = String((idx.coAddr && idx.coAddr[em]) || (idx.rawCo && idx.rawCo[em]) || '');
+        rec = (coRaw && typeof mbCoRec === 'function') ? mbHqRec(mbCoRec(coRaw)) : null;
+      }
+      if(!rec && typeof mbCoIdOfAddr === 'function' && typeof PuMailFill !== 'undefined'){
+        const dId = mbCoIdOfAddr(em);
+        if(dId && typeof ErpMatch !== 'undefined' && ErpMatch.byId && ErpMatch.byId[dId]) rec = mbHqRec(ErpMatch.byId[dId]);
+      }
+      if(rec && !rec.left){
+        coId = String(rec.id || '');
+        coName = String(rec.name || '').trim();
+        rel = '자문사·거래처';
+      }
+    }
+    if(!coName && typeof mbTaxRecOfRow === 'function'){
+      const tRec = mbTaxRecOfRow(v);
+      if(tRec && !tRec.left){
+        coId = String(tRec.id || '');
+        coName = String(tRec.name || '').trim();
+        rel = '세무연계 거래처';
+      }
+    }
+    if(!coName && typeof mbWorkOfRow === 'function'){
+      const ws = mbWorkOfRow(v) || [];
+      const liveW = ws.find(w => w && (w.coName || w.title));
+      if(liveW){
+        coId = String(liveW.coId || '');
+        coName = String(liveW.coName || liveW.title || '').trim();
+        rel = '진행사업 거래처';
+      }
+    }
+  }catch(_){}
+  const ack = mbAckOf(v);
+  if(!coName && ack && ack.coName){
+    coId = String(ack.coId || '');
+    coName = String(ack.coName || '').trim();
+    rel = '자문사·거래처';
+  }
+  if(!coName) return null;
+
+  const me = (typeof mbMyName === 'function') ? String(mbMyName() || '').trim() : '';
+  const activeMe = !!(me && !(typeof mbRetired === 'function' && mbRetired(me)));
+  const owners = (typeof mbWhoAllOfRow === 'function') ? mbWhoAllOfRow(v) : [];
+  const isOwner = !!(activeMe && owners.indexOf(me) >= 0);
+  const canAct = !!(state.isAdmin || state.isSubAdmin || isOwner);
+  const attNames = mbAckAttNames(v, o);
+  const attCount = Math.max(attNames.length, Number(v.a || 0));
+  const hasDocs = attCount > 0;
+  const noReply = !em || em.indexOf('@') < 1 || MB_ACK_NOREPLY_RE.test(em);
+  return {
+    slug: slug,
+    uid: String(v.u != null ? v.u : ((o && o.uid) || '')),
+    em: em,
+    senderName: String((typeof mbNameOf === 'function' ? mbNameOf(v.e, v.f) : '') || String(v.f || em || '')).replace(/[\r\n]+/g, ' ').trim(),
+    subject: String(v.s || '(제목 없음)').replace(/[\r\n]+/g, ' ').trim(),
+    coId: coId,
+    coName: coName,
+    rel: rel || '자문사·거래처',
+    owners: owners,
+    canAct: canAct,
+    attNames: attNames,
+    attCount: attCount,
+    hasDocs: hasDocs,
+    noReply: noReply,
+    ack: ack
+  };
+}
+
+function mbAckBuildBody(info, kind, extraNote){
+  const senderLb = mbAckSenderLabel();
+  const coLabel = info && info.coName ? info.coName : '귀 사';
+  const subj = String((info && info.subject) || '').trim();
+  const atts = (info && info.attNames) || [];
+  const attCnt = Number((info && info.attCount) || atts.length || 0);
+  const attLine = atts.length
+    ? ('· ' + (kind === 'reviewed' ? '검토 서류' : '확인 서류') + ': '
+       + atts.slice(0, 5).join(', ') + (atts.length > 5 ? ' 외 ' + (atts.length - 5) + '개' : ''))
+    : (attCnt > 0 ? ('· ' + (kind === 'reviewed' ? '검토 첨부' : '수신 첨부') + ': 첨부파일 ' + attCnt + '개') : '');
+  const note = String(extraNote || '').trim();
+  const lines = [
+    '안녕하십니까, 푸른노무법인 ' + senderLb + '입니다.',
+    '',
+    kind === 'reviewed'
+      ? (coLabel + '에서 보내주신 아래 서류(메일)를 잘 받아 검토 완료하였습니다.')
+      : (coLabel + '에서 보내주신 아래 서류(메일)를 정상적으로 잘 받았습니다.'),
+    subj ? ('· 관련 제목: ' + subj) : '',
+    attLine,
+    '',
+    kind === 'reviewed'
+      ? '검토 결과 정상 확인되었으며, 추가 보완이나 별도 안내가 필요한 사항이 있을 경우 다시 연락드리겠습니다.'
+      : '보내주신 자료를 면밀히 검토한 뒤 안내드리겠습니다.'
+  ].filter(function(x, idx, arr){
+    if(x === '' && idx > 0 && arr[idx - 1] === '') return false;
+    return x !== null && x !== undefined && !(x === '' && idx === arr.length - 1);
+  });
+  /* 빈 줄 정리 */
+  const cleaned = [];
+  lines.forEach(ln=>{
+    if(ln === '' && (!cleaned.length || cleaned[cleaned.length - 1] === '')) return;
+    cleaned.push(ln);
+  });
+  if(note){
+    cleaned.push('');
+    cleaned.push(note);
+  }
+  cleaned.push('');
+  cleaned.push('감사합니다.');
+  cleaned.push('푸른노무법인 ' + senderLb + ' 드림');
+  return cleaned.join('\n');
+}
+
+function mbSubReadBtnsHtml(o, v){
+  if(typeof mbIsPersonBox !== 'function' || !mbIsPersonBox(mbNow())) return '';
+  const who = mbSubWhoOfBox(mbNow());
+  if(typeof mbSubCanEdit !== 'function' || !mbSubCanEdit(who)) return '';
+  const done = mbSubIsDone(v, who);
+  return `<button type="button" class="rbtn" data-key="${esc(v._key||'')}" onclick="mbSubMoveMenu(event,this.dataset.key)"
+    title="이 메일의 개인 소분류 탭을 바꾸거나 자동정리 규칙으로 등록합니다">🗂 소분류 ▾</button>
+    <button type="button" class="rbtn" ${done?'style="color:#166534;font-weight:700"':''}
+      data-slug="${esc(o.slug||'')}" data-uid="${esc(o.uid||'')}"
+      onclick="mbSubToggleDone(this.dataset.slug,this.dataset.uid)"
+      title="담당함에서 이 메일을 처리완료 탭으로 넘기거나 되돌립니다">${done ? '✅ 완료됨' : '✓ 완료 처리'}</button>`;
+}
+
+function mbAckTopBtnHtml(o, v){
+  const info = mbAckInfoOf(v, o);
+  if(!info || !info.canAct || info.noReply) return '';
+  if(info.ack){
+    const lb = info.ack.kind === 'reviewed' ? '검토했습니다' : '받았습니다';
+    return `<button type="button" class="rbtn ack-btn sent" data-slug="${esc(info.slug)}" data-uid="${esc(info.uid)}"
+      onclick="mbAckOpen(this.dataset.slug,this.dataset.uid,'reviewed')"
+      title="${esc((info.ack.by || '담당자') + '님이 「' + lb + '」 확인 답메일을 이미 발송했습니다 (' + mbTime(info.ack.at) + ') — 눌러서 확인 또는 다시 보내기')}">✅ 확인답메일 보냄</button>`;
+  }
+  return `<button type="button" class="rbtn ack-btn" data-slug="${esc(info.slug)}" data-uid="${esc(info.uid)}"
+    onclick="mbAckOpen(this.dataset.slug,this.dataset.uid,'reviewed')"
+    title="자문사·거래처 서류 수신·검토 확인 표시와 확인 답메일을 한 번에 보냅니다">📨 받았습니다·검토 답메일</button>`;
+}
+
+function mbAckStripHtml(o, v){
+  const info = mbAckInfoOf(v, o);
+  if(!info) return '';
+  if(!info.hasDocs && !info.ack) return '';
+  if(info.ack){
+    const kLb = info.ack.kind === 'reviewed' ? '검토했습니다' : '받았습니다';
+    const byTxt = info.ack.by ? (info.ack.by + '님이 ') : '';
+    return `<div class="dm-ack-bar sent">
+      <div class="ack-txt">✅ <b>${esc(info.coName)}</b> (${esc(info.rel)}) — ${esc(byTxt)}<b>「${esc(kLb)}」</b> 확인 답메일을 발송했습니다
+        <span class="ack-sub">발송 시각: ${esc(mbTime(info.ack.at))}${info.attCount ? ' · 확인 서류 ' + info.attCount + '개' : ''}</span>
+      </div>
+      ${(info.canAct && !info.noReply) ? `<div class="ack-btns">
+        <button type="button" class="again" data-slug="${esc(info.slug)}" data-uid="${esc(info.uid)}"
+          onclick="mbAckOpen(this.dataset.slug,this.dataset.uid,'reviewed')">다시 보내기</button>
+      </div>` : ''}
+    </div>`;
+  }
+  if(!info.canAct){
+    const ownTxt = info.owners.length ? info.owners.join(', ') : '미배정';
+    return `<div class="dm-ack-bar">
+      <div class="ack-txt">📄 <b>${esc(info.coName)}</b> (${esc(info.rel)}) 서류 수신${info.attCount ? ' · 첨부 ' + info.attCount + '개' : ''}
+        <span class="ack-sub">담당 노무사·담당자(${esc(ownTxt)})가 확인 후 「받았습니다 · 검토했습니다」 답메일을 발송할 수 있습니다</span>
+      </div>
+    </div>`;
+  }
+  if(info.noReply){
+    return `<div class="dm-ack-bar">
+      <div class="ack-txt">📄 <b>${esc(info.coName)}</b> 서류 수신${info.attCount ? ' · 첨부 ' + info.attCount + '개' : ''}
+        <span class="ack-sub">보낸 주소(${esc(info.em || '없음')})가 발신전용이라 자동 답메일은 생략됩니다 — 상단 「내가 봤다」로 처리 표시만 남겨 주세요</span>
+      </div>
+    </div>`;
+  }
+  return `<div class="dm-ack-bar">
+    <div class="ack-txt">📄 <b>${esc(info.coName)}</b> (${esc(info.rel)}) 서류 수신${info.attCount ? ' · 첨부 ' + info.attCount + '개' : ''}
+      <span class="ack-sub">담당자 확인 후 클릭하면 내부 「내가 봤다」 처리와 함께 고객사에 확인 답메일(내 명함·서명 포함)을 바로 보냅니다</span>
+    </div>
+    <div class="ack-btns">
+      <button type="button" data-slug="${esc(info.slug)}" data-uid="${esc(info.uid)}"
+        onclick="mbAckOpen(this.dataset.slug,this.dataset.uid,'received')"
+        title="서류를 잘 받았다는 수신 확인 답메일을 보냅니다">📥 받았습니다 답메일</button>
+      <button type="button" class="rev" data-slug="${esc(info.slug)}" data-uid="${esc(info.uid)}"
+        onclick="mbAckOpen(this.dataset.slug,this.dataset.uid,'reviewed')"
+        title="서류를 잘 받아 검토 완료했다는 답메일을 보냅니다">✅ 검토했습니다 답메일</button>
+    </div>
+  </div>`;
+}
+
+function mbAckClose(force){
+  if(_mbAckBusy && !force) return;
+  _mbAckState = null;
+  const el = document.getElementById('mbAckBox');
+  if(el) el.remove();
+  if(_mbAckBackH){ const h = _mbAckBackH; _mbAckBackH = null; try{ PuBack.close(h); }catch(_){} }
+}
+
+function mbAckOpen(slug0, uid0, kind0){
+  const slug = String(slug0 || (state.mbOpen && state.mbOpen.slug) || '');
+  const uid = String(uid0 || (state.mbOpen && state.mbOpen.uid) || '');
+  const v = mbOneRow(slug, uid);
+  if(!v) return toast('대상 메일을 찾지 못했습니다', 5000);
+  const kind = (kind0 === 'received') ? 'received' : 'reviewed';
+  const o = (state.mbOpen && String(state.mbOpen.slug) === slug && String(state.mbOpen.uid) === uid) ? state.mbOpen : null;
+  if(!o || o.loading){
+    toast('본문과 첨부 목록을 확인한 뒤 답메일 창을 엽니다…', 4000);
+    state.mbAckAfterOpen = kind;
+    if(!o) mbOpenMsg(slug, uid, true);
+    return;
+  }
+  const info = mbAckInfoOf(v, o);
+  if(!info) return toast('자문사·거래처와 연결된 수신 메일에서만 사용할 수 있습니다', 6000);
+  if(!info.canAct) return toast('담당 노무사·담당자 또는 관리자만 확인 답메일을 보낼 수 있습니다', 6000);
+  if(info.noReply) return toast('발신전용 주소라 답메일을 보낼 수 없습니다', 6000);
+
+  /* 자동 발송이 꺼져 있으면 확인 문구를 미리 채워 전체 쓰기 화면으로 넘긴다 */
+  if(typeof mailModeOf === 'function' && mailModeOf(matMailCfg()) !== 'auto'){
+    const rawSubj0 = String(info.subject || '');
+    const subj0 = /^re\s*:/i.test(rawSubj0) ? rawSubj0 : 'RE: ' + rawSubj0;
+    const orig0 = o.text || htmlToTextC(o.html || '');
+    openMailPage({
+      to: info.em,
+      cc: '',
+      subject: subj0,
+      body: mbAckBuildBody(info, kind, '') + mbReplyBody(v, orig0),
+      replyTo: { slug: slug, uid: uid }
+    });
+    return;
+  }
+
+  try{ if(typeof mySign === 'function' && mySign() && !_signThumb) loadSignThumb(function(){}); }catch(_){}
+  _mbAckState = {
+    slug: slug,
+    uid: uid,
+    kind: kind,
+    note: '',
+    body: mbAckBuildBody(info, kind, ''),
+    bodyEdited: false,
+    markSeen: true
+  };
+  mbAckMount();
+  if(!_mbAckBackH){
+    try{ _mbAckBackH = PuBack.open('확인 답메일', function(){ mbAckClose(); }); }catch(_){}
+  }
+  setTimeout(function(){
+    const goBtn = document.getElementById('mbAckGo');
+    if(goBtn && typeof goBtn.focus === 'function') goBtn.focus();
+  }, 30);
+}
+
+function mbAckSetKind(k){
+  if(!_mbAckState || _mbAckBusy) return;
+  const nextKind = (k === 'received') ? 'received' : 'reviewed';
+  if(_mbAckState.kind === nextKind) return;
+  const v = mbOneRow(_mbAckState.slug, _mbAckState.uid);
+  const o = state.mbOpen;
+  const info = v ? mbAckInfoOf(v, o) : null;
+  _mbAckState.kind = nextKind;
+  if(info && (!_mbAckState.bodyEdited || confirm('선택한 확인 유형(「' + (nextKind === 'reviewed' ? '검토했습니다' : '받았습니다') + '」)에 맞춰 답메일 본문을 새로 채울까요?'))){
+    _mbAckState.body = mbAckBuildBody(info, nextKind, _mbAckState.note);
+    _mbAckState.bodyEdited = false;
+  }
+  mbAckMount();
+  setTimeout(function(){
+    const tabBtn = document.getElementById(nextKind === 'received' ? 'mbAckTabRec' : 'mbAckTabRev');
+    if(tabBtn && typeof tabBtn.focus === 'function') tabBtn.focus();
+  }, 10);
+}
+
+function mbAckSyncNote(val){
+  if(!_mbAckState || _mbAckBusy) return;
+  _mbAckState.note = String(val || '');
+  if(!_mbAckState.bodyEdited){
+    const v = mbOneRow(_mbAckState.slug, _mbAckState.uid);
+    const info = v ? mbAckInfoOf(v, state.mbOpen) : null;
+    if(info){
+      _mbAckState.body = mbAckBuildBody(info, _mbAckState.kind, _mbAckState.note);
+      const ta = document.getElementById('mbAckBody');
+      if(ta) ta.value = _mbAckState.body;
+    }
+  }
+}
+
+function mbAckEditBody(val){
+  if(!_mbAckState || _mbAckBusy) return;
+  _mbAckState.body = String(val || '');
+  _mbAckState.bodyEdited = true;
+}
+
+function mbAckToggleSeen(on){
+  if(!_mbAckState || _mbAckBusy) return;
+  _mbAckState.markSeen = !!on;
+}
+
+function mbAckFullCompose(){
+  if(_mbAckBusy || !_mbAckState) return;
+  const st = _mbAckState;
+  const v = mbOneRow(st.slug, st.uid);
+  const o = state.mbOpen;
+  if(!v) return;
+  const orig = (o && String(o.slug) === st.slug && String(o.uid) === st.uid) ? (o.text || htmlToTextC(o.html || '')) : '';
+  const cleanSubj = String(v.s || '').replace(/[\r\n]+/g, ' ').trim();
+  const subj = /^re\s*:/i.test(cleanSubj) ? cleanSubj : 'RE: ' + cleanSubj;
+  const bodyTxt = String(st.body || '').trim();
+  mbAckClose(true);
+  openMailPage({
+    to: String(v.e || '').replace(/[\r\n]+/g, '').trim(),
+    cc: '',
+    subject: subj,
+    body: bodyTxt + mbReplyBody(v, orig),
+    replyTo: { slug: st.slug, uid: st.uid }
+  });
+}
+
+function mbAckMount(){
+  if(!_mbAckState) return;
+  const st = _mbAckState;
+  const v = mbOneRow(st.slug, st.uid);
+  const info = v ? mbAckInfoOf(v, state.mbOpen) : null;
+  if(!info){ mbAckClose(); return; }
+  const subj = /^re\s*:/i.test(info.subject) ? info.subject : 'RE: ' + info.subject;
+  const myCard = (typeof myCardShouldAttachNow === 'function' && myCardShouldAttachNow() && typeof myCardAttachInfo === 'function')
+    ? myCardAttachInfo() : null;
+  let host = document.getElementById('mbAckBox');
+  if(!host){
+    host = document.createElement('div');
+    host.id = 'mbAckBox';
+    document.body.appendChild(host);
+  }
+  const prevWarn = info.ack
+    ? `<div class="mbtr-card" style="background:#fffbeb;border-color:#fde68a;color:#854d0e;font-size:12.5px">
+        ⚠ 이미 <b>${esc(info.ack.by || '담당자')}</b>님이 <b>「${esc(info.ack.kind === 'reviewed' ? '검토했습니다' : '받았습니다')}」</b> 확인 답메일을 발송했습니다 (${esc(mbTime(info.ack.at))}). 꼭 필요한 경우에만 다시 보내 주세요.
+      </div>` : '';
+  const attSummary = info.attNames.length
+    ? esc(info.attNames.slice(0, 4).join(' · ') + (info.attNames.length > 4 ? ' 외 ' + (info.attNames.length - 4) + '개' : ''))
+    : (info.attCount ? ('첨부파일 ' + info.attCount + '개') : '첨부 없음 (본문 확인)');
+  host.innerHTML = `<div class="mck-dim mbtr-dim" onclick="if(event.target===this&&!_mbAckBusy)mbAckClose()">
+    <div class="mck mbtr-box" role="dialog" aria-modal="true" aria-labelledby="mbAckTitle">
+      <header>
+        <b id="mbAckTitle">📨 자문사·거래처 서류 확인 및 자동 답메일</b>
+        <span class="sp"></span>
+        <button type="button" class="x" aria-label="닫기" onclick="mbAckClose()" ${_mbAckBusy ? 'disabled' : ''}>✕</button>
+      </header>
+      <div class="body" style="padding:14px 18px;max-height:74vh;overflow-y:auto">
+        ${prevWarn}
+        <div class="mbtr-card" style="background:#f8fafc">
+          <h4>🏢 ${esc(info.coName)} <span class="mbtr-pill">${esc(info.rel)}</span></h4>
+          <div style="font-size:12.5px;color:#475569;line-height:1.7">
+            <div>· <b>받는 사람</b>: ${esc(info.senderName)} &lt;${esc(info.em)}&gt;</div>
+            <div>· <b>답메일 제목</b>: ${esc(subj)}</div>
+            <div>· <b>대상 서류</b>: ${attSummary}</div>
+            <div>· <b>발신 서명·명함</b>: 푸른노무법인 ${esc(mbAckSenderLabel())} 서명 자동 포함${myCard ? ' · 📇 내 명함 이미지 자동 첨부' : ''}</div>
+          </div>
+        </div>
+        <div class="mbtr-tabs" role="tablist">
+          <button type="button" id="mbAckTabRec" role="tab" aria-selected="${st.kind === 'received' ? 'true' : 'false'}"
+            class="mbtr-tab${st.kind === 'received' ? ' on' : ''}" onclick="mbAckSetKind('received')" ${_mbAckBusy ? 'disabled' : ''}>📥 받았습니다 (수신 확인)</button>
+          <button type="button" id="mbAckTabRev" role="tab" aria-selected="${st.kind === 'reviewed' ? 'true' : 'false'}"
+            class="mbtr-tab${st.kind === 'reviewed' ? ' on' : ''}" onclick="mbAckSetKind('reviewed')" ${_mbAckBusy ? 'disabled' : ''}>✅ 검토했습니다 (검토 완료)</button>
+        </div>
+        <div class="mbtr-fld" style="margin-bottom:10px">
+          <label for="mbAckNote">덧붙일 한 줄 안내 (선택 — 입력 시 아래 답메일 문안에 자동 반영)</label>
+          <input id="mbAckNote" type="text" value="${esc(st.note)}" maxlength="300" ${_mbAckBusy ? 'disabled' : ''}
+            placeholder="예: 11월 급여대장 이상 없이 반영했습니다 / 3번 항목만 보완 부탁드립니다"
+            oninput="mbAckSyncNote(this.value)">
+        </div>
+        <div class="mbtr-fld" style="margin-bottom:10px">
+          <label for="mbAckBody">발송될 답메일 본문 (필요시 직접 다듬을 수 있으며, 아래에 원문 인용과 서명이 자동 부착됩니다)</label>
+          <textarea id="mbAckBody" rows="8" style="line-height:1.65" ${_mbAckBusy ? 'disabled' : ''} oninput="mbAckEditBody(this.value)">${esc(st.body)}</textarea>
+        </div>
+        <label class="mbtr-chk">
+          <input type="checkbox" ${st.markSeen ? 'checked' : ''} ${_mbAckBusy ? 'disabled' : ''} onchange="mbAckToggleSeen(this.checked)">
+          <span>내부 <b>「✅ 내가 봤다 (처리함)」</b> 표시도 함께 남겨 다른 담당자가 중복 확인하지 않게 합니다</span>
+        </label>
+      </div>
+      <footer>
+        <button type="button" id="mbAckFullBtn" onclick="mbAckFullCompose()" ${_mbAckBusy ? 'disabled' : ''}>⤢ 전체 쓰기 창에서 열기</button>
+        <span class="sp"></span>
+        <button type="button" id="mbAckCancelBtn" onclick="mbAckClose()" ${_mbAckBusy ? 'disabled' : ''}>취소</button>
+        <button type="button" id="mbAckGo" class="pri" style="background:#166534;border-color:#166534;color:#ffffff;font-weight:700"
+          onclick="mbAckSend()" ${_mbAckBusy ? 'disabled' : ''}>${_mbAckBusy ? '보내는 중…' : ('✉️ 「' + (st.kind === 'reviewed' ? '검토했습니다' : '받았습니다') + '」 확인 답메일 보내기')}</button>
+      </footer>
+    </div>
+  </div>`;
+}
+
+async function mbAckSend(){
+  if(_mbAckBusy || !_mbAckState) return;
+  const st = _mbAckState;
+  const bodyEl = document.getElementById('mbAckBody');
+  if(bodyEl) st.body = String(bodyEl.value || '');
+  const text = String(st.body || '').trim();
+  if(!text) return toast('답메일 본문을 입력해 주세요', 5000);
+  const v = mbOneRow(st.slug, st.uid);
+  const o = state.mbOpen;
+  const info = v ? mbAckInfoOf(v, o) : null;
+  if(!info || info.noReply) return toast('보낼 수 있는 거래처 주소를 찾지 못했습니다', 6000);
+  if(!info.canAct) return toast('담당 노무사·담당자 또는 관리자만 확인 답메일을 보낼 수 있습니다', 6000);
+  if(info.ack && !confirm('이미 ' + (info.ack.by || '담당자') + '님이 확인 답메일을 보낸 메일입니다.\n그래도 다시 보내시겠습니까?')) return;
+
+  const orig = (o && String(o.slug) === st.slug && String(o.uid) === st.uid) ? (o.text || htmlToTextC(o.html || '')) : '';
+  const subj = /^re\s*:/i.test(info.subject) ? info.subject : 'RE: ' + info.subject;
+  const html = textToHtml(text + mbReplyBody(v, orig)) + '<br><br>' + signBlockHtml();
+  const attachCard = (typeof myCardShouldAttachNow === 'function') ? !!myCardShouldAttachNow() : false;
+
+  _mbAckBusy = true;
+  mbAckMount();
+  try{
+    const r = await postAutoMail({
+      cardId: '',
+      to: info.em,
+      cc: '',
+      bcc: '',
+      toMe: false,
+      oneByOne: false,
+      scheduleAt: 0,
+      subject: subj,
+      body: htmlToTextC(html),
+      html: html,
+      matIds: [],
+      set: '',
+      toName: info.senderName || info.coName || '',
+      attachMyCard: attachCard,
+      files: []
+    });
+    /* ⚠ 실제로 메일이 나간 «뒤에만» 답장 표 · 내가 봤다 · 확인답메일 기록을 켠다 */
+    mbAnswered(st.slug, st.uid);
+    if(st.markSeen) mbSeenMark(v, 'done');
+    const seenKey = mbSeenKey(v);
+    if(seenKey){
+      const curUser = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) || null;
+      const actorName = (typeof mbMyName === 'function' && mbMyName()) || mbAckSenderLabel();
+      const ackRec = {
+        kind: st.kind === 'received' ? 'received' : 'reviewed',
+        by: String(actorName || '담당자').slice(0, 40),
+        uid: String((curUser && curUser.uid) || ''),
+        coId: String(info.coId || '').slice(0, 80),
+        coName: String(info.coName || '').slice(0, 120),
+        attCount: Math.min(200, Math.max(0, Number(info.attCount || 0))),
+        at: Date.now()
+      };
+      _mbAck = _mbAck || {};
+      const prevAck = _mbAck[seenKey];
+      _mbAck[seenKey] = ackRec;
+      if(typeof Store !== 'undefined' && Store.mode === 'firebase' && ackRec.uid){
+        firebase.database().ref(DB_ROOT + '/' + MB_ACK_PATH + '/' + seenKey).set(ackRec)
+          .catch(err=>{
+            if(prevAck === undefined) delete _mbAck[seenKey]; else _mbAck[seenKey] = prevAck;
+            renderMailPage();
+            console.warn('[확인답메일 기록]', (err && err.message) || err);
+            toast('⚠ 답메일은 정상 발송되었으나 확인 배지 저장에 실패했습니다 (다시 보내지 마세요)', 8000);
+          });
+      }
+    }
+    const doneLb = st.kind === 'reviewed' ? '검토했습니다' : '받았습니다';
+    _mbAckBusy = false;
+    mbAckClose(true);
+    renderPCSide(); renderMailPage();
+    toast('✉️ 「' + info.coName + '」(' + info.em + ') 앞으로 「' + doneLb + '」 확인 답메일을 보냈습니다'
+      + (r && r.from ? ' (' + r.from + ')' : ''), 7500);
+  }catch(e){
+    _mbAckBusy = false;
+    mbAckMount();
+    toast('답메일을 보내지 못했습니다 — ' + ((e && e.message) || '알 수 없는 오류') + ' (작성 내용은 그대로 남아 있습니다)', 9000);
+  }finally{
+    _mbAckBusy = false;
+  }
+}
+try{
+  document.addEventListener('keydown', function(e){
+    if(!e || !_mbAckState) return;
+    if(e.key === 'Escape' && !_mbAckBusy){
+      e.stopPropagation();
+      mbAckClose();
+      return;
+    }
+    if(e.key === 'Tab'){
+      const box = document.getElementById('mbAckBox');
+      if(!box || typeof box.querySelectorAll !== 'function') return;
+      const focusables = Array.prototype.slice.call(box.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if(!focusables.length) return;
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if(e.shiftKey && document.activeElement === first){
+        e.preventDefault();
+        last.focus();
+      } else if(!e.shiftKey && document.activeElement === last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
+}catch(_){}
 
 /* ══════ 전달 · 다시보내기 ══════
    답장이 아니다 — 우리 회사 주소로 **새 편지**를 쓴다. 그래야 보낸 기록이 앱에도 남고,
