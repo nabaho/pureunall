@@ -193,8 +193,11 @@
     var cat = getAppCat();
     var I = Intake();
     if (!cat.trackAudit || !I || typeof I.classifyFamilywork !== 'function') return null;
-    var ids = Object.keys(D.projects || {});
-    var ck = APP_KEY + '|' + ids.length + '|' + Object.keys(D.comms || {}).length + '|' + ((D.discover && D.discover.matchedCommsByPid) ? Object.keys(D.discover.matchedCommsByPid).length : 0) + '|' + ids.reduce(function (s, k) { var p = D.projects[k]; return s + num(p && p.revision, 0); }, 0);
+    var ids = Object.keys(D.projects || {}).filter(function (k) { return D.projects[k] && !D.projects[k]._deleted; });
+    var ck = APP_KEY + '|' + ids.map(function (k) {
+      var p = D.projects[k];
+      return k + ':' + num(p.revision, 0) + ':' + str(p.trackId) + ':' + getProjectComms(k).length;
+    }).join(',');
     if (_auditCache.key === ck && _auditCache.map) return _auditCache.map;
     var known = Object.create(null);
     (cat.tracks || []).forEach(function (t) { known[t.id] = t; });
@@ -598,6 +601,10 @@
 
   async function softDeleteRecord(subPath, prev, entityType) {
     if (!prev || typeof prev !== 'object') throw new Error('삭제할 원본을 찾지 못했습니다.');
+    if (Object.prototype.hasOwnProperty.call(prev, '_storedTrackId')) {
+      prev = Object.assign({}, prev, { trackId: prev._storedTrackId, trackName: prev._storedTrackName });
+      delete prev._storedTrackId; delete prev._storedTrackName; delete prev._audit;
+    }
     var curRev = num(prev.revision, 0);
     var delActor = str((ME && ME.uid) || '');
     if (PREVIEW_MODE || !fbDb || !gate) {
@@ -3003,7 +3010,7 @@
     if (!m || !box) return;
     LAST_FOCUS_EL = document.activeElement;
     var cat = getAppCat();
-    var tracks = getEffectiveTracks();
+    var tracks = getEffectiveTracks().filter(function (t) { return !t.virtual; });
     var opts = tracks.map(function (t) {
       return '<option value="' + esc(t.id) + '"' + (TRACK_FILTER === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>';
     }).join('');
@@ -3068,10 +3075,14 @@
     if (!m || !box) return;
     LAST_FOCUS_EL = document.activeElement;
     var cat = getAppCat();
-    var tracks = getEffectiveTracks();
-    var opts = tracks.map(function (t) {
-      return '<option value="' + esc(t.id) + '"' + (proj.trackId === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>';
-    }).join('');
+    var tracks = getEffectiveTracks().filter(function (t) { return !t.virtual; });
+    var curTr = str(proj.trackId);
+    var hasCurTr = tracks.some(function (t) { return t.id === curTr; });
+    var legacyLbl = (cat.legacyTrackNames && cat.legacyTrackNames[curTr]) || str(proj.trackName) || curTr;
+    var opts = (!hasCurTr && curTr ? '<option value="' + esc(curTr) + '" selected>기존 갈래 유지 (' + esc(legacyLbl) + ')</option>' : '') +
+      tracks.map(function (t) {
+        return '<option value="' + esc(t.id) + '"' + (curTr === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>';
+      }).join('');
     box.innerHTML =
       '<div class="mhd"><b id="mhdTitle">✏️ 사업 정보 수정 · ' + esc(proj.companyName) + '</b><span class="sp"></span><button type="button" class="sm" id="mCloseBtn">닫기</button></div>' +
       '<div class="mbd">' +
@@ -3095,17 +3106,19 @@
       var saveBtn = $('mEditSaveBtn');
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중…'; }
       var trId = $('epTrack').value;
-      var trObj = tracks.find(function (t) { return t.id === trId; }) || { id: trId, name: cat.shortName };
+      var trObj = tracks.find(function (t) { return t.id === trId; });
       var origSt = String(proj.status || 'active').trim();
       var selSt = String($('epStatus').value || 'active').trim();
       var patch = {
         companyName: co.slice(0, 190),
-        trackId: trObj.id,
-        trackName: trObj.name,
         year: num($('epYear').value, CUR_YEAR),
         consultantName: cleanText($('epMgr').value).slice(0, 70) || proj.consultantName || '전담 노무사',
         summaryNote: cleanText($('epNote').value).slice(0, 1900)
       };
+      if (trObj) {
+        patch.trackId = trObj.id;
+        patch.trackName = trObj.name;
+      }
       if (selSt !== origSt || !proj.status) patch.status = selSt === 'done' ? 'done' : 'active';
       var cno = cleanText($('epCaseNo').value).slice(0, 60);
       if (cno) patch.caseNo = cno;
@@ -3154,11 +3167,12 @@
     rows.forEach(function (r) { if (r.level === 'sure' && !VIRTUAL_TRACKS[r.to]) pick[r.pid] = 1; });
     function body() {
       var nPick = Object.keys(pick).length;
+      var allTa = rows.length > 0 && nPick === rows.length;
       return '<div class="note">근거(제목·사업장명·요약·사건번호·메일 제목)로 다시 본 갈래입니다. <b>확실</b>한 것만 미리 골랐습니다. «분류 바꾸기»는 고른 줄의 <b>갈래 한 칸</b>만 저장합니다. «관련 없음»은 휴지통(되살릴 수 있음)으로만 옮깁니다.</div>' +
         '<div class="bulk on"><b>' + nPick + '건 선택</b>' +
           '<button type="button" class="sm ok" id="taApplyBtn"' + (nPick ? '' : ' disabled') + '>선택한 ' + nPick + '건 분류 바꾸기</button>' +
           '<button type="button" class="sm danger" id="taTrashBtn">«관련 없음» 고른 줄 휴지통으로</button></div>' +
-        '<div class="scroll"><table class="t" data-name="trackAudit"><thead><tr><th class="c"><input type="checkbox" id="taAll" aria-label="전체 선택"></th><th class="n">№</th><th class="yr">연도</th><th>사업장명</th><th>지금(저장)</th><th>권장</th><th>확실도</th><th class="wide">근거</th></tr></thead><tbody>' +
+        '<div class="scroll"><table class="t" data-name="trackAudit"><thead><tr><th class="c"><input type="checkbox" id="taAll"' + (allTa ? ' checked' : '') + ' aria-label="전체 선택"></th><th class="n">№</th><th class="yr">연도</th><th>사업장명</th><th>지금(저장)</th><th>권장</th><th>확실도</th><th class="wide">근거</th></tr></thead><tbody>' +
         rows.map(function (r, i) {
           return '<tr><td class="c"><input type="checkbox" data-ta="' + esc(r.pid) + '"' + (pick[r.pid] ? ' checked' : '') + ' aria-label="' + esc(r.p.companyName) + ' 선택"></td>' +
             '<td class="n">' + (i + 1) + '</td><td class="yr">' + esc(String(r.p.year || '')) + '</td>' +
@@ -3172,15 +3186,21 @@
         '</tbody></table></div>';
     }
     function bind() {
+      var nPick = Object.keys(pick).length;
       box.querySelectorAll('[data-ta]').forEach(function (cb) {
-        cb.onchange = function () { var id = cb.getAttribute('data-ta'); if (cb.checked) pick[id] = 1; else delete pick[id]; redraw(); };
+        cb.onchange = function () { var id = cb.getAttribute('data-ta'); if (cb.checked) pick[id] = 1; else delete pick[id]; redraw(id); };
       });
-      if ($('taAll')) $('taAll').onchange = function () { var on = $('taAll').checked; rows.forEach(function (r) { if (on) pick[r.pid] = 1; else delete pick[r.pid]; }); redraw(); };
+      if ($('taAll')) {
+        $('taAll').indeterminate = nPick > 0 && nPick < rows.length;
+        $('taAll').onchange = function () { var on = $('taAll').checked; rows.forEach(function (r) { if (on) pick[r.pid] = 1; else delete pick[r.pid]; }); redraw('taAll'); };
+      }
       if ($('taApplyBtn')) $('taApplyBtn').onclick = async function () {
         var list = rows.filter(function (r) { return pick[r.pid] && !VIRTUAL_TRACKS[r.to]; });
         var skipped = Object.keys(pick).length - list.length;
         if (!list.length) { toast('바꿀 수 있는 줄(분류 확인·관련 없음이 아닌 줄)을 골라 주세요.'); return; }
         if (!global.confirm(list.length + '건의 사업 갈래를 권장 갈래로 바꿀까요?' + (skipped ? (' («분류 확인»·«관련 없음» ' + skipped + '건은 갈래가 정해지지 않아 건너뜁니다)') : ''))) return;
+        var btn = $('taApplyBtn');
+        if (btn) { btn.disabled = true; btn.textContent = '변경 중…'; }
         var ok = 0;
         for (var i = 0; i < list.length; i++) {
           var r = list[i];
@@ -3199,12 +3219,19 @@
       };
       if ($('mCloseBtn')) $('mCloseBtn').onclick = closeModal;
     }
-    function redraw() { if ($('taBody')) { $('taBody').innerHTML = body(); bind(); } }
+    function redraw(focusKey) {
+      if (!$('taBody')) return;
+      $('taBody').innerHTML = body();
+      bind();
+      var fEl = focusKey === 'taAll' ? $('taAll') : (focusKey ? box.querySelector('[data-ta="' + cssEsc(focusKey) + '"]') : null);
+      if (fEl && typeof fEl.focus === 'function') fEl.focus();
+    }
     box.innerHTML = '<div class="mhd"><b id="mhdTitle">🔎 분류 점검 — ' + esc(cat.name) + '</b><span class="sp"></span><button type="button" class="sm" id="mCloseBtn">닫기</button></div>' +
       '<div class="mbd" id="taBody">' + body() + '</div>';
     box.classList.add('wide');
     m.style.display = 'flex';
     bind();
+    if ($('mCloseBtn')) $('mCloseBtn').focus();
   }
 
   function openAddRegionModal() {
@@ -3308,6 +3335,7 @@
 
   function closeModal() {
     if ($('modal')) $('modal').style.display = 'none';
+    if ($('mbox')) $('mbox').classList.remove('wide');
     if (LAST_FOCUS_EL && typeof LAST_FOCUS_EL.focus === 'function') {
       try { LAST_FOCUS_EL.focus(); } catch (e) {}
     }
