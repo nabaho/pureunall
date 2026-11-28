@@ -875,3 +875,79 @@ test('★★★ manual 은 «이 넷뿐» — 충청북도 둘·충북연구원 
   assert.deepEqual(W.BOARDS.filter((b) => b.manual).map((b) => b.id).sort(), ['chungbuk', 'chungbuk2', 'cri', 'cri_job']);
   W.BOARDS.filter((b) => b.manual).forEach((b) => assert.match(b.url, /^https:\/\//, b.id + ' 직접 열기 주소가 없다'));
 });
+
+/* ── 도약(Jump-Up) 프로그램 (대표 지시 2026-11-28) — 제목은 2026-11-28 jumpup.or.kr 공지·모집공고 실제 글 ── */
+test('★★★ 도약 프로그램 게시판 둘이 들어 있다 — https · 로그인 없음 · 전용 잣대 · 화면 사전의 jumpup', () => {
+  const R = require('../js/gov-recruit.js');
+  ['jumpup', 'jumpup_recrt'].forEach((id) => {
+    const b = W.BOARDS.find((x) => x.id === id);
+    assert.ok(b, id + ' 게시판이 빠졌다');
+    assert.match(b.url, /^https:\/\/jumpup\.or\.kr\//);
+    assert.equal(b.rule, 'jumpup');
+    assert.ok(!b.login, '읽기만 한다 — 로그인 없음');
+    assert.ok(R.ORGS.some((o) => o.id === b.org), id + ' 의 기관이 화면 사전에 없다');
+  });
+});
+
+test('★★ 도약 잣대 — 참여기업 모집·양식·설명회는 잡고, 포럼·연간일정·해킹 안내·끝난 글은 거른다', () => {
+  const b = W.BOARDS.find((x) => x.id === 'jumpup');
+  [
+    '[모집] 2027년 도약(Jump-Up) 프로그램 참여기업 모집공고',
+    '2027년 도약(Jump-Up)프로그램 참여기업 모집',
+    '[모집] 2027년 도약(Jump-Up) 프로그램 참여신청서 및 계획서 양식',
+    '[모집] 2027년 도약(Jump-Up)프로그램 찾아가는 사업설명회 개최',
+    '도약(Jump-Up) 프로그램 수행기관 모집 안내',
+    '2028년 도약프로그램 서포터 및 평가위원 모집'
+  ].forEach((t) => assert.equal(W.pass(b, t), true, '놓친다: ' + t));
+  [
+    '2026년 도약 벤처 금융 포럼 개최(12/2(수))',
+    "[일정] '26년 도약(Jump-Up) 프로그램 연간일정 안내",
+    '정부 사칭 악성 해킹메일 피해 우려에 따른 협조 요청',
+    '2027년 도약(Jump-Up) 프로그램 최종 선정 결과 안내'
+  ].forEach((t) => assert.equal(W.pass(b, t), false, '잡음을 잡는다: ' + t));
+  assert.equal(W.pass({ id: 'erc' }, '[모집] 2027년 도약(Jump-Up) 프로그램 참여기업 모집공고'), false,
+    '일반 잣대는 「참여기업 모집」을 못 잡는다 — 그래서 전용 잣대(rule)가 있다');
+});
+
+test('★★ 모집공고 목록 — 제목 링크의 «;jsessionid=…» 를 떼어 다음 날에도 열리는 주소를 남긴다', () => {
+  const html = '<table><tbody><tr><td>2</td><td>일반</td><td><a href="/portal/board/recrtView;jsessionid=TESTSESSION0000000000000000000000?noticeSeq=4&amp;pageNo=1">2027년 도약(Jump-Up)프로그램 참여기업 모집</a></td><td>2026-10-15 13:00 ~ 2026-11-13 17:00</td></tr></tbody></table>';
+  const rows = W.parseRows(html, 'https://jumpup.or.kr/portal/board/recrtList', W.BOARDS.find((x) => x.id === 'jumpup_recrt'));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].href, 'https://jumpup.or.kr/portal/board/recrtView?noticeSeq=4&pageNo=1');
+  assert.ok(!/jsessionid/i.test(rows[0].href));
+});
+
+test('★★ 도약 공지 — 제목 링크가 javascript:void(0) 여도 글은 남고, 주소는 게시판 주소로 보낸다(막다른 링크 금지)', async () => {
+  const html = '<table><tbody>'
+    + '<tr><td>중요</td><td><a href="javascript:void(0)">[모집] 2027년 도약(Jump-Up) 프로그램 참여기업 모집공고</a></td><td>2026-10-15</td><td>786</td></tr>'
+    + '<tr><td>중요</td><td><a href="javascript:void(0)">2026년 도약 벤처 금융 포럼 개최(12/2(수))</a></td><td>2026-11-11</td><td>102</td></tr></tbody></table>';
+  const r = await W.run({ boards: W.BOARDS.filter((b) => b.id === 'jumpup'), fetchText: () => Promise.resolve(html), today: '2026-11-28', nowIso: 'T' });
+  assert.deepEqual(r.hits.map((h) => h.title), ['[모집] 2027년 도약(Jump-Up) 프로그램 참여기업 모집공고']);
+  assert.equal(r.hits[0].org, 'jumpup');
+  assert.equal(r.hits[0].href, 'https://jumpup.or.kr/portal/board/BoardList?bbsId=1');
+  /* 한 번 본 글은 다음 날 다시 안 들어온다 — 메일이 날마다 같은 글로 오지 않는다 */
+  const have = {}; r.hits.forEach((h) => { have[h.key] = h; });
+  const again = await W.run({ boards: W.BOARDS.filter((b) => b.id === 'jumpup'), fetchText: () => Promise.resolve(html), today: '2026-11-29', nowIso: 'T', existing: have });
+  assert.equal(again.hits.length, 0);
+});
+
+test('★★ 도약 잣대 — 「인력풀·전문가 풀·pool」은 잡고, 「풀타임」 같은 말은 안 잡는다(한글 뒤 \b 는 안 먹는다)', () => {
+  const b = W.BOARDS.find((x) => x.id === 'jumpup');
+  assert.equal(W.pass(b, '도약 프로그램 전문가 풀 안내'), true);
+  assert.equal(W.pass(b, '도약프로그램 인력풀 구성 안내'), true);
+  assert.equal(W.pass(b, '도약 프로그램 Pool 구성'), true);
+  assert.equal(W.pass(b, '도약 프로그램 풀타임 근무 안내'), false);
+});
+
+test('★★ 도약 게시판은 글 링크가 «다른 호스트»면 링크를 비운다 — 서버가 남의 주소를 따라가 열지 않는다(검토 2026-11-28)', () => {
+  const b = W.BOARDS.find((x) => x.id === 'jumpup_recrt');
+  assert.equal(b.sameHost, true);
+  const html = '<table><tbody>'
+    + '<tr><td><a href="https://evil.example/x">2027년 도약 참여기업 모집 안내 외부</a></td><td>2026-11-20</td></tr>'
+    + '<tr><td><a href="/portal/board/recrtView?noticeSeq=9">2027년 도약 참여기업 모집 안내 내부</a></td><td>2026-11-21</td></tr></tbody></table>';
+  const rows = W.parseRows(html, b.url, b);
+  assert.equal(rows.find((r) => /외부/.test(r.title)).href, '');
+  assert.equal(rows.find((r) => /내부/.test(r.title)).href, 'https://jumpup.or.kr/portal/board/recrtView?noticeSeq=9');
+  /* 호스트가 다른 링크는 본문을 열 대상이 아니다 — 그 글은 게시판 주소로 간다 */
+  assert.equal(W.hasDetail({ href: rows.find((r) => /외부/.test(r.title)).href || b.url }, b), false);
+});

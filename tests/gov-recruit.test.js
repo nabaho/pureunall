@@ -207,3 +207,19 @@ test('★★ 공단 AI훈련코치(AX 코칭)는 공단 일반 기관과 따로 
   assert.ok(o && /^https:\/\/www\.hrd4u\.or\.kr\//.test(o.url), '게시판 주소(https)가 있다');
   assert.ok(R.ORGS.findIndex((x) => x.id === 'hrdkai') < R.ORGS.findIndex((x) => x.id === 'hrdk'), '차례가 곧 우선순위 — 새 기관이 공단 앞');
 });
+
+test('★★ 도약(Jump-Up) 프로그램은 중진공 일반·재도약·소상공인 도약성장과 따로 간다 — 이름에 「중진공」이 같이 있어도 한 곳에만', () => {
+  /* matches 는 «걸리는 기관 전부»다 — 이름 하나가 실제로 가는 곳은 group 이 정한다(처음 맞는 기관 하나) */
+  const where = (name) => {
+    const g = R.group([{ y: '2026', name: name, t: 0 }], []);
+    return g.orgs.filter((o) => o.items.length).map((o) => o.id);
+  };
+  assert.deepEqual(where('2027 중진공 도약(Jump-Up) 프로그램 모집공고'), ['jumpup'], '중진공이 같이 있어도 도약이 먼저');
+  assert.deepEqual(where('2027 도약프로그램 참여기업 모집'), ['jumpup']);
+  assert.deepEqual(where('점프업 100 안내'), ['jumpup']);
+  assert.deepEqual(where('2018 재도약지원사업(회생컨설팅) 공고'), ['kosmes'], '중진공 재도약은 그대로 중진공');
+  assert.ok(R.matches('2026 소상공인연합회 도약성장 지원단 모집공고').indexOf('jumpup') < 0, '소상공인 도약성장은 도약 프로그램이 아니다');
+  const o = R.ORGS.find((x) => x.id === 'jumpup');
+  assert.ok(o && /^https:\/\/jumpup\.or\.kr\//.test(o.url), '게시판 주소(https)가 있다');
+  assert.ok(R.ORGS.findIndex((x) => x.id === 'jumpup') < R.ORGS.findIndex((x) => x.id === 'kosmes'), '차례가 곧 우선순위 — 도약이 중진공 앞');
+});

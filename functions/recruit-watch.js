@@ -171,7 +171,19 @@ const BOARDS = [
   { id: 'kpc',       org: '', gate: 'eval', name: '한국생산성본부 지원사업 모집공고', url: 'https://www.kpc.or.kr/kpc/PTWHP004_recruit_list.do' },
   { id: 'djtp',      org: '', gate: 'eval', name: '대전테크노파크 사업공고',    url: 'https://www.djtp.or.kr/board.es?mid=a20102000000&bid=0102' },
   { id: 'djbea',     org: '', gate: 'eval', name: '대전일자리경제진흥원 사업공고', url: 'https://www.djbea.or.kr/mps/bizTskPbnc?menuKey=TOfnnvp207' },
-  { id: 'kli',       org: '', gate: 'eval', name: '한국노동연구원 공지',        url: 'https://www.kli.re.kr/board.es?mid=a10302000000&bid=0004' }
+  { id: 'kli',       org: '', gate: 'eval', name: '한국노동연구원 공지',        url: 'https://www.kli.re.kr/board.es?mid=a10302000000&bid=0004' },
+
+  /* ★ 중진공 도약(Jump-Up) 프로그램 통합정보관리시스템 (대표 지시 2026-11-28 「사업 공고가 뜨면 푸른 메일함에 이메일로 자동으로 보내서 검토」)
+     2026-11-28 실측: 로그인 없이 목록 첫 쪽이 서버 HTML 로 읽힌다(공지 38건·모집공고 2건).
+     ⚠ 이 사업은 «지원기업»(업력 7년 이상·매출 100억 이상 중소기업)을 뽑는 글이 대부분이라 일반 잣대(isRecruit —
+       컨설턴트·전문가 + 모집)로는 「참여기업 모집공고」를 놓친다 → 전용 잣대(rule:'jumpup' → isJumpup)를 쓴다.
+       수행기관·서포터·평가위원 모집이 올라오면 같은 잣대가 잡는다.
+     ⚠ 공지 목록의 제목 링크는 javascript:void(0) 라 주소를 비운다 — 화면은 게시판 주소로 보낸다(막다른 링크 아님).
+     ⚠ 읽기만 한다 — 로그인·가입·신청 없음.
+     ⚠ sameHost — 글 링크가 «이 게시판과 같은 호스트»일 때만 서버가 본문을 연다(검토 2026-11-28: 다른 호스트 링크를 서버가 따라가
+       열면 안 된다). 다른 호스트면 링크를 비우고 화면은 게시판 주소로 보낸다. */
+  { id: 'jumpup',        org: 'jumpup', name: '도약(Jump-Up) 프로그램 공지',     url: 'https://jumpup.or.kr/portal/board/BoardList?bbsId=1', rule: 'jumpup', sameHost: true },
+  { id: 'jumpup_recrt',  org: 'jumpup', name: '도약(Jump-Up) 프로그램 모집공고', url: 'https://jumpup.or.kr/portal/board/recrtList', rule: 'jumpup', sameHost: true }
 ];
 
 /* 여러 기관 글이 섞인 게시판(org 가 빈 것)에서 제목으로 기관을 정한다.
@@ -237,7 +249,9 @@ function parseRows(html, base, board) {
     if (!best) return;
     let href = '';
     const h = /href\s*=\s*["']([^"']*)["']/i.exec(best.attrs);
-    if (h && h[1] && !/^\s*(javascript:|#)/i.test(h[1])) { try { href = new URL(h[1].replace(/&amp;/g, '&'), base).href; } catch (e) { href = ''; } }
+    /* ⚠ 「;jsessionid=…」(도약 모집공고 목록 실측)는 그날 접속의 임시 번호다 — 메일·화면에 남으면 다음 날 죽은 링크가 된다. 뗀다. */
+    if (h && h[1] && !/^\s*(javascript:|#)/i.test(h[1])) { try { href = new URL(h[1].replace(/&amp;/g, '&'), base).href.replace(/;jsessionid=[^?#]*/i, ''); } catch (e) { href = ''; } }
+    if (href && board && board.sameHost) { try { if (new URL(href).host !== new URL(base).host) href = ''; } catch (e) { href = ''; } }
     if (!href && board && board.js) { const j = board.js.re.exec(best.attrs); if (j) href = board.js.url.replace('{id}', j[1]); }
     const date = d[1] + '-' + pad(mo) + '-' + pad(da);
     const k = best.t + '|' + date; if (seen[k]) return; seen[k] = 1;
@@ -272,10 +286,21 @@ function isKcplaa(title) {
   const t = String(title || '');
   return KC_WHO.test(t) && KC_PICK.test(t) && !KC_NOT.test(t);
 }
+/* 도약(Jump-Up) 프로그램 잣대 — «기업이든 기관이든 사람이든» 새로 열리는 접수·설명회·양식 글이면 통과.
+   ⚠ 이 게시판은 글이 적고(공지 38건) 거의 다 사업 안내라, 일반 잣대의 「누구(WHO)」 조건을 걸지 않는다.
+   ⚠ 끝난 글(결과·명단·최종선정)과 보안 안내(사칭·해킹메일)는 뺀다. 「개최」(사업설명회 개최)는 일부러 안 뺀다. */
+/* ⚠ 「풀」은 «인력풀·전문가풀·pool» 꼴만 — 한글 뒤에서 \b(ASCII 단어 경계)는 동작하지 않고, 맨 「풀」은 「풀타임」 같은 말에도 걸린다 */
+const JU_PICK = /모집|공고|공모|신청|접수|설명회|수행기관|서포터|디렉터|평가위원|위촉|인력\s*풀|전문가\s*풀|\bpool\b|양식|추천/i;
+const JU_NOT = /결과|명단|합격|최종\s*선정|사칭|해킹/;
+function isJumpup(title) {
+  const t = String(title || '');
+  return JU_PICK.test(t) && !JU_NOT.test(t);
+}
 /* 지금 잣대가 «일부러 빼는» 말이 든 제목 — 이미 들어온 글을 지울 때만 쓴다.
    ⚠ 「안 맞는 것」 전부가 아니라 «빼는 말»에 걸린 것만 — 찾는 말(WHO·PICK)이 바뀌었다고 옛 글을 통째로 지우지 않는다. */
 function noise(board, title) {
   const t = String(title || '');
+  if (board && board.rule === 'jumpup') return JU_NOT.test(t);
   if (board && board.rule === 'kcplaa') return KC_NOT.test(t);
   return DONE.test(t) || LEARN.test(t) || (!!board && board.gate === 'eval' && evalOut(t));
 }
@@ -296,6 +321,7 @@ function evalOut(title) {
 }
 /* 게시판마다 잣대를 고른다 — rule 이 없으면 일반 잣대 */
 function pass(board, title) {
+  if (board && board.rule === 'jumpup') return isJumpup(title);
   if (board && board.rule === 'kcplaa') return isKcplaa(title);
   return isRecruit(title) && !(board && board.gate === 'eval' && evalOut(title));
 }
@@ -709,4 +735,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { evalOut, EXTRA_CA, caList, imagesOf, aiPerOf, aiAsk, bodyOf, docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
+module.exports = { evalOut, EXTRA_CA, caList, imagesOf, aiPerOf, aiAsk, bodyOf, docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, isJumpup, pass, keyOf, run, updatesOf, decode, clean };
