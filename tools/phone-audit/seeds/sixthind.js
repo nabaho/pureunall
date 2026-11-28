@@ -23,6 +23,48 @@ module.exports = {
           consultantName: '점검노무사',
           status: 'active',
           summaryNote: '6차산업컨설팅 현장 점검 진행 중 (연락처 010-0000-1001)'
+        },
+        'pr_sixthind_2': {
+          id: 'pr_sixthind_2', entityType: 'Project', schemaVersion: 1, contractVersion: 1,
+          createdAt: NOW - 864e5 * 12, updatedAt: NOW - 3600e3 * 2, revision: 1,
+          companyName: '(주)나다충남농원', year: 2026, trackId: 'sx_chungnam', trackName: '충남 농촌융복합산업지원센터 현장코칭·인증지원',
+          stage: 'visit', workerCount: 12, consultantName: '점검노무사', status: 'active',
+          summaryNote: '충남 샘플(지어낸 값)'
+        },
+        'pr_sixthind_3': {
+          id: 'pr_sixthind_3', entityType: 'Project', schemaVersion: 1, contractVersion: 1,
+          createdAt: NOW - 864e5 * 13, updatedAt: NOW - 3600e3 * 3, revision: 1,
+          companyName: '다라충북영농조합법인', year: 2026, trackId: 'sx_chungbuk', trackName: '충북 농촌융복합산업지원센터 전문상담·현장코칭',
+          stage: 'visit', workerCount: 13, consultantName: '점검노무사', status: 'active',
+          summaryNote: '충북 샘플(지어낸 값)'
+        },
+        'pr_sixthind_4': {
+          id: 'pr_sixthind_4', entityType: 'Project', schemaVersion: 1, contractVersion: 1,
+          createdAt: NOW - 864e5 * 14, updatedAt: NOW - 3600e3 * 4, revision: 1,
+          companyName: '(주)라마세종팜', year: 2025, trackId: 'sx_sejong', trackName: '세종 농촌융복합(6차)산업지원센터 현장코칭·전문상담',
+          stage: 'followup', workerCount: 14, consultantName: '점검노무사', status: 'done',
+          summaryNote: '세종 샘플(지어낸 값)'
+        },
+        'pr_sixthind_5': {
+          id: 'pr_sixthind_5', entityType: 'Project', schemaVersion: 1, contractVersion: 1,
+          createdAt: NOW - 864e5 * 15, updatedAt: NOW - 3600e3 * 5, revision: 1,
+          companyName: '마바충남발효', year: 2025, trackId: 'sx_chungnam', trackName: '충남 농촌융복합산업지원센터 현장코칭·인증지원',
+          stage: 'followup', workerCount: 15, consultantName: '점검노무사', status: 'done',
+          summaryNote: '충남 샘플(지어낸 값)'
+        },
+        'pr_sixthind_6': {
+          id: 'pr_sixthind_6', entityType: 'Project', schemaVersion: 1, contractVersion: 1,
+          createdAt: NOW - 864e5 * 16, updatedAt: NOW - 3600e3 * 6, revision: 1,
+          companyName: '6차산업 인증샘플(제외대상)', year: 2025, trackId: 'sx_cert', trackName: '6차산업(농촌융복합) 인증지원 현장평가 · 상생프로젝트',
+          stage: 'followup', workerCount: 16, consultantName: '점검노무사', status: 'done',
+          summaryNote: '제외 트랙 샘플 — 화면에 보이면 안 됨'
+        },
+        'pr_sixthind_7': {
+          id: 'pr_sixthind_7', entityType: 'Project', schemaVersion: 1, contractVersion: 1,
+          createdAt: NOW - 864e5 * 17, updatedAt: NOW - 3600e3 * 7, revision: 1,
+          companyName: '경기샘플농장(제외대상)', year: 2026, trackId: 'sx_gyeonggi', trackName: '경기·기타 광역 6차산업 지원센터',
+          stage: 'visit', workerCount: 17, consultantName: '점검노무사', status: 'active',
+          summaryNote: '제외 트랙 샘플 — 화면에 보이면 안 됨'
         }
       },
       checks: {

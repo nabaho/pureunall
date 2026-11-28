@@ -36,6 +36,9 @@
       shortName: '기술보호',
       icon: '🔐',
       htmlFile: 'techprotect.html',
+      slimUi: true,            // 이중 표시(변경점 띠·연도 드롭다운·연도별 자료함 탭 등)를 걷은 가벼운 화면 (대표 지시 2026-11-28)
+      roundUnit: '회',         // 이알피 계약의 일수/회수 단위 — 기술보호는 «회» (3회 = 3회차)
+      govTypeKeywords: ['기술보호'], // 정부사업일정(scal_types) 종류 이름에 들어 있는 글자
       agency: '대·중소기업·농어업협력재단',
       desc: '대중소협력재단·영업비밀·비밀유지·HWPX',
       erpTypeKeywords: ['통합기술보호지원단', '기술보호', '기술보호울타리'],
@@ -129,6 +132,9 @@
       shortName: '현장클리닉',
       icon: '🩺',
       htmlFile: 'clinic.html',
+      slimUi: true,            // 이중 표시를 걷은 가벼운 화면 (대표 지시 2026-11-28)
+      roundUnit: '일',         // 현장클리닉은 «일» 로 적는다 (3일 = 3회차)
+      govTypeKeywords: ['현장클리닉'],
       agency: '중소벤처기업청 비즈니스지원단',
       desc: '중기청 비즈니스지원단·방문·결과보고',
       erpTypeKeywords: ['현장클리닉', '비즈니스지원단', '비지니스지원단'],

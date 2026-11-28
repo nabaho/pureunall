@@ -90,8 +90,8 @@ function rtdbGet(dbPath, token) {
       res.on('data', (d) => chunks.push(d));
       res.on('end', () => {
         const txt = Buffer.concat(chunks).toString('utf8');
-        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode}: ${txt.slice(0, 120)}`));
-        try { resolve(JSON.parse(txt)); } catch (e) { reject(e); }
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode} GET ${dbPath}`));
+        try { resolve(JSON.parse(txt)); } catch { reject(new Error(`INVALID_JSON_RESPONSE GET ${dbPath}`)); }
       });
     });
     req.on('error', reject);
@@ -115,10 +115,10 @@ function rtdbGetWithEtag(dbPath, token) {
       res.on('data', (d) => chunks.push(d));
       res.on('end', () => {
         const txt = Buffer.concat(chunks).toString('utf8');
-        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode}: ${txt.slice(0, 120)}`));
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode} GET ${dbPath}`));
         try {
           resolve({ data: JSON.parse(txt), etag: String(res.headers.etag || '') });
-        } catch (e) { reject(e); }
+        } catch { reject(new Error(`INVALID_JSON_RESPONSE GET ${dbPath}`)); }
       });
     });
     req.on('error', reject);
@@ -147,61 +147,44 @@ function rtdbPutIfMatch(dbPath, value, etag, token) {
       res.on('end', () => {
         const txt = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode === 412) return resolve({ ok: false, conflict: true });
-        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode} PUT ${dbPath}: ${txt.slice(0, 160)}`));
-        resolve({ ok: true, data: txt ? JSON.parse(txt) : value });
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode} PUT ${dbPath}`));
+        try { resolve({ ok: true, data: txt ? JSON.parse(txt) : value }); } catch { reject(new Error(`INVALID_JSON_RESPONSE PUT ${dbPath}`)); }
       });
     });
     req.on('error', reject);
     req.end(body);
   });
+}
+
+const TERMINAL_STATUS_RE = /^(?:done|closed|transferred|cancelled|canceled|종결|완료|취소|이관|해지)$/i;
+function isTerminalProject(p) {
+  if (!p || typeof p !== 'object') return false;
+  if (p._deleted === true) return true;
+  if (TERMINAL_STATUS_RE.test(str(p.status))) return true;
+  if (p.closedAt || p.closedFrom || p.deletedAt || p.closedDate || p.closeDate || p.permanentArchived) return true;
+  return false;
 }
 
 async function writeProjectIfUnchanged(rootName, pid, expectedPrev, buildPayload, token) {
   const fullPath = `/${rootName}/projects/${pid}`;
   const fresh = await rtdbGetWithEtag(fullPath, token);
   const live = fresh && fresh.data && typeof fresh.data === 'object' ? fresh.data : null;
-  if (live && (live._deleted === true || live.status === 'done' || (str(live.updatedBy) && live.updatedBy !== 'backfill-script'))) {
+  if (live && (isTerminalProject(live) || (str(live.updatedBy) && live.updatedBy !== 'backfill-script'))) {
     return { ok: false, skipped: 'protected' };
   }
   if (expectedPrev) {
     if (!live || Number(live.revision || 0) !== Number(expectedPrev.revision || 0)) {
       return { ok: false, skipped: 'revision_changed' };
     }
+    if (!fresh.etag) return { ok: false, skipped: 'missing_etag' };
   } else if (live) {
     return { ok: false, skipped: 'already_exists' };
   }
   const nextPayload = buildPayload(live);
   if (!nextPayload) return { ok: false, skipped: 'cancelled' };
-  const etag = fresh.etag || (live ? '*' : 'null_etag');
+  const etag = live ? fresh.etag : (fresh.etag || 'null_etag');
   const res = await rtdbPutIfMatch(fullPath, nextPayload, etag, token);
   return res.ok ? { ok: true, data: nextPayload } : { ok: false, skipped: 'etag_conflict' };
-}
-
-function rtdbPatch(dbPath, value, token) {
-  const reqPath = `${encodeDbPath(dbPath)}.json`;
-  const body = JSON.stringify(value);
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: DB_HOST,
-      path: reqPath,
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      }
-    }, (res) => {
-      const chunks = [];
-      res.on('data', (d) => chunks.push(d));
-      res.on('end', () => {
-        const txt = Buffer.concat(chunks).toString('utf8');
-        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode} PATCH ${dbPath}: ${txt.slice(0, 160)}`));
-        resolve(txt ? JSON.parse(txt) : {});
-      });
-    });
-    req.on('error', reject);
-    req.end(body);
-  });
 }
 
 function listDirSafe(dir) {
@@ -638,18 +621,26 @@ function isGoodMailOnlyCandidate(appKey, b) {
   return b.topScore >= 70 || (b.topScore >= 50 && b.mailCount >= 2);
 }
 
+const ALLOWED_COMM_SOURCES = new Set([
+  'mail', 'local_archive', 'erp', 'msg_intake', 'msg',
+  'kakao', 'kakao_export', 'sms', 'sms_paste', 'android_sms_bridge', 'manual'
+]);
+
 function isCleanForRtdb(obj) {
   const fullJson = JSON.stringify(obj);
   if (LOCAL_PATH_RE.test(fullJson)) return false;
-  // ID/타임스탬프(createdAt/id/companyId) 오탐을 피하고 모든 사용자 가시 문자열만 PII 검증
+  // ID/타임스탬프(createdAt/id/companyId) 오탐 및 필드 경계 숫자 결합 오탐을 피하고 모든 사용자 가시 필드를 개별 PII 검증
   const textParts = [
     obj.companyName, obj.caseNo, obj.trackName, obj.summaryNote, obj.consultantName,
     obj.inspPeriod, obj.inspOffice, obj.inspIssues, obj.inspDue, obj.inspResult,
-    obj.subject, obj.maskedPreview,
-    Array.isArray(obj.atts) ? obj.atts.join(' ') : '',
-    Array.isArray(obj.matchedReasons) ? obj.matchedReasons.join(' ') : ''
-  ].filter(Boolean).join(' ');
-  return !Intake.hasResidualPii(textParts);
+    obj.subject, obj.maskedPreview, obj.source,
+    ...(Array.isArray(obj.atts) ? obj.atts : []),
+    ...(Array.isArray(obj.matchedReasons) ? obj.matchedReasons : [])
+  ];
+  for (const part of textParts) {
+    if (part && Intake.hasResidualPii(String(part))) return false;
+  }
+  return true;
 }
 
 async function main() {
@@ -796,26 +787,10 @@ async function main() {
       let writtenP = 0;
       let writtenC = 0;
       const now = Date.now();
-      const patchBatch = {};
-      let batchCount = 0;
-      async function flushPatch() {
-        if (!batchCount) return;
-        await rtdbPatch(`/${cat.rtdbRoot}`, Object.assign({}, patchBatch), token);
-        for (const k of Object.keys(patchBatch)) delete patchBatch[k];
-        batchCount = 0;
-      }
 
       for (const r of finalList) {
         const pid = safeHashId(`bf_${cat.key}_${r.year}`, r.seedKey);
         const prev = existingProjectsMap[pid] || null;
-        const isPureBackfill = !!(
-          prev &&
-          String(prev.id || '').startsWith('bf_') &&
-          prev.updatedBy === 'backfill-script' &&
-          !existingChecksMap[pid] &&
-          !existingReportsMap[pid] &&
-          !Object.values(existingCommsMap[pid] || {}).some((cm) => cm && cm.updatedBy && cm.updatedBy !== 'backfill-script')
-        );
         const isHumanEdited = prev && str(prev.updatedBy) && prev.updatedBy !== 'backfill-script';
         const cSid = r.consultantSid || 'P-001';
         const cName = staffMaps.sidToName[cSid] || staffMaps.adminName || '전담 노무사';
@@ -823,12 +798,11 @@ async function main() {
         const srcTag = Object.keys(r.sources).join('+');
         const summary = Intake.sanitizeText(`[${srcTag}] ${r.notes.join(' · ')}`).slice(0, 1900);
 
-        const isPrevDone = !!(prev && prev.status === 'done');
-        const allowRecleanOverwrite = !!(doRecleanBackfill && isPureBackfill && !isPrevDone);
-        const skipProjWrite = isHumanEdited || isPrevDone;
-        const keepPrevFields = isPrevDone;
-        const effectiveStatus = (isPrevDone || r.status === 'done') ? 'done' : 'active';
-        const effectiveStage = isPrevDone ? str(prev.stage || 'followup') : r.stage;
+        const isPrevTerminal = isTerminalProject(prev);
+        const skipProjWrite = isHumanEdited || isPrevTerminal;
+        const keepPrevFields = isPrevTerminal;
+        const effectiveStatus = isPrevTerminal ? str(prev.status || 'done') : (r.status === 'done' ? 'done' : 'active');
+        const effectiveStage = isPrevTerminal ? str(prev.stage || 'followup') : r.stage;
         const projPayload = {
           id: pid,
           entityType: 'Project',
@@ -858,9 +832,8 @@ async function main() {
         if (cat.key === 'laboraudit') {
           const inspMeta = Intake.extractInspectionMeta(r.comms);
           const pickInsp = (k, maxLen) => {
-            const fresh = str(inspMeta[k]);
             const oldV = str(prev && prev[k]);
-            const chosen = allowRecleanOverwrite ? (fresh || oldV) : (oldV || fresh);
+            const chosen = oldV || str(inspMeta[k]);
             return chosen ? Intake.sanitizeText(chosen).slice(0, maxLen) : '';
           };
           const pPeriod = pickInsp('inspPeriod', 80);
@@ -879,7 +852,7 @@ async function main() {
           piiLeakCount++;
           continue;
         }
-        // 사람 수정 레코드(updatedBy !== 'backfill-script') 및 종결(done) 레코드는 재실행 시 절대 덮어쓰지 않는다.
+        // 사람 수정 레코드(updatedBy !== 'backfill-script') 및 종결(done/closed/cancelled 등) 레코드는 재실행 시 절대 덮어쓰지 않는다.
         const needWriteProj = !skipProjWrite && (
           !prev
           || prev.trackId !== projPayload.trackId
@@ -907,6 +880,8 @@ async function main() {
           }, token);
           if (!projWriteRes.ok) continue;
           writtenP++;
+        } else if (prev && prev._deleted) {
+          continue;
         }
 
         const existingPidComms = existingCommsMap[pid] || {};
@@ -927,7 +902,7 @@ async function main() {
             updatedAt: now,
             createdBy: projPayload.createdBy,
             updatedBy: 'backfill-script',
-            source: str(cm.source || 'mail').slice(0, 50),
+            source: ((s) => (ALLOWED_COMM_SOURCES.has(s) ? s : 'msg'))(str(cm.source || 'mail').trim().toLowerCase().slice(0, 50)),
             date: cleanDate,
             subject: Intake.sanitizeText(cm.subject || '수신 자료').slice(0, 280),
             maskedPreview: Intake.sanitizeText(cm.maskedPreview || cm.subject || '').slice(0, 3800)
@@ -940,19 +915,16 @@ async function main() {
             piiLeakCount++;
             continue;
           }
-          patchBatch[`comms/${pid}/${cid}`] = commPayload;
-          batchCount++;
-          writtenC++;
-          if (batchCount >= 180) await flushPatch();
+          const commPutRes = await rtdbPutIfMatch(`/${cat.rtdbRoot}/comms/${pid}/${cid}`, commPayload, 'null_etag', token);
+          if (commPutRes.ok) writtenC++;
         }
-        if (batchCount >= 180) await flushPatch();
       }
       let pruned = 0;
       if (doPruneStale || doRecleanBackfill) {
         const activePidSet = new Set(finalList.map((r) => safeHashId(`bf_${cat.key}_${r.year}`, r.seedKey)));
         for (const [oldPid, oldRec] of Object.entries(existingProjectsMap)) {
           if (!oldPid.startsWith('bf_')) continue;
-          if (!oldRec || oldRec._deleted || oldRec.status === 'done') continue;
+          if (!oldRec || isTerminalProject(oldRec)) continue;
           if (oldRec.updatedBy !== 'backfill-script') continue;
           if (activePidSet.has(oldPid)) continue;
           // 체크·보고서 또는 사람이 추가한 수신자료가 연결된 건은 정리하지 않고 보존한다.
@@ -971,7 +943,6 @@ async function main() {
           if (pruneRes.ok) pruned++;
         }
       }
-      await flushPatch();
       totalWrittenProj += writtenP;
       totalWrittenComm += writtenC;
       totalPrunedProj += pruned;
@@ -990,32 +961,22 @@ const AMBIGUOUS_KEY = '__AMBIGUOUS__';
 function mergeAppRecords(cat, lookupList, rawBundles, appLocals) {
   const mergedMap = Object.create(null);
   const primaryKeyByCoYrTr = Object.create(null);
-  const primaryKeyByNormYrTr = Object.create(null);
 
-  function canShareNormCandidate(cid, candKey) {
-    if (!candKey || candKey === AMBIGUOUS_KEY) return false;
-    const cand = mergedMap[candKey];
-    if (!cand) return false;
-    return !(cid && cand.companyId && cid !== cand.companyId);
+  // 온톨로지 순서독립 사전 판정: 같은 정규화 이름을 가진 서로 다른 업체 ID 목록 파악
+  const idsByNorm = Object.create(null);
+  for (const c of (lookupList || [])) {
+    if (!c || !c.id || !c.name) continue;
+    const nn = Intake.normCorpName(c.name);
+    if (!nn) continue;
+    if (!idsByNorm[nn]) idsByNorm[nn] = new Set();
+    idsByNorm[nn].add(str(c.id));
   }
-
-  function registerNormKey(normYrTr, mKey, cid) {
-    const curKey = primaryKeyByNormYrTr[normYrTr];
-    if (!curKey) {
-      primaryKeyByNormYrTr[normYrTr] = mKey;
-      return;
-    }
-    if (curKey === AMBIGUOUS_KEY || curKey === mKey) return;
-    const curRec = mergedMap[curKey];
-    if (cid && curRec && curRec.companyId && cid !== curRec.companyId) {
-      primaryKeyByNormYrTr[normYrTr] = AMBIGUOUS_KEY;
-    }
-  }
+  const ambiguousNorms = new Set(Object.keys(idsByNorm).filter((k) => idsByNorm[k].size > 1));
 
   function upsertTarget(srcKind, rec) {
     const cleanName = Intake.sanitizeText(rec.companyName);
     const normNm = Intake.normCorpName(cleanName);
-    // 온톨로지 규칙: 이름 일치만으로 companyId 를 자동 대입하지 않고 명시적 ID 가 있을 때만 연결한다.
+    // 온톨로지 규칙: 이름 일치만으로 companyId 를 자동 대입하거나 co_* 확정 사업장에 미확인 로컬/메일을 흡수하지 않는다.
     const coObj = rec.companyId
       ? (lookupList || []).find((c) => str(c.id) === str(rec.companyId))
       : null;
@@ -1024,24 +985,24 @@ function mergeAppRecords(cat, lookupList, rawBundles, appLocals) {
     const trId = str(rec.trackId || (cat.tracks && cat.tracks[0] && cat.tracks[0].id) || 'default');
     const trName = str(rec.trackName || (cat.tracks && cat.tracks[0] && cat.tracks[0].name) || cat.shortName);
     const caseNo = str(rec.caseNo);
-    const baseCoKey = cid ? `co_${cid}` : `nm_${normNm || safeHashId('co', cleanName)}`;
-    const coYrTr = `${baseCoKey}|${yr}|${cat.key === 'chamber' ? trId : '*'}`;
-    const normYrTr = `${normNm}|${yr}|${cat.key === 'chamber' ? trId : '*'}`;
+    const trSlot = cat.key === 'chamber' ? trId : '*';
+    const isAmbiguousNoId = !cid && normNm && ambiguousNorms.has(normNm);
+    const baseKey = cid
+      ? `co_${cid}`
+      : (isAmbiguousNoId
+        ? `amb_${srcKind}_${safeHashId('co', cleanName)}`
+        : `nm_${normNm || safeHashId('co', cleanName)}`);
+    const bucketKey = `${baseKey}|${yr}|${trSlot}`;
 
     let mKey;
     if (caseNo) {
-      mKey = `${coYrTr}|${caseNo}`;
-      if (!primaryKeyByCoYrTr[coYrTr]) primaryKeyByCoYrTr[coYrTr] = mKey;
-      if (normNm) registerNormKey(normYrTr, mKey, cid);
-    } else if (primaryKeyByCoYrTr[coYrTr]) {
-      mKey = primaryKeyByCoYrTr[coYrTr];
-    } else if (normNm && canShareNormCandidate(cid, primaryKeyByNormYrTr[normYrTr])) {
-      mKey = primaryKeyByNormYrTr[normYrTr];
-      if (cid) primaryKeyByCoYrTr[coYrTr] = mKey;
+      mKey = `${bucketKey}|${caseNo}`;
+      if (!primaryKeyByCoYrTr[bucketKey]) primaryKeyByCoYrTr[bucketKey] = mKey;
+    } else if (!isAmbiguousNoId && primaryKeyByCoYrTr[bucketKey]) {
+      mKey = primaryKeyByCoYrTr[bucketKey];
     } else {
-      mKey = coYrTr;
-      primaryKeyByCoYrTr[coYrTr] = mKey;
-      if (normNm) registerNormKey(normYrTr, mKey, cid);
+      mKey = isAmbiguousNoId ? `${bucketKey}|${safeHashId('src', cleanName + '|' + str(rec.note))}` : bucketKey;
+      if (!isAmbiguousNoId) primaryKeyByCoYrTr[bucketKey] = mKey;
     }
 
     if (!mergedMap[mKey]) {
@@ -1065,7 +1026,6 @@ function mergeAppRecords(cat, lookupList, rawBundles, appLocals) {
     }
     const cur = mergedMap[mKey];
     cur.sources[srcKind] = 1;
-    if (cid && !cur.companyId) cur.companyId = cid;
     if (caseNo && !cur.caseNo) cur.caseNo = caseNo;
     if (rec.consultantSid && !cur.consultantSid) cur.consultantSid = str(rec.consultantSid);
     if (rec.status === 'done') { cur.status = 'done'; cur.stage = 'followup'; }
@@ -1141,33 +1101,35 @@ function mergeAppRecords(cat, lookupList, rawBundles, appLocals) {
     });
   }
 
-  // 2d) 상공회의소 구체지역 vs 기타(ch_korcham) 동사·동년도 병합 (이종 companyId · 모호 일치 제외)
+  // 2d) 상공회의소 구체지역 vs 기타(ch_korcham) 병합 (co_* 는 co_* 끼리만, 미확인 nm_* 는 단일·비모호 nm_* 끼리만)
   if (cat.key === 'chamber') {
     const specifics = Object.values(mergedMap).filter((r) => r.trackId && r.trackId !== 'ch_korcham');
     const specByCoYr = Object.create(null);
-    const specByNormYr = Object.create(null);
+    const specNoIdByNormYr = Object.create(null);
     for (const r of specifics) {
-      const kCo = r.companyId ? `co_${r.companyId}|${r.year}` : '';
-      const nmKey = Intake.normCorpName(r.companyName);
-      const kNm = nmKey ? `nm_${nmKey}|${r.year}` : '';
-      if (kCo && !specByCoYr[kCo]) specByCoYr[kCo] = r;
-      if (kNm) {
-        const prevSpec = specByNormYr[kNm];
-        if (!prevSpec) specByNormYr[kNm] = r;
-        else if (prevSpec !== AMBIGUOUS_KEY && r.companyId && prevSpec.companyId && r.companyId !== prevSpec.companyId) {
-          specByNormYr[kNm] = AMBIGUOUS_KEY;
+      if (r.companyId) {
+        const kCo = `co_${r.companyId}|${r.year}`;
+        if (!specByCoYr[kCo]) specByCoYr[kCo] = r;
+      } else {
+        const nmKey = Intake.normCorpName(r.companyName);
+        if (nmKey && !ambiguousNorms.has(nmKey)) {
+          const kNm = `nm_${nmKey}|${r.year}`;
+          if (!specNoIdByNormYr[kNm]) specNoIdByNormYr[kNm] = r;
+          else if (specNoIdByNormYr[kNm] !== r) specNoIdByNormYr[kNm] = AMBIGUOUS_KEY;
         }
       }
     }
     for (const [mKey, r] of Object.entries(mergedMap)) {
       if (r.trackId !== 'ch_korcham') continue;
-      const kCo = r.companyId ? `co_${r.companyId}|${r.year}` : '';
-      const nmKey = Intake.normCorpName(r.companyName);
-      const kNm = nmKey ? `nm_${nmKey}|${r.year}` : '';
-      let tgt = kCo ? specByCoYr[kCo] : null;
-      if (!tgt && kNm && specByNormYr[kNm] && specByNormYr[kNm] !== AMBIGUOUS_KEY) {
-        const nmTgt = specByNormYr[kNm];
-        if (!r.companyId || !nmTgt.companyId) tgt = nmTgt;
+      let tgt = null;
+      if (r.companyId) {
+        tgt = specByCoYr[`co_${r.companyId}|${r.year}`] || null;
+      } else {
+        const nmKey = Intake.normCorpName(r.companyName);
+        if (nmKey && !ambiguousNorms.has(nmKey)) {
+          const cand = specNoIdByNormYr[`nm_${nmKey}|${r.year}`];
+          if (cand && cand !== AMBIGUOUS_KEY) tgt = cand;
+        }
       }
       if (tgt && tgt !== r) {
         Object.assign(tgt.sources, r.sources);
@@ -1188,7 +1150,7 @@ function numOrZero(v) {
 
 if (require.main === module) {
   main().catch((err) => {
-    console.error('[backfill-consult-suite 오류]', (err && err.message) || err);
+    console.error('[backfill-consult-suite 오류]', (err && err.code) || (err && err.name) || 'ERR_BACKFILL');
     process.exitCode = 1;
   });
 }

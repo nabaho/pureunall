@@ -436,7 +436,7 @@ test('⑨ 정화·근로감독 전용·단일주사업: invalid 라벨 차단 ·
   const Backfill = require(path.join(ROOT, 'scripts', 'backfill-consult-suite.js'));
   const { execFileSync } = require('node:child_process');
 
-  // 4) 동명·이종 companyId 비병합 및 모호한 로컬/미매칭 건 보류
+  // 4) 동명·이종 companyId 비병합 + 단일 확정 co_* 와 companyId 없는 로컬/메일 비흡수
   const homonymRes = Backfill.mergeAppRecords(
     Cats.get('laboraudit'),
     [{ id: 'co_h1', name: '주식회사 동명가상' }, { id: 'co_h2', name: '(주)동명가상' }],
@@ -446,8 +446,17 @@ test('⑨ 정화·근로감독 전용·단일주사업: invalid 라벨 차단 ·
     ],
     [{ companyName: '동명가상', year: 2026, trackId: 'la_regular', trackName: '정기근로감독', stage: 'collect', status: 'active', tag: '2026 로컬', docCount: 1, docNames: ['a.hwp'] }]
   );
-  const homRows = Object.values(homonymRes.mergedMap);
-  assert.equal(homRows.length, 3, '서로 다른 companyId 동명 사업장과 모호한 로컬 건은 병합되면 안 됨');
+  assert.equal(Object.values(homonymRes.mergedMap).length, 3, '서로 다른 companyId 동명 사업장과 모호한 로컬 건은 병합되면 안 됨');
+
+  const coPlusLocalRes = Backfill.mergeAppRecords(
+    Cats.get('laboraudit'),
+    [{ id: 'co_u1', name: '주식회사 단독가상' }],
+    [
+      { companyId: 'co_u1', companyName: '주식회사 단독가상', year: 2026, erpCount: 1, mailCount: 0, msgCount: 0, suggestedTrackId: 'la_regular', suggestedTrackName: '정기근로감독', items: [] }
+    ],
+    [{ companyName: '단독가상', year: 2026, trackId: 'la_regular', trackName: '정기근로감독', stage: 'collect', status: 'active', tag: '2026 로컬', docCount: 1, docNames: ['b.hwp'] }]
+  );
+  assert.equal(Object.values(coPlusLocalRes.mergedMap).length, 2, '확정 companyId 사업장에 companyId 없는 동명 로컬 자료를 이름만으로 흡수하면 안 됨');
 
   // 5) fund_erp.mail_queue .validate=false 서버 규칙 검증
   const rulesJson = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-firebase-rules.js')], { encoding: 'utf8' }));

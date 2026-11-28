@@ -1213,7 +1213,24 @@ rules.paydata = {
   } },
   pending_shared: { '.read': LOGIN, '.write': LOGIN },
   owners: { '.read': LOGIN, $uid: { '.write': `(${LOGIN}) && $uid === auth.uid` } },
-  arrivals: { '.read': LOGIN, '.write': LOGIN },
+  arrivals: {
+    '.read': LOGIN,
+    '.write': LOGIN,
+    $coId: {
+      '.validate': 'newData.hasChildren()',
+      $slot: {
+        '.validate': 'newData.hasChildren()',
+        contract: { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        attend:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        ledger:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        output:   { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        etc:      { $id: { '.validate': 'newData.isNumber() && newData.val() > 0' } },
+        last:     { '.validate': 'newData.isNumber() && newData.val() > 0' },
+        vals:     { '.validate': 'newData.isNumber() && newData.val() >= 0' },
+        $other:   { '.validate': false }
+      }
+    }
+  },
   shares:   { '.read': LOGIN, '.write': LOGIN },
   /* 열람 기록은 «덧붙이기만» 된다 — 한 번 적힌 줄은 아무도 못 고친다(!data.exists()).
      기록을 고칠 수 있으면 기록이 아니다. */
@@ -1553,9 +1570,16 @@ rules.signboard = { '.read': LOGIN,
    ⚠ 이름(title)은 1~60자 — 화면(js/pu-gov-links.js LIMIT.title)과 같은 한도다. 한쪽만 바꾸면 화면이 만든 묶음을 규칙이 거절한다.
      주소가 http(s) 인지는 화면이 저장 직전·그리기 직전 두 번 본다(safeUrl) — 규칙은 배열 안을 못 본다. */
 const GOVLINKS_W = `(${LOGIN}) && newData.exists()`;
+/* ★ 즐겨찾기(2026-11-28 대시보드 판, 대표 지시 「대시보드에다가 별표 표시해서 상단에 자주 하는 거」) — 사람마다 govlinks/stars/{사번}.
+   «쓰기»는 본인만(사번은 uid_roles 로 맞춘다). 담기는 것: ★ 한 사업 id 목록 · ★ 한 사이트 주소 목록뿐(민감한 값 없음).
+   ⚠ 읽기는 뿌리(govlinks)의 재직 직원 읽기를 그대로 받는다 — 뿌리 읽기를 sets 로 내리면 rules-deploy 가 «사라지는 규칙»으로 멈춘다
+     (2026-11-28 tests/rules-deploy-guards 로 확인). 남의 ★ 가 읽혀도 사업 번호·공개 기관 주소뿐이라 그대로 둔다. 화면은 제 칸만 읽는다. */
+const GOVLINKS_ME = "root.child('uid_roles').child(auth.uid).child('sid').val() === $sid";
 rules.govlinks = { '.read': LOGIN,
   sets: { $id: { '.write': GOVLINKS_W,
-    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } } };
+    '.validate': "newData.child('id').val() === $id && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 60" } },
+  stars: { $sid: { '.write': `(${LOGIN}) && ${GOVLINKS_ME} && newData.exists()`,
+    '.validate': "newData.child('id').val() === $sid" } } };
 
 /* ══ 🎓 법정교육자료함(pu-edulib.html) — 강의자료 종류·강의일별 (2026-11-19) ══
    대표 지시 「다른 노무사가 참고할 수 있게 … 검토해서 추가할 수 있게 … 가급적 원본을 유지」.
@@ -2920,6 +2944,26 @@ rules.datahub_device_req = { '.read': false, '.write': false };
 rules.datahub_nonce = { '.read': false, '.write': false };
 rules.datahub_activity = { '.read': false, '.write': false };
 rules.datahub_board = { '.read': DATAHUB_OWNER, '.write': false };
+
+/* 라이브 콘솔 동기화 규칙 (fund_mail_queue · puwiki) */
+rules.fund_mail_queue = { '.read': false, '.write': false };
+rules.puwiki = {
+  '.read': LOGIN,
+  articles: {
+    $id: {
+      '.write': `(${LOGIN}) && newData.exists()`,
+      '.validate': "newData.child('id').val() === $id && newData.child('entityType').val() === 'WikiArticle' && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 120"
+    }
+  },
+  reviews: {
+    $art: {
+      $id: {
+        '.write': `(${LOGIN}) && newData.exists()`,
+        '.validate': "newData.child('id').val() === $id && newData.child('articleId').val() === $art && newData.child('entityType').val() === 'WikiReview' && (newData.child('kind').val() === 'verify' || newData.child('kind').val() === 'flag')"
+      }
+    }
+  }
+};
 
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');

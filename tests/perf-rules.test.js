@@ -189,8 +189,8 @@ const allowTop = ['govlinks' /* 정부사업 바로가기 — 사업별 기관 �
   'scal_techprotect','scal_clinic','scal_chamber','scal_hrconsult','scal_evalcomp','scal_pubconsult',
   'scal_familywork','scal_socialent','scal_sixthind','scal_laboraudit','scal_unionneg','scal_specialcons',
   'msg_intake','coach_rag',
-  /* 2026-11-28 사내 카톡 업무방 아카이브·노동위원회·산재 사건 관리(라이브 콘솔 적용분 동기화) */
-  'kakao_room','labor_cases','labor_secret','sanjae_cases','sanjae_secret'];
+  /* 2026-11-28 사내 카톡 업무방 아카이브·노동위원회·산재 사건 관리·기금메일큐·사내위키(라이브 콘솔 적용분 동기화) */
+  'kakao_room','labor_cases','labor_secret','sanjae_cases','sanjae_secret','fund_mail_queue','puwiki'];
 
 const keys = Object.keys(R);
 const removed = baseTop.filter(function (k) { return keys.indexOf(k) < 0; });
