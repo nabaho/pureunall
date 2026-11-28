@@ -691,13 +691,30 @@ body:has(#mgDrawer.open) #cfgFab,body:has(#mgDrawer.open) #pu-backup-admin-butto
 .mg-zone .tile b{font-size:.82rem;font-weight:700;margin:0;}
 .mg-zone .tile .tx span{display:block;font-size:.66rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mg-zone .tile .ic{position:static;backdrop-filter:none;}   /* backdrop-filter 가 있으면 ☆·딱지의 «기준 상자»가 아이콘으로 바뀐다 */
-.mg-zone .tile .pin-star{right:4px;bottom:auto;top:50%;width:28px;height:28px;margin-top:-14px;}   /* 누를 곳 24px 이상 */
+.mg-zone .tile .pin-star{right:4px;bottom:auto;top:50%;width:28px;height:28px;line-height:28px;margin-top:-14px;}   /* 누를 곳 24px 이상 */
 .mg-zone .tile .tile-alert{left:auto;right:36px;top:50%;margin-top:-11px;writing-mode:horizontal-tb;padding:3px 8px;letter-spacing:0;}
 .mg-zone .tile .nl-warn{top:50%;right:36px;margin-top:-10px;}
 .mg-zone .tile .tile-soon-pill{left:auto;right:36px;top:50%;margin-top:-9px;transform:none;}
 @media(max-width:520px){
   .pbar #mgBtn{padding:5px 11px;font-size:.74rem;}
-  .mg-drawer{width:min(290px,80vw);}   /* 폰 — 화면의 약 4/5 이하. 뒤 화면이 보여야 «서랍»으로 읽힌다 */
+  .mg-drawer{width:min(250px,72vw);}   /* 폰 — 화면의 약 7/10 이하. 뒤 화면이 보여야 «서랍»으로 읽힌다 (대표 2026-11-29 「폰에서 아직 크다」) */
+  .mg-hd{padding:9px 12px 6px;}
+  .mg-hd b{font-size:.9rem;}
+  .mg-hd small,.mg-zone-h small{display:none;}   /* 폰은 탭의 «누가 쓰는 일»이 대신한다 — 설명 줄을 걷어 세로를 아낀다 */
+  .mg-tabs{gap:6px;padding:0 8px 8px;}
+  .mg-tab{padding:6px 7px;border-radius:10px;}
+  .mg-tab-t{font-size:.78rem;gap:5px;}
+  .mg-tab-n{font-size:.62rem;}
+  .mg-tab-s{font-size:.58rem;}
+  .mg-tab-b{font-size:.58rem;padding:0 6px;}
+  .mg-zone{padding:8px 8px 12px;}
+  .mg-zone-t{font-size:.8rem;}
+  .mg-zone .tile{padding:4px 6px;gap:8px;}
+  .mg-zone .tile .ic{width:26px;height:26px;font-size:.85rem;}
+  .mg-zone .tile b{font-size:.76rem;}
+  .mg-zone .tile .tx span{font-size:.6rem;}
+  .mg-ft{padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
+  .mg-ft button{min-height:32px;font-size:.7rem;}
 }
 .tilerow-h{display:flex;align-items:center;gap:6px;padding:3px 6px 4px;border-radius:8px;}
 .tilerow-t{font-size:12px;font-weight:700;color:#1e293b;letter-spacing:-.2px;}
