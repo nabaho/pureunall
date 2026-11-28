@@ -21423,6 +21423,7 @@ function mbSeedApply(s){
     _mbBinsFromSeed = true;
   }
   Object.keys(s.msgs||{}).forEach(slug=>{ if(!_mbMsgs[slug]) _mbMsgs[slug] = s.msgs[slug] || {}; });
+  mbDropGoneRows();             /* 씨앗에 든 «없어진 폴더»의 메일은 읽어 둔 표에 올리지 않는다 */
   _mbSeeded = true;
   return true;
 }
@@ -21473,6 +21474,7 @@ function loadMailFolders(cb){
     mbInqRead()        /* 📥 신규 문의 기록 — 못 읽어도 메일함은 멀쩡해야 한다 */
   ]).then(([f,m,q])=>{
     _mbFolders = f.val()||{}; _mbMeta = m.val()||{}; _mbErr='';
+    mbDropGoneRows();           /* 다음메일에서 없어진 폴더의 메일을 읽어 둔 표에서 걷는다(사람이 만든 칸이 이은 것은 빼고) */
     _mbInq = (q && q.val()) || {};
     if(cb) cb();
   }).catch(e=>{
@@ -21531,6 +21533,35 @@ let _mbMemo = null;
 function mbMemoClear(){ _mbMemo = null; }
 function mbMemoOf(){ return (_mbMemo = _mbMemo || {}); }
 
+/* ── 다음메일에서 «없어진»(gone) 폴더의 메일을 «읽어 둔 표»(_mbMsgs)에서 걷는다 (대표 지시 2026-11-28 「숨기기로 진행」) ──
+   mbFolders() 가 업무별 칸·폴더 목록에서 그 폴더를 빼도, 이미 읽어 둔 표(씨앗·옛 화면)에 그 폴더의 메일이 들어 있으면
+   전체메일·담당자·점검 셈이 표를 «통째로» 훑으므로 이름을 바꾼 폴더의 같은 메일이 두 번 보인다(자동 검토 지적).
+   ⚠ 사람이 만든 칸이 이어진 폴더(_mbBins 의 l)와 손으로 옮긴 쪽지(_mbPut)가 가리키는 폴더는 걷지 않는다 —
+     사용자 자료를 자동으로 건드리지 않는다.
+   ⚠ 그 정보(_mbBins·_mbPut)를 아직 못 읽었으면 «아무것도 걷지 않는다» — 모르면 안 건드린다.
+     읽고 난 뒤(mbEnsureBins)에 한 번 더 부른다.
+   ⚠ 걷은 칸의 «스스로 받아 온 표시»(_mbFilled)도 지운다 — 그 폴더가 다시 생기면(표시가 사라지면) 도로 받아 와야 한다.
+   ⚠ 서버의 기록·메일은 그대로다 — 여기서는 «이 화면의 읽어 둔 표»만 줄인다. */
+function mbDropGoneRows(){
+  /* ⚠ 이 함수는 폴더 목록을 읽는 길(loadMailFolders·씨앗·칸 읽기) «안»에서 불린다 — 여기서 던지면 그 길의 오류 처리가
+       폴더 목록을 «빈 표»로 굳혀 옆줄이 통째로 사라진다. 어떤 실패도 삼킨다(걷기를 못 했을 뿐 화면은 그대로). */
+  try{
+    if(!_mbFolders || _mbBins===null || _mbPut===null) return 0;
+    const goneSlugs = Object.keys(_mbFolders).filter(s=>{ const f = _mbFolders[s]; return f && f.gone && _mbMsgs[s]; });
+    if(!goneSlugs.length) return 0;
+    const keep = {};
+    Object.keys(_mbBins).forEach(id=>{ const l = (_mbBins[id]||{}).l; if(l) keep[l] = 1; });
+    Object.keys(_mbPut).forEach(k=>{ const at = k.lastIndexOf(':'); if(at>0) keep[k.slice(0,at)] = 1; });
+    let n = 0;
+    goneSlugs.forEach(s=>{
+      if(keep[s]) return;
+      delete _mbMsgs[s]; n++;
+      try{ delete _mbFilled[s]; }catch(_){ /* _mbFilled 가 아직 만들어지기 전이면 지울 것이 없다 */ }
+    });
+    if(n) mbMemoClear();
+    return n;
+  }catch(_){ return 0; }
+}
 function mbFolders(){
   const m = mbMemoOf();
   if(m.folders) return m.folders;
@@ -21667,6 +21698,7 @@ function mbEnsureBins(cb){
     _mbBins = b.val()||{}; _mbPut = p.val()||{}; _mbPutBy = pb.val()||{}; _mbHide = h.val()||{}; _mbOwner = w.val()||{};
     _mbSucc = sc.val()||{}; _mbCo = co.val()||{}; _mbNotCo = nc.val()||{}; _mbWhoMsg = wm.val()||{}; _mbNoWho = nw.val()||{};
     _mbWorkLink = wk.val()||{}; _mbPush = pu.val()||{}; _mbBoxWho = bw.val()||{};
+    mbDropGoneRows();           /* 칸·쪽지를 읽었으니 이제 «사람이 이은 폴더»를 알고 걷을 수 있다 */
     /* ⚠ 안 적혀 있으면 «켠 것»이다 — 대표께서 「자동으로 거르게」라 하셨다.
          빈 값을 「꺼짐」으로 읽으면 만들어 놓고 아무 일도 안 하는 기능이 된다. */
     _mbNotSpam = ns.val()||{}; _mbSpamOff = (so.val() === true);

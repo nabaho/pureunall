@@ -75,7 +75,9 @@ function fakeDb() {
   function ref(p0) {
     const p = p0 === undefined ? '' : String(p0);
     return {
-      once: async () => ({ val: () => get(p) }),
+      /* ⚠ 실제 실시간DB 처럼 «읽은 순간의 사본»을 준다 — 살아 있는 객체를 그대로 주면 읽은 뒤의 쓰기·지우기가
+           읽어 둔 값까지 바꿔, «읽은 뒤 도중에 일어나는 일» 시험이 헛것이 된다(이 파일에서 한 번 겪었다). */
+      once: async () => ({ val: () => { const v = get(p); return v == null ? null : JSON.parse(JSON.stringify(v)); } }),
       update: async (obj) => { Object.keys(obj).forEach((k) => put(p ? p + '/' + k : k, obj[k])); },
       set: async (v) => put(p, v),
       remove: async () => put(p, null),
@@ -85,13 +87,14 @@ function fakeDb() {
   return { ref, __get: get };
 }
 
-function fakeMail(folders) {
+function fakeMail(folders, hooks) {
   let opened = null;
   return {
     async list() {
       return Object.keys(folders).map((p) => ({ path: p, name: p, flags: new Set(folders[p].flags || []), specialUse: folders[p].specialUse || '' }));
     },
     async status(p) {
+      if (hooks && hooks.onStatus) await hooks.onStatus(p);       // 회차 «도중»에 일어나는 일을 흉내 낸다
       const uids = Object.keys(folders[p].msgs).map(Number);
       return { messages: uids.length, unseen: uids.length,
         uidNext: (uids.length ? Math.max.apply(null, uids) : 0) + 1, uidValidity: 1 };
@@ -128,7 +131,7 @@ function deps(db) {
     functions: { region: () => ({ runWith: () => ({ pubsub: { schedule: () => ({ timeZone: () => ({ onRun: () => null }) }) }, https: { onRequest: () => null } }) }) },
   };
 }
-const run = (db, folders) => MS.runSync(deps(db), { client: fakeMail(folders), deadlineMs: 60000 });
+const run = (db, folders, hooks) => MS.runSync(deps(db), { client: fakeMail(folders, hooks), deadlineMs: 60000 });
 const folderRec = (db, p) => db.__get(MS.ROOT + '/folders/' + S(p));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -190,6 +193,17 @@ test('★★★ 받은메일함이 없는 목록(끊긴 응답)이면 어떤 칸
   assert.equal(r.ok, true, r.err);
   assert.equal(folderRec(db, '1.자문사답변').gone, undefined, '수상한 목록으로 칸을 숨겼다');
   assert.equal(folderRec(db, 'INBOX').gone, undefined, '받은메일함이 숨겨졌다');
+});
+
+test('★★ 회차 도중에 그 폴더 기록이 이미 지워졌으면(앱에서 지우기·이름 바꾸기) 경로 없는 찌꺼기를 만들지 않는다', async () => {
+  const db = fakeDb();
+  await run(db, { INBOX: box(1), '옛칸': box(2) });
+  /* 두 번째 회차 — 목록에서 옛칸이 사라졌고, 회차 «도중에» 관리자가 앱에서 그 기록을 지웠다(manageMailFolder 가 하는 일) */
+  await run(db, { INBOX: box(1) }, {
+    onStatus: async () => { await db.ref(MS.ROOT + '/folders/' + S('옛칸')).remove(); },
+  });
+  const left = folderRec(db, '옛칸');
+  assert.ok(left == null, '지워진 기록 자리에 «숨김 표시만 든 찌꺼기»가 생겼다: ' + JSON.stringify(left));
 });
 
 test('★★ 목록에는 «있는데» 열 수 없게 된(껍데기) 폴더는 숨기지 않는다 — 거르기 «전» 목록으로 가려야 한다', async () => {
@@ -267,6 +281,65 @@ test('★★ 담당자 「보는 사람 없는 칸」 점검(mbBoxTodo)에서 �
   const slugs = c.mbBoxTodo({ OLD: 50 }).map((x) => x.slug);
   assert.equal(slugs.indexOf('OLD'), -1, '없어진 폴더가 점검 목록에 남았다');
   assert.ok(slugs.indexOf('KEEP') >= 0, '있는 폴더가 점검 목록에서 빠졌다');
+});
+
+/* ── 읽어 둔 표(_mbMsgs)에 이미 들어 있는 «없어진 폴더»의 메일 — 씨앗·옛 화면 (자동 검토 2026-11-28 지적) ──
+   폴더 목록에서 빼도 전체메일·담당자·점검 셈은 읽어 둔 표를 «통째로» 훑는다. 표에서도 걷어야 같은 메일이 두 번 안 보인다. */
+function dropCtx(o) {
+  const ctx = {
+    Object, String, Number, Array, JSON,
+    _mbFolders: o.folders, _mbMsgs: o.msgs, _mbBins: o.bins === undefined ? {} : o.bins,
+    _mbPut: o.put === undefined ? {} : o.put, _mbFilled: o.filled || {},
+    cleared: 0, mbMemoClear() { ctx.cleared++; },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(sliceFn(app, 'function mbDropGoneRows('), ctx);
+  return ctx;
+}
+const rows = () => ({ 1: { s: 'a' }, 2: { s: 'b' } });
+
+test('★★★ 읽어 둔 표에 든 «없어진 폴더»의 메일을 걷는다 — 있는 폴더의 메일은 그대로', () => {
+  const c = dropCtx({ folders: F, msgs: { OLD: rows(), KEEP: rows() }, filled: { OLD: 1, KEEP: 1 } });
+  c.mbDropGoneRows();
+  assert.equal(c._mbMsgs.OLD, undefined, '없어진 폴더의 메일이 읽어 둔 표에 남았다 — 전체메일에 두 번 보인다');
+  assert.ok(c._mbMsgs.KEEP && Object.keys(c._mbMsgs.KEEP).length, '있는 폴더의 메일까지 걷었다');
+  assert.equal(c._mbFilled.OLD, undefined, '걷은 칸의 «받아 온 표시»가 남았다 — 폴더가 다시 생겨도 도로 안 받아 온다');
+  assert.equal(c._mbFilled.KEEP, 1);
+  assert.ok(c.cleared >= 1, '걷고도 화면 셈(memo)을 안 비웠다');
+});
+
+test('★★★ 사람이 만든 칸이 이은 폴더·손으로 옮긴 쪽지가 가리키는 폴더는 걷지 않는다 — 사용자 자료는 안 건드린다', () => {
+  const linked = dropCtx({ folders: F, msgs: { OLD: rows() }, bins: { MY: { n: '내 칸', l: 'OLD' } } });
+  linked.mbDropGoneRows();
+  assert.ok(linked._mbMsgs.OLD, '사람이 만든 칸이 이은 폴더의 메일을 걷었다');
+  const put = dropCtx({ folders: F, msgs: { OLD: rows() }, put: { 'OLD:2': 'MY' } });
+  put.mbDropGoneRows();
+  assert.ok(put._mbMsgs.OLD, '손으로 옮긴 쪽지가 가리키는 폴더의 메일을 걷었다');
+});
+
+test('★★ 칸·쪽지를 아직 못 읽었으면 아무것도 걷지 않는다 — 모르면 안 건드린다', () => {
+  const a = dropCtx({ folders: F, msgs: { OLD: rows() }, bins: null });
+  a.mbDropGoneRows();
+  assert.ok(a._mbMsgs.OLD, '칸을 못 읽었는데 걷었다');
+  const b = dropCtx({ folders: F, msgs: { OLD: rows() }, put: null });
+  b.mbDropGoneRows();
+  assert.ok(b._mbMsgs.OLD, '쪽지를 못 읽었는데 걷었다');
+  const c = dropCtx({ folders: null, msgs: { OLD: rows() } });
+  assert.doesNotThrow(() => c.mbDropGoneRows());
+});
+
+test('★★ 어떤 오류도 던지지 않는다 — 폴더 목록 읽는 길 안에서 불려, 던지면 옆줄이 통째로 사라진다', () => {
+  const c = dropCtx({ folders: F, msgs: { OLD: rows() } });
+  c._mbPut = { get 'x'() { throw new Error('깨진 쪽지'); } };      // 일부러 깨뜨린다
+  Object.defineProperty(c, '_mbBins', { get() { throw new Error('깨진 칸'); } });
+  assert.doesNotThrow(() => c.mbDropGoneRows());
+});
+
+test('★★ 폴더 목록·씨앗·칸 읽기가 끝날 때마다 걷는다 — 세 길 모두에 이어져 있다', () => {
+  ['loadMailFolders', 'mbSeedApply', 'mbEnsureBins'].forEach((n) => {
+    assert.match(sliceFn(app, 'function ' + n + '('), /mbDropGoneRows\(\)/,
+      n + ' 가 없어진 폴더의 메일을 걷지 않는다 — 그 길로 들어온 옛 메일이 전체메일에 남는다');
+  });
 });
 
 test('★ 사용자가 직접 만든 푸른 분류 칸(저장된 칸)은 건드리지 않는다 — 옛 폴더에 이어 둔 것도 그대로 선다', () => {

@@ -315,11 +315,18 @@ async function runSync(deps, opts) {
     try {
       const vanished = MB.vanishedFolders(knownFolders, listedAll);
       if (vanished.length) {
-        const mark = {};
-        const goneAt = nowMs();
-        vanished.forEach((slug) => { mark[ROOT + '/folders/' + slug + '/gone'] = goneAt; });
-        await db.ref().update(mark);
-        console.log('syncMailbox 다음메일에서 없어진 폴더에 숨김 표시:', vanished.length);
+        /* ⚠ 적기 «직전에» 다시 읽는다 — 이 회차 도중에 관리자가 앱에서 폴더를 지웠거나 이름을 바꿔(manageMailFolder)
+             기록이 이미 사라졌으면, 그 자리에 표시만 적으면 경로 없는 «찌꺼기 기록»이 생긴다(자동 검토 지적).
+             없어진 폴더가 있을 때만 드물게 읽는다. */
+        const fresh = (await db.ref(ROOT + '/folders').once('value')).val() || {};
+        const toMark = vanished.filter((slug) => fresh[slug] && fresh[slug].path && !fresh[slug].gone);
+        if (toMark.length) {
+          const mark = {};
+          const goneAt = nowMs();
+          toMark.forEach((slug) => { mark[ROOT + '/folders/' + slug + '/gone'] = goneAt; });
+          await db.ref().update(mark);
+          console.log('syncMailbox 다음메일에서 없어진 폴더에 숨김 표시:', toMark.length);
+        }
       }
     } catch (e) {
       console.warn('syncMailbox 없어진 폴더 숨기기 실패(동기화는 계속합니다):', String((e && e.message) || e));
