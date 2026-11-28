@@ -131,7 +131,7 @@ test('★ 원본 파일은 원본 보관함 🔒 자리에(from.kind deungi) 올
   assert.match(본문, /secretBlob\(f\.fileId\)\.then\(function\(b\)\{ if\(g!==GEN\) return; PuOfficeStore\.saveBlob/);
   assert.doesNotMatch(본문, /PuOfficeStore\.download\(/);
   assert.match(본문, /seq===PV_SEQ/);
-  ['function arcView(', 'function arcDownload('].forEach((k) => {
+  ['function arcView(', 'function arcDownload(', 'function arcInlineLoad('].forEach((k) => {
     const i = 본문.indexOf(k); assert.ok(i >= 0, k);
     assert.match(본문.slice(i, i + 200), /if\(!ME\.isAdmin\) return toast\('🔒 총괄관리자만 엽니다'\)/, k + ' 에 총괄관리자 문이 없다');
   });
@@ -252,7 +252,7 @@ test('★ 지난 기록 «보기»는 목록 오른쪽 칸에 — 이전·다음
   assert.match(본문, /document\.body\.classList\.toggle\('slim', !!SIDE && !ov && document\.documentElement\.clientWidth-w < 820\)/);
   assert.match(본문, /if\(e\) e\.inert=!!\(SIDE && ov\)/);
   assert.match(본문, /if\(!f \|\| i<0\)\{ sideClose\(\);/);
-  assert.match(본문, /\$\('histBox'\)\.innerHTML=drawArchive\(\)\+'<div class="hcols">'[^\n]*\n  sideMark\(\); sideHead\(\);/);
+  assert.match(본문, /\$\('histBox'\)\.innerHTML=drawArchive\(done, hi\);\n[^\n]*\n[^\n]*\n  sideMark\(\); sideHead\(\);/);
   assert.match(본문, /if\(!w \|\| Math\.abs\(w-SIDE_RW\)<8\) return;/);
   assert.match(html, /if\(window\.SIDE && window\.sideClose\)\{ sideClose\(\); return true; \}/);
   /* 덮는 창 닫기가 보기 칸 주소를 지우지 않는다 */
@@ -319,14 +319,15 @@ test('★ 새로 만든 서류도 같은 오른쪽 칸 — ② 목록은 한 줄
   assert.doesNotMatch(html, /\.hwpv|\.doctoc|\.docblk|#pv\{/);
 });
 
-test('★ 간략한 화면 — 지난 기록 목록은 한 줄(이름·종류·날짜·받기), 단계 줄은 지금 단계만 설명, 종류 바꾸기는 칸 위쪽', () => {
-  const a = 본문.slice(본문.indexOf("h+='<tr class=\"click\" data-arcf="), 본문.indexOf("h+='</tbody></table></div>';\n      }\n      h+='</div>';"));
+test('★ 간략한 화면 — 지난 기록 목록은 한 줄(이름·종류·날짜·받기), 단계 줄은 지금 단계만 설명, 종류 바꾸기는 칸·미리보기 위쪽', () => {
+  const a = 본문.slice(본문.indexOf("docTable+='<tr class=\"click\" data-arcf="), 본문.indexOf("docTable+='</tbody></table>';"));
   assert.match(a, /<td class="kd">/); assert.match(a, /<td class="dt">/); assert.match(a, /<td class="ac">/);
   assert.doesNotMatch(a, /<select|data-arckind|주민번호 가림|🔒<\/td>/);
-  assert.match(본문, /<th>파일<\/th><th>종류<\/th><th>날짜<\/th><th><\/th>/);
-  /* 종류는 칸 위쪽 select(#sdKind)에서 바꾼다 */
+  assert.match(본문, /<th>파일<\/th><th>종류<\/th><th class="dt">날짜<\/th><th class="ac-h"><\/th>/);
+  /* 종류는 칸 위쪽 select(#sdKind) 및 인라인 미리보기 위쪽 select(#arcPvKind)에서 바꾼다 */
   assert.match(본문, /<select id="sdKind" aria-label="이 파일의 종류" hidden>/);
   assert.match(본문, /if\(el\.id==='sdKind'\)\{ if\(ev\.type==='change' && SIDE && SIDE\.kind==='arc'\) arcSetKind\(SIDE\.ev, SIDE\.fid, el\.value\); return; \}/);
+  assert.match(본문, /if\(el\.id==='arcPvKind'\)\{ if\(ev\.type==='change' && HIST_UI\.sel && HIST_UI\.fid\) arcSetKind\(HIST_UI\.sel, HIST_UI\.fid, el\.value\); return; \}/);
   assert.match(본문, /f\.masked\?'주민번호 가림':''/);
   assert.match(html, /\.wiz button:not\(\.on\):not\(\.skip\) \.tx small\{display:none\}/);
   assert.match(본문, /\(skip\?' skip':''\)/);
@@ -373,29 +374,48 @@ test('★ 지사장 — 분사무소 표에서 사원을 고르고, 띠·사원 
   assert.match(본문, /C\.headProblems\(nb\)\.length>C\.headProblems\(BASE\)\.length/);
 });
 
-test('★ 접고 펴기 — 지난 기록 묶음은 기본 접힘, 누르면 펴고(aria-expanded), 펴 둔 것은 브라우저에 기억, 칸이 접힌 묶음 파일을 열면 펼친다', () => {
+test('★ 접고 펴기·지사장 번호·지난 기록 AB-1 대시보드(연도 타임라인 + 오른쪽 요약·서류 리스트·인라인 미리보기)', () => {
+  /* 정관 본문 접고 펴기 및 지사장 번호 보존 */
   assert.match(본문, /function isOpen\(k, dflt\)/); assert.match(본문, /lsSet\('fold', JSON\.stringify\(o\)\)/);
-  const ar = 본문.slice(본문.indexOf('function drawArchive(){'), 본문.indexOf('/* 묶음 하나 고치기'));
-  assert.match(ar, /isOpen\('a:'\+a\.id, false\)/, '묶음은 기본 접힘');
-  assert.match(ar, /<div class="arcg'\+\(op\?' open':''\)\+'" data-arc="/);
-  /* aria-controls 는 펴졌을 때만 — 접힌 묶음엔 가리킬 표가 없다(외부 검토 2026-11-18) */
-  assert.match(ar, /<button class="tg" data-act="fold" data-k="a:'\+esc\(a\.id\)\+'" aria-expanded="'\+\(op\?'true':'false'\)\+'"'\+\(op\?' aria-controls="arcb-'\+esc\(a\.id\)\+'"':''\)\+'>/);
-  assert.match(본문, /setFold\('a:'\+a\.id, fv\); \}\); drawHist\(\); var fb=document\.querySelector\('#histBox \[data-act="foldAll"\]'\); if\(fb\)/, '모두 펴기·접기 뒤 초점이 단추에 남는다');
-  /* 지사장 번호 — 사원 줄을 지우면 지사장도 비우고, 새 사원 번호는 지사장이 가리키는 번호를 다시 쓰지 않는다 */
   assert.match(본문, /b\.branches\.forEach\(function\(x\)\{ if\(x\.head\) used\[x\.head\]=1; \}\);/);
   assert.match(본문, /b3\.branches\.forEach\(function\(x\)\{ if\(x\.head && SEL\.mem\[x\.head\]\) x\.head=''; \}\);/);
-  /* 폰 — 표 안 글칸·법인 정보 칸도 16px(위 규칙에 밀리지 않게 폰 블록 안에서 다시) */
-  assert.match(html, /\.t td\.inp input,\.t td\.inp select,\.fgrid \.fl input\{font-size:16px\}/);
-  assert.match(ar, /if\(op\)\{/, '접힌 묶음은 파일 표를 그리지 않는다');
-  assert.match(ar, /arcKindSummary\(a\)/); assert.match(ar, /data-act="foldAll"/);
-  /* 머리 안의 «고치기»·«＋ 파일»은 접고 펴기 단추와 따로(단추 안에 단추 없음) */
-  assert.match(ar, /<\/button>'\+\s*'<span class="acts"><button class="sm" data-act="arcEdit">고치기<\/button>/);
+  assert.match(html, /\.t td\.inp input,\.t td\.inp select,\.fgrid \.fl input,\.hd-search input,#arcPvKind\{font-size:16px\}/);
   assert.match(본문, /else if\(act==='fold'\)\{ var fk=el\.dataset\.k, fo=el\.getAttribute\('aria-expanded'\)==='true'; setFold\(fk, !fo\); foldKeyDraw\(fk\); foldFocus\(fk\); \}/);
-  assert.match(본문, /if\(!isOpen\('a:'\+evId, false\)\)\{ setFold\('a:'\+evId, true\); if\(TAB==='hist'\) drawHist\(\); \}/);
-  /* 끝난 건·바뀐 기록·정관 본문도 같은 방식 */
-  assert.match(본문, /foldCard\('done', true,/); assert.match(본문, /foldCard\('hist', true,/); assert.match(본문, /isOpen\('charter', false\)/);
-  assert.match(html, /\.arcg\.open\{grid-column:1\/-1;/);
+  assert.match(본문, /isOpen\('charter', false\)/);
   assert.match(html, /\.card\.fc>\.fh\{display:flex;/);
+
+  /* 지난 기록 AB-1 대시보드 — 왼쪽 연도 타임라인·넘버링 + 오른쪽 요약 + 하단 좌우 [서류 리스트 | 미리보기] */
+  assert.match(html, /\.hd-wrap\{display:grid;/);
+  assert.match(html, /\.hd-split\{display:grid;/);
+  assert.match(html, /\.hd-doccol \.t\.arct\{table-layout:fixed;width:100%\}/);
+  assert.match(html, /\[data-act="histListToggle"\]\{display:none\}/);
+  const ar = 본문.slice(본문.indexOf('function drawArchive('), 본문.indexOf('/* 묶음 하나 고치기'));
+  assert.match(ar, /arcYear\(a\)/);
+  assert.match(ar, /№ '\+noMap\[a\.id\]/);
+  assert.match(ar, /data-hist-q="1"/);
+  assert.match(ar, /data-act="histYear"/);
+  assert.match(ar, /data-act="histTab"/);
+  assert.match(ar, /data-act="histKind"/);
+  assert.match(ar, /data-act="histListToggle"/);
+  assert.match(ar, /id="arcPvPanel"/);
+  assert.match(ar, /id="arcPvKind"/);
+  assert.match(ar, /role="tabpanel"/);
+  assert.match(ar, /arcKindSummary\(sel\)/);
+  assert.match(ar, /data-act="arcEdit"/);
+
+  /* 인라인 미리보기 — 총괄관리자 전용, 세대·순서 가드, 확장자 MIME 고정, 종류 허용 목록, 포커스·DOM 보존, 로그아웃 시 정리 */
+  const il = 본문.slice(본문.indexOf('function arcInlineLoad('), 본문.indexOf('function arcPvNav('));
+  assert.match(il, /if\(!ME\.isAdmin\) return toast\('🔒 총괄관리자만 엽니다'\)/);
+  assert.match(il, /if\(arcInlineHidden\(\)\)/);
+  assert.match(il, /seq===ARC_PV_SEQ/);
+  assert.match(il, /ARC_PV_URL=URL\.createObjectURL\(new Blob\(\[blob\], \{ type:ext==='png'\?'image\/png':'image\/jpeg' \}\)\)/);
+  assert.doesNotMatch(il, /openModal\(/);
+  assert.match(본문, /function arcSetKind\(evId, fid, kind\)\{\s*if\(!C\.ARC_KINDS\.some\(/);
+  assert.match(본문, /function histFocusRestore\(/);
+  assert.match(본문, /if\(arcInlineHidden\(\)\) return; HIST_UI\.listOff=!HIST_UI\.listOff;/);
+  const wipe = 본문.match(/function wipe\(\)\{[^\n]*\n[^\n]*/)[0];
+  assert.match(wipe, /arcPvRevoke\(\)/);
+  assert.match(wipe, /HIST_UI=histUiInit\(\)/);
 });
 
 /* 2026-11-24 푸른통합시스템 직원명부 자동 당겨오기 — 읽기 전용 · 세대 가드 · 온톨로지 공유 루트 · 메모리 전용 */
