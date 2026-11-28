@@ -187,6 +187,39 @@ const kakaoRoomFiles = {
   },
 };
 
+const userDir = {
+  P001: { sid: 'P001', name: '점검노무', pos: '대표노무사', dept: '노무총괄', status: 'active' },
+  P002: { sid: 'P002', name: '점검대표', pos: '공인노무사', dept: '기금·자문', status: 'active' },
+  P003: { sid: 'P003', name: '점검사무장', pos: '팀장', dept: '사건대응', status: 'active' },
+  P004: { sid: 'P004', name: '점검주임', pos: '주임', dept: '지원팀', status: 'active' },
+  P009: { sid: 'P009', name: '퇴사점검', pos: '사원', dept: '지원팀', status: 'retired' },
+};
+
+const mailFolders = {
+  sent_seed: { kind: 'sent', name: '보낸편지함' },
+};
+
+const mailMsgs = {
+  sent_seed: {
+    m_seed_1: {
+      d: NOW - 5 * 3600000,
+      f: '점검노무 <p001@example.com>',
+      t: '기관담당 <gov1@example.com>',
+      s: '[경기2026부해3347] 가나제조 답변서_연장신청서 제출',
+      a: 1,
+      an: ['답변서_연장신청서.hwpx'],
+    },
+    m_seed_2: {
+      d: NOW - 300000,
+      f: '점검사무장 <p003@example.com>',
+      t: '지청감독과 <gov2@example.com>',
+      s: '[서산2026시정108] 다라물류 시정지시서 회신',
+      a: 1,
+      an: ['시정지시서.pdf'],
+    },
+  },
+};
+
 module.exports = {
   data: {
     kakao_room: {
@@ -208,9 +241,18 @@ module.exports = {
       },
     },
     work_erp: { items: workItems },
-    data: { companies },
+    data: { companies, user_dir: userDir },
+    mailbox: { folders: mailFolders, msgs: mailMsgs },
   },
   views: [
+    {
+      name: 'person-expand',
+      run: async (p) => {
+        await p.click('#tabs button[data-tab=archive]');
+        await p.click('#dashViewTabs button[data-dash-view=person]');
+        await p.click('#btnToggleExpandAll');
+      },
+    },
     { name: 'dash-case', run: async (p) => { await p.click('#dashViewTabs button[data-dash-view=case]'); } },
     { name: 'dash-topic', run: async (p) => { await p.click('#dashViewTabs button[data-dash-view=topic]'); } },
     { name: 'dash-table', run: async (p) => { await p.click('#dashViewTabs button[data-dash-view=table]'); } },

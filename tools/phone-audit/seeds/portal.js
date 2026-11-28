@@ -74,6 +74,22 @@ module.exports = {
         });
         await page.waitForTimeout(300);
       }
+    },
+    {
+      /* 🗂 관리실 서랍(왼쪽) — 영업관리 구역 / 내부관리 구역을 각각 열어 폰 폭에서 화면 안에 들어오는지 잰다 (2026-11-28) */
+      name: 'drawer-sales',
+      async run(page) {
+        await page.evaluate(() => { const m = document.getElementById('orchModal'); if (m) m.hidden = true; const t = document.getElementById('mwTip'); if (t) t.remove(); });
+        await page.click('#mgBtn');
+        await page.waitForTimeout(450);
+      }
+    },
+    {
+      name: 'drawer-inside',
+      async run(page) {
+        await page.click('#mgTab_inside');
+        await page.waitForTimeout(300);
+      }
     }
   ]
 };
