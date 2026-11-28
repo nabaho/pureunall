@@ -118,6 +118,13 @@ table.t th.n,table.t td.n{width:38px;text-align:right;color:var(--mute);font-var
 table.t th.yr,table.t td.yr{width:58px;text-align:center;font-variant-numeric:tabular-nums}
 table.t td[data-k="badge"],table.t td[data-k="st"]{max-width:none;overflow:visible;text-overflow:clip}
 table.t td[data-k="erp"]{white-space:nowrap;max-width:none;overflow:visible;text-overflow:clip}
+/* 사업장 단위 묶어 보기(카탈로그 groupByCompany) — «연도» 칸에 연도 칩, 누르면 그 해 건이 열린다 */
+table.t th.yr.g,table.t td.yr.g{width:auto;text-align:left;white-space:nowrap}
+.gco-yrs{display:inline-flex;align-items:center;gap:3px;flex-wrap:nowrap}
+.yrchip{padding:1px 7px;min-height:22px;border-radius:9px;font-size:11px;font-weight:600;line-height:1.35;font-variant-numeric:tabular-nums;background:var(--bg);border-color:var(--line);color:var(--ink2)}
+.yrchip.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-d);font-weight:800}
+.yrchip.done:not(.on){color:var(--mute)}
+.yrchip.dim{opacity:.55}
 table.t tr[data-row]{cursor:pointer}
 table.t tr[data-row]:hover>td{background:var(--bg)}
 table.t tr.cur>td{background:var(--blue-bg)}
@@ -445,12 +452,12 @@ table.t tr.perf-direct>td:first-child{box-shadow:inset 3px 0 0 var(--green-m)}
 <script src="hangul/js/zip.js?v=1"></script>
 <script src="hangul/js/hwpx.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
-<script src="js/pu-consult-catalogs-a.js?v=6"></script>
-<script src="js/pu-consult-catalogs-b.js?v=5"></script>
+<script src="js/pu-consult-catalogs-a.js?v=8"></script>
+<script src="js/pu-consult-catalogs-b.js?v=6"></script>
 <script src="js/pu-consult-catalogs.js?v=2"></script>
-<script src="js/pu-consult-intake.js?v=6"></script>
+<script src="js/pu-consult-intake.js?v=7"></script>
 <script src="js/pu-consult-hwpx.js?v=3"></script>
-<script src="js/pu-consult-view.js?v=14"></script>
+<script src="js/pu-consult-view.js?v=16"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var isPv = (location.hostname==='localhost' || location.hostname==='127.0.0.1' || location.hostname.endsWith('.localhost')) && location.search.indexOf('preview=1')>=0;

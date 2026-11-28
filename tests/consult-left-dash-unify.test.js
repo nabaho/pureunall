@@ -153,3 +153,26 @@ test('⑥ 가벼운 화면은 12개 앱 공통, 보고서 일반 원고 접기�
   assert.ok(folded.indexOf('techprotect') >= 0 && folded.indexOf('clinic') >= 0, '기술보호·현장클리닉 서식은 컨설팅보고서에 있다');
   for (const k of ['hrconsult', 'evalcomp', 'unionneg']) assert.ok(folded.indexOf(k) < 0, k + ': 기관 서식이 없어 원고가 곧 산출물 — 접지 않는다');
 });
+
+test('⑨ 사업장 단위 묶어 보기(기초인사노무만) — 같은 사업장의 연도별 건이 한 줄, 저장된 건은 그대로', () => {
+  const V = loadView();
+  for (const k of ALL) { V.use(k, {}); assert.equal(V.isGrouped(), k === 'hrconsult', k + ': 묶어 보기는 기초인사노무만(카탈로그 groupByCompany)'); }
+  V.use('hrconsult', {});
+  const rows = [
+    { id: 'a1', companyId: 'co1', companyName: '(합성)가', year: 2024, status: 'done' },
+    { id: 'a2', companyId: 'co1', companyName: '(합성)가', year: 2026, status: 'active' },
+    { id: 'b1', companyName: '(합성)나', year: 2025, status: 'done' },
+    { id: 'b2', companyName: '(합성)나', year: 2023, status: 'done' }
+  ];
+  const g = V.groupProjects(rows);
+  assert.equal(g.length, 2, '사업장 둘');
+  const ga = g.find((x) => x.key === 'c:co1');
+  assert.equal(ga.rows.length, 2);
+  assert.equal(ga.head.id, 'a2', '대표는 가장 최근 연도 건');
+  assert.equal(ga.active, true, '진행 중 연도가 하나라도 있으면 진행중');
+  assert.equal(g.find((x) => x.key !== 'c:co1').active, false, '모두 끝났으면 완료');
+  const v = read('js/pu-consult-view.js');
+  assert.ok(/<td class="yr g"/.test(v) && /data-pick-yr=/.test(v), '연도 칸에 연도 칩(누르면 그 해 건)');
+  assert.ok(/function confirmGroupedBulk\(list, verb\)/.test(v) && /if \(!confirmGroupedBulk\(list, '보관삭제'\)\) return;/.test(v), '여러 연도 건을 한꺼번에 지울 때는 건수를 말하고 다시 묻는다');
+  assert.ok(!/groupProjects[\s\S]{0,400}saveRecord/.test(v.slice(v.indexOf('function groupProjects'), v.indexOf('function groupProjects') + 900)), '묶음은 보기 전용 — 저장하지 않는다');
+});

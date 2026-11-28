@@ -44,10 +44,10 @@
       erpTypeKeywords: ['출산육아휴직우수기업컨설팅', '출산육아', '가족친화', '일생활균형', '유연근로', '재택근무'],
       excelTypeKeywords: ['출산육아', '가족친화', '유연근로', '재택근무', '일생활균형', '근로시간단축'],
       tracks: [
-        { id: 'fw_maternity', name: '출산·육아휴직 우수기업 컨설팅 (충남경제진흥원 등)' },
-        { id: 'fw_cert',      name: '가족친화인증 심사대비 · 인증 컨설팅' },
-        { id: 'fw_flex',      name: '일생활균형 · 유연/재택/시차출퇴근 컨설팅' },
-        { id: 'fw_archive',   name: '과거 근로시간단축 · 재택/유연근무 이력 아카이브' }
+        { id: 'fw_maternity', shortName: '출산·육아휴직', name: '출산·육아휴직 우수기업 컨설팅 (충남경제진흥원 등)' },
+        { id: 'fw_cert',      shortName: '가족친화인증', name: '가족친화인증 심사대비 · 인증 컨설팅' },
+        { id: 'fw_flex',      shortName: '일생활·유연', name: '일생활균형 · 유연/재택/시차출퇴근 컨설팅' },
+        { id: 'fw_archive',   shortName: '과거 이력', name: '과거 근로시간단축 · 재택/유연근무 이력 아카이브' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -126,9 +126,9 @@
       erpTypeKeywords: ['사회적기업컨설팅', '사회적기업', '씨앗컨설팅', '사회적경제'],
       excelTypeKeywords: ['사회적기업', '씨앗컨설팅', '사회적경제'],
       tracks: [
-        { id: 'se_seed',   name: '충남사회적경제지원센터 씨앗컨설팅 (초기·진입)' },
-        { id: 'se_cert',   name: '(예비)사회적기업 인증·지정 노무요건 정비' },
-        { id: 'se_svi',    name: '사회적가치지표(SVI) · 일자리창출/전문인력 인건비 관리' }
+        { id: 'se_seed',   shortName: '씨앗컨설팅', name: '충남사회적경제지원센터 씨앗컨설팅 (초기·진입)' },
+        { id: 'se_cert',   shortName: '인증·지정', name: '(예비)사회적기업 인증·지정 노무요건 정비' },
+        { id: 'se_svi',    shortName: 'SVI·인건비', name: '사회적가치지표(SVI) · 일자리창출/전문인력 인건비 관리' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -308,10 +308,10 @@
       erpTypeKeywords: ['근로감독', '시정지시', '모의감독'],
       excelTypeKeywords: ['근로감독', '시정지시', '모의감독'],
       tracks: [
-        { id: 'la_regular', name: '정기근로감독 (고용노동부 정기·기획 감독 수검)' },
-        { id: 'la_special', name: '수시·특별·청원근로감독 긴급 대응' },
-        { id: 'la_remedy',  name: '시정지시서 수령 · 시정완료 보고 · 소명 대응' },
-        { id: 'la_mock',    name: '사전 모의근로감독 · 10대 법정장부 정비' }
+        { id: 'la_regular', shortName: '정기 감독', name: '정기근로감독 (고용노동부 정기·기획 감독 수검)' },
+        { id: 'la_special', shortName: '수시·특별', name: '수시·특별·청원근로감독 긴급 대응' },
+        { id: 'la_remedy',  shortName: '시정지시', name: '시정지시서 수령 · 시정완료 보고 · 소명 대응' },
+        { id: 'la_mock',    shortName: '모의 감독', name: '사전 모의근로감독 · 10대 법정장부 정비' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -394,10 +394,10 @@
       erpTypeKeywords: ['임단협노사교섭위원참석', '노사교섭', '단체교섭', '부당노동행위'],
       excelTypeKeywords: ['단체교섭', '임단협', '노조', '노사협의회'],
       tracks: [
-        { id: 'un_single',  name: '민간 교섭창구단일화 (법정기일 자동계산 · 공고문)' },
-        { id: 'un_cba',     name: '임금·단체협약 교섭 (요구안 검토 · 교섭시나리오 · 대안)' },
-        { id: 'un_mediate', name: '노동위원회 쟁의조정 · 파업/부당노동행위 대응' },
-        { id: 'un_council', name: '노사협의회 설치·정기회의·고충처리위원회 운영' }
+        { id: 'un_single',  shortName: '창구단일화', name: '민간 교섭창구단일화 (법정기일 자동계산 · 공고문)' },
+        { id: 'un_cba',     shortName: '임단협 교섭', name: '임금·단체협약 교섭 (요구안 검토 · 교섭시나리오 · 대안)' },
+        { id: 'un_mediate', shortName: '조정·쟁의', name: '노동위원회 쟁의조정 · 파업/부당노동행위 대응' },
+        { id: 'un_council', shortName: '노사협의회', name: '노사협의회 설치·정기회의·고충처리위원회 운영' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [
@@ -480,12 +480,12 @@
       erpTypeKeywords: ['혁신바우처', '통상변화대응', '삼성협력업체', '경비원', '고용구조개선', '이음센터', '공정채용', '노무진단', '노무점검'],
       excelTypeKeywords: ['혁신바우처', '통상변화', '삼성협력', '경비원컨설팅', '비정규직', 'NCS', '공정채용', '이음센터', '기술닥터제', 'MG맞춤 인사노무진단', '노무진단'],
       tracks: [
-        { id: 'sp_kosmes',  name: '중진공 혁신바우처 · 통상변화대응 기술경영혁신' },
-        { id: 'sp_samsung', name: '대기업(삼성 등) 협력업체 노무/HR 컨설팅' },
-        { id: 'sp_guard',   name: '공동주택 경비원·감단직 근로조건 개선 컨설팅' },
-        { id: 'sp_nonreg',  name: '비정규직 고용구조개선 · 외투기업 · 기술닥터제' },
-        { id: 'sp_public',  name: '근로자이음센터(프리랜서SOS) · 직업계고 · NCS/공정채용' },
-        { id: 'sp_audit',   name: '금융기관(새마을금고 등)·기업 맞춤 노무진단 (HR Audit)' }
+        { id: 'sp_kosmes',  shortName: '중진공', name: '중진공 혁신바우처 · 통상변화대응 기술경영혁신' },
+        { id: 'sp_samsung', shortName: '대기업 협력사', name: '대기업(삼성 등) 협력업체 노무/HR 컨설팅' },
+        { id: 'sp_guard',   shortName: '경비·감단직', name: '공동주택 경비원·감단직 근로조건 개선 컨설팅' },
+        { id: 'sp_nonreg',  shortName: '비정규직·외투', name: '비정규직 고용구조개선 · 외투기업 · 기술닥터제' },
+        { id: 'sp_public',  shortName: '이음센터·공정채용', name: '근로자이음센터(프리랜서SOS) · 직업계고 · NCS/공정채용' },
+        { id: 'sp_audit',   shortName: '금융기관 노무진단', name: '금융기관(새마을금고 등)·기업 맞춤 노무진단 (HR Audit)' }
       ],
       stages: STANDARD_STAGES,
       preChecks: [

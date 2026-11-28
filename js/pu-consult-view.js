@@ -203,6 +203,36 @@
     if (!pid || !D.projects || !D.projects[pid] || D.projects[pid]._deleted) return null;
     return Object.assign({ id: pid }, D.projects[pid]);
   }
+
+  /* ── 사업장 단위 묶어 보기 (카탈로그 groupByCompany — 기초인사노무, 대표 지시 2026-11-28 「연도가 중복돼서 업무가 중복된다 — 정확하게 다시 정리」) ──
+   * 푸른노무법인이 직접 계약한 사업은 같은 사업장이 해마다 한 건씩 쌓인다. 연도별 건·자료·보고서는 그대로 두고,
+   * 목록·집계만 «사업장 한 줄 + 연도 칩» 으로 묶는다. 저장된 자료는 바꾸지 않는다(보기 전용 묶음).
+   * 묶는 열쇠: companyId → 없으면 정규화한 상호(저장하지 않는 화면 전용 묶음이라 온톨로지 «이름으로 관계 저장 금지»와 부딪히지 않는다). */
+  function isGrouped() { return !!getAppCat().groupByCompany; }
+  function companyKeyOf(p) {
+    var cid = str(p.companyId);
+    if (cid) return 'c:' + cid;
+    var I = Intake();
+    var nn = (I && I.normCorpName) ? I.normCorpName(p.companyName) : str(p.companyName).toLowerCase();
+    return 'n:' + (nn || str(p.id));
+  }
+  // list 순서를 지키며 사업장별로 묶는다. 대표(head)는 지금 열어 둔 건, 없으면 가장 최근 연도 건.
+  function groupProjects(list) {
+    var order = [];
+    var map = Object.create(null);
+    list.forEach(function (p) {
+      var k = companyKeyOf(p);
+      var g = map[k];
+      if (!g) { g = map[k] = { key: k, rows: [] }; order.push(g); }
+      g.rows.push(p);
+    });
+    order.forEach(function (g) {
+      g.rows.sort(function (a, b) { return num(b.year, 0) - num(a.year, 0); });
+      g.head = g.rows.filter(function (p) { return p.id === CUR_PID; })[0] || g.rows[0];
+      g.active = g.rows.some(function (p) { return p.status !== 'done'; });
+    });
+    return order;
+  }
   /* ══ 컨설팅 «수행» 과 «안내·기타» 구분 (카탈로그 kindSplit 앱 전용 · 대표 지시 2026-11-28) ═════
    * 수행 = ERP 수임·로컬 산출물·사건번호가 있는 건.  안내·기타 = 메일·카톡만 있거나 신청 안내를 보낸 건.
    * p.kind 가 있으면 사람이 정한 값이 이긴다. 없으면 summaryNote 맨 앞 [출처] 꼬리표로 «읽을 때만» 추정한다 —
@@ -961,7 +991,7 @@
     var pList = mainProjects();
     var cands = (D.discover && D.discover.bundles) || [];
     if ($('nGuide')) $('nGuide').textContent = String(laneProjects('guide').length);
-    if ($('nProjects')) $('nProjects').textContent = String(pList.length);
+    if ($('nProjects')) $('nProjects').textContent = String(isGrouped() ? groupProjects(pList).length : pList.length);
     if ($('nInbox')) $('nInbox').textContent = String(cands.length);
     if ($('nYearly')) $('nYearly').textContent = String(pList.length + cands.length);
   }
@@ -973,20 +1003,21 @@
     if (el.value !== str(val)) el.value = '';
   }
 
-  function renderYearButtonsBar(elId, mode, items) {
+  // allCount: 사업장 단위 묶음이면 «전체» 칸에 건수 대신 사업장 수를 적는다
+  function renderYearButtonsBar(elId, mode, items, allCount) {
     var bar = $(elId);
     if (!bar) return;
     var map = Object.create(null);
     items.forEach(function (x) {
-      var yr = String(num(x.year, 2026));
-      map[yr] = (map[yr] || 0) + 1;
+      var yrList = (Array.isArray(x.yearsList) && x.yearsList.length) ? x.yearsList : [x.year]; // 사업장 단위 후보는 여러 연도를 가진다
+      yrList.forEach(function (y) { var yr = String(num(y, 2026)); map[yr] = (map[yr] || 0) + 1; });
     });
     if (YEAR_FILTER && !map[YEAR_FILTER]) map[YEAR_FILTER] = 0;
     var yrs = Object.keys(map).sort(function (a, b) { return Number(b) - Number(a); });
     var lbl = mode === 'inbox' ? '수신 연도:' : '연도별 필터:';
     var allOn = YEAR_FILTER === '';
     bar.innerHTML = '<span class="scope-lbl">' + lbl + '</span>' +
-      '<button type="button" class="scope-btn' + (allOn ? ' on' : '') + '" aria-pressed="' + (allOn ? 'true' : 'false') + '" data-yr-set="">전체 (' + items.length + ')</button>' +
+      '<button type="button" class="scope-btn' + (allOn ? ' on' : '') + '" aria-pressed="' + (allOn ? 'true' : 'false') + '" data-yr-set="">전체 (' + (allCount == null ? items.length : allCount) + ')</button>' +
       yrs.map(function (yr) {
         var on = YEAR_FILTER === yr;
         return '<button type="button" class="scope-btn' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-yr-set="' + esc(yr) + '">' + esc(yr) + '년 (' + map[yr] + ')</button>';
@@ -1112,9 +1143,10 @@
     return s;
   }
 
-  function getFilteredProjects() {
+  // skipStatus: 사업장 단위 묶음은 «진행중/완료» 를 묶은 뒤(사업장 단위)로 거르므로 건 단위 상태 거름을 건너뛴다.
+  function getFilteredProjects(skipStatus) {
     var q = str($('projQ') && $('projQ').value).toLowerCase();
-    var st = stFilter();
+    var st = skipStatus ? '' : stFilter();
     var mgr = str($('projMgr') && $('projMgr').value);
     var erpAud = ERP_FILTER ? erpAudit() : null;
     return mainProjects().filter(function (p) {
@@ -1130,6 +1162,24 @@
       }
       return true;
     });
+  }
+
+  // 사업장 단위 목록: 진행 중인 연도가 하나라도 있으면 «진행중», 전부 끝났으면 «완료»
+  function getFilteredGroups() {
+    var st = stFilter();
+    var groups = groupProjects(getFilteredProjects(true));
+    if (st === 'done') groups = groups.filter(function (g) { return !g.active; });
+    else if (st === 'active') groups = groups.filter(function (g) { return g.active; });
+    return groups;
+  }
+  // 목록에서 체크한 건(사업장 단위 묶음이면 체크한 사업장의 보이는 연도 건 전부)
+  function selectedProjects() {
+    if (isGrouped()) {
+      var out = [];
+      getFilteredGroups().forEach(function (g) { if (SEL['g:' + g.key]) out = out.concat(g.rows); });
+      return out;
+    }
+    return getFilteredProjects().filter(function (p) { return SEL['p:' + p.id]; });
   }
 
   function hasProjFilterActive() {
@@ -1233,7 +1283,8 @@
 
     // 연도별 빠른 필터 바 (#projYrBar — 전 12개 앱 연도별 관리)
     var trackScopedProjs = TRACK_FILTER ? allProjs.filter(function (p) { return p.trackId === TRACK_FILTER; }) : allProjs;
-    renderYearButtonsBar('projYrBar', 'all', trackScopedProjs);
+    var grouped = isGrouped();
+    renderYearButtonsBar('projYrBar', 'all', trackScopedProjs, grouped ? groupProjects(trackScopedProjs).length : null);
 
     // 초소형 1줄 KPI 배지 (#kpiBox — 선택된 지역/연도 범위 기준)
     var kpiBox = $('kpiBox');
@@ -1241,8 +1292,12 @@
       var kpiScope = trackScopedProjs.filter(function (p) {
         return !YEAR_FILTER || String(num(p.year, 2026)) === YEAR_FILTER;
       });
-      var doneCnt = kpiScope.filter(function (x) { return x.status === 'done'; }).length;
-      var activeCnt = kpiScope.length - doneCnt;
+      // 사업장 단위 묶음: 사업장 수로 세고(진행 중 연도가 하나라도 있으면 «진행중»), 연도별 건 수는 따로 보인다
+      var kpiGroups = grouped ? groupProjects(kpiScope) : null;
+      var kpiCount = grouped ? kpiGroups.length : kpiScope.length;
+      var doneCnt = grouped ? kpiGroups.filter(function (g) { return !g.active; }).length : kpiScope.filter(function (x) { return x.status === 'done'; }).length;
+      var activeCnt = kpiCount - doneCnt;
+      var unitLbl = grouped ? '곳' : '건';
       var totalComms = kpiScope.reduce(function (s, p) { return s + getProjectComms(p.id).length; }, 0);
       var scopedCands = TRACK_FILTER && ldOn
         ? cands.filter(function (b) { return str(b.suggestedTrackId) === TRACK_FILTER; })
@@ -1257,9 +1312,10 @@
         ? ('<span class="chip c-blue">' + esc((actTrack ? trackShortLabel(actTrack) : '전체') + (YEAR_FILTER ? (' · ' + YEAR_FILTER + '년') : '')) + '</span>')
         : '';
       kpiBox.innerHTML = scopeTag +
-        '<div class="kpi k-blue' + (allOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="" role="button" tabindex="0" aria-pressed="' + (allOn ? 'true' : 'false') + '"><span>' + (isSplit() ? '수행 컨설팅' : '총 사업') + '</span><b>' + kpiScope.length + '건</b></div>' +
-        '<div class="kpi k-green' + (doneOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="done" role="button" tabindex="0" aria-pressed="' + (doneOn ? 'true' : 'false') + '"><span>완료</span><b>' + doneCnt + '건</b></div>' +
-        '<div class="kpi k-amber' + (activeOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="active" role="button" tabindex="0" aria-pressed="' + (activeOn ? 'true' : 'false') + '"><span>진행중</span><b>' + activeCnt + '건</b></div>' +
+        '<div class="kpi k-blue' + (allOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="" role="button" tabindex="0" aria-pressed="' + (allOn ? 'true' : 'false') + '"><span>' + (isSplit() ? '수행 컨설팅' : (grouped ? '총 사업장' : '총 사업')) + '</span><b>' + kpiCount + unitLbl + '</b></div>' +
+        (grouped ? '<div class="kpi" title="같은 사업장의 연도별 건을 모두 센 수 — 사업장 한 줄에 연도 칩으로 묶여 보입니다"><span>연도별 건</span><b>' + kpiScope.length + '건</b></div>' : '') +
+        '<div class="kpi k-green' + (doneOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="done" role="button" tabindex="0" aria-pressed="' + (doneOn ? 'true' : 'false') + '"><span>완료</span><b>' + doneCnt + unitLbl + '</b></div>' +
+        '<div class="kpi k-amber' + (activeOn ? ' k-on' : '') + '" data-act="kpiSt" data-id="active" role="button" tabindex="0" aria-pressed="' + (activeOn ? 'true' : 'false') + '"><span>진행중</span><b>' + activeCnt + unitLbl + '</b></div>' +
         (lean ? '' : '<div class="kpi k-blue"><span>수집자료</span><b>' + totalComms + '건</b></div>') +
         roundKpiHtml(kpiScope) +
         (function () {
@@ -1312,7 +1368,9 @@
 
     var box = $('projectsBox');
     if (!box) return;
-    var filtered = getFilteredProjects();
+    var filtered = grouped ? getFilteredGroups() : getFilteredProjects();
+    var allByCo = Object.create(null); // 사업장별 «모든 연도» 건 — 연도 칩은 거름과 상관없이 전 이력을 보인다
+    if (grouped) groupProjects(allProjs).forEach(function (g) { allByCo[g.key] = g; });
     if (!filtered.length) {
       box.innerHTML = '<div class="empty">' + (ERP_FILTER ? 'ERP 사건번호가 비어 있는 사업장이 없습니다. ' : ('조건에 맞는 ' + esc(cat.name) + ' 사업장이 없습니다. ')) +
         (cands.length ? ('<b>📥 미등록 후보(' + cands.length + '곳)</b>에서 1클릭 등록하거나 ') : '') +
@@ -1322,10 +1380,12 @@
 
     var rowCap = SHOW_ALL_ROWS ? filtered.length : 120;
     var shown = filtered.slice(0, rowCap);
-    var selPids = shown.filter(function (p) { return SEL['p:' + p.id]; });
+    var selKeyOf = function (x) { return grouped ? ('g:' + x.key) : ('p:' + x.id); };
+    var unitTxt = grouped ? '곳' : '건';
+    var selPids = shown.filter(function (p) { return SEL[selKeyOf(p)]; });
     var allProjChecked = shown.length > 0 && selPids.length === shown.length;
     var bulkHtml = '<div class="bulk' + (selPids.length ? ' on' : '') + '" id="projBulkBar">' +
-      '<b id="projBulkCount">' + selPids.length + '건 선택</b>' +
+      '<b id="projBulkCount">' + selPids.length + unitTxt + ' 선택</b>' +
       '<button type="button" class="sm ok" id="bulkDoneProjBtn">✅ 완료 처리</button>' +
       (isSplit() ? '<button type="button" class="sm" id="bulkGuideProjBtn" title="고른 건을 안내·기타 목록으로 옮깁니다">📨 안내·기타로 이동</button>' : '') +
       '<button type="button" class="sm danger" id="bulkDelProjBtn">🗑 선택 보관삭제</button>' +
@@ -1339,7 +1399,50 @@
        · ERP 번호 칸은 비어 있으면 «미연결 · 사유»(PuConsultIntake.auditErpLinks)와, 후보가 정확히 하나일 때만 [연결] 단추.
        · 폰 카드 표식(split-row·pc-only·pm-st·pm-tr·data-pm-act)은 css/pu-consult-phone.css 와 짝이다. */
     var showTrackCol = !hideTrackChip;
+    // 사업장 한 줄(묶음 전용): «연도» 칸에 연도 칩(누르면 그 해 건), 대표 연도 건의 번호·단계·담당·체크율, 자료 수는 보이는 연도를 더한다
+    function groupRowHtml(g, i) {
+      var p = g.head;
+      var ckKey = 'g:' + g.key;
+      var allRows = (allByCo[g.key] && allByCo[g.key].rows) || g.rows;
+      var inView = Object.create(null);
+      g.rows.forEach(function (r) { inView[r.id] = 1; });
+      var clsList = ['split-row'];
+      if (g.rows.some(function (r) { return r.id === CUR_PID; })) clsList.push('cur');
+      if (!g.active) clsList.push('perf-direct');
+      var commCnt = g.rows.reduce(function (sAcc, r) { return sAcc + getProjectComms(r.id).length; }, 0);
+      var sum = hwpx ? hwpx.buildSummary(APP_KEY, p, getCheckDoc(p.id), []) : { overallPct: 0 };
+      var hasCk = !!(D.checks && D.checks[p.id]);
+      var ckChip = (lean && !hasCk) ? '' : (' <span class="chip">' + sum.overallPct + '%</span>');
+      var stChip = g.active ? '<span class="chip c-amber pm-st">진행중</span>' : '<span class="chip c-green pm-st">완료</span>';
+      var trObj = tracks.find(function (t) { return t.id === p.trackId; });
+      var trLbl = trObj ? trackShortLabel(trObj) : (p.trackName || cat.shortName);
+      var MAX_CHIPS = 4; // 칸 한 줄을 넘지 않게 — 나머지 연도는 «+N» 칩(title 에 연도 목록)
+      var yrChips = allRows.slice(0, MAX_CHIPS).map(function (r) {
+        var tip = String(r.year || 2026) + '년 · ' + (r.trackName || cat.shortName) + ' · ' + (r.status === 'done' ? '완료' : '진행중') + (r.caseNo ? (' · ' + r.caseNo) : '') + ' — 눌러서 이 연도 건 열기';
+        return '<button type="button" class="yrchip' + (r.id === p.id ? ' on' : '') + (r.status === 'done' ? ' done' : '') + (inView[r.id] ? '' : ' dim') + '" data-pick-yr="' + esc(r.id) + '" title="' + esc(tip) + '">' + esc(String(r.year || 2026)) + '</button>';
+      }).join('');
+      var moreChip = allRows.length > MAX_CHIPS ? ('<span class="chip" title="' + esc(allRows.slice(MAX_CHIPS).map(function (r) { return r.year || 2026; }).join(', ') + '년') + '">+' + (allRows.length - MAX_CHIPS) + '</span>') : '';
+      var yrsTxt = allRows.map(function (r) { return r.year || 2026; }).join(' · ');
+      var memoTxt = memoShown(p);
+      var memoHtml = (lean ? (sourceChipsHtml(p) + ' ' + esc(memoTxt ? noteWithoutTag({ summaryNote: memoTxt }) : '')) : esc(memoTxt || '-')) + (allRows.length > 1 ? (' <span class="hint">· 연도 ' + allRows.length + '건</span>') : '');
+      return '<tr data-row="' + esc(p.id) + '" class="' + clsList.join(' ') + '">' +
+        '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="proj"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(p.companyName) + ' 선택"></td>' +
+        '<td class="n">' + (i + 1) + '</td>' +
+        '<td class="yr g" title="' + esc(yrsTxt + '년') + '"><span class="gco-yrs">' + yrChips + moreChip + '</span></td>' +
+        '<td class="ti" title="' + esc(p.companyName) + '">' + esc(p.companyName) + '</td>' +
+        (showTrackCol ? '<td data-k="badge" title="' + esc(p.trackName || trLbl) + '"><span class="chip c-blue pm-tr">' + esc(trLbl) + '</span></td>' : '') +
+        '<td data-k="erp">' + erpCellHtml(p, audit) + '</td>' +
+        '<td data-k="st">' + stChip + '</td>' +
+        (showRounds ? '<td data-k="rd">' + roundChipsHtml(p) + '</td>' : '') +
+        '<td data-k="pc-only" title="' + esc(p.consultantName || '-') + '">' + esc(p.consultantName || '-') + '</td>' +
+        '<td data-k="pc-only" title="6단계 진행현황 (' + esc(String(p.year || 2026)) + '년 건)">' + stepDotsHtml(p.stage, p.status) + '</td>' +
+        '<td data-k="pc-only" title="수집자료 ' + commCnt + '건 · 체크 준비도 ' + sum.overallPct + '%"><span class="chip c-blue">📧 ' + commCnt + '</span>' + ckChip + '</td>' +
+        '<td class="wide" title="' + esc(memoTxt || '-') + '">' + memoHtml + '</td>' +
+        '<td data-k="act"><button type="button" class="sm pri" data-pick="' + esc(p.id) + '" data-pm-act="1">진행·체크</button> <button type="button" class="sm" data-open-report="' + esc(p.id) + '">📄 보고서</button></td>' +
+      '</tr>';
+    }
     var trs = shown.map(function (p, i) {
+      if (grouped) return groupRowHtml(p, i);
       var ckKey = 'p:' + p.id;
       var clsList = ['split-row'];
       if (p.id === CUR_PID) clsList.push('cur');
@@ -1392,11 +1495,11 @@
     }).join('');
 
     var moreHtml = filtered.length > shown.length
-      ? ('<div class="bar"><span class="hint">총 ' + filtered.length + '건 중 ' + shown.length + '건 표시</span><button type="button" class="sm pri" id="showAllProjBtn">전체 ' + filtered.length + '건 모두 보기 (+' + (filtered.length - shown.length) + ')</button></div>')
+      ? ('<div class="bar"><span class="hint">총 ' + filtered.length + unitTxt + ' 중 ' + shown.length + unitTxt + ' 표시</span><button type="button" class="sm pri" id="showAllProjBtn">전체 ' + filtered.length + unitTxt + ' 모두 보기 (+' + (filtered.length - shown.length) + ')</button></div>')
       : '';
 
     var diffMark = (isInsp && DIFF_HIGHLIGHT) ? (' ' + diffBadge('개편')) : '';
-    var headCols = '<th class="yr">연도</th><th>사업장명</th>' +
+    var headCols = '<th class="yr' + (grouped ? ' g' : '') + '">연도</th><th>사업장명</th>' +
       (showTrackCol ? '<th data-k="badge">' + esc(cat.regionLabel || '세부 트랙') + '</th>' : '') +
       '<th data-k="erp">ERP 번호</th>' +
       (isInsp
@@ -1410,6 +1513,9 @@
     refreshProjBulkUi();
     if ($('showAllProjBtn')) $('showAllProjBtn').onclick = function () { SHOW_ALL_ROWS = true; renderProjectsPane(); };
 
+    box.querySelectorAll('[data-pick-yr]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); CUR_PID = b.getAttribute('data-pick-yr'); switchTab('detail'); };
+    });
     box.querySelectorAll('[data-erp-link]').forEach(function (b) {
       b.onclick = function (e) { e.stopPropagation(); connectErpNo(b.getAttribute('data-erp-link'), b.getAttribute('data-erp-no')); };
     });
@@ -1428,15 +1534,13 @@
       };
     });
     if ($('bulkDoneProjBtn')) $('bulkDoneProjBtn').onclick = function () {
-      var curSel = getFilteredProjects().filter(function (p) { return SEL['p:' + p.id]; });
-      bulkUpdateProjectsDone(curSel);
+      bulkUpdateProjectsDone(selectedProjects());
     };
     if ($('bulkDelProjBtn')) $('bulkDelProjBtn').onclick = function () {
-      var curSel = getFilteredProjects().filter(function (p) { return SEL['p:' + p.id]; });
-      bulkDeleteProjects(curSel);
+      bulkDeleteProjects(selectedProjects());
     };
     if ($('bulkGuideProjBtn')) $('bulkGuideProjBtn').onclick = function () {
-      var curSel = getFilteredProjects().filter(function (p) { return SEL['p:' + p.id]; });
+      var curSel = selectedProjects();
       if (!curSel.length) { toast('먼저 줄을 골라 주세요.'); return; }
       bulkSaveGuide(curSel, function () { return { kind: 'guide' }; }, '구분 «안내·기타»');
     };
@@ -1456,7 +1560,7 @@
     var bar = $('projBulkBar');
     var cntEl = $('projBulkCount');
     if (bar) bar.classList.toggle('on', checkedCount > 0);
-    if (cntEl) cntEl.textContent = checkedCount + '건 선택';
+    if (cntEl) cntEl.textContent = checkedCount + (isGrouped() ? '곳' : '건') + ' 선택';
     var hdr = box.querySelector('input[type="checkbox"][data-ckall="proj"]');
     if (hdr) {
       hdr.checked = list.length > 0 && checkedCount === list.length;
@@ -1798,12 +1902,28 @@
       : allCands;
     var q = str($('inQ') && $('inQ').value).toLowerCase();
     var list = trackCands.filter(function (b) {
-      if (YEAR_FILTER && String(num(b.year, 2026)) !== YEAR_FILTER) return false;
+      if (YEAR_FILTER) {
+        // 사업장 단위 후보는 여러 연도를 가진다 — 그중 하나라도 맞으면 보인다
+        if (Array.isArray(b.yearsList) && b.yearsList.length) { if (b.yearsList.indexOf(Number(YEAR_FILTER)) < 0) return false; }
+        else if (String(num(b.year, 2026)) !== YEAR_FILTER) return false;
+      }
       if (!q) return true;
       var hay = [b.year, b.companyName, b.suggestedTrackName, b.caseNo].concat(b.sampleSubjects || []).concat(b.reasonsList || []).join(' ').toLowerCase();
       return hay.indexOf(q) >= 0;
     });
     return { trackCands: trackCands, list: list, q: q, hasLeft: hasLeft };
+  }
+
+  // 후보 한 줄의 연도 표시: 사업장 단위 후보는 «최근 연도 외 N개 연도», 아니면 연도 칩 하나
+  function candYearHtml(b) {
+    var ys = Array.isArray(b.yearsList) ? b.yearsList : [];
+    if (ys.length <= 1) return esc(String(b.year || 2026));
+    return candYearChipsHtml(b);
+  }
+  function candYearChipsHtml(b) {
+    var ys = Array.isArray(b.yearsList) ? b.yearsList : [];
+    if (ys.length <= 1) return '<span class="chip">' + esc(String(b.year || 2026)) + '</span>';
+    return '<span class="chip" title="' + esc(ys.join(', ') + '년의 자료를 한 사업장으로 묶었습니다') + '">' + esc(String(ys[0])) + ' 외 ' + (ys.length - 1) + '개 연도</span>';
   }
 
   function refreshCandBulkUi() {
@@ -1858,7 +1978,8 @@
       return '<tr data-cand="' + esc(b.key) + '">' +
         '<td class="c"><input type="checkbox" data-ck="' + esc(ckKey) + '" data-list="cand"' + (SEL[ckKey] ? ' checked' : '') + ' aria-label="' + esc(b.companyName) + ' 선택"></td>' +
         '<td class="n">' + (i + 1) + '</td>' +
-        '<td class="ti" title="' + esc(b.companyName) + '"><span class="chip">' + esc(String(b.year || 2026)) + '</span> ' + coBadge + esc(b.companyName) + '</td>' +
+        '<td class="yr' + ((Array.isArray(b.yearsList) && b.yearsList.length > 1) ? ' g' : '') + '">' + candYearHtml(b) + '</td>' +
+        '<td class="ti" title="' + esc(b.companyName) + '">' + coBadge + esc(b.companyName) + '</td>' +
         '<td data-k="badge" title="' + esc(badgeTxt) + '">' + trTag + '<span class="chip c-blue">' + esc(badgeTxt) + '</span></td>' +
         '<td data-k="pc-only" title="' + esc(b.latestDate || '-') + '">' + esc(b.latestDate || '-') + '</td>' +
         '<td class="wide" title="' + esc(sampleTxt) + '">' + esc(sampleTxt) + '</td>' +
@@ -1867,7 +1988,7 @@
     }).join('');
 
     box.innerHTML = '<div class="scroll"><table class="t" data-name="bundles">' +
-      '<thead><tr><th class="c"><input type="checkbox" data-ckall="cand" aria-label="후보 전체 선택"></th><th class="n">№</th><th>추정 기업 · 연도</th><th>지역 · 감지 출처</th><th>최근 일자</th><th class="wide">대표 수신 제목</th><th data-k="act">작업</th></tr></thead>' +
+      '<thead><tr><th class="c"><input type="checkbox" data-ckall="cand" aria-label="후보 전체 선택"></th><th class="n">№</th><th class="yr">연도</th><th>추정 기업</th><th>세부 트랙 · 감지 출처</th><th>최근 일자</th><th class="wide">대표 수신 제목</th><th data-k="act">작업</th></tr></thead>' +
       '<tbody>' + trs + '</tbody></table></div>';
 
     refreshCandBulkUi();
@@ -2495,8 +2616,18 @@
     } catch (e) { toast('삭제 오류: ' + e.message); }
   }
 
+  // 사업장 단위 묶음에서 한 사업장의 여러 연도 건이 한꺼번에 처리될 때는 한 번 더 확인한다(건수를 말해 준다)
+  function confirmGroupedBulk(list, verb) {
+    if (!isGrouped()) return true;
+    var gc = groupProjects(list).length;
+    if (list.length <= gc) return true;
+    if (typeof global.confirm !== 'function') return true;
+    return global.confirm('선택한 ' + gc + '곳의 연도별 건 ' + list.length + '건을 모두 ' + verb + '합니다. 계속할까요?');
+  }
+
   async function bulkUpdateProjectsDone(list) {
     if (!list.length) return;
+    if (!confirmGroupedBulk(list, '완료 처리')) return;
     try {
       for (var i = 0; i < list.length; i++) {
         var p = list[i];
@@ -2513,6 +2644,7 @@
 
   async function bulkDeleteProjects(list) {
     if (!list.length) return;
+    if (!confirmGroupedBulk(list, '보관삭제')) return;
     try {
       for (var i = 0; i < list.length; i++) {
         var p = list[i];
@@ -2547,7 +2679,8 @@
       consultantName: (ME && ME.name) || '전담 노무사',
       consultantUid: str(ME && ME.uid),
       status: yr < CUR_YEAR ? 'done' : 'active',
-      summaryNote: '자동 감지 등록 (메일 ' + bundle.mailCount + ' / 톡 ' + bundle.msgCount + ')'
+      summaryNote: '자동 감지 등록 (메일 ' + bundle.mailCount + ' / 톡 ' + bundle.msgCount + ')' +
+        ((Array.isArray(bundle.yearsList) && bundle.yearsList.length > 1) ? (' · ' + bundle.yearsList[bundle.yearsList.length - 1] + '~' + bundle.yearsList[0] + '년 자료 통합') : '')
     };
     if (str(bundle.caseNo)) rec.caseNo = cleanText(bundle.caseNo).slice(0, 60);
     if (APP_KEY === 'laboraudit' && bundle.inspMeta) {
@@ -3288,7 +3421,9 @@
       leftDashWanted: function () { return leftDashWanted(); },
       leftDashLabels: function () { return leftDashLabels(); },
       isSlim: function () { return isSlim(); },
-      reportFolded: function () { return reportFolded(); }
+      reportFolded: function () { return reportFolded(); },
+      groupProjects: function (list) { return groupProjects(list); },
+      isGrouped: function () { return isGrouped(); }
     },
     projectKind: projectKind,
     guideState: guideState

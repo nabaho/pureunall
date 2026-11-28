@@ -747,6 +747,14 @@
     var existingByCoYr = Object.create(null);
     var existingByNormYrTr = Object.create(null);
     var existingByNormYr = Object.create(null);
+    // 사업장 단위로 묶는 앱(cat.groupByCompany): 연도가 달라도 같은 사업장의 «가장 최근 연도» 등록 건을 찾아 둔다.
+    var byCompany = !!cat.groupByCompany;
+    var existingByCo = Object.create(null);
+    var existingByNorm = Object.create(null);
+    function keepLatest(map, key, p) {
+      var cur = map[key];
+      if (!cur || (Number(p.year || 0) > Number(cur.year || 0))) map[key] = p;
+    }
     existingProjects.forEach(function (p) {
       var cid = str(p.companyId);
       var yr = Number(p.year || 0) || CUR_YEAR;
@@ -757,19 +765,22 @@
       if (cid) {
         if (tr) existingByCoYrTr[cid + '|' + yr + '|' + tr] = p;
         existingByCoYr[cid + '|' + yr] = existingByCoYr[cid + '|' + yr] || p;
+        if (byCompany) keepLatest(existingByCo, cid, p);
       }
       if (nn) {
         if (tr) existingByNormYrTr[nn + '|' + yr + '|' + tr] = p;
         existingByNormYr[nn + '|' + yr] = existingByNormYr[nn + '|' + yr] || p;
+        if (byCompany) keepLatest(existingByNorm, nn, p);
       }
     });
 
     var matchedCommsByPid = Object.create(null);
     var bundleMap = Object.create(null);
     var bundlePrimaryByCoYrTr = Object.create(null);
+    var bundlePrimaryByCo = Object.create(null); // 사업장 단위 앱 전용: 사업장 → 대표 묶음 키
     var mailHits = 0, msgHits = 0, erpHits = 0;
 
-    function findExistingProject(co, label, yrKey, trId, caseNo) {
+    function findExistingProject(co, label, yrKey, trId, caseNo, kind) {
       if (caseNo && existingByCaseNo[caseNo]) return existingByCaseNo[caseNo];
       var cid = co ? str(co.id) : '';
       var nn = normCorpName((co && co.name) || label);
@@ -780,6 +791,12 @@
       if (nn) {
         if (trId && existingByNormYrTr[nn + '|' + yrKey + '|' + trId]) return existingByNormYrTr[nn + '|' + yrKey + '|' + trId];
         if (appKey !== 'chamber' && existingByNormYr[nn + '|' + yrKey]) return existingByNormYr[nn + '|' + yrKey];
+      }
+      // 사업장 단위 앱: 메일·카톡은 연도가 달라도 같은 사업장의 최근 등록 건에 붙인다(연도만 다른 «새 후보»를 만들지 않는다).
+      // ERP 수임 건(kind 'erp')은 별도 계약일 수 있으니 이 폴백을 타지 않고 연도·계약번호 기준을 그대로 쓴다.
+      if (byCompany && kind !== 'erp') {
+        if (cid && existingByCo[cid]) return existingByCo[cid];
+        if (nn && existingByNorm[nn]) return existingByNorm[nn];
       }
       return null;
     }
@@ -805,7 +822,7 @@
       var trName = str(mMeta.trackName || (tr && tr.name) || cat.shortName);
       var caseNo = str(mMeta.caseNo);
 
-      var existingProj = findExistingProject(co, label, yrKey, trId, caseNo);
+      var existingProj = findExistingProject(co, label, yrKey, trId, caseNo, kind);
       if (existingProj) {
         if (!matchedCommsByPid[existingProj.id]) matchedCommsByPid[existingProj.id] = [];
         matchedCommsByPid[existingProj.id].push(item);
@@ -819,6 +836,9 @@
         bKey = normCoKey + '_' + yrKey + '_' + (appKey === 'chamber' ? trId + '_' : '') + caseNo;
       } else if (bundlePrimaryByCoYrTr[coYrTrKey]) {
         bKey = bundlePrimaryByCoYrTr[coYrTrKey];
+      } else if (byCompany && kind !== 'erp') {
+        // 사업장 단위 앱: 같은 사업장의 메일·카톡은 연도가 달라도 한 묶음(후보 1곳)으로 모은다.
+        bKey = bundlePrimaryByCo[normCoKey] || (normCoKey + '_all');
       } else {
         bKey = normCoKey + '_' + yrKey + (appKey === 'chamber' ? ('_' + trId) : '');
       }
@@ -850,11 +870,18 @@
           items: []
         };
         if (!bundlePrimaryByCoYrTr[coYrTrKey]) bundlePrimaryByCoYrTr[coYrTrKey] = bKey;
+        if (byCompany && !bundlePrimaryByCo[normCoKey]) bundlePrimaryByCo[normCoKey] = bKey;
       }
       var b = bundleMap[bKey];
       if (!mMeta.trackId && appKey === 'laboraudit' && b.suggestedTrackId === 'la_regular' && trId !== 'la_regular') {
         b.suggestedTrackId = trId;
         b.suggestedTrackName = trName;
+      }
+      if (byCompany) {
+        // 연도는 사라지지 않게 목록으로 남기고, 계약번호가 없는 묶음의 대표 연도는 가장 최근 연도로 올린다.
+        b.years = b.years || {};
+        b.years[yrKey] = 1;
+        if (!b.caseNo && !caseNo && yrKey > b.year) b.year = yrKey;
       }
       if (!b.suggestedCompanyId && mMeta.suggestedCompanyId) b.suggestedCompanyId = str(mMeta.suggestedCompanyId);
       if (kind === 'mail') b.mailCount++;
@@ -867,7 +894,8 @@
       if (item.date && item.date > b.latestDate) b.latestDate = item.date;
       ((cls && cls.matchedReasons) || []).forEach(function (r) { b.reasons[r] = 1; });
       if (item.subject && b.sampleSubjects.length < 3 && b.sampleSubjects.indexOf(item.subject) < 0) b.sampleSubjects.push(item.subject);
-      if (b.items.length < 25) b.items.push(item);
+      // 사업장 단위 묶음은 여러 해 자료가 모이므로 넉넉히 담았다가 마지막에 최근 순 25건만 남긴다.
+      if (b.items.length < (byCompany ? 200 : 25)) b.items.push(item);
       b.comms = b.items;
     }
 
@@ -951,6 +979,13 @@
       b.reasonsList = Object.keys(b.reasons);
       b.totalCount = b.mailCount + b.msgCount + b.erpCount;
       if (appKey === 'laboraudit') b.inspMeta = extractInspectionMeta(b.items);
+      if (byCompany) {
+        b.years = b.years || {};
+        b.years[b.year] = 1;
+        b.yearsList = Object.keys(b.years).map(Number).sort(function (x, y) { return y - x; });
+        b.items = b.items.slice().sort(function (x, y) { return String(y.date || '').localeCompare(String(x.date || '')); }).slice(0, 25);
+        b.comms = b.items;
+      }
       return b;
     }).sort(function (a, b) {
       return (Number(!!a.isAgencyNotice) - Number(!!b.isAgencyNotice)) ||
