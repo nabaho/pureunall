@@ -540,8 +540,7 @@
     };
   }
 
-  function openInHangulEditor(kind, project, checkDoc, intakeMap, reportObj) {
-    var payload = buildHangulBridgePayload(kind, project, checkDoc, intakeMap, reportObj);
+  function sendHangulBridgePayload(payload) {
     if (typeof localStorage !== 'undefined') {
       try {
         var serialized = JSON.stringify(payload);
@@ -551,7 +550,16 @@
       } catch (e) {}
     }
     if (typeof window !== 'undefined') {
+      var clearBridgeStorage = function () {
+        if (typeof localStorage !== 'undefined') {
+          try { localStorage.removeItem('pureun_hangul_bridge'); } catch (e) {}
+        }
+      };
       var win = window.open('hangul.html?from=safety', '_blank');
+      if (!win) {
+        clearBridgeStorage();
+        return payload;
+      }
       var sendPayload = function () {
         try {
           if (win && !win.closed) win.postMessage({ type: 'pureun_hangul_open', payload: payload }, location.origin);
@@ -563,11 +571,6 @@
             ch.close();
           }
         } catch (e) {}
-      };
-      var clearBridgeStorage = function () {
-        if (typeof localStorage !== 'undefined') {
-          try { localStorage.removeItem('pureun_hangul_bridge'); } catch (e) {}
-        }
       };
       var onReadyMsg = function (ev) {
         if (!ev || ev.origin !== location.origin) return;
@@ -598,6 +601,10 @@
       }, 15000);
     }
     return payload;
+  }
+
+  function openInHangulEditor(kind, project, checkDoc, intakeMap, reportObj) {
+    return sendHangulBridgePayload(buildHangulBridgePayload(kind, project, checkDoc, intakeMap, reportObj));
   }
 
   /* ══ 4. A4 웹 미리보기 · PDF 인쇄 HTML 렌더러 ════════════════════════ */
@@ -708,9 +715,7 @@
       '</div>';
   }
 
-  function buildFullPrintDocument(kind, project, checkDoc, intakeMap, reportObj) {
-    var htmlBody = buildPreviewHtml(kind, project, checkDoc, intakeMap, reportObj);
-    var title = suggestedFileName(kind, project).replace(/\.hwpx$/i, '');
+  function wrapPrintHtml(title, bodyHtml) {
     return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
       '<style>' +
       '@page{size:A4;margin:14mm 15mm}' +
@@ -734,8 +739,14 @@
       '@media print{body{background:#fff;padding:0}.print-bar{display:none}.pv-doc{border:0;padding:0;max-width:none}}' +
       '</style></head><body>' +
       '<div class="print-bar"><button onclick="window.print()">인쇄 / PDF 저장</button></div>' +
-      htmlBody +
+      bodyHtml +
       '</body></html>';
+  }
+
+  function buildFullPrintDocument(kind, project, checkDoc, intakeMap, reportObj) {
+    var htmlBody = buildPreviewHtml(kind, project, checkDoc, intakeMap, reportObj);
+    var title = suggestedFileName(kind, project).replace(/\.hwpx$/i, '');
+    return wrapPrintHtml(title, htmlBody);
   }
 
   function openPrintWindow(kind, project, checkDoc, intakeMap, reportObj) {
@@ -748,6 +759,237 @@
     win.document.write(docHtml);
     win.document.close();
     return true;
+  }
+
+  /* ══ 4-B. 개별 안전보건 실무 서류·서식(.hwpx · A4 미리보기 · 인쇄 · ZIP) ══ */
+  function parseStructuredBodyNodes(rawBody) {
+    var lines = String(rawBody || '').split(/\r?\n/);
+    var nodes = [];
+    var tblBuf = [];
+    var paraBuf = [];
+
+    function flushPara() {
+      if (!paraBuf.length) return;
+      nodes.push({ kind: 'para', text: paraBuf.join('\n') });
+      paraBuf = [];
+    }
+    function flushTable() {
+      if (!tblBuf.length) return;
+      var parsed = tblBuf.map(function (ln) {
+        var trimmed = ln.trim().replace(/^\|/, '').replace(/\|$/, '');
+        return trimmed.split('|').map(function (c) { return c.trim(); });
+      }).filter(function (cells) {
+        return !cells.every(function (c) { return /^[-:]+$/.test(c); });
+      });
+      if (parsed.length) {
+        var colCnt = parsed.reduce(function (mx, r) { return Math.max(mx, r.length); }, 1);
+        var normRows = parsed.map(function (r) {
+          var row = r.slice(0, colCnt);
+          while (row.length < colCnt) row.push('');
+          return row;
+        });
+        nodes.push({ kind: 'table', headers: normRows[0], rows: normRows.slice(1) });
+      }
+      tblBuf = [];
+    }
+
+    lines.forEach(function (ln) {
+      var trimmed = ln.trim();
+      if (/^\|.*\|$/.test(trimmed)) {
+        flushPara();
+        tblBuf.push(trimmed);
+        return;
+      }
+      flushTable();
+      if (!trimmed) {
+        flushPara();
+        return;
+      }
+      if (
+        /^(?:\d+\.|제\s*\d+\s*장|\[.+\]$)/.test(trimmed) &&
+        trimmed.length <= 80 &&
+        !/다\.$/.test(trimmed) &&
+        !/^\d+\.\s*\[/.test(trimmed) &&
+        !/^\[(?:사업장|가림)\]/.test(trimmed)
+      ) {
+        flushPara();
+        nodes.push({ kind: 'heading', text: trimmed });
+        return;
+      }
+      paraBuf.push(ln);
+    });
+    flushTable();
+    flushPara();
+    return nodes;
+  }
+
+  function suggestedSingleDocFileName(docObj, project) {
+    var p = project || {};
+    var d = docObj || {};
+    var co = safeFilePart(p.companyName);
+    var docName = safeFilePart(d.short || d.title || d.code || '안전보건서식');
+    return co + '_' + docName + '.hwpx';
+  }
+
+  function buildSingleDocModel(docObj, project) {
+    var p = project || {};
+    var d = docObj || {};
+    var tr = Cat.getTrack(p.track);
+    var ind = Cat.getIndustry(p.industryCode);
+    var theme = themeForTrack(tr.code);
+    var coName = str(p.companyName) || '참여사업장';
+    var yr = p.year || 2026;
+    var docDate = str(d.docDate) || new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    var reqLabel = str(d.reqLabel || '표준서류');
+    var docTitle = str(d.title || d.name || '안전보건관리체계 실무 서류');
+
+    var blocks = [];
+    blocks.push(makeBannerTable(
+      yr + '년도 안전보건관리체계 구축 실무 서식  ·  ' + ind.short + '  ·  ' + reqLabel,
+      docTitle,
+      coName + '  |  작성일: ' + docDate + '  |  ' + (str(d.legalRef) || '산업안전보건법 · 중대재해처벌법'),
+      theme,
+      true
+    ));
+
+    blocks.push(makeKeyValueTable([
+      ['사 업 장 명', coName, '업 종 / 규 모', ind.short + ' (' + (Number(p.workerCount) || 0) + '명)'],
+      ['작 성 일 자', docDate, '진 행 상 태', d.status === 'done' ? '작성 완료' : (d.status === 'na' ? '해당 없음' : '작성 중(초안)')],
+      ['작 성 자', str(p.consultantName) || '푸른노무법인', '확 인 / 승 인', str(p.ceoName) || '경영책임자 (인)']
+    ], theme));
+
+    var nodes = parseStructuredBodyNodes(d.body || '');
+    nodes.forEach(function (nd) {
+      if (nd.kind === 'heading') {
+        blocks.push(makeSectionHeaderBlock(nd.text, '', theme, false));
+      } else if (nd.kind === 'table') {
+        var colN = nd.headers.length;
+        var cw = nd.headers.map(function (_, i) {
+          if (colN === 2) return i === 0 ? 0.28 : 0.72;
+          if (colN === 3) return i === 0 ? 0.24 : (i === 1 ? 0.50 : 0.26);
+          return 1 / colN;
+        });
+        blocks.push(makeTableBlock(nd.headers, nd.rows, cw, theme, 8.6));
+      } else {
+        blocks.push(pBlock(nd.text, { size: 9.6, after: 4 }));
+      }
+    });
+
+    return {
+      page: {
+        paper: 'A4', width: 210, height: 297, landscape: false,
+        margin: { top: 16, bottom: 14, left: 16, right: 16, header: 9, footer: 9 }
+      },
+      header: [pBlock(coName + '  |  ' + docTitle, { align: 'right', size: 8.5, color: '#64748B', after: 0 })],
+      footer: null,
+      pageNum: { pos: 'BOTTOM_CENTER', dash: true },
+      blocks: blocks
+    };
+  }
+
+  function generateSingleDocHwpxBytes(docObj, project) {
+    if (!root.PureunHwpx || typeof root.PureunHwpx.buildHwpx !== 'function') {
+      throw new Error('PureunHwpx 엔진이 로드되지 않았습니다.');
+    }
+    return root.PureunHwpx.buildHwpx(buildSingleDocModel(docObj, project));
+  }
+
+  function downloadSingleDocHwpx(docObj, project) {
+    var bytes = generateSingleDocHwpxBytes(docObj, project);
+    return downloadHwpxBytes(bytes, suggestedSingleDocFileName(docObj, project));
+  }
+
+  function openSingleDocInHangul(docObj, project) {
+    var bytes = generateSingleDocHwpxBytes(docObj, project);
+    var fileName = suggestedSingleDocFileName(docObj, project);
+    return sendHangulBridgePayload({
+      bridgeId: 'sfdoc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      source: 'safety',
+      sourceLabel: '안전보건서식',
+      format: 'hwpx',
+      name: fileName.replace(/\.hwpx$/i, ''),
+      label: fileName.replace(/\.hwpx$/i, ''),
+      b64: bytesToB64(bytes),
+      sentAt: Date.now()
+    });
+  }
+
+  function buildSingleDocPreviewHtml(docObj, project) {
+    var p = project || {};
+    var d = docObj || {};
+    var tr = Cat.getTrack(p.track);
+    var ind = Cat.getIndustry(p.industryCode);
+    var theme = themeForTrack(tr.code);
+    var coName = str(p.companyName) || '참여사업장';
+    var yr = p.year || 2026;
+    var docDate = str(d.docDate) || new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    var docTitle = str(d.title || d.name || '안전보건관리체계 실무 서류');
+
+    var nodesHtml = parseStructuredBodyNodes(d.body || '').map(function (nd) {
+      if (nd.kind === 'heading') return '<div class="pv-sec-hd">' + esc(nd.text) + '</div>';
+      if (nd.kind === 'table') return renderHtmlTable(nd.headers, nd.rows);
+      return '<div class="pv-para">' + esc(nd.text) + '</div>';
+    }).join('');
+
+    return '<div class="pv-doc ' + theme.cls + '">' +
+      '<div class="pv-banner">' +
+        '<div class="pv-top">' + esc(yr + '년도 안전보건관리체계 실무 서식 · ' + ind.short) + '</div>' +
+        '<h2>' + esc(docTitle) + '</h2>' +
+        '<p>' + esc(coName + '  |  근로자: ' + (Number(p.workerCount) || 0) + '명  |  작성일: ' + docDate) + '</p>' +
+      '</div>' +
+      renderHtmlTable(['사업장', '적용판정', '관계법령', '작성상태'], [[
+        coName,
+        str(d.reqLabel || '표준서류'),
+        str(d.legalRef || '산안법·중처법'),
+        d.status === 'done' ? '작성완료' : (d.status === 'na' ? '해당없음' : '작성중(초안)')
+      ]]) +
+      (nodesHtml || '<div class="pv-para">(본문 내용이 비어 있습니다. 왼쪽 편집창에서 초안을 생성하거나 샘플을 불러오세요.)</div>') +
+      '</div>';
+  }
+
+  function openSingleDocPrintWindow(docObj, project) {
+    if (typeof window === 'undefined') return false;
+    var win = window.open('', '_blank');
+    if (!win) return false;
+    var htmlBody = buildSingleDocPreviewHtml(docObj, project);
+    var title = suggestedSingleDocFileName(docObj, project).replace(/\.hwpx$/i, '');
+    var docHtml = wrapPrintHtml(title, htmlBody)
+      .replace('</body>', '<script>setTimeout(function(){window.print();},250);<\/script></body>');
+    win.document.open();
+    win.document.write(docHtml);
+    win.document.close();
+    return true;
+  }
+
+  function downloadDocsBundleZip(docsList, project) {
+    var JSZip = root.JSZip;
+    if (!JSZip) throw new Error('JSZip 라이브러리가 로드되지 않았습니다.');
+    var zip = new JSZip();
+    var p = project || {};
+    var co = safeFilePart(p.companyName);
+    var items = (Array.isArray(docsList) ? docsList : []).filter(function (d) {
+      return d && str(d.body) && d.status !== 'na' && d.applicable !== 'na';
+    });
+
+    items.forEach(function (d, idx) {
+      var noStr = String(d.no || (idx + 1)).padStart(2, '0');
+      var fileName = noStr + '_' + suggestedSingleDocFileName(d, p);
+      zip.file(fileName, generateSingleDocHwpxBytes(d, p));
+    });
+
+    var idxTable = renderHtmlTable(
+      ['번호', '서류명', '분류', '상태', '관계법령'],
+      items.map(function (d, i) {
+        return [d.no || (i + 1), d.title || d.name, d.categoryLabel || '-', d.status === 'done' ? '완료' : '초안', d.legalRef || '-'];
+      })
+    );
+    zip.file('00_' + co + '_안전보건서류_목록.html', wrapPrintHtml(co + ' 안전보건 필수서류 묶음', '<div class="pv-doc"><div class="pv-banner"><div class="pv-top">안전보건관리체계구축 실무 서류 묶음</div><h2>' + esc(str(p.companyName) + ' 필수서류·서식 (' + items.length + '종)') + '</h2><p>작성일: ' + esc(new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)) + '</p></div>' + idxTable + '</div>'));
+
+    return zip.generateAsync({ type: 'blob' }).then(function (blob) {
+      var zipName = co + '_안전보건_필수서류_' + items.length + '종.zip';
+      triggerBlobDownload(blob, zipName);
+      return zipName;
+    });
   }
 
   /* ══ 5. XLSX 5시트 통합 워크북 & ZIP 패키지 ══════════════════════════ */
@@ -845,6 +1087,14 @@
     buildFullPrintDocument: buildFullPrintDocument,
     openPrintWindow: openPrintWindow,
     downloadWorkbookXlsx: downloadWorkbookXlsx,
-    downloadBundleZip: downloadBundleZip
+    downloadBundleZip: downloadBundleZip,
+    suggestedSingleDocFileName: suggestedSingleDocFileName,
+    buildSingleDocModel: buildSingleDocModel,
+    generateSingleDocHwpxBytes: generateSingleDocHwpxBytes,
+    downloadSingleDocHwpx: downloadSingleDocHwpx,
+    openSingleDocInHangul: openSingleDocInHangul,
+    buildSingleDocPreviewHtml: buildSingleDocPreviewHtml,
+    openSingleDocPrintWindow: openSingleDocPrintWindow,
+    downloadDocsBundleZip: downloadDocsBundleZip
   };
 });
