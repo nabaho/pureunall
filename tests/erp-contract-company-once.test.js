@@ -116,7 +116,9 @@ test('사람이 고른 갈래는 안 건드린다', () => {
 
 test('다른 갈래도 그대로 채워진다 — 업체를 넣다가 남을 깨뜨리지 않았다', () => {
   const t = runFix(['company', 'consulting', 'fund', 'other', 'case']);
-  assert.equal(t.consulting, '컨설팅첫');
+  /* ⚠ 컨설팅만 예외 — «첫 번째»로 채우지 않는다(대표 지시 2026-11-28 「위험성평가·작업중지 해제 대응인데 왜 현장클리닉이냐」).
+       첫 번째가 현장클리닉이라 안 고른 계약이 모두 현장클리닉으로 굳었다. 글로 못 고르면 비운다(저장 전에 사람에게 묻는다). */
+  assert.ok(!t.consulting, '★ 컨설팅 유형을 목록 첫 번째로 채우면 안 됩니다 — 받은 값: ' + t.consulting);
   assert.equal(t.fund, '기금첫');
   assert.equal(t.other, '기타첫');
   assert.equal(t.case, '사건첫');
