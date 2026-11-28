@@ -336,11 +336,24 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
      1단계: 아바타·«이번 달» 글자를 접는다 — 폰이 이미 접는 것들이다(이름·금액은 그대로 남는다). PC 는 챗봇 글자도 접고(태블릿·폰이 이미 접음, 이름은 aria-label·title) 사이를 좁힌다.
      2단계(PC): 머리줄 단추(내 업무·캘린더)도 그림 + 딱지 — 태블릿(≤900px, 위 규칙)과 «같은» 모양(이름은 aria-label·title 에 그대로). 태블릿은 이미 이 모양이다.
      태블릿은 768px 에서 사용액 + «○ 서버 연결 끊김»이 함께 뜨면 로그아웃이 화면 밖으로 밀렸다(2026-11-28 외부 점검 지적·phone-audit pbar-offline 화면).
+     3~5단계(대표 2026-11-28 「후보 2 — 한 줄, 브랜드 글자부터」): 600·521px(작은 태블릿·나눈 창)은 1·2단계로도 모자랐다(로그아웃·내 메뉴가 화면 밖).
+       머리줄은 한 줄 그대로 두고 «기능 없는 글자»부터 접는다 — 3단계 브랜드 글자(로고 «푸»는 남는다) → 4단계 «건의하기» 글자(💬 그림만)
+       → 5단계(마지막) 로그아웃을 내 메뉴 맨 아래로(폰과 같은 자리 #meLogout). 로그아웃이 머리줄에서 빠지는 것은 가장 좁을 때뿐이다.
    ⚠ 폰(≤520px)은 이 규칙을 안 탄다 — 폰 머리줄은 줄이 접힌다(flex-wrap). @media 로 막고, pbarFit 도 그 폭에서는 data-fit 를 지운다.
-   ⚠ 틈·챗봇 여백은 PC 만 — 태블릿은 이미 더 좁다(위 521~900px 규칙). 태블릿에 PC 값을 덮으면 오히려 넓어진다. */
+   ⚠ 틈·챗봇 여백은 PC 만 — 태블릿은 이미 더 좁다(위 521~900px 규칙). 태블릿에 PC 값을 덮으면 오히려 넓어진다.
+   ⚠ 태블릿에 닿는 단계는 «감추기» · «평소 감춰 둔 대역 꺼내기»(내 메뉴 안 로그아웃·💬) · «빈 자리 밀개 넘겨받기»만 쓴다(tests/portal-pbar-fit.test.js ①). */
 @media(min-width:521px){
   .pbar[data-fit~="1"] .pmeta .avatar{display:none;}
   .pbar[data-fit~="1"] .pmeta .me-money small{display:none;}
+  /* 3단계: 브랜드 글자 — 오른쪽으로 미는 빈 자리(.nm 의 margin-right:auto)는 로고가 넘겨받는다(안 그러면 단추들이 왼쪽으로 쏠린다) */
+  .pbar[data-fit~="3"] .nm{display:none;}
+  .pbar[data-fit~="3"] .logo{margin-right:auto;}
+  /* 4단계: «💬 건의하기» 대신 평소 감춰 둔 💬 대역(.sg-ico — 이름은 aria-label)을 꺼낸다 */
+  .pbar[data-fit~="4"] #sgFab .sg-tx{display:none;}
+  .pbar[data-fit~="4"] #sgFab .sg-ico{display:inline;}
+  /* 5단계(마지막): 로그아웃은 내 메뉴 맨 아래로 — 폰과 같은 규칙(아래 ≤520px 구간) */
+  .pbar[data-fit~="5"] > #logoutBtn{display:none;}
+  .pbar[data-fit~="5"] .me-menu .me-logout{display:block;}
 }
 @media(min-width:901px){
   .pbar[data-fit~="1"]{gap:8px;}
@@ -370,7 +383,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .me-money small{font-size:.68rem;color:var(--mute);margin-left:3px;}
 .me-money[data-tone="warn"] b{color:#d97706;}
 .me-money[data-tone="over"] b{color:#dc2626;}
-.pbar > .logout{order:6;padding:6px 4px;}    /* 로그아웃은 맨 오른쪽에 «늘» 보인다(PC) — 폰은 내 메뉴 맨 아래 */
+.pbar > .logout{order:6;padding:6px 4px;}    /* 로그아웃은 맨 오른쪽에 «늘» 보인다(PC) — 폰·머리줄 맞춤 마지막 단계는 내 메뉴 맨 아래 */
 .pbar .pmeta:focus-visible{outline:2px solid #1e40af;outline-offset:2px;}
 .pbar .pmeta .un-title{display:none;}    /* 직책은 내 메뉴 맨 위에 — 머리줄에는 이름만 */
 .pbar .connection-status[data-state="online"] .cs-lb{display:none;}   /* 잘 될 때는 점 하나 · 끊기면 말 그대로 */
@@ -448,7 +461,7 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .me-go{margin-left:auto;font-size:.72rem;font-weight:700;color:var(--accent);}
 .pbar .me-menu .logout{display:block;width:100%;margin:6px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:9px;
   background:#ffffff;font-size:.8rem;text-align:center;}
-.pbar .me-menu .me-logout{display:none;}     /* PC 는 머리줄에 로그아웃이 있다 — 메뉴 안 것은 폰에서만 */
+.pbar .me-menu .me-logout{display:none;}     /* PC 는 머리줄에 로그아웃이 있다 — 메뉴 안 것은 폰·머리줄 맞춤 마지막 단계(5)에서만 */
 /* 📲 앱으로 깔기 — 직원 폰 ⋯ 안(appInstallFab) · 관리자 설정 창 안(cfgAppInstallRow).
    ⚠ ⋯ 안의 .docked 가 display 를 !important 로 켜므로, 숨김([hidden])이 그보다 세야 한다(아래 #moreDock 규칙). */
 #appInstallFab{display:none;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;border:none;
@@ -1011,6 +1024,7 @@ body.portal-mode #camFab{display:flex;}
 .sgd-warn-bar .sg-btn{width:auto;min-height:36px;margin:0;padding:8px 14px;font-size:.76rem;background:#991b1b;flex:none;}
 @media(max-width:520px){#sgDoneModal .sgd-warn{margin:10px 14px 0;padding:8px 10px;font-size:.74rem;line-height:1.5;}#sgDoneModal .sgd-warn .sub{display:none;}}
 .sg-fabwarn{display:none;}
+#sgFab .sg-ico{display:none;}   /* 💬 대역 — 머리줄 맞춤 4단계(태블릿·나눈 창이 좁을 때)에만 «💬 건의하기» 대신 꺼낸다 */
 #sgFab.sg-need .sg-fabwarn{display:inline;}
 #sgFab.sg-need{background:#991b1b;animation:sgNeedPulse 1.8s ease-in-out infinite;}
 @keyframes sgNeedPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55);}50%{box-shadow:0 0 0 8px rgba(220,38,38,0);}}
@@ -1655,7 +1669,10 @@ body.portal-mode #moreFab{display:flex;}
         <span class="hd-ico" aria-hidden="true"><i class="hd-m"></i><em class="hd-d"></em></span>
         <span class="hd-tx"><b>푸른 캘린더</b><small class="hd-n" hidden aria-hidden="true"><span class="hd-nl">오늘 </span><span class="hd-nv"></span><span class="hd-nl">건</span></small></span>
       </a>
-      <button id="sgFab" type="button"><span class="sg-fabwarn" id="sgFabWarn" aria-hidden="true">⚠ </span>💬 건의하기<span class="sg-fabbadge" id="sgFabBadge"></span></button>
+      <!-- «💬 건의하기»는 «한 칸·한 흐름»(.sg-tx)으로 둔다 — 안을 더 나누면(글자만 span) 글자 흐름이 끊겨 기본 모양이 몇 점씩 바뀌고,
+           칸을 따로 세우면 inline-flex 틈이 끼어 폭이 넓어진다(2026-11-28 갈무리로 확인). 머리줄이 모자라면 맞춤 4단계가 이 칸을 감추고
+           평소 감춰 둔 💬 대역(.sg-ico)을 꺼낸다 — 그때 단추 이름은 대역의 aria-label(건의하기)이 맡는다. -->
+      <button id="sgFab" type="button"><span class="sg-fabwarn" id="sgFabWarn" aria-hidden="true">⚠ </span><span class="sg-tx">💬 건의하기</span><span class="sg-ico" role="img" aria-label="건의하기">💬</span><span class="sg-fabbadge" id="sgFabBadge"></span></button>
       <!-- 👤 내 메뉴 (대표 2026-10-24 머리 카드 1안 「아바타 하나」) — 아래 .pmeta(이름 ▾)를 누르면 펼친다.
            사용액·AI 판독·내 정보·로그아웃이 여기 있다. ⚠ 이름·연결 상태는 머리줄(.pmeta)에 남는다(사번은 안 적는다). -->
       <div class="me-menu" id="meMenu" role="menu" aria-label="내 메뉴" hidden>
@@ -1685,7 +1702,8 @@ body.portal-mode #moreFab{display:flex;}
       <button type="button" class="me-item" id="meProfile">🔗 내 정보 · 카카오 연결<span class="me-go" aria-hidden="true">열기 ›</span></button>
       <button type="button" class="logout me-logout" id="meLogout">로그아웃</button>
       </div>
-      <!-- 로그아웃은 머리줄 맨 오른쪽에 늘 보인다(PC, order:6). 폰은 좁아서 숨기고 내 메뉴 맨 아래 #meLogout 이 대신 누른다. -->
+      <!-- 로그아웃은 머리줄 맨 오른쪽에 늘 보인다(PC, order:6). 폰은 좁아서 숨기고 내 메뉴 맨 아래 #meLogout 이 대신 누른다.
+           태블릿·나눈 창에서 다 접어도 모자라면(머리줄 맞춤 5단계) 폰처럼 내 메뉴 맨 아래로 간다. -->
       <button class="logout" id="logoutBtn">로그아웃</button>
       <div class="pmeta" id="meBtn" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="meMenu" title="내 메뉴">
         <span id="statusDot" class="connection-status" data-state="checking" role="status" aria-live="polite">○ 연결 확인 중</span>
@@ -5715,7 +5733,9 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 폰(≤520px)은 머리줄이 줄을 접는다(CSS flex-wrap) — 여기서는 data-fit 를 지우고 손대지 않는다.
      ⚠ 떠 있는 창(내 메뉴·첫 안내) 안의 바뀜은 무시한다 — 첫 안내 자리 맞춤(style)이 다시 맞춤을 부르는 되풀이를 막는다. */
   var PBAR_FIT_EDGE = 8;
-  var PBAR_FIT_STEPS = ['', '1', '1 2'];
+  /* 단계는 앞에서부터 하나씩 더 접는다 — 1 아바타·이번 달 · 2 머리줄 단추 그림만(PC) · 3 브랜드 글자 · 4 건의하기 글자 · 5 로그아웃을 내 메뉴로(마지막).
+     뒤 셋은 대표 2026-11-28 「후보 2」 — 로그아웃은 맨 나중(머리줄 CSS 「머리줄 맞춤」 풀이). */
+  var PBAR_FIT_STEPS = ['', '1', '1 2', '1 2 3', '1 2 3 4', '1 2 3 4 5'];
   var _pbarFitQ = 0, _pbarFitMo = null;
   function pbarFitRight(bar){
     var r = 0, kids = bar.children;
