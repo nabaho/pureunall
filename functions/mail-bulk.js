@@ -46,6 +46,9 @@ const MAX_SPACING_SEC = 600;
      index.js · 여기 · 화면 두 곳(pu-cards.html BULK_DRAIN_*, js/pu-news-core.js). */
 const DRAIN_EVERY_MIN = 15;
 const DRAIN_BATCH = 20;
+/* 단건 예약·회생 자동 메일이 뉴스레터/대량 발송(최대 400통) 뒤에 밀리지 않도록
+   priorityAt 색인을 통해 우선 레인으로 먼저 집어 간다(1회 최대 15통). */
+const PRIORITY_BATCH = 15;
 
 /* 예약 발송 실패 복구.
    일시적인 다음메일·통신 오류는 두 번 더 시도한다. 그래도 안 되면 기록은 남기되
@@ -55,6 +58,10 @@ const MAX_DELIVERY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 const PARKED_AT = Date.UTC(9999, 0, 1);
 const SENDING_LEASE_MS = 20 * 60 * 1000;
+
+function hasPriorityLane(row) {
+  return !!(row && typeof row === 'object' && row.priorityAt !== undefined && row.priorityAt !== null);
+}
 
 function deliveryFailure(row, now, error) {
   const r = row && typeof row === 'object' ? row : {};
@@ -67,11 +74,14 @@ function deliveryFailure(row, now, error) {
     sendingAt: null,
   };
   if (attempt < MAX_DELIVERY_ATTEMPTS) {
-    return Object.assign(common, { state: 'waiting', at: t + RETRY_DELAY_MS, retryAt: t + RETRY_DELAY_MS });
+    const nextAt = t + RETRY_DELAY_MS;
+    const patch = { state: 'waiting', at: nextAt, retryAt: nextAt };
+    if (hasPriorityLane(r)) patch.priorityAt = nextAt;
+    return Object.assign(common, patch);
   }
-  return Object.assign(common, {
-    state: 'failed', originalAt: Number(r.originalAt || r.at) || t, at: PARKED_AT,
-  });
+  const patch = { state: 'failed', originalAt: Number(r.originalAt || r.at) || t, at: PARKED_AT };
+  if (hasPriorityLane(r)) patch.priorityAt = PARKED_AT;
+  return Object.assign(common, patch);
 }
 
 function staleSending(row, now) {
@@ -84,7 +94,7 @@ function staleSending(row, now) {
 function uncertainDelivery(row, now) {
   const r = row && typeof row === 'object' ? row : {};
   const t = Number(now) || Date.now();
-  return {
+  const patch = {
     state: 'uncertain',
     error: '발송 중 실행이 중단되어 실제 발송 여부를 확인해야 합니다.',
     failedAt: t,
@@ -92,15 +102,42 @@ function uncertainDelivery(row, now) {
     at: PARKED_AT,
     sendingAt: null,
   };
+  if (hasPriorityLane(r)) patch.priorityAt = PARKED_AT;
+  return patch;
 }
 
 function parkOldFailure(row, now) {
   const r = row && typeof row === 'object' ? row : {};
   const t = Number(now) || Date.now();
-  return {
+  const patch = {
     originalAt: Number(r.originalAt || r.at) || t,
     at: PARKED_AT,
   };
+  if (hasPriorityLane(r)) patch.priorityAt = PARKED_AT;
+  return patch;
+}
+
+/* 우선 레인(단건·회생 자동 메일)을 대량 발송 레인보다 먼저 배치하고 중복 ID를 제거한다. */
+function mergeScheduledBatch(priorityMap, standardMap) {
+  const pMap = priorityMap && typeof priorityMap === 'object' ? priorityMap : {};
+  const sMap = standardMap && typeof standardMap === 'object' ? standardMap : {};
+  const pVal = (r) => Number((r && r.priorityAt != null ? r.priorityAt : r && r.at) || 0);
+  const sVal = (r) => Number((r && r.at) || 0);
+  const pIds = Object.keys(pMap).sort((a, b) => pVal(pMap[a]) - pVal(pMap[b]));
+  const sIds = Object.keys(sMap).sort((a, b) => sVal(sMap[a]) - sVal(sMap[b]));
+  const rowsById = {};
+  const ids = [];
+  for (const id of pIds) {
+    if (!pMap[id]) continue;
+    rowsById[id] = pMap[id];
+    ids.push(id);
+  }
+  for (const id of sIds) {
+    if (!sMap[id] || Object.prototype.hasOwnProperty.call(rowsById, id)) continue;
+    rowsById[id] = sMap[id];
+    ids.push(id);
+  }
+  return { rowsById, ids };
 }
 
 /* 글 안의 {이름}·{회사} 를 그 곳 값으로 바꾼다.
@@ -326,8 +363,8 @@ function etaText(n, gapMs) {
 
 module.exports = {
   MAX_BULK, DEFAULT_SPACING_SEC, MIN_SPACING_SEC, MAX_SPACING_SEC,
-  DRAIN_EVERY_MIN, DRAIN_BATCH, MAX_DELIVERY_ATTEMPTS, RETRY_DELAY_MS, PARKED_AT,
+  DRAIN_EVERY_MIN, DRAIN_BATCH, PRIORITY_BATCH, MAX_DELIVERY_ATTEMPTS, RETRY_DELAY_MS, PARKED_AT,
   SENDING_LEASE_MS, 같은사서함도메인,
   fill, cleanTargets, spacingMs, validateBulk, buildQueue, etaText, 보내는주소고르기,
-  deliveryFailure, staleSending, uncertainDelivery, parkOldFailure,
+  deliveryFailure, staleSending, uncertainDelivery, parkOldFailure, mergeScheduledBatch,
 };
