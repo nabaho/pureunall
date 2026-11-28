@@ -24,6 +24,8 @@
       ReviewCriterion:'검토 기준', LegalProvision:'법령 조문',
       /* 정부지원금(2026-10-11) — 지원사업 사전 한 건 · (회사, 사업) 한 쌍에 대한 노무사의 검토 결정 */
       SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
+      /* 정부사업 바로가기(2026-11-28) — 사업 하나의 기관 시스템 주소·메모·폴더 경로·이어 둔 이알피 사업 code 묶음 */
+      GovLinkSet:'정부사업 바로가기 묶음',
       /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
       SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
       /* 법정교육자료함(2026-11-19) — 강의자료 파일 한 건(원본은 창고에 받은 그대로) · 그 자료를 본 노무사의 검토 메모 */
@@ -270,6 +272,14 @@
                       /* 받은 지원금 금액(2026-11-01 진행 카드) — 관리자·재무만 읽고 쓰는 따로 자리 */
                       {path:'govaid_money/{key}/{programId}',entityType:'EligibilityReview'}],
       entityTypes:['Organization','SupportProgram','EligibilityReview','Document','Task'] },
+    /* 정부사업 바로가기 — 사업마다 기관 시스템 주소·메모·폴더·이어 둔 이알피 사업(대표 지시 2026-11-28).
+       ★ 쓰는 것: govlinks/sets/{id} (GovLinkSet) 하나뿐 — 지우기는 _deleted 표식. 재직 직원 읽기·쓰기(규칙 govlinks).
+       ★ 읽기만: 컨설팅보고서와 같은 자리(이알피 컨설팅 사업·사업 이음표·정부사업일정 업체·사업·일정·담당·사업 종결·순서) — 주인은 erp·consult·govreport.
+       ⚠ 이알피 사업과의 연결(bizCodes)은 사람이 고른 것만 저장한다 — 이름이 비슷해 보이는 사업은 «연결 제안»으로만 보인다(저장 안 함). */
+    govlinks:{ name:'정부사업 바로가기', file:'gov-links.html', primaryRoots:['govlinks'],
+      sharedRoots:['data/biz_cons_types','scal_erpTypeMap','scal_cos','scal_types','scal_scheds','scal_staff','scal_bizState','scal_bizOrder','uid_roles'],
+      writeContracts:[{path:'govlinks/sets/{id}',entityType:'GovLinkSet'}],
+      entityTypes:['GovLinkSet'] },
     /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
        ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).
@@ -815,6 +825,9 @@
     /* 정부지원금 — 고객사 이름·인원·검토가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     govaid_core:{program:'govaid',strategy:'in_app',path:'govaid',parser:'coverage',
       gives:'지원사업 사전·예비 고객·보충값·검토 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 정부사업 바로가기 — 기관 주소·메모·폴더 경로뿐이지만 업체는 남의 자리에서 빌려 보므로 앱 안에서만 본다 */
+    govlinks_core:{program:'govlinks',strategy:'in_app',path:'govlinks',parser:'coverage',
+      gives:'사업별 바로가기 묶음(기관 시스템 주소·메모·폴더 경로·이어 둔 이알피 사업) — 앱 안에서만 본다'},
     /* 전광판 — 광고 문구·올린 판이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     signboard_core:{program:'signboard',strategy:'in_app',path:'signboard',parser:'coverage',
       gives:'전광판 광고·올린 판·올린 기록·심부름꾼 상태 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
