@@ -184,6 +184,8 @@
     var co = (rec.companyId && ctx.companyById && okKey(String(rec.companyId)) && Object.prototype.hasOwnProperty.call(ctx.companyById, rec.companyId)) ? ctx.companyById[rec.companyId] : null;
     var cs = (co && !co.deleted) ? bizStatus(co.bizNo) : null;
     var coOk = !!(cs && (cs.kind === 'ok' || cs.kind === 'format'));
+    /* 이 건을 만든 «원본 계약»(sourceContractId·sourceContractNo 로 이어진)의 번호 — 이름 짐작이 아니라 이관 때의 번호표다 */
+    var srcOk = !!(rec.srcBiz && rec.srcBiz.digits && checksumOk(rec.srcBiz.digits));
 
     var key = nameKey(rec.name);
     var entry = (ctx.idx && ctx.idx.byName && okKey(key) && key.length >= 2 && Object.prototype.hasOwnProperty.call(ctx.idx.byName, key)) ? ctx.idx.byName[key] : null;
@@ -199,18 +201,29 @@
     }
 
     if (st.kind === 'empty') {
-      if (coOk) {
-        var linkEv = { kinds: ['link'], labels: ['업체 번호로 이어진 업체관리'], rows: 1, last: '', refs: [] };
-        /* 번호표로 이어졌어도 «바깥 자료»가 이 이름에 다른 번호를 말하면 충돌 — 번호표가 틀렸을 수 있다 */
-        var linkConf = nums.filter(function (d) { return d !== cs.digits && hasOutside(entry.nums[d]); });
-        if (linkConf.length) return out('conflict', 'conflict', { reason: 'link-vs-evidence', cands: linkConf.map(fmtDigits).concat([cs.fmt]) });
-        var rc0 = ceoKeys(rec.ceo), cc0 = ceoKeys(co.ceo);
-        if (rc0.length && cc0.length && !rc0.some(function (c) { return cc0.indexOf(c) >= 0; })) return out('conflict', 'conflict', { reason: 'ceo-differs', cands: [cs.fmt] });
-        /* 이 번호를 말하는 «바깥 자료의 대표자»와도 견준다 — 업체 한 곳의 대표자만 보지 않는다 */
-        if (entry && entry.nums[cs.digits] && ceoClash(rc0, entry.nums[cs.digits])) return out('conflict', 'conflict', { reason: 'ceo-differs', cands: [cs.fmt] });
-        /* 업체의 번호가 «자동으로 채운 값»이면 그것을 다시 퍼뜨리지 않는다 — 사람이 보고 고른다 */
-        if (co.auto) return out('suggest', 'ask', { to: cs.fmt, via: 'link', reason: 'company-auto', evidence: linkEv });
-        return out('fill', 'auto', { to: cs.fmt, via: 'link', reason: 'company-id', evidence: linkEv });
+      /* 번호표가 둘(업체·원본 계약)인데 서로 다른 번호를 말하면 어느 쪽도 믿지 않는다 */
+      if (coOk && srcOk && cs.digits !== rec.srcBiz.digits) return out('conflict', 'conflict', { reason: 'link-sources-differ', cands: [cs.fmt, fmtDigits(rec.srcBiz.digits)] });
+      var lk = coOk ? { d: cs.digits, fmt: cs.fmt, ceo: co.ceo, auto: !!co.auto, via: 'link', reason: 'company-id', autoReason: 'company-auto', label: '업체 번호로 이어진 업체관리' }
+        : (srcOk ? { d: rec.srcBiz.digits, fmt: fmtDigits(rec.srcBiz.digits), ceo: rec.srcBiz.ceo, auto: !!rec.srcBiz.auto, via: 'source-contract', reason: 'source-contract', autoReason: 'source-auto', label: '이관 원본 계약' } : null);
+      if (lk) {
+        var linkEv = { kinds: [lk.via === 'link' ? 'link' : 'source'], labels: [lk.label], rows: 1, last: '', refs: [] };
+        /* 근거 색인은 «이 건의 이름»과 «연결된 원본 계약의 이름» 둘 다로 찾는다 — 이름이 다르게 적혔어도 한쪽 이름의 근거가 충돌을 알려 준다 */
+        var entries = entry ? [entry] : [];
+        var sk = srcOk ? nameKey(rec.srcBiz.name) : '';
+        if (sk.length >= 2 && ctx.idx && ctx.idx.byName && okKey(sk) && Object.prototype.hasOwnProperty.call(ctx.idx.byName, sk) && ctx.idx.byName[sk] !== entry) entries.push(ctx.idx.byName[sk]);
+        /* 번호표로 이어졌어도 «바깥 자료»가 다른 번호를 말하면 충돌 — 번호표가 틀렸을 수 있다 */
+        var linkConf = [];
+        entries.forEach(function (en) { Object.keys(en.nums).forEach(function (d) { if (d !== lk.d && hasOutside(en.nums[d]) && linkConf.indexOf(d) < 0) linkConf.push(d); }); });
+        if (linkConf.length) return out('conflict', 'conflict', { reason: 'link-vs-evidence', cands: linkConf.map(fmtDigits).concat([lk.fmt]) });
+        var rc0 = ceoKeys(rec.ceo), cc0 = ceoKeys(lk.ceo);
+        if (rc0.length && cc0.length && !rc0.some(function (c) { return cc0.indexOf(c) >= 0; })) return out('conflict', 'conflict', { reason: 'ceo-differs', cands: [lk.fmt] });
+        /* 이 번호를 말하는 «바깥 자료의 대표자»와도 견준다 — 연결된 한 곳의 대표자만 보지 않는다 */
+        if (entries.some(function (en) { return en.nums[lk.d] && ceoClash(rc0, en.nums[lk.d]); })) return out('conflict', 'conflict', { reason: 'ceo-differs', cands: [lk.fmt] });
+        /* 이 건의 이름이 없으면(2글자 미만) 이름 근거를 견줄 수 없다 — 눈으로 확인할 «제안»으로만 */
+        if (key.length < 2) return out('suggest', 'ask', { to: lk.fmt, via: lk.via, reason: 'link-no-name', evidence: linkEv });
+        /* 연결된 쪽의 번호가 «자동으로 채운 값»이면 그것을 다시 퍼뜨리지 않는다 — 사람이 보고 고른다 */
+        if (lk.auto) return out('suggest', 'ask', { to: lk.fmt, via: lk.via, reason: lk.autoReason, evidence: linkEv });
+        return out('fill', 'auto', { to: lk.fmt, via: lk.via, reason: lk.reason, evidence: linkEv });
       }
       if (!entry) return out('none', 'none', { reason: 'no-evidence' });
       if (nums.length > 1) return out('conflict', 'conflict', { reason: 'same-name-other-number', cands: nums.map(fmtDigits) });          // ④
@@ -234,6 +247,69 @@
       extra.cands = nums.map(fmtDigits);
     }
     return out('check', 'check', extra);                                                                                                 // ⑦
+  }
+
+  /* 두 이름이 이어서 겹치는 가장 긴 글자 수 */
+  function lcsLen(a, b) {
+    var best = 0, prev = new Array(b.length + 1), cur, i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = 0;
+    for (i = 1; i <= a.length; i++) {
+      cur = [0];
+      for (j = 1; j <= b.length; j++) {
+        cur[j] = a.charAt(i - 1) === b.charAt(j - 1) ? prev[j - 1] + 1 : 0;
+        if (cur[j] > best) best = cur[j];
+      }
+      prev = cur;
+    }
+    return best;
+  }
+  var SIG_NAME_MIN = 5, SIG_NAME_RATIO = 0.6, SIG_DAYS = 90, SIG_CAP = 20000;
+
+  /* 복합 신호용 홈택스 줄 손질 — 한 번만(건마다 다시 하지 않는다). 번호가 믿을 만하고 이름·금액·날짜가 있는 줄만, «최근 날짜순»으로 상한만큼. */
+  function prepSignalRows(hometax) {
+    var list = [];
+    (hometax || []).forEach(function (h) {
+      if (!h || h._deleted) return;
+      var st = bizStatus(h.biznum);
+      if (st.kind !== 'ok' && st.kind !== 'format') return;
+      var hn = nameKey(h.company), sup = Number(h.supply) || 0, dt = Date.parse(h.date);
+      if (!hn || hn.length < 4 || !sup || isNaN(dt)) return;
+      list.push({ d: st.digits, hn: hn, sup: sup, dt: dt, date: str(h.date).slice(0, 10) });
+    });
+    list.sort(function (a, b) { return b.dt - a.dt; });
+    if (list.length > SIG_CAP) list.length = SIG_CAP;              // 넘치면 «오래된 줄»부터 빠진다(최근 계산서를 남긴다)
+    list.__prep = true;
+    return list;
+  }
+
+  /* ── 복합 신호 판정 — «꼭 같은 이름»의 근거가 없는 건에서, 세금계산서 한 줄이 «이름 일부 + 금액 + 날짜»를 모두 만족하고 번호가 «하나»일 때만 후보로 낸다.
+     ⚠ 자동으로 쓰지 않는다(level:'ask') — 이름이 닮기만 한 것은 같은 업체가 아닐 수 있고(예: 같은 낱말이 든 지점들), 금액은 업무 ID 가 아니다.
+       세 신호가 한꺼번에 맞고 후보가 하나일 때만 «눈으로 확인할 만한 제안»으로 올린다. 셋 중 하나라도 어긋나거나 후보가 둘 이상이면 아무것도 내지 않는다.
+     rec: { name, fees:[금액…], date:'YYYY-MM-DD' } · hometax: [{ company, biznum, supply, date }] */
+  function signalBiz(rec, hometax) {
+    var n = nameKey(rec && rec.name);
+    if (!n || n.length < 4 || !rec.fees || !rec.fees.length || !rec.date) return null;
+    var t0 = Date.parse(rec.date);
+    if (isNaN(t0)) return null;
+    var by = Object.create(null);
+    var rows = (hometax && hometax.__prep) ? hometax : prepSignalRows(hometax);
+    rows.forEach(function (h) {
+      /* 싼 검사부터 — 금액·날짜로 먼저 거르고, 맞는 줄에서만 이름을 견준다 */
+      var amtOk = rec.fees.some(function (f) { return f > 0 && (h.sup === f || Math.round(h.sup * 1.1) === f || Math.round(f / 1.1) === h.sup); });
+      if (!amtOk) return;
+      var days = Math.round(Math.abs(h.dt - t0) / 86400000);
+      if (days > SIG_DAYS) return;
+      var L = lcsLen(n, h.hn);
+      if (L < SIG_NAME_MIN || L < Math.ceil(Math.min(n.length, h.hn.length) * SIG_NAME_RATIO)) return;
+      var e = by[h.d] || (by[h.d] = { rows: 0, L: 0, dmin: 1e9, last: '' });
+      e.rows++; e.L = Math.max(e.L, L); e.dmin = Math.min(e.dmin, days);
+      if (h.date > e.last) e.last = h.date;
+    });
+    var nums = Object.keys(by);
+    if (nums.length !== 1) return null;                      // 후보가 둘 이상이면 고르지 않는다
+    var e0 = by[nums[0]];
+    return { to: fmtDigits(nums[0]), evidence: { kinds: ['hometax'], labels: ['홈택스 세금계산서'], rows: e0.rows, last: e0.last, refs: [],
+      signals: ['이름 일부 ' + e0.L + '글자', '금액 일치', '날짜 ' + e0.dmin + '일 차'] } };
   }
 
   /* ── 주담당 판정 — «제안만» (성과 분배·권한이 담당자에 걸려 있어 자동으로 배정하지 않는다) ──
@@ -376,6 +452,42 @@
       return out;
     }
 
+    /* 이 건을 만든 원본 계약 — id·번호로 이어진 것만(이름으로 찾지 않는다) */
+    var ctById = Object.create(null), ctByNo = Object.create(null);
+    (stores.contracts || []).forEach(function (ct) {
+      if (!ct || ct._deleted || !ct.id) return;
+      if (okKey(String(ct.id))) ctById[ct.id] = ct;
+      var no = str(ct.contractNo);
+      if (no && okKey(no)) ctByNo[no] = ctByNo[no] ? 'DUP' : ct;          // 같은 번호의 계약이 둘이면 «모른다»(마지막이 이기지 않는다)
+    });
+    /* 자동으로 채운 번호 — 계약 표는 이 도구가 쓰지 않아 표시가 안 남는다. 계약이 그 번호를 «베껴 오면» 자동 값으로 친다(짐작이 짐작을 낳지 않게). */
+    var autoNums = Object.create(null);
+    companies.forEach(function (c) { if (c && c.bizAuto && c.bizAuto.via !== 'format') autoNums[bizStatus(c.bizNo).digits] = 1; });
+    Object.keys(stores).forEach(function (s) { (stores[s] || []).forEach(function (r) { if (r && r.bizAuto && r.bizAuto.via !== 'format') autoNums[bizStatus(bizOfRec(s, r)).digits] = 1; }); });
+    function srcBizOf(store, r) {
+      if (store === 'contracts' || store === 'companies') return null;
+      var id = str(r.sourceContractId) || (r.sourceKind === 'contract' ? str(r.sourceId) : '');
+      var ct = (id && ctById[id]) || null;
+      if (!ct) {
+        /* 번호로 찾은 계약은 «같은 업체»일 때만 — 이름(법인 표기만 걷은 꼭 같은 이름)이나 업체 번호표가 같아야 한다 */
+        var byNo = str(r.sourceContractNo) ? ctByNo[str(r.sourceContractNo)] : null;
+        if (byNo && byNo !== 'DUP') {
+          var sameName = nameKey(nameOfRec(store, r)) !== '' && nameKey(nameOfRec(store, r)) === nameKey(nameOfRec('contracts', byNo));
+          var sameId = !!(str(r.companyId) && str(byNo.companyId) && str(r.companyId) === str(byNo.companyId));
+          if (sameName || sameId) ct = byNo;
+        }
+      }
+      if (!ct) return null;
+      var sn = bizStatus(bizOfRec('contracts', ct));
+      if (sn.kind !== 'ok' && sn.kind !== 'format') return null;
+      return { digits: sn.digits, name: nameOfRec('contracts', ct), ceo: str(ct.ceo) || str(ct.company && ct.company.ceo),
+        auto: !!(ct.bizAuto && ct.bizAuto.via !== 'format') || !!autoNums[sn.digits] };
+    }
+    var FEE_KEYS = ['contractFee', 'balanceFee', 'retainerFee', 'successFee', 'fee', 'totalFee'];
+    function feesOf(r) { return FEE_KEYS.map(function (k) { return Number(r[k]) || 0; }).filter(function (v) { return v > 0; }); }
+    function dateOf(r) { return str(r.startDate) || str(r.contractDate) || str(r.receiveDate) || str(r.estDate); }
+
+    var sigRows = prepSignalRows(ev.hometax);                     // 복합 신호용 홈택스 줄 — 한 번만 손질한다
     var out = [], noneN = 0, okN = 0;
     var tables = Object.assign({ companies: companies }, stores);
     Object.keys(tables).forEach(function (s) {
@@ -384,8 +496,13 @@
         var deleted = !!r._deleted || !!r.mergedInto;
         var term = isTerminal(r) || (s === 'companies' && String(r.status || '') === 'closed');
         var selfRef = s + ':' + r.id;
-        var rec = { name: nameOfRec(s, r), bizNo: bizOfRec(s, r), ceo: r.ceo, companyId: r.companyId, ref: selfRef, deleted: deleted, terminal: term };
+        var rec = { name: nameOfRec(s, r), bizNo: bizOfRec(s, r), ceo: r.ceo, companyId: r.companyId, ref: selfRef, deleted: deleted, terminal: term, srcBiz: srcBizOf(s, r) };
         var b = decideBiz(rec, { idx: idx, companyById: companyById });
+        /* 꼭 같은 이름의 근거가 없는 빈 칸 — 세금계산서 한 줄이 «이름 일부 + 금액 + 날짜»를 모두 맞출 때만 «제안» */
+        if (b.action === 'none' && !deleted && !term && s !== 'companies' && s !== 'contracts') {
+          var sg = signalBiz({ name: rec.name, fees: feesOf(r), date: dateOf(r) }, sigRows);
+          if (sg) b = Object.assign({}, b, { action: 'suggest', level: 'ask', to: sg.to, via: 'signals', reason: 'multi-signal', evidence: sg.evidence });
+        }
         if (b.level === 'none') noneN++;
         if (b.level === 'ok') okN++;
         if (['auto', 'ask', 'check', 'conflict'].indexOf(b.level) >= 0) {
@@ -415,7 +532,7 @@
   }
 
   var API = { bizStatus: bizStatus, checksumOk: checksumOk, fmtDigits: fmtDigits, nameKey: nameKey, buildIndex: buildIndex,
-    decideBiz: decideBiz, decideManager: decideManager, decideContact: decideContact, buildPlan: buildPlan,
+    decideBiz: decideBiz, signalBiz: signalBiz, prepSignalRows: prepSignalRows, decideManager: decideManager, decideContact: decideContact, buildPlan: buildPlan,
     isTerminal: isTerminal, KIND_CLASS: KIND_CLASS, KIND_LABEL: KIND_LABEL, STORE_LABEL: STORE_LABEL, READONLY_STORES: READONLY_STORES };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.PuBizEvidence = API;

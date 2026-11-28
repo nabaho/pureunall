@@ -12,6 +12,9 @@
      ⑧ 주담당·거래처 담당자는 «제안만» — 같은 업체(번호표·검증된 번호)의 다른 건에서 일관될 때만, 끝난 건·퇴사자·충돌은 제외.
      ⑨ 저장은 번호 칸 하나(bizNo + bizAuto 표시)뿐 — companyId·주담당·담당자는 이 창이 쓰지 않는다. 쓰는 지금 다시 고르고 «서버의 지금 값»도 다시 읽는다(못 읽으면 쓰지 않는다). 되돌리기는 «채울 때 남긴 표시와 똑같고 값이 그대로일 때만».
      ⑩ 번호표(companyId) 길도 «바깥 자료의 다른 번호·대표자 충돌»을 먼저 본다. 자동으로 채운 업체 번호는 다시 퍼뜨리지 않는다. 대표자는 근거 «줄마다» 견준다.
+     ⑫ 이 건을 만든 «원본 계약»(sourceContractId·sourceContractNo)의 번호는 번호표 연결이다 — 충돌·대표자·자동 값 전파를 똑같이 먼저 본다.
+     ⑬ 이름 «일부» + 금액 + 날짜(90일)를 한꺼번에 맞추는 세금계산서 한 줄이 «하나»일 때만 «제안»(자동 아님). 하나라도 어긋나거나 후보가 둘 이상이면 아무것도 안 낸다.
+     ⑭ 자동 연결은 «총괄관리자 PC · 하루 한 번 · 자동 채움 등급만». 제안·확인 필요·충돌은 저절로 쓰지 않는다. 끄는 칸이 있다.
      ⑪ 모두 같은 숫자(0000000000)는 번호가 아니다 · 법인 표기는 이름 «앞·뒤»에서만 걷는다 · 일반 객체의 상속 속성(constructor 등)이 근거로 읽히지 않는다.
    ⚠ 저장소는 공개다 — 검사는 지어낸 이름과 «123-» 으로 시작하는 가짜 번호만 쓴다(번호는 실행 때 만든다).
    실행: node --test tests/biz-evidence.test.js */
@@ -241,6 +244,107 @@ test('⑭-7 상속 키 이름(constructor)이 근거 갈래로 읽히지 않는�
   assert.equal(P.decideBiz({ name: '가나상사', bizNo: '' }, { idx, companyById: {} }).level, 'ask', '이상한 갈래 둘이 «바깥 자료 둘»로 읽히면 안 된다');
 });
 
+test('⑭-8 이 건을 만든 원본 계약의 번호 — 번호표 연결이라 근거 하나로 채운다. 충돌·대표자·자동 값은 먼저 본다', () => {
+  const idx = (rows) => P.buildIndex(rows || []);
+  const rec = (src) => ({ name: '가나상사', bizNo: '', ceo: '홍길동', srcBiz: src });
+  const src = (extra) => Object.assign({ digits: N1, ceo: '홍길동', auto: false }, extra || {});
+  const go = (r, rows) => P.decideBiz(r, { idx: idx(rows), companyById: {} });
+  const ok = go(rec(src()));
+  assert.equal(ok.action, 'fill'); assert.equal(ok.level, 'auto'); assert.equal(ok.via, 'source-contract'); assert.equal(ok.to, F(N1));
+  assert.equal(go(rec(src()), [hometax('가나상사', F(N2), 'h1')]).reason, 'link-vs-evidence', '바깥 자료가 이 이름에 다른 번호를 말하면 충돌');
+  assert.equal(go(rec(src({ ceo: '김철수' }))).reason, 'ceo-differs');
+  const auto = go(rec(src({ auto: true })));
+  assert.equal(auto.level, 'ask'); assert.equal(auto.reason, 'source-auto', '자동으로 채운 번호는 다시 퍼뜨리지 않는다');
+  assert.equal(go(rec({ digits: BAD, ceo: '', auto: false })).action, 'none', '검증숫자가 틀린 원본 번호는 쓰지 않는다');
+  assert.equal(go(rec(null)).action, 'none');
+});
+
+test('⑭-9 원본 계약은 «id·번호»로만 이어진다 — 이름이 같은 다른 계약은 이어지지 않는다 · 지운 계약·계약 표 자신은 제외', () => {
+  const ct = (extra) => Object.assign({ id: 'ct1', contractNo: '계약-1', companyName: '가나상사', bizNo: F(N1), company: { ceo: '홍길동' } }, extra || {});
+  const plan = (cts, rec) => P.buildPlan({ companies: [], stores: { contracts: cts, consultings: [rec] }, evidence: {} })
+    .rows.filter(r => r.store === 'consultings' && r.field === 'bizNo');
+  const base = { id: 'k1', companyName: '다른이름', bizNo: '' };
+  const hit = plan([ct()], Object.assign({ sourceContractId: 'ct1' }, base));
+  assert.equal(hit.length, 1); assert.equal(hit[0].via, 'source-contract'); assert.equal(hit[0].level, 'auto');
+  assert.equal(plan([ct()], Object.assign({ sourceContractNo: '계약-1' }, base)).length, 0, '번호로 찾은 계약은 «같은 업체»(이름·업체 번호표)가 아니면 이어지지 않는다');
+  const viaNo = plan([ct()], Object.assign({ sourceContractNo: '계약-1' }, base, { companyName: '가나상사 주식회사' }));
+  assert.equal(viaNo.length, 1); assert.equal(viaNo[0].via, 'source-contract', '번호 + 꼭 같은 이름(법인 표기만 다름)');
+  assert.equal(plan([ct({ companyId: 'c7' })], Object.assign({ sourceContractNo: '계약-1', companyId: 'c7' }, base)).length, 1, '번호 + 같은 업체 번호표');
+  assert.equal(plan([ct(), ct({ id: 'ct2' })], Object.assign({ sourceContractNo: '계약-1' }, base, { companyName: '가나상사' })).filter(r => r.via === 'source-contract').length, 0, '같은 번호의 계약이 둘이면 모른다 — 마지막 것이 이기지 않는다');
+  assert.equal(plan([ct()], Object.assign({ sourceKind: 'contract', sourceId: 'ct1' }, base)).length, 1);
+  const byName = plan([ct()], Object.assign({}, base, { companyName: '가나상사' }));
+  assert.ok(byName.every(r => r.via !== 'source-contract' && r.level !== 'auto'), '이름만 같은 계약은 «원본 계약»으로 이어지지 않는다(꼭 같은 이름은 근거 한 곳짜리 제안일 뿐)');
+  assert.equal(plan([ct({ _deleted: true })], Object.assign({ sourceContractId: 'ct1' }, base)).length, 0, '지운 계약');
+  /* 자동으로 채운 번호를 계약이 «베껴 오면» 그것도 자동 값이다 — 계약 표에는 표시가 안 남아도 다시 퍼뜨리지 않는다 */
+  const copied = P.buildPlan({ companies: [], stores: {
+    contracts: [ct()], consultings: [Object.assign({ id: 'k0', companyName: '다른이름0', bizNo: F(N1), bizAuto: { via: 'evidence', at: 'x' } }), Object.assign({ sourceContractId: 'ct1' }, base)] }, evidence: {} })
+    .rows.filter(r => r.id === 'k1' && r.field === 'bizNo');
+  assert.equal(copied.length, 1); assert.equal(copied[0].level, 'ask'); assert.equal(copied[0].reason, 'source-auto');
+  assert.equal(plan([ct({ bizNo: '', company: {} })], Object.assign({ sourceContractId: 'ct1' }, base)).length, 0, '원본 계약에도 번호가 없다');
+  assert.equal(plan([ct({ status: 'transferred' })], Object.assign({ sourceContractId: 'ct1' }, base)).length, 1, '이관된(끝난) 원본 계약의 번호도 읽을 수 있다 — 읽기만');
+  assert.equal(plan([ct({ bizAuto: { via: 'evidence', at: 'x' } })], Object.assign({ sourceContractId: 'ct1' }, base))[0].level, 'ask', '자동으로 채운 원본 번호');
+});
+
+test('⑭-9b 번호표가 둘(업체·원본 계약)인데 서로 다르면 충돌 · 원본 계약의 이름으로도 근거를 견준다 · 이 건의 이름이 없으면 제안', () => {
+  const idx = (rows) => P.buildIndex(rows || []);
+  const co = { c1: { bizNo: F(N1), deleted: false, ceo: '', auto: false } };
+  const both = P.decideBiz({ name: '가나상사', bizNo: '', companyId: 'c1', srcBiz: { digits: N2, name: '가나상사', ceo: '', auto: false } }, { idx: idx(), companyById: co });
+  assert.equal(both.action, 'conflict'); assert.equal(both.reason, 'link-sources-differ');
+  assert.equal(P.decideBiz({ name: '가나상사', bizNo: '', companyId: 'c1', srcBiz: { digits: N1, name: '가나상사', ceo: '', auto: false } }, { idx: idx(), companyById: co }).level, 'auto', '둘이 같은 번호면 통과');
+  /* 이 건의 이름과 원본 계약의 이름이 다르게 적혔다 — 원본 계약 이름에 걸린 바깥 자료의 다른 번호도 충돌로 본다 */
+  const rec = { name: '다른이름', bizNo: '', srcBiz: { digits: N1, name: '가나상사', ceo: '', auto: false } };
+  assert.equal(P.decideBiz(rec, { idx: idx([hometax('가나상사', F(N2), 'h1')]), companyById: {} }).reason, 'link-vs-evidence');
+  assert.equal(P.decideBiz(rec, { idx: idx([Object.assign(hometax('가나상사', F(N1), 'h1'), { ceo: '김철수' })]), companyById: {} }).level, 'auto', '대표자를 모르면 견주지 않는다');
+  assert.equal(P.decideBiz(Object.assign({}, rec, { ceo: '홍길동' }), { idx: idx([Object.assign(hometax('가나상사', F(N1), 'h1'), { ceo: '김철수' })]), companyById: {} }).reason, 'ceo-differs');
+  /* 이 건의 이름이 없다 — 이름 근거를 견줄 수 없으니 눈으로 확인할 제안으로만 */
+  const nameless = P.decideBiz({ name: '', bizNo: '', srcBiz: { digits: N1, name: '', ceo: '', auto: false } }, { idx: idx(), companyById: {} });
+  assert.equal(nameless.level, 'ask'); assert.equal(nameless.reason, 'link-no-name');
+});
+
+test('⑭-10 복합 신호 — 이름 일부 + 금액 + 날짜가 «모두» 맞고 후보가 «하나»일 때만 제안(자동 아님)', () => {
+  const row = (extra) => Object.assign({ company: '가나다라마바상사', biznum: F(N1), supply: 1000000, date: '2026-09-20', _id: 'h1' }, extra || {});
+  const rec = (extra) => Object.assign({ name: '가나다라마바 사업단', fees: [1100000], date: '2026-09-15' }, extra || {});
+  const sg = P.signalBiz(rec(), [row()]);
+  assert.ok(sg); assert.equal(sg.to, F(N1)); assert.deepEqual(sg.evidence.kinds, ['hometax']); assert.ok(sg.evidence.signals.length === 3);
+  /* 하나라도 어긋나면 아무것도 안 낸다 */
+  assert.equal(P.signalBiz(rec(), [row({ supply: 777000 })]), null, '금액 불일치');
+  assert.equal(P.signalBiz(rec(), [row({ date: '2027-03-01' })]), null, '날짜가 90일 밖');
+  assert.equal(P.signalBiz(rec(), [row({ company: '가나다상사' })]), null, '이름이 이어서 5글자 미만 겹침');
+  assert.equal(P.signalBiz(rec({ name: '가나다' }), [row()]), null, '이름이 너무 짧다(4글자 미만)');
+  assert.equal(P.signalBiz(rec({ fees: [] }), [row()]), null, '비교할 금액이 없다');
+  assert.equal(P.signalBiz(rec({ date: '' }), [row()]), null, '기준 날짜가 없다');
+  assert.equal(P.signalBiz(rec(), [row({ biznum: F(BAD) })]), null, '검증숫자 틀린 번호');
+  assert.equal(P.signalBiz(rec(), [row({ _deleted: true })]), null, '지운 줄');
+  /* 후보 번호가 둘이면 고르지 않는다 */
+  assert.equal(P.signalBiz(rec(), [row(), row({ biznum: F(N2), _id: 'h2' })]), null);
+  /* 홈택스 줄이 상한을 넘으면 «오래된 줄»부터 빠진다 — 최근 계산서를 남긴다 */
+  const many = [];
+  for (let i = 0; i < 20001; i++) many.push({ company: '다른회사' + i, biznum: F(N3), supply: 5, date: '2000-01-01', _id: 'o' + i });
+  many.push(row({ date: '2026-09-18', _id: 'new' }));          // 최근 줄이 «맨 끝»에 있어도 상한에 잘리지 않는다(날짜 내림차순으로 정렬한 뒤 자른다)
+  assert.equal(P.signalBiz(rec(), many).to, F(N1), '2만 줄을 넘어도 최근 계산서는 남는다');
+  assert.equal(P.prepSignalRows(many).length, 20000);
+  /* 같은 번호가 여러 줄이면 하나로 센다 */
+  assert.equal(P.signalBiz(rec(), [row(), row({ _id: 'h2', date: '2026-10-01' })]).evidence.rows, 2);
+  /* 금액은 공급가·부가세 포함·역산 모두 인정 */
+  assert.ok(P.signalBiz(rec({ fees: [1000000] }), [row()]) && P.signalBiz(rec({ fees: [1100000] }), [row({ supply: 1100000 })]));
+});
+
+test('⑭-11 복합 신호는 «꼭 같은 이름 근거가 없을 때만», 계획에서 ask 로만 올라온다 — 자동 채움·업체·계약 표에는 안 쓴다', () => {
+  const ev = { hometax: [{ company: '가나다라마바상사', biznum: F(N1), supply: 1000000, date: '2026-09-20', _id: 'h1' }] };
+  const mkRec = (extra) => Object.assign({ id: 'k1', companyName: '가나다라마바 사업단', bizNo: '', contractFee: 1100000, startDate: '2026-09-15' }, extra || {});
+  const plan = (stores, evidence) => P.buildPlan({ companies: [], stores, evidence: evidence || ev }).rows.filter(r => r.field === 'bizNo');
+  const hit = plan({ consultings: [mkRec()] });
+  assert.equal(hit.length, 1); assert.equal(hit[0].level, 'ask'); assert.equal(hit[0].via, 'signals'); assert.equal(hit[0].reason, 'multi-signal');
+  assert.ok(plan({ consultings: [mkRec()] }).every(r => r.level !== 'auto'), '복합 신호는 자동 채움이 아니다');
+  assert.equal(plan({ consultings: [mkRec({ status: 'closed' })] }).length, 0, '끝난 건');
+  assert.equal(plan({ consultings: [mkRec({ _deleted: true })] }).length, 0, '지운 건');
+  assert.equal(plan({ consultings: [mkRec({ bizNo: F(N2) })] }).filter(r => r.via === 'signals').length, 0, '이미 번호가 있으면 덮지 않는다');
+  assert.equal(plan({ contracts: [Object.assign(mkRec(), { company: { bizNo: '' } })] }).filter(r => r.via === 'signals').length, 0, '계약 표는 제외');
+  /* 꼭 같은 이름의 근거(CMS)가 따로 있으면 복합 신호가 끼어들지 않는다 */
+  const same = plan({ consultings: [mkRec({ companyName: '가나다라마바상사' })] }, Object.assign({ cms: [{ name: '가나다라마바상사', bizNo: F(N1), _k: 'c1' }] }, ev));
+  assert.equal(same.length, 1); assert.equal(same[0].via, 'evidence');
+});
+
 /* ══════ 담당 — 제안만 ══════ */
 const active = () => true;
 const peer = (main, extra) => Object.assign({ main, kind: 'record', terminal: false, deleted: false }, extra || {});
@@ -308,6 +412,7 @@ test('⑱ 계획 — 계약 표는 제안만(쓰기 대상 아님), 근거 없�
 /* ══════ ERP 쪽 — 저장·되돌리기 ══════ */
 function loadGlue(db, over) {
   const patches = [];
+  const ctx0 = { toasts: [] };
   const ctx = Object.assign({
     console, Object, Array, String, Number, Boolean, Math, Date, JSON, RegExp, Promise, PuBizEvidence: P,
     dbGet: (k, def) => (db[k] === undefined ? def : db[k]),
@@ -321,7 +426,10 @@ function loadGlue(db, over) {
     erpCmsLedgerGet: () => (db.__cms ? { rows: db.__cms } : null),
     ensurePucardsIdx: () => db.__pc || {},
     getUserAssignStatus: sid => ({ assignable: sid !== 'gone' }),
-    CURRENT_USER: { name: '검사' },
+    CURRENT_USER: { name: '검사', isAdmin: true, isOwner: true },
+    window: {}, setTimeout, localStorage: (function () { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; })(),
+    _pcIdx: { x: 1 }, erpInvArcPull: () => Promise.resolve(0), idbGetAll: () => Promise.resolve(db.__hometax || []),
+    toasts: [], showToast: function (m) { ctx0.toasts.push(m); },
     /* 서버 흉내 — 기본은 이 PC 사본과 같다. srv 를 바꿔 «다른 PC 에서 그사이 고친 것»을 흉내 낸다. 서버를 못 읽는 경우는 fbDb:null */
     fbDb: {
       ref: (pth) => {
@@ -332,9 +440,13 @@ function loadGlue(db, over) {
     },
   }, over || {});
   delete ctx.srv;
+  ctx.toasts = ctx0.toasts;
+  ctx.showToast = function (m) { ctx0.toasts.push(m); };
   vm.createContext(ctx);
   const src = [ERP.match(/var BF_APPLY_STORES = \{[^}]*\};/)[0], ERP.match(/var BF_ALL_STORES = \[[^\]]*\];/)[0],
     ERP.match(/var BF_SERVER_KEYS = \[[^\]]*\];/)[0], cutFn(ERP, 'function bfServerRec('), cutFn(ERP, 'function bfServerEnded('),
+    ERP.match(/var BF_AUTO_AT = [^;]*;/)[0], cutFn(ERP, 'function bfAutoOn('), cutFn(ERP, 'function bfAutoSet('), cutFn(ERP, 'function bfWaitPcIdx('),
+    cutFn(ERP, 'function bfLoadHometax('), cutFn(ERP, 'async function bfAutoRun('),
     cutFn(ERP, 'function bfEvidenceBase('), cutFn(ERP, 'function bfPlanNow('), cutFn(ERP, 'function bfRowKey('), cutFn(ERP, 'async function bfApply('),
     cutFn(ERP, 'function bfDoneList('), cutFn(ERP, 'async function bfUndo(')].join('\n');
   vm.runInContext(src, ctx);
@@ -580,9 +692,81 @@ test('㉒-2 되돌리기 — 끝난 건·다른 표시·사람이 고친 값·�
   assert.equal((await g.bfUndo(g.bfDoneList().filter(r => r.id === 'k1'))).n, 1);
 });
 
+test('㉓-6 자동 연결 — 총괄관리자 PC·하루 한 번·«자동 채움»만. 제안·확인 필요·충돌·계약은 저절로 쓰지 않는다', async () => {
+  const ht = [ht0('가나상사', F(N1), 'h1'), ht0('마바건설', F(N2), 'h2')];
+  function ht0(c, n, id) { return { company: c, biznum: n, _id: id, date: '2026-04-01' }; }
+  const mkAuto = () => {
+    const db = mkDb();
+    db.__hometax = ht;
+    db.consultings.push({ id: 'k8', no: '컨-008', companyName: '마바건설', bizNo: '' });      // 근거 한 곳(홈택스)뿐 → 제안(ask)
+    db.consultings.push({ id: 'k9', no: '컨-009', companyName: '사아상사', bizNo: F(BAD) });    // 값이 있는데 믿기 어렵다 → 확인 필요
+    return db;
+  };
+  /* ① 자동 채움만 쓴다 */
+  let db = mkAuto(), g = loadGlue(db);
+  let r = await g.bfAutoRun(false);
+  assert.equal(r.n, 2, '자동 채움: 가나상사 빈 칸(근거 둘) + 다라상사 표기 정리');
+  assert.equal(db.consultings.filter(x => x.id === 'k1')[0].bizNo, F(N1));
+  assert.equal(db.consultings.filter(x => x.id === 'k8')[0].bizNo, '', '제안(근거 한 곳)은 저절로 쓰지 않는다');
+  assert.equal(db.consultings.filter(x => x.id === 'k9')[0].bizNo, F(BAD), '확인 필요는 저절로 쓰지 않는다');
+  assert.equal(db.contracts[0].company.bizNo, '', '계약 표는 쓰지 않는다');
+  assert.ok(g.toasts.length === 1 && /자동 연결/.test(g.toasts[0]), '채운 건수를 알린다');
+  /* ② 하루 한 번 — 곧바로 다시 돌려도 안 돈다(force 는 돈다) */
+  assert.equal(await g.bfAutoRun(false), null);
+  assert.ok(await g.bfAutoRun(true), '강제로는 돈다(창에서·시험용)');
+  /* ③ 총괄관리자가 아니면 안 돈다 */
+  db = mkAuto(); g = loadGlue(db, { CURRENT_USER: { name: 'x', isAdmin: false, isOwner: false } });
+  assert.equal(await g.bfAutoRun(false), null); assert.equal(g.__patches.length, 0);
+  assert.equal(await loadGlue(mkAuto(), { CURRENT_USER: { name: 'x', isSubAdmin: true } }).bfAutoRun(false), null, '부관리자도 아니다');
+  assert.equal(await loadGlue(mkAuto(), { CURRENT_USER: { name: 'x', isAdmin: true, isOwner: false } }).bfAutoRun(false), null, '위임관리인(관리자 대행)도 아니다 — 대표(총괄)만');
+  /* ④ 끄면 안 돈다 */
+  db = mkAuto(); g = loadGlue(db);
+  g.bfAutoSet(false);
+  assert.equal(g.bfAutoOn(), false);
+  assert.equal(await g.bfAutoRun(false), null); assert.equal(g.__patches.length, 0);
+  g.bfAutoSet(true); assert.equal(g.bfAutoOn(), true);
+  /* ⑤ 서버에 못 닿으면(fbDb 없음) 안 돈다 */
+  db = mkAuto(); g = loadGlue(db, { fbDb: null });
+  assert.equal(await g.bfAutoRun(false), null); assert.equal(g.__patches.length, 0);
+  /* ⑤-2 근거가 다 도착하지 않았으면(기업정보함 색인 0건·홈택스 받기 실패·홈택스 0건) 쓰지 않고 «미룬다» — 근거가 빠지면 충돌이 사라져 보인다 */
+  for (const bad of [{ _pcIdx: {} }, { erpInvArcPull: () => Promise.reject(new Error('x')) }, { idbGetAll: () => Promise.resolve([]) }]) {
+    db = mkAuto(); g = loadGlue(db, Object.assign({}, bad));
+    const dr = await g.bfAutoRun(false);
+    assert.ok(dr && dr.deferred, '근거 미도착은 미룬다: ' + Object.keys(bad)[0]);
+    assert.equal(g.__patches.length, 0); assert.equal(g.toasts.length, 0);
+    assert.equal(g.localStorage.getItem('pu_bf_auto_at'), null, '미룬 날은 «오늘 했다»로 치지 않는다(다음에 다시 시도)');
+  }
+  /* ⑤-3 자동 실행의 표시에는 «자동 실행»이 남는다 — 사람이 창에서 한 것과 구분된다 */
+  db = mkAuto(); g = loadGlue(db);
+  await g.bfAutoRun(true);
+  assert.equal(db.consultings.filter(x => x.id === 'k1')[0].bizAuto.trigger, 'autorun');
+  db = mkAuto(); g = loadGlue(db);
+  await g.bfApply(g.bfPlanNow(ht).rows.filter(r => r.field === 'bizNo' && r.level === 'auto' && r.id === 'k1'), ht);
+  assert.equal(db.consultings.filter(x => x.id === 'k1')[0].bizAuto.trigger, 'manual');
+  /* ⑤-4 autoOnly 로 부르면 제안(ask)은 넘겨도 쓰지 않는다 — 사전 거르기가 깨져도 쓰는 쪽이 한 번 더 막는다 */
+  db = mkAuto(); g = loadGlue(db);
+  const askRows = g.bfPlanNow(ht).rows.filter(r => r.field === 'bizNo' && r.level === 'ask' && r.id === 'k8');
+  assert.equal(askRows.length, 1);
+  assert.equal((await g.bfApply(askRows, ht, { autoOnly: true })).n, 0);
+  assert.equal(db.consultings.filter(x => x.id === 'k8')[0].bizNo, '');
+  /* ⑥ 오류가 나도 앱을 멈추지 않는다 */
+  db = mkAuto(); g = loadGlue(db, { idbGetAll: () => Promise.reject(new Error('x')), erpInvArcPull: () => Promise.reject(new Error('y')) });
+  await assert.doesNotReject(() => g.bfAutoRun(false));
+});
+
+test('㉔-2 창은 오래된 홈택스 근거를 알리고 자동 연결 켬·끔 칸이 있으며, 자동 연결은 첫 동기화 30초 뒤 한 번 건다', () => {
+  const fn = cutFn(ERP, 'function BizFillModal(');
+  assert.ok(/htStale/.test(fn) && /Date\.now\(\) - Date\.parse\(htLast\)/.test(fn) && />\s*14/.test(fn), '홈택스가 14일 넘게 안 올라왔으면 경고');
+  assert.ok(/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$/.test(fn) && /d <= today/.test(fn), '날짜는 YYYY-MM-DD 만, 오늘 이후(미래) 날짜는 빼고 고른다');
+  assert.ok(/bfAutoSet\(!autoOn\)/.test(fn) && /자동 연결/.test(fn), '켬·끔 칸');
+  assert.match(ERP, /addEventListener\('fb_initial_done', function\(\)\{ setTimeout\(function\(\)\{ bfAutoRun\(false\); \}, 30000\); \}\)/);
+  assert.ok(/isOwner !== true/.test(cutFn(ERP, 'async function bfAutoRun(')), '대표(총괄)만');
+});
+
 test('㉔ 창은 자료 목록 규칙을 지킨다 — ☐ 고르기 칸 + 번호 맨 왼쪽, 한 칸 한 줄, 고르기만으로는 아무것도 안 바뀐다', () => {
   const fn = cutFn(ERP, 'function BizFillModal(');
-  assert.ok((fn.match(/type:'checkbox'/g) || []).length >= 3, '머리줄 ☐ + 줄마다 ☐(PC·폰)');
+  assert.ok(/h\('input', \{ type:'checkbox', checked:picked\.length === pickable\.length/.test(fn), '머리줄 ☐(보이는 줄 모두 고르기)');
+  assert.ok((fn.match(/type:'checkbox', checked:!!sel\[k\]/g) || []).length >= 2, '줄마다 ☐(PC·폰)');
   assert.ok(/'№'/.test(fn), '번호 칸이 있다');
   assert.ok(/gridTemplateColumns:'28px 36px/.test(fn), '맨 왼쪽 ☐ 약 28px · 번호 약 36px');
   assert.ok(/tabular-nums/.test(fn), '번호는 tabular-nums');
