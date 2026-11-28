@@ -1200,9 +1200,7 @@
       '🔵 능률협회(KMAC · 산일능률) (' + kmacCnt + ')</button>' +
       '<button type="button" class="agency-scope-btn cepa' + (AGENCY_SCOPE === 'cepa' ? ' on' : '') + '" data-set-agency-scope="cepa" aria-pressed="' + (AGENCY_SCOPE === 'cepa' ? 'true' : 'false') + '">' +
       '🟢 충남경제진흥원(CEPA · 산일충남) (' + cepaCnt + ')</button>' +
-      '<span class="sp"></span>' +
-      '<span class="chip c-amber wide-only" title="일터혁신 상생컨설팅(일터상생) 및 석유화학 노동전환지원센터 사업은 본 워크스페이스·메일 감지에서 자동 분리·배제됩니다">🚫 일터상생 · 석유화학노동전환 자동분리</span>' +
-      '<button type="button" class="sm" data-goto-tab="forms" title="능률협회(KMAC)와 충남경제진흥원(CEPA)의 서로 다른 보고서 양식·목차·검수기준을 나란히 검토합니다">⚖️ 양식·검토기준 분리보기</button>';
+      '<button type="button" class="agency-scope-btn" data-goto-tab="forms" title="능률협회(KMAC)와 충남경제진흥원(CEPA)의 서로 다른 보고서 양식·목차·검수기준을 나란히 검토합니다 (일터상생·석유화학노동전환 자동분리)">⚖️ 양식·검토기준 비교</button>';
   }
 
   /* ══ 3. 화면 전체 그리기 ════════════════════════════════════════════════ */
@@ -1307,9 +1305,8 @@
       Cat().STAGES.map(function (st) {
         var cls = st.order < curOrder ? ' done' : (st.order === curOrder ? ' cur' : '');
         var targetTab = st.phase === 'post_mid' ? 'final' : (st.code === 'mid_rpt' ? 'mid' : 'intake');
-        return '<button type="button" class="ws-step' + cls + '" data-goto-tab="' + targetTab + '">' +
+        return '<button type="button" class="ws-step' + cls + '" data-goto-tab="' + targetTab + '" title="' + esc(st.desc) + '">' +
           '<b>' + st.order + '. ' + esc(st.short) + '</b>' +
-          '<span>' + esc(st.desc) + '</span>' +
           '</button>';
       }).join('') +
       '</div></div>';

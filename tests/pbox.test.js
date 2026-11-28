@@ -6412,4 +6412,36 @@ test('㉛ 상단 필터 틀고정 · 법령 3단 비교(법률/시행령/시행�
   assert.ok(!readerEl.classList.contains('collapsed'), '접힌 레일을 다시 클릭하면 큰 화면 리더가 원래 상태 그대로 펼쳐져야 합니다');
   assert.ok(shellEl.classList.contains('reader-expanded'), '다시 펼치면 reader-expanded 클래스가 복구되어야 합니다');
   assert.ok(readerEl.innerHTML.includes('2020년 구법'), '접었다 펼쳐도 열람 중이던 구법 내용이 그대로 유지되어야 합니다');
+
+  /* 6) 오프라인/네트워크 오류로 미보관 법령 열기 실패 시 로딩 문구 대신 오류 배너 + 다시 시도 버튼 표시 */
+  fireClick({ 'data-act': 'open-law', 'data-dir': '최저임금법', 'data-file': '법률.md' });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(readerEl.innerHTML.includes('pbox-status-banner err'), '법령 원문 호출 실패 시 리더가 로딩 문구로 멈추지 않고 오류 배너를 표시해야 합니다');
+  assert.ok(readerEl.innerHTML.includes('data-act="retry-open-law"'), '오류 화면에 [다시 시도] 버튼이 제공되어야 합니다');
+
+  /* 7) 한 계정(user-A) 로그아웃 시 본인 UID DB/메모리만 파기하고 같은 브라우저의 다른 계정(user-B) 로컬 작업은 보존 */
+  await Store.init('shared-pc-user-B');
+  Store.saveProject({ name: 'B노무사 보존 프로젝트' });
+  assert.equal(Store.getProjects().length, 1);
+  await Store.init('shared-pc-user-A');
+  Store.saveProject({ name: 'A노무사 로그아웃 프로젝트' });
+  assert.equal(Store.getProjects().length, 1);
+  await Store.clearWorkspaceOnLogout();
+  assert.equal(Store.getProjects().length, 0, '로그아웃 직후 A노무사 메모리는 즉시 비워져야 합니다');
+  await Store.init('shared-pc-user-A');
+  assert.equal(Store.getProjects().length, 0, 'A노무사 재로그인 시 로그아웃으로 파기된 A노무사 로컬 작업은 남아있지 않아야 합니다');
+  await Store.init('shared-pc-user-B');
+  assert.equal(Store.getProjects().length, 1, 'A노무사 로그아웃이 같은 브라우저의 B노무사 로컬 작업을 지우면 안 됩니다');
+  assert.equal(Store.getProjects()[0].name, 'B노무사 보존 프로젝트');
+
+  /* 8) 라이브 QA 5건 회귀 방지: '산재' 약칭 매핑 · 서술어 어미('받았는데') 핵심어 제외 · 최근본자료 중복괄호 제거 · getDocById 정상 호출 */
+  const sanjaeJump = Engine.resolveSmartLawJump('산재', loadLawIndex().list());
+  assert.ok(sanjaeJump && sanjaeJump.lawTitle === '산업재해보상보험법', "'산재' 약칭 검색 시 산업재해보상보험법으로 매핑되어야 합니다");
+  const cleanHl = Engine.extractHighlightTerms('수습기간 중 구두로 해고 통보 받았는데 부당해고 구제신청 가능한가요?', '');
+  assert.ok(!cleanHl.includes('받았는데') && !cleanHl.includes('가능한가요'), '서술어 어미(받았는데·가능한가요)는 요청 핵심어 강조에서 제외되어야 합니다');
+  assert.ok(cleanHl.includes('부당해고') && cleanHl.includes('수습기간'), '실질 법률 핵심어(부당해고·수습기간)는 유지되어야 합니다');
+  const recentLawItem = Store.getRecents().find((r) => r.lawDir === '근로기준법');
+  if (recentLawItem) {
+    assert.ok(!recentLawItem.title.includes('(법률(법률))'), '최근 본 자료에 (법률(법률)) 중복 괄호가 표시되면 안 됩니다');
+  }
 });

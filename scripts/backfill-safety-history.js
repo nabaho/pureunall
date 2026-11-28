@@ -218,12 +218,159 @@ function normalizeDisplayCompany(rawName) {
     .replace(/\s*\([^)]*202\d[^)]*\)/g, '')
     .replace(/\s*중처법.*$/, '')
     .replace(/\s*우수사례.*$/, '')
-    .replace(/^(?:주식회사|㈜|\(주\))\s*/, '㈜')
+    .replace(/^\((?=(?:㈜|\(주\)|주식회사|주\)))/, '')
+    .replace(/^(?:주식회사|㈜|\(주\)|주\))\s*/, '㈜')
+    .replace(/\(주$/, '㈜')
+    .replace(/\)+$/, (m, offset, whole) => {
+      const prefix = whole.slice(0, offset);
+      const openCnt = (prefix.match(/\(/g) || []).length;
+      const closeCnt = (prefix.match(/\)/g) || []).length;
+      return m.slice(0, Math.max(0, openCnt - closeCnt));
+    })
     .trim();
 }
 
+const CANONICAL_CORP_MAP = {
+  '세종시사회서비스원': { name: '세종시사회서비스원', industryCode: 'medical_welfare', track: 'welfare_pub' },
+  '세종특별자치시사회서비스원': { name: '세종시사회서비스원', industryCode: 'medical_welfare', track: 'welfare_pub' },
+  '세종시사회서비스원아이돌봄서비스제공기관': { name: '세종시사회서비스원', industryCode: 'medical_welfare', track: 'welfare_pub' },
+  '충남유통': { name: '충남유통', industryCode: 'retail_logis', track: 'private_sapa' },
+  '삼성디지컴': { name: '삼성디지컴', industryCode: 'mfg_general', track: 'private_sapa' },
+  '반도기전': { name: '반도기전', industryCode: 'mfg_high', track: 'kosha_high' },
+  '금진식품': { name: '㈜금진식품', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '다우테크': { name: '㈜다우테크놀로지', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '다우테크놀로지': { name: '㈜다우테크놀로지', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '주다우테크놀로지': { name: '㈜다우테크놀로지', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '동양테이프': { name: '㈜동양테이프', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '동현엔지니어링': { name: '㈜동현엔지니어링', industryCode: 'mfg_high', track: 'kosha_high' },
+  '리싸이텍': { name: '㈜리싸이텍', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '주리싸이텍': { name: '㈜리싸이텍', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '새롬웰푸드': { name: '㈜새롬웰푸드', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '성창오토텍아산산업': { name: '㈜성창오토텍아산사업장', industryCode: 'mfg_high', track: 'kosha_high' },
+  '성창오토텍아산산업장': { name: '㈜성창오토텍아산사업장', industryCode: 'mfg_high', track: 'kosha_high' },
+  '성창오토텍아산사업장': { name: '㈜성창오토텍아산사업장', industryCode: 'mfg_high', track: 'kosha_high' },
+  '고산': { name: '㈜성창오토텍아산사업장', industryCode: 'mfg_high', track: 'kosha_high' },
+  '세일메카닉스': { name: '㈜세일메카닉스', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '신성하우징': { name: '㈜신성하우징', industryCode: 'const_sub', track: 'special_coop' },
+  '씨원케미칼': { name: '㈜씨원케미칼', industryCode: 'mfg_high', track: 'kosha_high' },
+  '엘라이트': { name: '㈜엘라이트', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '주엘라이트': { name: '㈜엘라이트', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '그랜드모터스': { name: '그랜드모터스', industryCode: 'mfg_high', track: 'kosha_high' },
+  '더부러': { name: '더부러주식회사', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '더부러주식회사': { name: '더부러주식회사', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '두원공업': { name: '두원공업', industryCode: 'mfg_high', track: 'kosha_high' },
+  '디마인드테크': { name: '디마인드테크', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '디마인드테크놀로지': { name: '디마인드테크', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '마인드테크': { name: '디마인드테크', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '미르g&i': { name: '미르지엔아이㈜', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '미르지엔아이': { name: '미르지엔아이㈜', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '미르지엔아이주식회사': { name: '미르지엔아이㈜', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '사랑과평화의집': { name: '사랑과평화의집', industryCode: 'medical_welfare', track: 'welfare_pub' },
+  '삼익에프앤티': { name: '삼익에프앤티㈜', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '삼익에프앤티주': { name: '삼익에프앤티㈜', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '우리미디어': { name: '㈜우리미디어', industryCode: 'edu_office', track: 'kosha_etc' },
+  '천안지역자활센터': { name: '천안지역자활센터', industryCode: 'medical_welfare', track: 'welfare_pub' },
+  '대명크라샤': { name: '㈜대명크라샤', industryCode: 'const_sub', track: 'special_coop' },
+  '대명크리샤': { name: '㈜대명크라샤', industryCode: 'const_sub', track: 'special_coop' },
+  '주대명크라샤': { name: '㈜대명크라샤', industryCode: 'const_sub', track: 'special_coop' },
+  '경덕산업': { name: '경덕산업', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '공주시정신건강복지센터': { name: '공주시정신건강복지센터', industryCode: 'medical_welfare', track: 'welfare_pub' },
+  'cts': { name: 'CTS', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '씨티에스': { name: 'CTS', industryCode: 'mfg_general', track: 'kosha_mfg' },
+  '에스에프이': { name: '에스에프이', industryCode: 'mfg_general', track: 'kosha_mfg' }
+};
+
+function resolveCanonicalCorp(rawName) {
+  const cleanName = normalizeDisplayCompany(rawName);
+  const rawNorm = Intake.normCorpName(cleanName);
+  const mapped = CANONICAL_CORP_MAP[rawNorm] || null;
+  if (mapped) {
+    return {
+      name: mapped.name,
+      norm: Intake.normCorpName(mapped.name),
+      industryCode: mapped.industryCode,
+      track: mapped.track
+    };
+  }
+  return { name: cleanName, norm: rawNorm, industryCode: '', track: '' };
+}
+
+const CONSULTING_EVIDENCE_RE = /(?:결과\s*보고서|결과보고서|컨설팅\s*보고서|보고서공문|결과\s*체크리스트|취합\s*자료|위임\s*계약서|용역\s*계약(?!서\.hwp)|과업\s*지시서|작업중지명령|실적\s*증명서|컨설팅\s*결과\s*공유|강의\s*교안|강의교안|리포트_|_리포트|안전보건관리체계\s*구축\s*(?:컨설팅\s*)?자료|안전보건관리체계\s*구축\s*관련\s*필요\s*자료|위험성\s*평가\s*컨설팅\s*(?:2회차\s*)?자료)/i;
+
+function resolveMailYear(dateStr, combinedText) {
+  const d = str(dateStr);
+  const yr = Number(d.slice(0, 4)) || 2024;
+  if (/^2024-0[12]/.test(d) && /취합\s*자료/.test(combinedText)) return 2023;
+  if (/^2024-0[1-4]/.test(d) && /실적\s*증명서/.test(combinedText)) return 2023;
+  return yr;
+}
+
+const NON_CORP_STOP_RE = /^(?:긴급|안내|공지|요청|회신|재송부|참고|공문|중요|외부|내부|첨부|수정|위탁|인쇄용|서식등포함양식|붙임|붙임1|안전보건공단|안전보건|고용노동부|근로복지공단|한국산업안전보건공단|대한산업보건협회|푸른노무법인|천안노동법률사무소|열린노무법인|법무법인|중대재해|위험성평가|산업안전컨설팅|작업중지명령|안전관리자|한국산업|선정|발송|결과|한국스마트컨설팅협회|충청남도사회복지사협회|충남노사민정협의회|한국안전보건협회|사단법인한국안전보건협회|한국공인노무사회|한국공인노무사회성실회원자료배포|개별의뢰인|참여사업장|표준|공통|발표|자료|계획|명단|매뉴얼|양식|요약|대상|전체)$/;
+const AGENCY_PREFIX_RE = /^\s*\[(?:한국산업안전보건공단|안전보건공단[^\]]*|한국공인노무사회[^\]]*|사단법인\s*한국안전보건협회|고용노동부)\]/i;
+
+function extractCorpNameFromMail(subject, attNames, coList) {
+  const subj = str(subject);
+  if (AGENCY_PREFIX_RE.test(subj)) return null;
+  const atts = Array.isArray(attNames) ? attNames : [];
+  const attStr = atts.join(' ');
+  const combinedText = subj + ' ' + attStr;
+
+  /* 1. [푸른노무법인] 업체명_위험성/안전... */
+  const mPureun = /\[푸른노무법인\]\s*([^_\n[\]]+?)_(?:위험성|안전|중대)/.exec(subj);
+  if (mPureun && mPureun[1]) {
+    const c1 = normalizeDisplayCompany(mPureun[1]);
+    if (c1 && !NON_CORP_STOP_RE.test(Intake.normCorpName(c1))) return { name: c1, co: null };
+  }
+
+  /* 2. ERP /data/companies 매칭 (리싸이텍, 대명크라샤 등) */
+  const subjNorm = Intake.normCorpName(combinedText);
+  for (const co of (coList || [])) {
+    const nn = Intake.normCorpName(co && co.name);
+    if (nn.length >= 2 && subjNorm.indexOf(nn) >= 0) {
+      return { name: co.name, co };
+    }
+  }
+
+  /* 3. 명시적 첨부 서식명 패턴: 위임계약서_산업안전컨설팅_업체명_261125 / 보고서공문_업체명_ / 체크리스트(업체명) */
+  const mContract = /위임계약서_산업안전컨설팅_([가-힣A-Za-z0-9㈜]+?)_(?:\d{6}|$)/.exec(attStr);
+  if (mContract && mContract[1]) {
+    const c2 = normalizeDisplayCompany(mContract[1]);
+    if (c2 && !NON_CORP_STOP_RE.test(Intake.normCorpName(c2))) return { name: c2, co: null };
+  }
+  const mGovDoc = /(?:보고서공문|결과\s*체크리스트)\s*[_(]\s*([가-힣A-Za-z0-9㈜()]+?)(?:_\d+\.|[)_]|$)/.exec(attStr);
+  if (mGovDoc && mGovDoc[1]) {
+    const c2b = normalizeDisplayCompany(mGovDoc[1]);
+    if (c2b && !NON_CORP_STOP_RE.test(Intake.normCorpName(c2b))) return { name: c2b, co: null };
+  }
+
+  /* 4. 제목 선두 (업체명) N회차 위험성평가/안전보건... */
+  const mLead = /^\s*(?:RE:\s*|FW:\s*|Fwd:\s*)*\(\(?((?:㈜|\(주\)|주식회사)?[가-힣A-Za-z0-9·&]{2,20}(?:\(주\)|㈜)?)\)?\)\s*(?:1회차|2회차|3회차|4회차|5회차|위험성\s*평가|안전\s*보건)/.exec(subj);
+  if (mLead && mLead[1]) {
+    const c3 = normalizeDisplayCompany(mLead[1]);
+    const n3 = Intake.normCorpName(c3);
+    if (n3.length >= 2 && !NON_CORP_STOP_RE.test(n3) && !/^202\d/.test(n3)) return { name: c3, co: null };
+  }
+
+  /* 5. 괄호 [업체명] / (업체명) */
+  const bm = /[\[\(]((?:주식회사|㈜|\(주\)|[가-힣A-Za-z0-9·&\s]){2,22})[\]\)]/.exec(combinedText);
+  if (bm && bm[1]) {
+    const cleaned = normalizeDisplayCompany(bm[1]);
+    const nn2 = Intake.normCorpName(cleaned);
+    if (nn2.length >= 2 && !NON_CORP_STOP_RE.test(nn2) && !/^202\d$/.test(nn2) && !/^(?:1차|2차|회차)$/.test(nn2)) {
+      return { name: cleaned, co: null };
+    }
+  }
+
+  /* 6. 주요 접미사·상호 패턴 */
+  const cm = /((?:㈜|\(주\)|주식회사)?\s*[가-힣A-Za-z]{2,14}(?:회계법인|복지관|요양원|복지센터|자활센터|평화의집|서비스원|모터스|크라샤|케미칼|공업|테크|산업|하우징|웰푸드|식품|푸드|유통|미디어|엔지니어링|메카닉스|테이프|정공|기전|디지컴|전자|마음터|농공단지|에스메카|에스앤씨|로스윈|네오텍|이노베이스|에스에프이|씨티에스|반도기전|에프앤티))/.exec(combinedText);
+  if (cm && cm[1] && !NON_CORP_STOP_RE.test(Intake.normCorpName(cm[1]))) {
+    return { name: cm[1].trim(), co: null };
+  }
+  return null;
+}
+
 /* ══ 후보 수집기 ══════════════════════════════════════════════════════════ */
-function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalCos, scalTypes, mailFolders, mailMsgs, skipLocalDirs }) {
+function collectSafetyProjectsAndCards({ companies, consultings, contracts, bizTypes, scalCos, scalTypes, mailFolders, mailMsgs, skipLocalDirs }) {
   const coList = rowsOf(companies);
   const coByNorm = new Map();
   coList.forEach(c => {
@@ -235,17 +382,21 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
   const cardsByPid = new Map();
 
   function upsertProject(raw) {
-    const cleanName = normalizeDisplayCompany(raw.companyName);
-    const norm = Intake.normCorpName(cleanName);
+    const canon = resolveCanonicalCorp(raw.companyName);
+    const cleanName = canon.name;
+    const norm = canon.norm;
     if (!norm || norm.length < 2) return null;
-    if (/^(공단|고용노동부|근로복지공단|한국산업안전보건공단|안전보건공단|대한산업보건협회|푸른노무법인|법무법인|참여사업장|표준|공통|발표|자료|안내|계획|명단|매뉴얼|양식|요약|대상|선정|전체)$/.test(norm)) return null;
+    if (NON_CORP_STOP_RE.test(norm)) return null;
 
-    const year = Number(raw.year) || 2025;
+    let year = Number(raw.year) || 2025;
+    if (raw.allowPriorYearMerge && year === 2024 && projectsByKey.has(norm + ':2023')) {
+      year = 2023;
+    }
     const co = coByNorm.get(norm) || null;
     const safeCidRaw = str(co ? co.id : (raw.companyId || ('sfco_' + Intake.safeIdPart(norm))));
     const companyId = safeCidRaw.replace(/[^A-Za-z0-9가-힣._:\-]+/g, '_').replace(/^_+|_+$/g, '') || ('sfco_' + Intake.sha256Hex(norm).slice(0, 10));
-    const indCode = raw.industryCode || Intake.inferIndustryCode(cleanName, co && co.bizType, co && co.bizItem, raw.hintText);
-    const trackCode = raw.track || Intake.inferTrackCode(raw.hintText || cleanName, indCode);
+    const indCode = raw.industryCode || canon.industryCode || Intake.inferIndustryCode(cleanName, co && co.bizType, co && co.bizItem, raw.hintText);
+    const trackCode = raw.track || canon.track || Intake.inferTrackCode(raw.hintText || cleanName, indCode);
     const key = norm + ':' + year;
 
     let proj = projectsByKey.get(key);
@@ -294,7 +445,7 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
     if (!map.has(cardObj.id)) map.set(cardObj.id, cardObj);
   }
 
-  /* 1. Desktop 안전보건컨설팅 폴더 (2023년안전보건컨설팅.xlsx 자문사명단 제외!) */
+  /* 1. Desktop 안전보건컨설팅 폴더 (실제 수행 사업장 서류만 — 2023년 자문사명단·배정명단·우수사례·노무상담 제외) */
   const desktopDir = path.join(os.homedir(), 'Desktop');
   const safetyDir = path.join(desktopDir, '컨설팅업체', '9 안전보건컨설팅');
   if (!skipLocalDirs && fs.existsSync(safetyDir)) {
@@ -323,84 +474,11 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
         });
       }
     });
-
-    /* 선정명단 엑셀 파싱 (1차_11.xlsx 등 — 2023년안전보건컨설팅.xlsx 절대 제외) */
-    entries.forEach(ent => {
-      if (!/\.(xlsx|xls)$/i.test(ent.name)) return;
-      if (/2023년안전보건컨설팅\.xlsx$/i.test(ent.name)) return;
-      if (!/선정\s*명단|우수사례/.test(ent.name)) return;
-      try {
-        const st = fs.statSync(ent.fullPath);
-        if (st.size > 15 * 1024 * 1024) return;
-        const wb = XLSX.read(fs.readFileSync(ent.fullPath), { type: 'buffer' });
-        (wb.SheetNames || []).forEach(sn => {
-          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
-          let corpCol = -1, itemCol = -1, indCol = -1;
-          for (let r = 0; r < Math.min(10, rows.length); r++) {
-            const line = (rows[r] || []).map(str);
-            line.forEach((cell, idx) => {
-              if (/사업장명|업체명|기업명|기관명/.test(cell) && corpCol < 0) corpCol = idx;
-              if (/주요품목|품목|생산품/.test(cell) && itemCol < 0) itemCol = idx;
-              if (/^업종$|업종코드|업종명/.test(cell) && indCol < 0) indCol = idx;
-            });
-            if (corpCol >= 0) {
-              for (let rr = r + 1; rr < rows.length; rr++) {
-                const rawCorp = str(rows[rr] && rows[rr][corpCol]);
-                if (!rawCorp || /사업장명|합계|소계|^연번$/.test(rawCorp)) continue;
-                const itemVal = itemCol >= 0 ? str(rows[rr] && rows[rr][itemCol]) : '';
-                const indVal = indCol >= 0 ? str(rows[rr] && rows[rr][indCol]) : '';
-                const ym = /(202[2-9])/.exec(ent.relPath);
-                upsertProject({
-                  companyName: rawCorp,
-                  year: ym ? Number(ym[1]) : 2023,
-                  hintText: ent.relPath + ' ' + itemVal + ' ' + indVal,
-                  source: '공단 위탁 선정명단',
-                  summaryNote: itemVal ? '품목: ' + itemVal : '2023 공단 체계구축 위탁 선정 사업장'
-                });
-              }
-              break;
-            }
-          }
-        });
-      } catch (e) {}
-    });
-
-    /* 우수사례 파일명에서 수행 기업 추출 */
-    entries.forEach(ent => {
-      const mEx = /우수사례[_\s]+([^\s_().]+)/.exec(ent.name);
-      if (mEx && mEx[1]) {
-        upsertProject({
-          companyName: mEx[1],
-          year: /(202[2-9])/.test(ent.relPath) ? Number(/(202[2-9])/.exec(ent.relPath)[1]) : 2023,
-          hintText: ent.relPath,
-          source: '공단 우수사례',
-          summaryNote: '공단 체계구축 우수사례 발표·수행 사업장'
-        });
-      }
-    });
   }
 
-  /* 2. 2026 사회복지사 안전체계 구축사업 */
-  const pubWelfareDir = path.join(desktopDir, '컨설팅업체', '1. 공공기관컨설팅', '2026 공공기관 컨설팅', '2026사회복지사 안전체계 구축사업 『노무상담』 신청자 연계');
-  if (!skipLocalDirs && fs.existsSync(pubWelfareDir)) {
-    walkFilesSafe(pubWelfareDir).forEach(ent => {
-      const m = /^\d+\.\s*([^_]+)_노무상담/.exec(ent.name);
-      if (m && m[1]) {
-        upsertProject({
-          companyName: m[1],
-          year: 2026,
-          industryCode: 'medical_welfare',
-          track: 'welfare_pub',
-          source: '2026 사회복지 안전체계',
-          summaryNote: '사회복지·종사자 안전체계 구축 및 노무상담 연계 기관'
-        });
-      }
-    });
-  }
-
-  /* 3. ERP · 정부사업일정 안전보건 후보 */
+  /* 2. ERP · 계약 · 정부사업일정 안전보건 후보 */
   const erpCands = Intake.discoverSafetyCandidates({
-    companies, consultings, bizTypes, scalCos, scalTypes, registeredProjects: []
+    companies, consultings, contracts, bizTypes, scalCos, scalTypes, registeredProjects: []
   });
   erpCands.forEach(c => {
     upsertProject({
@@ -414,42 +492,19 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
     });
   });
 
-  /* 4. 푸른메일함(전 폴더) 스캔 — 안전보건컨설팅 송수신 메일만 (개인 산재보상 100% 제외) */
+  /* 3. 푸른메일함(전 폴더) 스캔 — 실제 안전보건컨설팅 수행·계약 송수신 메일만 선별 */
   const flatMails = Intake.flattenMailboxRows(mailFolders || {}, mailMsgs || {});
-  const bracketStopRe = /^(?:긴급|안내|공지|요청|회신|재송부|참고|공문|중요|외부|내부|첨부|안전보건공단|안전보건|고용노동부|푸른노무법인|중대재해|위험성평가|선정|발송|결과)$/;
   flatMails.forEach(m => {
     if (!Intake.isSafetyConsultingMail(m.subject, m.attNames)) return;
     const combinedText = m.subject + ' ' + (m.attNames || []).join(' ');
-    const subjNorm = Intake.normCorpName(combinedText);
-    const yr = Number((m.date || '').slice(0, 4)) || 2024;
-    let matchedName = '';
-    let matchedCo = null;
+    if (!CONSULTING_EVIDENCE_RE.test(combinedText)) return;
+    const hit = extractCorpNameFromMail(m.subject, m.attNames, coList);
+    if (!hit || !hit.name) return;
 
-    for (const co of coList) {
-      const nn = Intake.normCorpName(co && co.name);
-      if (nn.length >= 2 && subjNorm.indexOf(nn) >= 0) {
-        matchedName = co.name;
-        matchedCo = co;
-        break;
-      }
-    }
-    if (!matchedName) {
-      const bm = /[\[\(]((?:주식회사|㈜|\(주\)|[가-힣A-Za-z0-9·()\s]){2,20})[\]\)]/.exec(combinedText);
-      if (bm && bm[1]) {
-        const cleaned = normalizeDisplayCompany(bm[1]);
-        const nn2 = Intake.normCorpName(cleaned);
-        if (nn2.length >= 2 && !bracketStopRe.test(nn2) && !/^202\d$/.test(nn2) && !/^1차|2차|회차$/.test(nn2)) matchedName = cleaned;
-      }
-    }
-    if (!matchedName) {
-      const cm = /((?:㈜|\(주\)|주식회사)?\s*[가-힣A-Za-z]{2,12}(?:회계법인|복지관|요양원|복지센터|서비스원|모터스|크라샤|케미칼|공업|테크|산업|하우징|웰푸드|식품|푸드|엔지니어링|메카닉스|테이프|정공|기전|디지컴|전자|마음터|농공단지|에스메카|에스앤씨|로스윈|네오텍|이노베이스|에스에프이|씨티에스|반도기전|에프앤티))/.exec(combinedText);
-      if (cm && cm[1] && cm[1] !== '푸른노무법인') matchedName = cm[1].trim();
-    }
-    if (!matchedName) return;
-
+    const yr = resolveMailYear(m.date, combinedText);
     const p = upsertProject({
-      companyId: matchedCo ? matchedCo.id : '',
-      companyName: matchedName,
+      companyId: hit.co ? hit.co.id : '',
+      companyName: hit.name,
       year: yr,
       hintText: combinedText,
       source: '푸른메일함 이력',
@@ -473,9 +528,7 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
     }
   });
 
-  /* 5. LLM-Wiki 안전보건 메일 색인 보조 스캔 (os.homedir() 기준 동적 경로 — 실제 안전체계/위험성/안전컨설팅 메일 제목만 선별) */
-  const SAFETY_SUBJ_ONLY_RE = /안전\s*보건\s*(?:관리)?체계|위험성\s*평가|중대\s*재해.*(?:예방|컨설팅|체계)|안전\s*컨설팅|안전\s*체계/i;
-  const EXCLUDE_AGENCY_RE = /^(?:공단|고용노동부|근로복지공단|한국산업안전보건공단|안전보건공단|대한산업보건협회|천안노동법률사무소|고용과산재|푸른노무법인|법무법인|참여사업장|표준|공통|개별의뢰인|공문)$/;
+  /* 4. LLM-Wiki 안전보건 메일 색인 보조 스캔 (실제 수행 증빙 메일 제목만 선별) */
   const wikiBase = path.join(os.homedir(), 'llm-wiki', '03_푸른메일_사건별_회사별_전체정리');
   const wikiListPath = path.join(wikiBase, '02_회사및기관별_유입메일_사건_총람', '01_중소교신기업_전체목록_사건분류표.md');
   if (!skipLocalDirs && fs.existsSync(wikiListPath)) {
@@ -483,13 +536,18 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
       if (!/\|/.test(ln)) return;
       const cols = ln.split('|').map(s => s.trim()).filter(Boolean);
       if (cols.length < 8) return;
+      const dateCol = cols[6] || '';
       const subjCol = cols[7] || '';
-      if (!SAFETY_SUBJ_ONLY_RE.test(subjCol)) return;
+      if (!Intake.isSafetyConsultingMail(subjCol, [])) return;
+      if (!CONSULTING_EVIDENCE_RE.test(subjCol)) return;
       const candCorp = normalizeDisplayCompany(cols[1]);
-      if (candCorp.length >= 2 && !EXCLUDE_AGENCY_RE.test(Intake.normCorpName(candCorp))) {
+      if (candCorp.length >= 2 && !NON_CORP_STOP_RE.test(Intake.normCorpName(candCorp))) {
+        const yr = resolveMailYear(dateCol, subjCol);
+        const isFollowUpDocOnly = /자료\s*송부/.test(subjCol) && !/(?:결과\s*보고서|결과보고서|취합\s*자료|위임\s*계약서|용역\s*계약)/.test(subjCol);
         upsertProject({
           companyName: candCorp,
-          year: /(202[2-9])/.test(cols[6] + subjCol) ? Number(/(202[2-9])/.exec(cols[6] + subjCol)[1]) : 2024,
+          year: yr,
+          allowPriorYearMerge: isFollowUpDocOnly,
           hintText: subjCol,
           source: '메일정리 색인',
           summaryNote: scrubTextStrict(subjCol)
@@ -503,13 +561,16 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
       if (!/\|/.test(ln)) return;
       const cols = ln.split('|').map(s => s.trim()).filter(Boolean);
       if (cols.length < 4) return;
+      const dateCol = cols[0] || '';
       const subjCol = cols[3] || '';
-      if (!SAFETY_SUBJ_ONLY_RE.test(subjCol)) return;
+      if (!Intake.isSafetyConsultingMail(subjCol, [])) return;
+      if (!CONSULTING_EVIDENCE_RE.test(subjCol)) return;
       const candCorp = normalizeDisplayCompany(cols[2]);
-      if (candCorp.length >= 2 && !EXCLUDE_AGENCY_RE.test(Intake.normCorpName(candCorp))) {
+      if (candCorp.length >= 2 && !NON_CORP_STOP_RE.test(Intake.normCorpName(candCorp))) {
+        const yr = resolveMailYear(dateCol, subjCol);
         upsertProject({
           companyName: candCorp,
-          year: /(202[2-9])/.test(cols[0] + subjCol) ? Number(/(202[2-9])/.exec(cols[0] + subjCol)[1]) : 2026,
+          year: yr,
           hintText: subjCol,
           source: '안전·중대재해 메일색인',
           summaryNote: scrubTextStrict(subjCol)
@@ -523,6 +584,24 @@ function collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalC
     cardsByPid,
     mailScannedCount: flatMails.length
   };
+}
+
+async function softDeleteRecord(dbPath, entityType, gw, token) {
+  const fetched = await rtdbGetWithEtag(dbPath, token);
+  const latest = (fetched && fetched.data && typeof fetched.data === 'object') ? fetched.data : null;
+  const etag = fetched ? String(fetched.etag || '') : '';
+  if (!etag || !latest) return { committed: false, skipped: 'missing' };
+  if (latest._deleted === true) return { committed: false, skipped: 'already_deleted' };
+  if (latest.updatedBy && latest.updatedBy !== 'SYSTEM_BACKFILL') return { committed: false, skipped: 'user_modified' };
+
+  const gone = OntWrite.tombstone(latest, {
+    actor: 'SYSTEM_BACKFILL',
+    entityType,
+    expectedRevision: Number(latest.revision || 0),
+    now: Date.now()
+  });
+  if (!gone || !gone.ok) return { committed: false, skipped: 'validation_failed', issues: gone && gone.issues };
+  return await rtdbPutIfMatch(dbPath, token, etag, stripUndef(gone.value));
 }
 
 async function runAudit(token) {
@@ -555,7 +634,9 @@ async function runAudit(token) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const doApply = args.includes('--apply');
+  const doReconcile = args.includes('--reconcile');
+  const doReconcileApply = args.includes('--reconcile-apply');
+  const doApply = args.includes('--apply') || doReconcileApply;
   const doAudit = args.includes('--audit');
 
   const token = loadFreshAccessToken();
@@ -564,9 +645,10 @@ async function main() {
     return;
   }
 
-  const [companies, consultings, bizTypes, scalCos, scalTypes, mailFolders, mailMsgs] = await Promise.all([
+  const [companies, consultings, contracts, bizTypes, scalCos, scalTypes, mailFolders, mailMsgs] = await Promise.all([
     rtdbGet('/data/companies', token),
     rtdbGet('/data/consultings', token),
+    rtdbGet('/data/contracts', token),
     rtdbGet('/data/biz_cons_types', token),
     rtdbGet('/scal_cos', token),
     rtdbGet('/scal_types', token),
@@ -574,7 +656,7 @@ async function main() {
     rtdbGet('/mailbox/msgs', token)
   ]);
 
-  const built = collectSafetyProjectsAndCards({ companies, consultings, bizTypes, scalCos, scalTypes, mailFolders, mailMsgs });
+  const built = collectSafetyProjectsAndCards({ companies, consultings, contracts, bizTypes, scalCos, scalTypes, mailFolders, mailMsgs });
   const byInd = {}, byYear = {}, byTrack = {};
   let blockedLeaks = 0;
 
@@ -588,6 +670,100 @@ async function main() {
     byTrack[p.track] = (byTrack[p.track] || 0) + 1;
   });
 
+  if (doReconcile || doReconcileApply) {
+    const curSafety = (await rtdbGet('/scal_safety', token)) || {};
+    const curProjs = curSafety.projects || {};
+    const curIntake = curSafety.intake || {};
+    const curChecks = curSafety.checks || {};
+    const curReports = curSafety.reports || {};
+    const curSnapshots = curSafety.snapshots || {};
+
+    const keepIds = new Set(cleanProjects.map(p => p.id));
+    const targetByCanonNorm = new Map();
+    cleanProjects.forEach(p => {
+      const cn = resolveCanonicalCorp(p.companyName).norm;
+      if (!targetByCanonNorm.has(cn)) targetByCanonNorm.set(cn, p);
+    });
+
+    const activeCur = Object.values(curProjs).filter(p => p && !p._deleted && p.id);
+    const toSoftDelete = [];
+    const blockedManual = [];
+    const migrateCards = [];
+
+    activeCur.forEach(oldP => {
+      if (keepIds.has(oldP.id)) return;
+      if ((oldP.updatedBy && oldP.updatedBy !== 'SYSTEM_BACKFILL') ||
+          curChecks[oldP.id] || curReports[oldP.id] || curSnapshots[oldP.id]) {
+        blockedManual.push({ id: oldP.id, companyName: oldP.companyName, updatedBy: oldP.updatedBy || '' });
+        return;
+      }
+      toSoftDelete.push(oldP.id);
+      const oldCanonNorm = resolveCanonicalCorp(oldP.companyName).norm;
+      const targetProj = targetByCanonNorm.get(oldCanonNorm) || null;
+      if (targetProj && curIntake[oldP.id]) {
+        Object.values(curIntake[oldP.id]).forEach(c => {
+          if (!c || c._deleted || !c.id || assertCleanPayload(c)) return;
+          migrateCards.push({ fromPid: oldP.id, targetProj, card: stripMetaFields(c) });
+        });
+      }
+    });
+
+    console.log(JSON.stringify({
+      mode: doReconcileApply ? 'reconcile-apply' : 'reconcile-dry-run',
+      discoveredProjects: cleanProjects.length,
+      currentActive: activeCur.length,
+      keepCount: keepIds.size,
+      softDeleteCount: toSoftDelete.length,
+      migrateCardCount: migrateCards.length,
+      blockedManualCount: blockedManual.length,
+      blockedManual,
+      byYear,
+      projects: cleanProjects.map(p => `${p.year} | ${p.id} | ${p.companyName} | ${p.industryCode} | ${p.track}`)
+    }, null, 2));
+
+    if (blockedLeaks > 0 || blockedManual.length > 0) {
+      console.error('FAIL: PII 누출 또는 수동 수정 레코드 보호로 중단합니다.');
+      process.exit(1);
+    }
+    if (!doReconcileApply) return;
+
+    const gw = OntWrite.createGateway({ mode: 'enforce', actor: 'SYSTEM_BACKFILL' });
+    let writtenProj = 0, writtenCard = 0, migratedCardCount = 0, softDeleted = 0, skipped = 0;
+
+    for (const proj of cleanProjects) {
+      const r = await conditionalWriteRecord(`/scal_safety/projects/${proj.id}`, proj, 'Project', gw, token);
+      if (r && r.committed) writtenProj++; else skipped++;
+      const cards = built.cardsByPid.get(proj.id);
+      if (cards) {
+        for (const c of cards.values()) {
+          if (assertCleanPayload(c)) continue;
+          const rc = await conditionalWriteRecord(`/scal_safety/intake/${proj.id}/${c.id}`, Object.assign({}, c, {
+            projectId: proj.id,
+            companyId: proj.companyId,
+            companyName: proj.companyName,
+            entityType: 'Document'
+          }), 'Document', gw, token);
+          if (rc && rc.committed) writtenCard++; else skipped++;
+        }
+      }
+    }
+    for (const mc of migrateCards) {
+      const rc = await conditionalWriteRecord(`/scal_safety/intake/${mc.targetProj.id}/${mc.card.id}`, Object.assign({}, mc.card, {
+        projectId: mc.targetProj.id,
+        companyId: mc.targetProj.companyId,
+        companyName: mc.targetProj.companyName,
+        entityType: 'Document'
+      }), 'Document', gw, token);
+      if (rc && rc.committed) migratedCardCount++;
+    }
+    for (const delId of toSoftDelete) {
+      const rd = await softDeleteRecord(`/scal_safety/projects/${delId}`, 'Project', gw, token);
+      if (rd && rd.committed) softDeleted++; else skipped++;
+    }
+    console.log(JSON.stringify({ applied: true, writtenProj, writtenCard, migratedCardCount, softDeleted, skipped }, null, 2));
+    return;
+  }
+
   console.log(JSON.stringify({
     mode: doApply ? 'apply' : 'dry-run',
     mailScannedCount: built.mailScannedCount,
@@ -596,7 +772,8 @@ async function main() {
     blockedLeaks,
     byYear,
     byIndustry: byInd,
-    byTrack
+    byTrack,
+    projects: cleanProjects.map(p => `${p.year} | ${p.id} | ${p.companyName} | ${p.industryCode} | ${p.track}`)
   }, null, 2));
 
   if (blockedLeaks > 0) {
@@ -638,5 +815,8 @@ if (require.main === module) {
 module.exports = {
   collectSafetyProjectsAndCards,
   assertCleanPayload,
-  normalizeDisplayCompany
+  normalizeDisplayCompany,
+  resolveCanonicalCorp,
+  resolveMailYear,
+  extractCorpNameFromMail
 };

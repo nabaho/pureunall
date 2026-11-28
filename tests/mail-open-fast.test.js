@@ -354,10 +354,11 @@ function seedBox(over) {
       '*old': { a: { s: '옛것' } },
     },
     mbAuthOk: () => true,
+    mbMemoClear: () => {},     /* 씨앗을 올린 뒤 «없어진 폴더»의 메일을 걷는 길(mbDropGoneRows)이 부른다 */
     mbSeedIdb: (mode, fn) => fn({ put: (v, k) => put.push([k, v]) }, () => {}),
   }, over || {});
   vm.createContext(ctx);
-  vm.runInContext(sliceFn(app, 'function mbSeedSave(') + '\n' + sliceFn(app, 'function mbSeedApply('), ctx);
+  vm.runInContext(sliceFn(app, 'function mbSeedSave(') + '\n' + sliceFn(app, 'function mbSeedApply(') + '\n' + sliceFn(app, 'function mbDropGoneRows('), ctx);
   ctx._put = put;
   return ctx;
 }

@@ -178,6 +178,42 @@ function folderRecord(box, status) {
   return rec;
 }
 
+/* ── 다음메일에서 «없어진» 폴더 찾기 (대표 지시 2026-11-28 「숨기기로 진행」) ──
+   다음메일에서 폴더를 지우거나 이름을 바꾸면, 우리 기록(mailbox/folders)에는 옛 폴더가 «그대로» 남아
+   푸른 분류에 옛 칸이 계속 보이고(이름을 바꾼 것은 «옛 이름 칸»과 «새 이름 칸»에 같은 메일이 두 번) 있었다.
+   known  = 지금 우리 기록 {slug:{path,kind,gone?}}
+   listed = 이번 회차 IMAP 폴더 목록 — 거르기 «전» 전부(스팸·열 수 없는 껍데기도 «있는» 폴더다)
+   → 이번 목록에 없고 아직 숨김 표시가 없는 폴더의 slug 들.
+   ⚠ 목록이 수상하면 «아무것도 없어졌다고 하지 않는다» — 받은메일함조차 없는 목록은 끊기거나 비어 온 응답이다.
+     그 응답으로 모든 칸을 숨기면 옆줄이 통째로 사라진다.
+   ⚠ 여기서는 «찾기만» 한다 — 지우지 않는다. 기록·담긴 메일은 그대로 두고 표시(gone)만 남기는 것은 부르는 쪽이 한다.
+   ⚠ 스팸처럼 «안 가져오기로 한» 칸은 따로 걷는 길이 있어 여기서 다루지 않는다. */
+function vanishedFolders(known, listed) {
+  const out = [];
+  const all = Array.isArray(listed) ? listed : [];
+  if (!all.some((b) => b && folderKind(b) === 'inbox')) return out;
+  const present = {};
+  all.forEach((b) => { if (b && b.path != null) present[slugOf(b.path)] = 1; });
+  Object.keys(known || {}).forEach((slug) => {
+    const r = (known || {})[slug] || {};
+    if (!r.path || r.gone) return;
+    if (SKIP_KINDS.indexOf(String(r.kind || '')) >= 0) return;
+    if (present[slug]) return;
+    out.push(slug);
+  });
+  return out;
+}
+
+/* ── 본문 찾기가 뒤질 폴더들 ──
+   asked 가 있으면 «우리가 아는 폴더»만, 없으면 아는 폴더 전부. ⚠ 다음메일에서 없어진(숨김 표시 gone) 폴더는
+   «안 적었을 때»의 전부에서 뺀다 — 열 곳이 없어 「못 읽은 칸」만 늘고 같은 메일이 두 번 걸린다. */
+function searchSlugs(folders, asked) {
+  const f = folders || {};
+  return Array.isArray(asked) && asked.length
+    ? asked.map(String).filter((s) => f[s])
+    : Object.keys(f).filter((s) => !(f[s] || {}).gone);
+}
+
 /* ── 폴더 이름으로 쓸 수 있는가 ──
    ⚠ 구분자가 든 이름은 막는다. 「가/나」로 만들면 IMAP 은 그것을 «두 층»으로 읽어
      엉뚱한 자리에 폴더가 생긴다. 사람은 이름 하나를 지었다고 생각한다.
@@ -723,7 +759,7 @@ module.exports = {
   folderKind, folderOrder, isSyncable, isWanted, SKIP_KINDS, folderRecord,
   wantsMsgs, NO_MSG_KINDS,
   attCount, attList, attNames, oneAddr, addrList, hasFlag, msgRow,
-  folderNameBad, childPath, renamedPath,
+  folderNameBad, childPath, renamedPath, vanishedFolders, searchSlugs,
   textPartOf, decodePart, toText, looksUtf8, previewFrom, unentity, isHeadLine, PREVIEW_MAX,
   ROW_VER, needsRefetch, folderDone,
   pickToFetch, uidSet, nextSync, uidReset, goneKeys, aliveEncode, aliveDecode,

@@ -1737,7 +1737,7 @@ html.dark :is([style*="color:#475569" i],[style*="color: #475569" i],[style*="co
 html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*="background:#f8fafc" i],[style*="background: #f8fafc" i],[style*="background:#eff6ff" i],[style*="background:#f0fdf4" i],[style*="background: #f0fdf4" i],[style*="background:#fef2f2" i],[style*="background:#fffbeb" i],[style*="background: #fffbeb" i],[style*="background: rgb(255, 255, 255)"],[style*="background: rgb(248, 250, 252)"],[style*="background: rgb(255, 251, 235)"],[style*="background: rgb(240, 253, 244)"],[style*="background: rgb(254, 242, 242)"],[style*="background: rgb(239, 246, 255)"],[style*="background:#e2e8f0" i],[style*="background: rgb(226, 232, 240)"]):not([style^="color:"]):not([style*=";color:"]):not([style*=" color:"]):not(#p1Paper):not(.cv-sheet):not(.kf-paper):not(.kf-sheet):not(.p1-note):not(.p1-card){background:var(--soft)!important}
 </style>
 <!-- 제미나이 판 «모양 값»(대표 「한번에 모든 것 다해」 2026-11-21) — 자기 <style> «뒤»에 싣는다. body 의 pu-design 을 빼면 옛 모양 -->
-<link rel="stylesheet" href="css/pu-design.css?v=2">
+<link rel="stylesheet" href="css/pu-design.css?v=3">
 <script src="js/pu-hwp-engine.js?v=22"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -1748,13 +1748,13 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=111"></script>
+<script src="js/pu-ontology.js?v=114"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=7" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=8"></script>
-<script src="js/pu-version.js?v=12"></script>
+<script src="js/pu-version.js?v=13"></script>
 <script src="js/pu-rrn-seal.js?v=3"></script>
 <script src="js/pu-backup.js?v=3"></script>
 <script src="js/kcareer-scan.js?v=3"></script>
@@ -1789,7 +1789,7 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=12"></script>
 <script src="js/kcareer-sendq.js?v=2"></script>
-<script src="js/kcareer-mailreq.js?v=7"></script>
+<script src="js/kcareer-mailreq.js?v=8"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -1818,11 +1818,11 @@ html.dark :is([style*="background:#fff" i],[style*="background: #fff" i],[style*
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=55"></script>
+  <script src="js/pu-appbar.js?v=59"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=2"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=7"></script>
+  <script src="js/pu-authsync.js?v=8"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=4"></script>
   <script>

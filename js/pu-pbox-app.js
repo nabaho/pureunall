@@ -109,6 +109,8 @@
     readerKind: '',          // 'law' | 'doc'
     readerLawMode: 'single', // 'single' | '3dan'
     readerLaw: null,
+    readerLawError: '',
+    readerLawTarget: null,
     readerLawFamily: null,
     reader3Dan: null,        // { dir, title, loading, cols: [...] }
     readerHistoryOpen: false,
@@ -1852,6 +1854,8 @@
     state.readerLawMode = 'single';
     state.readerLawFamily = fam;
     state.readerLaw = null;
+    state.readerLawError = '';
+    state.readerLawTarget = { dir: dir, fileName: targetFile, highlightArt: highlightArt || '', opts: opts };
     state.reader3Dan = null;
     state.readerHistoryOpen = !!opts.openHistory;
     state.readerHistoryBusy = false;
@@ -1864,10 +1868,11 @@
     global.PuPBoxStore.fetchLaw(dir, targetFile).then(function (parsed) {
       if (state._readerReqSeq !== reqSeq) return;
       state.readerLaw = parsed;
+      var cleanRecentSub = targetFile.replace(/\.md$/, '').replace(/\([^)]*\)$/, '').trim() || '법률';
       global.PuPBoxStore.recordRecent({
         id: 'law:' + dir + '/' + targetFile,
         kind: 'law',
-        title: parsed.title + ' (' + targetFile.replace(/\.md$/, '') + ')',
+        title: parsed.title + ' (' + cleanRecentSub + ')',
         sub: parsed.effectiveState ? parsed.effectiveState.label : '국가법령',
         lawDir: dir,
         fileName: targetFile
@@ -1887,7 +1892,9 @@
       }
     }).catch(function (err) {
       if (state._readerReqSeq !== reqSeq) return;
-      toast('법령 원문을 불러오지 못했습니다: ' + err.message, 'err');
+      state.readerLawError = String((err && err.message) || err || '오프라인 또는 네트워크 오류로 법령 원문을 불러오지 못했습니다.');
+      renderReader();
+      toast('법령 원문을 불러오지 못했습니다: ' + state.readerLawError, 'err');
     });
   }
 
@@ -4355,6 +4362,32 @@
       var law = state.readerLaw;
       var fam = state.readerLawFamily;
       if (!law) {
+        if (state.readerLawError) {
+          var errLawTitle = (fam && fam.title) || (state.readerLawTarget && state.readerLawTarget.dir) || '국가법령';
+          var errOfficialUrl = 'https://www.law.go.kr/%EB%B2%95%EB%A0%B9/' + encodeURIComponent(errLawTitle);
+          rEl.innerHTML = [
+            '<div class="pbox-reader-hd">',
+            '  <div class="pbox-reader-titlewrap"><strong class="pbox-reader-title">' + esc(errLawTitle) + '</strong></div>',
+            '  <div class="pbox-btn-group">',
+            '    <button type="button" class="pbox-btn-sm" data-act="toggle-reader-collapse" title="큰 화면 접기">▶ 접기</button>',
+            '    <button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button>',
+            '  </div>',
+            '</div>',
+            '<div class="pbox-reader-bd">',
+            '  <div class="pbox-status-banner err" role="alert">',
+            '    <strong>⚠ 법령 원문을 불러오지 못했습니다</strong>',
+            '    <div style="margin-top:4px">' + esc(state.readerLawError) + '</div>',
+            '    <div style="margin-top:4px">오프라인 상태이거나 일시적인 네트워크 오류일 수 있습니다. 오프라인 보관된 법령은 인터넷 없이도 열람할 수 있습니다.</div>',
+            '  </div>',
+            '  <div class="pbox-btn-group" style="margin-top:12px">',
+            '    <button type="button" class="pbox-btn-primary" data-act="retry-open-law">🔄 다시 시도</button>',
+            '    <a class="pbox-btn-sm" href="' + esc(errOfficialUrl) + '" target="_blank" rel="noopener noreferrer">🏛️ 법제처 원문 열기 ↗</a>',
+            '    <button type="button" class="pbox-btn-sm" data-act="close-reader">닫기</button>',
+            '  </div>',
+            '</div>'
+          ].join('\n');
+          return;
+        }
         rEl.innerHTML = '<div class="pbox-reader-hd"><strong>📖 법령 원문 불러오는 중…</strong><div class="pbox-btn-group"><button type="button" class="pbox-btn-sm" data-act="toggle-reader-collapse" title="큰 화면 접기">▶ 접기</button><button type="button" class="pbox-icon-btn" data-act="close-reader" aria-label="리더 닫기">✕</button></div></div><div class="pbox-reader-bd"><div class="pbox-loading-line">국가법령 미러에서 조문 전체를 가져오고 있습니다…</div></div>';
         return;
       }
@@ -5492,6 +5525,10 @@
       if (inf && (!ev || ev.target !== inf)) inf.click();
     } else if (act === 'open-law') {
       openLawInReader(btn.getAttribute('data-dir'), btn.getAttribute('data-file') || '', btn.getAttribute('data-art') || '');
+    } else if (act === 'retry-open-law') {
+      if (state.readerLawTarget && state.readerLawTarget.dir) {
+        openLawInReader(state.readerLawTarget.dir, state.readerLawTarget.fileName, state.readerLawTarget.highlightArt, state.readerLawTarget.opts);
+      }
     } else if (act === 'open-law-3dan') {
       openLaw3DanInReader(btn.getAttribute('data-dir'));
     } else if (act === 'open-law-history') {
@@ -7199,6 +7236,8 @@
     state.lawQuery = '';
     state.lawHistoryLookupDate = '';
     state.readerCollapsed = false;
+    state.readerLawError = '';
+    state.readerLawTarget = null;
     state.readerLawMode = 'single';
     state.reader3Dan = null;
     state.readerHistoryOpen = false;

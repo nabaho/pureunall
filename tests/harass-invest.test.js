@@ -2416,7 +2416,7 @@ test('⑯ 조사 필수 공문·서식 4종 정식 한글(.hwpx) 생성 · 기�
     'caseCsvBtn', 'caseResetBtn', 'erpBatchBtn', 'imapScanBtn', 'newCaseBtn', 'reloadBtn', 'syncAllBtn',
     'inboxYrBar', 'inQ', 'inResetBtn', 'imapInboxBtn', 'importAllDeferBtn', 'mailStat', 'inboxBox',
     'yrKpiBox', 'yrPillsBar', 'yrQ', 'yrCat', 'yrPerf', 'yrKind', 'yrResetBtn', 'yrCsvBtn', 'yearlyBox',
-    'detailBox', 'reportBox',
+    'detailBox', 'reportBox', 'thFltPop',
   ].forEach(getEl);
 
   const docListeners = Object.create(null);
@@ -2543,6 +2543,22 @@ test('⑯ 조사 필수 공문·서식 4종 정식 한글(.hwpx) 생성 · 기�
   assert.ok(getEl('casesBox').innerHTML.includes('resetCaseFilter'), '빈 검색 결과 화면에도 조건 초기화 바로가기 단추가 제공된다');
   getEl('caseResetBtn').listeners.click[0]();
   assert.equal(getEl('caseQ').value, '', '초기화 단추 클릭 시 검색어가 비워지고 전체 목록이 복원된다');
+
+  /* 표 머리글(컬럼별) 정렬·다중 필터 팝오버 작동 및 빈 결과에서도 머리글 유지 검증 */
+  assert.ok(getEl('casesBox').innerHTML.includes('data-thflt="perfCat"') && getEl('casesBox').innerHTML.includes('data-thflt="mgr"'), '사건 현황 표 머리글에 컬럼별 정렬·필터 버튼(data-thflt)이 렌더링된다');
+  const thPerfBtn = { getAttribute: (n) => (n === 'data-thflt' ? 'perfCat' : ''), setAttribute() {}, getBoundingClientRect: () => ({ left: 120, bottom: 180, top: 150 }) };
+  await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-thflt]' ? thPerfBtn : null) }, stopPropagation() {} });
+  assert.equal(getEl('thFltPop').style.display, 'flex', '머리글 버튼 클릭 시 컬럼 정렬·필터 팝오버(#thFltPop)가 열린다');
+  assert.ok(getEl('thFltPop').innerHTML.includes('수행구분 · 유형 필터'), '클릭한 열에 맞는 다중 체크 필터 목록이 표시된다');
+  await docListeners.change[0]({ target: { checked: true, matches: (sel) => sel === '[data-thck]', getAttribute: (n) => (n === 'data-thck' ? 'cats:sexual' : '') } });
+  assert.ok(getEl('casesBox').innerHTML.includes('data-thflt="perfCat"') && getEl('casesBox').innerHTML.includes('조건에 맞는 조사 사건이 없습니다'), '컬럼 필터 결과가 0건이어도 표 머리글(thead)이 사라지지 않고 유지된다');
+  await docListeners.change[0]({ target: { checked: true, matches: (sel) => sel === '[data-thck]', getAttribute: (n) => (n === 'data-thck' ? 'cats:harass' : '') } });
+  assert.ok(getEl('casesBox').innerHTML.includes('(주)가상통합점검기업'), '다중 체크(성희롱+괴롭힘) 시 해당 사건이 즉시 필터링되어 표시된다');
+  const thSortBtn = { getAttribute: (n) => (n === 'data-thsort' ? 'company:asc' : '') };
+  await docListeners.click[0]({ target: { closest: (sel) => (sel === '[data-thsort]' ? thSortBtn : sel === '#thFltPop' ? getEl('thFltPop') : null) }, stopPropagation() {} });
+  assert.ok(getEl('casesBox').innerHTML.includes('↑') || getEl('casesBox').innerHTML.includes('●'), '컬럼 정렬·필터 적용 시 해당 머리글에 활성 표시가 나타난다');
+  getEl('caseResetBtn').listeners.click[0]();
+  assert.equal(getEl('thFltPop').style.display, 'none', '전체 초기화 시 컬럼 필터 팝오버가 닫히고 컬럼 조건도 모두 해제된다');
 
   /* 공문·서식(.hwpx) 발급 모달 실행 → 내려받기 + 공문함·8단계 자동 기록 검증 */
   const openDocBtn = { disabled: false, getAttribute: (n) => (n === 'data-act' ? 'openOfficialDoc' : n === 'data-id' ? 'hc-u1' : '') };
